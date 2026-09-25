@@ -24,14 +24,8 @@ from _surface_finish import MACHINED_UM, SEAT_UM
 def test_every_marked_model_dimension_has_one_view_and_native_precision() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    view_sets = (
-        set(drawing.PROFILE_KEEP),
-        set(drawing.FEATURE_KEEP),
-        set(drawing.NOTCH_KEEP),
-        set(drawing.SECTION_KEEP),
-        set(drawing.DETAIL_KEEP),
-        set(drawing.SLOT_SECTION_KEEP),
-    )
+    view_sets = tuple(set(keep) for keep in drawing.VIEW_KEEPS.values())
+    assert drawing.VIEW_KEEPS["lock notch cap detail"] is drawing.CAP_DETAIL_KEEP
     kept = set().union(*view_sets)
     assert kept == marked
     assert sum(len(names) for names in view_sets) == len(kept)
@@ -750,7 +744,7 @@ def test_the_33_00_tail_has_no_value_over_it() -> None:
     ink = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY)
     assert "CapEDia" not in ink.texts
     assert "CapEDia" not in drawing.NOTCH_KEEP
-    assert drawing.DIMENSION_OWNER["CapEDia"] == "profile plan"
+    assert drawing.DIMENSION_OWNER["CapEDia"] == "lock notch cap detail"
     assert not any("CapECx" in f for f in drawing.sheet_ink_collisions(ink))
 
 
@@ -789,13 +783,13 @@ _D382_PROFILE_INK = drawing.SheetInk(
 
 
 def _profile_with_cap_dia(text_xy: tuple[float, float]) -> drawing.SheetInk:
-    leader, arrow = drawing.cap_dia_ink(text_xy)
+    leader, near_tip, _far_tip = drawing.cap_dia_ink(text_xy)
     ink = _D382_PROFILE_INK
     return drawing.SheetInk(
         texts={**ink.texts, "CapEDia": drawing.cap_dia_glyphs(text_xy)},
         lines=ink.lines,
         arcs=ink.arcs,
-        arrows={**ink.arrows, "CapEDia": [arrow]},
+        arrows={**ink.arrows, "CapEDia": [(near_tip, near_tip)]},
         leaders={"CapEDia": leader},
     )
 
@@ -816,36 +810,22 @@ def test_the_profile_cap_is_where_the_seat_put_it() -> None:
         assert drawing.on_drawn_cap_arc(tip, notch_cap)
 
 
-def test_the_8_00_stands_east_of_the_profile_2_mm_off_its_neighbours() -> None:
-    """The value below the R5.0, its leader out through the notch mouth:
-    2 mm or more to every neighbour, the arrow on the drawn arc, the
-    diameter's near end (where a first arrow would land) in the mouth."""
-    text = drawing.PROFILE_KEEP["CapEDia"]
-    ink = _profile_with_cap_dia(text)
-    assert drawing.sheet_ink_collisions(ink) == []
-    leader, arrow = drawing.cap_dia_ink(text)
-    glyphs = ink.texts["CapEDia"]
-    r5_text = _D382_PROFILE_TEXTS["CornerSWR"]
-    (r5_arrow,) = ink.arrows["CornerSWR"]
-    gaps = {
-        "R5.0 arrow to the leader": min(
-            _drawing_leaders.distance_to_point(s, r5_arrow[0]) for s in leader
-        ) - drawing.NOTCH_ANGLE_ARROW_HALF_WIDTH,
-        "R5.0 leader to the glyphs": min(
-            _drawing_leaders.distance_to_box(s, glyphs) for s in ink.lines["CornerSWR"]
-        ),
-        "R5.0 text to the glyphs": _box_gap(r5_text, glyphs),
-        "R5.0 text to the leader": min(_drawing_leaders.distance_to_box(s, r5_text) for s in leader),
-        "37.0 witness to the glyphs": _drawing_leaders.distance_to_box(
-            ink.lines["SouthWestX"][0], glyphs
-        ),
-    }
-    gaps["37.0 text to the glyphs"] = _box_gap(_D382_PROFILE_TEXTS["SouthWestX"], glyphs)
-    assert min(gaps.values()) >= 0.0022, gaps
-    assert drawing.on_drawn_cap_arc(arrow[0])
-    cap = drawing.PROFILE_CAP_XY
-    near = (2.0 * cap[0] - arrow[0][0], 2.0 * cap[1] - arrow[0][1])
+# tipslot-r5-7630 (C:/src/dt-logs/spring/tipslot-r5-7630-leaf.log:221): the
+# Ø8.00 east of the profile at (0.1149, 0.2417), SetSecondArrow on.  The far
+# arrow stood on the drawn arc; the first stayed at the diameter's near end,
+# out in the notch mouth -- SetSecondArrow adds an arrow, it moves none.
+_R5_7630_PROFILE_TIPS = ((0.08630467, 0.24076592), (0.09028448, 0.24036455))
+
+
+def test_the_profile_placement_left_its_first_arrow_in_the_mouth() -> None:
+    """Planted from the seat: the hard tip gate names the near arrow, and the
+    model put both ends within 0.05 mm of where the seat drew them."""
+    far, near = _R5_7630_PROFILE_TIPS
+    assert drawing.on_drawn_cap_arc(far)
     assert not drawing.on_drawn_cap_arc(near)
+    _leader, near_model, far_model = drawing.cap_dia_ink((0.1149, 0.2417))
+    assert math.dist(near_model, near) < 0.00005
+    assert math.dist(far_model, far) < 0.00005
 
 
 def test_an_8_00_leader_up_the_drawn_side_crosses_the_37_0() -> None:
@@ -854,6 +834,84 @@ def test_an_8_00_leader_up_the_drawn_side_crosses_the_37_0() -> None:
     line and runs within 2 mm of its witness."""
     findings = drawing.sheet_ink_collisions(_profile_with_cap_dia((0.098, 0.2590)))
     assert "leader-on-ink: CapEDia's leader crosses SouthWestX lines" in findings
+
+
+# The fields detail D shares, as d382/fix4b printed them: the isometric's
+# padded view box with ISO_CENTER (_iso_view_box), the 205.81's upper
+# witness end (x 0.3283 at the cap's y), the zone frame (d382 dump:
+# [12.7, 12.7]..[419.1, 266.7] mm), detail B's label box size (31.5 x
+# 16.4 mm, :512), and on the hole-location plan the 2X Ø5.11 callout's
+# shoulder (y 0.2524, x 0.1702..0.2282, :393) and the 189.26's hole witness
+# (y 0.2323, x 0.1869..0.2260, :360).
+_ZONE_FRAME = (0.0127, 0.0127, 0.4191, 0.2667)
+_D382_205_81_WITNESS_END = (0.3283, 0.24057)
+_DETAIL_LABEL_SIZE = (0.0315, 0.0164)
+_D382_RD2_SHOULDER = ((0.1702, 0.2524), (0.2282, 0.2524))
+_D382_189_26_HOLE_WITNESS = ((0.1869, 0.2323), (0.2260, 0.2323))
+
+
+def _cap_detail_outline() -> tuple[float, float, float, float]:
+    half = drawing.CAP_DETAIL_SHEET_RADIUS + drawing.DETAIL_OUTLINE_PAD
+    cx, cy = drawing.CAP_DETAIL_CENTER
+    return (cx - half, cy - half, cx + half, cy + half)
+
+
+def test_detail_d_fits_the_field_over_the_isometric() -> None:
+    """Outline inside the zone frame, the circle over the isometric's box
+    and 2 mm off the 205.81, the label right of the outline inside the
+    border, all clear of each other."""
+    outline = _cap_detail_outline()
+    assert outline[3] <= _ZONE_FRAME[3]
+    cx, cy = drawing.CAP_DETAIL_CENTER
+    radius = drawing.CAP_DETAIL_SHEET_RADIUS
+    assert cy - radius > _iso_view_box()[3]
+    assert math.dist((cx, cy), _D382_205_81_WITNESS_END) - radius >= 0.002
+    lower_left = drawing.CAP_DETAIL_LABEL_LOWER_LEFT
+    label = (*lower_left, lower_left[0] + _DETAIL_LABEL_SIZE[0], lower_left[1] + _DETAIL_LABEL_SIZE[1])
+    assert label[0] - outline[2] >= 0.0012  # detail B's own gap (47.9 -> 49.1)
+    assert _ZONE_FRAME[2] - label[2] >= 0.002
+    assert label[1] - _iso_view_box()[3] >= 0.002
+
+
+def test_detail_d_circle_on_the_hole_location_plan_clears_its_neighbours() -> None:
+    cap = drawing.plan_xy(drawing.FEATURE_CENTER, part.SLOT_E_X, part.SLOT_E_Z)
+    assert cap == pytest.approx((0.19325, 0.24057), abs=5e-5)
+    radius = drawing.CAP_DETAIL_RADIUS_MM * drawing.PLAN_SCALE
+    for stroke in (_D382_RD2_SHOULDER, _D382_189_26_HOLE_WITNESS):
+        assert _drawing_leaders.distance_to_point(stroke, cap) - radius >= 0.004
+
+
+def test_the_8_00_in_detail_d_lands_its_arrow_on_the_drawn_arc() -> None:
+    """The leader leaves the cap on its drawn side: the first arrow (the
+    near end) is on the arc, the far end across the mouth -- why the second
+    arrow is switched off -- and the value stands off the circle and the
+    border."""
+    text = drawing.CAP_DETAIL_KEEP["CapEDia"]
+    cap = drawing.CAP_DETAIL_CENTER
+    radius = drawing.CAP_DETAIL_ARC_RADIUS
+    leader, near_tip, far_tip = drawing.cap_dia_ink(text, cap, radius)
+    assert drawing.on_drawn_cap_arc(near_tip, cap, radius)
+    assert not drawing.on_drawn_cap_arc(far_tip, cap, radius)
+    glyphs = drawing.cap_dia_glyphs(text)
+    circle = drawing.CAP_DETAIL_SHEET_RADIUS
+    assert _drawing_leaders.distance_to_point(((glyphs[0], glyphs[1]), (glyphs[2], glyphs[1])), cap) - circle >= 0.002
+    assert _drawing_leaders.distance_to_point(((glyphs[2], glyphs[1]), (glyphs[2], glyphs[3])), cap) - circle >= 0.002
+    assert _ZONE_FRAME[3] - glyphs[3] >= 0.004
+    # The shoulder stays clear of the 205.81's upper witness.
+    shoulder = leader[1]
+    assert _drawing_leaders.distance_to_point(shoulder, _D382_205_81_WITNESS_END) >= 0.010
+
+
+def test_the_build_wires_detail_d() -> None:
+    import inspect
+
+    build = inspect.getsource(drawing.build)
+    assert 'detail_label="D"' in build
+    assert "_pin_cap_dia_arrow(adapter, cap_detail_annotations)" in build
+    assert build.index("keep=NOTCH_KEEP") < build.index("keep=CAP_DETAIL_KEEP")
+    pin = inspect.getsource(drawing._pin_cap_dia_arrow)
+    assert "SetSecondArrow(False, False)" in pin
+    assert "on_drawn_cap_arc(tip, CAP_DETAIL_CENTER, CAP_DETAIL_ARC_RADIUS)" in pin
 
 
 def test_the_arc_tail_crossing_the_205_81_witness_is_named_and_far_from_the_value() -> None:

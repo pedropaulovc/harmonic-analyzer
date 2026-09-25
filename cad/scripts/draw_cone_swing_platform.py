@@ -151,17 +151,6 @@ PROFILE_KEEP = {
     "CornerNWR": (0.135, 0.118),
     "CornerSWR": (0.110, 0.249),
     "CornerSER": (0.040, 0.2435),
-    # The lock-notch cap's size prints here, not on the notch plan: there
-    # the 33.00 and 205.81 witnesses both start ~1 mm off the cap centre,
-    # inside the arc, and a diameter leader runs through that centre, so
-    # every direction passed within 1.05 mm of both (MHA-091 item 3; the
-    # sweep test).  Here the value stands east of the plate, below the R5.0,
-    # its leader out through the notch mouth along the slot; the far-side
-    # arrow on the drawn arc is pinned in code (_pin_cap_dia_far_arrow).
-    # Every direction whose near end is on the drawn half crosses the
-    # 37.0 / 24.0 lines or the x 71.8 pivot witness, or passes 1.35 mm from
-    # the 37.0 witness.
-    "CapEDia": (0.1149, 0.2417),
 }
 FEATURE_KEEP = {
     # Short lines (12 characters, ~34 mm at most) between the 195.09 line
@@ -301,6 +290,39 @@ _DETAIL_S = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 # captions (80.5) and 2.1 short of the note.
 DETAIL_CENTER = (0.0835, 0.045)
 DETAIL_OUTLINE_PAD = 0.0104
+# DETAIL D: the lock-notch cap at 2:1, for its size alone (MHA-091 item 3).
+# On the notch plan the 33.00 and 205.81 witnesses both start ~1 mm off the
+# cap centre, inside the arc, and a diameter leader runs the full diameter
+# through that centre: every direction passes within 1.05 mm of both (the
+# sweep test).  On the profile the only leader direction clear of the 37.0,
+# 24.0 and pivot witness left the diameter's near end -- where SolidWorks
+# puts the first arrow -- in the open notch mouth (tipslot-r5-7630: tip at
+# (90.28, 240.36) mm; SetSecondArrow only ADDS the far one).  The detail
+# carries no location witness, so the leader can leave the drawn side.
+# Circled on the hole-location plan (cap at (193.25, 240.57) mm, its 3 mm
+# circle 8.8 mm under the 2X Ø5.11 shoulder and 5.3 over the 189.26's
+# witness), drawn in the open field over the isometric: the outline (circle
+# + DETAIL_OUTLINE_PAD) tops out at 266.4 mm, the circle's foot 1.3 mm over
+# the isometric's padded box (pictorial: the audit does not collide it; its
+# part stands ~20 mm lower here).
+CAP_DETAIL_SCALE = (2, 1)
+_CAP_DETAIL_S = CAP_DETAIL_SCALE[0] / CAP_DETAIL_SCALE[1] / 1000.0
+CAP_DETAIL_RADIUS_MM = 6.0
+CAP_DETAIL_CENTER = (0.357, 0.244)
+CAP_DETAIL_SHEET_RADIUS = CAP_DETAIL_RADIUS_MM * _CAP_DETAIL_S
+CAP_DETAIL_ARC_RADIUS = _part.SLOT_W / 2.0 * _CAP_DETAIL_S
+CAP_DETAIL_KEEP = {
+    # Up and left of the circle: the leader leaves the cap on its drawn
+    # (closed) side at ~130 deg, so the first arrow lands on the arc; the
+    # glyph top stays 5 mm under the border.
+    "CapEDia": (0.338, 0.2595),
+}
+# "DETAIL D / SCALE 2 : 1", right of the outline: detail B's label box is
+# 31.5 x 16.4 mm (d382 INote.GetExtent), so it ends ~8.6 mm inside the border.
+CAP_DETAIL_LABEL_LOWER_LEFT = (
+    CAP_DETAIL_CENTER[0] + CAP_DETAIL_SHEET_RADIUS + DETAIL_OUTLINE_PAD + 0.0016,
+    0.236,
+)
 DETAIL_SHEET_RADIUS = DETAIL_RADIUS_MM * _DETAIL_S
 _SLOT_Y = DETAIL_CENTER[1] + (DETAIL_MODEL_Z - TIP_SCREW_LOCAL_Z) * _DETAIL_S
 # Between its extension lines a vertical dimension's text is CENTRED on its
@@ -463,6 +485,7 @@ VIEW_KEEPS: dict[str, dict[str, tuple[float, float]]] = {
     "notch plan": NOTCH_KEEP,
     "pivot section": SECTION_KEEP,
     "tip screw slot detail": DETAIL_KEEP,
+    "lock notch cap detail": CAP_DETAIL_KEEP,
     "tip screw slot section": SLOT_SECTION_KEEP,
 }
 DIMENSION_OWNER: dict[str, str] = {
@@ -836,28 +859,33 @@ def cap_dia_glyphs(text_xy: tuple[float, float]) -> _drawing_leaders.Box:
 
 
 def cap_dia_ink(
-    text_xy: tuple[float, float], cap_xy: tuple[float, float] = PROFILE_CAP_XY
-) -> tuple[list[_drawing_leaders.Segment], _drawing_leaders.Segment]:
-    """The Ø8.00's leader, predicted: from the arc through the cap centre to
-    the shoulder's near end, then the shoulder under the value; and the far
-    arrow, tip on the arc where the leader enters it, head along the leader."""
+    text_xy: tuple[float, float],
+    cap_xy: tuple[float, float] = PROFILE_CAP_XY,
+    radius: float = CAP_ARC_RADIUS,
+) -> tuple[list[_drawing_leaders.Segment], tuple[float, float], tuple[float, float]]:
+    """The Ø8.00's leader, predicted: across the diameter through the cap
+    centre to the shoulder's end nearer the cap, then the shoulder under the
+    value; with the diameter's near end (toward the text, where SolidWorks
+    puts the first arrow) and its far end (the second arrow's)."""
     shoulder_y = text_xy[1] - CAP_E_DIA_SHOULDER_DROP
     ends = [(text_xy[0] + dx, shoulder_y) for dx in CAP_E_DIA_SHOULDER]
     knee, far = sorted(ends, key=lambda end: math.dist(end, cap_xy))
     length = math.dist(knee, cap_xy)
     ux, uy = (knee[0] - cap_xy[0]) / length, (knee[1] - cap_xy[1]) / length
-    root = (cap_xy[0] - CAP_ARC_RADIUS * ux, cap_xy[1] - CAP_ARC_RADIUS * uy)
-    head = (root[0] + NOTCH_ANGLE_ARROW_LENGTH * ux, root[1] + NOTCH_ANGLE_ARROW_LENGTH * uy)
-    return [(root, knee), (knee, far)], (root, head)
+    near_tip = (cap_xy[0] + radius * ux, cap_xy[1] + radius * uy)
+    far_tip = (cap_xy[0] - radius * ux, cap_xy[1] - radius * uy)
+    return [(far_tip, knee), (knee, far)], near_tip, far_tip
 
 
 def on_drawn_cap_arc(
-    tip: tuple[float, float], cap_xy: tuple[float, float] = PROFILE_CAP_XY
+    tip: tuple[float, float],
+    cap_xy: tuple[float, float] = PROFILE_CAP_XY,
+    radius: float = CAP_ARC_RADIUS,
 ) -> bool:
     """Whether an arrow tip lies on the drawn half of the cap circle, not
     out in the notch mouth."""
     dx, dy = tip[0] - cap_xy[0], tip[1] - cap_xy[1]
-    if abs(math.hypot(dx, dy) - CAP_ARC_RADIUS) > CAP_ARC_TIP_TOLERANCE:
+    if abs(math.hypot(dx, dy) - radius) > CAP_ARC_TIP_TOLERANCE:
         return False
     return dx * CAP_MOUTH_AXIS[0] + dy * CAP_MOUTH_AXIS[1] <= CAP_ARC_TIP_TOLERANCE
 
@@ -1108,22 +1136,25 @@ def arrowhead_styles(display: Any) -> tuple[int, int]:
     return int(first), int(second)
 
 
-def _pin_cap_dia_far_arrow(adapter: Any, annotations: list[Any]) -> None:
-    """Put the Ø8.00's arrow on the drawn arc and audit its ink on the seat.
+def _pin_cap_dia_arrow(adapter: Any, annotations: list[Any]) -> None:
+    """Pin the Ø8.00's single arrow onto the drawn cap arc in detail D.
 
-    The value stands east of the cap, so the leader's near end falls in the
-    open notch mouth.  SetSecondArrow enables the diameter's "second outside
-    arrow ... on the opposite side of the arc from the dimension text" -- the
-    drawn, closed end.  Arrows outside, read back; then every arrowhead the
-    dimension draws must stand on the drawn arc (a head in the mouth points
-    at nothing), and its leader and glyphs keep 2 mm off every other profile
-    dimension's lines, arcs and arrows."""
+    The leader leaves the cap on its drawn (closed) side, so the first arrow
+    -- at the diameter's end toward the text -- lands on the arc.  The far
+    end lies across the open mouth, so the diameter's "second outside arrow
+    ... on the opposite side of the arc from the dimension text"
+    (SetSecondArrow) is switched OFF explicitly, not left to the document.
+    Arrows outside, both read back; then every arrowhead tip must stand on
+    the drawn arc (tipslot-r5-7630: on the profile the first arrow landed in
+    the mouth, (90.28, 240.36) mm)."""
     by_name = {dimension_name(adapter, item): _early_bound(item, "IAnnotation") for item in annotations}
+    if set(by_name) != {"CapEDia"}:
+        raise RuntimeError(f"lock notch cap detail carries {sorted(by_name)}, expected ['CapEDia']")
     annotation = by_name["CapEDia"]
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     display.ArrowSide = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
-    display.SetSecondArrow(False, True)
-    rebuild_drawing(adapter, label="lock notch diameter far arrow")
+    display.SetSecondArrow(False, False)
+    rebuild_drawing(adapter, label="lock notch diameter arrow")
     state = (
         int(display.ArrowSide),
         bool(display.GetUseDocSecondArrow()),
@@ -1139,46 +1170,37 @@ def _pin_cap_dia_far_arrow(adapter: Any, annotations: list[Any]) -> None:
         if len(values) < 2:
             raise RuntimeError(f"CapEDia arrowhead {index} is unreadable: {values}")
         tips.append((values[0], values[1]))
-    others = [name for name in by_name if name != "CapEDia"]
-    ink = SheetInk(
-        texts={"CapEDia": cap_dia_glyphs(position)},
-        lines={name: _notch_strokes(by_name[name]) for name in others},
-        arcs={name: _arc_chords(by_name[name]) for name in others},
-        arrows={name: _arrow_segments(by_name[name]) for name in by_name},
-        leaders={"CapEDia": strokes},
-    )
-    findings = sheet_ink_collisions(ink)
-    glyphs = ink.texts["CapEDia"]
-    for name in others:
-        for kind, segments in (
-            ("line", ink.lines[name]),
-            ("arc", ink.arcs[name]),
-            ("arrow", ink.arrows[name]),
-        ):
-            gap = min(
-                (_drawing_leaders.distance_to_box(s, glyphs) for s in segments), default=math.inf
-            )
-            if gap < LEADER_INK_CLEARANCE:
-                findings.append(
-                    f"text-near-ink: {name}'s {kind} {gap * 1000.0:.2f} mm from 'CapEDia'"
-                )
-    off_arc = [tip for tip in tips if not on_drawn_cap_arc(tip)]
+    off_arc = [
+        tip
+        for tip in tips
+        if not on_drawn_cap_arc(tip, CAP_DETAIL_CENTER, CAP_DETAIL_ARC_RADIUS)
+    ]
+    glyphs = cap_dia_glyphs(position)
+    circle_gap = math.dist(
+        CAP_DETAIL_CENTER,
+        (
+            min(max(CAP_DETAIL_CENTER[0], glyphs[0]), glyphs[2]),
+            min(max(CAP_DETAIL_CENTER[1], glyphs[1]), glyphs[3]),
+        ),
+    ) - CAP_DETAIL_SHEET_RADIUS
     _telemetry.info(
-        f"CapEDia on the profile: text={position} arrow_side/use_doc_second/second={state} "
+        f"CapEDia in detail D: text={position} arrow_side/use_doc_second/second={state} "
         f"arrowhead_styles={styles} tips={tips} off_arc={off_arc} strokes={strokes} "
-        f"arrows={ink.arrows['CapEDia']} findings={findings}"
+        f"glyphs_outside_circle_m={circle_gap:.5f}"
     )
-    if state != (1, False, True):
-        raise RuntimeError(f"CapEDia did not keep outside arrows with its second arrow: {state}")
-    if math.dist(position, PROFILE_KEEP["CapEDia"]) > 0.0005:
-        raise RuntimeError(f"CapEDia text at {position}, not {PROFILE_KEEP['CapEDia']}")
-    if not tips or off_arc:
+    if state != (1, False, False):
+        raise RuntimeError(f"CapEDia did not keep one outside arrow: {state}")
+    if math.dist(position, CAP_DETAIL_KEEP["CapEDia"]) > 0.0005:
+        raise RuntimeError(f"CapEDia text at {position}, not {CAP_DETAIL_KEEP['CapEDia']}")
+    if len(tips) != 1 or off_arc:
         raise RuntimeError(
-            "CapEDia draws an arrowhead off the drawn cap arc (in the notch mouth): "
-            f"tips={tips}, off the arc={off_arc}"
+            f"CapEDia must draw one arrowhead, on the drawn cap arc: tips={tips}, "
+            f"off the arc={off_arc}"
         )
-    if findings:
-        raise RuntimeError("CapEDia ink collides on the profile: " + "; ".join(findings))
+    if circle_gap < LEADER_INK_CLEARANCE:
+        raise RuntimeError(
+            f"CapEDia glyphs stand {circle_gap * 1000.0:.2f} mm off detail D's circle"
+        )
 
 
 def _assert_notch_captions_clear(
@@ -2186,6 +2208,17 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Hidden edges dashed, so the underside counterbored slot reads.
     set_hidden_lines_visible(adapter, detail)
+    cap_detail = _create_detail_view(
+        adapter,
+        feature,
+        model_center_mm=(_part.SLOT_E_X, PLATE_THICKNESS, _part.SLOT_E_Z),
+        radius_mm=CAP_DETAIL_RADIUS_MM,
+        view_xy=CAP_DETAIL_CENTER,
+        detail_label="D",
+        scale=CAP_DETAIL_SCALE,
+        label="lock notch cap detail",
+    )
+    set_hidden_lines_removed(adapter, cap_detail)
     profile_pivot = model_point_in_view(
         adapter, profile, (0.0, PLATE_THICKNESS / 1000.0, 0.0), label="profile pivot"
     )
@@ -2224,7 +2257,6 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _hide_profile_cosmetic_threads(adapter, profile)
-    _pin_cap_dia_far_arrow(adapter, profile_annotations)
     feature_annotations = curate_view_dimensions(
         adapter,
         feature,
@@ -2284,6 +2316,17 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _set_arrows_inside(adapter, detail_annotations, DETAIL_ARROWS_INSIDE)
+    # After the notch plan: its import of the cap sketch brings CapEDia too
+    # and deletes it, so this import finds it free (NorthEdgeZ and detail
+    # B's TipSlot* split the same way).
+    cap_detail_annotations = curate_view_dimensions(
+        adapter,
+        cap_detail,
+        keep=CAP_DETAIL_KEEP,
+        view_label="lock notch cap detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    _pin_cap_dia_arrow(adapter, cap_detail_annotations)
     # U41: the thickness is the stock's, a reference with no band.
     thickness_annotations = [
         item for item in section_annotations
@@ -2320,6 +2363,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *notch_annotations,
         *section_annotations,
         *detail_annotations,
+        *cap_detail_annotations,
         *slot_section_annotations,
     ]
     if not auto_center_marks(adapter, feature, holes=True, size=0.0025):
@@ -2390,7 +2434,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
 
     # Annotation insertion can invalidate the exported display geometry.
-    for view in (profile, feature, notch, section, slot_section, iso):
+    for view in (profile, feature, notch, section, slot_section, iso, cap_detail):
         set_hidden_lines_removed(adapter, view)
     # Re-assert after the dimensions attach: the shared helper passes through
     # HLR, so the dashed edge set is regenerated, not a same-mode no-op.
@@ -2408,6 +2452,12 @@ async def build(adapter: Any) -> dict[str, str]:
         slot_section,
         SLOT_SECTION_LABEL_LOWER_LEFT,
         label="section C-C label",
+    )
+    _position_view_label(
+        adapter,
+        cap_detail,
+        CAP_DETAIL_LABEL_LOWER_LEFT,
+        label="detail D label",
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if (str(relief_reference.GetText(1)), str(relief_reference.GetText(2))) != ("(", ")"):
@@ -2444,6 +2494,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "isometric": iso,
             "pivot section": section,
             "tip screw slot detail": detail,
+            "lock notch cap detail": cap_detail,
             "tip screw slot section": slot_section,
         },
     )
