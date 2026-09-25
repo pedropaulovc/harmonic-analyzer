@@ -178,9 +178,14 @@ def test_follower_seat_station_is_printed_from_face_a_with_a_rule_12_web() -> No
         '_tolerance_at_dimension_places(adapter, "PinSeatProfile", "PinSeatCz")'
         in build_source
     )
-    assert drawing.LEFT_KEEP["PinSeatCz"][0] < drawing.LEFT_CENTER[0] - (
+    # Both through-thickness stations print left of face A with their arrows
+    # inside the span: centred, the cross hole's threw its right arrow outside,
+    # into the THRU callout's leader (pc-rc eye pass, nit D).
+    face_a = drawing.LEFT_CENTER[0] - (
         pinion_bracket_geometry.THICKNESS * drawing.SHEET_SCALE[0] / 2000.0
     )
+    for name in ("PinSeatCz", "CrossHoleCz"):
+        assert drawing.LEFT_KEEP[name][0] < face_a, name
 
 
 def _segment_distance(
