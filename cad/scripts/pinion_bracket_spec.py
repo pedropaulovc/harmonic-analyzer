@@ -70,17 +70,10 @@ PIN_SEAT_DIA_BAND = REAM_H7
 # functional band (pinion_strap_pin_spec).
 CROSS_HOLE_DIA = _strap_pin.HOLE_DIA
 CROSS_HOLE_BAND = _strap_pin.HOLE_BAND
-CROSS_HOLE_CALLOUT = "\n".join(
-    (
-        "THRU",
-        "SUPPLY 1/16 X 1/2 SLOTTED SPRING",
-        "PIN (ASME B18.8.2) LOOSE",
-    )
-)
-if "SUPPLY " + _strap_pin.PIN_SUPPLY + " LOOSE" != " ".join(
-    CROSS_HOLE_CALLOUT.splitlines()[1:]
-):
-    raise AssertionError("cross-hole callout drifted from the pin spec")
+# The pin is its own BOM line (MHA-145, 2 used), so the callout names it
+# instead of supplying one loose with each strap; test_pinion_bracket_drawing
+# keeps the number in step with the parts registry.
+CROSS_HOLE_CALLOUT = "THRU\nFOR MHA-145 SPRING PIN"
 
 # Rule 12 (#842, U27; audit W23) worst-case web from the blind seat to a broad
 # face.  Codex #858 P2, user ruling (a) (2026-09-25): the seat's station is

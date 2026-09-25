@@ -1,0 +1,12 @@
+pinion-strap-pin:
+  title: Pinion Strap Spring Pin
+  number: MHA-145
+  stock_name: 1050-1095 Spring Steel Slotted Spring Pin
+  supplier: McMaster-Carr
+  supplier_skus: [98296A027]
+  material: Plain Carbon Steel
+  material_specification: 1050-1095 spring steel, McMaster-Carr 98296A027
+  finish: plain; no coating
+  quantity: 2
+  tolerance_class: machined_block
+  process: purchased

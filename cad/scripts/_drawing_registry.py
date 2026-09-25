@@ -651,6 +651,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="pinion_strap_pin",
+        part="pinion_strap_pin",
+        artifact_stem="pinion-strap-pin",
+        script_name="draw_pinion_strap_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="frame_side_screw",
         part="frame_side_screw",
         artifact_stem="frame-side-screw",

@@ -618,6 +618,106 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     assert math.isclose(pin.SHAFT_LIGAMENT_QUARTER, 2.091, abs_tol=5e-4)
 
 
+def test_mha145_strap_pins_sit_in_both_strap_cross_holes() -> None:
+    # Codex #858 P2: the two E-a set pins are components, not only a mated
+    # tie.  BDT inserts MHA-145 once per strap (front first), each centred in
+    # its strap's cross hole -- the strap's local X line at CrossHoleCz =
+    # StrapThickness / 2 through the pivot-bore axis -- with the strap's rows,
+    # and locks it to that strap, so it joins the freed pinion swing family.
+    # Codex #858 P1: each pin is also coaxial with its MHA-062 hole, because
+    # the saved pose is the fit-up stack the holes are match-drilled in.
+    import inspect
+
+    from _assembly import allowed_free_stems
+    from pinion_bracket_geometry import THICKNESS
+    from pinion_pivot_shaft_spec import PIN_HOLE_Z
+
+    source = inspect.getsource(drive)
+    assert source.count('"pinion-strap-pin"') == 1
+    assert 'zip(("front", "back"), STRAP_PIN_Z, strict=True)' in source
+    assert 'named_ref(f"Front Plane@{strap_pins[tag]}", "PLANE")' in source
+    assert 'label=f"strap pin {tag} locked to its strap"' in source
+    assert len(drive.STRAP_PIN_Z) == 2
+    strap_rows = drive.compose_rows(
+        drive.ROT_Y_180, drive.rot_z_rows(drive.STRAP_LEAN_DEG)
+    )
+    strap_origin_z = (drive.RIG.STRAP_Z_INNER[0], drive.RIG.STRAP_Z_OUTER[1])
+    for z0, z_pin in zip(strap_origin_z, drive.STRAP_PIN_Z, strict=True):
+        hole = _world(
+            [drive.PIVOT_X, drive.PIVOT_Y, z0], strap_rows, [0.0, 0.0, THICKNESS / 2.0]
+        )
+        pin_point = [drive.PIVOT_X, drive.PIVOT_Y, z_pin]
+        assert all(math.isclose(a, b, abs_tol=1e-9) for a, b in zip(hole, pin_point))
+    shaft_holes = [
+        _world(
+            [drive.PIVOT_X, drive.PIVOT_Y, drive.PIVOT_SHAFT_Z0],
+            drive.TORQUE_SHAFT_ROWS,
+            [0.0, 0.0, z],
+        )[2]
+        for z in PIN_HOLE_Z
+    ]
+    for z_hole, z_pin in zip(shaft_holes, drive.STRAP_PIN_Z, strict=True):
+        assert math.isclose(z_hole, z_pin, abs_tol=1e-9)
+    assert "pinion-strap-pin" in allowed_free_stems("drive-train")
+
+
+def test_mha145_is_mcmaster_98296a027_and_a_purchased_bom_line() -> None:
+    # Main: MHA-145 carries a real SKU like its purchased siblings.  The part
+    # is the stock 98296A027 recipe (1/16 x 1/2, 0.012 in wall, as installed)
+    # at the nominal length; the spec proves the longest pin the band allows
+    # is still buried (PIN_BURIED_MARGIN).  The registry row is the
+    # drive-train BOM line, qty 2.
+    import inspect
+
+    import _config
+    import build_pinion_strap_pin as part
+    import pinion_strap_pin_spec as pin
+    from _buildgraph import part_stems, references_of
+    from _drawing_registry import DRAWINGS_BY_NAME
+    from _fastener_catalog import FASTENERS
+    from _stock_fastener import STOCK_RECIPES
+    from diagnostics import diag_build_98296A027 as recipe
+
+    assert part.SPEC is FASTENERS["pinion-strap-pin"]
+    assert part.SPEC.skus == ("98296A027",)
+    source = inspect.getsource(part)
+    assert 'sku="98296A027"' in source and "author=build_98296A027" in source
+    assert STOCK_RECIPES["98296A027"].module == "diagnostics.diag_build_98296A027"
+    assert (recipe.PIN_OD, recipe.PIN_LEN) == (pin.PIN_DIA, pin.PIN_LEN)
+    assert math.isclose(pin.WALL_T, 0.012 * 25.4)
+    assert math.isclose(recipe.PIN_ID, pin.PIN_DIA - 2.0 * pin.WALL_T)
+    assert pin.PIN_LEN + pin.PIN_LEN_BAND <= pin.STRAP_FOOT_MIN_WIDTH
+    row = _config.parts("pinion-strap-pin")
+    assert row["number"] == "MHA-145"
+    assert int(row["quantity"]) == 2
+    assert row["process"] == "purchased"
+    assert tuple(row["supplier_skus"]) == ("98296A027",)
+    assert row["stock_name"] == part.SPEC.stock_name
+    assert DRAWINGS_BY_NAME["pinion_strap_pin"].script_name == (
+        "draw_pinion_strap_pin.py"
+    )
+    assert "pinion_strap_pin" in part_stems()
+    assert "pinion_strap_pin" in references_of("drive_train")
+
+
+def test_mha145_pins_carry_no_interference_exemption() -> None:
+    # Codex #858 P1: a straight pin cannot pass offset holes, so the gate must
+    # never whitelist pin material inside the shaft.  Pin, strap hole and
+    # shaft hole are the one 1/16 drill on one axis: line-to-line contact,
+    # which the gate does not count.  The contracts therefore carry no strap
+    # pin row and read neither the rig layout nor the pin spec.
+    import inspect
+
+    import _interference_contracts as ic
+
+    pairs = ic.allowed_interference_pairs("drive-train")
+    assert not [p for p in pairs if any(n.startswith("pinion-strap-pin") for n in p)]
+    assert not [p for p in pairs if any(n.startswith("pinion-bracket") for n in p)]
+    source = inspect.getsource(ic)
+    for module in ("pinion_rig_layout", "pinion_strap_pin_spec"):
+        assert module not in source, module
+
+
 def test_torque_shaft_is_phased_to_the_straps_and_swings_with_them() -> None:
     # Option E-a: the shaft's pin-hole axis (local X) lies along the straps'
     # cross holes at the park lean, and verify:soundness admits the shaft into
