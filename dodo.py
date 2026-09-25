@@ -1069,7 +1069,7 @@ REPORTS = CAD_OUT / "reports"
 LOGS = CAD_OUT / "logs"
 # Forensic artefacts a failing COM build step leaves behind: the saved copy of
 # the failing document, the BMP of the seat and capture.json
-# (``_common.capture_com_failure`` / ``OUT_FAILURES``). A farm worker's
+# (``_seat_forensics.capture_com_failure`` / ``OUT_FAILURES``). A farm worker's
 # workspace is DISPOSABLE, so the doit parent enumerates them on every failure
 # path: the manifest goes to the process the pool captures into the leaf's
 # ``task.log``, which is the one channel that always reaches the submitter.
@@ -1176,7 +1176,7 @@ def _fail_task(label: str, rc: int, *, started: float) -> None:
 
     Only the EMISSIONS are suppressed, never the manifest arithmetic around
     them: a ``NameError`` or a bad f-string here must stay loud, or this path
-    becomes undebuggable. Same split as ``_common.capture_com_failure``, which
+    becomes undebuggable. Same split as ``_seat_forensics.capture_com_failure``, which
     wraps its final ERROR record and nothing else.
 
     A failure that captured NOTHING says so on its own line. Most failures
@@ -1308,6 +1308,7 @@ _CHECK_NAMES = (
     "freshness",
     "flagonly",
     "partiso",
+    "inert",
     "budget",
 )
 # Offline checks that are OPT-IN only (runnable via `doit check:<name>` but NOT
@@ -2832,7 +2833,7 @@ def task_check():
         # COM failure forensics: a null COM return must still raise its own
         # message (forensics can never mask the failure), and every capture step
         # must survive its own failure. Both are pure-Python contracts of
-        # _common.capture_com_failure, so they gate offline.
+        # _seat_forensics.capture_com_failure, so they gate offline.
         SCRIPTS_DIR / "test_failure_forensics.py",
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
@@ -3055,6 +3056,9 @@ def task_check():
                 str((SCRIPTS_DIR / "_watchdog.py").resolve()),
                 str((SCRIPTS_DIR / "_telemetry.py").resolve()),
                 str((SCRIPTS_DIR / "_common.py").resolve()),
+                # run_build's teardown (seat parking) lives in the recipe-inert
+                # module, which no module_deps_of closure reaches.
+                str((SCRIPTS_DIR / "_seat_forensics.py").resolve()),
                 str((SCRIPTS_DIR / "test_watchdog.py").resolve()),
             ],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_watchdog.py")],
@@ -3132,6 +3136,22 @@ def task_check():
                 }
             ),
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_part_isolation.py")],
+        },
+        "inert": {
+            # Recipe-inert modules (_buildgraph.RECIPE_INERT_MODULES) are in no
+            # cache key, so they must never change a saved artefact: pinned call
+            # sites only, no COM mutator before a save, pinned reads of tracked
+            # code (test_recipe_inert.py). The gate scans every local module for
+            # call sites, so every one is a dep, inert modules included.
+            "file_dep": sorted(
+                {
+                    str((REPO_ROOT / "dodo.py").resolve()),
+                    str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
+                    str((SCRIPTS_DIR / "test_recipe_inert.py").resolve()),
+                    *scanned_by_binding_gate,
+                }
+            ),
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_recipe_inert.py")],
         },
         "budget": {
             # The coefficient-error budget (cad/docs/tolerance-policy.md): the
