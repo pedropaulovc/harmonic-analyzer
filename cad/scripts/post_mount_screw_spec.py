@@ -18,13 +18,16 @@ assert, not printed on the part sheet.
 
 from __future__ import annotations
 
+import math
+
 import _config
 import cone_pivot_post_spec as post
 import cone_swing_platform_spec as platform
+from _fit_limits import deviations
 from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 
 SKU = "40923898"
-THREAD_DIA_MM, CUT_LENGTH_MM, _HEAD_H, _HEAD_DIA, _PITCH = FILLISTER_SIZES[SKU]
+THREAD_DIA_MM, CUT_LENGTH_MM, HEAD_H_MM, _HEAD_DIA, _PITCH = FILLISTER_SIZES[SKU]
 
 # Head seated on the MHA-016 counterbore floor: the under-head face to the
 # plate's top face, at the model's nominal post.
@@ -32,20 +35,27 @@ GRIP_MM = post.BLOCK_HEIGHT - post.ATTACHMENT_CBORE_DEPTH
 # The longest cut whose end is flush with the MHA-091 underside.
 FLUSH_LENGTH_MM = GRIP_MM + platform.PLATE_THICKNESS
 
-# Model-owned drawing controls: one hidden reference sketch whose single
-# driving dimension IS the cut length, under-head face to cut end.
+# Model-owned drawing controls: hidden reference sketches, each with ONE
+# driving dimension -- the cut length (under-head face to cut end) and the
+# cut end's deburr break.
 CUT_LENGTH_SKETCH = "CutLengthReference"
 CUT_LENGTH_DIMENSION = "CutLength"
-DRAWING_DIMENSIONS: dict[str, set[str]] = {CUT_LENGTH_SKETCH: {CUT_LENGTH_DIMENSION}}
+CUT_END_BREAK_SKETCH = "CutEndBreakReference"
+CUT_END_BREAK_DIMENSION = "CutEndBreak"
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    CUT_LENGTH_SKETCH: {CUT_LENGTH_DIMENSION},
+    CUT_END_BREAK_SKETCH: {CUT_END_BREAK_DIMENSION},
+}
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    CUT_LENGTH_SKETCH: {CUT_LENGTH_DIMENSION: 1}
+    CUT_LENGTH_SKETCH: {CUT_LENGTH_DIMENSION: 1},
+    CUT_END_BREAK_SKETCH: {CUT_END_BREAK_DIMENSION: 1},
 }
 DRAWING_PRECISION_BY_NAME = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
-REFERENCE_SKETCHES = (CUT_LENGTH_SKETCH,)
+REFERENCE_SKETCHES = (CUT_LENGTH_SKETCH, CUT_END_BREAK_SKETCH)
 
 # --- U27: can one fixed cut length serve every in-band post and plate? ---
 # The printed bands, as the shop reads them off the title block: the post's
@@ -58,12 +68,20 @@ _CBORE_DEPTH_PRINTED = round(post.ATTACHMENT_CBORE_DEPTH, 2)
 # U41: 1/4 plate as supplied.  Integ carries the same mill band as
 # cone_swing_platform_spec.PLATE_STOCK_BAND; this branch predates it.
 PLATE_STOCK_BAND_MM = 0.13
-# Title block: REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX.
-# Two breaks eat thread: the tap's entry at the plate top and the screw's
-# chamfered cut end (the cut-end chamfer carries no size, so the title block
-# limits it).
-EDGE_BREAK_MAX_MM = float(_config.title_block("edge_break")["chamfer_max_mm"])
-ENGAGEMENT_BREAKS_MM = 2.0 * EDGE_BREAK_MAX_MM
+# Two breaks eat thread, both held to a deburr, not the title block's 0.25
+# (Main's engagement ruling on #857):
+# - the MHA-091 tap's entry: deburr only, 0.1 max.  Integ carries this as
+#   cone_swing_platform_spec.POST_MOUNT_TAP_EDGE_BREAK (the platform's local
+#   override); this branch predates it, and integ dedupes it to one copy.
+# - the screw's cut end: 0.1 max, printed on the model's CutEndBreak
+#   dimension as 0.1 +0/-0.1, i.e. anywhere from none to 0.1.
+POST_MOUNT_TAP_EDGE_BREAK = 0.1
+CUT_END_BREAK_MM = 0.1
+CUT_END_BREAK_BAND = (0.0, -0.1)  # (upper, lower), the _fit_limits convention
+_break_lower, _break_upper = deviations(CUT_END_BREAK_BAND)
+CUT_END_BREAK_MAX_MM = CUT_END_BREAK_MM + _break_upper
+CUT_END_BREAK_MIN_MM = CUT_END_BREAK_MM + _break_lower
+ENGAGEMENT_BREAKS_MM = POST_MOUNT_TAP_EDGE_BREAK + CUT_END_BREAK_MAX_MM
 
 # Counterbore floor above PlateTop (the post foot seats on it), both ends.
 FLOOR_LOW_MM = (_POST_HEIGHT_PRINTED - _GENERAL_1PL_MM) - (
@@ -87,7 +105,7 @@ FIXED_LENGTH_FLUSH_MAX_MM = FLOOR_LOW_MM + PLATE_THIN_MM
 FIXED_LENGTH_ENGAGEMENT_MIN_MM = FLOOR_HIGH_MM + MIN_ENGAGEMENT_MM + ENGAGEMENT_BREAKS_MM
 if FIXED_LENGTH_ENGAGEMENT_MIN_MM > FLOOR_HIGH_MM + PLATE_THICK_MM:
     raise ValueError("the thick plate cannot hold 0.90D even when cut flush")
-# No single length satisfies both corners (84.89 vs 87.51 at the current
+# No single length satisfies both corners (84.89 vs 87.21 at the current
 # bands), so the shop cannot cut to a print band: each screw is cut to its
 # own hole at assembly (MHA-A03), and the sheet prints the modelled length as
 # a REFERENCE dimension with no band.  If the bands ever tighten enough for a
@@ -104,6 +122,31 @@ if FIXED_CUT_LENGTH_EXISTS:
 # short of its own MHA-091 underside, never proud.  The one copy: integ's
 # platform engagement stack and drive-train assembly step import it.
 POST_SCREW_CUT_TO_FIT_SHORT = 0.3
+
+# The named exception's worst case, cut to fit: unlike the fixed-length
+# corner above, the floor drops out (each screw is cut to its own hole), so
+# the plate limits it -- the thinnest stock, the full fit-to-hole allowance,
+# and both breaks at their maximum.  Mirrors integ's
+# cone_swing_platform_spec.POST_MOUNT_ENGAGEMENT_WORST, which dedupes to this.
+POST_MOUNT_ENGAGEMENT_WORST = round(
+    platform.PLATE_THICKNESS
+    - PLATE_STOCK_BAND_MM
+    - POST_SCREW_CUT_TO_FIT_SHORT
+    - POST_MOUNT_TAP_EDGE_BREAK
+    - CUT_END_BREAK_MAX_MM,
+    6,
+)
+POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS = POST_MOUNT_ENGAGEMENT_WORST / THREAD_DIA_MM
+# A MIN never rounds up: floor to two places.
+POST_MOUNT_ENGAGEMENT_PRINTED = (
+    math.floor(POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS * 100.0) / 100.0
+)
+if POST_MOUNT_ENGAGEMENT_PRINTED < MIN_ENGAGEMENT_DIAMETERS:
+    raise ValueError(
+        f"MHA-142 worst-case engagement {POST_MOUNT_ENGAGEMENT_WORST:.2f} "
+        f"({POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS:.3f}D) is under "
+        f"{MIN_ENGAGEMENT_DIAMETERS:.2f}D"
+    )
 
 # The model as built, on the nominal chain: the reference length never
 # stands proud, and still holds the exception's minimum.
