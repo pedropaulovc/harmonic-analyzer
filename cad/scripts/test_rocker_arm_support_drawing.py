@@ -149,7 +149,7 @@ def test_support_has_no_unapproved_gdt_contract() -> None:
 
 
 def test_stock_hold_down_clears_support_and_engages_blind_base_tap() -> None:
-    import build_harmonic_base as base
+    import harmonic_base_fasteners as base
 
     assert screw.SPEC.skus == ("92240A539",)
     assert screw.THREAD_SIZE == base.HOLD_DOWN_THREAD == "1/4-20"

@@ -46,7 +46,7 @@ from build_swing_stop_screw import SHANK_DIA as STOP_SHANK_DIA
         ),
         (
             part.PEDESTAL_SEAT_SPEC,
-            part.PEDESTAL_SCREW_LEN - part.PEDESTAL_FLANGE_THICKNESS,
+            part.PEDESTAL_SCREW_ENGAGEMENT,
             "tapped_bottoming",
             2,
         ),

@@ -60,7 +60,7 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
 * fillister-screw x4 (2026-09-02 ch26 p.71 re-derive): the brass slotted
   round-head screws at the plate's four corners, heads seated on the
   decorated face, shanks down through the plate's #4 clearance holes into the
-  base's blind #4-40 taps (build_harmonic_base NAMEPLATE_SCREW_XZ -- the same
+  base's blind #4-40 taps (harmonic_base_fasteners NAMEPLATE_SCREW_XZ -- the same
   nameplate_spec derivation). Same single-mate fix-all treatment.
 
 Hold-down: four stock 1/4-20 UNC-2A hex-head screws install from the top,
@@ -128,7 +128,7 @@ from _transforms import (
     rot_z_rows,
     rows_from_euler,
 )
-from build_harmonic_base import (
+from harmonic_base_fasteners import (
     BASE_CROSS_TAP_SPEC,
     HOLD_DOWN_ENGAGEMENT,
     HOLD_DOWN_THREAD,
@@ -324,7 +324,7 @@ if any(
 #
 # nameplate screws (2026-09-02 ch26 p.71 re-derive): 4x #4-40 brass
 # fillister-screw, one per plate corner, screwed DOWN into the base's blind
-# #4-40 taps (build_harmonic_base NAMEPLATE_SCREW_XZ -- the plate's own
+# #4-40 taps (harmonic_base_fasteners NAMEPLATE_SCREW_XZ -- the plate's own
 # corner holes carried through the mount transform: x 209.75/163.75,
 # z +/-45.5). The part is authored axis along local +Z with the origin at the
 # UNDER-HEAD bearing plane, head at -Z. The stock wrapper preserves that frame,

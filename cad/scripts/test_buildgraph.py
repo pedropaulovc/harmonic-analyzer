@@ -1402,6 +1402,126 @@ def test_cone_line_consumers_do_not_import_the_drive_train_script():
         assert "build_drive_train_assembly" not in deps, script
 
 
+# Part builders an assembly script (or an interference-contract module) still
+# imports directly.  Importing a part BUILDER puts its whole recipe -- sketch
+# code, drawing marks and the config it reads -- on the assembly's cache key;
+# the constants belong in a pure spec/geometry module both read.  The list only
+# shrinks: a new edge fails, and so does a listed edge that no longer exists.
+_ASSEMBLY_BUILDER_IMPORTS = {
+    "build_channel_assembly.py": {"build_fulcrum_keeper", "build_pivot_bracket"},
+    "build_drive_train_assembly.py": {
+        "build_alignment_pinion",
+        "build_arbor_pedestal",
+        "build_cone_lock_knob",
+        "build_cone_pivot_post",
+        "build_cone_pivot_screw",
+        "build_cone_swing_platform",
+        "build_cone_tip_adjuster",
+        "build_cone_tip_bushing",
+        "build_cone_tip_pinch_screw",
+        "build_crank_pin_eye",
+        "build_crank_pin_ring",
+        "build_crankshaft",
+        "build_cylinder_end_disc",
+        "build_dome_cap_screw",
+        "build_fillister_screw",
+        "build_foot_screw",
+        "build_harmonic_base",
+        "build_pedestal_hold_down_screw",
+        "build_rocker_arm_support",
+        "build_slotted_screw",
+        "build_swing_stop_screw",
+    },
+    "build_frame_assembly.py": {
+        "build_fillister_screw",
+        "build_gooseneck_set_screw",
+        "build_lag_screw",
+        "build_rocker_arm_support",
+        "build_top_frame",
+    },
+    "build_harmonic_analyzer_assembly.py": {
+        "build_measuring_stick",
+        "build_measuring_stick_stop",
+    },
+    "build_magnifier_assembly.py": {"build_thumb_screw"},
+    "build_paper_drive_assembly.py": {
+        "build_bracket_screw",
+        "build_clamp_screw",
+        "build_column_clamp_back",
+        "build_fillister_screw",
+        "build_guide_lock",
+        "build_latch_hook",
+        "build_platen",
+        "build_platen_clip",
+        "build_platen_guide",
+        "build_platen_paper",
+        "build_platen_rack",
+        "build_rack_pinion",
+        "build_support_bar",
+        "build_transgear_bracket",
+        "build_transgear_feed_pinion",
+        "build_transgear_knob_shaft",
+        "build_transgear_latch",
+        "build_transgear_pinion",
+        "build_transgear_removable",
+        "build_transgear_thumbnut",
+    },
+    "build_pen_assembly.py": {
+        "build_hanger_screw",
+        "build_pen_frame",
+        "build_pen_hanger",
+        "build_pen_set_screw",
+    },
+    "build_summing_assembly.py": {
+        "build_knife_hanger_stud",
+        "build_knife_hanger_washer",
+        "build_knife_mount",
+        "build_top_frame",
+    },
+}
+
+
+def _direct_builder_imports(path: Path) -> set[str]:
+    """``build_*`` modules ``path`` imports anywhere, top level or lazily."""
+    names: set[str] = set()
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.Import):
+            names.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            names.add(node.module)
+    return {name for name in names if name.startswith("build_")}
+
+
+def test_assemblies_and_contracts_import_no_new_part_builder():
+    """#880: an assembly (or its interference contract) reads a part's numbers
+    from a pure module, not from the part's builder.  harmonic_base_fasteners
+    replaced the frame's and the contracts' build_harmonic_base import, which
+    carried the cone journal line and the channel config onto the frame's key."""
+    scripts_dir = Path(__file__).resolve().parent
+    found = {
+        path.name: imports
+        for path in sorted(
+            [
+                *scripts_dir.glob("build_*_assembly.py"),
+                *scripts_dir.glob("_interference_contracts*.py"),
+            ]
+        )
+        if (imports := _direct_builder_imports(path))
+    }
+    added = {
+        name: sorted(imports - _ASSEMBLY_BUILDER_IMPORTS.get(name, set()))
+        for name, imports in found.items()
+        if imports - _ASSEMBLY_BUILDER_IMPORTS.get(name, set())
+    }
+    assert not added, f"new part-builder imports; read a pure module instead: {added}"
+    gone = {
+        name: sorted(listed - found.get(name, set()))
+        for name, listed in _ASSEMBLY_BUILDER_IMPORTS.items()
+        if listed - found.get(name, set())
+    }
+    assert not gone, f"edges no longer imported; delete them from the list: {gone}"
+
+
 def test_module_deps_are_transitive():
     """The closure follows imports through helper chains: a chain-link part pulls
     _chain_link -> _chain -> _common, and _config arrives via _common's lazy
