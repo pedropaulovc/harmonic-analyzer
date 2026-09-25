@@ -40,6 +40,7 @@ from _drawing_layout_check import (
     audit_layout,
     format_findings,
 )
+from _drawing_layout_audit import run_layout_audit
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import (
@@ -178,10 +179,6 @@ _DIM_DETAILING_SCOPES = {
     "swDetailingAngularRunningDimension": 209,
 }
 
-# A circular 2-character BOM balloon renders ~10-12 mm across at the template
-# font; its GetExtent is leader-polluted (see _note_element), so it gets this
-# nominal half-span box around its IAnnotation.GetPosition anchor instead.
-_NOMINAL_BALLOON_HALF_M = 0.006
 # Ink gap left between two balloon circles pushed apart on the ring. Their radius
 # is measured from its rendered full-circle arc (4.72 mm on pen-assembly), so
 # this is only the clearance between them, not a stand-in for the circle itself.
@@ -4532,10 +4529,11 @@ def _spread_balloons(
 
     ``AutoBalloon5`` stacks balloons whose attachment points cluster, and on a
     pictorial view its square layout can even drop balloons INSIDE the outline
-    box. Deterministic fix: place every balloon's box center on an ellipse
-    ``margin`` outside the view outline, evenly spaced, and assign the ring slots
-    in the angular order of the balloons' ATTACHMENT POINTS. Leaders stay
-    attached; only the balloon anchor moves (``IAnnotation.SetPosition``).
+    box. Deterministic fix: place every balloon's rendered CIRCLE centre on an
+    ellipse ``margin`` outside the view outline, evenly spaced, and assign the
+    ring slots in the angular order of the balloons' ATTACHMENT POINTS. Leaders
+    stay attached; only the balloon anchor moves (``IAnnotation.SetPosition``),
+    carrying the anchor's constant offset from the circle centre (#866).
 
     **Sort on the ATTACHMENT, not on where the balloon landed.** For straight
     leaders from points on a convex ring to points inside it, the non-crossing
@@ -4570,7 +4568,10 @@ def _spread_balloons(
         note = _sw_type_info.early_bound_or_flag(
             note, "INote", "GetAnnotation", "GetBomBalloonText"
         )
-        radii.append(rendered_balloon_circle(note, label="balloon spread")[2])
+        circle_x, circle_y, radius = rendered_balloon_circle(
+            note, label="balloon spread"
+        )
+        radii.append(radius)
         annotation = adapter._attempt(lambda n=note: n.GetAnnotation())
         if annotation is None:
             raise RuntimeError("balloon spread: balloon without an annotation")
@@ -4581,6 +4582,13 @@ def _spread_balloons(
             "SetPosition",
             "GetLeaderPointsAtIndex",
         )
+        # SetPosition moves the ANCHOR, which is not the circle centre: it sits
+        # a constant ~(+4.0, -1.7) mm off it (#866, 40 balloons on MHA-A03).
+        # Carry that offset so the CIRCLE lands on its ring slot.
+        anchor = annotation.GetPosition()
+        if anchor is None or len(anchor) < 2:
+            raise RuntimeError("balloon spread: balloon without a position")
+        offset = (float(anchor[0]) - circle_x, float(anchor[1]) - circle_y)
         # Never GetExtent: a balloon note's extent box includes its LEADER, so it
         # spans to the pointed-at component and is useless for placing the
         # balloon circle itself.
@@ -4595,7 +4603,13 @@ def _spread_balloons(
         attach_x, attach_y = float(raw[-3]), float(raw[-2])
         theta = math.atan2(attach_y - center_y, attach_x - center_x)
         items.append(
-            (theta, attach_x, attach_y, _balloon_item_key(adapter, note), annotation)
+            (
+                theta,
+                attach_x,
+                attach_y,
+                _balloon_item_key(adapter, note),
+                (annotation, offset),
+            )
         )
     # Sort on (theta, attach x, attach y, BOM item), never on theta alone. Two
     # balloons attached at the same angle from the view centre -- coaxial parts
@@ -4646,9 +4660,9 @@ def _spread_balloons(
     angles = _push_apart_on_ring(
         [theta for theta, _x, _y, _i, _a in items], min_gap=gap
     )
-    for angle, (_theta, _x, _y, _item, annotation) in zip(angles, items):
-        target_x = center_x + radius_x * math.cos(angle)
-        target_y = center_y + radius_y * math.sin(angle)
+    for angle, (_theta, _x, _y, _item, (annotation, offset)) in zip(angles, items):
+        target_x = center_x + radius_x * math.cos(angle) + offset[0]
+        target_y = center_y + radius_y * math.sin(angle) + offset[1]
         if not annotation.SetPosition(target_x, target_y, 0.0):
             raise RuntimeError("failed to re-ring a BOM balloon")
 
@@ -6184,6 +6198,15 @@ async def finalize_drawing(
     artifacts["png"] = str(outputs.png.resolve())
     if set(artifacts) != {"drawing", "pdf", "png"}:
         raise RuntimeError(f"drawing export incomplete: {artifacts!r}")
+    # Every sheet of every drawing is audited on the finished, still-open
+    # document, next to the PDF it printed (``_drawing_layout_audit``). Under
+    # GATE a finding fails the leaf, so no artefact is stored.
+    run_layout_audit(
+        adapter,
+        stem=outputs.slddrw.stem,
+        sheet_layouts=resolved_layouts,
+        is_pictorial=is_pictorial_orientation,
+    )
     # Release the file: SolidWorks keeps the saved SLDDRW open past the COM
     # session, and the next run (or a from-scratch rebuild deleting the
     # target) then hits "in use by another process".

@@ -1577,6 +1577,15 @@ def test_edge_key_is_none_when_the_geometry_cannot_be_read():
 
 
 class _FakeNote:
+    """A BOM balloon whose anchor sits a constant offset off its circle.
+
+    ``placed`` is the rendered CIRCLE centre. ``GetPosition``/``SetPosition``
+    read and move the ANCHOR, which native balloons keep ~(+4.0, -1.7) mm off
+    the centre (#866, MHA-A03 integ3 leaf, 40 balloons).
+    """
+
+    ANCHOR_OFFSET = (0.0040, -0.0017)
+
     def __init__(self, attach_x, attach_y, radius=0.0047, item="1"):
         self._attach = (attach_x, attach_y)
         self._radius = radius
@@ -1609,8 +1618,12 @@ class _FakeNote:
         # Flat x,y,z stream: balloon end first, attachment LAST.
         return (0.0, 0.0, 0.0, self._attach[0], self._attach[1], 0.0)
 
+    def GetPosition(self):
+        cx, cy = self.placed or (0.0, 0.0)
+        return (cx + self.ANCHOR_OFFSET[0], cy + self.ANCHOR_OFFSET[1], 0.0)
+
     def SetPosition(self, x, y, _z):
-        self.placed = (x, y)
+        self.placed = (x - self.ANCHOR_OFFSET[0], y - self.ANCHOR_OFFSET[1])
         return True
 
 
@@ -1738,6 +1751,19 @@ def test_balloons_attached_at_one_angle_ring_in_a_fixed_order():
     reversed_ = dict(zip(("far", "near"), _ring_positions([far2, near2])))
     assert forward == reversed_
     assert forward["near"] != forward["far"]
+
+
+def test_spread_balloons_land_their_circles_on_the_ring_not_their_anchors():
+    """#866: the ring slot is a CIRCLE centre, and SetPosition moves the anchor.
+
+    Placing the anchor on the slot left every circle ~(+4.0, -1.7) mm off the
+    ring (MHA-A03 integ3). The spread must carry each balloon's anchor offset.
+    """
+    notes = [_FakeNote(0.12, 0.13), _FakeNote(0.18, 0.17), _FakeNote(0.15, 0.19)]
+    margin = 0.014
+    rx = ry = 0.05 + margin
+    for x, y in _ring_positions(notes):
+        assert ((x - 0.15) / rx) ** 2 + ((y - 0.15) / ry) ** 2 == pytest.approx(1.0)
 
 
 def test_ring_order_survives_any_arrival_order():

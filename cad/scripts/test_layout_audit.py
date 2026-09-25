@@ -1,0 +1,491 @@
+"""SolidWorks-free contract for the unified drawing layout audit (``_layout_audit``).
+
+The audit's input is a per-sheet JSON dump the live collector
+(``_drawing_layout_audit.collect_sheet_dumps``) records on every drawing leaf,
+so every test here builds or replays a dump. The replayed values are REAL
+SolidWorks display data from harmonic-base farm leaves (dt-logs/hb-render-2 and
+hb-render-4 drawing-task.log, supports' "callout ... display data" lines and
+``INote::GetExtent`` obstacle boxes), not hand-drawn boxes.
+"""
+
+from __future__ import annotations
+
+import math
+
+import pytest
+
+from _layout_audit import (
+    LAYOUT_AUDIT_MODE,
+    FindingSeverity,
+    LayoutAuditMode,
+    TextItem,
+    apply_transform,
+    audit_dump,
+    balloon_circle,
+    decode_dump_lines,
+    encode_dump_lines,
+    glyph_count,
+    row_boxes,
+    severity,
+    sheet_model,
+    view_ink,
+    view_polyline_segments,
+)
+from _layout_geometry import Segment
+
+SHEET_W = 0.4318
+SHEET_H = 0.2794
+ZONE = {"left": 0.0127, "right": 0.0127, "bottom": 0.0127, "top": 0.0127}
+TITLE_BLOCK = [0.216, 0.0, SHEET_W, 0.066]
+
+
+def _line(x0, y0, x1, y1):
+    """A GetLineAtIndex3-shaped record: [color, type, style, weight, s3, e3]."""
+    return [0, 0, 0, 0, x0, y0, 0.0, x1, y1, 0.0]
+
+
+def _hole_callout(name, lines, texts, *, height=0.0035):
+    return {
+        "type": 4,
+        "name": name,
+        "visible": 1,
+        "display": {
+            "lines": [_line(*line) for line in lines],
+            "texts": [{"t": t, "pos": [x, y, 0.0], "h": height} for t, x, y in texts],
+        },
+        "dim": {"hole_callout": True},
+    }
+
+
+def _dim(name, text, x, y, *, lines=(), height=0.0035):
+    return {
+        "type": 4,
+        "name": name,
+        "display": {
+            "lines": [_line(*line) for line in lines],
+            "texts": [{"t": text, "pos": [x, y, 0.0], "h": height}],
+        },
+    }
+
+
+def _note(name, text, extent, *, owner_type=1):
+    x0, y0, x1, y1 = extent
+    return {
+        "type": 6,
+        "name": name,
+        "owner_type": owner_type,
+        "display": {},
+        "note": {"text": text, "extent": [x0, y0, 0.0, x1, y1, 0.0], "balloon": False},
+    }
+
+
+def _dump(*, views=(), sheet_annotations=(), tables=()):
+    return {
+        "schema": 1,
+        "stem": "fixture",
+        "sheet": "Sheet2",
+        "width": SHEET_W,
+        "height": SHEET_H,
+        "zone": ZONE,
+        "title_block": TITLE_BLOCK,
+        "views": list(views),
+        "sheet_annotations": list(sheet_annotations),
+        "tables": list(tables),
+    }
+
+
+def _view(name, outline, annotations=(), **extra):
+    return {"name": name, "outline": list(outline), "annotations": list(annotations), **extra}
+
+
+def _kinds(findings):
+    return sorted({f.kind for f in findings})
+
+
+# --------------------------------------------------------------------------
+# Real display data: MHA-035 harmonic base, sheet 2
+# --------------------------------------------------------------------------
+
+# hb-render-2 (e533ef6fd's layout): the MHA-004 transfer callout, as the leaf
+# logged its IDisplayDimension display data.
+HB2_PEDESTAL = (
+    "MHA-004",
+    [
+        (0.264542, 0.218153, 0.23054, 0.240834),
+        (0.265261, 0.217673, 0.264542, 0.218153),
+        (0.23054, 0.240834, 0.171047, 0.240834),
+    ],
+    [
+        ("2X ", 0.179215, 0.25761),
+        ("<MOD-DIAM>", 0.185938, 0.257556),
+        (" 3.45 ", 0.191216, 0.25761),
+        ("<HOLE-DEPTH>", 0.202854, 0.257556),
+        (" 19.50", 0.207854, 0.25761),
+        ("TRANSFER FROM MHA-004", 0.171047, 0.252),
+        ("AT ASSEMBLY;", 0.184746, 0.246444),
+        (" 8-32 UNC - 2B ", 0.174589, 0.240888),
+        ("<HOLE-DEPTH>", 0.20748, 0.240834),
+        (" 16.00", 0.21248, 0.240888),
+    ],
+)
+HB2_BLOCK = (
+    "MHA-061",
+    [
+        (0.278736, 0.216933, 0.29254, 0.240834),
+        (0.278304, 0.216185, 0.278736, 0.216933),
+        (0.29254, 0.240834, 0.233047, 0.240834),
+    ],
+    [
+        ("4X ", 0.241215, 0.25761),
+        ("<MOD-DIAM>", 0.247938, 0.257556),
+        (" 3.45 ", 0.253216, 0.25761),
+        ("<HOLE-DEPTH>", 0.264854, 0.257556),
+        (" 15.00", 0.269854, 0.25761),
+        ("TRANSFER FROM MHA-061", 0.233047, 0.252),
+        ("AT ASSEMBLY;", 0.246746, 0.246444),
+        (" 8-32 UNC - 2B ", 0.236589, 0.240888),
+        ("<HOLE-DEPTH>", 0.26948, 0.240834),
+        (" 12.75", 0.27448, 0.240888),
+    ],
+)
+# INote::GetExtent of "TOP VIEW SCALE 1:4": centred over the plan in
+# hb-render-2, moved beside the plan's top-left corner in hb-render-4.
+HB2_TOP_LABEL = (0.23475, 0.23265, 0.27947, 0.23703)
+HB4_TOP_LABEL = (0.169863, 0.23265, 0.214585, 0.237034)
+HOLES_TOP_OUTLINE = (0.19, 0.155, 0.34, 0.235)
+
+# hb-render-4: the MHA-114 spring callout and the MHA-132 cross-tap callout
+# whose top row sits 1.7 mm under the spring callout's underline.
+HB4_SPRING = (
+    "MHA-114",
+    [
+        (0.271414, 0.175759, 0.274041, 0.136412),
+        (0.271376, 0.176323, 0.271414, 0.175759),
+        (0.274041, 0.136412, 0.354372, 0.136412),
+    ],
+    [
+        ("<MOD-DIAM>", 0.297576, 0.147578),
+        (" 2.26 ", 0.302855, 0.147632),
+        ("<HOLE-DEPTH>", 0.314492, 0.147578),
+        (" 11.30", 0.319493, 0.147632),
+        ("TRANSFER FROM MHA-114", 0.286047, 0.142022),
+        ("AT ASSEMBLY; 4-40 UNC - 2B ", 0.275628, 0.136466),
+        ("<HOLE-DEPTH>", 0.339027, 0.136412),
+        (" 9.28", 0.344027, 0.136466),
+    ],
+)
+HB4_CROSS_TAP = (
+    "MHA-132",
+    [
+        (0.329717, 0.098055, 0.342356, 0.103278),
+        (0.328783, 0.09767, 0.329717, 0.098055),
+        (0.342356, 0.103278, 0.229232, 0.103278),
+    ],
+    [
+        ("4X ", 0.262404, 0.131166),
+        ("<MOD-DIAM>", 0.269127, 0.131113),
+        (" 4.04 ", 0.274406, 0.131166),
+        ("<HOLE-DEPTH>", 0.286043, 0.131113),
+        (" 48 MIN", 0.291044, 0.131166),
+        ("MHA-132 TUBE CROSS-SCREWS", 0.250907, 0.125556),
+        ("THRU BOTH WALLS, SINGLE CONTINUOUS THREAD", 0.230711, 0.12),
+        ("DEPTHS FROM SPOTFACE FLOOR", 0.248979, 0.114444),
+        ("ON A1-A4 X CENTRES", 0.261375, 0.108888),
+        ("2 EACH FRONT/REAR FACE 10-32 UNF - 2B ", 0.229232, 0.103331),
+        ("<HOLE-DEPTH>", 0.322837, 0.103278),
+        (" 46.00", 0.327838, 0.103331),
+    ],
+)
+
+
+def _holes_sheet(top_label, *callouts):
+    return _dump(
+        views=[_view("holes top", HOLES_TOP_OUTLINE, [_hole_callout(*c) for c in callouts])],
+        sheet_annotations=[_note("DetailItem467", "TOP VIEW SCALE 1:4", top_label)],
+    )
+
+
+def test_e533ef6fd_leader_through_the_top_view_label_is_found():
+    """Positive control: hb-render-2's MHA-004 leader struck "TOP VIEW SCALE 1:4"."""
+    findings = audit_dump(_holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK))
+    hits = [
+        f
+        for f in findings
+        if f.kind == "leader-through-text" and "MHA-004" in f.a and "TOP VIEW" in f.b
+    ]
+    assert len(hits) == 1
+    assert severity(hits[0]) is FindingSeverity.GATING
+
+
+def test_the_moved_top_view_label_clears_every_leader():
+    """hb-render-4 moved the label beside the plan; the same leaders miss it."""
+    findings = audit_dump(_holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK))
+    assert not [f for f in findings if f.kind.startswith("leader") and "TOP VIEW" in f.b]
+
+
+def test_the_two_transfer_callouts_side_by_side_keep_their_air():
+    findings = audit_dump(_holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK))
+    assert not [f for f in findings if f.kind == "text-clearance"]
+
+
+def test_hb_render_4_cross_tap_under_the_spring_underline_reads_as_one_callout():
+    """1.75 mm under the spring callout's underline: clear of it, but tighter
+    than the 2.06 mm gap between rows INSIDE one callout, so the pair reads as
+    one. It sits on the provisional 0.5 h clearance line (1.746 vs 1.75 mm);
+    whichever class the calibrated thresholds put it in, it is reported."""
+    findings = audit_dump(_holes_sheet(HB4_TOP_LABEL, HB4_SPRING, HB4_CROSS_TAP))
+    pair = [
+        f
+        for f in findings
+        if f.kind in ("text-clearance", "text-separation")
+        and {f.a.split()[1], f.b.split()[1]} == {"MHA-114", "MHA-132"}
+    ]
+    assert pair
+    assert min(f.extra["gap_mm"] for f in pair) == pytest.approx(1.75, abs=0.05)
+
+
+def test_callout_rows_centre_on_the_shoulder_and_tokens_are_one_glyph():
+    items = [TextItem(t, x, y, 0.0035) for t, x, y in HB2_PEDESTAL[2]]
+    shoulder = Segment(*HB2_PEDESTAL[1][2])
+    rows = dict(row_boxes(items, advance=0.6, shoulders=[shoulder]))
+    # The shoulder spans the widest row; the centred rows mirror about it.
+    centre = (0.23054 + 0.171047) / 2.0
+    top = rows["2X <MOD-DIAM> 3.45 <HOLE-DEPTH> 19.50"]
+    assert top.xmin == pytest.approx(0.179215)
+    assert top.xmax == pytest.approx(2 * centre - 0.179215)
+    assert top.ymin == pytest.approx(0.257556)
+    assert top.ymax == pytest.approx(0.25761 + 0.0035)
+    assert glyph_count("<MOD-DIAM> 3.45 ") == 7
+
+
+# --------------------------------------------------------------------------
+# the classes the older audits could not see
+# --------------------------------------------------------------------------
+
+
+def test_touching_dimension_texts_fail_the_clearance():
+    """MHA-092's "20.8" and "8.42" printed as "20.88.42": zero gap, no overlap.
+    A penetration test passes that; a clearance test does not."""
+    advance = 0.6
+    h = 0.0035
+    left = _dim("D1", "20.8", 0.040, 0.200)
+    # "8.42" starts exactly where "20.8" ends.
+    right = _dim("D2", "8.42", 0.040 + 4 * advance * h, 0.200)
+    # An exact-width item on the sheet pins the advance at 0.6.
+    ruler = _dim("D3", "", 0, 0)
+    ruler["display"]["texts"] = [
+        {"t": "12", "pos": [0.300, 0.100, 0.0], "h": h},
+        {"t": "34", "pos": [0.300 + 2 * advance * h, 0.100, 0.0], "h": h},
+    ]
+    dump = _dump(views=[_view("plan", (0.02, 0.15, 0.1, 0.25), [left, right, ruler])])
+    findings = [f for f in audit_dump(dump) if f.kind == "text-clearance"]
+    assert len(findings) == 1
+    assert findings[0].extra["gap_mm"] == pytest.approx(0.0, abs=1e-6)
+
+
+def test_text_crossed_by_a_foreign_view_edge_is_found():
+    """MHA-092's ADJUSTER ENTRY: a callout's text crossed by ANOTHER view's
+    outline edge. Model edges come from GetPolylines7 (sheet space here)."""
+    # A single vertical model edge of the right view at x = 0.130.
+    polyline = [0, 0, 0, 0, 0, 1, 0, 0, 2, 0.130, 0.080, 0.0, 0.130, 0.160, 0.0]
+    right_view = _view("right", (0.128, 0.078, 0.170, 0.162), polylines=polyline)
+    callout = _hole_callout(
+        "ADJ",
+        [(0.080, 0.100, 0.100, 0.118), (0.100, 0.118, 0.140, 0.118)],
+        [("ADJUSTER ENTRY", 0.100, 0.118)],
+    )
+    front = _view("front", (0.060, 0.080, 0.100, 0.160), [callout])
+    findings = audit_dump(_dump(views=[front, right_view]))
+    hits = [f for f in findings if f.kind == "text-on-line" and "view right geometry" in f.b]
+    assert len(hits) == 1
+
+
+def test_a_leader_through_its_own_rows_is_found_but_its_shoulder_joint_is_not():
+    h = 0.0035
+    rows = [("TOP ROW TEXT", 0.100, 0.110), ("BOTTOM ROW", 0.100, 0.1044)]
+    # Leader rises from the shoulder's right end, straight up through the rows.
+    through = _hole_callout(
+        "UP", [(0.125, 0.1044, 0.125, 0.140), (0.100, 0.1044, 0.1245, 0.1044)], rows, height=h
+    )
+    findings = audit_dump(_dump(views=[_view("v", (0.05, 0.05, 0.2, 0.2), [through])]))
+    assert [f.kind for f in findings if f.kind.startswith("leader-through")] == [
+        "leader-through-own-text"
+    ]
+    # Same leader leaving DOWNWARD from the shoulder end: only the joint touches.
+    down = _hole_callout(
+        "DOWN", [(0.1245, 0.1044, 0.140, 0.080), (0.100, 0.1044, 0.1245, 0.1044)], rows, height=h
+    )
+    findings = audit_dump(_dump(views=[_view("v", (0.05, 0.05, 0.2, 0.2), [down])]))
+    assert not [f for f in findings if f.kind.startswith("leader-through")]
+
+
+def test_a_leader_crossing_another_dimension_line_is_found():
+    callout = _hole_callout(
+        "C", [(0.100, 0.100, 0.140, 0.140), (0.140, 0.140, 0.170, 0.140)], [("Ø4.0", 0.140, 0.1402)]
+    )
+    dim = _dim("D", "25.0", 0.200, 0.200, lines=[(0.100, 0.130, 0.140, 0.110)])
+    findings = audit_dump(_dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [callout, dim])]))
+    assert "leader-crosses-line" in _kinds(findings)
+
+
+def test_text_in_the_title_block_or_over_the_border_is_found():
+    inside = _dim("IN", "12.0", 0.300, 0.030)
+    outside = _dim("OUT", "12.0", 0.005, 0.150)
+    findings = audit_dump(_dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [inside, outside])]))
+    assert {"keep-out", "outside-border"} <= set(_kinds(findings))
+
+
+def test_hidden_annotations_and_template_notes_are_not_audited():
+    hidden = _dim("H", "99", 0.005, 0.005)
+    hidden["visible"] = 3
+    template = _note("Z", "A", (0.003, 0.03, 0.009, 0.038), owner_type=2)
+    findings = audit_dump(
+        _dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [hidden])], sheet_annotations=[template])
+    )
+    assert findings == []
+
+
+# --------------------------------------------------------------------------
+# coordinate spaces, primitives, transport
+# --------------------------------------------------------------------------
+
+
+def test_polylines7_records_parse_with_and_without_geometry_data():
+    # One polyline record (type 0, no geom data) and one arc record (type 1,
+    # 12 geom values) followed by its tessellation.
+    arc_geom = [0.0] * 12
+    records = [
+        0, 0, 0, 0, 0, 1, 0, 0, 3, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.01, 0.01, 0.0,
+        1, 12, *arc_geom, 0, 0, 0, 1, 0, 0, 2, 0.02, 0.0, 0.0, 0.03, 0.0, 0.0,
+    ]
+    segments = view_polyline_segments(records)
+    assert [(s.x0, s.y0, s.x1, s.y1) for s in segments] == [
+        (0.0, 0.0, 0.01, 0.0),
+        (0.01, 0.0, 0.01, 0.01),
+        (0.02, 0.0, 0.03, 0.0),
+    ]
+
+
+def test_view_edges_are_accepted_in_sheet_space_or_through_the_view_transform():
+    outline = [0.10, 0.10, 0.20, 0.20]
+    in_sheet = [0, 0, 0, 0, 0, 1, 0, 0, 2, 0.12, 0.12, 0.0, 0.18, 0.18, 0.0]
+    assert view_ink({"name": "a", "outline": outline, "polylines": in_sheet}).space == "sheet"
+    # Model-space points (metres about the part origin) with a 1:2 view at (0.15, 0.15).
+    in_model = [0, 0, 0, 0, 0, 1, 0, 0, 2, -0.04, -0.04, 0.0, 0.04, 0.04, 0.0]
+    transform = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, 0.15, 0.0, 0.5, 0, 0, 0]
+    ink = view_ink({"name": "b", "outline": outline, "polylines": in_model, "transform": transform})
+    assert ink.space == "transformed"
+    assert (ink.segments[0].x0, ink.segments[0].y1) == pytest.approx((0.13, 0.17))
+    lost = view_ink({"name": "c", "outline": outline, "polylines": in_model})
+    assert lost.space == "unresolved"
+
+
+def test_an_unresolved_view_is_a_gating_finding_not_a_silent_skip():
+    in_model = [0, 0, 0, 0, 0, 1, 0, 0, 2, -0.04, -0.04, 0.0, 0.04, 0.04, 0.0]
+    findings = audit_dump(_dump(views=[_view("lost", (0.1, 0.1, 0.2, 0.2), polylines=in_model)]))
+    unresolved = [f for f in findings if f.kind == "view-geometry-unresolved"]
+    assert len(unresolved) == 1 and severity(unresolved[0]) is FindingSeverity.GATING
+
+
+def test_apply_transform_uses_row_vectors_scale_and_translation():
+    quarter_turn = [0, 1, 0, -1, 0, 0, 0, 0, 1, 0.1, 0.2, 0.0, 2.0, 0, 0, 0]
+    assert apply_transform(quarter_turn, 0.01, 0.0, 0.0) == pytest.approx((0.1, 0.22))
+
+
+def test_a_balloon_is_its_single_rendered_circle():
+    arc = [0, 0, 0, 0, 0.105, 0.2, 0.0, 0.105, 0.2, 0.0, 0.1, 0.2, 0.0, 0.0, 0.0, 1.0, 1.0]
+    assert balloon_circle({"arcs": [arc]}) == pytest.approx((0.1, 0.2, 0.005))
+    assert balloon_circle({"arcs": [arc, arc]}) is None
+
+
+def test_dumps_survive_the_chunked_log_transport():
+    dump = _holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL)
+    # Incompressible padding forces several chunks.
+    dump["padding"] = [math.sin(i) for i in range(20_000)]
+    lines = [f"  --  [  1.0s] {line}" for line in encode_dump_lines("harmonic-base", dump)]
+    assert len(lines) > 1
+    assert decode_dump_lines(["noise", *reversed(lines)]) == [dump]
+
+
+def test_the_audit_ships_in_report_mode_until_the_fleet_report_is_triaged():
+    """Main's gating decision (a), 2026-09-25: REPORT first, then GATE."""
+    assert LAYOUT_AUDIT_MODE is LayoutAuditMode.REPORT
+
+
+def test_sheet_model_measures_the_glyph_advance_from_exact_item_widths():
+    model = sheet_model(_holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK))
+    # '2X ' / '4X ' span 6.72 mm, ' 3.45 ' 11.64 mm, ' 8-32 UNC - 2B ' 32.9 mm,
+    # all at 3.5 mm height; token items are excluded.
+    assert model.advance == pytest.approx(median_ratio(), rel=1e-3)
+
+
+def median_ratio():
+    from statistics import median
+
+    widths = [
+        (0.185938 - 0.179215) / 3,
+        (0.202854 - 0.191216) / 6,
+        (0.247938 - 0.241215) / 3,
+        (0.264854 - 0.253216) / 6,
+        (0.20748 - 0.174589) / 15,
+        (0.26948 - 0.236589) / 15,
+    ]
+    return median(w / 0.0035 for w in widths)
+
+
+# --------------------------------------------------------------------------
+# run_layout_audit: REPORT never fails the leaf, GATE fails on gating findings
+# --------------------------------------------------------------------------
+
+
+def _patch_collect(monkeypatch, result):
+    import _drawing_layout_audit as live
+
+    def collect(*_args, **_kwargs):
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr(live, "collect_sheet_dumps", collect)
+    return live
+
+
+def _run(live, mode):
+    live.run_layout_audit(
+        object(), stem="fixture", sheet_layouts={}, is_pictorial=lambda _o: False, mode=mode
+    )
+
+
+def test_report_mode_survives_a_collector_fault_and_gate_mode_does_not(monkeypatch):
+    live = _patch_collect(monkeypatch, RuntimeError("COM went away"))
+    _run(live, LayoutAuditMode.REPORT)
+    with pytest.raises(RuntimeError, match="COM went away"):
+        _run(live, LayoutAuditMode.GATE)
+
+
+def test_gate_mode_fails_on_a_gating_finding_and_report_mode_logs_it(monkeypatch):
+    live = _patch_collect(monkeypatch, [_holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)])
+    _run(live, LayoutAuditMode.REPORT)
+    with pytest.raises(RuntimeError, match="leader-through-text"):
+        _run(live, LayoutAuditMode.GATE)
+
+
+def test_gate_mode_passes_a_sheet_with_only_advisories(monkeypatch):
+    live = _patch_collect(monkeypatch, [_holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)])
+    findings = audit_dump(_holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK))
+    assert all(severity(f) is FindingSeverity.ADVISORY for f in findings)
+    _run(live, LayoutAuditMode.GATE)
+
+
+def test_the_logged_replay_copy_trims_only_oversized_polylines():
+    import _drawing_layout_audit as live
+
+    small = [0.0] * 30
+    big = [0.0] * (live._LOGGED_POLYLINE_VALUES + 1)
+    dump = _dump(views=[_view("a", (0, 0, 1, 1), polylines=small), _view("b", (0, 0, 1, 1), polylines=big)])
+    logged = live.loggable_dump(dump)
+    assert logged["views"][0]["polylines"] == small
+    assert "polylines" not in logged["views"][1]
+    assert logged["views"][1]["polylines_omitted"] == len(big)
+    assert view_ink(logged["views"][1]).space == "omitted"
+    assert len(dump["views"][1]["polylines"]) == len(big)  # the audited copy is untouched
