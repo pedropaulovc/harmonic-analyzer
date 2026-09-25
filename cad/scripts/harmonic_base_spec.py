@@ -66,8 +66,11 @@ if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
 # states the requirement once, as this target on the plan profile. The target
 # NAMES the surface, so the one sheet symbol cannot be misread as the pad side
 # face or the rim (2026-09 review clarity item: three nested plan outlines sit
-# within a few millimetres of each other).
-FLANGE_PERIMETER_TARGET = "FLANGE EDGES, 4 SIDES"
+# within a few millimetres of each other). "(TABLE ORIGIN)" states the
+# function: the 2026-09-25 Codex machinist review read the edges as neither
+# running nor locating and asked for the symbol's removal (Main: rebutted,
+# and made legible on the sheet).
+FLANGE_PERIMETER_TARGET = "FLANGE EDGES, 4 SIDES (TABLE ORIGIN)"
 SURFACE_FINISHES = (
     SurfaceFinishControl("deck", SEAT_UM, PlanarFace((0, 1, 0), STACK_HEIGHT)),
     SurfaceFinishControl("underside", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),

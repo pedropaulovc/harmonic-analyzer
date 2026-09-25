@@ -153,6 +153,22 @@ ISO_CENTER = (0.3425, 0.175)
 # machinist review, clarity); from here it passes 4 mm clear of the bore.
 SERIAL_NOTE_XY = (0.080, 0.130)
 SERIAL_LEADER_START_OFFSET_M = (0.0440, -0.0118)
+# The flange-perimeter finish symbol, in sheet 1's open field left of the
+# plan. Its target, "FLANGE EDGES, 4 SIDES (TABLE ORIGIN)", runs ~63 mm at
+# 2.5 mm text, too long for sheet 2's strip between the hole table and the
+# plan (~50 mm), so the symbol moved here with its leader on the same west
+# flange face (Main, 2026-09-25, option A). The anchor is the symbol's leader
+# line; the leader lands on the straight west edge 100 mm in front of the
+# plan centre, below the text row, so it runs down and clear of it.
+FLANGE_FINISH_XY = (0.0168, 0.170)
+FLANGE_FINISH_ATTACH_Z_MM = 100.0
+# hb-render-5's sheet-2 flange symbol, measured at its 2.5 mm text: the vee
+# starts 2.1 mm left of the anchor, the target text 5.3 mm right of it at
+# 1.76 mm per character, and the text top sits 10.5 mm above the anchor.
+FINISH_SYMBOL_VEE_LEFT_M = 0.0021
+FINISH_TARGET_OFFSET_M = 0.0053
+FINISH_TARGET_CHAR_M = 0.00176
+FINISH_SYMBOL_TOP_M = 0.0105
 HOLE_TOP_CENTER = (0.280, 0.195)
 HOLE_SIDE_CENTER = (0.280, 0.095)
 SECTION_CENTER = (0.375, 0.135)
@@ -1488,7 +1504,26 @@ async def build(adapter: Any) -> dict[str, str]:
             label="underside finish edge",
         ),
     )
-    for label, symbol in (("deck", deck_finish), ("underside", underside_finish)):
+    # Rule 5: the flange perimeter is the hole table's datum -- every sheet-2
+    # coordinate is measured from the virtual corner of its west and rear
+    # faces -- so the plan carries the seat grade once, read off the west
+    # flange edge, and its target names the surface AND its function. The
+    # part owns one control per perimeter face; this callout states all four.
+    flange_west_edge = _visible_hole_table_entities(adapter, top, ())[2]
+    flange_finish = add_surface_finish(
+        adapter, top,
+        symbol_xy=FLANGE_FINISH_XY,
+        control=surface_finish_by_key(PART_SURFACE_FINISHES, "flange_west"),
+        label="flange perimeter seat finish",
+        char_height=0.0025,
+        edge_entity=flange_west_edge,
+        leader_attach_xy=_plan_xy(-BOTTOM_LENGTH / 2.0, FLANGE_FINISH_ATTACH_Z_MM),
+    )
+    for label, symbol in (
+        ("deck", deck_finish),
+        ("underside", underside_finish),
+        ("flange perimeter", flange_finish),
+    ):
         annotation = _early_bound(symbol.GetAnnotation(), "IAnnotation")
         annotation.BentLeaderLength = 0.035
         if abs(float(annotation.BentLeaderLength) - 0.035) > 1e-7:
@@ -1691,27 +1726,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # SolidWorks keeps the arrows inside and jogs a leader down to the text.
     if not auto_center_marks(adapter, hole_side, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base cross-screw entries")
-    # The hole table measures every coordinate from the virtual corner of the
-    # flange's west and rear faces, so the plan profile carries the seat grade
-    # once, read off the same west edge the table's Y axis is seeded from. The
-    # symbol's own target names the surface ("FLANGE EDGES, 4 SIDES"), which
-    # the three nested plan outlines made necessary; the part owns one control
-    # per perimeter face and this single callout states all four.
-    flange_finish = add_surface_finish(
-        adapter, hole_top,
-        symbol_xy=(0.170, 0.205),
-        control=surface_finish_by_key(PART_SURFACE_FINISHES, "flange_west"),
-        label="flange perimeter seat finish",
-        char_height=0.0025,
-        edge_entity=table_y_axis,
-        leader_attach_xy=_plan_xy(
-            -BOTTOM_LENGTH / 2.0, 0.0, center=HOLE_TOP_CENTER
-        ),
-    )
-    flange_annotation = _early_bound(flange_finish.GetAnnotation(), "IAnnotation")
-    flange_annotation.BentLeaderLength = 0.035
-    if abs(float(flange_annotation.BentLeaderLength) - 0.035) > 1e-7:
-        raise RuntimeError("flange perimeter finish leader did not clear its roughness text")
     # The four sockets locate the frame columns, so their bores carry the seat
     # grade (rule 5) -- the deck symbol stops at the deck plane and the hole
     # table's bore diameters are reference-only match-fit sizes. Section A-A is

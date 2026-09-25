@@ -1293,3 +1293,48 @@ def test_cross_tap_drill_keeps_the_bottoming_lead_past_the_deepest_thread() -> N
     # 48 MIN left 1.49 past 46.00 + 0.51, under two #10-32 pitches.
     assert 48.0 - (CASTING_FULL_THREAD_DEPTH + part.SEAT_DEPTH_BAND) < lead
     assert CASTING_TAP_DRILL_DEPTH - (CASTING_FULL_THREAD_DEPTH + part.SEAT_DEPTH_BAND) >= lead
+
+
+# hb-render-5's sheet frame: the drawable region starts 12.7 mm in from the
+# sheet's left edge (the frame obstacle the callout check logs).
+SHEET_FRAME_INNER_X_M = 0.0127
+FLANGE_FINISH_MIN_MARGIN_M = 0.0015
+
+
+def test_flange_finish_fits_sheet_1_left_of_the_plan_with_named_margins() -> None:
+    # Main's option A (2026-09-25): "FLANGE EDGES, 4 SIDES (TABLE ORIGIN)" is
+    # too long for sheet 2's 50 mm strip, so the symbol sits in sheet 1's open
+    # field left of the plan, leader on the west flange edge.
+    import draw_harmonic_base as sheet
+
+    assert harmonic_base_spec.FLANGE_PERIMETER_TARGET == "FLANGE EDGES, 4 SIDES (TABLE ORIGIN)"
+    x, y = sheet.FLANGE_FINISH_XY
+
+    def symbol_box(anchor, text):
+        return (
+            anchor[0] - sheet.FINISH_SYMBOL_VEE_LEFT_M,
+            anchor[1],
+            anchor[0] + sheet.FINISH_TARGET_OFFSET_M + len(text) * sheet.FINISH_TARGET_CHAR_M,
+            anchor[1] + sheet.FINISH_SYMBOL_TOP_M,
+        )
+
+    box = symbol_box(sheet.FLANGE_FINISH_XY, harmonic_base_spec.FLANGE_PERIMETER_TARGET)
+    west_edge_x = sheet._plan_xy(-harmonic_base_spec.BOTTOM_LENGTH / 2.0, 0.0)[0]
+    margins = {
+        "sheet frame": box[0] - SHEET_FRAME_INNER_X_M,
+        "plan west flange edge": west_edge_x - box[2],
+        # The deck Ra symbol below it at (0.040, 0.138) carries no target text.
+        "deck Ra symbol": box[1] - (0.138 + sheet.FINISH_SYMBOL_TOP_M),
+        # R22.2 FLANGE corner callout above it: its two-row block hangs from
+        # (0.040, 0.215) down to ~0.2104 (hb-render-5 sheet 1).
+        "flange corner radius callout": 0.2104 - box[3],
+        # The stamped-ID note below the plan starts at x 0.080, y 0.130.
+        "stamped-ID note": box[1] - sheet.SERIAL_NOTE_XY[1],
+    }
+    assert {name: gap for name, gap in margins.items() if gap < FLANGE_FINISH_MIN_MARGIN_M} == {}
+    # The leader lands on the straight west edge (inside its R22.2 corners),
+    # below the text row, so its run to the edge descends clear of the text.
+    attach = sheet._plan_xy(-harmonic_base_spec.BOTTOM_LENGTH / 2.0, sheet.FLANGE_FINISH_ATTACH_Z_MM)
+    straight = harmonic_base_spec.BOTTOM_WIDTH / 2.0 - part.FLANGE_CORNER_R
+    assert abs(sheet.FLANGE_FINISH_ATTACH_Z_MM) < straight
+    assert attach[1] < y
