@@ -198,6 +198,38 @@ def test_hub_end_callouts_stand_in_a_row_without_crossing_leaders() -> None:
     )
 
 
+def test_hub_seat_leader_lands_near_side_clear_of_r127_and_the_centre() -> None:
+    # Eye pass of w15-301f4bf4e (and the 2026-09-23 review): with both arrows
+    # the Ø19.5 leader ran from its text through the bore centre to the far
+    # rim, crossing R12.7's leader at the centre. Near-side, one arrow lands
+    # on the rim along the ray from the centre toward the text.
+    import math
+
+    import _drawing_leaders as leaders
+
+    cx, cy = drawing.BORE_CENTER
+    r = spec.HUB_SEAT_DIA * drawing.SHEET_SCALE[0] / 2000.0
+    assert drawing.HUB_SEAT_KEEP_OUT == pytest.approx(r / 2.0)
+    tx, ty = drawing.FRONT_KEEP["HubSeatDia"]
+    assert tx < cx and ty > cy + r  # above the bore, left of its centre
+    angle = math.atan2(ty - cy, tx - cx)
+    near = (cx + r * math.cos(angle), cy + r * math.sin(angle))
+    far = (cx - r * math.cos(angle), cy - r * math.sin(angle))
+    radius = [(drawing.FRONT_KEEP["BossRadius"], (cx, cy))]
+    old = [((tx, ty), far)]
+    new = [((tx, ty), near)]
+    assert leaders.distance_to_point(old[0], (cx, cy)) < drawing.HUB_SEAT_KEEP_OUT
+    leaders.assert_leaders_clear(
+        {"HubSeatDia": new, "BossRadius": radius},
+        centre=(cx, cy),
+        keep_out={"HubSeatDia": drawing.HUB_SEAT_KEEP_OUT},
+        label="hub seat layout",
+    )
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_hub_seat_leader_clear(adapter, front_annotations)" in source
+    assert 'set_near_side_diameter(hub_seat, "hub seat diameter")' in source
+
+
 def test_handle_pivot_is_tapped_for_the_mha139_screw_with_a_2mm_web() -> None:
     assert spec.HANDLE_PIVOT_HOLE_SPEC.kind == "tapped"
     assert spec.HANDLE_PIVOT_HOLE_SPEC.size == "#10-24"

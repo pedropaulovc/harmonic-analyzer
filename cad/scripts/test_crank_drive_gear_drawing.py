@@ -503,3 +503,40 @@ def test_outside_dia_reference_is_saved_hidden_and_imported_per_view() -> None:
     assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
     assert "    curate_view_dimensions,\n" not in source.replace("\r\n", "\n")
     assert "OutsideDiaReference" in spec.DRAWING_DIMENSIONS
+
+
+def test_bore_finish_reads_at_note_height_and_no_leader_crosses_at_the_bore() -> None:
+    # Eye pass of w15-301f4bf4e (present on the 2026-09-21 SHIP render too):
+    # "Ra 1.6" printed at twice the note height, and the tip diameter's line
+    # ran through the bore centre while the finish leader rose to the bore
+    # bottom between it and the bore callout.
+    import _drawing_leaders as leaders
+
+    assert drawing.FINISH_CHAR_HEIGHT == 0.0025  # the Gear Data / notes height
+    source = _source()
+    assert "char_height=FINISH_CHAR_HEIGHT" in source
+    assert '"Gear Data", *GEAR_DATA_POS, char_height=0.0025' in source
+    assert "_bore_leaders_clear(adapter, front_annotations, finish)" in source
+    assert 'set_near_side_diameter(tip, "tip diameter")' in source
+
+    cx, cy = drawing.FRONT_CENTER
+    r = drawing.BORE_SHEET_RADIUS
+    assert r == pytest.approx(spec.BORE_DIA * 1.5 / 2000.0)
+    ax, ay = drawing.FINISH_ATTACH
+    assert math.hypot(ax - cx, ay - cy) == pytest.approx(r)
+    assert ax > cx and ay < cy  # lower right, opposite the bore callout
+    tip_text = drawing.FRONT_KEEP["OutsideDia"]
+    bore_text = drawing.FRONT_KEEP["BoreDia"]
+    assert bore_text[0] < cx and bore_text[1] < cy  # bore callout lower left
+    angle = math.atan2(bore_text[1] - cy, bore_text[0] - cx)
+    bore = [(bore_text, (cx + r * math.cos(angle), cy + r * math.sin(angle)))]
+    old_tip = [(tip_text, (cx, cy - drawing.HALF_OD))]
+    new_tip = [(tip_text, (cx, cy + drawing.HALF_OD))]
+    finish = [(drawing.FINISH_SYMBOL, drawing.FINISH_ATTACH)]
+    assert leaders.distance_to_point(old_tip[0], (cx, cy)) < drawing.TIP_DIA_KEEP_OUT
+    leaders.assert_leaders_clear(
+        {"OutsideDia": new_tip, "BoreDia": bore, "BoreFinish": finish},
+        centre=(cx, cy),
+        keep_out={"OutsideDia": drawing.TIP_DIA_KEEP_OUT},
+        label="gear bore layout",
+    )

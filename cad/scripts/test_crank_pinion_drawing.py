@@ -238,14 +238,16 @@ def test_boss_dia_text_clears_its_extension_lines() -> None:
 
 
 def test_isometric_clears_the_boss_dia_text() -> None:
-    # Eye pass of f0c105531: at ISO_CENTER x 0.345 the isometric's outline
-    # began at 0.3038, under the boss diameter's text (0.3014 +- 0.0066). The
-    # outline's measured offsets from its centre at 3:1 carry over to the new
-    # centre; the sheet-side check reads the real outline.
-    left_offset, right_offset = 0.3038 - 0.345, 0.3913 - 0.345
+    # Eye pass of f0c105531: at ISO_CENTER x 0.345 the isometric began under
+    # the boss diameter's text (0.3014 +- 0.0066). The sheet-side check reads
+    # the view's bounding box, which w15-301f4bf4e read back as
+    # (0.3091, 0.4109) at centre 0.360 -- wider than the drawn silhouette, so
+    # 0.360 failed it. Those offsets carry over to any centre at 3:1.
+    left_offset, right_offset = 0.3091023168 - 0.360, 0.4108976832 - 0.360
     text_right = (
         drawing.BOSS_DIA_TEXT_X + drawing.BOSS_DIA_TEXT_HALF_WIDTH + drawing.ISO_TEXT_CLEARANCE
     )
+    assert 0.360 + left_offset < text_right
     assert 0.345 + left_offset < text_right
     assert drawing.ISO_CENTER[0] + left_offset >= text_right
     assert drawing.ISO_CENTER[0] + right_offset <= drawing.SHEET_INNER_BORDER[2]

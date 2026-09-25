@@ -36,6 +36,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_arc_endpoints_to_max,
@@ -44,6 +45,11 @@ from _drawing_common import (
     view_name,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_leaders import (
+    assert_leaders_clear,
+    dimension_segments,
+    set_near_side_diameter,
+)
 from _drawing_registry import DRAWINGS_BY_NAME
 from crank_arm_spec import (
     ANCHOR_HOLE_SPEC,
@@ -58,10 +64,15 @@ from crank_arm_spec import (
     DRAWING_REFERENCE_PRECISION,
     HALF_WIDTH,
     HANDLE_PIVOT_HOLE_SPEC,
+    HUB_SEAT_DIA,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from crank_arm_notes import HUB_SEAT_CALLOUT, SEAM_CALLOUT
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
 
 
 SPEC = DRAWINGS_BY_NAME["crank_arm"]
@@ -179,8 +190,15 @@ FRONT_KEEP = {
     "AxisOffset": (0.252, FRONT_CENTER[1] + 0.013),
     "Width": (0.279, FRONT_CENTER[1]),
     "BossRadius": (0.030, FRONT_CENTER[1]),
-    "HubSeatDia": (0.054, 0.225),
+    "HubSeatDia": (0.048, 0.225),
 }
+# The hub seat's leader lands on the near rim, upper left of the bore: at
+# 0.054 with both arrows it ran down through the bore centre to the far
+# rim and crossed R12.7's leader there (eye pass of w15-301f4bf4e; the
+# 2026-09-23 review had flagged the far-side landing). Nothing but R12.7
+# itself may come within half the seat radius of the centre.
+BORE_CENTER = (_sheet_x(0.0), FRONT_CENTER[1])
+HUB_SEAT_KEEP_OUT = HUB_SEAT_DIA * SHEET_SCALE[0] / 4000.0
 # The arm's half of the MHA-138 seam is the arc bulging from the seat edge
 # toward the arm end; the callout attaches 45 degrees up its flank.
 SEAM_EDGE_PICK = (
@@ -192,6 +210,29 @@ SEAM_CALLOUT_XY = (0.104, 0.250)
 ANCHOR_CALLOUT_XY = (0.195, 0.205)
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 DIMENSION_CALLOUTS = {"HubSeatDia": HUB_SEAT_CALLOUT}
+
+
+def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
+    matches = [a for a in annotations if dimension_name(adapter, a) == name]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
+    return matches[0]
+
+
+def _hub_seat_leader_clear(adapter: Any, annotations: list[Any]) -> None:
+    """Land the hub seat on its near rim; fail if it crosses R12.7 or the centre."""
+    hub_seat = _named(adapter, annotations, "HubSeatDia")
+    set_near_side_diameter(hub_seat, "hub seat diameter")
+    rebuild_drawing(adapter, label="hub seat near-side leader")
+    assert_leaders_clear(
+        {
+            "HubSeatDia": dimension_segments(hub_seat),
+            "BossRadius": dimension_segments(_named(adapter, annotations, "BossRadius")),
+        },
+        centre=BORE_CENTER,
+        keep_out={"HubSeatDia": HUB_SEAT_KEEP_OUT},
+        label="crank arm hub seat",
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -262,6 +303,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The part authored every displayed decimal place.  The match-fit hub seat
     # remains a one-place nominal because the assigned actual hub governs size.
     assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
+    _hub_seat_leader_clear(adapter, front_annotations)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

@@ -90,7 +90,10 @@ FRONT_CENTER = (0.110, 0.150)
 RIGHT_CENTER = (0.215, 0.150)
 # At 0.345 the isometric's outline began under the boss diameter's text
 # (eye pass of f0c105531); ``_isometric_clears_boss_dia`` now holds it clear.
-ISO_CENTER = (0.360, 0.150)
+# The guard reads the view's bounding box, +-0.0509 about its centre at 3:1
+# (w15-301f4bf4e read-back), wider than the drawn silhouette: 0.360 failed it
+# by 2.7 mm, and 0.365 clears the text by 2.3 mm and the border by 3.2 mm.
+ISO_CENTER = (0.365, 0.150)
 
 # Half the printed tooth-tip circle, in sheet metres: the face-view silhouette
 # radius and the section's half-height, which every dimension is placed clear

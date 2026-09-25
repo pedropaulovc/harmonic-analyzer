@@ -22,6 +22,7 @@ face view's 64 teeth need the size to read as teeth.
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -35,11 +36,18 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_leaders import (
+    assert_leaders_clear,
+    dimension_segments,
+    leader_segments,
+    set_near_side_diameter,
+)
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
@@ -55,6 +63,7 @@ from crank_drive_gear_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -114,6 +123,23 @@ BORE_CALLOUT = (
 )
 DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
 
+# Nothing but the bore's own finish and callout may reach the bore
+# (eye pass of w15-301f4bf4e: the tip diameter ran through the centre, and
+# the finish leader rose to the bottom of the bore between the other two).
+# The tip diameter lands one arrow on its near (top) rim; the bore callout
+# keeps its lower-left landing; the finish comes in from the lower right.
+BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)
+FINISH_ATTACH = (
+    FRONT_CENTER[0] + BORE_SHEET_RADIUS * math.cos(math.pi / 4.0),
+    FRONT_CENTER[1] - BORE_SHEET_RADIUS * math.sin(math.pi / 4.0),
+)
+FINISH_SYMBOL = (FRONT_CENTER[0] + 0.045, FRONT_CENTER[1] - 0.062)
+# The finish symbol reads at the sheet's note height, like every other Ra
+# in the set; left at the document default it printed twice that.
+FINISH_CHAR_HEIGHT = 0.0025
+# Past the bore's own radius, only the leaders that land on it arrive.
+TIP_DIA_KEEP_OUT = 2.0 * BORE_SHEET_RADIUS
+
 
 def _hide_tangent_edges(view: Any, label: str) -> None:
     """Drop a view's tangent edges, and prove they went.
@@ -129,6 +155,34 @@ def _hide_tangent_edges(view: Any, label: str) -> None:
     if int(view.GetDisplayTangentEdges2()) != 0:
         raise RuntimeError(f"failed to hide {label}-view tangent edges")
     view.UpdateViewDisplayGeometry()
+
+
+def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
+    matches = [a for a in annotations if dimension_name(adapter, a) == name]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
+    return matches[0]
+
+
+def _bore_leaders_clear(adapter: Any, annotations: list[Any], finish: Any) -> None:
+    """Fail unless the finish reads at note height and no two bore leaders cross."""
+    finish_annotation = finish.GetAnnotation()
+    height = float(finish_annotation.GetTextFormat(0).CharHeight)
+    if abs(height - FINISH_CHAR_HEIGHT) > 1e-6:
+        raise RuntimeError(f"bore finish text height {height} is not {FINISH_CHAR_HEIGHT}")
+    tip = _named(adapter, annotations, "OutsideDia")
+    set_near_side_diameter(tip, "tip diameter")
+    rebuild_drawing(adapter, label="tip diameter near-side leader")
+    assert_leaders_clear(
+        {
+            "OutsideDia": dimension_segments(tip),
+            "BoreDia": dimension_segments(_named(adapter, annotations, "BoreDia")),
+            "BoreFinish": leader_segments(finish_annotation),
+        },
+        centre=FRONT_CENTER,
+        keep_out={"OutsideDia": TIP_DIA_KEEP_OUT},
+        label="crank drive gear bore",
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -207,18 +261,17 @@ async def build(adapter: Any) -> dict[str, str]:
     # peaks as well as the size: REAM names the operation, not the finish it
     # leaves. The roughness is the project's general machined grade, authored
     # on the PART and read back here (policy rule 5's running-surface case).
-    add_surface_finish(
+    finish = add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + 0.020, FRONT_CENTER[1] - 0.062),
+        symbol_xy=FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "crank_drive_gear_bore"),
         label="crank-drive gear bore finish",
         entity=visible_circle_edge(adapter, front, BORE_DIA),
-        leader_attach_xy=(
-            FRONT_CENTER[0],
-            FRONT_CENTER[1] - BORE_DIA * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0),
-        ),
+        leader_attach_xy=FINISH_ATTACH,
+        char_height=FINISH_CHAR_HEIGHT,
     )
+    _bore_leaders_clear(adapter, front_annotations, finish)
 
     add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025)
     add_property_linked_note(
