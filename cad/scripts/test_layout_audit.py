@@ -1717,6 +1717,71 @@ def test_a_page_the_size_of_another_sheet_fails_loud(monkeypatch):
         )
 
 
+def test_a_collector_fault_carries_what_was_collected(monkeypatch):
+    """Main's ruling: fail loud, no report on a fault, but the error and a
+    warn say how far the collector got -- the sheets dumped with their
+    refused reads, and the refusals on the sheet it died in."""
+    from pathlib import Path
+
+    import _telemetry
+    from _pdf_ink import PageInk
+
+    pages = [PageInk(SHEET_W, SHEET_H, (), (), ()), PageInk(0.2794, 0.2159, (), (), ())]
+    live, adapter = _fake_drawing(monkeypatch, sheet_names=("A", "B"), views=(), pages=pages)
+
+    class View:
+        def __init__(self, name):
+            self.name = name
+
+        def GetName2(self):  # noqa: N802 - COM name
+            return self.name
+
+        def GetAnnotations(self):  # noqa: N802 - COM name
+            if self.name == "B":
+                raise RuntimeError("E_FAIL")
+            return ()
+
+        def GetTableAnnotations(self):  # noqa: N802 - COM name
+            return ()
+
+    class Sheet:
+        def GetProperties2(self):  # noqa: N802 - COM name
+            return (0, 0, 0, 0, 0, SHEET_W, SHEET_H)
+
+        def GetZoneMargin(self, _code):  # noqa: N802 - COM name
+            return 0.0
+
+    warnings = []
+    monkeypatch.setattr(_telemetry, "warn", lambda message, **_kw: warnings.append(message))
+    adapter.currentModel.GetViews = lambda: ((View("A"),), (View("B"),))
+    adapter.currentModel.Sheet = lambda _name: Sheet()
+    with pytest.raises(RuntimeError) as raised:
+        live.collect_sheet_dumps(
+            adapter, stem="x", pdf=Path("x.pdf"), sheet_layouts={}, is_pictorial=lambda _o: False
+        )
+    message = str(raised.value)
+    assert "1 sheet(s) dumped {'A': {}}" in message
+    assert "refused reads on the failing sheet {'GetAnnotations': 1}" in message
+    assert "page 1 of x.pdf is 279.4 x 215.9 mm" in message
+    assert message in warnings
+
+
+def test_an_empty_answer_is_not_a_refused_read():
+    """Main's rider: an overload answering an empty value (no points, ())
+    answered; only raising or None from every overload is a refusal."""
+    from _drawing_layout_audit import _Reader
+
+    reader = _Reader(adapter=None)
+
+    def refuse():
+        raise RuntimeError("E_NOTIMPL")
+
+    assert reader.first([refuse, lambda: ()], name="GetPolylineAtIndex2") == ()
+    assert reader.take_errors() == {}
+    assert reader.first([refuse, lambda: None], name="GetPolylineAtIndex2") is None
+    assert reader.take_errors() == {"GetPolylineAtIndex2": 1}
+
+
 def test_a_path_inside_a_form_xobject_fails_rather_than_misplace_ink():
     import pypdfium2.raw as pdfium_raw
     from _pdf_ink import _strokes

@@ -103,13 +103,14 @@ class _Reader:
     def first(self, fns: list[Callable[[], Any]], *, name: str) -> Any:
         """The first overload that answers; one refusal counted only when all do
         (``GetLineAtIndex3`` refusing before ``GetLineAtIndex2`` answers is the
-        expected path, not a lost primitive)."""
+        expected path, not a lost primitive). Raising or answering None is a
+        refusal; an empty answer is an answer."""
         for fn in fns:
             try:
                 value = fn()
             except Exception:
                 continue
-            if value:
+            if value is not None:
                 return value
         self._count(name)
         return None
@@ -338,72 +339,109 @@ def _collect_com(
         entries = list(row or ())
         if not entries:
             continue
-        sheet_view = reader.bind(entries[0], "IView")
-        name = str(reader.call(lambda: sheet_view.GetName2(), "") or reader.call(lambda: sheet_view.Name, ""))
-        sheet = reader.bind(reader.call(lambda n=name: ddoc.Sheet(n)), "ISheet")
-        if sheet is None:
-            raise RuntimeError(f"layout audit cannot reach sheet {name!r}")
-        properties = _round(reader.call(lambda: sheet.GetProperties2(), ()))
-        layout = sheet_layouts.get(name)
-        template = DRAWING_TEMPLATES[layout] if layout is not None else None
-        width, height = properties[5], properties[6]
-        zone = {
-            side: float(reader.call(lambda c=code: sheet.GetZoneMargin(c), 0.0))
-            for side, code in _ZONE_MARGINS.items()
-        }
-        dump: dict[str, Any] = {
-            "schema": DUMP_SCHEMA,
-            "stem": stem,
-            "sheet": name,
-            "index": index,
-            "page": page_of.get(name, -1),
-            "layout": layout.value if layout is not None else "",
-            "width": width,
-            "height": height,
-            "zone": zone,
-            "views": [_dump_view(reader, view, is_pictorial=is_pictorial) for view in entries[1:]],
-            "sheet_annotations": [
-                item
-                for item in (
-                    _dump_annotation(reader, annotation)
-                    for annotation in (reader.call(lambda: sheet_view.GetAnnotations(), ()) or ())
-                )
-                if item is not None
-            ],
-        }
-        if template is not None:
-            dump["title_block"] = _round(
-                (template.title_block_left_m, 0.0, width, template.title_block_top_m)
+        try:
+            dump = _dump_sheet(
+                reader, ddoc, entries, index=index, stem=stem, pdf=pdf, pages=pages, page_of=page_of,
+                sheet_layouts=sheet_layouts, is_pictorial=is_pictorial,
             )
-        tables: dict[str, dict[str, Any]] = {}
-        for view in entries:
-            view = reader.bind(view, "IView")
-            for raw in reader.call(lambda v=view: v.GetTableAnnotations(), ()) or ():
-                record = _table_record(reader, raw)
-                if record is not None:
-                    tables[record["name"]] = record
-        dump["tables"] = list(tables.values())
-        page = dump["page"]
-        if not 0 <= page < len(pages):
-            raise RuntimeError(
-                f"layout audit: sheet {name!r} is page {page} of {pdf.name}, which has {len(pages)}"
-            )
-        # A page of another size, or an origin/scale mismatch, would place all
-        # the ink wrong; the size is checked here, placement by the text match
-        # rate in _layout_audit.sheet_model.
-        ink = pages[page]
-        if abs(ink.width - width) > PAGE_SIZE_TOL_M or abs(ink.height - height) > PAGE_SIZE_TOL_M:
-            raise RuntimeError(
-                f"layout audit: sheet {name!r} is {width * 1000:.1f} x {height * 1000:.1f} mm but page "
-                f"{page} of {pdf.name} is {ink.width * 1000:.1f} x {ink.height * 1000:.1f} mm"
-            )
-        dump["ink"] = page_ink(ink)
-        dump["read_errors"] = reader.take_errors()
+        except Exception as exc:
+            raise _collector_fault(stem, dumps, reader, exc) from exc
         dumps.append(dump)
     audited = sorted(str(dump["sheet"]) for dump in dumps)
     if audited != sorted(page_of):
         raise RuntimeError(f"layout audit: dumped sheets {audited}, drawing has {sorted(page_of)}")
     return dumps
+
+
+def _collector_fault(stem: str, dumps: list[dict[str, Any]], reader: _Reader, exc: Exception) -> RuntimeError:
+    """The error a collector fault raises, and a warn saying how far it got.
+
+    Fail loud: no report is written. What was collected up to the fault
+    (the sheets dumped, each one's refused reads, and the refusals on the
+    sheet it died in) rides the error and the warn instead.
+    """
+    done = {str(dump["sheet"]): dump["read_errors"] for dump in dumps}
+    progress = f"{len(done)} sheet(s) dumped {done}; refused reads on the failing sheet {dict(reader.errors)}"
+    _telemetry.warn(f"layout audit {stem}: collector fault after {progress}: {exc}")
+    return RuntimeError(f"layout audit {stem}: collector fault after {progress}: {exc}")
+
+
+def _dump_sheet(
+    reader: _Reader,
+    ddoc: Any,
+    entries: list[Any],
+    *,
+    index: int,
+    stem: str,
+    pdf: Path,
+    pages: list[PageInk],
+    page_of: Mapping[str, int],
+    sheet_layouts: Mapping[str, DrawingLayout],
+    is_pictorial: Callable[[str], bool],
+) -> dict[str, Any]:
+    """One sheet's dump: ``entries`` is its ``GetViews`` row (sheet view first)."""
+    sheet_view = reader.bind(entries[0], "IView")
+    name = str(reader.call(lambda: sheet_view.GetName2(), "") or reader.call(lambda: sheet_view.Name, ""))
+    sheet = reader.bind(reader.call(lambda n=name: ddoc.Sheet(n)), "ISheet")
+    if sheet is None:
+        raise RuntimeError(f"layout audit cannot reach sheet {name!r}")
+    properties = _round(reader.call(lambda: sheet.GetProperties2(), ()))
+    layout = sheet_layouts.get(name)
+    template = DRAWING_TEMPLATES[layout] if layout is not None else None
+    width, height = properties[5], properties[6]
+    zone = {
+        side: float(reader.call(lambda c=code: sheet.GetZoneMargin(c), 0.0))
+        for side, code in _ZONE_MARGINS.items()
+    }
+    dump: dict[str, Any] = {
+        "schema": DUMP_SCHEMA,
+        "stem": stem,
+        "sheet": name,
+        "index": index,
+        "page": page_of.get(name, -1),
+        "layout": layout.value if layout is not None else "",
+        "width": width,
+        "height": height,
+        "zone": zone,
+        "views": [_dump_view(reader, view, is_pictorial=is_pictorial) for view in entries[1:]],
+        "sheet_annotations": [
+            item
+            for item in (
+                _dump_annotation(reader, annotation)
+                for annotation in (reader.call(lambda: sheet_view.GetAnnotations(), ()) or ())
+            )
+            if item is not None
+        ],
+    }
+    if template is not None:
+        dump["title_block"] = _round(
+            (template.title_block_left_m, 0.0, width, template.title_block_top_m)
+        )
+    tables: dict[str, dict[str, Any]] = {}
+    for view in entries:
+        view = reader.bind(view, "IView")
+        for raw in reader.call(lambda v=view: v.GetTableAnnotations(), ()) or ():
+            record = _table_record(reader, raw)
+            if record is not None:
+                tables[record["name"]] = record
+    dump["tables"] = list(tables.values())
+    page = dump["page"]
+    if not 0 <= page < len(pages):
+        raise RuntimeError(
+            f"layout audit: sheet {name!r} is page {page} of {pdf.name}, which has {len(pages)}"
+        )
+    # A page of another size, or an origin/scale mismatch, would place all
+    # the ink wrong; the size is checked here, placement by the text match
+    # rate in _layout_audit.sheet_model.
+    ink = pages[page]
+    if abs(ink.width - width) > PAGE_SIZE_TOL_M or abs(ink.height - height) > PAGE_SIZE_TOL_M:
+        raise RuntimeError(
+            f"layout audit: sheet {name!r} is {width * 1000:.1f} x {height * 1000:.1f} mm but page "
+            f"{page} of {pdf.name} is {ink.width * 1000:.1f} x {ink.height * 1000:.1f} mm"
+        )
+    dump["ink"] = page_ink(ink)
+    dump["read_errors"] = reader.take_errors()
+    return dump
 
 
 def run_layout_audit(
