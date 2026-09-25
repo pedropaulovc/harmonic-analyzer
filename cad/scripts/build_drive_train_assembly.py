@@ -1272,14 +1272,15 @@ if _ENGAGED < 0.85 * GEAR64_FACE * COS_I:
 # The base's pivot-screw hole sits exactly under the swing pivot -- both are
 # authored in the machine frame, so the coordinates agree directly (pre-#151
 # this module derived in the mirrored frame and the hole's x was the NEGATED
-# pivot x).
+# pivot x).  The base reads cone_swing_pivot_spec, so a cone-line move must
+# carry the new point into that spec: the check is exact, not a fit window.
 if (
-    abs(BASE_PIVOT_XZ[0] - _PPIVOT[0]) > 0.05
-    or abs(BASE_PIVOT_XZ[1] - _PPIVOT[2]) > 0.05
+    abs(BASE_PIVOT_XZ[0] - _PPIVOT[0]) > 1e-9
+    or abs(BASE_PIVOT_XZ[1] - _PPIVOT[2]) > 1e-9
 ):
     raise AssertionError(
         f"harmonic-base pivot-screw hole {BASE_PIVOT_XZ} != machine swing pivot "
-        f"({_PPIVOT[0]:.3f}, {_PPIVOT[2]:.3f})"
+        f"({_PPIVOT[0]!r}, {_PPIVOT[2]!r}); update cone_swing_pivot_spec"
     )
 if PLAT_PIVOT_HOLE_DIA <= PSCREW_SHOULDER_DIA:
     raise AssertionError("platform pivot hole does not clear the screw shoulder")
