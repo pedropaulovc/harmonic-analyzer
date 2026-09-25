@@ -139,6 +139,11 @@ FINISH_SYMBOL = (FRONT_CENTER[0] + 0.045, FRONT_CENTER[1] - 0.062)
 FINISH_CHAR_HEIGHT = 0.0025
 # Past the bore's own radius, only the leaders that land on it arrive.
 TIP_DIA_KEEP_OUT = 2.0 * BORE_SHEET_RADIUS
+# Where each leader must END, from the gear centre (sheet metres): the tip
+# diameter on the tip circle, the bore callout and finish on the bore rim.
+# A reading outside its band means the segments are not sheet metres.
+TIP_DIA_LANDING = (0.8 * HALF_OD, 1.2 * HALF_OD)
+BORE_LANDING = (0.5 * BORE_SHEET_RADIUS, 1.5 * BORE_SHEET_RADIUS)
 
 
 def _hide_tangent_edges(view: Any, label: str) -> None:
@@ -181,6 +186,11 @@ def _bore_leaders_clear(adapter: Any, annotations: list[Any], finish: Any) -> No
         },
         centre=FRONT_CENTER,
         keep_out={"OutsideDia": TIP_DIA_KEEP_OUT},
+        lands_within={
+            "OutsideDia": TIP_DIA_LANDING,
+            "BoreDia": BORE_LANDING,
+            "BoreFinish": BORE_LANDING,
+        },
         label="crank drive gear bore",
     )
 

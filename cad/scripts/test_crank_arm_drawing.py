@@ -219,15 +219,47 @@ def test_hub_seat_leader_lands_near_side_clear_of_r127_and_the_centre() -> None:
     old = [((tx, ty), far)]
     new = [((tx, ty), near)]
     assert leaders.distance_to_point(old[0], (cx, cy)) < drawing.HUB_SEAT_KEEP_OUT
+    landing = {"HubSeatDia": drawing.HUB_SEAT_LANDING, "BossRadius": drawing.BOSS_RADIUS_LANDING}
     leaders.assert_leaders_clear(
         {"HubSeatDia": new, "BossRadius": radius},
         centre=(cx, cy),
         keep_out={"HubSeatDia": drawing.HUB_SEAT_KEEP_OUT},
+        lands_within=landing,
         label="hub seat layout",
     )
+    assert drawing.HUB_SEAT_LANDING[0] <= r <= drawing.HUB_SEAT_LANDING[1]
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "_hub_seat_leader_clear(adapter, front_annotations)" in source
     assert 'set_near_side_diameter(hub_seat, "hub seat diameter")' in source
+
+
+def test_hub_seat_is_a_reference_nominal_under_its_match_fit_note() -> None:
+    # 2026-09-23 review: a plain one-place Ø19.5 takes the title block's
+    # +/-0.8 while the note makes it a match fit; the note alone governs.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert (
+        'set_reference_dimension(adapter, hub_seat, label="hub seat nominal", diameter=True)'
+        in source
+    )
+    assert "MATCH-FIT" in notes.HUB_SEAT_CALLOUT
+
+
+def test_no_front_dimension_text_sits_on_the_arm() -> None:
+    # 2026-09-23 review: 8.2 sat inside the silhouette, between the top edge
+    # and the 4-40 tap. It now reads above the top edge; the sheet-side check
+    # reads every front text back.
+    import _drawing_leaders as leaders
+
+    x0, y0, x1, y1 = drawing.ARM_SILHOUETTE
+    assert (x0, x1) == pytest.approx((drawing._sheet_x(-spec.HALF_WIDTH), drawing._sheet_x(spec.ARM_END_X)))
+    assert y1 - y0 == pytest.approx(spec.ARM_WIDTH * drawing.SHEET_SCALE[0] / 1000.0)
+    assert leaders.points_inside(list(drawing.FRONT_KEEP.values()), drawing.ARM_SILHOUETTE) == []
+    assert leaders.points_inside([(0.106, drawing.FRONT_CENTER[1] + 0.017)], drawing.ARM_SILHOUETTE)
+    ax, ay = drawing.FRONT_KEEP["AnchorOffset"]
+    assert ay >= y1 + 0.006  # clear above the top edge
+    assert "_texts_off_the_part(adapter, front_annotations)" in Path(drawing.__file__).read_text(
+        encoding="utf-8"
+    )
 
 
 def test_handle_pivot_is_tapped_for_the_mha139_screw_with_a_2mm_web() -> None:

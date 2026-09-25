@@ -48,6 +48,8 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_leaders import (
     assert_leaders_clear,
     dimension_segments,
+    dimension_text_points,
+    points_inside,
     set_near_side_diameter,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -186,7 +188,7 @@ FRONT_KEEP = {
     "ArmEndX": (0.190, 0.085),
     "PivotStation": (_sheet_x(ARM_C2C / 2.0), 0.095),
     "AnchorStation": (_sheet_x(ANCHOR_SCREW_X / 2.0), 0.104),
-    "AnchorOffset": (0.106, FRONT_CENTER[1] + 0.017),
+    "AnchorOffset": (0.108, FRONT_CENTER[1] + HALF_WIDTH * SHEET_SCALE[0] / 1000.0 + 0.008),
     "AxisOffset": (0.252, FRONT_CENTER[1] + 0.013),
     "Width": (0.279, FRONT_CENTER[1]),
     "BossRadius": (0.030, FRONT_CENTER[1]),
@@ -199,6 +201,19 @@ FRONT_KEEP = {
 # itself may come within half the seat radius of the centre.
 BORE_CENTER = (_sheet_x(0.0), FRONT_CENTER[1])
 HUB_SEAT_KEEP_OUT = HUB_SEAT_DIA * SHEET_SCALE[0] / 4000.0
+# Where each leader must END, from the bore centre (sheet metres): the hub
+# seat on its rim, R12.7 at the centre or on its arc. A reading outside the
+# band means the segments are not sheet metres, and the clear check fails.
+HUB_SEAT_LANDING = (HUB_SEAT_KEEP_OUT, 3.0 * HUB_SEAT_KEEP_OUT)
+BOSS_RADIUS_LANDING = (0.0, 1.2 * HALF_WIDTH * SHEET_SCALE[0] / 1000.0)
+# Every front-view dimension text stands outside the arm's silhouette
+# (2026-09-23 review: 8.2 sat on the part, between the top edge and the tap).
+ARM_SILHOUETTE = (
+    _sheet_x(-HALF_WIDTH),
+    FRONT_CENTER[1] - HALF_WIDTH * SHEET_SCALE[0] / 1000.0,
+    _sheet_x(ARM_END_X),
+    FRONT_CENTER[1] + HALF_WIDTH * SHEET_SCALE[0] / 1000.0,
+)
 # The arm's half of the MHA-138 seam is the arc bulging from the seat edge
 # toward the arm end; the callout attaches 45 degrees up its flank.
 SEAM_EDGE_PICK = (
@@ -220,8 +235,14 @@ def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
 
 
 def _hub_seat_leader_clear(adapter: Any, annotations: list[Any]) -> None:
-    """Land the hub seat on its near rim; fail if it crosses R12.7 or the centre."""
+    """Mark the hub seat reference and land it on its near rim, clear of R12.7.
+
+    The seat is match-fit to the MHA-137 hub, so the note under it governs
+    and its nominal prints as a reference, (Ø19.5), not a title-block
+    tolerance (2026-09-23 review).
+    """
     hub_seat = _named(adapter, annotations, "HubSeatDia")
+    set_reference_dimension(adapter, hub_seat, label="hub seat nominal", diameter=True)
     set_near_side_diameter(hub_seat, "hub seat diameter")
     rebuild_drawing(adapter, label="hub seat near-side leader")
     assert_leaders_clear(
@@ -231,8 +252,21 @@ def _hub_seat_leader_clear(adapter: Any, annotations: list[Any]) -> None:
         },
         centre=BORE_CENTER,
         keep_out={"HubSeatDia": HUB_SEAT_KEEP_OUT},
+        lands_within={"HubSeatDia": HUB_SEAT_LANDING, "BossRadius": BOSS_RADIUS_LANDING},
         label="crank arm hub seat",
     )
+
+
+def _texts_off_the_part(adapter: Any, annotations: list[Any]) -> None:
+    """Fail when a front-view dimension's text sits inside the arm's silhouette."""
+    inside = {
+        dimension_name(adapter, annotation): points
+        for annotation in annotations
+        if (points := points_inside(dimension_text_points(annotation), ARM_SILHOUETTE))
+    }
+    _telemetry.event("drawing.texts_off_part", inside=str(inside))
+    if inside:
+        raise RuntimeError(f"dimension text inside the arm silhouette {ARM_SILHOUETTE}: {inside}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -304,6 +338,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # remains a one-place nominal because the assigned actual hub governs size.
     assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
     _hub_seat_leader_clear(adapter, front_annotations)
+    _texts_off_the_part(adapter, front_annotations)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

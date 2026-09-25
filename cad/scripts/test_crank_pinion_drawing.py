@@ -254,6 +254,43 @@ def test_isometric_clears_the_boss_dia_text() -> None:
     assert "_isometric_clears_boss_dia(iso)" in _source()
 
 
+def test_bore_finish_lands_lower_right_clear_of_the_cutting_line() -> None:
+    # Eye pass of w15-3d3a9d762: dropped straight to the bore's bottom, the
+    # finish leader started on the A-A cutting-plane line (x = FRONT_CENTER).
+    import math
+
+    import _drawing_leaders as leaders
+
+    cx, cy = drawing.FRONT_CENTER
+    r = spec.BORE_DIA * drawing.VIEW_SCALE[0] / 2000.0
+    ax, ay = drawing.FINISH_ATTACH
+    assert math.hypot(ax - cx, ay - cy) == pytest.approx(r)
+    assert ax > cx and ay < cy
+    reach = drawing.HALF_OD + 0.005  # the cutting line runs past the tips
+    chain = [((cx, cy - reach), (cx, cy + reach))]
+    arrows = [((cx, cy + side * reach), (cx + 0.012, cy + side * reach)) for side in (-1, 1)]
+    old = [((cx + drawing.HALF_OD - 0.006, cy - 0.055), (cx, cy - r))]
+    new = [(drawing.FINISH_SYMBOL, drawing.FINISH_ATTACH)]
+    fit = [(drawing.BORE_FIT_NOTE, drawing.BORE_FIT_ATTACH)]
+    assert leaders.leader_crossings({"old": old, "section": chain + arrows})
+    leaders.assert_leaders_clear(
+        {"BoreFinish": new, "BoreFit": fit, "SectionLine": chain + arrows},
+        centre=(cx, cy),
+        keep_out={},
+        lands_within={
+            "BoreFinish": drawing.BORE_LANDING,
+            "BoreFit": drawing.BORE_LANDING,
+            "SectionLine": drawing.SECTION_LINE_LANDING,
+        },
+        label="pinion end view layout",
+    )
+    # The symbol stays off the teeth and left of the section view.
+    sx, sy = drawing.FINISH_SYMBOL
+    assert math.hypot(sx - cx, sy - cy) > drawing.HALF_OD + 0.005
+    assert sx + 0.015 < drawing._side_x(0.0)
+    assert "_bore_leaders_clear_section_line(adapter, front, bore_fit, finish)" in _source()
+
+
 def test_the_bore_is_the_only_feature_that_earns_a_band() -> None:
     # cad/docs/tolerance-policy.md: a feature is toleranced tighter than its
     # title-block general grade only through the named chain. On this part

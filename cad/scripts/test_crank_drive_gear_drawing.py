@@ -538,5 +538,10 @@ def test_bore_finish_reads_at_note_height_and_no_leader_crosses_at_the_bore() ->
         {"OutsideDia": new_tip, "BoreDia": bore, "BoreFinish": finish},
         centre=(cx, cy),
         keep_out={"OutsideDia": drawing.TIP_DIA_KEEP_OUT},
+        lands_within={
+            "OutsideDia": drawing.TIP_DIA_LANDING,
+            "BoreDia": drawing.BORE_LANDING,
+            "BoreFinish": drawing.BORE_LANDING,
+        },
         label="gear bore layout",
     )

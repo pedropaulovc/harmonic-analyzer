@@ -47,6 +47,11 @@ from _drawing_common import (
     stamp_drawing_summary,
     view_name,
 )
+from _drawing_leaders import (
+    assert_leaders_clear,
+    leader_segments,
+    section_line_segments,
+)
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
@@ -314,6 +319,43 @@ BORE_FIT_ATTACH = (
     FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(_BORE_GAP_ANGLE_RAD),
     FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(_BORE_GAP_ANGLE_RAD),
 )
+# The bore finish lands at -45 degrees, lower right: dropped straight to the
+# bore's bottom, its leader started on the A-A cutting-plane line (eye pass of
+# w15-3d3a9d762). The symbol stands right of the end view, clear of the teeth
+# and of the lower A arrow; ``_bore_leaders_clear_section_line`` reads the
+# cutting line back and fails on any crossing or overlap with it.
+FINISH_ATTACH = (
+    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(-45.0)),
+    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(-45.0)),
+)
+FINISH_SYMBOL = (FRONT_CENTER[0] + HALF_OD + 0.010, FRONT_CENTER[1] - 0.015)
+# Where each stroke must END, from the bore centre (sheet metres): both bore
+# leaders on the rim; the cutting line at its ends past the tooth tips. A
+# reading outside the band means the strokes are not sheet metres.
+BORE_LANDING = (0.5 * _BORE_SHEET_RADIUS, 1.5 * _BORE_SHEET_RADIUS)
+SECTION_LINE_LANDING = (0.0, HALF_OD + 0.010)
+
+
+def _bore_leaders_clear_section_line(
+    adapter: Any, front: Any, bore_fit: Any, finish: Any
+) -> None:
+    """Fail when either bore leader crosses or runs along the A-A cutting line."""
+    rebuild_drawing(adapter, label="bore leaders vs section line")
+    assert_leaders_clear(
+        {
+            "BoreFit": leader_segments(_early_bound(bore_fit, "INote").GetAnnotation()),
+            "BoreFinish": leader_segments(finish.GetAnnotation()),
+            "SectionLine": section_line_segments(front),
+        },
+        centre=FRONT_CENTER,
+        keep_out={},
+        lands_within={
+            "BoreFit": BORE_LANDING,
+            "BoreFinish": BORE_LANDING,
+            "SectionLine": SECTION_LINE_LANDING,
+        },
+        label="crank pinion end view",
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -437,7 +479,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Put the fit note immediately left of the end view and send its short
     # leader radially through the upper-left tooth gap to the visible bore.
     # The native section-view diameter remains beside its axial extent (rule 7).
-    add_leader_note(
+    bore_fit = add_leader_note(
         adapter,
         BORE_FIT_CALLOUT,
         text_xy=BORE_FIT_NOTE,
@@ -453,21 +495,19 @@ async def build(adapter: Any) -> dict[str, str]:
     # leaves. The roughness is the project's general machined grade, authored
     # on the PART and read back here (policy rule 5's "a surface that has to
     # work" case). A surface symbol's native anchor is its lower-left corner,
-    # and its text grows rightward; place it below the face view, clear of the
-    # boss-chamfer witness.
-    add_surface_finish(
+    # and its text grows rightward; place it right of the face view, clear of
+    # the A-A cutting-plane line.
+    finish = add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + HALF_OD - 0.006, FRONT_CENTER[1] - 0.055),
+        symbol_xy=FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "crank_pinion_bore"),
         label="crank pinion bore finish",
         entity=visible_circle_edge(adapter, front, BORE_DIA),
-        leader_attach_xy=(
-            FRONT_CENTER[0],
-            FRONT_CENTER[1] - BORE_DIA * VIEW_SCALE[0] / 2000.0,
-        ),
+        leader_attach_xy=FINISH_ATTACH,
         char_height=0.0025,
     )
+    _bore_leaders_clear_section_line(adapter, front, bore_fit, finish)
 
     add_property_linked_note(adapter, "Gear Data", 0.016, 0.258, char_height=0.0025)
     add_property_linked_note(
