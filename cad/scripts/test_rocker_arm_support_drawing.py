@@ -165,11 +165,16 @@ def test_stock_hold_down_clears_support_and_engages_blind_base_tap() -> None:
         screw.SHANK_LEN - support.FOOT_THICKNESS - screw.BEARING_OFFSET
     )
     assert base.HOLD_DOWN_ENGAGEMENT / screw.SHANK_DIA > 1.45
+    # Sized at the printed .XX band's worst case (base.seat_thread_depth).
     assert base.HOLD_DOWN_THREAD_DEPTH == pytest.approx(
-        base.HOLD_DOWN_ENGAGEMENT + base.HOLD_DOWN_TIP_CLEARANCE
+        base.seat_thread_depth(base.HOLD_DOWN_ENGAGEMENT)
     )
-    assert base.HOLD_DOWN_DRILL_DEPTH == pytest.approx(
-        base.HOLD_DOWN_THREAD_DEPTH + 5.0 * screw.THREAD_PITCH
+    assert (
+        base.HOLD_DOWN_THREAD_DEPTH - base.SEAT_DEPTH_BAND - base.HOLD_DOWN_ENGAGEMENT
+        >= base.HOLD_DOWN_TIP_CLEARANCE
+    )
+    assert base.HOLD_DOWN_DRILL_DEPTH - base.SEAT_DEPTH_BAND >= (
+        base.HOLD_DOWN_THREAD_DEPTH + base.SEAT_DEPTH_BAND + 5.0 * screw.THREAD_PITCH
     )
     assert frame.LAG_SCREW_TIP_Y == pytest.approx(
         frame.BASE_TOP_Y - base.HOLD_DOWN_ENGAGEMENT

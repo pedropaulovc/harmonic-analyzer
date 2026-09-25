@@ -223,9 +223,54 @@ BASE_CROSS_TAP_SPEC = HoleSpec(
 )
 BASE_CROSS_TAP_DRILL_DIA = TAP_DRILL_MM[BASE_CROSS_TAP_SPEC.size]
 BASE_SCREW_FACES = (("front", -1.0, True), ("rear", 1.0, False))
+
+
+def _title_block_band_mm(kind: str) -> float:
+    """A title-block general tolerance row's symmetric band, in mm."""
+    return float(str(_config.title_block(kind)["display"]).lstrip("±"))
+
+
+# Every blind-seat depth prints at two places (the hole table's thread and
+# drill cells, the transfer and cross-tap callouts), so the title block's
+# .XX band is its printed tolerance, and each seat is sized at that band's
+# worst case, not at nominal. The 2026-09-25 Codex machinist review found
+# the E seats' 9.50 thread held only 8.99 at its low limit, where the
+# nominal-length screw tip already ran into the incomplete threads.
+SEAT_DEPTH_BAND = _title_block_band_mm("linear_2pl")
+SEAT_TIP_RESERVE = 0.25
+SEAT_DEPTH_STEP = 0.05  # derived depths round UP to a shop-friendly step
+
+
+def _ceil_step(value: float) -> float:
+    return round(math.ceil(value / SEAT_DEPTH_STEP - 1e-9) * SEAT_DEPTH_STEP, 2)
+
+
+def _seat_lead_mm(size: str, kind: str) -> float:
+    """The tap's lead: two pitches for a bottoming tap, five for a plug."""
+    pitch = 25.4 / float(size.rsplit("-", 1)[1])
+    return (2.0 if kind == "tapped_bottoming" else 5.0) * pitch
+
+
+def seat_thread_depth(engagement: float) -> float:
+    """Full-thread depth that keeps the screw tip SEAT_TIP_RESERVE off the
+    incomplete threads when the printed depth sits at its low limit."""
+    return _ceil_step(engagement + SEAT_TIP_RESERVE + SEAT_DEPTH_BAND)
+
+
+def seat_drill_depth(thread_depth: float, size: str, kind: str) -> float:
+    """Tap-drill depth that keeps the tap's lead past the deepest printed
+    thread even when the drill sits at its low limit."""
+    return _ceil_step(thread_depth + 2.0 * SEAT_DEPTH_BAND + _seat_lead_mm(size, kind))
+
+
 if BASE_SPOTFACE_DEPTH <= 0.0:
     raise AssertionError("base cross-screw spotface must cut inward from the side")
-if CASTING_TAP_DRILL_DEPTH - CASTING_FULL_THREAD_DEPTH < 2.0 * 25.4 / 32.0:
+# The drill prints as a whole-mm MIN (no lower band); the thread's .XX band
+# still moves the deepest thread down towards it.
+if (
+    CASTING_TAP_DRILL_DEPTH - (CASTING_FULL_THREAD_DEPTH + SEAT_DEPTH_BAND)
+    < _seat_lead_mm(BASE_CROSS_TAP_SPEC.size, "tapped_bottoming") - 1e-9
+):
     raise AssertionError("base cross tap lacks two-pitch bottoming-tap lead")
 
 # Rocker-support hold-down seats (machine = part-local: frame.SLDASM places the
@@ -236,20 +281,21 @@ if CASTING_TAP_DRILL_DEPTH - CASTING_FULL_THREAD_DEPTH < 2.0 * 25.4 / 32.0:
 # The selected 1/4-20 x 5/8 screw bears on the bottom of its vendor-modeled
 # 0.277813 mm under-head washer transition. That physical bearing face crosses
 # the 6.35 mm support foot and leaves 9.247187 mm (1.456D) of engagement in
-# this base. Usable full thread extends 0.25 mm beyond the screw tip so it
-# cannot bottom before the head seats. A machine plug tap then needs four lead
-# threads plus one pitch of margin: cylindrical tap-drill depth = full-thread
-# depth + 5P = 15.847187 mm. Keep all three lengths explicit; they are
-# different assembly/manufacturing constraints.
+# this base. The seat is sized at its printed worst case (seat_thread_depth /
+# seat_drill_depth): full thread 10.05 keeps the tip 0.25 off the incomplete
+# threads at the thread's low limit, and the 17.45 drill keeps the plug
+# tap's five-pitch lead past its high limit. Keep all three lengths
+# explicit; they are different assembly/manufacturing constraints. The
+# engagement itself is under 1.5D: RELEASE_BLOCKER_SHORT_ENGAGEMENT.
 HOLD_DOWN_THREAD = "1/4-20"
 HOLD_DOWN_THREAD_CLASS = "2B"
 HOLD_DOWN_PITCH = IN / 20.0
 HOLD_DOWN_ENGAGEMENT = (
     HOLD_DOWN_SCREW_LEN - SUPPORT_FOOT_THICKNESS - HOLD_DOWN_BEARING_OFFSET
 )
-HOLD_DOWN_TIP_CLEARANCE = 0.25
-HOLD_DOWN_THREAD_DEPTH = HOLD_DOWN_ENGAGEMENT + HOLD_DOWN_TIP_CLEARANCE
-HOLD_DOWN_DRILL_DEPTH = HOLD_DOWN_THREAD_DEPTH + 5.0 * HOLD_DOWN_PITCH
+HOLD_DOWN_TIP_CLEARANCE = SEAT_TIP_RESERVE
+HOLD_DOWN_THREAD_DEPTH = seat_thread_depth(HOLD_DOWN_ENGAGEMENT)
+HOLD_DOWN_DRILL_DEPTH = seat_drill_depth(HOLD_DOWN_THREAD_DEPTH, HOLD_DOWN_THREAD, "tapped")
 HOLD_DOWN_SEAT_SPEC = HoleSpec(
     "tapped",
     HOLD_DOWN_THREAD,
@@ -335,25 +381,30 @@ LOCK_KNOB_XZ = SWING_HARDWARE_GEOMETRY.lock_xz
 STOP_SCREW_XZ = SWING_HARDWARE_GEOMETRY.stop_xz
 
 # Blind #10-24 UNC-2B bottoming tap: only the 9.525-mm threaded tail enters.
-# Full threads extend 0.25 past the tip; the 12-mm cylindrical drill leaves
-# 2.225 mm for the bottoming tap's two-pitch lead before the drill point.
-PIVOT_THREAD_BOTTOM_CLEARANCE = 0.25
-PIVOT_SCREW_HOLE_DEPTH = PIVOT_THREAD_ENGAGEMENT + PIVOT_THREAD_BOTTOM_CLEARANCE
-PIVOT_SCREW_DRILL_DEPTH = 12.0
+# Sized at the printed worst case: full threads clear the tip by 0.25 at
+# their low limit, and the drill keeps the bottoming tap's two-pitch lead.
+PIVOT_SCREW_HOLE_DEPTH = seat_thread_depth(PIVOT_THREAD_ENGAGEMENT)
+PIVOT_SCREW_DRILL_DEPTH = seat_drill_depth(
+    PIVOT_SCREW_HOLE_DEPTH, PIVOT_THREAD, "tapped_bottoming"
+)
 
 # The 19.05-mm stock stud enters 12.70 through the platform, or its full
 # length when the collar fences the disengaged notch on the bare base.
-# Full threads clear that deepest pose by 0.25; a five-pitch plug-tap lead
-# fits below them, before the separate 118-degree drill point.
+# Full threads clear that deepest pose by 0.25 at their printed low limit;
+# a five-pitch plug-tap lead fits below them, before the drill point.
 LOCK_STUD_ENGAGEMENT = LOCK_STUD_LEN - PLATE_T
-LOCK_SCREW_HOLE_DEPTH = LOCK_STUD_LEN + LOCK_STUD_BOTTOM_CLEARANCE
-LOCK_SCREW_DRILL_DEPTH = LOCK_SCREW_HOLE_DEPTH + LOCK_PLUG_TAP_LEAD
+LOCK_SCREW_HOLE_DEPTH = seat_thread_depth(LOCK_STUD_LEN)
+LOCK_SCREW_DRILL_DEPTH = seat_drill_depth(LOCK_SCREW_HOLE_DEPTH, LOCK_THREAD, "tapped")
+if LOCK_SCREW_HOLE_DEPTH - SEAT_DEPTH_BAND - LOCK_STUD_LEN < LOCK_STUD_BOTTOM_CLEARANCE:
+    raise AssertionError("cone lock seat loses the knob's stud clearance at its low limit")
+if LOCK_SCREW_DRILL_DEPTH - LOCK_SCREW_HOLE_DEPTH < LOCK_PLUG_TAP_LEAD:
+    raise AssertionError("cone lock seat drill loses the knob's plug-tap lead")
 
 # The shared 25.4-mm stock stop keeps its original 9.875-mm exposed height.
-# A 16-mm full thread clears the 15.525-mm embed; 4 mm below it accommodates
-# the #8-32 plug tap's five-pitch lead (3.96875), before the drill point.
-STOP_SCREW_HOLE_DEPTH = 16.0
-STOP_SCREW_DRILL_DEPTH = 20.0
+# Its full thread clears the 15.525-mm embed at the printed low limit; the
+# drill keeps the #8-32 plug tap's five-pitch lead below the high limit.
+STOP_SCREW_HOLE_DEPTH = seat_thread_depth(STOP_ENGAGEMENT)
+STOP_SCREW_DRILL_DEPTH = seat_drill_depth(STOP_SCREW_HOLE_DEPTH, STOP_THREAD, "tapped")
 
 # Alignment-pinion rig hold-downs, blind from the TOP face in the same
 # machine-handed convention: four #8-32 seats under the two pivot blocks
@@ -375,8 +426,11 @@ BLOCK_SCREW_XZ = tuple(
 # band.  The full-thread depth keeps the screw off the bottom at the worst
 # case (12.75 - 0.8 .X depth band >= 11.25 + 0.51 block band, 0.19 spare).
 BLOCK_SCREW_HOLE_DEPTH = 12.75
-BLOCK_SCREW_DRILL_DEPTH = 15.0
-# Bottoming tap: 3.1 mm runout exceeds two #8-32 pitches (1.5875 mm).
+# The drill keeps the bottoming tap's two #8-32 pitches (1.5875 mm) past the
+# deepest printed thread; 15.0 left 1.23 at the .XX worst case.
+BLOCK_SCREW_DRILL_DEPTH = seat_drill_depth(
+    BLOCK_SCREW_HOLE_DEPTH, "#8-32", "tapped_bottoming"
+)
 _FORMER_FOOT_SCREW_XZ = (
     # spring foot: 20.0 EAST of the swing pivot bore (the east block screw
     # is 8.5 east of it), outboard of the back strap (re-derived 2026-09-24;
@@ -387,10 +441,12 @@ _FORMER_FOOT_SCREW_XZ = (
 FOOT_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_FOOT_SCREW_XZ
 )
-# The stock 9.525-mm foot screw penetrates 9.025 mm below the 0.5-mm spring.
-FOOT_SCREW_HOLE_DEPTH = 9.275  # stock engagement + 0.25 tip reserve
-FOOT_SCREW_DRILL_DEPTH = 11.3
-# Bottoming tap: 2.025 mm runout exceeds two #4-40 pitches (1.27 mm).
+# The stock 9.525-mm foot screw penetrates 9.025 mm below the 0.5-mm spring;
+# the seat is sized at its printed worst case for a #4-40 bottoming tap.
+FOOT_SCREW_HOLE_DEPTH = seat_thread_depth(FOOT_SCREW_LEN - SPRING_THICKNESS)
+FOOT_SCREW_DRILL_DEPTH = seat_drill_depth(
+    FOOT_SCREW_HOLE_DEPTH, "#4-40", "tapped_bottoming"
+)
 
 # U34c (dt-bank-pedestal-layout-20260923 rev 3, H1): one MHA-143 #8-32 x 3/4
 # fillister holds each arbor pedestal through its ledge hole. Machine frame,
@@ -605,7 +661,7 @@ def _general_band_mm() -> float:
     The lengths and rim width print one place; the hole-table coordinates
     print at least one, so this band bounds every location term.
     """
-    return float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
+    return _title_block_band_mm("linear_1pl")
 
 
 def _edge_break_mm() -> float:
@@ -672,10 +728,26 @@ for _axis, _stack in COLUMN_SOCKET_LAND_STACKS.items():
         )
 
 
+# The one seat whose installed screw engages under 1.5D. Its fix is a
+# 1/4-20 x 3/4 screw (Main's ruling on the 2026-09-25 machinist review),
+# blocked on the user harvesting that McMaster SLDPRT and its SKU: the
+# vendor models are web downloads and are never tracked. Release blocker;
+# delete this entry when lag-screw moves to the 3/4 screw.
+RELEASE_BLOCKER_SHORT_ENGAGEMENT = {
+    "rocker support": "1/4-20 x 5/8 engages 1.456D; 3/4 screw harvest pending",
+}
+
+
 def require_blind_seat_fit(
-    label: str, seat: HoleSpec, engagement: float, *, tip_reserve: float = 0.25
+    label: str,
+    seat: HoleSpec,
+    engagement: float,
+    *,
+    tip_reserve: float = SEAT_TIP_RESERVE,
+    band: float = SEAT_DEPTH_BAND,
 ) -> None:
-    """Keep a stock screw in full threads above a manufacturable tap lead."""
+    """Keep a stock screw in full threads above a manufacturable tap lead,
+    with both printed depths at the worst case of their ``band``."""
     if seat.kind not in ("tapped", "tapped_bottoming") or seat.end != "blind":
         raise AssertionError(f"{label}: base seat must be a native blind tap")
     thread_depth = seat.overrides_mm.get("ThreadDepth", seat.depth_mm)
@@ -688,15 +760,28 @@ def require_blind_seat_fit(
         raise AssertionError(
             f"{label}: engagement and depths must be finite and positive"
         )
-    if engagement < THREAD_MAJOR_MM[seat.size]:
+    diameter = THREAD_MAJOR_MM[seat.size]
+    if engagement < diameter:
         raise AssertionError(
             f"{label}: less than one diameter of full-thread engagement"
         )
-    if thread_depth - engagement < tip_reserve - 1e-9:
-        raise AssertionError(f"{label}: screw bottoms before seating in full threads")
+    if engagement < 1.5 * diameter - 1e-9 and label not in RELEASE_BLOCKER_SHORT_ENGAGEMENT:
+        raise AssertionError(
+            f"{label}: screw engages {engagement / diameter:.3f}D, under 1.5D"
+        )
+    if thread_depth - band < 1.5 * diameter - 1e-9:
+        raise AssertionError(
+            f"{label}: full thread {thread_depth - band:.3f} at its printed low "
+            f"limit is under 1.5D ({1.5 * diameter:.3f})"
+        )
+    if thread_depth - band - engagement < tip_reserve - 1e-9:
+        raise AssertionError(
+            f"{label}: screw bottoms before seating in full threads at the "
+            f"printed low limit ({thread_depth:.2f} - {band:.2f})"
+        )
     pitch = 25.4 / float(seat.size.rsplit("-", 1)[1])
     lead_pitches = 2.0 if seat.kind == "tapped_bottoming" else 5.0
-    if seat.depth_mm - thread_depth < lead_pitches * pitch - 1e-9:
+    if seat.depth_mm - band - (thread_depth + band) < lead_pitches * pitch - 1e-9:
         tap = "bottoming" if seat.kind == "tapped_bottoming" else "plug"
         raise AssertionError(
             f"{label}: drill lacks {lead_pitches:g}-pitch {tap}-tap lead"

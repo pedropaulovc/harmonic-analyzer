@@ -21,36 +21,41 @@ from build_swing_stop_screw import SHANK_DIA as STOP_SHANK_DIA
 
 
 @pytest.mark.parametrize(
-    ("seat", "engagement", "kind", "lead_pitches"),
+    ("label", "seat", "engagement", "kind", "lead_pitches"),
     (
         (
+            "rocker support",
             part.HOLD_DOWN_SEAT_SPEC,
             part.HOLD_DOWN_ENGAGEMENT,
             "tapped",
             5,
         ),
-        (part.PIVOT_SEAT_SPEC, part.PIVOT_THREAD_ENGAGEMENT, "tapped_bottoming", 2),
-        (part.LOCK_SEAT_SPEC, part.LOCK_STUD_LEN, "tapped", 5),
-        (part.STOP_SEAT_SPEC, part.STOP_ENGAGEMENT, "tapped", 5),
+        ("cone pivot", part.PIVOT_SEAT_SPEC, part.PIVOT_THREAD_ENGAGEMENT, "tapped_bottoming", 2),
+        ("cone lock", part.LOCK_SEAT_SPEC, part.LOCK_STUD_LEN, "tapped", 5),
+        ("swing stop", part.STOP_SEAT_SPEC, part.STOP_ENGAGEMENT, "tapped", 5),
         (
+            "pinion block",
             part.BLOCK_SEAT_SPEC,
             part.BLOCK_SCREW_LEN - part.BLOCK_HEIGHT,
             "tapped_bottoming",
             2,
         ),
         (
+            "spring foot",
             part.FOOT_SEAT_SPEC,
             part.FOOT_SCREW_LEN - part.SPRING_THICKNESS,
             "tapped_bottoming",
             2,
         ),
         (
+            "pedestal hold-down",
             part.PEDESTAL_SEAT_SPEC,
             part.PEDESTAL_SCREW_LEN - part.PEDESTAL_FLANGE_THICKNESS,
             "tapped_bottoming",
             2,
         ),
         (
+            "nameplate",
             part.NAMEPLATE_SEAT_SPEC,
             part.NAMEPLATE_SCREW_LEN - part.nameplate_spec.PLATE_THICKNESS,
             "tapped_bottoming",
@@ -59,19 +64,23 @@ from build_swing_stop_screw import SHANK_DIA as STOP_SHANK_DIA
     ),
 )
 def test_blind_seats_keep_stock_in_full_threads_above_the_tap_lead(
-    seat, engagement: float, kind: str, lead_pitches: int
+    label: str, seat, engagement: float, kind: str, lead_pitches: int
 ) -> None:
     assert seat.kind == kind
-    part.require_blind_seat_fit("stock fit", seat, engagement)
+    part.require_blind_seat_fit(label, seat, engagement)
+    band = part.SEAT_DEPTH_BAND
     thread_depth = seat.overrides_mm["ThreadDepth"]
     pitch = 25.4 / float(seat.size.rsplit("-", 1)[1])
-    assert thread_depth - engagement >= 0.25 - 1e-9
-    assert seat.depth_mm - thread_depth >= lead_pitches * pitch - 1e-9
+    # Both printed depths at the worst case of their .XX band.
+    assert thread_depth - band - engagement >= 0.25 - 1e-9
+    assert seat.depth_mm - band - (thread_depth + band) >= lead_pitches * pitch - 1e-9
     # A drill that loses just 0.01 mm of the required tooling lead is invalid
     # even though the unchanged stock screw still clears the full threads.
-    short_lead = replace(seat, depth_mm=thread_depth + lead_pitches * pitch - 0.01)
+    short_lead = replace(
+        seat, depth_mm=thread_depth + 2.0 * band + lead_pitches * pitch - 0.01
+    )
     with pytest.raises(AssertionError, match="tap lead"):
-        part.require_blind_seat_fit("short lead", short_lead, engagement)
+        part.require_blind_seat_fit(label, short_lead, engagement)
 
 
 def test_pivot_rejects_former_full_threads_to_drill_bottom() -> None:
@@ -107,8 +116,8 @@ def test_base_seat_rejects_nonphysical_tip_reserve(tip_reserve: float) -> None:
 def test_pivot_drill_keeps_its_point_inside_the_pad_and_clear_of_cavities() -> None:
     from _holes import DRILL_POINT_H, blind_hole_volume_mm3
 
-    assert part.PIVOT_SEAT_SPEC.overrides_mm["ThreadDepth"] == pytest.approx(9.775)
-    assert part.PIVOT_SEAT_SPEC.depth_mm == pytest.approx(12.0)
+    assert part.PIVOT_SEAT_SPEC.overrides_mm["ThreadDepth"] == pytest.approx(10.30)
+    assert part.PIVOT_SEAT_SPEC.depth_mm == pytest.approx(13.45)
     radius = part.PIVOT_SCREW_HOLE_DIA / 2.0
     assert part.PIVOT_DRILL_BOTTOM_WALL == pytest.approx(
         part.TOP_THICKNESS - part.PIVOT_SEAT_SPEC.depth_mm - radius * DRILL_POINT_H
@@ -119,7 +128,7 @@ def test_pivot_drill_keeps_its_point_inside_the_pad_and_clear_of_cavities() -> N
     assert blind_hole_volume_mm3(
         part.PIVOT_SCREW_HOLE_DIA, part.PIVOT_SEAT_SPEC.depth_mm
     ) - blind_hole_volume_mm3(part.PIVOT_SCREW_HOLE_DIA, 11.525) == pytest.approx(
-        math.pi * radius**2 * 0.475
+        math.pi * radius**2 * (13.45 - 11.525)
     )
 
 
@@ -131,7 +140,7 @@ def test_cone_lock_seats_on_plate_and_bare_base_with_useful_threads() -> None:
     assert knob.STUD_LEN - platform.PLATE_T == pytest.approx(12.7)
     assert knob.STUD_LEN - platform.PLATE_T - knob.TIP_CHAMFER >= 1.5 * knob.STUD_DIA
     assert part.LOCK_SEAT_SPEC.overrides_mm["ThreadDepth"] - knob.STUD_LEN >= 0.25
-    assert part.LOCK_SEAT_SPEC.depth_mm == pytest.approx(25.65)
+    assert part.LOCK_SEAT_SPEC.depth_mm == pytest.approx(27.25)
     drill_tip_depth = (
         part.LOCK_SEAT_SPEC.depth_mm + part.LOCK_SCREW_HOLE_DIA / 2.0 * DRILL_POINT_H
     )
@@ -141,7 +150,7 @@ def test_cone_lock_seats_on_plate_and_bare_base_with_useful_threads() -> None:
     radius = part.LOCK_SCREW_HOLE_DIA / 2.0
     assert blind_hole_volume_mm3(
         part.LOCK_SCREW_HOLE_DIA, part.LOCK_SEAT_SPEC.depth_mm
-    ) == pytest.approx(math.pi * radius**2 * (25.65 + radius * DRILL_POINT_H / 3.0))
+    ) == pytest.approx(math.pi * radius**2 * (27.25 + radius * DRILL_POINT_H / 3.0))
 
 
 def test_cone_lock_rejects_short_stock_even_in_a_deep_receiver() -> None:
@@ -1215,3 +1224,72 @@ def test_stamped_id_leader_clears_the_socket_bores() -> None:
     assert clearance((0.125, 0.130)) < 0.0  # the reviewed sheet: through A3
     assert sheet.SERIAL_NOTE_XY == (0.080, 0.130)
     assert clearance(sheet.SERIAL_NOTE_XY) >= 0.004
+
+
+# The depths each seat printed before the 2026-09-25 machinist review sized
+# them at the .XX band's worst case: (label, seat, engagement, thread, drill).
+_PRE_BAND_SEATS = (
+    (
+        "rocker support",
+        part.HOLD_DOWN_SEAT_SPEC,
+        part.HOLD_DOWN_ENGAGEMENT,
+        part.HOLD_DOWN_ENGAGEMENT + 0.25,
+        part.HOLD_DOWN_ENGAGEMENT + 0.25 + 5.0 * part.HOLD_DOWN_PITCH,
+    ),
+    ("cone pivot", part.PIVOT_SEAT_SPEC, part.PIVOT_THREAD_ENGAGEMENT, 9.775, 12.0),
+    ("cone lock", part.LOCK_SEAT_SPEC, part.LOCK_STUD_LEN, 19.3, 25.65),
+    ("swing stop", part.STOP_SEAT_SPEC, part.STOP_ENGAGEMENT, 16.0, 20.0),
+    ("spring foot", part.FOOT_SEAT_SPEC, part.FOOT_SCREW_LEN - part.SPRING_THICKNESS, 9.275, 11.3),
+    ("pinion block", part.BLOCK_SEAT_SPEC, part.BLOCK_SCREW_LEN - part.BLOCK_HEIGHT, 12.75, 15.0),
+)
+
+
+@pytest.mark.parametrize(
+    ("label", "seat", "engagement", "thread", "drill"),
+    _PRE_BAND_SEATS,
+    ids=[row[0] for row in _PRE_BAND_SEATS],
+)
+def test_pre_band_seat_depths_fail_at_the_printed_low_limit(
+    label: str, seat, engagement: float, thread: float, drill: float
+) -> None:
+    # The 2026-09-25 Codex machinist review (hb-render-5): at the low limit of
+    # its printed .XX band the E seats' thread let the screw tip into the
+    # incomplete threads, as did four other seats; the pinion-block drill lost
+    # its bottoming-tap lead at the worst case. Each old seat now fails.
+    old = replace(seat, depth_mm=drill, overrides_mm={"ThreadDepth": thread})
+    with pytest.raises(AssertionError, match="bottoms|tap lead|under 1.5D"):
+        part.require_blind_seat_fit(label, old, engagement)
+
+
+def test_seat_depths_derive_from_engagement_band_and_tap_lead() -> None:
+    band = part.SEAT_DEPTH_BAND
+    assert band == pytest.approx(0.51)  # the title block's .XX row
+    assert part.HOLD_DOWN_THREAD_DEPTH == pytest.approx(10.05)
+    assert part.HOLD_DOWN_DRILL_DEPTH == pytest.approx(17.45)
+    for engagement, thread in (
+        (part.HOLD_DOWN_ENGAGEMENT, part.HOLD_DOWN_THREAD_DEPTH),
+        (part.PIVOT_THREAD_ENGAGEMENT, part.PIVOT_SCREW_HOLE_DEPTH),
+        (part.LOCK_STUD_LEN, part.LOCK_SCREW_HOLE_DEPTH),
+        (part.STOP_ENGAGEMENT, part.STOP_SCREW_HOLE_DEPTH),
+        (part.FOOT_SCREW_LEN - part.SPRING_THICKNESS, part.FOOT_SCREW_HOLE_DEPTH),
+    ):
+        needed = engagement + part.SEAT_TIP_RESERVE + band
+        assert needed <= thread < needed + part.SEAT_DEPTH_STEP
+
+
+def test_only_the_named_release_blocker_engages_under_one_and_a_half_d() -> None:
+    assert set(part.RELEASE_BLOCKER_SHORT_ENGAGEMENT) == {"rocker support"}
+    # The same short screw in any other seat fails loud.
+    with pytest.raises(AssertionError, match="under 1.5D"):
+        part.require_blind_seat_fit(
+            "some other seat", part.HOLD_DOWN_SEAT_SPEC, part.HOLD_DOWN_ENGAGEMENT
+        )
+
+
+def test_cross_tap_drill_keeps_the_bottoming_lead_past_the_deepest_thread() -> None:
+    from frame_attachment_spec import CASTING_FULL_THREAD_DEPTH, CASTING_TAP_DRILL_DEPTH
+
+    lead = 2.0 * 25.4 / 32.0
+    # 48 MIN left 1.49 past 46.00 + 0.51, under two #10-32 pitches.
+    assert 48.0 - (CASTING_FULL_THREAD_DEPTH + part.SEAT_DEPTH_BAND) < lead
+    assert CASTING_TAP_DRILL_DEPTH - (CASTING_FULL_THREAD_DEPTH + part.SEAT_DEPTH_BAND) >= lead
