@@ -1494,6 +1494,193 @@ def drawing_registry_reads_selected(texts: tuple[str, ...], stem: str) -> bool:
     return True
 
 
+@functools.lru_cache(maxsize=32)
+def _dict_table_source(
+    text: str, table: str
+) -> tuple[str, tuple[tuple[str, str], ...]]:
+    """Split a module into its shared code and the entries of one dict table.
+
+    The table must be ONE module-level assignment of a dict display with unique
+    string-literal keys; anything else raises, so a caller keeps the whole file.
+    Entry values may be any expression: each is kept as its own AST dump, and
+    every name it references is module code, which stays in the shared part.
+    """
+    tree = ast.parse(text)
+    stores = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name) and node.id == table and isinstance(node.ctx, ast.Store)
+    ]
+    declaration = next(
+        (
+            node
+            for node in tree.body
+            if isinstance(node, (ast.Assign, ast.AnnAssign))
+            and [target for target in (
+                node.targets if isinstance(node, ast.Assign) else [node.target]
+            ) if isinstance(target, ast.Name) and target.id == table]
+        ),
+        None,
+    )
+    if len(stores) != 1 or declaration is None or not isinstance(declaration.value, ast.Dict):
+        raise ValueError(f"{table} must be one module-level dict display")
+    entries = []
+    for key, value in zip(declaration.value.keys, declaration.value.values):
+        if not (isinstance(key, ast.Constant) and isinstance(key.value, str)):
+            raise ValueError(f"{table} keys must be string literals")
+        entries.append((key.value, ast.dump(value, include_attributes=False)))
+    if len({key for key, _ in entries}) != len(entries):
+        raise ValueError(f"{table} has duplicate keys")
+    declaration.value = ast.Dict(keys=[], values=[])
+    return ast.dump(tree, include_attributes=False), tuple(entries)
+
+
+def dict_table_entries(text: str, table: str) -> tuple[str, ...]:
+    """The keys of a dict table, in source order (raises like ``dict_table_recipe``)."""
+    return tuple(key for key, _ in _dict_table_source(text, table)[1])
+
+
+def dict_table_recipe(text: str, table: str, keys: frozenset[str]) -> str:
+    """The recipe of a dict-table module as seen by a consumer of ``keys`` only.
+
+    Shared code (everything but the table's entries) plus the selected entries.
+    An entry outside ``keys`` can change without moving this recipe; a selected
+    key that is absent is recorded as absent, so adding it moves the recipe too.
+    """
+    shared, entries = _dict_table_source(text, table)
+    by_key = dict(entries)
+    return json.dumps(
+        {"shared": shared, "entries": {key: by_key.get(key) for key in sorted(keys)}},
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+
+
+class TableReads(NamedTuple):
+    """What one source reads from a dict table through its accessor function."""
+
+    keys: frozenset[str]  # literal (or literal-constant) keys it asks for
+    dynamic: bool  # it also calls the accessor with a runtime value
+
+
+@functools.lru_cache(maxsize=512)
+def table_reads(
+    text: str, module: str, table: str, accessor: str, exports: frozenset[str]
+) -> TableReads | None:
+    """Classify how ``text`` uses ``module.table``; ``None`` keeps the whole file.
+
+    A source may import only ``accessor`` and the names in ``exports`` from
+    ``module`` (no alias, no star, no module import, no string alias), may never
+    name ``table``, and may call ``accessor`` with one positional argument. A
+    string literal, or a module-level name assigned a string literal exactly
+    once, is a literal key; any other argument is a dynamic read. Everything
+    else is unclassified. Like the drawing-registry reader this deliberately
+    does no general dataflow: a use it cannot prove narrow keeps the file.
+    """
+    tree = ast.parse(text)
+    nodes = tuple(ast.walk(tree))
+    constants: dict[str, str] = {}
+    stored: dict[str, int] = {}
+    for node in nodes:
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            stored[node.id] = stored.get(node.id, 0) + 1
+    for node in tree.body:
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ):
+            constants[node.targets[0].id] = node.value.value
+    constants = {name: value for name, value in constants.items() if stored.get(name) == 1}
+
+    accessor_names: set[str] = set()
+    for node in nodes:
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if node.value.rsplit(".", 1)[-1] == module:
+                return None  # a string alias can escape the static import graph
+        elif isinstance(node, ast.Import):
+            if any(alias.name.rsplit(".", 1)[-1] == module for alias in node.names):
+                return None
+        elif isinstance(node, ast.ImportFrom):
+            if node.module is None or node.module.rsplit(".", 1)[-1] != module:
+                if any(alias.name in {"*", "import_module"} for alias in node.names):
+                    return None
+                continue
+            for alias in node.names:
+                if alias.asname is not None:
+                    return None
+                if alias.name == accessor:
+                    accessor_names.add(alias.name)
+                elif alias.name not in exports:
+                    return None
+        elif isinstance(node, ast.Attribute) and node.attr in {table, "import_module", "modules"}:
+            return None
+        elif isinstance(node, ast.Name) and node.id in {
+            table,
+            "eval",
+            "exec",
+            "globals",
+            "vars",
+            "__import__",
+        }:
+            return None
+
+    keys: set[str] = set()
+    dynamic = False
+    calls = {
+        id(node.func): node
+        for node in nodes
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in accessor_names
+    }
+    for node in nodes:
+        if not (isinstance(node, ast.Name) and node.id in accessor_names):
+            continue
+        if isinstance(node.ctx, ast.Store):
+            return None
+        call = calls.get(id(node))
+        if call is None or len(call.args) != 1 or call.keywords:
+            return None  # passed around, re-exported or called unusually
+        argument = call.args[0]
+        if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+            keys.add(argument.value)
+        elif isinstance(argument, ast.Name) and argument.id in constants:
+            keys.add(constants[argument.id])
+        else:
+            dynamic = True
+    return TableReads(frozenset(keys), dynamic)
+
+
+FASTENER_TABLE = ("_fastener_catalog", "FASTENERS", "fastener", frozenset({"PurchasedFastenerSpec"}))
+
+
+def fastener_rows_selected(
+    texts: tuple[str, ...], own_row: str | None, rows: frozenset[str]
+) -> frozenset[str] | None:
+    """The catalog rows a complete consumer closure can read, or ``None`` (whole file).
+
+    Literal reads name their rows. A dynamic read (``fastener(part_name)`` in a
+    shared helper) is attributed to the task's own row when it has one (a
+    catalogued part, or the drawing of one). ``fastener`` enforces the result at
+    run time against ``HARMONIC_FASTENER_ROWS``: a dynamic read of any row outside
+    the set -- including by a task with no own row -- fails the build instead of
+    reusing an artefact keyed without that row.
+    """
+    selected: set[str] = set()
+    for text in texts:
+        reads = table_reads(text, *FASTENER_TABLE)
+        if reads is None:
+            return None
+        selected |= reads.keys
+        if reads.dynamic and own_row in rows:
+            selected.add(own_row)
+    return frozenset(selected)
+
+
 def data_deps_of(script: Path) -> list[str]:
     """Resolved paths of every vendored DXF/DWG artefact ``script`` (or a helper
     it imports) references by filename -- the run-time-imported input edges doit
