@@ -1122,9 +1122,9 @@ def test_flange_webs_and_nut_clear_the_2_0_target_at_the_printed_limits() -> Non
     assert (spec.FLANGE_SLOT_Z, spec.FLANGE_LEN, spec.FLANGE_T) == (10.7, 20.8, 3.50)
     slot_max = spec.FLANGE_SLOT_W + 0.10
     width = spec.BLOCK_X
-    # The slot is located .XX from +X; the flange's width is .X.
+    # r3: the slot is located .X from -X; the flange's width is .X.
     assert spec.WORST_FLANGE_SIDE_WEB_MM == pytest.approx(
-        min(width / 2.0 - 0.51, width - 0.8 - (width / 2.0 + 0.51)) - slot_max / 2.0
+        min(width / 2.0 - 0.8, width - 0.8 - (width / 2.0 + 0.8)) - slot_max / 2.0
     )
     # r3: each arc centre from the south face, .X.
     assert spec.WORST_FLANGE_END_WEB_MM == pytest.approx(
@@ -1317,7 +1317,6 @@ def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
         "HeelReliefHt",
         "FlangeT",
         "FlangeSlotW",
-        "FlangeSlotX",
     }
 
 
@@ -1627,3 +1626,26 @@ def test_section_arrows_stand_clear_of_every_value() -> None:
     body = source[source.index("async def build(") :]
     assert "_plan_y(Z_NORTH) - SECTION_LINE_OVERSHOOT)" in body
     assert "_plan_y(Z_SOUTH) + SECTION_LINE_OVERSHOOT)" in body
+
+
+def test_flange_slot_location_prints_one_place() -> None:
+    """Main (r3): FlangeSlotX kept I31's .XX with no stack behind it.  At .X
+    the flange's side webs keep 4.87 (target 2.0), and the hold-down screw
+    can sit 0.8 + 0.51 = 1.31 off the adjuster axis, which the platform's
+    worst cross-slot travel (1.74) plus the screw's float in the narrowest
+    flange slot (0.23) takes up with 0.66 to spare (0.25 required)."""
+    spec = cone_tip_block_spec
+    assert spec.DRAWING_PRECISION_BY_NAME["FlangeSlotX"] == 1
+    slot = _printed("FlangeSlotX", spec.FLANGE_SLOT_X)
+    width = _printed("Width", spec.BLOCK_X)
+    lower, upper = deviations(spec.FLANGE_SLOT_W_BAND)
+    side_web = min(slot[0], width[0] - slot[1]) - (spec.FLANGE_SLOT_W + upper) / 2.0
+    assert side_web >= 2.0
+    assert spec.WORST_FLANGE_SIDE_WEB_MM == pytest.approx(side_web)
+    passage = _printed("PassageCenter", spec.BLOCK_X / 2.0)
+    offset = max(slot[1] - passage[0], passage[1] - slot[0])
+    float_min = (spec.FLANGE_SLOT_W + lower - 0.138 * 25.4) / 2.0
+    take_up = 1.74 + float_min
+    assert offset + 0.25 <= take_up
+    assert spec.WORST_HOLDDOWN_LATERAL_OFFSET_MM == pytest.approx(offset)
+    assert take_up - offset == pytest.approx(0.662, abs=1e-3)

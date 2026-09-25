@@ -391,6 +391,7 @@ _FLANGE_SLOT_W_LOWER, _FLANGE_SLOT_W_UPPER = deviations(FLANGE_SLOT_W_BAND)
 FLANGE_SLOT_W_MIN = FLANGE_SLOT_W + _FLANGE_SLOT_W_LOWER
 FLANGE_SLOT_W_MAX = FLANGE_SLOT_W + _FLANGE_SLOT_W_UPPER
 FLANGE_SLOT_FLOAT = (FLANGE_SLOT_W_MAX - _HOLDDOWN_MAJOR_MM) / 2.0
+FLANGE_SLOT_FLOAT_MIN = (FLANGE_SLOT_W_MIN - _HOLDDOWN_MAJOR_MM) / 2.0
 # Why the width keeps that band (Main's ruled fit, r3): under the title
 # block's general .XX band the slot could come out 3.46, under the #6-32
 # major, and the hold-down screw would not pass; rule 12 lets the one-pass
@@ -458,13 +459,40 @@ NUT_WALL_AIR = 0.5
 # From the south face; the flange's own length is .X like the body's plan.
 _SLOT_SOUTH_EDGE_MAX = _south_end_limits[1] + FLANGE_SLOT_W_MAX / 2.0
 FLANGE_LEN = 20.8
-# The slot is on the block's centre plane, located .XX from the -X face (the
-# PassageCenter datum); the flange is the block's full width (.X).
+# The slot is on the block's centre plane, located from the -X face (the
+# PassageCenter datum); the flange is the block's full width (.X).  r3 (Main,
+# 2026-09-25): no stack needs the slot's location at .XX, so it prints .X --
+# the side webs below and the lateral take-up after them both close there.
 FLANGE_SLOT_X = BLOCK_X / 2.0
+FLANGE_SLOT_X_PLACES = 1
+_slot_x_limits = _printed_limits(FLANGE_SLOT_X, FLANGE_SLOT_X_PLACES)
 WORST_FLANGE_SIDE_WEB_MM = min(
-    round(FLANGE_SLOT_X, 2) - _GENERAL_2PL_MM,
-    round(BLOCK_X, 1) - _GENERAL_1PL_MM - (round(FLANGE_SLOT_X, 2) + _GENERAL_2PL_MM),
+    _slot_x_limits[0],
+    _width_limits[0] - _slot_x_limits[1],
 ) - (FLANGE_SLOT_W_MAX) / 2.0
+# Lateral fit-up: the shaft sets the adjuster axis (PassageCenter) and the
+# hold-down screw stands at the flange slot's centre (FlangeSlotX), both from
+# the -X face, so the two disagree by at most their two bands.  The screw's
+# float in the narrowest flange slot and the swing platform's cross slot take
+# that up: its worst lateral travel either side of the cone axis is 1.74
+# (cone_swing_platform_spec.TIP_LATERAL_TRAVEL_WORST, the platform's own
+# PR, asserted at 1.74 there), with HOLDDOWN_LATERAL_MARGIN_MM to spare.
+PLATE_TIP_LATERAL_TRAVEL_WORST_MM = 1.74
+HOLDDOWN_LATERAL_MARGIN_MM = 0.25
+_passage_x_limits = _printed_limits(BLOCK_X / 2.0, PASSAGE_CENTER_PLACES)
+WORST_HOLDDOWN_LATERAL_OFFSET_MM = max(
+    _slot_x_limits[1] - _passage_x_limits[0],
+    _passage_x_limits[1] - _slot_x_limits[0],
+)
+HOLDDOWN_LATERAL_TAKE_UP_MM = PLATE_TIP_LATERAL_TRAVEL_WORST_MM + FLANGE_SLOT_FLOAT_MIN
+if (
+    WORST_HOLDDOWN_LATERAL_OFFSET_MM + HOLDDOWN_LATERAL_MARGIN_MM
+    > HOLDDOWN_LATERAL_TAKE_UP_MM + 1e-9
+):
+    raise AssertionError(
+        f"the hold-down screw can sit {WORST_HOLDDOWN_LATERAL_OFFSET_MM:.3f} off the "
+        f"adjuster axis; the slots take up {HOLDDOWN_LATERAL_TAKE_UP_MM:.3f}"
+    )
 WORST_FLANGE_END_WEB_MM = FLANGE_LEN - _GENERAL_1PL_MM - _SLOT_SOUTH_EDGE_MAX
 WORST_FLANGE_ROOT_WEB_MM = _north_end_limits[0] - FLANGE_SLOT_W_MAX / 2.0
 WORST_NUT_WALL_AIR_MM = (
@@ -563,8 +591,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # thickness (the hold-down protrusion stack) and the flange slot's cutter
 # fit, and PassageCenter (at .X the west half could reach 9.3 against the
 # platform's 9.558 there; build_drive_train_assembly's print-worst
-# containment).  FlangeSlotX keeps I31's .XX though no stack needs it (its
-# side webs close at .X); dropping it is left to review.
+# containment).  FlangeSlotX dropped to .X in r3: no stack needed I31's .XX.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {"Width": BLOCK_WIDTH_PLACES, "Depth": BLOCK_DEPTH_PLACES},
     "Block": {"BlockHt": BLOCK_HEIGHT_PLACES},
@@ -579,7 +606,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Flange": {"FlangeT": 2},
     # The width is the 5/32 cutter's (+0.10/0, set on the model).
     "FlangeSlotProfile": {"FlangeSlotW": 2},
-    "FlangeSlotXReference": {"FlangeSlotX": 2},
+    "FlangeSlotXReference": {"FlangeSlotX": FLANGE_SLOT_X_PLACES},
     "FlangeSlotNorthReference": {"FlangeSlotNorthZ": FLANGE_SLOT_END_PLACES},
     "FlangeSlotSouthReference": {"FlangeSlotSouthZ": FLANGE_SLOT_END_PLACES},
 }
@@ -590,6 +617,7 @@ _STACK_GRADES = {
     ("Block", "BlockHt"): BLOCK_HEIGHT_PLACES,
     ("AxisHeightReference", "AxisHeight"): AXIS_HEIGHT_PLACES,
     ("PassageCenterReference", "PassageCenter"): PASSAGE_CENTER_PLACES,
+    ("FlangeSlotXReference", "FlangeSlotX"): FLANGE_SLOT_X_PLACES,
     ("PinchHeightReference", "PinchHeight"): PINCH_HEIGHT_PLACES,
     ("SlitProfile", "SlitW"): SLIT_W_PLACES,
     ("TopSlit", "SlitDepth"): SLIT_DEPTH_PLACES,
