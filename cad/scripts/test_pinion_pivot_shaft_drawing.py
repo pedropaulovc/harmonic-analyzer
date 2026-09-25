@@ -94,7 +94,16 @@ def test_direct_limits_and_native_cylindricity_control_the_body() -> None:
     assert "CYLINDRICITY" not in drawing.DIMENSION_CALLOUTS["ShaftDia"]
     assert "Ra 1.6" not in drawing.DIMENSION_CALLOUTS["ShaftDia"]
     assert "CROWN ROOT CIRCLES" in drawing.DIMENSION_CALLOUTS["Depth"]
-    assert drawing.FRONT_KEEP["ShaftDia"] == (0.055, 0.167)
+    # Main eye pass on pc-ea2: under the end view the diameter's leader ran
+    # back through its own stacked "-0.02".  Clear left of the end view the
+    # leader rises right from the underline and crosses no tolerance text.
+    text_x, text_y = drawing.FRONT_KEEP["ShaftDia"]
+    end_view_left = (
+        drawing.FRONT_CENTER[0]
+        - drawing.END_VIEW_SCALE * pinion_pivot_shaft_spec.SHAFT_DIA / 2.0 / 1000.0
+    )
+    assert text_x < end_view_left
+    assert text_y < drawing.FRONT_CENTER[1]
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

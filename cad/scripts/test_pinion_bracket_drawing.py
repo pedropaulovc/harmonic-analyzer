@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pinion_bracket_spec
@@ -78,7 +79,11 @@ def test_every_band_traces_to_a_named_fit_class() -> None:
         ("StrapProfile", "ArborBoreDia"): "*deviations(ARBOR_BORE_BAND)",
         ("PinSeatProfile", "PinSeatDia"): "*deviations(PIN_SEAT_DIA_BAND)",
         ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_BAND)",
+        # The one band that is not a fit: user ruling (a) tightened the seat's
+        # printed station for its far-face web (PIN_SEAT_WEB_WORST).
+        ("PinSeatProfile", "PinSeatCz"): "*deviations(PIN_SEAT_STATION_BAND)",
     }
+    assert pinion_bracket_spec.PIN_SEAT_STATION_BAND == (0.10, -0.10)
     assert pinion_bracket_spec.PIVOT_BORE_BAND is REAM_SLIDE
     assert pinion_bracket_spec.ARBOR_BORE_BAND is REAM_SLIDE
     assert pinion_bracket_spec.PIN_SEAT_DIA_BAND is REAM_H7
@@ -107,6 +112,7 @@ def test_decimal_places_cover_every_marked_dimension_and_resolve_fit_bands() -> 
         ("PivotBoreDia", pinion_bracket_spec.PIVOT_BORE_BAND),
         ("ArborBoreDia", pinion_bracket_spec.ARBOR_BORE_BAND),
         ("PinSeatDia", pinion_bracket_spec.PIN_SEAT_DIA_BAND),
+        ("PinSeatCz", pinion_bracket_spec.PIN_SEAT_STATION_BAND),
     ):
         width = abs(deviations(band)[0] - deviations(band)[1])
         assert width >= 10.0 ** -by_name[name]
@@ -141,15 +147,22 @@ def test_blind_seat_dimensions_are_assigned_to_readable_views() -> None:
         "PinSeatCy",
         "Depth",
         "CrossHoleDia",
+        "CrossHoleCz",
+        "PinSeatCz",
+        "CrossHoleFromBoreWall",
     }
 
 
-def test_follower_seat_is_printed_centred_with_a_rule_12_web() -> None:
-    # Rule 12 (audit W23): centred on the thickness, only the .X Depth band
-    # reaches the web -- 2.04 worst case against the 2.0 target.
-    assert "CENTRED ON THICKNESS" in drawing.DIMENSION_CALLOUTS["PinSeatDia"]
-    assert "PinSeatCz" not in pinion_bracket_spec.DRAWING_PRECISION_BY_NAME
-    assert pinion_bracket_spec.PIN_SEAT_WEB_WORST >= 2.0
+def test_follower_seat_station_is_printed_from_face_a_with_a_rule_12_web() -> None:
+    # Rule 12 (audit W23) under user ruling (a), Codex #858 P2: the station
+    # is the model's own PinSeatCz from broad face A, never "CENTRED" prose.
+    # At the general .XX grade the far-face web was 1.18, so the user approved
+    # +/-0.10 on the station alone: 1.54 worst case over the 1.5 floor.
+    assert "CENTRED" not in drawing.DIMENSION_CALLOUTS["PinSeatDia"]
+    assert "PinSeatCz" in pinion_bracket_spec.DRAWING_DIMENSIONS["PinSeatProfile"]
+    assert pinion_bracket_spec.DRAWING_PRECISION_BY_NAME["PinSeatCz"] == 2
+    assert pinion_bracket_spec.PIN_SEAT_WEB_WORST >= 1.5
+    assert pinion_bracket_spec.PIN_SEAT_NEAR_WEB_WORST >= 2.0
 
 
 def test_blind_seat_entry_face_is_complete_solid_flank() -> None:
@@ -188,25 +201,124 @@ def test_part_config_supplies_the_title_block_fields() -> None:
     assert int(spec["quantity"]) == 2  # the book uses two swing brackets
 
 
-def test_set_pin_cross_hole_is_located_by_its_callout() -> None:
-    # Option E-a: the hole sits ON the pivot-bore axis and centred on the
-    # thickness.  Both are zero/centred locations with no dimension to band
-    # (and no frame on a bracket, rule 3), so the callout states them and the
-    # diameter is the only marked dimension -- a plain drilled hole under the
-    # title block's DRILLED HOLES row.
+def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
+    # Codex #858 P2, user ruling (a): no location lives in prose.  Through the
+    # thickness the model's own CrossHoleCz (half the thickness from broad
+    # face A) prints at .XX; across the bar a hidden construction reference
+    # sketch owns the hole's distance from the pivot-bore wall ("PivotBore" /
+    # 2), which the side view shows and prints at .XX.  The callout keeps only
+    # THRU and the loose-supplied pin.
+    import inspect
+
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
     assert callout is pinion_bracket_spec.CROSS_HOLE_CALLOUT
-    assert "THRU ON PIVOT-BORE AXIS" in callout
-    assert "CENTRED ON THICKNESS" in callout
+    assert "AXIS" not in callout and "CENTRED" not in callout
+    assert callout.splitlines()[0] == "THRU"
     assert "SUPPLY 1/16 X 1/2 SLOTTED SPRING" in callout
     assert "PIN (ASME B18.8.2) LOOSE" in callout
     assert len(callout.splitlines()) <= 4
     body = callout.replace("1/16 X 1/2", "").replace("B18.8.2", "")
     assert not any(ch.isdigit() for ch in body)
-    assert pinion_bracket_spec.DRAWING_DIMENSIONS["CrossHoleProfile"] == {
-        "CrossHoleDia"
-    }
-    assert pinion_bracket_spec.DRAWING_PRECISION_BY_NAME["CrossHoleDia"] == 2
+    dims = pinion_bracket_spec.DRAWING_DIMENSIONS
+    assert dims["CrossHoleProfile"] == {"CrossHoleDia", "CrossHoleCz"}
+    assert dims["CrossHoleAxisReference"] == {"CrossHoleFromBoreWall"}
+    by_name = pinion_bracket_spec.DRAWING_PRECISION_BY_NAME
+    assert by_name["CrossHoleDia"] == 2
+    assert by_name["CrossHoleCz"] == 2
+    assert by_name["CrossHoleFromBoreWall"] == 2
+    # Both locations are the model's relations to its globals, not typed
+    # numbers, and the reference sketch is saved hidden so it never renders
+    # in an assembly.
+    build_source = inspect.getsource(bracket)
+    assert "'\"StrapThickness\" / 2'" in build_source
+    assert "(wall_dims[0], '\"PivotBore\" / 2')" in build_source
+    assert 'blank_sketch(adapter, "CrossHoleAxisReference")' in build_source
+    # A part-hidden owner sketch delivers nothing to the plain import, so the
+    # side view that keeps its dimension imports through the hidden-owner form.
+    draw_source = inspect.getsource(drawing)
+    assert "left_annotations = curate_hidden_owner_dimensions(" in draw_source
     assert pinion_bracket_spec.CROSS_HOLE_DIA == 25.4 / 16.0
     # The spring pin's own band, resolvable at two places.
     assert pinion_bracket_spec.CROSS_HOLE_BAND == (0.06, 0.0)
+
+
+# Title-block general grades by printed decimal places (.X, .XX, .XXX).
+_GENERAL_GRADE = {1: 0.8, 2: 0.51, 3: 0.13}
+# The 0.05 drilled-hole allowance every web budget on this strap carries.
+_DRILL_ALLOWANCE = 0.05
+_WEB_FLOOR = 1.5
+
+
+def _printed_band(name: str) -> float:
+    """The half-width a location can wander on the print: its own model band
+    when it carries one, else its decimal places' general grade."""
+    own = {"PinSeatCz": pinion_bracket_spec.PIN_SEAT_STATION_BAND}
+    if name in own:
+        upper, lower = own[name]
+        return max(abs(upper), abs(lower))
+    return _GENERAL_GRADE[pinion_bracket_spec.DRAWING_PRECISION_BY_NAME[name]]
+
+
+def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
+    # User ruling (a): each thin wall around the two pin holes is recomputed
+    # here from the model constants and the bands the sheet PRINTS (decimal
+    # places or a model band), so a later tolerance or precision change that
+    # thins one under the 1.5 floor fails loud.
+    import pinion_pivot_shaft_spec as shaft
+    import pinion_strap_pin_spec as pin
+
+    geometry = pinion_bracket_geometry
+    thickness_min = geometry.THICKNESS - _printed_band("Depth")
+    hole_r = (
+        pinion_bracket_spec.CROSS_HOLE_DIA + pinion_bracket_spec.CROSS_HOLE_BAND[0]
+    ) / 2.0
+    seat_r = (geometry.PIN_BORE + pinion_bracket_spec.PIN_SEAT_DIA_BAND[0]) / 2.0
+    bore_r = (geometry.PIVOT_BORE + pinion_bracket_spec.PIVOT_BORE_BAND[0]) / 2.0
+    shaft_min = shaft.SHAFT_DIA + shaft.SHAFT_DIA_BAND[1]
+    half = geometry.THICKNESS / 2.0
+    hole_height = _printed_band("CrossHoleFromBoreWall")
+    seat_height = _printed_band("PinSeatCy")
+    worst = {
+        # Cross hole to the far and the near broad face.
+        "cross hole far face": thickness_min
+        - (half + _printed_band("CrossHoleCz"))
+        - hole_r
+        - _DRILL_ALLOWANCE,
+        "cross hole near face": half
+        - _printed_band("CrossHoleCz")
+        - hole_r
+        - _DRILL_ALLOWANCE,
+        # Follower seat to the far and the near broad face.
+        "seat far face": thickness_min
+        - (half + _printed_band("PinSeatCz"))
+        - seat_r
+        - _DRILL_ALLOWANCE,
+        "seat near face": half - _printed_band("PinSeatCz") - seat_r - _DRILL_ALLOWANCE,
+        # The match-drilled hole off the shaft axis thins the shaft wall.
+        "shaft wall": (shaft_min - 2.0 * hole_r) / 2.0 - hole_height,
+        # Follower seat down to the pivot bore and to the cross hole.
+        "seat to pivot bore": abs(geometry.PIN_DROP)
+        - seat_height
+        - seat_r
+        - bore_r
+        - _DRILL_ALLOWANCE,
+        "seat to cross hole": abs(geometry.PIN_DROP)
+        - seat_height
+        - hole_height
+        - seat_r
+        - hole_r
+        - _DRILL_ALLOWANCE,
+    }
+    thin = {name: round(web, 3) for name, web in worst.items() if web < _WEB_FLOOR}
+    assert not thin, f"webs under the {_WEB_FLOOR} floor: {thin}"
+    # The spec constants the build and review cite are these same worst cases.
+    assert math.isclose(worst["cross hole far face"], pin.STRAP_FACE_WEB_WORST)
+    assert math.isclose(worst["seat far face"], pinion_bracket_spec.PIN_SEAT_WEB_WORST)
+    assert math.isclose(
+        worst["seat near face"], pinion_bracket_spec.PIN_SEAT_NEAR_WEB_WORST
+    )
+    assert math.isclose(worst["shaft wall"], pin.SHAFT_LIGAMENT_WORST)
+    # The values the ruling approved.
+    assert math.isclose(worst["cross hole far face"], 2.316, abs_tol=5e-4)
+    assert math.isclose(worst["seat far face"], 1.544, abs_tol=5e-4)
+    assert math.isclose(worst["shaft wall"], 1.831, abs_tol=5e-4)

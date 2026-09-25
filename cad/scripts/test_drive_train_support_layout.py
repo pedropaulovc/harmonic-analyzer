@@ -264,10 +264,10 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
     )
 
 
-# MHA-060's 192.4 length carries the title-block .X band (Main 2026-09-24:
-# keep it loose).  The front end is located by the lever hub (the rod bottoms
-# in its bore), so the whole band lands at the back end, on top of the rod's
-# axial float.
+# MHA-060's 192.0 length (pinion_rig_layout.LIFT_ROD_LEN) carries the
+# title-block .X band (Main 2026-09-24: keep it loose).  The front end is
+# located by the lever hub (the rod bottoms in its bore), so the whole band
+# lands at the back end, on top of the rod's axial float.
 _ROD_LEN_BAND = 0.8
 
 
@@ -469,10 +469,12 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     assert pin.PIN_BURIED_MARGIN >= 0.4
     # Engagement in each strap wall past the pivot bore.
     assert pin.PIN_LEN / 2.0 - drive.STRAP_PIVOT_BORE / 2.0 >= 3.0
-    # U27 webs: strap faces and follower seat at the 2.0 target; the shaft
+    # U27 webs: strap faces and follower seat at the 2.0 target (the far
+    # strap face against the .XX-printed station, Codex #858 P2); the shaft
     # ligament at the FULL general .XX offset meets the 1.5 floor, and a
     # 0.25 V-block set-up clears the 2.0 target.
-    assert math.isclose(pin.STRAP_FACE_WEB_WORST, 3.226, abs_tol=5e-4)
+    assert math.isclose(pin.STRAP_FACE_WEB_WORST, 2.316, abs_tol=5e-4)
+    assert pin.STRAP_FACE_WEB_WORST >= 2.0
     assert pin.FOLLOWER_SEAT_LIGAMENT >= 2.0
     assert math.isclose(pin.SHAFT_LIGAMENT_WORST, 1.831, abs_tol=5e-4)
     assert pin.SHAFT_LIGAMENT_WORST >= 1.5
