@@ -103,6 +103,11 @@ DETAIL_FOCUS = (
 )
 DETAIL_RADIUS_MM = 3.5
 DETAIL_LABEL_XY = (0.222, 0.160)
+# The parent fence's native "A" goes WEST of the fence, level with its centre:
+# SolidWorks sets it above the fence, on the FREE, TO KINK TANGENT row
+# (stacktop-dbe47ae3 and spring-r1 both printed it there).  West of the fence
+# is open sheet; the free-form phantom runs on the fence's west edge.
+PARENT_LETTER_OFFSET = (-(DETAIL_RADIUS_MM * _S + 0.005), 0.0)
 
 
 def _front_x(model_x_mm: float) -> float:
@@ -222,6 +227,19 @@ def _kink_detail(adapter: Any, front: Any) -> Any:
     actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
     if math.dist(actual, label_xyz) > 1e-8:
         raise RuntimeError(f"kink detail label position did not persist: {actual}")
+    # _stock_trim_drawing.position_parent_detail_letter's proven form.
+    circles = tuple(_read_member(parent, "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(f"expected one parent detail circle, found {len(circles)}")
+    circle = _early_bound(circles[0], "IDetailCircle")
+    letter = tuple(center[axis] + PARENT_LETTER_OFFSET[axis] for axis in range(2))
+    circle.SetLabelPosition(*letter)
+    draw.EditRebuild3()
+    placed = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(placed) != 2 or math.dist(placed, letter) > 1e-8:
+        raise RuntimeError(
+            f"parent detail-circle label position did not persist: {placed}"
+        )
     return detail
 
 
