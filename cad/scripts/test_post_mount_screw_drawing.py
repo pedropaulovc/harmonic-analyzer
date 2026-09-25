@@ -90,10 +90,12 @@ def test_cut_length_prints_as_a_reference_without_a_band() -> None:
     assert not hasattr(spec, "CUT_LENGTH_BAND")
     assert not hasattr(drawing, "EXPECTED_CONTROLS")
     builder = Path(part.__file__).read_text(encoding="utf-8")
-    # The one band in the builder is the cut end's break, never the length.
-    calls = builder.split("set_dimension_bilateral_tolerance(")[1:]
-    assert len(calls) == 1
-    assert calls[0].split(")")[0].split(",")[1].strip() == "CUT_END_BREAK_SKETCH"
+    # The one tolerance in the builder is the cut end's break (a single MAX
+    # limit), never the length.
+    assert "set_dimension_bilateral_tolerance(" not in builder
+    helper = builder.split("def _single_limit_break", 1)[1].split("\ndef ", 1)[0]
+    assert "CUT_END_BREAK_SKETCH, CUT_END_BREAK_DIMENSION" in helper
+    assert builder.count("tolerance.Type = ") == 1
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_reference_dimension(" in source
     assert "swTolNONE" in source
@@ -148,7 +150,7 @@ def test_cut_length_is_a_model_owned_drawing_dimension() -> None:
     }
     assert spec.REFERENCE_SKETCHES == ("CutLengthReference", "CutEndBreakReference")
     assert spec.DRAWING_PRECISION_BY_NAME == {"CutLength": 1, "CutEndBreak": 1}
-    assert set(drawing.FRONT_KEEP) == {"CutLength", "CutEndBreak"}
+    assert set(drawing.FRONT_KEEP) == {"CutLength"}
     builder = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in builder
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -158,21 +160,18 @@ def test_cut_length_is_a_model_owned_drawing_dimension() -> None:
 
 def test_cut_end_break_is_a_model_owned_deburr_of_at_most_0_1() -> None:
     """Main's engagement ruling: the cut end's break is 0.1 max (a deburr,
-    not the title block's 0.25), banded on the model's CutEndBreak dimension
-    and re-read on the sheet; the note stays digit-free."""
+    not the title block's 0.25).  The model's CutEndBreak carries the band's
+    deviations natively as a MAX-limit dimension; the note stays digit-free."""
     lower, upper = deviations(spec.CUT_END_BREAK_BAND)
     assert spec.CUT_END_BREAK_MM + upper <= 0.1 + 1e-12
     assert spec.CUT_END_BREAK_MM + lower >= 0.0
     assert spec.CUT_END_BREAK_MAX_MM == spec.CUT_END_BREAK_MM + upper
     assert spec.POST_MOUNT_TAP_EDGE_BREAK <= 0.1
     builder = Path(part.__file__).read_text(encoding="utf-8")
-    assert "lower, upper = deviations(CUT_END_BREAK_BAND)" in builder
-    assert "CUT_END_BREAK_DIMENSION" in builder
-    nominal, low, high = drawing.BREAK_CONTROLS["CutEndBreak"]
-    assert (nominal, low, high) == pytest.approx(
-        (spec.CUT_END_BREAK_MM / 1000, lower / 1000, upper / 1000)
-    )
-    assert drawing.BREAK_TOLERANCE_TYPES == {"CutEndBreak": 2}  # swTolBILAT
+    helper = builder.split("def _single_limit_break", 1)[1].split("\ndef ", 1)[0]
+    assert "lower, upper = deviations(CUT_END_BREAK_BAND)" in helper
+    assert "tolerance.Type = CUT_END_BREAK_TOL_TYPE" in helper
+    assert "_single_limit_break(adapter)" in builder
     assert not any(ch.isdigit() for ch in spec.MANUFACTURING_NOTES)
 
 
@@ -322,7 +321,7 @@ def test_sheet_notes_carry_no_dimension_rule_or_sequence() -> None:
     assert "installation_notes" not in row
     notes = spec.MANUFACTURING_NOTES
     assert not any(ch.isdigit() for ch in notes)
-    assert "CHAMFER CUT END" in notes
+    assert "DEBURR CUT END" in notes
     for word in ("RULE", "EXCEPTION", "ENGAGEMENT", "NOMINAL", "INSTALL", "MHA-"):
         assert word not in notes
     assert len(notes.splitlines()) <= 4
@@ -350,11 +349,7 @@ def test_sheet_layout_keeps_notes_clear_of_the_view() -> None:
     widest = max(len(line) for line in drawing.DIMENSION_CALLOUTS["CutLength"].splitlines())
     assert x + widest * 0.00285 / 2.0 < drawing.FRONT_CENTER[0] - part.HEAD_DIA / 2000.0 - 0.003
     assert x - widest * 0.00285 / 2.0 > 0.015  # inside the border
-    # The break's leadered text: right of the shank, above the note block.
-    text_x, text_y = drawing.BREAK_TEXT
-    assert text_x - 0.004 > drawing.FRONT_CENTER[0] + part.SHANK_DIA / 2000.0 + 0.010
-    assert text_y - 0.004 > notes_y + 0.004
-    assert text_y < drawing.TIP_Y
+    assert not hasattr(drawing, "BREAK_TEXT")
 
 
 def test_stock_build_uses_its_registered_recipe() -> None:
@@ -433,3 +428,102 @@ def test_break_gate_decides_on_the_rim_before_and_after() -> None:
     with pytest.raises(RuntimeError, match="is not the major"):
         part.assert_break_removed_metal(major - brk, major - brk, brk)
     assert part.RIM_TOL_MM == 1e-4
+
+
+# --- Main's MHA-142 eye pass on #857: the cut-end break callout -----------
+# A 0.1 dimension at 1:1 printed "0.0" stacked over "0.1 -0.1": illegible,
+# and +0/-0.1 read as permitting no break.  The note says DEBURR, the Front
+# view drops the break, and a 10:1 tip detail prints the single limit.
+
+
+def test_note_says_deburr_not_chamfer() -> None:
+    notes = spec.MANUFACTURING_NOTES
+    assert notes.splitlines()[0] == "DEBURR CUT END."
+    assert "CHAMFER" not in notes
+    assert not any(ch.isdigit() for ch in notes)
+
+
+def test_front_view_carries_no_break_dimension() -> None:
+    """The 1:1 Front claims only the cut length; the break is claimed only by
+    the tip detail."""
+    assert "CutEndBreak" not in drawing.FRONT_KEEP
+    assert spec.FRONT_VIEW_DIMENSIONS == {"CutLengthReference": {"CutLength"}}
+    assert spec.DETAIL_VIEW_DIMENSIONS == {"CutEndBreakReference": {"CutEndBreak"}}
+    assert set(drawing.DETAIL_KEEP) == {"CutEndBreak"}
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "dimensions_by_feature=FRONT_VIEW_DIMENSIONS" in source
+    assert "dimensions_by_feature=DETAIL_VIEW_DIMENSIONS" in source
+    assert "BREAK_CONTROLS" not in source and "offset_dimension_text" not in source
+
+
+def test_tip_detail_prints_the_band_max_as_a_single_limit() -> None:
+    """The detail's dimension reads the spec band's max at its places, as a
+    swTolMAX single limit; the seat read-back composes the same text."""
+    lower, upper = deviations(spec.CUT_END_BREAK_BAND)
+    places = spec.DRAWING_PRECISION_BY_NAME["CutEndBreak"]
+    expected = f"{spec.CUT_END_BREAK_MM + upper:.{places}f} MAX"
+    assert spec.CUT_END_BREAK_TEXT == expected == "0.1 MAX"
+    assert spec.CUT_END_BREAK_TOL_TYPE == 6  # swTolType_e.swTolMAX
+    # swTolMAX prints the nominal, so the nominal must be the band's max.
+    assert spec.CUT_END_BREAK_MM == spec.CUT_END_BREAK_MAX_MM
+    # Tighter than the title block's general chamfer, or it would not print.
+    general = float(_config.title_block("edge_break")["chamfer_max_mm"])
+    assert spec.TITLE_BLOCK_CHAMFER_MAX_MM == general
+    assert spec.CUT_END_BREAK_MAX_MM < general
+    # The seat composes the rendered text from the read-back parts.
+    assert drawing.break_text(spec.CUT_END_BREAK_MAX_MM, places, 6, "", "") == expected
+    assert drawing.break_text(spec.CUT_END_BREAK_MAX_MM, places, 2, "", "") != expected
+    assert drawing.break_text(spec.CUT_END_BREAK_MAX_MM, places, 6, "(", ")") != expected
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("_verify_tip_detail(adapter, front, detail)") == 2
+    assert "hidden_sketches.part_sketches_shown(" in source
+    block = source.split("hidden_sketches.part_sketches_shown(", 1)[1]
+    block = block.split("assert_imported_precision(adapter, detail_annotations", 1)[0]
+    assert "trim_drawing.end_detail(adapter, front, TIP_DETAIL)" in block
+    assert "hidden_sketches.curate_view_dimensions(" in block
+    assert spec.DETAIL_SKETCHES == ("CutEndBreakReference",)
+
+
+def test_tip_detail_geometry_keeps_the_break_inside_its_crop() -> None:
+    """A detail drops any dimension whose reference lies outside its crop:
+    both ends of the break's radial leg must sit inside the fence."""
+    assert drawing.DETAIL_SCALE == (10.0, 1.0)
+    reference_y = -spec.CUT_LENGTH_MM + drawing.DETAIL_OFFSET_MM
+    assert drawing.TIP_DETAIL.detail_reference_mm == (0.0, reference_y, 0.0)
+    for radius in (spec.MAJOR_RADIUS_MM, spec.MAJOR_RADIUS_MM - spec.CUT_END_BREAK_MM):
+        reach = math.hypot(radius, -spec.CUT_LENGTH_MM - reference_y)
+        assert reach < drawing.DETAIL_FENCE_MM - 0.25
+
+
+# Named margins for the sheet-local layout of the tip detail.
+DETAIL_BORDER_MARGIN = 0.013  # sheet edge to the inner frame, plus clearance
+DETAIL_VIEW_GAP = 0.010  # detail circle to any other view's ink
+DETAIL_NOTE_GAP = 0.008  # detail circle or label to the note block
+
+
+def test_tip_detail_layout_is_clear() -> None:
+    from _drawing_registry import DRAWING_TEMPLATES
+
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    cx, cy = drawing.DETAIL_CENTER
+    r = drawing.DETAIL_RADIUS
+    assert r == pytest.approx(drawing.DETAIL_FENCE_MM * 10.0 / 1000.0)
+    # Inside the frame.
+    assert cy + r < template.height_m - DETAIL_BORDER_MARGIN
+    # Right of the Front view's head, left of the isometric's head.
+    assert cx - r > drawing.FRONT_CENTER[0] + part.HEAD_DIA / 2000.0 + DETAIL_VIEW_GAP
+    assert cx + r < drawing.ISO_CENTER[0] - part.HEAD_DIA / 2000.0 - DETAIL_VIEW_GAP
+    # Above the title block and the note block.
+    assert cy - r > template.title_block_top_m + DETAIL_VIEW_GAP
+    notes_top = drawing.NOTES_XY[1] + 0.004
+    assert cy - r > notes_top + DETAIL_NOTE_GAP
+    label_x, label_y = drawing.TIP_DETAIL.detail_label_xy
+    assert label_y > notes_top + DETAIL_NOTE_GAP
+    assert label_y > template.title_block_top_m + DETAIL_NOTE_GAP
+    assert label_x < template.title_block_left_m or label_y > template.title_block_top_m
+    # The break's text sits inside the detail's column, below the end face.
+    text_x, text_y = drawing.DETAIL_KEEP["CutEndBreak"]
+    rim_x, rim_y = drawing.BREAK_RIM_XY
+    assert text_y < rim_y
+    assert cx - r < text_x < drawing.ISO_CENTER[0] - part.HEAD_DIA / 2000.0 - DETAIL_VIEW_GAP
+    assert text_y > label_y + DETAIL_NOTE_GAP / 2.0
