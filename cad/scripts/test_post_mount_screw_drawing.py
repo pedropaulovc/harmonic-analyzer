@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import _config
@@ -10,6 +9,8 @@ import build_post_mount_screw as part
 import cone_pivot_post_spec as post
 import cone_swing_platform_spec as platform
 import draw_post_mount_screw as drawing
+import post_mount_screw_spec as spec
+from _drawing_contract import drawing_specification_violations
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import THREAD_MAJOR_MM
 from _stock_fastener import STOCK_RECIPES
@@ -45,37 +46,75 @@ def test_nominal_end_sits_short_of_the_platform_underside() -> None:
     assert engagement / part.SHANK_DIA >= 0.90
 
 
-def test_installation_note_carries_the_ruled_cut_to_fit_line() -> None:
-    notes = " ".join(_config.parts(part.PART_NAME)["installation_notes"].split())
-    assert (
-        "CUT EACH TO FIT, SHORT OF MHA-091 UNDERSIDE, NEVER PROUD (NOMINAL 86.0)"
-        in notes
-    )
-    stated = float(re.search(r"ENGAGEMENT (\d+\.\d\d)D MIN", notes).group(1))
-    assert stated == 0.90
-    assert "NAMED EXCEPTION TO RULE 12" in notes
-    for number in ("MHA-016", "MHA-091"):
-        assert number in notes
-    assert f"NOMINAL {part.SHANK_LEN:.1f}" in notes
+def test_cut_length_band_is_derived_from_the_post_and_plate_chain() -> None:
+    """Modified purchased part: the cut is a real dimension whose band keeps
+    the end between the nominal cut and flush, never proud of MHA-091."""
+    assert spec.GRIP_MM == GRIP
+    assert spec.FLUSH_LENGTH_MM == GRIP + platform.PLATE_THICKNESS
+    assert spec.CUT_LENGTH_MM == part.SHANK_LEN == 86.0
+    upper, lower = spec.CUT_LENGTH_BAND
+    assert (upper, lower) == (0.3, 0.0)
+    assert spec.CUT_LENGTH_MIN_MM == spec.CUT_LENGTH_MM
+    assert spec.CUT_LENGTH_MAX_MM <= spec.FLUSH_LENGTH_MM  # never proud
+    # The band is stated at the dimension's own places, floored toward flush.
+    places = spec.DRAWING_PRECISION_BY_NAME["CutLength"]
+    assert places == 1
+    assert round(upper, places) == upper
+    assert spec.FLUSH_LENGTH_MM - spec.CUT_LENGTH_MAX_MM < 10.0**-places
 
 
-def test_installation_note_fits_the_purchased_note_box() -> None:
-    """The contract's reserved box (_purchased_fastener_drawing) is
-    (0.015, 0.169)-(0.225, 0.190), with the note anchored at (0.018, 0.189).
+def test_cut_length_is_a_model_owned_drawing_dimension() -> None:
+    """Rule 2: the value, places and band are the part's; the sheet imports
+    the one marked dimension from its hidden reference sketch and re-reads it."""
+    assert spec.DRAWING_DIMENSIONS == {"CutLengthReference": {"CutLength"}}
+    assert spec.REFERENCE_SKETCHES == ("CutLengthReference",)
+    assert set(drawing.FRONT_KEEP) == {"CutLength"}
+    nominal, low, high = drawing.EXPECTED_CONTROLS["CutLength"]
+    assert nominal == spec.CUT_LENGTH_MM / 1000
+    assert (low, high) == (0.0, spec.CUT_LENGTH_BAND[0] / 1000)
+    assert drawing.TOLERANCE_TYPES == {"CutLength": 2}  # swTolBILAT
+    builder = Path(part.__file__).read_text(encoding="utf-8")
+    assert "set_dimension_bilateral_tolerance(" in builder
+    assert "*deviations(CUT_LENGTH_BAND)" in builder
+    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in builder
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "hidden_sketches.curate_view_dimensions" in source
+    assert "verify_machining_controls" in source
 
-    It is a literal inside the builder, so this pins it from the one
-    measurement we have: 857-parts-r1 (bb0c8b18) rendered the six-line
-    note at 17.6..128.6 x 165.2..189.4 mm: 4.04 mm per line.  One of its
-    lines of 45 to 50 characters set the width, so a character is at most
-    110.96 / 45 = 2.47 mm.  Four lines leave about 4 mm spare, as MHA-140's
-    four did.
-    """
-    lines = _config.parts(part.PART_NAME)["installation_notes"].splitlines()
-    top, bottom, left, right = 189.42, 169.0, 17.62, 225.0
-    line_pitch, char_width = 24.25 / 6, 110.96 / 45
-    assert top - len(lines) * line_pitch >= bottom + 2.0
-    widest = max(len(line) for line in lines)
-    assert left + widest * char_width <= right - 10.0
+
+def test_sheet_notes_carry_no_dimension_rule_or_sequence() -> None:
+    """Main's eye pass of warm-c486 (rule 6): the old INSTALLATION block
+    printed "(NOMINAL 86.0)", "0.90D MIN" and "NAMED EXCEPTION TO RULE 12".
+    The cut length is now the dimension, engagement a model assert and the
+    sequence an MHA-A03 step, so no part note carries a number."""
+    row = _config.parts(part.PART_NAME)
+    assert "installation_notes" not in row
+    notes = spec.MANUFACTURING_NOTES
+    assert not any(ch.isdigit() for ch in notes)
+    assert "CHAMFER CUT END" in notes
+    for word in ("RULE", "EXCEPTION", "ENGAGEMENT", "NOMINAL", "INSTALL", "MHA-"):
+        assert word not in notes
+    assert len(notes.splitlines()) <= 4
+
+
+def test_engagement_exception_is_held_by_the_model() -> None:
+    """The named rule-12 exception (0.90D) is asserted at the short limit."""
+    assert spec.MIN_ENGAGEMENT_DIAMETERS == 0.90
+    assert spec.ENGAGEMENT_MIN_MM == spec.CUT_LENGTH_MIN_MM - GRIP
+    assert spec.ENGAGEMENT_MIN_MM / part.SHANK_DIA >= 0.90
+
+
+def test_sheet_layout_keeps_notes_clear_of_the_view() -> None:
+    """1:1 Front view spans ~92 mm around its centre; the note block sits
+    between it and the stock rows, the cut length left of the shank."""
+    half_h = (spec.CUT_LENGTH_MM + part.HEAD_H) / 2000.0
+    view_bottom = drawing.FRONT_CENTER[1] - half_h
+    notes_y = drawing.NOTES_XY[1]
+    assert notes_y + 0.004 < view_bottom
+    lines = len(spec.MANUFACTURING_NOTES.splitlines())
+    assert notes_y - lines * 0.0045 > max(y for _, _, y in drawing.STOCK_ROWS) + 0.003
+    x, _ = drawing.FRONT_KEEP["CutLength"]
+    assert x < drawing.FRONT_CENTER[0] - part.HEAD_DIA / 2000.0 - 0.010
 
 
 def test_stock_build_uses_its_registered_recipe() -> None:
@@ -91,14 +130,24 @@ def test_stock_build_uses_its_registered_recipe() -> None:
     assert "1456MSL" in row["material_specification"]
 
 
-def test_drawing_is_the_purchased_reference_sheet() -> None:
-    spec = DRAWINGS_BY_NAME["post_mount_screw"]
-    assert drawing.SPEC is spec
-    assert spec.artifact_stem == part.PART_NAME
-    assert spec.script == Path(drawing.__file__).resolve()
-    assert "build_purchased_fastener_drawing" in Path(drawing.__file__).read_text(
-        encoding="utf-8"
+def test_drawing_is_the_modified_stock_sheet() -> None:
+    """A cut purchased part takes a manufacturing sheet with its cut length,
+    not the dimensionless purchased reference sheet (boss hook's pattern)."""
+    registry = DRAWINGS_BY_NAME["post_mount_screw"]
+    assert drawing.SPEC is registry
+    assert registry.artifact_stem == part.PART_NAME
+    assert registry.script == Path(drawing.__file__).resolve()
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "build_purchased_fastener_drawing" not in source
+    assert "Installation Notes" not in source
+
+
+def test_sheet_passes_the_drawing_owned_precision_rule() -> None:
+    violations = drawing_specification_violations(
+        Path(drawing.__file__).read_text(encoding="utf-8"),
+        filename=Path(drawing.__file__).name,
     )
+    assert violations == ()
 
 
 def test_standalone_recipe_run_is_catalog_only() -> None:
