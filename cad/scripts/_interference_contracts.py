@@ -16,6 +16,8 @@ from build_harmonic_base import (
     HOLD_DOWN_ENGAGEMENT as _HOLD_DOWN_ENGAGEMENT,
     HOLD_DOWN_TAP_DRILL_DIA as _HOLD_DOWN_TAP_DRILL_DIA,
     HOLD_DOWN_THREAD as _HOLD_DOWN_THREAD,
+    PEDESTAL_FLANGE_THICKNESS as _PEDESTAL_FLANGE_THICKNESS,
+    PEDESTAL_SCREW_LEN as _PEDESTAL_SCREW_LEN,
 )
 from _hole_spec import THREAD_MAJOR_MM
 from crank_arm_spec import (
@@ -325,7 +327,9 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         "drive-train-1/pedestal-hold-down-screw",
         range(1, 3),
         "frame-1/harmonic-base",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 19.05 - 5.0),
+        _smooth_annulus_limit_mm3(
+            4.1656, 3.454, _PEDESTAL_SCREW_LEN - _PEDESTAL_FLANGE_THICKNESS
+        ),
     ),
     **_numbered_pairs(
         "channel-1/frame-side-screw",
