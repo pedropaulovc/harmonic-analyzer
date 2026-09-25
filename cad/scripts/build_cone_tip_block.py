@@ -32,12 +32,14 @@ from _common import (
     PANEL_BLACK,
     SketchDims,
     _early_bound,
+    add_line_chain,
     anchor_point_to_origin,
     apply_color,
     apply_material,
     blank_sketch,
     check,
     define_centered_rectangle,
+    define_rectilinear_chain,
     dimension_between,
     drive_dimension,
     ensure_fully_defined,
@@ -70,6 +72,8 @@ from cone_tip_block_spec import (
     DRAWING_PRECISION,
     FOOT_BORE_DIA,
     FOOT_BORE_SPEC,
+    HEEL_RELIEF_DEPTH,
+    HEEL_RELIEF_HEIGHT,
     MIN_WEB_MM,
     PINCH_CLEARANCE_DIA,
     PINCH_BORE_SPEC,
@@ -256,6 +260,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PinchDepthCenter", '"BlockZ" / 2')
     await set_global(adapter, "FootTapX", '"BlockX" / 2')
     await set_global(adapter, "FootTapZ", '"BlockZ" / 2')
+    await set_global(adapter, "HeelReliefDepth", f"{HEEL_RELIEF_DEPTH}mm")
+    await set_global(adapter, "HeelReliefHt", f"{HEEL_RELIEF_HEIGHT}mm")
     await set_global(
         adapter, "PinchBoreY", '"AdjusterAxisHeight" + "PinchRise"'
     )
@@ -399,6 +405,43 @@ async def build(adapter) -> dict[str, str]:
     )
     v_foot = blind_hole_volume_mm3(FOOT_BORE_DIA, FOOT_BORE_SPEC.depth_mm)
     volume = await volume_check(adapter, "foot tap", volume - v_foot, 0.03 * v_foot)
+
+    # I31 heel relief: a step along the whole north-bottom edge, so the cone
+    # pivot screw's head (on the platform top, just north of the block) never
+    # meets the north face at the fit-up extreme.  The Right plane reads the
+    # model's +Z (north) as sketch -x; the profile's outer edges lie on the
+    # north face and the foot, and a mid-plane cut runs it across the block.
+    heel = SketchDims()
+    heel_pts = [
+        (-BLOCK_Z / 2.0, 0.0),
+        (-BLOCK_Z / 2.0, HEEL_RELIEF_HEIGHT),
+        (-BLOCK_Z / 2.0 + HEEL_RELIEF_DEPTH, HEEL_RELIEF_HEIGHT),
+        (-BLOCK_Z / 2.0 + HEEL_RELIEF_DEPTH, 0.0),
+    ]
+    check("create_sketch heel relief", await adapter.create_sketch("Right"))
+    heel_lines = await add_line_chain(adapter, heel_pts)
+    await define_rectilinear_chain(
+        adapter,
+        heel_lines,
+        heel_pts,
+        label="heel relief",
+        dims=heel,
+        names=["HeelReliefHt", "HeelReliefDepth", "HeelReliefFace"],
+        drives=['"HeelReliefHt"', '"HeelReliefDepth"', '"BlockZ" / 2'],
+    )
+    await ensure_fully_defined(adapter, "heel relief sketch")
+    check("exit_sketch heel relief", await adapter.exit_sketch())
+    name_last_feature(adapter, "HeelReliefProfile")
+    drive_jobs += heel.apply(adapter, "HeelReliefProfile")
+    check(
+        "cut heel relief",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=BLOCK_X + 2.0, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "HeelRelief")
+    v_heel = BLOCK_X * HEEL_RELIEF_DEPTH * HEEL_RELIEF_HEIGHT
+    volume = await volume_check(adapter, "heel relief", volume - v_heel, 0.01 * v_heel)
 
     # Named bore axis for the view-independent coaxial mate: the shaft tip
     # positions this block (coaxial + axial distance), no face picks.
