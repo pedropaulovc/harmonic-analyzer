@@ -368,7 +368,9 @@ def _note_stalls(stalls: set[str], state: str, elapsed: float, *, after_launch: 
 def _signin_window() -> str | None:
     """Title of a visible 3DEXPERIENCE ID sign-in window, else ``None``. Reads
     only (``EnumWindows`` / ``IsWindowVisible`` / ``GetWindowTextW``); an
-    unreadable desktop names nothing."""
+    unreadable desktop names nothing. The three signatures are declared: an
+    undeclared call converts a 64-bit handle as a C ``int``, overflows, and the
+    exception inside the callback silently ends the enumeration."""
     import ctypes
     from ctypes import wintypes
 
@@ -377,6 +379,12 @@ def _signin_window() -> str | None:
     try:
         user32 = ctypes.WinDLL("user32", use_last_error=True)
         callback = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        user32.EnumWindows.argtypes = [callback, wintypes.LPARAM]
+        user32.EnumWindows.restype = wintypes.BOOL
+        user32.IsWindowVisible.argtypes = [wintypes.HWND]
+        user32.IsWindowVisible.restype = wintypes.BOOL
+        user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+        user32.GetWindowTextW.restype = ctypes.c_int
 
         def visit(hwnd, _parameter):
             if not user32.IsWindowVisible(hwnd):
