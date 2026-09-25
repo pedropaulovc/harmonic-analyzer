@@ -152,7 +152,9 @@ def registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """
     pdf = tmp_path / "out" / "crank-arm.pdf"
     pdf.parent.mkdir()
-    row = SimpleNamespace(outputs={"pdf": pdf}, script_name="draw_crank_arm.py")
+    row = SimpleNamespace(
+        outputs={"pdf": pdf}, script_name="draw_crank_arm.py", source_kind="part"
+    )
     monkeypatch.setitem(ml.DRAWINGS_BY_NAME, "crank_arm", row)
     _trailer(monkeypatch, None)
     return pdf
@@ -396,6 +398,57 @@ def test_only_the_exact_reviewed_pdf_of_an_accepted_registry_review_is_recorded(
     with pytest.raises(ValueError, match="is not the reviewed"):
         ml.record_review(review, pdf, **kwargs)
     assert not ledger_path.exists()
+
+
+def test_the_verdict_not_the_passed_flag_decides_a_pass(
+    tmp_path: Path, registry: Path
+) -> None:
+    ledger_path = tmp_path / "ledger.json"
+    pdf = _sheet(registry)
+    kwargs = {"author_family": "claude", "provenance": {}, "ledger_path": ledger_path}
+    ship, fix = _review(pdf), _review(pdf, passed=False)
+
+    # A FIX whose flag was edited to pass must not record as a SHIP.
+    with pytest.raises(ValueError, match="passed flag .*contradicts its FIX verdict"):
+        ml.record_review({**fix, "passed": True}, pdf, **kwargs)
+    with pytest.raises(ValueError, match="passed flag .*contradicts its SHIP verdict"):
+        ml.record_review({**ship, "passed": False}, pdf, **kwargs)
+    blocker = {"where": "view A", "issue": "no size", "fix": "add it"}
+    shipped_with_blocker = {**ship["verdict"], "blockers": [blocker]}
+    with pytest.raises(ValueError, match="contradicts its SHIP verdict"):
+        ml.record_review({**ship, "verdict": shipped_with_blocker}, pdf, **kwargs)
+    with pytest.raises(ValueError, match="verdict is malformed"):
+        ml.record_review({**ship, "verdict": {"verdict": "SHIP"}}, pdf, **kwargs)
+    assert not ledger_path.exists()
+
+
+def test_a_review_of_another_kind_than_the_registry_drawing_is_refused(
+    tmp_path: Path, registry: Path
+) -> None:
+    pdf = _sheet(registry)
+    review = _review(pdf)
+    # An assembly-rubric review, internally consistent, of a registry part.
+    prompt = mr._review_prompt(
+        mr.ReviewPackage("crank_arm", "assembly", (pdf,)), 1, reviewer="codex"
+    )
+    assembly = {
+        **review,
+        "kind": "assembly",
+        "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+        "extra": {"evidence": {"effective_prompt": prompt}},
+    }
+    assert ml.prompt_problem(assembly) is None
+
+    with pytest.raises(
+        ValueError, match="review kind is 'assembly', the registry's is 'part'"
+    ):
+        ml.record_review(
+            assembly,
+            pdf,
+            author_family="claude",
+            provenance={},
+            ledger_path=tmp_path / "ledger.json",
+        )
 
 
 def test_replacing_an_entry_prunes_pdfs_nothing_references(

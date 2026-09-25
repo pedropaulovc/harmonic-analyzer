@@ -707,6 +707,28 @@ def standard_rubrics(kind: str) -> tuple[str, ...]:
     return tuple(rubrics)
 
 
+def verdict_passes(review: dict[str, Any]) -> bool:
+    """Pass or fail from the verdict itself: a SHIP with no gating finding.
+
+    The record's ``passed`` flag must agree; an edited or malformed report is
+    refused rather than trusted or silently corrected.
+    """
+    import machinist_review  # imports this module; a top-level import would cycle
+
+    name = review["name"]
+    try:
+        verdict = machinist_review.validate_verdict(review["verdict"])
+    except ValueError as exc:
+        raise ValueError(f"{name}: its verdict is malformed: {exc}") from None
+    passed = machinist_review.is_pass(verdict)
+    if bool(review.get("passed")) != passed:
+        raise ValueError(
+            f"{name}: its passed flag ({review.get('passed')}) contradicts its "
+            f"{verdict['verdict']} verdict"
+        )
+    return passed
+
+
 def prompt_problem(review: dict[str, Any]) -> str | None:
     """Why a review's prompt is not the gate's; None under a committed rubric.
 
@@ -879,14 +901,21 @@ def record_review(
         )
     if not review.get("blind") or review.get("verdict") is None:
         raise ValueError(f"{name}: only a blind review with a verdict is recorded")
+    kind = DRAWINGS_BY_NAME[name].source_kind
+    if review.get("kind") != kind:
+        raise ValueError(
+            f"{name}: its review kind is {review.get('kind')!r}, the registry's is "
+            f"{kind!r}; only the {kind} rubric reviews it"
+        )
+    passed = verdict_passes(review)
     status = SHIP
     rebutted: list[dict[str, Any]] = []
     if rebuttals:
-        if review.get("passed"):
+        if passed:
             raise ValueError(f"{name}: a passing review has nothing to rebut")
         rebutted = apply_rebuttals(review["verdict"], rebuttals)
         status = ACCEPTED_WITH_RULINGS
-    elif not review.get("passed"):
+    elif not passed:
         raise ValueError(
             f"{name}: only a passing review, or one with rebuttals, is recorded"
         )
