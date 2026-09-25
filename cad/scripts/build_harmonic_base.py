@@ -39,13 +39,12 @@ from _common import (
     PANEL_BLACK,
     SketchDims,
     _early_bound,
-    _read_member,
     add_line_chain,
     anchor_point_to_origin,
     apply_color,
     apply_material,
     bbox_extent_check,
-    blank_sketch,
+    blank_reference_sketches,
     check,
     define_circle,
     define_rectilinear_chain,
@@ -823,27 +822,6 @@ async def _paint_machined_faces_black(adapter) -> None:
 REFERENCE_SKETCHES = ("RimWidthReference", "HeightReference")
 
 
-@_telemetry.traced("appearance.hide_reference_sketches")
-def _hide_reference_sketches(adapter) -> None:
-    """Blank the drawing-reference sketches and prove each one reads hidden."""
-    for name in REFERENCE_SKETCHES:
-        blank_sketch(adapter, name)
-    part = _early_bound(adapter.currentModel, "IPartDoc")
-    shown = {
-        name: visible
-        for name in REFERENCE_SKETCHES
-        # swVisibilityState_e: 1 hidden
-        if (visible := int(_read_member(part.FeatureByName(name), "Visible"))) != 1
-    }
-    if shown:
-        raise RuntimeError(f"reference sketches still visible after blanking: {shown}")
-    _telemetry.event(
-        "part.reference_sketches_hidden",
-        sketches=", ".join(REFERENCE_SKETCHES),
-        count=len(REFERENCE_SKETCHES),
-    )
-
-
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
@@ -1517,7 +1495,7 @@ async def build(adapter) -> dict[str, str]:
     _verify_named_dimension(
         adapter, "FlangeToRim@HeightReference", deck_top - BOTTOM_THICKNESS
     )
-    _hide_reference_sketches(adapter)
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     blank_reference_geometry(adapter, tuple((name, "PLANE") for name in ref_planes))
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
