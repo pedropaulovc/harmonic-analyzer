@@ -25,7 +25,6 @@ from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
     assert_imported_precision,
-    curate_view_dimensions,
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
@@ -35,6 +34,7 @@ from _drawing_common import (
     stamp_drawing_summary,
     view_name,
 )
+from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_registry import DRAWINGS_BY_NAME
 from pinion_lever_spec import (
     DRAWING_DIMENSIONS,
@@ -42,6 +42,7 @@ from pinion_lever_spec import (
     HUB_OD,
     LIFT_ROD_NUMBER,
     PIN_HOLE_CALLOUT,
+    REFERENCE_SKETCHES,
     ROD_LEN,
 )
 from solidworks_mcp.adapters.com_variant import double_array
@@ -197,6 +198,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open pinion-lever source", await adapter.open_model(str(SOURCE)))
+    source_model = adapter.currentModel
     read_required_properties(
         adapter.currentModel,
         (
@@ -256,15 +258,21 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="lever top",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    detail = _hub_detail(adapter, side)
-    set_hidden_lines_removed(adapter, detail)
-    detail_annotations = curate_view_dimensions(
-        adapter,
-        detail,
-        keep=DETAIL_KEEP,
-        view_label="hub detail",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
+    # The grip and pin-hole stations live in reference sketches the part saves
+    # hidden (#880).  A detail takes their visibility from the part when it is
+    # created, so it is created and dimensioned while the part shows them.
+    with part_sketches_shown(
+        adapter, source_model, REFERENCE_SKETCHES, label="hub detail stations"
+    ):
+        detail = _hub_detail(adapter, side)
+        set_hidden_lines_removed(adapter, detail)
+        detail_annotations = curate_view_dimensions(
+            adapter,
+            detail,
+            keep=DETAIL_KEEP,
+            view_label="hub detail",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
     annotations = [*front_annotations, *top_annotations, *detail_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)

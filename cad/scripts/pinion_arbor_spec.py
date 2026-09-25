@@ -296,6 +296,18 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
 }
 
+# The construction-only sketches that carry printed dimensions: the part saves
+# them hidden (#880) and the drawing shows them per view
+# (_drawing_hidden_sketches).
+REFERENCE_SKETCHES = (
+    "FrontJournalReference",
+    "BackJournalReference",
+    "BackRimReference",
+    "BondZoneReference",
+    "DrumStationReference",
+    "OverallReference",
+)
+
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HeadProfile": {"HeadDia": 1},
     "NeckProfile": {"NeckDia": 1},
