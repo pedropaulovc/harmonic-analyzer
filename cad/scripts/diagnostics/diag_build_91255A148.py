@@ -1,32 +1,47 @@
 r"""McMaster 91255A148 -- black-oxide alloy steel button head SHCS, #6-32 x 1/2".
 
-Modelled from the catalog dimensions.  Source: the McMaster product page,
-supplied by the user on 2026-09-24 (an agent fetch that day got HTTP 403):
-#6-32 UNC-3A, flat tip, head Ø0.262 in (6.65) x 0.073 in (1.85), 5/64 hex
-drive, 1/2 in (12.7) under the head, fully threaded; it matches the U30
-handoff's 2026-09-23 reading.  Class 3A is not modelled (nominal UN cutter).
-The vendor file is local-only (© McMaster, gitignored; never committed, see
-cad/references/mcmaster/README.md); the replica gate against it is pending.
+Catalog: #6-32 UNC-3A, flat tip, head Ø0.262 in (6.65) x 0.073 in (1.85),
+5/64 hex drive, 1/2 in (12.7) under the head, fully threaded (the McMaster
+product page, supplied by the user on 2026-09-24).  Class 3A is not modelled
+(nominal UN cutter).
 
-Laws (assumptions, flagged where the catalog is silent):
+Laws: measured from the vendor model (Main ruling (i), 2026-09-24), read by
+the read-only dump ``cad/out/reports/mcmaster-91255A148-dump.json`` of
+``cad/references/mcmaster/91255A148.SLDPRT``, SHA-256
+4b8dac17c6b7e77499209a399342aa51780743b657aec0df7175f227b54e59a0.  The vendor
+file is local-only (© McMaster, gitignored, never committed; see
+cad/references/mcmaster/README.md).  Vendor truth: volume 130.7033 mm^3, area
+291.3955 mm^2, 26 faces.  Every value below is the vendor's own dimension or
+solved sketch geometry, in mm:
 
-- head: flat bearing face, a short cylindrical edge band of 0.2 x head height
-  (assumed; ASME B18.3 draws a small edge), and a spherical dome through the
-  band's rim and the apex.
-- drive: 5/64 hex socket, flat-bottomed, with full hex depth
-  ``SOCKET_KEY_ENGAGEMENT`` at the corners.  0.028 in is the ASME B18.3 key
-  engagement minimum for a #6 button head (assumed from the standard; not on
-  the catalog page).  The socket stays inside the head, so no fit reads it.
-- shank and thread: the 90280A* fillister family's thread laws unchanged
-  (``diag_mcmaster_fillister``): 45 deg x 0.7P tip chamfer, helix from the
-  under-head junction to P past the tip, the vendor-derived UN cutter, the
-  split that scopes the sweep to the shank, and the runout boss + P/10
-  junction fillet.  They are copied, not imported, so this recipe cannot
-  re-key the fillister fleet.
+- head (their Sketch3 + Revolve1): a flat top Ø2.778125 (7/64, D1@Sketch2) at
+  the full head height 1.8542; a spherical dome R3.941216, centred on the
+  axis, from the flat top's edge down to the head OD Ø6.6548 at 0.27813 above
+  the bearing face; below it a 10 deg band cone 0.27813 high (0.15 x head
+  height) narrowing to Ø6.556716 at the bearing face.  Both band edges carry
+  an R0.09271 fillet (their Fillet1, 0.05 x head height), so the flat bearing
+  annulus ends at Ø6.401130.
+- drive (their Cut-Extrude1 + Cut-Extrude2): 5/64 hex socket, flat floor
+  1.01981 (0.55 x head height) below the flat top; the flat top covers the
+  hex, so the key depth is 1.020 at the corners as well as the flats.  A 60 deg
+  countersink (60 deg draft from the axis) from the hex's corner circle,
+  Ø2.291358, breaks the corners; it runs out on the flats 0.0886 down.  The
+  replica revolves that cone as a cut instead of drafting an extrude.
+- shank and thread (Split1, Helix/Spiral1, Sketch7, Cut-Sweep1): major
+  Ø3.5052 (0.138 in), 45 deg x 0.75P tip chamfer; helix seeded at the tip,
+  L + P high (17 revs, start 90 deg), overrunning the bearing face by P into
+  the split-off head, where the sweep's scope keeps it out; the symmetric UN
+  cutter centred 7P/16 past the tip (root flat P/8 at the root radius
+  1.237044, top 15P/16 at major + H/16).
+- neck (Boss-Extrude1): a 45 deg cone from Ø3.677052 (major + H/4, the sharp
+  V's crest line) at the bearing face, shrinking into the shank; it fills the
+  last groove turns under the head and re-merges the split bodies.  It
+  reaches the major 0.0859 below the bearing face and the root 0.6015 below.
 
-Frame: head UP, under-head junction at y = 0 (the fillister frame).
+Frame: head UP, bearing face at y = 0.  The vendor origin sits mid-overall
+(axis z, head +z), so their bearing face is at z = (L - HH) / 2 = 5.4229.
 
-Run standalone (SolidWorks open; there is no vendor truth to compare)::
+Run standalone (SolidWorks open, vendor file and dump local)::
 
     uv run python cad\scripts\diagnostics\diag_build_91255A148.py
 """
@@ -45,10 +60,8 @@ from _common import (  # noqa: E402
     name_last_feature,
     volume_check,
 )
-from _hole_spec import THREAD_MAJOR_MM  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
-    _spherical_cap_volume,
     insert_helix,
     offset_plane,
     replica_main,
@@ -56,74 +69,147 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
 )
 
 IN = 25.4
-MAJOR_DIA = THREAD_MAJOR_MM["#6-32"]  # 3.505
+MAJOR_DIA = 0.138 * IN  # 3.5052, their "Screw Size Decimal Equivalent"
 PITCH = IN / 32.0
 LENGTH = 0.5 * IN  # under the head, fully threaded
 HEAD_DIA = 0.262 * IN  # 6.6548
 HEAD_H = 0.073 * IN  # 1.8542
-HEAD_BAND = 0.2 * HEAD_H  # assumed edge band
-HEX_AF = 5.0 / 64.0 * IN  # 1.984
-SOCKET_KEY_ENGAGEMENT = 0.028 * IN  # 0.711, ASME B18.3 #6 button head (assumed)
+HEX_AF = 5.0 / 64.0 * IN  # 1.984375
+FLAT_TOP_DIA = 7.0 / 64.0 * IN  # 2.778125
+DOME_R_MEASURED = 3.941216
+BAND_H = 0.15 * HEAD_H  # 0.27813
+BAND_DEG = 10.0
+EDGE_FILLET_R = 0.05 * HEAD_H  # 0.09271
+SOCKET_DEPTH = 0.55 * HEAD_H  # 1.01981, flat top to floor
+CSK_DEG = 60.0  # draft from the axis
+TIP_CHAMFER = 0.75 * PITCH  # 45 deg
+H_SHARP = PITCH * math.sqrt(3.0) / 2.0
+ROOT_R = MAJOR_DIA / 2.0 - 0.75 * H_SHARP  # 1.237044
+NECK_DIA = MAJOR_DIA + H_SHARP / 4.0  # 3.677052
+VENDOR_BEARING_Z = (LENGTH - HEAD_H) / 2.0  # 5.4229
+
+
+def hex_corner_r() -> float:
+    return HEX_AF / math.sqrt(3.0)
+
+
+def bearing_edge_r() -> float:
+    """Radius where the band cone meets the bearing face, before the fillet."""
+    return HEAD_DIA / 2.0 - BAND_H * math.tan(math.radians(BAND_DEG))
+
+
+def _fillet_setback(interior_deg: float) -> float:
+    return EDGE_FILLET_R / math.tan(math.radians(interior_deg) / 2.0)
+
+
+def _fillet_area(interior_deg: float) -> float:
+    """Section area a fillet removes from a convex corner."""
+    theta = math.radians(interior_deg)
+    return EDGE_FILLET_R**2 * (1.0 / math.tan(theta / 2.0) - (math.pi - theta) / 2.0)
+
+
+def bearing_face_dia() -> float:
+    """Outer diameter of the flat bearing annulus: the band edge less the
+    fillet's setback (the bearing corner is 90 + BAND_DEG inside)."""
+    return 2.0 * (bearing_edge_r() - _fillet_setback(90.0 + BAND_DEG))
+
+
+def dome_center_y() -> float:
+    """The dome's centre on the axis, through the flat top's edge and the
+    head OD at the band's top."""
+    r1, y1 = FLAT_TOP_DIA / 2.0, HEAD_H
+    r2, y2 = HEAD_DIA / 2.0, BAND_H
+    return (r1**2 - r2**2 + y1**2 - y2**2) / (2.0 * (y1 - y2))
 
 
 def dome_radius() -> float:
-    """Sphere radius of the dome through the band rim and the apex."""
-    rim = HEAD_DIA / 2.0
-    rise = HEAD_H - HEAD_BAND
-    return (rim**2 + rise**2) / (2.0 * rise)
+    return math.hypot(FLAT_TOP_DIA / 2.0, HEAD_H - dome_center_y())
 
 
-def dome_height_at(r: float) -> float:
-    """Height of the dome surface above the bearing face at radius ``r``."""
+def _rim_interior_deg() -> float:
+    """Inside angle at the dome-to-band edge."""
+    yc = dome_center_y()
     big_r = dome_radius()
-    return HEAD_H - big_r + math.sqrt(big_r**2 - r**2)
+    nx, ny = HEAD_DIA / 2.0 / big_r, (BAND_H - yc) / big_r
+    up_dome = (-ny, nx)  # the dome's tangent, heading for the axis
+    band = math.radians(BAND_DEG)
+    down_band = (-math.sin(band), -math.cos(band))
+    cos_t = up_dome[0] * down_band[0] + up_dome[1] * down_band[1]
+    return math.degrees(math.acos(cos_t))
 
 
-def socket_floor_y() -> float:
-    """Flat socket floor: full hex depth measured at the hex corners."""
-    corner_r = HEX_AF / math.sqrt(3.0)
-    return dome_height_at(corner_r) - SOCKET_KEY_ENGAGEMENT
+def revolved_volume() -> float:
+    """The revolve before any cut: flat-topped dome zone, band cone, shank."""
+    yc = dome_center_y()
+    big_r = dome_radius()
+
+    def zone(y: float) -> float:
+        return big_r**2 * (y - yc) - (y - yc) ** 3 / 3.0
+
+    major_r = MAJOR_DIA / 2.0
+    return (
+        math.pi * (zone(HEAD_H) - zone(BAND_H))
+        + _rev_frustum(BAND_H, bearing_edge_r(), HEAD_DIA / 2.0)
+        + math.pi * major_r**2 * (LENGTH - TIP_CHAMFER)
+        + _rev_frustum(TIP_CHAMFER, major_r, major_r - TIP_CHAMFER)
+    )
 
 
-def socket_volume(steps: int = 240) -> float:
-    """Hex prism from the floor up to the dome (midpoint grid over the hex)."""
-    corner_r = HEX_AF / math.sqrt(3.0)
-    floor = socket_floor_y()
+def socket_volume() -> float:
+    return math.sqrt(3.0) / 2.0 * HEX_AF**2 * SOCKET_DEPTH
+
+
+def countersink_volume(steps: int = 2000) -> float:
+    """The 60 deg cone's bite outside the hex (six corner slivers)."""
+    rc = hex_corner_r()
+    slope = math.tan(math.radians(CSK_DEG))
     half_af = HEX_AF / 2.0
-    cell = 2.0 * corner_r / steps
     total = 0.0
+    dphi = (math.pi / 6.0) / steps
     for i in range(steps):
-        x = -corner_r + (i + 0.5) * cell
-        for j in range(steps):
-            y = -corner_r + (j + 0.5) * cell
-            # Flats at |y| = AF/2; the slanted flats at |x| sin60 + |y| cos60.
-            if abs(y) > half_af:
-                continue
-            if abs(x) * math.sqrt(3.0) / 2.0 + abs(y) / 2.0 > half_af:
-                continue
-            total += (dome_height_at(math.hypot(x, y)) - floor) * cell * cell
-    return total
+        phi = (i + 0.5) * dphi  # 0..30 deg off a flat's normal
+        rho = half_af / math.cos(phi)
+        total += (rc * (rc**2 - rho**2) / 2.0 - (rc**3 - rho**3) / 3.0) * dphi
+    return 12.0 * total / slope
 
 
-if socket_floor_y() <= HEAD_BAND:
-    raise ValueError("91255A148 socket floor falls into the head's edge band")
+def edge_fillet_volume() -> float:
+    """Both band-edge fillets by Pappus, each at its corner's radius."""
+    return 2.0 * math.pi * (
+        bearing_edge_r() * _fillet_area(90.0 + BAND_DEG)
+        + HEAD_DIA / 2.0 * _fillet_area(_rim_interior_deg())
+    )
+
+
+def neck_reach() -> tuple[float, float]:
+    """Depths below the bearing face where the 45 deg neck meets the major
+    and the root."""
+    neck_r = NECK_DIA / 2.0
+    return neck_r - MAJOR_DIA / 2.0, neck_r - ROOT_R
+
+
+if abs(dome_radius() - DOME_R_MEASURED) > 1e-5:
+    raise ValueError("91255A148 dome no longer matches the vendor's R3.941216")
+if FLAT_TOP_DIA <= 2.0 * hex_corner_r():
+    raise ValueError("91255A148 flat top no longer covers the hex socket")
+if HEAD_H - SOCKET_DEPTH <= BAND_H:
+    raise ValueError("91255A148 socket floor falls into the head's band")
 
 
 async def build_91255A148(adapter, truth=None):
     from _common import _feature_by_name, _early_bound, _read_member, add_line_chain
-    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
+    from solidworks_mcp.adapters.base import RevolveParameters
     from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
 
     major_r = MAJOR_DIA / 2.0
     head_r = HEAD_DIA / 2.0
-    dome_h = HEAD_H - HEAD_BAND
+    top_r = FLAT_TOP_DIA / 2.0
     cap_r = dome_radius()
-    tip_ch = 0.7 * PITCH
-    h_sharp = PITCH * math.sqrt(3.0) / 2.0
-    root_r = major_r - 0.75 * h_sharp
+    yc = dome_center_y()
+    tip_ch = TIP_CHAMFER
     revs = LENGTH / PITCH + 1.0
 
-    # --- revolve profile (the fillister's, with a button dome) --------------
+    # --- revolve profile (their Sketch3 + Revolve1) --------------------------
     check("create_sketch profile", await adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
     with no_sketch_inference(adapter):
@@ -134,16 +220,17 @@ async def build_91255A148(adapter, truth=None):
             raise RuntimeError("button head profile: CreateCenterLine failed")
     # Three-point dome arc under no_sketch_inference: the fillister's proven
     # form (inference snapping and CreateArc's direction flag both misfire).
-    yc = HEAD_H - cap_r
-    ang_mid = (math.pi / 2.0 + math.atan2(HEAD_BAND - yc, head_r)) / 2.0
+    ang_top = math.atan2(HEAD_H - yc, top_r)
+    ang_rim = math.atan2(BAND_H - yc, head_r)
+    ang_mid = (ang_top + ang_rim) / 2.0
     with no_sketch_inference(adapter):
         arc = sk_mgr.Create3PointArc(
-            0.0,
+            top_r / 1000.0,
             HEAD_H / 1000.0,
-            0.0,  # start: dome apex
+            0.0,  # start: the flat top's edge
             head_r / 1000.0,
-            HEAD_BAND / 1000.0,
-            0.0,  # end: band rim
+            BAND_H / 1000.0,
+            0.0,  # end: head OD, top of the band
             cap_r * math.cos(ang_mid) / 1000.0,  # mid, on the sphere
             (yc + cap_r * math.sin(ang_mid)) / 1000.0,
             0.0,
@@ -153,13 +240,14 @@ async def build_91255A148(adapter, truth=None):
         await add_line_chain(
             adapter,
             [
-                (head_r, HEAD_BAND),
-                (head_r, 0.0),
+                (head_r, BAND_H),
+                (bearing_edge_r(), 0.0),
                 (major_r, 0.0),
                 (major_r, -(LENGTH - tip_ch)),
                 (major_r - tip_ch, -LENGTH),
                 (0.0, -LENGTH),
                 (0.0, HEAD_H),
+                (top_r, HEAD_H),
             ],
             close=False,
         )
@@ -170,22 +258,17 @@ async def build_91255A148(adapter, truth=None):
         await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "Body")
-    v = (
-        _spherical_cap_volume(head_r, dome_h)
-        + math.pi * head_r**2 * HEAD_BAND
-        + math.pi * major_r**2 * (LENGTH - tip_ch)
-        + _rev_frustum(tip_ch, major_r, major_r - tip_ch)
-    )
-    volume = await volume_check(adapter, "revolved body", v, 0.005 * v)
+    v = revolved_volume()
+    v = await volume_check(adapter, "revolved body", v, 0.005 * v)
 
-    # --- hex socket: blind cut down from the apex plane ---------------------
+    # --- hex socket: blind cut down from the flat top ------------------------
     # 92865A585's grade-mark idiom: a sketch on a Top-offset plane at the head
     # top, FeatureCut4 single-direction, default direction, blind -- proven to
     # cut down into the head.
     offset_plane(adapter, "HeadTopPlane", HEAD_H)
     check("create_sketch socket", await adapter.create_sketch("HeadTopPlane"))
     flat = HEX_AF / 2.0
-    corner = HEX_AF / math.sqrt(3.0)
+    corner = hex_corner_r()
     with no_sketch_inference(adapter):
         await add_line_chain(
             adapter,
@@ -201,12 +284,12 @@ async def build_91255A148(adapter, truth=None):
     check("exit_sketch socket", await adapter.exit_sketch())
     name_last_feature(adapter, "SocketProfile")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
+    fm = _early_bound(_read_member(model, "FeatureManager"), "IFeatureManager")
     model.ClearSelection2(True)
     _feature_by_name(adapter, "SocketProfile").Select2(False, 0)
-    fm = _early_bound(_read_member(model, "FeatureManager"), "IFeatureManager")
     feat = fm.FeatureCut4(
         True, False, False,  # single, no flip, default dir
-        0, 0, (HEAD_H - socket_floor_y()) / 1000.0, 0.0,  # blind to the floor
+        0, 0, SOCKET_DEPTH / 1000.0, 0.0,  # blind to the floor
         False, False, False, False, 0.0, 0.0,
         False, False, False, False,
         False, False, True, False, False, False,
@@ -215,56 +298,75 @@ async def build_91255A148(adapter, truth=None):
     if feat is None:
         raise RuntimeError("hex socket cut failed")
     name_last_feature(adapter, "HexSocket")
-    v_socket = socket_volume()
-    await volume_check(adapter, "hex socket", volume - v_socket, 0.03 * v_socket)
+    v = await volume_check(
+        adapter, "hex socket", v - socket_volume(), 0.01 * socket_volume()
+    )
 
-    # --- split at the under-head junction (scopes the sweep) ---------------
+    # --- 60 deg countersink from the hex's corner circle ---------------------
+    # Their Cut-Extrude2 is a 60 deg drafted cut; a revolved cone removes the
+    # same six corner slivers (inside the flats the socket is already air)
+    # without a draft-direction flag, the 93075A194 crown-dish idiom.  The
+    # check's 0.02 is a twentieth of the ~0.4 mm^3 a cone dished into the flat
+    # top would take.
+    slope = math.tan(math.radians(CSK_DEG))
+    lift = 0.05
+    apex_y = HEAD_H - corner / slope
+    check("create_sketch countersink", await adapter.create_sketch("Front"))
+    sk3 = adapter.currentSketchManager
+    with no_sketch_inference(adapter):
+        if (
+            sk3.CreateCenterLine(
+                0.0, (HEAD_H + lift) / 1000.0, 0.0, 0.0, apex_y / 1000.0, 0.0
+            )
+            is None
+        ):
+            raise RuntimeError("countersink: CreateCenterLine failed")
+        await add_line_chain(
+            adapter,
+            [
+                (0.0, HEAD_H + lift),
+                (corner + lift * slope, HEAD_H + lift),
+                (0.0, apex_y),
+            ],
+        )
+    check("exit_sketch countersink", await adapter.exit_sketch())
+    name_last_feature(adapter, "CountersinkProfile")
+    check(
+        "countersink",
+        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+    )
+    name_last_feature(adapter, "SocketCountersink")
+    v = await volume_check(
+        adapter, "socket countersink", v - countersink_volume(), 0.02
+    )
+
+    # --- R0.09271 on both band edges (their Fillet1) -------------------------
+    check(
+        "band fillets",
+        await adapter.add_fillet(
+            EDGE_FILLET_R,
+            [[bearing_edge_r(), 0.0, 0.0], [head_r, BAND_H, 0.0]],
+        ),
+    )
+    name_last_feature(adapter, "BandFillets")
+    await volume_check(adapter, "band fillets", v - edge_fillet_volume(), 0.02)
+
+    # --- split at the bearing face (scopes the sweep) -----------------------
     body_boxes = split_at_plane(adapter, "Top Plane", "HeadSplit")
     shank_name = None
     for b in body_boxes:
         box = b["box_mm"]
-        if box and box[1] < -1.0:  # extends below the junction
+        if box and box[1] < -1.0:  # extends below the bearing face
             shank_name = b["name"]
     if not shank_name:
         raise RuntimeError("split produced no shank body")
     _telemetry.info(f"shank body: {shank_name}")
 
-    # --- helix (junction -> P past the tip) ---------------------------------
-    check("create_sketch helix seed", await adapter.create_sketch("Top"))
-    with no_sketch_inference(adapter):
-        seed = adapter.currentSketchManager.CreateCircleByRadius(
-            0.0, 0.0, 0.0, major_r / 1000.0
-        )
-        if seed is None:
-            raise RuntimeError("helix seed circle failed")
-    insert_helix(
-        adapter,
-        PITCH,
-        revs,
-        clockwise=True,
-        reversed_dir=True,
-        start_angle_rad=math.pi / 2.0,
-        feature_name="ThreadHelix",
-    )
-
-    # --- thread groove (the fillister family's cutter) ----------------------
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
-    with no_sketch_inference(adapter):
-        await add_line_chain(
-            adapter,
-            [
-                (root_r + (7.0 * PITCH / 16.0) * math.sqrt(3.0), 15.0 * PITCH / 16.0),
-                (root_r + (13.0 * PITCH / 32.0) * math.sqrt(3.0), -PITCH / 32.0),
-                (root_r, 3.0 * PITCH / 8.0),
-                (root_r, PITCH / 2.0),
-            ],
-        )
-    check("exit_sketch cutter", await adapter.exit_sketch())
-    name_last_feature(adapter, "ThreadCutter")
-    thread_sweep_cut(adapter, "ThreadCutter", "ThreadHelix", shank_name, "ThreadGroove")
-
-    # --- runout boss + junction fillet (re-merges the bodies) ---------------
-    check("create_sketch runout fill", await adapter.create_sketch("Top"))
+    # --- helix: tip-seeded, L + P up (90114A511's proven right hand) ---------
+    # Their tip plane has normal -z with clockwise=True, reverse=True; ours is
+    # +y, so both flags invert (93075A194 proved the handedness).
+    offset_plane(adapter, "TipPlane", -LENGTH)
+    check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
     with no_sketch_inference(adapter):
         if (
             adapter.currentSketchManager.CreateCircleByRadius(
@@ -272,53 +374,62 @@ async def build_91255A148(adapter, truth=None):
             )
             is None
         ):
-            raise RuntimeError("runout fill circle failed")
-    check("exit_sketch runout fill", await adapter.exit_sketch())
-    name_last_feature(adapter, "RunoutFillProfile")
-    check(
-        "runout fill",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=PITCH / 2.0, reverse_direction=True)
-        ),
+            raise RuntimeError("helix seed circle failed")
+    insert_helix(
+        adapter,
+        PITCH,
+        revs,
+        clockwise=False,
+        reversed_dir=False,
+        start_angle_rad=math.pi / 2.0,
+        feature_name="ThreadHelix",
     )
-    name_last_feature(adapter, "RunoutFill")
 
-    taper_h = (major_r - root_r) * math.sqrt(3.0)  # 30 deg from the axis
-    check("create_sketch runout taper", await adapter.create_sketch("Front"))
-    sk2 = adapter.currentSketchManager
+    # --- thread groove: the symmetric cutter 7P/16 past the tip ------------
+    cy = -LENGTH - 7.0 * PITCH / 16.0
+    crest_r = major_r + H_SHARP / 16.0
+    check("create_sketch cutter", await adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        if (
-            sk2.CreateCenterLine(
-                0.0, -PITCH / 2.0 / 1000.0, 0.0, 0.0, (-PITCH / 2.0 - taper_h) / 1000.0, 0.0
-            )
-            is None
-        ):
-            raise RuntimeError("runout taper: CreateCenterLine failed")
         await add_line_chain(
             adapter,
             [
-                (0.0, -PITCH / 2.0),
-                (major_r, -PITCH / 2.0),
-                (root_r, -PITCH / 2.0 - taper_h),
-                (0.0, -PITCH / 2.0 - taper_h),
+                (crest_r, cy + 15.0 * PITCH / 32.0),
+                (ROOT_R, cy + PITCH / 16.0),
+                (ROOT_R, cy - PITCH / 16.0),
+                (crest_r, cy - 15.0 * PITCH / 32.0),
             ],
         )
-    check("exit_sketch runout taper", await adapter.exit_sketch())
-    name_last_feature(adapter, "RunoutTaperProfile")
+    check("exit_sketch cutter", await adapter.exit_sketch())
+    name_last_feature(adapter, "ThreadCutter")
+    thread_sweep_cut(adapter, "ThreadCutter", "ThreadHelix", shank_name, "ThreadGroove")
+
+    # --- 45 deg neck cone (their Boss-Extrude1; re-merges the bodies) -------
+    neck_r = NECK_DIA / 2.0
+    neck_h = neck_reach()[1]
+    check("create_sketch neck", await adapter.create_sketch("Front"))
+    sk2 = adapter.currentSketchManager
+    with no_sketch_inference(adapter):
+        if sk2.CreateCenterLine(0.0, 0.0, 0.0, 0.0, -neck_h / 1000.0, 0.0) is None:
+            raise RuntimeError("neck: CreateCenterLine failed")
+        await add_line_chain(
+            adapter,
+            [
+                (0.0, 0.0),
+                (neck_r, 0.0),
+                (ROOT_R, -neck_h),
+                (0.0, -neck_h),
+            ],
+        )
+    check("exit_sketch neck", await adapter.exit_sketch())
+    name_last_feature(adapter, "NeckProfile")
     check(
-        "runout taper",
+        "neck cone",
         await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
-    name_last_feature(adapter, "RunoutTaper")
+    name_last_feature(adapter, "ThreadNeck")
 
-    check(
-        "junction fillet", await adapter.add_fillet(PITCH / 10.0, [[major_r, 0.0, 0.0]])
-    )
-    name_last_feature(adapter, "JunctionFillet")
-
-    # No vendor frame is known; assume the fillister family's (axis z, head
-    # +z, origin mid-overall) for any future native comparison.
-    adapter._mcm_com_map = lambda v: [v[1], v[2] - (LENGTH - HEAD_H) / 2.0, v[0]]
+    # Vendor frame: axis z, head +z, origin mid-overall.
+    adapter._mcm_com_map = lambda v: [v[1], v[2] - VENDOR_BEARING_Z, v[0]]
 
 
 if __name__ == "__main__":
