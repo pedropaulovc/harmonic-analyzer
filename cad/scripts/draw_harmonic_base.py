@@ -146,6 +146,13 @@ SIDE_CENTER = (0.145, 0.100)
 # so it is centred in that region instead of floating above a dead strip.
 ISO_SCALE = (1, 6)
 ISO_CENTER = (0.3425, 0.175)
+# The stamped-ID note's top-left corner, below the plan. SolidWorks runs its
+# leader from the right end of the note's last line (hb-render-5: 44.0 mm
+# right of and 11.8 mm below this anchor) to the serial on the +X rim. From
+# (0.125, 0.130) that leader ran through the A3 socket bore (2026-09-25 Codex
+# machinist review, clarity); from here it passes 4 mm clear of the bore.
+SERIAL_NOTE_XY = (0.080, 0.130)
+SERIAL_LEADER_START_OFFSET_M = (0.0440, -0.0118)
 HOLE_TOP_CENTER = (0.280, 0.195)
 HOLE_SIDE_CENTER = (0.280, 0.095)
 SECTION_CENTER = (0.375, 0.135)
@@ -1440,7 +1447,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         _serial_edge(top),
         f'STAMPED ID "{SERIAL_TEXT}"\n{SERIAL_HEIGHT_MM:.1f} HIGH\nAPPROX AS SHOWN',
-        (0.125, 0.130),
+        SERIAL_NOTE_XY,
     )
     deck_control = surface_finish_by_key(PART_SURFACE_FINISHES, "deck")
     deck_face = _resolve_faces(

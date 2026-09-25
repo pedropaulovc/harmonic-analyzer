@@ -1186,3 +1186,32 @@ def test_deck_land_worst_case_is_proven_instead_of_noted() -> None:
     assert part.COLUMN_SOCKET_BREAK_EVEN_BORE == pytest.approx(28.7)
     rejected = part.column_socket_land_stack(1.6)
     assert part.column_socket_break_even_bore(rejected) < part.COLUMN_SOCKET_MATCH_BORE_MAX
+
+
+def test_stamped_id_leader_clears_the_socket_bores() -> None:
+    # 2026-09-25 Codex machinist review (hb-render-5, clarity): the stamped-ID
+    # leader ran through the A3 socket bore. The leader starts where SolidWorks
+    # put it on hb-render-5 (the last line's right end) and ends on the serial.
+    import draw_harmonic_base as sheet
+
+    def clearance(anchor: tuple[float, float]) -> float:
+        start = (
+            anchor[0] + sheet.SERIAL_LEADER_START_OFFSET_M[0],
+            anchor[1] + sheet.SERIAL_LEADER_START_OFFSET_M[1],
+        )
+        tip = sheet._plan_xy(*part.SERIAL_XZ)
+        dx, dy = tip[0] - start[0], tip[1] - start[1]
+        gaps = []
+        for x, z in part.COLUMN_SOCKET_XZ:
+            cx, cy = sheet._plan_xy(x, z)
+            t = ((cx - start[0]) * dx + (cy - start[1]) * dy) / (dx * dx + dy * dy)
+            t = max(0.0, min(1.0, t))
+            gaps.append(
+                math.hypot(cx - start[0] - t * dx, cy - start[1] - t * dy)
+                - part.COLUMN_SOCKET_DIAMETER * sheet.VIEW_SCALE / 2000.0
+            )
+        return min(gaps)
+
+    assert clearance((0.125, 0.130)) < 0.0  # the reviewed sheet: through A3
+    assert sheet.SERIAL_NOTE_XY == (0.080, 0.130)
+    assert clearance(sheet.SERIAL_NOTE_XY) >= 0.004
