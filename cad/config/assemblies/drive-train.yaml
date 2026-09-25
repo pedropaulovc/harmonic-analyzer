@@ -33,6 +33,8 @@ flip_invert:
   - pinion cam front set pin axial
   - tip block axial seat
   - tip bushing axial seat
+  # Option E-a: the pinned torque shaft's axial station (pc-ea run).
+  - torque shaft axial
 allowed_free_stems:
   - alignment-pinion
   - cone-gear
