@@ -141,7 +141,7 @@ from cone_pivot_post_installation import (
     FRAME_FRONT_COLUMN_Z,
     FRAME_REAR_COLUMN_Z,
 )
-from build_fillister_screw import SHANK_LEN as NAMEPLATE_SCREW_SHANK_LEN
+from fillister_screw_spec import SHANK_LEN as NAMEPLATE_SCREW_SHANK_LEN
 from nameplate_spec import (
     MOUNT_EULER as NAMEPLATE_EULER,
     MOUNT_FRONT_Y as NAMEPLATE_FRONT_Y,
@@ -164,7 +164,7 @@ from frame_cross_screw_spec import (
     THREAD as CROSS_SCREW_THREAD,
     THREAD_CLASS as CROSS_SCREW_THREAD_CLASS,
 )
-from build_lag_screw import (
+from lag_screw_spec import (
     BEARING_OFFSET as LAG_BEARING_OFFSET,
     HEAD_AF as LAG_HEAD_AF,
     SHANK_DIA as LAG_SHANK_DIA,

@@ -9,13 +9,10 @@ from _common import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from diagnostics.diag_build_90280A201 import build_90280A201
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 
 PART_NAME = "clamp-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
-
-SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA, _PITCH = FILLISTER_SIZES["90280A201"]
 
 
 async def build(adapter) -> dict[str, str]:

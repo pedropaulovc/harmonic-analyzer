@@ -13,12 +13,12 @@ from __future__ import annotations
 import nameplate_spec
 from _hole_spec import TAP_DRILL_MM, HoleSpec, blind_cut_dia_mm
 from arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS
-from build_lag_screw import (
+from lag_screw_spec import (
     BEARING_OFFSET as HOLD_DOWN_BEARING_OFFSET,
     SHANK_LEN as HOLD_DOWN_SCREW_LEN,
 )
-from build_pedestal_hold_down_screw import SHANK_LEN as PEDESTAL_SCREW_LEN
-from build_rocker_arm_support import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
+from pedestal_hold_down_screw_spec import SHANK_LEN as PEDESTAL_SCREW_LEN
+from rocker_arm_support_section_spec import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
 from frame_attachment_spec import CASTING_FULL_THREAD_DEPTH, CASTING_TAP_DRILL_DEPTH
 
 IN = 25.4

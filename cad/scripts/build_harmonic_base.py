@@ -106,11 +106,11 @@ from cone_pivot_post_installation import (
     MECHANISM_Z_SHIFT,
 )
 from cone_line import PIVOT_XZ as PIVOT_SCREW_XZ
-from build_cone_pivot_screw import (
+from cone_pivot_screw_spec import (
     THREAD as PIVOT_THREAD,
     THREAD_TAIL_LEN as PIVOT_THREAD_ENGAGEMENT,
 )
-from build_cone_lock_knob import (
+from cone_lock_knob_spec import (
     COLLAR_DIA as LOCK_COLLAR_DIA,
     PLUG_TAP_LEAD as LOCK_PLUG_TAP_LEAD,
     STUD_BOTTOM_CLEARANCE as LOCK_STUD_BOTTOM_CLEARANCE,
@@ -118,14 +118,14 @@ from build_cone_lock_knob import (
     THREAD as LOCK_THREAD,
 )
 from cone_swing_platform_geometry import PLATE_T, swing_hardware_geometry
-from build_swing_stop_screw import (
+from swing_stop_screw_spec import (
     SHANK_DIA as STOP_SHANK_DIA,
     THREAD as STOP_THREAD,
 )
-from build_slotted_screw import SHANK_LEN as BLOCK_SCREW_LEN
-from build_foot_screw import SHANK_LEN as FOOT_SCREW_LEN
-from build_fillister_screw import SHANK_LEN as NAMEPLATE_SCREW_LEN
-from build_swing_stop_screw import EMBED_LEN as STOP_ENGAGEMENT
+from slotted_screw_spec import SHANK_LEN as BLOCK_SCREW_LEN
+from foot_screw_spec import SHANK_LEN as FOOT_SCREW_LEN
+from fillister_screw_spec import SHANK_LEN as NAMEPLATE_SCREW_LEN
+from swing_stop_screw_spec import EMBED_LEN as STOP_ENGAGEMENT
 from pinion_pivot_block_geometry import BLOCK_HEIGHT
 from pinion_rig_layout import BLOCK_SEAT_Z, SPRING_Z
 from pinion_spring_section import THICK as SPRING_THICKNESS

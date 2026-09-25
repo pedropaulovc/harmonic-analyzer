@@ -231,7 +231,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 def test_stock_anchor_clamps_eye_without_bottoming_or_drill_breakthrough() -> None:
     import build_crank_pin_eye as eye
     import build_drive_train_assembly as drive
-    import build_fillister_screw as screw
+    import fillister_screw_spec as screw
     import pytest
 
     # Derive the insertion from the placed under-head plane, not a duplicated

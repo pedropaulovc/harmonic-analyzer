@@ -88,7 +88,7 @@ from _assembly import (
 )
 from _transforms import IDENTITY, euler_from_rows, rot_z_rows
 from _interference_contracts import allowed_interference_pairs
-from build_hanger_screw import SHANK_LEN as HANGER_SHANK_LEN
+from hanger_screw_spec import SHANK_LEN as HANGER_SHANK_LEN
 from pen_wire_geom import WHEEL_BAR_Y, WHEEL_MID_Z
 from wheel_bar_geom import BAR_DEPTH as WHEEL_BAR_DEPTH
 from wheel_bar_geom import HANGER_SCREW_MACHINE_X

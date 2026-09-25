@@ -13,7 +13,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from build_cone_lock_knob import HEAD_DIA as LOCK_HEAD_DIA
+from cone_lock_knob_spec import HEAD_DIA as LOCK_HEAD_DIA
 from cone_swing_platform_spec import (
     PIVOT_BEARING_RELIEF_DEPTH,
     PIVOT_BEARING_THICKNESS,

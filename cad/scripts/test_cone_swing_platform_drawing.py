@@ -6,7 +6,7 @@ import dataclasses
 import math
 
 import _config
-import build_cone_pivot_screw
+import cone_pivot_screw_spec
 import build_cone_swing_platform as part
 import cone_pivot_post_spec
 import cone_swing_platform_drawing_spec as drawing_spec
@@ -47,7 +47,7 @@ def test_pivot_preserves_native_close_clearance_hole() -> None:
     assert spec.PIVOT_HOLE_SPEC.end == "through_all"
     assert spec.PIVOT_HOLE_DIA == blind_cut_dia_mm(spec.PIVOT_HOLE_SPEC)
     assert spec.PIVOT_HOLE_DIA == pytest.approx(6.756)
-    assert spec.PIVOT_HOLE_DIA > build_cone_pivot_screw.SHOULDER_DIA
+    assert spec.PIVOT_HOLE_DIA > cone_pivot_screw_spec.SHOULDER_DIA
 
 
 def test_post_mount_pattern_is_derived_from_its_mating_post() -> None:
@@ -123,7 +123,7 @@ def test_pivot_relief_runs_out_through_the_north_edge() -> None:
     closed_web = part.NORTH_OVERHANG - half
     assert closed_web < 2.0  # positive control: the closed spotface failed
     assert part.PIVOT_RELIEF_RUNOUT > 0.0
-    head_dia = build_cone_pivot_screw.HEAD_DIA
+    head_dia = cone_pivot_screw_spec.HEAD_DIA
     assert (spec.PIVOT_BEARING_RELIEF_DIAMETER - head_dia) / 2.0 >= (
         spec.PIVOT_HEAD_RADIAL_CLEARANCE - 1e-9
     )

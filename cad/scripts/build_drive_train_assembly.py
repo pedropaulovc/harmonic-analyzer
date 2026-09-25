@@ -634,7 +634,7 @@ from build_crank_pin_eye import (  # noqa: E402
     TAIL_LEN as EYE_TAIL_LEN,
     WIRE_DIA as EYE_WIRE_DIA,
 )
-from build_fillister_screw import (  # noqa: E402
+from fillister_screw_spec import (  # noqa: E402
     SHANK_DIA as ANCHOR_SCREW_SHANK_DIA,
     SHANK_LEN as ANCHOR_SCREW_SHANK_LEN,
 )
@@ -789,7 +789,7 @@ from cone_swing_platform_spec import (  # noqa: E402
     PIVOT_HEAD_RADIAL_CLEARANCE as PLAT_PIVOT_HEAD_RADIAL_CLEARANCE,
     PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA,
 )
-from build_cone_lock_knob import (  # noqa: E402
+from cone_lock_knob_spec import (  # noqa: E402
     HEAD_DIA as KNOB_HEAD_DIA,
     WASHER_DIA as KNOB_WASHER_DIA,  # noqa: F401 - verify footprint contract
     STUD_DIA as KNOB_STUD_DIA,
@@ -797,14 +797,14 @@ from build_cone_lock_knob import (  # noqa: E402
     THREAD as KNOB_THREAD,
     require_seat_fit as require_lock_seat_fit,
 )
-from build_cone_pivot_screw import (  # noqa: E402
+from cone_pivot_screw_spec import (  # noqa: E402
     HEAD_DIA as PSCREW_HEAD_DIA,
     SHOULDER_DIA as PSCREW_SHOULDER_DIA,
     SHOULDER_LEN as PSCREW_SHOULDER_LEN,
     THREAD as PSCREW_THREAD,
     THREAD_TAIL_LEN as PSCREW_THREAD_TAIL_LEN,
 )
-from build_swing_stop_screw import (  # noqa: E402
+from swing_stop_screw_spec import (  # noqa: E402
     EMBED_LEN as STOP_EMBED_LEN,
     HEAD_DIA as STOP_HEAD_DIA,
     PROUD_LEN as STOP_PROUD_LEN,
@@ -933,18 +933,18 @@ from pinion_spring_geometry import (  # noqa: E402
     root_stress as spr_root_stress,
 )
 from pinion_spring_section import THICK as SPRING_T, WIDTH as SPRING_W  # noqa: E402
-from build_slotted_screw import (  # noqa: E402
+from slotted_screw_spec import (  # noqa: E402
     HEAD_DIA as BSCREW_HEAD_DIA,
     SHANK_LEN as BSCREW_SHANK_LEN,
     THREAD as BSCREW_THREAD,
 )
 
-from build_foot_screw import (  # noqa: E402
+from foot_screw_spec import (  # noqa: E402
     HEAD_DIA as FSCREW_HEAD_DIA,
     SHANK_LEN as FSCREW_SHANK_LEN,
     THREAD as FSCREW_THREAD,
 )
-from build_pedestal_hold_down_screw import (  # noqa: E402
+from pedestal_hold_down_screw_spec import (  # noqa: E402
     HEAD_DIA as HDSCREW_HEAD_DIA,
     SHANK_DIA as HDSCREW_SHANK_DIA,
     SHANK_LEN as HDSCREW_SHANK_LEN,

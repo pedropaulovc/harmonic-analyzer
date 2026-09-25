@@ -1415,124 +1415,253 @@ def test_swing_platform_consumers_read_geometry_not_the_builder():
         assert "cone_swing_platform_drawing_spec" not in deps, script
 
 
-# Part builders an assembly script (or an interference-contract module) still
-# imports directly.  Importing a part BUILDER puts its whole recipe -- sketch
-# code, drawing marks and the config it reads -- on the assembly's cache key;
-# the constants belong in a pure spec/geometry module both read.  The list only
-# shrinks: a new edge fails, and so does a listed edge that no longer exists.
-_ASSEMBLY_BUILDER_IMPORTS = {
-    "build_channel_assembly.py": {"build_fulcrum_keeper", "build_pivot_bracket"},
-    "build_drive_train_assembly.py": {
-        "build_alignment_pinion",
-        "build_arbor_pedestal",
-        "build_cone_lock_knob",
-        "build_cone_pivot_post",
-        "build_cone_pivot_screw",
-        "build_cone_tip_adjuster",
-        "build_cone_tip_bushing",
-        "build_cone_tip_pinch_screw",
-        "build_crank_pin_eye",
-        "build_crank_pin_ring",
-        "build_crankshaft",
-        "build_cylinder_end_disc",
-        "build_dome_cap_screw",
-        "build_fillister_screw",
-        "build_foot_screw",
-        "build_harmonic_base",
-        "build_pedestal_hold_down_screw",
-        "build_rocker_arm_support",
-        "build_slotted_screw",
-        "build_swing_stop_screw",
-    },
-    "build_frame_assembly.py": {
-        "build_fillister_screw",
-        "build_gooseneck_set_screw",
-        "build_lag_screw",
-        "build_rocker_arm_support",
-        "build_top_frame",
-    },
-    "build_harmonic_analyzer_assembly.py": {
-        "build_measuring_stick",
-        "build_measuring_stick_stop",
-    },
-    "build_magnifier_assembly.py": {"build_thumb_screw"},
-    "build_paper_drive_assembly.py": {
-        "build_bracket_screw",
-        "build_clamp_screw",
-        "build_column_clamp_back",
-        "build_fillister_screw",
-        "build_guide_lock",
-        "build_latch_hook",
-        "build_platen",
-        "build_platen_clip",
-        "build_platen_guide",
-        "build_platen_paper",
-        "build_platen_rack",
-        "build_rack_pinion",
-        "build_support_bar",
-        "build_transgear_bracket",
-        "build_transgear_feed_pinion",
-        "build_transgear_knob_shaft",
-        "build_transgear_latch",
-        "build_transgear_pinion",
-        "build_transgear_removable",
-        "build_transgear_thumbnut",
-    },
-    "build_pen_assembly.py": {
-        "build_hanger_screw",
-        "build_pen_frame",
-        "build_pen_hanger",
-        "build_pen_set_screw",
-    },
-    "build_summing_assembly.py": {
-        "build_knife_hanger_stud",
-        "build_knife_hanger_washer",
-        "build_knife_mount",
-        "build_top_frame",
-    },
+# Direct imports of one build script by another, grandfathered at #880 and
+# owned by the follow-up that burns them down.  Importing a BUILDER puts its
+# whole recipe (sketch code, drawing marks, the config it reads) on the
+# importer's cache key; the numbers belong in the part's pure spec.  The list
+# only shrinks: an unlisted edge fails, and so does a listed edge that no longer
+# exists.  Each entry is "<owner>: <what it reads>".
+_GRANDFATHERED_BUILDER_EDGES = {
+    ("build_channel_assembly.py", "build_fulcrum_keeper"): (
+        "dtrefactor: reads CBORE_DEPTH_MM, FOOT_H"
+    ),
+    ("build_channel_assembly.py", "build_pivot_bracket"): (
+        "dtrefactor: reads FOOT_H"
+    ),
+    ("build_drive_train_assembly.py", "build_alignment_pinion"): (
+        "dtrefactor: reads BORE_DIA"
+    ),
+    ("build_drive_train_assembly.py", "build_arbor_pedestal"): (
+        "dtrefactor: reads FOOT_HEIGHT, FOOT_WIDTH, SCREW_Z"
+    ),
+    ("build_drive_train_assembly.py", "build_cone_pivot_post"): (
+        "dtrefactor: reads BLOCK_DIA, BORE_HEIGHT, CONE_BOSS_LENGTH, CRANK_BORE_HEIGHT, CRANK_BOSS_LENGTH, CRANK_BOSS_START_Z"
+    ),
+    ("build_drive_train_assembly.py", "build_cone_tip_adjuster"): (
+        "dtrefactor: reads BODY_LEN, CUP_DEPTH, CUP_DIA, THREAD"
+    ),
+    ("build_drive_train_assembly.py", "build_cone_tip_bushing"): (
+        "dtrefactor: reads BORE_DIA, LENGTH"
+    ),
+    ("build_drive_train_assembly.py", "build_cone_tip_pinch_screw"): (
+        "dtrefactor: reads SHANK_LEN, THREAD"
+    ),
+    ("build_drive_train_assembly.py", "build_crank_pin_eye"): (
+        "dtrefactor: reads LOOP_R, TAIL_LEN, WIRE_DIA"
+    ),
+    ("build_drive_train_assembly.py", "build_crank_pin_ring"): (
+        "dtrefactor: reads WIRE_DIA"
+    ),
+    ("build_drive_train_assembly.py", "build_crankshaft"): (
+        "dtrefactor: reads PINION_PIN_STATION_Y, SEAT_ARM, SEAT_PINION, SEAT_T12, SHAFT_LENGTH"
+    ),
+    ("build_drive_train_assembly.py", "build_cylinder_end_disc"): (
+        "dtrefactor: reads DISC_DIA, DISC_THICK"
+    ),
+    ("build_drive_train_assembly.py", "build_dome_cap_screw"): (
+        "dtrefactor: reads STUB_LEN"
+    ),
+    ("build_drive_train_assembly.py", "build_harmonic_base"): (
+        "dtrefactor: reads BLOCK_SCREW_HOLE_DEPTH, BLOCK_SCREW_XZ, BLOCK_SEAT_SPEC, FOOT_SCREW_HOLE_DEPTH, FOOT_SCREW_XZ, FOOT_SEAT_SPEC, LOCK_KNOB_XZ, LOCK_SEAT_SPEC, LOCK_STUD_ENGAGEMENT, PEDESTAL_SCREW_HOLE_DEPTH, PEDESTAL_SCREW_XZ, PEDESTAL_SEAT_SPEC, PIVOT_SCREW_XZ, PIVOT_SEAT_SPEC, STOP_SCREW_XZ, STOP_SEAT_SPEC, SWING_HARDWARE_GEOMETRY, require_blind_seat_fit"
+    ),
+    ("build_drive_train_assembly.py", "build_rocker_arm_support"): (
+        "dtrefactor: reads WIDE"
+    ),
+    ("build_frame_assembly.py", "build_gooseneck_set_screw"): (
+        "dtrefactor: reads SHANK_LEN"
+    ),
+    ("build_frame_assembly.py", "build_rocker_arm_support"): (
+        "dtrefactor: reads FOOT_THICKNESS, HOLE_DIA"
+    ),
+    ("build_frame_assembly.py", "build_top_frame"): (
+        "dtrefactor: reads SIDE_TAP_SPEC"
+    ),
+    ("build_harmonic_analyzer_assembly.py", "build_measuring_stick"): (
+        "dtrefactor: reads BODY_THICKNESS, BODY_WIDTH, DIVISION_SPACING, SCALE_START_X"
+    ),
+    ("build_harmonic_analyzer_assembly.py", "build_measuring_stick_stop"): (
+        "dtrefactor: reads HEAD_H, SLOT_FLOOR, SLOT_H, SLOT_W"
+    ),
+    ("build_kinematic_probe.py", "build_paper_drive_assembly"): (
+        "dtrefactor: reads CHAIN_CRANK_CENTRE, DISC_TEETH, FEED_PD, KNOB_SHAFT_XY, NET_RACK_TRAVEL_PER_CRANK_REV, SPARE_GEAR_POS, THIRD_TEETH"
+    ),
+    ("build_magnifier_assembly.py", "build_thumb_screw"): (
+        "dtrefactor: reads HEAD_STACK_LEN, SHANK_LEN"
+    ),
+    ("build_mobility_probe.py", "build_motion_study"): (
+        "dtrefactor: reads ANGLE, DISTANCE, _family, _iter_mates, _real_parts"
+    ),
+    ("build_motion_setup_drives.py", "build_motion_study"): (
+        "dtrefactor: reads ANGLE, DISTANCE, _comp_xform, _entity_ref, _family, _find_one, _iter_mates, _real_parts, _reset_to_assembled, _rot_angle, assert_motion_progressed"
+    ),
+    ("build_motion_study.py", "build_motion_study_springs"): (
+        "dtrefactor: reads add_springs, add_wires_gravity"
+    ),
+    ("build_motion_study_springs.py", "build_motion_study"): (
+        "dtrefactor: reads ANGLE, DISTANCE, SPRING_KCH, SPRING_KCT, STOCK_KCH, STOCK_KCT, _by_z_rank, _components, _entity_ref, _family, _find_one, _iter_mates, _lone_real, _read_member, _sub_model, _suppress_named"
+    ),
+    ("build_paper_drive_assembly.py", "build_bracket_screw"): (
+        "dtrefactor: reads SHANK_DIA, SHANK_LEN"
+    ),
+    ("build_paper_drive_assembly.py", "build_column_clamp_back"): (
+        "dtrefactor: reads DEPTH, HOLE_SPEC"
+    ),
+    ("build_paper_drive_assembly.py", "build_guide_lock"): (
+        "dtrefactor: reads HOLE_DIA, LOCK_THICK, LOCK_WIDTH"
+    ),
+    ("build_paper_drive_assembly.py", "build_latch_hook"): (
+        "dtrefactor: reads STRIP_T, X_MAX, X_MIN, Y_MIN"
+    ),
+    ("build_paper_drive_assembly.py", "build_platen_clip"): (
+        "dtrefactor: reads CLIP_LENGTH, CLIP_THICKNESS, HOLE_DIA, HOLE_INSET, HOLE_Y, SCREW_SEAT_BOSS_H, SCREW_SEAT_DIA, SCREW_SEAT_STACK"
+    ),
+    ("build_paper_drive_assembly.py", "build_platen_guide"): (
+        "dtrefactor: reads GUIDE_DEPTH, GUIDE_HEIGHT, GUIDE_LENGTH, GUIDE_SCREW_BOTTOM_CLEARANCE, GUIDE_SCREW_PASSAGE, GUIDE_SCREW_THREAD_ENGAGEMENT, HOLE_X, LOCK_SCREW_BOTTOM_CLEARANCE, LOCK_SCREW_PASSAGE, LOCK_SCREW_THREAD_ENGAGEMENT, LOCK_STATION_X, SCREW_STATION_X"
+    ),
+    ("build_paper_drive_assembly.py", "build_platen_paper"): (
+        "dtrefactor: reads PAPER_HEIGHT, PAPER_WIDTH"
+    ),
+    ("build_paper_drive_assembly.py", "build_platen_rack"): (
+        "dtrefactor: reads ADDENDUM, BAR_HEIGHT, FIRST_GAP_X, PITCH"
+    ),
+    ("build_paper_drive_assembly.py", "build_rack_pinion"): (
+        "dtrefactor: reads DP, FACE_WIDTH, TEETH"
+    ),
+    ("build_paper_drive_assembly.py", "build_support_bar"): (
+        "dtrefactor: reads BAR_DEPTH, BAR_HEIGHT, BRACKET_HOLE_SPEC, BRACKET_HOLE_X, BRACKET_STUD_X, CLAMP_CBORE_DEPTH, CLAMP_CBORE_DIA, CLAMP_HEAD_RECESS, CLAMP_HOLE_DIA, CLAMP_HOLE_X, LATCH_HOLE_X"
+    ),
+    ("build_paper_drive_assembly.py", "build_transgear_bracket"): (
+        "dtrefactor: reads PLATE_THICK, SCREW_HOLE_DX, SCREW_HOLE_SPEC"
+    ),
+    ("build_paper_drive_assembly.py", "build_transgear_feed_pinion"): (
+        "dtrefactor: reads DP, FACE_WIDTH, TEETH"
+    ),
+    ("build_paper_drive_assembly.py", "build_transgear_knob_shaft"): (
+        "dtrefactor: reads FRONT_STUB, SHAFT_DIA"
+    ),
+    ("build_paper_drive_assembly.py", "build_transgear_latch"): (
+        "dtrefactor: reads C2C, THICKNESS"
+    ),
+    ("build_paper_drive_assembly.py", "build_transgear_pinion"): (
+        "dtrefactor: reads DP, FACE_WIDTH, TEETH"
+    ),
+    ("build_paper_drive_assembly.py", "build_transgear_removable"): (
+        "dtrefactor: reads BORE_DIAMETER, FACE_WIDTH, PIN_CIRCLE_RADIUS, PIN_HOLE_DIAMETER"
+    ),
+    ("build_paper_drive_assembly.py", "build_transgear_thumbnut"): (
+        "dtrefactor: reads BORE_DIA, DISC_DIA, DISC_LEN, NECK_DIA, NECK_LEN, TOTAL_LEN"
+    ),
+    ("build_pen_assembly.py", "build_pen_frame"): (
+        "dtrefactor: reads FRAME_DEPTH, OUTER_HEIGHT, OUTER_WIDTH, RAIL_END, RAIL_SIDE"
+    ),
+    ("build_pen_assembly.py", "build_pen_hanger"): (
+        "dtrefactor: reads SCREW_HOLE_XY, STRAP_Z"
+    ),
+    ("build_pen_assembly.py", "build_pen_set_screw"): (
+        "dtrefactor: reads HEAD_STACK_LEN, SHANK_DIA, SHANK_LEN, TIP_CHAMFER"
+    ),
+    ("build_summing_assembly.py", "build_knife_hanger_stud"): (
+        "dtrefactor: reads SHANK_DIA, UNDERHEAD_LEN"
+    ),
+    ("build_summing_assembly.py", "build_knife_hanger_washer"): (
+        "dtrefactor: reads INNER_DIA, OUTER_DIA, THICKNESS"
+    ),
+    ("build_summing_assembly.py", "build_knife_mount"): (
+        "dtrefactor: reads CASTING_UNDERSIDE_Y, MOUNT_GAP, STUD_TAP_DEPTH"
+    ),
+    ("build_summing_assembly.py", "build_top_frame"): (
+        "dtrefactor: reads RING_HEIGHT, STUD_HOLE_DIA"
+    ),
 }
+# Entry tools that open built models and therefore import their builders; they
+# are run, never imported by a build recipe's pure helpers.
+_ENTRY_TOOLS = frozenset({"verify.py", "preflight_release.py"})
 
 
-def _direct_builder_imports(path: Path) -> set[str]:
-    """``build_*`` modules ``path`` imports anywhere, top level or lazily."""
-    names: set[str] = set()
-    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-        if isinstance(node, ast.Import):
-            names.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-            names.add(node.module)
-    return {name for name in names if name.startswith("build_")}
+def _direct_builder_edges() -> set[tuple[str, str]]:
+    """(importer, imported) for every build script importing another, anywhere
+    in the file (top level or lazily)."""
+    edges: set[tuple[str, str]] = set()
+    for path in sorted(SCRIPTS_DIR.glob("build_*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                names = [node.module]
+            else:
+                continue
+            edges.update((path.name, n) for n in names if n.startswith("build_"))
+    return edges
 
 
-def test_assemblies_and_contracts_import_no_new_part_builder():
-    """#880: an assembly (or its interference contract) reads a part's numbers
-    from a pure module, not from the part's builder.  harmonic_base_fasteners
-    replaced the frame's and the contracts' build_harmonic_base import, which
-    carried the cone journal line and the channel config onto the frame's key."""
-    scripts_dir = Path(__file__).resolve().parent
-    found = {
-        path.name: imports
-        for path in sorted(
-            [
-                *scripts_dir.glob("build_*_assembly.py"),
-                *scripts_dir.glob("_interference_contracts*.py"),
-            ]
-        )
-        if (imports := _direct_builder_imports(path))
+def _library_modules() -> list[Path]:
+    """Every module a build or drawing recipe imports that is not itself an
+    entry script: specs, geometry, layouts, helpers, interference contracts."""
+    entries = sorted([*SCRIPTS_DIR.glob("build_*.py"), *SCRIPTS_DIR.glob("draw_*.py")])
+    library = {
+        Path(dep)
+        for entry in entries
+        for dep in module_deps_of(entry)
+        if not Path(dep).name.startswith(("build_", "draw_", "test_"))
+        and Path(dep).name not in _ENTRY_TOOLS
     }
-    added = {
-        name: sorted(imports - _ASSEMBLY_BUILDER_IMPORTS.get(name, set()))
-        for name, imports in found.items()
-        if imports - _ASSEMBLY_BUILDER_IMPORTS.get(name, set())
-    }
-    assert not added, f"new part-builder imports; read a pure module instead: {added}"
-    gone = {
-        name: sorted(listed - found.get(name, set()))
-        for name, listed in _ASSEMBLY_BUILDER_IMPORTS.items()
-        if listed - found.get(name, set())
-    }
-    assert not gone, f"edges no longer imported; delete them from the list: {gone}"
+    return sorted(library)
 
+
+def _reached_builders(path: Path) -> list[str]:
+    """``build_*`` modules in ``path``'s transitive import closure, itself excluded."""
+    return sorted(
+        Path(dep).stem
+        for dep in module_deps_of(path)
+        if Path(dep).name.startswith("build_") and Path(dep).stem != path.stem
+    )
+
+
+def test_library_modules_reach_no_builder():
+    """#880: a spec, geometry, layout, helper or interference-contract module
+    reaches no build script, however indirectly.  There is no allowance: the
+    numbers a sibling needs move into the part's pure spec."""
+    library = _library_modules()
+    names = {path.name for path in library}
+    assert {"harmonic_base_fasteners.py", "_interference_contracts.py"} <= names
+    assert {"cone_swing_platform_geometry.py", "fillister_screw_spec.py"} <= names
+    reached = {
+        path.name: builders for path in library if (builders := _reached_builders(path))
+    }
+    assert not reached, f"read the part's spec, not its builder: {reached}"
+
+
+def test_a_builder_import_in_a_pure_module_goes_red(tmp_path):
+    """Fail-first for the guard above: a synthetic spec that imports a builder
+    is caught through the same closure the build graph uses."""
+    planted = tmp_path / "planted_spec.py"
+    planted.write_text("from build_foot_screw import THREAD\n", encoding="utf-8")
+    assert _reached_builders(planted) == ["build_foot_screw"]
+    clean = tmp_path / "clean_spec.py"
+    clean.write_text("from foot_screw_spec import THREAD\n", encoding="utf-8")
+    assert _reached_builders(clean) == []
+
+
+def test_builder_to_builder_edges_only_shrink():
+    """Every direct build-script edge is listed with its owner and reason; a new
+    one fails, and a listed one that is gone must be deleted."""
+    found = _direct_builder_edges()
+    listed = set(_GRANDFATHERED_BUILDER_EDGES)
+    assert not found - listed, f"new builder imports; read a spec: {sorted(found - listed)}"
+    assert not listed - found, f"edges gone; delete them: {sorted(listed - found)}"
+    for edge, note in _GRANDFATHERED_BUILDER_EDGES.items():
+        owner, _, reason = note.partition(": ")
+        assert owner and reason.strip(), edge
+
+
+def test_part_builders_reach_no_other_part_builder():
+    """#880: the part-to-part edges on the assembly re-key path are burned down;
+    a part builder reads a sibling's numbers from its spec."""
+    parts = [path for path in bg.part_scripts() if not path.name.endswith("_assembly.py")]
+    reached = {
+        path.name: builders for path in parts if (builders := _reached_builders(path))
+    }
+    assert not reached, reached
 
 def test_module_deps_are_transitive():
     """The closure follows imports through helper chains: a chain-link part pulls
