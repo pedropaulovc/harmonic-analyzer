@@ -2027,6 +2027,7 @@ def _on_record(
 
 
 def _backfill(tmp_path: Path, records: Path, **kwargs) -> ml.BackfillRow:
+    kwargs.setdefault("cache_path", tmp_path / "cache.json")
     result = ml.backfill([records], ledger_path=tmp_path / "ledger.json", **kwargs)
     [row] = result.rows
     return row
@@ -2261,7 +2262,9 @@ def test_backfill_skips_what_cannot_be_ingested_and_honours_exclusions(
     )
     _sheet(registry)
 
-    result = ml.backfill([records], ledger_path=tmp_path / "ledger.json", apply=True)
+    result = ml.backfill(
+        [records], ledger_path=tmp_path / "ledger.json", apply=True, cache_path=None
+    )
     [row] = result.rows
     assert row.outcome == ml.Backfill.INGESTED
     entry = ml.load_ledger(tmp_path / "ledger.json")["drawings"]["crank_arm"]
@@ -2282,6 +2285,7 @@ def test_backfill_cli_prints_the_table_and_its_counts(
     _on_record(records, "wt-a")
     _sheet(registry)
     argv = ["--ledger", str(tmp_path / "ledger.json"), "backfill", str(records)]
+    argv += ["--cache", str(tmp_path / "cache.json")]
 
     rulings = str(_author_rulings(tmp_path, family="gpt"))
     assert ml.main([*argv, "--author-rulings", rulings]) == 0
@@ -2331,3 +2335,56 @@ def test_a_newer_failing_verdict_withdraws_a_recorded_entry(
     assert "dropped from the ledger" in row.detail
     status = ml.check(["crank_arm"], ledger_path=ledger_path)[0]
     assert status.state == ml.State.UNREVIEWED
+
+
+def test_a_warm_backfill_hashes_and_renders_nothing_new(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    _on_record(records, "wt-a", producer="reviewed render")
+    _on_record(records, "wt-b", edge_x=60.0, reviewed_at=REVIEWED_AT)  # drifted
+    _sheet(registry)
+    cold = _backfill(tmp_path, records)
+    assert cold.outcome == ml.Backfill.INGESTED
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("a warm rerun hashed or rendered")
+
+    monkeypatch.setattr(ml, "read_sheets", forbidden)
+    real_sha256 = ml.sha256_file
+    hashed: list[Path] = []
+    monkeypatch.setattr(
+        ml, "sha256_file", lambda path: hashed.append(Path(path)) or real_sha256(path)
+    )
+
+    warm = ml.backfill(
+        [records],
+        ledger_path=tmp_path / "ledger.json",
+        cache_path=tmp_path / "cache.json",
+    )
+
+    [row] = warm.rows
+    assert (row.outcome, row.detail) == (cold.outcome, cold.detail)
+    # Only record_review's integrity check of the one PDF it would ingest.
+    [ingested] = [t for t in row.tried if t.outcome == ml.Backfill.INGESTED]
+    assert hashed == [ingested.candidate.pdf]
+
+
+def test_the_worktree_roots_are_each_worktrees_pdfs_and_reports(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _commit(repo, repo / "README", "base")
+    (repo / "cad" / "out" / "pdf").mkdir(parents=True)
+    other = tmp_path / "wt"
+    _git(repo, "worktree", "add", "-q", str(other))
+    (other / "cad" / "out" / "reports" / "machinist-review").mkdir(parents=True)
+
+    roots = {p.resolve() for p in ml.worktree_roots(repo)}
+
+    assert roots == {
+        (repo / "cad" / "out" / "pdf").resolve(),
+        (other / "cad" / "out" / "reports" / "machinist-review").resolve(),
+    }

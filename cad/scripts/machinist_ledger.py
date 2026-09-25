@@ -100,6 +100,7 @@ from typing import Any
 SCRIPTS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
+import _telemetry  # noqa: E402
 from _drawing_registry import CAD_ROOT, DRAWINGS, DRAWINGS_BY_NAME  # noqa: E402
 
 REPO_ROOT = CAD_ROOT.parent
@@ -1174,6 +1175,7 @@ def record_review(
     ledger_path: Path = LEDGER_PATH,
     outage: dict[str, Any] | None = None,
     repo: Path = REPO_ROOT,
+    digests: Sequence[str] | None = None,
 ) -> Recorded:
     """Enter one accepted review in its slot, replacing that slot's previous entry.
 
@@ -1231,12 +1233,13 @@ def record_review(
     problem = None
     if slot == LAST_RESORT:
         problem = _last_resort_problem(review, author, refusal)
-    sheets = read_sheets(pdf)
-    if len(sheets) != review["sheet_count"]:
+    if digests is None:  # a caller that rendered these exact bytes may pass them
+        digests = [sheet_digest(sheet.ink) for sheet in read_sheets(pdf)]
+    digests = list(digests)
+    if len(digests) != review["sheet_count"]:
         raise ValueError(
-            f"{name}: {pdf} has {len(sheets)} sheets, the review saw {review['sheet_count']}"
+            f"{name}: {pdf} has {len(digests)} sheets, the review saw {review['sheet_count']}"
         )
-    digests = [sheet_digest(sheet.ink) for sheet in sheets]
     prompt = prompt_problem(review)
     if prompt:
         raise ValueError(f"{name}: not recorded: {prompt}")
@@ -1611,6 +1614,60 @@ class Found:
     pdfs: _PdfIndex
 
 
+class BackfillCache:
+    """What a backfill already learned, kept between runs.
+
+    PDF hashes are keyed by (path, size, mtime_ns), so a rerun hashes only
+    new or changed files; sheet comparisons are keyed by the two PDFs'
+    sha256, so a rerun renders only pairs it has not compared.  Both are
+    dropped when the fingerprint settings change.
+    """
+
+    def __init__(self, path: Path | None) -> None:
+        self.path = path
+        self.pdfs: dict[str, list[Any]] = {}
+        self.comparisons: dict[str, list[Any]] = {}
+        self.sheets: dict[str, list[str]] = {}  # PDF sha256 -> sheet digests
+        self.hashed = 0
+        if path is None or not path.is_file():
+            return
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        if data.get("fingerprint") == empty_ledger()["fingerprint"]:
+            self.pdfs = data.get("pdfs", {})
+            self.comparisons = data.get("comparisons", {})
+            self.sheets = data.get("sheets", {})
+
+    def digest(self, path: Path, size: int, mtime_ns: int) -> str:
+        key = str(path)
+        known = self.pdfs.get(key)
+        if known and known[:2] == [size, mtime_ns]:
+            return known[2]
+        sha = sha256_file(path)
+        self.pdfs[key] = [size, mtime_ns, sha]
+        self.hashed += 1
+        return sha
+
+    def save(self) -> None:
+        if self.path is None:
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        data = {
+            "fingerprint": empty_ledger()["fingerprint"],
+            "pdfs": self.pdfs,
+            "comparisons": self.comparisons,
+            "sheets": self.sheets,
+        }
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data), encoding="utf-8")
+        os.replace(tmp, self.path)
+
+
+BACKFILL_CACHE = REPORT_DIR / "backfill-cache.json"
+
+
 class _PdfIndex:
     """Every PDF under the roots, found by content.
 
@@ -1619,17 +1676,17 @@ class _PdfIndex:
     PDF was renamed or is lost -- so the lookup is by content wherever it lives.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, cache: BackfillCache | None = None) -> None:
         self.by_name: dict[str, list[Path]] = {}
-        self.hashes: dict[Path, str] = {}
+        self.stats: dict[Path, tuple[int, int]] = {}
+        self.cache = cache or BackfillCache(None)
 
-    def add(self, path: Path) -> None:
+    def add(self, path: Path, size: int, mtime_ns: int) -> None:
         self.by_name.setdefault(path.name, []).append(path)
+        self.stats[path] = (size, mtime_ns)
 
     def _digest(self, path: Path) -> str:
-        if path not in self.hashes:
-            self.hashes[path] = sha256_file(path)
-        return self.hashes[path]
+        return self.cache.digest(path, *self.stats[path])
 
     def find(self, sha: str, name: str) -> Path | None:
         likely = [*self.by_name.get(name, []), *self.by_name.get(f"{sha}.pdf", [])]
@@ -1640,13 +1697,45 @@ class _PdfIndex:
         return None
 
 
-def _walk(roots: Sequence[Path]) -> Iterable[Path]:
-    for root in roots:
-        for directory, subdirs, files in os.walk(root):
-            subdirs[:] = [d for d in subdirs if d not in _WALK_SKIP]
-            for file in files:
-                if file.endswith((".json", ".pdf")):
-                    yield Path(directory) / file
+def _walk(roots: Sequence[Path]) -> Iterable[tuple[Path, int, int]]:
+    """Every JSON and PDF under ``roots``, with the size and mtime_ns of each.
+
+    ``os.scandir`` carries both from the directory listing on Windows, so a
+    warm rerun costs a directory walk, not a stat or a read per file.
+    """
+    pending = [root for root in roots if root.is_dir()]
+    while pending:
+        directory = pending.pop()
+        try:
+            entries = list(os.scandir(directory))
+        except OSError:
+            continue
+        for entry in entries:
+            if entry.is_dir(follow_symlinks=False):
+                if entry.name not in _WALK_SKIP:
+                    pending.append(Path(entry.path))
+            elif entry.name.endswith((".json", ".pdf")):
+                stat = entry.stat()
+                yield Path(entry.path), stat.st_size, stat.st_mtime_ns
+
+
+def worktree_roots(repo: Path = REPO_ROOT) -> list[Path]:
+    """Where every worktree of this repository keeps its PDFs and review records."""
+    listing = _git("worktree", "list", "--porcelain", repo=repo) or ""
+    worktrees = [
+        Path(line.removeprefix("worktree ").strip())
+        for line in listing.splitlines()
+        if line.startswith("worktree ")
+    ]
+    return [
+        path
+        for worktree in worktrees
+        for path in (
+            worktree / "cad" / "out" / "pdf",
+            worktree / "cad" / "out" / "reports" / "machinist-review",
+        )
+        if path.is_dir()
+    ]
 
 
 def _registry_name(review: dict[str, Any], by_pdf: dict[str, str]) -> str:
@@ -1670,17 +1759,17 @@ def _skip_reason(review: dict[str, Any], drawing: str) -> str:
     return ""
 
 
-def find_reviews(roots: Sequence[Path]) -> Found:
+def find_reviews(roots: Sequence[Path], cache: BackfillCache | None = None) -> Found:
     """Every machinist_review record under ``roots``: verdicts and quota refusals."""
     by_pdf = {spec.outputs["pdf"].name: name for name, spec in DRAWINGS_BY_NAME.items()}
     candidates: list[Candidate] = []
     objections: list[Candidate] = []
     refusals: list[tuple[Path, dict[str, Any]]] = []
-    pdfs = _PdfIndex()
+    pdfs = _PdfIndex(cache)
     seen: set[Path] = set()
-    for path in _walk(roots):
+    for path, size, mtime_ns in _walk(roots):
         if path.suffix == ".pdf":
-            pdfs.add(path)
+            pdfs.add(path, size, mtime_ns)
             continue
         resolved = path.resolve()
         if resolved in seen:
@@ -1751,22 +1840,39 @@ def _refusal_for(
     return None
 
 
-def _sheets_match(
-    candidate: Candidate, pdf: Path, current: Sequence[Sheet]
-) -> tuple[list[str], Comparison]:
-    """The reviewed sheet digests, and how they compare with the current sheets."""
-    located = _Located()
-    sha = candidate.review["source_sha256"][0]
-    located.paths[sha] = pdf
-    digests = [sheet_digest(sheet.ink) for sheet in located.get(sha)]
-    return digests, _compare({"pdf": sha, "sheets": digests}, current, located)
+class _Matcher:
+    """Reviewed sheets against one drawing's current render, cached by content."""
+
+    def __init__(self, current: Path, cache: BackfillCache) -> None:
+        self.current = current
+        stat = current.stat()
+        self.current_sha = cache.digest(current, stat.st_size, stat.st_mtime_ns)
+        self.cache = cache
+        self._sheets: list[Sheet] | None = None
+
+    def sheets(self) -> list[Sheet]:
+        if self._sheets is None:
+            self._sheets = read_sheets(self.current)
+        return self._sheets
+
+    def match(self, candidate: Candidate, pdf: Path) -> tuple[str, bool]:
+        """(problem, exact): the drift the ledger rule finds, "" when none."""
+        sha = candidate.review["source_sha256"][0]
+        key = f"{sha}:{self.current_sha}"
+        if key not in self.cache.comparisons:
+            located = _Located()
+            located.paths[sha] = pdf
+            reviewed = [sheet_digest(sheet.ink) for sheet in located.get(sha)]
+            self.cache.sheets[sha] = reviewed
+            current = self.sheets()
+            comparison = _compare({"pdf": sha, "sheets": reviewed}, current, located)
+            exact = reviewed == [sheet_digest(sheet.ink) for sheet in current]
+            self.cache.comparisons[key] = [comparison.problem, exact]
+        problem, exact = self.cache.comparisons[key]
+        return problem, exact
 
 
-def _objection(
-    candidate: Candidate,
-    current: Sequence[Sheet],
-    found: Found,
-) -> str:
+def _objection(candidate: Candidate, matcher: _Matcher, found: Found) -> str:
     """A failing verdict, newer than ``candidate``, that may have seen these sheets.
 
     A later FIX of the sheets now rendered overrides an earlier SHIP of the
@@ -1786,7 +1892,7 @@ def _objection(
                 f"newer {what} reviewed a PDF that is lost, so it may have seen "
                 f"these sheets [{other.report.resolve().as_posix()}]"
             )
-        if not _sheets_match(other, pdf, current)[1].problem:
+        if not matcher.match(other, pdf)[0]:
             return (
                 f"newer {what} reviewed these sheets "
                 f"[{other.report.resolve().as_posix()}]"
@@ -1805,7 +1911,7 @@ def _current_pdf(name: str, checkout: Path | None) -> Path:
 
 def _try(
     candidate: Candidate,
-    current: Sequence[Sheet],
+    matcher: _Matcher,
     *,
     author: Author | ValueError,
     ruling: dict[str, Any] | None,
@@ -1815,13 +1921,12 @@ def _try(
 ) -> Tried:
     """Match one located SHIP against the current sheets, then record it in ``scratch``."""
     review, drawing = candidate.review, candidate.drawing
-    reviewed, comparison = _sheets_match(candidate, candidate.pdf, current)
-    if comparison.problem:
-        return Tried(candidate, Backfill.DRIFTED, comparison.problem)
-    exact = reviewed == [sheet_digest(sheet.ink) for sheet in current]
+    problem, exact = matcher.match(candidate, candidate.pdf)
+    if problem:
+        return Tried(candidate, Backfill.DRIFTED, problem)
     match = "exact" if exact else "within tolerance"
     matched = f"{_reviewed(review)} matches ({match})"
-    objection = _objection(candidate, current, found)
+    objection = _objection(candidate, matcher, found)
     if objection:
         return Tried(candidate, Backfill.CONTRADICTED, f"{matched}; {objection}")
     if isinstance(author, ValueError):
@@ -1857,6 +1962,7 @@ def _try(
             refusal=refusal,
             ledger_path=scratch,
             repo=checkout,
+            digests=matcher.cache.sheets.get(review["source_sha256"][0]),
         )
     except ValueError as exc:
         return Tried(candidate, Backfill.NOT_COUNTED, f"{matched}; {exc}")
@@ -1882,6 +1988,7 @@ def backfill(
     rulings: dict[str, dict[str, Any]] | None = None,
     apply: bool = False,
     ledger_path: Path = LEDGER_PATH,
+    cache_path: Path | None = BACKFILL_CACHE,
 ) -> BackfillResult:
     """Try every SHIP on record under ``roots`` against the current sheets.
 
@@ -1899,13 +2006,59 @@ def backfill(
     if unknown:
         raise ValueError(f"unknown drawing names: {unknown}")
     repo = checkout or REPO_ROOT
-    found = find_reviews(roots)
-    by_drawing: dict[str, list[Candidate]] = {}
-    for candidate in found.candidates:
-        if candidate.skip:
-            continue
-        candidate.pdf = _locate(candidate, found.pdfs)
-        by_drawing.setdefault(candidate.drawing, []).append(candidate)
+    cache = BackfillCache(cache_path)
+    with _telemetry.span("backfill.discover", roots=len(roots)) as span:
+        found = find_reviews(roots, cache)
+        span.set_attributes(
+            {
+                "verdicts": len(found.candidates) + len(found.objections),
+                "pdfs": len(found.pdfs.stats),
+            }
+        )
+    with _telemetry.span("backfill.locate") as span:
+        by_drawing: dict[str, list[Candidate]] = {}
+        for candidate in found.candidates:
+            if candidate.skip:
+                continue
+            candidate.pdf = _locate(candidate, found.pdfs)
+            by_drawing.setdefault(candidate.drawing, []).append(candidate)
+        span.set_attributes({"hashed": cache.hashed})
+    try:
+        with _telemetry.span("backfill.match") as span:
+            result = _backfill_drawings(
+                by_drawing,
+                found,
+                cache,
+                repo=repo,
+                checkout=checkout,
+                excluded=excluded,
+                rulings=rulings or {},
+                apply=apply,
+                ledger_path=ledger_path,
+            )
+            span.set_attributes(
+                {
+                    "hashed": cache.hashed,
+                    "comparisons": len(cache.comparisons),
+                }
+            )
+    finally:
+        cache.save()
+    return result
+
+
+def _backfill_drawings(
+    by_drawing: dict[str, list[Candidate]],
+    found: Found,
+    cache: BackfillCache,
+    *,
+    repo: Path,
+    checkout: Path | None,
+    excluded: set[str],
+    rulings: dict[str, dict[str, Any]],
+    apply: bool,
+    ledger_path: Path,
+) -> BackfillResult:
     ledger = load_ledger(ledger_path)
     references = _References(sheets_dir(ledger_path))
     tried_names = sorted(set(by_drawing) - excluded)
@@ -1938,7 +2091,7 @@ def backfill(
                 slot = status.via.split()[0]
                 entry = ledger["drawings"][name][slot]
                 recorded = Candidate(ledger_path, entry, name)
-                objection = _objection(recorded, read_sheets(pdf), found)
+                objection = _objection(recorded, _Matcher(pdf, cache), found)
                 if not objection:
                     rows.append(
                         BackfillRow(
@@ -1966,7 +2119,7 @@ def backfill(
                     BackfillRow(name, Backfill.NO_SHIP, "no passing SHIP on record")
                 )
                 continue
-            current = read_sheets(pdf)
+            matcher = _Matcher(pdf, cache)
             tried: list[Tried] = []
             for index, candidate in enumerate(ships):
                 if candidate.pdf is None:
@@ -1981,9 +2134,9 @@ def backfill(
                     continue
                 attempt = _try(
                     candidate,
-                    current,
+                    matcher,
                     author=authors[name],
-                    ruling=(rulings or {}).get(name),
+                    ruling=rulings.get(name),
                     found=found,
                     checkout=repo,
                     # its own directory: a scratch save prunes its sheets dir
@@ -2112,9 +2265,21 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     )
     backfill_cmd.add_argument(
         "roots",
-        nargs="+",
+        nargs="*",
         type=Path,
-        help="directories searched for verdict JSONs and the PDFs they reviewed",
+        help="directories searched for verdict JSONs and the PDFs they reviewed "
+        "(e.g. C:/src/dt-logs)",
+    )
+    backfill_cmd.add_argument(
+        "--worktrees",
+        action="store_true",
+        help="also search every worktree's cad/out/pdf and machinist-review reports",
+    )
+    backfill_cmd.add_argument(
+        "--cache",
+        type=Path,
+        default=BACKFILL_CACHE,
+        help="hashes and comparisons kept between runs",
     )
     backfill_cmd.add_argument(
         "--checkout",
@@ -2209,8 +2374,12 @@ def _print_backfill(result: BackfillResult, args: argparse.Namespace) -> None:
 
 def _run(args: argparse.Namespace) -> int:
     if args.command == "backfill":
+        roots = [*args.roots, *(worktree_roots() if args.worktrees else [])]
+        if not roots:
+            raise ValueError("name the roots to search, or pass --worktrees")
         result = backfill(
-            args.roots,
+            roots,
+            cache_path=args.cache,
             checkout=args.checkout,
             exclude=args.exclude,
             rulings=load_author_rulings(args.author_rulings),
