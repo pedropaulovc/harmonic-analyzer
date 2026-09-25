@@ -23,7 +23,7 @@ _EXPECTED = {
     "knife-hanger-stud": (("91247A720",), "MHA-119", 2),
     "lag-screw": (("92240A539",), "MHA-039", 4),
     "pen-set-screw": (("99607A213",), "MHA-052", 1),
-    "pinion-strap-pin": (("98296A027",), "MHA-145", 2),
+    "pinion-strap-pin": (("98296A027",), "MHA-145", 3),
     "slotted-screw": (("90280A201",), "MHA-101", 4),
     "swing-stop-screw": (("90280A199",), "MHA-095", 1),
     "thumb-screw": (("91882A221",), "MHA-075", 2),

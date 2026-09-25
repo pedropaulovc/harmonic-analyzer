@@ -70,7 +70,7 @@ PIN_SEAT_DIA_BAND = REAM_H7
 # functional band (pinion_strap_pin_spec).
 CROSS_HOLE_DIA = _strap_pin.HOLE_DIA
 CROSS_HOLE_BAND = _strap_pin.HOLE_BAND
-# The pin is its own BOM line (MHA-145, 2 used), so the callout names it
+# The pin is its own BOM line (MHA-145), so the callout names it
 # instead of supplying one loose with each strap; test_pinion_bracket_drawing
 # keeps the number in step with the parts registry.
 CROSS_HOLE_CALLOUT = "THRU\nFOR MHA-145 SPRING PIN"
