@@ -80,8 +80,14 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         "91410A538": RecipeMetadata(
             "diagnostics.diag_build_91410A538", "build_91410A538"
         ),
+        "93075A150": RecipeMetadata(
+            "diagnostics.diag_build_93075A150", "build_93075A150"
+        ),
         "93075A194": RecipeMetadata(
             "diagnostics.diag_build_93075A194", "build_93075A194"
+        ),
+        "90631A007": RecipeMetadata(
+            "diagnostics.diag_build_90631A007", "build_90631A007"
         ),
         "92865A585": RecipeMetadata(
             "diagnostics.diag_build_92865A585", "build_92865A585"
