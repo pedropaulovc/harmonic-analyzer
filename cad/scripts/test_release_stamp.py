@@ -284,12 +284,19 @@ def test_an_open_that_reports_a_load_error_fails(tmp_path):
         package_native.open_silently(session, assembly, package_native.SW_DOC_ASSEMBLY)
 
 
-def test_an_open_with_other_warnings_only_warns(tmp_path, capsys):
-    session, assembly = _opened(tmp_path, 0, 0x20)  # swFileLoadWarning_NeedsRegen
+def test_an_open_with_other_warnings_only_warns_naming_the_references(tmp_path, capsys):
+    """IdMismatch stays non-fatal until a release run shows whether a healthy
+    open raises it; OpenDoc6 does not say which reference mismatched, so the
+    warn line names the document, the bits and every resident reference."""
+    session, assembly = _opened(tmp_path, 0, 0x21)  # IdMismatch | NeedsRegen
+    session.references[assembly] = [(tmp_path / "b.SLDPRT").resolve()]
 
     package_native.open_silently(session, assembly, package_native.SW_DOC_ASSEMBLY)
 
-    assert "swFileLoadWarning_e 0x20" in capsys.readouterr().err
+    assert (
+        "OpenDoc6 a.SLDASM: swFileLoadWarning_e 0x21 (IdMismatch, NeedsRegen); "
+        "resident references: b.SLDPRT"
+    ) in capsys.readouterr().err
 
 
 def _tree(root: Path, names: list[str]) -> list[Path]:

@@ -126,6 +126,21 @@ SW_OPEN_UNLOADED_REFERENCES = {
     0x40: "BasePartNotLoaded",
     0x100000: "MissingExternalReferences",
 }
+# Every other swFileLoadWarning_e bit an open may raise, named for the warn line.
+SW_OPEN_WARNINGS = {
+    0x1: "IdMismatch",
+    0x2: "ReadOnly",
+    0x4: "SharingViolation",
+    0x20: "NeedsRegen",
+    0x80: "AlreadyOpen",
+    0x400: "ViewMissingReferencedConfig",
+    0x2000: "ModelOutOfDate",
+    0x4000: "DimensionsReferencedIncorrectlyToModels",
+    0x8000: "ComponentMissingReferencedConfig",
+    0x40000: "AutomaticRepair",
+    0x80000: "CriticalDataRepair",
+    **SW_OPEN_UNLOADED_REFERENCES,
+}
 SW_CUSTOM_TEXT = 30  # swCustomInfoType_e.swCustomInfoText
 SW_PROP_REPLACE = 2  # swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
 _MODEL_DOC_TYPES = {".sldprt": SW_DOC_PART, ".sldasm": SW_DOC_ASSEMBLY}
@@ -611,7 +626,9 @@ def open_silently(sw: Any, path: Path, doc_type: int) -> None:
     declaration order (pinned against the typelib in test_release_stamp.py). A
     silent open reports a component that did not load only there: the parent
     still opens, and the resident walk cannot see a document that never loaded.
-    Other warnings are logged, not fatal.
+    Other warnings are logged, not fatal: the warn line names the document, the
+    warning bits and every reference resident with it, since OpenDoc6 does not
+    say which reference an IdMismatch came from.
     """
     errors, warnings, _document = sw.OpenDoc6(str(path), doc_type, SW_OPEN_SILENT, "", 0, 0)
     if errors:
@@ -622,8 +639,21 @@ def open_silently(sw: Any, path: Path, doc_type: int) -> None:
             f"OpenDoc6 {path.name}: references did not load ({', '.join(unloaded)}, "
             f"swFileLoadWarning_e {warnings:#x})"
         )
-    if warnings:
-        _telemetry.warn(f"OpenDoc6 {path.name}: swFileLoadWarning_e {warnings:#x}")
+    if not warnings:
+        return
+    named = [name for bit, name in SW_OPEN_WARNINGS.items() if warnings & bit]
+    references = sorted(
+        resident.name for resident, _doc in resident_documents(sw) if resident != path.resolve()
+    )
+    _telemetry.warn(
+        f"OpenDoc6 {path.name}: swFileLoadWarning_e {warnings:#x} "
+        f"({', '.join(named) or 'unnamed'}); resident references: "
+        f"{', '.join(references) or 'none'}",
+        document=path.name,
+        load_warnings=warnings,
+        load_warning_names=named,
+        references=references,
+    )
 
 
 def _open_document(sw: Any, path: Path, doc_type: int) -> Any:
