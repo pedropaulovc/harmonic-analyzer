@@ -1399,74 +1399,21 @@ def _git_executable() -> str:
     return str(Path(executable).resolve())
 
 
-@functools.lru_cache(maxsize=1)
-def _git_sha() -> str:
-    """Short HEAD sha (+ '-dirty'), for a reproducible Generator stamp.
-
-    Deterministic per source state — no wall-clock — so a rebuild from the same
-    commit writes the same property (see Part D determinism decision).
-    """
-    import subprocess
-
-    try:
-        sha = subprocess.run(  # noqa: S603 -- resolved Git; fixed internal argv
-            [_git_executable(), "rev-parse", "--short", "HEAD"],
-            cwd=str(CAD_ROOT),
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
-        dirty = subprocess.run(  # noqa: S603 -- resolved Git; fixed internal argv
-            [_git_executable(), "status", "--porcelain"],
-            cwd=str(CAD_ROOT),
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
-        return f"{sha}{'-dirty' if dirty else ''}"
-    except Exception:  # noqa: BLE001 -- not in a git checkout / no git
-        return "unknown"
-
-
-def _build_id() -> str:
-    """``<next release>[-dirty]`` -- the release designator, marked when dirty.
-
-    The title block's REV cell is the formal release designator
-    (``release.yaml``); a sheet also stamps this on itself
-    (``$PRP:{BUILD_ID}``) so a print made from an uncommitted working tree can
-    be told from a clean release print by eye.  Source-derived like
-    :func:`_git_sha` (no wall clock) and deliberately history-free: only the
-    working-tree state is read, never a tag, a commit count or a sha, so a
-    shallow checkout -- what every farm leaf clones -- stamps exactly what the
-    same commit stamps in a full clone.  Stamped only when a drawing task
-    actually runs -- git state is in no cache key or file_dep, so a commit
-    never rebuilds anything; a restored sheet keeps the id of the build that
-    made it.
-    """
-    import subprocess
-
-    import _config
-
-    try:
-        dirty = subprocess.run(  # noqa: S603 -- resolved Git; fixed internal argv
-            [_git_executable(), "status", "--porcelain", "--untracked-files=normal"],
-            cwd=str(CAD_ROOT),
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
-    except subprocess.CalledProcessError as exc:
-        raise RuntimeError(
-            "cannot determine Git working-tree state for the build id"
-        ) from exc
-    return f"{_config.release_revision()}{'-dirty' if dirty else ''}"
+# The everyday build identity: every part, assembly and drawing a build writes
+# carries these constants, never the release number or anything derived from
+# Git.  A release number in a build input re-keyed every cached leaf on each
+# release bump (about 9 seat-hours); a commit sha or a dirty-tree marker would
+# make restored artefacts carry whichever checkout happened to build them.  The
+# real ``vNN`` is stamped only at packaging (``package_native.stamp_release``)
+# onto the Pack-and-Go copies, which never feed back into a build.
+BUILD_REVISION = "DEV"
+GENERATOR = "harmonic-analyzer"
 
 
 def _git_commit_year() -> str:
     """Year of the HEAD commit, for the title block's copyright line.
 
-    Same determinism rule as :func:`_git_sha`: derived from the source state,
-    never the wall clock, so a rebuild from the same commit stamps the same
+    Derived from the source state, never the wall clock, so a rebuild from the same commit stamps the same
     year and a cache restore cannot disagree with a fresh build.  Outside a
     git checkout there is no source-derived year, so fail loud rather than
     stamp a guess into every part.
@@ -1489,16 +1436,16 @@ def _git_commit_year() -> str:
 def part_properties(part_name: str) -> dict[str, str]:
     """SolidWorks custom properties for ``part_name`` from the parts registry.
 
-    ``Revision`` is the next compact release number from ``release.yaml``;
-    per-part registry revisions are retained only as historical source data and
-    never override the release identity stamped into shipped CAD.
+    ``Revision`` is the constant :data:`BUILD_REVISION`; the release number is
+    stamped only onto the packaged copies (``package_native``).  Per-part
+    registry revisions are retained only as historical source data.
     """
     import _config
 
     props: dict[str, str] = {
         "Title": part_name,
-        "Revision": _config.release_revision(),
-        "Generator": f"harmonic-analyzer @ {_git_sha()}",
+        "Revision": BUILD_REVISION,
+        "Generator": GENERATOR,
         # The title block's "(c) <year> <holder>" line reads this via
         # $PRPSHEET:{COPYRIGHT_YEAR}; SolidWorks has no built-in year-only
         # property and its date built-ins change on every rebuild.

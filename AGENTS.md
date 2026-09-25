@@ -263,10 +263,18 @@ such build:
   explicit tag/options after `--` (for example, `doit release -- v22 --draft`).
   Its COM half is the separate `package:release` leaf (Pack-and-Go), so `release`
   itself only stages, diffs, tags and publishes — no seat, farm or local.
-- The tracked `cad/config/release.yaml` value is the Revision on every
-  `.SLDPRT`, `.SLDASM`, and linked drawing title block. `cut_release.py`
-  advances it after a successful publish and leaves a tracked merge bump;
-  the release agent MUST commit and merge that bump before the next release.
+- Every build stamps the constant Revision `DEV` (and drawing `BUILD_ID`
+  `DEV`) on each `.SLDPRT`, `.SLDASM` and drawing title block — never the
+  release number, a commit sha or a dirty marker, so no build leaf keys on
+  `cad/config/release.yaml`. Only `package:release` (`package_native.py`)
+  reads it: after Pack-and-Go it stamps that `vNN` into every packaged copy in
+  both `solidworks/` and `slddrw/`, rebuilds each drawing so its REV cell
+  re-reads the stamped model, and re-exports the release PDFs/PNGs from the
+  stamped copies. A release bump therefore re-keys that one leaf
+  (`check:recipe` pins it), and `cut_release.py` refuses a package stamped for
+  any other tag. `cut_release.py` advances `release.yaml` after a successful
+  publish and leaves a tracked merge bump; the release agent MUST commit and
+  merge that bump before the next release.
 
 ## `.farm-sources.json` — submodules the farm does not acquire
 
