@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 import sys
 from types import ModuleType
+import types
 
 import pytest
 
@@ -2950,6 +2951,45 @@ def test_a_signin_prompt_during_the_wait_is_named_once(monkeypatch):
 
     prompts = [kw for name, kw in events if name == "sw.signin_window"]
     assert prompts == [{"title": "Login | 3DEXPERIENCE ID", "elapsed_s": 0.0}]
+
+
+def test_the_signin_scan_reads_a_window_whose_handle_exceeds_32_bits(monkeypatch):
+    """Codex on #871: user32's exports carry no prototype, so an undeclared call
+    converts a 64-bit HWND as a C ``int``; the overflow inside the EnumWindows
+    callback ends the scan before it reaches the sign-in window. No real window
+    is touched: EnumWindows is faked, and the two readers are untyped function
+    pointers over Python thunks -- exactly how an unprototyped export behaves."""
+    import ctypes
+    from ctypes import wintypes
+
+    lifecycle = _load_dodo()._sw_lifecycle
+    high, signin = 0x1_0000_0010, 0x2_0000_0020
+    titles = {high: "Untitled - Notepad", signin: "Login | 3DEXPERIENCE ID"}
+
+    def visible(_hwnd):
+        return True
+
+    def text(hwnd, buffer, size):
+        title = titles.get(hwnd, "")[: size - 1]
+        ctypes.memmove(buffer, ctypes.create_unicode_buffer(title), (len(title) + 1) * 2)
+        return len(title)
+
+    class Unprototyped(ctypes._CFuncPtr):
+        _flags_ = ctypes._FUNCFLAG_STDCALL
+        _restype_ = ctypes.c_int
+
+    thunks = [
+        ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND)(visible),
+        ctypes.WINFUNCTYPE(ctypes.c_int, wintypes.HWND, ctypes.c_void_p, ctypes.c_int)(text),
+    ]
+    user32 = types.SimpleNamespace(
+        EnumWindows=lambda callback, _lparam: all(callback(h, 0) for h in titles),
+        IsWindowVisible=Unprototyped(ctypes.cast(thunks[0], ctypes.c_void_p).value),
+        GetWindowTextW=Unprototyped(ctypes.cast(thunks[1], ctypes.c_void_p).value),
+    )
+    monkeypatch.setattr(ctypes, "WinDLL", lambda *_a, **_k: user32)
+
+    assert lifecycle._signin_window() == "Login | 3DEXPERIENCE ID"
 
 
 def test_an_abandoned_grace_names_its_outcome(monkeypatch):
