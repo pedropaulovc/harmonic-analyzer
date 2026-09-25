@@ -8,7 +8,8 @@
       "^(?:v\\d+|DEV)(?:-b\\d+)?$",
       "\\bBUILD\\s+(?:v\\d+|DEV)(?:-b\\d+)?\\b"
     ],
-    "match_tolerance_px": 2
+    "match_tolerance_px": 2,
+    "text_position_tolerance_mm": 0.25
   },
   "drawings": {}
 }
