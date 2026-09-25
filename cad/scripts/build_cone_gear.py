@@ -102,13 +102,11 @@ from _common import (
     save_part_and_images,
     volume_check,
 )
-# NOTE: this module keeps its OWN validating ``set_global`` (below) -- it
-# round-trips every gear-math global through the SW equation parser to assert
-# the trig/sqr/pi dialect, which the plain ``_common.set_global`` does not do.
-# So we deliberately do NOT import ``_common.set_global`` (it would be shadowed
-# by the local def anyway). The self-naming helpers above drive only the two
-# ORDINARY circle dims (blank OD, bore); the involute tooth-gap profile is left
-# undimensioned so it stays free to re-solve from the globals and mesh.
+from _common import set_global as _set_global_checked
+
+# The self-naming helpers above drive only the two ORDINARY circle dims (blank
+# OD, bore); the involute tooth-gap profile is left undimensioned so it stays
+# free to re-solve from the globals and mesh.
 
 import _telemetry
 
@@ -238,34 +236,23 @@ def gap_area_in_disc(
 
 
 async def set_global_read(adapter: Any, name: str, expression: str) -> float:
-    """Upsert a global variable and return the value SolidWorks evaluated."""
-    from solidworks_mcp.adapters.base import SetGlobalVariableParameters
+    """Upsert a global variable and return the value SolidWorks stored.
 
-    res = await adapter.set_global_variable(
-        SetGlobalVariableParameters(name=name, expression=expression)
-    )
-    data = check(f"global {name} = {expression}", res)
-    value = data.get("value")
-    if value is None:
-        raise RuntimeError(f"global {name}: no evaluated value returned")
-    return float(value)
+    ``_common.set_global`` reads the value back against what the expression
+    means, so the probes below (``atn(1)``) fail loud on a dialect mismatch.
+    """
+    return await _set_global_checked(adapter, name, expression)
 
 
 async def set_global(adapter: Any, name: str, expression: str, expected: float) -> None:
     """Upsert a global variable and assert SolidWorks evaluated it correctly.
 
-    The value round-trip is the live test of the equation parser (trig in
-    DEGREES -- probed live, see ``build`` -- ``sqr`` = square root, literal-pi
-    arithmetic); a mismatch means the expression dialect is wrong and every
-    downstream curve would be silently bogus.
+    Besides the ``_common`` readback, the value must match the gear math's own
+    ``expected`` (trig in DEGREES -- probed live, see ``build`` -- ``sqr`` =
+    square root, literal-pi arithmetic); a mismatch means the expression dialect
+    is wrong and every downstream curve would be silently bogus.
     """
-    value = await set_global_read(adapter, name, expression)
-    tol = max(1e-9, abs(expected) * 1e-6)
-    if abs(value - expected) > tol:
-        raise RuntimeError(
-            f"global {name}: SolidWorks evaluated {value!r}, expected "
-            f"{expected:.9g} -- equation-parser dialect mismatch"
-        )
+    await _set_global_checked(adapter, name, expression, expected)
 
 
 async def equation_curve(
@@ -326,7 +313,6 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,
         CreateConfigurationParameters,
-        CreateEquationParameters,
         ExtrusionParameters,
     )
 
@@ -646,12 +632,7 @@ async def build(adapter) -> dict[str, str]:
     if pattern is None:
         raise RuntimeError("circular pattern: no axis candidate selectable")
     count_dim = pattern_count_dimension(adapter, pattern.data.name, DEFAULT_TEETH)
-    check(
-        f"link {count_dim} to ToothCount",
-        await adapter.create_equation(
-            CreateEquationParameters(equation=f'"{count_dim}" = "ToothCount"')
-        ),
-    )
+    await drive_dimension(adapter, count_dim, '"ToothCount"')
 
     # ------------------------------------------------------------------
     # Default-config (DEFAULT_TEETH) gear volume, by the same analytic
@@ -700,26 +681,12 @@ async def build(adapter) -> dict[str, str]:
                 )
             ),
         )
-    from solidworks_mcp.adapters.base import SetGlobalVariableParameters
-
     for name, teeth in CONFIGS:
-        check(
-            f"ToothCount = {teeth} in {name}",
-            await adapter.set_global_variable(
-                SetGlobalVariableParameters(
-                    name="ToothCount", expression=str(teeth), configuration=name
-                )
-            ),
+        await _set_global_checked(
+            adapter, "ToothCount", str(teeth), configuration=name
         )
-        check(
-            f"BoreDia = {bore_dia_in(teeth):g} in {name}",
-            await adapter.set_global_variable(
-                SetGlobalVariableParameters(
-                    name="BoreDia",
-                    expression=f"{bore_dia_in(teeth):g}",
-                    configuration=name,
-                )
-            ),
+        await _set_global_checked(
+            adapter, "BoreDia", f"{bore_dia_in(teeth):g}", configuration=name
         )
 
     # Author before the existing 20-configuration regeneration sweep.  This is

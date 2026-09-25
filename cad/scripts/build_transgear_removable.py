@@ -51,10 +51,8 @@ from _common import (
 )
 from _grouped_bom_properties import apply_grouped_bom_properties
 # ``set_global`` is imported from _common under a distinct name: the gear-math
-# globals below use build_cone_gear's stricter 4-arg ``set_global`` (asserts the
-# round-tripped value to test the equation-parser dialect), while the plain
-# length knobs added for the self-naming conversion use _common's mm-suffixing
-# 3-arg upsert. Keeping both avoids touching the validated involute math.
+# globals below use build_cone_gear's 4-arg ``set_global`` (the _common readback
+# plus the gear math's own expected value), the plain length knobs _common's.
 from _common import set_global as set_global_mm
 from build_cone_gear import (
     PI_LIT,
@@ -103,10 +101,8 @@ async def build(adapter) -> dict[str, str]:
         CircularPatternParameters,
         CreateAxisParameters,
         CreateConfigurationParameters,
-        CreateEquationParameters,
         ExtrusionParameters,
         RevolveParameters,
-        SetGlobalVariableParameters,
     )
 
     check("create_part", await adapter.create_part())
@@ -258,12 +254,7 @@ async def build(adapter) -> dict[str, str]:
             f"{radial_dim} reads {before!r}, matches neither inches nor mm"
         )
     _telemetry.debug(f"{radial_dim} reads {before:g} (unit factor {dim_unit:g})")
-    check(
-        f"link {radial_dim} to Ra",
-        await adapter.create_equation(
-            CreateEquationParameters(equation=f'"{radial_dim}" = "Ra"')
-        ),
-    )
+    await drive_dimension(adapter, radial_dim, '"Ra"')
 
     # ------------------------------------------------------------------
     # One tooth gap (global-referencing equation curves, t in [0,1]).
@@ -366,12 +357,7 @@ async def build(adapter) -> dict[str, str]:
     if pattern is None:
         raise RuntimeError("circular pattern: no axis candidate selectable")
     count_dim = pattern_count_dimension(adapter, pattern.data.name, DEFAULT_TEETH)
-    check(
-        f"link {count_dim} to ToothCount",
-        await adapter.create_equation(
-            CreateEquationParameters(equation=f'"{count_dim}" = "ToothCount"')
-        ),
-    )
+    await drive_dimension(adapter, count_dim, '"ToothCount"')
 
     # Fail fast: validate the toothed disc at the default tooth count before
     # any configuration work (localises pattern failures to this feature).
@@ -469,14 +455,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
     for name, teeth in CONFIGS:
-        check(
-            f"ToothCount = {teeth} in {name}",
-            await adapter.set_global_variable(
-                SetGlobalVariableParameters(
-                    name="ToothCount", expression=str(teeth), configuration=name
-                )
-            ),
-        )
+        await set_global_mm(adapter, "ToothCount", str(teeth), configuration=name)
 
     png_dir = OUT_PNG / PART_NAME
     png_dir.mkdir(parents=True, exist_ok=True)

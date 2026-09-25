@@ -2905,6 +2905,13 @@ def task_check():
         SCRIPTS_DIR / "test_logo_profile_closure.py",
         SCRIPTS_DIR / "test_sketch_preference_baseline.py",
         SCRIPTS_DIR / "test_diag_mcmaster_lib.py",
+        # Equation precision (#889/#890): the readback gate, its evaluator, the
+        # replay of logged readbacks, the pen-driver chain, and the static guard
+        # that keeps every equation write inside _common.
+        SCRIPTS_DIR / "test_equation_eval.py",
+        SCRIPTS_DIR / "test_equation_readbacks.py",
+        SCRIPTS_DIR / "test_equation_chokepoint.py",
+        SCRIPTS_DIR / "test_pen_driver.py",
     ]
     # These are runtime-read rather than imported, so module_deps_of cannot
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun
@@ -2914,6 +2921,8 @@ def task_check():
         SCRIPTS_DIR / "prompts" / "machinist_review_assembly.md",
         SCRIPTS_DIR / "prompts" / "machinist_review_schema.json",
     ]
+    # Runtime-read the same way: the logged readbacks the #889 gate replays.
+    equation_readback_fixture = SCRIPTS_DIR / "test_data" / "equation_readbacks.json"
     # test_out_param_binding SCANS sources instead of importing them (it reads
     # every top-level build script and every diagnostics/*.py looking for
     # VT_BYREF), so module_deps_of cannot see them -- an import graph does not
@@ -2931,6 +2940,7 @@ def task_check():
             *(str(path.resolve()) for path in recipe_tests),
             *(dep for path in recipe_tests for dep in module_deps_of(path)),
             *(str(path.resolve()) for path in machinist_review_contract_deps),
+            str(equation_readback_fixture.resolve()),
             *scanned_by_binding_gate,
             str(
                 (REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py").resolve()

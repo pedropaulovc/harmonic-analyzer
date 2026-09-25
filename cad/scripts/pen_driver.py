@@ -26,6 +26,7 @@ import math
 
 import _config
 import truth_model
+from _common import drive_dimension, set_global
 
 CRANK_GLOBAL = "CrankDeg"
 _SAMPLES = 720
@@ -43,19 +44,21 @@ def _phases_deg() -> list[float]:
     return [ch["phase_deg"] for ch in _config.channels()]
 
 
-def peak_pen_y() -> float:
+def peak_pen_y(amps: list[float] | None = None) -> float:
     """Max |pen_y| over one fundamental period (the curve's half-amplitude)."""
-    peak = max(abs(truth_model.pen_y(2 * math.pi * k / _SAMPLES)) for k in range(_SAMPLES))
+    peak = max(
+        abs(truth_model.pen_y(2 * math.pi * k / _SAMPLES, amps)) for k in range(_SAMPLES)
+    )
     return peak or 1.0
 
 
-def scale_mm_per_unit() -> float:
+def scale_mm_per_unit(amps: list[float] | None = None) -> float:
     """Physical mm of pen travel per unit of ``truth_model.pen_y``."""
-    return stroke_half_mm() / peak_pen_y()
+    return stroke_half_mm() / peak_pen_y(amps)
 
 
-def pen_y_rest() -> float:
-    return truth_model.pen_y(math.radians(rest_crank_deg()))
+def pen_y_rest(amps: list[float] | None = None) -> float:
+    return truth_model.pen_y(math.radians(rest_crank_deg()), amps)
 
 
 def _decimal(x: float) -> str:
@@ -69,32 +72,64 @@ def _decimal(x: float) -> str:
     return f"{x:.15f}"
 
 
-def expected_tip_disp_mm(theta_rad: float) -> float:
+def _signed(x: float) -> str:
+    """``+ 1.5`` / ``- 1.5``: a joined term never forms a double operator."""
+    return f"{'-' if x < 0 else '+'} {_decimal(abs(x))}"
+
+
+def expected_tip_disp_mm(theta_rad: float, amps: list[float] | None = None) -> float:
     """Pen-tip Y displacement (from the rest pose) the driver should realise."""
-    return scale_mm_per_unit() * (truth_model.pen_y(theta_rad) - pen_y_rest())
+    return scale_mm_per_unit(amps) * (
+        truth_model.pen_y(theta_rad, amps) - pen_y_rest(amps)
+    )
 
 
-def chain_links() -> list[tuple[str, str]]:
+def chain_links(
+    amps: list[float] | None = None, dropped: int | None = None
+) -> list[tuple[str, str]]:
     """``(global_name, expression)`` for the S1..S20 partial-sum of the raw
     curve ``Σ a_j·cos(j·CrankDeg + φ_j)`` (all 20 harmonics, so an arbitrary
-    coefficient vector still sums)."""
+    coefficient vector still sums). ``amps`` defaults to the config vector.
+    ``dropped`` (1-based) leaves that link's term out: the verify positive
+    control proving the sweep sees a broken chain."""
     js = truth_model.harmonics()
-    amps = truth_model.coefficients("config")
+    amps = truth_model.coefficients("config") if amps is None else amps
     phases = _phases_deg()
     links: list[tuple[str, str]] = []
     for i, (a, j, phi) in enumerate(zip(amps, js, phases), start=1):
-        term = f'{a:.12g}*cos({j}*"{CRANK_GLOBAL}"+{phi:.12g})'
-        links.append((f"S{i}", term if i == 1 else f'"S{i - 1}"+{term}'))
+        term = f'{_signed(a)}*cos({j}*"{CRANK_GLOBAL}" {_signed(phi)})'
+        if i == dropped:
+            term = "+ 0"
+        links.append((f"S{i}", f"0 {term}" if i == 1 else f'"S{i - 1}" {term}'))
     return links
 
 
 async def set_crank_deg(adapter, theta_deg: float) -> None:
     """Set the CrankDeg global (used by verify.py to sweep the pose)."""
-    from solidworks_mcp.adapters.base import SetGlobalVariableParameters
-    res = await adapter.set_global_variable(
-        SetGlobalVariableParameters(name=CRANK_GLOBAL, expression=f"{theta_deg:.12g}"))
-    if not res.is_success:
-        raise RuntimeError(f"set {CRANK_GLOBAL}={theta_deg}: {res.error}")
+    await set_global(adapter, CRANK_GLOBAL, f"{theta_deg:.12g}")
+
+
+async def load_coefficients(
+    adapter, factor: float, amps: list[float] | None = None, dropped: int | None = None
+) -> int:
+    """(Re)write the chain, scale and rest globals for coefficient vector ``amps``.
+
+    The travel-mate equation references only these globals, so rewriting them
+    retargets an installed driver: verify sweeps a non-zero vector on the
+    transient model after the config sweep. Returns the number of chain links.
+    """
+    links = chain_links(amps, dropped)
+    for name, expr in links:
+        await set_global(adapter, name, expr)
+    await set_global(adapter, "PenY", f'"Magnify" * "S{len(links)}"')
+    await set_global(adapter, "PenScale", _decimal(scale_mm_per_unit(amps) * factor))
+    # Rest offset as a GLOBAL (not an inline literal): an arbitrary coefficient
+    # vector can put pen_y(rest) anywhere, and inlining it risks a double operator
+    # (``- -1.9e-13``) and exponent notation the SW parser rejects -- both avoided
+    # by referencing a plain fixed-decimal global. At rest the mate == base, so the
+    # saved render pose is held for ANY coefficient vector.
+    await set_global(adapter, "PenRest", _decimal(pen_y_rest(amps)))
+    return len(links)
 
 
 async def install(adapter, travel_mate_name: str, base_doc: float, factor: float) -> dict:
@@ -106,39 +141,14 @@ async def install(adapter, travel_mate_name: str, base_doc: float, factor: float
         base_doc: that mate's D1 value in DOCUMENT units (read after creation).
         factor: document units per mm (``base_doc / base_mm``).
     """
-    from solidworks_mcp.adapters.base import (
-        CreateEquationParameters, SetGlobalVariableParameters,
-    )
-
-    async def setg(name: str, expr: str) -> float:
-        res = await adapter.set_global_variable(
-            SetGlobalVariableParameters(name=name, expression=expr))
-        if not res.is_success:
-            raise RuntimeError(f"global {name} rejected: {res.error}")
-        return float(res.data.get("value"))
-
-    await setg("Magnify", f"{truth_model.magnify():.12g}")
-    await setg(CRANK_GLOBAL, f"{rest_crank_deg():g}")
-    links = chain_links()
-    for name, expr in links:
-        await setg(name, expr)
-    await setg("PenY", f'"Magnify" * "S{len(links)}"')
-    await setg("PenScale", f"{scale_mm_per_unit() * factor:.12g}")
-    # Rest offset as a GLOBAL (not an inline literal): an arbitrary coefficient
-    # vector can put pen_y(rest) anywhere, and inlining it risks a double operator
-    # (``- -1.9e-13``) and exponent notation the SW parser rejects -- both avoided
-    # by referencing a plain fixed-decimal global. At rest the mate == base, so the
-    # saved render pose is held for ANY coefficient vector.
-    await setg("PenRest", _decimal(pen_y_rest()))
-
-    eqn = (f'"D1@{travel_mate_name}" = {base_doc:.9f} '
-           f'+ "PenScale" * ("PenY" - "PenRest")')
-    res = await adapter.create_equation(CreateEquationParameters(equation=eqn))
-    if not res.is_success:
-        raise RuntimeError(f"pen-driver equation rejected: {res.error}")
+    await set_global(adapter, "Magnify", _decimal(truth_model.magnify()))
+    await set_global(adapter, CRANK_GLOBAL, f"{rest_crank_deg():.12g}")
+    links = await load_coefficients(adapter, factor)
+    expression = f'{base_doc:.9f} + "PenScale" * ("PenY" - "PenRest")'
+    await drive_dimension(adapter, f"D1@{travel_mate_name}", expression)
     return {
-        "equation": eqn,
-        "links": len(links),
+        "equation": f'"D1@{travel_mate_name}" = {expression}',
+        "links": links,
         "scale_mm_per_unit": scale_mm_per_unit(),
         "rest_deg": rest_crank_deg(),
         "stroke_half_mm": stroke_half_mm(),

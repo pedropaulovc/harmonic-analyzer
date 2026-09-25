@@ -32,6 +32,7 @@ from _common import (
     apply_custom_properties,
     active_configuration_name,
     check,
+    check_equations,
     log,
     set_isometric_view,
 )
@@ -2224,6 +2225,8 @@ async def save_assembly_and_images(
     # ... and never save a solver-drifted one: every placed component must
     # still sit at its authored pose after the FINAL solve (see _POSE_LEDGER).
     assert_pose_ledger(adapter)
+    # ... and every equation holds what its expression means (#889).
+    check_equations(adapter)
     # Every driver is authored by now: prove the contract's flip seeds against
     # the signatures this build actually queried.
     audit_flip_seeds(asm_name)

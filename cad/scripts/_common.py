@@ -61,6 +61,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
+import _equation_eval  # what a global's expression means (the set_global readback)
 import _telemetry  # observability spine: console logging + tracing, preconfigured
 import _watchdog  # COM crash/hang watchdog (started per session in run_build)
 # Recipe-inert (in no cache key; see its docstring and check:inert). Imported as a
@@ -1324,6 +1325,7 @@ async def save_part_and_images(
     _seat_forensics.record_authoring_context(adapter, part_name)
     OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
     part_path = (OUT_SLDPRT / f"{part_name}.SLDPRT").resolve()
+    check_equations(adapter)  # every global and driven dimension, #889
     set_isometric_view(adapter)  # save on isometric so the .SLDPRT opens isometric
     check(f"save_file -> {part_path}", await adapter.save_file(str(part_path)))
 
@@ -2188,24 +2190,191 @@ def _name_dimensions_feature(
     return out
 
 
-@_telemetry.traced("param.global", label_param="name")
-async def set_global(adapter: Any, name: str, expr: str | float) -> float:
-    """Add or update an equation-manager global variable; returns its value.
+# Equation precision (#889). The equation manager rounds a literal to the
+# document's decimal places for its unit and COM reads the rounded value back as
+# if it were exact: the part template's 2 angular places stored
+# ``"ConeIncline" = 12.5182deg`` as 12.52. swUserPreferenceIntegerValue_e ids
+# from the SOLIDWORKS 2026 swconst typelib.
+_PREF_UNITS_LINEAR = 47  # swUnitsLinear -> swLengthUnit_e
+_PREF_UNITS_LINEAR_DECIMALS = 49  # swUnitsLinearDecimalPlaces
+_PREF_UNITS_ANGULAR_DECIMALS = 52  # swUnitsAngularDecimalPlaces
+EQUATION_DECIMALS = 8  # the most places SOLIDWORKS keeps
+# How far a stored global may sit from what its expression means, in document
+# units. A literal is rounded once at the 8th place, so it gets an absolute
+# 1e-8 (the ConeIncline bound, in degrees); a formula compounds rounded inputs,
+# so it gets 2e-8 per unit of magnitude. Calibrated on 275 logged readbacks
+# (test_data/equation_readbacks.json): literals worst 5.04e-9, formulas worst
+# 2.84e-9 through their references' stored values; the 2-place
+# 12.5182deg -> 12.52 is 1.8e-3.
+LITERAL_READBACK_TOLERANCE = 1e-8
+FORMULA_READBACK_TOLERANCE = 2e-8
 
-    Centralises the pen-driver pattern. ``expr`` is the equation-manager
-    expression (a literal like ``197`` or a formula like ``"ColumnX" +
-    "RailWidth" / 2``); the dialect takes degrees for trig and ``sqr`` is the
-    square root (see SetGlobalVariableParameters)."""
+def ensure_equation_precision(adapter: Any) -> _equation_eval.DocumentUnits:
+    """Give the active document 8 linear and 8 angular places, and read back.
+
+    Runs before every equation write (``set_global``, ``drive_dimension``), so
+    each document gets it before its first equation, whatever created it. Not a
+    span: it runs inside every ``param.global`` and is two preference reads once
+    the document is set; a change is logged and recorded as an event. Returns
+    the document's units for :mod:`_equation_eval`.
+    """
+    ext = _read_member(adapter.currentModel, "Extension")
+    for pref, label in (
+        (_PREF_UNITS_LINEAR_DECIMALS, "linear"),
+        (_PREF_UNITS_ANGULAR_DECIMALS, "angular"),
+    ):
+        before = int(ext.GetUserPreferenceInteger(pref, _PREF_OPT_NONE))
+        if before == EQUATION_DECIMALS:
+            continue
+        if not adapter._attempt(
+            lambda p=pref: ext.SetUserPreferenceInteger(
+                p, _PREF_OPT_NONE, EQUATION_DECIMALS
+            ),
+            default=False,
+        ):
+            raise RuntimeError(f"{label} decimal places: write of {EQUATION_DECIMALS} rejected")
+        after = int(ext.GetUserPreferenceInteger(pref, _PREF_OPT_NONE))
+        if after != EQUATION_DECIMALS:
+            raise RuntimeError(
+                f"{label} decimal places read {after} after setting {EQUATION_DECIMALS}"
+            )
+        _telemetry.event("units.equation_precision", unit=label, before=before, after=after)
+        _telemetry.info(f"{label} decimal places {before} -> {after}")
+    length_unit = int(ext.GetUserPreferenceInteger(_PREF_UNITS_LINEAR, _PREF_OPT_NONE))
+    return _equation_eval.DocumentUnits.from_length_unit(length_unit)
+
+
+def _equation_rows(adapter: Any) -> tuple[Any, list[tuple[int, str, str]]]:
+    """The active document's equation manager and its ``(index, lhs, rhs)`` rows.
+
+    ``lhs`` is unquoted: a global's name, or ``leaf@feature`` for a dimension.
+    """
+    from solidworks_mcp.adapters.solidworks.parametrics import _equation_manager
+
+    manager = _equation_manager(adapter)
+    rows = []
+    for index in range(int(_read_member(manager, "GetCount") or 0)):
+        lhs, _, rhs = str(manager.Equation(index) or "").partition("=")
+        rows.append((index, lhs.strip().strip('"'), rhs.strip()))
+    return manager, rows
+
+
+def _dimension_value(
+    adapter: Any, full_name: str, units: _equation_eval.DocumentUnits
+) -> float:
+    """A dimension's value in document units (angles in degrees)."""
+    raw = adapter._attempt(lambda: adapter.currentModel.Parameter(full_name), default=None)
+    if raw is None:
+        raise _equation_eval.EquationError(f"no dimension {full_name!r} in the document")
+    dimension = _early_bound(raw, "IDimension")
+    system = float(dimension.SystemValue)
+    kind = int(dimension.GetType())  # swDimensionParamType_e
+    if kind == 0:  # linear, in metres
+        return system * 1000.0 * units.per_mm
+    if kind == 1:  # angular, in radians
+        return math.degrees(system)
+    return system
+
+
+def _stored_lookup(
+    adapter: Any,
+    manager: Any,
+    rows: list[tuple[int, str, str]],
+    units: _equation_eval.DocumentUnits,
+) -> Callable[[str], float]:
+    """Resolve a reference as the equation manager does: through the values the
+    document holds now (a global's stored value, a dimension's value). Nothing
+    is remembered across documents, so a closed document that shared this
+    title cannot answer for the open one."""
+    indexes = {lhs: index for index, lhs, _ in rows if "@" not in lhs}
+
+    def lookup(reference: str) -> float:
+        if "@" in reference:
+            return _dimension_value(adapter, reference, units)
+        index = indexes.get(reference)
+        value = (
+            None
+            if index is None
+            else adapter._attempt(lambda: manager.Value(index), default=None)
+        )
+        if value is None:
+            raise _equation_eval.EquationError(
+                f"the document defines no global {reference!r}"
+            )
+        return float(value)
+
+    return lookup
+
+
+def _intended(adapter: Any, expression: str, units: _equation_eval.DocumentUnits) -> float:
+    """What ``expression`` means in the active document, in document units."""
+    if not _equation_eval.to_python(expression, units)[1]:
+        return _equation_eval.evaluate(expression, lambda _: 0.0, units)
+    manager, rows = _equation_rows(adapter)
+    lookup = _stored_lookup(adapter, manager, rows, units)
+    return _equation_eval.evaluate(expression, lookup, units)
+
+
+def readback_tolerance(expression: str, intended: float) -> float:
+    """The largest stored-vs-intended gap an equation check accepts."""
+    references = _equation_eval.to_python(expression, _equation_eval.DocumentUnits(1.0))[1]
+    if not references:
+        return LITERAL_READBACK_TOLERANCE
+    return FORMULA_READBACK_TOLERANCE * max(1.0, abs(intended))
+
+
+@_telemetry.traced("param.global", label_param="name")
+async def set_global(
+    adapter: Any,
+    name: str,
+    expr: str | float,
+    expected: float | None = None,
+    *,
+    configuration: str = "",
+) -> float:
+    """Add or update an equation-manager global; return the value it stores.
+
+    ``expr`` is the equation-manager expression (a literal like ``42.011mm`` or
+    a formula like ``"ColumnX" + "RailWidth" / 2``; the dialect is documented in
+    :mod:`_equation_eval`). The stored value is read back and must equal what
+    the expression means within :func:`readback_tolerance`, so a rounded
+    or misparsed global fails the build instead of shaping the part. A caller
+    that computes the value independently (the involute gears) passes it as
+    ``expected``, checked to 1e-6 relative. ``configuration`` scopes the global
+    to one configuration, which the adapter activates first. A formula's
+    references resolve through the values the document holds, as the equation
+    manager resolves them; each of those was checked when it was written.
+    """
     from solidworks_mcp.adapters.base import SetGlobalVariableParameters
 
+    units = ensure_equation_precision(adapter)
+    expression = str(expr)
     res = await adapter.set_global_variable(
-        SetGlobalVariableParameters(name=name, expression=str(expr))
+        SetGlobalVariableParameters(
+            name=name, expression=expression, configuration=configuration
+        )
     )
     if not res.is_success:
-        raise RuntimeError(f"set_global {name}={expr!r}: {res.error}")
-    value = res.data.get("value") if res.data else None
-    _telemetry.success(f"global {name} = {expr}  -> {value}")
-    return float(value) if value is not None else float("nan")
+        raise RuntimeError(f"set_global {name}={expression!r}: {res.error}")
+    stored = res.data.get("value") if res.data else None
+    if stored is None:
+        raise RuntimeError(f"global {name} = {expression}: no stored value returned")
+    stored = float(stored)
+    intended = _intended(adapter, expression, units)
+    _telemetry.annotate(stored=stored, intended=intended)
+    if abs(stored - intended) > readback_tolerance(expression, intended):
+        raise RuntimeError(
+            f"global {name} = {expression} stored {stored!r}, but the expression "
+            f"means {intended!r} (document units): the equation manager rounded or "
+            "misread it"
+        )
+    if expected is not None and abs(stored - expected) > max(1e-9, abs(expected) * 1e-6):
+        raise RuntimeError(
+            f"global {name}: SolidWorks evaluated {stored!r}, expected "
+            f"{expected:.9g} -- equation-parser dialect mismatch"
+        )
+    _telemetry.success(f"global {name} = {expression}  -> {stored}")
+    return stored
 
 
 @_telemetry.traced("param.dimension", label_param="dim_name")
@@ -2215,14 +2384,55 @@ async def drive_dimension(adapter: Any, dim_name: str, expr: str | float) -> Non
         await drive_dimension(adapter, "OuterWidth@OuterProfile", '2 * "OuterX"')
 
     so editing the ``OuterX`` global reshapes the part. ``dim_name`` is the
-    ``leaf@feature`` form returned by :func:`name_dimensions`."""
+    ``leaf@feature`` form returned by :func:`name_dimensions`. The dimension
+    moves on the next rebuild, so it is not read back here:
+    :func:`check_equations` proves every dimension equation at save."""
     from solidworks_mcp.adapters.base import CreateEquationParameters
 
+    ensure_equation_precision(adapter)
     equation = f'"{dim_name}" = {expr}'
     res = await adapter.create_equation(CreateEquationParameters(equation=equation))
     if not res.is_success:
         raise RuntimeError(f"drive_dimension {equation!r}: {res.error}")
     _telemetry.success(f"equation {equation}")
+
+
+@_telemetry.traced("equations.check")
+def check_equations(adapter: Any) -> None:
+    """Prove every equation in the active document before it is saved.
+
+    Each row's result -- a global's stored value, or the driven dimension's
+    value -- must equal what its right-hand side means within
+    :func:`readback_tolerance`. One pass over the equation manager after the
+    last rebuild; a document without equations costs one ``GetCount``.
+    """
+    manager, rows = _equation_rows(adapter)
+    counts = {"globals": 0, "dimensions": 0}
+    if not rows:
+        _telemetry.annotate(**counts, mismatches=0)
+        return
+    ext = _read_member(adapter.currentModel, "Extension")
+    units = _equation_eval.DocumentUnits.from_length_unit(
+        int(ext.GetUserPreferenceInteger(_PREF_UNITS_LINEAR, _PREF_OPT_NONE))
+    )
+    lookup = _stored_lookup(adapter, manager, rows, units)
+    mismatches: list[str] = []
+    for _, lhs, rhs in rows:
+        intended = _equation_eval.evaluate(rhs, lookup, units)
+        dimension = "@" in lhs
+        counts["dimensions" if dimension else "globals"] += 1
+        actual = _dimension_value(adapter, lhs, units) if dimension else lookup(lhs)
+        if abs(actual - intended) > readback_tolerance(rhs, intended):
+            mismatches.append(f'"{lhs}" = {rhs} holds {actual!r}, means {intended!r}')
+    _telemetry.annotate(**counts, mismatches=len(mismatches))
+    if mismatches:
+        raise RuntimeError(
+            f"{len(mismatches)} equation(s) disagree with their expression "
+            f"(document units): {'; '.join(mismatches)}"
+        )
+    _telemetry.success(
+        f"equations proven: {counts['globals']} globals, {counts['dimensions']} dimensions"
+    )
 
 
 @_telemetry.traced("feature.rebuild")

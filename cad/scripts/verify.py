@@ -66,6 +66,7 @@ import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from collections.abc import Iterable
 from typing import Any, Callable
 
 import _config
@@ -151,6 +152,16 @@ _MOTION_SWEEP_DEG = [0.0, 30.0, 45.0, 90.0, 135.0, 180.0, 225.0, 270.0, 315.0, 3
 # Generous vs the 5.25e-05 mm the de-risk probe achieved -- this is a fidelity
 # gate on the equation chain + doc-unit handling, not a numeric-precision race.
 _MOTION_TOL_MM = 1e-2
+# The shipped amplitude preset is ``neutral`` (every a_j = 0), so the config
+# sweep expects and measures zero at every angle and cannot see a broken chain
+# (#890). The transient probe retargets the installed driver to this preset.
+_MOTION_PROBE_PRESET = "square"
+# The probe's positive control, opt-in (#890): name a chain link (1..20) and the
+# probe drops that link's term, so probe-traces-truth must FAIL. A run with it set
+# is never a verdict (a gate says so), so its stamp can never reach the cache. The
+# farm forwards no environment: run it there from a throwaway commit that sets
+# the default here, never merged.
+PEN_PROBE_DROP_LINK_ENV = "HARMONIC_PEN_PROBE_DROP_LINK"
 _MOVING_CHANNEL_STEMS = (
     "rocker-arm",
     "connecting-rod",
@@ -1251,9 +1262,8 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
             _telemetry.error(f"{name}: cannot read D1@{travel_mate}")
             return
         base_doc = float(_read_member(param, "Value"))  # IPS doc -> inches
-        info = await pen_driver.install(
-            adapter, travel_mate, base_doc, base_doc / base_mm
-        )
+        factor = base_doc / base_mm
+        info = await pen_driver.install(adapter, travel_mate, base_doc, factor)
         log(
             f"pen driver (transient): {info['links']}-link chain, scale "
             f"{info['scale_mm_per_unit']:.4g} mm/unit, rest {info['rest_deg']:g} deg"
@@ -1306,12 +1316,31 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
         await pen_driver.set_crank_deg(adapter, pen_driver.rest_crank_deg())
         _rebuild(adapter)
 
+        dropped = _pen_probe_dropped_link()
+        probe_worst = await _pen_probe_sweep(adapter, marker, factor, dropped)
+
         report.gate(
             f"motion:{name}:tip-traces-truth",
             lambda: _expect(
                 worst <= _MOTION_TOL_MM,
                 f"pen tip deviates from truth_model by {worst:.3e} mm "
                 f"(> {_MOTION_TOL_MM} mm) over the CrankDeg sweep",
+            ),
+        )
+        report.gate(
+            f"motion:{name}:probe-traces-truth",
+            lambda: _expect(
+                probe_worst <= _MOTION_TOL_MM,
+                f"with the {_MOTION_PROBE_PRESET} preset the pen tip deviates from "
+                f"truth_model by {probe_worst:.3e} mm (> {_MOTION_TOL_MM} mm)",
+            ),
+        )
+        report.gate(
+            f"motion:{name}:probe-chain-intact",
+            lambda: _expect(
+                dropped is None,
+                f"{PEN_PROBE_DROP_LINK_ENV}={dropped} dropped chain link S{dropped}: "
+                "a positive-control run, never a verdict",
             ),
         )
         report.gate(
@@ -1344,6 +1373,72 @@ _CHAIN_AXIS_TOL_MM = 0.05  # wire centreline must hold the tangency radius
 _CHAIN_HOOK_TOL_MM = 0.02  # ball joint residual
 _CHAIN_MIN_WHEEL_SPAN_DEG = 5.0  # coupling-alive floor over the 0..1 deg sweep
 _CHAIN_REST_TOL = 0.02  # mm / deg drift allowed after restoring the rest pose
+
+
+async def _pen_sweep(
+    adapter: Any, marker: str, angles: Iterable[float], amps: list[float]
+) -> float:
+    """Worst |tip displacement - truth| over ``angles`` for coefficients ``amps``.
+
+    Displacements are measured from the rest pose, as in the config sweep.
+    """
+    await pen_driver.set_crank_deg(adapter, pen_driver.rest_crank_deg())
+    _rebuild(adapter)
+    tip0 = _tip_y_mm(adapter, marker)
+    worst = 0.0
+    for theta in angles:
+        await pen_driver.set_crank_deg(adapter, theta)
+        _rebuild(adapter)
+        got = _tip_y_mm(adapter, marker) - tip0
+        want = pen_driver.expected_tip_disp_mm(math.radians(theta), amps)
+        err = abs(got - want)
+        worst = max(worst, err)
+        _telemetry.debug(
+            f"probe CrankDeg={theta:6.1f}  tipDisp={got:+8.4f}  "
+            f"want={want:+8.4f}  |err|={err:.2e}"
+        )
+    return worst
+
+
+def _pen_probe_dropped_link() -> int | None:
+    """The chain link :data:`PEN_PROBE_DROP_LINK_ENV` asks the probe to drop."""
+    raw = os.environ.get(PEN_PROBE_DROP_LINK_ENV, "").strip()
+    if not raw:
+        return None
+    probe = truth_model.coefficients(_MOTION_PROBE_PRESET)
+    if not raw.isdigit() or not 1 <= int(raw) <= len(probe):
+        raise ValueError(f"{PEN_PROBE_DROP_LINK_ENV}={raw!r}: expected a link 1..{len(probe)}")
+    if probe[int(raw) - 1] == 0.0:
+        raise ValueError(
+            f"{PEN_PROBE_DROP_LINK_ENV}={raw}: link S{raw} carries a zero "
+            f"{_MOTION_PROBE_PRESET} amplitude, so dropping it changes nothing"
+        )
+    _telemetry.warn(f"{PEN_PROBE_DROP_LINK_ENV}={raw}: the pen probe drops chain link S{raw}")
+    return int(raw)
+
+
+async def _pen_probe_sweep(
+    adapter: Any, marker: str, factor: float, dropped: int | None
+) -> float:
+    """Sweep a non-zero coefficient vector through the pen driver (#890).
+
+    Retargets the installed driver to :data:`_MOTION_PROBE_PRESET`, sweeps the
+    config angles, restores the rest pose and returns the worst tip error.
+    ``dropped`` leaves that chain link out: the positive control, which must
+    push the error past the tolerance. The model is transient and discarded
+    unsaved by the caller.
+    """
+    probe = truth_model.coefficients(_MOTION_PROBE_PRESET)
+    await pen_driver.load_coefficients(adapter, factor, probe, dropped=dropped)
+    probe_worst = await _pen_sweep(adapter, marker, _MOTION_SWEEP_DEG, probe)
+    _telemetry.info(
+        f"pen probe ({_MOTION_PROBE_PRESET}"
+        + (f", link S{dropped} dropped" if dropped else "")
+        + f") worst |err| {probe_worst:.2e} mm"
+    )
+    await pen_driver.set_crank_deg(adapter, pen_driver.rest_crank_deg())
+    _rebuild(adapter)
+    return probe_worst
 
 
 async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
