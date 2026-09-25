@@ -24,8 +24,20 @@ What a seat has shown, and what it has not yet:
   miss every keep-out and crossing vacuously. ``lands_within`` closes that
   gap (each named annotation must end at its feature, in sheet metres), and
   the ``leaders clear`` info line puts the segment counts and landing
-  distances in the leaf log. The first leaf that passes it is the proof; add
-  its line here.
+  distances in the leaf log.
+- Farm run w15-8c4af0b9f (20260925T194809956Z-4929302b) is the proof. Every
+  landing reads the feature's exact sheet radius, so the segments are sheet
+  metres:
+  - drawing:crank_arm dffdcac16414, seat pid 7484: "crank arm hub seat:
+    leaders clear {'HubSeatDia': '2 seg, lands 19.50 mm', 'BossRadius':
+    '3 seg, lands 0.00 mm'}". Ø19.5 at 2:1 is a 19.50 mm sheet radius, and
+    R12.7 ends at the bore centre.
+  - drawing:crank_drive_gear 1b05750e1716, seat pid 11608: "crank drive gear
+    bore: leaders clear {'OutsideDia': '2 seg, lands 48.86 mm', 'BoreDia':
+    '3 seg, lands 7.14 mm', 'BoreFinish': '2 seg, lands 7.14 mm'}". These are
+    HALF_OD and the bore's sheet radius at 3:2.
+- ``section_line_segments`` (GetSectionLineInfo2) is not seat-proven yet;
+  drawing:crank_pinion's first leaf with it is.
 """
 
 from __future__ import annotations
