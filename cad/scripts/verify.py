@@ -1794,17 +1794,19 @@ def verify_base_footprint(report: Report) -> None:
         # cone-pivot-post rides the PLATE, so it is plate-contained at
         # drive-train import, not base-swept here.)
         mounts = (
+            # U34c: each foot runs 28 outboard of its strap inner face, so
+            # its plan centre is the band's mid-point, not the part origin.
             (
                 "arbor-pedestal south",
                 train.X_DRUM,
-                -train.ARBOR_PEDESTAL_Z,
+                sum(train.ARBOR_PED_SOUTH_Z_BAND) / 2.0,
                 arbor_post.FOOT_WIDTH / 2.0,
                 arbor_post.FOOT_DEPTH / 2.0,
             ),
             (
                 "arbor-pedestal north",
                 train.X_DRUM,
-                train.ARBOR_PEDESTAL_NORTH_Z,
+                sum(train.ARBOR_PED_NORTH_Z_BAND) / 2.0,
                 arbor_post.FOOT_WIDTH / 2.0,
                 arbor_post.FOOT_DEPTH / 2.0,
             ),

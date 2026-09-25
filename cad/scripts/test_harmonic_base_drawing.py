@@ -45,8 +45,8 @@ from build_swing_stop_screw import SHANK_DIA as STOP_SHANK_DIA
             2,
         ),
         (
-            part.FOOT_SEAT_SPEC,
-            part.FOOT_SCREW_LEN - part.PEDESTAL_FLANGE_THICKNESS,
+            part.PEDESTAL_SEAT_SPEC,
+            part.PEDESTAL_SCREW_LEN - part.PEDESTAL_FLANGE_THICKNESS,
             "tapped_bottoming",
             2,
         ),
@@ -311,11 +311,7 @@ def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
 
     former_block_x = (-17.226441649810653, -0.22644164981065273)
     former_pivot_x = former_block_x[0] + 8.5
-    former_feet = (
-        (former_pivot_x - 20.0, rig.SPRING_Z - MECHANISM_Z_SHIFT),
-        (-54.7, -95.5),
-        (-54.7, 102.5),
-    )
+    former_feet = ((former_pivot_x - 20.0, rig.SPRING_Z - MECHANISM_Z_SHIFT),)
     assert part.BLOCK_SCREW_XZ == tuple(
         (x + MECHANISM_X_SHIFT, z) for z in rig.BLOCK_SEAT_Z for x in former_block_x
     )
@@ -323,6 +319,11 @@ def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
     assert part.FOOT_SCREW_XZ == tuple(
         (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in former_feet
     )
+    # U34c: the arbor pedestals left the #4-40 foot group for their own #8-32
+    # seats, 19.0 outboard of each strap inner face on the unshifted drum axis.
+    expected = ((-54.7 + MECHANISM_X_SHIFT, -91.652), (-54.7 + MECHANISM_X_SHIFT, 94.202))
+    for actual, wanted in zip(part.PEDESTAL_SCREW_XZ, expected, strict=True):
+        assert actual == pytest.approx(wanted)
 
 
 def _socket_bore_geometry(x_mm: float, z_mm: float):
@@ -430,3 +431,22 @@ def test_transferred_pinion_block_seats_print_no_station() -> None:
     assert physical_front_seat - rig.BLOCK_SEAT_Z[0] == pytest.approx(
         2.0 * rig.STRAP_AIR
     )
+
+
+def test_transferred_pedestal_and_spring_seats_print_no_station() -> None:
+    # U34c (I27): each arbor pedestal is stood on the base with the arbor in
+    # both straps and its #8-32 seat is spotted through the MHA-004 ledge
+    # hole, so the pair leaves the hole table like the pinion-block seats. The
+    # spring-foot seat, now alone on its #4-40 feature, takes a native callout
+    # instead of a note naming a table row that no longer exists.
+    import draw_harmonic_base as sheet
+
+    pedestal_seats = {
+        (x, z, part.PEDESTAL_SCREW_HOLE_DIA) for x, z in part.PEDESTAL_SCREW_XZ
+    }
+    assert set(sheet.TRANSFER_PEDESTAL_HOLES) == pedestal_seats
+    assert sheet.TRANSFER_SPRING_HOLE[:2] == part.FOOT_SCREW_XZ[0]
+    assert not (pedestal_seats | {sheet.TRANSFER_SPRING_HOLE}) & set(sheet.TABLE_HOLES)
+    assert sheet.TRANSFER_PEDESTAL_CALLOUT == "TRANSFER FROM MHA-004\nAT ASSEMBLY;"
+    assert sheet.TRANSFER_SPRING_CALLOUT == "TRANSFER FROM MHA-114\nAT ASSEMBLY;"
+    assert not any(tag.startswith("G") for tag in sheet.HOLE_TAG_POSITIONS)

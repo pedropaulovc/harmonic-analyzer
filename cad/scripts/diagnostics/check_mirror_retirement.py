@@ -506,17 +506,22 @@ for k, (sx, sz) in enumerate(d._BLOCK_SCREW_XZ):
         IDENTITY,
         f"slotted-screw {k}",
     )
-for k, ((sx, sz), seat_y) in enumerate(
-    zip(
-        d._FOOT_SCREW_XZ,
-        (
-            d.Y_BASE_TOP + d.SPRING_T,
-            d.Y_BASE_TOP + d.ARBOR_PED_FLANGE_T,
-            d.Y_BASE_TOP + d.ARBOR_PED_FLANGE_T,
-        ),
+for k, (sx, sz) in enumerate(d._FOOT_SCREW_XZ):
+    expect(
+        DT,
+        f"foot-screw-{k + 1}",
+        [sx, d.Y_BASE_TOP + d.SPRING_T, sz],
+        IDENTITY,
+        f"foot-screw {k}",
     )
-):
-    expect(DT, f"foot-screw-{k + 1}", [sx, seat_y, sz], IDENTITY, f"foot-screw {k}")
+for k, (sx, sz) in enumerate(d._PEDESTAL_SCREW_XZ):
+    expect(
+        DT,
+        f"pedestal-hold-down-screw-{k + 1}",
+        [sx, d.Y_BASE_TOP + d.ARBOR_PED_FLANGE_T, sz],
+        IDENTITY,
+        f"pedestal-hold-down-screw {k}",
+    )
 expect(
     DT,
     "cone-gear-shaft-1",

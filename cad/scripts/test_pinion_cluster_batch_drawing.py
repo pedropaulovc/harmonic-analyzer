@@ -478,13 +478,14 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 2.261,
                 8.725,
             ),
+            # U34c: MHA-143 #8-32 x 3/4 through the 5.0 pedestal ledge.
             **_expected_numbered_pairs(
-                "drive-train-1/foot-screw",
-                range(2, 4),
+                "drive-train-1/pedestal-hold-down-screw",
+                range(1, 3),
                 "frame-1/harmonic-base",
-                2.8448,
-                2.261,
-                4.525,
+                4.1656,
+                3.454,
+                14.05,
             ),
             **_expected_numbered_pairs(
                 "channel-1/frame-side-screw",

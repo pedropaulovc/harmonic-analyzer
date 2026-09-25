@@ -32,7 +32,7 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "cylinder-end-disc",
         "dome-cap-screw",
         "cylinder-gear",
-        "foot-screw",
+        "pedestal-hold-down-screw",
     ),
     "cone-crank": (
         "cone-gear-shaft",
@@ -77,11 +77,7 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "foot-screw",
     ),
 }
-# foot-screw is the one family split by instance: the pedestal-flange screws
-# sit on the drum axis (cylinder bank); the spring-foot screw sits in the rig.
-SPLIT_STEMS = frozenset({"foot-screw"})
-
-Pick = Literal["south", "north", "drum-axis", "off-drum-axis"]
+Pick = Literal["south", "north"]
 
 
 @dataclass(frozen=True)
@@ -105,21 +101,21 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("north dome cap", ("dome-cap-screw",), "z", 55.0, ("north",)),
     ExplodeStep(
         "south pedestal",
-        ("arbor-pedestal", "foot-screw"),
+        ("arbor-pedestal", "pedestal-hold-down-screw"),
         "z",
         -35.0,
-        ("south", "drum-axis"),
+        ("south",),
     ),
     ExplodeStep(
         "north pedestal",
-        ("arbor-pedestal", "foot-screw"),
+        ("arbor-pedestal", "pedestal-hold-down-screw"),
         "z",
         35.0,
-        ("north", "drum-axis"),
+        ("north",),
     ),
     ExplodeStep("south end disc", ("cylinder-end-disc",), "z", -15.0, ("south",)),
     ExplodeStep("north end disc", ("cylinder-end-disc",), "z", 15.0, ("north",)),
-    ExplodeStep("pedestal screws lift", ("foot-screw",), "y", 30.0, ("drum-axis",)),
+    ExplodeStep("pedestal screws lift", ("pedestal-hold-down-screw",), "y", 30.0),
     # cone set: base hardware up, swing plate down
     ExplodeStep("swing plate drops", ("cone-swing-platform",), "y", -30.0),
     ExplodeStep("pivot screw lifts", ("cone-pivot-screw",), "y", 35.0),
@@ -149,9 +145,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("anchor eyelet", ("crank-pin-eye",), "z", -10.0),
     # alignment pinion rig
     ExplodeStep("block screws lift", ("slotted-screw",), "y", 30.0),
-    ExplodeStep(
-        "spring foot screw lifts", ("foot-screw",), "y", 25.0, ("off-drum-axis",)
-    ),
+    ExplodeStep("spring foot screw lifts", ("foot-screw",), "y", 25.0),
     ExplodeStep("pinion lever", ("pinion-lever", "pinion-lever-pin"), "z", -40.0),
     # The MHA-144 collar is pinned to the arbor, so it comes out with it.
     ExplodeStep(
@@ -187,10 +181,6 @@ STATIONARY_STEMS = frozenset(
     }
 )
 
-# Instance on the drum axis: within this of the arbor's world X (mm).
-DRUM_AXIS_TOLERANCE_MM = 1.0
-
-
 @dataclass(frozen=True)
 class Instance:
     name: str
@@ -210,15 +200,9 @@ def unclassified_stems(stems: Sequence[str]) -> list[str]:
     )
 
 
-def _picked(step: ExplodeStep, instance: Instance, drum_x_mm: float) -> bool:
-    x, _y, z = instance.origin_mm
-    on_axis = abs(x - drum_x_mm) <= DRUM_AXIS_TOLERANCE_MM
-    tests = {
-        "south": z < 0.0,
-        "north": z > 0.0,
-        "drum-axis": on_axis,
-        "off-drum-axis": not on_axis,
-    }
+def _picked(step: ExplodeStep, instance: Instance) -> bool:
+    z = instance.origin_mm[2]
+    tests = {"south": z < 0.0, "north": z > 0.0}
     return all(tests[pick] for pick in step.picks)
 
 
@@ -230,17 +214,12 @@ def plan_explode(
     Refuses an unknown or retired family, a moving family no step moves, a
     step that selects nothing, and a non-pending family a step names but the
     model lacks. The south/north picks split each paired family by world z
-    (the machine is laid out about z = 0); the drum-axis picks read the
-    arbor's own world X from the model.
+    (the machine is laid out about z = 0).
     """
     stems = {instance.stem for instance in instances}
     unknown = unclassified_stems(sorted(stems))
     if unknown:
         raise ValueError(f"explode plan does not classify {unknown!r}")
-    arbors = [i for i in instances if i.stem == "cylinder-gear-shaft"]
-    if len(arbors) != 1:
-        raise ValueError(f"expected one cylinder-gear-shaft, found {len(arbors)}")
-    drum_x = arbors[0].origin_mm[0]
 
     moved_stems = {stem for step in EXPLODE_STEPS for stem in step.stems}
     unplanned = sorted(stems - moved_stems - STATIONARY_STEMS)
@@ -259,7 +238,7 @@ def plan_explode(
             sorted(
                 instance.name
                 for instance in instances
-                if instance.stem in step.stems and _picked(step, instance, drum_x)
+                if instance.stem in step.stems and _picked(step, instance)
             )
         )
         if not names:
@@ -271,19 +250,12 @@ def plan_explode(
 def cluster_members(
     instances: Sequence[Instance],
 ) -> dict[Cluster, tuple[str, ...]]:
-    """Component names per drawing cluster (foot-screw split by the drum axis)."""
-    arbors = [i for i in instances if i.stem == "cylinder-gear-shaft"]
-    if len(arbors) != 1:
-        raise ValueError(f"expected one cylinder-gear-shaft, found {len(arbors)}")
-    drum_x = arbors[0].origin_mm[0]
+    """Component names per drawing cluster; every family sits in exactly one."""
     members: dict[Cluster, list[str]] = {cluster: [] for cluster in CLUSTERS}
     for instance in instances:
         owners = [c for c, stems in CLUSTERS.items() if instance.stem in stems]
         if not owners:
             raise ValueError(f"{instance.name}: family {instance.stem!r} has no cluster")
-        if instance.stem in SPLIT_STEMS:
-            on_axis = abs(instance.origin_mm[0] - drum_x) <= DRUM_AXIS_TOLERANCE_MM
-            owners = ["cylinder-bank" if on_axis else "pinion-rig"]
         if len(owners) != 1:
             raise ValueError(f"{instance.name}: family in clusters {owners!r}")
         members[owners[0]].append(instance.name)
