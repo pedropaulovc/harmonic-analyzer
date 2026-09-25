@@ -1676,6 +1676,9 @@ def test_release_is_gated_on_the_ledger_and_no_build_task_is_keyed_on_it() -> No
     assert ledger in gate["file_dep"]
     assert pdfs <= set(gate["file_dep"])
     assert str((ml.SCRIPTS_DIR / "machinist_ledger.py").resolve()) in gate["file_dep"]
+    # The rulings raise the bar, and closing an outage withdraws its fallbacks.
+    assert str(ml.AUTHOR_RULINGS_PATH.resolve()) in gate["file_dep"]
+    assert str(ml.OUTAGES_PATH.resolve()) in gate["file_dep"]
     assert "check:machinist" in dodo.task_release()["task_dep"]
     # In build it would fail every build between a drawing edit and its re-review.
     assert "check:machinist" not in dodo.task_build()["task_dep"]
@@ -2028,6 +2031,7 @@ def _on_record(
 
 def _backfill(tmp_path: Path, records: Path, **kwargs) -> ml.BackfillRow:
     kwargs.setdefault("cache_path", tmp_path / "cache.json")
+    kwargs.setdefault("outages", {})  # not the tracked file's live outage
     result = ml.backfill([records], ledger_path=tmp_path / "ledger.json", **kwargs)
     [row] = result.rows
     return row
@@ -2128,6 +2132,38 @@ def test_backfill_holds_a_same_family_ship_to_the_last_resort_rule(
     assert row.outcome == ml.Backfill.INGESTED
     entry = ml.load_ledger(tmp_path / "ledger.json")["drawings"]["crank_arm"]
     assert list(entry) == ["last_resort"] and entry["last_resort"]["counts"]
+
+
+def test_backfill_ingests_the_fallback_an_open_outage_directed(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    # A Fable SHIP of a Claude-authored sheet, made while codex was down.
+    _on_record(records, "wt-a", reviewer="claude", reviewed_at=REVIEWED_AT)
+    _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+
+    # No outage on record: still only a last resort without its refusal.
+    row = _backfill(tmp_path, records, apply=True)
+    assert row.outcome == ml.Backfill.NOT_COUNTED
+    assert not ledger_path.exists()
+
+    outages = ml.load_outages(_outages(tmp_path))
+    row = _backfill(tmp_path, records, outages=outages, apply=True)
+    assert row.outcome == ml.Backfill.INGESTED
+    assert "outage_fallback" in row.detail
+    entry = ml.load_ledger(ledger_path)["drawings"]["crank_arm"]
+    assert list(entry) == [ml.OUTAGE_FALLBACK]
+    assert entry[ml.OUTAGE_FALLBACK]["outage"]["quote"] == OUTAGE_QUOTE
+    row = _backfill(tmp_path, records, outages=outages)
+    assert row.outcome == ml.Backfill.RECORDED
+
+    # Once the outage has ended, a fresh backfill finds nothing that counts.
+    ledger_path.unlink()
+    ended = ml.load_outages(_outages(tmp_path, ended_at=NOW.isoformat()))
+    row = _backfill(tmp_path, records, outages=ended, apply=True)
+    assert row.outcome == ml.Backfill.NOT_COUNTED
+    assert not ledger_path.exists()
 
 
 def _author_rulings(
@@ -2285,6 +2321,33 @@ def test_a_both_families_drawing_is_blocked_until_each_family_has_reviewed_it(
     _sheet(registry, note=NOTE.replace("6.5", "6.6"))
     drifted = status()
     assert (drifted.state, drifted.missing) == (ml.State.DRIFT, ("claude", "gpt"))
+
+
+def test_an_outage_fallback_does_not_stand_in_for_a_both_families_half(
+    tmp_path: Path, registry: Path, records: Path
+) -> None:
+    rulings = ml.load_author_rulings(
+        _author_rulings(tmp_path, family="claude", both_families=BOTH_REASON)
+    )
+    outages = ml.load_outages(_outages(tmp_path))
+    pdf = _sheet(registry)
+    with pytest.raises(ValueError, match="does not stand in for the missing family"):
+        ml.record_review(
+            _review(pdf, reviewer="claude"),
+            pdf,
+            author_family="claude",
+            provenance={},
+            ledger_path=tmp_path / "ledger.json",
+            rulings=rulings,
+            outage=outages["codex-401-test"],
+        )
+
+    # Backfill records the Fable SHIP as the claude half, never as a fallback.
+    _on_record(records, "wt-a", reviewer="claude", reviewed_at=REVIEWED_AT)
+    row = _backfill(tmp_path, records, rulings=rulings, outages=outages, apply=True)
+    assert row.outcome == ml.Backfill.INGESTED
+    entry = ml.load_ledger(tmp_path / "ledger.json")["drawings"]["crank_arm"]
+    assert list(entry) == ["both_families_claude"]
 
 
 def test_a_both_families_ruling_covers_only_its_untrailered_commit(

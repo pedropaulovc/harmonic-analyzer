@@ -2081,6 +2081,18 @@ def _refusal_for(
     return None
 
 
+def _directing_outage(
+    review: dict[str, Any], author_family: str, outages: dict[str, dict[str, Any]]
+) -> dict[str, Any] | None:
+    """The open outage that directed this same-family review, if any."""
+    for outage in outages.values():
+        if not outage.get("ended_at") and not outage_problem(
+            review, author_family, outage
+        ):
+            return outage
+    return None
+
+
 class _Matcher:
     """Reviewed sheets against one drawing's current render, cached by content."""
 
@@ -2156,6 +2168,7 @@ def _try(
     *,
     author: Author | ValueError,
     rulings: AuthorRulings,
+    outages: dict[str, dict[str, Any]],
     found: Found,
     checkout: Path,
     head: str | None,
@@ -2183,9 +2196,14 @@ def _try(
         family, source, ruling, unruled = ruled_family(drawing, author, rulings)
     if family is None:
         return Tried(candidate, Backfill.AUTHOR_UNKNOWN, f"{matched}; {unruled}")
-    refusal = None
+    refusal = outage = None
     if review_slot(review["reviewer"], family) == LAST_RESORT:
         refusal = _refusal_for(candidate, drawing, family, found)
+        # Without a refusal, a user-directed fallback during an open outage of
+        # the cross-family reviewer still counts -- but never as one half of a
+        # both-families drawing.
+        if refusal is None and not both_families:
+            outage = _directing_outage(review, family, outages)
     provenance = {
         "backfilled_from": candidate.report.resolve().as_posix(),
         "reviewed_pdf_found_at": candidate.pdf.resolve().as_posix(),
@@ -2207,6 +2225,7 @@ def _try(
             author_family=family,
             provenance=provenance,
             refusal=refusal,
+            outage=outage,
             ledger_path=scratch,
             repo=checkout,
             digests=matcher.cache.sheets.get(review["source_sha256"][0]),
@@ -2235,6 +2254,7 @@ def backfill(
     checkout: Path | None = None,
     exclude: Iterable[str] = (),
     rulings: AuthorRulings | None = None,
+    outages: dict[str, dict[str, Any]] | None = None,
     apply: bool = False,
     ledger_path: Path = LEDGER_PATH,
     cache_path: Path | None = BACKFILL_CACHE,
@@ -2244,7 +2264,8 @@ def backfill(
     A SHIP is ingested only when the exact PDF it reviewed still exists, its
     sheets match the ones rendered now under the ledger's own rule, and it
     counts under the reviewer-family rule: cross-family, or last resort with a
-    recorded quota refusal.  ``checkout`` is the checkout whose ``cad/out/pdf``
+    recorded quota refusal, or the fallback an open outage in ``outages``
+    (default: the tracked file) directed.  ``checkout`` is the checkout whose ``cad/out/pdf``
     is current and whose draw-script commits name the authors (default: this
     one).  ``rulings`` give the author family where the draw script's last
     commit names no model.  Newest SHIP first; the first that
@@ -2252,6 +2273,7 @@ def backfill(
     """
     excluded = set(exclude)
     rulings = rulings or AuthorRulings()
+    outages = load_outages() if outages is None else outages
     unknown = sorted((excluded | set(rulings.drawings)) - set(DRAWINGS_BY_NAME))
     if unknown:
         raise ValueError(f"unknown drawing names: {unknown}")
@@ -2283,6 +2305,7 @@ def backfill(
                 checkout=checkout,
                 excluded=excluded,
                 rulings=rulings,
+                outages=outages,
                 apply=apply,
                 ledger_path=ledger_path,
             )
@@ -2330,6 +2353,7 @@ def _backfill_drawings(
     checkout: Path | None,
     excluded: set[str],
     rulings: AuthorRulings,
+    outages: dict[str, dict[str, Any]],
     apply: bool,
     ledger_path: Path,
 ) -> BackfillResult:
@@ -2369,6 +2393,7 @@ def _backfill_drawings(
                 pdf=pdf,
                 author=authors.get(name),
                 repo=repo,
+                outages=outages,
             )
             objected = _objections_to_recorded(
                 name, status, ledger, ledger_path, _Matcher(pdf, cache), found
@@ -2431,6 +2456,7 @@ def _backfill_drawings(
                     matcher,
                     author=authors[name],
                     rulings=rulings,
+                    outages=outages,
                     found=found,
                     checkout=repo,
                     head=head,
@@ -2604,6 +2630,12 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "commit names no model",
     )
     backfill_cmd.add_argument(
+        "--outages",
+        type=Path,
+        default=OUTAGES_PATH,
+        help="named outages whose directed same-family fallbacks count while open",
+    )
+    backfill_cmd.add_argument(
         "--apply", action="store_true", help="write the ledger (default: dry run)"
     )
     backfill_cmd.add_argument(
@@ -2685,6 +2717,7 @@ def _run(args: argparse.Namespace) -> int:
             checkout=args.checkout,
             exclude=args.exclude,
             rulings=load_author_rulings(args.author_rulings),
+            outages=load_outages(args.outages),
             apply=args.apply,
             ledger_path=args.ledger,
         )

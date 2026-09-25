@@ -369,7 +369,11 @@ trailer always wins over both. Where a per-drawing ruling and the class rule
 disagree, the ruling row carries `both_families` with its reason, and the gate
 then requires a counting review of the current sheets from each reviewer
 family (claude and gpt), so one of them is cross-family whoever wrote the
-script; each is filed in its own `both_families_<family>` slot. The command is a
+script; each is filed in its own `both_families_<family>` slot. A same-family
+`SHIP` with no quota refusal is ingested as `outage_fallback` when an open
+outage in `cad/reviews/outages.json` directed it, but never as one half of a
+`both_families` drawing: there it is filed as that family's half, and the
+other family still has to review. The command is a
 dry run that prints a per-drawing table unless given `--apply`, and it must run
 against a render of the head being released (`--checkout`).
 A review, and a ledger match, is always judged against the release render.

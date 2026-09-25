@@ -3238,6 +3238,8 @@ def task_check():
                     str(
                         (REPO_ROOT / "cad" / "reviews" / "author-rulings.json").resolve()
                     ),
+                    # an outage fallback counts only while its outage is open
+                    str((REPO_ROOT / "cad" / "reviews" / "outages.json").resolve()),
                     *(
                         str(DRAWINGS_BY_NAME[name].outputs["pdf"].resolve())
                         for name in _drawing_order()
