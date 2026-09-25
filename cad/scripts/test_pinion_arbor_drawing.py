@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 from types import SimpleNamespace
@@ -250,6 +251,12 @@ def test_every_post_import_name_is_carried_by_a_kept_or_moved_dimension() -> Non
     assert set(drawing.DIMENSION_CALLOUTS) <= carried
     assert set(spec.DRAWING_PRECISION_BY_NAME) == carried
     assert set(drawing.DIAMETER_POSITIONS) <= carried
+    assert set(drawing.DETAIL_DIAMETER_POSITIONS) <= carried
+    # Every donor diameter has exactly one destination view.
+    assert set(drawing.DIAMETER_POSITIONS).isdisjoint(drawing.DETAIL_DIAMETER_POSITIONS)
+    assert set(drawing.DIAMETER_POSITIONS) | set(drawing.DETAIL_DIAMETER_POSITIONS) == set(
+        drawing.DONOR_KEEP
+    )
     assert {"CrossHoleDia", "HeadCapSagDim", "BackCapSagDim", "OverallLen"} <= carried
 
 
@@ -1024,7 +1031,7 @@ def test_collar_pin_hole_is_a_drilled_spring_pin_hole_clear_of_the_front_land() 
 def test_collar_pin_dimensions_stand_above_the_shaft_clear_of_the_front_ra() -> None:
     """Below the shaft at x 0.269 is the front land's Ra symbol, so the pin
     hole's station and diameter both stand above it: the station over the
-    neck's Ø10.5 text, the diameter's leader left of the station witness and
+    Ø15's text row, the diameter's leader left of the station witness and
     above the 19.0 land length."""
     pin_x = drawing._sheet_x(spec.PIN_Z)
     head_rear_x = drawing._sheet_x(spec.HEAD_REAR_Z)
@@ -1032,17 +1039,110 @@ def test_collar_pin_dimensions_stand_above_the_shaft_clear_of_the_front_ra() -> 
     station_x, station_y = drawing.PRINCIPAL_KEEP["PinStationFromHeadRear"]
     dia_x, dia_y = drawing.PRINCIPAL_KEEP["PinHoleDia"]
     assert pin_x < station_x < head_rear_x
-    assert station_y > drawing.DIAMETER_POSITIONS["NeckDia"][1] + 0.010
+    assert station_y > drawing.DIAMETER_POSITIONS["HeadDia"][1] + 0.010
     assert dia_x < pin_x
     assert dia_y > station_y + 0.010
     assert dia_y > drawing.PRINCIPAL_KEEP["FrontJournalLen"][1] + 0.030
     assert min(station_y, dia_y) > axis_y
 
 
-def test_neck_diameter_text_ends_short_of_the_collar_pin_station_witness() -> None:
-    """The station's head-rear-face witness rises through the neck's text row
-    up to the station line, so the neck's Ø10.5 block must end left of it
-    (stacktop-dbe47ae3 failed its layout audit on exactly this crossing)."""
-    neck_x = drawing.DIAMETER_POSITIONS["NeckDia"][0]
+# Measured witness overshoot past a dimension line: c486b6e1's NeckDia line
+# at x 294.5 had its witnesses end at 293.5.
+WITNESS_OVERSHOOT_M = 0.001
+
+
+def _neck_text_box(xy: tuple[float, float]) -> tuple[float, float, float, float]:
+    left, right, bottom, top = drawing.NECK_DIA_TEXT_BOX_FROM_POSITION
+    return xy[0] + left, xy[0] + right, xy[1] + bottom, xy[1] + top
+
+
+def test_neck_text_box_is_the_audit_box_stacktop_dbe47ae3_measured() -> None:
+    # Text at (0.300, 0.194) audited as [284.4,191.2]..[311.5,194.7] mm.
+    box = _neck_text_box((0.300, 0.194))
+    assert box == pytest.approx((0.2844, 0.3115, 0.1912, 0.1947))
+
+
+def test_every_profile_diameter_keeps_its_witnesses_inside_the_detail_fence() -> None:
+    """A diameter on the 1:1 profile whose part lies inside detail A must
+    stand its line on that part, inside the fence: its witnesses run from the
+    part to the line and 1 mm past it, and the build's fence gate fails any
+    that leaves the circle (c486b6e1: NeckDia's line at x 0.2945, ahead of
+    the neck's front shoulder, ran both witnesses out through the fence)."""
+    center_x = drawing._sheet_x(spec.HEAD_CENTER_Z)
+    reach = drawing.DETAIL_RADIUS_MM / 1000.0 + drawing.FENCE_TOL_M
+    half = {"HeadDia": spec.HEAD_DIA / 2000.0, "NeckDia": spec.NECK_DIA / 2000.0}
+    for name, (x, _) in drawing.DIAMETER_POSITIONS.items():
+        far = math.hypot(abs(x - center_x) + WITNESS_OVERSHOOT_M, half[name])
+        assert far <= reach, f"{name} witnesses leave the fence ({far * 1000:.2f} mm)"
+
+
+def test_no_profile_placement_clears_both_the_fence_and_the_collar_pin_witness() -> None:
+    """Why the neck left the profile: the fence wants its line at x >= 0.300,
+    and the audit box (11.5 mm right of the line) must end short of the
+    collar-pin station's head-rear-face witness, which wants x < 0.296."""
+    center_x = drawing._sheet_x(spec.HEAD_CENTER_Z)
+    reach = drawing.DETAIL_RADIUS_MM / 1000.0 + drawing.FENCE_TOL_M
+    half = spec.NECK_DIA / 2000.0
+    fence_min_x = center_x - (reach**2 - half**2) ** 0.5 + WITNESS_OVERSHOOT_M
     witness_x = drawing._sheet_x(spec.HEAD_REAR_Z)
-    assert neck_x + drawing.NECK_DIA_TEXT_RIGHT_FROM_LINE < witness_x - 0.001
+    witness_max_x = witness_x - drawing.NECK_DIA_TEXT_BOX_FROM_POSITION[1]
+    assert fence_min_x > witness_max_x
+    assert "NeckDia" not in drawing.DIAMETER_POSITIONS
+
+
+def test_neck_diameter_is_dimensioned_on_the_neck_inside_detail_a() -> None:
+    """Detail A (2:1) holds the neck from the fence to the head rear face.
+    The line stands on that stretch, fence side of the end-on circle its
+    witnesses start from (Front plane, model z 0), with both witnesses and
+    their overshoot inside the circle."""
+    assert set(drawing.DETAIL_DIAMETER_POSITIONS) == {"NeckDia"}
+    x, _ = drawing.DETAIL_DIAMETER_POSITIONS["NeckDia"]
+    cx, cy = drawing.DETAIL_CENTER
+    radius = drawing.DETAIL_RATIO * drawing.DETAIL_RADIUS_MM / 1000.0
+    half = drawing.DETAIL_RATIO * spec.NECK_DIA / 2000.0
+    # The head centre sits at the detail's centre.
+    assert drawing._detail_x(spec.HEAD_CENTER_Z) == pytest.approx(cx)
+    head_rear_x = drawing._detail_x(spec.HEAD_REAR_Z)
+    neck_sketch_x = drawing._detail_x(0.0)
+    assert neck_sketch_x < head_rear_x
+    # On the neck, fence side of its end-on circle, with room for the arrows.
+    assert x < neck_sketch_x - 0.005
+    assert (cx - x) ** 2 + half**2 < radius**2
+    # Both witnesses and their overshoot inside the circle, 1 mm to spare.
+    far = math.hypot(cx - x + WITNESS_OVERSHOOT_M, half)
+    assert far <= radius - 0.001
+    # In profile terms the line stands on the neck, inside the 1:1 fence.
+    profile_x = drawing._sheet_x(spec.HEAD_CENTER_Z) + (x - cx) / drawing.DETAIL_RATIO
+    assert drawing._sheet_x(spec.NECK_END_Z) < profile_x < drawing._sheet_x(spec.HEAD_REAR_Z)
+    assert cy + half < drawing.DETAIL_DIAMETER_POSITIONS["NeckDia"][1]
+
+
+def test_neck_diameter_text_rides_clear_of_detail_a_and_its_callouts() -> None:
+    """The neck's text hangs above-left of the fence like the detail's other
+    callouts: its audit box stays above the head's top edge, left of the
+    SR10.9 leader (which leaves the head's top front corner) and inside the
+    sheet border, and the rendered text, left of its line, clears the circle.
+    The collar-pin station witness (stacktop-dbe47ae3) is on the profile, not
+    here."""
+    xy = drawing.DETAIL_DIAMETER_POSITIONS["NeckDia"]
+    left, right, bottom, top = _neck_text_box(xy)
+    cx, cy = drawing.DETAIL_CENTER
+    radius = drawing.DETAIL_RATIO * drawing.DETAIL_RADIUS_MM / 1000.0
+    head_top = cy + drawing.DETAIL_RATIO * spec.HEAD_DIA / 2000.0
+    assert bottom > head_top + 0.003
+    assert right < drawing._detail_x(spec.HEAD_FRONT_Z) - 0.010
+    # Inner border at y 266.75 mm on this ASME B sheet (a1a694a6 render).
+    assert top < 0.265
+    # Rendered text: left of its line, ending ~1.3 mm short of it, in the rows
+    # the a1a694a6 profile showed (1.9 mm below to 2.0 mm above the position).
+    glyph_right, glyph_bottom = xy[0] - 0.0013, xy[1] - 0.0019
+    assert math.hypot(cx - glyph_right, glyph_bottom - cy) > radius + 0.002
+    # The line leaves the circle square: at its x the circle's top is below
+    # the text row, so the jog to the text sits outside the fence.
+    circle_top = cy + (radius**2 - (cx - xy[0]) ** 2) ** 0.5
+    assert xy[1] - 0.003 > circle_top + 0.002
+    # The detail's own callouts sit right of and below the neck text.
+    for name in ("HeadCapR", "CrossHoleDia"):
+        assert drawing.DETAIL_KEEP[name][0] > right + 0.030
+    for name in ("HeadLen", "HeadCapSagDim"):
+        assert drawing.DETAIL_KEEP[name][1] < bottom - 0.030
