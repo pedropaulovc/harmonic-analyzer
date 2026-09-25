@@ -56,7 +56,6 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
             "BoreDia",
             "BossDia",
             "OverallLength",
-            "BossChamfer",
         }
     )
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
@@ -71,7 +70,6 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         "BossDia",
         "FaceWidth",
         "OverallLength",
-        "BossChamfer",
     }
     assert spec.DRAWING_DIMENSIONS["BossProfile"] == {
         "OutsideDia",
@@ -115,7 +113,6 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
         "BoreDia": 3,
         "BossDia": 1,
         "OverallLength": 1,
-        "BossChamfer": 1,
     }
     assert "draw_crank_pinion.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
@@ -135,7 +132,7 @@ def test_the_boss_is_the_root_circle_and_the_pin_hole_stays_in_its_wall() -> Non
     assert spec.OVERALL_LENGTH == pytest.approx(spec.FACE_WIDTH + spec.BOSS_LENGTH)
     assert spec.PIN_STATION == pytest.approx(spec.FACE_WIDTH + spec.BOSS_LENGTH / 2)
     assert spec.PIN_STATION - spec.PIN_DIA / 2 > spec.FACE_WIDTH
-    assert spec.PIN_STATION + spec.PIN_DIA / 2 < spec.OVERALL_LENGTH - spec.BOSS_CHAMFER
+    assert spec.PIN_STATION + spec.PIN_DIA / 2 < spec.OVERALL_LENGTH - 0.5
     assert spec.PIN_LENGTH == spec.BOSS_DIA
     build = _build_source()
     assert "[-BOSS_DIA / 2.0, 0.0, PIN_STATION]" in build
@@ -153,22 +150,6 @@ def test_pin_hole_is_match_drilled_to_the_named_pin() -> None:
     assert spec.PIN_DIA == pytest.approx(3.175)
     assert spec.CRANKSHAFT_NUMBER == _config.parts("crankshaft")["number"]
     assert spec.PIN_NUMBER == _config.parts("crank-pinion-pin")["number"]
-    assert spec.PIN_HOLE_PROCESS.split("\n") == [
-        "MATCH DRILL AT BOSS MID-LENGTH",
-        f"AT ASSY WITH CRANKSHAFT {spec.CRANKSHAFT_NUMBER}",
-        f"REAM TO FIT PIN {spec.PIN_NUMBER}",
-        "SEAT BY LIGHT HAND-HAMMER TAPS",
-        "NOT REMOVABLE BY HAND",
-        "FLUSH BOTH SIDES",
-    ]
-    assert spec.CRANKSHAFT_PIN_HOLE_PROCESS.split("\n") == [
-        f"MATCH DRILL AT ASSY WITH CRANK PINION {spec.PINION_NUMBER}",
-        "AT PINION BOSS MID-LENGTH",
-        f"REAM TO FIT PIN {spec.PIN_NUMBER}",
-        "SEAT BY LIGHT HAND-HAMMER TAPS",
-        "NOT REMOVABLE BY HAND",
-        "FLUSH BOTH SIDES",
-    ]
     assert "DRILL" in spec.PIN_HOLE_PROCESS
     assert "1/8" not in spec.PIN_HOLE_PROCESS
     assert f"{spec.PIN_DIA:.2f}" not in spec.PIN_HOLE_PROCESS
@@ -178,36 +159,82 @@ def test_pin_hole_is_match_drilled_to_the_named_pin() -> None:
     assert spec.PIN_CLOCKING_DEG == pytest.approx(13.703608450714796)
 
 
-def test_pin_hole_note_names_the_operation_and_leaves_the_procedure_to_assembly() -> None:
-    # Rule 6 (Main, 2026-09-25): a part print carries at most four note lines.
-    # The seating procedure (hammer taps, not removable) is MHA-A03 assembly
-    # work; the sheet keeps the operation, where it runs, the mate, and --
-    # because the fit to the actual pin governs the hole, not a drill size --
-    # the pin it is reamed to and its flush condition (run1c eye pass: with
-    # those two cut, neither sheet said how big the hole is).
-    process = spec.PIN_HOLE_PROCESS.split("\n")
-    note = drawing.PIN_HOLE_NOTE.split("\n")
-    assert len(note) <= 4
-    assert all(line in process for line in note)
-    assert note[0].startswith("MATCH DRILL")
-    assert spec.CRANKSHAFT_NUMBER in note[1]
-    assert f"REAM TO FIT PIN {spec.PIN_NUMBER}" in note
-    assert "FLUSH BOTH SIDES" in note
-    bare = drawing.PIN_HOLE_NOTE
-    for number in (spec.CRANKSHAFT_NUMBER, spec.PIN_NUMBER):
-        bare = bare.replace(number, "")
+def _assert_four_fact_note(note: str, mate_number: str) -> None:
+    """Rule 6 (Main, 2026-09-25): at most four lines, no dimensions, and --
+    because each sheet stands alone -- all four facts of the matched fit:
+    match drill at assembly with the named mate (and where it runs), ream to
+    fit the named pin, the fit's acceptance, flush both sides."""
+    lines = note.split("\n")
+    text = " ".join(lines)
+    assert len(lines) <= 4
+    assert lines[0] == f"MATCH DRILL AT ASSY WITH {mate_number}"
+    assert "BOSS MID-LENGTH" in lines[1]
+    assert f"REAM TO FIT PIN {spec.PIN_NUMBER}" in text
+    assert "LIGHT HAMMER FIT" in text and "NOT REMOVABLE BY HAND" in text
+    assert "FLUSH BOTH SIDES" in text
+    bare = text.replace(mate_number, "").replace(spec.PIN_NUMBER, "")
     assert not any(ch.isdigit() for ch in bare)
+
+
+def test_both_sheets_carry_the_same_four_fact_pin_hole_note() -> None:
+    # Machinist review of 4d4e038e3: the shaft's bare transfer note gave no
+    # size, process or fit, and the pinion's four-line trim had dropped the
+    # fit's acceptance. One source (pin_hole_note) now prints on both sheets;
+    # only the opening pair names the other part and where the hole runs.
+    _assert_four_fact_note(drawing.PIN_HOLE_NOTE, spec.CRANKSHAFT_NUMBER)
+    _assert_four_fact_note(spec.CRANKSHAFT_PIN_HOLE_PROCESS, spec.PINION_NUMBER)
+    pinion = drawing.PIN_HOLE_NOTE.split("\n")
+    shaft = spec.CRANKSHAFT_PIN_HOLE_PROCESS.split("\n")
+    assert pinion[2:] == shaft[2:] == list(spec.PIN_FIT_LINES)
+    assert drawing.PIN_HOLE_NOTE == spec.PIN_HOLE_PROCESS
+    crankshaft_drawing = Path(drawing.__file__).with_name("draw_crankshaft.py").read_text(
+        encoding="utf-8"
+    )
+    assert "text=CRANKSHAFT_PIN_HOLE_PROCESS," in crankshaft_drawing
     # The four-line block (upper-left anchored; ~0.8h a character, ~1.7h a
     # line) stays under the border and above the section and isometric.
     height = drawing.PIN_HOLE_NOTE_HEIGHT
     x0, top = drawing.PIN_HOLE_CALLOUT
-    right = x0 + 0.8 * height * max(map(len, note))
-    bottom = top - 1.7 * height * len(note)
+    right = x0 + 0.8 * height * max(map(len, pinion))
+    bottom = top - 1.7 * height * len(pinion)
     assert top < drawing.SHEET_INNER_BORDER[3] and right < drawing.SHEET_INNER_BORDER[2]
     assert bottom > drawing.RIGHT_CENTER[1] + drawing.HALF_OD + 0.010
     assert bottom > drawing.ISO_CENTER[1] + drawing.HALF_OD + 0.010
     source = _source().replace("\r\n", "\n")
     assert "PIN_HOLE_NOTE,\n        text_xy=PIN_HOLE_CALLOUT," in source
+
+
+def test_the_boss_end_takes_the_title_block_break_not_a_sized_chamfer() -> None:
+    # Machinist review of 4d4e038e3: the 1.0 x 45 chamfer only imitated the
+    # photo's rounding, and at its one-place grade it could reach the bore.
+    spec_source = Path(spec.__file__).read_text(encoding="utf-8")
+    for text in (_build_source(), _source(), spec_source):
+        assert "BossChamfer" not in text
+        assert "BOSS_CHAMFER" not in text
+    assert "add_chamfer" not in _build_source()
+
+
+def test_boss_dia_text_clears_its_extension_lines() -> None:
+    # Machinist review of 4d4e038e3 (clarity): the diameter text at +0.020
+    # sat on the upper extension line at +HALF_BOSS. The sheet-side check
+    # reads the native display data; here the same predicate runs on the
+    # layout, and rejects the reviewed placement.
+    x_end = drawing._side_x(spec.OVERALL_LENGTH)
+    x_dim = drawing.BOSS_DIA_TEXT_X
+    y_axis = drawing.RIGHT_CENTER[1]
+    height = 0.0035
+    extension = [
+        ((x_end, y_axis + side * drawing.HALF_BOSS), (x_dim + 0.002, y_axis + side * drawing.HALF_BOSS))
+        for side in (1.0, -1.0)
+    ]
+    dimension_line = [((x_dim, y_axis - drawing.HALF_BOSS), (x_dim, y_axis + drawing.HALF_BOSS))]
+    lines = extension + dimension_line
+    gap = drawing.DIMENSION_TEXT_LINE_GAP
+    reviewed = [(x_dim - 0.006, y_axis + 0.020, height)]
+    assert drawing._text_line_crossings(reviewed, lines, gap) == [extension[0]]
+    x, y = drawing.RIGHT_KEEP["BossDia"]
+    assert drawing._text_line_crossings([(x - 0.006, y, height)], lines, gap) == []
+    assert "_boss_dia_text_crossings(adapter, right_annotations)" in _source()
 
 
 def test_the_bore_is_the_only_feature_that_earns_a_band() -> None:
@@ -272,7 +299,6 @@ def test_callouts_add_only_what_the_number_cannot_carry() -> None:
     shaft_upper, shaft_lower = crankshaft_spec.SHAFT_DIA_BAND
     assert drawing.DIMENSION_CALLOUTS == {
         "BoreDia": spec.BORE_PROCESS_CALLOUT,
-        "BossChamfer": "X 45 DEG",
     }
     assert spec.BORE_PROCESS_CALLOUT == "REAM THRU"
     assert spec.BORE_FIT_CALLOUT == "\n".join(
@@ -398,20 +424,13 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     boss_x, boss_y = drawing.RIGHT_KEEP["BossDia"]
     assert drawing._side_x(spec.OVERALL_LENGTH) < boss_x
     assert boss_x < drawing.ISO_CENTER[0] - half_od - 0.010
-    assert boss_y > drawing.RIGHT_CENTER[1] + 0.015
+    assert boss_y == pytest.approx(drawing.RIGHT_CENTER[1])
     bore_x, bore_y = drawing.RIGHT_KEEP["BoreDia"]
     assert bore_x > drawing._side_x(0.0) + 0.010
     assert bore_x < drawing.ISO_CENTER[0] - half_od - 0.010
     assert bore_y == pytest.approx(drawing.RIGHT_CENTER[1])
     for name in ("FaceWidth", "OverallLength"):
         assert drawing.RIGHT_KEEP[name][1] < drawing.RIGHT_CENTER[1] - half_od, name
-    # The boss diameter reads beyond the boss end without extension lines
-    # crossing the section. The end break sits separately above-right, next to
-    # the actual chamfer and beyond the match-drill leader's path.
-    chamfer_x, chamfer_y = drawing.RIGHT_KEEP["BossChamfer"]
-    assert drawing._side_x(spec.OVERALL_LENGTH) < chamfer_x
-    assert chamfer_x < drawing.ISO_CENTER[0] - half_od - 0.010
-    assert chamfer_y > drawing.RIGHT_CENTER[1] + half_boss + 0.008
     assert (
         drawing.RIGHT_KEEP["FaceWidth"][1]
         > drawing.RIGHT_KEEP["OverallLength"][1]

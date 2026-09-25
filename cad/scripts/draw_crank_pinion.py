@@ -25,7 +25,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-from typing import Any
+from typing import Any, Sequence
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
@@ -67,6 +67,7 @@ from crank_pinion_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -181,34 +182,86 @@ FRONT_KEEP: dict[str, tuple[float, float]] = {}
 # bore diameter sits just right of the silhouette, still clear of the
 # isometric. The two lengths stay baseline-stacked below the view from the
 # toothed south face (rule 7: one origin per view, baseline not chained). The
-# boss diameter sits above-right on a vertical dimension line beyond the boss
-# end, while the end break stays separately above the chamfer.
+# boss diameter reads on a vertical dimension line beyond the boss end, its
+# text on the axis between the extension lines: at +0.020 it sat on the upper
+# extension line (machinist review of 4d4e038e3), which
+# ``_boss_dia_text_crossings`` now rejects on the sheet.
 _SIDE_BOTTOM = RIGHT_CENTER[1] - HALF_OD
+BOSS_DIA_TEXT_X = _side_x(OVERALL_LENGTH) + 0.049
 RIGHT_KEEP = {
     "OutsideDia": (
         (_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0,
         RIGHT_CENTER[1] + HALF_OD + 0.012,
     ),
-    "BossDia": (
-        _side_x(OVERALL_LENGTH) + 0.049,
-        RIGHT_CENTER[1] + 0.020,
-    ),
+    "BossDia": (BOSS_DIA_TEXT_X, RIGHT_CENTER[1]),
     "BoreDia": (_side_x(OVERALL_LENGTH) + 0.020, RIGHT_CENTER[1]),
     "FaceWidth": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.014),
     "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.026),
-    "BossChamfer": (
-        _side_x(OVERALL_LENGTH) + 0.025,
-        RIGHT_CENTER[1] + HALF_BOSS + 0.010,
-    ),
 }
+DIMENSION_TEXT_LINE_GAP = 0.0005
 
 DIMENSION_CALLOUTS = {
     # The native value/limits define the bore; this short feature callout adds
     # the process and extent without tangling its native diameter leaders.
     "BoreDia": BORE_PROCESS_CALLOUT,
-    # The chamfer feature imports its one distance; the angle is the caption.
-    "BossChamfer": "X 45 DEG",
 }
+
+
+Point = tuple[float, float]
+
+
+def _text_line_crossings(
+    texts: Sequence[tuple[float, float, float]],
+    lines: Sequence[tuple[Point, Point]],
+    gap: float,
+) -> list[tuple[Point, Point]]:
+    """The horizontal ink lines that run through a dimension's text.
+
+    ``texts`` are the display data's (x, y, height) text origins. The origin
+    may be the text's base or its middle, so a text claims y - height ..
+    y + height, widened by ``gap``; a horizontal line crosses it when its y is
+    in that band and its x-span reaches the origin.
+    """
+    crossings = []
+    for (x0, y0), (x1, y1) in lines:
+        if abs(y1 - y0) > 1e-6:
+            continue
+        for x, y, height in texts:
+            if abs(y0 - y) <= height + gap and min(x0, x1) <= x <= max(x0, x1):
+                crossings.append(((x0, y0), (x1, y1)))
+                break
+    return crossings
+
+
+def _boss_dia_text_crossings(adapter: Any, annotations: Sequence[Any]) -> None:
+    """Fail when the boss diameter's text sits on one of its own lines."""
+    for annotation in annotations:
+        annotation = _early_bound(annotation, "IAnnotation")
+        if dimension_name(adapter, annotation) != "BossDia":
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        data = _early_bound(display.GetDisplayData(), "IDisplayData")
+        lines = []
+        for index in range(int(data.GetLineCount())):
+            line = tuple(float(value) for value in data.GetLineAtIndex2(index))
+            if len(line) < 10:
+                raise RuntimeError("BossDia: incomplete native dimension line")
+            lines.append(((line[4], line[5]), (line[7], line[8])))
+        texts = [
+            (
+                *(float(v) for v in tuple(data.GetTextPositionAtIndex(index))[:2]),
+                float(data.GetTextHeightAtIndex(index)),
+            )
+            for index in range(int(data.GetTextCount()))
+        ]
+        crossings = _text_line_crossings(texts, lines, DIMENSION_TEXT_LINE_GAP)
+        _telemetry.event(
+            "drawing.boss_dia_text", texts=str(texts), lines=len(lines), crossings=len(crossings)
+        )
+        if not texts or crossings:
+            raise RuntimeError(f"BossDia text {texts} sits on its lines {crossings}")
+        return
+    raise RuntimeError("BossDia never reached the longitudinal section")
 
 # The retention-pin cross-hole is cut in section at the boss mid-length. Keep
 # its matched-fit callout above-right of the section so its leader leaves the
@@ -218,12 +271,11 @@ PIN_HOLE_EDGE = (
     RIGHT_CENTER[1] + PIN_DIA * VIEW_SCALE[0] / 2000.0,
 )
 PIN_HOLE_CALLOUT = (0.260, RIGHT_CENTER[1] + HALF_OD + 0.056)
-# The operation, where it runs, its mate, the pin it is reamed to (the fit to
-# the actual pin governs the hole, not a drill size) and its flush condition:
-# the spec process's lines 1, 2, 3 and 6.  The seating procedure between them
-# is the MHA-A03 assembly step (rule 6: at most four lines).
-_PROCESS_LINES = PIN_HOLE_PROCESS.split("\n")
-PIN_HOLE_NOTE = "\n".join(_PROCESS_LINES[i] for i in (0, 1, 2, 5))
+# The shared matched-fit note (crank_pinion_spec.pin_hole_note): match drill
+# with the shaft at the boss mid-length, ream to fit the named pin (the fit to
+# the actual pin governs the hole, not a drill size), the fit's acceptance and
+# flush both sides.
+PIN_HOLE_NOTE = PIN_HOLE_PROCESS
 # 2.5 mm text, anchored upper-left; the read-back extent, leader included,
 # must stay inside the B sheet's inner border.
 PIN_HOLE_NOTE_HEIGHT = 0.0025
@@ -314,6 +366,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(
         adapter, front_annotations + right_annotations, DRAWING_PRECISION_BY_NAME
     )
+    _boss_dia_text_crossings(adapter, right_annotations)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pinion bore")
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
@@ -329,9 +382,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The cross-hole is governed by a matched fit, not the model's nominal
     # drill diameter. The pinion's boss guides the drill, so its rim carries
-    # the operation, where it runs, the mating part, the pin it is reamed to
-    # and the flush condition; the seating procedure is assembly work
-    # (PIN_HOLE_PROCESS, for MHA-A03), not part-print prose (rule 6).
+    # the operation, where it runs, the mating part, the pin it is reamed to,
+    # the fit's acceptance and the flush condition.
     # A longitudinal section presents the radial through-hole as cut edges, not
     # a selectable model circle, so this view-owned pointer names its cut
     # location without dimensioning that hole.

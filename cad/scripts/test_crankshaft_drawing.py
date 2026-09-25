@@ -239,17 +239,18 @@ def test_pinion_land_is_turnable_at_the_printed_band() -> None:
     assert spec.JOURNAL_LENGTH / post_bore > 0.96
 
 
-def test_pinion_pin_hole_is_shown_as_a_transfer_from_the_pinion() -> None:
+def test_pinion_pin_hole_prints_the_shared_matched_fit_note() -> None:
     """Codex #813 (PRRT_kwDOPHDy386l4ZrZ): MHA-026 cut the PinionPinHole but
     the sheet did not show it.  The hole is match-drilled through the seated
-    pinion's boss at assembly (crank_pinion_spec), so -- like MHA-061's
-    transfer seats on the base (U28) -- the sheet names its source and prints
-    no size and no station (Main, 2026-09-25).  run1-61671871a proved a native
-    Hole Wizard callout cannot bind to the saddle rim of a radial hole in a
-    round shaft."""
+    pinion's boss at assembly, so the sheet prints no size and no station;
+    since the machinist review of 4d4e038e3 it prints the pinion sheet's own
+    four-fact note with the mates swapped, because a bare transfer gave the
+    shaft's machinist no process or fit (test_crank_pinion_drawing pins the
+    facts).  run1-61671871a proved a native Hole Wizard callout cannot bind
+    to the saddle rim of a radial hole in a round shaft."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_attached_note(" in source
-    assert "text=PINION_PIN_TRANSFER_NOTE," in source
+    assert "text=CRANKSHAFT_PIN_HOLE_PROCESS," in source
     assert "entity=_visible_cross_hole_edge(adapter, side, PINION_PIN_DIA)," in source
     # One native callout on the sheet, the MHA-024 cross-hole's; none here.
     assert source.count("add_native_hole_callout(\n") == 1
@@ -260,14 +261,9 @@ def test_pinion_pin_hole_is_shown_as_a_transfer_from_the_pinion() -> None:
     assert all("Pinion" not in name for name in drawing.SIDE_KEEP)
     build = Path(part.__file__).read_text(encoding="utf-8")
     assert '"ShaftLength" - "PinionPinStation"' not in build
-    # The text is the transfer, from the spec's own part number; the assembly
-    # procedure stays in CRANKSHAFT_PIN_HOLE_PROCESS for MHA-A03 (rule 6).
-    pinion_number = notes.PINION_NUMBER
-    assert notes.PINION_PIN_TRANSFER_NOTE == f"TRANSFER FROM {pinion_number}\nAT ASSEMBLY"
-    lines = notes.PINION_PIN_TRANSFER_NOTE.split("\n")
-    assert len(lines) <= 4
-    assert not any(ch.isdigit() for ch in notes.PINION_PIN_TRANSFER_NOTE.replace(pinion_number, ""))
-    # The build still stores the full process on the part for the assembly.
+    # The build stores the same text on the part; the sheet refuses a part
+    # built from any other.
+    assert not hasattr(notes, "PINION_PIN_TRANSFER_NOTE")
     assert '"Pinion Pin Hole Process"' in source
     assert drawing.PINION_PIN_X == pytest.approx(
         drawing.DOME_ROOT_X + part.PINION_PIN_STATION_Y * drawing.SHEET_SCALE[0] / 1000.0
@@ -276,6 +272,7 @@ def test_pinion_pin_hole_is_shown_as_a_transfer_from_the_pinion() -> None:
     # The note block (top-left anchored; sized for up to 3.5 mm note text)
     # stays inside its field: right of the Ø11.388 text, above its row,
     # left of the isometric and inside the border.
+    lines = drawing.CRANKSHAFT_PIN_HOLE_PROCESS.split("\n")
     height = 0.0035
     char_w, line_h = 0.8 * height, 1.7 * height
     x0, y0 = drawing.PINION_PIN_NOTE_XY

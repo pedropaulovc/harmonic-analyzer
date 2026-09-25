@@ -109,9 +109,9 @@ FACE_WIDTH = 10.4  # spans the 64T row north of the v2 crank boss
 # length real and conspicuous), and the toothed length is FaceWidth.
 ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN  # 13.51
 BOSS_DIA = ROOT_DIA
-# The outer edge is rounded in the photo; a sized 45-degree break is the lathe
-# operation that reads the same and rule 7 prefers a chamfer to a radius.
-BOSS_CHAMFER = 1.0
+# The boss's outer end edge takes the title block's edge break: the sized
+# chamfer that once imitated the photo's rounding had no function, and at its
+# general grade it could reach the bore (machinist review of 4d4e038e3).
 
 # Retention pin: a plain 1/8 in straight pin (stock drill rod) through the boss
 # and crankshaft, match-drilled at assembly with the pinion on its seat. The
@@ -174,8 +174,8 @@ PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0  # 17.5075 from the toothed (south)
 PIN_CLOCKING_DEG = 13.703608450714796  # = build_drive_train_assembly.PINION_SEED_DEG
 if PIN_STATION - PIN_DIA / 2.0 < FACE_WIDTH + 0.5:
     raise AssertionError("retention pin hole breaks into the pinion's tooth face")
-if PIN_STATION + PIN_DIA / 2.0 > OVERALL_LENGTH - BOSS_CHAMFER - 0.5:
-    raise AssertionError("retention pin hole reaches the boss end break")
+if PIN_STATION + PIN_DIA / 2.0 > OVERALL_LENGTH - 0.5:
+    raise AssertionError("retention pin hole reaches the boss end")
 # The matched-hole callout on both part records identifies both seated parts,
 # the shared boss-mid-length operation and the actual fitted pin. It deliberately
 # omits the modeled hole nominal: reaming to a functional acceptance governs,
@@ -193,26 +193,23 @@ BORE_FIT_CALLOUT = "\n".join(
         f"(DIA CLR {_CLEARANCE_MIN:.3f}-{_CLEARANCE_MAX:.3f} mm)",
     )
 )
-PIN_HOLE_PROCESS = "\n".join(
-    (
-        "MATCH DRILL AT BOSS MID-LENGTH",
-        f"AT ASSY WITH CRANKSHAFT {CRANKSHAFT_NUMBER}",
-        f"REAM TO FIT PIN {PIN_NUMBER}",
-        "SEAT BY LIGHT HAND-HAMMER TAPS",
-        "NOT REMOVABLE BY HAND",
-        "FLUSH BOTH SIDES",
-    )
+# One matched-fit note, printed on BOTH sheets (machinist review of 4d4e038e3):
+# a sheet stands alone, so each carries all four facts -- match drill at
+# assembly, ream to fit the named pin, the fit's acceptance, flush -- and only
+# the opening pair differs: the other part, and where on this one the hole
+# runs.  Four lines, no dimensions (rule 6); MHA-A03 step 4 reads the shaft's.
+PIN_FIT_LINES = (
+    f"REAM TO FIT PIN {PIN_NUMBER}, LIGHT HAMMER FIT",
+    "NOT REMOVABLE BY HAND, FLUSH BOTH SIDES",
 )
-CRANKSHAFT_PIN_HOLE_PROCESS = "\n".join(
-    (
-        f"MATCH DRILL AT ASSY WITH CRANK PINION {PINION_NUMBER}",
-        "AT PINION BOSS MID-LENGTH",
-        f"REAM TO FIT PIN {PIN_NUMBER}",
-        "SEAT BY LIGHT HAND-HAMMER TAPS",
-        "NOT REMOVABLE BY HAND",
-        "FLUSH BOTH SIDES",
-    )
-)
+
+
+def pin_hole_note(mate_number: str, where: str) -> str:
+    return "\n".join((f"MATCH DRILL AT ASSY WITH {mate_number}", where, *PIN_FIT_LINES))
+
+
+PIN_HOLE_PROCESS = pin_hole_note(CRANKSHAFT_NUMBER, "AT BOSS MID-LENGTH")
+CRANKSHAFT_PIN_HOLE_PROCESS = pin_hole_note(PINION_NUMBER, "AT ITS BOSS MID-LENGTH")
 
 # One roughness, on the one surface whose function depends on it: the bore is
 # a size-toleranced fit onto the crankshaft, and a fit lives on the peaks as
@@ -236,7 +233,6 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "BossProfile": {"OutsideDia", "BoreDia", "BossDia", "OverallLength"},
-    "BossBreak": {"BossChamfer"},
 }
 
 # --- Decimal places, authored ON THE PART ------------------------------------
@@ -267,7 +263,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BossDia": 1,
         "OverallLength": OVERALL_LENGTH_PLACES,
     },
-    "BossBreak": {"BossChamfer": 1},
 }
 
 # The drawing reads this flat view back off the sheet: a dimension name is

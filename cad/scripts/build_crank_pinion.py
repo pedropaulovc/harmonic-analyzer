@@ -67,7 +67,6 @@ from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _part_pmi import author_part_pmi
 from crank_pinion_spec import (
     BORE_DIA_BAND,
-    BOSS_CHAMFER,
     BOSS_DIA,
     BOSS_LENGTH,
     DRAWING_DIMENSIONS,
@@ -118,7 +117,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
     await set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
     await set_global(adapter, "BossLength", f"{BOSS_LENGTH}mm")
-    await set_global(adapter, "BossChamfer", f"{BOSS_CHAMFER}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -314,23 +312,6 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Bore")
     v_bore = math.pi * (BORE_DIAMETER / 2.0) ** 2 * OVERALL_LENGTH
     volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
-
-    # Boss end break: the photographed rounding as the sized 45-degree chamfer
-    # rule 7 prefers, on the boss's outer end edge. A cone of this size on the
-    # bore's edge instead would remove a different volume, so the gate below
-    # is also the guard on the coordinate edge pick.
-    check(
-        "chamfer boss end",
-        await adapter.add_chamfer(BOSS_CHAMFER, [[BOSS_DIA / 2.0, 0.0, OVERALL_LENGTH]]),
-    )
-    name_last_feature(adapter, "BossBreak")
-    drive_jobs += [
-        (name_dimensions(adapter, "BossBreak", ["BossChamfer"])[0], '"BossChamfer"')
-    ]
-    v_chamfer = math.pi * BOSS_CHAMFER**2 * (BOSS_DIA / 2.0 - BOSS_CHAMFER / 3.0)
-    volume = await volume_check(
-        adapter, "boss end break", volume - v_chamfer, 0.2 * v_chamfer
-    )
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train). Stays Axis2: the cross-hole comes
