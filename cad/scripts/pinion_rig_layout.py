@@ -148,6 +148,16 @@ if sum(TORQUE_SHAFT_BEARING_STACK.values()) < FRONT_BLOCK_MIN_BEARING - 1e-9:
     )
 TORQUE_SHAFT_Z0 = BACK_BLOCK_OUTER_Z - TORQUE_SHAFT_LEN
 
+# Option E-a (pinion_strap_pin_spec): MHA-062's two set-pin holes are
+# match-drilled through the MHA-056 cross holes at the fit-up stack, so they
+# sit at the strap mid-planes, measured from the shaft's front end (local z 0).
+# Computed here, beside the stations they come from, so the drive train reads
+# them without importing the shaft's drawing contract (restricted review).
+STRAP_MID_Z = tuple(
+    (outer + inner) / 2.0 for outer, inner in zip(STRAP_Z_OUTER, STRAP_Z_INNER)
+)  # (front, back)
+TORQUE_SHAFT_PIN_HOLE_Z = tuple(z - TORQUE_SHAFT_Z0 for z in STRAP_MID_Z)
+
 # Option E-a (pinion_strap_pin_spec): pinned to the straps, the shaft rides the
 # cluster's end play.  Match-drilled flush with the back block's outer face at
 # the back stop, it retreats up to the widest feeler setting into the back

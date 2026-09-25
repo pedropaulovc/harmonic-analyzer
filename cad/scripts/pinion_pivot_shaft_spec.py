@@ -14,12 +14,7 @@ from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 import pinion_strap_pin_spec as _strap_pin
-from pinion_rig_layout import (
-    STRAP_Z_INNER,
-    STRAP_Z_OUTER,
-    TORQUE_SHAFT_LEN,
-    TORQUE_SHAFT_Z0,
-)
+from pinion_rig_layout import TORQUE_SHAFT_LEN, TORQUE_SHAFT_PIN_HOLE_Z
 
 SHAFT_DIA = 6.35  # 1/4 in: rides both pivot blocks' east bores and the straps
 # Set back-flush with the back block's outer face; ruling (c) moved the front
@@ -57,10 +52,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 # a second, conflicting specification on a shaft whose length floats +/-0.8.
 PIN_HOLE_DIA = _strap_pin.HOLE_DIA
 PIN_HOLE_BAND = _strap_pin.HOLE_BAND  # the spring pin's functional band
-PIN_HOLE_Z = tuple(
-    (outer + inner) / 2.0 - TORQUE_SHAFT_Z0
-    for outer, inner in zip(STRAP_Z_OUTER, STRAP_Z_INNER)
-)  # (front, back)
+PIN_HOLE_Z = TORQUE_SHAFT_PIN_HOLE_Z  # (front, back), pinion_rig_layout
 PIN_HOLE_CALLOUT = "\n".join(
     (
         "MATCH-DRILL THRU AT ASSEMBLY",

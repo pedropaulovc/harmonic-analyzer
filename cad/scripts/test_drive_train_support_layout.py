@@ -767,6 +767,21 @@ def test_mha145_is_mcmaster_98296a027_and_a_purchased_bom_line() -> None:
     assert "pinion_strap_pin" in references_of("drive_train")
 
 
+def test_drive_train_reads_no_shaft_or_pin_drawing_contract() -> None:
+    # Restricted review (Main): BDT imported pinion_pivot_shaft_spec for the
+    # pin-hole stations, and through it pinion_strap_pin_spec, so rewording a
+    # note on MHA-062 re-keyed and fully rebuilt the drive train.  The stations
+    # live in pinion_rig_layout; the specs re-export them.
+    from pathlib import Path
+
+    from _buildgraph import module_deps_of
+    from pinion_pivot_shaft_spec import PIN_HOLE_Z
+
+    deps = {Path(p).stem for p in module_deps_of(Path(drive.__file__))}
+    assert not deps & {"pinion_pivot_shaft_spec", "pinion_strap_pin_spec"}, deps
+    assert PIN_HOLE_Z is RIG.TORQUE_SHAFT_PIN_HOLE_Z
+
+
 def test_mha145_pins_carry_no_interference_exemption() -> None:
     # Codex #858 P1: a straight pin cannot pass offset holes, so the gate must
     # never whitelist pin material inside the shaft.  Pin, strap hole and

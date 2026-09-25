@@ -859,7 +859,6 @@ from pinion_lever_geometry import (  # noqa: E402
     ROD_LEN as LEVER_ROD_LEN,
     WALL_T as LEVER_WALL_T,
 )
-from pinion_pivot_shaft_spec import PIN_HOLE_Z as SHAFT_PIN_HOLE_Z  # noqa: E402
 from pinion_lever_pin_geometry import (  # noqa: E402
     INSTALLED_CONFIG as LEVER_PIN_INSTALLED_CONFIG,
 )
@@ -1665,9 +1664,11 @@ if CAM_Z0[0] < BLOCK_FRONT_Z0 + BLOCK_DEPTH + RIG.FRONT_BLOCK_FEELER - 1e-9:
 # The torque shaft's holes are match-drilled through those cross holes at the
 # fit-up stack, which this pose is, so each pin runs straight through its
 # shaft hole (Codex #858 P1: a straight pin cannot pass offset holes, and no
-# interference row may pretend it does).
+# interference row may pretend it does).  LOCKSTEP GUARD: the holes and this
+# placement both come from pinion_rig_layout's strap stations, so this only
+# fires if BDT's own strap placement stops reading them.
 STRAP_PIN_Z = _STRAP_MID_Z
-for _z_pin, _z_hole in zip(STRAP_PIN_Z, SHAFT_PIN_HOLE_Z, strict=True):
+for _z_pin, _z_hole in zip(STRAP_PIN_Z, RIG.TORQUE_SHAFT_PIN_HOLE_Z, strict=True):
     if abs(PIVOT_SHAFT_Z0 + _z_hole - _z_pin) > 1e-9:
         raise AssertionError("a strap pin is not coaxial with its torque-shaft hole")
 
