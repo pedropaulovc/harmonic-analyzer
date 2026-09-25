@@ -264,9 +264,7 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
         115.6853574197016
     )
     assert cone_gear_shaft_spec.TIP_STUB_LENGTH == pytest.approx(23.293468528)
-    assert ends[-1] - ends[-2] == pytest.approx(
-        cone_gear_shaft_spec.TIP_STUB_LENGTH
-    )
+    assert ends[-1] - ends[-2] == pytest.approx(cone_gear_shaft_spec.TIP_STUB_LENGTH)
     assert (
         cone_gear_shaft_spec.TIP_STUB_START_STATION
         <= cone_gear_shaft_spec.TIP_BUSHING_START_STATION
@@ -413,11 +411,105 @@ def test_every_section_knob_drives_its_shoulder_plane_and_depth(monkeypatch) -> 
     sketch_dims = MagicMock()
     sketch_dims.return_value.apply.return_value = []
     monkeypatch.setattr(part, "SketchDims", sketch_dims)
+    gated_after: list[int] = []
+    monkeypatch.setattr(
+        part,
+        "_assert_shoulder_planes_single_owned",
+        lambda _adapter: gated_after.append(len(drives)),
+    )
 
     asyncio.run(part.build(AsyncMock()))
+    # the seat-side ownership gate runs once, after every drive is authored
+    assert gated_after == [len(drives)]
 
     owners = dict(drives)
     for i in range(1, len(cone_gear_shaft_spec.SECTIONS)):
         assert owners[f"Sec{i}Station@Sec{i}EndPlane"] == f'"SecEnd{i}"', i
         assert owners[f"Sec{i}End@Sec{i}"] == f'"SecEnd{i}"', i
     assert owners["Sec0End@Sec0"] == '"SecEnd0"'
+
+
+class _Dim:
+    def __init__(self, mm: float, driven_state: int = 1, reference: bool = False):
+        self.SystemValue = mm / 1000.0
+        self.DrivenState = driven_state
+        self._reference = reference
+
+    def IsReference(self) -> bool:
+        return self._reference
+
+
+def _gate_fixture(monkeypatch, dims, equations):
+    from unittest.mock import MagicMock
+
+    model = MagicMock()
+    model.Parameter.side_effect = dims.get
+    adapter = MagicMock()
+    adapter.currentModel = model
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(
+        part, "_equations_for", lambda _adapter, lhs: equations.get(lhs, [])
+    )
+    return adapter
+
+
+def _as_built(i: int, *, owner: str | None = None, state: int = 1):
+    end = cone_gear_shaft_spec.SECTIONS[i][1]
+    return (
+        {
+            f"Sec{i}Station@Sec{i}EndPlane": _Dim(end, state),
+            f"Sec{i}End@Sec{i}": _Dim(end),
+        },
+        {
+            f'"Sec{i}Station@Sec{i}EndPlane"': [
+                f'"Sec{i}Station@Sec{i}EndPlane" = {owner or f"{chr(34)}SecEnd{i}{chr(34)}"}'
+            ],
+            f'"SecEnd{i}"': [f'"SecEnd{i}" = {end}mm'],
+        },
+    )
+
+
+def _machine(override=None):
+    dims, equations = {}, {}
+    for i in range(1, len(cone_gear_shaft_spec.SECTIONS)):
+        d, e = _as_built(i, **(override or {}).get(i, {}))
+        dims.update(d)
+        equations.update(e)
+    return dims, equations
+
+
+def test_shoulder_plane_gate_accepts_single_ownership_at_driven_state_1(
+    monkeypatch,
+) -> None:
+    """Equation-owned dimensions read DrivenState 1 (driven), never 2: the
+    gate compares against the land's equation-owned depth, not a literal."""
+    dims, equations = _machine()
+    part._assert_shoulder_planes_single_owned(
+        _gate_fixture(monkeypatch, dims, equations)
+    )
+
+
+@pytest.mark.parametrize(
+    ("override", "message"),
+    [
+        ({2: {"owner": '"SecEnd1"'}}, "not SecEnd2"),
+        ({3: {"state": 2}}, "DrivenState 2 differs"),
+    ],
+)
+def test_shoulder_plane_gate_rejects_a_wrong_owner_or_state(
+    monkeypatch, override, message
+) -> None:
+    dims, equations = _machine(override)
+    adapter = _gate_fixture(monkeypatch, dims, equations)
+    with pytest.raises(RuntimeError, match=message):
+        part._assert_shoulder_planes_single_owned(adapter)
+
+
+def test_shoulder_plane_gate_rejects_a_missing_or_moved_plane(monkeypatch) -> None:
+    dims, equations = _machine()
+    del equations['"Sec1Station@Sec1EndPlane"']
+    dims["Sec4Station@Sec4EndPlane"] = _Dim(cone_gear_shaft_spec.SECTIONS[4][1] + 1e-3)
+    adapter = _gate_fixture(monkeypatch, dims, equations)
+    with pytest.raises(RuntimeError, match="expected one equation") as raised:
+        part._assert_shoulder_planes_single_owned(adapter)
+    assert "Sec4Station@Sec4EndPlane: plane reads" in str(raised.value)

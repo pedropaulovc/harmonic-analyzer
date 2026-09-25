@@ -62,10 +62,13 @@ from __future__ import annotations
 
 import math
 import sys
+from typing import Any
 
+import _telemetry
 from _common import (
     IN,
     SketchDims,
+    _early_bound,
     apply_material,
     name_bore_axis,
     check,
@@ -238,6 +241,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven cone-gear shaft (equations neutral)", volume, 0.005 * volume
     )
+    _assert_shoulder_planes_single_owned(adapter)
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train).
@@ -265,6 +269,92 @@ async def build(adapter) -> dict[str, str]:
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     return await save_part_and_images(adapter, PART_NAME)
+
+
+def _equations_for(adapter: Any, lhs: str) -> list[str]:
+    """Every equation whose left-hand side is exactly ``lhs``."""
+    from solidworks_mcp.adapters.solidworks.parametrics import (
+        _equation_manager,
+        _read_member,
+    )
+
+    manager = _equation_manager(adapter)
+    matches = []
+    for index in range(int(_read_member(manager, "GetCount") or 0)):
+        text = str(manager.Equation(index) or "")
+        if text.partition("=")[0].strip() == lhs:
+            matches.append(text)
+    return matches
+
+
+# A linear global keeps 8 document (inch) places: 5e-9 in, 1.3e-7 mm.
+_STATION_TOLERANCE_MM = 1e-6
+
+
+@_telemetry.traced("dim.shoulder_plane_ownership")
+def _assert_shoulder_planes_single_owned(adapter: Any) -> None:
+    """After the deferred equations and the final rebuild.
+
+    SecEnd{i} must be the ONE owner of both the offset plane land i is
+    sketched on and that land's depth back to the large end (Codex #839).  An
+    equation-owned dimension reads DrivenState 1 (driven), never 2, so the gate
+    is single ownership: exactly one equation per dimension, whose right-hand
+    side is SecEnd{i}; the same DrivenState as the land's equation-owned
+    depth; not a reference dimension; and still the as-built station (the
+    drive is neutral) to the global's 8 inch places.  Each reading is logged,
+    so the leaf log is the evidence.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    problems: list[str] = []
+    for i, (_dia_in, end_z) in enumerate(SECTIONS):
+        if i == 0:
+            continue
+        name = f"Sec{i}Station@Sec{i}EndPlane"
+        control_name = f"Sec{i}End@Sec{i}"
+        dimension = model.Parameter(name)
+        control = model.Parameter(control_name)
+        if dimension is None or control is None:
+            problems.append(f"{name} or its control {control_name} not found")
+            continue
+        dimension = _early_bound(dimension, "IDimension")
+        control = _early_bound(control, "IDimension")
+        equations = _equations_for(adapter, f'"{name}"')
+        globals_ = _equations_for(adapter, f'"SecEnd{i}"')
+        evidence = {
+            "dimension": name,
+            "equations": equations,
+            "global": globals_,
+            "driven_state": int(dimension.DrivenState),
+            "control_driven_state": int(control.DrivenState),
+            "is_reference": bool(dimension.IsReference()),
+            "value_mm": 1000.0 * float(dimension.SystemValue),
+            "control_mm": 1000.0 * float(control.SystemValue),
+            "station_mm": end_z,
+        }
+        _telemetry.info(f"shoulder plane ownership {evidence}")
+        if len(equations) != 1:
+            problems.append(f"{name}: expected one equation, found {equations}")
+        elif equations[0].partition("=")[2].strip() != f'"SecEnd{i}"':
+            problems.append(f"{name}: owned by {equations[0]!r}, not SecEnd{i}")
+        if evidence["driven_state"] != evidence["control_driven_state"]:
+            problems.append(
+                f"{name}: DrivenState {evidence['driven_state']} differs from "
+                f"the equation-owned depth {control_name} "
+                f"({evidence['control_driven_state']})"
+            )
+        if evidence["is_reference"]:
+            problems.append(f"{name}: became a reference dimension")
+        for label, value in (
+            ("plane", evidence["value_mm"]),
+            ("depth", evidence["control_mm"]),
+        ):
+            if abs(value - end_z) > _STATION_TOLERANCE_MM:
+                problems.append(
+                    f"{name}: {label} reads {value:.9f} mm, SecEnd{i} is {end_z}"
+                )
+    if problems:
+        raise RuntimeError("SecEnd ownership: " + "; ".join(problems))
+    _telemetry.success(f"SecEnd owns {len(SECTIONS) - 1} shoulder planes and depths")
 
 
 if __name__ == "__main__":
