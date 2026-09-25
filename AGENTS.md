@@ -343,7 +343,10 @@ enforced at **runtime** by a cross-process **file lock** (`_com_seat` in `dodo.p
 backed by `filelock`), NOT by fake `task_dep` edges. Every COM subprocess acquires
 the machine-global seat lock right before it drives SolidWorks and releases it after,
 so at most one COM task touches the seat at a time **even under `-n N`** — while the
-SolidWorks-free `check:*` tasks (which never take the lock) fan out in parallel. The
+SolidWorks-free `check:*` tasks (which never take the lock) fan out in parallel, up
+to the machine-wide local slots (`_local_slot`, `HARMONIC_LOCAL_SLOTS`, default 4,
+shared by every doit run and worktree on the machine; under `--executor farm`
+`-n` is sized for farm leaves, so the slots, not `-n`, bound local CPU). The
 lock lives under `%PROGRAMDATA%/harmonic-analyzer/com-seat.lock` (override with
 `HARMONIC_COM_LOCK`) and, being machine-global, also serializes COM **across
 worktrees and concurrent `doit` invocations** on the seat.

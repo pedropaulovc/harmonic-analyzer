@@ -28,9 +28,17 @@ That preflight runs for every doit command that executes task actions
 argv the command's own parser accepts; the others (``list``, ``info``, ``clean``,
 ...), ``--help``/``--version`` and an argv doit would reject (``run --help``: doit
 has no per-command help and exits 3) skip it and pass through untouched.
-``-n`` is added for ``run`` only. A release therefore needs no local SolidWorks;
-only the Blender-bound ``gallery`` task and the publishing half of ``release``
-run here.
+``-n``/``-P thread`` are added for ``run`` only. A release therefore needs no
+local SolidWorks; only the Blender-bound ``gallery`` task and the publishing half
+of ``release`` run here.
+
+Under the farm a doit worker spends a leaf WAITING on the pool, so ``run`` gets
+doit's thread runner and ``HARMONIC_FARM_PARALLELISM`` (16) workers: a thread
+costs next to nothing, where each process worker costs ~60 MB and a ~1 s import,
+and doit spawns all of them up front. The SolidWorks-free local tasks those
+workers also run stay bounded by the machine-wide local slots (``dodo._run``),
+not by ``-n``, and the ready leaves are offered slowest-first
+(``_farm_order``), so the critical path reaches the pool's queue first.
 """
 
 from __future__ import annotations
@@ -54,7 +62,7 @@ from doit.doit_cmd import DoitMain
 REPO_ROOT = Path(__file__).resolve().parent
 _LEVELS = ("debug", "info", "success", "warning", "error", "critical")
 _EXECUTORS = ("local", "farm")
-_DEFAULT_FARM_PARALLELISM = "8"
+_DEFAULT_FARM_PARALLELISM = "16"
 
 # doit hands the leading task-loader options to ``getopt`` before it reads the
 # subcommand (``DoitMain.run``); the wrapper's ``-h``/``--help`` ride along so a
@@ -73,7 +81,10 @@ other argument goes to doit unchanged, so `build.py part:cone_gear`, `build.py
 -n 4`, `build.py list` and `build.py help run` mean what they mean under `doit`."""
 _EPILOG = f"""\
 farm defaults (--executor farm; `build` / `build.cmd` pass it for you):
-  parallelism   -n {_DEFAULT_FARM_PARALLELISM} unless you pass -n/--process or set HARMONIC_FARM_PARALLELISM
+  parallelism   -P thread -n {_DEFAULT_FARM_PARALLELISM} unless you pass -n/--process (or
+                -P/--parallel-type) or set HARMONIC_FARM_PARALLELISM; local
+                SolidWorks-free tasks stay capped by HARMONIC_LOCAL_SLOTS (4)
+                machine-wide, and ready leaves go to the farm slowest-first
   leaf timeout  15 min per attempt (the control plane's default) unless you pass
                 --leaf-timeout or HARMONIC_FARM_LEAF_TIMEOUT_S (seconds) is
                 already set; the farm clamps either to 1 min - 3 h. A cold leaf
@@ -207,9 +218,36 @@ def _farm_command(command_class):
                     print(f"farm: {problem}", file=sys.stderr)
                     return 2
                 raise
-            return command_class._execute(self, *args, **kwargs)
+            _release_stream_capture(self.task_list)
+            with _farm_order().installed():
+                return command_class._execute(self, *args, **kwargs)
 
     return FarmCommand
+
+
+def _farm_order():
+    """``cad/scripts/_farm_order``, the critical-path-first ready queue."""
+    scripts = str(REPO_ROOT / "cad" / "scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import _farm_order
+
+    return _farm_order
+
+
+def _release_stream_capture(task_list) -> None:
+    """Stop doit swapping ``sys.stdout``/``sys.stderr`` around each action.
+
+    A doit ``PythonAction`` that captures output replaces the PROCESS-wide
+    ``sys.stdout``/``sys.stderr`` with its own tee for the action's duration and
+    restores what it saw on the way out. Under the thread runner two
+    overlapping actions restore each other's tees, leaving the console pointed
+    at a finished action's buffer. Every task here already runs at verbosity 2
+    (output streamed live), so the capture only duplicated the console; without
+    it doit hands each action the current streams and swaps nothing.
+    """
+    for task in task_list:
+        task.io.capture = False
 
 
 class _FarmDoitMain(DoitMain):
@@ -562,18 +600,25 @@ def _executing_command(doit_args: list[str], doit: DoitMain) -> tuple[str, int] 
 
 
 def _with_farm_parallelism(doit_args: list[str], command: str, at: int) -> list[str]:
-    """Keep up to ``HARMONIC_FARM_PARALLELISM`` (8) leaves in flight on the farm.
+    """Keep up to ``HARMONIC_FARM_PARALLELISM`` (16) leaves in flight on the farm,
+    on doit's thread runner.
 
-    Only ``run`` takes ``-n``, at ``at`` (see ``_executing_command``), unless the
-    caller already chose ``-n``/``--process``; ``strace`` traces one task and
-    has no such option.
+    Only ``run`` takes ``-n``/``-P``, at ``at`` (see ``_executing_command``).
+    ``-n`` is added unless the caller already chose ``-n``/``--process``, and
+    ``-P thread`` unless the caller chose ``-P``/``--parallel-type``; ``strace``
+    traces one task and has neither option.
     """
-    if command != "run" or any(
-        arg.startswith(("-n", "--process")) for arg in doit_args
-    ):
+    if command != "run":
         return doit_args
-    workers = os.environ.get("HARMONIC_FARM_PARALLELISM", _DEFAULT_FARM_PARALLELISM)
-    return [*doit_args[:at], "-n", workers, *doit_args[at:]]
+    added: list[str] = []
+    if not any(arg.startswith(("-P", "--parallel-type")) for arg in doit_args):
+        added += ["-P", "thread"]
+    if not any(arg.startswith(("-n", "--process")) for arg in doit_args):
+        added += [
+            "-n",
+            os.environ.get("HARMONIC_FARM_PARALLELISM", _DEFAULT_FARM_PARALLELISM),
+        ]
+    return [*doit_args[:at], *added, *doit_args[at:]]
 
 
 if __name__ == "__main__":
