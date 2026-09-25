@@ -447,3 +447,18 @@ def test_transferred_pinion_block_seats_print_no_station() -> None:
     # The front pair sits one feeler off the fit-up stack, with no pose air.
     front_seat = rig.BACK_BLOCK_Z0 - rig.INNER_SPAN - BLOCK_DEPTH / 2.0
     assert rig.BLOCK_SEAT_Z[0] == pytest.approx(front_seat, abs=1e-9)
+
+
+def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
+    # Main (restricted review of #858): one blanking helper in _common, traced
+    # like every other per-operation helper, and no local copy in the base.
+    import inspect
+
+    import _common
+
+    source = inspect.getsource(part)
+    blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
+    assert "def _hide_reference_sketches" not in source
+    assert source.count(blank) == 1
+    assert part.REFERENCE_SKETCHES == ("RimWidthReference", "HeightReference")
+    assert hasattr(_common.blank_reference_sketches, "__wrapped__")

@@ -896,6 +896,7 @@ def blank_sketch(adapter: Any, sketch_name: str) -> None:
     _telemetry.success(f"blanked sketch {sketch_name}")
 
 
+@_telemetry.traced("appearance.hide_reference_sketches")
 def blank_reference_sketches(adapter: Any, sketches: tuple[str, ...]) -> None:
     """Blank a part's reference sketches before it is saved, and prove it.
 
@@ -914,6 +915,11 @@ def blank_reference_sketches(adapter: Any, sketches: tuple[str, ...]) -> None:
             raise RuntimeError(
                 f"{sketch} still visible after BlankSketch (state {state})"
             )
+    _telemetry.event(
+        "part.reference_sketches_hidden",
+        sketches=", ".join(sketches),
+        count=len(sketches),
+    )
 
 
 def set_sketch_direct_db(adapter: Any, enabled: bool) -> None:
