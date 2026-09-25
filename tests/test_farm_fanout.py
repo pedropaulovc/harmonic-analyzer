@@ -106,11 +106,31 @@ def test_a_ready_set_of_leaves_is_submitted_without_waiting_on_each_other(farm_d
 
     assert build.main(["--executor", "farm", "build"]) == 0
 
-    assert seen == [["-P", "thread", "-n", "16", "build"]]
+    assert seen == [["-P", "thread", "-n", "64", "build"]]
     assert sorted(submitted) == [f"part:{stem}" for stem in LEAVES]
     assert not barrier.broken
     # doit's per-action stream capture is off, so no action's tee survived it.
     assert sys.stdout is stdout
+
+
+def test_every_farm_run_gets_its_own_fairness_key(farm_doit, monkeypatch):
+    install, _seen = farm_doit
+    keys = []
+    install(_graph(lambda label: keys.append(os.environ.get("HARMONIC_FARM_RUN"))))
+    monkeypatch.delenv("HARMONIC_FARM_RUN", raising=False)
+
+    assert build.main(["--executor", "farm", "build"]) == 0
+
+    [key] = set(keys)
+    host, worktree, pid, _stamp = key.split("/")
+    assert (worktree, pid) == (REPO_ROOT.name, str(os.getpid()))
+    assert host
+
+    # A launcher that named the run keeps its name.
+    monkeypatch.setenv("HARMONIC_FARM_RUN", "20260925T180000000Z-abc")
+    keys.clear()
+    assert build.main(["--executor", "farm", "build"]) == 0
+    assert set(keys) == {"20260925T180000000Z-abc"}
 
 
 def test_ready_leaves_go_to_the_farm_slowest_first(farm_doit, tmp_path, monkeypatch):

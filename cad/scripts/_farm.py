@@ -152,6 +152,21 @@ def submitter() -> str:
     return f"{getpass.getuser()}@{socket.gethostname()}"
 
 
+RUN_ENV = "HARMONIC_FARM_RUN"
+
+
+def fairness_key() -> str:
+    """The task-queue fairness key this run's leaves are dispatched under.
+
+    The pool round-robins its COM queue across fairness keys
+    (``matching.enableFairness``), so each doit run gets its own key: one run's
+    whole ready set cannot bury another's. ``build.py`` sets ``HARMONIC_FARM_RUN``
+    once per farm run (the supervised launcher sets it to its run id); a
+    process without one falls back to the submitter, the pool's own default.
+    """
+    return os.environ.get(RUN_ENV, "").strip() or submitter()
+
+
 def leaf_timeout_s() -> int | None:
     """The per-attempt budget this run asks for, or ``None`` for the default.
 
@@ -253,7 +268,7 @@ async def _dispatch(
     # temporalio loads a Rust bridge; import it only when a leaf is dispatched so
     # local builds and the offline check:* workers never pay for it.
     from temporalio.client import Client, WorkflowFailureError
-    from temporalio.common import WorkflowIDConflictPolicy
+    from temporalio.common import Priority, WorkflowIDConflictPolicy
     from temporalio.exceptions import CancelledError
     from temporalio.service import TLSConfig
 
@@ -287,6 +302,9 @@ async def _dispatch(
         result_type=LeafResult,
         id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
         execution_timeout=EXECUTION_TIMEOUT,
+        # BuildLeaf's activity inherits this; attaching to a leaf another run
+        # already started keeps that run's key.
+        priority=Priority(fairness_key=fairness_key()),
     )
     attached = time.monotonic()
     timings["submit_s"] = attached - started

@@ -362,6 +362,8 @@ try {
     $env:HARMONIC_REMOTE_CACHE_MODE = 'rw'
     $env:PYTHONUNBUFFERED = '1'
     $env:HARMONIC_FARM_PARALLELISM = [string]$farmParallelism
+    # The run id is this run's task-queue fairness key on the pool.
+    $env:HARMONIC_FARM_RUN = $runId
     Push-Location -LiteralPath $resolvedWorktree
     try {
         & uv @buildArgs *>&1 | Tee-Object -LiteralPath $logPath
