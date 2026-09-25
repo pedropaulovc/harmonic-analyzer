@@ -11,13 +11,14 @@ by the sheet's own view):
   and per type: a note's text/extent/balloon flag, a display dimension's
   hole-callout flag and its own ``IDisplayDimension::GetDisplayData``, a datum
   origin's ``GetAxisPoints2`` and labels;
-* every view's outline, orientation, ``ModelToViewTransform`` and visible
-  model edges (``IView::GetPolylines7``, crosshatch excluded), plus one model
-  vertex per view for the coordinate-space round trip;
+* every view's outline and orientation;
 * section lines (``IDrSection`` line, arrows, label origins, text height) and
   detail circles (``IView::GetDetailCircleInfo2``);
 * tables, boxed from anchor + row/column spans (as ``_drawing_common`` does);
-* the sheet size, zone margins and title-block keep-out.
+* the sheet size, zone margins and title-block keep-out;
+* the sheet's page of the exported PDF (``_pdf_ink``): every text object with
+  its tight glyph box, and every black stroke with its width and dash. The
+  PDF is where text and model edges are measured; COM says what each is.
 
 The dumps are audited by the SolidWorks-free ``_layout_audit.audit_dump`` and
 written, with every finding, to the drawing's report
@@ -31,11 +32,12 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Mapping
 
 import _telemetry
 from _common import _early_bound
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
+from _pdf_ink import PageInk, read_pdf_ink
 from _layout_audit import (
     DUMP_SCHEMA,
     LAYOUT_AUDIT_MODE,
@@ -48,8 +50,6 @@ _ANNOT_NOTE = 6
 _ANNOT_DATUM_ORIGIN = 16
 # swZoneMargin_e
 _ZONE_MARGINS = {"top": 0, "bottom": 1, "right": 2, "left": 3}
-# IView::GetPolylines7 CrossHatchOption: 1 = exclude crosshatch lines.
-_EXCLUDE_CROSSHATCH = 1
 
 _DISPLAY_PRIMITIVES = (
     ("lines", "GetLineCount", ("GetLineAtIndex3", "GetLineAtIndex2")),
@@ -68,17 +68,25 @@ def _round(values: Any) -> list[float]:
 
 
 class _Reader:
-    """Tolerant COM reads: an accessor that does not apply returns ``default``."""
+    """Tolerant COM reads: an accessor that does not apply returns ``default``.
+
+    Every refusal is counted under the accessor's name, so a report shows
+    which reads failed (an expected ``GetLineAtIndex3`` fallback) and which
+    are faults, instead of one opaque total.
+    """
 
     def __init__(self, adapter: Any) -> None:
         self.adapter = adapter
-        self.errors = 0
+        self.errors: dict[str, int] = {}
 
-    def call(self, fn: Callable[[], Any], default: Any = None) -> Any:
+    def _count(self, name: str) -> None:
+        self.errors[name] = self.errors.get(name, 0) + 1
+
+    def call(self, fn: Callable[[], Any], default: Any = None, *, name: str = "") -> Any:
         try:
             value = fn()
         except Exception:
-            self.errors += 1
+            self._count(name or (fn.__code__.co_names[-1] if fn.__code__.co_names else "?"))
             return default
         return default if value is None else value
 
@@ -88,8 +96,12 @@ class _Reader:
         try:
             return _early_bound(obj, interface)
         except Exception:
-            self.errors += 1
+            self._count(f"bind {interface}")
             return None
+
+    def take_errors(self) -> dict[str, int]:
+        errors, self.errors = self.errors, {}
+        return dict(sorted(errors.items()))
 
 
 def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
@@ -98,12 +110,12 @@ def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
         return {}
     out: dict[str, Any] = {}
     for key, count_name, getters in _DISPLAY_PRIMITIVES:
-        count = int(reader.call(lambda c=count_name: getattr(data, c)(), 0) or 0)
+        count = int(reader.call(lambda c=count_name: getattr(data, c)(), 0, name=count_name) or 0)
         rows = []
         for index in range(count):
             raw = None
             for getter in getters:
-                raw = reader.call(lambda g=getter, i=index: getattr(data, g)(i))
+                raw = reader.call(lambda g=getter, i=index: getattr(data, g)(i), name=getter)
                 if raw:
                     break
             if raw:
@@ -208,25 +220,6 @@ def _table_record(reader: _Reader, raw: Any) -> dict[str, Any] | None:
     }
 
 
-def _round_trip(reader: _Reader, edges: Sequence[Any]) -> dict[str, Any] | None:
-    """One model vertex and the index of the polyline its edge drew.
-
-    Offline, projecting ``model`` through the view transform must land on that
-    polyline's points -- the coordinate-space proof for ``GetPolylines7``.
-    """
-    for index, edge in enumerate(edges or ()):
-        edge = reader.bind(edge, "IEdge")
-        if edge is None:
-            continue
-        vertex = reader.bind(reader.call(lambda e=edge: e.GetStartVertex()), "IVertex")
-        if vertex is None:
-            continue
-        point = reader.call(lambda v=vertex: v.GetPoint())
-        if point:
-            return {"polyline_index": index, "model": _round(point)}
-    return None
-
-
 def _dump_view(
     reader: _Reader, view: Any, *, is_pictorial: Callable[[str], bool]
 ) -> dict[str, Any]:
@@ -241,18 +234,6 @@ def _dump_view(
         "scale": _round(reader.call(lambda: view.ScaleRatio, ())),
         "display_mode": int(reader.call(lambda: view.GetDisplayMode2(), -1)),
     }
-    transform = reader.bind(reader.call(lambda: view.ModelToViewTransform), "IMathTransform")
-    if transform is not None:
-        record["transform"] = _round(reader.call(lambda: transform.ArrayData, ()))
-    result = reader.call(lambda: view.GetPolylines7(_EXCLUDE_CROSSHATCH))
-    edges, polylines = (), ()
-    if isinstance(result, tuple) and len(result) == 2:
-        edges, polylines = result
-    if polylines:
-        record["polylines"] = _round(polylines)
-    trip = _round_trip(reader, edges)
-    if trip is not None:
-        record["round_trip"] = trip
     record["annotations"] = [
         item
         for item in (
@@ -286,14 +267,30 @@ def _dump_view(
     return record
 
 
+def page_ink(page: PageInk) -> dict[str, Any]:
+    """A PDF page as dump data: text objects, and black strokes (the frame and
+    title block print grey, so they drop out)."""
+    return {
+        "spans": [[span.text, *_round((span.xmin, span.ymin, span.xmax, span.ymax))] for span in page.spans],
+        "strokes": [
+            [*_round((stroke.x0, stroke.y0, stroke.x1, stroke.y1, stroke.width)), int(stroke.dashed)]
+            for stroke in page.strokes
+            if stroke.stroked and not stroke.filled and stroke.rgb == (0, 0, 0)
+        ],
+    }
+
+
 def collect_sheet_dumps(
     adapter: Any,
     *,
     stem: str,
+    pdf: Path,
     sheet_layouts: Mapping[str, DrawingLayout],
     is_pictorial: Callable[[str], bool],
 ) -> list[dict[str, Any]]:
-    """One dump per sheet of the adapter's open drawing, no sheet activated."""
+    """One dump per sheet of the adapter's open drawing, no sheet activated,
+    each carrying its page of the exported ``pdf``."""
+    pages = read_pdf_ink(pdf)
     reader = _Reader(adapter)
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     # GetViews' sheet order is undetermined; the PDF prints GetSheetNames order.
@@ -351,7 +348,13 @@ def collect_sheet_dumps(
                 if record is not None:
                     tables[record["name"]] = record
         dump["tables"] = list(tables.values())
-        dump["read_errors"] = reader.errors
+        page = dump["page"]
+        if not 0 <= page < len(pages):
+            raise RuntimeError(
+                f"layout audit: sheet {name!r} is page {page} of {pdf.name}, which has {len(pages)}"
+            )
+        dump["ink"] = page_ink(pages[page])
+        dump["read_errors"] = reader.take_errors()
         dumps.append(dump)
     return dumps
 
@@ -363,6 +366,7 @@ def run_layout_audit(
     adapter: Any,
     *,
     stem: str,
+    pdf: Path,
     report: Path,
     sheet_layouts: Mapping[str, DrawingLayout],
     is_pictorial: Callable[[str], bool],
@@ -376,7 +380,7 @@ def run_layout_audit(
     with _telemetry.span(f"layout.audit {stem}", stem=stem, mode=mode.value) as span:
         started = time.perf_counter()
         dumps = collect_sheet_dumps(
-            adapter, stem=stem, sheet_layouts=sheet_layouts, is_pictorial=is_pictorial
+            adapter, stem=stem, pdf=pdf, sheet_layouts=sheet_layouts, is_pictorial=is_pictorial
         )
         collected = time.perf_counter() - started
         content, gating = audit_report(stem, mode, dumps)
@@ -390,6 +394,7 @@ def run_layout_audit(
         span.set_attribute("sheets", summary["sheets"])
         span.set_attribute("gating", summary["gating"])
         span.set_attribute("collect_s", summary["collect_s"])
+        span.set_attribute("read_errors", sum(sum(d["read_errors"].values()) for d in dumps))
         for kind, count in summary["findings"].items():
             span.set_attribute(f"findings.{kind}", count)
         _telemetry.info(
