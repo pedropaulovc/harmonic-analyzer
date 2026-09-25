@@ -344,3 +344,76 @@ def test_section_line_on_a_broken_view_raises() -> None:
 
     with pytest.raises(RuntimeError, match="broken view 'Drawing View1'"):
         leaders.section_line_segments(object(), BrokenView())
+
+
+class _FakePoint:
+    def __init__(self, xyz):
+        self.ArrayData = tuple(xyz)
+
+    def MultiplyTransform(self, transform):
+        return _FakePoint(transform.apply(self.ArrayData))
+
+
+class _FakeTransform:
+    """A 3:1 view with its model origin at (0.110, 0.150) on the sheet."""
+
+    ArrayData = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.110, 0.150, 0.0, 3.0, 0.0, 0.0, 0.0)
+
+    def apply(self, xyz):
+        return (0.110 + 3.0 * xyz[0], 0.150 + 3.0 * xyz[1], 0.0)
+
+
+class _FakeUtility:
+    """SolidWorks' CreatePoint: a bare list reads as the origin; a VT_R8 VARIANT marshals."""
+
+    def CreatePoint(self, values):
+        if isinstance(values, list):
+            return _FakePoint((0.0, 0.0, 0.0))
+        return _FakePoint(tuple(values.value))
+
+
+def _seat_view(values):
+    class View:
+        ModelToViewTransform = _FakeTransform()
+
+        def GetName2(self):
+            return "Drawing View1"
+
+        def IsBroken(self):
+            return False
+
+        def GetSectionLineInfo2(self):
+            return tuple(values)
+
+    return View()
+
+
+def test_section_line_segments_marshals_chain_points_as_a_double_array() -> None:
+    # Seat, drawing:crank_pinion leaf 20260925T215656Z: CreatePoint(list)
+    # read both chain ends as the origin, so the chain collapsed onto the
+    # view's translation (0.110, 0.150) and arrow 1 raised.
+    pytest.importorskip("win32com.client")
+    half = 0.010550856167514645
+    chain = [4, 0.0, -half, 0.0, 0.0, half, 0.0]
+    arrow1 = [0.098, 0.12034743149745605, 0.0, 0.11, 0.12034743149745605, 0.0, 0.006, 0.003, 1.0]
+    arrow2 = [0.098, 0.17965256850254395, 0.0, 0.11, 0.17965256850254395, 0.0, 0.006, 0.003, 1.0]
+    text = [0.09, 0.115, 0.0, 0.09, 0.185, 0.0, 0.005]
+    values = [1, 0, 1, *chain, *arrow1, *arrow2, *text]
+    adapter = type("Adapter", (), {"swApp": type("App", (), {"GetMathUtility": lambda self: _FakeUtility()})()})()
+
+    segments = leaders.section_line_segments(adapter, _seat_view(values))
+    (x0, y0), (x1, y1) = segments[0]
+    assert (x0, y0, x1, y1) == pytest.approx((0.110, 0.150 - 3 * half, 0.110, 0.150 + 3 * half))
+    assert segments[1] == ((0.098, 0.12034743149745605), (0.11, 0.12034743149745605))
+
+
+def test_section_line_segments_raises_when_create_point_drops_the_array() -> None:
+    class Origin(_FakeUtility):
+        def CreatePoint(self, values):
+            return _FakePoint((0.0, 0.0, 0.0))
+
+    chain = [4, 0.0, -0.01, 0.0, 0.0, 0.01, 0.0]
+    values = [1, 0, 1, *chain, *([0.0] * 18), *([0.0] * 7)]
+    adapter = type("Adapter", (), {"swApp": type("App", (), {"GetMathUtility": lambda self: Origin()})()})()
+    with pytest.raises(RuntimeError, match="did not marshal"):
+        leaders.section_line_segments(adapter, _seat_view(values))

@@ -53,6 +53,7 @@ from typing import Any, Callable, Collection, Mapping, Sequence
 
 import _telemetry
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.com_variant import double_array
 
 Point = tuple[float, float]
 Point3 = tuple[float, float, float]
@@ -230,7 +231,7 @@ def _tail_first(
             f"{on_chain[0]}, end on chain {on_chain[1]} (insets {insets}); raw "
             f"{list(raw)}, chain on the sheet {list(chain)}"
         )
-    _telemetry.debug(
+    _telemetry.info(
         f"section arrow {arrow}: {orientation}; tail inset {inset * 1000:.2f} mm from "
         f"the chain end (negative past it; allowance {SECTION_CHAIN_OVERRUN * 1000:.1f} mm)"
     )
@@ -294,15 +295,25 @@ def section_line_segments(adapter: Any, view: Any) -> list[Segment]:
     transform = _sw_type_info.early_bound_or_flag(
         view.ModelToViewTransform, "IMathTransform", "ArrayData"
     )
-    _telemetry.debug(
+    _telemetry.info(
         f"section view {name!r} model-to-view transform {list(transform.ArrayData)}"
     )
 
     def to_sheet(point: Point3) -> Point:
-        model = utility.CreatePoint(list(point))
+        # A bare list marshals as VT_ARRAY | VT_VARIANT, which CreatePoint
+        # silently reads as the origin (seat, drawing:crank_pinion leaf
+        # 20260925T215656Z: both chain ends landed on the view's translation).
+        model = utility.CreatePoint(double_array(list(point)))
         if model is None:
             raise RuntimeError(f"section line: could not create model point {point}")
-        model = _sw_type_info.early_bound_or_flag(model, "IMathPoint", "MultiplyTransform")
+        model = _sw_type_info.early_bound_or_flag(
+            model, "IMathPoint", "MultiplyTransform", "ArrayData"
+        )
+        created = tuple(float(v) for v in tuple(model.ArrayData)[:3])
+        if not all(math.isclose(a, b, abs_tol=1e-12) for a, b in zip(created, point)):
+            raise RuntimeError(
+                f"section line: CreatePoint({point}) made {created}; the array did not marshal"
+            )
         mapped = model.MultiplyTransform(transform)
         if mapped is None:
             raise RuntimeError(f"section line: could not map model point {point}")
