@@ -367,11 +367,24 @@ def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
     assert pair_maximum == pytest.approx(0.191091, abs=1e-6)
 
 
-def test_notes_carry_only_the_tooth_edge_exception() -> None:
+def test_notes_carry_only_the_tooth_edge_and_boss_wall_exceptions() -> None:
+    lines = spec.DRAWING_NOTES.split("\n")
+    # The gear-data table already defines the nonstandard tooth system. One
+    # note overrides the title block's destructive edge break; the other
+    # states the option-C named exception, its number from the spec's own
+    # worst-case wall (drawing-simplicity-policy.md, "Named exceptions").
+    assert lines == [
+        "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
+        f"BOSS WALL {spec.BOSS_WALL_WORST:.2f} MIN AT BORE: "
+        "ACCEPTED EXCEPTION (GEAR CUTTER RUNOUT).",
+    ]
+    assert lines[1] == "BOSS WALL 1.56 MIN AT BORE: ACCEPTED EXCEPTION (GEAR CUTTER RUNOUT)."
+    assert len(lines) <= 4
+    policy = (
+        Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"
+    ).read_text(encoding="utf-8")
+    assert "| MHA-025 crank pinion boss |" in policy
     notes = spec.DRAWING_NOTES
-    # The gear-data table already defines the nonstandard tooth system. The
-    # only separate note overrides the title block's destructive edge break.
-    assert notes == "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
     assert spec.PIN_NUMBER not in notes
     assert "LIGHT DRIVE FIT" not in notes
     assert "FLUSH" not in notes
