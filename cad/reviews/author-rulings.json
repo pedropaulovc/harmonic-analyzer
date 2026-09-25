@@ -1,4 +1,10 @@
 {
+  "untrailered": {
+    "family": "claude",
+    "ruled_by": "user, via team-lead (Main)",
+    "ruled_at": "2026-09-25",
+    "evidence": "User ruling relayed by Main on 2026-09-25: \"Untrailered = Claude\". Every draw script whose producing commit has no Co-Authored-By model trailer counts as Claude-authored, so a GPT reviewer handles it. A trailer, where present, wins; a per-drawing ruling below on the script's current commit wins over this rule."
+  },
   "rulings": [
     {
       "drawing": "counter_spring",

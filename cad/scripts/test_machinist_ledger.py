@@ -2172,7 +2172,64 @@ def test_backfill_needs_a_ruling_where_no_trailer_names_the_author(
     assert (author["family"], author["model_source"]) == ("claude", "claimed")
     provenance = entry["cross_family"]["provenance"]
     assert provenance["author_family_source"] == "ruling"
-    assert provenance["author_ruling"] == rulings["crank_arm"]
+    assert provenance["author_ruling"] == rulings.drawings["crank_arm"]
+
+
+UNTRAILERED_RULE = {
+    "family": "claude",
+    "ruled_by": "user, via team-lead (Main)",
+    "ruled_at": "2026-09-25",
+    "evidence": "untrailered = Claude",
+}
+
+
+def test_an_untrailered_script_is_claude_by_rule_and_a_trailer_still_wins(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "author-rulings.json"
+    path.write_text(json.dumps({"untrailered": UNTRAILERED_RULE}), encoding="utf-8")
+    rulings = ml.load_author_rulings(path)
+    author = ml.Author(None, "c" * 40, "cad/scripts/draw_crank_arm.py")
+    assert ml.ruled_family("crank_arm", author, rulings) == (
+        "claude",
+        ml.UNTRAILERED,
+        UNTRAILERED_RULE,
+        "",
+    )
+    # A drawing's ruling on its current commit wins over the class rule; one on
+    # an older commit does not.
+    [ruling] = ml.load_author_rulings(
+        _author_rulings(tmp_path, family="gpt")
+    ).drawings.values()
+    ruled = ml.AuthorRulings({"crank_arm": ruling}, UNTRAILERED_RULE)
+    assert ml.ruled_family("crank_arm", author, ruled)[:2] == ("gpt", "ruling")
+    older = ml.Author(None, "d" * 40, author.script)
+    assert ml.ruled_family("crank_arm", older, ruled)[:2] == ("claude", ml.UNTRAILERED)
+
+    _on_record(records, "wt-a")  # a Codex SHIP: cross-family for a Claude author
+    _sheet(registry)
+    row = _backfill(tmp_path, records, rulings=rulings, apply=True)
+    assert row.outcome == ml.Backfill.INGESTED, row.detail
+    entry = ml.load_ledger(tmp_path / "ledger.json")["drawings"]["crank_arm"]
+    provenance = entry["cross_family"]["provenance"]
+    assert provenance["author_family_source"] == "rule: no trailer"
+    assert provenance["author_ruling"] == UNTRAILERED_RULE
+
+    # A GPT trailer wins over the rule, which makes the Codex SHIP same-family.
+    _trailer(monkeypatch, "gpt-6-sol")
+    (tmp_path / "trailered").mkdir()
+    row = _backfill(tmp_path / "trailered", records, rulings=rulings)
+    assert row.outcome == ml.Backfill.NOT_COUNTED, row.detail
+    assert "last_resort" in row.detail and "rule: no trailer" not in row.detail
+
+
+def test_the_untrailered_rule_needs_its_family_and_evidence(tmp_path: Path) -> None:
+    path = tmp_path / "author-rulings.json"
+    for change, error in [({"evidence": ""}, "lacks"), ({"family": "x"}, "not one of")]:
+        rule = {**UNTRAILERED_RULE, **change}
+        path.write_text(json.dumps({"untrailered": rule}), encoding="utf-8")
+        with pytest.raises(ValueError, match=error):
+            ml.load_author_rulings(path)
 
 
 @pytest.mark.parametrize(
@@ -2192,8 +2249,9 @@ def test_an_author_ruling_needs_its_family_commit_and_evidence(
 
 def test_the_tracked_author_rulings_load() -> None:
     rulings = ml.load_author_rulings()
-    assert rulings, "cad/reviews/author-rulings.json is empty or missing"
-    for name, ruling in rulings.items():
+    assert rulings.untrailered, "cad/reviews/author-rulings.json lacks its class rule"
+    assert rulings.untrailered["family"] == "claude"  # the user's ruling, 2026-09-25
+    for name, ruling in rulings.drawings.items():
         assert ml.DRAWINGS_BY_NAME[name]  # a registry drawing
         assert ruling["evidence"]
 
@@ -2383,7 +2441,9 @@ def test_a_backfill_ingest_reuses_the_authors_it_already_walked(
     heads: list[Path] = []
     real_head = ml._checkout_head
     monkeypatch.setattr(
-        ml, "_checkout_head", lambda checkout: heads.append(checkout) or real_head(checkout)
+        ml,
+        "_checkout_head",
+        lambda checkout: heads.append(checkout) or real_head(checkout),
     )
     _on_record(records, "wt-a", producer="reviewed render")
     _sheet(registry)

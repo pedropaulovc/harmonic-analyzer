@@ -358,10 +358,14 @@ under the roots. It finds the exact PDF each one reviewed by sha256 wherever it
 now lives, and ingests the newest `SHIP` whose sheets match the current render
 under the same rule and that counts under the family rule. A newer failing
 verdict that reviewed the same sheets, or whose reviewed PDF is lost, blocks
-the older `SHIP`, and `--apply` drops a recorded entry it contradicts. A draw script whose last commit names no model needs a
-recorded ruling in `cad/reviews/author-rulings.json`: the family, the exact
-commit it judged, who ruled and the evidence; a later commit to the script
-is not covered. The command is a
+the older `SHIP`, and `--apply` drops a recorded entry it contradicts. A draw
+script whose last commit names no model takes its family from
+`cad/reviews/author-rulings.json`. A per-drawing ruling names the family, the
+exact commit it judged, who ruled and the evidence; a later commit to the
+script is not covered. Otherwise the `untrailered` class rule applies: by the
+user's ruling of 2026-09-25, an untrailered commit is Claude's, so a GPT
+reviewer handles it, and the entry's provenance says `rule: no trailer`. A
+trailer always wins over both. The command is a
 dry run that prints a per-drawing table unless given `--apply`, and it must run
 against a render of the head being released (`--checkout`).
 Part and assembly packages render every native PDF page at 300 dpi and submit

@@ -49,8 +49,9 @@ sheet a reviewer passed.  This module is that link.
   whose PDF is lost, so nothing shows it saw other sheets) blocks it.  Dry run
   unless ``--apply``; the table sorts every drawing into what was ingested,
   what drifted and what never had a ``SHIP``.  A draw script whose last
-  commit names no model takes its family from a recorded ruling in
-  ``cad/reviews/author-rulings.json`` naming that exact commit.
+  commit names no model takes its family from ``cad/reviews/author-rulings.json``:
+  a ruling on that drawing naming that exact commit, else the ``untrailered``
+  class rule.
 
 No build task reads the ledger, so recording a review never re-keys a build.
 
@@ -95,7 +96,7 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS_DIR))
@@ -751,17 +752,50 @@ def resolve_author(
 
 
 _RULING_KEYS = ("drawing", "family", "commit", "ruled_by", "ruled_at", "evidence")
+_RULE_KEYS = ("family", "ruled_by", "ruled_at", "evidence")
+UNTRAILERED = "rule: no trailer"  # the author-family source the class rule gives
 
 
-def load_author_rulings(path: Path = AUTHOR_RULINGS_PATH) -> dict[str, dict[str, Any]]:
+@dataclass(frozen=True)
+class AuthorRulings:
+    """Who authored a draw script whose producing commit names no model.
+
+    ``drawings`` holds rulings on one drawing's exact commit; ``untrailered``
+    is the class rule for every commit without a model trailer.  A trailer
+    wins over both, and a drawing's ruling on its current commit over the rule.
+    """
+
+    drawings: dict[str, dict[str, Any]] = field(default_factory=dict)
+    untrailered: dict[str, Any] | None = None
+
+
+class Ruled(NamedTuple):
+    family: str | None
+    source: str  # "ruling", UNTRAILERED, or "" when nothing applies
+    ruling: dict[str, Any] | None
+    problem: str  # why nothing applies
+
+
+def load_author_rulings(path: Path = AUTHOR_RULINGS_PATH) -> AuthorRulings:
     """Recorded rulings on who authored a draw script whose commit names no model.
 
-    Each ruling names the exact commit it judged, so a later edit to the
-    script -- a new author -- is never covered by it.
+    Each drawing ruling names the exact commit it judged, so a later edit to
+    the script -- a new author -- is never covered by it.  The ``untrailered``
+    rule covers any commit whose trailers name no model.
     """
     if not path.is_file():
-        return {}
+        return AuthorRulings()
     data = json.loads(path.read_text(encoding="utf-8"))
+    rule = data.get("untrailered")
+    if rule is not None:
+        missing = [key for key in _RULE_KEYS if not rule.get(key)]
+        if missing:
+            raise ValueError(f"{path}: the untrailered rule lacks {missing}")
+        if rule["family"] not in AUTHOR_FAMILIES:
+            raise ValueError(
+                f"{path}: untrailered: family {rule['family']!r} is not one of "
+                f"{AUTHOR_FAMILIES}"
+            )
     rulings: dict[str, dict[str, Any]] = {}
     for ruling in data.get("rulings", []):
         missing = [key for key in _RULING_KEYS if not ruling.get(key)]
@@ -780,24 +814,29 @@ def load_author_rulings(path: Path = AUTHOR_RULINGS_PATH) -> dict[str, dict[str,
         if ruling["drawing"] in rulings:
             raise ValueError(f"{path}: two rulings for {ruling['drawing']}")
         rulings[ruling["drawing"]] = ruling
-    return rulings
+    return AuthorRulings(rulings, rule)
 
 
-def ruled_family(
-    name: str, author: Author, ruling: dict[str, Any] | None
-) -> tuple[str | None, str]:
-    """The family a ruling assigns this author, or None and why it does not apply."""
+def ruled_family(name: str, author: Author, rulings: AuthorRulings) -> Ruled:
+    """The family the rulings assign an author whose commit names no model."""
+    ruling = rulings.drawings.get(name)
+    if ruling is not None and ruling["commit"] == author.commit:
+        return Ruled(ruling["family"], "ruling", ruling, "")
+    if rulings.untrailered is not None:
+        return Ruled(
+            rulings.untrailered["family"], UNTRAILERED, rulings.untrailered, ""
+        )
     if ruling is None:
-        return None, (
+        problem = (
             f"{author.script} last commit {author.commit[:12]} names no model and "
             f"no ruling in {AUTHOR_RULINGS_PATH.name} covers it"
         )
-    if ruling["commit"] != author.commit:
-        return None, (
+    else:
+        problem = (
             f"the {name} ruling judged {ruling['commit'][:12]}, but {author.script} "
             f"was last changed by {author.commit[:12]}"
         )
-    return ruling["family"], ""
+    return Ruled(None, "", None, problem)
 
 
 # --- quota refusal -----------------------------------------------------------------
@@ -1931,7 +1970,7 @@ def _try(
     matcher: _Matcher,
     *,
     author: Author | ValueError,
-    ruling: dict[str, Any] | None,
+    rulings: AuthorRulings,
     found: Found,
     checkout: Path,
     head: str | None,
@@ -1952,8 +1991,7 @@ def _try(
     if author.model is not None:
         family, source, ruling = model_family(author.model), "trailer", None
     else:
-        family, unruled = ruled_family(drawing, author, ruling)
-        source = "ruling"
+        family, source, ruling, unruled = ruled_family(drawing, author, rulings)
     if family is None:
         return Tried(candidate, Backfill.AUTHOR_UNKNOWN, f"{matched}; {unruled}")
     refusal = None
@@ -2004,7 +2042,7 @@ def backfill(
     *,
     checkout: Path | None = None,
     exclude: Iterable[str] = (),
-    rulings: dict[str, dict[str, Any]] | None = None,
+    rulings: AuthorRulings | None = None,
     apply: bool = False,
     ledger_path: Path = LEDGER_PATH,
     cache_path: Path | None = BACKFILL_CACHE,
@@ -2016,12 +2054,13 @@ def backfill(
     counts under the reviewer-family rule: cross-family, or last resort with a
     recorded quota refusal.  ``checkout`` is the checkout whose ``cad/out/pdf``
     is current and whose draw-script commits name the authors (default: this
-    one).  ``rulings`` maps a drawing to its author family where the draw
-    script's last commit names no model.  Newest SHIP first; the first that
+    one).  ``rulings`` give the author family where the draw script's last
+    commit names no model.  Newest SHIP first; the first that
     counts is the one recorded.  Nothing is written unless ``apply``.
     """
     excluded = set(exclude)
-    unknown = sorted((excluded | set(rulings or {})) - set(DRAWINGS_BY_NAME))
+    rulings = rulings or AuthorRulings()
+    unknown = sorted((excluded | set(rulings.drawings)) - set(DRAWINGS_BY_NAME))
     if unknown:
         raise ValueError(f"unknown drawing names: {unknown}")
     repo = checkout or REPO_ROOT
@@ -2051,7 +2090,7 @@ def backfill(
                 repo=repo,
                 checkout=checkout,
                 excluded=excluded,
-                rulings=rulings or {},
+                rulings=rulings,
                 apply=apply,
                 ledger_path=ledger_path,
             )
@@ -2074,7 +2113,7 @@ def _backfill_drawings(
     repo: Path,
     checkout: Path | None,
     excluded: set[str],
-    rulings: dict[str, dict[str, Any]],
+    rulings: AuthorRulings,
     apply: bool,
     ledger_path: Path,
 ) -> BackfillResult:
@@ -2156,7 +2195,7 @@ def _backfill_drawings(
                     candidate,
                     matcher,
                     author=authors[name],
-                    ruling=rulings.get(name),
+                    rulings=rulings,
                     found=found,
                     checkout=repo,
                     head=head,
