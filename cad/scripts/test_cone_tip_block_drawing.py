@@ -119,8 +119,9 @@ def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
     assert spec.WORST_SCREW_ENVELOPE_GAP_MM > 0.0
     # U24b / U27: every web keeps 2.0 at the printed limits after edge breaks.
     # E11/W1's #10-32 root (ref Ø5.04 vs Ø8.28) adds ~1.6 to the adjuster webs.
-    assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(3.664, abs=1e-3)
-    assert spec.WORST_TOP_LIGAMENT_MM == pytest.approx(2.00, abs=1e-6)
+    # r3: PinchHeight .XX from the foot, AxisHeight and BlockHt .X.
+    assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(2.834, abs=1e-3)
+    assert spec.WORST_TOP_LIGAMENT_MM == pytest.approx(2.19, abs=1e-6)
     assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(3.670, abs=1e-3)
     for web in (
         spec.WORST_SLIT_MOUTH_WEB_MM,
@@ -196,30 +197,28 @@ def test_part_hides_every_model_reference_sketch() -> None:
     )
 
 
-def test_section_a_shows_every_hidden_sketch_it_dimensions() -> None:
+def test_section_a_carries_no_dimension_so_shows_no_hidden_sketch() -> None:
     """A derived view keeps the part's sketch visibility from its creation.
 
-    995a7c94 hides every reference sketch in the part; section A is made off
-    the plan and dimensions PinchRise, so it is created and curated while the
-    part shows exactly the hidden sketches that own its kept dimensions.
+    995a7c94 hides every reference sketch in the part.  Section A used to
+    dimension PinchRise and was cut while the part showed that sketch; r3
+    moved the pinch height to the right view, so the section keeps nothing
+    and is cut with the part as saved.
     """
-    owners = {
-        feature
-        for feature, names in cone_tip_block_spec.DRAWING_DIMENSIONS.items()
-        if set(names) & set(drawing.SECTION_KEEP)
-    }
-    hidden = owners & set(part.REFERENCE_SKETCHES)
-    assert hidden == {"PinchRiseReference"}
-    assert tuple(sorted(hidden)) == tuple(sorted(drawing.SECTION_SKETCHES))
+    assert drawing.SECTION_KEEP == {}
+    assert not hasattr(drawing, "SECTION_SKETCHES")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build(") :]
+    assert "part_sketches_shown(" not in body
 
 
 def test_only_views_dimensioning_hidden_sketches_opt_in() -> None:
     """The opt-in import goes where a kept dimension lives on a hidden sketch.
 
-    Right (PinchDepthCenter) and the plan (FlangeSlotX/Z, I31) always do; the
-    adjuster elevation (AxisHeight/PassageCenter) opts in at build time; left
-    and the base front keep only solid-feature dimensions and stay on
-    _drawing_common's import.
+    Right (PinchDepthCenter, and r3's PinchHeight) and the plan (FlangeSlotX,
+    I31, and r3's two arc-centre baselines) always do; the adjuster elevation
+    (AxisHeight/PassageCenter) opts in at build time; left and the base front
+    keep only solid-feature dimensions and stay on _drawing_common's import.
     """
 
     def hidden_owners(keep) -> set[str]:
@@ -229,10 +228,14 @@ def test_only_views_dimensioning_hidden_sketches_opt_in() -> None:
             if set(names) & set(keep)
         } & set(part.REFERENCE_SKETCHES)
 
-    assert hidden_owners(drawing.RIGHT_KEEP) == {"PinchDepthReference"}
+    assert hidden_owners(drawing.RIGHT_KEEP) == {
+        "PinchDepthReference",
+        "PinchHeightReference",
+    }
     assert hidden_owners(drawing.TOP_KEEP) == {
         "FlangeSlotXReference",
-        "FlangeSlotZReference",
+        "FlangeSlotNorthReference",
+        "FlangeSlotSouthReference",
     }
     assert hidden_owners({"AxisHeight": 0, "PassageCenter": 0}) == {
         "AxisHeightReference",
@@ -272,8 +275,8 @@ def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
     assert set(drawing.TOP_KEEP) == {
         "Depth",
         "FlangeLen",
-        "FlangeSlotCtoC",
-        "FlangeSlotZ",
+        "FlangeSlotNorthZ",
+        "FlangeSlotSouthZ",
         "FlangeSlotW",
         "FlangeSlotX",
     }
@@ -286,7 +289,12 @@ def test_slot_width_text_stands_left_of_its_outside_arrows() -> None:
     left_wall = slot_x - part.SLIT_W * drawing._S / 2.0
     arrow_tail = left_wall - drawing.ARROW_LENGTH
     assert text_x + drawing.VALUE_TEXT_HALF_WIDTH <= arrow_tail - 0.001
-    assert drawing.ARROWS_OUTSIDE == ("SlitW", "HeelReliefDepth", "FlangeSlotW")
+    assert drawing.ARROWS_OUTSIDE == (
+        "SlitW",
+        "HeelReliefDepth",
+        "FlangeSlotW",
+        "FlangeSlotNorthZ",
+    )
 
 
 def test_sheet_drops_to_three_to_two_for_the_flange() -> None:
@@ -391,10 +399,11 @@ def test_flange_thickness_stands_past_the_south_end_short_of_view_b() -> None:
 
 
 def test_plan_values_stand_off_the_part_and_each_other() -> None:
-    """Left of the plan: Depth and FlangeLen chained on one line, each value
-    mid-span, the slot's spacing between that line and the part.  Right: the
-    slot's station and, past the end of its span, the slot width.  Above the
-    south end, higher than the A-A arrow: the slot's location from +X."""
+    """Left of the plan, stepping out: the north and south arc centres, each
+    baselined from the body's south face (r3, option A), then Depth and
+    FlangeLen chained on one line, each value mid-span.  Right: the slot
+    width, its line across the slot's middle.  Above the south end, higher
+    than the A-A arrow: the slot's location from +X."""
     keep = drawing.TOP_KEEP
     half_width = drawing.VALUE_TEXT_HALF_WIDTH
     half_height = drawing.VALUE_TEXT_HALF_HEIGHT
@@ -406,27 +415,35 @@ def test_plan_values_stand_off_the_part_and_each_other() -> None:
     assert keep["FlangeLen"][1] == pytest.approx(
         drawing._plan_y((south_face + drawing.Z_SOUTH) / 2.0)
     )
-    ctoc_x = keep["FlangeSlotCtoC"][0]
-    # The chain's own values are centred on its line: measured from the line
-    # alone (+0.004), I31's "20.8" printed 0.7 mm from "8.42".
-    assert drawing.PLAN_CHAIN_X + half_width + drawing.TEXT_CLEARANCE <= ctoc_x - half_width
-    assert ctoc_x + half_width <= plan_left - 0.0005
-    slot_z_x, slot_z_y = keep["FlangeSlotZ"]
-    assert plan_right + 0.004 <= slot_z_x - half_width
-    assert drawing._plan_y(south_face) + half_height <= slot_z_y
-    assert slot_z_y + half_height <= drawing._plan_y(drawing.FLANGE_SLOT_CENTER_Z)
+    north_x, north_y = keep["FlangeSlotNorthZ"]
+    south_x, south_y = keep["FlangeSlotSouthZ"]
+    # Each value mid-span on its own line, the lines stepping out from the
+    # part: a value keeps TEXT_CLEARANCE off the next line out and the part.
+    assert north_y == pytest.approx(
+        drawing._plan_y((south_face + drawing.FLANGE_SLOT_NORTH_CENTER_Z) / 2.0)
+    )
+    assert south_y == pytest.approx(
+        drawing._plan_y((south_face + drawing.FLANGE_SLOT_SOUTH_CENTER_Z) / 2.0)
+    )
+    assert north_x + half_width + drawing.TEXT_CLEARANCE <= plan_left
+    for inner, outer in ((north_x, south_x), (south_x, drawing.PLAN_CHAIN_X)):
+        assert outer + half_width + drawing.TEXT_CLEARANCE <= inner
+    # Both arc centres are located from the south face, not from each other.
+    assert drawing.FLANGE_SLOT_NORTH_CENTER_Z == pytest.approx(
+        south_face - cone_tip_block_spec.FLANGE_SLOT_NORTH_Z
+    )
+    assert drawing.FLANGE_SLOT_SOUTH_CENTER_Z == pytest.approx(
+        south_face - cone_tip_block_spec.FLANGE_SLOT_SOUTH_Z
+    )
     width_x, width_y = keep["FlangeSlotW"]
     assert plan_right + drawing.ARROW_LENGTH <= width_x - half_width
-    # Past the station's span, level with the slot's straight south half.
+    # Its line, 4.5 mm under the value, runs across the slot's middle, well
+    # inside the straight walls and clear of both arc centres' witnesses.
     centre_y = drawing._plan_y(drawing.FLANGE_SLOT_CENTER_Z)
-    assert centre_y + 0.002 <= width_y - half_height
-    south_arc_centre = (
-        drawing.FLANGE_SLOT_CENTER_Z - cone_tip_block_spec.FLANGE_SLOT_CTOC / 2.0
-    )
-    # Its line, 4.5 mm under the value, crosses the straight south half 3 mm
-    # clear of the 10.7's witness from the slot centre (287c: 0.5 mm).
     width_line_y = width_y - drawing.FLANGE_SLOT_W_LINE_DROP
-    assert centre_y + 0.003 <= width_line_y <= drawing._plan_y(south_arc_centre)
+    assert width_line_y == pytest.approx(centre_y)
+    for arc_z in (drawing.FLANGE_SLOT_NORTH_CENTER_Z, drawing.FLANGE_SLOT_SOUTH_CENTER_Z):
+        assert abs(drawing._plan_y(arc_z) - width_line_y) >= 0.005
     # "3.97" starts 2 mm right of the plan (287c: 0.2 mm).
     value_left = width_x - drawing._VALUE_EXTENTS["FlangeSlotW"][0]
     assert value_left == pytest.approx(plan_right + 0.002)
@@ -503,37 +520,50 @@ _R287_LEADERS_MM = {
     "foot finish": ((99.31, 80.90), (77.63, 93.88)),
 }
 _R287_PINCH_HOLE_MM = ((155.40, 155.56), 2.45)  # the 6.0's hole: centre, radius
-# What the 287c sheet commanded at 287c5cf6a, before this round.
+# r3 (codex FIX review of 72ab) took the 10.7 and the 8.42 off the print: the
+# slot's arc centres are baselined from the south face instead.  Their
+# measured ink above stays as the record of those renders, but no placement
+# of today's module prints them, so every model comparison skips them.
+_R3_RETIRED = frozenset({"FlangeSlotZ", "FlangeSlotCtoC"})
+# What the 287c sheet commanded at 287c5cf6a, expressed against today's
+# module: the r3 lines that replaced a 287c placement map back to it, the
+# DRILL TO SLOT growth back to the blind depth's text, and r3's own new
+# dimensions keep r3's arrow sides.
 _R287_PLACEMENT = {
-    "TOP_CENTER[0] + 0.036,": "TOP_CENTER[0] + 0.022,",
-    "FLANGE_SLOT_CTOC * 0.6": "FLANGE_SLOT_CTOC * 0.4",
+    "FLANGE_SLOT_W_Z = FLANGE_SLOT_CENTER_Z - 3.0": (
+        "FLANGE_SLOT_W_Z = FLANGE_SLOT_CENTER_Z - 8.42 * 0.4"
+    ),
     "_plan_y(Z_SOUTH) + 0.0105)": "_plan_y(Z_SOUTH) + 0.013)",
-    "(RIGHT_CENTER[0] - 0.058, 0.176)": "(RIGHT_CENTER[0] - 0.033, 0.178)",
+    "(RIGHT_CENTER[0] - 0.0605, 0.1715)": "(RIGHT_CENTER[0] - 0.033, 0.178)",
+    "_PINCH_CLEARANCE_TEXT_GROWTH = 0.0196": "_PINCH_CLEARANCE_TEXT_GROWTH = 0.0",
     "FOOT_FINISH_CENTER = BACK_CENTER": "FOOT_FINISH_CENTER = FRONT_CENTER",
     "_PLAN_RIGHT + 0.0094 + 0.002,": (
         "_PLAN_RIGHT + ARROW_LENGTH + TEXT_CLEARANCE + VALUE_TEXT_HALF_WIDTH,"
     ),
-    'ARROWS_INSIDE = ("SlitDepth",)': "ARROWS_INSIDE: tuple[str, ...] = ()",
+    'ARROWS_INSIDE = ("SlitDepth", "FlangeSlotSouthZ", "PinchHeight")': (
+        'ARROWS_INSIDE = ("FlangeSlotSouthZ", "PinchHeight")'
+    ),
 }
 # ... and what the I31 sheet commanded at 7ab69742b, before round 1.
 _I31_PLACEMENT = {
     **_R287_PLACEMENT,
-    "(RIGHT_CENTER[0] - 0.058, 0.176)": "(RIGHT_CENTER[0] - 0.033, 0.1735)",
-    "PLAN_CHAIN_X = TOP_CENTER[0] - 0.036": "PLAN_CHAIN_X = TOP_CENTER[0] - 0.030",
+    "(RIGHT_CENTER[0] - 0.0605, 0.1715)": "(RIGHT_CENTER[0] - 0.033, 0.1735)",
+    "PLAN_CHAIN_X = _PLAN_LEFT - 3.0 * PLAN_BASELINE_STEP": (
+        "PLAN_CHAIN_X = TOP_CENTER[0] - 0.030"
+    ),
     "RIGHT_CENTER = (0.171,": "RIGHT_CENTER = (0.166,",
     "LEFT_CENTER = (0.243,": "LEFT_CENTER = (0.238,",
     "BACK_CENTER = (0.315,": "BACK_CENTER = (0.310,",
     "ADJUSTER_CALLOUT_Y = 0.121": "ADJUSTER_CALLOUT_Y = 0.115",
 }
-# The whole-sheet audit of the 287c placement.
+# The whole-sheet audit of the 287c placement.  287c also reported three
+# findings on the 10.7 (retired by r3): its line through "3.97", its witness
+# beside the 3.97's line and its arrow into the 3.97's stack.
 _R287_FINDINGS = [
     "text-on-outline: 'FlangeSlotW' ... plan outline",
-    "text-on-line: FlangeSlotZ's dimension line crosses 'FlangeSlotW'",
     "leader-on-dimension: foot finish's leader crosses Width's",
     "leader-on-dimension: pinch clearance callout's leader crosses PinchDepthCenter's",
-    "line-beside-line: FlangeSlotW's and FlangeSlotZ's",
     "arrow-near-text: FlangeSlotX's arrow ... 'view C letter'",
-    "arrow-near-text: FlangeSlotZ's arrow ... 'FlangeSlotW'",
     "arrow-near-text: HeelReliefHt's arrow ... 'foot finish'",
     "arrow-near-text: SlitDepth's arrow ... 'ADJUSTER ENTRY'",
 ]
@@ -629,22 +659,26 @@ def test_sheet_ink_audit_flags_the_i31_render_and_clears_the_moved_ink() -> None
     assert _findings_match(findings, _I31_FINDINGS), findings
 
     right_dx = drawing.RIGHT_CENTER[0] - 0.166
+    callout_x, callout_y = drawing.PINCH_CLEARANCE_CALLOUT_XY
     moves = {
         "FlangeLen": (drawing.PLAN_CHAIN_X - 0.042, 0.0),
-        "FlangeSlotCtoC": (
-            drawing.TOP_KEEP["FlangeSlotCtoC"][0] - (0.042 + 0.06075) / 2.0,
-            0.0,
-        ),
-        # Round 1 raised it from 0.1735 to 0.178 with the right view.
-        "pinch clearance callout": (right_dx, 0.178 - 0.1735),
+        # Round 1 raised it from 0.1735 to 0.178 with the right view; r3 moved
+        # it again for DRILL TO SLOT.
+        "pinch clearance callout": (callout_x - (0.166 - 0.033), callout_y - 0.1735),
         "PinchDepthCenter": (right_dx, 0.0),
         "adjuster callout": (0.0, drawing.ADJUSTER_CALLOUT_Y - 0.115),
     }
+    grow = drawing._PINCH_CLEARANCE_TEXT_GROWTH / 2.0
 
-    def moved(box, dx, dy):
-        return (box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy)
+    def moved(box, dx, dy, wider=0.0):
+        return (box[0] + dx - wider, box[1] + dy, box[2] + dx + wider, box[3] + dy)
 
-    texts = {name: moved(box, *moves[name]) for name, box in texts.items()}
+    # r3 took the 8.42 off the print.
+    texts = {
+        name: moved(box, *moves[name], grow if name == "pinch clearance callout" else 0.0)
+        for name, box in texts.items()
+        if name not in _R3_RETIRED
+    }
     silhouettes = {"right body": moved(silhouettes["right body"], right_dx, 0.0)}
     line = tuple((x + right_dx, y) for x, y in heel["HeelReliefHt"].lines[0])
     heel = {"HeelReliefHt": drawing.DimensionInk(lines=(line,))}
@@ -658,10 +692,14 @@ def test_sheet_ink_model_reproduces_the_i31_render() -> None:
     old = _drawing_at(_I31_PLACEMENT)
     findings = _sheet_findings(old)
     for pattern in _I31_FINDINGS:
+        if any(retired in pattern for retired in _R3_RETIRED):
+            continue
         assert any(_matches(finding, pattern) for finding in findings), (pattern, findings)
     slack = 0.0003
     predicted = old.sheet_text_boxes()
     for name, box in _I31_TEXT_MM.items():
+        if name in _R3_RETIRED:
+            continue
         assert _covers(predicted[name], _m(box), slack), name
     body = old.sheet_view_silhouettes()["right body"]
     assert body == pytest.approx(_m(_I31_RIGHT_BODY_MM), abs=slack)
@@ -676,18 +714,33 @@ def test_sheet_ink_model_reproduces_the_i31_render() -> None:
 @pytest.mark.parametrize(
     ("reverted", "expected"),
     [
-        (("PLAN_CHAIN_X = TOP_CENTER[0] - 0.036",), [_I31_FINDINGS[0]]),
+        # r3: the 8.42 is gone, but the chain's step out is still what keeps
+        # "20.8" off the south arc centre's "14.9" and its line.
         (
-            ("(RIGHT_CENTER[0] - 0.058, 0.176)",),
+            ("PLAN_CHAIN_X = _PLAN_LEFT - 3.0 * PLAN_BASELINE_STEP",),
             [
-                _I31_FINDINGS[1],
-                _R287_FINDINGS[3],
-                "arrow-near-text: PinchDepthCenter's arrow ... 'pinch clearance callout'",
+                "text-on-text: 'FlangeLen' and 'FlangeSlotSouthZ'",
+                "text-on-line: FlangeSlotSouthZ's dimension line crosses 'FlangeLen'",
+                "text-on-line: FlangeLen's dimension line crosses 'FlangeSlotSouthZ'",
+                "arrow-near-text: FlangeSlotSouthZ's arrow ... 'FlangeLen'",
             ],
         ),
         (
+            ("(RIGHT_CENTER[0] - 0.0605, 0.1715)",),
+            [
+                _I31_FINDINGS[1],
+                "arrow-near-text: PinchDepthCenter's arrow ... 'pinch clearance callout'",
+            ],
+        ),
+        # The right view's 5 mm slide still clears the adjuster callout; r3's
+        # wider pinch callout, placed from the right view, rides with it.
+        (
             ("RIGHT_CENTER = (0.171,", "LEFT_CENTER = (0.243,", "BACK_CENTER = (0.315,"),
-            [_I31_FINDINGS[2]],
+            [
+                _I31_FINDINGS[2],
+                "text-on-line: PassageCenter's dimension line crosses 'pinch clearance callout'",
+                "arrow-near-text: SlitW's arrow ... 'pinch clearance callout'",
+            ],
         ),
         (
             ("ADJUSTER_CALLOUT_Y = 0.121",),
@@ -748,6 +801,11 @@ def _moved_r287_fixture(names: tuple[str, ...]):
     """The planted 287c ink, each owner moved by what its constant moved."""
     old = _drawing_at(_R287_PLACEMENT)
     texts, silhouettes, dimensions, leaders = _r287_fixture(names)
+    # r3 took the 10.7 off the print: its ink is simply gone.
+    texts = {name: box for name, box in texts.items() if name not in _R3_RETIRED}
+    dimensions = {
+        name: ink for name, ink in dimensions.items() if name not in _R3_RETIRED
+    }
     moves = {
         "pinch clearance callout": _delta(
             drawing.PINCH_CLEARANCE_CALLOUT_XY, old.PINCH_CLEARANCE_CALLOUT_XY
@@ -756,12 +814,19 @@ def _moved_r287_fixture(names: tuple[str, ...]):
             drawing._foot_finish_placement()[0], old._foot_finish_placement()[0]
         ),
         "FlangeSlotW": _delta(drawing.TOP_KEEP["FlangeSlotW"], old.TOP_KEEP["FlangeSlotW"]),
-        "FlangeSlotZ": _delta(drawing.TOP_KEEP["FlangeSlotZ"], old.TOP_KEEP["FlangeSlotZ"]),
         "view C letter": _delta(drawing.VIEW_C_ARROW[0], old.VIEW_C_ARROW[0]),
     }
+    # r3's DRILL TO SLOT prints wider than 287c's blind depth, both sides of
+    # the commanded point; its leader leaves the wider shoulder's right end.
+    grow = {"pinch clearance callout": drawing._PINCH_CLEARANCE_TEXT_GROWTH / 2.0}
     still = (0.0, 0.0)
     texts = {
-        name: (box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy)
+        name: (
+            box[0] + dx - grow.get(name, 0.0),
+            box[1] + dy,
+            box[2] + dx + grow.get(name, 0.0),
+            box[3] + dy,
+        )
         for name, box in texts.items()
         for dx, dy in [moves.get(name, still)]
     }
@@ -780,7 +845,7 @@ def _moved_r287_fixture(names: tuple[str, ...]):
     moved_leaders = {}
     for name, leader in leaders.items():
         dx, dy = moves[name]
-        start = (leader.start[0] + dx, leader.start[1] + dy)
+        start = (leader.start[0] + dx + grow.get(name, 0.0), leader.start[1] + dy)
         moved_leaders[name] = (
             drawing._leader_to_circle(start, _m(hole), hole_r / 1000.0)
             if name == "pinch clearance callout"
@@ -852,12 +917,16 @@ def test_sheet_ink_model_reproduces_the_287c_render() -> None:
     slack = 0.0003
     predicted = old.sheet_text_boxes()
     for name, box in _R287_TEXT_MM.items():
+        if name in _R3_RETIRED:
+            continue
         assert _covers(predicted[name], _m(box), slack), name
     plan = old.sheet_view_silhouettes()["plan"]
     assert plan == pytest.approx(_m(_R287_PLAN_MM), abs=slack)
     ink = old.sheet_dimension_ink()
     for kind, measured in (("lines", _R287_LINES_MM), ("arrows", _R287_ARROWS_MM)):
         for name, segments in measured.items():
+            if name in _R3_RETIRED:
+                continue
             for segment in segments:
                 assert any(
                     _segment_covers(model, _m_segment(segment), slack)
@@ -870,20 +939,28 @@ def test_sheet_ink_model_reproduces_the_287c_render() -> None:
         assert model == pytest.approx(measured, abs=slack), name
 
 
+# 287c's plan-10.7-station and plan-3.97-line moves cleared collisions with
+# the 10.7, which r3 retired; the 3.97's line now runs across the slot's
+# middle for a reason of its own (test_plan_values_stand_off_the_part_and_each_other).
 @pytest.mark.parametrize(
     ("reverted", "expected"),
     [
-        (("TOP_CENTER[0] + 0.036,",), [_R287_FINDINGS[1], _R287_FINDINGS[6]]),
-        (("FLANGE_SLOT_CTOC * 0.6",), [_R287_FINDINGS[4]]),
         (("_PLAN_RIGHT + 0.0094 + 0.002,",), [_R287_FINDINGS[0]]),
-        (("(RIGHT_CENTER[0] - 0.058, 0.176)",), [_R287_FINDINGS[3]]),
-        (("FOOT_FINISH_CENTER = BACK_CENTER",), [_R287_FINDINGS[2], _R287_FINDINGS[7]]),
-        (('ARROWS_INSIDE = ("SlitDepth",)',), [_R287_FINDINGS[8]]),
-        (("_plan_y(Z_SOUTH) + 0.0105)",), [_R287_FINDINGS[5]]),
+        (("(RIGHT_CENTER[0] - 0.0605, 0.1715)",), [_R287_FINDINGS[2]]),
+        (("FOOT_FINISH_CENTER = BACK_CENTER",), [_R287_FINDINGS[1], _R287_FINDINGS[4]]),
+        # r3's lower, wider pinch callout now stands in the 15.2's upper
+        # outside arrow's run too: inside arrows clear both.
+        (
+            ('ARROWS_INSIDE = ("SlitDepth", "FlangeSlotSouthZ", "PinchHeight")',),
+            [
+                "text-on-line: SlitDepth's dimension line crosses 'pinch clearance callout'",
+                _R287_FINDINGS[5],
+                "arrow-near-text: SlitDepth's arrow ... 'pinch clearance callout'",
+            ],
+        ),
+        (("_plan_y(Z_SOUTH) + 0.0105)",), [_R287_FINDINGS[3]]),
     ],
     ids=[
-        "plan-10.7-station",
-        "plan-3.97-line",
         "plan-3.97-value",
         "b-pinch-callout",
         "ra-finish-to-view-c",
@@ -922,7 +999,7 @@ def test_sheet_ink_is_clear_and_the_build_places_what_it_audits() -> None:
     assert body.count("add_note(adapter,") == 1
     # The foot's Ra 3.2 sits on VIEW C, where nothing is dimensioned under it.
     assert drawing.FOOT_FINISH_CENTER == drawing.BACK_CENTER
-    assert drawing.ARROWS_INSIDE == ("SlitDepth",)
+    assert drawing.ARROWS_INSIDE == ("SlitDepth", "FlangeSlotSouthZ", "PinchHeight")
     assert not set(drawing.ARROWS_INSIDE) & set(drawing.ARROWS_OUTSIDE)
 
 
@@ -940,31 +1017,38 @@ def test_sheet_audit_uses_the_shared_leader_geometry() -> None:
 
 
 def test_flange_slot_travel_is_built_from_the_fit_up_chain() -> None:
-    """Main I31 ruling: slot travel +-(3.21 + 1) from named grade constants."""
+    """Main I31 ruling: the slot passes the screw the fit-up chain plus 1.0
+    each way.  r3 (option A): each arc centre is its own .X baseline from the
+    south face, so each end spends its own band, not a .XX spacing's."""
     spec = cone_tip_block_spec
     general = {1: 0.8, 2: 0.51}
     chain = (
         general[spec.SHAFT_OVERALL_LENGTH_PLACES]
         + general[spec.BLOCK_DEPTH_PLACES]
-        + general[spec.FLANGE_SLOT_Z_PLACES]
         + general[spec.PLATE_TIP_SLOT_Z_PLACES]
         + spec.PLATE_TIP_SLOT_FLOAT
     )
-    assert spec.FIT_UP_CHAIN_MM == pytest.approx(chain) == pytest.approx(3.2075)
+    assert spec.FIT_UP_CHAIN_MM == pytest.approx(chain) == pytest.approx(2.4075)
     assert spec.PLATE_TIP_SLOT_FLOAT == pytest.approx((4.0 + 0.10 - 3.505) / 2.0)
     assert spec.FIT_UP_MARGIN_MM == 1.0
-    assert spec.FLANGE_SLOT_HALF_TRAVEL == pytest.approx(4.2075)
-    assert spec.FLANGE_SLOT_CTOC == 8.42
-    # The spacing's short limit plus the screw's float still spans the chain.
-    assert (8.42 - 0.51) / 2.0 + spec.FLANGE_SLOT_FLOAT >= spec.FIT_UP_CHAIN_MM
-    # The literal is never typed: the source builds it from the grades.
+    assert (spec.FLANGE_SLOT_NORTH_Z, spec.FLANGE_SLOT_SOUTH_Z) == (6.5, 14.9)
+    end_band = general[spec.FLANGE_SLOT_END_PLACES]
+    north = spec.FLANGE_SLOT_Z - chain - (6.5 + end_band - spec.FLANGE_SLOT_FLOAT)
+    south = (14.9 - end_band + spec.FLANGE_SLOT_FLOAT) - (spec.FLANGE_SLOT_Z + chain)
+    assert spec.FIT_UP_NORTH_MARGIN_MM == pytest.approx(north)
+    assert spec.FIT_UP_SOUTH_MARGIN_MM == pytest.approx(south)
+    assert min(north, south) >= spec.FIT_UP_MARGIN_MM
+    # The ends straddle the screw's nominal station (the plate's TipSlotZ).
+    assert (6.5 + 14.9) / 2.0 == pytest.approx(spec.FLANGE_SLOT_Z)
+    assert spec.FLANGE_SLOT_CTOC == pytest.approx(8.4)
     source = Path(spec.__file__).read_text(encoding="utf-8")
     assert "3.21" not in source
     assert spec.DRAWING_PRECISION["BlockProfile"]["Depth"] == spec.BLOCK_DEPTH_PLACES
-    assert (
-        spec.DRAWING_PRECISION["FlangeSlotZReference"]["FlangeSlotZ"]
-        == spec.FLANGE_SLOT_Z_PLACES
-    )
+    for end in ("North", "South"):
+        assert (
+            spec.DRAWING_PRECISION[f"FlangeSlot{end}Reference"][f"FlangeSlot{end}Z"]
+            == spec.FLANGE_SLOT_END_PLACES
+        )
 
 
 def test_flange_slot_is_one_pass_of_a_five_thirty_second_end_mill() -> None:
@@ -975,10 +1059,7 @@ def test_flange_slot_is_one_pass_of_a_five_thirty_second_end_mill() -> None:
     assert deviations(spec.FLANGE_SLOT_W_BAND) == (0.0, 0.10)
     assert spec.FLANGE_SLOT_W - 3.505 >= 0.25
     assert spec.FLANGE_SLOT_X == spec.BLOCK_X / 2.0
-    assert spec.DRAWING_DIMENSIONS["FlangeSlotProfile"] == {
-        "FlangeSlotW",
-        "FlangeSlotCtoC",
-    }
+    assert spec.DRAWING_DIMENSIONS["FlangeSlotProfile"] == {"FlangeSlotW"}
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert (
         'set_dimension_bilateral_tolerance(\n        adapter, "FlangeSlotProfile", '
@@ -991,16 +1072,18 @@ def test_flange_webs_and_nut_clear_the_2_0_target_at_the_printed_limits() -> Non
     spec = cone_tip_block_spec
     assert (spec.FLANGE_SLOT_Z, spec.FLANGE_LEN, spec.FLANGE_T) == (10.7, 20.8, 3.50)
     slot_max = spec.FLANGE_SLOT_W + 0.10
-    half_ctoc_max = (8.42 + 0.51) / 2.0
-    # The slot is located .XX from +X; the flange's 15.0 width is .X.
+    width = spec.BLOCK_X
+    # The slot is located .XX from +X; the flange's width is .X.
     assert spec.WORST_FLANGE_SIDE_WEB_MM == pytest.approx(
-        min(7.5 - 0.51, 15.0 - 0.8 - (7.5 + 0.51)) - slot_max / 2.0
+        min(width / 2.0 - 0.51, width - 0.8 - (width / 2.0 + 0.51)) - slot_max / 2.0
     )
+    # r3: each arc centre from the south face, .X.
     assert spec.WORST_FLANGE_END_WEB_MM == pytest.approx(
-        20.8 - 0.8 - (10.7 + 0.8 + half_ctoc_max + slot_max / 2.0)
+        20.8 - 0.8 - (14.9 + 0.8 + slot_max / 2.0)
     )
-    assert spec.WORST_FLANGE_ROOT_WEB_MM == pytest.approx(
-        10.7 - 0.8 - half_ctoc_max - slot_max / 2.0
+    assert spec.WORST_FLANGE_ROOT_WEB_MM == pytest.approx(6.5 - 0.8 - slot_max / 2.0)
+    assert spec.WORST_NUT_WALL_AIR_MM == pytest.approx(
+        6.5 - 0.8 - spec.FLANGE_SLOT_FLOAT - spec.HOLDDOWN_NUT_AC / 2.0
     )
     for web in (
         spec.WORST_FLANGE_SIDE_WEB_MM,
@@ -1038,9 +1121,10 @@ def test_foot_flange_is_built_after_the_heel_relief_and_before_the_drives() -> N
     assert order == sorted(order)
     assert "FootBore" not in source
     assert "FootTap" not in source
-    assert part.REFERENCE_SKETCHES[-2:] == (
+    assert part.REFERENCE_SKETCHES[-3:] == (
         "FlangeSlotXReference",
-        "FlangeSlotZReference",
+        "FlangeSlotNorthReference",
+        "FlangeSlotSouthReference",
     )
 
 
@@ -1087,3 +1171,213 @@ def test_flange_slot_band_is_read_through_deviations() -> None:
         except AssertionError:
             continue  # an import-time floor caught it
         assert _flange_slot(mutant) != pytest.approx(_FLANGE_SLOT_WORST, abs=1e-9)
+
+
+# --- r3: codex FIX review of 72ab (C:/src/dt-logs/mreview-i31/block-72ab) ----
+# Every number below is recomputed from the print's own grades
+# (DRAWING_PRECISION) and the title block's general bands, never read back
+# from the spec's stack constants, so each test states the property itself.
+_GENERAL = {1: 0.8, 2: 0.51}
+_DRILLED_PLUS = 0.10
+
+
+def _printed(name: str, nominal: float) -> tuple[float, float]:
+    places = cone_tip_block_spec.DRAWING_PRECISION_BY_NAME[name]
+    return round(nominal, places) - _GENERAL[places], round(nominal, places) + _GENERAL[places]
+
+
+def _worst_near_jaw_wall() -> float:
+    """Deepest the slit's near wall can stand from the +X (drill) face."""
+    spec = cone_tip_block_spec
+    passage = _printed("PassageCenter", spec.BLOCK_X / 2.0)
+    width = _printed("Width", spec.BLOCK_X)
+    slit_half_min = _printed("SlitW", spec.SLIT_W)[0] / 2.0
+    return max(passage[1] - slit_half_min, width[1] - passage[0] - slit_half_min)
+
+
+def test_pinch_clearance_print_breaks_into_the_slit_at_the_worst_case() -> None:
+    """Blocker: 72ab printed the Ø3.26 6.9 deep (.X, floor 6.1) into a near
+    jaw the print lets run to 8.47 -- the screw could thread-lock short of the
+    slit.  Whatever the print says must break into the slit at the worst
+    case: a printed blind depth by its lower limit, 0.25 past the deepest
+    near wall; DRILL TO SLOT by definition, provided drilling full diameter
+    0.25 past that wall only meets the far jaw inside its tap drill."""
+    spec = cone_tip_block_spec
+    near_wall = _worst_near_jaw_wall()
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    if '"hw-depth"' in source:
+        depth = spec.PINCH_CLEARANCE_SPEC.depth_mm
+        floor = round(depth, 1) - _GENERAL[1]
+        assert floor >= near_wall + 0.25, (floor, near_wall)
+        return
+    assert drawing.PINCH_CLEARANCE_EXTENT_TEXT == "DRILL TO SLOT"
+    clearance_max = round(spec.PINCH_CLEARANCE_DIA, 2) + _DRILLED_PLUS
+    point = (clearance_max / 2.0) / math.tan(math.radians(118.0 / 2.0))
+    slit_min = _printed("SlitW", spec.SLIT_W)[0]
+    past_far_wall = 0.25 + point - slit_min
+    assert clearance_max * max(past_far_wall, 0.0) / point <= spec.PINCH_BORE_DIA
+    assert spec.WORST_PINCH_NEAR_WALL_MM == pytest.approx(near_wall)
+
+
+def test_pinch_clearance_callout_rewrites_the_blind_depth_to_drill_to_slot() -> None:
+    """The native blind depth pair becomes the instruction; the diameter
+    stays its Hole Wizard variable, and any other shape fails loud."""
+    native = {5: "<MOD-DIAM><hw-diam> <HOLE-DEPTH> <hw-depth>", 6: "", 7: "", 8: ""}
+    rewritten = drawing._pinch_clearance_callout_definitions(native)
+    assert rewritten == {5: "<MOD-DIAM><hw-diam> DRILL TO SLOT", 6: "", 7: "", 8: ""}
+    with pytest.raises(RuntimeError):
+        drawing._pinch_clearance_callout_definitions({**native, 5: "<MOD-DIAM><hw-diam>"})
+    with pytest.raises(RuntimeError):
+        drawing._pinch_clearance_callout_definitions({**native, 7: native[5]})
+    assert drawing._pinch_clearance_callout_resolved(
+        {1: "<MOD-DIAM> 3.26 DRILL TO SLOT", 2: "", 3: "", 4: ""}
+    )
+    assert not drawing._pinch_clearance_callout_resolved(
+        {1: "<MOD-DIAM> 3.26 <HOLE-DEPTH> 6.9", 2: "", 3: "", 4: ""}
+    )
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build(") :]
+    assert "_set_pinch_clearance_callout_text(pinch_clearance_callout)" in body
+    assert '"hw-depth"' not in source
+
+
+def test_far_jaw_is_tapped_full_thread_through_to_the_slit() -> None:
+    """The far jaw's thread runs through (TO SLOT), and the tap passes the
+    near jaw's clearance, so its lead runs out in the slit, not the jaw."""
+    spec = cone_tip_block_spec
+    assert spec.PINCH_BORE_SPEC.end == "through_all"
+    assert spec.PINCH_CLEARANCE_DIA > 0.112 * 25.4  # #4-40 basic major
+
+
+def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
+    """Over-specification: 46.83, 32.27, 8.42 and 8.85 printed .XX with no fit
+    or asserted margin needing it.  The overall and axis heights drop to .X;
+    the spacing and the rise leave the print (the arc centres baseline from
+    the south face, the pinch hole locates from the foot)."""
+    grades = cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
+    assert grades["BlockHt"] == 1
+    assert grades["AxisHeight"] == 1
+    for gone in ("FlangeSlotCtoC", "PinchRise", "FlangeSlotZ"):
+        assert gone not in grades, gone
+    # Kept .XX, each for a named stack (see the report's list).
+    assert {name for name, places in grades.items() if places == 2} == {
+        "PassageCenter",
+        "PinchHeight",
+        "SlitW",
+        "HeelReliefDepth",
+        "HeelReliefHt",
+        "FlangeT",
+        "FlangeSlotW",
+        "FlangeSlotX",
+    }
+
+
+def test_top_ligament_needs_the_pinch_height_at_two_places() -> None:
+    """The one r3 .XX kept for a web: at .X the ligament over the pinch hole
+    closes at 1.92, under the 2.0 target."""
+    spec = cone_tip_block_spec
+    clearance_r = (round(spec.PINCH_CLEARANCE_DIA, 2) + _DRILLED_PLUS) / 2.0
+    height_min = _printed("BlockHt", spec.BLOCK_HEIGHT)[0]
+
+    def ligament(places: int) -> float:
+        pinch_max = round(spec.PINCH_HEIGHT, places) + _GENERAL[places]
+        return height_min - pinch_max - clearance_r - 2.0 * spec.EDGE_BREAK_MAX_MM
+
+    assert ligament(2) == pytest.approx(spec.WORST_TOP_LIGAMENT_MM)
+    assert round(ligament(2), 6) >= 2.0 > ligament(1)
+
+
+def _reference_call(body: str, feature: str) -> str:
+    """The build's one offset-reference call that authors ``feature``."""
+    at = body.index(f'feature_name="{feature}"')
+    start = body.rindex("await _author_offset_reference_dimension(", 0, at)
+    return body[start : body.index("\n    )\n", at)]
+
+
+def test_pinch_hole_height_is_located_from_the_foot() -> None:
+    """Clarity: the pinch hole prints its height straight from the foot in the
+    right view, where it is drilled, not chained off the adjuster axis."""
+    spec = cone_tip_block_spec
+    assert spec.DRAWING_DIMENSIONS["PinchHeightReference"] == {"PinchHeight"}
+    assert "PinchHeight" in drawing.RIGHT_KEEP
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build(") :]
+    call = _reference_call(body, "PinchHeightReference")
+    # Its witness leaves the foot (sketch y 0) at the flange's south end.
+    assert "start=(BLOCK_Z / 2.0 + FLANGE_LEN, 0.0)" in call
+    assert "end_y=PINCH_BORE_Y" in call
+    assert "drive_expression='\"PinchBoreY\"'" in call
+    # Its value stands one value-width outside the flange thickness's, over
+    # VIEW B's flange and short of VIEW B's body.
+    text_x, text_y = drawing.RIGHT_KEEP["PinchHeight"]
+    flange_t_x = drawing.RIGHT_KEEP["FlangeT"][0]
+    half = drawing.VALUE_TEXT_HALF_WIDTH
+    silhouettes = drawing.sheet_view_silhouettes()
+    assert flange_t_x + half + drawing.TEXT_CLEARANCE <= text_x - half
+    assert text_x + half <= silhouettes["view B body"][0] - 0.005
+    assert text_y - drawing.VALUE_TEXT_HALF_HEIGHT >= silhouettes["view B flange"][3] + 0.005
+    assert text_y == pytest.approx(
+        drawing._elevation_y(spec.PINCH_HEIGHT / 2.0, drawing.RIGHT_CENTER)
+    )
+
+
+def test_flange_slot_arc_centres_baseline_from_the_south_face() -> None:
+    """Clarity: each arc centre is located from the body's south face, a face
+    the shop can reach, not from the slot's own midpoint."""
+    spec = cone_tip_block_spec
+    assert spec.DRAWING_DIMENSIONS["FlangeSlotNorthReference"] == {"FlangeSlotNorthZ"}
+    assert spec.DRAWING_DIMENSIONS["FlangeSlotSouthReference"] == {"FlangeSlotSouthZ"}
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build(") :]
+    for end in ("North", "South"):
+        call = _reference_call(body, f"FlangeSlot{end}Reference")
+        # Sketch y = -Z on the Top plane: BLOCK_Z / 2 is the south face.
+        assert "start=(-BLOCK_X / 2.0, BLOCK_Z / 2.0)" in call
+        assert f"end_y=BLOCK_Z / 2.0 + FLANGE_SLOT_{end.upper()}_Z" in call
+
+
+def test_slit_breaks_into_the_adjuster_thread_at_the_printed_limits() -> None:
+    """With the heights at .X the slit floor (SlitDepth down from the top)
+    must still open into the adjuster's tap drill (AxisHeight up from the
+    foot) by 0.25, or the jaws never grip the thread."""
+    spec = cone_tip_block_spec
+    floor_max = _printed("BlockHt", spec.BLOCK_HEIGHT)[1] - _printed(
+        "SlitDepth", spec.SLIT_DEPTH
+    )[0]
+    crown_min = _printed("AxisHeight", spec.ADJUSTER_AXIS_HEIGHT)[0] + (
+        spec.ADJUSTER_BORE_DIA / 2.0
+    )
+    assert crown_min - floor_max >= 0.25
+
+
+def test_shim_takes_up_the_printed_axis_height_band() -> None:
+    """The fit-up shim sets the adjuster axis on the shaft axis, so its range
+    covers the printed AxisHeight band either way plus 0.25, which in turn
+    covers the pivot post's journal position (it sets the shaft's height)."""
+    import cone_pivot_post_spec
+
+    post_zone = cone_pivot_post_spec.GEOMETRIC_TOLERANCES_MM["journal-axis true position"]
+    assert float(post_zone) / 2.0 <= 0.25
+    drive_train = Path(part.__file__).with_name("build_drive_train_assembly.py")
+    source = drive_train.read_text(encoding="utf-8")
+    assert 'POST_GEOMETRIC_TOLERANCES_MM["journal-axis true position"]' in source
+    spec = cone_tip_block_spec
+    low, high = _printed("AxisHeight", spec.ADJUSTER_AXIS_HEIGHT)
+    needed = (
+        spec.SHIM_NOMINAL - (spec.ADJUSTER_AXIS_HEIGHT - low) - 0.25,
+        spec.SHIM_NOMINAL + (high - spec.ADJUSTER_AXIS_HEIGHT) + 0.25,
+    )
+    assert spec.FOOT_SHIM_RANGE_MM[0] <= needed[0] + 1e-9
+    assert needed[1] <= spec.FOOT_SHIM_RANGE_MM[1] + 1e-9
+
+
+def test_flange_slot_fit_keeps_its_cutter_band_for_a_reason() -> None:
+    """3.97 +0.1/0 is Main's ruled fit: a general .XX band would let the slot
+    come out under the #6-32 major.  The reason is a spec comment and an
+    import-time check, not a sheet note (policy rule 6)."""
+    spec = cone_tip_block_spec
+    assert spec.FLANGE_SLOT_W - _GENERAL[2] < 0.138 * 25.4  # #6-32 basic major
+    lower, upper = deviations(spec.FLANGE_SLOT_W_BAND)
+    assert spec.FLANGE_SLOT_W + lower - 0.138 * 25.4 >= 0.25
+    source = Path(spec.__file__).read_text(encoding="utf-8")
+    assert "the fit is\n# no longer needed" in source

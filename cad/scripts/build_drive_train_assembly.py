@@ -840,6 +840,9 @@ from build_cone_pivot_post import (  # noqa: E402
     CRANK_BOSS_LENGTH as POST_CRANK_BOSS_LENGTH,
     CRANK_BOSS_START_Z as POST_CRANK_BOSS_START_Z,
 )
+from cone_pivot_post_spec import (  # noqa: E402
+    GEOMETRIC_TOLERANCES_MM as POST_GEOMETRIC_TOLERANCES_MM,
+)
 from cone_tip_block_spec import (  # noqa: E402
     ADJUSTER_BORE_SPEC as TIP_ADJ_BORE_SPEC,
     ADJUSTER_AXIS_HEIGHT as TIP_ADJUSTER_AXIS_HEIGHT,
@@ -847,6 +850,7 @@ from cone_tip_block_spec import (  # noqa: E402
     ADJUSTER_EMBED_WINDOW as TIP_ADJ_EMBED_WINDOW,
     BLOCK_X as TIP_BLOCK_X,
     BLOCK_Z as TIP_BLOCK_Z,
+    FIT_UP_SHIM_MARGIN_MM as TIP_FIT_UP_SHIM_MARGIN_MM,
     PINCH_BORE_SPEC as TIP_PINCH_BORE_SPEC,
     PINCH_CLEARANCE_SPEC as TIP_PINCH_CLEARANCE_SPEC,
     PINCH_HEIGHT as TIP_PINCH_Y,
@@ -910,6 +914,15 @@ if (
     > 1e-9
 ):
     raise AssertionError("cone axis height drifted between platform/post/block")
+# r3: the tip block's fit-up shim takes up its printed AxisHeight band plus a
+# margin for this side's terms: the pivot post sets the shaft's height, its
+# journal held to a diametral true-position zone (so half of it vertically).
+# The plate top is common to both riders and cancels.
+if (
+    float(POST_GEOMETRIC_TOLERANCES_MM["journal-axis true position"]) / 2.0
+    > TIP_FIT_UP_SHIM_MARGIN_MM
+):
+    raise AssertionError("the tip-block shim margin no longer covers the post journal position")
 # The shaft is placed by its front stub end; keep the station in lockstep with
 # the part's FRONT_STUB.
 if abs(SHAFT_FRONT_STATION + SHAFT_FRONT_STUB) > 1e-9:

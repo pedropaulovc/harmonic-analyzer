@@ -79,6 +79,8 @@ from cone_tip_block_spec import (
     DRAWING_PRECISION,
     FLANGE_LEN,
     FLANGE_SLOT_CTOC,
+    FLANGE_SLOT_NORTH_Z,
+    FLANGE_SLOT_SOUTH_Z,
     FLANGE_SLOT_W,
     FLANGE_SLOT_W_BAND,
     FLANGE_SLOT_X,
@@ -113,9 +115,10 @@ REFERENCE_SKETCHES = (
     "PassageCenterReference",
     "AxisHeightReference",
     "PinchDepthReference",
-    "PinchRiseReference",
+    "PinchHeightReference",
     "FlangeSlotXReference",
-    "FlangeSlotZReference",
+    "FlangeSlotNorthReference",
+    "FlangeSlotSouthReference",
 )
 
 # Geometry envelope comes from cone_tip_block_spec — the drawing's single
@@ -236,6 +239,64 @@ async def _author_reference_dimension(
     await force_rebuild(adapter)
 
 
+async def _author_offset_reference_dimension(
+    adapter,
+    *,
+    plane: str,
+    start: tuple[float, float],
+    end_y: float,
+    dimension_type: str,
+    value_mm: float,
+    feature_name: str,
+    dimension_name: str,
+    drive_expression: str,
+    start_drives: tuple[str, ...],
+) -> None:
+    """Author one construction-only location whose witness leaves a corner.
+
+    r3: a location measured from a face whose own witness would run along
+    that face's outline (the foot in section A-A, the south face on the plan)
+    starts from the face's outer corner instead, so the line is diagonal: no
+    orientation relation, the end on the sketch's vertical axis, the start
+    anchored at the corner (its anchor dimensions driven by ``start_drives``,
+    in anchor order) and the marked dimension ``dimension_type`` between them.
+    """
+    check(f"create_sketch {feature_name}", await adapter.create_sketch(plane))
+    set_sketch_direct_db(adapter, True)
+    reference = check(
+        f"{feature_name} line",
+        await adapter.add_line(*start, 0.0, end_y),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, reference)
+    await dimension_between(
+        adapter,
+        f"{reference}.start",
+        f"{reference}.end",
+        dimension_type,
+        value_mm,
+        feature_name,
+    )
+    check(
+        f"{feature_name} end on the axis",
+        await adapter.add_sketch_constraint(
+            f"{reference}.end", "origin", "vertical_points"
+        ),
+    )
+    await anchor_point_to_origin(adapter, f"{reference}.start", *start, feature_name)
+    await ensure_fully_defined(adapter, f"{feature_name} sketch")
+    check(f"exit_sketch {feature_name}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature_name)
+    names = name_dimensions(
+        adapter,
+        feature_name,
+        [dimension_name, *(f"{feature_name}Start{i}" for i in range(len(start_drives)))],
+    )
+    for full_name, expression in zip(names, (drive_expression, *start_drives), strict=True):
+        await drive_dimension(adapter, full_name, expression)
+    await force_rebuild(adapter)
+
+
 # The flange slot's centre in Top-plane sketch coordinates (y = -Z).
 _FLANGE_SLOT_Y = BLOCK_Z / 2.0 + FLANGE_SLOT_Z
 
@@ -261,9 +322,7 @@ async def _sketch_flange_slot(adapter) -> SketchDims:
     )
     set_sketch_direct_db(adapter, False)
     await anchor_point_to_origin(adapter, f"{arc_n}.center", 0.0, y_n, "flange slot north end")
-    dims.record(
-        "FlangeSlotNorthY", '"BlockZ" / 2 + "FlangeSlotZ" - "FlangeSlotCtoC" / 2'
-    )
+    dims.record("FlangeSlotNorthY", '"BlockZ" / 2 + "FlangeSlotNorthZ"')
     check(
         "flange slot end centres in line",
         await adapter.add_sketch_constraint(
@@ -278,7 +337,7 @@ async def _sketch_flange_slot(adapter) -> SketchDims:
         FLANGE_SLOT_CTOC,
         "flange slot spacing",
     )
-    dims.record("FlangeSlotCtoC", '"FlangeSlotCtoC"')
+    dims.record("FlangeSlotCtoC", '"FlangeSlotSouthZ" - "FlangeSlotNorthZ"')
     check(
         "vertical flange slot line a",
         await adapter.add_sketch_constraint(line_a, None, "vertical"),
@@ -345,9 +404,10 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "FlangeLen", f"{FLANGE_LEN}mm")
     await set_global(adapter, "FlangeT", f"{FLANGE_T}mm")
     await set_global(adapter, "FlangeSlotW", f"{FLANGE_SLOT_W}mm")
-    await set_global(adapter, "FlangeSlotCtoC", f"{FLANGE_SLOT_CTOC}mm")
     await set_global(adapter, "FlangeSlotX", '"BlockX" / 2')
-    await set_global(adapter, "FlangeSlotZ", f"{FLANGE_SLOT_Z}mm")
+    # r3 option A: both arc centres baselined from the body's south face.
+    await set_global(adapter, "FlangeSlotNorthZ", f"{FLANGE_SLOT_NORTH_Z}mm")
+    await set_global(adapter, "FlangeSlotSouthZ", f"{FLANGE_SLOT_SOUTH_Z}mm")
     await set_global(adapter, "HeelReliefDepth", f"{HEEL_RELIEF_DEPTH}mm")
     await set_global(adapter, "HeelReliefHt", f"{HEEL_RELIEF_HEIGHT}mm")
     await set_global(
@@ -549,8 +609,8 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "foot flange", volume + v_flange, 0.005 * v_flange)
 
     # The flange's axial slot: one pass of a 5/32 end mill along the cone
-    # axis, centred across the block, its arc centres FLANGE_SLOT_CTOC apart
-    # about FLANGE_SLOT_Z south of the south face.  Cut through the flange.
+    # axis, centred across the block, its arc centres FLANGE_SLOT_NORTH_Z and
+    # FLANGE_SLOT_SOUTH_Z south of the south face.  Cut through the flange.
     slot = await _sketch_flange_slot(adapter)
     name_last_feature(adapter, "FlangeSlotProfile")
     drive_jobs += slot.apply(adapter, "FlangeSlotProfile")
@@ -631,20 +691,23 @@ async def build(adapter) -> dict[str, str]:
         dimension_name="PinchDepthCenter",
         drive_expression='"PinchDepthCenter"',
     )
-    await _author_reference_dimension(
+    # r3: the pinch-hole centre straight from the foot.  Section A-A shows the
+    # foot edge-on along the whole block and flange, so the witness leaves the
+    # foot's corner at the flange's south end (the Right plane reads south as
+    # sketch +x) and runs clear of the outline.
+    await _author_offset_reference_dimension(
         adapter,
         plane="Right",
-        start=(0.0, ADJUSTER_AXIS_HEIGHT),
-        end=(0.0, PINCH_BORE_Y),
-        orientation="vertical",
+        start=(BLOCK_Z / 2.0 + FLANGE_LEN, 0.0),
+        end_y=PINCH_BORE_Y,
         dimension_type="vertical_distance",
-        value_mm=PINCH_RISE,
-        feature_name="PinchRiseReference",
-        dimension_name="PinchRise",
-        drive_expression='"PinchRise"',
+        value_mm=PINCH_BORE_Y,
+        feature_name="PinchHeightReference",
+        dimension_name="PinchHeight",
+        drive_expression='"PinchBoreY"',
+        start_drives=('"BlockZ" / 2 + "FlangeLen"',),
     )
-    # The flange slot's centre from the +X face (the PassageCenter datum) and
-    # from the body's south face.
+    # The flange slot's centre from the +X face (the PassageCenter datum).
     await _author_reference_dimension(
         adapter,
         plane="Top",
@@ -657,17 +720,32 @@ async def build(adapter) -> dict[str, str]:
         dimension_name="FlangeSlotX",
         drive_expression='"FlangeSlotX"',
     )
-    await _author_reference_dimension(
+    # r3 option A: each arc centre from the body's south face, the witness
+    # leaving that face's -X corner (the plan's left, where the block depth
+    # and flange length chain from the same corner).
+    await _author_offset_reference_dimension(
         adapter,
         plane="Top",
-        start=(0.0, BLOCK_Z / 2.0),
-        end=(0.0, _FLANGE_SLOT_Y),
-        orientation="vertical",
+        start=(-BLOCK_X / 2.0, BLOCK_Z / 2.0),
+        end_y=BLOCK_Z / 2.0 + FLANGE_SLOT_NORTH_Z,
         dimension_type="vertical_distance",
-        value_mm=FLANGE_SLOT_Z,
-        feature_name="FlangeSlotZReference",
-        dimension_name="FlangeSlotZ",
-        drive_expression='"FlangeSlotZ"',
+        value_mm=FLANGE_SLOT_NORTH_Z,
+        feature_name="FlangeSlotNorthReference",
+        dimension_name="FlangeSlotNorthZ",
+        drive_expression='"FlangeSlotNorthZ"',
+        start_drives=('"BlockX" / 2', '"BlockZ" / 2'),
+    )
+    await _author_offset_reference_dimension(
+        adapter,
+        plane="Top",
+        start=(-BLOCK_X / 2.0, BLOCK_Z / 2.0),
+        end_y=BLOCK_Z / 2.0 + FLANGE_SLOT_SOUTH_Z,
+        dimension_type="vertical_distance",
+        value_mm=FLANGE_SLOT_SOUTH_Z,
+        feature_name="FlangeSlotSouthReference",
+        dimension_name="FlangeSlotSouthZ",
+        drive_expression='"FlangeSlotSouthZ"',
+        start_drives=('"BlockX" / 2', '"BlockZ" / 2'),
     )
     # Model-owned places are applied only after the reference sketches exist.
     apply_drawing_precision(adapter, DRAWING_PRECISION)

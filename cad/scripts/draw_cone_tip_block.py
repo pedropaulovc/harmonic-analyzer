@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
 from dataclasses import dataclass
 from enum import Enum
@@ -29,7 +30,6 @@ from _drawing_common import (
     rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hole_callout_precision,
     stamp_drawing_summary,
     visible_view_entities,
 )
@@ -45,7 +45,8 @@ from cone_tip_block_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FLANGE_LEN,
-    FLANGE_SLOT_CTOC,
+    FLANGE_SLOT_NORTH_Z,
+    FLANGE_SLOT_SOUTH_Z,
     FLANGE_SLOT_W,
     FLANGE_SLOT_Z,
     FLANGE_T,
@@ -104,6 +105,8 @@ Z_NORTH = BLOCK_Z / 2.0
 Z_SOUTH = -BLOCK_Z / 2.0 - FLANGE_LEN
 Z_MID = (Z_NORTH + Z_SOUTH) / 2.0
 FLANGE_SLOT_CENTER_Z = -BLOCK_Z / 2.0 - FLANGE_SLOT_Z
+FLANGE_SLOT_NORTH_CENTER_Z = -BLOCK_Z / 2.0 - FLANGE_SLOT_NORTH_Z
+FLANGE_SLOT_SOUTH_CENTER_Z = -BLOCK_Z / 2.0 - FLANGE_SLOT_SOUTH_Z
 
 
 def _elevation_y(model_y: float, center: tuple[float, float]) -> float:
@@ -150,46 +153,45 @@ FRONT_KEEP = {
 PASSAGE_CENTER_RISE = 0.024
 # swDimensionArrowsSide_e, set rather than left to the document's smart
 # arrows: swDimArrowsOutside = 1, swDimArrowsInside = 0.
-ARROWS_OUTSIDE = ("SlitW", "HeelReliefDepth", "FlangeSlotW")
+ARROWS_OUTSIDE = ("SlitW", "HeelReliefDepth", "FlangeSlotW", "FlangeSlotNorthZ")
 # Main eye-pass of 287c: the 15.2's smart arrows stood outside, and its lower
 # tail ran down to 0.4 mm over ADJUSTER ENTRY.  Its 22.8 mm span holds the
 # two-line value and both arrows inside.
-ARROWS_INSIDE = ("SlitDepth",)
+ARROWS_INSIDE = ("SlitDepth", "FlangeSlotSouthZ", "PinchHeight")
 _DIM_ARROWS_OUTSIDE = 1
 _DIM_ARROWS_INSIDE = 0
-# The plan.  Left of it: the block depth and the flange length, chained on
-# one line, and the slot's arc-centre spacing between that line and the
-# part.  Right of it: the slot's station from the body's south face, and the
-# slot width's value (arrows outside) level with the slot's south half, past
-# the end of that station's span.  Above the flange's south end, higher than
-# the A-A cutting-plane arrow and its letter at that end: the slot's location
-# from the +X face.
+# The plan.  Left of it, stepping out from the part: the slot's two arc
+# centres, each baselined from the body's south face (r3, option A; the 6.5
+# arrows outside, its span being shorter than its value and two arrows), then
+# the block depth and the flange length chained on one line.  All three
+# leave the south face's -X corner, one shared witness.  Right of it: the
+# slot width's value (arrows outside) level with the slot's midpoint.  Above
+# the flange's south end, higher than the A-A cutting-plane arrow and its
+# letter at that end: the slot's location from the +X face.
 _PLAN_LEFT = TOP_CENTER[0] - BLOCK_X * _S / 2.0
 _PLAN_RIGHT = TOP_CENTER[0] + BLOCK_X * _S / 2.0
-# Both chain values sit on this line and the spacing's value midway to the
-# part, so each moves half as far as the line: at -0.030 the I31 render
-# printed "20.8" 0.7 mm from "8.42", which read as "20.88.42".  At -0.036
-# the two values keep 3.8 mm of air.
-PLAN_CHAIN_X = TOP_CENTER[0] - 0.036
-# The 3.97's line prints 4.5 mm under its value's centre.  At 0.4 of the
-# spacing south of the slot centre (287c) it ran 0.5 mm off the 10.7's
-# witness from that centre; at 0.6 it stands 3 mm clear, still 3.3 mm inside
-# the slot's straight walls.
-FLANGE_SLOT_W_Z = FLANGE_SLOT_CENTER_Z - FLANGE_SLOT_CTOC * 0.6
+# Each line stands one value-width plus air outside the last: a vertical
+# value sits on its line, and two values on neighbouring lines keep 1.8 mm.
+PLAN_BASELINE_STEP = 0.011
+FLANGE_SLOT_NORTH_LINE_X = _PLAN_LEFT - PLAN_BASELINE_STEP
+FLANGE_SLOT_SOUTH_LINE_X = _PLAN_LEFT - 2.0 * PLAN_BASELINE_STEP
+PLAN_CHAIN_X = _PLAN_LEFT - 3.0 * PLAN_BASELINE_STEP
+# The 3.97's line prints 4.5 mm (3 model mm at 3:2) under its value's centre.
+# With no witness leaving the slot's right side any more (r3), the value
+# stands 3 mm south of the slot's middle so its line runs across that middle,
+# 6.3 mm from either arc centre's witness on the left.
+FLANGE_SLOT_W_Z = FLANGE_SLOT_CENTER_Z - 3.0
 FLANGE_SLOT_X_RISE = 0.016
 TOP_KEEP = {
     "Depth": (PLAN_CHAIN_X, _plan_y(0.0)),
     "FlangeLen": (PLAN_CHAIN_X, _plan_y((-BLOCK_Z / 2.0 + Z_SOUTH) / 2.0)),
-    "FlangeSlotCtoC": (
-        (PLAN_CHAIN_X + _PLAN_LEFT) / 2.0,
-        _plan_y(FLANGE_SLOT_CENTER_Z),
+    "FlangeSlotNorthZ": (
+        FLANGE_SLOT_NORTH_LINE_X,
+        _plan_y((-BLOCK_Z / 2.0 + FLANGE_SLOT_NORTH_CENTER_Z) / 2.0),
     ),
-    # Main eye-pass of 287c: at +0.022 the 10.7's upper outside arrow stood
-    # between "3.97" and its +0.1 / 0.0 and read as part of the tolerance.
-    # Right of that stack its arrows clear the value by 3.4 mm.
-    "FlangeSlotZ": (
-        TOP_CENTER[0] + 0.036,
-        _plan_y(-BLOCK_Z / 2.0 - FLANGE_SLOT_Z / 2.0),
+    "FlangeSlotSouthZ": (
+        FLANGE_SLOT_SOUTH_LINE_X,
+        _plan_y((-BLOCK_Z / 2.0 + FLANGE_SLOT_SOUTH_CENTER_Z) / 2.0),
     ),
     # 287c: centred 9.5 mm right of the plan, the value-and-deviation pair
     # printed "3.97" 0.2 mm off the plan's right edge.  Its value now starts
@@ -203,17 +205,9 @@ TOP_KEEP = {
         _plan_y(Z_SOUTH) + FLANGE_SLOT_X_RISE,
     ),
 }
-# The part-hidden reference sketch section A dimensions (PinchRise).
-SECTION_SKETCHES = ("PinchRiseReference",)
-SECTION_KEEP = {
-    "PinchRise": (
-        SECTION_CENTER[0] + 0.060,
-        _elevation_y(
-            (ADJUSTER_AXIS_HEIGHT + PINCH_HEIGHT) / 2.0,
-            SECTION_CENTER,
-        ),
-    )
-}
+# r3: section A-A carries no dimension; the pinch-hole height moved to the
+# right view, where the hole is drilled and seen end-on.
+SECTION_KEEP: dict[str, tuple[float, float]] = {}
 # The half-block station below runs from the north face to the pinch-hole
 # centre, so its value sits midway along its span.  Centred on the hole (run
 # 5637ac42), the witness and centreline ended in the decimal point; at +0.003
@@ -224,10 +218,14 @@ SECTION_KEEP = {
 # half way up (at 3:2 the notch is only 8.3 mm tall), arrows outside, its value left of the north face;
 # the height stands further left, so the depth's value sits between the
 # height's two extension lines.  The flange thickness stands past the
-# flange's south end, on the right.
+# flange's south end, on the right, and (r3) the pinch-hole height from the
+# foot one value-width further out: its witness leaves the foot at the
+# flange's south-end corner, shared with the thickness's.
 _RIGHT_NORTH_X = _right_x(Z_NORTH)
 HEEL_DEPTH_TEXT_X = _RIGHT_NORTH_X - ARROW_LENGTH - TEXT_CLEARANCE - VALUE_TEXT_HALF_WIDTH
 HEEL_HEIGHT_LINE_X = HEEL_DEPTH_TEXT_X - VALUE_TEXT_HALF_WIDTH - 0.008
+FLANGE_T_LINE_X = _right_x(Z_SOUTH) + 0.010
+PINCH_HEIGHT_LINE_X = FLANGE_T_LINE_X + PLAN_BASELINE_STEP
 RIGHT_KEEP = {
     "PinchDepthCenter": (
         _right_x(BLOCK_Z / 4.0),
@@ -242,8 +240,12 @@ RIGHT_KEEP = {
         _elevation_y(HEEL_RELIEF_HEIGHT / 2.0, RIGHT_CENTER),
     ),
     "FlangeT": (
-        _right_x(Z_SOUTH) + 0.010,
+        FLANGE_T_LINE_X,
         _elevation_y(FLANGE_T / 2.0, RIGHT_CENTER),
+    ),
+    "PinchHeight": (
+        PINCH_HEIGHT_LINE_X,
+        _elevation_y(PINCH_HEIGHT / 2.0, RIGHT_CENTER),
     ),
 }
 LEFT_KEEP: dict[str, tuple[float, float]] = {}
@@ -254,8 +256,8 @@ AXIS_OVERRUN = 0.002
 # Review C1: the left and rear views sit right of the right view, out of
 # third-angle order, so each is a removed view named by a letter arrow on the
 # view that shows the face it looks at.  VIEW B looks at the -X (pinch-thread)
-# face: the arrow meets the front view's left edge between the 32.27 and
-# 46.83 extension lines.  VIEW C looks at the -Z (shaft-entry) face, from
+# face: the arrow meets the front view's left edge between the 32.3 and
+# 46.8 extension lines.  VIEW C looks at the -Z (shaft-entry) face, from
 # the plan's upper (south) end, left of the A-A cutting-plane stem.  Each pair
 # is (note upper-left, leader tip), sheet metres.
 # The letters match the A-A cutting-plane letters (~5 mm, run 6cab17f6), and
@@ -293,8 +295,12 @@ ADJUSTER_ENTRY_RISE = 0.0135
 # hole-centre witness and crossed the 6.0's dimension line.  25 mm further
 # left the leader runs down to the hole at about 35 degrees, passing 3.5 mm
 # outside the 6.0's left arrow tail and under its north-face witness, into
-# the view across its north face.
-PINCH_CLEARANCE_CALLOUT_XY = (RIGHT_CENTER[0] - 0.058, 0.176)
+# the view across its north face.  r3: DRILL TO SLOT prints about 20 mm wider
+# than the blind depth did (PINCH_CLEARANCE_CALLOUT_EXTENT, an estimate), so
+# the callout steps 2.5 mm further left, where its left end still clears the
+# adjuster elevation's PassageCenter witness at W 17, and drops 4.5 mm so its
+# leader leaves the shoulder low enough to pass outside the 6.0's arrow tail.
+PINCH_CLEARANCE_CALLOUT_XY = (RIGHT_CENTER[0] - 0.0605, 0.1715)
 PINCH_THREAD_CALLOUT_XY = (LEFT_CENTER[0] + 0.016, 0.190)
 ROTATED_NOTE_XY = (SECTION_CENTER[0] - 0.015, 0.195)
 # The locating foot's finish symbol, on the elevation named here.  On the
@@ -395,7 +401,18 @@ _VALUE_EXTENTS = {
 }
 # Hole callouts: every line plus the shoulder the leader leaves from.
 ADJUSTER_CALLOUT_EXTENT = (0.0295, 0.0086, 0.0278, 0.0078)
-PINCH_CLEARANCE_CALLOUT_EXTENT = (0.0150, 0.0030, 0.0166, 0.0023)
+# r3: "Ø 3.26 ↓ 6.9" measured 28.5 mm of text (I31); "Ø 2.26 TO SLOT" on
+# the same sheet 33.7 mm.  "Ø 3.26 DRILL TO SLOT" adds "DRILL " (six glyphs at
+# the 2.4 mm that line averages) to the latter: 19.6 mm over the old text,
+# split both sides of the commanded point as SolidWorks centres it.  An
+# estimate until a render measures it.
+_PINCH_CLEARANCE_TEXT_GROWTH = 0.0196
+PINCH_CLEARANCE_CALLOUT_EXTENT = (
+    0.0150 + _PINCH_CLEARANCE_TEXT_GROWTH / 2.0,
+    0.0030,
+    0.0166 + _PINCH_CLEARANCE_TEXT_GROWTH / 2.0,
+    0.0023,
+)
 PINCH_THREAD_CALLOUT_EXTENT = (0.0322, 0.0085, 0.0310, 0.0078)
 # Free notes are placed by their upper-left corner.
 _NOTE_EXTENTS = {
@@ -429,7 +446,7 @@ VIEW_C_LEADER_DX = -0.0005
 # 1.0-1.3 mm past the line.  An outside arrow's arrowhead and tail run
 # 6.3-6.4 mm past its extension line; an inside arrowhead is 3.4 mm long and
 # about 0.6 mm across.  A vertical dimension with its arrows outside prints
-# no line between them (the 12.0, 8.42, 10.7, 5.56, 3.50, 15.2).
+# no line between them (the 12.0, 8.42, 10.7, 5.56, 3.50, 15.2 on 287c).
 OUTSIDE_ARROW_RUN = 0.0064
 HORIZONTAL_LINE_DROP = 0.0028
 FLANGE_SLOT_W_LINE_DROP = 0.0045
@@ -679,8 +696,8 @@ def sheet_dimension_ink(
     plus_x = 1.0 if adjuster_center == FRONT_CENTER else -1.0
     slit = SLIT_W * _S / 2.0
     tc = TOP_CENTER[0]
-    slot_y = _plan_y(FLANGE_SLOT_CENTER_Z)
-    arc = FLANGE_SLOT_CTOC * _S / 2.0
+    slot_north = _plan_y(FLANGE_SLOT_NORTH_CENTER_Z)
+    slot_south = _plan_y(FLANGE_SLOT_SOUTH_CENTER_Z)
     slot_w = FLANGE_SLOT_W * _S / 2.0
     south_face = _plan_y(-BLOCK_Z / 2.0)
     north = _right_x(Z_NORTH)
@@ -712,28 +729,23 @@ def sheet_dimension_ink(
         "FlangeLen": (
             v, (south_face, _plan_y(Z_SOUTH)), (_PLAN_LEFT,) * 2, PLAN_CHAIN_X, inside
         ),
-        "FlangeSlotCtoC": (
-            v, (slot_y - arc, slot_y + arc), (tc, tc), keeps["FlangeSlotCtoC"][0], out
+        "FlangeSlotNorthZ": (
+            v,
+            (south_face, slot_north),
+            (_PLAN_LEFT, tc),
+            keeps["FlangeSlotNorthZ"][0],
+            out,
         ),
-        "FlangeSlotZ": (
-            v, (south_face, slot_y), (_PLAN_RIGHT, tc), keeps["FlangeSlotZ"][0], out
+        "FlangeSlotSouthZ": (
+            v,
+            (south_face, slot_south),
+            (_PLAN_LEFT, tc),
+            keeps["FlangeSlotSouthZ"][0],
+            inside,
         ),
         "FlangeSlotW": (h, (tc - slot_w, tc + slot_w), (None, None), drop("FlangeSlotW"), out),
         "FlangeSlotX": (
             h, (tc, _PLAN_RIGHT), (_plan_y(Z_SOUTH),) * 2, drop("FlangeSlotX"), out
-        ),
-        # Rotated section: the block's height runs along the sheet's x.  Its
-        # witnesses leave the adjuster axis and the pinch-bore centre 9.95 mm
-        # under the section's centre (287c render).
-        "PinchRise": (
-            h,
-            tuple(
-                SECTION_CENTER[0] + (height - BLOCK_HEIGHT / 2.0) * _S
-                for height in (ADJUSTER_AXIS_HEIGHT, PINCH_HEIGHT)
-            ),
-            (SECTION_CENTER[1] - 0.00995,) * 2,
-            drop("PinchRise"),
-            inside,
         ),
         "PinchDepthCenter": (
             h,
@@ -756,6 +768,15 @@ def sheet_dimension_ink(
             (_right_x(Z_SOUTH),) * 2,
             keeps["FlangeT"][0],
             out,
+        ),
+        # r3: from the foot's corner at the flange's south end to the pinch
+        # hole's centre, whose witness crosses the body's south face.
+        "PinchHeight": (
+            v,
+            (foot, _elevation_y(PINCH_HEIGHT, RIGHT_CENTER)),
+            (_right_x(Z_SOUTH), _right_x(0.0)),
+            keeps["PinchHeight"][0],
+            inside,
         ),
     }
     return {
@@ -1001,9 +1022,9 @@ def _set_arrow_sides(
 def _add_adjuster_axis(adapter: Any, section: Any) -> None:
     """Sketch the adjuster bore's axis across section A-A, owned by the view.
 
-    The 8.85 pinch rise is measured from this axis to the pinch-bore centre;
-    without the centreline its extension line reads as rising from nothing
-    (review 2026-09-23).  The cutting plane is X = 0, so the adjuster axis
+    The through thread and its countersinks read as one bore only with their
+    centreline (review 2026-09-23, when the 8.85 pinch rise still rose from
+    it).  The cutting plane is X = 0, so the adjuster axis
     (along Z) lies in it and projects as a line, while the pinch axis (along
     X) projects to a point -- run 71f5acc5 sketched that zero-length line and
     CreateCenterLine returned None.  Run 6cab17f6 then sketched it with sheet
@@ -1164,6 +1185,59 @@ def _pinch_thread_callout_definitions(
     ):
         raise RuntimeError(f"pinch-thread callout rewrite lost semantics: {updated!r}")
     return updated
+
+
+# r3 blocker: the near jaw is drilled full diameter until it opens into the
+# slit, so the native blind depth ("<HOLE-DEPTH> <hw-depth>") becomes the
+# instruction; the diameter stays the Hole Wizard variable.
+PINCH_CLEARANCE_EXTENT_TEXT = "DRILL TO SLOT"
+_BLIND_DEPTH_TOKENS = re.compile(r"<HOLE-DEPTH>\s*<hw-depth>")
+
+
+def _pinch_clearance_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Swap the one native blind-depth pair for DRILL TO SLOT, loudly."""
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected pinch clearance callout parts: {definitions!r}")
+    hits = {
+        part: len(_BLIND_DEPTH_TOKENS.findall(text)) for part, text in definitions.items()
+    }
+    if sorted(hits.values()) != [0, 0, 0, 1]:
+        raise RuntimeError(
+            f"pinch clearance callout has no single blind depth to replace: {definitions!r}"
+        )
+    updated = {
+        part: _BLIND_DEPTH_TOKENS.sub(PINCH_CLEARANCE_EXTENT_TEXT, text)
+        for part, text in definitions.items()
+    }
+    rewritten = "\n".join(updated.values())
+    if "<hw-depth>" in rewritten or "<HOLE-DEPTH>" in rewritten:
+        raise RuntimeError(f"pinch clearance rewrite left a depth: {updated!r}")
+    return updated
+
+
+def _pinch_clearance_callout_resolved(resolved_parts: dict[int, str]) -> bool:
+    joined = "\n".join(resolved_parts.values())
+    return (
+        joined.count(PINCH_CLEARANCE_EXTENT_TEXT) == 1
+        and "<HOLE-DEPTH>" not in joined
+        and f"{PINCH_CLEARANCE_DIA:.2f}" in joined
+    )
+
+
+def _set_pinch_clearance_callout_text(display: Any) -> None:
+    """State DRILL TO SLOT without severing the diameter's Hole Wizard variable."""
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    updated = _pinch_clearance_callout_definitions(definitions)
+    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition_part] != definitions[definition_part]:
+            display.SetText(writable_part, updated[definition_part])
+    persisted = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    resolved_parts = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
+    if persisted != updated or not _pinch_clearance_callout_resolved(resolved_parts):
+        raise RuntimeError(
+            "pinch clearance DRILL TO SLOT did not persist: "
+            f"definitions={persisted!r}, resolved={resolved_parts!r}"
+        )
 
 
 def _pinch_thread_callout_resolved(resolved_parts: dict[int, str]) -> bool:
@@ -1362,32 +1436,26 @@ async def build(adapter: Any) -> dict[str, str]:
     # countersinks, split jaws and pinch bore relationship without dashed
     # inference.
     #
-    # PinchRise lives on the part-hidden PinchRiseReference sketch (995a7c94).
-    # A derived view takes a hidden sketch's visibility from the part when it
-    # is created and refuses the per-view override the targeted import uses
-    # (lever's probe c0514e35, measured on a detail), so the section is made
-    # and dimensioned while the part shows that sketch in memory.
-    with hidden_sketches.part_sketches_shown(
-        adapter, source_model, SECTION_SKETCHES, label="section A pinch rise"
-    ):
-        section = create_section_view(
-            adapter,
-            top,
-            line_start=(TOP_CENTER[0], _plan_y(Z_NORTH) - 0.004),
-            line_end=(TOP_CENTER[0], _plan_y(Z_SOUTH) + 0.004),
-            view_xy=SECTION_CENTER,
-            section_label="A",
-            scale=SHEET_SCALE,
-            label="adjuster and pinch-bore centre section",
-        )
-        set_hidden_lines_removed(adapter, section)
-        section_annotations = hidden_sketches.curate_view_dimensions(
-            adapter,
-            section,
-            keep=SECTION_KEEP,
-            view_label="bore centre section",
-            dimensions_by_feature=DRAWING_DIMENSIONS,
-        )
+    # r3: the section carries no dimension (the pinch height moved to the
+    # right view), so no part-hidden sketch needs showing while it is cut.
+    section = create_section_view(
+        adapter,
+        top,
+        line_start=(TOP_CENTER[0], _plan_y(Z_NORTH) - 0.004),
+        line_end=(TOP_CENTER[0], _plan_y(Z_SOUTH) + 0.004),
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=SHEET_SCALE,
+        label="adjuster and pinch-bore centre section",
+    )
+    set_hidden_lines_removed(adapter, section)
+    section_annotations = curate_view_dimensions(
+        adapter,
+        section,
+        keep=SECTION_KEEP,
+        view_label="bore centre section",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     _add_adjuster_axis(adapter, section)
 
     adjuster_view, adjuster_center, adjuster_edge = _preferred_entry_circle(
@@ -1505,11 +1573,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=PINCH_CLEARANCE_CALLOUT_XY,
         label="pinch entry-jaw clearance",
     )
-    set_hole_callout_precision(
-        pinch_clearance_callout,
-        {"hw-depth": 1},
-        label="pinch clearance depth",
-    )
+    _set_pinch_clearance_callout_text(pinch_clearance_callout)
     pinch_thread_callout = add_native_hole_callout(
         adapter,
         left,
