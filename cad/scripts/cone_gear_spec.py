@@ -250,37 +250,44 @@ WEB_EXCEPTIONS_MM: dict[int, float] = {6: 0.621}
 BORE_BAND_PLACES = 3
 
 
-def _bonded_bore_band() -> tuple[float, float]:
-    """Return the one (upper, lower) bore band every configuration prints.
-
-    Each bore is the nominal of its shaft land and is bonded to it, so it
-    takes the shared retained-joint fit against that land's band (Main,
-    2026-09-25).  BoreCutDia is one model dimension across the family, so the
-    band is the intersection over every land that carries a gear.  Its upper
-    limit is also capped by T006's named web: the largest bore under the
-    printed MIN floor must leave WEB_EXCEPTIONS_MM[6].
-    """
+# The band is UNIFORM, not per land, for two reasons.  BoreCutDia is one model
+# dimension across all 20 configurations, and SOLIDWORKS 2026 rejects the
+# per-configuration IDimensionTolerance.SetValues2 on some dimension types
+# (_drawing_marks).  And T006's named web (U40) caps the largest bore under its
+# printed MIN floor: a per-land +0.085 would cut that web to 0.604.  So the one
+# band is the intersection of the shared retained-joint fit (Main,
+# 2026-09-25) over every land that carries a gear, with its upper limit the
+# lower of two named limits.
+def _bonded_fit_band() -> tuple[float, float]:
+    """(upper, lower): the retained-joint fit that holds on every gear land."""
     carried = [
         bonded_bore_band(band)
         for band, teeth in zip(SECTION_DIA_BANDS, SECTION_CONE_GEAR_TEETH)
         if teeth
     ]
-    upper = min(band[0] for band in carried)
-    lower = max(band[1] for band in carried)
+    return (min(band[0] for band in carried), max(band[1] for band in carried))
+
+
+def _t006_web_upper() -> float:
+    """Largest bore deviation that leaves T006 its named web, to print places."""
     web_cap = FLOOR_LIMITS_MM[6][0] - 2.0 * WEB_EXCEPTIONS_MM[6] - bore_dia_mm(6)
     scale = 10**BORE_BAND_PLACES
-    upper = min(upper, math.floor(web_cap * scale + 1e-9) / scale)
-    if upper - lower < 0.02 - 1e-9:
-        raise AssertionError(
-            f"cone-gear bonded bore band {upper:+.3f}/{lower:+.3f} is under 0.02 wide"
-        )
-    return (round(upper, BORE_BAND_PLACES), round(lower, BORE_BAND_PLACES))
+    return math.floor(web_cap * scale + 1e-9) / scale
 
 
+BORE_BAND_FIT_UPPER, BORE_BAND_LOWER = _bonded_fit_band()  # +0.055, +0.025
+BORE_BAND_WEB_UPPER = _t006_web_upper()  # +0.050 (0.0505 floored)
 # (upper, lower): +0.050/+0.025.  Clearance 0.025-0.100 on the soldered seat
-# lands, 0.025-0.070 on the running terminal land; the T006 web cap (0.0505)
-# rounds the retained fit's 0.055 down to 0.050.
-BORE_DIA_BAND = _bonded_bore_band()
+# lands, 0.025-0.070 on the running terminal land.
+BORE_DIA_BAND = (
+    round(min(BORE_BAND_FIT_UPPER, BORE_BAND_WEB_UPPER), BORE_BAND_PLACES),
+    round(BORE_BAND_LOWER, BORE_BAND_PLACES),
+)
+if BORE_DIA_BAND[0] - BORE_DIA_BAND[1] < 0.02 - 1e-9:
+    raise AssertionError(
+        f"cone-gear bonded bore band {BORE_DIA_BAND[0]:+.3f}/"
+        f"{BORE_DIA_BAND[1]:+.3f} is under 0.02 wide"
+    )
 
 
 def bore_surface_finish(teeth: int) -> SurfaceFinishControl:
