@@ -39,50 +39,20 @@ from pinion_bracket_geometry import THICKNESS as STRAP_T
 from pinion_bracket_geometry import THICKNESS_PLACES as STRAP_T_PLACES
 from pinion_cam_geometry import CAM_LEN
 from pinion_lever_geometry import BORE_DEPTH as LEVER_BORE_DEPTH
+from pinion_lever_geometry import BORE_DEPTH_PLACES as LEVER_BORE_DEPTH_PLACES
+from pinion_lever_geometry import GRIP_FROM_B_PLACES as LEVER_GRIP_FROM_B_PLACES
+from pinion_lever_geometry import HUB_LEN as LEVER_HUB_LEN
+from pinion_lever_geometry import ROD_DIA as LEVER_ROD_DIA
+from pinion_lever_geometry import ROD_DIA_PLACES as LEVER_ROD_DIA_PLACES
+from pinion_lever_geometry import WALL_T as LEVER_WALL_T
 from pinion_pivot_block_geometry import (
     BLOCK_DEPTH,
     BLOCK_DEPTH_BAND as BLOCK_DEPTH_BAND,
     BLOCK_DEPTH_PLACES,
 )
+from pinion_spring_geometry import PAD_WIDTH as SPRING_PAD_WIDTH
+from pinion_spring_geometry import PAD_WIDTH_PLACES as SPRING_PAD_WIDTH_PLACES
 from pinion_spring_geometry import WIDTH as SPRING_W
-
-# BACK_STOP_Z, the back block's inner face and the cluster's back stop, is the
-# one axial reference.  At fit-up the cluster is pushed hard against it, so the
-# back strap, the drum and the front strap close up in front of it and every
-# other station below derives from it.  The U28 block put it at 77.75 (its
-# outer face at the released machine z 88.0, 10.25 deep); the E-a re-size deepened MHA-061
-# OUTWARD, leaving the cluster where it was, and RIG_AFT_SHIFT then moved the
-# whole rig aft.
-#
-# RIG_AFT_SHIFT (Main, restricted review of #858): the drum is a 3.0-face
-# gear's partner at j = 19, so that gear must keep its FULL face at the worst
-# stack, with RIG_MARGIN_SPARE to spare like every other rig margin.  At the
-# drilling pose the drum's back end stands 0.276 past g19's back face.
-# DRUM_BACK_ADVANCE_STACK below -- the thickest back strap (+0.8), the pinned
-# cluster run forward to the front block (widest feeler, 0.35) and the drum
-# run forward in its shimmed end play (widest shim, DRUM_END_SHIM + 0.10) --
-# advances it, so j = 19 keeps 0.276 + s - 0.8 - 0.35 - (DRUM_END_SHIM + 0.10)
-# of spare past its full face.  Gear j = 0, at the drum's front end, keeps
-# 3.25 - s of slack (DRUM_FRONT_RETREAT_STACK), and the shim does not reach
-# it: the drum is hard on the back strap in the pose.  The shift is the
-# smallest 0.25 step at which both, and every other rig margin, stand
-# RIG_MARGIN_SPARE over their floors.  The drum shim is sized by the same
-# rule (DRUM_END_SHIM), so the two are chosen together: with the 0.45 shim
-# 1.75 leaves j = 19 0.326 and j0 1.50; 1.5 would leave j = 19 0.076.  The
-# rig-internal margins do not move with the shift; every rig-to-frame margin
-# it touches holds (the grip against the crank cluster opens, the base rim
-# and base seats keep >= 31 and >= 35, the rocker support opens, and the back
-# block overlaps the north pedestal only in z, 19.97 clear in x).
-# build_drive_train_assembly asserts the whole margin table at import.
-RIG_AFT_SHIFT = 1.75
-RIG_AFT_SHIFT_STEP = 0.25  # the grid the shift is chosen on
-# The U28 back block: its outer face at the released machine z 88.0, 10.25 deep.
-U28_BACK_BLOCK_OUTER_Z = 88.0
-U28_BLOCK_DEPTH = 10.25
-U28_BACK_STOP_Z = U28_BACK_BLOCK_OUTER_Z - U28_BLOCK_DEPTH  # 77.75
-BACK_STOP_Z = U28_BACK_STOP_Z + RIG_AFT_SHIFT + MECHANISM_Z_SHIFT
-BACK_BLOCK_Z0 = BACK_STOP_Z
-BACK_BLOCK_OUTER_Z = BACK_BLOCK_Z0 + BLOCK_DEPTH
 
 # The novice-margin rule (Main, restricted review of #858): every rig-scope
 # margin stands at least this much over its floor at the worst stack, and the
@@ -110,6 +80,30 @@ DRUM_END_SHIM_SET_ERROR = FRONT_BLOCK_FEELER_BAND
 # carries its own error, printed on the drilling note.
 FLUSH_SET_ERROR = 0.10
 
+# Every fit-up setting is a stock leaf (or a pair of leaves) of one purchased
+# metric thickness gage (pinion_rig_fitup.FEELER_GAGE pins the set: 0.05 to
+# 1.00 in 0.05 steps), set to the same +/- FEELER_SET_ERROR.
+FEELER_LEAF_STEP = 0.05
+FEELER_LEAF_MAX = 1.00
+FEELER_SET_ERROR = FRONT_BLOCK_FEELER_BAND
+
+
+def smallest_leaf_setting(required: float) -> float:
+    """The thinnest gage setting (one leaf, or a pair) of at least ``required``."""
+    setting = round(math.ceil(required / FEELER_LEAF_STEP - 1e-9) * FEELER_LEAF_STEP, 2)
+    if setting > 2.0 * FEELER_LEAF_MAX:
+        raise AssertionError(f"{setting} needs more than two gage leaves")
+    return setting
+
+
+def leaf_pair(setting: float) -> tuple[float, ...]:
+    """The leaves a setting is made of: one leaf up to the thickest, else the
+    thickest plus the remainder."""
+    if setting <= FEELER_LEAF_MAX + 1e-9:
+        return (setting,)
+    return (FEELER_LEAF_MAX, round(setting - FEELER_LEAF_MAX, 2))
+
+
 # MHA-002 drum.  The length is alignment_pinion_spec.FACE_WIDTH (a drawing
 # contract this module must not import); a lockstep test pins the two.  It is
 # trapped between the straps' inner faces, and at the drilling set-up it sits
@@ -118,6 +112,58 @@ FLUSH_SET_ERROR = 0.10
 DRUM_LEN = 143.2
 DRUM_LEN_PLACES = 1  # FaceWidth prints .X (alignment_pinion_spec)
 DRUM_LEN_BAND = printed_band_mm(DRUM_LEN_PLACES)  # 0.8
+DRUM_OD_PLACES = 2  # OutsideDia prints .XX (alignment_pinion_spec)
+
+# The rig's axial datum (user ruling, 2026-09-25, P1-2): the base seats are
+# transferred from the blocks, so nothing in the frame fixes the rig along z
+# until the fitter sets it.  With the cluster hard back and the drum hard on
+# the back strap, the drum's back end is set RIG_SET_LEAF_D off gear j = 19's
+# back face, and only then are the block seats spotted (the base's transfer
+# callout, pinion_rig_fitup.RIG_SET_STEP).  The drum is located from g19
+# directly, so neither the strap thickness nor g19's own station reaches
+# j = 19.  From that set-up the drum's back end can only advance: the pinned
+# cluster runs forward to the front block, the drum forward in its shimmed
+# end play, and the leaf itself sets to its band.  j = 19 keeps its FULL 3.0
+# face with RIG_MARGIN_SPARE to spare, so D is the thinnest gage setting that
+# covers the advance plus the spare.
+# TODO(#743): the cylinder-gear bank's end play (E_b) and its g0 -> g19
+# pitch-stack band come from the bank retention design and join both stacks
+# below as named terms; until then they are listed, never valued.
+G19_BACK_FACE_Z = (
+    71.56188830854866  # Z_DRUM0 + 19 Z_PITCH + 1.5 (the drive train pins it)
+)
+DRUM_BACK_ADVANCE_STACK = {
+    "MHA-A03 feeler, widest (the pinned cluster's end play)": FRONT_BLOCK_FEELER
+    + FRONT_BLOCK_FEELER_BAND,
+    "MHA-A03 feeler, widest (the drum's shimmed end play)": DRUM_END_SHIM
+    + DRUM_END_SHIM_SET_ERROR,
+    "rig-set leaf D, thinnest setting": FEELER_SET_ERROR,
+}
+DRUM_BACK_ADVANCE_OPEN_TERMS = ("MHA-027 bank end play E_b (#743)",)
+DRUM_FRONT_RETREAT_STACK = {
+    "MHA-002 drum length .X": -printed_deviations(DRUM_LEN, DRUM_LEN_PLACES)[0],
+    "rig-set leaf D, thickest setting": FEELER_SET_ERROR,
+}
+DRUM_FRONT_RETREAT_OPEN_TERMS = (
+    "MHA-027 bank end play E_b (#743)",
+    "MHA-027 g0 -> g19 pitch stack (#743)",
+)
+RIG_SET_LEAF_D = smallest_leaf_setting(
+    sum(DRUM_BACK_ADVANCE_STACK.values()) + RIG_MARGIN_SPARE
+)  # 1.25
+RIG_SET_LEAVES = leaf_pair(RIG_SET_LEAF_D)  # (1.00, 0.25)
+BACK_STOP_Z = G19_BACK_FACE_Z + RIG_SET_LEAF_D + STRAP_T
+# BACK_STOP_Z, the back block's inner face, is where every station below
+# derives from.  The U28 block put it at 77.75 (its outer face at the
+# released machine z 88.0, 10.25 deep); the E-a re-size deepened MHA-061
+# OUTWARD, and the D set-up now moves the whole rig RIG_AFT_SHIFT aft of it.
+U28_BACK_BLOCK_OUTER_Z = 88.0
+U28_BLOCK_DEPTH = 10.25
+U28_BACK_STOP_Z = U28_BACK_BLOCK_OUTER_Z - U28_BLOCK_DEPTH  # 77.75
+RIG_AFT_SHIFT = BACK_STOP_Z - U28_BACK_STOP_Z - MECHANISM_Z_SHIFT  # derived
+BACK_BLOCK_Z0 = BACK_STOP_Z
+BACK_BLOCK_OUTER_Z = BACK_BLOCK_Z0 + BLOCK_DEPTH
+
 DRUM_BACK_Z = BACK_BLOCK_Z0 - STRAP_T
 DRUM_FRONT_Z = DRUM_BACK_Z - DRUM_LEN
 STRAP_Z_INNER = (DRUM_FRONT_Z - DRUM_END_SHIM, DRUM_BACK_Z)
@@ -159,22 +205,6 @@ LENGTH_BAND = printed_band_mm(LENGTH_PLACES)  # 0.8
 _STRAP_T_UPPER = printed_deviations(STRAP_T, STRAP_T_PLACES)[1]
 _DRUM_LEN_UPPER = printed_deviations(DRUM_LEN, DRUM_LEN_PLACES)[1]
 _BLOCK_DEPTH_UPPER = printed_deviations(BLOCK_DEPTH, BLOCK_DEPTH_PLACES)[1]
-
-# The drum's ends against the cylinder gears at its two ends (RIG_AFT_SHIFT).
-# The pose is the drilling set-up: the cluster hard on the back stop and the
-# drum hard on the back strap, so the drum's back end can only advance from it
-# and its front end can only retreat (the drive train asserts both gears).
-DRUM_BACK_ADVANCE_STACK = {
-    "MHA-056 back strap thickness .X": _STRAP_T_UPPER,
-    "MHA-A03 feeler, widest (the pinned cluster's end play)": FRONT_BLOCK_FEELER
-    + FRONT_BLOCK_FEELER_BAND,
-    "MHA-A03 feeler, widest (the drum's shimmed end play)": DRUM_END_SHIM
-    + DRUM_END_SHIM_SET_ERROR,
-}
-DRUM_FRONT_RETREAT_STACK = {
-    "MHA-056 back strap thickness .X": -printed_deviations(STRAP_T, STRAP_T_PLACES)[0],
-    "MHA-002 drum length .X": -printed_deviations(DRUM_LEN, DRUM_LEN_PLACES)[0],
-}
 
 
 def _up_to_tenth(length: float) -> float:
@@ -269,35 +299,29 @@ if sum(TORQUE_SHAFT_BACK_BEARING_STACK.values()) < _BACK_BEARING_REQUIRED - 1e-9
     )
 
 # The rod floats north until the back MHA-104 collar lands on the back block;
-# the MHA-059 lever hub must never be that stop.  The back collar is set to its
-# follower pin (plane BACK_CAM_PIN_STATION from its front face, by eye to
-# BACK_CAM_SET_ERR) with the cluster hard back, so its gap to the block peaks
-# at the thickest back strap.  The hub bottoms the rod in its bore, so the rod
-# must stand LEVER_SEAT_MIN -- the bore, that gap and a margin -- proud of the
-# front block's outer face even for the shortest rod in the longest stack,
-# and RIG_MARGIN_SPARE more (Main, #858: rounding had left 0.03).
-# The pin plane sits 6.25 into the 9-long collar (Main, #858: 6.0 left the
-# collar 0.6 off the block at the thinnest strap and the late set, 0.1 over
-# its 0.5 floor): BACK_COLLAR_GAP_MIN is then 0.85.
-BACK_CAM_PIN_STATION = 6.25
-BACK_CAM_SET_ERR = 0.5
+# the MHA-059 lever hub must never be that stop.  User ruling (2026-09-25,
+# P1-1): the back collar's back face is set BACK_COLLAR_LEAF_F off the back
+# block's inner face with a gage leaf, mirroring the front collar's feeler
+# against the front block.  Its gap is then the leaf and its set error only --
+# no collar length, strap thickness or by-eye term -- and the follower pin
+# rides wherever that puts it (BACK_CAM_PIN_STATION, from the collar's front
+# face).  The by-eye set to the pin it replaces had no feasible station once
+# the collar's .X length band was booked (Main, restricted review of #858).
+# F = 0.90 (user ruling): one step thicker than the thinnest leaf whose
+# tightest setting keeps the collar BACK_COLLAR_MIN_GAP + RIG_MARGIN_SPARE off
+# the block (0.85), so that row keeps 0.05 in hand.
 BACK_COLLAR_MIN_GAP = 0.5  # the collar never lands on the block but as the stop
 HUB_STOP_MARGIN = 0.25
+BACK_COLLAR_LEAF_F = 0.90
+if BACK_COLLAR_LEAF_F < smallest_leaf_setting(
+    BACK_COLLAR_MIN_GAP + RIG_MARGIN_SPARE + FEELER_SET_ERROR
+):
+    raise AssertionError("the back-collar leaf no longer covers its floor and spare")
+BACK_COLLAR_GAP_MIN = BACK_COLLAR_LEAF_F - FEELER_SET_ERROR  # 0.80
+BACK_COLLAR_GAP_MAX = BACK_COLLAR_LEAF_F + FEELER_SET_ERROR  # 1.00
 _STRAP_T_LOWER = printed_deviations(STRAP_T, STRAP_T_PLACES)[0]
-BACK_COLLAR_GAP_MAX = (
-    (STRAP_T + _STRAP_T_UPPER) / 2.0 - (CAM_LEN - BACK_CAM_PIN_STATION) + BACK_CAM_SET_ERR
-)  # 2.65
-BACK_COLLAR_GAP_MIN = (
-    (STRAP_T + _STRAP_T_LOWER) / 2.0
-    - (CAM_LEN - BACK_CAM_PIN_STATION)
-    - BACK_CAM_SET_ERR
-)  # 0.85
-if BACK_COLLAR_GAP_MIN < BACK_COLLAR_MIN_GAP + RIG_MARGIN_SPARE - 1e-9:
-    raise AssertionError(
-        f"back collar to the back block, worst case {BACK_COLLAR_GAP_MIN:.3f} < "
-        f"{BACK_COLLAR_MIN_GAP} + {RIG_MARGIN_SPARE}"
-    )
-LEVER_SEAT_MIN = LEVER_BORE_DEPTH + BACK_COLLAR_GAP_MAX + HUB_STOP_MARGIN  # 10.9
+BACK_CAM_PIN_STATION = CAM_LEN + BACK_COLLAR_LEAF_F - STRAP_T / 2.0  # 5.40
+LEVER_SEAT_MIN = LEVER_BORE_DEPTH + BACK_COLLAR_GAP_MAX + HUB_STOP_MARGIN  # 9.25
 
 
 def lift_rod_seat_stack(rod_len: float) -> dict[str, float]:
@@ -315,10 +339,95 @@ def lift_rod_seat_stack(rod_len: float) -> dict[str, float]:
     }
 
 
-_LEVER_SEAT_REQUIRED = LEVER_SEAT_MIN + RIG_MARGIN_SPARE
-LIFT_ROD_LEN = _up_to_tenth(
-    _LEVER_SEAT_REQUIRED - sum(lift_rod_seat_stack(0.0).values())
+# The MHA-059 lever rides the rod's front end, just south of the torque
+# shaft's front end, so a SHORT rod pulls the lever's throw plane toward it.
+# The grip arm's axis sits GripFromB from the hub's mouth face B, which sits
+# BoreDepth from the floor the rod seats on, and the arm is RodDia across
+# (pinion_lever_geometry); the drive train pins this nominal to its pose.
+LEVER_THROW_MIN_AIR = 0.25
+# Lever throw plane north face, measured from the rod's front end.
+LEVER_PLANE_NORTH_FROM_ROD_END = (
+    LEVER_HUB_LEN / 2.0 - LEVER_WALL_T + LEVER_ROD_DIA / 2.0
 )
+
+
+def _lever_arm_stack(direction: str) -> dict[str, float]:
+    """The grip arm's own printed bands, toward ``direction``."""
+    bore = printed_deviations(LEVER_BORE_DEPTH, LEVER_BORE_DEPTH_PLACES)
+    grip = printed_deviations(LEVER_HUB_LEN / 2.0, LEVER_GRIP_FROM_B_PLACES)
+    arm = printed_deviations(LEVER_ROD_DIA, LEVER_ROD_DIA_PLACES)
+    return {
+        "MHA-059 bore depth .X": -bore[0] if direction == "south" else bore[1],
+        "MHA-059 grip from face B .XX": grip[1] if direction == "south" else -grip[0],
+        "MHA-059 arm dia .X, half": arm[1] / 2.0,
+    }
+
+
+def lever_north_travel_stack(rod_len: float) -> dict[str, float]:
+    """Worst-case travel of the lever's throw plane north of the pose."""
+    return {
+        "MHA-060 rod length .X (shortest)": -printed_deviations(rod_len, LENGTH_PLACES)[
+            0
+        ],
+        "MHA-060 floated north to the back collar": BACK_COLLAR_GAP_MAX,
+        **_lever_arm_stack("north"),
+    }
+
+
+def lever_south_travel_stack(rod_len: float) -> dict[str, float]:
+    """Worst-case travel of the lever's throw plane south of the pose."""
+    return {
+        "MHA-060 rod length .X (longest)": printed_deviations(rod_len, LENGTH_PLACES)[
+            1
+        ],
+        "MHA-060 floated south to the front collar (widest feeler)": (
+            FRONT_BLOCK_FEELER + FRONT_BLOCK_FEELER_BAND
+        ),
+        **_lever_arm_stack("south"),
+    }
+
+
+SHAFT_FRONT_SOUTH_TRAVEL_STACK = {
+    "MHA-062 length .X (longest)": printed_deviations(TORQUE_SHAFT_LEN, LENGTH_PLACES)[
+        1
+    ],
+    "MHA-A03 feeler, widest (the pinned cluster runs forward)": (
+        FRONT_BLOCK_FEELER + FRONT_BLOCK_FEELER_BAND
+    ),
+    "MHA-062 rear end flush set": FLUSH_SET_ERROR,
+}
+
+
+def lever_to_shaft_front_worst(rod_len: float) -> float:
+    """Worst-case air from the lever's throw plane to the shaft's front end."""
+    nominal = rod_len - TORQUE_SHAFT_LEN - LEVER_PLANE_NORTH_FROM_ROD_END
+    return (
+        nominal
+        - sum(lever_north_travel_stack(rod_len).values())
+        - sum(SHAFT_FRONT_SOUTH_TRAVEL_STACK.values())
+    )
+
+
+# MHA-060 is the longer of two requirements, each at its worst stack with
+# RIG_MARGIN_SPARE: the rod standing LEVER_SEAT_MIN proud of the front block,
+# and the lever's throw plane clearing the torque shaft's front end (the leaf
+# F shortened the seat requirement by 1.6, and the lever then crowded the
+# shaft to 0.14 -- Main, restricted review of #858).
+_LEVER_SEAT_REQUIRED = LEVER_SEAT_MIN + RIG_MARGIN_SPARE
+_LEVER_AIR_REQUIRED = LEVER_THROW_MIN_AIR + RIG_MARGIN_SPARE
+LIFT_ROD_LEN = _up_to_tenth(
+    max(
+        _LEVER_SEAT_REQUIRED - sum(lift_rod_seat_stack(0.0).values()),
+        _LEVER_AIR_REQUIRED - lever_to_shaft_front_worst(0.0),
+    )
+)
+LEVER_NORTH_TRAVEL_STACK = lever_north_travel_stack(LIFT_ROD_LEN)
+LEVER_SOUTH_TRAVEL_STACK = lever_south_travel_stack(LIFT_ROD_LEN)
+LEVER_TO_SHAFT_FRONT_WORST = lever_to_shaft_front_worst(LIFT_ROD_LEN)
+if LEVER_TO_SHAFT_FRONT_WORST < _LEVER_AIR_REQUIRED - 1e-9:
+    raise AssertionError(
+        f"lever throw plane to the shaft front, worst {LEVER_TO_SHAFT_FRONT_WORST:.3f}"
+    )
 LIFT_ROD_SEAT_STACK = lift_rod_seat_stack(LIFT_ROD_LEN)
 if sum(LIFT_ROD_SEAT_STACK.values()) < _LEVER_SEAT_REQUIRED - 1e-9:
     raise AssertionError(
@@ -329,21 +438,41 @@ if sum(LIFT_ROD_SEAT_STACK.values()) < _LEVER_SEAT_REQUIRED - 1e-9:
 LEVER_SEAT_PROUD = LIFT_ROD_LEN - 2.0 * BLOCK_DEPTH - INNER_SPAN  # 15.60
 LIFT_ROD_Z0 = BACK_BLOCK_OUTER_Z - LIFT_ROD_LEN
 
-# MHA-114 return spring: the blade rides the back strap's flank.  The inset
-# from the strap's inner face keeps the whole 4.0-wide blade on the flank at
-# every split of P and every strap thickness in its .X band (the worst case is
-# the thinnest strap hard back: inner face 0.8 aft of the nominal one), which
-# the support-layout gate proves.  1.25 leaves the blade 0.45 on the flank
-# there, SPRING_BLADE_MIN_ON_FLANK plus RIG_MARGIN_SPARE (Main, #858: 1.0 left
-# 0.1 over the floor; 1.5 would have left the foot pad 0.245 over its 0.25
-# air to the back block).
-SPRING_BLADE_INSET = 1.25
+# MHA-114 return spring: the blade rides the back strap's flank, and its foot
+# pad lies on the base beside the back block.  Main (restricted review of
+# #858): the pad is set SPRING_PAD_LEAF off the back block's inner face with a
+# gage leaf before its seat is transferred, so the spring is stationed from
+# the block, not from the strap.  The blade's inset from the strap's NOMINAL
+# inner face follows, and a thin strap (inner face 0.8 aft) or the leaf's
+# set error only moves the flank under it: 1.00 leaves the blade exactly
+# SPRING_BLADE_MIN_ON_FLANK + RIG_MARGIN_SPARE on the flank at the worst
+# setting, and the pad 0.645 off the block.
+SPRING_PAD_LEAF = 1.00
+SPRING_Z = BACK_BLOCK_Z0 - SPRING_PAD_LEAF - SPRING_PAD_WIDTH / 2.0
+SPRING_BLADE_INSET = SPRING_Z - SPRING_W / 2.0 - STRAP_Z_INNER[1]  # 1.25
 SPRING_BLADE_MIN_ON_FLANK = 0.1
-SPRING_BLADE_ON_FLANK_WORST = SPRING_BLADE_INSET + _STRAP_T_LOWER  # 0.45
-if SPRING_BLADE_ON_FLANK_WORST < SPRING_BLADE_MIN_ON_FLANK + RIG_MARGIN_SPARE - 1e-9:
-    raise AssertionError(
-        f"spring blade on the back strap flank, worst case "
-        f"{SPRING_BLADE_ON_FLANK_WORST:.3f} < {SPRING_BLADE_MIN_ON_FLANK} + "
-        f"{RIG_MARGIN_SPARE}"
-    )
-SPRING_Z = STRAP_Z_INNER[1] + SPRING_BLADE_INSET + SPRING_W / 2.0
+SPRING_BLADE_ON_FLANK_WORST = (
+    SPRING_BLADE_INSET + _STRAP_T_LOWER - FEELER_SET_ERROR
+)  # 0.35
+SPRING_PAD_MIN_AIR = 0.25
+SPRING_PAD_TO_BLOCK_WORST = (
+    SPRING_PAD_LEAF
+    - FEELER_SET_ERROR
+    - printed_deviations(SPRING_PAD_WIDTH, SPRING_PAD_WIDTH_PLACES)[1] / 2.0
+)  # 0.645
+for _name, _worst, _floor in (
+    (
+        "spring blade on the back strap flank",
+        SPRING_BLADE_ON_FLANK_WORST,
+        SPRING_BLADE_MIN_ON_FLANK,
+    ),
+    (
+        "spring foot pad to the back block",
+        SPRING_PAD_TO_BLOCK_WORST,
+        SPRING_PAD_MIN_AIR,
+    ),
+):
+    if _worst < _floor + RIG_MARGIN_SPARE - 1e-9:
+        raise AssertionError(
+            f"{_name}, worst case {_worst:.3f} < {_floor} + {RIG_MARGIN_SPARE}"
+        )

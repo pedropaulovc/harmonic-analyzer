@@ -442,8 +442,17 @@ def test_transferred_pinion_block_seats_print_no_station() -> None:
     block_seats = {(x, z, part.BLOCK_SCREW_HOLE_DIA) for x, z in part.BLOCK_SCREW_XZ}
     assert set(sheet.TRANSFER_BLOCK_HOLES) == block_seats
     assert not block_seats & set(sheet.TABLE_HOLES)
-    assert sheet.TRANSFER_BLOCK_CALLOUT.startswith("TRANSFER FROM MHA-061")
-    assert "AT ASSEMBLY" in sheet.TRANSFER_BLOCK_CALLOUT
+    # User ruling P1-2: nothing in the frame fixes the rig along the bank
+    # until the fitter sets it, so the callout leads with that set-up (the
+    # drum's back end on leaf D off the north gear), then the transfer.
+    import pinion_rig_fitup as fitup
+
+    assert sheet.TRANSFER_BLOCK_CALLOUT == (
+        f"{fitup.RIG_SET_STEP}\nTRANSFER FROM MHA-061\nAT ASSEMBLY;"
+    )
+    assert sheet.TRANSFER_BLOCK_CALLOUT.startswith("RIG SET: MHA-002 BACK END")
+    assert sheet.TRANSFER_SPRING_NOTE.startswith("PAD 1.00 LEAF OFF MHA-061;")
+    assert "TRANSFER FROM MHA-114" in sheet.TRANSFER_SPRING_NOTE
     # The front pair sits one feeler off the fit-up stack, with no pose air.
     front_seat = rig.BACK_BLOCK_Z0 - rig.INNER_SPAN - BLOCK_DEPTH / 2.0
     assert rig.BLOCK_SEAT_Z[0] == pytest.approx(front_seat, abs=1e-9)

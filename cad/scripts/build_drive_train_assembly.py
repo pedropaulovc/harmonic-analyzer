@@ -805,6 +805,7 @@ from pinion_arbor_geometry import (  # noqa: E402
     CROSSROD_MAX_CLEARANCE as ARBOR_CROSSROD_MAX_CLEARANCE,
     CROSSROD_MIN_CLEARANCE as ARBOR_CROSSROD_MIN_CLEARANCE,
     CROSS_HOLE_DIA as ARBOR_CROSS_HOLE_DIA,
+    DRUM_STATION_BAND as ARBOR_DRUM_STATION_BAND,
     BACK_JOURNAL_Z as ARBOR_BACK_JOURNAL_Z,
     DRUM_STATION as ARBOR_DRUM_STATION,
     drum_total_air as ARBOR_DRUM_TOTAL_AIR,
@@ -815,11 +816,16 @@ from pinion_arbor_geometry import (  # noqa: E402
     MIN_LAND_OVER_STRAP as ARBOR_MIN_LAND_OVER_STRAP,
     RETAINING_COMPOUND_MAX_GAP_MM as ARBOR_BOND_MAX_GAP,
     HEAD_CAP_SAG as ARBOR_HEAD_CAP_SAG,
+    HEAD_CAP_SAG_PLACES as ARBOR_HEAD_CAP_SAG_PLACES,
     HEAD_CENTER_Z as ARBOR_HEAD_CENTER_Z,
     HEAD_DIA as ARBOR_HEAD_DIA,
     HEAD_FRONT_Z as ARBOR_HEAD_FRONT_Z,
+    HEAD_LEN as ARBOR_HEAD_LEN,
+    HEAD_LEN_PLACES as ARBOR_HEAD_LEN_PLACES,
     HEAD_REAR_Z as ARBOR_HEAD_REAR_Z,
     NECK_END_Z as ARBOR_NECK_END_Z,
+    NECK_LEN as ARBOR_NECK_LEN,
+    NECK_LEN_PLACES as ARBOR_NECK_LEN_PLACES,
     SHAFT_DIA as ARBOR_DIA,
 )
 from pinion_bracket_geometry import (  # noqa: E402
@@ -868,7 +874,10 @@ from pinion_lever_geometry import (  # noqa: E402
 from pinion_lever_pin_geometry import (  # noqa: E402
     INSTALLED_CONFIG as LEVER_PIN_INSTALLED_CONFIG,
 )
-from pinion_handle_geometry import ROD_DIA as HANDLE_ROD_DIA  # noqa: E402
+from pinion_handle_geometry import (  # noqa: E402
+    ROD_DIA as HANDLE_ROD_DIA,
+    ROD_DIA_BAND as HANDLE_ROD_DIA_BAND,
+)
 from pinion_spring_geometry import (  # noqa: E402
     AXIS_OFFSET as SPRING_AXIS_OFF,
     BLADE_TILT_DEG as SPR_BLADE_TILT_DEG,
@@ -1453,12 +1462,15 @@ if Z_DRUM0 - DRUM_FACE / 2.0 < APINION_Z_FRONT + 1.0:
     raise AssertionError("alignment pinion too short at the front station")
 if Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 > APINION_Z_BACK + 0.5:
     raise AssertionError("alignment pinion misses the j = 19 station")
-# Worst stack at both ends (RIG_AFT_SHIFT, Main on #858): the drum's back end
-# advances from the pose by DRUM_BACK_ADVANCE_STACK and must still cover all of
-# g19's face (so j = 19 engages >= 2.0 a fortiori); its front end retreats by
-# DRUM_FRONT_RETREAT_STACK and must stay 1.0 south of g0's front face.  Both
-# spares join RIG_MARGINS (below), and one step less shift would leave
-# j = 19 short of RIG_MARGIN_SPARE (the shift is the smallest that holds).
+# Worst stack at both ends (user ruling P1-2): the rig is set with the drum's
+# back end RIG_SET_LEAF_D off g19's back face, so from the pose it advances
+# by DRUM_BACK_ADVANCE_STACK and must still cover all of g19's face (so j = 19
+# engages >= 2.0 a fortiori); its front end retreats by DRUM_FRONT_RETREAT_STACK
+# and must stay 1.0 south of g0's front face.  Both spares join RIG_MARGINS
+# (below), and one leaf step thinner would leave j = 19 short of
+# RIG_MARGIN_SPARE (D is the thinnest setting that holds).  The bank's own
+# terms (E_b and the g0 -> g19 pitch stack) are open until #743 lands
+# (RIG.DRUM_*_OPEN_TERMS), so both rows are rig terms only.
 _G19_FACE_Z = (
     Z_DRUM0 + 19 * Z_PITCH - DRUM_FACE / 2.0,
     Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0,
@@ -1472,8 +1484,14 @@ if J19_FULL_FACE_MARGIN < -1e-9:
     raise AssertionError(
         f"j = 19 loses {-J19_FULL_FACE_MARGIN:.3f} of its full face at the worst stack"
     )
-if J19_FULL_FACE_MARGIN - RIG.RIG_AFT_SHIFT_STEP >= RIG.RIG_MARGIN_SPARE:
-    raise AssertionError("RIG_AFT_SHIFT is more than the smallest step for j = 19")
+if J19_FULL_FACE_MARGIN - RIG.FEELER_LEAF_STEP >= RIG.RIG_MARGIN_SPARE - 1e-9:
+    raise AssertionError("RIG_SET_LEAF_D is more than the thinnest setting for j = 19")
+# The rig layout carries g19's back face as a number (it reads no config);
+# the pose must put the drum's back end exactly D off it.
+if abs(_G19_FACE_Z[1] - RIG.G19_BACK_FACE_Z) > 1e-9:
+    raise AssertionError("pinion_rig_layout.G19_BACK_FACE_Z drifted from the gear grid")
+if abs(APINION_Z_BACK - _G19_FACE_Z[1] - RIG.RIG_SET_LEAF_D) > 1e-9:
+    raise AssertionError("the drum's back end is not RIG_SET_LEAF_D off g19")
 APINION_FRONT_WORST_Z = APINION_Z_FRONT + sum(RIG.DRUM_FRONT_RETREAT_STACK.values())
 J0_SLACK_WORST = (Z_DRUM0 - DRUM_FACE / 2.0 - 1.0) - APINION_FRONT_WORST_Z
 if J0_SLACK_WORST < 0.0:
@@ -1679,10 +1697,10 @@ _FPIN_Y_AT_CAM = _FPIN_C[1] - _S_CAM * _SPR_N[1]  # 64.04
 # free cam spin.  Ruling (c): the FRONT collar is set against the front
 # block's inner face (0.25 feeler) -- flush with the strap's outer face, so
 # the pin rides mid-collar (T/2) and the collar and lever hub capture the lift
-# rod on the block.  The back collar moves from the boss-era 7.5 to 6.0: with
-# the end play, the rod play and a by-eye set it then keeps >= 2 of collar on
-# both sides of the pin, and its back face stays >= 1.1 off the back block at
-# the thinnest strap (test_drive_train_support_layout).
+# rod on the block.  The BACK collar is set the same way, its back face
+# BACK_COLLAR_LEAF_F off the back block (user ruling P1-1), so the pin rides
+# BACK_CAM_PIN_STATION into it and keeps >= 2.75 of collar on both sides at
+# every setting (test_drive_train_support_layout).
 _STRAP_MID_Z = tuple(
     z + s * STRAP_T / 2.0 for z, s in zip(STRAP_Z_INNER, (-1.0, 1.0), strict=True)
 )  # -74.562, +78.088 (pinion_rig_layout)
@@ -1900,13 +1918,79 @@ if _LEV_Z[1] > PIVOT_SHAFT_Z0 - 0.25:
 if _LEV_Z[0] < _GRIP_HEAD_Z[1] + 0.25:
     raise AssertionError("lever throw plane reaches the integral grip head")
 
+# Worst-case travel of the parts whose clearances RIG_MARGINS reads (Main,
+# restricted review of #858, P2-3: the table claims worst case, so no row
+# may read the nominal pose).  The pose is the drilling set-up -- cluster and
+# drum hard back, both collars set -- so from it the arbor can only move
+# south by the drum's advance or north by its retreat (it is bonded at the
+# drum's front end), the lift rod floats between its two collar stops, and
+# the pinned torque shaft runs forward with the cluster.  Each part adds the
+# printed bands that station its face; frame-side faces (the T12, the crank
+# arm) are their own assemblies' stations.
+def _upper(value: float, places: int) -> float:
+    return printed_deviations(value, places)[1]
+
+
+def _lower(value: float, places: int) -> float:
+    return -printed_deviations(value, places)[0]
+
+
+ARBOR_SOUTH_TRAVEL_STACK = {
+    **RIG.DRUM_BACK_ADVANCE_STACK,
+    "MHA-002 drum length .X (longest)": _upper(RIG.DRUM_LEN, RIG.DRUM_LEN_PLACES),
+    "MHA-102 drum station .X (deepest)": ARBOR_DRUM_STATION_BAND,
+}
+ARBOR_NORTH_TRAVEL_STACK = {
+    **RIG.DRUM_FRONT_RETREAT_STACK,
+    "MHA-102 drum station .X (shallowest)": ARBOR_DRUM_STATION_BAND,
+}
+
+
+LEVER_SOUTH_TRAVEL_STACK = RIG.LEVER_SOUTH_TRAVEL_STACK
+LEVER_NORTH_TRAVEL_STACK = RIG.LEVER_NORTH_TRAVEL_STACK
+SHAFT_FRONT_SOUTH_TRAVEL_STACK = RIG.SHAFT_FRONT_SOUTH_TRAVEL_STACK
+# The rig layout sizes MHA-060 from the lever's nominal throw plane; the pose
+# must put it there.
+if abs(_LEV_Z[1] - (LIFT_ROD_Z0 + RIG.LEVER_PLANE_NORTH_FROM_ROD_END)) > 1e-9:
+    raise AssertionError("the lever throw plane drifted from the rig layout's")
+GRIP_ROD_SOUTH_TRAVEL_STACK = {
+    **ARBOR_SOUTH_TRAVEL_STACK,
+    "MHA-102 head length .X, half (crossrod centred)": _upper(
+        ARBOR_HEAD_LEN, ARBOR_HEAD_LEN_PLACES
+    )
+    / 2.0,
+    "MHA-058 crossrod dia, half": HANDLE_ROD_DIA_BAND[0] / 2.0,
+}
+GRIP_HEAD_SOUTH_TRAVEL_STACK = {
+    **ARBOR_SOUTH_TRAVEL_STACK,
+    "MHA-102 head length .X": _upper(ARBOR_HEAD_LEN, ARBOR_HEAD_LEN_PLACES),
+    "MHA-102 front crown sag .X": _upper(
+        ARBOR_HEAD_CAP_SAG, ARBOR_HEAD_CAP_SAG_PLACES
+    ),
+}
+GRIP_HEAD_NORTH_TRAVEL_STACK = {
+    **ARBOR_NORTH_TRAVEL_STACK,
+    "MHA-102 neck length .XX": _upper(ARBOR_NECK_LEN, ARBOR_NECK_LEN_PLACES),
+}
+# Radial: the widest drum tip against the largest end disc, which has no
+# sheet and so carries the title block's general .X row on its diameter.
+DRUM_TIP_TO_END_DISC_STACK = {
+    "MHA-002 OD .XX, half": _upper(2.0 * TIP_APINION, RIG.DRUM_OD_PLACES) / 2.0,
+    "end disc dia, general .X, half": _upper(END_DISC_DIA, 1) / 2.0,
+}
+
+
+def _worst(nominal: float, *stacks: dict[str, float]) -> float:
+    return nominal - sum(sum(stack.values()) for stack in stacks)
+
+
 # The novice-margin rule (Main, restricted review of #858): every rig-scope
 # margin -- the fit-up stacks, the drum's gears and end play, and each
 # clearance the rig's axial stations set against its neighbours -- stands at
 # least RIG_MARGIN_SPARE over its floor.  name -> (worst value, floor).
 RIG_MARGINS = {
-    "j = 19 past its full face": (J19_FULL_FACE_MARGIN, 0.0),
-    "j = 0 drum overhang slack": (J0_SLACK_WORST, 0.0),
+    "j = 19 past its full face (rig terms; #743 open)": (J19_FULL_FACE_MARGIN, 0.0),
+    "j = 0 drum overhang slack (rig terms; #743 open)": (J0_SLACK_WORST, 0.0),
     "torque shaft bearing in the front block": (
         sum(RIG.TORQUE_SHAFT_BEARING_STACK.values()),
         RIG.FRONT_BLOCK_MIN_BEARING,
@@ -1930,24 +2014,41 @@ RIG_MARGINS = {
         RIG.SPRING_BLADE_MIN_ON_FLANK,
     ),
     "spring foot pad to the back block": (
-        BLOCK_BACK_Z0 - (SPRING_Z + SPRING_PAD_WIDTH_WORST / 2.0),
-        0.25,
+        RIG.SPRING_PAD_TO_BLOCK_WORST,
+        RIG.SPRING_PAD_MIN_AIR,
     ),
     "grip crossrod to the T12 chain wheel": (
-        _GRIP_ROD_Z[0] - (REMOVABLE_Z0 + 5.0),
+        _worst(_GRIP_ROD_Z[0] - (REMOVABLE_Z0 + 5.0), GRIP_ROD_SOUTH_TRAVEL_STACK),
         0.25,
     ),
     "grip head to the crank arm": (
-        _GRIP_HEAD_Z[0] - (CRANK_ARM_Z0 + ARM_THICKNESS),
+        _worst(
+            _GRIP_HEAD_Z[0] - (CRANK_ARM_Z0 + ARM_THICKNESS),
+            GRIP_HEAD_SOUTH_TRAVEL_STACK,
+        ),
         0.25,
     ),
-    "lever throw plane to the grip head": (_LEV_Z[0] - _GRIP_HEAD_Z[1], 0.25),
+    "lever throw plane to the grip head": (
+        _worst(
+            _LEV_Z[0] - _GRIP_HEAD_Z[1],
+            LEVER_SOUTH_TRAVEL_STACK,
+            GRIP_HEAD_NORTH_TRAVEL_STACK,
+        ),
+        0.25,
+    ),
     "lever throw plane to the torque shaft's front end": (
-        PIVOT_SHAFT_Z0 - _LEV_Z[1],
+        _worst(
+            PIVOT_SHAFT_Z0 - _LEV_Z[1],
+            LEVER_NORTH_TRAVEL_STACK,
+            SHAFT_FRONT_SOUTH_TRAVEL_STACK,
+        ),
         0.25,
     ),
     "engaged drum tips to the north end disc": (
-        ENGAGED_C2C - TIP_APINION - END_DISC_DIA / 2.0,
+        _worst(
+            ENGAGED_C2C - TIP_APINION - END_DISC_DIA / 2.0,
+            DRUM_TIP_TO_END_DISC_STACK,
+        ),
         0.25,
     ),
 }

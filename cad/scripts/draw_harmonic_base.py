@@ -80,6 +80,7 @@ from build_harmonic_base import (
     STOP_SCREW_HOLE_DIA,
     STOP_SCREW_XZ,
 )
+from pinion_rig_fitup import RIG_SET_STEP, SPRING_SET_STEP
 from harmonic_base_spec import (
     BOTTOM_FRONT_Z,
     BOTTOM_LENGTH,
@@ -562,13 +563,16 @@ def _spread_hole_tags(view: Any, table: Any) -> None:
 # the pinion rig is set on the base by a 2.5 feeler at the parked tip gap,
 # then the pivot-block and spring-foot seats are spotted THROUGH those parts.
 # The sheet therefore prints no position for them: they leave the hole
-# table and carry their native size on a callout naming their source.
+# table and carry their native size on a callout naming their source.  Along
+# the bank nothing in the frame fixes the rig until the fitter sets it, so the
+# block callout leads with that setting (user ruling P1-2, RIG_SET_STEP) and
+# the spring note with the foot pad's (SPRING_SET_STEP).
 TRANSFER_BLOCK_HOLES = tuple((x, z, BLOCK_SCREW_HOLE_DIA) for x, z in BLOCK_SCREW_XZ)
 TRANSFER_SPRING_HOLE = (*FOOT_SCREW_XZ[0], FOOT_SCREW_HOLE_DIA)
 # The prefix lands before the tap line, so the semicolon separates the
 # locating instruction from "8-32 UNC - 2B" on the rendered line.
-TRANSFER_BLOCK_CALLOUT = "TRANSFER FROM MHA-061\nAT ASSEMBLY;"
-TRANSFER_SPRING_NOTE = "TRANSFER FROM MHA-114\nAT ASSEMBLY; SIZE AS E1"
+TRANSFER_BLOCK_CALLOUT = f"{RIG_SET_STEP}\nTRANSFER FROM MHA-061\nAT ASSEMBLY;"
+TRANSFER_SPRING_NOTE = f"{SPRING_SET_STEP}\nTRANSFER FROM MHA-114\nAT ASSEMBLY; SIZE AS E1"
 
 ALL_HOLES = (
     *((x, z, HOLD_DOWN_TAP_DRILL_DIA) for x, z in HOLE_XZ),

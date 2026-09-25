@@ -221,10 +221,13 @@ BACK_JOURNAL_Z = HEAD_REAR_Z + BACK_JOURNAL_FROM_HEAD_REAR
 
 # Rule 12 worst-case web from the centred crossrod hole to either head face:
 # the .X HeadLen band split over both sides, the hole at its upper limit.
-HEAD_LEN_BAND = LINEAR_X_BAND  # .X title-block row
-CROSS_HOLE_WEB_WORST = (
-    (HEAD_LEN - HEAD_LEN_BAND) / 2.0 - (CROSS_HOLE_DIA + CROSS_HOLE_DIA_BAND[0]) / 2.0
-)
+HEAD_LEN_PLACES = 1  # HeadLen
+HEAD_CAP_SAG_PLACES = 1  # HeadCapSagDim
+NECK_LEN_PLACES = 2  # NeckLen
+HEAD_LEN_BAND = printed_band_mm(HEAD_LEN_PLACES)  # .X title-block row
+CROSS_HOLE_WEB_WORST = (HEAD_LEN - HEAD_LEN_BAND) / 2.0 - (
+    CROSS_HOLE_DIA + CROSS_HOLE_DIA_BAND[0]
+) / 2.0
 # Crossrod bond: the rod must still enter the hole at its tightest pair, and
 # the loosest pair must stay inside the retaining compound's gap.
 CROSSROD_MIN_CLEARANCE = (CROSS_HOLE_DIA + CROSS_HOLE_DIA_BAND[1]) - (
@@ -274,4 +277,6 @@ if not (
     <= min(BACK_JOURNAL_FROM_HEAD_REAR, DRUM_STATION + DRUM_LEN)
     - BOND_ZONE_LAND_CLEARANCE
 ):
-    raise AssertionError("the bond-zone diameter must sit on the drum, clear of both lands")
+    raise AssertionError(
+        "the bond-zone diameter must sit on the drum, clear of both lands"
+    )

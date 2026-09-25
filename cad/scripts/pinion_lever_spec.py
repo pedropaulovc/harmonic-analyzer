@@ -15,14 +15,17 @@ from _fit_limits import REAM_SLIDE
 from pinion_lever_geometry import (
     BORE as BORE,
     BORE_DEPTH as BORE_DEPTH,
+    BORE_DEPTH_PLACES as BORE_DEPTH_PLACES,
     CAP_RADIUS as CAP_RADIUS,
     CAP_SAG as CAP_SAG,
+    GRIP_FROM_B_PLACES as GRIP_FROM_B_PLACES,
     HUB_LEN as HUB_LEN,
     HUB_OD as HUB_OD,
     PIN_HOLE_DIA as PIN_HOLE_DIA,
     PIN_HOLE_FROM_MOUTH as PIN_HOLE_FROM_MOUTH,
     PIN_HOLE_Z as PIN_HOLE_Z,
     ROD_DIA as ROD_DIA,
+    ROD_DIA_PLACES as ROD_DIA_PLACES,
     ROD_LEN as ROD_LEN,
     ROD_Y0 as ROD_Y0,
     WALL_T as WALL_T,
@@ -65,12 +68,12 @@ REFERENCE_SKETCHES = ("GripStationReference", "PinHoleStationReference")
 # row); one everywhere a turned or hand-finished feature is routine.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BarrelProfile": {"HubOd": 1, "HubBore": 3},
-    "Barrel": {"BoreDepth": 1},
+    "Barrel": {"BoreDepth": BORE_DEPTH_PLACES},
     "Wall": {"EndWall": 2},
-    "RodProfile": {"RodTipY": 1, "RodDia": 1},
+    "RodProfile": {"RodTipY": 1, "RodDia": ROD_DIA_PLACES},
     "CapProfile": {"CapR": 1},
     "PinHoleProfile": {"PinHoleDia": 2},
-    "GripStationReference": {"GripFromB": 2},
+    "GripStationReference": {"GripFromB": GRIP_FROM_B_PLACES},
     "PinHoleStationReference": {"PinHoleFromB": 1},
 }
 _PRECISION_NAMES = [
