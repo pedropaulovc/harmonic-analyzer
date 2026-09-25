@@ -319,11 +319,13 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         "frame-1/harmonic-base",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 8.725),
     ),
+    # U34c: the #8-32 x 3/4 (19.05) MHA-143 hold-downs pass the 5.0 pedestal
+    # ledge and engage 14.05 of the transferred base seats.
     **_numbered_pairs(
-        "drive-train-1/foot-screw",
-        range(2, 4),
+        "drive-train-1/pedestal-hold-down-screw",
+        range(1, 3),
         "frame-1/harmonic-base",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 4.525),
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 19.05 - 5.0),
     ),
     **_numbered_pairs(
         "channel-1/frame-side-screw",
