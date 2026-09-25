@@ -69,6 +69,13 @@ DEFAULT_TEXT_OVERLAP_TOL_M = 0.0003
 # still leaves a 3.5 mm text box room on a dense sheet.
 DEFAULT_MOVE_CLEARANCE_M = 0.002
 
+# An arrowhead, or an outside arrow's tail, nearer another annotation's text
+# than this reads as part of that text (MHA-092 round 2: the 5.56's arrow
+# 0.4 mm from "Ra 3.2", the 10.7's inside the 3.97's tolerance stack). The
+# fleet rule: the layout audit gates on it, and ``_drawing_leaders`` checks
+# placed sheets against it -- one constant, so the two cannot drift.
+ARROW_TEXT_CLEARANCE_M = 0.002
+
 # Fallback glyph advance as a fraction of cap height, used to estimate a text
 # box's WIDTH: no SolidWorks API returns the rendered width of annotation text
 # (``IDisplayData::GetTextInBoxWidthAtIndex`` is table cells only and returns 0
@@ -236,6 +243,26 @@ def segment_box_overlap_length(segment: Segment, box: Box) -> float:
     if _collinear_with_box_edge(segment, box):
         return 0.0
     return (span[1] - span[0]) * segment.length
+
+
+def segment_box_distance(segment: Segment, box: Box) -> float:
+    """Shortest distance from ``segment`` to ``box``; 0 when it touches or
+    enters it."""
+    if clip_segment_to_box(segment, box) is not None:
+        return 0.0
+    corners = ((box.xmin, box.ymin), (box.xmax, box.ymin), (box.xmax, box.ymax), (box.xmin, box.ymax))
+    ends = ((segment.x0, segment.y0), (segment.x1, segment.y1))
+    return min(
+        *(_point_segment_distance(corner, segment) for corner in corners),
+        *(math.hypot(max(box.xmin - x, 0.0, x - box.xmax), max(box.ymin - y, 0.0, y - box.ymax)) for x, y in ends),
+    )
+
+
+def _point_segment_distance(point: tuple[float, float], segment: Segment) -> float:
+    dx, dy = segment.x1 - segment.x0, segment.y1 - segment.y0
+    squared = dx * dx + dy * dy
+    t = 0.0 if squared == 0.0 else max(0.0, min(1.0, ((point[0] - segment.x0) * dx + (point[1] - segment.y0) * dy) / squared))
+    return math.hypot(segment.x0 + t * dx - point[0], segment.y0 + t * dy - point[1])
 
 
 def _collinear_with_box_edge(segment: Segment, box: Box) -> bool:
