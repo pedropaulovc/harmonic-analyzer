@@ -1057,10 +1057,12 @@ def package_native(out: Path) -> dict[str, Any]:
     sw, revision = attach_solidworks()
     failed = False
     try:
-        # Empty the seat BEFORE wiping ``out``: a run that died mid-stamping (a
-        # watchdog abort, a leaf timeout) can leave a packaged copy open, and
-        # its share lock would fail the rmtree before anything could close it.
-        _discard_open_documents(sw)
+        # Release the seat BEFORE wiping ``out``: a run that died mid-stamping (a
+        # watchdog abort, a leaf timeout) can leave a packaged copy open and the
+        # seat's working directory parked inside ``out``. Either one fails the
+        # rmtree (a share lock, or WinError 32) before anything could release
+        # it, so close every document AND park the directory first.
+        _release_seat(sw)
         prepare_out(out)
         RELEASE_DIR.mkdir(parents=True, exist_ok=True)
         with _telemetry.span("package.top_assembly", document=top.name) as sp:

@@ -591,9 +591,10 @@ def test_build_print_is_never_a_release_print(tmp_path: Path, monkeypatch):
 def test_package_native_empties_the_seat_before_wiping_the_prepared_tree(
     tmp_path: Path, monkeypatch
 ):
-    """Codex round 4 on #876: a run killed mid-stamping can leave a packaged copy
-    open and share-locked, so the next run must close it before prepare_out's
-    rmtree -- not after, when the rmtree has already failed."""
+    """Codex rounds 4 and 5 on #876: a run killed mid-stamping can leave a
+    packaged copy open (a share lock) and the seat's working directory parked
+    inside the tree (WinError 32), so the next run releases the seat -- close
+    and park -- before prepare_out's rmtree, not after it has already failed."""
     events: list[str] = []
     sldasm = tmp_path / "sldasm"
     sldasm.mkdir()
@@ -603,9 +604,6 @@ def test_package_native_empties_the_seat_before_wiping_the_prepared_tree(
     monkeypatch.setattr(package_native._config, "release_revision", lambda: "v37")
     monkeypatch.setattr(
         package_native, "attach_solidworks", lambda: (events.append("attach"), (object(), "34.0"))[1]
-    )
-    monkeypatch.setattr(
-        package_native, "_discard_open_documents", lambda _sw: events.append("discard")
     )
     monkeypatch.setattr(package_native, "prepare_out", lambda _out: events.append("wipe"))
     monkeypatch.setattr(
@@ -619,4 +617,4 @@ def test_package_native_empties_the_seat_before_wiping_the_prepared_tree(
 
     package_native.package_native(tmp_path / "release" / "native")
 
-    assert events == ["attach", "discard", "wipe", "top", "release"]
+    assert events == ["attach", "release", "wipe", "top", "release"]
