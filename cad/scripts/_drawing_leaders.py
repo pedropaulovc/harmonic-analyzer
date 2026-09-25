@@ -36,19 +36,26 @@ What a seat has shown, and what it has not yet:
     bore: leaders clear {'OutsideDia': '2 seg, lands 48.86 mm', 'BoreDia':
     '3 seg, lands 7.14 mm', 'BoreFinish': '2 seg, lands 7.14 mm'}". These are
     HALF_OD and the bore's sheet radius at 3:2.
-- ``section_line_segments`` (GetSectionLineInfo2) is not seat-proven yet;
-  drawing:crank_pinion's first leaf with it is.
+- ``section_line_segments`` (GetSectionLineInfo2) is not seat-proven yet.
+  Its first leaf (drawing:crank_pinion 20260925T210727Z) showed the chain
+  comes back in MODEL space and the arrows on the sheet. Until the chain was
+  mapped through the view's model-to-view transform, every section chain
+  was tested in model metres near the sheet origin, far from every leader,
+  so any earlier section-line crossing result was VACUOUS. That includes
+  8c4af0b9f's pass: it proves the leaders' space, not the section line's.
+  The mapped version's first leaf is the proof.
 """
 
 from __future__ import annotations
 
 import math
-from typing import Any, Collection, Mapping, Sequence
+from typing import Any, Callable, Collection, Mapping, Sequence
 
 import _telemetry
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 
 Point = tuple[float, float]
+Point3 = tuple[float, float, float]
 Segment = tuple[Point, Point]
 Box = tuple[float, float, float, float]  # (x0, y0, x1, y1), x0 <= x1, y0 <= y1
 
@@ -116,17 +123,30 @@ def dimension_segments(annotation: Any) -> list[Segment]:
     return segments
 
 
-def parse_section_line_info(values: Sequence[float]) -> list[Segment]:
+def parse_section_line_info(
+    values: Sequence[float],
+    chain_to_sheet: Callable[[Point3], Point] | None = None,
+) -> list[Segment]:
     """Section-line strokes from ``IView.GetSectionLineInfo2``'s flat array.
 
     Layout: [count, layer, then per line: nSegments, nSegments x (lineType,
     start[3], end[3]), arrow1 (start[3], end[3], width, height, style), arrow2
     (same), text1[3], text2[3], textHeight]. The chain-line segments, both
     arrow shafts and both arrowheads' outlines come back; the labels' text
-    points do not. Each head is tipped at the shaft end AWAY from the chain
-    line: the end that meets a chain-segment endpoint is the tail. A shaft
-    with neither or both ends on the chain raises with its raw values rather
-    than guessing.
+    points do not.
+
+    The array mixes spaces: the chain points are MODEL coordinates and the
+    arrows are sheet coordinates (seat, drawing:crank_pinion leaf
+    20260925T210727Z: chain x 0, y +/-0.0106 against arrows at y 0.120 on a
+    3:1 view at (0.110, 0.150)). ``chain_to_sheet`` maps a chain point onto
+    the sheet (``section_line_segments`` passes the view's model-to-view
+    transform); without it the chain is read as already on the sheet.
+
+    Each head is tipped at the shaft end AWAY from the chain: the tail is the
+    end within ``COLLINEAR_TOLERANCE`` of a chain segment's line and inside
+    its span, give or take ``SECTION_CHAIN_OVERRUN``. That doubles as the
+    transform's proof -- a shaft with neither or both ends on the mapped
+    chain raises with the raw and mapped values, never guesses.
     """
     values = [float(v) for v in values]
     if not values:
@@ -135,19 +155,24 @@ def parse_section_line_info(values: Sequence[float]) -> list[Segment]:
     for _ in range(count):
         n = int(values[index])
         index += 1
-        chain_ends: list[Point] = []
+        chain: list[Segment] = []
         for _ in range(n):
-            start, end = values[index + 1 : index + 3], values[index + 4 : index + 6]
-            segments.append(((start[0], start[1]), (end[0], end[1])))
-            chain_ends.extend(((start[0], start[1]), (end[0], end[1])))
+            start = (values[index + 1], values[index + 2], values[index + 3])
+            end = (values[index + 4], values[index + 5], values[index + 6])
+            if chain_to_sheet is None:
+                stroke = ((start[0], start[1]), (end[0], end[1]))
+            else:
+                stroke = (chain_to_sheet(start), chain_to_sheet(end))
+            chain.append(stroke)
             index += 7
+        segments.extend(chain)
         for arrow in (1, 2):
             raw = values[index : index + 9]
             start, end = (raw[0], raw[1]), (raw[3], raw[4])
             width, height = raw[6], raw[7]
             segments.append((start, end))
             segments.extend(
-                arrowhead_outline(_tail_first(start, end, chain_ends, arrow, raw), width, height)
+                arrowhead_outline(_tail_first(start, end, chain, arrow, raw), width, height)
             )
             index += 9
         index += 7
@@ -156,25 +181,59 @@ def parse_section_line_info(values: Sequence[float]) -> list[Segment]:
     return segments
 
 
+# How far past a chain segment's end an arrow's tail may sit and still read as
+# on the chain (sheet metres). The seat's chain runs PAST its arrows instead:
+# drawing:crank_pinion leaf 20260925T210727Z mapped the chain end to y
+# 0.118347 and drew arrow 1's tail at 0.120347, 2.00 mm inside. The mirror
+# case is allowed the same 2 mm until a seat shows one; every arrow logs its
+# measured inset so the next run can tighten this with evidence.
+SECTION_CHAIN_OVERRUN = 0.002
+
+
+def _chain_inset(stroke: Segment, point: Point) -> float | None:
+    """How far inside the stroke's span ``point`` sits along its line.
+
+    Negative past an end; None when ``point`` is off the stroke's infinite
+    line by more than ``COLLINEAR_TOLERANCE``.
+    """
+    (x0, y0), (x1, y1) = stroke
+    length = math.dist((x0, y0), (x1, y1))
+    if length == 0.0:
+        return None
+    ux, uy = (x1 - x0) / length, (y1 - y0) / length
+    dx, dy = point[0] - x0, point[1] - y0
+    if abs(dx * uy - dy * ux) > COLLINEAR_TOLERANCE:
+        return None
+    along = dx * ux + dy * uy
+    return min(along, length - along)
+
+
 def _tail_first(
-    start: Point, end: Point, chain_ends: Sequence[Point], arrow: int, raw: Sequence[float]
+    start: Point, end: Point, chain: Sequence[Segment], arrow: int, raw: Sequence[float]
 ) -> Segment:
-    """The arrow shaft ordered tail (on the chain line) to tip."""
-    on_chain = [
-        any(math.dist(point, chain) <= COLLINEAR_TOLERANCE for chain in chain_ends)
+    """The arrow shaft ordered tail (on the chain) to tip."""
+    insets = [
+        max(
+            (inset for stroke in chain if (inset := _chain_inset(stroke, point)) is not None),
+            default=None,
+        )
         for point in (start, end)
     ]
+    on_chain = [inset is not None and inset >= -SECTION_CHAIN_OVERRUN for inset in insets]
     if on_chain == [True, False]:
-        orientation, shaft = "start on chain, tip at end", (start, end)
+        orientation, shaft, inset = "start on chain, tip at end", (start, end), insets[0]
     elif on_chain == [False, True]:
-        orientation, shaft = "end on chain, tip at start", (end, start)
+        orientation, shaft, inset = "end on chain, tip at start", (end, start), insets[1]
     else:
         raise RuntimeError(
             f"section arrow {arrow}: cannot tell its tip -- start on chain "
-            f"{on_chain[0]}, end on chain {on_chain[1]}; raw {list(raw)}, "
-            f"chain ends {list(chain_ends)}"
+            f"{on_chain[0]}, end on chain {on_chain[1]} (insets {insets}); raw "
+            f"{list(raw)}, chain on the sheet {list(chain)}"
         )
-    _telemetry.debug(f"section arrow {arrow}: {orientation}")
+    _telemetry.debug(
+        f"section arrow {arrow}: {orientation}; tail inset {inset * 1000:.2f} mm from "
+        f"the chain end (negative past it; allowance {SECTION_CHAIN_OVERRUN * 1000:.1f} mm)"
+    )
     return shaft
 
 
@@ -203,10 +262,56 @@ def arrowhead_outline(shaft: Segment, width: float, height: float) -> list[Segme
     return wings
 
 
-def section_line_segments(view: Any) -> list[Segment]:
-    """The cutting-plane strokes (chain line and arrow shafts) a view carries."""
-    view = _sw_type_info.early_bound_or_flag(view, "IView", "GetSectionLineInfo2")
-    return parse_section_line_info(tuple(view.GetSectionLineInfo2() or ()))
+def section_line_segments(adapter: Any, view: Any) -> list[Segment]:
+    """The cutting-plane strokes a view carries, all in sheet metres.
+
+    The chain points are mapped through ``IView.ModelToViewTransform`` (the
+    same model-to-sheet projection ``_drawing_common.model_point_in_view``
+    uses, with SolidWorks doing the matrix product); the arrows already come
+    back on the sheet. ``view`` is the view that CARRIES the section line
+    (the parent), whose model space the chain is in.
+
+    The layout audit dropped ModelToViewTransform (drawing-layout-audit.md:
+    GetPolylines7 edges and IVertex points, mapped by a hand-rolled
+    ArrayData product, missed their strokes by 86-460 mm). Neither of those
+    inputs is used here. A crop hides geometry without moving it. A break
+    DOES move it -- the transform does not know the gap -- so a broken view
+    raises. Any other mismatch leaves the arrows' tails off the mapped chain,
+    which raises in ``parse_section_line_info``.
+    """
+    view = _sw_type_info.early_bound_or_flag(
+        view, "IView", "GetSectionLineInfo2", "ModelToViewTransform", "IsBroken", "GetName2"
+    )
+    name = str(view.GetName2())
+    if view.IsBroken():
+        raise RuntimeError(
+            f"section line on broken view {name!r}: its model-to-view transform "
+            "does not carry the break gap"
+        )
+    utility = _sw_type_info.early_bound_or_flag(
+        adapter.swApp.GetMathUtility(), "IMathUtility", "CreatePoint"
+    )
+    transform = _sw_type_info.early_bound_or_flag(
+        view.ModelToViewTransform, "IMathTransform", "ArrayData"
+    )
+    _telemetry.debug(
+        f"section view {name!r} model-to-view transform {list(transform.ArrayData)}"
+    )
+
+    def to_sheet(point: Point3) -> Point:
+        model = utility.CreatePoint(list(point))
+        if model is None:
+            raise RuntimeError(f"section line: could not create model point {point}")
+        model = _sw_type_info.early_bound_or_flag(model, "IMathPoint", "MultiplyTransform")
+        mapped = model.MultiplyTransform(transform)
+        if mapped is None:
+            raise RuntimeError(f"section line: could not map model point {point}")
+        mapped = _sw_type_info.early_bound_or_flag(mapped, "IMathPoint", "ArrayData")
+        x, y = (float(v) for v in tuple(mapped.ArrayData)[:2])
+        _telemetry.debug(f"section chain point {point} -> sheet ({x:.6f}, {y:.6f})")
+        return (x, y)
+
+    return parse_section_line_info(tuple(view.GetSectionLineInfo2() or ()), to_sheet)
 
 
 def dimension_text_points(annotation: Any) -> list[Point]:

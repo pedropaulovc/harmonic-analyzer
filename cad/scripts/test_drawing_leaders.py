@@ -233,3 +233,114 @@ def test_arrows_near_text_skips_own_text_empty_ink_and_clear_arrows() -> None:
     assert leaders.arrows_near_text(clear, texts, clearance=0.003) == [
         ("A", "value", pytest.approx(0.0025))
     ]
+
+
+def test_section_chain_comes_back_in_model_space_and_is_mapped_to_the_sheet() -> None:
+    # Seat, drawing:crank_pinion leaf 20260925T210727Z: arrow 1's raw values
+    # verbatim, with the chain in MODEL metres (x 0, y +/-0.01055) on a 3:1
+    # view whose model origin sits at (0.110, 0.150) on the sheet.
+    chain = [4, 0.0, -0.010550856167514645, 0.0, 0.0, 0.010550856167514645, 0.0]
+    arrow1 = [0.098, 0.12034743149745605, 0.0, 0.11, 0.12034743149745605, 0.0, 0.006, 0.003, 1.0]
+    arrow2 = [0.098, 0.17965256850254395, 0.0, 0.11, 0.17965256850254395, 0.0, 0.006, 0.003, 1.0]
+    text = [0.09, 0.115, 0.0, 0.09, 0.185, 0.0, 0.005]
+    values = [1, 0, 1, *chain, *arrow1, *arrow2, *text]
+
+    def view_3_to_1(point):
+        return (0.110 + 3.0 * point[0], 0.150 + 3.0 * point[1])
+
+    segments = leaders.parse_section_line_info(values, view_3_to_1)
+    (x0, y0), (x1, y1) = segments[0]
+    assert (x0, y0, x1, y1) == pytest.approx((0.110, 0.1183474315, 0.110, 0.1816525685))
+    # The shaft END sits on the chain, so the head is at START, pointing -x.
+    tail, tip = (0.11, 0.12034743149745605), (0.098, 0.12034743149745605)
+    assert segments[1] == (tip, tail)
+    assert segments[2:8] == leaders.arrowhead_outline((tail, tip), 0.006, 0.003)
+    # Unmapped, the chain sits at the sheet origin and no shaft end is on it.
+    with pytest.raises(RuntimeError, match="section arrow 1: cannot tell its tip"):
+        leaders.parse_section_line_info(values)
+
+    # A wrong transform (scale left out) leaves the tails off the chain: loud.
+    def unscaled(point):
+        return (0.110 + point[0], 0.150 + point[1])
+
+    with pytest.raises(RuntimeError, match="chain on the sheet"):
+        leaders.parse_section_line_info(values, unscaled)
+
+
+def _row_vector_view(rotation, scale, origin):
+    """``sheet = scale * (p @ R) + t``, SolidWorks' ArrayData convention."""
+
+    def to_sheet(point):
+        x, y, z = point
+        return (
+            origin[0] + scale * (x * rotation[0][0] + y * rotation[1][0] + z * rotation[2][0]),
+            origin[1] + scale * (x * rotation[0][1] + y * rotation[1][1] + z * rotation[2][1]),
+        )
+
+    return to_sheet
+
+
+def test_section_chain_on_a_rotated_view_maps_through_the_rotation() -> None:
+    # A 3:1 view rotated 90 deg: model +x runs sheet +y, model +y runs sheet
+    # -x. The chain is offset 4 mm in model x so R and its transpose land on
+    # different sheet lines, and the arrows are the seat's, turned with the
+    # view about its origin.
+    quarter = ((0.0, 1.0, 0.0), (-1.0, 0.0, 0.0), (0.0, 0.0, 1.0))
+    transposed = tuple(zip(*quarter))
+    origin = (0.110, 0.150)
+
+    def turn(x, y):
+        return (origin[0] - (y - origin[1]), origin[1] + (x - origin[0]))
+
+    half = 0.010550856167514645
+    chain = [4, 0.004, -half, 0.0, 0.004, half, 0.0]
+    arrows = []
+    for y in (0.12034743149745605, 0.17965256850254395):
+        (sx, sy), (ex, ey) = turn(0.098, y), turn(0.110, y)
+        # Seat arrows sit on the unrotated chain line; shift them onto the
+        # offset chain (4 mm model = 12 mm sheet along +y after the turn).
+        arrows += [sx, sy + 0.012, 0.0, ex, ey + 0.012, 0.0, 0.006, 0.003, 1.0]
+    text = [0.09, 0.115, 0.0, 0.09, 0.185, 0.0, 0.005]
+    values = [1, 0, 1, *chain, *arrows, *text]
+
+    segments = leaders.parse_section_line_info(values, _row_vector_view(quarter, 3.0, origin))
+    (x0, y0), (x1, y1) = segments[0]
+    assert (x0, y0, x1, y1) == pytest.approx(
+        (0.110 + 3 * half, 0.162, 0.110 - 3 * half, 0.162)
+    )
+    # Arrow 1's END is on the chain; its head sits at START, pointing -y.
+    tail = (arrows[3], arrows[4])
+    tip = (arrows[0], arrows[1])
+    assert segments[1] == (tip, tail)
+    assert tip[1] < tail[1] and tip[0] == pytest.approx(tail[0])
+    assert segments[2:8] == leaders.arrowhead_outline((tail, tip), 0.006, 0.003)
+
+    # A row/column mix-up (R transposed) puts the chain on y 0.138: loud.
+    with pytest.raises(RuntimeError, match="section arrow 1: cannot tell its tip"):
+        leaders.parse_section_line_info(values, _row_vector_view(transposed, 3.0, origin))
+    # So does leaving the rotation out.
+    identity = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
+    with pytest.raises(RuntimeError, match="section arrow 1: cannot tell its tip"):
+        leaders.parse_section_line_info(values, _row_vector_view(identity, 3.0, origin))
+
+
+def test_section_arrow_tail_may_overrun_the_chain_end_by_the_allowance_only() -> None:
+    chain = [((0.110, 0.120), (0.110, 0.180))]
+    beyond = leaders.SECTION_CHAIN_OVERRUN
+    within = ((0.098, 0.120 - 0.9 * beyond), (0.110, 0.120 - 0.9 * beyond))
+    assert leaders._tail_first(*within, chain, 1, []) == (within[1], within[0])
+    past = ((0.098, 0.120 - 1.1 * beyond), (0.110, 0.120 - 1.1 * beyond))
+    with pytest.raises(RuntimeError, match="cannot tell its tip"):
+        leaders._tail_first(*past, chain, 1, [])
+
+
+def test_section_line_on_a_broken_view_raises() -> None:
+    class BrokenView:
+        def GetName2(self):
+            return "Drawing View1"
+
+        def IsBroken(self):
+            return True
+
+    with pytest.raises(RuntimeError, match="broken view 'Drawing View1'"):
+        leaders.section_line_segments(object(), BrokenView())
