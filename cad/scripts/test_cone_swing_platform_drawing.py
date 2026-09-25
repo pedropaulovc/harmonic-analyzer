@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import math
+from pathlib import Path
 
 import _config
 import build_cone_pivot_screw
@@ -455,21 +456,21 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
 # 2.5 mm text anchored upper-left, ~1.894 mm a character and 3.52 mm a line
 # (the relief note, 0.0947 x 0.0176 for 50 characters on five lines).
 _NOTE_CHAR_W, _NOTE_LINE_H = 0.001894, 0.00352
-_DETAIL_SPANS = {  # each vertical dimension's extension-line span, sheet y
-    "TipSlotZ": (0.033, 0.055),
-    "TipSlotW": (0.051, 0.059),
-    "TipCboreW": (0.04706, 0.06294),
+_DETAIL_SPANS = {  # each width's extension-line span, sheet y
+    name: (
+        drawing._SLOT_Y - width * drawing._DETAIL_S / 2.0,
+        drawing._SLOT_Y + width * drawing._DETAIL_S / 2.0,
+    )
+    for name, width in (("TipSlotW", spec.TIP_SLOT_W), ("TipCboreW", spec.TIP_CBORE_W))
 }
 
 
 def _detail_text_boxes(keep: dict[str, tuple[float, float]]) -> dict[str, tuple]:
-    z_x, z_y = keep["TipSlotZ"]
     slot_x, slot_y = keep["TipSlotW"]
     cbore_x, cbore_y = keep["TipCboreW"]
     east_x, east_y = keep["TipSlotEastCx"]
     west_x, west_y = keep["TipSlotWestCx"]
     return {
-        "TipSlotZ": (z_x, z_y - 0.0025, z_x + 0.013, z_y + 0.0025),
         "TipSlotW": (slot_x - 0.018, slot_y - 0.0045, slot_x, slot_y + 0.0045),
         "TipCboreW": (cbore_x - 0.022, cbore_y - 0.0045, cbore_x, cbore_y + 0.0045),
         "TipSlotEastCx": (east_x - 0.006, east_y - 0.0025, east_x + 0.006, east_y + 0.0025),
@@ -605,11 +606,6 @@ def test_detail_dimension_text_sits_outside_its_own_lines() -> None:
         # The widths run left from the slot's straight edges to their lines.
         "TipSlotW": [((keep["TipSlotW"][0], y), (east_arc_x, y)) for y in _DETAIL_SPANS["TipSlotW"]],
         "TipCboreW": [((keep["TipCboreW"][0], y), (east_arc_x, y)) for y in _DETAIL_SPANS["TipCboreW"]],
-        # Pivot-to-slot runs right from the pivot and the east arc centre.
-        "TipSlotZ": [
-            ((drawing.DETAIL_CENTER[0], 0.033), (keep["TipSlotZ"][0], 0.033)),
-            ((east_arc_x, 0.055), (keep["TipSlotZ"][0], 0.055)),
-        ],
     }
     for name, (low, high) in _DETAIL_SPANS.items():
         x, _y = keep[name]
@@ -622,14 +618,14 @@ def test_detail_dimension_text_sits_outside_its_own_lines() -> None:
     slot_x, cbore_x = keep["TipSlotW"][0], keep["TipCboreW"][0]
     assert cbore_x < slot_x < east_arc_x  # counterbore outboard of the slot
     assert set(drawing.DETAIL_ARROWS_INSIDE) == {"TipSlotW", "TipCboreW"}
-    # Positive control: 81788ce9's keeps put the 11.00 and both widths
-    # inside their spans, where the text is centred on its own line.
-    old = {
-        "TipSlotZ": (0.1135, 0.0435),
-        "TipSlotW": (0.0515, 0.055),
-        "TipCboreW": (0.1315, 0.055),
-    }
-    for name, (_x, y) in old.items():
+    # I31: the slot's station from the pivot left the detail for the notch
+    # plan (the circle is centred on the slot, 27.7 south of the pivot).
+    assert "TipSlotZ" not in keep
+    assert drawing.DETAIL_MODEL_Z == spec.TIP_SCREW_LOCAL_Z
+    # Positive control: 81788ce9's keeps put both widths inside their spans
+    # (there centred on the slot), where the text is centred on its own line.
+    old = {"TipSlotW": drawing._SLOT_Y, "TipCboreW": drawing._SLOT_Y}
+    for name, y in old.items():
         low, high = _DETAIL_SPANS[name]
         assert low < y < high
 
@@ -665,11 +661,9 @@ def test_cutter_note_leaders_reach_their_arcs_without_crossing() -> None:
     # The slot note rises from the upper quadrant, the counterbore note drops
     # from the lower one (their audit extents must not nest, ec70186e).
     assert by_key["slot"].tip_deg > 0.0 > by_key["cbore"].tip_deg
-    assert drawing.cutter_note_tip(by_key["slot"])[1] > 0.055
+    assert drawing.cutter_note_tip(by_key["slot"])[1] > drawing._SLOT_Y
     boxes = _detail_text_boxes(drawing.DETAIL_KEEP)
-    obstacles = {
-        name: boxes[name] for name in ("TipSlotZ", "TipSlotEastCx", "TipSlotWestCx")
-    }
+    obstacles = {name: boxes[name] for name in ("TipSlotEastCx", "TipSlotWestCx")}
     fans = {note.key: _leader_fan(note) for note in drawing.CUTTER_NOTES}
     for key, fan in fans.items():
         other = "cbore" if key == "slot" else "slot"
@@ -695,14 +689,16 @@ def test_slot_section_cut_keeps_its_plane_and_crosses_the_plate() -> None:
     """Section C-C cuts at the slot station, edge to edge (8783776d eye-pass).
 
     The plane is the one detail B carried; the line now runs past both plate
-    edges, so the strip is the full 26.98 mm width and needs no symmetry.
+    edges, so the strip is the full plate width at the slot (32.28 mm since
+    I31 moved the slot to -27.7 and widened the north-west) and needs no
+    symmetry.
     """
     z = spec.TIP_SCREW_LOCAL_Z
     ends = drawing.slot_section_line_model_points()
     assert all(end[1:] == (spec.PLATE_THICKNESS / 1000.0, z / 1000.0) for end in ends)
     east, west = drawing.plate_edge_mm(z, -1), drawing.plate_edge_mm(z, +1)
     assert ends[0][0] * 1000.0 < east and ends[1][0] * 1000.0 > west
-    assert west - east == pytest.approx(26.98, abs=0.01)
+    assert west - east == pytest.approx(32.28, abs=0.01)
     # The slot and its counterbore lie inside the cut.
     assert east < -(spec.TIP_SCREW_HALF_TRAVEL + spec.TIP_CBORE_W / 2.0)
     assert west > spec.TIP_SCREW_HALF_TRAVEL + spec.TIP_CBORE_W / 2.0
@@ -762,11 +758,14 @@ def test_slot_section_arrows_clear_the_profile_plan() -> None:
     assert not _clears_plate(old_letters[1], 1)
     half = 9.0 * 0.0005
     length, head = 0.0126, 0.0015
-    line_y = py - spec.TIP_SCREW_LOCAL_Z * 0.0005
-    # Positive control: the default north-looking arrows hit the R8 leader
-    # and the 8.0 extension line.
+    # Positive control, in 8783776d's geometry (the U30 slot 11.0 south of
+    # the pivot, the north-west corner at 8.0): the default north-looking
+    # arrows hit the R8 leader and the 8.0 extension line.
+    line_y = py + 11.0 * 0.0005
+    old_nw_x = px + 8.0 * 0.0005
+    old_nw_extension = ((old_nw_x, 0.113), (old_nw_x, north_edge_y))
     down = (px + half - head, line_y - length, px + half + head, line_y)
-    assert _segment_hits_box(nw_extension, down)
+    assert _segment_hits_box(old_nw_extension, down)
     assert _segment_hits_box(r8_leader, down)
 
 
@@ -861,3 +860,184 @@ def test_relief_width_text_sits_between_its_neighbours() -> None:
     # No compass word: sheet-down is model north (codex B2 on 68565ace).
     assert not any(word in drawing.RELIEF_WIDTH_CALLOUT for word in ("NORTH", "SOUTH"))
     assert "PIVOT" in drawing.RELIEF_WIDTH_CALLOUT.split("\n")[-1]
+
+
+def test_tip_slot_station_prints_on_the_notch_plan_off_the_plate() -> None:
+    """I31: 27.7 south of the pivot the slot left detail B's circle, so its
+    station prints on the notch plan's open east side: the dimension line
+    stands off the plate's east edge at the slot, and its value hangs left of
+    it just south of the span, outside it."""
+    x, y = drawing.NOTCH_KEEP["TipSlotZ"]
+    pivot = drawing.plan_xy(drawing.NOTCH_CENTER, 0.0, 0.0)
+    slot = drawing.plan_xy(drawing.NOTCH_CENTER, -spec.TIP_SCREW_HALF_TRAVEL, spec.TIP_SCREW_LOCAL_Z)
+    east_edge = drawing.plan_xy(
+        drawing.NOTCH_CENTER, drawing.plate_edge_mm(spec.TIP_SCREW_LOCAL_Z, -1), 0.0
+    )[0]
+    assert x <= east_edge - 0.008
+    text = (x - 0.013, y - 0.0025, x, y + 0.0025)  # "27.70", 12 x 5 mm
+    assert text[1] >= slot[1] and slot[1] > pivot[1]  # south of the span
+    # Clear of the notch plan's other texts and the feature plan's.
+    for name, (kx, ky) in drawing.NOTCH_KEEP.items():
+        if name != "TipSlotZ":
+            assert not _boxes_overlap(text, (kx - 0.0065, ky - 0.0025, kx + 0.0065, ky + 0.0025))
+    post_west_z = drawing.FEATURE_KEEP["PostMountWestZ"]
+    assert not _boxes_overlap(text, (post_west_z[0], post_west_z[1] - 0.0025, post_west_z[0] + 0.013, post_west_z[1] + 0.0025))
+    # The plan mapping agrees with the profile pivot the layout was measured on.
+    assert drawing.plan_xy(drawing.PROFILE_CENTER, 0.0, 0.0) == pytest.approx(
+        drawing.PROFILE_PIVOT_XY, abs=0.0005
+    )
+
+
+def test_tip_slot_moves_under_the_flange_slot_and_takes_a_hex_head() -> None:
+    """I31 option 1: the lateral slot sits under the tip block's flange slot;
+    the counterbored slot is one hex width across so the head cannot turn."""
+    assert spec.TIP_SCREW_LOCAL_Z == pytest.approx(-11.0 - (6.0 + 10.7))
+    assert spec.TIP_CBORE_W == 6.5
+    assert spec.TIP_CBORE_DEPTH == 3.00
+    assert spec.TIP_SCREW_HEAD_AF == pytest.approx((6.1976, 6.35))
+    assert spec.TIP_CBORE_W >= spec.TIP_SCREW_HEAD_AF[1] - 1e-9
+    assert spec.TIP_CBORE_W + 0.10 < spec.TIP_SCREW_HEAD_AC_MIN
+    assert spec.TIP_HEAD_RECESS == pytest.approx(3.00 - 0.51 - 3.0 / 32.0 * 25.4)
+    assert spec.TIP_HEAD_RECESS >= 0.1
+    assert spec.TIP_LEDGE_RANGE == pytest.approx((2.71, 3.99))
+    # (upper, lower) like every _fit_limits band; set through deviations().
+    assert spec.TIP_SLOT_W_BAND == (0.10, 0.0)
+    assert spec.TIP_CBORE_W_BAND == (0.10, 0.0)
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '("TipScrewSlotProfile", "TipSlotW", TIP_SLOT_W_BAND)' in source
+    assert '("TipScrewCboreProfile", "TipCboreW", TIP_CBORE_W_BAND)' in source
+    assert "*deviations(band)" in source
+    # Spelled apart so this source carries no band splat of its own.
+    for band in ("TIP_SLOT_W_BAND", "TIP_CBORE_W_BAND"):
+        assert "*" + band not in source
+
+
+# The screw-head fits at the printed worst case, as numbers: a 4.0 +0.10/0
+# slot and a 6.35 +0.10/0 counterbore slot against the 0.244-0.250 head
+# across the flats (0.272 min across the corners).
+_HEAD_FIT_WORST = {
+    "TIP_SLOT_W_MAX": 4.10,
+    "TIP_CBORE_W_MIN": 6.50,
+    "TIP_CBORE_W_MAX": 6.60,
+    "TIP_SLOT_FLOAT_MAX": (4.10 - 3.505) / 2.0,  # 0.2975
+    "TIP_SLOT_HEAD_BEARING": (0.244 * 25.4 - 4.10) / 2.0,  # 1.0488
+    # Running clearance: the narrowest 6.5 slot against the widest 1/4 head.
+    "TIP_CBORE_HEAD_ENTRY": 6.50 - 0.250 * 25.4,  # 0.15
+    # Anti-turn: the smallest head's corners against the widest slot.
+    "TIP_CBORE_HEAD_TURN_MARGIN": 0.272 * 25.4 - 6.60,  # 0.3088
+}
+
+
+def _head_fit(namespace) -> dict[str, float]:
+    return {name: getattr(namespace, name) for name in _HEAD_FIT_WORST}
+
+
+def test_head_fit_holds_at_the_printed_worst_case() -> None:
+    """dtscout / Main (I31): every band is read through deviations(), and
+    the head's bearing, entry and anti-turn margin are pinned at their worst
+    case.  Dropping the upper deviation makes each read 0.05 or 0.10 kinder."""
+    assert _head_fit(spec) == pytest.approx(_HEAD_FIT_WORST, abs=1e-9)
+
+
+def _spec_with(old: str, new: str):
+    import types
+
+    source = Path(spec.__file__).read_text(encoding="utf-8")
+    assert source.count(old) == 1, old
+    module = types.ModuleType("cone_swing_platform_spec_mutant")
+    module.__file__ = spec.__file__
+    exec(compile(source.replace(old, new), spec.__file__, "exec"), module.__dict__)
+    return module
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    (
+        # The pre-fix read: [1] taken as the upper deviation of the flipped band.
+        (
+            "_TIP_SLOT_W_LOWER, _TIP_SLOT_W_UPPER = deviations(TIP_SLOT_W_BAND)",
+            "_TIP_SLOT_W_LOWER, _TIP_SLOT_W_UPPER = "
+            + ", ".join("TIP_SLOT_W_BAND" + f"[{i}]" for i in (0, 1)),
+        ),
+        (
+            "_TIP_CBORE_W_LOWER, _TIP_CBORE_W_UPPER = deviations(TIP_CBORE_W_BAND)",
+            "_TIP_CBORE_W_LOWER, _TIP_CBORE_W_UPPER = "
+            + ", ".join("TIP_CBORE_W_BAND" + f"[{i}]" for i in (0, 1)),
+        ),
+        # The upper deviation dropped altogether.
+        ("TIP_SLOT_W_MAX = TIP_SLOT_W + _TIP_SLOT_W_UPPER", "TIP_SLOT_W_MAX = TIP_SLOT_W"),
+        ("TIP_CBORE_W_MAX = TIP_CBORE_W + _TIP_CBORE_W_UPPER", "TIP_CBORE_W_MAX = TIP_CBORE_W"),
+    ),
+)
+def test_head_fit_pin_catches_a_misread_band(old: str, new: str) -> None:
+    try:
+        mutant = _head_fit(_spec_with(old, new))
+    except AssertionError:
+        return  # an import-time floor caught the misread
+    assert mutant != pytest.approx(_HEAD_FIT_WORST, abs=1e-9)
+
+
+def test_hex_slot_limits_hold_both_ways() -> None:
+    """Main (I31, 2026-09-25): the 6.5 cutter's slot at its widest keeps
+    0.25 of the smallest head's corners (6.60 vs 6.91), and at its narrowest
+    still runs the widest head (6.50 vs 6.35)."""
+    assert spec.TIP_CBORE_HEAD_TURN_MARGIN >= spec.TIP_CBORE_ANTI_TURN_MIN == 0.25
+    assert spec.TIP_CBORE_HEAD_ENTRY > 0.0
+    assert round(spec.TIP_SCREW_HEAD_AC_MIN, 2) == 6.91
+
+
+def test_counterbored_slot_webs_hold_at_the_printed_worst_case() -> None:
+    assert set(part.TIP_CBORE_WEBS) == {"west edge", "east edge", "pivot relief"}
+    assert min(part.TIP_CBORE_WEBS.values()) >= 2.0
+
+
+def test_no_spec_reads_a_slot_band_by_index() -> None:
+    import re
+
+    for module in (spec, part, drawing):
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert not re.search(r"_BAND\[", source), module.__name__
+
+
+def test_lateral_travel_prose_matches_the_slot_constants() -> None:
+    """I31 item 7: +/-2.25 is the end centres (2.0) plus the screw's float in
+    the nominal 4.0 slot; +/-1.74 is the same with the .XX centres short."""
+    assert spec.TIP_SCREW_HALF_TRAVEL == 2.0
+    assert spec.TIP_LATERAL_TRAVEL == pytest.approx(2.0 + (4.0 - 3.505) / 2.0)
+    assert round(spec.TIP_LATERAL_TRAVEL, 2) == 2.25
+    assert round(spec.TIP_LATERAL_TRAVEL_WORST, 2) == 1.74
+    comment = Path(spec.__file__).read_text(encoding="utf-8")
+    assert "+/-2.25" in comment and "+/-1.74" in comment
+
+
+def test_north_west_half_width_keeps_the_block_on_the_plate_at_full_west_travel() -> None:
+    """I31 item 8: the U30 slot let the block hang 0.19 over the west edge.
+    The north-west half-width is derived from the block's full west reach --
+    every float and every .XX location band (TipSlotWestCx, FlangeSlotX) --
+    at its northmost station, plus 0.25, against the outline at the worst of
+    its .X bands (Main, 2026-09-25)."""
+    reach = (
+        (2.0 + 0.51)  # TipSlotWestCx
+        + (4.1 - 3.505) / 2.0  # screw float, widest plate slot
+        + (5.0 / 32.0 * 25.4 + 0.10 - 3.505) / 2.0  # ... widest flange slot
+        + (7.5 + 0.51)  # FlangeSlotX from the block's west face
+    )
+    assert spec.TIP_BLOCK_WEST_REACH == pytest.approx(reach)  # 11.099
+    assert spec.TIP_BLOCK_NORTH_REACH_Z == pytest.approx(-4.2)
+    assert part._WEST_HALF_N_REQUIRED == pytest.approx(10.9403, abs=1e-4)
+    assert part.WEST_HALF_N == 11.0
+    z = spec.TIP_BLOCK_NORTH_REACH_Z
+    assert part.west_edge_x_worst(11.0, z) - reach >= 0.25
+    # One place coarser misses the margin: the derivation, not a typed 11.0.
+    assert part.west_edge_x_worst(10.9, z) - reach < 0.25
+    # The worst outline is the nominal edge less its corner bands and the
+    # north corner's station band: strictly inside the nominal.
+    assert part.west_edge_x_worst(11.0, z) < part._west_edge_x(z) - 0.8
+    # Positive controls: the U30 plate (8.0) and the first I31 cut (9.0,
+    # floats only) both leave the block over the worst-case edge.
+    assert part.west_edge_x_worst(8.0, z) < reach
+    assert part.west_edge_x_worst(9.0, z) < reach
+    # The NW round ends north of the block, on the edge it was derived for.
+    assert part.NW_ROUND_END_Z - 0.8 > z
+    # The south end is untouched.
+    assert part.WEST_HALF_S == 37.0

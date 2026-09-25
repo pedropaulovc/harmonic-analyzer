@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 
+from _fit_limits import deviations
 from _gtol_spec import PlanarFace
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
@@ -111,36 +112,73 @@ POST_MOUNT_ENGAGEMENT_NOTE = (
 )
 
 
-# U30 (2026-09-23): the cone tip block is held by one hidden #6-32 x 1/2
-# BUTTON-head socket cap screw (McMaster 91255A148, black-oxide alloy steel;
-# rule-12 audit W22, Main 2026-09-23: the low head leaves a 2.9 ledge where a
-# socket head's 4.2 counterbore left 1.51) coming up from under the plate
-# through a lateral slot; a counterbored slot sinks the head below the slide
-# face. The slot runs across the cone axis so the block can be shifted +/-2.25
-# at fit-up; a shim pack under the foot sets its height. Both slots share the
-# same two end centres, TIP_SCREW_HALF_TRAVEL either side of the cone axis, at
-# the tip block's station (11.0 south of the pivot, from the drive-train
-# layout: PIVOT_STATION = TIP_BLOCK_STATION + 11.0).
-TIP_SCREW_LOCAL_Z = -11.0
+# I31 option 1 (Main, 2026-09-25): the cone tip block is held down by one
+# #6-32 x 5/8 hex head screw (McMaster 93075A150, low-strength zinc-plated
+# steel) rising from under the plate through a lateral slot, through the shim
+# pack and the block's south foot flange (an axial slot), into a nylon-insert
+# locknut on the flange top.  The plate slot lets the block move across the
+# cone axis, the flange slot along it.  The head sits in a counterbored slot
+# one hex width across, so its walls stop the head turning while the nut is
+# tightened from above.
+#
+# The block's own geometry, mirrored here because the plate may not import
+# cone_tip_block_spec; build_drive_train_assembly asserts each one equal to
+# the block spec's.  The block centre stands 11.0 south of the pivot (the
+# drive-train layout: PIVOT_STATION = TIP_BLOCK_STATION + 11.0).
+TIP_BLOCK_LOCAL_Z = -11.0
+TIP_BLOCK_HALF_DEPTH = 6.0  # BLOCK_Z / 2
+TIP_BLOCK_HALF_WIDTH = 7.5  # BLOCK_X / 2
+# FLANGE_SLOT_X: the flange slot's centre from the block's +X face, which is
+# its west face (the block and the plate share the inclined frame).
+TIP_FLANGE_SLOT_X = 7.5
+TIP_FLANGE_SLOT_Z = 10.7  # FLANGE_SLOT_Z, from the block's south face
+# FLANGE_SLOT_FLOAT: the screw's float across the 5/32 +0.10/0 flange slot.
+TIP_FLANGE_SLOT_FLOAT = (5.0 / 32.0 * 25.4 + 0.10 - 3.505) / 2.0
+# How far north the shaft tip can set the block's north face: the shaft's
+# overall length Sec4End at .X (the heel-relief check's HEEL_TIP_TRAVEL).
+TIP_BLOCK_NORTH_TRAVEL = 0.8
+# The lateral slot sits under the flange slot's centre.
+TIP_SCREW_LOCAL_Z = TIP_BLOCK_LOCAL_Z - (TIP_BLOCK_HALF_DEPTH + TIP_FLANGE_SLOT_Z)
+# Both slots share two end centres TIP_SCREW_HALF_TRAVEL either side of the
+# cone axis.
 TIP_SCREW_HALF_TRAVEL = 2.0
 TIP_SCREW_MAJOR = 3.505  # #6-32 basic major
-# McMaster 91255A148 lists one head size, 0.262 dia x 0.073 high, taken as the
-# max; the B18.3 #6 button-head minimum diameter, 0.250, bounds the bearing.
-TIP_SCREW_HEAD_DIA = (0.250 * 25.4, 0.262 * 25.4)
-TIP_SCREW_HEAD_H_MAX = 0.073 * 25.4
+# McMaster 93075A150 (product page read 2026-09-25): head 1/4 wide x 3/32
+# high.  ASME B18.6.3 bounds the #6 hex head at 0.244-0.250 across the flats
+# and 0.272 min across the corners; the catalogue height is taken as the max.
+TIP_SCREW_HEAD_AF = (0.244 * 25.4, 0.250 * 25.4)
+TIP_SCREW_HEAD_AC_MIN = 0.272 * 25.4
+TIP_SCREW_HEAD_H_MAX = 3.0 / 32.0 * 25.4
 # The slot widths are cut in one pass by an end mill of that size, so they
 # carry the same one-sided +0.10/0 band as the title block's DRILLED HOLES
-# row: the cutter makes the size, the machinist holds nothing tight.
+# row: the cutter makes the size, the machinist holds nothing tight.  Each
+# band is written (upper, lower) like every _fit_limits band and is only ever
+# read through _fit_limits.deviations -- here and on the model -- never by
+# index: a raw [1] read the flipped band's lower deviation as its upper and
+# made the head bearing 0.05 a side too generous with no failure (dtscout).
 TIP_SLOT_W = 4.0
-TIP_CBORE_W = 7.94  # a 5/16 end mill
-TIP_SLOT_W_BAND = (0.0, 0.10)
-TIP_CBORE_DEPTH = 2.8  # .XX
+# I31 (Main, 2026-09-25): a 6.5 end mill, not the 1/4 one the head's across
+# flats would need line to line: the widest head runs in the narrowest slot
+# and the smallest head's corners still cannot turn in the widest one.
+TIP_CBORE_W = 6.5
+TIP_SLOT_W_BAND = (0.10, 0.0)
+TIP_CBORE_W_BAND = (0.10, 0.0)
+TIP_CBORE_DEPTH = 3.00  # .XX
 _XX = 0.51
-TIP_SLOT_SCREW_CLEARANCE = TIP_SLOT_W - TIP_SCREW_MAJOR
-TIP_SLOT_HEAD_BEARING = (
-    TIP_SCREW_HEAD_DIA[0] - (TIP_SLOT_W + TIP_SLOT_W_BAND[1])
-) / 2.0
-TIP_CBORE_HEAD_CLEARANCE = TIP_CBORE_W - TIP_SCREW_HEAD_DIA[1]
+_TIP_SLOT_W_LOWER, _TIP_SLOT_W_UPPER = deviations(TIP_SLOT_W_BAND)
+_TIP_CBORE_W_LOWER, _TIP_CBORE_W_UPPER = deviations(TIP_CBORE_W_BAND)
+TIP_SLOT_W_MIN = TIP_SLOT_W + _TIP_SLOT_W_LOWER
+TIP_SLOT_W_MAX = TIP_SLOT_W + _TIP_SLOT_W_UPPER
+TIP_CBORE_W_MIN = TIP_CBORE_W + _TIP_CBORE_W_LOWER
+TIP_CBORE_W_MAX = TIP_CBORE_W + _TIP_CBORE_W_UPPER
+TIP_SLOT_SCREW_CLEARANCE = TIP_SLOT_W_MIN - TIP_SCREW_MAJOR
+TIP_SLOT_FLOAT_MAX = (TIP_SLOT_W_MAX - TIP_SCREW_MAJOR) / 2.0
+TIP_SLOT_HEAD_BEARING = (TIP_SCREW_HEAD_AF[0] - TIP_SLOT_W_MAX) / 2.0
+# The head runs in the counterbored slot at its narrowest against the widest
+# head, and cannot turn in it at its widest against the smallest head.
+TIP_CBORE_HEAD_ENTRY = TIP_CBORE_W_MIN - TIP_SCREW_HEAD_AF[1]
+TIP_CBORE_ANTI_TURN_MIN = 0.25
+TIP_CBORE_HEAD_TURN_MARGIN = TIP_SCREW_HEAD_AC_MIN - TIP_CBORE_W_MAX
 TIP_HEAD_RECESS = TIP_CBORE_DEPTH - _XX - TIP_SCREW_HEAD_H_MAX
 # Ledge under the head: the stock plate less the .XX counterbore depth, both
 # bands (rule-12 audit W22: the first cut left out the plate's band).
@@ -148,16 +186,45 @@ TIP_LEDGE_RANGE = (
     PLATE_THICKNESS - PLATE_STOCK_BAND - TIP_CBORE_DEPTH - _XX,
     PLATE_THICKNESS + PLATE_STOCK_BAND - TIP_CBORE_DEPTH + _XX,
 )
+# Lateral fit-up travel either side of the cone axis: the end centres plus
+# the screw's float in the narrowest slot, which is the nominal 4.0 (+/-2.25),
+# and with the .XX centres at their short limit (+/-1.74).
+TIP_LATERAL_TRAVEL = TIP_SCREW_HALF_TRAVEL + TIP_SLOT_SCREW_CLEARANCE / 2.0
+TIP_LATERAL_TRAVEL_WORST = TIP_LATERAL_TRAVEL - _XX
+if (round(TIP_LATERAL_TRAVEL, 2), round(TIP_LATERAL_TRAVEL_WORST, 2)) != (2.25, 1.74):
+    raise AssertionError("tip-block lateral travel no longer reads +/-2.25 (1.74 worst)")
 if TIP_SLOT_SCREW_CLEARANCE < 0.25:
     raise AssertionError("tip-block screw slot does not clear the #6-32 major")
 if TIP_SLOT_HEAD_BEARING < 0.5:
     raise AssertionError("tip-block screw head bears on under 0.5 mm per side")
-if TIP_CBORE_HEAD_CLEARANCE < 0.25:
-    raise AssertionError("tip-block counterbore slot does not clear the screw head")
+if TIP_CBORE_HEAD_ENTRY <= 0.0:
+    raise AssertionError("the widest hex head has no running clearance in the counterbored slot")
+if TIP_CBORE_HEAD_TURN_MARGIN < TIP_CBORE_ANTI_TURN_MIN:
+    raise AssertionError(
+        "the smallest hex head's corners overlap the widest counterbored slot "
+        f"by {TIP_CBORE_HEAD_TURN_MARGIN:.3f} (< {TIP_CBORE_ANTI_TURN_MIN})"
+    )
 if TIP_HEAD_RECESS < 0.1:
     raise AssertionError("tip-block screw head can stand proud of the slide face")
 if TIP_LEDGE_RANGE[0] < 2.0:
     raise AssertionError("tip-block counterbore ledge is below the U27 2.0 target")
+# The block's farthest reach west of the cone axis, at full west travel with
+# every float and location band taken up: the plate slot's west end centre
+# (TipSlotWestCx, .XX), the screw's float in the widest plate slot, its float
+# in the widest flange slot, and the flange slot's location from the block's
+# west face (FlangeSlotX, .XX on the block).  Its north face stands
+# TIP_BLOCK_NORTH_TRAVEL north, set by the shaft tip.  build_cone_swing_platform
+# derives the plate's north-west half-width from it with the outline's own
+# bands (Main, I31 item 8: the U30 slot let the block hang 0.19 over the west
+# edge; 2026-09-25: the location bands belong in the stack).
+TIP_BLOCK_WEST_REACH = (
+    (TIP_SCREW_HALF_TRAVEL + _XX)
+    + TIP_SLOT_FLOAT_MAX
+    + TIP_FLANGE_SLOT_FLOAT
+    + (TIP_FLANGE_SLOT_X + _XX)
+)
+TIP_BLOCK_NORTH_REACH_Z = TIP_BLOCK_LOCAL_Z + TIP_BLOCK_HALF_DEPTH + TIP_BLOCK_NORTH_TRAVEL
+TIP_BLOCK_EDGE_MARGIN = 0.25
 
 
 # Only functional sliding/locating surfaces carry roughness.  The existing
@@ -242,7 +309,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     # figure) rather than rounding it to 9: the band is the block's either way.
     "LockNotchProfile": {"NotchRunAngle": 2},
     "LockNotchCapEProfile": {"CapECx": 2, "CapECz": 2, "CapEDia": 2},
-    # The slot ends are .XX so the +/-2.25 fit-up travel keeps >= +/-1.74.
+    # The slot ends are .XX so the +/-2.25 fit-up travel keeps >= +/-1.74
+    # (TIP_LATERAL_TRAVEL, TIP_LATERAL_TRAVEL_WORST).
     "TipScrewSlotProfile": {
         "TipSlotEastCx": 2,
         "TipSlotWestCx": 2,
