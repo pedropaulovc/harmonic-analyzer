@@ -77,6 +77,7 @@ from _visibility import blank_reference_geometry
 from pinion_bracket_geometry import (
     ARBOR_BORE,
     C2C,
+    CROSS_HOLE_CZ,
     PIN_BORE,
     PIN_DROP,
     PIN_SEAT,
@@ -493,7 +494,7 @@ async def build(adapter) -> dict[str, str]:
     check("create_sketch cross hole", await adapter.create_sketch("Right"))
     await define_circle(
         adapter,
-        -THICKNESS / 2.0,
+        -CROSS_HOLE_CZ,
         0.0,
         CROSS_HOLE_DIA / 2.0,
         "cross hole",

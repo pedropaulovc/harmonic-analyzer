@@ -306,7 +306,7 @@ def test_worst_stack_bands_are_the_printed_places() -> None:
 
     x_band = 0.8  # title-block .X
     assert pinion_bracket_spec.DRAWING_PRECISION["Strap"]["Depth"] == 1
-    assert rig.STRAP_T_BAND == pinion_bracket_spec.THICKNESS_BAND == x_band
+    assert pinion_bracket_spec.THICKNESS_BAND == x_band
     assert alignment_pinion_spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 1
     assert rig.DRUM_LEN_BAND == x_band
     assert pinion_lift_rod_spec.DRAWING_PRECISION["Rod"]["Depth"] == 1
@@ -378,7 +378,7 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     # document's two places.
     assert "draw_pinion_pivot_block.py" not in PRECISION_MIGRATED_DRAWINGS
     assert f"{pinion_pivot_block_spec.BLOCK_DEPTH:.2f}" == "11.00"
-    assert (rig.STRAP_T_BAND, rig.DRUM_LEN_BAND, rig.LENGTH_BAND) == (x_band,) * 3
+    assert (rig.DRUM_LEN_BAND, rig.LENGTH_BAND) == (x_band,) * 2
     assert rig.BLOCK_DEPTH_BAND == xx_band
     # Main (Codex #854 P1): each band is the title block's row for the places
     # its dimension prints at, so a sheet that prints more places tightens its

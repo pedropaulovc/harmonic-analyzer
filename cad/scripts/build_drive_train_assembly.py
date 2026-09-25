@@ -161,6 +161,7 @@ from _common import (
     run_build,
 )
 from _drawing_marks import DRAWN_BY
+from _printed_tolerance import printed_deviations
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows
 from channel_frame_geom import (
     CAM_SHAFT_XY,
@@ -800,7 +801,7 @@ from arbor_pedestal_spec import SCREW_HOLE_SPEC as ARBOR_PED_HOLE_SPEC  # noqa: 
 from build_alignment_pinion import (  # noqa: E402
     BORE_DIA as DRUM_BORE_DIA,
 )
-from pinion_arbor_spec import (  # noqa: E402
+from pinion_arbor_geometry import (  # noqa: E402
     CROSSROD_MAX_CLEARANCE as ARBOR_CROSSROD_MAX_CLEARANCE,
     CROSSROD_MIN_CLEARANCE as ARBOR_CROSSROD_MIN_CLEARANCE,
     CROSS_HOLE_DIA as ARBOR_CROSS_HOLE_DIA,
@@ -824,6 +825,7 @@ from pinion_arbor_spec import (  # noqa: E402
 from pinion_bracket_geometry import (  # noqa: E402
     ARBOR_BORE as STRAP_ARBOR_BORE,
     C2C as STRAP_C2C,
+    CROSS_HOLE_CZ as STRAP_CROSS_HOLE_CZ,
     PIN_BORE as STRAP_PIN_BORE,
     PIN_DROP as FPIN_DROP,
     PIN_SEAT as FPIN_SEAT,
@@ -876,6 +878,7 @@ from pinion_spring_geometry import (  # noqa: E402
     HOLE_SPEC as SPR_HOLE_SPEC,
     KINK_START as SPR_CREST_L,
     PAD_WIDTH as SPR_PAD_WIDTH,
+    PAD_WIDTH_PLACES as SPR_PAD_WIDTH_PLACES,
     PIVOT_LX as SPR_PIVOT_LX,
     PIVOT_LY as SPR_PIVOT_LY,
     THICK as SPRING_T,
@@ -1552,8 +1555,9 @@ SPRING_X = PIVOT_X + SPR_PIVOT_LX  # machine anchor; the part is placed Ry(180)
 # keeps its authored z (and with it the base's foot-screw hole), and riding the
 # strap's inboard half buys the foot 1.5 more clearance to the back pivot block.
 STRAP_Z_INNER = RIG.STRAP_Z_INNER
-# Blade inner edge, in from the strap's inner face: 1.0 keeps the blade on
-# the flank at every split of the end play (pinion_rig_layout).
+# Blade inner edge, in from the strap's inner face: SPRING_BLADE_INSET keeps the
+# whole blade on the flank at every strap thickness, RIG_MARGIN_SPARE over its
+# floor (pinion_rig_layout).
 SPRING_BLADE_INSET = RIG.SPRING_BLADE_INSET
 SPRING_Z = RIG.SPRING_Z
 _SPR_TH = math.radians(-STRAP_LEAN_DEG)  # blade leans east of vertical
@@ -1612,9 +1616,13 @@ if (
 if SPRING_Z + SPRING_W / 2.0 > BLOCK_BACK_Z0 - 0.25:
     raise AssertionError("spring reaches the back pivot block")
 # The foot's screw pad (r7) widens the free end symmetrically about the strip.
-# Booked at the printed .XX worst case (+0.51 on the width): the pad lies on the
-# base top beside the back block, west of the lift rod.
-if SPRING_Z + (SPR_PAD_WIDTH + 0.51) / 2.0 > BLOCK_BACK_Z0 - 0.25:
+# Booked at the widest pad the sheet accepts (the upper deviation of the band
+# PadWidth prints at): the pad lies on the base top beside the back block,
+# west of the lift rod.
+SPRING_PAD_WIDTH_WORST = (
+    SPR_PAD_WIDTH + printed_deviations(SPR_PAD_WIDTH, SPR_PAD_WIDTH_PLACES)[1]
+)
+if SPRING_Z + SPRING_PAD_WIDTH_WORST / 2.0 > BLOCK_BACK_Z0 - 0.25:
     raise AssertionError("spring foot pad reaches the back pivot block")
 # West foot corridor (PR7 item 11): the strip crosses UNDER the lift rod and
 # the back cam collar; its screw head must clear the rod flank. (The rod now
@@ -1687,21 +1695,6 @@ if max(CAM_PIN_STATION) > CAM_LEN - 1.0 or min(CAM_PIN_STATION) < 1.0:
     raise AssertionError("follower pin rides off a collar face")
 if CAM_Z0[0] < BLOCK_FRONT_Z0 + BLOCK_DEPTH + RIG.FRONT_BLOCK_FEELER - 1e-9:
     raise AssertionError("front cam collar crowds the front pivot block")
-
-# Option E-a set pins (MHA-145, pinion-strap-pin): each strap cuts its cross
-# hole along its local X through the pivot-bore axis at CrossHoleCz =
-# StrapThickness / 2 from its part origin (build_pinion_bracket) -- on the
-# strap mid-plane -- so each pin is centred on the pivot axis at that plane.
-# The torque shaft's holes are match-drilled through those cross holes at the
-# fit-up stack, which this pose is, so each pin runs straight through its
-# shaft hole (Codex #858 P1: a straight pin cannot pass offset holes, and no
-# interference row may pretend it does).  LOCKSTEP GUARD: the holes and this
-# placement both come from pinion_rig_layout's strap stations, so this only
-# fires if BDT's own strap placement stops reading them.
-STRAP_PIN_Z = _STRAP_MID_Z
-for _z_pin, _z_hole in zip(STRAP_PIN_Z, RIG.TORQUE_SHAFT_PIN_HOLE_Z, strict=True):
-    if abs(PIVOT_SHAFT_Z0 + _z_hole - _z_pin) > 1e-9:
-        raise AssertionError("a strap pin is not coaxial with its torque-shaft hole")
 
 
 # PARK: collar (ecc down) under the pin, by design 0.10..0.25 of air. The
@@ -1937,7 +1930,7 @@ RIG_MARGINS = {
         RIG.SPRING_BLADE_MIN_ON_FLANK,
     ),
     "spring foot pad to the back block": (
-        BLOCK_BACK_Z0 - (SPRING_Z + (SPR_PAD_WIDTH + 0.51) / 2.0),
+        BLOCK_BACK_Z0 - (SPRING_Z + SPRING_PAD_WIDTH_WORST / 2.0),
         0.25,
     ),
     "grip crossrod to the T12 chain wheel": (
@@ -1963,6 +1956,18 @@ _THIN = {
     for name, (value, floor) in RIG_MARGINS.items()
     if value < floor + RIG.RIG_MARGIN_SPARE - 1e-9
 }
+
+
+def rig_margin_lines() -> list[str]:
+    """One line per RIG_MARGINS row: worst value, floor and spare over the
+    floor + RIG_MARGIN_SPARE requirement, for the build log."""
+    return [
+        f"{name}: worst {value:.3f}, floor {floor:g}, "
+        f"spare {value - floor - RIG.RIG_MARGIN_SPARE:+.3f}"
+        for name, (value, floor) in RIG_MARGINS.items()
+    ]
+
+
 if _THIN:
     raise AssertionError(
         "rig margins under their floor + RIG_MARGIN_SPARE: "
@@ -1981,7 +1986,7 @@ if abs(HANDLE_Z - (ARBOR_Z0 + ARBOR_HEAD_CENTER_Z)) > 1e-9:
     raise AssertionError("grip crossrod is not centred in the integral head")
 # MHA-102 runs in the straps on its two journal lands, so each land must
 # cover its strap in the pose, past both faces (the worst case over every
-# printed band and both drum stops is pinion_arbor_spec's own stack).
+# printed band and both drum stops is pinion_arbor_geometry's own stack).
 for _land_z, _strap_faces, _which in (
     (ARBOR_FRONT_JOURNAL_Z, (RIG.STRAP_Z_OUTER[0], RIG.STRAP_Z_INNER[0]), "front"),
     (ARBOR_BACK_JOURNAL_Z, (RIG.STRAP_Z_INNER[1], RIG.STRAP_Z_OUTER[1]), "back"),
@@ -2126,6 +2131,29 @@ LIFT_ROD_ROWS = rot_z_rows(LEVER_TILT_DEG)
 # Option E-a: the torque shaft's pin holes run along its local X, which must
 # lie along the straps' cross holes (their local X after Ry(180) . Rz(lean)).
 TORQUE_SHAFT_ROWS = rot_z_rows(STRAP_LEAN_DEG)
+# The straps extrude local +z, so their machine-handed pose composes a
+# Ry(180) with the lean, and each part origin sits on the strap's north face.
+STRAP_ROWS = compose_rows(ROT_Y_180, rot_z_rows(STRAP_LEAN_DEG))
+STRAP_ORIGIN_Z = (RIG.STRAP_Z_INNER[0], RIG.STRAP_Z_OUTER[1])  # (front, back)
+# Option E-a set pins (MHA-145, pinion-strap-pin): each strap cuts its cross
+# hole along its local X through the pivot-bore axis, CROSS_HOLE_CZ from its
+# part origin (build_pinion_bracket).  The torque shaft's holes are
+# match-drilled through those cross holes at the fit-up stack, which this pose
+# is, so each pin runs straight through its shaft hole (Codex #858 P1: a
+# straight pin cannot pass offset holes, and no interference row may pretend
+# it does).  LOCKSTEP GUARD (Main, restricted review of #858): each cross hole
+# is taken from the strap part as placed, each shaft hole from the stations
+# the shaft part cuts, so a strap placement, a cross-hole station or a shaft
+# station that drifts from the others fails here.
+STRAP_CROSS_HOLE_Z = tuple(
+    z0 + STRAP_CROSS_HOLE_CZ * STRAP_ROWS[2][2] for z0 in STRAP_ORIGIN_Z
+)
+STRAP_PIN_Z = STRAP_CROSS_HOLE_Z
+for _z_strap, _z_hole in zip(
+    STRAP_CROSS_HOLE_Z, RIG.TORQUE_SHAFT_PIN_HOLE_Z, strict=True
+):
+    if abs(PIVOT_SHAFT_Z0 + _z_hole * TORQUE_SHAFT_ROWS[2][2] - _z_strap) > 1e-9:
+        raise AssertionError("a strap cross hole is not coaxial with its torque-shaft hole")
 LEVER_ROWS = rot_z_rows(LEVER_TILT_DEG)
 PINION_CAM_ROWS = IDENTITY
 # Rod Top-plane normal (local +Y) against the assembly Right normal (+X): the
@@ -2278,6 +2306,9 @@ async def build(adapter) -> dict[str, str]:
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
     reset_dof_manifest()
+    # The rig's worst-case margin table (asserted at import), in the task log.
+    for line in rig_margin_lines():
+        log(f"rig margin {line}")
     check("create_assembly", await adapter.create_assembly())
 
     # =================== structure (static lock + moving joints) ===========
@@ -2500,13 +2531,10 @@ async def build(adapter) -> dict[str, str]:
     # pose composes a Ry(180) with the lean: the part origin then lands at the
     # component's NORTH face (south face + part thickness), which is where the
     # strap bands below are authored from.
-    _strap_rows = compose_rows(ROT_Y_180, rot_z_rows(STRAP_LEAN_DEG))
+    _strap_rows = STRAP_ROWS
     _strap_euler = euler_from_rows(_strap_rows)
     pinion_brackets: dict[str, str] = {}
-    for tag, z0 in (
-        ("front", RIG.STRAP_Z_INNER[0]),
-        ("back", RIG.STRAP_Z_OUTER[1]),
-    ):
+    for tag, z0 in zip(("front", "back"), STRAP_ORIGIN_Z, strict=True):
         pinion_brackets[tag] = await place_component(
             adapter,
             "pinion-bracket",

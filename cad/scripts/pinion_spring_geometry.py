@@ -37,6 +37,7 @@ HOLE_FROM_END = 4.5
 # with the blank, so every web around the hole clears 2.0 at the worst case of
 # the printed .XX bands (test_pinion_spring_drawing).
 PAD_WIDTH = 9.5
+PAD_WIDTH_PLACES = 2  # PadWidth prints .XX (pinion_spring_spec)
 PAD_LEN = 9.5
 
 _TH = math.radians(BLADE_TILT_DEG)

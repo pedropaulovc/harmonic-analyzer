@@ -14,6 +14,7 @@ import _drawing_marks
 import _fit_limits
 import build_pinion_arbor as part
 import draw_pinion_arbor as drawing
+import pinion_arbor_geometry as geometry
 import pinion_arbor_spec as spec
 import pinion_handle_geometry as rod_geometry
 import pinion_handle_spec as crossrod
@@ -416,7 +417,7 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     clear = spec.BOND_ZONE_LAND_CLEARANCE
     assert spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN + clear <= station
     assert station <= spec.BACK_JOURNAL_FROM_HEAD_REAR - clear
-    assert spec.DRUM_STATION < station < spec.DRUM_STATION + spec.DRUM_LEN
+    assert spec.DRUM_STATION < station < spec.DRUM_STATION + geometry.DRUM_LEN
     text_x, _ = drawing.PRINCIPAL_KEEP["BondZoneDia"]
     assert text_x == pytest.approx(drawing._sheet_x(spec.BOND_ZONE_DIA_Z))
     fence_x = drawing._sheet_x(spec.HEAD_CENTER_Z)
@@ -455,9 +456,9 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     import pinion_bracket_spec
 
     # The stack's inputs are the parts' and the assembly's own values.
-    assert spec.DRUM_LEN == drum.FACE_WIDTH == assembly.APINION_DRUM_LEN
-    assert spec.STRAP_T == strap.THICKNESS == assembly.STRAP_T
-    assert spec.STRAP_T_BAND == pinion_bracket_spec.THICKNESS_BAND
+    assert geometry.DRUM_LEN == drum.FACE_WIDTH == assembly.APINION_DRUM_LEN
+    assert geometry.STRAP_T == strap.THICKNESS == assembly.STRAP_T
+    assert geometry.STRAP_T_BAND == pinion_bracket_spec.THICKNESS_BAND
     assert spec.STRAP_AXIAL_LOCATION == "pinned-shim-set"
     assert spec.DRUM_STATION == pytest.approx(
         spec.DRUM_STATION_AS_BUILT + spec.DRUM_AFT_SHIFT
@@ -482,8 +483,8 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
         rig.DRUM_END_SHIM_SET_ERROR,
     )
     assert spec.LINEAR_X_BAND == spec.HEAD_LEN_BAND == printed_band_mm(1)
-    assert spec.DRUM_LEN == rig.DRUM_LEN
-    assert spec.STRAP_T_BAND == strap.THICKNESS_BAND
+    assert geometry.DRUM_LEN == rig.DRUM_LEN
+    assert geometry.STRAP_T_BAND == strap.THICKNESS_BAND
     spec_source = inspect.getsource(spec)
     for literal in (
         "LINEAR_X_BAND = 0.8",
@@ -515,8 +516,8 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     air = spec.END_PLAY / 2.0
     front_mid = spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN / 2.0
     back_mid = spec.BACK_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN / 2.0
-    front_strap_mid = spec.DRUM_STATION - air - spec.STRAP_T / 2.0
-    back_strap_mid = spec.DRUM_STATION + spec.DRUM_LEN + air + spec.STRAP_T / 2.0
+    front_strap_mid = spec.DRUM_STATION - air - geometry.STRAP_T / 2.0
+    back_strap_mid = spec.DRUM_STATION + geometry.DRUM_LEN + air + geometry.STRAP_T / 2.0
     assert abs(front_mid - front_strap_mid) <= 0.05 + 1e-9
     assert abs(back_mid - back_strap_mid) <= 0.05 + 1e-9
 
