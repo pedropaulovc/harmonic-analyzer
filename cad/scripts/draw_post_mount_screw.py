@@ -14,11 +14,11 @@ is a deburr (Main's MHA-142 eye pass on #857): a 0.1 dimension at 1:1 is
 illegible and its printed +0/-0.1 band read as allowing no break at all, so
 the Front view carries no break dimension.  A 10:1 detail of the tip carries
 it instead as the single limit "0.1 MAX" (the model's CutEndBreak at
-swTolMAX, generated from the spec band).  CutEndBreak lives on a part-hidden
-reference sketch, and a detail takes a hidden sketch's visibility from the
-part when it is created, so the detail is created and dimensioned inside
-``part_sketches_shown`` (the cone tip block's section A recipe, lever probe
-c0514e35).  The only note says to deburr the cut end and that the
+swTolMAX, generated from the spec band).  CutEndBreak is a driving
+dimension of the deburr cutter's profile (the boss hook's detail pattern);
+a part-hidden reference sketch shown via ``part_sketches_shown`` delivered
+nothing to this detail (pms857-f543 -- see post_mount_screw_spec).  The
+only note says to deburr the cut end and that the
 undimensioned purchased geometry is reference.  No installation sequence, engagement figure or rule
 number is printed: the sequence is an MHA-A03 assembly step and the
 engagement a model assert (Main's eye pass of warm-c486, policy rule 6).
@@ -61,7 +61,6 @@ from post_mount_screw_spec import (
     CUT_LENGTH_DIMENSION,
     CUT_LENGTH_MM,
     CUT_TO_FIT_CALLOUT,
-    DETAIL_SKETCHES,
     DETAIL_VIEW_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FRONT_VIEW_DIMENSIONS,
@@ -266,7 +265,6 @@ async def build(adapter: Any) -> dict[str, str]:
         "Manufacturing Notes",
     )
     read_required_properties(adapter.currentModel, required, required=required)
-    source_model = adapter.currentModel
     draw, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -299,22 +297,20 @@ async def build(adapter: Any) -> dict[str, str]:
     _reference_cut_length(adapter, annotations)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
 
-    # The break lives on a part-hidden sketch: create and dimension the
-    # detail while the part shows it (a detail ignores per-view overrides).
+    # The break is the deburr cutter's own dimension: a consumed profile
+    # imports into a detail (the boss hook's ChamferWidth), where the
+    # part-hidden reference sketch did not (pms857-f543).
     with _telemetry.span("drawing.tip_detail", scale=f"{DETAIL_SCALE[0]:g}:1"):
-        with hidden_sketches.part_sketches_shown(
-            adapter, source_model, DETAIL_SKETCHES, label="tip detail break"
-        ):
-            detail = trim_drawing.end_detail(adapter, front, TIP_DETAIL)
-            set_hidden_lines_removed(adapter, detail)
-            _early_bound(detail, "IView").UpdateViewDisplayGeometry()
-            detail_annotations = hidden_sketches.curate_view_dimensions(
-                adapter,
-                detail,
-                keep=DETAIL_KEEP,
-                view_label="tip detail break",
-                dimensions_by_feature=DETAIL_VIEW_DIMENSIONS,
-            )
+        detail = trim_drawing.end_detail(adapter, front, TIP_DETAIL)
+        set_hidden_lines_removed(adapter, detail)
+        _early_bound(detail, "IView").UpdateViewDisplayGeometry()
+        detail_annotations = hidden_sketches.curate_view_dimensions(
+            adapter,
+            detail,
+            keep=DETAIL_KEEP,
+            view_label="tip detail break",
+            dimensions_by_feature=DETAIL_VIEW_DIMENSIONS,
+        )
         assert_imported_precision(adapter, detail_annotations, DETAIL_PRECISION)
         _verify_tip_detail(adapter, front, detail)
 
