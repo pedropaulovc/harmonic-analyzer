@@ -1627,8 +1627,10 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
         "cone-swing-platform",
         "cone-tip-adjuster",
         "cone-tip-block",
+        "cone-tip-block-screw",
         "cone-tip-bushing",
         "cone-tip-pinch-screw",
+        "cone-tip-shim",
         "crank-arm",
         "crank-drive-gear",
         "crank-handle",
@@ -1647,6 +1649,7 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
         "pinion-cam-pin",
         "pinion-handle",
         "pinion-lever",
+        "post-mount-screw",
         # MHA-135: locked to the lift rod, it turns with the freed rod spin.
         "pinion-lever-pin",
         "pinion-lift-rod",
