@@ -2777,6 +2777,34 @@ def task_check():
         SCRIPTS_DIR / "test_logo_profile_closure.py",
         SCRIPTS_DIR / "test_sketch_preference_baseline.py",
         SCRIPTS_DIR / "test_diag_mcmaster_lib.py",
+        # Offline tests that no gate ran until the enrollment guard above
+        # listed them (Codex on #814).  Part and assembly recipe contracts:
+        SCRIPTS_DIR / "test_assembly_save.py",
+        SCRIPTS_DIR / "test_channel_installation_cascade.py",
+        SCRIPTS_DIR / "test_frame_fastener_fit.py",
+        SCRIPTS_DIR / "test_gear.py",
+        SCRIPTS_DIR / "test_hole_spec.py",
+        SCRIPTS_DIR / "test_holes_face_selection.py",
+        SCRIPTS_DIR / "test_motion_study_default_free_pen.py",
+        SCRIPTS_DIR / "test_platen_refit.py",
+        SCRIPTS_DIR / "test_stock_spring_mounts.py",
+        SCRIPTS_DIR / "test_summing_hanger_stack.py",
+        # Drawing layout, named-view and model-item helpers:
+        SCRIPTS_DIR / "test_layout_geometry.py",
+        SCRIPTS_DIR / "test_magnifier_drawing_metadata.py",
+        SCRIPTS_DIR / "test_named_views.py",
+        SCRIPTS_DIR / "test_targeted_model_items.py",
+        # The machinist-review evaluator, beside its runner's contract:
+        SCRIPTS_DIR / "test_machinist_review_eval.py",
+        # Diagnostics tooling, beside test_diag_mcmaster_lib (all mocked or
+        # recorded-receipt tests; none connects to SolidWorks):
+        SCRIPTS_DIR / "test_diag_dump_part.py",
+        SCRIPTS_DIR / "test_face_identity_diff.py",
+        SCRIPTS_DIR / "test_owned_assembly_health_session.py",
+        SCRIPTS_DIR / "test_vm2_rack_source_save.py",
+        # The early-bound fallback-name scan, sibling of test_out_param_binding
+        # (parses the checked-in makepy wrapper; no COM connection):
+        SCRIPTS_DIR / "test_or_flag_fallback_names.py",
     ]
     # These are runtime-read rather than imported, so module_deps_of cannot
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun
@@ -2797,12 +2825,34 @@ def task_check():
     scanned_by_binding_gate = {
         *(str(path.resolve()) for path in SCRIPTS_DIR.glob("*.py")),
         *(str(path.resolve()) for path in (SCRIPTS_DIR / "diagnostics").glob("*.py")),
+        # test_or_flag_fallback_names scans every early_bound_or_flag call site
+        # under cad/scripts and the vendored adapter, and resolves the names
+        # against the checked-in wrapper, so both trees are read, not imported.
+        *(
+            str(path.resolve())
+            for root in (SCRIPTS_DIR, REPO_ROOT / "SolidworksMCP-python" / "src")
+            for path in root.rglob("*.py")
+            if not {".venv", "__pycache__"} & set(path.parts)
+        ),
     }
+    # test_vm2_rack_source_save pins recorded native receipts byte-for-byte.
+    vm2_receipts = sorted(
+        (
+            REPO_ROOT
+            / "cad"
+            / "docs"
+            / "pipeline"
+            / "evidence"
+            / "vm2-datum-placement"
+            / "probes"
+        ).glob("rack-source-save-*/receipt.json")
+    )
     recipe_test_deps = sorted(
         {
             *(str(path.resolve()) for path in recipe_tests),
             *(dep for path in recipe_tests for dep in module_deps_of(path)),
             *(str(path.resolve()) for path in machinist_review_contract_deps),
+            *(str(path.resolve()) for path in vm2_receipts),
             *scanned_by_binding_gate,
             str(
                 (REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py").resolve()
@@ -2918,8 +2968,18 @@ def task_check():
                         / "measuring-stick-numerals.dxf"
                     ).resolve()
                 ),
+                # The base serial plate is the same generated-DXF contract:
+                # gen_base_serial_dxf must regenerate base-serial.dxf exactly.
+                str((SCRIPTS_DIR / "test_base_serial.py").resolve()),
+                *module_deps_of(SCRIPTS_DIR / "test_base_serial.py"),
+                *_config_deps(SCRIPTS_DIR / "test_base_serial.py"),
+                str((REPO_ROOT / "cad" / "references" / "base-serial.dxf").resolve()),
             ],
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_dxf_text.py")],
+            "cmd": [
+                *pytest_cmd,
+                str(SCRIPTS_DIR / "test_dxf_text.py"),
+                str(SCRIPTS_DIR / "test_base_serial.py"),
+            ],
         },
         "recipe": {
             # _CONFIG_YAMLS: the metadata-ownership contracts read part rows via
