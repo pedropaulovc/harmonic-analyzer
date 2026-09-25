@@ -8,7 +8,7 @@ above the 6.35-mm swing plate fixes the drive plane at y = 90.518):
   seated perpendicular to the stepped shaft (p.18/p.20 photos), the
   shaft inclined in PLAN and carried at BOTH ends ON the cone swing
   platform (p.18: the wedge plate labelled "pivot" at its tip): big end
-  journaled in the green pivot post, thin 1/32" tip end-play located by the
+  journaled in the green pivot post, thin 1/16" tip end-play located by the
   external spacer and cup-ended adjuster carried in the black tip block (the GT tip post at world
   (-81, 105, +102), realized at station
   185). The plate pivots about a vertical axis at its TIP end, so the
@@ -648,6 +648,56 @@ if abs((CRANKSHAFT_Z0 + CS_SEAT_PINION) - (PINION_TOOTH_Z - PINION_FACE / 2.0)) 
     raise AssertionError("crankshaft SeatPinion datum off the 16T station")
 if abs((CRANKSHAFT_Z0 + CS_SEAT_ARM) - CRANK_ARM_ORIGIN_Z) > 1e-6:
     raise AssertionError("crankshaft SeatArm datum off the arm origin station")
+# Pinion retention pin (ch12 p.19): a plain 1/8 in straight pin through the
+# pinion's hub boss and the crankshaft, match-drilled at assembly. The hole is
+# on the pinion's local -X at the boss's mid-length; the crankshaft's hole is
+# turned PIN_CLOCKING_DEG so that, with the pinion seated rot_z(-seed), the two
+# holes are one. The pin lies along machine X through the shaft axis, flush
+# with the boss on both sides. crank_pinion_spec carries the seed as a literal
+# (the part build must not import this module), so it is proven equal HERE.
+from crank_pinion_spec import (  # noqa: E402
+    BOSS_DIA as PINION_BOSS_DIA,
+    FACE_WIDTH as PINION_SPEC_FACE,
+    OVERALL_LENGTH as PINION_OVERALL_LENGTH,
+    PIN_CLOCKING_DEG as PINION_PIN_CLOCKING_DEG,
+    PIN_DIA as PINION_PIN_DIA,
+    PIN_LENGTH as PINION_PIN_LENGTH,
+    PIN_STATION as PINION_PIN_STATION,
+)
+from build_crankshaft import PINION_PIN_STATION_Y as CS_PINION_PIN_STATION  # noqa: E402
+
+PINION_Z0 = PINION_TOOTH_Z - PINION_FACE / 2.0  # pinion origin: toothed south face
+PINION_PIN_Z = PINION_Z0 + PINION_PIN_STATION  # -55.92
+# The pin's axis is the seated pinion's local X: rot_z(-seed) turns local +X to
+# machine (cos s, -sin s, 0). The pin part's +Z runs along that (ROT_Y_POS90
+# lays part +Z on machine +X, then the same rot_z(-seed) as the pinion), so
+# the pin origin sits on the boss's local -X wall, a half boss diameter back.
+PINION_PIN_U = (
+    math.cos(math.radians(PINION_SEED_DEG)),
+    -math.sin(math.radians(PINION_SEED_DEG)),
+    0.0,
+)
+PINION_PIN_ORIGIN = [
+    X_CRANK - PINION_PIN_LENGTH / 2.0 * PINION_PIN_U[0],
+    Y_CRANK - PINION_PIN_LENGTH / 2.0 * PINION_PIN_U[1],
+    PINION_PIN_Z,
+]
+if abs(PINION_SPEC_FACE - PINION_FACE) > 1e-9:
+    raise AssertionError("crank_pinion_spec.FACE_WIDTH disagrees with PINION_FACE")
+if abs(PINION_PIN_CLOCKING_DEG - PINION_SEED_DEG) > 1e-9:
+    raise AssertionError(
+        "crankshaft pin hole is clocked to a stale pinion seed: set "
+        f"crank_pinion_spec.PIN_CLOCKING_DEG = {PINION_SEED_DEG!r}"
+    )
+if abs((CRANKSHAFT_Z0 + CS_PINION_PIN_STATION) - PINION_PIN_Z) > 1e-6:
+    raise AssertionError("crankshaft pin hole station off the pinion's pin station")
+if abs(PINION_PIN_LENGTH - PINION_BOSS_DIA) > 1e-9:
+    raise AssertionError("pinion pin is not flush with the boss")
+_SHAFT_NORTH_END = CRANKSHAFT_Z0 + CS_SHAFT_LENGTH  # -53.0
+if (PINION_Z0 + PINION_OVERALL_LENGTH) - _SHAFT_NORTH_END < 0.25:
+    raise AssertionError("crankshaft end is not recessed inside the pinion boss")
+if _SHAFT_NORTH_END - (PINION_PIN_Z + PINION_PIN_DIA / 2.0) < 1.0:
+    raise AssertionError("pinion pin hole leaves under 1.0 wall to the shaft end")
 
 # The whole cone set rides the SWING PLATFORM (ch.12 p.18: the dark wedge
 # plate labelled "pivot" at its tip end). The green pivot post (big-end
@@ -954,7 +1004,7 @@ if SHAFT_FRONT_STATION > _POST_SOUTH_STATION - 1.0 + 1e-9:
     )
 # --- tip end-play stack (item 5, v4_t00471 / 7:49) ---------------------------
 # Along the axis, south to north: T006 gear | brass bushing | block | shaft tip
-# | the 94025A150 adjuster's conical cup. The adjusted 1/32-in shaft terminal
+# | the 94025A150 adjuster's conical cup. The adjusted 1/16-in shaft terminal
 # meets the vendor cup apex while the full 6 mm of 5/16-18 thread remains in
 # the block; the top slit and 90280A108 pinch screw lock that setting.
 TIP_SOUTH_STATION = TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0
@@ -965,7 +1015,7 @@ _ADJ_CUP_APEX = _ADJ_CUP_RIM + ADJ_CUP_DEPTH
 _STUB_DIA = SHAFT_SECTIONS[-1][0] * 25.4
 _STUB_START = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-2][1]
 if BUSH_STATION < _STUB_START + 1.0:
-    raise AssertionError("tip bushing rides off the 1/32in stub section")
+    raise AssertionError("tip bushing rides off the 1/16in tip journal")
 if abs(BUSH_BORE_DIA - _STUB_DIA) > 0.05:
     raise AssertionError("tip-bushing bore does not match the tip stub dia")
 _require_tapped_thread("cone-tip adjuster", ADJ_THREAD, TIP_ADJ_BORE_SPEC)
@@ -2574,6 +2624,26 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{ring}", "PLANE"),
         named_ref(f"Front Plane@{pin}", "PLANE"),
         label="keeper ring locked to the pin",
+    )
+    # Pinion retention pin (ch12 p.19): through the boss and the shaft at the
+    # pin station along the seated pinion's local X (PINION_PIN_U), flush with
+    # the boss both sides. Locked to the pinion so it turns with the crank; a
+    # light drive fit in its own match-drilled hole is line contact at the
+    # nominal, so no allowed-pair volume is needed.
+    pinion_pin = await place_component(
+        adapter,
+        "crank-pinion-pin",
+        PINION_PIN_ORIGIN,
+        [0.0, 90.0, -PINION_SEED_DEG],
+        compose_rows(ROT_Y_POS90, rot_z_rows(-PINION_SEED_DEG)),
+        ground=False,
+        label="crank pinion retention pin",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{pinion_pin}", "PLANE"),
+        named_ref(f"Front Plane@{pinion}", "PLANE"),
+        label="pinion retention pin locked to the pinion",
     )
     # Keeper-ring anchor screw + brass eyelet on the arm's front face (ch11
     # p.14); both lock to the arm so they turn with the crank.
