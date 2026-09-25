@@ -32,11 +32,21 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     # name the part never marks: an unplaced import is deleted silently.
     assert kept == marked
     assert not set(drawing.FRONT_KEEP) & set(drawing.TOP_KEEP)
-    assert marked == {"Width", "Depth", "FootHt", "BoreDia", "BoreHeight"}
-    # The strap and the crown are described by sheet-derived geometry (a band
-    # between two faces, an arc radius), so their sketches stay unmarked.
+    assert marked == {
+        "Width",
+        "Depth",
+        "FootHt",
+        "BoreDia",
+        "BoreHeight",
+        "DomeDia",
+        "StrapDepth",
+        "HoldDownLocation",
+        "HoleLateral",
+        "BoreLateral",
+    }
+    # The strap band is owned by its reference sketch, so the strap profile
+    # stays unmarked.
     assert "StrapProfile" not in arbor_pedestal_spec.DRAWING_DIMENSIONS
-    assert "DomeProfile" not in arbor_pedestal_spec.DRAWING_DIMENSIONS
 
 
 def test_the_part_owns_every_printed_decimal_place() -> None:
@@ -48,6 +58,11 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
         "FootHt": 1,
         "BoreDia": 2,
         "BoreHeight": 2,
+        "DomeDia": 1,
+        "StrapDepth": 1,
+        "HoldDownLocation": 1,
+        "HoleLateral": 1,
+        "BoreLateral": 1,
     }
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in part_source
@@ -81,14 +96,88 @@ def test_sheet_derived_dimensions_take_their_places_from_the_spec() -> None:
         re.findall(r'_set_reference_precision\([^,]+,\s*"([^"]+)"\)', _drawing_source())
     )
     assert labels == set(arbor_pedestal_spec.DRAWING_REFERENCE_PRECISION)
-    assert labels == {
-        "overall height",
-        "crown radius",
-        "strap depth",
-        "hold-down hole location",
-        "bore lateral location",
-        "hold-down hole lateral location",
+    assert labels == {"overall height"}
+
+
+def test_crown_radius_is_the_dome_diameter_printed_radial() -> None:
+    """#810 Codex l4afp follow-up (Main): the R10.0 crown is a controlling
+    dimension, so it is the dome boss's own DomeDia, imported and flipped to
+    its radial form, never a radius the sheet measures off the arc."""
+    spec = arbor_pedestal_spec
+    assert spec.DRAWING_DIMENSIONS["DomeProfile"] == {"DomeDia"}
+    assert spec.DRAWING_PRECISION["DomeProfile"] == {"DomeDia": 1}
+    assert "DomeDia" in drawing.FRONT_KEEP
+    source = _drawing_source()
+    assert "display.Diametric = False" in source
+    # 810-l4afp-1 eye pass: the radius line ran through the bore to the
+    # centre; the arrow sits outside the arc so the leader stops on it.
+    assert "display.ArrowSide = _ARROWS_OUTSIDE" in source
+    assert drawing._ARROWS_OUTSIDE == 1
+    assert "AddRadialDimension2" not in source
+    assert "_show_crown_as_radius(adapter, front_annotations)" in source
+
+
+def test_manufacturing_locations_are_model_dimensions() -> None:
+    """#810 Codex l4afp, policy rule 2: the strap band, the hold-down station
+    and both lateral locations carry the .X band, so the part owns them --
+    hidden reference sketches whose one driving dimension IS the value --
+    and the sheet imports them verbatim instead of deriving them from view
+    edges and rewriting their precision."""
+    spec = arbor_pedestal_spec
+    owned = {
+        "StrapDepthReference": "StrapDepth",
+        "HoldDownReference": "HoldDownLocation",
+        "HoleLateralReference": "HoleLateral",
+        "BoreLateralReference": "BoreLateral",
     }
+    assert spec.REFERENCE_SKETCHES == tuple(owned)
+    for sketch, name in owned.items():
+        assert spec.DRAWING_DIMENSIONS[sketch] == {name}
+        assert spec.DRAWING_PRECISION[sketch] == {name: 1}
+    source = _drawing_source()
+    assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
+    assert source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 2
+    for label in ("strap depth", "hold-down hole location", "lateral location"):
+        assert f'label="{label}' not in source
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "_hide_reference_sketches(adapter)" in part_source
+
+
+def test_reference_lines_restate_the_geometry_their_equations_drive() -> None:
+    """Each reference line's value, and the origin anchors that place it on
+    the outline, evaluate from the part's globals to the as-built value: the
+    deferred equations are neutral, and a global edit moves the line."""
+    spec = arbor_pedestal_spec
+    globals_mm = {
+        "FootWidth": spec.FOOT_WIDTH,
+        "FootDepth": spec.FOOT_DEPTH,
+        "StrapInnerZ": spec.STRAP_INNER_Z,
+        "StrapThickness": spec.STRAP_T,
+        "ScrewZ": -spec.SCREW_Z,
+    }
+
+    def evaluate(expression: str) -> float:
+        text = re.sub(r'"(\w+)"', lambda m: repr(globals_mm[m.group(1)]), expression)
+        return float(eval(text, {"__builtins__": {}}))  # noqa: S307 - literal arithmetic
+
+    expected = {
+        "StrapDepth": spec.STRAP_T,
+        "HoldDownLocation": spec.STRAP_INNER_Z - spec.SCREW_Z,
+        "HoleLateral": spec.FOOT_WIDTH / 2.0,
+        "BoreLateral": spec.FOOT_WIDTH / 2.0,
+    }
+    for sketch, plane, name, start, end, orientation, value, drives in part.REFERENCE_LINES:
+        assert value == expected[name]
+        axis = 1 if orientation == "vertical" else 0
+        assert abs(end[axis] - start[axis]) == value
+        assert end[1 - axis] == start[1 - axis]
+        anchors = [abs(c) for c in start if abs(c) > 1e-9]
+        assert [evaluate(d) for d in drives] == [value, *anchors], sketch
+        # Rule 7: every line starts on a feature -- the west side face for a
+        # lateral location, the far face or strap root for a plan depth.
+        if name in ("HoleLateral", "BoreLateral", "HoldDownLocation"):
+            assert start[0] == -spec.FOOT_WIDTH / 2.0
+        assert plane == ("Front" if name == "BoreLateral" else "Top")
 
 
 def test_arbor_bore_closes_the_configured_running_fit() -> None:
@@ -308,8 +397,9 @@ def test_lateral_locations_start_on_a_feature_not_the_symmetry_axis() -> None:
     views, and no callout falls back on the part centreline."""
     source = _drawing_source()
     assert "PART C/L" not in source
-    assert source.count("_side_face_edge(adapter, front, -FOOT_WIDTH / 2.0") == 1
-    assert source.count("_side_face_edge(adapter, top, -FOOT_WIDTH / 2.0") == 1
+    starts = {row[2]: row[3] for row in part.REFERENCE_LINES}
+    assert starts["BoreLateral"][0] == -arbor_pedestal_spec.FOOT_WIDTH / 2.0
+    assert starts["HoleLateral"][0] == -arbor_pedestal_spec.FOOT_WIDTH / 2.0
     # The hole lane sits between the plan's near edge and the foot-width lane.
     plan_top = drawing._top_y(arbor_pedestal_spec.FOOT_NEAR_Z)
     assert plan_top < drawing.HOLE_LATERAL_XY[1] < drawing.TOP_KEEP["Width"][1]
