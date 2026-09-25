@@ -147,6 +147,9 @@ def packaged(tmp_path: Path, monkeypatch):
             }
         },
     )
+    monkeypatch.setattr(
+        package_native, "DRAWING_SOURCES", {"platen_guide": "platen-guide.SLDPRT"}
+    )
     references = {
         top: [native_part],
         native_drawing: [native_part],
@@ -222,6 +225,17 @@ def test_stamp_release_records_library_residents(packaged, tmp_path):
     stamped = package_native.stamp_release(session, out, "v37")
 
     assert stamped["external_residents"] == ["binding head screw_ai.sldprt"]
+
+
+def test_stamp_release_fails_when_a_drawing_opens_without_its_model(packaged):
+    """A silent open hides a missing reference: the drawing opens on cached
+    views with nothing foreign and nothing stale resident, and its REV cell
+    would keep DEV. The drawing's own model must be resident from the tree."""
+    out, session, docs = packaged
+    session.references[docs["native_drawing"]] = []
+
+    with pytest.raises(RuntimeError, match="opened without its model platen-guide"):
+        package_native.stamp_release(session, out, "v37")
 
 
 def test_stamp_release_fails_when_a_save_does_not_reach_disk(packaged):
