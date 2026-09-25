@@ -80,10 +80,17 @@ Catalog specifications checked on September 10, 2026:
   the user on September 24, 2026 (an agent fetch that day was refused, HTTP
   403): #6-32 UNC-3A, right hand, flat tip, head Ø0.262 in x 0.073 in, 5/64
   hex drive, 1/2 in under the head, fully threaded, 140 ksi, ASME B18.3 /
-  ASTM F835. `diag_build_91255A148.py` models it from those catalog
-  dimensions, with its assumed edge band and socket depth stated in its
-  docstring. The vendor file is local-only (© McMaster, gitignored) as
-  `91255A148.SLDPRT`; the replica gate against it is pending.
+  ASTM F835. The catalog fixes the identity; the geometry is the vendor
+  model's own. `diag_build_91255A148.py` replays the dimensions and solved
+  sketch geometry read from `91255A148.SLDPRT` (the read-only dump
+  `cad/out/reports/mcmaster-91255A148-dump.json`): the 7/64 flat top and
+  R3.941216 dome, the 10 deg edge band and its R0.09271 fillets, the 5/64
+  hex socket 1.01981 deep with its 60 deg countersink, and the thread, tip
+  chamfer and 45 deg neck; its docstring lists each value. The vendor file is
+  local-only (© McMaster, gitignored). The replica gate against it passed on
+  September 25, 2026: volume 130.7034 vs 130.7033 mm^3, area 291.3955 mm^2
+  on both, 26 faces each with the same face-area multiset, and matching
+  centre of mass (`cad/out/reference/91255A148-replica-report.json`).
   Evidence SHA-256: native SLDPRT
   `4b8dac17c6b7e77499209a399342aa51780743b657aec0df7175f227b54e59a0`.
 
