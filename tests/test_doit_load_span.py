@@ -2,6 +2,7 @@
 the ``build-infra`` resource, emitted once whichever entry point loads the graph
 (``python -m doit`` or ``build.py``), and never fails the load."""
 
+import importlib.util
 import runpy
 import sys
 import types
@@ -62,6 +63,7 @@ _STAMPED = (
     "_started = time.time_ns()\n"
     "import _doit_load\n"
     "_DOIT_LOAD = _doit_load.LoadStamp(_started)\n"
+    "_doit_load.watch_import(_DOIT_LOAD)\n"
     "_doit_load.install()\n"
 )
 _TASKS = (
@@ -159,6 +161,61 @@ def test_a_generator_that_raises_still_writes_one_error_span(graph, monkeypatch)
     assert [str(exc) for exc in span.exceptions] == ["bad graph"]
     assert span.end_time is not None and span.start_time <= span.end_time
     assert "doit.tasks" not in span.attributes and "label" not in span.attributes
+
+
+def test_a_dodo_that_fails_to_import_still_writes_one_error_span(graph, monkeypatch):
+    """Codex on #863: an exception in dodo's own module body (a helper import,
+    a module-level computation) unwinds inside doit's ``setup``, before
+    ``load_tasks``, so only the import watch can write that load's span."""
+    spans, _ = _fake_telemetry(monkeypatch)
+    dodo = graph(_STAMPED + "raise RuntimeError('bad import')\n" + _TASKS)
+
+    with pytest.raises(RuntimeError, match="bad import"):
+        _load(dodo, ["one"])
+
+    (span,) = spans
+    assert span.name == "doit.load"
+    assert span.attributes["doit.command"] == "import"
+    assert not span.status.is_ok and "bad import" in span.status.description
+    assert [str(exc) for exc in span.exceptions] == ["bad import"]
+    assert _watch_tools() == []  # the watch is released
+
+
+def test_python_dash_m_doit_records_a_failed_import(graph, monkeypatch):
+    spans, _ = _fake_telemetry(monkeypatch)
+    dodo = graph(_STAMPED + "import no_such_helper_module\n" + _TASKS)
+    monkeypatch.setattr(sys, "argv", ["doit", "list", "-f", str(dodo)])
+
+    with pytest.raises(SystemExit) as done:
+        runpy.run_module("doit", run_name="__main__", alter_sys=False)
+
+    assert done.value.code != 0
+    (span,) = spans
+    assert not span.status.is_ok and "no_such_helper_module" in span.status.description
+
+
+def test_a_successful_load_releases_the_import_watch(graph, monkeypatch):
+    _fake_telemetry(monkeypatch)
+
+    _load(graph(), ["one"])
+
+    assert _watch_tools() == []
+
+
+def _watch_tools():
+    return [i for i in range(6) if sys.monitoring.get_tool(i) == "harmonic-doit-load"]
+
+
+def test_an_import_without_a_load_releases_the_import_watch(graph, monkeypatch):
+    """dodo imported directly (a test, a helper script) never reaches
+    ``load_tasks``: the module's own return still disarms the global event."""
+    _fake_telemetry(monkeypatch)
+    dodo = graph()
+    spec = importlib.util.spec_from_file_location("dodo_import_only", dodo)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    assert _watch_tools() == []
 
 
 def test_install_is_idempotent(graph, monkeypatch):
