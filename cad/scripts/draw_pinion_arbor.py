@@ -7,6 +7,7 @@ import math
 import sys
 from typing import Any
 
+import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
@@ -35,6 +36,7 @@ from pinion_arbor_spec import (
     BACK_JOURNAL_Z,
     BOND_ZONE_DIA_Z,
     CROSS_HOLE_CALLOUT,
+    DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRUM_STATION,
     FRONT_JOURNAL_Z,
@@ -44,7 +46,11 @@ from pinion_arbor_spec import (
     HEAD_FRONT_Z,
     HEAD_REAR_Z,
     JOURNAL_LEN,
+    NECK_DIA,
+    NECK_DIA_WITNESS_LEN,
+    NECK_DIA_WITNESS_Z,
     OVERALL_LEN,
+    REFERENCE_SKETCHES,
     SHAFT_DIA,
     SURFACE_FINISHES,
 )
@@ -81,12 +87,12 @@ DETAIL_LABEL_XY = (
     - DETAIL_RADIUS_MM * DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
     - DETAIL_LABEL_DROP,
 )
-# The head and neck diameters live in end-on Front-plane profile sketches, so
-# the end-on donor imports them: the head's moves onto the 1:1 profile, the
-# neck's into detail A (DETAIL_DIAMETER_POSITIONS says why).  The Ø8
-# is dimensioned on the profile itself, from the bond zone's flank.
+# The head diameter lives in an end-on Front-plane profile sketch, so the
+# end-on donor imports it and it moves onto the 1:1 profile.  The neck's is
+# imported straight into detail A from the part's hidden NeckReference sketch
+# (DETAIL_DIAMETER_POSITIONS says why), and the Ø8 is dimensioned on the
+# profile itself, from the bond zone's flank.
 DONOR_KEEP = {
-    "NeckDia": (0.055, 0.145),
     "HeadDia": (0.030, 0.215),
 }
 # Profile scale is 1:1 with the head to the right, so model z maps to sheet
@@ -186,6 +192,19 @@ REFERENCE_WITNESSES = {
     ),
     "BondZoneReference": (BOND_ZONE_DIA_Z, BOND_ZONE_DIA_Z + BOND_ZONE_WITNESS_LEN),
 }
+# Detail A shows the NeckReference sketch (it is created while the part shows
+# it), and its short construction witness lies on the lower Ø10.5 outline:
+# at 2:1 the same grey break, so it is drawn black there too.
+DETAIL_REFERENCE_WITNESSES = {
+    "NeckReference": (NECK_DIA_WITNESS_Z - NECK_DIA_WITNESS_LEN, NECK_DIA_WITNESS_Z),
+}
+# The profile should not show NeckReference: the part saves it hidden, and
+# the profile exists before the drawing shows it in memory.  That is not
+# measured, so the raster gate reads its span on the profile's neck too, and
+# a grey witness there fails loud.
+PROFILE_NECK_WITNESS = "NeckReference (profile)"
+# A witness's two sheet endpoints (m).
+Span = tuple[tuple[float, float], tuple[float, float]]
 SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
 REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the witnesses are fully defined sketch lengths
 # Exported-raster proof that the outline stays unbroken over each witness:
@@ -272,16 +291,22 @@ def _detail_x(model_z: float) -> float:
 
 
 # In detail A the neck runs from the fence (x ~0.137 at its edges) to the
-# head rear face (x 0.1545), its Ø10.5 at y 0.2245-0.2455.  Its end-on
-# circle is on the Front plane (model z 0, x 0.152), where the witnesses
-# start, so a line at x 0.140 on the neck's fence side keeps both witnesses
-# on the neck.  The text runs on past the line, away from that circle (the
-# profile rendered it left of its line at a1a694a6), so it rides above-left
-# of the fence, clear of the circle like every other detail-A callout; the
-# line crosses the fence once, square, to reach it.
+# head rear face (x 0.1545), its Ø10.5 at y 0.2245-0.2455.  Detail A takes
+# no dimension moved in from another view (move, copy and a centre drop all
+# failed, from its parent too: farm bisect neckbisect-ecef), so the Ø10.5 is
+# imported into it from the part's hidden NeckReference sketch, whose witness
+# stands NECK_DIA_WITNESS_Z on the neck (x 0.1425).  A line at x 0.140, fence
+# side of it, keeps both witnesses on the neck.  The text runs on past the
+# line (the profile rendered it left of its line at a1a694a6), so it rides
+# above-left of the fence, clear of the circle like every other detail-A
+# callout; the line crosses the fence once, square, to reach it.
 DETAIL_DIAMETER_POSITIONS = {
     "NeckDia": (0.140, 0.2575),
 }
+# Everything detail A prints, imported feature by feature
+# (_drawing_hidden_sketches.curate_view_dimensions) while the part shows
+# REFERENCE_SKETCHES.
+DETAIL_A_KEEP = {**DETAIL_KEEP, **DETAIL_DIAMETER_POSITIONS}
 DIMENSION_CALLOUTS = {
     # One name for the axial datum every station runs from (Fable m1): the
     # head end has two shoulders, Ø8-Ø10.5 and Ø10.5-Ø15.
@@ -417,6 +442,70 @@ def _head_detail(adapter: Any, parent_view: Any) -> Any:
     return detail
 
 
+DETAIL_A_LABEL = "integral-arbor head detail"
+
+
+def _logged_detail_arrivals(adapter: Any, detail: Any) -> list[str]:
+    """Log and return the model dimensions detail A owns, sorted: the farm
+    leaf's evidence of what the import delivered, whichever way it went."""
+    arrived = sorted(
+        dimension_name(adapter, annotation)
+        for annotation in (
+            _early_bound(item, "IAnnotation")
+            for item in (_early_bound(detail, "IView").GetAnnotations() or ())
+        )
+        if int(annotation.GetType()) == _SW_DISPLAY_DIMENSION
+    )
+    _telemetry.info(
+        f"pinion-arbor detail A after its import: arrived={arrived}, "
+        f"expected={sorted(DETAIL_A_KEEP)}",
+        arrived=",".join(arrived),
+    )
+    return arrived
+
+
+def _dimensioned_head_detail(
+    adapter: Any, source_model: Any, principal: Any
+) -> tuple[Any, list[Any], dict[str, Span]]:
+    """Create detail A and dimension it while the part shows NeckReference.
+
+    A detail takes a hidden sketch's visibility from the part when it is
+    created and refuses the per-view override (_drawing_hidden_sketches), so
+    it is created, imported feature by feature, and has its neck witness
+    drawn black inside ``part_sketches_shown``.  Returns the detail, its kept
+    dimensions and the witness's sheet span.  An import that misses NeckDia
+    fails with one message naming what did arrive.
+    """
+    detail = None
+    try:
+        with hidden_sketches.part_sketches_shown(
+            adapter, source_model, REFERENCE_SKETCHES, label="detail A neck diameter"
+        ):
+            detail = _head_detail(adapter, principal)
+            set_hidden_lines_removed(adapter, detail)
+            annotations = hidden_sketches.curate_view_dimensions(
+                adapter,
+                detail,
+                keep=DETAIL_A_KEEP,
+                view_label=DETAIL_A_LABEL,
+                dimensions_by_feature=DRAWING_DIMENSIONS,
+            )
+            _logged_detail_arrivals(adapter, detail)
+            spans = _blacken_reference_witnesses(
+                adapter, detail, DETAIL_REFERENCE_WITNESSES, flank_dia=NECK_DIA
+            )
+    except RuntimeError as error:
+        if detail is None:
+            raise
+        arrived = _logged_detail_arrivals(adapter, detail)
+        if "NeckDia" in arrived:
+            raise
+        raise RuntimeError(
+            f"NeckDia did not import into detail A: arrived={arrived}; {error}"
+        ) from error
+    return detail, annotations, spans
+
+
 def _add_turning_axis(adapter: Any, view: Any) -> None:
     """Draw one centreline over the whole turned axis.
 
@@ -460,25 +549,40 @@ def _add_turning_axis(adapter: Any, view: Any) -> None:
     draw.EditRebuild3()
 
 
+def _flank_span(
+    adapter: Any, view: Any, flank_dia: float, z0: float, z1: float, *, label: str
+) -> Span:
+    """Sheet endpoints of a run of the lower flank (model +x) from z0 to z1 mm."""
+    flank_x = flank_dia / 2000.0
+    first, second = (
+        model_point_in_view(adapter, view, (flank_x, 0.0, z / 1000.0), label=label)
+        for z in (z0, z1)
+    )
+    return first, second
+
+
 def _blacken_reference_witnesses(
-    adapter: Any, view: Any
-) -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
+    adapter: Any,
+    view: Any,
+    witnesses: dict[str, tuple[float, float]],
+    *,
+    flank_dia: float,
+) -> dict[str, Span]:
     """Draw each reference sketch's flank witness in the outline's black.
 
-    Returns each witness's sheet endpoints for the exported-raster check.
+    ``witnesses`` maps each sketch to its witness's model z span (mm), on the
+    lower flank of the ``flank_dia`` diameter.  Returns each witness's sheet
+    endpoints for the exported-raster check.
     """
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, view)):
-        raise RuntimeError("failed to activate the integral-arbor profile for its witnesses")
-    flank_x = SHAFT_DIA / 2000.0
+    label = view_name(adapter, view)
+    if not drawing.ActivateView(label):
+        raise RuntimeError(f"failed to activate {label} for its reference witnesses")
     spans = {}
-    for sketch_name, (z0, z1) in REFERENCE_WITNESSES.items():
-        ends = tuple(
-            model_point_in_view(
-                adapter, view, (flank_x, 0.0, z / 1000.0), label=f"{sketch_name} witness end"
-            )
-            for z in (z0, z1)
+    for sketch_name, (z0, z1) in witnesses.items():
+        ends = _flank_span(
+            adapter, view, flank_dia, z0, z1, label=f"{sketch_name} witness end"
         )
         mid = ((ends[0][0] + ends[1][0]) / 2.0, (ends[0][1] + ends[1][1]) / 2.0)
         draw.ClearSelection2(True)
@@ -495,8 +599,8 @@ def _blacken_reference_witnesses(
         # Identify the pick by its own length, not its sketch's name: an
         # ISketch is not an IFeature dispatch, so rebinding it reads another
         # member (7885c0d9 got a 16-double matrix back for ``Name``).  The
-        # only other flank construction segment here is the front land's
-        # 19 mm witness.
+        # only other flank construction segment on the profile is the front
+        # land's 19 mm witness; detail A has none but the neck's.
         name = str(segment.GetName())
         length = float(segment.GetLength()) * 1000.0
         expected = z1 - z0
@@ -510,9 +614,10 @@ def _blacken_reference_witnesses(
         draw.ClearSelection2(True)
         spans[sketch_name] = ends
         _telemetry.info(
-            f"pinion-arbor: {sketch_name} flank witness drawn black at sheet "
-            f"({mid[0] * 1000:.1f}, {mid[1] * 1000:.1f}) mm",
+            f"pinion-arbor: {sketch_name} flank witness drawn black in {label} "
+            f"at sheet ({mid[0] * 1000:.1f}, {mid[1] * 1000:.1f}) mm",
             sketch=sketch_name,
+            view=label,
         )
     draw.EditRebuild3()
     return spans
@@ -520,7 +625,7 @@ def _blacken_reference_witnesses(
 
 def _broken_outline_columns(
     raster: Any,
-    spans: dict[str, tuple[tuple[float, float], tuple[float, float]]],
+    spans: dict[str, Span],
     sheet_size: tuple[float, float],
 ) -> dict[str, list[int]]:
     """Return, per witness, the raster columns where the outline is not dark."""
@@ -542,7 +647,7 @@ def _broken_outline_columns(
 
 def _assert_outline_unbroken(
     png: Any,
-    spans: dict[str, tuple[tuple[float, float], tuple[float, float]]],
+    spans: dict[str, Span],
     sheet_size: tuple[float, float],
 ) -> None:
     from PIL import Image
@@ -554,9 +659,10 @@ def _assert_outline_unbroken(
             f"{name}: {len(columns)} column(s) from x={columns[0]} px"
             for name, columns in broken.items()
         )
-        raise RuntimeError(f"pinion-arbor: Ø8 outline broken over reference witness: {detail}")
+        raise RuntimeError(f"pinion-arbor: outline broken over reference witness: {detail}")
     _telemetry.info(
-        f"pinion-arbor: Ø8 outline unbroken over {len(spans)} reference witnesses",
+        f"pinion-arbor: outline unbroken over {len(spans)} reference witnesses: "
+        f"{sorted(spans)}",
         witnesses=len(spans),
     )
 
@@ -586,6 +692,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open pinion-arbor source", await adapter.open_model(str(SOURCE)))
+    source_model = adapter.currentModel
     read_required_properties(
         adapter.currentModel,
         (
@@ -637,21 +744,15 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (donor, principal, iso):
         set_hidden_lines_removed(adapter, view)
 
-    detail = _head_detail(adapter, principal)
-    set_hidden_lines_removed(adapter, detail)
     donor_annotations = curate_view_dimensions(
         adapter, donor, keep=DONOR_KEEP, view_label="diameter donor"
     )
     principal_annotations = curate_view_dimensions(
         adapter, principal, keep=PRINCIPAL_KEEP, view_label="integral-arbor profile"
     )
-    detail_annotations = curate_view_dimensions(
-        adapter, detail, keep=DETAIL_KEEP, view_label="integral-arbor head detail"
-    )
     for label, kept in (
         ("donor", donor_annotations),
         ("principal", principal_annotations),
-        ("detail", detail_annotations),
     ):
         names = sorted(dimension_name(adapter, annotation) for annotation in kept)
         _telemetry.info(
@@ -660,34 +761,31 @@ async def build(adapter: Any) -> dict[str, str]:
             kept=len(kept),
             names=",".join(names),
         )
-    diameter_targets = {
-        **{name: ("principal", principal, xy) for name, xy in DIAMETER_POSITIONS.items()},
-        **{name: ("detail", detail, xy) for name, xy in DETAIL_DIAMETER_POSITIONS.items()},
-    }
     moved_diameters = []
     moves = []
     for annotation in donor_annotations:
         name = dimension_name(adapter, annotation)
-        label, target, text_xy = diameter_targets[name]
+        text_xy = DIAMETER_POSITIONS[name]
         moved_diameters.append(
-            _move_dimension(adapter, annotation, target, text_xy, source_view=donor)
+            _move_dimension(adapter, annotation, principal, text_xy, source_view=donor)
         )
-        moves.append(f"{name} -> {label} ({text_xy[0] * 1000:.1f}, {text_xy[1] * 1000:.1f}) mm")
+        moves.append(f"{name} -> principal ({text_xy[0] * 1000:.1f}, {text_xy[1] * 1000:.1f}) mm")
     principal_count = len(_early_bound(principal, "IView").GetAnnotations() or ())
-    detail_count = len(_early_bound(detail, "IView").GetAnnotations() or ())
     _telemetry.info(
         f"pinion-arbor moved {len(moved_diameters)} diameters off the donor: "
-        f"{'; '.join(moves)}; principal now carries {principal_count} "
-        f"annotations, detail {detail_count}",
+        f"{'; '.join(moves)}; principal now carries {principal_count} annotations",
         moved=len(moved_diameters),
         moves="; ".join(moves),
         principal_annotations=principal_count,
-        detail_annotations=detail_count,
     )
     donor_name = view_name(adapter, donor)
     delete_view(adapter, donor)
     if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
         raise RuntimeError("failed to delete the empty diameter donor view")
+
+    detail, detail_annotations, detail_spans = _dimensioned_head_detail(
+        adapter, source_model, principal
+    )
     annotations = [
         *moved_diameters,
         *principal_annotations,
@@ -712,7 +810,19 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
         raise RuntimeError("failed to add center mark to the detailed grip cross-hole")
     _add_turning_axis(adapter, principal)
-    witness_spans = _blacken_reference_witnesses(adapter, principal)
+    witness_spans = {
+        **_blacken_reference_witnesses(
+            adapter, principal, REFERENCE_WITNESSES, flank_dia=SHAFT_DIA
+        ),
+        **detail_spans,
+        PROFILE_NECK_WITNESS: _flank_span(
+            adapter,
+            principal,
+            NECK_DIA,
+            *DETAIL_REFERENCE_WITNESSES["NeckReference"],
+            label="profile neck witness span",
+        ),
+    }
     for key, (station_z, symbol_xy, flank) in JOURNAL_FINISHES.items():
         land_x, axis_y = model_point_in_view(
             adapter,
@@ -774,7 +884,7 @@ async def build(adapter: Any) -> dict[str, str]:
         arrows=arrows,
         axis=_unit(far_on_axis[0] - fence_center[0], far_on_axis[1] - fence_center[1]),
     )
-    # The diameters moved INTO detail A answer to its own circle: their
+    # The diameters printed in detail A answer to its own circle: their
     # witnesses stay on the part inside it, only the dimension line leaves
     # for the text.  The detail's other callouts are leaders and axial
     # stations that leave it by design, so they are not judged here.
@@ -797,7 +907,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if len(detail_diameters) != len(DETAIL_DIAMETER_POSITIONS):
         raise RuntimeError(
             f"pinion-arbor: detail A carries {len(detail_diameters)} of its "
-            f"{len(DETAIL_DIAMETER_POSITIONS)} moved diameters in the layout audit"
+            f"{len(DETAIL_DIAMETER_POSITIONS)} diameters in the layout audit"
         )
     _assert_witnesses_clear_of_detail_fence(
         detail_diameters,
