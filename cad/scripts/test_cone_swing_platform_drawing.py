@@ -394,6 +394,8 @@ _D382_NOTCH_INK = drawing.SheetInk(
         "CapECz": [
             ((0.2743, 0.2406), (0.3060, 0.2406)),  # the upper witness
             ((0.3050, 0.2406), (0.3050, 0.1828)),  # the dimension line
+            ((0.3050, 0.1772), (0.3050, 0.1377)),  # its lower leg, under the text
+            ((0.2607, 0.1377), (0.3060, 0.1377)),  # the pivot's witness
         ],
     },
     arcs={
@@ -588,20 +590,26 @@ def test_the_leader_clearance_is_why_the_205_81_moved(
     )
 
 
-# The isometric view and its label as d382 printed them (describe_sheet,
-# C:/src/dt-logs/spring/tipslot-d382-leaf.log:291,478) with the view at
-# ISO_CENTER (0.355, 0.205); both follow the view.  A-A's "(6.35)" line
-# (:456) does not move.
+# The isometric VIEW as d382 printed it (describe_sheet,
+# C:/src/dt-logs/spring/tipslot-d382-leaf.log:291) with ISO_CENTER at
+# (0.355, 0.205); the view follows ISO_CENTER (fix4b's render: the part moved
+# 15 mm right with it).  Its CAPTION is a property-linked note at a fixed
+# sheet point that does NOT follow the view -- the premise fix4b's version of
+# this test got wrong; its exact box is :478 (INote.GetExtent) at the anchor
+# (0.315, 0.158).  A-A's "(6.35)" line (:456) does not move.
 _D382_ISO_CENTER = (0.355, 0.205)
 _D382_ISO_VIEW_BOX = (0.3160, 0.1793, 0.3940, 0.2307)
-_D382_ISO_LABEL_BOX = (0.3147, 0.1536, 0.3748, 0.1585)
+_D382_ISO_NOTE_ANCHOR = (0.315, 0.158)
+_D382_ISO_NOTE_BOX = (0.3147, 0.1536, 0.3748, 0.1585)
+_D382_NOTCH_NOTE_BOX = (0.2298, 0.1215, 0.2899, 0.1258)
 _PLATE_THK_TOP_LINE_BOX = (0.3095, 0.1318, 0.3246, 0.1353)
 _SHEET_BORDER_RIGHT = 0.4189
 
 
-def _iso_box(box: tuple[float, float, float, float]) -> tuple[float, float, float, float]:
+def _iso_view_box() -> tuple[float, float, float, float]:
     dx = drawing.ISO_CENTER[0] - _D382_ISO_CENTER[0]
     dy = drawing.ISO_CENTER[1] - _D382_ISO_CENTER[1]
+    box = _D382_ISO_VIEW_BOX
     return (box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy)
 
 
@@ -611,27 +619,61 @@ def _box_gap(first: tuple[float, ...], second: tuple[float, ...]) -> float:
     return math.hypot(dx, dy)
 
 
+def test_the_caption_extents_are_the_measured_ones() -> None:
+    """The captions' boxes in the model are the seat's exact extents about
+    their anchors, not estimates."""
+    iso = drawing._anchored_box(_D382_ISO_NOTE_ANCHOR, drawing.ISO_NOTE_EXTENT)
+    assert all(abs(a - b) < 1e-6 for a, b in zip(iso, _D382_ISO_NOTE_BOX))
+    notch = drawing._anchored_box(drawing.NOTCH_CAPTION_UPPER_LEFT, drawing.NOTCH_NOTE_EXTENT)
+    assert all(abs(a - b) < 1e-6 for a, b in zip(notch, _D382_NOTCH_NOTE_BOX))
+    # The isometric caption now follows its view: 40 mm left of its centre,
+    # as d382 had it.
+    assert drawing.ISO_NOTE_UPPER_LEFT[0] - drawing.ISO_CENTER[0] == pytest.approx(
+        _D382_ISO_NOTE_ANCHOR[0] - _D382_ISO_CENTER[0]
+    )
+
+
+# fix4b (2c406e963) as it printed: the 205.81 line at x 0.32694 (300-dpi
+# render, C:/src/dt-logs/tipslot-fix4b-2c40/cone-swing-platform_drawing.png,
+# columns 326.90..326.98 mm at y 150) from its text break (0.1672) down to the
+# pivot witness, and the isometric caption still at d382's anchor (Main's
+# MHA-091 eye pass: the line runs between the M and the E).
+_FIX4B_CAPTION_INK = drawing.SheetInk(
+    texts={"Isometric View Note": _D382_ISO_NOTE_BOX},
+    lines={"CapECz": [((0.32694, 0.1672), (0.32694, 0.13766))]},
+    arcs={},
+    arrows={},
+    leaders={},
+)
+
+
+def test_the_fix4b_caption_fails_the_ink_audit() -> None:
+    """Planted as printed, the audit names the 205.81 through the caption;
+    the model at fix4b's caption anchor does too."""
+    assert "text-on-line: CapECz's line runs through 'Isometric View Note'" in (
+        drawing.sheet_ink_collisions(_FIX4B_CAPTION_INK)
+    )
+    fix4b = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY, iso_note_xy=_D382_ISO_NOTE_ANCHOR)
+    assert "text-on-line: CapECz's line runs through 'Isometric View Note'" in (
+        drawing.sheet_ink_collisions(fix4b)
+    )
+
+
 def test_the_moved_205_81_clears_the_isometric_and_the_section_note() -> None:
-    """The 205.81 moved to x 0.327 for the run angle's leader; the isometric
-    moved 15 mm right to make room.  Every neighbour stays 2 mm off: the
-    dimension line (y 0.1377..0.2406) passes left of the view and its label,
-    its text sits under the view, its lower witness and arrowhead clear A-A's
-    "(6.35)", and the view stays inside the border."""
-    view = _iso_box(_D382_ISO_VIEW_BOX)
-    label = _iso_box(_D382_ISO_LABEL_BOX)
+    """The 205.81 at x 0.327 and its neighbours, 2 mm apart: both legs pass
+    left of the isometric view and its caption, its text sits under the view,
+    its lower witness and arrowhead clear A-A's "(6.35)", and the view stays
+    inside the border."""
+    view = _iso_view_box()
     ink = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY)
-    witness, line = ink.lines["CapECz"]
+    caption = ink.texts["Isometric View Note"]
+    witness, line, lower_leg, lower_witness = ink.lines["CapECz"]
     cap_x = drawing.NOTCH_KEEP["CapECz"][0]
-    lower_witness_y = witness[0][1] - 0.1029  # 205.81 at 1:2
-    dimension = ((cap_x, witness[0][1]), (cap_x, lower_witness_y))
-    lower_witness = ((0.2607, lower_witness_y), (cap_x + 0.001, lower_witness_y))
-    lower_arrow = ((cap_x, lower_witness_y), (cap_x, lower_witness_y + 0.0034))
-    for keep_out in (view, label):
-        assert _drawing_leaders.distance_to_box(dimension, keep_out) >= 0.002
-        assert _drawing_leaders.distance_to_box(witness, keep_out) >= 0.002
-    cap_text = ink.texts["CapECz"]
-    for keep_out in (view, label):
-        assert _box_gap(cap_text, keep_out) >= 0.002
+    lower_arrow = ((cap_x, lower_witness[0][1]), (cap_x, lower_witness[0][1] + 0.0034))
+    for keep_out in (view, caption):
+        for stroke in (witness, line, lower_leg, lower_witness):
+            assert _drawing_leaders.distance_to_box(stroke, keep_out) >= 0.002
+        assert _box_gap(ink.texts["CapECz"], keep_out) >= 0.002
     assert _drawing_leaders.distance_to_box(lower_witness, _PLATE_THK_TOP_LINE_BOX) >= 0.002
     assert (
         _drawing_leaders.distance_to_box(lower_arrow, _PLATE_THK_TOP_LINE_BOX)
@@ -639,9 +681,81 @@ def test_the_moved_205_81_clears_the_isometric_and_the_section_note() -> None:
         >= 0.002
     )
     assert _SHEET_BORDER_RIGHT - view[2] >= 0.002
-    # Positive control: d382's isometric with this 205.81 -- the line runs
-    # into the label.
-    assert _drawing_leaders.distance_to_box(dimension, _D382_ISO_LABEL_BOX) < 0.002
+    assert _SHEET_BORDER_RIGHT - caption[2] >= 0.002
+
+
+# d382/fix4b's 27.70 (TipSlotZ; unchanged between them), 300-dpi render
+# (C:/src/dt-logs/tipslot-fix4b-2c40/cone-swing-platform_drawing.png): its
+# shoulder at y 0.15268 runs from its line (x 0.2391) left to x 0.22479, and
+# the hole-location plan's 189.26 (PostMountWestZ) line stands at x 0.22492
+# (columns 224.87..224.96 mm) -- the shoulder ends ON it, a T.
+_D382_TIP_SLOT_Z_INK = {
+    "TipSlotZ leader": [
+        ((0.2391, 0.1515), (0.2391, 0.15268)),
+        ((0.2391, 0.15268), (0.22492, 0.15268)),
+    ],
+    "PostMountWestZ lines": [((0.22492, 0.13766), (0.22492, 0.1722))],
+}
+
+
+def test_the_d382_27_70_shoulder_tees_into_the_189_26() -> None:
+    """Main's MHA-091 item 2: the T rule counts it as a crossing."""
+    assert _drawing_leaders.leader_crossings(_D382_TIP_SLOT_Z_INK) == [
+        ("TipSlotZ leader", "PostMountWestZ lines")
+    ]
+
+
+def test_the_27_70_prints_inside_its_span() -> None:
+    """Centred on its line between the witnesses: no shoulder, 2 mm clear of
+    the 189.26 line and of every notch-plan stroke, the inside arrows fit."""
+    ink = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY)
+    text = drawing.NOTCH_KEEP["TipSlotZ"]
+    assert text[0] == drawing.TIP_SLOT_Z_LINE_X
+    lower, upper = ink.lines["TipSlotZ"]
+    assert lower[0][1] < text[1] < upper[1][1]
+    box = ink.texts["TipSlotZ"]
+    assert box[0] - _D382_TIP_SLOT_Z_INK["PostMountWestZ lines"][0][0][0] >= 0.002
+    for piece in (lower, upper):
+        assert abs(piece[1][1] - piece[0][1]) >= drawing.NOTCH_ANGLE_ARROW_LENGTH + 0.0005
+    assert drawing.sheet_ink_collisions(ink) == []
+
+
+# d382/fix4b's 33.00 outside tail and the "Ø8.00" above it, 300-dpi render:
+# the tail at y 0.25524 from its witness (x 0.2733) to x 0.27954, the glyphs
+# [0.27886, 0.29190] x [0.25683, 0.26123].
+_D382_CAP_DIA_INK = drawing.SheetInk(
+    texts={"CapEDia": (0.27886, 0.25683, 0.29190, 0.26123)},
+    lines={},
+    arcs={},
+    arrows={"CapECx": [((0.2733, 0.25524), (0.27954, 0.25524))]},
+    leaders={},
+)
+
+
+def test_the_d382_33_00_tail_stands_under_the_8_00() -> None:
+    """layoutcheck c5 #2 / MHA-091 item 3, planted as printed: 1.6 mm."""
+    near = _drawing_leaders.arrows_near_text(
+        _D382_CAP_DIA_INK.arrows, _D382_CAP_DIA_INK.texts, clearance=0.002
+    )
+    assert [(owner, name) for owner, name, _gap in near] == [("CapECx", "CapEDia")]
+    assert near[0][2] == pytest.approx(0.00159, abs=0.00005)
+    model = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY, cap_dia_text_xy=(0.285, 0.259))
+    assert any(f.startswith("arrow-near-text: CapECx's arrow") for f in (
+        drawing.sheet_ink_collisions(model)
+    ))
+
+
+def test_the_8_00_rises_clear_of_the_33_00_tail() -> None:
+    """At y 0.2605 the glyphs stand 3.1 mm over the tail and its shoulder
+    2.5 mm over the 33.00 line.  They still overlap along x (shoulder from
+    ~0.2750, tail to 0.2797): the separation is the vertical one."""
+    ink = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY)
+    (tail,) = ink.arrows["CapECx"]
+    glyphs = ink.texts["CapEDia"]
+    assert _drawing_leaders.distance_to_box(tail, glyphs) >= 0.0025 + drawing.NOTCH_ANGLE_ARROW_HALF_WIDTH
+    shoulder_y = drawing.NOTCH_KEEP["CapEDia"][1] - drawing.DIMENSION_TEXT_BREAK
+    assert shoulder_y - tail[0][1] >= 0.0024
+    assert not any("CapECx" in f for f in drawing.sheet_ink_collisions(ink))
 
 
 def test_the_arc_tail_crossing_the_205_81_witness_is_named_and_far_from_the_value() -> None:
@@ -714,6 +828,15 @@ def test_the_build_audits_the_run_angle_ink_on_the_sheet() -> None:
     assert build.index("assert_notch_angle_ink_clear()") < build.index("open_model")
     wedge = build.index("_assert_notch_angle_in_wedge(adapter, notch, notch_annotations)")
     assert build.index("_offset_notch_angle_text(adapter, notch_annotations)") > wedge
+    assert wedge < build.index("_pin_tip_slot_z_arrows_inside(adapter, notch_annotations)")
+    # The captions go into the live text set once they exist.
+    iso = build.index('"Isometric View Note", *ISO_NOTE_UPPER_LEFT)')
+    captions = build.index("_assert_notch_captions_clear(")
+    assert iso < captions
+    assert '"Isometric View Note": iso_note' in build[captions:]
+    audit = inspect.getsource(drawing._assert_notch_captions_clear)
+    assert "GetExtent()" in audit and "sheet_ink_collisions(ink)" in audit
+    assert "leader_segments(" in inspect.getsource(drawing._notch_strokes)
     offset = inspect.getsource(drawing._offset_notch_angle_text)
     assert 'offset_dimension_text(adapter, [angle], {"NotchRunAngle": NOTCH_ANGLE_TEXT_XY})' in offset
     assert "sheet_ink_collisions(ink)" in offset
@@ -1468,8 +1591,10 @@ def test_relief_width_text_sits_between_its_neighbours() -> None:
 def test_tip_slot_station_prints_on_the_notch_plan_off_the_plate() -> None:
     """I31: 27.7 south of the pivot the slot left detail B's circle, so its
     station prints on the notch plan's open east side: the dimension line
-    stands off the plate's east edge at the slot, and its value hangs left of
-    it just south of the span, outside it."""
+    stands off the plate's east edge at the slot, and its value sits centred
+    on the line inside the span.  (It used to hang left of the line, south of
+    the span, on a shoulder that ended in a T on the hole-location plan's
+    189.26 line -- Main's MHA-091 eye pass of fix4b ruled it inside.)"""
     x, y = drawing.NOTCH_KEEP["TipSlotZ"]
     pivot = drawing.plan_xy(drawing.NOTCH_CENTER, 0.0, 0.0)
     slot = drawing.plan_xy(drawing.NOTCH_CENTER, -spec.TIP_SCREW_HALF_TRAVEL, spec.TIP_SCREW_LOCAL_Z)
@@ -1477,8 +1602,9 @@ def test_tip_slot_station_prints_on_the_notch_plan_off_the_plate() -> None:
         drawing.NOTCH_CENTER, drawing.plate_edge_mm(spec.TIP_SCREW_LOCAL_Z, -1), 0.0
     )[0]
     assert x <= east_edge - 0.008
-    text = (x - 0.013, y - 0.0025, x, y + 0.0025)  # "27.70", 12 x 5 mm
-    assert text[1] >= slot[1] and slot[1] > pivot[1]  # south of the span
+    text = (x - 0.0065, y - 0.0025, x + 0.0065, y + 0.0025)  # "27.70", 13 x 5 mm
+    assert pivot[1] < text[1] and text[3] < slot[1]  # inside the span
+    assert text[2] <= east_edge - 0.002
     # Clear of the notch plan's other texts and the feature plan's.
     for name, (kx, ky) in drawing.NOTCH_KEEP.items():
         if name != "TipSlotZ":
@@ -1644,3 +1770,40 @@ def test_north_west_half_width_keeps_the_block_on_the_plate_at_full_west_travel(
     assert part.NW_ROUND_END_Z - 0.8 > z
     # The south end is untouched.
     assert part.WEST_HALF_S == 37.0
+
+
+# The two location dimensions' witnesses at the notch-plan cap, as d382
+# printed them (C:/src/dt-logs/spring/tipslot-d382-leaf.log:418 and :425):
+# the 33.00 (CapECx) rises from (273.3, 241.6) and the 205.81 (CapECz) runs
+# east from (274.3, 240.6), both ~1 mm off the cap centre, inside its arc.
+_D382_CAP_WITNESS_STARTS = {
+    "CapECx": (0.2733, 0.2416),
+    "CapECz": (0.2743, 0.2406),
+}
+
+
+def test_no_diameter_leader_on_the_notch_plan_clears_the_cap_witnesses() -> None:
+    """MHA-091 item 3's fence, swept: a diameter leader runs the full
+    diameter through the cap centre toward its text.  Both witnesses start
+    inside the arc (1.03 and 1.05 mm out), so for EVERY leader direction the
+    ink passes within ~1.05 mm of both starts: at the printed ~1 mm witness
+    gaps no placement of the Ø8.00 on the notch plan reaches the 2 mm floor,
+    so it leaves the view."""
+    cap = drawing.plan_xy(drawing.NOTCH_CENTER, part.SLOT_E_X, part.SLOT_E_Z)
+    radius = part.SLOT_W / 2.0 * drawing.PLAN_SCALE
+    reach = 0.050  # past any text position on the sheet
+    worst = {name: 0.0 for name in _D382_CAP_WITNESS_STARTS}
+    for step in range(720):
+        theta = math.radians(step / 2.0)
+        direction = (math.cos(theta), math.sin(theta))
+        leader = (
+            (cap[0] - radius * direction[0], cap[1] - radius * direction[1]),
+            (cap[0] + reach * direction[0], cap[1] + reach * direction[1]),
+        )
+        for name, start in _D382_CAP_WITNESS_STARTS.items():
+            gap = _drawing_leaders.distance_to_point(leader, start)
+            worst[name] = max(worst[name], gap)
+    for name, start in _D382_CAP_WITNESS_STARTS.items():
+        assert math.dist(start, cap) < radius
+        assert worst[name] == pytest.approx(math.dist(start, cap), abs=2e-5)
+        assert worst[name] < 0.0011 < drawing.LEADER_INK_CLEARANCE

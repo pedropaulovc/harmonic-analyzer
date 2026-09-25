@@ -111,6 +111,14 @@ NOTCH_CENTER = (0.260, 0.190)
 # "ISOMETRIC VIEW" label ([0.3147, 0.3748]); +15 mm leaves the box 9.9 mm
 # inside the border.
 ISO_CENTER = (0.370, 0.205)
+# Its "ISOMETRIC VIEW SCALE 1:3" caption is a property-linked note at a
+# fixed sheet point, not the view's own label: it does NOT follow the view.
+# fix4b (2c406e963) left it at d382's (0.315, 0.158) and the 205.81 line ran
+# through it.  Anchored on the view now: 40 mm left of its centre, as d382
+# had it.  ISO_NOTE_EXTENT is its exact box about that anchor (d382
+# INote.GetExtent, [0.3147, 0.3748] x [0.1536, 0.1585] at (0.315, 0.158)).
+ISO_NOTE_UPPER_LEFT = (ISO_CENTER[0] - 0.040, 0.158)
+ISO_NOTE_EXTENT = (-0.0003, -0.0044, 0.0598, 0.0005)
 # The section group sits up and right in the open field below the isometric,
 # clear of the lock-notch caption; every section annotation shares this shift.
 # x 0.030, not 0.020: at 0.020 section C-C's 2.80 arrow line ran up through
@@ -184,9 +192,13 @@ def _plan_east_edge_x(z_mm: float) -> float:
 # circle, so its station prints here: on the plan's open east side, sharing
 # nothing with the NorthEdgeZ/CapECz witnesses on the west.  The dimension
 # line stands 9 mm (sheet) off the plate's east edge at the slot; its text
-# hangs left of it, just south of the span (outside it, so the line does not
-# run through the value).
+# sits inside the span, centred on the line (the 205.81's form).  d382 hung
+# it left of the line just south of the span, on a shoulder that ended in a
+# T on the hole-location plan's 189.26 line (x 0.225; Main's MHA-091 eye
+# pass of fix4b).  The arrows are pinned inside: 4.1 mm of line each side of
+# the text break carries a 3.4 mm head.
 _NOTCH_SLOT_XY = plan_xy(NOTCH_CENTER, -TIP_SCREW_HALF_TRAVEL, TIP_SCREW_LOCAL_Z)
+_NOTCH_PIVOT_XY = plan_xy(NOTCH_CENTER, 0.0, 0.0)
 TIP_SLOT_Z_LINE_X = plan_xy(NOTCH_CENTER, _plan_east_edge_x(TIP_SCREW_LOCAL_Z), 0.0)[0] - 0.009
 # The run angle's vertex on the notch plan (plan_xy agrees with the seat to
 # 0.05 mm), and the in-wedge anchor that picks its acute sector.  The arc
@@ -216,7 +228,12 @@ NOTCH_KEEP = {
     # view's box.  The lower witness (y 0.1377) passes 2.4 mm over A-A's
     # "(6.35)" (top 0.1353) and the lower arrowhead 2.9 mm right of it.
     "CapECz": (0.327, 0.170),
-    "CapEDia": (0.285, 0.259),
+    # y 0.2605, not d382's 0.259: there the 33.00's outside tail (y 0.2552,
+    # out to 0.2795) ran 1.6 mm under the "Ø8.00" glyphs (layoutcheck
+    # c5 #2, gating: an outside tail within 2 mm of foreign text).  1.5 mm up
+    # gives 3.1 (2.7 past the arrowhead's half-width); the text top stays
+    # 5 mm under the border.
+    "CapEDia": (0.285, 0.2605),
     # The run angle (PR #830, Codex P1: without it the rails had no
     # direction).  Its vertex is the north rail's closed-end corner.  This is
     # the ANCHOR only, on the bisector inside the 9.11 deg wedge -- a text
@@ -225,7 +242,7 @@ NOTCH_KEEP = {
     # value itself moves out on a leader (NOTCH_ANGLE_TEXT_XY, below).
     # _assert_notch_angle_in_wedge proves the sector on the sheet.
     "NotchRunAngle": NOTCH_ANGLE_ANCHOR_XY,
-    "TipSlotZ": (TIP_SLOT_Z_LINE_X, _NOTCH_SLOT_XY[1] + 0.004),
+    "TipSlotZ": (TIP_SLOT_Z_LINE_X, (_NOTCH_SLOT_XY[1] + _NOTCH_PIVOT_XY[1]) / 2.0),
 }
 SECTION_KEEP = {
     # Outside its witnesses, the text hangs LEFT of the dimension line (away
@@ -459,6 +476,9 @@ SLOT_SECTION_LABEL_LOWER_LEFT = (SLOT_SECTION_CENTER[0] - 0.02325, 0.0815)
 # anchored upper-left and centred under the notch plan, clears the 7.0
 # arrow tip (y 0.1276) above and the C-C strip (ink top ~0.1152) below.
 NOTCH_CAPTION_UPPER_LEFT = (NOTCH_CENTER[0] - 0.02985, 0.1255)
+# Its exact box about that anchor (d382 INote.GetExtent,
+# [0.2298, 0.2899] x [0.1215, 0.1258]).
+NOTCH_NOTE_EXTENT = (-0.00035, -0.0040, 0.05975, 0.0003)
 # The pivot on the profile plan, as the farm measured it (plan_xy agrees to
 # 0.05 mm; the corner stations below are projected, not read off a render).
 PROFILE_PIVOT_XY = (0.0718, 0.1377)
@@ -602,6 +622,20 @@ NOTCH_ANGLE_SHOULDER_HALF = 0.00675  # either side of it
 CAP_EC_Z_WITNESS_START = 0.0010  # past the cap centre
 CAP_EC_Z_WITNESS_PAST_LINE = 0.0010
 CAP_EC_Z_TEXT_SIZE = (0.0120, 0.0035)
+# A linear dimension's line stops this far either side of its text's
+# anchor (d382 dump: 205.81 at 0.180 breaks at 0.1772 and 0.1828).
+DIMENSION_TEXT_BREAK = 0.0028
+# The pivot's witnesses start this far east of it (d382: 0.2607 at 0.25675).
+PIVOT_WITNESS_START = 0.0040
+# The "Ø8.00" glyphs about CapEDia's text position (d382 render, 300 dpi:
+# [0.27886, 0.29190] x [0.25683, 0.26123] at (0.285, 0.259)), and the 33.00
+# (CapECx) dimension line, 2.8 mm under its text like the 205.81's.  Its
+# right arrow sits outside, on the cap-centre witness, tail running right.
+CAP_E_DIA_GLYPHS = (-0.00614, -0.00217, 0.00690, 0.00223)
+CAP_E_CX_LINE_BELOW_TEXT = 0.0028
+# layoutcheck's gating rule: an outside arrow's tail counts as arrow ink
+# for its first 6.35 mm.
+OUTSIDE_ARROW_TAIL = 0.00635
 # A line nearer a text block than this reads as touching it.
 LINE_TEXT_CLEARANCE = 0.0005
 ARROW_TEXT_CLEARANCE = _drawing_leaders.ARROW_TEXT_CLEARANCE
@@ -650,6 +684,17 @@ def _centred_box(
     )
 
 
+def _anchored_box(
+    anchor: tuple[float, float], extent: tuple[float, float, float, float]
+) -> _drawing_leaders.Box:
+    return (
+        anchor[0] + extent[0],
+        anchor[1] + extent[1],
+        anchor[0] + extent[2],
+        anchor[1] + extent[3],
+    )
+
+
 def _polar(origin: tuple[float, float], radius: float, degrees: float) -> tuple[float, float]:
     angle = math.radians(degrees)
     return (origin[0] + radius * math.cos(angle), origin[1] + radius * math.sin(angle))
@@ -670,13 +715,19 @@ def notch_angle_ink(
     text_xy: tuple[float, float] | None,
     anchor_xy: tuple[float, float] = NOTCH_ANGLE_ANCHOR_XY,
     cap_text_xy: tuple[float, float] | None = None,
+    cap_dia_text_xy: tuple[float, float] | None = None,
+    iso_note_xy: tuple[float, float] | None = None,
 ) -> SheetInk:
-    """The run angle's and the 205.81's ink near the notch, predicted.
+    """The notch plan's ink around the run angle, predicted: the angle, the
+    205.81 (both legs and witnesses), the 33.00's outside tail under the
+    "Ø8.00", the 27.70 inside its span, and the lock-notch and isometric
+    captions (property-linked notes, boxed from their measured extents).
 
     ``anchor_xy`` sets the arc's radius; ``text_xy`` is the offset value's
     centre, ``None`` leaving it at the anchor (the d382 sheet, with d382's
-    anchor).  ``cap_text_xy`` places the 205.81 (NOTCH_KEEP's by default).
-    The run points sheet-down-right, NOTCH_RUN_DEG below the ray.
+    anchor).  ``cap_text_xy`` places the 205.81, ``cap_dia_text_xy`` the
+    Ø8.00 and ``iso_note_xy`` the isometric caption (the layout's by
+    default).  The run points sheet-down-right, NOTCH_RUN_DEG below the ray.
     """
     vertex = NOTCH_ANGLE_VERTEX_XY
     radius = math.dist(anchor_xy, vertex)
@@ -701,9 +752,36 @@ def notch_angle_ink(
         (cap[0] + CAP_EC_Z_WITNESS_START, cap[1]),
         (cap_x + CAP_EC_Z_WITNESS_PAST_LINE, cap[1]),
     )
-    # The dump's 205.81 line stops 2.8 mm short of its text's anchor.
-    cap_line = ((cap_x, cap[1]), (cap_x, cap_text[1] + 0.0028))
+    # The dump's 205.81 line stops 2.8 mm either side of its text's anchor;
+    # the lower leg runs on to the pivot's witness.
+    pivot = _NOTCH_PIVOT_XY
+    cap_line = ((cap_x, cap[1]), (cap_x, cap_text[1] + DIMENSION_TEXT_BREAK))
+    cap_lower_leg = ((cap_x, cap_text[1] - DIMENSION_TEXT_BREAK), (cap_x, pivot[1]))
+    cap_lower_witness = (
+        (pivot[0] + PIVOT_WITNESS_START, pivot[1]),
+        (cap_x + CAP_EC_Z_WITNESS_PAST_LINE, pivot[1]),
+    )
     cap_arrow = ((cap_x, cap[1]), (cap_x, cap[1] - NOTCH_ANGLE_ARROW_LENGTH))
+    slot_z = NOTCH_KEEP["TipSlotZ"]
+    slot_y = _NOTCH_SLOT_XY[1]
+    slot_z_lines = [
+        ((slot_z[0], pivot[1]), (slot_z[0], slot_z[1] - DIMENSION_TEXT_BREAK)),
+        ((slot_z[0], slot_z[1] + DIMENSION_TEXT_BREAK), (slot_z[0], slot_y)),
+    ]
+    slot_z_arrows = [
+        ((slot_z[0], pivot[1]), (slot_z[0], pivot[1] + NOTCH_ANGLE_ARROW_LENGTH)),
+        ((slot_z[0], slot_y), (slot_z[0], slot_y - NOTCH_ANGLE_ARROW_LENGTH)),
+    ]
+    iso_note = ISO_NOTE_UPPER_LEFT if iso_note_xy is None else iso_note_xy
+    cx_line_y = NOTCH_KEEP["CapECx"][1] - CAP_E_CX_LINE_BELOW_TEXT
+    cx_tail = ((cap[0], cx_line_y), (cap[0] + OUTSIDE_ARROW_TAIL, cx_line_y))
+    dia = NOTCH_KEEP["CapEDia"] if cap_dia_text_xy is None else cap_dia_text_xy
+    dia_box = (
+        dia[0] + CAP_E_DIA_GLYPHS[0],
+        dia[1] + CAP_E_DIA_GLYPHS[1],
+        dia[0] + CAP_E_DIA_GLYPHS[2],
+        dia[1] + CAP_E_DIA_GLYPHS[3],
+    )
     centre = anchor_xy if text_xy is None else text_xy
     leaders = (
         [] if text_xy is None else notch_angle_leader(_polar(vertex, radius, run / 2.0), text_xy)
@@ -712,10 +790,23 @@ def notch_angle_ink(
         texts={
             "NotchRunAngle": _centred_box(centre, NOTCH_ANGLE_TEXT_SIZE),
             "CapECz": _centred_box(cap_text, CAP_EC_Z_TEXT_SIZE),
+            "CapEDia": dia_box,
+            "TipSlotZ": _centred_box(slot_z, CAP_EC_Z_TEXT_SIZE),
+            "Notch View Note": _anchored_box(NOTCH_CAPTION_UPPER_LEFT, NOTCH_NOTE_EXTENT),
+            "Isometric View Note": _anchored_box(iso_note, ISO_NOTE_EXTENT),
         },
-        lines={"NotchRunAngle": [ray_line, run_line], "CapECz": [witness, cap_line]},
+        lines={
+            "NotchRunAngle": [ray_line, run_line],
+            "CapECz": [witness, cap_line, cap_lower_leg, cap_lower_witness],
+            "TipSlotZ": slot_z_lines,
+        },
         arcs={"NotchRunAngle": arcs},
-        arrows={"NotchRunAngle": arrows, "CapECz": [cap_arrow]},
+        arrows={
+            "NotchRunAngle": arrows,
+            "CapECz": [cap_arrow],
+            "CapECx": [cx_tail],
+            "TipSlotZ": slot_z_arrows,
+        },
         leaders={"NotchRunAngle": leaders},
     )
 
@@ -920,6 +1011,74 @@ def _same_segments(
     )
 
 
+def _notch_strokes(annotation: Any) -> list[_drawing_leaders.Segment]:
+    """A dimension's display lines plus any API leader polyline."""
+    return _drawing_leaders.dimension_segments(annotation) + _drawing_leaders.leader_segments(
+        annotation
+    )
+
+
+def _pin_tip_slot_z_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
+    """The 27.70 prints inside its span; smart arrows could flip out and run
+    ~6.3 mm tails past both witnesses, so pin them inside and read it back."""
+    matches = [item for item in annotations if dimension_name(adapter, item) == "TipSlotZ"]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one TipSlotZ annotation, found {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.ArrowSide = 0  # swDimensionArrowsSide_e.swDimArrowsInside
+    rebuild_drawing(adapter, label="tip slot z arrows inside")
+    if int(display.ArrowSide) != 0:
+        raise RuntimeError("TipSlotZ did not keep its arrows inside")
+    position = tuple(float(v) for v in annotation.GetPosition())[:2]
+    if math.dist(position, NOTCH_KEEP["TipSlotZ"]) > 0.0005:
+        raise RuntimeError(f"TipSlotZ text at {position}, not {NOTCH_KEEP['TipSlotZ']}")
+    shoulder = [
+        segment
+        for segment in _notch_strokes(annotation)
+        # Its witnesses run 1.0 mm past the line; d382's shoulder ran 14 mm.
+        if min(segment[0][0], segment[1][0]) < TIP_SLOT_Z_LINE_X - 0.002
+    ]
+    _telemetry.info(f"TipSlotZ inside its span: text={position} strokes_left_of_line={shoulder}")
+    if shoulder:
+        raise RuntimeError(f"TipSlotZ still draws ink left of its line: {shoulder}")
+
+
+def _assert_notch_captions_clear(
+    adapter: Any, annotations: list[Any], captions: dict[str, Any]
+) -> None:
+    """No notch-plan dimension line, arc or arrow on a caption.
+
+    The captions are property-linked notes at fixed sheet points; fix4b's
+    205.81 line ran through "ISOMETRIC VIEW SCALE 1:3" because no caption was
+    in the audit's text set.  Their boxes are read off the seat
+    (``INote.GetExtent``), after the rebuild that resolves their text."""
+    rebuild_drawing(adapter, label="captions placed")
+    texts = {}
+    for name, note in captions.items():
+        values = [float(v) for v in (_early_bound(note, "INote").GetExtent() or ())]
+        if len(values) < 6:
+            raise RuntimeError(f"{name} has no extent: {values}")
+        texts[name] = (
+            min(values[0], values[3]),
+            min(values[1], values[4]),
+            max(values[0], values[3]),
+            max(values[1], values[4]),
+        )
+    by_name = {dimension_name(adapter, item): _early_bound(item, "IAnnotation") for item in annotations}
+    ink = SheetInk(
+        texts=texts,
+        lines={name: _notch_strokes(item) for name, item in by_name.items()},
+        arcs={name: _arc_chords(item) for name, item in by_name.items()},
+        arrows={name: _arrow_segments(item) for name, item in by_name.items()},
+        leaders={},
+    )
+    findings = sheet_ink_collisions(ink)
+    _telemetry.info(f"notch captions: boxes={texts} findings={findings}")
+    if findings:
+        raise RuntimeError("notch plan ink collides with a caption: " + "; ".join(findings))
+
+
 def _offset_notch_angle_text(adapter: Any, annotations: list[Any]) -> None:
     """Move the run angle's value onto its leader and audit the real ink.
 
@@ -976,11 +1135,7 @@ def _offset_notch_angle_text(adapter: Any, annotations: list[Any]) -> None:
     ] + _drawing_leaders.leader_segments(angle)
     ink = SheetInk(
         texts={"NotchRunAngle": _centred_box(position, NOTCH_ANGLE_TEXT_SIZE)},
-        lines={
-            name: _drawing_leaders.dimension_segments(item)
-            for name, item in by_name.items()
-            if name != "NotchRunAngle"
-        }
+        lines={name: _notch_strokes(item) for name, item in by_name.items() if name != "NotchRunAngle"}
         | {"NotchRunAngle": lines},
         arcs={name: _arc_chords(item) for name, item in by_name.items() if name != "NotchRunAngle"}
         | {"NotchRunAngle": after_arcs},
@@ -1954,6 +2109,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _assert_notch_angle_in_wedge(adapter, notch, notch_annotations)
+    _pin_tip_slot_z_arrows_inside(adapter, notch_annotations)
     _offset_notch_angle_text(adapter, notch_annotations)
     section_annotations = curate_view_dimensions(
         adapter,
@@ -2078,8 +2234,13 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Profile View Note", 0.045, 0.085)
     add_property_linked_note(adapter, "Feature View Note", 0.150, 0.085)
-    add_property_linked_note(adapter, "Notch View Note", *NOTCH_CAPTION_UPPER_LEFT)
-    add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.158)
+    notch_note = add_property_linked_note(adapter, "Notch View Note", *NOTCH_CAPTION_UPPER_LEFT)
+    iso_note = add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_UPPER_LEFT)
+    _assert_notch_captions_clear(
+        adapter,
+        notch_annotations,
+        {"Notch View Note": notch_note, "Isometric View Note": iso_note},
+    )
     add_property_linked_note(
         adapter, "Post Mount Engagement", *ENGAGEMENT_NOTE_XY, char_height=0.0025
     )
