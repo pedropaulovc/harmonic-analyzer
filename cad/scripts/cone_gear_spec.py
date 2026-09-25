@@ -69,8 +69,11 @@ MESH_BACKLASH_MIN_MM = 0.06
 # 0.05..0.20) that error_budget.yaml ``mesh_lag_spread`` is derived from.
 TOOTH_THICKNESS_BAND = (0.075, -0.075)
 # Backlash with MHA-027 over a full turn at assembly, swing stop set: thickest
-# tooth with both runouts closing to thinnest tooth with both opening.
-BACKLASH_ACCEPTANCE_MM = (0.06, 0.33)
+# tooth with both runouts closing, to thinnest tooth with both runouts and both
+# journal floats opening.  The tooth load pushes the gears apart, so rocking
+# the mesh takes up the cone-shaft journal and drum-arbor clearances too.  The
+# upper is that worst case (0.374, T006) rounded up to two places.
+BACKLASH_ACCEPTANCE_MM = (0.06, 0.38)
 CONTACT_RATIO_EXCEPTION_TEETH = (6, 12, 18, 24, 30, 36, 42)
 # teeth: (tip diameter, thickest circular tooth thickness at the standard
 # pitch circle), mm.
