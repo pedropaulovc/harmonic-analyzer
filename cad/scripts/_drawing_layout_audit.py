@@ -74,7 +74,9 @@ class _Reader:
 
     Every refusal is counted per sheet under the accessor's name. A refused
     read can drop an annotation's ink or text from the audit, so any count is
-    a gating ``com-read-errors`` finding.
+    a gating ``com-read-errors`` finding. A read the audit cannot do without
+    (``need``) also counts a ``None`` answer: SolidWorks often fails that way
+    instead of raising.
     """
 
     def __init__(self, adapter: Any) -> None:
@@ -84,13 +86,19 @@ class _Reader:
     def _count(self, name: str) -> None:
         self.errors[name] = self.errors.get(name, 0) + 1
 
-    def call(self, fn: Callable[[], Any], default: Any = None, *, name: str = "") -> Any:
+    def call(self, fn: Callable[[], Any], default: Any = None, *, name: str = "", required: bool = False) -> Any:
         try:
             value = fn()
         except Exception:
-            self._count(name or (fn.__code__.co_names[-1] if fn.__code__.co_names else "?"))
+            self._count(name or _accessor(fn))
             return default
+        if value is None and required:
+            self._count(name or _accessor(fn))
         return default if value is None else value
+
+    def need(self, fn: Callable[[], Any], default: Any = None, *, name: str = "") -> Any:
+        """``call`` for a read whose ``None`` loses ink or text."""
+        return self.call(fn, default, name=name, required=True)
 
     def first(self, fns: list[Callable[[], Any]], *, name: str) -> Any:
         """The first overload that answers; one refusal counted only when all do
@@ -120,6 +128,10 @@ class _Reader:
         return dict(sorted(errors.items()))
 
 
+def _accessor(fn: Callable[[], Any]) -> str:
+    return fn.__code__.co_names[-1] if fn.__code__.co_names else "?"
+
+
 def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
     data = reader.bind(data, "IDisplayData")
     if data is None:
@@ -140,8 +152,8 @@ def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
     for index in range(int(reader.call(lambda: data.GetTextCount(), 0) or 0)):
         texts.append(
             {
-                "t": str(reader.call(lambda i=index: data.GetTextAtIndex(i), "")),
-                "pos": _round(reader.call(lambda i=index: data.GetTextPositionAtIndex(i), ())),
+                "t": str(reader.need(lambda i=index: data.GetTextAtIndex(i), "")),
+                "pos": _round(reader.need(lambda i=index: data.GetTextPositionAtIndex(i), ())),
                 "h": round(float(reader.call(lambda i=index: data.GetTextHeightAtIndex(i), 0.0)), 7),
                 "ref": int(reader.call(lambda i=index: data.GetTextRefPositionAtIndex(i), -1)),
                 "ang": round(float(reader.call(lambda i=index: data.GetTextAngleAtIndex(i), 0.0)), 7),
@@ -169,13 +181,17 @@ def _dump_annotation(reader: _Reader, raw: Any) -> dict[str, Any] | None:
     }
     leaders = []
     for index in range(int(reader.call(lambda: annotation.GetLeaderCount(), 0) or 0)):
-        points = reader.call(lambda i=index: annotation.GetLeaderPointsAtIndex(i))
+        points = reader.need(lambda i=index: annotation.GetLeaderPointsAtIndex(i))
         if points:
             leaders.append(_round(points))
     if leaders:
         record["leaders"] = leaders
-    record["display"] = _dump_display(reader, reader.call(lambda: annotation.GetDisplayData()))
-    specific = reader.call(lambda: annotation.GetSpecificAnnotation())
+    record["display"] = _dump_display(reader, reader.need(lambda: annotation.GetDisplayData()))
+    specific = (
+        reader.need(lambda: annotation.GetSpecificAnnotation())
+        if kind in (_ANNOT_NOTE, _ANNOT_DIM, _ANNOT_DATUM_ORIGIN)
+        else None
+    )
     if kind == _ANNOT_NOTE:
         note = reader.bind(specific, "INote")
         if note is not None:
@@ -241,7 +257,7 @@ def _dump_view(
         "type": int(reader.call(lambda: view.Type, -1)),
         "orientation": orientation,
         "pictorial": bool(is_pictorial(orientation)),
-        "outline": _round(reader.call(lambda: view.GetOutline(), ())),
+        "outline": _round(reader.need(lambda: view.GetOutline(), ())),
         "scale": _round(reader.call(lambda: view.ScaleRatio, ())),
         "display_mode": int(reader.call(lambda: view.GetDisplayMode2(), -1)),
     }
@@ -262,8 +278,8 @@ def _dump_view(
         sections.append(
             {
                 "label": str(reader.call(lambda s=section: s.GetLabel(), "")),
-                "line": _round(reader.call(lambda s=section: s.GetLineInfo(), ())),
-                "arrows": _round(reader.call(lambda s=section: s.GetArrowInfo(), ())),
+                "line": _round(reader.need(lambda s=section: s.GetLineInfo(), ())),
+                "arrows": _round(reader.need(lambda s=section: s.GetArrowInfo(), ())),
                 "texts": _round(reader.call(lambda s=section: s.GetTextInfo(), ())),
                 "text_height": round(
                     float(reader.call(lambda: text_format.CharHeight, 0.0)) if text_format else 0.0, 7
