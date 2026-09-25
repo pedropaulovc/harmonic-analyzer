@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "fingerprint": {
+    "algorithm": "sheet-1bit-sha256-v1",
+    "dpi": 300,
+    "ink_threshold": 128,
+    "masked": [
+      "^(?:v\\d+|DEV)(?:-b\\d+)?$",
+      "\\bBUILD\\s+(?:v\\d+|DEV)(?:-b\\d+)?\\b"
+    ],
+    "match_tolerance_px": 2
+  },
+  "drawings": {}
+}

@@ -311,6 +311,21 @@ verdict counts: work authored by Sol or Opus is reviewed by a stronger model
 (Astra or Fable), and work authored by Astra or Fable is reviewed by Astra or
 Fable at high reasoning. `--reviewer claude` defaults to `claude-fable-5-1` at
 medium effort, which is the Opus fallback.
+Every review run names the author's family with `--author-family
+<claude|gpt|mimo>`, and a same-family pair is refused. A last-resort run adds
+`--last-resort --author-model <model> --quota-refusal <verdict.json>`, where
+the JSON is the cross-family reviewer's refused report for the same drawing.
+It is refused before any reviewer runs unless the refusal is a usage-limit
+message and the tier rule holds.
+A passing registry-drawing review is recorded in the tracked ledger
+`cad/reviews/machinist-ledger.json`, together with a 1-bit 300 dpi raster of
+every sheet it saw (title-block revision and BUILD stamp masked).
+`uv run cad/scripts/machinist_ledger.py check [<name>...]` exits nonzero for any
+drawing whose current PDF matches neither its cross-family SHIP nor a counting
+last-resort SHIP. The match tolerates re-render noise up to 2 px. A review
+that predates the ledger is entered with `machinist_ledger.py ingest
+<verdict.json> --author-family <family>`, which checks the exact PDF it
+reviewed.
 Part and assembly packages render every native PDF page at 300 dpi and submit
 all sheet images to one review, using the rubric for that package kind. A
 downscaled contact-sheet preview is not a substitute for reviewing every page.

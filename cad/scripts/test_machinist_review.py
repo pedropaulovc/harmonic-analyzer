@@ -939,12 +939,12 @@ def test_main_distinguishes_missing_and_unknown_names(capsys) -> None:
         "--reviewer is required for review runs (choose claude or codex)\n"
     )
 
-    assert mr.main(["--reviewer", "codex"]) == 2
+    assert mr.main(["--reviewer", "codex", "--author-family", "claude"]) == 2
     assert capsys.readouterr().err == (
         "no drawing names given; use --all, --png or a name\n"
     )
 
-    assert mr.main(["--reviewer", "codex", "not-a-drawing"]) == 2
+    assert mr.main(["--reviewer", "codex", "--author-family", "claude", "not-a-drawing"]) == 2
     assert capsys.readouterr().err == "unknown drawing names: ['not-a-drawing']\n"
 
 
