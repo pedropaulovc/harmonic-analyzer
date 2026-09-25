@@ -86,6 +86,7 @@ PROMPT_FILES = {
 }
 SCHEMA_FILE = PROMPTS_DIR / "machinist_review_schema.json"
 REPORT_DIR = CAD_ROOT / "out" / "reports" / "machinist-review"
+QUOTA_REFUSED_SUFFIX = ".quota-refused.json"
 
 DEFAULT_MODELS = {
     "claude": "claude-fable-5-1",
@@ -853,6 +854,8 @@ def render_markdown(review: Review) -> str:
 def load_reviews(report_dir: Path = REPORT_DIR) -> list[Review]:
     reviews: list[Review] = []
     for path in sorted(report_dir.glob("*.json")):
+        if path.name.endswith(QUOTA_REFUSED_SUFFIX):  # evidence, not a report
+            continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             reviews.append(Review(**data))
@@ -1149,7 +1152,7 @@ def _keep_quota_refusal(review: Review, report_dir: Path) -> None:
     report = report_dir / f"{review.name}.json"
     if machinist_ledger.quota_evidence(asdict(review), report) is None:
         return
-    kept = report_dir / f"{review.name}.quota-refused.json"
+    kept = report_dir / f"{review.name}{QUOTA_REFUSED_SUFFIX}"
     shutil.copyfile(report, kept)
     print(
         f"{review.name}: {review.reviewer} refused on quota; kept {kept} as the "
@@ -1169,7 +1172,7 @@ def _last_resort_problem(args: argparse.Namespace) -> str:
     if args.prompt_file is not None:
         return "a rubric override is not the gate"
     name = args.names[0]
-    refusal_report = args.quota_refusal or args.report_dir / f"{name}.quota-refused.json"
+    refusal_report = args.quota_refusal or args.report_dir / f"{name}{QUOTA_REFUSED_SUFFIX}"
     if refusal_report.resolve() == (args.report_dir / f"{name}.json").resolve():
         return f"{refusal_report} is the report this run overwrites; pass its kept copy"
     model = args.model or DEFAULT_MODELS[args.reviewer]

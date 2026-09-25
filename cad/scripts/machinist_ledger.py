@@ -65,6 +65,7 @@ A rebuttals file::
 from __future__ import annotations
 
 import argparse
+import functools
 import hashlib
 import json
 import re
@@ -87,6 +88,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 from _drawing_registry import CAD_ROOT, DRAWINGS, DRAWINGS_BY_NAME  # noqa: E402
 
 REPO_ROOT = CAD_ROOT.parent
+PROMPTS_DIR = SCRIPTS_DIR / "prompts"
 LEDGER_PATH = CAD_ROOT / "reviews" / "machinist-ledger.json"
 REPORT_DIR = CAD_ROOT / "out" / "reports" / "machinist-ledger"
 LEDGER_VERSION = 1
@@ -676,6 +678,73 @@ def refusal_problem(
     return None
 
 
+# --- prompt ------------------------------------------------------------------------
+
+
+@functools.cache
+def standard_rubrics(kind: str) -> tuple[str, ...]:
+    """Every committed version of the standard rubric for a ``kind`` package."""
+    rel = (PROMPTS_DIR / f"machinist_review_{kind}.md").relative_to(REPO_ROOT)
+    commits = (_git("log", "--format=%H", "--", rel.as_posix()) or "").split()
+    if not commits:
+        return ()
+    # One process for every version: a git spawn costs ~70 ms on Windows.
+    proc = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "cat-file", "--batch"],
+        input="".join(f"{commit}:{rel.as_posix()}\n" for commit in commits).encode(),
+        capture_output=True,
+        check=False,
+    )
+    rubrics, out = [], proc.stdout
+    while out:
+        header, _, out = out.partition(b"\n")
+        fields = header.split()
+        if len(fields) != 3:  # "<object> missing"
+            continue
+        size = int(fields[2])
+        blob, out = out[:size], out[size + 1 :]
+        rubrics.append(blob.decode("utf-8").replace("\r\n", "\n"))
+    return tuple(rubrics)
+
+
+def prompt_problem(review: dict[str, Any]) -> str | None:
+    """Why a review's prompt is not the gate's; None under a committed rubric.
+
+    A ``--prompt-file`` override (or any hand-edited prompt) is a different
+    review, whatever its verdict, so it fails closed: the record must carry
+    the exact prompt the reviewer saw, hashing to its ``prompt_sha256``, and
+    that prompt must be exactly what machinist_review builds around a
+    committed version of the standard rubric -- no text added or removed.
+    """
+    import machinist_review  # imports this module; a top-level import would cycle
+
+    evidence = (review.get("extra") or {}).get("evidence") or {}
+    prompt = evidence.get("effective_prompt")
+    if not prompt:
+        return "the record does not carry the prompt the reviewer saw"
+    if hashlib.sha256(prompt.encode("utf-8")).hexdigest() != review.get(
+        "prompt_sha256"
+    ):
+        return "the recorded prompt does not hash to its prompt_sha256"
+    package = machinist_review.ReviewPackage(review["name"], review["kind"], ())
+    text = prompt.replace("\r\n", "\n")
+    standard = (
+        machinist_review._review_prompt(
+            package,
+            review["sheet_count"],
+            reviewer=review["reviewer"],
+            prompt_text=rubric,
+        )
+        for rubric in standard_rubrics(review["kind"])
+    )
+    if text not in standard:
+        return (
+            f"its prompt is not the standard prompt around a committed rubric for a "
+            f"{review['kind']} package (a --prompt-file override is not the gate)"
+        )
+    return None
+
+
 # --- rulings -----------------------------------------------------------------------
 
 
@@ -699,7 +768,8 @@ def _cited_excerpt(ruling: str, citation: str) -> str:
     if not path.is_file():
         raise ValueError(f"citation {citation!r}: no such file")
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(ruling)}(?![0-9])")
+    # The whole id: "U31" must not match inside "U31A" or "U310".
+    pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(ruling)}(?![A-Za-z0-9])")
     if match["line"] is None:
         found = [line for line in lines if pattern.search(line)]
         if not found:
@@ -840,6 +910,9 @@ def record_review(
             f"{name}: {pdf} has {len(sheets)} sheets, the review saw {review['sheet_count']}"
         )
     digests = [sheet_digest(sheet.ink) for sheet in sheets]
+    prompt = prompt_problem(review)
+    if prompt:
+        raise ValueError(f"{name}: not recorded: {prompt}")
     stored = sheets_dir(ledger_path) / f"{actual}.pdf"
     if not stored.is_file():
         stored.parent.mkdir(parents=True, exist_ok=True)
