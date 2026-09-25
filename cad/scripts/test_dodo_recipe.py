@@ -2953,6 +2953,13 @@ def test_a_signin_prompt_during_the_wait_is_named_once(monkeypatch):
     assert prompts == [{"title": "Login | 3DEXPERIENCE ID", "elapsed_s": 0.0}]
 
 
+_WIN32_ONLY = pytest.mark.skipif(
+    "sys.platform != 'win32'",
+    reason="Win32 only: needs ctypes.WINFUNCTYPE and stdcall function pointers",
+)
+
+
+@_WIN32_ONLY
 def test_the_signin_scan_reads_a_window_whose_handle_exceeds_32_bits(monkeypatch):
     """Codex on #871: user32's exports carry no prototype, so an undeclared call
     converts a 64-bit HWND as a C ``int``; the overflow inside the EnumWindows
@@ -2990,6 +2997,17 @@ def test_the_signin_scan_reads_a_window_whose_handle_exceeds_32_bits(monkeypatch
     monkeypatch.setattr(ctypes, "WinDLL", lambda *_a, **_k: user32)
 
     assert lifecycle._signin_window() == "Login | 3DEXPERIENCE ID"
+
+
+def test_the_win32_scan_test_is_skipped_off_windows(monkeypatch):
+    """Codex on #871: the check:* suite is SolidWorks-free and must stay green off
+    Windows, where ctypes has no WINFUNCTYPE. The condition is a string, so pytest
+    evaluates it at setup against this module's ``sys``; evaluate it the same way."""
+    (mark,) = test_the_signin_scan_reads_a_window_whose_handle_exceeds_32_bits.pytestmark
+    assert mark.name == "skipif" and "Win32 only" in mark.kwargs["reason"]
+    for platform, skipped in (("win32", False), ("linux", True), ("darwin", True)):
+        monkeypatch.setattr(sys, "platform", platform)
+        assert eval(mark.args[0], {"sys": sys}) is skipped, platform
 
 
 def test_an_abandoned_grace_names_its_outcome(monkeypatch):
