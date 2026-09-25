@@ -1485,6 +1485,63 @@ def test_an_overload_fallback_is_not_a_read_error():
     assert reader.take_errors() == {"GetLineAtIndex3/GetLineAtIndex2": 1}
 
 
+def test_a_required_read_answering_none_is_a_read_error(monkeypatch):
+    """SolidWorks often fails a getter by answering None rather than raising:
+    an annotation whose display data is None loses all its ink, so it counts."""
+    import _drawing_layout_audit as collector
+
+    monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
+
+    class Annotation:
+        Visible = 1
+        OwnerType = 1
+        Layer = ""
+
+        def GetType(self):
+            return 6  # swNote
+
+        def GetName(self):
+            return "Note1"
+
+        def GetPosition(self):
+            return (0.1, 0.1, 0.0)
+
+        def GetLeaderCount(self):
+            return 1
+
+        def GetLeaderPointsAtIndex(self, _index):
+            return None
+
+        def GetDisplayData(self):
+            return None
+
+        def GetSpecificAnnotation(self):
+            return None
+
+    reader = collector._Reader(adapter=None)
+    record = collector._dump_annotation(reader, Annotation())
+    assert record is not None and record["display"] == {}
+    assert reader.take_errors() == {
+        "GetDisplayData": 1,
+        "GetLeaderPointsAtIndex": 1,
+        "GetSpecificAnnotation": 1,
+    }
+    # An optional read answering None is not a refusal.
+    assert reader.call(lambda: None, "") == "" and reader.take_errors() == {}
+
+
+def test_a_run_meeting_a_leader_end_to_end_is_not_its_copy():
+    """A shoulder running on from a leader's landing shares an end and a
+    direction with it but is real ink; only a run overlapping it is a copy."""
+    from _layout_audit import _same_run
+
+    leader = Segment(0.10, 0.10, 0.12, 0.10)
+    assert _same_run(Segment(0.10, 0.10, 0.12, 0.10), leader)
+    assert _same_run(Segment(0.1005, 0.10, 0.12, 0.10), leader)  # starts 0.5 mm off the attach point
+    assert not _same_run(Segment(0.12, 0.10, 0.13, 0.10), leader)
+    assert not _same_run(Segment(0.10, 0.10, 0.09, 0.10), leader)
+
+
 def test_the_report_keeps_a_stroke_count_not_every_stroke():
     from _layout_audit import audit_report
 

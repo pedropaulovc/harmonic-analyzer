@@ -755,7 +755,13 @@ def _same_run(segment: Segment, leader: Segment, *, degrees: float = 2.0) -> boo
     a = math.atan2(segment.y1 - segment.y0, segment.x1 - segment.x0)
     b = math.atan2(leader.y1 - leader.y0, leader.x1 - leader.x0)
     turn = abs((a - b + math.pi) % (2.0 * math.pi) - math.pi)
-    return min(turn, math.pi - turn) <= math.radians(degrees)
+    if min(turn, math.pi - turn) > math.radians(degrees):
+        return False
+    # Meeting end to end is a continuation (a shoulder running on from the
+    # landing), not a copy: the two must overlap along the leader.
+    ux, uy = (leader.x1 - leader.x0) / leader.length, (leader.y1 - leader.y0) / leader.length
+    along = sorted((x - leader.x0) * ux + (y - leader.y0) * uy for x, y in ends)
+    return min(along[1], leader.length) - max(along[0], 0.0) > COLLINEAR_TOL_M
 
 
 def _registered_leaders(annotation: Mapping[str, Any]) -> list[Segment]:
