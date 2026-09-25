@@ -38,15 +38,15 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "FootHt",
         "BoreDia",
         "BoreHeight",
+        "DomeDia",
         "StrapDepth",
         "HoldDownLocation",
         "HoleLateral",
         "BoreLateral",
     }
-    # The strap band is owned by its reference sketch, and the crown is an arc
-    # radius the sheet restates, so the profile sketches stay unmarked.
+    # The strap band is owned by its reference sketch, so the strap profile
+    # stays unmarked.
     assert "StrapProfile" not in arbor_pedestal_spec.DRAWING_DIMENSIONS
-    assert "DomeProfile" not in arbor_pedestal_spec.DRAWING_DIMENSIONS
 
 
 def test_the_part_owns_every_printed_decimal_place() -> None:
@@ -58,6 +58,7 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
         "FootHt": 1,
         "BoreDia": 2,
         "BoreHeight": 2,
+        "DomeDia": 1,
         "StrapDepth": 1,
         "HoldDownLocation": 1,
         "HoleLateral": 1,
@@ -95,7 +96,21 @@ def test_sheet_derived_dimensions_take_their_places_from_the_spec() -> None:
         re.findall(r'_set_reference_precision\([^,]+,\s*"([^"]+)"\)', _drawing_source())
     )
     assert labels == set(arbor_pedestal_spec.DRAWING_REFERENCE_PRECISION)
-    assert labels == {"overall height", "crown radius"}
+    assert labels == {"overall height"}
+
+
+def test_crown_radius_is_the_dome_diameter_printed_radial() -> None:
+    """#810 Codex l4afp follow-up (Main): the R10.0 crown is a controlling
+    dimension, so it is the dome boss's own DomeDia, imported and flipped to
+    its radial form, never a radius the sheet measures off the arc."""
+    spec = arbor_pedestal_spec
+    assert spec.DRAWING_DIMENSIONS["DomeProfile"] == {"DomeDia"}
+    assert spec.DRAWING_PRECISION["DomeProfile"] == {"DomeDia": 1}
+    assert "DomeDia" in drawing.FRONT_KEEP
+    source = _drawing_source()
+    assert "display.Diametric = False" in source
+    assert "AddRadialDimension2" not in source
+    assert "_show_crown_as_radius(adapter, front_annotations)" in source
 
 
 def test_manufacturing_locations_are_model_dimensions() -> None:

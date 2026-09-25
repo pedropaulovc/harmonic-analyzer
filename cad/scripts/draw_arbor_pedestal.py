@@ -117,6 +117,8 @@ FRONT_KEEP = {
     "BoreHeight": (FRONT_CENTER[0] - 0.046, _front_y(BORE_HEIGHT / 2.0)),
     "BoreDia": (FRONT_CENTER[0] + 0.043, _front_y(BORE_HEIGHT) - 0.010),
     "BoreLateral": BORE_LATERAL_XY,
+    # Crown: printed radial (_show_crown_as_radius), up and right of the dome.
+    "DomeDia": (0.178, _front_y(BORE_HEIGHT + TOP_RADIUS) + 0.008),
 }
 TOP_KEEP = {
     "Width": (TOP_CENTER[0], _top_y(FOOT_NEAR_Z) + 0.018),
@@ -151,10 +153,10 @@ def _set_reference_precision(display: Any, label: str) -> None:
     Policy rule 2 puts display precision on the model, and every imported
     dimension here is read back by ``assert_imported_precision``. The strap
     band, the hold-down station and both lateral locations are owned by the
-    part's hidden reference sketches (#810 Codex l4afp). What is left is the
-    crown radius (the boss is a full circle in the model, an arc on the part)
-    and the parenthesised overall height. Their places are still
-    specification, so they come from the spec, never a literal.
+    part's hidden reference sketches, and the crown radius is the dome's own
+    diameter printed radial (#810 Codex l4afp). What is left is the
+    parenthesised overall height, a band-free restatement. Its places are
+    still specification, so they come from the spec, never a literal.
     """
     places = DRAWING_REFERENCE_PRECISION[label]
     display = _early_bound(display, "IDisplayDimension")
@@ -216,31 +218,43 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
     return foot_edge, bore_edge, dome_edge
 
 
-@_telemetry.traced("drawing.radial_dimension", label_param="label")
-def _add_radial_dimension(
-    adapter: Any,
-    view: Any,
-    entity: Any,
-    *,
-    position: tuple[float, float],
-    label: str,
-) -> Any:
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, view)):
-        raise RuntimeError(f"failed to activate view for {label}")
-    draw.ClearSelection2(True)
-    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    selection_data = selection_manager.CreateSelectData()
-    selection_data.View = view
-    if not _early_bound(entity, "IEntity").Select4(False, selection_data):
-        raise RuntimeError(f"failed to select {label} entity")
-    display = draw.AddRadialDimension2(*position, 0.0)
-    draw.ClearSelection2(True)
-    if display is None:
-        raise RuntimeError(f"failed to create {label} radial dimension")
-    draw.EditRebuild3()
-    return display
+@_telemetry.traced("drawing.crown_radius")
+def _show_crown_as_radius(adapter: Any, annotations: list[Any]) -> None:
+    """Print the model's dome diameter as the crown RADIUS it is on the part.
+
+    The dome is a full-circle boss in the model (DomeDia, part-owned places),
+    but only its upper arc survives on the part, and a print gives an arc a
+    radius. ``Diametric = False`` flips the imported diameter to its radial
+    form -- same model dimension, same places, half the value -- so no sheet
+    geometry restates it (#810 Codex l4afp, policy rule 2).
+    """
+    for raw_annotation in annotations:
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if dimension_name(adapter, annotation) != "DomeDia":
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.Diametric = False
+        # The crown is what places the tapered flanks: each side runs from a
+        # 24.0 foot corner up to tangency with this radius, whose centre is
+        # the bore's (the shared centre mark says so). The Fable round-2
+        # review could not tell where the flanks start, so the words name
+        # both ends. Words only -- every digit on this sheet is a dimension.
+        display.SetText(4, CROWN_CALLOUT)
+        # The leader runs from the text toward the crown centre; with the
+        # default "extend to the opposite side" it kept going through the bore
+        # and crossed the Ø9.55 dimension at the centre. Stop it at the arc.
+        display.ArcExtensionLineOrOppositeSide = False
+        if (
+            bool(display.Diametric)
+            or str(display.GetText(4) or "") != CROWN_CALLOUT
+            or bool(display.ArcExtensionLineOrOppositeSide)
+        ):
+            raise RuntimeError("crown radius display did not persist")
+        _telemetry.info(
+            f"crown radius: DomeDia shown radial, text {display.GetText(1)!r}"
+        )
+        return
+    raise RuntimeError("front view has no imported DomeDia to show as the crown radius")
 
 
 @_telemetry.traced("drawing.diameter_second_arrow", label_param="label")
@@ -440,29 +454,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="overall height",
     )
     _set_reference_precision(overall, "overall height")
-    radius_dimension = _add_radial_dimension(
-        adapter,
-        front,
-        dome_entity,
-        position=(0.178, _front_y(BORE_HEIGHT + TOP_RADIUS) + 0.008),
-        label="crown radius",
-    )
-    radius_display = _early_bound(radius_dimension, "IDisplayDimension")
-    # The crown is what places the tapered flanks: each side runs from a
-    # 24.0 foot corner up to tangency with this radius, whose centre is the
-    # bore's (the shared centre mark says so). The Fable round-2 review could
-    # not tell where the flanks start, so the words name both ends. Words
-    # only -- every digit on this sheet is a dimension.
-    radius_display.SetText(4, CROWN_CALLOUT)
-    # The leader runs from the text toward the crown centre; with the default
-    # "extend to the opposite side" it kept going through the bore and crossed
-    # the Ø9.55 dimension at the centre. Stop it at the crown arc.
-    radius_display.ArcExtensionLineOrOppositeSide = False
-    if str(radius_display.GetText(4) or "") != CROWN_CALLOUT or bool(
-        radius_display.ArcExtensionLineOrOppositeSide
-    ):
-        raise RuntimeError("crown radius annotation did not persist")
-    _set_reference_precision(radius_dimension, "crown radius")
+    _show_crown_as_radius(adapter, front_annotations)
     adapter.currentModel.GraphicsRedraw2()
     _screw_r = SCREW_HOLE_DIA / 2.0 * _S
     # ``callout_xy`` is the text's CENTRE, and this callout's text is ~114 mm

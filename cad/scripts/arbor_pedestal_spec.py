@@ -95,6 +95,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # BoreHeight plus a concentric R10 crown and tangent sides defines the
     # complete upright profile without redundant endpoint widths.
     "BoreProfile": {"BoreDia", "BoreHeight"},
+    # The crown: the dome boss's own diameter, printed radial on the arc.
+    "DomeProfile": {"DomeDia"},
     "StrapDepthReference": {"StrapDepth"},
     "HoldDownReference": {"HoldDownLocation"},
     "HoleLateralReference": {"HoleLateral"},
@@ -115,6 +117,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FootProfile": {"Width": 1, "Depth": 1},
     "Foot": {"FootHt": 1},
     "BoreProfile": {"BoreDia": 2, "BoreHeight": 2},
+    # One place (R10.0): the crown is a cosmetic envelope that only has to
+    # meet the tangent flanks; nothing mates to it.
+    "DomeProfile": {"DomeDia": 1},
     "StrapDepthReference": {"StrapDepth": 1},
     # One place (.X, ±0.8): the base seat is transferred from this hole at
     # assembly, so its location only has to keep the webs, and the U27 worst
@@ -128,17 +133,15 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BoreLateralReference": {"BoreLateral": 1},
 }
 
-# Places for the two dimensions the SHEET still derives, keyed by the recipe's
-# own label: the parenthesised overall height (a band-free restatement of the
-# axis height plus the crown) and the crown radius, which restates the dome
-# boss's model diameter as the radius a print gives an arc.  Those places are
-# still specification, so the spec owns the digit and the sheet passes it
-# through instead of writing a literal.
+# Places for the one dimension the SHEET still derives, keyed by the recipe's
+# own label: the parenthesised overall height, a band-free restatement of the
+# axis height plus the crown.  Its places are still specification, so the
+# spec owns the digit and the sheet passes it through instead of writing a
+# literal.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # Two places, like the axis height it is the sum of: a one-place (49.7)
     # next to 39.72 + R10.0 reads as an arithmetic error on the print.
     "overall height": 2,
-    "crown radius": 1,
 }
 
 _PRECISION_NAMES = [
