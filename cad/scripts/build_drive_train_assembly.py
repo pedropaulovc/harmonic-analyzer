@@ -845,11 +845,8 @@ from arbor_pedestal_spec import SCREW_HOLE_SPEC as ARBOR_PED_HOLE_SPEC  # noqa: 
 from build_alignment_pinion import (  # noqa: E402
     BORE_DIA as DRUM_BORE_DIA,
 )
-from pinion_arbor_spec import (  # noqa: E402
-    CROSSROD_MAX_CLEARANCE as ARBOR_CROSSROD_MAX_CLEARANCE,
-    CROSSROD_MIN_CLEARANCE as ARBOR_CROSSROD_MIN_CLEARANCE,
+from pinion_arbor_geometry import (  # noqa: E402
     CROSS_HOLE_DIA as ARBOR_CROSS_HOLE_DIA,
-    RETAINING_COMPOUND_MAX_GAP_MM as ARBOR_BOND_MAX_GAP,
     HEAD_CAP_SAG as ARBOR_HEAD_CAP_SAG,
     HEAD_CENTER_Z as ARBOR_HEAD_CENTER_Z,
     HEAD_DIA as ARBOR_HEAD_DIA,
@@ -2063,16 +2060,11 @@ if abs(ARBOR_Z0 + ARBOR_LEN - (91.25 + MECHANISM_Z_SHIFT)) > 0.01:
     raise AssertionError("arbor back end off the translated p2 station")
 if not (ARBOR_DIA == DRUM_BORE_DIA == STRAP_ARBOR_BORE):
     raise AssertionError("arbor dia disagrees with drum and strap bores")
-# R1: the crossrod is a bonded slip fit, modelled line to line; at the printed
-# limits it must still enter the hole and stay inside the Loctite 638 gap.
+# R1: the crossrod is a bonded slip fit, modelled line to line.  Its printed
+# limits (rod enters, gap inside Loctite 638) are pinion_arbor_spec's asserts;
+# the assembly only needs the shared nominal it places both parts at.
 if abs(HANDLE_ROD_DIA - ARBOR_CROSS_HOLE_DIA) > 1e-9:
     raise AssertionError("grip crossrod and head hole no longer share a nominal")
-if not 0.0 <= ARBOR_CROSSROD_MIN_CLEARANCE <= ARBOR_CROSSROD_MAX_CLEARANCE <= ARBOR_BOND_MAX_GAP:
-    raise AssertionError(
-        "grip crossrod bond clearance "
-        f"{ARBOR_CROSSROD_MIN_CLEARANCE:.3f}-{ARBOR_CROSSROD_MAX_CLEARANCE:.3f} "
-        f"is outside 0-{ARBOR_BOND_MAX_GAP}"
-    )
 if abs(STRAP_PIVOT_BORE - 6.35) > 1e-9:
     raise AssertionError("strap pivot bore no longer rides the O6.35 shaft")
 # Block screws: exact 90280A201 #8-32 x 31.75 stock screws pass through normal

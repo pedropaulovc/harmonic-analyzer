@@ -100,6 +100,7 @@ def test_drawing_notes_do_not_change_the_drive_train_recipe() -> None:
         for path in module_deps_of(scripts / "build_drive_train_assembly.py")
     }
     drawing_only = {
+        "pinion_arbor_spec.py",
         "pinion_cam_spec.py",
         "pinion_cam_pin_spec.py",
         "pinion_handle_spec.py",
@@ -108,6 +109,7 @@ def test_drawing_notes_do_not_change_the_drive_train_recipe() -> None:
     }
     assert deps.isdisjoint(drawing_only)
     assert {
+        "pinion_arbor_geometry.py",
         "pinion_cam_geometry.py",
         "pinion_cam_pin_geometry.py",
         "pinion_handle_geometry.py",
