@@ -42,6 +42,7 @@ from cone_tip_block_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FOOT_BORE_DIA,
+    HEEL_RELIEF_HEIGHT,
     PINCH_BORE_DIA,
     PINCH_CLEARANCE_DIA,
     PINCH_HEIGHT,
@@ -113,7 +114,7 @@ FRONT_KEEP = {
     ),
 }
 # swDimArrowsOutside: set, not left to the document's smart arrows.
-ARROWS_OUTSIDE = ("SlitW",)
+ARROWS_OUTSIDE = ("SlitW", "HeelReliefDepth")
 _DIM_ARROWS_OUTSIDE = 1
 TOP_KEEP = {"Depth": (TOP_CENTER[0] - 0.035, TOP_CENTER[1])}
 # The part-hidden reference sketch section A dimensions (PinchRise).
@@ -139,7 +140,24 @@ RIGHT_KEEP = {
         _elevation_y(BLOCK_HEIGHT, RIGHT_CENTER) + 0.007,
     )
 }
-LEFT_KEEP: dict[str, tuple[float, float]] = {}
+# I31 heel relief, dimensioned in VIEW B, which looks at the -X face with
+# north on the right, so the step is the view's lower-right notch.  The depth's
+# dimension line runs through the notch's air, a third of the way up, with its
+# arrows outside and its value right of the north face.  The height stands
+# further right, so the depth's value sits between its two extension lines.
+_LEFT_NORTH_X = LEFT_CENTER[0] + BLOCK_Z * _S / 2.0
+HEEL_DEPTH_TEXT_X = _LEFT_NORTH_X + ARROW_LENGTH + TEXT_CLEARANCE + VALUE_TEXT_HALF_WIDTH
+HEEL_HEIGHT_LINE_X = HEEL_DEPTH_TEXT_X + VALUE_TEXT_HALF_WIDTH + 0.008
+LEFT_KEEP: dict[str, tuple[float, float]] = {
+    "HeelReliefDepth": (
+        HEEL_DEPTH_TEXT_X,
+        _elevation_y(HEEL_RELIEF_HEIGHT / 3.0, LEFT_CENTER),
+    ),
+    "HeelReliefHt": (
+        HEEL_HEIGHT_LINE_X,
+        _elevation_y(HEEL_RELIEF_HEIGHT / 2.0, LEFT_CENTER),
+    ),
+}
 # The foot tap's two locations: FootTapX above the bottom view (between it and
 # the front view's 15.0), FootTapZ to its left; the view caption moves under it.
 # At the tap's height FootTapZ's witness ran into the end of its "6.0".

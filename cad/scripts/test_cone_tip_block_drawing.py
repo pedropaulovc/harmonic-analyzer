@@ -257,7 +257,7 @@ def test_slot_width_text_stands_left_of_its_outside_arrows() -> None:
     left_wall = slot_x - part.SLIT_W * drawing._S / 2.0
     arrow_tail = left_wall - drawing.ARROW_LENGTH
     assert text_x + drawing.VALUE_TEXT_HALF_WIDTH <= arrow_tail - 0.001
-    assert drawing.ARROWS_OUTSIDE == ("SlitW",)
+    assert drawing.ARROWS_OUTSIDE == ("SlitW", "HeelReliefDepth")
 
 
 @pytest.mark.parametrize(
@@ -299,3 +299,56 @@ def test_pinch_depth_dimension_line_stands_off_the_block_top() -> None:
         drawing.BOTTOM_KEEP["FootTapX"][1]
         - (drawing.BOTTOM_CENTER[1] + part.BLOCK_Z * drawing._S / 2.0)
     )
+
+
+def test_heel_relief_is_a_marked_xx_step_on_the_north_bottom_edge() -> None:
+    """I31: a 1.53 x 5.56 step clears the cone pivot screw's head (Main,
+    2026-09-25); the drive train proves the size from the live parts."""
+    spec = cone_tip_block_spec
+    assert (spec.HEEL_RELIEF_DEPTH, spec.HEEL_RELIEF_HEIGHT) == (1.53, 5.56)
+    assert spec.DRAWING_DIMENSIONS["HeelReliefProfile"] == {
+        "HeelReliefDepth",
+        "HeelReliefHt",
+    }
+    assert spec.DRAWING_PRECISION["HeelReliefProfile"] == {
+        "HeelReliefDepth": 2,
+        "HeelReliefHt": 2,
+    }
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build(") :]
+    # Cut on the Right plane from the north face (sketch -x) down to the foot.
+    assert 'create_sketch("Right")' in body[body.index("heel relief") :]
+    assert body.index('"FootBore"') < body.index('"HeelRelief"')
+    assert body.index('"HeelRelief"') < body.index("drive_dimension(")
+
+
+def test_heel_relief_web_to_the_foot_tap_closes_the_floor_at_xx() -> None:
+    """The relief and FootTapZ share the north face.  At .X the web was 1.41
+    (under the 1.5 floor), so FootTapZ prints .XX: 1.70, over the floor and
+    short of the 2.0 target until I31's flange retires the tap."""
+    spec = cone_tip_block_spec
+    assert spec.DRAWING_PRECISION["FootTapZReference"] == {"FootTapZ": 2}
+    assert spec.WORST_HEEL_RELIEF_TAP_WEB_MM == pytest.approx(
+        6.0 - 0.51 - 3.505 / 2.0 - (1.53 + 0.51)
+    )
+    assert spec.MIN_WEB_FLOOR_MM <= spec.WORST_HEEL_RELIEF_TAP_WEB_MM < spec.MIN_WEB_MM
+    at_one_place = 6.0 - 0.8 - 3.505 / 2.0 - (1.53 + 0.51)
+    assert at_one_place < spec.MIN_WEB_FLOOR_MM
+
+
+def test_heel_relief_values_sit_off_their_own_lines_in_view_b() -> None:
+    """VIEW B looks at -X with north on the right: the depth's value stands
+    right of the north face past its outside arrow, between the height's two
+    extension lines, and left of the height's dimension line."""
+    north_x = drawing.LEFT_CENTER[0] + part.BLOCK_Z * drawing._S / 2.0
+    depth_x, depth_y = drawing.LEFT_KEEP["HeelReliefDepth"]
+    height_x, _height_y = drawing.LEFT_KEEP["HeelReliefHt"]
+    assert depth_x - drawing.VALUE_TEXT_HALF_WIDTH >= north_x + drawing.ARROW_LENGTH
+    assert depth_x + drawing.VALUE_TEXT_HALF_WIDTH + 0.004 <= height_x
+    foot_y = drawing._elevation_y(0.0, drawing.LEFT_CENTER)
+    top_y = drawing._elevation_y(
+        cone_tip_block_spec.HEEL_RELIEF_HEIGHT, drawing.LEFT_CENTER
+    )
+    half_height = 0.0019
+    assert foot_y + 0.001 <= depth_y - half_height
+    assert depth_y + half_height <= top_y - 0.001

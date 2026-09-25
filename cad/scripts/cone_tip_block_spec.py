@@ -223,6 +223,42 @@ if not (
 ):
     raise AssertionError("adjuster embed band leaves its working window")
 
+# I31 heel relief (Main, 2026-09-25): the cone pivot screw's head (McMaster
+# 91829A560, Ø9.525 x 4.7625) stands on the platform top 11.0 north of the
+# block centre, only 0.2375 off the block's north face at nominal, and the
+# block's north face moves north with the shaft tip (Sec4End, .X) at fit-up.
+# A rectangular step along the whole north-bottom edge clears the head: the
+# drive-train builder derives the required depth (tip travel + head float in
+# the pivot hole + 0.20 air - nominal gap) and height (head top above the
+# lowest foot) from the live parts and asserts these printed .XX values cover
+# them (build_drive_train_assembly, "heel relief").
+HEEL_RELIEF_DEPTH = 1.53
+HEEL_RELIEF_HEIGHT = 5.56
+# The relief's inner face and the foot tap share the foot: FootTapZ prints
+# .XX from the north face (the relief's own datum), so the web between the
+# relief and the tap's thread major closes at the printed limits.  It clears
+# the 1.5 floor but not the 2.0 target (U27): the tap is transient, I31's
+# flange hold-down retires it.
+WORST_HEEL_RELIEF_TAP_WEB_MM = (
+    round(BLOCK_Z / 2.0, 2)
+    - _GENERAL_2PL_MM
+    - THREAD_MAJOR_MM[FOOT_THREAD] / 2.0
+    - (HEEL_RELIEF_DEPTH + _GENERAL_2PL_MM)
+)
+MIN_WEB_FLOOR_MM = 1.5
+if round(WORST_HEEL_RELIEF_TAP_WEB_MM, 6) < MIN_WEB_FLOOR_MM:
+    raise AssertionError(
+        f"heel relief leaves {WORST_HEEL_RELIEF_TAP_WEB_MM:.3f} to the foot tap "
+        "at the printed limits (< 1.5 floor, U27)"
+    )
+# The relief stays in the foot, well under the adjuster thread and its
+# countersink.
+if (
+    HEEL_RELIEF_HEIGHT + _GENERAL_2PL_MM
+    > ADJUSTER_AXIS_HEIGHT - ADJUSTER_CSK_DIA / 2.0 - MIN_WEB_MM
+):
+    raise AssertionError("heel relief rises into the adjuster countersink")
+
 SURFACE_FINISHES = (
     # This face locates the adjuster block on the swing platform. Everything
     # else remains governed by the title-block CAST/MACHINED process row.
@@ -244,6 +280,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # 2026-09-23: centre marks alone are not a location).
     "FootTapXReference": {"FootTapX"},
     "FootTapZReference": {"FootTapZ"},
+    # I31 heel relief: depth from the north face, height from the foot.
+    "HeelReliefProfile": {"HeelReliefDepth", "HeelReliefHt"},
 }
 
 # Decimal places carry the general tolerance and therefore live on the model.
@@ -261,7 +299,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "TopSlit": {"SlitDepth": 1},
     # A centred tap in a 15 x 12 foot: .X leaves 4.95 of wall to the edge.
     "FootTapXReference": {"FootTapX": 1},
-    "FootTapZReference": {"FootTapZ": 1},
+    # .XX from the north face: the heel relief shares that face, and the web
+    # between them misses the 1.5 floor at .X (1.41).
+    "FootTapZReference": {"FootTapZ": 2},
+    "HeelReliefProfile": {"HeelReliefDepth": 2, "HeelReliefHt": 2},
 }
 DRAWING_PRECISION_BY_NAME = {
     name: places
