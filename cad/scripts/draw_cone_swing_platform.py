@@ -105,7 +105,12 @@ SHEET_SCALE = (1.0, 2.0)  # title block states the principal (plan) scale; iso a
 PROFILE_CENTER = (0.075, 0.190)
 FEATURE_CENTER = (0.180, 0.190)
 NOTCH_CENTER = (0.260, 0.190)
-ISO_CENTER = (0.355, 0.205)
+# x 0.370, not d382's 0.355: the notch plan's 205.81 dimension line runs at
+# x 0.327 (NOTCH_KEEP) to give the run angle's leader room, and it must pass
+# 2 mm left of this view (d382 box [0.316, 0.394] at 0.355) and of its
+# "ISOMETRIC VIEW" label ([0.3147, 0.3748]); +15 mm leaves the box 9.9 mm
+# inside the border.
+ISO_CENTER = (0.370, 0.205)
 # The section group sits up and right in the open field below the isometric,
 # clear of the lock-notch caption; every section annotation shares this shift.
 # x 0.030, not 0.020: at 0.020 section C-C's 2.80 arrow line ran up through
@@ -188,9 +193,9 @@ TIP_SLOT_Z_LINE_X = plan_xy(NOTCH_CENTER, _plan_east_edge_x(TIP_SCREW_LOCAL_Z), 
 # lies where the anchor is: 18 mm out, past the construction ray's hidden
 # 10 mm (the ray's extension line starts at 11.0), so the arrows land on
 # drawn lines.  The radius is where the value's leader clears both extension
-# lines' ends by most (NOTCH_ANGLE_TEXT_XY, below): flat past 17 mm.
+# lines' ends by most (NOTCH_ANGLE_TEXT_XY, below): flat from 31.5 to 33 mm.
 NOTCH_ANGLE_VERTEX_XY = plan_xy(NOTCH_CENTER, *_part.NOTCH_ANGLE_VERTEX_XZ)
-NOTCH_ANGLE_ARC_RADIUS = 0.018
+NOTCH_ANGLE_ARC_RADIUS = 0.032
 NOTCH_ANGLE_ANCHOR_XY = (
     NOTCH_ANGLE_VERTEX_XY[0]
     + NOTCH_ANGLE_ARC_RADIUS * math.cos(math.radians(_part.NOTCH_RUN_DEG / 2.0)),
@@ -203,11 +208,14 @@ NOTCH_KEEP = {
     "NorthEdgeZ": (0.270, 0.150),
     # Text between its witnesses: outside, it read as spanning from the corner.
     "CapECx": (0.2652, 0.258),
-    # 8 mm right of d382's 0.305, so the run angle's value and its leader
-    # shoulder fit between the angle's open end and this line (tipslot-fix3:
-    # at 0.305 the leader could clear the run's extension line by 0.45 mm at
-    # best).  The field out to the isometric (x ~0.325 at y 0.195) is empty.
-    "CapECz": (0.313, 0.180),
+    # 22 mm right of d382's 0.305, so the run angle's value and its leader
+    # shoulder fit between the angle's open end and this line with the
+    # leader 2 mm off both extension lines' ends (tipslot-fix3/4: at 0.305
+    # the best was 0.45 mm, at 0.313 1.13 mm).  The isometric moved right to
+    # make room (ISO_CENTER); the text sits at y 0.170, 7.5 mm under that
+    # view's box.  The lower witness (y 0.1377) passes 2.4 mm over A-A's
+    # "(6.35)" (top 0.1353) and the lower arrowhead 2.9 mm right of it.
+    "CapECz": (0.327, 0.170),
     "CapEDia": (0.285, 0.259),
     # The run angle (PR #830, Codex P1: without it the rails had no
     # direction).  Its vertex is the north rail's closed-end corner.  This is
@@ -570,11 +578,12 @@ _COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
 # under the value's near end, then a shoulder under the value.  fix3 placed
 # the value for a straight leader, so the leg crossed the run's extension
 # line.  The leg now has to leave the wedge between the two lines' ends,
-# which lie only ~2.4 mm apart, and the value above its shoulder has to stay
-# 2 mm under the 205.81 witness: the value sits low and far out, just
-# short of the 205.81 line, so the leg runs nearly flat.  Placed from the
-# vertex, so it follows the notch.
-NOTCH_ANGLE_TEXT_XY = (NOTCH_ANGLE_VERTEX_XY[0] + 0.0320, NOTCH_ANGLE_VERTEX_XY[1] - 0.0018)
+# which lie 0.16 x (R + 1) apart, and the value above its shoulder has to
+# stay 2.5 mm under the 205.81 witness (Main, tipslot-fix4): the arc goes
+# out to 32 mm, where the ends are 5.3 mm apart, and the value sits low and
+# far out, short of the 205.81 line, so the leg runs nearly flat.  Placed
+# from the vertex, so it follows the notch.
+NOTCH_ANGLE_TEXT_XY = (NOTCH_ANGLE_VERTEX_XY[0] + 0.0450, NOTCH_ANGLE_VERTEX_XY[1] - 0.0023)
 # Ink the d382 render (300 dpi) and the d382/fix3 leaf dumps measured, sheet
 # metres: the "9.11°" glyphs, the arrowheads, the extension lines' reach past
 # the arc and the run's start, the arcs' tails beyond each line (arrows
@@ -597,10 +606,10 @@ CAP_EC_Z_TEXT_SIZE = (0.0120, 0.0035)
 LINE_TEXT_CLEARANCE = 0.0005
 ARROW_TEXT_CLEARANCE = _drawing_leaders.ARROW_TEXT_CLEARANCE
 # An offset leader keeps this far off every stroke it does not cross or
-# root on.  The layout gives 1.13 mm (the leg past the run's extension line
-# end); the gate sits just under it, so an edit that squeezes the leg back
+# root on (Main's floor, tipslot-fix4).  The layout gives 2.24 mm (the leg
+# past the run's extension line end), so an edit that squeezes the leg back
 # toward fix3's crossing fails here, not on the eye pass.
-LEADER_INK_CLEARANCE = 0.0010
+LEADER_INK_CLEARANCE = 0.0020
 # Tipslot ruling (b): another annotation's line may cross a moved value's
 # dimension ink only farther than half the value's text height from it, and
 # only as a named, expected crossing (reported, not gated).

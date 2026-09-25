@@ -526,20 +526,21 @@ def test_the_notch_ink_model_reproduces_d382() -> None:
 
 
 def test_the_run_angle_value_prints_clear_on_its_leader() -> None:
-    """The fix: an 18 mm arc from the in-wedge anchor, the value low and far
+    """The fix: a 32 mm arc from the in-wedge anchor, the value low and far
     out, short of the 205.81 line.  Nothing touches it, no foreign arrow is
     within 2 mm, and the seat's leader shape -- arc midpoint, knee, shoulder
     -- crosses nothing, meets nothing in a T and keeps LEADER_INK_CLEARANCE
-    off every stroke."""
+    (Main's 2.0 mm) off every stroke."""
     ink = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY)
     assert drawing.sheet_ink_collisions(ink) == []
+    assert drawing.LEADER_INK_CLEARANCE == 0.002
     box = ink.texts["NotchRunAngle"]
     ray, run = ink.lines["NotchRunAngle"]
-    # Past both extension lines' ends, 2 mm under the 205.81 witness (swing,
-    # fix3 ruling), and its arrowhead's 2 mm + half-width off the value.
+    # Past both extension lines' ends, 2.5 mm under the 205.81 witness
+    # (Main, tipslot-fix4), and its arrowhead's 2 mm + half-width off the value.
     assert box[0] - max(ray[1][0], run[1][0]) >= 0.002
     cap_witness_y = ink.lines["CapECz"][0][0][1]
-    assert cap_witness_y - box[3] >= 0.002
+    assert cap_witness_y - box[3] >= 0.0025
     assert drawing.NOTCH_KEEP["CapECz"][0] - box[2] >= (
         drawing.ARROW_TEXT_CLEARANCE + drawing.NOTCH_ANGLE_ARROW_HALF_WIDTH
     )
@@ -551,28 +552,96 @@ def test_the_run_angle_value_prints_clear_on_its_leader() -> None:
     # the 205.81 line: the leg leaves the wedge through its open end.
     assert knee[0] > max(ray[1][0], run[1][0])
     assert drawing.NOTCH_KEEP["CapECz"][0] - far[0] >= drawing.LEADER_INK_CLEARANCE
-    # The margins the layout was solved for (tipslot-fix3 reply to swing).
-    assert drawing._segment_gap((root, knee), run) >= 0.0011
-    assert drawing._segment_gap((root, knee), ray) >= 0.0011
+    # The margins the layout was solved for (tipslot-fix4 reply to Main).
+    assert drawing._segment_gap((root, knee), run) >= 0.0022
+    assert drawing._segment_gap((root, knee), ray) >= 0.0025
     # The anchor still selects the acute sector, and its arc sits past the
     # hidden 10 mm construction ray, where the ray's extension line is drawn.
     assert drawing.NOTCH_KEEP["NotchRunAngle"] == drawing.NOTCH_ANGLE_ANCHOR_XY
     assert drawing.NOTCH_ANGLE_ARC_RADIUS > drawing.NOTCH_ANGLE_RAY_START + 0.002
 
 
-def test_the_leader_clearance_is_why_the_205_81_moved() -> None:
-    """With the 205.81 at d382's x 0.305, the best layout (18 mm arc swept
-    down to 11.5, value as far out as that line allows) left the leg 0.45 mm
-    off the run's extension line's end: legal for the crossing rule, a
-    near-miss on the sheet.  The clearance gate names it."""
+@pytest.mark.parametrize(
+    ("radius", "text_offset", "cap_text_xy", "gap_mm"),
+    [
+        # d382's 205.81 at x 0.305: the best any arc/value gave.
+        (0.0115, (0.0242, -0.0018), (0.305, 0.180), "0.45"),
+        # dbfc81fb2 (fix4 as first committed): 205.81 at x 0.313.
+        (0.018, (0.0320, -0.0018), (0.313, 0.180), "1.13"),
+    ],
+)
+def test_the_leader_clearance_is_why_the_205_81_moved(
+    radius: float, text_offset: tuple[float, float], cap_text_xy: tuple[float, float], gap_mm: str
+) -> None:
+    """With the 205.81 at x 0.305 or 0.313 the best layout left the leg
+    0.45 / 1.13 mm off the run's extension line's end: legal for the
+    crossing rule, a near-miss on the sheet.  The clearance gate names it."""
     vertex = drawing.NOTCH_ANGLE_VERTEX_XY
-    anchor = drawing._polar(vertex, 0.0115, -part.NOTCH_RUN_DEG / 2.0)
-    text = (vertex[0] + 0.0242, vertex[1] - 0.0018)
-    ink = drawing.notch_angle_ink(text, anchor_xy=anchor, cap_text_xy=(0.305, 0.180))
+    anchor = drawing._polar(vertex, radius, -part.NOTCH_RUN_DEG / 2.0)
+    text = (vertex[0] + text_offset[0], vertex[1] + text_offset[1])
+    ink = drawing.notch_angle_ink(text, anchor_xy=anchor, cap_text_xy=cap_text_xy)
     findings = drawing.sheet_ink_collisions(ink)
     assert not any(f.startswith("leader-on-ink") for f in findings)
-    near = [f for f in findings if f.startswith("leader-near-ink")]
-    assert near == ["leader-near-ink: NotchRunAngle's leader passes 0.45 mm from NotchRunAngle lines"]
+    assert (
+        f"leader-near-ink: NotchRunAngle's leader passes {gap_mm} mm from NotchRunAngle lines"
+        in findings
+    )
+
+
+# The isometric view and its label as d382 printed them (describe_sheet,
+# C:/src/dt-logs/spring/tipslot-d382-leaf.log:291,478) with the view at
+# ISO_CENTER (0.355, 0.205); both follow the view.  A-A's "(6.35)" line
+# (:456) does not move.
+_D382_ISO_CENTER = (0.355, 0.205)
+_D382_ISO_VIEW_BOX = (0.3160, 0.1793, 0.3940, 0.2307)
+_D382_ISO_LABEL_BOX = (0.3147, 0.1536, 0.3748, 0.1585)
+_PLATE_THK_TOP_LINE_BOX = (0.3095, 0.1318, 0.3246, 0.1353)
+_SHEET_BORDER_RIGHT = 0.4189
+
+
+def _iso_box(box: tuple[float, float, float, float]) -> tuple[float, float, float, float]:
+    dx = drawing.ISO_CENTER[0] - _D382_ISO_CENTER[0]
+    dy = drawing.ISO_CENTER[1] - _D382_ISO_CENTER[1]
+    return (box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy)
+
+
+def _box_gap(first: tuple[float, ...], second: tuple[float, ...]) -> float:
+    dx = max(0.0, first[0] - second[2], second[0] - first[2])
+    dy = max(0.0, first[1] - second[3], second[1] - first[3])
+    return math.hypot(dx, dy)
+
+
+def test_the_moved_205_81_clears_the_isometric_and_the_section_note() -> None:
+    """The 205.81 moved to x 0.327 for the run angle's leader; the isometric
+    moved 15 mm right to make room.  Every neighbour stays 2 mm off: the
+    dimension line (y 0.1377..0.2406) passes left of the view and its label,
+    its text sits under the view, its lower witness and arrowhead clear A-A's
+    "(6.35)", and the view stays inside the border."""
+    view = _iso_box(_D382_ISO_VIEW_BOX)
+    label = _iso_box(_D382_ISO_LABEL_BOX)
+    ink = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY)
+    witness, line = ink.lines["CapECz"]
+    cap_x = drawing.NOTCH_KEEP["CapECz"][0]
+    lower_witness_y = witness[0][1] - 0.1029  # 205.81 at 1:2
+    dimension = ((cap_x, witness[0][1]), (cap_x, lower_witness_y))
+    lower_witness = ((0.2607, lower_witness_y), (cap_x + 0.001, lower_witness_y))
+    lower_arrow = ((cap_x, lower_witness_y), (cap_x, lower_witness_y + 0.0034))
+    for keep_out in (view, label):
+        assert _drawing_leaders.distance_to_box(dimension, keep_out) >= 0.002
+        assert _drawing_leaders.distance_to_box(witness, keep_out) >= 0.002
+    cap_text = ink.texts["CapECz"]
+    for keep_out in (view, label):
+        assert _box_gap(cap_text, keep_out) >= 0.002
+    assert _drawing_leaders.distance_to_box(lower_witness, _PLATE_THK_TOP_LINE_BOX) >= 0.002
+    assert (
+        _drawing_leaders.distance_to_box(lower_arrow, _PLATE_THK_TOP_LINE_BOX)
+        - drawing.NOTCH_ANGLE_ARROW_HALF_WIDTH
+        >= 0.002
+    )
+    assert _SHEET_BORDER_RIGHT - view[2] >= 0.002
+    # Positive control: d382's isometric with this 205.81 -- the line runs
+    # into the label.
+    assert _drawing_leaders.distance_to_box(dimension, _D382_ISO_LABEL_BOX) < 0.002
 
 
 def test_the_arc_tail_crossing_the_205_81_witness_is_named_and_far_from_the_value() -> None:
@@ -583,7 +652,10 @@ def test_the_arc_tail_crossing_the_205_81_witness_is_named_and_far_from_the_valu
     findings, reported = drawing.dimension_crossings(ink)
     assert findings == []
     assert len(reported) == 1
-    assert reported[0].startswith("NotchRunAngle arcs x CapECz lines, at least 2.0")
+    head = "NotchRunAngle arcs x CapECz lines, at least "
+    assert reported[0].startswith(head)
+    gap_mm = float(reported[0][len(head) :].split(" mm", 1)[0])
+    assert gap_mm > 0.5 * drawing.NOTCH_ANGLE_TEXT_SIZE[1] * 1000.0 + 0.5
     assert frozenset(("NotchRunAngle arcs", "CapECz lines")) in drawing.EXPECTED_DIMENSION_CROSSINGS
     # The value moved onto the crossing: it gates.
     witness_y = ink.lines["CapECz"][0][0][1]
@@ -628,7 +700,7 @@ def test_the_leader_audit_counts_a_t_and_allows_its_own_arc() -> None:
     # Across the 205.81's line is a crossing too: why the value stops short.
     across = dataclasses.replace(
         ink,
-        leaders={"NotchRunAngle": [(drawing.NOTCH_ANGLE_TEXT_XY, (0.320, 0.230))]},
+        leaders={"NotchRunAngle": [(drawing.NOTCH_ANGLE_TEXT_XY, (0.335, 0.230))]},
     )
     assert "leader-on-ink: NotchRunAngle's leader crosses CapECz lines" in (
         drawing.sheet_ink_collisions(across)
