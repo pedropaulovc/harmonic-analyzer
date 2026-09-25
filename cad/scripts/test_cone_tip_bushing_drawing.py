@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import _config
 import build_cone_tip_bushing as part
 import cone_tip_bushing_spec
 import draw_cone_tip_bushing as drawing
@@ -64,3 +65,30 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "brass" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 1
+
+
+def test_dimensions_table_states_the_modelled_bore() -> None:
+    """cad/config/dimensions.yaml is the repository's dimensions table; its
+    cone-tip-bushing row must name the bore the part models, or a reader
+    specifies a bushing that cannot pass the 1/16 in journal (Codex #839
+    PRRT_kwDOPHDy386mKNTc)."""
+    import yaml
+
+    table = yaml.safe_load(
+        (Path(_config.CONFIG_DIR) / "dimensions.yaml").read_text(encoding="utf-8")
+    )
+
+    def rows(node):
+        if isinstance(node, list):
+            if node and isinstance(node[0], str):
+                yield node
+            for item in node:
+                yield from rows(item)
+        if isinstance(node, dict):
+            for item in node.values():
+                yield from rows(item)
+
+    row = next(r for r in rows(table) if r[0].startswith("`cone-tip-bushing`"))
+    assert f"Ø{cone_tip_bushing_spec.BORE_DIA + 1e-9:.3f}" in row[1]  # 1.5875 -> 1.588
+    assert '1/16"' in row[1]
+    assert "1/32" not in row[1]
