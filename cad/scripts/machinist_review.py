@@ -12,7 +12,8 @@ reviews with ``--reviewer codex``, a Codex/GPT-driven session with
 ``--author-family`` names the author's family explicitly and a same-family pair
 is refused unless ``--last-resort`` says so. A last-resort run needs the
 cross-family reviewer's quota refusal for that drawing, which this tool keeps as
-``<name>.quota-refused.json`` when a run is refused for usage limits, and an
+``<name>.<reviewer>.quota-refused.json`` (one per reviewer, so a refused
+last-resort run never replaces it) when a run is refused for usage limits, and an
 author model (read from the draw script's last commit trailer) that meets the
 tier rule; otherwise it is refused before any reviewer runs. ``--rebuttals``
 answers a FIX verdict's gating findings with cited user rulings, recording it
@@ -931,7 +932,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--quota-refusal",
         type=Path,
         help="the cross-family reviewer's quota-refused report "
-        "(default: <report-dir>/<name>.quota-refused.json)",
+        "(default: <report-dir>/<name>.<cross-family reviewer>.quota-refused.json)",
     )
     parser.add_argument(
         "--rebuttals",
@@ -1145,6 +1146,15 @@ def _record_in_ledger(
     return recorded
 
 
+def quota_refused_path(report_dir: Path, name: str, reviewer: str) -> Path:
+    """Where ``reviewer``'s usage-limit refusal of ``name`` is kept.
+
+    One record per reviewer: a same-family last-resort run refused in turn is
+    kept beside the cross-family refusal that licensed it, never over it.
+    """
+    return report_dir / f"{name}.{reviewer}{QUOTA_REFUSED_SUFFIX}"
+
+
 def _keep_quota_refusal(review: Review, report_dir: Path) -> None:
     """Keep a usage-limit refusal where the next run's report cannot overwrite it."""
     if review.verdict is not None:
@@ -1152,7 +1162,7 @@ def _keep_quota_refusal(review: Review, report_dir: Path) -> None:
     report = report_dir / f"{review.name}.json"
     if machinist_ledger.quota_evidence(asdict(review), report) is None:
         return
-    kept = report_dir / f"{review.name}{QUOTA_REFUSED_SUFFIX}"
+    kept = quota_refused_path(report_dir, review.name, review.reviewer)
     shutil.copyfile(report, kept)
     print(
         f"{review.name}: {review.reviewer} refused on quota; kept {kept} as the "
@@ -1172,7 +1182,10 @@ def _last_resort_problem(args: argparse.Namespace) -> str:
     if args.prompt_file is not None:
         return "a rubric override is not the gate"
     name = args.names[0]
-    refusal_report = args.quota_refusal or args.report_dir / f"{name}{QUOTA_REFUSED_SUFFIX}"
+    cross = next(reviewer for reviewer in REVIEWERS if reviewer != args.reviewer)
+    refusal_report = args.quota_refusal or quota_refused_path(
+        args.report_dir, name, cross
+    )
     if refusal_report.resolve() == (args.report_dir / f"{name}.json").resolve():
         return f"{refusal_report} is the report this run overwrites; pass its kept copy"
     model = args.model or DEFAULT_MODELS[args.reviewer]
@@ -1196,7 +1209,9 @@ def _last_resort_problem(args: argparse.Namespace) -> str:
         return stale
     if author["model_source"] != "trailer":
         return "the draw script's last commit names no author model in a trailer"
-    return machinist_ledger.last_resort_tier_problem(author["model"], model, effort) or ""
+    return (
+        machinist_ledger.last_resort_tier_problem(author["model"], model, effort) or ""
+    )
 
 
 if __name__ == "__main__":

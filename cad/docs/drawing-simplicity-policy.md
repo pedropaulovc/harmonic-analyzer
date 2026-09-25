@@ -320,7 +320,9 @@ included (for example `Co-Authored-By: GPT-6 Sol <noreply@openai.com>`); without
 one the ledger can only record the claimed family, and a last-resort review
 cannot count. A
 cross-family run refused for usage limits keeps its report as
-`<name>.quota-refused.json`. A same-family `--last-resort` run is refused before
+`<name>.<reviewer>.quota-refused.json`, one per reviewer, so a last-resort run
+refused in turn is kept beside it and never replaces the evidence a retry
+needs. A same-family `--last-resort` run is refused before
 any reviewer runs unless that refusal is under 24 h old and the trailer's model
 and the reviewer meet the tier rule.
 Every accepted registry-drawing review is recorded in the tracked ledger

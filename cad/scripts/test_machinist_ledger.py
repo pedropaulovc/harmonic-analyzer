@@ -1346,7 +1346,7 @@ def test_a_quota_refusal_is_kept_and_unlocks_the_last_resort_run(
 
     _fake_run(monkeypatch, pdf, lambda: mr.Review(**refusal))
     assert mr.main(["--reviewer", "codex", "--author-family", "claude", *common]) == 1
-    assert (reports / "crank_arm.quota-refused.json").is_file()
+    assert (reports / "crank_arm.codex.quota-refused.json").is_file()
 
     _trailer(monkeypatch, "claude-opus-5-5")
     _fake_run(monkeypatch, pdf, lambda: mr.Review(**_review(pdf, reviewer="claude")))
@@ -1358,9 +1358,42 @@ def test_a_quota_refusal_is_kept_and_unlocks_the_last_resort_run(
     assert code == 0
     assert list(entry) == [ml.LAST_RESORT] and entry[ml.LAST_RESORT]["counts"]
     assert entry[ml.LAST_RESORT]["quota_refusal"]["report"].endswith(
-        "crank_arm.quota-refused.json"
+        "crank_arm.codex.quota-refused.json"
     )
     assert ml.check(["crank_arm"], ledger_path=ledger_path)[0].state == ml.State.OK
+
+
+def test_a_refused_last_resort_run_keeps_the_cross_family_refusal(
+    tmp_path: Path, registry: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pdf = _sheet(registry)
+    reports = tmp_path / "reports"
+    ledger_path = tmp_path / "ledger.json"
+    refusal = json.loads(_refused(tmp_path, pdf).read_text(encoding="utf-8"))
+    common = ["crank_arm", "--ledger", str(ledger_path), "--report-dir", str(reports)]
+    last_resort = ["--reviewer", "claude", "--author-family", "claude", "--last-resort"]
+
+    _fake_run(monkeypatch, pdf, lambda: mr.Review(**refusal))
+    assert mr.main(["--reviewer", "codex", "--author-family", "claude", *common]) == 1
+    cross = reports / "crank_arm.codex.quota-refused.json"
+    kept = cross.read_bytes()
+
+    # The same-family last resort is refused on quota too: kept beside, not over.
+    _trailer(monkeypatch, "claude-opus-5-5")
+    claude_refusal = {**refusal, "reviewer": "claude", "model": "claude-fable-5-1"}
+    _fake_run(monkeypatch, pdf, lambda: mr.Review(**claude_refusal))
+    assert mr.main([*last_resort, *common]) == 1
+    assert cross.read_bytes() == kept
+    assert (reports / "crank_arm.claude.quota-refused.json").is_file()
+
+    # The retry's preflight still finds the cross-family evidence.
+    _fake_run(monkeypatch, pdf, lambda: mr.Review(**_review(pdf, reviewer="claude")))
+    assert mr.main([*last_resort, *common]) == 0
+    entry = ml.load_ledger(ledger_path)["drawings"]["crank_arm"][ml.LAST_RESORT]
+    assert entry["counts"]
+    assert entry["quota_refusal"]["report"].endswith(
+        "crank_arm.codex.quota-refused.json"
+    )
 
 
 def test_passing_cross_family_run_records_the_ledger(
