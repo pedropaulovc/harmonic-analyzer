@@ -3925,13 +3925,17 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
                 # SolidWorks when none is running, so this is the only moment at
                 # which "did this build start the seat, or attach to one someone
                 # left?" can still be answered (see note_seats_before_connect).
-                note_seats_before_connect()
-                await adapter.connect()
+                # 2.2 s p50 per COM subprocess, split into its three steps so
+                # the connect cost is attributable (dispatch/identity/discard).
+                async with _telemetry.aspan("sw.dispatch"):
+                    note_seats_before_connect()
+                    await adapter.connect()
                 _telemetry.success("connected")
                 # WHICH sldworks.exe is about to build this target, how old it is
                 # and how big: the attribution a "failed once, passed on retry"
                 # leaf needs, recorded before any build work can fail.
-                provenance = record_seat_provenance(adapter)
+                with _telemetry.span("seat.identity"):
+                    provenance = record_seat_provenance(adapter)
                 # Re-runnable: a previous (possibly failed) build — or a human
                 # inspecting an artefact in the UI — leaves documents open, and
                 # saving over (or deleting) an open path fails. Verified, not
@@ -3944,13 +3948,14 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
                 # share-locks its file, while Toolbox library parts (e.g. `binding
                 # head screw_ai.sldprt` behind a Hole Wizard insert) live outside
                 # cad/out and are residents CloseAllDocuments never releases.
-                discard_open_documents(adapter)
-                holding = _resident_output_documents(adapter)
-                if holding:
-                    raise RuntimeError(
-                        f"{len(holding)} cad/out document(s) still open after "
-                        f"discard_open_documents: {holding}"
-                    )
+                with _telemetry.span("seat.discard"):
+                    discard_open_documents(adapter)
+                    holding = _resident_output_documents(adapter)
+                    if holding:
+                        raise RuntimeError(
+                            f"{len(holding)} cad/out document(s) still open after "
+                            f"discard_open_documents: {holding}"
+                        )
                 _telemetry.success("all documents closed (clean session)")
                 _pin_default_part_template(adapter)
             # Group the build's own operations (inserts, the mate chokepoint, the
