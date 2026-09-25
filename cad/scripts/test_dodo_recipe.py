@@ -1453,6 +1453,9 @@ def test_autostart_ensures_sw_as_a_top_level_sibling_before_the_task(
     monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext(45.0))
     monkeypatch.setattr(dodo, "_SW_ENSURED", False)
     monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "1")
+    # The real preflight reads the live sldworks.exe commit and force-recovers
+    # (stops and relaunches) SolidWorks past the budget.
+    monkeypatch.setattr(dodo, "_sw_preflight", lambda: None)
 
     opened: list[str] = []
     depth = 0
@@ -1498,6 +1501,9 @@ def test_sw_ensure_once_runs_once_and_respects_the_opt_out(monkeypatch):
     dodo = _load_dodo()
     calls: list[int] = []
     monkeypatch.setattr(dodo._sw_lifecycle, "ensure_ready", lambda: calls.append(1))
+    # The real preflight reads the live sldworks.exe commit and force-recovers
+    # (stops and relaunches) SolidWorks past the budget.
+    monkeypatch.setattr(dodo, "_sw_preflight", lambda: None)
 
     monkeypatch.setattr(dodo, "_SW_ENSURED", False)
     monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "1")
