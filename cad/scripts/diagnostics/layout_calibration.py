@@ -7,7 +7,7 @@ WHY THIS EXISTS
 (no API returns it) and the polylines' coordinate SPACE. The drawing leaf's own
 vector PDF answers both exactly -- SolidWorks exports text as real PDF text
 objects (tight glyph boxes) and every line as a stroked path with its width --
-so this tool replays each leaf's logged dump against that PDF and reports:
+so this tool replays each leaf's layout report against that PDF and reports:
 
 * text: how often a COM text row matches a PDF text object 1:1 (by string and
   position), per annotation kind, and the COM-vs-PDF edge errors (left, right,
@@ -20,12 +20,13 @@ so this tool replays each leaf's logged dump against that PDF and reports:
 
 INPUTS
 ------
-``--log``: one or more task logs carrying ``layout-audit-dump`` lines (a farm
-leaf's task.log, or a local cad/out/logs/drawing-<stem>.log). ``--pdf-dir``:
-where each drawing's ``<stem>.pdf`` lives (cad/out/pdf after a cache restore).
+``--report``: one or more drawing layout reports
+(cad/out/reports/layout-audit/<stem>.json, a cached drawing-task target, so a
+restored leaf has one too). ``--pdf-dir``: where each drawing's ``<stem>.pdf``
+lives (cad/out/pdf).
 
     uv run python cad/scripts/diagnostics/layout_calibration.py \
-        --log leaf-logs/*/task.log --pdf-dir cad/out/pdf --json calib.json
+        --report cad/out/reports/layout-audit/*.json --pdf-dir cad/out/pdf --json calib.json
 """
 
 from __future__ import annotations
@@ -43,13 +44,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from _layout_audit import (  # noqa: E402
     ANNOTATION_KINDS,
-    FINDING_PREFIX,
-    SUMMARY_PREFIX,
     TextItem,
     _TOKEN,
     apply_transform,
     audit_dump,
-    decode_dump_lines,
     sheet_model,
     text_items,
 )
@@ -252,21 +250,11 @@ def _summarise(values: list[float]) -> dict[str, float]:
     }
 
 
-def calibrate(logs: list[Path], pdf_dir: Path | None) -> dict[str, Any]:
-    lines: list[str] = []
-    for log in logs:
-        lines.extend(log.read_text(encoding="utf-8", errors="replace").splitlines())
-    dumps = decode_dump_lines(lines)
-    summaries = [
-        json.loads(line[line.index(SUMMARY_PREFIX) + len(SUMMARY_PREFIX) :])
-        for line in lines
-        if SUMMARY_PREFIX in line
-    ]
-    logged_findings = [
-        json.loads(line[line.index(FINDING_PREFIX) + len(FINDING_PREFIX) :])
-        for line in lines
-        if FINDING_PREFIX in line
-    ]
+def calibrate(reports: list[Path], pdf_dir: Path | None) -> dict[str, Any]:
+    loaded = [json.loads(path.read_text(encoding="utf-8")) for path in reports]
+    dumps = [dump for report in loaded for dump in report["sheets"]]
+    summaries = [{"stem": report["stem"], **report["summary"]} for report in loaded]
+    logged_findings = [finding for report in loaded for finding in report["findings"]]
     report: dict[str, Any] = {"sheets": [], "summaries": summaries}
     item_records: list[dict[str, Any]] = []
     row_records: list[dict[str, Any]] = []
@@ -321,11 +309,11 @@ def calibrate(logs: list[Path], pdf_dir: Path | None) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--log", type=Path, nargs="+", required=True)
+    parser.add_argument("--report", type=Path, nargs="+", required=True)
     parser.add_argument("--pdf-dir", type=Path)
     parser.add_argument("--json", type=Path)
     args = parser.parse_args(argv)
-    report = calibrate(args.log, args.pdf_dir)
+    report = calibrate(args.report, args.pdf_dir)
     text = json.dumps(report, indent=2, default=str)
     if args.json:
         args.json.write_text(text, encoding="utf-8")
