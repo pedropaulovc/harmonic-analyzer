@@ -942,7 +942,9 @@ scripts that `from _common import log, check` are instrumented unchanged.
   now a namespace and a fallback for an unmapped label, not a span label.
     - **`build-infra` owns the seat + cache spans.** Queueing for the COM seat and
       pulling/publishing artefacts belong to no pipeline stage, so `com.seat.wait`,
-      `cache.probe` and `cache.store` are attributed to a `build-infra` resource
+      `cache.probe`, `cache.store` and `cache.auth` (one per token request: the
+      credential that answered, tries, latency, outcome) are attributed to a
+      `build-infra` resource
       (`_telemetry.BUILD_INFRA_SERVICE`) — NOT to the stage their task belongs to —
       so the resource column answers "how much of this build was queue and transfer,
       not work?" in one filter. Together with the stage-labelled `task` span above,

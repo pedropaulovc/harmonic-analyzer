@@ -360,6 +360,19 @@ drive. Auth is **keyless** via `DefaultAzureCredential`:
 - **builder (`vm-solidworks`)** → its system-assigned managed identity
   (granted *Storage Blob Data Contributor*); nothing to log in.
 
+The chain is trimmed to managed identity, `az` and the two environment-only
+members. `az` gets 60 s to answer instead of azure-identity's 10 s, and a failed
+token request is tried three times. A loaded farm submitter (run
+`20260925T134711810Z`) hit the 10 s limit on every try for eleven minutes.
+Override the timeout with `HARMONIC_CACHE_AUTH_TIMEOUT_S`. Each token request
+is a `cache.auth` span on the `build-infra` resource.
+
+If a token still can't be had, a restore raises `RestoreAuthFailed`, not a
+miss, because the key was never looked up. A local seat builds the task as it
+would with the cache off, and its probe span reads `auth-failed`. The farm
+submitter fails the task instead of dispatching a leaf whose output it could not
+fetch.
+
 A machine without the data-plane RBAC role is **fail-soft**: its push is denied
 and the build proceeds normally (a miss/error never fails a build).
 

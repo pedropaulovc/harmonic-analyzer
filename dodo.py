@@ -2010,12 +2010,16 @@ def _probe_cache(
     """One remote-cache restore attempt for a phase span; returns its disposition.
 
     ``hit`` (or the caller's ``hit`` wording, e.g. ``hit-after-wait``) / ``miss`` /
-    ``locked`` -- the last when the cached build exists but an output is
-    share-locked by a document SolidWorks still holds
+    ``locked`` / ``auth-failed``. ``locked``: the cached build exists but an
+    output is share-locked by a document SolidWorks still holds
     (:class:`_artifact_cache.RestoreLocked`). A locked probe must NOT fall through
     to a local build (that forks the artefact's identity off the fleet's); the
-    seat-holding caller releases the documents and re-probes instead. Under the
-    farm executor the submitter holds no seat to release, so it fails loud.
+    seat-holding caller releases the documents and re-probes instead.
+    ``auth-failed``: the cache could not authenticate, so the key was never
+    looked up (:class:`_artifact_cache.RestoreAuthFailed`); a local seat builds
+    it, as it would with the cache off, and the span says why. Under the farm
+    executor both are fatal: the submitter holds no seat to release, and a leaf
+    dispatched without a token publishes an artefact this side cannot fetch.
     """
     _tag_cache_key(span, key)
     try:
@@ -2024,6 +2028,10 @@ def _probe_cache(
         if _farm.enabled():
             raise
         outcome = "locked"
+    except _cache.RestoreAuthFailed:
+        if _farm.enabled():
+            raise
+        outcome = "auth-failed"
     span.set_attribute("cache", outcome)
     return outcome
 
@@ -2209,8 +2217,11 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
     The worker runs the same doit task with the cache in ``rw`` mode and stores
     ``key``; this side never takes the COM seat and never runs ``cache.store``.
     A farm failure is the task's failure (worker, category, exit code, log blob all
-    in the message); a success whose key is still absent is an infrastructure
-    fault and fails just as loud.
+    in the message); a success whose key does not restore is an infrastructure
+    fault and fails just as loud -- naming what the cache said, since a restore
+    that errored, or could not authenticate
+    (:class:`_artifact_cache.RestoreAuthFailed`, raised through), is not an
+    absent key.
     """
     result = _farm.run_leaf(label, key)
     if result.state != "succeeded":
@@ -2229,10 +2240,27 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
     ) as restore:
         _tag_cache_key(restore, key)
         if not _cache.restore(key, outputs, label):
-            raise RuntimeError(
-                f"{label}: farm reported success but cache key {key[:12]} is absent"
-            )
+            raise RuntimeError(_unrestored_leaf(label, key))
         restore.set_attribute("cache", "hit")
+
+
+def _unrestored_leaf(label: str, key: str) -> str:
+    """Why a succeeded leaf's key did not restore, as far as the cache can say.
+
+    ``restore`` answers False for a miss and for an error alike, so ask the
+    store directly (a HEAD, no download) before calling the key absent."""
+    present = _cache.probe(key)
+    if present is False:
+        return f"{label}: farm reported success but cache key {key[:12]} is absent"
+    if present:
+        return (
+            f"{label}: farm reported success and cache key {key[:12]} is present "
+            "but did not restore -- see the [cache] restore error above"
+        )
+    return (
+        f"{label}: farm reported success but cache key {key[:12]} did not "
+        "restore, and its presence could not be checked (cache unreachable)"
+    )
 
 
 def _cached_part_action(stem: str, script: Path) -> None:

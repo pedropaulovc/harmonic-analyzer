@@ -157,12 +157,88 @@ def test_success_without_the_key_is_an_infrastructure_fault(farm_part, monkeypat
     dodo, script, calls, restore = farm_part
     restore((False, False))  # probe miss, then the post-farm restore also misses
     monkeypatch.setattr(dodo._farm, "run_leaf", lambda label, key: _leaf_result())
+    monkeypatch.setattr(dodo._cache, "probe", lambda key: False)
 
     with pytest.raises(RuntimeError, match=r"farm reported success but cache key k{12} is absent"):
         dodo._cached_part_action("pen_rod", script)
 
     assert len(calls["restore"]) == 2
     assert calls["stamp"] == []
+
+
+@pytest.mark.parametrize(
+    ("present", "reads"),
+    [
+        (True, r"is present but did not restore"),
+        (None, r"could not be checked"),
+    ],
+)
+def test_a_restore_that_fails_after_success_says_what_it_saw(
+    farm_part, monkeypatch, present, reads
+):
+    """"Absent" only when the cache says so: a restore that errored (the blob is
+    there) or a cache that cannot be reached is not an absent key."""
+    dodo, script, calls, restore = farm_part
+    restore((False, False))
+    monkeypatch.setattr(dodo._farm, "run_leaf", lambda label, key: _leaf_result())
+    monkeypatch.setattr(dodo._cache, "probe", lambda key: present)
+
+    with pytest.raises(RuntimeError, match=reads) as failure:
+        dodo._cached_part_action("pen_rod", script)
+
+    assert "absent" not in str(failure.value)
+    assert calls["stamp"] == []
+
+
+def _auth_failed(dodo, key, label):
+    return dodo._cache.RestoreAuthFailed(
+        label, key, dodo._cache.CacheAuthError("AzureCliCredential: Failed to invoke the Azure CLI")
+    )
+
+
+def test_an_auth_failure_after_success_is_named_not_read_as_absent(farm_part, monkeypatch):
+    """Farm run 20260925T134711810Z: the leaf succeeded, the submitter's token
+    request timed out, and the task died reading "cache key a2e60761e503 is
+    absent". The key was never looked up."""
+    dodo, script, calls, _restore = farm_part
+    outcomes = iter((False, "auth"))
+
+    def restore(key, outputs, label):
+        calls["restore"].append((key, outputs, label))
+        if next(outcomes) == "auth":
+            raise _auth_failed(dodo, key, label)
+        return False
+
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(dodo._farm, "run_leaf", lambda label, key: _leaf_result())
+
+    with pytest.raises(dodo._cache.RestoreAuthFailed, match="restore auth failed") as failure:
+        dodo._cached_part_action("pen_rod", script)
+
+    assert "absent" not in str(failure.value)
+    assert calls["stamp"] == []
+
+
+def test_an_auth_failure_at_the_probe_fails_before_any_leaf_is_dispatched(
+    farm_part, monkeypatch
+):
+    """A submitter that cannot authenticate cannot restore what the leaf would
+    publish either: dispatching it would spend a worker on an artefact this side
+    can never fetch, and the probe's failure would read as a miss."""
+    dodo, script, calls, _restore = farm_part
+
+    def restore(key, outputs, label):
+        raise _auth_failed(dodo, key, label)
+
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(
+        dodo._farm,
+        "run_leaf",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("leaf dispatched")),
+    )
+
+    with pytest.raises(dodo._cache.RestoreAuthFailed):
+        dodo._cached_part_action("pen_rod", script)
 
 
 def test_success_restores_the_leaf_key_and_stamps_without_publishing(
