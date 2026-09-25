@@ -90,6 +90,95 @@ def _install_launch_guard():
     os.system = guarded_system
 
 
+# COM activation and the SolidworksMCP launch entry points. The process guard
+# above cannot see these: ``SldWorks.Application``'s LocalServer32 is
+# SLDWORKS.exe itself, so a Dispatch starts SolidWorks without any Popen, and
+# ``sw_recovery``'s connector launch only reaches Popen after a registry walk
+# a test can fake. Each is replaced for the whole session, collection included.
+_COM_ACTIVATORS = {
+    "win32com.client": ("Dispatch", "DispatchEx", "GetObject"),
+    "win32com.client.dynamic": ("Dispatch", "DumbDispatch"),
+    "win32com.client.gencache": ("EnsureDispatch",),
+    "pythoncom": ("CoCreateInstance", "CoCreateInstanceEx"),
+    "comtypes.client": ("CreateObject", "CoGetObject"),
+}
+_LAUNCH_ENTRY_POINTS = {
+    "solidworks_mcp.adapters.sw_recovery": (
+        "start_solidworks",
+        "stop_solidworks",
+        "kill_connector_processes",
+        "recover_solidworks",
+    ),
+    "solidworks_mcp.adapters.sw_install": ("launch_via_platform_shortcut",),
+}
+
+
+def _solidworks_class_ids():
+    """The CLSID ``SldWorks.Application`` resolves to on this machine, if any.
+
+    A caller may activate the class by CLSID instead of ProgID.
+    """
+    try:
+        import winreg
+    except ImportError:
+        return set()
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_CLASSES_ROOT, r"SldWorks.Application\CLSID"
+        ) as key:
+            return {str(winreg.QueryValue(key, None)).lower()}
+    except OSError:
+        return set()
+
+
+def _names_solidworks(args, kwargs, class_ids):
+    text = " ".join(str(part) for part in (*args, *kwargs.values())).lower()
+    return "sldworks" in text or any(clsid in text for clsid in class_ids)
+
+
+def _refuse_com_activation(module_name, attribute, original, class_ids):
+    def refuse_solidworks_activation(*args, **kwargs):
+        if _names_solidworks(args, kwargs, class_ids):
+            _refuse(f"{module_name}.{attribute}", args)
+        return original(*args, **kwargs)
+
+    return refuse_solidworks_activation
+
+
+def _refuse_launch(module_name, attribute):
+    def refuse_solidworks_launch(*args, **kwargs):
+        _refuse(f"{module_name}.{attribute}", args)
+
+    return refuse_solidworks_launch
+
+
+def _install_activation_guard():
+    import importlib
+
+    class_ids = _solidworks_class_ids()
+    for module_name, attributes in _COM_ACTIVATORS.items():
+        try:
+            module = importlib.import_module(module_name)
+        except ImportError:
+            continue
+        for attribute in attributes:
+            original = getattr(module, attribute, None)
+            if original is None:
+                continue
+            setattr(
+                module,
+                attribute,
+                _refuse_com_activation(module_name, attribute, original, class_ids),
+            )
+    for module_name, attributes in _LAUNCH_ENTRY_POINTS.items():
+        try:
+            module = importlib.import_module(module_name)
+        except ImportError:
+            continue
+        for attribute in attributes:
+            setattr(module, attribute, _refuse_launch(module_name, attribute))
+
+
 def pytest_configure(config):
     """Isolate the test session from the machine it runs on.
 
@@ -104,8 +193,9 @@ def pytest_configure(config):
     Refuse every SolidWorks start from this process: ``subprocess`` argv naming
     ``os.startfile``, a ``.lnk`` or a SolidWorks/3DEXPERIENCE launcher image
     (``tasklist`` still reads the process table), in-process ``os.startfile``,
-    and ``os.system``. A refusal raises with the caller's stack and fails the
-    test even if the code under test swallowed it.
+    and ``os.system``; COM activation of ``SldWorks.Application``; and the
+    SolidworksMCP start/stop/launch entry points. A refusal raises with the
+    caller's stack and fails the test even if the code under test swallowed it.
     """
     if "HARMONIC_BUILDGRAPH_CACHE" not in os.environ:
         os.environ["HARMONIC_BUILDGRAPH_CACHE"] = tempfile.mkdtemp(
@@ -113,6 +203,7 @@ def pytest_configure(config):
         )
     if not _guard_disabled():
         _install_launch_guard()
+        _install_activation_guard()
 
 
 @pytest.fixture
@@ -132,3 +223,15 @@ def _no_swallowed_solidworks_launch():
         attempts = "\n".join(_refused)
         _refused.clear()
         pytest.fail(f"SolidWorks launch attempt(s) refused:\n{attempts}", pytrace=False)
+
+
+@pytest.fixture(autouse=True)
+def _solidworks_autostart_off(monkeypatch):
+    """Keep dodo's autostart and recovery paths off unless a test opts in.
+
+    ``HARMONIC_SW_AUTOSTART`` defaults to on, so a test that reaches
+    ``dodo._sw_ensure_once`` or ``dodo._exec_com`` without patching them would
+    otherwise try to start or recover SolidWorks. A test that exercises that
+    logic sets the variable itself and patches the lifecycle calls it reaches.
+    """
+    monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "0")
