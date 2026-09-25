@@ -1,8 +1,9 @@
 r"""Create the machinist drawing for the MHA-141 cone tip shim pack.
 
-One plan view carries the whole blank at 4:1: the 15.0 x 12.0 outline, the
-horseshoe slot's width with its full-radius callout, and the radius centre
-located from the closed edge and the lower edge (policy rule 7: a location
+One plan view carries the whole blank at 3:1: the 15.0 x 31.3 outline
+(I31: the pack runs under the tip block's foot flange), the horseshoe slot's
+width with its full-radius callout, and the radius centre located from the
++X edge and the lower (north) edge (policy rule 7: a location
 starts on a face the shop can pick up, never the model origin).  An edge
 view below it carries the thickness dimension, which reads the stack-to-fit
 range around the model's nominal ("0.05–2.20 STACK (1.10 NOM)"): the fitted
@@ -47,7 +48,8 @@ from cone_tip_shim_spec import (
     SHIM_T,
     SHIM_X,
     SHIM_Z,
-    SLOT_OPEN_SIDE,
+    SLOT_CENTRE_Z,
+    SLOT_OPEN_EDGE,
     THICKNESS_TEXT_PREFIX,
     THICKNESS_TEXT_SUFFIX,
 )
@@ -66,40 +68,48 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (4.0, 1.0)
+# I31: 31.3 long, the plan no longer fits over the edge view at 4:1.
+SHEET_SCALE = (3.0, 1.0)
 _S = SHEET_SCALE[0] / 1000.0
 # Third-angle: the plan (Top) above the edge view (Front).
 TOP_CENTER = (0.120, 0.170)
 FRONT_CENTER = (TOP_CENTER[0], 0.100)
 ISO_CENTER = (0.320, 0.180)
-HALF_X = SHIM_X * _S / 2.0  # 0.030 on the sheet
-HALF_Z = SHIM_Z * _S / 2.0  # 0.021 on the sheet
-# The view centres on the plan's box.  Since the I31 heel-relief trim the
-# plan is no longer centred on the slot axis: the *Top view shows model +Z
-# (north, the trimmed edge) at the bottom, so the axis sits this far below
-# the view centre.
-SLOT_AXIS_Y = TOP_CENTER[1] + (SHIM_NORTH_Z + SHIM_SOUTH_Z) / 2.0 * _S
+HALF_X = SHIM_X * _S / 2.0  # 0.0225 on the sheet
+HALF_Z = SHIM_Z * _S / 2.0  # 0.0469 on the sheet
+# The view centres on the plan's box; the *Top view shows model +Z (north,
+# the heel-trimmed edge) at the bottom and the south (open) edge at the top.
+_MID_Z = (SHIM_NORTH_Z + SHIM_SOUTH_Z) / 2.0
 
-# The *Top view keeps model +X to the right, so the slot opens to the LEFT
-# edge and the closed (radius) end looks right.
-if SLOT_OPEN_SIDE != -1:
-    raise ValueError("the plan layout assumes the slot opens to model -X")
 
-# Larger dimensions stand outside smaller ones: the 12.0 depth outboard of
-# the 6.0 radius-centre location on the right.
+def plan_y(model_z: float) -> float:
+    """Sheet y of a block-frame station on the plan."""
+    return TOP_CENTER[1] - (model_z - _MID_Z) * _S
+
+
+SLOT_CENTRE_Y = plan_y(SLOT_CENTRE_Z)
+PLAN_TOP = plan_y(SHIM_SOUTH_Z)
+PLAN_BOTTOM = plan_y(SHIM_NORTH_Z)
+
+if SLOT_OPEN_EDGE != "south":
+    raise ValueError("the plan layout assumes the slot opens to the south edge")
+
+# Larger dimensions stand outside smaller ones: the 31.3 depth outboard of
+# the 13.2 radius-centre location on the right; the 15.0 width above the
+# slot's width at the open (top) edge.
 TOP_KEEP = {
-    "Width": (TOP_CENTER[0], TOP_CENTER[1] + HALF_Z + 0.014),
+    "Width": (TOP_CENTER[0], PLAN_TOP + 0.020),
     "Depth": (TOP_CENTER[0] + HALF_X + 0.024, TOP_CENTER[1]),
-    # Past the open mouth, level with the slot's centreline.
-    "SlotWidth": (TOP_CENTER[0] - HALF_X - 0.016, SLOT_AXIS_Y),
-    # The radius centre from the closed (right) edge and the lower edge,
-    # model-owned (the part's hidden reference sketches).  Each value sits
-    # midway along its span, off both witnesses (the tip block's 5637ac42
-    # lesson).
-    "SlotCentreX": (TOP_CENTER[0] + HALF_X / 2.0, TOP_CENTER[1] - HALF_Z - 0.012),
+    # Past the open mouth, above the top edge.
+    "SlotWidth": (TOP_CENTER[0], PLAN_TOP + 0.008),
+    # The radius centre from the +X (right) edge and the lower (north)
+    # edge, model-owned (the part's hidden reference sketches).  Each value
+    # sits midway along its span, off both witnesses (the tip block's
+    # 5637ac42 lesson).
+    "SlotCentreX": (TOP_CENTER[0] + HALF_X / 2.0, PLAN_BOTTOM - 0.012),
     "SlotCentreZ": (
         TOP_CENTER[0] + HALF_X + 0.010,
-        (SLOT_AXIS_Y + TOP_CENTER[1] - HALF_Z) / 2.0,
+        (SLOT_CENTRE_Y + PLAN_BOTTOM) / 2.0,
     ),
 }
 FRONT_KEEP = {"Thickness": (TOP_CENTER[0] + HALF_X + 0.016, FRONT_CENTER[1])}
