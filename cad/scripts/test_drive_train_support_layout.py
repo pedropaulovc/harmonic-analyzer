@@ -189,12 +189,16 @@ def test_rod_phase_leaves_the_cams_parked_ecc_down() -> None:
     assert math.isclose(drive._PARK_GAP, 0.1606, abs_tol=5e-4)
 
 
-# Ruling (c) worst-case stack (user, 2026-09-24).  Physical end play is ONE
-# feeler setting, P = 0.25 +/- 0.10, shared by the four axial gaps (front
-# block/strap g_f, strap/drum g_df, drum/strap g_db, strap/back block g_b), each
-# >= 0; the saved pose is the fit-up vertex, all of P at the front block.
-# Every quantity below is linear in the gaps, so the extremes sit at the
-# vertices swept here.
+# Ruling (c) worst-case stack (user, 2026-09-24), under option E-a (Main,
+# restricted review of #858).  Both straps are pinned to the torque shaft, so
+# the strap / shaft / strap group slides between the blocks as one: its end
+# play is the front-block feeler setting, P = 0.25 +/- 0.10, split between the
+# front block gap g_f and the back block gap g_b (g_f + g_b = P).  The two
+# drum-end gaps are frozen at the shim the shaft was drilled on, not a free
+# share of P: the drum turns in DRUM_END_SHIM +/- DRUM_END_SHIM_SET_ERROR of
+# air, split between its ends.  The saved pose is the drilling set-up, g_b = 0
+# and the drum hard on the back strap.  Every quantity below is linear in the
+# gaps, so the extremes sit at the vertices swept here.
 #
 # The lift rod floats axially.  Southward, the front cam collar stops on the
 # front block's inner face; it is set there with the same 0.25 feeler, so up
@@ -207,6 +211,8 @@ def test_rod_phase_leaves_the_cams_parked_ecc_down() -> None:
 # is set back-flush, so its travel is measured from there against the front
 # block (pinion_rig_layout: the pose is the fit-up stack, Codex #854).
 _P_MAX = FITUP.FRONT_BLOCK_FEELER + FITUP.FRONT_BLOCK_FEELER_BAND
+_P_MIN = FITUP.FRONT_BLOCK_FEELER - FITUP.FRONT_BLOCK_FEELER_BAND
+_AIR_MAX = RIG.DRUM_END_SHIM + RIG.DRUM_END_SHIM_SET_ERROR  # the drum's end play
 _FEELER_BAND = (  # front collar set gap to the block
     FITUP.FRONT_BLOCK_FEELER - FITUP.FRONT_BLOCK_FEELER_BAND,
     FITUP.FRONT_BLOCK_FEELER + FITUP.FRONT_BLOCK_FEELER_BAND,
@@ -233,24 +239,77 @@ def _strap_t_band() -> tuple[float, float]:
     return (drive.STRAP_T - RIG.STRAP_T_BAND, drive.STRAP_T + RIG.STRAP_T_BAND)
 
 
-def test_j19_keeps_two_thirds_face_at_the_worst_stack() -> None:
+def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
     # The drum's back end is located from the back block through the back
-    # strap: worst when the strap is thickest and all the play sits behind the
-    # drum.  Floor 2.0 of the 3.0 face (Main, 2026-09-24: lightly loaded train).
+    # strap: worst when the strap is thickest, the pinned cluster has run
+    # forward to the front block (g_b = P) and the drum forward in its shimmed
+    # end play.  Main (#858): RIG_AFT_SHIFT keeps the FULL 3.0 face there, the
+    # old floor of 2.0 a fortiori; without the shift the drum shim left 1.776.
     g19_front = drive.Z_DRUM0 + 19 * drive.Z_PITCH - drive.DRUM_FACE / 2.0
     g19_back = g19_front + drive.DRUM_FACE
-    worst = min(
-        min(drive.BLOCK_BACK_Z0 - t - g, g19_back) - g19_front
+    backs = [
+        drive.BLOCK_BACK_Z0 - t - g_b - a
         for t in _strap_t_band()
-        for g in (0.0, _P_MAX)
-    )
+        for g_b in (0.0, _P_MAX)
+        for a in (0.0, _AIR_MAX)
+    ]
+    worst = min(min(back, g19_back) - g19_front for back in backs)
     assert worst >= 2.0, worst
-    assert math.isclose(worst, 2.126, abs_tol=5e-3)
-    # j = 0 at the front: the drum's front end never uncovers gear 0.
+    assert math.isclose(worst, drive.DRUM_FACE, abs_tol=1e-9)
+    # The layout's named-term advance is this sweep, term for term, and the
+    # assembly asserts it at import; one grid step less loses the full face.
+    assert math.isclose(
+        min(backs),
+        drive.APINION_Z_BACK - sum(RIG.DRUM_BACK_ADVANCE_STACK.values()),
+        abs_tol=1e-9,
+    )
+    assert math.isclose(min(backs) - g19_back, drive.J19_FULL_FACE_MARGIN, abs_tol=1e-9)
+    assert math.isclose(drive.J19_FULL_FACE_MARGIN, 0.026, abs_tol=5e-4)
+    assert drive.J19_FULL_FACE_MARGIN - RIG.RIG_AFT_SHIFT_STEP < 0.0
+    assert (RIG.RIG_AFT_SHIFT, RIG.RIG_AFT_SHIFT_STEP) == (1.25, 0.25)
+    # j = 0 at the front: the drum's front end never uncovers gear 0, even
+    # hard aft (the pose) with the thinnest back strap and the shortest drum.
     g0_front = drive.Z_DRUM0 - drive.DRUM_FACE / 2.0
     face_min = drive.APINION_DRUM_LEN - RIG.DRUM_LEN_BAND
-    for t in _strap_t_band():
-        assert drive.BLOCK_BACK_Z0 - t - face_min <= g0_front - 1.0
+    slack = min(
+        (g0_front - 1.0) - (drive.BLOCK_BACK_Z0 - t - face_min) for t in _strap_t_band()
+    )
+    assert slack >= 0.0, slack
+    assert math.isclose(slack, drive.J0_SLACK_WORST, abs_tol=1e-9)
+    assert math.isclose(slack, 2.0, abs_tol=5e-3)
+
+
+def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
+    # RIG_AFT_SHIFT moves every rig station aft together, so the rig-internal
+    # margins cannot move; the rig-to-frame ones it touches keep their floors.
+    import arbor_pedestal_spec as ped
+    import harmonic_base_spec as base
+    from build_cylinder_end_disc import DISC_DIA
+    from connecting_rod_spec import RING_OUTER_RADIUS
+    from cylinder_gear_spec import ECCENTRICITY
+
+    assert math.isclose(
+        RIG.BACK_STOP_Z,
+        77.75 + RIG.RIG_AFT_SHIFT + drive.MECHANISM_Z_SHIFT,
+        abs_tol=1e-12,
+    )
+    # Past g19 the drum runs into the north end disc's z band; engaged, its
+    # tips stand clear of the disc rim, as they already stand clear of g0's
+    # cam and connecting-rod ring at the other end.
+    assert drive.ENGAGED_C2C - drive.TIP_APINION - DISC_DIA / 2.0 >= 2.5
+    assert (
+        drive.ENGAGED_C2C - drive.TIP_APINION - (RING_OUTER_RADIUS + ECCENTRICITY)
+        >= 1.0
+    )
+    # The back block now shares the north pedestal foot's z band; they stand
+    # apart in x.
+    block_east = drive.BLOCK_X - BLOCK_EAST
+    assert block_east - (drive.X_DRUM + ped.FOOT_WIDTH / 2.0) >= 19.0
+    # The grip keeps opening from the crank cluster.
+    assert drive._GRIP_ROD_Z[0] - (drive.REMOVABLE_Z0 + 5.0) >= 12.5
+    assert drive._GRIP_HEAD_Z[0] - (drive.CRANK_ARM_Z0 + drive.ARM_THICKNESS) >= 21.5
+    # The base rim still stands far past the rod's reach and every seat.
+    assert base.TOP_WIDTH / 2.0 - base.LIP_W - RIG.BACK_BLOCK_OUTER_Z >= 25.0
 
 
 def _follower_stations() -> tuple[list[float], list[float]]:
@@ -262,10 +321,12 @@ def _follower_stations() -> tuple[list[float], list[float]]:
     # block, else the hub on the front block).  The back collar is set to its
     # pin at c_set with the cluster hard back; the strap then moves forward by
     # g_b and the rod north by c - c_set.  Pins ride their strap mid-planes.
+    # The pinned cluster splits its end play P between the block gaps, so the
+    # extremes are all of it at one block or the other (option E-a).
     front, back = [], []
-    for g_f, g_b, t, c_set, e in itertools.product(
-        (0.0, _P_MAX),
-        (0.0, _P_MAX),
+    splits = [(p, 0.0) for p in (_P_MIN, _P_MAX)] + [(0.0, p) for p in (_P_MIN, _P_MAX)]
+    for (g_f, g_b), t, c_set, e in itertools.product(
+        splits,
         _strap_t_band(),
         _FEELER_BAND,
         (-_BACK_CAM_SET_ERR, _BACK_CAM_SET_ERR),
@@ -320,9 +381,9 @@ def _stack_vertices():
 
     Measured from the back block's outer face, where the shaft and rod are set
     flush: the back block's depth in its .XX band (Codex #854 P1), both straps
-    and the drum in their .X bands and the feeler in its ruled band (Codex #837
-    P1) move the front block's inner face; its own .XX depth moves its outer
-    face.  The back strap's own thickness also sets the back collar's gap, so
+    and the drum in their .X bands, and the drum shim and the feeler in their
+    ruled band (Codex #837 P1) move the front block's inner face; its own .XX
+    depth moves its outer face.  The back strap's own thickness also sets the back collar's gap, so
     it is carried separately.
     """
     import itertools
@@ -330,15 +391,17 @@ def _stack_vertices():
     t_lo, t_hi = _strap_t_band()
     d_block = (-RIG.BLOCK_DEPTH_BAND, RIG.BLOCK_DEPTH_BAND)
     inner_nominal = RIG.FRONT_BLOCK_Z0 + RIG.BLOCK_DEPTH
-    for t_f, t_b, d_drum, d_feel, d_back, d_front in itertools.product(
+    d_shim = (-RIG.DRUM_END_SHIM_SET_ERROR, RIG.DRUM_END_SHIM_SET_ERROR)
+    for t_f, t_b, d_drum, d_air, d_feel, d_back, d_front in itertools.product(
         (t_lo, t_hi),
         (t_lo, t_hi),
         (-RIG.DRUM_LEN_BAND, RIG.DRUM_LEN_BAND),
+        d_shim,
         (-RIG.FRONT_BLOCK_FEELER_BAND, RIG.FRONT_BLOCK_FEELER_BAND),
         d_block,
         d_block,
     ):
-        growth = (t_f - drive.STRAP_T) + (t_b - drive.STRAP_T) + d_drum + d_feel
+        growth = (t_f - drive.STRAP_T) + (t_b - drive.STRAP_T) + d_drum + d_air + d_feel
         inner = inner_nominal - growth - d_back
         yield inner, inner - (RIG.BLOCK_DEPTH + d_front), t_b
 
@@ -356,28 +419,32 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     from pinion_lever_geometry import BORE_DEPTH
 
     assert not hasattr(RIG, "STACK_BAND")  # the stacks name every term
-    assert (RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN) == (185.3, 197.5)
+    assert (RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN) == (185.8, 197.8)
     assert math.isclose(RIG.BACK_COLLAR_GAP_MAX, 2.4, abs_tol=1e-9)
     bearing_min = math.inf
     hub_margin_min = math.inf
     nominal_inner = RIG.FRONT_BLOCK_Z0 + RIG.BLOCK_DEPTH
     # The sweep's longest stack is the named-term budget's growth, term for
-    # term: everything in it but the nominal and the shaft's own band.
+    # term: everything in it but the nominal and the shaft's own length and
+    # flush setting.
+    shaft_own = ("nominal", "MHA-062 shaft length", "MHA-062 rear end flush")
     growth = -sum(
         value
         for name, value in RIG.TORQUE_SHAFT_BEARING_STACK.items()
-        if not name.startswith(("nominal", "MHA-062"))
+        if not name.startswith(shaft_own)
     )
     assert math.isclose(
         max(nominal_inner - inner for inner, _o, _t in _stack_vertices()),
         growth,
         abs_tol=1e-9,
     )
+    flush = (-RIG.FLUSH_SET_ERROR, RIG.FLUSH_SET_ERROR)  # rear end past the face
     for inner, outer, t_b in _stack_vertices():
         for dl in (-_ROD_LEN_BAND, _ROD_LEN_BAND):
-            shaft_front = RIG.BACK_BLOCK_OUTER_Z - (RIG.TORQUE_SHAFT_LEN + dl)
-            bearing = inner - max(shaft_front, outer)
-            bearing_min = min(bearing_min, bearing)
+            for f in flush:
+                shaft_front = RIG.BACK_BLOCK_OUTER_Z + f - (RIG.TORQUE_SHAFT_LEN + dl)
+                bearing = inner - max(shaft_front, outer)
+                bearing_min = min(bearing_min, bearing)
             rod_front = RIG.BACK_BLOCK_OUTER_Z - (RIG.LIFT_ROD_LEN + dl)
             hub_gap = outer - (rod_front + BORE_DEPTH)
             for e in (-_BACK_CAM_SET_ERR, _BACK_CAM_SET_ERR):
@@ -388,7 +455,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     assert math.isclose(
         bearing_min, sum(RIG.TORQUE_SHAFT_BEARING_STACK.values()), abs_tol=1e-9
     )
-    assert math.isclose(bearing_min, 9.54, abs_tol=5e-3)
+    assert math.isclose(bearing_min, 9.59, abs_tol=5e-3)
     assert hub_margin_min >= RIG.HUB_STOP_MARGIN - 1e-9
     assert math.isclose(
         hub_margin_min,
@@ -397,7 +464,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
         + RIG.HUB_STOP_MARGIN,
         abs_tol=1e-9,
     )
-    assert math.isclose(hub_margin_min, 0.33, abs_tol=5e-3)
+    assert math.isclose(hub_margin_min, 0.28, abs_tol=5e-3)
 
 
 def test_lever_station_clears_at_both_rod_extremes() -> None:
@@ -461,19 +528,20 @@ def test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack() -> None:
     # accepted block is its printed depth less the .XX row.  It must still bear
     # the 1.5 D floor the front block keeps (rule 12).  The retired check read
     # the nominal depth only (10.25 - 0.35 = 9.90); at the printed worst case
-    # the U28 block bore 9.39.
+    # the U28 block bore 9.39.  Main (#858, ruling 2): the flush setting it is
+    # drilled at carries its own error, printed on MHA-062's drilling note.
     from _printed_tolerance import printed_band_mm
     from pinion_pivot_block_geometry import BLOCK_DEPTH_PLACES
 
     shallowest = drive.BLOCK_DEPTH - printed_band_mm(BLOCK_DEPTH_PLACES)
-    bearing = shallowest - _P_MAX
+    bearing = shallowest - _P_MAX - RIG.FLUSH_SET_ERROR
     assert bearing >= 9.5 - 1e-9, bearing
     assert RIG.BACK_BLOCK_MIN_BEARING == RIG.FRONT_BLOCK_MIN_BEARING == 9.5
     # The layout's named-term stack is this sweep, term for term.
     assert math.isclose(
         sum(RIG.TORQUE_SHAFT_BACK_BEARING_STACK.values()), bearing, abs_tol=1e-9
     )
-    assert math.isclose(bearing, 9.64, abs_tol=5e-3)
+    assert math.isclose(bearing, 9.54, abs_tol=5e-3)
     # The drilling station: the shaft's back end flush with that outer face.
     assert math.isclose(
         drive.PIVOT_SHAFT_Z0 + RIG.TORQUE_SHAFT_LEN,
@@ -485,7 +553,7 @@ def test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack() -> None:
 def test_torque_shaft_length_band_clears_both_ends() -> None:
     # MHA-062 at the title-block .X band (U27), set back-flush: at the
     # shortest stack (both blocks thin, Codex #854 P1) the longest shaft's
-    # body end stands 7.17 proud of the front block, and its SR crown 1.2
+    # body end stands 7.52 proud of the front block, and its SR crown 1.2
     # beyond that (Codex #837 P1).
     import arbor_pedestal_spec as ped
     import pinion_lever_geometry as lever
@@ -505,15 +573,15 @@ def test_torque_shaft_length_band_clears_both_ends() -> None:
     )
     shortest_outer = rig.FRONT_BLOCK_Z0 + shrink
     proud = shortest_outer - front_end
-    assert math.isclose(proud, 7.17, abs_tol=5e-3)
-    assert math.isclose(proud + CAP_SAG, 8.37, abs_tol=5e-3)
+    assert math.isclose(proud, 7.52, abs_tol=5e-3)
+    assert math.isclose(proud + CAP_SAG, 8.72, abs_tol=5e-3)
     assert math.isclose(
         max(outer for _i, outer, _t in _stack_vertices()), shortest_outer, abs_tol=1e-9
     )
     # Option E-a: pinned to the straps, the shaft rides the cluster's end play
     # from its back-flush drilling station to the front stop.
-    assert math.isclose(proud + _P_MAX, 7.52, abs_tol=5e-3)
-    assert math.isclose(proud + _P_MAX + CAP_SAG, 8.72, abs_tol=5e-3)
+    assert math.isclose(proud + _P_MAX, 7.87, abs_tol=5e-3)
+    assert math.isclose(proud + _P_MAX + CAP_SAG, 9.07, abs_tol=5e-3)
     # Its back end then sits P_MAX inside the back block, bearing
     # test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack.
     # South of the front block nothing stands on the shaft's axis at any z.
@@ -636,7 +704,9 @@ def test_set_pin_holes_sit_at_the_physical_back_stop_straps() -> None:
     t = drive.STRAP_T
     from_back = [SHAFT_LEN - z for z in PIN_HOLE_Z]  # (front, back)
     physical_back = drive.BLOCK_DEPTH + t / 2.0
-    physical_front = physical_back + t + rig.DRUM_LEN
+    # Main (#858, ruling 3): drilled with the feeler as a shim at the drum's
+    # front end, so the front strap stands the shim off the drum.
+    physical_front = physical_back + t + rig.DRUM_LEN + rig.DRUM_END_SHIM
     assert math.isclose(from_back[1], physical_back, abs_tol=1e-9)
     assert math.isclose(from_back[1], 15.0, abs_tol=1e-9)
     assert math.isclose(from_back[0], physical_front, abs_tol=1e-9)

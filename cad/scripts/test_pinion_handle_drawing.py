@@ -67,10 +67,13 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     # that head centre is MHA-102 local z=-6.5; MHA-058 keeps its own origin.
     # Codex #854/#858 P1 (Main): the assembly shows the fit-up stack, where the
     # back stop puts the drum -- and the arbor it is bonded on -- 0.25 aft of
-    # the released -135.0 arbor station.  Every released station below moves
-    # by exactly that, and nothing else about the cutover changes.
+    # the released -135.0 arbor station, and RIG_AFT_SHIFT (Main, #858: j = 19's
+    # full face) a further 1.25.  Every released station below moves by
+    # exactly that, and nothing else about the cutover changes.
+    import pinion_rig_layout as rig
+
     fitup_shift = assembly.ARBOR_Z0 - (-135.0 + assembly.MECHANISM_Z_SHIFT)
-    assert fitup_shift == pytest.approx(0.25, abs=1e-9)
+    assert fitup_shift == pytest.approx(0.25 + rig.RIG_AFT_SHIFT, abs=1e-9)
     released_origin = (
         assembly.APINION_X,
         assembly.APINION_Y,
@@ -96,7 +99,7 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     )
     # x follows the drum's parked station: U28 (2026-09-23) parks it with a
     # 2.2425 tip gap to the review-first 32T drum's 8.667 tip radius.
-    expected_axis = (-18.383940352466745, 90.518, -138.16241221957347)
+    expected_axis = (-18.383940352466745, 90.518, -136.91241221957347)
     # Rule 12 (audit W6): the head grows 9.0 -> 10.5 about the released
     # centre, so both faces and the crown move 0.75 out; the neck shoulder
     # (the released head rear + 2 wall + 10) stays put.
@@ -117,10 +120,10 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     )
     assert integral_head_stations == pytest.approx(
         (
-            -143.41241221957347,
-            -132.91241221957347,
-            -146.41241221957347,
-            -121.66241221957347,
+            -142.16241221957347,
+            -131.66241221957347,
+            -145.16241221957347,
+            -120.41241221957347,
         ),
         abs=1e-12,
     )
@@ -134,11 +137,11 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     for local, expected in (
         (
             (0.0, -32.0, 0.0),
-            (10.617908832706053, 76.99421562429762, -138.16241221957347),
+            (10.617908832706053, 76.99421562429762, -136.91241221957347),
         ),
         (
             (0.0, 33.0, 0.0),
-            (-48.29209732467619, 104.46440263744309, -138.16241221957347),
+            (-48.29209732467619, 104.46440263744309, -136.91241221957347),
         ),
     ):
         released_endpoint = _world_point(released_origin, assembly.HANDLE_ROWS, local)

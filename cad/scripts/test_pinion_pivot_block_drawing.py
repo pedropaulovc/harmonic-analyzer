@@ -198,8 +198,9 @@ def test_views_carry_no_hidden_lines_and_the_drill_callout_names_its_process() -
 def test_rig_layout_sets_the_front_block_by_feeler_off_the_back_stop() -> None:
     # User ruling (c): the blocks locate the swing cluster.  Codex #854/#858
     # P1 (Main): the pose IS the fit-up stack -- back strap hard on the back
-    # block, drum and front strap closed up line to line behind it, and the
-    # front block one feeler off the front strap.
+    # block, the drum hard on it, the front strap one shim off the drum's front
+    # end (the shaft's drilling set-up, ruling 3), and the front block one
+    # feeler off the front strap.
     import alignment_pinion_spec
     import pinion_rig_layout as rig
     from pinion_bracket_geometry import THICKNESS
@@ -208,9 +209,10 @@ def test_rig_layout_sets_the_front_block_by_feeler_off_the_back_stop() -> None:
     assert rig.STRAP_Z_OUTER[1] == pytest.approx(rig.BACK_BLOCK_Z0, abs=1e-9)
     front_inner = rig.FRONT_BLOCK_Z0 + pinion_pivot_block_spec.BLOCK_DEPTH
     assert rig.STRAP_Z_OUTER[0] - front_inner == pytest.approx(0.25, abs=1e-9)
-    assert (rig.DRUM_FRONT_Z, rig.DRUM_BACK_Z) == pytest.approx(
+    assert (rig.DRUM_FRONT_Z - rig.DRUM_END_SHIM, rig.DRUM_BACK_Z) == pytest.approx(
         rig.STRAP_Z_INNER, abs=1e-9
     )
+    assert rig.DRUM_END_SHIM == rig.FRONT_BLOCK_FEELER  # the one feeler
     assert not hasattr(rig, "STRAP_AIR")
     assert rig.STRAP_Z_OUTER[1] - rig.STRAP_Z_INNER[1] == THICKNESS
 
@@ -234,7 +236,7 @@ def test_rig_layout_shaft_and_rod_are_set_back_flush() -> None:
     assert rig.LEVER_SEAT_PROUD - 1e-9 <= proud <= rig.LEVER_SEAT_PROUD + 0.1
     # Both are budgeted on the worst fitted stack (their own tests); at
     # nominal each stands that allowance proud of the front block.
-    assert (SHAFT_LEN, ROD_LEN) == (185.3, 197.5)
+    assert (SHAFT_LEN, ROD_LEN) == (185.8, 197.8)
 
 
 def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
@@ -333,12 +335,15 @@ def test_manufactured_block_span_is_the_solid_stack_plus_one_feeler() -> None:
     # Codex #854 P1: the span between the blocks is the solid stack (strap,
     # drum, strap) plus the one feeler end play.  Codex #854/#858 P1 (Main):
     # the saved pose carries exactly that span -- no extra pose air -- so the
-    # base seats cut from it fit the single-feeler fit-up.
+    # base seats cut from it fit the single-feeler fit-up.  Ruling 3 adds the
+    # drum shim the pinned straps were drilled on.
     import pinion_rig_layout as rig
     from pinion_bracket_geometry import THICKNESS
 
     solid = 2.0 * THICKNESS + rig.DRUM_LEN
-    assert rig.INNER_SPAN == pytest.approx(solid + rig.FRONT_BLOCK_FEELER)
+    assert rig.INNER_SPAN == pytest.approx(
+        solid + rig.DRUM_END_SHIM + rig.FRONT_BLOCK_FEELER
+    )
     model_span = rig.BACK_BLOCK_Z0 - (
         rig.FRONT_BLOCK_Z0 + pinion_pivot_block_spec.BLOCK_DEPTH
     )
@@ -386,8 +391,12 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
 
     depth = pinion_pivot_block_spec.BLOCK_DEPTH
     shortest_shaft = rig.TORQUE_SHAFT_LEN - x_band
-    longest_span = (depth + xx_band) + rig.INNER_SPAN + 2.0 * x_band + x_band + 0.10
-    bearing = shortest_shaft - longest_span
+    # Straps and drum at .X, the feeler and the drum shim each 0.10 wide, and
+    # the flush setting the shaft is drilled at 0.10 proud (ruling 2).
+    longest_span = (
+        (depth + xx_band) + rig.INNER_SPAN + 2.0 * x_band + x_band + 0.10 + 0.10
+    )
+    bearing = shortest_shaft - longest_span - 0.10
     assert bearing == pytest.approx(sum(rig.TORQUE_SHAFT_BEARING_STACK.values()))
     assert bearing >= rig.FRONT_BLOCK_MIN_BEARING == 9.5
     # The smallest .X length that does it: 0.1 shorter falls under 9.5.
@@ -396,8 +405,8 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     # the front block, and nothing sits on its axis there -- the MHA-059 lever
     # hub rides the lift rod, which the blocks carry off the shaft axis.
     longest_shaft = rig.TORQUE_SHAFT_LEN + x_band
-    shortest_outer = 2.0 * (depth - xx_band) + rig.INNER_SPAN - 2.5
-    assert longest_shaft - shortest_outer == pytest.approx(7.17, abs=5e-3)
+    shortest_outer = 2.0 * (depth - xx_band) + rig.INNER_SPAN - 2.6
+    assert longest_shaft - shortest_outer == pytest.approx(7.52, abs=5e-3)
     hub_clear = (
         math.hypot(LIFT_BORE_SPACING, LIFT_BORE_RISE) - (HUB_OD + SHAFT_DIA) / 2.0
     )
@@ -405,8 +414,8 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
 
 
 def test_spring_blade_stays_on_the_back_strap_flank_at_every_stack() -> None:
-    # Physical end play is the feeler setting P = 0.25 +/- 0.10 shared by the
-    # four axial gaps; the back strap sits anywhere from hard on the back block
+    # The pinned cluster's end play is the feeler setting P = 0.25 +/- 0.10
+    # (option E-a); the back strap sits anywhere from hard on the back block
     # to P forward of it, at any thickness in its .X band.
     import pinion_rig_layout as rig
     from pinion_bracket_geometry import THICKNESS

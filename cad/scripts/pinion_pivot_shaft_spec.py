@@ -14,7 +14,12 @@ from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 import pinion_strap_pin_spec as _strap_pin
-from pinion_rig_layout import TORQUE_SHAFT_LEN, TORQUE_SHAFT_PIN_HOLE_Z
+from pinion_rig_layout import (
+    DRUM_END_SHIM,
+    FLUSH_SET_ERROR,
+    TORQUE_SHAFT_LEN,
+    TORQUE_SHAFT_PIN_HOLE_Z,
+)
 
 SHAFT_DIA = 6.35  # 1/4 in: rides both pivot blocks' east bores and the straps
 # Set back-flush with the back block's outer face; ruling (c) moved the front
@@ -29,10 +34,11 @@ SHAFT_DIA_BAND = SHAFT_H
 # U27 (Main, 2026-09-24): the length carries the title-block .X band (+/-0.8),
 # not a tight one.  Pinned to the straps (option E-a) the shaft rides the
 # cluster's end play (0.25 +/- 0.10): drilled back-flush at the back stop,
-# the longest shaft in the shortest stack stands at worst 7.17 proud of the
-# front block, 7.52 at the front stop with the SR crown apex at 8.72, and its
-# back end then sits 0.35 inside the back block, still bearing 9.64 of the
-# shallowest one (pinion_rig_layout.torque_shaft_back_bearing_stack).
+# the longest shaft in the shortest stack stands at worst 7.52 proud of the
+# front block, 7.87 at the front stop with the SR crown apex at 9.07, and its
+# back end then sits 0.35 inside the back block, still bearing 9.54 of the
+# shallowest one past its flush setting
+# (pinion_rig_layout.torque_shaft_back_bearing_stack).
 # Nothing stands on the shaft's axis past either block: the nearest body, the
 # MHA-059 lever, rides the lift rod 18.63 off it -- hub 8.95 radial clear,
 # arm >= 12.42 clear over the -82 degree throw (test_drive_train_support_layout::
@@ -53,10 +59,16 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 PIN_HOLE_DIA = _strap_pin.HOLE_DIA
 PIN_HOLE_BAND = _strap_pin.HOLE_BAND  # the spring pin's functional band
 PIN_HOLE_Z = TORQUE_SHAFT_PIN_HOLE_Z  # (front, back), pinion_rig_layout
+# The drilling set-up the pin-hole stations and both bearing stacks assume
+# (Main, restricted review of #858, rulings 2 and 3): printed on the part that
+# is drilled, not deferred to an assembly sheet.
 PIN_HOLE_CALLOUT = "\n".join(
     (
         "MATCH-DRILL THRU AT ASSEMBLY",
-        "IN MHA-056 CROSS HOLES, 2 PL",
+        "IN MHA-056 CROSS HOLES, 2 PL:",
+        f"REAR END FLUSH WITH MHA-061 REAR FACE +/-{FLUSH_SET_ERROR:.2f},",
+        "STRAPS ON BACK STOP, MHA-002 ON BACK STRAP,",
+        f"{DRUM_END_SHIM:.2f} FEELER AT MHA-002 FRONT END",
     )
 )
 
