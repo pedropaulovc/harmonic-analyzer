@@ -1565,6 +1565,49 @@ def test_tag_seat_wait_labels_the_task_span_only_when_a_seat_was_taken():
     assert gate.attrs == {}
 
 
+def test_every_cache_phase_span_names_its_cache_key(monkeypatch):
+    """The phase spans are sibling ROOT traces, so a build can be tied to the key
+    it produced only if each span names it: probe, re-probe, task and store all
+    carry ``cache.key`` (the 12-hex prefix ``cache.jsonl`` prints)."""
+    dodo = _load_dodo()
+    key = "0123456789abcdef" * 4
+    spans: list[tuple[str, dict]] = []
+
+    @contextlib.contextmanager
+    def record_span(name, **attrs):
+        entry = (name, dict(attrs))
+        spans.append(entry)
+
+        class _Span:
+            def set_attribute(self, attr, value):
+                entry[1][attr] = value
+
+        yield _Span()
+
+    @contextlib.contextmanager
+    def free_seat(label):
+        yield 0.0
+
+    monkeypatch.setattr(dodo._telemetry, "span", record_span)
+    monkeypatch.setattr(dodo, "_cache_key", lambda file_deps, label: key)
+    monkeypatch.setattr(dodo._cache, "restore", lambda *args: False)
+    monkeypatch.setattr(dodo._cache, "store", lambda *args: "stored")
+    monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
+    monkeypatch.setattr(dodo, "_com_seat", free_seat)
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    monkeypatch.setattr(dodo, "_exec_com", lambda *args, **kwargs: None)
+
+    dodo._cached_com_action("part:x", ["build"], [], [], "part-x")
+
+    tagged = {name.split()[0]: attrs.get("cache.key") for name, attrs in spans}
+    assert tagged == {
+        "cache.probe": key[:12],
+        "cache.reprobe": key[:12],
+        "task": key[:12],
+        "cache.store": key[:12],
+    }
+
+
 def test_com_seat_is_reentrant_within_a_process(tmp_path, monkeypatch):
     """filelock counts same-process acquisitions, so a nested ``_com_seat`` (defensive
     -- no COM action nests today) neither deadlocks nor releases the seat early: the
