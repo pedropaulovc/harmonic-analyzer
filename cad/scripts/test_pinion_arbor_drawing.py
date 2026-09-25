@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import inspect
+import math
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+import _drawing_leaders
 import _drawing_marks
 import _fit_limits
+import _surface_finish
 import build_pinion_arbor as part
 import draw_pinion_arbor as drawing
 import pinion_arbor_spec as spec
@@ -129,9 +134,7 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
         assert finish.face.diameter_mm == spec.SHAFT_DIA
         station = lands[finish.key]
         assert station < finish.face.contains_z_mm < station + spec.JOURNAL_LEN
-    assert set(drawing.JOURNAL_FINISHES) == set(lands)
-    for key, (station_z, _symbol_xy, _flank) in drawing.JOURNAL_FINISHES.items():
-        assert lands[key] < station_z < lands[key] + spec.JOURNAL_LEN
+    assert spec.JOURNAL_LANDS_FINISH_NOTE in spec.DRAWING_NOTES
     assert "MHA-056" in spec.DRAWING_NOTES
     assert "PRESSES INTO" not in spec.DRAWING_NOTES
     assert not hasattr(spec, "PART_DATUMS")
@@ -264,34 +267,6 @@ def test_back_journal_diameter_hangs_above_clear_of_the_crown_witnesses() -> Non
     len_x, _len_y = drawing.PRINCIPAL_KEEP["BackJournalLen"]
     crown_end = drawing._sheet_x(spec.BACK_JOURNAL_Z + spec.JOURNAL_LEN)
     assert len_x - 0.0055 > crown_end
-
-
-def test_back_ra_symbol_hangs_above_the_shaft_clear_of_every_witness() -> None:
-    """c6eb7f6f: the back Ra leader's shoulder crossed the 199.9 / 19.0
-    witness below the shaft, a line through the symbol (Main).  Above the
-    shaft nothing rises from the back land, so the symbol hangs there."""
-    edge_z, (symbol_x, symbol_y), flank = drawing.JOURNAL_FINISHES["back_journal"]
-    assert flank == "upper"
-    assert drawing.JOURNAL_FINISHES["front_journal"][2] == "lower"
-    head_end = drawing._sheet_x(spec.BACK_JOURNAL_Z)
-    crown_end = drawing._sheet_x(spec.BACK_JOURNAL_Z + spec.JOURNAL_LEN)
-    arrow_x = drawing._sheet_x(edge_z)
-    assert crown_end < arrow_x < head_end  # the arrow lands on the land
-    left, right, top = drawing.RA_SYMBOL_EXTENT
-    shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
-    # A leader rise long enough to carry its arrowhead.
-    assert symbol_y - shaft_top >= 0.004
-    # The shoulder runs head side from the arrow, right of the diameter line.
-    dia_line_x = drawing.BACK_JOURNAL_DIA_POINT_X
-    assert dia_line_x + 0.010 < arrow_x < symbol_x
-    assert symbol_x + left - dia_line_x >= 0.010
-    # Under the back JOURNAL block, with a gap.
-    _width, height = drawing.DIAMETER_BLOCK_SIZE
-    dia_bottom = drawing.PRINCIPAL_KEEP["BackJournalDia"][1] - height / 2.0
-    assert dia_bottom - (symbol_y + top) >= 0.002
-    # Clear of the DETAIL A label to its right.
-    assert (drawing.DETAIL_LABEL_XY[0] - 0.017) - (symbol_x + right) >= 0.005
-    assert "leader-crosses-leader" in drawing.BLOCKING_LAYOUT_FINDINGS
 
 
 def test_bond_zone_callout_sits_above_the_shaft_clear_of_its_neighbours() -> None:
@@ -487,6 +462,7 @@ def test_drum_station_is_a_model_dimension_the_note_only_names() -> None:
     at .X with the "DRUM STATION" callout the note points to."""
     assert spec.DRAWING_NOTES.splitlines() == [
         "JOURNALS RUN IN MHA-056 REAMED BORES.",
+        "JOURNAL LANDS Ra 1.6.",
         "SHAFT SLIPS INTO MHA-002; BOND WITH LOCTITE 638, DRUM FRONT END",
         "  AT DRUM STATION. WIPE SQUEEZE-OUT OFF JOURNAL LANDS.",
     ]
@@ -642,11 +618,11 @@ def test_collar_pin_hole_is_a_drilled_spring_pin_hole_clear_of_the_front_land() 
     assert part.V_PIN_HOLE > 0.0
 
 
-def test_collar_pin_dimensions_stand_above_the_shaft_clear_of_the_front_ra() -> None:
-    """Below the shaft at x 0.269 is the front land's Ra symbol, so the pin
+def test_collar_pin_dimensions_stand_above_the_shaft() -> None:
+    """Below the shaft at x 0.269 run the front land's stations, so the pin
     hole's station and diameter both stand above it: the station well over
-    the Ø15 head, the diameter's leader left of the station witness and above
-    the 19.0 land length."""
+    the Ø15 head, the diameter's callout left of the station witness and
+    above the 19.0 land length, its leader leaning in from the upper left."""
     pin_x = drawing._sheet_x(spec.PIN_Z)
     head_rear_x = drawing._sheet_x(spec.HEAD_REAR_Z)
     axis_y = drawing.PRINCIPAL_CENTER[1]
@@ -655,8 +631,8 @@ def test_collar_pin_dimensions_stand_above_the_shaft_clear_of_the_front_ra() -> 
     assert pin_x < station_x < head_rear_x
     assert station_y > axis_y + spec.HEAD_DIA / 2000.0 + 0.020
     assert dia_x < pin_x
-    assert dia_y > station_y + 0.010
-    assert dia_y > drawing.PRINCIPAL_KEEP["FrontJournalLen"][1] + 0.030
+    assert dia_y > station_y + 0.005
+    assert dia_y > drawing.PRINCIPAL_KEEP["FrontJournalLen"][1] + 0.020
     assert min(station_y, dia_y) > axis_y
 
 
@@ -754,11 +730,13 @@ def test_owner_check_wants_each_diameter_once_on_the_end_view_only() -> None:
 
 
 def _corner_findings(
-    keep: dict[str, tuple[float, float]], **arrows: tuple[float, float]
+    keep: dict[str, tuple[float, float]],
+    principal: dict[str, tuple[float, float]] = drawing.PRINCIPAL_KEEP,
+    **arrows: tuple[float, float],
 ) -> list[str]:
-    lines, tips = drawing.sheet_corner_ink(keep)
+    lines, tips = drawing.sheet_corner_ink(keep, principal=principal)
     return drawing.end_view_ink_collisions(
-        drawing.end_view_text_boxes(keep),
+        drawing.end_view_text_boxes(keep, principal),
         drawing.sheet_view_outlines(),
         lines,
         {**tips, **arrows},
@@ -783,11 +761,12 @@ def test_end_view_ink_audit_catches_each_collision_class() -> None:
         "text-on-arrow": ({}, {"probe arrow": (probe[0], probe[1] - 0.0038)}),
         # Past the sheet's inner border.
         "outside-border": ({"HeadDia": (0.020, 0.196)}, {}),
-        # Down-right of the view, the Ø10.5's leader crosses the SR7.3's.
-        "leader-crosses-line": ({"NeckDia": (0.090, 0.150)}, {}),
+        # Up-right of the view, the Ø10.5's leader crosses the SR7.3's shoulder.
+        "leader-crosses-line": ({"NeckDia": (0.070, 0.200)}, {}),
     }
     for kind, (moves, arrows) in cases.items():
-        findings = _corner_findings({**drawing.END_KEEP, **moves}, **arrows)
+        principal = _LEAF_07AF_PRINCIPAL if kind == "text-on-line" else drawing.PRINCIPAL_KEEP
+        findings = _corner_findings({**drawing.END_KEEP, **moves}, principal, **arrows)
         assert any(finding.startswith(kind) for finding in findings), (kind, findings)
 
 
@@ -806,6 +785,13 @@ def test_the_two_diameter_lines_meet_only_at_the_common_centre() -> None:
 # inside them, the shoulders and the (1.2)'s apex extension, in sheet mm, for
 # the positions that build commanded.
 _LEAF_07AF_KEEP = {"HeadDia": (0.030, 0.196), "NeckDia": (0.062, 0.188)}
+# The profile callouts' positions then: the (1.2) above the part, the SR7.3
+# below-left.
+_LEAF_07AF_PRINCIPAL = {
+    **drawing.PRINCIPAL_KEEP,
+    "BackCapSagDim": (0.055, 0.220),
+    "BackCapR": (0.045, 0.140),
+}
 _LEAF_07AF_AUDIT_BOX = {
     "HeadDia": (22.8, 193.2, 47.9, 196.7),
     "NeckDia": (54.8, 185.2, 79.9, 188.7),
@@ -830,8 +816,8 @@ def _mm(value):
 def test_ink_extents_are_the_boxes_the_leaf_measured() -> None:
     """The module's text, shoulder and (1.2) extension ink reproduce what the
     layout audit measured on neckc2-07af, to its 0.1 mm print."""
-    audit = drawing.end_view_text_boxes(_LEAF_07AF_KEEP)
-    lines, _ = drawing.sheet_corner_ink(_LEAF_07AF_KEEP)
+    audit = drawing.end_view_text_boxes(_LEAF_07AF_KEEP, _LEAF_07AF_PRINCIPAL)
+    lines, _ = drawing.sheet_corner_ink(_LEAF_07AF_KEEP, principal=_LEAF_07AF_PRINCIPAL)
     for name, point in _LEAF_07AF_KEEP.items():
         assert _mm(audit[name]) == pytest.approx(_LEAF_07AF_AUDIT_BOX[name], abs=0.051)
         core = drawing._ink_box(point, drawing.END_DIA_CORE_EXTENT)
@@ -870,7 +856,7 @@ def test_the_measured_leaf_boxes_fail_and_the_shipped_positions_clear_them() -> 
             )
         return texts
 
-    lines, _ = drawing.sheet_corner_ink(_LEAF_07AF_KEEP)
+    lines, _ = drawing.sheet_corner_ink(_LEAF_07AF_KEEP, principal=_LEAF_07AF_PRINCIPAL)
     lines = {**lines, "BackCapSagDim apex extension": extension}
     leaf = drawing.end_view_ink_collisions(
         planted(_LEAF_07AF_KEEP), drawing.sheet_view_outlines(), lines
@@ -895,17 +881,17 @@ def test_the_measured_leaf_boxes_fail_and_the_shipped_positions_clear_them() -> 
 
 
 def test_end_view_texts_stand_clear_of_the_back_crown_callouts() -> None:
-    """The back crown's SR7.3 hangs below the axis and its (1.2) sag above,
-    with the sag's extensions rising at the profile's left end: the end-view
-    texts stand left of those extensions, the Ø15 above the view and the Ø10.5
-    below it, clear of both callouts with air."""
+    """The back crown's SR7.3 comes in from the upper left and its (1.2) sits
+    under the part: the end-view texts stand left of the crown's witnesses,
+    the Ø15 above the view and the Ø10.5 below it, clear of both callouts
+    with Main's 2 mm of air."""
     boxes = drawing.end_view_text_boxes()
     apex_x = drawing._sheet_x(drawing.BACK_APEX_Z)
     head_r = spec.HEAD_DIA / 2000.0
     for name in drawing.END_KEEP:
         assert boxes[name][2] < apex_x - drawing.END_LINE_CLEARANCE
-        assert drawing._box_gap(boxes[name], boxes["BackCapR"]) > 0.010
-        assert boxes[name][3] < boxes["BackCapSagDim"][1] - 0.010
+        assert drawing._box_gap(boxes[name], boxes["BackCapR"]) >= 0.002
+        assert drawing._box_gap(boxes[name], boxes["BackCapSagDim"]) >= 0.002
     assert boxes["HeadDia"][1] > drawing.END_CENTER[1] + head_r
     assert boxes["NeckDia"][3] < drawing.END_CENTER[1] - head_r
 
@@ -931,6 +917,397 @@ def test_only_the_two_diameters_crossing_at_the_end_view_centre_are_excused() ->
     for finding in blocking:
         with pytest.raises(RuntimeError, match="blocking finding"):
             drawing._assert_no_text_on_line([finding])
+
+
+# --- Round 4 (neckc3-a652): no leader meets a dimension or extension line ---
+
+# a652's sheet (neckc3-a652, 300 dpi export, 11.811 px/mm), measured off the
+# PNG in sheet mm.  An end hidden under other ink (an extension line's start
+# under the part or a centre mark, one under an arrowhead) is the model's.
+_A652_KEEP = {
+    **drawing.PRINCIPAL_KEEP,
+    "BackCapSagDim": (0.055, 0.220),
+    "BackCapR": (0.045, 0.140),
+    "PinHoleDia": (0.250, 0.222),
+    "NeckLen": (0.340, 0.100),
+}
+_A652_RUNS = {
+    "PinHoleDia": ("dim", ((232.33, 214.7), (269.16, 214.7)), ((269.16, 214.7), (268.6, 170.8))),
+    "PinStationFromHeadRear": (
+        "dim",
+        ((262.13, 201.5), (313.94, 201.5)),
+        ((268.48, 171.0), (268.48, 202.44)),
+        ((307.6, 178.5), (307.6, 202.44)),
+    ),
+    "FrontJournalLen": (
+        "dim",
+        ((234.78, 185.2), (266.53, 185.2)),
+        ((241.17, 175.0), (241.17, 186.3)),
+        ((260.14, 175.0), (260.14, 186.3)),
+    ),
+    "BackCapR": (
+        "dim",
+        ((37.85, 137.2), (53.72, 137.2)),
+        ((53.72, 137.2), (80.86, 164.6)),
+        ((80.86, 164.6), (86.1, 170.0)),
+    ),
+    "BackCapSagDim": (
+        "dim",
+        ((38.65, 214.42), (86.4, 214.42)),
+        ((78.87, 171.0), (78.87, 215.48)),
+        ((80.05, 175.0), (80.05, 215.48)),
+    ),
+    "OverallLen": (
+        "dim",
+        ((78.82, 74.45), (321.14, 74.45)),
+        ((78.87, 169.0), (78.87, 73.32)),
+        ((321.06, 169.08), (321.06, 74.17)),
+    ),
+    "BackRimFromHeadRear": (
+        "dim",
+        ((80.01, 89.4), (307.59, 89.4)),
+        ((80.05, 165.0), (80.05, 88.39)),
+        ((307.55, 162.05), (307.55, 88.4)),
+    ),
+    "FrontJournalFromHeadRear": (
+        "dim",
+        ((260.1, 127.2), (307.59, 127.2)),
+        ((260.14, 165.02), (260.14, 126.2)),
+        ((307.55, 162.05), (307.55, 126.2)),
+    ),
+    "DrumStationFromHeadRear": (
+        "dim",
+        ((207.8, 117.45), (307.59, 117.45)),
+        ((246.0, 165.02), (246.0, 116.45)),
+        ((307.55, 162.05), (307.55, 116.45)),
+    ),
+    "BackJournalFromHeadRear": (
+        "dim",
+        ((107.53, 112.2), (307.59, 112.2)),
+        ((107.65, 165.02), (107.65, 111.17)),
+        ((307.55, 162.05), (307.55, 111.2)),
+    ),
+    "NeckLen": (
+        "dim",
+        ((296.25, 97.2), (347.05, 97.2)),
+        ((296.3, 163.75), (296.3, 96.2)),
+        ((307.55, 162.05), (307.55, 96.2)),
+    ),
+    "BackJournalLen": (
+        "dim",
+        ((82.3, 140.2), (114.05, 140.2)),
+        ((88.65, 165.0), (88.65, 139.2)),
+        ((107.65, 165.02), (107.65, 139.19)),
+    ),
+    # The front land's Ra 1.6: its leader rising to the land and its shoulder.
+    "Surface Finish2": (
+        "surface-finish",
+        ((257.05, 150.0), (257.6, 166.0)),
+        ((257.05, 150.0), (264.67, 150.0)),
+    ),
+}
+# The sweep's verdict on a652: Main's two leaders, the front Ra's shoulder and
+# the 11.25's run to its text, and nothing else.
+_A652_FINDINGS = {
+    ("leader-crossing", "PinHoleDia", "PinStationFromHeadRear"),
+    ("leader-crossing", "BackCapR", "OverallLen"),
+    ("leader-crossing", "BackCapR", "BackRimFromHeadRear"),
+    ("leader-crossing", "Surface Finish2", "FrontJournalFromHeadRear"),
+    ("line-crossing", "NeckLen", "OverallLen"),
+}
+
+
+def _annotations(runs_by_label):
+    from _layout_geometry import AnnotationGeometry, Segment
+
+    return [
+        AnnotationGeometry(
+            label=label,
+            kind=kind,
+            owner="Drawing View2",
+            segments=tuple(
+                Segment(x0 / 1000.0, y0 / 1000.0, x1 / 1000.0, y1 / 1000.0)
+                for (x0, y0), (x1, y1) in runs
+            ),
+        )
+        for label, (kind, *runs) in runs_by_label.items()
+    ]
+
+
+def _pairs(findings):
+    pairs = set()
+    for finding in findings:
+        kind, rest = finding.split(": ", 1)
+        first = rest.split("'s ", 1)[0]
+        second = rest.split(" meets ", 1)[1].split("'s ", 1)[0]
+        pairs.add((kind, first, second))
+    return pairs
+
+
+def test_the_a652_sheet_fails_the_leader_rule_on_its_measured_ink() -> None:
+    ink = drawing.sheet_ink(_annotations(_A652_RUNS))
+    assert _pairs(drawing.leader_line_findings(ink)) == _A652_FINDINGS
+    # The neck witness's three crossings are reported, not gated.
+    assert len(drawing.expected_crossings_found(ink)) == 3
+
+
+def test_the_seat_check_raises_on_the_a652_ink_and_names_the_ra_symbol() -> None:
+    sheets = [SimpleNamespace(annotations=_annotations(_A652_RUNS))]
+    with pytest.raises(RuntimeError) as failure:
+        drawing._assert_sheet_leaders_clear(sheets)
+    message = str(failure.value)
+    assert "PinHoleDia's leader" in message
+    assert "surface-finish symbols on the sheet: ['Surface Finish2']" in message
+
+
+def test_the_model_reproduces_the_a652_crossings_and_clears_them_now() -> None:
+    """profile_ink at a652's positions and arrow sides meets the same lines the
+    PNG shows (the Ra symbols are no longer modelled: they are a note now);
+    at the shipped positions it meets none, and only the three report-only
+    neck-witness crossings remain."""
+    a652 = drawing.profile_ink(_A652_KEEP, drawing.ARROWS_OUTSIDE)
+    expected = {f for f in _A652_FINDINGS if f[1] != "Surface Finish2"}
+    assert _pairs(drawing.leader_line_findings(a652)) == expected
+    shipped = drawing.profile_ink()
+    assert drawing.leader_line_findings(shipped) == []
+    assert sorted(drawing.expected_crossings_found(shipped)) == [
+        "NeckLen x BackJournalFromHeadRear: the neck witness drops through the 199.9",
+        "NeckLen x DrumStationFromHeadRear: the neck witness drops through the 61.55",
+        "NeckLen x FrontJournalFromHeadRear: the neck witness drops through the 47.4",
+    ]
+    drawing.assert_profile_leaders_clear()
+
+
+def test_the_model_matches_the_a652_ink_it_was_measured_from() -> None:
+    """Every modelled stroke at a652's positions lies on the stroke the PNG
+    shows, to 1.2 mm (arrowheads hide an extension line's last 0-1 mm)."""
+    a652 = drawing.profile_ink(_A652_KEEP, drawing.ARROWS_OUTSIDE)
+    for name, (_role, runs) in a652.items():
+        measured = [
+            tuple((x / 1000.0, y / 1000.0) for x, y in run) for run in _A652_RUNS[name][1:]
+        ]
+        for run in runs:
+            if name in ("PinHoleDia", "BackCapR") and run is runs[-1]:
+                continue  # the diameter's far side / the radius's run to its centre
+            best = min(
+                max(
+                    min(math.dist(end, other) for other in candidate)
+                    for end in run
+                )
+                for candidate in measured
+            )
+            assert best <= 0.0012, (name, run, best)
+
+
+def test_leaders_get_no_allowance_a_t_junction_or_an_overlap_is_a_crossing() -> None:
+    line = ((0.100, 0.100), (0.100, 0.150))
+    cases = {
+        "crossing": ((0.090, 0.120), (0.110, 0.125)),
+        "t-junction": ((0.090, 0.120), (0.100, 0.120)),
+        "lying along": ((0.100, 0.110), (0.100, 0.130)),
+    }
+    for case, leader in cases.items():
+        ink = {"Lead": ("leader", [leader]), "Dim": ("linear", [line])}
+        assert drawing.leader_line_findings(ink), case
+    clear = {"Lead": ("leader", [((0.090, 0.120), (0.0995, 0.120))]), "Dim": ("linear", [line])}
+    assert drawing.leader_line_findings(clear) == []
+    assert drawing.LEADER_TOUCHING == {}
+
+
+def test_only_named_witnesses_may_be_shared_and_only_along_the_witness() -> None:
+    apex = ((0.0789, 0.169), (0.0789, 0.073))
+    shared = ((0.0789, 0.169), (0.0789, 0.127))
+    ink = {
+        "OverallLen": ("linear", [apex]),
+        "BackCapSagDim": ("linear", [shared, ((0.0386, 0.128), (0.0864, 0.128))]),
+    }
+    assert drawing.leader_line_findings(ink) == []
+    unnamed = {"OverallLen": ink["OverallLen"], "HeadLen": ink["BackCapSagDim"]}
+    assert drawing.leader_line_findings(unnamed)
+    # A named pair still may not meet off the witness they share.
+    stray = {
+        "OverallLen": ("linear", [apex, ((0.060, 0.100), (0.090, 0.100))]),
+        "BackCapSagDim": ("linear", [shared, ((0.070, 0.090), (0.070, 0.110))]),
+    }
+    assert drawing.leader_line_findings(stray)
+    assert set(drawing.SHARED_WITNESSES["back crown apex"]) == {"BackCapSagDim", "OverallLen"}
+    assert set(drawing.SHARED_WITNESSES["back crown root"]) == {
+        "BackCapSagDim",
+        "BackRimFromHeadRear",
+    }
+
+
+def test_the_expected_crossings_cover_only_the_neck_witness_through_a_line() -> None:
+    neck = ((0.2963, 0.16375), (0.2963, 0.0962))
+    row = ((0.2601, 0.1272), (0.30759, 0.1272))
+    ink = {"NeckLen": ("linear", [neck]), "FrontJournalFromHeadRear": ("linear", [row])}
+    assert drawing.leader_line_findings(ink) == []
+    # The same pair meeting any other way is a finding.
+    swapped = {
+        "NeckLen": ("linear", [((0.280, 0.130), (0.300, 0.130))]),
+        "FrontJournalFromHeadRear": ("linear", [((0.290, 0.140), (0.290, 0.120))]),
+    }
+    assert drawing.leader_line_findings(swapped)
+
+
+def test_sr73_lands_on_the_crown_at_its_radius_inside_the_arc() -> None:
+    center = drawing.BACK_CAP_CENTER
+    assert center[0] == pytest.approx(drawing._sheet_x(drawing.BACK_APEX_Z - spec.BACK_CAP_R))
+    assert drawing.BACK_CAP_R_M == pytest.approx(spec.BACK_CAP_R / 1000.0)
+    assert drawing.BACK_CAP_HALF_ANGLE_DEG == pytest.approx(33.4, abs=0.05)
+    landing = drawing.BACK_CAP_R_LANDING
+    assert math.dist(landing, center) == pytest.approx(drawing.BACK_CAP_R_M, abs=1e-9)
+    assert drawing.back_crown_landing_problems(center, landing) == []
+    # Under the (1.2)'s old apex extension (x 78.9 from y 171.0 up) it would
+    # have to land within 7.8° of the axis; at 25° it lands 3.1 mm up the crown,
+    # with nothing standing over it once the (1.2) is under the part.
+    assert landing[1] - drawing.PROFILE_AXIS_Y == pytest.approx(0.00307, abs=5e-5)
+    assert 20.0 <= drawing.BACK_CAP_R_LANDING_DEG <= drawing.BACK_CAP_HALF_ANGLE_DEG - 5.0
+    # a652's 45° leader landed on the arc's extension, past the Ø8 flank.
+    a652 = drawing._on_radius(center, drawing.BACK_CAP_R_M, 45.0)
+    assert any(
+        "outside the crown" in problem
+        for problem in drawing.back_crown_landing_problems(center, a652)
+    )
+
+
+def test_the_seat_landing_check_passes_the_model_and_fails_a652() -> None:
+    center = drawing.BACK_CAP_CENTER
+    _role, runs = drawing.profile_ink()["BackCapR"]
+    shipped = {"BackCapR": ("dim", *(tuple(tuple(v * 1000 for v in p) for p in run) for run in runs))}
+    drawing._assert_back_crown_radius_lands([SimpleNamespace(annotations=_annotations(shipped))], center)
+    a652 = {"BackCapR": _A652_RUNS["BackCapR"]}
+    with pytest.raises(RuntimeError, match="outside the crown"):
+        drawing._assert_back_crown_radius_lands(
+            [SimpleNamespace(annotations=_annotations(a652))], (0.0861, 0.170)
+        )
+    with pytest.raises(RuntimeError, match="no ink"):
+        drawing._assert_back_crown_radius_lands([SimpleNamespace(annotations=[])], center)
+
+
+# Glyph boxes measured on the a652 PNG (sheet mm): the 39.0 / COLLAR PIN, the
+# 227.5 block's text, the BOND ZONE block, and the front land's "19.0".
+_A652_TEXT = {
+    "PinStationFromHeadRear": (274.74, 202.44, 300.99, 211.41),
+    "BackRimFromHeadRear": (171.4, 90.09, 264.5, 99.4),
+    "BondZoneDia": (194.99, 183.64, 221.57, 197.19),
+    "FrontJournalLen": (247.0, 186.1, 256.29, 189.65),
+}
+GLYPH_CLEARANCE = 0.002
+
+
+def _box(point, extent):
+    return drawing._ink_box(point, extent)
+
+
+def _mm_box(box):
+    return tuple(v / 1000.0 for v in box)
+
+
+def _gap(first, second):
+    """Closest approach of two strokes (0 when they meet)."""
+    if _drawing_leaders.segments_cross(first, second):
+        return 0.0
+    return min(
+        *(_drawing_leaders.distance_to_point(second, end) for end in first),
+        *(_drawing_leaders.distance_to_point(first, end) for end in second),
+    )
+
+
+def _box_to_line(box, line):
+    x0, y0, x1, y1 = box
+    corners = ((x0, y0), (x1, y0), (x1, y1), (x0, y1))
+    edges = list(zip(corners, corners[1:] + corners[:1]))
+    if drawing._line_meets_box(line, box):
+        return 0.0
+    return min(_gap(edge, line) for edge in edges)
+
+
+def test_moved_texts_keep_two_mm_of_air_to_every_neighbour() -> None:
+    keep = drawing.PRINCIPAL_KEEP
+    sr = _box(keep["BackCapR"], drawing.BACK_CAP_R_TEXT_EXTENT)
+    sag = _box(keep["BackCapSagDim"], drawing.BACK_CAP_SAG_TEXT_EXTENT)
+    pin = _box(keep["PinHoleDia"], drawing.PIN_HOLE_TEXT_EXTENT)
+    neck_len = _box(keep["NeckLen"], (0.00514, 0.00179, 0.00553, 0.0016))
+    end_texts = drawing.end_view_text_boxes()
+    end_lines, end_arrows = drawing.sheet_corner_ink()
+    outlines = drawing.sheet_view_outlines()
+    # SR7.3: above-right of the end view, clear of the Ø15's text, leader and
+    # arrow, the end view's outline and the profile.
+    for name in ("HeadDia", "NeckDia"):
+        assert drawing._box_gap(sr, end_texts[name]) >= GLYPH_CLEARANCE
+        for run in ("shoulder", "leader", "line"):
+            assert _box_to_line(sr, end_lines[f"{name} {run}"]) >= GLYPH_CLEARANCE, (name, run)
+    for tip in end_arrows.values():
+        assert not drawing._in_box(tip, drawing._grown(sr, GLYPH_CLEARANCE))
+    for outline in ("end view", "profile"):
+        assert drawing._box_gap(sr, outlines[outline]) >= GLYPH_CLEARANCE
+    # (1.2) BACK CROWN under the part: clear of the end view's texts, the
+    # SR7.3 and the back land's 19.0 row, text and witness.
+    _role, back_len = drawing.profile_ink()["BackJournalLen"]
+    _role, sag_runs = drawing.profile_ink()["BackCapSagDim"]
+    for name in ("HeadDia", "NeckDia"):
+        assert drawing._box_gap(sag, end_texts[name]) >= GLYPH_CLEARANCE
+    assert drawing._box_gap(sag, sr) >= GLYPH_CLEARANCE
+    assert drawing._box_gap(sag, outlines["end view"]) >= GLYPH_CLEARANCE
+    for line in back_len:
+        assert _box_to_line(sag, line) >= GLYPH_CLEARANCE
+        for run in sag_runs:
+            assert _gap(run, line) >= GLYPH_CLEARANCE
+    # The pin hole's callout: clear of the 39.0, the bond zone and the 19.0.
+    for name in ("PinStationFromHeadRear", "BondZoneDia", "FrontJournalLen"):
+        assert drawing._box_gap(pin, _mm_box(_A652_TEXT[name])) >= GLYPH_CLEARANCE, name
+    # The 11.25: clear of the 227.5 block and of the (242.2)'s front-apex witness.
+    assert drawing._box_gap(neck_len, _mm_box(_A652_TEXT["BackRimFromHeadRear"])) >= GLYPH_CLEARANCE
+    assert drawing._sheet_x(drawing.FRONT_APEX_Z) - neck_len[2] >= GLYPH_CLEARANCE
+
+
+def test_the_pin_hole_leader_clears_the_39_tail_and_the_19_witness_by_two_mm() -> None:
+    ink = drawing.profile_ink()
+    _role, (shoulder, leader, _through) = ink["PinHoleDia"]
+    _role, (pin_line, pin_extension, _head) = ink["PinStationFromHeadRear"]
+    _role, (land_line, _crown_end, land_head_end) = ink["FrontJournalLen"]
+    assert _gap(leader, pin_line) >= GLYPH_CLEARANCE
+    assert _gap(shoulder, pin_line) >= GLYPH_CLEARANCE
+    assert _gap(leader, land_head_end) >= GLYPH_CLEARANCE
+    assert _gap(leader, land_line) >= GLYPH_CLEARANCE
+    # It lands on the hole's rim along the radius, left of the station witness.
+    (_bend, tip) = leader
+    assert math.dist(tip, drawing.PIN_HOLE_CENTER) == pytest.approx(drawing.PIN_HOLE_DIA / 2000.0)
+    assert tip[0] < pin_extension[0][0]
+    assert drawing.FRONT_LAND_ARROWS_INSIDE == ("FrontJournalLen",)
+    assert drawing.DIM_ARROWS_INSIDE == 0
+
+
+def test_the_build_stands_the_19_arrows_inside_and_gates_the_sheet() -> None:
+    source = inspect.getsource(drawing.build)
+    assert "_set_arrow_sides(" in source
+    assert "FRONT_LAND_ARROWS_INSIDE" in source
+    assert "_assert_sheet_leaders_clear(sheets)" in source
+    assert "_assert_back_crown_radius_lands(" in source
+    assert "assert_profile_leaders_clear()" in source
+    assert "add_surface_finish" not in inspect.getsource(drawing)
+
+
+def test_every_ra_was_a_journal_land_and_the_note_carries_their_one_grade() -> None:
+    """Main's round-4 ruling (iii): the two journal-land Ra 1.6 symbols become
+    one general note.  Before, the sheet drew one symbol per SURFACE_FINISHES
+    control; every control is a journal land at one grade, and the note prints
+    that grade through the controls' own roughness_ra."""
+    keys = {control.key for control in spec.SURFACE_FINISHES}
+    assert keys == {"front_journal", "back_journal"}
+    lands = {"front_journal": spec.FRONT_JOURNAL_Z, "back_journal": spec.BACK_JOURNAL_Z}
+    for control in spec.SURFACE_FINISHES:
+        assert lands[control.key] < control.face.contains_z_mm < lands[control.key] + spec.JOURNAL_LEN
+        assert control.face.diameter_mm == spec.SHAFT_DIA
+    grades = {control.roughness_ra for control in spec.SURFACE_FINISHES}
+    assert grades == {_surface_finish.ra(_surface_finish.MACHINED_UM)}
+    assert spec.JOURNAL_LANDS_FINISH_NOTE == f"JOURNAL LANDS Ra {grades.pop()}."
+    assert spec.JOURNAL_LANDS_FINISH_NOTE in spec.DRAWING_NOTES.splitlines()
+    assert not hasattr(drawing, "JOURNAL_FINISHES")
+    # The bond zone keeps its own diameter callout.
+    assert "BondZoneDia" in drawing.PRINCIPAL_KEEP
+    assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] == "BOND ZONE"
 
 
 # --- Reference witnesses are selected by identity, not by a screen pick ------

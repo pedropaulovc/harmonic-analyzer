@@ -8,13 +8,13 @@ import sys
 from dataclasses import dataclass, field
 from typing import Any
 
+import _drawing_leaders
 import _telemetry
 from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     _drawing_component_name,
     add_property_linked_note,
-    add_surface_finish,
     assert_imported_precision,
     curate_view_dimensions,
     dimension_name,
@@ -31,9 +31,9 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import audit_sheet, format_findings
-from _surface_finish import surface_finish_by_key
-from pinion_arbor_pin_spec import PIN_HOLE_CALLOUT
+from pinion_arbor_pin_spec import PIN_HOLE_CALLOUT, PIN_HOLE_DIA
 from pinion_arbor_spec import (
+    BACK_CAP_R,
     BACK_CAP_SAG,
     BACK_JOURNAL_Z,
     BOND_ZONE_DIA_Z,
@@ -48,9 +48,10 @@ from pinion_arbor_spec import (
     HEAD_REAR_Z,
     JOURNAL_LEN,
     NECK_DIA,
+    NECK_END_Z,
     OVERALL_LEN,
+    PIN_Z,
     SHAFT_DIA,
-    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -107,27 +108,6 @@ def _sheet_x(model_z: float) -> float:
     return PRINCIPAL_CENTER[0] - (model_z - MODEL_Z_AT_SHEET_ORIGIN_X) / 1000.0
 
 
-# Each land's Ra arrow lands RA_ARROW_FROM_HEAD_END in from the land's
-# head-side end, and its symbol hangs RA_SHOULDER further head side on a short
-# bent-leader shoulder.  The front symbol hangs below the shaft, its left edge
-# clear of that end's station witness.  At c6eb7f6f the back symbol did the
-# same and its shoulder ran through the 199.9 / 19.0 witness below the shaft
-# (Main).  Nothing rises from the back land above the shaft, so its symbol
-# hangs there, over the land's head-side end and under the raised back
-# JOURNAL diameter (BACK_JOURNAL_DIA_Y).
-RA_ARROW_FROM_HEAD_END = 2.0
-RA_SYMBOL_OFFSET = 0.0033
-RA_SHOULDER = RA_SYMBOL_OFFSET + RA_ARROW_FROM_HEAD_END / 1000.0
-FRONT_RA_X = _sheet_x(FRONT_JOURNAL_Z) + RA_SYMBOL_OFFSET
-BACK_RA_XY = (
-    _sheet_x(BACK_JOURNAL_Z + RA_ARROW_FROM_HEAD_END) + RA_SHOULDER,
-    0.179,
-)
-# Rendered extent of an Ra 1.6 symbol about its insertion point (left, right,
-# top; the point is the shoulder's end under the triangle's vertex), measured
-# on the c6eb7f6f sheet.
-RA_SYMBOL_EXTENT = (-0.0019, 0.0151, 0.0062)
-FLANK_SIGN = {"lower": -1.0, "upper": 1.0}
 # Each land's diameter is measured at a short witness JOURNAL_DIA_POINT_FROM_
 # CROWN_END in from its crown-side end (build_pinion_arbor, pinned equal by
 # test), and its line stands 1 mm from that point, so its extensions are ~1 mm
@@ -143,11 +123,9 @@ BACK_JOURNAL_DIA_POINT_X = _sheet_x(
     BACK_JOURNAL_Z + JOURNAL_LEN - JOURNAL_DIA_POINT_FROM_CROWN_END
 )
 # The back land is boxed in below the shaft (the back-crown and overall
-# witnesses at x 0.079-0.081 on its crown side, the 199.9 witness and the Ra
-# leader on its head side), so its diameter hangs ABOVE the shaft, its text
-# right of the line over the land and clear of the back-crown sag witnesses,
-# and its 19.0 length moves below.  The block rides high enough that the
-# back Ra symbol fits under it, over the land.
+# witnesses at x 0.079-0.081 on its crown side, the 199.9 witness on its head
+# side), so its diameter hangs ABOVE the shaft, its text right of the line
+# over the land, and its 19.0 length moves below.
 BACK_JOURNAL_TEXT_X = BACK_JOURNAL_DIA_POINT_X + JOURNAL_DIA_LINE_OFFSET
 BACK_JOURNAL_DIA_Y = 0.1945
 # The drum station's text block (~35 mm "DRUM STATION" callout) ends 4 mm left
@@ -207,12 +185,103 @@ Span = tuple[tuple[float, float], tuple[float, float]]
 OUTLINE_DARK_MAX = 60
 OUTLINE_CORE_ROWS = 2
 OUTLINE_SEARCH_ROWS = 6
+# ---------------------------------------------------------------------------
+# Profile leader corners
+#
+# No leader may cross, touch or run along a dimension or extension line
+# (drawing-simplicity rule 8; Main's eye-pass of neckc3-a652).  Two leaders on
+# the a652 sheet did: the pin hole's Ø1.59 dropped straight down through the
+# 39.0 COLLAR PIN's dimension line and along its pin extension, and the back
+# crown's SR7.3 rose at 45° from the lower left, past the crown's ±33° arc,
+# through the (242.2) OVERALL and 227.5 witnesses under the part.  The
+# positions below are derived from the model and from ink measured on that
+# sheet's 300 dpi export (11.811 px/mm), and profile_leader_findings proves
+# them before any COM work.
+#
+# Every sheet dimension's text is placed at its commanded position; each
+# extent below is (left, down, right, up) from it, in sheet metres.
+PROFILE_AXIS_Y = PRINCIPAL_CENTER[1]
+# The SR7.3's arc: the back crown's sphere, centred on the axis R in from the
+# apex.  Its ends meet the Ø8 land's flanks, so a radial leader lands on the
+# crown only within asin(4 / 7.27) = 33.4° of the axis.
+BACK_CAP_CENTER = (_sheet_x(BACK_APEX_Z - BACK_CAP_R), PROFILE_AXIS_Y)
+BACK_CAP_R_M = BACK_CAP_R / 1000.0 * SHEET_SCALE[0] / SHEET_SCALE[1]
+BACK_CAP_HALF_ANGLE_DEG = math.degrees(math.asin(SHAFT_DIA / 2.0 / BACK_CAP_R))
+# a652: "SR7.3" for (45.0, 140.0) printed x 39.3-50.55, y 138.2-141.65 mm, its
+# shoulder 37.85-53.72 mm at y 137.2, and the leader left the shoulder's
+# circle-side end along the radius (45.3° through the centre at 86.2, 170).
+BACK_CAP_R_TEXT_EXTENT = (0.0057, 0.0018, 0.00555, 0.00165)
+BACK_CAP_R_SHOULDER = (0.00715, 0.00872, 0.0028)  # left, right (the bend), drop
+# The leader now comes in from the upper left, 25° above the axis: inside the
+# arc with 8° to spare, and over the crown where nothing stands once the (1.2)
+# moved under the part.  The bend sits 26 mm out along that radius, which puts
+# the text above-right of the end view, clear of the Ø15's leader.
+BACK_CAP_R_LANDING_DEG = 25.0
+BACK_CAP_R_BEND_RADIUS = 0.026
+
+
+def _on_radius(
+    center: tuple[float, float], radius: float, degrees_above_left: float
+) -> tuple[float, float]:
+    """The point ``radius`` from ``center`` along a ray that leaves it to the
+    left, ``degrees_above_left`` above the horizontal."""
+    angle = math.radians(degrees_above_left)
+    return (center[0] - radius * math.cos(angle), center[1] + radius * math.sin(angle))
+
+
+BACK_CAP_R_BEND = _on_radius(BACK_CAP_CENTER, BACK_CAP_R_BEND_RADIUS, BACK_CAP_R_LANDING_DEG)
+BACK_CAP_R_LANDING = _on_radius(BACK_CAP_CENTER, BACK_CAP_R_M, BACK_CAP_R_LANDING_DEG)
+BACK_CAP_R_TEXT_XY = (
+    BACK_CAP_R_BEND[0] - BACK_CAP_R_SHOULDER[1],
+    BACK_CAP_R_BEND[1] + BACK_CAP_R_SHOULDER[2],
+)
+# The (1.2) BACK CROWN stands UNDER the part (Main, neckc3-a652 ruling b), its
+# extensions dropping along the (242.2)'s from the apex and the 227.5's from
+# the root, so the crown's upper left is free for the SR7.3.  a652 printed it
+# for (55.0, 220.0): "(1.2)" x 50.6-59.3, y 220.1-224.5; "BACK CROWN" x
+# 39.1-70.8, y 215.8-218.9; its line 5.6 mm under the position, from under
+# the text's left end (38.65) to 6.3 mm past the root.  Its row at y 128.4
+# sits between the back land's 19.0 row (140.2) and the 199.9's (112.2).
+BACK_CAP_SAG_XY = (0.055, 0.134)
+BACK_CAP_SAG_TEXT_EXTENT = (0.0159, 0.0042, 0.0158, 0.0045)
+BACK_CAP_SAG_LINE_LEFT = 0.01635
+BACK_CAP_SAG_LINE_DROP = 0.00558
+# The pin hole's leader comes in from the upper left, leaning
+# PIN_LEADER_LEAN (dx per dy) off vertical along its radius, so it passes left
+# of the 39.0's outside-arrow tail (x 262.1 at its row) and right of the front
+# land's 19.0 witness, whose arrows now stand inside (FRONT_LAND_ARROWS_INSIDE:
+# at a652 their tail ran to x 266.5 and left no straight way in).  a652
+# printed the callout for (250.0, 222.0) at x 233.2-267.0, y 215.3-229.2 mm,
+# its shoulder 232.33-269.16 mm at y 214.7.
+PIN_X = _sheet_x(PIN_Z)
+PIN_HOLE_CENTER = (PIN_X, PROFILE_AXIS_Y)
+PIN_HOLE_TEXT_EXTENT = (0.01683, 0.00669, 0.01704, 0.00719)
+PIN_HOLE_SHOULDER = (0.01767, 0.01916, 0.0073)  # left, right (the bend), drop
+PIN_LEADER_LEAN = 0.31
+PIN_SHOULDER_Y = 0.206
+PIN_HOLE_BEND = (
+    PIN_X - PIN_LEADER_LEAN * (PIN_SHOULDER_Y - PROFILE_AXIS_Y),
+    PIN_SHOULDER_Y,
+)
+PIN_HOLE_TEXT_XY = (
+    PIN_HOLE_BEND[0] - PIN_HOLE_SHOULDER[1],
+    PIN_HOLE_BEND[1] + PIN_HOLE_SHOULDER[2],
+)
+# swDimensionArrowsSide_e (enums/swDimensionArrowsSide_e.md); read back after
+# setting, as draw_cone_tip_block's proven _set_arrow_sides does (mha092-72ab).
+DIM_ARROWS_INSIDE = 0
+FRONT_LAND_ARROWS_INSIDE = ("FrontJournalLen",)
+# The 11.25 stands LEFT of its neck witness: at (0.340, 0.100) its line ran
+# right to the text through the (242.2)'s front-apex witness at x 321.1
+# (Main, round 4).  Left, it runs from the text to the neck witness under the
+# 227.5's block's right end with nothing standing between.
+NECK_LEN_XY = (0.284, 0.100)
 # Rendered width and height of a two-place "Ø8.00 -0.01/-0.0x" callout block,
 # measured on the 63468ee9 sheet.
 DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 PRINCIPAL_KEEP = {
     "FrontJournalLen": (0.252, 0.188),
-    # Below the shaft, under the back Ra symbol and its leader.
+    # Below the shaft, clear of the back crown's witnesses.
     "BackJournalLen": (0.097, 0.143),
     "FrontJournalDia": (FRONT_JOURNAL_DIA_X, 0.150),
     "BondZoneDia": BOND_ZONE_TEXT_XY,
@@ -223,20 +292,22 @@ PRINCIPAL_KEEP = {
     # it.
     "DrumStationFromHeadRear": DRUM_STATION_TEXT_XY,
     "BackJournalFromHeadRear": (0.170, 0.115),
-    # Right of the overall-length witness at the front crown apex (x 0.3215).
-    "NeckLen": (0.340, 0.100),
+    # Left of its neck witness, clear of the (242.2)'s front-apex witness.
+    "NeckLen": NECK_LEN_XY,
     "BackRimFromHeadRear": (0.205, 0.095),
     "OverallLen": (0.205, 0.080),
-    "BackCapSagDim": (0.055, 0.220),
-    # Radial leader down-left from the back crown, below the shaft axis and
-    # clear of the (1.2) sag reference above it and the overall witnesses.
-    "BackCapR": (0.045, 0.140),
-    # R1a's collar pin hole (x 0.269) sits over the front land's Ra symbol,
+    # Under the part, left of the back crown (BACK_CAP_SAG_XY).
+    "BackCapSagDim": BACK_CAP_SAG_XY,
+    # Radial leader in from the upper left, 25° above the axis, over a crown
+    # no witness rises from (BACK_CAP_R_TEXT_XY).
+    "BackCapR": BACK_CAP_R_TEXT_XY,
+    # R1a's collar pin hole (x 0.269) stands over the front land's stations,
     # so both its dimensions stand ABOVE the shaft: the station from the head
-    # rear face in a row well over the Ø15 head, and the hole's leader rising
-    # left of that row's witness, above the 19.0's right arrow tail.
+    # rear face in a row well over the Ø15 head, and the hole's leader leaning
+    # in from the upper left, between that row's left arrow tail and the front
+    # land's 19.0 witness (PIN_HOLE_TEXT_XY).
     "PinStationFromHeadRear": (0.288, 0.207),
-    "PinHoleDia": (0.250, 0.222),
+    "PinHoleDia": PIN_HOLE_TEXT_XY,
 }
 DETAIL_KEEP = {
     "HeadLen": (0.165, 0.201),
@@ -310,21 +381,16 @@ END_DIA_CORE_EXTENT = (0.0019, 0.0028, 0.0106, 0.0007)
 END_DIA_SHOULDER_TOWARD = 0.0100
 END_DIA_SHOULDER_AWAY = 0.0085
 END_DIA_SHOULDER_DROP = 0.0028
-# The profile's callouts in that corner, measured on the a1a694a6 render
-# (4.63 px/mm): "SR7.3" x 38.9-50.7, y 137.3-142.3 mm with its shelf to 54 mm;
-# "(1.2) / BACK CROWN" x 38.9-71.2, y 214.6-225.0 mm with its shelf to 77 mm;
-# the back JOURNAL block right of its line (DIAMETER_BLOCK_SIZE).
+# The profile's callouts in that corner, measured on the a652 sheet
+# (BACK_CAP_R_TEXT_EXTENT, BACK_CAP_SAG_TEXT_EXTENT) and the back JOURNAL block
+# right of its line (DIAMETER_BLOCK_SIZE).  Their lines come from
+# profile_corner_ink: neckc2-07af measured the (1.2)'s apex extension at
+# (78.9,171.0)->(78.9,215.4) mm for a text at y 220, which that model gives.
 NEIGHBOUR_TEXT_EXTENTS = {
-    "BackCapR": (0.0065, 0.0030, 0.0095, 0.0025),
-    "BackCapSagDim": (0.0165, 0.0060, 0.0225, 0.0055),
+    "BackCapR": BACK_CAP_R_TEXT_EXTENT,
+    "BackCapSagDim": BACK_CAP_SAG_TEXT_EXTENT,
     "BackJournalDia": (0.0010, 0.0075, 0.0270, 0.0075),
 }
-# The SR7.3 leader leaves its shelf end for the crown 2.9 mm under the axis.
-BACK_CAP_R_LEADER_DROP = 0.0029
-# The (1.2)'s extension lines rise from 1 mm off the axis to 4.6 mm under its
-# text position (neckc2-07af: (78.9,171.0)->(78.9,215.4) mm for y 220).
-BACK_CAP_SAG_WITNESS_GAP = 0.0010
-BACK_CAP_SAG_WITNESS_TOP_DROP = 0.0046
 # Air an end-view text keeps: to a foreign line, and to any arrowhead tip
 # (Main: 2 mm); to another text, a view's model outline and the inner border.
 END_LINE_CLEARANCE = 0.0020
@@ -349,12 +415,15 @@ def _circle_box(center: tuple[float, float], radius: float) -> InkBox:
     return (center[0] - radius, center[1] - radius, center[0] + radius, center[1] + radius)
 
 
-def end_view_text_boxes(keep: dict[str, tuple[float, float]] = END_KEEP) -> dict[str, InkBox]:
+def end_view_text_boxes(
+    keep: dict[str, tuple[float, float]] = END_KEEP,
+    principal: dict[str, tuple[float, float]] = PRINCIPAL_KEEP,
+) -> dict[str, InkBox]:
     """The end view's diameter texts (as the layout audit boxes them) and the
     profile callouts beside them."""
     boxes = {name: _ink_box(point, END_DIA_AUDIT_EXTENT) for name, point in keep.items()}
     for name, extent in NEIGHBOUR_TEXT_EXTENTS.items():
-        boxes[name] = _ink_box(PRINCIPAL_KEEP[name], extent)
+        boxes[name] = _ink_box(principal[name], extent)
     return boxes
 
 
@@ -398,22 +467,20 @@ def diameter_ink(
 def sheet_corner_ink(
     keep: dict[str, tuple[float, float]] = END_KEEP,
     end_center: tuple[float, float] = END_CENTER,
+    principal: dict[str, tuple[float, float]] = PRINCIPAL_KEEP,
 ) -> tuple[dict[str, InkLine], dict[str, tuple[float, float]]]:
     """The lines standing in the end view's corner, keyed by owner and run, and
     the end-view arrowhead tips."""
-    axis_y = PRINCIPAL_CENTER[1]
-    sag_y = PRINCIPAL_KEEP["BackCapSagDim"][1]
-    witness = (axis_y + BACK_CAP_SAG_WITNESS_GAP, sag_y - BACK_CAP_SAG_WITNESS_TOP_DROP)
-    radius_x, radius_y = PRINCIPAL_KEEP["BackCapR"]
-    extent = NEIGHBOUR_TEXT_EXTENTS["BackCapR"]
-    lines: dict[str, InkLine] = {}
-    for run, z in (("apex", BACK_APEX_Z), ("root", BACK_APEX_Z - BACK_CAP_SAG)):
-        x = _sheet_x(z)
-        lines[f"BackCapSagDim {run} extension"] = ((x, witness[0]), (x, witness[1]))
-    lines["BackCapR leader"] = (
-        (radius_x + extent[2], radius_y - extent[1]),
-        (_sheet_x(BACK_APEX_Z), axis_y - BACK_CAP_R_LEADER_DROP),
-    )
+    corner = profile_ink(principal)
+    _, sag = corner["BackCapSagDim"]
+    _, crown = corner["BackCapR"]
+    lines: dict[str, InkLine] = {
+        "BackCapSagDim line": sag[0],
+        "BackCapSagDim apex extension": sag[1],
+        "BackCapSagDim root extension": sag[2],
+        "BackCapR shoulder": crown[0],
+        "BackCapR leader": crown[1],
+    }
     arrows: dict[str, tuple[float, float]] = {}
     for name, xy in keep.items():
         shoulder, leader, through, tips = diameter_ink(xy, end_center, DIAMETERS[name])
@@ -556,6 +623,379 @@ def assert_end_view_ink_clear() -> None:
     _telemetry.debug("pinion-arbor end-view ink clear")
 
 
+# ---------------------------------------------------------------------------
+# Leaders against dimension and extension lines
+#
+# The sheet's rule (Main, neckc3-a652): a leader may not cross, touch or run
+# along any dimension or extension line.  A T-junction counts (a leader's end
+# on a line's interior, or a line's end on a leader), and so does a leader
+# lying along a line: _drawing_leaders.segments_cross, whose only exemption is
+# a shared endpoint.  A T is allowed only where LEADER_TOUCHING declares the
+# pair with its reason; this sheet declares none.  The shared layout audit
+# compares leaders only with leaders and views, so this sheet applies the rule
+# itself, to its own annotations, until _drawing_leaders carries it.
+#
+# A leader-bearing annotation is every radial or diametric dimension (all its
+# runs lead to a circle or arc) and every non-dimension annotation with ink.
+# Every other dimension is linear: a dimension line and extension lines.
+LEADER_DIMENSIONS = frozenset(
+    {
+        "PinHoleDia",
+        "BackCapR",
+        "HeadDia",
+        "NeckDia",
+        "CrossHoleDia",
+        "HeadCapR",
+        "FrontJournalDia",
+        "BackJournalDia",
+        "BondZoneDia",
+    }
+)
+LEADER_TOUCHING: dict[frozenset[str], str] = {}
+# Linear dimensions may meet only where the sheet says so.  Baseline
+# dimensions from one face share their witness by design; each such sharing
+# is named here, and it covers only strokes ON that witness: the two vertical
+# extension lines lying along each other, or one dimension's line meeting the
+# other's extension where it lies along its own.
+SHARED_WITNESSES = {
+    # Main's ruling b (neckc3-a652): the (1.2) drops along the (242.2)'s apex
+    # witness and the 227.5's root witness.
+    "back crown apex": frozenset({"BackCapSagDim", "OverallLen"}),
+    "back crown root": frozenset({"BackCapSagDim", "BackRimFromHeadRear"}),
+    # The stations under the shaft all run from the Ø15 head's rear face.
+    "Ø15 head rear face": frozenset(
+        {
+            "FrontJournalFromHeadRear",
+            "DrumStationFromHeadRear",
+            "BackJournalFromHeadRear",
+            "BackRimFromHeadRear",
+            "NeckLen",
+        }
+    ),
+    # The back land's 19.0 and the 199.9 both end at its head-side end.
+    "back land head-side end": frozenset({"BackJournalLen", "BackJournalFromHeadRear"}),
+    # Detail A's 10.5 and (3.0) both end at the head's front face.
+    "head front face": frozenset({"HeadLen", "HeadCapSagDim"}),
+}
+# Report-only crossings (Main, round 4): the Ø10.5 neck's extension line,
+# dropping to the 11.25 under the other stations, crosses their dimension
+# lines.  Keyed (extension owner, dimension-line owner); any other crossing,
+# or any other stroke of these pairs, still fails.
+EXPECTED_CROSSINGS = {
+    ("NeckLen", "FrontJournalFromHeadRear"): "the neck witness drops through the 47.4",
+    ("NeckLen", "DrumStationFromHeadRear"): "the neck witness drops through the 61.55",
+    ("NeckLen", "BackJournalFromHeadRear"): "the neck witness drops through the 199.9",
+}
+# A stroke within this of vertical or horizontal is an extension line or a
+# dimension line of these horizontal dimensions.
+AXIS_ALIGNED_M = 1e-4
+LineRole = str  # "leader" or "linear"
+SheetInk = dict[str, tuple[LineRole, list[InkLine]]]
+
+# Linear dimension ink, measured on the a652 sheet: a one-line value's line
+# prints 2.8 mm under its position, a two-line block's 5.5-5.6 mm; extension
+# lines start 1.0 mm off the feature and run 0.9-1.1 mm past the line; an
+# outside arrow's arrowhead and tail run 6.3-6.4 mm past its extension line.
+# SolidWorks put the arrows inside every long station and outside the 19.0s,
+# the 39.0 and the (1.2); a line runs on under a text standing outside its
+# extensions, to 1.0-1.3 mm past the text's far end (DrumStation, (1.2),
+# the 11.25 at a652).
+ONE_LINE_DROP = 0.0028
+TWO_LINE_DROP = 0.0056
+PIN_STATION_LINE_DROP = 0.0055
+DRUM_STATION_LINE_DROP = 0.00555
+EXTENSION_GAP = 0.0010
+EXTENSION_OVERSHOOT = 0.0010
+OUTSIDE_ARROW_RUN = 0.00635
+ARROWS_OUTSIDE = frozenset(
+    {"BackJournalLen", "FrontJournalLen", "PinStationFromHeadRear", "BackCapSagDim"}
+)
+DRUM_STATION_LINE_LEFT = 0.01675
+NECK_LEN_LINE_REACH = 0.00705
+
+
+def _fmt_line(line: InkLine) -> str:
+    (x0, y0), (x1, y1) = line
+    return f"({x0 * 1000:.1f},{y0 * 1000:.1f})->({x1 * 1000:.1f},{y1 * 1000:.1f})mm"
+
+
+def _vertical(line: InkLine) -> bool:
+    return abs(line[0][0] - line[1][0]) <= AXIS_ALIGNED_M
+
+
+def _horizontal(line: InkLine) -> bool:
+    return abs(line[0][1] - line[1][1]) <= AXIS_ALIGNED_M
+
+
+def _along(first: InkLine, second: InkLine) -> bool:
+    """Two vertical strokes on one x sharing some of their length."""
+    if not (_vertical(first) and _vertical(second)):
+        return False
+    if abs(first[0][0] - second[0][0]) > _drawing_leaders.COLLINEAR_TOLERANCE:
+        return False
+    low = max(min(first[0][1], first[1][1]), min(second[0][1], second[1][1]))
+    high = min(max(first[0][1], first[1][1]), max(second[0][1], second[1][1]))
+    return high - low > _drawing_leaders.COLLINEAR_TOLERANCE
+
+
+def _on_shared_witness(
+    first: InkLine, second: InkLine, first_runs: list[InkLine], second_runs: list[InkLine]
+) -> bool:
+    """Whether the meeting of two strokes lies on a witness both dimensions
+    share: the extensions themselves, or one's stroke meeting the other's
+    extension where it lies along one of its own."""
+    return (
+        _along(first, second)
+        or any(_along(second, own) for own in first_runs)
+        or any(_along(first, own) for own in second_runs)
+    )
+
+
+def _expected_crossing(
+    first: str, a: InkLine, second: str, b: InkLine
+) -> str | None:
+    for (extension, line), reason in EXPECTED_CROSSINGS.items():
+        if (first, second) == (extension, line) and _vertical(a) and _horizontal(b):
+            return reason
+        if (second, first) == (extension, line) and _vertical(b) and _horizontal(a):
+            return reason
+    return None
+
+
+def leader_line_findings(ink: SheetInk) -> list[str]:
+    """Every leader stroke meeting a linear dimension's stroke, and every
+    meeting of two linear dimensions the sheet does not name."""
+    findings: list[str] = []
+    leaders = {name: runs for name, (role, runs) in ink.items() if role == "leader"}
+    linear = {name: runs for name, (role, runs) in ink.items() if role == "linear"}
+    for name, runs in sorted(leaders.items()):
+        for other, lines in sorted(linear.items()):
+            if other == name:
+                continue
+            touching = (
+                "allowed" if frozenset({name, other}) in LEADER_TOUCHING else "crossing"
+            )
+            for run in runs:
+                for line in lines:
+                    if _drawing_leaders.segments_cross(run, line, touching=touching):
+                        findings.append(
+                            f"leader-crossing: {name}'s leader {_fmt_line(run)} meets "
+                            f"{other}'s line {_fmt_line(line)}"
+                        )
+    names = sorted(linear)
+    for index, first in enumerate(names):
+        for second in names[index + 1 :]:
+            shared = any({first, second} <= group for group in SHARED_WITNESSES.values())
+            for a in linear[first]:
+                for b in linear[second]:
+                    if not _drawing_leaders.segments_cross(a, b):
+                        continue
+                    if shared and _on_shared_witness(a, b, linear[first], linear[second]):
+                        continue
+                    if _expected_crossing(first, a, second, b):
+                        continue
+                    findings.append(
+                        f"line-crossing: {first}'s {_fmt_line(a)} meets "
+                        f"{second}'s {_fmt_line(b)}"
+                    )
+    return findings
+
+
+def expected_crossings_found(ink: SheetInk) -> list[str]:
+    """The report-only crossings present in ``ink``, for the leaf log."""
+    linear = {name: runs for name, (role, runs) in ink.items() if role == "linear"}
+    found = []
+    for (extension, line), reason in sorted(EXPECTED_CROSSINGS.items()):
+        if any(
+            _drawing_leaders.segments_cross(a, b)
+            for a in linear.get(extension, ())
+            for b in linear.get(line, ())
+            if _vertical(a) and _horizontal(b)
+        ):
+            found.append(f"{extension} x {line}: {reason}")
+    return found
+
+
+def _linear_ink(
+    text_xy: tuple[float, float],
+    line_drop: float,
+    first: tuple[float, float],
+    second: tuple[float, float],
+    *,
+    arrows_inside: bool,
+    text_reach: tuple[float, float] | None = None,
+) -> list[InkLine]:
+    """A horizontal dimension's line and its two vertical extension lines.
+
+    ``text_reach`` = (left, right): how far the line runs either side of a
+    text standing outside the extensions.
+    """
+    row = text_xy[1] - line_drop
+    lo, hi = sorted((first[0], second[0]))
+    if not arrows_inside:
+        lo, hi = lo - OUTSIDE_ARROW_RUN, hi + OUTSIDE_ARROW_RUN
+    if text_reach is not None:
+        lo = min(lo, text_xy[0] - text_reach[0])
+        hi = max(hi, text_xy[0] + text_reach[1])
+    lines: list[InkLine] = [((lo, row), (hi, row))]
+    for x, y in (first, second):
+        sign = 1.0 if row > y else -1.0
+        lines.append(((x, y + sign * EXTENSION_GAP), (x, row + sign * EXTENSION_OVERSHOOT)))
+    return lines
+
+
+def _radial_leader_ink(
+    text_xy: tuple[float, float],
+    shoulder: tuple[float, float, float],
+    center: tuple[float, float],
+    radius: float,
+    *,
+    through: str,
+) -> tuple[list[InkLine], tuple[float, float]]:
+    """A radius or diameter leader: the shoulder under its text, the run from
+    the shoulder's circle-side end along the radius to the arrow tip, and the
+    line on from the tip to the centre (``through="center"``, a radius) or to
+    the far side (``through="far"``, a diameter).  Returns the runs and the
+    tip."""
+    left, right, drop = shoulder
+    bend = (text_xy[0] + right, text_xy[1] - drop)
+    dx, dy = bend[0] - center[0], bend[1] - center[1]
+    length = math.hypot(dx, dy)
+    ux, uy = dx / length, dy / length
+    tip = (center[0] + ux * radius, center[1] + uy * radius)
+    end = center if through == "center" else (center[0] - ux * radius, center[1] - uy * radius)
+    return [((text_xy[0] - left, bend[1]), bend), (bend, tip), (tip, end)], tip
+
+
+def profile_ink(
+    keep: dict[str, tuple[float, float]] = PRINCIPAL_KEEP,
+    arrows_outside: frozenset[str] = ARROWS_OUTSIDE - frozenset(FRONT_LAND_ARROWS_INSIDE),
+) -> SheetInk:
+    """The profile's station dimensions and its two tight leaders (the pin
+    hole's Ø1.59 and the back crown's SR7.3), modelled from the commanded
+    positions."""
+    axis = PROFILE_AXIS_Y
+    land = SHAFT_DIA / 2000.0
+    head = HEAD_DIA / 2000.0
+    head_rear = _sheet_x(HEAD_REAR_Z)
+    apex = _sheet_x(BACK_APEX_Z)
+    root = _sheet_x(BACK_APEX_Z - BACK_CAP_SAG)
+    front_land = sorted((_sheet_x(FRONT_JOURNAL_Z), _sheet_x(FRONT_JOURNAL_Z + JOURNAL_LEN)))
+    back_land = sorted((_sheet_x(BACK_JOURNAL_Z), _sheet_x(BACK_JOURNAL_Z + JOURNAL_LEN)))
+
+    def linear(name, first, second, drop, text_reach=None):
+        def flank(x: float, radius: float) -> tuple[float, float]:
+            return (x, axis + radius if keep[name][1] > axis else axis - radius)
+
+        return (
+            "linear",
+            _linear_ink(
+                keep[name],
+                drop,
+                flank(*first),
+                flank(*second),
+                arrows_inside=name not in arrows_outside,
+                text_reach=text_reach,
+            ),
+        )
+
+    pin_runs, _ = _radial_leader_ink(
+        keep["PinHoleDia"], PIN_HOLE_SHOULDER, PIN_HOLE_CENTER, PIN_HOLE_DIA / 2000.0, through="far"
+    )
+    crown_runs, _ = _radial_leader_ink(
+        keep["BackCapR"], BACK_CAP_R_SHOULDER, BACK_CAP_CENTER, BACK_CAP_R_M, through="center"
+    )
+    neck = _sheet_x(NECK_END_Z)
+    return {
+        "PinHoleDia": ("leader", pin_runs),
+        "BackCapR": ("leader", crown_runs),
+        "PinStationFromHeadRear": linear(
+            "PinStationFromHeadRear", (PIN_X, 0.0), (head_rear, head), PIN_STATION_LINE_DROP
+        ),
+        "FrontJournalLen": linear(
+            "FrontJournalLen", (front_land[0], land), (front_land[1], land), ONE_LINE_DROP
+        ),
+        "FrontJournalFromHeadRear": linear(
+            "FrontJournalFromHeadRear", (front_land[1], land), (head_rear, head), ONE_LINE_DROP
+        ),
+        "DrumStationFromHeadRear": linear(
+            "DrumStationFromHeadRear",
+            (DRUM_STATION_WITNESS_X, land),
+            (head_rear, head),
+            DRUM_STATION_LINE_DROP,
+            text_reach=(DRUM_STATION_LINE_LEFT, 0.0),
+        ),
+        "BackJournalFromHeadRear": linear(
+            "BackJournalFromHeadRear", (back_land[1], land), (head_rear, head), ONE_LINE_DROP
+        ),
+        "NeckLen": linear(
+            "NeckLen",
+            (neck, NECK_DIA / 2000.0),
+            (head_rear, head),
+            ONE_LINE_DROP,
+            text_reach=(NECK_LEN_LINE_REACH, NECK_LEN_LINE_REACH),
+        ),
+        "BackJournalLen": linear(
+            "BackJournalLen", (back_land[0], land), (back_land[1], land), ONE_LINE_DROP
+        ),
+        "BackCapSagDim": linear(
+            "BackCapSagDim",
+            (apex, 0.0),
+            (root, land),
+            BACK_CAP_SAG_LINE_DROP,
+            text_reach=(BACK_CAP_SAG_LINE_LEFT, 0.0),
+        ),
+        "OverallLen": linear(
+            "OverallLen", (apex, 0.0), (_sheet_x(FRONT_APEX_Z), 0.0), TWO_LINE_DROP
+        ),
+        "BackRimFromHeadRear": linear(
+            "BackRimFromHeadRear", (root, land), (head_rear, head), TWO_LINE_DROP
+        ),
+    }
+
+
+def back_crown_landing_problems(
+    center: tuple[float, float],
+    landing: tuple[float, float],
+    *,
+    radius: float = BACK_CAP_R_M,
+    tol: float = 5e-5,
+) -> list[str]:
+    """Why a radius leader's landing is not on the back crown: off the SR7.3's
+    radius at sheet scale, or outside the arc between the Ø8 flanks."""
+    problems = []
+    reach = math.dist(center, landing)
+    if abs(reach - radius) > tol:
+        problems.append(
+            f"lands {reach * 1000:.2f} mm from the centre, not on the "
+            f"{radius * 1000:.2f} mm radius"
+        )
+    angle = math.degrees(math.atan2(landing[1] - center[1], center[0] - landing[0]))
+    if abs(angle) >= BACK_CAP_HALF_ANGLE_DEG:
+        problems.append(
+            f"lands {angle:.1f}° off the axis, outside the crown's "
+            f"±{BACK_CAP_HALF_ANGLE_DEG:.1f}° arc"
+        )
+    return problems
+
+
+def assert_profile_leaders_clear() -> None:
+    """Refuse a modelled leader or station that meets a line it may not, or an
+    SR7.3 that misses the crown, before any COM work."""
+    problems = [
+        *leader_line_findings(profile_ink()),
+        *(
+            f"SR7.3 {problem}"
+            for problem in back_crown_landing_problems(BACK_CAP_CENTER, BACK_CAP_R_LANDING)
+        ),
+    ]
+    if problems:
+        raise RuntimeError(
+            "pinion-arbor profile leaders collide:\n"
+            + "\n".join(f"  - {problem}" for problem in problems)
+        )
+    _telemetry.debug("pinion-arbor profile leaders clear")
+
 DIMENSION_CALLOUTS = {
     # One name for the axial datum every station runs from (Fable m1): the
     # head end has two shoulders, Ø8-Ø10.5 and Ø10.5-Ø15.
@@ -573,16 +1013,6 @@ DIMENSION_CALLOUTS = {
 }
 # The turning axis runs the full part and this far past each crown.
 AXIS_OVERSHOOT_MM = 3.0
-# Each land's Ra symbol hangs off one flank on the land's head side of its
-# diameter line, clear of the split-line rings at the land ends.
-JOURNAL_FINISHES = {
-    "front_journal": (
-        FRONT_JOURNAL_Z + RA_ARROW_FROM_HEAD_END,
-        (FRONT_RA_X, 0.150),
-        "lower",
-    ),
-    "back_journal": (BACK_JOURNAL_Z + RA_ARROW_FROM_HEAD_END, BACK_RA_XY, "upper"),
-}
 
 
 def _orient_like_profile(view: Any, *, label: str) -> None:
@@ -1148,6 +1578,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
     assert_end_view_ink_clear()
+    assert_profile_leaders_clear()
 
     check("open pinion-arbor source", await adapter.open_model(str(SOURCE)))
     read_required_properties(
@@ -1231,6 +1662,11 @@ async def build(adapter: Any) -> dict[str, str]:
         *detail_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _set_arrow_sides(
+        adapter,
+        principal_annotations,
+        {name: DIM_ARROWS_INSIDE for name in FRONT_LAND_ARROWS_INSIDE},
+    )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     for name, label in {
         "HeadCapSagDim": "front-crown height reference",
@@ -1250,23 +1686,6 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add center mark to the detailed grip cross-hole")
     _add_turning_axis(adapter, principal)
     witness_spans = _blacken_reference_witnesses(adapter, principal)
-    for key, (station_z, symbol_xy, flank) in JOURNAL_FINISHES.items():
-        land_x, axis_y = model_point_in_view(
-            adapter,
-            principal,
-            (0.0, 0.0, station_z / 1000.0),
-            label=f"arbor {key} finish station",
-        )
-        add_surface_finish(
-            adapter,
-            principal,
-            edge_xy=(land_x, axis_y + FLANK_SIGN[flank] * SHAFT_DIA / 2000.0),
-            symbol_xy=symbol_xy,
-            control=surface_finish_by_key(SURFACE_FINISHES, key),
-            label=f"arbor {key} finish",
-            entity_type="SILHOUETTE",
-            char_height=0.0025,
-        )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.255)
     _position_detail_label(adapter, detail)
@@ -1274,6 +1693,16 @@ async def build(adapter: Any) -> dict[str, str]:
     sheets = collect_document(adapter)
     _log_end_view_ink(sheets, view_name(adapter, end))
     _assert_no_text_on_line([f for sheet in sheets for f in audit_sheet(sheet)])
+    _assert_sheet_leaders_clear(sheets)
+    _assert_back_crown_radius_lands(
+        sheets,
+        model_point_in_view(
+            adapter,
+            principal,
+            (0.0, 0.0, (BACK_APEX_Z - BACK_CAP_R) / 1000.0),
+            label="back crown SR7.3 centre",
+        ),
+    )
     fence_center = model_point_in_view(
         adapter,
         principal,
@@ -1329,10 +1758,128 @@ async def build(adapter: Any) -> dict[str, str]:
     return outputs
 
 
+def sheet_ink(annotations: list[Any]) -> SheetInk:
+    """The audit's annotations as the leader rule reads them: each radial or
+    diametric dimension and each non-dimension annotation with ink is a
+    leader, every other dimension is linear."""
+    ink: SheetInk = {}
+    for annotation in annotations:
+        runs = [
+            ((segment.x0, segment.y0), (segment.x1, segment.y1))
+            for segment in annotation.segments
+        ]
+        if not runs:
+            continue
+        linear = annotation.kind == "dim" and annotation.label not in LEADER_DIMENSIONS
+        name = annotation.label
+        while name in ink:
+            name += "'"
+        ink[name] = ("linear" if linear else "leader", runs)
+    return ink
+
+
+def _assert_sheet_leaders_clear(sheets: list[Any]) -> None:
+    """The sheet's leader rule on the rendered ink: no leader meets a
+    dimension or extension line, no two linear dimensions meet unnamed, and no
+    surface-finish symbol remains (the journal lands' Ra is a note)."""
+    annotations = [annotation for sheet in sheets for annotation in sheet.annotations]
+    symbols = sorted(a.label for a in annotations if a.kind == "surface-finish")
+    ink = sheet_ink(annotations)
+    findings = leader_line_findings(ink)
+    expected = expected_crossings_found(ink)
+    leaders = sorted(name for name, (role, _runs) in ink.items() if role == "leader")
+    _telemetry.info(
+        f"pinion-arbor sheet leaders: {len(leaders)} leader-bearing {leaders}, "
+        f"{len(ink) - len(leaders)} linear; report-only crossings {expected}",
+        leaders=len(leaders),
+        expected=len(expected),
+    )
+    if symbols:
+        findings.append(f"surface-finish symbols on the sheet: {symbols}")
+    if findings:
+        raise RuntimeError(
+            "pinion-arbor: leaders meet lines on the sheet:\n"
+            + "\n".join(f"  - {finding}" for finding in findings)
+        )
+    _telemetry.success("pinion-arbor: no leader meets a dimension or extension line")
+
+
+# How near a BackCapR stroke's end must come to the SR7.3's radius (or to its
+# centre, for the stroke SolidWorks runs on to it) to count as landing there.
+LANDING_TOL_M = 1e-4
+
+
+def _assert_back_crown_radius_lands(sheets: list[Any], center: tuple[float, float]) -> None:
+    """The SR7.3's arrow lands on the back crown: a BackCapR stroke ends on the
+    7.27 mm radius about the crown's centre, inside the crown's arc.  a652's
+    landed on the arc's extension past the Ø8 flank."""
+    runs = [
+        ((segment.x0, segment.y0), (segment.x1, segment.y1))
+        for sheet in sheets
+        for annotation in sheet.annotations
+        if annotation.label == "BackCapR"
+        for segment in annotation.segments
+    ]
+    if not runs:
+        raise RuntimeError("pinion-arbor: the SR7.3 carries no ink to land")
+    ends = [end for run in runs for end in run]
+    landing = min(ends, key=lambda end: abs(math.dist(end, center) - BACK_CAP_R_M))
+    proof = "a stroke ends on the radius"
+    if abs(math.dist(landing, center) - BACK_CAP_R_M) > LANDING_TOL_M:
+        # One stroke may run from the bend straight on to the centre: then it
+        # crosses the radius where the arrow stands.
+        for run in runs:
+            near, far = sorted(run, key=lambda end: math.dist(end, center))
+            if math.dist(near, center) <= LANDING_TOL_M < math.dist(far, center) - BACK_CAP_R_M:
+                length = math.dist(far, center)
+                landing = (
+                    center[0] + (far[0] - center[0]) / length * BACK_CAP_R_M,
+                    center[1] + (far[1] - center[1]) / length * BACK_CAP_R_M,
+                )
+                proof = "a stroke runs from the centre out through the radius"
+                break
+    problems = back_crown_landing_problems(center, landing, tol=LANDING_TOL_M)
+    reach = math.dist(landing, center)
+    angle = math.degrees(math.atan2(landing[1] - center[1], center[0] - landing[0]))
+    _telemetry.info(
+        f"pinion-arbor: SR7.3 lands at ({landing[0] * 1000:.2f}, {landing[1] * 1000:.2f}) mm, "
+        f"{reach * 1000:.3f} mm from the crown centre ({center[0] * 1000:.2f}, "
+        f"{center[1] * 1000:.2f}) at {angle:.1f}° (arc ±{BACK_CAP_HALF_ANGLE_DEG:.1f}°); "
+        f"({proof}); {len(runs)} strokes {[_fmt_line(run) for run in runs]}",
+        reach_mm=reach * 1000,
+        angle_deg=angle,
+    )
+    if problems:
+        raise RuntimeError(
+            "pinion-arbor: the SR7.3 misses the back crown: " + "; ".join(problems)
+        )
+
+
+def _set_arrow_sides(adapter: Any, annotations: list[Any], sides: dict[str, int]) -> None:
+    """Stand each named dimension's arrows on its swDimensionArrowsSide_e side,
+    read back (draw_cone_tip_block's _set_arrow_sides, farm-proven at
+    mha092-72ab)."""
+    remaining = dict(sides)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        side = remaining.pop(name)
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArrowSide = side
+        if int(display.ArrowSide) != side:
+            raise RuntimeError(f"{name} did not keep its arrows on side {side}")
+    if remaining:
+        raise RuntimeError(f"no dimension to set arrow sides: {sorted(remaining)}")
+
+
 # Text on text joined the gate with the bond-zone callout's move above the
 # shaft, beside the DETAIL A label (63468ee9 read 0 advisory findings).
 # Leader on leader joined with the back Ra symbol's move above the shaft: at
-# c6eb7f6f its shoulder crossed the back land's 19.0 witness (Main).
+# c6eb7f6f its shoulder crossed the back land's 19.0 witness (Main).  Both
+# symbols have since become the JOURNAL LANDS note; a leader meeting a
+# dimension or extension line is _assert_sheet_leaders_clear's.
 BLOCKING_LAYOUT_FINDINGS = frozenset(
     {"text-on-line", "text-on-text", "leader-crosses-leader"}
 )

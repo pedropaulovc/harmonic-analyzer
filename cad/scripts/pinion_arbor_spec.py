@@ -345,12 +345,25 @@ CROSS_HOLE_CALLOUT = (
     "REAM THRU,\n"
     "CENTRED ON HEAD LENGTH"
 )
+# The journal lands' roughness prints as one general note, not as a symbol on
+# each land: under the profile the front land's symbol had no leader clear of
+# the 47.4 and 61.55 witnesses (Main, round 4 on neckc3-a652).  Every surface
+# control here is a journal land, and they share one grade, printed through
+# the controls' own roughness_ra (the _surface_finish.ra rendering the symbols
+# used), so a unit change reaches the note too.
+_JOURNAL_ROUGHNESS = {control.roughness_ra for control in SURFACE_FINISHES}
+if {control.key for control in SURFACE_FINISHES} != {"front_journal", "back_journal"}:
+    raise AssertionError("the journal-lands finish note covers the journal lands only")
+if len(_JOURNAL_ROUGHNESS) != 1:
+    raise AssertionError("the journal lands must share one roughness grade")
+JOURNAL_LANDS_FINISH_NOTE = f"JOURNAL LANDS Ra {next(iter(_JOURNAL_ROUGHNESS))}."
 # Notes never carry dimensions (Codex P1 on #814): the drum station is the
 # model's DrumStationFromHeadRear, printed on the profile as "DRUM STATION"
 # with its .X band, and the note only names it.
 DRAWING_NOTES = "\n".join(
     (
         "JOURNALS RUN IN MHA-056 REAMED BORES.",
+        JOURNAL_LANDS_FINISH_NOTE,
         f"SHAFT SLIPS INTO MHA-002; BOND WITH {RETAINING_COMPOUND}, DRUM FRONT END",
         "  AT DRUM STATION. WIPE SQUEEZE-OUT OFF JOURNAL LANDS.",
     )
