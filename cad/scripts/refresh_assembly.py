@@ -38,9 +38,9 @@ def main() -> int:
 
     async def build(adapter):
         # The press-fit allowance lookup lives HERE (the entrypoint dodo invokes,
-        # outside every assembly's recipe closure) so _interference_contracts and
-        # its pinion geometry imports invalidate only the builders that import
-        # them directly (codex #359).
+        # outside every assembly's recipe closure).  Each builder imports its own
+        # _interference_contracts_<assembly> table, so a table's geometry
+        # imports invalidate only that assembly (codex #359, #888).
         from _interference_contracts import allowed_interference_pairs
 
         native_contact_check = None

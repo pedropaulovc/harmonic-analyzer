@@ -136,7 +136,7 @@ from build_harmonic_base import (
     NAMEPLATE_SCREW_HOLE_DEPTH,
     NAMEPLATE_SCREW_XZ,
 )
-from _interference_contracts import allowed_interference_pairs
+from _interference_contracts_frame import ALLOWED_PAIRS as ALLOWED_INTERFERENCE_PAIRS
 from cone_pivot_post_installation import (
     FRAME_FRONT_COLUMN_Z,
     FRAME_REAR_COLUMN_Z,
@@ -871,7 +871,7 @@ async def build(adapter) -> dict[str, str]:
     assert_components_fully_defined(adapter)
     check_no_interference(
         adapter,
-        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+        allowed_pairs=ALLOWED_INTERFERENCE_PAIRS,
     )
     # Title-block identity for the assembly drawing (draw_frame_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells

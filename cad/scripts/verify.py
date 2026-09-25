@@ -1908,6 +1908,30 @@ def verify_base_footprint(report: Report) -> None:
     report.gate("footprint:drive-train-mounts-on-base", _mounts_on_plate)
 
 
+def verify_chain_crank_station(report: Report) -> None:
+    """Keep the paper-drive chain's crank sprocket on the drive-train crank.
+
+    ``_chain`` holds the loop in the pre-mirror frame, so its crank centre must
+    be the reflection of the drive train's (X_CRANK, Y_CRANK).  The paper-drive
+    build used to import the drive-train script to check this, which put the
+    whole drive-train recipe (and its interference contract) on paper-drive's
+    cache key (#888); the gate lives here instead, where both are in reach.
+    """
+
+    def _crank_centre() -> None:
+        import _chain
+        import build_drive_train_assembly as train
+
+        expected = (-train.X_CRANK, train.Y_CRANK)
+        _expect(
+            _chain.CRANK_CENTRE == expected,
+            f"_chain CRANK_CENTRE {_chain.CRANK_CENTRE} != -drive-train crank "
+            f"{expected}",
+        )
+
+    report.gate("layout:paper-drive-chain-on-crank", _crank_centre)
+
+
 def _expect(condition: bool, message: str) -> None:
     if not condition:
         raise RuntimeError(message)
@@ -2247,6 +2271,7 @@ async def build(adapter: Any) -> dict[str, str]:
         verify_truth(report)
         verify_spring_base(report)
         verify_base_footprint(report)
+        verify_chain_crank_station(report)
     if suite == "config":
         verify_config_vs_dimensions(report)
         verify_tolerance_audit(report)
@@ -2322,6 +2347,7 @@ if __name__ == "__main__":
             verify_truth(_report)
             verify_spring_base(_report)
             verify_base_footprint(_report)
+            verify_chain_crank_station(_report)
         else:
             verify_config_vs_dimensions(_report)
             verify_tolerance_audit(_report)

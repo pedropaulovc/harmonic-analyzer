@@ -1256,11 +1256,19 @@ VERIFY_PY = (SCRIPTS_DIR / "verify.py").resolve()
 # Verify/preflight gate logic that is NOT on any assembly's build closure (so it
 # does not ride a .SLDASM digest) -> a direct file_dep of verify:/preflight tasks.
 POSTBUILD_PY = (SCRIPTS_DIR / "_assembly_postbuild.py").resolve()
-# Interference-acceptance contract read by verify.py's soundness gate. Like
-# POSTBUILD_PY it decides gate OUTCOMES, so a change to it must re-run soundness
-# even when no geometry moved; the part-geometry it imports already rides each
-# assembly's execution token (codex #359).
+# Interference-acceptance contracts read by verify.py's soundness gate. Like
+# POSTBUILD_PY they decide gate OUTCOMES, so a change to one must re-run
+# soundness even when no geometry moved; the part-geometry a table imports
+# already rides its assembly's execution token (codex #359).  The core holds the
+# by-name lookup; each assembly's table is its own module (#888), so a leaf
+# depends on the core plus its own table, never on the other assemblies'.
 INTERFERENCE_CONTRACTS_PY = (SCRIPTS_DIR / "_interference_contracts.py").resolve()
+
+
+def _interference_contract_py(stem: str) -> Path | None:
+    """The assembly's own contract table, or None for one without intended fits."""
+    path = SCRIPTS_DIR / f"_interference_contracts_{stem}.py"
+    return path.resolve() if path.exists() else None
 EXPORT_PY = (SCRIPTS_DIR / "export_models.py").resolve()
 RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
 PREFLIGHT_PY = (SCRIPTS_DIR / "preflight_release.py").resolve()
@@ -1750,6 +1758,9 @@ def _soundness_file_deps(stem: str) -> list[str]:
         _sldasm(stem),
         _assembly_execution_token(stem),
     ]
+    contract = _interference_contract_py(stem)
+    if contract is not None:
+        deps.append(str(contract))
     if stem == "paper_drive":
         deps.append(_dof_json(stem))
     return deps

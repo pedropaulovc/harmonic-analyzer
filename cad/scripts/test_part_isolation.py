@@ -174,11 +174,46 @@ def test_no_part_imports_main_assembly_helper():
         f"part scripts transitively import an assembly-level helper: {offenders}")
 
 
+def test_each_assembly_reads_only_its_own_interference_contract():
+    """An assembly's recipe carries its own contract table and no other (#888).
+
+    One shared table module put every table's geometry imports (pinion rig
+    layout, crank specs, base seats) on all eight assembly keys.  The core's
+    by-name lookup imports a table only when called, so it must stay free of
+    static imports of the tables, or every builder would pull them back in.
+    """
+    import _interference_contracts as core
+
+    tables = {f"_interference_contracts_{stem}" for stem in ASSEMBLY_ORDER}
+    registered = {
+        name.replace("-", "_"): module
+        for name, module in core.CONTRACT_MODULES.items()
+    }
+    assert set(registered.values()) <= tables
+    for stem, module in registered.items():
+        assert module == f"_interference_contracts_{stem}"
+        assert (SCRIPTS_DIR / f"{module}.py").is_file()
+
+    core_path = SCRIPTS_DIR / "_interference_contracts.py"
+    core_deps = {Path(p).stem for p in module_deps_of(core_path)}
+    assert not core_deps & tables, f"core imports a table statically: {core_deps & tables}"
+
+    offenders = {}
+    for stem in ASSEMBLY_ORDER:
+        script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
+        read = {Path(p).stem for p in module_deps_of(script)} & tables
+        expected = {registered[stem]} if stem in registered else set()
+        if read != expected:
+            offenders[stem] = sorted(read)
+    assert not offenders, f"assemblies reading another contract table: {offenders}"
+
+
 def _main() -> int:
     test_forbidden_set_is_nonempty()
     test_no_part_imports_assembly_level_submodule()
     test_no_assembly_imports_drawing_submodule()
     test_no_part_imports_main_assembly_helper()
+    test_each_assembly_reads_only_its_own_interference_contract()
     n, m = len(part_scripts()), len(_assembly_scripts())
     print(f"OK  part-isolation: {n} part scripts import no assembly/motion/drawing "
           f"module; {m} assembly scripts import no drawing module")

@@ -205,7 +205,9 @@ from _assembly_patterns import (
     grid_component_pattern,
     PatternDirection,
 )
-from _interference_contracts import allowed_interference_pairs
+from _interference_contracts_drive_train import (
+    ALLOWED_PAIRS as ALLOWED_INTERFERENCE_PAIRS,
+)
 from _drive_train_explode import create_drive_train_explode
 
 # CopyWithMates2 helpers for the cone-gear ladder (#228). NB importing _cwm
@@ -2906,7 +2908,7 @@ async def build(adapter) -> dict[str, str]:
     # under the hole's bottom edge). Both lock to the arm so they spin with the
     # crank. The pin's nominal taper is larger than the arm's #14 / shaft's #9
     # pilot holes (they are taper-reamed together at assembly), so the two
-    # overlaps are volume-bounded allowed pairs in _interference_contracts.
+    # overlaps are volume-bounded allowed pairs in _interference_contracts_drive_train.
     pin = await place_component(
         adapter,
         "crank-pin",
@@ -4367,7 +4369,7 @@ async def build(adapter) -> dict[str, str]:
     write_dof_manifest(ASM_NAME)
     check_no_interference(
         adapter,
-        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+        allowed_pairs=ALLOWED_INTERFERENCE_PAIRS,
     )
     # Title-block identity for the assembly drawing (draw_drive_train_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells

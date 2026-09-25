@@ -118,7 +118,9 @@ from _assembly_patterns import (
     grid_component_pattern,
     PatternDirection,
 )
-from _interference_contracts import allowed_interference_pairs
+from _interference_contracts_paper_drive import (
+    ALLOWED_PAIRS as ALLOWED_INTERFERENCE_PAIRS,
+)
 from _holes import CLEARANCE_MM
 from _transforms import (  # noqa: E402
     IDENTITY,
@@ -804,13 +806,9 @@ def _assert_chain_layout() -> None:
             f"_chain KNOB_CENTRE {CHAIN_KNOB_CENTRE} != -KNOB_SHAFT_XY"
             f" ({knob_pre[0]:.4f}, {knob_pre[1]:.4f})"
         )
-    from build_drive_train_assembly import X_CRANK, Y_CRANK
-
-    if CHAIN_CRANK_CENTRE != (-X_CRANK, Y_CRANK):
-        raise RuntimeError(
-            f"_chain CRANK_CENTRE {CHAIN_CRANK_CENTRE} != -drive-train crank"
-            f" ({-X_CRANK}, {Y_CRANK})"
-        )
+    # The crank end is pinned to the drive train by check:math
+    # (verify_chain_crank_station): importing the drive-train script here put
+    # its whole recipe on this assembly's cache key.
     if (TIP_R_T24, TIP_R_T12) != (REMOVABLE_TIP_R["T24"], REMOVABLE_TIP_R["T12"]):
         raise RuntimeError("_chain tip radii diverged from REMOVABLE_TIP_R")
     log(
@@ -1612,7 +1610,7 @@ async def build(adapter) -> dict[str, str]:
     # Crank-end T12 removable = the crank-shaft chain wheel, brought over from
     # drive-train so the chain seats on BOTH sprockets locally. Placed at the
     # MACHINE crank centre = -CHAIN_CRANK_CENTRE (the pre-mirror _chain anchor,
-    # == -drive-train (X_CRANK, Y_CRANK); _assert_chain_layout pins this).
+    # == -drive-train (X_CRANK, Y_CRANK); check:math pins this).
     # Coplanar with the T24 on the -155 chain plane; a spur gear is symmetric so
     # identity rotation. FREE to spin -- this is the crank input, the single
     # operational DOF.
@@ -1734,7 +1732,7 @@ async def build(adapter) -> dict[str, str]:
     write_dof_manifest(ASM_NAME)
     check_no_interference(
         adapter,
-        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+        allowed_pairs=ALLOWED_INTERFERENCE_PAIRS,
     )
     # Machine coords put the output/paper side at -Z, so SolidWorks' native Front
     # renders the machine BACK (chain and transgear cluster mirrored). Re-base the
