@@ -545,18 +545,37 @@ class Author:
     script: str
 
 
-def _last_commits(rels: set[str], repo: Path) -> dict[str, str]:
-    """The newest commit touching each of ``rels``; the walk stops once all are seen.
+_OBJECT_ID = re.compile(r"^[0-9a-f]{40}([0-9a-f]{24})?$")
 
-    Every path in ``rels`` is committed, so an unbounded walk would only read
-    older history -- which a shallow or partial clone (a farm worker's depth-1
-    fetch) does not have, making git fail or fetch its way back.
+
+def _last_commits(blobs: dict[str, str], repo: Path) -> dict[str, str]:
+    """The newest commit that produced each path's HEAD blob; stops once all are seen.
+
+    Matching the blob, not just "touched the path", is what keeps a newer edit
+    on a side branch that a merge did not take from reading as the author of
+    the content the merge kept.  Every blob in ``blobs`` is committed, so an
+    unbounded walk would only read older history -- which a shallow or partial
+    clone (a farm worker's depth-1 fetch) does not have, making git fail or
+    fetch its way back.
     """
     last: dict[str, str] = {}
-    if not rels:
+    if not blobs:
         return last
     proc = subprocess.Popen(
-        ["git", "-C", str(repo), "log", "--format=%x00%H", "--name-only", "--", *rels],
+        # -c: a merge whose result differs from every parent produced its blob
+        [
+            "git",
+            "-C",
+            str(repo),
+            "log",
+            "--format=%x00%H",
+            "--raw",
+            "-c",
+            "--no-abbrev",
+            "--no-renames",
+            "--",
+            *blobs,
+        ],
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
         text=True,
@@ -564,12 +583,17 @@ def _last_commits(rels: set[str], repo: Path) -> dict[str, str]:
     try:
         commit = ""
         for line in proc.stdout or ():
-            line = line.strip()
+            line = line.rstrip("\n")
             if line.startswith("\x00"):
                 commit = line[1:]
-            elif line in rels:
-                last.setdefault(line, commit)
-                if len(last) == len(rels):
+                continue
+            meta, tab, path = line.partition("\t")
+            if not tab or path not in blobs:
+                continue
+            ids = [token for token in meta.split() if _OBJECT_ID.match(token)]
+            if ids and ids[-1] == blobs[path]:  # the post-image
+                last.setdefault(path, commit)
+                if len(last) == len(blobs):
                     break
     finally:
         proc.kill()
@@ -601,10 +625,13 @@ def script_authors(
     }
     status = _git("status", "--porcelain", "--", *rels.values(), repo=repo) or ""
     dirty = {line.split(maxsplit=1)[-1] for line in status.splitlines()}  # "XY path"
-    tracked = set(
-        (_git("ls-files", "--", *rels.values(), repo=repo) or "").splitlines()
+    tree = _git("ls-tree", "HEAD", "--", *rels.values(), repo=repo) or ""
+    blobs = {  # "<mode> blob <id>\t<path>"
+        line.partition("\t")[2]: line.split()[2] for line in tree.splitlines()
+    }
+    last = _last_commits(
+        {rel: blob for rel, blob in blobs.items() if rel not in dirty}, repo
     )
-    last = _last_commits(tracked - dirty, repo)
     boundary = _shallow_boundary(repo) if last else set()
     bodies: dict[str, str] = {}
     if last:

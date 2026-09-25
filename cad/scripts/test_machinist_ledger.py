@@ -574,6 +574,50 @@ def test_a_shallow_clone_names_no_author_instead_of_erroring(tmp_path: Path) -> 
     assert "--author-family <family>" in ml.fix_command(status, missing)
 
 
+def test_the_author_is_the_commit_that_produced_the_scripts_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Integ's draw_cone_tip_bushing.py: a newer side-branch edit (6b993ef73) that
+    # the merge did not take read as the author of the older content it kept.
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    script, other = repo / "draw_crank_arm.py", repo / "notes.py"
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2026-09-20T00:00:00Z")
+    _commit(repo, other, "base")
+    _git(repo, "checkout", "-q", "-b", "side")
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2026-09-22T00:00:00Z")
+    _commit(repo, script, "side edit\n\nCo-Authored-By: GPT-6 Sol <noreply@openai.com>")
+    _commit(repo, other, "side notes\n\nCo-Authored-By: GPT-6 Sol <noreply@openai.com>")
+    _git(repo, "checkout", "-q", "main")
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2026-09-21T00:00:00Z")
+    _commit(
+        repo,
+        script,
+        "kept edit\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+    )
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2026-09-23T00:00:00Z")
+    # A merge that takes the side's notes and keeps main's script.
+    _git(repo, "merge", "-q", "-s", "ours", "--no-commit", "side")
+    _git(repo, "checkout", "side", "--", other.name)
+    _git(
+        repo,
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@example.com",
+        "commit",
+        "-q",
+        "-m",
+        "merge side's notes, keeping main's script",
+    )
+
+    authors = ml.script_authors([script, other], repo=repo)
+
+    assert authors[script].model == "claude-opus-5-5"
+    assert authors[other].model == "gpt-6-sol"
+
+
 def test_claims_must_agree_with_the_trailer(
     registry: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
