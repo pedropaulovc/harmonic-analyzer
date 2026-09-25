@@ -328,10 +328,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("fillister-screw-1", "crank-arm-1")): _annulus_limit(
                 2.8448, 2.261, 5.33
             ),
-            # U30 I21: MHA-140 #6-32 in the #36 foot tap, 8.05 deep (I38
-            # replaces this bound with the first build's observation).
-            frozenset(("cone-tip-block-screw-1", "cone-tip-block-1")): _annulus_limit(
-                3.505, 2.705, 8.05
+            # I31: MHA-140 #6-32 through the MHA-146 locknut's #36 bore,
+            # 11/64 high (the first build's observation replaces this bound).
+            frozenset(("cone-tip-block-screw-1", "cone-tip-block-nut-1")): _annulus_limit(
+                3.505, 2.705, 11.0 / 64.0 * 25.4
             ),
             # U30 I22: each MHA-142 1/4-20 in its #7 MHA-091 tap, 6.0198 deep.
             **_expected_numbered_pairs(

@@ -138,12 +138,12 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(
         ("cone-tip-adjuster-1", "cone-gear-shaft-1")
     ): _ADJUSTER_THRUST_GATE_LIMIT_MM3,
-    # U30 (I21): MHA-140 (#6-32 91255A148, major 3.505) in the block's #36
-    # (2.705) foot tap, 8.05 deep (12.7 less the 3.55 ledge and the 1.10
-    # shim).  The smooth-annulus bound until the first drive-train build
-    # observes the helical overlap (I38; ~12.7 mm3 estimated).
-    frozenset(("cone-tip-block-screw-1", "cone-tip-block-1")): _smooth_annulus_limit_mm3(
-        3.505, 2.705, 8.05
+    # I31: MHA-140 (#6-32 93075A150, major 3.505) through the MHA-146
+    # nylon-insert locknut, bored at the #36 (2.705) tap drill over its whole
+    # 11/64 (4.3656) height.  The smooth-annulus upper bound until the first
+    # drive-train build observes the helical overlap.
+    frozenset(("cone-tip-block-screw-1", "cone-tip-block-nut-1")): _smooth_annulus_limit_mm3(
+        3.505, 2.705, 11.0 / 64.0 * 25.4
     ),
     # U30 (I22): each MHA-142 (1/4-20 MSC 40923898, major 6.35) in its #7
     # (5.105) MHA-091 tap, 6.0198 deep (86.0 less the 79.9802 post seat).

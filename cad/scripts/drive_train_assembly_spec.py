@@ -46,6 +46,7 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "cone-tip-pinch-screw",
         "cone-tip-shim",
         "cone-tip-block-screw",
+        "cone-tip-block-nut",
         "post-mount-screw",
         "cone-lock-knob",
         "cone-pivot-screw",
@@ -126,6 +127,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # cone set: base hardware up, swing plate down
     ExplodeStep("swing plate drops", ("cone-swing-platform",), "y", -30.0),
     ExplodeStep("tip block screw drops", ("cone-tip-block-screw",), "y", -45.0),
+    ExplodeStep("tip block nut lifts", ("cone-tip-block-nut",), "y", 20.0),
     ExplodeStep("post mount screws lift", ("post-mount-screw",), "y", 100.0),
     ExplodeStep("pivot screw lifts", ("cone-pivot-screw",), "y", 35.0),
     ExplodeStep("lock knob lifts", ("cone-lock-knob",), "y", 30.0),
