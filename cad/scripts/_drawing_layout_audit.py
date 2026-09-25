@@ -37,7 +37,7 @@ from typing import Any, Callable, Mapping
 import _telemetry
 from _common import _early_bound
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
-from _pdf_ink import PageInk, read_pdf_ink
+from _pdf_ink import PageInk, page_ink, read_pdf_ink
 from _layout_audit import (
     DUMP_SCHEMA,
     LAYOUT_AUDIT_MODE,
@@ -48,6 +48,8 @@ from _layout_audit import (
 _ANNOT_DIM = 4
 _ANNOT_NOTE = 6
 _ANNOT_DATUM_ORIGIN = 16
+# How far a PDF page may differ from its sheet's GetProperties2 size.
+PAGE_SIZE_TOL_M = 0.0005
 # swZoneMargin_e
 _ZONE_MARGINS = {"top": 0, "bottom": 1, "right": 2, "left": 3}
 
@@ -70,9 +72,9 @@ def _round(values: Any) -> list[float]:
 class _Reader:
     """Tolerant COM reads: an accessor that does not apply returns ``default``.
 
-    Every refusal is counted under the accessor's name, so a report shows
-    which reads failed (an expected ``GetLineAtIndex3`` fallback) and which
-    are faults, instead of one opaque total.
+    Every refusal is counted per sheet under the accessor's name. A refused
+    read can drop an annotation's ink or text from the audit, so any count is
+    a gating ``com-read-errors`` finding.
     """
 
     def __init__(self, adapter: Any) -> None:
@@ -89,6 +91,20 @@ class _Reader:
             self._count(name or (fn.__code__.co_names[-1] if fn.__code__.co_names else "?"))
             return default
         return default if value is None else value
+
+    def first(self, fns: list[Callable[[], Any]], *, name: str) -> Any:
+        """The first overload that answers; one refusal counted only when all do
+        (``GetLineAtIndex3`` refusing before ``GetLineAtIndex2`` answers is the
+        expected path, not a lost primitive)."""
+        for fn in fns:
+            try:
+                value = fn()
+            except Exception:
+                continue
+            if value:
+                return value
+        self._count(name)
+        return None
 
     def bind(self, obj: Any, interface: str) -> Any:
         if obj is None:
@@ -113,11 +129,9 @@ def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
         count = int(reader.call(lambda c=count_name: getattr(data, c)(), 0, name=count_name) or 0)
         rows = []
         for index in range(count):
-            raw = None
-            for getter in getters:
-                raw = reader.call(lambda g=getter, i=index: getattr(data, g)(i), name=getter)
-                if raw:
-                    break
+            raw = reader.first(
+                [lambda g=getter, i=index: getattr(data, g)(i) for getter in getters], name="/".join(getters)
+            )
             if raw:
                 rows.append(_round(raw))
         if rows:
@@ -173,12 +187,9 @@ def _dump_annotation(reader: _Reader, raw: Any) -> dict[str, Any] | None:
     elif kind == _ANNOT_DIM:
         display = reader.bind(specific, "IDisplayDimension")
         if display is not None:
-            record["dim"] = {
-                "hole_callout": bool(reader.call(lambda: display.IsHoleCallout(), False)),
-                # Calibration only: does the dimension's own display data
-                # differ from IAnnotation's? (hole callouts were measured on it)
-                "display": _dump_display(reader, reader.call(lambda: display.GetDisplayData())),
-            }
+            # IDisplayDimension::GetDisplayData is not read: on the d09c2b9eb
+            # calibration leaves it equalled IAnnotation's for all 72 dimensions.
+            record["dim"] = {"hole_callout": bool(reader.call(lambda: display.IsHoleCallout(), False))}
     elif kind == _ANNOT_DATUM_ORIGIN:
         origin = reader.bind(specific, "IDatumOrigin")
         if origin is not None:
@@ -267,19 +278,6 @@ def _dump_view(
     return record
 
 
-def page_ink(page: PageInk) -> dict[str, Any]:
-    """A PDF page as dump data: text objects, and black strokes (the frame and
-    title block print grey, so they drop out)."""
-    return {
-        "spans": [[span.text, *_round((span.xmin, span.ymin, span.xmax, span.ymax))] for span in page.spans],
-        "strokes": [
-            [*_round((stroke.x0, stroke.y0, stroke.x1, stroke.y1, stroke.width)), int(stroke.dashed)]
-            for stroke in page.strokes
-            if stroke.stroked and not stroke.filled and stroke.rgb == (0, 0, 0)
-        ],
-    }
-
-
 def collect_sheet_dumps(
     adapter: Any,
     *,
@@ -290,7 +288,24 @@ def collect_sheet_dumps(
 ) -> list[dict[str, Any]]:
     """One dump per sheet of the adapter's open drawing, no sheet activated,
     each carrying its page of the exported ``pdf``."""
-    pages = read_pdf_ink(pdf)
+    with _telemetry.span("layout.read_pdf", pdf=pdf.name) as span:
+        pages = read_pdf_ink(pdf)
+        span.set_attribute("pages", len(pages))
+    with _telemetry.span("layout.collect_com", stem=stem) as span:
+        dumps = _collect_com(adapter, stem=stem, pdf=pdf, pages=pages, sheet_layouts=sheet_layouts, is_pictorial=is_pictorial)
+        span.set_attribute("sheets", len(dumps))
+    return dumps
+
+
+def _collect_com(
+    adapter: Any,
+    *,
+    stem: str,
+    pdf: Path,
+    pages: list[PageInk],
+    sheet_layouts: Mapping[str, DrawingLayout],
+    is_pictorial: Callable[[str], bool],
+) -> list[dict[str, Any]]:
     reader = _Reader(adapter)
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     # GetViews' sheet order is undetermined; the PDF prints GetSheetNames order.
@@ -357,7 +372,16 @@ def collect_sheet_dumps(
             raise RuntimeError(
                 f"layout audit: sheet {name!r} is page {page} of {pdf.name}, which has {len(pages)}"
             )
-        dump["ink"] = page_ink(pages[page])
+        # A page of another size, or an origin/scale mismatch, would place all
+        # the ink wrong; the size is checked here, placement by the text match
+        # rate in _layout_audit.sheet_model.
+        ink = pages[page]
+        if abs(ink.width - width) > PAGE_SIZE_TOL_M or abs(ink.height - height) > PAGE_SIZE_TOL_M:
+            raise RuntimeError(
+                f"layout audit: sheet {name!r} is {width * 1000:.1f} x {height * 1000:.1f} mm but page "
+                f"{page} of {pdf.name} is {ink.width * 1000:.1f} x {ink.height * 1000:.1f} mm"
+            )
+        dump["ink"] = page_ink(ink)
         dump["read_errors"] = reader.take_errors()
         dumps.append(dump)
     audited = sorted(str(dump["sheet"]) for dump in dumps)
@@ -366,9 +390,6 @@ def collect_sheet_dumps(
     return dumps
 
 
-# A view's polylines are logged only up to this many values (~30k points):
-# an assembly view can carry millions, which no log line should. The in-process
-# audit always reads the full array; only the logged replay copy is trimmed.
 def run_layout_audit(
     adapter: Any,
     *,
@@ -390,7 +411,12 @@ def run_layout_audit(
             adapter, stem=stem, pdf=pdf, sheet_layouts=sheet_layouts, is_pictorial=is_pictorial
         )
         collected = time.perf_counter() - started
-        content, gating = audit_report(stem, mode, dumps)
+        with _telemetry.span("layout.findings", stem=stem) as child:
+            finding_started = time.perf_counter()
+            content, gating = audit_report(stem, mode, dumps)
+            child.set_attribute("findings_s", round(time.perf_counter() - finding_started, 3))
+            for kind, count in content["summary"]["findings"].items():
+                child.set_attribute(f"findings.{kind}", count)
         summary = content["summary"]
         summary["collect_s"] = round(collected, 3)
         summary["total_s"] = round(time.perf_counter() - started, 3)
@@ -401,7 +427,13 @@ def run_layout_audit(
         span.set_attribute("sheets", summary["sheets"])
         span.set_attribute("gating", summary["gating"])
         span.set_attribute("collect_s", summary["collect_s"])
-        span.set_attribute("read_errors", sum(sum(d["read_errors"].values()) for d in dumps))
+        read_errors = sum(sum(d["read_errors"].values()) for d in dumps)
+        span.set_attribute("read_errors", read_errors)
+        if read_errors:
+            _telemetry.warn(
+                f"layout audit {stem}: {read_errors} refused COM read(s): "
+                + "; ".join(f"{d['sheet']}: {d['read_errors']}" for d in dumps if d["read_errors"])
+            )
         for kind, count in summary["findings"].items():
             span.set_attribute(f"findings.{kind}", count)
         _telemetry.info(

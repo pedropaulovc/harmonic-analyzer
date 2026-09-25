@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from collections.abc import Iterable
 from itertools import combinations, product
 from statistics import median
 
@@ -250,10 +251,12 @@ def union_boxes(boxes: list[Box]) -> Box | None:
     """The single box enclosing every box in ``boxes`` (None when empty)."""
     if not boxes:
         return None
-    total = boxes[0]
-    for box in boxes[1:]:
-        total = total.union(box)
-    return total
+    return Box(
+        min(box.xmin for box in boxes),
+        min(box.ymin for box in boxes),
+        max(box.xmax for box in boxes),
+        max(box.ymax for box in boxes),
+    )
 
 
 def estimate_text_box(
@@ -447,6 +450,40 @@ def _free_direction_mm(box: Box, obstacle: Box) -> tuple[float, float]:
     return ((x + dx) * MM, (y + dy) * MM)
 
 
+# Cell size of the segment grid ``find_text_on_line`` buckets ink into: about
+# one row of text, so a box touches a handful of cells.
+SEGMENT_GRID_M = 0.005
+
+
+class SegmentGrid:
+    """Segments bucketed by the grid cells their bounding boxes cover.
+
+    A PDF-measured sheet carries thousands of model-edge pieces; testing
+    every text box against every one of them runs while the build holds the
+    COM seat. ``near(box)`` returns only the segments whose cells the box
+    touches, in insertion order, each once.
+    """
+
+    def __init__(self, segments: Iterable[tuple[int, Segment]], cell: float = SEGMENT_GRID_M) -> None:
+        self.cell = cell
+        self.cells: dict[tuple[int, int], list[int]] = {}
+        self.items: list[tuple[int, Segment]] = []
+        for owner, segment in segments:
+            index = len(self.items)
+            self.items.append((owner, segment))
+            for key in self._keys(segment.box()):
+                self.cells.setdefault(key, []).append(index)
+
+    def _keys(self, box: Box) -> Iterable[tuple[int, int]]:
+        for i in range(math.floor(box.xmin / self.cell), math.floor(box.xmax / self.cell) + 1):
+            for j in range(math.floor(box.ymin / self.cell), math.floor(box.ymax / self.cell) + 1):
+                yield (i, j)
+
+    def near(self, box: Box) -> list[tuple[int, Segment]]:
+        found = sorted({index for key in self._keys(box) for index in self.cells.get(key, ())})
+        return [self.items[index] for index in found]
+
+
 def find_text_on_line(
     sheet: SheetGeometry, *, tol: float = DEFAULT_TEXT_TOUCH_TOL_M
 ) -> list[Finding]:
@@ -459,34 +496,39 @@ def find_text_on_line(
     length rather than something only the PDF can show.
     """
     findings: list[Finding] = []
+    grid = SegmentGrid(
+        (owner, segment)
+        for owner, annotation in enumerate(sheet.annotations)
+        for segment in annotation.segments
+    )
     for target in sheet.annotations:
         for box in target.text_boxes:
-            for source in sheet.annotations:
+            for owner, segment in grid.near(box):
+                source = sheet.annotations[owner]
                 if source.label == target.label:
                     continue
-                for segment in source.segments:
-                    length = segment_box_overlap_length(segment, box)
-                    if length <= tol:
-                        continue
-                    span = clip_segment_to_box(segment, box)
-                    mid = segment.point_at(sum(span) / 2.0) if span else box.center()
-                    findings.append(
-                        Finding(
-                            kind="text-on-line",
-                            sheet=sheet.name,
-                            a=target.label,
-                            b=source.label,
-                            detail=(
-                                f"text of {target.label!r} {box.format_mm()} is "
-                                f"crossed by {source.label!r}'s {segment.role} "
-                                f"{segment.format_mm()} over "
-                                f"{length * MM:.2f}mm"
-                            ),
-                            at_mm=(mid[0] * MM, mid[1] * MM),
-                            move_target_mm=_free_direction_mm(box, segment.box()),
-                            extra={"overlap_mm": length * MM},
-                        )
+                length = segment_box_overlap_length(segment, box)
+                if length <= tol:
+                    continue
+                span = clip_segment_to_box(segment, box)
+                mid = segment.point_at(sum(span) / 2.0) if span else box.center()
+                findings.append(
+                    Finding(
+                        kind="text-on-line",
+                        sheet=sheet.name,
+                        a=target.label,
+                        b=source.label,
+                        detail=(
+                            f"text of {target.label!r} {box.format_mm()} is "
+                            f"crossed by {source.label!r}'s {segment.role} "
+                            f"{segment.format_mm()} over "
+                            f"{length * MM:.2f}mm"
+                        ),
+                        at_mm=(mid[0] * MM, mid[1] * MM),
+                        move_target_mm=_free_direction_mm(box, segment.box()),
+                        extra={"overlap_mm": length * MM},
                     )
+                )
     return findings
 
 

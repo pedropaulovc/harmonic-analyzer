@@ -17,6 +17,7 @@ from __future__ import annotations
 import ctypes
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_raw
@@ -144,6 +145,12 @@ def _strokes(page: "pdfium.PdfPage") -> list[Stroke]:
     for obj in page.get_objects(max_depth=8):
         if obj.type != pdfium_raw.FPDF_PAGEOBJ_PATH:
             continue
+        if obj.level > 0:
+            # A path inside a form XObject carries its matrix relative to the
+            # form, not the page. SolidWorks drawing PDFs have none (all six
+            # calibration PDFs: every object at level 0); fail rather than
+            # read a displaced path as ink.
+            raise ValueError(f"PDF path inside a form XObject (level {obj.level}): matrix not composed")
         handle = obj.raw
         width = ctypes.c_float()
         pdfium_raw.FPDFPageObj_GetStrokeWidth(handle, width)
@@ -224,3 +231,21 @@ def read_pdf_ink(path: Path) -> list[PageInk]:
     finally:
         document.close()
     return pages
+
+
+def page_ink(page: PageInk) -> dict[str, Any]:
+    """A page as layout-dump data: every text object with its glyph box, and
+    every black stroked line (the frame and title block print grey, and
+    arrowheads and section arrows are filled)."""
+    return {
+        "spans": [[span.text, *_round((span.xmin, span.ymin, span.xmax, span.ymax))] for span in page.spans],
+        "strokes": [
+            [*_round((stroke.x0, stroke.y0, stroke.x1, stroke.y1, stroke.width)), int(stroke.dashed)]
+            for stroke in page.strokes
+            if stroke.stroked and not stroke.filled and stroke.rgb == (0, 0, 0)
+        ],
+    }
+
+
+def _round(values: Any) -> list[float]:
+    return [round(float(value), 7) for value in values]

@@ -40,8 +40,9 @@ JSON, together with its page of the exported PDF, and audited by
 `_layout_audit.audit_dump`. The offline tests and the
 calibration tool replay the same dumps through the same function.
 
-Every sheet dump, every finding and the per-class counts are written to the
-drawing's report, `cad/out/reports/layout-audit/<artifact-stem>.json`. The
+Every sheet dump (its page's text objects, and only a count of its strokes:
+the PDF is itself a cached drawing output, and a replay re-reads it), every
+finding and the per-class counts are written to the drawing's report, `cad/out/reports/layout-audit/<artifact-stem>.json`. The
 report is a declared target of the `drawing:<stem>` task and one of the
 outputs the remote cache stores and restores, so a leaf restored from cache
 carries the same report as the seat that built it, and the fleet report
@@ -59,21 +60,50 @@ under-count the fleet report: the dumped sheets must be exactly
 
 **The PDF says where; COM says what.** Each `IDisplayData` text item is
 matched to the PDF text object that printed it: same string (symbol tokens
-and blanks stripped), lower-left within 3 mm plus one text height, closest
-pairs first, one object per item (`match_ink`). A row's box is the union of
-its items' glyph boxes. A symbol token (`<MOD-DIAM>`, `<HOLE-DEPTH>`) prints
-as a path, not text, so it is boxed from its COM position and shifted by the
-offset its printed neighbours show. Section and detail-circle labels are
-matched the same way. Any COM string with no printed match is a
-`text-unmatched` finding: the audit is blind there, so it gates.
+and blanks stripped), its reference point (`GetTextRefPositionAtIndex`:
+lower-left, centre, ...) within 3 mm plus one text height of the same point
+of the printed box, closest pairs first, one object per item
+(`match_ink_indices`). A run with a symbol inside it matches the text objects
+either side of the symbol's path. A row's box is the union of its items'
+glyph boxes. A symbol token (`<MOD-DIAM>`, `<HOLE-DEPTH>`) prints as a path,
+not text, so it is boxed from its COM position and shifted by the offset its
+printed neighbours show. Section and detail-circle labels are matched the
+same way. The match runs both ways, and both gate: a COM string with no
+printed match is `text-unmatched`, and printed text no COM item claims
+(outside the title block, the border band and tables) is
+`pdf-text-unclaimed`, which is what a refused COM read looks like on paper.
+
+The page must hold the sheet, or the audit stops rather than fall back to
+COM boxes: the page size must equal `GetProperties2`'s (0.5 mm), COM text on
+a page with no PDF text fails, and so does a sheet where fewer than half of
+at least five COM strings find their printed text (origin, scale or page
+mapping wrong). A path inside a PDF form XObject fails too (its matrix is
+not composed; SolidWorks writes none). A refused COM read is counted per
+sheet and per accessor (an overload that answers after another refused is
+not a refusal) and is a gating `com-read-errors` finding.
 
 Model edges are the page's 0.25 mm solid black strokes (curves tessellated,
 not their Bezier control polygons), each assigned to the smallest view
 outline holding it. Annotation lines, arrows and leaders come
 from COM display data. `GetArrowHeadAtIndex2`'s direction points from the tip
 back toward the arrowhead's base (125 of 125 unambiguous arrowheads on the
-calibration PDFs). A section's cutting line is drawn between its two arrow
-tails: `IDrSection::GetLineInfo` answers in the view's model space.
+calibration PDFs). `GetArcAtIndex2`'s `rotationDir` is CCW when non-zero
+(the docs' true) and CW at 0; no open arc appeared in the calibration dumps,
+so this rests on the docs. A section's cutting line is drawn between its two
+arrow tails: `IDrSection::GetLineInfo` answers in the view's model space.
+A dimension's straight lines split into `dim-line` (parallel to an arrow and
+through its tip, including the run out to parked text) and `ext-line`
+(every other line). `IDisplayDimension::GetDisplayData` is not read: it
+equalled `IAnnotation::GetDisplayData` for all 72 dimensions on the
+calibration leaves.
+
+`find_text_on_line` buckets every segment in a 5 mm grid, so each text box
+is tested against nearby ink only. On a synthetic assembly sheet (67 k
+strokes, 350 text runs) the whole audit takes 0.42 s, down from 8.6 s; the
+largest calibration sheet (pen-assembly, 8.4 k strokes) takes 45 ms. The
+drawing's `layout.audit` span has three children: `layout.read_pdf`,
+`layout.collect_com` and `layout.findings` (`findings_s` and the per-kind
+counts).
 
 A balloon keeps its rendered circle. The COM row model (exact item widths,
 per-sheet glyph advance, supports' shoulder-centred callout rows) remains
@@ -85,13 +115,19 @@ only for a dump with no PDF text, i.e. the offline fixtures.
 | `text-on-line` | gating | a foreign line runs through text; covers annotation lines, printed model edges, datum-origin, section-line and detail-circle ink |
 | `text-on-view` | gating | text printed inside a view its annotation does not belong to: within the extent of that view's printed edges (`GetOutline` pads the part by a few mm, so it is used, inset, only when no edges printed; pictorial views skipped); from swing's MHA-092 gap diff |
 | `leader-through-text` / `leader-through-own-text` | gating | a leader runs through foreign text, or through its own rows (0.2 mm inset, shoulder excluded) |
-| `leader-crosses-line` / `shoulder-crosses-line` | gating | a leader, or a callout's shoulder under its text, crosses another annotation's dimension, witness or frame line transversally (MHA-092's heel-height line through the ADJUSTER shoulder). Not a detail circle (a leader to a feature inside it must cross it), and not on the stretch a leader runs past its arrow tip into the hole, where the hole's own centre and extension lines pass |
-| `leader-crosses-section-line` | advisory | a leader crossing a section cutting line; advisory until ruled on |
+| `leader-crosses-line` / `shoulder-crosses-line` | gating | a leader, or a callout's shoulder under its text, crosses another annotation's dimension or extension line (Main's ruling a) or frame line transversally (MHA-092's heel-height line through the ADJUSTER shoulder). Not a detail circle (a leader to a feature inside it must cross it), and not on the stretch a leader runs past its arrow tip into the hole, where the hole's own centre and extension lines pass |
+| `leader-converges-at-landing` | advisory | a leader crossing within 5 mm of both its own landing and the crossed line's end: two leaders closing on one corner (Main's ruling on cone-gear-shaft's Ra 1.6) |
+| `leader-crosses-section-line` | gating | a leader crossing a section cutting line (Main's ruling: the MHA-025 finish leader was moved off its A-A line for this) |
+| `line-on-dimension-line` | gating | a leader, or a section line's arrow, lying along another annotation's dimension line within 0.1 mm: the two print as one stroke. Shared extension lines are normal drafting and exempt |
+| `dim-line-crosses-extension-at-text` / `dim-line-crosses-extension` | gating / advisory | a dimension line crossing another dimension's extension line. ASME allows it when unavoidable, so it gates only within 0.5 × text height of either dimension's text (Main's ruling b) |
 | `leader-crosses-view` / `leader-crosses-leader` | gating | as in `_drawing_layout_check` |
 | `outside-border` / `keep-out` | gating | past the zone frame, or inside the title block |
 | `merged-blocks` | gating | two callouts (hole callouts or leadered notes) stacked in one column, x spans overlapping, less than a row pitch (1.59 h, 5.556 mm at 3.5 mm text) apart; supports' `find_merged_blocks` |
 | `tall-block` | gating | a callout (hole callout or leadered note) over four rows (Main's hb-render-4 ruling); supports' `find_tall_callouts`. A free general note is a text block by design |
 | `text-unmatched` | gating | a COM text item with no printed PDF text object: the audit cannot place it |
+| `pdf-text-unclaimed` | gating | printed text in the drawable region no COM item claims (not the title block or a table) |
+| `view-edges-missing` / `-pictorial` | gating / advisory | a view with an outline but no printed model edge (a shaded or draft view, another edge weight): text over it is unchecked |
+| `com-read-errors` | gating | the collector was refused a COM read on the sheet; the counts per accessor are in the finding |
 | `text-separation` | advisory | distinct annotation blocks clear of each other but closer than one text height; they read as one callout |
 
 Each kind is reported once per annotation pair: a two-row callout crossed by
@@ -137,7 +173,7 @@ design:
   460 mm. Every 0.25 mm stroke fell inside exactly one view outline. So the
   audit takes model edges from the PDF, and neither API is read.
 
-`diagnostics/layout_calibration.py` replays layout reports and prints, per
+`diagnostics/layout_calibration.py --pdf-dir` replays layout reports and prints, per
 annotation kind, the match rate and the COM-vs-ink offsets, per view the
 model edges it owns, and the findings per kind.
 
@@ -166,7 +202,6 @@ Not checked:
   edges has not been tried, so this class is untested;
 * crosshatch: it prints 0.18 mm like annotation ink and no COM record
   claims it, so text over hatching is not seen;
-* lines lying ON each other (collinear overlap): a section arrow drawn along
-  a dimension line (pinion-bracket's B over 28.00), or an extension line on
-  a section cutting line. Shared extension lines are normal drafting, so a
-  general rule would flood; no class exists yet.
+* lines lying on each other other than a leader or section arrow along a
+  dimension line (for example an extension line on a section cutting line).
+  Shared extension lines are normal drafting, so a general rule would flood.

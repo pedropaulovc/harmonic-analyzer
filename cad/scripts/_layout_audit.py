@@ -65,6 +65,7 @@ from _layout_geometry import (
     find_leader_crossings,
     find_text_on_line,
     segment_box_overlap_length,
+    union_boxes,
 )
 
 DUMP_SCHEMA = 1
@@ -171,6 +172,23 @@ ANNOTATION_KINDS = {
 # Annotations whose ink is a construction mark on the geometry, not a callout:
 # their lines are obstacles for text, but they carry no text of their own.
 _MARK_KINDS = frozenset({"center-mark", "centerline", "cosmetic-thread"})
+# swTextPosition_e: where a text run's reference point sits on its box, as
+# (x, y) fractions of the box. Unknown references read as lower-left.
+_TEXT_ANCHORS = {0: (0.0, 1.0), 1: (0.0, 0.0), 2: (0.5, 0.5), 3: (1.0, 1.0), 4: (1.0, 0.0), 5: (0.5, 1.0)}
+# Lines closer than this, over more than this, print as one stroke
+# (crankhub's _drawing_leaders COLLINEAR_TOLERANCE, Main's ruling).
+COLLINEAR_TOL_M = 1e-4
+# Two leaders landing on one corner may converge within their last 5 mm
+# (Main's ruling on cone-gear-shaft's Ra 1.6 and Sec4Dia): advisory there.
+LANDING_CONVERGE_M = 0.005
+# A dimension line crossing a foreign extension line gates only this close
+# to a dimension's text, in text heights (Main's ruling b, ASME).
+DIM_CROSSING_TEXT_HEIGHTS = 0.5
+# Under this share of a sheet's COM strings matched to printed text, the page
+# is not where the sheet is (origin, scale or page mapping): fail.
+MIN_MATCH_SHARE = 0.5
+# Line roles a leader must not cross.
+LINE_ROLES = frozenset({"line", "dim-line", "ext-line"})
 # Annotation ink a leader may cross (see ``find_leader_across_lines``).
 _NOT_CROSSING_TARGETS = frozenset({"geometry", "detail-circle"})
 # swAnnotationVisibilityState_e: 2 = half hidden, 3 = hidden.
@@ -233,7 +251,8 @@ def arc_segments(raw: Sequence[float], role: str = "line") -> list[Segment]:
     """``GetArcAtIndex2``: [color, type, _, _, start3, end3, center3, normal3, dir].
 
     A closed arc (start == end) is a full circle -- a balloon, a detail circle.
-    The rotation direction sign is honoured, flipped by a -Z normal.
+    ``rotationDir`` is a boolean as a double, CCW = true (any non-zero, as a
+    COM VARIANT_BOOL true may read -1) and CW = 0; a -Z normal flips it.
     """
     values = _floats(raw)
     if len(values) < 17:
@@ -243,7 +262,7 @@ def arc_segments(raw: Sequence[float], role: str = "line") -> list[Segment]:
     center = (values[10], values[11])
     normal_z = values[15]
     direction = values[16]
-    ccw = (direction >= 0) == (normal_z >= 0)
+    ccw = (direction != 0) == (normal_z >= 0)
     points = _arc_points(center, start, end, ccw=ccw)
     return [
         Segment(a[0], a[1], b[0], b[1], role) for a, b in zip(points, points[1:])
@@ -353,38 +372,97 @@ def ink_edges(dump: Mapping[str, Any]) -> list[Segment]:
     ]
 
 
-def match_ink(
-    items: Sequence[tuple[Any, TextItem]], spans: Sequence[InkSpan]
-) -> dict[Any, Box]:
-    """One-to-one: each keyed COM text item to the PDF text object that printed it.
+def _anchor(box: Box, reference: int) -> tuple[float, float]:
+    fx, fy = _TEXT_ANCHORS.get(reference, (0.0, 0.0))
+    return box.xmin + fx * box.width, box.ymin + fy * box.height
+
+
+def match_ink_indices(
+    items: Sequence[tuple[Any, TextItem]],
+    spans: Sequence[InkSpan],
+    *,
+    taken: Iterable[int] = (),
+) -> dict[Any, tuple[int, ...]]:
+    """One-to-one: each keyed COM text item to the PDF text object(s) that
+    printed it, as span indices (``taken`` spans are already claimed).
 
     Candidates share the item's ink string and sit within ``INK_MATCH_WINDOW_M``
-    of its lower-left corner; the closest pairs are taken first and each span
-    serves one item, so six "13.12"s on one sheet cannot claim the same run.
-    Symbol-only items (``<MOD-DIAM>``) print as paths, not text, and never match.
+    plus one text height of its reference point, compared to the same point of
+    the span's box (``GetTextRefPositionAtIndex``: lower-left, centre, ...).
+    The closest pairs are taken first and each span serves one item, so six
+    "13.12"s on one sheet cannot claim the same run. Symbol-only items
+    (``<MOD-DIAM>``) print as paths, not text, and never match. A run with a
+    symbol INSIDE it may print as one text object per side of the symbol's
+    path; it then matches those pieces left to right along its baseline.
     """
-    pairs = []
+    used = set(taken)
     by_key: dict[str, list[int]] = {}
     for index, span in enumerate(spans):
         by_key.setdefault(span.key, []).append(index)
+    pairs = []
     for key, item in items:
         wanted = ink_key(item.text)
         if not wanted:
             continue
         window = INK_MATCH_WINDOW_M + item.height
         for index in by_key.get(wanted, ()):
-            box = spans[index].box
-            dx, dy = abs(box.xmin - item.x), abs(box.ymin - item.y)
+            if index in used:
+                continue
+            ax, ay = _anchor(spans[index].box, item.reference)
+            dx, dy = abs(ax - item.x), abs(ay - item.y)
             if dx < window and dy < window:
                 pairs.append((dx + dy, key, index))
-    matched: dict[Any, Box] = {}
-    used: set[int] = set()
+    matched: dict[Any, tuple[int, ...]] = {}
     for _cost, key, index in sorted(pairs, key=lambda pair: pair[0]):
         if key in matched or index in used:
             continue
-        matched[key] = spans[index].box
+        matched[key] = (index,)
         used.add(index)
+    for key, item in items:
+        if key in matched:
+            continue
+        parts = [ink_key(part) for part in _TOKEN.split(item.text) if ink_key(part)]
+        if len(parts) < 2:
+            continue
+        window = INK_MATCH_WINDOW_M + item.height
+        left, right = item.x - window, item.x + (glyph_count(item.text) + 1) * item.height
+        chosen: list[int] = []
+        for part in parts:
+            candidates = [
+                index
+                for index in by_key.get(part, ())
+                if index not in used
+                and index not in chosen
+                and left <= spans[index].box.xmin <= right
+                and abs(spans[index].box.ymin - item.y) < window
+            ]
+            if not candidates:
+                break
+            best = min(candidates, key=lambda index: spans[index].box.xmin)
+            chosen.append(best)
+            left = spans[best].box.xmax - INK_MATCH_WINDOW_M
+        else:
+            matched[key] = tuple(chosen)
+            used.update(chosen)
     return matched
+
+
+def _union(boxes: Iterable[Box]) -> Box:
+    boxes = list(boxes)
+    box = boxes[0]
+    for other in boxes[1:]:
+        box = box.union(other)
+    return box
+
+
+def match_ink(
+    items: Sequence[tuple[Any, TextItem]], spans: Sequence[InkSpan]
+) -> dict[Any, Box]:
+    """``match_ink_indices`` as glyph boxes: one box per matched item."""
+    return {
+        key: _union(spans[index].box for index in indices)
+        for key, indices in match_ink_indices(items, spans).items()
+    }
 
 
 def glyph_count(text: str) -> int:
@@ -486,7 +564,7 @@ def _with_symbols(item: TextItem, box: Box, advance: float) -> Box:
     text = item.text.strip()
     lead = re.match(r"(?:<[^<>]+>\s*)*", text).group(0)
     trail = re.search(r"(?:\s*<[^<>]+>)*$", text[len(lead):]).group(0)
-    xmin = min(box.xmin, item.x) if lead else box.xmin
+    xmin = min(box.xmin, item.x) if lead and item.reference in (-1, 0, 1) else box.xmin
     xmax = box.xmax + len(_TOKEN.findall(trail)) * advance * item.height
     return Box(xmin, box.ymin, xmax, box.ymax)
 
@@ -573,14 +651,14 @@ def row_boxes(
 # --------------------------------------------------------------------------
 
 
-def _display_segments(display: Mapping[str, Any]) -> list[Segment]:
+def _display_segments(display: Mapping[str, Any], *, arc_role: str = "line") -> list[Segment]:
     segments: list[Segment] = []
     for raw in display.get("lines", ()):
         segment = line_segment(raw)
         if segment is not None:
             segments.append(segment)
     for raw in display.get("arcs", ()):
-        segments.extend(arc_segments(raw))
+        segments.extend(arc_segments(raw, role=arc_role))
     for raw in display.get("polylines", ()):
         segments.extend(polyline_segments(raw))
     for raw in display.get("polygons", ()):
@@ -590,6 +668,41 @@ def _display_segments(display: Mapping[str, Any]) -> list[Segment]:
     for raw in display.get("arrows", ()):
         segments.extend(arrowhead_segments(raw))
     return segments
+
+
+def _split_dimension_lines(segments: Sequence[Segment], arrows: Sequence[Any]) -> list[Segment]:
+    """A dimension's straight lines as ``dim-line`` or ``ext-line``.
+
+    The dimension line carries the arrowheads: a line parallel to an arrow's
+    direction that runs through its tip is dimension line (including the run
+    out to text parked beyond the arrows, and a diameter's leader-like line).
+    Every other straight line of the dimension is an extension line. Arc
+    pieces (angular dimensions) arrive already marked ``dim-line``. A
+    dimension without arrowheads keeps plain ``line``.
+    """
+    tips = []
+    for raw in arrows:
+        values = _floats(raw)
+        if len(values) < 8:
+            continue
+        length = math.hypot(values[3], values[4])
+        if length:
+            tips.append(((values[0], values[1]), (values[3] / length, values[4] / length)))
+    if not tips:
+        return list(segments)
+    out = []
+    for segment in segments:
+        if segment.role != "line" or not segment.length:
+            out.append(segment)
+            continue
+        ux, uy = (segment.x1 - segment.x0) / segment.length, (segment.y1 - segment.y0) / segment.length
+        along = any(
+            abs(ux * dy - uy * dx) < 0.02
+            and abs((tip[0] - segment.x0) * uy - (tip[1] - segment.y0) * ux) < COLLINEAR_TOL_M
+            for tip, (dx, dy) in tips
+        )
+        out.append(replace(segment, role="dim-line" if along else "ext-line"))
+    return out
 
 
 def _is_horizontal(segment: Segment) -> bool:
@@ -623,6 +736,28 @@ def balloon_circle(display: Mapping[str, Any]) -> tuple[float, float, float] | N
     return circles[0] if len(circles) == 1 else None
 
 
+def _same_run(segment: Segment, leader: Segment, *, degrees: float = 2.0) -> bool:
+    """A display-data run that is the registered ``leader``: it shares an end
+    with it and runs the same way. The two can start apart -- cone-swing-
+    platform's C'BORE note draws its display run from 0.5 mm off the attach
+    point the registered leader (and the printed PDF stroke) starts at."""
+    if not segment.length or not leader.length:
+        return False
+    ends = ((segment.x0, segment.y0), (segment.x1, segment.y1))
+    shared = [
+        (end, other)
+        for end in ends
+        for other in ((leader.x0, leader.y0), (leader.x1, leader.y1))
+        if math.hypot(end[0] - other[0], end[1] - other[1]) <= COLLINEAR_TOL_M
+    ]
+    if not shared:
+        return False
+    a = math.atan2(segment.y1 - segment.y0, segment.x1 - segment.x0)
+    b = math.atan2(leader.y1 - leader.y0, leader.x1 - leader.x0)
+    turn = abs((a - b + math.pi) % (2.0 * math.pi) - math.pi)
+    return min(turn, math.pi - turn) <= math.radians(degrees)
+
+
 def _registered_leaders(annotation: Mapping[str, Any]) -> list[Segment]:
     segments = []
     for raw in annotation.get("leaders", ()):
@@ -646,8 +781,10 @@ def _classify(
     * A hole callout's display data is its leader plus the shoulder under its
       text (supports' calibration): every other line is leader; its
       arrowhead stays an arrow.
-    * Other annotations: a run that touches the annotation's own text is its
-      leader, everything else is dimension/witness/frame ink.
+    * Other annotations keep their display-data roles. Their leaders come
+      from ``GetLeaderPointsAtIndex`` (``_registered_leaders``), and the
+      display-data copy of each leader run is dropped (``_same_run``), so a
+      leader is not reported twice, as line and as leader.
     """
     shoulder_ids = {id(s) for s in shoulders}
     hole_callout = bool((annotation.get("dim") or {}).get("hole_callout"))
@@ -700,8 +837,9 @@ def annotation_geometry(
     label = str(annotation.get("name") or kind)
     display = annotation.get("display") or {}
     items = text_items(display)
-    segments = _display_segments(display)
-    if kind == "dim" and (annotation.get("dim") or {}).get("hole_callout"):
+    hole_callout = bool((annotation.get("dim") or {}).get("hole_callout"))
+    segments = _display_segments(display, arc_role="dim-line" if kind == "dim" and not hole_callout else "line")
+    if kind == "dim" and hole_callout:
         kind = "hole-callout"
     if kind == "note" and (annotation.get("note") or {}).get("balloon"):
         # A BOM balloon is a note with a leader, but a circle, not a callout.
@@ -710,7 +848,11 @@ def annotation_geometry(
     # (hole callout, leadered note) has a shoulder under its text.
     shoulders = _shoulders(segments, items) if kind in ("hole-callout", "note") else []
     segments = _classify(kind, annotation, segments, shoulders)
-    segments.extend(_registered_leaders(annotation))
+    if kind == "dim":
+        segments = _split_dimension_lines(segments, display.get("arrows", ()))
+    registered = _registered_leaders(annotation)
+    segments = [s for s in segments if not any(_same_run(s, leader) for leader in registered)]
+    segments.extend(registered)
 
     note = annotation.get("note") or {}
     exact = False
@@ -772,6 +914,7 @@ def _section_geometry(
     advance: float,
     spans: Sequence[InkSpan] = (),
     unmatched: list[tuple[str, str]] | None = None,
+    claimed: set[int] | None = None,
 ) -> AnnotationGeometry | None:
     """A section line: cutting line + arrows as ink, its two labels as text.
 
@@ -800,10 +943,15 @@ def _section_geometry(
         for i in range(0, len(texts) - 2, 3):
             x, y = texts[i], texts[i + 1]
             item = TextItem(label, x, y - height, height)
-            printed = match_ink([(0, item)], [span for span in spans if span.key == ink_key(label)])
+            printed = match_ink_indices([(0, item)], spans, taken=claimed or ())
             if spans and 0 not in printed and unmatched is not None:
                 unmatched.append((f"section-line {label}", label))
-            rows.append(printed.get(0) or Box(x, y - height, x + width, y))
+            if 0 in printed:
+                if claimed is not None:
+                    claimed.update(printed[0])
+                rows.append(_union(spans[index].box for index in printed[0]))
+                continue
+            rows.append(Box(x, y - height, x + width, y))
     if not segments and not rows:
         return None
     return AnnotationGeometry(
@@ -816,8 +964,8 @@ def _section_geometry(
 
 
 def _detail_label_box(
-    text_pt: tuple[float, float], height: float, spans: Sequence[InkSpan]
-) -> Box | None:
+    text_pt: tuple[float, float], height: float, spans: Sequence[InkSpan], claimed: set[int] | None = None
+) -> int | None:
     """The PDF text object printing a detail circle's label at ``text_pt``.
 
     ``GetDetailCircleInfo2`` gives the label's position but not its letter, so
@@ -827,12 +975,12 @@ def _detail_label_box(
     x, y = text_pt[0], text_pt[1] - height
     window = INK_MATCH_WINDOW_M + height
     candidates = [
-        (abs(span.box.xmin - x) + abs(span.box.ymin - y), span.box)
-        for span in spans
-        if 0 < len(span.key) <= 2 and span.key.isalpha()
+        (abs(span.box.xmin - x) + abs(span.box.ymin - y), index)
+        for index, span in enumerate(spans)
+        if 0 < len(span.key) <= 2 and span.key.isalpha() and index not in (claimed or ())
         and abs(span.box.xmin - x) < window and abs(span.box.ymin - y) < window
     ]
-    return min(candidates, key=lambda pair: pair[0])[1] if candidates else None
+    return min(candidates)[1] if candidates else None
 
 
 def _detail_circle_geometries(
@@ -842,6 +990,7 @@ def _detail_circle_geometries(
     advance: float,
     spans: Sequence[InkSpan] = (),
     unmatched: list[tuple[str, str]] | None = None,
+    claimed: set[int] | None = None,
 ) -> list[AnnotationGeometry]:
     """``IView::GetDetailCircleInfo2``: [n, (layer, center3, start3, end3,
     lineType, textPt3, textHeight, numArrows, (tip3, comp3, w, h, style)*)*].
@@ -872,10 +1021,16 @@ def _detail_circle_geometries(
         rows = ()
         label = f"detail-circle {owner} #{number + 1}"
         if height > 0.0:
-            printed = _detail_label_box(text_pt, height, spans) if spans else None
-            if spans and printed is None and unmatched is not None:
+            index = _detail_label_box(text_pt, height, spans, claimed) if spans else None
+            if spans and index is None and unmatched is not None:
                 unmatched.append((label, "label"))
-            rows = (printed or Box(text_pt[0], text_pt[1] - height, text_pt[0] + advance * height, text_pt[1]),)
+            if index is not None and claimed is not None:
+                claimed.add(index)
+            rows = (
+                spans[index].box
+                if index is not None
+                else Box(text_pt[0], text_pt[1] - height, text_pt[0] + advance * height, text_pt[1]),
+            )
         geometries.append(
             AnnotationGeometry(
                 label=label,
@@ -913,7 +1068,9 @@ def view_edges(
 class SheetModel:
     geometry: SheetGeometry
     advance: float
-    unmatched: tuple[tuple[str, str], ...]  # (annotation label, item text)
+    unmatched: tuple[tuple[str, str], ...] = ()  # (annotation label, item text)
+    unclaimed: tuple[tuple[str, Box], ...] = ()  # printed text no COM item claims
+    edgeless: tuple[tuple[str, bool], ...] = ()  # (view, pictorial) with no model edge
 
 
 def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
@@ -956,12 +1113,26 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
     ]
 
     spans = ink_spans(dump)
+    printed_page = "ink" in dump
     keyed = [
         ((id(annotation), index), item)
         for annotation in audited
         for index, item in enumerate(text_items(annotation.get("display") or {}))
     ]
-    printed = match_ink(keyed, spans) if spans else {}
+    matchable = [(key, item) for key, item in keyed if ink_key(item.text)]
+    if printed_page and matchable and not spans:
+        raise ValueError(
+            f"layout audit: sheet {dump.get('sheet')!r} has {len(matchable)} COM text item(s) "
+            "but its PDF page has no text"
+        )
+    indices = match_ink_indices(keyed, spans) if spans else {}
+    if spans and len(matchable) >= 5 and len(indices) < MIN_MATCH_SHARE * len(matchable):
+        raise ValueError(
+            f"layout audit: sheet {dump.get('sheet')!r}: only {len(indices)} of {len(matchable)} COM "
+            "strings found their printed text; the PDF page does not line up with the sheet"
+        )
+    claimed = {index for chosen in indices.values() for index in chosen}
+    printed = {key: _union(spans[index].box for index in chosen) for key, chosen in indices.items()}
 
     def ink_of(annotation: Mapping[str, Any]) -> dict[int, Box] | None:
         if not spans:
@@ -999,7 +1170,9 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
             if item is not None:
                 annotations.append(item)
         for section in view.get("sections", ()):
-            item = _section_geometry(section, owner=name, advance=advance, spans=spans, unmatched=unmatched)
+            item = _section_geometry(
+                section, owner=name, advance=advance, spans=spans, unmatched=unmatched, claimed=claimed
+            )
             if item is not None:
                 annotations.append(item)
         annotations.extend(
@@ -1009,6 +1182,7 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
                 advance=advance,
                 spans=spans,
                 unmatched=unmatched,
+                claimed=claimed,
             )
         )
         if edges.get(name):
@@ -1048,7 +1222,31 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
         annotations=tuple(annotations),
         advance_ratio=advance,
     )
-    return SheetModel(geometry, advance, tuple(unmatched))
+    tables = [a.text_boxes[0] for a in annotations if a.kind == "table"]
+    unclaimed = tuple(
+        (span.key, span.box)
+        for index, span in enumerate(spans)
+        if index not in claimed and span.key and _stray_text(span.box, region, keep_outs, tables)
+    )
+    edgeless = tuple(
+        (view.name, view.pictorial)
+        for view in view_geometry
+        if printed_page and view.outline is not None and not edges.get(view.name)
+    )
+    return SheetModel(geometry, advance, tuple(unmatched), unclaimed, edgeless)
+
+
+def _stray_text(box: Box, region: DrawableRegion, keep_outs: Sequence[tuple[str, Box]], tables: Sequence[Box]) -> bool:
+    """Printed text the audit should have a COM owner for: inside the drawable
+    region (the zone labels print in the border band), and not in the title
+    block or a table, whose text COM reports as a whole."""
+    x, y = box.center()
+    if not (region.xmin <= x <= region.xmax and region.ymin <= y <= region.ymax):
+        return False
+    for _name, keep_out in keep_outs:
+        if keep_out.xmin <= x <= keep_out.xmax and keep_out.ymin <= y <= keep_out.ymax:
+            return False
+    return not any(t.xmin <= x <= t.xmax and t.ymin <= y <= t.ymax for t in tables)
 
 
 # --------------------------------------------------------------------------
@@ -1367,6 +1565,17 @@ def _past_arrow_zones(annotation: AnnotationGeometry) -> list[tuple[tuple[float,
     return zones
 
 
+def _converging(point: tuple[float, float], landings: Sequence[tuple[float, float]], line: Segment) -> bool:
+    """The crossing lies within ``LANDING_CONVERGE_M`` of both the leader's
+    landing and an end of the line it crosses: two leaders closing on one
+    corner, not a leader cutting across a dimension."""
+    near_landing = any(math.hypot(point[0] - x, point[1] - y) <= LANDING_CONVERGE_M for x, y in landings)
+    near_end = min(
+        math.hypot(point[0] - line.x0, point[1] - line.y0), math.hypot(point[0] - line.x1, point[1] - line.y1)
+    ) <= LANDING_CONVERGE_M
+    return near_landing and near_end
+
+
 def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
     """A leader or callout shoulder transversally crossing another annotation's
     dimension/witness line.
@@ -1377,13 +1586,18 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
     leader landing ON a line) are not crossings -- see
     ``_drawing_layout_check._proper_crossing``.
 
-    A detail circle is no target: a leader to a feature inside it must cross
-    it. A section cutting line is reported as its own advisory kind until the
-    rule for it is ruled on. A crossing on the stretch a leader runs past its
-    arrow tip is inside the feature it points at (``_past_arrow_zones``).
+    Targets are dimension, extension and frame lines (Main's ruling a) and
+    section cutting lines (``leader-crosses-section-line``, gating: the MHA-025
+    finish leader was moved off its A-A line for this). A detail circle is no
+    target: a leader to a feature inside it must cross it. A crossing on the
+    stretch a leader runs past its arrow tip is inside the feature it points
+    at (``_past_arrow_zones``). A crossing within ``LANDING_CONVERGE_M`` of
+    both the leader's landing and the crossed line's end is two leaders
+    closing on one corner: advisory ``leader-converges-at-landing``.
     """
     findings = []
     zones = {annotation.label: _past_arrow_zones(annotation) for annotation in sheet.annotations}
+    landings = {label: [end for end, _radius in found] for label, found in zones.items()}
     leaders = [
         (annotation, segment)
         for annotation in sheet.annotations
@@ -1395,7 +1609,7 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
         for annotation in sheet.annotations
         if annotation.kind not in _NOT_CROSSING_TARGETS and annotation.kind not in _MARK_KINDS
         for segment in annotation.segments
-        if segment.role == "line"
+        if segment.role in LINE_ROLES
     ]
     seen = set()
     for source, leader in leaders:
@@ -1411,10 +1625,13 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
                 continue
             if any(math.hypot(point[0] - end[0], point[1] - end[1]) <= radius for end, radius in zones[source.label]):
                 continue
-            seen.add((source.label, target.label))
             kind = "shoulder-crosses-line" if leader.role == "shoulder" else "leader-crosses-line"
             if target.kind == "section-line":
                 kind = "leader-crosses-section-line"
+            elif _converging(point, landings[source.label], line):
+                kind = "leader-converges-at-landing"
+            if kind != "leader-converges-at-landing":
+                seen.add((source.label, target.label))
             findings.append(
                 Finding(
                     kind=kind,
@@ -1426,6 +1643,137 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
                         f"{target.label!r}'s line {line.format_mm()}"
                     ),
                     at_mm=(point[0] * MM, point[1] * MM),
+                )
+            )
+    return findings
+
+
+def _point_box_distance(point: tuple[float, float], box: Box) -> float:
+    dx = max(box.xmin - point[0], 0.0, point[0] - box.xmax)
+    dy = max(box.ymin - point[1], 0.0, point[1] - box.ymax)
+    return math.hypot(dx, dy)
+
+
+def find_dimension_line_crossings(
+    sheet: SheetGeometry, *, heights: float = DIM_CROSSING_TEXT_HEIGHTS
+) -> list[Finding]:
+    """A dimension line crossing ANOTHER dimension's extension line.
+
+    Main's ruling b: ASME allows it when unavoidable, so it is advisory
+    (``dim-line-crosses-extension``), and gating only where the crossing is
+    through, or within ``heights`` text heights of, either dimension's text
+    (``dim-line-crosses-extension-at-text``). One finding per pair, the worse.
+    """
+    def runs(role: str) -> list[tuple[AnnotationGeometry, list[Segment], Box]]:
+        found = []
+        for annotation in sheet.annotations:
+            chosen = [s for s in annotation.segments if s.role == role]
+            if chosen:
+                found.append((annotation, chosen, union_boxes([s.box() for s in chosen])))
+        return found
+
+    findings = []
+    extended = runs("ext-line")
+    for source, lines, line_box in runs("dim-line"):
+        for target, extensions, extension_box in extended:
+            if source.label == target.label or line_box.gap(extension_box) > COLLINEAR_TOL_M:
+                continue
+            worst = None
+            for line in lines:
+                for extension in extensions:
+                    point = _proper_crossing(
+                        LeaderSegment(source.label, source.kind, line.x0, line.y0, line.x1, line.y1),
+                        LeaderSegment(target.label, target.kind, extension.x0, extension.y0, extension.x1, extension.y1),
+                        tol=1e-4,
+                    )
+                    if point is None:
+                        continue
+                    near = any(
+                        _point_box_distance(point, box) <= heights * text_height(owner)
+                        for owner in (source, target)
+                        for box in owner.text_boxes
+                    )
+                    if worst is None or (near and not worst[0]):
+                        worst = (near, point, line, extension)
+            if worst is None:
+                continue
+            near, point, line, extension = worst
+            findings.append(
+                Finding(
+                    kind="dim-line-crosses-extension-at-text" if near else "dim-line-crosses-extension",
+                    sheet=sheet.name,
+                    a=source.label,
+                    b=target.label,
+                    detail=(
+                        f"dimension line of {source.label!r} {line.format_mm()} crosses "
+                        f"{target.label!r}'s extension line {extension.format_mm()}"
+                        + (" at its text" if near else "")
+                    ),
+                    at_mm=(point[0] * MM, point[1] * MM),
+                )
+            )
+    return findings
+
+
+def _collinear_overlap(segment: Segment, line: Segment, tol: float = COLLINEAR_TOL_M) -> tuple[tuple[float, float], float] | None:
+    """Midpoint and length of the stretch where ``segment`` lies ON ``line``."""
+    if not line.length or not segment.length:
+        return None
+    ux, uy = (line.x1 - line.x0) / line.length, (line.y1 - line.y0) / line.length
+    offsets = [((x - line.x0) * uy - (y - line.y0) * ux) for x, y in ((segment.x0, segment.y0), (segment.x1, segment.y1))]
+    if max(abs(o) for o in offsets) > tol:
+        return None
+    t0 = (segment.x0 - line.x0) * ux + (segment.y0 - line.y0) * uy
+    t1 = (segment.x1 - line.x0) * ux + (segment.y1 - line.y0) * uy
+    low, high = max(min(t0, t1), 0.0), min(max(t0, t1), line.length)
+    if high - low <= tol:
+        return None
+    middle = (low + high) / 2.0
+    return (line.x0 + ux * middle, line.y0 + uy * middle), high - low
+
+
+def find_lines_on_dimension_lines(sheet: SheetGeometry) -> list[Finding]:
+    """A leader, or a section line's arrow, lying ALONG another annotation's
+    dimension line: the two print as one stroke (pinion-bracket's section
+    arrow B down 28.00's dimension line). Main's ruling: gating, within
+    ``COLLINEAR_TOL_M``. Shared extension lines are normal drafting and exempt.
+    """
+    sources = [
+        (annotation, segment)
+        for annotation in sheet.annotations
+        for segment in annotation.segments
+        if segment.role in ("leader", "shoulder")
+        or (annotation.kind == "section-line" and segment.role in ("arrow", "line"))
+    ]
+    targets = [
+        (annotation, segment)
+        for annotation in sheet.annotations
+        for segment in annotation.segments
+        if segment.role == "dim-line"
+    ]
+    findings = []
+    seen = set()
+    for source, segment in sources:
+        for target, line in targets:
+            if source.label == target.label or (source.label, target.label) in seen:
+                continue
+            overlap = _collinear_overlap(segment, line)
+            if overlap is None:
+                continue
+            seen.add((source.label, target.label))
+            point, length = overlap
+            findings.append(
+                Finding(
+                    kind="line-on-dimension-line",
+                    sheet=sheet.name,
+                    a=source.label,
+                    b=target.label,
+                    detail=(
+                        f"{segment.role} of {source.label!r} {segment.format_mm()} lies along "
+                        f"{target.label!r}'s dimension line {line.format_mm()} for {length * MM:.2f}mm"
+                    ),
+                    at_mm=(point[0] * MM, point[1] * MM),
+                    extra={"overlap_mm": length * MM},
                 )
             )
     return findings
@@ -1501,6 +1849,57 @@ def find_text_on_view(
     return findings
 
 
+def find_unclaimed_text(model: SheetModel) -> list[Finding]:
+    """Printed text no COM item claims: an annotation whose COM read failed
+    (``_Reader`` counts it, but it prints) is invisible to every other check."""
+    return [
+        Finding(
+            kind="pdf-text-unclaimed",
+            sheet=model.geometry.name,
+            a=f"pdf {text!r}",
+            b="",
+            detail=f"printed text {text!r} {box.format_mm()} has no COM annotation claiming it",
+            at_mm=tuple(value * MM for value in box.center()),
+        )
+        for text, box in model.unclaimed
+    ]
+
+
+def find_edgeless_views(model: SheetModel) -> list[Finding]:
+    """A view that printed no model edge: text over it cannot be checked.
+
+    Shaded and draft views print images or other weights, and a template with
+    another edge weight would blank every view. A pictorial view is advisory
+    (its text-on-view check is skipped anyway)."""
+    return [
+        Finding(
+            kind="view-edges-missing-pictorial" if pictorial else "view-edges-missing",
+            sheet=model.geometry.name,
+            a=f"view {name}",
+            b="",
+            detail=f"view {name!r} has an outline but no printed 0.25 mm model edge",
+        )
+        for name, pictorial in model.edgeless
+    ]
+
+
+def find_read_errors(dump: Mapping[str, Any]) -> list[Finding]:
+    """COM reads the collector was refused on this sheet: each can hide ink."""
+    errors = dump.get("read_errors") or {}
+    if not errors:
+        return []
+    return [
+        Finding(
+            kind="com-read-errors",
+            sheet=str(dump.get("sheet", "")),
+            a="collector",
+            b=", ".join(sorted(errors)),
+            detail=f"{sum(errors.values())} refused COM read(s): {dict(sorted(errors.items()))}",
+            extra={"read_errors": dict(errors)},
+        )
+    ]
+
+
 def find_unmatched_text(model: SheetModel) -> list[Finding]:
     """COM text the printed PDF has no text object for: the audit is blind there.
 
@@ -1533,6 +1932,12 @@ GATING_KINDS = frozenset(
         "outside-border",
         "keep-out",
         "text-unmatched",
+        "pdf-text-unclaimed",
+        "view-edges-missing",
+        "com-read-errors",
+        "leader-crosses-section-line",
+        "dim-line-crosses-extension-at-text",
+        "line-on-dimension-line",
         "merged-blocks",
         "tall-block",
         "text-on-view",
@@ -1571,9 +1976,14 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
         *find_text_on_view(sheet),
         *find_leader_through_text(sheet),
         *find_leader_across_lines(sheet),
+        *find_dimension_line_crossings(sheet),
+        *find_lines_on_dimension_lines(sheet),
         *find_leader_crossings(sheet),
         *find_border_breaches(sheet),
         *find_unmatched_text(model),
+        *find_unclaimed_text(model),
+        *find_edgeless_views(model),
+        *find_read_errors(dump),
         *(f for f in find_text_separation(sheet) if frozenset((f.a, f.b)) not in reported),
     ])
 
@@ -1593,6 +2003,22 @@ def finding_record(stem: str, finding: Finding) -> dict[str, Any]:
 
 
 REPORT_SCHEMA = 1
+
+
+def report_sheet(dump: Mapping[str, Any]) -> dict[str, Any]:
+    """A dump as the report keeps it: the page's strokes become a count.
+
+    Thousands of strokes per sheet would dominate the cached report; the PDF
+    they came from is itself a cached drawing output, and a replay re-reads
+    it (``diagnostics/layout_calibration.py --pdf-dir``). Findings carry their
+    offending segments in their detail.
+    """
+    sheet = dict(dump)
+    ink = dict(dump.get("ink") or {})
+    if "strokes" in ink:
+        ink["stroke_count"] = len(ink.pop("strokes"))
+        sheet["ink"] = ink
+    return sheet
 
 
 def audit_report(
@@ -1623,6 +2049,6 @@ def audit_report(
             "gating": len(gating),
         },
         "findings": records,
-        "sheets": [dict(dump) for dump in dumps],
+        "sheets": [report_sheet(dump) for dump in dumps],
     }
     return report, gating
