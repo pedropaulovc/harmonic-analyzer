@@ -86,6 +86,19 @@ from crank_arm_spec import (
 )
 
 PART_NAME = "crank-arm"
+# Reference sketches this part still saves shown (#880), each with its owner
+# and why.  Delete an entry once the part hides that sketch; the release
+# refuses to start while any part lists one (visibility_debt).
+SHOWN_SKETCH_ALLOWANCES = {
+    "PinStationReference": (
+        "crankhub: carries the drawing's marked dimensions; hide it once "
+        "the sheet imports them from the hidden sketch"
+    ),
+    "StationReference": (
+        "crankhub: carries the drawing's marked dimensions; hide it once "
+        "the sheet imports them from the hidden sketch"
+    ),
+}
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 
@@ -541,7 +554,9 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return await save_part_and_images(
+        adapter, PART_NAME, allowed_shown=SHOWN_SKETCH_ALLOWANCES
+    )
 
 
 if __name__ == "__main__":

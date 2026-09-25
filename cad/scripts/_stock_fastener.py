@@ -11,7 +11,6 @@ import _telemetry
 from _fastener_catalog import fastener
 from _common import (
     _early_bound,
-    _flag,
     _read_member,
     apply_color,
     apply_custom_properties,
@@ -22,6 +21,7 @@ from _common import (
     report_mass_properties,
     save_part_and_images,
 )
+from _visibility import FeatureWalk
 
 
 type RecipeAuthor = Callable[..., Awaitable[None]]
@@ -239,23 +239,8 @@ def _blank_recipe_references(adapter: Any) -> None:
     }
     model = adapter.currentModel
     hidden: list[str] = []
-    visited = 0
-
-    def walk_siblings(feature: Any, next_member: str):
-        nonlocal visited
-        while feature:
-            visited += 1
-            if visited > 5000:
-                raise RuntimeError("stock reference traversal exceeded 5000 features")
-            yield feature
-            child = _read_member(feature, "GetFirstSubFeature")
-            if child:
-                yield from walk_siblings(child, "GetNextSubFeature")
-            feature = _read_member(feature, next_member)
-
-    first = _read_member(model, "FirstFeature")
-    for feature in walk_siblings(first, "GetNextFeature"):
-        _flag(feature, "IFeature")
+    walk = FeatureWalk(model)
+    for feature in walk:
         kind = str(_read_member(feature, "GetTypeName2"))
         name = str(_read_member(feature, "Name"))
         select_type = hide_types.get(kind)
@@ -296,6 +281,7 @@ def _blank_recipe_references(adapter: Any) -> None:
     _telemetry.event(
         "fastener.stock.references_hidden",
         count=len(hidden),
+        features_visited=walk.visited,
         references=", ".join(hidden),
     )
 

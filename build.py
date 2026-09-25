@@ -146,12 +146,41 @@ def main(argv: Sequence[str] | None = None) -> int:
     # --executor must win over an inherited HARMONIC_EXECUTOR.
     os.environ["HARMONIC_EXECUTOR"] = options.executor
 
+    if _selects_release(doit_args):
+        refusal = _visibility_debt()
+        if refusal:
+            print(f"release: {refusal}", file=sys.stderr)
+            return 2
+
     doit = _FarmDoitMain() if options.executor == "farm" else DoitMain()
     if options.executor == "farm":
         executing = _executing_command(doit_args, doit)
         if executing is not None:
             doit_args = _with_farm_parallelism(doit_args, *executing)
     return doit.run(doit_args)
+
+
+def _selects_release(doit_args: Sequence[str]) -> bool:
+    """Whether the command names the ``release`` task (not a forwarded arg)."""
+    selection = list(doit_args)
+    if "--" in selection:
+        selection = selection[: selection.index("--")]
+    return "release" in selection
+
+
+def _visibility_debt() -> str | None:
+    """Refuse a release whose parts still save reference sketches shown.
+
+    Seat-free and instant, so it runs before any leaf is dispatched rather
+    than after hours of gates (visibility_debt, #880)."""
+    sys.path.insert(0, str(REPO_ROOT / "cad" / "scripts"))
+    import visibility_debt
+
+    try:
+        visibility_debt.assert_no_visibility_debt()
+    except RuntimeError as problem:
+        return str(problem)
+    return None
 
 
 def _isolated_tasks(task_list):

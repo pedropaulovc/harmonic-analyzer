@@ -2737,6 +2737,9 @@ def task_check():
         SCRIPTS_DIR / "test_drawing_marks.py",
         SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
         SCRIPTS_DIR / "test_fastener_catalog.py",
+        # No part or assembly saves construction geometry shown, and the
+        # per-part sketch allowances only shrink (#880).
+        SCRIPTS_DIR / "test_reference_visibility.py",
         # Fleet-wide manufacturing ownership/validation contracts are standalone
         # tests rather than one-file-per-drawing tests, so the glob below cannot
         # discover them.  They must execute under the required recipe gate: these
@@ -3285,7 +3288,13 @@ def _run_release(relargs):
     the renders and the gallery, then tags and uploads. It takes NO COM seat, so it
     neither blocks another worktree's build nor needs SolidWorks on this machine --
     which is the whole point: a release can be cut from a seatless box, with every
-    COM stage dispatched to the farm."""
+    COM stage dispatched to the farm.
+
+    ``build.py`` refuses a release with visibility debt before dispatching any
+    leaf; a bare ``doit release`` reaches this check only after its gates."""
+    import visibility_debt
+
+    visibility_debt.assert_no_visibility_debt()
     _run([sys.executable, str(RELEASE_PY), *relargs], "cut release")
 
 

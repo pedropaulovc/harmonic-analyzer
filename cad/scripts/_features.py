@@ -17,6 +17,7 @@ from _common import (
     feature_name_by_type,
     set_sketch_direct_db,
 )
+from _visibility import blank_reference_geometry
 
 import _telemetry
 
@@ -234,6 +235,9 @@ async def add_spring_end_hooks(
             await _profile(getattr(plane, "name", plane), f"{label} (flipped)")
             res = await adapter.create_sweep(SweepParameters(path=path_name))
         check(f"sweep {label} hook", res)
+        if d > 0:
+            # The profile plane has served the sweep; hide it from renders.
+            blank_reference_geometry(adapter, ((getattr(plane, "name", plane), "PLANE"),))
 
         added = await _volume() - before
         # Upper bound 1%: planar-path Pappus is exact analytically, but the
@@ -349,6 +353,8 @@ async def add_reeded_head_and_thread(
             )
         ),
     )
+    # Hidden once the pattern owns it, so it does not print in renders.
+    blank_reference_geometry(adapter, ((axis.name, "AXIS"),))
     after_pattern = await _volume()
     expected = before - groove_count * v_groove
     if abs(after_pattern - expected) > 0.02 * groove_count * v_groove:

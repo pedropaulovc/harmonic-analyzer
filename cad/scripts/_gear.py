@@ -30,6 +30,7 @@ from _common import (
     name_last_feature,
     volume_check,
 )
+from _visibility import blank_reference_geometry
 from involute_gear import gear_facts
 
 __all__ = [
@@ -199,7 +200,7 @@ async def pattern_about_z(
         ),
     )
     features = [seed_feature] if isinstance(seed_feature, str) else list(seed_feature)
-    return check(
+    pattern = check(
         f"circular pattern about {axis.name}",
         await adapter.circular_pattern_feature(
             CircularPatternParameters(
@@ -210,6 +211,9 @@ async def pattern_about_z(
             )
         ),
     )
+    # Hidden once the pattern owns it, so it does not print in renders.
+    blank_reference_geometry(adapter, ((axis.name, "AXIS"),))
+    return pattern
 
 
 def gap_area_in_disc_ext(

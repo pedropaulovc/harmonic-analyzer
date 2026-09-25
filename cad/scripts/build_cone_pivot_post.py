@@ -98,6 +98,19 @@ from cone_pivot_post_spec import (
 )
 
 PART_NAME = "cone-pivot-post"
+# Reference sketches this part still saves shown (#880), each with its owner
+# and why.  Delete an entry once the part hides that sketch; the release
+# refuses to start while any part lists one (visibility_debt).
+SHOWN_SKETCH_ALLOWANCES = {
+    "BoreSpacingReference": (
+        "pivot: carries the drawing's marked dimensions; hide it once "
+        "the sheet imports them from the hidden sketch"
+    ),
+    "JournalPlanReference": (
+        "pivot: carries the drawing's marked dimensions; hide it once "
+        "the sheet imports them from the hidden sketch"
+    ),
+}
 MATERIAL = "Gray Cast Iron"
 
 ATTACHMENT_HOLE_SPEC = HoleSpec(
@@ -858,7 +871,9 @@ async def build(adapter: Any) -> dict[str, str]:
             ("mount east", "AXIS"),
         ),
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return await save_part_and_images(
+        adapter, PART_NAME, allowed_shown=SHOWN_SKETCH_ALLOWANCES
+    )
 
 
 @_telemetry.traced("dim.driving_plan_incline", label_param="label")

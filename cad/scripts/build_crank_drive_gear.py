@@ -138,6 +138,15 @@ def _verify_named_dimension(adapter, full_name: str, expected_mm: float) -> None
 
 
 PART_NAME = "crank-drive-gear"
+# Reference sketches this part still saves shown (#880), each with its owner
+# and why.  Delete an entry once the part hides that sketch; the release
+# refuses to start while any part lists one (visibility_debt).
+SHOWN_SKETCH_ALLOWANCES = {
+    "OutsideDiaReference": (
+        "crankhub: carries the drawing's marked dimensions; hide it once "
+        "the sheet imports them from the hidden sketch"
+    ),
+}
 MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass train
 
 TEETH = 64  # Appendix C #9 estimate, photo-ratified 2026-07-14 (see docstring)
@@ -290,7 +299,9 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return await save_part_and_images(
+        adapter, PART_NAME, allowed_shown=SHOWN_SKETCH_ALLOWANCES
+    )
 
 
 if __name__ == "__main__":
