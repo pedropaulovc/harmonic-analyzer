@@ -3081,9 +3081,10 @@ def task_check():
             # hard-exits the COM subprocess (releasing the seat via the doit
             # parent); a hung SW window only warns. Pure python, injectable
             # probes -- so the fatal/log-only contract can't silently regress.
-            # _common.py is a dep because the gate also pins the INTEGRATION
-            # (run_build arms/disarms the watchdog): an edit that drops those
-            # calls must re-run this gate, not reuse the old stamp (codex #344).
+            # _common.py and package_native.py are deps because the gate also
+            # pins the INTEGRATION (run_build, and package_native's comtypes
+            # session, arm/disarm the watchdog): an edit that drops those calls
+            # must re-run this gate, not reuse the old stamp (codex #344).
             "file_dep": [
                 str((SCRIPTS_DIR / "_watchdog.py").resolve()),
                 str((SCRIPTS_DIR / "_telemetry.py").resolve()),
@@ -3091,6 +3092,7 @@ def task_check():
                 # run_build's teardown (seat parking) lives in the recipe-inert
                 # module, which no module_deps_of closure reaches.
                 str((SCRIPTS_DIR / "_seat_forensics.py").resolve()),
+                str(PACKAGE_NATIVE_PY),
                 str((SCRIPTS_DIR / "test_watchdog.py").resolve()),
             ],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_watchdog.py")],

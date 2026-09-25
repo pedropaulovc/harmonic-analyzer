@@ -439,7 +439,10 @@ cold build; the incremental/cache-hit common case keeps restores parallel.
 
 Every COM subprocess runs a daemon watchdog thread (`_watchdog.py`;
 `_common.run_build` starts it right before `sw.connect` and stops it after
-`sw.disconnect`) so a dead SolidWorks can never hold the seat forever. Four
+`sw.disconnect`) so a dead SolidWorks can never hold the seat forever.
+`package_native.py` (`package:release`) attaches through comtypes instead of
+`run_build`, so it arms and disarms the same watchdog around its own seat
+session; a new COM entry point that bypasses `run_build` must do the same. Four
 signals, three fatal, one log-only:
 
 - **Crash — fatal, exit 86.** A NEW `sldexitapp.exe` process (SolidWorks' own
