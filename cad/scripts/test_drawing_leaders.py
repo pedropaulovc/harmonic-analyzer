@@ -96,3 +96,46 @@ def test_section_line_info_parses_chain_segments_and_arrow_shafts() -> None:
 def test_points_inside_is_strict() -> None:
     box = (0.0, 0.0, 1.0, 1.0)
     assert leaders.points_inside([(0.5, 0.5), (1.5, 0.5), (1.0, 0.5)], box) == [(0.5, 0.5)]
+
+
+def test_distance_to_box_is_zero_on_contact_and_the_gap_otherwise() -> None:
+    box = (0.0, 0.0, 2.0, 1.0)
+    # An end inside, straight through, and along an edge all touch.
+    assert leaders.distance_to_box(((1.0, 0.5), (5.0, 5.0)), box) == 0.0
+    assert leaders.distance_to_box(((-1.0, 0.5), (3.0, 0.5)), box) == 0.0
+    assert leaders.distance_to_box(((2.0, -1.0), (2.0, 3.0)), box) == 0.0
+    assert leaders.distance_to_box(((3.0, 0.0), (3.0, 1.0)), box) == pytest.approx(1.0)
+    assert leaders.distance_to_box(((1.0, 1.5), (1.0, 4.0)), box) == pytest.approx(0.5)
+    # Beside a corner the nearest point is the corner.
+    assert leaders.distance_to_box(((3.0, 2.0), (3.0, 4.0)), box) == pytest.approx(2.0**0.5)
+    # A diagonal passing a corner measures to the corner, not to an end.
+    assert leaders.distance_to_box(((1.5, 2.0), (3.0, 0.5)), box) == pytest.approx(
+        0.5 / 2.0**0.5
+    )
+
+
+def test_arrows_near_text_flags_foreign_text_within_the_clearance() -> None:
+    assert leaders.ARROW_TEXT_CLEARANCE == 0.002
+    texts = {"value": (0.010, 0.010, 0.016, 0.013), "note": (0.000, 0.000, 0.005, 0.004)}
+    # A vertical arrow 0.55 mm right of the note, 4.45 mm from the value.
+    arrows = {"A": [((0.00555, 0.0030), (0.00555, -0.0035))]}
+    assert leaders.arrows_near_text(arrows, texts) == [("A", "note", pytest.approx(0.00055))]
+    # The arrowhead's half breadth comes off the gap.
+    ((owner, name, gap),) = leaders.arrows_near_text(arrows, texts, half_width=0.0003)
+    assert (owner, name, gap) == ("A", "note", pytest.approx(0.00025))
+    # An arrow inside the text is at 0, not negative.
+    inside = {"B": [((0.012, 0.011), (0.012, 0.020))]}
+    assert leaders.arrows_near_text(inside, texts, half_width=0.0003) == [("B", "value", 0.0)]
+
+
+def test_arrows_near_text_skips_own_text_empty_ink_and_clear_arrows() -> None:
+    texts = {"value": (0.010, 0.010, 0.016, 0.013)}
+    # Its own value is not foreign text.
+    assert leaders.arrows_near_text({"value": [((0.009, 0.011), (0.009, 0.005))]}, texts) == []
+    assert leaders.arrows_near_text({"A": []}, texts) == []
+    # 2.5 mm off is clear of the 2 mm default, and near under a 3 mm one.
+    clear = {"A": [((0.0185, 0.011), (0.0185, 0.005))]}
+    assert leaders.arrows_near_text(clear, texts) == []
+    assert leaders.arrows_near_text(clear, texts, clearance=0.003) == [
+        ("A", "value", pytest.approx(0.0025))
+    ]

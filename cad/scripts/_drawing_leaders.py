@@ -38,6 +38,11 @@ from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 
 Point = tuple[float, float]
 Segment = tuple[Point, Point]
+Box = tuple[float, float, float, float]  # (x0, y0, x1, y1), x0 <= x1, y0 <= y1
+
+# An arrowhead or its tail nearer foreign text than this reads as part of
+# that text: keep 2 mm of ink between them.
+ARROW_TEXT_CLEARANCE = 0.002
 
 _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 _BROKEN_LEADER_HORIZONTAL = 2  # SetBrokenLeader2 style: horizontal text
@@ -231,6 +236,25 @@ def distance_to_point(segment: Segment, point: Point) -> float:
     return math.dist((x0 + t * dx, y0 + t * dy), point)
 
 
+def distance_to_box(segment: Segment, box: Box) -> float:
+    """Shortest distance from the segment to an axis-aligned box.
+
+    0 when it touches or enters the box, or runs along an edge within
+    ``COLLINEAR_TOLERANCE`` (``segments_cross``).
+    """
+    x0, y0, x1, y1 = box
+    if any(x0 <= x <= x1 and y0 <= y <= y1 for x, y in segment):
+        return 0.0
+    corners = ((x0, y0), (x1, y0), (x1, y1), (x0, y1))
+    edges = tuple(zip(corners, corners[1:] + corners[:1]))
+    if any(segments_cross(segment, edge) for edge in edges):
+        return 0.0
+    return min(
+        *(distance_to_point(segment, corner) for corner in corners),
+        *(distance_to_point(edge, end) for edge in edges for end in segment),
+    )
+
+
 def leader_crossings(groups: Mapping[str, Sequence[Segment]]) -> list[tuple[str, str]]:
     """Every pair of named annotations whose ink crosses."""
     names = list(groups)
@@ -247,6 +271,35 @@ def leader_crossings(groups: Mapping[str, Sequence[Segment]]) -> list[tuple[str,
 def landing_distance(segments: Sequence[Segment], centre: Point) -> float:
     """How close the annotation's nearest segment END comes to ``centre``."""
     return min(math.dist(end, centre) for segment in segments for end in segment)
+
+
+def arrows_near_text(
+    arrows: Mapping[str, Sequence[Segment]],
+    texts: Mapping[str, Box],
+    *,
+    clearance: float = ARROW_TEXT_CLEARANCE,
+    half_width: float = 0.0,
+) -> list[tuple[str, str, float]]:
+    """Every (owner, text, gap) where an owner's arrowhead stands nearer than
+    ``clearance`` to another annotation's text box.
+
+    ``arrows`` gives each annotation's arrowheads (and any outside arrow's
+    tail) as segments along their axis; ``half_width`` is half an arrowhead's
+    breadth, taken off the axis distance.  A text keyed like the owner is its
+    own and is skipped.  The gap is the nearest arrow's, floored at 0.
+    """
+    near = []
+    for owner, segments in arrows.items():
+        if not segments:
+            continue
+        for name, box in texts.items():
+            if name == owner:
+                continue
+            nearest = min(distance_to_box(segment, box) for segment in segments)
+            gap = nearest - half_width
+            if gap < clearance:
+                near.append((owner, name, max(gap, 0.0)))
+    return near
 
 
 def assert_leaders_clear(
