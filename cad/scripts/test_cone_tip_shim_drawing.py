@@ -14,18 +14,19 @@ import cone_tip_shim_spec as spec
 import draw_cone_tip_shim as drawing
 from _drawing_contract import drawing_specification_violations
 from _drawing_registry import DRAWINGS_BY_NAME
-from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
+from _hole_spec import THREAD_MAJOR_MM
 
 
 def test_pack_is_cut_to_the_block_foot_face_at_the_nominal_stack() -> None:
-    """U30 / handoff item 3: the block's width, from its south face to the
-    I31 heel relief's inner face (15.0 x 10.47), at SHIM_NOMINAL."""
+    """U30 / handoff item 3 / I31: the block's width, from the foot flange's
+    south end to the heel relief's inner face (15.0 x 31.27), at
+    SHIM_NOMINAL."""
     assert spec.SHIM_X == block.BLOCK_X
-    assert spec.SHIM_SOUTH_Z == pytest.approx(-block.BLOCK_Z / 2.0)
+    assert spec.SHIM_SOUTH_Z == pytest.approx(-block.BLOCK_Z / 2.0 - block.FLANGE_LEN)
     assert spec.SHIM_NORTH_Z == pytest.approx(
         block.BLOCK_Z / 2.0 - block.HEEL_RELIEF_DEPTH
     )
-    assert spec.SHIM_Z == pytest.approx(10.47)
+    assert spec.SHIM_Z == pytest.approx(31.27)
     assert spec.SHIM_T == block.SHIM_NOMINAL == 1.10
     assert spec.STACK_RANGE_MM == block.FOOT_SHIM_RANGE_MM
     low, high = spec.STACK_RANGE_MM
@@ -42,26 +43,43 @@ def test_leaf_stock_builds_the_nominal_and_both_stack_limits() -> None:
         assert round(target, 2) in reachable
 
 
-def test_horseshoe_slot_passes_the_screw_with_clearance_and_webs() -> None:
-    """Main's ruling: #6 normal clearance wide, full radius on the screw axis."""
-    assert spec.SLOT_SPEC.kind == "clearance"
-    assert spec.SLOT_SPEC.size == "#6"
-    assert spec.SLOT_SPEC.fit == "normal"
-    assert spec.SLOT_W == pytest.approx(blind_cut_dia_mm(spec.SLOT_SPEC))
+def test_horseshoe_slot_spans_the_flange_slot_with_webs() -> None:
+    """I31: at its narrowest .XX print the slot still spans the flange
+    slot's widest cut (4.07 +0.10/0 -> 4.58 .XX), full radius at the end."""
+    assert spec.SLOT_W == 4.58
+    assert spec.SLOT_W - 0.51 >= block.FLANGE_SLOT_W_MAX
     assert spec.SLOT_R == pytest.approx(spec.SLOT_W / 2.0)
     major = THREAD_MAJOR_MM[block.FOOT_THREAD]
-    assert spec.SLOT_W - major >= 0.25
-    assert spec.SIDE_WEB_MM >= 2.0
-    assert spec.SIDE_WEB_MM == pytest.approx(spec.SHIM_NORTH_Z - spec.SLOT_R)
-    assert spec.END_WEB_MM >= 2.0
-    assert spec.END_WEB_MM == pytest.approx(block.BLOCK_X / 2.0 - spec.SLOT_R)
+    assert spec.SLOT_W - 0.51 - major >= 0.25
+    assert spec.SIDE_WEB_MM == pytest.approx(block.BLOCK_X / 2.0 - spec.SLOT_R)
+    assert spec.END_WEB_MM == pytest.approx(spec.SLOT_CENTRE_FROM_NORTH - spec.SLOT_R)
+    assert min(spec.SIDE_WEB_MM, spec.END_WEB_MM) >= 2.0
 
 
-def test_slot_opens_away_from_the_drum() -> None:
-    """Local -X (east) is the accessible 12 mm edge; +X faces the drum."""
-    assert spec.SLOT_OPEN_SIDE == -1
-    run_end = part.SLOT_OPEN_SIDE * (spec.SHIM_X / 2.0 + part.SLOT_OVERRUN)
-    assert run_end < -spec.SHIM_X / 2.0
+def test_closed_end_stays_north_of_every_screw_position() -> None:
+    """The pack is squared on the heel-relief face; the screw's farthest
+    reach north of that edge runs through the block's printed bands and its
+    float in the flange slot.  The radius end, at its narrowest and at its
+    location's long limit, still passes it."""
+    nominal = (12.0 - 1.53) + 10.7 - 8.42 / 2.0
+    assert spec.FLANGE_SLOT_NORTH_CENTRE_FROM_NORTH == pytest.approx(nominal)
+    reach = nominal - (0.51 + 0.8 + 0.8 + 0.51 / 2.0 + block.FLANGE_SLOT_FLOAT)
+    assert spec.SCREW_NORTH_REACH_FROM_NORTH == pytest.approx(reach)
+    slack = (spec.SLOT_W - 0.51) / 2.0 - 3.505 / 2.0
+    assert spec.SLOT_CENTRE_FROM_NORTH == 13.7
+    assert spec.SLOT_CENTRE_FROM_NORTH + 0.8 - slack <= reach
+    # One step further south (13.8) no longer passes: the value is derived.
+    assert 13.8 + 0.8 - slack > reach
+    assert spec.SLOT_CENTRE_Z == pytest.approx(spec.SHIM_NORTH_Z - 13.7)
+
+
+def test_slot_opens_south_along_the_flange_slot() -> None:
+    """I31: the screw rides the block's axial flange slot, so the horseshoe
+    opens to the south edge on the block's centre plane."""
+    assert spec.SLOT_OPEN_EDGE == "south"
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "run_end = -SHIM_SOUTH_Z + SLOT_OVERRUN" in source
+    assert "slot_pts = [(-h, y_centre), (h, y_centre), (h, run_end), (-h, run_end)]" in source
     # The mid-plane cut clears the whole pack from its bottom face.
     assert part.CUT_DEPTH / 2.0 > spec.SHIM_T
 
@@ -117,13 +135,15 @@ def test_every_marked_dimension_has_a_view_and_a_precision() -> None:
 
 
 def test_slot_width_reads_past_the_open_mouth() -> None:
+    """The slot opens at the plan's top (south) edge; its width reads above
+    that edge, under the 15.0 width."""
     x, y = drawing.TOP_KEEP["SlotWidth"]
-    assert x < drawing.TOP_CENTER[0] - drawing.HALF_X
-    assert y == pytest.approx(drawing.SLOT_AXIS_Y)
-    # North (the trimmed edge) is at the bottom of the plan, so the axis sits
-    # below the view centre by half the trim.
-    assert drawing.TOP_CENTER[1] - y == pytest.approx(
-        block.HEEL_RELIEF_DEPTH / 2.0 * drawing._S
+    assert x == pytest.approx(drawing.TOP_CENTER[0])
+    assert drawing.PLAN_TOP < y < drawing.TOP_KEEP["Width"][1] - 0.008
+    # North (the trimmed edge) is at the bottom of the plan.
+    assert drawing.PLAN_BOTTOM < drawing.SLOT_CENTRE_Y < drawing.PLAN_TOP
+    assert drawing.PLAN_TOP - drawing.PLAN_BOTTOM == pytest.approx(
+        spec.SHIM_Z * drawing._S
     )
 
 
@@ -137,9 +157,9 @@ def test_slot_location_values_sit_between_their_witnesses() -> None:
     right = drawing.TOP_CENTER[0] + drawing.HALF_X
     x = drawing.TOP_KEEP["SlotCentreX"][0]
     assert drawing.TOP_CENTER[0] + 0.002 <= x - half_w and x + half_w <= right - 0.002
-    lower = drawing.TOP_CENTER[1] - drawing.HALF_Z
+    lower = drawing.PLAN_BOTTOM
     y = drawing.TOP_KEEP["SlotCentreZ"][1]
-    assert lower + 0.002 <= y - 0.0019 and y + 0.0019 <= drawing.SLOT_AXIS_Y - 0.002
+    assert lower + 0.002 <= y - 0.0019 and y + 0.0019 <= drawing.SLOT_CENTRE_Y - 0.002
 
 
 def test_drawing_registry_row() -> None:
