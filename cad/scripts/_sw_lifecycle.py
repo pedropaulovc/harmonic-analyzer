@@ -41,6 +41,7 @@ A recovery that ends anywhere but connected is an ERROR span.
 
 from __future__ import annotations
 
+import math
 import os
 import time
 
@@ -94,10 +95,32 @@ def _disabled() -> bool:
 
 
 def _connect_timeout() -> float:
-    try:
-        return float(os.environ.get(_CONNECT_TIMEOUT_ENV, _DEFAULT_CONNECT_TIMEOUT))
-    except ValueError:
+    """``HARMONIC_SW_CONNECT_TIMEOUT`` in seconds, else the default. A value that
+    is not a positive finite number warns and falls back: a NaN deadline would
+    never compare as reached, so the connect poll would never end."""
+    raw = os.environ.get(_CONNECT_TIMEOUT_ENV, "").strip()
+    if not raw:
         return _DEFAULT_CONNECT_TIMEOUT
+    try:
+        value = float(raw)
+    except ValueError:
+        value = math.nan
+    if math.isfinite(value) and value > 0:
+        return value
+    _telemetry.warn(
+        f"[sw] ignoring {_CONNECT_TIMEOUT_ENV}={raw!r}: not a positive finite number "
+        f"of seconds; using {_DEFAULT_CONNECT_TIMEOUT:.0f} s"
+    )
+    return _DEFAULT_CONNECT_TIMEOUT
+
+
+def _mark_failed(span, exc: BaseException) -> None:
+    """A best-effort lifecycle step swallowed ``exc`` to keep the build going: the
+    span still ends ERROR with the exception recorded, never OK."""
+    from opentelemetry.trace import Status, StatusCode
+
+    span.record_exception(exc)
+    span.set_status(Status(StatusCode.ERROR, f"{type(exc).__name__}: {exc}"))
 
 
 def ensure_ready() -> str:
@@ -146,6 +169,7 @@ def ensure_ready() -> str:
                 _telemetry.warn(f"[sw] still not connected after ensure_ready (state={final.value})")
             return final.value
         except Exception as exc:  # noqa: BLE001 - autostart must never harden into a new failure
+            _mark_failed(span, exc)
             _telemetry.error(f"[sw] ensure_ready failed ({exc}); proceeding to connect anyway",
                              exc_info=True)
             return "error"
@@ -196,6 +220,7 @@ def force_recover(reason: str, **context: object) -> str:
                 )
             return final
         except Exception as exc:  # noqa: BLE001 - recovery must not harden into a new failure
+            _mark_failed(span, exc)
             _telemetry.error(f"[sw] force_recover failed ({exc})", exc_info=True)
             return "error"
 
@@ -226,6 +251,7 @@ def wait_until_ready() -> str:
             if outcome != CONNECTED_STATE:
                 _telemetry.event("sw.grace_abandoned", grace_s=grace, reason=outcome)
         except Exception as exc:  # noqa: BLE001 - recovery must never fail the build
+            _mark_failed(span, exc)
             _telemetry.warn(f"[sw] wait_until_ready gave up after {grace:.0f}s ({exc})")
             # Abandoning the grace is a decision INSIDE this span, and the retry
             # that follows it will probably fail -- so the trace has to show when
