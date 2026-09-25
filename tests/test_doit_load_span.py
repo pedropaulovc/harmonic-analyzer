@@ -22,9 +22,13 @@ class _Span:
     def __init__(self, name, start_time, attributes):
         self.name, self.start_time, self.attributes = name, start_time, attributes
         self.status = self.end_time = None
+        self.exceptions = []
 
     def set_status(self, status):
         self.status = status
+
+    def record_exception(self, exc):
+        self.exceptions.append(exc)
 
     def end(self, end_time=None):
         self.end_time = end_time
@@ -137,6 +141,24 @@ def test_build_py_emits_the_span_exactly_once(graph, monkeypatch):
 
     assert [s.name for s in spans] == ["doit.load"]
     assert spans[0].attributes["doit.command"] == "list"
+
+
+def test_a_generator_that_raises_still_writes_one_error_span(graph, monkeypatch):
+    """Codex on #863: a failing ``task_*`` left the wrapper before ``record``,
+    so the load that failed was exactly the one missing from the trace."""
+    spans, _ = _fake_telemetry(monkeypatch)
+    dodo = graph(_STAMPED + "def task_boom():\n    raise RuntimeError('bad graph')\n")
+
+    with pytest.raises(RuntimeError, match="bad graph"):
+        _load(dodo, ["boom"])
+
+    (span,) = spans
+    assert span.name == "doit.load"
+    assert not span.status.is_ok
+    assert "bad graph" in span.status.description
+    assert [str(exc) for exc in span.exceptions] == ["bad graph"]
+    assert span.end_time is not None and span.start_time <= span.end_time
+    assert "doit.tasks" not in span.attributes and "label" not in span.attributes
 
 
 def test_install_is_idempotent(graph, monkeypatch):
