@@ -2764,6 +2764,9 @@ def task_check():
         # Same failure shape: never enrolled, so the U28 re-lay (997f3534) left
         # its three drive-train support pins red with every gate green.
         SCRIPTS_DIR / "test_drive_train_support_layout.py",
+        # One cone-train frame: the drive-train and the paper-drive must read
+        # drive_train_frame_geom's own objects, never a second copy.
+        SCRIPTS_DIR / "test_drive_train_frame_geom.py",
         # dimensions.yaml is read by no part, so only this test keeps its
         # alignment-pinion record pinned to the CAD constants (#814).
         SCRIPTS_DIR / "test_dimensions_alignment_pinion_layout.py",

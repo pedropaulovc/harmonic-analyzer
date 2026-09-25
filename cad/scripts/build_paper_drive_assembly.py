@@ -129,6 +129,7 @@ from _transforms import (  # noqa: E402
     rows_from_euler,
 )
 from cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z
+from drive_train_frame_geom import X_CRANK, Y_CRANK
 from harmonic_base_spec import STACK_HEIGHT as BASE_DECK_Y
 
 ASM_NAME = "paper-drive"
@@ -804,8 +805,6 @@ def _assert_chain_layout() -> None:
             f"_chain KNOB_CENTRE {CHAIN_KNOB_CENTRE} != -KNOB_SHAFT_XY"
             f" ({knob_pre[0]:.4f}, {knob_pre[1]:.4f})"
         )
-    from build_drive_train_assembly import X_CRANK, Y_CRANK
-
     if CHAIN_CRANK_CENTRE != (-X_CRANK, Y_CRANK):
         raise RuntimeError(
             f"_chain CRANK_CENTRE {CHAIN_CRANK_CENTRE} != -drive-train crank"

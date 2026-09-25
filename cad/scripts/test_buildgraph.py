@@ -965,10 +965,6 @@ _SOURCE_VALUE_IMPORTS = {
         "KNIFE",
         "KNIFE_CONTACT_Y",
     },
-    ("build_paper_drive_assembly", "build_drive_train_assembly"): {
-        "X_CRANK",
-        "Y_CRANK",
-    },
 }
 
 
@@ -1372,8 +1368,9 @@ def test_assemblies_depend_on_assembly_helpers():
     [
         ("_assembly_patterns", {"drive_train", "frame", "magnifier", "paper_drive"}),
         ("_assembly_couplings", {"drive_train", "paper_drive"}),
-        # paper_drive imports the drive-train builder for X_CRANK/Y_CRANK.
-        ("_drive_train_explode", {"drive_train", "paper_drive"}),
+        # paper_drive reads X_CRANK/Y_CRANK from drive_train_frame_geom, not
+        # the drive-train builder, so the explode helper is drive-train only.
+        ("_drive_train_explode", {"drive_train"}),
     ],
 )
 def test_specialized_assembly_helpers_have_exact_transitive_consumers(
@@ -1611,6 +1608,31 @@ def test_pen_assembly_free_of_pen_driver_closure():
     pen_cfg = config_files_of(script_for("pen"))
     assert "machine/output.yaml" not in pen_cfg, pen_cfg
     assert "channels.yaml" not in pen_cfg, pen_cfg
+
+
+def test_paper_drive_free_of_drive_train_assembly_closure():
+    """The paper-drive pins its chain to the crank axis (X_CRANK, Y_CRANK). It
+    used to import them from build_drive_train_assembly, so every drive-train
+    script edit re-keyed assembly:paper_drive and its config set carried the
+    drive-train's. Both now read drive_train_frame_geom, which must itself stay
+    leaf-safe (no _assembly, no build script), so a part-level helper such as
+    _chain could read it too."""
+    closure = {Path(p).stem for p in module_deps_of(script_for("paper_drive"))}
+    assert "build_drive_train_assembly" not in closure
+    assert "drive_train_frame_geom" in closure
+    frame = SCRIPTS_DIR / "drive_train_frame_geom.py"
+    frame_closure = {Path(p).stem for p in module_deps_of(frame)}
+    assert "_assembly" not in frame_closure, frame_closure
+    assert not {m for m in frame_closure if m.startswith("build_")}, frame_closure
+    frame_cfg = config_files_of(frame)
+    assert {
+        "machine/gear_train.yaml",
+        "machine/cone_incline.yaml",
+        "machine/channels.yaml",
+        "tolerances.yaml",
+    } <= frame_cfg, frame_cfg
+    for stem in ("paper_drive", "drive_train"):
+        assert frame_cfg <= config_files_of(script_for(stem)), stem
 
 
 def test_module_deps_follow_non_helper_siblings():
