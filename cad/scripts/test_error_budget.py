@@ -771,6 +771,7 @@ def test_shipped_readout_procedure_carries_every_correction(report, nom):
     assert "crank stopped on its index" in doc
     assert "ONE direction" in doc
     assert "never back the crank off" in doc
+    assert " ".join(LUBRICATION.split()) in " ".join(doc.split())
     # the one-sided setting bias at the ends of the scale is published, so the
     # read-vs-set vector the operator subtracts is the one the Monte Carlo does
     tol = report["station_setting_tolerance_mm"]
@@ -1428,3 +1429,36 @@ def test_procedures_never_back_the_crank_off():
     for name in ("device-operation.md", "tolerance-policy.md"):
         text = " ".join((docs / name).read_text(encoding="utf-8").split())
         assert sentence in text, name
+
+
+LUBRICATION = (
+    "Lubricate each connecting-rod strap on its cam and each drum arbor in its "
+    "pedestal with castor oil or grease before running, and keep them lubricated; "
+    "never run them dry."
+)
+
+
+def test_procedures_specify_the_lubrication_the_toggle_is_scored_at(budget):
+    """The flank toggle is scored at lubricated brass-on-steel friction (castor
+    oil 0.11 to grease 0.19); dry would hold one flank. So the lubrication is an
+    operating instruction in both procedure documents, naming the two cited
+    lubricants, and the toggle row points at it."""
+    docs = eb._config.CONFIG_DIR.parent / "docs"
+    for name in ("device-operation.md", "tolerance-policy.md"):
+        text = " ".join((docs / name).read_text(encoding="utf-8").split())
+        assert LUBRICATION in text, name
+    holds = budget["critical_features"]["flank_toggle"]["holds"]
+    assert "0.19 greased" in holds and "0.11 castor oil" in holds
+    policy = (docs / "tolerance-policy.md").read_text(encoding="utf-8")
+    row = next(
+        line
+        for line in policy.splitlines()
+        if line.startswith("| **mesh: flank toggle**")
+    )
+    assert "device-operation.md` setup step" in row
+    trial = next(
+        line
+        for line in policy.splitlines()
+        if line.startswith("| flank toggle (bench repro) |")
+    )
+    assert "dry" in trial and "MODELLED, NOT PROVEN" in trial

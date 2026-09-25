@@ -270,7 +270,7 @@ pools the all-ones, half-rectangle, Gaussian and lifted-square (odd channels on)
 | mesh: drum bore-on-arbor runout | 0.035 mm | 0.010 | 0.06 | 0.07 | 0.17 | `cylinder_gear_spec.BORE_DIAMETRAL_CLEARANCE_MM`; rides the drum |
 | mesh: cone journal float | 0.0375 mm | 0.006 | 0.09 | 0.07 | 0.26 | `shaft_in_bushing` at the post journal and tip bushing; one shaft, one draw per machine |
 | mesh: arbor journal float | 0.0375 mm | 0.011 | 0.06 | 0.08 | 0.17 | `shaft_in_bushing`, drum arbor in its pedestal |
-| **mesh: flank toggle** | **μ 0.11–0.19** | **0.150** | **0.31** | **0.06** | — (3.0× its share) | **modelled, not proven** (statics only): the drum overruns onto its other flank where the spring releases and $|\sin(\text{lobe})| > 2.33\mu$, leading by $B/R$; lubricated brass on steel (Engineering ToolBox). Dry (μ ≥ 0.43) would hold one flank |
+| **mesh: flank toggle** | **μ 0.11–0.19** | **0.150** | **0.31** | **0.06** | — (3.0× its share) | **modelled, not proven** (statics only): the drum overruns onto its other flank where the spring releases and $|\sin(\text{lobe})| > 2.33\mu$, leading by $B/R$; lubricated brass on steel (Engineering ToolBox) — the lubrication is an instruction, `device-operation.md` setup step and readout step 0 below. Dry (μ ≥ 0.43) would hold one flank. Bench repro: the "flank toggle" trial below |
 | station setting (setup) | 0.25 mm | 0.052 | 0.30 | 0.52 | 0.24 | interpolate the released stick; zero/travel-stop errors are one-sided and their mean bias is recorded. Scored at each input's pen-forced scale, 0.33–0.79 for broad inputs |
 | **all combined** | | **0.195** | **0.83** | **1.47** | | targets 0.30 / 1.5 / 2.0 |
 
@@ -374,6 +374,11 @@ flowchart LR
 $S = \sum_i x^\text{read}_i$ and $C_2 = \sum_i x^\text{read}_i\kappa_i$ are the two sums the
 operator forms from step 1; the table is the only data the procedure needs beyond the readings.
 
+0. **Lubricate the drum drive** ([`device-operation.md`](./device-operation.md), setup step):
+   Lubricate each connecting-rod strap on its cam and each drum arbor in its pedestal with
+   castor oil or grease before running, and keep them lubricated; never run them dry. The
+   flank-toggle term is scored at that friction (μ 0.11–0.19); a dry machine is not the one
+   the budget scores.
 1. **Zero the measuring stick at the pivot** (every station ≥ 0, the only side the CAD builds)
    and **set each bar to its linear station** $x_i \cdot 88$ mm on the engraved 14.20 mm/division
    scale, then **record the ordinate it actually reads** from the station table in the shipped
@@ -436,6 +441,7 @@ operator forms from step 1; the table is the only data the procedure needs beyon
 |---|---|---|---|
 | channel consistency | each bar alone at full scale, read the k = 0 amplitude | spring rate, eccentricity, arms, summing holes (gain scatter) | every channel within ±2 % of the mean (the budget's combined worst case is ±2.1 %); an outlier is a spring to swap |
 | channel phase | same runs, zero-crossing position vs. expected (the expected includes the common drive-flank lag) | cam-to-notch, mesh thickness/runout/float, flank toggle | ≤ 0.69° each: the Monte Carlo's p99 of cam phase + every mesh term at each zero crossing (`channel_phase_trial`, pinned by `check:budget`) |
+| flank toggle (bench repro) | one bar at full scale, strap and arbor lubricated per the setup step: crank forward and read the channel phase at the zero crossings in the spring's releasing half and in its drive half; then clean the strap bore and arbor journal dry and repeat | whether the drum overruns onto its other flank where the spring releases (`flank_toggle`, modelled from statics only) | lubricated: the releasing-half crossings lead the drive-half ones by about the mesh backlash over the 120T pitch radius (≈ 0.36° at the nominal 0.19 mm); dry: no lead. Until this trial is run the toggle stays MODELLED, NOT PROVEN |
 | hysteresis | one bar at full scale, crank forward then back slowly | knife edge, wheel bearing, wire preload | proposed: trace width ≤ 1 % of that channel's stroke (an edge rolling-resistance length ≤ 0.005 mm at the derived load) |
 | station table check | one bar alone at each station, k = 0 amplitude vs a full-scale bar | slide-arc height, contact offset, gain curvature | matches the `READOUT.md` table; idle bar reads ≈ 0.029; subtract the read-vs-set vector (20ℓ at k = 0, −ℓ at odd k) from every trial |
 | broad-input benchmark | Michelson's Gaussian ($e^{-(0.1i)^2}$) and half-range rectangle, corrected readout | everything | MAE ≈ 0.7 %, max ≈ 2 % of the greatest term — historical parity |

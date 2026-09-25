@@ -2381,6 +2381,9 @@ $P(f)$ for 20 bars set at $f$ (from the table; check your arithmetic against it)
 
 ## 2. Run and read
 
+Lubricate each connecting-rod strap on its cam and each drum arbor in its
+pedestal with castor oil or grease before running, and keep them lubricated;
+never run them dry.
 Crank in ONE direction only. If you overshoot a crank index, go on round to it
 again; never back the crank off.
 Take the zero of each trial as the mean line of the trace over one full period.
