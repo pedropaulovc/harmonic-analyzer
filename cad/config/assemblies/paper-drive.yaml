@@ -16,7 +16,6 @@
 flip_invert:
   - crank wheel axial
   - knob wheel axial
-  - platen feed snapshot
   # (was "rack pinion disc axial" -- the 120T disc's label became "reducer
   # disc" in the PR #196 real-train rework; same mate, same learned side.
   # Latent until 2026-07-07's full paper-drive rebuild re-keyed it.)

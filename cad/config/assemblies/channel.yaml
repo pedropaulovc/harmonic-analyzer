@@ -26,7 +26,6 @@ flip_invert:
   - pivot bracket datum y
   - pivot bracket datum z
   - pivot bracket datum y @npn
-  - spring hook datum y @npn
 allowed_free_stems:
   - rocker-arm
   - connecting-rod
