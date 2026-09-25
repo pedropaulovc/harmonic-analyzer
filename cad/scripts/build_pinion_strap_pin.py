@@ -1,4 +1,4 @@
-r"""Purchased torque-shaft set pin: McMaster 98296A027 (option E-a; MHA-145, 2 used).
+r"""Purchased 1/16 spring pin: McMaster 98296A027 (MHA-145, 3 used: E-a strap pins and the R1a collar pin).
 
 A 1/16 x 1/2 slotted spring pin to ASME B18.8.2 (pinion_strap_pin_spec): one
 runs through each MHA-056 strap foot's cross hole and the MHA-062 torque
