@@ -15,8 +15,7 @@ POST_Z_SHIFT = 35.415
 
 # Move the working gear stack toward the fixed post until the 64T retains
 # 0.10 mm axial air to the post's cone boss.  The world projections follow the
-# unchanged cone-incline journal (cone_incline.INCLINE_DEG) and recenter the
-# channel/cylinder bank.
+# unchanged 12.5182-degree journal and recenter the channel/cylinder bank.
 GEAR_AXIS_SHIFT = -33.114642580298394
 MECHANISM_X_SHIFT = -5.69360213488344
 MECHANISM_Z_SHIFT = 3.0875877804265315
