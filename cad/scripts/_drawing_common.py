@@ -6190,6 +6190,7 @@ async def finalize_drawing(
     run_layout_audit(
         adapter,
         stem=outputs.slddrw.stem,
+        pdf=outputs.pdf,
         report=layout_report_path(outputs.slddrw.stem),
         sheet_layouts=resolved_layouts,
         is_pictorial=is_pictorial_orientation,
