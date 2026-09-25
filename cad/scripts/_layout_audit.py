@@ -130,6 +130,19 @@ ROW_Y_FRACTION = 0.3
 # callout's SHOULDER (its underline), not a leader.
 SHOULDER_Y_TOL_M = 0.0003
 
+# PDF ink (``_pdf_ink``, stored in each dump's ``ink``) is the truth for WHERE
+# text and model edges printed; COM display data says WHAT each one is.
+# Calibration run layoutcal-d09c2b9eb: every COM text item with a string
+# matched one PDF text object (208/208), while COM row boxes overshot the ink
+# by a median 2.5 mm (p95 21 mm) and GetPolylines7 put 0-59% of a view's
+# edges on its printed strokes. A text item and its PDF text object are the
+# same run when their strings agree and their lower-left corners lie within
+# this window (COM positions sit ~0.9 mm below the glyphs).
+INK_MATCH_WINDOW_M = 0.003
+# Model edges print as 0.25 mm solid black strokes (annotation ink 0.18 mm,
+# section lines 0.35 mm, the frame and title block grey).
+MODEL_EDGE_WIDTH_M = (0.00022, 0.00030)
+
 # Symbol tokens IDisplayData returns unresolved; each renders as ONE glyph.
 _TOKEN = re.compile(r"<[^<>]+>")
 
@@ -158,6 +171,8 @@ ANNOTATION_KINDS = {
 # Annotations whose ink is a construction mark on the geometry, not a callout:
 # their lines are obstacles for text, but they carry no text of their own.
 _MARK_KINDS = frozenset({"center-mark", "centerline", "cosmetic-thread"})
+# Annotation ink a leader may cross (see ``find_leader_across_lines``).
+_NOT_CROSSING_TARGETS = frozenset({"geometry", "detail-circle"})
 # swAnnotationVisibilityState_e: 2 = half hidden, 3 = hidden.
 _HIDDEN_STATES = (2, 3)
 _OWNER_DRAWING_SHEET = 1
@@ -278,7 +293,10 @@ def triangle_segments(raw: Sequence[float], role: str = "arrow") -> list[Segment
 def arrowhead_segments(raw: Sequence[float], role: str = "arrow") -> list[Segment]:
     """``GetArrowHeadAtIndex2``: [tip3, dir3, width, height, style, normal3].
 
-    Width runs along the arrow direction, height across it.
+    Width runs along the arrow direction, height across it. ``dir`` points
+    from the tip back along the shaft, toward the arrowhead's base: every
+    unambiguous arrowhead on the six calibration PDFs (125 of 125, d09c2b9eb)
+    printed its base there, none on the far side of the tip.
     """
     values = _floats(raw)
     if len(values) < 8:
@@ -290,7 +308,7 @@ def arrowhead_segments(raw: Sequence[float], role: str = "arrow") -> list[Segmen
         return []
     ux, uy = dx / length, dy / length
     width, height = values[6], values[7]
-    base = (tip[0] - ux * width, tip[1] - uy * width)
+    base = (tip[0] + ux * width, tip[1] + uy * width)
     left = (base[0] - uy * height / 2.0, base[1] + ux * height / 2.0)
     right = (base[0] + uy * height / 2.0, base[1] - ux * height / 2.0)
     xy = [tip, left, right]
@@ -299,52 +317,74 @@ def arrowhead_segments(raw: Sequence[float], role: str = "arrow") -> list[Segmen
     ]
 
 
-def view_polyline_segments(raw: Sequence[float], role: str = "geometry") -> list[Segment]:
-    """``IView::GetPolylines7`` out-array: repeated records of
-
-    ``[Type, GeomDataSize, GeomData[size], LineColor, LineStyle, LineFont,
-    LineWeight, LayerID, LayerOverride, NumPolyPoints, xyz * n]``.
-
-    Every record is tessellated already (arcs too), so the points are joined.
-    """
-    values = _floats(raw)
-    segments: list[Segment] = []
-    index = 0
-    while index + 2 <= len(values):
-        size = int(values[index + 1])
-        count_at = index + 2 + size + 6
-        if count_at >= len(values):
-            break
-        count = int(values[count_at])
-        points = values[count_at + 1 : count_at + 1 + 3 * count]
-        if len(points) != 3 * count:
-            break
-        xy = [(points[i], points[i + 1]) for i in range(0, len(points), 3)]
-        segments.extend(
-            Segment(a[0], a[1], b[0], b[1], role) for a, b in zip(xy, xy[1:])
-        )
-        index = count_at + 1 + 3 * count
-    return segments
-
-
-def apply_transform(
-    array_data: Sequence[float], x: float, y: float, z: float
-) -> tuple[float, float]:
-    """Map a point through a SolidWorks ``IMathTransform.ArrayData``.
-
-    ArrayData is [r00..r22 (row-major 3x3), tx, ty, tz, scale, 0, 0, 0] and a
-    point p maps to ``scale * (p @ R) + t`` (row vector convention).
-    """
-    r = _floats(array_data)
-    scale = r[12] if len(r) > 12 and r[12] else 1.0
-    px = x * r[0] + y * r[3] + z * r[6]
-    py = x * r[1] + y * r[4] + z * r[7]
-    return (scale * px + r[9], scale * py + r[10])
-
-
 # --------------------------------------------------------------------------
 # text rows
 # --------------------------------------------------------------------------
+
+
+def ink_key(text: str) -> str:
+    """A string as the PDF prints it: symbol tokens are paths, blanks no ink."""
+    return re.sub(r"\s+", "", _TOKEN.sub("", text)).upper()
+
+
+@dataclass(frozen=True)
+class InkSpan:
+    """One PDF text object: what it says and its tight glyph box."""
+
+    key: str
+    box: Box
+
+
+def ink_spans(dump: Mapping[str, Any]) -> list[InkSpan]:
+    spans = []
+    for raw in (dump.get("ink") or {}).get("spans", ()):
+        text, *box = raw
+        spans.append(InkSpan(ink_key(str(text)), Box(*_floats(box)[:4])))
+    return spans
+
+
+def ink_edges(dump: Mapping[str, Any]) -> list[Segment]:
+    """The page's model-edge strokes (``MODEL_EDGE_WIDTH_M``, solid black)."""
+    low, high = MODEL_EDGE_WIDTH_M
+    return [
+        Segment(*_floats(raw)[:4], "geometry")
+        for raw in (dump.get("ink") or {}).get("strokes", ())
+        if low <= float(raw[4]) <= high and not raw[5]
+    ]
+
+
+def match_ink(
+    items: Sequence[tuple[Any, TextItem]], spans: Sequence[InkSpan]
+) -> dict[Any, Box]:
+    """One-to-one: each keyed COM text item to the PDF text object that printed it.
+
+    Candidates share the item's ink string and sit within ``INK_MATCH_WINDOW_M``
+    of its lower-left corner; the closest pairs are taken first and each span
+    serves one item, so six "13.12"s on one sheet cannot claim the same run.
+    Symbol-only items (``<MOD-DIAM>``) print as paths, not text, and never match.
+    """
+    pairs = []
+    by_key: dict[str, list[int]] = {}
+    for index, span in enumerate(spans):
+        by_key.setdefault(span.key, []).append(index)
+    for key, item in items:
+        wanted = ink_key(item.text)
+        if not wanted:
+            continue
+        window = INK_MATCH_WINDOW_M + item.height
+        for index in by_key.get(wanted, ()):
+            box = spans[index].box
+            dx, dy = abs(box.xmin - item.x), abs(box.ymin - item.y)
+            if dx < window and dy < window:
+                pairs.append((dx + dy, key, index))
+    matched: dict[Any, Box] = {}
+    used: set[int] = set()
+    for _cost, key, index in sorted(pairs, key=lambda pair: pair[0]):
+        if key in matched or index in used:
+            continue
+        matched[key] = spans[index].box
+        used.add(index)
+    return matched
 
 
 def glyph_count(text: str) -> int:
@@ -434,6 +474,39 @@ def _rotated_hull(item: TextItem, width: float) -> Box:
     return Box.from_points(
         [(item.x + x * cos_a - y * sin_a, item.y + x * sin_a + y * cos_a) for x, y in corners]
     )
+
+
+def ink_row_boxes(
+    items: Sequence[TextItem], ink: Mapping[int, Box], *, advance: float
+) -> list[tuple[str, Box]]:
+    """``(row text, box)`` per printed row, from the items' PDF glyph boxes.
+
+    An item with no PDF text object (a symbol token, drawn as a path) is boxed
+    from its COM position -- up to the next item on its row, else one advance --
+    shifted by the offset its row's printed items show against their COM
+    positions, so it lands where the glyphs did.
+    """
+    boxes: list[tuple[str, Box]] = []
+    index_of = {id(item): index for index, item in enumerate(items)}
+    for row in group_rows(items):
+        text = "".join(item.text for item in row).strip()
+        printed = [(item, ink[index_of[id(item)]]) for item in row if index_of[id(item)] in ink]
+        shift = (
+            median(box.ymin - item.y for item, box in printed),
+            median(box.height for _item, box in printed),
+        ) if printed else (0.0, 0.0)
+        parts = [box for _item, box in printed]
+        for position, item in enumerate(row):
+            if index_of[id(item)] in ink:
+                continue
+            nxt = row[position + 1].x if position + 1 < len(row) else item.x + advance * item.height * glyph_count(item.text.strip())
+            height = shift[1] or item.height
+            parts.append(Box(item.x, item.y + shift[0], max(nxt, item.x), item.y + shift[0] + height))
+        box = parts[0]
+        for part in parts[1:]:
+            box = box.union(part)
+        boxes.append((text, box))
+    return boxes
 
 
 def row_boxes(
@@ -556,7 +629,8 @@ def _classify(
     """Give each display-data segment its role: shoulder, leader or line.
 
     * A hole callout's display data is its leader plus the shoulder under its
-      text (supports' calibration): every non-shoulder line is leader.
+      text (supports' calibration): every other line is leader; its
+      arrowhead stays an arrow.
     * Other annotations: a run that touches the annotation's own text is its
       leader, everything else is dimension/witness/frame ink.
     """
@@ -566,7 +640,7 @@ def _classify(
     for segment in segments:
         if id(segment) in shoulder_ids:
             role = "shoulder"
-        elif hole_callout:
+        elif hole_callout and segment.role == "line":
             role = "leader"
         else:
             role = segment.role
@@ -594,9 +668,17 @@ def text_height(annotation: AnnotationGeometry) -> float:
 
 
 def annotation_geometry(
-    annotation: Mapping[str, Any], *, owner: str, advance: float
+    annotation: Mapping[str, Any],
+    *,
+    owner: str,
+    advance: float,
+    ink: Mapping[int, Box] | None = None,
 ) -> AnnotationGeometry | None:
-    """One dumped annotation as the audit sees it: text rows plus its own ink."""
+    """One dumped annotation as the audit sees it: text rows plus its own ink.
+
+    ``ink`` maps an item's index in ``text_items(display)`` to its printed PDF
+    glyph box (``match_ink``); a sheet dumped with its PDF always passes it.
+    """
     kind = ANNOTATION_KINDS.get(int(annotation.get("type", 0)), "other")
     if int(annotation.get("visible", 1) or 1) in _HIDDEN_STATES:
         return None
@@ -606,7 +688,9 @@ def annotation_geometry(
     segments = _display_segments(display)
     if kind == "dim" and (annotation.get("dim") or {}).get("hole_callout"):
         kind = "hole-callout"
-    shoulders = _shoulders(segments, items) if kind in ("dim", "hole-callout", "note") else []
+    # A plain dimension's text sits on its own DIMENSION line; only a callout
+    # (hole callout, leadered note) has a shoulder under its text.
+    shoulders = _shoulders(segments, items) if kind in ("hole-callout", "note") else []
     segments = _classify(kind, annotation, segments, shoulders)
     segments.extend(_registered_leaders(annotation))
 
@@ -619,6 +703,9 @@ def annotation_geometry(
         # full-circle arc is the balloon (``rendered_balloon_circle``).
         cx, cy, radius = circle
         rows = [(str(note.get("text", "")), Box(cx - radius, cy - radius, cx + radius, cy + radius))]
+        exact = True
+    elif ink:
+        rows = ink_row_boxes(items, ink, advance=advance)
         exact = True
     elif kind == "note" and len(_floats(note.get("extent"))) >= 6 and not annotation.get("leaders"):
         # A free note's GetExtent is exact; a leadered one's includes its
@@ -633,7 +720,9 @@ def annotation_geometry(
     if not rows and not segments:
         return None
     heights = [item.height for item in items]
-    if heights:
+    if ink:
+        height = median(box.height for box in ink.values())
+    elif heights:
         height = max(heights)
     elif circle is not None:
         # No text items: a balloon circle is ~2.7 text heights across
@@ -658,20 +747,32 @@ def annotation_geometry(
     )
 
 
-def _section_geometry(section: Mapping[str, Any], *, owner: str, advance: float) -> AnnotationGeometry | None:
+def _section_geometry(
+    section: Mapping[str, Any],
+    *,
+    owner: str,
+    advance: float,
+    spans: Sequence[InkSpan] = (),
+    unmatched: list[tuple[str, str]] | None = None,
+) -> AnnotationGeometry | None:
     """A section line: cutting line + arrows as ink, its two labels as text.
 
-    ``IDrSection::GetTextInfo`` gives each label's UPPER-LEFT origin
-    (types/IDrSection/GetTextInfo.md); its height is the section text format's
-    ``CharHeight``.
+    ``IDrSection::GetLineInfo`` answers in the VIEW's model space, not the
+    sheet's (cone-tip-block A-A: (0, -8)..(0, 8) mm for a line printed at
+    x 72 mm), so the cutting line is drawn between the two arrows' tails,
+    which ``GetArrowInfo`` gives in sheet space. ``GetTextInfo`` gives each
+    label's UPPER-LEFT origin (types/IDrSection/GetTextInfo.md); the label's
+    box is the PDF text object printed there, else ``CharHeight`` estimated
+    and the label counted in ``unmatched``.
     """
     segments = []
-    line = _floats(section.get("line"))
-    for i in range(0, len(line) - 5, 6):
-        segments.append(Segment(line[i], line[i + 1], line[i + 3], line[i + 4], "line"))
     arrows = _floats(section.get("arrows"))
+    tails = []
     for i in range(0, len(arrows) - 5, 6):
         segments.append(Segment(arrows[i], arrows[i + 1], arrows[i + 3], arrows[i + 4], "arrow"))
+        tails.append((arrows[i], arrows[i + 1]))
+    if len(tails) == 2:
+        segments.append(Segment(*tails[0], *tails[1], "line"))
     label = str(section.get("label") or "")
     height = float(section.get("text_height") or 0.0)
     texts = _floats(section.get("texts"))
@@ -680,7 +781,11 @@ def _section_geometry(section: Mapping[str, Any], *, owner: str, advance: float)
         width = advance * height * max(1, glyph_count(label))
         for i in range(0, len(texts) - 2, 3):
             x, y = texts[i], texts[i + 1]
-            rows.append(Box(x, y - height, x + width, y))
+            item = TextItem(label, x, y - height, height)
+            printed = match_ink([(0, item)], [span for span in spans if span.key == ink_key(label)])
+            if spans and 0 not in printed and unmatched is not None:
+                unmatched.append((f"section-line {label}", label))
+            rows.append(printed.get(0) or Box(x, y - height, x + width, y))
     if not segments and not rows:
         return None
     return AnnotationGeometry(
@@ -692,9 +797,40 @@ def _section_geometry(section: Mapping[str, Any], *, owner: str, advance: float)
     )
 
 
-def _detail_circle_geometries(info: Sequence[float], *, owner: str, advance: float) -> list[AnnotationGeometry]:
+def _detail_label_box(
+    text_pt: tuple[float, float], height: float, spans: Sequence[InkSpan]
+) -> Box | None:
+    """The PDF text object printing a detail circle's label at ``text_pt``.
+
+    ``GetDetailCircleInfo2`` gives the label's position but not its letter, so
+    the candidates are the short all-letter runs a label prints as, nearest
+    first within the match window.
+    """
+    x, y = text_pt[0], text_pt[1] - height
+    window = INK_MATCH_WINDOW_M + height
+    candidates = [
+        (abs(span.box.xmin - x) + abs(span.box.ymin - y), span.box)
+        for span in spans
+        if 0 < len(span.key) <= 2 and span.key.isalpha()
+        and abs(span.box.xmin - x) < window and abs(span.box.ymin - y) < window
+    ]
+    return min(candidates, key=lambda pair: pair[0])[1] if candidates else None
+
+
+def _detail_circle_geometries(
+    info: Sequence[float],
+    *,
+    owner: str,
+    advance: float,
+    spans: Sequence[InkSpan] = (),
+    unmatched: list[tuple[str, str]] | None = None,
+) -> list[AnnotationGeometry]:
     """``IView::GetDetailCircleInfo2``: [n, (layer, center3, start3, end3,
-    lineType, textPt3, textHeight, numArrows, (tip3, comp3, w, h, style)*)*]."""
+    lineType, textPt3, textHeight, numArrows, (tip3, comp3, w, h, style)*)*].
+
+    The label is boxed from its printed PDF text object when the sheet has
+    one (``_detail_label_box``); else estimated and counted in ``unmatched``.
+    """
     values = _floats(info)
     if not values:
         return []
@@ -716,11 +852,15 @@ def _detail_circle_geometries(info: Sequence[float], *, owner: str, advance: flo
             Segment(a[0], a[1], b[0], b[1], "line") for a, b in zip(points, points[1:])
         )
         rows = ()
+        label = f"detail-circle {owner} #{number + 1}"
         if height > 0.0:
-            rows = (Box(text_pt[0], text_pt[1] - height, text_pt[0] + advance * height, text_pt[1]),)
+            printed = _detail_label_box(text_pt, height, spans) if spans else None
+            if spans and printed is None and unmatched is not None:
+                unmatched.append((label, "label"))
+            rows = (printed or Box(text_pt[0], text_pt[1] - height, text_pt[0] + advance * height, text_pt[1]),)
         geometries.append(
             AnnotationGeometry(
-                label=f"detail-circle {owner} #{number + 1}",
+                label=label,
                 kind="detail-circle",
                 owner=owner,
                 text_boxes=rows,
@@ -731,74 +871,31 @@ def _detail_circle_geometries(info: Sequence[float], *, owner: str, advance: flo
 
 
 # --------------------------------------------------------------------------
-# view geometry: which coordinate space GetPolylines7 answers in
-# --------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class ViewInk:
-    """One view's projected model edges in sheet metres, and how they got there."""
-
-    name: str
-    segments: tuple[Segment, ...]
-    space: str  # "sheet" | "transformed" | "unresolved" | "none"
-    inside_fraction: float
-
-
-def _inside_fraction(segments: Sequence[Segment], outline: Box) -> float:
-    if not segments:
-        return 0.0
-    pad = 0.001
-    inside = 0
-    for s in segments:
-        for x, y in ((s.x0, s.y0), (s.x1, s.y1)):
-            if outline.xmin - pad <= x <= outline.xmax + pad and outline.ymin - pad <= y <= outline.ymax + pad:
-                inside += 1
-    return inside / (2 * len(segments))
-
-
-def view_ink(view: Mapping[str, Any]) -> ViewInk:
-    """The view's visible model edges, in SHEET space.
-
-    ``GetPolylines7`` does not document its coordinate space. The points are
-    accepted as sheet space when they land inside the view's ``GetOutline``;
-    otherwise the view's ``ModelToViewTransform`` is applied and re-tested.
-    Neither landing inside is reported (``space == "unresolved"``) rather than
-    guessed -- the calibration run fixes the answer from real data.
-    """
-    name = str(view.get("name", ""))
-    outline_values = _floats(view.get("outline"))
-    raw = view.get("polylines") or []
-    segments = view_polyline_segments(raw)
-    if not segments or len(outline_values) < 4:
-        return ViewInk(name, (), "none", 0.0)
-    outline = Box(*outline_values[:4])
-    direct = _inside_fraction(segments, outline)
-    if direct >= 0.95:
-        return ViewInk(name, tuple(segments), "sheet", direct)
-    transform = _floats(view.get("transform"))
-    if len(transform) >= 13:
-        mapped = []
-        for s in segments:
-            x0, y0 = apply_transform(transform, s.x0, s.y0, 0.0)
-            x1, y1 = apply_transform(transform, s.x1, s.y1, 0.0)
-            mapped.append(Segment(x0, y0, x1, y1, "geometry"))
-        fraction = _inside_fraction(mapped, outline)
-        if fraction >= 0.95:
-            return ViewInk(name, tuple(mapped), "transformed", fraction)
-    return ViewInk(name, (), "unresolved", direct)
-
-
-# --------------------------------------------------------------------------
 # dump -> SheetGeometry
 # --------------------------------------------------------------------------
+
+
+def view_edges(
+    edges: Sequence[Segment], outlines: Sequence[tuple[str, Box]], *, pad: float = 0.001
+) -> dict[str, list[Segment]]:
+    """Each printed model edge to the view whose outline holds it -- the
+    smallest one, when a detail or section outline sits inside another."""
+    owned: dict[str, list[Segment]] = {}
+    ranked = sorted(outlines, key=lambda view: view[1].width * view[1].height)
+    for edge in edges:
+        x, y = (edge.x0 + edge.x1) / 2.0, (edge.y0 + edge.y1) / 2.0
+        for name, box in ranked:
+            if box.xmin - pad <= x <= box.xmax + pad and box.ymin - pad <= y <= box.ymax + pad:
+                owned.setdefault(name, []).append(edge)
+                break
+    return owned
 
 
 @dataclass(frozen=True)
 class SheetModel:
     geometry: SheetGeometry
-    view_ink: tuple[ViewInk, ...]
     advance: float
+    unmatched: tuple[tuple[str, str], ...]  # (annotation label, item text)
 
 
 def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
@@ -827,9 +924,35 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
     ] + list(dump.get("sheet_annotations", ()))
     advance = calibrate_sheet_advance(every_annotation)
 
+    spans = ink_spans(dump)
+    keyed = [
+        ((id(annotation), index), item)
+        for annotation in every_annotation
+        for index, item in enumerate(text_items(annotation.get("display") or {}))
+    ]
+    printed = match_ink(keyed, spans) if spans else {}
+
+    def ink_of(annotation: Mapping[str, Any]) -> dict[int, Box] | None:
+        if not spans:
+            return None
+        return {index: box for (owner_id, index), box in printed.items() if owner_id == id(annotation)}
+
+    unmatched = [
+        (str(annotation.get("name", "")), item.text)
+        for annotation in every_annotation
+        if spans and int(annotation.get("visible", 1) or 1) not in _HIDDEN_STATES
+        for index, item in enumerate(text_items(annotation.get("display") or {}))
+        if ink_key(item.text) and (id(annotation), index) not in printed
+    ]
+    outlines = [
+        (str(view.get("name", "")), Box(*_floats(view.get("outline"))[:4]))
+        for view in views
+        if len(_floats(view.get("outline"))) >= 4
+    ]
+    edges = view_edges(ink_edges(dump), outlines)
+
     view_geometry = []
     annotations: list[AnnotationGeometry] = []
-    inks = []
     for view in views:
         name = str(view.get("name", ""))
         outline = _floats(view.get("outline"))
@@ -841,31 +964,35 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
             )
         )
         for annotation in view.get("annotations", ()):
-            item = annotation_geometry(annotation, owner=name, advance=advance)
+            item = annotation_geometry(annotation, owner=name, advance=advance, ink=ink_of(annotation))
             if item is not None:
                 annotations.append(item)
         for section in view.get("sections", ()):
-            item = _section_geometry(section, owner=name, advance=advance)
+            item = _section_geometry(section, owner=name, advance=advance, spans=spans, unmatched=unmatched)
             if item is not None:
                 annotations.append(item)
         annotations.extend(
-            _detail_circle_geometries(view.get("detail_circles_info") or (), owner=name, advance=advance)
+            _detail_circle_geometries(
+                view.get("detail_circles_info") or (),
+                owner=name,
+                advance=advance,
+                spans=spans,
+                unmatched=unmatched,
+            )
         )
-        ink = view_ink(view)
-        inks.append(ink)
-        if ink.segments:
+        if edges.get(name):
             annotations.append(
                 AnnotationGeometry(
                     label=f"view {name} geometry",
                     kind="geometry",
                     owner=name,
-                    segments=ink.segments,
+                    segments=tuple(edges[name]),
                 )
             )
     for annotation in dump.get("sheet_annotations", ()):
         if int(annotation.get("owner_type", _OWNER_DRAWING_SHEET)) != _OWNER_DRAWING_SHEET:
             continue
-        item = annotation_geometry(annotation, owner="sheet", advance=advance)
+        item = annotation_geometry(annotation, owner="sheet", advance=advance, ink=ink_of(annotation))
         if item is not None:
             annotations.append(item)
     for table in dump.get("tables", ()):
@@ -890,7 +1017,7 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
         annotations=tuple(annotations),
         advance_ratio=advance,
     )
-    return SheetModel(geometry, tuple(inks), advance)
+    return SheetModel(geometry, advance, tuple(unmatched))
 
 
 # --------------------------------------------------------------------------
@@ -1076,7 +1203,13 @@ def find_merged_blocks(
 
 
 def find_tall_blocks(dump: Mapping[str, Any], *, limit: int = TEXT_ROW_LIMIT) -> list[Finding]:
-    """Every note or hole callout whose text runs over ``limit`` rows."""
+    """Every CALLOUT -- hole callout or leadered note -- whose text runs over
+    ``limit`` rows.
+
+    Supports' rule is about callouts (``find_tall_callouts``): a block at the
+    end of a leader stops reading as one label. A free general note (a
+    process paragraph) is a text block by design, like ``_callout_blocks``.
+    """
     owned = [
         (str(view.get("name", "")), annotation)
         for view in dump.get("views", ())
@@ -1091,7 +1224,8 @@ def find_tall_blocks(dump: Mapping[str, Any], *, limit: int = TEXT_ROW_LIMIT) ->
         kind = ANNOTATION_KINDS.get(int(annotation.get("type", 0)), "other")
         note = annotation.get("note") or {}
         hole_callout = bool((annotation.get("dim") or {}).get("hole_callout"))
-        if not (kind == "note" and not note.get("balloon")) and not hole_callout:
+        leadered_note = kind == "note" and not note.get("balloon") and bool(annotation.get("leaders"))
+        if not leadered_note and not hole_callout:
             continue
         if int(annotation.get("visible", 1) or 1) in _HIDDEN_STATES:
             continue
@@ -1170,6 +1304,40 @@ def find_leader_through_text(
     return findings
 
 
+def _past_arrow_zones(annotation: AnnotationGeometry) -> list[tuple[tuple[float, float], float]]:
+    """``(end, radius)`` for each leader run that continues past its arrowhead.
+
+    A hole callout's leader can run on from the arrow tip on the hole's edge
+    to the hole's centre (cone-swing-platform's 6.76 and 5.11 callouts). A
+    line crossing that stretch -- the hole's own centre or extension line --
+    crosses inside the feature the arrow points at, not across the sheet. The
+    arrow end of a run is the free end nearer its arrowhead than its text;
+    the zone is that end's distance to the nearest arrowhead vertex (the tip).
+    """
+    leaders = [s for s in annotation.segments if s.role == "leader"]
+    arrows = [(s.x0, s.y0) for s in annotation.segments if s.role == "arrow"]
+    if not leaders or not arrows:
+        return []
+    ends: dict[tuple[float, float], int] = {}
+    for segment in leaders:
+        for point in ((segment.x0, segment.y0), (segment.x1, segment.y1)):
+            key = (round(point[0], 5), round(point[1], 5))
+            ends[key] = ends.get(key, 0) + 1
+    zones = []
+    for end, degree in ends.items():
+        if degree != 1:
+            continue
+        to_arrow = min(math.hypot(x - end[0], y - end[1]) for x, y in arrows)
+        to_text = min(
+            (math.hypot(max(b.xmin - end[0], 0.0, end[0] - b.xmax), max(b.ymin - end[1], 0.0, end[1] - b.ymax))
+             for b in annotation.text_boxes),
+            default=math.inf,
+        )
+        if to_arrow < to_text:
+            zones.append((end, to_arrow + 1e-4))
+    return zones
+
+
 def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
     """A leader or callout shoulder transversally crossing another annotation's
     dimension/witness line.
@@ -1179,8 +1347,14 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
     the ADJUSTER callout's shoulder (swing's gap diff, class d). Touches (a
     leader landing ON a line) are not crossings -- see
     ``_drawing_layout_check._proper_crossing``.
+
+    A detail circle is no target: a leader to a feature inside it must cross
+    it. A section cutting line is reported as its own advisory kind until the
+    rule for it is ruled on. A crossing on the stretch a leader runs past its
+    arrow tip is inside the feature it points at (``_past_arrow_zones``).
     """
     findings = []
+    zones = {annotation.label: _past_arrow_zones(annotation) for annotation in sheet.annotations}
     leaders = [
         (annotation, segment)
         for annotation in sheet.annotations
@@ -1190,7 +1364,7 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
     lines = [
         (annotation, segment)
         for annotation in sheet.annotations
-        if annotation.kind not in ("geometry",) and annotation.kind not in _MARK_KINDS
+        if annotation.kind not in _NOT_CROSSING_TARGETS and annotation.kind not in _MARK_KINDS
         for segment in annotation.segments
         if segment.role == "line"
     ]
@@ -1206,10 +1380,15 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
             )
             if point is None:
                 continue
+            if any(math.hypot(point[0] - end[0], point[1] - end[1]) <= radius for end, radius in zones[source.label]):
+                continue
             seen.add((source.label, target.label))
+            kind = "shoulder-crosses-line" if leader.role == "shoulder" else "leader-crosses-line"
+            if target.kind == "section-line":
+                kind = "leader-crosses-section-line"
             findings.append(
                 Finding(
-                    kind="shoulder-crosses-line" if leader.role == "shoulder" else "leader-crosses-line",
+                    kind=kind,
                     sheet=sheet.name,
                     a=source.label,
                     b=target.label,
@@ -1234,20 +1413,36 @@ def find_text_on_view(
     just as wrong (policy rule 8). The outline is ``GetOutline``'s padded box,
     inset like the leader-crossing check; pictorial views are skipped because
     their box is mostly empty diagonal space.
+
+    A view whose model edges were read from the PDF is bounded by those
+    edges: ``GetOutline`` pads the part by a few millimetres, so a symbol
+    parked beside a view read as over it (knife-mount's Ra 0.8, 2 mm into
+    the outline, 1.5 mm clear of the first edge).
     """
-    views = [
-        (
-            view.name,
-            Box(
-                view.outline.xmin + inset,
-                view.outline.ymin + inset,
-                view.outline.xmax - inset,
-                view.outline.ymax - inset,
-            ),
+    printed = {
+        annotation.owner: list(annotation.segments)
+        for annotation in sheet.annotations
+        if annotation.kind == "geometry"
+    }
+    views = []
+    for view in sheet.views:
+        if view.outline is None or view.pictorial:
+            continue
+        edges = printed.get(view.name)
+        if edges:
+            views.append((view.name, Box.from_points([p for s in edges for p in ((s.x0, s.y0), (s.x1, s.y1))])))
+            continue
+        views.append(
+            (
+                view.name,
+                Box(
+                    view.outline.xmin + inset,
+                    view.outline.ymin + inset,
+                    view.outline.xmax - inset,
+                    view.outline.ymax - inset,
+                ),
+            )
         )
-        for view in sheet.views
-        if view.outline is not None and not view.pictorial
-    ]
     findings = []
     for annotation in sheet.annotations:
         if annotation.kind == "geometry":
@@ -1277,26 +1472,21 @@ def find_text_on_view(
     return findings
 
 
-def find_unresolved_views(sheet: SheetModel) -> list[Finding]:
-    """A view whose model edges could not be placed on the sheet.
+def find_unmatched_text(model: SheetModel) -> list[Finding]:
+    """COM text the printed PDF has no text object for: the audit is blind there.
 
-    The text-vs-geometry check is blind for that view; reporting it is the
-    only honest outcome (the fail-loud coordinate-space assertion).
+    Symbol tokens print as paths and are exempt; anything else unmatched means
+    the sheet printed something other than what COM reports, or not at all.
     """
     return [
         Finding(
-            kind="view-geometry-unresolved",
-            sheet=sheet.geometry.name,
-            a=ink.name,
-            detail=(
-                f"view {ink.name!r}: GetPolylines7 points land inside its outline "
-                f"{ink.inside_fraction:.0%} of the time untransformed and not "
-                "after ModelToViewTransform either -- text vs model edges is "
-                "unchecked for this view"
-            ),
+            kind="text-unmatched",
+            sheet=model.geometry.name,
+            a=label,
+            b=text,
+            detail=f"{label!r}'s text {text!r} has no printed PDF text object near its position",
         )
-        for ink in sheet.view_ink
-        if ink.space == "unresolved"
+        for label, text in model.unmatched
     ]
 
 
@@ -1313,7 +1503,7 @@ GATING_KINDS = frozenset(
         "leader-crosses-leader",
         "outside-border",
         "keep-out",
-        "view-geometry-unresolved",
+        "text-unmatched",
         "merged-blocks",
         "tall-block",
         "text-on-view",
@@ -1344,7 +1534,7 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
     touching = {frozenset((f.a, f.b)) for f in clearance}
     merged = [f for f in find_merged_blocks(sheet) if frozenset((f.a, f.b)) not in touching]
     reported = touching | {frozenset((f.a, f.b)) for f in merged}
-    return [
+    return _one_per_pair([
         *clearance,
         *merged,
         *find_tall_blocks(dump),
@@ -1354,9 +1544,19 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
         *find_leader_across_lines(sheet),
         *find_leader_crossings(sheet),
         *find_border_breaches(sheet),
-        *find_unresolved_views(model),
+        *find_unmatched_text(model),
         *(f for f in find_text_separation(sheet) if frozenset((f.a, f.b)) not in reported),
-    ]
+    ])
+
+
+def _one_per_pair(findings: Sequence[Finding]) -> list[Finding]:
+    """The first finding of each kind per pair: moving one annotation clears
+    them all, so a two-row callout crossed by one line is one defect, not two
+    (knife-mount's Ø12.00 / THRU)."""
+    kept: dict[tuple[str, str, str], Finding] = {}
+    for finding in findings:
+        kept.setdefault((finding.kind, finding.a, finding.b), finding)
+    return list(kept.values())
 
 
 def finding_record(stem: str, finding: Finding) -> dict[str, Any]:

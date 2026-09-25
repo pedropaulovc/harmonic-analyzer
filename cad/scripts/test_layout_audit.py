@@ -18,18 +18,20 @@ from _layout_audit import (
     FindingSeverity,
     LayoutAuditMode,
     TextItem,
-    apply_transform,
+    annotation_geometry,
+    arrowhead_segments,
     audit_dump,
     balloon_circle,
     find_merged_blocks,
     glyph_count,
+    ink_edges,
+    match_ink,
     row_boxes,
     severity,
     sheet_model,
-    view_ink,
-    view_polyline_segments,
+    view_edges,
 )
-from _layout_geometry import Segment
+from _layout_geometry import Box, Segment
 
 SHEET_W = 0.4318
 SHEET_H = 0.2794
@@ -77,7 +79,16 @@ def _note(name, text, extent, *, owner_type=1):
     }
 
 
-def _dump(*, views=(), sheet_annotations=(), tables=()):
+def _edges(*segments, width=0.00025, dashed=0):
+    """PDF strokes as the collector dumps them: [x0, y0, x1, y1, width, dashed]."""
+    return [[*segment, width, dashed] for segment in segments]
+
+
+def _box_edges(x0, y0, x1, y1):
+    return _edges((x0, y0, x1, y0), (x1, y0, x1, y1), (x1, y1, x0, y1), (x0, y1, x0, y0))
+
+
+def _dump(*, views=(), sheet_annotations=(), tables=(), spans=(), strokes=()):
     return {
         "schema": 1,
         "stem": "fixture",
@@ -89,6 +100,8 @@ def _dump(*, views=(), sheet_annotations=(), tables=()):
         "views": list(views),
         "sheet_annotations": list(sheet_annotations),
         "tables": list(tables),
+        "ink": {"spans": [list(span) for span in spans], "strokes": [list(stroke) for stroke in strokes]},
+        "read_errors": {},
     }
 
 
@@ -309,17 +322,16 @@ def test_touching_dimension_texts_fail_the_clearance():
 
 def test_text_crossed_by_a_foreign_view_edge_is_found():
     """MHA-092's ADJUSTER ENTRY: a callout's text crossed by ANOTHER view's
-    outline edge. Model edges come from GetPolylines7 (sheet space here)."""
+    outline edge. Model edges are the PDF's 0.25 mm solid strokes."""
     # A single vertical model edge of the right view at x = 0.130.
-    polyline = [0, 0, 0, 0, 0, 1, 0, 0, 2, 0.130, 0.080, 0.0, 0.130, 0.160, 0.0]
-    right_view = _view("right", (0.128, 0.078, 0.170, 0.162), polylines=polyline)
+    right_view = _view("right", (0.128, 0.078, 0.170, 0.162))
     callout = _hole_callout(
         "ADJ",
         [(0.080, 0.100, 0.100, 0.118), (0.100, 0.118, 0.140, 0.118)],
         [("ADJUSTER ENTRY", 0.100, 0.118)],
     )
     front = _view("front", (0.060, 0.080, 0.100, 0.160), [callout])
-    findings = audit_dump(_dump(views=[front, right_view]))
+    findings = audit_dump(_dump(views=[front, right_view], strokes=_edges((0.130, 0.080, 0.130, 0.160))))
     hits = [f for f in findings if f.kind == "text-on-line" and "view right geometry" in f.b]
     assert len(hits) == 1
 
@@ -346,10 +358,8 @@ def _mha_092_pre_287c_sheet():
     plan = _view("plan", (0.020, 0.170, 0.110, 0.240), [plan_left, plan_right, ruler])
     # The right view: a 30 x 60 mm face whose only model edges are its border.
     x0, y0, x1, y1 = 0.160, 0.080, 0.190, 0.140
-    border = [x0, y0, 0.0, x1, y0, 0.0, x1, y1, 0.0, x0, y1, 0.0, x0, y0, 0.0]
-    polyline = [0, 0, 0, 0, 0, 1, 0, 0, 5, *border]
     six = _dim("RightDepth", "6.0", 0.165, 0.120)
-    right = _view("right", (x0 - 0.001, y0 - 0.001, x1 + 0.001, y1 + 0.001), [six], polylines=polyline)
+    right = _view("right", (x0 - 0.001, y0 - 0.001, x1 + 0.001, y1 + 0.001), [six])
     # "6.0" spans x 165.0-171.3, y 120.0-123.5 mm. "<MOD-DIAM> 3.26" ends
     # 4.8 mm into it and sits 1.3 mm down over its top.
     pinch = _hole_callout(
@@ -363,7 +373,7 @@ def _mha_092_pre_287c_sheet():
         [("THRU ALL", 0.1660, 0.0952)],
     )
     front = _view("front", (0.100, 0.080, 0.150, 0.140), [pinch, adjuster])
-    return _dump(views=[plan, right, front])
+    return _dump(views=[plan, right, front], strokes=_box_edges(x0, y0, x1, y1))
 
 
 def test_mha_092_collisions_fail_the_shared_audit_and_passed_the_old_one():
@@ -418,19 +428,14 @@ def test_mha_092_i31_ink_fails_on_every_collision_the_eye_pass_found():
         _dim("HeelReliefHt", "5.56", 0.1100, 0.0950, lines=[(hx0 / 1000, hy0 / 1000, hx1 / 1000, hy1 / 1000)])
     )
     x0, y0, x1, y1 = (v / 1000.0 for v in I31_RIGHT_BODY_MM)
-    border = [x0, y0, 0.0, x1, y0, 0.0, x1, y1, 0.0, x0, y1, 0.0, x0, y0, 0.0]
     pad = 0.003  # GetOutline pads the body with whitespace
     dump = _dump(
         views=[
             _view("plan", (0.020, 0.190, 0.120, 0.250), by_view["plan"]),
             _view("front", (0.060, 0.090, 0.118, 0.170), by_view["front"]),
-            _view(
-                "right",
-                (x0 - pad, y0 - pad, x1 + pad, y1 + pad),
-                by_view["right"],
-                polylines=[0, 0, 0, 0, 0, 1, 0, 0, 5, *border],
-            ),
-        ]
+            _view("right", (x0 - pad, y0 - pad, x1 + pad, y1 + pad), by_view["right"]),
+        ],
+        strokes=_box_edges(x0, y0, x1, y1),
     )
     gating = [f for f in audit_dump(dump) if severity(f) is FindingSeverity.GATING]
 
@@ -531,50 +536,8 @@ def test_hidden_annotations_and_template_notes_are_not_audited():
 
 
 # --------------------------------------------------------------------------
-# coordinate spaces, primitives, transport
+# primitives
 # --------------------------------------------------------------------------
-
-
-def test_polylines7_records_parse_with_and_without_geometry_data():
-    # One polyline record (type 0, no geom data) and one arc record (type 1,
-    # 12 geom values) followed by its tessellation.
-    arc_geom = [0.0] * 12
-    records = [
-        0, 0, 0, 0, 0, 1, 0, 0, 3, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.01, 0.01, 0.0,
-        1, 12, *arc_geom, 0, 0, 0, 1, 0, 0, 2, 0.02, 0.0, 0.0, 0.03, 0.0, 0.0,
-    ]
-    segments = view_polyline_segments(records)
-    assert [(s.x0, s.y0, s.x1, s.y1) for s in segments] == [
-        (0.0, 0.0, 0.01, 0.0),
-        (0.01, 0.0, 0.01, 0.01),
-        (0.02, 0.0, 0.03, 0.0),
-    ]
-
-
-def test_view_edges_are_accepted_in_sheet_space_or_through_the_view_transform():
-    outline = [0.10, 0.10, 0.20, 0.20]
-    in_sheet = [0, 0, 0, 0, 0, 1, 0, 0, 2, 0.12, 0.12, 0.0, 0.18, 0.18, 0.0]
-    assert view_ink({"name": "a", "outline": outline, "polylines": in_sheet}).space == "sheet"
-    # Model-space points (metres about the part origin) with a 1:2 view at (0.15, 0.15).
-    in_model = [0, 0, 0, 0, 0, 1, 0, 0, 2, -0.04, -0.04, 0.0, 0.04, 0.04, 0.0]
-    transform = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, 0.15, 0.0, 0.5, 0, 0, 0]
-    ink = view_ink({"name": "b", "outline": outline, "polylines": in_model, "transform": transform})
-    assert ink.space == "transformed"
-    assert (ink.segments[0].x0, ink.segments[0].y1) == pytest.approx((0.13, 0.17))
-    lost = view_ink({"name": "c", "outline": outline, "polylines": in_model})
-    assert lost.space == "unresolved"
-
-
-def test_an_unresolved_view_is_a_gating_finding_not_a_silent_skip():
-    in_model = [0, 0, 0, 0, 0, 1, 0, 0, 2, -0.04, -0.04, 0.0, 0.04, 0.04, 0.0]
-    findings = audit_dump(_dump(views=[_view("lost", (0.1, 0.1, 0.2, 0.2), polylines=in_model)]))
-    unresolved = [f for f in findings if f.kind == "view-geometry-unresolved"]
-    assert len(unresolved) == 1 and severity(unresolved[0]) is FindingSeverity.GATING
-
-
-def test_apply_transform_uses_row_vectors_scale_and_translation():
-    quarter_turn = [0, 1, 0, -1, 0, 0, 0, 0, 1, 0.1, 0.2, 0.0, 2.0, 0, 0, 0]
-    assert apply_transform(quarter_turn, 0.01, 0.0, 0.0) == pytest.approx((0.1, 0.22))
 
 
 def test_a_balloon_is_its_single_rendered_circle():
@@ -627,9 +590,12 @@ def _patch_collect(monkeypatch, result):
 
 
 def _run(live, mode, report):
+    from pathlib import Path
+
     live.run_layout_audit(
         object(),
         stem="fixture",
+        pdf=Path("fixture.pdf"),
         report=report,
         sheet_layouts={},
         is_pictorial=lambda _o: False,
@@ -772,3 +738,325 @@ def test_every_drawing_task_targets_and_caches_its_layout_report():
         assert str(report) in tasks[drawing.name]["targets"]
         assert report in dodo._drawing_cache_outputs(drawing.name)
         assert report not in drawing.outputs.values()
+
+
+# --------------------------------------------------------------------------
+# PDF ink: where text and model edges printed
+# --------------------------------------------------------------------------
+#
+# Real records from the d09c2b9eb calibration leaves (integ 06b840e49): each
+# drawing's layout dump replayed against its own exported PDF page.
+
+
+def test_an_arrowhead_base_lies_along_its_direction_from_the_tip():
+    """``GetArrowHeadAtIndex2``'s direction points from the tip back along the
+    shaft. pinion-bracket's 28.00 (ArborBoreCz) prints its lower arrowhead's
+    base at y 125.55 mm, above the tip at 122.00: drawn the other way, the
+    triangle landed inside the section label "B" beneath it."""
+    lower = [0.24, 0.122, -0.0088, 0.0, 1.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0]
+    upper = [0.24, 0.178, -0.0088, -0.0, -1.0, -0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0]
+    tip, *base = ((s.x0, s.y0) for s in arrowhead_segments(lower))
+    assert tip == pytest.approx((0.24, 0.122))
+    assert [v for point in sorted(base) for v in point] == pytest.approx([0.239619, 0.125556, 0.240381, 0.125556])
+    assert {round(s.y0, 6) for s in arrowhead_segments(upper)} == {0.178, 0.174444}
+
+
+def test_ink_matching_is_one_to_one_nearest_first_and_same_string_only():
+    """Six "13.12"s on one sheet must not all claim one printed run."""
+    h = 0.0035
+    near_left = TextItem("13.12", 0.1000, 0.1000, h)
+    near_right = TextItem("13.12", 0.1015, 0.1000, h)
+    stranded = TextItem("13.12", 0.3000, 0.1000, h)
+    other_string = TextItem("8.42", 0.1000, 0.1000, h)
+    spans = [
+        _ink_span("13.12", 0.1012, 0.0991),
+        _ink_span("13.12", 0.1003, 0.0991),
+        _ink_span("13.12", 0.3100, 0.0991),  # 10 mm off: outside the window
+    ]
+    matched = match_ink(
+        [("L", near_left), ("R", near_right), ("S", stranded), ("O", other_string)], spans
+    )
+    assert matched["L"].xmin == pytest.approx(0.1003)
+    assert matched["R"].xmin == pytest.approx(0.1012)
+    assert "S" not in matched and "O" not in matched
+
+
+def _ink_span(text, x, y, width=0.008, height=0.0033):
+    from _layout_audit import InkSpan, ink_key
+
+    return InkSpan(ink_key(text), Box(x, y, x + width, y + height))
+
+
+def test_printed_glyph_boxes_replace_com_boxes_and_a_symbol_follows_its_row():
+    """The row box is the printed glyphs', not COM's row estimate (which ran
+    up to 21 mm wide on a dimension). ``<MOD-DIAM>`` prints as a path, so it
+    is boxed from COM and shifted by the offset its printed neighbour shows."""
+    h = 0.0035
+    dim = _dim("Bore", "", 0, 0)
+    dim["display"]["texts"] = [
+        {"t": "<MOD-DIAM>", "pos": [0.1000, 0.1500, 0.0], "h": h},
+        {"t": " 3.26", "pos": [0.1027, 0.1500, 0.0], "h": h},
+    ]
+    printed = Box(0.1035, 0.1491, 0.1120, 0.1524)
+    geometry = annotation_geometry(dim, owner="v", advance=0.6, ink={1: printed})
+    [row] = geometry.text_boxes
+    assert (row.xmin, row.ymin, row.xmax, row.ymax) == pytest.approx((0.1000, 0.1491, 0.1120, 0.1524))
+    assert geometry.exact
+
+
+def test_com_text_the_pdf_never_printed_gates_but_symbols_do_not():
+    """The audit is blind wherever COM and the PDF disagree, so an unmatched
+    string is a gating finding. A symbol-only item (``<MOD-DIAM>``) prints as
+    a path and is exempt."""
+    printed = _dim("Printed", "12.0", 0.100, 0.150)
+    lost = _dim("Lost", "7.5", 0.150, 0.150)
+    symbol = _dim("Symbol", "<MOD-DIAM>", 0.180, 0.150)
+    dump = _dump(
+        views=[_view("v", (0.05, 0.05, 0.25, 0.25), [printed, lost, symbol])],
+        spans=[["12.0", 0.1002, 0.1491, 0.1060, 0.1524]],
+    )
+    unmatched = [f for f in audit_dump(dump) if f.kind == "text-unmatched"]
+    assert [(f.a, f.b) for f in unmatched] == [("Lost", "7.5")]
+    assert severity(unmatched[0]) is FindingSeverity.GATING
+
+
+def test_model_edges_are_solid_quarter_millimetre_strokes_owned_by_the_smallest_view():
+    """Model edges print 0.25 mm solid black; annotation ink is 0.18 mm and
+    hidden lines are dashed. An edge belongs to the innermost outline holding
+    it (a detail drawn inside its parent's box), and none outside every view."""
+    dump = {
+        "ink": {
+            "strokes": [
+                [0.12, 0.12, 0.13, 0.12, 0.00025, 0],  # parent edge
+                [0.15, 0.15, 0.16, 0.15, 0.00025, 0],  # inside the detail
+                [0.12, 0.13, 0.13, 0.13, 0.00018, 0],  # annotation line
+                [0.12, 0.14, 0.13, 0.14, 0.00025, 1],  # hidden line
+                [0.30, 0.30, 0.31, 0.30, 0.00025, 0],  # in no view
+            ]
+        }
+    }
+    edges = ink_edges(dump)
+    assert len(edges) == 3
+    owned = view_edges(edges, [("parent", Box(0.10, 0.10, 0.20, 0.20)), ("detail", Box(0.14, 0.14, 0.17, 0.17))])
+    assert [(e.x0, e.y0) for e in owned["parent"]] == [(0.12, 0.12)]
+    assert [(e.x0, e.y0) for e in owned["detail"]] == [(0.15, 0.15)]
+
+
+# cone-tip-block section A-A: GetLineInfo answers (0, -8)..(0, 8) mm -- the
+# view's model space -- for a cutting line printed at x 72 mm.
+CTB_SECTION_A = {
+    "label": "A",
+    "line": [0.0, -0.008, 0.0, 0.0, 0.008, 0.0],
+    "arrows": [0.072, 0.209, 0.0, 0.084, 0.209, 0.0, 0.072, 0.241, 0.0, 0.084, 0.241, 0.0],
+    "texts": [0.0855346, 0.2138229, 0.0, 0.0855346, 0.2458229, 0.0],
+    "text_height": 0.00635,
+}
+CTB_SECTION_A_SPANS = [
+    ["A", 0.0862235, 0.2077981, 0.0920824, 0.2139703],
+    ["A", 0.0862235, 0.2397982, 0.0920824, 0.2459704],
+]
+
+
+def test_a_section_line_runs_between_its_arrow_tails_with_its_printed_labels():
+    view = _view("Drawing View2", (0.051412, 0.207412, 0.092588, 0.242588), sections=[CTB_SECTION_A])
+    model = sheet_model(_dump(views=[view], spans=CTB_SECTION_A_SPANS))
+    [section] = [a for a in model.geometry.annotations if a.kind == "section-line"]
+    [line] = [s for s in section.segments if s.role == "line"]
+    assert (line.x0, line.y0, line.x1, line.y1) == pytest.approx((0.072, 0.209, 0.072, 0.241))
+    assert [(b.xmin, b.ymin, b.xmax, b.ymax) for b in section.text_boxes] == [
+        tuple(span[1:]) for span in CTB_SECTION_A_SPANS
+    ]
+    assert model.unmatched == ()
+    lost = sheet_model(_dump(views=[view], spans=CTB_SECTION_A_SPANS[:1]))
+    assert lost.unmatched == (("section-line A", "A"),)
+
+
+# cone-swing-platform, Drawing View2: the 6.76 hole callout's leader runs
+# past its arrow tip on the hole's edge to the hole's centre, where 195.09's
+# extension line and section line A both pass.
+CSP_VIEW2 = (0.1594442, 0.1285735, 0.2005558, 0.2514265)
+CSP_DRILL = {
+    "type": 4,
+    "name": "RD1",
+    "visible": 1,
+    "display": {
+        "lines": [
+            _line(0.1773666, 0.1360656, 0.1884146, 0.1041951),
+            _line(0.1762602, 0.1392573, 0.1773666, 0.1360656),
+            _line(0.1884146, 0.1041951, 0.2399979, 0.1041951),
+        ],
+        "arrows": [[0.1773666, 0.1360656, -0.0015875, 0.3275313, -0.9448403, 0.0, 0.003556, 0.000762, 0.0, 0.0, -0.0, -1.0]],
+        "texts": [
+            {"t": "DRILL ", "pos": [0.1900021, 0.1042486, 0.0], "h": 0.0035},
+            {"t": "<MOD-DIAM>", "pos": [0.2029618, 0.1041951, 0.0], "h": 0.0035},
+            {"t": " 6.76 THRU ALL", "pos": [0.2082403, 0.1042486, 0.0], "h": 0.0035},
+        ],
+    },
+    "dim": {"hole_callout": True},
+}
+CSP_POST_MOUNT = _dim(
+    "PostMountEastZ",
+    " 195.09 ",
+    0.1215951,
+    0.1722219,
+    lines=[
+        (0.1737778, 0.2352052, 0.129, 0.2352052),
+        (0.1807524, 0.1376615, 0.129, 0.1376615),
+        (0.13, 0.2352052, 0.13, 0.1777781),
+        (0.13, 0.1376615, 0.13, 0.1722219),
+    ],
+)
+CSP_SECTION_A = {
+    "label": "A",
+    "arrows": [0.1574442, 0.1376615, 0.0, 0.1574442, 0.1256615, 0.0, 0.2025558, 0.1376615, 0.0, 0.2025558, 0.1256615, 0.0],
+    "texts": [0.1547156, 0.1235998, 0.0, 0.1998272, 0.1235998, 0.0],
+    "text_height": 0.00635,
+}
+CSP_DETAIL_B = [1.0, -1.0, 0.1768134, 0.1406615, 0.0, 0.1828134, 0.1406615, 0.0, 0.1828134, 0.1406615, 0.0,
+                3.0, 0.1849758, 0.1445509, -0.0, 0.00635, 0.0]
+CSP_DETAIL_B_SPAN = ["B", 0.1860114, 0.1383209, 0.1896602, 0.1444931]
+# Detail View B: the C'BORE SLOT note's leader crosses 11.00's dimension line
+# mid-span -- the one true leader crossing on the sheet.
+CSP_SLOT_NOTE = {
+    "type": 6,
+    "name": "DetailItem375",
+    "visible": 1,
+    "leaders": [[0.1204851, 0.0455793, -0.0, 0.0940041, 0.0504458, 0.0]],
+    "display": {
+        "lines": [_line(0.1202019, 0.04615, 0.0940041, 0.0504458)],
+        "arrows": [[0.0940041, 0.0504458, 0.0, 0.9868211, -0.1618151, -0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]],
+        "texts": [
+            {"t": "<MOD-DIAM>", "pos": [0.121, 0.0435, 0.0], "h": 0.0025},
+            {"t": "7.94 END MILL C'BORE SLOT", "pos": [0.1247703, 0.0435, 0.0], "h": 0.0025},
+            {"t": "FROM UNDERSIDE", "pos": [0.121, 0.04, 0.0], "h": 0.0025},
+        ],
+    },
+    "note": {"text": "<MOD-DIAM>7.94 END MILL C'BORE SLOT\r\nFROM UNDERSIDE", "balloon": False},
+}
+CSP_TIP_SLOT = _dim(
+    "TipSlotZ",
+    " 11.00 ",
+    0.1135,
+    0.0567219,
+    lines=[
+        (0.0805, 0.055, 0.1145, 0.055),
+        (0.096256, 0.033, 0.1145, 0.033),
+        (0.1277236, 0.0567219, 0.1135, 0.0567219),
+        (0.1135, 0.0567219, 0.1135, 0.055),
+        (0.1135, 0.055, 0.1135, 0.033),
+    ],
+)
+
+
+def _cone_swing_platform():
+    view2 = _view(
+        "Drawing View2",
+        CSP_VIEW2,
+        [CSP_DRILL, CSP_POST_MOUNT],
+        sections=[CSP_SECTION_A],
+        detail_circles_info=CSP_DETAIL_B,
+    )
+    detail = _view("Detail View B (2 : 1)", (0.049112, 0.0106121, 0.117888, 0.079388), [CSP_SLOT_NOTE, CSP_TIP_SLOT])
+    return _dump(views=[view2, detail], spans=[CSP_DETAIL_B_SPAN])
+
+
+def test_a_leader_running_past_its_arrow_into_the_hole_crosses_nothing():
+    """The crossings on the stretch past the arrow tip are the hole's own
+    centre and extension lines; the slot note's leader across 11.00's
+    dimension line, 20 mm from its tip, still gates."""
+    crossings = [f for f in audit_dump(_cone_swing_platform()) if "crosses" in f.kind]
+    assert [(f.kind, f.a.split()[1], f.b.split()[1]) for f in crossings] == [
+        ("leader-crosses-line", "DetailItem375", "TipSlotZ")
+    ]
+    assert severity(crossings[0]) is FindingSeverity.GATING
+
+
+def test_a_detail_circle_is_no_leader_target_and_its_label_is_the_printed_one():
+    """A leader to a feature inside a detail circle must cross the circle.
+    The circle's label is boxed from its printed "B" (x 186.0 mm), which
+    10.50's dimension line (ending x 185.8) stops short of; the COM estimate
+    started at 185.0 and read the line as crossing it."""
+    detail = {"type": 4, "name": "Reach", "visible": 1, "display": {
+        "lines": [_line(0.1700, 0.1300, 0.1840, 0.1420)], "texts": []}, "dim": {"hole_callout": True}}
+    relief = _dim("PivotBearingReliefDia", "10.50", 0.1650, 0.1500, lines=[(0.1794, 0.1411, 0.1858, 0.1411)])
+    view = _view("Drawing View2", CSP_VIEW2, [detail, relief], detail_circles_info=CSP_DETAIL_B)
+    findings = audit_dump(_dump(views=[view], spans=[CSP_DETAIL_B_SPAN]))
+    assert not [f for f in findings if "detail-circle" in f.a + f.b]
+    estimated = audit_dump(_dump(views=[view]))
+    assert [f.kind for f in estimated if "detail-circle" in f.a + f.b] == ["text-on-line"]
+
+
+def test_a_leader_across_a_section_cutting_line_is_its_own_advisory_class():
+    """Pending Main's ruling: reported, not gated."""
+    callout = _hole_callout(
+        "C", [(0.160, 0.120, 0.190, 0.150), (0.190, 0.150, 0.230, 0.150)], [("THRU", 0.190, 0.1502)]
+    )
+    view = _view("v", CSP_VIEW2, [callout], sections=[CSP_SECTION_A])
+    [finding] = [f for f in audit_dump(_dump(views=[view])) if "crosses" in f.kind]
+    assert finding.kind == "leader-crosses-section-line"
+    assert severity(finding) is FindingSeverity.ADVISORY
+
+
+def test_text_beside_a_view_is_measured_against_its_printed_edges_not_its_padded_outline():
+    """knife-mount's Ra 0.8 (owned by View1) ends 2 mm inside View2's
+    GetOutline but 1.5 mm clear of its first printed edge."""
+    outline = (0.200412, 0.105046, 0.239588, 0.174954)
+    beside = _note("Ra", "Ra 0.8", (0.1805, 0.1194, 0.2044, 0.1259))
+    over = _note("Over", "Ra 0.8", (0.1845, 0.1394, 0.2084, 0.1459))
+    views = [_view("View1", (0.085, 0.105, 0.145, 0.175), [beside, over]), _view("View2", outline)]
+    findings = audit_dump(_dump(views=views, strokes=_box_edges(0.2059, 0.1070, 0.2380, 0.1730)))
+    assert [f.a for f in findings if f.kind == "text-on-view"] == ["note Over 'Ra 0.8'"]
+    padded = audit_dump(_dump(views=views))
+    assert sorted(f.a for f in padded if f.kind == "text-on-view") == ["note Over 'Ra 0.8'", "note Ra 'Ra 0.8'"]
+
+
+def test_a_general_note_is_no_tall_callout_but_a_leadered_one_is():
+    """knife-mount's 11-row process note is a text block by design; the
+    same rows at the end of a leader stop reading as one label."""
+    h = 0.0035
+    rows = [{"t": f"ROW {i}", "pos": [0.020, 0.070 - i * 0.0045, 0.0], "h": h} for i in range(11)]
+    general = {"type": 6, "name": "Process", "visible": 1, "display": {"texts": rows}, "note": {"balloon": False}}
+    leadered = {**general, "name": "Callout", "leaders": [[0.020, 0.075, 0.0, 0.050, 0.090, 0.0]]}
+    findings = audit_dump(_dump(views=[_view("v", (0.1, 0.1, 0.2, 0.2), [general, leadered])]))
+    assert [f.a for f in findings if f.kind == "tall-block"] == ["note Callout"]
+
+
+def test_one_line_through_a_two_row_dimension_is_one_finding():
+    """knife-mount's Ø12.00 / THRU, both rows crossed by 29.37's dimension line."""
+    bore = _dim("BoreDia", "", 0, 0)
+    bore["display"]["texts"] = [
+        {"t": "<MOD-DIAM>12.00", "pos": [0.0585, 0.1555, 0.0], "h": 0.0035},
+        {"t": "THRU", "pos": [0.0615, 0.1500, 0.0], "h": 0.0035},
+    ]
+    height = _dim("BlockHeight", "29.37", 0.0590, 0.1380, lines=[(0.063, 0.1694, 0.063, 0.1428)])
+    findings = audit_dump(_dump(views=[_view("v", (0.04, 0.13, 0.09, 0.18), [bore, height])]))
+    assert [(f.a.split()[1], f.b.split()[1]) for f in findings if f.kind == "text-on-line"] == [
+        ("BoreDia", "BlockHeight")
+    ]
+
+
+def test_a_pdf_page_dumps_its_text_and_only_its_black_stroked_lines():
+    """The frame and title block print grey and arrowheads/section arrows are
+    filled: neither is a line the audit measures."""
+    from _drawing_layout_audit import page_ink
+    from _pdf_ink import PageInk, Span, Stroke
+
+    def stroke(y, *, rgb=(0, 0, 0), filled=False, stroked=True, dashed=False):
+        return Stroke(0.1, y, 0.2, y, 0.00025, rgb, dashed, filled, stroked)
+
+    page = PageInk(
+        width=SHEET_W,
+        height=SHEET_H,
+        glyphs=(),
+        spans=(Span("6.0", 0.1, 0.1, 0.106, 0.1033, ()),),
+        strokes=(
+            stroke(0.10),
+            stroke(0.11, dashed=True),
+            stroke(0.12, rgb=(128, 128, 128)),
+            stroke(0.13, filled=True),
+            stroke(0.14, stroked=False, filled=True),
+        ),
+    )
+    ink = page_ink(page)
+    assert ink["spans"] == [["6.0", 0.1, 0.1, 0.106, 0.1033]]
+    assert ink["strokes"] == [[0.1, 0.1, 0.2, 0.1, 0.00025, 0], [0.1, 0.11, 0.2, 0.11, 0.00025, 1]]
