@@ -557,9 +557,8 @@ def test_reference_witnesses_are_drawn_in_the_outline_black() -> None:
     assert bond[1] - bond[0] == pytest.approx(part.BOND_ZONE_WITNESS_LEN)
     helper = inspect.getsource(drawing._blacken_reference_witnesses)
     assert "drawing.SetLineColor(REFERENCE_WITNESS_COLOR)" in helper
-    assert "SW_SEL_EXT_SKETCH_SEGS" in helper and "ConstructionGeometry" in helper
     # 7885c0d9: rebinding the ISketch as IFeature read a matrix for Name.
-    assert '"IFeature"' not in helper and "segment.GetLength()" in helper
+    assert '"IFeature"' not in inspect.getsource(drawing._selection_problem)
     source = inspect.getsource(drawing.build)
     blacken = source.index("_blacken_reference_witnesses(adapter, principal)")
     finalize = source.index("await finalize_drawing(")
@@ -821,3 +820,225 @@ def test_only_the_two_diameters_crossing_at_the_end_view_centre_are_excused() ->
     for finding in blocking:
         with pytest.raises(RuntimeError, match="blocking finding"):
             drawing._assert_no_text_on_line([finding])
+
+
+# --- Reference witnesses are selected by identity, not by a screen pick ------
+
+
+class _FakeSegment:
+    """A part sketch line: its model ends (m), selectable into a view."""
+
+    def __init__(self, seat, name, model_ends, *, construction=True, selectable=True):
+        self.seat = seat
+        self.name = name
+        self.model_ends = model_ends
+        self.construction = construction
+        self.selectable = selectable
+
+    @property
+    def ConstructionGeometry(self):  # noqa: N802 - COM member name
+        return self.construction
+
+    def GetName(self):  # noqa: N802
+        return self.name
+
+    def GetType(self):  # noqa: N802
+        return drawing.SW_SKETCH_LINE
+
+    def GetLength(self):  # noqa: N802
+        (x0, y0, z0), (x1, y1, z1) = self.model_ends
+        return ((x1 - x0) ** 2 + (y1 - y0) ** 2 + (z1 - z0) ** 2) ** 0.5
+
+    def Select4(self, append, data):  # noqa: N802
+        if not self.selectable or data.View is not self.seat.view:
+            return False
+        self.seat.selected = [self]
+        return True
+
+
+class _FakeSeat:
+    """The profile view, its part's reference sketches, and one decoy: the
+    227.5 mm BackRimReference axis a midpoint screen pick returned on the
+    56fa631bc leaf."""
+
+    def __init__(self, *, witness_select4=True, qualified_names=True, extra=()):
+        from types import SimpleNamespace
+
+        mm = 0.001
+        flank = spec.SHAFT_DIA / 2000.0
+        head_rear = spec.HEAD_REAR_Z * mm
+        self.selected = []
+        self.colored = []
+        self.qualified_names = qualified_names
+        self.sketches = {}
+        for sketch_name, (z0, z1) in drawing.REFERENCE_WITNESSES.items():
+            axis = _FakeSegment(self, "Line1", ((0.0, 0.0, head_rear), (0.0, 0.0, z1 * mm)))
+            witness = _FakeSegment(
+                self,
+                "Line2",
+                ((flank, 0.0, z1 * mm), (flank, 0.0, z0 * mm)),
+                selectable=witness_select4,
+            )
+            self.sketches[sketch_name] = [axis, witness, *extra]
+        self.decoy = _FakeSegment(
+            self,
+            "Line1",
+            ((0.0, 0.0, head_rear), (0.0, 0.0, spec.SHAFT_LEN * mm)),
+        )
+        seat = self
+
+        class Part:
+            def FeatureByName(self, name):  # noqa: N802
+                if name not in seat.sketches:
+                    return None
+                sketch = SimpleNamespace(GetSketchSegments=lambda: tuple(seat.sketches[name]))
+                return SimpleNamespace(GetSpecificFeature2=lambda: sketch, Visible=2)
+
+        self.view = SimpleNamespace(
+            ReferencedDocument=Part(),
+            GetName2=lambda: "Drawing View2",
+            UpdateViewDisplayGeometry=lambda: None,
+            RootDrawingComponent2=lambda _child: SimpleNamespace(Name="pinion-arbor-2"),
+        )
+
+        class Manager_:
+            def CreateSelectData(self):  # noqa: N802
+                return SimpleNamespace(View=None)
+
+            def GetSelectedObjectCount2(self, _mark):  # noqa: N802
+                return len(seat.selected)
+
+            def GetSelectedObjectType3(self, _index, _mark):  # noqa: N802
+                return drawing.SW_SEL_EXT_SKETCH_SEGS
+
+            def GetSelectedObject6(self, _index, _mark):  # noqa: N802
+                return seat.selected[0]
+
+        class Ext:
+            def SelectByID2(self, name, kind, x, y, z, append, mark, callout, option):  # noqa: N802
+                if kind != "EXTSKETCHSEGMENT":
+                    return False
+                if not name:
+                    # Any screen pick on the flank resolves to the decoy axis.
+                    seat.selected = [seat.decoy]
+                    return True
+                if not seat.qualified_names:
+                    return False
+                line, sketch_name, component, view = name.split("@")
+                if (component, view) != ("pinion-arbor-2", "Drawing View2"):
+                    return False
+                matches = [s for s in seat.sketches.get(sketch_name, ()) if s.name == line]
+                seat.selected = matches[:1]
+                return bool(matches)
+
+        class Draw:
+            SelectionManager = Manager_()
+            Extension = Ext()
+
+            def ActivateView(self, name):  # noqa: N802
+                return name == "Drawing View2"
+
+            def ClearSelection2(self, _all):  # noqa: N802
+                seat.selected = []
+
+            def SetLineColor(self, color):  # noqa: N802
+                seat.colored.append((tuple(seat.selected), color))
+
+            def EditRebuild3(self):  # noqa: N802
+                return True
+
+        self.adapter = SimpleNamespace(
+            currentModel=Draw(),
+            _get_attr_or_call=lambda obj, name: (
+                getattr(obj, name)() if callable(getattr(obj, name)) else getattr(obj, name)
+            ),
+        )
+
+
+def _profile_projection(_adapter, _view, xyz, *, label):
+    """The 1:1 profile: model z runs left from x 0.200 at z 106.725, +x down."""
+    x, _y, z = xyz
+    return (
+        drawing.PRINCIPAL_CENTER[0] - (z * 1000.0 - drawing.MODEL_Z_AT_SHEET_ORIGIN_X) / 1000.0,
+        drawing.PRINCIPAL_CENTER[1] - x,
+    )
+
+
+@pytest.fixture
+def witness_seat(monkeypatch):
+    monkeypatch.setattr(drawing, "model_point_in_view", _profile_projection)
+    monkeypatch.setattr(
+        drawing,
+        "_sketch_line_model_ends",
+        lambda _adapter, _sketch, segment: segment.model_ends,
+        raising=False,
+    )
+    return _FakeSeat
+
+
+def test_witnesses_are_selected_by_identity_past_a_decoy_axis(witness_seat) -> None:
+    """56fa631bc's midpoint pick returned the 227.5 mm BackRimReference axis;
+    the witness is now read off its own sketch and selected as itself."""
+    seat = witness_seat()
+    spans = drawing._blacken_reference_witnesses(seat.adapter, seat.view)
+    assert set(spans) == set(drawing.REFERENCE_WITNESSES)
+    witnesses = [seat.sketches[name][1] for name in drawing.REFERENCE_WITNESSES]
+    assert seat.colored == [((witness,), drawing.REFERENCE_WITNESS_COLOR) for witness in witnesses]
+    assert all(seat.decoy not in selected for selected, _ in seat.colored)
+    for name, (z0, z1) in drawing.REFERENCE_WITNESSES.items():
+        (x0, y0), (x1, y1) = spans[name]
+        assert y0 == pytest.approx(drawing.PRINCIPAL_CENTER[1] - spec.SHAFT_DIA / 2000.0)
+        assert abs(x1 - x0) == pytest.approx((z1 - z0) / 1000.0)
+
+
+def test_witness_selection_falls_back_to_its_qualified_name(witness_seat) -> None:
+    seat = witness_seat(witness_select4=False)
+    drawing._blacken_reference_witnesses(seat.adapter, seat.view)
+    assert [selected[0].name for selected, _ in seat.colored] == ["Line2", "Line2"]
+
+
+def test_an_unselectable_witness_fails_naming_every_attempt(witness_seat) -> None:
+    seat = witness_seat(witness_select4=False, qualified_names=False)
+    with pytest.raises(RuntimeError, match="could not be selected by identity") as error:
+        drawing._blacken_reference_witnesses(seat.adapter, seat.view)
+    assert "Select4 in view: returned False" in str(error.value)
+    assert "SelectByID2 'Line2@DrumStationReference@pinion-arbor-2@Drawing View2'" in str(
+        error.value
+    )
+    assert seat.colored == []
+
+
+def test_no_or_two_matching_lines_fail_naming_the_candidates(witness_seat) -> None:
+    seat = witness_seat()
+    for segments in seat.sketches.values():
+        segments[1].construction = False
+    with pytest.raises(RuntimeError, match=r"visibility 2\): 0 of 2 sketch lines match") as e:
+        drawing._blacken_reference_witnesses(seat.adapter, seat.view)
+    assert "Line2 1.000 mm construction=False" in str(e.value)
+    assert "Line1 61.550 mm" in str(e.value)
+
+    seat = witness_seat()
+    twin = seat.sketches["DrumStationReference"][1]
+    seat.sketches["DrumStationReference"].append(
+        _FakeSegment(seat, "Line3", tuple(reversed(twin.model_ends)))
+    )
+    with pytest.raises(RuntimeError, match=r"2 of 3 sketch lines match"):
+        drawing._blacken_reference_witnesses(seat.adapter, seat.view)
+    assert seat.colored == []
+
+
+def test_witness_ranges_are_the_parts_own_flank_lines() -> None:
+    """The part authors each witness on a Top-plane sketch, v = -z: the drum
+    station's from its station 1 mm back towards the head, the bond zone's
+    from its station 4 mm away from it.  Both drawing ranges are that line."""
+    drum = drawing.REFERENCE_WITNESSES["DrumStationReference"]
+    end_v = -(spec.HEAD_REAR_Z + spec.DRUM_STATION)
+    assert sorted(-v for v in (end_v, end_v + part.DRUM_STATION_POINT_LEN)) == pytest.approx(
+        list(drum)
+    )
+    bond = drawing.REFERENCE_WITNESSES["BondZoneReference"]
+    end_v = -spec.BOND_ZONE_DIA_Z
+    assert sorted(-v for v in (end_v, end_v - part.BOND_ZONE_WITNESS_LEN)) == pytest.approx(
+        list(bond)
+    )
+    assert part.DRUM_STATION_POINT_X == pytest.approx(spec.SHAFT_DIA / 2.0)

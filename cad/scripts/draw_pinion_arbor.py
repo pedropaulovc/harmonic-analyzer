@@ -5,12 +5,14 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from dataclasses import dataclass, field
 from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    _drawing_component_name,
     add_property_linked_note,
     add_surface_finish,
     assert_imported_precision,
@@ -183,7 +185,15 @@ REFERENCE_WITNESSES = {
     "BondZoneReference": (BOND_ZONE_DIA_Z, BOND_ZONE_DIA_Z + BOND_ZONE_WITNESS_LEN),
 }
 SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
+SW_SKETCH_LINE = 0  # swSketchSegments_e.swSketchLINE
 REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the witnesses are fully defined sketch lengths
+# A reference line IS the witness when both its projected ends sit this close
+# to the witness's (sheet m, 1:1): fully defined sketch geometry, so only float
+# noise separates them, and the nearest other line (the sketch's own axis) is
+# 4 mm away.
+WITNESS_END_TOL_M = 5e-5
+# A witness's two sheet endpoints (m).
+Span = tuple[tuple[float, float], tuple[float, float]]
 # Exported-raster proof that the outline stays unbroken over each witness:
 # the grey witness core measured 107-128 and the black outline 0 (5471a6ef
 # PNG), so every raster column over a span needs at least two dark pixels
@@ -748,61 +758,237 @@ def _add_turning_axis(adapter: Any, view: Any) -> None:
     draw.EditRebuild3()
 
 
-def _blacken_reference_witnesses(
-    adapter: Any, view: Any
-) -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
+@dataclass(frozen=True)
+class WitnessCandidate:
+    """One line of a reference sketch, as it projects into the profile."""
+
+    name: str
+    length_mm: float
+    construction: bool
+    ends: Span
+    segment: Any = field(compare=False, repr=False)
+
+    def describe(self) -> str:
+        (x0, y0), (x1, y1) = self.ends
+        return (
+            f"{self.name} {self.length_mm:.3f} mm construction={self.construction} "
+            f"({x0 * 1000:.2f},{y0 * 1000:.2f})-({x1 * 1000:.2f},{y1 * 1000:.2f}) mm"
+        )
+
+
+def _same_ends(first: Span, second: Span, *, tol: float = WITNESS_END_TOL_M) -> bool:
+    """Two segments share both sheet endpoints, in either order."""
+    forward = all(math.dist(a, b) <= tol for a, b in zip(first, second))
+    backward = all(math.dist(a, b) <= tol for a, b in zip(first, reversed(second)))
+    return forward or backward
+
+
+def matching_witnesses(
+    candidates: list[WitnessCandidate], expected_ends: Span, expected_len_mm: float
+) -> list[WitnessCandidate]:
+    """The candidates that ARE the witness: construction, its length, its ends."""
+    return [
+        candidate
+        for candidate in candidates
+        if candidate.construction
+        and abs(candidate.length_mm - expected_len_mm) <= REFERENCE_WITNESS_LEN_TOL
+        and _same_ends(candidate.ends, expected_ends)
+    ]
+
+
+def _reference_sketch(view: Any, sketch_name: str) -> tuple[Any, int]:
+    """The part's own reference sketch behind ``view``, and its part-level
+    visibility (swVisibilityState_e: 1 hidden, 2 shown) for the log."""
+    referenced = _early_bound(view, "IView").ReferencedDocument
+    if referenced is None:
+        raise RuntimeError(f"{sketch_name}: the profile view references no document")
+    raw = _early_bound(referenced, "IPartDoc").FeatureByName(sketch_name)
+    if raw is None:
+        raise RuntimeError(f"{sketch_name}: no such feature in the arbor part")
+    feature = _early_bound(raw, "IFeature")
+    return _early_bound(feature.GetSpecificFeature2(), "ISketch"), int(feature.Visible)
+
+
+def _sketch_line_model_ends(
+    adapter: Any, sketch: Any, segment: Any
+) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    """A sketch line's two endpoints in model space (m), through the sketch's
+    own transform rather than an assumed plane orientation."""
+    line = _early_bound(segment, "ISketchLine")
+    to_sketch = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    to_model = _early_bound(to_sketch.Inverse(), "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    ends = []
+    for accessor in ("GetStartPoint2", "GetEndPoint2"):
+        point = _early_bound(adapter._get_attr_or_call(line, accessor), "ISketchPoint")
+        xyz = [float(adapter._get_attr_or_call(point, axis)) for axis in ("X", "Y", "Z")]
+        sketch_point = _early_bound(utility.CreatePoint(double_array(xyz)), "IMathPoint")
+        model = _early_bound(sketch_point.MultiplyTransform(to_model), "IMathPoint")
+        ends.append(tuple(float(value) for value in model.ArrayData)[:3])
+    return ends[0], ends[1]
+
+
+def _witness_candidates(
+    adapter: Any, view: Any, sketch_name: str
+) -> tuple[list[WitnessCandidate], int]:
+    """Every line of the reference sketch, projected into ``view``, and the
+    sketch's part-level visibility."""
+    sketch, visible = _reference_sketch(view, sketch_name)
+    candidates = []
+    for raw in sketch.GetSketchSegments() or ():
+        segment = _early_bound(raw, "ISketchSegment")
+        if int(segment.GetType()) != SW_SKETCH_LINE:
+            continue
+        ends = tuple(
+            model_point_in_view(adapter, view, xyz, label=f"{sketch_name} line end")
+            for xyz in _sketch_line_model_ends(adapter, sketch, segment)
+        )
+        candidates.append(
+            WitnessCandidate(
+                name=str(segment.GetName()),
+                length_mm=float(segment.GetLength()) * 1000.0,
+                construction=bool(segment.ConstructionGeometry),
+                ends=ends,
+                segment=segment,
+            )
+        )
+    return candidates, visible
+
+
+def _selection_problem(draw: Any, witness: WitnessCandidate) -> str | None:
+    """None when exactly ``witness`` is selected; otherwise what is."""
+    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    count = int(manager.GetSelectedObjectCount2(-1))
+    if count != 1:
+        return f"{count} objects selected"
+    kind = int(manager.GetSelectedObjectType3(1, -1))
+    if kind != SW_SEL_EXT_SKETCH_SEGS:
+        return f"selection is type {kind}"
+    # Identify the selection by its own name, length and construction flag,
+    # not its sketch's name: an ISketch is not an IFeature dispatch, so
+    # rebinding it reads another member (7885c0d9 got a matrix for ``Name``).
+    segment = _early_bound(manager.GetSelectedObject6(1, -1), "ISketchSegment")
+    name = str(segment.GetName())
+    length = float(segment.GetLength()) * 1000.0
+    construction = bool(segment.ConstructionGeometry)
+    if (
+        name != witness.name
+        or abs(length - witness.length_mm) > REFERENCE_WITNESS_LEN_TOL
+        or not construction
+    ):
+        return f"selection is {name} ({length:.3f} mm, construction={construction})"
+    return None
+
+
+def _select_witness(adapter: Any, view: Any, sketch_name: str, witness: WitnessCandidate) -> str:
+    """Select exactly ``witness`` in ``view`` by identity, never by a screen pick.
+
+    First the part's own segment with the view in its ISelectData (the
+    documented way to select a model entity in a drawing view, as the arbor
+    pedestal's dimensions do); then its qualified name through the view, the
+    form model features are selected by (_drawing_common._select_model_feature).
+    Every attempt is checked against the witness and logged.
+    """
+    draw = adapter.currentModel
+    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    qualified = (
+        f"{witness.name}@{sketch_name}@{_drawing_component_name(adapter, view)}"
+        f"@{view_name(adapter, view)}"
+    )
+
+    def select_in_view() -> bool:
+        data = manager.CreateSelectData()
+        data.View = view
+        return bool(_early_bound(witness.segment, "ISketchSegment").Select4(False, data))
+
+    def select_by_name() -> bool:
+        return bool(
+            draw.Extension.SelectByID2(
+                qualified, "EXTSKETCHSEGMENT", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+            )
+        )
+
+    attempts = []
+    for method, select in (
+        ("Select4 in view", select_in_view),
+        (f"SelectByID2 {qualified!r}", select_by_name),
+    ):
+        draw.ClearSelection2(True)
+        returned = select()
+        problem = _selection_problem(draw, witness) if returned else "returned False"
+        attempts.append(f"{method}: {problem or 'OK'}")
+        _telemetry.debug(
+            f"pinion-arbor: {sketch_name} witness {witness.name} via {method}: "
+            f"returned={returned}, {problem or 'selected exactly the witness'}"
+        )
+        if problem is None:
+            return method
+        draw.ClearSelection2(True)
+    raise RuntimeError(
+        f"{sketch_name} witness {witness.describe()} could not be selected by "
+        f"identity: {'; '.join(attempts)}"
+    )
+
+
+def _blacken_reference_witnesses(adapter: Any, view: Any) -> dict[str, Span]:
     """Draw each reference sketch's flank witness in the outline's black.
+
+    The witness is chosen by identity: the part's own reference sketch is
+    read, its lines are projected into the view, and exactly one must be a
+    construction line of the witness's length on the witness's two sheet
+    endpoints.  No screen pick: on the 56fa631bc leaf a SelectByID2 at the
+    witness's midpoint returned the 227.5 mm BackRimReference axis (Line1)
+    instead of the 1 mm drum-station witness.
 
     Returns each witness's sheet endpoints for the exported-raster check.
     """
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, view)):
-        raise RuntimeError("failed to activate the integral-arbor profile for its witnesses")
+    label = view_name(adapter, view)
     flank_x = SHAFT_DIA / 2000.0
-    spans = {}
-    for sketch_name, (z0, z1) in REFERENCE_WITNESSES.items():
-        ends = tuple(
-            model_point_in_view(
-                adapter, view, (flank_x, 0.0, z / 1000.0), label=f"{sketch_name} witness end"
+    spans: dict[str, Span] = {}
+    with _telemetry.span(
+        "drawing.blacken_reference_witnesses", view=label, witnesses=len(REFERENCE_WITNESSES)
+    ) as span:
+        if not drawing.ActivateView(label):
+            raise RuntimeError("failed to activate the integral-arbor profile for its witnesses")
+        candidates_seen = 0
+        for sketch_name, (z0, z1) in REFERENCE_WITNESSES.items():
+            ends = tuple(
+                model_point_in_view(
+                    adapter, view, (flank_x, 0.0, z / 1000.0), label=f"{sketch_name} witness end"
+                )
+                for z in (z0, z1)
             )
-            for z in (z0, z1)
-        )
-        mid = ((ends[0][0] + ends[1][0]) / 2.0, (ends[0][1] + ends[1][1]) / 2.0)
-        draw.ClearSelection2(True)
-        _early_bound(view, "IView").UpdateViewDisplayGeometry()
-        if not draw.Extension.SelectByID2(
-            "", "EXTSKETCHSEGMENT", mid[0], mid[1], 0.0, False, 0, null_callout(), 0
-        ):
-            raise RuntimeError(f"failed to select the {sketch_name} flank witness")
-        selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
-        kind = int(selection.GetSelectedObjectType3(1, -1))
-        if kind != SW_SEL_EXT_SKETCH_SEGS:
-            raise RuntimeError(f"{sketch_name} witness pick resolved to type {kind}")
-        segment = _early_bound(selection.GetSelectedObject6(1, -1), "ISketchSegment")
-        # Identify the pick by its own length, not its sketch's name: an
-        # ISketch is not an IFeature dispatch, so rebinding it reads another
-        # member (7885c0d9 got a 16-double matrix back for ``Name``).  The
-        # only other flank construction segment here is the front land's
-        # 19 mm witness.
-        name = str(segment.GetName())
-        length = float(segment.GetLength()) * 1000.0
-        expected = z1 - z0
-        construction = bool(segment.ConstructionGeometry)
-        if abs(length - expected) > REFERENCE_WITNESS_LEN_TOL or not construction:
-            raise RuntimeError(
-                f"{sketch_name} witness pick resolved to {name} "
-                f"({length:.3f} mm, want {expected:.3f}; construction={construction})"
+            candidates, visible = _witness_candidates(adapter, view, sketch_name)
+            candidates_seen += len(candidates)
+            for candidate in candidates:
+                _telemetry.debug(f"pinion-arbor: {sketch_name} candidate {candidate.describe()}")
+            matches = matching_witnesses(candidates, ends, z1 - z0)
+            if len(matches) != 1:
+                (x0, y0), (x1, y1) = ends
+                raise RuntimeError(
+                    f"{sketch_name} (part visibility {visible}): {len(matches)} of "
+                    f"{len(candidates)} sketch lines match "
+                    f"its {z1 - z0:.3f} mm construction witness at "
+                    f"({x0 * 1000:.2f},{y0 * 1000:.2f})-({x1 * 1000:.2f},{y1 * 1000:.2f}) mm; "
+                    "candidates: " + "; ".join(candidate.describe() for candidate in candidates)
+                )
+            witness = matches[0]
+            method = _select_witness(adapter, view, sketch_name, witness)
+            drawing.SetLineColor(REFERENCE_WITNESS_COLOR)
+            draw.ClearSelection2(True)
+            spans[sketch_name] = ends
+            mid = ((ends[0][0] + ends[1][0]) / 2.0, (ends[0][1] + ends[1][1]) / 2.0)
+            _telemetry.info(
+                f"pinion-arbor: {sketch_name} flank witness {witness.name} drawn black at "
+                f"sheet ({mid[0] * 1000:.1f}, {mid[1] * 1000:.1f}) mm, selected by {method} "
+                f"(part visibility {visible})",
+                sketch=sketch_name,
             )
-        drawing.SetLineColor(REFERENCE_WITNESS_COLOR)
-        draw.ClearSelection2(True)
-        spans[sketch_name] = ends
-        _telemetry.info(
-            f"pinion-arbor: {sketch_name} flank witness drawn black at sheet "
-            f"({mid[0] * 1000:.1f}, {mid[1] * 1000:.1f}) mm",
-            sketch=sketch_name,
-        )
-    draw.EditRebuild3()
+        span.set_attribute("candidates", candidates_seen)
+        span.set_attribute("blackened", len(spans))
+        draw.EditRebuild3()
     return spans
 
 
