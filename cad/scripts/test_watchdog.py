@@ -665,6 +665,102 @@ def test_log_records_poke_the_heartbeat() -> None:
     assert _telemetry.last_activity_op().startswith("log watchdog heartbeat")
 
 
+def test_foreign_otel_spans_poke_the_heartbeat() -> None:
+    # The connector library opens its own OTel spans (sw.open <file>), not
+    # _telemetry.span; the heartbeat is a span processor, so they count too.
+    from opentelemetry import trace
+
+    _telemetry.configure()
+    _telemetry._last_activity = 0.0
+    with trace.get_tracer("foreign").start_as_current_span("foreign.op"):
+        assert _telemetry.last_activity_op() == "span-start foreign.op"
+    assert _telemetry.last_activity() > 0.0
+    assert _telemetry.last_activity_op() == "span-end foreign.op"
+
+
+def test_connector_loguru_lines_poke_the_heartbeat() -> None:
+    from loguru import logger
+
+    _telemetry.configure()
+    _telemetry._last_activity = 0.0
+    logger.info("opening heartbeat-probe.SLDPRT")
+    assert _telemetry.last_activity() > 0.0
+    assert _telemetry.last_activity_op() == "log opening heartbeat-probe.SLDPRT"
+
+
+@pytest.mark.asyncio
+async def test_a_wedged_adapter_open_is_the_watchdogs_last_op() -> None:
+    # The rekey2 package:release leaf sat ~83 min inside one OpenDoc6 (#881,
+    # #886). An idle-timeout abort must name the FILE it wedged on.
+    from solidworks_mcp.adapters.base import AdapterResult, AdapterResultStatus
+    from solidworks_mcp.adapters.solidworks.io import SolidWorksIOMixin
+
+    seen: list[str] = []
+
+    def open_doc(*_args: object) -> object:
+        seen.append(_telemetry.last_activity_op())
+        raise RuntimeError("wedged")
+
+    class _Adapter(SolidWorksIOMixin):
+        swApp = SimpleNamespace(OpenDoc6=open_doc)
+        constants = {"swDocPART": 1, "swDocASSEMBLY": 2, "swDocDRAWING": 3}
+
+        def is_connected(self) -> bool:
+            return True
+
+        def _handle_com_operation(self, _name, callback):
+            try:
+                return AdapterResult(status=AdapterResultStatus.SUCCESS, data=callback())
+            except RuntimeError as exc:
+                return AdapterResult(status=AdapterResultStatus.ERROR, error=str(exc))
+
+    _telemetry.configure()
+    result = await _Adapter().open_model(r"C:\models\magnifier-assembly.SLDDRW")
+
+    assert result.is_error
+    assert seen == ["span-start sw.open magnifier-assembly.SLDDRW"]
+
+
+def test_each_discarded_document_is_its_own_span(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A close that wedges on a modal must name its document as last_op, not
+    # the enclosing seat.discard.
+    titles = ["summing.SLDASM", "cone-gear.SLDPRT"]
+    during: list[str] = []
+
+    def close(title: str) -> bool:
+        during.append(_telemetry.last_activity_op())
+        titles.remove(title)
+        return True
+
+    def close_all(_include_unsaved: bool) -> bool:
+        during.append(_telemetry.last_activity_op())
+        return True
+
+    app = SimpleNamespace(CloseDoc=close, CloseAllDocuments=close_all)
+    adapter = SimpleNamespace(
+        swApp=app, _attempt=lambda callback, default=None: callback()
+    )
+    monkeypatch.setattr(
+        _common,
+        "_read_member",
+        lambda obj, name: (
+            (SimpleNamespace(title=titles[0]) if titles else None)
+            if name == "IActiveDoc2"
+            else obj.title
+        ),
+    )
+
+    _common.discard_open_documents(adapter)
+
+    assert during == [
+        "span-start seat.close summing.SLDASM",
+        "span-start seat.close cone-gear.SLDPRT",
+        "span-start seat.close_all",
+    ]
+
+
 def test_connect_is_split_into_dispatch_identity_and_discard(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

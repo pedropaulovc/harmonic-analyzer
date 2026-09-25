@@ -143,6 +143,12 @@ def test_logs_split_into_severity_levels(capture):
     assert {"DEBUG", "INFO", "SUCCESS", "WARN", "ERROR"} <= seen
 
 
+def _only_heartbeat(processors) -> bool:
+    """No console, capture or collector processor: just the watchdog heartbeat,
+    which every configuration keeps."""
+    return [type(p) for p in processors] == [_telemetry._HeartbeatSpanProcessor]
+
+
 def test_console_verbosity_configures_handler_and_spans(monkeypatch):
     logger = logging.getLogger(_telemetry._LOGGER_NAME)
     monkeypatch.setattr(
@@ -161,13 +167,13 @@ def test_console_verbosity_configures_handler_and_spans(monkeypatch):
     _telemetry.configure(force=True)
     (handler,) = console_handlers()
     assert handler.level == logging.WARNING
-    assert _telemetry._span_processors == []
+    assert _only_heartbeat(_telemetry._span_processors)
 
     monkeypatch.setenv("HARMONIC_VERBOSITY", "success")
     _telemetry.configure(force=True)
     (handler,) = console_handlers()
     assert handler.level == _telemetry.SUCCESS
-    assert _telemetry._span_processors == []
+    assert _only_heartbeat(_telemetry._span_processors)
 
 
 def test_span_records_exception_and_sets_error_status(capture):

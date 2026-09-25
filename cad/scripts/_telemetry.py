@@ -58,7 +58,7 @@ from opentelemetry.sdk._logs.export import (
     SimpleLogRecordProcessor,
 )
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+from opentelemetry.sdk.trace import ReadableSpan, SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.export import (
     BatchSpanProcessor,
     ConsoleSpanExporter,
@@ -410,6 +410,22 @@ def last_activity_op() -> str:
     almost certainly wedged inside -- so the abort is traceable without
     scrollback archaeology."""
     return _last_activity_op
+
+
+class _HeartbeatSpanProcessor(SpanProcessor):
+    """Every span boundary pokes the watchdog heartbeat, whoever opened it.
+
+    A processor rather than a call in :func:`span`, because the COM calls most
+    likely to wedge are not all ours: the connector library opens its own OTel
+    spans around ``OpenDoc6`` (``sw.open <file>``), and an idle-timeout abort
+    must name that file as its ``last_op``, not the harmonic span that was
+    last seen before the call went quiet."""
+
+    def on_start(self, span: Span, parent_context: Any = None) -> None:
+        _touch_activity(f"span-start {getattr(span, 'name', '?')}")
+
+    def on_end(self, span: ReadableSpan) -> None:
+        _touch_activity(f"span-end {span.name}")
 
 
 class _ActivityFilter(logging.Filter):
@@ -952,7 +968,9 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     # same process) reuses these exact processor objects rather than opening its own
     # console stream and traces.jsonl handle.
     global _span_processors
-    _span_processors = []
+    # The heartbeat comes first and is unconditional: the watchdog needs it even
+    # when no console, capture file or collector is configured.
+    _span_processors = [_HeartbeatSpanProcessor()]
     # Span boundaries are deliberately debug-only: spans have no severity field,
     # so warning-and-above console modes suppress the whole compact trace tree
     # while structured span capture remains complete.
@@ -1027,6 +1045,7 @@ def configure(*, console: bool = True, force: bool = False) -> None:
         pylog.addHandler(stream)
         _log_utc_anchor(pylog, stream)
     _use_utc_in_loguru()
+    _loguru_pokes_heartbeat()
     for warning in pending_otlp_warnings:
         pylog.warning("%s", warning)
 
@@ -1097,6 +1116,32 @@ def _use_utc_in_loguru() -> None:
             # established variable is what governs; the level is normalised
             # because loguru rejects a lowercase name.
             level=(os.environ.get("LOGURU_LEVEL") or "INFO").strip().upper(),
+        )
+
+
+_loguru_heartbeat_id: int | None = None
+
+
+def _loguru_pokes_heartbeat() -> None:
+    """Connector INFO-and-above lines poke the watchdog heartbeat too.
+
+    ``solidworks_mcp`` announces each ``OpenDoc6`` through loguru ("opening
+    <file>"), which never reaches the harmonic logger's ``_ActivityFilter``. A
+    separate sink, so the heartbeat does not depend on the display sink's
+    level; INFO rather than DEBUG, so loguru keeps skipping the connector's
+    debug chatter without building a record for it. Idempotent and
+    best-effort, like :func:`_use_utc_in_loguru`."""
+    global _loguru_heartbeat_id
+    with contextlib.suppress(Exception):
+        from loguru import logger as _loguru
+
+        if _loguru_heartbeat_id is not None:
+            with contextlib.suppress(Exception):
+                _loguru.remove(_loguru_heartbeat_id)
+        _loguru_heartbeat_id = _loguru.add(
+            lambda message: _touch_activity(f"log {message.record['message'][:80]}"),
+            level="INFO",
+            format="{message}",
         )
 
 
@@ -1239,7 +1284,6 @@ def annotate(**attributes: Any) -> None:
 def _enter_span(
     name: str, attributes: Mapping[str, Any] | None, service: str | None = None
 ) -> tuple[Span, Any, int]:
-    _touch_activity(f"span-start {name}")
     tracer = get_tracer(service=service)
     depth = _depth.get()
     attrs = {"harmonic.depth": depth}
@@ -1262,7 +1306,6 @@ def _exit_span(handle: Any, exc: BaseException | None) -> None:
     cm, token = handle
     _depth.reset(token)
     span = trace.get_current_span()
-    _touch_activity(f"span-end {getattr(span, 'name', '?')}")
     if exc is not None:
         span.record_exception(exc)
         span.set_status(Status(StatusCode.ERROR, str(exc)))

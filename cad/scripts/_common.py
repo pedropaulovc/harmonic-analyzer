@@ -2349,7 +2349,9 @@ def discard_open_documents(adapter: Any) -> None:
     ``CloseAllDocuments(True)`` as a backstop with nothing dirty left to prompt
     about. Bounded so a misbehaving session can't spin; an empty title is
     refused (``CloseDoc("")`` silently no-ops on assemblies and would leave the
-    document resident)."""
+    document resident). Each close is its own span named for the document, so
+    a close that wedges on a modal is the watchdog's ``last_op``, not the
+    enclosing ``seat.discard``."""
     for _ in range(500):
         doc = adapter._attempt(lambda: _read_member(adapter.swApp, "IActiveDoc2"),
                                default=None)
@@ -2361,8 +2363,10 @@ def discard_open_documents(adapter: Any) -> None:
                 "active document has an empty title -- refusing CloseDoc(''), which "
                 "silently no-ops on assemblies and would leave the document resident"
             )
-        adapter._attempt(lambda t=title: adapter.swApp.CloseDoc(t), default=None)
-    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+        with _telemetry.span(f"seat.close {title}", document=title):
+            adapter._attempt(lambda t=title: adapter.swApp.CloseDoc(t), default=None)
+    with _telemetry.span("seat.close_all"):
+        adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
 
 def _preference_id(adapter: Any, name: str) -> int | None:
