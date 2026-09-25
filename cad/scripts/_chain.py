@@ -12,7 +12,7 @@ explicitly placed along this centreline loop (build_paper_drive_assembly
 stand-in are both retired.
 
 Geometry (local frame: knob wrap centre at the origin, machine xy
-pre-mirror; crank centre from build_drive_train_assembly X_CRANK / Y_CRANK
+pre-mirror; crank centre from drive_train_frame_geom X_CRANK / Y_CRANK
 minus build_paper_drive_assembly KNOB_SHAFT_XY): two UNEQUAL wrap arcs whose
 centreline rides each gear's PITCH circle (where a real chain seats -- the
 rollers rest in the tooth valleys, the plates STRADDLE the 2.4-wide
@@ -39,14 +39,14 @@ KNOB_CENTRE = (42.575, 252.3672)  # build_paper_drive_assembly KNOB_SHAFT_XY:
 # The v2 casting's exact Ry180 installation moves this axis 1.484 mm in machine
 # X while the photo-anchored T12 axial plane remains at z -155.
 # Hardcoded as a literal (like KNOB_CENTRE above) -- NOT imported from
-# build_drive_train_assembly. _chain feeds the leaf chain-link PARTS through
-# _chain_link, and a leaf part must not transitively depend on _assembly
-# (test_buildgraph / check:graph enforces this); importing the drive-train
-# assembly module would drag _assembly into that import chain. Instead,
-# build_paper_drive_assembly._assert_chain_layout pins this value to the live
-# drive-train (X_CRANK, Y_CRANK) and fails loud on drift, so a stale literal can
-# never silently mis-anchor the chain over the relocated 64T/cone. The cleaner
-# split (leaf-safe geometry vs assembly-time layout, no literal) is issue #86.
+# drive_train_frame_geom, although that module is leaf-safe: _chain feeds the
+# leaf chain-link PARTS through _chain_link, and importing the frame would
+# re-key every link part on any gear_train / cone_incline / channels edit for
+# no geometry gain (Main, 2026-09-25). The literal is guarded instead:
+# test_drive_train_frame_geom.test_chain_crank_centre_is_the_mirrored_frame_crank_axis
+# (check:recipe) pins it to (-X_CRANK, Y_CRANK) offline, and
+# build_paper_drive_assembly._assert_chain_layout re-checks it at build time,
+# so a stale literal fails loud instead of mis-anchoring the chain.
 CRANK_CENTRE = (129.33630593573418, 129.85)
 # drive-train -X_CRANK, Y_CRANK: cone-pivot-post-v2's cast-in crank axis.
 # The chain count and droop below are re-solved from this centre automatically.
