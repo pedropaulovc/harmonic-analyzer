@@ -114,6 +114,10 @@ git submodule update --init --recursive
 
 1. Invoke `/developing-solidworks` first (see the note at the top of this file).
 2. Python tooling: always use `uv`.
+3. Never run the `SolidworksMCP-python` test suite on amet. It can launch
+   SolidWorks, which takes the licence farm worker w6 shares. A bare `pytest` or
+   `pytest .` at the root skips it (`testpaths`/`norecursedirs` in
+   `pyproject.toml`); run it on a farm worker or in its own CI.
 
 ## Minimum merge gate (every PR)
 
