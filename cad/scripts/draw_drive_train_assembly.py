@@ -890,7 +890,16 @@ def _balloon_leader(annotation: Any, name: str) -> LeaderSegment:
 
 
 def _uncross_balloon_leaders(adapter: Any, balloons: list[Any], *, label: str) -> None:
-    """Swap the ring slots of any two balloons whose leaders cross."""
+    """Swap the ring slots of any two balloons whose leaders cross.
+
+    Swapping the slots of two crossing straight leaders strictly shortens
+    their summed length (triangle inequality), so the swaps cannot cycle and
+    the loop ends crossing-free. It can need more than one swap per balloon,
+    though: integ1 (leaf 20260925T000314Z-1-c91d9a33) left items 11/35
+    crossed on sheet 4 with the old one-pass-per-balloon cap. The cap is now
+    quadratic, and any crossing left is logged by name so the next failure is
+    diagnosable from task.log alone.
+    """
     annotations = {}
     for balloon in balloons:
         note = _early_bound(balloon, "INote")
@@ -898,7 +907,8 @@ def _uncross_balloon_leaders(adapter: Any, balloons: list[Any], *, label: str) -
             note.GetAnnotation(), "IAnnotation"
         )
     swaps = []
-    for _attempt in range(len(annotations)):
+    crossings = ()
+    for _attempt in range(len(annotations) ** 2):
         segments = [_balloon_leader(annotation, name) for name, annotation in annotations.items()]
         crossings = find_leader_leader_crossings(segments)
         if not crossings:
@@ -912,6 +922,10 @@ def _uncross_balloon_leaders(adapter: Any, balloons: list[Any], *, label: str) -
         adapter.currentModel.EditRebuild3()
         swaps.append((first, second))
     _telemetry.event("drawing.balloon_uncross", label=label, swaps=tuple(swaps))
+    _telemetry.info(f"{label}: uncrossed balloon leaders with {len(swaps)} swap(s)")
+    if crossings:
+        pairs = ", ".join(f"{c.a.label}/{c.b.label}" for c in crossings)
+        _telemetry.warn(f"{label}: leaders still cross after {len(swaps)} swap(s): {pairs}")
 
 
 def _head_edge(adapter: Any, view: Any, instance: str, *, label: str) -> Any | None:

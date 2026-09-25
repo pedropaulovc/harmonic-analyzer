@@ -380,3 +380,50 @@ def test_every_text_sheet_places_a_view_for_its_title_block() -> None:
             if isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
         }
         assert "_reference_iso" in calls, name
+
+
+class _Annotation:
+    def __init__(self, x: float, attach: float) -> None:
+        self.position = (x, 1.0)
+        self.attach = attach
+
+    def GetPosition(self):
+        return (*self.position, 0.0)
+
+    def SetPosition(self, x, y, z) -> bool:
+        self.position = (x, y)
+        return True
+
+    def GetLeaderPointsAtIndex(self, index):
+        return (*self.position, 0.0, self.attach, 0.0, 0.0)
+
+
+class _Balloon:
+    def __init__(self, name: str, annotation: _Annotation) -> None:
+        self.name = name
+        self.annotation = annotation
+
+    def GetName(self) -> str:
+        return self.name
+
+    def GetAnnotation(self) -> _Annotation:
+        return self.annotation
+
+
+class _RebuildModel:
+    def EditRebuild3(self) -> bool:
+        return True
+
+
+class _RebuildAdapter:
+    currentModel = _RebuildModel()
+
+
+def test_uncross_needs_more_than_one_swap_per_balloon_and_still_converges() -> None:
+    """Six fully reversed leaders cross pairwise: 15 swaps, not 6 (integ1)."""
+    count = 6
+    annotations = [_Annotation(float(i), float(count - 1 - i)) for i in range(count)]
+    balloons = [_Balloon(str(i), a) for i, a in enumerate(annotations)]
+    drawing._uncross_balloon_leaders(_RebuildAdapter(), balloons, label="test")
+    segments = [drawing._balloon_leader(a, str(i)) for i, a in enumerate(annotations)]
+    assert not drawing.find_leader_leader_crossings(segments)
