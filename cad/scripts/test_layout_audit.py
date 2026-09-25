@@ -1060,3 +1060,106 @@ def test_a_pdf_page_dumps_its_text_and_only_its_black_stroked_lines():
     ink = page_ink(page)
     assert ink["spans"] == [["6.0", 0.1, 0.1, 0.106, 0.1033]]
     assert ink["strokes"] == [[0.1, 0.1, 0.2, 0.1, 0.00025, 0], [0.1, 0.11, 0.2, 0.11, 0.00025, 1]]
+
+
+# --------------------------------------------------------------------------
+# codex review of 6bab30da9
+# --------------------------------------------------------------------------
+
+
+def test_a_run_mixing_a_symbol_and_text_keeps_the_symbol_in_its_box():
+    """``<MOD-DIAM>12.00`` prints "12.00" as text and "Ø" as a path: the box
+    reaches back to the run's COM start, where the symbol is."""
+    dim = _dim("Bore", "<MOD-DIAM>12.00", 0.0585, 0.1545)
+    printed = Box(0.0645, 0.1556, 0.0753, 0.1592)
+    geometry = annotation_geometry(dim, owner="v", advance=0.6, ink={0: printed})
+    [row] = geometry.text_boxes
+    assert (row.xmin, row.xmax) == pytest.approx((0.0585, 0.0753))
+    trailing = _dim("Depth", "6.9<HOLE-DEPTH>", 0.100, 0.100)
+    [row] = annotation_geometry(
+        trailing, owner="v", advance=0.6, ink={0: Box(0.1005, 0.1009, 0.1060, 0.1042)}
+    ).text_boxes
+    assert row.xmax == pytest.approx(0.1060 + 0.6 * 0.0035)
+
+
+def test_hidden_and_template_text_neither_claims_printed_text_nor_goes_unmatched():
+    visible = _dim("Visible", "12.0", 0.1000, 0.1500)
+    hidden = _dim("Hidden", "12.0", 0.1001, 0.1500)
+    hidden["visible"] = 3
+    template = _note("Template", "", (0.003, 0.03, 0.009, 0.038), owner_type=2)
+    template["display"] = {"texts": [{"t": "REV", "pos": [0.005, 0.030, 0.0], "h": 0.0035}]}
+    dump = _dump(
+        views=[_view("v", (0.05, 0.05, 0.25, 0.25), [hidden, visible])],
+        sheet_annotations=[template],
+        spans=[["12.0", 0.10012, 0.15093, 0.1060, 0.1542]],
+    )
+    model = sheet_model(dump)
+    assert model.unmatched == ()
+    [box] = [a.text_boxes[0] for a in model.geometry.annotations if "Visible" in a.label]
+    assert box.xmin == pytest.approx(0.10012)
+
+
+def test_two_printed_leadered_notes_stacked_tight_merge():
+    """A note matched to its PDF text is exact, and still a callout."""
+    h = 0.0035
+
+    def leadered(name, y):
+        note = {
+            "type": 6,
+            "name": name,
+            "visible": 1,
+            "leaders": [[0.100, y, 0.0, 0.080, y - 0.010, 0.0]],
+            "display": {"texts": [{"t": name, "pos": [0.100, y, 0.0], "h": h}]},
+            "note": {"balloon": False},
+        }
+        return note, [name, 0.1002, y + 0.0009, 0.1300, y + 0.0042]
+
+    upper, upper_ink = leadered("UPPER", 0.1500)
+    lower, lower_ink = leadered("LOWER", 0.1450)
+    dump = _dump(views=[_view("v", (0.02, 0.02, 0.07, 0.07), [upper, lower])], spans=[upper_ink, lower_ink])
+    assert [f.kind for f in audit_dump(dump) if f.kind == "merged-blocks"] == ["merged-blocks"]
+
+
+def test_pdf_arcs_are_the_curve_not_its_control_polygon():
+    from _pdf_ink import bezier_points
+
+    k = 0.5522847498  # quarter-circle cubic, 30 mm radius
+    r = 0.030
+    points = bezier_points((r, 0.0), (r, k * r), (k * r, r), (0.0, r))
+    assert points[0] == (r, 0.0) and points[-1] == pytest.approx((0.0, r))
+    assert all(abs((x * x + y * y) ** 0.5 - r) < 1e-5 for x, y in points)
+
+
+def _fake_drawing(monkeypatch, *, sheet_names, views, pages):
+    import _drawing_layout_audit as live
+
+    class Doc:
+        def GetSheetNames(self):  # noqa: N802 - COM name
+            if isinstance(sheet_names, Exception):
+                raise sheet_names
+            return sheet_names
+
+        def GetViews(self):  # noqa: N802 - COM name
+            return views
+
+    monkeypatch.setattr(live, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(live, "read_pdf_ink", lambda _pdf: pages)
+    adapter = type("Adapter", (), {"currentModel": Doc()})()
+    return live, adapter
+
+
+def test_the_collector_fails_loud_rather_than_audit_no_sheet(monkeypatch, tmp_path):
+    """A refused GetSheetNames/GetViews used to read as an empty drawing and
+    cache a clean zero-sheet report."""
+    from pathlib import Path
+
+    kwargs = {"stem": "x", "pdf": Path("x.pdf"), "sheet_layouts": {}, "is_pictorial": lambda _o: False}
+    live, adapter = _fake_drawing(monkeypatch, sheet_names=RuntimeError("RPC"), views=(), pages=[object()])
+    with pytest.raises(RuntimeError, match="RPC"):
+        live.collect_sheet_dumps(adapter, **kwargs)
+    live, adapter = _fake_drawing(monkeypatch, sheet_names=("Sheet1",), views=(), pages=[object()])
+    with pytest.raises(RuntimeError, match=r"dumped sheets \[\], drawing has \['Sheet1'\]"):
+        live.collect_sheet_dumps(adapter, **kwargs)
+    live, adapter = _fake_drawing(monkeypatch, sheet_names=("Sheet1", "Sheet2"), views=(), pages=[object()])
+    with pytest.raises(RuntimeError, match="2 sheet"):
+        live.collect_sheet_dumps(adapter, **kwargs)
