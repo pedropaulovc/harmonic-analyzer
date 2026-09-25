@@ -142,19 +142,58 @@ def test_assembly_drawing_depends_on_actual_assembly_execution():
     assert token in drawing["file_dep"]
 
 
-def test_release_revision_source_invalidates_native_and_drawing_tasks():
+def test_release_revision_source_feeds_only_package_release():
+    """release.yaml is a declared input of package:release and of no other leaf.
+
+    Builds stamp the constant ``DEV``; package:release stamps ``vNN`` into the
+    packaged copies. A release.yaml dep on any build leaf would re-key it on
+    every release bump (227 leaves, about 9 seat-hours, before this split).
+    """
     dodo = _load_dodo()
     revision_source = str(dodo.RELEASE_VERSION_FILE)
+    rows = dict(dodo._cache_rows())
 
-    part = next(task for task in dodo.task_part() if task["name"] == "platen_guide")
-    assembly = next(task for task in dodo.task_assembly() if task["name"] == "pen")
-    drawing = next(
-        task for task in dodo.task_drawing() if task["name"] == "platen_guide"
-    )
+    carrying = sorted(label for label, deps in rows.items() if revision_source in deps)
+    assert carrying == ["package:release"]
+    for task in (*dodo.task_part(), *dodo.task_assembly(), *dodo.task_drawing()):
+        assert revision_source not in task["file_dep"], task["name"]
 
-    assert revision_source in part["file_dep"]
-    assert revision_source in assembly["file_dep"]
-    assert revision_source in drawing["file_dep"]
+
+def test_release_bump_rekeys_only_package_release(monkeypatch):
+    """The key-dump regression: a release.yaml edit moves exactly one cache key.
+
+    Every cacheable COM leaf's remote-cache key is computed twice through the
+    real dep graph -- once as-is, once with release.yaml's content digest
+    changed (what a ``next_revision`` bump does). Transitive paths count: part
+    and assembly digests fold their recipe closures, so a helper that still
+    read ``_config.release_revision`` would re-key its whole family here.
+    """
+    dodo = _load_dodo()
+    revision_source = str(dodo.RELEASE_VERSION_FILE)
+    original = dodo.ContentChecker._digest
+
+    def keys() -> dict[str, str]:
+        dodo._ARTEFACT_DIGEST_MEMO.clear()
+        return {
+            label: dodo._cache.key_inputs(deps, dodo.ContentChecker._digest)[0]
+            for label, deps in dodo._cache_rows()
+        }
+
+    before = keys()
+
+    def bumped(file_path: str) -> str:
+        digest = original(file_path)
+        if str(Path(file_path).resolve()) == revision_source:
+            return f"bumped-{digest}"
+        return digest
+
+    monkeypatch.setattr(dodo.ContentChecker, "_digest", staticmethod(bumped))
+    after = keys()
+
+    assert before.keys() == after.keys()
+    assert len(before) > 200  # every part, assembly, drawing and gate leaf
+    moved = sorted(label for label in before if before[label] != after[label])
+    assert moved == ["package:release"]
 
 
 def test_drawing_tasks_depend_on_all_selected_layout_templates():
@@ -361,9 +400,7 @@ def test_selected_drawing_row_changes_only_its_freshness_and_cache_key(
         assert after[stem] == before[stem]
 
 
-@pytest.mark.parametrize(
-    "member", ["shared_registry", "transitive_helper", "template", "revision"]
-)
+@pytest.mark.parametrize("member", ["shared_registry", "transitive_helper", "template"])
 def test_shared_drawing_inputs_invalidate_freshness_and_cache_keys(
     isolated_drawing_keys, member
 ):
@@ -379,8 +416,6 @@ def test_shared_drawing_inputs_invalidate_freshness_and_cache_keys(
             ),
             encoding="utf-8",
         )
-    elif member == "revision":
-        dodo.RELEASE_VERSION_FILE.write_text("next_revision: v999\n", encoding="utf-8")
     else:
         path = {
             "transitive_helper": scripts / "_drawing_common.py",
@@ -390,6 +425,14 @@ def test_shared_drawing_inputs_invalidate_freshness_and_cache_keys(
     after = snapshot()
     for stem in before:
         assert all(a != b for a, b in zip(before[stem], after[stem])), stem
+
+
+def test_release_revision_edit_leaves_drawing_keys_unchanged(isolated_drawing_keys):
+    """A drawing prints ``DEV``; only package:release reads release.yaml."""
+    dodo, _root, snapshot = isolated_drawing_keys()
+    before = snapshot()
+    dodo.RELEASE_VERSION_FILE.write_text("next_revision: v999\n", encoding="utf-8")
+    assert snapshot() == before
 
 
 def test_registry_imported_helper_remains_in_complete_drawing_closure(
@@ -1819,21 +1862,19 @@ def test_config_deps_are_fine_grained():
     # A gear part reads machine("gear_train", ...) -> machine/gear_train.yaml ONLY
     # (NOT machine/channels.yaml, where active_count lives) + its own registry row
     # + title_block.yaml (every part stamps the title-block tolerance properties
-    # from _common.part_properties -> _config.title_block) + release.yaml for the
-    # global CAD Revision.
+    # from _common.part_properties -> _config.title_block). NOT release.yaml:
+    # builds stamp the constant DEV, only package:release reads the release.
     cone = dodo._config_deps(scripts / "build_cone_gear.py", "cone_gear", "part")
     assert _rel(cone, cfg) == {
         "machine/gear_train.yaml",
         "parts/cone-gear.yaml",
         "parts/_defaults.yaml",
         "title_block.yaml",
-        "release.yaml",
     }, _rel(cone, cfg)
     assert set(cone) <= whole
 
     # Editing ONE part's registry row rebuilds only that part: a leaf screw depends
-    # on its own row + shared defaults + title_block.yaml + release.yaml, nothing
-    # else.
+    # on its own row + shared defaults + title_block.yaml, nothing else.
     screw = dodo._config_deps(
         scripts / "build_fillister_screw.py", "fillister_screw", "part"
     )
@@ -1841,7 +1882,6 @@ def test_config_deps_are_fine_grained():
         "parts/fillister-screw.yaml",
         "parts/_defaults.yaml",
         "title_block.yaml",
-        "release.yaml",
     }
 
     # No part depends on dimensions.yaml.
@@ -1865,10 +1905,10 @@ def test_config_deps_are_fine_grained():
     # tolerances.yaml (fit classes) stays out of frame.
     assert "tolerances.yaml" not in frame_recipe, frame_recipe
     assert "title_block.yaml" in frame_recipe, frame_recipe
-    assert "release.yaml" in frame_recipe, frame_recipe
+    assert "release.yaml" not in frame_recipe, frame_recipe
     channel_recipe = _rel(dodo._recipe_files("channel"), cfg)
     assert "parts/channel-spring-installed.yaml" in channel_recipe, channel_recipe
-    assert "release.yaml" in channel_recipe, channel_recipe
+    assert "release.yaml" not in channel_recipe, channel_recipe
     assert "title_block.yaml" in channel_recipe, channel_recipe
     # The part TEMPLATE narrows identically: channel GENERATES its stretch
     # springs in-script via NewPart (which instantiates the template), so the

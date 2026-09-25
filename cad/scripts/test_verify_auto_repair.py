@@ -164,8 +164,11 @@ def test_save_chokepoint_skips_rebuild_when_solve_state_is_clean() -> None:
 def test_in_place_save_restamps_stale_revision(monkeypatch) -> None:
     import _assembly
 
-    expected = _assembly._config.release_revision()
-    stale = f"v{int(expected[1:]) - 1}"
+    # A cached assembly saved before the release number left the build still
+    # carries a vNN Revision; a refresh restamps the constant build revision.
+    expected = _assembly.BUILD_REVISION
+    assert expected == "DEV"
+    stale = "v36"
     model = SimpleNamespace(
         GetCustomInfoValue=lambda _configuration, name: (
             stale if name == "Revision" else ""

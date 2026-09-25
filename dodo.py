@@ -1697,7 +1697,6 @@ def _drawing_file_deps(stem: str) -> list[str]:
     return sorted(
         {
             str(script),
-            str(RELEASE_VERSION_FILE),
             *source_deps,
             *runtime,
             *(str(path.resolve()) for path in spec.assets),
@@ -1859,11 +1858,18 @@ def _export_cache_outputs() -> list[Path]:
 
 
 def _package_file_deps() -> list[str]:
-    """Release-packaging inputs: the Pack-and-Go script, the revision the title
-    blocks carry, every model's exact identity, and every native drawing (each is
-    Pack-and-Go'd with its references)."""
+    """Release-packaging inputs: the Pack-and-Go script and its helper closure
+    (it re-exports the stamped drawings through _drawing_common's PDF helpers),
+    the release number it stamps, every model's exact identity, and every native
+    drawing (each is Pack-and-Go'd with its references).
+
+    ``release.yaml`` is an input of THIS leaf only: parts, assemblies and
+    drawings carry the constant build revision (``_common.BUILD_REVISION``), so
+    a release bump re-keys package:release and nothing else
+    (``test_release_bump_rekeys_only_package_release``)."""
     return [
         str(PACKAGE_NATIVE_PY),
+        *_helper_deps(PACKAGE_NATIVE_PY),
         str(RELEASE_VERSION_FILE),
         *_cad_identity_deps(),
         *(
@@ -2050,7 +2056,6 @@ def _part_file_deps(script: Path, stem: str) -> list[str]:
     # template-drifted parts under a stale key.
     return [
         str(script.resolve()),
-        str(RELEASE_VERSION_FILE),
         *_helper_deps(script),
         *_config_deps(script, stem, "part"),
         *data_deps_of(script),
@@ -2195,7 +2200,6 @@ def _recipe_files(stem: str) -> list[str]:
     )
     return [
         str(asm_script.resolve()),
-        str(RELEASE_VERSION_FILE),
         *hooks,
         *_helper_deps(asm_script),
         *_config_deps(asm_script, stem, "assembly"),
@@ -2701,6 +2705,9 @@ def task_check():
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
         SCRIPTS_DIR / "test_cut_release_version.py",
+        # The release number is stamped only at packaging: both packaged trees,
+        # contained references, and a print that names vNN, never DEV.
+        SCRIPTS_DIR / "test_release_stamp.py",
         SCRIPTS_DIR / "test_export_models.py",
         SCRIPTS_DIR / "test_pose_manifest.py",
         SCRIPTS_DIR / "test_render_offline.py",

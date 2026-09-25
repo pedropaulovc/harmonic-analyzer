@@ -15,8 +15,10 @@ from typing import Any
 import _config
 import _telemetry
 from _common import (
+    BUILD_REVISION,
     DEFAULT_VIEWS,
     FULLY_CONSTRAINED,
+    GENERATOR,
     OUT_PNG,
     OUT_SLDASM,
     OUT_SLDPRT,
@@ -25,7 +27,6 @@ from _common import (
     _FEATURE_ERROR,
     _MATE_TOL_MM,
     _git_commit_year,
-    _git_sha,
     _early_bound,
     _read_member,
     apply_custom_properties,
@@ -39,14 +40,14 @@ from _common import (
 def assembly_title_properties(assembly_name: str) -> dict[str, str]:
     """Return title-block properties for an assembly document.
 
-    Assembly drawings use the tracked next release revision, not a per-part
-    registry row, so native assemblies and their linked title blocks stay in
-    lockstep with leaf parts.
+    Assemblies carry the constant build revision, exactly like leaf parts, so
+    native assemblies and their linked title blocks stay in lockstep; the
+    release number is stamped only onto the packaged copies (``package_native``).
     """
     return {
         "Title": assembly_name,
-        "Revision": _config.release_revision(),
-        "Generator": f"harmonic-analyzer @ {_git_sha()}",
+        "Revision": BUILD_REVISION,
+        "Generator": GENERATOR,
         "COPYRIGHT_YEAR": _git_commit_year(),
         "TOL_LIN_X": str(_config.title_block("linear_1pl")["display"]),
         "TOL_LIN_XX": str(_config.title_block("linear_2pl")["display"]),
@@ -64,9 +65,13 @@ def assembly_title_properties(assembly_name: str) -> dict[str, str]:
 
 @_telemetry.traced("assembly.ensure_revision")
 def _ensure_assembly_revision(adapter: Any, model: Any = None) -> bool:
-    """Restamp an existing assembly with the current release Revision if stale."""
+    """Restamp an existing assembly with the build Revision (``DEV``) if stale.
+
+    A cached assembly saved before the release number left the build still
+    carries a ``vNN`` Revision; a refresh brings it back to the constant.
+    """
     target = adapter.currentModel if model is None else model
-    expected = _config.release_revision()
+    expected = BUILD_REVISION
     current = str(
         adapter._attempt(lambda: target.GetCustomInfoValue("", "Revision"), default="")
         or ""

@@ -87,9 +87,12 @@ uv run python -m doit list --all
 uv run python -m doit clean
 ```
 
-`cad/config/release.yaml` reserves the Revision stamped into every native CAD
-file and linked drawing title block. A successful publish advances it to the
-next `vNN`; commit and merge that tracked version bump before the next release.
+`cad/config/release.yaml` reserves the next release's Revision. Builds never
+read it: every native CAD file and drawing title block a build writes carries
+Revision `DEV`. `doit package:release` stamps the reserved `vNN` into the
+packaged copies and their prints, so a bump re-keys only that leaf. A
+successful publish advances it to the next `vNN`; commit and merge that tracked
+version bump before the next release.
 
 ## Parallelism
 

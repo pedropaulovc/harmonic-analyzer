@@ -20,10 +20,9 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Mapping, Sequence
 
 
-import _config
 import _telemetry
 from _common import (
-    _build_id,
+    BUILD_REVISION,
     _early_bound,
     _visible_document_paths,
     apply_custom_properties,
@@ -1711,7 +1710,8 @@ TITLE_BLOCK_REVISION_PROPERTY = "Revision"
 # The copyright line's year ($PRPSHEET:{COPYRIGHT_YEAR}); required like the
 # tolerance rows so a stale source model cannot print "(c)  Pedro ...".
 TITLE_BLOCK_COPYRIGHT_PROPERTY = "COPYRIGHT_YEAR"
-# Stamped on the drawing document itself at finalize (see _common._build_id).
+# Stamped on the drawing document itself at finalize: the constant
+# _common.BUILD_REVISION in a build, the release number at packaging.
 DRAWING_BUILD_ID_PROPERTY = "BUILD_ID"
 
 
@@ -1723,12 +1723,10 @@ def read_required_properties(
     if missing:
         raise RuntimeError(f"source part properties are missing: {missing}")
     revision = properties.get(TITLE_BLOCK_REVISION_PROPERTY)
-    if revision is not None:
-        expected = _config.release_revision()
-        if revision != expected:
-            raise RuntimeError(
-                f"source model Revision {revision!r} != current release {expected!r}"
-            )
+    if revision is not None and revision != BUILD_REVISION:
+        raise RuntimeError(
+            f"source model Revision {revision!r} != build revision {BUILD_REVISION!r}"
+        )
     return properties
 
 
@@ -5970,10 +5968,10 @@ async def finalize_drawing(
     )  # IDrawingDoc view for drawing-only methods (same dispatch)
     drawing_model.ClearSelection2(True)
     # The sheet's own build identifier (title block "BUILD $PRP:{BUILD_ID}"):
-    # a DRAWING-document property, not a $PRPSHEET link, so it names the build
-    # that made this sheet even when the part it shows is older.
+    # a DRAWING-document property, not a $PRPSHEET link.  Every build writes
+    # the constant; package:release restamps the packaged copy with vNN.
     apply_custom_properties(
-        adapter, {DRAWING_BUILD_ID_PROPERTY: _build_id()}, model=drawing_model
+        adapter, {DRAWING_BUILD_ID_PROPERTY: BUILD_REVISION}, model=drawing_model
     )
     sheet_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
     if not sheet_names:
@@ -6009,7 +6007,7 @@ async def finalize_drawing(
 
     # Every sheet owns its own $PRPSHEET link. Point each at that sheet's first
     # real view after all views exist, validate the linked model's tolerance and
-    # current-release Revision properties, and hold every sheet to the same ASME B
+    # build Revision (DEV) properties, and hold every sheet to the same ASME B
     # contract.
     for sheet_name in sheet_names:
         if not ddoc.ActivateSheet(sheet_name):
