@@ -405,7 +405,9 @@ def test_plan_values_stand_off_the_part_and_each_other() -> None:
         drawing._plan_y((south_face + drawing.Z_SOUTH) / 2.0)
     )
     ctoc_x = keep["FlangeSlotCtoC"][0]
-    assert drawing.PLAN_CHAIN_X + 0.004 <= ctoc_x - half_width
+    # The chain's own values are centred on its line: measured from the line
+    # alone (+0.004), I31's "20.8" printed 0.7 mm from "8.42".
+    assert drawing.PLAN_CHAIN_X + half_width + drawing.TEXT_CLEARANCE <= ctoc_x - half_width
     assert ctoc_x + half_width <= plan_left - 0.0005
     slot_z_x, slot_z_y = keep["FlangeSlotZ"]
     assert plan_right + 0.004 <= slot_z_x - half_width
@@ -426,6 +428,168 @@ def test_plan_values_stand_off_the_part_and_each_other() -> None:
     # VIEW C's letter stands left of the stem, clear of the location's value.
     view_c_note = drawing.VIEW_C_ARROW[0]
     assert view_c_note[0] + drawing.VIEW_LETTER_HEIGHT <= loc_x - half_width
+
+
+# Ink measured on the I31 farm render (7ab69742b, cone-tip-block_drawing.png,
+# 5100 x 3300 px = 431.8 x 279.4 mm, 11.81 px/mm): connected-component boxes
+# of the dark pixels (< 128), converted to sheet mm with y up from the sheet's
+# lower edge.  A callout's box spans its text lines and its leader shoulder.
+# The 6.0's glyphs merge with that shoulder, so its box is the column extent
+# of its glyph band under the shoulder (143.00 .. 148.84) with the merged
+# component's rows.  The heel height's line is its dark column run.
+_I31_TEXT_MM = {
+    "FlangeLen": (37.68, 229.19, 46.31, 232.66),  # "20.8"
+    "FlangeSlotCtoC": (46.99, 229.70, 55.63, 233.09),  # "8.42"
+    "pinch clearance callout": (118.11, 170.60, 149.52, 175.68),
+    "PinchDepthCenter": (143.00, 169.42, 148.84, 172.72),  # "6.0"
+    "adjuster callout": (85.60, 106.51, 142.66, 122.68),
+}
+_I31_RIGHT_BODY_MM = (141.31, 93.81, 159.43, 164.17)
+_I31_HEEL_HEIGHT_LINE_MM = ((119.25, 87.55), (119.25, 108.46))
+# What the I31 sheet commanded at 7ab69742b, before this fix.
+_I31_PLACEMENT = {
+    "PLAN_CHAIN_X = TOP_CENTER[0] - 0.036": "PLAN_CHAIN_X = TOP_CENTER[0] - 0.030",
+    "RIGHT_CENTER = (0.171,": "RIGHT_CENTER = (0.166,",
+    "LEFT_CENTER = (0.243,": "LEFT_CENTER = (0.238,",
+    "BACK_CENTER = (0.315,": "BACK_CENTER = (0.310,",
+    "(RIGHT_CENTER[0] - 0.033, 0.178)": "(RIGHT_CENTER[0] - 0.033, 0.1735)",
+    "ADJUSTER_CALLOUT_Y = 0.121": "ADJUSTER_CALLOUT_Y = 0.115",
+}
+_I31_FINDINGS = [
+    "text-on-text: 'FlangeLen' and 'FlangeSlotCtoC'",
+    "text-on-text: 'PinchDepthCenter' and 'pinch clearance callout'",
+    "text-on-outline: 'adjuster callout'",
+    "text-on-line: HeelReliefHt's dimension line crosses 'adjuster callout'",
+]
+
+
+def _m(box):
+    return tuple(value / 1000.0 for value in box)
+
+
+def _findings_match(findings: list[str], expected: list[str]) -> bool:
+    return len(findings) == len(expected) and all(
+        finding.startswith(prefix) for finding, prefix in zip(findings, expected)
+    )
+
+
+def _drawing_at(replacements: dict[str, str]):
+    """The drawing module with some placement lines swapped (a mutant)."""
+    import types
+
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for old, new in replacements.items():
+        assert source.count(old) == 1, old
+        source = source.replace(old, new)
+    mutant = types.ModuleType("draw_cone_tip_block_mutant")
+    mutant.__file__ = drawing.__file__
+    exec(compile(source, drawing.__file__, "exec"), mutant.__dict__)
+    return mutant
+
+
+def _sheet_findings(module) -> list[str]:
+    return module.sheet_ink_collisions(
+        module.sheet_text_boxes(),
+        module.sheet_view_silhouettes(),
+        module.sheet_dimension_lines(),
+    )
+
+
+def test_sheet_ink_audit_flags_the_i31_render_and_clears_the_moved_ink() -> None:
+    """Main's eye-pass of I31: "20.8" ran into "8.42", the pinch callout sat on
+    the 6.0, and the adjuster callout ran over the right view's north face and
+    the 5.56's outside arrow.  The shared audit compares none of those pairs
+    (dimension and callout boxes are CollisionScope.NONE).  Planted from the
+    render's own ink, the sheet audit flags all four; each box moved by what
+    its placement constant moved clears them."""
+    texts = {name: _m(box) for name, box in _I31_TEXT_MM.items()}
+    silhouettes = {"right body": _m(_I31_RIGHT_BODY_MM)}
+    lines = {"HeelReliefHt": tuple(_m(point) for point in _I31_HEEL_HEIGHT_LINE_MM)}
+    findings = drawing.sheet_ink_collisions(texts, silhouettes, lines)
+    assert _findings_match(findings, _I31_FINDINGS), findings
+
+    right_dx = drawing.RIGHT_CENTER[0] - 0.166
+    moves = {
+        "FlangeLen": (drawing.PLAN_CHAIN_X - 0.042, 0.0),
+        "FlangeSlotCtoC": (
+            drawing.TOP_KEEP["FlangeSlotCtoC"][0] - (0.042 + 0.06075) / 2.0,
+            0.0,
+        ),
+        "pinch clearance callout": (
+            drawing.PINCH_CLEARANCE_CALLOUT_XY[0] - 0.133,
+            drawing.PINCH_CLEARANCE_CALLOUT_XY[1] - 0.1735,
+        ),
+        "PinchDepthCenter": (right_dx, 0.0),
+        "adjuster callout": (0.0, drawing.ADJUSTER_CALLOUT_Y - 0.115),
+    }
+
+    def moved(box, dx, dy):
+        return (box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy)
+
+    texts = {name: moved(box, *moves[name]) for name, box in texts.items()}
+    silhouettes = {"right body": moved(silhouettes["right body"], right_dx, 0.0)}
+    lines = {
+        "HeelReliefHt": tuple(
+            (x + right_dx, y) for x, y in lines["HeelReliefHt"]
+        )
+    }
+    assert drawing.sheet_ink_collisions(texts, silhouettes, lines) == []
+
+
+def test_sheet_ink_model_reproduces_the_i31_render() -> None:
+    """At the I31 placement the module's own boxes cover the measured ink
+    (within 0.3 mm) and the audit reports exactly the four collisions."""
+    old = _drawing_at(_I31_PLACEMENT)
+    assert _findings_match(_sheet_findings(old), _I31_FINDINGS), _sheet_findings(old)
+    slack = 0.0003
+    predicted = old.sheet_text_boxes()
+    for name, box in _I31_TEXT_MM.items():
+        model, ink = predicted[name], _m(box)
+        assert model[0] <= ink[0] + slack and model[1] <= ink[1] + slack, name
+        assert model[2] >= ink[2] - slack and model[3] >= ink[3] - slack, name
+    body = old.sheet_view_silhouettes()["right body"]
+    assert body == pytest.approx(_m(_I31_RIGHT_BODY_MM), abs=slack)
+    (x0, y0), (x1, y1) = old.sheet_dimension_lines()["HeelReliefHt"]
+    (ink_x0, ink_y0), (ink_x1, ink_y1) = (_m(p) for p in _I31_HEEL_HEIGHT_LINE_MM)
+    assert (x0, x1) == pytest.approx((ink_x0, ink_x1), abs=slack)
+    assert y0 <= ink_y0 + slack and y1 >= ink_y1 - slack
+
+
+@pytest.mark.parametrize(
+    ("reverted", "expected"),
+    [
+        (("PLAN_CHAIN_X = TOP_CENTER[0] - 0.036",), [_I31_FINDINGS[0]]),
+        (("(RIGHT_CENTER[0] - 0.033, 0.178)",), [_I31_FINDINGS[1]]),
+        (
+            ("RIGHT_CENTER = (0.171,", "LEFT_CENTER = (0.243,", "BACK_CENTER = (0.315,"),
+            [_I31_FINDINGS[2]],
+        ),
+        (("ADJUSTER_CALLOUT_Y = 0.121",), [_I31_FINDINGS[3]]),
+    ],
+    ids=["a-plan-chain", "b-pinch-callout", "c-right-view", "c-adjuster-callout"],
+)
+def test_each_i31_move_is_what_clears_its_collision(reverted, expected) -> None:
+    mutant = _drawing_at({line: _I31_PLACEMENT[line] for line in reverted})
+    findings = _sheet_findings(mutant)
+    assert _findings_match(findings, expected), findings
+
+
+def test_sheet_ink_is_clear_and_the_build_places_what_it_audits() -> None:
+    assert _sheet_findings(drawing) == []
+    drawing.assert_sheet_ink_clear()
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build(") :]
+    assert "assert_sheet_ink_clear(adjuster_center)" in body
+    assert body.index("assert_sheet_ink_clear(") < body.index("curate(")
+    for placed in (
+        "callout_xy=_adjuster_callout_xy(adjuster_center)",
+        "callout_xy=PINCH_CLEARANCE_CALLOUT_XY",
+        "callout_xy=PINCH_THREAD_CALLOUT_XY",
+        "for text, x, y in _sheet_notes(adjuster_center):",
+        "adjuster_axis_keep = _adjuster_axis_keep(adjuster_center)",
+    ):
+        assert placed in body, placed
+    assert body.count("add_note(adapter,") == 1
 
 
 def test_flange_slot_travel_is_built_from_the_fit_up_chain() -> None:

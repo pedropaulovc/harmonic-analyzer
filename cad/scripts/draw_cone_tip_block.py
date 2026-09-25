@@ -81,9 +81,15 @@ SHEET_SCALE = (3.0, 2.0)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
 FRONT_CENTER = (0.072, 0.129)
 TOP_CENTER = (FRONT_CENTER[0], 0.222)
-RIGHT_CENTER = (0.166, FRONT_CENTER[1])
-LEFT_CENTER = (0.238, FRONT_CENTER[1])
-BACK_CENTER = (0.310, FRONT_CENTER[1])
+# Main eye-pass of the I31 render (7ab69742b): at x 0.166 the adjuster
+# callout's longest line (54.5 mm, shoulder 57.1) ran over the right view's
+# north face -- the gap between the front and right views was 58.2 mm.  The
+# right view slides 5 mm along its projection row (ASME alignment is the
+# shared y), and the removed views B and C slide with it so the gaps to
+# their right keep their measured air.
+RIGHT_CENTER = (0.171, FRONT_CENTER[1])
+LEFT_CENTER = (0.243, FRONT_CENTER[1])
+BACK_CENTER = (0.315, FRONT_CENTER[1])
 SECTION_CENTER = (0.190, 0.225)
 ISO_CENTER = (0.350, 0.215)
 # A view centres on the part's box.  Along the cone axis that box runs from
@@ -149,7 +155,11 @@ _DIM_ARROWS_OUTSIDE = 1
 # from the +X face.
 _PLAN_LEFT = TOP_CENTER[0] - BLOCK_X * _S / 2.0
 _PLAN_RIGHT = TOP_CENTER[0] + BLOCK_X * _S / 2.0
-PLAN_CHAIN_X = TOP_CENTER[0] - 0.030
+# Both chain values sit on this line and the spacing's value midway to the
+# part, so each moves half as far as the line: at -0.030 the I31 render
+# printed "20.8" 0.7 mm from "8.42", which read as "20.88.42".  At -0.036
+# the two values keep 3.8 mm of air.
+PLAN_CHAIN_X = TOP_CENTER[0] - 0.036
 FLANGE_SLOT_W_Z = FLANGE_SLOT_CENTER_Z - FLANGE_SLOT_CTOC * 0.4
 FLANGE_SLOT_X_RISE = 0.016
 TOP_KEEP = {
@@ -246,6 +256,303 @@ VIEW_C_ARROW = (
 DIMENSION_CALLOUTS = {
     "SlitDepth": "SLOT DEPTH",
 }
+
+# The adjuster's hole callout stands between the adjuster elevation and the
+# right view, named by the ADJUSTER ENTRY note above it.  At y 0.115 (I31
+# render) its shoulder sat at 106.6 mm, where the 5.56 heel height's outside
+# arrow runs up to 108.5 mm: the callout rises 6 mm, still 7 mm under the
+# SLOT DEPTH witness line at 141.3 mm.
+ADJUSTER_CALLOUT_DX = 0.043
+ADJUSTER_CALLOUT_Y = 0.121
+ADJUSTER_ENTRY_RISE = 0.0135
+# Fable review af561fa7 put the pinch clearance callout under the 6.0
+# dimension, right of the SLOT DEPTH line; at y 0.1735 its text printed
+# over the 6.0 (I31 render).  4.5 mm higher its shoulder clears the 6.0's
+# printed value by 2.3 mm; the leader still drops to the hole just right of
+# that value, as before.
+PINCH_CLEARANCE_CALLOUT_XY = (RIGHT_CENTER[0] - 0.033, 0.178)
+PINCH_THREAD_CALLOUT_XY = (LEFT_CENTER[0] + 0.016, 0.190)
+ROTATED_NOTE_XY = (SECTION_CENTER[0] - 0.015, 0.195)
+
+
+def _adjuster_axis_keep(
+    adjuster_center: tuple[float, float],
+) -> dict[str, tuple[float, float]]:
+    """The adjuster-axis values, kept on whichever elevation shows its entry."""
+    plus_x_side = 1.0 if adjuster_center == FRONT_CENTER else -1.0
+    return {
+        "AxisHeight": (
+            adjuster_center[0] - 0.045,
+            _elevation_y(ADJUSTER_AXIS_HEIGHT / 2.0, adjuster_center),
+        ),
+        "PassageCenter": (
+            adjuster_center[0] + plus_x_side * BLOCK_X * _S / 4.0,
+            _elevation_y(BLOCK_HEIGHT, adjuster_center) + PASSAGE_CENTER_RISE,
+        ),
+        "SlitDepth": (
+            adjuster_center[0] + 0.043,
+            _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH / 2.0, adjuster_center),
+        ),
+    }
+
+
+def _adjuster_callout_xy(adjuster_center: tuple[float, float]) -> tuple[float, float]:
+    return (adjuster_center[0] + ADJUSTER_CALLOUT_DX, ADJUSTER_CALLOUT_Y)
+
+
+def _sheet_notes(
+    adjuster_center: tuple[float, float],
+) -> tuple[tuple[str, float, float], ...]:
+    """Every free note this sheet adds: (text, upper-left x, upper-left y)."""
+    # The through thread shows the same rim from both ends; VIEW C (the
+    # opposite elevation) is the shaft's entry.
+    shaft_entry_center = BACK_CENTER if adjuster_center == FRONT_CENTER else FRONT_CENTER
+    return (
+        ("VIEW C\nSHAFT ENTRY", shaft_entry_center[0] - 0.021, CAPTION_Y),
+        ("RIGHT VIEW\nPINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.026, CAPTION_Y),
+        ("VIEW B\nPINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023, CAPTION_Y),
+        # Review: named above the thread callout it describes.
+        (
+            "ADJUSTER ENTRY",
+            adjuster_center[0] + 0.023,
+            ADJUSTER_CALLOUT_Y + ADJUSTER_ENTRY_RISE,
+        ),
+        ("ROTATED 90°", *ROTATED_NOTE_XY),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Sheet ink audit
+#
+# Main's eye-pass of the I31 farm render (7ab69742b) found three collisions no
+# gate saw: "20.8" run into "8.42" on the plan (value text on value text), the
+# pinch clearance callout printed over the right view's "6.0" (callout text on
+# value text), and the adjuster callout's THRU ALL / BOTH ENDS printed over the
+# right view's north face (callout text on a view's model outline), its
+# shoulder also crossed by the 5.56 heel height's outside arrow (callout text
+# on a dimension line).  The shared audit cannot see any of those classes:
+# _drawing_common._dim_element boxes every display dimension and hole callout
+# as a nominal 8 mm square with CollisionScope.NONE, _drawing_layout_check.
+# _may_collide drops every pair holding a NONE element, and since ab28f4e49
+# finalize_drawing no longer runs check_drawing_layout at all.
+#
+# So the sheet audits its own ink before it opens a document: every text
+# block it places, boxed from where it places it and how large that text
+# printed, against every other text block, every view's model silhouette, and
+# the outside-arrow dimension lines that stand in the gaps between the views.
+#
+# Extents are (left, down, right, up) of the printed ink from the point the
+# module commands, in sheet metres, measured on the I31 render's 300 dpi PNG
+# (11.81 px/mm) by connected-component ink boxes and rounded outward to
+# 0.1 mm.  A single value uses the module's value-text half sizes (4.6 x 1.9
+# mm, over the 4.3 x 1.7 mm a four-character value measured).
+_VALUE_EXTENT = (
+    VALUE_TEXT_HALF_WIDTH,
+    VALUE_TEXT_HALF_HEIGHT,
+    VALUE_TEXT_HALF_WIDTH,
+    VALUE_TEXT_HALF_HEIGHT,
+)
+_VALUE_EXTENTS = {
+    # "3.97" with its stacked +0.1 / 0.0 deviations to the right.
+    "FlangeSlotW": (0.0069, 0.0036, 0.0097, 0.0045),
+    # "15.2" over its SLOT DEPTH callout line.
+    "SlitDepth": (0.0129, 0.0046, 0.0124, 0.0045),
+}
+# Hole callouts: every line plus the shoulder the leader leaves from.
+ADJUSTER_CALLOUT_EXTENT = (0.0295, 0.0086, 0.0278, 0.0078)
+PINCH_CLEARANCE_CALLOUT_EXTENT = (0.0150, 0.0030, 0.0166, 0.0023)
+PINCH_THREAD_CALLOUT_EXTENT = (0.0322, 0.0085, 0.0310, 0.0078)
+# Free notes are placed by their upper-left corner.
+_NOTE_EXTENTS = {
+    "ADJUSTER ENTRY": (0.0, 0.0036, 0.0365, 0.0),
+    "ROTATED 90°": (0.0, 0.0036, 0.0200, 0.0),
+    "RIGHT VIEW\nPINCH CLEARANCE ENTRY": (0.0, 0.0081, 0.0581, 0.0),
+    "VIEW B\nPINCH THREAD ENTRY": (0.0, 0.0081, 0.0476, 0.0),
+    "VIEW C\nSHAFT ENTRY": (0.0, 0.0081, 0.0278, 0.0),
+}
+# SolidWorks places section A-A's "SECTION A-A / SCALE 3:2" label under the
+# view; its ink relative to SECTION_CENTER.
+SECTION_LABEL_BOX = (-0.0227, -0.0537, 0.0227, -0.0392)
+# An outside arrow's dimension line runs this far past its extension line
+# (arrowhead plus tail): 6.35 mm on the 5.56, 6.2-6.3 mm on the 6.0.
+OUTSIDE_ARROW_RUN = 0.0064
+# The 6.0's dimension line printed 2.8 mm under its value's centre.
+PINCH_DEPTH_LINE_DROP = 0.0028
+# A text block may not come nearer a view's model outline than this.
+OUTLINE_CLEARANCE = 0.0005
+
+Box = tuple[float, float, float, float]
+Segment = tuple[tuple[float, float], tuple[float, float]]
+
+
+def _extent_box(
+    point: tuple[float, float], extent: tuple[float, float, float, float]
+) -> Box:
+    left, down, right, up = extent
+    return (point[0] - left, point[1] - down, point[0] + right, point[1] + up)
+
+
+def sheet_text_boxes(adjuster_center: tuple[float, float] = FRONT_CENTER) -> dict[str, Box]:
+    """Every text block this module places, keyed by dimension or note name."""
+    keeps = {
+        **FRONT_KEEP,
+        **_adjuster_axis_keep(adjuster_center),
+        **TOP_KEEP,
+        **SECTION_KEEP,
+        **RIGHT_KEEP,
+        **LEFT_KEEP,
+    }
+    boxes = {
+        name: _extent_box(point, _VALUE_EXTENTS.get(name, _VALUE_EXTENT))
+        for name, point in keeps.items()
+    }
+    boxes["adjuster callout"] = _extent_box(
+        _adjuster_callout_xy(adjuster_center), ADJUSTER_CALLOUT_EXTENT
+    )
+    boxes["pinch clearance callout"] = _extent_box(
+        PINCH_CLEARANCE_CALLOUT_XY, PINCH_CLEARANCE_CALLOUT_EXTENT
+    )
+    boxes["pinch thread callout"] = _extent_box(
+        PINCH_THREAD_CALLOUT_XY, PINCH_THREAD_CALLOUT_EXTENT
+    )
+    for text, x, y in _sheet_notes(adjuster_center):
+        boxes[text.split("\n")[0]] = _extent_box((x, y), _NOTE_EXTENTS[text])
+    x0, y0, x1, y1 = SECTION_LABEL_BOX
+    boxes["SECTION A-A label"] = (
+        SECTION_CENTER[0] + x0,
+        SECTION_CENTER[1] + y0,
+        SECTION_CENTER[0] + x1,
+        SECTION_CENTER[1] + y1,
+    )
+    return boxes
+
+
+def sheet_view_silhouettes() -> dict[str, Box]:
+    """Each view's model outline as rectangles (an L view is two)."""
+    foot = _elevation_y(0.0, FRONT_CENTER)
+    top = _elevation_y(BLOCK_HEIGHT, FRONT_CENTER)
+    flange_top = _elevation_y(FLANGE_T, FRONT_CENTER)
+    half_x = BLOCK_X * _S / 2.0
+    boxes = {
+        "front": (FRONT_CENTER[0] - half_x, foot, FRONT_CENTER[0] + half_x, top),
+        "back": (BACK_CENTER[0] - half_x, foot, BACK_CENTER[0] + half_x, top),
+        "plan": (
+            TOP_CENTER[0] - half_x,
+            _plan_y(Z_NORTH),
+            TOP_CENTER[0] + half_x,
+            _plan_y(Z_SOUTH),
+        ),
+        # Rotated 90 degrees: the block height runs across the sheet.
+        "section A-A": (
+            SECTION_CENTER[0] - BLOCK_HEIGHT * _S / 2.0,
+            SECTION_CENTER[1] - (Z_NORTH - Z_SOUTH) * _S / 2.0,
+            SECTION_CENTER[0] + BLOCK_HEIGHT * _S / 2.0,
+            SECTION_CENTER[1] + (Z_NORTH - Z_SOUTH) * _S / 2.0,
+        ),
+    }
+    # The right view has north on the left, VIEW B north on the right.
+    for label, center, sign in (("right", RIGHT_CENTER, -1.0), ("view B", LEFT_CENTER, 1.0)):
+        north, south_face, south_end = (
+            center[0] + sign * (z - Z_MID) * _S
+            for z in (Z_NORTH, -BLOCK_Z / 2.0, Z_SOUTH)
+        )
+        boxes[f"{label} body"] = (min(north, south_face), foot, max(north, south_face), top)
+        boxes[f"{label} flange"] = (
+            min(south_face, south_end),
+            foot,
+            max(south_face, south_end),
+            flange_top,
+        )
+    return boxes
+
+
+def sheet_dimension_lines() -> dict[str, Segment]:
+    """The outside-arrow dimension lines that stand in the gaps between views."""
+    heel_x = RIGHT_KEEP["HeelReliefHt"][0]
+    depth_y = RIGHT_KEEP["PinchDepthCenter"][1] - PINCH_DEPTH_LINE_DROP
+    return {
+        "HeelReliefHt": (
+            (heel_x, _elevation_y(0.0, RIGHT_CENTER) - OUTSIDE_ARROW_RUN),
+            (heel_x, _elevation_y(HEEL_RELIEF_HEIGHT, RIGHT_CENTER) + OUTSIDE_ARROW_RUN),
+        ),
+        "PinchDepthCenter": (
+            (_right_x(Z_NORTH) - OUTSIDE_ARROW_RUN, depth_y),
+            (_right_x(0.0) + OUTSIDE_ARROW_RUN, depth_y),
+        ),
+    }
+
+
+def _box_gap(a: Box, b: Box) -> float:
+    """Air between two boxes along their clearer axis; negative when they overlap."""
+    return max(b[0] - a[2], a[0] - b[2], b[1] - a[3], a[1] - b[3])
+
+
+def _segment_meets_box(segment: Segment, box: Box) -> bool:
+    """Liang-Barsky: whether any part of ``segment`` lies inside ``box``."""
+    (x0, y0), (x1, y1) = segment
+    dx, dy = x1 - x0, y1 - y0
+    t0, t1 = 0.0, 1.0
+    for p, q in ((-dx, x0 - box[0]), (dx, box[2] - x0), (-dy, y0 - box[1]), (dy, box[3] - y0)):
+        if p == 0.0:
+            if q < 0.0:
+                return False
+            continue
+        t = q / p
+        if p < 0.0:
+            t0 = max(t0, t)
+        else:
+            t1 = min(t1, t)
+        if t0 > t1:
+            return False
+    return True
+
+
+def sheet_ink_collisions(
+    texts: dict[str, Box],
+    silhouettes: dict[str, Box],
+    lines: dict[str, Segment],
+    *,
+    text_clearance: float = TEXT_CLEARANCE,
+    outline_clearance: float = OUTLINE_CLEARANCE,
+) -> list[str]:
+    """Every text block too near another, a view's outline, or a foreign line."""
+    findings: list[str] = []
+    names = sorted(texts)
+    for index, first in enumerate(names):
+        for second in names[index + 1 :]:
+            gap = _box_gap(texts[first], texts[second])
+            if gap < text_clearance:
+                findings.append(
+                    f"text-on-text: {first!r} and {second!r} stand "
+                    f"{gap * 1000.0:.2f} mm apart"
+                )
+    for name in names:
+        for view, outline in sorted(silhouettes.items()):
+            gap = _box_gap(texts[name], outline)
+            if gap < outline_clearance:
+                findings.append(
+                    f"text-on-outline: {name!r} stands {gap * 1000.0:.2f} mm "
+                    f"from the {view} outline"
+                )
+        for owner, segment in sorted(lines.items()):
+            if owner != name and _segment_meets_box(segment, texts[name]):
+                findings.append(f"text-on-line: {owner}'s dimension line crosses {name!r}")
+    return findings
+
+
+def assert_sheet_ink_clear(adjuster_center: tuple[float, float] = FRONT_CENTER) -> None:
+    """Refuse a placement whose own text collides before any COM work is spent."""
+    findings = sheet_ink_collisions(
+        sheet_text_boxes(adjuster_center),
+        sheet_view_silhouettes(),
+        sheet_dimension_lines(),
+    )
+    if findings:
+        raise RuntimeError(
+            "cone-tip-block sheet ink collides:\n"
+            + "\n".join(f"  - {finding}" for finding in findings)
+        )
+    _telemetry.debug("cone-tip-block sheet ink clear")
 
 
 def _foot_edge(adapter: Any, view: Any, *, min_span_mm: float = 13.9) -> Any:
@@ -689,9 +996,7 @@ async def build(adapter: Any) -> dict[str, str]:
         center_y_mm=ADJUSTER_AXIS_HEIGHT,
         label="through adjuster thread",
     )
-    # The through thread shows the same rim from both ends; VIEW C (the
-    # opposite elevation) is the shaft's entry.
-    shaft_entry_center = BACK_CENTER if adjuster_view is front else FRONT_CENTER
+    assert_sheet_ink_clear(adjuster_center)
     pinch_clearance_edge = _circle_entity(
         adapter,
         right,
@@ -708,21 +1013,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     front_keep = dict(FRONT_KEEP)
     back_keep: dict[str, tuple[float, float]] = {}
-    plus_x_side = 1.0 if adjuster_view is front else -1.0
-    adjuster_axis_keep = {
-        "AxisHeight": (
-            adjuster_center[0] - 0.045,
-            _elevation_y(ADJUSTER_AXIS_HEIGHT / 2.0, adjuster_center),
-        ),
-        "PassageCenter": (
-            adjuster_center[0] + plus_x_side * BLOCK_X * _S / 4.0,
-            _elevation_y(BLOCK_HEIGHT, adjuster_center) + PASSAGE_CENTER_RISE,
-        ),
-        "SlitDepth": (
-            adjuster_center[0] + 0.043,
-            _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH / 2.0, adjuster_center),
-        ),
-    }
+    adjuster_axis_keep = _adjuster_axis_keep(adjuster_center)
     if adjuster_view is front:
         front_keep.update(adjuster_axis_keep)
     else:
@@ -795,10 +1086,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         adjuster_view,
         edge=adjuster_edge,
-        callout_xy=(
-            adjuster_center[0] + 0.043,
-            0.115,
-        ),
+        callout_xy=_adjuster_callout_xy(adjuster_center),
         label="through adjuster thread",
     )
     _set_adjuster_callout_text(adjuster_callout)
@@ -806,11 +1094,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge=pinch_clearance_edge,
-        # Fable review af561fa7: at (0.145, 0.185) the leader ran through the
-        # 6.0 text.  Measured on that render the text spans x-0.015..x+0.007,
-        # centred on y; here it sits under the 6.0 dimension, right of the
-        # SLOT DEPTH line (x 0.115) and left of the view (x 0.154).
-        callout_xy=(0.133, 0.1735),
+        callout_xy=PINCH_CLEARANCE_CALLOUT_XY,
         label="pinch entry-jaw clearance",
     )
     set_hole_callout_precision(
@@ -822,7 +1106,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         left,
         edge=pinch_thread_edge,
-        callout_xy=(0.254, 0.190),
+        callout_xy=PINCH_THREAD_CALLOUT_XY,
         label="pinch opposite-jaw thread",
     )
     _set_pinch_thread_callout_text(pinch_thread_callout)
@@ -831,18 +1115,9 @@ async def build(adapter: Any) -> dict[str, str]:
     _hide_cosmetic_threads(adapter, iso, label="isometric")
 
     _hide_cosmetic_threads(adapter, section, label="section")
-    for text, x, y in (
-        ("VIEW C\nSHAFT ENTRY", shaft_entry_center[0] - 0.021, CAPTION_Y),
-        ("RIGHT VIEW\nPINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.026, CAPTION_Y),
-        ("VIEW B\nPINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023, CAPTION_Y),
-        # Review: named beside the thread callout it describes (the callout
-        # text starts ~0.018 right of the adjuster axis, top at ~0.120).
-        ("ADJUSTER ENTRY", adjuster_center[0] + 0.023, 0.1285),
-    ):
+    for text, x, y in _sheet_notes(adjuster_center):
         if add_note(adapter, text, x, y) is None:
-            raise RuntimeError(f"failed to add {text.lower()} view caption")
-    if add_note(adapter, "ROTATED 90°", SECTION_CENTER[0] - 0.015, 0.195) is None:
-        raise RuntimeError("failed to label the rotated section")
+            raise RuntimeError(f"failed to add the {text.lower()!r} note")
     # C1 verdict (2026-09-23): the native projected-view arrow is not
     # switchable through the documented API -- IProjectionArrow.Visible is
     # get-only and no document preference or IView member sets it; only the
