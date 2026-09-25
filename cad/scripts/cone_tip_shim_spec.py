@@ -3,7 +3,8 @@ r"""Pure-data contract shared by the MHA-141 cone tip shim pack part and drawing
 User ruling U30 (2026-09-23): the cone tip block (MHA-092) stands on a
 blackened carbon-steel shim pack between the swing platform's top face and
 its foot, set at fit-up to bring the adjuster axis onto the cone axis. The
-pack is cut to the block's footprint, so every size here is the tip block's.
+pack is cut to the block's foot face -- the footprint less the I31 heel
+relief -- so every size here is the tip block's.
 The MHA-140 hold-down screw rises through it into the block's foot tap.
 
 Main's ruling on the passage (2026-09-24): a HORSESHOE, not a hole.  Stacking
@@ -22,11 +23,18 @@ from cone_tip_block_spec import (
     BLOCK_Z,
     FOOT_SHIM_RANGE_MM,
     FOOT_THREAD,
+    HEEL_RELIEF_DEPTH,
     SHIM_NOMINAL,
 )
 
 SHIM_X = BLOCK_X
-SHIM_Z = BLOCK_Z
+# I31 (Main, 2026-09-25): the block's north-bottom heel is relieved for the
+# cone pivot screw's head, so the pack stops at the relief's inner face; left
+# full length it would reach under the head the relief clears.  Edges are in
+# the block frame (+Z north), origin on the screw axis.
+SHIM_NORTH_Z = BLOCK_Z / 2.0 - HEEL_RELIEF_DEPTH
+SHIM_SOUTH_Z = -BLOCK_Z / 2.0
+SHIM_Z = SHIM_NORTH_Z - SHIM_SOUTH_Z
 SHIM_T = SHIM_NOMINAL  # modelled at the nominal stack
 STACK_RANGE_MM = FOOT_SHIM_RANGE_MM
 # Handoff BOM: leaves cut from 0.05 / 0.10 / 0.25 / 0.50 mm carbon steel shim
@@ -47,9 +55,10 @@ SLOT_R = SLOT_W / 2.0  # full radius, centred on the screw axis
 # PR body has the numbers).
 SLOT_OPEN_SIDE = -1
 
-# U27 / rule 12: the side webs either side of the slot (12.0 across).
+# U27 / rule 12: the side webs either side of the slot; the trimmed north
+# side is the narrower one.
 MIN_WEB_MM = 1.5
-SIDE_WEB_MM = (SHIM_Z - SLOT_W) / 2.0
+SIDE_WEB_MM = min(SHIM_NORTH_Z, -SHIM_SOUTH_Z) - SLOT_R
 if SIDE_WEB_MM < 2.0:
     raise ValueError(f"shim side web {SIDE_WEB_MM:.2f} is under the 2.0 target")
 # The closed end: from the radius apex to the +X face.
