@@ -450,3 +450,76 @@ def test_transferred_pedestal_and_spring_seats_print_no_station() -> None:
     assert sheet.TRANSFER_PEDESTAL_CALLOUT == "TRANSFER FROM MHA-004\nAT ASSEMBLY;"
     assert sheet.TRANSFER_SPRING_CALLOUT == "TRANSFER FROM MHA-114\nAT ASSEMBLY;"
     assert not any(tag.startswith("G") for tag in sheet.HOLE_TAG_POSITIONS)
+
+
+def _deck_seat_features_in_build() -> dict[str, object]:
+    """Each deck Hole Wizard seat feature build_harmonic_base cuts, name ->
+    its stations: the named SupportHoldDownSeats call plus every row of the
+    ``for tag, spec, xz, label in (...)`` seat-group loop."""
+    import ast
+    from pathlib import Path
+
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    features: dict[str, object] = {"SupportHoldDownSeats": part.HOLE_XZ}
+    named_cuts = {
+        kw.value.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "wizard_holes"
+        for kw in node.keywords
+        if kw.arg == "name" and isinstance(kw.value, ast.Constant)
+    }
+    assert "SupportHoldDownSeats" in named_cuts
+    loops = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.For, ast.AsyncFor))
+        and isinstance(node.target, ast.Tuple)
+        and [getattr(elt, "id", None) for elt in node.target.elts]
+        == ["tag", "spec", "xz", "label"]
+    ]
+    assert len(loops) == 1
+    for row in loops[0].iter.elts:
+        tag, _spec, xz, _label = row.elts
+        features[tag.value] = eval(ast.unparse(xz), vars(part))  # noqa: S307
+    return features
+
+
+def test_tapped_hole_note_count_is_derived_from_the_deck_seat_features() -> None:
+    # warm-c486: the sheet removed 16 descriptive "Tapped Hole" notes against a
+    # literal 14, because U34c split the two pedestal seats out of
+    # FootScrewHoles into their own PedestalSeats feature. SolidWorks drops one
+    # such note per deck seat FEATURE into each plan view, so the count is
+    # derived from the same per-feature table that feeds the hole table.
+    import ast
+    from pathlib import Path
+
+    import draw_harmonic_base as sheet
+
+    build_features = _deck_seat_features_in_build()
+    names = [name for name, _stations, _dia in sheet.DECK_TAPPED_SEAT_FEATURES]
+    assert len(names) == len(set(names))
+    assert {name for name, _stations, _dia in sheet.DECK_TAPPED_SEAT_FEATURES} == set(
+        build_features
+    )
+    for name, stations, _dia in sheet.DECK_TAPPED_SEAT_FEATURES:
+        assert tuple(stations) == tuple(build_features[name]), name
+
+    source = Path(sheet.__file__).read_text(encoding="utf-8")
+    calls = [node for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Call)]
+    plan_views = [
+        call
+        for call in calls
+        if getattr(call.func, "id", None) == "place_view"
+        and any(isinstance(arg, ast.Constant) and arg.value == "*Top" for arg in call.args)
+    ]
+    assert len(plan_views) == len(sheet.PLAN_VIEWS)
+    assert sheet.TAPPED_HOLE_NOTES == len(build_features) * len(sheet.PLAN_VIEWS)
+    assert sheet.TAPPED_HOLE_NOTES == 16
+
+    finalize = [call for call in calls if getattr(call.func, "id", None) == "finalize_drawing"]
+    assert len(finalize) == 1
+    keywords = {kw.arg: kw.value for kw in finalize[0].keywords}
+    # A literal count is what went stale; the call must name the derivation.
+    assert ast.unparse(keywords["expected_redundant_notes"]) == "TAPPED_HOLE_NOTES"
+    assert ast.unparse(keywords["redundant_note_substrings"]) == "(TAPPED_HOLE_NOTE,)"
+    assert sheet.TAPPED_HOLE_NOTE == "Tapped Hole"

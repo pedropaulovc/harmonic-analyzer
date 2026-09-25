@@ -102,6 +102,7 @@ from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
+    iter_views,
     place_view,
 )
 
@@ -577,21 +578,71 @@ TRANSFER_SPRING_CALLOUT = "TRANSFER FROM MHA-114\nAT ASSEMBLY;"
 TRANSFER_PEDESTAL_CALLOUT = "TRANSFER FROM MHA-004\nAT ASSEMBLY;"
 TRANSFER_HOLES = (*TRANSFER_BLOCK_HOLES, TRANSFER_SPRING_HOLE, *TRANSFER_PEDESTAL_HOLES)
 
+# One row per native Hole Wizard tapped-seat FEATURE build_harmonic_base cuts
+# down into the deck (its SupportHoldDownSeats call plus its seat-group loop),
+# in hole-table order: later seat groups stay after the earlier mounting-seat
+# groups. The front/rear BaseCrossTaps features are side-face taps outside
+# the table and outside this list.
+DECK_TAPPED_SEAT_FEATURES = (
+    ("SupportHoldDownSeats", HOLE_XZ, HOLD_DOWN_TAP_DRILL_DIA),
+    ("PivotSeat", (PIVOT_SCREW_XZ,), PIVOT_SCREW_HOLE_DIA),
+    ("StopSeat", (STOP_SCREW_XZ,), STOP_SCREW_HOLE_DIA),
+    ("BlockScrewHoles", BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
+    ("FootScrewHoles", FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DIA),
+    ("PedestalSeats", PEDESTAL_SCREW_XZ, PEDESTAL_SCREW_HOLE_DIA),
+    ("NameplateSeats", NAMEPLATE_SCREW_XZ, NAMEPLATE_SCREW_HOLE_DIA),
+    ("LockSeat", (LOCK_KNOB_XZ,), LOCK_SCREW_HOLE_DIA),
+)
 ALL_HOLES = (
-    *((x, z, HOLD_DOWN_TAP_DRILL_DIA) for x, z in HOLE_XZ),
-    (*PIVOT_SCREW_XZ, PIVOT_SCREW_HOLE_DIA),
-    (*STOP_SCREW_XZ, STOP_SCREW_HOLE_DIA),
-    *((x, z, BLOCK_SCREW_HOLE_DIA) for x, z in BLOCK_SCREW_XZ),
-    *((x, z, FOOT_SCREW_HOLE_DIA) for x, z in FOOT_SCREW_XZ),
-    *TRANSFER_PEDESTAL_HOLES,
-    # Keep later seat groups after the earlier mounting-seat groups.
-    *((x, z, NAMEPLATE_SCREW_HOLE_DIA) for x, z in NAMEPLATE_SCREW_XZ),
-    (*LOCK_KNOB_XZ, LOCK_SCREW_HOLE_DIA),
+    *(
+        (x, z, diameter)
+        for _feature, stations, diameter in DECK_TAPPED_SEAT_FEATURES
+        for x, z in stations
+    ),
     *((x, z, COLUMN_SOCKET_DIAMETER) for x, z in COLUMN_SOCKET_XZ),
 )
+# SolidWorks drops a descriptive "<size> Tapped Hole" note into the views,
+# and the final cleanup deletes every one. The count goes with deck seat
+# FEATURES, not holes: 14 with seven deck features (pcbase-5945), 16 once U34c
+# split the two pedestal seats out of FootScrewHoles into PedestalSeats with
+# the hole count unchanged (warm-c486; both runs import 22 cosmetic threads).
+# One note per feature in each plan view fits both runs, with the side-face
+# BaseCrossTaps adding none. _log_tapped_hole_notes records the per-view
+# split on every build, so a drifted count names the view it drifted in.
+TAPPED_HOLE_NOTE = "Tapped Hole"
+PLAN_VIEWS = ((SHEET_NAMES[0], "*Top"), (SHEET_NAMES[1], "*Top"))
+TAPPED_HOLE_NOTES = len(DECK_TAPPED_SEAT_FEATURES) * len(PLAN_VIEWS)
 TABLE_HOLES = tuple(hole for hole in ALL_HOLES if hole not in TRANSFER_HOLES)
 if len(TABLE_HOLES) != len(ALL_HOLES) - len(TRANSFER_HOLES):
     raise AssertionError("a transferred seat is not a unique base hole")
+
+
+_SW_NOTE = 6  # swAnnotationType_e.swNote
+
+
+def _log_tapped_hole_notes(adapter: Any, ddoc: Any) -> None:
+    """Log each descriptive tapped-hole note by sheet and view before the final
+    cleanup deletes them, so a TAPPED_HOLE_NOTES mismatch names where it is."""
+    per_view: dict[str, list[str]] = {}
+    for sheet_name in SHEET_NAMES:
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(f"failed to activate {sheet_name} for the note inventory")
+        for view in iter_views(adapter):
+            texts = []
+            annotation = _early_bound(view, "IView").GetFirstAnnotation3()
+            while annotation is not None:
+                annotation = _early_bound(annotation, "IAnnotation")
+                if annotation.GetType() == _SW_NOTE:
+                    text = str(_early_bound(annotation.GetSpecificAnnotation(), "INote").GetText() or "")
+                    if TAPPED_HOLE_NOTE.lower() in text.lower():
+                        texts.append(text)
+                annotation = annotation.GetNext3()
+            if texts:
+                per_view[f"{sheet_name}/{view_name(adapter, view)}"] = texts
+    _telemetry.info(
+        f"tapped-hole notes before cleanup: {sum(map(len, per_view.values()))} "
+        f"(expected {TAPPED_HOLE_NOTES}): {per_view!r}"
+    )
 
 
 def _visible_hole_table_entities(
@@ -1204,13 +1255,14 @@ async def build(adapter: Any) -> dict[str, str]:
         DRAWING_PRECISION_BY_NAME,
     )
 
+    _log_tapped_hole_notes(adapter, ddoc)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Harmonic Base Manufacturing Drawing",
         scale=SHEET_SCALE,
-        redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=14,
+        redundant_note_substrings=(TAPPED_HOLE_NOTE,),
+        expected_redundant_notes=TAPPED_HOLE_NOTES,
         layout=SPEC.layout,
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
