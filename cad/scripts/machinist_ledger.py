@@ -1154,14 +1154,19 @@ _REVIEWER_FOR = {"claude": "codex", "gpt": "claude", "mimo": "claude"}
 
 
 def fix_command(status: Status, author: Author | ValueError | None = None) -> str:
-    """The command that clears a failing drawing: render it, or review it."""
+    """The commands that clear a failing drawing: render it if needed, then review it."""
+    review = _review_command(status.name, author)
     if status.state == State.UNRENDERED:
-        return f"uv run python -m doit drawing:{status.name}"
-    review = f"uv run cad/scripts/machinist_review.py {status.name}"
-    script = DRAWINGS_BY_NAME[status.name].script_name
+        return f"uv run python -m doit drawing:{status.name}, then {review}"
+    return review
+
+
+def _review_command(name: str, author: Author | ValueError | None) -> str:
+    review = f"uv run cad/scripts/machinist_review.py {name}"
+    script = DRAWINGS_BY_NAME[name].script_name
     if author is None:
         try:
-            author = draw_script_author(status.name)
+            author = draw_script_author(name)
         except ValueError as exc:
             author = exc
     if isinstance(author, ValueError):

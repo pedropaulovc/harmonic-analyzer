@@ -1400,7 +1400,12 @@ def test_failing_check_lists_each_blocked_drawing_with_its_fix(
 @pytest.mark.parametrize(
     ("state", "author", "fix"),
     [
-        (ml.State.UNRENDERED, None, "uv run python -m doit drawing:crank_arm"),
+        (
+            ml.State.UNRENDERED,
+            "claude-opus-5-5",
+            "uv run python -m doit drawing:crank_arm, then uv run cad/scripts/"
+            "machinist_review.py crank_arm --reviewer codex --author-family claude",
+        ),
         (ml.State.DRIFT, "gpt-6-sol", "--reviewer claude --author-family gpt"),
         (ml.State.UNREVIEWED, None, "(its last commit names no model)"),
         (
@@ -1411,7 +1416,7 @@ def test_failing_check_lists_each_blocked_drawing_with_its_fix(
     ],
 )
 def test_fix_command(registry: Path, state, author, fix: str) -> None:
-    if isinstance(author, str) or author is None and state != ml.State.UNRENDERED:
+    if isinstance(author, str) or author is None:
         author = ml.Author(author, "c" * 40, "cad/scripts/draw_crank_arm.py")
     status = ml.Status("crank_arm", state, "", "", "-")
 
