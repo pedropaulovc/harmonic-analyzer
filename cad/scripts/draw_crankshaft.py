@@ -59,13 +59,18 @@ from crankshaft_spec import (
     PIN_HOLE_HEIGHT,
     PIN_HOLE_SPEC,
     REFERENCE_DIMENSIONS,
+    SHAFT_DIA,
     SHAFT_DOME_HEIGHT,
     SHAFT_LENGTH,
     SPHERICAL_DIMENSIONS,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from build_crankshaft import PINION_PIN_DIA, PINION_PIN_STATION_Y
+from build_crankshaft import (
+    PINION_PIN_CLOCKING_DEG,
+    PINION_PIN_DIA,
+    PINION_PIN_STATION_Y,
+)
 from crank_pinion_spec import CRANKSHAFT_PIN_HOLE_PROCESS
 from crankshaft_notes import CROSS_HOLE_CALLOUT, PINION_PIN_NOTE
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -171,14 +176,29 @@ FINISH_SYMBOL = (JOURNAL_START_X + 0.050, 0.203)
 # left of the Ø9.525 text and clear of the SR on the left.
 HOLE_CALLOUT_XY = (PIN_X + 0.054, 0.247)
 # The 16T retention-pin hole, 2.9 from the far end, clocked 13.7 deg off the
-# MHA-024 hole so it reads nearly round in this view.  Its note's top-left
-# corner sits in the free field above the far-end seat, right of the
-# Ø11.388 text and left of the isometric; the leader runs down-right to the
-# hole's upper rim without crossing a dimension.
+# MHA-024 hole.  The *Right view looks from +X and the hole is drilled from -X
+# (build_crankshaft's entry direction), so the visible rim is its exit on the
+# near side: projected, it is centred R sin(s) above the axis, and its top,
+# on the hole's transverse diameter, stands sqrt(R^2 - r^2) sin(s) + r cos(s)
+# above it (2.61 for the 1/8 hole in the 3/8 shaft).  The leader lands there.
+_PINION_CLOCK = math.radians(PINION_PIN_CLOCKING_DEG)
+PINION_PIN_RIM_TOP = math.sqrt(
+    (SHAFT_DIA / 2.0) ** 2 - (PINION_PIN_DIA / 2.0) ** 2
+) * math.sin(_PINION_CLOCK) + PINION_PIN_DIA / 2.0 * math.cos(_PINION_CLOCK)
 PINION_PIN_X = _sheet_x(PINION_PIN_STATION_Y)
-PINION_PIN_EDGE = (PINION_PIN_X, _sheet_y(PINION_PIN_DIA / 2.0))
+PINION_PIN_EDGE = (PINION_PIN_X, _sheet_y(PINION_PIN_RIM_TOP))
+# The note (2.5 mm text, anchored upper-left like every leadered note) sits in
+# the free field above the far-end seat, right of the Ø11.388 text and left of
+# the isometric; its leader runs down-right to the rim without crossing a
+# dimension.  Its read-back extent, leader included, must stay in this box.
 PINION_PIN_NOTE_XY = (0.290, 0.258)
 PINION_PIN_NOTE_HEIGHT = 0.0025
+PINION_PIN_NOTE_FIELD = (
+    DIAMETER_POSITIONS["JournalDiaDim"][0] + 0.010,
+    SIDE_CENTER[1],
+    ISO_CENTER[0] - 0.012,
+    0.2657,  # 1 mm inside the ASME B inner border
+)
 NOTES_XY = (0.016, 0.062)
 ISO_NOTE_XY = (0.368, 0.108)
 
@@ -448,7 +468,7 @@ async def build(adapter: Any) -> dict[str, str]:
         process=CROSS_HOLE_PROCESS,
     )
     _set_callout_below(cross_hole, CROSS_HOLE_CALLOUT, "tapered-pin cross-hole")
-    add_leader_note(
+    pinion_note = add_leader_note(
         adapter,
         PINION_PIN_NOTE,
         text_xy=PINION_PIN_NOTE_XY,
@@ -457,6 +477,18 @@ async def build(adapter: Any) -> dict[str, str]:
         view=side,
         height=PINION_PIN_NOTE_HEIGHT,
     )
+    drawing_model.GraphicsRedraw2()
+    extent = tuple(
+        float(value) for value in (_early_bound(pinion_note, "INote").GetExtent() or ())
+    )
+    _telemetry.info(f"16T retention-pin note extent {extent}")
+    x0, y0, x1, y1 = PINION_PIN_NOTE_FIELD
+    if len(extent) < 5 or not (
+        x0 <= extent[0] and y0 <= extent[1] and extent[3] <= x1 and extent[4] <= y1
+    ):
+        raise RuntimeError(
+            f"16T retention-pin note extent {extent} left its field {PINION_PIN_NOTE_FIELD}"
+        )
     add_surface_finish(
         adapter,
         side,

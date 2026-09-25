@@ -241,13 +241,23 @@ def test_pinion_pin_hole_is_printed_with_the_process_the_part_carries() -> None:
     assert notes.PINION_PIN_NOTE.split() == notes.CRANKSHAFT_PIN_HOLE_PROCESS.split()
     lines = notes.PINION_PIN_NOTE.split("\n")
     assert max(map(len, lines)) <= notes.PINION_PIN_NOTE_WIDTH
-    # The leader lands on the hole's upper rim, at the part's own station.
+    # The leader lands on the top of the near-side (exit) rim, at the part's
+    # own station: the rim projects centred R sin(s) above the axis.
     assert drawing.PINION_PIN_X == pytest.approx(
         drawing.DOME_ROOT_X + part.PINION_PIN_STATION_Y * drawing.SHEET_SCALE[0] / 1000.0
     )
+    radius, pin_r = spec.SHAFT_DIA / 2.0, part.PINION_PIN_DIA / 2.0
+    clock = math.radians(part.PINION_PIN_CLOCKING_DEG)
+    rim_centre = radius * math.sin(clock)
+    assert drawing.PINION_PIN_RIM_TOP == pytest.approx(2.605, abs=0.005)
+    assert rim_centre < drawing.PINION_PIN_RIM_TOP < rim_centre + pin_r
     assert drawing.PINION_PIN_EDGE[1] == pytest.approx(
-        drawing.SIDE_CENTER[1] + part.PINION_PIN_DIA * drawing.SHEET_SCALE[0] / 2000.0
+        drawing.SIDE_CENTER[1]
+        + drawing.PINION_PIN_RIM_TOP * drawing.SHEET_SCALE[0] / 1000.0
     )
+    note_x0, note_y0, note_x1, note_y1 = drawing.PINION_PIN_NOTE_FIELD
+    assert note_x0 <= drawing.PINION_PIN_NOTE_XY[0] and note_y0 <= drawing.PINION_PIN_EDGE[1]
+    assert drawing.PINION_PIN_EDGE[0] <= note_x1 and drawing.PINION_PIN_NOTE_XY[1] <= note_y1
     assert drawing.JOURNAL_END_X < drawing.PINION_PIN_X < drawing.FAR_END_X
     # The note's block (top-left anchored) stays right of the Ø11.388 text,
     # above the dimension row and left of the isometric view.
