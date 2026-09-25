@@ -1525,10 +1525,18 @@ def test_print_worst_containment_fails_loud_on_the_east_datum() -> None:
     )
     assert margin == pytest.approx(0.548, abs=1e-3)
     assert margin >= (
-        drive_train.TIP_CONTAINMENT_FLOOR_MM + drive_train.TIP_PRINT_WORST_MARGIN_MM
+        drive_train.PLATFORM_CONTAINMENT_FLOOR_MM + drive_train.TIP_PRINT_WORST_MARGIN_MM
     )
     assert drive_train.TIP_PRINT_WORST_CONTAINMENT_MM == pytest.approx(margin)
     source = Path(drive_train.__file__).read_text(encoding="utf-8")
+    # Main's rider: one floor, read by the nominal loop and the print-worst
+    # contract alike -- no bare literal beside the named one.
+    assert source.count("PLATFORM_CONTAINMENT_FLOOR_MM = ") == 1
+    assert "if _plat_half_width(_end) < _hx + PLATFORM_CONTAINMENT_FLOOR_MM:" in source
+    assert (
+        "if margin < PLATFORM_CONTAINMENT_FLOOR_MM + TIP_PRINT_WORST_MARGIN_MM" in source
+    )
+    assert "_hx + 0.25" not in source
     assert (
         "tip_block_print_worst_containment_mm(\n"
         "    tip_worst_half_widths_mm(TIP_PASSAGE_CENTER_DATUM)\n)"

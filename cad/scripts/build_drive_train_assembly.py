@@ -952,13 +952,15 @@ def _plat_half_width(s: float) -> float:
 
 # Both riders stand fully ON the plate (plan, in the platform's own inclined
 # frame: both are centred on the shaft-axis plan line, so only the along-axis
-# span and the half-width at each end matter).
+# span and the half-width at each end matter), each face at least
+# PLATFORM_CONTAINMENT_FLOOR_MM inside the plate's edge.
+PLATFORM_CONTAINMENT_FLOOR_MM = 0.25
 for _lbl, _s0, _hx, _hz in (
     ("pivot post", POST_STATION, POST_BLOCK_DIA / 2.0, POST_BLOCK_DIA / 2.0),
     ("tip block", TIP_BLOCK_STATION, TIP_BLOCK_X / 2.0, TIP_BLOCK_Z / 2.0),
 ):
     for _end in (_s0 - _hz, _s0 + _hz):
-        if _plat_half_width(_end) < _hx + 0.25:
+        if _plat_half_width(_end) < _hx + PLATFORM_CONTAINMENT_FLOOR_MM:
             raise AssertionError(
                 f"{_lbl} overhangs the swing platform at station {_end:g}"
             )
@@ -970,10 +972,10 @@ for _lbl, _s0, _hx, _hz in (
 # one face and the width's .X band lands on the other -- so each face is held
 # against its own plate edge, the block's +X (pinch-head) face against the
 # east edge and its -X face against the trimmed west one, with the nominal
-# contract's floor plus TIP_PRINT_WORST_MARGIN_MM, from the body's north face
+# contract's PLATFORM_CONTAINMENT_FLOOR_MM plus TIP_PRINT_WORST_MARGIN_MM,
+# from the body's north face
 # to the foot flange's south end (the flange is the block's full width, and
 # the plate's edges run straight between those stations).
-TIP_CONTAINMENT_FLOOR_MM = 0.25
 TIP_PRINT_WORST_MARGIN_MM = 0.25
 
 
@@ -999,10 +1001,10 @@ def tip_block_print_worst_containment_mm(half_widths: dict[str, float]) -> float
         for face in ("+X", "-X")
     ]
     margin = min(margins)
-    if margin < TIP_CONTAINMENT_FLOOR_MM + TIP_PRINT_WORST_MARGIN_MM - 1e-9:
+    if margin < PLATFORM_CONTAINMENT_FLOOR_MM + TIP_PRINT_WORST_MARGIN_MM - 1e-9:
         raise AssertionError(
             f"tip block can overhang the swing platform at its printed limits: "
-            f"{margin:.3f} left (< {TIP_CONTAINMENT_FLOOR_MM} + "
+            f"{margin:.3f} left (< {PLATFORM_CONTAINMENT_FLOOR_MM} + "
             f"{TIP_PRINT_WORST_MARGIN_MM})"
         )
     return margin
