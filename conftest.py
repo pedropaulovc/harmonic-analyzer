@@ -100,6 +100,7 @@ _COM_ACTIVATORS = {
     "win32com.client.dynamic": ("Dispatch", "DumbDispatch"),
     "win32com.client.gencache": ("EnsureDispatch",),
     "pythoncom": ("CoCreateInstance", "CoCreateInstanceEx"),
+    "comtypes": ("CoCreateInstance",),
     "comtypes.client": ("CreateObject", "CoGetObject"),
 }
 _LAUNCH_ENTRY_POINTS = {

@@ -91,6 +91,7 @@ def _require_refuser(module, attribute, name):
         ("win32com.client", "DispatchEx"),
         ("win32com.client.dynamic", "Dispatch"),
         ("win32com.client.gencache", "EnsureDispatch"),
+        ("comtypes.client", "CreateObject"),
     ],
 )
 def test_com_activation_of_solidworks_is_refused(
@@ -123,6 +124,14 @@ def test_com_activation_by_class_id_is_refused(solidworks_launch_refusals):
         lambda: pythoncom.CoCreateInstance(
             clsid, None, pythoncom.CLSCTX_LOCAL_SERVER, pythoncom.IID_IDispatch
         ),
+    )
+
+    import comtypes
+
+    _require_refuser(comtypes, "CoCreateInstance", "refuse_solidworks_activation")
+    _expect_blocked(
+        solidworks_launch_refusals,
+        lambda: comtypes.CoCreateInstance(comtypes.GUID(clsid)),
     )
 
 
