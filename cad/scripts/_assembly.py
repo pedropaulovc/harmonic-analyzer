@@ -1915,7 +1915,10 @@ def check_no_interference(
     intentional overlap volume permitted in mm^3.  This is for modeled
     interference fits whose nominal CAD solids genuinely overlap: both the
     pair identity and the measured volume must match, so a neighbouring clash
-    or an unexpectedly deep overlap remains a hard fault.
+    or an unexpectedly deep overlap remains a hard fault.  The volume is the
+    pair's TOTAL over every interference body SolidWorks reports for it: a
+    thread annulus comes back as a dozen slivers, each far under a limit the
+    sum can exceed (#853).
 
     Chain-internal contact (a pair of roller-chain links touching each other)
     is allowed and reported separately, not raised: a chain is an articulating
@@ -1936,6 +1939,8 @@ def check_no_interference(
             )
         details = []
         bounded_contacts = []
+        # frozenset(names) -> (names as first reported, [body volumes])
+        allowed_bodies: dict[frozenset[str], tuple[list[str], list[float]]] = {}
         chain_contacts = []
         chain_mesh_contacts = []
         for interference in list(interferences or []):
@@ -1948,13 +1953,8 @@ def check_no_interference(
                 configs.append(str(_read_member(comp, "ReferencedConfiguration") or ""))
             volume_mm3 = float(_read_member(interference, "Volume") or 0.0) * 1e9
             pair = frozenset(names)
-            allowed_volume = (allowed_pairs or {}).get(pair)
-            if (
-                len(names) == 2
-                and allowed_volume is not None
-                and volume_mm3 <= allowed_volume
-            ):
-                bounded_contacts.append((names, volume_mm3, allowed_volume))
+            if len(names) == 2 and pair in (allowed_pairs or {}):
+                allowed_bodies.setdefault(pair, (names, []))[1].append(volume_mm3)
                 continue
             if (
                 all(n.startswith(_CHAIN_LINK_PREFIXES) for n in names)
@@ -1986,6 +1986,23 @@ def check_no_interference(
             )
             details.append(f"{' & '.join(names)}: {volume_mm3:.9g} mm^3")
         adapter._attempt(lambda: mgr.Done(), default=None)
+        for pair, (names, bodies) in allowed_bodies.items():
+            total_mm3 = sum(bodies)
+            allowed_volume = allowed_pairs[pair]
+            if total_mm3 <= allowed_volume:
+                bounded_contacts.append((names, total_mm3, len(bodies), allowed_volume))
+                continue
+            _telemetry.event(
+                "interference.unexpected",
+                components=names,
+                volume_mm3=total_mm3,
+                body_count=len(bodies),
+                limit_mm3=allowed_volume,
+            )
+            details.append(
+                f"{' & '.join(names)}: {total_mm3:.9g} mm^3 over {len(bodies)} "
+                f"bodies (limit {allowed_volume:.9g} mm^3)"
+            )
         isp.set_attribute("hits", len(details))
         isp.set_attribute("bounded_contacts", len(bounded_contacts))
         isp.set_attribute("chain_contacts", len(chain_contacts))
@@ -2001,10 +2018,21 @@ def check_no_interference(
                 f" (<= {max(chain_mesh_contacts):.2f} mm^3) allowed -- chain seated"
                 f" on the pitch circle"
             )
-        for names, volume_mm3, allowed_volume in bounded_contacts:
-            _telemetry.debug(
+        # Info, not debug, and a span event: a farm leaf keeps only its
+        # info-level task.log, and a bounded limit is calibrated from these
+        # readings.
+        for names, volume_mm3, body_count, allowed_volume in bounded_contacts:
+            _telemetry.event(
+                "interference.bounded_pair",
+                pair=names,
+                overlap_mm3=volume_mm3,
+                body_count=body_count,
+                limit_mm3=allowed_volume,
+            )
+            _telemetry.info(
                 f"{' <-> '.join(names)} intentional fit overlap "
-                f"{volume_mm3:.2f} mm^3 allowed (limit {allowed_volume:.2f} mm^3)"
+                f"{volume_mm3:.4f} mm^3 over {body_count} bodies allowed "
+                f"(limit {allowed_volume:.4f} mm^3)"
             )
         if details:
             raise RuntimeError(f"{len(details)} interference(s): " + "; ".join(details))
