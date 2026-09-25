@@ -1018,7 +1018,10 @@ if (
 # foot rests on it across the whole face.
 if abs(TIP_SHIM_T - TIP_SHIM_NOMINAL) > 1e-9:
     raise AssertionError("MHA-141 shim thickness differs from the block's nominal pack")
-if (TIP_SHIM_X, TIP_SHIM_Z) != (TIP_BLOCK_X, TIP_BLOCK_Z):
+if (
+    abs(TIP_SHIM_X - TIP_BLOCK_X) > 1e-9
+    or abs(TIP_SHIM_Z - TIP_BLOCK_Z) > 1e-9
+):
     raise AssertionError("MHA-141 shim footprint differs from the tip block foot")
 # U30 hold-down (I21): MHA-140 rises from the counterbore ledge (the
 # counterbore is cut TIP_CBORE_DEPTH up from the plate underside) through the
