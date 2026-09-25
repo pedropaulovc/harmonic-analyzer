@@ -33,12 +33,15 @@ local SolidWorks; only the Blender-bound ``gallery`` task and the publishing hal
 of ``release`` run here.
 
 Under the farm a doit worker spends a leaf WAITING on the pool, so ``run`` gets
-doit's thread runner and ``HARMONIC_FARM_PARALLELISM`` (16) workers: a thread
+doit's thread runner and ``HARMONIC_FARM_PARALLELISM`` (64) workers: a thread
 costs next to nothing, where each process worker costs ~60 MB and a ~1 s import,
 and doit spawns all of them up front. The SolidWorks-free local tasks those
 workers also run stay bounded by the machine-wide local slots (``dodo._run``),
 not by ``-n``, and the ready leaves are offered slowest-first
 (``_farm_order``), so the critical path reaches the pool's queue first.
+Every leaf of one run carries that run's task-queue fairness key
+(``HARMONIC_FARM_RUN``), so the pool serves concurrent runs round-robin and a
+run's whole ready set in the queue cannot starve another run's few leaves.
 """
 
 from __future__ import annotations
@@ -49,9 +52,11 @@ import functools
 import getopt
 import json
 import os
+import socket
 import subprocess
 import sys
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
 from doit.cmd_base import get_loader
@@ -62,7 +67,7 @@ from doit.doit_cmd import DoitMain
 REPO_ROOT = Path(__file__).resolve().parent
 _LEVELS = ("debug", "info", "success", "warning", "error", "critical")
 _EXECUTORS = ("local", "farm")
-_DEFAULT_FARM_PARALLELISM = "16"
+_DEFAULT_FARM_PARALLELISM = "64"
 
 # doit hands the leading task-loader options to ``getopt`` before it reads the
 # subcommand (``DoitMain.run``); the wrapper's ``-h``/``--help`` ride along so a
@@ -159,10 +164,17 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     doit = _FarmDoitMain() if options.executor == "farm" else DoitMain()
     if options.executor == "farm":
+        os.environ.setdefault("HARMONIC_FARM_RUN", _run_identity())
         executing = _executing_command(doit_args, doit)
         if executing is not None:
             doit_args = _with_farm_parallelism(doit_args, *executing)
     return doit.run(doit_args)
+
+
+def _run_identity() -> str:
+    """One farm run's fairness key when no launcher named it (``_farm.fairness_key``)."""
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    return f"{socket.gethostname()}/{REPO_ROOT.name}/{os.getpid()}/{stamp}"
 
 
 def _isolated_tasks(task_list):
@@ -600,7 +612,7 @@ def _executing_command(doit_args: list[str], doit: DoitMain) -> tuple[str, int] 
 
 
 def _with_farm_parallelism(doit_args: list[str], command: str, at: int) -> list[str]:
-    """Keep up to ``HARMONIC_FARM_PARALLELISM`` (16) leaves in flight on the farm,
+    """Keep up to ``HARMONIC_FARM_PARALLELISM`` (64) leaves in flight on the farm,
     on doit's thread runner.
 
     Only ``run`` takes ``-n``/``-P``, at ``at`` (see ``_executing_command``).

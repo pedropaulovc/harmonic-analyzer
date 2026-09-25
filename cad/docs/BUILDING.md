@@ -106,7 +106,7 @@ so it also serializes COM across worktrees on the seat. Outputs land in
 The same lock is what bounds a farm worker: it serializes that worker's own COM
 session, not the fleet. Different workers hold different seats and run different
 leaves at the same time, which is why a farm submitter keeps several leaves in
-flight. Run `build.py --executor farm` yourself and it adds `-P thread -n 16`
+flight. Run `build.py --executor farm` yourself and it adds `-P thread -n 64`
 (`HARMONIC_FARM_PARALLELISM`) unless you pass `-n`/`--process` or
 `-P`/`--parallel-type`; the supervised launcher exports the same variable and
 records the value in its run record. A farm leaf only waits on the pool, so its

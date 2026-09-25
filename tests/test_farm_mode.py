@@ -590,7 +590,7 @@ def test_successful_preflight_stamps_only_committed_head_without_mutating_refs(
 
     assert build.main(["--executor", "farm", "assembly:x"]) == 0
 
-    assert seen == [["-P", "thread", "-n", "16", "assembly:x"]]
+    assert seen == [["-P", "thread", "-n", "64", "assembly:x"]]
     assert executed == [
         {
             "HARMONIC_FARM_COMMIT": SHA,
@@ -1168,8 +1168,8 @@ def test_farm_command_wrappers_preserve_native_execute_signatures():
 @pytest.mark.parametrize(
     ("given", "expected", "runs"),
     [
-        (["assembly:x"], ["-P", "thread", "-n", "16", "assembly:x"], True),
-        (["run", "assembly:x"], ["run", "-P", "thread", "-n", "16", "assembly:x"], True),
+        (["assembly:x"], ["-P", "thread", "-n", "64", "assembly:x"], True),
+        (["run", "assembly:x"], ["run", "-P", "thread", "-n", "64", "assembly:x"], True),
         # a caller's -n wins, but a farm leaf still waits on a thread
         (["-n", "2", "assembly:x"], ["-P", "thread", "-n", "2", "assembly:x"], True),
         (["run", "-n", "2", "x"], ["run", "-P", "thread", "-n", "2", "x"], True),
@@ -1179,36 +1179,36 @@ def test_farm_command_wrappers_preserve_native_execute_signatures():
             True,
         ),
         # ...and a caller's parallel type wins too
-        (["-P", "process", "x"], ["-n", "16", "-P", "process", "x"], True),
+        (["-P", "process", "x"], ["-n", "64", "-P", "process", "x"], True),
         (
             ["run", "--parallel-type=process", "-n", "3", "x"],
             ["run", "--parallel-type=process", "-n", "3", "x"],
             True,
         ),
         (["list"], ["list"], False),
-        ([], ["-P", "thread", "-n", "16"], True),
+        ([], ["-P", "thread", "-n", "64"], True),
         (["--help"], ["--help"], False),
         (["-h"], ["-h"], False),
         (["--version"], ["--version"], False),
         (["-f", "dodo.py", "list"], ["-f", "dodo.py", "list"], False),
-        (["-f", "dodo.py", "part:x"], ["-f", "dodo.py", "-P", "thread", "-n", "16", "part:x"], True),
-        (["-fdodo.py", "run", "part:x"], ["-fdodo.py", "run", "-P", "thread", "-n", "16", "part:x"], True),
+        (["-f", "dodo.py", "part:x"], ["-f", "dodo.py", "-P", "thread", "-n", "64", "part:x"], True),
+        (["-fdodo.py", "run", "part:x"], ["-fdodo.py", "run", "-P", "thread", "-n", "64", "part:x"], True),
         (["--file=dodo.py", "-k", "--help"], ["--file=dodo.py", "-k", "--help"], False),
         (["-d", ".", "clean"], ["-d", ".", "clean"], False),
         # doit's loader options are getopt: grouped shorts, unique long prefixes
         (["-kf", "dodo.py", "-h"], ["-kf", "dodo.py", "-h"], False),
-        (["-kf", "dodo.py", "part:x"], ["-kf", "dodo.py", "-P", "thread", "-n", "16", "part:x"], True),
+        (["-kf", "dodo.py", "part:x"], ["-kf", "dodo.py", "-P", "thread", "-n", "64", "part:x"], True),
         (["--fi=dodo.py", "list"], ["--fi=dodo.py", "list"], False),
         # a loader parse error hands the whole argv to run, as doit does
-        (["-f", "dodo.py", "-a", "x"], ["-P", "thread", "-n", "16", "-f", "dodo.py", "-a", "x"], True),
+        (["-f", "dodo.py", "-a", "x"], ["-P", "thread", "-n", "64", "-f", "dodo.py", "-a", "x"], True),
         # ``name=value`` command-line variables are dropped before the subcommand
         (["profile=ci", "list"], ["profile=ci", "list"], False),
-        (["profile=ci", "run", "x"], ["profile=ci", "run", "-P", "thread", "-n", "16", "x"], True),
-        (["profile=ci", "part:x"], ["-P", "thread", "-n", "16", "profile=ci", "part:x"], True),
+        (["profile=ci", "run", "x"], ["profile=ci", "run", "-P", "thread", "-n", "64", "x"], True),
+        (["profile=ci", "part:x"], ["-P", "thread", "-n", "64", "profile=ci", "part:x"], True),
         (["profile=ci", "-h"], ["profile=ci", "-h"], False),
         # a ``--`` the loader getopt swallowed still has to follow ``-n``
-        (["--", "part:x"], ["-P", "thread", "-n", "16", "--", "part:x"], True),
-        (["-f", "--", "x"], ["-f", "--", "-P", "thread", "-n", "16", "x"], True),
+        (["--", "part:x"], ["-P", "thread", "-n", "64", "--", "part:x"], True),
+        (["-f", "--", "x"], ["-f", "--", "-P", "thread", "-n", "64", "x"], True),
         # doit has no per-command help: its parser rejects these and exits 3
         # before any task, so no preflight and the argv passes untouched
         (["run", "--help"], ["run", "--help"], False),
@@ -1220,8 +1220,8 @@ def test_farm_command_wrappers_preserve_native_execute_signatures():
         # value (``-r --help`` is an unknown reporter; ``-o --help`` a file
         # name) or a task name after ``--``
         (["run", "-r", "--help", "x"], ["run", "-r", "--help", "x"], False),
-        (["run", "-o", "--help", "x"], ["run", "-P", "thread", "-n", "16", "-o", "--help", "x"], True),
-        (["run", "--", "--help"], ["run", "-P", "thread", "-n", "16", "--", "--help"], True),
+        (["run", "-o", "--help", "x"], ["run", "-P", "thread", "-n", "64", "-o", "--help", "x"], True),
+        (["run", "--", "--help"], ["run", "-P", "thread", "-n", "64", "--", "--help"], True),
     ],
 )
 def test_farm_runs_fan_out_unless_the_caller_chose(given, expected, runs, monkeypatch):
@@ -1257,7 +1257,7 @@ def test_every_task_executing_command_gets_the_preflight_and_only_run_fans_out(
     assert seen == [
         ["strace", "part:x"],
         ["list"],
-        ["run", "-P", "thread", "-n", "16", "part:x"],
+        ["run", "-P", "thread", "-n", "64", "part:x"],
     ]
 
 
@@ -1485,11 +1485,14 @@ def test_workflow_id_is_logged_before_acceptance_and_attachment_before_wait(
     assert cancellations == []
 
 
-def test_run_leaf_starts_the_shared_workflow_with_the_contract(temporal_boundary):
+def test_run_leaf_starts_the_shared_workflow_with_the_contract(
+    temporal_boundary, monkeypatch
+):
     from temporalio.common import WorkflowIDConflictPolicy
 
     calls, resolve = temporal_boundary
     resolve(_leaf_result(worker_id="sw-02@7", attempt=2))
+    monkeypatch.setenv("HARMONIC_FARM_RUN", "amet/wt-x/42/20260925T180000Z")
 
     result = _farm.run_leaf("part:pen_rod", "k" * 64)
 
@@ -1521,6 +1524,20 @@ def test_run_leaf_starts_the_shared_workflow_with_the_contract(temporal_boundary
     assert options["id_conflict_policy"] is WorkflowIDConflictPolicy.USE_EXISTING
     assert options["execution_timeout"] == timedelta(hours=8)
     assert options["result_type"] is _farm.LeafResult
+    # the run is the pool's fairness key; BuildLeaf's activity inherits it
+    assert options["priority"].fairness_key == "amet/wt-x/42/20260925T180000Z"
+    assert options["priority"].priority_key is None
+
+
+def test_a_process_outside_any_run_is_fair_by_submitter(temporal_boundary, monkeypatch):
+    calls, resolve = temporal_boundary
+    resolve(_leaf_result())
+    monkeypatch.delenv("HARMONIC_FARM_RUN", raising=False)
+
+    _farm.run_leaf("part:pen_rod", "k" * 64)
+
+    [(_, _, options)] = calls["start"]
+    assert options["priority"].fairness_key == _farm.submitter()
 
 
 def test_a_keyless_leaf_uses_the_commit_in_its_workflow_identity(temporal_boundary):

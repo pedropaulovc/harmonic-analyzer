@@ -79,12 +79,15 @@ uv run --frozen python build.py --executor farm --leaf-timeout <minutes> \
 leaves in flight, each waiting on the pool from a thread of one process. The
 launcher resolves N from `-Parallelism`, else an inherited
 `HARMONIC_FARM_PARALLELISM`, else the `_DEFAULT_FARM_PARALLELISM` the worktree's
-own `build.py` declares (16), exports it, and records it as `farm_parallelism`,
+own `build.py` declares (64), exports it, and records it as `farm_parallelism`,
 so the run record states the fan-out the build really used. The local
 SolidWorks-free tasks of the same run (`check:*`, `gallery`) do not scale with
 N: they share the machine-wide local slots (`HARMONIC_LOCAL_SLOTS`, 4). Ready
 leaves are submitted slowest-first by the machine's duration ledger
-(`cad/scripts/_farm_order.py`). `--continue` collects later failures instead of
+(`cad/scripts/_farm_order.py`). The launcher also exports its run id as
+`HARMONIC_FARM_RUN`, the run's task-queue fairness key: with fairness on the
+pool's COM queue, concurrent runs are served round-robin, so one run's whole
+ready set does not bury another run's leaves. `--continue` collects later failures instead of
 stopping at the first; any failed task still leaves the run nonzero.
 
 ### Starting one under the supervisor
@@ -148,7 +151,7 @@ farm-launch started 20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516 C:\src\
     "HARMONIC_CACHE_SALT": null
   },
   "tag": "smoke",
-  "farm_parallelism": 16,
+  "farm_parallelism": 64,
   "argv": ["uv", "run", "--frozen", "python", "build.py", "--executor", "farm",
            "--leaf-timeout", "90", "--verbosity", "info",
            "--continue", "part:pen_rod"]

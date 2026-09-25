@@ -77,6 +77,7 @@ Path(os.environ["UV_STUB_INVOCATION"]).write_text(
                 "HARMONIC_REMOTE_CACHE_MODE": os.environ.get("HARMONIC_REMOTE_CACHE_MODE"),
                 "PYTHONUNBUFFERED": os.environ.get("PYTHONUNBUFFERED"),
                 "HARMONIC_FARM_PARALLELISM": os.environ.get("HARMONIC_FARM_PARALLELISM"),
+                "HARMONIC_FARM_RUN": os.environ.get("HARMONIC_FARM_RUN"),
             },
         }
     ),
@@ -356,6 +357,8 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
         "HARMONIC_REMOTE_CACHE_MODE": "rw",
         "PYTHONUNBUFFERED": "1",
         "HARMONIC_FARM_PARALLELISM": "16",
+        # the run id is the run's fairness key on the pool
+        "HARMONIC_FARM_RUN": running["run_id"],
     }
     launch_log = Path(finished["log"]).read_text(encoding="utf-8")
     assert "uv-stdout" in launch_log
