@@ -49,3 +49,11 @@ R_END = WIDTH / 2.0
 HALF_WIDTH = R_END
 OVERALL_LENGTH = C2C + 2.0 * R_END
 
+# Printed places of the dimensions whose bands the E-a cross-hole webs read
+# (pinion_strap_pin_spec).  pinion_bracket_spec.DRAWING_PRECISION states them
+# natively from these, so a precision change reaches the web gates by itself
+# (restricted review, ruling 3).
+END_RADIUS_PLACES = 1  # BottomCapRadius / TopCapRadius
+CROSS_HOLE_CZ_PLACES = 2  # CrossHoleCz, from broad face A
+CROSS_HOLE_FROM_BORE_WALL_PLACES = 2  # CrossHoleFromBoreWall
+
