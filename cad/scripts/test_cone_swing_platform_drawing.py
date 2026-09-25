@@ -1905,3 +1905,18 @@ def test_no_diameter_leader_on_the_notch_plan_clears_the_cap_witnesses() -> None
         assert math.dist(start, cap) < radius
         assert worst[name] == pytest.approx(math.dist(start, cap), abs=2e-5)
         assert worst[name] < 0.0011 < drawing.LEADER_INK_CLEARANCE
+
+
+class _GeneratedArrowStyleWrapper:
+    """GetArrowHeadStyle2 as the generated sldworks wrapper declares it: two
+    by-reference in/out ints; a call without them is what the seat refused
+    with 'Type mismatch.' in tipslot-r5-e7d8."""
+
+    def GetArrowHeadStyle2(self, *args: object) -> tuple[bool, int, int]:
+        if len(args) != 2 or not all(isinstance(value, int) for value in args):
+            raise TypeError("Type mismatch.")
+        return True, 1, 1
+
+
+def test_arrowhead_styles_seeds_both_by_reference_ints() -> None:
+    assert drawing.arrowhead_styles(_GeneratedArrowStyleWrapper()) == (1, 1)

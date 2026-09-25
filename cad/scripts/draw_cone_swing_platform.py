@@ -1095,6 +1095,19 @@ def _pin_tip_slot_z_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"TipSlotZ still draws ink left of its line: {shoulder}")
 
 
+def arrowhead_styles(display: Any) -> tuple[int, int]:
+    """A display dimension's two arrowhead styles (swArrowStyle_e).
+
+    Both are by-reference in/out ints, so the late-bound call takes seeds
+    and returns (ok, style1, style2) -- GetWitnessLineGap's shape.  Unseeded,
+    the generated wrapper passes missing arguments and the seat answers
+    'Type mismatch.' (tipslot-r5-e7d8, swmaker000006)."""
+    ok, first, second = display.GetArrowHeadStyle2(0, 0)
+    if ok is not True:
+        raise RuntimeError("arrowhead styles could not be read")
+    return int(first), int(second)
+
+
 def _pin_cap_dia_far_arrow(adapter: Any, annotations: list[Any]) -> None:
     """Put the Ø8.00's arrow on the drawn arc and audit its ink on the seat.
 
@@ -1116,7 +1129,7 @@ def _pin_cap_dia_far_arrow(adapter: Any, annotations: list[Any]) -> None:
         bool(display.GetUseDocSecondArrow()),
         bool(display.GetSecondArrow()),
     )
-    styles = display.GetArrowHeadStyle2()
+    styles = arrowhead_styles(display)
     position = tuple(float(v) for v in annotation.GetPosition())[:2]
     strokes = _notch_strokes(annotation)
     data = _display_data(annotation)
