@@ -29,8 +29,11 @@ import math
 
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SurfaceFinishControl
+from crank_handle_pivot_screw_spec import FULL_THREAD_WORST_DIAMETERS_PRINTED
 from crank_hub_geometry import (
     ARM_FIDUCIAL_RADIUS,
+    ARM_STOCK_THICKNESS,
+    ARM_STOCK_THICKNESS_IN,
     ARM_THICKNESS,
     ARM_WIDTH,
     AXIAL_PIN_DIA,
@@ -40,6 +43,7 @@ from crank_hub_geometry import (
     FIDUCIAL_MODEL_DIA,
     GENERAL_1PL_TOL_MM,
     HUB_SEAT_DIA,
+    MM_PER_IN,
     WALL_TARGET_MM,
 )
 
@@ -47,6 +51,12 @@ from crank_hub_geometry import (
 # --- Nominal geometry -------------------------------------------------------
 ARM_C2C = 75.0
 SQUARE_END_OVERHANG = 10.0
+# The bar is left at its as-supplied thickness, so that stock must read as the
+# printed 8.0 inside the title block's .X band.
+if abs(ARM_STOCK_THICKNESS - ARM_THICKNESS) > GENERAL_1PL_TOL_MM:
+    raise AssertionError(
+        f"arm stock {ARM_STOCK_THICKNESS:.3f} is outside the printed {ARM_THICKNESS:.1f}'s .X band"
+    )
 # U33: the MHA-139 slotted shoulder screw threads through the arm and carries
 # the handle.  Its tapped web to the square end is judged at the .X worst case
 # of both stations (U27).
@@ -148,11 +158,23 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
 # Policy rule 6: at most four short lines, each under ~75 characters so the
 # block stays left of the title block.  The section line is a requirement,
 # not a convenience: the U29 cheek around the hub seat reaches 2 mm only at
-# the mill's width tolerance, not at the .X band.
+# the mill's width tolerance, not at the .X band.  The third line states the
+# MHA-139 named exception on the sheet that is tapped for it (user ruling
+# 2026-09-25, MHA-020 review B2), with the worst case the screw spec derives
+# from the stock thickness -- the same line and number MHA-139 prints.
+STOCK_NOTE = (
+    f"{ARM_WIDTH:.1f} x {ARM_THICKNESS:.1f} SECTION: "
+    f"{ARM_WIDTH / MM_PER_IN:g} x {ARM_STOCK_THICKNESS_IN} IN CF FLAT BAR AS SUPPLIED."
+)
+PIVOT_ENGAGEMENT_EXCEPTION = (
+    f"{HANDLE_PIVOT_HOLE_SPEC.size} THREAD ENGAGEMENT "
+    f"{FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D MIN: NAMED EXCEPTION TO RULE 12."
+)
 DRAWING_NOTES = "\n".join(
     (
         "PUNCH FIDUCIAL MARK WHERE SHOWN; LOCATE BY EYE.",
-        "25.4 x 8.0 SECTION: 1 x 5/16 IN CF FLAT BAR AS SUPPLIED.",
+        STOCK_NOTE,
+        PIVOT_ENGAGEMENT_EXCEPTION,
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

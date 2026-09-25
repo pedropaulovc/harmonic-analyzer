@@ -396,3 +396,22 @@ def test_assembly_seats_the_shoulder_on_the_arm_and_bounds_the_tip() -> None:
     assert assembly.HANDLE_SCREW_TIP_Z_MAX - stock_inboard_face == pytest.approx(
         spec.PROUD_INBOARD_MAX
     )
+
+
+def test_quarter_inch_arm_stock_fails_the_full_strength_floor(monkeypatch) -> None:
+    # User ruling 2026-09-25: the exception holds only while a steel screw in
+    # the steel arm keeps >= 1D of full thread.  1/4-in bar would leave
+    # min(8.0, 6.35 - 0.25) - 2.01 = 4.09, 0.85D.
+    import importlib
+    from fractions import Fraction
+
+    assert spec.FULL_STRENGTH_ENGAGEMENT_D == 1.0
+    monkeypatch.setattr(geometry, "ARM_STOCK_THICKNESS_IN", Fraction(1, 4))
+    monkeypatch.setattr(geometry, "ARM_STOCK_THICKNESS", 0.25 * 25.4)
+    try:
+        with pytest.raises(AssertionError, match="under 1D"):
+            importlib.reload(spec)
+    finally:
+        monkeypatch.undo()
+        importlib.reload(spec)
+    assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)

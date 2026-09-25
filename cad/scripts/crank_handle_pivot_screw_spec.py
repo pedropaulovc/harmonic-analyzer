@@ -31,6 +31,7 @@ from crank_handle_spec import (
     PIVOT_BORE_DIA,
 )
 from crank_hub_geometry import (
+    ARM_STOCK_THICKNESS,
     ARM_THICKNESS,
     EDGE_BREAK_MAX_MM,
     GENERAL_1PL_TOL_MM,
@@ -144,9 +145,9 @@ DIAMETRAL_CLEARANCE_MAX = round(HANDLE_BORE_MAX - SHOULDER_DIA_MIN, 6)
 # MHA-020 arm; exception to the 1.5D rule.
 ENGAGEMENT_EXCEPTION_FLOOR_D = 1.15
 ENGAGEMENT_FLOOR = ENGAGEMENT_EXCEPTION_FLOOR_D * THREAD_MODEL_DIA
-# The arm is 5/16-in cold-finished flat bar left at stock thickness; its
-# printed 8.0 carries the .X title-block band.
-ARM_STOCK_THICKNESS = 0.3125 * MM_PER_IN
+# The arm is 5/16-in cold-finished flat bar left at stock thickness
+# (crank_hub_geometry.ARM_STOCK_THICKNESS); its printed 8.0 carries the .X
+# title-block band.
 ARM_PRINTED_THICKNESS_MAX = ARM_THICKNESS + GENERAL_1PL_TOL_MM
 # The relief width prints at .XX (Main, on the rule-12 audit note): at .X its
 # +0.8 alone took the stock-arm case under the U33b floor once the tapped
@@ -216,7 +217,17 @@ NECK_AREA = math.pi / 4.0 * RELIEF_DIA**2
 TENSILE_STRESS_AREA = 0.0175 * MM_PER_IN**2
 NECK_TO_STRESS_AREA = NECK_AREA / TENSILE_STRESS_AREA
 
+# User ruling 2026-09-25 (MHA-020 review B2): the exception stands because a
+# steel screw in a steel tap develops full strength at about 1D of full
+# thread.  Below 1D that reason is gone, whatever the U33b floor says.
+FULL_STRENGTH_ENGAGEMENT_D = 1.0
 for _ok, _what in (
+    (
+        min(FULL_THREAD_WORST, FULL_THREAD_WORST_PRINTED_ARM)
+        >= FULL_STRENGTH_ENGAGEMENT_D * THREAD_MODEL_DIA,
+        "worst-case engagement is under 1D: the steel-in-steel full-strength "
+        "reason for the named exception no longer holds",
+    ),
     (END_PLAY_MIN > 0.0, "handle is clamped: no end play at worst case"),
     (END_PLAY_MAX <= 1.0, "handle end play exceeds 1.0 at worst case"),
     (DIAMETRAL_CLEARANCE_MIN > 0.0, "shoulder can bind in the oak bore"),

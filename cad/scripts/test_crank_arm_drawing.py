@@ -287,3 +287,17 @@ def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
     assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
     assert "    curate_view_dimensions,\n" not in source.replace("\r\n", "\n")
     assert "StationReference" in spec.DRAWING_DIMENSIONS
+
+
+def test_arm_states_the_mha139_engagement_exception_it_is_tapped_for() -> None:
+    # User ruling 2026-09-25 (MHA-020 review B2): the tapped arm states the
+    # named exception with the same worst case the MHA-139 sheet prints.
+    import crank_handle_pivot_screw_spec as screw
+
+    assert spec.DRAWING_NOTES.splitlines()[-1] == screw.DRAWING_NOTES.replace(
+        "THREAD ENGAGEMENT", "#10-24 THREAD ENGAGEMENT"
+    )
+    assert "1.17D MIN: NAMED EXCEPTION TO RULE 12." in spec.DRAWING_NOTES
+    # The stock line comes from the one stock constant.
+    assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
+    assert spec.STOCK_NOTE == "25.4 x 8.0 SECTION: 1 x 5/16 IN CF FLAT BAR AS SUPPLIED."
