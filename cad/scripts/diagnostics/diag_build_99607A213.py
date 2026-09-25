@@ -32,9 +32,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import _seat_forensics  # noqa: E402
 import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
-    capture_com_failure,
     check,
     name_last_feature,
     volume_check,
@@ -278,7 +278,7 @@ async def build_99607A213(adapter, truth=None):
         True, False, True,               # Merge -> re-unites the bodies
         0, 0.0, False)
     if feat is None:
-        capture_com_failure(
+        _seat_forensics.capture_com_failure(
             adapter,
             "runout-extrude",
             "runout extrude failed",
@@ -351,7 +351,7 @@ async def build_99607A213(adapter, truth=None):
         if feat is not None:
             break
     if feat is None:
-        capture_com_failure(
+        _seat_forensics.capture_com_failure(
             adapter,
             "knurl-stripe-cut",
             "knurl stripe cut failed (all flag combos)",
