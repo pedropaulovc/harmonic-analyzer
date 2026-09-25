@@ -624,7 +624,7 @@ sections:
         - 'McMaster-Carr 90280A199 recipe (`cad/scripts/diagnostics/diag_mcmaster_fillister.py`); embed and receiver depths from `cad/scripts/build_swing_stop_screw.py` and `cad/scripts/build_harmonic_base.py`; user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry'
         - high (stock dimensions exact; function and placement derived)
       - - '`cone-tip-bushing` (T006 spacer on the tip stub)'
-        - brass sleeve Ø6 × 4, Ø0.79 (1/32") bore
+        - brass sleeve Ø6 × 4, Ø1.588 (1/16") bore
         - 'on the shaft''s tip stub at stations 129.2723..133.2723, directly north of T006 and 2 mm south of the tip block — the axial spacer the adjuster loads the shaft stack against'
         - v4_t00471 / 7:49 (brass collar between the smallest gear and the tip block)
         - med (role high, dims low)
