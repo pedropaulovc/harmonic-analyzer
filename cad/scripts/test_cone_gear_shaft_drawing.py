@@ -105,21 +105,14 @@ def _gear_faces() -> list[tuple[float, float]]:
     """Every cone gear's (south, north) face, in the shaft's station frame.
 
     The 6.0 gears sit on the historical 6.5 reference stations narrowed from
-    the SOUTH face only, so each centre is the reference station plus
-    (reference - face)/2 -- build_drive_train_assembly's seed placement.
+    the SOUTH face only; ``cone_gear_shaft_spec.gear_faces`` carries that
+    shift in the pivot-end frame, and test_gear_face_model_follows_the_drive_train
+    pins it to build_drive_train_assembly's seed placement.
     """
-    seat0 = (
-        cone_gear_shaft_spec.FRONT_STUB
-        + cone_pivot_post_installation.GEAR_AXIS_SHIFT
-        + drive.SHAFT_T120_STATION
-        + (drive.CONE_FACE_STATION_REFERENCE - drive.CONE_FACE) / 2.0
-    )
+    stub = cone_gear_shaft_spec.FRONT_STUB
     return [
-        (
-            seat0 + j * drive.SEAT_PITCH - drive.CONE_FACE / 2.0,
-            seat0 + j * drive.SEAT_PITCH + drive.CONE_FACE / 2.0,
-        )
-        for j in range(20)
+        (stub + south, stub + north)
+        for south, north in map(cone_gear_shaft_spec.gear_faces, range(20))
     ]
 
 
@@ -159,20 +152,46 @@ def test_gear_seat_shoulders_are_held_inside_the_air_gap() -> None:
     assert cone_gear_shaft_spec.SECTION_ENDS[4] > _gear_faces()[19][1]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "#839 moves Sec1End..Sec3End to the derived gap midpoints (Main, "
-        "2026-09-25) and removes this marker in that commit: with the 6.0 "
-        "gears narrowed from the south the steps sit 0.18 off the inboard "
-        "face, so the .XX band no longer reaches the outboard gear"
-    ),
-)
 def test_two_place_shoulders_would_leave_the_air_gap() -> None:
     """Why Sec1End..Sec3End print three places: the .XX band would not hold."""
     grade2 = _config.title_block("linear_2pl")["value_in"] * 25.4
-    for name, station, _north_of_inboard, south_of_outboard, _held in _shoulder_gaps():
+    for name, station, north_of_inboard, south_of_outboard, _held in _shoulder_gaps():
+        assert station - grade2 < north_of_inboard, name
         assert station + grade2 > south_of_outboard, name
+
+
+def test_gear_face_model_follows_the_drive_train() -> None:
+    """The spec's duplicated seat pitch and reference face are the assembly's."""
+    spec = cone_gear_shaft_spec
+    assert spec.CONE_SEAT_PITCH == pytest.approx(drive.SEAT_PITCH, abs=1e-12)
+    assert spec.CONE_FACE_STATION_REFERENCE == drive.CONE_FACE_STATION_REFERENCE
+    assert spec.CONE_GEAR_FACE_WIDTH == drive.CONE_FACE
+    for j in range(20):
+        # BDT's seed: seat station plus half the south-side narrowing.
+        centre = (
+            drive.SHAFT_T120_STATION
+            + cone_pivot_post_installation.GEAR_AXIS_SHIFT
+            + (drive.CONE_FACE_STATION_REFERENCE - drive.CONE_FACE) / 2.0
+            + j * drive.SEAT_PITCH
+        )
+        south, north = spec.gear_faces(j)
+        assert (south + north) / 2.0 == pytest.approx(centre, abs=1e-9)
+        assert north - south == pytest.approx(drive.CONE_FACE)
+
+
+def test_gear_seat_steps_are_centred_with_band_plus_quarter_air() -> None:
+    """Main, 2026-09-25: each step sits mid-gap, >= .XXX band + 0.25 from both faces."""
+    spec = cone_gear_shaft_spec
+    band = _config.title_block("linear_3pl")["value_in"] * 25.4
+    for name, j, end in zip(
+        ("Sec1End", "Sec2End", "Sec3End"), (15, 16, 17), spec.SECTION_ENDS[1:4]
+    ):
+        station = end - spec.FRONT_STUB
+        inboard_north = spec.gear_faces(j)[1]
+        outboard_south = spec.gear_faces(j + 1)[0]
+        assert station - inboard_north == pytest.approx(outboard_south - station), name
+        assert station - inboard_north >= band + 0.25, name
+        assert outboard_south - station >= band + 0.25, name
 
 
 def test_required_drawing_paths() -> None:
@@ -278,28 +297,28 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     assert cone_gear_shaft_spec.SHAFT_LENGTH == (
         cone_gear_shaft_spec.FRONT_STUB + cone_gear_shaft_spec.T006_TIP_STATION
     )
-    # U40 (option S1, 2026-09-23): each gear-seat shoulder sits one seat
-    # station nearer the big end than the old (154.2, 161.1, 168.0) map,
-    # so the 1/16-in land carries T012 and T006; the terminal endpoint still
-    # follows the stock cup apex and the overall length is unchanged.
-    stub_delta = cone_gear_shaft_spec.FRONT_STUB - 12.3
+    # U40 (option S1, 2026-09-23): each gear-seat shoulder sits in the air gap
+    # one seat nearer the big end than before (T030|T024, T024|T018,
+    # T018|T012), so the 1/16-in land carries T012 and T006; the terminal
+    # endpoint still follows the stock cup apex and the overall length is
+    # unchanged.  Each step is centred in its gap (Main, 2026-09-25).
     assert ends[1:-1] == pytest.approx(
         tuple(
-            old_end + stub_delta + cone_gear_shaft_spec.GEAR_AXIS_SHIFT
-            for old_end in (147.3, 154.2, 161.1)
+            cone_gear_shaft_spec.FRONT_STUB + cone_gear_shaft_spec.seat_gap_midpoint(j)
+            for j in (15, 16, 17)
         )
     )
     # Printed baseline stations from the big (journal) end, as ruled; the
     # overall length follows the E11 #10-32 cup apex (202.267 before E11).
-    assert ends[1:] == pytest.approx((163.792, 170.692, 177.592, 200.886), abs=1e-3)
+    assert ends[1:] == pytest.approx((164.068, 170.957, 177.846, 200.886), abs=1e-3)
     assert ends[-1] == pytest.approx(
         cone_gear_shaft_spec.FRONT_STUB + 138.97882594770454
     )
     # The longer terminal stub still supports the entire 4 mm bushing.
     assert cone_gear_shaft_spec.TIP_STUB_START_STATION == pytest.approx(
-        115.6853574197016
+        115.939, abs=1e-3
     )
-    assert cone_gear_shaft_spec.TIP_STUB_LENGTH == pytest.approx(23.293468528)
+    assert cone_gear_shaft_spec.TIP_STUB_LENGTH == pytest.approx(23.040, abs=1e-3)
     assert ends[-1] - ends[-2] == pytest.approx(
         cone_gear_shaft_spec.TIP_STUB_LENGTH
     )
@@ -316,8 +335,8 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
 def test_shoulder_roots_are_modelled_not_noted() -> None:
     """The root radius is geometry with a size, not a sentence in a note block."""
     assert cone_gear_shaft_spec.FILLET_RADIUS == pytest.approx(0.10)
-    # It has to clear the ~0.19 mm of air on each side of every step.
-    assert cone_gear_shaft_spec.FILLET_RADIUS < 0.19
+    # It has to clear the air on each side of every step.
+    assert cone_gear_shaft_spec.FILLET_RADIUS < cone_gear_shaft_spec.SEAT_STEP_AIR
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "add_fillet(FILLET_RADIUS, fillet_edges, propagate=False)" in source
     assert 'name_last_feature(adapter, "ShoulderFillets")' in source
@@ -329,7 +348,7 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     # 375a122c) -- without adding a check of its own (no MUST), and carries
     # no number but the mate's part number, no tolerance, datum or method
     # word -- except the tailstock line, a user-ruled process requirement
-    # (U40, 2026-09-23: the 23.293 mm Ø1.588 tip land at L/D 14.7 is only
+    # (U40, 2026-09-23: the 23.04 mm Ø1.588 tip land at L/D 14.5 is only
     # turnable supported), so "TURN" is allowed in that one line only.  The
     # three-place-stations lines went in the U27 round: the places already
     # say it.
