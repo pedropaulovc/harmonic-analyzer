@@ -56,6 +56,7 @@ from _common import (
     force_rebuild,
     name_last_feature,
     name_dimensions,
+    OUT_PNG,
     REFERENCES_DIR,
     report_mass_properties,
     run_build,
@@ -80,6 +81,7 @@ from _holes import (
     blind_hole_volume_mm3,
     wizard_holes,
 )
+from _fit_limits import deviations
 from _part_pmi import _resolve_faces, author_part_pmi
 from harmonic_base_spec import (
     BOTTOM_LENGTH,
@@ -91,7 +93,6 @@ from harmonic_base_spec import (
     DRAWING_PRECISION,
     LIP_H,
     LIP_W,
-    DRAWING_NOTES,
     PART_SURFACE_FINISHES,
     SOCKET_BORE_FINISHES,
     SPOTFACE_DEPTH_BAND_MM,
@@ -152,7 +153,10 @@ from frame_attachment_spec import (
     COLUMN_SOCKET_DIAMETER,
     SCREW_SPOTFACE_DIAMETER,
 )
+from frame_column_stations import COLUMN_SOCKET_MATCH_BORE_MAX
 from _visibility import blank_reference_geometry
+
+import _config
 
 import _telemetry
 
@@ -565,12 +569,11 @@ if COLUMN_SOCKET_NEAREST_OCCUPANT_WALL < 1.0:
     raise AssertionError(
         "base column socket leaves less than 1 mm wall to another base cavity"
     )
-# Nominal model-space sanity only: this does not validate manufactured
-# tolerance combinations. DRAWING_NOTES governs finished-part land acceptance.
-# TOP_WIDTH is sized so this land is EQUAL on both axes: the 2026-09 blind
-# machinist review rejected the former 10.5 in pad, whose 1.6 mm land in Z
-# could not survive the coordinate stack behind the 1.0 MIN finished-land
-# note while every table dimension stayed in tolerance.
+# Nominal model-space land; its worst case is proven below. TOP_WIDTH is
+# sized so this land is EQUAL on both axes: the 2026-09 blind machinist
+# review rejected the former 10.5 in pad, whose 1.6 mm land in Z could not
+# survive the coordinate stack while every table dimension stayed in
+# tolerance.
 COLUMN_SOCKET_LAND_X = min(
     TOP_LENGTH / 2.0 - LIP_W - abs(x) - COLUMN_SOCKET_DIAMETER / 2.0
     for x, _z in COLUMN_SOCKET_XZ
@@ -587,6 +590,68 @@ if abs(COLUMN_SOCKET_LAND_X - COLUMN_SOCKET_LAND_Z) > 1e-9:
     )
 if COLUMN_SOCKET_RIM_CLEARANCE < 1.0:
     raise AssertionError("base column socket crowds the raised rim")
+
+# The finished deck land between each bore and the rim inner face must stay
+# 1.0 wide and continuous (2026-09 blind machinist review). It used to be
+# a sheet note ("1.0 MIN ... AFTER MATCHING AND EDGE BREAK"), which put a
+# dimension in a note (hb-render-4 eye pass); the stack below proves every
+# in-tolerance part meets it, so the sheet needs no note.
+COLUMN_SOCKET_LAND_MIN = 1.0
+
+
+def _general_band_mm() -> float:
+    """The title block's .X band: the loosest general tolerance it defines.
+
+    The lengths and rim width print one place; the hole-table coordinates
+    print at least one, so this band bounds every location term.
+    """
+    return float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
+
+
+def _edge_break_mm() -> float:
+    row = _config.title_block("edge_break")
+    return max(float(row["radius_mm"]), float(row["chamfer_max_mm"]))
+
+
+def column_socket_land_stack(nominal: float) -> dict[str, float]:
+    """Worst-case finished deck land from a bore to the rim inner face.
+
+    One axis, from its owning sources. The table locates the bore from the
+    flange edge; the rim inner face sits LIP_W in from the pad edge, and
+    the pad edge's place on the flange follows from the two printed plate
+    lengths, each of which moves one edge by half its band. The bore is
+    matched to its tube up to COLUMN_SOCKET_MATCH_BORE_MAX, and both land
+    edges take the title block's largest edge break.
+    """
+    band = _general_band_mm()
+    edge_break = _edge_break_mm()
+    return {
+        "nominal": nominal,
+        "flange length": -band / 2.0,
+        "pad length": -band / 2.0,
+        "rim width": -band,
+        "bore location": -band,
+        "matched bore": -(COLUMN_SOCKET_MATCH_BORE_MAX - COLUMN_SOCKET_DIAMETER) / 2.0,
+        "bore edge break": -edge_break,
+        "rim edge break": -edge_break,
+    }
+
+
+def _stack_text(stack: dict[str, float]) -> str:
+    terms = ", ".join(f"{name} {value:+.3f}" for name, value in stack.items())
+    return f"{terms} = {sum(stack.values()):.3f}"
+
+
+COLUMN_SOCKET_LAND_STACKS = {
+    "x": column_socket_land_stack(COLUMN_SOCKET_LAND_X),
+    "z": column_socket_land_stack(COLUMN_SOCKET_LAND_Z),
+}
+for _axis, _stack in COLUMN_SOCKET_LAND_STACKS.items():
+    if sum(_stack.values()) < COLUMN_SOCKET_LAND_MIN:
+        raise AssertionError(
+            f"base deck land ({_axis}), worst case: {_stack_text(_stack)} "
+            f"< {COLUMN_SOCKET_LAND_MIN}"
+        )
 
 
 def require_blind_seat_fit(
@@ -921,7 +986,7 @@ async def _paint_machined_faces_black(adapter) -> None:
         _telemetry.info(f"{key} face painted black ({area * 1e6:.0f} mm^2)")
 
 
-REFERENCE_SKETCHES = ("RimWidthReference", "HeightReference")
+REFERENCE_SKETCHES = ("RimWidthReference", "HeightReference", "CrossTapReference")
 
 
 @_telemetry.traced("appearance.hide_reference_sketches")
@@ -1145,8 +1210,9 @@ async def build(adapter) -> dict[str, str]:
             )
         after = after_cut
 
-    # Four blind column sockets from the deck. Their Ø25.50 +0.05/0 limits
-    # match MHA-083's Ø25.40 +0/-0.05 OD for 0.10..0.20 diametral clearance.
+    # Four blind column sockets from the deck, nominal Ø25.50: production
+    # bores are matched to their assigned actual MHA-083 tubes, so the
+    # drawing prints the size as reference only.
     socket_plane = check(
         "create_plane column socket mouths",
         await adapter.create_plane(
@@ -1624,6 +1690,69 @@ async def build(adapter) -> dict[str, str]:
     _verify_named_dimension(
         adapter, "FlangeToRim@HeightReference", deck_top - BOTTOM_THICKNESS
     )
+
+    # The cross-tap X stations, chained from the flange's west face (the hole
+    # table's X0) to the first tap and on to the second, along the tap axis.
+    # The taps share their X with the A1-A4 bores, but the table locates only
+    # the bores, and "ON A1-A4 X CENTRES" in the tap callout was a location
+    # in a note (hb-render-4 eye pass). Chained, not baselined: the front
+    # view has one free dimension row beneath it.
+    check("create_sketch cross-tap reference", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    tap_edge_ref = check(
+        "cross-tap edge reference line",
+        await adapter.add_line(
+            -BOTTOM_LENGTH / 2.0, BASE_SCREW_Y, -COLUMN_X, BASE_SCREW_Y
+        ),
+    )
+    tap_pitch_ref = check(
+        "cross-tap pitch reference line",
+        await adapter.add_line(-COLUMN_X, BASE_SCREW_Y, COLUMN_X, BASE_SCREW_Y),
+    )
+    set_sketch_direct_db(adapter, False)
+    for line in (tap_edge_ref, tap_pitch_ref):
+        _as_construction(adapter, line)
+        check(
+            f"cross-tap reference {line} horizontal",
+            await adapter.add_sketch_constraint(line, None, "horizontal"),
+        )
+    check(
+        "cross-tap reference chain",
+        await adapter.add_sketch_constraint(
+            f"{tap_edge_ref}.end", f"{tap_pitch_ref}.start", "coincident"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{tap_edge_ref}.start",
+        f"{tap_edge_ref}.end",
+        "horizontal_distance",
+        BOTTOM_LENGTH / 2.0 - COLUMN_X,
+        "cross-tap X from flange edge",
+    )
+    await dimension_between(
+        adapter,
+        f"{tap_pitch_ref}.start",
+        f"{tap_pitch_ref}.end",
+        "horizontal_distance",
+        2.0 * COLUMN_X,
+        "cross-tap pitch",
+    )
+    await anchor_point_to_origin(
+        adapter,
+        f"{tap_edge_ref}.start",
+        -BOTTOM_LENGTH / 2.0,
+        BASE_SCREW_Y,
+        "cross-tap reference",
+    )
+    await ensure_fully_defined(adapter, "cross-tap reference sketch")
+    check("exit_sketch cross-tap reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "CrossTapReference")
+    name_dimensions(adapter, "CrossTapReference", ["CrossTapX", "CrossTapPitch"])
+    _verify_named_dimension(
+        adapter, "CrossTapX@CrossTapReference", BOTTOM_LENGTH / 2.0 - COLUMN_X
+    )
+    _verify_named_dimension(adapter, "CrossTapPitch@CrossTapReference", 2.0 * COLUMN_X)
     _hide_reference_sketches(adapter)
     blank_reference_geometry(adapter, tuple((name, "PLANE") for name in ref_planes))
     await apply_material(adapter, MATERIAL)
@@ -1646,17 +1775,51 @@ async def build(adapter) -> dict[str, str]:
     # never shallow, or the screw head rocks on an unfaced ring.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     set_dimension_bilateral_tolerance(
-        adapter, "BaseSpotFaceRear", "SpotFaceDepth", *SPOTFACE_DEPTH_BAND_MM
+        adapter,
+        "BaseSpotFaceRear",
+        "SpotFaceDepth",
+        *deviations(SPOTFACE_DEPTH_BAND_MM),
     )
     author_part_pmi(adapter, surface_finishes=PART_SURFACE_FINISHES)
-    apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-        },
+    apply_drawing_properties(adapter, PART_NAME)
+    return await _save_with_annotation_free_render(adapter)
+
+
+_SW_DISPLAY_ANNOTATIONS = 31  # swUserPreferenceToggle_e.swDisplayAnnotations
+_SW_DETAILING_NO_OPTION = 0  # swUserPreferenceOption_e.swDetailingNoOptionSpecified
+
+
+async def _save_with_annotation_free_render(adapter) -> dict[str, str]:
+    """Save the part, then render its isometric with model annotations hidden.
+
+    The part-owned surface-finish PMI is model annotation, so the isometric
+    showed "A1-A4 BORES Ra 3.2" and "FLANGE EDGES, 4 SIDES" floating in 3D over
+    the casting. The part is saved first with its annotations shown; only the
+    image hides them, and the teardown closes the document without saving, so
+    the display toggle never reaches the .SLDPRT the drawing reads.
+    """
+    artefacts = await save_part_and_images(adapter, PART_NAME, views=())
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    toggle = (_SW_DISPLAY_ANNOTATIONS, _SW_DETAILING_NO_OPTION)
+    extension.SetUserPreferenceToggle(*toggle, False)
+    if extension.GetUserPreferenceToggle(*toggle):
+        raise RuntimeError("harmonic-base render: model annotations are still displayed")
+    image = (OUT_PNG / PART_NAME / f"{PART_NAME}_isometric.png").resolve()
+    check(
+        "export_image isometric (annotations hidden)",
+        await adapter.export_image(
+            {
+                "file_path": str(image),
+                "format_type": "png",
+                "width": 1600,
+                "height": 1000,
+                "view_orientation": "isometric",
+            }
+        ),
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    artefacts["isometric"] = str(image)
+    return artefacts
 
 
 if __name__ == "__main__":

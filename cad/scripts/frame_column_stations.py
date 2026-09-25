@@ -21,3 +21,8 @@ COLUMN_X = 197.0
 # actual MHA-083 tubes, not to a fixed diameter band.
 COLUMN_SOCKET_DEPTH = 25.4
 COLUMN_SOCKET_DIAMETER = 25.5
+# The largest bore a match can produce. Not a fit band and never printed: a
+# socket 0.6 over the 1.000 in tube's nominal OD rocks visibly, so no close
+# hand-slip match with no perceptible rock reaches it. It exists so the
+# casting's worst-case deck land (build_harmonic_base) has a bore to stack.
+COLUMN_SOCKET_MATCH_BORE_MAX = 26.0
