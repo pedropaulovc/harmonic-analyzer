@@ -146,6 +146,39 @@ def test_sub_hundredth_model_bands_get_exact_tolerance_precision(
     assert _drawing_marks._tolerance_precision_mm(*band) == expected
 
 
+def test_display_precision_times_each_com_step_on_its_own_span(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The four COM steps of ``dim.display_precision`` are timed as attributes of
+    that one span (thousands of calls a week: child spans would flood the trace)."""
+
+    class PrecisionDisplay:
+        primary = -2
+
+        def SetPrecision3(self, primary: int, *_rest: int) -> int:
+            self.primary = primary
+            return 0
+
+        def GetPrimaryPrecision2(self) -> int:
+            return self.primary
+
+    annotated: list[dict[str, Any]] = []
+    display = PrecisionDisplay()
+    monkeypatch.setattr(
+        _drawing_marks, "_named_dimension", lambda *_args: (display, object())
+    )
+    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(
+        _drawing_marks._telemetry, "annotate", lambda **attrs: annotated.append(attrs)
+    )
+
+    _drawing_marks.set_dimension_display_precision(object(), "Boss", "D1", 3)
+
+    (timings,) = annotated
+    assert set(timings) == {"lookup_ms", "bind_ms", "set_ms", "readback_ms"}
+    assert all(value >= 0 for value in timings.values())
+
+
 def test_bilateral_tolerance_sets_and_verifies_display_precision(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

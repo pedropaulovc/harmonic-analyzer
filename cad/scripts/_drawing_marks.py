@@ -13,6 +13,7 @@ the single source of every manufacturing dimension.
 from __future__ import annotations
 
 import math
+import time
 from typing import Any, Mapping
 
 import _config
@@ -136,11 +137,23 @@ def set_dimension_display_precision(
     """
     if decimals < 0 or decimals > 8:
         raise ValueError(f"display precision must be 0..8 decimals, got {decimals!r}")
+    # ~1.5-2 s per call, flat, thousands of calls a week: time the four COM
+    # steps as attributes of this span rather than as four child spans each.
+    started = time.perf_counter()
     display, _dimension = _named_dimension(adapter, feature_name, dimension_name)
+    looked_up = time.perf_counter()
     display = _early_bound(display, "IDisplayDimension")
+    bound = time.perf_counter()
     do_not_change = -1  # swDimensionPrecisionSettings_e
     display.SetPrecision3(decimals, do_not_change, do_not_change, do_not_change)
+    set_at = time.perf_counter()
     applied = int(display.GetPrimaryPrecision2())
+    _telemetry.annotate(
+        lookup_ms=round((looked_up - started) * 1000, 1),
+        bind_ms=round((bound - looked_up) * 1000, 1),
+        set_ms=round((set_at - bound) * 1000, 1),
+        readback_ms=round((time.perf_counter() - set_at) * 1000, 1),
+    )
     if applied != decimals:
         raise RuntimeError(
             f"{dimension_name}@{feature_name}: display precision did not persist: "

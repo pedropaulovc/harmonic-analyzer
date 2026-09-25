@@ -1223,6 +1223,19 @@ def event(name: str, **attributes: Any) -> None:
             span.add_event(name, attributes=_extra(attributes) or {})
 
 
+def annotate(**attributes: Any) -> None:
+    """Set attributes on the CURRENT span (best-effort, like :func:`event`).
+
+    The per-item counterpart of a child span: a helper that runs thousands of
+    times per build records its sub-step timings here instead of opening a
+    child span per step, which would flood the trace (see AGENTS.md, "Right
+    granularity"). No-op when no span is recording; never raises."""
+    with contextlib.suppress(Exception):
+        span = trace.get_current_span()
+        if span is not None and span.get_span_context().is_valid:
+            span.set_attributes(_extra(attributes) or {})
+
+
 def _enter_span(
     name: str, attributes: Mapping[str, Any] | None, service: str | None = None
 ) -> tuple[Span, Any, int]:

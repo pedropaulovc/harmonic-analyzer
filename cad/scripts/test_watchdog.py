@@ -657,3 +657,33 @@ def test_log_records_poke_the_heartbeat() -> None:
     _telemetry.debug("watchdog heartbeat probe")
     assert _telemetry.last_activity() > 0.0
     assert _telemetry.last_activity_op().startswith("log watchdog heartbeat")
+
+
+def test_connect_is_split_into_dispatch_identity_and_discard(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # sw.connect costs ~2.2 s p50 in every COM subprocess; its three steps each
+    # get a child span so that cost is attributable without log archaeology.
+    opened: list[str] = []
+    span, aspan = _common._telemetry.span, _common._telemetry.aspan
+
+    def record_span(name, /, **attrs):
+        opened.append(name)
+        return span(name, **attrs)
+
+    def record_aspan(name, /, **attrs):
+        opened.append(name)
+        return aspan(name, **attrs)
+
+    monkeypatch.setattr(_common._telemetry, "span", record_span)
+    monkeypatch.setattr(_common._telemetry, "aspan", record_aspan)
+    adapter, _app = _seat(str(_common._seat_park_directory()))
+
+    _session(monkeypatch, adapter)
+
+    connect = opened.index("sw.connect")
+    assert opened[connect + 1 : connect + 4] == [
+        "sw.dispatch",
+        "seat.identity",
+        "seat.discard",
+    ]
