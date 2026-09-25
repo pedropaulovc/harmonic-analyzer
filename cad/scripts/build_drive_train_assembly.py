@@ -508,7 +508,12 @@ from crank_arm_spec import (  # noqa: E402
     ARM_THICKNESS,
     ARM_WIDTH,
 )
-from crankshaft_spec import PIN_HOLE_HEIGHT  # noqa: E402
+from _fit_limits import deviations  # noqa: E402
+from crankshaft_spec import (  # noqa: E402
+    PIN_HOLE_HEIGHT,
+    SHAFT_LENGTH as CRANKSHAFT_LENGTH,
+    SHAFT_LENGTH_BAND as CRANKSHAFT_LENGTH_BAND,
+)
 from crank_handle_pivot_screw_spec import (  # noqa: E402
     OVERALL_LENGTH as HANDLE_SCREW_LENGTH,
     PROUD_INBOARD_MAX as HANDLE_SCREW_PROUD_MAX,
@@ -519,7 +524,6 @@ from crank_handle_pivot_screw_spec import (  # noqa: E402
 
 CRANK_FACE_Z = -183.0
 CRANKSHAFT_Z0 = CRANK_FACE_Z
-CRANKSHAFT_LENGTH = 130.0
 CRANK_ARM_Z0 = CRANK_FACE_Z
 CRANK_HUB_Z0 = CRANK_FACE_Z
 CRANK_ARM_ORIGIN_Z = CRANK_ARM_Z0 + ARM_THICKNESS
@@ -749,12 +753,18 @@ from crank_pinion_spec import (  # noqa: E402
     PIN_CLOCKING_DEG as PINION_PIN_CLOCKING_DEG,
     PIN_DIA as PINION_PIN_DIA,
     PIN_LENGTH as PINION_PIN_LENGTH,
+    OVERALL_LENGTH_GRADE_MM as PINION_OVERALL_LENGTH_GRADE_MM,
+    PIN_EDGE_MIN_WORST as PINION_PIN_EDGE_MIN_WORST,
+    PIN_EDGE_TO_SHAFT_END_NOMINAL as PINION_PIN_EDGE_NOMINAL,
     PIN_STATION as PINION_PIN_STATION,
+    PIN_STATION_LAYOUT_ALLOWANCE_MM as PINION_PIN_LAYOUT_ALLOWANCE,
+    SEAT_FEELER_MM as PINION_SEAT_FEELER,
+    SHAFT_END_RECESS_MIN_WORST as PINION_RECESS_MIN_WORST,
 )
 from build_crankshaft import PINION_PIN_STATION_Y as CS_PINION_PIN_STATION  # noqa: E402
 
 PINION_Z0 = PINION_TOOTH_Z - PINION_FACE / 2.0  # pinion origin: toothed south face
-PINION_PIN_Z = PINION_Z0 + PINION_PIN_STATION  # -55.92
+PINION_PIN_Z = PINION_Z0 + PINION_PIN_STATION  # -52.453
 # The pin's axis is the seated pinion's local X: rot_z(-seed) turns local +X to
 # machine (cos s, -sin s, 0). The pin part's +Z runs along that (ROT_Y_POS90
 # lays part +Z on machine +X, then the same rot_z(-seed) as the pinion), so
@@ -780,11 +790,13 @@ if abs((CRANKSHAFT_Z0 + CS_PINION_PIN_STATION) - PINION_PIN_Z) > 1e-6:
     raise AssertionError("crankshaft pin hole station off the pinion's pin station")
 if abs(PINION_PIN_LENGTH - PINION_BOSS_DIA) > 1e-9:
     raise AssertionError("pinion pin is not flush with the boss")
-_SHAFT_NORTH_END = CRANKSHAFT_Z0 + CS_SHAFT_LENGTH  # -53.0
-if (PINION_Z0 + PINION_OVERALL_LENGTH) - _SHAFT_NORTH_END < 0.25:
-    raise AssertionError("crankshaft end is not recessed inside the pinion boss")
-if _SHAFT_NORTH_END - (PINION_PIN_Z + PINION_PIN_DIA / 2.0) < 1.0:
-    raise AssertionError("pinion pin hole leaves under 1.0 wall to the shaft end")
+_SHAFT_NORTH_END = CRANKSHAFT_Z0 + CS_SHAFT_LENGTH  # -46.3655
+# Nominal recess of the shaft end inside the boss and the pin's wall to that
+# end; their worst cases are asserted once the seat gap is known (below).
+PINION_RECESS_NOMINAL = (PINION_Z0 + PINION_OVERALL_LENGTH) - _SHAFT_NORTH_END
+PINION_PIN_EDGE_NOMINAL_ACTUAL = _SHAFT_NORTH_END - (
+    PINION_PIN_Z + PINION_PIN_DIA / 2.0
+)
 
 # The whole cone set rides the SWING PLATFORM (ch.12 p.18: the dark wedge
 # plate labelled "pivot" at its tip end). The green pivot post (big-end
@@ -1228,13 +1240,81 @@ _T12_NORTH = REMOVABLE_Z0 + 5.0
 _PINION_SOUTH = PINION_TOOTH_Z - PINION_FACE / 2.0
 _BOSS_SOUTH_GAP = _POST_BOSS_SOUTH - _T12_NORTH
 _BOSS_NORTH_GAP = _PINION_SOUTH - _POST_BOSS_NORTH
+# The 16T's south face seats against the post boss's north face across this
+# gap (low, high): the pinion is set on the feeler at the floor, and the gap
+# may open to the ceiling before the pinion is re-set.
+PINION_BOSS_NORTH_GAP_RANGE = (PINION_SEAT_FEELER, 1.0)
+_GAP_LO, _GAP_HI = PINION_BOSS_NORTH_GAP_RANGE
+# The shaft length's fit band, read once through its helper (lower, upper).
+_SHAFT_LENGTH_LOWER, _SHAFT_LENGTH_UPPER = deviations(CRANKSHAFT_LENGTH_BAND)
 if min(_BOSS_SOUTH_GAP, _BOSS_NORTH_GAP) < 0.25:
     raise AssertionError("v2 crank boss does not clear its axial hardware")
 # Keep both independently derived gaps visible to import-time geometry checks.
 if not 10.0 < _BOSS_SOUTH_GAP < 10.5:
     raise AssertionError("v2 crank boss south/T12 clearance left its derived band")
-if not 0.24 < _BOSS_NORTH_GAP < 1.0:
+if not (
+    _GAP_LO - 1e-6
+    <= _BOSS_NORTH_GAP
+    < _GAP_HI
+):
     raise AssertionError("v2 crank boss north/pinion clearance left its derived band")
+
+
+def pinion_pin_edge_stack(edge_nominal: float) -> dict[str, float]:
+    """W15's worst-case wall from the 16T pin hole to the shaft's north end.
+
+    Each term comes from the source that owns it: the shaft length's lower
+    deviation (crankshaft_spec), the seat gap opening from its nominal to the
+    band's ceiling (the pinion, and its pin, move north), the laid-out pin
+    station's allowance (crank_pinion_spec), and the title block's drilled-hole
+    oversize on the pin's radius.
+    """
+    return {
+        "nominal": edge_nominal,
+        "shaft length": _SHAFT_LENGTH_LOWER,
+        "seat gap": -(_GAP_HI - _BOSS_NORTH_GAP),
+        "pin layout": -PINION_PIN_LAYOUT_ALLOWANCE,
+        "drill oversize": -float(_config.title_block("drilled_hole")["plus_mm"]) / 2.0,
+    }
+
+
+def pinion_recess_stack(recess_nominal: float) -> dict[str, float]:
+    """W15's worst-case recess of the shaft end inside the 16T boss.
+
+    A short pinion at its general grade, a seat gap closing from its nominal to
+    the band's floor, and a shaft at its upper deviation each bring the shaft
+    end out toward the boss face.
+    """
+    return {
+        "nominal": recess_nominal,
+        "pinion overall length": -PINION_OVERALL_LENGTH_GRADE_MM,
+        "seat gap": -(_BOSS_NORTH_GAP - _GAP_LO),
+        "shaft length": -_SHAFT_LENGTH_UPPER,
+    }
+
+
+def _stack_text(stack: dict[str, float]) -> str:
+    terms = ", ".join(f"{name} {value:+.3f}" for name, value in stack.items())
+    return f"{terms} = {sum(stack.values()):.3f}"
+
+
+if PINION_PIN_EDGE_NOMINAL_ACTUAL < PINION_PIN_EDGE_NOMINAL - 1e-6:
+    raise AssertionError(
+        f"16T pin wall to the shaft end {PINION_PIN_EDGE_NOMINAL_ACTUAL:.3f} is under "
+        f"its {PINION_PIN_EDGE_NOMINAL} nominal"
+    )
+PINION_PIN_EDGE_STACK = pinion_pin_edge_stack(PINION_PIN_EDGE_NOMINAL_ACTUAL)
+if sum(PINION_PIN_EDGE_STACK.values()) < PINION_PIN_EDGE_MIN_WORST:
+    raise AssertionError(
+        f"16T pin wall to the shaft end, worst case: "
+        f"{_stack_text(PINION_PIN_EDGE_STACK)} < {PINION_PIN_EDGE_MIN_WORST}"
+    )
+PINION_RECESS_STACK = pinion_recess_stack(PINION_RECESS_NOMINAL)
+if sum(PINION_RECESS_STACK.values()) < PINION_RECESS_MIN_WORST:
+    raise AssertionError(
+        f"crankshaft end recess inside the 16T boss, worst case: "
+        f"{_stack_text(PINION_RECESS_STACK)} < {PINION_RECESS_MIN_WORST}"
+    )
 if abs(
     (PINION_TOOTH_Z - PINION_FACE / 2.0)
     - (_GEAR64_CONTACT_Z - PINION_FACE_STATION_REFERENCE / 2.0)

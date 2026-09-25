@@ -30,7 +30,9 @@ from crank_pin_spec import (
     PIN_LENGTH as _PIN_L,
     SMALL_END_DIA as _PIN_D1,
 )
-from crankshaft_spec import SHAFT_DIA as _CS_DIA
+# The shaft diameter's owner, not crankshaft_spec: every assembly imports this
+# module, so a crankshaft length or station edit must not re-key them all.
+from crank_hub_geometry import SHAFT_DIA as _CS_DIA
 import summing_lever_spec
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 from frame_attachment_spec import COLUMN_SOCKET_DIAMETER

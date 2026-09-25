@@ -368,13 +368,14 @@ def test_notes_carry_only_the_tooth_edge_exception() -> None:
         assert banned not in notes, banned
 
 
-def test_sheet_runs_at_4_to_1_with_every_view_at_sheet_scale() -> None:
-    # A 17.8 x 17.28 mm part on a B sheet: 4:1 is the largest scale whose
-    # isometric still clears the right border. One scale for every view means
-    # the title block's SCALE field is the whole truth and no view needs a
-    # scale note.
-    assert drawing.SHEET_SCALE == (4.0, 1.0)
-    assert drawing.VIEW_SCALE == (4, 1)
+def test_sheet_runs_at_3_to_1_with_every_view_at_sheet_scale() -> None:
+    # A 17.8 x 24.615 mm part on a B sheet (W15): at 4:1 the section's boss-end
+    # dimensions ran into the isometric, so 3:1 is the largest scale that lays
+    # out. One scale for every view means the title block's SCALE field is the
+    # whole truth and no view needs a scale note.
+    assert drawing.SHEET_SCALE == (3.0, 1.0)
+    assert drawing.VIEW_SCALE == (3, 1)
+    assert drawing.SHEET_SCALE[0] == drawing.VIEW_SCALE[0]
     assert _source().count("scale=VIEW_SCALE") == 3
     assert not hasattr(spec, "ISOMETRIC_VIEW_NOTE")
 
@@ -386,10 +387,10 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     # it measures, and nothing crosses into the title block's bottom-right
     # corner of the B sheet.
     half_od = drawing.HALF_OD
-    assert half_od == pytest.approx(spec.OUTSIDE_DIA * 4 / 2000.0)
+    assert half_od == pytest.approx(spec.OUTSIDE_DIA * drawing.VIEW_SCALE[0] / 2000.0)
     assert drawing.FRONT_KEEP == {}
     half_boss = drawing.HALF_BOSS
-    assert half_boss == pytest.approx(spec.BOSS_DIA * 4 / 2000.0)
+    assert half_boss == pytest.approx(spec.BOSS_DIA * drawing.VIEW_SCALE[0] / 2000.0)
     outside_x, outside_y = drawing.RIGHT_KEEP["OutsideDia"]
     assert min(drawing._side_x(0.0), drawing._side_x(spec.FACE_WIDTH)) < outside_x
     assert outside_x < max(drawing._side_x(0.0), drawing._side_x(spec.FACE_WIDTH))
@@ -420,7 +421,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     # text, the toothed rectangle, or the outside-diameter extension line.
     assert drawing.PIN_HOLE_CALLOUT[1] > drawing.RIGHT_CENTER[1] + half_od + 0.040
     assert abs(drawing.PIN_HOLE_EDGE[1] - drawing.RIGHT_CENTER[1]) == pytest.approx(
-        spec.PIN_DIA * 4 / 2000.0
+        spec.PIN_DIA * drawing.VIEW_SCALE[0] / 2000.0
     )
     assert drawing.PIN_HOLE_EDGE[0] == pytest.approx(drawing._side_x(spec.PIN_STATION))
     assert drawing.PIN_HOLE_EDGE[0] < drawing.PIN_HOLE_CALLOUT[0]
@@ -431,7 +432,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     bore_dx = drawing.BORE_FIT_ATTACH[0] - drawing.FRONT_CENTER[0]
     bore_dy = drawing.BORE_FIT_ATTACH[1] - drawing.FRONT_CENTER[1]
     assert math.hypot(bore_dx, bore_dy) == pytest.approx(
-        spec.BORE_DIA * 4 / 2000.0
+        spec.BORE_DIA * drawing.VIEW_SCALE[0] / 2000.0
     )
     assert bore_dx < 0 < bore_dy
     positions = (
@@ -448,7 +449,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
         assert not (x > 0.216 and y < 0.070), (x, y)  # title-block keep-out
     # The three views march left to right without overlapping: face view,
     # longitudinal section (half the overall length each side), isometric.
-    half_len = spec.OVERALL_LENGTH * 4 / 2000.0
+    half_len = spec.OVERALL_LENGTH * drawing.VIEW_SCALE[0] / 2000.0
     assert (
         drawing.FRONT_CENTER[0] + half_od < drawing.RIGHT_CENTER[0] - half_len - 0.010
     )
@@ -474,3 +475,42 @@ def test_part_stamps_make_critical_properties() -> None:
     )
     assert "gear cutting" in config["process"]
     assert int(config["quantity"]) == 1
+
+
+def test_w15_boss_hides_the_shaft_end_and_walls_the_pin_at_every_limit() -> None:
+    # Main rulings 2026-09-25 (W15, option 1): the boss is sized so the pin keeps
+    # 4.5 of shaft beyond it nominally and 2.0 in the worst case, and the shaft
+    # end stays 0.25 inside the boss even with the pinion at its general grade.
+    import build_drive_train_assembly as bdt
+
+    grade = _config.title_block("linear_1pl")["value_in"] * 25.4
+    assert spec.OVERALL_LENGTH_GRADE_MM == pytest.approx(grade)
+    assert spec.DRAWING_PRECISION["BossProfile"]["OverallLength"] == 1
+    assert spec.SHAFT_END_RECESS == pytest.approx(1.02)
+    assert spec.BOSS_LENGTH == pytest.approx(14.215)
+    assert spec.OVERALL_LENGTH == pytest.approx(24.615)
+    assert spec.PIN_STATION == pytest.approx(spec.FACE_WIDTH + spec.BOSS_LENGTH / 2.0)
+    assert bdt.PINION_RECESS_NOMINAL == pytest.approx(spec.SHAFT_END_RECESS)
+    assert bdt.PINION_PIN_EDGE_NOMINAL_ACTUAL == pytest.approx(
+        spec.PIN_EDGE_TO_SHAFT_END_NOMINAL
+    )
+    edge = bdt.PINION_PIN_EDGE_STACK
+    assert edge == {
+        "nominal": pytest.approx(4.5),
+        "shaft length": pytest.approx(-0.40),
+        "seat gap": pytest.approx(-0.75),
+        "pin layout": pytest.approx(-0.25),
+        "drill oversize": pytest.approx(-0.05),
+    }
+    assert sum(edge.values()) == pytest.approx(3.05)
+    assert sum(edge.values()) >= spec.PIN_EDGE_MIN_WORST
+    # The seat gap is a (low, high) range starting at the one feeler MHA-A03
+    # sets, not a fit band.
+    assert bdt.PINION_BOSS_NORTH_GAP_RANGE == (spec.SEAT_FEELER_MM, 1.0)
+    assert not hasattr(bdt, "PINION_BOSS_NORTH_GAP_BAND")
+    recess = bdt.PINION_RECESS_STACK
+    assert sum(recess.values()) >= spec.SHAFT_END_RECESS_MIN_WORST
+    # The ruled g = 5.935 grew the boss and the shaft equally, keeping the old
+    # 0.32 recess: at the general grade the shaft end then stands proud.
+    equal_growth_recess = 113.039505572 + 17.28 - 130.0
+    assert sum(bdt.pinion_recess_stack(equal_growth_recess).values()) < 0.25

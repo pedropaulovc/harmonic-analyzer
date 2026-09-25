@@ -5,6 +5,7 @@ from __future__ import annotations
 from _hole_spec import HoleSpec, drill_process
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+import crank_pinion_spec
 from crank_hub_geometry import (
     CRANK_FACE_SHIFT,
     FIDUCIAL_MODEL_DEPTH,
@@ -17,10 +18,22 @@ from crank_hub_geometry import (
 )
 
 
-SHAFT_LENGTH = 122.0 + CRANK_FACE_SHIFT
 # The common arm/hub/shaft cylinder face moved 8 mm outboard.  Adding the same
 # shift to all inboard stations preserves every established bearing, T12 and
-# pinion world interface and keeps the far end at its prior world coordinate.
+# pinion world interface.  The 16T pinion's toothed south face seats here.
+SEAT_PINION = 105.039505572 + CRANK_FACE_SHIFT  # 113.039505572
+# W15 (Main, 2026-09-25): the far end sits the pinion's SHAFT_END_RECESS
+# inside its boss, and crank_pinion_spec sizes that boss so the retention pin
+# keeps its wall to this end.  Moving either part's numbers moves the length.
+SHAFT_LENGTH = (
+    SEAT_PINION
+    + crank_pinion_spec.OVERALL_LENGTH
+    - crank_pinion_spec.SHAFT_END_RECESS
+)  # 136.6345
+# Unilateral: a long shaft would stand proud of the boss, and a short one only
+# deepens the recess and shortens the pin's wall, which build_drive_train_
+# assembly's worst-case stacks carry.  Printed on Depth from the model.
+SHAFT_LENGTH_BAND = (0.00, -0.40)  # (upper, lower) deviations
 
 # The installed v2 pivot post remains fixed.  Its Ø11.438 bore spans world
 # z -142.244894428..-70.210494428.  Moving the common crank face from -175 to

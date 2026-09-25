@@ -11,6 +11,7 @@ import build_drive_train_assembly as drive
 import crank_arm_notes as notes
 import crank_arm_spec as spec
 import crank_hub_geometry as geometry
+import crankshaft_spec
 import draw_crank_arm as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -127,7 +128,9 @@ def test_assembly_keeps_common_face_and_established_inboard_stations() -> None:
     assert drive.CRANK_PIN_Z == pytest.approx(-169.4)
     assert drive.CRANK_HUB_REAR_Z == -163.0
     assert drive.REMOVABLE_Z0 - drive.CRANK_HUB_REAR_Z == pytest.approx(5.5)
-    assert drive.CRANKSHAFT_Z0 + drive.CRANKSHAFT_LENGTH == pytest.approx(-53.0)
+    # W15: the shaft's length is crankshaft_spec's, never a restated literal.
+    assert drive.CRANKSHAFT_LENGTH == crankshaft_spec.SHAFT_LENGTH
+    assert drive.CRANKSHAFT_Z0 + drive.CRANKSHAFT_LENGTH == pytest.approx(-46.3655, abs=1e-4)
 
 
 def test_stock_anchor_still_clamps_eye_without_bottoming() -> None:

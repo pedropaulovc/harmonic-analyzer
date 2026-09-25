@@ -15,8 +15,9 @@ mating crankshaft and required diametral clearance. The decimal places are the
 PART's (``crank_pinion_spec.DRAWING_PRECISION``, applied natively by
 ``build_crank_pinion``); this script only reads them back off the sheet.
 
-Drawn 4:1 -- the boss makes the part 17.28 long, and at the disc's 5:1 the
-isometric ran off the B sheet's right border.
+Drawn 3:1 -- W15's boss makes the part 24.615 long: at 4:1 the section's
+boss-end dimensions ran into the isometric, and at 5:1 the isometric had
+already run off the B sheet's right border.
 """
 
 from __future__ import annotations
@@ -82,8 +83,8 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (4.0, 1.0)
-VIEW_SCALE = (4, 1)
+SHEET_SCALE = (3.0, 1.0)
+VIEW_SCALE = (3, 1)
 FRONT_CENTER = (0.110, 0.150)
 RIGHT_CENTER = (0.215, 0.150)
 ISO_CENTER = (0.345, 0.150)
@@ -91,8 +92,8 @@ ISO_CENTER = (0.345, 0.150)
 # Half the printed tooth-tip circle, in sheet metres: the face-view silhouette
 # radius and the section's half-height, which every dimension is placed clear
 # of; and half the printed boss, the section's height past the teeth.
-HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0  # 0.0356
-HALF_BOSS = BOSS_DIA * VIEW_SCALE[0] / 2000.0  # 0.0270
+HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0  # 0.0267
+HALF_BOSS = BOSS_DIA * VIEW_SCALE[0] / 2000.0  # 0.0203
 
 
 def _side_x(z_mm: float) -> float:

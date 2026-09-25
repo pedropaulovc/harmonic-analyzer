@@ -70,10 +70,10 @@ def test_far_end_stations_restate_the_modelled_geometry() -> None:
     # The StationReference sketch drives each printed station from the same
     # globals as the features; these are the values the equations evaluate to.
     far = spec.SHAFT_LENGTH
-    assert far - (spec.JOURNAL_START + spec.JOURNAL_LENGTH) == pytest.approx(19.8)
-    assert far - spec.JOURNAL_START == pytest.approx(89.2449, abs=1e-3)
-    assert far - spec.PIN_HOLE_HEIGHT == pytest.approx(116.4)
-    assert far + spec.SHAFT_DOME_HEIGHT == pytest.approx(132.0)
+    assert far - (spec.JOURNAL_START + spec.JOURNAL_LENGTH) == pytest.approx(26.4345)
+    assert far - spec.JOURNAL_START == pytest.approx(95.8794, abs=1e-3)
+    assert far - spec.PIN_HOLE_HEIGHT == pytest.approx(123.0345)
+    assert far + spec.SHAFT_DOME_HEIGHT == pytest.approx(138.6345)
     assert part.DOME_SPHERE_R == pytest.approx(6.6710, abs=1e-3)
 
 
@@ -84,7 +84,15 @@ def test_notes_stay_within_rule_six() -> None:
 
 
 def test_face_shift_preserves_every_inboard_world_station() -> None:
-    assert spec.SHAFT_LENGTH == 130.0
+    # W15: the far end sits the 16T's recess inside its boss, so the length
+    # follows the pinion (crank_pinion_spec), not a literal.
+    assert spec.SHAFT_LENGTH == pytest.approx(
+        spec.SEAT_PINION
+        + spec.crank_pinion_spec.OVERALL_LENGTH
+        - spec.crank_pinion_spec.SHAFT_END_RECESS
+    )
+    assert spec.SHAFT_LENGTH == pytest.approx(136.6345, abs=1e-4)
+    assert part.SEAT_PINION == spec.SEAT_PINION
     assert spec.JOURNAL_START == pytest.approx(40.755105572)
     assert spec.JOURNAL_END == pytest.approx(110.2)
     assert spec.JOURNAL_LENGTH == pytest.approx(69.4449, abs=1e-4)
@@ -95,7 +103,7 @@ def test_face_shift_preserves_every_inboard_world_station() -> None:
     assert not hasattr(part, "SEAT_ARM")
     assert -183.0 + part.SEAT_T12 == pytest.approx(-157.5)
     assert -183.0 + part.SEAT_PINION == pytest.approx(-69.960494428)
-    assert -183.0 + spec.SHAFT_LENGTH == pytest.approx(-53.0)
+    assert -183.0 + spec.SHAFT_LENGTH == pytest.approx(-46.3655, abs=1e-4)
 
 
 def test_integral_dome_is_the_only_outboard_shaft_projection() -> None:
@@ -313,3 +321,13 @@ def test_leader_tip_is_the_point_nearest_the_hole_and_must_land_on_it() -> None:
     assert not drawing._inside((drawing.PINION_PIN_X, 0.20), window)
     with pytest.raises(RuntimeError, match="no leader points"):
         drawing._leader_tip((), centre)
+
+
+def test_shaft_length_is_unilateral_and_printed_from_the_model() -> None:
+    # W15 band (a): a long shaft would stand proud of the 16T boss, so the
+    # length only comes out short, and the model's Depth carries the band.
+    assert spec.SHAFT_LENGTH_BAND == (0.00, -0.40)
+    build = Path(part.__file__).read_text(encoding="utf-8")
+    assert '"Shaft", "Depth", *deviations(SHAFT_LENGTH_BAND)' in build
+    assert "Depth" in spec.DRAWING_DIMENSIONS["Shaft"]
+    assert "Depth" not in spec.REFERENCE_DIMENSIONS

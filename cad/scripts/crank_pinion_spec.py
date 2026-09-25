@@ -27,7 +27,7 @@ from __future__ import annotations
 import math
 
 import _config
-import crankshaft_spec
+import crank_hub_geometry
 from _gtol_spec import CylinderFace
 from _hole_spec import FRACTIONAL_DRILL_MM, HoleSpec
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -80,7 +80,7 @@ BORE_DIAMETRAL_CLEARANCE = tuple(
     _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
 )
 _CLEARANCE_MIN, _CLEARANCE_MAX = BORE_DIAMETRAL_CLEARANCE
-_SHAFT_UPPER, _SHAFT_LOWER = crankshaft_spec.SHAFT_DIA_BAND
+_SHAFT_UPPER, _SHAFT_LOWER = crank_hub_geometry.SHAFT_DIA_BAND
 BORE_DIA_BAND = (  # (upper, lower) deviations
     round(_SHAFT_LOWER + _CLEARANCE_MAX, 3),
     round(_SHAFT_UPPER + _CLEARANCE_MIN, 3),
@@ -91,8 +91,8 @@ FACE_WIDTH = 10.4  # spans the 64T row north of the v2 crank boss
 # PINION_FACE asserts equality.)  It was 10.8 until the deepened cone mesh
 # (#834, U38) grew the T120 tip: its inclined rim then reached the toothed
 # north end (-0.26 against the 0.25 axial clearance).  Main ruled option A
-# (2026-09-23): shorten the teeth from the north.  The south face, the
-# overall length and the boss's north end stay where they were.
+# (2026-09-23): shorten the teeth from the north.  The south face stays where
+# it was; the boss length is now set by W15 below.
 
 # --- Hub boss + retention pin (ch. 12 p. 19, page002_img02 / img06) ---------
 #
@@ -101,17 +101,14 @@ FACE_WIDTH = 10.4  # spans the 64T row north of the v2 crank boss
 # largest diameter that can never meet the 64T's tips (they clear it by the
 # tooth system's own tip clearance plus the mesh's centre-distance slack,
 # exactly as they clear the gap floors). It runs from the toothed length to the
-# 17.28 overall length, 0.66 face widths -- the photo's "a little over half" --
-# which covers the crankshaft's outboard overhang past the pinion's north face
-# and leaves its end recessed inside the boss as photographed
-# (build_drive_train_assembly asserts the recess). The boss is
+# overall length, covers the crankshaft's outboard overhang past the pinion's
+# north face and leaves its end recessed inside the boss as photographed; its
+# length is derived below (W15). The boss is
 # extruded from the SAME faced end as the teeth, so the print carries one
 # overall length from that end (rule 7: lengths from one faced end, the overall
 # length real and conspicuous), and the toothed length is FaceWidth.
 ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN  # 13.51
 BOSS_DIA = ROOT_DIA
-OVERALL_LENGTH = 17.28  # the 10.8 face + its 0.6-face boss, kept at option A
-BOSS_LENGTH = OVERALL_LENGTH - FACE_WIDTH  # 6.88
 # The outer edge is rounded in the photo; a sized 45-degree break is the lathe
 # operation that reads the same and rule 7 prefers a chamfer to a radius.
 BOSS_CHAMFER = 1.0
@@ -130,7 +127,50 @@ BOSS_CHAMFER = 1.0
 PIN_HOLE_SPEC = HoleSpec("drilled_fractional", "1/8")
 PIN_DIA = FRACTIONAL_DRILL_MM["1/8"]  # 3.175
 PIN_LENGTH = BOSS_DIA  # flush both sides
-PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0  # 13.84 from the toothed (south) face
+
+# --- W15: the boss is as long as the shaft end it hides and the pin's wall to
+# that end need (Main rulings, 2026-09-25, option 1) ---------------------------
+#
+# The pin crosses the crankshaft PIN_EDGE_TO_SHAFT_END_NOMINAL from its north
+# end, so the drill never breaks out through a thin end wall; after every
+# band in build_drive_train_assembly's stack at least PIN_EDGE_MIN_WORST
+# remains.  The pin station is laid out on the seated pair at boss mid-length
+# (the callout), never dimensioned: PIN_STATION_LAYOUT_ALLOWANCE_MM is that
+# layout's allowance.
+PIN_EDGE_TO_SHAFT_END_NOMINAL = 4.5
+PIN_EDGE_MIN_WORST = 2.0
+PIN_STATION_LAYOUT_ALLOWANCE_MM = 0.25
+# The pinion is set on its seat with this feeler between its toothed south
+# face and the v2 post boss's spot face (MHA-A03 step 4); the assembly's
+# seat-gap range starts here.
+SEAT_FEELER_MM = 0.25
+# The shaft end stays recessed inside the boss in the worst case too.  The
+# overall length prints at OVERALL_LENGTH_PLACES, so the title block's general
+# grade for that many places is its band.  Nothing else can shallow the recess:
+# the pinion seats at the boss-north gap FLOOR (build_drive_train_assembly), so
+# the seat can only move it north, and the shaft length is +0/-0.40, so the
+# shaft can only get shorter.  The nominal recess is the 0.25 floor plus that
+# grade, rounded up to the next 0.01; a title-block change moves it.
+OVERALL_LENGTH_PLACES = 1
+OVERALL_LENGTH_GRADE_MM = (
+    _config.title_block(f"linear_{OVERALL_LENGTH_PLACES}pl")["value_in"] * MM_PER_IN
+)  # 0.762
+SHAFT_END_RECESS_MIN_WORST = 0.25
+SHAFT_END_RECESS = (
+    math.ceil(round((SHAFT_END_RECESS_MIN_WORST + OVERALL_LENGTH_GRADE_MM) * 100.0, 6))
+    / 100.0
+)  # 1.02
+# With the pin at boss mid-length, its wall to the shaft end is half the boss
+# less the recess less the pin radius, so the boss follows from the three.
+BOSS_LENGTH = 2.0 * (
+    PIN_EDGE_TO_SHAFT_END_NOMINAL + SHAFT_END_RECESS + PIN_DIA / 2.0
+)  # 14.215
+OVERALL_LENGTH = FACE_WIDTH + BOSS_LENGTH  # 24.615
+# Fidelity departure (#877): ch. 12 p. 19 shows the boss "a little over half"
+# a face long; this one is BOSS_LENGTH / FACE_WIDTH = 1.37 faces.  The 4.5 pin
+# wall alone needed 12.815 (1.23 faces) at the old 0.32 recess; the 1.02
+# recess that survives the general grade adds 1.40 more.
+PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0  # 17.5075 from the toothed (south) face
 PIN_CLOCKING_DEG = 13.703608450714796  # = build_drive_train_assembly.PINION_SEED_DEG
 if PIN_STATION - PIN_DIA / 2.0 < FACE_WIDTH + 0.5:
     raise AssertionError("retention pin hole breaks into the pinion's tooth face")
@@ -148,7 +188,7 @@ BORE_FIT_CALLOUT = "\n".join(
     (
         "BORE LIMITS GOVERN",
         f"MATE SHAFT {CRANKSHAFT_NUMBER}",
-        f"(\N{DIAMETER SIGN}{crankshaft_spec.SHAFT_DIA:.3f} "
+        f"(\N{DIAMETER SIGN}{crank_hub_geometry.SHAFT_DIA:.3f} "
         f"+{_SHAFT_UPPER:.3f}/{_SHAFT_LOWER:.3f})",
         f"(DIA CLR {_CLEARANCE_MIN:.3f}-{_CLEARANCE_MAX:.3f} mm)",
     )
@@ -217,14 +257,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # its callout locates the shared operation at boss mid-length and the actual
 # crankshaft/pinion stack sets it. The overall length is one place like the
 # face width: it only has to leave the shaft end recessed inside the boss, a
-# look, not a fit. The end break is a deburr: one place.
+# look, not a fit, and W15 sizes the boss so its general grade does. The end
+# break is a deburr: one place.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": 1},
     "BossProfile": {
         "OutsideDia": 2,
         "BoreDia": 3,
         "BossDia": 1,
-        "OverallLength": 1,
+        "OverallLength": OVERALL_LENGTH_PLACES,
     },
     "BossBreak": {"BossChamfer": 1},
 }

@@ -2107,3 +2107,12 @@ def test_a_malformed_stored_entry_is_recomputed(tmp_path, monkeypatch):
     bg._module_syntax.cache_clear()
     assert bg._module_syntax(source) == expected
     bg._module_syntax.cache_clear()
+
+
+def test_interference_contracts_do_not_depend_on_the_crankshaft_spec() -> None:
+    # Every assembly imports _interference_contracts, so a crankshaft length or
+    # station edit must not re-key them all (W15, Main 2026-09-25): the shaft
+    # diameter comes from its owner, crank_hub_geometry.
+    closure = _helper_names("_interference_contracts.py")
+    assert "crank_hub_geometry" in closure
+    assert "crankshaft_spec" not in closure
