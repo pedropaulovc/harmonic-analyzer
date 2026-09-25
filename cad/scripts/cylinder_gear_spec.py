@@ -37,8 +37,15 @@ FACE_WIDTH = 3.0
 FACE_WIDTH_TOLERANCE_MM = 0.05
 CAM_DIA = 30.6  # integral eccentric cam disc
 CAM_DIA_BAND = (0.0, -0.05)  # (upper, lower) deviations
-CAM_THICKNESS = 3.5  # reference nominal; axial fit governs the finished thickness
-OVERALL_THICKNESS = FACE_WIDTH + CAM_THICKNESS
+# Solid stack (#743): the overall thickness, cam face to back face, IS the
+# channel station pitch (machine channels.station_pitch_mm, pinned by
+# test_cylinder_bank_layout), so neighbouring gears bear cam face on back face
+# and set the stations the way the rocker hubs do (rocker_arm_spec.HUB_LENGTH).
+# The band is one-sided: a long stack is re-faced at fit-up, a thin gear could
+# not be fixed (cylinder_bank_layout.STACK_L20_ACCEPT).
+OVERALL_THICKNESS = 7.0565
+OVERALL_THICKNESS_BAND = (0.05, 0.0)  # (upper, lower) deviations
+CAM_THICKNESS = OVERALL_THICKNESS - FACE_WIDTH  # reference: the closed rod slot
 ECCENTRICITY = 8.64  # cam axis offset from the bore axis
 ECCENTRICITY_TOLERANCE_MM = 0.025
 SET_ECCENTRICITY_RANGE_MM = 0.025
@@ -70,13 +77,13 @@ SURFACE_FINISHES = (
     SurfaceFinishControl("cam_follower", MACHINED_UM, CylinderFace(CAM_DIA)),
 )
 
-# Marked model dimensions locate the blank, bore, cam and kerf. Bore diameter
-# and cam thickness are reference nominals with finished-fit callouts.
+# Marked model dimensions locate the blank, bore, cam, stacking thickness and
+# kerf. Bore diameter is a reference nominal with a finished-fit callout.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "BoreProfile": {"BoreDia"},
     "CamProfile": {"CamDia", "CamCy"},
-    "CamBoss": {"CamThickness"},
+    "CamBoss": {"OverallThickness"},
     "NotchProfile": {"NotchDepth", "NotchWidth", "NotchPhase"},
 }
 
@@ -84,14 +91,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # 2), so the MODEL owns them: build_cylinder_gear applies this map to the
 # .SLDPRT and draw_cylinder_gear only reads it back.  Three places where a
 # three-place band rides the dimension (the matched running bore's reference
-# nominal, the cam eccentricity); two where the band is a two-place one (cam
-# OD, face width, kerf width); one on the reference cam thickness and the
-# kerf depth; the notch phase is an angle read to the tenth of a degree.
+# nominal, the cam eccentricity, the +0.05/0 stacking thickness that sets
+# the station pitch); two where the band is a two-place one (cam OD, face
+# width, kerf width); one on the kerf depth; the notch phase is an angle read
+# to the tenth of a degree.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": 2},
     "BoreProfile": {"BoreDia": 3},
     "CamProfile": {"CamDia": 2, "CamCy": 3},
-    "CamBoss": {"CamThickness": 1},
+    "CamBoss": {"OverallThickness": 3},
     "NotchProfile": {"NotchDepth": 1, "NotchWidth": 2, "NotchPhase": 1},
 }
 
@@ -115,10 +123,12 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
-# The one sheet-derived dimension: the parenthesised end-to-end axial stack
-# (face width plus cam thickness), a read-only sum with no model dimension to
-# import.  Its places are still specification, so the sheet reads them here.
-DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall axial thickness": 1}
+# The one sheet-derived dimension: the parenthesised cam thickness (overall
+# less face width, #743), a read-only difference with no model dimension to
+# import.  Two places: it is the closed rod slot, and one place would print
+# 4.1 for the 4.0565 the ring runs in.  Its places are still specification,
+# so the sheet reads them here.
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {"cam thickness reference": 2}
 
 
 def matched_bore_limits(finished_shaft_dia_mm: float) -> tuple[float, float]:
