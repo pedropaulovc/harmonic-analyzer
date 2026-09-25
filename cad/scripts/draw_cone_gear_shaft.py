@@ -2,11 +2,12 @@ r"""Create the cone-gear-shaft manufacturing drawing under the simplicity policy
 
 The turned shaft is shown horizontally at 1:1 with baseline lengths from the
 large (faced) end below it and every diameter above it on that same side
-view, each dimension line inside the land it measures.  The three short tip
-lands are 6.9 mm apart, so their diameter texts climb in steps: the tip's
-line rises highest and each text hangs to the RIGHT of its line above every
-line it spans.  A standard isometric supplies pictorial clarity, and one
-note names the gear seats the lands are fitted to.  Source geometry and
+view, each dimension line inside the land it measures.  The two short lands
+ahead of the tip are 6.9 mm long, so the three tip-end diameter texts climb
+in steps: the tip's line rises highest and each text hangs to the RIGHT of
+its line above every line it spans.  A standard isometric supplies pictorial
+clarity, and the note names the gear seats the lands are fitted to and the
+tailstock support the tip land needs (U40).  Source geometry and
 native model fits stay authoritative: the sheet types no tolerance and no
 precision.
 
@@ -27,7 +28,6 @@ from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
     add_surface_finish,
-    add_view_centerline,
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
@@ -74,12 +74,16 @@ ISO_SCALE = (1, 2)
 
 
 # Landscape sheet, 0.4318 x 0.2794 m, title block bottom right (x > ~0.216,
-# y < ~0.066).  The 205.17 mm shaft at 1:1 spans 0.0474..0.2526 about
-# SIDE_CENTER, leaving the right third for the pictorial; the group sits
-# mid-height so the baseline stack below and the diameters above share the
-# field evenly, with the note block in the lower left.
-SIDE_CENTER = (0.150, 0.170)
-ISO_CENTER = (0.345, 0.185)
+# y < ~0.066).  The 200.89 mm shaft at 1:1 spans 0.0503..0.2512, leaving the
+# right third for the pictorial; the group sits just below mid-height so
+# the baseline stack below and the diameters above share the field with the
+# note block in the lower left (review 2026-09-23: at 0.170 rows A-B stood
+# empty but for the note).  The view is placed by its large end: every
+# dimension below is laid out from that datum face, so a change at the tip
+# (E1 shortened it 2.9 mm) moves only the tip.
+BIG_END_X = 0.2526
+SIDE_CENTER = (BIG_END_X - SHAFT_LENGTH / 2000.0, 0.150)
+ISO_CENTER = (0.345, 0.165)
 NOTES_XY = (0.058, 0.060)
 # Off-sheet-left donor: the five diameters are model dimensions of circular
 # profile sketches, so they can only be IMPORTED into a view that faces those
@@ -89,32 +93,35 @@ DONOR_CENTER = (0.360, 0.090)
 
 # Axial step stations (extrude depths Sec{i}End), all measured from the
 # large-end datum face: baseline dimensioning below the shaft, shortest
-# nearest the part.  The one radius rides above the journal shoulder it
+# nearest the part, each text centred between the big end and its shoulder.
+# The one radius rides above the journal shoulder it
 # attaches to (the fillet feature's first edge), its leader dropping straight
 # to that corner, right of the Ø9.525 text and left of the pivot finish.
 SIDE_KEEP = {
-    "Sec0End": (0.2311, 0.1555),
-    "Sec1End": (0.1672, 0.1465),
-    "Sec2End": (0.1638, 0.1375),
-    "Sec3End": (0.1603, 0.1285),
-    "Sec4End": (0.1499, 0.1195),
-    "ShoulderR": (0.2000, 0.2120),
+    "Sec0End": (0.2311, 0.1355),
+    "Sec1End": (0.1707, 0.1265),
+    "Sec2End": (0.1672, 0.1175),
+    "Sec3End": (0.1638, 0.1085),
+    "Sec4End": (0.1499, 0.0995),
+    "ShoulderR": (0.2000, 0.1920),
 }
 # Diameters, imported on the donor and dragged onto the side view.  A vertical
 # linear dimension's line sits at its text x and the text hangs to the RIGHT
 # of that line (~32 mm wide with its stacked band), so each x lies INSIDE the
-# land it measures (the big end is at sheet x 0.2526; land 1 spans
-# 0.0819..0.2096, land 2 0.0750..0.0819, land 3 0.0681..0.0750, land 4
-# 0.0474..0.0681); Ø12.231 stands just off the faced end.  The three tip
-# lands are only 6.9 mm apart, so a text spans its right-hand neighbours'
+# land it measures (the big end is at sheet x 0.2526; since U40 land 1 spans
+# 0.0888..0.2096, land 2 0.0819..0.0888, land 3 0.0750..0.0819, land 4
+# 0.0503..0.0750); Ø12.231 stands just off the faced end.  Lands 2 and 3 are
+# only 6.9 mm long, so a tip-end text spans its right-hand neighbours'
 # lines: the tip's text sits highest and each neighbour to the right steps
-# down, so no line rises through a text (codex, 18395f30).
+# down, so no line rises through a text (codex, 18395f30).  Lands 2 and 3
+# carry their lines mid-land; the tip's line stays 1.7 mm in from the tip
+# face, right of the tip finish glyph.
 SIDE_DIAMETERS = {
-    "Sec0Dia": (0.2700, 0.1820),
-    "Sec1Dia": (0.1400, 0.1930),
-    "Sec2Dia": (0.0810, 0.1960),
-    "Sec3Dia": (0.0690, 0.2080),
-    "Sec4Dia": (0.0520, 0.2200),
+    "Sec0Dia": (0.2700, 0.1620),
+    "Sec1Dia": (0.1400, 0.1730),
+    "Sec2Dia": (0.0853, 0.1760),
+    "Sec3Dia": (0.0785, 0.1880),
+    "Sec4Dia": (0.0520, 0.2000),
 }
 # Sheet width of one diameter text with its stacked band, for the layout test.
 DIAMETER_TEXT_WIDTH = 0.032
@@ -150,6 +157,48 @@ def _cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
             f"nearest is {radius_mm:.4f} mm"
         )
     return face
+
+
+# A centreline runs a short way past the part it marks.
+AXIS_OVERRUN = 0.003
+
+
+def _add_shaft_axis(adapter: Any, view: Any) -> None:
+    """Draw the shaft axis end to end as ONE sheet centreline.
+
+    A face-derived centreline (``add_view_centerline``) stops at its own land,
+    so the first sheet showed an axis under the journal only (review
+    2026-09-23), and ``InsertCenterLine2`` returned nothing for the third land
+    (Ø6.35) on the farm (run 772bf5f3), after the first two had succeeded.
+    So the axis is sketched on the sheet, as the swing platform's cone axis
+    is: through the projected axis the finish leaders already attach to,
+    checked against the view outline's mid-height, and AXIS_OVERRUN past each
+    end face.
+    """
+    big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
+    tip_end_x = big_end_x - SHAFT_LENGTH / 1000.0
+    axis_y = SIDE_CENTER[1]
+    outline = tuple(float(value) for value in view.GetOutline())
+    if abs(0.5 * (outline[1] + outline[3]) - axis_y) > 0.0005:
+        raise RuntimeError(
+            f"side view outline {outline!r} is not centred on the axis y={axis_y}"
+        )
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    drawing.EditSheet()
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    centerline = manager.CreateCenterLine(
+        tip_end_x - AXIS_OVERRUN, axis_y, 0.0, big_end_x + AXIS_OVERRUN, axis_y, 0.0
+    )
+    if centerline is None:
+        raise RuntimeError("failed to sketch the shaft axis centreline")
+    # A sheet sketch line prints in the under-defined sketch blue (run
+    # f2e72b0f); colour it black, as draw_top_frame's owned centrelines are.
+    segment = _early_bound(centerline, "ISketchSegment")
+    segment.Color = 0
+    if int(segment.Color) != 0:
+        raise RuntimeError("shaft axis centreline colour did not persist")
+    adapter.currentModel.ClearSelection2(True)
+    adapter.currentModel.EditRebuild3()
 
 
 def _move_dimension(
@@ -235,13 +284,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     pivot_face = _cylindrical_face(adapter, side, JOURNAL_DIA)
     tip_face = _cylindrical_face(adapter, side, SECTION_DIAS[-1])
-    add_view_centerline(
-        adapter,
-        side,
-        face_xy=(SIDE_CENTER[0] + 0.050, SIDE_CENTER[1]),
-        label="shaft longitudinal axis",
-        entity=pivot_face,
-    )
+    _add_shaft_axis(adapter, side)
 
     # The donor is curated FIRST so the diameters cannot be claimed (and then
     # deleted) by a view that cannot show them.
@@ -283,9 +326,10 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         side,
-        symbol_xy=(0.2400, 0.2000),
+        symbol_xy=(0.2400, 0.1800),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_journal"),
         label="pivot journal finish",
+        char_height=0.0025,
         entity_type="FACE",
         entity=pivot_face,
         leader_attach_xy=pivot_top,
@@ -293,9 +337,10 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         side,
-        symbol_xy=(0.0240, 0.2160),
+        symbol_xy=(0.0240, 0.1960),
         control=surface_finish_by_key(SURFACE_FINISHES, "tip_journal"),
         label="tip journal finish",
+        char_height=0.0025,
         entity_type="FACE",
         entity=tip_face,
         leader_attach_xy=tip_top,

@@ -46,7 +46,7 @@ BASE_PITCH = math.pi * M * math.cos(PRESSURE_ANGLE)
 # Radial play.  Runouts turn with their gear, so they close the mesh at some
 # angle; float can open it.  The cone runout is sized for the soldered seats
 # #839 prints (0/-0.05), the looser of that and the current shaft land band.
-SEAT_LAND_LOWER = min(cone_gear_shaft_spec.SECTION_DIA_BAND[1], -0.05)
+SEAT_LAND_LOWER = min(cone_gear_shaft_spec.GEAR_SEAT_BAND[1], -0.05)
 CONE_RUNOUT = (spec.BORE_DIA_BAND[0] - SEAT_LAND_LOWER) / 2.0
 DRUM_RUNOUT = drum.BORE_DIAMETRAL_CLEARANCE_MM[1] / 2.0
 _JOURNAL = max(_config.fit("shaft_in_bushing")["diametral_clearance_mm"]) / 2.0

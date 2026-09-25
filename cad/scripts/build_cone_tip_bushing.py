@@ -75,7 +75,7 @@ _CLEARANCE_MIN, _CLEARANCE_MAX = (
     float(value)
     for value in _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
 )
-_JOURNAL_UPPER, _JOURNAL_LOWER = cone_gear_shaft_spec.SECTION_DIA_BAND
+_JOURNAL_UPPER, _JOURNAL_LOWER = cone_gear_shaft_spec.SECTION_DIA_BANDS[-1]
 BORE_DIA_BAND = (  # (upper, lower) deviations
     _JOURNAL_LOWER + _CLEARANCE_MAX,
     _JOURNAL_UPPER + _CLEARANCE_MIN,

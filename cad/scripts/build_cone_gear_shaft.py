@@ -26,16 +26,17 @@ gear faces (stations below quoted from the legacy pivot end):
 
 * 12.2308 mm x 43.011 -- v2 pivot-post bearing journal, 0.05 diametral
   running clearance
-* 3/8 in x 141.9 -- 64T at stations 14.9..24.9 + seats T120..T024
-* 1/4 in x 148.8 -- T018 seat
-* 1/8 in x 155.7 -- T012 seat
-* 1/16 in x 138.9788 -- T006 seat and tip journal; contacts the exact
-  McMaster 94025A164 conical cup apex at 9.5 mm thread engagement
-  (rule-12 E11).  Its 16.393 mm terminal land also carries the 4 mm tip
-  bushing.  It was 1/32 in while the bore rule was read literally off the
-  gear seat; at L/D 26 that land could not be turned in steel.  The chosen
+* 3/8 in x 135.0 -- 64T at stations 14.9..24.9 + seats T120..T030
+* 1/4 in x 141.9 -- T024 seat
+* 1/8 in x 148.8 -- T018 seat
+* 1/16 in x 138.9788 -- T012 and T006 seats and tip journal; contacts the
+  exact McMaster 94025A164 conical cup apex at 9.5 mm thread engagement
+  (rule-12 E11).  Its 23.294 mm terminal land also carries the 4 mm tip bushing.  U40
+  (2026-09-23) moved every small land one station toward the big end at
+  unchanged overall length, so this land now also carries T012 and runs at
+  L/D 14.7; it is turned with tailstock support (a drawing note).  The
   1/16 in step leaves T006 the 0.621 mm worst-case web accepted as its named
-  exception (U40) and L/D 10 -- see cone_gear_shaft_spec.SECTIONS.
+  exception (U40) -- see cone_gear_shaft_spec.SECTIONS.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 12" -- the journal comes from the
 manually rederived v2 post bore and its 42.011 axial body; the gear-seat
@@ -94,7 +95,7 @@ from cone_gear_shaft_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FILLET_RADIUS,
-    SECTION_DIA_BAND,
+    SECTION_DIA_BANDS,
     SECTIONS,
     SURFACE_FINISHES,
 )
@@ -115,11 +116,11 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 # exact-tracking seat pitch 6.8889 (= 7.0565 drum z-pitch x cos 12.5188 deg,
 # the shallower incline at DP 49.82): seat j spans 28.25 + 6.8889 j +- 3.25
 # from the pivot end; each step station sits in the ~0.39 air gap between
-# faces (T024 north 141.72 | 141.9 | T018 south 142.11, and so on). Diameters
-# mirror build_cone_gear.bore_dia_in (snug perpendicular seats), stepping much
-# finer than the old DP 30 shaft because the tip gears shrank: T006 OD is now
-# 4.08 mm.  The terminal land stops at 1/16": below that the T006 rim gains
-# little and the journal becomes unturnable (L/D 26 at 1/32").
+# faces (T030 north 134.83 | 135.0 | T024 south 135.22, and so on; U40).
+# Diameters agree with build_cone_gear.bore_dia_in (snug perpendicular seats),
+# stepping much finer than the old DP 30 shaft because the tip gears shrank:
+# T006 OD is now 4.08 mm.  The terminal land stops at 1/16": below that the
+# T006 rim gains little and the journal becomes unturnable (L/D 31 at 1/32").
 
 
 async def build(adapter) -> dict[str, str]:
@@ -243,12 +244,12 @@ async def build(adapter) -> dict[str, str]:
     # The five turned diameters carry their fit on the MODEL dimension, so
     # SolidWorks renders the limits and re-renders them on a unit change. The
     # sheet used to append "+0.00/-0.02" as frozen callout text instead.
-    for section in range(5):
+    for section, band in enumerate(SECTION_DIA_BANDS):
         set_dimension_bilateral_tolerance(
             adapter,
             f"Sec{section}Profile",
             f"Sec{section}Dia",
-            *deviations(SECTION_DIA_BAND),
+            *deviations(band),
         )
     # Display precision is model-owned too (drawing-simplicity policy rule 2).
     apply_drawing_precision(adapter, DRAWING_PRECISION)

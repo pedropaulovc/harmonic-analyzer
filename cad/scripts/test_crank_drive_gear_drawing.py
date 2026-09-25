@@ -122,7 +122,7 @@ def test_bore_band_is_derived_from_its_fit_class_not_written_by_hand() -> None:
     # limits. Move either input and the bore must move with it -- that is what
     # this pins, not the literal pair of numbers.
     low, high = _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
-    land_upper, land_lower = cone_gear_shaft_spec.SECTION_DIA_BAND
+    land_upper, land_lower = cone_gear_shaft_spec.SECTION_DIA_BANDS[1]
     assert spec.BORE_DIA == pytest.approx(cone_gear_shaft_spec.SECTION_DIAS[1])
     assert part.BORE_DIA_BAND == (
         pytest.approx(land_lower + high),
