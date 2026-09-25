@@ -5,7 +5,7 @@ metadata:
   type: reference
 ---
 
-meshprobe (`uv run meshprobe`, pedropaulovc/meshprobe, 1.2.0) inspects/renders release
+meshprobe (`uv run meshprobe`, pedropaulovc/meshprobe, pinned `>=1.4.0`) inspects/renders release
 GLBs in durable sessions. Hard-won usage notes (2026-07-17, filed as issues #93–#102):
 
 - **Blender ≥ 5.2 required** (worker calls `gpu.init()`, new in 5.2; 4.5/5.1 crash with
@@ -44,7 +44,11 @@ GLBs in durable sessions. Hard-won usage notes (2026-07-17, filed as issues #93�
   un-newlined traceback line so the controller never parses the reply
   (filed upstream: pedropaulovc/meshprobe). Fixes: `export_models.sanitize_glb` now
   strips such attributes at export time (every `.glb` through `_save_as`); for an
-  already-exported bundle run the same function on the file. Local venv patch to
-  `meshprobe/blender/worker.py::emit` (an empty `print()` before the JSON) makes a
-  bad file fail in 6 s with the importer's message -- `uv sync` reverts it. Bare
-  `meshprobe find *` gets shell-expanded: quote the pattern.
+  already-exported bundle run the same function on the file. meshprobe **1.4.0 fixes
+  the worker upstream** (`emit` writes `"\n" + json + "\n"`), so a bad file now fails
+  in seconds with the importer's traceback in the error (verified 2026-09-24 on a
+  synthetic TEXCOORD_0-short GLB). The interim fix was a hand edit to `worker.py`
+  in amet's **uv cache**, NOT the venv: uv hardlinks installs from the cache, so the
+  edit reached every environment on amet and `uv sync` did NOT revert it, while farm
+  workers never had it. Never patch an installed dependency in place; bump the pin.
+  Bare `meshprobe find *` gets shell-expanded: quote the pattern.
