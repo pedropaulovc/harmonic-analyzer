@@ -100,6 +100,16 @@ for _stream in (sys.stdout, sys.stderr):
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "cad" / "scripts"))
 
+import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
+import _doit_load  # noqa: E402  (the graph load as a ``doit.load`` span)
+
+# doit's loader finds this stamp in the namespace it loads and emits ``doit.load``
+# once task generation ends -- under ``python -m doit`` and ``build.py`` alike;
+# the watch records a failure in the rest of this module's own import.
+_DOIT_LOAD = _doit_load.LoadStamp(_DOIT_LOAD_STARTED_NS)
+_doit_load.watch_import(_DOIT_LOAD)
+_doit_load.install()
+
 from _buildgraph import (  # noqa: E402
     ASSEMBLY_ORDER,
     CAD_OUT,
@@ -126,17 +136,10 @@ from _buildgraph import (  # noqa: E402
 import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
 import _farm  # noqa: E402  (farm executor: cache-missing leaves run on the pool)
 import _sw_lifecycle  # noqa: E402  (SolidWorks autostart/recover; lazy-imports sw_recovery)
-import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
-import _doit_load  # noqa: E402  (the graph load as a ``doit.load`` span)
 from _drawing_registry import (  # noqa: E402
     DRAWING_TEMPLATES,
     DRAWINGS_BY_NAME,
 )
-
-# doit's loader finds this stamp in the namespace it loads and emits ``doit.load``
-# once task generation ends -- under ``python -m doit`` and ``build.py`` alike.
-_DOIT_LOAD = _doit_load.LoadStamp(_DOIT_LOAD_STARTED_NS)
-_doit_load.install()
 
 REPO_ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = REPO_ROOT / "cad" / "config"
