@@ -17,7 +17,7 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_bracket_geometry import THICKNESS as STRAP_T
 from pinion_bracket_geometry import THICKNESS_BAND as STRAP_T_BAND
 from pinion_handle_geometry import ROD_DIA, ROD_DIA_BAND
-from pinion_rig_layout import DRUM_LEN, FRONT_BLOCK_FEELER, FRONT_BLOCK_FEELER_BAND
+from pinion_rig_layout import DRUM_END_SHIM, DRUM_END_SHIM_SET_ERROR, DRUM_LEN
 
 SHAFT_DIA = 8.0
 SHAFT_LEN = 226.25  # unchanged origin-to-back-crown-root station
@@ -58,18 +58,18 @@ DRUM_STATION = DRUM_STATION_AS_BUILT + DRUM_AFT_SHIFT
 DRUM_LEN_BAND = (LINEAR_X_BAND, -LINEAR_X_BAND)  # general .X
 MIN_LAND_OVER_STRAP = 0.5
 DRUM_STATION_BAND = LINEAR_X_BAND
-# User ruling 2026-09-24 (option c): the pivot blocks locate the swing cluster.
-# It is pushed against the back block, and the front block's slotted base
-# holes are set at fit-up with an END_PLAY feeler, within END_PLAY_SET_ERROR.
-# That total play is shared by the cluster's four axial gaps (front block to
-# front strap, front strap to drum, drum to back strap, back strap to back
-# block), each >= 0 and split any way, so the two drum-end airs together run
-# from 0 (all the play at the blocks) up to the whole play.  The assembly
-# shows the fit-up stack, both drum-end airs at 0 (pinion_rig_layout).  The
-# drum hard forward and hard aft are the two stops.
-STRAP_AXIAL_LOCATION = "block-stop-slot-set"
-END_PLAY = FRONT_BLOCK_FEELER  # the rig's one fit-up feeler (pinion_rig_layout)
-END_PLAY_SET_ERROR = FRONT_BLOCK_FEELER_BAND
+# User ruling 2026-09-24 (option c): the pivot blocks locate the swing
+# cluster.  Option E-a then pins both straps to the torque shaft, which is
+# match-drilled with the END_PLAY feeler as a shim at the drum's front end
+# (Main, restricted review of #858): the strap spacing is frozen at the drum
+# plus the shim, so the drum turns between the straps in END_PLAY +/-
+# END_PLAY_SET_ERROR of air, split any way between its two ends.  The block
+# gaps are the pinned group's own end play and no longer feed the drum's air.
+# The assembly shows the drilling set-up, the drum hard on the back strap
+# (pinion_rig_layout).  The drum hard forward and hard aft are the two stops.
+STRAP_AXIAL_LOCATION = "pinned-shim-set"
+END_PLAY = DRUM_END_SHIM  # the rig's one fit-up feeler (pinion_rig_layout)
+END_PLAY_SET_ERROR = DRUM_END_SHIM_SET_ERROR
 MIN_END_PLAY = 0.1  # the drum never binds between the straps
 LAND_FINISH_RUNOUT = 2.0  # the Ra 1.6 pass runs out this far past the land
 LAND_ENDS = ("front inboard", "front outboard", "back inboard", "back outboard")
@@ -78,9 +78,9 @@ STOPS = {"drum forward": 0.0, "drum aft": 1.0}  # share of the air at the front
 
 def drum_total_air() -> tuple[float, float]:
     """Total axial air between the drum ends and the strap inner faces."""
-    if STRAP_AXIAL_LOCATION != "block-stop-slot-set":
+    if STRAP_AXIAL_LOCATION != "pinned-shim-set":
         raise AssertionError(f"no float model for {STRAP_AXIAL_LOCATION!r}")
-    return (0.0, END_PLAY + END_PLAY_SET_ERROR)
+    return (END_PLAY - END_PLAY_SET_ERROR, END_PLAY + END_PLAY_SET_ERROR)
 
 
 def land_stations(journal_len: float) -> tuple[float, float]:

@@ -458,7 +458,7 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     assert spec.DRUM_LEN == drum.FACE_WIDTH == assembly.APINION_DRUM_LEN
     assert spec.STRAP_T == strap.THICKNESS == assembly.STRAP_T
     assert spec.STRAP_T_BAND == pinion_bracket_spec.THICKNESS_BAND
-    assert spec.STRAP_AXIAL_LOCATION == "block-stop-slot-set"
+    assert spec.STRAP_AXIAL_LOCATION == "pinned-shim-set"
     assert spec.DRUM_STATION == pytest.approx(
         spec.DRUM_STATION_AS_BUILT + spec.DRUM_AFT_SHIFT
     )
@@ -475,8 +475,8 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     from _printed_tolerance import printed_band_mm
 
     assert (spec.END_PLAY, spec.END_PLAY_SET_ERROR) == (
-        rig.FRONT_BLOCK_FEELER,
-        rig.FRONT_BLOCK_FEELER_BAND,
+        rig.DRUM_END_SHIM,
+        rig.DRUM_END_SHIM_SET_ERROR,
     )
     assert spec.LINEAR_X_BAND == spec.HEAD_LEN_BAND == printed_band_mm(1)
     assert spec.DRUM_LEN == rig.DRUM_LEN
@@ -502,9 +502,9 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     assert spec.land_margin_slack(spec.JOURNAL_LEN - 1.0) < 0.0
     # The drum never binds between the straps.
     assert spec.END_PLAY - spec.END_PLAY_SET_ERROR >= 0.1
-    # The drum-end airs share the cluster's one end play with the block gaps.
+    # The drum-end airs are the shim the pinned straps were drilled on.
     assert spec.drum_total_air() == (
-        0.0,
+        pytest.approx(spec.END_PLAY - spec.END_PLAY_SET_ERROR),
         pytest.approx(spec.END_PLAY + spec.END_PLAY_SET_ERROR),
     )
     # The lands are centred on their straps (to the printed place) with the
@@ -671,10 +671,51 @@ def test_journal_lands_cover_their_straps_in_the_pose() -> None:
         start = assembly.ARBOR_Z0 + land_z
         margins += [lo - start, start + spec.JOURNAL_LEN - hi]
     assert min(margins) >= spec.MIN_LAND_OVER_STRAP
-    assert margins == pytest.approx([5.15, 4.85, 4.85, 5.15], abs=5e-3)
+    # The pose is the drilling set-up: the drum hard on the back strap and
+    # the front strap one shim ahead of the drum (Main, #858 ruling 3).
+    assert margins == pytest.approx([4.9, 5.1, 4.85, 5.15], abs=5e-3)
     source = inspect.getsource(assembly)
     assert "falls short of the back strap" not in source
     assert "journal land misses its strap" in source
+
+
+def test_drum_runs_in_the_shim_the_straps_were_drilled_on() -> None:
+    # Main (#858, ruling 3): the E-a pins freeze the strap spacing where the
+    # shaft is match-drilled, so the drum's running clearance is whatever the
+    # drilling set-up leaves.  It is set with the rig's one feeler as a shim at
+    # the drum's front end, which MHA-062's drilling note prints; the drum
+    # then runs in 0.25 +/- 0.10 of end play and never binds.  Before the
+    # ruling the straps closed line to line on the drum, and drum_total_air
+    # still read the block-stop model (0.0 up to the whole feeler).
+    import pinion_pivot_shaft_spec as shaft
+    import pinion_rig_layout as rig
+
+    assert spec.drum_total_air() == pytest.approx((0.15, 0.35))
+    assert spec.drum_total_air()[0] >= spec.MIN_END_PLAY
+    assert rig.STRAP_Z_INNER[1] - rig.STRAP_Z_INNER[0] == pytest.approx(
+        rig.DRUM_LEN + rig.FRONT_BLOCK_FEELER, abs=1e-9
+    )
+    assert rig.DRUM_BACK_Z == rig.STRAP_Z_INNER[1]
+    assert (rig.DRUM_END_SHIM, rig.DRUM_END_SHIM_SET_ERROR) == (
+        rig.FRONT_BLOCK_FEELER,
+        rig.FRONT_BLOCK_FEELER_BAND,
+    )
+    assert rig.DRUM_FRONT_Z - rig.STRAP_Z_INNER[0] == pytest.approx(rig.DRUM_END_SHIM)
+    # The drilling pose is printed on the part that is drilled.
+    callout = shaft.PIN_HOLE_CALLOUT.split("\n")
+    assert callout == [
+        "MATCH-DRILL THRU AT ASSEMBLY",
+        "IN MHA-056 CROSS HOLES, 2 PL:",
+        "REAR END FLUSH WITH MHA-061 REAR FACE +/-0.10,",
+        "STRAPS ON BACK STOP, MHA-002 ON BACK STRAP,",
+        "0.25 FEELER AT MHA-002 FRONT END",
+    ]
+    # Both bearing stacks carry the flush setting, and the front one the
+    # shim's set error, by name.
+    assert rig.TORQUE_SHAFT_BEARING_STACK["MHA-062 rear end flush set"] == -0.10
+    assert rig.TORQUE_SHAFT_BACK_BEARING_STACK["MHA-062 rear end flush set"] == -0.10
+    assert rig.TORQUE_SHAFT_BEARING_STACK["MHA-062 drum end shim set error"] == -0.10
+    assert rig.LIFT_ROD_SEAT_STACK["MHA-062 drum end shim set error"] == -0.10
 
 
 class _SketchFeature:

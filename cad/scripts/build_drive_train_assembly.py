@@ -1367,7 +1367,8 @@ APINION_X = X_DRUM + TIP_DRUM120 + TIP_APINION + APINION_GAP
 APINION_Y = Y_DRIVE
 # Ruling (c) (user, 2026-09-24): the blocks locate the swing cluster -- every
 # rig z station is pinion_rig_layout's fit-up stack (the cluster hard on the
-# back block, line to line), shared with the base's transferred seats.
+# back block, the drum hard on the back strap and one shim off the front one:
+# MHA-062's drilling set-up), shared with the base's transferred seats.
 APINION_DRUM_LEN = RIG.DRUM_LEN  # build_alignment_pinion FACE_WIDTH
 APINION_Z_FRONT = RIG.DRUM_FRONT_Z
 APINION_Z_BACK = RIG.DRUM_BACK_Z
@@ -1397,7 +1398,7 @@ PIVOT_SHAFT_Z0 = RIG.TORQUE_SHAFT_Z0
 # Ø6.35 torque shaft, set back-flush; its front end stands the worst-stack
 # allowance proud of the front block (pinion_rig_layout).
 LIFT_ROD_Z0 = RIG.LIFT_ROD_Z0
-# front end LEVER_SEAT_PROUD (15.05) south of the front block -- the lever
+# front end LEVER_SEAT_PROUD (15.10) south of the front block -- the lever
 # hub's seat, sized so the hub never stops the rod (pinion_rig_layout)
 BLOCK_X = PIVOT_X  # block local origin ON the pivot bore (datum B, U28)
 BLOCK_FRONT_Z0 = RIG.FRONT_BLOCK_Z0  # one 0.25 feeler off the front strap
@@ -1444,6 +1445,30 @@ if Z_DRUM0 - DRUM_FACE / 2.0 < APINION_Z_FRONT + 1.0:
     raise AssertionError("alignment pinion too short at the front station")
 if Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 > APINION_Z_BACK + 0.5:
     raise AssertionError("alignment pinion misses the j = 19 station")
+# Worst stack at both ends (RIG_AFT_SHIFT, Main on #858): the drum's back end
+# advances from the pose by DRUM_BACK_ADVANCE_STACK and must still cover all of
+# g19's face (so j = 19 engages >= 2.0 a fortiori), by less than one grid step
+# (the shift is the smallest that does it); its front end retreats by
+# DRUM_FRONT_RETREAT_STACK and must stay 1.0 south of g0's front face.
+_G19_FACE_Z = (
+    Z_DRUM0 + 19 * Z_PITCH - DRUM_FACE / 2.0,
+    Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0,
+)
+APINION_BACK_WORST_Z = APINION_Z_BACK - sum(RIG.DRUM_BACK_ADVANCE_STACK.values())
+J19_ENGAGEMENT_WORST = min(APINION_BACK_WORST_Z, _G19_FACE_Z[1]) - _G19_FACE_Z[0]
+if J19_ENGAGEMENT_WORST < 2.0:
+    raise AssertionError(f"j = 19 engages only {J19_ENGAGEMENT_WORST:.3f} at the worst stack")
+J19_FULL_FACE_MARGIN = APINION_BACK_WORST_Z - _G19_FACE_Z[1]
+if J19_FULL_FACE_MARGIN < -1e-9:
+    raise AssertionError(
+        f"j = 19 loses {-J19_FULL_FACE_MARGIN:.3f} of its full face at the worst stack"
+    )
+if J19_FULL_FACE_MARGIN >= RIG.RIG_AFT_SHIFT_STEP:
+    raise AssertionError("RIG_AFT_SHIFT is more than the smallest step for j = 19")
+APINION_FRONT_WORST_Z = APINION_Z_FRONT + sum(RIG.DRUM_FRONT_RETREAT_STACK.values())
+J0_SLACK_WORST = (Z_DRUM0 - DRUM_FACE / 2.0 - 1.0) - APINION_FRONT_WORST_Z
+if J0_SLACK_WORST < 0.0:
+    raise AssertionError(f"the drum uncovers j = 0 by {-J0_SLACK_WORST:.3f} at the worst stack")
 if (
     math.hypot(APINION_X - X_DRUM, Y_DRIVE - APINION_Y)
     < TIP_DRUM120 + TIP_APINION + 1.0
@@ -1646,7 +1671,7 @@ _FPIN_Y_AT_CAM = _FPIN_C[1] - _S_CAM * _SPR_N[1]  # 64.04
 # the thinnest strap (test_drive_train_support_layout).
 _STRAP_MID_Z = tuple(
     z + s * STRAP_T / 2.0 for z, s in zip(STRAP_Z_INNER, (-1.0, 1.0), strict=True)
-)  # -75.862, +76.338 (pinion_rig_layout)
+)  # -74.862, +77.588 (pinion_rig_layout)
 CAM_PIN_STATION = (STRAP_T / 2.0, RIG.BACK_CAM_PIN_STATION)  # pin plane, from each collar front face
 CAM_Z0 = tuple(z - s for z, s in zip(_STRAP_MID_Z, CAM_PIN_STATION, strict=True))
 for _z0 in CAM_Z0:

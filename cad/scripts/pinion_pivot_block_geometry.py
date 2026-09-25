@@ -32,8 +32,9 @@ BLOCK_DEPTH = 10.5  # U28: 12 -> 10.25; ruling (c) then put the back strap hard
 # Option E-a (Main, Codex #858): the strap-pinned torque shaft retreats up to
 # the widest feeler setting (0.35) into the back block, so the shallowest
 # printed block (depth - .XX row) must still bear the 9.5 floor: 10.25 bore
-# 9.39, so the depth grew to the round 10.5 (9.64 worst), outward, so the
-# cluster and its drilled stations stay put (pinion_rig_layout).
+# 9.39, so the depth grew to the round 10.5 (9.54 worst, the shaft's flush
+# setting included), outward, so the cluster and its drilled stations stay
+# put (pinion_rig_layout).
 # Depth prints at the drawing document's two places: MHA-061's sheet is not
 # precision-migrated (_drawing_contract), so the title block's .XX row governs
 # it, and the rig's worst fitted stack reads that printed row (Main, Codex #854
