@@ -370,7 +370,7 @@ def test_plan_angle_prints_one_place_under_the_one_degree_band() -> None:
 def test_section_reads_by_its_bore_axis_not_by_a_note() -> None:
     assert "SECTION A-A" not in spec.DRAWING_NOTES
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_add_cone_section_centerline(adapter, section)" in source
+    assert "_add_cone_section_centerline(adapter, section, cone_axis)" in source
 
 
 def test_spotface_station_prints_its_value_on_its_own_dimension_line() -> None:
@@ -764,3 +764,109 @@ def test_journal_axis_readback_runs_before_the_ownership_gate() -> None:
     axis = source.index("    _assert_journal_axis_direction(adapter)\n")
     owner = source.index("    _assert_cone_incline_single_owner(adapter)\n")
     assert axis < owner
+
+
+def _function_source(module, name: str) -> str:
+    import inspect
+
+    return inspect.getsource(getattr(module, name))
+
+
+def test_cone_axis_view_is_derived_from_the_rebuilt_axis() -> None:
+    # Codex PRRT_kwDOPHDy386mFsEs: the named view was a matrix frozen to the
+    # Python-time INCLINE_DEG, so a GUI edit of ConeIncline left View B skewed.
+    import math
+
+    incline = math.radians(spec.INCLINE_DEG)
+    designed = (math.sin(incline), 0.0, math.cos(incline))
+    expected = (
+        math.cos(incline), 0.0, -math.sin(incline),
+        0.0, 1.0, 0.0,
+        math.sin(incline), 0.0, math.cos(incline),
+    )
+    # r12's readback runs the other sense; either sense gives the same view.
+    readback = (-0.0009728067983417014, 0.0, -0.004381452997468928)
+    for axis in (designed, tuple(-v for v in designed), readback):
+        rotation = part.cone_axis_view_rotation(axis)
+        assert max(abs(a - b) for a, b in zip(rotation, expected)) < 1e-9
+    # A different rebuilt incline yields a different view: nothing is frozen.
+    edited = math.radians(20.0)
+    rotation = part.cone_axis_view_rotation((math.sin(edited), 0.0, math.cos(edited)))
+    assert abs(rotation[6] - math.sin(edited)) < 1e-12
+    assert abs(rotation[0] - math.cos(edited)) < 1e-12
+    for body in (
+        _function_source(part, "cone_axis_view_rotation"),
+        _function_source(part, "sync_cone_axis_view"),
+        _function_source(drawing, "_assert_view_geometry"),
+        _function_source(drawing, "_add_cone_section_centerline"),
+    ):
+        assert "math.radians(INCLINE_DEG)" not in body
+        assert "INCLINE_DEG)" not in body
+    assert "journal_axis_vector(adapter)" in _function_source(part, "sync_cone_axis_view")
+    assert not hasattr(part, "_name_cone_axis_view")
+
+
+def test_drawing_regenerates_view_b_from_the_live_axis_before_placing_it() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    sync = source.index("    cone_axis = sync_cone_axis_view(adapter)\n")
+    place = source.index("        CONE_AXIS_VIEW,\n")
+    assert sync < place
+    assert "        cone_axis=cone_axis,\n" in source
+
+
+class _ViewModel:
+    def __init__(self, stored) -> None:
+        from _named_views import octant_rotation
+
+        self._standard = octant_rotation(1, 1, 1)
+        self.stored = stored
+        self.named: list[str] = []
+        self.Extension = self
+        self.ActiveView = type("View", (), {"Orientation3": None})()
+
+    def GetStandardViewRotation(self, _view: int):
+        return self._standard
+
+    def GetNamedViewRotation(self, _name: str):
+        return self.stored
+
+    def NameView(self, name: str) -> None:
+        self.named.append(name)
+        self.stored = self.pending
+
+    def ShowNamedView2(self, _name: str, _view: int) -> None:
+        pass
+
+
+def test_sync_regenerates_only_a_stale_named_view(monkeypatch) -> None:
+    import math
+    from types import SimpleNamespace
+
+    edited = math.radians(20.0)
+    axis = (math.sin(edited), 0.0, math.cos(edited))
+    fresh = part.cone_axis_view_rotation(axis)
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(part, "journal_axis_vector", lambda _adapter: axis)
+    monkeypatch.setattr(part, "double_array", lambda values: tuple(values))
+
+    class _Utility:
+        def CreateTransform(self, values):
+            model.pending = tuple(values[:9])
+            return values
+
+    # A view saved at the old incline is regenerated from the rebuilt axis.
+    stale = part.cone_axis_view_rotation(
+        (math.sin(math.radians(spec.INCLINE_DEG)), 0.0, math.cos(math.radians(spec.INCLINE_DEG)))
+    )
+    model = _ViewModel(stale)
+    adapter = SimpleNamespace(
+        currentModel=model, swApp=SimpleNamespace(GetMathUtility=lambda: _Utility())
+    )
+    assert part.sync_cone_axis_view(adapter) == axis
+    assert model.named == [spec.CONE_AXIS_VIEW]
+    assert model.stored == fresh
+    # An up-to-date view is left alone (a normal drawing build never dirties it).
+    model = _ViewModel(fresh)
+    adapter.currentModel = model
+    part.sync_cone_axis_view(adapter)
+    assert model.named == []

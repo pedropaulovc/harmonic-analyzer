@@ -224,46 +224,96 @@ def _rotations_close(
     ) <= tolerance
 
 
-def _name_cone_axis_view(adapter: Any) -> None:
-    """Persist the true-shape journal view used by the manufacturing drawing."""
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    extension = _early_bound(model.Extension, "IModelDocExtension")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+def cone_axis_view_rotation(
+    axis: tuple[float, float, float],
+) -> tuple[float, ...]:
+    """Row-major rotation of the true-shape journal view for a cone ``axis``.
 
+    View Z points along the journal axis at the observer (the sense with
+    positive model Z, as the harvested view reads), view Y is model +Y and
+    view X completes the right-handed frame, so X is the cone-axis normal in
+    the model X-Z plane.  The rotation comes from the axis the part actually
+    built, never from ``INCLINE_DEG``: a GUI edit of ``ConeIncline`` turns the
+    journal, and the view regenerated from the rebuilt axis turns with it.
+    """
+    length = math.sqrt(sum(value * value for value in axis))
+    if length <= 1e-12:
+        raise ValueError(f"cone axis {axis!r} has no direction")
+    x, y, z = (value / length for value in axis)
+    if abs(y) > 1e-9:
+        raise ValueError(f"cone axis {axis!r} is not horizontal")
+    if z < 0.0:
+        x, z = -x, -z
+    return (z, 0.0, -x, 0.0, 1.0, 0.0, x, 0.0, z)
+
+
+def journal_axis_vector(adapter: Any) -> tuple[float, float, float]:
+    """Direction of the rebuilt ``journal axis`` reference, read from the model."""
+    from solidworks_mcp.adapters import sw_type_info
+
+    part = sw_type_info.early_bound_doc(adapter.currentModel)
+    feature = part.FeatureByName("journal axis")
+    if feature is None:
+        raise RuntimeError("journal axis: reference axis not found")
+    feature = _early_bound(feature, "IFeature")
+    axis = _early_bound(feature.GetSpecificFeature2(), "IRefAxis")
+    points = tuple(float(value) for value in axis.GetRefAxisParams())
+    if len(points) != 6 or not all(math.isfinite(value) for value in points):
+        raise RuntimeError(f"journal axis: invalid axis endpoints {points!r}")
+    return (points[3] - points[0], points[4] - points[1], points[5] - points[2])
+
+
+def _named_view_store(model: Any) -> Any:
+    """How this seat stores a named-view rotation: row-major or transposed."""
     built_in = tuple(float(value) for value in model.GetStandardViewRotation(7))
     row_isometric = octant_rotation(1, 1, 1)
     if _rotations_close(built_in, row_isometric, 1e-3):
-        store = lambda rotation: rotation  # noqa: E731
-    elif _rotations_close(built_in, _transpose_rotation(row_isometric), 1e-3):
-        store = _transpose_rotation
-    else:
-        raise RuntimeError(
-            f"*Isometric rotation {built_in!r} establishes no known convention"
-        )
-
-    incline = math.radians(INCLINE_DEG)
-    sine = math.sin(incline)
-    cosine = math.cos(incline)
-    # View X is the cone-axis-normal direction in the model X-Z plane, view Y
-    # is model +Y, and view Z points along the journal axis at the observer.
-    row_rotation = (
-        cosine,
-        0.0,
-        -sine,
-        0.0,
-        1.0,
-        0.0,
-        sine,
-        0.0,
-        cosine,
+        return lambda rotation: rotation
+    if _rotations_close(built_in, _transpose_rotation(row_isometric), 1e-3):
+        return _transpose_rotation
+    raise RuntimeError(
+        f"*Isometric rotation {built_in!r} establishes no known convention"
     )
-    rotation = store(row_rotation)
+
+
+@_telemetry.traced("view.cone_axis_sync")
+def sync_cone_axis_view(adapter: Any) -> tuple[float, float, float]:
+    """Keep the persisted journal view normal to the rebuilt cone axis.
+
+    Reads the live ``journal axis``, derives the view rotation from it and, only
+    when the stored named view differs, re-names the view on the active part.
+    The part build calls it once the axis exists; the drawing calls it on the
+    opened source before placing View B, so a view saved before a GUI edit of
+    ``ConeIncline`` is regenerated instead of drawn skewed.  Returns the axis.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    axis = journal_axis_vector(adapter)
+    rotation = _named_view_store(model)(cone_axis_view_rotation(axis))
+    stored = tuple(
+        float(value)
+        for value in (extension.GetNamedViewRotation(CONE_AXIS_VIEW) or ())
+    )
+    if _rotations_close(stored, rotation, 1e-9):
+        _telemetry.info(
+            f"cone-axis named view {CONE_AXIS_VIEW!r} already normal to "
+            f"axis={axis!r}"
+        )
+        return axis
+
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     transform = utility.CreateTransform(
         double_array([*rotation, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
     )
     if transform is None:
         raise RuntimeError("failed to create cone-axis view transform")
-    view = _early_bound(model.ActiveView, "IModelView")
+    active = model.ActiveView
+    if active is None:
+        raise RuntimeError(
+            "cone-axis named view is stale but the part has no active model view "
+            "to re-orient; open the source part visible"
+        )
+    view = _early_bound(active, "IModelView")
     view.Orientation3 = transform
     model.NameView(CONE_AXIS_VIEW)
     readback = tuple(
@@ -276,8 +326,10 @@ def _name_cone_axis_view(adapter: Any) -> None:
         )
     model.ShowNamedView2("*Isometric", 7)
     _telemetry.info(
-        f"cone-axis named view {CONE_AXIS_VIEW!r}: rotation={readback!r}"
+        f"cone-axis named view {CONE_AXIS_VIEW!r} (re)generated from "
+        f"axis={axis!r}: rotation={readback!r} (stored was {stored!r})"
     )
+    return axis
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -845,7 +897,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
-    _name_cone_axis_view(adapter)
+    sync_cone_axis_view(adapter)
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
@@ -1089,18 +1141,7 @@ def _journal_axis_misalignment(vector: tuple[float, float, float]) -> float:
 @_telemetry.traced("reference.journal_axis_direction")
 def _assert_journal_axis_direction(adapter: Any) -> None:
     """Fail loud unless the built journal axis lies on the ConeIncline yaw."""
-    from solidworks_mcp.adapters import sw_type_info
-
-    part = sw_type_info.early_bound_doc(adapter.currentModel)
-    feature = part.FeatureByName("journal axis")
-    if feature is None:
-        raise RuntimeError("journal axis: reference axis not found")
-    feature = _early_bound(feature, "IFeature")
-    axis = _early_bound(feature.GetSpecificFeature2(), "IRefAxis")
-    points = tuple(float(value) for value in axis.GetRefAxisParams())
-    if len(points) != 6 or not all(math.isfinite(value) for value in points):
-        raise RuntimeError(f"journal axis: invalid axis endpoints {points!r}")
-    vector = (points[3] - points[0], points[4] - points[1], points[5] - points[2])
+    vector = journal_axis_vector(adapter)
     error = _journal_axis_misalignment(vector)
     _telemetry.info(f"journal axis readback vector={vector!r} sin_error={error:.3g}")
     if error > 1e-6:

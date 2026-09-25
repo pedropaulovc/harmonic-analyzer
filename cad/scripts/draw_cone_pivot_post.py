@@ -59,6 +59,7 @@ from _drawing_common import (
     view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from build_cone_pivot_post import sync_cone_axis_view
 from _surface_finish import surface_finish_by_key
 from cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DIA,
@@ -75,7 +76,6 @@ from cone_pivot_post_spec import (
     CRANK_BOSS_START_Z,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    INCLINE_DEG,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -368,11 +368,17 @@ def _assert_view_geometry(
     journal: Any,
     iso: Any,
     face_evidence: dict[str, list[tuple[str, tuple[float, ...]]]],
+    cone_axis: tuple[float, float, float],
 ) -> None:
-    """Prove which bore axis each manufacturing view is normal to."""
-    incline = math.radians(INCLINE_DEG)
+    """Prove which bore axis each manufacturing view is normal to.
+
+    ``cone_axis`` is the rebuilt journal axis read from the part, so the proof
+    holds for whatever incline the model carries, not only ``INCLINE_DEG``.
+    """
     crank_axis = (0.0, 0.0, 1.0)
-    cone_axis = (math.sin(incline), 0.0, math.cos(incline))
+    axis_length = math.sqrt(sum(value * value for value in cone_axis))
+    cone_axis = tuple(value / axis_length for value in cone_axis)
+    live_incline = math.degrees(math.atan2(abs(cone_axis[0]), abs(cone_axis[2])))
     crank_center = (0.0, CRANK_BORE_HEIGHT / 1000.0, 0.0)
     cone_center = (0.0, BORE_HEIGHT / 1000.0, 0.0)
     sample = 0.040
@@ -430,9 +436,9 @@ def _assert_view_geometry(
         length(top_crank) * length(top_cone)
     )
     acute = math.degrees(math.acos(max(-1.0, min(1.0, abs(cosine)))))
-    if abs(acute - INCLINE_DEG) > 0.01:
+    if abs(acute - live_incline) > 0.01:
         raise RuntimeError(
-            f"top-view bore-axis angle {acute:.6f} != {INCLINE_DEG:.6f}"
+            f"top-view bore-axis angle {acute:.6f} != rebuilt {live_incline:.6f}"
         )
     iso_crank = rows["isometric"]["crank_center"]
     iso_cone = rows["isometric"]["cone_center"]
@@ -552,16 +558,20 @@ _CENTERLINE_OVERSHOOT_MM = 3.0
 _SW_LINE_CENTER = 4  # swLineStyles_e.swLineCENTER
 
 
-def _add_cone_section_centerline(adapter: Any, view: Any) -> None:
+def _add_cone_section_centerline(
+    adapter: Any, view: Any, cone_axis: tuple[float, float, float]
+) -> None:
     """Draw the cone-bore axis through Section A-A.
 
     The section is a surface-only cut, so it has no bore face to hand
     ``InsertCenterLine2``; without the axis a blind reader saw two unrelated
     hatched islands.  The endpoints are the model axis projected through the
     section's own transform into sheet space, so the line is the bore axis
-    itself, and it runs a centerline overshoot past each boss end face.
+    itself (the rebuilt ``cone_axis``), and it runs a centerline overshoot past
+    each boss end face.
     """
-    incline = math.radians(INCLINE_DEG)
+    axis_length = math.sqrt(sum(value * value for value in cone_axis))
+    direction = tuple(value / axis_length for value in cone_axis)
     reach = (CONE_BOSS_LENGTH / 2.0 + _CENTERLINE_OVERSHOOT_MM) / 1000.0
     centre = (0.0, BORE_HEIGHT / 1000.0, 0.0)
     ends = [
@@ -569,9 +579,9 @@ def _add_cone_section_centerline(adapter: Any, view: Any) -> None:
             adapter,
             view,
             (
-                sign * reach * math.sin(incline),
+                sign * reach * direction[0],
                 centre[1],
-                sign * reach * math.cos(incline),
+                sign * reach * direction[2],
             ),
             label=f"cone section axis end {sign:+d}",
         )
@@ -826,6 +836,9 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     face_evidence = _model_face_evidence(adapter.currentModel)
+    # View B looks down the axis the part REBUILT, not the Python-time incline:
+    # regenerate the named view from the live journal axis if it went stale.
+    cone_axis = sync_cone_axis_view(adapter)
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -875,6 +888,7 @@ async def build(adapter: Any) -> dict[str, str]:
         journal=journal,
         iso=iso,
         face_evidence=face_evidence,
+        cone_axis=cone_axis,
     )
 
     front_annotations = curate_view_dimensions(
@@ -960,7 +974,7 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=(_top_x(0.0), _top_y(35.0)),
         label="crank boss axis",
     )
-    _add_cone_section_centerline(adapter, section)
+    _add_cone_section_centerline(adapter, section, cone_axis)
     add_attached_note(
         adapter,
         front,
