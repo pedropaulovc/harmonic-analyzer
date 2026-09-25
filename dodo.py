@@ -2754,6 +2754,12 @@ def task_check():
         # Every cad/config YAML parses: prose-only records move no cache key,
         # so a row that breaks the file is otherwise invisible (caf03f2b7).
         SCRIPTS_DIR / "test_config_yaml_parses.py",
+        # The mirror-retirement diagnostic's drive-train rows equal the rows the
+        # assembly places with (Codex on #814 and #844).
+        SCRIPTS_DIR / "test_mirror_retirement_expectations.py",
+        # Every cad/scripts/test_*.py runs in some check:* gate or is exempted
+        # with a reason, so a new test cannot ship un-enrolled (Codex on #844).
+        SCRIPTS_DIR / "test_check_gate_enrollment.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.
