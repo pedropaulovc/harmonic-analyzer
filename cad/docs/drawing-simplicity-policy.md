@@ -334,7 +334,10 @@ drawing whose current PDF matches no accepted, counting review. Sheets match on
 identical masked ink, or on an identical text layer (every string, positions
 within 0.12 mm) plus ink within 2 px, so re-render noise passes and a changed
 character does not. On a mismatch it writes the leftover pixels and the text
-difference under `cad/out/reports/machinist-ledger/`. A review that predates
+difference under `cad/out/reports/machinist-ledger/`. `release` depends on the
+same check as `check:machinist`: every registered drawing without a counting
+review of the sheet now rendered blocks the release, and the failure lists each
+one with the command that clears it. A review that predates
 the ledger is entered with `machinist_ledger.py ingest <verdict.json>
 --author-family <family>`, which checks the exact PDF it reviewed.
 Part and assembly packages render every native PDF page at 300 dpi and submit
