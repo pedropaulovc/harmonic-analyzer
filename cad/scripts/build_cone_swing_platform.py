@@ -79,6 +79,7 @@ from _drawing_marks import (
 from _holes import wizard_holes
 from _visibility import blank_reference_geometry
 from build_cone_lock_knob import HEAD_DIA as LOCK_HEAD_DIA
+import cone_post_mount_interface as mount
 from cone_swing_platform_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -128,7 +129,8 @@ _COS_I = math.cos(math.radians(INCLINE_DEG))
 # --- cone-pivot-post-v2 attachment footprint -------------------------------
 # The rederived casting is centred at cone station -39.90136099793 while the
 # plate origin/pivot remains station 196.  Its two vertical attachment holes
-# are a world-X pair at +/-13.44352 mm.  Undoing the engaged Ry(+INCLINE)
+# are a world-X pair at half the interface pitch (cone_post_mount_interface).
+# Undoing the engaged Ry(+INCLINE)
 # placement gives this skewed pair in the platform's local (x, z) frame.
 POST_STATION = -39.90136099793
 PIVOT_STATION = 152.27232594770453
@@ -137,7 +139,7 @@ POST_LOCAL_Z = POST_STATION - PIVOT_STATION
 POST_SOUTH_MARGIN = 3.175  # 1/8 in clearance beyond the post's south rim
 PLATE_SOUTH_Z = POST_LOCAL_Z - POST_MAIN_DIA / 2.0 - POST_SOUTH_MARGIN
 PLATE_LEN = NORTH_OVERHANG - PLATE_SOUTH_Z
-POST_MOUNT_HALF_PITCH = 13.44352
+POST_MOUNT_HALF_PITCH = mount.PITCH / 2.0
 POST_MOUNT_X = POST_MOUNT_HALF_PITCH * _COS_I
 POST_MOUNT_DZ = POST_MOUNT_HALF_PITCH * _SIN_I
 POST_MOUNT_WEST_XZ = (POST_MOUNT_X, POST_LOCAL_Z + POST_MOUNT_DZ)

@@ -32,7 +32,6 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
@@ -41,7 +40,6 @@ from _drawing_common import (
     add_surface_finish,
     add_view_centerline,
     assert_imported_precision,
-    curate_view_dimensions,
     create_section_view,
     dimension_name,
     finalize_drawing,
@@ -56,8 +54,8 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
     stamp_drawing_summary,
     visible_view_entities,
-    view_name,
 )
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from build_cone_pivot_post import sync_cone_axis_view
 from _surface_finish import surface_finish_by_key
@@ -156,6 +154,11 @@ CONE_SECTION_LINE = (
 
 FRONT_KEEP = {
     "MainBodyHt": (0.040, FRONT_CENTER[1]),
+    # ONE direct hole-to-hole pitch carrying the platform interface band
+    # (cone_post_mount_interface), printed at the foot the holes are drilled
+    # from, between the two hole-axis centrelines: below the seat line and
+    # above the notes block.
+    "MountPitch": (_front_x(0.0), 0.0620),
     "MainBodyDia": (0.150, 0.080),
     # A REFERENCE since U31: the crank bore is located from the cone bore
     # (View B), so its height above the foot only follows that chain.
@@ -179,8 +182,6 @@ TOP_KEEP = {
     # callout's leader crossed its dimension line, so its text had to be
     # offset to a distant shelf, where a blind reader took it for a note.
     "CrankBossStartZ": (0.0655, 0.2338),
-    "MountEastX": (0.075, 0.2525),
-    "MountWestX": (0.110, 0.2525),
     "InclineAngle": (0.142, _top_y(28.0)),
 }
 SECTION_KEEP = {
@@ -329,35 +330,6 @@ def _model_face_evidence(
             f"cone pivot post final BREP {feature}: {surfaces!r}"
         )
     return rows
-
-
-def _hide_witness_sketch(adapter: Any, view: Any, sketch_name: str) -> None:
-    """Hide one model sketch in one drawing view, retaining imported dimensions."""
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    typed_view = _early_bound(view, "IView")
-    name = view_name(adapter, typed_view)
-    if not drawing.ActivateView(name):
-        raise RuntimeError(f"failed to activate {name!r} to hide {sketch_name}")
-    root = typed_view.RootDrawingComponent2(False)
-    if root is None:
-        raise RuntimeError(f"{name!r} has no drawing component for {sketch_name}")
-    component = str(_early_bound(root, "IDrawingComponent").Name)
-    qualified = f"{sketch_name}@{component}@{name}"
-    draw.ClearSelection2(True)
-    if not draw.Extension.SelectByID2(
-        qualified, "SKETCH", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
-    ):
-        raise RuntimeError(f"failed to select drawing witness sketch {qualified!r}")
-    # BlankSketch is a VT_VOID mutator.  Its drawing-view override has no
-    # corresponding getter: IFeature.Visible reports the model feature's
-    # global state, not the per-view override (and therefore remains "shown").
-    # The selected qualified path above is the API's documented call form; the
-    # exported sheet is the authoritative read-back for this view-local change.
-    draw.BlankSketch()
-    rebuild_drawing(adapter, label=f"hide {sketch_name} in {name}")
-    draw.ClearSelection2(True)
-    _telemetry.info(f"drawing witness sketch blanked in view: {qualified}")
 
 
 def _assert_view_geometry(
@@ -949,16 +921,11 @@ async def build(adapter: Any) -> dict[str, str]:
         journal_annotations,
         {"JournalAxisY": (0.190, 0.157), "CrankAboveCone": (0.193, 0.183)},
     )
-    # The plan must retain JournalPlanReference: its two native centreline rays
-    # and imported dimensions carry the spotface station and 12.52-degree bore
-    # azimuth.  Other projections have no use for that witness geometry.
-    for view in (front, journal, iso):
-        _hide_witness_sketch(adapter, view, "JournalPlanReference")
-    # The cone-axis view keeps BoreSpacingReference: its centreline joins the
-    # two bore centres and carries the spacing.  Elsewhere it only doubles the
-    # post axis.
-    for view in (front, top, iso):
-        _hide_witness_sketch(adapter, view, "BoreSpacingReference")
+    # The part saves its reference sketches hidden (REFERENCE_SKETCHES), and
+    # the _drawing_hidden_sketches import above showed each only in the view it
+    # dimensions: JournalPlanReference in the plan, BoreSpacingReference in
+    # View B, HolePitchReference in the elevation.  The section and the iso
+    # show none of them.
     for view, label in ((front, "front"), (top, "top"), (journal, "cone journal")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to the {label} view")
@@ -1002,13 +969,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # mounting-hole exit rims project onto the same line, so the hit-test has
     # nothing unambiguous to return), so the rim is found by its geometry --
     # the ONE circular edge of body radius centred at y=0.  Its leader lands
-    # on the seat's left quarter while the symbol sits clear of the body at right.
+    # on the seat's right quarter, east of the mounting-hole pitch's witness
+    # line, while the symbol sits clear of the body at right.
     add_surface_finish(
         adapter,
         front,
         edge_entity=_circular_edge(front, radius_mm=BLOCK_DIA / 2.0, center_y_mm=0.0),
         symbol_xy=(_front_x(30.0), _front_y(-6.0)),
-        leader_attach_xy=(_front_x(-10.0), _front_y(0.0)),
+        leader_attach_xy=(_front_x(18.0), _front_y(0.0)),
         control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
         label="foot seat finish",
         char_height=0.0025,

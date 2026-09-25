@@ -14,6 +14,8 @@ from __future__ import annotations
 import math
 
 from _gtol_spec import CylinderFace, PlanarFace
+import _config
+import cone_post_mount_interface as mount
 from cone_incline import INCLINE_DEG
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
@@ -68,14 +70,22 @@ CONE_BOSS_LENGTH = BLOCK_DIA
 # local east/west axes to the opposite platform names.
 #
 # The screw is MHA-142, a 1/4-20 x 3-1/2 slotted fillister (MSC 40923898, user
-# ruling U37c) cut to 86.0 at assembly.  Its ASME B18.6.3 head (dia 9.1-9.5 x
-# 5.5 overall) sits about 0.5 below the top face in the dia 11.509 x 6.02
-# counterbore.  Deepening the counterbore for a shorter screw is not an
-# option: at 16.15 it would pass the crank bore with a 1.20 worst-case web.
-ATTACHMENT_SPACING = 26.88704
+# ruling U37c) cut to 86.0 at assembly; its head envelope is the ASME B18.6.3
+# row cone_post_mount_interface reads.  Deepening the counterbore for a shorter
+# screw is not an option: at 16.15 it would pass the crank bore with a 1.20
+# worst-case web.
+#
+# The pitch, the clearance hole, the piloted 7/16 counterbore and the pitch
+# band are the mating contract with the platform's tapped pair, so they come
+# from cone_post_mount_interface.  The holes are drilled from the foot, where
+# the pitch mates, and the print states ONE direct pitch dimension with that
+# band at the foot (HolePitchReference), the pair drawn symmetric about the
+# post axis (Main ruling (a) on #833).
+ATTACHMENT_SPACING = mount.PITCH
 ATTACHMENT_X = ATTACHMENT_SPACING / 2.0
-ATTACHMENT_THRU_DIA = 7.14248
-ATTACHMENT_CBORE_DIA = 11.50874
+ATTACHMENT_PITCH_BAND = (mount.POST_PITCH_BAND, -mount.POST_PITCH_BAND)
+ATTACHMENT_THRU_DIA = mount.POST_HOLE_DIA
+ATTACHMENT_CBORE_DIA = mount.POST_CBORE_DIA
 ATTACHMENT_CBORE_DEPTH = 6.0198
 
 # Final solid volume, the sum of the per-feature analytic terms the build
@@ -89,16 +99,16 @@ ATTACHMENT_CBORE_DEPTH = 6.0198
 #   crank bore pi*5.719^2*72.0344                   = -  7 401.6752
 #   cone pads outside the body cylinder             = +    209.0550
 #   cone bore pi*6.1404^2*42.011                    = -  4 976.2960
-#   2x (thru pi*3.57124^2*79.9802 + cbore pi*5.75437^2*6.0198) = - 7 661.5921
-#                                                   = 114 076.5723
+#   2x (thru pi*3.57124^2*79.9802 + cbore pi*5.55625^2*6.0198) = - 7 576.8343
+#                                                   = 114 161.3295
 #
 # The 2026-09-21 farm build of the previous recipe read 121 575.3: it had
 # never bored the crank boss (7 401.7) and had only nicked the 45 mm^3 collar
 # sliver behind the spot-face plane inside the bore disc -- a cut whose
 # default direction (opposite the sketch normal) found the Ø44 collar to bite
 # instead of auto-flipping into the boss.  Mass at gray iron 7.20 g/cc.
-HARVESTED_VOLUME_MM3 = 114_076.5723
-HARVESTED_MASS_KG = 0.821351
+HARVESTED_VOLUME_MM3 = 114_161.3295
+HARVESTED_MASS_KG = 0.821962
 
 # Both bores are running journals, so both carry the SAME size band -- the one
 # the `shaft_in_bushing` fit class needs and no tighter (tolerance-policy.md,
@@ -114,6 +124,22 @@ HARVESTED_MASS_KG = 0.821351
 # an accuracy feature, so nothing else carries a band: the title block's
 # general grades govern.
 RUNNING_BORE_BAND = (0.005, -0.025)
+
+# The walls around the mounting holes at the printed worst case, drill wander
+# included: the collar-to-counterbore ligament (the r12 machinist review found
+# 1.64 under the per-hole .XX stations) and the webs to both running bores.
+# The one-place collar takes the title block's .X band and both holes its
+# DRILLED HOLES band; cone_post_mount_interface owns the stack and its terms.
+MOUNT_WALLS = mount.assert_post_stack(
+    collar_dia=HEAD_DIA,
+    collar_band=_config.title_block("linear_1pl")["value_in"] * MM_PER_IN,
+    drilled_plus=_config.title_block("drilled_hole")["plus_mm"],
+    crank_bore_dia=CRANK_BORE_DIA,
+    crank_bore_upper=RUNNING_BORE_BAND[0],
+    cone_bore_dia=BORE_DIA,
+    cone_bore_upper=RUNNING_BORE_BAND[0],
+    incline_deg=INCLINE_DEG,
+)
 
 # Crank-above-cone bore spacing (user ruling U31, 2026-09-23, option 3a).  The
 # crank axis is located FROM THE CONE AXIS, not from the foot: the 16T:64T
@@ -179,7 +205,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "MainBody": {"MainBodyHt"},
     "HeadProfile": {"HeadDia"},
     "Head": {"HeadHt"},
-    "AttachmentScrewHoles": {"MountWestX", "MountEastX"},
+    "HolePitchReference": {"MountPitch"},
     "CrankBossProfile": {"CrankAxisY", "CrankBossDia"},
     "CrankSprocketBoss": {"CrankBossLen"},
     "CrankBoreProfile": {"CrankBoreDia"},
@@ -196,10 +222,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # The as-cast collar diameter and the cast body/boss sizes take one place --
 # nothing mates on them.  The cone-axis height, the crank-above-cone spacing
 # (which carries its own explicit band), the crank-axis height the print
-# repeats only as a reference, the two mounting-hole stations and the machined
-# spot-face station take two.  The plan angle takes
-# one: the title block holds angles to +/-1 deg, so a second place would only
-# suggest a precision nobody sets up for.  Only the two running bores take
+# repeats only as a reference, the mounting-hole pitch (which carries its own
+# explicit band) and the machined spot-face station take two.  The plan angle
+# takes one: the title block holds angles to +/-1 deg, so a second place would
+# only suggest a precision nobody sets up for.  Only the two running bores take
 # three, and only because their size limits are what deliver the
 # `shaft_in_bushing` clearance band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -207,7 +233,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "MainBody": {"MainBodyHt": 1},
     "HeadProfile": {"HeadDia": 1},
     "Head": {"HeadHt": 1},
-    "AttachmentScrewHoles": {"MountWestX": 2, "MountEastX": 2},
+    "HolePitchReference": {"MountPitch": 2},
     "CrankBossProfile": {"CrankAxisY": 2, "CrankBossDia": 1},
     "CrankSprocketBoss": {"CrankBossLen": 1},
     "CrankBoreProfile": {"CrankBoreDia": 3},
@@ -232,6 +258,17 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
+# Construction-only reference sketches that carry printed dimensions.  The part
+# saves them hidden so no assembly renders them; the drawing shows each only in
+# the view it dimensions (_drawing_hidden_sketches): the plan angle and
+# spot-face station in the plan, the crank-above-cone spacing in View B and the
+# mounting-hole pitch in the elevation.
+REFERENCE_SKETCHES = (
+    "JournalPlanReference",
+    "BoreSpacingReference",
+    "HolePitchReference",
+)
+
 # Notes identify mating parts and geometry relationships that are not
 # recognizable from silhouette alone; every size, band and finish remains on a
 # dimension or native symbol (drawing-simplicity-policy rules 1 and 6).
@@ -240,7 +277,7 @@ DRAWING_NOTES = "\n".join(
         "CRANK BORE CARRIES MHA-026, CONE BORE MHA-014; FOOT ON MHA-091.",
         "CONE BOSS END FACES ARE SYMMETRIC ABOUT THE POST AXIS.",
         "BORE BOTH IN ONE SETUP; INSPECT BORE-TO-BORE BEFORE UNCLAMPING.",
-        "DRILL MOUNTING HOLES FROM TOP FACE; CHECK CONE BORE AT BREAKOUT.",
+        "DRILL MOUNTING HOLES FROM FOOT; PILOTED C'BORE FROM TOP.",
     )
 )
 

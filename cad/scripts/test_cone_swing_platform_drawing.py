@@ -44,7 +44,8 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "33.00 +/-0.10 WEST AND 205.808 +/-0.10 SOUTH" in notes
     assert "2X 1/4-20 UNC-2B THRU" in notes
     assert "192.174 +/-0.10 SOUTH OF PIVOT" in notes
-    assert "26.887" in notes
+    assert "26.670" in notes
+    assert "26.670 +/-0.25 PITCH" in " ".join(notes.split())
     assert "12.5182 +/-0.10 DEG NORTH OF WEST" in notes
     assert "9.11 +/-0.10 DEG NORTH" in notes
     assert "FULL-R CLOSED END (R4.000 REF)" in notes

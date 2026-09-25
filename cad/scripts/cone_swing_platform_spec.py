@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 
+import cone_post_mount_interface as mount
 from cone_pivot_post_spec import BORE_HEIGHT as POST_CONE_BORE_HEIGHT
 from crank_drive_gear_spec import OUTSIDE_DIA as CRANK_GEAR_OUTSIDE_DIA
 
@@ -22,6 +23,11 @@ PIVOT_BEARING_THICKNESS = PLATE_THICKNESS - PIVOT_BEARING_RELIEF_DEPTH
 PLATE_LENGTH_TOLERANCE_MM = 0.25
 PIVOT_HOLE_SPEC = HoleSpec("clearance", "1/4", fit="close")
 PIVOT_HOLE_DIA = blind_cut_dia_mm(PIVOT_HOLE_SPEC)
+
+# The post-mount taps run through the plate, so a tap's tilt shifts its screw
+# over the full plate thickness; cone_post_mount_interface proves the pitch
+# bands leave room for it.
+POST_MOUNT_TILT_DEMAND = mount.assert_tilt_covered(PLATE_THICKNESS)
 
 
 # The recentered DP25.731 gear is smaller than the intermediate DP24.74 gear;
@@ -59,8 +65,10 @@ DRAWING_NOTES = "\n".join(
         f"{PIVOT_BEARING_RELIEF_DEPTH:.2f} DEEP;",
         f"   LOCAL BEARING THICKNESS {PIVOT_BEARING_THICKNESS:.2f} +/-0.05.",
         f"4. POST MOUNT: 2X {POST_MOUNT_SPEC.size} UNC-2B THRU PER PLAN-VIEW CALLOUT.",
-        "   PAIR CENTROID ON CONE AXIS, 192.174 +/-0.10 SOUTH OF PIVOT; 26.887",
-        "   +/-0.10 PITCH ON A LINE 12.5182 +/-0.10 DEG NORTH OF WEST.",
+        "   PAIR CENTROID ON CONE AXIS, 192.174 +/-0.10 SOUTH OF PIVOT; "
+        f"{mount.PITCH:.3f}",
+        f"   +/-{mount.PLATFORM_PITCH_BAND:.2f} PITCH ON A LINE 12.5182 +/-0.10 DEG "
+        "NORTH OF WEST.",
         "5. LOCK NOTCH 8.000 +0.100/0 WIDE; FULL-R CLOSED END (R4.000 REF).",
         "   CLOSED-END CENTRE 33.00 +/-0.10 WEST AND 205.808 +/-0.10 SOUTH",
         "   OF PIVOT; AXIS 9.11 +/-0.10 DEG NORTH OF WEST. RUN PARALLEL SIDES",

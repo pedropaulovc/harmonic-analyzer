@@ -3,11 +3,19 @@
 from __future__ import annotations
 
 import re
+import subprocess
+import sys
 from pathlib import Path
 
+import pytest
+
 import _equation_units
+import asme_b18_6_3
+import build_cone_swing_platform as platform_part
 import build_cone_pivot_post as part
 import cone_incline
+import cone_post_mount_interface as mount
+import cone_swing_platform_spec as platform_spec
 import cone_pivot_post_spec as spec
 import draw_cone_pivot_post as drawing
 from _assembly import _seed_flip, activate_assembly_contract
@@ -59,7 +67,7 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
         spec.ATTACHMENT_THRU_DIA,
         spec.ATTACHMENT_CBORE_DIA,
         spec.ATTACHMENT_CBORE_DEPTH,
-    ) == (26.88704, 7.14248, 11.50874, 6.0198)
+    ) == (1.050 * 25.4, 7.14248, 7.0 / 16.0 * 25.4, 6.0198)
     # The final volume is the per-feature sum the build checks natively; a
     # constant that drifts from the features (the 2026-09-21 unbored-boss
     # build) fails at import, so only mass coherence is left to pin here.
@@ -67,7 +75,7 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
     assert round(spec.HARVESTED_VOLUME_MM3 * 7.2e-6, 6) == spec.HARVESTED_MASS_KG
     assert round(part.CRANK_BORE_MM3, 1) == 7401.7
     assert round(part.CRANK_SPOT_FACE_MM3, 1) == 93.1
-    assert round(part.ATTACHMENT_HOLES_MM3, 1) == 7661.6
+    assert round(part.ATTACHMENT_HOLES_MM3, 1) == 7576.8
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
@@ -85,8 +93,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "MainBodyHt",
         "HeadDia",
         "HeadHt",
-        "MountWestX",
-        "MountEastX",
+        "MountPitch",
         "CrankAxisY",
         "CrankAboveCone",
         "CrankBossDia",
@@ -178,16 +185,16 @@ def test_running_bores_close_the_configured_fit_class() -> None:
 def test_nothing_else_on_the_casting_carries_a_band() -> None:
     """One band, named once, applied to the two features the fit class names.
 
-    The cast body, collar and boss diameters and the mounting-hole stations
-    are not accuracy features (cad/docs/tolerance-policy.md, "Result"), so the
+    The cast body, collar and boss diameters are not accuracy features (cad/docs/tolerance-policy.md, "Result"), so the
     part must not author a tolerance on them at all: the title block's general
     grade is the whole specification.
     """
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert source.count("set_dimension_bilateral_tolerance(") == 3
+    assert source.count("set_dimension_bilateral_tolerance(") == 4
     assert "set_dimension_symmetric_tolerance" not in source
     assert source.count("deviations(RUNNING_BORE_BAND)") == 2
     assert source.count("deviations(CRANK_ABOVE_CONE_BAND)") == 1
+    assert source.count("deviations(ATTACHMENT_PITCH_BAND)") == 1
     assert not hasattr(spec, "TURNED_DIAMETER_TOLERANCE_MM")
     assert not hasattr(spec, "CRANK_BORE_TOLERANCE_MM")
 
@@ -325,6 +332,243 @@ def test_v2_feature_topology_uses_midplane_extrusions_and_hole_wizard() -> None:
     assert 'name="AttachmentScrewHoles"' in source
 
 
+def test_mounting_holes_print_one_direct_pitch_at_the_foot() -> None:
+    """Codex P1 on #833: the post and platform print ONE pitch each.
+
+    eb202ca6 printed two half-pitch stations at .XX (pitch +/-1.02 by the
+    title block) while the swing platform located each tap at .XX per axis;
+    their worst case overran the 0.79 screw clearance.  Both parts now read the
+    pitch, its band and the holes from cone_post_mount_interface, and the post
+    prints its pitch at the foot it is drilled from (Main ruling (a)).
+    """
+    assert spec.ATTACHMENT_SPACING == mount.PITCH == 1.050 * mount.MM_PER_IN
+    assert spec.ATTACHMENT_THRU_DIA == mount.POST_HOLE_DIA
+    assert spec.ATTACHMENT_CBORE_DIA == mount.POST_CBORE_DIA
+    assert spec.ATTACHMENT_PITCH_BAND == (
+        mount.POST_PITCH_BAND,
+        -mount.POST_PITCH_BAND,
+    )
+    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert spec.DRAWING_DIMENSIONS["HolePitchReference"] == {"MountPitch"}
+    assert not marked & {"MountWestX", "MountEastX"}
+    assert "AttachmentScrewHoles" not in spec.DRAWING_DIMENSIONS
+    assert "MountPitch" in drawing.FRONT_KEEP
+    assert "MountPitch" not in drawing.TOP_KEEP
+    # Below the seat line, above the notes block.
+    assert drawing._front_y(0.0) > drawing.FRONT_KEEP["MountPitch"][1] > 0.0555
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'create_sketch("Front"),' in source
+    assert """pitch.record("MountPitch", '"MountSpacing"')""" in source
+    assert """pitch.record(f"Mount{side}AxisLen", '"MainBodyHeight"')""" in source
+    assert '"HolePitchReference",\n        "MountPitch",' in source
+    # The half-pitch placement dimensions still drive the Hole Wizard points
+    # from the same global the printed pitch reads.
+    assert source.count("""'"MountSpacing" / 2'""") == 2
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    # The seat finish leader lands east of the pitch's east witness line.
+    assert "leader_attach_xy=(_front_x(18.0), _front_y(0.0))" in drawing_source
+    assert 18.0 > spec.ATTACHMENT_X
+
+
+def test_platform_reads_the_pitch_and_proves_tilt_from_the_interface() -> None:
+    platform_source = Path(platform_part.__file__).read_text(encoding="utf-8")
+    assert "POST_MOUNT_HALF_PITCH = mount.PITCH / 2.0" in platform_source
+    assert platform_part.POST_MOUNT_HALF_PITCH == mount.PITCH / 2.0
+    spec_source = Path(platform_spec.__file__).read_text(encoding="utf-8")
+    assert "mount.assert_tilt_covered(PLATE_THICKNESS)" in spec_source
+    assert (
+        f"{mount.PITCH:.3f} +/-{mount.PLATFORM_PITCH_BAND:.2f} PITCH"
+        in platform_spec.DRAWING_NOTES.replace("\n   ", " ")
+    )
+
+
+def test_reference_sketches_are_saved_hidden_and_shown_only_where_dimensioned() -> None:
+    """The part blanks every dimension-carrying reference sketch at save; the
+    drawing imports their dimensions through the _drawing_hidden_sketches
+    opt-in, which shows each only in the view that dimensions it."""
+    references = {
+        feature for feature in spec.DRAWING_DIMENSIONS if feature.endswith("Reference")
+    }
+    assert set(spec.REFERENCE_SKETCHES) == references == {
+        "JournalPlanReference",
+        "BoreSpacingReference",
+        "HolePitchReference",
+    }
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert (
+        "    _blank_reference_sketches(adapter, REFERENCE_SKETCHES)\n"
+        "    return await save_part_and_images(adapter, PART_NAME)"
+    ) in source
+    # Any childless sketch the list misses fails the build at save.
+    assert 'raise RuntimeError(f"childless sketches still shown at save: {shown}")' in source
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "from _drawing_hidden_sketches import curate_view_dimensions\n" in drawing_source
+    assert "_hide_witness_sketch" not in drawing_source
+    # Each sketch owns a dimension kept in exactly one view.
+    owner_views = {
+        feature: {
+            label
+            for label, keep in (
+                ("front", drawing.FRONT_KEEP),
+                ("top", drawing.TOP_KEEP),
+                ("journal", drawing.JOURNAL_KEEP),
+                ("section", drawing.SECTION_KEEP),
+            )
+            if set(keep) & spec.DRAWING_DIMENSIONS[feature]
+        }
+        for feature in spec.REFERENCE_SKETCHES
+    }
+    assert owner_views == {
+        "JournalPlanReference": {"top"},
+        "BoreSpacingReference": {"journal"},
+        "HolePitchReference": {"front"},
+    }
+
+
+_SPEC_CALLS_PROBE = """
+import sys
+sys.path.insert(0, {scripts!r})
+import cone_post_mount_interface as mount
+calls = []
+for name in ("assert_post_stack", "assert_tilt_covered"):
+    real = getattr(mount, name)
+    def spy(*args, _real=real, _name=name, **kwargs):
+        calls.append(_name)
+        return _real(*args, **kwargs)
+    setattr(mount, name, spy)
+import {module}
+print(",".join(calls))
+"""
+
+
+def _stack_calls_on_import(module: str) -> list[str]:
+    scripts = str(Path(spec.__file__).resolve().parent)
+    result = subprocess.run(
+        [sys.executable, "-c", _SPEC_CALLS_PROBE.format(scripts=scripts, module=module)],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    )
+    return result.stdout.strip().splitlines()[-1].split(",")
+
+
+def test_each_spec_runs_its_interface_stack_when_imported_alone() -> None:
+    """A spec that forgets its interface call imports without proving it."""
+    assert _stack_calls_on_import("cone_pivot_post_spec") == ["assert_post_stack"]
+    # The platform spec imports the post spec first, then proves tilt.
+    assert _stack_calls_on_import("cone_swing_platform_spec") == [
+        "assert_post_stack",
+        "assert_tilt_covered",
+    ]
+
+
+def test_mount_interface_pitch_bands_close_only_with_direct_pitches() -> None:
+    allowance = mount.PERPENDICULARITY_ALLOWANCE
+    assert allowance == pytest.approx(
+        mount.CLEARANCE - mount.POST_PITCH_BAND - mount.PLATFORM_PITCH_BAND
+    )
+    assert round(allowance, 4) == 0.2925
+    mount.assert_pitch_stack_closes(
+        mount.POST_PITCH_BAND, mount.PLATFORM_PITCH_BAND, allowance
+    )
+    # eb202ca6's post: two .XX half-pitch stations, each +/-0.508 (.02 in).
+    eb202ca6_post_band = 2 * 0.02 * mount.MM_PER_IN
+    assert round(eb202ca6_post_band, 3) == 1.016
+    with pytest.raises(AssertionError, match="perpendicularity allowance"):
+        mount.assert_pitch_stack_closes(
+            eb202ca6_post_band, mount.PLATFORM_PITCH_BAND, allowance
+        )
+    # Even with a perfect platform and no allowance the old post band alone
+    # overruns the clearance.
+    with pytest.raises(AssertionError):
+        mount.assert_pitch_stack_closes(eb202ca6_post_band, 0.0, 0.0)
+
+
+def test_mount_interface_asserts_its_own_stack_at_import() -> None:
+    """The module refuses to import once a band or the head no longer fits."""
+    path = Path(mount.__file__)
+    source = path.read_text(encoding="utf-8")
+    assert source.count("\nPOST_PITCH_BAND = 0.25\n") == 1
+    loosened = source.replace(
+        "\nPOST_PITCH_BAND = 0.25\n", "\nPOST_PITCH_BAND = 1.016\n"
+    )
+    with pytest.raises(AssertionError, match="exceeds the 0.79248"):
+        exec(compile(loosened, str(path), "exec"), {"__name__": "loosened"})
+    # The pre-approved 27/64 counterbore clears the ligament but not the head.
+    cbore = "\nPOST_CBORE_DIA = 7.0 / 16.0 * MM_PER_IN"
+    assert source.count(cbore) == 1
+    small = source.replace(cbore, "\nPOST_CBORE_DIA = 27.0 / 64.0 * MM_PER_IN")
+    with pytest.raises(AssertionError, match="head radial clearance 0.1000"):
+        exec(compile(small, str(path), "exec"), {"__name__": "small_cbore"})
+    exec(compile(source, str(path), "exec"), {"__name__": "as_shipped"})
+
+
+def test_head_diameter_comes_from_the_b18_6_3_row() -> None:
+    assert asme_b18_6_3.FILLISTER_HEAD["1/4"].dia_max_in == 0.414
+    assert mount.SCREW_HEAD_DIA_MAX == 0.414 * mount.MM_PER_IN
+    assert round(mount.assert_head_clearance(), 4) == 0.2984
+    spec_source = Path(spec.__file__).read_text(encoding="utf-8")
+    assert "9.1-9.5" not in spec_source
+
+
+def test_tap_tilt_fits_the_allowance_left_by_the_pitch_bands(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert mount.TAP_TILT_DEG == 1.0
+    assert round(mount.assert_tilt_covered(platform_spec.PLATE_THICKNESS), 4) == 0.2217
+    # Break-even 1.32 deg over the 6.35 plate: a 1.5 deg tap fails loud.
+    monkeypatch.setattr(mount, "TAP_TILT_DEG", 1.5)
+    with pytest.raises(AssertionError, match=r"break-even 1\.32 deg"):
+        mount.assert_tilt_covered(platform_spec.PLATE_THICKNESS)
+
+
+def _post_geometry(**overrides: float) -> dict[str, float]:
+    geometry = {
+        "collar_dia": spec.HEAD_DIA,
+        "collar_band": 0.03 * mount.MM_PER_IN,
+        "drilled_plus": 0.10,
+        "crank_bore_dia": spec.CRANK_BORE_DIA,
+        "crank_bore_upper": spec.RUNNING_BORE_BAND[0],
+        "cone_bore_dia": spec.BORE_DIA,
+        "cone_bore_upper": spec.RUNNING_BORE_BAND[0],
+        "incline_deg": spec.INCLINE_DEG,
+    }
+    geometry.update(overrides)
+    return geometry
+
+
+def test_walls_around_the_mounting_holes_meet_the_web_target() -> None:
+    """Ligament and both bore webs >= 2.0 at the worst case, wander included."""
+    walls = {name: round(wall, 3) for name, wall in spec.MOUNT_WALLS.items()}
+    assert walls == {
+        "collar-to-counterbore ligament": 2.053,
+        "hole-to-crank-bore web": 3.367,
+        "hole-to-cone-bore web": 2.644,
+    }
+    assert spec.MOUNT_WALLS == mount.assert_post_stack(**_post_geometry())
+    terms = mount.post_stack_terms(**_post_geometry())
+    assert terms["collar-to-counterbore ligament"]["drill wander at exit"] == -0.5
+    assert (
+        terms["collar-to-counterbore ligament"]["station band"]
+        == -mount.POST_PITCH_BAND / 2.0
+    )
+
+
+def test_old_post_geometry_fails_the_ligament_with_its_terms_printed() -> None:
+    """U37c's 11.51 counterbore at 26.887 left 1.75 once wander is counted."""
+    source = Path(mount.__file__).read_text(encoding="utf-8")
+    old = source.replace(
+        "\nPOST_CBORE_DIA = 7.0 / 16.0 * MM_PER_IN", "\nPOST_CBORE_DIA = 11.50874"
+    ).replace("\nPITCH = 1.050 * MM_PER_IN", "\nPITCH = 26.88704")
+    namespace: dict[str, object] = {"__name__": "u37c"}
+    exec(compile(old, "u37c", "exec"), namespace)
+    with pytest.raises(AssertionError) as raised:
+        namespace["assert_post_stack"](**_post_geometry())
+    message = str(raised.value)
+    assert "collar-to-counterbore ligament 1.7461 < 2.0" in message
+    assert "drill wander at exit -0.5000" in message
+    assert "crank-bore" not in message
 
 
 def test_bore_rim_com_scan_is_traced() -> None:
@@ -459,9 +703,13 @@ def test_crank_bore_is_located_from_the_cone_bore_inside_the_mesh_window() -> No
 
 
 def test_deep_mounting_holes_carry_a_drilling_note() -> None:
-    """U37: the 2X mounting holes run the full post height in cast iron."""
-    assert "DRILL MOUNTING HOLES FROM TOP FACE" in spec.DRAWING_NOTES
-    assert "CONE BORE AT BREAKOUT" in spec.DRAWING_NOTES
+    """U37 as reversed by Main on #833: drilled from the foot, where the pitch
+    mates; the counterbore is piloted in the hole so the head clears it
+    whatever the drill wandered."""
+    assert "DRILL MOUNTING HOLES FROM FOOT" in spec.DRAWING_NOTES
+    assert "PILOTED C'BORE FROM TOP" in spec.DRAWING_NOTES
+    assert "TOP FACE" not in spec.DRAWING_NOTES
+    assert len(spec.DRAWING_NOTES.splitlines()) == 4
 
 
 def test_point_relations_use_the_point_relation_types() -> None:

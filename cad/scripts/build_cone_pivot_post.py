@@ -32,8 +32,10 @@ from _common import (
     CASTING_GREEN,
     SketchDims,
     _early_bound,
+    _read_member,
     apply_color,
     apply_material,
+    blank_sketch,
     check,
     define_circle,
     drive_dimension,
@@ -65,6 +67,7 @@ from solidworks_mcp.adapters.com_variant import double_array
 from cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DEPTH,
     ATTACHMENT_CBORE_DIA,
+    ATTACHMENT_PITCH_BAND,
     ATTACHMENT_SPACING,
     ATTACHMENT_THRU_DIA,
     ATTACHMENT_X,
@@ -95,6 +98,7 @@ from cone_pivot_post_spec import (
     JOURNAL_REFERENCE_LENGTH,
     JOURNAL_REFERENCE_X,
     JOURNAL_REFERENCE_Z,
+    REFERENCE_SKETCHES,
     RUNNING_BORE_BAND,
     SURFACE_FINISHES,
 )
@@ -183,7 +187,7 @@ CONE_PADS_OUTSIDE_BODY_MM3 = (
 )
 CONE_BORE_MM3 = math.pi * BORE_RADIUS**2 * CONE_BOSS_LENGTH
 # Mounting holes: two through drills plus two counterbores; they clear the
-# crank bore (|x| <= 5.72 against a hole edge at 9.87) and, drilled last, are
+# crank bore (|x| <= 5.72 against a hole edge at 9.76) and, drilled last, are
 # not re-filled by any boss.
 ATTACHMENT_HOLES_MM3 = 2.0 * (
     math.pi * (ATTACHMENT_THRU_DIA / 2.0) ** 2 * (BLOCK_HEIGHT - ATTACHMENT_CBORE_DEPTH)
@@ -654,7 +658,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # 5. Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the
     # top face, ONE native Hole Wizard feature with two driven placement
     # points.  Drilled LAST, as the real casting is: the crank boss is cast
-    # integral and its Ø21.93 cylinder passes 1.09 mm into both Ø7.14 thru
+    # integral and its Ø21.93 cylinder passes 1.20 mm into both Ø7.14 thru
     # holes, so a boss extruded after the holes would re-fill a crescent of
     # each and no 1/4 screw would pass.  The top face is still one +Y planar
     # face after the transverse booleans (they stop 2.3 mm below it), which is
@@ -841,6 +845,80 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "BoreSpacingReference")
     drive_jobs += spacing.apply(adapter, "BoreSpacingReference")
 
+    # 8. Mounting-hole pitch reference sketch.  The hole pair is the mating
+    # contract with the swing platform's tapped pair
+    # (cone_post_mount_interface), and both parts print it as ONE direct
+    # hole-to-hole pitch with an explicit band -- never as two half-pitch
+    # stations, whose general bands stacked to +/-1.02 on the pitch (Codex P1,
+    # #833).  The holes are drilled from the foot, where the pitch mates, so
+    # the pitch is printed at the foot, in the elevation: the Front plane
+    # holds both hole axes (z = 0), and three construction lines on it carry
+    # the foot-level pitch line, centred on the post axis, and the two hole
+    # axes rising from its ends.  The pitch is driven by the same global as the
+    # Hole Wizard placements, so the printed pitch IS the drilled pitch.
+    pitch = SketchDims()
+    check(
+        "create sketch HolePitchReference",
+        await adapter.create_sketch("Front"),
+    )
+    set_sketch_direct_db(adapter, True)
+    # Front-plane sketch X is model +X and sketch Y is model +Y; the foot is
+    # y = 0.
+    pitch_line = check(
+        "mounting-hole pitch centreline at the foot",
+        await adapter.add_centerline(-ATTACHMENT_X, 0.0, ATTACHMENT_X, 0.0),
+    )
+    hole_axes = [
+        check(
+            f"{side} mounting-hole axis",
+            await adapter.add_centerline(x, 0.0, x, BLOCK_HEIGHT),
+        )
+        for side, x in (("west", -ATTACHMENT_X), ("east", ATTACHMENT_X))
+    ]
+    set_sketch_direct_db(adapter, False)
+    check(
+        "hole pitch line across the post",
+        await adapter.add_sketch_constraint(pitch_line, None, "horizontal"),
+    )
+    check(
+        "hole pitch line centred on the post axis",
+        await adapter.add_sketch_constraint("origin", pitch_line, "midpoint"),
+    )
+    check(
+        "mounting-hole pitch",
+        await adapter.add_sketch_dimension(
+            pitch_line, None, "linear", ATTACHMENT_SPACING
+        ),
+    )
+    pitch.record("MountPitch", '"MountSpacing"')
+    for axis, end, side in zip(hole_axes, ("start", "end"), ("West", "East")):
+        check(
+            f"{side.lower()} hole axis vertical",
+            await adapter.add_sketch_constraint(axis, None, "vertical"),
+        )
+        # Point pairs take the point relation types (see section 7).
+        check(
+            f"{side.lower()} hole axis over its pitch-line end",
+            await adapter.add_sketch_constraint(
+                f"{axis}.start", f"{pitch_line}.{end}", "vertical_points"
+            ),
+        )
+        check(
+            f"{side.lower()} hole axis rising from the foot",
+            await adapter.add_sketch_constraint(
+                f"{axis}.start", "origin", "horizontal_points"
+            ),
+        )
+        check(
+            f"{side.lower()} hole axis full post height",
+            await adapter.add_sketch_dimension(axis, None, "linear", BLOCK_HEIGHT),
+        )
+        pitch.record(f"Mount{side}AxisLen", '"MainBodyHeight"')
+    await ensure_fully_defined(adapter, "HolePitchReference")
+    check("exit sketch HolePitchReference", await adapter.exit_sketch())
+    name_last_feature(adapter, "HolePitchReference")
+    drive_jobs += pitch.apply(adapter, "HolePitchReference")
+
     # Apply all neutral equations only after every referenced dimension exists.
     await force_rebuild(adapter)
     for dimension, expression in drive_jobs:
@@ -852,12 +930,13 @@ async def build(adapter: Any) -> dict[str, str]:
         HARVESTED_VOLUME_MM3,
         0.001 * HARVESTED_VOLUME_MM3,
     )
-    # Three accuracy features on this casting: the two running bores carry the
+    # Four accuracy features on this casting: the two running bores carry the
     # ONE band that closes the `shaft_in_bushing` fit class against their
-    # turned shafts (cad/docs/tolerance-policy.md), and the spacing between
-    # them carries the 16T:64T mesh band.  Everything else -- cast body and
-    # collar diameters, boss diameters, boss extents, mounting-hole stations,
-    # the cone axis above the foot -- runs at the title block's general grade.
+    # turned shafts (cad/docs/tolerance-policy.md), the spacing between them
+    # carries the 16T:64T mesh band, and the mounting-hole pitch carries the
+    # platform interface band.  Everything else -- cast body and collar
+    # diameters, boss diameters, boss extents, the cone axis above the foot --
+    # runs at the title block's general grade.
     set_dimension_bilateral_tolerance(
         adapter, "CrankBoreProfile", "CrankBoreDia", *deviations(RUNNING_BORE_BAND)
     )
@@ -874,6 +953,14 @@ async def build(adapter: Any) -> dict[str, str]:
         "BoreSpacingReference",
         "CrankAboveCone",
         *deviations(CRANK_ABOVE_CONE_BAND),
+    )
+    # The mating pitch band (cone_post_mount_interface closes it against the
+    # platform's band and the screw clearance).
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "HolePitchReference",
+        "MountPitch",
+        *deviations(ATTACHMENT_PITCH_BAND),
     )
 
     # Semantic, name-selected assembly references.  The journal axis is taken
@@ -925,6 +1012,7 @@ async def build(adapter: Any) -> dict[str, str]:
             ("mount east", "AXIS"),
         ),
     )
+    _blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     return await save_part_and_images(adapter, PART_NAME)
 
 
@@ -1150,6 +1238,49 @@ def _assert_journal_axis_direction(adapter: Any) -> None:
             f"(sin error {error:.3g}): ConeShaftNormal took the wrong solution"
         )
     _telemetry.success(f"journal axis on the {INCLINE_DEG} deg incline")
+
+
+# swVisibilityState_e
+_SKETCH_HIDDEN = 1
+_SKETCH_FEATURE_TYPES = ("ProfileFeature", "3DProfileFeature")
+
+
+@_telemetry.traced("appearance.hide_reference_sketches")
+def _blank_reference_sketches(adapter: Any, sketches: tuple[str, ...]) -> None:
+    """Save the construction-only reference sketches hidden.
+
+    A childless sketch renders in every assembly instance unless its part
+    blanks it.  The drawing still dimensions from these sketches through the
+    ``_drawing_hidden_sketches`` opt-in, which shows each one only in the view
+    it dimensions.  Afterwards no childless sketch may remain shown: the walk
+    names any the list missed.
+    """
+    part_doc = _early_bound(adapter.currentModel, "IPartDoc")
+    for sketch in sketches:
+        blank_sketch(adapter, sketch)
+        feature = _early_bound(part_doc.FeatureByName(sketch), "IFeature")
+        state = int(_read_member(feature, "Visible"))
+        if state != _SKETCH_HIDDEN:
+            raise RuntimeError(f"{sketch} still visible after BlankSketch (state {state})")
+    shown = []
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    raw = _read_member(model, "FirstFeature")
+    walked = 0
+    while raw is not None:
+        feature = _early_bound(raw, "IFeature")
+        walked += 1
+        if str(_read_member(feature, "GetTypeName2")) in _SKETCH_FEATURE_TYPES:
+            visible = int(_read_member(feature, "Visible"))
+            children = _read_member(feature, "GetChildren") or ()
+            if visible != _SKETCH_HIDDEN and not children:
+                shown.append(str(_read_member(feature, "Name")))
+        raw = _read_member(feature, "GetNextFeature")
+    _telemetry.info(
+        f"reference sketches blanked: {list(sketches)}; walked {walked} features, "
+        f"childless sketches still shown: {shown}"
+    )
+    if shown:
+        raise RuntimeError(f"childless sketches still shown at save: {shown}")
 
 
 @_telemetry.traced("appearance.hide_reference_geometry")
