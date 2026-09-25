@@ -581,6 +581,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="cone_tip_shim",
+        part="cone_tip_shim",
+        artifact_stem="cone-tip-shim",
+        script_name="draw_cone_tip_shim.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="arbor_pedestal",
         part="arbor_pedestal",
         artifact_stem="arbor-pedestal",
@@ -662,6 +669,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="cone_tip_pinch_screw",
         artifact_stem="cone-tip-pinch-screw",
         script_name="draw_cone_tip_pinch_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="cone_tip_block_screw",
+        part="cone_tip_block_screw",
+        artifact_stem="cone-tip-block-screw",
+        script_name="draw_cone_tip_block_screw.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
@@ -753,6 +767,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="pen_set_screw",
         artifact_stem="pen-set-screw",
         script_name="draw_pen_set_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="post_mount_screw",
+        part="post_mount_screw",
+        artifact_stem="post-mount-screw",
+        script_name="draw_post_mount_screw.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

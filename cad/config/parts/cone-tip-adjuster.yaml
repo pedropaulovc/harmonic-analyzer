@@ -3,9 +3,9 @@ cone-tip-adjuster:
   number: MHA-097
   stock_name: 18-8 Stainless Steel Slotted Cup-Tip Set Screw
   supplier: McMaster-Carr
-  supplier_skus: [94025A150]
+  supplier_skus: [94025A164]
   material: 18-8 stainless steel
-  material_specification: 18-8 stainless steel, McMaster-Carr 94025A150
+  material_specification: 18-8 stainless steel, McMaster-Carr 94025A164 (#10-32 x 3/8 in)
   finish: plain
   quantity: 1
   tolerance_class: machined_block

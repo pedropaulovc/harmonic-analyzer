@@ -171,7 +171,7 @@ BACKLASH_MM = _config.machine("gear_train", "crank_drive_backlash_mm")
 _CLEARANCE_MIN, _CLEARANCE_MAX = _config.fit("shaft_in_bushing")[
     "diametral_clearance_mm"
 ]
-_LAND_UPPER, _LAND_LOWER = cone_gear_shaft_spec.SECTION_DIA_BAND
+_LAND_UPPER, _LAND_LOWER = cone_gear_shaft_spec.SECTION_DIA_BANDS[1]
 BORE_DIA_BAND = (  # (upper, lower) deviations
     round(_LAND_LOWER + _CLEARANCE_MAX, 3),
     round(_LAND_UPPER + _CLEARANCE_MIN, 3),

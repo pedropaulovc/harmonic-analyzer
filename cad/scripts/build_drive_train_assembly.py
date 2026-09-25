@@ -473,15 +473,8 @@ PINION_SEED_DEG = (
     (ALPHA16 + 180.0) - DELTA64 * (R64 / R16) - 22.5 / 2.0
 ) % 22.5 + MESH_WINDOW_CENTRE_DEG  # window-centred tooth-in-gap
 
-ARBOR_SOUTH_Z = -90.0 + MECHANISM_Z_SHIFT
-# end stops INSIDE the arbor-pedestal bore, blind-bearing look; was -98, poking
-# 8 clear through the block). = cylinder-gear-shaft origin, placed by its south
-# end.
-ARBOR_LENGTH = 187.0  # north end at z +132.415: 7.5 seated in the NORTH
-# arbor-pedestal's bore band (PR8, ch12 page002_img09 -- the real machine's
-# base-standing north clamp restored as a second, mirrored pedestal with its
-# foot just clear of the rocker-arm-support footprint). Must match
-# cylinder-gear-shaft SHAFT_LENGTH; the pedestal geometry is asserted below.
+# ARBOR_SOUTH_Z / ARBOR_LENGTH (the cylinder arbor) follow from the pedestal
+# strap faces and are defined with them below (U34b/U34c).
 from crank_hub_geometry import (  # noqa: E402
     AXIAL_PIN_LENGTH,
     AXIAL_PIN_RADIUS_FROM_AXIS,
@@ -534,13 +527,6 @@ if abs(REMOVABLE_Z0 - CRANK_HUB_REAR_Z - 5.5) > 1e-9:
     raise AssertionError("crank hub rear/T12 air gap drifted")
 # The small removable gear is the chain wheel (ch. 23 -- bead chain on its
 # m2 teeth; v2_gears_010).
-ARBOR_PEDESTAL_Z = 90.5 - MECHANISM_Z_SHIFT
-# Its complete footing follows the translated cylinder/arbor family.
-ARBOR_PEDESTAL_NORTH_Z = 97.5 + MECHANISM_Z_SHIFT
-# real machine's base-standing north clamp) -- the SAME casting rotated 180
-# about Y so its strap looks SOUTH at the drum.  After the fixed-post recenter
-# its foot spans z 92.588..108.588, still north of the unchanged rocker support.
-from build_arbor_pedestal import FOOT_DEPTH as ARBOR_PED_DEPTH  # noqa: E402
 from build_cylinder_end_disc import DISC_DIA as END_DISC_DIA  # noqa: E402
 from build_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E402
 
@@ -554,39 +540,102 @@ from build_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E402
 # instead, the O60 disc fouled the cone-tip block (interference gate).
 from cylinder_gear_spec import CAM_THICKNESS as DRUM_CAM_T  # noqa: E402
 
-END_DISC_AIR = 0.5
-# Dome cap screws (2026-09, ch13 page002_img01/img03, ch25 page002_img03): the
-# bright crown head on each pedestal's OUTER strap face, on the arbor axis --
-# it closes the blind arbor bore (the arbor ends 2.5 inside the strap; the
-# cap's 2.0 spigot stops 0.5 short of it). South strap face = foot centre
-# - 2 (band -2..+8 of the 16 foot); north casting turned 180 -> + 2.
-from build_dome_cap_screw import STUB_LEN as CAP_STUB_LEN  # noqa: E402
-
-CAP_SOUTH_Z = -ARBOR_PEDESTAL_Z - 2.0  # crown base on the south face, +Y -> -Z
-CAP_NORTH_Z = ARBOR_PEDESTAL_NORTH_Z + 2.0  # crown base on the north face, +Y -> +Z
-if (ARBOR_SOUTH_Z - CAP_SOUTH_Z) - CAP_STUB_LEN < 0.25:
-    raise AssertionError("south dome cap spigot reaches the arbor end")
+# U34 (pedestals inboard): each disc floats between its end unit and its
+# pedestal strap. The fitter sets 0.5-0.8 end play per end with a 0.025 in
+# (0.64) feeler, so the model splits that nominal evenly: END_DISC_AIR from the
+# end unit to the disc and the same air from the disc to the strap.
+END_DISC_AIR = 0.32
 END_DISC_SOUTH_Z0 = (
     Z_DRUM0 - DRUM_FACE / 2.0 - DRUM_CAM_T - END_DISC_AIR - END_DISC_THICK
 )
 END_DISC_NORTH_Z0 = Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 + END_DISC_AIR
-if END_DISC_SOUTH_Z0 < -ARBOR_PEDESTAL_Z + ARBOR_PED_DEPTH / 2.0 + 0.25:
-    raise AssertionError("south end disc reaches the south pedestal strap")
-if (
-    END_DISC_NORTH_Z0 + END_DISC_THICK
-    > ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0 - 0.25
-):
-    raise AssertionError("north end disc reaches the north pedestal strap")
-# (also imported with the main block below; repeated here because these
-# asserts run before it)
 
-_ARBOR_NORTH = ARBOR_SOUTH_Z + ARBOR_LENGTH  # +132.415
-if (ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0) - 88.9 < 0.5:
-    raise AssertionError("north pedestal foot reaches the rocker-support foot")
-_N_PED_FACE = ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0
-# south-looking strap face after the Ry180 installation
-if not 6.0 <= _ARBOR_NORTH - _N_PED_FACE <= ARBOR_PED_DEPTH - 4.0:
-    raise AssertionError("arbor north engagement in the north pedestal out of band")
+# Arbor pedestals (U34c, dt-bank-pedestal-layout-20260923 rev 3): the SAME
+# casting twice -- south as built, north rotated 180 about Y so its strap looks
+# south at the drum (PR8, ch12 img09). Each is anchored on its strap INNER face,
+# END_DISC_AIR outboard of its disc; the foot grows 28 outboard of that face and
+# carries one MHA-143 hold-down in a base seat transferred from the pedestal.
+from arbor_pedestal_spec import (  # noqa: E402
+    FOOT_NEAR_Z as ARBOR_PED_FOOT_NEAR_Z,
+    STRAP_INNER_Z as ARBOR_PED_STRAP_INNER_Z,
+    STRAP_ROOT_Z as ARBOR_PED_STRAP_ROOT_Z,
+)
+
+ARBOR_STRAP_SOUTH_Z = END_DISC_SOUTH_Z0 - END_DISC_AIR  # -72.652
+ARBOR_STRAP_NORTH_Z = END_DISC_NORTH_Z0 + END_DISC_THICK + END_DISC_AIR  # +75.202
+# Pedestal ORIGINS: south at -ARBOR_PEDESTAL_Z (as built, local +Z = machine
+# +Z), north at +ARBOR_PEDESTAL_NORTH_Z (Ry180, local +Z = machine -Z).
+ARBOR_PEDESTAL_Z = -(ARBOR_STRAP_SOUTH_Z - ARBOR_PED_STRAP_INNER_Z)  # 80.652
+ARBOR_PEDESTAL_NORTH_Z = ARBOR_STRAP_NORTH_Z + ARBOR_PED_STRAP_INNER_Z  # 83.202
+# Plan z band of each whole foot (strap inner face .. ledge end).
+ARBOR_PED_SOUTH_Z_BAND = (
+    -ARBOR_PEDESTAL_Z + ARBOR_PED_FOOT_NEAR_Z,
+    -ARBOR_PEDESTAL_Z + ARBOR_PED_STRAP_INNER_Z,
+)  # -100.652..-72.652
+ARBOR_PED_NORTH_Z_BAND = (
+    ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_STRAP_INNER_Z,
+    ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_FOOT_NEAR_Z,
+)  # +75.202..+103.202
+# The layout study's stations (rev 3 section 2) -- a derivation drift is loud.
+for _got, _want in (
+    (ARBOR_STRAP_SOUTH_Z, -72.652),
+    (ARBOR_STRAP_NORTH_Z, 75.202),
+):
+    if abs(_got - _want) > 0.005:
+        raise AssertionError(
+            f"arbor strap face {_got:.4f} drifted from the U34 station {_want}"
+        )
+
+# Dome cap screws (2026-09, ch13 page002_img01/img03, ch25 page002_img03): the
+# bright crown head on each pedestal's OUTER strap face, on the arbor axis --
+# it closes the blind arbor bore. Its 2.0 spigot must stop short of the arbor.
+from build_dome_cap_screw import STUB_LEN as CAP_STUB_LEN  # noqa: E402
+
+CAP_SOUTH_Z = -ARBOR_PEDESTAL_Z + ARBOR_PED_STRAP_ROOT_Z  # -82.652, +Y -> -Z
+CAP_NORTH_Z = ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_STRAP_ROOT_Z  # +85.202, +Y -> +Z
+
+# The cylinder arbor (MHA-028) is CUT TO FIT at assembly (U34b): the span over
+# both strap outer faces less 6.0, so it sits centred with ~7.0 in each strap.
+# The model carries the part's REF length and centres it the same way.
+from cylinder_gear_shaft_spec import SHAFT_LENGTH as ARBOR_LENGTH  # noqa: E402
+
+ARBOR_SOUTH_Z = CAP_SOUTH_Z + ((CAP_NORTH_Z - CAP_SOUTH_Z) - ARBOR_LENGTH) / 2.0
+_ARBOR_NORTH = ARBOR_SOUTH_Z + ARBOR_LENGTH
+for _label, _engagement, _spigot_air in (
+    ("south", ARBOR_STRAP_SOUTH_Z - ARBOR_SOUTH_Z, ARBOR_SOUTH_Z - CAP_SOUTH_Z),
+    ("north", _ARBOR_NORTH - ARBOR_STRAP_NORTH_Z, CAP_NORTH_Z - _ARBOR_NORTH),
+):
+    # 6.0..8.0 seated per the cut-to-fit rule; the dome cap's spigot must
+    # still stop 0.25 short of the arbor end in the blind bore.
+    if not 6.0 <= _engagement <= 8.0:
+        raise AssertionError(
+            f"arbor {_label} engagement {_engagement:.3f} in its pedestal out of band"
+        )
+    if _spigot_air - CAP_STUB_LEN < 0.25:
+        raise AssertionError(f"{_label} dome cap spigot reaches the arbor end")
+if END_DISC_SOUTH_Z0 - ARBOR_STRAP_SOUTH_Z < 0.25:
+    raise AssertionError("south end disc reaches the south pedestal strap")
+if ARBOR_STRAP_NORTH_Z - (END_DISC_NORTH_Z0 + END_DISC_THICK) < 0.25:
+    raise AssertionError("north end disc reaches the north pedestal strap")
+# Plan overlap, not z alone, against the rocker-arm-support foot (x 41.15..
+# 104.65 about SUPPORT_WORLD_X, z +-88.9): the north foot shares its z band but
+# stands ~89.5 away in x (study rev 3 section 6; the z-only test fired falsely).
+from build_arbor_pedestal import FOOT_WIDTH as _PED_FOOT_WIDTH  # noqa: E402
+from build_rocker_arm_support import WIDE as _SUPPORT_FOOT_HALF_X  # noqa: E402
+from rocker_arm_support_spec import (  # noqa: E402
+    SUPPORT_HALF_MACHINE_Z as _SUPPORT_FOOT_HALF_Z,
+    SUPPORT_WORLD_X as _SUPPORT_X,
+    SUPPORT_WORLD_Z as _SUPPORT_Z,
+)
+
+for _band in (ARBOR_PED_SOUTH_Z_BAND, ARBOR_PED_NORTH_Z_BAND):
+    _gap_x = (_SUPPORT_X - _SUPPORT_FOOT_HALF_X) - (X_DRUM + _PED_FOOT_WIDTH / 2.0)
+    _gap_z = max(
+        _band[0] - (_SUPPORT_Z + _SUPPORT_FOOT_HALF_Z),
+        (_SUPPORT_Z - _SUPPORT_FOOT_HALF_Z) - _band[1],
+    )
+    if max(_gap_x, _gap_z) < 0.5:
+        raise AssertionError("an arbor pedestal foot reaches the rocker-support foot")
 
 # The pinion must sit fully on the crankshaft.
 if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
@@ -794,6 +843,9 @@ from build_harmonic_base import (  # noqa: E402
     LOCK_KNOB_XZ as BASE_LOCK_XZ,
     LOCK_SEAT_SPEC as BASE_LOCK_SEAT_SPEC,
     LOCK_STUD_ENGAGEMENT as BASE_LOCK_ENGAGEMENT,
+    PEDESTAL_SCREW_HOLE_DEPTH as BASE_PEDESTAL_HOLE_DEPTH,
+    PEDESTAL_SCREW_XZ as BASE_PEDESTAL_XZ,
+    PEDESTAL_SEAT_SPEC as BASE_PEDESTAL_SEAT_SPEC,
     PIVOT_SEAT_SPEC as BASE_PIVOT_SEAT_SPEC,
     PIVOT_SCREW_XZ as BASE_PIVOT_XZ,
     STOP_SEAT_SPEC as BASE_STOP_SEAT_SPEC,
@@ -806,11 +858,9 @@ from harmonic_base_spec import (  # noqa: E402
     TOP_WIDTH as BASE_TOP_WIDTH,
 )
 from build_arbor_pedestal import (  # noqa: E402
-    FOOT_DEPTH as ARBOR_PED_DEPTH,
     FOOT_HEIGHT as ARBOR_PED_FLANGE_T,
     FOOT_WIDTH as ARBOR_PED_WIDTH,
     SCREW_Z as ARBOR_PED_SCREW_Z,
-    STRAP_T as ARBOR_PED_STRAP_T,
 )
 from arbor_pedestal_spec import SCREW_HOLE_SPEC as ARBOR_PED_HOLE_SPEC  # noqa: E402
 
@@ -918,6 +968,12 @@ from build_foot_screw import (  # noqa: E402
     SHANK_LEN as FSCREW_SHANK_LEN,
     THREAD as FSCREW_THREAD,
 )
+from build_pedestal_hold_down_screw import (  # noqa: E402
+    HEAD_DIA as HDSCREW_HEAD_DIA,
+    SHANK_DIA as HDSCREW_SHANK_DIA,
+    SHANK_LEN as HDSCREW_SHANK_LEN,
+    THREAD as HDSCREW_THREAD,
+)
 from build_cone_pivot_post import (  # noqa: E402
     BLOCK_DIA as POST_BLOCK_DIA,
     BORE_HEIGHT as POST_BORE_HEIGHT,
@@ -929,13 +985,15 @@ from build_cone_pivot_post import (  # noqa: E402
 from cone_tip_block_spec import (  # noqa: E402
     ADJUSTER_BORE_SPEC as TIP_ADJ_BORE_SPEC,
     ADJUSTER_AXIS_HEIGHT as TIP_ADJUSTER_AXIS_HEIGHT,
-    ADJUSTER_DEPTH as TIP_ADJ_BORE_DEPTH,
+    ADJUSTER_EMBED as TIP_ADJ_EMBED,
+    ADJUSTER_EMBED_WINDOW as TIP_ADJ_EMBED_WINDOW,
     BLOCK_X as TIP_BLOCK_X,
     BLOCK_Z as TIP_BLOCK_Z,
     PINCH_BORE_SPEC as TIP_PINCH_BORE_SPEC,
     PINCH_CLEARANCE_SPEC as TIP_PINCH_CLEARANCE_SPEC,
     PINCH_HEIGHT as TIP_PINCH_Y,
     SHAFT_PASSAGE_DIA as TIP_SHAFT_PASSAGE_DIA,
+    SHIM_NOMINAL as TIP_SHIM_NOMINAL,
     SLIT_W as TIP_SLIT_W,
 )
 from build_cone_tip_bushing import (  # noqa: E402
@@ -988,7 +1046,10 @@ PIVOT_STATION = TIP_BLOCK_STATION + 11.0
 # thickness under each foot + bore height = 54 above the base top.
 if (
     abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + POST_BORE_HEIGHT)) > 1e-9
-    or abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + TIP_ADJUSTER_AXIS_HEIGHT)) > 1e-9
+    or abs(
+        (Y_DRIVE - Y_BASE_TOP) - (PLAT_T + TIP_SHIM_NOMINAL + TIP_ADJUSTER_AXIS_HEIGHT)
+    )
+    > 1e-9
 ):
     raise AssertionError("cone axis height drifted between platform/post/block")
 # The shaft is placed by its front stub end; keep the station in lockstep with
@@ -1024,15 +1085,12 @@ for _lbl, _s0, _hx, _hz in (
             raise AssertionError(
                 f"{_lbl} overhangs the swing platform at station {_end:g}"
             )
-# The shaft's tip reaches through the block to the adjuster cup (>= 5 inside
-# the block envelope, end short of the north face).
+# Where the tip ends is owned by the end-play stack below: it sits on the
+# adjuster's cup apex, and the cup rim stays inside the adjuster's working
+# window.  (The former ">= 5 inside the block" floor was the tip-JOURNAL
+# engagement of ada675b1, when the block was the tip bearing; f4462091 moved
+# radial support to the brass bushing and left the number behind.)
 _TIP_END_STATION = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-1][1]
-if not (
-    TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0 + 5.0
-    <= _TIP_END_STATION
-    <= TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 - 0.5
-):
-    raise AssertionError("shaft tip end does not reach the tip-block adjuster")
 # The stub end stands 1.0 mm proud of the post's inclined journal face.
 _STUB_END_Z = cone_station(SHAFT_FRONT_STATION)[2]
 _POST_SOUTH_STATION = POST_STATION - POST_CONE_BOSS_LENGTH / 2.0
@@ -1044,12 +1102,13 @@ if SHAFT_FRONT_STATION > _POST_SOUTH_STATION - 1.0 + 1e-9:
     )
 # --- tip end-play stack (item 5, v4_t00471 / 7:49) ---------------------------
 # Along the axis, south to north: T006 gear | brass bushing | block | shaft tip
-# | the 94025A150 adjuster's conical cup. The shaft's flat 1/16-in end cannot
-# reach the cup apex: it seats on the ring where its end edge meets the cone
-# wall, ADJ_SEAT_DEPTH short of the apex (end radius / tan of the vendor cup's
-# half-angle). The adjuster therefore backs out from the nominal 6 mm embed by
+# | the 94025A164 adjuster's conical cup, its #10-32 thread tapped through the
+# block (rule-12 E11/W1). The shaft's flat 1/16-in end cannot reach the cup
+# apex: it seats on the ring where its end edge meets the cone wall,
+# ADJ_SEAT_DEPTH short of the apex (end radius / tan of the vendor cup's
+# half-angle). The adjuster therefore backs out from the nominal ADJ_EMBED by
 # that depth (Main ruling 2026-09-23; burying the apex left 1.05 mm^3 of
-# overlap once the journal grew from 1/32 in). The top slit and 90280A108 pinch
+# overlap once the journal grew from 1/32 in). The top slit and 90280A110 pinch
 # screw lock that setting.
 TIP_SOUTH_STATION = TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0
 BUSH_STATION = T006_NORTH_FACE
@@ -1063,13 +1122,21 @@ ADJ_HEAD_STATION = (
 _ADJ_CUP_RIM = ADJ_HEAD_STATION - ADJ_LEN
 _ADJ_CUP_APEX = _ADJ_CUP_RIM + ADJ_CUP_DEPTH
 _STUB_START = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-2][1]
-if BUSH_STATION < _STUB_START + 1.0:
-    raise AssertionError("tip bushing rides off the 1/16in tip journal")
+# tip_stub_radially_supported: the brass bushing is the tip's only radial
+# bearing, so its whole length rides the stub section on a matching bore.
+if not (
+    _STUB_START + 1.0 <= BUSH_STATION
+    and BUSH_STATION + BUSH_LEN <= _TIP_END_STATION
+):
+    raise AssertionError("tip stub is not radially supported: bushing rides off the stub")
 if abs(BUSH_BORE_DIA - _STUB_DIA) > 0.05:
     raise AssertionError("tip-bushing bore does not match the tip stub dia")
 _require_tapped_thread("cone-tip adjuster", ADJ_THREAD, TIP_ADJ_BORE_SPEC)
-if ADJ_EMBED > TIP_ADJ_BORE_DEPTH - 0.5:
-    raise AssertionError("adjuster bottoms out in the block tapped hole")
+# adjuster_cup_in_working_window: the fit-up embed is the block spec's.
+if ADJ_EMBED != TIP_ADJ_EMBED or not (
+    TIP_ADJ_EMBED_WINDOW[0] <= ADJ_EMBED <= TIP_ADJ_EMBED_WINDOW[1]
+):
+    raise AssertionError("adjuster cup rim is outside its working window")
 if not 0.0 < ADJ_CUP_DEPTH < ADJ_LEN:
     raise AssertionError("adjuster cup depth is outside the stock body")
 if ADJ_CUP_DIA < _STUB_DIA + 0.25:
@@ -1319,20 +1386,8 @@ _ARB_Z_BANDS = (
     # NORTH one runs at the repository's 0.25 mm interference-design floor;
     # ch12 img09 shows the real clamp hugging the plate edge, and the p1 swing
     # moves the plate away from it.
-    (
-        (
-            -ARBOR_PEDESTAL_Z - ARBOR_PED_DEPTH / 2.0,
-            -ARBOR_PEDESTAL_Z + ARBOR_PED_DEPTH / 2.0,
-        ),
-        2.0,
-    ),  # -63.085..-47.085
-    (
-        (
-            ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0,
-            ARBOR_PEDESTAL_NORTH_Z + ARBOR_PED_DEPTH / 2.0,
-        ),
-        0.25,
-    ),
+    (ARBOR_PED_SOUTH_Z_BAND, 2.0),
+    (ARBOR_PED_NORTH_Z_BAND, 0.25),
 )
 _EDGE_X_INTERCEPT = PLAT_WEST_N + _K_W * PLAT_OVERHANG
 _EDGE_WORLD_Z_BASE = _PPIVOT[2] - _EDGE_X_INTERCEPT * SIN_I
@@ -2105,37 +2160,56 @@ if (
     and APINION_Y - ARBOR_COLLAR_OD / 2.0 < BLOCK_TOP_Y + 0.25
 ):
     raise AssertionError("arbor collar sits on the front pivot block")
-# Exact 90280A108 #4-40 x 9.525 stock screws pass through the spring and
-# pedestal's normal #4 clearances into the base's #4-40 UNC-2B seats.
+# The exact 90280A108 #4-40 x 9.525 stock screw passes through the spring's
+# normal #4 clearance into the base's #4-40 UNC-2B seat.
 _require_clearance_size("pinion spring foot", FSCREW_THREAD, SPR_HOLE_SPEC)
-_require_clearance_size("arbor pedestal foot", FSCREW_THREAD, ARBOR_PED_HOLE_SPEC)
 _require_tapped_thread(
     "foot-screw base seat", FSCREW_THREAD, BASE_FOOT_SEAT_SPEC, kind="tapped_bottoming"
 )
-if FSCREW_SHANK_LEN - ARBOR_PED_FLANGE_T < 2.0:
-    raise AssertionError("foot screw barely engages the base at the pedestal")
 if FSCREW_SHANK_LEN - SPRING_T > BASE_FOOT_HOLE_DEPTH - 0.25:
     raise AssertionError("foot screw bottoms out in the base spring seat")
-# Head fits the pedestal's exposed flange strip (local z -8..-2, centre -5).
-if FSCREW_HEAD_DIA / 2.0 > min(
-    abs(ARBOR_PED_SCREW_Z + ARBOR_PED_DEPTH / 2.0),
-    abs(ARBOR_PED_DEPTH / 2.0 - ARBOR_PED_STRAP_T - ARBOR_PED_SCREW_Z),
+_FOOT_SCREW_XZ = ((SPRING_HOLE_X, SPRING_Z),)
+# U34c: one MHA-143 (90280A197 #8-32 x 3/4) per pedestal, through the ledge's
+# #8 close clearance into a base seat transferred from the fitted pedestal.
+_require_clearance_size("arbor pedestal ledge", HDSCREW_THREAD, ARBOR_PED_HOLE_SPEC)
+_require_tapped_thread(
+    "pedestal hold-down base seat",
+    HDSCREW_THREAD,
+    BASE_PEDESTAL_SEAT_SPEC,
+    kind="tapped_bottoming",
+)
+# Rule 12 (audit E15): at the printed worst case (flange 5.0 +-0.8, screw
+# 19.05 +0/-0.76, seat depths +-0.8) the screw keeps >= 1.5D of thread and
+# never reaches the incomplete threads at the bottom of the seat.
+_HDSCREW_MIN_ENGAGEMENT = (HDSCREW_SHANK_LEN - 0.76) - (ARBOR_PED_FLANGE_T + 0.8)
+_HDSCREW_MAX_REACH = HDSCREW_SHANK_LEN - (ARBOR_PED_FLANGE_T - 0.8)
+if _HDSCREW_MIN_ENGAGEMENT < 1.5 * HDSCREW_SHANK_DIA:
+    raise AssertionError("pedestal hold-down keeps under 1.5D of thread at worst case")
+if _HDSCREW_MAX_REACH + 0.25 > BASE_PEDESTAL_HOLE_DEPTH - 0.8:
+    raise AssertionError("pedestal hold-down reaches the seat's incomplete threads")
+# The head sits on the 18 ledge, clear of the strap root and the ledge end.
+if HDSCREW_HEAD_DIA / 2.0 > min(
+    ARBOR_PED_SCREW_Z - ARBOR_PED_FOOT_NEAR_Z,
+    ARBOR_PED_STRAP_ROOT_Z - ARBOR_PED_SCREW_Z,
 ):
-    raise AssertionError("foot screw head overhangs the pedestal flange")
-_FOOT_SCREW_XZ = (
-    (SPRING_HOLE_X, SPRING_Z),
-    (X_DRUM, -ARBOR_PEDESTAL_Z + ARBOR_PED_SCREW_Z),
-    # North pedestal (ry180 flips its flange to +z): z_c - SCREW_Z = 102.5.
-    (X_DRUM, ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_SCREW_Z),
+    raise AssertionError("pedestal hold-down head overhangs the ledge")
+_PEDESTAL_SCREW_XZ = (
+    (X_DRUM, -ARBOR_PEDESTAL_Z + ARBOR_PED_SCREW_Z),  # -91.652
+    # North pedestal (Ry180 flips its ledge to +z): origin - SCREW_Z.
+    (X_DRUM, ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_SCREW_Z),  # +94.202
 )
 
 # Both machine-handed: the base holes agree directly.
-for _want, _have in zip(_FOOT_SCREW_XZ, BASE_FOOT_XZ, strict=True):
-    if abs(_want[0] - _have[0]) > 0.05 or abs(_want[1] - _have[1]) > 0.05:
-        raise AssertionError(
-            f"harmonic-base foot-screw hole {_have} != machine derived "
-            f"({_want[0]:.3f}, {_want[1]:.3f})"
-        )
+for _label, _derived, _base in (
+    ("foot-screw", _FOOT_SCREW_XZ, BASE_FOOT_XZ),
+    ("pedestal hold-down", _PEDESTAL_SCREW_XZ, BASE_PEDESTAL_XZ),
+):
+    for _want, _have in zip(_derived, _base, strict=True):
+        if abs(_want[0] - _have[0]) > 0.05 or abs(_want[1] - _have[1]) > 0.05:
+            raise AssertionError(
+                f"harmonic-base {_label} hole {_have} != machine derived "
+                f"({_want[0]:.3f}, {_want[1]:.3f})"
+            )
 
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
@@ -2382,8 +2456,9 @@ async def build(adapter) -> dict[str, str]:
     )
     await _lock_static(adapter, arbor_pedestal, arbor)
     # NORTH pedestal (PR8, ch12 img09): the same casting rotated 180 about Y
-    # so its strap face looks south at the drum's north end; the arbor's +97
-    # end seats 7.5 into its bore band. Base-bolted static like the south one.
+    # so its strap face looks south at the drum's north end; the arbor's north
+    # end seats ~7.0 into its strap bore (U34c). Base-bolted static like the
+    # south one.
     north_pedestal = await place_component(
         adapter,
         "arbor-pedestal",
@@ -2455,10 +2530,15 @@ async def build(adapter) -> dict[str, str]:
         label="cone-pivot-post (v2 Ry180, big-end journal, on the plate)",
     )
     ptip = cone_station(TIP_BLOCK_STATION)
+    # U30: the block stands on the nominal MHA-141 fit-up shim pack, so its
+    # foot sits TIP_SHIM_NOMINAL above PlateTop (the axis-height assert above
+    # already counts it).  The shim is the integrator's; until it is inserted
+    # the block floats that far above the plate.
+    tip_foot_y = Y_BASE_TOP + PLAT_T + TIP_SHIM_NOMINAL
     tip_block = await place_component(
         adapter,
         "cone-tip-block",
-        [ptip[0], Y_BASE_TOP + PLAT_T, ptip[2]],
+        [ptip[0], tip_foot_y, ptip[2]],
         [0.0, INCLINE_DEG, 0.0],
         ROT_Y_INCLINE,
         ground=False,
@@ -2493,7 +2573,7 @@ async def build(adapter) -> dict[str, str]:
         "cone-tip-pinch-screw",
         [
             ptip[0] - (TIP_BLOCK_X / 2.0) * COS_I,
-            Y_BASE_TOP + PLAT_T + TIP_PINCH_Y,
+            tip_foot_y + TIP_PINCH_Y,
             ptip[2] + (TIP_BLOCK_X / 2.0) * SIN_I,
         ],
         PINCH_WEST_EULER,
@@ -2713,21 +2793,28 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="slotted-screw block hold-down seed",
     )
-    foot_screws: list[str] = []
-    for tag, (sx, sz), seat_y in (
-        ("spring foot", _FOOT_SCREW_XZ[0], Y_BASE_TOP + SPRING_T),
-        ("pedestal flange", _FOOT_SCREW_XZ[1], Y_BASE_TOP + ARBOR_PED_FLANGE_T),
-    ):
-        scr = await place_component(
-            adapter,
-            "foot-screw",
-            [sx, seat_y, sz],
-            [0.0, 0.0, 0.0],
-            IDENTITY,
-            ground=False,
-            label=f"foot-screw ({tag})",
-        )
-        foot_screws.append(scr)
+    sx, sz = _FOOT_SCREW_XZ[0]
+    spring_foot_screw = await place_component(
+        adapter,
+        "foot-screw",
+        [sx, Y_BASE_TOP + SPRING_T, sz],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="foot-screw (spring foot)",
+    )
+    # U34c: the south pedestal's MHA-143 is the seed; the north one is its
+    # linear pattern instance below (pedestal-hold-down-screw-1 / -2).
+    sx, sz = _PEDESTAL_SCREW_XZ[0]
+    pedestal_screw = await place_component(
+        adapter,
+        "pedestal-hold-down-screw",
+        [sx, Y_BASE_TOP + ARBOR_PED_FLANGE_T, sz],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="pedestal-hold-down-screw (south ledge)",
+    )
 
     # =================== cone cluster (driven, on-solution) ====================
     cone_shaft = await place_component(
@@ -3275,9 +3362,10 @@ async def build(adapter) -> dict[str, str]:
     # Tip block: aligned to the shaft/adjuster axis (which the post + platform
     # already carry) + an axial seat + a
     # parallel anti-spin against the PLATFORM (not the spinning shaft). Its
-    # height falls out of the coaxial (bore height + plate = drive height,
-    # asserted at import), so its foot lands ON PlateTop with no seat mate --
-    # contact, not constraint. It follows the p1 swing through the shaft.
+    # height falls out of the coaxial (plate + shim + axis height = drive
+    # height, asserted at import), so its foot sits the nominal shim pack
+    # above PlateTop with no seat mate; the shim (MHA-141) is the
+    # integrator's. It follows the p1 swing through the shaft.
     tb_o = _org(adapter, tip_block)
     tb_axial = sum((tb_o[k] - cone_o[k]) * cone_axis_dir[k] for k in range(3))
     await coincident_mate(
@@ -3973,7 +4061,7 @@ async def build(adapter) -> dict[str, str]:
         verify=(pivot_shaft, ps_o),
     )
     await _lock_static(adapter, spring, arbor)
-    for scr in [block_screw, *foot_screws]:
+    for scr in (block_screw, spring_foot_screw, pedestal_screw):
         await _lock_static(adapter, scr, arbor)
     block_instances = await grid_component_pattern(
         adapter,
@@ -3996,24 +4084,24 @@ async def build(adapter) -> dict[str, str]:
         "pinion block-screw grid",
     )
     pedestal_target = [
-        _FOOT_SCREW_XZ[2][0],
+        _PEDESTAL_SCREW_XZ[1][0],
         Y_BASE_TOP + ARBOR_PED_FLANGE_T,
-        _FOOT_SCREW_XZ[2][1],
+        _PEDESTAL_SCREW_XZ[1][1],
     ]
     pedestal_instances = await linear_component_pattern(
         adapter,
-        [foot_screws[1]],
+        [pedestal_screw],
         axis="z",
-        spacing_mm=_FOOT_SCREW_XZ[2][1] - _FOOT_SCREW_XZ[1][1],
+        spacing_mm=_PEDESTAL_SCREW_XZ[1][1] - _PEDESTAL_SCREW_XZ[0][1],
         instances=2,
-        label="arbor pedestal foot-screw pattern",
+        label="arbor pedestal hold-down pattern",
     )
     assert_pattern_targets(
         adapter,
         pedestal_instances,
         [pedestal_target],
         IDENTITY,
-        "arbor pedestal foot-screw pattern",
+        "arbor pedestal hold-down pattern",
     )
     # Front strap: revolute on the torque shaft (coincident pivot bore + axial
     # seat) -- the swing DOF. The parked-lean ANGLE driver is a FREED

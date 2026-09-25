@@ -1,0 +1,197 @@
+r"""Create the machinist drawing for the MHA-141 cone tip shim pack.
+
+One plan view carries the whole blank at 4:1: the 15.0 x 12.0 outline, the
+horseshoe slot's width with its full-radius callout, and the radius centre
+located from the closed edge and the lower edge (policy rule 7: a location
+starts on a face the shop can pick up, never the model origin).  An edge
+view below it shows the nominal stack as a reference dimension; the
+stack-to-fit range rides the manufacturing notes and the leaf stock the
+material specification, because the fitted thickness is set at assembly,
+not machined.
+
+Run with SolidWorks open::
+
+    uv run python cad\scripts\draw_cone_tip_shim.py cone-tip-shim
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from typing import Any
+
+import _drawing_hidden_sketches as hidden_sketches
+import _telemetry
+from _common import CAD_ROOT, check, run_build
+from _drawing_common import (
+    DrawingOutputs,
+    add_property_linked_note,
+    assert_imported_precision,
+    curate_view_dimensions,
+    dimension_name,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    offset_dimension_text,
+    set_dimension_callouts,
+    set_hidden_lines_removed,
+    set_reference_dimension,
+    stamp_drawing_summary,
+)
+from _drawing_registry import DRAWINGS_BY_NAME
+from cone_tip_shim_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    SHIM_X,
+    SHIM_Z,
+    SLOT_OPEN_SIDE,
+)
+from solidworks_mcp.adapters.solidworks.drawing import place_view
+
+
+SPEC = DRAWINGS_BY_NAME["cone_tip_shim"]
+PART_STEM = SPEC.artifact_stem
+SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
+OUTPUTS = DrawingOutputs(
+    slddrw=SPEC.outputs["slddrw"],
+    pdf=SPEC.outputs["pdf"],
+    png=SPEC.outputs["png"],
+)
+SLDDRW = OUTPUTS.slddrw
+PDF = OUTPUTS.pdf
+PNG = OUTPUTS.png
+
+SHEET_SCALE = (4.0, 1.0)
+_S = SHEET_SCALE[0] / 1000.0
+# Third-angle: the plan (Top) above the edge view (Front).
+TOP_CENTER = (0.120, 0.170)
+FRONT_CENTER = (TOP_CENTER[0], 0.100)
+ISO_CENTER = (0.320, 0.180)
+HALF_X = SHIM_X * _S / 2.0  # 0.030 on the sheet
+HALF_Z = SHIM_Z * _S / 2.0  # 0.024 on the sheet
+
+# The *Top view keeps model +X to the right, so the slot opens to the LEFT
+# edge and the closed (radius) end looks right.
+if SLOT_OPEN_SIDE != -1:
+    raise ValueError("the plan layout assumes the slot opens to model -X")
+
+# Larger dimensions stand outside smaller ones: the 12.0 depth outboard of
+# the 6.0 radius-centre location on the right.
+TOP_KEEP = {
+    "Width": (TOP_CENTER[0], TOP_CENTER[1] + HALF_Z + 0.014),
+    "Depth": (TOP_CENTER[0] + HALF_X + 0.024, TOP_CENTER[1]),
+    # Past the open mouth, level with the slot's centreline.
+    "SlotWidth": (TOP_CENTER[0] - HALF_X - 0.016, TOP_CENTER[1]),
+    # The radius centre from the closed (right) edge and the lower edge,
+    # model-owned (the part's hidden reference sketches).  Each value sits
+    # midway along its span, off both witnesses (the tip block's 5637ac42
+    # lesson).
+    "SlotCentreX": (TOP_CENTER[0] + HALF_X / 2.0, TOP_CENTER[1] - HALF_Z - 0.012),
+    "SlotCentreZ": (TOP_CENTER[0] + HALF_X + 0.010, TOP_CENTER[1] - HALF_Z / 2.0),
+}
+FRONT_KEEP = {"Thickness": (TOP_CENTER[0] + HALF_X + 0.016, FRONT_CENTER[1])}
+# The 1.10 span is 4.4 mm on the sheet, so its value cannot sit between the
+# arrows: r1 printed it across its own dimension line.  Lead it out to the
+# right and a little below, clear of the line and of the notes above.
+THICKNESS_TEXT = (FRONT_KEEP["Thickness"][0] + 0.022, FRONT_CENTER[1] - 0.010)
+REFERENCE_DIMENSIONS = ("Thickness",)
+DIMENSION_CALLOUTS = {"Thickness": "NOMINAL STACK", "SlotWidth": "SLOT, FULL R"}
+
+NOTES_XY = (0.190, 0.120)
+
+
+async def build(adapter: Any) -> dict[str, str]:
+    if not SOURCE.is_file():
+        raise FileNotFoundError(f"source part is missing: {SOURCE}")
+
+    check("open cone-tip-shim source", await adapter.open_model(str(SOURCE)))
+    read_required_properties(
+        adapter.currentModel,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+        ),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+        ),
+    )
+    drawing_model, _sheet = new_project_drawing(
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+    )
+    stamp_drawing_summary(
+        adapter,
+        drawing_model,
+        {
+            0: "Cone Tip Shim Pack Manufacturing Drawing",
+            1: "Harmonic Analyzer hobby-machinist book drawing",
+            2: "Harmonic Analyzer Project",
+            3: "cone tip shim pack; fit-up stack; shim stock",
+            4: "Generated from the project-owned ASME B drawing standard",
+        },
+    )
+
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=SHEET_SCALE)
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=SHEET_SCALE)
+    for view in (top, front, iso):
+        set_hidden_lines_removed(adapter, view)
+
+    # The plan imports the part-hidden SlotCentre reference sketches, so it
+    # takes the opt-in curation that shows them in this view only.
+    top_annotations = hidden_sketches.curate_view_dimensions(
+        adapter,
+        top,
+        keep=TOP_KEEP,
+        view_label="plan",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    front_annotations = curate_view_dimensions(
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="stack edge",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    annotations = [*top_annotations, *front_annotations]
+    # The singular helper: the plural one adds a diameter glyph ("(Ø1.10)"
+    # in r1), since its only other callers mark diameters.
+    for annotation in annotations:
+        if dimension_name(adapter, annotation) in REFERENCE_DIMENSIONS:
+            set_reference_dimension(adapter, annotation, label="nominal stack")
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    offset_dimension_text(adapter, front_annotations, {"Thickness": THICKNESS_TEXT})
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+
+    for view in (top, front):
+        set_hidden_lines_removed(adapter, view)
+
+    return await finalize_drawing(
+        adapter,
+        OUTPUTS,
+        pdf_title="Cone Tip Shim Pack Manufacturing Drawing",
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+    )
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("part", choices=[PART_STEM])
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    _parse_args()
+    _telemetry.set_service("drawing-export")
+    sys.exit(run_build(build))

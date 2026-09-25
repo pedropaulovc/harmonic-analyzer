@@ -107,6 +107,12 @@ def test_base_holes_follow_the_rederived_support() -> None:
         assert math.dist(derived, base) < 1e-9
     for derived, base in zip(drive._FOOT_SCREW_XZ, drive.BASE_FOOT_XZ, strict=True):
         assert math.dist(derived, base) < 1e-9
+    # U34c: the base carries the transferred pedestal seats at the study's
+    # rounded stations; the drive train derives them from the disc stack.
+    for derived, base in zip(
+        drive._PEDESTAL_SCREW_XZ, drive.BASE_PEDESTAL_XZ, strict=True
+    ):
+        assert math.dist(derived, base) < 0.005
 
 
 def _world(origin, rows, local):
@@ -308,10 +314,7 @@ def test_lift_rod_length_band_clears_past_the_back_block() -> None:
     band = (rig.BACK_BLOCK_OUTER_Z, reach + 0.25)
     # Occupants of that z band near the rod axis (drive_train + frame):
     # the north arbor pedestal stands on the drum axis, well west of the rod.
-    ped_z = (
-        drive.ARBOR_PEDESTAL_NORTH_Z - ped.FOOT_DEPTH / 2.0,
-        drive.ARBOR_PEDESTAL_NORTH_Z + ped.FOOT_DEPTH / 2.0,
-    )
+    ped_z = drive.ARBOR_PED_NORTH_Z_BAND
     assert ped_z[0] < band[1] and ped_z[1] > band[0]  # it IS in the band
     assert (drive.LIFT_X - rod_r) - (drive.X_DRUM + ped.FOOT_WIDTH / 2.0) >= 25.0
     # The rocker-arm support ends short of the back block's outer face.
