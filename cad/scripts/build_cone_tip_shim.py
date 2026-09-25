@@ -1,14 +1,16 @@
 r"""Reproduction script: MHA-141 cone tip shim pack (U30 fit-up stack).
 
 The blackened carbon-steel shim pack under the cone tip block (MHA-092): a
-15 x 12 pack of leaves cut from shim stock, stacked at fit-up so the block's
-adjuster axis lands on the cone axis, then clamped between the swing
-platform's top face and the block's foot by the MHA-140 hold-down screw. The
-model is ONE solid at the nominal stack (cone_tip_shim_spec.SHIM_T); the
-drawing states the stack range on the thickness dimension and the leaf stock
-in the material specification.
+15 x 10.47 pack of leaves (the block's foot less its I31 heel relief) cut
+from shim stock, stacked at fit-up so the block's adjuster axis lands on the
+cone axis, then clamped between the swing platform's top face and the
+block's foot by the MHA-140 hold-down screw. The model is ONE solid at the
+nominal stack (cone_tip_shim_spec.SHIM_T); the drawing states the stack
+range on the thickness dimension and the leaf stock in the material
+specification.
 
-Layout: origin at the centre of the bottom face, footprint on the Top plane
+Layout: origin on the bottom face, on the block's foot-tap axis (the plan
+runs from the block's south face to its heel relief), footprint on the Top plane
 (X across the cone shaft, Z along it -- the tip block's own frame), thickness
 up +Y. The horseshoe slot (#6 clearance wide) runs from the -X edge to a
 full radius centred on the Y axis, coaxial with the block's foot tap when
@@ -34,7 +36,6 @@ from _common import (
     apply_material,
     blank_sketch,
     check,
-    define_centered_rectangle,
     define_circle,
     define_rectilinear_chain,
     dimension_between,
@@ -60,6 +61,8 @@ from cone_tip_shim_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     REFERENCE_SKETCHES,
+    SHIM_NORTH_Z,
+    SHIM_SOUTH_Z,
     SHIM_T,
     SHIM_X,
     SHIM_Z,
@@ -145,25 +148,34 @@ async def build(adapter) -> dict[str, str]:
     # inch document.
     await set_global(adapter, "ShimX", f"{SHIM_X}mm")
     await set_global(adapter, "ShimZ", f"{SHIM_Z}mm")
+    await set_global(adapter, "ShimNorthZ", f"{SHIM_NORTH_Z}mm")
     await set_global(adapter, "ShimT", f"{SHIM_T}mm")
     await set_global(adapter, "SlotW", f"{SLOT_W}mm")
     await set_global(adapter, "SlotCentreX", '"ShimX" / 2')
-    await set_global(adapter, "SlotCentreZ", '"ShimZ" / 2')
+    await set_global(adapter, "SlotCentreZ", '"ShimNorthZ"')
 
     drive_jobs: list[tuple[str, str]] = []
 
+    # The plan: full block width, from the block's south face to the heel
+    # relief's inner face (I31), with the origin on the screw axis.  A
+    # Top-plane sketch reads model +Z (north) as -y.
     profile = SketchDims()
+    shim_pts = [
+        (-SHIM_X / 2.0, -SHIM_NORTH_Z),
+        (SHIM_X / 2.0, -SHIM_NORTH_Z),
+        (SHIM_X / 2.0, -SHIM_SOUTH_Z),
+        (-SHIM_X / 2.0, -SHIM_SOUTH_Z),
+    ]
     check("create_sketch shim", await adapter.create_sketch("Top"))
-    await define_centered_rectangle(
+    shim_lines = await add_line_chain(adapter, shim_pts)
+    await define_rectilinear_chain(
         adapter,
-        SHIM_X / 2.0,
-        SHIM_Z / 2.0,
-        "shim",
+        shim_lines,
+        shim_pts,
+        label="shim",
         dims=profile,
-        name_width="Width",
-        drive_width='"ShimX"',
-        name_depth="Depth",
-        drive_depth='"ShimZ"',
+        names=["Width", "Depth", "ShimEdgeX", "ShimNorthEdge"],
+        drives=['"ShimX"', '"ShimZ"', '"ShimX" / 2', '"ShimNorthZ"'],
     )
     await ensure_fully_defined(adapter, "shim sketch")
     check("exit_sketch shim", await adapter.exit_sketch())
@@ -263,9 +275,9 @@ async def build(adapter) -> dict[str, str]:
     )
     await _author_reference_dimension(
         adapter,
-        start=(0.0, -SHIM_Z / 2.0),
+        start=(0.0, -SHIM_NORTH_Z),
         orientation="vertical",
-        value_mm=SHIM_Z / 2.0,
+        value_mm=SHIM_NORTH_Z,
         feature_name="SlotCentreZReference",
         dimension_name="SlotCentreZ",
         drive_expression='"SlotCentreZ"',
