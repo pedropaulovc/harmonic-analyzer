@@ -24,6 +24,7 @@ import crank_drive_gear_spec as spec
 import crank_pinion_spec as pinion_spec
 import draw_crank_drive_gear as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
+from _fit_limits import deviations
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -185,6 +186,22 @@ def test_bond_gap_is_a_reamable_band_inside_the_loctite_648_fill_limit() -> None
     assert gap_max <= part.LOCTITE_648_GAP_FILL_MAX - 0.02
     # A +0.001 in oversize 3/8 reamer (9.5504) cuts inside the band.
     assert spec.BORE_DIA + lower <= (0.375 + 0.001) * 25.4 <= spec.BORE_DIA + upper
+
+
+def test_bore_band_survives_the_model_setter_and_every_limit_pair_bonds() -> None:
+    # warm-c486 (farm, 2026-09-25) died in part:crank_drive_gear on
+    # deviations((0.025, 0.025)): "fit band is inverted".  The build hands the
+    # band to the model through deviations(), so an offline call must pass,
+    # and the worst-case pairs of printed limits -- smallest bore on largest
+    # land, largest bore on smallest land -- must stay inside the ruled
+    # retained-joint window.
+    bore_lower, bore_upper = deviations(part.BORE_DIA_BAND)
+    assert bore_upper - bore_lower >= 0.02
+    land_upper, land_lower = cone_shaft_land_bands.GEAR_SEAT_BAND
+    tightest = bore_lower - land_upper
+    loosest = bore_upper - land_lower
+    low, high = retained_joint_fit.RETAINED_JOINT_CLEARANCE
+    assert low - 1e-9 <= tightest <= loosest <= high + 1e-9
 
 
 def test_print_carries_no_gdt_or_basic_dimensions() -> None:
