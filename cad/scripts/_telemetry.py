@@ -419,13 +419,28 @@ class _HeartbeatSpanProcessor(SpanProcessor):
     likely to wedge are not all ours: the connector library opens its own OTel
     spans around ``OpenDoc6`` (``sw.open <file>``), and an idle-timeout abort
     must name that file as its ``last_op``, not the harmonic span that was
-    last seen before the call went quiet."""
+    last seen before the call went quiet.
+
+    The primary provider and every auxiliary one (``build-infra``) are built
+    from :data:`_span_processors`, so both carry it. Spans tagged
+    ``watchdog_signal`` are the watchdog's own and are skipped, as
+    :class:`_ActivityFilter` skips its logs: they must not reset the idle
+    clock they report on. Two attribute reads and an assignment -- no lock,
+    no I/O -- because it runs on every span boundary."""
 
     def on_start(self, span: Span, parent_context: Any = None) -> None:
+        if _is_watchdog_signal(span):
+            return
         _touch_activity(f"span-start {getattr(span, 'name', '?')}")
 
     def on_end(self, span: ReadableSpan) -> None:
+        if _is_watchdog_signal(span):
+            return
         _touch_activity(f"span-end {span.name}")
+
+
+def _is_watchdog_signal(span: Any) -> bool:
+    return bool((getattr(span, "attributes", None) or {}).get("watchdog_signal"))
 
 
 class _ActivityFilter(logging.Filter):

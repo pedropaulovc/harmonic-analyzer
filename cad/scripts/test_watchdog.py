@@ -665,44 +665,31 @@ def test_log_records_poke_the_heartbeat() -> None:
     assert _telemetry.last_activity_op().startswith("log watchdog heartbeat")
 
 
-def test_foreign_otel_spans_poke_the_heartbeat() -> None:
-    # The connector library opens its own OTel spans (sw.open <file>), not
-    # _telemetry.span; the heartbeat is a span processor, so they count too.
-    from opentelemetry import trace
-
-    _telemetry.configure()
-    _telemetry._last_activity = 0.0
-    with trace.get_tracer("foreign").start_as_current_span("foreign.op"):
-        assert _telemetry.last_activity_op() == "span-start foreign.op"
-    assert _telemetry.last_activity() > 0.0
-    assert _telemetry.last_activity_op() == "span-end foreign.op"
-
-
-def test_connector_loguru_lines_poke_the_heartbeat() -> None:
-    from loguru import logger
-
-    _telemetry.configure()
-    _telemetry._last_activity = 0.0
-    logger.info("opening heartbeat-probe.SLDPRT")
-    assert _telemetry.last_activity() > 0.0
-    assert _telemetry.last_activity_op() == "log opening heartbeat-probe.SLDPRT"
-
-
 @pytest.mark.asyncio
-async def test_a_wedged_adapter_open_is_the_watchdogs_last_op() -> None:
+async def test_an_idle_abort_inside_an_adapter_open_names_the_file(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     # The rekey2 package:release leaf sat ~83 min inside one OpenDoc6 (#881,
-    # #886). An idle-timeout abort must name the FILE it wedged on.
+    # #886). The connector opens the span (sw.open <file>), not _telemetry, so
+    # this pins the whole path: the heartbeat processor sees the foreign span
+    # and the op-timeout abort reports it as last_op.
     from solidworks_mcp.adapters.base import AdapterResult, AdapterResultStatus
     from solidworks_mcp.adapters.solidworks.io import SolidWorksIOMixin
 
-    seen: list[str] = []
+    aborts: list[tuple[str, int, dict]] = []
+    monkeypatch.setattr(
+        _watchdog,
+        "_abort",
+        lambda reason, msg, code, **f: aborts.append((reason, code, f)),
+    )
+    dog, exits = _make(idle=901.0, timeout=900.0)
 
-    def open_doc(*_args: object) -> object:
-        seen.append(_telemetry.last_activity_op())
-        raise RuntimeError("wedged")
+    def wedged_open(*_args: object) -> object:
+        dog.tick()  # the poll that finds the seat silent past the timeout
+        raise AssertionError("the watchdog should have aborted")
 
     class _Adapter(SolidWorksIOMixin):
-        swApp = SimpleNamespace(OpenDoc6=open_doc)
+        swApp = SimpleNamespace(OpenDoc6=wedged_open)
         constants = {"swDocPART": 1, "swDocASSEMBLY": 2, "swDocDRAWING": 3}
 
         def is_connected(self) -> bool:
@@ -710,15 +697,20 @@ async def test_a_wedged_adapter_open_is_the_watchdogs_last_op() -> None:
 
         def _handle_com_operation(self, _name, callback):
             try:
-                return AdapterResult(status=AdapterResultStatus.SUCCESS, data=callback())
+                return AdapterResult(
+                    status=AdapterResultStatus.SUCCESS, data=callback()
+                )
             except RuntimeError as exc:
                 return AdapterResult(status=AdapterResultStatus.ERROR, error=str(exc))
 
     _telemetry.configure()
-    result = await _Adapter().open_model(r"C:\models\magnifier-assembly.SLDDRW")
+    with pytest.raises(_Exit):
+        await _Adapter().open_model(r"C:\models\magnifier-assembly.SLDDRW")
 
-    assert result.is_error
-    assert seen == ["span-start sw.open magnifier-assembly.SLDDRW"]
+    assert exits == [EXIT_OP_TIMEOUT]
+    ((reason, _code, fields),) = aborts
+    assert reason == "op-timeout"
+    assert fields["last_op"] == "span-start sw.open magnifier-assembly.SLDDRW"
 
 
 def test_each_discarded_document_is_its_own_span(
@@ -789,6 +781,8 @@ def test_connect_is_split_into_dispatch_identity_and_discard(
         "seat.identity",
         "seat.discard",
     ]
+
+
 def _package_seat(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, open_doc):
     """package_native pointed at a tmp top assembly and a mock seat whose
     ``OpenDoc6`` is ``open_doc``; returns the prepared-tree directory."""
@@ -800,7 +794,9 @@ def _package_seat(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, open_doc):
     monkeypatch.setattr(package_native, "OUT_SLDASM", sldasm)
     monkeypatch.setattr(package_native, "RELEASE_DIR", tmp_path / "release")
     monkeypatch.setattr(
-        package_native._seat_forensics, "release_seat_working_directory", lambda _sw: None
+        package_native._seat_forensics,
+        "release_seat_working_directory",
+        lambda _sw: None,
     )
     seat = SimpleNamespace(
         IActiveDoc2=None, CloseAllDocuments=Mock(), CloseDoc=Mock(), OpenDoc6=open_doc
@@ -884,7 +880,9 @@ def test_package_native_arms_the_watchdog_around_the_seat_session_only(
     out = _package_seat(tmp_path, monkeypatch, Mock())
     attach = package_native.attach_solidworks
     monkeypatch.setattr(
-        package_native, "attach_solidworks", lambda: (events.append("attach"), attach())[1]
+        package_native,
+        "attach_solidworks",
+        lambda: (events.append("attach"), attach())[1],
     )
     monkeypatch.setattr(
         package_native,
@@ -912,12 +910,22 @@ def test_package_native_arms_the_watchdog_around_the_seat_session_only(
     monkeypatch.setattr(
         package_native,
         "write_sidecar",
-        lambda *_a, **_k: (events.append("sidecar"), {"solidworks_revision": "34.0"})[1],
+        lambda *_a, **_k: (events.append("sidecar"), {"solidworks_revision": "34.0"})[
+            1
+        ],
     )
 
     package_native.package_native(out)
 
     assert events == [
-        "arm", "attach", "release", "top", "drawings", "stamp", "release", "disarm",
-        "prints", "sidecar",
+        "arm",
+        "attach",
+        "release",
+        "top",
+        "drawings",
+        "stamp",
+        "release",
+        "disarm",
+        "prints",
+        "sidecar",
     ]

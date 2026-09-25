@@ -135,6 +135,7 @@ def _abort(reason: str, message: str, code: int, **fields: object) -> None:
     with contextlib.suppress(Exception):
         with _telemetry.span(
             "watchdog.abort",
+            watchdog_signal=True,
             reason=reason,
             exit_code=code,
             **_seat_fields,

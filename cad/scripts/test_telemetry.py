@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import cast
 
 import pytest
+from opentelemetry import trace
 from opentelemetry._logs import get_logger_provider
 from opentelemetry.sdk._logs import LoggerProvider as SdkLoggerProvider
 from opentelemetry.sdk._logs.export import (
@@ -141,6 +142,46 @@ def test_logs_split_into_severity_levels(capture):
 
     seen = {r.log_record.severity_text for r in logs.get_finished_logs()}
     assert {"DEBUG", "INFO", "SUCCESS", "WARN", "ERROR"} <= seen
+
+
+def test_foreign_tracer_spans_poke_the_heartbeat():
+    # The connector library opens its own OTel spans (sw.open <file>), not
+    # _telemetry.span; the heartbeat is a span processor, so they count too.
+    _telemetry.configure()
+    _telemetry._last_activity = 0.0
+    with trace.get_tracer("solidworks_mcp").start_as_current_span("sw.open a.SLDPRT"):
+        assert _telemetry.last_activity() > 0.0
+        assert _telemetry.last_activity_op() == "span-start sw.open a.SLDPRT"
+    assert _telemetry.last_activity_op() == "span-end sw.open a.SLDPRT"
+
+
+def test_build_infra_spans_poke_the_heartbeat():
+    _telemetry.configure()
+    _telemetry._last_activity = 0.0
+    with _telemetry.span("cache.probe x", service=_telemetry.BUILD_INFRA_SERVICE):
+        assert _telemetry.last_activity_op() == "span-start cache.probe x"
+
+
+def test_watchdog_signal_spans_do_not_poke_the_heartbeat():
+    # The watchdog's own abort span must not reset the idle clock it reports on.
+    _telemetry.configure()
+    _telemetry._last_activity = 0.0
+    tracer = trace.get_tracer("watchdog")
+    with tracer.start_as_current_span(
+        "watchdog.abort", attributes={"watchdog_signal": True}
+    ):
+        pass
+    assert _telemetry.last_activity() == 0.0
+
+
+def test_connector_loguru_lines_poke_the_heartbeat():
+    from loguru import logger
+
+    _telemetry.configure()
+    _telemetry._last_activity = 0.0
+    logger.info("opening heartbeat-probe.SLDPRT")
+    assert _telemetry.last_activity() > 0.0
+    assert _telemetry.last_activity_op() == "log opening heartbeat-probe.SLDPRT"
 
 
 def _only_heartbeat(processors) -> bool:
