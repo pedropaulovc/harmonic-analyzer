@@ -180,13 +180,32 @@ def test_pin_hole_is_match_drilled_to_the_named_pin() -> None:
 
 def test_pin_hole_note_names_the_operation_and_leaves_the_procedure_to_assembly() -> None:
     # Rule 6 (Main, 2026-09-25): a part print carries at most four note lines.
-    # The six-line match-drill procedure is MHA-A03 assembly work; the sheet
-    # prints its first two lines -- the operation, where it runs and the mate.
+    # The seating procedure (hammer taps, not removable) is MHA-A03 assembly
+    # work; the sheet keeps the operation, where it runs, the mate, and --
+    # because the fit to the actual pin governs the hole, not a drill size --
+    # the pin it is reamed to and its flush condition (run1c eye pass: with
+    # those two cut, neither sheet said how big the hole is).
+    process = spec.PIN_HOLE_PROCESS.split("\n")
     note = drawing.PIN_HOLE_NOTE.split("\n")
-    assert note == spec.PIN_HOLE_PROCESS.split("\n")[:2]
     assert len(note) <= 4
+    assert all(line in process for line in note)
     assert note[0].startswith("MATCH DRILL")
     assert spec.CRANKSHAFT_NUMBER in note[1]
+    assert f"REAM TO FIT PIN {spec.PIN_NUMBER}" in note
+    assert "FLUSH BOTH SIDES" in note
+    bare = drawing.PIN_HOLE_NOTE
+    for number in (spec.CRANKSHAFT_NUMBER, spec.PIN_NUMBER):
+        bare = bare.replace(number, "")
+    assert not any(ch.isdigit() for ch in bare)
+    # The four-line block (upper-left anchored; ~0.8h a character, ~1.7h a
+    # line) stays under the border and above the section and isometric.
+    height = drawing.PIN_HOLE_NOTE_HEIGHT
+    x0, top = drawing.PIN_HOLE_CALLOUT
+    right = x0 + 0.8 * height * max(map(len, note))
+    bottom = top - 1.7 * height * len(note)
+    assert top < drawing.SHEET_INNER_BORDER[3] and right < drawing.SHEET_INNER_BORDER[2]
+    assert bottom > drawing.RIGHT_CENTER[1] + drawing.HALF_OD + 0.010
+    assert bottom > drawing.ISO_CENTER[1] + drawing.HALF_OD + 0.010
     source = _source().replace("\r\n", "\n")
     assert "PIN_HOLE_NOTE,\n        text_xy=PIN_HOLE_CALLOUT," in source
 

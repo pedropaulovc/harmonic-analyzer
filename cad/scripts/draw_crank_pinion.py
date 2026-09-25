@@ -217,9 +217,16 @@ PIN_HOLE_EDGE = (
     RIGHT_CENTER[1] + PIN_DIA * VIEW_SCALE[0] / 2000.0,
 )
 PIN_HOLE_CALLOUT = (0.260, RIGHT_CENTER[1] + HALF_OD + 0.056)
-# The operation, where it runs and its mate: the spec process's first two
-# lines.  The rest (ream, seat, flush) is the MHA-A03 assembly step.
-PIN_HOLE_NOTE = "\n".join(PIN_HOLE_PROCESS.split("\n")[:2])
+# The operation, where it runs, its mate, the pin it is reamed to (the fit to
+# the actual pin governs the hole, not a drill size) and its flush condition:
+# the spec process's lines 1, 2, 3 and 6.  The seating procedure between them
+# is the MHA-A03 assembly step (rule 6: at most four lines).
+_PROCESS_LINES = PIN_HOLE_PROCESS.split("\n")
+PIN_HOLE_NOTE = "\n".join(_PROCESS_LINES[i] for i in (0, 1, 2, 5))
+# 2.5 mm text, anchored upper-left; the read-back extent, leader included,
+# must stay inside the B sheet's inner border.
+PIN_HOLE_NOTE_HEIGHT = 0.0025
+SHEET_INNER_BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
 _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
 _BORE_GAP_ANGLE_RAD = math.radians(168.75)
 BORE_FIT_NOTE = (0.016, 0.174)
@@ -321,21 +328,31 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The cross-hole is governed by a matched fit, not the model's nominal
     # drill diameter. The pinion's boss guides the drill, so its rim carries
-    # the operation, where it runs and the mating part; the ream, seat and
-    # flush procedure is assembly work (PIN_HOLE_PROCESS, for MHA-A03), not
-    # part-print prose (rule 6).
+    # the operation, where it runs, the mating part, the pin it is reamed to
+    # and the flush condition; the seating procedure is assembly work
+    # (PIN_HOLE_PROCESS, for MHA-A03), not part-print prose (rule 6).
     # A longitudinal section presents the radial through-hole as cut edges, not
     # a selectable model circle, so this view-owned pointer names its cut
     # location without dimensioning that hole.
-    add_leader_note(
+    pin_note = add_leader_note(
         adapter,
         PIN_HOLE_NOTE,
         text_xy=PIN_HOLE_CALLOUT,
         attach_xy=PIN_HOLE_EDGE,
         label="retention-pin matched cross-hole",
         view=right,
-        height=0.0025,
+        height=PIN_HOLE_NOTE_HEIGHT,
     )
+    adapter.currentModel.GraphicsRedraw2()
+    extent = tuple(float(v) for v in (_early_bound(pin_note, "INote").GetExtent() or ()))
+    _telemetry.info(f"retention-pin note extent {extent}")
+    x0, y0, x1, y1 = SHEET_INNER_BORDER
+    if len(extent) < 5 or not (
+        x0 <= extent[0] and y0 <= extent[1] and extent[3] <= x1 and extent[4] <= y1
+    ):
+        raise RuntimeError(
+            f"retention-pin note extent {extent} left the inner border {SHEET_INNER_BORDER}"
+        )
     # Put the fit note immediately left of the end view and send its short
     # leader radially through the upper-left tooth gap to the visible bore.
     # The native section-view diameter remains beside its axial extent (rule 7).
