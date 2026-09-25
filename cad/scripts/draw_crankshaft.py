@@ -29,6 +29,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_leader_note,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
@@ -64,7 +65,9 @@ from crankshaft_spec import (
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from crankshaft_notes import CROSS_HOLE_CALLOUT
+from build_crankshaft import PINION_PIN_DIA, PINION_PIN_STATION_Y
+from crank_pinion_spec import CRANKSHAFT_PIN_HOLE_PROCESS
+from crankshaft_notes import CROSS_HOLE_CALLOUT, PINION_PIN_NOTE
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -167,6 +170,15 @@ FINISH_SYMBOL = (JOURNAL_START_X + 0.050, 0.203)
 # line rather than a near parallel one (run 20260923T030252135Z-49e46990),
 # left of the Ø9.525 text and clear of the SR on the left.
 HOLE_CALLOUT_XY = (PIN_X + 0.054, 0.247)
+# The 16T retention-pin hole, 2.9 from the far end, clocked 13.7 deg off the
+# MHA-024 hole so it reads nearly round in this view.  Its note's top-left
+# corner sits in the free field above the far-end seat, right of the
+# Ø11.388 text and left of the isometric; the leader runs down-right to the
+# hole's upper rim without crossing a dimension.
+PINION_PIN_X = _sheet_x(PINION_PIN_STATION_Y)
+PINION_PIN_EDGE = (PINION_PIN_X, _sheet_y(PINION_PIN_DIA / 2.0))
+PINION_PIN_NOTE_XY = (0.290, 0.258)
+PINION_PIN_NOTE_HEIGHT = 0.0025
 NOTES_XY = (0.016, 0.062)
 ISO_NOTE_XY = (0.368, 0.108)
 
@@ -324,7 +336,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open crankshaft source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
+    properties = read_required_properties(
         adapter.currentModel,
         (
             "Number",
@@ -335,6 +347,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
+            "Pinion Pin Hole Process",
         ),
         required=(
             "Number",
@@ -343,8 +356,17 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
+            "Pinion Pin Hole Process",
         ),
     )
+    # The note prints the property's words re-wrapped; a part built from a
+    # different process text must not be printed with this one.
+    pinion_process = properties["Pinion Pin Hole Process"].replace("\r", "")
+    if pinion_process != CRANKSHAFT_PIN_HOLE_PROCESS:
+        raise RuntimeError(
+            f"crankshaft Pinion Pin Hole Process {pinion_process!r} != "
+            f"crank_pinion_spec {CRANKSHAFT_PIN_HOLE_PROCESS!r}"
+        )
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -426,6 +448,15 @@ async def build(adapter: Any) -> dict[str, str]:
         process=CROSS_HOLE_PROCESS,
     )
     _set_callout_below(cross_hole, CROSS_HOLE_CALLOUT, "tapered-pin cross-hole")
+    add_leader_note(
+        adapter,
+        PINION_PIN_NOTE,
+        text_xy=PINION_PIN_NOTE_XY,
+        attach_xy=PINION_PIN_EDGE,
+        label="16T retention-pin matched cross-hole",
+        view=side,
+        height=PINION_PIN_NOTE_HEIGHT,
+    )
     add_surface_finish(
         adapter,
         side,

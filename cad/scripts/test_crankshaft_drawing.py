@@ -168,6 +168,7 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         drawing.END_CENTER,
         drawing.ISO_CENTER,
         drawing.HOLE_CALLOUT_XY,
+        drawing.PINION_PIN_NOTE_XY,
         drawing.NOTES_XY,
         drawing.ISO_NOTE_XY,
         drawing.FINISH_SYMBOL,
@@ -228,3 +229,33 @@ def test_pinion_land_is_turnable_at_the_printed_band() -> None:
     assert land - geometry.GENERAL_1PL_TOL_MM >= 2.0
     post_bore = 104.789505572 - 32.755105572
     assert spec.JOURNAL_LENGTH / post_bore > 0.96
+
+
+def test_pinion_pin_hole_is_printed_with_the_process_the_part_carries() -> None:
+    """Codex #813 (PRRT_kwDOPHDy386l4ZrZ): MHA-026 cut the PinionPinHole and
+    stored its "Pinion Pin Hole Process", but the sheet printed neither."""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"Pinion Pin Hole Process"' in source
+    assert "PINION_PIN_NOTE," in source and "add_leader_note(" in source
+    # Same words as the property the build writes, only re-wrapped short.
+    assert notes.PINION_PIN_NOTE.split() == notes.CRANKSHAFT_PIN_HOLE_PROCESS.split()
+    lines = notes.PINION_PIN_NOTE.split("\n")
+    assert max(map(len, lines)) <= notes.PINION_PIN_NOTE_WIDTH
+    # The leader lands on the hole's upper rim, at the part's own station.
+    assert drawing.PINION_PIN_X == pytest.approx(
+        drawing.DOME_ROOT_X + part.PINION_PIN_STATION_Y * drawing.SHEET_SCALE[0] / 1000.0
+    )
+    assert drawing.PINION_PIN_EDGE[1] == pytest.approx(
+        drawing.SIDE_CENTER[1] + part.PINION_PIN_DIA * drawing.SHEET_SCALE[0] / 2000.0
+    )
+    assert drawing.JOURNAL_END_X < drawing.PINION_PIN_X < drawing.FAR_END_X
+    # The note's block (top-left anchored) stays right of the Ø11.388 text,
+    # above the dimension row and left of the isometric view.
+    char_w = 0.8 * drawing.PINION_PIN_NOTE_HEIGHT
+    line_h = 1.7 * drawing.PINION_PIN_NOTE_HEIGHT
+    x0, y0 = drawing.PINION_PIN_NOTE_XY
+    right = x0 + char_w * max(map(len, lines))
+    bottom = y0 - line_h * len(lines)
+    assert drawing.DIAMETER_POSITIONS["JournalDiaDim"][0] + 0.010 < x0
+    assert right < drawing.ISO_CENTER[0] - 0.012
+    assert bottom > drawing.DIAMETER_POSITIONS["JournalDiaDim"][1] + 0.010
