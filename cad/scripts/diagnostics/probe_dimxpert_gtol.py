@@ -92,7 +92,7 @@ not a prerequisite.
 
    The 2026-07-28-morning session wedged at Q2 twice (unreproducible since —
    see RESULTS).  Still: do not run this probe during a build, and if it
-   hangs, recover with ``_sw_lifecycle.force_recover()``.
+   hangs, recover with ``_sw_lifecycle.force_recover("manual")``.
 
     uv run python cad/scripts/diagnostics/probe_dimxpert_gtol.py
 """

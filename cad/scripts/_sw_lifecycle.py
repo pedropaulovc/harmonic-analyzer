@@ -31,12 +31,18 @@ Telemetry: every operation is a ``build-infra`` span (like the COM seat queue an
 the artefact cache), so a trace answers "did this build have to start or recover
 SolidWorks, and how long did it wait?" in one filter. ``sw.ensure_ready`` carries
 ``initial_state`` / ``action`` / ``final_state``; ``sw.start`` / ``sw.stop`` /
-``sw.wait_connected`` time the sub-steps.
+``sw.wait_connected`` time the sub-steps. ``sw.force_recover`` names WHY it ran
+(``recover.reason`` plus the caller's context) and how each phase ended
+(``stop.ok``, ``start.launched``, ``outcome``), and every connect wait records
+where its time went: a ``sw.state`` event per state transition, ``dwell.<state>_s``
+attributes, and one-shot ``sw.no_process`` / ``sw.signin_window`` stall events.
+A recovery that ends anywhere but connected is an ERROR span.
 """
 
 from __future__ import annotations
 
 import os
+import time
 
 import _telemetry
 
@@ -61,11 +67,26 @@ _DEFAULT_CONNECT_TIMEOUT = 900.0
 # the second force_recover needed in both measured incidents.
 _READY_GRACE_FRACTION = 1.0 / 3.0
 # The one state value that means "ready to build". Callers compare the state
-# force_recover RETURNS against this rather than re-probing via is_connected():
+# force_recover RETURNS against this rather than re-probing via current_state():
 # force_recover returns "error" exactly when detect_state() raised, so a second
 # probe would re-raise that failure into the caller and abort the retry path.
 CONNECTED_STATE = "connected"
+_WEDGE_STATE = "dotnet_splash_wedge"
+_NOT_RUNNING_STATE = "not_running"
 _INFRA = _telemetry.BUILD_INFRA_SERVICE
+# The connect poll mirrors ``sw_recovery.wait_until_connected`` (2 s), but reads
+# the full ``detect_state()`` so the trace can say which state the wait sat in.
+_POLL_S = 2.0
+# A launch that returned True yet has no sldworks.exe this long after is a launch
+# that never happened -- today it silently burns the whole connect budget.
+_NO_PROCESS_AFTER_S = 120.0
+# The 3DEXPERIENCE ID sign-in window, owned by the launcher chain's browser host
+# (not sldworks.exe). Same rule as the pool's seat probe
+# (solidworks-pool agent/seat_probe.py SIGNIN_TITLE_PREFIX).
+_SIGNIN_TITLE_PREFIX = "Login | 3DEXPERIENCE ID"
+# Indirection so tests can drive the poll on a fake clock.
+_monotonic = time.monotonic
+_sleep = time.sleep
 
 
 def _disabled() -> bool:
@@ -130,15 +151,14 @@ def ensure_ready() -> str:
             return "error"
 
 
-def is_connected() -> bool:
-    """True when SolidWorks is running and the connector reports loaded."""
+def current_state() -> str:
+    """The seat's ``SolidWorksState`` value now. A probe failure propagates."""
     from solidworks_mcp.adapters import sw_recovery
-    from solidworks_mcp.adapters.sw_recovery import SolidWorksState
 
-    return sw_recovery.detect_state() is SolidWorksState.CONNECTED
+    return str(sw_recovery.detect_state().value)
 
 
-def force_recover() -> str:
+def force_recover(reason: str, **context: object) -> str:
     """Unconditional kill → relaunch → wait-connected for the COM-failure retry path.
 
     Unlike :func:`ensure_ready`, does NOT trust ``detect_state()`` — a crashed
@@ -146,19 +166,34 @@ def force_recover() -> str:
     stop→start, and first clears the crash-report handler (``sldexitapp.exe``) so a
     crashed session's modal can't block the relaunch. Best-effort; returns the final
     state value.
+
+    ``reason`` (``watchdog_crash`` / ``seat_starting`` / ``memory`` / ...) and the
+    caller's ``context`` land on the span as ``recover.*``, so the trigger is read
+    off the span instead of joined from the logs around it. A recovery that does
+    not end connected sets the span ERROR: it burnt its budget for nothing.
     """
+    from opentelemetry.trace import Status, StatusCode
     from solidworks_mcp.adapters import sw_recovery
 
     timeout = _connect_timeout()
-    with _telemetry.span("sw.force_recover", service=_INFRA) as span:
+    attributes = {f"recover.{key}": value for key, value in context.items()}
+    attributes["recover.reason"] = reason
+    with _telemetry.span("sw.force_recover", service=_INFRA, **attributes) as span:
         try:
             _kill_crash_handler()
-            with _telemetry.span("sw.stop", service=_INFRA):
+            with _telemetry.span("sw.stop", service=_INFRA) as stop:
                 _telemetry.event("sw.stop")
-                sw_recovery.stop_solidworks()
-            _start(sw_recovery, timeout)
-            final = sw_recovery.detect_state().value
+                stopped = bool(sw_recovery.stop_solidworks())
+                stop.set_attribute("stop.ok", stopped)
+            span.set_attribute("stop.ok", stopped)
+            outcome = _start(sw_recovery, timeout)
+            final = str(sw_recovery.detect_state().value)
+            span.set_attribute("outcome", outcome)
             span.set_attribute("final_state", final)
+            if final != CONNECTED_STATE:
+                span.set_status(
+                    Status(StatusCode.ERROR, f"recovery {outcome}, final_state={final}")
+                )
             return final
         except Exception as exc:  # noqa: BLE001 - recovery must not harden into a new failure
             _telemetry.error(f"[sw] force_recover failed ({exc})", exc_info=True)
@@ -187,7 +222,9 @@ def wait_until_ready() -> str:
     with _telemetry.span("sw.wait_ready", service=_INFRA) as span:
         span.set_attribute("grace_s", grace)
         try:
-            _wait(sw_recovery, grace)
+            outcome = _wait(sw_recovery, grace)
+            if outcome != CONNECTED_STATE:
+                _telemetry.event("sw.grace_abandoned", grace_s=grace, reason=outcome)
         except Exception as exc:  # noqa: BLE001 - recovery must never fail the build
             _telemetry.warn(f"[sw] wait_until_ready gave up after {grace:.0f}s ({exc})")
             # Abandoning the grace is a decision INSIDE this span, and the retry
@@ -221,16 +258,115 @@ def _kill_crash_handler() -> None:
         pass
 
 
-def _wait(sw_recovery, timeout: float) -> None:
-    with _telemetry.span("sw.wait_connected", service=_INFRA):
-        sw_recovery.wait_until_connected(timeout=timeout)
+def _wait(sw_recovery, timeout: float) -> str:
+    with _telemetry.span("sw.wait_connected", service=_INFRA) as span:
+        return _poll_connected(sw_recovery, timeout, span, after_launch=False)
 
 
-def _start(sw_recovery, timeout: float) -> None:
-    with _telemetry.span("sw.start", service=_INFRA):
+def _start(sw_recovery, timeout: float) -> str:
+    """Launch and wait; returns ``connected`` / ``timeout`` / ``wedge``, or
+    ``not_launched`` when the library refused to launch (an sldworks.exe is still
+    running -- the stop before it failed) and so nothing was waited on."""
+    with _telemetry.span("sw.start", service=_INFRA) as span:
         _telemetry.event("sw.start", via="connector-launch")
-        if sw_recovery.start_solidworks():
-            sw_recovery.wait_until_connected(timeout=timeout)
+        launched = bool(sw_recovery.start_solidworks())
+        span.set_attribute("start.launched", launched)
+        if not launched:
+            return "not_launched"
+        return _poll_connected(sw_recovery, timeout, span, after_launch=True)
+
+
+def _poll_connected(sw_recovery, timeout: float, span, *, after_launch: bool) -> str:
+    """Wait for ``connected`` like ``sw_recovery.wait_until_connected`` (a wedge
+    ends it early), recording where the time went on ``span``.
+
+    One ``sw.state`` event per TRANSITION (not per poll) and a ``dwell.<state>_s``
+    attribute per state visited, so a 900 s budget burn reads as, e.g., 12 s
+    not_running then 888 s starting. Two stalls are named once each:
+    ``sw.no_process`` (a launch with no sldworks.exe after
+    :data:`_NO_PROCESS_AFTER_S`) and ``sw.signin_window`` (the 3DEXPERIENCE ID
+    login is up, and nothing answers it on an unattended seat). Returns
+    ``connected`` / ``wedge`` / ``timeout``.
+    """
+    started = _monotonic()
+    deadline = started + timeout
+    dwell: dict[str, float] = {}
+    state, since = "", started
+    stalls: set[str] = set()
+    outcome = "timeout"
+    while True:
+        now = _monotonic()
+        current = _state_value(sw_recovery)
+        if current != state:
+            if state:
+                dwell[state] = dwell.get(state, 0.0) + (now - since)
+            _telemetry.event("sw.state", state=current, elapsed_s=round(now - started, 1))
+            state, since = current, now
+        if current == CONNECTED_STATE:
+            outcome = "connected"
+            break
+        if current == _WEDGE_STATE:
+            outcome = "wedge"
+            break
+        _note_stalls(stalls, current, now - started, after_launch=after_launch)
+        if now >= deadline:
+            break
+        _sleep(_POLL_S)
+    ended = _monotonic()
+    dwell[state] = dwell.get(state, 0.0) + (ended - since)
+    for name, seconds in dwell.items():
+        span.set_attribute(f"dwell.{name}_s", round(seconds, 1))
+    span.set_attribute("wait.outcome", outcome)
+    span.set_attribute("wait.s", round(ended - started, 1))
+    return outcome
+
+
+def _note_stalls(stalls: set[str], state: str, elapsed: float, *, after_launch: bool) -> None:
+    if (
+        after_launch
+        and "no_process" not in stalls
+        and state == _NOT_RUNNING_STATE
+        and elapsed >= _NO_PROCESS_AFTER_S
+    ):
+        stalls.add("no_process")
+        _telemetry.event("sw.no_process", elapsed_s=round(elapsed, 1))
+    if "signin" in stalls:
+        return
+    title = _signin_window()
+    if title is None:
+        return
+    stalls.add("signin")
+    _telemetry.event("sw.signin_window", title=title, elapsed_s=round(elapsed, 1))
+
+
+def _signin_window() -> str | None:
+    """Title of a visible 3DEXPERIENCE ID sign-in window, else ``None``. Reads
+    only (``EnumWindows`` / ``IsWindowVisible`` / ``GetWindowTextW``); an
+    unreadable desktop names nothing."""
+    import ctypes
+    from ctypes import wintypes
+
+    found: list[str] = []
+    wanted = _SIGNIN_TITLE_PREFIX.casefold()
+    try:
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        callback = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+        def visit(hwnd, _parameter):
+            if not user32.IsWindowVisible(hwnd):
+                return True
+            buffer = ctypes.create_unicode_buffer(512)
+            user32.GetWindowTextW(hwnd, buffer, len(buffer))
+            title = buffer.value.strip()
+            if not title.casefold().startswith(wanted):
+                return True
+            found.append(title)
+            return False
+
+        user32.EnumWindows(callback(visit), 0)
+    except Exception:  # noqa: BLE001 - a window read never affects the recovery
+        return None
+    return found[0] if found else None
 
 
 def _recover(sw_recovery, timeout: float) -> None:
