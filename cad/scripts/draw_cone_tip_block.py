@@ -5,9 +5,12 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from dataclasses import dataclass
+from enum import Enum
 from typing import Any
 
 import _drawing_hidden_sketches as hidden_sketches
+import _drawing_leaders
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -43,8 +46,10 @@ from cone_tip_block_spec import (
     DRAWING_PRECISION_BY_NAME,
     FLANGE_LEN,
     FLANGE_SLOT_CTOC,
+    FLANGE_SLOT_W,
     FLANGE_SLOT_Z,
     FLANGE_T,
+    HEEL_RELIEF_DEPTH,
     HEEL_RELIEF_HEIGHT,
     PINCH_BORE_DIA,
     PINCH_CLEARANCE_DIA,
@@ -143,9 +148,15 @@ FRONT_KEEP = {
 # PassageCenter stands above SlitW on the adjuster elevation; the plan's
 # north edge is the ceiling for both.
 PASSAGE_CENTER_RISE = 0.024
-# swDimArrowsOutside: set, not left to the document's smart arrows.
+# swDimensionArrowsSide_e, set rather than left to the document's smart
+# arrows: swDimArrowsOutside = 1, swDimArrowsInside = 0.
 ARROWS_OUTSIDE = ("SlitW", "HeelReliefDepth", "FlangeSlotW")
+# Main eye-pass of 287c: the 15.2's smart arrows stood outside, and its lower
+# tail ran down to 0.4 mm over ADJUSTER ENTRY.  Its 22.8 mm span holds the
+# two-line value and both arrows inside.
+ARROWS_INSIDE = ("SlitDepth",)
 _DIM_ARROWS_OUTSIDE = 1
+_DIM_ARROWS_INSIDE = 0
 # The plan.  Left of it: the block depth and the flange length, chained on
 # one line, and the slot's arc-centre spacing between that line and the
 # part.  Right of it: the slot's station from the body's south face, and the
@@ -160,7 +171,11 @@ _PLAN_RIGHT = TOP_CENTER[0] + BLOCK_X * _S / 2.0
 # printed "20.8" 0.7 mm from "8.42", which read as "20.88.42".  At -0.036
 # the two values keep 3.8 mm of air.
 PLAN_CHAIN_X = TOP_CENTER[0] - 0.036
-FLANGE_SLOT_W_Z = FLANGE_SLOT_CENTER_Z - FLANGE_SLOT_CTOC * 0.4
+# The 3.97's line prints 4.5 mm under its value's centre.  At 0.4 of the
+# spacing south of the slot centre (287c) it ran 0.5 mm off the 10.7's
+# witness from that centre; at 0.6 it stands 3 mm clear, still 3.3 mm inside
+# the slot's straight walls.
+FLANGE_SLOT_W_Z = FLANGE_SLOT_CENTER_Z - FLANGE_SLOT_CTOC * 0.6
 FLANGE_SLOT_X_RISE = 0.016
 TOP_KEEP = {
     "Depth": (PLAN_CHAIN_X, _plan_y(0.0)),
@@ -169,12 +184,18 @@ TOP_KEEP = {
         (PLAN_CHAIN_X + _PLAN_LEFT) / 2.0,
         _plan_y(FLANGE_SLOT_CENTER_Z),
     ),
+    # Main eye-pass of 287c: at +0.022 the 10.7's upper outside arrow stood
+    # between "3.97" and its +0.1 / 0.0 and read as part of the tolerance.
+    # Right of that stack its arrows clear the value by 3.4 mm.
     "FlangeSlotZ": (
-        TOP_CENTER[0] + 0.022,
+        TOP_CENTER[0] + 0.036,
         _plan_y(-BLOCK_Z / 2.0 - FLANGE_SLOT_Z / 2.0),
     ),
+    # 287c: centred 9.5 mm right of the plan, the value-and-deviation pair
+    # printed "3.97" 0.2 mm off the plan's right edge.  Its value now starts
+    # 2 mm clear of it.
     "FlangeSlotW": (
-        _PLAN_RIGHT + ARROW_LENGTH + TEXT_CLEARANCE + VALUE_TEXT_HALF_WIDTH,
+        _PLAN_RIGHT + 0.0094 + 0.002,
         _plan_y(FLANGE_SLOT_W_Z),
     ),
     "FlangeSlotX": (
@@ -249,8 +270,9 @@ VIEW_B_ARROW = (
     ),
     (FRONT_CENTER[0] - BLOCK_X * _S / 2.0, _VIEW_B_TIP_Y),
 )
+# 287c: at +0.013 the letter C stood 0.5 mm under the 7.50's left arrow tail.
 VIEW_C_ARROW = (
-    (TOP_CENTER[0] - 0.006 - 0.0018, _plan_y(Z_SOUTH) + 0.013),
+    (TOP_CENTER[0] - 0.006 - 0.0018, _plan_y(Z_SOUTH) + 0.0105),
     (TOP_CENTER[0] - 0.006, _plan_y(Z_SOUTH)),
 )
 DIMENSION_CALLOUTS = {
@@ -265,14 +287,24 @@ DIMENSION_CALLOUTS = {
 ADJUSTER_CALLOUT_DX = 0.043
 ADJUSTER_CALLOUT_Y = 0.121
 ADJUSTER_ENTRY_RISE = 0.0135
-# Fable review af561fa7 put the pinch clearance callout under the 6.0
-# dimension, right of the SLOT DEPTH line; at y 0.1735 its text printed
-# over the 6.0 (I31 render).  4.5 mm higher its shoulder clears the 6.0's
-# printed value by 2.3 mm; the leader still drops to the hole just right of
-# that value, as before.
-PINCH_CLEARANCE_CALLOUT_XY = (RIGHT_CENTER[0] - 0.033, 0.178)
+# The pinch clearance callout stands above and left of the right view.  At
+# (x - 0.033, 0.1735) its text printed over the 6.0 (I31); raised to 0.178
+# (287c) its leader still dropped almost straight down beside the 6.0's
+# hole-centre witness and crossed the 6.0's dimension line.  25 mm further
+# left the leader runs down to the hole at about 35 degrees, passing 3.5 mm
+# outside the 6.0's left arrow tail and under its north-face witness, into
+# the view across its north face.
+PINCH_CLEARANCE_CALLOUT_XY = (RIGHT_CENTER[0] - 0.058, 0.176)
 PINCH_THREAD_CALLOUT_XY = (LEFT_CENTER[0] + 0.016, 0.190)
 ROTATED_NOTE_XY = (SECTION_CENTER[0] - 0.015, 0.195)
+# The locating foot's finish symbol, on the elevation named here.  On the
+# front view (287c) its "Ra 3.2" stood 0.2 mm off the 5.56's lower arrow, and
+# no leader can reach that foot without crossing the 15.0's extension or
+# dimension line.  VIEW C shows the same foot edge-on with nothing
+# dimensioned under it.
+FOOT_FINISH_CENTER = BACK_CENTER
+FOOT_FINISH_DX = 0.034
+FOOT_FINISH_DROP = 0.013
 
 
 def _adjuster_axis_keep(
@@ -353,8 +385,11 @@ _VALUE_EXTENT = (
     VALUE_TEXT_HALF_HEIGHT,
 )
 _VALUE_EXTENTS = {
-    # "3.97" with its stacked +0.1 / 0.0 deviations to the right.
-    "FlangeSlotW": (0.0069, 0.0036, 0.0097, 0.0045),
+    # "3.97" with its stacked +0.1 / 0.0 deviations to the right; SolidWorks
+    # centres the pair, so the value starts 9.3 mm left of its point (287c).
+    "FlangeSlotW": (0.0094, 0.0040, 0.0097, 0.0045),
+    # "6.0": three characters, 5.8 mm wide (I31).
+    "PinchDepthCenter": (0.0033, 0.0019, 0.0033, 0.0019),
     # "15.2" over its SLOT DEPTH callout line.
     "SlitDepth": (0.0129, 0.0046, 0.0124, 0.0045),
 }
@@ -365,7 +400,7 @@ PINCH_THREAD_CALLOUT_EXTENT = (0.0322, 0.0085, 0.0310, 0.0078)
 # Free notes are placed by their upper-left corner.
 _NOTE_EXTENTS = {
     "ADJUSTER ENTRY": (0.0, 0.0036, 0.0365, 0.0),
-    "ROTATED 90°": (0.0, 0.0036, 0.0200, 0.0),
+    "ROTATED 90°": (0.0, 0.0036, 0.0257, 0.0),
     "RIGHT VIEW\nPINCH CLEARANCE ENTRY": (0.0, 0.0081, 0.0581, 0.0),
     "VIEW B\nPINCH THREAD ENTRY": (0.0, 0.0081, 0.0476, 0.0),
     "VIEW C\nSHAFT ENTRY": (0.0, 0.0081, 0.0278, 0.0),
@@ -373,16 +408,88 @@ _NOTE_EXTENTS = {
 # SolidWorks places section A-A's "SECTION A-A / SCALE 3:2" label under the
 # view; its ink relative to SECTION_CENTER.
 SECTION_LABEL_BOX = (-0.0227, -0.0537, 0.0227, -0.0392)
-# An outside arrow's dimension line runs this far past its extension line
-# (arrowhead plus tail): 6.35 mm on the 5.56, 6.2-6.3 mm on the 6.0.
+# The locating-foot finish symbol: its leader lands midway along the right
+# half of the foot edge; measured on the 287c render, its ink (shoulder,
+# triangle, arm and "Ra 3.2") spans this far round the commanded point and
+# its leader leaves from the shoulder's left end.
+FOOT_FINISH_EXTENT = (0.0072, 0.0003, 0.0178, 0.0087)
+FOOT_FINISH_LEADER_DX = -0.0067
+# A view letter's ink from its note's upper-left corner (287c: C 64.5-69.2 x
+# 254.4-259.3 mm, B 48.3-52.8 x 150.7-155.5 mm).  C's leader leaves the
+# letter's left side at mid-height; B's leaves its right side level with
+# the tip.
+VIEW_LETTER_EXTENT = (0.0, 0.0053, 0.0051, 0.0)
+VIEW_B_LEADER_DX = 0.0058
+VIEW_C_LEADER_DX = -0.0005
+
+# Dimension ink, measured on the 287c render (run mha092-287c): a horizontal
+# dimension's line prints 2.7-2.8 mm under its value's centre (4.5 mm under
+# the 3.97's, whose deviations stack above it); a vertical one's value sits
+# on its line.  Extension lines start 0.5-1.1 mm off the feature and run
+# 1.0-1.3 mm past the line.  An outside arrow's arrowhead and tail run
+# 6.3-6.4 mm past its extension line; an inside arrowhead is 3.4 mm long and
+# about 0.6 mm across.  A vertical dimension with its arrows outside prints
+# no line between them (the 12.0, 8.42, 10.7, 5.56, 3.50, 15.2).
 OUTSIDE_ARROW_RUN = 0.0064
-# The 6.0's dimension line printed 2.8 mm under its value's centre.
-PINCH_DEPTH_LINE_DROP = 0.0028
+HORIZONTAL_LINE_DROP = 0.0028
+FLANGE_SLOT_W_LINE_DROP = 0.0045
+EXTENSION_GAP = 0.0005
+EXTENSION_OVERSHOOT = 0.0013
+LINE_PAST_TEXT = 0.0013
+ARROW_HALF_WIDTH = 0.0003
 # A text block may not come nearer a view's model outline than this.
 OUTLINE_CLEARANCE = 0.0005
+# Main's eye-pass of 287c: an arrowhead or its tail within 0.2-0.4 mm of
+# foreign text reads as part of it; _drawing_leaders keeps 2 mm between them.
+ARROW_TEXT_CLEARANCE = _drawing_leaders.ARROW_TEXT_CLEARANCE
+# Two dimensions' parallel lines nearer than this read as one: 287c ran the
+# 3.97's line 0.52 mm off the 10.7's witness from the slot centre.  The 1.20
+# slot's walls stand 0.9 mm either side of the 7.50's slot-centre witness,
+# which reads as three lines.  Collinear lines (a shared witness) are one.
+LINE_SEPARATION = 0.0008
+COLLINEAR = 0.00005
 
-Box = tuple[float, float, float, float]
-Segment = tuple[tuple[float, float], tuple[float, float]]
+Box = _drawing_leaders.Box
+Point = _drawing_leaders.Point
+Segment = _drawing_leaders.Segment
+
+
+class ArrowSide(Enum):
+    INSIDE = "inside"
+    OUTSIDE = "outside"
+
+
+class Axis(Enum):
+    HORIZONTAL = "horizontal"  # measures along the sheet's x
+    VERTICAL = "vertical"  # measures along the sheet's y
+
+
+@dataclass(frozen=True)
+class DimensionInk:
+    """What one dimension prints besides its value, in sheet metres."""
+
+    lines: tuple[Segment, ...] = ()  # dimension-line pieces and extension lines
+    arrows: tuple[Segment, ...] = ()  # arrowheads, and an outside arrow's tail
+
+    def segments(self) -> tuple[Segment, ...]:
+        return (*self.lines, *self.arrows)
+
+
+@dataclass(frozen=True)
+class Leader:
+    """A leader, from where it leaves its annotation to its arrow's tip."""
+
+    start: Point
+    tip: Point
+
+    def segment(self) -> Segment:
+        return (self.start, self.tip)
+
+    def arrowhead(self) -> Segment:
+        (x0, y0), (x1, y1) = self.start, self.tip
+        length = math.hypot(x1 - x0, y1 - y0)
+        run = min(ARROW_LENGTH, length) / length if length else 0.0
+        return ((x1 - (x1 - x0) * run, y1 - (y1 - y0) * run), self.tip)
 
 
 def _extent_box(
@@ -390,6 +497,15 @@ def _extent_box(
 ) -> Box:
     left, down, right, up = extent
     return (point[0] - left, point[1] - down, point[0] + right, point[1] + up)
+
+
+def _foot_finish_placement() -> tuple[Point, Point]:
+    """(symbol point, leader tip) of the locating-foot finish."""
+    foot = _elevation_y(0.0, FOOT_FINISH_CENTER)
+    return (
+        (FOOT_FINISH_CENTER[0] + FOOT_FINISH_DX, foot - FOOT_FINISH_DROP),
+        (FOOT_FINISH_CENTER[0] + BLOCK_X * _S / 4.0, foot),
+    )
 
 
 def sheet_text_boxes(adjuster_center: tuple[float, float] = FRONT_CENTER) -> dict[str, Box]:
@@ -415,6 +531,9 @@ def sheet_text_boxes(adjuster_center: tuple[float, float] = FRONT_CENTER) -> dic
     boxes["pinch thread callout"] = _extent_box(
         PINCH_THREAD_CALLOUT_XY, PINCH_THREAD_CALLOUT_EXTENT
     )
+    boxes["foot finish"] = _extent_box(_foot_finish_placement()[0], FOOT_FINISH_EXTENT)
+    for label, (text_xy, _tip) in (("view B letter", VIEW_B_ARROW), ("view C letter", VIEW_C_ARROW)):
+        boxes[label] = _extent_box(text_xy, VIEW_LETTER_EXTENT)
     for text, x, y in _sheet_notes(adjuster_center):
         boxes[text.split("\n")[0]] = _extent_box((x, y), _NOTE_EXTENTS[text])
     x0, y0, x1, y1 = SECTION_LABEL_BOX
@@ -466,18 +585,232 @@ def sheet_view_silhouettes() -> dict[str, Box]:
     return boxes
 
 
-def sheet_dimension_lines() -> dict[str, Segment]:
-    """The outside-arrow dimension lines that stand in the gaps between views."""
-    heel_x = RIGHT_KEEP["HeelReliefHt"][0]
-    depth_y = RIGHT_KEEP["PinchDepthCenter"][1] - PINCH_DEPTH_LINE_DROP
-    return {
-        "HeelReliefHt": (
-            (heel_x, _elevation_y(0.0, RIGHT_CENTER) - OUTSIDE_ARROW_RUN),
-            (heel_x, _elevation_y(HEEL_RELIEF_HEIGHT, RIGHT_CENTER) + OUTSIDE_ARROW_RUN),
+def _dimension_ink(
+    axis: Axis,
+    ends: tuple[float, float],
+    origins: tuple[float | None, float | None],
+    line: float,
+    arrows: ArrowSide,
+    text: Box,
+) -> DimensionInk:
+    """A linear dimension's line, extension lines and arrows.
+
+    ``ends`` are the two measured stations along ``axis``; ``origins`` the
+    cross-axis coordinate each extension line leaves its feature from (None:
+    the dimension line meets the feature itself); ``line`` the dimension
+    line's cross-axis coordinate.  Built in (along, across) and mapped back.
+    """
+
+    def point(along: float, across: float) -> Point:
+        return (along, across) if axis is Axis.HORIZONTAL else (across, along)
+
+    lo, hi = sorted(ends)
+    text_lo, text_hi = (text[0], text[2]) if axis is Axis.HORIZONTAL else (text[1], text[3])
+    lines: list[Segment] = []
+    for end, origin in zip(ends, origins):
+        if origin is None:
+            continue
+        side = 1.0 if line >= origin else -1.0
+        lines.append(
+            (
+                point(end, origin + side * EXTENSION_GAP),
+                point(end, line + side * EXTENSION_OVERSHOOT),
+            )
+        )
+    if arrows is ArrowSide.OUTSIDE:
+        arrow_ink = [
+            (point(lo, line), point(lo - OUTSIDE_ARROW_RUN, line)),
+            (point(hi, line), point(hi + OUTSIDE_ARROW_RUN, line)),
+        ]
+    else:
+        arrow_ink = [
+            (point(lo, line), point(lo + ARROW_LENGTH, line)),
+            (point(hi, line), point(hi - ARROW_LENGTH, line)),
+        ]
+    start = lo - (OUTSIDE_ARROW_RUN if arrows is ArrowSide.OUTSIDE else 0.0)
+    stop = hi + (OUTSIDE_ARROW_RUN if arrows is ArrowSide.OUTSIDE else 0.0)
+    if text_hi <= lo:
+        start = min(start, text_lo - LINE_PAST_TEXT)
+    if text_lo >= hi:
+        stop = max(stop, text_hi + LINE_PAST_TEXT)
+    if axis is Axis.HORIZONTAL:
+        # The value stands above a continuous line.
+        lines.append((point(start, line), point(stop, line)))
+    elif arrows is ArrowSide.INSIDE:
+        # The value breaks the line; outside arrows leave only their tails.
+        lines.append((point(lo, line), point(max(lo, text_lo - LINE_PAST_TEXT), line)))
+        lines.append((point(min(hi, text_hi + LINE_PAST_TEXT), line), point(hi, line)))
+        if text_hi <= lo or text_lo >= hi:
+            lines.append((point(start, line), point(stop, line)))
+    return DimensionInk(tuple(lines), tuple(arrow_ink))
+
+
+def sheet_dimension_ink(
+    adjuster_center: tuple[float, float] = FRONT_CENTER,
+) -> dict[str, DimensionInk]:
+    """Every kept dimension's printed lines and arrows."""
+    texts = sheet_text_boxes(adjuster_center)
+    keeps = {
+        **FRONT_KEEP,
+        **_adjuster_axis_keep(adjuster_center),
+        **TOP_KEEP,
+        **SECTION_KEEP,
+        **RIGHT_KEEP,
+    }
+    half_x = BLOCK_X * _S / 2.0
+    # Each spec's side is the smart side it printed on 287c, unless the
+    # module sets it.
+    out, inside = ArrowSide.OUTSIDE, ArrowSide.INSIDE
+    set_sides = {
+        **{name: ArrowSide.OUTSIDE for name in ARROWS_OUTSIDE},
+        **{name: ArrowSide.INSIDE for name in ARROWS_INSIDE},
+    }
+    h, v = Axis.HORIZONTAL, Axis.VERTICAL
+
+    def drop(name: str) -> float:
+        return keeps[name][1] - (
+            FLANGE_SLOT_W_LINE_DROP if name == "FlangeSlotW" else HORIZONTAL_LINE_DROP
+        )
+
+    front_x = FRONT_CENTER[0]
+    foot = _elevation_y(0.0, FRONT_CENTER)
+    top = _elevation_y(BLOCK_HEIGHT, FRONT_CENTER)
+    ax = adjuster_center[0]
+    plus_x = 1.0 if adjuster_center == FRONT_CENTER else -1.0
+    slit = SLIT_W * _S / 2.0
+    tc = TOP_CENTER[0]
+    slot_y = _plan_y(FLANGE_SLOT_CENTER_Z)
+    arc = FLANGE_SLOT_CTOC * _S / 2.0
+    slot_w = FLANGE_SLOT_W * _S / 2.0
+    south_face = _plan_y(-BLOCK_Z / 2.0)
+    north = _right_x(Z_NORTH)
+    heel_top = _elevation_y(HEEL_RELIEF_HEIGHT, RIGHT_CENTER)
+    specs = {
+        "Width": (h, (front_x - half_x, front_x + half_x), (foot, foot), drop("Width"), out),
+        "BlockHt": (v, (foot, top), (front_x - half_x,) * 2, keeps["BlockHt"][0], inside),
+        "SlitW": (h, (front_x - slit, front_x + slit), (top, top), drop("SlitW"), out),
+        "AxisHeight": (
+            v,
+            (foot, _elevation_y(ADJUSTER_AXIS_HEIGHT, adjuster_center)),
+            (ax - half_x,) * 2,
+            keeps["AxisHeight"][0],
+            inside,
+        ),
+        "PassageCenter": (
+            h, (ax, ax + plus_x * half_x), (top, top), drop("PassageCenter"), out
+        ),
+        "SlitDepth": (
+            v,
+            (_elevation_y(BLOCK_HEIGHT - SLIT_DEPTH, adjuster_center), top),
+            (ax + slit, ax + half_x),
+            keeps["SlitDepth"][0],
+            out,
+        ),
+        "Depth": (
+            v, (_plan_y(Z_NORTH), south_face), (_PLAN_LEFT,) * 2, PLAN_CHAIN_X, out
+        ),
+        "FlangeLen": (
+            v, (south_face, _plan_y(Z_SOUTH)), (_PLAN_LEFT,) * 2, PLAN_CHAIN_X, inside
+        ),
+        "FlangeSlotCtoC": (
+            v, (slot_y - arc, slot_y + arc), (tc, tc), keeps["FlangeSlotCtoC"][0], out
+        ),
+        "FlangeSlotZ": (
+            v, (south_face, slot_y), (_PLAN_RIGHT, tc), keeps["FlangeSlotZ"][0], out
+        ),
+        "FlangeSlotW": (h, (tc - slot_w, tc + slot_w), (None, None), drop("FlangeSlotW"), out),
+        "FlangeSlotX": (
+            h, (tc, _PLAN_RIGHT), (_plan_y(Z_SOUTH),) * 2, drop("FlangeSlotX"), out
+        ),
+        # Rotated section: the block's height runs along the sheet's x.  Its
+        # witnesses leave the adjuster axis and the pinch-bore centre 9.95 mm
+        # under the section's centre (287c render).
+        "PinchRise": (
+            h,
+            tuple(
+                SECTION_CENTER[0] + (height - BLOCK_HEIGHT / 2.0) * _S
+                for height in (ADJUSTER_AXIS_HEIGHT, PINCH_HEIGHT)
+            ),
+            (SECTION_CENTER[1] - 0.00995,) * 2,
+            drop("PinchRise"),
+            inside,
         ),
         "PinchDepthCenter": (
-            (_right_x(Z_NORTH) - OUTSIDE_ARROW_RUN, depth_y),
-            (_right_x(0.0) + OUTSIDE_ARROW_RUN, depth_y),
+            h,
+            (north, _right_x(0.0)),
+            (top, top - 0.002),
+            drop("PinchDepthCenter"),
+            out,
+        ),
+        "HeelReliefDepth": (
+            h,
+            (north, north + HEEL_RELIEF_DEPTH * _S),
+            (heel_top, None),
+            drop("HeelReliefDepth"),
+            out,
+        ),
+        "HeelReliefHt": (v, (foot, heel_top), (north, north), keeps["HeelReliefHt"][0], out),
+        "FlangeT": (
+            v,
+            (foot, _elevation_y(FLANGE_T, RIGHT_CENTER)),
+            (_right_x(Z_SOUTH),) * 2,
+            keeps["FlangeT"][0],
+            out,
+        ),
+    }
+    return {
+        name: _dimension_ink(
+            axis, ends, origins, line, set_sides.get(name, arrows), texts[name]
+        )
+        for name, (axis, ends, origins, line, arrows) in specs.items()
+    }
+
+
+def _leader_to_circle(start: Point, center: Point, radius: float) -> Leader:
+    dx, dy = start[0] - center[0], start[1] - center[1]
+    length = math.hypot(dx, dy)
+    return Leader(start, (center[0] + dx / length * radius, center[1] + dy / length * radius))
+
+
+def _callout_leader(
+    callout: Point, extent: tuple[float, float, float, float], center: Point, radius: float
+) -> Leader:
+    """A hole callout's leader leaves its shoulder's end nearer the hole."""
+    left, down, right, _up = extent
+    x = callout[0] + right if center[0] >= callout[0] else callout[0] - left
+    return _leader_to_circle((x, callout[1] - down), center, radius)
+
+
+def sheet_leaders(adjuster_center: tuple[float, float] = FRONT_CENTER) -> dict[str, Leader]:
+    """Every leader this module places, keyed like its text block."""
+    pinch_y = _elevation_y(PINCH_HEIGHT, RIGHT_CENTER)
+    finish, finish_tip = _foot_finish_placement()
+    view_b_text, view_b_tip = VIEW_B_ARROW
+    view_c_text, view_c_tip = VIEW_C_ARROW
+    return {
+        "adjuster callout": _callout_leader(
+            _adjuster_callout_xy(adjuster_center),
+            ADJUSTER_CALLOUT_EXTENT,
+            (adjuster_center[0], _elevation_y(ADJUSTER_AXIS_HEIGHT, adjuster_center)),
+            ADJUSTER_BORE_DIA * _S / 2.0,
+        ),
+        "pinch clearance callout": _callout_leader(
+            PINCH_CLEARANCE_CALLOUT_XY,
+            PINCH_CLEARANCE_CALLOUT_EXTENT,
+            (_right_x(0.0), pinch_y),
+            PINCH_CLEARANCE_DIA * _S / 2.0,
+        ),
+        "pinch thread callout": _callout_leader(
+            PINCH_THREAD_CALLOUT_XY,
+            PINCH_THREAD_CALLOUT_EXTENT,
+            (LEFT_CENTER[0] + (0.0 - Z_MID) * _S, pinch_y),
+            PINCH_BORE_DIA * _S / 2.0,
+        ),
+        "foot finish": Leader((finish[0] + FOOT_FINISH_LEADER_DX, finish[1]), finish_tip),
+        "view B letter": Leader((view_b_text[0] + VIEW_B_LEADER_DX, view_b_tip[1]), view_b_tip),
+        "view C letter": Leader(
+            (view_c_text[0] + VIEW_C_LEADER_DX, view_c_text[1] - VIEW_LETTER_HEIGHT / 2.0),
+            view_c_tip,
         ),
     }
 
@@ -488,34 +821,52 @@ def _box_gap(a: Box, b: Box) -> float:
 
 
 def _segment_meets_box(segment: Segment, box: Box) -> bool:
-    """Liang-Barsky: whether any part of ``segment`` lies inside ``box``."""
-    (x0, y0), (x1, y1) = segment
-    dx, dy = x1 - x0, y1 - y0
-    t0, t1 = 0.0, 1.0
-    for p, q in ((-dx, x0 - box[0]), (dx, box[2] - x0), (-dy, y0 - box[1]), (dy, box[3] - y0)):
-        if p == 0.0:
-            if q < 0.0:
-                return False
+    """Whether any part of ``segment`` touches or lies inside ``box``."""
+    return _drawing_leaders.distance_to_box(segment, box) == 0.0
+
+
+def _parallel_gap(a: Segment, b: Segment) -> float | None:
+    """Cross distance of two axis-aligned parallel segments that overlap along
+    their length by more than a millimetre, else None."""
+    for along, across in ((0, 1), (1, 0)):
+        if a[0][across] != a[1][across] or b[0][across] != b[1][across]:
             continue
-        t = q / p
-        if p < 0.0:
-            t0 = max(t0, t)
-        else:
-            t1 = min(t1, t)
-        if t0 > t1:
-            return False
-    return True
+        lo = max(min(a[0][along], a[1][along]), min(b[0][along], b[1][along]))
+        hi = min(max(a[0][along], a[1][along]), max(b[0][along], b[1][along]))
+        if hi - lo > 0.001:
+            return abs(a[0][across] - b[0][across])
+    return None
 
 
 def sheet_ink_collisions(
     texts: dict[str, Box],
     silhouettes: dict[str, Box],
-    lines: dict[str, Segment],
+    dimensions: dict[str, DimensionInk],
+    leaders: dict[str, Leader],
     *,
     text_clearance: float = TEXT_CLEARANCE,
     outline_clearance: float = OUTLINE_CLEARANCE,
+    arrow_clearance: float = ARROW_TEXT_CLEARANCE,
 ) -> list[str]:
-    """Every text block too near another, a view's outline, or a foreign line."""
+    """Every collision among this sheet's text, outlines, lines and leaders.
+
+    * text-on-text: two text blocks nearer than ``text_clearance``;
+    * text-on-outline: a text block nearer a view's model outline than
+      ``outline_clearance``;
+    * text-on-line: another dimension's line, extension line or arrow, or
+      another annotation's leader, running through a text block;
+    * leader-on-dimension / leader-on-leader: a leader crossing a
+      dimension's line, extension line or arrow, or another leader
+      (``_drawing_leaders.leader_crossings``);
+    * arrow-near-text: a dimension's arrow (head and outside tail) or a
+      leader's arrowhead within ``arrow_clearance`` of foreign text ink
+      (``_drawing_leaders.arrows_near_text``);
+    * line-beside-line: two dimensions' parallel lines nearer than
+      ``LINE_SEPARATION`` but not collinear.
+
+    The geometry is ``_drawing_leaders``'; which ink to compare, and where it
+    prints, is this sheet's.
+    """
     findings: list[str] = []
     names = sorted(texts)
     for index, first in enumerate(names):
@@ -527,25 +878,75 @@ def sheet_ink_collisions(
                     f"{gap * 1000.0:.2f} mm apart"
                 )
     for name in names:
+        box = texts[name]
         for view, outline in sorted(silhouettes.items()):
-            gap = _box_gap(texts[name], outline)
+            gap = _box_gap(box, outline)
             if gap < outline_clearance:
                 findings.append(
                     f"text-on-outline: {name!r} stands {gap * 1000.0:.2f} mm "
                     f"from the {view} outline"
                 )
-        for owner, segment in sorted(lines.items()):
-            if owner != name and _segment_meets_box(segment, texts[name]):
+        for owner, ink in sorted(dimensions.items()):
+            if owner != name and any(_segment_meets_box(s, box) for s in ink.segments()):
                 findings.append(f"text-on-line: {owner}'s dimension line crosses {name!r}")
+        for owner, leader in sorted(leaders.items()):
+            if owner != name and _segment_meets_box(leader.segment(), box):
+                findings.append(f"text-on-line: {owner}'s leader crosses {name!r}")
+    shared = set(leaders) & set(dimensions)
+    if shared:
+        raise ValueError(f"leaders and dimensions share names: {sorted(shared)}")
+    # Leaders first, so every pair a leader is in names the leader first.
+    groups = {
+        **{owner: [leader.segment()] for owner, leader in sorted(leaders.items())},
+        **{owner: list(ink.segments()) for owner, ink in sorted(dimensions.items())},
+    }
+    for first, second in _drawing_leaders.leader_crossings(groups):
+        if first not in leaders:
+            continue  # two dimensions' lines may cross
+        if second in leaders:
+            findings.append(f"leader-on-leader: {first}'s and {second}'s leaders cross")
+            continue
+        findings.append(
+            f"leader-on-dimension: {first}'s leader crosses {second}'s "
+            "dimension or extension line"
+        )
+    owned = sorted(dimensions.items())
+    for index, (first, ink_a) in enumerate(owned):
+        for second, ink_b in owned[index + 1 :]:
+            gaps = [
+                gap
+                for a in ink_a.segments()
+                for b in ink_b.segments()
+                if (gap := _parallel_gap(a, b)) is not None and COLLINEAR < gap < LINE_SEPARATION
+            ]
+            if gaps:
+                findings.append(
+                    f"line-beside-line: {first}'s and {second}'s lines run "
+                    f"{min(gaps) * 1000.0:.2f} mm apart"
+                )
+    arrows = {
+        **{owner: ink.arrows for owner, ink in sorted(dimensions.items())},
+        **{owner: (leader.arrowhead(),) for owner, leader in sorted(leaders.items())},
+    }
+    for owner, name, gap in _drawing_leaders.arrows_near_text(
+        arrows,
+        {name: texts[name] for name in names},
+        clearance=arrow_clearance,
+        half_width=ARROW_HALF_WIDTH,
+    ):
+        findings.append(
+            f"arrow-near-text: {owner}'s arrow stands {gap * 1000.0:.2f} mm from {name!r}"
+        )
     return findings
 
 
 def assert_sheet_ink_clear(adjuster_center: tuple[float, float] = FRONT_CENTER) -> None:
-    """Refuse a placement whose own text collides before any COM work is spent."""
+    """Refuse a placement whose own ink collides before any COM work is spent."""
     findings = sheet_ink_collisions(
         sheet_text_boxes(adjuster_center),
         sheet_view_silhouettes(),
-        sheet_dimension_lines(),
+        sheet_dimension_ink(adjuster_center),
+        sheet_leaders(adjuster_center),
     )
     if findings:
         raise RuntimeError(
@@ -571,30 +972,30 @@ def _foot_edge(adapter: Any, view: Any, *, min_span_mm: float = 13.9) -> Any:
         span = max(abs(p1[0] - p0[0]), abs(p1[2] - p0[2]))
         candidates.append((span, edge))
     if not candidates:
-        raise RuntimeError("front view has no real edge on the locating foot plane")
+        raise RuntimeError("view has no real edge on the locating foot plane")
     span, edge = max(candidates, key=lambda item: item[0])
     if span < min_span_mm:
         raise RuntimeError(f"locating-foot edge span is only {span:.3f} mm")
     return edge
 
 
-def _set_arrows_outside(
-    adapter: Any, annotations: list[Any], names: tuple[str, ...]
+def _set_arrow_sides(
+    adapter: Any, annotations: list[Any], sides: dict[str, int]
 ) -> None:
-    """Stand each named dimension's arrows outside its extension lines."""
-    remaining = set(names)
+    """Stand each named dimension's arrows on its swDimensionArrowsSide_e side."""
+    remaining = dict(sides)
     for raw in annotations:
         annotation = _early_bound(raw, "IAnnotation")
         name = dimension_name(adapter, annotation)
         if name not in remaining:
             continue
+        side = remaining.pop(name)
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        display.ArrowSide = _DIM_ARROWS_OUTSIDE
-        if int(display.ArrowSide) != _DIM_ARROWS_OUTSIDE:
-            raise RuntimeError(f"{name} did not keep its arrows outside")
-        remaining.discard(name)
+        display.ArrowSide = side
+        if int(display.ArrowSide) != side:
+            raise RuntimeError(f"{name} did not keep its arrows on side {side}")
     if remaining:
-        raise RuntimeError(f"no dimension to set arrows outside: {sorted(remaining)}")
+        raise RuntimeError(f"no dimension to set arrow sides: {sorted(remaining)}")
 
 
 def _add_adjuster_axis(adapter: Any, section: Any) -> None:
@@ -1070,7 +1471,14 @@ async def build(adapter: Any) -> dict[str, str]:
         *back_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    _set_arrows_outside(adapter, annotations, ARROWS_OUTSIDE)
+    _set_arrow_sides(
+        adapter,
+        annotations,
+        {
+            **{name: _DIM_ARROWS_OUTSIDE for name in ARROWS_OUTSIDE},
+            **{name: _DIM_ARROWS_INSIDE for name in ARROWS_INSIDE},
+        },
+    )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
     for view, label in (
@@ -1151,16 +1559,16 @@ async def build(adapter: Any) -> dict[str, str]:
         if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
             raise RuntimeError(f"view {letter} arrow tip moved when its letter was sized")
 
-    foot_edge = _foot_edge(adapter, front)
-    foot_y = _elevation_y(0.0, FRONT_CENTER)
+    foot_view = {FRONT_CENTER: front, BACK_CENTER: back}[FOOT_FINISH_CENTER]
+    foot_edge = _foot_edge(adapter, foot_view)
     # Onto the foot edge itself, midway along its right half: at the corner
     # vertex (run 6cab17f6) it could name the side face as well as the seat.
-    foot_right = (FRONT_CENTER[0] + BLOCK_X * _S / 4.0, foot_y)
+    foot_symbol, foot_right = _foot_finish_placement()
     foot_finish = add_surface_finish(
         adapter,
-        front,
+        foot_view,
         edge_entity=foot_edge,
-        symbol_xy=(FRONT_CENTER[0] + 0.034, foot_y - 0.013),
+        symbol_xy=foot_symbol,
         leader_attach_xy=foot_right,
         control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
         char_height=0.003,
