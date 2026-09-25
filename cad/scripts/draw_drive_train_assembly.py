@@ -187,11 +187,11 @@ CLUSTER_BALLOON_CLEARANCE = {
     "pinion-rig": 0.008,
 }
 # Families whose balloon lands on the head of one chosen instance instead of
-# the first visible edge the shared picker meets. Sheet 3's pedestal flange
+# the first visible edge the shared picker meets. Sheet 3's pedestal hold-down
 # screw balloon (r6b item 26) pointed at the north screw, which hides behind
-# its upright; the south one stands clear in the exploded view.
+# its strap; the south one stands clear in the exploded view.
 HEAD_ANCHORED: dict[Cluster, dict[str, Literal["south", "north"]]] = {
-    "cylinder-bank": {"foot-screw": "south"},
+    "cylinder-bank": {"pedestal-hold-down-screw": "south"},
 }
 SW_VIEW_ENTITY_EDGE = 1  # swViewEntityType_e.swViewEntityType_Edge
 
@@ -231,6 +231,7 @@ BOM_PART_NUMBERS = {
     "cylinder-end-disc": "MHA-121",
     "dome-cap-screw": "MHA-125",
     "cylinder-gear": "MHA-027",
+    "pedestal-hold-down-screw": "MHA-143",
     "foot-screw": "MHA-103",
     "cone-gear-shaft": "MHA-014",
     "cone-gear": "MHA-013",
@@ -276,6 +277,7 @@ BOM_DESCRIPTIONS = {
     "cylinder-end-disc": "CYLINDER BANK END DISC",
     "dome-cap-screw": "ARBOR DOME CAP",
     "cylinder-gear": "CYLINDER GEAR WITH CAM, 120T",
+    "pedestal-hold-down-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A197",
     "foot-screw": "#4-40 FILLISTER SCREW, MCMASTER 90280A108",
     "cone-gear-shaft": "CONE GEAR SHAFT",
     "cone-gear": "CONE GEAR, T006-T120 BY 6; 1 EACH",
@@ -549,7 +551,7 @@ INTERFACE_NOTES = "\n".join(
     (
         "EXTERNAL INTERFACES - NOT BOM ITEMS",
         "BASE MHA-035 (FRAME ASSEMBLY MHA-A04) RECEIVES MHA-094, MHA-093,",
-        "MHA-095, {slotted}X MHA-101 AND {foot}X MHA-103.",
+        "MHA-095, {slotted}X MHA-101, {foot}X MHA-103 AND {hold_down}X MHA-143.",
         "PAPER DRIVE MHA-A06: T12 CHAIN WHEEL ON MHA-026.",
         "CHANNEL ASSEMBLY MHA-A02: CONNECTING RODS RUN ON THE MHA-027 CAMS.",
     )
@@ -1218,8 +1220,9 @@ def _head_edge(adapter: Any, view: Any, instance: str, *, label: str) -> Any | N
     does (the view object as placed, ``GetVisibleEntities2`` of the drawing
     component's model component), the path that finds these screws' edges on
     every build. r7 (leaf 20260923T180240Z-1-e6c4ca27) found no circular edge
-    on foot-screw-2 through an early-bound ``IView``; the log could not say
-    whether it saw no edges or no circles, so both counts are logged now.
+    on the south pedestal screw through an early-bound ``IView``; the log
+    could not say whether it saw no edges or no circles, so both counts are
+    logged now.
     """
     root = adapter._attempt(lambda: view.RootDrawingComponent2(False), default=None)
     if root is None:
@@ -1416,9 +1419,8 @@ def _set_exploded_state(adapter: Any, view: Any, show: bool, *, label: str) -> N
 def _isolate_instances(adapter: Any, view: Any, names: frozenset[str], *, label: str) -> None:
     """Show exactly the named top-level instances in one drawing view.
 
-    The shared ``isolate_drawing_view_components`` works per FAMILY; foot-screw
-    belongs to two clusters (pedestal flange vs spring foot), so this isolates
-    per instance and reads the visibility back.
+    The shared ``isolate_drawing_view_components`` works per FAMILY; this
+    isolates per instance and reads the visibility back.
     """
     view = _early_bound(view, "IView")
     root = view.RootDrawingComponent2(False)
@@ -2056,7 +2058,9 @@ def _place_checks_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
             (
                 "external interfaces",
                 INTERFACE_NOTES.format(
-                    slotted=facts.count("slotted-screw"), foot=facts.count("foot-screw")
+                    slotted=facts.count("slotted-screw"),
+                    foot=facts.count("foot-screw"),
+                    hold_down=facts.count("pedestal-hold-down-screw"),
                 ),
             ),
         ),

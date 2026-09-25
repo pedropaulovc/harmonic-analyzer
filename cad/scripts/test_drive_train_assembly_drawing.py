@@ -24,7 +24,7 @@ EXTERNAL_NUMBERS = frozenset({"MHA-035"})
 # 2026-09-23: drawing-only rulings commit). The integration commit that adds
 # the rows deletes this set; the test below fails once a row lands anyway.
 PRE_REGISTERED_NUMBERS = frozenset(
-    {"MHA-139", "MHA-140", "MHA-141", "MHA-142", "MHA-143"}
+    {"MHA-139", "MHA-140", "MHA-141", "MHA-142"}
 )
 
 
@@ -53,7 +53,8 @@ def _instances(**overrides) -> list[spec.Instance]:
         "cylinder-end-disc": [(drum_x, 90.5, -72.5), (drum_x, 90.5, 72.1)],
         "dome-cap-screw": [(drum_x, 90.5, -89.4), (drum_x, 90.5, 102.6)],
         "cylinder-gear": [(drum_x, 90.5, -64.0 + 7.0 * j) for j in range(20)],
-        "foot-screw": [(7.49, 52.0, 74.0), (drum_x, 53.0, -92.4), (drum_x, 53.0, 105.6)],
+        "foot-screw": [(7.49, 52.0, 74.0)],
+        "pedestal-hold-down-screw": [(drum_x, 55.8, -91.652), (drum_x, 55.8, 94.202)],
         "slotted-screw": [(-19.4, 60.0, -94.9), (7.6, 60.0, -94.9), (-19.4, 60.0, 85.1), (7.6, 60.0, 85.1)],
         "cone-gear": [(-115.0 + j, 90.5, -25.0 + 6.0 * j) for j in range(20)],
         "pinion-bracket": [(-12.1, 62.8, -72.0), (-12.1, 62.8, 71.0)],
@@ -125,7 +126,14 @@ def test_note_lines_fit_a_half_sheet_field() -> None:
         drawing.CONSUMABLES_NOTES,
     ):
         for line in text.format(
-            cone_gears=20, cylinder_gears=20, cam_pins=2, pivot_blocks=2, cams=2, slotted=4, foot=3
+            cone_gears=20,
+            cylinder_gears=20,
+            cam_pins=2,
+            pivot_blocks=2,
+            cams=2,
+            slotted=4,
+            foot=1,
+            hold_down=2,
         ).splitlines():
             assert len(line) <= 70, line
 
@@ -176,9 +184,12 @@ def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
     plan = spec.plan_explode(_instances())
     assert [step.label for step, _names in plan] == [s.label for s in spec.EXPLODE_STEPS]
     moved = {step.label: names for step, names in plan}
-    assert moved["south pedestal"] == ("arbor-pedestal-1", "foot-screw-2")
-    assert moved["north pedestal"] == ("arbor-pedestal-2", "foot-screw-3")
-    assert moved["pedestal screws lift"] == ("foot-screw-2", "foot-screw-3")
+    assert moved["south pedestal"] == ("arbor-pedestal-1", "pedestal-hold-down-screw-1")
+    assert moved["north pedestal"] == ("arbor-pedestal-2", "pedestal-hold-down-screw-2")
+    assert moved["pedestal screws lift"] == (
+        "pedestal-hold-down-screw-1",
+        "pedestal-hold-down-screw-2",
+    )
     assert moved["spring foot screw lifts"] == ("foot-screw-1",)
     assert moved["block screws lift"] == tuple(f"slotted-screw-{i}" for i in range(1, 5))
 
@@ -219,7 +230,9 @@ def test_clusters_partition_every_instance_once() -> None:
     flat = [name for names in members.values() for name in names]
     assert sorted(flat) == sorted(i.name for i in census)
     assert "foot-screw-1" in members["pinion-rig"]
-    assert {"foot-screw-2", "foot-screw-3"} <= set(members["cylinder-bank"])
+    assert {"pedestal-hold-down-screw-1", "pedestal-hold-down-screw-2"} <= set(
+        members["cylinder-bank"]
+    )
 
 
 def test_source_refusals_and_bom_order() -> None:
@@ -328,13 +341,13 @@ class _View:
 
 def _bank_facts():
     instances = [
-        spec.Instance("foot-screw-1", "foot-screw", (0.0, 0.0, 80.0)),
-        spec.Instance("foot-screw-2", "foot-screw", (0.0, 0.0, -80.0)),
+        spec.Instance("pedestal-hold-down-screw-1", "pedestal-hold-down-screw", (0.0, 0.0, 80.0)),
+        spec.Instance("pedestal-hold-down-screw-2", "pedestal-hold-down-screw", (0.0, 0.0, -80.0)),
     ]
     return type(
         "Facts",
         (),
-        {"instances": instances, "clusters": {"cylinder-bank": ("foot-screw-1", "foot-screw-2")}},
+        {"instances": instances, "clusters": {"cylinder-bank": ("pedestal-hold-down-screw-1", "pedestal-hold-down-screw-2")}},
     )()
 
 
@@ -347,19 +360,19 @@ def test_head_anchor_takes_the_largest_rim_and_falls_through_hidden_instances(mo
     )
     rim, shank = _Edge(0.0027), _Edge(0.0014)
     # r7: the south screw (preferred) showed nothing usable; the north one does.
-    view = _View({"foot-screw-1": [_Edge(None), shank, rim], "foot-screw-2": []})
+    view = _View({"pedestal-hold-down-screw-1": [_Edge(None), shank, rim], "pedestal-hold-down-screw-2": []})
     balloons, anchored = drawing._head_anchored_balloons(
-        _Adapter(), view, "cylinder-bank", _bank_facts(), {"foot-screw": "26"}, label="t"
+        _Adapter(), view, "cylinder-bank", _bank_facts(), {"pedestal-hold-down-screw": "26"}, label="t"
     )
-    assert placed == [(rim, "foot-screw")] and balloons == [rim]
-    assert anchored == {"foot-screw"}
+    assert placed == [(rim, "pedestal-hold-down-screw")] and balloons == [rim]
+    assert anchored == {"pedestal-hold-down-screw"}
 
 
 def test_head_anchor_without_any_rim_leaves_the_family_to_the_shared_picker(monkeypatch):
     monkeypatch.setattr(drawing, "_insert_balloon_on_edge", pytest.fail)
-    view = _View({"foot-screw-1": [_Edge(None)], "foot-screw-2": []})
+    view = _View({"pedestal-hold-down-screw-1": [_Edge(None)], "pedestal-hold-down-screw-2": []})
     balloons, anchored = drawing._head_anchored_balloons(
-        _Adapter(), view, "cylinder-bank", _bank_facts(), {"foot-screw": "26"}, label="t"
+        _Adapter(), view, "cylinder-bank", _bank_facts(), {"pedestal-hold-down-screw": "26"}, label="t"
     )
     assert balloons == [] and anchored == frozenset()
 
