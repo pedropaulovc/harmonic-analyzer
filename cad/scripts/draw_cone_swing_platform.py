@@ -27,7 +27,7 @@ import argparse
 import math
 import sys
 from dataclasses import dataclass
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from typing import Any
 
 import _drawing_leaders
@@ -185,11 +185,12 @@ _NOTCH_SLOT_XY = plan_xy(NOTCH_CENTER, -TIP_SCREW_HALF_TRAVEL, TIP_SCREW_LOCAL_Z
 TIP_SLOT_Z_LINE_X = plan_xy(NOTCH_CENTER, _plan_east_edge_x(TIP_SCREW_LOCAL_Z), 0.0)[0] - 0.009
 # The run angle's vertex on the notch plan (plan_xy agrees with the seat to
 # 0.05 mm), and the in-wedge anchor that picks its acute sector.  The arc
-# lies where the anchor is: 14 mm out, past the construction ray's hidden
+# lies where the anchor is: 18 mm out, past the construction ray's hidden
 # 10 mm (the ray's extension line starts at 11.0), so the arrows land on
-# drawn lines, and short of where the value goes.
+# drawn lines.  The radius is where the value's leader clears both extension
+# lines' ends by most (NOTCH_ANGLE_TEXT_XY, below): flat past 17 mm.
 NOTCH_ANGLE_VERTEX_XY = plan_xy(NOTCH_CENTER, *_part.NOTCH_ANGLE_VERTEX_XZ)
-NOTCH_ANGLE_ARC_RADIUS = 0.014
+NOTCH_ANGLE_ARC_RADIUS = 0.018
 NOTCH_ANGLE_ANCHOR_XY = (
     NOTCH_ANGLE_VERTEX_XY[0]
     + NOTCH_ANGLE_ARC_RADIUS * math.cos(math.radians(_part.NOTCH_RUN_DEG / 2.0)),
@@ -202,7 +203,11 @@ NOTCH_KEEP = {
     "NorthEdgeZ": (0.270, 0.150),
     # Text between its witnesses: outside, it read as spanning from the corner.
     "CapECx": (0.2652, 0.258),
-    "CapECz": (0.305, 0.180),
+    # 8 mm right of d382's 0.305, so the run angle's value and its leader
+    # shoulder fit between the angle's open end and this line (tipslot-fix3:
+    # at 0.305 the leader could clear the run's extension line by 0.45 mm at
+    # best).  The field out to the isometric (x ~0.325 at y 0.195) is empty.
+    "CapECz": (0.313, 0.180),
     "CapEDia": (0.285, 0.259),
     # The run angle (PR #830, Codex P1: without it the rails had no
     # direction).  Its vertex is the north rail's closed-end corner.  This is
@@ -555,31 +560,59 @@ _COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
 # tall -- as tall as "9.11°": the run's own extension line struck through it
 # and the ray's ran 0.1 mm over it, 2.0 mm under the 205.81 witness.  Nowhere
 # in the wedge left of the 205.81 dimension line is wide enough for the text,
-# so the anchor now lays a short arc (14 mm) and OffsetText moves the value
-# out of the wedge's open end, past the extension lines' ends and short of
-# the 205.81 line, on a leader that stays in the wedge until the lines end.
+# so OffsetText moves the value out of the wedge's open end, on a leader.
 # With OffsetText the dimension and extension lines do not move
 # (types/IDisplayDimension/OffsetText.md); the build reads the arcs back to
-# prove the sector did not flip.  Placed from the vertex, so it follows the
-# notch.
-NOTCH_ANGLE_TEXT_XY = (NOTCH_ANGLE_VERTEX_XY[0] + 0.0224, NOTCH_ANGLE_VERTEX_XY[1] - 0.0026)
-# Ink the d382 render (300 dpi) and its describe_sheet dump measured, sheet
+# prove the sector did not flip.
+#
+# tipslot-fix3's leaf (C:/src/dt-logs/spring/tipslot-fix3-leaf.log:224,256)
+# showed the leader's shape: rooted at the arc's midpoint, a leg to a knee
+# under the value's near end, then a shoulder under the value.  fix3 placed
+# the value for a straight leader, so the leg crossed the run's extension
+# line.  The leg now has to leave the wedge between the two lines' ends,
+# which lie only ~2.4 mm apart, and the value above its shoulder has to stay
+# 2 mm under the 205.81 witness: the value sits low and far out, just
+# short of the 205.81 line, so the leg runs nearly flat.  Placed from the
+# vertex, so it follows the notch.
+NOTCH_ANGLE_TEXT_XY = (NOTCH_ANGLE_VERTEX_XY[0] + 0.0320, NOTCH_ANGLE_VERTEX_XY[1] - 0.0018)
+# Ink the d382 render (300 dpi) and the d382/fix3 leaf dumps measured, sheet
 # metres: the "9.11°" glyphs, the arrowheads, the extension lines' reach past
 # the arc and the run's start, the arcs' tails beyond each line (arrows
-# outside), and the 205.81 witness's reach either side of its dimension line.
+# outside) -- a fixed length, 6.2-6.3 mm at both 13.96 mm and 24 mm -- the
+# leader's shoulder under the value, and the 205.81 witness's reach either
+# side of its dimension line.
 NOTCH_ANGLE_TEXT_SIZE = (0.0106, 0.0035)
 NOTCH_ANGLE_ARROW_LENGTH = 0.0034
 NOTCH_ANGLE_ARROW_HALF_WIDTH = 0.0004
 NOTCH_ANGLE_EXTENSION_PAST_ARC = 0.0010
 NOTCH_ANGLE_RAY_START = 0.0110  # the 10.0 sheet-mm construction ray + its gap
 NOTCH_ANGLE_RUN_START = 0.0044
-NOTCH_ANGLE_ARC_TAIL_DEG = 15.2
+NOTCH_ANGLE_ARC_TAIL = 0.00625
+NOTCH_ANGLE_SHOULDER_DROP = 0.00278  # below the value's centre
+NOTCH_ANGLE_SHOULDER_HALF = 0.00675  # either side of it
 CAP_EC_Z_WITNESS_START = 0.0010  # past the cap centre
 CAP_EC_Z_WITNESS_PAST_LINE = 0.0010
 CAP_EC_Z_TEXT_SIZE = (0.0120, 0.0035)
 # A line nearer a text block than this reads as touching it.
 LINE_TEXT_CLEARANCE = 0.0005
 ARROW_TEXT_CLEARANCE = _drawing_leaders.ARROW_TEXT_CLEARANCE
+# An offset leader keeps this far off every stroke it does not cross or
+# root on.  The layout gives 1.13 mm (the leg past the run's extension line
+# end); the gate sits just under it, so an edit that squeezes the leg back
+# toward fix3's crossing fails here, not on the eye pass.
+LEADER_INK_CLEARANCE = 0.0010
+# Tipslot ruling (b): another annotation's line may cross a moved value's
+# dimension ink only farther than half the value's text height from it, and
+# only as a named, expected crossing (reported, not gated).
+DIMENSION_CROSSING_TEXT_FRACTION = 0.5
+EXPECTED_DIMENSION_CROSSINGS = {
+    frozenset(("NotchRunAngle arcs", "CapECz lines")): (
+        "the angle's outside arc tail on the ray side runs up through the "
+        "205.81 cap-centre witness, 2 mm above the ray: the witness is pinned "
+        "to the cap centre and the tail is SolidWorks' fixed ~6.2 mm outside "
+        "tail (d382 crossed it too)"
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -613,21 +646,28 @@ def _polar(origin: tuple[float, float], radius: float, degrees: float) -> tuple[
     return (origin[0] + radius * math.cos(angle), origin[1] + radius * math.sin(angle))
 
 
-def _nearest_on_box(
-    point: tuple[float, float], box: _drawing_leaders.Box
-) -> tuple[float, float]:
-    return (min(max(point[0], box[0]), box[2]), min(max(point[1], box[1]), box[3]))
+def notch_angle_leader(
+    root: tuple[float, float], text_xy: tuple[float, float]
+) -> list[_drawing_leaders.Segment]:
+    """The offset value's leader as fix3's seat drew it: ``root`` to a knee
+    at the shoulder's near end, then the shoulder under the value."""
+    shoulder_y = text_xy[1] - NOTCH_ANGLE_SHOULDER_DROP
+    ends = [(text_xy[0] + side * NOTCH_ANGLE_SHOULDER_HALF, shoulder_y) for side in (-1, 1)]
+    knee, far = sorted(ends, key=lambda end: math.dist(end, root))
+    return [(root, knee), (knee, far)]
 
 
 def notch_angle_ink(
     text_xy: tuple[float, float] | None,
     anchor_xy: tuple[float, float] = NOTCH_ANGLE_ANCHOR_XY,
+    cap_text_xy: tuple[float, float] | None = None,
 ) -> SheetInk:
     """The run angle's and the 205.81's ink near the notch, predicted.
 
     ``anchor_xy`` sets the arc's radius; ``text_xy`` is the offset value's
     centre, ``None`` leaving it at the anchor (the d382 sheet, with d382's
-    anchor).  The run points sheet-down-right, NOTCH_RUN_DEG below the ray.
+    anchor).  ``cap_text_xy`` places the 205.81 (NOTCH_KEEP's by default).
+    The run points sheet-down-right, NOTCH_RUN_DEG below the ray.
     """
     vertex = NOTCH_ANGLE_VERTEX_XY
     radius = math.dist(anchor_xy, vertex)
@@ -635,7 +675,7 @@ def notch_angle_ink(
     reach = radius + NOTCH_ANGLE_EXTENSION_PAST_ARC
     ray_line = (_polar(vertex, NOTCH_ANGLE_RAY_START, 0.0), _polar(vertex, reach, 0.0))
     run_line = (_polar(vertex, NOTCH_ANGLE_RUN_START, run), _polar(vertex, reach, run))
-    tail = NOTCH_ANGLE_ARC_TAIL_DEG
+    tail = math.degrees(NOTCH_ANGLE_ARC_TAIL / radius)
     arcs = [
         (_polar(vertex, radius, 0.0), _polar(vertex, radius, tail)),
         (_polar(vertex, radius, run), _polar(vertex, radius, run - tail)),
@@ -646,7 +686,7 @@ def notch_angle_ink(
         (_polar(vertex, radius, run), _polar(vertex, radius, run - turn)),
     ]
     cap = plan_xy(NOTCH_CENTER, _part.SLOT_E_X, _part.SLOT_E_Z)
-    cap_text = NOTCH_KEEP["CapECz"]
+    cap_text = NOTCH_KEEP["CapECz"] if cap_text_xy is None else cap_text_xy
     cap_x = cap_text[0]
     witness = (
         (cap[0] + CAP_EC_Z_WITNESS_START, cap[1]),
@@ -655,16 +695,10 @@ def notch_angle_ink(
     # The dump's 205.81 line stops 2.8 mm short of its text's anchor.
     cap_line = ((cap_x, cap[1]), (cap_x, cap_text[1] + 0.0028))
     cap_arrow = ((cap_x, cap[1]), (cap_x, cap[1] - NOTCH_ANGLE_ARROW_LENGTH))
-    leaders: list[_drawing_leaders.Segment] = []
     centre = anchor_xy if text_xy is None else text_xy
-    if text_xy is not None:
-        box = _centred_box(text_xy, NOTCH_ANGLE_TEXT_SIZE)
-        # Where SolidWorks roots an angular dimension's offset leader is not
-        # documented: the arc's midpoint or the arc point toward the text.
-        # Both are modelled; the value is placed so either stays in the wedge.
-        toward = math.degrees(math.atan2(text_xy[1] - vertex[1], text_xy[0] - vertex[0]))
-        for root in (_polar(vertex, radius, run / 2.0), _polar(vertex, radius, toward)):
-            leaders.append((root, _nearest_on_box(root, box)))
+    leaders = (
+        [] if text_xy is None else notch_angle_leader(_polar(vertex, radius, run / 2.0), text_xy)
+    )
     return SheetInk(
         texts={
             "NotchRunAngle": _centred_box(centre, NOTCH_ANGLE_TEXT_SIZE),
@@ -681,8 +715,67 @@ def _grown(box: _drawing_leaders.Box, margin: float) -> _drawing_leaders.Box:
     return (box[0] - margin, box[1] - margin, box[2] + margin, box[3] + margin)
 
 
+def _segment_gap(first: _drawing_leaders.Segment, second: _drawing_leaders.Segment) -> float:
+    """Distance between two segments that do not cross: the nearest of each
+    one's ends to the other."""
+    return min(
+        *(_drawing_leaders.distance_to_point(first, end) for end in second),
+        *(_drawing_leaders.distance_to_point(second, end) for end in first),
+    )
+
+
+def _strokes(ink: SheetInk, owners: Collection[str]) -> list[tuple[str, _drawing_leaders.Segment]]:
+    return [
+        (f"{owner} {kind}", segment)
+        for kind, strokes in (("lines", ink.lines), ("arcs", ink.arcs))
+        for owner in sorted(owners)
+        for segment in strokes.get(owner, ())
+    ]
+
+
+def dimension_crossings(ink: SheetInk) -> tuple[list[str], list[str]]:
+    """(findings, reported): other annotations' lines across a moved value's
+    dimension ink.
+
+    Only annotations with an offset leader are checked.  A crossing within
+    DIMENSION_CROSSING_TEXT_FRACTION of the value's text height of the value,
+    or one not in EXPECTED_DIMENSION_CROSSINGS, is a finding; a named one
+    farther out is reported.  The distance taken is the nearer of the two
+    crossing segments' to the value's box -- never farther than the crossing
+    point itself, so a pass is proven."""
+    findings, reported = [], []
+    for owner in sorted(name for name, leaders in ink.leaders.items() if leaders):
+        box = ink.texts[owner]
+        limit = DIMENSION_CROSSING_TEXT_FRACTION * (box[3] - box[1])
+        others = {*ink.lines, *ink.arcs} - {owner}
+        nearest: dict[tuple[str, str], float] = {}
+        for mine, first in _strokes(ink, [owner]):
+            for theirs, second in _strokes(ink, others):
+                if not _drawing_leaders.segments_cross(first, second):
+                    continue
+                gap = min(
+                    _drawing_leaders.distance_to_box(first, box),
+                    _drawing_leaders.distance_to_box(second, box),
+                )
+                nearest[(mine, theirs)] = min(gap, nearest.get((mine, theirs), math.inf))
+        for (mine, theirs), gap in sorted(nearest.items()):
+            reason = EXPECTED_DIMENSION_CROSSINGS.get(frozenset((mine, theirs)))
+            where = f"{mine} x {theirs}, at least {gap * 1000.0:.2f} mm from {owner!r}"
+            if gap <= limit:
+                findings.append(
+                    f"dimension-crossing: {where}, within {limit * 1000.0:.2f} mm "
+                    f"(half its text height)"
+                )
+            elif reason is None:
+                findings.append(f"dimension-crossing: {where}, not an expected crossing")
+            else:
+                reported.append(f"{where}: {reason}")
+    return findings, reported
+
+
 def sheet_ink_collisions(ink: SheetInk) -> list[str]:
-    """Text a line touches, arrows at text, leaders across ink.
+    """Text a line touches, arrows at text, leaders across or near ink,
+    dimension ink crossed at a moved value.
 
     * text-on-line: any annotation's dimension, extension or arc line -- its
       own included -- within LINE_TEXT_CLEARANCE of a text block;
@@ -693,7 +786,10 @@ def sheet_ink_collisions(ink: SheetInk) -> list[str]:
       foreign arrow, or running through foreign text.  One pair is declared
       touching: a leader and its own dimension arc, where SolidWorks roots it.
       Its own arrowheads stay out of the leader test -- their outside halves
-      are the arc tails, which are in it.
+      are the arc tails, which are in it;
+    * leader-near-ink: a leader within LEADER_INK_CLEARANCE of any of those
+      strokes it does not cross (its own arc excepted);
+    * dimension-crossing: ``dimension_crossings``.
     """
     findings = []
     for name, box in sorted(ink.texts.items()):
@@ -712,34 +808,53 @@ def sheet_ink_collisions(ink: SheetInk) -> list[str]:
             f"arrow-near-text: {owner}'s arrow stands {gap * 1000.0:.2f} mm from {name!r}"
         )
     for owner, leaders in sorted(ink.leaders.items()):
-        if not leaders:
+        if leaders:
+            findings.extend(_leader_findings(ink, owner, leaders))
+    findings.extend(dimension_crossings(ink)[0])
+    return findings
+
+
+def _leader_findings(
+    ink: SheetInk, owner: str, leaders: list[_drawing_leaders.Segment]
+) -> list[str]:
+    leader = f"{owner} leader"
+    groups = {leader: list(leaders)}
+    for other in sorted({*ink.lines, *ink.arcs, *ink.arrows}):
+        groups[f"{other} lines"] = list(ink.lines.get(other, ()))
+        groups[f"{other} arcs"] = list(ink.arcs.get(other, ()))
+        if other != owner:
+            groups[f"{other} arrows"] = list(ink.arrows.get(other, ()))
+    # The one declared touch: an offset leader roots on its own arc.
+    own_arcs = f"{owner} arcs"
+    findings = []
+    crossed = set()
+    for first, second in _drawing_leaders.leader_crossings(groups, {frozenset((leader, own_arcs))}):
+        if leader in (first, second):
+            other = second if first == leader else first
+            crossed.add(other)
+            findings.append(f"leader-on-ink: {owner}'s leader crosses {other}")
+    for other, segments in groups.items():
+        if other in (leader, own_arcs) or other in crossed or not segments:
             continue
-        leader = f"{owner} leader"
-        groups = {leader: list(leaders)}
-        for other in sorted({*ink.lines, *ink.arcs, *ink.arrows}):
-            groups[f"{other} lines"] = list(ink.lines.get(other, ()))
-            groups[f"{other} arcs"] = list(ink.arcs.get(other, ()))
-            if other != owner:
-                groups[f"{other} arrows"] = list(ink.arrows.get(other, ()))
-        # The one declared touch: an offset leader roots on its own arc.
-        touching = {frozenset((leader, f"{owner} arcs"))}
-        for first, second in _drawing_leaders.leader_crossings(groups, touching):
-            if leader in (first, second):
-                other = second if first == leader else first
-                findings.append(f"leader-on-ink: {owner}'s leader crosses {other}")
-        for name, box in sorted(ink.texts.items()):
-            if name != owner and any(
-                _drawing_leaders.distance_to_box(s, box) == 0.0 for s in leaders
-            ):
-                findings.append(f"leader-on-ink: {owner}'s leader runs through {name!r}")
+        gap = min(_segment_gap(a, b) for a in leaders for b in segments)
+        if gap < LEADER_INK_CLEARANCE:
+            findings.append(
+                f"leader-near-ink: {owner}'s leader passes {gap * 1000.0:.2f} mm from {other}"
+            )
+    for name, box in sorted(ink.texts.items()):
+        if name != owner and any(_drawing_leaders.distance_to_box(s, box) == 0.0 for s in leaders):
+            findings.append(f"leader-on-ink: {owner}'s leader runs through {name!r}")
     return findings
 
 
 def assert_notch_angle_ink_clear() -> None:
     """Refuse the run angle's placement before any COM work is spent."""
-    findings = sheet_ink_collisions(notch_angle_ink(NOTCH_ANGLE_TEXT_XY))
+    ink = notch_angle_ink(NOTCH_ANGLE_TEXT_XY)
+    findings = sheet_ink_collisions(ink)
     if findings:
         raise RuntimeError("notch run angle ink collides: " + "; ".join(findings))
+    for crossing in dimension_crossings(ink)[1]:
+        _telemetry.info(f"notch run angle: expected dimension crossing {crossing}")
 
 
 def _display_data(annotation: Any) -> Any:
@@ -751,7 +866,7 @@ def _arcs(annotation: Any) -> list[tuple[_drawing_leaders.Segment, tuple[float, 
     """A dimension's arcs as (start->end chord, centre), sheet metres.
 
     ``GetArcAtIndex2`` -> [color, lineType, unused, unused, start[3], end[3],
-    centre[3], normal[3], rotationDir]; the run angle's arcs are its 15 deg
+    centre[3], normal[3], rotationDir]; the run angle's arcs are its ~6.2 mm
     tails, whose chords sag 0.2 mm."""
     data = _display_data(annotation)
     arcs = []
@@ -866,7 +981,7 @@ def _offset_notch_angle_text(adapter: Any, annotations: list[Any]) -> None:
     findings = sheet_ink_collisions(ink)
     _telemetry.info(
         f"NotchRunAngle ink: leaders={leaders} arrows={ink.arrows['NotchRunAngle']} "
-        f"findings={findings}"
+        f"findings={findings} expected_crossings={dimension_crossings(ink)[1]}"
     )
     if findings:
         raise RuntimeError("notch run angle ink collides on the sheet: " + "; ".join(findings))
