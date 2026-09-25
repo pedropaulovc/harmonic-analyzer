@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 
 import _config
 import build_cone_tip_bushing as part
@@ -153,3 +154,34 @@ def test_part_registry_values_remain_the_title_block_source() -> None:
     assert config["number"] == "MHA-096"
     assert config["material_specification"] == "C36000 free-machining brass"
     assert int(config["quantity"]) == 1
+
+
+def _dimension_rows(node: object):
+    """Yield every table row (a list whose first cell is text) in the record."""
+    if isinstance(node, dict):
+        for value in node.values():
+            yield from _dimension_rows(value)
+    elif isinstance(node, list):
+        if node and isinstance(node[0], str):
+            yield node
+        for value in node:
+            yield from _dimension_rows(value)
+
+
+def test_dimensions_record_carries_the_bushing_bore() -> None:
+    # Codex (#811): the tip-journal row moved to 1/16 in while the bushing's
+    # own row still printed the retired 1/32 in (0.79) bore.
+    record = yaml.safe_load(
+        (Path(part.__file__).resolve().parents[1] / "config" / "dimensions.yaml")
+        .read_text(encoding="utf-8")
+    )
+    rows = [
+        row
+        for row in _dimension_rows(record)
+        if row[0].startswith("`cone-tip-bushing`")
+    ]
+    assert len(rows) == 1
+    assert rows[0][1] == (
+        f"brass sleeve Ø{spec.OUTER_DIA:g} × {spec.LENGTH:g}, "
+        f"Ø{spec.BORE_DIA + 1e-9:.3f} (1/16\") bore"
+    )

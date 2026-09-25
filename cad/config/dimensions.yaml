@@ -284,7 +284,7 @@ sections:
       - - Cone set axial length
         - 150 mm
         - '5.91'
-        - photo callout p.18; with the finer DP 49.82 module the gear stack shrank to 19 × 6.889 + 6.5 ≈ 137.4 mm (+ 64T face 8 + air) — the 150 arrow no longer matches cleanly and is flagged (the annotated 7/7.5/150 trio was already inconsistent with the drum grid)
+        - photo callout p.18; with the finer DP 49.82 module the gear stack shrank to 19 × 6.889 + 6.0 ≈ 136.9 mm (6.0 faces narrowed from the south on the 6.5 reference stations; + 64T face 8 + air) — the 150 arrow no longer matches cleanly and is flagged (the annotated 7/7.5/150 trio was already inconsistent with the drum grid)
         - annotated
         - high
       - - Gear count
@@ -336,7 +336,7 @@ sections:
         - legacy + derived
         - high
       - - Gear bores (configured `BoreDia`)
-        - 'snug on the stepped shaft (M6.7 perpendicular seats) AND inside each gear''s root circle: 9.5 (3/8") T024–T120; 6.35 (1/4") T018; 3.18 (1/8") T012; 1.59 (1/16") T006; no keyway'
+        - 'snug on the stepped shaft (M6.7 perpendicular seats) AND inside each gear''s root circle: 9.525 (3/8") T030–T120; 6.350 (1/4") T024; 3.175 (1/8") T018; 1.588 (1/16") T006–T012; no keyway'
         - —
         - 'Appendix C #7: bore = shaft section at the seat (perpendicular gears need no ellipse margin). At the finer module T006 takes a 1/16" bore. Its gap floor is printed at 2.880 mm MIN diameter (U40), so the nominal bore leaves a 0.646 mm radial web and the maximum allowed bore 0.621 mm, the one named web exception (cone_gear_spec.WEB_EXCEPTIONS_MM). The p.21 macro shows solder blobs fixing the small gears — no keyway evidence anywhere.'
         - derived
@@ -624,7 +624,7 @@ sections:
         - 'McMaster-Carr 90280A199 recipe (`cad/scripts/diagnostics/diag_mcmaster_fillister.py`); embed and receiver depths from `cad/scripts/build_swing_stop_screw.py` and `cad/scripts/build_harmonic_base.py`; user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry'
         - high (stock dimensions exact; function and placement derived)
       - - '`cone-tip-bushing` (T006 spacer on the tip stub)'
-        - brass sleeve Ø6 × 4, Ø0.79 (1/32") bore
+        - brass sleeve Ø6 × 4, Ø1.588 (1/16") bore
         - 'on the shaft''s tip stub at stations 129.2723..133.2723, directly north of T006 and 2 mm south of the tip block — the axial spacer the adjuster loads the shaft stack against'
         - v4_t00471 / 7:49 (brass collar between the smallest gear and the tip block)
         - med (role high, dims low)

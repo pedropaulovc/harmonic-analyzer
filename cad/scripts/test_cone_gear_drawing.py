@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 
 import _config
 import build_cone_gear as part
@@ -84,15 +85,12 @@ def test_each_configuration_sheet_carries_its_own_drawing_number() -> None:
     assert '"Number": configuration_number(part_number, teeth)' in source
 
 
-def test_bore_band_is_the_explicit_soldered_seat_band() -> None:
-    # Main (2026-09-23): MHA-013 bores print +0.05/0 on their shaft land's
-    # nominal; the soldered seats go to 0/-0.05 (#839), so the pair spans
-    # 0 to 0.10 diametral, the gap the solder or retaining compound fills.
+def test_bore_band_is_the_derived_retained_joint_band() -> None:
+    # Main (2026-09-25): every bonded bore takes the shared retained-joint fit
+    # against its land (retained_joint_fit); the family's one BoreCutDia band
+    # is +0.050/+0.025 (test_cone_gear_seat_fit proves every seat).
     assert part.BORE_DIA_BAND is spec.BORE_DIA_BAND
-    assert spec.BORE_DIA_BAND == (0.05, 0.0)
-    land_upper, land_lower = cone_gear_shaft_spec.GEAR_SEAT_BAND
-    assert spec.BORE_DIA_BAND[1] - land_upper == pytest.approx(0.0)
-    assert 0.0 < spec.BORE_DIA_BAND[0] - land_lower <= 0.10
+    assert spec.BORE_DIA_BAND == (0.05, 0.025)
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"BoreProfile", "BoreCutDia", *deviations(BORE_DIA_BAND)' in source
 
@@ -226,33 +224,40 @@ def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> 
 
 
 def test_notes_define_only_the_approved_plain_bore_attachment() -> None:
+    common = [
+        "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
+        "MAKE ONE GEAR FROM EACH SHEET IN THIS PACKAGE.",
+        "PLAIN BORE, NO KEYWAY; SOLDER, SILVER-BRAZE OR LOCTITE 638/648 TO "
+        "MHA-014 AT ASSEMBLY.",
+    ]
+    # Named exceptions print only on the sheets they cover, with no ruling ids;
+    # T006 carries both on one line.
+    cr_line = (
+        "CONTACT RATIO BELOW 1.1 ON T006-T042: ACCEPTED EXCEPTION (BOOK FIDELITY)."
+    )
+    both_line = (
+        "CONTACT RATIO BELOW 1.1, ROOT-TO-BORE WEB 0.62 MIN: "
+        "ACCEPTED EXCEPTIONS (BOOK FIDELITY)."
+    )
     for teeth in spec.CONFIGURATION_TEETH:
         text = notes.drawing_notes(teeth)
         lines = text.splitlines()
+        # Policy rule 6: at most four short lines on every sheet.
+        assert len(lines) <= 4
         assert all(len(line) <= 90 for line in lines)
-        # Named exceptions print only on the sheets they cover, one short
-        # line each like MHA-142/139, with no ruling ids.
-        cr_line = (
-            "CONTACT RATIO BELOW 1.1 ON T006-T042: ACCEPTED EXCEPTION (BOOK FIDELITY)."
-        )
-        assert (cr_line in lines) == (teeth <= 42)
-        web_line = (
-            "ROOT-TO-BORE WEB 0.62 MIN, BELOW 1.5: ACCEPTED EXCEPTION (BOOK FIDELITY)."
-        )
-        assert (web_line in lines) == (teeth == 6)
-        assert len(lines) == 4 + (teeth <= 42) + (teeth == 6)
+        expected = list(common)
+        if teeth == 6:
+            expected.append(both_line)
+        elif teeth <= 42:
+            expected.append(cr_line)
+        assert lines == expected
         assert "U4" not in text and "BY DESIGN" not in text
-        assert "PLAIN BORE, NO KEYWAY" in text
-        assert "BOND TO MHA-014 SHAFT SEAT AT ASSEMBLY" in text
-        assert notes.ATTACHMENT_PROCESS in text
-        assert notes.ATTACHMENT_ALTERNATIVE in text
-        assert "ACCEPTABLE BONDS:" in text
+        assert notes.ATTACHMENT in text
         for unsupported in ("PIN", "SET SCREW", "HUB"):
             assert unsupported not in text
         for retired in ("RUNOUT", "DATUM", "+/-", "PITCH DIA="):
             assert retired not in text
-    assert notes.ATTACHMENT_PROCESS == "SOLDER OR SILVER-BRAZE"
-    assert notes.ATTACHMENT_ALTERNATIVE == "LOCTITE 638 OR LOCTITE 648"
+    assert notes.ATTACHMENT == "SOLDER, SILVER-BRAZE OR LOCTITE 638/648"
     assert notes.CYLINDER_MATE_NUMBER == _config.parts("cylinder-gear")["number"]
     assert notes.SHAFT_MATE_NUMBER == _config.parts("cone-gear-shaft")["number"]
     source = Path(part.__file__).read_text(encoding="utf-8")
@@ -364,3 +369,36 @@ def test_root_to_bore_webs_meet_u27_except_the_named_t006() -> None:
     assert [spec.bore_dia_mm(t) for t in (6, 12, 18, 24, 30)] == pytest.approx(
         [1.5875, 1.5875, 3.175, 6.35, 9.525]
     )
+
+
+def test_dimensions_record_gear_bores_row_follows_the_spec() -> None:
+    # The narrative record is read by no part, so nothing rebuilds when the
+    # bores move: it kept the pre-S1 map (9.5 on T024-T120) after U40.
+    inch = {0.0625: "1/16", 0.125: "1/8", 0.25: "1/4", 0.375: "3/8"}
+    groups: dict[float, list[int]] = {}
+    for teeth in spec.CONFIGURATION_TEETH:
+        groups.setdefault(spec.bore_dia_mm(teeth), []).append(teeth)
+    cells = []
+    for bore, teeth in sorted(groups.items(), reverse=True):
+        span = f"T{teeth[0]:03d}" if len(teeth) == 1 else f"T{teeth[0]:03d}–T{teeth[-1]:03d}"
+        cells.append(f'{bore + 1e-9:.3f} ({inch[round(bore / spec.MM_PER_IN, 4)]}") {span}')
+    expected = (
+        "snug on the stepped shaft (M6.7 perpendicular seats) AND inside each "
+        "gear's root circle: " + "; ".join(cells) + "; no keyway"
+    )
+    record = yaml.safe_load(
+        (Path(part.__file__).resolve().parents[1] / "config" / "dimensions.yaml")
+        .read_text(encoding="utf-8")
+    )
+    rows = []
+    stack = [record]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            stack.extend(node.values())
+        elif isinstance(node, list):
+            if node and isinstance(node[0], str) and node[0].startswith("Gear bores"):
+                rows.append(node)
+            stack.extend(node)
+    assert len(rows) == 1
+    assert rows[0][1] == expected
