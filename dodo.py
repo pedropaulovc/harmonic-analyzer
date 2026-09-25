@@ -2751,6 +2751,9 @@ def task_check():
         # dimensions.yaml is read by no part, so only this test keeps its
         # alignment-pinion record pinned to the CAD constants (#814).
         SCRIPTS_DIR / "test_dimensions_alignment_pinion_layout.py",
+        # Every cad/config YAML parses: prose-only records move no cache key,
+        # so a row that breaks the file is otherwise invisible (caf03f2b7).
+        SCRIPTS_DIR / "test_config_yaml_parses.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.
