@@ -1608,6 +1608,48 @@ def test_every_cache_phase_span_names_its_cache_key(monkeypatch):
     }
 
 
+def test_farm_restore_span_names_its_cache_key(monkeypatch):
+    """Under ``--executor farm`` the submitter's phases are ``cache.probe`` then
+    ``cache.restore`` (the worker publishes, this side downloads). The restore is
+    the span that proves the leaf landed, so it names the key like the rest."""
+    dodo = _load_dodo()
+    key = "fedcba9876543210" * 4
+    spans: list[tuple[str, dict]] = []
+    restores = iter([False, True])  # probe misses, post-farm restore hits
+
+    @contextlib.contextmanager
+    def record_span(name, **attrs):
+        entry = (name, dict(attrs))
+        spans.append(entry)
+
+        class _Span:
+            def set_attribute(self, attr, value):
+                entry[1][attr] = value
+
+        yield _Span()
+
+    succeeded = dodo._farm.LeafResult(
+        state="succeeded",
+        exit_code=0,
+        worker_id="w@1",
+        attempt=1,
+        cache_present=True,
+        log_blob=None,
+        failure_category=None,
+        failure_message=None,
+    )
+    monkeypatch.setattr(dodo._telemetry, "span", record_span)
+    monkeypatch.setattr(dodo, "_cache_key", lambda file_deps, label: key)
+    monkeypatch.setattr(dodo._cache, "restore", lambda *args: next(restores))
+    monkeypatch.setattr(dodo._farm, "enabled", lambda: True)
+    monkeypatch.setattr(dodo._farm, "run_leaf", lambda label, k: succeeded)
+
+    dodo._cached_com_action("part:x", ["build"], [], [], "part-x")
+
+    tagged = {name.split()[0]: attrs.get("cache.key") for name, attrs in spans}
+    assert tagged == {"cache.probe": key[:12], "cache.restore": key[:12]}
+
+
 def test_com_seat_is_reentrant_within_a_process(tmp_path, monkeypatch):
     """filelock counts same-process acquisitions, so a nested ``_com_seat`` (defensive
     -- no COM action nests today) neither deadlocks nor releases the seat early: the

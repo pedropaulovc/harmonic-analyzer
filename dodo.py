@@ -2107,6 +2107,7 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
     with _telemetry.span(
         f"cache.restore {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as restore:
+        _tag_cache_key(restore, key)
         if not _cache.restore(key, outputs, label):
             raise RuntimeError(
                 f"{label}: farm reported success but cache key {key[:12]} is absent"
