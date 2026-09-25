@@ -54,7 +54,7 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
+    _named_dimension,
 )
 from _fastener_catalog import fastener
 from _fit_limits import deviations
@@ -66,7 +66,10 @@ from post_mount_screw_spec import (
     CUT_END_BREAK_BAND,
     CUT_END_BREAK_DIMENSION,
     CUT_END_BREAK_MM,
+    CUT_END_BREAK_MAX_MM,
     CUT_END_BREAK_SKETCH,
+    CUT_END_BREAK_TEXT,
+    CUT_END_BREAK_TOL_TYPE,
     CUT_LENGTH_DIMENSION,
     CUT_LENGTH_MM,
     CUT_END_DEBURR_REMOVED_MM3,
@@ -478,6 +481,30 @@ async def _modify_stock(adapter) -> None:
     )
 
 
+def _single_limit_break(adapter) -> None:
+    """CutEndBreak as a MAX-limit dimension carrying the band's deviations."""
+    lower, upper = deviations(CUT_END_BREAK_BAND)
+    _, dimension = _named_dimension(
+        adapter, CUT_END_BREAK_SKETCH, CUT_END_BREAK_DIMENSION
+    )
+    label = f"{CUT_END_BREAK_DIMENSION}@{CUT_END_BREAK_SKETCH}"
+    if not math.isclose(
+        float(dimension.SystemValue), CUT_END_BREAK_MAX_MM / 1000.0, abs_tol=1e-12
+    ):
+        raise RuntimeError(f"{label}: nominal is not the band's max")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = CUT_END_BREAK_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != CUT_END_BREAK_TOL_TYPE
+        or not math.isclose(float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12)
+        or not math.isclose(float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12)
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {CUT_END_BREAK_TEXT}")
+
+
 def _manufacturing_controls(adapter) -> None:
     """Places, the break's band and drawing marks; the sheet's note."""
     cut_end = _cut_end_y_mm(adapter)
@@ -487,16 +514,12 @@ def _manufacturing_controls(adapter) -> None:
             f"{CUT_LENGTH_MM} below the under-head face"
         )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # The cut end's deburr: 0.1 +0/-0.1, i.e. none to 0.1.  The cut length
-    # stays unbanded (reference): no fixed length suits every post and plate.
-    lower, upper = deviations(CUT_END_BREAK_BAND)
-    set_dimension_bilateral_tolerance(
-        adapter,
-        CUT_END_BREAK_SKETCH,
-        CUT_END_BREAK_DIMENSION,
-        lower_deviation_mm=lower,
-        upper_deviation_mm=upper,
-    )
+    # The cut end's deburr prints as the single limit "0.1 MAX" (swTolMAX)
+    # in the sheet's tip detail; the band's deviations stay on the native
+    # tolerance, read back, as the model's record of "none to 0.1".  The cut
+    # length stays unbanded (reference): no fixed length suits every post and
+    # plate.
+    _single_limit_break(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
