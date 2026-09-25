@@ -1,0 +1,199 @@
+r"""Axial (machine-z) layout of the cylinder-gear bank and its retention
+(issue #743) -- one source for the drive-train assembly, the channel cam plane
+and the alignment-pinion rig's worst stacks.
+
+GEOMETRY ONLY: no drawing notes, no annotation contract, no drawing-spec
+imports, and no title-block reads (the ``pinion_rig_layout`` precedent), so a
+print-wording edit can never re-key the drive train.
+
+The bank is a SOLID STACK. Each MHA-027 gear's overall thickness, cam face to
+back face, is the station pitch, so neighbouring gears bear cam face on back
+face, as the rocker hubs do (``rocker_arm_spec.HUB_LENGTH``). A turned thrust
+washer (MHA-121) sits at each end between the end gear and its arbor-pedestal
+strap.
+
+* The BACK (north) strap is the bank's axial datum. Its inner face is
+  DRO-located at fit-up, and the bank is pushed back against it: g19's back
+  face bears on the back washer, which bears on the back strap.
+* The FRONT (south) strap is feeler-set: one BANK_END_FEELER leaf between the
+  front washer and the strap. That gap is the bank's assembled end play, E_b.
+  The feeler is chosen by the rule ``pinion_rig_layout`` uses for its drum
+  shim: the smallest 0.05 blade whose tightest setting keeps MIN_END_PLAY with
+  MARGIN_SPARE to spare.
+* Every gear's overall thickness is +0.05/0 on its print. A fit-up acceptance
+  on the measured 20-gear stack (STACK_L20_ACCEPT) caps the cumulative excess,
+  so g0's position relative to g19 never carries 19 per-gear bands.
+
+The bank is not preloaded. So in service any one gear interface can open by up
+to E_b max, and a connecting-rod ring pressed toward the gear in front of it
+overhangs its cam by at most that gap (user ruling on #743, Q1: bounded
+overhang accepted; RING_OVERHANG_MAX).
+
+Stacks are dicts of named, non-negative terms, summed like
+``pinion_rig_layout.DRUM_BACK_ADVANCE_STACK``. "South" is machine -z (the
+front, gear 0, crank side); "north" is +z (the back, gear 19).
+"""
+
+from __future__ import annotations
+
+import math
+
+import _config
+from cylinder_end_disc_spec import (
+    WASHER_THICK,
+    WASHER_THICK_TOLERANCE_MM,
+)
+from cylinder_gear_spec import (
+    CAM_THICKNESS,
+    FACE_WIDTH,
+    FACE_WIDTH_TOLERANCE_MM,
+    OVERALL_THICKNESS,
+    OVERALL_THICKNESS_BAND,
+)
+
+COUNT = 20  # the bank is the full set of 20 cylinder gears (every build)
+
+# --- station pitch --------------------------------------------------------
+# The drive-train ladders the gears at the cone-incline z-pitch (the same
+# formula as build_drive_train_assembly.Z_PITCH). The gear's printed overall
+# thickness is the channel station pitch; the two agree to well under a
+# micrometre per station, and the gear is never the longer of the two, so the
+# modelled stack closes without interference.
+_DP_TRAIN = _config.machine("gear_train", "diametral_pitch")
+_RADIUS_STEP = 3.0 * 25.4 / _DP_TRAIN
+_SEAT = _config.machine("cone_incline", "drum_seat_nominal_mm")
+BANK_PITCH = _SEAT * math.cos(math.asin(_RADIUS_STEP / _SEAT))
+STATION_Z0 = _config.machine("channels", "station_z0_mm")
+PITCH_LOCKSTEP_TOLERANCE = 0.001
+if not 0.0 <= BANK_PITCH - OVERALL_THICKNESS <= PITCH_LOCKSTEP_TOLERANCE:
+    raise AssertionError(
+        f"gear overall thickness {OVERALL_THICKNESS} is not the bank pitch "
+        f"{BANK_PITCH:.6f} (0..{PITCH_LOCKSTEP_TOLERANCE})"
+    )
+
+
+def station_z(j: int) -> float:
+    """Machine z of gear j's tooth-face mid-plane."""
+    return STATION_Z0 + BANK_PITCH * j
+
+
+# --- end play (E_b) ---------------------------------------------------------
+MIN_END_PLAY = 0.10  # running floor for 20 oiled brass faces
+MARGIN_SPARE = 0.25  # novice spare over every floor (pinion_rig_layout rule)
+FEELER_STEP = 0.05  # blades of the metric gauge set (pinion_rig_fitup)
+BANK_END_FEELER_BAND = 0.10  # set error: hold-down float re-set, ruled band
+BANK_END_FEELER = FEELER_STEP * math.ceil(
+    round((MIN_END_PLAY + MARGIN_SPARE + BANK_END_FEELER_BAND) / FEELER_STEP, 9)
+)
+BANK_END_PLAY = (
+    BANK_END_FEELER - BANK_END_FEELER_BAND,
+    BANK_END_FEELER + BANK_END_FEELER_BAND,
+)
+BANK_END_PLAY_TERMS = {
+    "front feeler": BANK_END_FEELER,
+    "feeler set error": BANK_END_FEELER_BAND,
+}
+# Differential expansion of the brass stack against the iron base over
+# +/-15 K. Reported, not counted: it sits inside MARGIN_SPARE, as the rig's
+# drum-shim rule treats it.
+THERMAL_END_PLAY_DRIFT = (19e-6 - 11e-6) * OVERALL_THICKNESS * COUNT * 15.0
+
+# --- stack length acceptance -------------------------------------------------
+STACK_L20 = COUNT * OVERALL_THICKNESS  # g0 cam face to g19 back face
+STACK_L20_ACCEPT_BAND = (0.20, 0.0)  # (upper, lower): re-face a long stack
+STACK_L20_ACCEPT = (
+    STACK_L20 + STACK_L20_ACCEPT_BAND[1],
+    STACK_L20 + STACK_L20_ACCEPT_BAND[0],
+)
+if OVERALL_THICKNESS_BAND[1] < 0.0:
+    raise AssertionError("a thin gear cannot be fixed at fit-up; keep T +/0")
+
+# --- nominal stations (bank pushed back against the datum) -----------------
+G19_BACK_FACE_Z = station_z(COUNT - 1) + FACE_WIDTH / 2.0
+BACK_WASHER_Z = (G19_BACK_FACE_Z, G19_BACK_FACE_Z + WASHER_THICK)
+BACK_STRAP_INNER_Z = BACK_WASHER_Z[1]
+G0_TOOTH_FRONT_Z = station_z(0) - FACE_WIDTH / 2.0
+G0_CAM_FACE_Z = station_z(0) + FACE_WIDTH / 2.0 - OVERALL_THICKNESS
+FRONT_WASHER_Z = (G0_CAM_FACE_Z - WASHER_THICK, G0_CAM_FACE_Z)
+FRONT_STRAP_INNER_Z = FRONT_WASHER_Z[0] - BANK_END_FEELER
+STRAP_INNER_SPAN = BACK_STRAP_INNER_Z - FRONT_STRAP_INNER_Z
+# Cam / connecting-rod ring mid-plane relative to its gear's station: the cam
+# spans FACE_WIDTH/2 .. FACE_WIDTH/2 + CAM_THICKNESS south of it.
+CAM_MID_DZ = -(FACE_WIDTH + CAM_THICKNESS) / 2.0
+
+# --- g0 -> g19 pitch-stack band ---------------------------------------------
+# g0's tooth-front face sits at g19's back face - L20 + (T0 - FW0).
+G0_FRONT_FROM_G19_BACK = G0_TOOTH_FRONT_Z - G19_BACK_FACE_Z
+G0_FRONT_SOUTH_STACK = {
+    "20-gear stack acceptance (L20 +0.20/0)": STACK_L20_ACCEPT_BAND[0],
+    "gear 0 face width (+0.05)": FACE_WIDTH_TOLERANCE_MM,
+    "bank end play E_b max": BANK_END_PLAY[1],
+}
+G0_FRONT_NORTH_STACK = {
+    "gear 0 overall thickness (+0.05/0)": OVERALL_THICKNESS_BAND[0],
+    "gear 0 face width (-0.05)": FACE_WIDTH_TOLERANCE_MM,
+}
+# The pitch-stack band alone (without end play), south / north of nominal.
+G0_G19_BAND = (
+    -(STACK_L20_ACCEPT_BAND[0] + FACE_WIDTH_TOLERANCE_MM),
+    OVERALL_THICKNESS_BAND[0] + FACE_WIDTH_TOLERANCE_MM,
+)
+# g19 is the datum: the rig sets its leaf D off g19's back face with the bank
+# pushed back (north), so g19 can only move south of that, by the end play.
+G19_BACK_NORTH_STACK: dict[str, float] = {}
+G19_BACK_SOUTH_STACK = {"bank end play E_b max": BANK_END_PLAY[1]}
+# Any intermediate gear's tooth-face mid-plane against its nominal, bank
+# pushed back: the acceptance caps the excess of the gears north of it.
+STATION_STACK_BAND = (
+    -(STACK_L20_ACCEPT_BAND[0] + FACE_WIDTH_TOLERANCE_MM / 2.0),
+    FACE_WIDTH_TOLERANCE_MM / 2.0,
+)
+
+# --- ring support -----------------------------------------------------------
+# A closed slot IS the cam: gear j's web to gear j-1's back face. Its smallest
+# width is the thinnest cam (T at nominal, FW at its top).
+SLOT_MIN = OVERALL_THICKNESS + OVERALL_THICKNESS_BAND[1] - (
+    FACE_WIDTH + FACE_WIDTH_TOLERANCE_MM
+)
+RING_OVERHANG_MAX = BANK_END_PLAY[1]
+
+# --- datum chain for the cone-mesh axial budget -----------------------------
+BACK_STRAP_LOCATE_BAND = 0.10  # DRO edge-find on the strap inner face
+DATUM_CHAIN_STACK = {
+    "back strap DRO locate": BACK_STRAP_LOCATE_BAND,
+    "back washer thickness": WASHER_THICK_TOLERANCE_MM,
+}
+
+__all__ = [
+    "BACK_STRAP_INNER_Z",
+    "BACK_WASHER_Z",
+    "BANK_END_FEELER",
+    "BANK_END_FEELER_BAND",
+    "BANK_END_PLAY",
+    "BANK_END_PLAY_TERMS",
+    "BANK_PITCH",
+    "CAM_MID_DZ",
+    "CAM_THICKNESS",
+    "COUNT",
+    "DATUM_CHAIN_STACK",
+    "FRONT_STRAP_INNER_Z",
+    "FRONT_WASHER_Z",
+    "G0_CAM_FACE_Z",
+    "G0_FRONT_FROM_G19_BACK",
+    "G0_FRONT_NORTH_STACK",
+    "G0_FRONT_SOUTH_STACK",
+    "G0_G19_BAND",
+    "G0_TOOTH_FRONT_Z",
+    "G19_BACK_FACE_Z",
+    "G19_BACK_NORTH_STACK",
+    "G19_BACK_SOUTH_STACK",
+    "RING_OVERHANG_MAX",
+    "SLOT_MIN",
+    "STACK_L20",
+    "STACK_L20_ACCEPT",
+    "STATION_STACK_BAND",
+    "STATION_Z0",
+    "STRAP_INNER_SPAN",
+    "THERMAL_END_PLAY_DRIFT",
+    "station_z",
+]
