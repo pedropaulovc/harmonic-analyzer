@@ -1286,6 +1286,41 @@ def test_only_the_named_release_blocker_engages_under_one_and_a_half_d() -> None
         )
 
 
+def test_short_engagement_blocker_lasts_until_the_specified_screw_ships() -> None:
+    import build_lag_screw as screw
+
+    # Flipping lag-screw's catalog row to the specified 3/4 screw must delete
+    # the blocker in the same change, and the blocker cannot outlive it.
+    assert ("rocker support" in part.RELEASE_BLOCKER_SHORT_ENGAGEMENT) == (
+        screw.SKU != screw.SPECIFIED_SKU
+    )
+
+
+def test_specified_hold_down_screw_fits_a_derived_seat_without_the_blocker() -> None:
+    import build_lag_screw as screw
+
+    length, _replay = screw.REPLAYS[screw.SPECIFIED_SKU]
+    assert length == 19.05  # 3/4 in under the head
+    engagement = length - part.SUPPORT_FOOT_THICKNESS - part.HOLD_DOWN_BEARING_OFFSET
+    diameter = part.THREAD_MAJOR_MM[part.HOLD_DOWN_THREAD]
+    assert engagement >= 1.5 * diameter
+    thread = part.seat_thread_depth(engagement)
+    drill = part.seat_drill_depth(thread, part.HOLD_DOWN_THREAD, "tapped")
+    seat = replace(
+        part.HOLD_DOWN_SEAT_SPEC, depth_mm=drill, overrides_mm={"ThreadDepth": thread}
+    )
+    part.require_blind_seat_fit("specified rocker support", seat, engagement)
+    # The deeper drill still leaves the upper pad 1.5 drill diameters of wall
+    # under its point at the printed high limit.
+    tap_drill = part.HOLD_DOWN_TAP_DRILL_DIA
+    floor = (
+        part.TOP_THICKNESS
+        - (drill + part.SEAT_DEPTH_BAND)
+        - tap_drill / 2.0 * part.DRILL_POINT_H
+    )
+    assert floor >= 1.5 * tap_drill
+
+
 def test_cross_tap_drill_keeps_the_bottoming_lead_past_the_deepest_thread() -> None:
     from frame_attachment_spec import CASTING_FULL_THREAD_DEPTH, CASTING_TAP_DRILL_DEPTH
 
