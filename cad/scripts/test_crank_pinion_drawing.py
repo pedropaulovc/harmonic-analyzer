@@ -395,7 +395,7 @@ def test_notes_carry_only_the_tooth_edge_exception() -> None:
 
 
 def test_sheet_runs_at_3_to_1_with_every_view_at_sheet_scale() -> None:
-    # A 17.8 x 24.615 mm part on a B sheet (W15): at 4:1 the section's boss-end
+    # A 17.8 x 24.9 mm part on a B sheet (W15): at 4:1 the section's boss-end
     # dimensions ran into the isometric, so 3:1 is the largest scale that lays
     # out. One scale for every view means the title block's SCALE field is the
     # whole truth and no view needs a scale note.
@@ -499,37 +499,77 @@ def test_part_stamps_make_critical_properties() -> None:
 def test_w15_boss_hides_the_shaft_end_and_walls_the_pin_at_every_limit() -> None:
     # Main rulings 2026-09-25 (W15, option 1): the boss is sized so the pin keeps
     # 4.5 of shaft beyond it nominally and 2.0 in the worst case, and the shaft
-    # end stays 0.25 inside the boss even with the pinion at its general grade.
+    # end stays 0.25 inside the boss with every length at its PRINTED limit.
     import build_drive_train_assembly as bdt
 
-    grade = _config.title_block("linear_1pl")["value_in"] * 25.4
-    assert spec.OVERALL_LENGTH_GRADE_MM == pytest.approx(grade)
-    assert spec.DRAWING_PRECISION["BossProfile"]["OverallLength"] == 1
-    assert spec.SHAFT_END_RECESS == pytest.approx(1.02)
-    assert spec.BOSS_LENGTH == pytest.approx(14.215)
-    assert spec.OVERALL_LENGTH == pytest.approx(24.615)
+    printed = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
+    assert spec.OVERALL_LENGTH_GRADE_MM == pytest.approx(printed) == pytest.approx(0.8)
+    assert spec.DRAWING_PRECISION["BossProfile"]["OverallLength"] == spec.OVERALL_LENGTH_PLACES
+    assert spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == spec.FACE_WIDTH_PLACES
+    # Both lengths print exactly, so no rounded nominal eats the margin.
+    assert spec.OVERALL_LENGTH == pytest.approx(24.9)
+    assert spec.OVERALL_LENGTH == round(spec.OVERALL_LENGTH, spec.OVERALL_LENGTH_PLACES)
+    assert spec.BOSS_LENGTH == pytest.approx(14.5)
     assert spec.PIN_STATION == pytest.approx(spec.FACE_WIDTH + spec.BOSS_LENGTH / 2.0)
-    assert bdt.PINION_RECESS_NOMINAL == pytest.approx(spec.SHAFT_END_RECESS)
-    assert bdt.PINION_PIN_EDGE_NOMINAL_ACTUAL == pytest.approx(
-        spec.PIN_EDGE_TO_SHAFT_END_NOMINAL
-    )
+    assert spec.PIN_STATION == pytest.approx(17.65)
+    assert bdt.PINION_RECESS_NOMINAL == pytest.approx(crankshaft_spec.SHAFT_END_RECESS)
+    assert spec.SHAFT_END_RECESS_MIN <= bdt.PINION_RECESS_NOMINAL <= spec.SHAFT_END_RECESS_MAX
+    assert bdt.PINION_PIN_EDGE_NOMINAL_ACTUAL >= spec.PIN_EDGE_TO_SHAFT_END_NOMINAL
     edge = bdt.PINION_PIN_EDGE_STACK
     assert edge == {
-        "nominal": pytest.approx(4.5),
+        "nominal": pytest.approx(4.523, abs=1e-3),
         "shaft length": pytest.approx(-0.40),
         "seat gap": pytest.approx(-0.75),
+        # The pin is laid out at the boss mid-length on the ACTUAL part, so a
+        # long face and overall length (each +0.8 printed) move it north.
+        "boss mid-length": pytest.approx(-0.80),
         "pin layout": pytest.approx(-0.25),
         "drill oversize": pytest.approx(-0.05),
     }
-    assert sum(edge.values()) == pytest.approx(3.05)
+    assert sum(edge.values()) == pytest.approx(2.273, abs=1e-3)
     assert sum(edge.values()) >= spec.PIN_EDGE_MIN_WORST
     # The seat gap is a (low, high) range starting at the one feeler MHA-A03
     # sets, not a fit band.
     assert bdt.PINION_BOSS_NORTH_GAP_RANGE == (spec.SEAT_FEELER_MM, 1.0)
     assert not hasattr(bdt, "PINION_BOSS_NORTH_GAP_BAND")
     recess = bdt.PINION_RECESS_STACK
+    assert recess == {
+        "nominal": pytest.approx(1.1395, abs=1e-4),
+        "pinion overall length": pytest.approx(-0.80),
+        "seat gap": pytest.approx(0.0),
+        "shaft length": pytest.approx(0.0),
+    }
     assert sum(recess.values()) >= spec.SHAFT_END_RECESS_MIN_WORST
+    # Codex P2 on #892: 4d4e038e3 (recess 1.02, pinion 24.615 printed 24.6,
+    # shaft 136.6345 printed 136.6) passed only against the inch grade 0.762;
+    # at the printed +/-0.8 and printed nominals its recess is 0.240.
+    shipped = bdt.pinion_recess_stack(1.02, 136.6345, 24.615)
+    assert shipped["pinion overall length"] == pytest.approx(-0.815)
+    assert shipped["shaft length"] == pytest.approx(0.0345)
+    assert sum(shipped.values()) == pytest.approx(0.2395, abs=1e-4)
+    assert sum(shipped.values()) < spec.SHAFT_END_RECESS_MIN_WORST
+    assert 1.02 - 0.03 * 25.4 >= spec.SHAFT_END_RECESS_MIN_WORST
     # The ruled g = 5.935 grew the boss and the shaft equally, keeping the old
-    # 0.32 recess: at the general grade the shaft end then stands proud.
+    # 0.32 recess: at the printed row the shaft end then stands proud.
     equal_growth_recess = 113.039505572 + 17.28 - 130.0
-    assert sum(bdt.pinion_recess_stack(equal_growth_recess).values()) < 0.25
+    assert sum(bdt.pinion_recess_stack(equal_growth_recess, 130.0, 17.28).values()) < 0.25
+    # #893: the leaf log carries both sums, since the asserts are import-time.
+    build = Path(bdt.__file__).read_text(encoding="utf-8")
+    assert "{_stack_text(PINION_PIN_EDGE_STACK)} >= {PINION_PIN_EDGE_MIN_WORST}" in build
+    assert "{_stack_text(PINION_RECESS_STACK)} >= {PINION_RECESS_MIN_WORST}" in build
+
+
+def test_boss_wall_is_the_ruled_option_c_exception() -> None:
+    # USER RULING 2026-09-25 (MHA-025 boss option C): the boss stays at the
+    # tooth root; its worst wall at the printed row over the bore's upper
+    # limit is under the 2.0 target and held above the 1.5 floor.
+    bore_lower, bore_upper = spec.deviations(spec.BORE_DIA_BAND)
+    printed_boss = round(spec.BOSS_DIA, spec.BOSS_DIA_PLACES)
+    worst = (printed_boss - 0.8 - (spec.BORE_DIA + bore_upper)) / 2.0
+    assert spec.BOSS_DIA == pytest.approx(spec.ROOT_DIA)
+    assert spec.BOSS_WALL_WORST == pytest.approx(worst) == pytest.approx(1.56, abs=1e-3)
+    assert spec.BOSS_WALL_FLOOR_MM <= spec.BOSS_WALL_WORST < 2.0
+    assert spec.DRAWING_PRECISION["BossProfile"]["BossDia"] == spec.BOSS_DIA_PLACES
+    assert "USER RULING 2026-09-25, MHA-025 boss option C" in Path(spec.__file__).read_text(
+        encoding="utf-8"
+    )

@@ -28,6 +28,7 @@ import math
 
 import _config
 import crank_hub_geometry
+from _fit_limits import deviations
 from _gtol_spec import CylinderFace
 from _hole_spec import FRACTIONAL_DRILL_MM, HoleSpec
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -113,6 +114,59 @@ BOSS_DIA = ROOT_DIA
 # chamfer that once imitated the photo's rounding had no function, and at its
 # general grade it could reach the bore (machinist review of 4d4e038e3).
 
+
+def printed_band_mm(places: int) -> float:
+    """The +/- the metric sheet PRINTS for a dimension shown at ``places``.
+
+    An accepted part is checked against the title block's printed row (.X
+    +/-0.8), not the inch grade behind it (0.03 in = 0.762): Codex P2 on #892.
+    """
+    return float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
+
+
+def printed_deviations(
+    model: float, places: int, limits: tuple[float, float] | None = None
+) -> tuple[float, float]:
+    """``(lower, upper)`` deviations from the MODEL value an accepted part may
+    show: the sheet prints the model rounded to ``places`` and checks the part
+    against that number's limits -- the printed general row unless the
+    dimension's own ``(lower, upper)`` limits (``deviations(band)``) are given."""
+    if limits is None:
+        grade = printed_band_mm(places)
+        limits = (-grade, grade)
+    lower, upper = limits
+    printed = round(model, places)
+    return printed + lower - model, printed + upper - model
+
+
+def ceil_to_places(value: float, places: int) -> float:
+    scale = 10.0**places
+    return math.ceil(round(value * scale, 6)) / scale
+
+
+def floor_to_places(value: float, places: int) -> float:
+    scale = 10.0**places
+    return math.floor(round(value * scale, 6)) / scale
+
+
+# USER RULING 2026-09-25, MHA-025 boss option C: the boss stays at the tooth
+# root, where a form cutter runs out onto it untouched and the photo reads it;
+# a boss proud of the root is scalloped by the cutter's arc up to the pin hole.
+# Its worst wall -- the printed diameter at its general row over the bore's
+# upper limit -- is therefore a ruled exception under the 2.0 wall target,
+# held above the 1.5 floor here, so an OD, tooth or bore change that eats
+# into the floor fails loud.
+BOSS_DIA_PLACES = 1
+BOSS_WALL_FLOOR_MM = 1.5
+_BORE_LOWER, _BORE_UPPER = deviations(BORE_DIA_BAND)
+_BOSS_DIA_LOWER, _BOSS_DIA_UPPER = printed_deviations(BOSS_DIA, BOSS_DIA_PLACES)
+BOSS_WALL_WORST = (BOSS_DIA + _BOSS_DIA_LOWER - (BORE_DIA + _BORE_UPPER)) / 2.0  # 1.560
+if BOSS_WALL_WORST < BOSS_WALL_FLOOR_MM:
+    raise AssertionError(
+        f"16T boss worst wall {BOSS_WALL_WORST:.3f} is under the {BOSS_WALL_FLOOR_MM} "
+        "floor of the 2026-09-25 option-C ruling"
+    )
+
 # Retention pin: a plain 1/8 in straight pin (stock drill rod) through the boss
 # and crankshaft, match-drilled at assembly with the pinion on its seat. The
 # drawing therefore governs the hole by its fit to the named pin, not by the
@@ -145,32 +199,42 @@ PIN_STATION_LAYOUT_ALLOWANCE_MM = 0.25
 # seat-gap range starts here.
 SEAT_FEELER_MM = 0.25
 # The shaft end stays recessed inside the boss in the worst case too.  The
-# overall length prints at OVERALL_LENGTH_PLACES, so the title block's general
-# grade for that many places is its band.  Nothing else can shallow the recess:
-# the pinion seats at the boss-north gap FLOOR (build_drive_train_assembly), so
-# the seat can only move it north, and the shaft length is +0/-0.40, so the
-# shaft can only get shorter.  The nominal recess is the 0.25 floor plus that
-# grade, rounded up to the next 0.01; a title-block change moves it.
+# overall length prints at OVERALL_LENGTH_PLACES, so an accepted pinion is as
+# short as the printed row allows (.X +/-0.8).  Nothing else can shallow the
+# recess: the pinion seats at the boss-north gap FLOOR
+# (build_drive_train_assembly), so the seat can only move it north, and the
+# shaft length is +0/-0.40, so the shaft can only get shorter.  Both lengths
+# are sized to print EXACTLY at their places, so no rounding of a printed
+# nominal can eat the margin (Codex P2 on #892): crankshaft_spec floors the
+# shaft length to SHAFT_LENGTH_PLACES, which leaves the nominal recess between
+# its minimum and one printed unit more, and the boss is sized for the most.
 OVERALL_LENGTH_PLACES = 1
-OVERALL_LENGTH_GRADE_MM = (
-    _config.title_block(f"linear_{OVERALL_LENGTH_PLACES}pl")["value_in"] * MM_PER_IN
-)  # 0.762
+SHAFT_LENGTH_PLACES = 1  # crankshaft_spec prints its Depth here and asserts it
+FACE_WIDTH_PLACES = 1
+OVERALL_LENGTH_GRADE_MM = printed_band_mm(OVERALL_LENGTH_PLACES)  # 0.8
 SHAFT_END_RECESS_MIN_WORST = 0.25
-SHAFT_END_RECESS = (
-    math.ceil(round((SHAFT_END_RECESS_MIN_WORST + OVERALL_LENGTH_GRADE_MM) * 100.0, 6))
-    / 100.0
-)  # 1.02
+SHAFT_END_RECESS_MIN = SHAFT_END_RECESS_MIN_WORST + OVERALL_LENGTH_GRADE_MM  # 1.05
+SHAFT_END_RECESS_MAX = SHAFT_END_RECESS_MIN + 10.0**-SHAFT_LENGTH_PLACES  # 1.15
 # With the pin at boss mid-length, its wall to the shaft end is half the boss
-# less the recess less the pin radius, so the boss follows from the three.
-BOSS_LENGTH = 2.0 * (
-    PIN_EDGE_TO_SHAFT_END_NOMINAL + SHAFT_END_RECESS + PIN_DIA / 2.0
-)  # 14.215
-OVERALL_LENGTH = FACE_WIDTH + BOSS_LENGTH  # 24.615
+# less the recess less the pin radius, so the boss follows from the three at
+# the deepest recess, and the overall length rounds UP to what it prints.
+OVERALL_LENGTH = ceil_to_places(
+    FACE_WIDTH
+    + 2.0 * (PIN_EDGE_TO_SHAFT_END_NOMINAL + SHAFT_END_RECESS_MAX + PIN_DIA / 2.0),
+    OVERALL_LENGTH_PLACES,
+)  # 24.9
+BOSS_LENGTH = round(OVERALL_LENGTH - FACE_WIDTH, OVERALL_LENGTH_PLACES)  # 14.5
+for _name, _value, _places in (
+    ("FACE_WIDTH", FACE_WIDTH, FACE_WIDTH_PLACES),
+    ("OVERALL_LENGTH", OVERALL_LENGTH, OVERALL_LENGTH_PLACES),
+):
+    if abs(_value - round(_value, _places)) > 1e-9:
+        raise AssertionError(f"{_name} {_value!r} does not print exactly at {_places} places")
 # Fidelity departure (#877): ch. 12 p. 19 shows the boss "a little over half"
-# a face long; this one is BOSS_LENGTH / FACE_WIDTH = 1.37 faces.  The 4.5 pin
-# wall alone needed 12.815 (1.23 faces) at the old 0.32 recess; the 1.02
-# recess that survives the general grade adds 1.40 more.
-PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0  # 17.5075 from the toothed (south) face
+# a face long; this one is BOSS_LENGTH / FACE_WIDTH = 1.39 faces.  The 4.5 pin
+# wall alone needed 12.815 (1.23 faces) at the old 0.32 recess; the recess
+# that survives the printed row and an exactly printed shaft adds the rest.
+PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0  # 17.65 from the toothed (south) face
 PIN_CLOCKING_DEG = 13.703608450714796  # = build_drive_train_assembly.PINION_SEED_DEG
 if PIN_STATION - PIN_DIA / 2.0 < FACE_WIDTH + 0.5:
     raise AssertionError("retention pin hole breaks into the pinion's tooth face")
@@ -256,11 +320,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # look, not a fit, and W15 sizes the boss so its general grade does. The end
 # break is a deburr: one place.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "GearBlank": {"FaceWidth": 1},
+    "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
     "BossProfile": {
         "OutsideDia": 2,
         "BoreDia": 3,
-        "BossDia": 1,
+        "BossDia": BOSS_DIA_PLACES,
         "OverallLength": OVERALL_LENGTH_PLACES,
     },
 }

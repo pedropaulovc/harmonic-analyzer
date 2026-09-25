@@ -70,10 +70,10 @@ def test_far_end_stations_restate_the_modelled_geometry() -> None:
     # The StationReference sketch drives each printed station from the same
     # globals as the features; these are the values the equations evaluate to.
     far = spec.SHAFT_LENGTH
-    assert far - (spec.JOURNAL_START + spec.JOURNAL_LENGTH) == pytest.approx(26.4345)
-    assert far - spec.JOURNAL_START == pytest.approx(95.8794, abs=1e-3)
-    assert far - spec.PIN_HOLE_HEIGHT == pytest.approx(123.0345)
-    assert far + spec.SHAFT_DOME_HEIGHT == pytest.approx(138.6345)
+    assert far - (spec.JOURNAL_START + spec.JOURNAL_LENGTH) == pytest.approx(26.6)
+    assert far - spec.JOURNAL_START == pytest.approx(96.0449, abs=1e-3)
+    assert far - spec.PIN_HOLE_HEIGHT == pytest.approx(123.2)
+    assert far + spec.SHAFT_DOME_HEIGHT == pytest.approx(138.8)
     assert part.DOME_SPHERE_R == pytest.approx(6.6710, abs=1e-3)
 
 
@@ -84,14 +84,20 @@ def test_notes_stay_within_rule_six() -> None:
 
 
 def test_face_shift_preserves_every_inboard_world_station() -> None:
-    # W15: the far end sits the 16T's recess inside its boss, so the length
-    # follows the pinion (crank_pinion_spec), not a literal.
+    # W15: the far end sits recessed inside the 16T's boss, so the length
+    # follows the pinion (crank_pinion_spec), not a literal -- floored to the
+    # places it prints, so the sheet's nominal is the model's (Codex P2, #892).
+    pinion = spec.crank_pinion_spec
     assert spec.SHAFT_LENGTH == pytest.approx(
-        spec.SEAT_PINION
-        + spec.crank_pinion_spec.OVERALL_LENGTH
-        - spec.crank_pinion_spec.SHAFT_END_RECESS
+        pinion.floor_to_places(
+            spec.SEAT_PINION + pinion.OVERALL_LENGTH - pinion.SHAFT_END_RECESS_MIN,
+            pinion.SHAFT_LENGTH_PLACES,
+        )
     )
-    assert spec.SHAFT_LENGTH == pytest.approx(136.6345, abs=1e-4)
+    assert spec.SHAFT_LENGTH == round(spec.SHAFT_LENGTH, pinion.SHAFT_LENGTH_PLACES)
+    assert spec.DRAWING_PRECISION["Shaft"]["Depth"] == pinion.SHAFT_LENGTH_PLACES
+    assert spec.SHAFT_LENGTH == pytest.approx(136.8)
+    assert pinion.SHAFT_END_RECESS_MIN <= spec.SHAFT_END_RECESS <= pinion.SHAFT_END_RECESS_MAX
     assert part.SEAT_PINION == spec.SEAT_PINION
     assert spec.JOURNAL_START == pytest.approx(40.755105572)
     assert spec.JOURNAL_END == pytest.approx(110.2)
@@ -103,7 +109,7 @@ def test_face_shift_preserves_every_inboard_world_station() -> None:
     assert not hasattr(part, "SEAT_ARM")
     assert -183.0 + part.SEAT_T12 == pytest.approx(-157.5)
     assert -183.0 + part.SEAT_PINION == pytest.approx(-69.960494428)
-    assert -183.0 + spec.SHAFT_LENGTH == pytest.approx(-46.3655, abs=1e-4)
+    assert -183.0 + spec.SHAFT_LENGTH == pytest.approx(-46.2)
 
 
 def test_integral_dome_is_the_only_outboard_shaft_projection() -> None:

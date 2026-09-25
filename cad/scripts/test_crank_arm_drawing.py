@@ -130,7 +130,7 @@ def test_assembly_keeps_common_face_and_established_inboard_stations() -> None:
     assert drive.REMOVABLE_Z0 - drive.CRANK_HUB_REAR_Z == pytest.approx(5.5)
     # W15: the shaft's length is crankshaft_spec's, never a restated literal.
     assert drive.CRANKSHAFT_LENGTH == crankshaft_spec.SHAFT_LENGTH
-    assert drive.CRANKSHAFT_Z0 + drive.CRANKSHAFT_LENGTH == pytest.approx(-46.3655, abs=1e-4)
+    assert drive.CRANKSHAFT_Z0 + drive.CRANKSHAFT_LENGTH == pytest.approx(-46.2)
 
 
 def test_stock_anchor_still_clamps_eye_without_bottoming() -> None:

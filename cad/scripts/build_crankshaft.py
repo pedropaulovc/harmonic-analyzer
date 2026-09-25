@@ -101,7 +101,7 @@ SEAT_T12 = 25.5
 # sits on. Machine z = CRANKSHAFT_Z0 + this. The recess of the shaft end inside
 # the pinion's boss (build_drive_train_assembly asserts it) is
 # SEAT_PINION + OVERALL_LENGTH - SHAFT_LENGTH.
-PINION_PIN_STATION_Y = SEAT_PINION + PINION_PIN_STATION  # 130.547 (+8 face shift)
+PINION_PIN_STATION_Y = SEAT_PINION + PINION_PIN_STATION  # 130.690 (+8 face shift)
 PINION_PIN_EDGE_TO_END = SHAFT_LENGTH - (PINION_PIN_STATION_Y + PINION_PIN_DIA / 2.0)
 if PINION_PIN_EDGE_TO_END < PIN_EDGE_TO_SHAFT_END_NOMINAL - 1e-9:
     raise AssertionError(
