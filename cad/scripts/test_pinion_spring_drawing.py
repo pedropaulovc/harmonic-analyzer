@@ -131,7 +131,9 @@ def test_views_are_projected_and_hidden_lines_removed() -> None:
     assert "set_hidden_lines_visible" not in source
     assert "add_feature_control_frame" not in source
     assert "add_datum_feature" not in source
-    assert 'process="DRILL"' in source
+    assert "process=HOLE_PROCESS" in source
+    assert drawing.HOLE_PROCESS == "#30 DRILL"
+    assert geometry.HOLE_DIA == pytest.approx(0.1285 * 25.4, abs=1e-3)  # No. 30 drill
     assert source.count("add_edge_dimension(") == 1  # the two hole locations
 
 
