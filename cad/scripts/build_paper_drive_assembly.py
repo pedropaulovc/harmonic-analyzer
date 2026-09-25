@@ -804,7 +804,9 @@ def _assert_chain_layout() -> None:
             f"_chain KNOB_CENTRE {CHAIN_KNOB_CENTRE} != -KNOB_SHAFT_XY"
             f" ({knob_pre[0]:.4f}, {knob_pre[1]:.4f})"
         )
-    from build_drive_train_assembly import X_CRANK, Y_CRANK
+    # cone_line, not the drive-train script: importing the script put the
+    # whole drive-train recipe on this assembly's cache key.
+    from cone_line import X_CRANK, Y_CRANK
 
     if CHAIN_CRANK_CENTRE != (-X_CRANK, Y_CRANK):
         raise RuntimeError(

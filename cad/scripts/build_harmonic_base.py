@@ -105,9 +105,8 @@ from cone_pivot_post_installation import (
     FRAME_FRONT_COLUMN_Z,
     MECHANISM_X_SHIFT,
     MECHANISM_Z_SHIFT,
-    POST_X_SHIFT,
-    POST_Z_SHIFT,
 )
+from cone_line import PIVOT_XZ as PIVOT_SCREW_XZ
 from build_cone_pivot_screw import (
     THREAD as PIVOT_THREAD,
     THREAD_TAIL_LEN as PIVOT_THREAD_ENGAGEMENT,
@@ -316,12 +315,8 @@ SERIAL_AREA_MM2 = 3.1029  # pinned from gen_base_serial_dxf's summary (net glyph
 
 # Cone swing hardware, blind from the TOP face. MACHINE-handed part coords.
 # The platform recipe owns the shared lock/stop contact calculation; the base
-# supplies its installed pivot station and exact purchased-hardware diameters.
-_FORMER_PIVOT_SCREW_XZ = (-89.16663981674521, 60.60437088764276)
-PIVOT_SCREW_XZ = (
-    _FORMER_PIVOT_SCREW_XZ[0] + POST_X_SHIFT,
-    _FORMER_PIVOT_SCREW_XZ[1] + POST_Z_SHIFT,
-)
+# supplies its installed pivot station (cone_line.PIVOT_XZ, the swing pivot
+# on the cone journal line) and exact purchased-hardware diameters.
 SWING_HARDWARE_GEOMETRY = swing_hardware_geometry(
     PIVOT_SCREW_XZ,
     lock_collar_dia=LOCK_COLLAR_DIA,

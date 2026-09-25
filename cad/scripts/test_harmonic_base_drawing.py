@@ -9,12 +9,12 @@ import pytest
 
 import build_harmonic_base as part
 import build_cone_swing_platform as platform
+import cone_pivot_post_installation
+import cone_line
 import harmonic_base_spec
 from cone_pivot_post_installation import (
     MECHANISM_X_SHIFT,
     MECHANISM_Z_SHIFT,
-    POST_X_SHIFT,
-    POST_Z_SHIFT,
 )
 from build_cone_lock_knob import COLLAR_DIA as KNOB_COLLAR_DIA
 from build_swing_stop_screw import SHANK_DIA as STOP_SHANK_DIA
@@ -239,13 +239,23 @@ def test_nameplate_seats_are_derived_from_the_plate_mount() -> None:
     assert part.NAMEPLATE_SEAT_SPEC.depth_mm - engagement >= 0.75
 
 
+def test_pivot_seat_reads_the_cone_line_pivot() -> None:
+    """The seat is the cone line's pivot, bit-for-bit the former hand-shifted sum.
+
+    The value reaches the part as a ``set_global`` string, so byte-identical
+    geometry needs the exact repr, not a tolerance.
+    """
+    assert part.PIVOT_SCREW_XZ is cone_line.PIVOT_XZ
+    assert repr(part.PIVOT_SCREW_XZ) == repr(
+        (-89.16663981674521 + 1.484, 60.60437088764276 + 35.415)
+    )
+    assert not hasattr(cone_pivot_post_installation, "POST_X_SHIFT")
+    assert not hasattr(cone_pivot_post_installation, "POST_Z_SHIFT")
+
+
 def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
     """Mirror the drive-train formula without importing its COM-heavy graph."""
     pivot_x, pivot_z = part.PIVOT_SCREW_XZ
-    assert part.PIVOT_SCREW_XZ == (
-        -89.16663981674521 + POST_X_SHIFT,
-        60.60437088764276 + POST_Z_SHIFT,
-    )
     assert part.STOP_SCREW_XZ == part.SWING_HARDWARE_GEOMETRY.stop_xz
     east_slope = (platform.EAST_HALF_S - platform.HALF_WIDTH_N) / platform.PLATE_LEN
     stop_local_z = -105.0

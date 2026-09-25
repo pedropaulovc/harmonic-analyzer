@@ -1372,8 +1372,8 @@ def test_assemblies_depend_on_assembly_helpers():
     [
         ("_assembly_patterns", {"drive_train", "frame", "magnifier", "paper_drive"}),
         ("_assembly_couplings", {"drive_train", "paper_drive"}),
-        # paper_drive imports the drive-train builder for X_CRANK/Y_CRANK.
-        ("_drive_train_explode", {"drive_train", "paper_drive"}),
+        # paper_drive reads X_CRANK/Y_CRANK from cone_line, not the builder.
+        ("_drive_train_explode", {"drive_train"}),
     ],
 )
 def test_specialized_assembly_helpers_have_exact_transitive_consumers(
@@ -1390,6 +1390,16 @@ def test_specialized_assembly_helpers_have_exact_transitive_consumers(
     )
     for stem in part_stems():
         assert helper not in _helper_names(f"build_{stem}.py"), stem
+
+
+def test_cone_line_consumers_do_not_import_the_drive_train_script():
+    """The base's pivot seat and the paper-drive crank sprocket read the pure
+    cone_line module; importing build_drive_train_assembly instead would put the
+    whole drive-train recipe on their cache keys (#880)."""
+    for script in ("build_harmonic_base.py", "build_paper_drive_assembly.py"):
+        deps = _helper_names(script)
+        assert "cone_line" in deps, script
+        assert "build_drive_train_assembly" not in deps, script
 
 
 def test_module_deps_are_transitive():
