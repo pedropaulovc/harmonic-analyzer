@@ -115,6 +115,29 @@ def test_mha135_pin_holes_share_one_axis_at_the_drive_train_pose() -> None:
     assert all(math.isclose(a, b, abs_tol=1e-9) for a, b in zip(rod_point, lever_point))
 
 
+def test_mha135_is_placed_on_the_shared_pin_axis_and_rides_the_rod() -> None:
+    # MHA-135 is a component, not only a mated joint: BDT inserts it with
+    # the rod's phase at the rod's pin station (both holes' common point),
+    # and locks it to the rod, so it joins the freed lift-rod spin family.
+    import inspect
+
+    from _assembly import _ALLOWED_FREE_STEMS
+    from pinion_lever_geometry import ROD_PIN_HOLE_FROM_END
+
+    source = inspect.getsource(drive)
+    assert source.count('"pinion-lever-pin"') == 1
+    assert 'f"Axis2@{lift_rod}"' in source
+    pin_point = [drive.LIFT_X, drive.LIFT_Y, drive.LIFT_ROD_Z0 + ROD_PIN_HOLE_FROM_END]
+    rod_point = _world(
+        [drive.LIFT_X, drive.LIFT_Y, drive.LIFT_ROD_Z0],
+        drive.LIFT_ROD_ROWS,
+        [0.0, 0.0, ROD_PIN_HOLE_FROM_END],
+    )
+    assert all(math.isclose(a, b, abs_tol=1e-9) for a, b in zip(pin_point, rod_point))
+    free = _ALLOWED_FREE_STEMS["drive-train"]
+    assert "pinion-lever-pin" in free and "pinion-lift-rod" in free
+
+
 def test_rod_phase_leaves_the_cams_parked_ecc_down() -> None:
     # The rod carries LEVER_TILT_DEG of phase; the cams must not: their world
     # rows stay the identity the park-gap and engage solves assume, tied back
@@ -241,10 +264,10 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
     )
 
 
-# MHA-060's 192.4 length carries the title-block .X band (Main 2026-09-24:
-# keep it loose).  The front end is located by the lever hub (the rod bottoms
-# in its bore), so the whole band lands at the back end, on top of the rod's
-# axial float.
+# MHA-060's 192.0 length (pinion_rig_layout.LIFT_ROD_LEN) carries the
+# title-block .X band (Main 2026-09-24: keep it loose).  The front end is
+# located by the lever hub (the rod bottoms in its bore), so the whole band
+# lands at the back end, on top of the rod's axial float.
 _ROD_LEN_BAND = 0.8
 
 
@@ -295,6 +318,11 @@ def test_torque_shaft_length_band_clears_both_ends() -> None:
     proud = rig.PHYSICAL_FRONT_BLOCK_OUTER_Z - front_end
     assert math.isclose(proud, 0.85, abs_tol=5e-3)
     assert math.isclose(proud + CAP_SAG, 2.05, abs_tol=5e-3)
+    # Option E-a: pinned to the straps, the shaft rides the cluster's end play
+    # from its back-flush drilling station to the front stop.
+    assert math.isclose(proud + _P_MAX, 1.20, abs_tol=5e-3)
+    assert math.isclose(proud + _P_MAX + CAP_SAG, 2.40, abs_tol=5e-3)
+    assert drive.BLOCK_DEPTH - _P_MAX >= 9.5
     # South of the front block nothing stands on the shaft's axis at any z.
     # The nearest body is the MHA-059 lever on the lift rod: its hub keeps
     # 8.95 radial clearance, and its arm points away from the shaft over the
@@ -303,7 +331,7 @@ def test_torque_shaft_length_band_clears_both_ends() -> None:
     rel = (drive.PIVOT_X - drive.LIFT_X, drive.PIVOT_Y - drive.LIFT_Y)
     hub_clear = math.hypot(*rel) - lever.HUB_OD / 2.0 - shaft_r
     assert math.isclose(hub_clear, 8.95, abs_tol=5e-3)
-    arm_r = max(drive.LEVER_ROD_DIA, drive.LEVER_ROD_TIP_DIA) / 2.0
+    arm_r = drive.LEVER_ROD_DIA / 2.0
     steps = 200
     for k in range(steps + 1):
         t = math.radians(
@@ -396,3 +424,75 @@ def test_cam_set_screw_hole_stays_clear_of_the_follower() -> None:
     engaged = _hole_to_contact_deg(drive.CAM_ENGAGE_ROTATION_DEG, drive._PHI_ENG)
     assert math.isclose(engaged, 83.52, abs_tol=0.05)
     assert math.isclose(engaged - half, 75.45, abs_tol=0.05)
+
+
+def test_set_pin_holes_sit_under_the_pose_straps_and_the_hardware_straps() -> None:
+    # Option E-a: MHA-062's holes are match-drilled through the MHA-056 cross
+    # holes with the shaft back-flush and the cluster at the back stop.  The
+    # model holds them under the POSE's strap mid-planes, so the saved model
+    # shows the pin axes through both parts; the hardware's strap stations
+    # carry 2 x STRAP_AIR less between them (the M2 pose-air rule).
+    import pinion_rig_layout as rig
+    from pinion_pivot_shaft_spec import PIN_HOLE_Z, SHAFT_LEN
+
+    t = drive.STRAP_T
+    model_mid = [(o + i) / 2.0 for o, i in zip(rig.STRAP_Z_OUTER, rig.STRAP_Z_INNER)]
+    for z_hole, mid in zip(PIN_HOLE_Z, model_mid):
+        assert math.isclose(rig.TORQUE_SHAFT_Z0 + z_hole, mid, abs_tol=1e-9)
+    from_back = [SHAFT_LEN - z for z in PIN_HOLE_Z]  # (front, back)
+    physical_back = drive.BLOCK_DEPTH + t / 2.0
+    physical_front = physical_back + t + rig.DRUM_LEN
+    assert math.isclose(from_back[1], physical_back, abs_tol=1e-9)
+    assert math.isclose(from_back[1], 14.75, abs_tol=1e-9)
+    assert math.isclose(from_back[0] - physical_front, 2.0 * rig.STRAP_AIR)
+    # Both holes stay well inside the body, clear of the crown roots.
+    assert min(PIN_HOLE_Z) >= 10.0
+    assert max(PIN_HOLE_Z) <= SHAFT_LEN - 10.0
+
+
+def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
+    # Option E-a: the pin's west end faces the MHA-104 cam collar, whose air
+    # to the strap foot is 0.38 at the printed worst case.  The longest pin
+    # (B18.8.2 length +/-0.010 in) fits inside the narrowest strap foot (the
+    # .X end-cap radius at its minimum), so driven flush-or-below on the west
+    # edge it is buried on the east edge too: it can never eat that air.
+    import pinion_strap_pin_spec as pin
+
+    assert pin.PIN_STANDARD == "ASME B18.8.2"
+    assert (pin.PIN_DIA, pin.PIN_LEN) == (25.4 / 16.0, 25.4 / 2.0)
+    # B18.8.2's recommended 1/16 hole is 0.062-0.065 in.
+    assert 0.062 * 25.4 <= pin.HOLE_DIA
+    assert pin.HOLE_MAX <= 0.065 * 25.4
+    assert math.isclose(pin.PIN_CENTRED_SUB_FLUSH, 0.35, abs_tol=1e-9)
+    assert math.isclose(pin.STRAP_FOOT_MIN_WIDTH, 2.0 * (drive.STRAP_R_END - 0.8))
+    assert pin.PIN_LEN + pin.PIN_LEN_BAND <= pin.STRAP_FOOT_MIN_WIDTH
+    assert pin.PIN_BURIED_MARGIN >= 0.4
+    # Engagement in each strap wall past the pivot bore.
+    assert pin.PIN_LEN / 2.0 - drive.STRAP_PIVOT_BORE / 2.0 >= 3.0
+    # U27 webs: strap faces and follower seat at the 2.0 target (the far
+    # strap face against the .XX-printed station, Codex #858 P2); the shaft
+    # ligament at the FULL general .XX offset meets the 1.5 floor, and a
+    # 0.25 V-block set-up clears the 2.0 target.
+    assert math.isclose(pin.STRAP_FACE_WEB_WORST, 2.316, abs_tol=5e-4)
+    assert pin.STRAP_FACE_WEB_WORST >= 2.0
+    assert pin.FOLLOWER_SEAT_LIGAMENT >= 2.0
+    assert math.isclose(pin.SHAFT_LIGAMENT_WORST, 1.831, abs_tol=5e-4)
+    assert pin.SHAFT_LIGAMENT_WORST >= 1.5
+    assert math.isclose(pin.SHAFT_LIGAMENT_QUARTER, 2.091, abs_tol=5e-4)
+
+
+def test_torque_shaft_is_phased_to_the_straps_and_swings_with_them() -> None:
+    # Option E-a: the shaft's pin-hole axis (local X) lies along the straps'
+    # cross holes at the park lean, and verify:soundness admits the shaft into
+    # the drive train's free swing family.
+    from _assembly import _ALLOWED_FREE_STEMS
+    from pinion_pivot_shaft_spec import SHAFT_DIA
+
+    strap_rows = drive.compose_rows(
+        drive.ROT_Y_180, drive.rot_z_rows(drive.STRAP_LEAN_DEG)
+    )
+    dot = sum(a * b for a, b in zip(drive.TORQUE_SHAFT_ROWS[0], strap_rows[0]))
+    assert math.isclose(abs(dot), 1.0, abs_tol=1e-12)
+    assert drive.TORQUE_SHAFT_ROWS[2] == [0.0, 0.0, 1.0]
+    assert "pinion-pivot-shaft" in _ALLOWED_FREE_STEMS["drive-train"]
+    assert SHAFT_DIA == drive.STRAP_PIVOT_BORE

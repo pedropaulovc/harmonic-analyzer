@@ -848,9 +848,9 @@ from pinion_cam_pin_geometry import (  # noqa: E402
 from pinion_lever_geometry import (  # noqa: E402
     CAP_SAG as LEVER_CAP_SAG,
     HUB_LEN as LEVER_HUB_LEN,
+    ROD_DIA as LEVER_ROD_DIA,
+    ROD_PIN_HOLE_FROM_END as LEVER_PIN_FROM_ROD_END,
     ROD_LEN as LEVER_ROD_LEN,
-    ROD_ROOT_DIA as LEVER_ROD_DIA,
-    ROD_TIP_DIA as LEVER_ROD_TIP_DIA,
     WALL_T as LEVER_WALL_T,
 )
 from pinion_handle_geometry import ROD_DIA as HANDLE_ROD_DIA  # noqa: E402
@@ -1449,10 +1449,9 @@ if abs((LEVER_Z - (LEVER_HUB_LEN / 2.0 - LEVER_WALL_T)) - LIFT_ROD_Z0) > 1e-9:
     raise AssertionError("lever hub bore floor off the lift rod's front end")
 # The parked lever shaft passes clear of the pinion ARBOR (PR7: the Ø8 steel
 # arbor replaced the drum's Ø6.35 stubs; it spans the lever's z band, so the
-# 3D clearance is the 2D distance from the arbor's (x, y) to the Ø6 rod-root
+# 3D clearance is the 2D distance from the arbor's (x, y) to the Ø6 rod's
 # axis line). Perpendicular form when the foot lands on the rod segment,
-# endpoint distance otherwise. Rod ROOT dia books the worst case (the PR7
-# taper only thins toward the tip).
+# endpoint distance otherwise. The rod is a straight Ø6 (ch25 img07).
 _LEV_T = math.radians(LEVER_TILT_DEG)
 _LEV_U = (-math.sin(_LEV_T), math.cos(_LEV_T))  # positive tips machine -X
 _LEV_REL = (APINION_X - LIFT_X, APINION_Y - LIFT_Y)  # root -> arbor axis
@@ -1464,7 +1463,7 @@ else:
     _LEV_STUB_D = math.hypot(
         _LEV_REL[0] - _end * _LEV_U[0], _LEV_REL[1] - _end * _LEV_U[1]
     )
-if _LEV_STUB_D < (ARBOR_DIA + max(LEVER_ROD_DIA, LEVER_ROD_TIP_DIA)) / 2.0 + 0.25:
+if _LEV_STUB_D < (ARBOR_DIA + LEVER_ROD_DIA) / 2.0 + 0.25:
     raise AssertionError("lever shaft crowds the pinion arbor")
 
 # --- pinion return spring (ch. 25, p.68-69): keeps the drum disengaged -------
@@ -1823,7 +1822,7 @@ for _step in range(_LEV_SWEEP_STEPS + 1):
             _LEV_REL[0] - _end * _u[0],
             _LEV_REL[1] - _end * _u[1],
         )
-    if _d < (ARBOR_DIA + max(LEVER_ROD_DIA, LEVER_ROD_TIP_DIA)) / 2.0 + 0.25:
+    if _d < (ARBOR_DIA + LEVER_ROD_DIA) / 2.0 + 0.25:
         raise AssertionError("lever shaft crowds the arbor mid-throw")
 _LEV_Z = (LEVER_Z - 3.0, LEVER_Z + 3.0)  # rod plane through the throw
 if (
@@ -1980,6 +1979,9 @@ def rot_z_rows(deg: float) -> list[list[float]]:
 # lever clamps parallel to it.  The cams keep their world phase (ecc straight
 # down) through an angle tie of the same LEVER_TILT_DEG back off the rod.
 LIFT_ROD_ROWS = rot_z_rows(LEVER_TILT_DEG)
+# Option E-a: the torque shaft's pin holes run along its local X, which must
+# lie along the straps' cross holes (their local X after Ry(180) . Rz(lean)).
+TORQUE_SHAFT_ROWS = rot_z_rows(STRAP_LEAN_DEG)
 LEVER_ROWS = rot_z_rows(LEVER_TILT_DEG)
 PINION_CAM_ROWS = IDENTITY
 # Rod Top-plane normal (local +Y) against the assembly Right normal (+X): the
@@ -2380,13 +2382,17 @@ async def build(adapter) -> dict[str, str]:
             label=f"pinion-pivot-block {tag}",
         )
         pinion_blocks.append(blk)
+    # Option E-a: the shaft is pinned to both straps through their cross
+    # holes, so it is inserted phased to them -- its local X (the pin-hole
+    # axis) lies along the straps' local X at the park lean.
     pivot_shaft = await place_component(
         adapter,
         "pinion-pivot-shaft",
         [PIVOT_X, PIVOT_Y, PIVOT_SHAFT_Z0],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
+        [0.0, 0.0, STRAP_LEAN_DEG],
+        TORQUE_SHAFT_ROWS,
         ground=False,
+        label="pinion-pivot-shaft (pinned to the straps, E-a)",
     )
     lift_rod = await place_component(
         adapter,
@@ -2438,6 +2444,18 @@ async def build(adapter) -> dict[str, str]:
         LEVER_ROWS,  # positive rest angle tips machine -X
         ground=False,
         label="pinion-lever (clamp hub on the lift rod front end)",
+    )
+    # MHA-135: the 1/16 pin driven through the match-drilled hub and rod holes.
+    # Its axis is its local X, so it takes the rod's phase and sits centred on
+    # the rod's "lever pin" station.
+    lever_pin = await place_component(
+        adapter,
+        "pinion-lever-pin",
+        [LIFT_X, LIFT_Y, LIFT_ROD_Z0 + LEVER_PIN_FROM_ROD_END],
+        [0.0, 0.0, LEVER_TILT_DEG],
+        LIFT_ROD_ROWS,
+        ground=False,
+        label="pinion-lever-pin (MHA-135 through hub and rod)",
     )
     grip_crossrod = await place_component(
         adapter,
@@ -3586,15 +3604,44 @@ async def build(adapter) -> dict[str, str]:
         reledger_to_solved(adapter, cyl)
 
     # =============== alignment-pinion swing group (p2 engage DOF) ==============
-    # The two straps + the pinion drum swing as ONE group on the torque shaft to
-    # mesh the cylinder train (ch.25, p.66); parked DISENGAGED (p.68 "gap").
-    # Statics first: the pivot blocks and torque shaft are base-bolted mounts at
-    # their authored transforms -> locked once to the fixed seed arbor. The
-    # lift rod is NOT static any more (PR8): it journals in the blocks' raised
-    # west bores as a revolute below, carrying the cams + lever.
+    # The two straps + the pinion drum swing as ONE group to mesh the cylinder
+    # train (ch.25, p.66); parked DISENGAGED (p.68 "gap").  Option E-a pins
+    # both straps to the torque shaft, so the shaft swings with them in the
+    # blocks' pivot bores.  Statics first: the pivot blocks are base-bolted
+    # mounts at their authored transforms -> locked once to the fixed seed
+    # arbor. The lift rod is NOT static any more (PR8): it journals in the
+    # blocks' raised west bores as a revolute below, carrying the cams + lever.
     for blk in pinion_blocks:
         await _lock_static(adapter, blk, arbor)
-    await _lock_static(adapter, pivot_shaft, arbor)
+    # The shaft's axis sits on the blocks' pivot bores and its station is the
+    # authored one (the cone-platform pivot idiom: an axis held off two
+    # assembly planes); only its spin is left, and the pin tie to the front
+    # strap below takes that.
+    ps_o = _org(adapter, pivot_shaft)
+    await distance_driver(
+        adapter,
+        named_ref(f"Axis1@{pivot_shaft}", "AXIS"),
+        named_ref("Right Plane", "PLANE"),
+        ps_o[0],
+        label=f"torque shaft axis X d={abs(ps_o[0]):.2f}",
+        verify=(pivot_shaft, ps_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Axis1@{pivot_shaft}", "AXIS"),
+        named_ref("Top Plane", "PLANE"),
+        ps_o[1],
+        label=f"torque shaft axis Y d={abs(ps_o[1]):.2f}",
+        verify=(pivot_shaft, ps_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Front Plane@{pivot_shaft}", "PLANE"),
+        named_ref("Front Plane", "PLANE"),
+        ps_o[2],
+        label=f"torque shaft axial d={abs(ps_o[2]):.2f}",
+        verify=(pivot_shaft, ps_o),
+    )
     await _lock_static(adapter, spring, arbor)
     for scr in [block_screw, *foot_screws]:
         await _lock_static(adapter, scr, arbor)
@@ -3709,6 +3756,27 @@ async def build(adapter) -> dict[str, str]:
         # Same on-axis-origin blindness as the front strap (#154): parallel is
         # satisfied at either lean, so witness the arbor bore at the strap top.
         witness_local=[0.0, STRAP_C2C, 0.0],
+    )
+    # Option E-a set pins: the shaft's pin holes and the straps' cross holes
+    # share an axis (their local X), so the pin tie is the back strap's own
+    # rigid-group idiom -- the shaft's Right plane parallel to the front
+    # strap's.  The front strap's swing is the freed DOF, so the shaft now
+    # turns with the group in the block bores.  Its origin is on the swing
+    # axis (#154 blindness), so a point on the pin-hole axis at the shaft's
+    # surface witnesses the phase.
+    shaft_x = component_transform(adapter, pivot_shaft)[0:3]
+    strap_x = component_transform(adapter, fb)[0:3]
+    if abs(abs(sum(a * b for a, b in zip(shaft_x, strap_x))) - 1.0) > 1e-6:
+        raise AssertionError(
+            "torque-shaft pin holes are not phased to the straps' cross holes"
+        )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{pivot_shaft}", "PLANE"),
+        named_ref(f"Right Plane@{fb}", "PLANE"),
+        label="torque shaft pinned to the front strap (E-a set pin)",
+        verify=(pivot_shaft, ps_o),
+        witness_local=[STRAP_PIVOT_BORE / 2.0, 0.0, 0.0],
     )
     # Cam-follower pins (PR8): pressed in each strap's blind WEST-EDGE seat
     # (Axis3), so they RIDE the swing group -- coaxial + the seat-bottom axial
@@ -3852,6 +3920,33 @@ async def build(adapter) -> dict[str, str]:
         label="lever clamp phase (parallel to the rod: coaxial pin holes)",
         verify=(lever, lev_o),
         witness_local=[0.0, LEVER_LEN, 0.0],
+    )
+    # MHA-135 locked to the rod: on the rod's pin-hole axis (Axis2), centred
+    # across it (Right planes coincident -- both contain the rod axis), and
+    # anti-spun about its own axis by a Top-plane parallel.  Rigid with the
+    # rod, it turns with the freed lift-rod spin.
+    lp_o = _org(adapter, lever_pin)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{lever_pin}", "AXIS"),
+        named_ref(f"Axis2@{lift_rod}", "AXIS"),
+        label="MHA-135 on the lift rod's pin-hole axis",
+        verify=(lever_pin, lp_o),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"Right Plane@{lever_pin}", "PLANE"),
+        named_ref(f"Right Plane@{lift_rod}", "PLANE"),
+        label="MHA-135 centred across the lift rod",
+        verify=(lever_pin, lp_o),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Top Plane@{lever_pin}", "PLANE"),
+        named_ref(f"Top Plane@{lift_rod}", "PLANE"),
+        label="MHA-135 anti-spin (parallel to the rod)",
+        verify=(lever_pin, lp_o),
+        witness_local=[0.0, 0.0, 1.0],
     )
     # Pinion drum: journaled in the straps' top bores -- coaxial on the front
     # strap's Axis2 + an axial seat. Its free spin (real: the zeroing input) is

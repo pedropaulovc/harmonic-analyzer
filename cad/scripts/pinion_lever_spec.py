@@ -2,7 +2,7 @@ r"""Pure-data dimensional contract shared by the pinion engage lever and its
 manufacturing drawing.
 
 PURE DATA, no SolidWorks/COM imports.  A hub slipped over the lift rod's front
-end, with a tapered grip rod rising out of it -- turned steel.  The MHA-135 pin
+end, with a straight Ø6 grip rod rising out of it -- turned steel.  The MHA-135 pin
 (U36) match-drilled through hub and rod at assembly carries the drive torque, so
 the bore is a plain slip fit.  The nominals drive the part's named equation
 globals AND the drawing's coordinate math; the marked-dimension map keeps the
@@ -22,9 +22,8 @@ from pinion_lever_geometry import (
     PIN_HOLE_DIA as PIN_HOLE_DIA,
     PIN_HOLE_FROM_MOUTH as PIN_HOLE_FROM_MOUTH,
     PIN_HOLE_Z as PIN_HOLE_Z,
+    ROD_DIA as ROD_DIA,
     ROD_LEN as ROD_LEN,
-    ROD_ROOT_DIA as ROD_ROOT_DIA,
-    ROD_TIP_DIA as ROD_TIP_DIA,
     ROD_Y0 as ROD_Y0,
     WALL_T as WALL_T,
 )
@@ -45,10 +44,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarrelProfile": {"HubOd", "HubBore"},
     "Barrel": {"BoreDepth"},
     "Wall": {"EndWall"},
-    # The taper prints as root and tip diameters over the 86.0 height.  The
-    # r7 render showed the 0.7-degree half-angle's extension line running to
-    # the cone's virtual apex, 163 mm below the root and off the sheet.
-    "RodProfile": {"RodTipY", "RodTipDia", "RodRootDia"},
+    # The straight grip rod prints its one diameter and its 86.0 height.
+    "RodProfile": {"RodTipY", "RodDia"},
     "CapProfile": {"CapR"},
     "PinHoleProfile": {"PinHoleDia"},
     # Rule 2 reference sketches: the grip axis and the pin-hole station are
@@ -67,7 +64,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BarrelProfile": {"HubOd": 1, "HubBore": 3},
     "Barrel": {"BoreDepth": 1},
     "Wall": {"EndWall": 2},
-    "RodProfile": {"RodTipY": 1, "RodTipDia": 1, "RodRootDia": 1},
+    "RodProfile": {"RodTipY": 1, "RodDia": 1},
     "CapProfile": {"CapR": 1},
     "PinHoleProfile": {"PinHoleDia": 2},
     "GripStationReference": {"GripFromB": 2},

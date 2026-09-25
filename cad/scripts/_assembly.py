@@ -609,6 +609,8 @@ _FLIP_INVERT: frozenset[str] = frozenset(
         "swing stop screw datum Z",
         "tip block axial seat",
         "tip bushing axial seat",
+        # Option E-a: the pinned torque shaft's axial station (pc-ea run).
+        "torque shaft axial",
     }
 )
 
@@ -1644,7 +1646,11 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
         "pinion-cam-pin",
         "pinion-handle",
         "pinion-lever",
+        # MHA-135: locked to the lift rod, it turns with the freed rod spin.
+        "pinion-lever-pin",
         "pinion-lift-rod",
+        # Option E-a: pinned to both straps, the torque shaft swings with them.
+        "pinion-pivot-shaft",
     ),
     "magnifier": (
         "lever-wire",

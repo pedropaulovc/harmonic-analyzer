@@ -18,7 +18,10 @@ the isometric:
 * LEFT -- the seat flank, where the blind O4 seat mouth is a SOLID circle:
   its size, its station through the bar and the bar thickness; plus the
   (43.0) overall as a reference, so nobody saws the bar short of the two
-  end radii the 28.00 centre distance does not include.
+  end radii the 28.00 centre distance does not include.  The option E-a
+  set-pin cross hole's mouth is a solid circle here too, located by its
+  station from broad face A and its height from the pivot-bore wall (the
+  part's hidden CrossHoleAxisReference sketch, shown in this view only).
 * SECTION B-B -- a cut through the follower-seat axis showing its legitimate
   blind depth and solid flat bottom.
 
@@ -54,11 +57,15 @@ from _drawing_common import (
     set_reference_dimension,
     stamp_drawing_summary,
 )
+from _drawing_hidden_sketches import (
+    curate_view_dimensions as curate_hidden_owner_dimensions,
+)
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from pinion_bracket_spec import (
     ARBOR_BORE,
     C2C,
+    CROSS_HOLE_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIN_DROP,
@@ -137,9 +144,28 @@ LEFT_KEEP = {
     "PinSeatCy": (0.130, 0.125),
     # r6 eye-pass: beside the view its widest callout line ran across the
     # flank.  Converged-r7: above the view the leader crossed the 9.0 thickness
-    # dimension, so the callout sits below-right and its leader rises past the
-    # text's left end to the seat, crossing only the bottom outline.
-    "PinSeatDia": (0.125, 0.082),
+    # dimension.  pc-ra eye pass (Main, nit C): below-right, its leader ran
+    # a few pixels from the cross-hole callout's and grazed the cross hole's
+    # rim, so the callout sits up-right in the lane between the views --
+    # right of the (43.0), above the 7.000, under the arbor finish leader --
+    # and its leader comes down onto the seat from the upper right.
+    "PinSeatDia": (0.156, 0.170),
+    # Option E-a: the cross-hole mouth sits on the flank at the pivot-bore
+    # axis height, below the seat.  pc-ea eye pass: left of the view its
+    # 32-character line ran off the sheet's left border, so the callout sits
+    # in the clear field under the view, left of the follower-seat callout's
+    # underline, and its leader rises to the mouth.
+    "CrossHoleDia": (0.053, 0.045),
+    # Codex #858 P2, user ruling (a): both through-thickness stations run from
+    # broad face A (the view's left edge) -- the cross hole's under the view,
+    # left of both callout leaders, the seat's above it, under the 9.0 -- and
+    # the cross hole's height from the pivot-bore wall sits in the clear field
+    # left of the view.  pc-ra eye pass: centred between its witnesses the
+    # seat's 4.50 was cut by the seat-axis witness, so its text sits left of
+    # face A, outside the extension lines like the 3.18.
+    "CrossHoleCz": (0.0754, 0.099),
+    "PinSeatCz": (0.058, 0.2025),
+    "CrossHoleFromBoreWall": (0.058, 0.119),
 }
 SECTION_CENTER = (0.350, 0.115)
 # Right of the seat's witness lines (x <= 0.3394), callout below the value:
@@ -167,7 +193,8 @@ PIVOT_FINISH_LEADER = (
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU",
     "ArborBoreDia": "REAM THRU",
-    "PinSeatDia": "FOLLOWER SEAT FOR MHA-116\nCENTRED ON THICKNESS\nBLIND FLAT-BOTTOM\nREAM",
+    "PinSeatDia": "FOLLOWER SEAT FOR MHA-116\nBLIND FLAT-BOTTOM\nREAM",
+    "CrossHoleDia": CROSS_HOLE_CALLOUT,
 }
 PIN_SEAT_DEPTH_CALLOUT = "FOLLOWER SEAT\nREAM DEPTH FROM\nENTRY FACE"
 
@@ -302,7 +329,9 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="strap face",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    left_annotations = curate_view_dimensions(
+    # The part saves CrossHoleAxisReference hidden, so the side view imports
+    # through the hidden-owner form, which shows that sketch here only.
+    left_annotations = curate_hidden_owner_dimensions(
         adapter,
         left,
         keep=LEFT_KEEP,
