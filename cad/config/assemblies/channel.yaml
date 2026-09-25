@@ -1,0 +1,49 @@
+# channel assembly contract -- per-assembly build data read through
+# cad/scripts/_assembly_contract.py. Editing this file re-keys ONLY the channel
+# closure (its assembly leaf, its verify_soundness leaf, and whatever consumes
+# its saved .SLDASM), never a sibling assembly.
+#
+# flip_invert: _assembly._flip_sig signatures (+ " @<diag>" orientation suffix
+#   for a rotation/mirror twin) whose distance driver seats OPPOSITE the plain
+#   sign rule. List every signature THIS build queries that needs inverting; a
+#   signature shared with another assembly goes in both files. A build that
+#   lands a mate on the wrong side fails with "flip-seed MISS ... toggle sig",
+#   naming this file; the end-of-build seed audit logs every queried signature
+#   and warns on entries no mate queried.
+# allowed_free_stems: the exact component families allowed to read
+#   under-constrained (freed operational DOF + everything coupled to them).
+#   Shared by the incremental refresh and verify:soundness.
+# required_free_stems: one family per freed DOF that must itself read
+#   under-constrained (verify:soundness necessity).
+# free_dof (+ free_dof_per_active_channel x active channels): the operational
+#   DOF the saved model ships free (verify:soundness).
+flip_invert:
+  - frame side screw datum x
+  - frame side screw datum y
+  - frame side screw datum z
+  - fulcrum shaft datum x
+  - fulcrum shaft datum y
+  - fulcrum shaft datum z
+  # (was "pivot ball mount datum x/y/z" -- the rocker pivot stands became
+  # pivot-bracket 2026-09; same datum-locate idiom, same learned sides)
+  - pivot bracket datum x
+  - pivot bracket datum y
+  - pivot bracket datum z
+  - pivot bracket datum y @npn
+allowed_free_stems:
+  - rocker-arm
+  - connecting-rod
+  - amplitude-bar
+  - channel-lever
+# Rocker swing + rod follow + bar amplitude, plus the channel lever which
+# must read under-constrained WITH the chain (closed by the J5 foot-on-arc
+# coupling off the rocker -- a frozen lever means the coupling died).
+required_free_stems:
+  - rocker-arm
+  - connecting-rod
+  - amplitude-bar
+  - channel-lever
+# 3 DOF per active channel: rocker swing + connecting-rod follow +
+# amplitude-bar slide.
+free_dof: 0
+free_dof_per_active_channel: 3
