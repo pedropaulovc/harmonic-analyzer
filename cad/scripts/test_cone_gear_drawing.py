@@ -226,33 +226,40 @@ def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> 
 
 
 def test_notes_define_only_the_approved_plain_bore_attachment() -> None:
+    common = [
+        "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
+        "MAKE ONE GEAR FROM EACH SHEET IN THIS PACKAGE.",
+        "PLAIN BORE, NO KEYWAY; SOLDER, SILVER-BRAZE OR LOCTITE 638/648 TO "
+        "MHA-014 AT ASSEMBLY.",
+    ]
+    # Named exceptions print only on the sheets they cover, with no ruling ids;
+    # T006 carries both on one line.
+    cr_line = (
+        "CONTACT RATIO BELOW 1.1 ON T006-T042: ACCEPTED EXCEPTION (BOOK FIDELITY)."
+    )
+    both_line = (
+        "CONTACT RATIO BELOW 1.1, ROOT-TO-BORE WEB 0.62 MIN: "
+        "ACCEPTED EXCEPTIONS (BOOK FIDELITY)."
+    )
     for teeth in spec.CONFIGURATION_TEETH:
         text = notes.drawing_notes(teeth)
         lines = text.splitlines()
+        # Policy rule 6: at most four short lines on every sheet.
+        assert len(lines) <= 4
         assert all(len(line) <= 90 for line in lines)
-        # Named exceptions print only on the sheets they cover, one short
-        # line each like MHA-142/139, with no ruling ids.
-        cr_line = (
-            "CONTACT RATIO BELOW 1.1 ON T006-T042: ACCEPTED EXCEPTION (BOOK FIDELITY)."
-        )
-        assert (cr_line in lines) == (teeth <= 42)
-        web_line = (
-            "ROOT-TO-BORE WEB 0.62 MIN, BELOW 1.5: ACCEPTED EXCEPTION (BOOK FIDELITY)."
-        )
-        assert (web_line in lines) == (teeth == 6)
-        assert len(lines) == 4 + (teeth <= 42) + (teeth == 6)
+        expected = list(common)
+        if teeth == 6:
+            expected.append(both_line)
+        elif teeth <= 42:
+            expected.append(cr_line)
+        assert lines == expected
         assert "U4" not in text and "BY DESIGN" not in text
-        assert "PLAIN BORE, NO KEYWAY" in text
-        assert "BOND TO MHA-014 SHAFT SEAT AT ASSEMBLY" in text
-        assert notes.ATTACHMENT_PROCESS in text
-        assert notes.ATTACHMENT_ALTERNATIVE in text
-        assert "ACCEPTABLE BONDS:" in text
+        assert notes.ATTACHMENT in text
         for unsupported in ("PIN", "SET SCREW", "HUB"):
             assert unsupported not in text
         for retired in ("RUNOUT", "DATUM", "+/-", "PITCH DIA="):
             assert retired not in text
-    assert notes.ATTACHMENT_PROCESS == "SOLDER OR SILVER-BRAZE"
-    assert notes.ATTACHMENT_ALTERNATIVE == "LOCTITE 638 OR LOCTITE 648"
+    assert notes.ATTACHMENT == "SOLDER, SILVER-BRAZE OR LOCTITE 638/648"
     assert notes.CYLINDER_MATE_NUMBER == _config.parts("cylinder-gear")["number"]
     assert notes.SHAFT_MATE_NUMBER == _config.parts("cone-gear-shaft")["number"]
     source = Path(part.__file__).read_text(encoding="utf-8")
