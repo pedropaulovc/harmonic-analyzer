@@ -28,6 +28,7 @@ from _drawing_common import (
     _spread_balloons,
     add_component_bom_balloons,
     check_drawing_layout,
+    collect_layout_elements,
     create_blank_drawing_sheets,
     finalize_drawing,
     insert_bom_table,
@@ -881,31 +882,102 @@ def _caption_under(adapter: Any, view: Any, text: str, *, label: str) -> None:
     )
 
 
-def _balloon_leader(annotation: Any, name: str) -> LeaderSegment:
-    """A balloon's straight leader: balloon end -> attachment, sheet meters."""
-    points = tuple(float(value) for value in (annotation.GetLeaderPointsAtIndex(0) or ()))
-    if len(points) < 6:
-        raise RuntimeError(f"{name}: balloon leader is unreadable: {points!r}")
-    return LeaderSegment(name, "note", points[0], points[1], points[-3], points[-2])
+# Readback drift above this is logged loud: the leader start SolidWorks
+# reports should sit on the balloon rim facing the attachment.
+LEADER_START_DRIFT_WARN_M = 0.001
 
 
-def _uncross_balloon_leaders(adapter: Any, balloons: list[Any], *, label: str) -> None:
-    """Swap the ring slots of any two balloons whose leaders cross.
-
-    Swapping the slots of two crossing straight leaders strictly shortens
-    their summed length (triangle inequality), so the swaps cannot cycle and
-    the loop ends crossing-free. It can need more than one swap per balloon,
-    though: integ1 (leaf 20260925T000314Z-1-c91d9a33) left items 11/35
-    crossed on sheet 4 with the old one-pass-per-balloon cap. The cap is now
-    quadratic, and any crossing left is logged by name so the next failure is
-    diagnosable from task.log alone.
-    """
+def _balloon_annotations(balloons: list[Any]) -> dict[str, Any]:
+    """Each balloon's ``IAnnotation`` keyed by its note name (``DetailItemN``)."""
     annotations = {}
     for balloon in balloons:
         note = _early_bound(balloon, "INote")
         annotations[str(note.GetName() or "")] = _early_bound(
             note.GetAnnotation(), "IAnnotation"
         )
+    return annotations
+
+
+def _balloon_rim_start(
+    annotation: Any, name: str
+) -> tuple[tuple[float, float], tuple[float, float], tuple[float, float]]:
+    """``(rim start, attachment, reported start)`` of one balloon, sheet meters.
+
+    The attachment (last leader point) is stable: integ1's verify event and its
+    audit read the same attachments 90 s apart. The leader START is not: after
+    ``SetPosition`` + ``EditRebuild3``, ``GetLeaderPointsAtIndex`` can still
+    report the old start, which is how integ1 (leaf 20260925T000314Z-1-c91d9a33)
+    missed a 375/385 crossing its audit then found, while integ2 caught the same
+    pair. So the start is rebuilt from ``GetPosition`` (what was just set): the
+    rim point on the line toward the attachment.
+    """
+    points = tuple(float(value) for value in (annotation.GetLeaderPointsAtIndex(0) or ()))
+    if len(points) < 6:
+        raise RuntimeError(f"{name}: balloon leader is unreadable: {points!r}")
+    centre = tuple(float(value) for value in annotation.GetPosition())[:2]
+    attach = (points[-3], points[-2])
+    reported = (points[0], points[1])
+    dx, dy = attach[0] - centre[0], attach[1] - centre[1]
+    reach = math.hypot(dx, dy)
+    radius = BALLOON_DIAMETER / 2.0
+    if reach <= radius:
+        return centre, attach, reported
+    start = (centre[0] + dx * radius / reach, centre[1] + dy * radius / reach)
+    return start, attach, reported
+
+
+def _balloon_leader(annotation: Any, name: str) -> LeaderSegment:
+    """A balloon's straight leader from current state: rim -> attachment."""
+    start, attach, _ = _balloon_rim_start(annotation, name)
+    return LeaderSegment(name, "note", *start, *attach)
+
+
+def _swap_balloon_slots(adapter: Any, a: Any, b: Any, *, label: str, names: str) -> None:
+    pa = tuple(float(value) for value in a.GetPosition())
+    pb = tuple(float(value) for value in b.GetPosition())
+    if not (a.SetPosition(*pb) and b.SetPosition(*pa)):
+        raise RuntimeError(f"{label}: cannot swap balloons {names}")
+    rebuild_drawing(adapter, label=f"{label} swap")
+
+
+def _log_leader_start_drift(annotations: dict[str, Any], *, label: str) -> None:
+    """Record GetPosition-derived vs reported leader starts; WARN on drift."""
+    rows = []
+    for name, annotation in annotations.items():
+        start, _, reported = _balloon_rim_start(annotation, name)
+        drift = math.hypot(start[0] - reported[0], start[1] - reported[1])
+        rows.append(
+            (
+                name,
+                round(start[0] * 1000.0, 2),
+                round(start[1] * 1000.0, 2),
+                round(reported[0] * 1000.0, 2),
+                round(reported[1] * 1000.0, 2),
+                round(drift * 1000.0, 2),
+            )
+        )
+    _telemetry.event("drawing.balloon_leader_start", label=label, starts=tuple(rows))
+    stale = [row for row in rows if row[5] > LEADER_START_DRIFT_WARN_M * 1000.0]
+    if not stale:
+        _telemetry.info(f"{label}: {len(rows)} balloon leader start(s) match their positions")
+        return
+    listed = ", ".join(f"{row[0]} {row[5]:.2f} mm" for row in stale)
+    _telemetry.warn(
+        f"{label}: {len(stale)} balloon leader start(s) read off their set positions: {listed}"
+    )
+
+
+def _uncross_balloon_leaders(adapter: Any, balloons: list[Any], *, label: str) -> None:
+    """Swap the ring slots of any two balloons whose leaders cross.
+
+    Swapping the slots of two crossing straight leaders strictly shortens
+    their summed length (triangle inequality), so the swaps cannot cycle; the
+    count is bounded by the inversions, under the quadratic cap. Leaders are
+    built from ``GetPosition`` (see ``_balloon_rim_start``), and the reported
+    starts are logged against them so a stale readback shows in task.log.
+    """
+    annotations = _balloon_annotations(balloons)
+    _log_leader_start_drift(annotations, label=label)
     swaps = []
     crossings = ()
     for _attempt in range(len(annotations) ** 2):
@@ -914,18 +986,80 @@ def _uncross_balloon_leaders(adapter: Any, balloons: list[Any], *, label: str) -
         if not crossings:
             break
         first, second = crossings[0].a.label, crossings[0].b.label
-        a, b = annotations[first], annotations[second]
-        pa = tuple(float(value) for value in a.GetPosition())
-        pb = tuple(float(value) for value in b.GetPosition())
-        if not (a.SetPosition(*pb) and b.SetPosition(*pa)):
-            raise RuntimeError(f"{label}: cannot swap balloons {first} and {second}")
-        adapter.currentModel.EditRebuild3()
+        _swap_balloon_slots(
+            adapter,
+            annotations[first],
+            annotations[second],
+            label=label,
+            names=f"{first} and {second}",
+        )
         swaps.append((first, second))
     _telemetry.event("drawing.balloon_uncross", label=label, swaps=tuple(swaps))
     _telemetry.info(f"{label}: uncrossed balloon leaders with {len(swaps)} swap(s)")
     if crossings:
         pairs = ", ".join(f"{c.a.label}/{c.b.label}" for c in crossings)
         _telemetry.warn(f"{label}: leaders still cross after {len(swaps)} swap(s): {pairs}")
+
+
+def _audit_leader_segments(adapter: Any, sheet_name: str) -> list[LeaderSegment]:
+    """The layout audit's own leader read of one sheet, after activating it."""
+    _activate_sheet(adapter, sheet_name)
+    _elements, segments, _region = collect_layout_elements(
+        adapter, layout=SHEET_LAYOUTS[sheet_name]
+    )
+    return segments
+
+
+def _balloon_crossings(
+    segments: list[LeaderSegment], annotations: dict[str, Any]
+) -> list[tuple[str, str]]:
+    """Crossing balloon pairs by note name; audit labels read ``DetailItemN '11'``."""
+    pairs = []
+    for crossing in find_leader_leader_crossings(segments):
+        first = crossing.a.label.split(" ", 1)[0]
+        second = crossing.b.label.split(" ", 1)[0]
+        if first in annotations and second in annotations:
+            pairs.append((first, second))
+    return pairs
+
+
+def _final_balloon_uncross(
+    adapter: Any,
+    sheet_name: str,
+    annotations: dict[str, Any],
+    *,
+    read_segments: Callable[[Any, str], list[LeaderSegment]] = _audit_leader_segments,
+) -> None:
+    """Uncross a sheet's balloons on the audit's geometry, just before the audit.
+
+    One predicate, one reader: the audit's ``collect_layout_elements`` after
+    ``_activate_sheet``, exactly as ``_check_package_layout`` will read it. A
+    crossing the placement-time pass could not see (a stale leader, a view
+    regenerated since) is swapped here; one that survives the quadratic cap
+    raises by name. Crossings with non-balloon leaders are the audit's to report.
+    """
+    swaps = []
+    pairs: list[tuple[str, str]] = []
+    for _attempt in range(len(annotations) ** 2):
+        pairs = _balloon_crossings(read_segments(adapter, sheet_name), annotations)
+        if not pairs:
+            break
+        first, second = pairs[0]
+        _swap_balloon_slots(
+            adapter,
+            annotations[first],
+            annotations[second],
+            label=sheet_name,
+            names=f"{first} and {second}",
+        )
+        swaps.append((first, second))
+    _telemetry.event("drawing.balloon_final_uncross", sheet=sheet_name, swaps=tuple(swaps))
+    _telemetry.info(f"{sheet_name}: final uncross on audit geometry, {len(swaps)} swap(s)")
+    if pairs:
+        listed = ", ".join(f"{a}/{b}" for a, b in pairs)
+        raise RuntimeError(
+            f"{sheet_name}: balloon leaders still cross after {len(swaps)} swap(s): {listed}"
+        )
 
 
 def _head_edge(adapter: Any, view: Any, instance: str, *, label: str) -> Any | None:
@@ -1626,7 +1760,8 @@ def _place_cluster_sheet(
     *,
     bom_name: str,
     items: dict[str, str],
-) -> None:
+) -> dict[str, Any]:
+    """Place one exploded cluster sheet; return its balloons by note name."""
     number = CLUSTER_SHEETS[cluster]
     _activate_sheet(adapter, SHEET_NAMES[number - 1])
     label = f"{cluster} exploded isometric"
@@ -1686,6 +1821,7 @@ def _place_cluster_sheet(
         f"{CLUSTER_TITLES[cluster]} - EXPLODED ISOMETRIC "
         f"{int(scale[0])}:{int(scale[1])}; ITEMS PER SHEET 2",
     )
+    return _balloon_annotations(balloons)
 
 
 def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
@@ -1785,11 +1921,16 @@ def _place_package(adapter: Any, facts: SourceFacts) -> None:
     _create_package_sheets(adapter)
     findings = _place_assembled_sheet(adapter)
     bom_name, items = _place_bom_sheet(adapter, facts)
-    for cluster in CLUSTER_SHEETS:
-        _place_cluster_sheet(adapter, cluster, facts, bom_name=bom_name, items=items)
+    cluster_balloons: dict[str, dict[str, Any]] = {}
+    for cluster, number in CLUSTER_SHEETS.items():
+        cluster_balloons[SHEET_NAMES[number - 1]] = _place_cluster_sheet(
+            adapter, cluster, facts, bom_name=bom_name, items=items
+        )
     findings += _place_sequence_sheet(adapter, facts)
     findings += _place_fit_sheet(adapter, facts)
     findings += _place_checks_sheet(adapter, facts)
+    for sheet_name, sheet_balloons in cluster_balloons.items():
+        _final_balloon_uncross(adapter, sheet_name, sheet_balloons)
     _check_package_layout(adapter, findings)
 
 

@@ -427,3 +427,92 @@ def test_uncross_needs_more_than_one_swap_per_balloon_and_still_converges() -> N
     drawing._uncross_balloon_leaders(_RebuildAdapter(), balloons, label="test")
     segments = [drawing._balloon_leader(a, str(i)) for i, a in enumerate(annotations)]
     assert not drawing.find_leader_leader_crossings(segments)
+
+
+class _StaleAnnotation(_Annotation):
+    """Reports its leader from where it USED to be, as integ1's readback did."""
+
+    def __init__(self, x: float, attach: float, stale_x: float) -> None:
+        super().__init__(x, attach)
+        self.stale_x = stale_x
+
+    def GetLeaderPointsAtIndex(self, index):
+        return (self.stale_x, 1.0, 0.0, self.attach, 0.0, 0.0)
+
+
+def test_uncross_builds_leaders_from_the_set_position_not_a_stale_start() -> None:
+    annotation = _StaleAnnotation(4.0, 0.0, stale_x=0.0)
+    start, attach, reported = drawing._balloon_rim_start(annotation, "b")
+    assert reported == (0.0, 1.0)
+    assert attach == (0.0, 0.0)
+    radius = drawing.BALLOON_DIAMETER / 2.0
+    reach = (4.0**2 + 1.0**2) ** 0.5
+    assert start == pytest.approx((4.0 - 4.0 * radius / reach, 1.0 - radius / reach))
+
+
+def test_uncross_sees_a_crossing_hidden_by_a_stale_leader_start() -> None:
+    # Set positions cross (0 -> 1, 1 -> 0); the stale starts would not.
+    crossed = [_StaleAnnotation(0.0, 1.0, stale_x=1.0), _StaleAnnotation(1.0, 0.0, stale_x=0.0)]
+    balloons = [_Balloon(str(i), a) for i, a in enumerate(crossed)]
+    drawing._uncross_balloon_leaders(_RebuildAdapter(), balloons, label="test")
+    assert [a.position[0] for a in crossed] == [1.0, 0.0]
+
+
+def _audit_reader(attach_after_activation: dict[str, float], annotations: dict[str, _Annotation]):
+    """Audit-style segments from CURRENT positions to post-activation attachments."""
+    reads = []
+
+    def read(adapter, sheet_name):
+        reads.append(sheet_name)
+        return [
+            drawing.LeaderSegment(
+                f"{name} '{name[-1]}'", "note", *annotation.position, attach_after_activation[name], 0.0
+            )
+            for name, annotation in annotations.items()
+        ]
+
+    return read, reads
+
+
+def test_final_uncross_swaps_a_crossing_only_the_audit_geometry_shows() -> None:
+    annotations = {"DetailItem1": _Annotation(0.0, 0.0), "DetailItem2": _Annotation(1.0, 1.0)}
+    # Placement-time leaders are parallel; after activation the attachments
+    # have moved so the leaders cross, as the audit read integ1's 375/385.
+    placement = [drawing._balloon_leader(a, n) for n, a in annotations.items()]
+    assert not drawing.find_leader_leader_crossings(placement)
+    read, reads = _audit_reader({"DetailItem1": 1.0, "DetailItem2": 0.0}, annotations)
+    drawing._final_balloon_uncross(_RebuildAdapter(), "SHEET", annotations, read_segments=read)
+    assert annotations["DetailItem1"].position[0] == 1.0
+    assert annotations["DetailItem2"].position[0] == 0.0
+    assert not drawing.find_leader_leader_crossings(read(None, "SHEET"))
+    assert reads[0] == "SHEET"
+
+
+def test_final_uncross_raises_by_name_when_a_crossing_survives() -> None:
+    annotations = {"DetailItem1": _Annotation(0.0, 0.0), "DetailItem2": _Annotation(1.0, 0.0)}
+
+    def always_crossed(adapter, sheet_name):
+        return [
+            drawing.LeaderSegment("DetailItem1 '1'", "note", 0.0, 1.0, 1.0, 0.0),
+            drawing.LeaderSegment("DetailItem2 '2'", "note", 1.0, 1.0, 0.0, 0.0 + 0.5),
+        ]
+
+    with pytest.raises(RuntimeError, match="DetailItem1/DetailItem2"):
+        drawing._final_balloon_uncross(
+            _RebuildAdapter(), "SHEET", annotations, read_segments=always_crossed
+        )
+
+
+def test_final_uncross_leaves_non_balloon_crossings_to_the_audit() -> None:
+    annotations = {"DetailItem1": _Annotation(0.0, 0.0)}
+
+    def crossed_with_a_note(adapter, sheet_name):
+        return [
+            drawing.LeaderSegment("DetailItem1 '1'", "note", 0.0, 1.0, 1.0, 0.0),
+            drawing.LeaderSegment("DetailItem9 'NOTE'", "note", 1.0, 1.0, 0.0, 0.0 + 0.5),
+        ]
+
+    drawing._final_balloon_uncross(
+        _RebuildAdapter(), "SHEET", annotations, read_segments=crossed_with_a_note
+    )
+    assert annotations["DetailItem1"].position == (0.0, 1.0)
