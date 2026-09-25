@@ -707,9 +707,22 @@ def _package_seat(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, open_doc):
         package_native._seat_forensics, "release_seat_working_directory", lambda _sw: None
     )
     seat = SimpleNamespace(
-        IActiveDoc2=None, CloseAllDocuments=Mock(), CloseDoc=Mock(), OpenDoc6=open_doc
+        IActiveDoc2=None,
+        CloseAllDocuments=Mock(),
+        CloseDoc=Mock(),
+        OpenDoc6=open_doc,
+        GetProcessID=lambda: 4242,
     )
     monkeypatch.setattr(package_native, "attach_solidworks", lambda: (seat, "34.0"))
+    # Provenance is read off the attached seat through the adapter shim, but no
+    # real process is inspected; the published fields are restored after the test.
+    monkeypatch.setattr(_watchdog, "_seat_fields", {})
+    monkeypatch.setattr(package_native._seat_forensics, "note_seats_before_connect", Mock())
+    monkeypatch.setattr(
+        package_native._seat_forensics,
+        "seat_provenance",
+        lambda adapter: {"seat_pid": adapter._attempt(adapter.swApp.GetProcessID)},
+    )
     return tmp_path / "release" / "native"
 
 
@@ -736,7 +749,9 @@ def test_a_pack_and_go_open_that_never_returns_trips_the_watchdog(
         raise RuntimeError(f"seat killed while opening {Path(path).name}")
 
     def record_abort(reason, message, code, **fields):
-        aborts.append({"reason": reason, "code": code, **fields})
+        aborts.append(
+            {"reason": reason, "code": code, **fields, "seat": dict(_watchdog._seat_fields)}
+        )
 
     def record_exit(code):
         exits.append(code)
@@ -771,6 +786,8 @@ def test_a_pack_and_go_open_that_never_returns_trips_the_watchdog(
     assert aborts[0]["last_op"] == (
         f"span-start package.open {package_native.TOP_ASSEMBLY}.SLDASM"
     )
+    # The seat was identified before the first COM call, so the abort names it.
+    assert aborts[0]["seat"] == {"seat_pid": 4242}
     assert dogs[-1]._stop.is_set()  # disarmed on the way out, even on failure
 
 
@@ -789,6 +806,11 @@ def test_package_native_arms_the_watchdog_around_the_seat_session_only(
     attach = package_native.attach_solidworks
     monkeypatch.setattr(
         package_native, "attach_solidworks", lambda: (events.append("attach"), attach())[1]
+    )
+    monkeypatch.setattr(
+        package_native._seat_forensics,
+        "record_attached_seat_provenance",
+        lambda _sw: events.append("provenance"),
     )
     monkeypatch.setattr(
         package_native,
@@ -822,6 +844,6 @@ def test_package_native_arms_the_watchdog_around_the_seat_session_only(
     package_native.package_native(out)
 
     assert events == [
-        "arm", "attach", "release", "top", "drawings", "stamp", "release", "disarm",
-        "prints", "sidecar",
+        "arm", "attach", "provenance", "release", "top", "drawings", "stamp",
+        "release", "disarm", "prints", "sidecar",
     ]

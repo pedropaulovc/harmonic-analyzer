@@ -13,6 +13,7 @@ import os
 import win32com.client
 
 from _common import _early_bound
+import _seat_forensics
 import _telemetry
 import _watchdog
 
@@ -49,7 +50,10 @@ async def connected_probe(adapter, callback):
     _watchdog.start()
     try:
         async with _telemetry.aspan("sw.attach"):
+            _seat_forensics.note_seats_before_connect()
             attach_running(adapter)
+            # A watchdog abort names the seat it killed, as run_build's does.
+            _seat_forensics.record_seat_provenance(adapter)
         return await callback(adapter)
     finally:
         try:

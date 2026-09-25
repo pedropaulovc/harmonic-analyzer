@@ -29,6 +29,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
+import _seat_forensics  # noqa: E402
 import _watchdog  # noqa: E402
 from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
 from _drawing_common import create_section_view, model_point_in_view  # noqa: E402
@@ -89,7 +90,10 @@ async def main() -> int:
     adapter = PyWin32Adapter({})
     _watchdog.start()
     try:
+        _seat_forensics.note_seats_before_connect()
         await adapter.connect()
+        # A watchdog abort names the seat it killed, as run_build's does.
+        _seat_forensics.record_seat_provenance(adapter)
         adapter.swApp.CloseAllDocuments(True)
         shutil.copy2(SOURCE, SCRATCH_PRT)
         SCRATCH_DRW.unlink(missing_ok=True)

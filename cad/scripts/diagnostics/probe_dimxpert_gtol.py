@@ -108,6 +108,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
+import _seat_forensics  # noqa: E402
 import _watchdog  # noqa: E402
 from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
 from _drawing_common import _GTOL_SYMBOLS, _gtol_frame_xml  # noqa: E402
@@ -266,7 +267,10 @@ async def _probe() -> int:
     # run -- arm the same crash/idle guard run_build uses.
     _watchdog.start()
     try:
+        _seat_forensics.note_seats_before_connect()
         await adapter.connect()
+        # A watchdog abort names the seat it killed, as run_build's does.
+        _seat_forensics.record_seat_provenance(adapter)
         # A previous run that raised mid-probe left the scratch part OPEN, and
         # SolidWorks holds a write lock on an open document -- the copy below
         # then dies with WinError 32. Close it first so the probe is rerunnable

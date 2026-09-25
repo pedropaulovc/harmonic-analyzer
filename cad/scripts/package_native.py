@@ -1110,7 +1110,10 @@ def _package_with_seat(
     """Attach, Pack-and-Go the top assembly and every drawing, stamp both trees,
     release the seat."""
     with _telemetry.span("package.attach"):
+        _seat_forensics.note_seats_before_connect()
         sw, revision = attach_solidworks()
+        # Before any COM work: a watchdog abort names the seat it killed.
+        _seat_forensics.record_attached_seat_provenance(sw)
     failed = False
     try:
         # Release the seat BEFORE wiping ``out``: a run that died mid-stamping (a

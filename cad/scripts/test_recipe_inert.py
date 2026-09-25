@@ -38,6 +38,8 @@ SCRIPTS = bg.SCRIPTS_DIR
 INERT = {Path(name).stem: SCRIPTS / name for name in bg.RECIPE_INERT_MODULES}
 
 # Rule 2: where tracked code may name the inert module, and what it may use there.
+# Read-only seat provenance around a connect: every entry that arms the watchdog.
+_PROVENANCE = frozenset({"note_seats_before_connect", "record_seat_provenance"})
 CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
     # Connect-time provenance (read-only) and the post-save teardown.
     ("_common.py", "run_build"): frozenset(
@@ -46,6 +48,16 @@ CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
     # PRE-save, by necessity: the camera moves right after this, and the snapshot
     # records the view the sketches were authored under. Rule 3 proves it reads only.
     ("_common.py", "save_part_and_images"): frozenset({"record_authoring_context"}),
+    # Release packaging's attach: read-only provenance, as run_build records it.
+    ("package_native.py", "_package_with_seat"): frozenset(
+        {"note_seats_before_connect", "record_attached_seat_provenance"}
+    ),
+    # The hand-run probes that arm the watchdog record the seat the same way.
+    ("diagnostics/_owned_native_session.py", "connected_probe"): _PROVENANCE,
+    ("diagnostics/probe_dimxpert_authoring.py", "main"): _PROVENANCE,
+    ("diagnostics/probe_dimxpert_gtol.py", "_probe"): _PROVENANCE,
+    ("diagnostics/probe_pmi_plain_annotations.py", "main"): _PROVENANCE,
+    ("diagnostics/probe_surface_finish_pmi.py", "main"): _PROVENANCE,
     # Release packaging's own teardown, after Pack-and-Go.
     ("package_native.py", "_release_seat"): frozenset({"release_seat_working_directory"}),
 }
@@ -353,3 +365,32 @@ def test_rule2_rejects_a_geometry_path_call(tmp_path):
         "_seat_forensics.display_geometry",
         "_seat_forensics.capture_com_failure",
     ], violations
+
+
+def test_every_entry_that_arms_the_watchdog_publishes_seat_provenance():
+    """A fatal abort names the seat it killed only if the entry that armed the
+    watchdog published the seat's provenance (codex #881). Static, over the same
+    local modules this gate already scans (and depends on), so a NEW entry
+    cannot forget: any module that calls ``_watchdog.start`` must also call a
+    ``_seat_forensics`` provenance publisher. The order within each entry (after
+    connect, before COM work) is pinned by its own session test in
+    test_watchdog: run_build's split-connect test and package_native's order
+    test."""
+    publishers = {"record_seat_provenance", "record_attached_seat_provenance"}
+    armed: dict[str, bool] = {}
+    for path in _tracked_sources():
+        if path.name.startswith("test_") or path.stem == "_watchdog":
+            continue
+        calls = {
+            (node.func.value.id, node.func.attr)
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+        }
+        if ("_watchdog", "start") in calls:
+            rel = path.relative_to(SCRIPTS).as_posix()
+            armed[rel] = any(("_seat_forensics", name) in calls for name in publishers)
+
+    assert {"_common.py", "package_native.py"} <= set(armed)
+    assert [rel for rel, publishes in armed.items() if not publishes] == []

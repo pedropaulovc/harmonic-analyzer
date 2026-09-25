@@ -39,6 +39,7 @@ import os
 import re
 import tempfile
 import time
+from types import SimpleNamespace
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -406,6 +407,22 @@ def seat_provenance(adapter: Any) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001 - provenance is never fatal
         prov["seat_liveness_error"] = f"{type(exc).__name__}: {exc}"
     return prov
+
+
+def _attempt_quietly(call: Any, default: Any = None) -> Any:
+    try:
+        return call()
+    except Exception:  # noqa: BLE001 - provenance is never fatal
+        return default
+
+
+def record_attached_seat_provenance(sw: Any) -> dict[str, Any]:
+    """:func:`record_seat_provenance` for a seat attached without the adapter,
+    so a watchdog abort in ``package_native`` names the seat it killed too.
+
+    ``package_native`` attaches a raw ``ISldWorks`` through comtypes; the
+    provenance reads only the adapter's ``swApp`` and ``_attempt``."""
+    return record_seat_provenance(SimpleNamespace(swApp=sw, _attempt=_attempt_quietly))
 
 
 def record_seat_provenance(adapter: Any) -> dict[str, Any]:
