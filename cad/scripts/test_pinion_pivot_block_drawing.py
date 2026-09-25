@@ -228,6 +228,60 @@ def test_rig_layout_shaft_and_rod_stay_flush_with_the_block_faces() -> None:
     assert (SHAFT_LEN, ROD_LEN) == (182.0, 192.0)
 
 
+def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
+    # Codex #854 P1: MHA-060 carries both MHA-061 lift bores, the two MHA-104
+    # collars between them and the MHA-059 lever hub past the front block --
+    # nothing else rides it (ruling (c): no collar, no spacer; the MHA-135
+    # cross pin runs radially and takes no length).  The drive-train assembly
+    # must place every one of them from pinion_rig_layout: before the
+    # placement moved into this PR, the old hard-coded stations left the
+    # 192.0 rod 0.25 into the back block, which no interference gate sees.
+    import math
+
+    import build_drive_train_assembly as drive
+    import pinion_rig_layout as rig
+    from pinion_cam_geometry import CAM_LEN
+    from pinion_lever_geometry import (
+        BORE_DEPTH,
+        HUB_LEN,
+        PIN_HOLE_DIA,
+        ROD_PIN_HOLE_FROM_END,
+        WALL_T,
+    )
+
+    depth = pinion_pivot_block_spec.BLOCK_DEPTH
+    budget = 2.0 * depth + rig.PHYSICAL_INNER_SPAN + rig.LEVER_SEAT_PROUD
+    assert rig.LIFT_ROD_LEN == math.ceil(budget * 10.0 - 1e-6) / 10.0
+    # One source of truth: every rig station the assembly places is the
+    # layout's.
+    assert drive.LIFT_ROD_Z0 == rig.LIFT_ROD_Z0
+    assert drive.PIVOT_SHAFT_Z0 == rig.TORQUE_SHAFT_Z0
+    assert (drive.BLOCK_FRONT_Z0, drive.BLOCK_BACK_Z0) == rig.BLOCK_Z0
+    rod = (drive.LIFT_ROD_Z0, drive.LIFT_ROD_Z0 + rig.LIFT_ROD_LEN)
+    shaft = (drive.PIVOT_SHAFT_Z0, drive.PIVOT_SHAFT_Z0 + rig.TORQUE_SHAFT_LEN)
+    # Full engagement of the rod in both lift bores, and both rod and shaft
+    # reach the back block's outer face (the (c) back stop).
+    for z0 in rig.BLOCK_Z0:
+        assert rod[0] <= z0 and z0 + depth <= rod[1] + 1e-9
+    assert rod[1] == pytest.approx(rig.BACK_BLOCK_OUTER_Z)
+    assert shaft[1] == pytest.approx(rig.BACK_BLOCK_OUTER_Z)
+    # Both collars sit on the rod between the blocks' inner faces.
+    inner = (drive.BLOCK_FRONT_Z0 + depth, drive.BLOCK_BACK_Z0)
+    for z0 in drive.CAM_Z0:
+        assert inner[0] - 1e-9 <= z0 and z0 + CAM_LEN <= inner[1] + 1e-9
+    # The lever hub takes BORE_DEPTH of the proud length (the rod bottoms on
+    # its floor) and its mouth stays clear of the block, physical and pose.
+    assert drive.LEVER_Z - HUB_LEN / 2.0 + WALL_T == pytest.approx(rod[0])
+    hub_mouth = rod[0] + BORE_DEPTH
+    assert rig.PHYSICAL_FRONT_BLOCK_OUTER_Z - hub_mouth == pytest.approx(
+        rig.LEVER_SEAT_PROUD - BORE_DEPTH, abs=0.1
+    )
+    assert rig.FRONT_BLOCK_Z0 - hub_mouth >= rig.STRAP_AIR
+    # MHA-135's hole stays inside the hub engagement at the title block's .X.
+    assert ROD_PIN_HOLE_FROM_END - PIN_HOLE_DIA / 2.0 - 0.8 >= 0.0
+    assert ROD_PIN_HOLE_FROM_END + PIN_HOLE_DIA / 2.0 + 0.8 <= BORE_DEPTH
+
+
 def test_manufactured_block_span_is_the_solid_stack_plus_one_feeler() -> None:
     # Codex #854 P1: the model pose's STRAP_AIR is not hardware.  The printed
     # shaft length is the two blocks plus the solid stack (strap, drum, strap)
