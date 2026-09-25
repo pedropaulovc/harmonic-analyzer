@@ -42,6 +42,7 @@ import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, NoReturn
 
 import _common
@@ -406,6 +407,22 @@ def seat_provenance(adapter: Any) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001 - provenance is never fatal
         prov["seat_liveness_error"] = f"{type(exc).__name__}: {exc}"
     return prov
+
+
+def _attempt_quietly(call: Any, default: Any = None) -> Any:
+    try:
+        return call()
+    except Exception:  # noqa: BLE001 - provenance is never fatal
+        return default
+
+
+def record_attached_seat_provenance(sw: Any) -> dict[str, Any]:
+    """:func:`record_seat_provenance` for a seat attached without the adapter,
+    so a watchdog abort in ``package_native`` names the seat it killed too.
+
+    ``package_native`` attaches a raw ``ISldWorks`` through comtypes; the
+    provenance reads only the adapter's ``swApp`` and ``_attempt``."""
+    return record_seat_provenance(SimpleNamespace(swApp=sw, _attempt=_attempt_quietly))
 
 
 def record_seat_provenance(adapter: Any) -> dict[str, Any]:
@@ -1198,7 +1215,10 @@ async def teardown_seat(adapter: Any) -> None:
     connect re-checks loud.
     """
     try:
-        _common.discard_open_documents(adapter)
+        # The same span name as the connect-time discard in run_build; the
+        # phase tells them apart, and a close that wedges names its phase.
+        with _telemetry.span("seat.discard", phase="teardown"):
+            _common.discard_open_documents(adapter)
         holding = _common._resident_output_documents(adapter)
         if holding:
             _telemetry.warn(
@@ -1219,7 +1239,8 @@ async def teardown_seat(adapter: Any) -> None:
     # seat provenance uses, which samples at CONNECT: one query then reads both
     # ends -- where a leaf left the seat, and where the next leaf found it.
     try:
-        left = release_seat_working_directory(adapter.swApp)
+        with _telemetry.span("seat.park"):
+            left = release_seat_working_directory(adapter.swApp)
         if left is not None:
             _telemetry.success(
                 f"seat working directory moved to {left}",

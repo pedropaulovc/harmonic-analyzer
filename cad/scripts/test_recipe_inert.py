@@ -48,6 +48,10 @@ CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
     ("_common.py", "save_part_and_images"): frozenset({"record_authoring_context"}),
     # Release packaging's own teardown, after Pack-and-Go.
     ("package_native.py", "_release_seat"): frozenset({"release_seat_working_directory"}),
+    # Release packaging's attach: read-only provenance, as run_build records it.
+    ("package_native.py", "_package_with_seat"): frozenset(
+        {"note_seats_before_connect", "record_attached_seat_provenance"}
+    ),
 }
 # Allowed anywhere, but only as a statement whose value is the call: it always raises.
 TERMINAL = frozenset({"capture_com_failure"})

@@ -23,8 +23,9 @@ from the telemetry history (2026-07-18 audit of ~3 weeks of ``traces.jsonl``):
   memory... SOLIDWORKS strongly recommends that you do not continue") precedes
   a crash -- so the safe recovery is kill + relaunch, never clicking Yes. Fatal
   once the box has survived ``_MODAL_CONFIRM_TICKS`` consecutive polls (a
-  transient box is only warned about); ``dodo._exec_com`` treats exit 88 like
-  a crash: force-recover SolidWorks and retry the task. The start-up .NET splash
+  transient box is only warned about); exit 88 is recovered like a crash
+  (``dodo._exec_com`` on a local seat, the pool on the farm -- see the
+  seat-fault record below). The start-up .NET splash
   wedge (owner = the ``splash`` window) belongs to the lifecycle library.
 * **OP TIMEOUT (fatal).** No telemetry activity -- span boundary or log
   record -- for ``HARMONIC_COM_OP_TIMEOUT`` seconds (default 900). The longest
@@ -45,6 +46,12 @@ its ``_com_seat`` context (the seat lock is held by the PARENT, not this
 process) releases the machine-global lock: the seat never leaks. Distinct exit
 codes make the three fatals diagnosable from the doit console alone.
 
+When ``HARMONIC_SEAT_FAULT_PATH`` is set, every fatal abort also leaves a
+small JSON record there before the exit (exit code, reason, the seat's
+``sldworks.exe`` pid and start time, ``last_op``, the UTC time). A process
+killed by ``os._exit`` has nothing else to hand whoever launched it; on the
+farm the pool reads the record to mark the seat suspect and recover it.
+
 Disable entirely with ``HARMONIC_COM_WATCHDOG=0``; disable just the idle
 timeout with ``HARMONIC_COM_OP_TIMEOUT=0``.
 """
@@ -52,10 +59,14 @@ timeout with ``HARMONIC_COM_OP_TIMEOUT=0``.
 from __future__ import annotations
 
 import contextlib
+import json
 import os
+import tempfile
 import threading
 import time
 from collections.abc import Callable
+from datetime import UTC, datetime
+from pathlib import Path
 
 import _telemetry
 
@@ -72,6 +83,9 @@ except Exception:  # noqa: BLE001 - lib is always present in the build venv; deg
 EXIT_CRASH = 86
 EXIT_OP_TIMEOUT = 87
 EXIT_MODAL_DIALOG = 88
+
+# Where a fatal abort leaves its seat-fault record; unset writes nothing.
+SEAT_FAULT_ENV = "HARMONIC_SEAT_FAULT_PATH"
 
 DEFAULT_OP_TIMEOUT = 900.0
 _POLL_INTERVAL = 15.0
@@ -122,6 +136,45 @@ def set_seat_provenance(fields: dict[str, object]) -> None:
     }
 
 
+def _write_seat_fault(reason: str, code: int, last_op: object) -> None:
+    """Leave the seat-fault record at ``$HARMONIC_SEAT_FAULT_PATH``, if set.
+
+    Atomic -- a temp file in the same directory, then ``os.replace`` -- so a
+    reader never sees half a record. Best-effort: a write that fails warns and
+    returns, because nothing may stand between a fatal signal and the exit."""
+    target = os.environ.get(SEAT_FAULT_ENV, "").strip()
+    if not target:
+        return
+    record = {
+        "exit_code": code,
+        "reason": reason,
+        "sldworks_pid": _seat_fields.get("seat_pid"),
+        "seat_started_at": _seat_fields.get("seat_started_at"),
+        "last_op": last_op,
+        "utc": datetime.now(UTC).isoformat(timespec="seconds"),
+    }
+    path = Path(target)
+    temp: Path | None = None
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temp = Path(handle.name)
+            json.dump(record, handle)
+        os.replace(temp, path)
+    except Exception as exc:  # noqa: BLE001 - never block the exit
+        _warn(f"seat-fault record not written to {target}: {exc}", reason=reason)
+        if temp is not None:
+            with contextlib.suppress(OSError):
+                temp.unlink()
+
+
 def _abort(reason: str, message: str, code: int, **fields: object) -> None:
     """Record a fatal watchdog signal on BOTH telemetry channels, then flush.
 
@@ -130,7 +183,11 @@ def _abort(reason: str, message: str, code: int, **fields: object) -> None:
     too -- the watchdog thread has no ambient span context, so without an
     explicit span a fatal exit would leave no trace-side record at all. Both
     carry the same structured attrs (reason / idle_s / last_op / exit code),
-    so either channel alone reconstructs what happened."""
+    so either channel alone reconstructs what happened.
+
+    The seat-fault record goes first: it is a local file write, while the
+    telemetry flush below can spend its export deadlines on a dead collector."""
+    _write_seat_fault(reason, code, fields.get("last_op"))
     _error(message, reason=reason, exit_code=code, **_seat_fields, **fields)
     with contextlib.suppress(Exception):
         with _telemetry.span(

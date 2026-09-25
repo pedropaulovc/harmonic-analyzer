@@ -21,9 +21,11 @@ the document.
 
 from __future__ import annotations
 
+import json
 import sys
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -256,6 +258,94 @@ def test_fatal_signals_carry_structured_context(
     assert (reason, code) == ("op-timeout", EXIT_OP_TIMEOUT)
     assert fields["idle_s"] == 901 and fields["timeout_s"] == 900
     assert "last_op" in fields
+
+
+def _fatal(signal: str) -> tuple[Watchdog, list[int]]:
+    """A watchdog whose next tick (or two, for a modal) fires ``signal``."""
+    if signal == "crash":
+        return _make(baseline=set(), crash={4242})
+    if signal == "modal-dialog":
+        return _make(dialog_probe=lambda: (0x1234, _LOW_MEMORY))
+    return _make(idle=901.0, timeout=900.0)
+
+
+_FATAL_EXITS = {
+    "crash": EXIT_CRASH,
+    "modal-dialog": EXIT_MODAL_DIALOG,
+    "op-timeout": EXIT_OP_TIMEOUT,
+}
+
+
+@pytest.mark.parametrize("signal", sorted(_FATAL_EXITS))
+def test_every_fatal_abort_leaves_the_seat_fault_record(
+    signal: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """farmops' seat-suspect handoff (H1): os._exit leaves the pool nothing but an
+    exit code, so the abort writes the seat it killed and the op it wedged in."""
+    record = tmp_path / "faults" / "seat-fault.json"
+    monkeypatch.setenv(_watchdog.SEAT_FAULT_ENV, str(record))
+    monkeypatch.setattr(
+        _watchdog,
+        "_seat_fields",
+        {"seat_pid": 11044, "seat_started_at": "2026-09-25T06:02:11+00:00"},
+    )
+    monkeypatch.setattr(_telemetry, "shutdown", lambda: None)
+    monkeypatch.setattr(_watchdog, "_warn", lambda msg, **f: None)
+    dog, exits = _fatal(signal)
+
+    with pytest.raises(_Exit):
+        while True:
+            dog.tick()
+
+    fault = json.loads(record.read_text(encoding="utf-8"))
+    assert exits == [_FATAL_EXITS[signal]]
+    assert fault == {
+        "exit_code": _FATAL_EXITS[signal],
+        "reason": signal,
+        "sldworks_pid": 11044,
+        "seat_started_at": "2026-09-25T06:02:11+00:00",
+        "last_op": _telemetry.last_activity_op(),
+        "utc": fault["utc"],
+    }
+    assert datetime.fromisoformat(fault["utc"]).tzinfo is not None
+    assert [path.name for path in record.parent.iterdir()] == ["seat-fault.json"]
+
+
+def test_no_seat_fault_record_without_the_variable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv(_watchdog.SEAT_FAULT_ENV, raising=False)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(_telemetry, "shutdown", lambda: None)
+    dog, exits = _fatal("op-timeout")
+
+    with pytest.raises(_Exit):
+        dog.tick()
+
+    assert exits == [EXIT_OP_TIMEOUT]
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_seat_fault_record_that_cannot_be_written_never_blocks_the_exit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A directory where the record should go makes os.replace fail: the abort
+    warns, cleans its temp file and exits all the same."""
+    record = tmp_path / "seat-fault.json"
+    record.mkdir()
+    (record / "occupied").write_text("x", encoding="utf-8")
+    monkeypatch.setenv(_watchdog.SEAT_FAULT_ENV, str(record))
+    monkeypatch.setattr(_telemetry, "shutdown", lambda: None)
+    warns: list[str] = []
+    monkeypatch.setattr(_watchdog, "_warn", lambda msg, **f: warns.append(msg))
+    dog, exits = _fatal("crash")
+
+    with pytest.raises(_Exit):
+        dog.tick()
+
+    assert exits == [EXIT_CRASH]
+    assert any("seat-fault record not written" in msg for msg in warns)
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["seat-fault.json"]
 
 
 def test_watchdog_self_logs_do_not_reset_the_idle_clock() -> None:
@@ -693,6 +783,75 @@ def test_connect_is_split_into_dispatch_identity_and_discard(
         "seat.identity",
         "seat.discard",
     ]
+def test_teardown_spans_its_discard_and_park(monkeypatch: pytest.MonkeyPatch) -> None:
+    """H3: the teardown discard reuses the connect-time ``seat.discard`` name,
+    told apart by its phase, and the re-point is its own ``seat.park`` -- so a
+    teardown that wedges names the step, not just ``sw.disconnect``."""
+    opened: list[tuple[str, object]] = []
+    span = _telemetry.span
+
+    def record_span(name, /, **attrs):
+        opened.append((name, attrs.get("phase")))
+        return span(name, **attrs)
+
+    monkeypatch.setattr(_telemetry, "span", record_span)
+    adapter, _app = _seat(str(_seat_forensics._seat_park_directory()))
+
+    _session(monkeypatch, adapter)
+
+    discards = [phase for name, phase in opened if name == "seat.discard"]
+    assert discards == [None, "teardown"]
+    teardown = opened.index(("seat.discard", "teardown"))
+    assert ("seat.park", None) in opened[teardown:]
+
+
+def test_package_discard_spans_each_close_by_document() -> None:
+    """H3 in package_native: each CloseDoc is a span named for its document, and
+    the CloseAllDocuments backstop has its own, so last_op names the close."""
+    import package_native
+
+    titles = ["harmonic-analyzer.SLDASM", "frame.SLDPRT"]
+    closed: list[str] = []
+
+    class _Doc:
+        def __init__(self, title: str) -> None:
+            self._title = title
+
+        def GetTitle(self) -> str:
+            return self._title
+
+    class _Seat:
+        @property
+        def IActiveDoc2(self):
+            return _Doc(titles[0]) if titles else None
+
+        def CloseDoc(self, title: str) -> None:
+            closed.append(title)
+            titles.remove(title)
+
+        def CloseAllDocuments(self, _include_unsaved: bool) -> bool:
+            return True
+
+    seat = _Seat()
+    ops: list[str] = []
+    span = _telemetry.span
+
+    def record_span(name, /, **attrs):
+        ops.append(name)
+        return span(name, **attrs)
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_telemetry, "span", record_span)
+        package_native._discard_open_documents(seat)
+
+    assert closed == ["harmonic-analyzer.SLDASM", "frame.SLDPRT"]
+    assert ops == [
+        "package.close harmonic-analyzer.SLDASM",
+        "package.close frame.SLDPRT",
+        "package.close_all",
+    ]
+
+
 def _package_seat(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, open_doc):
     """package_native pointed at a tmp top assembly and a mock seat whose
     ``OpenDoc6`` is ``open_doc``; returns the prepared-tree directory."""
@@ -785,6 +944,14 @@ def test_package_native_arms_the_watchdog_around_the_seat_session_only(
     events: list[str] = []
     monkeypatch.setattr(_watchdog, "start", lambda: events.append("arm"))
     monkeypatch.setattr(_watchdog, "stop", lambda: events.append("disarm"))
+    monkeypatch.setattr(
+        _seat_forensics, "note_seats_before_connect", lambda: events.append("note")
+    )
+    monkeypatch.setattr(
+        _seat_forensics,
+        "record_attached_seat_provenance",
+        lambda _sw: (events.append("provenance"), {})[1],
+    )
     out = _package_seat(tmp_path, monkeypatch, Mock())
     attach = package_native.attach_solidworks
     monkeypatch.setattr(
@@ -822,5 +989,6 @@ def test_package_native_arms_the_watchdog_around_the_seat_session_only(
     package_native.package_native(out)
 
     assert events == [
-        "arm", "attach", "top", "drawings", "stamp", "release", "disarm", "prints", "sidecar",
+        "arm", "note", "attach", "provenance", "top", "drawings", "stamp",
+        "release", "disarm", "prints", "sidecar",
     ]

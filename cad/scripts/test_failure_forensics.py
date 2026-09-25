@@ -37,10 +37,12 @@ import importlib.util
 import io
 import logging
 import re
+import os
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 from unittest import mock
 
@@ -592,6 +594,23 @@ def test_unresolvable_seat_pid_is_not_invented(monkeypatch):
 
     assert prov["seat_pid_source"] == "unresolved"
     assert "seat_pid" not in prov
+
+
+def test_a_comtypes_attached_seat_is_named_to_the_watchdog(monkeypatch):
+    """package_native attaches a raw ISldWorks, not the adapter; its provenance
+    still reaches the watchdog, so an abort (and its seat-fault record) names
+    the seat pid and start time."""
+    monkeypatch.setattr(_seat_forensics, "_seat_identity", {})
+    sw = SimpleNamespace(GetProcessID=os.getpid, RevisionNumber=lambda: "34.0.0")
+    try:
+        prov = _seat_forensics.record_attached_seat_provenance(sw)
+        pushed = dict(_watchdog._seat_fields)
+    finally:
+        _watchdog.set_seat_provenance({})
+
+    assert prov["seat_pid"] == os.getpid() and prov["seat_pid_source"] == "GetProcessID"
+    assert pushed["seat_pid"] == os.getpid()
+    assert "seat_started_at" in pushed
 
 
 def test_watchdog_abort_names_the_seat_it_killed(capture_telemetry):

@@ -59,8 +59,9 @@ root cleanup fails with ``WinError 32``.
 The COM session runs under the same watchdog ``_common.run_build`` arms
 (``_watchdog``): this entry attaches through comtypes rather than ``run_build``,
 so it starts and stops the watchdog itself. A crashed seat, a blocking modal or
-15 min without a span boundary or log record hard-exits 86/87/88, which
-``dodo._exec_com`` answers with force-recover + retry -- 2026-09-25 rekey2 sat ~83
+15 min without a span boundary or log record hard-exits 86/87/88, which a local
+``dodo._exec_com`` answers with force-recover + retry and the farm pool answers
+by recovering the seat (AGENTS.md, "COM watchdog") -- 2026-09-25 rekey2 sat ~83
 min inside one drawing's ``OpenDoc6`` with nothing to end it. Every COM step is a
 span NAMED for its document (``package.open magnifier-assembly.SLDDRW``), so an
 idle abort's ``last_op`` says which document the seat wedged on.
@@ -194,7 +195,10 @@ def _close_active_documents(sw: Any) -> None:
                 f"CloseDoc(''), which silently no-ops on assemblies and would "
                 f"leave the document resident"
             )
-        sw.CloseDoc(title)
+        # One span per close, named for the document: a close that wedges is
+        # then the watchdog's last_op, not the discard around it.
+        with _telemetry.span(f"package.close {title}", document=title):
+            sw.CloseDoc(title)
     if sw.IActiveDoc2 is not None:
         raise RuntimeError(
             "documents are still open after 500 CloseDoc calls -- the seat is "
@@ -215,7 +219,8 @@ def _discard_open_documents(sw: Any) -> None:
     backstop -- with nothing dirty left, it has nothing to prompt about.
     """
     _close_active_documents(sw)
-    sw.CloseAllDocuments(True)
+    with _telemetry.span("package.close_all"):
+        sw.CloseAllDocuments(True)
 
 
 def _release_seat(sw: Any) -> None:
@@ -652,7 +657,9 @@ def open_silently(sw: Any, path: Path, doc_type: int) -> None:
     say which reference an IdMismatch came from.
     """
     # Named for the document: the watchdog's idle abort reports the last span
-    # boundary, so a wedged open names the file it wedged on.
+    # boundary, so a wedged open names the file it wedged on. The log line puts
+    # the same name in the console and logs.jsonl before the call can block.
+    log(f"opening {path.name}")
     with _telemetry.span(f"package.open {path.name}", document=path.name, doc_type=doc_type):
         errors, warnings, _document = sw.OpenDoc6(
             str(path), doc_type, SW_OPEN_SILENT, "", 0, 0
@@ -1107,7 +1114,10 @@ def _package_with_seat(
     """Attach, Pack-and-Go the top assembly and every drawing, stamp both trees,
     release the seat."""
     with _telemetry.span("package.attach"):
+        _seat_forensics.note_seats_before_connect()
         sw, revision = attach_solidworks()
+        # The watchdog's abort (and its seat-fault record) names this seat.
+        _seat_forensics.record_attached_seat_provenance(sw)
     failed = False
     try:
         with _telemetry.span("package.top_assembly", document=top.name) as sp:

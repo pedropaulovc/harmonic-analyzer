@@ -461,8 +461,8 @@ signals, three fatal, one log-only:
   running critically low on committed memory... SOLIDWORKS strongly
   recommends that you do not continue") precedes a crash, so the watchdog
   never clicks Yes: it aborts once the box has survived two consecutive polls
-  (a transient box only warns), and `dodo._exec_com` treats 88 like a crash
-  (force-recover + retry). The message text rides the abort's `dialog_text`.
+  (a transient box only warns), and exit 88 is recovered like a crash (see
+  below). The message text rides the abort's `dialog_text`.
 - **Op timeout — fatal, exit 87.** No telemetry activity — span boundary or log
   record (`_telemetry.last_activity()`, poked by every span/log) — for
   `HARMONIC_COM_OP_TIMEOUT` seconds (default 900). Calibrated from ~3 weeks of
@@ -481,10 +481,20 @@ A fatal signal logs `xx`, flushes telemetry, and hard-exits (`os._exit`) — the
 main thread is blocked inside the dead COM call, so only a process exit frees
 it. The doit parent then fails the task, and since the seat lock is held by the
 PARENT's `_com_seat`, the machine-global seat releases cleanly. Kill switch:
-`HARMONIC_COM_WATCHDOG=0`. Recovery after exit 86/87/88 is automatic
-(`_exec_com`: kill, relaunch, retry); by hand: clear the crash dialog,
-relaunch SolidWorks via the 3DEXPERIENCE Platform desktop shortcut (never
-COM-start it), rerun the build. The fatal/log-only contract is pinned by
+`HARMONIC_COM_WATCHDOG=0`.
+
+Recovery after exit 86/87/88 depends on who owns the seat. On a local seat
+(`HARMONIC_SW_AUTOSTART` unset or `1`), `_exec_com` kills SolidWorks,
+relaunches it and retries the task. On the farm it does not: `build.py
+--executor farm` and the pool's leaf environment both set
+`HARMONIC_SW_AUTOSTART=0`, so `_exec_com` runs the task once and fails it, and
+the seat is the pool's to recover. For that hand-off every fatal abort also
+writes a seat-fault record, atomically and best-effort, to
+`$HARMONIC_SEAT_FAULT_PATH` when the variable is set: `exit_code`, `reason`,
+`sldworks_pid`, `seat_started_at`, `last_op` and `utc`. The pool reads it to
+mark the seat suspect. By hand: clear the crash dialog, relaunch SolidWorks
+via the 3DEXPERIENCE Platform desktop shortcut (never COM-start it), rerun the
+build. The fatal/log-only contract and the record are pinned by
 `check:watchdog` (`test_watchdog.py`).
 
 **Memory preflight — restart before the warning, not after.** SolidWorks'
