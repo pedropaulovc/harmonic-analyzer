@@ -402,16 +402,18 @@ def test_quarter_inch_arm_stock_fails_the_full_strength_floor(monkeypatch) -> No
     # User ruling 2026-09-25: the exception holds only while a steel screw in
     # the steel arm keeps >= 1D of full thread.  1/4-in bar would leave
     # min(8.0, 6.35 - 0.25) - 2.01 = 4.09, 0.85D.
-    import importlib
+    # Executed as a separate, unregistered module: reloading the real one
+    # would swap its band tuples for new objects under every importer
+    # (test_fit_bands tracks them by identity).
+    import importlib.util
     from fractions import Fraction
 
     assert spec.FULL_STRENGTH_ENGAGEMENT_D == 1.0
     monkeypatch.setattr(geometry, "ARM_STOCK_THICKNESS_IN", Fraction(1, 4))
     monkeypatch.setattr(geometry, "ARM_STOCK_THICKNESS", 0.25 * 25.4)
-    try:
-        with pytest.raises(AssertionError, match="under 1D"):
-            importlib.reload(spec)
-    finally:
-        monkeypatch.undo()
-        importlib.reload(spec)
-    assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
+    probe_spec = importlib.util.spec_from_file_location("_quarter_inch_probe", spec.__file__)
+    probe = importlib.util.module_from_spec(probe_spec)
+    with pytest.raises(AssertionError, match="under 1D"):
+        probe_spec.loader.exec_module(probe)
+    assert probe.ARM_STOCK_THICKNESS == pytest.approx(6.35)
+    assert probe.FULL_THREAD_WORST < probe.THREAD_MODEL_DIA
