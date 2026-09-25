@@ -1163,3 +1163,27 @@ def test_the_collector_fails_loud_rather_than_audit_no_sheet(monkeypatch, tmp_pa
     live, adapter = _fake_drawing(monkeypatch, sheet_names=("Sheet1", "Sheet2"), views=(), pages=[object()])
     with pytest.raises(RuntimeError, match="2 sheet"):
         live.collect_sheet_dumps(adapter, **kwargs)
+
+
+def test_stacked_leadered_balloons_are_not_merged_callouts():
+    """Codex on 9aaa829d6: admitting exact (PDF-matched) leadered notes as
+    callouts must not admit BOM balloons, which are leadered note circles."""
+
+    def balloon(name, cy):
+        arc = [0, 0, 0, 0, 0.105, cy, 0.0, 0.105, cy, 0.0, 0.1, cy, 0.0, 0.0, 0.0, 1.0, 1.0]
+        return {
+            "type": 6,
+            "name": name,
+            "visible": 1,
+            "leaders": [[0.095, cy, 0.0, 0.080, cy - 0.010, 0.0]],
+            "display": {"arcs": [arc], "texts": [{"t": name, "pos": [0.099, cy - 0.001, 0.0], "h": 0.0035}]},
+            "note": {"balloon": True, "text": name},
+        }
+
+    dump = _dump(
+        views=[_view("v", (0.02, 0.02, 0.07, 0.07), [balloon("1", 0.150), balloon("2", 0.1385)])],
+        spans=[["1", 0.0992, 0.1491, 0.1010, 0.1524], ["2", 0.0992, 0.1376, 0.1010, 0.1409]],
+    )
+    findings = audit_dump(dump)
+    assert not [f for f in findings if f.kind == "merged-blocks"]
+    assert {a.kind for a in sheet_model(dump).geometry.annotations} == {"balloon"}

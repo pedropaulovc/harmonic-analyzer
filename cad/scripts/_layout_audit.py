@@ -703,6 +703,9 @@ def annotation_geometry(
     segments = _display_segments(display)
     if kind == "dim" and (annotation.get("dim") or {}).get("hole_callout"):
         kind = "hole-callout"
+    if kind == "note" and (annotation.get("note") or {}).get("balloon"):
+        # A BOM balloon is a note with a leader, but a circle, not a callout.
+        kind = "balloon"
     # A plain dimension's text sits on its own DIMENSION line; only a callout
     # (hole callout, leadered note) has a shoulder under its text.
     shoulders = _shoulders(segments, items) if kind in ("hole-callout", "note") else []
