@@ -55,15 +55,15 @@ TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 # The terminal land is 1/16 in, not the 1/32 in a literal "bore = shaft
 # section at the seat" first produced.  At DP 49.82 / PA 14.5 a 6-tooth gear
 # is cut as involute flanks closed by a chord on the base circle -- the
-# project's own DXF profile, cut with a self-made form cutter -- so T006's
-# minimum-material radius is 1.3365 mm and its tooth depth 0.703 mm.  A
-# 1/16 in bore still leaves a 0.543 mm rim under that root (0.77x tooth
-# depth) on a soldered, keyless, near-torque-free gear, and in exchange the
-# 20.675 mm terminal journal goes from L/D 26 to 13 -- 16x the bending
-# stiffness, the difference between a land a manual lathe can turn and one
-# that whips off the tool.  It is also the largest step that keeps the shaft
-# monotonically decreasing: the cone is assembled tip-first, and every gear
-# OD exceeds the next inboard gear's bore (T006 4.08 > T012 bore 3.175;
+# project's own DXF profile, cut with a self-made form cutter.  T006's gap
+# floor is printed at 2.880 mm MIN diameter (U40), so a 1/16 in bore leaves a
+# 0.646 mm nominal web, 0.621 mm at maximum bore -- the one named web
+# exception (cone_gear_spec.WEB_EXCEPTIONS_MM) -- on a soldered, keyless,
+# near-torque-free gear.  In exchange the 20.675 mm terminal journal goes
+# from L/D 26 to 13 -- 16x the bending stiffness, the difference between a
+# land a manual lathe can turn and one that whips off the tool.  The steps
+# remain monotonically decreasing: the cone is assembled tip-first, and every
+# gear OD exceeds the next inboard gear's bore (T006 4.08 > T012 bore 3.175;
 # T012 7.14 > T018 6.35; T018 10.20 > T024 9.525), so no single gear can be
 # made integral with the shaft unless all twenty are.
 SECTIONS: tuple[tuple[float, float], ...] = (

@@ -11,8 +11,8 @@ import pytest
 import _config
 from _buildgraph import module_deps_of
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
-from build_cone_gear import gear_facts
 import build_cylinder_gear as part
+from involute_gear import gear_facts
 import cylinder_gear_shaft_spec as arbor
 import cylinder_gear_spec as spec
 import draw_cylinder_gear as drawing

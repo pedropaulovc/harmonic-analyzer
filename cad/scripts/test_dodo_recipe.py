@@ -1822,11 +1822,10 @@ def test_config_deps_are_fine_grained():
     cfg = (REPO_ROOT / "cad" / "config").resolve()
     whole = set(dodo._CONFIG_YAMLS)
 
-    # A gear part reads machine("gear_train", ...) -> machine/gear_train.yaml ONLY
-    # (NOT machine/channels.yaml, where active_count lives) + its own registry row
-    # + title_block.yaml (every part stamps the title-block tolerance properties
-    # from _common.part_properties -> _config.title_block) + release.yaml for the
-    # global CAD Revision.
+    # The cone-gear part reads gear_train (through ``involute_gear``), its own
+    # registry row, title-block properties and the global release.  Its bore
+    # and tooth-thickness bands are cone-specific constants in
+    # ``cone_gear_spec`` (U38/U42), so ``tolerances.yaml`` is not an input.
     cone = dodo._config_deps(scripts / "build_cone_gear.py", "cone_gear", "part")
     assert _rel(cone, cfg) == {
         "machine/gear_train.yaml",
@@ -1835,6 +1834,10 @@ def test_config_deps_are_fine_grained():
         "title_block.yaml",
         "release.yaml",
     }, _rel(cone, cfg)
+    cylinder = dodo._config_deps(
+        scripts / "build_cylinder_gear.py", "cylinder_gear", "part"
+    )
+    assert "machine/gear_train.yaml" in _rel(cylinder, cfg)
     assert set(cone) <= whole
 
     # Editing ONE part's registry row rebuilds only that part: a leaf screw depends
