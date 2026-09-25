@@ -65,7 +65,9 @@ build_or_refresh takes the FULL branch when the target is absent)::
 from __future__ import annotations
 
 import contextlib
+import functools
 import hashlib
+import json
 import math
 import os
 import re
@@ -3531,6 +3533,98 @@ def _cache_rows() -> list[tuple[str, list[str]]]:
     return rows
 
 
+# --- STALE-CHILD (issue #909): a dependent's key folds each child's on-disk
+# `.execution` token, but a build first reruns any child that is stale locally and
+# restamps that token -- so a key computed from a stale token is one no build would
+# use (a stale 10:10 part token made `drawing:cone_swing_platform` key differently
+# in one worktree than a fresh one at the same SHA). The record the token was
+# stamped under is the child's own `.doit.db` entry: `save_success` writes it right
+# after the action that stamps the token. Compare its per-dep DIGESTS, never keys --
+# a salt bump moves every key while doit reruns nothing.
+def _execution_token_owners() -> dict[str, str]:
+    """``.execution`` token path -> the task label that stamps it."""
+    owners = {_part_execution_token(stem): f"part:{stem}" for stem in part_stems()}
+    owners.update(
+        {_assembly_execution_token(s): f"assembly:{s}" for s in ASSEMBLY_ORDER}
+    )
+    return owners
+
+
+def _doit_records() -> dict:
+    """This checkout's doit dependency records ({} when absent or unreadable)."""
+    try:
+        records = json.loads(Path(DOIT_CONFIG["dep_file"]).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return records if isinstance(records, dict) else {}
+
+
+class _StaleChildProbe:
+    """Decide, from doit's records alone, which child tokens a build would restamp.
+
+    A child is stale when doit would rerun it: no record under the ContentChecker,
+    a changed dep set, a dep whose digest moved since the record, an invalid token
+    (``_ExecutionIdentityTracker``), or -- transitively -- a stale child of its own:
+    an assembly whose part reruns is refreshed and restamped too, although its
+    record still matches until that happens."""
+
+    def __init__(self, rows, owners: dict[str, str], records: dict, digest) -> None:
+        self._deps = dict(rows)
+        self._owners = owners
+        self._tokens = {label: token for token, label in owners.items()}
+        self._records = records
+        self._digest = digest
+        self.reasons: dict[str, str | None] = {}
+
+    def children(self, deps: list[str]) -> list[str]:
+        """The stale children among ``deps``' tokens, in dep order."""
+        owned = [self._owners[dep] for dep in deps if dep in self._owners]
+        return [label for label in owned if self.reason(label)]
+
+    def reason(self, label: str) -> str | None:
+        if label in self.reasons:
+            return self.reasons[label]
+        self.reasons[label] = "dependency cycle"  # never expected; stay conservative
+        own = self._own_reason(label)
+        if own is None:
+            stale = self.children(self._deps.get(label, []))
+            own = f"child {stale[0]} is stale" if stale else None
+        self.reasons[label] = own
+        return own
+
+    def _own_reason(self, label: str) -> str | None:
+        deps = self._deps.get(label)
+        record = self._records.get(label)
+        if deps is None or not isinstance(record, dict):
+            return "no doit record here"
+        if record.get("checker:") != ContentChecker.__name__:
+            return f"recorded by {record.get('checker:')}"
+        if set(record.get("deps:") or []) != set(deps):
+            return "dependency set changed"
+        for dep in deps:
+            state = record.get(dep)
+            try:
+                moved = not isinstance(state, list) or state[-1] != self._digest(dep)
+            except OSError:
+                moved = True
+            if moved:
+                return f"{_cache._rel(Path(dep))} changed"
+        token = self._tokens.get(label)
+        if token and not _ExecutionIdentityTracker(token)(None, None):
+            return "execution token missing or invalid"
+        return None
+
+
+def _stale_children(probe: _StaleChildProbe, label: str, deps: list[str]) -> list[str]:
+    """``label``'s stale children, [] when every one is current. Best-effort like
+    DRIFT: a diagnostic never fails cache_status."""
+    try:
+        return probe.children(deps)
+    except Exception as exc:  # noqa: BLE001
+        _telemetry.debug(f"         stale-child check skipped for {label}: {exc!r}")
+        return []
+
+
 def _cache_status(statusargs):
     args = [a.lower() for a in (statusargs or [])]
     only_miss = "miss" in args
@@ -3547,11 +3641,16 @@ def _cache_status(statusargs):
             "[cache_status] cache disabled (mode=off) -- keys computed, backend NOT probed"
         )
 
-    hits = misses = unknown = 0
-    for label, deps in _cache_rows():
+    hits = misses = unknown = stale_rows = 0
+    rows = _cache_rows()
+    digest_one = functools.cache(ContentChecker._digest)  # shared with the probe
+    probe = _StaleChildProbe(
+        rows, _execution_token_owners(), _doit_records(), digest_one
+    )
+    for label, deps in rows:
         if filters and not any(f in label.lower() for f in filters):
             continue
-        key, inputs = _cache.key_inputs(deps, ContentChecker._digest)
+        key, inputs = _cache.key_inputs(deps, digest_one)
         present = _cache.probe(key)  # True / False / None (disabled|unreachable)
         if present is True:
             mark, hits = "HIT ", hits + 1
@@ -3559,12 +3658,22 @@ def _cache_status(statusargs):
             mark, misses = "MISS", misses + 1
         else:
             mark, unknown = "?   ", unknown + 1
+        stale = _stale_children(probe, label, deps)
+        stale_rows += bool(stale)
         if only_miss and present is not False:
             continue
         last = _cache.last_stored_key(label)
         drift = f"  DRIFT(last published {last[:12]})" if last and last != key else ""
-        emit = _telemetry.warn if present is False else _telemetry.info
-        emit(f"{mark} {key[:12]}  {label}{drift}")
+        flag = ""
+        if stale:
+            more = f" +{len(stale) - 3} more" if len(stale) > 3 else ""
+            flag = f"  STALE-CHILD({','.join(stale[:3])}{more})"
+        # A row keyed on a stale child token names a key no build would use, so
+        # even its HIT is not healthy.
+        emit = _telemetry.warn if present is False or stale else _telemetry.info
+        emit(f"{mark} {key[:12]}  {label}{drift}{flag}")
+        for child in stale:
+            _telemetry.debug(f"         stale child {child}: {probe.reasons[child]}")
         if drift:
             previous = dict(_cache.last_stored_inputs(label))
             current = dict(inputs)
@@ -3578,7 +3687,10 @@ def _cache_status(statusargs):
         if show_all or present is False:
             for rel, digest in inputs:
                 _telemetry.debug(f"         {digest}  {rel}")
-    _telemetry.success(f"[cache_status] {hits} hit / {misses} miss / {unknown} unknown")
+    _telemetry.success(
+        f"[cache_status] {hits} hit / {misses} miss / {unknown} unknown / "
+        f"{stale_rows} stale-child"
+    )
 
 
 def task_cache_status():

@@ -587,7 +587,10 @@ fail a build):
   command*. Positional args after `--`: label substrings to filter
   (`doit cache_status -- cone_gear`), `miss` (only misses), `all` (dump dep digests
   for every task, not just misses). A `DRIFT(...)` flag marks a task whose current
-  key differs from the last key this seat published.
+  key differs from the last key this seat published. A `STALE-CHILD(<child>)` flag
+  marks a dependent keyed on a child `.execution` token that a build would restamp
+  first (the child is stale in this checkout's `.doit.db`), so its printed key is
+  not the one a build uses.
 - **`HARMONIC_CACHE_DEBUG=1`** — during a real build, logs every `(digest, relpath)`
   feeding each key plus the final key, tagged by task.
 - **`cad/out/reports/cache.jsonl`** — append-only event log (key + event:

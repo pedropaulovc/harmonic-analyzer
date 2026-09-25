@@ -8,6 +8,7 @@ injected ``changed`` arg, which is corrupted after an intervening failed task.
 import contextlib
 import importlib.util
 import inspect
+import json
 import os
 import re
 import time
@@ -1042,6 +1043,197 @@ def test_cache_status_covers_drawings():
     rows = dict(dodo._cache_rows())
     stem = dodo._drawing_order()[0]
     assert rows[f"drawing:{stem}"] == dodo._drawing_file_deps(stem)
+
+
+@pytest.fixture
+def stale_child_layout(tmp_path):
+    """A part -> assembly -> drawing chain on disk, each child with a valid token,
+    plus a ``record(label, digests)`` helper writing doit's JSON record the way
+    ``Dependency.save_success`` does (``[mtime, size, digest]`` per dep)."""
+    dodo = _load_dodo()
+    part_script = tmp_path / "build_c.py"
+    asm_script = tmp_path / "build_a_assembly.py"
+    draw_script = tmp_path / "draw_c.py"
+    part_token = tmp_path / ".c.execution"
+    asm_token = tmp_path / ".a.execution"
+    part_script.write_text("WIDTH = 3.0\n")
+    asm_script.write_text("MATES = 1\n")
+    draw_script.write_text("VIEWS = 2\n")
+    part_token.write_text("a" * 64 + "\n")
+    asm_token.write_text("b" * 64 + "\n")
+    rows = [
+        ("part:c", [str(part_script)]),
+        ("assembly:a", [str(asm_script), str(part_token)]),
+        ("drawing:c", [str(draw_script), str(part_token)]),
+        ("drawing:a", [str(draw_script), str(asm_token)]),
+    ]
+    owners = {str(part_token): "part:c", str(asm_token): "assembly:a"}
+    deps = dict(rows)
+    records: dict = {}
+
+    def record(label, digests=None):
+        digests = digests or {}
+        records[label] = {
+            "_values_:": {},
+            "checker:": "ContentChecker",
+            "deps:": deps[label],
+            **{
+                dep: [0.0, 0, digests.get(dep, dodo.ContentChecker._digest(dep))]
+                for dep in deps[label]
+            },
+        }
+
+    def probe():
+        return dodo._StaleChildProbe(
+            rows, owners, records, dodo.ContentChecker._digest
+        )
+
+    return {
+        "dodo": dodo,
+        "rows": rows,
+        "deps": deps,
+        "owners": owners,
+        "records": records,
+        "record": record,
+        "probe": probe,
+        "part_script": part_script,
+        "part_token": part_token,
+    }
+
+
+def test_stale_child_flags_a_token_stamped_under_an_old_recipe(stale_child_layout):
+    """#909: the part's token on disk was stamped by a run whose recipe digest the
+    script has since moved off, so a build reruns the part first and restamps it.
+    The drawing's key, folded from that old token, is one no build would use."""
+    lay = stale_child_layout
+    lay["record"]("part:c", {str(lay["part_script"]): "0" * 32})
+
+    assert lay["probe"]().children(lay["deps"]["drawing:c"]) == ["part:c"]
+
+
+def test_stale_child_leaves_a_fresh_token_unflagged(stale_child_layout):
+    lay = stale_child_layout
+    lay["record"]("part:c")
+
+    assert lay["probe"]().children(lay["deps"]["drawing:c"]) == []
+
+
+def test_stale_child_flags_a_child_this_seat_never_ran(stale_child_layout):
+    """No doit record means doit runs the child before any dependent; the token on
+    disk (or its absence) is not what that run will stamp."""
+    lay = stale_child_layout
+
+    assert lay["probe"]().children(lay["deps"]["drawing:c"]) == ["part:c"]
+
+
+def test_stale_child_flags_a_changed_dependency_set(stale_child_layout):
+    lay = stale_child_layout
+    lay["record"]("part:c")
+    lay["records"]["part:c"]["deps:"] = [*lay["deps"]["part:c"], "C:/gone.py"]
+
+    assert lay["probe"]().children(lay["deps"]["drawing:c"]) == ["part:c"]
+
+
+def test_stale_child_flags_an_invalid_token(stale_child_layout):
+    """``_ExecutionIdentityTracker`` reruns a child whose token is not a sha256."""
+    lay = stale_child_layout
+    lay["record"]("part:c")
+    lay["part_token"].write_text("1720860000000000000\n")
+
+    assert lay["probe"]().children(lay["deps"]["drawing:c"]) == ["part:c"]
+
+
+def test_stale_child_propagates_through_a_fresh_assembly(stale_child_layout):
+    """The assembly's own record still matches (its token dep has not moved yet),
+    but the build reruns the part, which refreshes the assembly and restamps its
+    token -- so an assembly-sourced drawing names the assembly, its direct child."""
+    lay = stale_child_layout
+    lay["record"]("part:c", {str(lay["part_script"]): "0" * 32})
+    lay["record"]("assembly:a")
+
+    assert lay["probe"]().children(lay["deps"]["drawing:a"]) == ["assembly:a"]
+
+    lay["record"]("part:c")
+    assert lay["probe"]().children(lay["deps"]["drawing:a"]) == []
+
+
+def test_stale_child_ignores_a_salt_bump(stale_child_layout, monkeypatch):
+    """A salt bump moves every child key while doit reruns nothing, so the
+    dependent's printed key IS the one its build uses: comparing keys instead of
+    recorded digests would flag the whole fleet."""
+    lay = stale_child_layout
+    lay["record"]("part:c")
+    monkeypatch.setenv("HARMONIC_CACHE_SALT", "a-different-salt")
+
+    assert lay["probe"]().children(lay["deps"]["drawing:c"]) == []
+
+
+def _run_cache_status(lay, monkeypatch, tmp_path, db_text=None, present=True):
+    dodo = lay["dodo"]
+    db = tmp_path / ".doit.db"
+    db.write_text(db_text or json.dumps(lay["records"]), encoding="utf-8")
+    lines: list[tuple[str, str]] = []
+    for level in ("debug", "info", "warn", "success"):
+        monkeypatch.setattr(
+            dodo._telemetry,
+            level,
+            lambda msg, *_a, _level=level, **_k: lines.append((_level, msg)),
+        )
+    monkeypatch.setitem(dodo.DOIT_CONFIG, "dep_file", str(db))
+    monkeypatch.setattr(dodo, "_cache_rows", lambda: lay["rows"])
+    monkeypatch.setattr(dodo, "_execution_token_owners", lambda: lay["owners"])
+    monkeypatch.setattr(dodo._cache, "probe", lambda _key: present)
+    monkeypatch.setattr(dodo._cache, "last_stored_key", lambda _label: None)
+    dodo._cache_status([])
+    return lines
+
+
+def _row(lines, label):
+    return next(
+        (level, msg) for level, msg in lines if msg.endswith(label) or f"{label}  " in msg
+    )
+
+
+def test_cache_status_marks_a_row_keyed_on_a_stale_child(
+    stale_child_layout, monkeypatch, tmp_path
+):
+    lay = stale_child_layout
+    lay["record"]("part:c", {str(lay["part_script"]): "0" * 32})
+    lay["record"]("assembly:a")
+
+    lines = _run_cache_status(lay, monkeypatch, tmp_path)
+
+    level, msg = _row(lines, "drawing:c")
+    assert msg.endswith("drawing:c  STALE-CHILD(part:c)")
+    assert level == "warn", "a HIT under a phantom key must not read as healthy"
+    assert _row(lines, "drawing:a")[1].endswith("STALE-CHILD(assembly:a)")
+    assert "STALE-CHILD" not in _row(lines, "part:c")[1]
+    assert lines[-1][1].endswith("3 stale-child")
+
+
+def test_cache_status_leaves_rows_on_fresh_children_unmarked(
+    stale_child_layout, monkeypatch, tmp_path
+):
+    lay = stale_child_layout
+    lay["record"]("part:c")
+    lay["record"]("assembly:a")
+
+    lines = _run_cache_status(lay, monkeypatch, tmp_path)
+
+    assert not any("STALE-CHILD" in msg for _level, msg in lines)
+    assert _row(lines, "drawing:c")[0] == "info"
+
+
+def test_cache_status_survives_an_unreadable_doit_db(
+    stale_child_layout, monkeypatch, tmp_path
+):
+    """Best-effort like DRIFT: a torn or foreign db never fails the diagnostic; with
+    no records every child reads never-run here, which is what doit would do."""
+    lay = stale_child_layout
+    lay["record"]("part:c")
+    lines = _run_cache_status(lay, monkeypatch, tmp_path, db_text="{not json")
+
+    assert _row(lines, "drawing:c")[1].endswith("STALE-CHILD(part:c)")
 
 
 def test_content_checker_digest_ignores_yaml_noise(tmp_path):
@@ -2756,3 +2948,18 @@ def test_every_subprocess_launch_names_a_task_the_guard_can_map():
         for action, args in task["actions"]:
             if action is dodo._run_stamped:
                 dodo._fastener_rows_env(args[3])  # raises on an unmappable task
+
+
+def test_cache_status_flags_rows_after_a_miss_dump(
+    stale_child_layout, monkeypatch, tmp_path
+):
+    """A MISS dumps its per-dep digests; the rows after it must still be keyed and
+    probed for stale children."""
+    lay = stale_child_layout
+    lay["record"]("part:c", {str(lay["part_script"]): "0" * 32})
+    lay["record"]("assembly:a")
+
+    lines = _run_cache_status(lay, monkeypatch, tmp_path, present=False)
+
+    assert _row(lines, "drawing:a")[1].endswith("STALE-CHILD(assembly:a)")
+    assert lines[-1][1].endswith("0 hit / 4 miss / 0 unknown / 3 stale-child")

@@ -319,6 +319,15 @@ build):
   - `all` — dump dep digests for **every** task, not just misses
   - a `DRIFT(last published …)` flag appears when a task's current key differs from
     the last key *this seat* published (see below).
+  - a `STALE-CHILD(<child>, …)` flag marks an assembly, drawing or gate whose key
+    folds a child `.execution` token that a build would restamp first. The child is
+    stale when its own `.doit.db` record is missing, lists other deps, records a dep
+    digest that has since moved, or its token is invalid, or when one of its own
+    children is stale. Such a row's key (HIT or MISS) is not the one a build uses;
+    rebuild or restore the child and re-run `cache_status`. The comparison is by
+    recorded dep digest, not key, so a salt or epoch bump does not raise it. A fresh
+    worktree has no records yet, so every dependent row carries the flag. The row
+    prints at warning level, and debug verbosity names each child's reason.
 - **`HARMONIC_CACHE_DEBUG=1`** — during a real `doit` build, logs each
   `(digest, relpath)` feeding every key and the resulting key, tagged by task. Turn
   it on for the build you're diagnosing rather than reasoning after the fact.
