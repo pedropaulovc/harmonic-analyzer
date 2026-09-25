@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import _config
 import _fit_limits
 import build_cone_gear_shaft as part
+import build_drive_train_assembly as drive
 import cone_gear_shaft_spec
+import cone_pivot_post_installation
 import draw_cone_gear_shaft as drawing
 import pytest
-from _drawing_contract import model_toleranced_dimensions
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -21,7 +24,6 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
     "+0.00/-0.02" reading as inches on every land. The identity assertion also
     stops a local retype from silently forking the shared class.
     """
-    assert drawing.DIMENSION_CALLOUTS == {}
     assert cone_gear_shaft_spec.SECTION_DIA_BAND is _fit_limits.SHAFT_H
     # Applied in a loop over the five sections, so the AST reports the f-string
     # source rather than five literal keys.
@@ -31,6 +33,74 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
         )
     }
     assert "for section in range(5)" in Path(part.__file__).read_text(encoding="utf-8")
+
+
+def test_display_precision_is_owned_by_the_part() -> None:
+    """Policy rule 2: the .SLDPRT carries the places, the sheet reads them back."""
+    assert "draw_cone_gear_shaft.py" in PRECISION_MIGRATED_DRAWINGS
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_dimension_precision" not in source
+    assert "SetPrecision3" not in source
+    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in (
+        Path(part.__file__).read_text(encoding="utf-8")
+    )
+    # Every diameter carries the shared band, so its places are only spelling.
+    # The stations carry no band, so their places ARE the grade they are held
+    # to: three for the gear-seat shoulders that must land in the air gap
+    # between two gear faces, one for the journal length and overall length,
+    # which nothing seats against.
+    by_name = cone_gear_shaft_spec.DRAWING_PRECISION_BY_NAME
+    assert by_name == {
+        "Sec0Dia": 3,
+        "Sec1Dia": 3,
+        "Sec2Dia": 3,
+        "Sec3Dia": 3,
+        "Sec4Dia": 3,
+        "Sec0End": 1,
+        "Sec1End": 3,
+        "Sec2End": 3,
+        "Sec3End": 3,
+        "Sec4End": 1,
+        "ShoulderR": 2,
+    }
+
+
+def test_gear_seat_shoulders_are_held_inside_the_air_gap() -> None:
+    """The .XXX grade is a location requirement, not a spelling choice.
+
+    Gears are soldered at the seat pitch with 6.5 faces, so each seat step
+    has to fall in the ~0.39 air gap between two neighbouring gear faces;
+    otherwise the small-bore gear cannot pass the larger land to reach its
+    station.  The title-block .XXX grade keeps every step in its gap and the
+    .XX grade does not -- which is why Sec1End..Sec3End print three places.
+    """
+    grade = {
+        places: _config.title_block(f"linear_{places}pl")["value_in"] * 25.4
+        for places in (2, 3)
+    }
+    ends = cone_gear_shaft_spec.SECTION_ENDS
+    seat0 = (
+        cone_gear_shaft_spec.FRONT_STUB
+        + cone_pivot_post_installation.GEAR_AXIS_SHIFT
+        + drive.SHAFT_T120_STATION
+    )
+    faces = [
+        (
+            seat0 + j * drive.SEAT_PITCH - drive.CONE_FACE / 2.0,
+            seat0 + j * drive.SEAT_PITCH + drive.CONE_FACE / 2.0,
+        )
+        for j in range(20)
+    ]
+    for name, station in zip(("Sec1End", "Sec2End", "Sec3End"), ends[1:4]):
+        north_of_inboard = max(north for _south, north in faces if north < station)
+        south_of_outboard = min(south for south, _north in faces if south > station)
+        held = grade[cone_gear_shaft_spec.DRAWING_PRECISION_BY_NAME[name]]
+        assert station - held > north_of_inboard, name
+        assert station + held < south_of_outboard, name
+        assert station + grade[2] > south_of_outboard, name
+    # The last seat's north face and the tip journal end share the terminal
+    # land: the overall length locates nothing but an adjustable cup point.
+    assert ends[4] > faces[19][1]
 
 
 def test_required_drawing_paths() -> None:
@@ -45,11 +115,65 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is cone_gear_shaft_spec.DRAWING_DIMENSIONS
     marked = set().union(*cone_gear_shaft_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.SIDE_KEEP) | set(drawing.END_KEEP)
-    assert kept == marked
+    assert set(drawing.SIDE_KEEP) | set(drawing.SIDE_DIAMETERS) == marked
+    # Nothing is imported twice, and the donor hands over exactly the five
+    # diameters it was placed for.
+    assert set(drawing.DONOR_KEEP) == set(drawing.SIDE_DIAMETERS)
+    assert not set(drawing.SIDE_KEEP) & set(drawing.DONOR_KEEP)
     assert part.SECTIONS is cone_gear_shaft_spec.SECTIONS
     assert drawing.SHAFT_LENGTH == cone_gear_shaft_spec.SHAFT_LENGTH
     assert drawing.SECTION_DIAS == cone_gear_shaft_spec.SECTION_DIAS
+
+
+def test_every_diameter_stands_on_its_own_land() -> None:
+    """A diameter may only be dragged to the land its profile sketch measures.
+
+    Land 0's circle is the large-end face; every other land is sketched on an
+    offset plane at its END station and extruded back to that face, so the
+    dimension lands on the shoulder it measures instead of piling up with the
+    other four at z=0 (which is what forced the old leadered end view).  On
+    the sheet a vertical linear dimension's line sits at its text x, so that
+    x must fall inside the land: outside it the extension lines would run
+    through a bigger neighbour and across its shoulder.
+    """
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'mode="offset", base_plane="Front Plane", offset=end_z' in source
+    assert "ExtrusionParameters(depth=end_z, reverse_direction=i > 0)" in source
+    assert "await adapter.create_sketch(plane_name)" in source
+
+    ends = cone_gear_shaft_spec.SECTION_ENDS
+    big_end = drawing.SIDE_CENTER[0] + cone_gear_shaft_spec.SHAFT_LENGTH / 2000.0
+    starts = (0.0, *ends[:-1])
+    for index, (start, end) in enumerate(zip(starts, ends)):
+        x, y = drawing.SIDE_DIAMETERS[f"Sec{index}Dia"]
+        land = (big_end - end / 1000.0, big_end - start / 1000.0)
+        if index == 0:
+            # The faced end is the one place a line may stand off the part.
+            assert land[0] < x < big_end + 0.025
+        else:
+            assert land[0] < x < land[1], index
+        assert (
+            y > drawing.SIDE_CENTER[1] + cone_gear_shaft_spec.SECTION_DIAS[0] / 2000.0
+        )
+
+
+def test_stacked_tip_diameters_never_run_a_line_through_a_text() -> None:
+    """Three lands 6.9 mm apart carry three texts; each line clears the others.
+
+    A dragged diameter's text hangs to the RIGHT of its dimension line, so the
+    text at (x, y) spans x..x+width; any other line inside that span rises
+    from the shaft and must stop below the text.  The first render stepped
+    the texts the other way and three leaders crossed (codex, 18395f30).
+    """
+    width = drawing.DIAMETER_TEXT_WIDTH
+    text_height = 0.009  # nominal over a stacked two-line band
+    items = list(drawing.SIDE_DIAMETERS.values())
+    for x_a, y_a in items:
+        for x_b, y_b in items:
+            if (x_a, y_a) == (x_b, y_b):
+                continue
+            if x_a < x_b < x_a + width:
+                assert y_b < y_a - text_height, ((x_a, y_a), (x_b, y_b))
 
 
 def test_sections_are_a_monotonic_stepped_shaft() -> None:
@@ -66,7 +190,7 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     assert cone_gear_shaft_spec.JOURNAL_CLEARANCE == pytest.approx(0.05)
     assert cone_gear_shaft_spec.JOURNAL_DIA == pytest.approx(12.2308)
     assert cone_gear_shaft_spec.JOURNAL_END == pytest.approx(43.011)
-    assert dias == pytest.approx((12.2308, 9.525, 6.35, 3.175, 0.79375))
+    assert dias == pytest.approx((12.2308, 9.525, 6.35, 3.175, 1.5875))
     assert cone_gear_shaft_spec.FRONT_STUB == pytest.approx(61.9068609979)
     assert cone_gear_shaft_spec.TIP_BLOCK_NORTH_FACE_STATION == pytest.approx(
         147.27232594770454
@@ -81,7 +205,7 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
         cone_gear_shaft_spec.FRONT_STUB + cone_gear_shaft_spec.T006_TIP_STATION
     )
     # The journal and all preceding gear-seat endpoints stay put; only the
-    # terminal 1/32-in endpoint follows the stock cup apex.
+    # terminal 1/16-in endpoint follows the stock cup apex.
     stub_delta = cone_gear_shaft_spec.FRONT_STUB - 12.3
     assert ends[1:-1] == pytest.approx(
         tuple(
@@ -105,82 +229,88 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
         cone_gear_shaft_spec.TIP_BUSHING_END_STATION
         <= cone_gear_shaft_spec.T006_TIP_STATION
     )
-    # Every seat diameter carries the snug fit as a NATIVE model tolerance --
-    # see test_section_fits_are_toleranced_on_the_model. Display precision stays
-    # a sheet decision (an exact-conversion nominal needs its decimals shown).
-    assert drawing.DIMENSION_PRECISION == {
-        name: 4 if name == "Sec0Dia" else 3 for name in drawing.END_KEEP
-    }
 
 
-def test_linked_notes_cover_the_remaining_shaft_operations() -> None:
+def test_shoulder_roots_are_modelled_not_noted() -> None:
+    """The root radius is geometry with a size, not a sentence in a note block."""
+    assert cone_gear_shaft_spec.FILLET_RADIUS == pytest.approx(0.10)
+    # It has to clear the ~0.19 mm of air on each side of every step.
+    assert cone_gear_shaft_spec.FILLET_RADIUS < 0.19
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "add_fillet(FILLET_RADIUS, fillet_edges, propagate=False)" in source
+    assert 'name_last_feature(adapter, "ShoulderFillets")' in source
+    assert 'name_dimensions(adapter, "ShoulderFillets", ["ShoulderR"])' in source
+    # One feature, one dimension, one quantity prefix -- not four dimensions.
+    assert drawing.DIMENSION_CALLOUTS == {"ShoulderR": "4X"}
+    # The old "SHOULDER ROOTS R0.10 MAX" note is gone.  What remains names
+    # the mates behind the h band and the three-place stations (rule 2)
+    # without adding a check of its own (no MUST), and carries no number
+    # but the mate's part number, no tolerance, datum or method word.
     notes = cone_gear_shaft_spec.DRAWING_NOTES
-    assert "NO CENTRE HOLE" in notes
-    assert "LARGE-END FACE" in notes
-    # The 0.79 mm tip journal is a documented, Phase-3-flagged design
-    # characteristic -- the print warns the machinist instead of hiding it.
-    assert "FRAGILE BY DESIGN" in notes
-    assert "FOLLOWER-REST" in notes
-    assert "12.2308 BEARING JOURNAL" in notes
-    assert "12.2808 POST BORE" in notes
-    assert "0.05 DIAMETRAL CLEARANCE" in notes
-    assert "DIA 12.5 MIN ROUND BAR" in notes
-    assert "X.XX" not in notes
-    assert "BREAK EXTERNAL EDGES" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert "def _manufacturing_notes" not in source
-
-
-def test_native_gdt_controls_shaft_form_coaxiality_and_finish() -> None:
-    """GD&T identity lives in the spec's PMI rows; the sheet only imports it."""
-    from cone_gear_shaft_spec import GEOMETRIC_CONTROLS, PART_DATUMS
-
-    by_key = {control.key: control for control in GEOMETRIC_CONTROLS}
-    assert set(by_key) == {"journal_cylindricity", "tip_runout"}
-    assert by_key["journal_cylindricity"].characteristic == "cylindricity"
-    assert by_key["journal_cylindricity"].tolerance == "0.01"
-    assert by_key["tip_runout"].characteristic == "circular_runout"
-    assert by_key["tip_runout"].tolerance == "0.05"
-    assert by_key["tip_runout"].datums == ("A",)
-    # Both controls resolve their face by diameter alone; the Ø0.79375 tip
-    # carries a tightened match tolerance so the pick stays unique.
-    assert by_key["journal_cylindricity"].face.diameter_mm == (
-        cone_gear_shaft_spec.JOURNAL_DIA
+    assert 1 <= len(notes.splitlines()) <= 4
+    # The sheet's note text runs ~2.7 mm per character; a line from the
+    # note anchor must end before the title block at x = 0.216 m (the
+    # first render's 67-character line ran under the tolerance table).
+    assert max(len(line) for line in notes.splitlines()) * 0.0027 < (
+        0.216 - drawing.NOTES_XY[0]
     )
+    mate_number = _config.parts("cone-gear")["number"]
+    assert not any(character.isdigit() for character in notes.replace(mate_number, ""))
+    for forbidden in (
+        "R0.",
+        "MAX",
+        "MUST",
+        "DATUM",
+        "BASIC",
+        "FINISH",
+        "TURN",
+        "GRIND",
+    ):
+        assert forbidden not in notes.upper()
+    assert "SLIP FIT" in notes and f"CONE GEAR BORES, {mate_number}" in notes
+    assert "SOLDERED CONE GEAR SEATS" in notes
     assert (
-        by_key["tip_runout"].face.diameter_mm == cone_gear_shaft_spec.SECTION_DIAS[-1]
+        'apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})'
+        in source
     )
-    assert by_key["tip_runout"].face.tolerance_mm == 0.01
-    assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)' in (
+        Path(drawing.__file__).read_text(encoding="utf-8")
+    )
 
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(" in part_source
+
+def test_the_sheet_carries_no_datums_or_feature_control_frames() -> None:
+    """Simplicity policy rule 3: no GD&T on a hand-built hobby shaft."""
+    assert not hasattr(cone_gear_shaft_spec, "PART_DATUMS")
+    assert not hasattr(cone_gear_shaft_spec, "GEOMETRIC_CONTROLS")
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "project_part_pmi(" in source
-    assert "controls=GEOMETRIC_CONTROLS" in source
-    assert "add_feature_control_frame(" not in source
-    assert "add_datum_feature(" not in source
+    for banned in (
+        "project_part_pmi(",
+        "add_feature_control_frame(",
+        "add_datum_feature(",
+    ):
+        assert banned not in source
+    # The two lands that RUN keep their roughness symbol; nothing else does.
     assert source.count("add_surface_finish(") == 2
+    assert tuple(control.key for control in cone_gear_shaft_spec.SURFACE_FINISHES) == (
+        "pivot_journal",
+        "tip_journal",
+    )
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in part_source
 
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
+    assert drawing.SIDE_SCALE == (1, 1)  # full length, no reduction
+    assert drawing.ISO_SCALE == (1, 2)  # reduced pictorial
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(1, 1)") == 1  # side silhouette at sheet scale
-    assert source.count("scale=(4, 1)") == 1  # enlarged end view
-    assert source.count("scale=(1, 2)") == 1  # reduced pictorial
-    assert drawing.END_VIEW_SCALE == 4.0
-
-
-def test_datum_symbol_requests_the_persisted_journal_boundary() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # The imported datum tag's placement stays DERIVED from the journal's
-    # small-end station (JOURNAL_END), never a frozen sheet number.
-    assert "position=(big_end_x - JOURNAL_END / 1000.0, 0.252)" in source
-    assert "symbol_xy=(0.255, 0.242)" in source
-    assert cone_gear_shaft_spec.END_VIEW_NOTE == "END VIEW SCALE 4:1"
-    assert 'add_property_linked_note(adapter, "End View Note"' in source
+    # The end view is gone: its only content was a pile of leadered diameters.
+    # The tip detail is gone too: DragModelDimension refuses to re-home a
+    # model dimension into a detail view, so the five diameters share the
+    # side view.
+    assert '"*Front"' in source  # the donor, and only as a donor
+    assert "delete_view(adapter, donor)" in source
+    assert "CreateDetailViewAt4" not in source
 
 
 def test_part_stamps_make_critical_properties() -> None:
