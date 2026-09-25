@@ -19,10 +19,12 @@ INPUTS
 ------
 ``--report``: one or more drawing layout reports
 (cad/out/reports/layout-audit/<stem>.json, a cached drawing-task target, so a
-restored leaf has one too).
+restored leaf has one too). A report keeps each page's text but only a count
+of its strokes; ``--pdf-dir`` (cad/out/pdf, also cached) re-reads them, so
+model-edge findings replay too.
 
     uv run python cad/scripts/diagnostics/layout_calibration.py \
-        --report cad/out/reports/layout-audit/*.json --json calib.json
+        --report cad/out/reports/layout-audit/*.json --pdf-dir cad/out/pdf --json calib.json
 """
 
 from __future__ import annotations
@@ -48,6 +50,7 @@ from _layout_audit import (  # noqa: E402
     view_edges,
 )
 from _layout_geometry import Box  # noqa: E402
+from _pdf_ink import page_ink, read_pdf_ink  # noqa: E402
 
 MM = 1000.0
 
@@ -116,14 +119,24 @@ def _summarise(values: list[float]) -> dict[str, float]:
     }
 
 
-def calibrate(reports: list[Path]) -> dict[str, Any]:
+def with_strokes(dump: dict[str, Any], pdf_dir: Path | None) -> dict[str, Any]:
+    """The dump with its page's strokes re-read from the drawing's PDF."""
+    if "strokes" in (dump.get("ink") or {}):
+        return dump
+    if pdf_dir is None:
+        raise SystemExit(f"{dump.get('stem')}: the report keeps no strokes; pass --pdf-dir")
+    pages = read_pdf_ink(pdf_dir / f"{dump['stem']}.pdf")
+    return {**dump, "ink": page_ink(pages[int(dump["page"])])}
+
+
+def calibrate(reports: list[Path], pdf_dir: Path | None = None) -> dict[str, Any]:
     loaded = [json.loads(path.read_text(encoding="utf-8")) for path in reports]
     report: dict[str, Any] = {
         "sheets": [],
         "summaries": [{"stem": r["stem"], **r["summary"]} for r in loaded],
     }
     records: list[dict[str, Any]] = []
-    for dump in (dump for r in loaded for dump in r["sheets"]):
+    for dump in (with_strokes(dump, pdf_dir) for r in loaded for dump in r["sheets"]):
         items = match_items(dump)
         records.extend({"stem": dump.get("stem"), **item} for item in items)
         report["sheets"].append(
@@ -156,9 +169,10 @@ def calibrate(reports: list[Path]) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--report", type=Path, nargs="+", required=True)
+    parser.add_argument("--pdf-dir", type=Path)
     parser.add_argument("--json", type=Path)
     args = parser.parse_args(argv)
-    report = calibrate(args.report)
+    report = calibrate(args.report, args.pdf_dir)
     if args.json:
         args.json.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     for sheet in report["sheets"]:

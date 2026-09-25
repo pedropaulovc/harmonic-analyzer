@@ -31,7 +31,7 @@ from _layout_audit import (
     sheet_model,
     view_edges,
 )
-from _layout_geometry import Box, Segment
+from _layout_geometry import DEFAULT_TEXT_TOUCH_TOL_M, Box, Segment
 
 SHEET_W = 0.4318
 SHEET_H = 0.2794
@@ -88,8 +88,35 @@ def _box_edges(x0, y0, x1, y1):
     return _edges((x0, y0, x1, y0), (x1, y0, x1, y1), (x1, y1, x0, y1), (x0, y1, x0, y0))
 
 
-def _dump(*, views=(), sheet_annotations=(), tables=(), spans=(), strokes=()):
-    return {
+def _printed(annotations, advance=0.6):
+    """An ideal PDF of fixture COM text: one text object per item, its glyphs
+    from the item's lower-left, symbols printing as paths (no object)."""
+    from _layout_audit import ink_key, text_items
+
+    spans = []
+    for annotation in annotations:
+        for item in text_items(annotation.get("display") or {}):
+            if not ink_key(item.text) or "<" in item.text:
+                continue
+            width = advance * item.height * len(item.text.strip())
+            spans.append([item.text.strip(), item.x, item.y, item.x + width, item.y + item.height])
+    return spans
+
+
+def _dump(*, views=(), sheet_annotations=(), tables=(), spans=(), strokes=(), print_rest=True):
+    """A sheet dump; with ``strokes`` or ``spans`` it is a printed page. Text
+    ``spans`` does not give prints where the fixture's COM items say, unless
+    ``print_rest`` is off."""
+    ink = {}
+    if strokes or spans:
+        from _layout_audit import ink_key
+
+        annotations = [a for view in views for a in view.get("annotations", ())] + list(sheet_annotations)
+        given = {ink_key(str(span[0])) for span in spans}
+        rest = [span for span in _printed(annotations) if ink_key(span[0]) not in given] if print_rest else []
+        printed = [*spans, *rest]
+        ink = {"ink": {"spans": [list(span) for span in printed], "strokes": [list(stroke) for stroke in strokes]}}
+    return {**ink, **{
         "schema": 1,
         "stem": "fixture",
         "sheet": "Sheet2",
@@ -100,9 +127,8 @@ def _dump(*, views=(), sheet_annotations=(), tables=(), spans=(), strokes=()):
         "views": list(views),
         "sheet_annotations": list(sheet_annotations),
         "tables": list(tables),
-        "ink": {"spans": [list(span) for span in spans], "strokes": [list(stroke) for stroke in strokes]},
         "read_errors": {},
-    }
+    }}
 
 
 def _view(name, outline, annotations=(), **extra):
@@ -331,7 +357,10 @@ def test_text_crossed_by_a_foreign_view_edge_is_found():
         [("ADJUSTER ENTRY", 0.100, 0.118)],
     )
     front = _view("front", (0.060, 0.080, 0.100, 0.160), [callout])
-    findings = audit_dump(_dump(views=[front, right_view], strokes=_edges((0.130, 0.080, 0.130, 0.160))))
+    printed = [["ADJUSTER ENTRY", 0.1002, 0.1189, 0.1400, 0.1222]]  # runs the width of its shoulder
+    findings = audit_dump(
+        _dump(views=[front, right_view], strokes=_edges((0.130, 0.080, 0.130, 0.160)), spans=printed)
+    )
     hits = [f for f in findings if f.kind == "text-on-line" and "view right geometry" in f.b]
     assert len(hits) == 1
 
@@ -673,10 +702,12 @@ def test_the_audit_span_carries_per_class_counts(monkeypatch, tmp_path):
     live = _patch_collect(monkeypatch, [_holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)])
     monkeypatch.setattr(live._telemetry, "span", recording_span)
     _run(live, LayoutAuditMode.REPORT, tmp_path / "fixture.json")
-    [(name, recorder)] = spans
-    assert name == "layout.audit fixture"
-    assert recorder.attributes["findings.leader-through-text"] == 1
-    assert recorder.attributes["sheets"] == 1
+    recorded = dict(spans)
+    assert list(recorded) == ["layout.audit fixture", "layout.findings"]
+    assert recorded["layout.audit fixture"].attributes["findings.leader-through-text"] == 1
+    assert recorded["layout.audit fixture"].attributes["sheets"] == 1
+    assert recorded["layout.findings"].attributes["findings.leader-through-text"] == 1
+    assert recorded["layout.findings"].attributes["findings_s"] >= 0.0
 
 
 # hb-render-5 (375bf2aad, supports' fix): the cross-tap cut to three rows and
@@ -814,6 +845,7 @@ def test_com_text_the_pdf_never_printed_gates_but_symbols_do_not():
     dump = _dump(
         views=[_view("v", (0.05, 0.05, 0.25, 0.25), [printed, lost, symbol])],
         spans=[["12.0", 0.1002, 0.1491, 0.1060, 0.1524]],
+        print_rest=False,
     )
     unmatched = [f for f in audit_dump(dump) if f.kind == "text-unmatched"]
     assert [(f.a, f.b) for f in unmatched] == [("Lost", "7.5")]
@@ -986,15 +1018,16 @@ def test_a_detail_circle_is_no_leader_target_and_its_label_is_the_printed_one():
     assert [f.kind for f in estimated if "detail-circle" in f.a + f.b] == ["text-on-line"]
 
 
-def test_a_leader_across_a_section_cutting_line_is_its_own_advisory_class():
-    """Pending Main's ruling: reported, not gated."""
+def test_a_leader_across_a_section_cutting_line_gates():
+    """Main's ruling: gating -- the MHA-025 finish leader was moved off its
+    A-A line for exactly this."""
     callout = _hole_callout(
         "C", [(0.160, 0.120, 0.190, 0.150), (0.190, 0.150, 0.230, 0.150)], [("THRU", 0.190, 0.1502)]
     )
     view = _view("v", CSP_VIEW2, [callout], sections=[CSP_SECTION_A])
     [finding] = [f for f in audit_dump(_dump(views=[view])) if "crosses" in f.kind]
     assert finding.kind == "leader-crosses-section-line"
-    assert severity(finding) is FindingSeverity.ADVISORY
+    assert severity(finding) is FindingSeverity.GATING
 
 
 def test_text_beside_a_view_is_measured_against_its_printed_edges_not_its_padded_outline():
@@ -1038,7 +1071,7 @@ def test_one_line_through_a_two_row_dimension_is_one_finding():
 def test_a_pdf_page_dumps_its_text_and_only_its_black_stroked_lines():
     """The frame and title block print grey and arrowheads/section arrows are
     filled: neither is a line the audit measures."""
-    from _drawing_layout_audit import page_ink
+    from _pdf_ink import page_ink
     from _pdf_ink import PageInk, Span, Stroke
 
     def stroke(y, *, rgb=(0, 0, 0), filled=False, stroked=True, dashed=False):
@@ -1187,3 +1220,380 @@ def test_stacked_leadered_balloons_are_not_merged_callouts():
     findings = audit_dump(dump)
     assert not [f for f in findings if f.kind == "merged-blocks"]
     assert {a.kind for a in sheet_model(dump).geometry.annotations} == {"balloon"}
+
+
+# --------------------------------------------------------------------------
+# Main's C2 review (CHANGES) and rulings, 2026-09-25
+# --------------------------------------------------------------------------
+
+
+def _dim_record(name, lines, arrows, texts):
+    """A dimension as the collector dumps it (real d09c2b9eb records below)."""
+    return {
+        "type": 4,
+        "name": name,
+        "visible": 1,
+        "display": {
+            "lines": [[0.0, 0.0, 0.0, 0.0, x0, y0, 0.0, x1, y1, 0.0] for x0, y0, x1, y1 in lines],
+            "arrows": [[x, y, 0.0, dx, dy, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0] for x, y, dx, dy in arrows],
+            "texts": [{"t": t, "pos": [x, y, 0.0], "h": 0.0035, "ref": 1} for t, x, y in texts],
+        },
+        "dim": {"hole_callout": False},
+    }
+
+
+# pinion-bracket (d09c2b9eb): in Drawing View2, 4.50 +/-0.10 and 9.0 share
+# the x = 71 extension line; in View1, 28.00 runs its dimension line down
+# x = 240, the line section arrow B is drawn along.
+PB_PIN_SEAT_CZ = _dim_record(
+    "PinSeatCz",
+    [
+        (0.08, 0.126, 0.08, 0.2007219),
+        (0.071, 0.123, 0.071, 0.2007219),
+        (0.08, 0.1997219, 0.071, 0.1997219),
+        (0.071, 0.1997219, 0.0457281, 0.1997219),
+    ],
+    [(0.08, 0.1997219, -1.0, 0.0), (0.071, 0.1997219, 1.0, 0.0)],
+    [(" 4.50 ±0.10 ", 0.0457281, 0.1997219)],
+)
+PB_DEPTH = _dim_record(
+    "Depth",
+    [
+        (0.071, 0.123, 0.071, 0.2102219),
+        (0.089, 0.123, 0.089, 0.2102219),
+        (0.071, 0.2092219, 0.06465, 0.2092219),
+        (0.071, 0.2092219, 0.089, 0.2092219),
+        (0.089, 0.2092219, 0.09535, 0.2092219),
+    ],
+    [(0.071, 0.2092219, -1.0, 0.0), (0.089, 0.2092219, 1.0, 0.0)],
+    [(" 9.0 ", 0.0754743, 0.2092219)],
+)
+PB_ARBOR_BORE_CZ = _dim_record(
+    "ArborBoreCz",
+    [
+        (0.224, 0.178, 0.241, 0.178),
+        (0.22235, 0.122, 0.241, 0.122),
+        (0.24, 0.178, 0.24, 0.1537781),
+        (0.24, 0.122, 0.24, 0.1482219),
+    ],
+    [(0.24, 0.178, 0.0, -1.0), (0.24, 0.122, 0.0, 1.0)],
+    [(" 28.00 ", 0.2328882, 0.1482219)],
+)
+PB_SECTION_B = {
+    "label": "B",
+    "line": [-0.015, -0.007, 0.0, 0.015, -0.007, 0.0],
+    "arrows": [0.18, 0.136, 0.0, 0.18, 0.124, 0.0, 0.24, 0.136, 0.0, 0.24, 0.124, 0.0],
+    "texts": [0.1778777, 0.1219384, 0.0, 0.2378777, 0.1219384, 0.0],
+    "text_height": 0.00635,
+}
+PB_SPANS = [
+    ["28.00", 0.2343213, 0.1491558, 0.2456694, 0.1527211],
+    ["B", 0.1783162, 0.11566, 0.1819653, 0.1218322],
+    ["B", 0.2383162, 0.11566, 0.2419653, 0.1218322],
+    ["9.0", 0.0769961, 0.2101558, 0.0830833, 0.2137211],
+    ["4.50±0.10", 0.0471378, 0.2006558, 0.0688295, 0.2042211],
+]
+
+
+def test_a_dimension_splits_into_its_dimension_line_and_extension_lines():
+    geometry = annotation_geometry(PB_PIN_SEAT_CZ, owner="v", advance=0.6)
+    roles = [
+        (s.role, round(s.x0 * 1000, 1), round(s.x1 * 1000, 1)) for s in geometry.segments if s.role != "arrow"
+    ]
+    assert roles == [
+        ("ext-line", 80.0, 80.0),
+        ("ext-line", 71.0, 71.0),
+        ("dim-line", 80.0, 71.0),
+        ("dim-line", 71.0, 45.7),  # the run out to the text parked left
+    ]
+
+
+def test_a_section_arrow_along_a_dimension_line_gates_but_a_shared_extension_line_does_not():
+    """Main's collinear ruling: pinion-bracket's section arrow B runs 12 mm
+    down 28.00's dimension line. 4.50 +/-0.10 and 9.0 share x = 71 as
+    extension line, which is normal drafting."""
+    view1 = _view(
+        "Drawing View1", (0.189412, 0.101412, 0.230588, 0.198588), [PB_ARBOR_BORE_CZ], sections=[PB_SECTION_B]
+    )
+    view2 = _view("Drawing View2", (0.04, 0.12, 0.1, 0.215), [PB_PIN_SEAT_CZ, PB_DEPTH])
+    findings = audit_dump(_dump(views=[view1, view2], spans=PB_SPANS, print_rest=False))
+    along = [f for f in findings if f.kind == "line-on-dimension-line"]
+    assert [(f.a, f.b.split()[1]) for f in along] == [("section-line B", "ArborBoreCz")]
+    assert along[0].extra["overlap_mm"] == pytest.approx(12.0, abs=0.01)
+    assert severity(along[0]) is FindingSeverity.GATING
+
+
+def test_a_dimension_line_across_a_foreign_extension_line_gates_only_at_text():
+    """Main's ruling b: advisory, unless within 0.5 h of either dimension's text."""
+    far = _dim_record("Far", [(0.100, 0.150, 0.140, 0.150)], [(0.100, 0.150, 1.0, 0.0)], [("12.0", 0.150, 0.150)])
+    near = _dim_record("Near", [(0.100, 0.130, 0.140, 0.130)], [(0.100, 0.130, 1.0, 0.0)], [("8.0", 0.121, 0.1305)])
+    crossed = _dim_record(
+        "Crossed",
+        [(0.120, 0.100, 0.120, 0.170), (0.120, 0.160, 0.180, 0.160)],
+        [(0.180, 0.160, -1.0, 0.0)],
+        [("30.0", 0.185, 0.160)],
+    )
+    findings = audit_dump(_dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [far, near, crossed])]))
+    crossings = {(f.a.split()[1], f.kind, severity(f).value) for f in findings if "extension" in f.kind}
+    assert crossings == {
+        ("Far", "dim-line-crosses-extension", "advisory"),
+        ("Near", "dim-line-crosses-extension-at-text", "gating"),
+    }
+
+
+def test_two_leaders_converging_on_one_landing_are_advisory():
+    """cone-gear-shaft (d09c2b9eb): Ra 1.6's leader meets Sec4Dia's dimension
+    line 3.7 mm before both arrows land on the shaft's corner. Main's ruling:
+    advisory within the last 5 mm."""
+    finish = {
+        "type": 7,
+        "name": "DetailItem352",
+        "visible": 1,
+        "leaders": [[0.02275, 0.196, 0.0, 0.03035, 0.196, 0.0, 0.0537143, 0.1507938, 0.0]],
+        "display": {
+            "lines": [_line(0.02275, 0.196, 0.03035, 0.196), _line(0.03035, 0.196, 0.0537143, 0.1507938)],
+            "arrows": [
+                [0.0537143, 0.1507938, 0.0, -0.4591403, 0.8883638, -0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]
+            ],
+            "texts": [{"t": "Ra 1.6", "pos": [0.029, 0.1995713, 0.0], "h": 0.0025, "ref": 1}],
+        },
+    }
+    sec4 = _dim_record(
+        "Sec4Dia",
+        [(0.0833972, 0.1954743, 0.052, 0.1954743), (0.052, 0.1954743, 0.052, 0.1507938)],
+        [(0.052, 0.1507938, 0.0, 1.0)],
+        [("1.588 ", 0.0585715, 0.1955278)],
+    )
+    findings = audit_dump(_dump(views=[_view("v", (0.02, 0.14, 0.09, 0.21), [finish, sec4])]))
+    crossing = [f for f in findings if "leader" in f.kind and "Sec4Dia" in f.b]
+    assert [(f.kind, severity(f).value) for f in crossing] == [("leader-converges-at-landing", "advisory")]
+
+
+def test_a_clockwise_arc_is_its_own_sweep_not_the_complement():
+    """``rotationDir`` CW = 0. Read as CCW, a 30 degree CW arc became its
+    330 degree complement: phantom ink across the sheet."""
+    import math
+
+    from _layout_audit import arc_segments
+
+    r = 0.010
+    start = (r, 0.0)
+    end = (r * math.cos(math.radians(-30)), r * math.sin(math.radians(-30)))
+    raw = [0, 0, 0, 0, *start, 0.0, *end, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+    angles = [math.degrees(math.atan2(s.y0, s.x0)) for s in arc_segments(raw)]
+    assert all(-30.0 - 1e-6 <= a <= 1e-6 for a in angles)
+    ccw = arc_segments([*raw[:16], 1.0])
+    assert max(math.degrees(math.atan2(s.y0, s.x0)) for s in ccw) > 90.0
+    variant_true = arc_segments([*raw[:16], -1.0])  # a COM VARIANT_BOOL true
+    assert [(s.x0, s.y0) for s in variant_true] == [(s.x0, s.y0) for s in ccw]
+
+
+def test_a_wide_centred_string_matches_on_its_centre():
+    """``GetTextRefPositionAtIndex`` swCENTER (2): the item's point is the
+    box centre. Compared as a lower-left corner, a 60 mm string's centre sits
+    30 mm off its printed left edge and matched nothing."""
+    item = TextItem("GENERAL TOLERANCES UNLESS NOTED", 0.200, 0.100, 0.0035, reference=2)
+    span = _ink_span("GENERAL TOLERANCES UNLESS NOTED", 0.170, 0.0983, width=0.060, height=0.0033)
+    assert match_ink([("C", item)], [span])["C"].xmin == pytest.approx(0.170)
+    as_lower_left = TextItem(item.text, item.x, item.y, item.height, reference=1)
+    assert match_ink([("C", as_lower_left)], [span]) == {}
+
+
+def test_a_run_with_a_symbol_inside_matches_the_text_either_side():
+    """A symbol inside a run prints as a path, splitting the text around it."""
+    item = TextItem("2X <MOD-DIAM> 3.45", 0.100, 0.100, 0.0035)
+    spans = [_ink_span("2X", 0.1002, 0.1009, width=0.004), _ink_span("3.45", 0.1090, 0.1009, width=0.009)]
+    box = match_ink([("S", item)], spans)["S"]
+    assert (box.xmin, box.xmax) == pytest.approx((0.1002, 0.1180))
+
+
+def test_printed_text_no_annotation_claims_gates_outside_the_title_block_border_and_tables():
+    """The reverse of text-unmatched: an annotation whose COM read failed
+    still prints, and would be invisible to every other check."""
+    owned = _dim("Owned", "12.0", 0.100, 0.150)
+    dump = _dump(
+        views=[_view("v", (0.05, 0.05, 0.25, 0.25), [owned])],
+        tables=[{"name": "BOM", "box": [0.300, 0.200, 0.400, 0.250]}],
+        spans=[
+            ["12.0", 0.1002, 0.1509, 0.1060, 0.1542],
+            ["7.5", 0.1500, 0.1509, 0.1550, 0.1542],  # printed, no COM owner
+            ["REV", 0.3000, 0.0300, 0.3100, 0.0335],  # title block
+            ["A", 0.0035, 0.1000, 0.0090, 0.1060],  # zone label in the border band
+            ["QTY", 0.3100, 0.2300, 0.3200, 0.2335],  # inside the BOM table
+        ],
+        print_rest=False,
+    )
+    unclaimed = [f for f in audit_dump(dump) if f.kind == "pdf-text-unclaimed"]
+    assert [f.a for f in unclaimed] == ["pdf '7.5'"]
+    assert severity(unclaimed[0]) is FindingSeverity.GATING
+
+
+def test_a_printed_page_that_cannot_hold_the_sheet_fails_loud():
+    """No silent fall-back to COM boxes: COM text on a page with no PDF text,
+    or a page where most strings find no printed match (origin, scale or page
+    mapping wrong), stops the audit."""
+    dims = [_dim(f"D{i}", f"{i}.5", 0.100, 0.100 + 0.01 * i) for i in range(6)]
+    view = _view("v", (0.05, 0.05, 0.25, 0.25), dims)
+    blank = _dump(views=[view], strokes=_edges((0.06, 0.06, 0.07, 0.06)))
+    blank["ink"]["spans"] = []
+    with pytest.raises(ValueError, match="no text"):
+        audit_dump(blank)
+    shifted = _dump(
+        views=[view], spans=[[f"{i}.5", 0.200, 0.100 + 0.01 * i, 0.206, 0.1033 + 0.01 * i] for i in range(6)]
+    )
+    with pytest.raises(ValueError, match="does not line up"):
+        audit_dump(shifted)
+
+
+def test_a_view_that_printed_no_model_edge_is_found():
+    """A shaded or draft view, or a template with another edge weight, prints
+    no 0.25 mm stroke: text over it is unchecked. Pictorial: advisory."""
+    views = [
+        _view("front", (0.05, 0.05, 0.10, 0.10)),
+        _view("shaded", (0.15, 0.05, 0.20, 0.10)),
+        _view("iso", (0.25, 0.05, 0.30, 0.10), pictorial=True),
+    ]
+    findings = audit_dump(_dump(views=views, strokes=_edges((0.06, 0.06, 0.09, 0.06))))
+    missing = {(f.a, f.kind, severity(f).value) for f in findings if f.kind.startswith("view-edges")}
+    assert missing == {
+        ("view shaded", "view-edges-missing", "gating"),
+        ("view iso", "view-edges-missing-pictorial", "advisory"),
+    }
+
+
+def test_a_refused_com_read_is_a_gating_finding():
+    dump = _dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25))])
+    dump["read_errors"] = {"GetDisplayData": 2}
+    [finding] = [f for f in audit_dump(dump) if f.kind == "com-read-errors"]
+    assert finding.extra["read_errors"] == {"GetDisplayData": 2}
+    assert severity(finding) is FindingSeverity.GATING
+
+
+def test_an_overload_fallback_is_not_a_read_error():
+    """GetLineAtIndex3 refusing before GetLineAtIndex2 answers is the
+    expected path; only a primitive every overload refuses counts."""
+    from _drawing_layout_audit import _Reader
+
+    reader = _Reader(adapter=None)
+
+    def refuse():
+        raise RuntimeError("E_NOTIMPL")
+
+    assert reader.first([refuse, lambda: (1.0, 2.0)], name="GetLineAtIndex3/GetLineAtIndex2") == (1.0, 2.0)
+    assert reader.take_errors() == {}
+    assert reader.first([refuse, refuse], name="GetLineAtIndex3/GetLineAtIndex2") is None
+    assert reader.take_errors() == {"GetLineAtIndex3/GetLineAtIndex2": 1}
+
+
+def test_the_report_keeps_a_stroke_count_not_every_stroke():
+    from _layout_audit import audit_report
+
+    dump = _dump(
+        views=[_view("v", (0.05, 0.05, 0.25, 0.25))], strokes=_edges((0.06, 0.06, 0.07, 0.06), (0.1, 0.1, 0.2, 0.1))
+    )
+    report, _gating = audit_report("x", LayoutAuditMode.REPORT, [dump])
+    [sheet] = report["sheets"]
+    assert sheet["ink"]["stroke_count"] == 2 and "strokes" not in sheet["ink"]
+    assert "strokes" in dump["ink"]  # the audited dump is untouched
+
+
+def test_a_page_the_size_of_another_sheet_fails_loud(monkeypatch):
+    from pathlib import Path
+
+    from _pdf_ink import PageInk
+
+    letter = PageInk(0.2794, 0.2159, (), (), ())
+    live, adapter = _fake_drawing(monkeypatch, sheet_names=("Sheet1",), views=(), pages=[letter])
+
+    class View:
+        def GetName2(self):  # noqa: N802 - COM name
+            return "Sheet1"
+
+        def GetAnnotations(self):  # noqa: N802 - COM name
+            return ()
+
+        def GetTableAnnotations(self):  # noqa: N802 - COM name
+            return ()
+
+    class Sheet:
+        def GetProperties2(self):  # noqa: N802 - COM name
+            return (0, 0, 0, 0, 0, SHEET_W, SHEET_H)
+
+        def GetZoneMargin(self, _code):  # noqa: N802 - COM name
+            return 0.0
+
+    adapter.currentModel.GetViews = lambda: ((View(),),)
+    adapter.currentModel.Sheet = lambda _name: Sheet()
+    with pytest.raises(RuntimeError, match=r"431\.8 x 279\.4 mm but page 0 of x\.pdf is 279\.4 x 215\.9 mm"):
+        live.collect_sheet_dumps(
+            adapter, stem="x", pdf=Path("x.pdf"), sheet_layouts={}, is_pictorial=lambda _o: False
+        )
+
+
+def test_a_path_inside_a_form_xobject_fails_rather_than_misplace_ink():
+    import pypdfium2.raw as pdfium_raw
+    from _pdf_ink import _strokes
+
+    class FormPath:
+        type = pdfium_raw.FPDF_PAGEOBJ_PATH
+        level = 1
+
+    class Page:
+        def get_objects(self, max_depth):
+            return [FormPath()]
+
+    with pytest.raises(ValueError, match="form XObject"):
+        _strokes(Page())
+
+
+def test_the_segment_grid_finds_exactly_what_a_full_scan_finds():
+    """find_text_on_line buckets ink in a grid (thousands of PDF edge pieces
+    per sheet, checked while the build holds the COM seat); its findings must
+    equal the every-box-against-every-segment scan it replaced."""
+    import random
+
+    from _layout_geometry import AnnotationGeometry, SheetGeometry, find_text_on_line, segment_box_overlap_length
+
+    random.seed(7)
+    annotations = []
+    for i in range(40):
+        x, y = random.uniform(0.02, 0.4), random.uniform(0.02, 0.26)
+        starts = [(random.uniform(0.0, 0.43), random.uniform(0.0, 0.28)) for _ in range(30)]
+        segments = tuple(
+            Segment(a, b, a + random.uniform(-0.05, 0.05), b + random.uniform(-0.05, 0.05)) for a, b in starts
+        )
+        annotations.append(AnnotationGeometry(f"a{i}", "dim", "v", (Box(x, y, x + 0.01, y + 0.0035),), segments))
+    sheet = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), tuple(annotations), 0.6)
+    found = [(f.a, f.b) for f in find_text_on_line(sheet)]
+    expected = [
+        (target.label, source.label)
+        for target in annotations
+        for box in target.text_boxes
+        for source in annotations
+        if source.label != target.label
+        for segment in source.segments
+        if segment_box_overlap_length(segment, box) > DEFAULT_TEXT_TOUCH_TOL_M
+    ]
+    assert found == expected
+    assert len(found) > 20
+
+
+def test_a_note_leader_is_one_leader_not_also_a_line():
+    """cone-swing-platform's C'BORE note (d09c2b9eb): its display data draws
+    the leader from 0.5 mm off the attach point GetLeaderPointsAtIndex (and
+    the printed stroke) starts at. Kept both, the leader read as line AND
+    leader, and a crossing was reported twice under two kinds."""
+    note = {
+        "type": 6,
+        "name": "DetailItem375",
+        "visible": 1,
+        "leaders": [[0.1204851, 0.0455793, -0.0, 0.0940041, 0.0504458, 0.0]],
+        "display": {
+            "lines": [_line(0.1202019, 0.04615, 0.1202019, 0.04615), _line(0.1202019, 0.04615, 0.0940041, 0.0504458)],
+            "texts": [{"t": "7.94 END MILL C'BORE SLOT", "pos": [0.1247703, 0.0435, 0.0], "h": 0.0025}],
+        },
+        "note": {"balloon": False},
+    }
+    geometry = annotation_geometry(note, owner="v", advance=0.6)
+    long_runs = [(s.role, round(s.x0 * 1000, 2)) for s in geometry.segments if s.length > 0.001]
+    assert long_runs == [("leader", 120.49)]
