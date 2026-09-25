@@ -26,7 +26,7 @@ geometry is casting-shaped, not milling-shaped.
      **21.717 mm unsupported** past each end of a casting-shaped organic lever. Delicate (nicks/rounds)
      *and* fixturing-hostile from bar. Per §6 the edge should be a **separate hardened tool-steel
      insert**, not this parent — which also removes it from this part's machining hazard.
-  3. **`cone-gear-shaft` tip** — a **Ø1.588 mm × 23.3 mm journal in steel** (L/D 14.7, carrying T012 and T006 since U40). Was Ø0.79
+  3. **`cone-gear-shaft` tip** — a **Ø1.588 mm × 23.0 mm journal in steel** (L/D 14.5, carrying T012 and T006 since U40). Was Ø0.79
      (L/D 29, whip city); enlarging the T006 bore to 1/16 in bought 16× the bending stiffness and
      still needs a follower/steady and a light finishing cut.
 
@@ -113,7 +113,7 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`cone-gear`** ×20 (T006→T120) | round brass bar, extruded disc, face 6.0, long-addendum OD printed per gear at DP 49.82 → **4.28 (T006) → 62.93 (T120)** (same DP as the 120T cylinder gear it meshes; `cone_gear_spec.DEEPENED_MESH_MM`); tip gears T006–T024 harder yellow metal | 1 central through-bore, **bonded (solder, silver-braze or Loctite 638/648), no key**; bore Ø by config (T006/T012 **1.588**/1/16″, T018 3.175, T024 6.350, T030+ 9.525); 6–120 involute teeth PA14.5°, 2.5D through-cut; gap floor printed as a MIN diameter, any shape | **T006 wall 0.646 mm nominal / 0.621 mm at maximum bore** (headline); T006 whole gear tiny → brutal workholding; the floor may take any shape above its MIN diameter, so the flank↔floor corner needs no radius control | ~2 (lathe OD/face/bore; teeth) | **single-point fly cutter ground to the gap form, indexed** (in-house; plunge to the floor, widen by indexing — no catalogue cutter fits DP 49.82); T006 = hardest part — on enlarging tip gears see gap #5 (DP caveat) |
-| **`cone-gear-shaft`** ×1 | stepped steel bar ~252; integral Ø12.2308 post journal then 3/8→1/4→1/8→1/16″ | 5 turned diameter steps; **no keyseat** (gears soldered); finish the Ø12.2308 journal for 0.05 diametral clearance in the v2 post bore | **Ø1.588×23.3 tip journal in steel, L/D 14.7** (tailstock-supported, U40) → was 29:1 at Ø0.79; long slender overall | 1 (single-axis turn from one end) | manual lathe **+ steady/follower**; light finish on both bearing journals |
+| **`cone-gear-shaft`** ×1 | stepped steel bar ~252; integral Ø12.2308 post journal then 3/8→1/4→1/8→1/16″ | 5 turned diameter steps; **no keyseat** (gears soldered); finish the Ø12.2308 journal for 0.05 diametral clearance in the v2 post bore | **Ø1.588×23.0 tip journal in steel, L/D 14.5** (tailstock-supported, U40) → was 29:1 at Ø0.79; long slender overall | 1 (single-axis turn from one end) | manual lathe **+ steady/follower**; light finish on both bearing journals |
 
 ### Pivots, bushings, shafts (T1 — the 19-channel stacks)
 
@@ -191,7 +191,7 @@ steps instead of one big engagement.
   rule-of-thumb checker.
   - **But its blind spot is exactly where the worst risk lives.** Fusion treats geometry as **rigid**
   and stock as **held**, so it will *not* warn that the **T006 0.621 mm minimum web** breaks in
-  workholding, the **Ø1.588 × 23.3 mm shaft tip** whips, the **1.90 mm cam wall** is fragile, or that
+  workholding, the **Ø1.588 × 23.0 mm shaft tip** whips, the **1.90 mm cam wall** is fragile, or that
   a ~4 mm gear can't be gripped. Thin-wall / fragile-feature / fixturing failures are not modelled
   by CAM sim. **A clean Fusion sim is not a substitute for a first cut on the fragile parts.**
 

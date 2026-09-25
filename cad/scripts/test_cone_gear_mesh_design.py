@@ -6,6 +6,8 @@ each drum face -- the slice that carries the load -- from the assembly pose and
 the printed bands, and check the design rules the table was sized to:
 
 * tightest case (thickest tooth, runouts closing): backlash >= BL_MIN;
+* loosest case (thinnest tooth, runouts and journal float opening): backlash
+  inside the printed acceptance, whose upper is that limit;
 * thinnest tooth at the largest tip: tip land >= 0.10;
 * largest tip, runouts closing: cone tip >= 0.10 off the drum's chord floor,
   and the drum tip clear of the printed cone floor (0.30 where it is raised);
@@ -151,7 +153,7 @@ def _worst(teeth: int, tip_dia: float, thickest: float) -> dict[str, float]:
     closing = nominal - RUNOUT
     return {
         "tight_backlash": _backlash(teeth, thickest, closing),
-        "loose_backlash": _backlash(teeth, thinnest, nominal + RUNOUT),
+        "loose_backlash": _backlash(teeth, thinnest, nominal + FLOAT),
         "tip_land": _tip_land(teeth, thinnest, (tip_dia + od_upper) / 2.0),
         "drum_floor": closing - (tip_dia + od_upper) / 2.0 - DRUM_FLOOR_R,
         "cone_floor": closing
@@ -199,6 +201,17 @@ def test_printed_mesh_meets_its_design_rules(teeth: int) -> None:
     # stack.
     standard = _worst(teeth, (teeth + 2) * M, spec.STANDARD_TOOTH_THICKNESS)
     assert worst["contact_ratio"] > standard["contact_ratio"]
+
+
+def test_backlash_acceptance_upper_is_the_loosest_printed_mesh() -> None:
+    # The separating tooth load takes up both journal clearances while the
+    # mesh is rocked, so the loosest reading includes FLOAT, not only RUNOUT.
+    loosest = max(
+        _worst(teeth, *spec.DEEPENED_MESH_MM[teeth])["loose_backlash"]
+        for teeth in spec.CONFIGURATION_TEETH
+    )
+    high = spec.BACKLASH_ACCEPTANCE_MM[1]
+    assert high == math.ceil(loosest * 100.0) / 100.0, loosest
 
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
