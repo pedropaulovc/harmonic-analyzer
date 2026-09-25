@@ -155,6 +155,9 @@ HOLE_EDGE_TEXT_XY = (_PAD_EAST + 0.012, TOP_CENTER[1] + 0.004)
 # dimensions on its way down to the hole.  The note centres on this point, so
 # it sits east of the pad, clear of the FREE, TO TIP text below the top view.
 HOLE_CALLOUT_XY = (_PAD_EAST + 0.035, TOP_CENTER[1] - 0.019)
+# The #4 normal clearance (3.264 mm = 0.1285 in) is a No. 30 drill; the shop
+# reaches for the number, the native size compartment still prints the diameter.
+HOLE_PROCESS = "#30 DRILL"
 
 
 def _kink_detail(adapter: Any, front: Any) -> Any:
@@ -409,7 +412,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=hole_edge,
         callout_xy=HOLE_CALLOUT_XY,
         label="spring pad clearance hole",
-        process="DRILL",
+        process=HOLE_PROCESS,
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.058)
