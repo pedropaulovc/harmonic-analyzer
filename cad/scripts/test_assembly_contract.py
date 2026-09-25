@@ -299,3 +299,40 @@ def test_allowed_free_stems_come_from_the_contract():
         )
     assert _assembly.allowed_free_stems("frame") == ()
     assert "pinion-lever" in _assembly.allowed_free_stems("drive-train")
+
+
+def _effective_probe_flip(script: Path, label: str) -> bool:
+    """The side a diagnostic's literal-labelled distance driver seeds: its
+    explicit ``flip=`` if it passes one, else ``_seed_flip`` under the contract
+    the script activates (every such call in the probes passes a magnitude)."""
+    tree = ast.parse(script.read_text(encoding="utf-8"))
+    stem = None
+    call = None
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+            continue
+        if node.func.id == "activate_assembly_contract":
+            stem = node.args[0].value
+        kw = {k.arg: k.value for k in node.keywords}
+        if (
+            node.func.id == "distance_driver"
+            and isinstance(kw.get("label"), ast.Constant)
+            and kw["label"].value == label
+        ):
+            call = node
+    assert stem is not None and call is not None, (script.name, label)
+    explicit = {k.arg: k.value for k in call.keywords}.get("flip")
+    if explicit is not None:
+        return bool(ast.literal_eval(explicit))
+    _assembly.activate_assembly_contract(stem)
+    return _assembly._seed_flip(label, 1.0)
+
+
+def test_platen_probe_keeps_its_learned_feed_side(fresh_seed_state):
+    """``platen feed snapshot`` is a diagnostic-only mate: no paper-drive build
+    queries it, so its learned inverted side (the old global seed) lives with
+    the probe rather than as a dead entry in paper-drive's contract (codex
+    #873). Seeding it from paper-drive's contract lands the probe's final
+    X-position mate on the wrong side and fails its verify guard."""
+    probe = SCRIPTS_DIR / "diagnostics" / "probe_platen.py"
+    assert _effective_probe_flip(probe, "platen feed snapshot") is True
