@@ -8,10 +8,21 @@ the calibrated prompt in ``cad/scripts/prompts/``. ``--reviewer`` is mandatory
 and MUST name a different model family from the agent that authored or last
 edited the drawing script: a Claude-driven session (Fable, Opus, Sonnet)
 reviews with ``--reviewer codex``, a Codex/GPT-driven session with
-``--reviewer claude``. A same-family verdict is not the gate, even a ``SHIP``. Registry part and assembly
+``--reviewer claude``. A same-family verdict is not the gate, even a ``SHIP``.
+``--author-family`` names the author's family explicitly and a same-family pair
+is refused unless ``--last-resort`` says so. A last-resort run needs the
+cross-family reviewer's quota refusal for that drawing, which this tool keeps as
+``<name>.quota-refused.json`` when a run is refused for usage limits, and an
+author model (read from the draw script's last commit trailer) that meets the
+tier rule; otherwise it is refused before any reviewer runs. ``--rebuttals``
+answers a FIX verdict's gating findings with cited user rulings, recording it
+as ``accepted_with_rulings``. Registry part and assembly
 PDFs are split into full-resolution page images and every page is supplied
 to one reviewer invocation. The schema-validated verdict and its
-provenance are written under ``cad/out/reports/machinist-review/``.
+provenance are written under ``cad/out/reports/machinist-review/``, and a
+passing registry-drawing review is also recorded in the tracked review ledger
+(``machinist_ledger.py``) with the content of every sheet it saw, so the drift
+check can tell later whether the sheet now shipping is the one reviewed.
 
 Why the prompt is calibrated the way it is: the earlier ad-hoc reviews asked a
 "senior machinist" to hunt for MISSING tolerances / datums / finishes and were
@@ -36,9 +47,9 @@ so a completed review's reasoning can be reopened offline.
 
 Usage (SolidWorks-free; needs the native PDFs under ``cad/out/pdf``)::
 
-    uv run cad/scripts/machinist_review.py crank_arm pivot_shaft
-    uv run cad/scripts/machinist_review.py --all --jobs 4
-    uv run cad/scripts/machinist_review.py --png sheet-1.png --png sheet-2.png --kind assembly
+    uv run cad/scripts/machinist_review.py crank_arm pivot_shaft --reviewer codex --author-family claude
+    uv run cad/scripts/machinist_review.py --all --jobs 4 --reviewer codex --author-family claude
+    uv run cad/scripts/machinist_review.py --png sheet-1.png --png sheet-2.png --kind assembly         --reviewer codex --author-family claude
     uv run cad/scripts/machinist_review.py --index      # rebuild index.md only
 
 Exit status is 0 only when every reviewed package passes (``SHIP`` with no
@@ -54,7 +65,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -67,6 +77,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME, CAD_ROOT  # noqa: E402
+import machinist_ledger  # noqa: E402
 
 PROMPTS_DIR = SCRIPTS_DIR / "prompts"
 PROMPT_FILES = {
@@ -75,6 +86,7 @@ PROMPT_FILES = {
 }
 SCHEMA_FILE = PROMPTS_DIR / "machinist_review_schema.json"
 REPORT_DIR = CAD_ROOT / "out" / "reports" / "machinist-review"
+QUOTA_REFUSED_SUFFIX = ".quota-refused.json"
 
 DEFAULT_MODELS = {
     "claude": "claude-fable-5-1",
@@ -89,7 +101,8 @@ FINDING_KEYS = ("blockers", "over_specification", "clarity", "minor")
 GATING_KEYS = ("blockers", "over_specification", "clarity")
 # PDFium's native API is process-global and not thread-safe.  Hold this only while
 # opening/counting/rendering/closing PDFs; Codex review subprocesses remain parallel.
-_PDFIUM_LOCK = threading.Lock()
+# The ledger renders too (recording a passing review), so it is the ledger's lock.
+_PDFIUM_LOCK = machinist_ledger._PDFIUM_LOCK
 
 
 # Event/item types that indicate tool or command activity. Claude permits only
@@ -841,6 +854,8 @@ def render_markdown(review: Review) -> str:
 def load_reviews(report_dir: Path = REPORT_DIR) -> list[Review]:
     reviews: list[Review] = []
     for path in sorted(report_dir.glob("*.json")):
+        if path.name.endswith(QUOTA_REFUSED_SUFFIX):  # evidence, not a report
+            continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             reviews.append(Review(**data))
@@ -897,6 +912,34 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--kind", choices=("part", "assembly"), default="part")
     parser.add_argument("--reviewer", choices=REVIEWERS)
     parser.add_argument(
+        "--author-family",
+        choices=machinist_ledger.AUTHOR_FAMILIES,
+        help="model family that authored or last edited the drawing script; "
+        "must differ from the reviewer's family",
+    )
+    parser.add_argument(
+        "--last-resort",
+        action="store_true",
+        help="allow a same-family review because the cross-family reviewer refused "
+        "this drawing on quota; recorded as last_resort",
+    )
+    parser.add_argument(
+        "--author-model",
+        help="cross-check for the model in the draw script's last commit trailer",
+    )
+    parser.add_argument(
+        "--quota-refusal",
+        type=Path,
+        help="the cross-family reviewer's quota-refused report "
+        "(default: <report-dir>/<name>.quota-refused.json)",
+    )
+    parser.add_argument(
+        "--rebuttals",
+        type=Path,
+        help="cited user rulings answering every gating finding of this run's verdict",
+    )
+    parser.add_argument("--ledger", type=Path, default=machinist_ledger.LEDGER_PATH)
+    parser.add_argument(
         "--model",
         help=f"reviewer model (defaults: {DEFAULT_MODELS})",
     )
@@ -936,6 +979,33 @@ def main(argv: Sequence[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
+    if args.author_family is None:
+        print(
+            "--author-family is required for review runs (claude, gpt or mimo)",
+            file=sys.stderr,
+        )
+        return 2
+    same_family = machinist_ledger.reviewer_family(args.reviewer) == args.author_family
+    if same_family and not args.last_resort:
+        print(
+            f"--reviewer {args.reviewer} is the same family as the {args.author_family} "
+            "author, so its verdict is not the gate; use the other reviewer "
+            "(or --last-resort to record it as last_resort)",
+            file=sys.stderr,
+        )
+        return 2
+    if args.last_resort and not same_family:
+        print("--last-resort applies only to a same-family review", file=sys.stderr)
+        return 2
+    args.refusal = None
+    if args.rebuttals is not None and (args.png or args.all or len(args.names) != 1):
+        print("--rebuttals applies to exactly one registry drawing", file=sys.stderr)
+        return 2
+    if args.last_resort:
+        problem = _last_resort_problem(args)
+        if problem:
+            print(f"--last-resort refused: {problem}", file=sys.stderr)
+            return 2
 
     packages: list[ReviewPackage]
     if args.png:
@@ -974,6 +1044,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
 
     reviews: list[Review] = []
+    unrecorded: list[str] = []
+    accepted: list[str] = []
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
         futures = {
             pool.submit(
@@ -997,6 +1069,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(f"{package.name}: {type(exc).__name__}: {exc}", file=sys.stderr)
                 continue
             reviews.append(review)
+            _keep_quota_refusal(review, report_dir)
+            recorded = _record_in_ledger(review, package, args, prompt_text)
+            if recorded is None:
+                unrecorded.append(review.name)
+            elif recorded and recorded.status == machinist_ledger.ACCEPTED_WITH_RULINGS:
+                accepted.append(review.name)
             verdict = (review.verdict or {}).get("verdict", "ERROR")
             counts = " ".join(
                 f"{k}={len((review.verdict or {}).get(k) or [])}" for k in FINDING_KEYS
@@ -1007,13 +1085,118 @@ def main(argv: Sequence[str] | None = None) -> int:
                 file=sys.stderr,
             )
     index = write_index(report_dir)
-    failed = [r.name for r in reviews if not r.passed]
+    failed = [r.name for r in reviews if not r.passed and r.name not in accepted]
     errored = len(packages) - len(reviews)
     print(
         f"{len(reviews) - len(failed)}/{len(packages)} pass; index: {index}",
         file=sys.stderr,
     )
-    return 0 if not failed and not errored else 1
+    return 0 if not failed and not errored and not unrecorded else 1
+
+
+def _record_in_ledger(
+    review: Review,
+    package: ReviewPackage,
+    args: argparse.Namespace,
+    prompt_text: str | None,
+) -> machinist_ledger.Recorded | bool | None:
+    """Record an accepted registry-drawing review; None when it failed or does not count.
+
+    Arbitrary ``--png`` packages and rubric overrides are not the gate, so they
+    never enter the ledger.  A FIX enters it only with ``--rebuttals``.
+    """
+    if args.png or prompt_text is not None or review.verdict is None:
+        return False
+    if not review.passed and args.rebuttals is None:
+        return False
+    try:
+        recorded = machinist_ledger.record_review(
+            asdict(review),
+            package.sources[0],
+            author_family=args.author_family,
+            author_model=args.author_model,
+            refusal=args.refusal,
+            rebuttals=None
+            if review.passed or args.rebuttals is None
+            else machinist_ledger.load_rebuttals(args.rebuttals, name=review.name),
+            provenance={
+                **machinist_ledger.git_state(),
+                "report": (args.report_dir / f"{review.name}.json").resolve().as_posix(),
+            },
+            ledger_path=args.ledger,
+        )
+    except (OSError, ValueError) as exc:
+        print(f"{review.name}: not recorded in the ledger: {exc}", file=sys.stderr)
+        return None
+    if not recorded.counts:
+        # Recorded is not accepted: the pre-run check can pass and the evidence
+        # still lapse before the reviewer finishes (a refusal ageing past 24 h).
+        print(
+            f"{recorded.name}: {recorded.slot} review recorded in the ledger but does "
+            f"NOT count: {recorded.problem}",
+            file=sys.stderr,
+        )
+        return None
+    print(
+        f"ledger: {recorded.name} recorded as {recorded.slot} {recorded.status} "
+        f"({len(recorded.sheets)} sheets) in {args.ledger}",
+        file=sys.stderr,
+    )
+    return recorded
+
+
+def _keep_quota_refusal(review: Review, report_dir: Path) -> None:
+    """Keep a usage-limit refusal where the next run's report cannot overwrite it."""
+    if review.verdict is not None:
+        return
+    report = report_dir / f"{review.name}.json"
+    if machinist_ledger.quota_evidence(asdict(review), report) is None:
+        return
+    kept = report_dir / f"{review.name}{QUOTA_REFUSED_SUFFIX}"
+    shutil.copyfile(report, kept)
+    print(
+        f"{review.name}: {review.reviewer} refused on quota; kept {kept} as the "
+        "evidence a same-family --last-resort run needs",
+        file=sys.stderr,
+    )
+
+
+def _last_resort_problem(args: argparse.Namespace) -> str:
+    """Why a same-family run would not count as the policy's last resort.
+
+    Checked before any reviewer runs, so a run that could never count spends
+    no quota.  Sets ``args.refusal`` to the recorded quota refusal.
+    """
+    if args.png or args.all or len(args.names) != 1:
+        return "name exactly one registry drawing; a quota refusal is per drawing"
+    if args.prompt_file is not None:
+        return "a rubric override is not the gate"
+    name = args.names[0]
+    refusal_report = args.quota_refusal or args.report_dir / f"{name}{QUOTA_REFUSED_SUFFIX}"
+    if refusal_report.resolve() == (args.report_dir / f"{name}.json").resolve():
+        return f"{refusal_report} is the report this run overwrites; pass its kept copy"
+    model = args.model or DEFAULT_MODELS[args.reviewer]
+    effort = args.effort or DEFAULT_EFFORTS[args.reviewer]
+    try:
+        author = machinist_ledger.resolve_author(name, args.author_family, args.author_model)
+        args.refusal = machinist_ledger.quota_refusal(
+            refusal_report, name=name, author_family=args.author_family
+        )
+    except (OSError, ValueError, KeyError) as exc:
+        return str(exc)
+    pdf = DRAWINGS_BY_NAME[name].outputs["pdf"]
+    if not pdf.is_file():
+        return f"no rendered PDF at {pdf}"
+    stale = machinist_ledger.refusal_problem(
+        args.refusal,
+        pdf_sha256=machinist_ledger.sha256_file(pdf),
+        reviewed_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    )
+    if stale:
+        return stale
+    if author["model_source"] != "trailer":
+        return "the draw script's last commit names no author model in a trailer"
+    return machinist_ledger.last_resort_tier_problem(author["model"], model, effort) or ""
 
 
 if __name__ == "__main__":

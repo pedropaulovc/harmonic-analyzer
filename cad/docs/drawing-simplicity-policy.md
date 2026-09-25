@@ -311,15 +311,42 @@ verdict counts: work authored by Sol or Opus is reviewed by a stronger model
 (Astra or Fable), and work authored by Astra or Fable is reviewed by Astra or
 Fable at high reasoning. `--reviewer claude` defaults to `claude-fable-5-1` at
 medium effort, which is the Opus fallback.
+Every review run names the author's family with `--author-family
+<claude|gpt|mimo>`, and a same-family pair is refused. The author model is read
+from the `Co-Authored-By:` trailer of the last commit that touched the drawing's
+`draw_*.py`, and `--author-family`/`--author-model` must agree with it. Every
+agent commit that touches a `draw_*.py` carries a model trailer, Codex sessions
+included (for example `Co-Authored-By: GPT-6 Sol <noreply@openai.com>`); without
+one the ledger can only record the claimed family, and a last-resort review
+cannot count. A
+cross-family run refused for usage limits keeps its report as
+`<name>.quota-refused.json`. A same-family `--last-resort` run is refused before
+any reviewer runs unless that refusal is under 24 h old and the trailer's model
+and the reviewer meet the tier rule.
+Every accepted registry-drawing review is recorded in the tracked ledger
+`cad/reviews/machinist-ledger.json`, together with the exact PDF it saw
+(`cad/reviews/sheets/<sha256>.pdf`). Accepted means `SHIP`, or
+`accepted_with_rulings`: a verdict whose every gating finding is answered, via
+`--rebuttals <file>`, by a user ruling id plus the file and line that record it.
+A finding with no cited ruling keeps the drawing failing.
+`uv run cad/scripts/machinist_ledger.py check [<name>...]` exits nonzero for any
+drawing whose current PDF matches no accepted, counting review. Sheets match on
+identical masked ink, or on an identical text layer (every string, positions
+within 0.12 mm) plus ink within 2 px, so re-render noise passes and a changed
+character does not. On a mismatch it writes the leftover pixels and the text
+difference under `cad/out/reports/machinist-ledger/`. A review that predates
+the ledger is entered with `machinist_ledger.py ingest <verdict.json>
+--author-family <family>`, which checks the exact PDF it reviewed.
 Part and assembly packages render every native PDF page at 300 dpi and submit
 all sheet images to one review, using the rubric for that package kind. A
 downscaled contact-sheet preview is not a substitute for reviewing every page.
 A package passes when
 the verdict is `SHIP` with no blocker, no over-specification and no clarity
-finding. The runner passes `SHIP` only, so a `FIX` whose only gating findings
-are blockers matching a named exception still exits nonzero; it is accepted by
-hand, citing the row in the PR, and the durable cure is stating the exception
-on the sheet so the reviewer files it under minor. Minor findings are recorded, not gating. Regression tests must defend
+finding. A `FIX` whose gating findings are each answered by a user ruling or a
+named exception is accepted only through `--rebuttals`, which cites the ruling
+or row for every finding and records the verdict as `accepted_with_rulings`;
+without it the runner passes `SHIP` only. The durable cure is still stating the
+exception on the sheet so the reviewer files it under minor. Minor findings are recorded, not gating. Regression tests must defend
 observable manufacturing contracts and plausible failures, not fixed note wording,
 line counts, or mocked API-call sequences. Native drawing generation must verify
 persisted dimension values, tolerances, reference state, and required view modes;
