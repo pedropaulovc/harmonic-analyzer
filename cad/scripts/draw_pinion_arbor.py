@@ -108,12 +108,26 @@ def _sheet_x(model_z: float) -> float:
     return PRINCIPAL_CENTER[0] - (model_z - MODEL_Z_AT_SHEET_ORIGIN_X) / 1000.0
 
 
+# Each land's two ends on the sheet, (head side, crown side), from the spec's
+# stations and land length: every land witness, and every text placed against
+# one, follows the spec when the lands move (pinioncluster's #858 re-lay).
+FRONT_LAND_X = (_sheet_x(FRONT_JOURNAL_Z), _sheet_x(FRONT_JOURNAL_Z + JOURNAL_LEN))
+BACK_LAND_X = (_sheet_x(BACK_JOURNAL_Z), _sheet_x(BACK_JOURNAL_Z + JOURNAL_LEN))
+Lands = tuple[tuple[float, float], tuple[float, float]]
+LANDS: Lands = (FRONT_LAND_X, BACK_LAND_X)
+
+
+def _mid(ends: tuple[float, float]) -> float:
+    return (ends[0] + ends[1]) / 2.0
+
+
 # Each land's diameter is measured at a short witness JOURNAL_DIA_POINT_FROM_
-# CROWN_END in from its crown-side end (build_pinion_arbor, pinned equal by
-# test), and its line stands 1 mm from that point, so its extensions are ~1 mm
-# rather than a run along the flank (Main, 2026-09-24).  The text hangs away
-# from the side its extensions come from: left of the front line, right of the
-# back one.
+# CROWN_END in from its crown-side end (build_pinion_arbor's constant of the
+# same name; test_each_land_diameter_is_measured_a_short_extension_from_its_line
+# pins the two equal), and its line stands JOURNAL_DIA_LINE_OFFSET from that point, so
+# its extensions are ~1 mm rather than a run along the flank (Main,
+# 2026-09-24).  The text hangs away from the side its extensions come from:
+# left of the front line, right of the back one.
 JOURNAL_DIA_POINT_FROM_CROWN_END = 2.0
 JOURNAL_DIA_LINE_OFFSET = 0.001
 FRONT_JOURNAL_DIA_POINT_X = _sheet_x(
@@ -123,9 +137,9 @@ BACK_JOURNAL_DIA_POINT_X = _sheet_x(
     BACK_JOURNAL_Z + JOURNAL_LEN - JOURNAL_DIA_POINT_FROM_CROWN_END
 )
 # The back land is boxed in below the shaft (the back-crown and overall
-# witnesses at x 0.079-0.081 on its crown side, the 199.9 witness on its head
-# side), so its diameter hangs ABOVE the shaft, its text right of the line
-# over the land, and its 19.0 length moves below.
+# witnesses at x 0.079-0.081 on its crown side, the back station's witness on
+# its head side), so its diameter hangs ABOVE the shaft, its text right of the
+# line over the land, and its length dimension moves below.
 BACK_JOURNAL_TEXT_X = BACK_JOURNAL_DIA_POINT_X + JOURNAL_DIA_LINE_OFFSET
 BACK_JOURNAL_DIA_Y = 0.1945
 # The drum station's text block (~35 mm "DRUM STATION" callout) ends 4 mm left
@@ -140,15 +154,18 @@ DRUM_STATION_TEXT_XY = (
 # The front land's diameter text hangs LEFT of its line (x-0.026 .. x+0.001,
 # measured at 4e97c4d8), and the drum station's witness drops through the
 # whole band below the shaft (run 059b5b0f: text-on-line at x 246.0).  Its
-# line stands on the land 1 mm crown side of its measuring point, the text
-# block ending ~2.4 mm short of that witness.
+# line stands on the land 1 mm crown side of its measuring point, so the text
+# block ends on that point, JOURNAL_DIA_POINT_FROM_CROWN_END in from the
+# land's crown end, short of the drum witness by what the spec leaves between
+# the two (test_the_front_diameter_text_ends_short_of_the_drum_witness holds
+# at least 2 mm).
 JOURNAL_DIA_TEXT_OVERHANG = 0.001
 FRONT_JOURNAL_DIA_X = FRONT_JOURNAL_DIA_POINT_X - JOURNAL_DIA_LINE_OFFSET
 # The bond-zone diameter stands over the part's witness (x 0.195) but hangs
 # its text ABOVE the shaft: below it, beside the front "JOURNAL" shelf, the
 # two read as one paired callout (Main and Fable, 63468ee9).  Above, its line
 # rises a few mm off the silhouette to the shelf, right of the DETAIL A label
-# and under detail A's "(3.0)", and short of the front land's 19.0 witnesses.
+# and under detail A's "(3.0)", and short of the front land's length witnesses.
 BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.190)
 # The drum-station and bond-zone reference sketches stand alone, so the
 # profile shows them, and each ends on a short construction witness lying ON
@@ -241,7 +258,8 @@ BACK_CAP_R_TEXT_XY = (
 # for (55.0, 220.0): "(1.2)" x 50.6-59.3, y 220.1-224.5; "BACK CROWN" x
 # 39.1-70.8, y 215.8-218.9; its line 5.6 mm under the position, from under
 # the text's left end (38.65) to 6.3 mm past the root.  Its row at y 128.4
-# sits between the back land's 19.0 row (140.2) and the 199.9's (112.2).
+# sits between the back land's length row (140.2 at a652) and the back
+# station's (112.2).
 BACK_CAP_SAG_XY = (0.055, 0.134)
 BACK_CAP_SAG_TEXT_EXTENT = (0.0159, 0.0042, 0.0158, 0.0045)
 BACK_CAP_SAG_LINE_LEFT = 0.01635
@@ -249,8 +267,9 @@ BACK_CAP_SAG_LINE_DROP = 0.00558
 # The pin hole's leader comes in from the upper left, leaning
 # PIN_LEADER_LEAN (dx per dy) off vertical along its radius, so it passes left
 # of the 39.0's outside-arrow tail (x 262.1 at its row) and right of the front
-# land's 19.0 witness, whose arrows now stand inside (FRONT_LAND_ARROWS_INSIDE:
-# at a652 their tail ran to x 266.5 and left no straight way in).  a652
+# land length's head-end witness, whose arrows now stand inside
+# (LAND_ARROWS_INSIDE: at a652 their tail ran to x 266.5 and left no straight
+# way in).  a652
 # printed the callout for (250.0, 222.0) at x 233.2-267.0, y 215.3-229.2 mm,
 # its shoulder 232.33-269.16 mm at y 214.7.
 PIN_X = _sheet_x(PIN_Z)
@@ -270,7 +289,13 @@ PIN_HOLE_TEXT_XY = (
 # swDimensionArrowsSide_e (enums/swDimensionArrowsSide_e.md); read back after
 # setting, as draw_cone_tip_block's proven _set_arrow_sides does (mha092-72ab).
 DIM_ARROWS_INSIDE = 0
-FRONT_LAND_ARROWS_INSIDE = ("FrontJournalLen",)
+# Both land lengths stand their arrows inside, so no arrow tail reaches past
+# a land end towards a neighbour whatever the spec does to the lands.  At a652
+# SolidWorks put them outside: the front tail ran 6.35 mm right of the land's
+# head end into the pin leader's path, and the back tail 6.35 mm left of its
+# crown end, to within 2.25 mm of the (1.2)'s apex witness (1.65 once #858
+# moves that end 0.6 mm crown-wards).
+LAND_ARROWS_INSIDE = ("FrontJournalLen", "BackJournalLen")
 # The 11.25 stands LEFT of its neck witness: at (0.340, 0.100) its line ran
 # right to the text through the (242.2)'s front-apex witness at x 321.1
 # (Main, round 4).  Left, it runs from the text to the neck witness under the
@@ -279,17 +304,43 @@ NECK_LEN_XY = (0.284, 0.100)
 # Rendered width and height of a two-place "Ø8.00 -0.01/-0.0x" callout block,
 # measured on the 63468ee9 sheet.
 DIAMETER_BLOCK_SIZE = (0.027, 0.014)
+# The texts placed against a land ride with it: each keeps the offset from its
+# land (or, for the front station, from its span's middle) at which leaf a652
+# printed it clear, so a spec move of the lands carries text and witness
+# together rather than closing the gap between them.
+FRONT_LAND_LEN_TEXT_DX = 0.0013
+BACK_LAND_LEN_TEXT_DX = -0.0012
+FRONT_STATION_TEXT_DX = -0.0009
+FRONT_LAND_LEN_Y = 0.188
+BACK_LAND_LEN_Y = 0.143
+FRONT_STATION_Y = 0.130
+
+
+def land_keep(lands: Lands = LANDS) -> dict[str, tuple[float, float]]:
+    """The land-borne texts' positions for ``lands`` ((head side, crown side)
+    sheet x of the front and back lands)."""
+    front, back = lands
+    head_rear = _sheet_x(HEAD_REAR_Z)
+    return {
+        "FrontJournalLen": (_mid(front) + FRONT_LAND_LEN_TEXT_DX, FRONT_LAND_LEN_Y),
+        # Below the shaft, clear of the back crown's witnesses.
+        "BackJournalLen": (_mid(back) + BACK_LAND_LEN_TEXT_DX, BACK_LAND_LEN_Y),
+        "FrontJournalFromHeadRear": (
+            _mid((front[0], head_rear)) + FRONT_STATION_TEXT_DX,
+            FRONT_STATION_Y,
+        ),
+    }
+
+
 PRINCIPAL_KEEP = {
-    "FrontJournalLen": (0.252, 0.188),
-    # Below the shaft, clear of the back crown's witnesses.
-    "BackJournalLen": (0.097, 0.143),
+    **land_keep(),
     "FrontJournalDia": (FRONT_JOURNAL_DIA_X, 0.150),
     "BondZoneDia": BOND_ZONE_TEXT_XY,
     "BackJournalDia": (BACK_JOURNAL_TEXT_X, BACK_JOURNAL_DIA_Y),
-    "FrontJournalFromHeadRear": (0.283, 0.130),
     # The drum station stacks between the two land stations, its text left of
     # its own drum-end witness.  The back station's text moves left to clear
-    # it.
+    # it; it stands 60 mm from the back land's head end, so no land move
+    # reaches it.
     "DrumStationFromHeadRear": DRUM_STATION_TEXT_XY,
     "BackJournalFromHeadRear": (0.170, 0.115),
     # Left of its neck witness, clear of the (242.2)'s front-apex witness.
@@ -305,7 +356,7 @@ PRINCIPAL_KEEP = {
     # so both its dimensions stand ABOVE the shaft: the station from the head
     # rear face in a row well over the Ø15 head, and the hole's leader leaning
     # in from the upper left, between that row's left arrow tail and the front
-    # land's 19.0 witness (PIN_HOLE_TEXT_XY).
+    # land length's head-end witness (PIN_HOLE_TEXT_XY).
     "PinStationFromHeadRear": (0.288, 0.207),
     "PinHoleDia": PIN_HOLE_TEXT_XY,
 }
@@ -672,7 +723,7 @@ SHARED_WITNESSES = {
             "NeckLen",
         }
     ),
-    # The back land's 19.0 and the 199.9 both end at its head-side end.
+    # The back land's length and its station both end at its head-side end.
     "back land head-side end": frozenset({"BackJournalLen", "BackJournalFromHeadRear"}),
     # Detail A's 10.5 and (3.0) both end at the head's front face.
     "head front face": frozenset({"HeadLen", "HeadCapSagDim"}),
@@ -682,9 +733,9 @@ SHARED_WITNESSES = {
 # lines.  Keyed (extension owner, dimension-line owner); any other crossing,
 # or any other stroke of these pairs, still fails.
 EXPECTED_CROSSINGS = {
-    ("NeckLen", "FrontJournalFromHeadRear"): "the neck witness drops through the 47.4",
-    ("NeckLen", "DrumStationFromHeadRear"): "the neck witness drops through the 61.55",
-    ("NeckLen", "BackJournalFromHeadRear"): "the neck witness drops through the 199.9",
+    ("NeckLen", "FrontJournalFromHeadRear"): "the neck witness drops through the front station",
+    ("NeckLen", "DrumStationFromHeadRear"): "the neck witness drops through the drum station",
+    ("NeckLen", "BackJournalFromHeadRear"): "the neck witness drops through the back station",
 }
 # A stroke within this of vertical or horizontal is an extension line or a
 # dimension line of these horizontal dimensions.
@@ -696,8 +747,8 @@ SheetInk = dict[str, tuple[LineRole, list[InkLine]]]
 # prints 2.8 mm under its position, a two-line block's 5.5-5.6 mm; extension
 # lines start 1.0 mm off the feature and run 0.9-1.1 mm past the line; an
 # outside arrow's arrowhead and tail run 6.3-6.4 mm past its extension line.
-# SolidWorks put the arrows inside every long station and outside the 19.0s,
-# the 39.0 and the (1.2); a line runs on under a text standing outside its
+# SolidWorks put the arrows inside every long station and outside the land
+# lengths, the 39.0 and the (1.2); a line runs on under a text standing outside its
 # extensions, to 1.0-1.3 mm past the text's far end (DrumStation, (1.2),
 # the 11.25 at a652).
 ONE_LINE_DROP = 0.0028
@@ -869,19 +920,19 @@ def _radial_leader_ink(
 
 def profile_ink(
     keep: dict[str, tuple[float, float]] = PRINCIPAL_KEEP,
-    arrows_outside: frozenset[str] = ARROWS_OUTSIDE - frozenset(FRONT_LAND_ARROWS_INSIDE),
+    arrows_outside: frozenset[str] = ARROWS_OUTSIDE - frozenset(LAND_ARROWS_INSIDE),
+    lands: Lands = LANDS,
 ) -> SheetInk:
     """The profile's station dimensions and its two tight leaders (the pin
     hole's Ø1.59 and the back crown's SR7.3), modelled from the commanded
-    positions."""
+    positions, with the lands' ends at ``lands``."""
     axis = PROFILE_AXIS_Y
     land = SHAFT_DIA / 2000.0
     head = HEAD_DIA / 2000.0
     head_rear = _sheet_x(HEAD_REAR_Z)
     apex = _sheet_x(BACK_APEX_Z)
     root = _sheet_x(BACK_APEX_Z - BACK_CAP_SAG)
-    front_land = sorted((_sheet_x(FRONT_JOURNAL_Z), _sheet_x(FRONT_JOURNAL_Z + JOURNAL_LEN)))
-    back_land = sorted((_sheet_x(BACK_JOURNAL_Z), _sheet_x(BACK_JOURNAL_Z + JOURNAL_LEN)))
+    front_land, back_land = (sorted(ends) for ends in lands)
 
     def linear(name, first, second, drop, text_reach=None):
         def flank(x: float, radius: float) -> tuple[float, float]:
@@ -1665,7 +1716,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _set_arrow_sides(
         adapter,
         principal_annotations,
-        {name: DIM_ARROWS_INSIDE for name in FRONT_LAND_ARROWS_INSIDE},
+        {name: DIM_ARROWS_INSIDE for name in LAND_ARROWS_INSIDE},
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     for name, label in {
@@ -1844,7 +1895,8 @@ def _assert_back_crown_radius_lands(sheets: list[Any], center: tuple[float, floa
     _telemetry.info(
         f"pinion-arbor: SR7.3 lands at ({landing[0] * 1000:.2f}, {landing[1] * 1000:.2f}) mm, "
         f"{reach * 1000:.3f} mm from the crown centre ({center[0] * 1000:.2f}, "
-        f"{center[1] * 1000:.2f}) at {angle:.1f}° (arc half-angle {BACK_CAP_HALF_ANGLE_DEG:.1f}°); "
+        f"{center[1] * 1000:.2f}) at {angle:.1f}° "
+        f"(arc half-angle {BACK_CAP_HALF_ANGLE_DEG:.1f}°); "
         f"({proof}); {len(runs)} strokes {[_fmt_line(run) for run in runs]}",
         reach_mm=reach * 1000,
         angle_deg=angle,
@@ -1877,7 +1929,7 @@ def _set_arrow_sides(adapter: Any, annotations: list[Any], sides: dict[str, int]
 # Text on text joined the gate with the bond-zone callout's move above the
 # shaft, beside the DETAIL A label (63468ee9 read 0 advisory findings).
 # Leader on leader joined with the back Ra symbol's move above the shaft: at
-# c6eb7f6f its shoulder crossed the back land's 19.0 witness (Main).  Both
+# c6eb7f6f its shoulder crossed the back land length's witness (Main).  Both
 # symbols have since become the JOURNAL LANDS note; a leader meeting a
 # dimension or extension line is _assert_sheet_leaders_clear's.
 BLOCKING_LAYOUT_FINDINGS = frozenset(
