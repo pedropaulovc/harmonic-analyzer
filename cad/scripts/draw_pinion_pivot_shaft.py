@@ -83,7 +83,10 @@ RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
     # Option E-a: the set-pin holes read as solid circles in the side view.
     # Only the size is printed; the match-drill callout carries the location.
-    "PinHoleDia": (0.120, 0.178),
+    # pc-ea eye pass: below the view its text ran into the 182.0 body
+    # dimension's callout, so it sits above the view between the datum frame
+    # and the Ra flag, its leader dropping to the left-hand hole.
+    "PinHoleDia": (0.125, 0.241),
 }
 DIMENSION_CALLOUTS = {
     "ShaftDia": "FINAL SIZE",
