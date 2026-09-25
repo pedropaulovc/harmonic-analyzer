@@ -42,12 +42,12 @@ flowchart TD
 
     EXPORT --> COMMIT["⑨ git commit + push<br/>(lint/test first)"]
 
-    COMMIT --> REL["⑩ cut_release.py<br/>[next vNN; CAD Revision=vNN]"]
-    REL --> PRE{"Preflight:<br/>tag free · tree clean ·<br/>CAD Revision matches tag ·<br/>TOP .SLDASM built · boxes fresh + unit=mm"}
+    COMMIT --> REL["⑩ cut_release.py<br/>[next vNN; builds carry Revision=DEV]"]
+    REL --> PRE{"Preflight:<br/>tag free · tree clean ·<br/>package stamped CAD Revision = tag ·<br/>TOP .SLDASM built · boxes fresh + unit=mm"}
     PRE -->|fail| FAILR["✗ SystemExit"]
 
-    PRE -->|pass| PNG["⑩a Pack-and-Go +<br/>re-export STEP/STL/PNG<br/>into stage/"]
-    PNG -.->|ASSETS| APNG[("stage/solidworks/ (flattened P&amp;G)<br/>stage/step/ · stage/stl/ · stage/gltf/<br/>stage/png/ · stage/boxes/")]
+    PRE -->|pass| PNG["⑩a package:release: Pack-and-Go ·<br/>stamp Revision/BUILD_ID=vNN on both trees ·<br/>re-export drawing PDF/PNG · stage"]
+    PNG -.->|ASSETS| APNG[("stage/solidworks/ + stage/slddrw/ (stamped vNN)<br/>stage/pdf/ (stamped prints)<br/>stage/step/ · stage/stl/ · stage/gltf/<br/>stage/png/ · stage/boxes/")]
 
     PNG --> DIFF["⑩b render_diff.py (uv run)<br/>download prev release →<br/>offscreen render changed parts<br/>(Hausdorff, noise-filtered)"]
     DIFF -->|no prior / render fails| SKIP["⚠ non-fatal: skip<br/>release continues"]

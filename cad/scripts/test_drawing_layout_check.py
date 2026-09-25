@@ -1939,13 +1939,14 @@ def test_drawing_revision_must_match_current_release():
         def GetCustomInfoValue(self, _configuration, name):
             return self.revision if name == "Revision" else "present"
 
-    expected = drawing_common._config.release_revision()
+    expected = drawing_common.BUILD_REVISION
+    assert expected == "DEV"
     drawing_common.read_required_properties(
         Model(expected),
         ("Revision",),
         required=("Revision",),
     )
-    with pytest.raises(RuntimeError, match=r"Revision .* current release"):
+    with pytest.raises(RuntimeError, match=r"Revision .* build revision"):
         drawing_common.read_required_properties(
             Model("v1"),
             ("Revision",),

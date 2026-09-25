@@ -379,6 +379,33 @@ def _prepared_native_tree(
     return out
 
 
+def _write_stamped_sidecar(
+    out: Path, drawings: dict, revision: str = "v37"
+) -> dict:
+    """``write_sidecar`` as package_native calls it after stamping, with
+    placeholder release prints (the COM stamping has its own fake-seat tests)."""
+    prints = {}
+    for name in drawings:
+        pdf = out / package_native.PDF_SUBDIR / f"{name}.pdf"
+        png = out / package_native.PNG_SUBDIR / f"{name}_drawing.png"
+        for path, payload in ((pdf, b"stamped pdf"), (png, b"stamped png")):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(payload)
+        prints[name] = {
+            "pdf": package_native._repo_relative(pdf),
+            "png": package_native._repo_relative(png),
+        }
+    return package_native.write_sidecar(
+        out,
+        "R2026x-test",
+        (),
+        drawings,
+        cad_revision=revision,
+        stamped={"revision": revision, "trees": {}, "external_residents": []},
+        prints=prints,
+    )
+
+
 def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None:
     sources: dict[str, Path] = {}
     for kind, name in (
@@ -394,13 +421,6 @@ def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None
 
     stage = tmp_path / "stage"
     stage.mkdir()
-    staged = cut_release.stage_drawings(stage)
-    assert staged == {
-        "platen_guide:pdf": "pdf/platen-guide.pdf",
-        "platen_guide:png": "png/platen-guide_drawing.png",
-    }
-    for relpath in staged.values():
-        assert (stage / relpath).is_file()
 
     referenced_model = tmp_path / "source" / "sldprt" / "platen-guide.SLDPRT"
     referenced_model.parent.mkdir(parents=True)
@@ -418,11 +438,12 @@ def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None
         monkeypatch, tmp_path, {"platen_guide": sources}, fake_pack
     )
     drawings = package_native.package_drawings(object(), out, {})
-    package_native.write_sidecar(out, "R2026x-test", (), drawings)
+    _write_stamped_sidecar(out, drawings)
 
     # The publisher holds no seat: it copies the prepared tree and rebuilds the
     # very drawing facts the COM half used to return inline.
-    native = cut_release.stage_native(stage, cut_release.load_native_package())
+    package = cut_release.load_native_package("v37")
+    native = cut_release.stage_native(stage, package)
     assert native == {
         "platen_guide:solidworks_slddrw": "solidworks/platen-guide.SLDDRW",
         "platen_guide:slddrw": "slddrw/platen-guide.SLDDRW",
@@ -435,6 +456,38 @@ def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None
     assert (
         stage / "slddrw" / "platen-guide.SLDPRT"
     ).read_bytes() == b"referenced model"
+
+    # The prints ship from the STAMPED package, never the build's DEV prints.
+    staged = cut_release.stage_drawings(stage, package)
+    assert staged == {
+        "platen_guide:pdf": "pdf/platen_guide.pdf",
+        "platen_guide:png": "png/platen_guide_drawing.png",
+    }
+    assert (stage / "pdf" / "platen_guide.pdf").read_bytes() == b"stamped pdf"
+    assert (stage / "png" / "platen_guide_drawing.png").read_bytes() == b"stamped png"
+
+
+def test_release_refuses_a_package_stamped_for_another_tag(
+    tmp_path: Path, monkeypatch
+) -> None:
+    drawing = tmp_path / "source" / "slddrw" / "platen-guide.SLDDRW"
+    drawing.parent.mkdir(parents=True)
+    drawing.write_bytes(b"slddrw")
+
+    def fake_pack(_sw, source, _doc_type, archive):
+        with zipfile.ZipFile(archive, "w") as package:
+            package.writestr(source.name, source.read_bytes())
+        return (source,)
+
+    out = _prepared_native_tree(
+        monkeypatch, tmp_path, {"platen_guide": {"slddrw": drawing}}, fake_pack
+    )
+    drawings = package_native.package_drawings(object(), out, {})
+    _write_stamped_sidecar(out, drawings, revision="v36")
+
+    with pytest.raises(SystemExit, match="stamped CAD Revision 'v36', not v37"):
+        cut_release.load_native_package("v37")
+    assert cut_release.load_native_package("v36")["cad_revision"] == "v36"
 
 
 def test_native_package_sidecar_carries_only_repo_relative_paths(
@@ -456,9 +509,10 @@ def test_native_package_sidecar_carries_only_repo_relative_paths(
         monkeypatch, tmp_path, {"platen_guide": {"slddrw": drawing}}, fake_pack
     )
     drawings = package_native.package_drawings(object(), out, {})
-    sidecar = package_native.write_sidecar(out, "R2026x-test", (), drawings)
+    sidecar = _write_stamped_sidecar(out, drawings)
 
-    assert sidecar["schema"] == 1
+    assert sidecar["schema"] == 2
+    assert sidecar["cad_revision"] == "v37"
     assert sidecar["solidworks_revision"] == "R2026x-test"
     assert sidecar["out_dir"] == "native"
     assert sidecar["native_dir"] == "native/solidworks"
@@ -470,6 +524,8 @@ def test_native_package_sidecar_carries_only_repo_relative_paths(
         "native_slddrw": "native/solidworks/platen-guide.SLDDRW",
         "portable_slddrw": "native/slddrw/platen-guide.SLDDRW",
         "sources": ["source/slddrw/platen-guide.SLDDRW"],
+        "pdf": "native/pdf/platen_guide.pdf",
+        "png": "native/png/platen_guide_drawing.png",
     }
 
     def _strings(node):
@@ -502,13 +558,13 @@ def test_release_rejects_a_truncated_prepared_native_tree(
         monkeypatch, tmp_path, {"platen_guide": {"slddrw": drawing}}, fake_pack
     )
     drawings = package_native.package_drawings(object(), out, {})
-    package_native.write_sidecar(out, "R2026x-test", (), drawings)
+    _write_stamped_sidecar(out, drawings)
     (out / "solidworks" / "platen-guide.SLDDRW").unlink()
 
     stage = tmp_path / "stage"
     stage.mkdir()
     with pytest.raises(RuntimeError, match="recorded 1"):
-        cut_release.stage_native(stage, cut_release.load_native_package())
+        cut_release.stage_native(stage, cut_release.load_native_package("v37"))
 
 
 def test_release_rejects_a_stale_native_package_schema(
@@ -519,11 +575,11 @@ def test_release_rejects_a_stale_native_package_schema(
     monkeypatch.setattr(cut_release, "NATIVE_PACKAGE_FILE", sidecar)
 
     with pytest.raises(SystemExit, match="doit package:release"):
-        cut_release.load_native_package()
+        cut_release.load_native_package("v37")
 
     sidecar.unlink()
     with pytest.raises(SystemExit, match="doit package:release"):
-        cut_release.load_native_package()
+        cut_release.load_native_package("v37")
 
 
 def test_release_accepts_pack_rewrite_of_same_original_source(

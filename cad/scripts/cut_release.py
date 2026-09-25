@@ -20,10 +20,13 @@ What it does, in order:
   3. Stage the bundle. This script opens NO SolidWorks document and needs NO
      seat: ``package_native.py`` (doit task ``package:release``, dispatchable to
      the farm) already ran every Pack-and-Go and left a PREPARED native tree
-     under ``cad/out/release/native/`` -- ``solidworks/`` + ``slddrw/`` plus
-     ``native-package.json``, the sidecar carrying every COM-derived fact (the
-     SolidWorks revision, the referenced-document count, the per-drawing
-     members). Here those directories are COPIED in, and the complete
+     under ``cad/out/release/native/`` -- ``solidworks/`` + ``slddrw/`` stamped
+     with the release's CAD Revision, the ``pdf/`` + ``png/`` prints re-exported
+     from those stamped drawings, and ``native-package.json``, the sidecar
+     carrying every COM-derived fact (the SolidWorks revision, the stamped CAD
+     revision -- which must equal the tag -- the referenced-document count, the
+     per-drawing members and prints). Builds say ``DEV``; only that tree carries
+     ``vNN``. Here those directories are COPIED in, and the complete
      recipe-keyed neutral set produced by the prerequisite ``export`` task is
      validated and staged: AP214 STEP for every part, fine binary STL for every
      part/assembly plus distinct configurations, and the build-owned isometric
@@ -128,7 +131,7 @@ RELEASE_VERSION_FILE = (CAD_ROOT / "config" / "release.yaml").resolve()
 # here.
 NATIVE_PACKAGE_DIR = RELEASE_DIR / "native"
 NATIVE_PACKAGE_FILE = NATIVE_PACKAGE_DIR / "native-package.json"
-NATIVE_PACKAGE_SCHEMA = 1
+NATIVE_PACKAGE_SCHEMA = 2
 _NATIVE_PACKAGE_FIX = "uv run python -m doit package:release"
 
 
@@ -191,12 +194,18 @@ def configured_revision() -> str:
 
 
 def require_configured_revision(version: str) -> None:
-    """Ensure the release tag matches the revision stamped into native CAD."""
+    """Ensure the release tag matches the revision package:release stamps.
+
+    Builds carry the constant ``DEV``; ``package:release`` stamps the
+    ``release.yaml`` value into the packaged copies, so a mismatch is fixed by
+    editing ``release.yaml`` and re-running that one leaf -- no CAD rebuild.
+    """
     expected = configured_revision()
     if expected != version:
         raise SystemExit(
             f"!!  release {version} does not match configured CAD Revision {expected}; "
-            "update cad/config/release.yaml and rebuild the CAD before cutting it"
+            "update cad/config/release.yaml and rerun `doit package:release` "
+            "before cutting it"
         )
 
 
@@ -496,13 +505,15 @@ def preflight(version: str, allow_dirty: bool) -> None:
 # --------------------------------------------------------------------------- #
 # Prepared native tree (produced on the COM seat by package_native.py)
 # --------------------------------------------------------------------------- #
-def load_native_package() -> dict[str, Any]:
+def load_native_package(version: str) -> dict[str, Any]:
     """Read ``native-package.json`` -- the COM-derived facts this publisher cannot
     obtain itself, because it runs on a machine with no SolidWorks seat.
 
     Written by ``cad/scripts/package_native.py`` beside the prepared tree it
     describes; every path inside is repo-relative POSIX, so a sidecar produced on
-    a farm worker reads correctly here.
+    a farm worker reads correctly here.  The release gate: the tree must have
+    been stamped with exactly ``version`` (``cad_revision``), since it is the
+    only place the release number enters a native document or a print.
     """
     if not NATIVE_PACKAGE_FILE.is_file():
         raise SystemExit(
@@ -518,8 +529,16 @@ def load_native_package() -> dict[str, Any]:
             f"{NATIVE_PACKAGE_SCHEMA} -- regenerate it with "
             f"`{_NATIVE_PACKAGE_FIX}`"
         )
+    stamped = package.get("cad_revision")
+    if stamped != version:
+        raise SystemExit(
+            f"!!  {NATIVE_PACKAGE_FILE} was stamped CAD Revision {stamped!r}, "
+            f"not {version} -- set cad/config/release.yaml to {version} and "
+            f"regenerate it with `{_NATIVE_PACKAGE_FIX}`"
+        )
     log(
-        f"native package: {package['documents']} referenced documents, "
+        f"native package: stamped {stamped}; "
+        f"{package['documents']} referenced documents, "
         f"SolidWorks revision {package['solidworks_revision']} "
         f"(packaged {package['packaged_utc']})"
     )
@@ -695,13 +714,25 @@ def write_provenance(
 # --------------------------------------------------------------------------- #
 # Bundle assembly (single zip)
 # --------------------------------------------------------------------------- #
-def stage_drawings(stage: Path) -> dict[str, str]:
-    """Copy required manufacturing drawings into their release directories."""
+def stage_drawings(stage: Path, package: dict[str, Any]) -> dict[str, str]:
+    """Copy the release prints (PDF + PNG) into their release directories.
+
+    The prints come from the prepared native tree, NOT from the drawing tasks'
+    ``cad/out/pdf|png``: a build's print says ``DEV``, and only
+    ``package_native`` re-exports each drawing from its copy stamped ``vNN``.
+    """
     staged: dict[str, str] = {}
     for drawing_name, outputs in DRAWING_OUTPUTS.items():
-        for kind, source in outputs.items():
+        entry = package["drawings"].get(drawing_name)
+        if entry is None:
+            raise RuntimeError(
+                f"{NATIVE_PACKAGE_FILE.name} has no release prints for "
+                f"{drawing_name}; regenerate it with `{_NATIVE_PACKAGE_FIX}`"
+            )
+        for kind in outputs:
             if kind == "slddrw":
                 continue
+            source = REPO_ROOT / entry[kind]
             if not source.is_file() or source.stat().st_size == 0:
                 raise RuntimeError(f"required drawing output is missing: {source}")
             destination_dir = stage / kind
@@ -876,7 +907,7 @@ def bundle(
     """
     # 0. The COM-derived half. Read FIRST: a missing or stale sidecar is the one
     #    prerequisite failure that must not cost a staging rebuild.
-    package = load_native_package()
+    package = load_native_package(version)
     revision = package["solidworks_revision"]
 
     stage = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}"
@@ -900,7 +931,7 @@ def bundle(
 
     # 2. Validate + stage the complete export cache.
     facts.update(stage_release_neutral(stage))
-    facts["drawings"] = stage_drawings(stage)
+    facts["drawings"] = stage_drawings(stage, package)
     facts["drawings"].update(native_drawings)
     facts["solidworks_files"] = sum(1 for path in sw_dir.iterdir() if path.is_file())
 
