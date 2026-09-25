@@ -552,6 +552,7 @@ async def build(adapter) -> dict[str, str]:
         ("JournalInboardStation", JOURNAL_START + JOURNAL_LENGTH),
         ("JournalOutboardStation", JOURNAL_START),
         ("PinHoleStation", PIN_HOLE_HEIGHT),
+        ("PinionPinHoleStation", PINION_PIN_STATION_Y),
     ):
         station_lines[name] = check(
             f"{name} reference line",
@@ -634,6 +635,11 @@ async def build(adapter) -> dict[str, str]:
             station_lines["PinHoleStation"],
             '"ShaftLength" - "PinHoleHeight"',
         ),
+        (
+            "PinionPinHoleStation",
+            station_lines["PinionPinHoleStation"],
+            '"ShaftLength" - "PinionPinStation"',
+        ),
     ):
         await dimension_between(
             adapter,
@@ -644,6 +650,7 @@ async def build(adapter) -> dict[str, str]:
                 "JournalInboardStation": JOURNAL_START + JOURNAL_LENGTH,
                 "JournalOutboardStation": JOURNAL_START,
                 "PinHoleStation": PIN_HOLE_HEIGHT,
+                "PinionPinHoleStation": PINION_PIN_STATION_Y,
             }[name],
             f"{name} reference",
         )

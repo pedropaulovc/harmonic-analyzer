@@ -37,6 +37,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "JournalInboardStation",
         "JournalOutboardStation",
         "PinHoleStation",
+        "PinionPinHoleStation",
         "DomeSphereRadius",
     }
     # Diameters are imported in the end view only to be dragged onto the
@@ -168,7 +169,7 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         drawing.END_CENTER,
         drawing.ISO_CENTER,
         drawing.HOLE_CALLOUT_XY,
-        drawing.PINION_PIN_NOTE_XY,
+        drawing.PINION_HOLE_CALLOUT_XY,
         drawing.NOTES_XY,
         drawing.ISO_NOTE_XY,
         drawing.FINISH_SYMBOL,
@@ -233,39 +234,42 @@ def test_pinion_land_is_turnable_at_the_printed_band() -> None:
 
 def test_pinion_pin_hole_is_printed_with_the_process_the_part_carries() -> None:
     """Codex #813 (PRRT_kwDOPHDy386l4ZrZ): MHA-026 cut the PinionPinHole and
-    stored its "Pinion Pin Hole Process", but the sheet printed neither."""
+    stored its "Pinion Pin Hole Process", but the sheet printed neither.  Its
+    size and station now come from the model (Main, 2026-09-25): the native
+    Hole Wizard callout and a far-end reference station, with no typed note."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '"Pinion Pin Hole Process"' in source
-    assert "PINION_PIN_NOTE," in source and "add_leader_note(" in source
+    assert "add_leader_note" not in source
+    assert "edge=_visible_cross_hole_edge(adapter, side, PINION_PIN_DIA)" in source
+    assert "process=PINION_PIN_PROCESS" in source
+    assert "_set_callout_below(pinion_hole, PINION_PIN_NOTE," in source
+    assert drawing.PINION_PIN_PROCESS == "1/8 DRILL"
+    # The station prints from the far end, as a reference: the pinion's boss
+    # locates the match-drilled hole.
+    assert "PinionPinHoleStation" in spec.DRAWING_DIMENSIONS["StationReference"]
+    assert "PinionPinHoleStation" in spec.REFERENCE_DIMENSIONS
+    build = Path(part.__file__).read_text(encoding="utf-8")
+    assert '\'"ShaftLength" - "PinionPinStation"\'' in build
+    assert spec.SHAFT_LENGTH - part.PINION_PIN_STATION_Y == pytest.approx(2.9205, abs=1e-3)
     # Same words as the property the build writes, only re-wrapped short.
     assert notes.PINION_PIN_NOTE.split() == notes.CRANKSHAFT_PIN_HOLE_PROCESS.split()
     lines = notes.PINION_PIN_NOTE.split("\n")
     assert max(map(len, lines)) <= notes.PINION_PIN_NOTE_WIDTH
-    # The leader lands on the top of the near-side (exit) rim, at the part's
-    # own station: the rim projects centred R sin(s) above the axis.
     assert drawing.PINION_PIN_X == pytest.approx(
         drawing.DOME_ROOT_X + part.PINION_PIN_STATION_Y * drawing.SHEET_SCALE[0] / 1000.0
     )
-    radius, pin_r = spec.SHAFT_DIA / 2.0, part.PINION_PIN_DIA / 2.0
-    clock = math.radians(part.PINION_PIN_CLOCKING_DEG)
-    rim_centre = radius * math.sin(clock)
-    assert drawing.PINION_PIN_RIM_TOP == pytest.approx(2.605, abs=0.005)
-    assert rim_centre < drawing.PINION_PIN_RIM_TOP < rim_centre + pin_r
-    assert drawing.PINION_PIN_EDGE[1] == pytest.approx(
-        drawing.SIDE_CENTER[1]
-        + drawing.PINION_PIN_RIM_TOP * drawing.SHEET_SCALE[0] / 1000.0
-    )
-    note_x0, note_y0, note_x1, note_y1 = drawing.PINION_PIN_NOTE_FIELD
-    assert note_x0 <= drawing.PINION_PIN_NOTE_XY[0] and note_y0 <= drawing.PINION_PIN_EDGE[1]
-    assert drawing.PINION_PIN_EDGE[0] <= note_x1 and drawing.PINION_PIN_NOTE_XY[1] <= note_y1
     assert drawing.JOURNAL_END_X < drawing.PINION_PIN_X < drawing.FAR_END_X
-    # The note's block (top-left anchored) stays right of the Ø11.388 text,
-    # above the dimension row and left of the isometric view.
-    char_w = 0.8 * drawing.PINION_PIN_NOTE_HEIGHT
-    line_h = 1.7 * drawing.PINION_PIN_NOTE_HEIGHT
-    x0, y0 = drawing.PINION_PIN_NOTE_XY
-    right = x0 + char_w * max(map(len, lines))
-    bottom = y0 - line_h * len(lines)
-    assert drawing.DIAMETER_POSITIONS["JournalDiaDim"][0] + 0.010 < x0
-    assert right < drawing.ISO_CENTER[0] - 0.012
-    assert bottom > drawing.DIAMETER_POSITIONS["JournalDiaDim"][1] + 0.010
+    # The callout text (centred on its point, ~2.7 mm a character and ~4.3 mm
+    # a line at the callout height, measured off the MHA-024 callout) stays
+    # right of the Ø11.388 text, above its row and left of the isometric.
+    char_w, line_h = 0.0027, 0.0043
+    cx, cy = drawing.PINION_HOLE_CALLOUT_XY
+    half_w = char_w * max(map(len, lines)) / 2.0
+    half_h = line_h * (len(lines) + 1) / 2.0
+    assert cx - half_w > drawing.DIAMETER_POSITIONS["JournalDiaDim"][0] + 0.030
+    assert cx + half_w < drawing.ISO_CENTER[0] - 0.012
+    assert cy - half_h > drawing.DIAMETER_POSITIONS["JournalDiaDim"][1] + 0.010
+    assert cy + half_h < 0.2667 - 0.005
+    # Its far-end reference station sits on the first row, right of the end.
+    x, y = drawing.SIDE_KEEP["PinionPinHoleStation"]
+    assert x > drawing.FAR_END_X and y == drawing._ROW_Y[0]

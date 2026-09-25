@@ -29,7 +29,6 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_leader_note,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
@@ -48,7 +47,7 @@ from _drawing_common import (
     view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _hole_spec import blind_cut_dia_mm
+from _hole_spec import blind_cut_dia_mm, drill_process
 from _surface_finish import surface_finish_by_key
 from crankshaft_spec import (
     CROSS_HOLE_PROCESS,
@@ -59,19 +58,15 @@ from crankshaft_spec import (
     PIN_HOLE_HEIGHT,
     PIN_HOLE_SPEC,
     REFERENCE_DIMENSIONS,
-    SHAFT_DIA,
     SHAFT_DOME_HEIGHT,
     SHAFT_LENGTH,
     SPHERICAL_DIMENSIONS,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from build_crankshaft import (
-    PINION_PIN_CLOCKING_DEG,
-    PINION_PIN_DIA,
-    PINION_PIN_STATION_Y,
-)
+from build_crankshaft import PINION_PIN_DIA, PINION_PIN_STATION_Y
 from crank_pinion_spec import CRANKSHAFT_PIN_HOLE_PROCESS
+from crank_pinion_spec import PIN_HOLE_SPEC as PINION_PIN_HOLE_SPEC
 from crankshaft_notes import CROSS_HOLE_CALLOUT, PINION_PIN_NOTE
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -130,9 +125,10 @@ JOURNAL_FLANK_Y = _sheet_y(JOURNAL_DIA / 2.0)
 # Baseline rows below the profile, all from the FAR END and stacked
 # shortest-first so no extension line crosses a dimension line; rows are 13
 # mm apart because the text sits ~3 mm above its requested point and the
-# dimension line ~5 mm below it.  The 2.0 dome height shares the first row at
-# the far left, where no baseline reaches.
-_ROW_Y = (0.150, 0.137, 0.124, 0.111, 0.096)
+# dimension line ~5 mm below it.  The first row carries the two short ends:
+# the 2.0 dome height at the far left and the 16T pin hole's reference
+# station at the far right, where no other baseline reaches.
+_ROW_Y = (0.150, 0.137, 0.124, 0.111, 0.098, 0.085)
 # The two diameters are authored in end-profile sketches; the end view
 # receives them first and they are then dragged onto the profile (rule 7:
 # diameters on the side view).  Their temporary end-view spots are clear of
@@ -143,11 +139,14 @@ END_KEEP = {
 }
 SIDE_KEEP = {
     "DomeHeight": (DOME_TIP_X - 0.016, _ROW_Y[0]),
-    "JournalInboardStation": ((JOURNAL_END_X + FAR_END_X) / 2.0 + 0.004, _ROW_Y[0]),
-    "JournalOutboardStation": ((JOURNAL_START_X + FAR_END_X) / 2.0 - 0.020, _ROW_Y[1]),
-    "PinHoleStation": ((PIN_X + FAR_END_X) / 2.0, _ROW_Y[2]),
-    "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0, _ROW_Y[3]),
-    "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0, _ROW_Y[4]),
+    # Its 5.8-mm span is too short for its text, which sits outside to the
+    # right of the far end.
+    "PinionPinHoleStation": (FAR_END_X + 0.012, _ROW_Y[0]),
+    "JournalInboardStation": ((JOURNAL_END_X + FAR_END_X) / 2.0 + 0.004, _ROW_Y[1]),
+    "JournalOutboardStation": ((JOURNAL_START_X + FAR_END_X) / 2.0 - 0.020, _ROW_Y[2]),
+    "PinHoleStation": ((PIN_X + FAR_END_X) / 2.0, _ROW_Y[3]),
+    "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0, _ROW_Y[4]),
+    "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0, _ROW_Y[5]),
     # Above-left of the dome, where no extension line rises: the radial
     # leader runs down-right to the dome silhouette.
     "DomeSphereRadius": (DOME_TIP_X - 0.022, 0.205),
@@ -175,30 +174,16 @@ FINISH_SYMBOL = (JOURNAL_START_X + 0.050, 0.203)
 # line rather than a near parallel one (run 20260923T030252135Z-49e46990),
 # left of the Ø9.525 text and clear of the SR on the left.
 HOLE_CALLOUT_XY = (PIN_X + 0.054, 0.247)
-# The 16T retention-pin hole, 2.9 from the far end, clocked 13.7 deg off the
-# MHA-024 hole.  The *Right view looks from +X and the hole is drilled from -X
-# (build_crankshaft's entry direction), so the visible rim is its exit on the
-# near side: projected, it is centred R sin(s) above the axis, and its top,
-# on the hole's transverse diameter, stands sqrt(R^2 - r^2) sin(s) + r cos(s)
-# above it (2.61 for the 1/8 hole in the 3/8 shaft).  The leader lands there.
-_PINION_CLOCK = math.radians(PINION_PIN_CLOCKING_DEG)
-PINION_PIN_RIM_TOP = math.sqrt(
-    (SHAFT_DIA / 2.0) ** 2 - (PINION_PIN_DIA / 2.0) ** 2
-) * math.sin(_PINION_CLOCK) + PINION_PIN_DIA / 2.0 * math.cos(_PINION_CLOCK)
+# The 16T retention-pin hole, 2.9 from the far end.  Its size is the native
+# Hole Wizard callout (the 1/8 drill first) and its station the reference
+# PinionPinHoleStation above, both read from the model; the match-drill
+# prose reads under the size, as on the MHA-024 cross-hole.  The text is
+# centred in the free field above the far-end seat, right of the Ø11.388
+# text and left of the isometric, so its leader runs down to the hole
+# without crossing a dimension.
 PINION_PIN_X = _sheet_x(PINION_PIN_STATION_Y)
-PINION_PIN_EDGE = (PINION_PIN_X, _sheet_y(PINION_PIN_RIM_TOP))
-# The note (2.5 mm text, anchored upper-left like every leadered note) sits in
-# the free field above the far-end seat, right of the Ø11.388 text and left of
-# the isometric; its leader runs down-right to the rim without crossing a
-# dimension.  Its read-back extent, leader included, must stay in this box.
-PINION_PIN_NOTE_XY = (0.290, 0.258)
-PINION_PIN_NOTE_HEIGHT = 0.0025
-PINION_PIN_NOTE_FIELD = (
-    DIAMETER_POSITIONS["JournalDiaDim"][0] + 0.010,
-    SIDE_CENTER[1],
-    ISO_CENTER[0] - 0.012,
-    0.2657,  # 1 mm inside the ASME B inner border
-)
+PINION_PIN_PROCESS = drill_process(PINION_PIN_HOLE_SPEC)
+PINION_HOLE_CALLOUT_XY = (0.325, 0.236)
 NOTES_XY = (0.016, 0.062)
 ISO_NOTE_XY = (0.368, 0.108)
 
@@ -217,9 +202,9 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
         raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
 
 
-def _visible_cross_hole_edge(adapter: Any, view: Any) -> Any:
-    """Return a visible rim edge adjacent to the modeled pin-hole cylinder."""
-    expected_radius_m = _PIN_HOLE_DIA / 2000.0
+def _visible_cross_hole_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
+    """Return a visible rim edge adjacent to a modeled cross-hole cylinder."""
+    expected_radius_m = diameter_mm / 2000.0
     candidates: list[Any] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
@@ -464,31 +449,19 @@ async def build(adapter: Any) -> dict[str, str]:
         side,
         callout_xy=HOLE_CALLOUT_XY,
         label="tapered-pin cross-hole",
-        edge=_visible_cross_hole_edge(adapter, side),
+        edge=_visible_cross_hole_edge(adapter, side, _PIN_HOLE_DIA),
         process=CROSS_HOLE_PROCESS,
     )
     _set_callout_below(cross_hole, CROSS_HOLE_CALLOUT, "tapered-pin cross-hole")
-    pinion_note = add_leader_note(
+    pinion_hole = add_native_hole_callout(
         adapter,
-        PINION_PIN_NOTE,
-        text_xy=PINION_PIN_NOTE_XY,
-        attach_xy=PINION_PIN_EDGE,
-        label="16T retention-pin matched cross-hole",
-        view=side,
-        height=PINION_PIN_NOTE_HEIGHT,
+        side,
+        callout_xy=PINION_HOLE_CALLOUT_XY,
+        label="16T retention-pin cross-hole",
+        edge=_visible_cross_hole_edge(adapter, side, PINION_PIN_DIA),
+        process=PINION_PIN_PROCESS,
     )
-    drawing_model.GraphicsRedraw2()
-    extent = tuple(
-        float(value) for value in (_early_bound(pinion_note, "INote").GetExtent() or ())
-    )
-    _telemetry.info(f"16T retention-pin note extent {extent}")
-    x0, y0, x1, y1 = PINION_PIN_NOTE_FIELD
-    if len(extent) < 5 or not (
-        x0 <= extent[0] and y0 <= extent[1] and extent[3] <= x1 and extent[4] <= y1
-    ):
-        raise RuntimeError(
-            f"16T retention-pin note extent {extent} left its field {PINION_PIN_NOTE_FIELD}"
-        )
+    _set_callout_below(pinion_hole, PINION_PIN_NOTE, "16T retention-pin cross-hole")
     add_surface_finish(
         adapter,
         side,
