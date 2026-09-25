@@ -2902,6 +2902,9 @@ def task_check():
         # match rule, the stored-PDF integrity check, rulings and the last-resort
         # evidence rules are pinned offline.
         SCRIPTS_DIR / "test_machinist_ledger.py",
+        # The review-wave driver: routing by author, quota fallback, ingest,
+        # resume from its checkpoint.
+        SCRIPTS_DIR / "test_machinist_wave.py",
         # The settings-independence contracts this PR adds.  All three are
         # pure Python (no COM), and unenrolled they would be exactly the
         # "green gate that checks nothing" the comments above warn about: the

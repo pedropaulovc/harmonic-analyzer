@@ -1928,7 +1928,9 @@ def test_only_the_review_tools_and_the_release_gate_read_the_ledger() -> None:
         "dodo.py",
         "machinist_ledger.py",
         "machinist_review.py",
+        "machinist_wave.py",
         "test_machinist_ledger.py",
+        "test_machinist_wave.py",
     }
 
 
