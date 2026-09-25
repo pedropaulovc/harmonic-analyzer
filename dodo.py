@@ -1878,6 +1878,14 @@ def _package_cache_outputs() -> list[Path]:
     return [(CAD_OUT / "release" / "native").resolve()]
 
 
+def _tag_cache_key(span: Any, key: str) -> None:
+    """Name the cache key on a phase span (``cache.key``, its first 12 hex digits
+    as ``cache.jsonl`` and the ``cache.*`` events print it). The sibling phase
+    spans are separate root traces, so without it a build could only be tied to
+    the key it produced by matching the next ``cache.store`` event on time."""
+    span.set_attribute("cache.key", key[:12])
+
+
 def _probe_cache(
     key: str, outputs: list[Path], label: str, span: Any, hit: str = "hit"
 ) -> str:
@@ -1891,6 +1899,7 @@ def _probe_cache(
     seat-holding caller releases the documents and re-probes instead. Under the
     farm executor the submitter holds no seat to release, so it fails loud.
     """
+    _tag_cache_key(span, key)
     try:
         outcome = hit if _cache.restore(key, outputs, label) else "miss"
     except _cache.RestoreLocked:
@@ -2006,6 +2015,7 @@ def _cached_com_action(
         ) as sp:
             _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
+            _tag_cache_key(sp, key)
             _exec_com(cmd, label, log_stem=log_stem)
             if stamp is not None:
                 _write_stamp(label, stamp)
@@ -2015,6 +2025,7 @@ def _cached_com_action(
     with _telemetry.span(
         f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as store:
+        _tag_cache_key(store, key)
         store.set_attribute("cache", _cache.store(key, outputs, label))
 
 
@@ -2096,6 +2107,7 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
     with _telemetry.span(
         f"cache.restore {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as restore:
+        _tag_cache_key(restore, key)
         if not _cache.restore(key, outputs, label):
             raise RuntimeError(
                 f"{label}: farm reported success but cache key {key[:12]} is absent"
@@ -2143,6 +2155,7 @@ def _cached_part_action(stem: str, script: Path) -> None:
         ) as sp:
             _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
+            _tag_cache_key(sp, key)
             _exec_com([sys.executable, str(script)], label, log_stem=f"part-{stem}")
             _stamp_part_execution(stem)
 
@@ -2151,6 +2164,7 @@ def _cached_part_action(stem: str, script: Path) -> None:
     with _telemetry.span(
         f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as store:
+        _tag_cache_key(store, key)
         store.set_attribute("cache", _cache.store(key, outputs, label))
 
 
@@ -2412,6 +2426,7 @@ def build_or_refresh(stem, dependencies, changed, targets):
         ) as sp:
             _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
+            _tag_cache_key(sp, cache_key)
 
             target_missing = not Path(targets[0]).exists()
             try:
@@ -2457,6 +2472,7 @@ def build_or_refresh(stem, dependencies, changed, targets):
     with _telemetry.span(
         f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as store:
+        _tag_cache_key(store, cache_key)
         store.set_attribute(
             "cache", _cache.store(cache_key, _assembly_cache_outputs(stem), label)
         )
