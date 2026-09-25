@@ -4,12 +4,13 @@ Head up, under-head junction at the origin: the head seats on the MHA-016
 counterbore floor and the shank runs down through the post into the
 MHA-091 tap.  Modelled at the 86.0 cut-to-fit nominal (U37c).
 
-The cut is the one modification, so the part owns it as a manufacturing
-control: a hidden construction sketch whose single driving dimension is the
-cut length (under-head face to cut end), toleranced with the band
-``post_mount_screw_spec`` derives from the post/plate chain, at its
-model-owned places, and marked for the drawing.  The build proves the
-dimension and the solid's cut end agree.
+The cut is the one modification, so the part owns its length: a hidden
+construction sketch whose single driving dimension is the cut length
+(under-head face to cut end), at its model-owned places, marked for the
+drawing.  It carries no band: no one length suits every in-band post and
+plate (``post_mount_screw_spec``'s U27 check), so the sheet prints it as a
+reference and each screw is cut to its own hole at assembly.  The build
+proves the dimension and the solid's cut end agree.
 """
 
 from __future__ import annotations
@@ -33,15 +34,12 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
 )
 from _fastener_catalog import fastener
-from _fit_limits import deviations
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from diagnostics.diag_build_40923898 import build_40923898
 from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 from post_mount_screw_spec import (
-    CUT_LENGTH_BAND,
     CUT_LENGTH_DIMENSION,
     CUT_LENGTH_MM,
     CUT_LENGTH_SKETCH,
@@ -121,7 +119,7 @@ async def _author_cut_length(adapter) -> None:
 
 
 def _manufacturing_controls(adapter) -> None:
-    """Places, band and drawing mark on the cut length; the sheet's note."""
+    """Places and drawing mark on the cut length; the sheet's note."""
     cut_end = _cut_end_y_mm(adapter)
     if abs(cut_end + CUT_LENGTH_MM) > 1e-4:
         raise RuntimeError(
@@ -129,9 +127,6 @@ def _manufacturing_controls(adapter) -> None:
             f"{CUT_LENGTH_MM} below the under-head face"
         )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    set_dimension_bilateral_tolerance(
-        adapter, CUT_LENGTH_SKETCH, CUT_LENGTH_DIMENSION, *deviations(CUT_LENGTH_BAND)
-    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

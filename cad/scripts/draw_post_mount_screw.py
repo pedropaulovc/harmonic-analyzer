@@ -3,10 +3,12 @@ r"""Create the modified-stock drawing for the MHA-142 cone pivot post mount scre
 MSC 40923898 is bought by SKU and cut to length, so the sheet is a
 modified-purchased-part drawing (the boss hook's pattern), not the purchased
 reference sheet: a Front view carrying the cut length -- the part's hidden
-reference dimension, imported with its model-owned places and its band
-(never proud of the MHA-091 underside) -- and an isometric, both 1:1.  The
-only note says to chamfer the cut end and that the undimensioned purchased
-geometry is reference.  No installation sequence, engagement figure or rule
+reference-sketch dimension, imported at its model-owned places -- and an
+isometric, both 1:1.  No single length suits every in-band post and plate
+(post_mount_screw_spec's U27 check), so the length prints as a REFERENCE,
+"(86.0)", with "CUT TO FIT AT ASSEMBLY" beneath it and no band; MHA-A03 says
+how.  The only note says to chamfer the cut end and that the undimensioned
+purchased geometry is reference.  No installation sequence, engagement figure or rule
 number is printed: the sequence is an MHA-A03 assembly step and the
 engagement a model assert (Main's eye pass of warm-c486, policy rule 6).
 
@@ -22,23 +24,23 @@ import sys
 from typing import Any
 
 import _drawing_hidden_sketches as hidden_sketches
-import _stock_trim_drawing as trim_drawing
 import _telemetry
-from _common import check, run_build
+from _common import _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
     assert_imported_precision,
     finalize_drawing,
     new_project_drawing,
+    dimension_name,
     read_required_properties,
+    set_dimension_callouts,
     set_hidden_lines_removed,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import deviations
 from post_mount_screw_spec import (
-    CUT_LENGTH_BAND,
     CUT_LENGTH_DIMENSION,
     CUT_LENGTH_MM,
     DRAWING_DIMENSIONS,
@@ -58,8 +60,10 @@ SHEET_SCALE = (1.0, 1.0)
 FRONT_CENTER = (0.100, 0.165)
 ISO_CENTER = (0.270, 0.185)
 # The cut length reads on the left, where its reference line runs along the
-# shank's silhouette, midway along the span.
-FRONT_KEEP = {CUT_LENGTH_DIMENSION: (FRONT_CENTER[0] - 0.022, FRONT_CENTER[1])}
+# shank's silhouette, midway along the span, far enough out that its
+# two-line callout clears the shank.
+FRONT_KEEP = {CUT_LENGTH_DIMENSION: (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1])}
+DIMENSION_CALLOUTS = {CUT_LENGTH_DIMENSION: "CUT TO FIT\nAT ASSEMBLY"}
 # Below the Front view (its lower end ~0.119), above the stock rows.
 NOTES_XY = (0.016, 0.100)
 STOCK_ROWS = (
@@ -67,13 +71,33 @@ STOCK_ROWS = (
     ("Supplier SKUs", 0.080, 0.060),
     ("Stock Name", 0.016, 0.049),
 )
-# The cut length is a live cutting control: driving, bilateral (swTolBILAT
-# = 2), at the model's nominal and band -- re-read on the sheet, not trusted.
-_LOWER, _UPPER = deviations(CUT_LENGTH_BAND)
-EXPECTED_CONTROLS = {
-    CUT_LENGTH_DIMENSION: (CUT_LENGTH_MM / 1000, _LOWER / 1000, _UPPER / 1000)
-}
-TOLERANCE_TYPES = {CUT_LENGTH_DIMENSION: 2}
+
+
+def _reference_cut_length(adapter: Any, annotations: list[Any]) -> None:
+    """Re-read the imported cut length, then mark it reference.
+
+    It must be the model's nominal and carry NO band (swTolNONE): a band
+    would promise a fixed length the post and plate bands cannot honour.
+    """
+    for annotation in annotations:
+        if dimension_name(adapter, annotation) != CUT_LENGTH_DIMENSION:
+            continue
+        display = _early_bound(
+            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        if abs(float(dimension.SystemValue) - CUT_LENGTH_MM / 1000.0) > 1e-9:
+            raise RuntimeError(
+                f"cut length {float(dimension.SystemValue)!r} m is not the "
+                f"modelled {CUT_LENGTH_MM} mm"
+            )
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        if int(tolerance.Type) != 0:  # swTolNONE
+            raise RuntimeError("cut length carries a band; it must be reference")
+        set_reference_dimension(adapter, annotation, label="cut length")
+        return
+    raise RuntimeError("Front view has no cut length to mark reference")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -120,13 +144,8 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    trim_drawing.verify_machining_controls(
-        adapter,
-        annotations,
-        expected=EXPECTED_CONTROLS,
-        tolerance_types=TOLERANCE_TYPES,
-        precision=DRAWING_PRECISION_BY_NAME,
-    )
+    _reference_cut_length(adapter, annotations)
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
 
     add_property_linked_note(
         adapter, "Manufacturing Notes", *NOTES_XY, char_height=0.003
