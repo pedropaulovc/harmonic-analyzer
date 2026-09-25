@@ -15,6 +15,29 @@ def test_segments_cross_only_on_a_proper_intersection() -> None:
     assert not leaders.segments_cross(((0, 0), (1, 0)), ((0.5, 0.1), (0.5, 1)))
 
 
+def test_a_stroke_ending_on_another_line_is_a_crossing_unless_declared() -> None:
+    # Codex P2 on 81651bb85: a T-junction has one orientation product of 0,
+    # which the proper-crossing test rejected.
+    tol = leaders.COLLINEAR_TOLERANCE
+    base = ((0.0, 0.0), (0.010, 0.0))
+    t_leader = ((0.005, 0.0), (0.005, 0.010))
+    assert leaders.segments_cross(base, t_leader)
+    assert leaders.segments_cross(t_leader, base)
+    assert leaders.segments_cross(base, ((0.005, tol / 2), (0.005, 0.010)))
+    # Only a true shared endpoint is exempt, within the tolerance too.
+    assert not leaders.segments_cross(base, ((0.010 + tol / 2, 0.0), (0.010, 0.010)))
+    # A declared touch lets the T stand, never a proper crossing.
+    assert not leaders.segments_cross(base, t_leader, touching="allowed")
+    assert leaders.segments_cross(
+        base, ((0.005, -0.001), (0.005, 0.010)), touching="allowed"
+    )
+    with pytest.raises(ValueError, match="touching"):
+        leaders.segments_cross(base, t_leader, touching="maybe")
+    groups = {"Dim": [base], "Leader": [t_leader]}
+    assert leaders.leader_crossings(groups) == [("Dim", "Leader")]
+    assert leaders.leader_crossings(groups, {frozenset(("Dim", "Leader"))}) == []
+
+
 def test_a_leader_laid_along_another_line_crosses_it() -> None:
     # Main's rider on _drawing_leaders: collinear overlap prints as one stroke.
     tol = leaders.COLLINEAR_TOLERANCE
@@ -66,31 +89,102 @@ def test_assert_leaders_clear_names_crossings_intrusions_and_missing_ink() -> No
         leaders.assert_leaders_clear(
             {"A": near}, centre=(0.0, 0.0), keep_out={}, lands_within={}, label="t"
         )
-    # A leader that only ENDS at the centre (R12.7 does) is caught by the
-    # keep-out, not as a crossing: the endpoint touch is not proper.
-    assert not leaders.segments_cross(through[0], ((-2.0, 0.5), (0.0, 0.0)))
+    # A leader that ENDS on another's line (R12.7 ends at the centre) is a
+    # T: a crossing unless the pair is declared touching.
+    tee = [((-2.0, 0.5), (0.0, 0.0))]
+    assert leaders.segments_cross(through[0], tee[0])
+    with pytest.raises(RuntimeError, match=r"crossings \[\('A', 'B'\)\]"):
+        leaders.assert_leaders_clear(
+            {"A": through, "B": tee}, centre=(0.0, 0.0), keep_out={},
+            lands_within=anywhere, label="t",
+        )
+    leaders.assert_leaders_clear(
+        {"A": through, "B": tee}, centre=(0.0, 0.0), keep_out={},
+        lands_within=anywhere, label="t", touching={frozenset(("A", "B"))},
+    )
     leaders.assert_leaders_clear(
         {"A": near, "B": radius}, centre=(0.0, 0.0), keep_out={"A": 0.2},
         lands_within={"A": (0.3, 0.5), "B": (0.3, 0.5)}, label="t",
     )
 
 
-def test_section_line_info_parses_chain_segments_and_arrow_shafts() -> None:
+def test_section_line_info_parses_chain_segments_arrow_shafts_and_heads() -> None:
     # One section line, two chain segments, two arrows, two labels.
     chain = [4, 0.1, 0.1, 0.0, 0.1, 0.2, 0.0, 4, 0.1, 0.2, 0.0, 0.1, 0.3, 0.0]
     arrow1 = [0.1, 0.1, 0.0, 0.12, 0.1, 0.0, 0.002, 0.004, 1]
     arrow2 = [0.1, 0.3, 0.0, 0.12, 0.3, 0.0, 0.002, 0.004, 1]
     text = [0.13, 0.1, 0.0, 0.13, 0.3, 0.0, 0.005]
     values = [1, 0, 2, *chain, *arrow1, *arrow2, *text]
-    assert leaders.parse_section_line_info(values) == [
+    segments = leaders.parse_section_line_info(values)
+    shaft1, shaft2 = ((0.1, 0.1), (0.12, 0.1)), ((0.1, 0.3), (0.12, 0.3))
+    assert segments == [
         ((0.1, 0.1), (0.1, 0.2)),
         ((0.1, 0.2), (0.1, 0.3)),
-        ((0.1, 0.1), (0.12, 0.1)),
-        ((0.1, 0.3), (0.12, 0.3)),
+        shaft1,
+        *leaders.arrowhead_outline(shaft1, 0.002, 0.004),
+        shaft2,
+        *leaders.arrowhead_outline(shaft2, 0.002, 0.004),
     ]
     assert leaders.parse_section_line_info([]) == []
     with pytest.raises(RuntimeError, match="parsed"):
         leaders.parse_section_line_info([*values, 0.0])
+
+
+def test_section_arrow_tip_is_the_shaft_end_off_the_chain_line() -> None:
+    # Main's rider on the P2 fix: the tip is resolved from which shaft end
+    # meets a chain endpoint, never assumed to be ``end``.
+    chain = [4, 0.1, 0.1, 0.0, 0.1, 0.3, 0.0]
+    text = [0.13, 0.1, 0.0, 0.13, 0.3, 0.0, 0.005]
+    forward = [0.1, 0.3, 0.0, 0.12, 0.3, 0.0, 0.002, 0.004, 1]
+    reversed_ = [0.12, 0.1, 0.0, 0.1, 0.1, 0.0, 0.002, 0.004, 1]
+    segments = leaders.parse_section_line_info(
+        [1, 0, 1, *chain, *reversed_, *forward, *text]
+    )
+    # The reversed shaft comes back as read, its head at its START.
+    assert segments[1] == ((0.12, 0.1), (0.1, 0.1))
+    assert segments[2:8] == leaders.arrowhead_outline(
+        ((0.1, 0.1), (0.12, 0.1)), 0.002, 0.004
+    )
+    assert segments[9:] == leaders.arrowhead_outline(
+        ((0.1, 0.3), (0.12, 0.3)), 0.002, 0.004
+    )
+    floating = [0.2, 0.1, 0.0, 0.22, 0.1, 0.0, 0.002, 0.004, 1]
+    with pytest.raises(RuntimeError, match="section arrow 1: cannot tell its tip"):
+        leaders.parse_section_line_info([1, 0, 1, *chain, *floating, *forward, *text])
+    # A shaft lying along the chain touches it at both ends: ambiguous too.
+    along = [0.1, 0.1, 0.0, 0.1, 0.3, 0.0, 0.002, 0.004, 1]
+    with pytest.raises(RuntimeError, match="section arrow 2: cannot tell its tip"):
+        leaders.parse_section_line_info([1, 0, 1, *chain, *forward, *along, *text])
+
+
+def test_arrowhead_outline_has_both_size_readings_tipped_at_the_shaft_end() -> None:
+    wings = leaders.arrowhead_outline(((0.0, 0.0), (0.010, 0.0)), 0.002, 0.004)
+    # width along / height across, then height along / width across.
+    assert wings == pytest.approx([
+        ((0.010, 0.0), (0.008, 0.002)),
+        ((0.010, 0.0), (0.008, -0.002)),
+        ((0.008, 0.002), (0.008, -0.002)),
+        ((0.010, 0.0), (0.006, 0.001)),
+        ((0.010, 0.0), (0.006, -0.001)),
+        ((0.006, 0.001), (0.006, -0.001)),
+    ])
+    assert leaders.arrowhead_outline(((0.0, 0.0), (0.0, 0.0)), 0.002, 0.004) == []
+
+
+def test_a_leader_through_a_section_arrow_wing_crosses_the_section_line() -> None:
+    # Codex P2 on 81651bb85: only the arrow shafts came back, so a leader
+    # through a wing -- clear of the shaft -- read clear.
+    chain = [4, 0.1, 0.1, 0.0, 0.1, 0.3, 0.0]
+    arrow1 = [0.1, 0.1, 0.0, 0.12, 0.1, 0.0, 0.003, 0.003, 1]
+    arrow2 = [0.1, 0.3, 0.0, 0.12, 0.3, 0.0, 0.003, 0.003, 1]
+    text = [0.13, 0.1, 0.0, 0.13, 0.3, 0.0, 0.005]
+    section = leaders.parse_section_line_info([1, 0, 1, *chain, *arrow1, *arrow2, *text])
+    wing_only = [((0.1185, 0.1005), (0.1185, 0.110))]  # above the shaft, inside the head
+    assert leaders.leader_crossings({"SectionLine": section, "Leader": wing_only}) == [
+        ("SectionLine", "Leader")
+    ]
+    clear = [((0.1185, 0.1025), (0.1185, 0.110))]  # above the head's 1.5 half-breadth
+    assert leaders.leader_crossings({"SectionLine": section, "Leader": clear}) == []
 
 
 def test_points_inside_is_strict() -> None:
