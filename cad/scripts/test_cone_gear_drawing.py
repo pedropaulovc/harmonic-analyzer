@@ -109,7 +109,8 @@ def test_bore_band_is_the_derived_retained_joint_band() -> None:
 
 def test_native_tooth_thickness_is_the_modelled_deepened_mesh_tooth() -> None:
     # The band is the configured backlash WINDOW, centred on the modelled
-    # tooth: error_budget.yaml mesh_lag_spread is derived from that window.
+    # tooth: error_budget.yaml's tooth-thickness mesh-lag term is derived
+    # from that window.
     minimum, maximum = _config.fit("gear_mesh", "backlash_mm")
     upper, lower = spec.TOOTH_THICKNESS_BAND
     assert upper == pytest.approx(-lower)

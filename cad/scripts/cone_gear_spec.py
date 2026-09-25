@@ -66,13 +66,15 @@ STANDARD_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
 MESH_BACKLASH_MIN_MM = 0.06
 # (upper, lower) about the modelled mid thickness.  The 0.15 window is the
 # configured cone<->cylinder backlash window (tolerances.yaml gear_mesh
-# 0.05..0.20) that error_budget.yaml ``mesh_lag_spread`` is derived from.
+# 0.05..0.20) that error_budget.yaml's tooth-thickness mesh-lag term is
+# derived from.
 TOOTH_THICKNESS_BAND = (0.075, -0.075)
-# Backlash with MHA-027 over a full turn at assembly, swing stop set: thickest
-# tooth with both runouts closing, to thinnest tooth with both runouts and both
-# journal floats opening.  The tooth load pushes the gears apart, so rocking
-# the mesh takes up the cone-shaft journal and drum-arbor clearances too.  The
-# upper is that worst case (0.374, T006) rounded up to two places.
+# Backlash with MHA-027, rocked by hand over a full turn at assembly, swing
+# stop set.  The acceptance is that measurement's worst case and nothing more:
+# thickest tooth with both runouts closing, to thinnest tooth with both runouts
+# and both journal floats opening (rocking takes up the cone-shaft journal and
+# drum-arbor clearances).  The upper, 0.374 on T006, is rounded up to two
+# places.
 BACKLASH_ACCEPTANCE_MM = (0.06, 0.38)
 CONTACT_RATIO_EXCEPTION_TEETH = (6, 12, 18, 24, 30, 36, 42)
 # teeth: (tip diameter, thickest circular tooth thickness at the standard
