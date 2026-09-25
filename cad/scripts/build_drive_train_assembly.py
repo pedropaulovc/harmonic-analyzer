@@ -1976,8 +1976,12 @@ for _lo, _what in (
 ):
     if HANDLE_SCREW_TIP_Z_MAX > _lo - 0.25:
         raise AssertionError(f"MHA-139 tip sweep reaches the {_what}")
-# The hub barrel is the only body behind the arm inside the sweep's axial
-# band; the screw circle stays radially clear of it.
+# The base, and the swing platform and posts standing on it, end at the base's
+# south face (-137.25), far north of the tip band: the arm and its sweep
+# hang in front of the base.  The hub barrel is inside the band but radially
+# inside the screw circle.
+if HANDLE_SCREW_TIP_Z_MAX > -_BASE_Z_LIMIT - 0.25:
+    raise AssertionError("MHA-139 tip sweep reaches the harmonic-base south face")
 if ARM_C2C - HANDLE_SCREW_THREAD_MAJOR / 2.0 < HUB_BARREL_DIA / 2.0 + 0.25:
     raise AssertionError("MHA-139 tip sweep reaches the crank hub barrel")
 
