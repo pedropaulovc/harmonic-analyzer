@@ -34,9 +34,9 @@ SHAFT_DIA_BAND = SHAFT_H
 # U27 (Main, 2026-09-24): the length carries the title-block .X band (+/-0.8),
 # not a tight one.  Pinned to the straps (option E-a) the shaft rides the
 # cluster's end play (0.25 +/- 0.10): drilled back-flush at the back stop,
-# the longest shaft in the shortest stack stands at worst 7.52 proud of the
-# front block, 7.87 at the front stop with the SR crown apex at 9.07, and its
-# back end then sits 0.35 inside the back block, still bearing 9.54 of the
+# the longest shaft in the shortest stack stands at worst 7.02 proud of the
+# front block, 7.37 at the front stop with the SR crown apex at 8.57, and its
+# back end then sits 0.35 inside the back block, still bearing 10.04 of the
 # shallowest one past its flush setting
 # (pinion_rig_layout.torque_shaft_back_bearing_stack).
 # Nothing stands on the shaft's axis past either block: the nearest body, the

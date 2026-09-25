@@ -67,7 +67,7 @@ from pinion_spring_geometry import WIDTH as SPRING_W
 # so 1.25 is the smallest shift giving the full face: 0.026 to spare, with j0
 # keeping 2.00.  The rig-internal margins do not move with it; every rig-to-
 # frame margin the move touches holds (the grip against the crank cluster
-# opens, the base rim and base seats keep >= 33 and >= 35, the rocker support
+# opens, the base rim and base seats keep >= 32 and >= 35, the rocker support
 # opens, and the back block overlaps the north pedestal only in z, 19.97 clear
 # in x).  build_drive_train_assembly asserts both gears at import.
 RIG_AFT_SHIFT = 1.25
@@ -220,8 +220,10 @@ TORQUE_SHAFT_PIN_HOLE_Z = tuple(z - TORQUE_SHAFT_Z0 for z in STRAP_MID_Z)
 # block when the cluster runs forward to the front block, so the shallowest
 # printed back block must still give it the front block's floor (rule 12's
 # 1.5 D on the 1/4 in shaft).  Geometry, not a tighter band, carries it:
-# BLOCK_DEPTH.
+# BLOCK_DEPTH, with a real margin over that floor (Main, #858: the 10.5 block
+# left 0.04 once the flush setting was booked).
 BACK_BLOCK_MIN_BEARING = FRONT_BLOCK_MIN_BEARING
+BACK_BLOCK_BEARING_MARGIN = 0.5
 
 
 def torque_shaft_back_bearing_stack() -> dict[str, float]:
@@ -239,10 +241,11 @@ def torque_shaft_back_bearing_stack() -> dict[str, float]:
 
 
 TORQUE_SHAFT_BACK_BEARING_STACK = torque_shaft_back_bearing_stack()
-if sum(TORQUE_SHAFT_BACK_BEARING_STACK.values()) < BACK_BLOCK_MIN_BEARING - 1e-9:
+_BACK_BEARING_REQUIRED = BACK_BLOCK_MIN_BEARING + BACK_BLOCK_BEARING_MARGIN
+if sum(TORQUE_SHAFT_BACK_BEARING_STACK.values()) < _BACK_BEARING_REQUIRED - 1e-9:
     raise AssertionError(
         "pinned torque shaft bearing in the back block, worst case: "
-        f"{_stack_text(TORQUE_SHAFT_BACK_BEARING_STACK)} < {BACK_BLOCK_MIN_BEARING}"
+        f"{_stack_text(TORQUE_SHAFT_BACK_BEARING_STACK)} < {_BACK_BEARING_REQUIRED}"
     )
 
 # The rod floats north until the back MHA-104 collar lands on the back block;
