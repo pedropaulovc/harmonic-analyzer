@@ -2675,12 +2675,16 @@ def test_memory_preflight_names_itself_as_the_trigger(monkeypatch):
 class _RecordedSpan:
     def __init__(self, name, attributes):
         self.name, self.attributes, self.status = name, dict(attributes), None
+        self.exceptions = []
 
     def set_attribute(self, key, value):
         self.attributes[key] = value
 
     def set_status(self, status):
         self.status = status
+
+    def record_exception(self, exc):
+        self.exceptions.append(exc)
 
 
 def _lifecycle_on_a_fake_seat(monkeypatch, state_at, *, launched=True, signin=None):
@@ -2805,3 +2809,59 @@ def test_an_abandoned_grace_names_its_outcome(monkeypatch):
 
     abandoned = [kw for name, kw in events if name == "sw.grace_abandoned"]
     assert len(abandoned) == 1 and abandoned[0]["reason"] == "timeout"
+
+
+@pytest.mark.parametrize("raw", ["nan", "inf", "-inf", "0", "-5", "banana"])
+def test_connect_timeout_rejects_a_value_the_poll_could_never_reach(monkeypatch, raw):
+    """Codex on #871: a NaN deadline never compares as reached, so the connect
+    poll would spin forever; nan/inf/non-positive fall back to the default."""
+    lifecycle = _load_dodo()._sw_lifecycle
+    warned = []
+    monkeypatch.setattr(lifecycle._telemetry, "warn", lambda msg, **_kw: warned.append(msg))
+    monkeypatch.setenv("HARMONIC_SW_CONNECT_TIMEOUT", raw)
+
+    assert lifecycle._connect_timeout() == lifecycle._DEFAULT_CONNECT_TIMEOUT
+    assert len(warned) == 1 and "HARMONIC_SW_CONNECT_TIMEOUT" in warned[0]
+
+
+def test_connect_timeout_keeps_a_valid_override(monkeypatch):
+    lifecycle = _load_dodo()._sw_lifecycle
+    monkeypatch.setenv("HARMONIC_SW_CONNECT_TIMEOUT", "450")
+    assert lifecycle._connect_timeout() == 450.0
+    monkeypatch.setenv("HARMONIC_SW_CONNECT_TIMEOUT", "")
+    assert lifecycle._connect_timeout() == lifecycle._DEFAULT_CONNECT_TIMEOUT
+
+
+def test_a_recovery_that_raises_is_an_error_span(monkeypatch):
+    """Codex on #871: a stop/start/wait that RAISES is swallowed (best-effort),
+    and the span must still end ERROR with the exception, not OK."""
+    from solidworks_mcp.adapters import sw_recovery
+
+    lifecycle, spans, _events = _lifecycle_on_a_fake_seat(monkeypatch, lambda t: "starting")
+
+    def stop_fails():
+        raise OSError("taskkill denied")
+
+    monkeypatch.setattr(sw_recovery, "stop_solidworks", stop_fails)
+
+    assert lifecycle.force_recover("watchdog_crash") == "error"
+
+    recover = next(s for s in spans if s.name == "sw.force_recover")
+    assert recover.status is not None and not recover.status.is_ok
+    assert "taskkill denied" in recover.status.description
+    assert [str(exc) for exc in recover.exceptions] == ["taskkill denied"]
+
+
+def test_an_abandoned_grace_that_raised_is_an_error_span(monkeypatch):
+    lifecycle, spans, _events = _lifecycle_on_a_fake_seat(monkeypatch, lambda t: "starting")
+
+    def wait_fails(_recovery, _timeout):
+        raise RuntimeError("registry unreadable")
+
+    monkeypatch.setattr(lifecycle, "_wait", wait_fails)
+
+    assert lifecycle.wait_until_ready() == "starting"
+
+    wait = next(s for s in spans if s.name == "sw.wait_ready")
+    assert wait.status is not None and not wait.status.is_ok
+    assert [str(exc) for exc in wait.exceptions] == ["registry unreadable"]
