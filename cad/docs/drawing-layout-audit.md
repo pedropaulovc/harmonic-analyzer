@@ -119,6 +119,8 @@ only for a dump with no PDF text, i.e. the offline fixtures.
 | `leader-converges-at-landing` | advisory | a leader crossing within 5 mm of both its own landing and the crossed line's end: two leaders closing on one corner (Main's ruling on cone-gear-shaft's Ra 1.6) |
 | `leader-crosses-section-line` | gating | a leader crossing a section cutting line (Main's ruling: the MHA-025 finish leader was moved off its A-A line for this) |
 | `line-on-dimension-line` | gating | a leader, or a section line's arrow, lying along another annotation's dimension line within 0.1 mm: the two print as one stroke. Shared extension lines are normal drafting and exempt |
+| `arrow-near-text` | gating | an arrowhead, or an outside arrow's tail (the first 6.35 mm from its tip, the stand-alone tail length on every calibration sheet), within 2 mm (`ARROW_TEXT_CLEARANCE_M`, the fleet's arrow-to-text rule) of another annotation's text. An arrow through the text is `text-on-line` instead, reported once |
+| `extension-near-text` | advisory | an extension line within 2 mm of another annotation's text without running through it: witnesses routinely pass close to neighbouring text (Main's ruling) |
 | `dim-line-crosses-extension-at-text` / `dim-line-crosses-extension` | gating / advisory | a dimension line crossing another dimension's extension line. ASME allows it when unavoidable, so it gates only within 0.5 × text height of either dimension's text (Main's ruling b) |
 | `leader-crosses-view` / `leader-crosses-leader` | gating | as in `_drawing_layout_check` |
 | `outside-border` / `keep-out` | gating | past the zone frame, or inside the title block |

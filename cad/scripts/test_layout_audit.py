@@ -1334,11 +1334,141 @@ def test_a_dimension_line_across_a_foreign_extension_line_gates_only_at_text():
         [("30.0", 0.185, 0.160)],
     )
     findings = audit_dump(_dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [far, near, crossed])]))
-    crossings = {(f.a.split()[1], f.kind, severity(f).value) for f in findings if "extension" in f.kind}
+    crossings = {(f.a.split()[1], f.kind, severity(f).value) for f in findings if f.kind.startswith("dim-line")}
     assert crossings == {
         ("Far", "dim-line-crosses-extension", "advisory"),
         ("Near", "dim-line-crosses-extension-at-text", "gating"),
     }
+
+
+# --------------------------------------------------------------------------
+# Arrow and extension line near foreign text (Main's ruling on swing's MHA-092
+# round-2 rule). Ink measured off the 287c5cf6a cone-tip-block render, sheet
+# mm (C:/src/dt-logs/handoffs/mha092-r2-fixtures.md).
+# --------------------------------------------------------------------------
+
+
+def _mm(*values):
+    return tuple(value / 1000.0 for value in values)
+
+
+def _vertical_dim(name, text, x, low, high, text_box, *, outside=True):
+    """A vertical dimension between tips (x, low) and (x, high), its text
+    printed in ``text_box`` (mm). Outside arrows point in and carry 6.35 mm
+    tails; inside arrows point out."""
+    sign = 1.0 if outside else -1.0
+    lines = [_mm(x, low, x, high)]
+    if outside:
+        lines += [_mm(x, low, x, low - 6.35), _mm(x, high, x, high + 6.35)]
+    arrows = [(*_mm(x, low), 0.0, -sign), (*_mm(x, high), 0.0, sign)]
+    record = _dim_record(name, lines, arrows, [(f" {text} ", *_mm(text_box[0], text_box[1]))])
+    return record, [text, *_mm(*text_box)]
+
+
+def _text_note(name, text, box):
+    x0, y0 = _mm(box[0], box[1])
+    note = {
+        "type": 6,
+        "name": name,
+        "visible": 1,
+        "display": {"texts": [{"t": text, "pos": [x0, y0, 0.0], "h": 0.0035, "ref": 1}]},
+        "note": {"text": text, "balloon": False},
+    }
+    return note, [text, *_mm(*box)]
+
+
+def _near_text(annotations_and_spans):
+    annotations = [a for a, _span in annotations_and_spans]
+    spans = [span for _a, span in annotations_and_spans]
+    view = _view("v", _mm(20.0, 20.0, 300.0, 270.0), annotations)
+    findings = audit_dump(_dump(views=[view], spans=spans, print_rest=False))
+    return {
+        (f.kind, f.a.split()[1], f.b.split()[1], severity(f).value)
+        for f in findings
+        if f.kind in ("arrow-near-text", "extension-near-text", "text-on-line")
+    }
+
+
+def test_an_arrow_tail_near_foreign_text_gates():
+    """287c: the 15.2's lower outside arrow's tail stood 0.2 mm over the
+    ADJUSTER ENTRY note; its head, 3.5 mm off, does not reach. Arrows set
+    inside (the fix) carry no tail and clear the note."""
+    note = _text_note("adjuster", "ADJUSTER ENTRY", (95.17, 130.98, 131.49, 134.37))
+    slit = _vertical_dim("SlitDepth", "15.2", 114.93, 141.39, 164.19, (116.5, 150.0, 122.5, 153.5))
+    assert _near_text([note, slit]) == {("arrow-near-text", "SlitDepth", "adjuster", "gating")}
+    inside = _vertical_dim("SlitDepth", "15.2", 114.93, 141.39, 164.19, (116.5, 150.0, 122.5, 153.5), outside=False)
+    assert _near_text([note, inside]) == set()
+
+
+def test_an_arrowhead_near_foreign_text_gates():
+    """287c: the 5.56's lower arrow ran 0.4 mm from the foot finish's Ra 3.2
+    (fixture 2), and the 7.50's left arrow sat on VIEW C's letter. Moving the
+    note clears it."""
+    heel = _vertical_dim("HeelReliefHt", "5.56", 124.25, 93.90, 102.11, (125.5, 96.2, 131.5, 99.7))
+    finish = _text_note("foot", "Ra 3.2", (112.35, 85.94, 123.70, 89.49))
+    assert _near_text([heel, finish]) == {("arrow-near-text", "HeelReliefHt", "foot", "gating")}
+    moved = _text_note("foot", "Ra 3.2", (62.35, 85.94, 73.70, 89.49))  # 50 mm left, clear of every arrow
+    assert _near_text([heel, moved]) == set()
+
+    letter = _text_note("viewC", "C", (64.60, 254.51, 69.17, 259.50))
+    slot_x = _dim_record(
+        "FlangeSlotX",
+        [_mm(72.0, 259.88, 79.5, 259.88), _mm(72.0, 259.88, 65.65, 259.88), _mm(79.5, 259.88, 85.85, 259.88)],
+        [(*_mm(72.0, 259.88), -1.0, 0.0), (*_mm(79.5, 259.88), 1.0, 0.0)],
+        [(" 7.50 ", *_mm(73.0, 262.0))],
+    )
+    assert _near_text([letter, (slot_x, ["7.50", *_mm(73.0, 262.0, 79.0, 265.5)])]) == {
+        ("arrow-near-text", "FlangeSlotX", "viewC", "gating")
+    }
+
+
+def test_an_arrow_inside_foreign_text_is_one_gating_finding():
+    """287c fixture 3: the 10.7's upper arrow landed inside the 3.97's
+    tolerance stack. It is ink through text (text-on-line), reported once."""
+    stack = _text_note("FlangeSlotW", "3.97", (83.48, 232.58, 102.36, 240.96))
+    slot_z = _vertical_dim("FlangeSlotZ", "10.7", 93.90, 215.48, 231.39, (90.17, 221.66, 98.30, 225.04))
+    found = _near_text([stack, slot_z])
+    assert {(kind, a, b) for kind, a, b, _severity in found} == {("text-on-line", "FlangeSlotW", "FlangeSlotZ")}
+
+
+def test_an_extension_line_near_foreign_text_is_advisory():
+    """Main's ruling: an extension line within 2 mm of another annotation's
+    text, not touching it, is advisory; through it is text-on-line."""
+    witness = _dim_record(
+        "Witness",
+        [_mm(150.0, 100.0, 150.0, 140.0), _mm(170.0, 100.0, 170.0, 140.0), _mm(150.0, 138.0, 170.0, 138.0)],
+        [(*_mm(150.0, 138.0), 1.0, 0.0), (*_mm(170.0, 138.0), -1.0, 0.0)],
+        [(" 20.0 ", *_mm(155.0, 139.0))],
+    )
+    beside = _text_note("beside", "SIDE", (130.0, 120.0, 148.8, 123.5))
+    through = _text_note("through", "CROSS", (165.0, 125.0, 175.0, 128.5))
+    found = _near_text(
+        [(witness, ["20.0", *_mm(155.0, 139.0, 163.0, 142.5)]), beside, through]
+    )
+    assert found == {
+        ("extension-near-text", "Witness", "beside", "advisory"),
+        ("text-on-line", "through", "Witness", "gating"),
+    }
+
+
+def test_only_an_outside_arrow_has_a_tail():
+    """Real pinion-bracket records: 9.0's outside arrows carry 6.35 mm tails;
+    4.50's inside arrows, whose line runs on to text parked left, carry none."""
+    depth = annotation_geometry(PB_DEPTH, owner="v", advance=0.6)
+    assert sorted((round(t.x0 * 1000, 2), round(t.x1 * 1000, 2)) for t in depth.arrow_tails) == [
+        (71.0, 64.65),
+        (89.0, 95.35),
+    ]
+    assert annotation_geometry(PB_PIN_SEAT_CZ, owner="v", advance=0.6).arrow_tails == ()
+
+
+def test_the_audit_and_the_placement_checks_share_one_arrow_text_clearance():
+    from _layout_audit import find_arrows_near_text, find_extensions_near_text
+    from _layout_geometry import ARROW_TEXT_CLEARANCE_M
+
+    assert ARROW_TEXT_CLEARANCE_M == 0.002
+    for finder in (find_arrows_near_text, find_extensions_near_text):
+        assert finder.__kwdefaults__["clearance"] is ARROW_TEXT_CLEARANCE_M
 
 
 def test_two_leaders_converging_on_one_landing_are_advisory():
