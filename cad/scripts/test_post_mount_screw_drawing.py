@@ -84,7 +84,8 @@ def test_no_fixed_cut_length_fits_both_in_band_corners() -> None:
 
 def test_cut_length_prints_as_a_reference_without_a_band() -> None:
     """No fixed length exists, so the model's 86.0 prints as "(86.0)" with
-    no tolerance, and the fit-to-hole rule stays in the assembly steps."""
+    no tolerance; the callout beneath it carries the fit-to-hole acceptance
+    (see test_cut_to_fit_acceptance_prints_on_the_delegating_callout)."""
     assert spec.CUT_LENGTH_MM == part.SHANK_LEN == 86.0
     assert not hasattr(spec, "CUT_LENGTH_BAND")
     assert not hasattr(drawing, "EXPECTED_CONTROLS")
@@ -97,8 +98,40 @@ def test_cut_length_prints_as_a_reference_without_a_band() -> None:
     assert "set_reference_dimension(" in source
     assert "swTolNONE" in source
     callout = drawing.DIMENSION_CALLOUTS["CutLength"]
-    assert " ".join(callout.split()) == "CUT TO FIT AT ASSEMBLY"
-    assert not any(ch.isdigit() for ch in callout)
+    # The callout still promises no fixed length: never the modelled cut
+    # length, never a band on it.
+    assert f"{spec.CUT_LENGTH_MM:.1f}" not in callout
+    assert "±" not in callout and "+" not in callout
+
+
+def test_cut_to_fit_acceptance_prints_on_the_delegating_callout() -> None:
+    """Codex P1 on #857: the callout delegated the cut to assembly, but no
+    MHA-A03 step stated the acceptance the 0.90D worst case depends on.  The
+    acceptance is a spec band -- upper 0 (never proud), lower the most a
+    screw may be cut short -- and the callout prints it, generated from that
+    band at the cut length's places, not a literal."""
+    lower, upper = deviations(spec.POST_SCREW_CUT_TO_FIT_BAND)
+    assert upper == 0.0
+    assert spec.POST_SCREW_CUT_TO_FIT_SHORT == -lower
+    places = spec.DRAWING_PRECISION_BY_NAME["CutLength"]
+    callout = drawing.DIMENSION_CALLOUTS["CutLength"]
+    assert callout == spec.CUT_TO_FIT_CALLOUT
+    flat = " ".join(callout.split())
+    assert flat.startswith("CUT TO FIT AT ASSEMBLY")
+    assert f"FLUSH TO {-lower:.{places}f} SHORT OF MHA-091 UNDERSIDE" in flat
+    assert "NEVER PROUD" in flat
+    # The printed allowance is the one the named exception's worst case
+    # spends: thinnest plate, full allowance, both breaks at their maximum.
+    assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(
+        platform.PLATE_THICKNESS
+        - spec.PLATE_STOCK_BAND_MM
+        - (-lower)
+        - spec.POST_MOUNT_TAP_EDGE_BREAK
+        - spec.CUT_END_BREAK_MAX_MM
+    )
+    assert spec.POST_MOUNT_ENGAGEMENT_WORST / spec.THREAD_DIA_MM >= spec.MIN_ENGAGEMENT_DIAMETERS
+    # No other sheet text restates it: the part notes stay digit-free.
+    assert not any(ch.isdigit() for ch in spec.MANUFACTURING_NOTES)
 
 
 def test_cut_to_fit_allowance_is_exported_once() -> None:

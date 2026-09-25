@@ -118,10 +118,31 @@ if FIXED_CUT_LENGTH_EXISTS:
         "print it with its band instead of a reference length"
     )
 
-# The fit-to-hole allowance (MHA-A03): each screw is cut flush to this much
-# short of its own MHA-091 underside, never proud.  The one copy: integ's
-# platform engagement stack and drive-train assembly step import it.
-POST_SCREW_CUT_TO_FIT_SHORT = 0.3
+# The fit-to-hole acceptance (MHA-A03): each screw's cut end sits between
+# flush with its own MHA-091 underside and this much short of it, never proud.
+# A band on the cut end's position relative to that underside, in the
+# (upper, lower) _fit_limits convention: upper 0 IS "never proud", lower is
+# the most it may be cut short.  POST_SCREW_CUT_TO_FIT_SHORT is the one copy
+# of the allowance: integ's platform engagement stack imports it, and the
+# worst-case engagement below spends all of it.
+POST_SCREW_CUT_TO_FIT_BAND = (0.0, -0.3)
+_fit_lower, _fit_upper = deviations(POST_SCREW_CUT_TO_FIT_BAND)
+if _fit_upper != 0.0:
+    raise ValueError("the cut-to-fit band must top out flush: never proud")
+POST_SCREW_CUT_TO_FIT_SHORT = -_fit_lower
+# No MHA-A03 procedure sheet exists, so the acceptance prints where the part
+# sheet delegates the cut: the CutLength dimension's callout (Codex P1 on
+# #857).  The number is the band's, at the cut length's own places; a band
+# the places would round is refused rather than printed wrong.
+_FIT_PLACES = DRAWING_PRECISION[CUT_LENGTH_SKETCH][CUT_LENGTH_DIMENSION]
+if round(POST_SCREW_CUT_TO_FIT_SHORT, _FIT_PLACES) != POST_SCREW_CUT_TO_FIT_SHORT:
+    raise ValueError("the cut-to-fit allowance does not print at the cut length's places")
+CUT_TO_FIT_CALLOUT = (
+    "CUT TO FIT AT ASSEMBLY\n"
+    f"END FLUSH TO {POST_SCREW_CUT_TO_FIT_SHORT:.{_FIT_PLACES}f} SHORT\n"
+    "OF MHA-091 UNDERSIDE,\n"
+    "NEVER PROUD"
+)
 
 # The named exception's worst case, cut to fit: unlike the fixed-length
 # corner above, the floor drops out (each screw is cut to its own hole), so
@@ -245,8 +266,8 @@ if STOCK_LENGTH_MM - FACTORY_TIP_CHAMFER_MM <= CUT_LENGTH_MM:
     raise ValueError("the cut no longer clears the factory tip")
 
 # Rule 6: no dimension, no tolerance, no installation sequence.  The cut
-# length is the reference dimension above; cutting each screw to its hole is
-# an MHA-A03 step.
+# length is the reference dimension above; its fit-to-hole acceptance is the
+# CutLength callout (CUT_TO_FIT_CALLOUT), not a note.
 MANUFACTURING_NOTES = (
     "CHAMFER CUT END.\nUNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."
 )

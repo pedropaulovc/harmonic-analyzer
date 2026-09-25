@@ -6,8 +6,10 @@ reference sheet: a Front view carrying the cut length -- the part's hidden
 reference-sketch dimension, imported at its model-owned places -- and an
 isometric, both 1:1.  No single length suits every in-band post and plate
 (post_mount_screw_spec's U27 check), so the length prints as a REFERENCE,
-"(86.0)", with "CUT TO FIT AT ASSEMBLY" beneath it and no band; MHA-A03 says
-how.  The cut end's deburr break is a live banded dimension, 0.1 +0/-0.1.  The only note says to chamfer the cut end and that the undimensioned
+"(86.0)", with no band and the cut-to-fit acceptance beneath it: cut at
+assembly, end flush to the spec band's allowance short of the MHA-091
+underside, never proud (post_mount_screw_spec.CUT_TO_FIT_CALLOUT -- no MHA-A03
+procedure sheet exists to carry it, Codex P1 on #857).  The cut end's deburr break is a live banded dimension, 0.1 +0/-0.1.  The only note says to chamfer the cut end and that the undimensioned
 purchased geometry is reference.  No installation sequence, engagement figure or rule
 number is printed: the sequence is an MHA-A03 assembly step and the
 engagement a model assert (Main's eye pass of warm-c486, policy rule 6).
@@ -49,6 +51,7 @@ from post_mount_screw_spec import (
     CUT_END_BREAK_MM,
     CUT_LENGTH_DIMENSION,
     CUT_LENGTH_MM,
+    CUT_TO_FIT_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     HEAD_H_MM,
@@ -69,7 +72,8 @@ FRONT_CENTER = (0.100, 0.165)
 ISO_CENTER = (0.270, 0.185)
 # The cut length reads on the left, where its reference line runs along the
 # shank's silhouette, midway along the span, far enough out that its
-# two-line callout clears the shank.
+# four-line acceptance callout (22 capitals at its widest) clears the head
+# and stays inside the border.
 # The cut end's 0.1 break spans 0.1 mm at 1:1, so its dimension line sits
 # just below the end face and its text leads out to the right, clear of the
 # shank and above the note block.  (The view is placed by its outline's
@@ -77,11 +81,11 @@ ISO_CENTER = (0.270, 0.185)
 TIP_Y = FRONT_CENTER[1] - (CUT_LENGTH_MM + HEAD_H_MM) / 2000.0
 BREAK_X = FRONT_CENTER[0] + (THREAD_DIA_MM / 2.0 - CUT_END_BREAK_MM / 2.0) / 1000.0
 FRONT_KEEP = {
-    CUT_LENGTH_DIMENSION: (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1]),
+    CUT_LENGTH_DIMENSION: (FRONT_CENTER[0] - 0.047, FRONT_CENTER[1]),
     CUT_END_BREAK_DIMENSION: (BREAK_X, TIP_Y - 0.006),
 }
 BREAK_TEXT = (FRONT_CENTER[0] + 0.028, TIP_Y - 0.006)
-DIMENSION_CALLOUTS = {CUT_LENGTH_DIMENSION: "CUT TO FIT\nAT ASSEMBLY"}
+DIMENSION_CALLOUTS = {CUT_LENGTH_DIMENSION: CUT_TO_FIT_CALLOUT}
 # The break is a live cutting control: driving, bilateral (swTolBILAT = 2)
 # at the model's nominal and band -- re-read on the sheet, not trusted.
 _break_lower, _break_upper = deviations(CUT_END_BREAK_BAND)
