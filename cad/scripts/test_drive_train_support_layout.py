@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 import build_drive_train_assembly as drive
+import pinion_rig_fitup as FITUP
 from pinion_pivot_block_geometry import BLOCK_EAST
 from rocker_arm_support_spec import SUPPORT_WORLD_X
 
@@ -136,8 +137,8 @@ def test_rod_phase_leaves_the_cams_parked_ecc_down() -> None:
 # captured on the front block between the lever hub and the front cam collar,
 # whose feeler leaves the same 0.10..0.35 of rod play.  Every quantity below is
 # linear in the gaps, so the extremes sit at the vertices swept here.
-_P_MAX = 0.25 + 0.10
-_ROD_PLAY_MAX = 0.25 + 0.10
+_P_MAX = FITUP.FRONT_BLOCK_FEELER + FITUP.FRONT_BLOCK_FEELER_BAND
+_ROD_PLAY_MAX = FITUP.FRONT_BLOCK_FEELER + FITUP.FRONT_BLOCK_FEELER_BAND
 _BACK_CAM_SET_ERR = 0.5  # the back collar is set to its pin by eye
 
 
