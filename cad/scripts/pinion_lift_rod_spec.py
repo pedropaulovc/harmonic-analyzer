@@ -16,7 +16,9 @@ ROD_DIA = 6.35
 # the deeper E-a blocks (Codex #858), then 197.8 for the drum's end shim
 # (Main, #858 ruling 3), then 198.8 for the 11.0 blocks, then 199.5 for the
 # 0.45 drum shim, the 6.25 back-collar pin plane and RIG_MARGIN_SPARE past
-# the lever seat (Main, #858).
+# the lever seat (Main, #858), then 198.3 once the back collar went on its
+# leaf F (user ruling P1-1): the lever throw plane's air to the torque shaft's
+# front end now sizes it, not the seat.
 ROD_LEN = LIFT_ROD_LEN
 CAP_SAG = 1.2
 CAP_R = round((ROD_DIA**2 / 4.0 + CAP_SAG**2) / (2.0 * CAP_SAG), 2)  # 4.80

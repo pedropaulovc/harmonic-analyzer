@@ -238,7 +238,7 @@ def test_rig_layout_shaft_and_rod_are_set_back_flush() -> None:
     assert rig.LEVER_SEAT_PROUD - 1e-9 <= proud <= rig.LEVER_SEAT_PROUD + 0.1
     # Both are budgeted on the worst fitted stack (their own tests); at
     # nominal each stands that allowance proud of the front block.
-    assert (SHAFT_LEN, ROD_LEN) == (187.0, 199.5)
+    assert (SHAFT_LEN, ROD_LEN) == (187.0, 198.3)
 
 
 def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:

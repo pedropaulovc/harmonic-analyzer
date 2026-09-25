@@ -354,8 +354,9 @@ STOP_SCREW_DRILL_DEPTH = 20.0
 # about the pivot bore, block mid-depth 5.125 in from each outer face; the
 # drum-axis pedestal seats remain unchanged.  Ruling (c) (user, 2026-09-24):
 # the block and spring-foot z stations are pinion_rig_layout's -- the front
-# block stands one feeler off the front strap, the spring rides 0.8 aft, and
-# the whole rig stands RIG_AFT_SHIFT aft so gear j = 19 keeps its full face.
+# block stands one feeler off the front strap, the spring foot's pad one
+# leaf off the back block, and the whole rig where the rig-set leaf D off gear
+# j = 19 puts it (RIG_AFT_SHIFT, user ruling P1-2).
 _FORMER_BLOCK_SCREW_X = (-17.226441649810653, -0.22644164981065273)  # east, west
 BLOCK_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z) for z in BLOCK_SEAT_Z for x in _FORMER_BLOCK_SCREW_X
