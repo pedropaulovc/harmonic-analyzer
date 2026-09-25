@@ -2370,6 +2370,31 @@ def test_a_warm_backfill_hashes_and_renders_nothing_new(
     assert hashed == [ingested.candidate.pdf]
 
 
+def test_a_backfill_ingest_reuses_the_authors_it_already_walked(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    walked = ml.draw_script_authors
+
+    def rewalk(name, **_):
+        raise AssertionError(f"{name}: walked the draw script's history again")
+
+    monkeypatch.setattr(ml, "draw_script_author", rewalk)
+    heads: list[Path] = []
+    real_head = ml._checkout_head
+    monkeypatch.setattr(
+        ml, "_checkout_head", lambda checkout: heads.append(checkout) or real_head(checkout)
+    )
+    _on_record(records, "wt-a", producer="reviewed render")
+    _sheet(registry)
+
+    row = _backfill(tmp_path, records)
+
+    assert row.outcome == ml.Backfill.INGESTED, row.detail
+    assert ml.draw_script_authors is walked
+    assert len(heads) == 1
+
+
 def test_the_worktree_roots_are_each_worktrees_pdfs_and_reports(
     tmp_path: Path,
 ) -> None:

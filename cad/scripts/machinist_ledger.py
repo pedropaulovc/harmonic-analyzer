@@ -620,10 +620,16 @@ def _last_commits(blobs: dict[str, str], repo: Path) -> dict[str, str]:
     return last
 
 
+@functools.cache
+def _shallow_file(repo: Path) -> Path | None:
+    """Where this clone lists its shallow commits (a worktree shares its clone's)."""
+    shallow = _git("rev-parse", "--git-path", "shallow", repo=repo)
+    return repo / shallow if shallow else None
+
+
 def _shallow_boundary(repo: Path) -> set[str]:
     """Commits whose parents this clone lacks; their diff lists every file."""
-    shallow = _git("rev-parse", "--git-path", "shallow", repo=repo)
-    path = repo / shallow if shallow else None
+    path = _shallow_file(repo)
     if path is None or not path.is_file():
         return set()
     return set(path.read_text(encoding="utf-8").split())
@@ -714,10 +720,18 @@ def draw_script_authors(
 
 
 def resolve_author(
-    name: str, author_family: str, author_model: str | None, *, repo: Path = REPO_ROOT
+    name: str,
+    author_family: str,
+    author_model: str | None,
+    *,
+    repo: Path = REPO_ROOT,
+    known: Author | None = None,
 ) -> dict[str, Any]:
-    """The author on record: the trailer's model, cross-checked against the claims."""
-    author = draw_script_author(name, repo=repo)
+    """The author on record: the trailer's model, cross-checked against the claims.
+
+    ``known`` is the draw script's author when the caller already walked it.
+    """
+    author = known or draw_script_author(name, repo=repo)
     record = {"family": author_family, "commit": author.commit, "script": author.script}
     model = author.model
     source = "trailer"
@@ -1176,6 +1190,7 @@ def record_review(
     outage: dict[str, Any] | None = None,
     repo: Path = REPO_ROOT,
     digests: Sequence[str] | None = None,
+    known_author: Author | None = None,
 ) -> Recorded:
     """Enter one accepted review in its slot, replacing that slot's previous entry.
 
@@ -1229,7 +1244,9 @@ def record_review(
         if why:
             raise ValueError(f"{name}: not an outage fallback: {why}")
         slot = OUTAGE_FALLBACK
-    author = resolve_author(name, author_family, author_model, repo=repo)
+    author = resolve_author(
+        name, author_family, author_model, repo=repo, known=known_author
+    )
     problem = None
     if slot == LAST_RESORT:
         problem = _last_resort_problem(review, author, refusal)
@@ -1917,6 +1934,7 @@ def _try(
     ruling: dict[str, Any] | None,
     found: Found,
     checkout: Path,
+    head: str | None,
     scratch: Path,
 ) -> Tried:
     """Match one located SHIP against the current sheets, then record it in ``scratch``."""
@@ -1945,7 +1963,7 @@ def _try(
         "backfilled_from": candidate.report.resolve().as_posix(),
         "reviewed_pdf_found_at": candidate.pdf.resolve().as_posix(),
         "matched_checkout": checkout.resolve().as_posix(),
-        "matched_checkout_head": _checkout_head(checkout),
+        "matched_checkout_head": head,
         "author_family_source": source,
         "match": match,
     }
@@ -1963,6 +1981,7 @@ def _try(
             ledger_path=scratch,
             repo=checkout,
             digests=matcher.cache.sheets.get(review["source_sha256"][0]),
+            known_author=author,
         )
     except ValueError as exc:
         return Tried(candidate, Backfill.NOT_COUNTED, f"{matched}; {exc}")
@@ -2063,6 +2082,7 @@ def _backfill_drawings(
     references = _References(sheets_dir(ledger_path))
     tried_names = sorted(set(by_drawing) - excluded)
     authors = draw_script_authors(tried_names, repo=repo) if tried_names else {}
+    head = _checkout_head(repo)
     rows: list[BackfillRow] = []
     with tempfile.TemporaryDirectory(prefix="machinist-backfill-") as tmp:
         for name in DRAWINGS_BY_NAME:
@@ -2139,6 +2159,7 @@ def _backfill_drawings(
                     ruling=rulings.get(name),
                     found=found,
                     checkout=repo,
+                    head=head,
                     # its own directory: a scratch save prunes its sheets dir
                     scratch=Path(tmp) / name / str(index) / "ledger.json",
                 )
@@ -2157,7 +2178,7 @@ def _backfill_drawings(
             if apply and best.outcome == Backfill.INGESTED:
                 _adopt(best, name, ledger, ledger_path)
     skipped = [candidate for candidate in found.candidates if candidate.skip]
-    return BackfillResult(repo, _checkout_head(repo), rows, skipped)
+    return BackfillResult(repo, head, rows, skipped)
 
 
 def _adopt(tried: Tried, name: str, ledger: dict[str, Any], ledger_path: Path) -> None:
