@@ -2196,10 +2196,20 @@ def stamps_title_block_properties(script: Path) -> bool:
 
 
 # Modules that read title_block.yaml for GEOMETRY -- a worst-case stack that
-# sizes or places a part from the printed rows -- rather than for the TOL_*
-# stamping.  A title-block edit moves those placements, so a build importing
-# one keeps title_block.yaml even when it stamps nothing (Codex #854 review).
-TITLE_BLOCK_GEOMETRY_MODULES = frozenset({"_printed_tolerance"})
+# sizes or places a part from the printed rows, or a part dimension set to a
+# printed band -- rather than for the TOL_* stamping.  A title-block edit moves
+# those, so a build importing one keeps title_block.yaml even when it stamps
+# nothing (Codex #854 review).  Every module that calls the accessor and is not
+# a stamper or a drawing script is listed here (test_dodo_recipe pins it).
+TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
+    {
+        "_printed_tolerance",
+        "boss_hook_spec",
+        "build_swing_stop_screw",
+        "build_wheel_bar",
+        "spring_hook_spec",
+    }
+)
 
 
 def reads_title_block_geometry(script: Path) -> bool:
