@@ -218,6 +218,9 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
     return foot_edge, bore_edge, dome_edge
 
 
+_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+
+
 @_telemetry.traced("drawing.crown_radius")
 def _show_crown_as_radius(adapter: Any, annotations: list[Any]) -> None:
     """Print the model's dome diameter as the crown RADIUS it is on the part.
@@ -244,10 +247,16 @@ def _show_crown_as_radius(adapter: Any, annotations: list[Any]) -> None:
         # default "extend to the opposite side" it kept going through the bore
         # and crossed the Ø9.55 dimension at the centre. Stop it at the arc.
         display.ArcExtensionLineOrOppositeSide = False
+        # Arrow OUTSIDE the arc (swDimArrowsOutside): the leader runs from the
+        # text to the crown and stops there. Inside, the dimension line ran
+        # from the arc to the centre, straight through the bore (810-l4afp-1
+        # eye pass).
+        display.ArrowSide = _ARROWS_OUTSIDE
         if (
             bool(display.Diametric)
             or str(display.GetText(4) or "") != CROWN_CALLOUT
             or bool(display.ArcExtensionLineOrOppositeSide)
+            or int(display.ArrowSide) != _ARROWS_OUTSIDE
         ):
             raise RuntimeError("crown radius display did not persist")
         _telemetry.info(

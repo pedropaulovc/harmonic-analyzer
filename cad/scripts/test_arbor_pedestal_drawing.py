@@ -109,6 +109,10 @@ def test_crown_radius_is_the_dome_diameter_printed_radial() -> None:
     assert "DomeDia" in drawing.FRONT_KEEP
     source = _drawing_source()
     assert "display.Diametric = False" in source
+    # 810-l4afp-1 eye pass: the radius line ran through the bore to the
+    # centre; the arrow sits outside the arc so the leader stops on it.
+    assert "display.ArrowSide = _ARROWS_OUTSIDE" in source
+    assert drawing._ARROWS_OUTSIDE == 1
     assert "AddRadialDimension2" not in source
     assert "_show_crown_as_radius(adapter, front_annotations)" in source
 
