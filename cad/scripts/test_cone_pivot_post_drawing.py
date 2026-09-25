@@ -639,3 +639,57 @@ def test_cone_incline_single_ownership_gate_rejects_each_failure(monkeypatch) ->
         adapter.currentModel = _Model(dims)
         with pytest.raises(RuntimeError, match=message):
             part._assert_cone_incline_single_owner(adapter)
+
+
+def test_cone_incline_global_is_stored_at_full_precision() -> None:
+    # r10 (a5df755e) leaf: "global ConeIncline = 12.5182deg -> 12.52". The
+    # equation manager rounds a global to the document's angular decimal places
+    # (the template's 2), so both ConeIncline-owned angles read 12.52 against
+    # the 12.5182 geometry.  The build widens the angular places first and
+    # proves the stored value before anything is driven from it.
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    widen = source.index("    _keep_equation_angles_exact(adapter)\n")
+    define = source.index('set_global(adapter, "ConeIncline", f"{INCLINE_DEG!r}deg")')
+    assert widen < define
+    assert "if abs(cone_incline - INCLINE_DEG) > 1e-8:" in source
+    assert part._SW_UNITS_ANGULAR_DECIMAL_PLACES == 52
+    assert part._EQUATION_ANGULAR_DECIMALS == 8
+    # The expression carries the spec value exactly, not a display rounding.
+    expression = f"{spec.INCLINE_DEG!r}deg"
+    assert float(expression.removesuffix("deg")) == spec.INCLINE_DEG
+
+
+def test_equation_angular_decimals_are_set_and_read_back(monkeypatch) -> None:
+    import pytest
+    from types import SimpleNamespace
+
+    class _Extension:
+        def __init__(self, sticks: bool) -> None:
+            self.values = {part._SW_UNITS_ANGULAR_DECIMAL_PLACES: 2}
+            self.sticks = sticks
+
+        def GetUserPreferenceInteger(self, pref: int, option: int) -> int:
+            assert option == 0
+            return self.values[pref]
+
+        def SetUserPreferenceInteger(self, pref: int, option: int, value: int) -> bool:
+            assert option == 0
+            if self.sticks:
+                self.values[pref] = value
+            return True
+
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
+    extension = _Extension(sticks=True)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(Extension=extension))
+    part._keep_equation_angles_exact(adapter)
+    assert extension.values[part._SW_UNITS_ANGULAR_DECIMAL_PLACES] == 8
+    adapter.currentModel.Extension = _Extension(sticks=False)
+    with pytest.raises(RuntimeError, match="angular decimal places read 2"):
+        part._keep_equation_angles_exact(adapter)
+
+
+def test_journal_axis_readback_runs_before_the_ownership_gate() -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    axis = source.index("    _assert_journal_axis_direction(adapter)\n")
+    owner = source.index("    _assert_cone_incline_single_owner(adapter)\n")
+    assert axis < owner

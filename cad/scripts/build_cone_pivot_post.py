@@ -331,7 +331,18 @@ async def build(adapter: Any) -> dict[str, str]:
     }
     for name, value in globals_mm.items():
         await set_global(adapter, name, f"{value}mm")
-    await set_global(adapter, "ConeIncline", f"{INCLINE_DEG}deg")
+    # The equation manager rounds a global to the document's decimal places for
+    # its unit: the template's 8 linear places are harmless, but its 2 angular
+    # places stored ConeIncline as 12.52 deg against the 12.5182 geometry (r10
+    # leaf log: "global ConeIncline = 12.5182deg -> 12.52").  Widen the angular
+    # places first and prove the stored value; the printed angle keeps its own
+    # one-place override (DRAWING_PRECISION).
+    _keep_equation_angles_exact(adapter)
+    cone_incline = await set_global(adapter, "ConeIncline", f"{INCLINE_DEG!r}deg")
+    if abs(cone_incline - INCLINE_DEG) > 1e-8:
+        raise RuntimeError(
+            f"global ConeIncline stored {cone_incline!r} deg, expected {INCLINE_DEG!r}"
+        )
     # The crank axis is located FROM THE CONE AXIS (U31): the 16T:64T mesh
     # closes on that spacing, so it is the independent value and the height
     # above the foot only follows it.
@@ -795,7 +806,6 @@ async def build(adapter: Any) -> dict[str, str]:
         HARVESTED_VOLUME_MM3,
         0.001 * HARVESTED_VOLUME_MM3,
     )
-    _assert_cone_incline_single_owner(adapter)
     # Three accuracy features on this casting: the two running bores carry the
     # ONE band that closes the `shaft_in_bushing` fit class against their
     # turned shafts (cad/docs/tolerance-policy.md), and the spacing between
@@ -830,6 +840,9 @@ async def build(adapter: Any) -> dict[str, str]:
         "journal axis",
     )
     _assert_journal_axis_direction(adapter)
+    # After the axis readback, so one leaf reports both the built direction and
+    # the ownership evidence.
+    _assert_cone_incline_single_owner(adapter)
     for label, x in (("mount west", ATTACHMENT_X), ("mount east", -ATTACHMENT_X)):
         await name_bore_axis(
             adapter, "Front Plane", 0.0, "Right Plane", x, label
@@ -982,6 +995,33 @@ def _create_feature_cylinder_axis(
     )
 
 
+# swUserPreferenceIntegerValue_e.swUnitsAngularDecimalPlaces, read from the
+# SOLIDWORKS 2026 swconst typelib (swUnitsLinearDecimalPlaces = 49 beside it
+# matches the adapter's own constant).  8 is the API's maximum.
+_SW_UNITS_ANGULAR_DECIMAL_PLACES = 52
+_EQUATION_ANGULAR_DECIMALS = 8
+
+
+@_telemetry.traced("units.equation_angular_decimals")
+def _keep_equation_angles_exact(adapter: Any) -> None:
+    """Give angle-valued equations the document's full 8 decimal places."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    before = int(
+        extension.GetUserPreferenceInteger(_SW_UNITS_ANGULAR_DECIMAL_PLACES, 0)
+    )
+    if not extension.SetUserPreferenceInteger(
+        _SW_UNITS_ANGULAR_DECIMAL_PLACES, 0, _EQUATION_ANGULAR_DECIMALS
+    ):
+        raise RuntimeError("SetUserPreferenceInteger(angular decimals) failed")
+    after = int(
+        extension.GetUserPreferenceInteger(_SW_UNITS_ANGULAR_DECIMAL_PLACES, 0)
+    )
+    if after != _EQUATION_ANGULAR_DECIMALS:
+        raise RuntimeError(f"angular decimal places read {after} after setting 8")
+    _telemetry.success(f"angular decimal places {before} -> {after}")
+
+
 def _equations_for(adapter: Any, lhs: str) -> list[str]:
     """Every equation whose left-hand side is exactly ``lhs``."""
     from solidworks_mcp.adapters.solidworks.parametrics import (
@@ -1095,6 +1135,7 @@ def _assert_journal_axis_direction(adapter: Any) -> None:
         raise RuntimeError(f"journal axis: invalid axis endpoints {points!r}")
     vector = (points[3] - points[0], points[4] - points[1], points[5] - points[2])
     error = _journal_axis_misalignment(vector)
+    _telemetry.info(f"journal axis readback vector={vector!r} sin_error={error:.3g}")
     if error > 1e-6:
         raise RuntimeError(
             f"journal axis {vector!r} is off the {INCLINE_DEG} deg incline "
