@@ -282,6 +282,22 @@ def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
     assert ROD_PIN_HOLE_FROM_END + PIN_HOLE_DIA / 2.0 + 0.8 <= BORE_DEPTH
 
 
+def test_front_block_feeler_setting_is_the_ruled_band() -> None:
+    # Codex #854 P1: the fit-up setting that makes PHYSICAL_INNER_SPAN (and
+    # so the 182.0 shaft and 192.0 rod) true is ruling (c)'s 0.25 +/- 0.10
+    # feeler between the front strap and the front block.  The band is a
+    # named fit-up value so the MHA-A03 step and every worst-case gate read
+    # one source; it never closes the gap or doubles it.  It lives outside
+    # pinion_rig_layout so it stays out of every part's rebuild closure.
+    import pinion_rig_fitup as fitup
+    import pinion_rig_layout as rig
+
+    assert fitup.FRONT_BLOCK_FEELER is rig.FRONT_BLOCK_FEELER
+    assert (fitup.FRONT_BLOCK_FEELER, fitup.FRONT_BLOCK_FEELER_BAND) == (0.25, 0.10)
+    assert 0.0 < fitup.FRONT_BLOCK_FEELER - fitup.FRONT_BLOCK_FEELER_BAND
+    assert fitup.FRONT_BLOCK_FEELER_BAND < fitup.FRONT_BLOCK_FEELER
+
+
 def test_manufactured_block_span_is_the_solid_stack_plus_one_feeler() -> None:
     # Codex #854 P1: the model pose's STRAP_AIR is not hardware.  The printed
     # shaft length is the two blocks plus the solid stack (strap, drum, strap)
