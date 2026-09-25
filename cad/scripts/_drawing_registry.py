@@ -567,6 +567,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="cylinder_end_disc",
+        part="cylinder_end_disc",
+        artifact_stem="cylinder-end-disc",
+        script_name="draw_cylinder_end_disc.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="arbor_pedestal",
         part="arbor_pedestal",
         artifact_stem="arbor-pedestal",
