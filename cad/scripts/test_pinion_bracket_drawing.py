@@ -283,18 +283,20 @@ def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
     # face A) prints at .XX; across the bar a hidden construction reference
     # sketch owns the hole's distance from the pivot-bore wall ("PivotBore" /
     # 2), which the side view shows and prints at .XX.  The callout keeps only
-    # THRU and the loose-supplied pin.
+    # THRU and the pin it takes.  Main overrode the loose-SUPPLY wording once
+    # MHA-145 became a modelled BOM line (2 used): supplying one per strap
+    # would double the order, so the callout names the part, and its number
+    # is the parts registry's.
     import inspect
+
+    import _config
 
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
     assert callout is pinion_bracket_spec.CROSS_HOLE_CALLOUT
     assert "AXIS" not in callout and "CENTRED" not in callout
-    assert callout.splitlines()[0] == "THRU"
-    assert "SUPPLY 1/16 X 1/2 SLOTTED SPRING" in callout
-    assert "PIN (ASME B18.8.2) LOOSE" in callout
-    assert len(callout.splitlines()) <= 4
-    body = callout.replace("1/16 X 1/2", "").replace("B18.8.2", "")
-    assert not any(ch.isdigit() for ch in body)
+    assert "SUPPLY" not in callout and "LOOSE" not in callout
+    number = _config.parts("pinion-strap-pin")["number"]
+    assert callout.splitlines() == ["THRU", f"FOR {number} SPRING PIN"]
     dims = pinion_bracket_spec.DRAWING_DIMENSIONS
     assert dims["CrossHoleProfile"] == {"CrossHoleDia", "CrossHoleCz"}
     assert dims["CrossHoleAxisReference"] == {"CrossHoleFromBoreWall"}

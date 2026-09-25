@@ -67,6 +67,8 @@ allowed_free_stems:
   - pinion-lift-rod
   # Option E-a: pinned to both straps, the torque shaft swings with them.
   - pinion-pivot-shaft
+  # MHA-145: locked in each strap's cross hole, it swings with the strap.
+  - pinion-strap-pin
 # One family per freed DOF that must ITSELF read under-constrained.
 required_free_stems:
   - crankshaft

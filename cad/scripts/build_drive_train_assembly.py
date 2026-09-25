@@ -859,6 +859,7 @@ from pinion_lever_geometry import (  # noqa: E402
     ROD_LEN as LEVER_ROD_LEN,
     WALL_T as LEVER_WALL_T,
 )
+from pinion_pivot_shaft_spec import PIN_HOLE_Z as SHAFT_PIN_HOLE_Z  # noqa: E402
 from pinion_handle_geometry import ROD_DIA as HANDLE_ROD_DIA  # noqa: E402
 from pinion_spring_geometry import (  # noqa: E402
     AXIS_OFFSET as SPRING_AXIS_OFF,
@@ -1653,6 +1654,19 @@ if max(CAM_PIN_STATION) > CAM_LEN - 1.0 or min(CAM_PIN_STATION) < 1.0:
 if CAM_Z0[0] < BLOCK_FRONT_Z0 + BLOCK_DEPTH + RIG.FRONT_BLOCK_FEELER - 1e-9:
     raise AssertionError("front cam collar crowds the front pivot block")
 
+# Option E-a set pins (MHA-145, pinion-strap-pin): each strap cuts its cross
+# hole along its local X through the pivot-bore axis at CrossHoleCz =
+# StrapThickness / 2 from its part origin (build_pinion_bracket) -- on the
+# strap mid-plane -- so each pin is centred on the pivot axis at that plane.
+# The torque shaft's holes are match-drilled through those cross holes at the
+# fit-up stack, which this pose is, so each pin runs straight through its
+# shaft hole (Codex #858 P1: a straight pin cannot pass offset holes, and no
+# interference row may pretend it does).
+STRAP_PIN_Z = _STRAP_MID_Z
+for _z_pin, _z_hole in zip(STRAP_PIN_Z, SHAFT_PIN_HOLE_Z, strict=True):
+    if abs(PIVOT_SHAFT_Z0 + _z_hole - _z_pin) > 1e-9:
+        raise AssertionError("a strap pin is not coaxial with its torque-shaft hole")
+
 
 # PARK: collar (ecc down) under the pin, by design 0.10..0.25 of air. The
 # binding quantity is the SKEW-perpendicular distance from the collar axis's
@@ -2403,6 +2417,21 @@ async def build(adapter) -> dict[str, str]:
             _strap_rows,
             ground=False,
             label=f"pinion-bracket {tag} (leaning, arbor bore up top)",
+        )
+    # Option E-a set pins (MHA-145): the purchased 1/16 x 1/2 spring pin in
+    # each strap's cross hole, inserted with the strap's own rows so its axis
+    # (local X) is the hole's and its principal planes parallel the strap's.
+    # Front first: the interference contract keys the front pin as -1.
+    strap_pins: dict[str, str] = {}
+    for tag, z_pin in zip(("front", "back"), STRAP_PIN_Z, strict=True):
+        strap_pins[tag] = await place_component(
+            adapter,
+            "pinion-strap-pin",
+            [PIVOT_X, PIVOT_Y, z_pin],
+            _strap_euler,
+            _strap_rows,
+            ground=False,
+            label=f"pinion-strap-pin {tag} (MHA-145 in the strap cross hole)",
         )
     pinion_blocks: list[str] = []
     for tag, z0 in (("front", BLOCK_FRONT_Z0), ("back", BLOCK_BACK_Z0)):
@@ -3861,6 +3890,16 @@ async def build(adapter) -> dict[str, str]:
             cp_phase,
             label=f"cam follower {tag} anti-spin (a={cp_phase:.2f})",
             verify=(cpin, cp_o),
+        )
+    # Option E-a set pins (MHA-145): each is inserted on its strap's cross
+    # hole -- coaxial with its shaft hole -- and locked to that strap, so it
+    # rides the freed swing.
+    for tag in ("front", "back"):
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{strap_pins[tag]}", "PLANE"),
+            named_ref(f"Front Plane@{pinion_brackets[tag]}", "PLANE"),
+            label=f"strap pin {tag} locked to its strap",
         )
     # Lift rod REVOLUTE (PR8): coaxial in the front block's raised west bore
     # + an axial seat; its spin -- the lever/cam input -- is a FREED

@@ -21,7 +21,10 @@ INCH = 25.4
 PIN_STANDARD = "ASME B18.8.2"
 PIN_DIA = INCH / 16.0  # 1/16 in
 PIN_LEN = INCH / 2.0  # 1/2 in
-PIN_SUPPLY = "1/16 X 1/2 SLOTTED SPRING PIN (ASME B18.8.2)"
+# McMaster 98296A027 (_fastener_catalog), read live on September 25, 2026:
+# 1050-1095 spring steel, 0.012 in wall.  The catalog gives no slot or
+# chamfer size, so the stock recipe models neither.
+WALL_T = 0.012 * INCH
 # B18.8.2 cuts the length to +/-0.010 in.
 PIN_LEN_BAND = 0.010 * INCH
 
