@@ -19,6 +19,7 @@ recipes:
 | 90126A211 | `knife-hanger-washer` | Zinc-Plated Steel SAE Washer |
 | 90280A108 | `cone-tip-pinch-screw`, `foot-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A194 | `bracket-screw`, `frame-side-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A197 | `pedestal-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A199 | `slotted-screw`, `swing-stop-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A201 | `clamp-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
@@ -71,6 +72,13 @@ Catalog specifications checked on September 10, 2026:
   `5bcc08b043bb1e7a8060c75d32db9f30f1528139478ee2a3f35676ab754c05c8`;
   native SLDPRT
   `0e52851776ee9ac5cd03c4d6ad2b1c07715417e4b97b85f032206cd8c2e3fad2`.
+- [90280A197](https://www.mcmaster.com/90280A197/) was read live on
+  September 23, 2026: #8-32 UNC class 2A, 3/4 in (19.05 mm) long under the
+  head, fully threaded zinc-plated steel, flat tip, ASME B18.6.3; head
+  diameter 0.27 in and height 0.156 in. Its head and thread match the
+  harvested 90280A194 and 90280A199, so the shared fillister family recipe
+  builds it from the length alone. No vendor SLDPRT has been harvested for
+  this length yet.
 
 Ground rules (mirrored in the diagnostics themselves): the vendor files are
 opened read-only and NEVER saved or modified; everything derived from them

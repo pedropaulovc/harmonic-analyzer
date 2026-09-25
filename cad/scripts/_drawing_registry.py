@@ -637,6 +637,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="pedestal_hold_down_screw",
+        part="pedestal_hold_down_screw",
+        artifact_stem="pedestal-hold-down-screw",
+        script_name="draw_pedestal_hold_down_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="frame_side_screw",
         part="frame_side_screw",
         artifact_stem="frame-side-screw",
