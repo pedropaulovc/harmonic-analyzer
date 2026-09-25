@@ -105,8 +105,11 @@ from _buildgraph import (  # noqa: E402
     artefact_for,
     config_files_of,
     data_deps_of,
+    dict_table_entries,
+    dict_table_recipe,
     drawing_registry_reads_selected,
     drawing_registry_recipe,
+    fastener_rows_selected,
     machine_family_files,
     module_deps_of,
     part_row_files,
@@ -651,6 +654,11 @@ def _run_subprocess(cmd: list[str], label: str, log_stem: str | None = None) -> 
     _telemetry.info(f">> {label}: {' '.join(cmd)}")
     env = _telemetry.inject_env()
     env["OTEL_SERVICE_NAME"] = _stage_name(label)
+    # The catalog rows this task's cache key folds; `fastener` refuses others.
+    env.pop("HARMONIC_FASTENER_ROWS", None)
+    fastener_rows = _fastener_rows_env(label)
+    if fastener_rows is not None:
+        env["HARMONIC_FASTENER_ROWS"] = fastener_rows
     # The MCP adapter uses Loguru directly. Keep its console sink aligned with
     # the build's warning-by-default policy while preserving an explicit override.
     env.setdefault("LOGURU_LEVEL", _external_console_level())
@@ -1663,6 +1671,69 @@ def _drawing_registry_dep(stem: str, registry: Path) -> str:
     )
 
 
+_FASTENER_CATALOG = (SCRIPTS_DIR / "_fastener_catalog.py").resolve()
+# label -> the catalog rows its narrowed recipe folds (see _narrow_fastener_catalog).
+_FASTENER_ROWS: dict[str, frozenset[str]] = {}
+
+
+def _narrow_fastener_catalog(
+    label: str, deps: list[str], own_row: str | None
+) -> list[str]:
+    """Swap ``_fastener_catalog.py`` for a digest of only the rows ``label`` reads.
+
+    ``FASTENERS`` is a data registry: every catalogued part, its drawing and every
+    assembly reaches it, so a one-row edit re-keyed ~97 leaves. When the task's
+    whole Python closure reads the table only through ``fastener(...)``
+    (``_buildgraph.fastener_rows_selected``), the dependency becomes a sidecar
+    holding the shared code plus the selected rows, like ``_drawing_registry_dep``.
+    ``_run_subprocess`` hands the same row set to the build as
+    ``HARMONIC_FASTENER_ROWS`` and ``fastener`` refuses any other row, so a read
+    the static analysis attributed wrongly fails loud instead of reusing a
+    stale artefact. Anything unclassified keeps the whole file."""
+    if str(_FASTENER_CATALOG) not in deps:
+        return deps
+    text = _FASTENER_CATALOG.read_text(encoding="utf-8")
+    try:
+        rows = frozenset(dict_table_entries(text, "FASTENERS"))
+    except ValueError:
+        return deps
+    consumers = sorted(
+        {Path(dep) for dep in deps if dep.endswith(".py")} - {_FASTENER_CATALOG}
+    )
+    selected = fastener_rows_selected(
+        tuple(path.read_text(encoding="utf-8") for path in consumers), own_row, rows
+    )
+    if selected is None:
+        return deps
+    _FASTENER_ROWS[label] = selected
+    family, stem = label.split(":", 1)
+    sidecar = _write_digest_sidecar(
+        CAD_OUT / ".fastener-catalog" / f"{family}-{stem}.digest",
+        hashlib.md5(
+            dict_table_recipe(text, "FASTENERS", selected).encode("utf-8")
+        ).hexdigest(),
+    )
+    return [sidecar if dep == str(_FASTENER_CATALOG) else dep for dep in deps]
+
+
+def _fastener_rows_env(label: str) -> str | None:
+    """The ``HARMONIC_FASTENER_ROWS`` value for ``label``'s build subprocess.
+
+    Recomputed from the task's own file_dep function when this process never
+    built the graph (a ``doit -n`` worker), so the guard never depends on which
+    process ran the task."""
+    family, _, stem = label.partition(":")
+    if label not in _FASTENER_ROWS:
+        if family == "part":
+            _part_file_deps(SCRIPTS_DIR / f"build_{stem}.py", stem)
+        elif family == "assembly" and stem in ASSEMBLY_ORDER:
+            _recipe_files(stem)
+        elif family == "drawing" and stem in DRAWINGS_BY_NAME:
+            _drawing_file_deps(stem)
+    rows = _FASTENER_ROWS.get(label)
+    return None if rows is None else ",".join(sorted(rows))
+
+
 def _drawing_file_deps(stem: str) -> list[str]:
     """Inputs for both doit freshness and the shared drawing-cache key.
 
@@ -1694,7 +1765,7 @@ def _drawing_file_deps(stem: str) -> list[str]:
         )
     else:
         source_deps = (_sldprt(spec.part), _part_execution_token(spec.part))
-    return sorted(
+    deps = sorted(
         {
             str(script),
             str(RELEASE_VERSION_FILE),
@@ -1703,6 +1774,7 @@ def _drawing_file_deps(stem: str) -> list[str]:
             *(str(path.resolve()) for path in spec.assets),
         }
     )
+    return _narrow_fastener_catalog(f"drawing:{stem}", deps, spec.artifact_stem)
 
 
 def _drawing_cache_outputs(stem: str) -> list[Path]:
@@ -2048,7 +2120,7 @@ def _part_file_deps(script: Path, stem: str) -> list[str]:
     # get-only prefs ride it). Folding it in makes a template edit rebuild
     # every part AND shift the remote-cache key, so no seat can publish
     # template-drifted parts under a stale key.
-    return [
+    deps = [
         str(script.resolve()),
         str(RELEASE_VERSION_FILE),
         *_helper_deps(script),
@@ -2057,6 +2129,7 @@ def _part_file_deps(script: Path, stem: str) -> list[str]:
         str(PART_TEMPLATE.resolve()),
         _submodule_part_dep(),
     ]
+    return _narrow_fastener_catalog(f"part:{stem}", deps, stem.replace("_", "-"))
 
 
 def _assembly_file_deps(stem: str) -> list[str]:
@@ -2193,7 +2266,7 @@ def _recipe_files(stem: str) -> list[str]:
     template = (
         [str(PART_TEMPLATE.resolve())] if stamps_part_properties(asm_script) else []
     )
-    return [
+    deps = [
         str(asm_script.resolve()),
         str(RELEASE_VERSION_FILE),
         *hooks,
@@ -2202,6 +2275,7 @@ def _recipe_files(stem: str) -> list[str]:
         *template,
         _submodule_assembly_dep(),
     ]
+    return _narrow_fastener_catalog(f"assembly:{stem}", deps, None)
 
 
 def _recipe_sidecar(stem: str) -> Path:

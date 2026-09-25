@@ -2606,3 +2606,48 @@ def test_check_gates_depend_on_everything_they_execute():
         f"check:{name} misses {len(paths)}: {', '.join(paths)}"
         for name, paths in sorted(gaps.items())
     )
+
+
+def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
+    """A catalogued part, its drawing and an assembly that imports a fastener
+    script's constants depend on a per-task digest of only the rows they read,
+    and the build subprocess is told exactly those rows."""
+    dodo = _load_dodo()
+    catalog = str(dodo._FASTENER_CATALOG)
+    part = dodo._part_file_deps(dodo.SCRIPTS_DIR / "build_bracket_screw.py", "bracket_screw")
+    drawing = dodo._drawing_file_deps("bracket_screw")
+    assembly = dodo._recipe_files("channel")
+    for label, deps in (
+        ("part-bracket_screw", part),
+        ("drawing-bracket_screw", drawing),
+        ("assembly-channel", assembly),
+    ):
+        assert catalog not in deps, label
+        assert any(
+            Path(dep).name == f"{label}.digest"
+            and Path(dep).parent.name == ".fastener-catalog"
+            for dep in deps
+        ), label
+    assert dodo._fastener_rows_env("part:bracket_screw") == "bracket-screw"
+    assert dodo._fastener_rows_env("drawing:bracket_screw") == "bracket-screw"
+    # channel's closure imports build_frame_side_screw (through build_fulcrum_keeper)
+    # for its constants; that module's fastener("frame-side-screw") runs on import.
+    assert dodo._fastener_rows_env("assembly:channel") == "frame-side-screw"
+    assert dodo._fastener_rows_env("check:math") is None
+
+
+def test_run_subprocess_hands_the_fastener_rows_to_the_build(monkeypatch):
+    dodo = _load_dodo()
+    seen = {}
+
+    def fake_run(cmd, cwd, env):
+        seen.update(env)
+        return type("Done", (), {"returncode": 0})()
+
+    monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "inherited-must-not-leak")
+    monkeypatch.setattr(dodo.subprocess, "run", fake_run)
+    assert dodo._run_subprocess(["x"], "part:bracket_screw") == 0
+    assert seen["HARMONIC_FASTENER_ROWS"] == "bracket-screw"
+    seen.clear()
+    assert dodo._run_subprocess(["x"], "check:math") == 0
+    assert "HARMONIC_FASTENER_ROWS" not in seen
