@@ -1655,6 +1655,9 @@ def test_a_same_family_review_without_an_outage_is_still_only_a_last_resort(
         ({"reviewer": "gemini"}, "reviewer"),
         ({"fallback_reviewer": "codex"}, "same family"),
         ({"ended_at": "2020-01-01T00:00:00+00:00"}, "before it started"),
+        # A naive time cannot be compared with a review's UTC reviewed_at.
+        ({"started_at": "2026-09-25T22:46:00"}, "started_at needs a UTC offset"),
+        ({"ended_at": "2099-01-01T00:00:00"}, "ended_at needs a UTC offset"),
     ],
 )
 def test_an_outage_record_needs_its_quote_evidence_and_window(

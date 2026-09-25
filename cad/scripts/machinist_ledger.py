@@ -724,9 +724,16 @@ def load_outages(path: Path = OUTAGES_PATH) -> dict[str, dict[str, Any]]:
                 f"{path}: {name}: the fallback is the same family as the reviewer "
                 "that is down"
             )
-        started = datetime.fromisoformat(outage["started_at"])
-        ended = outage.get("ended_at")
-        if ended is not None and datetime.fromisoformat(ended) < started:
+        # Reviews are stamped in UTC; a naive window time cannot be compared.
+        window = {
+            key: datetime.fromisoformat(outage[key])
+            for key in ("started_at", "ended_at")
+            if outage.get(key) is not None
+        }
+        naive = [key for key, when in window.items() if when.tzinfo is None]
+        if naive:
+            raise ValueError(f"{path}: {name}: {naive[0]} needs a UTC offset")
+        if "ended_at" in window and window["ended_at"] < window["started_at"]:
             raise ValueError(f"{path}: {name}: it ended before it started")
         if name in outages:
             raise ValueError(f"{path}: two outages named {name}")
