@@ -31,8 +31,10 @@ import math
 from _printed_tolerance import printed_band_mm, printed_deviations
 from cone_pivot_post_installation import MECHANISM_Z_SHIFT
 from pinion_bracket_geometry import THICKNESS as STRAP_T
-from pinion_bracket_geometry import THICKNESS_BAND as STRAP_T_BAND  # noqa: F401
+from pinion_bracket_geometry import THICKNESS_BAND as STRAP_T_BAND
 from pinion_bracket_geometry import THICKNESS_PLACES as STRAP_T_PLACES
+from pinion_cam_geometry import CAM_LEN
+from pinion_lever_geometry import BORE_DEPTH as LEVER_BORE_DEPTH
 from pinion_pivot_block_geometry import (
     BLOCK_DEPTH,
     BLOCK_DEPTH_BAND as BLOCK_DEPTH_BAND,
@@ -83,6 +85,8 @@ if abs(INNER_SPAN - (2.0 * STRAP_T + DRUM_LEN + FRONT_BLOCK_FEELER)) > 1e-9:
 # straps' and the drum's .X (U27: never tightened to .XX for this), the
 # feeler's ruled band -- and each block adds its own .XX depth.  The stacks
 # below carry every term by name; nothing sums them into one symmetric band.
+# The torque shaft and the lift rod are set back-flush, so those terms land
+# at their front ends and size both lengths.
 
 # Torque shaft and lift rod: back ends flush with the back block's outer face,
 # both printed at .X (title-block +/-0.8, U27) and rounded UP.
@@ -137,8 +141,46 @@ if sum(TORQUE_SHAFT_BEARING_STACK.values()) < FRONT_BLOCK_MIN_BEARING - 1e-9:
         f"{_stack_text(TORQUE_SHAFT_BEARING_STACK)} < {FRONT_BLOCK_MIN_BEARING}"
     )
 TORQUE_SHAFT_Z0 = BACK_BLOCK_OUTER_Z - TORQUE_SHAFT_LEN
-LEVER_SEAT_PROUD = 10.0
-LIFT_ROD_LEN = _up_to_tenth(BACK_BLOCK_OUTER_Z - FRONT_BLOCK_Z0 + LEVER_SEAT_PROUD)
+
+# The rod floats north until the back MHA-104 collar lands on the back block;
+# the MHA-059 lever hub must never be that stop.  The back collar is set to its
+# follower pin (plane BACK_CAM_PIN_STATION from its front face, by eye to
+# BACK_CAM_SET_ERR) with the cluster hard back, so its gap to the block peaks
+# at the thickest back strap.  The hub bottoms the rod in its bore, so the rod
+# must stand LEVER_SEAT_MIN -- the bore, that gap and a margin -- proud of the
+# front block's outer face even for the shortest rod in the longest stack.
+BACK_CAM_PIN_STATION = 6.0
+BACK_CAM_SET_ERR = 0.5
+HUB_STOP_MARGIN = 0.25
+BACK_COLLAR_GAP_MAX = (
+    (STRAP_T + STRAP_T_BAND) / 2.0 - (CAM_LEN - BACK_CAM_PIN_STATION) + BACK_CAM_SET_ERR
+)  # 2.4
+LEVER_SEAT_MIN = LEVER_BORE_DEPTH + BACK_COLLAR_GAP_MAX + HUB_STOP_MARGIN  # 10.65
+
+
+def lift_rod_seat_stack(rod_len: float) -> dict[str, float]:
+    """Worst-case length of lift rod standing proud of the front block."""
+    return {
+        "nominal (rod - both blocks - inner span)": rod_len
+        - 2.0 * BLOCK_DEPTH
+        - INNER_SPAN,
+        "MHA-060 rod length .X": printed_deviations(rod_len, LENGTH_PLACES)[0],
+        "MHA-061 block depth .XX (2 blocks)": -2.0 * _BLOCK_DEPTH_UPPER,
+        "MHA-056 strap thickness .X (2 straps)": -2.0 * _STRAP_T_UPPER,
+        "MHA-002 drum length .X": -_DRUM_LEN_UPPER,
+        "MHA-A03 front block feeler band": -FRONT_BLOCK_FEELER_BAND,
+    }
+
+
+LIFT_ROD_LEN = _up_to_tenth(LEVER_SEAT_MIN - sum(lift_rod_seat_stack(0.0).values()))
+LIFT_ROD_SEAT_STACK = lift_rod_seat_stack(LIFT_ROD_LEN)
+if sum(LIFT_ROD_SEAT_STACK.values()) < LEVER_SEAT_MIN - 1e-9:
+    raise AssertionError(
+        "lift rod seat past the front block, worst case: "
+        f"{_stack_text(LIFT_ROD_SEAT_STACK)} < {LEVER_SEAT_MIN}"
+    )
+# The nominal rod standing proud of the front block, as built.
+LEVER_SEAT_PROUD = LIFT_ROD_LEN - 2.0 * BLOCK_DEPTH - INNER_SPAN  # 15.05
 LIFT_ROD_Z0 = BACK_BLOCK_OUTER_Z - LIFT_ROD_LEN
 
 # MHA-114 return spring: the blade rides the back strap's flank.  The inset

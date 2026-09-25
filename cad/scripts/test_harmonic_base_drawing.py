@@ -420,13 +420,11 @@ def test_socket_bore_leader_lands_on_bore_clear_of_the_cross_tap() -> None:
 
 
 def test_transferred_pinion_block_seats_print_no_station() -> None:
-    # Codex #855 P1: BLOCK_SEAT_Z is a model-pose station, and the pose's two
-    # STRAP_AIR gaps stand the front block 2 x STRAP_AIR south of its
-    # manufactured station -- more than a #8 floats in its clearance hole.
-    # That is harmless only because the print never carries the station: the
-    # four block seats are spotted THROUGH MHA-061 at assembly (U28 corollary;
-    # MHA-061's note "SPOT BASE SEATS THROUGH BLOCK HOLES AT ASSEMBLY."), so
-    # they leave the hole table and their one callout names the transfer.
+    # Codex #855 P1: the four block seats are spotted THROUGH MHA-061 at
+    # assembly (U28 corollary; MHA-061's note "SPOT BASE SEATS THROUGH BLOCK
+    # HOLES AT ASSEMBLY."), so they leave the hole table and their one callout
+    # names the transfer.  Codex #854 P1: the model seats themselves sit at the
+    # fit-up stations, so the modelled holes match the transferred ones.
     import draw_harmonic_base as sheet
     import pinion_rig_layout as rig
     from pinion_pivot_block_geometry import BLOCK_DEPTH
@@ -436,8 +434,6 @@ def test_transferred_pinion_block_seats_print_no_station() -> None:
     assert not block_seats & set(sheet.TABLE_HOLES)
     assert sheet.TRANSFER_BLOCK_CALLOUT.startswith("TRANSFER FROM MHA-061")
     assert "AT ASSEMBLY" in sheet.TRANSFER_BLOCK_CALLOUT
-    # The front pair's pose-vs-hardware offset the transfer absorbs.
-    physical_front_seat = rig.PHYSICAL_FRONT_BLOCK_OUTER_Z + BLOCK_DEPTH / 2.0
-    assert physical_front_seat - rig.BLOCK_SEAT_Z[0] == pytest.approx(
-        2.0 * rig.STRAP_AIR
-    )
+    # The front pair sits one feeler off the fit-up stack, with no pose air.
+    front_seat = rig.BACK_BLOCK_Z0 - rig.INNER_SPAN - BLOCK_DEPTH / 2.0
+    assert rig.BLOCK_SEAT_Z[0] == pytest.approx(front_seat, abs=1e-9)
