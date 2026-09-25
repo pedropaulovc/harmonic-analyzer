@@ -183,6 +183,59 @@ def test_follower_seat_station_is_printed_from_face_a_with_a_rule_12_web() -> No
     )
 
 
+def _segment_distance(
+    p: tuple[float, float], a: tuple[float, float], b: tuple[float, float]
+) -> float:
+    ax, ay = a
+    dx, dy = b[0] - ax, b[1] - ay
+    t = max(0.0, min(1.0, ((p[0] - ax) * dx + (p[1] - ay) * dy) / (dx * dx + dy * dy)))
+    return math.hypot(p[0] - (ax + t * dx), p[1] - (ay + t * dy))
+
+
+# Callout geometry calibrated on the pc-ra render (7f7b58460): a 2.7 mm
+# character pitch and a 5.3 mm row pitch put the leader's start -- the near
+# end of the callout's underline -- within 3 mm of where SolidWorks drew it
+# for both hole callouts.
+_CHAR_PITCH = 0.0027
+_ROW_PITCH = 0.0053
+
+
+def _leader_start(name: str, hole: tuple[float, float]) -> tuple[float, float]:
+    """The near end of a hole callout's underline: the leader's start."""
+    lines = drawing.DIMENSION_CALLOUTS[name].splitlines()
+    half_width = max(len(line) for line in lines) * _CHAR_PITCH / 2.0
+    rows = len(lines) + 2  # the diameter and its stacked tolerance
+    x, y = drawing.LEFT_KEEP[name]
+    near = x - half_width if hole[0] < x else x + half_width
+    return near, y - rows * _ROW_PITCH / 2.0
+
+
+def test_hole_callout_leaders_keep_off_the_other_hole() -> None:
+    # pc-ra eye pass (Main, nit C): the follower-seat leader grazed the cross
+    # hole's rim, a few pixels from the cross hole's own leader, so a reader
+    # could not tell which callout owned which hole.  The layout audit sees
+    # leader crossings, not leader-to-feature clearance, so this models each
+    # leader (underline end to hole centre) and holds it at least 1 mm (sheet)
+    # clear of the OTHER hole's circle, arriving on a clearly different
+    # bearing.  At the pc-ra layout the seat leader passed 2.2 mm from the
+    # cross hole's centre against the 2.6 mm this requires.
+    scale = drawing.SHEET_SCALE[0] / 1000.0
+    x = drawing.LEFT_CENTER[0]
+    seat = (x, drawing._flank_y(-pinion_bracket_geometry.PIN_DROP))
+    cross = (x, drawing._flank_y(0.0))
+    seat_r = pinion_bracket_geometry.PIN_BORE / 2.0 * scale
+    cross_r = pinion_bracket_spec.CROSS_HOLE_DIA / 2.0 * scale
+    seat_leader = (_leader_start("PinSeatDia", seat), seat)
+    cross_leader = (_leader_start("CrossHoleDia", cross), cross)
+    assert _segment_distance(cross, *seat_leader) >= cross_r + 0.001
+    assert _segment_distance(seat, *cross_leader) >= seat_r + 0.001
+    bearing = [
+        math.degrees(math.atan2(start[1] - hole[1], start[0] - hole[0]))
+        for start, hole in (seat_leader, cross_leader)
+    ]
+    assert abs(bearing[0] - bearing[1]) >= 45.0
+
+
 def test_blind_seat_entry_face_is_complete_solid_flank() -> None:
     # The full follower-seat mouth lies on the straight flank between the two
     # rounded ends. Its complete diameter and blind depth therefore remain in
