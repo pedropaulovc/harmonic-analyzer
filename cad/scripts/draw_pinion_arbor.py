@@ -1045,7 +1045,35 @@ def assert_profile_leaders_clear() -> None:
             "pinion-arbor profile leaders collide:\n"
             + "\n".join(f"  - {problem}" for problem in problems)
         )
-    _telemetry.debug("pinion-arbor profile leaders clear")
+    ink = profile_ink()
+    margin = pin_leader_land_margin(ink)
+    expected = expected_crossings_found(ink)
+    _telemetry.info(
+        f"pinion-arbor profile leaders clear (model): the pin leader stands "
+        f"{margin * 1000:.2f} mm off the front land length's ink, the sheet's "
+        f"tightest land-sensitive margin; report-only crossings {expected}",
+        pin_leader_land_margin_mm=margin * 1000,
+        expected=len(expected),
+    )
+
+
+def pin_leader_land_margin(ink: SheetInk) -> float:
+    """Closest approach (sheet m) of the pin hole's shoulder and leader to the
+    front land length's line and extensions: the margin a land move eats
+    first (3.23 mm at 19.0 lands, 2.65 at #858's 20.0)."""
+    _role, (shoulder, leader, _through) = ink["PinHoleDia"]
+    _role, lines = ink["FrontJournalLen"]
+    return min(
+        0.0
+        if _drawing_leaders.segments_cross(run, line)
+        else min(
+            *(_drawing_leaders.distance_to_point(line, end) for end in run),
+            *(_drawing_leaders.distance_to_point(run, end) for end in line),
+        )
+        for run in (shoulder, leader)
+        for line in lines
+    )
+
 
 DIMENSION_CALLOUTS = {
     # One name for the axial datum every station runs from (Fable m1): the

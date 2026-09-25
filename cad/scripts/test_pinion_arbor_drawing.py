@@ -1356,6 +1356,7 @@ def test_every_ra_was_a_journal_land_and_the_note_carries_their_one_grade() -> N
 # head end 0.4 mm towards the head, its crown end 0.6 mm aft.
 _PC858_LAND_STATIONS = (46.8, 199.5)
 _PC858_JOURNAL_LEN = 20.0
+_PIN_LEADER_LAND_MARGIN = {"a652": 0.00323, "pc858": 0.00265}
 _LAND_CASES = {
     "a652": (_A652_LAND_STATIONS, _A652_JOURNAL_LEN),
     "pc858": (_PC858_LAND_STATIONS, _PC858_JOURNAL_LEN),
@@ -1394,6 +1395,9 @@ def test_every_leader_and_text_margin_holds_at_both_land_layouts(case) -> None:
     assert drawing.leader_line_findings(ink) == []
     assert len(drawing.expected_crossings_found(ink)) == 3
     _role, (shoulder, leader, _through) = ink["PinHoleDia"]
+    # The tightest land-sensitive margin, which the build logs pre-COM.
+    margin = drawing.pin_leader_land_margin(ink)
+    assert margin == pytest.approx(_PIN_LEADER_LAND_MARGIN[case], abs=1e-5)
     _role, front_len = ink["FrontJournalLen"]
     _role, back_len = ink["BackJournalLen"]
     _role, sag_runs = ink["BackCapSagDim"]
