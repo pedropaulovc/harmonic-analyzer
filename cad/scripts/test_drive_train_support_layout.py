@@ -372,8 +372,14 @@ def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
     # apart in x.
     block_east = drive.BLOCK_X - BLOCK_EAST
     assert block_east - (drive.X_DRUM + ped.FOOT_WIDTH / 2.0) >= 19.0
-    # The grip keeps opening from the crank cluster.
+    # The grip keeps opening from the crank cluster.  Nominal floor re-pinned
+    # for the P1-2 rig shift (12.5 -> 12.0: the rig sits 0.776 further south);
+    # the worst case gates it (RIG_MARGINS' grip crossrod row, 9.312 vs 0.25).
     assert drive._GRIP_ROD_Z[0] - (drive.REMOVABLE_Z0 + 5.0) >= 12.0
+    assert (
+        drive.RIG_MARGINS["grip crossrod to the T12 chain wheel"][0]
+        >= 0.25 + RIG.RIG_MARGIN_SPARE
+    )
     assert drive._GRIP_HEAD_Z[0] - (drive.CRANK_ARM_Z0 + drive.ARM_THICKNESS) >= 21.5
     # The base rim still stands far past the rod's reach and every seat.
     assert base.TOP_WIDTH / 2.0 - base.LIP_W - RIG.BACK_BLOCK_OUTER_Z >= 25.0
