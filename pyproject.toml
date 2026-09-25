@@ -53,7 +53,7 @@ dependencies = [
     "pypdfium2>=5.11.0",
     "pypdf>=6.14.2",
     # Read-only inspection and evidence rendering for release glTF/GLB models.
-    "meshprobe>=1.2.0,<2",
+    "meshprobe>=1.4.0,<2",
     # Farm executor (cad/scripts/_farm.py): dispatches cache-missing part/assembly/
     # drawing leaves as Temporal workflows to the SolidWorks build farm.
     "temporalio>=1.32",
@@ -67,11 +67,33 @@ dev = [
     "pytest-asyncio>=0.21.0",
     "ruff>=0.15.20",
     # Pull the submodule's `ui` extra (fastapi + prefab-ui) transitively through
-    # the editable path source, so its UI server test suite
-    # (SolidworksMCP-python/tests/solidworks_mcp/ui) collects and runs from this
-    # one venv. Single source of truth — the versions stay pinned in the
-    # submodule's own pyproject, not duplicated here.
+    # the editable path source, so its UI modules import from this one venv.
+    # Its test suite is NOT collected from this root (see
+    # [tool.pytest.ini_options]) and must not run on amet. Single source of
+    # truth — the versions stay pinned in the submodule's own pyproject, not
+    # duplicated here.
     "solidworks-mcp-python[ui]",
+]
+
+[tool.pytest.ini_options]
+# A bare `pytest` runs these; `pytest .` is kept out of the vendored submodule
+# by norecursedirs. The SolidworksMCP-python suite can launch SolidWorks, which
+# on amet steals the licence farm worker w6 shares, so it never runs from here.
+# The first nine entries are pytest's defaults, which a custom list replaces;
+# `.*` also skips .git, .venv and the nested checkouts under .claude/worktrees.
+testpaths = ["cad/scripts", "cad/comparisons/tools", "tests"]
+norecursedirs = [
+    "*.egg",
+    ".*",
+    "_darcs",
+    "build",
+    "CVS",
+    "dist",
+    "node_modules",
+    "venv",
+    "{arch}",
+    "SolidworksMCP-python",
+    "references",
 ]
 
 [tool.uv]

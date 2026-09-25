@@ -114,6 +114,10 @@ git submodule update --init --recursive
 
 1. Invoke `/developing-solidworks` first (see the note at the top of this file).
 2. Python tooling: always use `uv`.
+3. Never run the `SolidworksMCP-python` test suite on amet. It can launch
+   SolidWorks, which takes the licence farm worker w6 shares. A bare `pytest` or
+   `pytest .` at the root skips it (`testpaths`/`norecursedirs` in
+   `pyproject.toml`); run it on a farm worker or in its own CI.
 
 ## Minimum merge gate (every PR)
 
@@ -235,7 +239,7 @@ such build:
 | `verify_soundness:<stem>`, `verify:kinematics` | yes | yes | yes |
 | `preflight`, `export`, `package:release` | yes | yes | yes |
 | `verify:soundness` | no (aggregator) | no | — (its leaves are) |
-| `check:math`, `check:config`, `check:graph`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:budget` | **no** | no (parallel) | no (runs locally) |
+| `check:math`, `check:config`, `check:graph`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget` | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
 | `gallery` | **no** (Blender + GPU) | no | no (no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
@@ -402,7 +406,7 @@ the seat's `cwd` **is** that directory — and Windows refuses to remove a direc
 that is any process's `cwd`. Closing documents does not release it (the `cwd`
 belongs to the process, not to a document), so `run_build`'s teardown and
 `package_native._release_seat` both park it with
-`_common.release_seat_working_directory`. The park directory is *checked*, never
+`_seat_forensics.release_seat_working_directory`. The park directory is *checked*, never
 assumed: `tempfile.gettempdir()` reads `TMPDIR`/`TEMP`/`TMP` and falls back to the
 process `cwd` — which under the farm helper is the workspace being torn down — so
 `_seat_park_directory` rejects any candidate inside this checkout or inside
@@ -613,6 +617,25 @@ whole config — so it can only over-rebuild, never skip a real change. Don't ad
 new `_config` accessor without mapping it in `_buildgraph` (`check:graph`'s
 coverage test fails loud otherwise).
 
+**Per-assembly contracts — `cad/config/assemblies/<dashed-stem>.yaml`.** Data
+that belongs to ONE assembly (its learned `flip_invert` seeds and its free-DOF
+contract: `free_dof`/`free_dof_per_active_channel`, `required_free_stems`,
+`allowed_free_stems`) lives in its own file, read through
+`_assembly_contract.py` — never as a stem-keyed table in `_assembly.py` (on every
+assembly's recipe: one drive-train seed there used to re-key all eight
+assemblies and every gate behind them) or `verify.py` (on every soundness
+gate's). Any closure reaching `_assembly_contract`
+gets the `assemblies/*` token; `dodo._config_deps` narrows it to the task's OWN
+file for an assembly task, and `_soundness_file_deps` adds the gate's own file.
+Each `build_<stem>_assembly.build()` opens with
+`activate_assembly_contract(ASM_NAME)` — the file its seeds come from is the file
+its recipe depends on. A signature two assemblies both query goes in BOTH files
+(the reverted #193 split was disjoint). `_seed_flip` records every signature it
+queries, and the save chokepoint's `audit_flip_seeds` logs them and warns on
+entries no mate queried. `check:recipe` (`test_assembly_contract.py`) pins all of
+this. The accessor is deliberately not in `_config.py`: editing that re-keys
+every part.
+
 ## Three-tier submodule digest (part vs assembly vs drawing)
 
 The vendored `SolidworksMCP-python` submodule is a runtime input of every COM task,
@@ -659,6 +682,51 @@ rare MCP-tooling bump rather than risking a stale part. (drawing.py's exclusion 
 rests on "not-IMPORTED by any part/assembly build script", which IS repo-local
 checkable.)
 
+## Recipe-inert modules (`check:inert`)
+
+Some code runs inside every COM build but can never change what the build saves:
+seat provenance, failure forensics, the authoring-context snapshot, seat
+parking and teardown. It lives in `cad/scripts/_seat_forensics.py`, which
+`_buildgraph.RECIPE_INERT_MODULES` puts in `_local_modules`' skip set, like
+`_telemetry`/`_watchdog`. So an edit to it re-keys nothing. Before the split,
+8 of the 16 `_common.py` commits in two weeks touched only this code, and each
+re-keyed all 227 leaves.
+
+For telemetry, "inert" is argued. Here `check:inert` (`test_recipe_inert.py`)
+enforces it, and derives its scope from that one constant:
+
+1. **No recipe folds it.** No build script's `module_deps_of` closure contains an
+   inert module.
+2. **Pinned call sites only.** Tracked code names it only as `<module>.<name>`,
+   inside a pinned `(file, function)`: `_common.run_build` (connect-time
+   provenance, post-save `teardown_seat`), `_common.save_part_and_images`
+   (`record_authoring_context`), and `package_native._release_seat`. The one
+   exception is `capture_com_failure(...)` as a bare statement: it always
+   raises. A new call site fails loud with file:line.
+3. **No COM write before a save.** The module calls no mutator verb
+   (`Save*`/`Set*`/`Add*`/`Insert*`/`Create*`/`Edit*`/`Select*`/…, which covers
+   custom-property and dimension writes) and stores no attribute on a foreign
+   object. Three calls are pinned exceptions, each reachable only from a
+   pinned root: `SaveAs3`/`SaveBMP` under the always-raising
+   `capture_com_failure`, and `SetCurrentWorkingDirectory` under
+   `teardown_seat`. Nothing reachable from a PRE-save entry point
+   (`record_authoring_context`, `record_seat_provenance`,
+   `note_seats_before_connect`) reaches any of them.
+4. **Pinned reads.** The module reads tracked code only as attributes from a
+   pinned list (`_common._read_member`, `_common._early_bound`, …,
+   `_sketch_closure._sketch_state`). There are no from-imports, because
+   `_common` imports it and the modules are cycle-safe only by attribute access.
+
+**What must stay tracked.** A verdict a build raises on stays tracked, because
+identical inputs must give an identical verdict. The sketch-closure census and
+`record_sketch_closure`/`log_profile_geometry` live in the tracked
+`_sketch_closure.py` for that reason. So does anything that writes into the
+model before it is saved, such as `_build_id`'s `Generator` property.
+
+If you need a new inert entry point, add it to the gate's `CALL_SITES` only if
+it runs after the save or provably reads nothing into the model. Otherwise put
+the code in a tracked module.
+
 ## Verify suites (renamed)
 
 `verify.py --suite <x>` where `<x>` ∈ {`soundness`, `kinematics`, `math`,
@@ -693,7 +761,8 @@ DOF (drive-train + channel + magnifier + paper-drive + summing + pen) is
 checked by the **free-DOF set gate** (`assert_free_dof_necessity`) — at least
 the expected number of top-level components read under-constrained, each freed
 DOF's own family among them (necessity), AND, where the assembly's allowed
-coupled-family list is pinned (`verify._ALLOWED_FREE_STEMS`), no component
+coupled-family list is pinned (`allowed_free_stems` in its
+`cad/config/assemblies/<stem>.yaml`), no component
 OUTSIDE that list reads under-constrained (the exact-set direction — an
 unintended freedom, e.g. a dropped mate on a structural part, fails soundness
 loud). Every assembly with nothing freed gets the strict 0-DOF check,
@@ -775,7 +844,7 @@ fixed, and the replay path was a recurring bug source. See
 There is **no scalar DOF API** in SolidWorks COM. `soundness` proves the free
 set from both directions with one status walk (`assert_free_dof_necessity`):
 ≥ N components under-constrained with each freed DOF's family present
-(necessity), and — where `verify._ALLOWED_FREE_STEMS` pins the assembly's
+(necessity), and — where the contract's `allowed_free_stems` pins the assembly's
 coupled families — no component outside that list under-constrained (exact
 set). As a hand-run diagnostic, `build_mobility_probe.py` authors the manifest
 drives to reconstitute a 0-DOF baseline, then suppresses each to show it frees

@@ -38,6 +38,14 @@ from _assembly import assembly_title_properties  # noqa: E402
 from _common import part_properties  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _isolated_syntax_facts(tmp_path_factory, monkeypatch):
+    """Each test starts from an EMPTY machine-wide facts store of its own, so a
+    parse-count assertion never depends on what an earlier run left behind."""
+    monkeypatch.setenv(bg._FACTS_ENV, str(tmp_path_factory.mktemp("facts")))
+    monkeypatch.setattr(bg, "_FACTS", bg._FactStore())
+
+
 @pytest.mark.parametrize(
     "declaration",
     [
@@ -1645,17 +1653,13 @@ def test_module_deps_follow_dotted_package_recipe_chain(tmp_path, monkeypatch):
     helper.write_text("import external_site_package\n", encoding="utf-8")
 
     monkeypatch.setattr(bg, "SCRIPTS_DIR", scripts)
-    bg._local_modules.cache_clear()
-    bg._module_by_path.cache_clear()
-    bg._direct_local_imports.cache_clear()
+    bg.clear_import_caches()
     try:
         deps = {Path(dep) for dep in module_deps_of(wrapper)}
     finally:
         # Do not leave cached temporary paths behind after monkeypatch restores
         # the production scripts root.
-        bg._direct_local_imports.cache_clear()
-        bg._module_by_path.cache_clear()
-        bg._local_modules.cache_clear()
+        bg.clear_import_caches()
 
     assert entry.resolve() in deps
     assert helper.resolve() in deps
@@ -1684,9 +1688,7 @@ def test_identical_module_text_resolves_against_its_own_package(tmp_path, monkey
         (directory / "helper.py").write_text("", encoding="utf-8")
 
     monkeypatch.setattr(bg, "SCRIPTS_DIR", scripts)
-    bg._local_modules.cache_clear()
-    bg._module_by_path.cache_clear()
-    bg._direct_local_imports.cache_clear()
+    bg.clear_import_caches()
     try:
         closures = {
             package: {
@@ -1696,9 +1698,7 @@ def test_identical_module_text_resolves_against_its_own_package(tmp_path, monkey
             for package in ("alpha", "beta")
         }
     finally:
-        bg._direct_local_imports.cache_clear()
-        bg._module_by_path.cache_clear()
-        bg._local_modules.cache_clear()
+        bg.clear_import_caches()
 
     for package, other in (("alpha", "beta"), ("beta", "alpha")):
         assert (scripts / package / "helper.py").resolve() in closures[package]
@@ -1932,3 +1932,326 @@ def _run() -> int:
 
 if __name__ == "__main__":
     sys.exit(_run())
+
+
+# --- Machine-wide syntax facts store (_FactStore / _persisted_facts) ---------------
+
+
+def _fresh_store(monkeypatch, directory: Path) -> bg._FactStore:
+    """A store as a NEW process would see it, rooted in ``directory``."""
+    monkeypatch.setenv(bg._FACTS_ENV, str(directory))
+    store = bg._FactStore()
+    monkeypatch.setattr(bg, "_FACTS", store)
+    return store
+
+
+def test_syntax_facts_are_reused_by_the_next_process(tmp_path, monkeypatch):
+    calls: list[str] = []
+
+    @bg._persisted_facts("probe")
+    def probe(text: str) -> frozenset[str]:
+        calls.append(text)
+        return frozenset(text.split())
+
+    _fresh_store(monkeypatch, tmp_path)
+    assert probe("a b") == frozenset({"a", "b"})
+    bg._FACTS.save()
+    _fresh_store(monkeypatch, tmp_path)
+    assert probe("a b") == frozenset({"a", "b"})
+    assert calls == ["a b"]
+
+
+def test_syntax_facts_are_keyed_by_content_not_by_file(tmp_path, monkeypatch):
+    calls: list[str] = []
+
+    @bg._persisted_facts("probe")
+    def probe(text: str) -> frozenset[str]:
+        calls.append(text)
+        return frozenset(text.split())
+
+    _fresh_store(monkeypatch, tmp_path)
+    probe("import a")
+    bg._FACTS.save()
+    _fresh_store(monkeypatch, tmp_path)
+    assert probe("import b") == frozenset({"import", "b"})
+    assert calls == ["import a", "import b"]
+
+
+def test_module_syntax_round_trips_through_the_store(tmp_path, monkeypatch):
+    source = "import os\nfrom . import x\n\ndef f():\n    g()\n    m.h()\n"
+    _fresh_store(monkeypatch, tmp_path)
+    bg._module_syntax.cache_clear()
+    expected = bg._module_syntax(source)
+    bg._FACTS.save()
+    _fresh_store(monkeypatch, tmp_path)
+    bg._module_syntax.cache_clear()
+    with patch.object(bg.ast, "parse", side_effect=AssertionError("re-parsed")):
+        assert bg._module_syntax(source) == expected
+    bg._module_syntax.cache_clear()
+
+
+def test_config_references_round_trip_through_the_store(tmp_path, monkeypatch):
+    source = "import _config\n\ndef f():\n    return _config.tolerances()\n"
+    modules = frozenset({"_config"})
+    _fresh_store(monkeypatch, tmp_path)
+    bg._config_references_in_text.cache_clear()
+    expected = bg._config_references_in_text(source, modules)
+    assert expected and isinstance(expected[0][1], bg._ConfigUse)
+    bg._FACTS.save()
+    _fresh_store(monkeypatch, tmp_path)
+    bg._config_references_in_text.cache_clear()
+    with patch.object(bg.ast, "parse", side_effect=AssertionError("re-parsed")):
+        assert bg._config_references_in_text(source, modules) == expected
+    bg._config_references_in_text.cache_clear()
+
+
+def test_syntax_errors_are_never_stored(tmp_path, monkeypatch):
+    _fresh_store(monkeypatch, tmp_path)
+    bg._module_syntax.cache_clear()
+    with pytest.raises(SyntaxError):
+        bg._module_syntax("def (:\n")
+    bg._FACTS.save()
+    assert not list(tmp_path.glob("*.pickle"))
+
+
+def test_a_corrupt_or_foreign_store_reads_as_empty(tmp_path, monkeypatch):
+    import pickle
+
+    store = _fresh_store(monkeypatch, tmp_path)
+    path = store._location()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"not a pickle")
+    assert store.get(b"k") == (False, None)
+
+    # A pathlib object is picklable but not a builtin container of strings.
+    path.write_bytes(pickle.dumps({b"k": Path("foreign")}))
+    assert _fresh_store(monkeypatch, tmp_path).get(b"k") == (False, None)
+
+
+def test_the_store_can_be_switched_off(tmp_path, monkeypatch):
+    calls: list[str] = []
+
+    @bg._persisted_facts("probe")
+    def probe(text: str) -> str:
+        calls.append(text)
+        return text
+
+    monkeypatch.setenv(bg._FACTS_ENV, "off")
+    monkeypatch.setattr(bg, "_FACTS", bg._FactStore())
+    probe("x")
+    bg._FACTS.save()
+    monkeypatch.setattr(bg, "_FACTS", bg._FactStore())
+    probe("x")
+    assert calls == ["x", "x"]
+    assert not list(tmp_path.rglob("*.pickle"))
+
+
+def test_the_store_file_is_named_for_this_analyzer(tmp_path, monkeypatch):
+    import hashlib
+
+    location = _fresh_store(monkeypatch, tmp_path)._location()
+    analyzer = hashlib.sha256(Path(bg.__file__).read_bytes()).hexdigest()[:16]
+    assert location.parent == tmp_path
+    assert analyzer in location.name
+    assert f"-v{bg._FACTS_SCHEMA}-" in location.name
+    assert sys.implementation.cache_tag in location.name
+
+
+def test_a_malformed_entry_is_overwritten_by_the_recomputed_fact(tmp_path, monkeypatch):
+    store = _fresh_store(monkeypatch, tmp_path)
+    bg._module_syntax.cache_clear()
+    source = "import json\n"
+    bg._module_syntax(source)
+    (key,) = [k for k in store._entries]
+    store._entries[key] = ("garbage",)
+    bg._module_syntax.cache_clear()
+    bg._module_syntax(source)
+    assert bg._ModuleSyntax(*store._entries[key]) == bg._module_syntax(source)
+    bg._module_syntax.cache_clear()
+
+
+def test_no_nameable_home_disables_the_store_instead_of_failing(monkeypatch):
+    # A farm leaf runs under a filtered environment: with no LOCALAPPDATA and
+    # no home, Path.home() raises RuntimeError; the graph load must go on.
+    for name in (
+        "HARMONIC_BUILDGRAPH_CACHE",
+        "LOCALAPPDATA",
+        "USERPROFILE",
+        "HOMEPATH",
+        "HOMEDRIVE",
+        "HOME",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    def no_home(cls):
+        raise RuntimeError("Could not determine home directory.")
+
+    monkeypatch.setattr(bg, "_FACTS", bg._FactStore())
+    monkeypatch.setattr(bg.Path, "home", classmethod(no_home))
+    bg._module_syntax.cache_clear()
+    assert bg._module_syntax("import os\n").imports == (("os", None),)
+    assert bg._FACTS._path is None
+    bg._module_syntax.cache_clear()
+
+
+def test_a_malformed_stored_entry_is_recomputed(tmp_path, monkeypatch):
+    store = _fresh_store(monkeypatch, tmp_path)
+    bg._module_syntax.cache_clear()
+    source = "import os\n"
+    expected = bg._module_syntax(source)
+    for key in list(store._entries):
+        store._entries[key] = ("not", "a", "module", "syntax")
+    bg._module_syntax.cache_clear()
+    assert bg._module_syntax(source) == expected
+    bg._module_syntax.cache_clear()
+
+
+# --- Fastener catalog per-row digest (dict-table projection) -------------------
+
+_CATALOG = (SCRIPTS_DIR / "_fastener_catalog.py").read_text(encoding="utf-8")
+
+
+def _row_edited(source: str, row: str) -> str:
+    """``source`` with one catalog row's stock name changed."""
+    marker = f'    "{row}": _stock(\n        "{row}",\n        "'
+    assert marker in source, row
+    return source.replace(marker, marker + "Edited ", 1)
+
+
+def test_fastener_recipe_ignores_other_rows_and_tracks_its_own():
+    selected = frozenset({"bracket-screw"})
+    before = bg.dict_table_recipe(_CATALOG, "FASTENERS", selected)
+    assert bg.dict_table_recipe(
+        _row_edited(_CATALOG, "clamp-screw"), "FASTENERS", selected
+    ) == before, "another row's edit must not move this row's recipe"
+    assert bg.dict_table_recipe(
+        _row_edited(_CATALOG, "bracket-screw"), "FASTENERS", selected
+    ) != before, "the selected row's edit must move it"
+    shared_edit = _CATALOG.replace(
+        'supplier: str = "McMaster-Carr"', 'supplier: str = "McMaster"'
+    )
+    assert shared_edit != _CATALOG
+    assert bg.dict_table_recipe(shared_edit, "FASTENERS", selected) != before, (
+        "shared code (the dataclass, _stock, fastener) must stay in every recipe"
+    )
+
+
+def test_fastener_recipe_records_an_absent_selected_row():
+    """A selected key that does not exist yet is part of the recipe, so adding it
+    moves the key of every task that asked for it."""
+    ghost = frozenset({"not-yet-catalogued"})
+    removed = _CATALOG.replace('"bracket-screw": _stock(', '"bracket-screw-x": _stock(', 1)
+    assert bg.dict_table_recipe(_CATALOG, "FASTENERS", ghost) == bg.dict_table_recipe(
+        removed, "FASTENERS", ghost
+    )
+    assert bg.dict_table_recipe(
+        _CATALOG, "FASTENERS", frozenset({"bracket-screw"})
+    ) != bg.dict_table_recipe(removed, "FASTENERS", frozenset({"bracket-screw"}))
+
+
+@pytest.mark.parametrize(
+    "declaration",
+    [
+        "X = 1\n",
+        "FASTENERS = dict(a=1)\n",
+        "FASTENERS = {}\nFASTENERS = {}\n",
+        "FASTENERS = {KEY: 1}\n",
+        "FASTENERS = {'a': 1, 'a': 2}\n",
+    ],
+    ids=["missing", "call", "reassigned", "computed-key", "duplicate"],
+)
+def test_dict_table_projection_rejects_non_declarative_tables(declaration):
+    with pytest.raises(ValueError):
+        bg.dict_table_recipe(declaration, "FASTENERS", frozenset())
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ('from _fastener_catalog import fastener\nS = fastener("a")\n', (["a"], False)),
+        (
+            'from _fastener_catalog import fastener\nNAME = "b"\nS = fastener(NAME)\n',
+            (["b"], False),
+        ),
+        (
+            "from _fastener_catalog import fastener\n"
+            "def f(name):\n    return fastener(name)\n",
+            ([], True),
+        ),
+        (
+            'from _fastener_catalog import fastener\nNAME = "b"\nNAME = "c"\n'
+            "S = fastener(NAME)\n",
+            ([], True),
+        ),
+        ("from _fastener_catalog import PurchasedFastenerSpec\n", ([], False)),
+        ("import os\n", ([], False)),
+    ],
+    ids=["literal", "constant", "dynamic", "reassigned-constant", "type-only", "unrelated"],
+)
+def test_fastener_reads_classify_literal_and_dynamic_rows(source, expected):
+    reads = bg.table_reads(source, *bg.FASTENER_TABLE)
+    assert reads is not None
+    assert (sorted(reads.keys), reads.dynamic) == expected
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from _fastener_catalog import FASTENERS\n",
+        "import _fastener_catalog\n",
+        "from _fastener_catalog import fastener as f\n",
+        "from _fastener_catalog import *\n",
+        "import importlib\nm = importlib.import_module('_fastener_catalog')\n",
+        "from _fastener_catalog import fastener\nlookup = fastener\n",
+        "from _fastener_catalog import fastener\nS = fastener(name='a')\n",
+        "from x import FASTENERS\nFASTENERS['a']\n",
+        "from _fastener_catalog import fastener\nS = eval('fastener(\"a\")')\n",
+    ],
+    ids=[
+        "table-import",
+        "module-import",
+        "alias",
+        "star",
+        "string-alias",
+        "passed-around",
+        "keyword-call",
+        "table-name",
+        "eval",
+    ],
+)
+def test_unclassified_catalog_use_keeps_the_whole_file(source):
+    """The fallback the per-row digest rests on: any use the reader cannot prove
+    narrow returns None, and the task keeps the whole _fastener_catalog.py."""
+    assert bg.table_reads(source, *bg.FASTENER_TABLE) is None
+    assert bg.fastener_rows_selected((source,), "a", frozenset({"a"})) is None
+
+
+def test_dynamic_reads_resolve_to_the_tasks_own_row_only():
+    dynamic = "from _fastener_catalog import fastener\ndef f(n):\n    return fastener(n)\n"
+    literal = 'from _fastener_catalog import fastener\nS = fastener("b")\n'
+    rows = frozenset({"a", "b"})
+    assert bg.fastener_rows_selected((dynamic, literal), "a", rows) == {"a", "b"}
+    # No own row: the dynamic read adds nothing, and the run-time guard refuses it.
+    assert bg.fastener_rows_selected((dynamic, literal), None, rows) == {"b"}
+    assert bg.fastener_rows_selected((dynamic,), "not-a-row", rows) == frozenset()
+
+
+def test_every_catalog_consumer_in_the_tree_is_classified():
+    """Pins the fallback surface: today every consumer reads the catalog through
+    ``fastener(...)``. A new consumer that the reader cannot classify makes its
+    tasks silently fall back to the whole file (still correct, just no longer
+    narrow); this test makes that visible instead."""
+    consumers = [
+        path
+        for path in sorted(SCRIPTS_DIR.rglob("*.py"))
+        if "_fastener_catalog" in path.read_text(encoding="utf-8")
+        and path.name not in {"_fastener_catalog.py", "_buildgraph.py"}  # owner, analyzer
+        and not path.name.startswith("test_")
+    ]
+    assert consumers
+    unclassified = [
+        path.name
+        for path in consumers
+        if bg.table_reads(path.read_text(encoding="utf-8"), *bg.FASTENER_TABLE) is None
+    ]
+    assert unclassified == []

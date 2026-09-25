@@ -194,9 +194,7 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
     }
 
     def clear_closure():
-        bg._direct_local_imports.cache_clear()
-        bg._module_by_path.cache_clear()
-        bg._local_modules.cache_clear()
+        bg.clear_import_caches()
 
     def checkout(name="repo", *, crlf=False):
         root = tmp_path / name
@@ -1455,6 +1453,9 @@ def test_autostart_ensures_sw_as_a_top_level_sibling_before_the_task(
     monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext(45.0))
     monkeypatch.setattr(dodo, "_SW_ENSURED", False)
     monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "1")
+    # The real preflight reads the live sldworks.exe commit and force-recovers
+    # (stops and relaunches) SolidWorks past the budget.
+    monkeypatch.setattr(dodo, "_sw_preflight", lambda: None)
 
     opened: list[str] = []
     depth = 0
@@ -1500,6 +1501,9 @@ def test_sw_ensure_once_runs_once_and_respects_the_opt_out(monkeypatch):
     dodo = _load_dodo()
     calls: list[int] = []
     monkeypatch.setattr(dodo._sw_lifecycle, "ensure_ready", lambda: calls.append(1))
+    # The real preflight reads the live sldworks.exe commit and force-recovers
+    # (stops and relaunches) SolidWorks past the budget.
+    monkeypatch.setattr(dodo, "_sw_preflight", lambda: None)
 
     monkeypatch.setattr(dodo, "_SW_ENSURED", False)
     monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "1")
@@ -1565,6 +1569,91 @@ def test_tag_seat_wait_labels_the_task_span_only_when_a_seat_was_taken():
     dodo._tag_seat_wait(gate, None)
     assert com.attrs == {"seat_wait_s": 45.0}
     assert gate.attrs == {}
+
+
+def test_every_cache_phase_span_names_its_cache_key(monkeypatch):
+    """The phase spans are sibling ROOT traces, so a build can be tied to the key
+    it produced only if each span names it: probe, re-probe, task and store all
+    carry ``cache.key`` (the 12-hex prefix ``cache.jsonl`` prints)."""
+    dodo = _load_dodo()
+    key = "0123456789abcdef" * 4
+    spans: list[tuple[str, dict]] = []
+
+    @contextlib.contextmanager
+    def record_span(name, **attrs):
+        entry = (name, dict(attrs))
+        spans.append(entry)
+
+        class _Span:
+            def set_attribute(self, attr, value):
+                entry[1][attr] = value
+
+        yield _Span()
+
+    @contextlib.contextmanager
+    def free_seat(label):
+        yield 0.0
+
+    monkeypatch.setattr(dodo._telemetry, "span", record_span)
+    monkeypatch.setattr(dodo, "_cache_key", lambda file_deps, label: key)
+    monkeypatch.setattr(dodo._cache, "restore", lambda *args: False)
+    monkeypatch.setattr(dodo._cache, "store", lambda *args: "stored")
+    monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
+    monkeypatch.setattr(dodo, "_com_seat", free_seat)
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    monkeypatch.setattr(dodo, "_exec_com", lambda *args, **kwargs: None)
+
+    dodo._cached_com_action("part:x", ["build"], [], [], "part-x")
+
+    tagged = {name.split()[0]: attrs.get("cache.key") for name, attrs in spans}
+    assert tagged == {
+        "cache.probe": key[:12],
+        "cache.reprobe": key[:12],
+        "task": key[:12],
+        "cache.store": key[:12],
+    }
+
+
+def test_farm_restore_span_names_its_cache_key(monkeypatch):
+    """Under ``--executor farm`` the submitter's phases are ``cache.probe`` then
+    ``cache.restore`` (the worker publishes, this side downloads). The restore is
+    the span that proves the leaf landed, so it names the key like the rest."""
+    dodo = _load_dodo()
+    key = "fedcba9876543210" * 4
+    spans: list[tuple[str, dict]] = []
+    restores = iter([False, True])  # probe misses, post-farm restore hits
+
+    @contextlib.contextmanager
+    def record_span(name, **attrs):
+        entry = (name, dict(attrs))
+        spans.append(entry)
+
+        class _Span:
+            def set_attribute(self, attr, value):
+                entry[1][attr] = value
+
+        yield _Span()
+
+    succeeded = dodo._farm.LeafResult(
+        state="succeeded",
+        exit_code=0,
+        worker_id="w@1",
+        attempt=1,
+        cache_present=True,
+        log_blob=None,
+        failure_category=None,
+        failure_message=None,
+    )
+    monkeypatch.setattr(dodo._telemetry, "span", record_span)
+    monkeypatch.setattr(dodo, "_cache_key", lambda file_deps, label: key)
+    monkeypatch.setattr(dodo._cache, "restore", lambda *args: next(restores))
+    monkeypatch.setattr(dodo._farm, "enabled", lambda: True)
+    monkeypatch.setattr(dodo._farm, "run_leaf", lambda label, k: succeeded)
+
+    dodo._cached_com_action("part:x", ["build"], [], [], "part-x")
+
+    tagged = {name.split()[0]: attrs.get("cache.key") for name, attrs in spans}
+    assert tagged == {"cache.probe": key[:12], "cache.restore": key[:12]}
 
 
 def test_com_seat_is_reentrant_within_a_process(tmp_path, monkeypatch):
@@ -2471,3 +2560,199 @@ def test_export_cache_ships_every_file_it_certifies():
         f"{len(uncovered)} certified release file(s) are not in the export cache "
         f"payload: {uncovered[:5]}"
     )
+
+
+def test_check_gates_depend_on_everything_they_execute():
+    """Every ``check:*`` stamp must go stale when code or config it EXECUTES
+    changes, or the gate reports green without running.
+
+    For each gate, the entry points are the ``.py`` arguments of its command
+    (``verify.py`` for math/config, the pytest files otherwise). Their local
+    import closure (``module_deps_of``, which follows lazy function-local
+    imports too) and the config files that closure reads (``_config_deps``,
+    conservative whole-config on any unclassified use) must all be declared
+    ``file_dep``s. ``check:math`` missed ``build_summing_assembly.py`` and
+    ``gooseneck_geom.py``: a gooseneck edit left the stamp green (2026-09-23),
+    and only an unrelated config change later re-ran it -- red.
+
+    Not covered by this derivation, so still hand-listed where a gate needs
+    them: modules ``module_deps_of`` excludes by design (``_buildgraph``,
+    ``_telemetry``, ``_watchdog``, ``test_*`` helpers), ``dodo.py`` itself
+    (outside ``cad/scripts``, loaded via ``spec_from_file_location``), other
+    ``importlib``/``runpy`` loads, and data files read at run time.
+    """
+    dodo = _load_dodo()
+    gaps: dict[str, list[str]] = {}
+    for task in dodo.task_check():
+        declared = {str(Path(dep).resolve()) for dep in task["file_dep"]}
+        command = task["actions"][0][1][0]
+        entries = [Path(arg) for arg in command if str(arg).endswith(".py")]
+        assert entries, f"check:{task['name']} runs no .py entry point: {command}"
+        executed = {
+            path
+            for entry in entries
+            for path in (
+                str(entry.resolve()),
+                *dodo.module_deps_of(entry),
+                *dodo._config_deps(entry),
+            )
+        }
+        missing = sorted(executed - declared)
+        if missing:
+            gaps[task["name"]] = [
+                str(Path(path).relative_to(REPO_ROOT)) for path in missing
+            ]
+    assert not gaps, "check:* gates execute undeclared inputs (stale-green): " + "; ".join(
+        f"check:{name} misses {len(paths)}: {', '.join(paths)}"
+        for name, paths in sorted(gaps.items())
+    )
+
+
+def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
+    """A catalogued part, its drawing and an assembly that imports a fastener
+    script's constants depend on a per-task digest of only the rows they read,
+    and the build subprocess is told exactly those rows."""
+    dodo = _load_dodo()
+    catalog = str(dodo._FASTENER_CATALOG)
+    part = dodo._part_file_deps(dodo.SCRIPTS_DIR / "build_bracket_screw.py", "bracket_screw")
+    drawing = dodo._drawing_file_deps("bracket_screw")
+    assembly = dodo._recipe_files("channel")
+    for label, deps in (
+        ("part-bracket_screw", part),
+        ("drawing-bracket_screw", drawing),
+        ("assembly-channel", assembly),
+    ):
+        assert catalog not in deps, label
+        assert any(
+            Path(dep).name == f"{label}.digest"
+            and Path(dep).parent.name == ".fastener-catalog"
+            for dep in deps
+        ), label
+    assert dodo._fastener_rows_env("part:bracket_screw") == "bracket-screw"
+    assert dodo._fastener_rows_env("drawing:bracket_screw") == "bracket-screw"
+    # channel's closure imports build_frame_side_screw (through build_fulcrum_keeper)
+    # for its constants; that module's fastener("frame-side-screw") runs on import.
+    assert dodo._fastener_rows_env("assembly:channel") == "frame-side-screw"
+    assert dodo._fastener_rows_env("check:math") is None
+
+
+def test_run_subprocess_hands_the_fastener_rows_to_the_build(monkeypatch):
+    dodo = _load_dodo()
+    seen = {}
+
+    def fake_run(cmd, cwd, env):
+        seen.update(env)
+        return type("Done", (), {"returncode": 0})()
+
+    monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "inherited-must-not-leak")
+    monkeypatch.setattr(dodo.subprocess, "run", fake_run)
+    assert dodo._run_subprocess(["x"], "part:bracket_screw") == 0
+    assert seen["HARMONIC_FASTENER_ROWS"] == "bracket-screw"
+    seen.clear()
+    assert dodo._run_subprocess(["x"], "check:math") == 0
+    assert "HARMONIC_FASTENER_ROWS" not in seen
+
+
+def _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, stem, *, mode):
+    """Drive a local ``build_or_refresh(stem)`` miss through ``mode`` ("full" with
+    one injected post-assembly hook, or "refresh") and return ``(label, env)`` for
+    every subprocess it launched."""
+    launched = []
+
+    class FakePopen:
+        def __init__(self, cmd, cwd, env, **_kw):
+            launched.append((cmd, env))
+            self.stdout = iter(())
+
+        def wait(self):
+            return 0
+
+    @contextlib.contextmanager
+    def free_seat(label):
+        yield 0.0
+
+    target = tmp_path / f"{stem}.SLDASM"
+    sidecar = tmp_path / f".{stem}.recipe.md5"
+    if mode == "refresh":
+        target.write_bytes(b"asm")
+        sidecar.write_text("d" * 32 + "\n", encoding="utf-8")
+    # Prime the task's rows from the real recipe, then stub the recipe so the
+    # injected hook (no such file) is never read.
+    dodo._fastener_rows_env(f"assembly:{stem}")
+    monkeypatch.setattr(dodo, "_recipe_files", lambda _stem: [])
+    monkeypatch.setattr(dodo, "LOGS", tmp_path / "logs")
+    monkeypatch.setattr(dodo, "POST_ASSEMBLY", {stem: ("hook_probe.py",)})
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+    monkeypatch.setattr(dodo._cache, "restore", lambda *_a: False)
+    monkeypatch.setattr(dodo._cache, "store", lambda *_a: "stored")
+    monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
+    monkeypatch.setattr(dodo, "_com_seat", free_seat)
+    monkeypatch.setattr(dodo, "_reprobe_under_seat", lambda *_a: False)
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    monkeypatch.setattr(dodo, "_sw_autostart_enabled", lambda: False)
+    monkeypatch.setattr(dodo, "_recipe_sidecar", lambda _stem: sidecar)
+    monkeypatch.setattr(dodo, "_digest_files", lambda _files: "d" * 32)
+    monkeypatch.setattr(dodo, "_assembly_cache_outputs", lambda _stem: [])
+    monkeypatch.setattr(dodo, "_stamp_assembly_execution", lambda _stem: None)
+    monkeypatch.setattr(dodo.subprocess, "Popen", FakePopen)
+    monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "inherited-must-not-leak")
+
+    dodo.build_or_refresh(stem, [], [], [str(target)])
+
+    return [(Path(cmd[1]).name, env) for cmd, env in launched]
+
+
+@pytest.mark.parametrize("mode", ["full", "refresh"])
+def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path, mode):
+    """Codex on #868: the FULL/REFRESH/hook subprocesses carry display labels, so
+    keying the guard on the label dropped it for every assembly build. The guard
+    is keyed on the doit task instead, whatever the display label says."""
+    dodo = _load_dodo()
+    launched = _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, "channel", mode=mode)
+
+    scripts = [name for name, _env in launched]
+    if mode == "full":
+        assert scripts == ["build_channel_assembly.py", "hook_probe.py"]
+    else:
+        assert scripts == ["refresh_assembly.py"]
+    for name, env in launched:
+        assert env.get("HARMONIC_FASTENER_ROWS") == "frame-side-screw", name
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "FULL build channel (target missing)",
+        "REFRESH channel",
+        "hook hook_probe.py",
+        "check math",
+        "release documents part:bracket_screw",
+        "part:no_such_part",
+        "assembly:no_such_assembly",
+        "drawing:no_such_drawing",
+        "",
+    ],
+)
+def test_fastener_rows_refuse_a_label_that_names_no_task(label):
+    """Silently mapping a display label to "no rows" is what dropped the guard; a
+    label that is not a task (or names a task that does not exist) fails loud."""
+    dodo = _load_dodo()
+    with pytest.raises(ValueError):
+        dodo._fastener_rows_env(label)
+
+
+def test_fastener_rows_leave_unnarrowed_tasks_unguarded():
+    dodo = _load_dodo()
+    assert dodo._fastener_rows_env("check:math") is None
+    assert dodo._fastener_rows_env("release") is None
+    assert dodo._fastener_rows_env("verify:kinematics") is None
+
+
+def test_every_subprocess_launch_names_a_task_the_guard_can_map():
+    """Every task action that launches a subprocess under a display label passes
+    its doit task, so none can reach the guard's refusal at run time."""
+    dodo = _load_dodo()
+    for task in dodo.task_check():
+        for action, args in task["actions"]:
+            if action is dodo._run_stamped:
+                dodo._fastener_rows_env(args[3])  # raises on an unmappable task

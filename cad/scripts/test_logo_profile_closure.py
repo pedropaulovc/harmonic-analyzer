@@ -27,7 +27,7 @@ lives here is the bit-identity the weld depends on.
 
 What they do NOT claim: they do not prove the profile extrudes.  Exactness is
 necessary and not sufficient, so the seat's outcome is still measured once
-after ``exit_sketch`` (``_common.record_sketch_closure``), and
+after ``exit_sketch`` (``_sketch_closure.record_sketch_closure``), and
 ``assert_profile_closed`` fails the build on a pair the seat left unwelded.
 """
 

@@ -90,6 +90,7 @@ from _common import (
 )
 from _drawing_marks import DRAWN_BY
 from _assembly import (
+    activate_assembly_contract,
     angle_driver,
     assembly_title_properties,
     assert_component_placed,
@@ -1047,6 +1048,8 @@ async def _sprocket_revolute(adapter, name: str, label: str) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
+    # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
+    activate_assembly_contract(ASM_NAME)
     _assert_fastener_stacks()
     _assert_rack_mesh()
     _assert_gear_mesh()

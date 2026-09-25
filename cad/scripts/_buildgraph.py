@@ -15,9 +15,17 @@ not occurrences of part names in prose. Unknown source expressions fail loudly.
 from __future__ import annotations
 
 import ast
+import atexit
+import contextlib
 import functools
+import hashlib
+import io
 import json
+import os
+import pickle
 import re
+import sys
+import tempfile
 from dataclasses import asdict, fields
 from enum import Enum
 from pathlib import Path
@@ -26,6 +34,10 @@ from typing import NamedTuple
 SCRIPTS_DIR = Path(__file__).resolve().parent
 CAD_OUT = SCRIPTS_DIR.parent / "out"
 CONFIG_DIR = SCRIPTS_DIR.parent / "config"
+# Per-assembly contracts (flip seeds, free-DOF sets): see _assembly_contract.
+ASSEMBLY_CONTRACT_DIR = CONFIG_DIR / "assemblies"
+ASSEMBLY_CONTRACT_PY = (SCRIPTS_DIR / "_assembly_contract.py").resolve()
+ASSEMBLY_CONTRACTS_TOKEN = "assemblies/*"
 REFERENCES_DIR = SCRIPTS_DIR.parent / "references"
 
 # Vendored input artefacts (DXF/DWG) a build imports at run time. A build that
@@ -837,6 +849,14 @@ def references_of(asm_stem: str) -> list[str]:
     return [stem for stem in candidates if stem in found]
 
 
+# Observation-only modules no recipe folds in: an edit to one re-keys nothing.
+# Each is imported by tracked code (``_common`` imports ``_seat_forensics``) but
+# can never change a saved artefact, which ``check:inert`` (test_recipe_inert.py)
+# enforces -- pinned call sites, no COM mutator before a save -- and derives its
+# scope from this constant. See AGENTS.md, "Recipe-inert modules".
+RECIPE_INERT_MODULES = frozenset({"_seat_forensics.py"})
+
+
 @functools.lru_cache(maxsize=1)
 def _local_modules() -> dict[str, Path]:
     """Every local importable module a build script may pull in transitively,
@@ -872,6 +892,11 @@ def _local_modules() -> dict[str, Path]:
     also imported by ``_common``, it only ever aborts-or-logs (crash/idle/hung
     detection) -- a build it kills produces NO artefact at all, so its content can
     never change saved CAD bytes either (codex #344).
+
+    :data:`RECIPE_INERT_MODULES` are excluded on the same argument, but theirs is
+    ENFORCED rather than argued: ``check:inert`` proves each one is reached only
+    from pinned call sites and runs no COM mutator that could land in a saved
+    artefact.
     """
     skip = {
         "_buildgraph.py",
@@ -879,6 +904,7 @@ def _local_modules() -> dict[str, Path]:
         "_rewrite_imports.py",
         "_telemetry.py",
         "_watchdog.py",
+        *RECIPE_INERT_MODULES,
     }
     out: dict[str, Path] = {}
     for path in sorted(SCRIPTS_DIR.rglob("*.py")):
@@ -922,6 +948,164 @@ def _module_by_path() -> dict[Path, str]:
     return {path.resolve(): name for name, path in _local_modules().items()}
 
 
+# --- Machine-wide store of pure syntax facts -------------------------------------
+# Every doit graph load parses and walks each local module up to three times
+# (imports, config reads, drawing-registry reads): ~1400 parses, measured as most
+# of the load once path resolution was memoized. A farm leaf loads the graph twice
+# (prepare's export and execute's ``build.py run``) and the submitter once per
+# command, and between loads almost no source changes. These facts are pure
+# functions of a file's TEXT, so they are kept across processes keyed by the
+# SHA-256 of that text -- plus the SHA-256 of this analyzer, which names the
+# store file, so any change to the analysis starts an empty store. A stale answer
+# is therefore impossible by construction: a different text is a different key.
+# The store lives OUTSIDE the checkout (a farm root is ``clean -ffdx``-ed on every
+# leaf) and is best-effort: an unreadable, foreign or corrupt store is an empty
+# one, and a failed write only costs the next process a parse.
+# ``HARMONIC_BUILDGRAPH_CACHE`` overrides the directory; ``off`` disables it.
+_FACTS_ENV = "HARMONIC_BUILDGRAPH_CACHE"
+# Beyond this many entries a save keeps only what this process used, so a
+# long-lived store sheds the facts of source versions nothing reads any more
+# (~700 modules x 3 analyzers per source version; ~0.6 MB per 2k entries).
+_FACTS_MAX_ENTRIES = 20_000
+# Bump when the ENCODED shape of a stored fact changes without _buildgraph.py
+# itself changing (it always does today, which already renames the store; the
+# constant makes the contract explicit rather than incidental).
+_FACTS_SCHEMA = 1
+
+
+class _BuiltinsOnly(pickle.Unpickler):
+    """The store holds builtin containers of strings only; refuse anything else."""
+
+    _ALLOWED = frozenset({"frozenset", "set", "tuple", "list", "dict", "str"})
+
+    def find_class(self, module: str, name: str):
+        if module == "builtins" and name in self._ALLOWED:
+            return super().find_class(module, name)
+        raise pickle.UnpicklingError(f"refused {module}.{name}")
+
+
+class _FactStore:
+    def __init__(self) -> None:
+        self._entries: dict[bytes, object] | None = None
+        self._used: dict[bytes, object] = {}
+        self._dirty = False
+        self._path: Path | None = None
+
+    def _location(self) -> Path | None:
+        """The store file, or None when disabled or when no home can be named.
+
+        A farm leaf runs under a filtered environment; a missing
+        ``LOCALAPPDATA`` and home (``Path.home()`` raises ``RuntimeError``)
+        disables the store rather than failing the graph load.
+        """
+        try:
+            setting = os.environ.get(_FACTS_ENV, "")
+            if setting.lower() in {"off", "0", "false", "no"}:
+                return None
+            base = (
+                Path(setting)
+                if setting
+                else Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".cache")
+                / "harmonic-analyzer"
+                / "buildgraph"
+            )
+            analyzer = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:16]
+        except Exception:  # noqa: BLE001 - the store is an optimisation only
+            return None
+        # The interpreter matters too: ``ast`` output differs across versions
+        # and implementations (cache_tag is e.g. ``cpython-314``).
+        interpreter = sys.implementation.cache_tag or (
+            f"{sys.implementation.name}-{sys.version_info[0]}{sys.version_info[1]}"
+        )
+        return base / (
+            f"syntax-facts-v{_FACTS_SCHEMA}-{analyzer}-{interpreter}.pickle"
+        )
+
+    def _read(self, path: Path) -> dict[bytes, object]:
+        try:
+            with path.open("rb") as handle:
+                entries = _BuiltinsOnly(io.BytesIO(handle.read())).load()
+        except Exception:  # noqa: BLE001 - unreadable, corrupt or foreign: empty
+            return {}
+        return entries if isinstance(entries, dict) else {}
+
+    def _load(self) -> dict[bytes, object]:
+        if self._entries is None:
+            self._path = self._location()
+            self._entries = {} if self._path is None else self._read(self._path)
+        return self._entries
+
+    def get(self, key: bytes) -> tuple[bool, object]:
+        entries = self._load()
+        if key not in entries:
+            return False, None
+        self._used[key] = entries[key]
+        return True, entries[key]
+
+    def put(self, key: bytes, value: object) -> None:
+        self._load()[key] = value
+        self._used[key] = value
+        if self._path is not None and not self._dirty:
+            self._dirty = True
+            atexit.register(self.save)
+
+    def save(self) -> None:
+        if not self._dirty or self._path is None:
+            return
+        self._dirty = False
+        # Merge with whatever a concurrent process saved since we loaded: every
+        # entry is content-addressed, so any union of them is still correct.
+        merged = {**self._read(self._path), **(self._entries or {})}
+        if len(merged) > _FACTS_MAX_ENTRIES:
+            merged = dict(self._used)
+        try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            fd, temporary = tempfile.mkstemp(
+                dir=self._path.parent, prefix=".facts-", suffix=".tmp"
+            )
+            with os.fdopen(fd, "wb") as handle:
+                pickle.dump(merged, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            os.replace(temporary, self._path)
+        except Exception:  # noqa: BLE001 - a failed save only costs a re-parse
+            with contextlib.suppress(OSError, UnboundLocalError):
+                os.unlink(temporary)
+
+
+_FACTS = _FactStore()
+
+
+def _persisted_facts(name: str, encode=lambda value: value, decode=lambda raw: raw):
+    """Keep a pure ``text -> facts`` function's results in :data:`_FACTS`.
+
+    ``encode`` must reduce the result to builtin containers of strings (the
+    store refuses to unpickle anything else) and ``decode`` must rebuild it.
+    Exceptions (a ``SyntaxError``) are never stored: the next process re-raises
+    them by parsing again.
+    """
+
+    def wrap(function):
+        @functools.wraps(function)
+        def facts(text: str, *extra):
+            digest = hashlib.sha256()
+            for part in (name, text, *(repr(sorted(e)) for e in extra)):
+                digest.update(part.encode("utf-8", "surrogatepass"))
+                digest.update(b"\0")
+            key = digest.digest()
+            found, raw = _FACTS.get(key)
+            if found:
+                try:
+                    return decode(raw)
+                except Exception:  # noqa: BLE001 - a malformed entry is a miss
+                    pass
+            value = function(text, *extra)
+            _FACTS.put(key, encode(value))
+            return value
+
+        return facts
+
+    return wrap
+
+
 class _ModuleSyntax(NamedTuple):
     """Syntax facts of ONE source text: what it imports, and what each top-level
     function calls.
@@ -957,6 +1141,7 @@ def _function_call_names(
 
 
 @functools.lru_cache(maxsize=1024)
+@_persisted_facts("module_syntax", encode=tuple, decode=lambda raw: _ModuleSyntax(*raw))
 def _module_syntax(text: str) -> _ModuleSyntax:
     """Parse one source CONTENT once, for every syntax consumer of it.
 
@@ -1037,7 +1222,7 @@ def _direct_local_imports(path: Path) -> frozenset[str]:
                 found.add(parent)
             parent = parent.rpartition(".")[0]
 
-    current_module = _module_by_path().get(path.resolve())
+    current_module = _module_by_path().get(_resolved(path))
     syntax = _module_syntax(path.read_text(encoding="utf-8"))
     for name, _asname in syntax.imports:
         add(name)
@@ -1082,16 +1267,63 @@ def module_deps_of(script: Path) -> list[str]:
     script imports what it uses, which Python enforces at run time.  The BFS is
     cycle-safe (``build_motion_study`` <-> ``build_motion_study_springs``).
     """
+    return list(_module_closure(_resolved(script)))
+
+
+def _resolved(path: Path) -> Path:
+    """``path.resolve()``, once per ABSOLUTE path per process.
+
+    A doit graph load resolves the same few hundred module and config paths
+    ~56k times (every closure re-resolves every member); on Windows each is a
+    ``GetFinalPathNameByHandle`` round trip, which measured ~5 s of a ~21 s
+    load. Only absolute paths are memoized: the memo key ignores the working
+    directory, so a relative path is resolved afresh every time. Dropped by
+    :func:`clear_import_caches`.
+    """
+    if not path.is_absolute():
+        return path.resolve()
+    return _resolved_absolute(path)
+
+
+@functools.lru_cache(maxsize=None)
+def _resolved_absolute(path: Path) -> Path:
+    return path.resolve()
+
+
+@functools.lru_cache(maxsize=None)
+def _module_closure(script: Path) -> tuple[str, ...]:
+    """:func:`module_deps_of` for one RESOLVED script, computed once.
+
+    The graph asks for the same closure from several task generators (helper
+    deps, config deps, data deps, the check gates). Every input is already
+    memoized per process (``_direct_local_imports``), so the closure is too;
+    it is dropped with them (:func:`clear_import_caches`).
+    """
     mods = _local_modules()
     result: set[str] = set()
-    frontier = set(_direct_local_imports(script.resolve()))
+    frontier = set(_direct_local_imports(script))
     while frontier:
         mod = frontier.pop()
         if mod in result:
             continue
         result.add(mod)
-        frontier |= set(_direct_local_imports(mods[mod].resolve())) - result
-    return sorted(str(mods[m].resolve()) for m in result)
+        frontier |= set(_direct_local_imports(_resolved(mods[mod]))) - result
+    return tuple(sorted(str(_resolved(mods[m])) for m in result))
+
+
+def clear_import_caches() -> None:
+    """Forget every per-process fact about the local module tree: the module map,
+    each module's direct imports, the import closures and the resolved paths.
+
+    The one entry point for "re-read the tree" -- a test that rebuilds its
+    fixture sources, or a long-lived process whose checkout moved. The syntax
+    facts themselves need no clearing: they are keyed by source content.
+    """
+    _local_modules.cache_clear()
+    _module_by_path.cache_clear()
+    _direct_local_imports.cache_clear()
+    _module_closure.cache_clear()
+    _resolved_absolute.cache_clear()
 
 
 def _drawing_registry_value(node: ast.AST) -> object:
@@ -1189,6 +1421,7 @@ def drawing_registry_recipe(text: str, spec: object) -> str:
 
 
 @functools.lru_cache(maxsize=512)
+@_persisted_facts("drawing_registry_reads")
 def _drawing_registry_reads(text: str) -> frozenset[str] | None:
     """Cache a source's literal row read set; None denotes an unclassified use."""
     nodes = tuple(ast.walk(ast.parse(text)))
@@ -1279,6 +1512,193 @@ def drawing_registry_reads_selected(texts: tuple[str, ...], stem: str) -> bool:
     return True
 
 
+@functools.lru_cache(maxsize=32)
+def _dict_table_source(
+    text: str, table: str
+) -> tuple[str, tuple[tuple[str, str], ...]]:
+    """Split a module into its shared code and the entries of one dict table.
+
+    The table must be ONE module-level assignment of a dict display with unique
+    string-literal keys; anything else raises, so a caller keeps the whole file.
+    Entry values may be any expression: each is kept as its own AST dump, and
+    every name it references is module code, which stays in the shared part.
+    """
+    tree = ast.parse(text)
+    stores = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name) and node.id == table and isinstance(node.ctx, ast.Store)
+    ]
+    declaration = next(
+        (
+            node
+            for node in tree.body
+            if isinstance(node, (ast.Assign, ast.AnnAssign))
+            and [target for target in (
+                node.targets if isinstance(node, ast.Assign) else [node.target]
+            ) if isinstance(target, ast.Name) and target.id == table]
+        ),
+        None,
+    )
+    if len(stores) != 1 or declaration is None or not isinstance(declaration.value, ast.Dict):
+        raise ValueError(f"{table} must be one module-level dict display")
+    entries = []
+    for key, value in zip(declaration.value.keys, declaration.value.values):
+        if not (isinstance(key, ast.Constant) and isinstance(key.value, str)):
+            raise ValueError(f"{table} keys must be string literals")
+        entries.append((key.value, ast.dump(value, include_attributes=False)))
+    if len({key for key, _ in entries}) != len(entries):
+        raise ValueError(f"{table} has duplicate keys")
+    declaration.value = ast.Dict(keys=[], values=[])
+    return ast.dump(tree, include_attributes=False), tuple(entries)
+
+
+def dict_table_entries(text: str, table: str) -> tuple[str, ...]:
+    """The keys of a dict table, in source order (raises like ``dict_table_recipe``)."""
+    return tuple(key for key, _ in _dict_table_source(text, table)[1])
+
+
+def dict_table_recipe(text: str, table: str, keys: frozenset[str]) -> str:
+    """The recipe of a dict-table module as seen by a consumer of ``keys`` only.
+
+    Shared code (everything but the table's entries) plus the selected entries.
+    An entry outside ``keys`` can change without moving this recipe; a selected
+    key that is absent is recorded as absent, so adding it moves the recipe too.
+    """
+    shared, entries = _dict_table_source(text, table)
+    by_key = dict(entries)
+    return json.dumps(
+        {"shared": shared, "entries": {key: by_key.get(key) for key in sorted(keys)}},
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+
+
+class TableReads(NamedTuple):
+    """What one source reads from a dict table through its accessor function."""
+
+    keys: frozenset[str]  # literal (or literal-constant) keys it asks for
+    dynamic: bool  # it also calls the accessor with a runtime value
+
+
+@functools.lru_cache(maxsize=512)
+def table_reads(
+    text: str, module: str, table: str, accessor: str, exports: frozenset[str]
+) -> TableReads | None:
+    """Classify how ``text`` uses ``module.table``; ``None`` keeps the whole file.
+
+    A source may import only ``accessor`` and the names in ``exports`` from
+    ``module`` (no alias, no star, no module import, no string alias), may never
+    name ``table``, and may call ``accessor`` with one positional argument. A
+    string literal, or a module-level name assigned a string literal exactly
+    once, is a literal key; any other argument is a dynamic read. Everything
+    else is unclassified. Like the drawing-registry reader this deliberately
+    does no general dataflow: a use it cannot prove narrow keeps the file.
+    """
+    tree = ast.parse(text)
+    nodes = tuple(ast.walk(tree))
+    constants: dict[str, str] = {}
+    stored: dict[str, int] = {}
+    for node in nodes:
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            stored[node.id] = stored.get(node.id, 0) + 1
+    for node in tree.body:
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ):
+            constants[node.targets[0].id] = node.value.value
+    constants = {name: value for name, value in constants.items() if stored.get(name) == 1}
+
+    accessor_names: set[str] = set()
+    for node in nodes:
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if node.value.rsplit(".", 1)[-1] == module:
+                return None  # a string alias can escape the static import graph
+        elif isinstance(node, ast.Import):
+            if any(alias.name.rsplit(".", 1)[-1] == module for alias in node.names):
+                return None
+        elif isinstance(node, ast.ImportFrom):
+            if node.module is None or node.module.rsplit(".", 1)[-1] != module:
+                if any(alias.name in {"*", "import_module"} for alias in node.names):
+                    return None
+                continue
+            for alias in node.names:
+                if alias.asname is not None:
+                    return None
+                if alias.name == accessor:
+                    accessor_names.add(alias.name)
+                elif alias.name not in exports:
+                    return None
+        elif isinstance(node, ast.Attribute) and node.attr in {table, "import_module", "modules"}:
+            return None
+        elif isinstance(node, ast.Name) and node.id in {
+            table,
+            "eval",
+            "exec",
+            "globals",
+            "vars",
+            "__import__",
+        }:
+            return None
+
+    keys: set[str] = set()
+    dynamic = False
+    calls = {
+        id(node.func): node
+        for node in nodes
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in accessor_names
+    }
+    for node in nodes:
+        if not (isinstance(node, ast.Name) and node.id in accessor_names):
+            continue
+        if isinstance(node.ctx, ast.Store):
+            return None
+        call = calls.get(id(node))
+        if call is None or len(call.args) != 1 or call.keywords:
+            return None  # passed around, re-exported or called unusually
+        argument = call.args[0]
+        if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+            keys.add(argument.value)
+        elif isinstance(argument, ast.Name) and argument.id in constants:
+            keys.add(constants[argument.id])
+        else:
+            dynamic = True
+    return TableReads(frozenset(keys), dynamic)
+
+
+FASTENER_TABLE = ("_fastener_catalog", "FASTENERS", "fastener", frozenset({"PurchasedFastenerSpec"}))
+
+
+def fastener_rows_selected(
+    texts: tuple[str, ...], own_row: str | None, rows: frozenset[str]
+) -> frozenset[str] | None:
+    """The catalog rows a complete consumer closure can read, or ``None`` (whole file).
+
+    Literal reads name their rows. A dynamic read (``fastener(part_name)`` in a
+    shared helper) is attributed to the task's own row when it has one (a
+    catalogued part, or the drawing of one). ``fastener`` enforces the result at
+    run time against ``HARMONIC_FASTENER_ROWS``: a dynamic read of any row outside
+    the set -- including by a task with no own row -- fails the build instead of
+    reusing an artefact keyed without that row.
+    """
+    selected: set[str] = set()
+    for text in texts:
+        reads = table_reads(text, *FASTENER_TABLE)
+        if reads is None:
+            return None
+        selected |= reads.keys
+        if reads.dynamic and own_row in rows:
+            selected.add(own_row)
+    return frozenset(selected)
+
+
 def data_deps_of(script: Path) -> list[str]:
     """Resolved paths of every vendored DXF/DWG artefact ``script`` (or a helper
     it imports) references by filename -- the run-time-imported input edges doit
@@ -1326,10 +1746,12 @@ def data_deps_of(script: Path) -> list[str]:
 # or one of four dynamic tokens -- ``"machine/*"`` (whole machine family, for a
 # dynamic subsystem), ``"parts/*"`` (whole parts registry, for the dynamic part
 # name in ``_common.part_properties``), ``"title_block"`` (title_block.yaml,
-# but only for tasks that stamp part properties), ``"**"`` (whole config, the
-# fallback). dodo.py expands these, narrowing ``"parts/*"``/``"title_block"``
-# per task: a part to its OWN row, an assembly to the rows it actually stamps
-# (see _config_deps in dodo.py).
+# but only for tasks that stamp part properties), ``"assemblies/*"`` (the
+# per-assembly contracts, for any closure reaching ``_assembly_contract``),
+# ``"**"`` (whole config, the fallback). dodo.py expands these, narrowing
+# ``"parts/*"``/``"title_block"`` per task: a part to its OWN row, an assembly
+# to the rows it actually stamps; and ``"assemblies/*"`` to an assembly's OWN
+# contract (see _config_deps in dodo.py).
 
 # Accessors that read a FIXED file (no argument resolution needed). Derived from
 # _config.py; kept in sync by test_config_accessor_coverage. Note active_count
@@ -1454,6 +1876,15 @@ class _ConfigUse(Enum):
 
 
 @functools.lru_cache(maxsize=512)
+@_persisted_facts(
+    "config_references",
+    encode=lambda refs: None
+    if refs is None
+    else tuple((attr, use.value, argument) for attr, use, argument in refs),
+    decode=lambda raw: None
+    if raw is None
+    else tuple((attr, _ConfigUse(use), argument) for attr, use, argument in raw),
+)
 def _config_references_in_text(
     text: str, config_modules: frozenset[str]
 ) -> tuple[tuple[str, _ConfigUse, str | None], ...] | None:
@@ -1548,6 +1979,10 @@ def config_files_of(script: Path) -> frozenset[str]:
             tokens |= _config_tokens_in_source(src)
         except (_UnknownConfigUse, SyntaxError, OSError):
             return frozenset({"**"})  # conservative: the whole config
+    # The per-assembly contracts are read by stem at run time (the building
+    # assembly activates its own), so the closure edge IS the read-set edge.
+    if ASSEMBLY_CONTRACT_PY in sources:
+        tokens.add(ASSEMBLY_CONTRACTS_TOKEN)
     return frozenset(tokens)
 
 
@@ -1555,19 +1990,34 @@ def config_files_of(script: Path) -> frozenset[str]:
 # narrowing of the "parts/*" token).
 def all_config_files() -> list[str]:
     """Every config file (recursive) -- the ``"**"`` whole-config expansion."""
-    return sorted(str(p.resolve()) for p in CONFIG_DIR.rglob("*.yaml"))
+    return sorted(str(_resolved(p)) for p in CONFIG_DIR.rglob("*.yaml"))
 
 
 def machine_family_files() -> list[str]:
     """Every machine/*.yaml (incl _base) -- the ``"machine/*"`` expansion."""
     d = CONFIG_DIR / "machine"
-    return sorted(str(p.resolve()) for p in d.glob("*.yaml")) if d.is_dir() else []
+    return sorted(str(_resolved(p)) for p in d.glob("*.yaml")) if d.is_dir() else []
 
 
 def parts_registry_files() -> list[str]:
     """Every parts/*.yaml (incl _defaults) -- the conservative ``"parts/*"``
     expansion (dodo.py narrows this per task)."""
     d = CONFIG_DIR / "parts"
+    return sorted(str(_resolved(p)) for p in d.glob("*.yaml")) if d.is_dir() else []
+
+
+def assembly_contract_file(stem: str) -> str:
+    """One assembly's contract (``stem`` dashed or underscored) -- the narrowed
+    ``"assemblies/*"`` expansion for that assembly's own tasks. Listed whether
+    or not it exists, so a missing contract fails the task loud."""
+    dashed = stem.replace("_", "-")
+    return str((ASSEMBLY_CONTRACT_DIR / f"{dashed}.yaml").resolve())
+
+
+def assembly_contract_files() -> list[str]:
+    """Every assembly contract -- the conservative ``"assemblies/*"``
+    expansion for a consumer that is not one assembly's task."""
+    d = ASSEMBLY_CONTRACT_DIR
     return sorted(str(p.resolve()) for p in d.glob("*.yaml")) if d.is_dir() else []
 
 
@@ -1579,7 +2029,7 @@ def part_row_files(dashed_name: str) -> list[str]:
     if not row.exists():
         return []
     defaults = CONFIG_DIR / "parts" / "_defaults.yaml"
-    return sorted({str(row.resolve()), str(defaults.resolve())})
+    return sorted({str(_resolved(row)), str(_resolved(defaults))})
 
 
 # A generic custom-property write says nothing about registry ownership.  Part

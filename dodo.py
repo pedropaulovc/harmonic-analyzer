@@ -101,12 +101,18 @@ from _buildgraph import (  # noqa: E402
     CAD_OUT,
     POST_ASSEMBLY,
     SCRIPTS_DIR,
+    ASSEMBLY_CONTRACTS_TOKEN,
     all_config_files,
     artefact_for,
+    assembly_contract_file,
+    assembly_contract_files,
     config_files_of,
     data_deps_of,
+    dict_table_entries,
+    dict_table_recipe,
     drawing_registry_reads_selected,
     drawing_registry_recipe,
+    fastener_rows_selected,
     machine_family_files,
     module_deps_of,
     part_row_files,
@@ -607,7 +613,9 @@ def _stage_name(label: str) -> str:
     return "harmonic-analyzer"
 
 
-def _exec(cmd: list[str], label: str, log_stem: str | None = None) -> None:
+def _exec(
+    cmd: list[str], label: str, log_stem: str | None = None, *, task: str | None = None
+) -> None:
     """Run a subprocess from the repo root; raise on non-zero (fail-loud). The
     subprocess CONTINUES the active span via the injected ``TRACEPARENT`` and is
     labelled with its pipeline stage via ``OTEL_SERVICE_NAME`` (:func:`_stage_name`).
@@ -623,7 +631,7 @@ def _exec(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     non-release happy path. Decode the pipe as UTF-8 (errors=replace) so the gate
     labels' non-ASCII glyphs survive on a cp1252 Windows console."""
     started = time.time()
-    rc = _run_subprocess(cmd, label, log_stem)
+    rc = _run_subprocess(cmd, label, log_stem, task=task)
     if rc:
         _fail_task(label, rc, started=started)
 
@@ -644,13 +652,25 @@ def _external_console_level() -> str:
     return _EXTERNAL_LOG_LEVELS.get(raw, "WARNING")
 
 
-def _run_subprocess(cmd: list[str], label: str, log_stem: str | None = None) -> int:
+def _run_subprocess(
+    cmd: list[str], label: str, log_stem: str | None = None, *, task: str | None = None
+) -> int:
     """Run the subprocess (span-less) and return its exit code (the raise-on-failure
     part is :func:`_exec`; the COM-retry wrapper :func:`_exec_com` needs the raw code
-    to tell a SolidWorks crash/op-timeout (86/87) from an ordinary gate failure)."""
+    to tell a SolidWorks crash/op-timeout (86/87) from an ordinary gate failure).
+
+    ``label`` is the display name; ``task`` is the doit task the subprocess works
+    for (default: ``label``, which already is one for most callers). The fastener
+    guard is keyed on ``task``, so a FULL/REFRESH/hook subprocess with a display
+    label still gets its assembly's rows."""
     _telemetry.info(f">> {label}: {' '.join(cmd)}")
     env = _telemetry.inject_env()
     env["OTEL_SERVICE_NAME"] = _stage_name(label)
+    # The catalog rows this task's cache key folds; `fastener` refuses others.
+    env.pop("HARMONIC_FASTENER_ROWS", None)
+    fastener_rows = _fastener_rows_env(task or label)
+    if fastener_rows is not None:
+        env["HARMONIC_FASTENER_ROWS"] = fastener_rows
     # The MCP adapter uses Loguru directly. Keep its console sink aligned with
     # the build's warning-by-default policy while preserving an explicit override.
     env.setdefault("LOGURU_LEVEL", _external_console_level())
@@ -855,7 +875,9 @@ def _sw_ensure_once() -> None:
     _sw_preflight()
 
 
-def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
+def _exec_com(
+    cmd: list[str], label: str, log_stem: str | None = None, *, task: str | None = None
+) -> None:
     """Run a COM subprocess with reactive SolidWorks recovery.
 
     If the subprocess exits with a watchdog crash/op-timeout/modal-dialog code
@@ -872,7 +894,7 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     Fail-loud contract of :func:`_exec` is preserved: a terminal failure still raises
     ``RuntimeError``. Honors ``HARMONIC_SW_AUTOSTART=0`` (skip retry, plain ``_exec``)."""
     if not _sw_autostart_enabled():
-        _exec(cmd, label, log_stem)
+        _exec(cmd, label, log_stem, task=task)
         return
 
     backoff = _com_retry_backoff()
@@ -882,7 +904,7 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
         # capture, not the previous attempt's (they differ by exactly the seat
         # state this evidence exists to compare).
         started = time.time()
-        rc = _run_subprocess(cmd, label, log_stem)
+        rc = _run_subprocess(cmd, label, log_stem, task=task)
         if rc == 0:
             return
         sw_broke = rc in _WATCHDOG_EXIT_CODES or not _sw_lifecycle.is_connected()
@@ -921,7 +943,9 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
             _sw_lifecycle.wait_until_ready()
 
 
-def _run(cmd: list[str], label: str, log_stem: str | None = None) -> None:
+def _run(
+    cmd: list[str], label: str, log_stem: str | None = None, *, task: str | None = None
+) -> None:
     """Open a ``task <label>`` span and run the subprocess inside it (see
     :func:`_exec`). One span per task action, NAMED for the doit task
     (``task check:math``) so the trace reads as the task itself; the subprocess
@@ -936,7 +960,7 @@ def _run(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     with _telemetry.span(
         f"task {label}", label=label, cmd=" ".join(cmd), service=_stage_name(label)
     ):
-        _exec(cmd, label, log_stem)
+        _exec(cmd, label, log_stem, task=task)
 
 
 # --- Per-script helper dependencies, computed from each build script's REAL
@@ -1011,6 +1035,16 @@ def _expand_title_block_token(kind: str | None, script: Path) -> list[str]:
     return [str((CONFIG_DIR / "title_block.yaml").resolve())]
 
 
+def _expand_assembly_contracts_token(stem: str | None, kind: str | None) -> list[str]:
+    """Per-task expansion of the ``"assemblies/*"`` token (any closure reaching
+    ``_assembly_contract``). An ASSEMBLY task reads only its OWN contract -- the
+    build activates its own stem -- so a sibling's seed or free-stem edit never
+    re-keys it; any other consumer keeps the whole family (conservative)."""
+    if kind == "assembly" and stem is not None:
+        return [assembly_contract_file(stem)]
+    return assembly_contract_files()
+
+
 def _config_deps(script, stem: str | None = None, kind: str | None = None) -> list[str]:
     """The cad/config FILES this build script actually reads (fine-grained;
     conservative whole-config fallback on any unclassifiable ``_config`` use).
@@ -1032,6 +1066,8 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
             out.update(_expand_parts_token(stem, kind, script))
         elif tok == "title_block":
             out.update(_expand_title_block_token(kind, script))
+        elif tok == ASSEMBLY_CONTRACTS_TOKEN:
+            out.update(_expand_assembly_contracts_token(stem, kind))
         else:
             out.add(str((CONFIG_DIR / tok).resolve()))
     return sorted(out)
@@ -1048,7 +1084,7 @@ REPORTS = CAD_OUT / "reports"
 LOGS = CAD_OUT / "logs"
 # Forensic artefacts a failing COM build step leaves behind: the saved copy of
 # the failing document, the BMP of the seat and capture.json
-# (``_common.capture_com_failure`` / ``OUT_FAILURES``). A farm worker's
+# (``_seat_forensics.capture_com_failure`` / ``OUT_FAILURES``). A farm worker's
 # workspace is DISPOSABLE, so the doit parent enumerates them on every failure
 # path: the manifest goes to the process the pool captures into the leaf's
 # ``task.log``, which is the one channel that always reaches the submitter.
@@ -1155,7 +1191,7 @@ def _fail_task(label: str, rc: int, *, started: float) -> None:
 
     Only the EMISSIONS are suppressed, never the manifest arithmetic around
     them: a ``NameError`` or a bad f-string here must stay loud, or this path
-    becomes undebuggable. Same split as ``_common.capture_com_failure``, which
+    becomes undebuggable. Same split as ``_seat_forensics.capture_com_failure``, which
     wraps its final ERROR record and nothing else.
 
     A failure that captured NOTHING says so on its own line. Most failures
@@ -1287,6 +1323,7 @@ _CHECK_NAMES = (
     "freshness",
     "flagonly",
     "partiso",
+    "inert",
     "budget",
 )
 # Offline checks that are OPT-IN only (runnable via `doit check:<name>` but NOT
@@ -1297,12 +1334,12 @@ _CHECK_NAMES = (
 _OPTIONAL_CHECK_NAMES = ("verify_telemetry",)
 
 
-def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
+def _run_stamped(cmd: list[str], label: str, stamp: str, task: str) -> None:
     """Run a SolidWorks-free gate subprocess; on success write its stamp target.
     _run raises on non-zero, so a failed gate never writes a stamp (stays stale ->
     re-runs). The COM gates (``verify:*``/``preflight``) do NOT come here: they are
     cache-keyed leaves whose stamp is written by :func:`_cached_com_action`."""
-    _run(cmd, label, log_stem=Path(stamp).stem)
+    _run(cmd, label, log_stem=Path(stamp).stem, task=task)
     Path(stamp).parent.mkdir(parents=True, exist_ok=True)
     Path(stamp).write_text(f"{label}\n", encoding="utf-8")
 
@@ -1663,6 +1700,83 @@ def _drawing_registry_dep(stem: str, registry: Path) -> str:
     )
 
 
+_FASTENER_CATALOG = (SCRIPTS_DIR / "_fastener_catalog.py").resolve()
+# label -> the catalog rows its narrowed recipe folds (see _narrow_fastener_catalog).
+_FASTENER_ROWS: dict[str, frozenset[str]] = {}
+
+
+def _narrow_fastener_catalog(
+    label: str, deps: list[str], own_row: str | None
+) -> list[str]:
+    """Swap ``_fastener_catalog.py`` for a digest of only the rows ``label`` reads.
+
+    ``FASTENERS`` is a data registry: every catalogued part, its drawing and every
+    assembly reaches it, so a one-row edit re-keyed ~97 leaves. When the task's
+    whole Python closure reads the table only through ``fastener(...)``
+    (``_buildgraph.fastener_rows_selected``), the dependency becomes a sidecar
+    holding the shared code plus the selected rows, like ``_drawing_registry_dep``.
+    ``_run_subprocess`` hands the same row set to the build as
+    ``HARMONIC_FASTENER_ROWS`` and ``fastener`` refuses any other row, so a read
+    the static analysis attributed wrongly fails loud instead of reusing a
+    stale artefact. Anything unclassified keeps the whole file."""
+    if str(_FASTENER_CATALOG) not in deps:
+        return deps
+    text = _FASTENER_CATALOG.read_text(encoding="utf-8")
+    try:
+        rows = frozenset(dict_table_entries(text, "FASTENERS"))
+    except ValueError:
+        return deps
+    consumers = sorted(
+        {Path(dep) for dep in deps if dep.endswith(".py")} - {_FASTENER_CATALOG}
+    )
+    selected = fastener_rows_selected(
+        tuple(path.read_text(encoding="utf-8") for path in consumers), own_row, rows
+    )
+    if selected is None:
+        return deps
+    _FASTENER_ROWS[label] = selected
+    family, stem = label.split(":", 1)
+    sidecar = _write_digest_sidecar(
+        CAD_OUT / ".fastener-catalog" / f"{family}-{stem}.digest",
+        hashlib.md5(
+            dict_table_recipe(text, "FASTENERS", selected).encode("utf-8")
+        ).hexdigest(),
+    )
+    return [sidecar if dep == str(_FASTENER_CATALOG) else dep for dep in deps]
+
+
+def _fastener_rows_env(task: str) -> str | None:
+    """The ``HARMONIC_FASTENER_ROWS`` value for ``task``'s build subprocess.
+
+    ``task`` must be a doit task name (``part:x``, ``check:math``, ``release``).
+    Only part, assembly and drawing recipes are narrowed, so any other task folds
+    the whole catalog (when it reads it at all) and runs unguarded. A display
+    label (``FULL build channel (...)``) or an unknown part/assembly/drawing stem
+    raises: silently dropping the guard would let a read the static analysis
+    missed publish under a key that does not fold its row.
+
+    Recomputed from the task's own file_dep function when this process never
+    built the graph (a ``doit -n`` worker), so the guard never depends on which
+    process ran the task."""
+    if not task or any(ch.isspace() for ch in task):
+        raise ValueError(
+            f"{task!r} is not a doit task name; pass the task the subprocess works "
+            "for, or its fastener-row guard is lost"
+        )
+    family, _, stem = task.partition(":")
+    if task not in _FASTENER_ROWS:
+        if family == "part" and stem in part_stems():
+            _part_file_deps(SCRIPTS_DIR / f"build_{stem}.py", stem)
+        elif family == "assembly" and stem in ASSEMBLY_ORDER:
+            _recipe_files(stem)
+        elif family == "drawing" and stem in DRAWINGS_BY_NAME:
+            _drawing_file_deps(stem)
+        elif family in ("part", "assembly", "drawing"):
+            raise ValueError(f"{task!r} names no {family} task; its fastener rows are unknown")
+    rows = _FASTENER_ROWS.get(task)
+    return None if rows is None else ",".join(sorted(rows))
+
+
 def _drawing_file_deps(stem: str) -> list[str]:
     """Inputs for both doit freshness and the shared drawing-cache key.
 
@@ -1694,7 +1808,7 @@ def _drawing_file_deps(stem: str) -> list[str]:
         )
     else:
         source_deps = (_sldprt(spec.part), _part_execution_token(spec.part))
-    return sorted(
+    deps = sorted(
         {
             str(script),
             str(RELEASE_VERSION_FILE),
@@ -1703,6 +1817,7 @@ def _drawing_file_deps(stem: str) -> list[str]:
             *(str(path.resolve()) for path in spec.assets),
         }
     )
+    return _narrow_fastener_catalog(f"drawing:{stem}", deps, spec.artifact_stem)
 
 
 def _drawing_cache_outputs(stem: str) -> list[Path]:
@@ -1742,11 +1857,14 @@ def _cad_identity_deps() -> list[str]:
 def _soundness_file_deps(stem: str) -> list[str]:
     """One assembly's soundness-gate inputs: verify.py, the gate logic that lives
     outside every build closure (_assembly_postbuild, the interference contract),
-    and the assembly itself with its execution token."""
+    the assembly's OWN contract (its free-DOF sets decide the verdict, and
+    verify.py is not run through ``_config_deps``), and the assembly itself with
+    its execution token."""
     deps = [
         str(VERIFY_PY),
         str(POSTBUILD_PY),
         str(INTERFERENCE_CONTRACTS_PY),
+        assembly_contract_file(stem),
         _sldasm(stem),
         _assembly_execution_token(stem),
     ]
@@ -1878,6 +1996,14 @@ def _package_cache_outputs() -> list[Path]:
     return [(CAD_OUT / "release" / "native").resolve()]
 
 
+def _tag_cache_key(span: Any, key: str) -> None:
+    """Name the cache key on a phase span (``cache.key``, its first 12 hex digits
+    as ``cache.jsonl`` and the ``cache.*`` events print it). The sibling phase
+    spans are separate root traces, so without it a build could only be tied to
+    the key it produced by matching the next ``cache.store`` event on time."""
+    span.set_attribute("cache.key", key[:12])
+
+
 def _probe_cache(
     key: str, outputs: list[Path], label: str, span: Any, hit: str = "hit"
 ) -> str:
@@ -1891,6 +2017,7 @@ def _probe_cache(
     seat-holding caller releases the documents and re-probes instead. Under the
     farm executor the submitter holds no seat to release, so it fails loud.
     """
+    _tag_cache_key(span, key)
     try:
         outcome = hit if _cache.restore(key, outputs, label) else "miss"
     except _cache.RestoreLocked:
@@ -1920,6 +2047,7 @@ def _release_seat_documents(label: str) -> None:
             [sys.executable, str(SCRIPTS_DIR / "release_seat_documents.py")],
             f"release documents {label}",
             log_stem="release-seat-documents",
+            task=label,
         )
 
 
@@ -2006,6 +2134,7 @@ def _cached_com_action(
         ) as sp:
             _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
+            _tag_cache_key(sp, key)
             _exec_com(cmd, label, log_stem=log_stem)
             if stamp is not None:
                 _write_stamp(label, stamp)
@@ -2015,6 +2144,7 @@ def _cached_com_action(
     with _telemetry.span(
         f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as store:
+        _tag_cache_key(store, key)
         store.set_attribute("cache", _cache.store(key, outputs, label))
 
 
@@ -2037,7 +2167,7 @@ def _part_file_deps(script: Path, stem: str) -> list[str]:
     # get-only prefs ride it). Folding it in makes a template edit rebuild
     # every part AND shift the remote-cache key, so no seat can publish
     # template-drifted parts under a stale key.
-    return [
+    deps = [
         str(script.resolve()),
         str(RELEASE_VERSION_FILE),
         *_helper_deps(script),
@@ -2046,6 +2176,7 @@ def _part_file_deps(script: Path, stem: str) -> list[str]:
         str(PART_TEMPLATE.resolve()),
         _submodule_part_dep(),
     ]
+    return _narrow_fastener_catalog(f"part:{stem}", deps, stem.replace("_", "-"))
 
 
 def _assembly_file_deps(stem: str) -> list[str]:
@@ -2096,6 +2227,7 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
     with _telemetry.span(
         f"cache.restore {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as restore:
+        _tag_cache_key(restore, key)
         if not _cache.restore(key, outputs, label):
             raise RuntimeError(
                 f"{label}: farm reported success but cache key {key[:12]} is absent"
@@ -2143,6 +2275,7 @@ def _cached_part_action(stem: str, script: Path) -> None:
         ) as sp:
             _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
+            _tag_cache_key(sp, key)
             _exec_com([sys.executable, str(script)], label, log_stem=f"part-{stem}")
             _stamp_part_execution(stem)
 
@@ -2151,6 +2284,7 @@ def _cached_part_action(stem: str, script: Path) -> None:
     with _telemetry.span(
         f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as store:
+        _tag_cache_key(store, key)
         store.set_attribute("cache", _cache.store(key, outputs, label))
 
 
@@ -2179,7 +2313,7 @@ def _recipe_files(stem: str) -> list[str]:
     template = (
         [str(PART_TEMPLATE.resolve())] if stamps_part_properties(asm_script) else []
     )
-    return [
+    deps = [
         str(asm_script.resolve()),
         str(RELEASE_VERSION_FILE),
         *hooks,
@@ -2188,6 +2322,7 @@ def _recipe_files(stem: str) -> list[str]:
         *template,
         _submodule_assembly_dep(),
     ]
+    return _narrow_fastener_catalog(f"assembly:{stem}", deps, None)
 
 
 def _recipe_sidecar(stem: str) -> Path:
@@ -2412,6 +2547,7 @@ def build_or_refresh(stem, dependencies, changed, targets):
         ) as sp:
             _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
+            _tag_cache_key(sp, cache_key)
 
             target_missing = not Path(targets[0]).exists()
             try:
@@ -2429,12 +2565,14 @@ def build_or_refresh(stem, dependencies, changed, targets):
                     [sys.executable, str(asm_script)],
                     f"FULL build {stem} ({why})",
                     log_stem=f"assembly-{stem}",
+                    task=label,
                 )
                 for hook in hooks:
                     _exec_com(
                         [sys.executable, str(hook)],
                         f"hook {hook.name}",
                         log_stem=f"hook-{stem}-{hook.stem}",
+                        task=label,
                     )
             else:
                 sp.set_attribute("mode", "refresh")
@@ -2442,6 +2580,7 @@ def build_or_refresh(stem, dependencies, changed, targets):
                     [sys.executable, str(SCRIPTS_DIR / "refresh_assembly.py"), stem],
                     f"REFRESH {stem}",
                     log_stem=f"assembly-{stem}",
+                    task=label,
                 )
             # _exec raised if the build failed, so we only get here on success: record
             # this build's recipe digest for the next run's FULL/REFRESH decision.
@@ -2457,6 +2596,7 @@ def build_or_refresh(stem, dependencies, changed, targets):
     with _telemetry.span(
         f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as store:
+        _tag_cache_key(store, cache_key)
         store.set_attribute(
             "cache", _cache.store(cache_key, _assembly_cache_outputs(stem), label)
         )
@@ -2684,6 +2824,9 @@ def task_check():
     pytest_cmd = [sys.executable, "-m", "pytest", "-q"]
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
+        # Per-assembly contracts stay per-assembly (no stem-keyed tables in
+        # _assembly.py; each recipe carries its own contract only).
+        SCRIPTS_DIR / "test_assembly_contract.py",
         SCRIPTS_DIR / "test_cut_release_version.py",
         SCRIPTS_DIR / "test_export_models.py",
         SCRIPTS_DIR / "test_pose_manifest.py",
@@ -2711,7 +2854,7 @@ def task_check():
         # COM failure forensics: a null COM return must still raise its own
         # message (forensics can never mask the failure), and every capture step
         # must survive its own failure. Both are pure-Python contracts of
-        # _common.capture_com_failure, so they gate offline.
+        # _seat_forensics.capture_com_failure, so they gate offline.
         SCRIPTS_DIR / "test_failure_forensics.py",
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
@@ -2821,43 +2964,13 @@ def task_check():
     )
     specs = {
         "math": {
-            # truth_model reads harmonics/phases/amplitudes/magnification from
-            # _config + the YAML layer, so those must invalidate the math stamp
-            # too (codex review). The base-footprint gate reads placement +
-            # footprint constants straight off these build modules -- folded via
-            # module_deps_of so the geometry contracts they import (the
-            # *_spec.py single-source modules) invalidate the stamp too (codex
-            # review #353: a FOOT_WIDTH edit in arbor_pedestal_spec.py must
-            # re-run the gate, not leave its stamp valid).
-            "file_dep": [
-                str(VERIFY_PY),
-                *sorted(
-                    {
-                        str(Path(dep).resolve())
-                        for module in (
-                            "truth_model.py",
-                            "build_drive_train_assembly.py",
-                            "build_cone_pivot_post.py",
-                            "build_cone_pivot_screw.py",
-                            "build_swing_stop_screw.py",
-                            "build_cone_swing_platform.py",
-                            "build_cone_lock_knob.py",
-                            "build_cone_tip_block.py",
-                            "build_cone_tip_bushing.py",
-                            "build_cone_tip_adjuster.py",
-                            "build_cone_tip_pinch_screw.py",
-                            "build_arbor_pedestal.py",
-                            "build_harmonic_base.py",
-                        )
-                        for dep in (
-                            SCRIPTS_DIR / module,
-                            *module_deps_of(SCRIPTS_DIR / module),
-                        )
-                    }
-                ),
-                config_py,
-                *_CONFIG_YAMLS,
-            ],
+            # The import closure of verify.py (truth_model, the base-footprint
+            # build modules and the *_spec.py single-source modules they import,
+            # build_summing_assembly for the counter-spring hang, ...) is derived
+            # below from the command's entry point, like every gate's. Only the
+            # YAML layer truth_model reads outside the _config accessors is
+            # declared here (codex review).
+            "file_dep": [config_py, *_CONFIG_YAMLS],
             "cmd": [sys.executable, str(VERIFY_PY), "--suite", "math"],
         },
         "config": {
@@ -2979,6 +3092,9 @@ def task_check():
                 str((SCRIPTS_DIR / "_watchdog.py").resolve()),
                 str((SCRIPTS_DIR / "_telemetry.py").resolve()),
                 str((SCRIPTS_DIR / "_common.py").resolve()),
+                # run_build's teardown (seat parking) lives in the recipe-inert
+                # module, which no module_deps_of closure reaches.
+                str((SCRIPTS_DIR / "_seat_forensics.py").resolve()),
                 str((SCRIPTS_DIR / "test_watchdog.py").resolve()),
             ],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_watchdog.py")],
@@ -3057,6 +3173,22 @@ def task_check():
             ),
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_part_isolation.py")],
         },
+        "inert": {
+            # Recipe-inert modules (_buildgraph.RECIPE_INERT_MODULES) are in no
+            # cache key, so they must never change a saved artefact: pinned call
+            # sites only, no COM mutator before a save, pinned reads of tracked
+            # code (test_recipe_inert.py). The gate scans every local module for
+            # call sites, so every one is a dep, inert modules included.
+            "file_dep": sorted(
+                {
+                    str((REPO_ROOT / "dodo.py").resolve()),
+                    str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
+                    str((SCRIPTS_DIR / "test_recipe_inert.py").resolve()),
+                    *scanned_by_binding_gate,
+                }
+            ),
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_recipe_inert.py")],
+        },
         "budget": {
             # The coefficient-error budget (cad/docs/tolerance-policy.md): the
             # sensitivity model's linear gains agree with the exact channel
@@ -3105,11 +3237,30 @@ def task_check():
     )
     for name, spec in specs.items():
         stamp = str(REPORTS / f"check-{name}.ok")
+        # A gate's stamp must go stale whenever code or config it EXECUTES changes,
+        # so every .py entry point on its command line contributes its local import
+        # closure (lazy imports included) and the config that closure reads. Hand
+        # lists drifted: check:math never listed build_summing_assembly.py or
+        # gooseneck_geom.py, so a gooseneck edit left it green without running
+        # (2026-09-23). The hand-listed deps above stay for what an import graph
+        # cannot see: runtime-read data, scanned sources, dodo.py, and the tooling
+        # modules module_deps_of excludes. test_dodo_recipe pins the invariant.
+        executed = {
+            path
+            for entry in (Path(arg) for arg in spec["cmd"] if arg.endswith(".py"))
+            for path in (
+                str(entry.resolve()),
+                *module_deps_of(entry),
+                *_config_deps(entry),
+            )
+        }
         yield {
             "name": name,
-            "file_dep": spec["file_dep"],
+            "file_dep": sorted({*spec["file_dep"], *executed}),
             "targets": [stamp],
-            "actions": [(_run_stamped, [spec["cmd"], f"check {name}", stamp])],
+            "actions": [
+                (_run_stamped, [spec["cmd"], f"check {name}", stamp, f"check:{name}"])
+            ],
             "clean": True,
             "verbosity": 2,
         }
@@ -3292,7 +3443,7 @@ def _run_release(relargs):
     neither blocks another worktree's build nor needs SolidWorks on this machine --
     which is the whole point: a release can be cut from a seatless box, with every
     COM stage dispatched to the farm."""
-    _run([sys.executable, str(RELEASE_PY), *relargs], "cut release")
+    _run([sys.executable, str(RELEASE_PY), *relargs], "cut release", task="release")
 
 
 def task_release():

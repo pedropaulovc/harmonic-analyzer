@@ -21,6 +21,7 @@ from _common import (
     run_build,
 )
 from _assembly import (
+    activate_assembly_contract,
     angle_driver,
     component_transform,
     distance_driver,
@@ -28,6 +29,10 @@ from _assembly import (
     place_component,
     world_point,
 )
+
+# Distance drivers seed their side from paper-drive's flip seeds
+# (cad/config/assemblies/paper-drive.yaml), the assembly this probe mirrors.
+activate_assembly_contract("paper-drive")
 
 PLATE_X0 = -33.213
 PLATE_Y0 = 273.234
@@ -86,9 +91,14 @@ async def build(adapter):
                        label="platen spin snapshot", verify=(pl, pl_o))
     log(f"after angle(Top): {_status(adapter, pl)}")
 
+    # Probe-only mate: no paper-drive build queries "platen feed snapshot", so
+    # its learned inverted side lives HERE, not as a dead seed in
+    # cad/config/assemblies/paper-drive.yaml (codex #873). flip=True is the old
+    # global seed applied to this magnitude: (d < 0) XOR inverted.
     await distance_driver(adapter, named_ref(f"Right Plane@{pl}", "PLANE"),
                           named_ref("Right Plane", "PLANE"), abs(pl_o[0]),
-                          label="platen feed snapshot", verify=(pl, pl_o))
+                          label="platen feed snapshot", verify=(pl, pl_o),
+                          flip=True)
     log(f"after X snapshot(d={abs(pl_o[0]):.1f}): {_status(adapter, pl)}")
 
     corner1 = world_point(adapter, pl, [269.64, 134.82, 4.0])
