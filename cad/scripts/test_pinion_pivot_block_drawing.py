@@ -193,9 +193,10 @@ def test_views_carry_no_hidden_lines_and_the_drill_callout_names_its_process() -
 
 
 def test_rig_layout_sets_the_front_block_by_feeler_off_the_back_stop() -> None:
-    # User ruling (c): the blocks locate the swing cluster; the model pose has
-    # the back strap hard on the back block and the front block one feeler
-    # off the front strap.
+    # User ruling (c): the blocks locate the swing cluster.  Codex #854/#858
+    # P1 (Main): the pose IS the fit-up stack -- back strap hard on the back
+    # block, drum and front strap closed up line to line behind it, and the
+    # front block one feeler off the front strap.
     import alignment_pinion_spec
     import pinion_rig_layout as rig
     from pinion_bracket_geometry import THICKNESS
@@ -204,9 +205,10 @@ def test_rig_layout_sets_the_front_block_by_feeler_off_the_back_stop() -> None:
     assert rig.STRAP_Z_OUTER[1] == pytest.approx(rig.BACK_BLOCK_Z0, abs=1e-9)
     front_inner = rig.FRONT_BLOCK_Z0 + pinion_pivot_block_spec.BLOCK_DEPTH
     assert rig.STRAP_Z_OUTER[0] - front_inner == pytest.approx(0.25, abs=1e-9)
-    assert rig.STRAP_Z_INNER[1] - rig.STRAP_Z_INNER[0] == pytest.approx(
-        rig.DRUM_LEN + 2.0 * rig.STRAP_AIR, abs=1e-9
+    assert (rig.DRUM_FRONT_Z, rig.DRUM_BACK_Z) == pytest.approx(
+        rig.STRAP_Z_INNER, abs=1e-9
     )
+    assert not hasattr(rig, "STRAP_AIR")
     assert rig.STRAP_Z_OUTER[1] - rig.STRAP_Z_INNER[1] == THICKNESS
 
 
@@ -218,12 +220,12 @@ def test_rig_layout_shaft_and_rod_stay_flush_with_the_block_faces() -> None:
     assert SHAFT_LEN == rig.TORQUE_SHAFT_LEN
     assert ROD_LEN == rig.LIFT_ROD_LEN
     # Back ends flush with the back block; the shaft's front end flush with
-    # the PHYSICAL front block, the rod >= LEVER_SEAT_PROUD proud of it.
+    # the front block, the rod >= LEVER_SEAT_PROUD proud of it.
     assert rig.TORQUE_SHAFT_Z0 + SHAFT_LEN == pytest.approx(rig.BACK_BLOCK_OUTER_Z)
     assert rig.LIFT_ROD_Z0 + ROD_LEN == pytest.approx(rig.BACK_BLOCK_OUTER_Z)
-    shaft_proud = rig.PHYSICAL_FRONT_BLOCK_OUTER_Z - rig.TORQUE_SHAFT_Z0
+    shaft_proud = rig.FRONT_BLOCK_Z0 - rig.TORQUE_SHAFT_Z0
     assert -1e-9 <= shaft_proud <= 0.1
-    proud = rig.PHYSICAL_FRONT_BLOCK_OUTER_Z - rig.LIFT_ROD_Z0
+    proud = rig.FRONT_BLOCK_Z0 - rig.LIFT_ROD_Z0
     assert rig.LEVER_SEAT_PROUD - 1e-9 <= proud <= rig.LEVER_SEAT_PROUD + 0.1
     assert (SHAFT_LEN, ROD_LEN) == (182.0, 192.0)
 
@@ -250,7 +252,7 @@ def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
     )
 
     depth = pinion_pivot_block_spec.BLOCK_DEPTH
-    budget = 2.0 * depth + rig.PHYSICAL_INNER_SPAN + rig.LEVER_SEAT_PROUD
+    budget = 2.0 * depth + rig.INNER_SPAN + rig.LEVER_SEAT_PROUD
     assert rig.LIFT_ROD_LEN == math.ceil(budget * 10.0 - 1e-6) / 10.0
     # One source of truth: every rig station the assembly places is the
     # layout's.
@@ -270,20 +272,19 @@ def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
     for z0 in drive.CAM_Z0:
         assert inner[0] - 1e-9 <= z0 and z0 + CAM_LEN <= inner[1] + 1e-9
     # The lever hub takes BORE_DEPTH of the proud length (the rod bottoms on
-    # its floor) and its mouth stays clear of the block, physical and pose.
+    # its floor) and its mouth stays clear of the block.
     assert drive.LEVER_Z - HUB_LEN / 2.0 + WALL_T == pytest.approx(rod[0])
     hub_mouth = rod[0] + BORE_DEPTH
-    assert rig.PHYSICAL_FRONT_BLOCK_OUTER_Z - hub_mouth == pytest.approx(
+    assert rig.FRONT_BLOCK_Z0 - hub_mouth == pytest.approx(
         rig.LEVER_SEAT_PROUD - BORE_DEPTH, abs=0.1
     )
-    assert rig.FRONT_BLOCK_Z0 - hub_mouth >= rig.STRAP_AIR
     # MHA-135's hole stays inside the hub engagement at the title block's .X.
     assert ROD_PIN_HOLE_FROM_END - PIN_HOLE_DIA / 2.0 - 0.8 >= 0.0
     assert ROD_PIN_HOLE_FROM_END + PIN_HOLE_DIA / 2.0 + 0.8 <= BORE_DEPTH
 
 
 def test_front_block_feeler_setting_is_the_ruled_band() -> None:
-    # Codex #854 P1: the fit-up setting that makes PHYSICAL_INNER_SPAN (and
+    # Codex #854 P1: the fit-up setting that makes INNER_SPAN (and
     # so the 182.0 shaft and 192.0 rod) true is ruling (c)'s 0.25 +/- 0.10
     # feeler between the front strap and the front block.  The band is a
     # named fit-up value so the MHA-A03 step and every worst-case gate read
@@ -299,23 +300,23 @@ def test_front_block_feeler_setting_is_the_ruled_band() -> None:
 
 
 def test_manufactured_block_span_is_the_solid_stack_plus_one_feeler() -> None:
-    # Codex #854 P1: the model pose's STRAP_AIR is not hardware.  The printed
-    # shaft length is the two blocks plus the solid stack (strap, drum, strap)
-    # plus the one feeler end play -- no STRAP_AIR term anywhere.
+    # Codex #854 P1: the span between the blocks is the solid stack (strap,
+    # drum, strap) plus the one feeler end play.  Codex #854/#858 P1 (Main):
+    # the saved pose carries exactly that span -- no extra pose air -- so the
+    # base seats cut from it fit the single-feeler fit-up.
     import pinion_rig_layout as rig
     from pinion_bracket_geometry import THICKNESS
 
     solid = 2.0 * THICKNESS + rig.DRUM_LEN
-    assert rig.PHYSICAL_INNER_SPAN == pytest.approx(solid + rig.FRONT_BLOCK_FEELER)
+    assert rig.INNER_SPAN == pytest.approx(solid + rig.FRONT_BLOCK_FEELER)
     physical = (
         2.0 * pinion_pivot_block_spec.BLOCK_DEPTH + solid + rig.FRONT_BLOCK_FEELER
     )
     assert 0.0 <= rig.TORQUE_SHAFT_LEN - physical < 0.1  # rounded up to .X
-    # The model's block span carries the pose air on top, and only it.
     model_span = rig.BACK_BLOCK_Z0 - (
         rig.FRONT_BLOCK_Z0 + pinion_pivot_block_spec.BLOCK_DEPTH
     )
-    assert model_span - rig.PHYSICAL_INNER_SPAN == pytest.approx(2.0 * rig.STRAP_AIR)
+    assert model_span == pytest.approx(rig.INNER_SPAN, abs=1e-9)
 
 
 def test_spring_blade_stays_on_the_back_strap_flank_at_every_stack() -> None:

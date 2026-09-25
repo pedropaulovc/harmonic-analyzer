@@ -63,9 +63,9 @@ DRUM_STATION_BAND = LINEAR_X_BAND
 # That total play is shared by the cluster's four axial gaps (front block to
 # front strap, front strap to drum, drum to back strap, back strap to back
 # block), each >= 0 and split any way, so the two drum-end airs together run
-# from 0 (all the play at the blocks) up to the whole play.  The model's
-# STRAP_AIR is only a pose and never enters this stack (pinioncluster,
-# 2026-09-24).  The drum hard forward and hard aft are the two stops.
+# from 0 (all the play at the blocks) up to the whole play.  The assembly
+# shows the fit-up stack, both drum-end airs at 0 (pinion_rig_layout).  The
+# drum hard forward and hard aft are the two stops.
 STRAP_AXIAL_LOCATION = "block-stop-slot-set"
 END_PLAY = 0.25
 END_PLAY_SET_ERROR = 0.10

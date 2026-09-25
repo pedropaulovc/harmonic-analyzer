@@ -141,8 +141,8 @@ def test_each_journal_land_covers_its_strap_with_axial_margin() -> None:
     """The lands must cover the MHA-056 straps where the assembly puts them."""
     import build_drive_train_assembly as assembly
 
-    front_face = assembly.APINION_Z_FRONT - assembly.STRAP_AIR - assembly.ARBOR_Z0
-    back_face = assembly.APINION_Z_BACK + assembly.STRAP_AIR - assembly.ARBOR_Z0
+    front_face = assembly.RIG.STRAP_Z_INNER[0] - assembly.ARBOR_Z0
+    back_face = assembly.RIG.STRAP_Z_INNER[1] - assembly.ARBOR_Z0
     # 9 mm is the thicker strap the pinion-cluster slice carries.
     for strap_t in {assembly.STRAP_T, 9.0}:
         for strap_lo, strap_hi, land_lo in (
@@ -617,9 +617,35 @@ def test_drum_station_text_clears_the_station_stack() -> None:
 
 
 def test_drum_station_matches_the_assembled_drum_on_the_arbor() -> None:
-    """pinioncluster's option-(c) re-lay (#855) moved BDT APINION_Z_FRONT 0.3
-    aft with ARBOR_Z0 fixed, so the assembly now carries the printed station."""
+    """The drum is bonded at the printed station, so BDT derives ARBOR_Z0 from
+    the fit-up stack's drum station (Codex #854/#858 P1) and the assembly
+    carries the printed station."""
     import build_drive_train_assembly as assembly
 
     shoulder_z = assembly.ARBOR_Z0 + spec.HEAD_REAR_Z
     assert assembly.APINION_Z_FRONT - shoulder_z == pytest.approx(spec.DRUM_STATION)
+
+
+def test_journal_lands_cover_their_straps_in_the_pose() -> None:
+    # Codex #854 review (Main): the released "arbor back end at 91.25"
+    # landmark became a nominal check ~13.75 clear that could never fire.
+    # What matters is that each land covers its strap past both faces in the
+    # saved pose; BDT asserts it at import and this pins the pose margins.
+    import inspect
+
+    import build_drive_train_assembly as assembly
+    import pinion_rig_layout as rig
+
+    faces = (
+        (rig.STRAP_Z_OUTER[0], rig.STRAP_Z_INNER[0]),
+        (rig.STRAP_Z_INNER[1], rig.STRAP_Z_OUTER[1]),
+    )
+    margins = []
+    for land_z, (lo, hi) in zip((spec.FRONT_JOURNAL_Z, spec.BACK_JOURNAL_Z), faces):
+        start = assembly.ARBOR_Z0 + land_z
+        margins += [lo - start, start + spec.JOURNAL_LEN - hi]
+    assert min(margins) >= spec.MIN_LAND_OVER_STRAP
+    assert margins == pytest.approx([5.15, 4.85, 4.85, 5.15], abs=5e-3)
+    source = inspect.getsource(assembly)
+    assert "falls short of the back strap" not in source
+    assert "journal land misses its strap" in source

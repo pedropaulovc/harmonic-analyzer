@@ -79,8 +79,10 @@ from alignment_pinion_spec import (
 PART_NAME = "alignment-pinion"
 MATERIAL = "Brass"  # p.67: brass drum, same finish as the cylinder train
 
-# The back face (machine z +68.2) shaves the last 0.28 mm of the j = 19
-# gear face (ends +68.48); documented in Appendix C. The retired cone-knob
+# The back face (machine z +68.75 before the mechanism shift) covers the whole
+# j = 19 gear face (ends +68.47) with 0.28 to spare: ruling (c) bonded the
+# drum 0.3 aft and the fit-up stack (#854) put it 0.25 further aft.  The
+# released +68.2 shaved that face (Appendix C). The retired cone-knob
 # post no longer caps the free back reach. The brass drum's bore matches the
 # separate MHA-102 steel arbor.
 

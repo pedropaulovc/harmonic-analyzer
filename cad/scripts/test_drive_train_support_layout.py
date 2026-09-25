@@ -133,10 +133,11 @@ def test_rod_phase_leaves_the_cams_parked_ecc_down() -> None:
 # Ruling (c) worst-case stack (user, 2026-09-24).  Physical end play is ONE
 # feeler setting, P = 0.25 +/- 0.10, shared by the four axial gaps (front
 # block/strap g_f, strap/drum g_df, drum/strap g_db, strap/back block g_b), each
-# >= 0 -- the model pose's STRAP_AIR is not extra clearance.  The lift rod is
-# captured on the front block between the lever hub and the front cam collar,
-# whose feeler leaves the same 0.10..0.35 of rod play.  Every quantity below is
-# linear in the gaps, so the extremes sit at the vertices swept here.
+# >= 0; the saved pose is the fit-up vertex, all of P at the front block.  The
+# lift rod is captured on the front block between the lever hub and the front
+# cam collar, whose feeler leaves the same 0.10..0.35 of rod play.  Every
+# quantity below is linear in the gaps, so the extremes sit at the vertices
+# swept here.
 _P_MAX = FITUP.FRONT_BLOCK_FEELER + FITUP.FRONT_BLOCK_FEELER_BAND
 _ROD_PLAY_MAX = FITUP.FRONT_BLOCK_FEELER + FITUP.FRONT_BLOCK_FEELER_BAND
 _BACK_CAM_SET_ERR = 0.5  # the back collar is set to its pin by eye
