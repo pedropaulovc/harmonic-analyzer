@@ -47,7 +47,12 @@ from itertools import combinations
 from statistics import median
 from typing import Any, Iterable, Mapping, Sequence
 
-from _drawing_layout_check import DrawableRegion, LeaderSegment, _proper_crossing
+from _drawing_layout_check import (
+    DEFAULT_CROSSING_INSET_M,
+    DrawableRegion,
+    LeaderSegment,
+    _proper_crossing,
+)
 from _layout_geometry import (
     DEFAULT_ADVANCE_RATIO,
     DEFAULT_TEXT_TOUCH_TOL_M,
@@ -1272,6 +1277,60 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
     return findings
 
 
+def find_text_on_view(
+    sheet: SheetGeometry, *, inset: float = DEFAULT_CROSSING_INSET_M
+) -> list[Finding]:
+    """Text printed over a view its annotation does not belong to.
+
+    MHA-092's adjuster callout, owned by the front view, printed across the
+    right view's face (swing's gap diff). Text-on-line only sees text that
+    touches an edge; text sitting INSIDE a foreign view, between its edges, is
+    just as wrong (policy rule 8). The outline is ``GetOutline``'s padded box,
+    inset like the leader-crossing check; pictorial views are skipped because
+    their box is mostly empty diagonal space.
+    """
+    views = [
+        (
+            view.name,
+            Box(
+                view.outline.xmin + inset,
+                view.outline.ymin + inset,
+                view.outline.xmax - inset,
+                view.outline.ymax - inset,
+            ),
+        )
+        for view in sheet.views
+        if view.outline is not None and not view.pictorial
+    ]
+    findings = []
+    for annotation in sheet.annotations:
+        if annotation.kind == "geometry":
+            continue
+        for name, inner in views:
+            if name == annotation.owner or inner.xmin >= inner.xmax or inner.ymin >= inner.ymax:
+                continue
+            for box in annotation.text_boxes:
+                depth = box.overlaps(inner, tol=0.0)
+                if depth is None:
+                    continue
+                findings.append(
+                    Finding(
+                        kind="text-on-view",
+                        sheet=sheet.name,
+                        a=annotation.label,
+                        b=f"view {name}",
+                        detail=(
+                            f"text of {annotation.label!r} {box.format_mm()} prints over "
+                            f"view {name!r} by {depth[0] * MM:.2f}x{depth[1] * MM:.2f}mm"
+                        ),
+                        at_mm=tuple(value * MM for value in box.center()),
+                        move_target_mm=_move_mm(box, inner),
+                        extra={"depth_x_mm": depth[0] * MM, "depth_y_mm": depth[1] * MM},
+                    )
+                )
+    return findings
+
+
 def find_unresolved_views(sheet: SheetModel) -> list[Finding]:
     """A view whose model edges could not be placed on the sheet.
 
@@ -1310,6 +1369,7 @@ GATING_KINDS = frozenset(
         "view-geometry-unresolved",
         "merged-blocks",
         "tall-block",
+        "text-on-view",
     }
 )
 
@@ -1342,6 +1402,7 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
         *merged,
         *find_tall_blocks(dump),
         *find_text_on_line(unled),
+        *find_text_on_view(sheet),
         *find_leader_through_text(sheet),
         *find_leader_across_lines(sheet),
         *find_leader_crossings(sheet),

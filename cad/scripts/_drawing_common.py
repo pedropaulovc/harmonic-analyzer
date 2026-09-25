@@ -125,16 +125,12 @@ _SF_BOX_UP_M = 0.018
 _SF_BOX_DOWN_M = 0.0
 
 # swAnnotationType_e.swDisplayDimension -- every linear/diameter dimension AND
-# the native hole callouts (a diameter dim carrying "/ THRU" text). Like GD&T
-# they expose only a text-anchor GetPosition (no clean box) and by design sit
-# ON/ACROSS the view geometry they measure, so they get a small nominal box and
-# ``NONE`` scope: overflow-checked + title-block keep-out (a callout dragged off
-# the sheet or over the title block is caught) but NOT overlap-checked against
-# views. Half-span is smaller than GD&T's -- dimension text is compact, and a
-# tight box keeps the zero-slack overflow check false-positive-free on interior
-# dims (Codex #269 thread 1).
+# the native hole callouts. The element audit gives them NO box: the shared
+# layout audit (``_drawing_layout_audit``) boxes their text from its display
+# data and checks it against text, lines and model edges on every sheet. The
+# 8 mm nominal square they used to get here was never overlap-checked, so
+# MHA-092's "20.8"/"8.42" and its callouts over the right view passed.
 _ANNOT_DIM = 4
-_NOMINAL_DIM_HALF_M = 0.004
 
 
 # swLeaderStyle_e.swBENT / swLeaderSide_e.swLS_SMART. Every leadered annotation
@@ -5454,25 +5450,6 @@ def _gdt_element(
     )
 
 
-def _dim_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | None:
-    """Box a display dimension / hole callout as a small nominal square (NONE scope).
-
-    Like GD&T, a dimension exposes only a text-anchor ``GetPosition`` and sits on
-    the geometry it measures, so it is overflow-checked and title-block-keep-out
-    checked only -- never overlap-checked against a view (Codex #269 thread 1).
-    """
-    position = adapter._attempt(
-        lambda: adapter._get_attr_or_call(annotation, "GetPosition")
-    )
-    if not position:
-        return None
-    x, y = float(position[0]), float(position[1])
-    half = _NOMINAL_DIM_HALF_M
-    return LayoutElement(
-        name, "dim", x - half, y - half, x + half, y + half, scope=CollisionScope.NONE
-    )
-
-
 def _iter_view_annotations(adapter: Any, view: Any):
     """Yield ``(LayoutElement, annotation)`` for each note / GD&T symbol / dimension.
 
@@ -5483,7 +5460,9 @@ def _iter_view_annotations(adapter: Any, view: Any):
     ``GetTableAnnotations`` instead.
 
     The live annotation rides along so the caller can pull its leader geometry
-    (see :func:`_leader_segments_of`) without a second COM walk.
+    (see :func:`_leader_segments_of`) without a second COM walk. A DISPLAY
+    DIMENSION yields ``None`` for its element: it gets no box here (see
+    ``_ANNOT_DIM``), only its leaders.
     """
     annotations = (
         adapter._attempt(lambda: adapter._get_attr_or_call(view, "GetAnnotations"))
@@ -5506,7 +5485,8 @@ def _iter_view_annotations(adapter: Any, view: Any):
         elif kind in _GDT_TYPES:
             element = _gdt_element(adapter, annotation, name, kind)
         elif kind == _ANNOT_DIM:
-            element = _dim_element(adapter, annotation, name)
+            yield None, annotation
+            continue
         else:
             continue
         if element is not None:
@@ -5762,9 +5742,10 @@ def collect_layout_elements(
       SMALL note centered inside its own view is a hole tag / balloon sitting on
       the geometry and is scoped ``NON_VIEW`` (does not collide with its view);
     * every native GD&T symbol (datum tag / feature-control frame /
-      surface-finish) and DISPLAY DIMENSION / hole callout, boxed nominally and
-      scoped ``NONE`` (no real bbox API, and they sit on the geometry they
+      surface-finish), boxed and scoped ``NONE`` (they sit on the geometry they
       annotate) -- overflow- and title-block-keep-out-checked only;
+    * NO display dimension or hole callout: only their leaders. The shared
+      layout audit boxes their text from display data (``_ANNOT_DIM``);
     * every TABLE (hole tables land on the SHEET view, so it is scanned too);
     * two reserved KEEP-OUT boxes -- the checked-in title block and its
       projection symbol -- so no content may land on either.
@@ -5816,6 +5797,25 @@ def collect_layout_elements(
                 )
             )
         for element, annotation in _iter_view_annotations(adapter, view):
+            if element is None:
+                # A display dimension: no box, but its leaders still cross-check.
+                label = str(adapter._get_attr_or_call(annotation, "GetName") or "")
+                leaders.extend(
+                    _leader_segments_of(
+                        adapter, annotation, label=label, kind="dim", owner=name
+                    )
+                )
+                # A native hole callout is an IDisplayDimension whose leader is
+                # NOT a SetLeader3 leader, so GetLeaderCount()==0 and the call
+                # above returns nothing -- yet its offset text can drive a leader
+                # across a neighbouring view. Read it from the display data
+                # (codex #3605215320); a no-op for non-callout dimensions.
+                leaders.extend(
+                    _display_dimension_leader_segments(
+                        adapter, annotation, label=label, owner=name
+                    )
+                )
+                continue
             # Record the owning view: a NON_VIEW annotation is exempt from
             # colliding with THIS view only, not other drawing views (Codex #269
             # thread 3).
@@ -5849,20 +5849,6 @@ def collect_layout_elements(
                         adapter, annotation, label=element.label, owner=name
                     )
                 )
-            # A native hole callout is an IDisplayDimension whose leader is NOT a
-            # SetLeader3 leader, so GetLeaderCount()==0 and the call above returns
-            # nothing -- yet its offset text can drive a leader across a
-            # neighbouring view. Reconstruct it from the text + the projected
-            # attachment (codex #3605215320); a no-op for non-callout dimensions.
-            if element.kind == "dim":
-                leaders.extend(
-                    _display_dimension_leader_segments(
-                        adapter,
-                        annotation,
-                        label=element.label,
-                        owner=name,
-                    )
-                )
             # A SMALL note centered inside its owning view is a hole tag / balloon
             # sitting on the geometry -- give it NON_VIEW scope so it does not
             # collide with the view it sits on (but still collides with a free
@@ -5890,7 +5876,7 @@ def collect_layout_elements(
         for table in _iter_tables(adapter, sheet_view):
             tables[table.label] = table
         for element, annotation in _iter_view_annotations(adapter, sheet_view):
-            if element.kind != "note":
+            if element is None or element.kind != "note":
                 continue
             owner_type = int(
                 adapter._attempt(

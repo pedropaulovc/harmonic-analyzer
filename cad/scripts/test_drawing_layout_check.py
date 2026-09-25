@@ -334,7 +334,6 @@ def test_live_collector_never_flags_transient_dispatches(monkeypatch):
     assert [(element.label, element.kind) for element in elements] == [
         ("Front", "view"),
         ("general-note", "note"),
-        ("dimension", "dim"),
         ("hole-table", "table"),
         ("title-block", "titleblock"),
     ]
@@ -938,6 +937,47 @@ def test_hole_callout_leader_reads_the_true_bent_geometry():
     # The shoulder reaches x=0.12252, PAST the text at 0.104 -- ground a straight
     # attachment->text chord never covered, so the chord could miss a crossing.
     assert max(s.x1 for s in segs) == pytest.approx(0.12252)
+
+
+def test_collector_boxes_no_dimension_but_keeps_hole_callout_leaders(monkeypatch):
+    """A display dimension used to become an 8 mm nominal square with NONE
+    scope, which nothing ever overlap-checked: MHA-092's "20.8"/"8.42" and its
+    callouts over the right view all passed. The shared layout audit boxes
+    dimension text from display data now, so the element audit carries NO
+    dimension box -- only the hole callout's leader ink for crossing checks."""
+    monkeypatch.setattr(
+        drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_a, **_k: obj
+    )
+    lines = [
+        ((0.0707, 0.20571), (0.08389, 0.2192)),
+        ((0.0693, 0.20429), (0.0707, 0.20571)),
+        ((0.08389, 0.2192), (0.12252, 0.2192)),
+    ]
+    callout = _hole_callout(lines)
+    callout.GetPosition = lambda: [0.104, 0.2192, 0.0]
+    view = SimpleNamespace(
+        GetName2="Front",
+        GetOrientationName=lambda: "*Front",
+        GetOutline=[0.05, 0.15, 0.15, 0.25],
+        GetAnnotations=lambda: [callout],
+        GetTableAnnotations=[],
+        GetNextView=None,
+    )
+    sheet_view = SimpleNamespace(
+        GetNextView=lambda: view, GetTableAnnotations=[], GetAnnotations=lambda: []
+    )
+    sheet = SimpleNamespace(
+        GetProperties=lambda: [0.0, 0.0, 1.0, 1.0, 0.0, SHEET_W, SHEET_H],
+        GetZoneMargin=lambda _code: 0.0127,
+    )
+    model = SimpleNamespace(GetCurrentSheet=sheet, GetFirstView=lambda: sheet_view)
+
+    elements, leaders, _region = drawing_common.collect_layout_elements(
+        _FakeAdapter(model), layout=DrawingLayout.LANDSCAPE
+    )
+
+    assert not [element for element in elements if element.kind == "dim"]
+    assert [(s.label, s.owner) for s in leaders] == [("RD3", "Front")] * 3
 
 
 def test_plain_dimension_contributes_no_leader():

@@ -19,6 +19,10 @@ audits that existed missed real collisions:
 | `_layout_geometry` + `diagnostics/drawing_layout_audit` | 3 drawings | touching text (0.3 mm penetration test); widths counted `<MOD-DIAM>` as ten glyphs; text vs geometry |
 | `draw_harmonic_base` locals | harmonic base sheet 2 | everything off that sheet |
 
+The element audit's 8 mm `NONE`-scope square for every dimension and hole
+callout is gone: `collect_layout_elements` now gives dimensions no box, only
+their leaders, and this audit boxes their text from display data.
+
 `check_drawing_layout` left `finalize_drawing` in ab28f4e49 (2026-07-24); a
 post-build gate (46e2f8550) was reverted the same day it landed (8cc8040e6).
 The eye pass then found, on MHA-092: "20.8"/"8.42" printed as "20.88.42";
@@ -54,6 +58,7 @@ and a balloon keeps its rendered circle.
 |---|---|---|
 | `text-clearance` | gating | text of two distinct annotations closer than 0.5 × text height, or overlapping |
 | `text-on-line` | gating | a foreign line runs through text; covers annotation lines and visible model edges (`IView::GetPolylines7`), datum-origin, section-line and detail-circle ink |
+| `text-on-view` | gating | text printed inside a view its annotation does not belong to, between that view's edges (the view's `GetOutline`, inset as for leaders; pictorial views skipped); from swing's MHA-092 gap diff |
 | `leader-through-text` / `leader-through-own-text` | gating | a leader runs through foreign text, or through its own rows (0.2 mm inset, shoulder excluded) |
 | `leader-crosses-line` | gating | a leader crosses another annotation's dimension, witness or frame line transversally |
 | `leader-crosses-view` / `leader-crosses-leader` | gating | as in `_drawing_layout_check` |

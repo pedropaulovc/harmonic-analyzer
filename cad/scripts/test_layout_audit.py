@@ -153,7 +153,9 @@ HB2_BLOCK = (
 # hb-render-2, moved beside the plan's top-left corner in hb-render-4.
 HB2_TOP_LABEL = (0.23475, 0.23265, 0.27947, 0.23703)
 HB4_TOP_LABEL = (0.169863, 0.23265, 0.214585, 0.237034)
-HOLES_TOP_OUTLINE = (0.19, 0.155, 0.34, 0.235)
+# The plan's casting box as supports' check logged it (hb-render-5 obstacles,
+# 'view holes top'); the label and every callout sit outside it.
+HOLES_TOP_OUTLINE = (0.22285, 0.1591, 0.33715, 0.2309)
 
 # hb-render-4: the MHA-114 spring callout and the MHA-132 cross-tap callout
 # whose top row sits 1.7 mm under the spring callout's underline.
@@ -323,6 +325,73 @@ def test_text_crossed_by_a_foreign_view_edge_is_found():
     findings = audit_dump(_dump(views=[front, right_view]))
     hits = [f for f in findings if f.kind == "text-on-line" and "view right geometry" in f.b]
     assert len(hits) == 1
+
+
+def _mha_092_pre_287c_sheet():
+    """MHA-092's three collisions as Main's I31 eye pass measured them, rebuilt
+    as display data (the calibration run's own dump replaces this once logged):
+
+    * plan "20.8" 0.68 mm left of "8.42" -- same view, no overlap;
+    * the pinch-clearance callout (front view) over the right view's "6.0",
+      overlapping it 1.3 x 4.8 mm;
+    * the ADJUSTER callout (front view) printed INSIDE the right view's face,
+      between its edges, touching none of them.
+    """
+    h = 0.0035
+    advance = 0.6
+    ruler = _dim("ruler", "", 0, 0)
+    ruler["display"]["texts"] = [
+        {"t": "12", "pos": [0.300, 0.230, 0.0], "h": h},
+        {"t": "34", "pos": [0.300 + 2 * advance * h, 0.230, 0.0], "h": h},
+    ]
+    plan_left = _dim("PlanWidth", "20.8", 0.040, 0.200)
+    plan_right = _dim("PlanPitch", "8.42", 0.040 + 4 * advance * h + 0.00068, 0.200)
+    plan = _view("plan", (0.020, 0.170, 0.110, 0.240), [plan_left, plan_right, ruler])
+    # The right view: a 30 x 60 mm face whose only model edges are its border.
+    x0, y0, x1, y1 = 0.160, 0.080, 0.190, 0.140
+    border = [x0, y0, 0.0, x1, y0, 0.0, x1, y1, 0.0, x0, y1, 0.0, x0, y0, 0.0]
+    polyline = [0, 0, 0, 0, 0, 1, 0, 0, 5, *border]
+    six = _dim("RightDepth", "6.0", 0.165, 0.120)
+    right = _view("right", (x0 - 0.001, y0 - 0.001, x1 + 0.001, y1 + 0.001), [six], polylines=polyline)
+    # "6.0" spans x 165.0-171.3, y 120.0-123.5 mm. "<MOD-DIAM> 3.26" ends
+    # 4.8 mm into it and sits 1.3 mm down over its top.
+    pinch = _hole_callout(
+        "PinchClearance",
+        [(0.120, 0.100, 0.1572, 0.1222), (0.1572, 0.1222, 0.1698, 0.1222)],
+        [("<MOD-DIAM>", 0.1572, 0.1222), (" 3.26", 0.1572 + advance * h, 0.1222)],
+    )
+    adjuster = _hole_callout(
+        "Adjuster",
+        [(0.140, 0.090, 0.1650, 0.0950), (0.1650, 0.0950, 0.1850, 0.0950)],
+        [("THRU ALL", 0.1660, 0.0952)],
+    )
+    front = _view("front", (0.100, 0.080, 0.150, 0.140), [pinch, adjuster])
+    return _dump(views=[plan, right, front])
+
+
+def test_mha_092_collisions_fail_the_shared_audit_and_passed_the_old_one():
+    """Fail-first: the annotation audit of the time (``_layout_geometry``)
+    passes the 0.68 mm "20.88.42" pair and the ADJUSTER text inside the right
+    view; the element audit boxed every dimension as a NONE-scope placeholder
+    and compared none of the three. The shared audit gates all three."""
+    from _layout_geometry import audit_sheet
+
+    dump = _mha_092_pre_287c_sheet()
+    old = audit_sheet(sheet_model(dump).geometry)
+    assert not [f for f in old if {"PlanWidth", "PlanPitch"} <= set((f.a + " " + f.b).split())]
+    assert not [f for f in old if "Adjuster" in f.a and f.kind.startswith("text")]
+
+    findings = audit_dump(dump)
+    gating = [f for f in findings if severity(f) is FindingSeverity.GATING]
+
+    def pair(kind, a, b):
+        return [f for f in gating if f.kind == kind and a in f.a + f.b and b in f.a + f.b]
+
+    near = pair("text-clearance", "PlanWidth", "PlanPitch")
+    assert len(near) == 1 and near[0].extra["gap_mm"] == pytest.approx(0.68, abs=0.01)
+    assert pair("text-clearance", "PinchClearance", "RightDepth")
+    assert pair("text-on-view", "Adjuster", "view right")
+    assert not pair("text-on-line", "Adjuster", "view right geometry")
 
 
 def test_a_leader_through_its_own_rows_is_found_but_its_shoulder_joint_is_not():
