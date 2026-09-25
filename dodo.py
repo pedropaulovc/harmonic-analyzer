@@ -1979,7 +1979,8 @@ def _package_file_deps() -> list[str]:
     """Release-packaging inputs: the Pack-and-Go script and its helper closure
     (it re-exports the stamped drawings through _drawing_common's PDF helpers),
     the release number it stamps, every model's exact identity, and every native
-    drawing (each is Pack-and-Go'd with its references).
+    drawing (each is Pack-and-Go'd with its references) with its build PDF (the
+    release print takes that print's title and page count).
 
     ``release.yaml`` is an input of THIS leaf only: parts, assemblies and
     drawings carry the constant build revision (``_common.BUILD_REVISION``), so
@@ -1991,8 +1992,11 @@ def _package_file_deps() -> list[str]:
         str(RELEASE_VERSION_FILE),
         *_cad_identity_deps(),
         *(
-            str(DRAWINGS_BY_NAME[stem].outputs["slddrw"].resolve())
+            str(DRAWINGS_BY_NAME[stem].outputs[kind].resolve())
             for stem in _drawing_order()
+            # The build PDF is read for its title and page count when the
+            # stamped release print is re-exported (package_native.build_pdf_facts).
+            for kind in ("slddrw", "pdf")
         ),
     ]
 

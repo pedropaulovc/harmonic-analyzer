@@ -97,6 +97,8 @@ PNG_SUBDIR = "png"
 SIDECAR_NAME = "native-package.json"
 SIDECAR_SCHEMA = 2
 DRAWING_OUTPUTS = {drawing.name: drawing.outputs for drawing in DRAWINGS}
+# The model each drawing documents (its $PRPSHEET REV source), by filename.
+DRAWING_SOURCES = {drawing.name: drawing.source.name for drawing in DRAWINGS}
 # Every sheet orientation a drawing may use; release pages are matched to one.
 DRAWING_LAYOUTS = {
     drawing.name: tuple(dict.fromkeys((drawing.layout, *drawing.additional_layouts)))
@@ -648,11 +650,33 @@ def _stale_revisions(
     return stale
 
 
+def _require_source_resident(sw: Any, tree: Path, drawing: Path, source: str) -> None:
+    """The drawing's own model must have loaded from this tree.
+
+    A silent open never shows the missing-reference dialog: a drawing whose
+    model failed to resolve opens on its cached views, nothing foreign is
+    resident, nothing stale is found -- and its REV cell would keep the build's
+    ``DEV``.  So the model it documents must be resident, as the tree's copy.
+    """
+    wanted = source.casefold()
+    for path, _document in resident_documents(sw):
+        if path.name.casefold() == wanted and _inside(path, tree.resolve()):
+            return
+    raise RuntimeError(
+        f"{tree.name}/{drawing.name} opened without its model {source} -- "
+        "the reference did not resolve, so its REV cell cannot refresh"
+    )
+
+
 def stamp_models(sw: Any, tree: Path, revision: str) -> tuple[int, set[str]]:
     """Stamp ``Revision`` into every packaged part, then every assembly.
 
     Parts go first so an assembly (whose save may rewrite dirty children) only
-    ever loads already-stamped parts.  Each document opens in an empty session,
+    ever loads already-stamped parts.  The order is also load-bearing for
+    reference resolution: SolidWorks searches the folder it last opened from
+    BEFORE the referencing document's own folder, so opening this tree's parts
+    directly first makes the tree the "last path" by the time any assembly or
+    drawing resolves its children.  Each document opens in an empty session,
     is proven contained, stamped, read back and saved.
     """
     files = sorted(path for path in tree.iterdir() if path.is_file())
@@ -702,6 +726,9 @@ def stamp_drawings(
             _discard_open_documents(sw)
             document = _open_document(sw, path, SW_DOC_DRAWING)
             external |= assert_contained(sw, tree, tree_names)
+            entry = registered.get(path.name.casefold())
+            if entry is not None:
+                _require_source_resident(sw, tree, path, DRAWING_SOURCES[entry[0]])
             stale = _stale_revisions(sw, tree, revision)
             if stale:
                 raise RuntimeError(
@@ -713,7 +740,6 @@ def stamp_drawings(
             # model property before the save and the export capture it.
             document.ForceRebuild3(False)
             save_document(document, path)
-            entry = registered.get(path.name.casefold())
             if pdf_dir is not None and entry is not None:
                 name, outputs = entry
                 pdf = pdf_dir / outputs["pdf"].name
