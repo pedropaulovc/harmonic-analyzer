@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 
 import pytest
 
@@ -48,29 +49,42 @@ def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None
         spec.BORE_DIA + spec.ARBOR_BORE_BAND[1],
         spec.BORE_DIA + spec.ARBOR_BORE_BAND[0],
     )
-    assert shaft_limits == pytest.approx((7.98, 8.00))
+    # The drum bonds onto MHA-102's bond zone, not its journal lands (U39).
+    assert arbor.SHAFT_DIA_BAND != arbor.JOURNAL_DIA_BAND
     assert bore_limits == pytest.approx((8.00, 8.10))
     # A stock 8 mm H7 reamer (8.000-8.015) lands inside the band.
     assert bore_limits[0] <= 8.000 and 8.015 <= bore_limits[1]
     minimum_clearance = bore_limits[0] - shaft_limits[1]
     maximum_clearance = bore_limits[1] - shaft_limits[0]
-    assert minimum_clearance == pytest.approx(0.0)
-    assert maximum_clearance == pytest.approx(0.12)
+    assert minimum_clearance == pytest.approx(
+        spec.ARBOR_BORE_BAND[1] - arbor.SHAFT_DIA_BAND[0]
+    )
+    # The drum slides on by hand: the arbor's bond zone sits 0.01 under 8.00.
+    assert minimum_clearance == pytest.approx(0.010)
+    assert minimum_clearance >= 0.010 - 1e-9
+    assert maximum_clearance == pytest.approx(
+        spec.ARBOR_BORE_BAND[0] - arbor.SHAFT_DIA_BAND[1]
+    )
+    assert maximum_clearance == pytest.approx(0.200)
     assert maximum_clearance < spec.RETAINING_COMPOUND_MAX_GAP_MM
     assert spec.BORE_DIA == arbor.SHAFT_DIA  # the CAD models line-to-line
 
 
-def test_notes_bond_the_drum_and_locate_it_from_the_back_end() -> None:
+def test_notes_bond_the_drum_at_the_station_mha102_owns() -> None:
     notes = spec.DRAWING_NOTES
-    # Rule 6 (R3): three notes -- the bond and its axial location merged, the
-    # MHA-102 journal size left to MHA-102's own sheet -- so the generated
-    # MHA-102 bond-zone line (#814) makes the fourth.
-    assert sum(not line.startswith("  ") for line in notes.splitlines()) == 3
+    # Rule 6 (R3): three notes.  The drum is symmetric, so no orientation
+    # note; its axial station is stated once, on MHA-102, never re-derived
+    # here from j=19.  The MHA-102 bond-zone band is MHA-102's own native
+    # dimension (Codex P1 on #814), so it is not restated here.
+    assert len(notes.splitlines()) == 3
+    assert "BOND ZONE" not in notes
+    assert "DRUM SHALL SLIDE ON MHA-102 BY HAND." in notes
     assert "ARBOR JOURNAL" not in notes
     assert (
-        "ON ASSEMBLY: BOND TO MHA-102 WITH LOCTITE 638, LOCATED FROM\n"
-        "  THE END AT THE LAST MHA-027 GEAR (j=19)." in notes
+        "ON ASSEMBLY: BOND TO MHA-102 WITH LOCTITE 638 AT THE "
+        "DRUM STATION ON MHA-102." in notes
     )
+    assert "j=19" not in notes and "LOCATED FROM" not in notes
     assert "MATES WITH CYLINDER-GEAR BANK" not in notes
     for retired in ("INTERFERENCE", "MATCHED FIT", "ENSURES FULL ENGAGEMENT", "+/-0.5"):
         assert retired not in notes, retired
@@ -182,3 +196,12 @@ def test_od_at_the_general_band_keeps_tip_clearance_and_contact() -> None:
         smallest_tip_r = (spec.OUTSIDE_DIA - general) / 2.0
         assert c2c - largest_tip_r - gear_floor_r > 0.20
         assert contact_ratio(c2c, smallest_tip_r) > 1.1
+
+
+def test_no_note_line_carries_a_dimension() -> None:
+    """Rule 6: once part numbers and the named retaining compound are set
+    aside, no note line carries a digit (Codex P1 on #814)."""
+    for line in spec.DRAWING_NOTES.splitlines():
+        text = re.sub(r"MHA-\d+", "", line).replace(spec.RETAINING_COMPOUND, "")
+        assert not re.search(r"\d", text), line
+

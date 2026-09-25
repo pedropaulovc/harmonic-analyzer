@@ -55,9 +55,11 @@ BASE_CHORD_ROOT_FORM = "INVOLUTE FLANKS; GAP FLOOR CHORD AT BASE CIRCLE"
 BORE_DIA = 8.0  # Ø8 arbor through-bore (build_pinion_arbor.py)
 # Slip fit bonded with Loctite 638, not a press: a press over the full 143.2
 # bore is a seizing risk for a novice (U27, U6 precedent).  The band admits a
-# stock 8 mm H7 reamer (8.000-8.015); against the MHA-102 SHAFT_H journal
-# (7.98-8.00) it leaves 0.000-0.120 diametral clearance, inside the 0.25 mm
-# bond gap the 638 technical data sheet allows.
+# stock 8 mm H7 reamer (8.000-8.015).  The drum sits on MHA-102's bond zone,
+# not its journal lands (U39: Ø8 -0.01/-0.10), so the diametral clearance
+# runs from 0.010 (the drum slides on by hand) up to the drum's upper
+# deviation minus the arbor's lower one (0.200), inside the 0.25 mm bond gap
+# the 638 technical data sheet allows.
 ARBOR_BORE_BAND = (0.100, 0.000)  # (upper, lower) deviations
 RETAINING_COMPOUND = "LOCTITE 638"
 RETAINING_COMPOUND_MAX_GAP_MM = 0.25
@@ -119,11 +121,13 @@ GEAR_DATA = gear_data_note(
     ]
 )
 
+# Rule 6: notes never carry a dimension.  MHA-102 owns its bond-zone band
+# natively (BondZoneDia); the hand slide is this part's functional acceptance.
 DRAWING_NOTES = "\n".join(
     (
         "DRUM SHALL SLIDE ON MHA-102 BY HAND.",
-        f"ON ASSEMBLY: BOND TO MHA-102 WITH {RETAINING_COMPOUND}, LOCATED FROM\n"
-        "  THE END AT THE LAST MHA-027 GEAR (j=19).",
+        f"ON ASSEMBLY: BOND TO MHA-102 WITH {RETAINING_COMPOUND} AT THE "
+        "DRUM STATION ON MHA-102.",
         "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND.",
     )
 )

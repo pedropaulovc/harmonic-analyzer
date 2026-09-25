@@ -13,7 +13,6 @@ from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
     add_surface_finish,
-    add_view_centerline,
     assert_imported_precision,
     curate_view_dimensions,
     dimension_name,
@@ -21,20 +20,30 @@ from _drawing_common import (
     model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_reference_dimension,
-    set_reference_dimensions,
     stamp_drawing_summary,
     view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _layout_geometry import audit_sheet, format_findings
 from _surface_finish import surface_finish_by_key
 from pinion_arbor_spec import (
-    BACK_CAP_R,
+    BACK_JOURNAL_Z,
+    BOND_ZONE_DIA_Z,
     CROSS_HOLE_CALLOUT,
     DRAWING_PRECISION_BY_NAME,
+    DRUM_STATION,
+    FRONT_JOURNAL_Z,
+    HEAD_CAP_SAG,
     HEAD_CENTER_Z,
+    HEAD_DIA,
+    HEAD_FRONT_Z,
+    HEAD_REAR_Z,
+    JOURNAL_LEN,
+    OVERALL_LEN,
     SHAFT_DIA,
     SURFACE_FINISHES,
 )
@@ -46,6 +55,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     iter_views,
     place_view,
 )
+from diagnostics.drawing_layout_audit import collect_document
 
 SPEC = DRAWINGS_BY_NAME["pinion_arbor"]
 PART_STEM = SPEC.artifact_stem
@@ -60,42 +70,197 @@ ISO_CENTER = (0.365, 0.225)
 DETAIL_CENTER = (0.165, 0.235)
 DETAIL_SCALE = (2, 1)
 DETAIL_RADIUS_MM = 15.0
-# Top-centre anchor. Beside the circle (x >= 0.135), clear of the SR7.3 BACK
-# CROWN note (x <= 0.078, y <= 0.224): below the circle it floated over the
-# 1:1 shaft and read as that view's label (Main, r7 eye-pass).
-DETAIL_LABEL_XY = (DETAIL_CENTER[0] - 0.057, DETAIL_CENTER[1] + 0.013)
+# The native "DETAIL A / SCALE 2:1" label sits centred under its own detail
+# circle, this far below it (the label's anchor is its top edge): clear of the
+# HeadLen text that rides the circle's lower edge.
+DETAIL_LABEL_DROP = 0.012
+DETAIL_LABEL_XY = (
+    DETAIL_CENTER[0],
+    DETAIL_CENTER[1]
+    - DETAIL_RADIUS_MM * DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
+    - DETAIL_LABEL_DROP,
+)
+# The head and neck diameters live in end-on Front-plane profile sketches, so
+# the end-on donor imports them and each moves onto the 1:1 profile.  The Ø8
+# is dimensioned on the profile itself, from the bond zone's flank.
 DONOR_KEEP = {
-    "ShaftDia": (0.030, 0.145),
     "NeckDia": (0.055, 0.145),
     "HeadDia": (0.030, 0.215),
 }
+# Profile scale is 1:1 with the head to the right, so model z maps to sheet
+# x = 0.200 - (z - 106.725) / 1000.  The lands are centred on their straps, so
+# their centres (x 0.252 front, 0.099 back) hold whatever the derived land
+# length; only their ends move.  The front land's length rides above the
+# shaft and its diameter hangs below; the back land's are swapped (see
+# BACK_JOURNAL_TEXT_X).  The stations from the Ø15 head rear face stack
+# below the shaft.
+MODEL_Z_AT_SHEET_ORIGIN_X = 106.725
+
+
+def _sheet_x(model_z: float) -> float:
+    return PRINCIPAL_CENTER[0] - (model_z - MODEL_Z_AT_SHEET_ORIGIN_X) / 1000.0
+
+
+# Each land's Ra arrow lands RA_ARROW_FROM_HEAD_END in from the land's
+# head-side end, and its symbol hangs RA_SHOULDER further head side on a short
+# bent-leader shoulder.  The front symbol hangs below the shaft, its left edge
+# clear of that end's station witness.  At c6eb7f6f the back symbol did the
+# same and its shoulder ran through the 199.9 / 19.0 witness below the shaft
+# (Main).  Nothing rises from the back land above the shaft, so its symbol
+# hangs there, over the land's head-side end and under the raised back
+# JOURNAL diameter (BACK_JOURNAL_DIA_Y).
+RA_ARROW_FROM_HEAD_END = 2.0
+RA_SYMBOL_OFFSET = 0.0033
+RA_SHOULDER = RA_SYMBOL_OFFSET + RA_ARROW_FROM_HEAD_END / 1000.0
+FRONT_RA_X = _sheet_x(FRONT_JOURNAL_Z) + RA_SYMBOL_OFFSET
+BACK_RA_XY = (
+    _sheet_x(BACK_JOURNAL_Z + RA_ARROW_FROM_HEAD_END) + RA_SHOULDER,
+    0.179,
+)
+# Rendered extent of an Ra 1.6 symbol about its insertion point (left, right,
+# top; the point is the shoulder's end under the triangle's vertex), measured
+# on the c6eb7f6f sheet.
+RA_SYMBOL_EXTENT = (-0.0019, 0.0151, 0.0062)
+FLANK_SIGN = {"lower": -1.0, "upper": 1.0}
+# Each land's diameter is measured at a short witness JOURNAL_DIA_POINT_FROM_
+# CROWN_END in from its crown-side end (build_pinion_arbor, pinned equal by
+# test), and its line stands 1 mm from that point, so its extensions are ~1 mm
+# rather than a run along the flank (Main, 2026-09-24).  The text hangs away
+# from the side its extensions come from: left of the front line, right of the
+# back one.
+JOURNAL_DIA_POINT_FROM_CROWN_END = 2.0
+JOURNAL_DIA_LINE_OFFSET = 0.001
+FRONT_JOURNAL_DIA_POINT_X = _sheet_x(
+    FRONT_JOURNAL_Z + JOURNAL_LEN - JOURNAL_DIA_POINT_FROM_CROWN_END
+)
+BACK_JOURNAL_DIA_POINT_X = _sheet_x(
+    BACK_JOURNAL_Z + JOURNAL_LEN - JOURNAL_DIA_POINT_FROM_CROWN_END
+)
+# The back land is boxed in below the shaft (the back-crown and overall
+# witnesses at x 0.079-0.081 on its crown side, the 199.9 witness and the Ra
+# leader on its head side), so its diameter hangs ABOVE the shaft, its text
+# right of the line over the land and clear of the back-crown sag witnesses,
+# and its 19.0 length moves below.  The block rides high enough that the
+# back Ra symbol fits under it, over the land.
+BACK_JOURNAL_TEXT_X = BACK_JOURNAL_DIA_POINT_X + JOURNAL_DIA_LINE_OFFSET
+BACK_JOURNAL_DIA_Y = 0.1945
+# The drum station's text block (~35 mm "DRUM STATION" callout) ends 4 mm left
+# of its drum-end witness: between that witness and the head face, the
+# neck-end witness drops through.
+DRUM_STATION_TEXT_WIDTH = 0.035
+DRUM_STATION_WITNESS_X = _sheet_x(HEAD_REAR_Z + DRUM_STATION)
+DRUM_STATION_TEXT_XY = (
+    DRUM_STATION_WITNESS_X - 0.004 - DRUM_STATION_TEXT_WIDTH / 2.0,
+    0.123,
+)
+# The front land's diameter text hangs LEFT of its line (x-0.026 .. x+0.001,
+# measured at 4e97c4d8), and the drum station's witness drops through the
+# whole band below the shaft (run 059b5b0f: text-on-line at x 246.0).  Its
+# line stands on the land 1 mm crown side of its measuring point, the text
+# block ending ~2.4 mm short of that witness.
+JOURNAL_DIA_TEXT_OVERHANG = 0.001
+FRONT_JOURNAL_DIA_X = FRONT_JOURNAL_DIA_POINT_X - JOURNAL_DIA_LINE_OFFSET
+# The bond-zone diameter stands over the part's witness (x 0.195) but hangs
+# its text ABOVE the shaft: below it, beside the front "JOURNAL" shelf, the
+# two read as one paired callout (Main and Fable, 63468ee9).  Above, its line
+# rises a few mm off the silhouette to the shelf, right of the DETAIL A label
+# and under detail A's "(3.0)", and short of the front land's 19.0 witnesses.
+BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.190)
+# The drum-station and bond-zone reference sketches stand alone, so the
+# profile shows them, and each ends on a short construction witness lying ON
+# the lower Ø8 outline.  The view paints that witness construction grey over
+# the black silhouette, which at 1:1 read as a break in the outline, i.e. a
+# groove or relief to a machinist (Main, 5471a6ef).  Each is re-coloured in
+# the view to the outline's black; the model sketch and its dimension are
+# untouched.  The spans (model z, mm) mirror build_pinion_arbor's
+# DRUM_STATION_POINT_LEN / BOND_ZONE_WITNESS_LEN, pinned by test.
+REFERENCE_WITNESS_COLOR = 0  # COLORREF black, the outline's colour.
+DRUM_STATION_POINT_LEN = 1.0
+BOND_ZONE_WITNESS_LEN = 4.0
+REFERENCE_WITNESSES = {
+    "DrumStationReference": (
+        HEAD_REAR_Z + DRUM_STATION - DRUM_STATION_POINT_LEN,
+        HEAD_REAR_Z + DRUM_STATION,
+    ),
+    "BondZoneReference": (BOND_ZONE_DIA_Z, BOND_ZONE_DIA_Z + BOND_ZONE_WITNESS_LEN),
+}
+SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
+REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the witnesses are fully defined sketch lengths
+# Exported-raster proof that the outline stays unbroken over each witness:
+# the grey witness core measured 107-128 and the black outline 0 (5471a6ef
+# PNG), so every raster column over a span needs at least two dark pixels
+# within a few rows of the flank.
+OUTLINE_DARK_MAX = 60
+OUTLINE_CORE_ROWS = 2
+OUTLINE_SEARCH_ROWS = 6
+# Rendered width and height of a two-place "Ø8.00 -0.01/-0.0x" callout block,
+# measured on the 63468ee9 sheet.
+DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 PRINCIPAL_KEEP = {
-    "NeckLen": (0.325, 0.100),
+    "FrontJournalLen": (0.252, 0.188),
+    # Below the shaft, under the back Ra symbol and its leader.
+    "BackJournalLen": (0.097, 0.143),
+    "FrontJournalDia": (FRONT_JOURNAL_DIA_X, 0.150),
+    "BondZoneDia": BOND_ZONE_TEXT_XY,
+    "BackJournalDia": (BACK_JOURNAL_TEXT_X, BACK_JOURNAL_DIA_Y),
+    "FrontJournalFromHeadRear": (0.283, 0.130),
+    # The drum station stacks between the two land stations, its text left of
+    # its own drum-end witness.  The back station's text moves left to clear
+    # it.
+    "DrumStationFromHeadRear": DRUM_STATION_TEXT_XY,
+    "BackJournalFromHeadRear": (0.170, 0.115),
+    # Right of the overall-length witness at the front crown apex (x 0.3215).
+    "NeckLen": (0.340, 0.100),
     "BackRimFromHeadRear": (0.205, 0.095),
     "OverallLen": (0.205, 0.080),
     "BackCapSagDim": (0.055, 0.220),
+    # Radial leader down-left from the back crown, below the shaft axis and
+    # clear of the (1.2) sag reference above it and the overall witnesses.
+    "BackCapR": (0.045, 0.140),
 }
 DETAIL_KEEP = {
-    "HeadLen": (0.165, 0.205),
+    "HeadLen": (0.165, 0.201),
     "HeadCapR": (0.195, 0.262),
     "HeadCapSagDim": (0.205, 0.210),
-    "CrossHoleDia": (0.245, 0.245),
+    # Above the hole's centre line, so the leader drops onto the hole edge.
+    "CrossHoleDia": (0.245, 0.256),
 }
-# 5cc191fb's positions: the head and neck text sit above and right of the
-# head on the 1:1 profile, clear of detail A's fence and the NeckLen and
-# OverallLen witnesses.
+# The head and neck sit inside detail A's fence at the right end of the
+# profile (x 0.296-0.320, axis y 0.171): each diameter's dimension line stands
+# inside the fence and runs up to its text above it.  The head's line sits
+# between the crown apex (x 0.3215) and the fence (x 0.3262 at the head's
+# top and bottom edges), so its witnesses stay inside the circle: they used
+# to run out through it to x 0.340, reading as part of the detail callout
+# with the "A" label between them (Fable r-delta).
 DIAMETER_POSITIONS = {
-    "HeadDia": (0.340, 0.192),
+    "HeadDia": (0.3238, 0.192),
     "NeckDia": (0.300, 0.194),
-    "ShaftDia": (0.235, 0.190),
 }
 DIMENSION_CALLOUTS = {
-    "BackRimFromHeadRear": "FROM BACK CROWN ROOT TO HEAD SHOULDER",
+    # One name for the axial datum every station runs from (Fable m1): the
+    # head end has two shoulders, Ø8-Ø10.5 and Ø10.5-Ø15.
+    # <MOD-DIAM> carries its own leading gap, so no space before it.
+    "BackRimFromHeadRear": f"FROM BACK CROWN ROOT TO<MOD-DIAM>{HEAD_DIA:.0f} HEAD REAR FACE",
+    "DrumStationFromHeadRear": "DRUM STATION",
     "OverallLen": "OVERALL",
-    "BackCapSagDim": f"SR{BACK_CAP_R:.1f} BACK CROWN",
+    "BackCapSagDim": "BACK CROWN",
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
+    "FrontJournalDia": "JOURNAL",
+    "BackJournalDia": "JOURNAL",
+    "BondZoneDia": "BOND ZONE",
 }
-SHAFT_FLANK_Y = PRINCIPAL_CENTER[1] + SHAFT_DIA / 2000.0
+# The turning axis runs the full part and this far past each crown.
+AXIS_OVERSHOOT_MM = 3.0
+# Each land's Ra symbol hangs off one flank on the land's head side of its
+# diameter line, clear of the split-line rings at the land ends.
+JOURNAL_FINISHES = {
+    "front_journal": (
+        FRONT_JOURNAL_Z + RA_ARROW_FROM_HEAD_END,
+        (FRONT_RA_X, 0.150),
+        "lower",
+    ),
+    "back_journal": (BACK_JOURNAL_Z + RA_ARROW_FROM_HEAD_END, BACK_RA_XY, "upper"),
+}
 
 
 def _move_dimension(
@@ -204,8 +369,152 @@ def _head_detail(adapter: Any, parent_view: Any) -> Any:
     return detail
 
 
+def _add_turning_axis(adapter: Any, view: Any) -> None:
+    """Draw one centreline over the whole turned axis.
+
+    The journal split lines cut the Ø8 cylinder into five faces, so a
+    face-derived ``InsertCenterLine2`` would cover a single zone.  The axis is
+    instead a view-sketch centreline between two model points on it, created
+    direct-to-database so screen-space inference cannot snap an end onto the
+    crown apex.
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the integral-arbor profile for its axis")
+    draw.ClearSelection2(True)
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    front_z = HEAD_FRONT_Z - HEAD_CAP_SAG - AXIS_OVERSHOOT_MM
+    points = []
+    for z in (front_z, front_z + OVERALL_LEN + 2.0 * AXIS_OVERSHOOT_MM):
+        x, y = model_point_in_view(
+            adapter, view, (0.0, 0.0, z / 1000.0), label="integral-arbor axis end"
+        )
+        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        segment = manager.CreateCenterLine(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if segment is None:
+        raise RuntimeError("failed to create the integral-arbor turning axis")
+    segment = _early_bound(segment, "ISketchSegment")
+    segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
+    if int(segment.Color) != 0:
+        raise RuntimeError("integral-arbor turning axis colour did not persist")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+
+
+def _blacken_reference_witnesses(
+    adapter: Any, view: Any
+) -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
+    """Draw each reference sketch's flank witness in the outline's black.
+
+    Returns each witness's sheet endpoints for the exported-raster check.
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the integral-arbor profile for its witnesses")
+    flank_x = SHAFT_DIA / 2000.0
+    spans = {}
+    for sketch_name, (z0, z1) in REFERENCE_WITNESSES.items():
+        ends = tuple(
+            model_point_in_view(
+                adapter, view, (flank_x, 0.0, z / 1000.0), label=f"{sketch_name} witness end"
+            )
+            for z in (z0, z1)
+        )
+        mid = ((ends[0][0] + ends[1][0]) / 2.0, (ends[0][1] + ends[1][1]) / 2.0)
+        draw.ClearSelection2(True)
+        _early_bound(view, "IView").UpdateViewDisplayGeometry()
+        if not draw.Extension.SelectByID2(
+            "", "EXTSKETCHSEGMENT", mid[0], mid[1], 0.0, False, 0, null_callout(), 0
+        ):
+            raise RuntimeError(f"failed to select the {sketch_name} flank witness")
+        selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        kind = int(selection.GetSelectedObjectType3(1, -1))
+        if kind != SW_SEL_EXT_SKETCH_SEGS:
+            raise RuntimeError(f"{sketch_name} witness pick resolved to type {kind}")
+        segment = _early_bound(selection.GetSelectedObject6(1, -1), "ISketchSegment")
+        # Identify the pick by its own length, not its sketch's name: an
+        # ISketch is not an IFeature dispatch, so rebinding it reads another
+        # member (7885c0d9 got a 16-double matrix back for ``Name``).  The
+        # only other flank construction segment here is the front land's
+        # 19 mm witness.
+        name = str(segment.GetName())
+        length = float(segment.GetLength()) * 1000.0
+        expected = z1 - z0
+        construction = bool(segment.ConstructionGeometry)
+        if abs(length - expected) > REFERENCE_WITNESS_LEN_TOL or not construction:
+            raise RuntimeError(
+                f"{sketch_name} witness pick resolved to {name} "
+                f"({length:.3f} mm, want {expected:.3f}; construction={construction})"
+            )
+        drawing.SetLineColor(REFERENCE_WITNESS_COLOR)
+        draw.ClearSelection2(True)
+        spans[sketch_name] = ends
+        _telemetry.info(
+            f"pinion-arbor: {sketch_name} flank witness drawn black at sheet "
+            f"({mid[0] * 1000:.1f}, {mid[1] * 1000:.1f}) mm",
+            sketch=sketch_name,
+        )
+    draw.EditRebuild3()
+    return spans
+
+
+def _broken_outline_columns(
+    raster: Any,
+    spans: dict[str, tuple[tuple[float, float], tuple[float, float]]],
+    sheet_size: tuple[float, float],
+) -> dict[str, list[int]]:
+    """Return, per witness, the raster columns where the outline is not dark."""
+    gray = raster.convert("L")
+    scale = gray.width / sheet_size[0]
+    broken = {}
+    for name, ((x0, y), (x1, _)) in spans.items():
+        row = round((sheet_size[1] - y) * scale)
+        rows = range(row - OUTLINE_SEARCH_ROWS, row + OUTLINE_SEARCH_ROWS + 1)
+        columns = range(round(min(x0, x1) * scale), round(max(x0, x1) * scale) + 1)
+        broken[name] = [
+            column
+            for column in columns
+            if sum(gray.getpixel((column, r)) <= OUTLINE_DARK_MAX for r in rows)
+            < OUTLINE_CORE_ROWS
+        ]
+    return {name: columns for name, columns in broken.items() if columns}
+
+
+def _assert_outline_unbroken(
+    png: Any,
+    spans: dict[str, tuple[tuple[float, float], tuple[float, float]]],
+    sheet_size: tuple[float, float],
+) -> None:
+    from PIL import Image
+
+    with Image.open(png) as raster:
+        broken = _broken_outline_columns(raster, spans, sheet_size)
+    if broken:
+        detail = "; ".join(
+            f"{name}: {len(columns)} column(s) from x={columns[0]} px"
+            for name, columns in broken.items()
+        )
+        raise RuntimeError(f"pinion-arbor: Ø8 outline broken over reference witness: {detail}")
+    _telemetry.info(
+        f"pinion-arbor: Ø8 outline unbroken over {len(spans)} reference witnesses",
+        witnesses=len(spans),
+    )
+
+
 def _position_detail_label(adapter: Any, detail: Any) -> None:
-    """Keep the native detail label clear of the parent shaft."""
+    """Centre the native detail label under its own detail circle."""
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
     if not sheet.SetScale(*SHEET_SCALE, False, False):
@@ -260,13 +569,13 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Integral Pinion Arbor Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "integral arbor and grip head; match-reamed crossrod hole",
+            3: "integral arbor and grip head; reamed, bonded crossrod hole",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
 
     donor = place_view(adapter, str(SOURCE), "*Front", 0.030, 0.180, scale=(2, 1))
-    # Looking along model Y presents the match-reamed cross-hole as a true
+    # Looking along model Y presents the reamed cross-hole as a true
     # circle while retaining the entire turned profile in one horizontal view.
     principal = place_view(
         adapter, str(SOURCE), "*Top", *PRINCIPAL_CENTER, scale=SHEET_SCALE
@@ -291,19 +600,36 @@ async def build(adapter: Any) -> dict[str, str]:
     detail_annotations = curate_view_dimensions(
         adapter, detail, keep=DETAIL_KEEP, view_label="integral-arbor head detail"
     )
-    moved_diameters = [
-        _move_dimension(
-            adapter,
-            annotation,
-            principal,
-            DIAMETER_POSITIONS[dimension_name(adapter, annotation)],
-            source_view=donor,
+    for label, kept in (
+        ("donor", donor_annotations),
+        ("principal", principal_annotations),
+        ("detail", detail_annotations),
+    ):
+        names = sorted(dimension_name(adapter, annotation) for annotation in kept)
+        _telemetry.info(
+            f"pinion-arbor {label} view kept {len(kept)} imported dimensions: {names}",
+            view=label,
+            kept=len(kept),
+            names=",".join(names),
         )
-        for annotation in donor_annotations
-    ]
+    moved_diameters = []
+    for annotation in donor_annotations:
+        name = dimension_name(adapter, annotation)
+        moved_diameters.append(
+            _move_dimension(
+                adapter,
+                annotation,
+                principal,
+                DIAMETER_POSITIONS[name],
+                source_view=donor,
+            )
+        )
+    principal_count = len(_early_bound(principal, "IView").GetAnnotations() or ())
     _telemetry.info(
-        f"pinion-arbor moved {len(moved_diameters)} diameters donor -> principal",
+        f"pinion-arbor moved {len(moved_diameters)} diameters donor -> principal; "
+        f"principal now carries {principal_count} annotations",
         moved=len(moved_diameters),
+        principal_annotations=principal_count,
     )
     donor_name = view_name(adapter, donor)
     delete_view(adapter, donor)
@@ -316,7 +642,6 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_reference_dimensions(adapter, annotations, {"CrossHoleDia"})
     for name, label in {
         "HeadCapSagDim": "front-crown height reference",
         "BackCapSagDim": "back-crown descriptive reference",
@@ -333,33 +658,289 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
         raise RuntimeError("failed to add center mark to the detailed grip cross-hole")
-    add_view_centerline(
-        adapter,
-        principal,
-        face_xy=(PRINCIPAL_CENTER[0], PRINCIPAL_CENTER[1] + 0.001),
-        label="pinion arbor turning axis",
-    )
-    add_surface_finish(
-        adapter,
-        principal,
-        edge_xy=(PRINCIPAL_CENTER[0] + 0.025, SHAFT_FLANK_Y),
-        symbol_xy=(0.265, 0.205),
-        control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
-        label="arbor bearing finish",
-        entity_type="SILHOUETTE",
-        char_height=0.0025,
-    )
+    _add_turning_axis(adapter, principal)
+    witness_spans = _blacken_reference_witnesses(adapter, principal)
+    for key, (station_z, symbol_xy, flank) in JOURNAL_FINISHES.items():
+        land_x, axis_y = model_point_in_view(
+            adapter,
+            principal,
+            (0.0, 0.0, station_z / 1000.0),
+            label=f"arbor {key} finish station",
+        )
+        add_surface_finish(
+            adapter,
+            principal,
+            edge_xy=(land_x, axis_y + FLANK_SIGN[flank] * SHAFT_DIA / 2000.0),
+            symbol_xy=symbol_xy,
+            control=surface_finish_by_key(SURFACE_FINISHES, key),
+            label=f"arbor {key} finish",
+            entity_type="SILHOUETTE",
+            char_height=0.0025,
+        )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.255)
     _position_detail_label(adapter, detail)
+    rebuild_drawing(adapter, label="pinion arbor layout audit")
+    sheets = collect_document(adapter)
+    _assert_no_text_on_line([f for sheet in sheets for f in audit_sheet(sheet)])
+    fence_center = model_point_in_view(
+        adapter,
+        principal,
+        (0.0, 0.0, HEAD_CENTER_Z / 1000.0),
+        label="integral-arbor detail fence centre",
+    )
+    far_on_axis = model_point_in_view(
+        adapter,
+        principal,
+        (0.0, 0.0, (HEAD_CENTER_Z + OVERALL_LEN) / 1000.0),
+        label="integral-arbor axis direction",
+    )
+    arrows = _dimension_arrows(adapter, principal)
+    # The tips ride the message text, not only an attribute: a farm leaf's
+    # task.log and the fleet workspace carry the text alone.
+    directions = ", ".join(
+        f"{name} tip ({tx * 1000:.1f}, {ty * 1000:.1f}) mm dir ({dx:.3f}, {dy:.3f})"
+        for name, ((tx, ty), (dx, dy)) in sorted(arrows.items())
+    )
+    _telemetry.info(
+        f"pinion-arbor: {len(arrows)} profile dimensions carry a readable "
+        f"arrowhead: {directions}",
+        arrows=len(arrows),
+        directions=directions,
+    )
+    _assert_witnesses_clear_of_detail_fence(
+        [
+            annotation
+            for sheet in sheets
+            for annotation in sheet.annotations
+            if annotation.owner == view_name(adapter, principal)
+            and annotation.kind == "dim"
+        ],
+        center=fence_center,
+        radius=DETAIL_RADIUS_MM / 1000.0,
+        arrows=arrows,
+        axis=_unit(far_on_axis[0] - fence_center[0], far_on_axis[1] - fence_center[1]),
+    )
 
-    return await finalize_drawing(
+    sheet = _early_bound(
+        _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(), "ISheet"
+    )
+    properties = tuple(float(value) for value in sheet.GetProperties2())
+    sheet_size = (properties[5], properties[6])
+    outputs = await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Integral Pinion Arbor Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
     )
+    _assert_outline_unbroken(PNG, witness_spans, sheet_size)
+    return outputs
+
+
+# Text on text joined the gate with the bond-zone callout's move above the
+# shaft, beside the DETAIL A label (63468ee9 read 0 advisory findings).
+# Leader on leader joined with the back Ra symbol's move above the shaft: at
+# c6eb7f6f its shoulder crossed the back land's 19.0 witness (Main).
+BLOCKING_LAYOUT_FINDINGS = frozenset(
+    {"text-on-line", "text-on-text", "leader-crosses-leader"}
+)
+
+
+def _assert_no_text_on_line(findings: list[Any]) -> None:
+    """Fail the sheet when any annotation's text sits on another's line or text.
+
+    Main's eye-pass of 30620a85 found the back-crown and overall witnesses
+    running through the back journal's "8.00" and "JOURNAL".  The native audit
+    reads every dimension's rendered witness, dimension and leader segments, so
+    that defect is now a build failure with sheet-millimetre fix coordinates.
+    Text on text is gated too, since the bond-zone callout moved above the
+    shaft beside the DETAIL A label.  The audit's other finding kinds are
+    logged, not gated: the diametric Ø6 leader crossing the SR10.9 leader
+    inside detail A is conventional ink.
+    """
+    blocking = [f for f in findings if f.kind in BLOCKING_LAYOUT_FINDINGS]
+    advisory = [f for f in findings if f.kind not in BLOCKING_LAYOUT_FINDINGS]
+    if advisory:
+        _telemetry.warn(
+            f"pinion-arbor layout audit: {len(advisory)} advisory finding(s)\n"
+            + format_findings(advisory),
+            advisory=len(advisory),
+        )
+    if blocking:
+        raise RuntimeError(
+            f"pinion-arbor layout audit: {len(blocking)} blocking finding(s)\n"
+            + format_findings(blocking)
+        )
+    _telemetry.success(
+        f"pinion-arbor layout audit: no text on a foreign line or text "
+        f"({len(advisory)} advisory)"
+    )
+
+
+FENCE_TOL_M = 0.0002
+# A run within this angle of its dimension's measured direction is that
+# dimension's line; within this angle of the perpendicular, an extension line.
+# Anything between is neither and is judged like an extension line.
+DIRECTION_TOL_RAD = math.radians(5.0)
+# An arrowhead's tip lies on its own dimension line, or on its extension past
+# a run that stops at the arrow's base.
+ARROW_ON_LINE_TOL_M = 0.0005
+ARROW_REACH_M = 0.005
+# swAnnotationType_e.swDisplayDimension
+_SW_DISPLAY_DIMENSION = 4
+
+Arrow = tuple[tuple[float, float], tuple[float, float]]
+
+
+def _unit(dx: float, dy: float) -> tuple[float, float]:
+    length = math.hypot(dx, dy)
+    if length == 0.0:
+        raise ValueError("a direction needs a non-zero vector")
+    return dx / length, dy / length
+
+
+def _dimension_arrows(adapter: Any, view: Any) -> dict[str, Arrow]:
+    """Each dimension's first arrowhead on ``view``: its tip and unit direction.
+
+    ``IDisplayData`` labels no run as extension or dimension line, and
+    ``IDimension::DimensionLineDirection`` answers feature dimensions only,
+    while this sheet mixes feature and sketch dimensions.  An arrowhead, the
+    one signal every dimension carries, points along its own
+    dimension line (``IDisplayData::GetArrowHeadAtIndex2``: tip[3], dir[3],
+    ...), so it names the dimension's measured direction on the sheet.
+    """
+    arrows = {}
+    for item in _early_bound(view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(item, "IAnnotation")
+        if int(annotation.GetType()) != _SW_DISPLAY_DIMENSION:
+            continue
+        data = annotation.GetDisplayData()
+        if data is None:
+            continue
+        data = _early_bound(data, "IDisplayData")
+        for index in range(int(data.GetArrowHeadCount() or 0)):
+            values = [float(value) for value in (data.GetArrowHeadAtIndex2(index) or ())]
+            if len(values) < 6 or math.hypot(values[3], values[4]) < 1e-9:
+                continue
+            arrows[str(annotation.GetName())] = (
+                (values[0], values[1]),
+                _unit(values[3], values[4]),
+            )
+            break
+    return arrows
+
+
+def _segment_kind(segment: Any, measured: tuple[float, float]) -> str:
+    """Classify one straight run against its own dimension's measured direction."""
+    direction = _unit(segment.x1 - segment.x0, segment.y1 - segment.y0)
+    along = abs(direction[0] * measured[0] + direction[1] * measured[1])
+    if along >= math.cos(DIRECTION_TOL_RAD):
+        return "dimension-line"
+    if along <= math.sin(DIRECTION_TOL_RAD):
+        return "extension-line"
+    return "oblique"
+
+
+def _on_line_through(point: tuple[float, float], segment: Any) -> bool:
+    """``point`` lies on ``segment``'s line, within an arrow's reach of its ends."""
+    direction = _unit(segment.x1 - segment.x0, segment.y1 - segment.y0)
+    dx, dy = point[0] - segment.x0, point[1] - segment.y0
+    along = dx * direction[0] + dy * direction[1]
+    across = abs(dx * direction[1] - dy * direction[0])
+    return (
+        across <= ARROW_ON_LINE_TOL_M
+        and -ARROW_REACH_M <= along <= segment.length + ARROW_REACH_M
+    )
+
+
+def _measured_direction(annotation: Any, arrow: Arrow | None) -> tuple[float, float] | None:
+    """The arrowhead's direction, once its tip is proven to sit on its own line."""
+    if arrow is None:
+        return None
+    tip, measured = arrow
+    on_own_line = any(
+        _segment_kind(segment, measured) == "dimension-line"
+        and _on_line_through(tip, segment)
+        for segment in annotation.segments
+        if segment.length > 0.0
+    )
+    if not on_own_line:
+        raise RuntimeError(
+            f"{annotation.label!r}: arrowhead at ({tip[0] * 1000:.1f},"
+            f"{tip[1] * 1000:.1f})mm lies on none of its own parallel runs; "
+            "its measured direction is unreadable"
+        )
+    return measured
+
+
+def _assert_witnesses_clear_of_detail_fence(
+    annotations: list[Any],
+    *,
+    center: tuple[float, float],
+    radius: float,
+    arrows: dict[str, Arrow],
+    axis: tuple[float, float],
+) -> None:
+    """No extension line may run out through the detail-A fence on the profile.
+
+    The head sits inside the fence, so every head dimension starts inside it.
+    Each crossing run is judged against ITS OWN dimension (Main's ruling on
+    run 492a7be5).  The dimension line, parallel to the measured direction,
+    may cross the fence to reach its text, as any line may cross a line.  An
+    extension line, perpendicular to it, may leave only as a station witness,
+    belonging to a dimension measured along the turning axis, which drops to
+    the station stack.  Anything else leaving the circle (the Ø15.0 witnesses
+    did, with the "A" label between them) reads as part of the detail callout.
+    A dimension with no readable arrowhead is judged as all extension lines.
+    """
+    offenders = []
+    for annotation in annotations:
+        crossing = []
+        for segment in annotation.segments:
+            if segment.role != "line":
+                continue
+            ends = ((segment.x0, segment.y0), (segment.x1, segment.y1))
+            far = max(math.dist(end, center) for end in ends)
+            near = _segment_distance(center, ends)
+            if near < radius - FENCE_TOL_M and far > radius + FENCE_TOL_M:
+                crossing.append(segment)
+        if not crossing:
+            continue
+        measured = _measured_direction(annotation, arrows.get(annotation.label))
+        axial = measured is not None and abs(
+            measured[0] * axis[0] + measured[1] * axis[1]
+        ) >= math.cos(DIRECTION_TOL_RAD)
+        for segment in crossing:
+            kind = "extension-line" if measured is None else _segment_kind(segment, measured)
+            if kind == "dimension-line":
+                continue
+            if kind == "extension-line" and axial:
+                continue
+            offenders.append(
+                f"{annotation.label!r} {kind} "
+                f"({segment.x0 * 1000:.1f},{segment.y0 * 1000:.1f})-"
+                f"({segment.x1 * 1000:.1f},{segment.y1 * 1000:.1f})mm"
+            )
+    if offenders:
+        raise RuntimeError(
+            f"pinion-arbor: {len(offenders)} extension line(s) cross the detail-A "
+            "fence:\n  " + "\n  ".join(offenders)
+        )
+    _telemetry.success("pinion-arbor: no extension line crosses the detail-A fence")
+
+
+def _segment_distance(
+    point: tuple[float, float],
+    ends: tuple[tuple[float, float], tuple[float, float]],
+) -> float:
+    (x0, y0), (x1, y1) = ends
+    dx, dy = x1 - x0, y1 - y0
+    span = dx * dx + dy * dy
+    if span == 0.0:
+        return math.dist(point, (x0, y0))
+    t = max(0.0, min(1.0, ((point[0] - x0) * dx + (point[1] - y0) * dy) / span))
+    return math.dist(point, (x0 + t * dx, y0 + t * dy))
 
 
 def _parse_args() -> argparse.Namespace:

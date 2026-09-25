@@ -32,10 +32,12 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked crossrod dimension needs authored places")
 
 SURFACE_FINISHES = ()
+# Rule 6: notes never carry a dimension.  The bar size is the registry's
+# material specification and the imported RodDia.
 DRAWING_NOTES = "\n".join(
     (
-        "USE COLD-FINISHED DIA 6 BAR AS RECEIVED.",
-        "MHA-102 HEAD IS MATCH-REAMED TO THIS ACTUAL ROD.",
+        "USE COLD-FINISHED BAR AS RECEIVED.",
+        "ON ASSEMBLY: BOND INTO MHA-102 HEAD WITH LOCTITE 638.",
         "INSTALLED ROD SHALL NOT TURN OR SLIDE BY HAND.",
     )
 )

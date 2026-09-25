@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -28,7 +29,10 @@ def test_registry_slug_now_describes_the_separate_grip_crossrod() -> None:
 
 
 def test_crossrod_preserves_released_geometry_and_local_origin() -> None:
-    assert spec.ROD_DIA == pytest.approx(6.0175)
+    # R1: as-received Ø6 bar, bonded into MHA-102 (no longer a 6.0175 press rod).
+    assert spec.ROD_DIA == pytest.approx(6.0)
+    assert "ON ASSEMBLY: BOND INTO MHA-102 HEAD WITH LOCTITE 638." in spec.DRAWING_NOTES
+    assert "MATCH-REAM" not in spec.DRAWING_NOTES
     assert spec.ROD_DOWN == pytest.approx(32.0)
     assert spec.ROD_UP == pytest.approx(33.0)
     assert spec.ROD_SPAN == pytest.approx(65.0)
@@ -175,3 +179,14 @@ def test_part_metadata_names_the_grip_crossrod_work() -> None:
     assert "cold-finished steel rod" in str(config["material_specification"])
     assert "crossrod" in str(config["process"])
     assert int(config["quantity"]) == 1
+
+
+def test_no_note_line_carries_a_dimension() -> None:
+    """Rule 6 (Codex P1 on #814): the Ø6 bar size lives in the registry's
+    material specification and the imported RodDia, never in a note."""
+    for line in spec.DRAWING_NOTES.splitlines():
+        text = re.sub(r"MHA-\d+", "", line).replace(arbor.RETAINING_COMPOUND, "")
+        assert not re.search(r"\d", text), line
+    assert "USE COLD-FINISHED BAR AS RECEIVED." in spec.DRAWING_NOTES
+    assert "6 mm" in _config.parts("pinion-handle")["material_specification"]
+

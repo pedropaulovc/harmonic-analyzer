@@ -2764,6 +2764,9 @@ def task_check():
         # Same failure shape: never enrolled, so the U28 re-lay (997f3534) left
         # its three drive-train support pins red with every gate green.
         SCRIPTS_DIR / "test_drive_train_support_layout.py",
+        # dimensions.yaml is read by no part, so only this test keeps its
+        # alignment-pinion record pinned to the CAD constants (#814).
+        SCRIPTS_DIR / "test_dimensions_alignment_pinion_layout.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.
