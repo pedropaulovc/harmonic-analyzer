@@ -8,12 +8,17 @@ lost ``part:crank_drive_gear`` to "fit band is inverted: (0.025, 0.025)" at
 
 This file finds every band consumer by reading the scripts' source, resolves each
 argument in the imported module (the value ``build()`` would see), and applies
-the same checks ``build()`` would:
+the same checks ``build()`` would. ``deviations(band)`` /
+``fit_limits(nominal, band)`` / ``band_text(band)`` take an ``(upper, lower)``
+band; the helper must accept it and return lower < upper.
 
-* ``deviations(band)`` / ``fit_limits(nominal, band)`` / ``band_text(band)`` take
-  ``(upper, lower)``; the helper must accept it and return lower < upper.
-* ``set_dimension_bilateral_tolerance(..., *BAND)`` splats ``(lower, upper)``
-  straight into the setter, which refuses lower >= upper.
+Two source rules keep every band on that checked path:
+
+* ``set_dimension_bilateral_tolerance`` takes its signed (lower, upper) pair only
+  as ``*deviations(BAND)``; a raw tuple or two loose numbers skip the check.
+* No script reads a band raw (``X_BAND[i]``, ``*X_BAND``, ``a, b = X_BAND``)
+  outside the audited ``RAW_ACCESS_ALLOWLIST``. ``deviations(X_BAND)`` returns
+  (lower, upper) whatever the band, so ``deviations(X_BAND)[1]`` is the upper.
 
 A second test inventories every module-level band (an uppercase name with
 ``BAND`` or ``BANDS`` as a word) in every script outside ``OUT_OF_SCOPE``. A
@@ -31,6 +36,7 @@ from __future__ import annotations
 import ast
 import importlib
 import math
+from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,7 +50,12 @@ SCRIPTS = Path(__file__).resolve().parent
 
 # Helpers that take an (upper, lower) band, and the positional index of the band.
 _BAND_HELPERS = {"deviations": 0, "band_text": 0, "fit_limits": 1}
-_SETTER = "set_dimension_bilateral_tolerance"
+
+# Setters that take a signed (lower, upper) deviation pair after
+# (adapter, feature, dimension), and the helpers allowed to produce that pair
+# from an (upper, lower) band.
+_PAIR_SETTERS = {"set_dimension_bilateral_tolerance": 3}
+_PAIR_PRODUCERS = {"deviations"}
 
 # A consumer whose argument is a name local to build() (so it cannot be read off
 # the imported module) must say here which module-level value build() derives it
@@ -117,7 +128,6 @@ class BandUse:
     module: str  # consumer module stem
     line: int
     expression: str  # the argument as written
-    order: str  # "upper_lower" (helpers) or "lower_upper" (setter splat)
 
 
 def _call_name(node: ast.Call) -> str | None:
@@ -146,19 +156,11 @@ def _band_uses_in(tree: ast.AST, module: str) -> list[BandUse]:
         if not isinstance(node, ast.Call):
             continue
         name = _call_name(node)
-        if name in _BAND_HELPERS:
-            index = _BAND_HELPERS[name]
-            if len(node.args) > index:
-                arg = node.args[index]
-                uses.append(BandUse(module, node.lineno, ast.unparse(arg), "upper_lower"))
-        elif name == _SETTER:
-            # A splat that is not itself a helper call hands the setter a
-            # raw (lower, upper) pair.
-            for arg in node.args:
-                if isinstance(arg, ast.Starred) and not isinstance(arg.value, ast.Call):
-                    uses.append(
-                        BandUse(module, node.lineno, ast.unparse(arg.value), "lower_upper")
-                    )
+        if name not in _BAND_HELPERS:
+            continue
+        index = _BAND_HELPERS[name]
+        if len(node.args) > index:
+            uses.append(BandUse(module, node.lineno, ast.unparse(node.args[index])))
     return uses
 
 
@@ -200,15 +202,12 @@ def _resolve(use: BandUse) -> list[tuple[str, Any]]:
     return [(use.expression, value)]
 
 
-def _check_band(label: str, band: Any, order: str) -> None:
+def _check_band(label: str, band: Any) -> None:
     assert isinstance(band, tuple) and len(band) == 2, f"{label}: not a 2-tuple: {band!r}"
     assert all(isinstance(v, (int, float)) for v in band), f"{label}: {band!r}"
-    if order == "upper_lower":
-        # Exactly what build() does; raises on an inverted or zero-width band.
-        lower, upper = _fit_limits.deviations(band)
-    else:
-        lower, upper = band
-    assert lower < upper, f"{label}: lower {lower} >= upper {upper} ({order})"
+    # Exactly what build() does; raises on an inverted or zero-width band.
+    lower, upper = _fit_limits.deviations(band)
+    assert lower < upper, f"{label}: lower {lower} >= upper {upper}"
     assert upper - lower > 0.0, f"{label}: zero-width band {band!r}"
 
 
@@ -227,8 +226,7 @@ def _case_ids() -> list[Any]:
 
 def test_band_uses_are_found() -> None:
     # A scanner that silently finds nothing would pass every case below.
-    helpers = [u for u in BAND_USES if u.order == "upper_lower"]
-    assert len(helpers) >= 50, len(helpers)
+    assert len(BAND_USES) >= 50, len(BAND_USES)
     ids = {f"{u.module}:{u.expression}" for u in BAND_USES}
     assert "build_crank_drive_gear:BORE_DIA_BAND" in ids
     assert "build_cone_gear_shaft:band" in ids
@@ -243,7 +241,7 @@ def test_known_bad_ids_are_live() -> None:
 @pytest.mark.parametrize("use", _case_ids())
 def test_every_band_build_passes_is_valid(use: BandUse) -> None:
     for label, band in _resolve(use):
-        _check_band(f"{use.module}:{use.line} {label}", band, use.order)
+        _check_band(f"{use.module}:{use.line} {label}", band)
 
 
 def _is_band_name(name: str) -> bool:
@@ -354,7 +352,7 @@ def test_every_band_is_checked_or_classified() -> None:
 )
 def test_indexed_fit_bands_are_valid(module_name: str, name: str) -> None:
     band = getattr(importlib.import_module(module_name), name)
-    _check_band(f"{module_name}.{name}", band, "upper_lower")
+    _check_band(f"{module_name}.{name}", band)
 
 
 def test_classification_lists_are_current() -> None:
@@ -366,22 +364,19 @@ def test_classification_lists_are_current() -> None:
 
 
 @pytest.mark.parametrize(
-    ("band", "order", "error"),
+    "band",
     [
-        # A helper-fed band must fail inside deviations(), as the farm leaf did.
-        ((0.025, 0.025), "upper_lower", ValueError),  # warm-c486 crank_drive_gear
-        ((0.010, 0.050), "upper_lower", ValueError),
-        ((0.050, 0.010), "lower_upper", AssertionError),
-        ((0.020, 0.020), "lower_upper", AssertionError),
+        (0.025, 0.025),  # the warm-c486 crank_drive_gear band
+        (0.010, 0.050),
     ],
 )
 def test_check_band_rejects_inverted_and_zero_width_bands(
-    band: tuple[float, float], order: str, error: type[Exception]
+    band: tuple[float, float],
 ) -> None:
-    # The guard must fail on the shapes it exists to catch, in both argument
-    # orders, or every parametrized case above passes vacuously.
-    with pytest.raises(error):
-        _check_band("synthetic", band, order)
+    # The guard must fail inside deviations(), as the farm leaf did, or every
+    # parametrized case above passes vacuously.
+    with pytest.raises(ValueError, match="fit band is inverted"):
+        _check_band("synthetic", band)
 
 
 def test_scanner_finds_a_planted_consumer() -> None:
@@ -390,17 +385,9 @@ def test_scanner_finds_a_planted_consumer() -> None:
         "    deviations(NEW_BAND)\n"
         "    _fit_limits.fit_limits(12.0, OTHER_BAND)\n"
         "    band_text(TEXT_BAND)\n"
-        "    set_dimension_bilateral_tolerance(adapter, 'F', 'D', *RAW_BAND)\n"
     )
-    found = {
-        (use.expression, use.order) for use in _band_uses_in(ast.parse(source), "planted")
-    }
-    assert found == {
-        ("NEW_BAND", "upper_lower"),
-        ("OTHER_BAND", "upper_lower"),
-        ("TEXT_BAND", "upper_lower"),
-        ("RAW_BAND", "lower_upper"),
-    }
+    found = {use.expression for use in _band_uses_in(ast.parse(source), "planted")}
+    assert found == {"NEW_BAND", "OTHER_BAND", "TEXT_BAND"}
 
 
 def test_inventory_finds_a_planted_band_constant() -> None:
@@ -494,3 +481,280 @@ def test_hole_tolerance_tripwire_rejects_a_use(call: str) -> None:
 def test_hole_tolerance_tripwire_accepts_none() -> None:
     call = "wizard_holes(a, spec, pts, n, 'h', dia_tolerance_mm=None)"
     assert not _unchecked_tolerance_uses(ast.parse(call), "planted")
+
+
+def _setter_violations(tree: ast.AST, module: str) -> list[str]:
+    """Setter calls whose deviation pair does not come from a producer."""
+    found = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = _call_name(node)
+        if name not in _PAIR_SETTERS:
+            continue
+        pair = node.args[_PAIR_SETTERS[name] :]
+        produced = (
+            len(pair) == 1
+            and not node.keywords
+            and isinstance(pair[0], ast.Starred)
+            and isinstance(pair[0].value, ast.Call)
+            and _call_name(pair[0].value) in _PAIR_PRODUCERS
+        )
+        if not produced:
+            found.append(f"{module}:{node.lineno} {ast.unparse(node)}")
+    return found
+
+
+def test_tolerance_setters_take_pairs_from_deviations() -> None:
+    violations = [
+        violation
+        for stem, tree in SCRIPT_TREES
+        if stem != "_drawing_marks"  # the setter's own definition
+        for violation in _setter_violations(tree, stem)
+    ]
+    assert not violations, (
+        "pass the setter *deviations(BAND) with BAND written (upper, lower), so "
+        "the band is checked the way every other fit is: " + "; ".join(violations)
+    )
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        "set_dimension_bilateral_tolerance(a, 'F', 'D', *BAND)",
+        "set_dimension_bilateral_tolerance(a, 'F', 'D', 0.0, 0.1)",
+        "set_dimension_bilateral_tolerance(a, 'F', 'D', *swap(BAND))",
+        "marks.set_dimension_bilateral_tolerance(a, 'F', 'D', *BAND)",
+        "set_dimension_bilateral_tolerance(a, 'F', 'D', lower_deviation_mm=0.0, "
+        "upper_deviation_mm=0.1)",
+    ],
+    ids=["raw-splat", "loose-numbers", "other-call", "attribute", "keywords"],
+)
+def test_setter_rule_rejects_a_raw_pair(call: str) -> None:
+    assert _setter_violations(ast.parse(call), "planted")
+
+
+def test_setter_rule_accepts_deviations() -> None:
+    call = "set_dimension_bilateral_tolerance(a, 'F', 'D', *deviations(BAND))"
+    assert not _setter_violations(ast.parse(call), "planted")
+
+
+# Raw access to a band -- X_BAND[i], *X_BAND, or `a, b = X_BAND` -- reads the
+# tuple in whatever order the reader assumes, and nothing checks that the band
+# still has that order. A flipped band read raw stays silent: normalizing
+# TIP_SLOT_W_BAND to (upper, lower) turns cone_swing_platform_spec's
+# TIP_SLOT_W_BAND[1] from the 0.10 upper into 0.0. deviations(X_BAND) validates
+# the band and returns (lower, upper) whatever it looks like, so
+# deviations(X_BAND)[1] is always the upper deviation.
+#
+# RAW_ACCESS_ALLOWLIST is a ratchet, not a design. Every raw access in the tree
+# on 2026-09-25 was audited against its band's order and is listed, keyed by
+# (module, source text), with its count and what it reads. A new access fails,
+# and so does an entry whose count changed. The listed sites move to
+# deviations() and this allowlist is DELETED in the post-release re-key window,
+# with the _holes dia_tolerance_mm deletion: rewriting them now would re-key
+# every part that imports these specs.
+RAW_ACCESS_ALLOWLIST: dict[tuple[str, str], tuple[int, str]] = {
+    ("alignment_pinion_spec", "BASE_TANGENT_SPAN_BAND[0]"): (1, "upper, printed"),
+    ("alignment_pinion_spec", "BASE_TANGENT_SPAN_BAND[1]"): (1, "lower, printed"),
+    ("build_cone_gear", "BORE_DIA_BAND[0]"): (1, "upper: maximum bore"),
+    ("build_cone_tip_bushing", "cone_gear_shaft_spec.SECTION_DIA_BANDS[-1]"): (
+        1,
+        "journal band, unpacked as (upper, lower)",
+    ),
+    ("build_crank_drive_gear", "cone_gear_shaft_spec.SECTION_DIA_BANDS[1]"): (
+        1,
+        "land band, unpacked as (upper, lower)",
+    ),
+    ("build_drive_train_assembly", "CONE_GEAR_BLANK_DIA_BAND[0]"): (
+        1,
+        "upper: maximum blank OD",
+    ),
+    ("cone_gear_spec", "TOOTH_THICKNESS_BAND[0]"): (1, "upper; the band is symmetric"),
+    ("cone_gear_spec", "BORE_DIA_BAND[0]"): (2, "upper: width check and its message"),
+    ("cone_gear_spec", "BORE_DIA_BAND[1]"): (2, "lower: width check and its message"),
+    (
+        "crank_pinion_spec",
+        "_SHAFT_UPPER, _SHAFT_LOWER = crankshaft_spec.SHAFT_DIA_BAND",
+    ): (1, "unpacked as (upper, lower)"),
+    ("draw_crank_arm", "CRANKSHAFT_DIA_BAND[0]"): (1, "upper: minimum clearance"),
+    ("draw_crank_arm", "CRANKSHAFT_DIA_BAND[1]"): (1, "lower: maximum clearance"),
+    ("pinion_arbor_collar_spec", "BORE_BAND[0]"): (2, "upper: worst-case walls"),
+    ("pinion_arbor_collar_spec", "BORE_BAND[1]"): (1, "lower: minimum clearance"),
+    ("pinion_arbor_collar_spec", "SHAFT_DIA_BAND[0]"): (1, "upper: minimum clearance"),
+    ("pinion_arbor_pin_spec", "SHAFT_DIA_BAND[1]"): (1, "lower: worst ligament"),
+    ("pinion_arbor_spec", "DRUM_LEN_BAND[0]"): (1, "upper: longest drum"),
+    ("pinion_arbor_spec", "DRUM_LEN_BAND[1]"): (1, "lower: shortest drum"),
+    ("pinion_arbor_spec", "CROSS_HOLE_DIA_BAND[0]"): (
+        2,
+        "upper: worst web, maximum clearance",
+    ),
+    ("pinion_arbor_spec", "CROSS_HOLE_DIA_BAND[1]"): (1, "lower: minimum clearance"),
+    ("pinion_arbor_spec", "ROD_DIA_BAND[0]"): (1, "upper: minimum clearance"),
+    ("pinion_arbor_spec", "ROD_DIA_BAND[1]"): (1, "lower: maximum clearance"),
+    ("pinion_bracket_spec", "PIN_SEAT_DIA_BAND[0]"): (1, "upper: largest seat"),
+    ("pinion_cam_pin_spec", "SEAT_BAND[0]"): (1, "upper of REAM_H7: maximum clearance"),
+    ("pinion_cam_pin_spec", "SEAT_BAND[1]"): (1, "lower of REAM_H7: minimum clearance"),
+    ("pinion_cam_pin_spec", "PIN_DIA_BAND[0]"): (1, "upper: minimum clearance"),
+    ("pinion_cam_pin_spec", "PIN_DIA_BAND[1]"): (1, "lower: maximum clearance"),
+    ("pinion_cam_spec", "BORE_BAND[0]"): (1, "upper: maximum clearance"),
+    ("pinion_cam_spec", "BORE_BAND[1]"): (1, "lower: minimum clearance"),
+    ("pinion_cam_spec", "LIFT_ROD_DIA_BAND[0]"): (1, "upper: minimum clearance"),
+    ("pinion_cam_spec", "LIFT_ROD_DIA_BAND[1]"): (1, "lower: maximum clearance"),
+    ("pinion_strap_pin_spec", "HOLE_BAND[0]"): (1, "upper: largest hole"),
+}
+
+# A raw access that is wrong, or about to be, on this integration head. swing's
+# I31 plate commit (#830) reads TIP_SLOT_W_BAND through deviations() as it flips
+# the band to (upper, lower); that removes the site, and this entry with it.
+_XFAIL_TIP_SLOT_READ = pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason=(
+        "TIP_SLOT_W_BAND[1] is the upper only while the band is (lower, upper); "
+        "swing's I31 plate commit (#830) reads it through deviations() and "
+        "removes this xfail."
+    ),
+)
+KNOWN_BAD_ACCESS: dict[str, pytest.MarkDecorator] = {
+    "cone_swing_platform_spec:TIP_SLOT_W_BAND[1]": _XFAIL_TIP_SLOT_READ,
+}
+
+# NOT_FIT_BANDS are (low, high) intervals, not deviations; indexing them is how
+# they are used.
+_INTERVAL_BANDS = {name for _module, name in NOT_FIT_BANDS}
+
+
+def _band_ref(node: ast.expr) -> str | None:
+    """The band a Name or attribute refers to, unless it is an interval."""
+    if isinstance(node, ast.Name):
+        name = node.id
+    elif isinstance(node, ast.Attribute):
+        name = node.attr
+    else:
+        return None
+    if not _is_band_name(name) or name in _INTERVAL_BANDS:
+        return None
+    return name
+
+
+def _is_unpack(target: ast.expr) -> bool:
+    return isinstance(target, (ast.Tuple, ast.List))
+
+
+def _raw_band_access_in(tree: ast.AST) -> list[str]:
+    """Source text of every raw read of a band in ``tree``."""
+    found = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Subscript, ast.Starred)) and _band_ref(node.value):
+            found.append(ast.unparse(node))
+        elif (
+            isinstance(node, ast.Assign)
+            and any(_is_unpack(target) for target in node.targets)
+            and _band_ref(node.value)
+        ):
+            found.append(ast.unparse(node))
+        elif (
+            isinstance(node, (ast.For, ast.comprehension))
+            and _is_unpack(node.target)
+            and _band_ref(node.iter)
+        ):
+            found.append(f"for {ast.unparse(node.target)} in {ast.unparse(node.iter)}")
+    return found
+
+
+RAW_ACCESS: Counter[tuple[str, str]] = Counter(
+    (stem, text)
+    for stem, tree in SCRIPT_TREES
+    if stem != "_fit_limits"
+    for text in _raw_band_access_in(tree)
+)
+
+
+def _raw_access_cases() -> list[Any]:
+    params = []
+    for (module, text), count in sorted(RAW_ACCESS.items()):
+        case_id = f"{module}:{text}"
+        marks = [KNOWN_BAD_ACCESS[case_id]] if case_id in KNOWN_BAD_ACCESS else []
+        params.append(pytest.param(module, text, count, id=case_id, marks=marks))
+    return params
+
+
+@pytest.mark.parametrize(("module", "text", "count"), _raw_access_cases())
+def test_no_raw_band_access(module: str, text: str, count: int) -> None:
+    allowed = RAW_ACCESS_ALLOWLIST.get((module, text))
+    assert allowed is not None, (
+        f"{module}: raw band access {text!r}. Read the band through "
+        "deviations(), which returns (lower, upper) whatever the band's order."
+    )
+    assert count <= allowed[0], (
+        f"{module}: {text!r} occurs {count} times, {allowed[0]} audited; read the "
+        "new ones through deviations()"
+    )
+
+
+def test_raw_access_allowlist_is_current() -> None:
+    # The ratchet only turns one way: a migrated site must leave the list.
+    stale = {
+        key: (allowed, RAW_ACCESS.get(key, 0))
+        for key, (allowed, _reads) in RAW_ACCESS_ALLOWLIST.items()
+        if RAW_ACCESS.get(key, 0) != allowed
+    }
+    assert not stale, f"update the audited counts, (listed, found): {stale}"
+
+
+def test_known_bad_access_ids_are_live() -> None:
+    ids = {f"{module}:{text}" for module, text in RAW_ACCESS}
+    assert set(KNOWN_BAD_ACCESS) <= ids, set(KNOWN_BAD_ACCESS) - ids
+    listed = {f"{module}:{text}" for module, text in RAW_ACCESS_ALLOWLIST}
+    assert not set(KNOWN_BAD_ACCESS) & listed
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "x = X_BAND[0]",
+        "x = X_BAND_MM[i]",
+        "x = spec.X_BANDS[1]",
+        "f(*X_BAND)",
+        "lower, upper = X_BAND",
+        "[lower, upper] = spec.X_BAND",
+        "for upper, lower in X_BANDS:\n    pass",
+        "y = [u - l for u, l in X_BANDS]",
+    ],
+    ids=[
+        "index",
+        "index-mm",
+        "attribute",
+        "splat",
+        "unpack",
+        "unpack-attribute",
+        "for-unpack",
+        "comprehension",
+    ],
+)
+def test_raw_access_rule_catches_a_planted_read(source: str) -> None:
+    assert _raw_band_access_in(ast.parse(source))
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "x = deviations(X_BAND)[1]",
+        "lower, upper = deviations(X_BAND)",
+        "f(*deviations(X_BAND))",
+        "for band in X_BANDS:\n    deviations(band)",
+        "x = X_BAND",
+        "x = _G64_BAND[0]",
+    ],
+    ids=[
+        "deviations-index",
+        "deviations-unpack",
+        "deviations-splat",
+        "loop",
+        "alias",
+        "interval",
+    ],
+)
+def test_raw_access_rule_passes_the_checked_path(source: str) -> None:
+    assert not _raw_band_access_in(ast.parse(source))
