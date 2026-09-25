@@ -43,6 +43,8 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
+from build_crank_drive_gear import BORE_DIAMETRAL_GAP
+from crank_drive_gear_notes import SHAFT_MATE_NUMBER
 from crank_drive_gear_spec import (
     BORE_DIA,
     DRAWING_DIMENSIONS,
@@ -102,11 +104,15 @@ RIGHT_KEEP = {
     "FaceWidth": (RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_OD + 0.014),
 }
 
-DIMENSION_CALLOUTS = {
-    # The bore's own limits are the fit; the callout only has to say how far it
-    # goes and how it is finished (policy rule 7).
-    "BoreDia": "REAM THRU",
-}
+# The bore's own limits are the fit; the callout says how far it goes and how
+# it is finished (policy rule 7), then restates, as a reference, the bond gap
+# those limits leave on the MHA-014 land (the crank hub's bore precedent).
+BORE_CALLOUT = (
+    "REAM THRU\n"
+    f"({BORE_DIAMETRAL_GAP[0]:.3f}-{BORE_DIAMETRAL_GAP[1]:.3f} DIAMETRAL\n"
+    f"GAP ON {SHAFT_MATE_NUMBER})"
+)
+DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
 
 
 def _hide_tangent_edges(view: Any, label: str) -> None:
