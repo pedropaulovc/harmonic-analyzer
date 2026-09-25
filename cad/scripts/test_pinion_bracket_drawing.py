@@ -241,6 +241,23 @@ def test_hole_callout_leaders_keep_off_the_other_hole() -> None:
     assert abs(bearing[0] - bearing[1]) >= 45.0
 
 
+def test_section_labels_hang_clear_of_the_centre_distance_arrows() -> None:
+    # Layout audit (text-on-line, gating): the section cut ended on the 28.00
+    # centre distance's dimension line, so the right B label hung under that
+    # dimension's lower arrow, 0.17 mm off it.  Each label hangs under its
+    # cut end; both ends stand clear of that dimension line, and the right
+    # one past its extension lines' end, by at least a label's width.
+    label_width = 0.005
+    dim_x = drawing.FRONT_KEEP["ArborBoreCz"][0]
+    for end_x in drawing.SECTION_LINE_X:
+        assert abs(end_x - dim_x) >= 2.0 * label_width, end_x
+    assert drawing.SECTION_LINE_X[1] > dim_x
+    # The cut still crosses the whole strap, with room for its arrows.
+    half = pinion_bracket_geometry.R_END * drawing.SHEET_SCALE[0] / 1000.0
+    assert drawing.SECTION_LINE_X[0] <= drawing.FRONT_CENTER[0] - half - 0.010
+    assert drawing.SECTION_LINE_X[1] >= drawing.FRONT_CENTER[0] + half + 0.010
+
+
 def test_blind_seat_entry_face_is_complete_solid_flank() -> None:
     # The full follower-seat mouth lies on the straight flank between the two
     # rounded ends. Its complete diameter and blind depth therefore remain in
