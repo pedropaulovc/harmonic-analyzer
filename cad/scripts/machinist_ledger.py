@@ -48,7 +48,9 @@ sheet a reviewer passed.  This module is that link.
   render and which counts.  A newer failing verdict of the same sheets (or one
   whose PDF is lost, so nothing shows it saw other sheets) blocks it.  Dry run
   unless ``--apply``; the table sorts every drawing into what was ingested,
-  what drifted and what never had a ``SHIP``.
+  what drifted and what never had a ``SHIP``.  A draw script whose last
+  commit names no model takes its family from a recorded ruling in
+  ``cad/reviews/author-rulings.json`` naming that exact commit.
 
 No build task reads the ledger, so recording a review never re-keys a build.
 
@@ -60,7 +62,7 @@ Usage (SolidWorks-free)::
     uv run cad/scripts/machinist_ledger.py ingest <fix.json> --author-family claude \
         --rebuttals <rebuttals.json>
     uv run cad/scripts/machinist_ledger.py backfill <root>... --exclude <name> \
-        --author-family <name>=<family> [--checkout <rendered checkout>] [--apply]
+        [--checkout <rendered checkout>] [--apply]
     uv run cad/scripts/machinist_ledger.py fingerprint <drawing.pdf>
 
 A rebuttals file::
@@ -104,6 +106,7 @@ REPO_ROOT = CAD_ROOT.parent
 PROMPTS_DIR = SCRIPTS_DIR / "prompts"
 LEDGER_PATH = CAD_ROOT / "reviews" / "machinist-ledger.json"
 OUTAGES_PATH = CAD_ROOT / "reviews" / "outages.json"
+AUTHOR_RULINGS_PATH = CAD_ROOT / "reviews" / "author-rulings.json"
 REPORT_DIR = CAD_ROOT / "out" / "reports" / "machinist-ledger"
 LEDGER_VERSION = 1
 
@@ -730,6 +733,56 @@ def resolve_author(
             f"{name}: author model {model} is not in the {author_family} family"
         )
     return {**record, "model": model, "model_source": source}
+
+
+_RULING_KEYS = ("drawing", "family", "commit", "ruled_by", "ruled_at", "evidence")
+
+
+def load_author_rulings(path: Path = AUTHOR_RULINGS_PATH) -> dict[str, dict[str, Any]]:
+    """Recorded rulings on who authored a draw script whose commit names no model.
+
+    Each ruling names the exact commit it judged, so a later edit to the
+    script -- a new author -- is never covered by it.
+    """
+    if not path.is_file():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    rulings: dict[str, dict[str, Any]] = {}
+    for ruling in data.get("rulings", []):
+        missing = [key for key in _RULING_KEYS if not ruling.get(key)]
+        if missing:
+            raise ValueError(f"{path}: ruling {ruling} lacks {missing}")
+        if ruling["family"] not in AUTHOR_FAMILIES:
+            raise ValueError(
+                f"{path}: {ruling['drawing']}: family {ruling['family']!r} is not "
+                f"one of {AUTHOR_FAMILIES}"
+            )
+        if not re.fullmatch(r"[0-9a-f]{40}", ruling["commit"]):
+            raise ValueError(
+                f"{path}: {ruling['drawing']}: commit must be a full sha, "
+                f"not {ruling['commit']!r}"
+            )
+        if ruling["drawing"] in rulings:
+            raise ValueError(f"{path}: two rulings for {ruling['drawing']}")
+        rulings[ruling["drawing"]] = ruling
+    return rulings
+
+
+def ruled_family(
+    name: str, author: Author, ruling: dict[str, Any] | None
+) -> tuple[str | None, str]:
+    """The family a ruling assigns this author, or None and why it does not apply."""
+    if ruling is None:
+        return None, (
+            f"{author.script} last commit {author.commit[:12]} names no model and "
+            f"no ruling in {AUTHOR_RULINGS_PATH.name} covers it"
+        )
+    if ruling["commit"] != author.commit:
+        return None, (
+            f"the {name} ruling judged {ruling['commit'][:12]}, but {author.script} "
+            f"was last changed by {author.commit[:12]}"
+        )
+    return ruling["family"], ""
 
 
 # --- quota refusal -----------------------------------------------------------------
@@ -1755,7 +1808,7 @@ def _try(
     current: Sequence[Sheet],
     *,
     author: Author | ValueError,
-    ruled_family: str | None,
+    ruling: dict[str, Any] | None,
     found: Found,
     checkout: Path,
     scratch: Path,
@@ -1773,17 +1826,13 @@ def _try(
         return Tried(candidate, Backfill.CONTRADICTED, f"{matched}; {objection}")
     if isinstance(author, ValueError):
         return Tried(candidate, Backfill.AUTHOR_UNKNOWN, f"{matched}; {author}")
-    family = ruled_family
-    source = "ruling"
     if author.model is not None:
-        family, source = model_family(author.model), "trailer"
+        family, source, ruling = model_family(author.model), "trailer", None
+    else:
+        family, unruled = ruled_family(drawing, author, ruling)
+        source = "ruling"
     if family is None:
-        return Tried(
-            candidate,
-            Backfill.AUTHOR_UNKNOWN,
-            f"{matched}; {author.script} last commit {author.commit[:12]} names no "
-            f"model; rule with --author-family {drawing}=<family>",
-        )
+        return Tried(candidate, Backfill.AUTHOR_UNKNOWN, f"{matched}; {unruled}")
     refusal = None
     if review_slot(review["reviewer"], family) == LAST_RESORT:
         refusal = _refusal_for(candidate, drawing, family, found)
@@ -1795,6 +1844,8 @@ def _try(
         "author_family_source": source,
         "match": match,
     }
+    if ruling is not None:
+        provenance["author_ruling"] = ruling
     if review.get("name") != drawing:
         provenance["reviewed_as"] = review.get("name")
     try:
@@ -1828,7 +1879,7 @@ def backfill(
     *,
     checkout: Path | None = None,
     exclude: Iterable[str] = (),
-    rulings: dict[str, str] | None = None,
+    rulings: dict[str, dict[str, Any]] | None = None,
     apply: bool = False,
     ledger_path: Path = LEDGER_PATH,
 ) -> BackfillResult:
@@ -1932,7 +1983,7 @@ def backfill(
                     candidate,
                     current,
                     author=authors[name],
-                    ruled_family=(rulings or {}).get(name),
+                    ruling=(rulings or {}).get(name),
                     found=found,
                     checkout=repo,
                     # its own directory: a scratch save prunes its sheets dir
@@ -2079,12 +2130,11 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         help="a drawing a ruling keeps out of the backfill",
     )
     backfill_cmd.add_argument(
-        "--author-family",
-        action="append",
-        default=[],
-        metavar="NAME=FAMILY",
-        help="a ruling on the author family of a draw script whose last commit "
-        "names no model",
+        "--author-rulings",
+        type=Path,
+        default=AUTHOR_RULINGS_PATH,
+        help="recorded rulings on the author family of draw scripts whose last "
+        "commit names no model",
     )
     backfill_cmd.add_argument(
         "--apply", action="store_true", help="write the ledger (default: dry run)"
@@ -2107,19 +2157,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (OSError, ValueError) as exc:
         print(f"{args.command}: {exc}", file=sys.stderr)
         return 2
-
-
-def _rulings(values: Sequence[str]) -> dict[str, str]:
-    rulings: dict[str, str] = {}
-    for value in values:
-        name, sep, family = value.partition("=")
-        if not sep or family not in AUTHOR_FAMILIES:
-            raise ValueError(
-                f"--author-family {value!r}: expected NAME=FAMILY, FAMILY one of "
-                f"{AUTHOR_FAMILIES}"
-            )
-        rulings[name] = family
-    return rulings
 
 
 def _print_backfill(result: BackfillResult, args: argparse.Namespace) -> None:
@@ -2176,7 +2213,7 @@ def _run(args: argparse.Namespace) -> int:
             args.roots,
             checkout=args.checkout,
             exclude=args.exclude,
-            rulings=_rulings(args.author_family),
+            rulings=load_author_rulings(args.author_rulings),
             apply=args.apply,
             ledger_path=args.ledger,
         )

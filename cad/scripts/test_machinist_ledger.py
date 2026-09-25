@@ -2129,6 +2129,24 @@ def test_backfill_holds_a_same_family_ship_to_the_last_resort_rule(
     assert list(entry) == ["last_resort"] and entry["last_resort"]["counts"]
 
 
+def _author_rulings(
+    tmp_path: Path, *, family: str = "claude", commit: str = "c" * 40, **extra
+) -> Path:
+    """A rulings file on crank_arm; the registry fixture's draw commit is c*40."""
+    ruling = {
+        "drawing": "crank_arm",
+        "family": family,
+        "commit": commit,
+        "ruled_by": "team-lead (Main)",
+        "ruled_at": "2026-09-25",
+        "evidence": "committed in the same session as two Claude-trailered commits",
+        **extra,
+    }
+    path = tmp_path / "author-rulings.json"
+    path.write_text(json.dumps({"rulings": [ruling]}), encoding="utf-8")
+    return path
+
+
 def test_backfill_needs_a_ruling_where_no_trailer_names_the_author(
     tmp_path: Path, registry: Path, records: Path
 ) -> None:
@@ -2137,14 +2155,46 @@ def test_backfill_needs_a_ruling_where_no_trailer_names_the_author(
 
     row = _backfill(tmp_path, records)
     assert row.outcome == ml.Backfill.AUTHOR_UNKNOWN
-    assert "--author-family crank_arm=<family>" in row.detail
+    assert "no ruling in author-rulings.json covers it" in row.detail
 
-    row = _backfill(tmp_path, records, rulings={"crank_arm": "claude"}, apply=True)
+    # A ruling on an older commit does not cover the script's current author.
+    stale = ml.load_author_rulings(_author_rulings(tmp_path, commit="b" * 40))
+    row = _backfill(tmp_path, records, rulings=stale)
+    assert row.outcome == ml.Backfill.AUTHOR_UNKNOWN
+    assert "judged bbbbbbbbbbbb, but" in row.detail
+
+    rulings = ml.load_author_rulings(_author_rulings(tmp_path))
+    row = _backfill(tmp_path, records, rulings=rulings, apply=True)
     assert row.outcome == ml.Backfill.INGESTED
     entry = ml.load_ledger(tmp_path / "ledger.json")["drawings"]["crank_arm"]
     author = entry["cross_family"]["author"]
     assert (author["family"], author["model_source"]) == ("claude", "claimed")
-    assert entry["cross_family"]["provenance"]["author_family_source"] == "ruling"
+    provenance = entry["cross_family"]["provenance"]
+    assert provenance["author_family_source"] == "ruling"
+    assert provenance["author_ruling"] == rulings["crank_arm"]
+
+
+@pytest.mark.parametrize(
+    ("change", "error"),
+    [
+        ({"evidence": ""}, "lacks \\['evidence'\\]"),
+        ({"family": "human"}, "is not one of"),
+        ({"commit": "c" * 12}, "full sha"),
+    ],
+)
+def test_an_author_ruling_needs_its_family_commit_and_evidence(
+    tmp_path: Path, change: dict, error: str
+) -> None:
+    with pytest.raises(ValueError, match=error):
+        ml.load_author_rulings(_author_rulings(tmp_path, **change))
+
+
+def test_the_tracked_author_rulings_load() -> None:
+    rulings = ml.load_author_rulings()
+    assert rulings, "cad/reviews/author-rulings.json is empty or missing"
+    for name, ruling in rulings.items():
+        assert ml.DRAWINGS_BY_NAME[name]  # a registry drawing
+        assert ruling["evidence"]
 
 
 def test_backfill_records_the_newest_matching_ship(
@@ -2233,13 +2283,15 @@ def test_backfill_cli_prints_the_table_and_its_counts(
     _sheet(registry)
     argv = ["--ledger", str(tmp_path / "ledger.json"), "backfill", str(records)]
 
-    assert ml.main([*argv, "--author-family", "crank_arm=gpt"]) == 0
+    rulings = str(_author_rulings(tmp_path, family="gpt"))
+    assert ml.main([*argv, "--author-rulings", rulings]) == 0
     out, err = capsys.readouterr()
     assert out.startswith("not-counted ")  # codex on a gpt author: same family
     assert "dry run, nothing written" in err and "not-counted: 1" in err
 
-    assert ml.main([*argv, "--author-family", "crank_arm"]) == 2
-    assert "expected NAME=FAMILY" in capsys.readouterr().err
+    bad = str(_author_rulings(tmp_path, family="human"))
+    assert ml.main([*argv, "--author-rulings", bad]) == 2
+    assert "is not one of" in capsys.readouterr().err
 
 
 def test_backfill_finds_a_reviewed_pdf_archived_under_another_name(
