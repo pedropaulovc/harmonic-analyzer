@@ -1632,8 +1632,9 @@ def test_flange_slot_location_prints_one_place() -> None:
     """Main (r3): FlangeSlotX kept I31's .XX with no stack behind it.  At .X
     the flange's side webs keep 4.87 (target 2.0), and the hold-down screw
     can sit 0.8 + 0.51 = 1.31 off the adjuster axis, which the platform's
-    worst cross-slot travel (1.74) plus the screw's float in the narrowest
-    flange slot (0.23) takes up with 0.66 to spare (0.25 required)."""
+    worst cross-slot travel (1.7375, printed 1.74) plus the screw's float in
+    the narrowest flange slot (0.23) takes up with 0.66 to spare (0.25
+    required)."""
     spec = cone_tip_block_spec
     assert spec.DRAWING_PRECISION_BY_NAME["FlangeSlotX"] == 1
     slot = _printed("FlangeSlotX", spec.FLANGE_SLOT_X)
@@ -1645,7 +1646,31 @@ def test_flange_slot_location_prints_one_place() -> None:
     passage = _printed("PassageCenter", spec.BLOCK_X / 2.0)
     offset = max(slot[1] - passage[0], passage[1] - slot[0])
     float_min = (spec.FLANGE_SLOT_W + lower - 0.138 * 25.4) / 2.0
-    take_up = 1.74 + float_min
+    take_up = 1.7375 + float_min
     assert offset + 0.25 <= take_up
     assert spec.WORST_HOLDDOWN_LATERAL_OFFSET_MM == pytest.approx(offset)
-    assert take_up - offset == pytest.approx(0.662, abs=1e-3)
+    # The thread table rounds the #6-32 major to 3.505; 0.138 in is 3.5052.
+    assert spec.HOLDDOWN_LATERAL_TAKE_UP_MM == pytest.approx(take_up, abs=1e-3)
+    assert take_up - offset == pytest.approx(0.6595, abs=1e-3)
+
+
+_PLATFORM_TRAVEL_RIDER = (
+    "merge rider (#838): cone_swing_platform_spec.TIP_LATERAL_TRAVEL_WORST "
+    "lands with #830; when #830 is on the base, import it in "
+    "cone_tip_block_spec and delete this skip"
+)
+
+
+def test_platform_lateral_travel_lockstep() -> None:
+    """The hold-down take-up reads the swing platform's worst lateral travel
+    through a named copy until #830 merges.  Once the platform's own symbol is
+    importable the copy must equal it, so the platform cannot move its travel
+    without this check seeing it."""
+    import cone_swing_platform_spec as platform
+
+    source = getattr(platform, "TIP_LATERAL_TRAVEL_WORST", None)
+    if source is None:
+        pytest.skip(_PLATFORM_TRAVEL_RIDER)
+    assert cone_tip_block_spec.PLATE_TIP_LATERAL_TRAVEL_WORST_MM == pytest.approx(
+        source, abs=1e-9
+    )

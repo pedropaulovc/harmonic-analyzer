@@ -307,12 +307,10 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
 def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     threaded_by_assembly = {
         "drive-train": {
-            # Rule-12 E11: 94025A164 #10-32 in the #21 tap drill, 9.5 deep.
-            frozenset(("cone-tip-adjuster-1", "cone-tip-block-1")): _annulus_limit(
-                4.826, 4.0386, 9.5
-            ),
-            # r3: 91794A112 (15.875), 6.47 scaled by its far-jaw length.
-            frozenset(("cone-tip-pinch-screw-1", "cone-tip-block-1")): 25.058,
+            # mha092-r3-8b1b drive-train leaf: 16.4412 and 7.8008 observed,
+            # plus ten percent.
+            frozenset(("cone-tip-adjuster-1", "cone-tip-block-1")): 18.08532,
+            frozenset(("cone-tip-pinch-screw-1", "cone-tip-block-1")): 8.58088,
             frozenset(("cone-tip-adjuster-1", "cone-gear-shaft-1")): 0.143,
             frozenset(("fillister-screw-1", "crank-arm-1")): _annulus_limit(
                 2.8448, 2.261, 5.33

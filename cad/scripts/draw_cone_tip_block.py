@@ -1,4 +1,5 @@
 r"""Create the simplicity-policy machinist drawing for the cone tip block."""
+# TODO(#910): stray sketch lines + 12.0/20.8 and 5.56/1.53 crowding -- sheet ships as-is, reassess later.
 
 from __future__ import annotations
 

@@ -474,10 +474,17 @@ WORST_FLANGE_SIDE_WEB_MM = min(
 # hold-down screw stands at the flange slot's centre (FlangeSlotX), both from
 # the -X face, so the two disagree by at most their two bands.  The screw's
 # float in the narrowest flange slot and the swing platform's cross slot take
-# that up: its worst lateral travel either side of the cone axis is 1.74
-# (cone_swing_platform_spec.TIP_LATERAL_TRAVEL_WORST, the platform's own
-# PR, asserted at 1.74 there), with HOLDDOWN_LATERAL_MARGIN_MM to spare.
-PLATE_TIP_LATERAL_TRAVEL_WORST_MM = 1.74
+# that up with HOLDDOWN_LATERAL_MARGIN_MM to spare.
+#
+# The platform's worst lateral travel either side of the cone axis is owned by
+# cone_swing_platform_spec.TIP_LATERAL_TRAVEL_WORST (PR #830, branch
+# drawings/dt-cone-swing-platform): 2.2475 - 0.51 = 1.7375, which the platform
+# asserts rounds to 1.74.  That symbol is not on this branch's base yet, so its
+# exact value is held here as a named copy and
+# test_platform_lateral_travel_lockstep compares the two once the import
+# resolves.  MERGE RIDER (#838): when #830 is on the base, replace this
+# constant with the import and delete the lockstep test's skip.
+PLATE_TIP_LATERAL_TRAVEL_WORST_MM = 1.7375
 HOLDDOWN_LATERAL_MARGIN_MM = 0.25
 _passage_x_limits = _printed_limits(BLOCK_X / 2.0, PASSAGE_CENTER_PLACES)
 WORST_HOLDDOWN_LATERAL_OFFSET_MM = max(
