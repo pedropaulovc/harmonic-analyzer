@@ -43,6 +43,8 @@ from _common import (  # noqa: E402
     _early_bound,
     _read_member,
     check,
+)
+from _sketch_closure import (  # noqa: E402
     log_profile_geometry,
     record_sketch_closure,
 )
@@ -389,7 +391,7 @@ def assert_profile_closed(
 
     Call immediately after ``exit_sketch``, and pass the ``feature`` name the
     sketch was just given by ``name_last_feature``.  The read itself belongs to
-    ``_common.record_sketch_closure``, which logs one uniform line, emits a
+    ``_sketch_closure.record_sketch_closure``, which logs one uniform line, emits a
     ``sketch.closure`` span event and returns the verdict -- so the seat is
     interrogated ONCE and both the forensics record and this decision come from
     the same numbers.  This function only decides the raise.
@@ -537,7 +539,7 @@ async def draw_closed_profile(
     corner that an inference snap would have collapsed.
 
     The authored INTENT is recorded before drawing
-    (``_common.log_profile_geometry``); the seat's OUTCOME is read once after
+    (``_sketch_closure.log_profile_geometry``); the seat's OUTCOME is read once after
     ``exit_sketch`` by :func:`assert_profile_closed`, which the CALLER invokes
     because the read resolves the last profile feature's sketch and so needs
     the sketch closed.  The pair is what makes a success comparable with a
