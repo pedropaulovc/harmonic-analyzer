@@ -21,9 +21,11 @@ from __future__ import annotations
 import math
 import sys
 
+import _config
 from _common import (
     POLISHED_STEEL,
     SketchDims,
+    active_configuration_name,
     apply_color,
     apply_material,
     check,
@@ -48,7 +50,9 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
 )
 from _fit_limits import deviations
+from _grouped_bom_properties import apply_grouped_bom_properties
 from _saved_part_guard import require_saved_drawing_properties
+from pinion_lever_pin_geometry import INSTALLED_CONFIG, INSTALLED_LEN
 from pinion_lever_pin_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -70,10 +74,15 @@ _SAVED_DRAWING_PROPERTIES = (
 
 PIN_R = PIN_DIA / 2.0
 V_PIN = math.pi * PIN_R**2 * PIN_LEN
+V_INSTALLED = math.pi * PIN_R**2 * INSTALLED_LEN
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import (
+        CreateConfigurationParameters,
+        ExtrusionParameters,
+        SetGlobalVariableParameters,
+    )
 
     check("create_part", await adapter.create_part())
 
@@ -124,6 +133,49 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven pin (equations neutral)", volume, 0.005 * V_PIN)
+
+    # Installed configuration (Codex #858 P2): the drive train places the pin
+    # trimmed and peened flush with the MHA-059 hub.  The default stays the
+    # overlength cut the drawing prints, and both carry one MHA-135 BOM
+    # identity.  PinLen is set per configuration in each, so neither inherits
+    # the other's length.
+    default_config = active_configuration_name(adapter)
+    check(
+        f"create_configuration {INSTALLED_CONFIG}",
+        await adapter.create_configuration(
+            CreateConfigurationParameters(
+                name=INSTALLED_CONFIG, comment="trimmed and peened flush with the hub"
+            )
+        ),
+    )
+    for name, length in ((default_config, PIN_LEN), (INSTALLED_CONFIG, INSTALLED_LEN)):
+        check(
+            f"PinLen = {length} in {name}",
+            await adapter.set_global_variable(
+                SetGlobalVariableParameters(
+                    name="PinLen", expression=f"{length}mm", configuration=name
+                )
+            ),
+        )
+    check(
+        f"activate {INSTALLED_CONFIG}",
+        await adapter.set_active_configuration(INSTALLED_CONFIG),
+    )
+    await force_rebuild(adapter)
+    await volume_check(adapter, "installed pin", V_INSTALLED, 0.005 * V_INSTALLED)
+    check(
+        f"re-activate {default_config}",
+        await adapter.set_active_configuration(default_config),
+    )
+    await force_rebuild(adapter)
+    await volume_check(adapter, "manufactured pin (default)", volume, 0.005 * V_PIN)
+    grouped_spec = _config.parts(PART_NAME)
+    apply_grouped_bom_properties(
+        adapter,
+        [default_config, INSTALLED_CONFIG],
+        part_number=str(grouped_spec["number"]),
+        description=str(grouped_spec["title"]),
+    )
 
     # Manufacturing drawing support: the stock band, the marked set and the
     # model-owned decimal places.

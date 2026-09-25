@@ -140,6 +140,41 @@ def test_mha135_is_placed_on_the_shared_pin_axis_and_rides_the_rod() -> None:
     assert "pinion-lever-pin" in free and "pinion-lift-rod" in free
 
 
+def test_mha135_is_shown_trimmed_flush_in_its_installed_configuration() -> None:
+    # Codex #858 P2: the assembly shows MHA-135 as assembly leaves it, trimmed
+    # and peened flush with the hub, not the 16.0 overlength cut the part's
+    # drawing prints.  The part carries both as configurations with one BOM
+    # identity, and BDT places the installed one.
+    import ast
+    import inspect
+
+    import build_pinion_lever_pin as pin_build
+    import pinion_lever_pin_geometry as pin
+    from pinion_lever_geometry import HUB_OD
+
+    assert pin.INSTALLED_LEN == HUB_OD < pin.PIN_LEN
+    calls = [
+        node
+        for node in ast.walk(ast.parse(inspect.getsource(drive)))
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", None) == "place_component"
+        and any(
+            isinstance(arg, ast.Constant) and arg.value == "pinion-lever-pin"
+            for arg in node.args
+        )
+    ]
+    assert len(calls) == 1
+    keywords = {kw.arg: kw.value for kw in calls[0].keywords}
+    configuration = keywords["configuration"]
+    assert isinstance(configuration, ast.Name)
+    assert configuration.id == "LEVER_PIN_INSTALLED_CONFIG"
+    assert drive.LEVER_PIN_INSTALLED_CONFIG == pin.INSTALLED_CONFIG
+    source = inspect.getsource(pin_build)
+    assert "(INSTALLED_CONFIG, INSTALLED_LEN)" in source
+    assert "(default_config, PIN_LEN)" in source
+    assert "apply_grouped_bom_properties(" in source
+
+
 def test_rod_phase_leaves_the_cams_parked_ecc_down() -> None:
     # The rod carries LEVER_TILT_DEG of phase; the cams must not: their world
     # rows stay the identity the park-gap and engage solves assume, tied back
