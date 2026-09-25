@@ -7,14 +7,15 @@ bore plane and a pictorial isometric, and imports exactly the model dimensions
 import, curation and export behaviour lives in ``_drawing_common``.
 
 The casting has two axes and they are not parallel: the crank journal runs
-along part +Z and the cone journal is yawed 12.5182 degrees about the vertical
-body axis.  The part therefore persists a named view looking exactly down the
-cone axis.  That view retains the boss end face and shows its Ø17.2 OD and
-Ø12.281 bore as separate true-shape circles.  A native section in the
-horizontal cone-bore plane removes the head from the projection and exposes
-the raised boss corners beyond the Ø42 body, together with the boss's axial
-length, in a hatched solid-line profile; the elevation keeps the crank
-journal, whose own sketch plane is parallel to it.
+along part +Z and the cone journal is yawed by the drive train's cone incline
+(``cone_incline.INCLINE_DEG``, ~12.518 degrees) about the vertical body axis.
+The part therefore persists a named view looking exactly down the cone axis.
+That view retains the boss end face and shows its Ø17.2 OD and Ø12.281 bore as
+separate true-shape circles. A native section in the horizontal cone-bore plane
+removes the head from the projection and exposes the raised boss corners beyond
+the Ø42 body, together with the boss's axial length, in a hatched solid-line
+profile; the elevation keeps the crank journal, whose own sketch plane is
+parallel to it.
 
 Run with SolidWorks open::
 

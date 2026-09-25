@@ -9,7 +9,8 @@ photos (``ch11_images/page002_img05.jpeg`` and ``page002_img06.jpeg``).
 
 The v2 coordinate frame is also authoritative: the body stands on Top at y=0,
 the crank bore runs straight along +Z, and the cone journal itself is yawed
-12.5182 degrees about the vertical body axis.  That is the PART feature frame;
+by the drive train's cone incline (``cone_incline.INCLINE_DEG``, ~12.518
+degrees) about the vertical body axis.  That is the PART feature frame;
 installation turns the casting exactly Ry(180), mapping its long +Z crank boss
 to machine -Z as shown by ch30 p004.  Stable semantic references are emitted
 for downstream mates: ``ConeShaftNormal``, ``journal axis``, ``swing pivot``,
@@ -55,6 +56,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
+from _equation_units import set_angular_global
 from _fit_limits import deviations
 from _holes import HoleSpec, wizard_holes
 from _named_views import octant_rotation
@@ -300,7 +302,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 base_plane="Front Plane",
                 # The harvested v2 plane reports ReverseDirection=true.  The
                 # signed helper maps the negative angle to that alternate
-                # solution while retaining the positive 12.5182° magnitude.
+                # solution while retaining the positive incline magnitude.
                 angle=-INCLINE_DEG,
                 pivot_axis="swing pivot",
             )
@@ -331,18 +333,10 @@ async def build(adapter: Any) -> dict[str, str]:
     }
     for name, value in globals_mm.items():
         await set_global(adapter, name, f"{value}mm")
-    # The equation manager rounds a global to the document's decimal places for
-    # its unit: the template's 8 linear places are harmless, but its 2 angular
-    # places stored ConeIncline as 12.52 deg against the 12.5182 geometry (r10
-    # leaf log: "global ConeIncline = 12.5182deg -> 12.52").  Widen the angular
-    # places first and prove the stored value; the printed angle keeps its own
-    # one-place override (DRAWING_PRECISION).
-    _keep_equation_angles_exact(adapter)
-    cone_incline = await set_global(adapter, "ConeIncline", f"{INCLINE_DEG!r}deg")
-    if abs(cone_incline - INCLINE_DEG) > 1e-8:
-        raise RuntimeError(
-            f"global ConeIncline stored {cone_incline!r} deg, expected {INCLINE_DEG!r}"
-        )
+    # An angular global goes through _equation_units: the template's 2 angular
+    # places stored ConeIncline as 12.52 deg against the built geometry until
+    # r11 (see that module); the printed angle keeps its own one-place override.
+    await set_angular_global(adapter, "ConeIncline", INCLINE_DEG)
     # The crank axis is located FROM THE CONE AXIS (U31): the 16T:64T mesh
     # closes on that spacing, so it is the independent value and the height
     # above the foot only follows it.
@@ -635,7 +629,7 @@ async def build(adapter: Any) -> dict[str, str]:
     volume -= ATTACHMENT_HOLES_MM3
     await volume_check(adapter, "v2 mounting holes", volume, 0.001 * volume)
 
-    # 6. Journal-plan reference sketch.  The 12.5182 deg plan angle between the
+    # 6. Journal-plan reference sketch.  The INCLINE_DEG plan angle between the
     # crank axis and the cone-journal axis is the casting's defining
     # relationship, but it lives in ConeShaftNormal's plane angle and no FACE
     # projects it into a view.  Two Top-plane construction centrelines carry
@@ -993,33 +987,6 @@ def _create_feature_cylinder_axis(
         f"axis {label} from {feature_name} r={radius_mm:g} mm "
         f"({len(candidates)} candidate face(s))"
     )
-
-
-# swUserPreferenceIntegerValue_e.swUnitsAngularDecimalPlaces, read from the
-# SOLIDWORKS 2026 swconst typelib (swUnitsLinearDecimalPlaces = 49 beside it
-# matches the adapter's own constant).  8 is the API's maximum.
-_SW_UNITS_ANGULAR_DECIMAL_PLACES = 52
-_EQUATION_ANGULAR_DECIMALS = 8
-
-
-@_telemetry.traced("units.equation_angular_decimals")
-def _keep_equation_angles_exact(adapter: Any) -> None:
-    """Give angle-valued equations the document's full 8 decimal places."""
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    extension = _early_bound(model.Extension, "IModelDocExtension")
-    before = int(
-        extension.GetUserPreferenceInteger(_SW_UNITS_ANGULAR_DECIMAL_PLACES, 0)
-    )
-    if not extension.SetUserPreferenceInteger(
-        _SW_UNITS_ANGULAR_DECIMAL_PLACES, 0, _EQUATION_ANGULAR_DECIMALS
-    ):
-        raise RuntimeError("SetUserPreferenceInteger(angular decimals) failed")
-    after = int(
-        extension.GetUserPreferenceInteger(_SW_UNITS_ANGULAR_DECIMAL_PLACES, 0)
-    )
-    if after != _EQUATION_ANGULAR_DECIMALS:
-        raise RuntimeError(f"angular decimal places read {after} after setting 8")
-    _telemetry.success(f"angular decimal places {before} -> {after}")
 
 
 def _equations_for(adapter: Any, lhs: str) -> list[str]:

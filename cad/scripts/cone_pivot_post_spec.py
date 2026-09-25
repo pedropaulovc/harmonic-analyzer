@@ -14,6 +14,7 @@ from __future__ import annotations
 import math
 
 from _gtol_spec import CylinderFace, PlanarFace
+from cone_incline import INCLINE_DEG
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
 
@@ -51,10 +52,11 @@ CRANK_BOSS_LENGTH_IN = 2.8360
 CRANK_BOSS_LENGTH = CRANK_BOSS_LENGTH_IN * MM_PER_IN
 CRANK_BOSS_END_Z = CRANK_BOSS_START_Z + CRANK_BOSS_LENGTH
 
-# Inclined cone-shaft journal.  Unlike v1, the 12.5182-degree incline is baked
-# into the part; downstream placement composes it with the exact Ry(180)
-# installation instead of re-authoring the harvested feature frame.
-INCLINE_DEG = 12.5182
+# Inclined cone-shaft journal.  Unlike v1, the incline is baked into the part;
+# downstream placement composes it with the exact Ry(180) installation instead
+# of re-authoring the harvested feature frame.  It is the drive train's derived
+# cone incline (cone_incline, ~12.518 deg), never a rounded literal: the journal
+# must lie on the same line the assembly places the cone shaft on.
 CONE_AXIS_VIEW = "CONE JOURNAL"
 BORE_HEIGHT = 33.368
 CONE_BOSS_DIA = 17.2
@@ -143,7 +145,7 @@ RUNNING_BORE_BAND = (0.005, -0.025)
 CRANK_ABOVE_CONE = CRANK_BORE_HEIGHT - BORE_HEIGHT
 CRANK_ABOVE_CONE_BAND = (0.37, 0.0)
 
-# Journal-plan reference sketch (Top plane, all construction).  The 12.5182 deg
+# Journal-plan reference sketch (Top plane, all construction).  The INCLINE_DEG
 # plan angle between the crank axis and the cone-journal axis is REAL model
 # geometry -- ConeShaftNormal's angle -- but no face carries it into a view, so
 # a construction sketch holds the two axis directions and a driven angular

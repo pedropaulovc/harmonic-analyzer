@@ -5,7 +5,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import _equation_units
 import build_cone_pivot_post as part
+import cone_incline
 import cone_pivot_post_spec as spec
 import draw_cone_pivot_post as drawing
 from _assembly import _seed_flip, activate_assembly_contract
@@ -49,7 +51,9 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
         12.2808,
         33.368,
     )
-    assert spec.INCLINE_DEG == 12.5182
+    # The incline is the drive train's derived one, not a rounded literal.
+    assert spec.INCLINE_DEG is cone_incline.INCLINE_DEG
+    assert f"{spec.INCLINE_DEG:.4f}" == "12.5182"
     assert (
         spec.ATTACHMENT_SPACING,
         spec.ATTACHMENT_THRU_DIA,
@@ -201,8 +205,8 @@ def test_the_plan_angle_is_model_geometry_not_sheet_text() -> None:
     assert "InclineAngle" in spec.DRAWING_DIMENSIONS["JournalPlanReference"]
     assert "CrankBossStartZ" in spec.DRAWING_DIMENSIONS["JournalPlanReference"]
     assert round(spec.CRANK_BOSS_NEAR_Z, 4) == 21.3753
-    assert round(spec.JOURNAL_REFERENCE_X, 6) == 8.669989
-    assert round(spec.JOURNAL_REFERENCE_Z, 6) == 39.049088
+    assert round(spec.JOURNAL_REFERENCE_X, 6) == 8.670004
+    assert round(spec.JOURNAL_REFERENCE_Z, 6) == 39.049085
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'plan.record("InclineAngle", \'"ConeIncline"\')' in source
     assert "add_angular_reference_dimension" not in source
@@ -645,47 +649,114 @@ def test_cone_incline_global_is_stored_at_full_precision() -> None:
     # r10 (a5df755e) leaf: "global ConeIncline = 12.5182deg -> 12.52". The
     # equation manager rounds a global to the document's angular decimal places
     # (the template's 2), so both ConeIncline-owned angles read 12.52 against
-    # the 12.5182 geometry.  The build widens the angular places first and
-    # proves the stored value before anything is driven from it.
+    # the built geometry.  The angular global goes through _equation_units,
+    # which widens the places and proves the stored value (r11: -> 12.5182).
     source = Path(part.__file__).read_text(encoding="utf-8")
-    widen = source.index("    _keep_equation_angles_exact(adapter)\n")
-    define = source.index('set_global(adapter, "ConeIncline", f"{INCLINE_DEG!r}deg")')
-    assert widen < define
-    assert "if abs(cone_incline - INCLINE_DEG) > 1e-8:" in source
-    assert part._SW_UNITS_ANGULAR_DECIMAL_PLACES == 52
-    assert part._EQUATION_ANGULAR_DECIMALS == 8
-    # The expression carries the spec value exactly, not a display rounding.
-    expression = f"{spec.INCLINE_DEG!r}deg"
-    assert float(expression.removesuffix("deg")) == spec.INCLINE_DEG
+    assert 'await set_angular_global(adapter, "ConeIncline", INCLINE_DEG)' in source
+    assert 'set_global(adapter, "ConeIncline"' not in source
+    assert _equation_units.SW_UNITS_ANGULAR_DECIMAL_PLACES == 52
+    assert _equation_units.EQUATION_ANGULAR_DECIMALS == 8
+    assert _equation_units.ANGULAR_GLOBAL_TOLERANCE_DEG == 1e-8
+
+
+class _Extension:
+    def __init__(self, sticks: bool) -> None:
+        self.values = {_equation_units.SW_UNITS_ANGULAR_DECIMAL_PLACES: 2}
+        self.sticks = sticks
+
+    def GetUserPreferenceInteger(self, pref: int, option: int) -> int:
+        assert option == 0
+        return self.values[pref]
+
+    def SetUserPreferenceInteger(self, pref: int, option: int, value: int) -> bool:
+        assert option == 0
+        if self.sticks:
+            self.values[pref] = value
+        return True
+
+
+def _units_adapter(monkeypatch, sticks: bool):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(_equation_units, "_early_bound", lambda obj, _iface: obj)
+    extension = _Extension(sticks)
+    return SimpleNamespace(currentModel=SimpleNamespace(Extension=extension)), extension
 
 
 def test_equation_angular_decimals_are_set_and_read_back(monkeypatch) -> None:
     import pytest
-    from types import SimpleNamespace
 
-    class _Extension:
-        def __init__(self, sticks: bool) -> None:
-            self.values = {part._SW_UNITS_ANGULAR_DECIMAL_PLACES: 2}
-            self.sticks = sticks
-
-        def GetUserPreferenceInteger(self, pref: int, option: int) -> int:
-            assert option == 0
-            return self.values[pref]
-
-        def SetUserPreferenceInteger(self, pref: int, option: int, value: int) -> bool:
-            assert option == 0
-            if self.sticks:
-                self.values[pref] = value
-            return True
-
-    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
-    extension = _Extension(sticks=True)
-    adapter = SimpleNamespace(currentModel=SimpleNamespace(Extension=extension))
-    part._keep_equation_angles_exact(adapter)
-    assert extension.values[part._SW_UNITS_ANGULAR_DECIMAL_PLACES] == 8
-    adapter.currentModel.Extension = _Extension(sticks=False)
+    adapter, extension = _units_adapter(monkeypatch, sticks=True)
+    _equation_units.keep_equation_angles_exact(adapter)
+    assert extension.values[_equation_units.SW_UNITS_ANGULAR_DECIMAL_PLACES] == 8
+    adapter, _extension = _units_adapter(monkeypatch, sticks=False)
     with pytest.raises(RuntimeError, match="angular decimal places read 2"):
-        part._keep_equation_angles_exact(adapter)
+        _equation_units.keep_equation_angles_exact(adapter)
+
+
+def test_angular_global_is_written_exactly_and_rounding_fails_loud(monkeypatch) -> None:
+    import asyncio
+
+    import pytest
+
+    written: list[tuple[str, str]] = []
+
+    def fake_set_global(stored: float):
+        async def _set_global(_adapter, name, expr):
+            written.append((name, expr))
+            return stored
+
+        return _set_global
+
+    adapter, extension = _units_adapter(monkeypatch, sticks=True)
+    monkeypatch.setattr(
+        _equation_units, "set_global", fake_set_global(round(spec.INCLINE_DEG, 8))
+    )
+    stored = asyncio.run(
+        _equation_units.set_angular_global(adapter, "ConeIncline", spec.INCLINE_DEG)
+    )
+    assert abs(stored - spec.INCLINE_DEG) < 1e-8
+    assert written == [("ConeIncline", f"{spec.INCLINE_DEG!r}deg")]
+    assert float(written[0][1].removesuffix("deg")) == spec.INCLINE_DEG
+    assert extension.values[_equation_units.SW_UNITS_ANGULAR_DECIMAL_PLACES] == 8
+    # The r10 failure: the template's two places store 12.52.
+    monkeypatch.setattr(_equation_units, "set_global", fake_set_global(12.52))
+    with pytest.raises(RuntimeError, match="global ConeIncline stored 12.52"):
+        asyncio.run(
+            _equation_units.set_angular_global(adapter, "ConeIncline", spec.INCLINE_DEG)
+        )
+
+
+# The incline's consumers this PR owns.  TODO(swing): add
+# build_cone_swing_platform.py (and its INCLINE_DEG = literal, line 124) when
+# that branch rebases onto #833 and switches to cone_incline.INCLINE_DEG.
+_CONE_INCLINE_CONSUMERS = (
+    "cone_incline.py",
+    "_equation_units.py",
+    "build_cone_pivot_post.py",
+    "cone_pivot_post_spec.py",
+    "cone_pivot_post_installation.py",
+    "draw_cone_pivot_post.py",
+    "build_drive_train_assembly.py",
+    "test_cone_pivot_post_drawing.py",
+)
+
+
+def test_no_script_carries_the_rounded_cone_incline_literal() -> None:
+    # One source for the cone incline (cone_incline.INCLINE_DEG): the post
+    # hard-coded 12.5182 against the drive train's derived 12.518222...  No
+    # numeric literal of it may come back in a consumer.
+    import io
+    import tokenize
+
+    scripts = Path(part.__file__).resolve().parent
+    offenders = []
+    for path in (scripts / name for name in _CONE_INCLINE_CONSUMERS):
+        source = path.read_text(encoding="utf-8")
+        for token in tokenize.generate_tokens(io.StringIO(source).readline):
+            if token.type == tokenize.NUMBER and token.string.startswith("12.518"):
+                offenders.append(f"{path.relative_to(scripts)}:{token.start[0]}")
+    assert offenders == []
 
 
 def test_journal_axis_readback_runs_before_the_ownership_gate() -> None:
