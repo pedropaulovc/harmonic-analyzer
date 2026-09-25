@@ -183,6 +183,43 @@ def test_follower_seat_station_is_printed_from_face_a_with_a_rule_12_web() -> No
     )
 
 
+def _segment_distance(
+    p: tuple[float, float], a: tuple[float, float], b: tuple[float, float]
+) -> float:
+    ax, ay = a
+    dx, dy = b[0] - ax, b[1] - ay
+    t = max(0.0, min(1.0, ((p[0] - ax) * dx + (p[1] - ay) * dy) / (dx * dx + dy * dy)))
+    return math.hypot(p[0] - (ax + t * dx), p[1] - (ay + t * dy))
+
+
+def test_hole_callout_leaders_keep_off_the_other_hole() -> None:
+    # pc-ra eye pass (Main, nit C): the follower-seat leader grazed the cross
+    # hole's rim, running a few pixels from the cross hole's own leader, so a
+    # reader could not tell which callout owned which hole.  The layout audit
+    # sees leader crossings, not leader-to-feature clearance, so this checks
+    # the leader's line of approach -- callout anchor to hole centre -- stays
+    # at least 1 mm (sheet) clear of the OTHER hole's circle, and that the two
+    # leaders arrive on clearly different bearings.
+    scale = drawing.SHEET_SCALE[0] / 1000.0
+    x = drawing.LEFT_CENTER[0]
+    seat = (x, drawing._flank_y(-pinion_bracket_geometry.PIN_DROP))
+    cross = (x, drawing._flank_y(0.0))
+    seat_r = pinion_bracket_geometry.PIN_BORE / 2.0 * scale
+    cross_r = pinion_bracket_spec.CROSS_HOLE_DIA / 2.0 * scale
+    seat_text = drawing.LEFT_KEEP["PinSeatDia"]
+    cross_text = drawing.LEFT_KEEP["CrossHoleDia"]
+    assert _segment_distance(cross, seat_text, seat) >= cross_r + 0.001
+    assert _segment_distance(seat, cross_text, cross) >= seat_r + 0.001
+    bearing = [
+        math.degrees(math.atan2(text[1] - hole[1], text[0] - hole[0]))
+        for text, hole in ((seat_text, seat), (cross_text, cross))
+    ]
+    assert abs(bearing[0] - bearing[1]) >= 45.0
+    # The seat callout comes from the upper right, the cross hole's from below.
+    assert seat_text[0] > x and seat_text[1] > seat[1]
+    assert cross_text[1] < cross[1]
+
+
 def test_blind_seat_entry_face_is_complete_solid_flank() -> None:
     # The full follower-seat mouth lies on the straight flank between the two
     # rounded ends. Its complete diameter and blind depth therefore remain in
