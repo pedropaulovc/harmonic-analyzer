@@ -96,6 +96,8 @@ and no scheduled cleanup job. See ``scripts/azure/provision_build_cache.ps1``.
 
 from __future__ import annotations
 
+import enum
+import errno
 import hashlib
 import io
 import json
@@ -134,6 +136,19 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # Constraining extraction here blocks both path traversal and a poisoned blob from
 # overwriting tracked SOURCE (e.g. cad/scripts/*.py) that a later doit task runs.
 _CACHE_OUTPUT_ROOT = REPO_ROOT / "cad" / "out"
+
+# Waits (seconds) between re-extractions of a HIT whose destination another
+# process holds -- ~60 s in total, short first so a brief hold heals fast. The
+# holder is not always SolidWorks: a scanner, the Search indexer or a thumbnail
+# host that has the file MAPPED makes Windows refuse the truncate with
+# ERROR_USER_MAPPED_FILE, which the CRT reports as EINVAL (stud-6, 2026-09-22:
+# a drawing PNG, released within 60 s). Waiting is the only cure -- a temp file
+# plus os.replace over a mapped destination fails the same way -- and extraction
+# is idempotent, so a retry that succeeds also heals a torn restore (members
+# land in order, so the ones before the held file were already overwritten).
+_HELD_RETRY_DELAYS_S: tuple[float, ...] = (0.5, 1.0, 2.0, 4.0, 8.0, 15.0, 30.0)
+# EACCES: a share lock (PermissionError). EINVAL: a mapped view of the file.
+_HELD_ERRNOS = (errno.EACCES, errno.EINVAL)
 
 # A machine's role (off | ro | rw). Read from HARMONIC_REMOTE_CACHE_MODE, else this
 # gitignored one-line file at the repo root, else _DEFAULT_MODE. Default is rw:
@@ -276,6 +291,10 @@ def _pack(outputs: list[Path]) -> bytes:
 
 
 def _unpack(blob: bytes) -> None:
+    """Extract a cache archive over ``cad/out``. An ``OSError`` raised while
+    writing a member carries that member's name as ``cache_member``, so the
+    restore telemetry says WHICH output failed even when the error names no
+    usable path."""
     with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
         members = tar.getmembers()
         for member in members:
@@ -291,7 +310,12 @@ def _unpack(blob: bytes) -> None:
                 dest.relative_to(_CACHE_OUTPUT_ROOT)
             except ValueError:
                 raise RuntimeError(f"cache archive member escapes cad/out/: {member.name}")
-        tar.extractall(REPO_ROOT)
+        for member in members:
+            try:
+                tar.extract(member, REPO_ROOT)
+            except OSError as exc:
+                exc.cache_member = member.name  # type: ignore[attr-defined]
+                raise
         # tar.add recorded the BUILDER's mtimes; refresh restored files to now so a
         # pulled native part/assembly is never OLDER than a developer's pre-existing
         # derived export -- the mtime-based downstream freshness guards (render_offline
@@ -558,11 +582,23 @@ def probe(key: str) -> bool | None:
         return None
 
 
+class RestoreOutcome(enum.StrEnum):
+    """What :func:`restore` did. ``ERROR`` is not a miss: the key's presence is
+    unknown or its archive could not be written, so a caller that reports "the
+    key is absent" on it would be lying (stud-6, 2026-09-22)."""
+
+    HIT = "hit"
+    MISS = "miss"
+    ERROR = "error"
+
+
 class RestoreLocked(RuntimeError):
     """A cached build for ``key`` EXISTS but could not be written over the seat's
-    outputs: a share lock (Windows ``PermissionError``) -- SolidWorks still holds
-    the document from an earlier session (a crashed/killed build, or a human with
-    the artefact open in the UI).
+    outputs because another process holds one of them, and still did after
+    ``_HELD_RETRY_DELAYS_S`` of waiting. The holder is SolidWorks keeping the
+    document from an earlier session (a crashed/killed build, or a human with
+    the artefact open in the UI -- a share lock, ``PermissionError``), or a
+    scanner/indexer/thumbnailer with the file mapped (``EINVAL``).
 
     Deliberately NOT swallowed like other restore errors: "building locally" here
     would succeed (SolidWorks can save over its own resident document) and mint a
@@ -576,10 +612,67 @@ class RestoreLocked(RuntimeError):
         self.key = key
         self.cause = cause
         super().__init__(
-            f"{label}: cached build {key[:12]} exists but its outputs are "
-            f"share-locked on this seat ({cause.filename!s}) -- SolidWorks still "
-            "holds the document; close it (release the seat) and retry"
+            f"{label}: cached build {key[:12]} exists but an output is held by "
+            f"another process ({cause.filename!s}, errno {cause.errno}) -- "
+            "SolidWorks still holding the document, or a scanner/indexer with "
+            "the file mapped; release it and retry"
         )
+
+
+def _held_output(exc: OSError) -> Path | None:
+    """The ``cad/out`` file another process holds, or ``None`` when ``exc`` is
+    not a held destination (and so stays an ordinary restore error)."""
+    if exc.errno not in _HELD_ERRNOS or not exc.filename:
+        return None
+    path = Path(os.fsdecode(exc.filename))
+    if not path.is_absolute():
+        path = REPO_ROOT / path
+    path = path.resolve()
+    try:
+        path.relative_to(_CACHE_OUTPUT_ROOT)
+    except ValueError:
+        return None
+    return path
+
+
+def _error_fields(exc: BaseException) -> dict[str, str | int]:
+    """The OS detail a restore failure's repr drops (``OSError(22, 'Invalid
+    argument')`` names no file): errno, winerror, filename and the archive
+    member being written. ``None`` values are left out -- span attributes
+    reject them."""
+    fields = {
+        "error": repr(exc),
+        "errno": getattr(exc, "errno", None),
+        "winerror": getattr(exc, "winerror", None),
+        "filename": getattr(exc, "filename", None),
+        "member": getattr(exc, "cache_member", None),
+    }
+    return {
+        name: value if isinstance(value, int) else str(value)
+        for name, value in fields.items()
+        if value is not None
+    }
+
+
+def _unpack_waiting_for_holders(blob: bytes, label: str, key: str) -> int:
+    """``_unpack``, re-run while another process holds a ``cad/out``
+    destination. Returns how many retries it took; raises the last ``OSError``
+    once ``_HELD_RETRY_DELAYS_S`` is spent, or at once for any other error."""
+    for retry, delay in enumerate((*_HELD_RETRY_DELAYS_S, None)):
+        try:
+            _unpack(blob)
+            return retry
+        except OSError as exc:
+            if delay is None or _held_output(exc) is None:
+                raise
+            fields = _error_fields(exc)
+            _debug_log(
+                f"{label} ({key[:12]}): {fields.get('filename')} held by another "
+                f"process (errno {exc.errno}); retry {retry + 1} in {delay:g} s"
+            )
+            _event("cache.restore_held", label, key, retry=retry + 1, **fields)
+            time.sleep(delay)
+    raise AssertionError("unreachable: the last delay is None")
 
 
 def _note_hit_provenance(label: str, key: str) -> None:
@@ -614,12 +707,14 @@ def _note_hit_provenance(label: str, key: str) -> None:
         _debug_log(f"{label}: drift check skipped ({exc!r})")
 
 
-def restore(key: str, outputs: list[Path], label: str) -> bool:
-    """Try to download+unpack a cached build for ``key``. Return True on a HIT (the
-    outputs are now on disk and the COM build can be skipped), False on a miss or
-    any error (caller falls through to the real build). Raises
+def restore(key: str, outputs: list[Path], label: str) -> RestoreOutcome:
+    """Try to download+unpack a cached build for ``key``. Return ``HIT`` (the
+    outputs are now on disk and the COM build can be skipped), ``MISS`` (no such
+    key, or the cache is off) or ``ERROR`` (the backend or the extraction
+    failed; logged with its errno/winerror/filename/member). Raises
     :class:`RestoreLocked` -- the ONE non-swallowed failure -- when the HIT's
-    extraction is refused by a share lock on an output (see the class).
+    extraction stays refused because another process holds an output (see the
+    class); a hold that clears within ``_HELD_RETRY_DELAYS_S`` is a HIT.
 
     On a HIT under a key this seat never PUBLISHED (its sidecar holds a different
     one), WARN -- the seat is serving an artefact it should have stored itself: the
@@ -630,11 +725,11 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
     severity moves: every outcome, demoted drift included (tagged
     ``drift_expected`` plus the reason), is appended to cache.jsonl."""
     if not enabled():
-        return False
+        return RestoreOutcome.MISS
     try:
         backend = _backend()
         if backend is None:
-            return False
+            return RestoreOutcome.MISS
         blob = backend.get(key)
         if blob is None:
             # A miss is routine on changed inputs. Keep it at DEBUG so the default
@@ -643,26 +738,30 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
             _debug_log(f"miss  {label} ({key[:12]}) -> building locally")
             _event("cache.miss", label, key)
             _record("restore_miss", label, key)
-            return False
+            return RestoreOutcome.MISS
         try:
-            _unpack(blob)
-        except PermissionError as exc:
+            retries = _unpack_waiting_for_holders(blob, label, key)
+        except OSError as exc:
+            if _held_output(exc) is None:
+                raise
             locked = RestoreLocked(label, key, exc)
+            fields = _error_fields(exc)
             _warn(str(locked))
-            _event("cache.restore_locked", label, key, path=str(exc.filename))
-            _record("restore_locked", label, key)
+            _event("cache.restore_locked", label, key, **fields)
+            _record("restore_locked", label, key, **fields)
             raise locked from exc
         _log(f"HIT   {label} ({key[:12]}) -> skipped COM build")
-        _event("cache.hit", label, key)
+        _event("cache.hit", label, key, held_retries=retries)
         _note_hit_provenance(label, key)
-        return True
+        return RestoreOutcome.HIT
     except RestoreLocked:
         raise
     except Exception as exc:  # noqa: BLE001 -- cache must never break a build
-        _warn(f"restore error for {label}: {exc!r} -- building locally")
-        _event("cache.restore_error", label, key)
-        _record("restore_error", label, key)
-        return False
+        fields = _error_fields(exc)
+        _warn(f"restore error for {label}: {fields} -- not a hit")
+        _event("cache.restore_error", label, key, **fields)
+        _record("restore_error", label, key, **fields)
+        return RestoreOutcome.ERROR
 
 
 def store(key: str, outputs: list[Path], label: str) -> str:

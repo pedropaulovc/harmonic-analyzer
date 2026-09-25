@@ -94,13 +94,13 @@ def _refuse_local_build(dodo, monkeypatch, calls):
 
 
 def _restore_sequence(dodo, monkeypatch, calls, outcomes, on_hit=None):
-    """``_cache.restore`` answering ``outcomes`` in turn; ``on_hit`` runs on True."""
+    """``_cache.restore`` answering ``outcomes`` in turn; ``on_hit`` runs on "hit"."""
     pending = iter(outcomes)
 
     def restore(key, outputs, label):
         calls["restore"].append((key, outputs, label))
         hit = next(pending)
-        if hit and on_hit:
+        if hit == "hit" and on_hit:
             on_hit()
         return hit
 
@@ -133,7 +133,7 @@ def farm_part(tmp_path, monkeypatch):
 
 def test_failed_leaf_fails_the_task_with_the_farm_diagnosis(farm_part, monkeypatch):
     dodo, script, calls, restore = farm_part
-    restore((False,))
+    restore(("miss",))
     monkeypatch.setattr(
         dodo._farm, "run_leaf", lambda label, key: _leaf_result(**_FAILED_LEAF)
     )
@@ -155,7 +155,7 @@ def test_failed_leaf_fails_the_task_with_the_farm_diagnosis(farm_part, monkeypat
 
 def test_success_without_the_key_is_an_infrastructure_fault(farm_part, monkeypatch):
     dodo, script, calls, restore = farm_part
-    restore((False, False))  # probe miss, then the post-farm restore also misses
+    restore(("miss", "miss"))  # probe miss, then the post-farm restore also misses
     monkeypatch.setattr(dodo._farm, "run_leaf", lambda label, key: _leaf_result())
 
     with pytest.raises(RuntimeError, match=r"farm reported success but cache key k{12} is absent"):
@@ -165,11 +165,26 @@ def test_success_without_the_key_is_an_infrastructure_fault(farm_part, monkeypat
     assert calls["stamp"] == []
 
 
+def test_success_whose_restore_errors_is_not_reported_absent(farm_part, monkeypatch):
+    """stud-6 (2026-09-22): the restore after a green leaf failed on a held PNG
+    and the task said the key "is absent" -- a peer hit it 90 s later. An
+    errored restore must say it errored."""
+    dodo, script, calls, restore = farm_part
+    restore(("miss", "error"))
+    monkeypatch.setattr(dodo._farm, "run_leaf", lambda label, key: _leaf_result())
+
+    with pytest.raises(RuntimeError, match=r"restoring cache key k{12} failed") as failure:
+        dodo._cached_part_action("pen_rod", script)
+
+    assert "is absent" not in str(failure.value)
+    assert calls["stamp"] == []
+
+
 def test_success_restores_the_leaf_key_and_stamps_without_publishing(
     farm_part, monkeypatch
 ):
     dodo, script, calls, restore = farm_part
-    restore((False, True))
+    restore(("miss", "hit"))
     dispatched = []
     monkeypatch.setattr(
         dodo._farm,
@@ -233,7 +248,7 @@ def test_assembly_success_restores_then_stamps_token_and_recipe(
     farm_assembly, monkeypatch
 ):
     dodo, files, calls, restore = farm_assembly
-    restore((False, True))
+    restore(("miss", "hit"))
     dispatched = []
     monkeypatch.setattr(
         dodo._farm,
@@ -254,7 +269,7 @@ def test_assembly_success_restores_then_stamps_token_and_recipe(
 
 def test_assembly_failure_leaves_no_token_and_no_sidecar(farm_assembly, monkeypatch):
     dodo, files, calls, restore = farm_assembly
-    restore((False,))
+    restore(("miss",))
     monkeypatch.setattr(
         dodo._farm, "run_leaf", lambda label, key: _leaf_result(**_FAILED_LEAF)
     )
@@ -290,7 +305,7 @@ def farm_drawing(tmp_path, monkeypatch):
 
 def test_drawing_success_restores_without_seat_or_store(farm_drawing, monkeypatch):
     dodo, stem, calls, restore = farm_drawing
-    restore((False, True))
+    restore(("miss", "hit"))
     dispatched = []
     monkeypatch.setattr(
         dodo._farm,
@@ -307,7 +322,7 @@ def test_drawing_success_restores_without_seat_or_store(farm_drawing, monkeypatc
 
 def test_drawing_failure_raises_the_farm_diagnosis(farm_drawing, monkeypatch):
     dodo, stem, calls, restore = farm_drawing
-    restore((False,))
+    restore(("miss",))
     monkeypatch.setattr(
         dodo._farm, "run_leaf", lambda label, key: _leaf_result(**_FAILED_LEAF)
     )
@@ -360,7 +375,7 @@ def test_a_com_gate_is_dispatched_and_its_stamp_restored(farm_gate, monkeypatch)
     """The gates are farm leaves now: the submitter holds no seat, runs no
     SolidWorks, publishes nothing, and ends up with the stamp the worker made."""
     dodo, stamp, calls, restore, run = farm_gate
-    restore((False, True))
+    restore(("miss", "hit"))
     dispatched = []
     monkeypatch.setattr(
         dodo._farm,
@@ -377,7 +392,7 @@ def test_a_com_gate_is_dispatched_and_its_stamp_restored(farm_gate, monkeypatch)
 
 def test_a_failed_gate_leaf_fails_the_task_and_leaves_no_stamp(farm_gate, monkeypatch):
     dodo, stamp, calls, restore, run = farm_gate
-    restore((False,))
+    restore(("miss",))
     monkeypatch.setattr(
         dodo._farm, "run_leaf", lambda label, key: _leaf_result(**_FAILED_LEAF)
     )
@@ -393,7 +408,7 @@ def test_a_failed_gate_leaf_fails_the_task_and_leaves_no_stamp(farm_gate, monkey
 
 def test_a_cached_gate_never_dispatches_a_leaf(farm_gate, monkeypatch):
     dodo, stamp, calls, restore, run = farm_gate
-    restore((True,))
+    restore(("hit",))
     monkeypatch.setattr(
         dodo._farm, "run_leaf", lambda label, key: pytest.fail("dispatched on a hit")
     )

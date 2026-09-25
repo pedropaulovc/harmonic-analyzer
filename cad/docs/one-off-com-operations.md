@@ -170,8 +170,10 @@ throw away afterwards. Non-negotiable shape:
      `measuring_stick` behind an open top-assembly drawing and failed its leaf
      `cache_missing`.
 
-  Step 2 is therefore NOT swallowed: `_artifact_cache.restore` raises
-  `RestoreLocked` rather than falling through. Locally the seat-holder runs
+  Step 2 is therefore NOT swallowed: `_artifact_cache.restore` waits ~60 s for
+  the holder to let go (a mapped view from a scanner or indexer fails the
+  extract with `OSError(22)` instead of `PermissionError`, and is treated the
+  same), then raises `RestoreLocked` rather than falling through. Locally the seat-holder runs
   `release_seat_documents.py` (an empty `run_build` session — the discard IS
   the work) and re-probes once; still locked after that is fatal. Under the
   farm executor the submitter holds no seat to release, so it fails loud.

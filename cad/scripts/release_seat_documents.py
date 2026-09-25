@@ -1,8 +1,9 @@
 """Release every cad/out document SolidWorks still holds -- a COM session whose
 only work is the connect-time discard + the teardown close in ``run_build``.
 
-dodo runs this under the seat when a remote-cache restore is refused by a share
-lock (``_artifact_cache.RestoreLocked``): a crashed or killed build never reached
+dodo runs this under the seat when a remote-cache restore stays refused because
+an output is held (``_artifact_cache.RestoreLocked``). When the holder is
+SolidWorks, this frees it: a crashed or killed build never reached
 ``run_build``'s teardown, so its documents stay resident (and locked) across COM
 sessions, and extracting the cached artefact over them fails. Building locally
 instead would fork the artefact's ``.execution`` token off the fleet's, so the
