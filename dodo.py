@@ -3226,15 +3226,13 @@ def task_check():
             # CURRENT PDF must match a counting entry of the tracked review
             # ledger. SolidWorks-free, but it reads the rendered sheets, so each
             # drawing's PDF is a file_dep -- that orders the gate after every
-            # drawing:* task (and restores/renders them under either executor)
-            # and re-runs it whenever a sheet changes. The ledger and the
-            # reviewed PDFs it stores are runtime-read, so they are listed too.
+            # drawing:* task (and restores/renders them under either executor).
+            # Always run: the stored reviewed PDFs it verifies can vanish without
+            # any file_dep changing, and a stale stamp must never excuse that.
             "file_dep": sorted(
                 {
-                    str((REPO_ROOT / "cad" / "reviews" / "machinist-ledger.json").resolve()),
-                    *(
-                        str(path.resolve())
-                        for path in (REPO_ROOT / "cad" / "reviews" / "sheets").glob("*.pdf")
+                    str(
+                        (REPO_ROOT / "cad" / "reviews" / "machinist-ledger.json").resolve()
                     ),
                     *(
                         str(DRAWINGS_BY_NAME[name].outputs["pdf"].resolve())
@@ -3242,6 +3240,7 @@ def task_check():
                     ),
                 }
             ),
+            "uptodate": [False],
             "cmd": [sys.executable, str(SCRIPTS_DIR / "machinist_ledger.py"), "check"],
         },
     }
@@ -3283,6 +3282,7 @@ def task_check():
             ],
             "clean": True,
             "verbosity": 2,
+            **({"uptodate": spec["uptodate"]} if "uptodate" in spec else {}),
         }
 
 
