@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import dataclass, replace
 import math
 import sys
 import time
@@ -48,9 +49,81 @@ GEAR64_SEAT = np.array(cms.GEAR64_SEAT)
 U = np.array([cms.SIN_I, 0.0, cms.COS_I])  # 64T axis
 EX = np.array([cms.COS_I, 0.0, -cms.SIN_I])
 EY = np.array([0.0, 1.0, 0.0])
-TAN_SKEW = math.tan(math.radians(cms.HELIX_DEG))
 SLICE_MM = 0.1
 PITCH16 = 22.5
+IN = cms.IN
+DEDENDUM_FACTOR = 1.157  # root depth below pitch, in cutter addenda (ROOT16/ROOT64)
+
+
+@dataclass(frozen=True)
+class GearDef:
+    """One gear's tooth definition.
+
+    ``definition`` says which plane carries the cutter's DP and PA:
+    ``"transverse"`` is the shipped CAD convention (the 64T's transverse
+    section is the pinion's profile, twisted); ``"normal"`` is what a form
+    or fly cutter set over at the helix angle cuts (the normal section is
+    the cutter's profile, the transverse DP is ``dp_n * cos(beta)`` and the
+    transverse PA ``atan(tan(pa_n) / cos(beta))``). The tooth depth is the
+    cutter's either way.
+    """
+
+    teeth: int
+    beta_deg: float = 0.0
+    dp_n: float = cms.DP_CRANK
+    pa_n: float = cms.PA_DEG
+    definition: str = "transverse"
+
+    @property
+    def dp_t(self) -> float:
+        if self.definition == "transverse":
+            return self.dp_n
+        return self.dp_n * math.cos(math.radians(self.beta_deg))
+
+    @property
+    def pa_t(self) -> float:
+        if self.definition == "transverse":
+            return self.pa_n
+        return math.degrees(math.atan(
+            math.tan(math.radians(self.pa_n)) / math.cos(math.radians(self.beta_deg))))
+
+    @property
+    def addendum_extra_in(self) -> float:
+        return 1.0 / self.dp_n - 1.0 / self.dp_t
+
+    @property
+    def rp(self) -> float:
+        return self.teeth / self.dp_t / 2.0 * IN
+
+    @property
+    def root(self) -> float:
+        return self.rp - DEDENDUM_FACTOR * IN / self.dp_n
+
+    @property
+    def twist_per_mm(self) -> float:
+        """Rotation (rad) of the tooth per mm along the gear's own axis."""
+        return math.tan(math.radians(self.beta_deg)) / self.rp
+
+    def lookup(self, widen: float, lut: dict) -> cms.GapLookup:
+        key = (self.teeth, self.dp_t, self.pa_t, self.addendum_extra_in, widen, self.root)
+        if key not in lut:
+            lut[key] = cms.GapLookup(self.teeth, self.dp_t, widen, self.root,
+                                     pa_deg=self.pa_t,
+                                     addendum_extra_in=self.addendum_extra_in)
+        return lut[key]
+
+
+SHIPPED16 = GearDef(16)
+SHIPPED64 = GearDef(64, cms.HELIX_DEG)
+assert math.isclose(SHIPPED16.rp, cms.R16) and math.isclose(SHIPPED64.rp, cms.R64)
+assert math.isclose(SHIPPED16.root, cms.ROOT16) and math.isclose(SHIPPED64.root, cms.ROOT64)
+
+
+def y_for_extra(extra: float, g16: GearDef, g64: GearDef) -> float:
+    """Crank-axle height for a centre distance of R64 + R16 + ``extra``."""
+    dxh = (GEAR64_SEAT[0] - cms.X_CRANK) * cms.COS_I
+    c2c = g64.rp + g16.rp + extra
+    return cms.Y_DRIVE + math.sqrt(c2c * c2c - dxh * dxh)
 
 
 def boundary(g: cms.GapLookup) -> tuple[np.ndarray, np.ndarray]:
@@ -74,29 +147,34 @@ def boundary(g: cms.GapLookup) -> tuple[np.ndarray, np.ndarray]:
 
 
 class Pose:
-    """The pair at one (extra, widen16, widen64, crank phase)."""
+    """The pair at one (extra, widen16, widen64, crank phase, gear definitions).
+
+    Both helices twist about mid-face: the 64T by ``s * twist`` (s along its
+    axis from the seat), the pinion by ``(z - face/2) * twist16`` (z from its
+    tooth-row start). ``hand16`` picks the pinion's hand (``--hand-check``).
+    """
 
     def __init__(self, extra: float, widen16: float, widen64: float,
-                 crank_deg: float, lut: dict) -> None:
-        self.y_crank = cms.y_for_extra(extra)
-        key16 = (16, widen16, cms.ROOT16)
-        key64 = (64, widen64, cms.ROOT64)
-        if key16 not in lut:
-            lut[key16] = cms.GapLookup(16, cms.DP_CRANK, widen16, cms.ROOT16)
-        if key64 not in lut:
-            lut[key64] = cms.GapLookup(64, cms.DP_CRANK, widen64, cms.ROOT64)
-        self.g16, self.g64 = lut[key16], lut[key64]
+                 crank_deg: float, lut: dict, gear16: GearDef = SHIPPED16,
+                 gear64: GearDef = SHIPPED64, hand16: float = 1.0) -> None:
+        self.gear16, self.gear64 = gear16, gear64
+        self.y_crank = y_for_extra(extra, gear16, gear64)
+        self.g16 = gear16.lookup(widen16, lut)
+        self.g64 = gear64.lookup(widen64, lut)
+        self.twist64 = gear64.twist_per_mm
+        self.twist16 = hand16 * gear16.twist_per_mm
         self.crank = math.radians(crank_deg)
         self.z0 = cms.PINION_TOOTH_Z - cms.PINION_FACE / 2.0
         # The seed the voxel study places at seed_off = 0 (tooth-in-gap
-        # formula for this centre distance).
+        # formula for this centre distance); a 64T angle is 64/16 pinion
+        # angles whatever the pitch radii.
         dx16 = (GEAR64_SEAT[0] - cms.X_CRANK) * cms.COS_I
         dy16 = self.y_crank - cms.Y_DRIVE
         alpha64 = math.degrees(math.atan2(dy16, dx16))
         alpha16 = math.degrees(math.atan2(dy16, GEAR64_SEAT[0] - cms.X_CRANK))
         tp64 = 360.0 / 64.0
         delta64 = round(alpha64 / tp64) * tp64 - alpha64
-        self.seed0 = ((alpha16 + 180.0) - delta64 * (cms.R64 / cms.R16)
+        self.seed0 = ((alpha16 + 180.0) - delta64 * (64.0 / 16.0)
                       - PITCH16 / 2.0) % PITCH16
         self._pinion_local()
         self._gear_world()
@@ -107,10 +185,9 @@ class Pose:
         # Every pinion tooth; points far from the 64T are culled per test.
         ths = np.concatenate([th + k * gamma for k in range(16)])
         rs = np.tile(r, 16)
-        near = rs > self.g16.ra - 3.0 * cms.ADD16  # the toothed annulus only
+        near = rs > self.g16.ra - 3.0 * IN / self.gear16.dp_n  # the toothed annulus only
         self.p_th, self.p_r = ths[near], rs[near]
-        zs = np.arange(0.0, cms.PINION_FACE + 1e-9, SLICE_MM)
-        self.p_z = zs
+        self.p_z = np.arange(0.0, cms.PINION_FACE + 1e-9, SLICE_MM)
 
     def _gear_world(self) -> None:
         th, r = boundary(self.g64)
@@ -118,7 +195,7 @@ class Pose:
         pts = []
         for s in np.arange(-cms.GEAR64_FACE / 2.0, cms.GEAR64_FACE / 2.0 + 1e-9, SLICE_MM):
             for k in range(64):
-                phi = th + k * gamma - self.crank / 4.0 + s * TAN_SKEW / cms.R64
+                phi = th + k * gamma - self.crank / 4.0 + s * self.twist64
                 p = (GEAR64_SEAT + s * U)[None, :] + (
                     (r * np.cos(phi))[:, None] * EX + (r * np.sin(phi))[:, None] * EY
                 )
@@ -134,33 +211,30 @@ class Pose:
         s = rel @ U
         radial = rel - np.outer(s, U)
         r = np.linalg.norm(radial, axis=1)
-        th = np.arctan2(radial @ EY, radial @ EX) + self.crank / 4.0 - s * TAN_SKEW / cms.R64
+        th = np.arctan2(radial @ EY, radial @ EX) + self.crank / 4.0 - s * self.twist64
         return (np.abs(s) <= cms.GEAR64_FACE / 2.0) & self.g64.material(th, r)
+
+    def _pinion_twist(self, z_local: np.ndarray) -> np.ndarray:
+        return (z_local - cms.PINION_FACE / 2.0) * self.twist16
 
     def collides(self, seed_off: float) -> bool:
         rot = math.radians(self.seed0 + seed_off) - self.crank
         # Pinion boundary -> world; test in the 64T.
-        phi = self.p_th - rot
-        x = cms.X_CRANK + self.p_r * np.cos(phi)
-        y = self.y_crank + self.p_r * np.sin(phi)
-        rel = np.stack([x, y], axis=1)
-        # Cull to points within reach of the 64T teeth before extruding.
-        d64 = np.hypot(x - GEAR64_SEAT[0], y - GEAR64_SEAT[1])
-        near = d64 <= self.g64.ra + 1.5  # the inclined 64T's plan reach
-        rel = rel[near]
-        n = len(rel)
-        zs = self.z0 + self.p_z
-        p = np.empty((n * len(zs), 3))
-        p[:, 0] = np.repeat(rel[:, 0], len(zs))
-        p[:, 1] = np.repeat(rel[:, 1], len(zs))
-        p[:, 2] = np.tile(zs, n)
+        phi = (self.p_th[:, None] - rot) + self._pinion_twist(self.p_z)[None, :]
+        r = np.broadcast_to(self.p_r[:, None], phi.shape)
+        x = cms.X_CRANK + r * np.cos(phi)
+        y = self.y_crank + r * np.sin(phi)
+        z = np.broadcast_to(self.z0 + self.p_z[None, :], phi.shape)
+        # Cull to points within reach of the 64T teeth.
+        near = np.hypot(x - GEAR64_SEAT[0], y - GEAR64_SEAT[1]) <= self.g64.ra + 1.5
+        p = np.stack([x[near], y[near], z[near]], axis=1)
         if self._in64(p).any():
             return True
         # 64T boundary -> pinion frame; test in the pinion.
         g = self.gear_pts
         px, py = g[:, 0] - cms.X_CRANK, g[:, 1] - self.y_crank
         pz = g[:, 2] - self.z0
-        pth = np.arctan2(py, px) + rot
+        pth = np.arctan2(py, px) + rot - self._pinion_twist(pz)
         in16 = (pz >= 0) & (pz <= cms.PINION_FACE) & self.g16.material(pth, np.hypot(px, py))
         return bool(in16.any())
 
@@ -201,19 +275,67 @@ def window(pose: Pose, guess: float) -> dict:
         "neg_deg": neg,
         "pos_deg": pos,
         "width_deg": width,
-        "backlash_mm": math.radians(width) * cms.R16,
+        "backlash_mm": math.radians(width) * pose.gear16.rp,
         "centre_deg": (pos + neg) / 2.0,
     }
 
 
-CASES: list[tuple[str, float, float, float]] = [
-    # (name, extra, widen16, widen64)
-    ("nominal", 0.25, 0.0, 0.15),
-    *[(f"cd{e:+.3f}", 0.25 + e, 0.0, 0.15) for e in (-0.15, -0.075, 0.075, 0.15, 0.30)],
-    *[(f"thin64={w:.2f}", 0.25, 0.0, w) for w in (0.05, 0.10, 0.20, 0.25)],
-    *[(f"thin16={w:.3f}", 0.25, w, 0.15) for w in (0.02, 0.05)],
-    ("cd-0.15,thin64=0.05", 0.10, 0.0, 0.05),
+@dataclass(frozen=True)
+class Case:
+    name: str
+    extra: float = 0.25
+    widen16: float = 0.0
+    widen64: float = 0.15
+    gear16: GearDef = SHIPPED16
+    gear64: GearDef = SHIPPED64
+    hand16: float = 1.0
+
+    def record(self) -> dict:
+        return {
+            "case": self.name, "extra": self.extra, "widen16": self.widen16,
+            "widen64": self.widen64, "hand16": self.hand16,
+            **{f"g16_{k}": v for k, v in _gear_record(self.gear16).items()},
+            **{f"g64_{k}": v for k, v in _gear_record(self.gear64).items()},
+        }
+
+
+def _gear_record(g: GearDef) -> dict:
+    return {"beta": g.beta_deg, "def": g.definition, "dp_n": g.dp_n, "pa_n": g.pa_n,
+            "dp_t": g.dp_t, "pa_t": g.pa_t, "rp": g.rp}
+
+
+CASES: list[Case] = [
+    Case("nominal"),
+    *[Case(f"cd{e:+.3f}", extra=0.25 + e) for e in (-0.15, -0.075, 0.075, 0.15, 0.30)],
+    *[Case(f"thin64={w:.2f}", widen64=w) for w in (0.05, 0.10, 0.20, 0.25)],
+    *[Case(f"thin16={w:.3f}", widen16=w) for w in (0.02, 0.05)],
+    Case("cd-0.15,thin64=0.05", extra=0.10, widen64=0.05),
 ]
+
+GEAR_KEYS = {"b16": "beta_deg", "b64": "beta_deg", "def16": "definition",
+             "def64": "definition", "dpn16": "dp_n", "dpn64": "dp_n"}
+
+
+def parse_case(spec: str) -> Case:
+    """``NAME:key=value,...`` over the shipped case.
+
+    Keys: extra, w16, w64, hand16 (+1/-1), b16, b64 (helix deg), def16,
+    def64 (transverse|normal), dpn16, dpn64 (cutter DP).
+    """
+    name, _, body = spec.partition(":")
+    fields: dict = {}
+    g16: dict = {}
+    g64: dict = {}
+    for item in filter(None, body.split(",")):
+        key, value = item.split("=")
+        if key in ("extra", "w16", "w64", "hand16"):
+            fields[{"w16": "widen16", "w64": "widen64"}.get(key, key)] = float(value)
+            continue
+        target = g16 if key.endswith("16") else g64
+        attr = GEAR_KEYS[key]
+        target[attr] = value if attr == "definition" else float(value)
+    return Case(name, **fields,
+                gear16=replace(SHIPPED16, **g16), gear64=replace(SHIPPED64, **g64))
 
 
 def main() -> int:
@@ -223,15 +345,10 @@ def main() -> int:
     ap.add_argument("--case", action="append", help="run only these case names")
     ap.add_argument(
         "--custom", action="append", default=[],
-        help="extra case NAME:EXTRA:WIDEN16:WIDEN64 (run instead of the built-ins)",
+        help="extra case NAME:key=value,... (run instead of the built-ins; see parse_case)",
     )
     args = ap.parse_args()
-    cases = CASES
-    if args.custom:
-        cases = []
-        for spec in args.custom:
-            name, extra, w16, w64 = spec.split(":")
-            cases.append((name, float(extra), float(w16), float(w64)))
+    cases = [parse_case(spec) for spec in args.custom] or CASES
     done: set[tuple[str, float]] = set()
     if args.out.exists():
         for line in args.out.read_text(encoding="utf-8").splitlines():
@@ -240,21 +357,21 @@ def main() -> int:
     lut: dict = {}
     phases = np.linspace(0.0, PITCH16, args.phases, endpoint=False)
     centre = dta.MESH_WINDOW_CENTRE_DEG
-    for name, extra, w16, w64 in cases:
-        if args.case and name not in args.case:
+    for case in cases:
+        if args.case and case.name not in args.case:
             continue
         guess = centre
         for ph in phases:
-            if (name, float(ph)) in done:
+            if (case.name, float(ph)) in done:
                 continue
             t0 = time.perf_counter()
-            pose = Pose(extra, w16, w64, float(ph), lut)
+            pose = Pose(case.extra, case.widen16, case.widen64, float(ph), lut,
+                        case.gear16, case.gear64, case.hand16)
             res = window(pose, guess)
             if "centre_deg" in res:
                 guess = res["centre_deg"]
-            rec = {"case": name, "extra": extra, "widen16": w16, "widen64": w64,
-                   "crank_deg": float(ph), "seconds": round(time.perf_counter() - t0, 1),
-                   **res}
+            rec = {**case.record(), "crank_deg": float(ph),
+                   "seconds": round(time.perf_counter() - t0, 1), **res}
             with args.out.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(rec) + "\n")
             print(json.dumps(rec), flush=True)

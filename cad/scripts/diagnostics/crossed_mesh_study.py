@@ -46,7 +46,7 @@ import _common  # noqa: F401  -- resolves to diagnostics/_common.py, the import
 # real _common (every diag_*/probe_* script here relies on it)
 import build_drive_train_assembly as dta
 from _gear import gap_area_in_disc_ext  # noqa: F401  (re-exported for callers)
-from involute_gear import gear_facts
+from involute_gear import PA_DEG, gear_facts
 from build_crank_drive_gear import BACKLASH_MM, HELIX_DEG
 
 IN = 25.4
@@ -64,15 +64,17 @@ PINION_TOOTH_Z = dta.PINION_TOOTH_Z
 
 
 def gap_polygon(teeth: int, dp: float, root_r_mm: float | None = None,
-                widen_mm: float = 0.0, samples: int = 400) -> np.ndarray:
+                widen_mm: float = 0.0, samples: int = 400, *,
+                pa_deg: float = PA_DEG, addendum_extra_in: float = 0.0) -> np.ndarray:
     """One tooth-gap polygon (mm): the exact ``_gear.cut_tooth_gap`` boundary.
 
     ``widen_mm`` is the symmetric flank backlash (circumferential, at pitch
     radius); the mirrored lower flank takes the offset with the OPPOSITE
     phase sign (its azimuth is the negated phase), exactly as the live curve
-    literals do.
+    literals do. ``pa_deg`` and ``addendum_extra_in`` pass through to
+    ``gear_facts`` (a normal-defined helical gear's transverse profile).
     """
-    f = gear_facts(teeth, dp)
+    f = gear_facts(teeth, dp, pa_deg, addendum_extra_in=addendum_extra_in)
     rb, ra = f["Rb"] * IN, f["Ra"] * IN
     tmax, delta, gamma = f["Tmax"], f["Delta"], f["Gamma"]
     rp = teeth / dp / 2.0 * IN
@@ -112,13 +114,15 @@ class GapLookup:
     """Vectorized material test on a fine (theta mod Gamma, r) grid."""
 
     def __init__(self, teeth: int, dp: float, widen_mm: float = 0.0,
-                 root_r_mm: float | None = None):
-        f = gear_facts(teeth, dp)
+                 root_r_mm: float | None = None, *, pa_deg: float = PA_DEG,
+                 addendum_extra_in: float = 0.0):
+        f = gear_facts(teeth, dp, pa_deg, addendum_extra_in=addendum_extra_in)
         self.gamma = f["Gamma"]
         self.ra = f["Ra"] * IN
         self.rmin = (root_r_mm if root_r_mm is not None
                      else f["Rb"] * IN * math.cos((f["Gamma"] - 2 * f["Delta"]) / 2.0) * 0.999)
-        poly = Path(gap_polygon(teeth, dp, root_r_mm, widen_mm))
+        poly = Path(gap_polygon(teeth, dp, root_r_mm, widen_mm, pa_deg=pa_deg,
+                                addendum_extra_in=addendum_extra_in))
         self.nth, self.nr = 2048, 512
         th = np.linspace(0.0, self.gamma, self.nth, endpoint=False)
         rr = np.linspace(self.rmin, self.ra, self.nr)
