@@ -7,6 +7,7 @@ import math
 from pathlib import Path
 
 import _config
+import _drawing_leaders
 import build_cone_pivot_screw
 import build_cone_swing_platform as part
 import cone_pivot_post_spec
@@ -331,8 +332,10 @@ def test_notch_run_angle_gives_the_rails_their_direction() -> None:
     which way it runs.  92a84f6dc replaced the "AXIS 9.11 DEG" note with the
     model-owned NotchRunAngle; abde20e3c dropped it from all three contracts
     and nothing took its place.  It is marked, carries its places, and is
-    kept on the notch plan with its text inside the acute sector (a text
+    kept on the notch plan with its anchor inside the acute sector (a text
     point outside prints the supplement: d22701cf8's sheet-spanning arc).
+    Since tipslot-d382 the value itself prints on a leader at
+    NOTCH_ANGLE_TEXT_XY; that is what must clear the 205.81.
     """
     assert "NotchRunAngle" in spec.DRAWING_DIMENSIONS["LockNotchProfile"]
     assert spec.DRAWING_PRECISION_BY_NAME["NotchRunAngle"] == 2
@@ -356,8 +359,9 @@ def test_notch_run_angle_gives_the_rails_their_direction() -> None:
     assert _distance_to_line(text, vertex, ray) >= 0.001
     assert _distance_to_line(text, vertex, run_dir) >= 0.001
 
-    # The text clears the 205.81 cap-centre witness and that dimension's line.
-    box = _angle_text_box(text)
+    # The printed value clears the 205.81 cap-centre witness and that
+    # dimension's line.
+    box = _angle_text_box(drawing.NOTCH_ANGLE_TEXT_XY)
     cap_witness_y = _notch_plan_sheet(part.SLOT_E_X, part.SLOT_E_Z)[1]
     cap_dimension_x = drawing.NOTCH_KEEP["CapECz"][0]
     assert cap_witness_y - box[3] >= 0.0018
@@ -373,6 +377,143 @@ def test_notch_run_angle_gives_the_rails_their_direction() -> None:
     south_text = (south[0] + to_text[0], south[1] + to_text[1])
     south_box = _angle_text_box(south_text)
     assert south_box[1] < cap_witness_y < south_box[3]
+
+
+# tipslot-d382 (d38223cf9) as it printed, sheet metres: the "9.11°" glyphs,
+# measured off the 300-dpi render
+# (C:/src/dt-logs/tipslot-d382/platform-crop-notch-angle-300dpi.png), and the
+# run angle's and the 205.81's ink from the leaf's describe_sheet dump
+# (C:/src/dt-logs/spring/tipslot-d382-leaf.log:408-427).
+_D382_NOTCH_INK = drawing.SheetInk(
+    texts={"NotchRunAngle": (0.29169, 0.23500, 0.30226, 0.23850)},
+    lines={
+        "NotchRunAngle": [
+            ((0.2840, 0.2386), (0.2980, 0.2386)),  # the ray's extension
+            ((0.2773, 0.2379), (0.2977, 0.2346)),  # the run's extension
+        ],
+        "CapECz": [
+            ((0.2743, 0.2406), (0.3060, 0.2406)),  # the upper witness
+            ((0.3050, 0.2406), (0.3050, 0.1828)),  # the dimension line
+        ],
+    },
+    arcs={
+        "NotchRunAngle": [
+            ((0.2970, 0.2386), (0.2962, 0.2448)),
+            ((0.2967, 0.2348), (0.2949, 0.2288)),
+        ]
+    },
+    arrows={
+        "NotchRunAngle": [
+            ((0.29690, 0.23859), (0.29666, 0.24199)),
+            ((0.29667, 0.23478), (0.29590, 0.23148)),
+        ],
+        "CapECz": [((0.3050, 0.24058), (0.3050, 0.23707))],
+    },
+    leaders={},
+)
+
+
+def test_the_d382_run_angle_fails_the_ink_audit() -> None:
+    """Main's eye pass of tipslot-d382: the value's own run line struck
+    through it, the ray's ran over it.  Planted as measured, the audit the
+    build now runs names both."""
+    findings = drawing.sheet_ink_collisions(_D382_NOTCH_INK)
+    assert "text-on-line: NotchRunAngle's line runs through 'NotchRunAngle'" in findings
+    # The strike itself: the run's extension crosses the glyphs.
+    ray, run = _D382_NOTCH_INK.lines["NotchRunAngle"]
+    box = _D382_NOTCH_INK.texts["NotchRunAngle"]
+    assert _drawing_leaders.distance_to_box(run, box) == 0.0
+    assert _drawing_leaders.distance_to_box(ray, box) < drawing.LINE_TEXT_CLEARANCE
+
+
+def test_the_notch_ink_model_reproduces_d382() -> None:
+    """The predicted ink, at d382's anchor, lands on what d382 printed --
+    so the model the placement is checked against is the sheet's."""
+    predicted = drawing.notch_angle_ink(None, anchor_xy=(0.2969, 0.2367))
+    for field in ("lines", "arcs", "arrows"):
+        for owner, measured in getattr(_D382_NOTCH_INK, field).items():
+            model = getattr(predicted, field)[owner]
+            assert len(model) == len(measured), (field, owner)
+            for got, want in zip(model, measured):
+                for end in (0, 1):
+                    assert math.dist(got[end], want[end]) < 0.0003, (field, owner, got, want)
+    text = predicted.texts["NotchRunAngle"]
+    assert all(
+        abs(a - b) < 0.0003 for a, b in zip(text, _D382_NOTCH_INK.texts["NotchRunAngle"])
+    )
+    assert drawing.sheet_ink_collisions(predicted) != []
+
+
+def test_the_run_angle_value_prints_clear_on_its_leader() -> None:
+    """The fix: a 14 mm arc from the in-wedge anchor, the value on a leader
+    out of the wedge's open end.  Nothing touches it, no foreign arrow is
+    within 2 mm, and the leader -- rooted at the arc's midpoint or at the arc
+    toward the text -- crosses nothing and meets nothing in a T."""
+    ink = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY)
+    assert drawing.sheet_ink_collisions(ink) == []
+    box = ink.texts["NotchRunAngle"]
+    ray, run = ink.lines["NotchRunAngle"]
+    # Past both extension lines' ends, short of the 205.81 line, under its
+    # witness by more than d382's 2.0 mm.
+    assert box[0] - max(ray[1][0], run[1][0]) >= 0.002
+    assert drawing.NOTCH_KEEP["CapECz"][0] - box[2] >= 0.004
+    cap_witness_y = ink.lines["CapECz"][0][0][1]
+    assert cap_witness_y - box[3] >= 0.0025
+    assert len(ink.leaders["NotchRunAngle"]) == 2
+    for root, tip in ink.leaders["NotchRunAngle"]:
+        assert math.dist(root, drawing.NOTCH_ANGLE_VERTEX_XY) == pytest.approx(
+            drawing.NOTCH_ANGLE_ARC_RADIUS
+        )
+        # Inside the wedge where the lines run: below the ray, above the run.
+        assert root[1] < ray[0][1] and tip[1] < ray[0][1]
+    # The anchor still selects the acute sector, and its arc sits past the
+    # hidden 10 mm construction ray, where the ray's extension line is drawn.
+    assert drawing.NOTCH_KEEP["NotchRunAngle"] == drawing.NOTCH_ANGLE_ANCHOR_XY
+    assert drawing.NOTCH_ANGLE_ARC_RADIUS > drawing.NOTCH_ANGLE_RAY_START + 0.002
+
+
+def test_the_leader_audit_counts_a_t_and_allows_its_own_arc() -> None:
+    """_drawing_leaders' T rule (e33969f40): a leader ending on another line
+    is a crossing; the one declared touch is the leader's own arc."""
+    ink = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY)
+    ray = ink.lines["NotchRunAngle"][0]
+    on_ray = ((ray[0][0] + ray[1][0]) / 2.0, ray[0][1])
+    tee = dataclasses.replace(
+        ink, leaders={"NotchRunAngle": [(on_ray, (on_ray[0] + 0.004, on_ray[1] - 0.003))]}
+    )
+    assert "leader-on-ink: NotchRunAngle's leader crosses NotchRunAngle lines" in (
+        drawing.sheet_ink_collisions(tee)
+    )
+    arc = ink.arcs["NotchRunAngle"][0]
+    on_arc = ((arc[0][0] + arc[1][0]) / 2.0, (arc[0][1] + arc[1][1]) / 2.0)
+    rooted = dataclasses.replace(
+        ink, leaders={"NotchRunAngle": [(on_arc, (on_arc[0] + 0.004, on_arc[1] + 0.001))]}
+    )
+    assert not any("NotchRunAngle arcs" in f for f in drawing.sheet_ink_collisions(rooted))
+    # Across the 205.81's line is a crossing too: why the value stops short.
+    across = dataclasses.replace(
+        ink,
+        leaders={"NotchRunAngle": [(drawing.NOTCH_ANGLE_TEXT_XY, (0.312, 0.230))]},
+    )
+    assert "leader-on-ink: NotchRunAngle's leader crosses CapECz lines" in (
+        drawing.sheet_ink_collisions(across)
+    )
+
+
+def test_the_build_audits_the_run_angle_ink_on_the_sheet() -> None:
+    import inspect
+
+    build = inspect.getsource(drawing.build)
+    assert build.index("assert_notch_angle_ink_clear()") < build.index("open_model")
+    wedge = build.index("_assert_notch_angle_in_wedge(adapter, notch, notch_annotations)")
+    assert build.index("_offset_notch_angle_text(adapter, notch_annotations)") > wedge
+    offset = inspect.getsource(drawing._offset_notch_angle_text)
+    assert 'offset_dimension_text(adapter, [angle], {"NotchRunAngle": NOTCH_ANGLE_TEXT_XY})' in offset
+    assert "sheet_ink_collisions(ink)" in offset
+    audit = inspect.getsource(drawing.sheet_ink_collisions)
+    for primitive in ("arrows_near_text(", "leader_crossings(", "distance_to_box("):
+        assert f"_drawing_leaders.{primitive}" in audit, primitive
+    assert drawing.ARROW_TEXT_CLEARANCE == _drawing_leaders.ARROW_TEXT_CLEARANCE == 0.002
 
 
 def test_section_a_a_group_stays_inside_the_border() -> None:

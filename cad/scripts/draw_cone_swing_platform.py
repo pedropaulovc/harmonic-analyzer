@@ -30,6 +30,7 @@ from dataclasses import dataclass
 from collections.abc import Sequence
 from typing import Any
 
+import _drawing_leaders
 import _telemetry
 from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
@@ -46,6 +47,7 @@ from _drawing_common import (
     rebuild_drawing,
     new_project_drawing,
     model_point_in_view,
+    offset_dimension_text,
     read_required_properties,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -181,6 +183,19 @@ def _plan_east_edge_x(z_mm: float) -> float:
 # run through the value).
 _NOTCH_SLOT_XY = plan_xy(NOTCH_CENTER, -TIP_SCREW_HALF_TRAVEL, TIP_SCREW_LOCAL_Z)
 TIP_SLOT_Z_LINE_X = plan_xy(NOTCH_CENTER, _plan_east_edge_x(TIP_SCREW_LOCAL_Z), 0.0)[0] - 0.009
+# The run angle's vertex on the notch plan (plan_xy agrees with the seat to
+# 0.05 mm), and the in-wedge anchor that picks its acute sector.  The arc
+# lies where the anchor is: 14 mm out, past the construction ray's hidden
+# 10 mm (the ray's extension line starts at 11.0), so the arrows land on
+# drawn lines, and short of where the value goes.
+NOTCH_ANGLE_VERTEX_XY = plan_xy(NOTCH_CENTER, *_part.NOTCH_ANGLE_VERTEX_XZ)
+NOTCH_ANGLE_ARC_RADIUS = 0.014
+NOTCH_ANGLE_ANCHOR_XY = (
+    NOTCH_ANGLE_VERTEX_XY[0]
+    + NOTCH_ANGLE_ARC_RADIUS * math.cos(math.radians(_part.NOTCH_RUN_DEG / 2.0)),
+    NOTCH_ANGLE_VERTEX_XY[1]
+    - NOTCH_ANGLE_ARC_RADIUS * math.sin(math.radians(_part.NOTCH_RUN_DEG / 2.0)),
+)
 NOTCH_KEEP = {
     # Pivot-to-north-edge lives here, sharing the 205.81 pivot witness: in the
     # profile the R8 corner ray has no path that clears this dimension.
@@ -190,15 +205,13 @@ NOTCH_KEEP = {
     "CapECz": (0.305, 0.180),
     "CapEDia": (0.285, 0.259),
     # The run angle (PR #830, Codex P1: without it the rails had no
-    # direction).  Its vertex is the north rail's closed-end corner, sheet
-    # ~(0.2730, 0.2386) with the pivot at (0.2568, 0.1377); the text sits on
-    # the bisector 24 mm out, inside the 9.11 deg wedge -- a text point
-    # outside it selects the supplement or the opposite sector (d22701cf8's
-    # sheet-spanning arc).  A ~11.8 x 3.8 mm "9.11°" box there keeps ~2.0 mm
-    # under the 205.81 cap-centre witness (y 0.2406) and ~2.2 mm left of that
-    # dimension's line (x 0.305).  Laid out from those figures, NOT from a
-    # render; _assert_notch_angle_in_wedge proves the sector on the sheet.
-    "NotchRunAngle": (0.2969, 0.2367),
+    # direction).  Its vertex is the north rail's closed-end corner.  This is
+    # the ANCHOR only, on the bisector inside the 9.11 deg wedge -- a text
+    # point outside it selects the supplement or the opposite sector
+    # (d22701cf8's sheet-spanning arc) -- and it sets the arc's radius; the
+    # value itself moves out on a leader (NOTCH_ANGLE_TEXT_XY, below).
+    # _assert_notch_angle_in_wedge proves the sector on the sheet.
+    "NotchRunAngle": NOTCH_ANGLE_ANCHOR_XY,
     "TipSlotZ": (TIP_SLOT_Z_LINE_X, _NOTCH_SLOT_XY[1] + 0.004),
 }
 SECTION_KEEP = {
@@ -535,6 +548,328 @@ def slot_section_line_model_points() -> tuple[tuple[float, float, float], ...]:
 
 
 _COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
+
+
+# --- the run angle's value, on a leader (tipslot-d382 eye pass) ------------
+# d382 printed the value at the anchor, 24 mm out, where the wedge is 3.8 mm
+# tall -- as tall as "9.11°": the run's own extension line struck through it
+# and the ray's ran 0.1 mm over it, 2.0 mm under the 205.81 witness.  Nowhere
+# in the wedge left of the 205.81 dimension line is wide enough for the text,
+# so the anchor now lays a short arc (14 mm) and OffsetText moves the value
+# out of the wedge's open end, past the extension lines' ends and short of
+# the 205.81 line, on a leader that stays in the wedge until the lines end.
+# With OffsetText the dimension and extension lines do not move
+# (types/IDisplayDimension/OffsetText.md); the build reads the arcs back to
+# prove the sector did not flip.  Placed from the vertex, so it follows the
+# notch.
+NOTCH_ANGLE_TEXT_XY = (NOTCH_ANGLE_VERTEX_XY[0] + 0.0224, NOTCH_ANGLE_VERTEX_XY[1] - 0.0026)
+# Ink the d382 render (300 dpi) and its describe_sheet dump measured, sheet
+# metres: the "9.11°" glyphs, the arrowheads, the extension lines' reach past
+# the arc and the run's start, the arcs' tails beyond each line (arrows
+# outside), and the 205.81 witness's reach either side of its dimension line.
+NOTCH_ANGLE_TEXT_SIZE = (0.0106, 0.0035)
+NOTCH_ANGLE_ARROW_LENGTH = 0.0034
+NOTCH_ANGLE_ARROW_HALF_WIDTH = 0.0004
+NOTCH_ANGLE_EXTENSION_PAST_ARC = 0.0010
+NOTCH_ANGLE_RAY_START = 0.0110  # the 10.0 sheet-mm construction ray + its gap
+NOTCH_ANGLE_RUN_START = 0.0044
+NOTCH_ANGLE_ARC_TAIL_DEG = 15.2
+CAP_EC_Z_WITNESS_START = 0.0010  # past the cap centre
+CAP_EC_Z_WITNESS_PAST_LINE = 0.0010
+CAP_EC_Z_TEXT_SIZE = (0.0120, 0.0035)
+# A line nearer a text block than this reads as touching it.
+LINE_TEXT_CLEARANCE = 0.0005
+ARROW_TEXT_CLEARANCE = _drawing_leaders.ARROW_TEXT_CLEARANCE
+
+
+@dataclass(frozen=True)
+class SheetInk:
+    """One neighbourhood's ink, keyed by annotation, in sheet metres.
+
+    ``lines`` are dimension and extension lines, ``arcs`` dimension arcs (as
+    chords), ``arrows`` arrowheads along their axis, ``leaders`` offset-text
+    leaders."""
+
+    texts: dict[str, _drawing_leaders.Box]
+    lines: dict[str, list[_drawing_leaders.Segment]]
+    arcs: dict[str, list[_drawing_leaders.Segment]]
+    arrows: dict[str, list[_drawing_leaders.Segment]]
+    leaders: dict[str, list[_drawing_leaders.Segment]]
+
+
+def _centred_box(
+    xy: tuple[float, float], size: tuple[float, float]
+) -> _drawing_leaders.Box:
+    return (
+        xy[0] - size[0] / 2.0,
+        xy[1] - size[1] / 2.0,
+        xy[0] + size[0] / 2.0,
+        xy[1] + size[1] / 2.0,
+    )
+
+
+def _polar(origin: tuple[float, float], radius: float, degrees: float) -> tuple[float, float]:
+    angle = math.radians(degrees)
+    return (origin[0] + radius * math.cos(angle), origin[1] + radius * math.sin(angle))
+
+
+def _nearest_on_box(
+    point: tuple[float, float], box: _drawing_leaders.Box
+) -> tuple[float, float]:
+    return (min(max(point[0], box[0]), box[2]), min(max(point[1], box[1]), box[3]))
+
+
+def notch_angle_ink(
+    text_xy: tuple[float, float] | None,
+    anchor_xy: tuple[float, float] = NOTCH_ANGLE_ANCHOR_XY,
+) -> SheetInk:
+    """The run angle's and the 205.81's ink near the notch, predicted.
+
+    ``anchor_xy`` sets the arc's radius; ``text_xy`` is the offset value's
+    centre, ``None`` leaving it at the anchor (the d382 sheet, with d382's
+    anchor).  The run points sheet-down-right, NOTCH_RUN_DEG below the ray.
+    """
+    vertex = NOTCH_ANGLE_VERTEX_XY
+    radius = math.dist(anchor_xy, vertex)
+    run = -_part.NOTCH_RUN_DEG
+    reach = radius + NOTCH_ANGLE_EXTENSION_PAST_ARC
+    ray_line = (_polar(vertex, NOTCH_ANGLE_RAY_START, 0.0), _polar(vertex, reach, 0.0))
+    run_line = (_polar(vertex, NOTCH_ANGLE_RUN_START, run), _polar(vertex, reach, run))
+    tail = NOTCH_ANGLE_ARC_TAIL_DEG
+    arcs = [
+        (_polar(vertex, radius, 0.0), _polar(vertex, radius, tail)),
+        (_polar(vertex, radius, run), _polar(vertex, radius, run - tail)),
+    ]
+    turn = math.degrees(NOTCH_ANGLE_ARROW_LENGTH / radius)
+    arrows = [
+        (_polar(vertex, radius, 0.0), _polar(vertex, radius, turn)),
+        (_polar(vertex, radius, run), _polar(vertex, radius, run - turn)),
+    ]
+    cap = plan_xy(NOTCH_CENTER, _part.SLOT_E_X, _part.SLOT_E_Z)
+    cap_text = NOTCH_KEEP["CapECz"]
+    cap_x = cap_text[0]
+    witness = (
+        (cap[0] + CAP_EC_Z_WITNESS_START, cap[1]),
+        (cap_x + CAP_EC_Z_WITNESS_PAST_LINE, cap[1]),
+    )
+    # The dump's 205.81 line stops 2.8 mm short of its text's anchor.
+    cap_line = ((cap_x, cap[1]), (cap_x, cap_text[1] + 0.0028))
+    cap_arrow = ((cap_x, cap[1]), (cap_x, cap[1] - NOTCH_ANGLE_ARROW_LENGTH))
+    leaders: list[_drawing_leaders.Segment] = []
+    centre = anchor_xy if text_xy is None else text_xy
+    if text_xy is not None:
+        box = _centred_box(text_xy, NOTCH_ANGLE_TEXT_SIZE)
+        # Where SolidWorks roots an angular dimension's offset leader is not
+        # documented: the arc's midpoint or the arc point toward the text.
+        # Both are modelled; the value is placed so either stays in the wedge.
+        toward = math.degrees(math.atan2(text_xy[1] - vertex[1], text_xy[0] - vertex[0]))
+        for root in (_polar(vertex, radius, run / 2.0), _polar(vertex, radius, toward)):
+            leaders.append((root, _nearest_on_box(root, box)))
+    return SheetInk(
+        texts={
+            "NotchRunAngle": _centred_box(centre, NOTCH_ANGLE_TEXT_SIZE),
+            "CapECz": _centred_box(cap_text, CAP_EC_Z_TEXT_SIZE),
+        },
+        lines={"NotchRunAngle": [ray_line, run_line], "CapECz": [witness, cap_line]},
+        arcs={"NotchRunAngle": arcs},
+        arrows={"NotchRunAngle": arrows, "CapECz": [cap_arrow]},
+        leaders={"NotchRunAngle": leaders},
+    )
+
+
+def _grown(box: _drawing_leaders.Box, margin: float) -> _drawing_leaders.Box:
+    return (box[0] - margin, box[1] - margin, box[2] + margin, box[3] + margin)
+
+
+def sheet_ink_collisions(ink: SheetInk) -> list[str]:
+    """Text a line touches, arrows at text, leaders across ink.
+
+    * text-on-line: any annotation's dimension, extension or arc line -- its
+      own included -- within LINE_TEXT_CLEARANCE of a text block;
+    * arrow-near-text: an arrowhead within ARROW_TEXT_CLEARANCE of another
+      annotation's text (``_drawing_leaders.arrows_near_text``);
+    * leader-on-ink: an offset leader crossing, or ending in a T on, any line
+      or arc (``_drawing_leaders.leader_crossings``: a T is a crossing), or a
+      foreign arrow, or running through foreign text.  One pair is declared
+      touching: a leader and its own dimension arc, where SolidWorks roots it.
+      Its own arrowheads stay out of the leader test -- their outside halves
+      are the arc tails, which are in it.
+    """
+    findings = []
+    for name, box in sorted(ink.texts.items()):
+        guard = _grown(box, LINE_TEXT_CLEARANCE)
+        for kind, strokes in (("line", ink.lines), ("arc", ink.arcs)):
+            for owner, segments in sorted(strokes.items()):
+                if any(_drawing_leaders.distance_to_box(s, guard) == 0.0 for s in segments):
+                    findings.append(f"text-on-line: {owner}'s {kind} runs through {name!r}")
+    for owner, name, gap in _drawing_leaders.arrows_near_text(
+        ink.arrows,
+        ink.texts,
+        clearance=ARROW_TEXT_CLEARANCE,
+        half_width=NOTCH_ANGLE_ARROW_HALF_WIDTH,
+    ):
+        findings.append(
+            f"arrow-near-text: {owner}'s arrow stands {gap * 1000.0:.2f} mm from {name!r}"
+        )
+    for owner, leaders in sorted(ink.leaders.items()):
+        if not leaders:
+            continue
+        leader = f"{owner} leader"
+        groups = {leader: list(leaders)}
+        for other in sorted({*ink.lines, *ink.arcs, *ink.arrows}):
+            groups[f"{other} lines"] = list(ink.lines.get(other, ()))
+            groups[f"{other} arcs"] = list(ink.arcs.get(other, ()))
+            if other != owner:
+                groups[f"{other} arrows"] = list(ink.arrows.get(other, ()))
+        # The one declared touch: an offset leader roots on its own arc.
+        touching = {frozenset((leader, f"{owner} arcs"))}
+        for first, second in _drawing_leaders.leader_crossings(groups, touching):
+            if leader in (first, second):
+                other = second if first == leader else first
+                findings.append(f"leader-on-ink: {owner}'s leader crosses {other}")
+        for name, box in sorted(ink.texts.items()):
+            if name != owner and any(
+                _drawing_leaders.distance_to_box(s, box) == 0.0 for s in leaders
+            ):
+                findings.append(f"leader-on-ink: {owner}'s leader runs through {name!r}")
+    return findings
+
+
+def assert_notch_angle_ink_clear() -> None:
+    """Refuse the run angle's placement before any COM work is spent."""
+    findings = sheet_ink_collisions(notch_angle_ink(NOTCH_ANGLE_TEXT_XY))
+    if findings:
+        raise RuntimeError("notch run angle ink collides: " + "; ".join(findings))
+
+
+def _display_data(annotation: Any) -> Any:
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    return _early_bound(display.GetDisplayData(), "IDisplayData")
+
+
+def _arcs(annotation: Any) -> list[tuple[_drawing_leaders.Segment, tuple[float, float]]]:
+    """A dimension's arcs as (start->end chord, centre), sheet metres.
+
+    ``GetArcAtIndex2`` -> [color, lineType, unused, unused, start[3], end[3],
+    centre[3], normal[3], rotationDir]; the run angle's arcs are its 15 deg
+    tails, whose chords sag 0.2 mm."""
+    data = _display_data(annotation)
+    arcs = []
+    for index in range(int(data.GetArcCount())):
+        values = [float(v) for v in (data.GetArcAtIndex2(index) or ())]
+        if len(values) < 13:
+            raise RuntimeError(f"display arc {index} is incomplete: {values}")
+        arcs.append((((values[4], values[5]), (values[7], values[8])), (values[10], values[11])))
+    return arcs
+
+
+def _arc_chords(annotation: Any) -> list[_drawing_leaders.Segment]:
+    return [chord for chord, _centre in _arcs(annotation)]
+
+
+def _arrow_segments(annotation: Any) -> list[_drawing_leaders.Segment]:
+    """Each arrowhead as a segment through its tip along its axis.
+
+    ``GetArrowHeadAtIndex2`` -> [tip[3], dir[3], width, height, style,
+    normal[3]], width measured along the direction.  Which way the head
+    extends from its tip is not seat-proven here, so the segment spans the
+    width both ways: stricter, never blind."""
+    data = _display_data(annotation)
+    arrows = []
+    for index in range(int(data.GetArrowHeadCount())):
+        values = [float(v) for v in (data.GetArrowHeadAtIndex2(index) or ())]
+        if len(values) < 8:
+            raise RuntimeError(f"arrowhead {index} is incomplete: {values}")
+        (x, y), (dx, dy), width = values[0:2], values[3:5], values[6]
+        length = math.hypot(dx, dy) or 1.0
+        ux, uy = dx / length * width, dy / length * width
+        arrows.append(((x - ux, y - uy), (x + ux, y + uy)))
+    return arrows
+
+
+def _same_segments(
+    first: Sequence[_drawing_leaders.Segment], second: Sequence[_drawing_leaders.Segment]
+) -> bool:
+    return len(first) == len(second) and all(
+        any(math.dist(a[0], b[0]) + math.dist(a[1], b[1]) < 1e-6 for b in second)
+        for a in first
+    )
+
+
+def _offset_notch_angle_text(adapter: Any, annotations: list[Any]) -> None:
+    """Move the run angle's value onto its leader and audit the real ink.
+
+    Arrows are pinned outside first, so the arcs read before the offset are
+    the ones SolidWorks keeps; the same arcs and lines after it prove the
+    acute sector the in-wedge anchor chose still holds.  The value must then
+    clear every line, arrow and text of the notch plan (``sheet_ink_collisions``
+    on the live reads)."""
+    by_name = {dimension_name(adapter, item): _early_bound(item, "IAnnotation") for item in annotations}
+    angle = by_name["NotchRunAngle"]
+    display = _early_bound(angle.GetSpecificAnnotation(), "IDisplayDimension")
+    display.ArrowSide = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+    if int(display.ArrowSide) != 1:
+        raise RuntimeError("NotchRunAngle did not keep its arrows outside")
+    rebuild_drawing(adapter, label="notch run angle arrows outside")
+    arcs = _arc_chords(angle)
+    circle = [(centre, math.dist(chord[0], centre)) for chord, centre in _arcs(angle)]
+    lines = _drawing_leaders.dimension_segments(angle)
+    # d382's dump: the ray's and the run's extension lines, and the two
+    # outside tails (each listed twice).  Counts are not pinned; the offset
+    # must only keep what was there.
+    if len(arcs) < 2 or len(lines) < 2:
+        raise RuntimeError(
+            f"NotchRunAngle before its offset: expected its tails and extension lines, "
+            f"got arcs {arcs}, lines {lines}"
+        )
+    offset_dimension_text(adapter, [angle], {"NotchRunAngle": NOTCH_ANGLE_TEXT_XY})
+    if _read_member(display, "OffsetText") is not True:
+        raise RuntimeError("NotchRunAngle did not keep its offset text")
+    position = tuple(float(v) for v in angle.GetPosition())[:2]
+    after = _arcs(angle)
+    after_arcs = [chord for chord, _centre in after]
+    after_lines = _drawing_leaders.dimension_segments(angle)
+    print(
+        f"NotchRunAngle offset: text={position} arcs_before={arcs} arcs_after={after_arcs} "
+        f"lines_before={lines} lines_after={after_lines}"
+    )
+    if math.dist(position, NOTCH_ANGLE_TEXT_XY) > 0.0001:
+        raise RuntimeError(f"NotchRunAngle text landed at {position}, not {NOTCH_ANGLE_TEXT_XY}")
+    # Every arc the anchor laid is still there, and anything SolidWorks adds
+    # (the arc between the arrows, once the value leaves it) lies on the same
+    # circle: the sector did not flip.
+    same_circle = all(
+        math.dist(centre, circle[0][0]) < 1e-6
+        and abs(math.dist(chord[0], centre) - circle[0][1]) < 1e-6
+        for chord, centre in after
+    )
+    if not same_circle or not all(any(_same_segments([a], [b]) for b in after_arcs) for a in arcs):
+        raise RuntimeError("NotchRunAngle arcs moved with its offset text: the sector may have flipped")
+    if not all(any(_same_segments([a], [b]) for b in after_lines) for a in lines):
+        raise RuntimeError("NotchRunAngle extension lines moved with its offset text")
+    leaders = [
+        segment for segment in after_lines if not any(_same_segments([segment], [a]) for a in lines)
+    ] + _drawing_leaders.leader_segments(angle)
+    ink = SheetInk(
+        texts={"NotchRunAngle": _centred_box(position, NOTCH_ANGLE_TEXT_SIZE)},
+        lines={
+            name: _drawing_leaders.dimension_segments(item)
+            for name, item in by_name.items()
+            if name != "NotchRunAngle"
+        }
+        | {"NotchRunAngle": lines},
+        arcs={name: _arc_chords(item) for name, item in by_name.items() if name != "NotchRunAngle"}
+        | {"NotchRunAngle": after_arcs},
+        arrows={name: _arrow_segments(item) for name, item in by_name.items()},
+        leaders={"NotchRunAngle": leaders},
+    )
+    findings = sheet_ink_collisions(ink)
+    _telemetry.info(
+        f"NotchRunAngle ink: leaders={leaders} arrows={ink.arrows['NotchRunAngle']} "
+        f"findings={findings}"
+    )
+    if findings:
+        raise RuntimeError("notch run angle ink collides on the sheet: " + "; ".join(findings))
 
 
 def _assert_notch_angle_in_wedge(
@@ -1341,6 +1676,7 @@ def _assert_each_kept_dimension_once(adapter: Any, views: dict[str, Any]) -> Non
 
 
 async def build(adapter: Any) -> dict[str, str]:
+    assert_notch_angle_ink_clear()
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
@@ -1494,6 +1830,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _assert_notch_angle_in_wedge(adapter, notch, notch_annotations)
+    _offset_notch_angle_text(adapter, notch_annotations)
     section_annotations = curate_view_dimensions(
         adapter,
         section,
