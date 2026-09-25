@@ -427,6 +427,44 @@ async def _add_notch_run_angle(
     dims.record("NotchRunAngle")
 
 
+# The tip slot's end centres are dimensioned to a construction centerline on
+# the cone axis (sketch x = 0), from the origin to this far past the slot's
+# far (south) edge -- not to the origin.  Detail B is centred on the slot,
+# 27.7 south of the origin, and a detail view drops every model dimension
+# whose reference falls outside its crop circle (farm leaf 7ab69742b:
+# "missing model dimensions: ['TipSlotEastCx', 'TipSlotWestCx']"); the
+# centerline's end lies inside it.
+TIP_SLOT_AXIS_RUNOUT = 2.0
+
+# Each tip-slot sketch dimension (name after the prefix, in creation order)
+# and its two sketch references, named as in tip_slot_sketch_points.
+TIP_SLOT_DIMENSION_REFERENCES: dict[str, tuple[str, str]] = {
+    "AxisLen": ("axis_start", "axis_end"),
+    "EastCx": ("east_center", "axis_end"),
+    "Z": ("east_center", "origin"),
+    "WestCx": ("west_center", "axis_end"),
+    "W": ("line_a_start", "line_b_end"),
+}
+
+
+def tip_slot_sketch_points(width: float) -> dict[str, tuple[float, float]]:
+    """The tip slot sketch's named points, Top-plane sketch mm (y is part -Z).
+
+    ``axis_start``/``axis_end`` are the cone-axis centerline's ends; the
+    builder draws and dimensions from these very coordinates."""
+    c, r = TIP_SCREW_HALF_TRAVEL, width / 2.0
+    y = -TIP_SCREW_LOCAL_Z  # sketch y -> part -Z
+    return {
+        "origin": (0.0, 0.0),
+        "axis_start": (0.0, 0.0),
+        "axis_end": (0.0, y + r + TIP_SLOT_AXIS_RUNOUT),
+        "east_center": (-c, y),
+        "west_center": (c, y),
+        "line_a_start": (-c, y - r),
+        "line_b_end": (-c, y + r),
+    }
+
+
 async def _sketch_tip_screw_slot(
     adapter, *, width: float, label: str, prefix: str
 ) -> SketchDims:
@@ -434,11 +472,16 @@ async def _sketch_tip_screw_slot(
 
     Two lines and two end arcs whose centres sit TIP_SCREW_HALF_TRAVEL either
     side of the pivot's cone-axis line, so the shop sets each end from the
-    pivot centre. The width is dimensioned between the two lines (it is the
+    pivot centre.  That line is a construction centerline on sketch x = 0,
+    started at the origin, and each end centre is dimensioned horizontally to
+    its far end (TIP_SLOT_AXIS_RUNOUT past the slot), which detail B's crop
+    takes in; the station (``Z``) stays dimensioned to the origin for the
+    plan.  The width is dimensioned between the two lines (it is the
     end-mill size); tangency makes the arcs full radius."""
     dims = SketchDims()
     c, r = TIP_SCREW_HALF_TRAVEL, width / 2.0
     y = -TIP_SCREW_LOCAL_Z  # sketch y -> part -Z
+    points = tip_slot_sketch_points(width)
     check(f"create_sketch {label}", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     line_a = check(f"{label} line a", await adapter.add_line(-c, y - r, c, y - r))
@@ -449,21 +492,49 @@ async def _sketch_tip_screw_slot(
     arc_e = check(
         f"{label} east arc", await adapter.add_arc(-c, y, -c, y + r, -c, y - r)
     )
+    # Direct-to-DB like the profile: a vertical line from the origin would
+    # otherwise infer the very relations added below and over-define.
+    axis = check(
+        f"{label} cone-axis centerline",
+        await adapter.add_centerline(*points["axis_start"], *points["axis_end"]),
+    )
     set_sketch_direct_db(adapter, False)
-    await anchor_point_to_origin(adapter, f"{arc_e}.center", -c, y, f"{label} east end")
-    dims.record(f"{prefix}EastCx")
-    dims.record(f"{prefix}Z")
+    refs = {
+        "origin": "origin",
+        "axis_start": f"{axis}.start",
+        "axis_end": f"{axis}.end",
+        "east_center": f"{arc_e}.center",
+        "west_center": f"{arc_w}.center",
+        "line_a_start": f"{line_a}.start",
+        "line_b_end": f"{line_b}.end",
+    }
+
+    async def dimension(name: str, kind: str, value: float, what: str) -> None:
+        first, second = TIP_SLOT_DIMENSION_REFERENCES[name]
+        await dimension_between(
+            adapter, refs[first], refs[second], kind, value, f"{label} {what}"
+        )
+        dims.record(f"{prefix}{name}")
+
+    await anchor_point_to_origin(
+        adapter, refs["axis_start"], *points["axis_start"], f"{label} axis start"
+    )
+    check(
+        f"{label} axis vertical",
+        await adapter.add_sketch_constraint(axis, None, "vertical"),
+    )
+    await dimension(
+        "AxisLen", "vertical_distance", points["axis_end"][1], "axis length"
+    )
+    await dimension("EastCx", "horizontal_distance", c, "east end")
+    await dimension("Z", "vertical_distance", y, "station")
     check(
         f"{label} end centres level",
         await adapter.add_sketch_constraint(
-            f"{arc_e}.center", f"{arc_w}.center", "horizontal_points"
+            refs["east_center"], refs["west_center"], "horizontal_points"
         ),
     )
-    await dimension_between(
-        adapter, f"{arc_w}.center", "origin", "horizontal_distance", c,
-        f"{label} west end",
-    )
-    dims.record(f"{prefix}WestCx")
+    await dimension("WestCx", "horizontal_distance", c, "west end")
     check(
         f"horizontal {label} line a",
         await adapter.add_sketch_constraint(line_a, None, "horizontal"),
@@ -478,11 +549,7 @@ async def _sketch_tip_screw_slot(
             f"{label} tangent {junction}",
             await adapter.add_sketch_constraint(e1, e2, "tangent"),
         )
-    await dimension_between(
-        adapter, f"{line_a}.start", f"{line_b}.end", "vertical_distance", width,
-        f"{label} width",
-    )
-    dims.record(f"{prefix}W")
+    await dimension("W", "vertical_distance", width, "width")
     await ensure_fully_defined(adapter, f"{label} sketch")
     check(f"exit_sketch {label}", await adapter.exit_sketch())
     return dims

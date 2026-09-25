@@ -685,6 +685,96 @@ def test_cutter_note_leaders_reach_their_arcs_without_crossing() -> None:
     )
 
 
+_TIP_SLOT_WIDTHS = {"TipSlot": spec.TIP_SLOT_W, "TipCbore": spec.TIP_CBORE_W}
+
+
+def _tip_slot_dimension(name: str) -> tuple[float, str]:
+    """(sketch width, reference key) of a tip-slot sketch's dimension."""
+    for prefix, width in _TIP_SLOT_WIDTHS.items():
+        if name.startswith(prefix):
+            return width, name[len(prefix) :]
+    raise AssertionError(f"{name} is not a tip-slot sketch dimension")
+
+
+def _crop_distance(sketch_xy: tuple[float, float]) -> float:
+    """Plan distance (mm) of a Top-plane sketch point from detail B's centre.
+
+    Sketch y is part -Z; the crop circle is centred on (0, DETAIL_MODEL_Z)."""
+    x, y = sketch_xy
+    return math.hypot(x, -y - drawing.DETAIL_MODEL_Z)
+
+
+def test_detail_b_dimension_references_lie_inside_its_crop() -> None:
+    """A detail view imports a model dimension only when its references fall
+    inside the crop circle.  Farm leaf 7ab69742b: with the end centres
+    dimensioned to the sketch origin, 27.7 from the slot-centred R12 circle,
+    detail B came up with only the two widths ("missing model dimensions:
+    ['TipSlotEastCx', 'TipSlotWestCx']")."""
+    assert set(drawing.DETAIL_KEEP) == {
+        "TipSlotEastCx",
+        "TipSlotWestCx",
+        "TipSlotW",
+        "TipCboreW",
+    }
+    for name in drawing.DETAIL_KEEP:
+        width, key = _tip_slot_dimension(name)
+        points = part.tip_slot_sketch_points(width)
+        for ref in part.TIP_SLOT_DIMENSION_REFERENCES[key]:
+            distance = _crop_distance(points[ref])
+            assert distance < drawing.DETAIL_RADIUS_MM - 1.0, (name, ref, distance)
+    # Positive control: the origin, the Cx dimensions' old reference, lies
+    # outside the crop -- and before I31 (slot at z -11, circle centred at
+    # z -6) it lay inside, which is why the same dimensions imported then.
+    origin = part.tip_slot_sketch_points(spec.TIP_SLOT_W)["origin"]
+    assert _crop_distance(origin) > drawing.DETAIL_RADIUS_MM
+    assert math.hypot(0.0, 0.0 - (-6.0)) < drawing.DETAIL_RADIUS_MM
+
+
+def test_tip_slot_end_centres_dimension_to_the_cone_axis_centerline() -> None:
+    """Main's option (a): each end centre is a horizontal distance to a
+    construction centerline on the cone axis, not to the origin.  The line
+    starts at the origin, stays on sketch x = 0, and runs past the slot."""
+    import inspect
+    import re
+
+    refs = part.TIP_SLOT_DIMENSION_REFERENCES
+    assert refs["EastCx"] == ("east_center", "axis_end")
+    assert refs["WestCx"] == ("west_center", "axis_end")
+    # The station stays on the origin: it prints on the notch plan.
+    assert refs["Z"] == ("east_center", "origin")
+    assert all("origin" not in refs[key] for key in ("EastCx", "WestCx", "W"))
+    for width in _TIP_SLOT_WIDTHS.values():
+        points = part.tip_slot_sketch_points(width)
+        assert points["axis_start"] == (0.0, 0.0) == points["origin"]
+        assert points["axis_end"][0] == 0.0
+        slot_y = -spec.TIP_SCREW_LOCAL_Z
+        assert points["east_center"] == (-spec.TIP_SCREW_HALF_TRAVEL, slot_y)
+        assert points["west_center"] == (spec.TIP_SCREW_HALF_TRAVEL, slot_y)
+        # Past the slot's far edge, so the line crosses the whole slot.
+        assert points["axis_end"][1] > slot_y + width / 2.0
+    source = inspect.getsource(part._sketch_tip_screw_slot)
+    assert '"origin", "horizontal_distance"' not in source
+    assert "anchor_point_to_origin(adapter, f\"{arc_e}" not in source
+    assert "add_centerline(" in source
+    assert 'await adapter.add_sketch_constraint(axis, None, "vertical")' in source
+    assert 'anchor_point_to_origin(\n        adapter, refs["axis_start"]' in source
+    assert '"axis_start": f"{axis}.start"' in source
+    assert '"axis_end": f"{axis}.end"' in source
+    assert 'add_centerline(*points["axis_start"], *points["axis_end"])' in source
+    # Every dimension goes through the reference table, in its order -- the
+    # order SketchDims names them in.
+    assert "dims.record(f\"{prefix}{name}\")" in source
+    assert source.count("dims.record(") == 1
+    assert source.count("dimension_between(") == 1
+    created = re.findall(r'await dimension\(\s*"(\w+)"', source)
+    assert created == list(refs)
+    names = {f"TipSlot{key}" for key in refs}
+    assert spec.DRAWING_DIMENSIONS["TipScrewSlotProfile"] <= names
+    assert spec.DRAWING_DIMENSIONS["TipScrewCboreProfile"] <= {
+        f"TipCbore{key}" for key in refs
+    }
+
+
 def test_slot_section_cut_keeps_its_plane_and_crosses_the_plate() -> None:
     """Section C-C cuts at the slot station, edge to edge (8783776d eye-pass).
 
