@@ -378,3 +378,46 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "1018" in str(config["material"])
     assert config["finish"]
     assert int(config["quantity"]) == 1
+
+
+def test_every_section_knob_drives_its_shoulder_plane_and_depth(monkeypatch) -> None:
+    """SecEnd{i} is a documented knob (Tools > Equations): editing it must move
+    the shoulder, not only the extrude depth back to the large end. Run the
+    real build() against recording stubs and read the drive equations it
+    authors: every land on an offset plane has that plane's offset AND its
+    depth owned by the same SecEnd{i} (Codex #839 PRRT_kwDOPHDy386mKNTW)."""
+    import asyncio
+    import inspect
+    from unittest.mock import AsyncMock, MagicMock
+
+    drives: list[tuple[str, str]] = []
+
+    def name_dimensions(_adapter, feature, names):
+        return [f"{name}@{feature}" for name in names]
+
+    async def drive_dimension(_adapter, dim_name, expr):
+        drives.append((dim_name, expr))
+
+    for attr, value in list(vars(part).items()):
+        if not callable(value) or attr.startswith("__") or attr == "build":
+            continue
+        if getattr(value, "__module__", "") == part.__name__:
+            continue
+        if not inspect.isfunction(value) and not inspect.isclass(value):
+            continue
+        stub = AsyncMock() if inspect.iscoroutinefunction(value) else MagicMock()
+        monkeypatch.setattr(part, attr, stub)
+    monkeypatch.setattr(part, "name_dimensions", name_dimensions)
+    monkeypatch.setattr(part, "drive_dimension", drive_dimension)
+    # the diameter drives ride SketchDims.apply; this test reads the stations
+    sketch_dims = MagicMock()
+    sketch_dims.return_value.apply.return_value = []
+    monkeypatch.setattr(part, "SketchDims", sketch_dims)
+
+    asyncio.run(part.build(AsyncMock()))
+
+    owners = dict(drives)
+    for i in range(1, len(cone_gear_shaft_spec.SECTIONS)):
+        assert owners[f"Sec{i}Station@Sec{i}EndPlane"] == f'"SecEnd{i}"', i
+        assert owners[f"Sec{i}End@Sec{i}"] == f'"SecEnd{i}"', i
+    assert owners["Sec0End@Sec0"] == '"SecEnd0"'

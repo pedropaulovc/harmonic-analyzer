@@ -135,7 +135,9 @@ async def build(adapter) -> dict[str, str]:
     # to inches by the pure-data spec). The end stations are extrude DEPTHS
     # (feature parameters); each is named Sec{i}End and driven by its SecEnd{i}
     # global below, so the knobs really reshape the shaft AND the stations are
-    # markable manufacturing dimensions for the drawing.
+    # markable manufacturing dimensions for the drawing. A land sketched on its
+    # own offset plane has that plane's offset driven by the same SecEnd{i}, so
+    # the knob moves the shoulder and the depth back to the large end together.
     for i, (dia_in, end_z) in enumerate(SECTIONS):
         await set_global(adapter, f"SecDia{i}", f"{dia_in * IN}mm")
         await set_global(adapter, f"SecEnd{i}", f"{end_z}mm")
@@ -172,6 +174,8 @@ async def build(adapter) -> dict[str, str]:
             )
             plane_name = f"Sec{i}EndPlane"
             name_last_feature(adapter, plane_name)
+            plane_dim = name_dimensions(adapter, plane_name, [f"Sec{i}Station"])
+            drive_jobs += [(plane_dim[0], f'"SecEnd{i}"')]
         # On-axis circle (centre at the origin): define_circle records ONLY the
         # diameter dim (the X/Z centre slots are relations, not display dims).
         sec = SketchDims()
