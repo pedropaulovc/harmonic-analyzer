@@ -1652,17 +1652,13 @@ def test_module_deps_follow_dotted_package_recipe_chain(tmp_path, monkeypatch):
     helper.write_text("import external_site_package\n", encoding="utf-8")
 
     monkeypatch.setattr(bg, "SCRIPTS_DIR", scripts)
-    bg._local_modules.cache_clear()
-    bg._module_by_path.cache_clear()
-    bg._direct_local_imports.cache_clear()
+    bg.clear_import_caches()
     try:
         deps = {Path(dep) for dep in module_deps_of(wrapper)}
     finally:
         # Do not leave cached temporary paths behind after monkeypatch restores
         # the production scripts root.
-        bg._direct_local_imports.cache_clear()
-        bg._module_by_path.cache_clear()
-        bg._local_modules.cache_clear()
+        bg.clear_import_caches()
 
     assert entry.resolve() in deps
     assert helper.resolve() in deps
@@ -1691,9 +1687,7 @@ def test_identical_module_text_resolves_against_its_own_package(tmp_path, monkey
         (directory / "helper.py").write_text("", encoding="utf-8")
 
     monkeypatch.setattr(bg, "SCRIPTS_DIR", scripts)
-    bg._local_modules.cache_clear()
-    bg._module_by_path.cache_clear()
-    bg._direct_local_imports.cache_clear()
+    bg.clear_import_caches()
     try:
         closures = {
             package: {
@@ -1703,9 +1697,7 @@ def test_identical_module_text_resolves_against_its_own_package(tmp_path, monkey
             for package in ("alpha", "beta")
         }
     finally:
-        bg._direct_local_imports.cache_clear()
-        bg._module_by_path.cache_clear()
-        bg._local_modules.cache_clear()
+        bg.clear_import_caches()
 
     for package, other in (("alpha", "beta"), ("beta", "alpha")):
         assert (scripts / package / "helper.py").resolve() in closures[package]
@@ -2060,6 +2052,21 @@ def test_the_store_file_is_named_for_this_analyzer(tmp_path, monkeypatch):
     analyzer = hashlib.sha256(Path(bg.__file__).read_bytes()).hexdigest()[:16]
     assert location.parent == tmp_path
     assert analyzer in location.name
+    assert f"-v{bg._FACTS_SCHEMA}-" in location.name
+    assert sys.implementation.cache_tag in location.name
+
+
+def test_a_malformed_entry_is_overwritten_by_the_recomputed_fact(tmp_path, monkeypatch):
+    store = _fresh_store(monkeypatch, tmp_path)
+    bg._module_syntax.cache_clear()
+    source = "import json\n"
+    bg._module_syntax(source)
+    (key,) = [k for k in store._entries]
+    store._entries[key] = ("garbage",)
+    bg._module_syntax.cache_clear()
+    bg._module_syntax(source)
+    assert bg._ModuleSyntax(*store._entries[key]) == bg._module_syntax(source)
+    bg._module_syntax.cache_clear()
 
 
 def test_no_nameable_home_disables_the_store_instead_of_failing(monkeypatch):

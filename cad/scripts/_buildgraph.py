@@ -946,8 +946,13 @@ def _module_by_path() -> dict[Path, str]:
 # ``HARMONIC_BUILDGRAPH_CACHE`` overrides the directory; ``off`` disables it.
 _FACTS_ENV = "HARMONIC_BUILDGRAPH_CACHE"
 # Beyond this many entries a save keeps only what this process used, so a
-# long-lived store sheds the facts of source versions nothing reads any more.
+# long-lived store sheds the facts of source versions nothing reads any more
+# (~700 modules x 3 analyzers per source version; ~0.6 MB per 2k entries).
 _FACTS_MAX_ENTRIES = 20_000
+# Bump when the ENCODED shape of a stored fact changes without _buildgraph.py
+# itself changing (it always does today, which already renames the store; the
+# constant makes the contract explicit rather than incidental).
+_FACTS_SCHEMA = 1
 
 
 class _BuiltinsOnly(pickle.Unpickler):
@@ -989,8 +994,14 @@ class _FactStore:
             analyzer = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:16]
         except Exception:  # noqa: BLE001 - the store is an optimisation only
             return None
-        version = f"py{sys.version_info[0]}{sys.version_info[1]}"
-        return base / f"syntax-facts-{analyzer}-{version}.pickle"
+        # The interpreter matters too: ``ast`` output differs across versions
+        # and implementations (cache_tag is e.g. ``cpython-314``).
+        interpreter = sys.implementation.cache_tag or (
+            f"{sys.implementation.name}-{sys.version_info[0]}{sys.version_info[1]}"
+        )
+        return base / (
+            f"syntax-facts-v{_FACTS_SCHEMA}-{analyzer}-{interpreter}.pickle"
+        )
 
     def _read(self, path: Path) -> dict[bytes, object]:
         try:
@@ -1241,16 +1252,23 @@ def module_deps_of(script: Path) -> list[str]:
     return list(_module_closure(_resolved(script)))
 
 
-@functools.lru_cache(maxsize=None)
 def _resolved(path: Path) -> Path:
-    """``path.resolve()``, once per path per process.
+    """``path.resolve()``, once per ABSOLUTE path per process.
 
     A doit graph load resolves the same few hundred module and config paths
     ~56k times (every closure re-resolves every member); on Windows each is a
     ``GetFinalPathNameByHandle`` round trip, which measured ~5 s of a ~21 s
-    load. Cleared with the module map (``_local_modules.cache_clear``), so a
-    test that rebuilds its fixture tree re-resolves.
+    load. Only absolute paths are memoized: the memo key ignores the working
+    directory, so a relative path is resolved afresh every time. Dropped by
+    :func:`clear_import_caches`.
     """
+    if not path.is_absolute():
+        return path.resolve()
+    return _resolved_absolute(path)
+
+
+@functools.lru_cache(maxsize=None)
+def _resolved_absolute(path: Path) -> Path:
     return path.resolve()
 
 
@@ -1261,7 +1279,7 @@ def _module_closure(script: Path) -> tuple[str, ...]:
     The graph asks for the same closure from several task generators (helper
     deps, config deps, data deps, the check gates). Every input is already
     memoized per process (``_direct_local_imports``), so the closure is too;
-    it is dropped with them (``_direct_local_imports.cache_clear``).
+    it is dropped with them (:func:`clear_import_caches`).
     """
     mods = _local_modules()
     result: set[str] = set()
@@ -1275,20 +1293,19 @@ def _module_closure(script: Path) -> tuple[str, ...]:
     return tuple(sorted(str(_resolved(mods[m])) for m in result))
 
 
-def _clear_import_caches(
-    _imports=_direct_local_imports.cache_clear,
-    _closure=_module_closure.cache_clear,
-    _paths=_resolved.cache_clear,
-) -> None:
-    """Clearing the import facts also drops the closures and resolved paths
-    derived from them, so the existing single entry point keeps meaning
-    "re-read the tree"."""
-    _imports()
-    _closure()
-    _paths()
+def clear_import_caches() -> None:
+    """Forget every per-process fact about the local module tree: the module map,
+    each module's direct imports, the import closures and the resolved paths.
 
-
-_direct_local_imports.cache_clear = _clear_import_caches
+    The one entry point for "re-read the tree" -- a test that rebuilds its
+    fixture sources, or a long-lived process whose checkout moved. The syntax
+    facts themselves need no clearing: they are keyed by source content.
+    """
+    _local_modules.cache_clear()
+    _module_by_path.cache_clear()
+    _direct_local_imports.cache_clear()
+    _module_closure.cache_clear()
+    _resolved_absolute.cache_clear()
 
 
 def _drawing_registry_value(node: ast.AST) -> object:
