@@ -7,7 +7,7 @@ reference-sketch dimension, imported at its model-owned places -- and an
 isometric, both 1:1.  No single length suits every in-band post and plate
 (post_mount_screw_spec's U27 check), so the length prints as a REFERENCE,
 "(86.0)", with "CUT TO FIT AT ASSEMBLY" beneath it and no band; MHA-A03 says
-how.  The only note says to chamfer the cut end and that the undimensioned
+how.  The cut end's deburr break is a live banded dimension, 0.1 +0/-0.1.  The only note says to chamfer the cut end and that the undimensioned
 purchased geometry is reference.  No installation sequence, engagement figure or rule
 number is printed: the sequence is an MHA-A03 assembly step and the
 engagement a model assert (Main's eye pass of warm-c486, policy rule 6).
@@ -24,6 +24,7 @@ import sys
 from typing import Any
 
 import _drawing_hidden_sketches as hidden_sketches
+import _stock_trim_drawing as trim_drawing
 import _telemetry
 from _common import _early_bound, check, run_build
 from _drawing_common import (
@@ -33,6 +34,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     dimension_name,
+    offset_dimension_text,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
@@ -40,11 +42,17 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _fit_limits import deviations
 from post_mount_screw_spec import (
+    CUT_END_BREAK_BAND,
+    CUT_END_BREAK_DIMENSION,
+    CUT_END_BREAK_MM,
     CUT_LENGTH_DIMENSION,
     CUT_LENGTH_MM,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    HEAD_H_MM,
+    THREAD_DIA_MM,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
@@ -62,8 +70,29 @@ ISO_CENTER = (0.270, 0.185)
 # The cut length reads on the left, where its reference line runs along the
 # shank's silhouette, midway along the span, far enough out that its
 # two-line callout clears the shank.
-FRONT_KEEP = {CUT_LENGTH_DIMENSION: (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1])}
+# The cut end's 0.1 break spans 0.1 mm at 1:1, so its dimension line sits
+# just below the end face and its text leads out to the right, clear of the
+# shank and above the note block.  (The view is placed by its outline's
+# centre: the end face is half the screw's overall height below it.)
+TIP_Y = FRONT_CENTER[1] - (CUT_LENGTH_MM + HEAD_H_MM) / 2000.0
+BREAK_X = FRONT_CENTER[0] + (THREAD_DIA_MM / 2.0 - CUT_END_BREAK_MM / 2.0) / 1000.0
+FRONT_KEEP = {
+    CUT_LENGTH_DIMENSION: (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1]),
+    CUT_END_BREAK_DIMENSION: (BREAK_X, TIP_Y - 0.006),
+}
+BREAK_TEXT = (FRONT_CENTER[0] + 0.028, TIP_Y - 0.006)
 DIMENSION_CALLOUTS = {CUT_LENGTH_DIMENSION: "CUT TO FIT\nAT ASSEMBLY"}
+# The break is a live cutting control: driving, bilateral (swTolBILAT = 2)
+# at the model's nominal and band -- re-read on the sheet, not trusted.
+_break_lower, _break_upper = deviations(CUT_END_BREAK_BAND)
+BREAK_CONTROLS = {
+    CUT_END_BREAK_DIMENSION: (
+        CUT_END_BREAK_MM / 1000.0,
+        _break_lower / 1000.0,
+        _break_upper / 1000.0,
+    )
+}
+BREAK_TOLERANCE_TYPES = {CUT_END_BREAK_DIMENSION: 2}
 # Below the Front view (its lower end ~0.119), above the stock rows.
 NOTES_XY = (0.016, 0.100)
 STOCK_ROWS = (
@@ -145,7 +174,21 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _reference_cut_length(adapter, annotations)
+    trim_drawing.verify_machining_controls(
+        adapter,
+        [
+            annotation
+            for annotation in annotations
+            if dimension_name(adapter, annotation) in BREAK_CONTROLS
+        ],
+        expected=BREAK_CONTROLS,
+        tolerance_types=BREAK_TOLERANCE_TYPES,
+        precision=DRAWING_PRECISION_BY_NAME,
+    )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    offset_dimension_text(
+        adapter, annotations, {CUT_END_BREAK_DIMENSION: BREAK_TEXT}
+    )
 
     add_property_linked_note(
         adapter, "Manufacturing Notes", *NOTES_XY, char_height=0.003
