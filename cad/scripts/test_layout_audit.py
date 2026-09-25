@@ -514,3 +514,40 @@ def test_the_logged_replay_copy_trims_only_oversized_polylines():
     assert logged["views"][1]["polylines_omitted"] == len(big)
     assert view_ink(logged["views"][1]).space == "omitted"
     assert len(dump["views"][1]["polylines"]) == len(big)  # the audited copy is untouched
+
+
+# hb-render-5 (375bf2aad, supports' fix): the cross-tap cut to three rows and
+# lowered 10 mm clear of the spring block (dt-logs/hb-render-5 line 54).
+HB5_CROSS_TAP = (
+    "MHA-132",
+    [
+        (0.3295759581969177, 0.09824798610154864, 0.3408763902127743, 0.11161215219646692),
+        (0.3289240418030824, 0.09747701389845134, 0.3295759581969177, 0.09824798610154864),
+        (0.3408763902127743, 0.11161215219646692, 0.23071110978722575, 0.11161215219646692),
+    ],
+    [
+        ("4X ", 0.2624042181670666, 0.12283159763785084),
+        ("<MOD-DIAM>", 0.26912713501602414, 0.12277812546119099),
+        (" 4.04 ", 0.2744055724143982, 0.12283159763785084),
+        ("<HOLE-DEPTH>", 0.2860430719703436, 0.12277812546119099),
+        (" 48 MIN", 0.2910436967760325, 0.12283159763785084),
+        ("THRU BOTH WALLS, SINGLE CONTINUOUS THREAD", 0.23071110978722575, 0.1172218752955087),
+        (" 10-32 UNF - 2B ", 0.2590618392825127, 0.1116656253044494),
+        ("<HOLE-DEPTH>", 0.29300697878003124, 0.11161215312778955),
+        (" 46.00", 0.2980076035857201, 0.1116656253044494),
+    ],
+)
+
+
+def test_hb_render_5_fixed_cross_tap_passes_the_block_rules():
+    """Negative control: supports' fix keeps three rows, 10 mm under the
+    spring block, so neither block rule nor the clearance rule fires."""
+    findings = audit_dump(
+        _holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK, HB4_SPRING, HB5_CROSS_TAP)
+    )
+    assert not [
+        f
+        for f in findings
+        if f.kind in ("merged-blocks", "tall-block", "text-clearance", "text-separation")
+        and "MHA-132" in f.a + f.b
+    ]
