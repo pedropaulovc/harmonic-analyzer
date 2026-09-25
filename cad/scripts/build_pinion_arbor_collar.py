@@ -58,7 +58,6 @@ from pinion_arbor_collar_geometry import (
     PIN_HOLE_Z,
 )
 from pinion_arbor_collar_spec import (
-    BORE_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -212,11 +211,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven collar (equations neutral)", volume, 0.01 * V_COLLAR
     )
 
-    # Manufacturing drawing support: the two drilled fits carry their bands
-    # on the model; the places are the part's (policy rule 2).
-    set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *deviations(BORE_BAND)
-    )
+    # Manufacturing drawing support: only the pin hole's tighter band rides
+    # the model.  The Ø8 bore is a plain drilled hole, so the title block's
+    # DRILLED HOLES row governs it and the dimension restates nothing (policy
+    # rule 1, Codex on #860).  The places are the part's (policy rule 2).
     set_dimension_bilateral_tolerance(
         adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_BAND)
     )
