@@ -551,25 +551,37 @@ def test_cam_set_screw_hole_stays_clear_of_the_follower() -> None:
     assert math.isclose(engaged - half, 75.45, abs_tol=0.05)
 
 
-def test_set_pin_holes_sit_under_the_pose_straps_and_the_hardware_straps() -> None:
+def test_set_pin_holes_sit_at_the_physical_back_stop_straps() -> None:
     # Option E-a: MHA-062's holes are match-drilled through the MHA-056 cross
-    # holes with the shaft back-flush and the cluster at the back stop.  The
-    # model holds them under the POSE's strap mid-planes, so the saved model
-    # shows the pin axes through both parts; the hardware's strap stations
-    # carry 2 x STRAP_AIR less between them (the M2 pose-air rule).
+    # holes with the shaft back-flush and the cluster at the back stop.  Codex
+    # #858 P1: the released part is the manufactured shaft, so its holes sit
+    # under the HARDWARE strap mid-planes (back strap hard on the back block,
+    # drum and front strap closed up behind it).  Codex #854/#858 P1 (Main):
+    # that fit-up stack is also the saved pose, so both strap cross holes
+    # share an axis with the shaft's holes in the assembly.
     import pinion_rig_layout as rig
-    from pinion_pivot_shaft_spec import PIN_HOLE_Z, SHAFT_LEN
+    from pinion_pivot_shaft_spec import (
+        PIN_HOLE_BAND,
+        PIN_HOLE_DIA,
+        PIN_HOLE_Z,
+        SHAFT_LEN,
+    )
 
     t = drive.STRAP_T
-    model_mid = [(o + i) / 2.0 for o, i in zip(rig.STRAP_Z_OUTER, rig.STRAP_Z_INNER)]
-    for z_hole, mid in zip(PIN_HOLE_Z, model_mid):
-        assert math.isclose(rig.TORQUE_SHAFT_Z0 + z_hole, mid, abs_tol=1e-9)
     from_back = [SHAFT_LEN - z for z in PIN_HOLE_Z]  # (front, back)
     physical_back = drive.BLOCK_DEPTH + t / 2.0
     physical_front = physical_back + t + rig.DRUM_LEN
     assert math.isclose(from_back[1], physical_back, abs_tol=1e-9)
     assert math.isclose(from_back[1], 14.75, abs_tol=1e-9)
-    assert math.isclose(from_back[0] - physical_front, 2.0 * rig.STRAP_AIR)
+    assert math.isclose(from_back[0], physical_front, abs_tol=1e-9)
+    # Against the pose: both strap mid-planes are the holes' stations.
+    model_mid = [(o + i) / 2.0 for o, i in zip(rig.STRAP_Z_OUTER, rig.STRAP_Z_INNER)]
+    world = [rig.TORQUE_SHAFT_Z0 + z for z in PIN_HOLE_Z]
+    for hole, mid in zip(world, model_mid, strict=True):
+        assert math.isclose(hole, mid, abs_tol=1e-9)
+    # Each hole stays inside its strap's thickness at its band's maximum.
+    hole_max = PIN_HOLE_DIA + PIN_HOLE_BAND[0]
+    assert hole_max / 2.0 < t / 2.0
     # Both holes stay well inside the body, clear of the crown roots.
     assert min(PIN_HOLE_Z) >= 10.0
     assert max(PIN_HOLE_Z) <= SHAFT_LEN - 10.0

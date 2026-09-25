@@ -3792,7 +3792,10 @@ async def build(adapter) -> dict[str, str]:
         witness_local=[0.0, STRAP_C2C, 0.0],
     )
     # Option E-a set pins: the shaft's pin holes and the straps' cross holes
-    # share an axis (their local X), so the pin tie is the back strap's own
+    # run along the same direction (their local X), and each pair shares an
+    # axis: the shaft's holes sit at the fit-up stack's strap stations, which
+    # this pose is (pinion_pivot_shaft_spec).  The pin tie is the back
+    # strap's own
     # rigid-group idiom -- the shaft's Right plane parallel to the front
     # strap's.  The front strap's swing is the freed DOF, so the shaft now
     # turns with the group in the block bores.  Its origin is on the swing
