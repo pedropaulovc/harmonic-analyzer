@@ -194,9 +194,7 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
     }
 
     def clear_closure():
-        bg._direct_local_imports.cache_clear()
-        bg._module_by_path.cache_clear()
-        bg._local_modules.cache_clear()
+        bg.clear_import_caches()
 
     def checkout(name="repo", *, crlf=False):
         root = tmp_path / name

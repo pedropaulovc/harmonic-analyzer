@@ -15,9 +15,17 @@ not occurrences of part names in prose. Unknown source expressions fail loudly.
 from __future__ import annotations
 
 import ast
+import atexit
+import contextlib
 import functools
+import hashlib
+import io
 import json
+import os
+import pickle
 import re
+import sys
+import tempfile
 from dataclasses import asdict, fields
 from enum import Enum
 from pathlib import Path
@@ -922,6 +930,164 @@ def _module_by_path() -> dict[Path, str]:
     return {path.resolve(): name for name, path in _local_modules().items()}
 
 
+# --- Machine-wide store of pure syntax facts -------------------------------------
+# Every doit graph load parses and walks each local module up to three times
+# (imports, config reads, drawing-registry reads): ~1400 parses, measured as most
+# of the load once path resolution was memoized. A farm leaf loads the graph twice
+# (prepare's export and execute's ``build.py run``) and the submitter once per
+# command, and between loads almost no source changes. These facts are pure
+# functions of a file's TEXT, so they are kept across processes keyed by the
+# SHA-256 of that text -- plus the SHA-256 of this analyzer, which names the
+# store file, so any change to the analysis starts an empty store. A stale answer
+# is therefore impossible by construction: a different text is a different key.
+# The store lives OUTSIDE the checkout (a farm root is ``clean -ffdx``-ed on every
+# leaf) and is best-effort: an unreadable, foreign or corrupt store is an empty
+# one, and a failed write only costs the next process a parse.
+# ``HARMONIC_BUILDGRAPH_CACHE`` overrides the directory; ``off`` disables it.
+_FACTS_ENV = "HARMONIC_BUILDGRAPH_CACHE"
+# Beyond this many entries a save keeps only what this process used, so a
+# long-lived store sheds the facts of source versions nothing reads any more
+# (~700 modules x 3 analyzers per source version; ~0.6 MB per 2k entries).
+_FACTS_MAX_ENTRIES = 20_000
+# Bump when the ENCODED shape of a stored fact changes without _buildgraph.py
+# itself changing (it always does today, which already renames the store; the
+# constant makes the contract explicit rather than incidental).
+_FACTS_SCHEMA = 1
+
+
+class _BuiltinsOnly(pickle.Unpickler):
+    """The store holds builtin containers of strings only; refuse anything else."""
+
+    _ALLOWED = frozenset({"frozenset", "set", "tuple", "list", "dict", "str"})
+
+    def find_class(self, module: str, name: str):
+        if module == "builtins" and name in self._ALLOWED:
+            return super().find_class(module, name)
+        raise pickle.UnpicklingError(f"refused {module}.{name}")
+
+
+class _FactStore:
+    def __init__(self) -> None:
+        self._entries: dict[bytes, object] | None = None
+        self._used: dict[bytes, object] = {}
+        self._dirty = False
+        self._path: Path | None = None
+
+    def _location(self) -> Path | None:
+        """The store file, or None when disabled or when no home can be named.
+
+        A farm leaf runs under a filtered environment; a missing
+        ``LOCALAPPDATA`` and home (``Path.home()`` raises ``RuntimeError``)
+        disables the store rather than failing the graph load.
+        """
+        try:
+            setting = os.environ.get(_FACTS_ENV, "")
+            if setting.lower() in {"off", "0", "false", "no"}:
+                return None
+            base = (
+                Path(setting)
+                if setting
+                else Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".cache")
+                / "harmonic-analyzer"
+                / "buildgraph"
+            )
+            analyzer = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:16]
+        except Exception:  # noqa: BLE001 - the store is an optimisation only
+            return None
+        # The interpreter matters too: ``ast`` output differs across versions
+        # and implementations (cache_tag is e.g. ``cpython-314``).
+        interpreter = sys.implementation.cache_tag or (
+            f"{sys.implementation.name}-{sys.version_info[0]}{sys.version_info[1]}"
+        )
+        return base / (
+            f"syntax-facts-v{_FACTS_SCHEMA}-{analyzer}-{interpreter}.pickle"
+        )
+
+    def _read(self, path: Path) -> dict[bytes, object]:
+        try:
+            with path.open("rb") as handle:
+                entries = _BuiltinsOnly(io.BytesIO(handle.read())).load()
+        except Exception:  # noqa: BLE001 - unreadable, corrupt or foreign: empty
+            return {}
+        return entries if isinstance(entries, dict) else {}
+
+    def _load(self) -> dict[bytes, object]:
+        if self._entries is None:
+            self._path = self._location()
+            self._entries = {} if self._path is None else self._read(self._path)
+        return self._entries
+
+    def get(self, key: bytes) -> tuple[bool, object]:
+        entries = self._load()
+        if key not in entries:
+            return False, None
+        self._used[key] = entries[key]
+        return True, entries[key]
+
+    def put(self, key: bytes, value: object) -> None:
+        self._load()[key] = value
+        self._used[key] = value
+        if self._path is not None and not self._dirty:
+            self._dirty = True
+            atexit.register(self.save)
+
+    def save(self) -> None:
+        if not self._dirty or self._path is None:
+            return
+        self._dirty = False
+        # Merge with whatever a concurrent process saved since we loaded: every
+        # entry is content-addressed, so any union of them is still correct.
+        merged = {**self._read(self._path), **(self._entries or {})}
+        if len(merged) > _FACTS_MAX_ENTRIES:
+            merged = dict(self._used)
+        try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            fd, temporary = tempfile.mkstemp(
+                dir=self._path.parent, prefix=".facts-", suffix=".tmp"
+            )
+            with os.fdopen(fd, "wb") as handle:
+                pickle.dump(merged, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            os.replace(temporary, self._path)
+        except Exception:  # noqa: BLE001 - a failed save only costs a re-parse
+            with contextlib.suppress(OSError, UnboundLocalError):
+                os.unlink(temporary)
+
+
+_FACTS = _FactStore()
+
+
+def _persisted_facts(name: str, encode=lambda value: value, decode=lambda raw: raw):
+    """Keep a pure ``text -> facts`` function's results in :data:`_FACTS`.
+
+    ``encode`` must reduce the result to builtin containers of strings (the
+    store refuses to unpickle anything else) and ``decode`` must rebuild it.
+    Exceptions (a ``SyntaxError``) are never stored: the next process re-raises
+    them by parsing again.
+    """
+
+    def wrap(function):
+        @functools.wraps(function)
+        def facts(text: str, *extra):
+            digest = hashlib.sha256()
+            for part in (name, text, *(repr(sorted(e)) for e in extra)):
+                digest.update(part.encode("utf-8", "surrogatepass"))
+                digest.update(b"\0")
+            key = digest.digest()
+            found, raw = _FACTS.get(key)
+            if found:
+                try:
+                    return decode(raw)
+                except Exception:  # noqa: BLE001 - a malformed entry is a miss
+                    pass
+            value = function(text, *extra)
+            _FACTS.put(key, encode(value))
+            return value
+
+        return facts
+
+    return wrap
+
+
 class _ModuleSyntax(NamedTuple):
     """Syntax facts of ONE source text: what it imports, and what each top-level
     function calls.
@@ -957,6 +1123,7 @@ def _function_call_names(
 
 
 @functools.lru_cache(maxsize=1024)
+@_persisted_facts("module_syntax", encode=tuple, decode=lambda raw: _ModuleSyntax(*raw))
 def _module_syntax(text: str) -> _ModuleSyntax:
     """Parse one source CONTENT once, for every syntax consumer of it.
 
@@ -1037,7 +1204,7 @@ def _direct_local_imports(path: Path) -> frozenset[str]:
                 found.add(parent)
             parent = parent.rpartition(".")[0]
 
-    current_module = _module_by_path().get(path.resolve())
+    current_module = _module_by_path().get(_resolved(path))
     syntax = _module_syntax(path.read_text(encoding="utf-8"))
     for name, _asname in syntax.imports:
         add(name)
@@ -1082,16 +1249,63 @@ def module_deps_of(script: Path) -> list[str]:
     script imports what it uses, which Python enforces at run time.  The BFS is
     cycle-safe (``build_motion_study`` <-> ``build_motion_study_springs``).
     """
+    return list(_module_closure(_resolved(script)))
+
+
+def _resolved(path: Path) -> Path:
+    """``path.resolve()``, once per ABSOLUTE path per process.
+
+    A doit graph load resolves the same few hundred module and config paths
+    ~56k times (every closure re-resolves every member); on Windows each is a
+    ``GetFinalPathNameByHandle`` round trip, which measured ~5 s of a ~21 s
+    load. Only absolute paths are memoized: the memo key ignores the working
+    directory, so a relative path is resolved afresh every time. Dropped by
+    :func:`clear_import_caches`.
+    """
+    if not path.is_absolute():
+        return path.resolve()
+    return _resolved_absolute(path)
+
+
+@functools.lru_cache(maxsize=None)
+def _resolved_absolute(path: Path) -> Path:
+    return path.resolve()
+
+
+@functools.lru_cache(maxsize=None)
+def _module_closure(script: Path) -> tuple[str, ...]:
+    """:func:`module_deps_of` for one RESOLVED script, computed once.
+
+    The graph asks for the same closure from several task generators (helper
+    deps, config deps, data deps, the check gates). Every input is already
+    memoized per process (``_direct_local_imports``), so the closure is too;
+    it is dropped with them (:func:`clear_import_caches`).
+    """
     mods = _local_modules()
     result: set[str] = set()
-    frontier = set(_direct_local_imports(script.resolve()))
+    frontier = set(_direct_local_imports(script))
     while frontier:
         mod = frontier.pop()
         if mod in result:
             continue
         result.add(mod)
-        frontier |= set(_direct_local_imports(mods[mod].resolve())) - result
-    return sorted(str(mods[m].resolve()) for m in result)
+        frontier |= set(_direct_local_imports(_resolved(mods[mod]))) - result
+    return tuple(sorted(str(_resolved(mods[m])) for m in result))
+
+
+def clear_import_caches() -> None:
+    """Forget every per-process fact about the local module tree: the module map,
+    each module's direct imports, the import closures and the resolved paths.
+
+    The one entry point for "re-read the tree" -- a test that rebuilds its
+    fixture sources, or a long-lived process whose checkout moved. The syntax
+    facts themselves need no clearing: they are keyed by source content.
+    """
+    _local_modules.cache_clear()
+    _module_by_path.cache_clear()
+    _direct_local_imports.cache_clear()
+    _module_closure.cache_clear()
+    _resolved_absolute.cache_clear()
 
 
 def _drawing_registry_value(node: ast.AST) -> object:
@@ -1189,6 +1403,7 @@ def drawing_registry_recipe(text: str, spec: object) -> str:
 
 
 @functools.lru_cache(maxsize=512)
+@_persisted_facts("drawing_registry_reads")
 def _drawing_registry_reads(text: str) -> frozenset[str] | None:
     """Cache a source's literal row read set; None denotes an unclassified use."""
     nodes = tuple(ast.walk(ast.parse(text)))
@@ -1454,6 +1669,15 @@ class _ConfigUse(Enum):
 
 
 @functools.lru_cache(maxsize=512)
+@_persisted_facts(
+    "config_references",
+    encode=lambda refs: None
+    if refs is None
+    else tuple((attr, use.value, argument) for attr, use, argument in refs),
+    decode=lambda raw: None
+    if raw is None
+    else tuple((attr, _ConfigUse(use), argument) for attr, use, argument in raw),
+)
 def _config_references_in_text(
     text: str, config_modules: frozenset[str]
 ) -> tuple[tuple[str, _ConfigUse, str | None], ...] | None:
@@ -1555,20 +1779,20 @@ def config_files_of(script: Path) -> frozenset[str]:
 # narrowing of the "parts/*" token).
 def all_config_files() -> list[str]:
     """Every config file (recursive) -- the ``"**"`` whole-config expansion."""
-    return sorted(str(p.resolve()) for p in CONFIG_DIR.rglob("*.yaml"))
+    return sorted(str(_resolved(p)) for p in CONFIG_DIR.rglob("*.yaml"))
 
 
 def machine_family_files() -> list[str]:
     """Every machine/*.yaml (incl _base) -- the ``"machine/*"`` expansion."""
     d = CONFIG_DIR / "machine"
-    return sorted(str(p.resolve()) for p in d.glob("*.yaml")) if d.is_dir() else []
+    return sorted(str(_resolved(p)) for p in d.glob("*.yaml")) if d.is_dir() else []
 
 
 def parts_registry_files() -> list[str]:
     """Every parts/*.yaml (incl _defaults) -- the conservative ``"parts/*"``
     expansion (dodo.py narrows this per task)."""
     d = CONFIG_DIR / "parts"
-    return sorted(str(p.resolve()) for p in d.glob("*.yaml")) if d.is_dir() else []
+    return sorted(str(_resolved(p)) for p in d.glob("*.yaml")) if d.is_dir() else []
 
 
 def part_row_files(dashed_name: str) -> list[str]:
@@ -1579,7 +1803,7 @@ def part_row_files(dashed_name: str) -> list[str]:
     if not row.exists():
         return []
     defaults = CONFIG_DIR / "parts" / "_defaults.yaml"
-    return sorted({str(row.resolve()), str(defaults.resolve())})
+    return sorted({str(_resolved(row)), str(_resolved(defaults))})
 
 
 # A generic custom-property write says nothing about registry ownership.  Part
