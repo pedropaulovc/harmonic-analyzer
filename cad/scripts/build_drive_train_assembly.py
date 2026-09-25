@@ -28,10 +28,11 @@ above the 6.35-mm swing plate fixes the drive plane at y = 90.518):
   removable crank chain wheel -- ch. 23, the roller chain rides its m2 teeth
   -- is NOT placed here: paper-drive now owns the whole crank->paper chain
   drive, so the single crank wheel lives there, avoiding a duplicate at the
-  top level -- codex #189 :605. MHA-024 is not inserted in this as-machined
-  assembly model: MHA-020 and MHA-026 retain their coaxial straight pilot
-  holes here, while the released drawings require their shared 1:48 taper to
-  be match-reamed at assembly.)
+  top level -- codex #189 :605. MHA-024 IS inserted: MHA-020 and MHA-026
+  retain their coaxial straight pilot holes in this as-machined model, the
+  nominal taper overlaps them as volume-bounded allowed pairs, and the
+  released drawings require their shared 1:48 taper to be match-reamed at
+  assembly.)
 * alignment pinion (ch. 25): the 32T zeroing drum + its swing rig, parked
   DISENGAGED, inboard of the drum and level with the drive axis (GT).
 
@@ -205,6 +206,7 @@ from _assembly_patterns import (
     PatternDirection,
 )
 from _interference_contracts import allowed_interference_pairs
+from _drive_train_explode import create_drive_train_explode
 
 # CopyWithMates2 helpers for the cone-gear ladder (#228). NB importing _cwm
 # folds it into THIS assembly's recipe/cache key -- intended.
@@ -1025,15 +1027,24 @@ if SHAFT_FRONT_STATION > _POST_SOUTH_STATION - 1.0 + 1e-9:
     )
 # --- tip end-play stack (item 5, v4_t00471 / 7:49) ---------------------------
 # Along the axis, south to north: T006 gear | brass bushing | block | shaft tip
-# | the 94025A150 adjuster's conical cup. The adjusted 1/16-in shaft terminal
-# meets the vendor cup apex while the full 6 mm of 5/16-18 thread remains in
-# the block; the top slit and 90280A108 pinch screw lock that setting.
+# | the 94025A150 adjuster's conical cup. The shaft's flat 1/16-in end cannot
+# reach the cup apex: it seats on the ring where its end edge meets the cone
+# wall, ADJ_SEAT_DEPTH short of the apex (end radius / tan of the vendor cup's
+# half-angle). The adjuster therefore backs out from the nominal 6 mm embed by
+# that depth (Main ruling 2026-09-23; burying the apex left 1.05 mm^3 of
+# overlap once the journal grew from 1/32 in). The top slit and 90280A108 pinch
+# screw lock that setting.
 TIP_SOUTH_STATION = TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0
 BUSH_STATION = T006_NORTH_FACE
-ADJ_HEAD_STATION = TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 + (ADJ_LEN - ADJ_EMBED)
+_STUB_DIA = SHAFT_SECTIONS[-1][0] * 25.4
+ADJ_CUP_HALF_ANGLE = math.atan((ADJ_CUP_DIA / 2.0) / ADJ_CUP_DEPTH)
+ADJ_SEAT_DEPTH = (_STUB_DIA / 2.0) / math.tan(ADJ_CUP_HALF_ANGLE)
+ADJ_THREAD_ENGAGEMENT = ADJ_EMBED - ADJ_SEAT_DEPTH
+ADJ_HEAD_STATION = (
+    TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 + (ADJ_LEN - ADJ_THREAD_ENGAGEMENT)
+)
 _ADJ_CUP_RIM = ADJ_HEAD_STATION - ADJ_LEN
 _ADJ_CUP_APEX = _ADJ_CUP_RIM + ADJ_CUP_DEPTH
-_STUB_DIA = SHAFT_SECTIONS[-1][0] * 25.4
 _STUB_START = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-2][1]
 if BUSH_STATION < _STUB_START + 1.0:
     raise AssertionError("tip bushing rides off the 1/16in tip journal")
@@ -1046,10 +1057,12 @@ if not 0.0 < ADJ_CUP_DEPTH < ADJ_LEN:
     raise AssertionError("adjuster cup depth is outside the stock body")
 if ADJ_CUP_DIA < _STUB_DIA + 0.25:
     raise AssertionError("adjuster cup rim is too tight around the tip stub")
-if abs(_TIP_END_STATION - _ADJ_CUP_APEX) > 1e-6:
+if not 0.0 < ADJ_SEAT_DEPTH < ADJ_CUP_DEPTH:
+    raise AssertionError("shaft end does not seat on the adjuster cup wall")
+if abs(_TIP_END_STATION + ADJ_SEAT_DEPTH - _ADJ_CUP_APEX) > 1e-6:
     raise AssertionError(
-        f"shaft tip {_TIP_END_STATION:.6f} does not contact vendor cup apex "
-        f"{_ADJ_CUP_APEX:.6f}"
+        f"shaft tip {_TIP_END_STATION:.6f} does not seat on the vendor cup wall "
+        f"{ADJ_SEAT_DEPTH:.6f} short of its apex {_ADJ_CUP_APEX:.6f}"
     )
 if TIP_SHAFT_PASSAGE_DIA < _STUB_DIA + 0.25:
     raise AssertionError("tip-block passage too tight around the shaft tip")
@@ -4266,6 +4279,7 @@ async def build(adapter) -> dict[str, str]:
     # The PART cell resolves the document summary Title; "drive-train assembly"
     # (not the bare stem) so the sheet identifies itself as an assembly drawing.
     apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
+    create_drive_train_explode(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 
