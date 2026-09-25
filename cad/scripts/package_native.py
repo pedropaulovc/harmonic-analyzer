@@ -514,9 +514,10 @@ def package_drawings(
 def _as_model(document: Any) -> Any:
     """View an enumerated document through IModelDoc2.
 
-    ``GetDocuments`` returns IDispatch pointers that comtypes may wrap as the
-    coclass' default interface (IPartDoc/IAssemblyDoc/IDrawingDoc), none of
-    which carries ``GetPathName``; ``IActiveDoc2`` is already IModelDoc2.
+    ``GetFirstDocument`` / ``GetNext`` return IDispatch pointers that comtypes
+    may wrap as the coclass' default interface (IPartDoc/IAssemblyDoc/
+    IDrawingDoc), none of which carries ``GetPathName``; ``IActiveDoc2`` is
+    already IModelDoc2.
     """
     query = getattr(document, "QueryInterface", None)
     if query is None or _SW_MODULE is None:
@@ -524,17 +525,32 @@ def _as_model(document: Any) -> Any:
     return query(_SW_MODULE.IModelDoc2)
 
 
+_MAX_RESIDENTS = 10_000
+
+
 def resident_documents(sw: Any) -> list[tuple[Path, Any]]:
-    """Every document resident in the session (visible or hidden), with its path."""
+    """Every document resident in the session (visible or hidden), with its path.
+
+    Walks ``GetFirstDocument`` / ``GetNext``, as ``_common``'s teardown does,
+    never ``GetDocuments``: that returns a SAFEARRAY of IDispatch
+    (``VT_ARRAY | VT_DISPATCH``), which comtypes cannot unpack -- ``KeyError: 9``
+    in ``comtypes.automation._vartype_to_ctype`` (rekey2's package:release,
+    2026-09-25). A single IDispatch return marshals fine. The walk ends on
+    ``None`` or a NULL comtypes pointer, which is falsy.
+    """
     residents: list[tuple[Path, Any]] = []
-    for raw in sw.GetDocuments() or ():
-        if raw is None:
-            continue
+    raw = sw.GetFirstDocument()
+    for _ in range(_MAX_RESIDENTS):
+        if not raw:
+            return residents
         document = _as_model(raw)
         name = str(document.GetPathName() or "")
         if name:
             residents.append((Path(name).resolve(), document))
-    return residents
+        raw = document.GetNext()
+    raise RuntimeError(
+        f"more than {_MAX_RESIDENTS} resident documents -- GetNext never ended"
+    )
 
 
 def _inside(path: Path, root: Path) -> bool:

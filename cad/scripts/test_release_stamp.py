@@ -7,11 +7,16 @@ a property store keyed by path, so they prove the orchestration: every model in
 BOTH packaged trees is stamped and saved before any drawing opens, every drawing
 is stamped, rebuilt, saved and (portable tree) exported, a reference resolved
 outside the package fails the leaf, and the offline print gate reads the PDF
-text. The COM calls themselves are proven on the farm (the release dry run).
+text. The COM calls themselves are proven on the farm (the release dry run);
+the one marshalling fact the fake cannot show -- comtypes cannot unpack a
+SAFEARRAY of IDispatch, which is why residents are walked one by one -- is
+pinned against comtypes itself, with no seat.
 """
 
 from __future__ import annotations
 
+import ctypes
+import sys
 from pathlib import Path
 
 import pytest
@@ -55,6 +60,11 @@ class _Document:
 
     def GetCustomInfoValue(self, _configuration: str, name: str) -> str:
         return self.props.get(name, "")
+
+    def GetNext(self):
+        resident = self.session.resident
+        at = next(i for i, doc in enumerate(resident) if doc is self)
+        return resident[at + 1] if at + 1 < len(resident) else None
 
     def Save3(self, _options: int) -> bool:
         if self.path in self.session.refuse_save:
@@ -100,8 +110,12 @@ class _Session:
         ]
         return self.resident[0]
 
+    def GetFirstDocument(self):
+        return self.resident[0] if self.resident else None
+
     def GetDocuments(self):
-        return tuple(self.resident)
+        # What comtypes does with this SAFEARRAY of IDispatch on a real seat.
+        raise KeyError(9)
 
     def CloseDoc(self, _title: str) -> None:
         self.resident = []
@@ -109,6 +123,66 @@ class _Session:
     def CloseAllDocuments(self, _include_unsaved: bool) -> bool:
         self.resident = []
         return True
+
+
+class _NullPointer:
+    """A NULL comtypes interface pointer: falsy, and unusable if dereferenced."""
+
+    def __bool__(self) -> bool:
+        return False
+
+    def __getattr__(self, name: str):
+        raise ValueError("NULL COM pointer access")
+
+
+def test_resident_documents_walks_first_and_next_not_the_document_array(tmp_path):
+    """rekey2's package:release (2026-09-25) died in ``GetDocuments`` with
+    comtypes' KeyError 9. The walk must reach every resident -- the hidden
+    references a drawing loads included -- through GetFirstDocument/GetNext,
+    and stop at the NULL pointer comtypes hands back after the last one."""
+    drawing, part = (tmp_path / "a.SLDDRW").resolve(), (tmp_path / "b.SLDPRT").resolve()
+    session = _Session({drawing: [part]})
+    session.OpenDoc6(str(drawing), 3, 1, "", 0, 0)
+    last = session.resident[-1]
+    last.GetNext = lambda: _NullPointer()
+
+    residents = package_native.resident_documents(session)
+
+    assert [path for path, _doc in residents] == [drawing, part]
+
+
+def test_resident_documents_refuses_a_walk_that_never_ends(tmp_path, monkeypatch):
+    monkeypatch.setattr(package_native, "_MAX_RESIDENTS", 3)
+    session = _Session({})
+    session.OpenDoc6(str((tmp_path / "a.SLDPRT").resolve()), 1, 1, "", 0, 0)
+    looping = session.resident[0]
+    looping.GetNext = lambda: looping
+
+    with pytest.raises(RuntimeError, match="GetNext never ended"):
+        package_native.resident_documents(session)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Win32 only: oleaut32 SAFEARRAYs")
+def test_comtypes_cannot_unpack_a_safearray_of_idispatch():
+    """The seat-free half of the rekey2 failure: comtypes converts a SAFEARRAY
+    of BSTR (Pack-and-Go's GetDocumentNames) but raises KeyError 9 on one of
+    IDispatch (GetDocuments) -- before reading a single element."""
+    from comtypes.automation import VARIANT, VT_ARRAY, VT_BSTR, VT_DISPATCH
+
+    create = ctypes.windll.oleaut32.SafeArrayCreateVector
+    create.restype = ctypes.c_void_p
+    create.argtypes = [ctypes.c_ushort, ctypes.c_long, ctypes.c_ulong]
+
+    def array_of(vt: int) -> VARIANT:
+        variant = VARIANT()
+        variant.vt = VT_ARRAY | vt
+        variant._.c_void_p = create(vt, 0, 2)
+        return variant
+
+    assert array_of(VT_BSTR).value == (None, None)
+    with pytest.raises(KeyError) as err:
+        array_of(VT_DISPATCH).value
+    assert err.value.args == (VT_DISPATCH,)
 
 
 def _tree(root: Path, names: list[str]) -> list[Path]:
