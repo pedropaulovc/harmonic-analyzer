@@ -94,16 +94,19 @@ if SHANK_LEN != CUT_LENGTH_MM:
 
 TRIM_PROFILE = "CutToLengthProfile"
 TRIM_FEATURE = "CutToLength"
-DEBURR_PROFILE = "CutEndDeburrProfile"
+# The cutter's profile owns CutEndBreak (see post_mount_screw_spec).
+DEBURR_PROFILE = CUT_END_BREAK_SKETCH
 DEBURR_FEATURE = "CutEndDeburr"
 # Equation drives: each cutter follows the model dimension that owns it.
 CUT_LENGTH_REF = f'"{CUT_LENGTH_DIMENSION}@{CUT_LENGTH_SKETCH}"'
 CUT_END_BREAK_REF = f'"{CUT_END_BREAK_DIMENSION}@{CUT_END_BREAK_SKETCH}"'
 DEBURR_MARGIN_GLOBAL = "CutEndDeburrMargin"
 TRIM_DRIVES = {"TrimAt": CUT_LENGTH_REF}
+# CutEndBreak is the cutter's own driving dimension (the radial leg inside
+# the major radius); the margin leg and the rise follow it by equation.
 DEBURR_DRIVES = {
     "CutEnd": CUT_LENGTH_REF,
-    "CutterRun": f'{CUT_END_BREAK_REF} + "{DEBURR_MARGIN_GLOBAL}"',
+    "CutterMargin": f'"{DEBURR_MARGIN_GLOBAL}"',
     "CutterRise": f'{CUT_END_BREAK_REF} + "{DEBURR_MARGIN_GLOBAL}"',
 }
 # The deburr cutter overshoots the major radius so its cone clears the crest.
@@ -197,8 +200,8 @@ async def _author_reference_dimension(
 async def _author_cut_controls(adapter) -> None:
     """The cut length runs along the shank's left silhouette, under-head face
     to cut end: the print dimensions between faces the shop measures, not
-    along the axis through the part.  The cut end's break is its radial leg
-    on the right silhouette at the end face."""
+    along the axis through the part.  The cut end's break is authored on the
+    deburr cutter's profile (_break_cut_end)."""
     x = -SHANK_DIA / 2.0
     await _author_reference_dimension(
         adapter,
@@ -208,16 +211,6 @@ async def _author_cut_controls(adapter) -> None:
         end=(x, -CUT_LENGTH_MM),
         orientation="vertical",
         value_mm=CUT_LENGTH_MM,
-    )
-    rim = SHANK_DIA / 2.0
-    await _author_reference_dimension(
-        adapter,
-        sketch=CUT_END_BREAK_SKETCH,
-        dimension=CUT_END_BREAK_DIMENSION,
-        start=(rim, -CUT_LENGTH_MM),
-        end=(rim - CUT_END_BREAK_MM, -CUT_LENGTH_MM),
-        orientation="horizontal",
-        value_mm=CUT_END_BREAK_MM,
     )
 
 
@@ -373,7 +366,12 @@ async def _trim_to_cut_length(adapter) -> None:
 
 
 async def _break_cut_end(adapter) -> None:
-    """The 45 deg break at the new end, its radial leg = CutEndBreak."""
+    """The 45 deg break at the new end, its radial leg = CutEndBreak.
+
+    The cutter's bottom edge runs along the end face in two collinear legs
+    split at the major radius: the inner leg IS CutEndBreak (a driving,
+    drawing-marked dimension), the outer leg the overshoot margin.  The
+    split point is the one anchored to the origin, at the major radius."""
     from solidworks_mcp.adapters.base import RevolveParameters
 
     radius, end = MAJOR_RADIUS_MM, -CUT_LENGTH_MM
@@ -387,17 +385,22 @@ async def _break_cut_end(adapter) -> None:
         )
         lines = await add_line_chain(
             adapter,
-            [(radius - CUT_END_BREAK_MM, end), (outer, end), (outer, end + leg)],
+            [
+                (radius - CUT_END_BREAK_MM, end),
+                (radius, end),
+                (outer, end),
+                (outer, end + leg),
+            ],
         )
         for line, direction in zip(
-            lines[:2], ("horizontal", "vertical"), strict=True
+            lines[:3], ("horizontal", "horizontal", "vertical"), strict=True
         ):
             check(
                 f"{DEBURR_PROFILE} {direction}",
                 await adapter.add_sketch_constraint(line, None, direction),
             )
         await anchor_point_to_origin(
-            adapter, f"{lines[1]}.start", outer, end, DEBURR_PROFILE
+            adapter, f"{lines[1]}.start", radius, end, DEBURR_PROFILE
         )
         dims.record("CutterRadius")
         dims.record("CutEnd", DEBURR_DRIVES["CutEnd"])
@@ -406,14 +409,23 @@ async def _break_cut_end(adapter) -> None:
             f"{lines[0]}.start",
             f"{lines[0]}.end",
             "horizontal_distance",
-            leg,
-            f"{DEBURR_PROFILE} run",
+            CUT_END_BREAK_MM,
+            f"{DEBURR_PROFILE} break",
         )
-        dims.record("CutterRun", DEBURR_DRIVES["CutterRun"])
+        dims.record(CUT_END_BREAK_DIMENSION)
         await dimension_between(
             adapter,
             f"{lines[1]}.start",
             f"{lines[1]}.end",
+            "horizontal_distance",
+            DEBURR_MARGIN_MM,
+            f"{DEBURR_PROFILE} margin",
+        )
+        dims.record("CutterMargin", DEBURR_DRIVES["CutterMargin"])
+        await dimension_between(
+            adapter,
+            f"{lines[2]}.start",
+            f"{lines[2]}.end",
             "vertical_distance",
             leg,
             f"{DEBURR_PROFILE} rise",

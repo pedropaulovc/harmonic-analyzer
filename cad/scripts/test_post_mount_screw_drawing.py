@@ -143,12 +143,13 @@ def test_cut_to_fit_allowance_is_exported_once() -> None:
 
 def test_cut_length_is_a_model_owned_drawing_dimension() -> None:
     """Rule 2: the value and places are the part's; the sheet imports the
-    one marked dimension from its hidden reference sketch and re-reads it."""
+    cut length from its hidden reference sketch and the break from the deburr
+    cutter's profile, and re-reads both."""
     assert spec.DRAWING_DIMENSIONS == {
         "CutLengthReference": {"CutLength"},
-        "CutEndBreakReference": {"CutEndBreak"},
+        "CutEndDeburrProfile": {"CutEndBreak"},
     }
-    assert spec.REFERENCE_SKETCHES == ("CutLengthReference", "CutEndBreakReference")
+    assert spec.REFERENCE_SKETCHES == ("CutLengthReference",)
     assert spec.DRAWING_PRECISION_BY_NAME == {"CutLength": 1, "CutEndBreak": 1}
     assert set(drawing.FRONT_KEEP) == {"CutLength"}
     builder = Path(part.__file__).read_text(encoding="utf-8")
@@ -277,10 +278,12 @@ def test_cut_end_features_are_driven_by_the_model_dimensions() -> None:
     the major radius less CutEndBreak."""
     assert part.TRIM_DRIVES == {"TrimAt": '"CutLength@CutLengthReference"'}
     assert part.DEBURR_DRIVES["CutEnd"] == '"CutLength@CutLengthReference"'
-    for leg in ("CutterRun", "CutterRise"):
-        assert part.DEBURR_DRIVES[leg] == (
-            '"CutEndBreak@CutEndBreakReference" + "CutEndDeburrMargin"'
-        )
+    assert part.DEBURR_DRIVES["CutterMargin"] == '"CutEndDeburrMargin"'
+    assert part.DEBURR_DRIVES["CutterRise"] == (
+        '"CutEndBreak@CutEndDeburrProfile" + "CutEndDeburrMargin"'
+    )
+    # CutEndBreak itself is the cutter's driving dimension: no equation.
+    assert "CutEndBreak" not in part.DEBURR_DRIVES
     assert (part.TRIM_FEATURE, part.DEBURR_FEATURE) == ("CutToLength", "CutEndDeburr")
     source = Path(part.__file__).read_text(encoding="utf-8")
     body = source.split("async def _modify_stock", 1)[1].split("\ndef ", 1)[0]
@@ -448,7 +451,7 @@ def test_front_view_carries_no_break_dimension() -> None:
     the tip detail."""
     assert "CutEndBreak" not in drawing.FRONT_KEEP
     assert spec.FRONT_VIEW_DIMENSIONS == {"CutLengthReference": {"CutLength"}}
-    assert spec.DETAIL_VIEW_DIMENSIONS == {"CutEndBreakReference": {"CutEndBreak"}}
+    assert spec.DETAIL_VIEW_DIMENSIONS == {"CutEndDeburrProfile": {"CutEndBreak"}}
     assert set(drawing.DETAIL_KEEP) == {"CutEndBreak"}
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "dimensions_by_feature=FRONT_VIEW_DIMENSIONS" in source
@@ -476,12 +479,10 @@ def test_tip_detail_prints_the_band_max_as_a_single_limit() -> None:
     assert drawing.break_text(spec.CUT_END_BREAK_MAX_MM, places, 6, "(", ")") != expected
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("_verify_tip_detail(adapter, front, detail)") == 2
-    assert "hidden_sketches.part_sketches_shown(" in source
-    block = source.split("hidden_sketches.part_sketches_shown(", 1)[1]
+    block = source.split('_telemetry.span("drawing.tip_detail"', 1)[1]
     block = block.split("assert_imported_precision(adapter, detail_annotations", 1)[0]
     assert "trim_drawing.end_detail(adapter, front, TIP_DETAIL)" in block
     assert "hidden_sketches.curate_view_dimensions(" in block
-    assert spec.DETAIL_SKETCHES == ("CutEndBreakReference",)
 
 
 def test_tip_detail_geometry_keeps_the_break_inside_its_crop() -> None:
@@ -527,3 +528,25 @@ def test_tip_detail_layout_is_clear() -> None:
     assert text_y < rim_y
     assert cx - r < text_x < drawing.ISO_CENTER[0] - part.HEAD_DIA / 2000.0 - DETAIL_VIEW_GAP
     assert text_y > label_y + DETAIL_NOTE_GAP / 2.0
+
+
+def test_break_is_owned_by_the_deburr_cutter_not_a_hidden_reference_sketch() -> None:
+    """pms857-f543 (f54309af5): the 10:1 detail imported nothing from the
+    part-hidden CutEndBreakReference, even shown in memory around the detail
+    ("tip detail break view is missing model dimensions: ['CutEndBreak']").
+    The agreed fallback is the boss hook's pattern: the break is a driving
+    dimension of the deburr cutter's own (consumed) profile."""
+    assert spec.CUT_END_BREAK_SKETCH == part.DEBURR_PROFILE == "CutEndDeburrProfile"
+    assert spec.REFERENCE_SKETCHES == ("CutLengthReference",)
+    assert not hasattr(spec, "DETAIL_SKETCHES")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "part_sketches_shown(" not in source
+    builder = Path(part.__file__).read_text(encoding="utf-8")
+    controls = builder.split("async def _author_cut_controls", 1)[1].split("\nasync def ", 1)[0]
+    assert "CUT_END_BREAK_SKETCH" not in controls
+    cutter = builder.split("async def _break_cut_end", 1)[1].split("\nasync def ", 1)[0]
+    assert "dims.record(CUT_END_BREAK_DIMENSION)" in cutter
+    # The break leg is the inner of two collinear legs split at the major
+    # radius, and that split point is the one anchored to the origin.
+    assert "(radius - CUT_END_BREAK_MM, end),\n                (radius, end)," in cutter
+    assert 'f"{lines[1]}.start", radius, end, DEBURR_PROFILE' in cutter

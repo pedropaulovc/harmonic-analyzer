@@ -35,12 +35,23 @@ GRIP_MM = post.BLOCK_HEIGHT - post.ATTACHMENT_CBORE_DEPTH
 # The longest cut whose end is flush with the MHA-091 underside.
 FLUSH_LENGTH_MM = GRIP_MM + platform.PLATE_THICKNESS
 
-# Model-owned drawing controls: hidden reference sketches, each with ONE
-# driving dimension -- the cut length (under-head face to cut end) and the
-# cut end's deburr break.
+# Model-owned drawing controls.  The cut length lives on a hidden reference
+# sketch with ONE driving dimension (under-head face to cut end).  The cut
+# end's break is a driving dimension of the deburr CUTTER's own profile,
+# CutEndDeburrProfile -- the boss hook's StockDeburrProfile pattern -- not a
+# hidden reference sketch: the tip detail could not import it from one.
+# Dead under: a childless part-hidden CutEndBreakReference, shown in the
+# part in memory (part_sketches_shown) around creating and curating the 10:1
+# detail, targeted feature import (pms857-f543, f54309af5, drawing leaf log
+# dt-logs/spring/pms857-f543-drawing-leaf.log, first xx: "tip detail break
+# view is missing model dimensions: ['CutEndBreak']; available=[] from
+# features=['CutEndBreakReference']").  Observed in that leaf, not claimed as
+# the cause: the detail's hidden-sketch check read the sketch Visible=2
+# (shown), children=0, and showed nothing further.  Untested: the per-view
+# override on a detail, an entire-model import, other detail types.
 CUT_LENGTH_SKETCH = "CutLengthReference"
 CUT_LENGTH_DIMENSION = "CutLength"
-CUT_END_BREAK_SKETCH = "CutEndBreakReference"
+CUT_END_BREAK_SKETCH = "CutEndDeburrProfile"
 CUT_END_BREAK_DIMENSION = "CutEndBreak"
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     CUT_LENGTH_SKETCH: {CUT_LENGTH_DIMENSION},
@@ -55,13 +66,11 @@ DRAWING_PRECISION_BY_NAME = {
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
-REFERENCE_SKETCHES = (CUT_LENGTH_SKETCH, CUT_END_BREAK_SKETCH)
+REFERENCE_SKETCHES = (CUT_LENGTH_SKETCH,)
 # Which view claims which marked dimension: the 1:1 Front view carries only
-# the cut length; the break is claimed only by the 10:1 tip detail, which is
-# created while the part shows its hidden sketch (part_sketches_shown).
+# the cut length; the break is claimed only by the 10:1 tip detail.
 FRONT_VIEW_DIMENSIONS = {CUT_LENGTH_SKETCH: {CUT_LENGTH_DIMENSION}}
 DETAIL_VIEW_DIMENSIONS = {CUT_END_BREAK_SKETCH: {CUT_END_BREAK_DIMENSION}}
-DETAIL_SKETCHES = (CUT_END_BREAK_SKETCH,)
 
 # --- U27: can one fixed cut length serve every in-band post and plate? ---
 # The printed bands, as the shop reads them off the title block: the post's
