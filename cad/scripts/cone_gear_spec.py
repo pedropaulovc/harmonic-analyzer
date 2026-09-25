@@ -5,9 +5,11 @@ package gives every configuration its own complete sheet: configuration-owned
 tip and bore diameters, common face width, and a native driving tooth-thickness
 dimension with the cone-specific deepened-mesh band.
 
-This module stays fit-free because assemblies import it.  Every band here is
-a cone-specific constant; the drawing merely imports the resulting native
-model dimensions, precision, and tolerances.
+This module stays free of tolerances.yaml because assemblies import it.  The
+bore band derives from the shaft's land bands (cone_shaft_land_bands) through
+the shared bonded-joint fit (retained_joint_fit), two small import-free
+modules; every other band is a cone-specific constant.  The drawing merely
+imports the resulting native model dimensions, precision, and tolerances.
 """
 
 from __future__ import annotations
@@ -17,6 +19,8 @@ import math
 import _config
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from cone_shaft_land_bands import SECTION_CONE_GEAR_TEETH, SECTION_DIA_BANDS
+from retained_joint_fit import bonded_bore_band
 
 
 MM_PER_IN = 25.4
@@ -115,9 +119,6 @@ OUTSIDE_DIA = outside_dia_mm(TEETH)
 TOOTH_THICKNESS = tooth_thickness_mm(TEETH)
 
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
-# (upper, lower).  Each bore is the nominal of its shaft land; the soldered or
-# retained seat takes the land's own band (MHA-014) as the rest of the gap.
-BORE_DIA_BAND = (0.05, 0.0)
 # U27 face width (Main ruling, 2026-09-23): 6.0 at the .X band keeps the
 # widest gear (6.8) inside the 6.889 seat pitch; 6.5 +/-0.51 could reach
 # 7.01 and overlap a neighbour.  The drum's engaged zone spans
@@ -240,10 +241,46 @@ FAMILY_BORES_MM = {teeth: bore_dia_mm(teeth) for teeth in CONFIGURATION_TEETH}
 # 1.5 mm, between the printed MIN floor diameter and the maximum bore.  U40
 # (user, 2026-09-23): T012, T018 and T024 each drop one shaft land so their
 # webs meet the target; T006 has no compliant construction (its floor sits at
-# r 1.43) and its web is the one named exception (book fidelity).
+# r 1.44) and its web is the one named exception (book fidelity).
 MACHINED_WEB_FLOOR_MM = 1.5
 MACHINED_WEB_TARGET_MM = 2.0
 WEB_EXCEPTIONS_MM: dict[int, float] = {6: 0.621}
+
+# Printed places of the bore band (model-owned, DRAWING_PRECISION).
+BORE_BAND_PLACES = 3
+
+
+def _bonded_bore_band() -> tuple[float, float]:
+    """Return the one (upper, lower) bore band every configuration prints.
+
+    Each bore is the nominal of its shaft land and is bonded to it, so it
+    takes the shared retained-joint fit against that land's band (Main,
+    2026-09-25).  BoreCutDia is one model dimension across the family, so the
+    band is the intersection over every land that carries a gear.  Its upper
+    limit is also capped by T006's named web: the largest bore under the
+    printed MIN floor must leave WEB_EXCEPTIONS_MM[6].
+    """
+    carried = [
+        bonded_bore_band(band)
+        for band, teeth in zip(SECTION_DIA_BANDS, SECTION_CONE_GEAR_TEETH)
+        if teeth
+    ]
+    upper = min(band[0] for band in carried)
+    lower = max(band[1] for band in carried)
+    web_cap = FLOOR_LIMITS_MM[6][0] - 2.0 * WEB_EXCEPTIONS_MM[6] - bore_dia_mm(6)
+    scale = 10**BORE_BAND_PLACES
+    upper = min(upper, math.floor(web_cap * scale + 1e-9) / scale)
+    if upper - lower < 0.02 - 1e-9:
+        raise AssertionError(
+            f"cone-gear bonded bore band {upper:+.3f}/{lower:+.3f} is under 0.02 wide"
+        )
+    return (round(upper, BORE_BAND_PLACES), round(lower, BORE_BAND_PLACES))
+
+
+# (upper, lower): +0.050/+0.025.  Clearance 0.025-0.100 on the soldered seat
+# lands, 0.025-0.070 on the running terminal land; the T006 web cap (0.0505)
+# rounds the retained fit's 0.055 down to 0.050.
+BORE_DIA_BAND = _bonded_bore_band()
 
 
 def bore_surface_finish(teeth: int) -> SurfaceFinishControl:
