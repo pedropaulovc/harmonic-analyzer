@@ -42,6 +42,15 @@ sheet a reviewer passed.  This module is that link.
   the leftover pixels (red) and the text difference of each changed sheet
   under ``--report-dir``.  ``release`` depends on it as ``check:machinist``
   (``dodo.py``), which reads the rendered ``cad/out/pdf`` sheets as file_deps.
+* **Backfill** -- ``backfill`` searches directories for every ``SHIP`` on
+  record, finds the exact PDF each reviewed by its sha256 wherever it now
+  lives, and ingests per drawing the newest one whose sheets match the current
+  render and which counts.  A newer failing verdict of the same sheets (or one
+  whose PDF is lost, so nothing shows it saw other sheets) blocks it.  Dry run
+  unless ``--apply``; the table sorts every drawing into what was ingested,
+  what drifted and what never had a ``SHIP``.  A draw script whose last
+  commit names no model takes its family from a recorded ruling in
+  ``cad/reviews/author-rulings.json`` naming that exact commit.
 
 No build task reads the ledger, so recording a review never re-keys a build.
 
@@ -52,6 +61,8 @@ Usage (SolidWorks-free)::
     uv run cad/scripts/machinist_ledger.py ingest <verdict.json> --author-family gpt
     uv run cad/scripts/machinist_ledger.py ingest <fix.json> --author-family claude \
         --rebuttals <rebuttals.json>
+    uv run cad/scripts/machinist_ledger.py backfill <root>... --exclude <name> \
+        [--checkout <rendered checkout>] [--apply]
     uv run cad/scripts/machinist_ledger.py fingerprint <drawing.pdf>
 
 A rebuttals file::
@@ -70,10 +81,12 @@ import argparse
 import functools
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 from collections import Counter
 from collections.abc import Iterable, Sequence
@@ -92,6 +105,7 @@ from _drawing_registry import CAD_ROOT, DRAWINGS, DRAWINGS_BY_NAME  # noqa: E402
 REPO_ROOT = CAD_ROOT.parent
 PROMPTS_DIR = SCRIPTS_DIR / "prompts"
 LEDGER_PATH = CAD_ROOT / "reviews" / "machinist-ledger.json"
+AUTHOR_RULINGS_PATH = CAD_ROOT / "reviews" / "author-rulings.json"
 REPORT_DIR = CAD_ROOT / "out" / "reports" / "machinist-ledger"
 LEDGER_VERSION = 1
 
@@ -679,21 +693,28 @@ def script_author(path: Path, *, repo: Path = REPO_ROOT) -> Author:
     return author
 
 
-def draw_script_author(name: str) -> Author:
-    return script_author(SCRIPTS_DIR / DRAWINGS_BY_NAME[name].script_name)
+def _draw_script(name: str, repo: Path) -> Path:
+    scripts = repo / SCRIPTS_DIR.relative_to(REPO_ROOT)
+    return scripts / DRAWINGS_BY_NAME[name].script_name
 
 
-def draw_script_authors(names: Sequence[str]) -> dict[str, Author | ValueError]:
-    paths = {name: SCRIPTS_DIR / DRAWINGS_BY_NAME[name].script_name for name in names}
-    found = script_authors(list(paths.values()))
+def draw_script_author(name: str, *, repo: Path = REPO_ROOT) -> Author:
+    return script_author(_draw_script(name, repo), repo=repo)
+
+
+def draw_script_authors(
+    names: Sequence[str], *, repo: Path = REPO_ROOT
+) -> dict[str, Author | ValueError]:
+    paths = {name: _draw_script(name, repo) for name in names}
+    found = script_authors(list(paths.values()), repo=repo)
     return {name: found[path] for name, path in paths.items()}
 
 
 def resolve_author(
-    name: str, author_family: str, author_model: str | None
+    name: str, author_family: str, author_model: str | None, *, repo: Path = REPO_ROOT
 ) -> dict[str, Any]:
     """The author on record: the trailer's model, cross-checked against the claims."""
-    author = draw_script_author(name)
+    author = draw_script_author(name, repo=repo)
     record = {"family": author_family, "commit": author.commit, "script": author.script}
     model = author.model
     source = "trailer"
@@ -710,6 +731,56 @@ def resolve_author(
             f"{name}: author model {model} is not in the {author_family} family"
         )
     return {**record, "model": model, "model_source": source}
+
+
+_RULING_KEYS = ("drawing", "family", "commit", "ruled_by", "ruled_at", "evidence")
+
+
+def load_author_rulings(path: Path = AUTHOR_RULINGS_PATH) -> dict[str, dict[str, Any]]:
+    """Recorded rulings on who authored a draw script whose commit names no model.
+
+    Each ruling names the exact commit it judged, so a later edit to the
+    script -- a new author -- is never covered by it.
+    """
+    if not path.is_file():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    rulings: dict[str, dict[str, Any]] = {}
+    for ruling in data.get("rulings", []):
+        missing = [key for key in _RULING_KEYS if not ruling.get(key)]
+        if missing:
+            raise ValueError(f"{path}: ruling {ruling} lacks {missing}")
+        if ruling["family"] not in AUTHOR_FAMILIES:
+            raise ValueError(
+                f"{path}: {ruling['drawing']}: family {ruling['family']!r} is not "
+                f"one of {AUTHOR_FAMILIES}"
+            )
+        if not re.fullmatch(r"[0-9a-f]{40}", ruling["commit"]):
+            raise ValueError(
+                f"{path}: {ruling['drawing']}: commit must be a full sha, "
+                f"not {ruling['commit']!r}"
+            )
+        if ruling["drawing"] in rulings:
+            raise ValueError(f"{path}: two rulings for {ruling['drawing']}")
+        rulings[ruling["drawing"]] = ruling
+    return rulings
+
+
+def ruled_family(
+    name: str, author: Author, ruling: dict[str, Any] | None
+) -> tuple[str | None, str]:
+    """The family a ruling assigns this author, or None and why it does not apply."""
+    if ruling is None:
+        return None, (
+            f"{author.script} last commit {author.commit[:12]} names no model and "
+            f"no ruling in {AUTHOR_RULINGS_PATH.name} covers it"
+        )
+    if ruling["commit"] != author.commit:
+        return None, (
+            f"the {name} ruling judged {ruling['commit'][:12]}, but {author.script} "
+            f"was last changed by {author.commit[:12]}"
+        )
+    return ruling["family"], ""
 
 
 # --- quota refusal -----------------------------------------------------------------
@@ -1010,6 +1081,7 @@ def record_review(
     refusal: dict[str, Any] | None = None,
     rebuttals: Sequence[dict[str, Any]] | None = None,
     ledger_path: Path = LEDGER_PATH,
+    repo: Path = REPO_ROOT,
 ) -> Recorded:
     """Enter one accepted review in its slot, replacing that slot's previous entry.
 
@@ -1056,7 +1128,7 @@ def record_review(
             f"{pdf}: sha256 {actual[:12]} is not the reviewed {review['source_sha256'][0][:12]}"
         )
     slot = review_slot(review["reviewer"], author_family)
-    author = resolve_author(name, author_family, author_model)
+    author = resolve_author(name, author_family, author_model, repo=repo)
     problem = None
     if slot == LAST_RESORT:
         problem = _last_resort_problem(review, author, refusal)
@@ -1193,10 +1265,13 @@ class _References:
         self.cache: dict[str, list[Sheet]] = {}
         self.problems: dict[str, str] = {}
 
+    def path(self, sha: str) -> Path:
+        return self.directory / f"{sha}.pdf"
+
     def problem(self, sha: str) -> str:
         """Empty when the stored PDF exists and still hashes to ``sha``."""
         if sha not in self.problems:
-            path = self.directory / f"{sha}.pdf"
+            path = self.path(sha)
             if not path.is_file():
                 self.problems[sha] = "the reviewed PDF is missing from the ledger"
             elif sha256_file(path) != sha:
@@ -1209,7 +1284,7 @@ class _References:
 
     def get(self, sha: str) -> list[Sheet] | None:
         if sha not in self.cache:
-            path = self.directory / f"{sha}.pdf"
+            path = self.path(sha)
             if not path.is_file():
                 return None
             self.cache[sha] = read_sheets(path)
@@ -1327,6 +1402,483 @@ def check(
     ]
 
 
+# --- backfill ----------------------------------------------------------------------
+
+_WALK_SKIP = {".git", ".venv", "node_modules", "__pycache__"}
+
+
+class Backfill(StrEnum):
+    """Where one drawing stands after its SHIPs on record were tried."""
+
+    RECORDED = "already-recorded"  # the ledger already accepts the current sheets
+    INGESTED = "ingested"  # a SHIP matched and counts (dry run: would be ingested)
+    NOT_COUNTED = "not-counted"  # a SHIP matched; the reviewer-family rule rejects it
+    CONTRADICTED = "contradicted"  # a SHIP matched; a newer failing verdict may too
+    AUTHOR_UNKNOWN = "author-unknown"  # a SHIP matched; no trailer and no ruling given
+    DRIFTED = "drifted"  # every locatable SHIP's sheets differ from the current ones
+    PDF_LOST = "pdf-lost"  # SHIPs on record, but the bytes they reviewed exist nowhere
+    NO_SHIP = "no-ship"  # no passing SHIP on record
+    UNRENDERED = "unrendered"
+    EXCLUDED = "excluded"
+
+
+# The order the table lists categories in; for several SHIPs of one drawing, the
+# best-placed outcome is the drawing's.
+_BACKFILL_ORDER = list(Backfill)
+
+
+@dataclass
+class Candidate:
+    """One SHIP verdict on record."""
+
+    report: Path
+    review: dict[str, Any]
+    drawing: str  # registry name; "" when the record names none
+    pdf: Path | None = None  # where the exact reviewed bytes still exist
+    skip: str = ""  # why it cannot be ingested at all; "" when it can be tried
+
+
+@dataclass
+class Tried:
+    candidate: Candidate
+    outcome: Backfill
+    detail: str
+    scratch: Path | None = None  # the scratch ledger it was recorded in, if it was
+
+
+@dataclass
+class BackfillRow:
+    name: str
+    outcome: Backfill
+    detail: str
+    tried: list[Tried] = field(default_factory=list)
+
+
+@dataclass
+class BackfillResult:
+    checkout: Path
+    head: str | None
+    rows: list[BackfillRow]
+    skipped: list[Candidate]  # SHIPs that cannot be ingested whatever the sheets
+
+
+@dataclass
+class Found:
+    """What the search roots hold: verdicts, quota refusals and PDFs by file name."""
+
+    candidates: list[Candidate]
+    objections: list[Candidate]  # failing verdicts (FIX, or SHIP with findings)
+    refusals: list[tuple[Path, dict[str, Any]]]
+    pdfs: _PdfIndex
+
+
+class _PdfIndex:
+    """Every PDF under the roots, found by content.
+
+    The file a verdict names is tried first, then any ``<sha256>.pdf`` store,
+    and only then is every other PDF hashed -- once, and only when a reviewed
+    PDF was renamed or is lost -- so the lookup is by content wherever it lives.
+    """
+
+    def __init__(self) -> None:
+        self.by_name: dict[str, list[Path]] = {}
+        self.hashes: dict[Path, str] = {}
+
+    def add(self, path: Path) -> None:
+        self.by_name.setdefault(path.name, []).append(path)
+
+    def _digest(self, path: Path) -> str:
+        if path not in self.hashes:
+            self.hashes[path] = sha256_file(path)
+        return self.hashes[path]
+
+    def find(self, sha: str, name: str) -> Path | None:
+        likely = [*self.by_name.get(name, []), *self.by_name.get(f"{sha}.pdf", [])]
+        everything = (path for paths in self.by_name.values() for path in paths)
+        for path in (*likely, *everything):
+            if self._digest(path) == sha:
+                return path
+        return None
+
+
+def _walk(roots: Sequence[Path]) -> Iterable[Path]:
+    for root in roots:
+        for directory, subdirs, files in os.walk(root):
+            subdirs[:] = [d for d in subdirs if d not in _WALK_SKIP]
+            for file in files:
+                if file.endswith((".json", ".pdf")):
+                    yield Path(directory) / file
+
+
+def _registry_name(review: dict[str, Any], by_pdf: dict[str, str]) -> str:
+    """The registry drawing a verdict reviewed, by its name or its PDF's file name."""
+    if review.get("name") in DRAWINGS_BY_NAME:
+        return review["name"]
+    sources = review.get("sources") or []
+    return by_pdf.get(Path(str(sources[0])).name, "") if len(sources) == 1 else ""
+
+
+def _skip_reason(review: dict[str, Any], drawing: str) -> str:
+    sources = review.get("sources") or []
+    if len(sources) != 1 or not str(sources[0]).lower().endswith(".pdf"):
+        return f"reviewed {len(sources)} files, not one PDF"
+    if not drawing:
+        return f"{review.get('name')!r} is not a registry drawing"
+    if not review.get("passed"):
+        return "SHIP with gating findings (passed: false)"
+    if not review.get("blind"):
+        return "not a blind review"
+    return ""
+
+
+def find_reviews(roots: Sequence[Path]) -> Found:
+    """Every machinist_review record under ``roots``: verdicts and quota refusals."""
+    by_pdf = {spec.outputs["pdf"].name: name for name, spec in DRAWINGS_BY_NAME.items()}
+    candidates: list[Candidate] = []
+    objections: list[Candidate] = []
+    refusals: list[tuple[Path, dict[str, Any]]] = []
+    pdfs = _PdfIndex()
+    seen: set[Path] = set()
+    for path in _walk(roots):
+        if path.suffix == ".pdf":
+            pdfs.add(path)
+            continue
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if '"prompt_sha256"' not in text:
+            continue
+        try:
+            review = json.loads(text)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(review, dict) or "reviewer" not in review:
+            continue
+        verdict = review.get("verdict")
+        if verdict is None:
+            if review.get("name") and quota_evidence(review, path) is not None:
+                refusals.append((path, review))
+            continue
+        drawing = _registry_name(review, by_pdf)
+        skip = _skip_reason(review, drawing)
+        if not review.get("passed") and not skip.startswith("reviewed"):
+            objections.append(Candidate(path, review, drawing))
+        if verdict.get("verdict") == "SHIP":
+            candidates.append(Candidate(path, review, drawing, skip=skip))
+    return Found(candidates, objections, refusals, pdfs)
+
+
+class _Located(_References):
+    """Reviewed PDFs where they were found, rather than in the ledger's store."""
+
+    def __init__(self) -> None:
+        super().__init__(Path())
+        self.paths: dict[str, Path] = {}
+
+    def path(self, sha: str) -> Path:
+        return self.paths[sha]
+
+
+def _locate(candidate: Candidate, pdfs: _PdfIndex) -> Path | None:
+    """A file holding exactly the bytes the review saw, wherever it is now."""
+    sha = candidate.review["source_sha256"][0]
+    return pdfs.find(sha, Path(str(candidate.review["sources"][0])).name)
+
+
+def _refusal_for(
+    candidate: Candidate, drawing: str, author_family: str, found: Found
+) -> dict[str, Any] | None:
+    """A recorded quota refusal licensing this same-family review, if any."""
+    for path, data in found.refusals:
+        if data.get("name") not in (drawing, candidate.review.get("name")):
+            continue
+        try:
+            refusal = quota_refusal(
+                path, name=data["name"], author_family=author_family
+            )
+        except ValueError:
+            continue
+        if not refusal_problem(
+            refusal,
+            pdf_sha256=candidate.review["source_sha256"][0],
+            reviewed_at=candidate.review["reviewed_at"],
+        ):
+            return refusal
+    return None
+
+
+def _sheets_match(
+    candidate: Candidate, pdf: Path, current: Sequence[Sheet]
+) -> tuple[list[str], Comparison]:
+    """The reviewed sheet digests, and how they compare with the current sheets."""
+    located = _Located()
+    sha = candidate.review["source_sha256"][0]
+    located.paths[sha] = pdf
+    digests = [sheet_digest(sheet.ink) for sheet in located.get(sha)]
+    return digests, _compare({"pdf": sha, "sheets": digests}, current, located)
+
+
+def _objection(
+    candidate: Candidate,
+    current: Sequence[Sheet],
+    found: Found,
+) -> str:
+    """A failing verdict, newer than ``candidate``, that may have seen these sheets.
+
+    A later FIX of the sheets now rendered overrides an earlier SHIP of the
+    same sheets; so does one whose reviewed PDF is lost, since nothing shows
+    it reviewed other sheets.
+    """
+    shipped = datetime.fromisoformat(candidate.review["reviewed_at"])
+    for other in found.objections:
+        if other.drawing != candidate.drawing:
+            continue
+        if datetime.fromisoformat(other.review["reviewed_at"]) <= shipped:
+            continue
+        what = f"{_reviewed(other.review)} {other.review['verdict']['verdict']}"
+        pdf = _locate(other, found.pdfs)
+        if pdf is None:
+            return (
+                f"newer {what} reviewed a PDF that is lost, so it may have seen "
+                f"these sheets [{other.report.resolve().as_posix()}]"
+            )
+        if not _sheets_match(other, pdf, current)[1].problem:
+            return (
+                f"newer {what} reviewed these sheets "
+                f"[{other.report.resolve().as_posix()}]"
+            )
+    return ""
+
+
+def _checkout_head(checkout: Path) -> str | None:
+    return _git("rev-parse", "HEAD", repo=checkout)
+
+
+def _current_pdf(name: str, checkout: Path | None) -> Path:
+    pdf = DRAWINGS_BY_NAME[name].outputs["pdf"]
+    return pdf if checkout is None else checkout / "cad" / "out" / "pdf" / pdf.name
+
+
+def _try(
+    candidate: Candidate,
+    current: Sequence[Sheet],
+    *,
+    author: Author | ValueError,
+    ruling: dict[str, Any] | None,
+    found: Found,
+    checkout: Path,
+    scratch: Path,
+) -> Tried:
+    """Match one located SHIP against the current sheets, then record it in ``scratch``."""
+    review, drawing = candidate.review, candidate.drawing
+    reviewed, comparison = _sheets_match(candidate, candidate.pdf, current)
+    if comparison.problem:
+        return Tried(candidate, Backfill.DRIFTED, comparison.problem)
+    exact = reviewed == [sheet_digest(sheet.ink) for sheet in current]
+    match = "exact" if exact else "within tolerance"
+    matched = f"{_reviewed(review)} matches ({match})"
+    objection = _objection(candidate, current, found)
+    if objection:
+        return Tried(candidate, Backfill.CONTRADICTED, f"{matched}; {objection}")
+    if isinstance(author, ValueError):
+        return Tried(candidate, Backfill.AUTHOR_UNKNOWN, f"{matched}; {author}")
+    if author.model is not None:
+        family, source, ruling = model_family(author.model), "trailer", None
+    else:
+        family, unruled = ruled_family(drawing, author, ruling)
+        source = "ruling"
+    if family is None:
+        return Tried(candidate, Backfill.AUTHOR_UNKNOWN, f"{matched}; {unruled}")
+    refusal = None
+    if review_slot(review["reviewer"], family) == LAST_RESORT:
+        refusal = _refusal_for(candidate, drawing, family, found)
+    provenance = {
+        "backfilled_from": candidate.report.resolve().as_posix(),
+        "reviewed_pdf_found_at": candidate.pdf.resolve().as_posix(),
+        "matched_checkout": checkout.resolve().as_posix(),
+        "matched_checkout_head": _checkout_head(checkout),
+        "author_family_source": source,
+        "match": match,
+    }
+    if ruling is not None:
+        provenance["author_ruling"] = ruling
+    if review.get("name") != drawing:
+        provenance["reviewed_as"] = review.get("name")
+    try:
+        recorded = record_review(
+            {**review, "name": drawing},
+            candidate.pdf,
+            author_family=family,
+            provenance=provenance,
+            refusal=refusal,
+            ledger_path=scratch,
+            repo=checkout,
+        )
+    except ValueError as exc:
+        return Tried(candidate, Backfill.NOT_COUNTED, f"{matched}; {exc}")
+    if not recorded.counts:
+        return Tried(
+            candidate,
+            Backfill.NOT_COUNTED,
+            f"{matched}; {recorded.slot}: {recorded.problem}",
+        )
+    return Tried(
+        candidate,
+        Backfill.INGESTED,
+        f"{matched}; {recorded.slot}, author {family} ({source})",
+        scratch,
+    )
+
+
+def backfill(
+    roots: Sequence[Path],
+    *,
+    checkout: Path | None = None,
+    exclude: Iterable[str] = (),
+    rulings: dict[str, dict[str, Any]] | None = None,
+    apply: bool = False,
+    ledger_path: Path = LEDGER_PATH,
+) -> BackfillResult:
+    """Try every SHIP on record under ``roots`` against the current sheets.
+
+    A SHIP is ingested only when the exact PDF it reviewed still exists, its
+    sheets match the ones rendered now under the ledger's own rule, and it
+    counts under the reviewer-family rule: cross-family, or last resort with a
+    recorded quota refusal.  ``checkout`` is the checkout whose ``cad/out/pdf``
+    is current and whose draw-script commits name the authors (default: this
+    one).  ``rulings`` maps a drawing to its author family where the draw
+    script's last commit names no model.  Newest SHIP first; the first that
+    counts is the one recorded.  Nothing is written unless ``apply``.
+    """
+    excluded = set(exclude)
+    unknown = sorted((excluded | set(rulings or {})) - set(DRAWINGS_BY_NAME))
+    if unknown:
+        raise ValueError(f"unknown drawing names: {unknown}")
+    repo = checkout or REPO_ROOT
+    found = find_reviews(roots)
+    by_drawing: dict[str, list[Candidate]] = {}
+    for candidate in found.candidates:
+        if candidate.skip:
+            continue
+        candidate.pdf = _locate(candidate, found.pdfs)
+        by_drawing.setdefault(candidate.drawing, []).append(candidate)
+    ledger = load_ledger(ledger_path)
+    references = _References(sheets_dir(ledger_path))
+    tried_names = sorted(set(by_drawing) - excluded)
+    authors = draw_script_authors(tried_names, repo=repo) if tried_names else {}
+    rows: list[BackfillRow] = []
+    with tempfile.TemporaryDirectory(prefix="machinist-backfill-") as tmp:
+        for name in DRAWINGS_BY_NAME:
+            ships = sorted(
+                by_drawing.get(name, []),
+                key=lambda c: datetime.fromisoformat(c.review["reviewed_at"]),
+                reverse=True,
+            )
+            if name in excluded:
+                rows.append(
+                    BackfillRow(
+                        name,
+                        Backfill.EXCLUDED,
+                        f"{len(ships)} SHIPs on record, excluded by ruling",
+                    )
+                )
+                continue
+            pdf = _current_pdf(name, checkout)
+            if not pdf.is_file():
+                rows.append(
+                    BackfillRow(name, Backfill.UNRENDERED, f"no rendered PDF at {pdf}")
+                )
+                continue
+            status = drawing_status(name, ledger, references=references, pdf=pdf)
+            if status.state == State.OK:
+                slot = status.via.split()[0]
+                entry = ledger["drawings"][name][slot]
+                recorded = Candidate(ledger_path, entry, name)
+                objection = _objection(recorded, read_sheets(pdf), found)
+                if not objection:
+                    rows.append(
+                        BackfillRow(
+                            name, Backfill.RECORDED, f"{status.via} {status.detail}"
+                        )
+                    )
+                    continue
+                # A newer failing verdict of these sheets withdraws the entry.
+                dropped = "dropped from the ledger" if apply else "to drop (--apply)"
+                rows.append(
+                    BackfillRow(
+                        name,
+                        Backfill.CONTRADICTED,
+                        f"recorded {slot} {status.detail}: {objection}; {dropped}",
+                    )
+                )
+                if apply:
+                    del ledger["drawings"][name][slot]
+                    if not ledger["drawings"][name]:
+                        del ledger["drawings"][name]
+                    save_ledger(ledger, ledger_path)
+                continue
+            if not ships:
+                rows.append(
+                    BackfillRow(name, Backfill.NO_SHIP, "no passing SHIP on record")
+                )
+                continue
+            current = read_sheets(pdf)
+            tried: list[Tried] = []
+            for index, candidate in enumerate(ships):
+                if candidate.pdf is None:
+                    sha = candidate.review["source_sha256"][0]
+                    tried.append(
+                        Tried(
+                            candidate,
+                            Backfill.PDF_LOST,
+                            f"no file holds the reviewed {sha[:12]}",
+                        )
+                    )
+                    continue
+                attempt = _try(
+                    candidate,
+                    current,
+                    author=authors[name],
+                    ruling=(rulings or {}).get(name),
+                    found=found,
+                    checkout=repo,
+                    # its own directory: a scratch save prunes its sheets dir
+                    scratch=Path(tmp) / name / str(index) / "ledger.json",
+                )
+                tried.append(attempt)
+                if attempt.outcome == Backfill.INGESTED:
+                    break
+            best = min(tried, key=lambda t: _BACKFILL_ORDER.index(t.outcome))
+            rows.append(
+                BackfillRow(
+                    name,
+                    best.outcome,
+                    f"{best.detail} [{best.candidate.report.resolve().as_posix()}]",
+                    tried,
+                )
+            )
+            if apply and best.outcome == Backfill.INGESTED:
+                _adopt(best, name, ledger, ledger_path)
+    skipped = [candidate for candidate in found.candidates if candidate.skip]
+    return BackfillResult(repo, _checkout_head(repo), rows, skipped)
+
+
+def _adopt(tried: Tried, name: str, ledger: dict[str, Any], ledger_path: Path) -> None:
+    """Move a scratch-recorded entry, and the PDF it reviewed, into the ledger."""
+    scratch = load_ledger(tried.scratch)["drawings"][name]
+    ledger["drawings"].setdefault(name, {}).update(scratch)
+    for entry in scratch.values():
+        stored = sheets_dir(ledger_path) / f"{entry['pdf']}.pdf"
+        stored.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(sheets_dir(tried.scratch) / stored.name, stored)
+    save_ledger(ledger, ledger_path)
+
+
 _REVIEWER_FOR = {"claude": "codex", "gpt": "claude", "mimo": "claude"}
 
 
@@ -1407,6 +1959,43 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "--pdf", type=Path, help="the reviewed PDF, if it moved since"
     )
 
+    backfill_cmd = commands.add_parser(
+        "backfill",
+        help="ingest the SHIPs on record whose reviewed sheets still match",
+    )
+    backfill_cmd.add_argument(
+        "roots",
+        nargs="+",
+        type=Path,
+        help="directories searched for verdict JSONs and the PDFs they reviewed",
+    )
+    backfill_cmd.add_argument(
+        "--checkout",
+        type=Path,
+        help="checkout whose cad/out/pdf is current and whose draw-script commits "
+        "name the authors (default: this one)",
+    )
+    backfill_cmd.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="a drawing a ruling keeps out of the backfill",
+    )
+    backfill_cmd.add_argument(
+        "--author-rulings",
+        type=Path,
+        default=AUTHOR_RULINGS_PATH,
+        help="recorded rulings on the author family of draw scripts whose last "
+        "commit names no model",
+    )
+    backfill_cmd.add_argument(
+        "--apply", action="store_true", help="write the ledger (default: dry run)"
+    )
+    backfill_cmd.add_argument(
+        "--json", action="store_true", help="machine-readable rows"
+    )
+
     fingerprint_cmd = commands.add_parser(
         "fingerprint", help="print a PDF's sheet digests"
     )
@@ -1423,7 +2012,66 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
 
+def _print_backfill(result: BackfillResult, args: argparse.Namespace) -> None:
+    rows = sorted(result.rows, key=lambda r: (_BACKFILL_ORDER.index(r.outcome), r.name))
+    if args.json:
+        print(
+            json.dumps(
+                [
+                    {
+                        "name": row.name,
+                        "outcome": str(row.outcome),
+                        "detail": row.detail,
+                        "tried": [
+                            {
+                                "report": t.candidate.report.as_posix(),
+                                "reviewed_at": t.candidate.review["reviewed_at"],
+                                "reviewer": t.candidate.review["reviewer"],
+                                "outcome": str(t.outcome),
+                                "detail": t.detail,
+                            }
+                            for t in row.tried
+                        ],
+                    }
+                    for row in rows
+                ],
+                indent=2,
+            )
+        )
+    else:
+        for row in rows:
+            print(f"{row.outcome:<16} {row.name:<32} {row.detail}")
+        for candidate in result.skipped:
+            print(
+                f"{'skipped':<16} {candidate.review.get('name')!s:<32} "
+                f"{candidate.skip} [{candidate.report.as_posix()}]"
+            )
+    counts = Counter(row.outcome for row in result.rows)
+    mode = "applied" if args.apply else "dry run, nothing written"
+    print(
+        f"backfill ({mode}) against {result.checkout.as_posix()} at "
+        f"{(result.head or '?')[:12]}; excluded: {', '.join(args.exclude) or 'none'}",
+        file=sys.stderr,
+    )
+    print(
+        ", ".join(f"{outcome}: {counts[outcome]}" for outcome in _BACKFILL_ORDER)
+        + f"; {len(result.skipped)} SHIP records skipped",
+        file=sys.stderr,
+    )
+
+
 def _run(args: argparse.Namespace) -> int:
+    if args.command == "backfill":
+        result = backfill(
+            args.roots,
+            checkout=args.checkout,
+            exclude=args.exclude,
+            rulings=load_author_rulings(args.author_rulings),
+            apply=args.apply,
+            ledger_path=args.ledger,
+        )
+        _print_backfill(result, args)
+        return 0
     if args.command == "fingerprint":
         for index, digest in enumerate(fingerprint(args.pdf), start=1):
             print(f"sheet {index}: {digest}")
