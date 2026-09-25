@@ -2232,12 +2232,91 @@ def test_the_untrailered_rule_needs_its_family_and_evidence(tmp_path: Path) -> N
             ml.load_author_rulings(path)
 
 
+BOTH_REASON = (
+    "class rule conflicts with per-drawing ruling; both families required "
+    "(Main, 2026-09-25)"
+)
+
+
+def test_a_both_families_drawing_is_blocked_until_each_family_has_reviewed_it(
+    tmp_path: Path, registry: Path
+) -> None:
+    rulings = ml.load_author_rulings(
+        _author_rulings(tmp_path, family="gpt", both_families=BOTH_REASON)
+    )
+    pdf = _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+
+    def status() -> ml.Status:
+        return ml.check(["crank_arm"], ledger_path=ledger_path, rulings=rulings)[0]
+
+    assert status().missing == ("claude", "gpt")
+    # A Claude SHIP is cross-family under the per-drawing ruling (a GPT author),
+    # and the ruling's own family would accept it; alone it is not enough.
+    recorded = ml.record_review(
+        _review(pdf, reviewer="claude"),
+        pdf,
+        author_family="gpt",
+        provenance={},
+        ledger_path=ledger_path,
+        rulings=rulings,
+    )
+    assert (recorded.slot, recorded.counts) == ("both_families_claude", True)
+    blocked = status()
+    assert (blocked.state, blocked.missing) == (ml.State.UNREVIEWED, ("gpt",))
+    assert BOTH_REASON in blocked.detail
+    assert "--reviewer codex --author-family claude" in ml.fix_command(blocked)
+
+    ml.record_review(
+        _review(pdf, reviewer="codex"),
+        pdf,
+        author_family="claude",
+        provenance={},
+        ledger_path=ledger_path,
+        rulings=rulings,
+    )
+    passed = status()
+    assert passed.state == ml.State.OK
+    assert passed.via == "both_families_claude ship + both_families_gpt ship"
+    entry = ml.load_ledger(ledger_path)["drawings"]["crank_arm"]["both_families_gpt"]
+    assert entry["both_families"] == BOTH_REASON
+
+    # A re-render drifts both reviews: blocked again, as drift.
+    _sheet(registry, note=NOTE.replace("6.5", "6.6"))
+    drifted = status()
+    assert (drifted.state, drifted.missing) == (ml.State.DRIFT, ("claude", "gpt"))
+
+
+def test_backfill_adds_only_the_family_a_both_families_drawing_lacks(
+    tmp_path: Path, registry: Path, records: Path
+) -> None:
+    rulings = ml.load_author_rulings(
+        _author_rulings(tmp_path, family="gpt", both_families=BOTH_REASON)
+    )
+    _on_record(records, "wt-a", reviewer="claude")
+    _sheet(registry)
+
+    row = _backfill(tmp_path, records, rulings=rulings, apply=True)
+
+    assert row.outcome == ml.Backfill.INGESTED, row.detail
+    entry = ml.load_ledger(tmp_path / "ledger.json")["drawings"]["crank_arm"]
+    provenance = entry["both_families_claude"]["provenance"]
+    assert provenance["author_family_source"] == ml.BOTH_FAMILIES
+    assert provenance["both_families"] == BOTH_REASON
+    # The Claude SHIP is on record; only a GPT one could help now, and there is none.
+    again = _backfill(tmp_path, records, rulings=rulings)
+    assert again.outcome == ml.Backfill.NO_SHIP
+    assert "no counting gpt review" in again.detail
+
+
 @pytest.mark.parametrize(
     ("change", "error"),
     [
         ({"evidence": ""}, "lacks \\['evidence'\\]"),
         ({"family": "human"}, "is not one of"),
         ({"commit": "c" * 12}, "full sha"),
+        ({"both_families": ""}, "must say why"),
+        ({"both_families": True}, "must say why"),
     ],
 )
 def test_an_author_ruling_needs_its_family_commit_and_evidence(
@@ -2254,6 +2333,9 @@ def test_the_tracked_author_rulings_load() -> None:
     for name, ruling in rulings.drawings.items():
         assert ml.DRAWINGS_BY_NAME[name]  # a registry drawing
         assert ruling["evidence"]
+    # Main, 2026-09-25: where a ruling and the class rule disagree, both review.
+    both = {name for name in rulings.drawings if rulings.both_families(name)}
+    assert both == {"counter_spring", "crank_pinion"}
 
 
 def test_backfill_records_the_newest_matching_ship(

@@ -3234,6 +3234,10 @@ def task_check():
                     str(
                         (REPO_ROOT / "cad" / "reviews" / "machinist-ledger.json").resolve()
                     ),
+                    # both_families rulings raise the bar for their drawings
+                    str(
+                        (REPO_ROOT / "cad" / "reviews" / "author-rulings.json").resolve()
+                    ),
                     *(
                         str(DRAWINGS_BY_NAME[name].outputs["pdf"].resolve())
                         for name in _drawing_order()

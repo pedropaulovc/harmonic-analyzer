@@ -51,7 +51,9 @@ sheet a reviewer passed.  This module is that link.
   what drifted and what never had a ``SHIP``.  A draw script whose last
   commit names no model takes its family from ``cad/reviews/author-rulings.json``:
   a ruling on that drawing naming that exact commit, else the ``untrailered``
-  class rule.
+  class rule.  A ruling marked ``both_families`` (it and the class rule
+  disagree) makes ``check`` require a counting review from each reviewer
+  family, filed under ``both_families_<family>``.
 
 No build task reads the ledger, so recording a review never re-keys a build.
 
@@ -133,6 +135,7 @@ _BUILD_STAMP = re.compile(rf"\bBUILD\s+{_REVISION}\b")
 _MASK_TOKEN = "#"
 
 REVIEWER_FAMILIES = {"claude": "claude", "codex": "gpt"}
+REVIEW_FAMILIES = tuple(sorted(set(REVIEWER_FAMILIES.values())))  # ("claude", "gpt")
 AUTHOR_FAMILIES = ("claude", "gpt", "mimo")
 FINDING_KEYS = ("blockers", "over_specification", "clarity", "minor")
 GATING_KEYS = ("blockers", "over_specification", "clarity")
@@ -140,6 +143,7 @@ GATING_KEYS = ("blockers", "over_specification", "clarity")
 CROSS_FAMILY = "cross_family"
 LAST_RESORT = "last_resort"
 OUTAGE_FALLBACK = "outage_fallback"  # same family, by user direction, during an outage
+BOTH_FAMILIES = "both_families"  # slot prefix: both_families_<reviewer family>
 SHIP = "ship"
 ACCEPTED_WITH_RULINGS = "accepted_with_rulings"
 
@@ -491,6 +495,12 @@ def reviewer_family(reviewer: str) -> str:
         ) from None
 
 
+def other_family(family: str) -> str:
+    """The other reviewer family: the author under which a review is cross-family."""
+    [other] = [f for f in REVIEW_FAMILIES if f != family]
+    return other
+
+
 def review_slot(reviewer: str, author_family: str) -> str:
     """``cross_family`` when the reviewer's family differs from the author's."""
     if author_family not in AUTHOR_FAMILIES:
@@ -768,6 +778,15 @@ class AuthorRulings:
     drawings: dict[str, dict[str, Any]] = field(default_factory=dict)
     untrailered: dict[str, Any] | None = None
 
+    def both_families(self, name: str) -> str:
+        """Why ``name`` needs a counting review from every reviewer family; "" if not.
+
+        Set on a drawing whose per-drawing ruling and class rule disagree on
+        the author: one of the two reviews is then cross-family whoever wrote
+        it.  It holds whatever the script's last commit, so it fails closed.
+        """
+        return (self.drawings.get(name) or {}).get("both_families", "")
+
 
 class Ruled(NamedTuple):
     family: str | None
@@ -810,6 +829,12 @@ def load_author_rulings(path: Path = AUTHOR_RULINGS_PATH) -> AuthorRulings:
             raise ValueError(
                 f"{path}: {ruling['drawing']}: commit must be a full sha, "
                 f"not {ruling['commit']!r}"
+            )
+        both = ruling.get("both_families")
+        if "both_families" in ruling and not (isinstance(both, str) and both):
+            raise ValueError(
+                f"{path}: {ruling['drawing']}: both_families must say why both "
+                "families are required"
             )
         if ruling["drawing"] in rulings:
             raise ValueError(f"{path}: two rulings for {ruling['drawing']}")
@@ -1230,6 +1255,7 @@ def record_review(
     repo: Path = REPO_ROOT,
     digests: Sequence[str] | None = None,
     known_author: Author | None = None,
+    rulings: AuthorRulings | None = None,
 ) -> Recorded:
     """Enter one accepted review in its slot, replacing that slot's previous entry.
 
@@ -1242,6 +1268,9 @@ def record_review(
     trailer-verified author model and the tier rule met.  A same-family review
     the user directed during a named ``outage`` of the cross-family reviewer
     lands in ``outage_fallback`` instead: it counts while that outage is open.
+    A drawing whose ``rulings`` (default: the tracked file) require both
+    families files each review under its reviewer's family,
+    ``both_families_<family>``; an outage fallback does not stand in for one.
     """
     name = review["name"]
     if name not in DRAWINGS_BY_NAME:
@@ -1283,6 +1312,15 @@ def record_review(
         if why:
             raise ValueError(f"{name}: not an outage fallback: {why}")
         slot = OUTAGE_FALLBACK
+    rulings = load_author_rulings() if rulings is None else rulings
+    both_families = rulings.both_families(name)
+    if both_families and outage is not None:
+        raise ValueError(
+            f"{name}: both families are required ({both_families}); an outage "
+            "fallback does not stand in for the missing family"
+        )
+    if both_families:  # either family's review counts; drawing_status needs each
+        slot = f"{BOTH_FAMILIES}_{reviewer_family(review['reviewer'])}"
     author = resolve_author(
         name, author_family, author_model, repo=repo, known=known_author
     )
@@ -1329,6 +1367,8 @@ def record_review(
         entry["rebuttals"] = rebutted
     if outage is not None:
         entry["outage"] = outage
+    if both_families:
+        entry["both_families"] = both_families
     if slot == LAST_RESORT:
         entry["quota_refusal"] = refusal
         entry["quota_refusal_window_hours"] = QUOTA_REFUSAL_MAX_AGE / timedelta(hours=1)
@@ -1417,6 +1457,7 @@ class Status:
     via: str  # the accepting entry, e.g. "cross_family ship"; "" when none
     last_resort: str  # "-" (none recorded) | "matches" | "drift"
     diff_files: tuple[str, ...] = ()
+    missing: tuple[str, ...] = ()  # reviewer families a both-families drawing lacks
 
 
 @dataclass
@@ -1499,20 +1540,30 @@ def drawing_status(
     pdf: Path | None = None,
     report_dir: Path | None = None,
     outages: dict[str, dict[str, Any]] | None = None,
+    both_families: str = "",
 ) -> Status:
     """Where ``name``'s current sheets stand against its recorded reviews.
 
     An ``outage_fallback`` entry of the current sheets is accepted only while
     its outage (``outages``, default: the tracked file) is open; once it is
-    closed the drawing needs a cross-family re-review.
+    closed the drawing needs a cross-family re-review.  ``both_families`` (the
+    ruling's reason) instead requires a counting review of the current sheets
+    from every reviewer family.
     """
     pdf = pdf or DRAWINGS_BY_NAME[name].outputs["pdf"]
     if not pdf.is_file():
         return Status(name, State.UNRENDERED, f"no rendered PDF at {pdf}", "", "-")
     entry = ledger["drawings"].get(name, {})
     if not entry:  # nothing to compare against: skip the 300 dpi render
-        return Status(name, State.UNREVIEWED, "no accepted review recorded", "", "-")
+        missing = REVIEW_FAMILIES if both_families else ()
+        return Status(
+            name, State.UNREVIEWED, "no accepted review recorded", "", "-", (), missing
+        )
     current = read_sheets(pdf)
+    if both_families:
+        return _both_families_status(
+            name, entry, current, references, both_families, report_dir
+        )
     cross, last = entry.get(CROSS_FAMILY), entry.get(LAST_RESORT)
     cross_cmp = None if cross is None else _compare(cross, current, references)
     last_cmp = None if last is None else _compare(last, current, references)
@@ -1578,14 +1629,61 @@ def drawing_status(
     )
 
 
+def _both_families_status(
+    name: str,
+    entry: dict[str, Any],
+    current: Sequence[Sheet],
+    references: _References,
+    reason: str,
+    report_dir: Path | None,
+) -> Status:
+    """OK only when a counting review from every reviewer family matches."""
+    matched: dict[str, str] = {}  # reviewer family -> "<slot> <status>"
+    drifted: list[tuple[dict[str, Any], Comparison]] = []
+    for slot, recorded in entry.items():
+        if not recorded.get("counts"):
+            continue
+        comparison = _compare(recorded, current, references)
+        if comparison.problem:
+            drifted.append((recorded, comparison))
+            continue
+        matched.setdefault(recorded["reviewer_family"], f"{slot} {recorded['status']}")
+    missing = tuple(family for family in REVIEW_FAMILIES if family not in matched)
+    if not missing:
+        via = " + ".join(matched[family] for family in REVIEW_FAMILIES)
+        return Status(name, State.OK, f"{BOTH_FAMILIES}: {reason}", via, "-")
+    detail = (
+        f"both families required ({reason}); no counting {', '.join(missing)} "
+        "review of these sheets"
+    )
+    drift = [(r, c) for r, c in drifted if r["reviewer_family"] in missing]
+    if not drift:
+        return Status(name, State.UNREVIEWED, detail, "", "-", (), missing)
+    reference, comparison = drift[0]
+    files: list[Path] = []
+    if report_dir is not None and comparison.differences:
+        files = write_diff(name, comparison.differences, current, report_dir)
+    return Status(
+        name,
+        State.DRIFT,
+        f"{detail}; {comparison.problem} since {_reviewed(reference)}",
+        "",
+        "-",
+        tuple(path.as_posix() for path in files),
+        missing,
+    )
+
+
 def check(
     names: Iterable[str] = (),
     *,
     ledger_path: Path = LEDGER_PATH,
     report_dir: Path | None = None,
     outages: dict[str, dict[str, Any]] | None = None,
+    rulings: AuthorRulings | None = None,
 ) -> list[Status]:
     outages = load_outages() if outages is None else outages
+    rulings = load_author_rulings() if rulings is None else rulings
     ledger = load_ledger(ledger_path)
     selected = list(names) or [spec.name for spec in DRAWINGS]
     unknown = [name for name in selected if name not in DRAWINGS_BY_NAME]
@@ -1594,7 +1692,12 @@ def check(
     references = _References(sheets_dir(ledger_path))
     return [
         drawing_status(
-            name, ledger, references=references, report_dir=report_dir, outages=outages
+            name,
+            ledger,
+            references=references,
+            report_dir=report_dir,
+            outages=outages,
+            both_families=rulings.both_families(name),
         )
         for name in selected
     ]
@@ -1988,7 +2091,11 @@ def _try(
         return Tried(candidate, Backfill.CONTRADICTED, f"{matched}; {objection}")
     if isinstance(author, ValueError):
         return Tried(candidate, Backfill.AUTHOR_UNKNOWN, f"{matched}; {author}")
-    if author.model is not None:
+    both_families = rulings.both_families(drawing)
+    if both_families:  # counts for its reviewer's family, whoever the author was
+        family = other_family(reviewer_family(review["reviewer"]))
+        source, ruling = BOTH_FAMILIES, rulings.drawings[drawing]
+    elif author.model is not None:
         family, source, ruling = model_family(author.model), "trailer", None
     else:
         family, source, ruling, unruled = ruled_family(drawing, author, rulings)
@@ -2007,6 +2114,8 @@ def _try(
     }
     if ruling is not None:
         provenance["author_ruling"] = ruling
+    if both_families:
+        provenance["both_families"] = both_families
     if review.get("name") != drawing:
         provenance["reviewed_as"] = review.get("name")
     try:
@@ -2020,6 +2129,7 @@ def _try(
             repo=checkout,
             digests=matcher.cache.sheets.get(review["source_sha256"][0]),
             known_author=author,
+            rulings=rulings,
         )
     except ValueError as exc:
         return Tried(candidate, Backfill.NOT_COUNTED, f"{matched}; {exc}")
@@ -2145,7 +2255,13 @@ def _backfill_drawings(
                     BackfillRow(name, Backfill.UNRENDERED, f"no rendered PDF at {pdf}")
                 )
                 continue
-            status = drawing_status(name, ledger, references=references, pdf=pdf)
+            status = drawing_status(
+                name,
+                ledger,
+                references=references,
+                pdf=pdf,
+                both_families=rulings.both_families(name),
+            )
             if status.state == State.OK:
                 slot = status.via.split()[0]
                 entry = ledger["drawings"][name][slot]
@@ -2173,10 +2289,17 @@ def _backfill_drawings(
                         del ledger["drawings"][name]
                     save_ledger(ledger, ledger_path)
                 continue
+            if status.missing:  # both families required: only a missing one helps
+                ships = [
+                    ship
+                    for ship in ships
+                    if REVIEWER_FAMILIES.get(ship.review["reviewer"]) in status.missing
+                ]
             if not ships:
-                rows.append(
-                    BackfillRow(name, Backfill.NO_SHIP, "no passing SHIP on record")
-                )
+                detail = "no passing SHIP on record"
+                if status.missing:
+                    detail = f"{status.detail}; no passing SHIP from it on record"
+                rows.append(BackfillRow(name, Backfill.NO_SHIP, detail))
                 continue
             matcher = _Matcher(pdf, cache)
             tried: list[Tried] = []
@@ -2237,6 +2360,13 @@ _REVIEWER_FOR = {"claude": "codex", "gpt": "claude", "mimo": "claude"}
 def fix_command(status: Status, author: Author | ValueError | None = None) -> str:
     """The commands that clear a failing drawing: render it if needed, then review it."""
     review = _review_command(status.name, author)
+    if status.missing:  # both families required: one review per missing family
+        tools = {family: tool for tool, family in REVIEWER_FAMILIES.items()}
+        review = " and ".join(
+            f"uv run cad/scripts/machinist_review.py {status.name} "
+            f"--reviewer {tools[family]} --author-family {other_family(family)}"
+            for family in status.missing
+        )
     if status.state == State.UNRENDERED:
         return f"uv run python -m doit drawing:{status.name}, then {review}"
     return review

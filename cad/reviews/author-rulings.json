@@ -12,7 +12,8 @@
       "commit": "aeb1afcfc624d4ae232fde32ddb1e43c9827087f",
       "ruled_by": "team-lead (Main)",
       "ruled_at": "2026-09-25",
-      "evidence": "Committed 2026-09-14T06:44:34-07:00 with no model trailer. That is in the omp era, before Claude Code sessions began on 2026-09-22 ~03:00Z, and the omp contract made GPT the author (dt-logs/handoffs/DriveTrain-resume-cc-20260922.md section 1.3)."
+      "evidence": "Committed 2026-09-14T06:44:34-07:00 with no model trailer. That is in the omp era, before Claude Code sessions began on 2026-09-22 ~03:00Z, and the omp contract made GPT the author (dt-logs/handoffs/DriveTrain-resume-cc-20260922.md section 1.3).",
+      "both_families": "class rule conflicts with per-drawing ruling; both families required (Main, 2026-09-25)"
     },
     {
       "drawing": "crank_pinion",
@@ -20,7 +21,8 @@
       "commit": "af2b553e8a3c25c37af9c208fe2889a59c9d96b1",
       "ruled_by": "team-lead (Main)",
       "ruled_at": "2026-09-25",
-      "evidence": "Committed 2026-09-21T16:06:26-07:00 (2026-09-21T23:06Z) with no model trailer. That is before the Claude Code era began on 2026-09-22 ~03:00Z, so the omp contract applies and GPT is the author (dt-logs/handoffs/DriveTrain-resume-cc-20260922.md section 1.3; dt-logs/handoffs/machinist-review-inventory-20260925.md)."
+      "evidence": "Committed 2026-09-21T16:06:26-07:00 (2026-09-21T23:06Z) with no model trailer. That is before the Claude Code era began on 2026-09-22 ~03:00Z, so the omp contract applies and GPT is the author (dt-logs/handoffs/DriveTrain-resume-cc-20260922.md section 1.3; dt-logs/handoffs/machinist-review-inventory-20260925.md).",
+      "both_families": "class rule conflicts with per-drawing ruling; both families required (Main, 2026-09-25)"
     }
   ]
 }

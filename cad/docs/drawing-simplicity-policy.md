@@ -365,7 +365,11 @@ exact commit it judged, who ruled and the evidence; a later commit to the
 script is not covered. Otherwise the `untrailered` class rule applies: by the
 user's ruling of 2026-09-25, an untrailered commit is Claude's, so a GPT
 reviewer handles it, and the entry's provenance says `rule: no trailer`. A
-trailer always wins over both. The command is a
+trailer always wins over both. Where a per-drawing ruling and the class rule
+disagree, the ruling row carries `both_families` with its reason, and the gate
+then requires a counting review of the current sheets from each reviewer
+family (claude and gpt), so one of them is cross-family whoever wrote the
+script; each is filed in its own `both_families_<family>` slot. The command is a
 dry run that prints a per-drawing table unless given `--apply`, and it must run
 against a render of the head being released (`--checkout`).
 Part and assembly packages render every native PDF page at 300 dpi and submit
