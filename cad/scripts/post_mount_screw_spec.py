@@ -56,6 +56,12 @@ DRAWING_PRECISION_BY_NAME = {
     for name, places in dimensions.items()
 }
 REFERENCE_SKETCHES = (CUT_LENGTH_SKETCH, CUT_END_BREAK_SKETCH)
+# Which view claims which marked dimension: the 1:1 Front view carries only
+# the cut length; the break is claimed only by the 10:1 tip detail, which is
+# created while the part shows its hidden sketch (part_sketches_shown).
+FRONT_VIEW_DIMENSIONS = {CUT_LENGTH_SKETCH: {CUT_LENGTH_DIMENSION}}
+DETAIL_VIEW_DIMENSIONS = {CUT_END_BREAK_SKETCH: {CUT_END_BREAK_DIMENSION}}
+DETAIL_SKETCHES = (CUT_END_BREAK_SKETCH,)
 
 # --- U27: can one fixed cut length serve every in-band post and plate? ---
 # The printed bands, as the shop reads them off the title block: the post's
@@ -73,8 +79,11 @@ PLATE_STOCK_BAND_MM = 0.13
 # - the MHA-091 tap's entry: deburr only, 0.1 max.  Integ carries this as
 #   cone_swing_platform_spec.POST_MOUNT_TAP_EDGE_BREAK (the platform's local
 #   override); this branch predates it, and integ dedupes it to one copy.
-# - the screw's cut end: 0.1 max, printed on the model's CutEndBreak
-#   dimension as 0.1 +0/-0.1, i.e. anywhere from none to 0.1.
+# - the screw's cut end: a deburr (the shop hacksaws and files the burr),
+#   0.1 max.  The model holds 0.1 as the nominal of its band; the sheet
+#   prints the single limit "0.1 MAX" in a 10:1 detail of the tip, because
+#   a 0.1 dimension at 1:1 is illegible and a printed +0/-0.1 band reads as
+#   permitting no break at all (Main's MHA-142 eye pass on #857).
 POST_MOUNT_TAP_EDGE_BREAK = 0.1
 CUT_END_BREAK_MM = 0.1
 CUT_END_BREAK_BAND = (0.0, -0.1)  # (upper, lower), the _fit_limits convention
@@ -82,6 +91,28 @@ _break_lower, _break_upper = deviations(CUT_END_BREAK_BAND)
 CUT_END_BREAK_MAX_MM = CUT_END_BREAK_MM + _break_upper
 CUT_END_BREAK_MIN_MM = CUT_END_BREAK_MM + _break_lower
 ENGAGEMENT_BREAKS_MM = POST_MOUNT_TAP_EDGE_BREAK + CUT_END_BREAK_MAX_MM
+# Why the part needs its own limit: the title block's general "CHAMFER <C>
+# MAX" is looser than the engagement stack below allows (the 0.90D worst
+# case spends CUT_END_BREAK_MAX_MM), so the sheet must print the tighter max.
+TITLE_BLOCK_CHAMFER_MAX_MM = float(_config.title_block("edge_break")["chamfer_max_mm"])
+if not CUT_END_BREAK_MAX_MM < TITLE_BLOCK_CHAMFER_MAX_MM:
+    raise ValueError(
+        f"the cut-end break max {CUT_END_BREAK_MAX_MM} no longer tightens the "
+        f"title block's chamfer {TITLE_BLOCK_CHAMFER_MAX_MM}: drop the local limit"
+    )
+# swTolMAX prints the dimension's NOMINAL followed by "MAX", so the printed
+# limit is the band's maximum only while the nominal sits at the band's top.
+CUT_END_BREAK_TOL_TYPE = 6  # swTolType_e.swTolMAX
+if CUT_END_BREAK_MM != CUT_END_BREAK_MAX_MM:
+    raise ValueError(
+        f"CutEndBreak nominal {CUT_END_BREAK_MM} is not its band's max "
+        f"{CUT_END_BREAK_MAX_MM}: a MAX-limit dimension would print the wrong limit"
+    )
+_BREAK_PLACES = DRAWING_PRECISION[CUT_END_BREAK_SKETCH][CUT_END_BREAK_DIMENSION]
+if round(CUT_END_BREAK_MAX_MM, _BREAK_PLACES) != CUT_END_BREAK_MAX_MM:
+    raise ValueError("the cut-end break max does not print at its places")
+# What the detail's dimension must read: the band's max at its places.
+CUT_END_BREAK_TEXT = f"{CUT_END_BREAK_MAX_MM:.{_BREAK_PLACES}f} MAX"
 
 # Counterbore floor above PlateTop (the post foot seats on it), both ends.
 FLOOR_LOW_MM = (_POST_HEIGHT_PRINTED - _GENERAL_1PL_MM) - (
@@ -269,5 +300,5 @@ if STOCK_LENGTH_MM - FACTORY_TIP_CHAMFER_MM <= CUT_LENGTH_MM:
 # length is the reference dimension above; its fit-to-hole acceptance is the
 # CutLength callout (CUT_TO_FIT_CALLOUT), not a note.
 MANUFACTURING_NOTES = (
-    "CHAMFER CUT END.\nUNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."
+    "DEBURR CUT END.\nUNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."
 )

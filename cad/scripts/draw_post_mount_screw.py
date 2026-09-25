@@ -9,8 +9,17 @@ isometric, both 1:1.  No single length suits every in-band post and plate
 "(86.0)", with no band and the cut-to-fit acceptance beneath it: cut at
 assembly, end flush to the spec band's allowance short of the MHA-091
 underside, never proud (post_mount_screw_spec.CUT_TO_FIT_CALLOUT -- no MHA-A03
-procedure sheet exists to carry it, Codex P1 on #857).  The cut end's deburr break is a live banded dimension, 0.1 +0/-0.1.  The only note says to chamfer the cut end and that the undimensioned
-purchased geometry is reference.  No installation sequence, engagement figure or rule
+procedure sheet exists to carry it, Codex P1 on #857).  The cut end's break
+is a deburr (Main's MHA-142 eye pass on #857): a 0.1 dimension at 1:1 is
+illegible and its printed +0/-0.1 band read as allowing no break at all, so
+the Front view carries no break dimension.  A 10:1 detail of the tip carries
+it instead as the single limit "0.1 MAX" (the model's CutEndBreak at
+swTolMAX, generated from the spec band).  CutEndBreak lives on a part-hidden
+reference sketch, and a detail takes a hidden sketch's visibility from the
+part when it is created, so the detail is created and dimensioned inside
+``part_sketches_shown`` (the cone tip block's section A recipe, lever probe
+c0514e35).  The only note says to deburr the cut end and that the
+undimensioned purchased geometry is reference.  No installation sequence, engagement figure or rule
 number is printed: the sequence is an MHA-A03 assembly step and the
 engagement a model assert (Main's eye pass of warm-c486, policy rule 6).
 
@@ -36,7 +45,6 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     dimension_name,
-    offset_dimension_text,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
@@ -44,16 +52,19 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import deviations
+from _stock_trim_drawing import TrimSheet
 from post_mount_screw_spec import (
-    CUT_END_BREAK_BAND,
     CUT_END_BREAK_DIMENSION,
-    CUT_END_BREAK_MM,
+    CUT_END_BREAK_MAX_MM,
+    CUT_END_BREAK_TEXT,
+    CUT_END_BREAK_TOL_TYPE,
     CUT_LENGTH_DIMENSION,
     CUT_LENGTH_MM,
     CUT_TO_FIT_CALLOUT,
-    DRAWING_DIMENSIONS,
+    DETAIL_SKETCHES,
+    DETAIL_VIEW_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    FRONT_VIEW_DIMENSIONS,
     HEAD_H_MM,
     THREAD_DIA_MM,
 )
@@ -74,29 +85,61 @@ ISO_CENTER = (0.270, 0.185)
 # shank's silhouette, midway along the span, far enough out that its
 # four-line acceptance callout (22 capitals at its widest) clears the head
 # and stays inside the border.
-# The cut end's 0.1 break spans 0.1 mm at 1:1, so its dimension line sits
-# just below the end face and its text leads out to the right, clear of the
-# shank and above the note block.  (The view is placed by its outline's
-# centre: the end face is half the screw's overall height below it.)
+# The cut end's break is not dimensioned in this 1:1 view (see the module
+# docstring).  (The view is placed by its outline's centre: the end face is
+# half the screw's overall height below it.)
 TIP_Y = FRONT_CENTER[1] - (CUT_LENGTH_MM + HEAD_H_MM) / 2000.0
-BREAK_X = FRONT_CENTER[0] + (THREAD_DIA_MM / 2.0 - CUT_END_BREAK_MM / 2.0) / 1000.0
 FRONT_KEEP = {
     CUT_LENGTH_DIMENSION: (FRONT_CENTER[0] - 0.047, FRONT_CENTER[1]),
-    CUT_END_BREAK_DIMENSION: (BREAK_X, TIP_Y - 0.006),
 }
-BREAK_TEXT = (FRONT_CENTER[0] + 0.028, TIP_Y - 0.006)
 DIMENSION_CALLOUTS = {CUT_LENGTH_DIMENSION: CUT_TO_FIT_CALLOUT}
-# The break is a live cutting control: driving, bilateral (swTolBILAT = 2)
-# at the model's nominal and band -- re-read on the sheet, not trusted.
-_break_lower, _break_upper = deviations(CUT_END_BREAK_BAND)
-BREAK_CONTROLS = {
-    CUT_END_BREAK_DIMENSION: (
-        CUT_END_BREAK_MM / 1000.0,
-        _break_lower / 1000.0,
-        _break_upper / 1000.0,
+
+# The 10:1 tip detail: its crop centres on the axis 1 mm above the cut end
+# with a 3.6 mm fence, so both ends of the break's radial leg (r 3.075 and
+# 3.175 on the end face) sit inside the crop -- a detail drops any dimension
+# whose reference lies outside it.  It sits between the Front view and the
+# isometric, above the note block and clear of the title block.
+DETAIL_SCALE = (10.0, 1.0)
+DETAIL_FENCE_MM = 3.6
+DETAIL_OFFSET_MM = 1.0
+DETAIL_CENTER = (0.190, 0.175)
+DETAIL_RADIUS = DETAIL_FENCE_MM * DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
+TIP_DETAIL = TrimSheet(
+    sheet_scale=SHEET_SCALE,
+    detail_center=DETAIL_CENTER,
+    detail_scale=DETAIL_SCALE,
+    fence_radius_mm=DETAIL_FENCE_MM,
+    cut_end_y_mm=-CUT_LENGTH_MM,
+    detail_offset_mm=DETAIL_OFFSET_MM,
+    detail_label_xy=(
+        DETAIL_CENTER[0] - 0.020,
+        DETAIL_CENTER[1] - DETAIL_RADIUS - 0.010,
+    ),
+    parent_letter_offset=(0.008, 0.006),
+)
+
+
+def _detail_point(x_mm: float, y_mm: float) -> tuple[float, float]:
+    """Sheet position of a Front-view model point inside the tip detail."""
+    ratio = DETAIL_SCALE[0] / DETAIL_SCALE[1]
+    ref_y = -CUT_LENGTH_MM + DETAIL_OFFSET_MM
+    return (
+        DETAIL_CENTER[0] + ratio * x_mm / 1000.0,
+        DETAIL_CENTER[1] + ratio * (y_mm - ref_y) / 1000.0,
     )
+
+
+# The break's text sits below the end face, under the right-hand rim.
+BREAK_RIM_XY = _detail_point(THREAD_DIA_MM / 2.0, -CUT_LENGTH_MM)
+DETAIL_KEEP = {
+    CUT_END_BREAK_DIMENSION: (BREAK_RIM_XY[0] - 0.006, BREAK_RIM_XY[1] - 0.012)
 }
-BREAK_TOLERANCE_TYPES = {CUT_END_BREAK_DIMENSION: 2}
+FRONT_PRECISION = {
+    CUT_LENGTH_DIMENSION: DRAWING_PRECISION_BY_NAME[CUT_LENGTH_DIMENSION]
+}
+DETAIL_PRECISION = {
+    CUT_END_BREAK_DIMENSION: DRAWING_PRECISION_BY_NAME[CUT_END_BREAK_DIMENSION]
+}
 # Below the Front view (its lower end ~0.119), above the stock rows.
 NOTES_XY = (0.016, 0.100)
 STOCK_ROWS = (
@@ -104,6 +147,81 @@ STOCK_ROWS = (
     ("Supplier SKUs", 0.080, 0.060),
     ("Stock Name", 0.016, 0.049),
 )
+
+
+def _view_dimension_names(adapter: Any, view: Any) -> list[str]:
+    return [
+        dimension_name(adapter, _early_bound(item, "IAnnotation"))
+        for item in (_early_bound(view, "IView").GetAnnotations() or ())
+    ]
+
+
+def break_text(value_mm: float, places: int, tol_type: int, prefix: str, suffix: str) -> str:
+    """The break dimension's printed text, composed from its read-back parts.
+
+    The API exposes no rendered string for a toleranced value, so the seat
+    check composes it: value at its places, the MAX limit when the type is
+    swTolMAX, and whatever prefix and suffix the display carries.
+    """
+    limit = " MAX" if tol_type == CUT_END_BREAK_TOL_TYPE else ""
+    return f"{prefix}{value_mm:.{places}f}{limit}{suffix}"
+
+
+def _verify_tip_detail(adapter: Any, front: Any, detail: Any) -> None:
+    """Seat read-back: the detail exists at its scale, carries the one break
+    dimension as a MAX limit reading the spec's text, and the Front does not."""
+    view = _early_bound(detail, "IView")
+    ratio = tuple(float(value) for value in view.ScaleRatio)
+    if ratio != DETAIL_SCALE:
+        raise RuntimeError(f"tip detail scale {ratio!r}, expected {DETAIL_SCALE!r}")
+    names = _view_dimension_names(adapter, detail)
+    if names.count(CUT_END_BREAK_DIMENSION) != 1:
+        raise RuntimeError(
+            f"tip detail must carry one {CUT_END_BREAK_DIMENSION}: {names}"
+        )
+    front_names = _view_dimension_names(adapter, front)
+    if CUT_END_BREAK_DIMENSION in front_names:
+        raise RuntimeError(f"Front view still carries the 1:1 break: {front_names}")
+    annotation = next(
+        _early_bound(item, "IAnnotation")
+        for item in view.GetAnnotations()
+        if dimension_name(adapter, _early_bound(item, "IAnnotation"))
+        == CUT_END_BREAK_DIMENSION
+    )
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    value_mm = float(dimension.SystemValue) * 1000.0
+    places = int(display.GetPrimaryPrecision2())
+    tol_type = int(tolerance.Type)
+    parenthesis = bool(display.ShowParenthesis)
+    text = break_text(
+        value_mm,
+        places,
+        tol_type,
+        str(display.GetText(1) or ""),  # swDimensionTextPrefix
+        str(display.GetText(2) or ""),  # swDimensionTextSuffix
+    )
+    _telemetry.event(
+        "drawing.tip_detail_break",
+        text=text,
+        value_mm=value_mm,
+        places=places,
+        tol_type=tol_type,
+        parenthesis=parenthesis,
+        scale=f"{ratio[0]:g}:{ratio[1]:g}",
+    )
+    if (
+        tol_type != CUT_END_BREAK_TOL_TYPE
+        or abs(value_mm - CUT_END_BREAK_MAX_MM) > 1e-9
+        or parenthesis
+        or text != CUT_END_BREAK_TEXT
+    ):
+        raise RuntimeError(
+            f"tip detail break reads {text!r} (type {tol_type}, parenthesis "
+            f"{parenthesis}), expected {CUT_END_BREAK_TEXT!r}"
+        )
+    _telemetry.success(f"tip detail {ratio[0]:g}:{ratio[1]:g} reads {text}")
 
 
 def _reference_cut_length(adapter: Any, annotations: list[Any]) -> None:
@@ -148,6 +266,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "Manufacturing Notes",
     )
     read_required_properties(adapter.currentModel, required, required=required)
+    source_model = adapter.currentModel
     draw, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -174,25 +293,30 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         keep=FRONT_KEEP,
         view_label="cut length",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
+        dimensions_by_feature=FRONT_VIEW_DIMENSIONS,
     )
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(adapter, annotations, FRONT_PRECISION)
     _reference_cut_length(adapter, annotations)
-    trim_drawing.verify_machining_controls(
-        adapter,
-        [
-            annotation
-            for annotation in annotations
-            if dimension_name(adapter, annotation) in BREAK_CONTROLS
-        ],
-        expected=BREAK_CONTROLS,
-        tolerance_types=BREAK_TOLERANCE_TYPES,
-        precision=DRAWING_PRECISION_BY_NAME,
-    )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    offset_dimension_text(
-        adapter, annotations, {CUT_END_BREAK_DIMENSION: BREAK_TEXT}
-    )
+
+    # The break lives on a part-hidden sketch: create and dimension the
+    # detail while the part shows it (a detail ignores per-view overrides).
+    with _telemetry.span("drawing.tip_detail", scale=f"{DETAIL_SCALE[0]:g}:1"):
+        with hidden_sketches.part_sketches_shown(
+            adapter, source_model, DETAIL_SKETCHES, label="tip detail break"
+        ):
+            detail = trim_drawing.end_detail(adapter, front, TIP_DETAIL)
+            set_hidden_lines_removed(adapter, detail)
+            _early_bound(detail, "IView").UpdateViewDisplayGeometry()
+            detail_annotations = hidden_sketches.curate_view_dimensions(
+                adapter,
+                detail,
+                keep=DETAIL_KEEP,
+                view_label="tip detail break",
+                dimensions_by_feature=DETAIL_VIEW_DIMENSIONS,
+            )
+        assert_imported_precision(adapter, detail_annotations, DETAIL_PRECISION)
+        _verify_tip_detail(adapter, front, detail)
 
     add_property_linked_note(
         adapter, "Manufacturing Notes", *NOTES_XY, char_height=0.003
@@ -201,6 +325,10 @@ async def build(adapter: Any) -> dict[str, str]:
         add_property_linked_note(adapter, name, x, y, char_height=0.003)
 
     set_hidden_lines_removed(adapter, front)
+    trim_drawing.position_detail_label(adapter, detail, TIP_DETAIL)
+    trim_drawing.position_parent_detail_letter(adapter, front, TIP_DETAIL)
+    # Re-read after the label moves and the last rebuilds, before the save.
+    _verify_tip_detail(adapter, front, detail)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
