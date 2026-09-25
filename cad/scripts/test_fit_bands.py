@@ -300,3 +300,21 @@ def test_classification_lists_are_current() -> None:
         stale = set(listing) - inventory
         assert not stale, f"listed constants that are gone: {sorted(stale)}"
     assert not set(NOT_FIT_BANDS) & set(INDEXED_FIT_BANDS)
+
+
+@pytest.mark.parametrize(
+    ("band", "order"),
+    [
+        ((0.025, 0.025), "upper_lower"),  # the warm-c486 crank_drive_gear band
+        ((0.010, 0.050), "upper_lower"),
+        ((0.050, 0.010), "lower_upper"),
+        ((0.020, 0.020), "lower_upper"),
+    ],
+)
+def test_check_band_rejects_inverted_and_zero_width_bands(
+    band: tuple[float, float], order: str
+) -> None:
+    # The guard must fail on the shapes it exists to catch, in both argument
+    # orders, or every parametrized case above passes vacuously.
+    with pytest.raises((AssertionError, ValueError)):
+        _check_band("synthetic", band, order)
