@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import sys
 import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -717,16 +718,20 @@ def test_a_pack_and_go_open_that_never_returns_trips_the_watchdog(
 ) -> None:
     """rekey2, 2026-09-25: package:release sat 78 min inside one drawing's open
     with nothing to end it -- package_native attaches through comtypes, not
-    run_build, so the watchdog was never armed. The real Watchdog, a short op
-    timeout and a seat whose OpenDoc6 blocks: the idle abort must fire with the
-    op-timeout exit code and name the document the seat wedged on."""
+    run_build, so the watchdog was never armed. The real Watchdog and a seat
+    whose OpenDoc6 blocks: the idle abort must fire with the op-timeout exit
+    code and name the document the seat wedged on. No wall-clock wait: the
+    watchdog's clock jumps past the op timeout the moment the open starts, so
+    the abort lands on the next 10 ms poll and can never fire early under load."""
     import package_native
 
     released = threading.Event()
+    opening = threading.Event()
     aborts: list[dict[str, object]] = []
     exits: list[int] = []
 
     def open_doc(path, *_args):
+        opening.set()
         released.wait(5)
         raise RuntimeError(f"seat killed while opening {Path(path).name}")
 
@@ -741,8 +746,9 @@ def test_a_pack_and_go_open_that_never_returns_trips_the_watchdog(
 
     def start():
         dog = Watchdog(
-            op_timeout=0.3,
-            poll_interval=0.05,
+            op_timeout=5.0,
+            poll_interval=0.01,
+            clock=lambda: time.monotonic() + (1000.0 if opening.is_set() else 0.0),
             crash_pids=set,
             hung_probe=lambda: False,
             dialog_probe=lambda: None,
