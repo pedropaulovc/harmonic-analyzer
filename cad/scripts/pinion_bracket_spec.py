@@ -44,7 +44,7 @@ import pinion_strap_pin_spec as _strap_pin
 # axis and through-thickness station, +/-0.05 on the bar thickness and a
 # +0.10/0 seat depth) traced to no fit class and to no error-budget row: they
 # were habit, not specification, and are gone.  The one non-fit band that
-# survives is PIN_SEAT_STATION_BAND below, and it traces to a web. ---
+# survives is PIN_SEAT_STATION_TOL below, and it traces to a web. ---
 # Option E-a: the strap is pinned to the torque shaft, which turns with it in
 # the MHA-061 block bores.  The slide fit stays so the strap goes onto the
 # shaft for fit-up and the cross hole can be match-drilled through both.
@@ -92,16 +92,17 @@ if "SUPPLY " + _strap_pin.PIN_SUPPLY + " LOOSE" != " ".join(
 # the 1.5 floor (the 2.0 target gives way to the printed location).  The near
 # face keeps PIN_SEAT_NEAR_WEB_WORST.
 THICKNESS_BAND = 0.8  # Depth prints .X
-PIN_SEAT_STATION_BAND = (0.10, -0.10)
+# Symmetric, so the print reads +/- (ASME Y14.5), not an equal bilateral pair.
+PIN_SEAT_STATION_TOL = 0.10
 _PIN_SEAT_MAX = PIN_BORE + PIN_SEAT_DIA_BAND[0]
 PIN_SEAT_WEB_WORST = (
     (THICKNESS - THICKNESS_BAND)
-    - (THICKNESS / 2.0 + PIN_SEAT_STATION_BAND[0])
+    - (THICKNESS / 2.0 + PIN_SEAT_STATION_TOL)
     - _PIN_SEAT_MAX / 2.0
     - 0.05
 )
 PIN_SEAT_NEAR_WEB_WORST = (
-    THICKNESS / 2.0 + PIN_SEAT_STATION_BAND[1] - _PIN_SEAT_MAX / 2.0 - 0.05
+    THICKNESS / 2.0 - PIN_SEAT_STATION_TOL - _PIN_SEAT_MAX / 2.0 - 0.05
 )
 if PIN_SEAT_WEB_WORST < 1.5:
     raise AssertionError(

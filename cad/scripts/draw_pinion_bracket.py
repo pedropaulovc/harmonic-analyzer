@@ -157,9 +157,11 @@ LEFT_KEEP = {
     # broad face A (the view's left edge) -- the cross hole's under the view,
     # left of both callout leaders, the seat's above it, under the 9.0 -- and
     # the cross hole's height from the pivot-bore wall sits in the clear field
-    # left of the view.
+    # left of the view.  pc-ra eye pass: centred between its witnesses the
+    # seat's 4.50 was cut by the seat-axis witness, so its text sits left of
+    # face A, outside the extension lines like the 3.18.
     "CrossHoleCz": (0.0754, 0.099),
-    "PinSeatCz": (0.0754, 0.2025),
+    "PinSeatCz": (0.058, 0.2025),
     "CrossHoleFromBoreWall": (0.058, 0.119),
 }
 SECTION_CENTER = (0.350, 0.115)

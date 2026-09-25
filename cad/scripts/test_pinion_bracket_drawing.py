@@ -81,9 +81,9 @@ def test_every_band_traces_to_a_named_fit_class() -> None:
         ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_BAND)",
         # The one band that is not a fit: user ruling (a) tightened the seat's
         # printed station for its far-face web (PIN_SEAT_WEB_WORST).
-        ("PinSeatProfile", "PinSeatCz"): "*deviations(PIN_SEAT_STATION_BAND)",
+        ("PinSeatProfile", "PinSeatCz"): "PIN_SEAT_STATION_TOL",
     }
-    assert pinion_bracket_spec.PIN_SEAT_STATION_BAND == (0.10, -0.10)
+    assert pinion_bracket_spec.PIN_SEAT_STATION_TOL == 0.10
     assert pinion_bracket_spec.PIVOT_BORE_BAND is REAM_SLIDE
     assert pinion_bracket_spec.ARBOR_BORE_BAND is REAM_SLIDE
     assert pinion_bracket_spec.PIN_SEAT_DIA_BAND is REAM_H7
@@ -112,7 +112,13 @@ def test_decimal_places_cover_every_marked_dimension_and_resolve_fit_bands() -> 
         ("PivotBoreDia", pinion_bracket_spec.PIVOT_BORE_BAND),
         ("ArborBoreDia", pinion_bracket_spec.ARBOR_BORE_BAND),
         ("PinSeatDia", pinion_bracket_spec.PIN_SEAT_DIA_BAND),
-        ("PinSeatCz", pinion_bracket_spec.PIN_SEAT_STATION_BAND),
+        (
+            "PinSeatCz",
+            (
+                pinion_bracket_spec.PIN_SEAT_STATION_TOL,
+                -pinion_bracket_spec.PIN_SEAT_STATION_TOL,
+            ),
+        ),
     ):
         width = abs(deviations(band)[0] - deviations(band)[1])
         assert width >= 10.0 ** -by_name[name]
@@ -163,6 +169,18 @@ def test_follower_seat_station_is_printed_from_face_a_with_a_rule_12_web() -> No
     assert pinion_bracket_spec.DRAWING_PRECISION_BY_NAME["PinSeatCz"] == 2
     assert pinion_bracket_spec.PIN_SEAT_WEB_WORST >= 1.5
     assert pinion_bracket_spec.PIN_SEAT_NEAR_WEB_WORST >= 2.0
+    # pc-ra eye pass: a symmetric +/- band (ASME Y14.5), printed at the
+    # dimension's own two places ("4.50 +/-0.10"), set on the model.
+    import inspect
+
+    build_source = inspect.getsource(bracket)
+    assert (
+        '_tolerance_at_dimension_places(adapter, "PinSeatProfile", "PinSeatCz")'
+        in build_source
+    )
+    assert drawing.LEFT_KEEP["PinSeatCz"][0] < drawing.LEFT_CENTER[0] - (
+        pinion_bracket_geometry.THICKNESS * drawing.SHEET_SCALE[0] / 2000.0
+    )
 
 
 def test_blind_seat_entry_face_is_complete_solid_flank() -> None:
@@ -252,10 +270,9 @@ _WEB_FLOOR = 1.5
 def _printed_band(name: str) -> float:
     """The half-width a location can wander on the print: its own model band
     when it carries one, else its decimal places' general grade."""
-    own = {"PinSeatCz": pinion_bracket_spec.PIN_SEAT_STATION_BAND}
+    own = {"PinSeatCz": pinion_bracket_spec.PIN_SEAT_STATION_TOL}
     if name in own:
-        upper, lower = own[name]
-        return max(abs(upper), abs(lower))
+        return own[name]
     return _GENERAL_GRADE[pinion_bracket_spec.DRAWING_PRECISION_BY_NAME[name]]
 
 
