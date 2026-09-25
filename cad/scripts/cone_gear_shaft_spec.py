@@ -6,7 +6,7 @@ from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
-from cone_gear_spec import FACE_WIDTH as CONE_GEAR_FACE_WIDTH
+from cone_gear_spec import DEEPENED_MESH_MM, FACE_WIDTH as CONE_GEAR_FACE_WIDTH
 
 
 MM_PER_IN = 25.4
@@ -110,9 +110,10 @@ TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 # the tip held on a tailstock centre -- unsupported, it whips off the tool --
 # which is why the tailstock note below is a requirement (U40), not a method.
 # The shaft still decreases monotonically toward the tip: the cone is
-# assembled tip-first, and every gear OD exceeds the next inboard gear's bore
-# (T006 OD 4.08 > T012 bore 1.5875; T012 7.14 > T018 3.175; T018 10.20 >
-# T024 6.35; T024 13.26 > T030 9.525), so no single gear can be made integral
+# assembled tip-first, and every gear's tip diameter exceeds the next inboard
+# gear's bore (T006 4.28 > T012 bore 1.5875; T012 7.55 > T018 3.175; T018
+# 10.74 > T024 6.35; T024 13.90 > T030 9.525; asserted below from
+# cone_gear_spec.DEEPENED_MESH_MM), so no single gear can be made integral
 # with the shaft unless all twenty are.
 SECTIONS: tuple[tuple[float, float], ...] = (
     (JOURNAL_DIA / MM_PER_IN, JOURNAL_END),  # integral v2-post bearing journal
@@ -125,6 +126,14 @@ SECTIONS: tuple[tuple[float, float], ...] = (
 SECTION_DIAS = tuple(dia_in * MM_PER_IN for dia_in, _end in SECTIONS)
 SECTION_ENDS = tuple(end for _dia_in, end in SECTIONS)
 SHAFT_LENGTH = SECTION_ENDS[-1]
+# Tip-first assembly: each small gear passes over no land it cannot clear.
+# T006..T024 sit on SECTIONS[4..2] (T006/T012 share the terminal land); the
+# next inboard gear's bore is the land under it.
+for _teeth, _next_bore in ((6, 4), (12, 3), (18, 2), (24, 1)):
+    if DEEPENED_MESH_MM[_teeth][0] <= SECTION_DIAS[_next_bore]:
+        raise AssertionError(
+            f"T{_teeth:03d} tip diameter does not exceed the next inboard bore"
+        )
 
 # Diameter bands, one NAMED class per land, applied to the model dimension
 # by build_cone_gear_shaft -- never "+0.00/-0.02" typed as sheet callout text.

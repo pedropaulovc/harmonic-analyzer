@@ -6,7 +6,7 @@ pivot post and its thin end located by the external spacer and cup-ended
 adjuster -- the post and adjuster carrier both stand on the swing platform,
 so the whole set pivots out of engagement as one
 unit (ch. 25; p. 18 "pivot"). At the finer module DP 49.82 (ch13 OD 62.2) the
-tip gears are tiny -- T006 OD is 4.08 mm -- so the shaft steps down far
+tip gears are tiny -- T006 OD is 4.28 mm -- so the shaft steps down far
 more at the thin end to match the configured gear bores AND stay inside
 each gear's root circle (`build_cone_gear.py` ``BoreDia``, DIMENSIONS.md
 Appendix C #7). Gears attach by means the book never shows (p.21 macro
@@ -122,7 +122,7 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 # 134.83 | 135.28 | T024 south 135.72, and so on; U40).
 # Diameters agree with build_cone_gear.bore_dia_in (snug perpendicular seats),
 # stepping much finer than the old DP 30 shaft because the tip gears shrank:
-# T006 OD is now 4.08 mm.  The terminal land stops at 1/16": below that the
+# T006 OD is now 4.28 mm.  The terminal land stops at 1/16": below that the
 # T006 rim gains little and the journal becomes unturnable (L/D 31 at 1/32").
 
 
