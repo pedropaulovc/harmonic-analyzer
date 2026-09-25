@@ -1332,6 +1332,12 @@ _CHECK_NAMES = (
 # checks) and has never caught a product defect -- so it is off the every-build
 # required path. Union of both MUST match task_check's specs keys.
 _OPTIONAL_CHECK_NAMES = ("verify_telemetry",)
+# Offline checks only `release` depends on. ``machinist`` fails while any
+# registered drawing lacks a counting machinist review of the sheet now rendered
+# (cad/docs/drawing-simplicity-policy.md, "The gate"); in `build` it would fail
+# every build between a drawing edit and its re-review. Also part of the union
+# that must match task_check's specs keys.
+_RELEASE_CHECK_NAMES = ("machinist",)
 
 
 def _run_stamped(cmd: list[str], label: str, stamp: str, task: str) -> None:
@@ -3215,12 +3221,37 @@ def task_check():
             ),
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_error_budget.py")],
         },
+        "machinist": {
+            # The release's machinist-review gate: every registered drawing's
+            # CURRENT PDF must match a counting entry of the tracked review
+            # ledger. SolidWorks-free, but it reads the rendered sheets, so each
+            # drawing's PDF is a file_dep -- that orders the gate after every
+            # drawing:* task (and restores/renders them under either executor)
+            # and re-runs it whenever a sheet changes. The ledger and the
+            # reviewed PDFs it stores are runtime-read, so they are listed too.
+            "file_dep": sorted(
+                {
+                    str((REPO_ROOT / "cad" / "reviews" / "machinist-ledger.json").resolve()),
+                    *(
+                        str(path.resolve())
+                        for path in (REPO_ROOT / "cad" / "reviews" / "sheets").glob("*.pdf")
+                    ),
+                    *(
+                        str(DRAWINGS_BY_NAME[name].outputs["pdf"].resolve())
+                        for name in _drawing_order()
+                    ),
+                }
+            ),
+            "cmd": [sys.executable, str(SCRIPTS_DIR / "machinist_ledger.py"), "check"],
+        },
     }
     # Tripwire: `build` and `release` depend on f"check:{c}" for c in _CHECK_NAMES, so a
     # spec added here without the matching name (or vice versa) would silently never run
     # in the default paths -- exactly the gap Codex caught on freshness/flagonly. Keep
     # the two in lockstep.
-    _all_check_names = set(_CHECK_NAMES) | set(_OPTIONAL_CHECK_NAMES)
+    _all_check_names = (
+        set(_CHECK_NAMES) | set(_OPTIONAL_CHECK_NAMES) | set(_RELEASE_CHECK_NAMES)
+    )
     assert set(specs) == _all_check_names, (
         f"check specs vs check-names drift: {set(specs) ^ _all_check_names}"
     )
@@ -3445,9 +3476,11 @@ def task_release():
     Gated on EVERY gate via REAL task_dep edges: ``export`` (which itself pulls the
     parts/assemblies + the ``verify:*`` gates), ``gallery``, ``package:release``
     (the Pack-and-Go tree it stages), every registered ``drawing:*`` artifact,
-    ``preflight`` (gear-ratios), the ``verify:*`` suites, and every offline
-    ``check:*`` -- so a release cannot publish past a stale/failing gate or package
-    a missing/stale drawing.
+    ``preflight`` (gear-ratios), the ``verify:*`` suites, every offline
+    ``check:*``, and ``check:machinist`` (every drawing's current sheet has a
+    counting machinist review) -- so a release cannot publish past a
+    stale/failing gate, package a missing/stale drawing, or ship a sheet no
+    machinist review accepted.
     """
     return {
         "task_dep": [
@@ -3458,6 +3491,7 @@ def task_release():
             *(f"drawing:{s}" for s in _drawing_order()),
             *(f"verify:{s}" for s in _VERIFY_NAMES),
             *(f"check:{c}" for c in _CHECK_NAMES),
+            *(f"check:{c}" for c in _RELEASE_CHECK_NAMES),
         ],
         "uptodate": [False],
         "pos_arg": "relargs",

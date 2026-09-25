@@ -151,6 +151,9 @@ def registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def _trailer(monkeypatch: pytest.MonkeyPatch, model: str | None) -> None:
     author = ml.Author(model, "c" * 40, "cad/scripts/draw_crank_arm.py")
     monkeypatch.setattr(ml, "draw_script_author", lambda name: author)
+    monkeypatch.setattr(
+        ml, "draw_script_authors", lambda names: {n: author for n in names}
+    )
 
 
 def _only(pdf: Path) -> ml.Sheet:
@@ -495,6 +498,16 @@ def test_author_model_comes_from_the_draw_scripts_commit_trailer(
     )
     with pytest.raises(ValueError, match="several models"):
         ml.script_author(script, repo=repo)
+
+    # The batch form answers every script in three git calls, per script alike.
+    other = repo / "draw_pen_rod.py"
+    _commit(
+        repo, other, "draw: pen rod\n\nCo-Authored-By: GPT-6 Sol <noreply@openai.com>"
+    )
+    batch = ml.script_authors([script, other, repo / "draw_never.py"], repo=repo)
+    assert isinstance(batch[script], ValueError)
+    assert batch[other].model == "gpt-6-sol"
+    assert "has no commit" in str(batch[repo / "draw_never.py"])
 
     script.write_text("edited, not committed\n", encoding="utf-8")
     with pytest.raises(ValueError, match="uncommitted"):
@@ -1307,11 +1320,11 @@ def test_the_ledger_tests_run_under_the_recipe_gate() -> None:
     assert 'SCRIPTS_DIR / "test_machinist_review.py"' in dodo
 
 
-def test_no_build_task_reads_the_ledger() -> None:
-    """Recording a review must never re-key a build: only these tools import it.
+def test_only_the_review_tools_and_the_release_gate_read_the_ledger() -> None:
+    """Naming a test file (``test_machinist_ledger.py``) to enroll it is not a read.
 
-    Naming a test file (``test_machinist_ledger.py``) to enroll it in a gate is
-    not a read of the ledger.
+    dodo.py reads it only for ``check:machinist``; the next test proves no
+    cache-keyed build task does.
     """
     import re
 
@@ -1322,10 +1335,87 @@ def test_no_build_task_reads_the_ledger() -> None:
         if reads.search(path.read_text(encoding="utf-8"))
     }
     assert readers == {
+        "dodo.py",
         "machinist_ledger.py",
         "machinist_review.py",
         "test_machinist_ledger.py",
     }
+
+
+def _load_dodo():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("dodo", ml.REPO_ROOT / "dodo.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_release_is_gated_on_the_ledger_and_no_build_task_is_keyed_on_it() -> None:
+    dodo = _load_dodo()
+    gate = next(task for task in dodo.task_check() if task["name"] == "machinist")
+    ledger = str(ml.LEDGER_PATH.resolve())
+    pdfs = {str(spec.outputs["pdf"].resolve()) for spec in ml.DRAWINGS}
+
+    # SolidWorks-free, but ordered after (and re-run by) every rendered sheet.
+    assert ledger in gate["file_dep"]
+    assert pdfs <= set(gate["file_dep"])
+    assert str((ml.SCRIPTS_DIR / "machinist_ledger.py").resolve()) in gate["file_dep"]
+    assert "check:machinist" in dodo.task_release()["task_dep"]
+    # In build it would fail every build between a drawing edit and its re-review.
+    assert "check:machinist" not in dodo.task_build()["task_dep"]
+
+    reviews = str((ml.CAD_ROOT / "reviews").resolve())
+    tool = str((ml.SCRIPTS_DIR / "machinist_ledger.py").resolve())
+    keyed = [
+        (label, dep)
+        for label, deps in dodo._cache_rows()
+        for dep in deps
+        if str(Path(dep).resolve()).startswith(reviews)
+        or str(Path(dep).resolve()) == tool
+    ]
+    assert keyed == []
+
+
+def test_failing_check_lists_each_blocked_drawing_with_its_fix(
+    tmp_path: Path, registry: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    ledger = str(tmp_path / "ledger.json")
+    _sheet(registry)
+    _trailer(monkeypatch, "claude-opus-5-5")
+
+    assert ml.main(["--ledger", ledger, "check", "crank_arm"]) == 1
+    err = capsys.readouterr().err
+    assert "1 drawings have no counting machinist review" in err
+    assert (
+        "  crank_arm (unreviewed): uv run cad/scripts/machinist_review.py crank_arm "
+        "--reviewer codex --author-family claude"
+    ) in err
+
+    assert ml.main(["--ledger", ledger, "check", "crank_arm", "--json"]) == 1
+    row = json.loads(capsys.readouterr().out)[0]
+    assert row["fix"].endswith("--reviewer codex --author-family claude")
+
+
+@pytest.mark.parametrize(
+    ("state", "author", "fix"),
+    [
+        (ml.State.UNRENDERED, None, "uv run python -m doit drawing:crank_arm"),
+        (ml.State.DRIFT, "gpt-6-sol", "--reviewer claude --author-family gpt"),
+        (ml.State.UNREVIEWED, None, "(its last commit names no model)"),
+        (
+            ml.State.UNREVIEWED,
+            ValueError("draw_crank_arm.py has uncommitted changes"),
+            "uncommitted",
+        ),
+    ],
+)
+def test_fix_command(registry: Path, state, author, fix: str) -> None:
+    if isinstance(author, str) or author is None and state != ml.State.UNRENDERED:
+        author = ml.Author(author, "c" * 40, "cad/scripts/draw_crank_arm.py")
+    status = ml.Status("crank_arm", state, "", "", "-")
+
+    assert fix in ml.fix_command(status, author)
 
 
 def test_the_tracked_ledger_matches_this_checkouts_fingerprint_settings() -> None:
