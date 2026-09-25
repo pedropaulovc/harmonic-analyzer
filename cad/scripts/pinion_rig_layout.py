@@ -36,7 +36,6 @@ import math
 from _printed_tolerance import printed_band_mm, printed_deviations
 from cone_pivot_post_installation import MECHANISM_Z_SHIFT
 from pinion_bracket_geometry import THICKNESS as STRAP_T
-from pinion_bracket_geometry import THICKNESS_BAND as STRAP_T_BAND
 from pinion_bracket_geometry import THICKNESS_PLACES as STRAP_T_PLACES
 from pinion_cam_geometry import CAM_LEN
 from pinion_lever_geometry import BORE_DEPTH as LEVER_BORE_DEPTH
@@ -51,7 +50,7 @@ from pinion_spring_geometry import WIDTH as SPRING_W
 # one axial reference.  At fit-up the cluster is pushed hard against it, so the
 # back strap, the drum and the front strap close up in front of it and every
 # other station below derives from it.  The U28 block put it at 77.75 (its
-# outer face at the released machine z 88); the E-a re-size deepened MHA-061
+# outer face at the released machine z 88.0, 10.25 deep); the E-a re-size deepened MHA-061
 # OUTWARD, leaving the cluster where it was, and RIG_AFT_SHIFT then moved the
 # whole rig aft.
 #
@@ -77,7 +76,11 @@ from pinion_spring_geometry import WIDTH as SPRING_W
 # build_drive_train_assembly asserts the whole margin table at import.
 RIG_AFT_SHIFT = 1.75
 RIG_AFT_SHIFT_STEP = 0.25  # the grid the shift is chosen on
-BACK_STOP_Z = 77.75 + RIG_AFT_SHIFT + MECHANISM_Z_SHIFT
+# The U28 back block: its outer face at the released machine z 88.0, 10.25 deep.
+U28_BACK_BLOCK_OUTER_Z = 88.0
+U28_BLOCK_DEPTH = 10.25
+U28_BACK_STOP_Z = U28_BACK_BLOCK_OUTER_Z - U28_BLOCK_DEPTH  # 77.75
+BACK_STOP_Z = U28_BACK_STOP_Z + RIG_AFT_SHIFT + MECHANISM_Z_SHIFT
 BACK_BLOCK_Z0 = BACK_STOP_Z
 BACK_BLOCK_OUTER_Z = BACK_BLOCK_Z0 + BLOCK_DEPTH
 
@@ -95,7 +98,7 @@ FRONT_BLOCK_FEELER_BAND = 0.10
 # the shaft is match-drilled with a feeler as a shim at the drum's FRONT end
 # (MHA-062's drilling note), freezing the strap spacing at the drum plus the
 # shim.  The drum then runs in DRUM_END_SHIM +/- DRUM_END_SHIM_SET_ERROR of end
-# play (pinion_arbor_spec.drum_total_air), set with the same band as the
+# play (pinion_arbor_geometry.drum_total_air), set with the same band as the
 # front-block feeler.  The shim is the smallest 0.05 blade whose tightest
 # setting keeps the drum's MIN_END_PLAY (0.1) with RIG_MARGIN_SPARE to spare:
 # 0.45, a stock leaf of the same metric gage set as the 0.25 feeler
@@ -282,7 +285,7 @@ BACK_COLLAR_MIN_GAP = 0.5  # the collar never lands on the block but as the stop
 HUB_STOP_MARGIN = 0.25
 _STRAP_T_LOWER = printed_deviations(STRAP_T, STRAP_T_PLACES)[0]
 BACK_COLLAR_GAP_MAX = (
-    (STRAP_T + STRAP_T_BAND) / 2.0 - (CAM_LEN - BACK_CAM_PIN_STATION) + BACK_CAM_SET_ERR
+    (STRAP_T + _STRAP_T_UPPER) / 2.0 - (CAM_LEN - BACK_CAM_PIN_STATION) + BACK_CAM_SET_ERR
 )  # 2.65
 BACK_COLLAR_GAP_MIN = (
     (STRAP_T + _STRAP_T_LOWER) / 2.0

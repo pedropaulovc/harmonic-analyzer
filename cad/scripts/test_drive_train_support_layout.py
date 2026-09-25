@@ -236,7 +236,11 @@ def _back_collar_gap(t: float, e: float) -> float:
 
 
 def _strap_t_band() -> tuple[float, float]:
-    return (drive.STRAP_T - RIG.STRAP_T_BAND, drive.STRAP_T + RIG.STRAP_T_BAND)
+    from _printed_tolerance import printed_deviations
+    from pinion_bracket_geometry import THICKNESS_PLACES
+
+    lower, upper = printed_deviations(drive.STRAP_T, THICKNESS_PLACES)
+    return (drive.STRAP_T + lower, drive.STRAP_T + upper)
 
 
 def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
@@ -893,3 +897,79 @@ def test_torque_shaft_is_phased_to_the_straps_and_swings_with_them() -> None:
     assert drive.TORQUE_SHAFT_ROWS[2] == [0.0, 0.0, 1.0]
     assert "pinion-pivot-shaft" in allowed_free_stems("drive-train")
     assert SHAFT_DIA == drive.STRAP_PIVOT_BORE
+
+
+def test_drive_train_reads_no_arbor_drawing_contract() -> None:
+    # Main (restricted review of #858): the drive train sizes the drum air and
+    # the land margins from MHA-102, so it must read the arbor GEOMETRY module,
+    # never pinion_arbor_spec -- a print-wording or precision edit there would
+    # otherwise re-key the whole drive train.
+    from pathlib import Path
+
+    from _buildgraph import module_deps_of
+
+    deps = {Path(dep).stem for dep in module_deps_of(Path(drive.__file__))}
+    assert "pinion_arbor_geometry" in deps
+    assert "pinion_arbor_spec" not in deps
+
+
+def test_rig_anchors_are_named_not_literal() -> None:
+    # Main (restricted review of #858): the back stop and the drum bond station
+    # carry their derivations, not bare literals.
+    import pinion_arbor_geometry as arbor
+
+    assert math.isclose(RIG.U28_BACK_STOP_Z, 88.0 - 10.25, abs_tol=1e-12)
+    assert math.isclose(
+        RIG.BACK_STOP_Z,
+        RIG.U28_BACK_STOP_Z + RIG.RIG_AFT_SHIFT + drive.MECHANISM_Z_SHIFT,
+        abs_tol=1e-12,
+    )
+    assert math.isclose(
+        arbor.DRUM_STATION_AS_BUILT,
+        arbor.RELEASED_DRUM_FRONT_Z - arbor.RELEASED_ARBOR_ROOT_Z - arbor.HEAD_REAR_Z,
+        abs_tol=1e-12,
+    )
+    assert math.isclose(arbor.DRUM_STATION_AS_BUILT, 61.25, abs_tol=1e-12)
+
+
+def test_spring_pad_books_its_printed_width_band() -> None:
+    # Main (restricted review of #858, P2-4): the pad width reads the band its
+    # sheet prints, not a 0.51 literal.
+    import inspect
+    import re
+
+    from _printed_tolerance import printed_deviations
+    from pinion_spring_geometry import PAD_WIDTH, PAD_WIDTH_PLACES
+
+    assert not re.search(r"\b0\.51\b", inspect.getsource(drive))
+    upper = printed_deviations(PAD_WIDTH, PAD_WIDTH_PLACES)[1]
+    assert math.isclose(drive.SPRING_PAD_WIDTH_WORST, PAD_WIDTH + upper, abs_tol=1e-12)
+
+
+def test_rig_margin_table_is_logged_at_build() -> None:
+    # Main (restricted review of #858): the margin table is visible in the
+    # task log, one line per row, not only asserted at import.
+    import inspect
+
+    lines = drive.rig_margin_lines()
+    assert len(lines) == len(drive.RIG_MARGINS)
+    for name, line in zip(drive.RIG_MARGINS, lines, strict=True):
+        assert line.startswith(name), line
+    assert "rig_margin_lines()" in inspect.getsource(drive.build)
+
+
+def test_strap_pin_guard_reads_the_strap_parts_cross_holes() -> None:
+    # Main (restricted review of #858): the lockstep guard compared two values
+    # derived from the same rig stations, so it could never fire.  It now
+    # takes each cross hole from the strap part (its placement and CROSS_HOLE_CZ)
+    # and each shaft hole from the shaft part's own stations.
+    from pinion_bracket_geometry import CROSS_HOLE_CZ, THICKNESS
+
+    assert math.isclose(CROSS_HOLE_CZ, THICKNESS / 2.0, abs_tol=1e-12)
+    strap_rows = drive.compose_rows(
+        drive.ROT_Y_180, drive.rot_z_rows(drive.STRAP_LEAN_DEG)
+    )
+    for z0, z_hole in zip(drive.STRAP_ORIGIN_Z, drive.STRAP_CROSS_HOLE_Z, strict=True):
+        world = _world([drive.PIVOT_X, drive.PIVOT_Y, z0], strap_rows, [0.0, 0.0, CROSS_HOLE_CZ])
+        assert math.isclose(world[2], z_hole, abs_tol=1e-9)
+    assert drive.STRAP_PIN_Z == drive.STRAP_CROSS_HOLE_Z

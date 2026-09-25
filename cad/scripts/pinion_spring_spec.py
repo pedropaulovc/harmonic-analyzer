@@ -26,6 +26,7 @@ from pinion_spring_geometry import (
     KINK_DEG as KINK_DEG,
     PAD_LEN as PAD_LEN,
     PAD_WIDTH as PAD_WIDTH,
+    PAD_WIDTH_PLACES as PAD_WIDTH_PLACES,
     R_BEND as R_BEND,
     R_KINK as R_KINK,
     THICK as THICK,
@@ -65,7 +66,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SpringProfile": {name: 1 for name in FORMED_DIMENSIONS["SpringProfile"]},
     "Spring": {"StripWidth": 2},
-    "PadProfile": {"PadWidth": 2, "PadLen": 2},
+    "PadProfile": {"PadWidth": PAD_WIDTH_PLACES, "PadLen": 2},
 }
 
 _PRECISION_NAMES = [

@@ -44,6 +44,10 @@ PIN_DROP = -7.0  # NEGATIVE: the stud seat is 7 ABOVE the pivot bore (on the
 # web to the O6.35 pivot bore, and the higher pin lets the lift cam carry a
 # 2.1 mm thin-side wall at the same park gap.
 PIN_SEAT = 4.0
+# Option E-a: the 1/16 cross hole runs along local X on the strap mid-plane,
+# this far from the part origin face (build_pinion_bracket drives it, the
+# drive train reads it to place the MHA-145 pins).
+CROSS_HOLE_CZ = THICKNESS / 2.0
 
 R_END = WIDTH / 2.0
 HALF_WIDTH = R_END
