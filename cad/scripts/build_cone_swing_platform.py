@@ -11,9 +11,11 @@ grows with distance from the pivot, so pivoting at the TIP gives the
 big-end gears the largest throw.
 
 Plan shape is the p.18 wedge, ASYMMETRIC about the shaft line: the east
-side tapers 16 -> 24 half-width, the west side flares 8 -> 37 so the
+side tapers 16 -> 24 half-width, the west side flares out to 37 so the
 run from the swing pivot to the cone-lock-knob is SOLID plate (no lobe
-protrusion); the open LOCK NOTCH cuts straight into the west edge. The
+protrusion); the open LOCK NOTCH cuts straight into the west edge.  The
+west edge's north end is derived from the tip block's full west reach
+(I31).  The
 four plan corners are rounded, echoing the hardware each sits beside
 (pivot screw head at the north end, the green column at the south-east,
 the lock-knob head at the south-west). A native close-clearance Ø6.756 pivot
@@ -45,6 +47,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import itertools
 import math
 from dataclasses import dataclass
 import sys
@@ -108,13 +111,19 @@ from cone_swing_platform_spec import (
     POST_MOUNT_TAP_DIA,
     PROFILE_VIEW_NOTE,
     SURFACE_FINISHES,
+    TIP_BLOCK_EDGE_MARGIN,
+    TIP_BLOCK_NORTH_REACH_Z,
+    TIP_BLOCK_WEST_REACH,
     TIP_CBORE_DEPTH,
     TIP_CBORE_W,
+    TIP_CBORE_W_BAND,
+    TIP_CBORE_W_MAX,
     TIP_SCREW_HALF_TRAVEL,
     TIP_SCREW_LOCAL_Z,
     TIP_SLOT_W,
     TIP_SLOT_W_BAND,
 )
+from _fit_limits import deviations
 
 PART_NAME = "cone-swing-platform"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel plate (p.18 dark wedge)
@@ -122,9 +131,6 @@ MATERIAL = "Plain Carbon Steel"  # black-finished steel plate (p.18 dark wedge)
 PLATE_T = PLATE_THICKNESS  # 1/4" plate
 HALF_WIDTH_N = 16.0  # north (pivot/tip) half-width, EAST side (the lock-slot
 # region keeps its full seat)
-WEST_HALF_N = 8.0  # north half-width, WEST side.  The recentered north arbor
-# pedestal otherwise clips the flared edge; 8.0 leaves 0.37 mm exact plan
-# clearance while retaining the close photo relationship in ch12 img09.
 EAST_HALF_S = 24.0  # widened for the v2 post's Ø42.011 casting foot
 WEST_HALF_S = 37.0  # west half-width at the south end: the flare that makes
 # the pivot -> lock-knob line solid plate (covers the notch seat + collar)
@@ -155,6 +161,87 @@ POST_LOCAL_Z = POST_STATION - PIVOT_STATION
 POST_SOUTH_MARGIN = 3.175  # 1/8 in clearance beyond the post's south rim
 PLATE_SOUTH_Z = POST_LOCAL_Z - POST_MAIN_DIA / 2.0 - POST_SOUTH_MARGIN
 PLATE_LEN = NORTH_OVERHANG - PLATE_SOUTH_Z
+# North half-width, WEST side (I31 item 8, Main 2026-09-25: widen the plate,
+# do not narrow the block's travel).  The west edge runs straight from here
+# to WEST_HALF_S.  At the tip block's northmost station it keeps
+# TIP_BLOCK_EDGE_MARGIN outside the block's worst-case west reach (every
+# float and location band, cone_swing_platform_spec) with the outline itself
+# at the worst of its printed .X bands: both west corners' half-widths
+# (NorthWestX, SouthWestX), the north edge's station (NorthEdgeZ) and the
+# length to the south edge (PlateLenDim).  Rounded up to the outline's one
+# place.  The drive train proves the arbor pedestals and the base clear the
+# widened edge over the whole p1 swing.
+OUTLINE_BAND = 0.8  # .X title-block band on every outline dimension
+_OUTLINE_BAND_CASES = tuple(
+    itertools.product((-OUTLINE_BAND, OUTLINE_BAND), repeat=4)
+)
+
+
+def edge_half_width_worst(half_n: float, half_s: float, z_local: float) -> float:
+    """Narrowest half-width of one plan side (its north and south corner
+    half-widths given) at plate-local z, over the outline's .X bands."""
+    worst = math.inf
+    for d_xn, d_xs, d_zn, d_len in _OUTLINE_BAND_CASES:
+        z_n = NORTH_OVERHANG + d_zn
+        z_s = z_n - (PLATE_LEN + d_len)
+        run = (z_n - z_local) / (z_n - z_s)
+        x_n, x_s = half_n + d_xn, half_s + d_xs
+        worst = min(worst, x_n + (x_s - x_n) * run)
+    return worst
+
+
+def west_edge_x_worst(west_half_n: float, z_local: float) -> float:
+    """Narrowest west edge at plate-local z over the outline's .X bands."""
+    return edge_half_width_worst(west_half_n, WEST_HALF_S, z_local)
+
+
+def _west_half_n_required(reach: float, z_local: float) -> float:
+    required = -math.inf
+    for d_xn, d_xs, d_zn, d_len in _OUTLINE_BAND_CASES:
+        z_n = NORTH_OVERHANG + d_zn
+        z_s = z_n - (PLATE_LEN + d_len)
+        run = (z_n - z_local) / (z_n - z_s)
+        required = max(
+            required, (reach - (WEST_HALF_S + d_xs) * run) / (1.0 - run) - d_xn
+        )
+    return required
+
+
+TIP_WEST_EDGE_NEED = TIP_BLOCK_WEST_REACH + TIP_BLOCK_EDGE_MARGIN
+_WEST_HALF_N_REQUIRED = _west_half_n_required(TIP_WEST_EDGE_NEED, TIP_BLOCK_NORTH_REACH_Z)
+WEST_HALF_N = math.ceil(_WEST_HALF_N_REQUIRED * 10.0 - 1e-6) / 10.0
+TIP_WEST_EDGE_MARGIN_WORST = (
+    west_edge_x_worst(WEST_HALF_N, TIP_BLOCK_NORTH_REACH_Z) - TIP_BLOCK_WEST_REACH
+)
+if TIP_WEST_EDGE_MARGIN_WORST < TIP_BLOCK_EDGE_MARGIN - 1e-9:
+    raise AssertionError("tip block reaches past the worst-case west edge")
+# The 6.5 counterbored slot's webs at the printed worst case (U27: 2.0
+# target, 1.5 floor): to both plan edges across the slot's station band, and
+# along the axis to the pivot's bearing relief.  The slot's station
+# (TipSlotZ) and end centres (TipSlot*Cx) print .XX.
+_TIP_XX = 0.51
+_CBORE_HALF_Z = TIP_CBORE_W_MAX / 2.0 + _TIP_XX
+_CBORE_REACH_X = TIP_SCREW_HALF_TRAVEL + _TIP_XX + TIP_CBORE_W_MAX / 2.0
+TIP_CBORE_WEBS = {
+    "west edge": min(
+        west_edge_x_worst(WEST_HALF_N, TIP_SCREW_LOCAL_Z + dz)
+        for dz in (-_CBORE_HALF_Z, _CBORE_HALF_Z)
+    )
+    - _CBORE_REACH_X,
+    "east edge": min(
+        edge_half_width_worst(HALF_WIDTH_N, EAST_HALF_S, TIP_SCREW_LOCAL_Z + dz)
+        for dz in (-_CBORE_HALF_Z, _CBORE_HALF_Z)
+    )
+    - _CBORE_REACH_X,
+    "pivot relief": -TIP_SCREW_LOCAL_Z
+    - _CBORE_HALF_Z
+    - (PIVOT_BEARING_RELIEF_DIAMETER / 2.0 + _TIP_XX),
+}
+for _web_name, _web in TIP_CBORE_WEBS.items():
+    if _web < 2.0:
+        raise AssertionError(
+            f"tip counterbored slot leaves {_web:.3f} to the {_web_name} (< 2.0, U27)"
+        )
 POST_MOUNT_HALF_PITCH = POST_ATTACHMENT_SPACING / 2.0
 POST_MOUNT_X = POST_MOUNT_HALF_PITCH * _COS_I
 POST_MOUNT_DZ = POST_MOUNT_HALF_PITCH * _SIN_I
@@ -213,7 +300,7 @@ _SLOT_TX, _SLOT_TZ = -SLOT_E_Z / SLOT_R, SLOT_E_X / SLOT_R
 
 
 def _west_edge_x(z_local: float) -> float:
-    """Authored x of the west taper edge at local z (linear 8 -> 37)."""
+    """Authored x of the west taper edge at local z (linear WEST_HALF_N -> 37)."""
     return (
         WEST_HALF_N
         + (WEST_HALF_S - WEST_HALF_N) * (NORTH_OVERHANG - z_local) / PLATE_LEN
@@ -581,6 +668,13 @@ _CORNERS = (
     ("SW", WEST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 5.0),
     ("SE", -EAST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 12.0),
 )
+# The NW round must end on the west edge north of the tip block's reach, so
+# the straight edge WEST_HALF_N is derived for is the one beside the block.
+_NW_TURN = math.pi / 2.0 + math.atan((WEST_HALF_S - WEST_HALF_N) / PLATE_LEN)
+_NW_SETBACK = _CORNERS[1][3] / math.tan(_NW_TURN / 2.0)
+NW_ROUND_END_Z = NORTH_OVERHANG - _NW_SETBACK * math.cos(_NW_TURN - math.pi / 2.0)
+if NW_ROUND_END_Z - OUTLINE_BAND < TIP_BLOCK_NORTH_REACH_Z:
+    raise AssertionError("the NW corner round reaches down beside the tip block")
 
 
 def _corner_theta(label: str) -> float:
@@ -680,7 +774,7 @@ async def build(adapter) -> dict[str, str]:
     plan_pts = [
         (-HALF_WIDTH_N, -NORTH_OVERHANG),  # north-east (anchor)
         (WEST_HALF_N, -NORTH_OVERHANG),  # north-west (authored +x = west;
-        # trimmed to clear the north arbor pedestal, PR8)
+        # derived from the tip block's west reach, I31)
         (WEST_HALF_S, PLATE_LEN - NORTH_OVERHANG),  # south-west (flare)
         (-EAST_HALF_S, PLATE_LEN - NORTH_OVERHANG),  # south-east
     ]
@@ -855,9 +949,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, "v2 post mount taps", volume - v_post_mounts, 0.01 * v_post_mounts
     )
 
-    # U30 tip-block hold-down: a through slot for the #6-32 shank, then a
-    # counterbored slot from the underside that sinks the socket head below
-    # the slide face. Same end centres, so the head bears on a uniform ledge.
+    # I31 tip-block hold-down: a through slot for the #6-32 shank, then a
+    # counterbored slot from the underside, one hex width across, that sinks
+    # the hex head below the slide face and stops it turning.  Same end
+    # centres, so the head bears on a uniform ledge.
     tip_slot = await _sketch_tip_screw_slot(
         adapter, width=TIP_SLOT_W, label="tip screw slot", prefix="TipSlot"
     )
@@ -1088,12 +1183,12 @@ async def build(adapter) -> dict[str, str]:
     # Decimal places for imported model dimensions live on the PART.  The
     # Hole Wizard owns the pivot-hole precision and native size callout.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    for feature_name, dimension_name in (
-        ("TipScrewSlotProfile", "TipSlotW"),
-        ("TipScrewCboreProfile", "TipCboreW"),
+    for feature_name, dimension_name, band in (
+        ("TipScrewSlotProfile", "TipSlotW", TIP_SLOT_W_BAND),
+        ("TipScrewCboreProfile", "TipCboreW", TIP_CBORE_W_BAND),
     ):
         set_dimension_bilateral_tolerance(
-            adapter, feature_name, dimension_name, *TIP_SLOT_W_BAND
+            adapter, feature_name, dimension_name, *deviations(band)
         )
     await volume_check(
         adapter, "driven platform (equations neutral)", volume, 0.01 * v_hole

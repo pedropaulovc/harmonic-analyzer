@@ -9,12 +9,12 @@ model.
 The platform is an asymmetric steel wedge with a 1/4-in close-clearance pivot
 hole over the stock screw shoulder, paired 1/4-20 post-mount taps, an open
 west-edge lock notch, four rounded plan corners and the counterbored slot
-for the tip block's hidden hold-down screw (U30).  The three plan views run
-1:2 and pivot section A-A 2:1.  Slot detail B enlarges a 12 mm radius
-around the pivot-to-slot region at 2:1, hidden lines dashed, at sheet
-(88, 44) mm, its cutters named by leadered notes; section C-C (1:1),
-cut on the plate-profile plan, runs along the slot for the counterbore
-depth.  The isometric runs 1:3.
+for the tip block's hold-down screw (I31).  The three plan views run 1:2
+and pivot section A-A 2:1; the lock-notch plan also carries the slot's
+station from the pivot.  Slot detail B enlarges a 12 mm radius around the
+slot at 2:1, hidden lines dashed, at sheet (88, 44) mm, its cutters named
+by leadered notes; section C-C (1:1), cut on the plate-profile plan, runs
+along the slot for the counterbore depth.  The isometric runs 1:3.
 
 Run with SolidWorks open::
 
@@ -75,6 +75,7 @@ from cone_swing_platform_spec import (
     POST_MOUNT_SPEC,
     SURFACE_FINISHES,
     TIP_CBORE_W,
+    TIP_SCREW_HALF_TRAVEL,
     TIP_SCREW_LOCAL_Z,
     TIP_SLOT_W,
 )
@@ -152,6 +153,34 @@ FEATURE_KEEP = {
 # sheet's lower edge, since sheet-down is model north (codex blocker B2; B3's
 # phantom 0.695 lip followed from it).
 RELIEF_WIDTH_CALLOUT = "TOP RELIEF\nCTR ON PIVOT\nOPEN THRU\nPIVOT END"
+# The three 1:2 plans centre on the plate's plan box; sheet +x is model +x
+# (west), sheet +y model -z (south).
+PLAN_SCALE = 0.0005
+_PLAN_MID_X = (_part.WEST_HALF_S - _part.EAST_HALF_S) / 2.0
+_PLAN_MID_Z = _part.NORTH_OVERHANG - _part.PLATE_LEN / 2.0
+
+
+def plan_xy(center: tuple[float, float], x_mm: float, z_mm: float) -> tuple[float, float]:
+    """Sheet point of plate-local (x, z) on the 1:2 plan centred at ``center``."""
+    return (
+        center[0] + (x_mm - _PLAN_MID_X) * PLAN_SCALE,
+        center[1] - (z_mm - _PLAN_MID_Z) * PLAN_SCALE,
+    )
+
+
+def _plan_east_edge_x(z_mm: float) -> float:
+    run = (_part.NORTH_OVERHANG - z_mm) / _part.PLATE_LEN
+    return -(_part.HALF_WIDTH_N + (_part.EAST_HALF_S - _part.HALF_WIDTH_N) * run)
+
+
+# I31 moved the tip slot 27.7 south of the pivot, out of reach of one detail
+# circle, so its station prints here: on the plan's open east side, sharing
+# nothing with the NorthEdgeZ/CapECz witnesses on the west.  The dimension
+# line stands 9 mm (sheet) off the plate's east edge at the slot; its text
+# hangs left of it, just south of the span (outside it, so the line does not
+# run through the value).
+_NOTCH_SLOT_XY = plan_xy(NOTCH_CENTER, -TIP_SCREW_HALF_TRAVEL, TIP_SCREW_LOCAL_Z)
+TIP_SLOT_Z_LINE_X = plan_xy(NOTCH_CENTER, _plan_east_edge_x(TIP_SCREW_LOCAL_Z), 0.0)[0] - 0.009
 NOTCH_KEEP = {
     # Pivot-to-north-edge lives here, sharing the 205.81 pivot witness: in the
     # profile the R8 corner ray has no path that clears this dimension.
@@ -160,6 +189,7 @@ NOTCH_KEEP = {
     "CapECx": (0.2652, 0.258),
     "CapECz": (0.305, 0.180),
     "CapEDia": (0.285, 0.259),
+    "TipSlotZ": (TIP_SLOT_Z_LINE_X, _NOTCH_SLOT_XY[1] + 0.004),
 }
 SECTION_KEEP = {
     # Outside its witnesses, the text hangs LEFT of the dimension line (away
@@ -173,8 +203,8 @@ SECTION_KEEP = {
     "PivotBearingReliefDepth": _shifted(0.365, 0.115),
 }
 
-# U30 tip-block hold-down slot: too small to dimension at 1:2, so DETAIL B
-# enlarges the pivot-to-slot region of the hole-location plan to 2:1, with
+# I31 tip-block hold-down slot: too small to dimension at 1:2, so DETAIL B
+# enlarges the slot on the hole-location plan to 2:1, with
 # hidden lines shown so the underside counterbored slot reads dashed.  At
 # 1:1 (run 7959e994) five dimensions and two cutter callouts crowded a 24 mm
 # circle, texts over the outline and each other; 2:1 gives them the room.
@@ -189,7 +219,9 @@ SECTION_KEEP = {
 # A vertical dimension's text hangs outward from its dimension line (the
 # e86bf319 extents: left of a left-side line, right of a right-side one).
 # Sheet +x is model +x (west) and sheet +y is model -z (south) in these plans.
-DETAIL_MODEL_Z = -6.0  # detail circle centre, between the pivot and the slot
+# I31: centred on the slot.  Until then the circle took in the pivot as
+# well; 27.7 south, the slot's station from it prints on the notch plan.
+DETAIL_MODEL_Z = TIP_SCREW_LOCAL_Z
 DETAIL_RADIUS_MM = 12.0
 DETAIL_SCALE = (2, 1)
 _DETAIL_S = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
@@ -202,23 +234,19 @@ _DETAIL_S = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 DETAIL_CENTER = (0.0835, 0.045)
 DETAIL_OUTLINE_PAD = 0.0104
 DETAIL_SHEET_RADIUS = DETAIL_RADIUS_MM * _DETAIL_S
-_PIVOT_Y = DETAIL_CENTER[1] + DETAIL_MODEL_Z * _DETAIL_S
 _SLOT_Y = DETAIL_CENTER[1] + (DETAIL_MODEL_Z - TIP_SCREW_LOCAL_Z) * _DETAIL_S
 # Between its extension lines a vertical dimension's text is CENTRED on its
 # dimension line, which then runs through it (81788ce9: "SLOT|THRU",
 # "11.|00"); outside them the text hangs outward, one edge on the line,
 # centred on the keep y.  So every vertical dimension here parks its text
-# OUTSIDE its span.  The three spans all overlap (pivot-to-slot 33..55,
-# counterbore 47..63, slot 51..59), so no layout of them is crossing-free:
-# the one left is the slot's dimension line running down past the
-# counterbore's lower extension line to its text.  The slot sits nearest
+# OUTSIDE its span.  The two width spans overlap (counterbore 38.7..51.3,
+# slot 41..49), so the slot's dimension line runs up past the
+# counterbore's upper extension line to its text (below the spans the
+# detail's own label sits, since I31 centred the circle on the slot).  The slot sits nearest
 # the part, the counterbore outboard (its extension lines then never cross
-# the slot's dimension line inside the slot's span), and pivot-to-slot alone
-# on the right.  The cutters are named by leadered notes, not dimension text.
+# the slot's dimension line inside the slot's span).  The cutters are named
+# by leadered notes, not dimension text.
 DETAIL_KEEP = {
-    # Right, alone: text above the slot-centre extension line (0.055),
-    # hanging right, under the cutter notes' leaders (>= 0.063 here).
-    "TipSlotZ": (DETAIL_CENTER[0] + 0.030, _SLOT_Y + 0.0045),
     # Above the circle, each 2.00 outside its own extension lines and under
     # the plan caption row (y >= 0.0805).  The west one sits in toward the
     # circle, left of the through-slot leader's path.
@@ -230,11 +258,11 @@ DETAIL_KEEP = {
         DETAIL_CENTER[0] + 0.0135,
         DETAIL_CENTER[1] + DETAIL_SHEET_RADIUS + 0.005,
     ),
-    # Left, nearest the circle: the through slot, text below its span
-    # (under the counterbore's lower extension line at 0.047).
-    "TipSlotW": (DETAIL_CENTER[0] - 0.0275, _SLOT_Y - 0.014),
-    # Left, outboard: the counterbored slot, text above its span (0.063).
-    "TipCboreW": (DETAIL_CENTER[0] - 0.0465, _SLOT_Y + 0.0135),
+    # Left, nearest the circle: the through slot, text above both spans
+    # (over the counterbore's upper extension line).
+    "TipSlotW": (DETAIL_CENTER[0] - 0.0275, _SLOT_Y + 0.0125),
+    # Left, outboard: the counterbored slot, text above the slot's.
+    "TipCboreW": (DETAIL_CENTER[0] - 0.0465, _SLOT_Y + 0.0225),
 }
 # Arrowheads inside the extension lines: outside, the slot's 8 mm span put
 # an arrow tail across the counterbore's upper extension line (81788ce9).
@@ -278,7 +306,9 @@ CUTTER_NOTES = (
     CutterNote(
         "cbore",
         f"<MOD-DIAM>{TIP_CBORE_W:g} END MILL C'BORE SLOT\nFROM UNDERSIDE",
-        (0.121, 0.047),
+        # I31: 2.5 mm lower than 0.047, so its extent stays 3 mm under the
+        # slot note's, whose tip came down 10 mm with the re-centred slot.
+        (0.121, 0.0445),
         "TipScrewCbore",
         TIP_CBORE_W / 2.0,
         -35.0,
@@ -326,17 +356,20 @@ ENGAGEMENT_NOTE_XY = (0.222, 0.0795)
 # plan, not in detail B: in the detail it lay ON the slot centreline, so
 # pivot-to-slot's extension line ran along it and its arrows sat in every
 # width extension's path.  On the plan the default arrows (looking north,
-# sheet-down) ran beside the 8.0 extension line and through the R8 leader,
+# sheet-down) ran beside the NorthWestX extension line and through the R8 leader,
 # so the cut looks SOUTH (arrows sheet-up).
 #
-# The line runs PAST both plate edges (a full section, 26.98 mm across at
-# the slot station): as a +-9 mm partial cut its sheet-up arrows sat inside
-# the plate, and the west letter, 42..55 mm south of the cut where the plate
+# The line runs PAST both plate edges (a full section across the slot
+# station): as a +-9 mm partial cut its sheet-up arrows sat inside the
+# plate, and the west letter, 31..44 mm south of the cut where the plate
 # flares, landed on the sloped west edge (Main's eye-pass of 8783776d).
 # Each end clears its edge at the letter's far station by the letter's half
-# width (5.5 model mm at 1:2) plus 1.5.
-SLOT_SECTION_LINE_X_MM = (-26.0, 24.0)
-# 1:1, full width: the strip is the plate edge-on, 26.98 x 6.35, in the
+# width (5.5 model mm at 1:2) plus 1.5 -- SLOT_SECTION_LINE_X_MM, derived
+# below from the plate's edges.
+CC_LETTER_TOP_SHEET = 0.022  # a letter's far side above the line (8783776d)
+CC_LETTER_HALF_W_MM = 5.5
+CC_LETTER_EDGE_CLEAR_MM = 1.5
+# 1:1, full width: the strip is the plate edge-on x 6.35, in the
 # pocket right of the drill callout RD1 (x <= 0.246), under the notch plan
 # (y >= 0.1286) and its lifted caption (y >= 0.1207), with its native label
 # centred directly under it, right of the plan caption row (x <= 0.2185)
@@ -369,6 +402,23 @@ def plate_edge_mm(z_mm: float, side: int) -> float:
     if side < 0:
         return -(_part.HALF_WIDTH_N + (_part.EAST_HALF_S - _part.HALF_WIDTH_N) * run)
     return _part.WEST_HALF_N + (_part.WEST_HALF_S - _part.WEST_HALF_N) * run
+
+
+_CC_LETTER_FAR_Z = TIP_SCREW_LOCAL_Z - CC_LETTER_TOP_SHEET / PLAN_SCALE
+SLOT_SECTION_LINE_X_MM = tuple(
+    side
+    * math.ceil(
+        (
+            abs(plate_edge_mm(_CC_LETTER_FAR_Z, side))
+            + CC_LETTER_HALF_W_MM
+            + CC_LETTER_EDGE_CLEAR_MM
+        )
+        * 10.0
+        - 1e-6
+    )
+    / 10.0
+    for side in (-1, 1)
+)
 
 
 def slot_section_line_model_points() -> tuple[tuple[float, float, float], ...]:
