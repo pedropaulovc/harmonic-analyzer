@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 
 import _config
 import build_cone_gear as part
@@ -371,3 +372,36 @@ def test_root_to_bore_webs_meet_u27_except_the_named_t006() -> None:
     assert [spec.bore_dia_mm(t) for t in (6, 12, 18, 24, 30)] == pytest.approx(
         [1.5875, 1.5875, 3.175, 6.35, 9.525]
     )
+
+
+def test_dimensions_record_gear_bores_row_follows_the_spec() -> None:
+    # The narrative record is read by no part, so nothing rebuilds when the
+    # bores move: it kept the pre-S1 map (9.5 on T024-T120) after U40.
+    inch = {0.0625: "1/16", 0.125: "1/8", 0.25: "1/4", 0.375: "3/8"}
+    groups: dict[float, list[int]] = {}
+    for teeth in spec.CONFIGURATION_TEETH:
+        groups.setdefault(spec.bore_dia_mm(teeth), []).append(teeth)
+    cells = []
+    for bore, teeth in sorted(groups.items(), reverse=True):
+        span = f"T{teeth[0]:03d}" if len(teeth) == 1 else f"T{teeth[0]:03d}–T{teeth[-1]:03d}"
+        cells.append(f'{bore + 1e-9:.3f} ({inch[round(bore / spec.MM_PER_IN, 4)]}") {span}')
+    expected = (
+        "snug on the stepped shaft (M6.7 perpendicular seats) AND inside each "
+        "gear's root circle: " + "; ".join(cells) + "; no keyway"
+    )
+    record = yaml.safe_load(
+        (Path(part.__file__).resolve().parents[1] / "config" / "dimensions.yaml")
+        .read_text(encoding="utf-8")
+    )
+    rows = []
+    stack = [record]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            stack.extend(node.values())
+        elif isinstance(node, list):
+            if node and isinstance(node[0], str) and node[0].startswith("Gear bores"):
+                rows.append(node)
+            stack.extend(node)
+    assert len(rows) == 1
+    assert rows[0][1] == expected
