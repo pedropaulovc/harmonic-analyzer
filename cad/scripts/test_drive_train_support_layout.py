@@ -356,7 +356,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     from pinion_lever_geometry import BORE_DEPTH
 
     assert not hasattr(RIG, "STACK_BAND")  # the stacks name every term
-    assert (RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN) == (185.1, 197.0)
+    assert (RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN) == (185.3, 197.5)
     assert math.isclose(RIG.BACK_COLLAR_GAP_MAX, 2.4, abs_tol=1e-9)
     bearing_min = math.inf
     hub_margin_min = math.inf
@@ -388,7 +388,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     assert math.isclose(
         bearing_min, sum(RIG.TORQUE_SHAFT_BEARING_STACK.values()), abs_tol=1e-9
     )
-    assert math.isclose(bearing_min, 9.59, abs_tol=5e-3)
+    assert math.isclose(bearing_min, 9.54, abs_tol=5e-3)
     assert hub_margin_min >= RIG.HUB_STOP_MARGIN - 1e-9
     assert math.isclose(
         hub_margin_min,
@@ -453,10 +453,39 @@ def test_lift_rod_length_band_clears_past_the_back_block() -> None:
     )
 
 
+def test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack() -> None:
+    # Option E-a (Main, Codex #858): pinned to the straps, the shaft rides the
+    # cluster's end play.  Drilled flush with the back block's outer face with
+    # the cluster at the back stop, it retreats up to P_MAX into that block
+    # when the cluster runs forward to the front block -- and the shallowest
+    # accepted block is its printed depth less the .XX row.  It must still bear
+    # the 1.5 D floor the front block keeps (rule 12).  The retired check read
+    # the nominal depth only (10.25 - 0.35 = 9.90); at the printed worst case
+    # the U28 block bore 9.39.
+    from _printed_tolerance import printed_band_mm
+    from pinion_pivot_block_geometry import BLOCK_DEPTH_PLACES
+
+    shallowest = drive.BLOCK_DEPTH - printed_band_mm(BLOCK_DEPTH_PLACES)
+    bearing = shallowest - _P_MAX
+    assert bearing >= 9.5 - 1e-9, bearing
+    assert RIG.BACK_BLOCK_MIN_BEARING == RIG.FRONT_BLOCK_MIN_BEARING == 9.5
+    # The layout's named-term stack is this sweep, term for term.
+    assert math.isclose(
+        sum(RIG.TORQUE_SHAFT_BACK_BEARING_STACK.values()), bearing, abs_tol=1e-9
+    )
+    assert math.isclose(bearing, 9.64, abs_tol=5e-3)
+    # The drilling station: the shaft's back end flush with that outer face.
+    assert math.isclose(
+        drive.PIVOT_SHAFT_Z0 + RIG.TORQUE_SHAFT_LEN,
+        RIG.BACK_BLOCK_OUTER_Z,
+        abs_tol=1e-9,
+    )
+
+
 def test_torque_shaft_length_band_clears_both_ends() -> None:
     # MHA-062 at the title-block .X band (U27), set back-flush: at the
     # shortest stack (both blocks thin, Codex #854 P1) the longest shaft's
-    # body end stands 7.47 proud of the front block, and its SR crown 1.2
+    # body end stands 7.17 proud of the front block, and its SR crown 1.2
     # beyond that (Codex #837 P1).
     import arbor_pedestal_spec as ped
     import pinion_lever_geometry as lever
@@ -476,15 +505,17 @@ def test_torque_shaft_length_band_clears_both_ends() -> None:
     )
     shortest_outer = rig.FRONT_BLOCK_Z0 + shrink
     proud = shortest_outer - front_end
-    assert math.isclose(proud, 7.47, abs_tol=5e-3)
-    assert math.isclose(proud + CAP_SAG, 8.67, abs_tol=5e-3)
+    assert math.isclose(proud, 7.17, abs_tol=5e-3)
+    assert math.isclose(proud + CAP_SAG, 8.37, abs_tol=5e-3)
     assert math.isclose(
         max(outer for _i, outer, _t in _stack_vertices()), shortest_outer, abs_tol=1e-9
     )
     # Option E-a: pinned to the straps, the shaft rides the cluster's end play
     # from its back-flush drilling station to the front stop.
-    assert math.isclose(proud + _P_MAX, 7.82, abs_tol=5e-3)
-    assert math.isclose(proud + _P_MAX + CAP_SAG, 9.02, abs_tol=5e-3)
+    assert math.isclose(proud + _P_MAX, 7.52, abs_tol=5e-3)
+    assert math.isclose(proud + _P_MAX + CAP_SAG, 8.72, abs_tol=5e-3)
+    # Its back end then sits P_MAX inside the back block, bearing
+    # test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack.
     # South of the front block nothing stands on the shaft's axis at any z.
     # The nearest body is the MHA-059 lever on the lift rod: its hub keeps
     # 8.95 radial clearance, and its arm points away from the shaft over the
@@ -607,7 +638,7 @@ def test_set_pin_holes_sit_at_the_physical_back_stop_straps() -> None:
     physical_back = drive.BLOCK_DEPTH + t / 2.0
     physical_front = physical_back + t + rig.DRUM_LEN
     assert math.isclose(from_back[1], physical_back, abs_tol=1e-9)
-    assert math.isclose(from_back[1], 14.75, abs_tol=1e-9)
+    assert math.isclose(from_back[1], 15.0, abs_tol=1e-9)
     assert math.isclose(from_back[0], physical_front, abs_tol=1e-9)
     # Against the pose: both strap mid-planes are the holes' stations.
     model_mid = [(o + i) / 2.0 for o, i in zip(rig.STRAP_Z_OUTER, rig.STRAP_Z_INNER)]

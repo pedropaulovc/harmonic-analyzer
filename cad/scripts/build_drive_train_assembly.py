@@ -1402,10 +1402,11 @@ LIFT_ROD_Z0 = RIG.LIFT_ROD_Z0
 # hub's seat, sized so the hub never stops the rod (pinion_rig_layout)
 BLOCK_X = PIVOT_X  # block local origin ON the pivot bore (datum B, U28)
 BLOCK_FRONT_Z0 = RIG.FRONT_BLOCK_Z0  # one 0.25 feeler off the front strap
-BLOCK_BACK_Z0 = RIG.BACK_BLOCK_Z0  # outer face fixed at 88; the (c) back stop
+BLOCK_BACK_Z0 = RIG.BACK_BLOCK_Z0  # the (c) back stop, the rig's reference
 # U28 thinned the blocks (12 -> 10.25); ruling (c) then put the back strap hard
 # on the back block, and pinion_rig_layout sizes the shaft and rod from the
-# worst fitted stack (Codex #837)
+# worst fitted stack (Codex #837).  Option E-a deepened them outward to 10.5
+# so the strap-pinned shaft still bears the back block (Codex #858).
 LEVER_TILT_DEG = 10.0  # parked, from vertical toward machine -X
 # ch25 p.68 page002_img08 is explicitly the FRONT side and shows the
 # disengaged lever only about 10 degrees from vertical, with its tip to image

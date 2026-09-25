@@ -34,12 +34,13 @@ SHAFT_DIA_BAND = SHAFT_H
 # U27 (Main, 2026-09-24): the length carries the title-block .X band (+/-0.8),
 # not a tight one.  Pinned to the straps (option E-a) the shaft rides the
 # cluster's end play (0.25 +/- 0.10): drilled back-flush at the back stop,
-# the longest shaft in the shortest stack stands at worst 7.47 proud of the
-# front block, 7.82 at the front stop with the SR crown apex at 9.02, and its
-# back end then sits 0.35 inside the back block.  Nothing stands on the
-# shaft's axis past either block: the nearest body, the MHA-059 lever, rides
-# the lift rod 18.63 off it -- hub 8.95 radial clear, arm >= 12.42 clear
-# over the -82 degree throw (test_drive_train_support_layout::
+# the longest shaft in the shortest stack stands at worst 7.17 proud of the
+# front block, 7.52 at the front stop with the SR crown apex at 8.72, and its
+# back end then sits 0.35 inside the back block, still bearing 9.64 of the
+# shallowest one (pinion_rig_layout.torque_shaft_back_bearing_stack).
+# Nothing stands on the shaft's axis past either block: the nearest body, the
+# MHA-059 lever, rides the lift rod 18.63 off it -- hub 8.95 radial clear,
+# arm >= 12.42 clear over the -82 degree throw (test_drive_train_support_layout::
 # test_torque_shaft_length_band_clears_both_ends).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Shaft": {"Depth": 1},

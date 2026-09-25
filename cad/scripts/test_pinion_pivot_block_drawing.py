@@ -234,7 +234,7 @@ def test_rig_layout_shaft_and_rod_are_set_back_flush() -> None:
     assert rig.LEVER_SEAT_PROUD - 1e-9 <= proud <= rig.LEVER_SEAT_PROUD + 0.1
     # Both are budgeted on the worst fitted stack (their own tests); at
     # nominal each stands that allowance proud of the front block.
-    assert (SHAFT_LEN, ROD_LEN) == (185.1, 197.0)
+    assert (SHAFT_LEN, ROD_LEN) == (185.3, 197.5)
 
 
 def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
@@ -361,10 +361,10 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     x_band, xx_band = 0.8, 0.51  # title-block .X / .XX
     assert pinion_bracket_spec.DRAWING_PRECISION["Strap"]["Depth"] == 1
     assert DRAWING_PRECISION["Shaft"]["Depth"] == 1
-    # MHA-061 is not precision-migrated, so its 10.25 Depth prints at the
+    # MHA-061 is not precision-migrated, so its 10.50 Depth prints at the
     # document's two places.
     assert "draw_pinion_pivot_block.py" not in PRECISION_MIGRATED_DRAWINGS
-    assert f"{pinion_pivot_block_spec.BLOCK_DEPTH:.2f}" == "10.25"
+    assert f"{pinion_pivot_block_spec.BLOCK_DEPTH:.2f}" == "10.50"
     assert (rig.STRAP_T_BAND, rig.DRUM_LEN_BAND, rig.LENGTH_BAND) == (x_band,) * 3
     assert rig.BLOCK_DEPTH_BAND == xx_band
     # Main (Codex #854 P1): each band is the title block's row for the places
@@ -397,7 +397,7 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     # hub rides the lift rod, which the blocks carry off the shaft axis.
     longest_shaft = rig.TORQUE_SHAFT_LEN + x_band
     shortest_outer = 2.0 * (depth - xx_band) + rig.INNER_SPAN - 2.5
-    assert longest_shaft - shortest_outer == pytest.approx(7.47, abs=5e-3)
+    assert longest_shaft - shortest_outer == pytest.approx(7.17, abs=5e-3)
     hub_clear = (
         math.hypot(LIFT_BORE_SPACING, LIFT_BORE_RISE) - (HUB_OD + SHAFT_DIA) / 2.0
     )
