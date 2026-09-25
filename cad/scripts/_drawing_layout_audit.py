@@ -294,10 +294,14 @@ def collect_sheet_dumps(
     reader = _Reader(adapter)
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     # GetViews' sheet order is undetermined; the PDF prints GetSheetNames order.
-    page_of = {
-        str(name): page for page, name in enumerate(reader.call(lambda: ddoc.GetSheetNames(), ()) or ())
-    }
-    rows = reader.call(lambda: ddoc.GetViews(), ()) or ()
+    # Both are read strictly: a tolerant empty answer would audit no sheet and
+    # cache a clean report.
+    page_of = {str(name): page for page, name in enumerate(ddoc.GetSheetNames() or ())}
+    if not page_of or len(pages) != len(page_of):
+        raise RuntimeError(
+            f"layout audit: {len(page_of)} sheet(s) but {len(pages)} page(s) in {pdf.name}"
+        )
+    rows = ddoc.GetViews() or ()
     dumps = []
     for index, row in enumerate(rows):
         entries = list(row or ())
@@ -356,6 +360,9 @@ def collect_sheet_dumps(
         dump["ink"] = page_ink(pages[page])
         dump["read_errors"] = reader.take_errors()
         dumps.append(dump)
+    audited = sorted(str(dump["sheet"]) for dump in dumps)
+    if audited != sorted(page_of):
+        raise RuntimeError(f"layout audit: dumped sheets {audited}, drawing has {sorted(page_of)}")
     return dumps
 
 

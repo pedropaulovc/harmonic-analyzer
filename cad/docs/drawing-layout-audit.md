@@ -52,7 +52,8 @@ Telemetry: one `layout.audit <stem>` span per drawing, with `sheets`,
 class as attributes (each dump also names the COM accessor behind every
 refused read); each finding is a debug log line. A collector or audit fault
 fails the drawing in every mode, because a silently skipped sheet would
-under-count the fleet report.
+under-count the fleet report: the dumped sheets must be exactly
+`GetSheetNames`, one PDF page each.
 
 ## What it checks
 
@@ -66,8 +67,9 @@ offset its printed neighbours show. Section and detail-circle labels are
 matched the same way. Any COM string with no printed match is a
 `text-unmatched` finding: the audit is blind there, so it gates.
 
-Model edges are the page's 0.25 mm solid black strokes, each assigned to the
-smallest view outline holding it. Annotation lines, arrows and leaders come
+Model edges are the page's 0.25 mm solid black strokes (curves tessellated,
+not their Bezier control polygons), each assigned to the smallest view
+outline holding it. Annotation lines, arrows and leaders come
 from COM display data. `GetArrowHeadAtIndex2`'s direction points from the tip
 back toward the arrowhead's base (125 of 125 unambiguous arrowheads on the
 calibration PDFs). A section's cutting line is drawn between its two arrow

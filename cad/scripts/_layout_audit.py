@@ -476,6 +476,21 @@ def _rotated_hull(item: TextItem, width: float) -> Box:
     )
 
 
+def _with_symbols(item: TextItem, box: Box, advance: float) -> Box:
+    """A matched run's glyph box plus the symbols it prints as paths.
+
+    ``"<MOD-DIAM>12.00"`` prints its text as a PDF text object and its "Ø" as
+    a path the text object does not cover: a leading symbol reaches back to
+    the run's COM start, a trailing one one glyph advance per token past it.
+    """
+    text = item.text.strip()
+    lead = re.match(r"(?:<[^<>]+>\s*)*", text).group(0)
+    trail = re.search(r"(?:\s*<[^<>]+>)*$", text[len(lead):]).group(0)
+    xmin = min(box.xmin, item.x) if lead else box.xmin
+    xmax = box.xmax + len(_TOKEN.findall(trail)) * advance * item.height
+    return Box(xmin, box.ymin, xmax, box.ymax)
+
+
 def ink_row_boxes(
     items: Sequence[TextItem], ink: Mapping[int, Box], *, advance: float
 ) -> list[tuple[str, Box]]:
@@ -495,7 +510,7 @@ def ink_row_boxes(
             median(box.ymin - item.y for item, box in printed),
             median(box.height for _item, box in printed),
         ) if printed else (0.0, 0.0)
-        parts = [box for _item, box in printed]
+        parts = [_with_symbols(item, box, advance) for item, box in printed]
         for position, item in enumerate(row):
             if index_of[id(item)] in ink:
                 continue
@@ -923,11 +938,24 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
         for annotation in view.get("annotations", ())
     ] + list(dump.get("sheet_annotations", ()))
     advance = calibrate_sheet_advance(every_annotation)
+    # Only what the audit draws takes part in matching: a hidden or template
+    # duplicate must not claim a visible annotation's printed text.
+    audited = [
+        annotation
+        for view in views
+        for annotation in view.get("annotations", ())
+        if int(annotation.get("visible", 1) or 1) not in _HIDDEN_STATES
+    ] + [
+        annotation
+        for annotation in dump.get("sheet_annotations", ())
+        if int(annotation.get("visible", 1) or 1) not in _HIDDEN_STATES
+        and int(annotation.get("owner_type", _OWNER_DRAWING_SHEET)) == _OWNER_DRAWING_SHEET
+    ]
 
     spans = ink_spans(dump)
     keyed = [
         ((id(annotation), index), item)
-        for annotation in every_annotation
+        for annotation in audited
         for index, item in enumerate(text_items(annotation.get("display") or {}))
     ]
     printed = match_ink(keyed, spans) if spans else {}
@@ -939,8 +967,8 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
 
     unmatched = [
         (str(annotation.get("name", "")), item.text)
-        for annotation in every_annotation
-        if spans and int(annotation.get("visible", 1) or 1) not in _HIDDEN_STATES
+        for annotation in audited
+        if spans
         for index, item in enumerate(text_items(annotation.get("display") or {}))
         if ink_key(item.text) and (id(annotation), index) not in printed
     ]
@@ -1158,9 +1186,7 @@ def _callout_blocks(sheet: SheetGeometry) -> list[tuple[AnnotationGeometry, Box,
     for annotation in sheet.annotations:
         if not annotation.text_boxes:
             continue
-        leadered_note = (
-            annotation.kind == "note" and not annotation.exact and annotation.leader_segments()
-        )
+        leadered_note = annotation.kind == "note" and annotation.leader_segments()
         if annotation.kind != "hole-callout" and not leadered_note:
             continue
         block = annotation.text_boxes[0]
