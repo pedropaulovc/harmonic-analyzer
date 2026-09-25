@@ -118,6 +118,11 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(("fillister-screw-1", "crank-arm-1")): _smooth_annulus_limit_mm3(
         2.8448, 2.261, 5.33
     ),
+    # MHA-139 #10-24 major Ø4.826 in the arm's #25 tap drill Ø3.797: the full
+    # thread past the 1.5 relief (6.5 of the 8.0 arm) plus its 0.5 lead cone.
+    frozenset(("crank-handle-pivot-screw-1", "crank-arm-1")): _smooth_annulus_limit_mm3(
+        4.826, 3.797, 7.0
+    ),
     frozenset(("cone-tip-adjuster-1", "cone-tip-block-1")): _smooth_annulus_limit_mm3(
         7.9502, 6.528, 6.0
     ),

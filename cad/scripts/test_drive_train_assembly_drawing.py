@@ -10,6 +10,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+import crank_handle_pivot_screw_spec as screw_spec
+import crank_handle_spec as handle_spec
 import draw_drive_train_assembly as drawing
 import drive_train_assembly_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -24,7 +26,7 @@ EXTERNAL_NUMBERS = frozenset({"MHA-035"})
 # 2026-09-23: drawing-only rulings commit). The integration commit that adds
 # the rows deletes this set; the test below fails once a row lands anyway.
 PRE_REGISTERED_NUMBERS = frozenset(
-    {"MHA-139", "MHA-140", "MHA-141", "MHA-142", "MHA-143"}
+    {"MHA-140", "MHA-141", "MHA-142", "MHA-143"}
 )
 
 
@@ -564,3 +566,20 @@ def test_final_uncross_leaves_non_balloon_crossings_to_the_audit() -> None:
         _RebuildAdapter(), "SHEET", annotations, read_segments=crossed_with_a_note
     )
     assert annotations["DetailItem1"].position == (0.0, 1.0)
+
+
+def test_handle_pivot_screw_is_built_released_and_backs_out_of_the_handle() -> None:
+    """#831 P1: MHA-139 is a builder family with its BOM row, and its explode
+    carries it with the handle, then clear of the handle's bore."""
+    assert "crank-handle-pivot-screw" in _builder_stems()
+    assert drawing.BOM_PART_NUMBERS["crank-handle-pivot-screw"] == "MHA-139"
+    moved = {step.label: names for step, names in spec.plan_explode(_instances())}
+    screw = "crank-handle-pivot-screw-1"
+    assert screw in moved["crank arm group"]
+    assert screw in moved["crank handle"]
+    steps = {step.label: step for step in spec.EXPLODE_STEPS}
+    back_out = steps["handle screw backs out"]
+    assert back_out.stems == ("crank-handle-pivot-screw",) and back_out.axis == "z"
+    # Relative to the handle, the tip starts THREAD_LENGTH past its inboard
+    # end; it must travel the whole handle and clear it.
+    assert -back_out.distance_mm > screw_spec.THREAD_LENGTH + handle_spec.HANDLE_LENGTH

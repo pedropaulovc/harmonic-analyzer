@@ -277,6 +277,11 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("fillister-screw-1", "crank-arm-1")): _annulus_limit(
                 2.8448, 2.261, 5.33
             ),
+            # MHA-139 #10-24 major 4.826 in the #25 tap drill 3.797: 6.5 of
+            # full thread past the 1.5 relief plus the 0.5 lead cone.
+            frozenset(("crank-handle-pivot-screw-1", "crank-arm-1")): _annulus_limit(
+                4.826, 3.797, 7.0
+            ),
             # R1: MHA-058 is a bonded slip fit modelled line to line in the
             # MHA-102 cross-hole, so the pair needs no interference allowance.
         },

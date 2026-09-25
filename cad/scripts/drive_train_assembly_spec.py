@@ -56,6 +56,7 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "crank-pin-eye",
         "fillister-screw",
         "crank-handle",
+        "crank-handle-pivot-screw",
         "crank-hub",
         "crank-hub-pin",
     ),
@@ -137,13 +138,19 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
             "crank-pin-eye",
             "fillister-screw",
             "crank-handle",
+            "crank-handle-pivot-screw",
             "crank-hub",
             "crank-hub-pin",
         ),
         "z",
         -30.0,
     ),
-    ExplodeStep("crank handle", ("crank-handle",), "z", -35.0),
+    # MHA-139 rides out with the handle, then backs out of its bore: the tip
+    # starts 9.0 past the handle's inboard end and the handle is ~58 long.
+    ExplodeStep(
+        "crank handle", ("crank-handle", "crank-handle-pivot-screw"), "z", -35.0
+    ),
+    ExplodeStep("handle screw backs out", ("crank-handle-pivot-screw",), "z", -80.0),
     ExplodeStep("taper pin", ("crank-pin", "crank-pin-ring"), "x", -25.0),
     ExplodeStep("anchor screw", ("fillister-screw",), "z", -20.0),
     ExplodeStep("anchor eyelet", ("crank-pin-eye",), "z", -10.0),

@@ -103,7 +103,7 @@ _INSERTED_SOURCES = {
     "drive_train": "alignment_pinion arbor_pedestal cone_gear cone_gear_shaft "
     "cone_lock_knob cone_pivot_post cone_pivot_screw cone_swing_platform "
     "cone_tip_adjuster cone_tip_block cone_tip_bushing cone_tip_pinch_screw "
-    "crank_arm crank_drive_gear crank_handle crank_hub crank_hub_pin crank_pin "
+    "crank_arm crank_drive_gear crank_handle crank_handle_pivot_screw crank_hub crank_hub_pin crank_pin "
     "crank_pin_eye crank_pin_ring "
     "crank_pinion crank_pinion_pin crankshaft cylinder_end_disc cylinder_gear "
     "cylinder_gear_shaft "

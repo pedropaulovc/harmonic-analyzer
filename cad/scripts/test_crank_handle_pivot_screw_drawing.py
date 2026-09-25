@@ -378,3 +378,21 @@ def test_printed_material_fits_one_title_block_line() -> None:
     row = _config.parts("crank-handle-pivot-screw")
     assert len(str(row["material"])) <= 36
     assert "cold-finished" in str(row["material_specification"])
+
+
+def test_assembly_seats_the_shoulder_on_the_arm_and_bounds_the_tip() -> None:
+    """#831 P1 (Codex PRRT_kwDOPHDy386lqC_R): MHA-139 is inserted in the drive
+    train with ArmSeat on the arm's outboard face, and its tip stands at most
+    PROUD_INBOARD_MAX past the arm's inboard face (I57)."""
+    import build_drive_train_assembly as assembly
+
+    assert assembly.HANDLE_SCREW_Z0 + spec.SEAT_STATION == pytest.approx(
+        assembly.CRANK_ARM_Z0
+    )
+    proud = assembly.HANDLE_SCREW_TIP_Z - assembly.CRANK_ARM_ORIGIN_Z
+    assert proud == pytest.approx(spec.THREAD_LENGTH - geometry.ARM_THICKNESS)
+    assert 0.0 < proud <= spec.PROUD_INBOARD_MAX
+    stock_inboard_face = assembly.CRANK_ARM_Z0 + spec.ARM_STOCK_THICKNESS
+    assert assembly.HANDLE_SCREW_TIP_Z_MAX - stock_inboard_face == pytest.approx(
+        spec.PROUD_INBOARD_MAX
+    )

@@ -498,6 +498,13 @@ from crank_arm_spec import (  # noqa: E402
     ARM_WIDTH,
 )
 from crankshaft_spec import PIN_HOLE_HEIGHT  # noqa: E402
+from crank_handle_pivot_screw_spec import (  # noqa: E402
+    OVERALL_LENGTH as HANDLE_SCREW_LENGTH,
+    PROUD_INBOARD_MAX as HANDLE_SCREW_PROUD_MAX,
+    SEAT_STATION as HANDLE_SCREW_SEAT_STATION,
+    THREAD_LENGTH_MAX as HANDLE_SCREW_THREAD_MAX,
+    THREAD_MODEL_DIA as HANDLE_SCREW_THREAD_MAJOR,
+)
 
 CRANK_FACE_Z = -183.0
 CRANKSHAFT_Z0 = CRANK_FACE_Z
@@ -1951,6 +1958,29 @@ if (
 if _GRIP_HEAD_Z[0] < CRANK_HUB_REAR_Z + 0.25:
     raise AssertionError("integral grip-head band reaches the crank hub")
 
+# MHA-139 handle pivot screw (U33): the shoulder seats on the arm's outboard
+# face and the #10-24 thread runs inboard through the arm's tapped hole, so
+# its tip stands proud of the arm's inboard face and sweeps the r = ARM_C2C
+# circle with the crank.  At its longest thread in the thinnest (stock 5/16)
+# arm the tip reaches CRANK_ARM_Z0 + THREAD_LENGTH_MAX; that is the axial
+# band every neighbour on the sweep must clear.
+HANDLE_SCREW_Z0 = CRANK_ARM_Z0 - HANDLE_SCREW_SEAT_STATION  # slotted head face
+HANDLE_SCREW_TIP_Z = HANDLE_SCREW_Z0 + HANDLE_SCREW_LENGTH
+HANDLE_SCREW_TIP_Z_MAX = CRANK_ARM_Z0 + HANDLE_SCREW_THREAD_MAX
+if not 0.0 < HANDLE_SCREW_TIP_Z - CRANK_ARM_ORIGIN_Z <= HANDLE_SCREW_PROUD_MAX:
+    raise AssertionError("MHA-139 tip left its proud band past the arm's inboard face")
+for _lo, _what in (
+    (REMOVABLE_Z0, "T12 chain wheel"),
+    (_GRIP_HEAD_Z[0], "integral grip head"),
+    (_GRIP_ROD_Z[0], "grip crossrod"),
+):
+    if HANDLE_SCREW_TIP_Z_MAX > _lo - 0.25:
+        raise AssertionError(f"MHA-139 tip sweep reaches the {_what}")
+# The hub barrel is the only body behind the arm inside the sweep's axial
+# band; the screw circle stays radially clear of it.
+if ARM_C2C - HANDLE_SCREW_THREAD_MAJOR / 2.0 < HUB_BARREL_DIA / 2.0 + 0.25:
+    raise AssertionError("MHA-139 tip sweep reaches the crank hub barrel")
+
 # Lever full throw: sample the solved cam-contact path from the photographed
 # +10-degree parked pose to about -72 degrees engaged.  Clearance improves
 # after the parked endpoint, but the complete crossing through vertical is
@@ -2910,6 +2940,16 @@ async def build(adapter) -> dict[str, str]:
         ROT_Y_POS90,
         ground=False,
     )
+    # MHA-139 carries the handle: head outboard, local +Z (head -> tip) along
+    # machine +z, so the shoulder's ArmSeat lands on the arm's outboard face.
+    handle_screw = await place_component(
+        adapter,
+        "crank-handle-pivot-screw",
+        [X_CRANK, Y_CRANK - ARM_C2C, HANDLE_SCREW_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+    )
 
     # =================== joints ================================================
     # Crankshaft revolute on the PLATFORM's "crank axis" (the machine-z crank
@@ -3089,6 +3129,34 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Right Plane@{arm}", "PLANE"),
         label="handle anti-spin (grip rest)",
         verify=(handle, hd_o),
+    )
+    # MHA-139 mirrors the handle's pin joint on the same arm datums: coaxial
+    # on the arm pivot, shoulder seated on HandleSeat (ArmSeat's normal is
+    # machine +z, HandleSeat's reads -z), and a parallel holding the slot's
+    # clocking (immaterial, like the handle's grip spin).  The arm's Right
+    # Plane is machine XZ, the identity-placed screw's Top Plane.
+    hs_o = _org(adapter, handle_screw)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{handle_screw}", "AXIS"),
+        named_ref(f"Axis2@{arm}", "AXIS"),
+        label="MHA-139 coaxial on arm pivot",
+        verify=(handle_screw, hs_o),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"ArmSeat@{handle_screw}", "PLANE"),
+        named_ref(f"HandleSeat@{arm}", "PLANE"),
+        label="MHA-139 shoulder seated on arm outboard face",
+        alignment="anti_aligned",
+        verify=(handle_screw, hs_o),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Top Plane@{handle_screw}", "PLANE"),
+        named_ref(f"Right Plane@{arm}", "PLANE"),
+        label="MHA-139 slot clocking",
+        verify=(handle_screw, hs_o),
     )
 
     # =============== cone platform swing (p1 disengage DOF) ==============
