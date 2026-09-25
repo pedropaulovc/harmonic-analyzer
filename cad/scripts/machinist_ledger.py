@@ -553,6 +553,8 @@ def script_authors(
     Three git calls for any number of paths: a drift check that lists every
     unreviewed drawing must not spawn git per drawing.
     """
+    if not paths:  # an empty pathspec would make git walk every file's history
+        return {}
     rels = {
         path: path.resolve().relative_to(repo.resolve()).as_posix() for path in paths
     }

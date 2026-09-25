@@ -1369,6 +1369,9 @@ def test_release_is_gated_on_the_ledger_and_no_build_task_is_keyed_on_it() -> No
     assert "check:machinist" in dodo.task_release()["task_dep"]
     # In build it would fail every build between a drawing edit and its re-review.
     assert "check:machinist" not in dodo.task_build()["task_dep"]
+    # Always run: a stored reviewed PDF deleted after a green run must be
+    # re-verified, never excused by a stale stamp.
+    assert gate["uptodate"] == [False]
 
     reviews = str((ml.CAD_ROOT / "reviews").resolve())
     tool = str((ml.SCRIPTS_DIR / "machinist_ledger.py").resolve())
@@ -1470,3 +1473,10 @@ def test_fix_command(registry: Path, state, author, fix: str) -> None:
 def test_the_tracked_ledger_matches_this_checkouts_fingerprint_settings() -> None:
     ledger = ml.load_ledger(ml.LEDGER_PATH)
     assert ledger["fingerprint"] == ml.empty_ledger()["fingerprint"]
+
+
+def test_no_failing_drawing_means_no_git_call(monkeypatch: pytest.MonkeyPatch) -> None:
+    # An empty pathspec would walk the whole history instead of nothing.
+    monkeypatch.setattr(ml, "_git", lambda *a, **k: pytest.fail(f"git {a}"))
+    assert ml.draw_script_authors([]) == {}
+    assert ml.script_authors([]) == {}
