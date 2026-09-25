@@ -539,7 +539,7 @@ def on_shaft(station, face):
 expect(
     DT,
     "crank-drive-gear-1",
-    on_shaft(d.GEAR64_STATION, d.GEAR64_FACE),
+    on_shaft(d.GEAR64_STATION + d.GEAR_AXIS_SHIFT, d.GEAR64_FACE),
     d.ROT_Y_INCLINE,
     "crank-drive-gear 64T",
 )
@@ -547,7 +547,14 @@ for j in range(20):
     expect(
         DT,
         f"cone-gear-{j + 1}",
-        on_shaft(d.SHAFT_T120_STATION + j * d.SEAT_PITCH, d.CONE_FACE),
+        # BDT: seed at the shifted T120 station, narrowed from the south face.
+        on_shaft(
+            d.SHAFT_T120_STATION
+            + d.GEAR_AXIS_SHIFT
+            + (d.CONE_FACE_STATION_REFERENCE - d.CONE_FACE) / 2.0
+            + j * d.SEAT_PITCH,
+            d.CONE_FACE,
+        ),
         d.ROT_Y_INCLINE,
         f"cone-gear j={j}",
     )

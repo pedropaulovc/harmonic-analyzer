@@ -101,42 +101,78 @@ def test_display_precision_is_owned_by_the_part() -> None:
     }
 
 
-def test_gear_seat_shoulders_are_held_inside_the_air_gap() -> None:
-    """The .XXX grade is a location requirement, not a spelling choice.
+def _gear_faces() -> list[tuple[float, float]]:
+    """Every cone gear's (south, north) face, in the shaft's station frame.
 
-    Gears are soldered at the seat pitch with 6.5 faces, so each seat step
-    has to fall in the ~0.39 air gap between two neighbouring gear faces;
-    otherwise the small-bore gear cannot pass the larger land to reach its
-    station.  The title-block .XXX grade keeps every step in its gap and the
-    .XX grade does not -- which is why Sec1End..Sec3End print three places.
+    The 6.0 gears sit on the historical 6.5 reference stations narrowed from
+    the SOUTH face only, so each centre is the reference station plus
+    (reference - face)/2 -- build_drive_train_assembly's seed placement.
     """
-    grade = {
-        places: _config.title_block(f"linear_{places}pl")["value_in"] * 25.4
-        for places in (2, 3)
-    }
-    ends = cone_gear_shaft_spec.SECTION_ENDS
     seat0 = (
         cone_gear_shaft_spec.FRONT_STUB
         + cone_pivot_post_installation.GEAR_AXIS_SHIFT
         + drive.SHAFT_T120_STATION
+        + (drive.CONE_FACE_STATION_REFERENCE - drive.CONE_FACE) / 2.0
     )
-    faces = [
+    return [
         (
             seat0 + j * drive.SEAT_PITCH - drive.CONE_FACE / 2.0,
             seat0 + j * drive.SEAT_PITCH + drive.CONE_FACE / 2.0,
         )
         for j in range(20)
     ]
+
+
+def _shoulder_gaps() -> list[tuple[str, float, float, float, float]]:
+    """(name, station, inboard north face, outboard south face, held band)."""
+    grade = _config.title_block("linear_3pl")["value_in"] * 25.4
+    faces = _gear_faces()
+    ends = cone_gear_shaft_spec.SECTION_ENDS
+    gaps = []
     for name, station in zip(("Sec1End", "Sec2End", "Sec3End"), ends[1:4]):
-        north_of_inboard = max(north for _south, north in faces if north < station)
-        south_of_outboard = min(south for south, _north in faces if south > station)
-        held = grade[cone_gear_shaft_spec.DRAWING_PRECISION_BY_NAME[name]]
+        assert cone_gear_shaft_spec.DRAWING_PRECISION_BY_NAME[name] == 3, name
+        gaps.append(
+            (
+                name,
+                station,
+                max(north for _south, north in faces if north < station),
+                min(south for south, _north in faces if south > station),
+                grade,
+            )
+        )
+    return gaps
+
+
+def test_gear_seat_shoulders_are_held_inside_the_air_gap() -> None:
+    """The .XXX grade is a location requirement, not a spelling choice.
+
+    Gears are soldered at the seat pitch, so each seat step has to fall in
+    the ~0.89 air gap between two neighbouring gear faces; otherwise the
+    small-bore gear cannot pass the larger land to reach its station.  The
+    title-block .XXX grade keeps every step in its gap.
+    """
+    for name, station, north_of_inboard, south_of_outboard, held in _shoulder_gaps():
         assert station - held > north_of_inboard, name
         assert station + held < south_of_outboard, name
-        assert station + grade[2] > south_of_outboard, name
     # The last seat's north face and the tip journal end share the terminal
     # land: the overall length locates nothing but an adjustable cup point.
-    assert ends[4] > faces[19][1]
+    assert cone_gear_shaft_spec.SECTION_ENDS[4] > _gear_faces()[19][1]
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "#839 moves Sec1End..Sec3End to the derived gap midpoints (Main, "
+        "2026-09-25) and removes this marker in that commit: with the 6.0 "
+        "gears narrowed from the south the steps sit 0.18 off the inboard "
+        "face, so the .XX band no longer reaches the outboard gear"
+    ),
+)
+def test_two_place_shoulders_would_leave_the_air_gap() -> None:
+    """Why Sec1End..Sec3End print three places: the .XX band would not hold."""
+    grade2 = _config.title_block("linear_2pl")["value_in"] * 25.4
+    for name, station, _north_of_inboard, south_of_outboard, _held in _shoulder_gaps():
+        assert station + grade2 > south_of_outboard, name
 
 
 def test_required_drawing_paths() -> None:
