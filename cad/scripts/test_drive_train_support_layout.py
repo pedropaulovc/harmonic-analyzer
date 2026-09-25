@@ -326,16 +326,23 @@ def test_rig_set_leaf_d_derives_the_shift_and_leaves_743_open() -> None:
     assert math.isclose(RIG.G19_BACK_FACE_Z, g19_back, abs_tol=1e-9)
     # User ruling (E_b): the bank's own terms come from the #743 retention
     # design.  Until then they are named, open, and never valued.
-    assert RIG.DRUM_BACK_ADVANCE_OPEN_TERMS == ("MHA-027 bank end play E_b (#743)",)
+    # D is set with the bank pushed north (#743 rider): g19 then never sits
+    # north of the datum, so the bank adds nothing to the advance -- and the
+    # print must say so, or the stack would have to carry E_b max.
+    assert RIG.DRUM_BACK_ADVANCE_OPEN_TERMS == ()
+    assert FITUP.RIG_SET_BANK_PRECONDITION == "BANK PUSHED NORTH"
+    assert FITUP.RIG_SET_STEP.endswith(",\nBANK PUSHED NORTH;")
     assert RIG.DRUM_FRONT_RETREAT_OPEN_TERMS == (
         "MHA-027 bank end play E_b (#743)",
         "MHA-027 g0 -> g19 pitch stack (#743)",
     )
     for stack in (RIG.DRUM_BACK_ADVANCE_STACK, RIG.DRUM_FRONT_RETREAT_STACK):
         assert not any("E_b" in name or "#743" in name for name in stack)
-    for name in drive.RIG_MARGINS:
-        if name.startswith(("j = 19", "j = 0")):
-            assert name.endswith("(rig terms; #743 open)"), name
+    rows = [name for name in drive.RIG_MARGINS if name.startswith(("j = 19", "j = 0"))]
+    assert rows == [
+        "j = 19 past its full face (bank pushed north)",
+        "j = 0 drum overhang slack (rig terms; #743 open)",
+    ]
 
 
 def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
@@ -1080,7 +1087,8 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
     assert FITUP.BACK_COLLAR_LEAF_F == 0.90
     assert FITUP.FRONT_COLLAR_LEAF == FITUP.FRONT_BLOCK_FEELER
     assert FITUP.RIG_SET_STEP == (
-        "RIG SET: MHA-002 BACK END\n1.00 + 0.25 LEAVES OFF\nNORTH MHA-027 BACK FACE;"
+        "RIG SET: MHA-002 BACK END\n1.00 + 0.25 LEAVES OFF\n"
+        "NORTH MHA-027 BACK FACE,\nBANK PUSHED NORTH;"
     )
     assert base_sheet.TRANSFER_BLOCK_CALLOUT.startswith(FITUP.RIG_SET_STEP)
     assert base_sheet.TRANSFER_SPRING_NOTE.startswith(FITUP.SPRING_SET_STEP)

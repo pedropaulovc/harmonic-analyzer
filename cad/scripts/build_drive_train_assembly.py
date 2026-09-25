@@ -1468,9 +1468,10 @@ if Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 > APINION_Z_BACK + 0.5:
 # engages >= 2.0 a fortiori); its front end retreats by DRUM_FRONT_RETREAT_STACK
 # and must stay 1.0 south of g0's front face.  Both spares join RIG_MARGINS
 # (below), and one leaf step thinner would leave j = 19 short of
-# RIG_MARGIN_SPARE (D is the thinnest setting that holds).  The bank's own
-# terms (E_b and the g0 -> g19 pitch stack) are open until #743 lands
-# (RIG.DRUM_*_OPEN_TERMS), so both rows are rig terms only.
+# RIG_MARGIN_SPARE (D is the thinnest setting that holds).  D is set with the
+# bank pushed north, so the bank adds nothing to j = 19; its own terms at the
+# front (E_b and the g0 -> g19 pitch stack) are open until #743 lands
+# (RIG.DRUM_FRONT_RETREAT_OPEN_TERMS), so the j = 0 row is rig terms only.
 _G19_FACE_Z = (
     Z_DRUM0 + 19 * Z_PITCH - DRUM_FACE / 2.0,
     Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0,
@@ -1972,6 +1973,9 @@ GRIP_HEAD_NORTH_TRAVEL_STACK = {
     **ARBOR_NORTH_TRAVEL_STACK,
     "MHA-102 neck length .XX": _upper(ARBOR_NECK_LEN, ARBOR_NECK_LEN_PLACES),
 }
+# TODO(#743): the bank retention replaces the Ø55 end discs (MHA-121) with
+# Ø25 x 1.50 steel thrust washers, so this row changes or retires with it
+# (retention743 owns the update).
 # Radial: the widest drum tip against the largest end disc, which has no
 # sheet and so carries the title block's general .X row on its diameter.
 DRUM_TIP_TO_END_DISC_STACK = {
@@ -1989,7 +1993,7 @@ def _worst(nominal: float, *stacks: dict[str, float]) -> float:
 # clearance the rig's axial stations set against its neighbours -- stands at
 # least RIG_MARGIN_SPARE over its floor.  name -> (worst value, floor).
 RIG_MARGINS = {
-    "j = 19 past its full face (rig terms; #743 open)": (J19_FULL_FACE_MARGIN, 0.0),
+    "j = 19 past its full face (bank pushed north)": (J19_FULL_FACE_MARGIN, 0.0),
     "j = 0 drum overhang slack (rig terms; #743 open)": (J0_SLACK_WORST, 0.0),
     "torque shaft bearing in the front block": (
         sum(RIG.TORQUE_SHAFT_BEARING_STACK.values()),

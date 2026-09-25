@@ -117,9 +117,14 @@ DRUM_OD_PLACES = 2  # OutsideDia prints .XX (alignment_pinion_spec)
 # The rig's axial datum (user ruling, 2026-09-25, P1-2): the base seats are
 # transferred from the blocks, so nothing in the frame fixes the rig along z
 # until the fitter sets it.  With the cluster hard back and the drum hard on
-# the back strap, the drum's back end is set RIG_SET_LEAF_D off gear j = 19's
-# back face, and only then are the block seats spotted (the base's transfer
-# callout, pinion_rig_fitup.RIG_SET_STEP).  The drum is located from g19
+# the back strap, and the cylinder-gear bank pushed north (back), the drum's
+# back end is set RIG_SET_LEAF_D off gear j = 19's back face, and only then
+# are the block seats spotted (the base's transfer callout,
+# pinion_rig_fitup.RIG_SET_STEP).  With the bank pushed north at the set, g19
+# never sits north of that datum: the bank's end play E_b only moves it south,
+# away from j = 19's worst case, so the bank adds nothing to the advance
+# (#743's G19_BACK_NORTH_STACK is empty; without the precondition the stack
+# would carry E_b max).  The drum is located from g19
 # directly, so neither the strap thickness nor g19's own station reaches
 # j = 19.  From that set-up the drum's back end can only advance: the pinned
 # cluster runs forward to the front block, the drum forward in its shimmed
@@ -127,8 +132,9 @@ DRUM_OD_PLACES = 2  # OutsideDia prints .XX (alignment_pinion_spec)
 # face with RIG_MARGIN_SPARE to spare, so D is the thinnest gage setting that
 # covers the advance plus the spare.
 # TODO(#743): the cylinder-gear bank's end play (E_b) and its g0 -> g19
-# pitch-stack band come from the bank retention design and join both stacks
-# below as named terms; until then they are listed, never valued.
+# pitch-stack band come from the bank retention design
+# (cylinder_bank_layout.G0_FRONT_SOUTH_STACK) and join the front stack below
+# as named terms; until that module lands they are listed, never valued.
 G19_BACK_FACE_Z = (
     71.56188830854866  # Z_DRUM0 + 19 Z_PITCH + 1.5 (the drive train pins it)
 )
@@ -139,7 +145,7 @@ DRUM_BACK_ADVANCE_STACK = {
     + DRUM_END_SHIM_SET_ERROR,
     "rig-set leaf D, thinnest setting": FEELER_SET_ERROR,
 }
-DRUM_BACK_ADVANCE_OPEN_TERMS = ("MHA-027 bank end play E_b (#743)",)
+DRUM_BACK_ADVANCE_OPEN_TERMS: tuple[str, ...] = ()  # the bank is pushed north
 DRUM_FRONT_RETREAT_STACK = {
     "MHA-002 drum length .X": -printed_deviations(DRUM_LEN, DRUM_LEN_PLACES)[0],
     "rig-set leaf D, thickest setting": FEELER_SET_ERROR,
