@@ -181,8 +181,10 @@ FREE_PATH = {
 # (rule 7): the hole off the foot's free end runs along the pad's upper edge,
 # the hole off the pad's lower edge runs up the free end to the hole's
 # centreline. ``drives`` binds, in creation order, the value and then the
-# start point's two origin anchors; FOOT_END's x is blade-geometry derived and
-# has no global, so it stays literal like the other endpoint dims.
+# start point's two origin anchors to the part's globals. FOOT_END's x is
+# derived from the blade geometry, so the "FootEndX" global carries it and
+# drives the pad's free-end anchor too: the reference lines cannot drift off
+# the pad they restate (Main, #843 aB7 review).
 FOOT_HOLE_LINES = (
     (
         "HoleFromEnd",
@@ -190,7 +192,7 @@ FOOT_HOLE_LINES = (
         (FOOT_END[0] - HOLE_FROM_END, PAD_WIDTH / 2.0),
         "horizontal",
         HOLE_FROM_END,
-        (None, None, '"PadWidth" / 2'),
+        ('"HoleFromEnd"', '"FootEndX"', '"PadWidth" / 2'),
     ),
     (
         "HoleFromEdge",
@@ -198,7 +200,7 @@ FOOT_HOLE_LINES = (
         (FOOT_END[0], 0.0),
         "vertical",
         PAD_WIDTH / 2.0,
-        ('"PadWidth" / 2', None, '"PadWidth" / 2'),
+        ('"PadWidth" / 2', '"FootEndX"', '"PadWidth" / 2'),
     ),
 )
 
@@ -343,6 +345,10 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "StripWidth", f"{WIDTH}mm")
     await set_global(adapter, "PadWidth", f"{PAD_WIDTH}mm")
     await set_global(adapter, "PadLength", f"{PAD_LEN}mm")
+    # The foot's free end and the hole's station off it: the pad and the
+    # FootHoleReference sketch both hang off these (#843 aB7).
+    await set_global(adapter, "FootEndX", f"{FOOT_END[0]}mm")
+    await set_global(adapter, "HoleFromEnd", f"{HOLE_FROM_END}mm")
 
     # Open inside-surface path, drawn from the free tip DOWN (_formed_path).
     check("create_sketch spring", await adapter.create_sketch("Front"))
@@ -406,7 +412,7 @@ async def build(adapter) -> dict[str, str]:
         label="pad",
         dims=pad,
         names=["PadLen", "PadWidth", "PadEndX", "PadEdgeZ"],
-        drives=['"PadLength"', '"PadWidth"', None, '"PadWidth" / 2'],
+        drives=['"PadLength"', '"PadWidth"', '"FootEndX"', '"PadWidth" / 2'],
     )
     await ensure_fully_defined(adapter, "pad sketch")
     check("exit_sketch pad", await adapter.exit_sketch())

@@ -191,8 +191,16 @@ def test_foot_hole_reference_lines_restate_the_hole_on_the_pad_outline() -> None
     assert orientation == "horizontal" and value == geometry.HOLE_FROM_END
     assert start == (end_x, half) and stop == (end_x - geometry.HOLE_FROM_END, half)
     assert end_x - geometry.HOLE_FROM_END == pytest.approx(geometry.HOLE_X)
-    assert drives == (None, None, '"PadWidth" / 2')
+    assert drives == ('"HoleFromEnd"', '"FootEndX"', '"PadWidth" / 2')
     _, start, stop, orientation, value, drives = lines["HoleFromEdge"]
     assert orientation == "vertical" and value == half
     assert start == (end_x, -half) and stop == (end_x, 0.0)
-    assert drives == ('"PadWidth" / 2', None, '"PadWidth" / 2')
+    assert drives == ('"PadWidth" / 2', '"FootEndX"', '"PadWidth" / 2')
+    # Main (#843 aB7 review): the free-end station is not an unguarded
+    # literal. One global carries it into the pad's anchor and both lines,
+    # and the hole the lines restate is cut from the same two values.
+    source = Path(spring.__file__).read_text(encoding="utf-8")
+    assert 'set_global(adapter, "FootEndX", f"{FOOT_END[0]}mm")' in source
+    assert 'set_global(adapter, "HoleFromEnd", f"{HOLE_FROM_END}mm")' in source
+    assert "'\"PadWidth\"', '\"FootEndX\"', '\"PadWidth\" / 2']" in source
+    assert "[[FOOT_END[0] - HOLE_FROM_END, FOOT_Y, 0.0]]" in source
