@@ -15,8 +15,8 @@ Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
 Appendix C #9. Face slightly wider than the drive gear's (meshing-pair
 practice, axial alignment slack).
 
-Layout: gear axis = Z through the origin, teeth z = 0..10.8 mm, boss
-z = 10.8..17.28 mm, pin cross-hole along X at z = 14.04.
+Layout: gear axis = Z through the origin, teeth z = 0..10.4 mm, boss
+z = 10.4..17.28 mm, pin cross-hole along X at z = 13.84.
 
 Run (SolidWorks already open)::
 
@@ -89,7 +89,7 @@ MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
 TEETH = 16  # DIMENSIONS.md ch12 / Appendix C #9 estimate (low)
 DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine.yaml (low)
 PA_DEG = 14.5
-# FACE_WIDTH (10.8: spans the 64T row north of the v2 crank boss) lives in
+# FACE_WIDTH (10.4: spans the 64T row north of the v2 crank boss) lives in
 # crank_pinion_spec with the boss and pin it sizes; build_drive_train_assembly's
 # PINION_FACE asserts equality. (The old 12.0 "slightly wider than the drive
 # gear's 10" was a low-confidence read; 11.0 fit the line-of-centres overhang

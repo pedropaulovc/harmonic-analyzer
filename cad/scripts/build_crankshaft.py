@@ -121,7 +121,7 @@ SEAT_ARM = 8.0  # the arm's ORIGIN plane. The arm's placed pose composes a
 # sits on. Machine z = CRANKSHAFT_Z0 + this. The recess of the shaft end inside
 # the pinion's boss (build_drive_train_assembly asserts it) is
 # SEAT_PINION + OVERALL_LENGTH - SHAFT_LENGTH.
-PINION_PIN_STATION_Y = SEAT_PINION + PINION_PIN_STATION  # 119.0795
+PINION_PIN_STATION_Y = SEAT_PINION + PINION_PIN_STATION  # 118.8795
 if PINION_PIN_STATION_Y + PINION_PIN_DIA / 2.0 > SHAFT_LENGTH - 1.0:
     raise AssertionError("pinion pin hole runs out the crankshaft's north end")
 
