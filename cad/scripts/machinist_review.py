@@ -1097,7 +1097,7 @@ def _record_in_ledger(
     args: argparse.Namespace,
     prompt_text: str | None,
 ) -> machinist_ledger.Recorded | bool | None:
-    """Record an accepted registry-drawing review; None when that recording failed.
+    """Record an accepted registry-drawing review; None when it failed or does not count.
 
     Arbitrary ``--png`` packages and rubric overrides are not the gate, so they
     never enter the ledger.  A FIX enters it only with ``--rebuttals``.
@@ -1125,10 +1125,18 @@ def _record_in_ledger(
     except (OSError, ValueError) as exc:
         print(f"{review.name}: not recorded in the ledger: {exc}", file=sys.stderr)
         return None
-    counted = "" if recorded.counts else f", does NOT count: {recorded.problem}"
+    if not recorded.counts:
+        # Recorded is not accepted: the pre-run check can pass and the evidence
+        # still lapse before the reviewer finishes (a refusal ageing past 24 h).
+        print(
+            f"{recorded.name}: {recorded.slot} review recorded in the ledger but does "
+            f"NOT count: {recorded.problem}",
+            file=sys.stderr,
+        )
+        return None
     print(
         f"ledger: {recorded.name} recorded as {recorded.slot} {recorded.status} "
-        f"({len(recorded.sheets)} sheets{counted}) in {args.ledger}",
+        f"({len(recorded.sheets)} sheets) in {args.ledger}",
         file=sys.stderr,
     )
     return recorded

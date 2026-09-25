@@ -670,8 +670,8 @@ def refusal_problem(
     if age < timedelta(0) or age > QUOTA_REFUSAL_MAX_AGE:
         hours = QUOTA_REFUSAL_MAX_AGE / timedelta(hours=1)
         return (
-            f"the quota refusal at {refusal['refused_at']} is not within {hours:g} h "
-            "before the review"
+            f"the quota refusal at {refusal['refused_at']} is "
+            f"{age / timedelta(hours=1):.1f} h before the review, not within {hours:g} h"
         )
     return None
 
@@ -1182,7 +1182,8 @@ def _run(args: argparse.Namespace) -> int:
             f"recorded {recorded.name} as {recorded.slot} {recorded.status} "
             f"({len(recorded.sheets)} sheets{counted})"
         )
-        return 0
+        # Recorded is not accepted: a row that does not count must not read as success.
+        return 0 if recorded.counts else 1
 
     statuses = check(args.names, ledger_path=args.ledger, report_dir=args.report_dir)
     if args.json:

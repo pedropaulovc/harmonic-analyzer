@@ -1004,7 +1004,7 @@ def test_ingest_cli_records_rebuttals_and_last_resort(
 
     assert (
         ml.main(["--ledger", ledger, "ingest", report, "--author-family", "claude"])
-        == 0
+        == 1
     )
     assert "does NOT count: no recorded quota refusal" in capsys.readouterr().out
     assert ml.main(["--ledger", ledger, "check", "crank_arm"]) == 1
@@ -1114,6 +1114,59 @@ def _fake_run(monkeypatch: pytest.MonkeyPatch, pdf: Path, make_review) -> None:
         mr, "package_for", lambda name: mr.ReviewPackage(name, "part", (pdf,))
     )
     monkeypatch.setattr(mr, "review_package", fake_review)
+
+
+def test_a_last_resort_whose_refusal_expires_mid_run_fails_the_run(
+    tmp_path: Path, registry: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    # The clock: the refusal is 23 h old when the run starts (the pre-run check
+    # passes) and 25 h old when the reviewer finishes (the record does not count).
+    pdf = _sheet(registry)
+    refused = _refused(
+        tmp_path, pdf, refused_at=(NOW - timedelta(hours=23)).isoformat()
+    )
+    finished = (NOW + timedelta(hours=2)).isoformat()
+    _trailer(monkeypatch, "claude-opus-5-5")
+    _fake_run(
+        monkeypatch,
+        pdf,
+        lambda: mr.Review(**_review(pdf, reviewer="claude", reviewed_at=finished)),
+    )
+    ledger_path = tmp_path / "ledger.json"
+
+    code = mr.main(
+        ["--reviewer", "claude", "--author-family", "claude", "--last-resort", "crank_arm",
+         "--quota-refusal", str(refused), "--ledger", str(ledger_path),
+         "--report-dir", str(tmp_path / "reports")]
+    )  # fmt: skip
+
+    err = capsys.readouterr().err
+    assert code == 1
+    assert "recorded in the ledger but does NOT count" in err
+    assert "25.0 h before the review, not within 24 h" in err
+    entry = ml.load_ledger(ledger_path)["drawings"]["crank_arm"][ml.LAST_RESORT]
+    assert entry["counts"] is False
+
+
+def test_ingest_of_a_review_that_does_not_count_exits_nonzero(
+    tmp_path: Path, registry: Path, capsys
+) -> None:
+    pdf = _sheet(registry)
+    mr.write_review(mr.Review(**_review(pdf, reviewer="claude")), tmp_path / "reports")
+    ledger = str(tmp_path / "ledger.json")
+    argv = [
+        "ingest",
+        str(tmp_path / "reports" / "crank_arm.json"),
+        "--author-family",
+        "claude",
+    ]
+
+    assert ml.main(["--ledger", ledger, *argv]) == 1
+    assert "does NOT count: no recorded quota refusal" in capsys.readouterr().out
+    assert (
+        ml.load_ledger(Path(ledger))["drawings"]["crank_arm"][ml.LAST_RESORT]["counts"]
+        is False
+    )
 
 
 def test_a_quota_refusal_is_kept_and_unlocks_the_last_resort_run(
