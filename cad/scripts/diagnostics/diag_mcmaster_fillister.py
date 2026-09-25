@@ -53,6 +53,10 @@ FILLISTER_SIZES = {
     "90280A199": (4.1656, 25.4, 3.9624, 6.858, 0.79375),
     "90280A201": (4.1656, 31.75, 3.9624, 6.858, 0.79375),
     "90280A837": (SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA, PITCH),
+    # MSC 40923898 (mfr 1456MSL), 1/4-20 x 3-1/2 slotted fillister, fully
+    # threaded; MSC lists no head sizes, so the head is ASME B18.6.3's 1/4
+    # maximum (A 0.414, O 0.237).  Modelled at the 86.0 cut-to-fit length.
+    "40923898": (6.35, 86.0, 0.237 * 25.4, 0.414 * 25.4, 25.4 / 20.0),
 }
 
 

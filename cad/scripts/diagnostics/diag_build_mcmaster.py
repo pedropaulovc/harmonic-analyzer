@@ -33,7 +33,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from _common import run_build  # noqa: E402
-from diagnostics.diag_mcmaster_lib import run_replica  # noqa: E402
+import _telemetry  # noqa: E402
+from diagnostics.diag_mcmaster_lib import (  # noqa: E402
+    MCMASTER_DIR,
+    REPORTS_DIR,
+    run_replica,
+)
 from diagnostics.diag_build_90114A511 import build_90114A511  # noqa: E402
 from diagnostics.diag_build_90126A211 import build_90126A211  # noqa: E402
 from diagnostics.diag_build_90280A108 import build_90280A108  # noqa: E402
@@ -44,6 +49,7 @@ from diagnostics.diag_build_90280A199 import build_90280A199  # noqa: E402
 from diagnostics.diag_build_90280A201 import build_90280A201  # noqa: E402
 from diagnostics.diag_build_90280A837 import build_90280A837  # noqa: E402
 from diagnostics.diag_build_91247A720 import build_91247A720  # noqa: E402
+from diagnostics.diag_build_91255A148 import build_91255A148  # noqa: E402
 from diagnostics.diag_build_91410A538 import build_91410A538  # noqa: E402
 from diagnostics.diag_build_92240A539 import build_92240A539  # noqa: E402
 from diagnostics.diag_build_91882A221 import build_91882A221  # noqa: E402
@@ -65,6 +71,7 @@ REGISTRY = {
     "93075A194": build_93075A194,
     "92865A585": build_92865A585,
     "91247A720": build_91247A720,
+    "91255A148": build_91255A148,
     "99607A213": build_99607A213,
     "91882A221": build_91882A221,
     "91882A425": build_91882A425,
@@ -96,9 +103,36 @@ def _selected_parts() -> list[str]:
     return args
 
 
+def _missing_inputs(part_no: str) -> str | None:
+    """Why ``part_no`` cannot replicate here, or None when it can.
+
+    The vendor files are local-only (gitignored, never committed), so a clean
+    checkout has none: the replica needs the user's download and its harvest.
+    """
+    vendor = MCMASTER_DIR / f"{part_no}.SLDPRT"
+    if not vendor.exists():
+        return (
+            f"vendor SLDPRT not present locally ({vendor}); download it from "
+            f"https://www.mcmaster.com/{part_no}/ to cad/references/mcmaster/ "
+            "(gitignored, never committed)"
+        )
+    dump = REPORTS_DIR / f"mcmaster-{part_no}-dump.json"
+    if not dump.exists():
+        return f"no harvest ({dump}); run diagnostics/diag_dump_part.py on {vendor}"
+    return None
+
+
 async def build(adapter) -> dict[str, str]:
+    selected = _selected_parts()
+    missing = {p: why for p in selected if (why := _missing_inputs(p))}
+    if missing and "--all" not in sys.argv[1:]:
+        raise SystemExit("; ".join(f"{p}: {why}" for p, why in missing.items()))
+    for part_no, why in missing.items():
+        _telemetry.warn(f"skipping {part_no}: {why}")
     artefacts: dict[str, str] = {}
-    for part_no in _selected_parts():
+    for part_no in selected:
+        if part_no in missing:
+            continue
         artefacts.update(await run_replica(adapter, part_no, REGISTRY[part_no]))
     return artefacts
 

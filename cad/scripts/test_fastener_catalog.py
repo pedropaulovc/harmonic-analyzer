@@ -5,13 +5,14 @@ from _fastener_catalog import FASTENERS
 
 
 _EXPECTED = {
-    # Stable production stem: (McMaster SKU(s), MHA number, fleet quantity).
+    # Stable production stem: (supplier SKU(s), MHA number, fleet quantity).
     "boss-hook": (("9490T1",), "MHA-005", 1),
     "bracket-screw": (("90280A194",), "MHA-108", 2),
     "clamp-screw": (("90280A201",), "MHA-107", 6),
     "cone-lock-knob": (("91882A425",), "MHA-093", 1),
     "cone-pivot-screw": (("91829A560",), "MHA-094", 1),
     "cone-tip-adjuster": (("94025A164",), "MHA-097", 1),
+    "cone-tip-block-screw": (("91255A148",), "MHA-140", 1),
     "cone-tip-pinch-screw": (("90280A110",), "MHA-098", 1),
     "fillister-screw": (("90114A511",), "MHA-030", 27),
     "foot-screw": (("90280A108",), "MHA-103", 1),
@@ -24,6 +25,7 @@ _EXPECTED = {
     "lag-screw": (("92240A539",), "MHA-039", 4),
     "pedestal-hold-down-screw": (("90280A197",), "MHA-143", 2),
     "pen-set-screw": (("99607A213",), "MHA-052", 1),
+    "post-mount-screw": (("40923898",), "MHA-142", 2),
     "slotted-screw": (("90280A201",), "MHA-101", 4),
     "swing-stop-screw": (("90280A199",), "MHA-095", 1),
     "thumb-screw": (("91882A221",), "MHA-075", 2),
@@ -31,17 +33,28 @@ _EXPECTED = {
     "spring-hook": (("9489T111",), "MHA-090", 20),
     "tube-frame-cap": (("9275K141",), "MHA-133", 4),
 }
+# U37c: McMaster carries no 1/4-20 x 3-1/2 steel slotted fillister.
+_SUPPLIERS = {"post-mount-screw": "MSC Industrial Supply"}
 
 
-def test_catalog_carries_only_purchased_mcmaster_identities() -> None:
+def _supplier(stem: str) -> str:
+    return _SUPPLIERS.get(stem, "McMaster-Carr")
+
+
+def test_catalog_carries_only_purchased_supplier_identities() -> None:
     assert set(FASTENERS) == set(_EXPECTED)
     for stem, (skus, _number, _quantity) in _EXPECTED.items():
         spec = FASTENERS[stem]
         assert spec.part_name == stem
-        assert spec.supplier == "McMaster-Carr"
+        assert spec.supplier == _supplier(stem)
         assert spec.skus == skus
         assert spec.stock_name.strip()
-        assert spec.material in {"Plain Carbon Steel", "AISI 304", "Brass"}
+        assert spec.material in {
+            "Plain Carbon Steel",
+            "AISI 304",
+            "Brass",
+            "Alloy Steel",
+        }
 
 
 def test_purchased_config_preserves_bom_identity_and_quantity() -> None:
@@ -49,7 +62,7 @@ def test_purchased_config_preserves_bom_identity_and_quantity() -> None:
         row = _config.parts(stem)
         assert row["number"] == number
         assert tuple(row["supplier_skus"]) == skus
-        assert row["supplier"] == "McMaster-Carr"
+        assert row["supplier"] == _supplier(stem)
         assert row["stock_name"] == FASTENERS[stem].stock_name
         assert row["process"] == "purchased"
         if quantity is None:

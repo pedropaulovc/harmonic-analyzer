@@ -1,7 +1,8 @@
 """Purchased fastener identities used by the production CAD fleet.
 
 The part stems are stable machine/BOM identities.  ``stock_name`` and ``skus``
-identify the McMaster-Carr hardware represented by each generated SLDPRT;
+identify the supplier's hardware represented by each generated SLDPRT
+(McMaster-Carr unless ``supplier`` names another);
 ``material`` is the SOLIDWORKS library material used for production rendering
 and mass properties.
 """
@@ -25,8 +26,9 @@ def _stock(
     stock_name: str,
     *skus: str,
     material: str = "Plain Carbon Steel",
+    supplier: str = "McMaster-Carr",
 ) -> PurchasedFastenerSpec:
-    return PurchasedFastenerSpec(part_name, stock_name, skus, material)
+    return PurchasedFastenerSpec(part_name, stock_name, skus, material, supplier)
 
 
 FASTENERS: dict[str, PurchasedFastenerSpec] = {
@@ -50,6 +52,12 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Slotted 18-8 Stainless Steel Precision Shoulder Screw",
         "91829A560",
         material="AISI 304",
+    ),
+    "cone-tip-block-screw": _stock(
+        "cone-tip-block-screw",
+        "Black-Oxide Alloy Steel Button Head Hex Drive Screw",
+        "91255A148",
+        material="Alloy Steel",
     ),
     "cone-tip-adjuster": _stock(
         "cone-tip-adjuster",
@@ -124,6 +132,12 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Stainless Steel Flared-Collar Knurled-Head Thumb Screw",
         "99607A213",
         material="AISI 304",
+    ),
+    "post-mount-screw": _stock(
+        "post-mount-screw",
+        "Zinc-Plated Steel Slotted Fillister Head Machine Screw",
+        "40923898",
+        supplier="MSC Industrial Supply",
     ),
     "slotted-screw": _stock(
         "slotted-screw",
