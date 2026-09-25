@@ -1633,7 +1633,7 @@ _FPIN_Y_AT_CAM = _FPIN_C[1] - _S_CAM * _SPR_N[1]  # 64.04
 # the thinnest strap (test_drive_train_support_layout).
 _STRAP_MID_Z = tuple(
     z + s * STRAP_T / 2.0 for z, s in zip(STRAP_Z_INNER, (-1.0, 1.0), strict=True)
-)  # -44.085, +107.865
+)  # -76.362, +76.338 (pinion_rig_layout)
 CAM_PIN_STATION = (STRAP_T / 2.0, 6.0)  # pin plane, from each collar front face
 CAM_Z0 = tuple(z - s for z, s in zip(_STRAP_MID_Z, CAM_PIN_STATION, strict=True))
 for _z0 in CAM_Z0:
