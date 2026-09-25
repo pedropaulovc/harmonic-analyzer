@@ -63,8 +63,9 @@ def _expected_fragments() -> list[str]:
         f"ecc {dt.CAM_ECC:.1f}, {dt.CAM_THIN_SIDE_WALL:.3f} thin-side wall",
         f"solves {_mm(dt.CAM_ENGAGE_ROTATION_DEG)}° cam rotation and a "
         f"{_mm(dt.LEVER_ENGAGED_TILT_DEG)}° engaged lever",
-        # Return-spring row.
-        f"{spring.THICK:g} × {spring.WIDTH:.1f} brass strip; "
+        # Return-spring row: the numbers only.  The strip material is prose
+        # the spring owner may change, not a dimension this record derives.
+        f"{spring.THICK:g} × {spring.WIDTH:.1f} ",
         f"{spring.FOOT_LEN:.1f} foot",
     ]
 
@@ -83,7 +84,9 @@ def test_superseded_rig_values_are_gone() -> None:
         "Ø10.32",
         "cam eccentricity is 1.4",
         "R6.90 bracket scallops",
-        "silver-brazed",
+        # Only the retired follower-stud sentence: dt-crank's 64T crank-drive
+        # gear row legitimately allows a silver-brazed shaft joint.
+        "follower-stud mouth is silver-brazed",
         "34.0 foot",
         "−81.793",
         "2.115 thin-side",
