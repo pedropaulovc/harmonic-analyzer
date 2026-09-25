@@ -499,7 +499,7 @@ def test_author_model_comes_from_the_draw_scripts_commit_trailer(
     with pytest.raises(ValueError, match="several models"):
         ml.script_author(script, repo=repo)
 
-    # The batch form answers every script in three git calls, per script alike.
+    # The batch form answers every script in a fixed number of git calls.
     other = repo / "draw_pen_rod.py"
     _commit(
         repo, other, "draw: pen rod\n\nCo-Authored-By: GPT-6 Sol <noreply@openai.com>"
@@ -512,6 +512,66 @@ def test_author_model_comes_from_the_draw_scripts_commit_trailer(
     script.write_text("edited, not committed\n", encoding="utf-8")
     with pytest.raises(ValueError, match="uncommitted"):
         ml.script_author(script, repo=repo)
+
+
+def _repo_with_history(tmp_path: Path) -> tuple[Path, Path, Path]:
+    """Old commits, then the draw script's trailered commit on top of them."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _commit(repo, repo / "README", "base")
+    old = repo / "draw_pen_rod.py"
+    _commit(
+        repo, old, "draw: pen rod\n\nCo-Authored-By: GPT-6 Sol <noreply@openai.com>"
+    )
+    script = repo / "draw_crank_arm.py"
+    _commit(
+        repo,
+        script,
+        "draw: crank arm\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+    )
+    return repo, script, old
+
+
+def test_the_author_walk_stops_at_each_scripts_latest_commit(tmp_path: Path) -> None:
+    repo, script, _ = _repo_with_history(tmp_path)
+    base = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "HEAD~2"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    # Older objects missing, as in a partial clone: a walk past the latest
+    # commit that touched the script would fail on them.
+    obj = repo / ".git" / "objects" / base[:2] / base[2:]
+    obj.chmod(0o666)  # git writes loose objects read-only
+    obj.unlink()
+
+    author = ml.script_author(script, repo=repo)
+
+    assert author.model == "claude-opus-5-5"
+
+
+def test_a_shallow_clone_names_no_author_instead_of_erroring(tmp_path: Path) -> None:
+    repo, script, old = _repo_with_history(tmp_path)
+    clone = tmp_path / "clone"
+    subprocess.run(
+        ["git", "clone", "-q", "--depth", "1", repo.resolve().as_uri(), str(clone)],
+        check=True,
+        capture_output=True,
+    )
+
+    authors = ml.script_authors([clone / script.name, clone / old.name], repo=clone)
+
+    # The depth-1 root diffs against nothing, so it lists every file whether or
+    # not it touched them: pen_rod's GPT commit is past the boundary and must
+    # not read as HEAD's Claude trailer, and nothing tells crank_arm apart.
+    for path in (clone / script.name, clone / old.name):
+        missing = authors[path]
+        assert isinstance(missing, ValueError)
+        assert "shallow" in str(missing)
+    status = ml.Status("crank_arm", ml.State.UNREVIEWED, "", "", "-")
+    assert "--author-family <family>" in ml.fix_command(status, missing)
 
 
 def test_claims_must_agree_with_the_trailer(

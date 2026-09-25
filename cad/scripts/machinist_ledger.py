@@ -545,13 +545,54 @@ class Author:
     script: str
 
 
+def _last_commits(rels: set[str], repo: Path) -> dict[str, str]:
+    """The newest commit touching each of ``rels``; the walk stops once all are seen.
+
+    Every path in ``rels`` is committed, so an unbounded walk would only read
+    older history -- which a shallow or partial clone (a farm worker's depth-1
+    fetch) does not have, making git fail or fetch its way back.
+    """
+    last: dict[str, str] = {}
+    if not rels:
+        return last
+    proc = subprocess.Popen(
+        ["git", "-C", str(repo), "log", "--format=%x00%H", "--name-only", "--", *rels],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
+    try:
+        commit = ""
+        for line in proc.stdout or ():
+            line = line.strip()
+            if line.startswith("\x00"):
+                commit = line[1:]
+            elif line in rels:
+                last.setdefault(line, commit)
+                if len(last) == len(rels):
+                    break
+    finally:
+        proc.kill()
+        proc.wait()
+    return last
+
+
+def _shallow_boundary(repo: Path) -> set[str]:
+    """Commits whose parents this clone lacks; their diff lists every file."""
+    shallow = _git("rev-parse", "--git-path", "shallow", repo=repo)
+    path = repo / shallow if shallow else None
+    if path is None or not path.is_file():
+        return set()
+    return set(path.read_text(encoding="utf-8").split())
+
+
 def script_authors(
     paths: Sequence[Path], *, repo: Path = REPO_ROOT
 ) -> dict[Path, Author | ValueError]:
     """The model named by the last commit that touched each path.
 
-    Three git calls for any number of paths: a drift check that lists every
-    unreviewed drawing must not spawn git per drawing.
+    A fixed number of git calls for any number of paths: a drift check that
+    lists every unreviewed drawing must not spawn git per drawing.
     """
     if not paths:  # an empty pathspec would make git walk every file's history
         return {}
@@ -560,15 +601,11 @@ def script_authors(
     }
     status = _git("status", "--porcelain", "--", *rels.values(), repo=repo) or ""
     dirty = {line.split(maxsplit=1)[-1] for line in status.splitlines()}  # "XY path"
-    log = (
-        _git("log", "--format=%x00%H", "--name-only", "--", *rels.values(), repo=repo)
-        or ""
+    tracked = set(
+        (_git("ls-files", "--", *rels.values(), repo=repo) or "").splitlines()
     )
-    last: dict[str, str] = {}
-    for block in log.split("\x00")[1:]:
-        commit, *files = block.strip().splitlines()
-        for name in files:
-            last.setdefault(name.strip(), commit)
+    last = _last_commits(tracked - dirty, repo)
+    boundary = _shallow_boundary(repo) if last else set()
     bodies: dict[str, str] = {}
     if last:
         shown = _git(
@@ -587,6 +624,11 @@ def script_authors(
         elif commit is None:
             authors[path] = ValueError(
                 f"{rel} has no commit; its author is not on record"
+            )
+        elif commit in boundary:
+            authors[path] = ValueError(
+                f"{rel}: this clone is shallow and its history stops at "
+                f"{commit[:12]}, so the commit that last touched it is not on record"
             )
         else:
             trailers = _TRAILER.findall(bodies.get(commit, ""))
