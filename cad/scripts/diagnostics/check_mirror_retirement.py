@@ -440,7 +440,7 @@ expect(
     DT,
     "pinion-pivot-shaft-1",
     [d.PIVOT_X, d.PIVOT_Y, d.PIVOT_SHAFT_Z0],
-    IDENTITY,
+    d.TORQUE_SHAFT_ROWS,
     "pinion-pivot-shaft",
 )
 expect(
