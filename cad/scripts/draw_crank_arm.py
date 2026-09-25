@@ -33,7 +33,6 @@ from _drawing_common import (
     add_native_hole_callout,
     add_property_linked_note,
     assert_imported_precision,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -44,6 +43,7 @@ from _drawing_common import (
     stamp_drawing_summary,
     view_name,
 )
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from crank_arm_spec import (
     ANCHOR_HOLE_SPEC,

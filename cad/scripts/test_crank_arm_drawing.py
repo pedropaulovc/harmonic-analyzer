@@ -204,3 +204,17 @@ def test_handle_pivot_is_tapped_for_the_mha139_screw_with_a_2mm_web() -> None:
     assert spec.HANDLE_PIVOT_HOLE_SPEC.end == "through_all"
     assert spec.PIVOT_END_WEB_NOMINAL == pytest.approx(7.587)
     assert spec.PIVOT_END_WEB_WORST >= 2.0
+
+
+def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
+    # #880: a reference sketch owns printed dimensions but no geometry, so the
+    # part saves it hidden (no assembly instance renders it) and the drawing
+    # shows it per view through _drawing_hidden_sketches to import them.
+    build = Path(arm.__file__).read_text(encoding="utf-8")
+    blank = 'blank_sketch(adapter, "StationReference")'
+    assert blank in build
+    assert build.index(blank) < build.rindex("save_part_and_images(adapter, PART_NAME)")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
+    assert "    curate_view_dimensions,\n" not in source.replace("\r\n", "\n")
+    assert "StationReference" in spec.DRAWING_DIMENSIONS

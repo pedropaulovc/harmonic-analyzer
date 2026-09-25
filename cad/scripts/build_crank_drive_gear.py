@@ -72,6 +72,7 @@ from _common import (
     _early_bound,
     _feature_by_name,
     apply_material,
+    blank_sketch,
     name_bore_axis,
     check,
     define_circle,
@@ -302,6 +303,10 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
     )
+    # The reference sketch owns printed dimensions but no geometry: hide it so
+    # no assembly instance renders it (#880).  The drawing shows it per view
+    # through _drawing_hidden_sketches to import those dimensions.
+    blank_sketch(adapter, "OutsideDiaReference")
     return await save_part_and_images(adapter, PART_NAME)
 
 
