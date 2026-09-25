@@ -23,7 +23,10 @@ IN = 25.4
 def test_recipe_is_the_catalog_screw_the_block_is_sized_for() -> None:
     """Handoff item 4 (read 2026-09-23): #6-32 x 1/2, head 0.262 x 0.073, 5/64 hex."""
     assert part.THREAD == block.FOOT_THREAD == "#6-32"
-    assert recipe.MAJOR_DIA == THREAD_MAJOR_MM[block.FOOT_THREAD]
+    # The vendor's 0.138 in; the shared table rounds it to 3.505.
+    assert recipe.MAJOR_DIA == pytest.approx(
+        THREAD_MAJOR_MM[block.FOOT_THREAD], abs=5e-4
+    )
     assert recipe.PITCH == IN / 32.0
     assert recipe.LENGTH == block.FOOT_SCREW_LENGTH == 0.5 * IN
     assert recipe.HEAD_DIA == 0.262 * IN
@@ -31,16 +34,57 @@ def test_recipe_is_the_catalog_screw_the_block_is_sized_for() -> None:
     assert recipe.HEX_AF == 5.0 / 64.0 * IN
 
 
-def test_socket_stays_inside_the_head() -> None:
-    assert recipe.HEAD_BAND < recipe.socket_floor_y() < recipe.HEAD_H
-    corner = recipe.HEX_AF / math.sqrt(3.0)
-    assert (
-        recipe.dome_height_at(corner) - recipe.socket_floor_y()
-        == recipe.SOCKET_KEY_ENGAGEMENT
-    )
-    hex_area = math.sqrt(3.0) / 2.0 * recipe.HEX_AF**2
-    depth = recipe.HEAD_H - recipe.socket_floor_y()
-    assert hex_area * (depth - 0.2) < recipe.socket_volume(120) < hex_area * depth
+def test_head_laws_reproduce_the_vendor_measurements() -> None:
+    """Main ruling (i), 2026-09-24: the head is the vendor's, measured from the
+    dump of 91255A148.SLDPRT (SHA-256 4b8dac17...), not the ASME sketch."""
+    assert recipe.dome_radius() == pytest.approx(3.941216, abs=1e-5)
+    assert recipe.dome_center_y() == pytest.approx(-1.834117, abs=1e-5)
+    assert recipe.FLAT_TOP_DIA == pytest.approx(2.778125, abs=1e-6)
+    assert recipe.BAND_H == pytest.approx(0.27813, abs=1e-5)
+    assert recipe.EDGE_FILLET_R == pytest.approx(0.09271, abs=1e-5)
+    assert recipe.SOCKET_DEPTH == pytest.approx(1.01981, abs=1e-5)
+    # Their bearing-face annulus runs out to r 3.200565 past the fillet.
+    assert recipe.bearing_face_dia() == pytest.approx(6.401130, abs=1e-5)
+    assert 2.0 * recipe.bearing_edge_r() == pytest.approx(6.556716, abs=1e-5)
+    # Their neck cone meets the shank cylinder 0.0859 under the bearing face.
+    assert recipe.NECK_DIA / 2.0 == pytest.approx(1.838526, abs=1e-6)
+    assert recipe.neck_reach()[0] == pytest.approx(5.4229 - 5.337, abs=1e-3)
+    assert recipe.ROOT_R == pytest.approx(1.237044, abs=1e-6)
+
+
+def test_socket_and_countersink_stay_inside_the_flat_top() -> None:
+    corner = recipe.hex_corner_r()
+    assert 2.0 * corner < recipe.FLAT_TOP_DIA
+    assert recipe.HEAD_H - recipe.SOCKET_DEPTH > recipe.BAND_H
+    slope = math.tan(math.radians(recipe.CSK_DEG))
+    runout = (corner - recipe.HEX_AF / 2.0) / slope  # onto the flats
+    apex = corner / slope
+    assert runout == pytest.approx(0.0886, abs=1e-4)
+    assert runout < apex < recipe.SOCKET_DEPTH
+    # The flat top the socket and countersink leave: their plane face, 1.9381.
+    top = math.pi * ((recipe.FLAT_TOP_DIA / 2.0) ** 2 - corner**2)
+    assert top == pytest.approx(1.9381, abs=1e-4)
+    assert 0.0 < recipe.countersink_volume() < 0.05
+    assert 0.0 < recipe.edge_fillet_volume() < 0.05
+
+
+def test_neck_cone_stays_under_the_platform_ledge() -> None:
+    """The neck fills the last groove turns 0.60 under the bearing face; the
+    thinnest ledge plus shim stack is 2.96, so the block's tap only ever meets
+    full thread and the tip chamfer, and the printed 1.80D still stands."""
+    to_root = recipe.neck_reach()[1]
+    assert to_root == pytest.approx(0.6015, abs=1e-4)
+    assert to_root < block.FOOT_LEDGE_RANGE_MM[0] + block.FOOT_SHIM_RANGE_MM[0]
+    major = THREAD_MAJOR_MM[block.FOOT_THREAD]
+    full_form = block.FOOT_SCREW_REACH_MM[0] - recipe.TIP_CHAMFER
+    assert full_form / major >= 1.5
+    # The neck collar (above the major) passes the shim's horseshoe and the
+    # platform's 4.0 tip slot (cone_swing_platform_spec.TIP_SLOT_W on #830,
+    # not yet in this stack).
+    import cone_tip_shim_spec as shim
+
+    assert recipe.NECK_DIA < shim.SLOT_W
+    assert (4.0 - recipe.NECK_DIA) / 2.0 == pytest.approx(0.161, abs=1e-3)
 
 
 def test_stock_build_uses_its_registered_recipe() -> None:
