@@ -280,3 +280,36 @@ def test_pinion_pin_hole_is_shown_as_a_transfer_from_the_pinion() -> None:
     assert field_x0 < x0 and right < field_x1
     assert y0 <= field_y1
     assert bottom > drawing.DIAMETER_POSITIONS["JournalDiaDim"][1] + 0.010
+
+
+def test_note_text_is_shifted_into_its_field_from_the_measured_box() -> None:
+    # run1b-e7fd1a2ec: the note's extent INCLUDES its leader, whose tip sits on
+    # the hole below the field floor, so the text is placed from its own box.
+    field = (0.26, 0.17, 0.378, 0.2657)
+    margin = drawing.NOTE_FIELD_MARGIN
+    inside = (0.30, 0.235, 0.35, 0.25)
+    assert drawing._shift_into_field(inside, field, margin) == (0.0, 0.0)
+    dx, dy = drawing._shift_into_field((0.30, 0.24, 0.35, 0.2665), field, margin)
+    assert dx == 0.0 and dy == pytest.approx(0.2657 - margin - 0.2665)
+    dx, dy = drawing._shift_into_field((0.25, 0.20, 0.30, 0.21), field, margin)
+    assert dx == pytest.approx(0.26 + margin - 0.25) and dy == 0.0
+    dx, dy = drawing._shift_into_field((0.34, 0.165, 0.39, 0.18), field, margin)
+    assert dx == pytest.approx(0.378 - margin - 0.39)
+    assert dy == pytest.approx(0.17 + margin - 0.165)
+    with pytest.raises(RuntimeError, match="over by 0.0020 wide"):
+        drawing._shift_into_field((0.26, 0.20, 0.378 + 0.0, 0.21), field, margin)
+
+
+def test_leader_tip_is_the_point_nearest_the_hole_and_must_land_on_it() -> None:
+    window = drawing.PINION_PIN_HOLE_WINDOW
+    centre = ((window[0] + window[2]) / 2.0, (window[1] + window[3]) / 2.0)
+    assert centre[0] == pytest.approx(drawing.PINION_PIN_X)
+    assert centre[1] == pytest.approx(drawing.SIDE_CENTER[1])
+    # run1b's measured tip, 3.0 mm below the axis on the 2:1 sheet, is on it.
+    leader = (0.3004, 0.2472, 0.0, drawing.PINION_PIN_X - 0.001, 0.16699, 0.0)
+    tip = drawing._leader_tip(leader, centre)
+    assert tip == (drawing.PINION_PIN_X - 0.001, 0.16699)
+    assert drawing._inside(tip, window)
+    assert not drawing._inside((drawing.PINION_PIN_X, 0.20), window)
+    with pytest.raises(RuntimeError, match="no leader points"):
+        drawing._leader_tip((), centre)
