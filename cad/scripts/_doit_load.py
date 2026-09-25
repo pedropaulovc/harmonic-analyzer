@@ -50,22 +50,35 @@ def install() -> None:
 
     @functools.wraps(original)
     def load_tasks(self, cmd, pos_args):
-        tasks = original(self, cmd, pos_args)
         stamp = getattr(self, "namespace", {}).get(STAMP_NAME)
-        if hasattr(stamp, "take"):
-            record(
-                stamp.take(),
-                command=cmd.get_name() if hasattr(cmd, "get_name") else str(cmd),
-                targets=list(pos_args or ()),
-                task_names={task.name for task in tasks},
-            )
+        if not hasattr(stamp, "take"):
+            return original(self, cmd, pos_args)
+        started = stamp.take()
+        command = cmd.get_name() if hasattr(cmd, "get_name") else str(cmd)
+        targets = list(pos_args or ())
+        try:
+            tasks = original(self, cmd, pos_args)
+        except BaseException as exc:
+            # A task generator raised: the load still happened and failed, so
+            # the span is written, ERROR, before the failure propagates.
+            record(started, command=command, targets=targets, task_names=None, error=exc)
+            raise
+        record(
+            started,
+            command=command,
+            targets=targets,
+            task_names={task.name for task in tasks},
+        )
         return tasks
 
     load_tasks._records_doit_load = True
     DodoTaskLoader.load_tasks = load_tasks
 
 
-def record(started_ns, *, command, targets, task_names) -> None:
+def record(started_ns, *, command, targets, task_names, error=None) -> None:
+    """Write the ``doit.load`` span. ``error`` (with ``task_names=None``) is a
+    failed load: the span is ERROR with the exception recorded, and carries no
+    task count or label, since no graph was built."""
     telemetry = sys.modules.get("_telemetry")
     if started_ns is None or telemetry is None:
         return
@@ -76,9 +89,10 @@ def record(started_ns, *, command, targets, task_names) -> None:
             "harmonic.depth": 0,
             "doit.command": command,
             "doit.targets": " ".join(targets),
-            "doit.tasks": len(task_names),
         }
-        if len(targets) == 1 and targets[0] in task_names:
+        if task_names is not None:
+            attributes["doit.tasks"] = len(task_names)
+        if task_names is not None and len(targets) == 1 and targets[0] in task_names:
             # One named task (a farm leaf's ``run -n 0 part:x``): the same
             # ``label`` its task and cache phase spans carry.
             attributes["label"] = targets[0]
@@ -87,7 +101,11 @@ def record(started_ns, *, command, targets, task_names) -> None:
         span = telemetry.get_tracer(service=telemetry.BUILD_INFRA_SERVICE).start_span(
             "doit.load", context=parent, start_time=started_ns, attributes=attributes
         )
-        span.set_status(Status(StatusCode.OK))
+        if error is None:
+            span.set_status(Status(StatusCode.OK))
+        else:
+            span.record_exception(error)
+            span.set_status(Status(StatusCode.ERROR, f"{type(error).__name__}: {error}"))
         span.end(end_time=time.time_ns())
     except Exception:  # noqa: BLE001 - telemetry never fails the graph load
         return
