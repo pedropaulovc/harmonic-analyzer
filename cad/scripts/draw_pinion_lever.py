@@ -1,9 +1,11 @@
 r"""Create the curated machinist drawing for the pinion engage lever.
 
-A clamp hub (Ø13 OD, Ø6.3675 bore) with a tapered grip rod (Ø4 at the hub to Ø6
-at the tip) rising 86 mm out of it.  The rod-revolve and hub sketches both live
-on the Front plane, so every marked dimension imports into the FRONT view; the
-hub longitudinal view controls the blind bore, end wall, and spherical crown.
+A turned hub slipped over the MHA-060 lift rod's front end, with a tapered grip
+rod rising out of it; the MHA-135 pin (U36) match-drilled through hub and rod at
+assembly carries the drive.  The 1:1 front view carries the hub and grip sizes,
+the projected top view the crown, and a 3:1 detail of the side view the hub's
+axial stations -- bore depth, end wall, grip axis and pin hole, all baselined
+from the flat mouth face B.
 
 Run with SolidWorks open::
 
@@ -17,18 +19,12 @@ import math
 import sys
 from typing import Any
 
-from pinion_lever_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_attached_note,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
-    add_view_centerline,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
     model_point_in_view,
@@ -36,23 +32,19 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
+    view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge
-from _native_axis_datum import add_native_axis_datum
-from _surface_finish import surface_finish_by_key
 from pinion_lever_spec import (
-    BORE,
-    CAP_RADIUS,
-    CAP_SAG,
-    HUB_LEN,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
     HUB_OD,
+    LIFT_ROD_NUMBER,
+    PIN_HOLE_CALLOUT,
     ROD_LEN,
-    ROD_ROOT_DIA,
-    SURFACE_FINISHES,
 )
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -72,48 +64,135 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
+_S = SHEET_SCALE[0] / 1000.0
 
-# Front view (XY): the hub is a Ø13 circle at the origin with the tapered rod
-# rising +Y to the tip (model y=ROD_LEN).  bbox y runs -HUB_OD/2..ROD_LEN.
+# Third-angle orthographic views stay aligned around the front view: the side
+# view shares its Y station, the top view its X station.  The front view's box
+# spans the hub's bottom (-HUB_OD/2) to the grip tip (ROD_LEN).
 FRONT_BBOX_CY = (ROD_LEN - HUB_OD / 2.0) / 2.0
-# At 1:1 the full 86 mm rod leaves enough room for the hub callouts and GD&T
-# without crowding the orthographic views.
-FRONT_CENTER = (0.078, 0.170)
-SECTION_CENTER = (0.190, 0.185)
-TOP_CENTER = (0.290, 0.135)
-ISO_CENTER = (0.340, 0.105)
-
-
-def _front_x(model_x_mm: float) -> float:
-    return FRONT_CENTER[0] + model_x_mm * SHEET_SCALE[0] / 1000.0
+FRONT_CENTER = (0.070, 0.160)
+SIDE_CENTER = (0.135, FRONT_CENTER[1])
+TOP_CENTER = (FRONT_CENTER[0], 0.240)
+# Between the side view (x <= 0.152) and the detail fence (x >= 0.218), so the
+# field right of the detail is free for the pin-hole callout.
+ISO_CENTER = (0.184, 0.142)
+DETAIL_CENTER = (0.245, 0.170)
+DETAIL_SCALE = (3, 1)
+DETAIL_RADIUS_MM = 9.0
+# r7 eye-pass: at (0.228, 0.128) the label sat on the 8.0 FLAT BOTTOM text;
+# FLAT BOTTOM now sits right of the detail at y 0.122, so the label rides
+# above it, clear of the fence (x <= 0.263 at this height).
+DETAIL_LABEL_XY = (0.300, 0.150)
+_DS = DETAIL_SCALE[0] / 1000.0
 
 
 def _front_y(model_y_mm: float) -> float:
-    return FRONT_CENTER[1] + (model_y_mm - FRONT_BBOX_CY) * SHEET_SCALE[0] / 1000.0
+    return FRONT_CENTER[1] + (model_y_mm - FRONT_BBOX_CY) * _S
 
 
-HUB_R_SHEET = HUB_OD * SHEET_SCALE[0] / 2000.0
+ROD_ROOT_TEXT_Y = 20.0  # model height of the root-diameter text, clear of the hub
+
+
 FRONT_KEEP = {
-    "HubOd": (0.025, 0.102),
-    "HubBore": (0.115, 0.085),
-    "RodTipY": (0.044, 0.170),
-    "RodTipDia": (0.125, 0.250),
-    "GripHalfAngle": (0.135, 0.205),
+    "HubOd": (0.030, _front_y(-HUB_OD / 2.0) - 0.010),
+    "HubBore": (0.105, _front_y(-HUB_OD / 2.0) - 0.014),
+    "RodTipY": (0.035, FRONT_CENTER[1] + 0.010),
+    "RodTipDia": (0.100, _front_y(ROD_LEN) + 0.012),
+    "RodRootDia": (0.105, _front_y(ROD_ROOT_TEXT_Y)),
 }
-RIGHT_KEEP = {
-    "BoreDepth": (0.245, 0.105),
-    "EndWall": (0.235, 0.190),
+TOP_KEEP = {"CapR": (0.105, TOP_CENTER[1] + 0.012)}
+# In the side view B (the mouth face, model z +5) is the LEFT end and the
+# crown the right; the detail keeps that orientation at 3:1.
+# r7 eye-pass: the GRIP AXIS and TO CROWN ROOT texts ran into each other, and
+# the pin-hole callout sat across the hub outline.  The two top stations now
+# spread apart.  Converged-r7 review: a leader dropping between them read as
+# the GRIP AXIS extension line, so the callout sits right of the detail with
+# its underline at hole height and a short, near-horizontal leader (the
+# isometric moved out of that field).
+DETAIL_KEEP = {
+    "GripFromB": (DETAIL_CENTER[0] - 0.020, DETAIL_CENTER[1] + 0.032),
+    "EndWall": (DETAIL_CENTER[0] + 0.045, DETAIL_CENTER[1] + 0.032),
+    "PinHoleFromB": (DETAIL_CENTER[0] - 3.0 * _DS, DETAIL_CENTER[1] - 0.031),
+    # Right of the witness lines (bore wall 0.2245, crown root 0.260): between
+    # them FLAT BOTTOM was struck by both.
+    "BoreDepth": (DETAIL_CENTER[0] + 0.037, DETAIL_CENTER[1] - 0.048),
+    "PinHoleDia": (DETAIL_CENTER[0] + 0.085, DETAIL_CENTER[1] + 0.008),
 }
-TOP_KEEP = {"CapR": (0.290, 0.165)}
 DIMENSION_CALLOUTS = {
-    "HubBore": "FINAL REAM",
-    "BoreDepth": "FULL-DIA DEPTH FROM B; FLAT BOTTOM",
-    "EndWall": "END WALL TO CROWN ROOT PLANE",
+    "HubBore": f"BORE OR REAM\nSLIP ON {LIFT_ROD_NUMBER}",
+    "BoreDepth": "FLAT BOTTOM",
+    "EndWall": "TO CROWN ROOT",
     "RodTipY": "FROM HUB AXIS",
     "RodTipDia": "AT TIP",
-    "GripHalfAngle": "GRIP HALF-ANGLE TO AXIS",
-    "CapR": "SPHERICAL CROWN",
+    "RodRootDia": "AT ROOT",
+    "GripFromB": "GRIP AXIS",
+    "PinHoleDia": PIN_HOLE_CALLOUT,
 }
+
+
+def _hub_detail(adapter: Any, side: Any) -> Any:
+    """A native 3:1 detail of the hub in the side view."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(side, "IView")
+    if not drawing.ActivateView(view_name(adapter, side)):
+        raise RuntimeError("failed to activate hub-detail parent")
+    draw.ClearSelection2(True)
+    center = model_point_in_view(adapter, side, (0.0, 0.0, 0.0), label="hub centre")
+    radius = DETAIL_RADIUS_MM * _S
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("failed to create hub-detail fence")
+    detail = drawing.CreateDetailViewAt4(
+        *DETAIL_CENTER,
+        0.0,
+        0,  # swDetViewSTANDARD
+        *DETAIL_SCALE,
+        "A",
+        1,  # swDetCircleCIRCLE
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("failed to create hub detail")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("hub detail has invalid bounds")
+    target = [
+        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position hub detail")
+    draw.EditRebuild3()
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native detail label, found {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    label_xyz = (*DETAIL_LABEL_XY, 0.0)
+    if not annotation.SetPosition2(*label_xyz):
+        raise RuntimeError("failed to position hub detail label")
+    draw.EditRebuild3()
+    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
+    if math.dist(actual, label_xyz) > 1e-8:
+        raise RuntimeError(f"hub detail label position did not persist: {actual}")
+    return detail
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -142,7 +221,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
         ),
     )
-    drawing_model, sheet = new_project_drawing(
+    drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
@@ -152,155 +231,54 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Pinion Engage Lever Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "pinion engage lever; clamp hub; tapered grip rod",
+            3: "pinion engage lever; pinned hub; tapered grip rod",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
+    side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=(1, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    set_hidden_lines_removed(adapter, iso)
-    set_hidden_lines_visible(adapter, front)
-    hub_center = (FRONT_CENTER[0], _front_y(0.0))
-    side = place_view(adapter, str(SOURCE), "*Right", *SECTION_CENTER, scale=(1, 1))
-    set_hidden_lines_visible(adapter, side)
+    # Rule 7: the pin hole shows true in the side view and its detail, and the
+    # blind bore's depth and wall are dimensioned there to its visible end
+    # faces -- no feature needs a hidden line.
+    for view in (front, side, top, iso):
+        set_hidden_lines_removed(adapter, view)
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
-    right_annotations = curate_view_dimensions(
-        adapter, side, keep=RIGHT_KEEP, view_label="side"
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="lever front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     top_annotations = curate_view_dimensions(
-        adapter, top, keep=TOP_KEEP, view_label="top"
-    )
-    set_dimension_callouts(
         adapter,
-        [*front_annotations, *right_annotations, *top_annotations],
-        DIMENSION_CALLOUTS,
+        top,
+        keep=TOP_KEEP,
+        view_label="lever top",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    detail = _hub_detail(adapter, side)
+    set_hidden_lines_removed(adapter, detail)
+    detail_annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="hub detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    annotations = [*front_annotations, *top_annotations, *detail_annotations]
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
-    bore_edge = visible_circle_edge(adapter, front, BORE)
+    if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center mark to the pin hole")
 
-    hub_right = (hub_center[0] + HUB_R_SHEET, hub_center[1])
-    flat_face = model_point_in_view(
-        adapter,
-        side,
-        (0.0, HUB_OD / 2000.0, HUB_LEN / 2000.0),
-        label="lever flat end face",
-    )
-    grip_edge = (_front_x(ROD_ROOT_DIA / 2.0), _front_y(12.0))
-    add_native_axis_datum(
-        adapter,
-        front,
-        entity=bore_edge,
-        source_path=SOURCE,
-        radius_m=BORE / 2000.0,
-        datum="A",
-        label="lever final bore axis",
-        stability_tolerance_m=2e-5,
-    )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_entity=bore_edge,
-        symbol_xy=(0.155, 0.115),
-        control=surface_finish_by_key(SURFACE_FINISHES, "hub_bore"),
-        label="lever hub bore finish",
-    )
-    add_datum_feature(
-        adapter,
-        side,
-        edge_xy=flat_face,
-        symbol_xy=(flat_face[0] - 0.025, flat_face[1]),
-        datum="B",
-        label="lever flat end face",
-        entity_type="SILHOUETTE",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=hub_right,
-        frame_xy=(0.145, 0.120),
-        characteristic="circular_runout",
-        tolerance=GEOMETRIC_TOLERANCES_MM["lever hub OD runout"],
-        datums=("A",),
-        label="lever hub OD runout",
-    )
-    add_feature_control_frame(
-        adapter,
-        side,
-        edge_xy=flat_face,
-        frame_xy=(0.145, 0.165),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["lever flat-face perpendicularity"],
-        datums=("A",),
-        label="lever flat-face perpendicularity",
-        entity_type="SILHOUETTE",
-    )
-    add_view_centerline(
-        adapter,
-        front,
-        face_xy=grip_edge,
-        label="lever tapered grip axis",
-    )
-    add_attached_note(
-        adapter,
-        front,
-        text=(
-            "STRAIGHT CONICAL GRIP\n"
-            "TIP FACE FLAT WITHIN "
-            f"{GEOMETRIC_TOLERANCES_MM['grip tip face flatness']}\n"
-            "PERPENDICULAR TO GRIP AXIS\n"
-            f"WITHIN {GEOMETRIC_TOLERANCES_MM['grip tip face perpendicularity']}"
-        ),
-        entity_xy=grip_edge,
-        note_xy=(0.105, 0.235),
-        label="lever conical grip size",
-        entity_type="SILHOUETTE",
-    )
-    crown_axial = CAP_SAG / 2.0
-    crown_radial = math.sqrt(CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2)
-    crown_face = model_point_in_view(
-        adapter,
-        side,
-        (
-            0.0,
-            crown_radial / 1000.0,
-            -(HUB_LEN / 2.0 + crown_axial) / 1000.0,
-        ),
-        label="lever spherical crown face",
-    )
-    add_attached_note(
-        adapter,
-        side,
-        text=(
-            f"SPHERICAL CROWN\n{HUB_LEN:.2f} REF B TO CROWN ROOT PLANE\n"
-            f"({CAP_SAG:.2f}) REF AXIAL HEIGHT ROOT TO APEX"
-        ),
-        entity_xy=crown_face,
-        note_xy=(0.300, 0.240),
-        label="lever spherical crown definition",
-        entity_type="SILHOUETTE",
-    )
-    add_feature_control_frame(
-        adapter,
-        side,
-        edge_xy=crown_face,
-        frame_xy=(0.315, 0.205),
-        characteristic="circular_runout",
-        tolerance=GEOMETRIC_TOLERANCES_MM["lever crown profile"],
-        datums=("A",),
-        quantity="CROWN",
-        label="lever crown profile",
-        entity_type="SILHOUETTE",
-    )
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-    # The title block occupies the lower-right strip; keep this caption beside
-    # the narrow isometric instead of beneath it where the two texts collide.
-    add_property_linked_note(adapter, "Isometric View Note", 0.355, 0.115)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
+    # Top-left anchored under the relocated isometric (bottom y ~0.102).
+    add_property_linked_note(adapter, "Isometric View Note", 0.1545, 0.097)
 
     return await finalize_drawing(
         adapter,

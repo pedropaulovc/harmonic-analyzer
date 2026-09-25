@@ -10,6 +10,7 @@ import draw_pinion_pivot_block as drawing
 import build_pinion_pivot_block as block
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _fit_limits import REAM_SLIDE
 from _hole_spec import blind_cut_dia_mm
 
 
@@ -72,7 +73,10 @@ def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> 
     assert "MHA-062 TORQUE SHAFT" in notes
     assert "MHA-060 LIFT ROD" in notes
     assert "TURNS FREELY BY HAND" in notes
-    assert "1/4 IN" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
+    # R2 (converged-r7): REAM_SLIDE, one fit per shaft with MHA-056; the
+    # stock 1/4 in reamer wording went with the line-to-line band.
+    assert pinion_pivot_block_spec.BORE_DIA_BAND == REAM_SLIDE
+    assert "1/4 IN" not in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
     # General tolerances live in the title block ONLY -- a second general
     # tolerance in the notes would conflict with it.
     assert "LINEAR +/-" not in notes

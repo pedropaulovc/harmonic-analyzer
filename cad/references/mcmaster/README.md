@@ -19,8 +19,8 @@ recipes:
 | 90126A211 | `knife-hanger-washer` | Zinc-Plated Steel SAE Washer |
 | 90280A108 | `cone-tip-pinch-screw`, `foot-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A194 | `bracket-screw`, `frame-side-screw` | Steel Narrow Fillister Head Slotted Screw |
-| 90280A199 | `slotted-screw`, `swing-stop-screw` | Steel Narrow Fillister Head Slotted Screw |
-| 90280A201 | `clamp-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A199 | `swing-stop-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A201 | `clamp-screw`, `slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 91247A720 | `knife-hanger-stud` | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91410A538 | `gooseneck-set-screw` | Steel Square-Head Cup-Point Set Screw |

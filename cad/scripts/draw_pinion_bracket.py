@@ -30,6 +30,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -50,7 +51,6 @@ from _drawing_common import (
     rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     set_reference_dimension,
     stamp_drawing_summary,
 )
@@ -136,11 +136,15 @@ LEFT_KEEP = {
     "Depth": (0.080, 0.212),
     "PinSeatCy": (0.130, 0.125),
     # r6 eye-pass: beside the view its widest callout line ran across the
-    # flank; above the view the leader crosses only the outline.
-    "PinSeatDia": (0.050, 0.245),
+    # flank.  Converged-r7: above the view the leader crossed the 9.0 thickness
+    # dimension, so the callout sits below-right and its leader rises past the
+    # text's left end to the seat, crossing only the bottom outline.
+    "PinSeatDia": (0.125, 0.082),
 }
 SECTION_CENTER = (0.350, 0.115)
-SECTION_KEEP = {"PinSeatDepth": (SECTION_CENTER[0], 0.145)}
+# Right of the seat's witness lines (x <= 0.3394), callout below the value:
+# the above-lane callout never rendered and left a bare 66 mm dimension line.
+SECTION_KEEP = {"PinSeatDepth": (0.361, 0.160)}
 # The flank's top and bottom edges are the strap's two extreme lines. Put the
 # overall on its clear right, between the third-angle left and front views.
 OVERALL_XY = (0.112, 0.168)
@@ -148,7 +152,13 @@ OVERALL_XY = (0.112, 0.168)
 ARBOR_FINISH_EDGE = (_front_x(-ARBOR_BORE / 2.0), _front_y(C2C))
 ARBOR_FINISH_XY = (0.155, 0.205)
 PIVOT_FINISH_EDGE = (_front_x(-PIVOT_BORE / 2.0), _front_y(0.0))
-PIVOT_FINISH_XY = (0.155, 0.095)
+# Low and far left, with the leader to the bore's lower-left quadrant: a
+# shallow rise keeps it under the symbol's own Ra text and the B label.
+PIVOT_FINISH_XY = (0.136, 0.106)
+PIVOT_FINISH_LEADER = (
+    _front_x(-PIVOT_BORE / 2.0 * math.cos(math.radians(45.0))),
+    _front_y(-PIVOT_BORE / 2.0 * math.sin(math.radians(45.0))),
+)
 # A callout says only what a dimension cannot: how the feature is made, where
 # it stops, and -- for the one dimension held finer than the general grade --
 # why it is held there.  Naming both follower-seat annotations ties the native
@@ -217,7 +227,6 @@ def _seat_depth_dimension(adapter: Any, section: Any) -> Any:
         adapter,
         [annotation],
         {"PinSeatDepth": PIN_SEAT_DEPTH_CALLOUT},
-        location="above",
     )
     return annotation
 
@@ -279,9 +288,11 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=(3.0, 1.0),
         label="follower seat depth section",
     )
-    for view in (front, left):
-        set_hidden_lines_visible(adapter, view)
-    for view in (iso, seat_section):
+    # Policy rule 7: every view is hidden-lines-removed.  The two reamed
+    # through-bores are fully defined by their callouts and the blind seat by
+    # its callout plus Section B-B, so no dashed line carries information here
+    # (converged-r7 Fable delta, reviewfirst).
+    for view in (front, left, iso, seat_section):
         set_hidden_lines_removed(adapter, view)
 
     front_annotations = curate_view_dimensions(
@@ -316,6 +327,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=PIVOT_FINISH_EDGE,
         symbol_xy=PIVOT_FINISH_XY,
+        leader_attach_xy=PIVOT_FINISH_LEADER,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
         char_height=0.0025,

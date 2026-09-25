@@ -360,9 +360,12 @@ _FORMER_BLOCK_SCREW_XZ = (
 BLOCK_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_BLOCK_SCREW_XZ
 )
-# Stock 25.4-mm slotted screws penetrate 4.9 mm below each 20.5-mm block (U28).
-BLOCK_SCREW_HOLE_DEPTH = 6.9  # 4.9 engagement + 2.0 reserve (18.75-block depth kept)
-BLOCK_SCREW_DRILL_DEPTH = 10.0
+# Rule 12 (audit E10): stock 31.75-mm (#8-32 x 1-1/4) slotted screws penetrate
+# 11.25 mm below each 20.5-mm block -- 10.74 = 2.58D at the BlockHeight .XX
+# band.  The full-thread depth keeps the screw off the bottom at the worst
+# case (12.75 - 0.8 .X depth band >= 11.25 + 0.51 block band, 0.19 spare).
+BLOCK_SCREW_HOLE_DEPTH = 12.75
+BLOCK_SCREW_DRILL_DEPTH = 15.0
 # Bottoming tap: 3.1 mm runout exceeds two #8-32 pitches (1.5875 mm).
 _FORMER_FOOT_SCREW_XZ = (
     (16.87259321646788, 70.95),  # spring foot follows the shifted 32T swing rig

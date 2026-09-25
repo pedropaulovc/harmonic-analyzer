@@ -1,6 +1,7 @@
 pinion-spring:
+  title: Pinion Return Leaf Spring
   number: MHA-114
-  material: CDA 260 brass sheet, half-hard; 0.8 mm (0.032 in) thick
+  material: CDA 260 half-hard, 0.8 mm
   material_specification: CDA 260 brass sheet, half-hard; 0.8 mm (0.032 in) thick
   finish: degreased after forming; bare brass, no coating
   quantity: 1

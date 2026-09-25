@@ -87,10 +87,13 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     # x follows the drum's parked station: U28 (2026-09-23) parks it with a
     # 2.2425 tip gap to the review-first 32T drum's 8.667 tip radius.
     expected_axis = (-18.383940352466745, 90.518, -138.41241221957347)
+    # Rule 12 (audit W6): the head grows 9.0 -> 10.5 about the released
+    # centre, so both faces and the crown move 0.75 out; the neck shoulder
+    # (the released head rear + 2 wall + 10) stays put.
     released_head_stations = (
-        released_origin[2] - 9.0 / 2.0,
-        released_origin[2] + 9.0 / 2.0,
-        released_origin[2] - (9.0 / 2.0 + 3.0),
+        released_origin[2] - 10.5 / 2.0,
+        released_origin[2] + 10.5 / 2.0,
+        released_origin[2] - (10.5 / 2.0 + 3.0),
         released_origin[2] + 9.0 / 2.0 + 2.0 + 10.0,
     )
     integral_head_stations = (
@@ -104,9 +107,9 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     )
     assert integral_head_stations == pytest.approx(
         (
-            -142.91241221957347,
-            -133.91241221957347,
-            -145.91241221957347,
+            -143.66241221957347,
+            -133.16241221957347,
+            -146.66241221957347,
             -121.91241221957347,
         ),
         abs=1e-12,
