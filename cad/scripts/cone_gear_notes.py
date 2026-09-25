@@ -64,16 +64,16 @@ def gear_data(teeth: int) -> str:
 
 
 # The user approved either a metallurgical joint or a retaining-compound joint
-# for every cone gear.  State the required bonded interface first, then list
-# the accepted joint systems without turning one process into the part's
-# definition.  There is no key, pin, set screw, or hub in the evidence or model.
-ATTACHMENT_PROCESS = "SOLDER OR SILVER-BRAZE"
-ATTACHMENT_ALTERNATIVE = "LOCTITE 638 OR LOCTITE 648"
+# for every cone gear.  One line states the plain bonded bore and the accepted
+# joint systems without turning one process into the part's definition.  There
+# is no key, pin, set screw, or hub in the evidence or model.
+ATTACHMENT = "SOLDER, SILVER-BRAZE OR LOCTITE 638/648"
 SHAFT_MATE_NUMBER = "MHA-014"
 
 # Named rule-12 exceptions (user rulings U42 and U40, 2026-09-23), each
 # printed only on the sheets it covers: the blind review reads every other
-# sheet without it.
+# sheet without it.  Rule 6 caps the notes at four lines, so T006, which
+# carries both, states them on one line.
 CONTACT_RATIO_EXCEPTION = (
     f"CONTACT RATIO BELOW 1.1 ON T{spec.CONTACT_RATIO_EXCEPTION_TEETH[0]:03d}"
     f"-T{spec.CONTACT_RATIO_EXCEPTION_TEETH[-1]:03d}: "
@@ -84,16 +84,24 @@ CONTACT_RATIO_EXCEPTION = (
 def web_exception(teeth: int) -> str:
     """Return the sheet line naming one gear's accepted thin web."""
     return (
-        f"ROOT-TO-BORE WEB {spec.WEB_EXCEPTIONS_MM[teeth]:.2f} MIN, BELOW 1.5: "
+        f"ROOT-TO-BORE WEB {spec.WEB_EXCEPTIONS_MM[teeth]:.2f} MIN: "
         "ACCEPTED EXCEPTION (BOOK FIDELITY)."
+    )
+
+
+def both_exceptions(teeth: int) -> str:
+    """Return the one sheet line naming a gear's thin web and low CR."""
+    return (
+        "CONTACT RATIO BELOW 1.1, "
+        f"ROOT-TO-BORE WEB {spec.WEB_EXCEPTIONS_MM[teeth]:.2f} MIN: "
+        "ACCEPTED EXCEPTIONS (BOOK FIDELITY)."
     )
 
 
 _COMMON_NOTES = (
     "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
     "MAKE ONE GEAR FROM EACH SHEET IN THIS PACKAGE.",
-    f"PLAIN BORE, NO KEYWAY; BOND TO {SHAFT_MATE_NUMBER} SHAFT SEAT AT ASSEMBLY.",
-    f"ACCEPTABLE BONDS: {ATTACHMENT_PROCESS}, OR {ATTACHMENT_ALTERNATIVE}.",
+    f"PLAIN BORE, NO KEYWAY; {ATTACHMENT} TO {SHAFT_MATE_NUMBER} AT ASSEMBLY.",
 )
 
 
@@ -102,8 +110,11 @@ def drawing_notes(teeth: int) -> str:
     if teeth not in spec.CONFIGURATION_TEETH:
         raise ValueError(f"unsupported cone-gear tooth count {teeth}")
     lines = list(_COMMON_NOTES)
-    if teeth in spec.CONTACT_RATIO_EXCEPTION_TEETH:
-        lines.append(CONTACT_RATIO_EXCEPTION)
-    if teeth in spec.WEB_EXCEPTIONS_MM:
+    low_contact_ratio = teeth in spec.CONTACT_RATIO_EXCEPTION_TEETH
+    if low_contact_ratio and teeth in spec.WEB_EXCEPTIONS_MM:
+        lines.append(both_exceptions(teeth))
+    elif teeth in spec.WEB_EXCEPTIONS_MM:
         lines.append(web_exception(teeth))
+    elif low_contact_ratio:
+        lines.append(CONTACT_RATIO_EXCEPTION)
     return "\n".join(lines)
