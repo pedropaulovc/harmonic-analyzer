@@ -17,11 +17,14 @@ import pytest
 import _config
 import build_crank_drive_gear as part
 import cone_gear_shaft_spec
+import cone_shaft_land_bands
+import retained_joint_fit
 import crank_drive_gear_notes as notes
 import crank_drive_gear_spec as spec
 import crank_pinion_spec as pinion_spec
 import draw_crank_drive_gear as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
+from _fit_limits import deviations
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -116,13 +119,13 @@ def test_the_bore_is_the_only_feature_that_earns_a_band() -> None:
 
 
 def test_bore_band_is_derived_from_its_fit_class_not_written_by_hand() -> None:
-    # A slip fit exists only if the size limits on BOTH mating features are
-    # narrower than the clearance band they claim, so the bore's limits are
-    # computed from the named fit class and the shaft land's own published
-    # limits. Move either input and the bore must move with it -- that is what
-    # this pins, not the literal pair of numbers.
-    low, high = _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
-    land_upper, land_lower = cone_gear_shaft_spec.SECTION_DIA_BAND
+    # A bonded joint needs a real gap on BOTH mating limits, so the bore's
+    # limits are computed from the shared retained-joint fit class and the
+    # shaft land's own published limits. Move either input and the bore must
+    # move with it -- that is what this pins, not the literal pair of numbers.
+    low, high = retained_joint_fit.RETAINED_JOINT_CLEARANCE
+    land_upper, land_lower = cone_gear_shaft_spec.SECTION_DIA_BANDS[1]
+    assert (land_upper, land_lower) == cone_shaft_land_bands.GEAR_SEAT_BAND
     assert spec.BORE_DIA == pytest.approx(cone_gear_shaft_spec.SECTION_DIAS[1])
     assert part.BORE_DIA_BAND == (
         pytest.approx(land_lower + high),
@@ -163,8 +166,42 @@ def test_outside_diameter_stays_at_the_general_grade() -> None:
 
 def test_bore_callout_states_the_process_and_how_far_it_goes() -> None:
     # Rule 7: the Ø and its limits come from the dimension; the callout adds
-    # only the two facts the number cannot carry.
-    assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "REAM THRU"}
+    # the process and extent, then the bond gap as a reference (crank hub
+    # precedent), computed from the printed limits.
+    assert drawing.DIMENSION_CALLOUTS == {
+        "BoreDia": "REAM THRU\n(0.025-0.105 DIAMETRAL\nGAP ON MHA-014)"
+    }
+
+
+def test_bond_gap_is_a_reamable_band_inside_the_loctite_648_fill_limit() -> None:
+    # Main ruling 2026-09-25 (64T): the shaft_in_bushing running fit on the
+    # 0.05-wide gear-seat land left a ZERO-width bore band (+0.025/+0.025).
+    upper, lower = part.BORE_DIA_BAND
+    assert (upper, lower) == (pytest.approx(0.055), pytest.approx(0.025))
+    assert spec.BORE_DIA + lower == pytest.approx(9.550)
+    assert spec.BORE_DIA + upper == pytest.approx(9.580)
+    assert upper - lower >= 0.02
+    gap_min, gap_max = part.BORE_DIAMETRAL_GAP
+    assert (gap_min, gap_max) == (pytest.approx(0.025), pytest.approx(0.105))
+    assert gap_max <= part.LOCTITE_648_GAP_FILL_MAX - 0.02
+    # A +0.001 in oversize 3/8 reamer (9.5504) cuts inside the band.
+    assert spec.BORE_DIA + lower <= (0.375 + 0.001) * 25.4 <= spec.BORE_DIA + upper
+
+
+def test_bore_band_survives_the_model_setter_and_every_limit_pair_bonds() -> None:
+    # warm-c486 (farm, 2026-09-25) died in part:crank_drive_gear on
+    # deviations((0.025, 0.025)): "fit band is inverted".  The build hands the
+    # band to the model through deviations(), so an offline call must pass,
+    # and the worst-case pairs of printed limits -- smallest bore on largest
+    # land, largest bore on smallest land -- must stay inside the ruled
+    # retained-joint window.
+    bore_lower, bore_upper = deviations(part.BORE_DIA_BAND)
+    assert bore_upper - bore_lower >= 0.02
+    land_upper, land_lower = cone_shaft_land_bands.GEAR_SEAT_BAND
+    tightest = bore_lower - land_upper
+    loosest = bore_upper - land_lower
+    low, high = retained_joint_fit.RETAINED_JOINT_CLEARANCE
+    assert low - 1e-9 <= tightest <= loosest <= high + 1e-9
 
 
 def test_print_carries_no_gdt_or_basic_dimensions() -> None:

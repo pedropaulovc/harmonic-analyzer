@@ -506,17 +506,22 @@ for k, (sx, sz) in enumerate(d._BLOCK_SCREW_XZ):
         IDENTITY,
         f"slotted-screw {k}",
     )
-for k, ((sx, sz), seat_y) in enumerate(
-    zip(
-        d._FOOT_SCREW_XZ,
-        (
-            d.Y_BASE_TOP + d.SPRING_T,
-            d.Y_BASE_TOP + d.ARBOR_PED_FLANGE_T,
-            d.Y_BASE_TOP + d.ARBOR_PED_FLANGE_T,
-        ),
+for k, (sx, sz) in enumerate(d._FOOT_SCREW_XZ):
+    expect(
+        DT,
+        f"foot-screw-{k + 1}",
+        [sx, d.Y_BASE_TOP + d.SPRING_T, sz],
+        IDENTITY,
+        f"foot-screw {k}",
     )
-):
-    expect(DT, f"foot-screw-{k + 1}", [sx, seat_y, sz], IDENTITY, f"foot-screw {k}")
+for k, (sx, sz) in enumerate(d._PEDESTAL_SCREW_XZ):
+    expect(
+        DT,
+        f"pedestal-hold-down-screw-{k + 1}",
+        [sx, d.Y_BASE_TOP + d.ARBOR_PED_FLANGE_T, sz],
+        IDENTITY,
+        f"pedestal-hold-down-screw {k}",
+    )
 expect(
     DT,
     "cone-gear-shaft-1",
@@ -534,7 +539,7 @@ def on_shaft(station, face):
 expect(
     DT,
     "crank-drive-gear-1",
-    on_shaft(d.GEAR64_STATION, d.GEAR64_FACE),
+    on_shaft(d.GEAR64_STATION + d.GEAR_AXIS_SHIFT, d.GEAR64_FACE),
     d.ROT_Y_INCLINE,
     "crank-drive-gear 64T",
 )
@@ -542,7 +547,14 @@ for j in range(20):
     expect(
         DT,
         f"cone-gear-{j + 1}",
-        on_shaft(d.SHAFT_T120_STATION + j * d.SEAT_PITCH, d.CONE_FACE),
+        # BDT: seed at the shifted T120 station, narrowed from the south face.
+        on_shaft(
+            d.SHAFT_T120_STATION
+            + d.GEAR_AXIS_SHIFT
+            + (d.CONE_FACE_STATION_REFERENCE - d.CONE_FACE) / 2.0
+            + j * d.SEAT_PITCH,
+            d.CONE_FACE,
+        ),
         d.ROT_Y_INCLINE,
         f"cone-gear j={j}",
     )

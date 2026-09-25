@@ -86,9 +86,13 @@ BORE_DIA_BAND = (  # (upper, lower) deviations
     round(_SHAFT_UPPER + _CLEARANCE_MIN, 3),
 )
 
-FACE_WIDTH = 10.8  # spans the 64T row north of the v2 crank boss
+FACE_WIDTH = 10.4  # spans the 64T row north of the v2 crank boss
 # (build_crank_pinion drives the blank from this; build_drive_train_assembly's
-# PINION_FACE asserts equality.)
+# PINION_FACE asserts equality.)  It was 10.8 until the deepened cone mesh
+# (#834, U38) grew the T120 tip: its inclined rim then reached the toothed
+# north end (-0.26 against the 0.25 axial clearance).  Main ruled option A
+# (2026-09-23): shorten the teeth from the north.  The south face, the
+# overall length and the boss's north end stay where they were.
 
 # --- Hub boss + retention pin (ch. 12 p. 19, page002_img02 / img06) ---------
 #
@@ -96,17 +100,18 @@ FACE_WIDTH = 10.8  # spans the 64T row north of the v2 crank boss
 # length: the photo reads it at the tooth roots, and the root circle is the
 # largest diameter that can never meet the 64T's tips (they clear it by the
 # tooth system's own tip clearance plus the mesh's centre-distance slack,
-# exactly as they clear the gap floors). It runs 0.6 face widths -- the photo's
-# "a little over half" -- which covers the crankshaft's outboard overhang past
-# the pinion's north face and leaves its end recessed inside the boss as
-# photographed (build_drive_train_assembly asserts the recess). The boss is
+# exactly as they clear the gap floors). It runs from the toothed length to the
+# 17.28 overall length, 0.66 face widths -- the photo's "a little over half" --
+# which covers the crankshaft's outboard overhang past the pinion's north face
+# and leaves its end recessed inside the boss as photographed
+# (build_drive_train_assembly asserts the recess). The boss is
 # extruded from the SAME faced end as the teeth, so the print carries one
 # overall length from that end (rule 7: lengths from one faced end, the overall
 # length real and conspicuous), and the toothed length is FaceWidth.
 ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN  # 13.51
 BOSS_DIA = ROOT_DIA
-BOSS_LENGTH = 0.6 * FACE_WIDTH  # 6.48
-OVERALL_LENGTH = FACE_WIDTH + BOSS_LENGTH  # 17.28
+OVERALL_LENGTH = 17.28  # the 10.8 face + its 0.6-face boss, kept at option A
+BOSS_LENGTH = OVERALL_LENGTH - FACE_WIDTH  # 6.88
 # The outer edge is rounded in the photo; a sized 45-degree break is the lathe
 # operation that reads the same and rule 7 prefers a chamfer to a radius.
 BOSS_CHAMFER = 1.0
@@ -125,7 +130,7 @@ BOSS_CHAMFER = 1.0
 PIN_HOLE_SPEC = HoleSpec("drilled_fractional", "1/8")
 PIN_DIA = FRACTIONAL_DRILL_MM["1/8"]  # 3.175
 PIN_LENGTH = BOSS_DIA  # flush both sides
-PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0  # 14.04 from the toothed (south) face
+PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0  # 13.84 from the toothed (south) face
 PIN_CLOCKING_DEG = 13.703608450714796  # = build_drive_train_assembly.PINION_SEED_DEG
 if PIN_STATION - PIN_DIA / 2.0 < FACE_WIDTH + 0.5:
     raise AssertionError("retention pin hole breaks into the pinion's tooth face")

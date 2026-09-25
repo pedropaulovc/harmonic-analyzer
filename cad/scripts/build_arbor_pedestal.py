@@ -37,13 +37,17 @@ import sys
 
 from _common import (
     SketchDims,
+    _early_bound,
+    _read_member,
     add_line_chain,
     anchor_point_to_origin,
+    blank_sketch,
     apply_color,
     apply_material,
     check,
     define_circle,
     define_rectilinear_chain,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
@@ -76,6 +80,7 @@ from arbor_pedestal_spec import (
     FOOT_HEIGHT,
     FOOT_NEAR_Z,
     FOOT_WIDTH,
+    REFERENCE_SKETCHES,
     SCREW_HOLE_DIA,
     SCREW_HOLE_SPEC,
     SCREW_Z,
@@ -88,6 +93,7 @@ from arbor_pedestal_spec import (
     TOP_RADIUS,
 )
 from _holes import DIAMETER_TOLERANCE_MM, wizard_holes
+import _telemetry
 
 PART_NAME = "arbor-pedestal"
 MATERIAL = "Plain Carbon Steel"  # photo-likely steel; gray iron remains permitted
@@ -104,6 +110,128 @@ CAD_APPEARANCE = (0.28, 0.28, 0.30)  # neutral charcoal keeps drawing edges legi
 # SCREW_Z (spec): hole centre on the ledge, local z -11.
 
 BORE_RADIUS = BORE_DIA / 2.0
+
+# The four drawing-reference lines (arbor_pedestal_spec.REFERENCE_SKETCHES):
+# (sketch, plane, dimension, start, end, orientation, value, drives). Points
+# are sketch coordinates -- the Top plane's sketch y is machine -Z, the Front
+# plane's is machine +Y. Every line lies on the part outline, so the view
+# that shows its sketch prints no extra line, and each starts on a FEATURE
+# (policy rule 7): the far face / strap root for the depths, the west side
+# face for the lateral locations. ``drives`` binds, in creation order, the
+# value dimension and then the start point's origin anchors (two for a
+# general point, one for a point on a sketch axis) to the part's globals, so
+# a global edit moves the line with the geometry it restates.
+REFERENCE_LINES = (
+    (
+        "StrapDepthReference",
+        "Top",
+        "StrapDepth",
+        (FOOT_WIDTH / 2.0, -STRAP_ROOT_Z),
+        (FOOT_WIDTH / 2.0, -STRAP_INNER_Z),
+        "vertical",
+        STRAP_T,
+        ('"StrapThickness"', '"FootWidth" / 2', '"StrapThickness" - "StrapInnerZ"'),
+    ),
+    (
+        "HoldDownReference",
+        "Top",
+        "HoldDownLocation",
+        (-FOOT_WIDTH / 2.0, -STRAP_INNER_Z),
+        (-FOOT_WIDTH / 2.0, -SCREW_Z),
+        "vertical",
+        STRAP_INNER_Z - SCREW_Z,
+        ('"StrapInnerZ" + "ScrewZ"', '"FootWidth" / 2', '"StrapInnerZ"'),
+    ),
+    (
+        "HoleLateralReference",
+        "Top",
+        "HoleLateral",
+        (-FOOT_WIDTH / 2.0, -FOOT_NEAR_Z),
+        (0.0, -FOOT_NEAR_Z),
+        "horizontal",
+        FOOT_WIDTH / 2.0,
+        ('"FootWidth" / 2', '"FootWidth" / 2', '"FootDepth" - "StrapInnerZ"'),
+    ),
+    (
+        "BoreLateralReference",
+        "Front",
+        "BoreLateral",
+        (-FOOT_WIDTH / 2.0, 0.0),
+        (0.0, 0.0),
+        "horizontal",
+        FOOT_WIDTH / 2.0,
+        ('"FootWidth" / 2', '"FootWidth" / 2'),
+    ),
+)
+if tuple(row[0] for row in REFERENCE_LINES) != REFERENCE_SKETCHES:
+    raise AssertionError("REFERENCE_LINES and REFERENCE_SKETCHES disagree")
+
+
+def _as_construction(adapter, entity_id: str) -> None:
+    """Flag a registered sketch line as construction geometry.
+
+    ``ConstructionGeometry`` is declared on the base ISketchSegment, not the
+    derived ISketchLine the entity registry binds -- rebind before the set.
+    """
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+async def _reference_line(
+    adapter, sketch, plane, dimension, start, end, orientation, value, drives
+) -> list[tuple[str, str]]:
+    """One hidden-reference sketch: a construction line whose driving
+    dimension IS ``value``; returns its deferred drive jobs."""
+    check(f"create_sketch {sketch}", await adapter.create_sketch(plane))
+    # Direct-to-DB: the line lies on an outline station and runs along a
+    # sketch axis direction, so creation-time inference would snap in the
+    # relations added below and over-define the sketch.
+    set_sketch_direct_db(adapter, True)
+    line = check(f"{sketch} line", await adapter.add_line(*start, *end))
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, line)
+    check(
+        f"{sketch} {orientation}",
+        await adapter.add_sketch_constraint(line, None, orientation),
+    )
+    await dimension_between(
+        adapter, f"{line}.start", f"{line}.end", f"{orientation}_distance", value, sketch
+    )
+    await anchor_point_to_origin(adapter, f"{line}.start", *start, sketch)
+    await ensure_fully_defined(adapter, f"{sketch} sketch")
+    check(f"exit_sketch {sketch}", await adapter.exit_sketch())
+    name_last_feature(adapter, sketch)
+    names = [dimension, *(f"{dimension}Anchor{i}" for i in range(1, len(drives)))]
+    full = name_dimensions(adapter, sketch, names)
+    measured = float(
+        _early_bound(adapter.currentModel.Parameter(full[0]), "IDimension").SystemValue
+    ) * 1000.0
+    if abs(measured - value) > 1e-6:
+        raise RuntimeError(f"{full[0]} measures {measured:g} mm, expected {value:g} mm")
+    return list(zip(full, drives, strict=True))
+
+
+@_telemetry.traced("appearance.hide_reference_sketches")
+def _hide_reference_sketches(adapter) -> None:
+    """Blank the drawing-reference sketches and prove each one reads hidden."""
+    for name in REFERENCE_SKETCHES:
+        blank_sketch(adapter, name)
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    shown = {
+        name: visible
+        for name in REFERENCE_SKETCHES
+        # swVisibilityState_e: 1 hidden
+        if (visible := int(_read_member(part.FeatureByName(name), "Visible"))) != 1
+    }
+    if shown:
+        raise RuntimeError(f"reference sketches still visible after blanking: {shown}")
+    _telemetry.event(
+        "part.reference_sketches_hidden",
+        sketches=", ".join(REFERENCE_SKETCHES),
+        count=len(REFERENCE_SKETCHES),
+    )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -326,6 +454,9 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "screw hole", volume - v_hole, 0.02 * v_hole)
     v_final = volume
 
+    for row in REFERENCE_LINES:
+        drive_jobs += await _reference_line(adapter, *row)
+
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
     await force_rebuild(adapter)
@@ -335,6 +466,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven pedestal (equations neutral)", v_final, 0.01 * v_bore
     )
+    _hide_reference_sketches(adapter)
     # Decimal places are the tolerance statement, so the PART carries them
     # (policy rule 2); the drawing reads them back instead of rewriting them.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
