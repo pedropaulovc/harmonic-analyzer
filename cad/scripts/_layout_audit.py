@@ -36,11 +36,8 @@ against the leaf's own vector PDF; the constants say what they were set from.
 
 from __future__ import annotations
 
-import base64
-import json
 import math
 import re
-import zlib
 from dataclasses import dataclass, replace
 from enum import Enum
 from itertools import combinations
@@ -164,57 +161,6 @@ _MARK_KINDS = frozenset({"center-mark", "centerline", "cosmetic-thread"})
 # swAnnotationVisibilityState_e: 2 = half hidden, 3 = hidden.
 _HIDDEN_STATES = (2, 3)
 _OWNER_DRAWING_SHEET = 1
-
-
-# --------------------------------------------------------------------------
-# dump transport: one sheet dump per log record set, grep-able from task.log
-# --------------------------------------------------------------------------
-
-DUMP_PREFIX = "layout-audit-dump"
-FINDING_PREFIX = "layout-audit-finding"
-SUMMARY_PREFIX = "layout-audit-summary"
-# Farm leaves upload the console log; keep each record well under any
-# collector's per-record limit.
-_DUMP_CHUNK = 60_000
-
-
-def encode_dump_lines(stem: str, dump: Mapping[str, Any]) -> list[str]:
-    """``dump`` as grep-able, chunked log lines: prefix, stem, sheet, i/n, b64."""
-    payload = base64.b64encode(
-        zlib.compress(json.dumps(dump, separators=(",", ":")).encode("utf-8"), 9)
-    ).decode("ascii")
-    chunks = [
-        payload[index : index + _DUMP_CHUNK]
-        for index in range(0, len(payload), _DUMP_CHUNK)
-    ] or [""]
-    sheet = str(dump.get("sheet", "")).replace(" ", "_")
-    return [
-        f"{DUMP_PREFIX} {stem} {sheet} {index + 1}/{len(chunks)} {chunk}"
-        for index, chunk in enumerate(chunks)
-    ]
-
-
-def decode_dump_lines(lines: Iterable[str]) -> list[dict[str, Any]]:
-    """Every complete dump in ``lines`` (any text containing the log records)."""
-    parts: dict[tuple[str, str], dict[int, tuple[int, str]]] = {}
-    for line in lines:
-        at = line.find(DUMP_PREFIX + " ")
-        if at < 0:
-            continue
-        fields = line[at:].split()
-        if len(fields) < 5:
-            continue
-        _, stem, sheet, position, chunk = fields[:5]
-        index, _, total = position.partition("/")
-        parts.setdefault((stem, sheet), {})[int(index)] = (int(total), chunk)
-    dumps = []
-    for (_stem, _sheet), chunks in parts.items():
-        total = next(iter(chunks.values()))[0]
-        if sorted(chunks) != list(range(1, total + 1)):
-            continue
-        payload = "".join(chunks[index][1] for index in range(1, total + 1))
-        dumps.append(json.loads(zlib.decompress(base64.b64decode(payload))))
-    return dumps
 
 
 # --------------------------------------------------------------------------
@@ -795,7 +741,7 @@ class ViewInk:
 
     name: str
     segments: tuple[Segment, ...]
-    space: str  # "sheet" | "transformed" | "unresolved" | "none" | "omitted"
+    space: str  # "sheet" | "transformed" | "unresolved" | "none"
     inside_fraction: float
 
 
@@ -821,10 +767,6 @@ def view_ink(view: Mapping[str, Any]) -> ViewInk:
     guessed -- the calibration run fixes the answer from real data.
     """
     name = str(view.get("name", ""))
-    if view.get("polylines_omitted"):
-        # A logged replay copy whose polylines were too large to log; the leaf
-        # audited the full array in process.
-        return ViewInk(name, (), "omitted", 0.0)
     outline_values = _floats(view.get("outline"))
     raw = view.get("polylines") or []
     segments = view_polyline_segments(raw)
@@ -1419,3 +1361,39 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
 
 def finding_record(stem: str, finding: Finding) -> dict[str, Any]:
     return {"stem": stem, "severity": severity(finding).value, **finding.to_dict()}
+
+
+REPORT_SCHEMA = 1
+
+
+def audit_report(
+    stem: str, mode: LayoutAuditMode, dumps: Sequence[Mapping[str, Any]]
+) -> tuple[dict[str, Any], list[Finding]]:
+    """One drawing's layout report and its gating findings.
+
+    The report is the drawing task's cached ``layout-audit/<stem>.json``: the
+    summary, every finding, and every sheet dump, so a leaf restored from the
+    remote cache replays exactly what the building seat saw.
+    """
+    records = []
+    gating = []
+    counts: dict[str, int] = {}
+    for dump in dumps:
+        for finding in audit_dump(dump):
+            records.append(finding_record(stem, finding))
+            counts[finding.kind] = counts.get(finding.kind, 0) + 1
+            if severity(finding) is FindingSeverity.GATING:
+                gating.append(finding)
+    report = {
+        "schema": REPORT_SCHEMA,
+        "stem": stem,
+        "mode": mode.value,
+        "summary": {
+            "sheets": len(dumps),
+            "findings": dict(sorted(counts.items())),
+            "gating": len(gating),
+        },
+        "findings": records,
+        "sheets": [dict(dump) for dump in dumps],
+    }
+    return report, gating

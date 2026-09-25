@@ -1416,6 +1416,8 @@ def _drawing_registry_reads(text: str) -> frozenset[str] | None:
         "DrawingSpec",
         "DRAWING_TEMPLATES",
         "DRAWINGS_BY_NAME",
+        # Row-independent: a path from the artefact stem the caller already has.
+        "layout_report_path",
     }
     for node in nodes:
         if (
