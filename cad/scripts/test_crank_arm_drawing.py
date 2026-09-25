@@ -31,9 +31,14 @@ def test_arm_is_a_matched_receiver_for_the_separate_hub() -> None:
     assert spec.HUB_SEAT_DIA == geometry.HUB_SEAT_DIA == 19.5
     assert spec.HALF_WIDTH == pytest.approx(12.7)
     assert "1 x 5/16 IN CF FLAT BAR AS SUPPLIED" in spec.DRAWING_NOTES
-    # The arm bore is made first and keeps its band; the hub is fitted to it.
-    assert notes.HUB_SEAT_CALLOUT.startswith("MHA-137 HUB IS MATCH-FIT")
-    assert "TO THIS BORE" in notes.HUB_SEAT_CALLOUT
+    # The arm bore is made first; the hub is turned to suit it (B1, Main
+    # 2026-09-25: the fit is printed functionally, not as "match-fit").
+    assert notes.HUB_SEAT_CALLOUT.splitlines() == [
+        "MHA-137 HUB IS A LIGHT",
+        "PRESS FIT IN THIS BORE;",
+        "FACES FLUSH",
+    ]
+    assert "MATCH" not in notes.HUB_SEAT_CALLOUT
     assert "FACES FLUSH" in notes.HUB_SEAT_CALLOUT
     assert not hasattr(spec, "SHAFT_BORE_DIA")
     assert not hasattr(spec, "PIN_HOLE_SPEC")
@@ -241,7 +246,7 @@ def test_hub_seat_is_a_reference_nominal_under_its_match_fit_note() -> None:
         'set_reference_dimension(adapter, hub_seat, label="hub seat nominal", diameter=True)'
         in source
     )
-    assert "MATCH-FIT" in notes.HUB_SEAT_CALLOUT
+    assert "LIGHT" in notes.HUB_SEAT_CALLOUT and "PRESS FIT" in notes.HUB_SEAT_CALLOUT
 
 
 def test_no_front_dimension_text_sits_on_the_arm() -> None:

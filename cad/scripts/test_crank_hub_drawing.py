@@ -62,6 +62,18 @@ def test_named_shaft_fit_class_bounds_the_through_bore() -> None:
     )
 
 
+def test_seat_press_sits_inside_the_iso_locational_interference_fit() -> None:
+    # ISO 286-2, 18-30 mm: H7 hole 0/+0.021; p6 shaft +0.022/+0.035.
+    assert 18.0 < geometry.HUB_SEAT_DIA <= 30.0
+    h7_upper, p6_lower, p6_upper = 0.021, 0.022, 0.035
+    iso = (p6_lower - h7_upper, p6_upper)  # 0.001-0.035 diametral
+    low, high = crank_hub_notes.SEAT_PRESS_INTERFERENCE
+    assert iso[0] < low < high <= iso[1]
+    # A real press at the loose end: the match-turned seat never goes
+    # line-to-line.
+    assert low >= 0.010
+
+
 def test_hub_shoulder_and_pin_stations_preserve_removal_topology() -> None:
     assert geometry.HUB_SEAT_LENGTH == geometry.ARM_THICKNESS
     assert geometry.HUB_SHOULDER_STATION < geometry.SERVICE_PIN_STATION
@@ -81,10 +93,19 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     # Policy rule 6: no general notes; each matched fit sits on its feature.
     assert not hasattr(crank_hub_spec, "DRAWING_NOTES")
     seat = crank_hub_notes.SEAT_CALLOUT
-    assert seat.startswith("MATCH-FIT TO MHA-020 ARM BORE")
-    assert "SHOULDER" in seat and "FACES FLUSH" in seat
-    # The arm bore is made first and carries the band; the hub seat is fitted
-    # to it, so its nominal prints as a reference.
+    # B1 (Main 2026-09-25): turned to suit the MHA-020 bore, with the press
+    # interference printed from the notes constant.
+    low, high = crank_hub_notes.SEAT_PRESS_INTERFERENCE
+    assert seat.splitlines() == [
+        "TURN TO SUIT MHA-020 BORE",
+        f"FOR LIGHT PRESS: {low:.3f}-{high:.3f}",
+        "DIAMETRAL INTERFERENCE",
+        "ARBOR-PRESS TO SHOULDER",
+        "FACES FLUSH",
+    ]
+    assert "MATCH-FIT" not in seat
+    # The arm bore is made first; the hub seat is turned to suit it, so its
+    # nominal prints as a reference.
     assert crank_hub_spec.REFERENCE_DIMENSIONS == {"SeatDia"}
     seam = crank_hub_notes.SEAM_CALLOUT
     assert "MHA-020" in seam and "MHA-138" in seam and "LIGHT DRIVE FIT" in seam
@@ -153,7 +174,9 @@ def test_callouts_stand_clear_of_views_and_each_other() -> None:
     # The cross-hole leader rises from the hole's top rim to the block's
     # right end; the seat callout must start right of that leader.
     assert hole_block[1] < drawing.SERVICE_PIN_TOP_RIM[0] < seat_block[0]
-    assert seat_y - 4 * 0.006 > drawing.BARREL_TOP
+    # The value line plus every callout line stays above the barrel.
+    seat_lines = 1 + len(crank_hub_notes.SEAT_CALLOUT.splitlines())
+    assert seat_y - seat_lines * 0.006 > drawing.BARREL_TOP
     assert hole_y - 5 * 0.006 > drawing.BARREL_TOP
     end_left = drawing.END_CENTER[0] - geometry.HUB_BARREL_DIA / 2.0 * drawing._S
     end_right = drawing.END_CENTER[0] + geometry.HUB_BARREL_DIA / 2.0 * drawing._S

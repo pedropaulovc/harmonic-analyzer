@@ -1,6 +1,7 @@
 r"""Create the curated machinist drawing for crank arm MHA-020.
 
-The arm is match-fitted to separate through hub MHA-137.  Its outboard face
+Separate through hub MHA-137 is a light press in the arm's seat bore, turned
+to suit it.  Its outboard face
 shows the simple punched alignment witness and the axial seam for MHA-138,
 match-drilled with the hub; the seam's callout gives its nominal size and
 depth.  The handle pivot is tapped for the MHA-139 shoulder screw.
@@ -237,8 +238,8 @@ def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
 def _hub_seat_leader_clear(adapter: Any, annotations: list[Any]) -> None:
     """Mark the hub seat reference and land it on its near rim, clear of R12.7.
 
-    The seat is match-fit to the MHA-137 hub, so the note under it governs
-    and its nominal prints as a reference, (Ø19.5), not a title-block
+    MHA-137 is turned to suit this bore for a light press, so the note under
+    it governs and the bore's nominal prints as a reference, (Ø19.5), not a title-block
     tolerance (2026-09-23 review).
     """
     hub_seat = _named(adapter, annotations, "HubSeatDia")
@@ -334,8 +335,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     imported_annotations = [*front_annotations, *right_annotations]
     set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
-    # The part authored every displayed decimal place.  The match-fit hub seat
-    # remains a one-place nominal because the assigned actual hub governs size.
+    # The part authored every displayed decimal place.  The hub seat bore
+    # remains a one-place reference nominal: MHA-137 is turned to suit it.
     assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
     _hub_seat_leader_clear(adapter, front_annotations)
     _texts_off_the_part(adapter, front_annotations)

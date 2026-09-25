@@ -112,7 +112,7 @@ BARREL_FACE_PICK = (INBOARD_X + 0.008, SIDE_CENTER[1] + 0.015)
 #   MHA-024 station from the arm shoulder (policy rule 12), stacked below the
 #   profile shortest-first; the parenthesised overall is the bottom row.
 # - Barrel diameter: left of the inboard end.  Seat diameter: between the
-#   profile and the end view, its value and matched-fit callout above.
+#   profile and the end view, its value and light-press callout above.
 # - Cross-hole callout: above the barrel, its leader rising almost straight
 #   from the hole's top rim, clear of the barrel diameter's extension lines.
 # - Bore callout: right of the end view, its leader entering the bore from the
