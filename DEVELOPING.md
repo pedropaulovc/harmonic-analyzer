@@ -363,7 +363,8 @@ drive. Auth is **keyless** via `DefaultAzureCredential`:
 The chain is trimmed to managed identity, `az` and the two environment-only
 members. `az` gets 60 s to answer instead of azure-identity's 10 s, and a failed
 token request is tried three times. A loaded farm submitter (run
-`20260925T134711810Z`) hit the 10 s limit on every try for eleven minutes.
+`20260925T134711810Z`) hit the limit on every try of two restores, eleven
+minutes apart.
 Override the timeout with `HARMONIC_CACHE_AUTH_TIMEOUT_S`. Each token request
 is a `cache.auth` span on the `build-infra` resource.
 

@@ -523,10 +523,10 @@ _BACKEND: _BlobBackend | None | _Unset = _UNSET
 # How long ``az account get-access-token`` may take. azure-identity's default is
 # 10 s, and on the farm submitter under ``-n 4`` that is no margin at all: the
 # first token of each doit worker took ~10 s (cache.probe spans, run
-# 20260925T134711810Z) and one worker's ``az`` then timed out for eleven minutes
-# ("AzureCliCredential: Failed to invoke the Azure CLI" is the SDK's timeout
-# branch). An idle dev box answers in 4-7 s. Override with
-# HARMONIC_CACHE_AUTH_TIMEOUT_S.
+# 20260925T134711810Z), and one worker's ``az`` then failed every try of two
+# restores eleven minutes apart ("AzureCliCredential: Failed to invoke the
+# Azure CLI" is the SDK's catch-all branch, where a timeout lands). amet
+# answered in 2-7 s at 96 % CPU. Override with HARMONIC_CACHE_AUTH_TIMEOUT_S.
 _AUTH_PROCESS_TIMEOUT_S = 60
 # How many times one token request is tried, and the pause before each retry.
 _AUTH_ATTEMPTS = 3
