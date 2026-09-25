@@ -1364,6 +1364,8 @@ def test_assemblies_depend_on_assembly_helpers():
     [
         ("_assembly_patterns", {"drive_train", "frame", "magnifier", "paper_drive"}),
         ("_assembly_couplings", {"drive_train", "paper_drive"}),
+        # paper_drive imports the drive-train builder for X_CRANK/Y_CRANK.
+        ("_drive_train_explode", {"drive_train", "paper_drive"}),
     ],
 )
 def test_specialized_assembly_helpers_have_exact_transitive_consumers(
