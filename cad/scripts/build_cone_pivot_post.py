@@ -366,7 +366,7 @@ async def build(adapter: Any) -> dict[str, str]:
     body_volume = math.pi * BLOCK_RADIUS**2 * BLOCK_HEIGHT
     await volume_check(adapter, "v2 main body", body_volume, 0.001 * body_volume)
 
-    # 2. Slightly larger O42.7506 head/collar over y=59.4..86.
+    # 2. As-cast HEAD_DIA collar (cone_pivot_post_spec) over HEAD_BASE_Y..BLOCK_HEIGHT.
     check(
         "create HeadBasePlane",
         await adapter.create_plane(
