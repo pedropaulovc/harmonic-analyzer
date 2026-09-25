@@ -88,7 +88,9 @@ SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 FRONT_CENTER = (0.110, 0.150)
 RIGHT_CENTER = (0.215, 0.150)
-ISO_CENTER = (0.345, 0.150)
+# At 0.345 the isometric's outline began under the boss diameter's text
+# (eye pass of f0c105531); ``_isometric_clears_boss_dia`` now holds it clear.
+ISO_CENTER = (0.360, 0.150)
 
 # Half the printed tooth-tip circle, in sheet metres: the face-view silhouette
 # radius and the section's half-height, which every dimension is placed clear
@@ -199,6 +201,11 @@ RIGHT_KEEP = {
     "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.026),
 }
 DIMENSION_TEXT_LINE_GAP = 0.0005
+# The boss diameter's text is centred on its dimension line; it read 13.1 mm
+# wide on the f0c105531 render. Its right edge plus a clearance bounds where
+# the isometric's outline may begin.
+BOSS_DIA_TEXT_HALF_WIDTH = 0.0075
+ISO_TEXT_CLEARANCE = 0.003
 
 DIMENSION_CALLOUTS = {
     # The native value/limits define the bore; this short feature callout adds
@@ -262,6 +269,23 @@ def _boss_dia_text_crossings(adapter: Any, annotations: Sequence[Any]) -> None:
             raise RuntimeError(f"BossDia text {texts} sits on its lines {crossings}")
         return
     raise RuntimeError("BossDia never reached the longitudinal section")
+
+
+def _isometric_clears_boss_dia(iso: Any) -> None:
+    """Fail when the isometric starts under the boss diameter's text or leaves the border."""
+    outline = tuple(float(value) for value in iso.GetOutline())
+    if len(outline) != 4:
+        raise RuntimeError(f"isometric has invalid bounds {outline}")
+    _telemetry.event("drawing.isometric_outline", outline=str(outline))
+    text_right = BOSS_DIA_TEXT_X + BOSS_DIA_TEXT_HALF_WIDTH + ISO_TEXT_CLEARANCE
+    if outline[0] < text_right:
+        raise RuntimeError(
+            f"isometric outline {outline} starts left of the boss diameter text's {text_right:.4f}"
+        )
+    if outline[2] > SHEET_INNER_BORDER[2]:
+        raise RuntimeError(
+            f"isometric outline {outline} left the inner border {SHEET_INNER_BORDER}"
+        )
 
 # The retention-pin cross-hole is cut in section at the boss mid-length. Keep
 # its matched-fit callout above-right of the section so its leader leaves the
@@ -345,6 +369,7 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
+    _isometric_clears_boss_dia(iso)
 
     front_annotations = curate_view_dimensions(
         adapter,

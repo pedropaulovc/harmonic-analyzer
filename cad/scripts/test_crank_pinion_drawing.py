@@ -237,6 +237,21 @@ def test_boss_dia_text_clears_its_extension_lines() -> None:
     assert "_boss_dia_text_crossings(adapter, right_annotations)" in _source()
 
 
+def test_isometric_clears_the_boss_dia_text() -> None:
+    # Eye pass of f0c105531: at ISO_CENTER x 0.345 the isometric's outline
+    # began at 0.3038, under the boss diameter's text (0.3014 +- 0.0066). The
+    # outline's measured offsets from its centre at 3:1 carry over to the new
+    # centre; the sheet-side check reads the real outline.
+    left_offset, right_offset = 0.3038 - 0.345, 0.3913 - 0.345
+    text_right = (
+        drawing.BOSS_DIA_TEXT_X + drawing.BOSS_DIA_TEXT_HALF_WIDTH + drawing.ISO_TEXT_CLEARANCE
+    )
+    assert 0.345 + left_offset < text_right
+    assert drawing.ISO_CENTER[0] + left_offset >= text_right
+    assert drawing.ISO_CENTER[0] + right_offset <= drawing.SHEET_INNER_BORDER[2]
+    assert "_isometric_clears_boss_dia(iso)" in _source()
+
+
 def test_the_bore_is_the_only_feature_that_earns_a_band() -> None:
     # cad/docs/tolerance-policy.md: a feature is toleranced tighter than its
     # title-block general grade only through the named chain. On this part
