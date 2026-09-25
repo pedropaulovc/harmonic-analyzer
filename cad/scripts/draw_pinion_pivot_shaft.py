@@ -77,7 +77,10 @@ ISO_CENTER = (0.355, 0.205)
 ISO_SCALE = (1, 2)
 
 FRONT_KEEP = {
-    "ShaftDia": (0.055, 0.167),
+    # Left of the end view, so the leader rises right from the underline and
+    # never crosses the stacked tolerance (Main eye pass on pc-ea2: under the
+    # view its leader ran back through "-0.02").
+    "ShaftDia": (0.030, 0.167),
 }
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),

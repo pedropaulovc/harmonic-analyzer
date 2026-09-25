@@ -44,7 +44,8 @@ import pinion_strap_pin_spec as _strap_pin
 # former per-part numbers (a +/-0.10 bore centre distance, +/-0.05 on the seat
 # axis and through-thickness station, +/-0.05 on the bar thickness and a
 # +0.10/0 seat depth) traced to no fit class and to no error-budget row: they
-# were habit, not specification, and are gone. ---
+# were habit, not specification, and are gone.  The one non-fit band that
+# survives is PIN_SEAT_STATION_BAND below, and it traces to a web. ---
 # Option E-a: the strap is pinned to the torque shaft, which turns with it in
 # the MHA-061 block bores.  The slide fit stays so the strap goes onto the
 # shaft for fit-up and the cross hole can be match-drilled through both.
@@ -57,34 +58,50 @@ PIN_SEAT_DIA_BAND = REAM_H7
 # Option E-a set-pin cross hole (pinion_strap_pin_spec).  Its location is a
 # functional requirement, not habit: the hole is match-drilled on into the
 # MHA-062 shaft, and every bit it runs off the bore axis comes straight off
-# the shaft wall beside it (SHAFT_LIGAMENT_WORST).  The print states it on the
-# hole's own callout -- ON the axis, CENTRED on the thickness -- the same form
-# as the follower seat's, with no dimension to hang a band on (rule 6).  Read
-# against the full .XX grade the shaft wall still clears the 1.5 floor.  The
-# diameter carries the spring pin's own functional band (pinion_strap_pin_spec).
+# the shaft wall beside it (SHAFT_LIGAMENT_WORST).  Codex #858 P2, user
+# ruling (a): both locations are model dimensions on the print, never prose.
+# Through the thickness the model's own CrossHoleCz (half the thickness from
+# broad face A) prints at .XX; its far-face web is STRAP_FACE_WEB_WORST.
+# Across the bar the hole sits ON the pivot-bore axis, a relation with no
+# dimension to print, so a hidden construction reference sketch
+# (CrossHoleAxisReference) owns its distance from the pivot-bore wall,
+# CrossHoleFromBoreWall = "PivotBore" / 2, printed at .XX: the
+# SHAFT_LIGAMENT_WORST case.  The diameter carries the spring pin's own
+# functional band (pinion_strap_pin_spec).
 CROSS_HOLE_DIA = _strap_pin.HOLE_DIA
 CROSS_HOLE_BAND = _strap_pin.HOLE_BAND
 CROSS_HOLE_CALLOUT = "\n".join(
     (
-        "THRU ON PIVOT-BORE AXIS",
-        "CENTRED ON THICKNESS",
+        "THRU",
         "SUPPLY 1/16 X 1/2 SLOTTED SPRING",
         "PIN (ASME B18.8.2) LOOSE",
     )
 )
 if "SUPPLY " + _strap_pin.PIN_SUPPLY + " LOOSE" != " ".join(
-    CROSS_HOLE_CALLOUT.splitlines()[2:]
+    CROSS_HOLE_CALLOUT.splitlines()[1:]
 ):
     raise AssertionError("cross-hole callout drifted from the pin spec")
 
-# Rule 12 (#842, U27; audit W23) worst-case web from the centred blind seat to
-# either broad face: half the thickness at its .X minus band, minus the seat's
-# upper-limit radius and the 0.05 drilled-hole allowance.  Printed from one
-# face at .XX it was 1.18; centred it clears the 2.0 target.
+# Rule 12 (#842, U27; audit W23) worst-case web from the blind seat to a broad
+# face.  Codex #858 P2, user ruling (a) (2026-09-25): the seat's station is
+# printed from broad face A as the model's own PinSeatCz, not as "CENTRED ON
+# THICKNESS" prose.  At the general .XX grade that web was 1.18, under the 1.5
+# floor, so the user approved tightening the station alone to +/-0.10: a
+# functional band that traces to this web, not habit.  The far face then sees
+# the thinnest bar (.X minus band) less the station at its upper limit, the
+# seat's upper-limit radius and the 0.05 drilled-hole allowance: 1.54, over
+# the 1.5 floor (the 2.0 target gives way to the printed location).  The near
+# face keeps PIN_SEAT_NEAR_WEB_WORST.
+PIN_SEAT_STATION_BAND = (0.10, -0.10)
+_PIN_SEAT_MAX = PIN_BORE + PIN_SEAT_DIA_BAND[0]
 PIN_SEAT_WEB_WORST = (
-    (THICKNESS - THICKNESS_BAND) / 2.0
-    - (PIN_BORE + PIN_SEAT_DIA_BAND[0]) / 2.0
+    (THICKNESS - THICKNESS_BAND)
+    - (THICKNESS / 2.0 + PIN_SEAT_STATION_BAND[0])
+    - _PIN_SEAT_MAX / 2.0
     - 0.05
+)
+PIN_SEAT_NEAR_WEB_WORST = (
+    THICKNESS / 2.0 + PIN_SEAT_STATION_BAND[1] - _PIN_SEAT_MAX / 2.0 - 0.05
 )
 if PIN_SEAT_WEB_WORST < 1.5:
     raise AssertionError(
@@ -104,15 +121,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "TopCapRadius",
     },
     "Strap": {"Depth"},
-    # Rule 12 (audit W23): the seat is printed CENTRED on the bar thickness
-    # (its callout says so) instead of located by a .XX station from one face,
-    # so only the .X thickness band reaches the web -- see PIN_SEAT_WEB_WORST.
-    "PinSeatProfile": {"PinSeatDia", "PinSeatCy"},
+    # Rule 12 (audit W23) and user ruling (a): the seat's station from broad
+    # face A prints as the model's own PinSeatCz at +/-0.10 -- see
+    # PIN_SEAT_WEB_WORST.
+    "PinSeatProfile": {"PinSeatDia", "PinSeatCy", "PinSeatCz"},
     "PinSeat": {"PinSeatDepth"},
-    # Option E-a: the set-pin cross hole, printed ON the pivot-bore axis and
-    # centred on the thickness by its callout (pinion_strap_pin_spec), so its
-    # diameter is the only marked dimension.
-    "CrossHoleProfile": {"CrossHoleDia"},
+    # Option E-a: the set-pin cross hole.  Its size and its station from
+    # broad face A (Codex #858 P2) ...
+    "CrossHoleProfile": {"CrossHoleDia", "CrossHoleCz"},
+    # ... and its height, from the pivot-bore wall (user ruling (a)).
+    "CrossHoleAxisReference": {"CrossHoleFromBoreWall"},
 }
 
 # Decimal places ARE the tolerance statement (drawing-simplicity policy rule
@@ -137,10 +155,13 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "TopCapRadius": 1,
     },
     "Strap": {"Depth": 1},
-    "PinSeatProfile": {"PinSeatDia": 2, "PinSeatCy": 3},
+    # Two places on PinSeatCz resolve its +/-0.10 band.
+    "PinSeatProfile": {"PinSeatDia": 2, "PinSeatCy": 3, "PinSeatCz": 2},
     "PinSeat": {"PinSeatDepth": 1},
-    # Two places resolve the spring pin's +0.06/0 hole band.
-    "CrossHoleProfile": {"CrossHoleDia": 2},
+    # Two places resolve the spring pin's +0.06/0 hole band; both locations
+    # are routine .XX (their worst cases clear the 1.5 floor at that grade).
+    "CrossHoleProfile": {"CrossHoleDia": 2, "CrossHoleCz": 2},
+    "CrossHoleAxisReference": {"CrossHoleFromBoreWall": 2},
 }
 
 _PRECISION_NAMES = [
