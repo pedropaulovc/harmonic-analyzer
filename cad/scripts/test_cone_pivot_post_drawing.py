@@ -486,3 +486,35 @@ def test_point_relations_use_the_point_relation_types() -> None:
                 f"line-only relation {relation!r} on points {entity1} / {entity2}"
             )
     assert '"origin", "horizontal_points"' in source
+
+
+def _catalog_rows(node):
+    if isinstance(node, dict):
+        for value in node.values():
+            yield from _catalog_rows(value)
+    if isinstance(node, list):
+        if node and all(isinstance(cell, str) for cell in node):
+            yield node
+        for item in node:
+            yield from _catalog_rows(item)
+
+
+def test_dimension_catalog_row_matches_the_spec() -> None:
+    # dimensions.yaml is the narrative geometry catalog; its cone-pivot-post
+    # row must state the collar the part is built with, not the retired
+    # v2-harvest O42.7506 (Codex PRRT_kwDOPHDy386l4aOa).
+    import yaml
+
+    catalog = Path(spec.__file__).resolve().parents[1] / "config" / "dimensions.yaml"
+    rows = [
+        row
+        for row in _catalog_rows(yaml.safe_load(catalog.read_text(encoding="utf-8")))
+        if row[0].startswith("`cone-pivot-post`")
+    ]
+    assert len(rows) == 1
+    dims = rows[0][1]
+    assert f"Ø{spec.HEAD_DIA:.1f} ± 0.4 × {spec.HEAD_HEIGHT:g} upper collar" in dims
+    assert f"y {spec.HEAD_BASE_Y:g}..{spec.BLOCK_HEIGHT:g}" in dims
+    assert f"Ø{spec.BLOCK_DIA:g} × {spec.BLOCK_HEIGHT:.1f} tall" in dims
+    assert f"bore on the body centreline at y {spec.CRANK_BORE_HEIGHT:g}" in dims
+    assert "42.7506" not in " ".join(rows[0])
