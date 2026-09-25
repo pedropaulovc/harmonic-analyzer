@@ -20,6 +20,7 @@ from _common import (
     anchor_point_to_origin,
     apply_color,
     apply_material,
+    blank_reference_sketches,
     check,
     define_circle,
     drive_dimension,
@@ -84,6 +85,7 @@ from pinion_arbor_spec import (
     NECK_END_Z,
     NECK_LEN,
     OVERALL_LEN,
+    REFERENCE_SKETCHES,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHAFT_LEN,
@@ -875,6 +877,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts

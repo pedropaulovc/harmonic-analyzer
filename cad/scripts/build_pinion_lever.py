@@ -48,6 +48,7 @@ from _common import (
     anchor_point_to_origin,
     apply_color,
     apply_material,
+    blank_reference_sketches,
     check,
     define_circle,
     dimension_between,
@@ -91,6 +92,7 @@ from pinion_lever_spec import (
     ISOMETRIC_VIEW_NOTE,
     PIN_HOLE_DIA,
     PIN_HOLE_Z,
+    REFERENCE_SKETCHES,
     ROD_DIA,
     ROD_LEN,
     ROD_Y0,
@@ -552,6 +554,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts

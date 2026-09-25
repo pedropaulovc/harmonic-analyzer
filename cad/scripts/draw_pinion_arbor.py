@@ -27,6 +27,9 @@ from _drawing_common import (
     stamp_drawing_summary,
     view_name,
 )
+from _drawing_hidden_sketches import (
+    curate_view_dimensions as curate_hidden_owner_dimensions,
+)
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import audit_sheet, format_findings
 from _surface_finish import surface_finish_by_key
@@ -34,6 +37,7 @@ from pinion_arbor_spec import (
     BACK_JOURNAL_Z,
     BOND_ZONE_DIA_Z,
     CROSS_HOLE_CALLOUT,
+    DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRUM_STATION,
     FRONT_JOURNAL_Z,
@@ -594,8 +598,16 @@ async def build(adapter: Any) -> dict[str, str]:
     donor_annotations = curate_view_dimensions(
         adapter, donor, keep=DONOR_KEEP, view_label="diameter donor"
     )
-    principal_annotations = curate_view_dimensions(
-        adapter, principal, keep=PRINCIPAL_KEEP, view_label="integral-arbor profile"
+    # The profile prints every reference-sketch dimension.  The part saves
+    # those sketches hidden (#880), so this projected view shows them per view
+    # and imports feature by feature (_drawing_hidden_sketches).  The donor and
+    # detail A dimension none of them and keep the whole-model import.
+    principal_annotations = curate_hidden_owner_dimensions(
+        adapter,
+        principal,
+        keep=PRINCIPAL_KEEP,
+        view_label="integral-arbor profile",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     detail_annotations = curate_view_dimensions(
         adapter, detail, keep=DETAIL_KEEP, view_label="integral-arbor head detail"

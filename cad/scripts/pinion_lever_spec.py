@@ -55,6 +55,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GripStationReference": {"GripFromB"},
     "PinHoleStationReference": {"PinHoleFromB"},
 }
+# Both saved hidden (#880); the drawing's hub detail is created and dimensioned
+# while the part shows them (_drawing_hidden_sketches.part_sketches_shown).
+REFERENCE_SKETCHES = ("GripStationReference", "PinHoleStationReference")
 
 # Decimal places ARE the tolerance statement (policy rule 2); the part authors
 # them and the drawing reads them back.  Three on the banded bore; two on the

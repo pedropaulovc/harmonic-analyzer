@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+
+import _common
 
 import _drawing_marks
 import _fit_limits
@@ -638,7 +642,6 @@ def test_drum_station_text_clears_the_station_stack() -> None:
     assert back_x + 0.009 + 0.010 <= x - half
 
 
-
 def test_drum_station_matches_the_assembled_drum_on_the_arbor() -> None:
     """The drum is bonded at the printed station, so BDT derives ARBOR_Z0 from
     the fit-up stack's drum station (Codex #854/#858 P1) and the assembly
@@ -672,3 +675,90 @@ def test_journal_lands_cover_their_straps_in_the_pose() -> None:
     source = inspect.getsource(assembly)
     assert "falls short of the back strap" not in source
     assert "journal land misses its strap" in source
+
+
+class _SketchFeature:
+    def __init__(self) -> None:
+        self.Visible = 2  # swVisibilityState_e: shown
+
+
+class _PartDoc:
+    def __init__(self, names) -> None:
+        self.features = {name: _SketchFeature() for name in names}
+
+    def FeatureByName(self, name):  # noqa: N802 - the COM member name
+        return self.features.get(name)
+
+
+def _run_blank(monkeypatch, module, sketches, *, blanks: bool) -> list[str]:
+    doc = _PartDoc(sketches)
+    blanked: list[str] = []
+
+    def fake_blank(_adapter, name) -> None:
+        blanked.append(name)
+        if blanks:
+            doc.features[name].Visible = 1  # swVisibilityState_e: hidden
+
+    monkeypatch.setattr(module, "blank_sketch", fake_blank)
+    monkeypatch.setattr(module, "_early_bound", lambda obj, _interface: obj)
+    module.blank_reference_sketches(SimpleNamespace(currentModel=doc), sketches)
+    return blanked
+
+
+def test_every_dimension_carrying_reference_sketch_is_saved_hidden() -> None:
+    # #880 (Main, via dtrefactor): the arbor's reference sketches rendered as
+    # grey dots and lines in the drive-train; the part saves them hidden.
+    expected = {
+        "FrontJournalReference",
+        "BackJournalReference",
+        "BackRimReference",
+        "BondZoneReference",
+        "DrumStationReference",
+        "OverallReference",
+    }
+    assert set(spec.REFERENCE_SKETCHES) == expected
+    assert len(spec.REFERENCE_SKETCHES) == len(expected)
+    assert expected == {name for name in spec.DRAWING_DIMENSIONS if name.endswith("Reference")}
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    authored = set(re.findall(r'"(\w+Reference)"', source)) | {
+        f"{prefix}Reference" for prefix in re.findall(r'prefix="(\w+)"', source)
+    }
+    assert authored == expected
+    blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
+    # One shared helper in _common (restricted review), no local copy.
+    assert "def _blank_reference_sketches" not in source
+    assert source.count(blank) == 1
+    assert source.index(blank) < source.rindex("save_part_and_images(adapter, PART_NAME)")
+
+
+def test_reference_sketch_blank_reads_every_sketch_back_hidden(monkeypatch) -> None:
+    blanked = _run_blank(monkeypatch, _common, spec.REFERENCE_SKETCHES, blanks=True)
+    assert blanked == list(spec.REFERENCE_SKETCHES)
+    with pytest.raises(RuntimeError, match="FrontJournalReference still visible"):
+        _run_blank(monkeypatch, _common, spec.REFERENCE_SKETCHES, blanks=False)
+
+
+def test_profile_imports_the_hidden_reference_dimensions_per_view() -> None:
+    # The profile is a projected view: _drawing_hidden_sketches shows each
+    # childless part-hidden owner in that view before its targeted import.
+    source = Path(drawing.__file__).read_text(encoding="utf-8").replace("\r\n", "\n")
+    assert (
+        "from _drawing_hidden_sketches import (\n"
+        "    curate_view_dimensions as curate_hidden_owner_dimensions,\n)"
+    ) in source
+    call = re.search(
+        r"(\w+)\(\s*adapter,\s*principal,\s*keep=PRINCIPAL_KEEP,([^)]*)\)", source
+    )
+    assert call is not None
+    assert call.group(1) == "curate_hidden_owner_dimensions"
+    assert "dimensions_by_feature=DRAWING_DIMENSIONS" in call.group(2)
+    assert drawing.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
+    # Every reference sketch prints on the profile, so each one the view shows
+    # keeps a dimension there; the donor and detail A dimension none of them,
+    # so neither needs the part to show them (no part_sketches_shown).
+    reference_dims = set().union(
+        *(spec.DRAWING_DIMENSIONS[name] for name in spec.REFERENCE_SKETCHES)
+    )
+    assert reference_dims <= set(drawing.PRINCIPAL_KEEP)
+    assert not reference_dims & (set(drawing.DONOR_KEEP) | set(drawing.DETAIL_KEEP))
+    assert "part_sketches_shown" not in source
