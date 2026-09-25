@@ -1,3 +1,5 @@
-# Next compact release number. CAD Revision properties and drawing title blocks use this value.
+# Next compact release number. package:release (package_native.py) stamps it into the
+# packaged CAD Revision properties and drawing title blocks; every build writes "DEV",
+# so editing this re-keys only package:release.
 # cut_release.py advances it after publishing a release; commit and merge that bump.
 next_revision: v37

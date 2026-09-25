@@ -1769,23 +1769,26 @@ def test_git_executable_is_resolved_absolute(tmp_path, monkeypatch):
         _common._git_executable.cache_clear()
 
 
-def test_build_id_is_the_release_revision_in_full_and_depth_1_checkouts(
+def test_build_stamps_are_identical_across_commits_and_checkouts(
     tmp_path, monkeypatch
 ):
-    """Real Git checkouts of the SAME commit, one full and one depth-1.
+    """Real Git checkouts at two DIFFERENT commits, one full and one depth-1.
 
-    The depth-1 clone is what a farm leaf gets: its history is truncated, so
-    anything derived from a tag, a commit count or a walk is either different
-    or unavailable there. Both must stamp the release revision, and an
-    uncommitted edit must still mark the sheet.
+    Every build-time document stamp (part and assembly Revision/Generator, the
+    drawing BUILD_ID) must be the same constant at both, dirty tree or not: a
+    commit sha, a dirty marker or the release number in a file property is
+    exactly the churn that made every cached artefact carry whichever checkout
+    built it -- and, for the release number, re-keyed every leaf on each
+    release bump. Only the copyright year is source-derived, and both commits
+    share it.
     """
     import os
     import subprocess
 
+    import _assembly
     import _common
-    import _config
+    import _drawing_common
 
-    # Never execute a developer's hooks, filters, signer, or filesystem monitor.
     for name in tuple(os.environ):
         if name.startswith("GIT_"):
             monkeypatch.delenv(name)
@@ -1807,54 +1810,64 @@ def test_build_id_is_the_release_revision_in_full_and_depth_1_checkouts(
     origin = tmp_path / "origin"
     origin.mkdir()
     git(origin, "init", "--quiet")
-    git(origin, "config", "user.email", "build-id@example.invalid")
-    git(origin, "config", "user.name", "build id test")
-    for revision, message in enumerate(("base", "second", "third")):
-        (origin / "part.txt").write_text(f"{revision}\n", encoding="utf-8")
-        git(origin, "add", "part.txt")
-        git(origin, "commit", "--quiet", "--no-gpg-sign", "-m", message)
-        if not revision:
-            # A reachable release tag: the history a release-relative id would
-            # have counted from, present here and absent from the leaf clone.
-            git(origin, "tag", "v8")
+    git(origin, "config", "user.email", "build-stamp@example.invalid")
+    git(origin, "config", "user.name", "build stamp test")
 
+    def commit(message: str) -> None:
+        (origin / "part.txt").write_text(f"{message}\n", encoding="utf-8")
+        git(origin, "add", "part.txt")
+        git(
+            origin,
+            "commit",
+            "--quiet",
+            "--no-gpg-sign",
+            "--date=2026-09-01T00:00:00",
+            "-m",
+            message,
+        )
+
+    def stamps(root) -> dict[str, dict[str, str]]:
+        monkeypatch.setattr(_common, "CAD_ROOT", root)
+        return {
+            "part": _common.part_properties("platen-guide"),
+            "assembly": _assembly.assembly_title_properties("frame"),
+            "drawing": {"BUILD_ID": _drawing_common.BUILD_REVISION},
+        }
+
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2026-09-01T00:00:00")
+    commit("first")
+    first = stamps(origin)
+    commit("second")
     leaf = tmp_path / "leaf"
     git(tmp_path, "clone", "--quiet", "--depth", "1", origin.as_uri(), str(leaf))
-    # Guard the fixture itself: a local clone silently ignores --depth unless
-    # fetched over file://, and a full clone here would prove nothing.
     assert git(leaf, "rev-parse", "--is-shallow-repository") == "true"
-    assert git(leaf, "rev-parse", "HEAD") == git(origin, "rev-parse", "HEAD")
-
-    monkeypatch.setattr(_config, "release_revision", lambda: "v9")
-
-    monkeypatch.setattr(_common, "CAD_ROOT", origin)
-    full_id = _common._build_id()
-    monkeypatch.setattr(_common, "CAD_ROOT", leaf)
-    leaf_id = _common._build_id()
-
-    assert full_id == leaf_id == "v9"
-
-    git(leaf, "config", "status.showUntrackedFiles", "no")
+    assert git(leaf, "rev-parse", "HEAD") != git(origin, "rev-parse", "HEAD~1")
+    second = stamps(leaf)
     (leaf / "uncommitted.txt").write_text("operator edit\n", encoding="utf-8")
-    assert _common._build_id() == "v9-dirty"
+    dirty = stamps(leaf)
+
+    assert first == second == dirty
+    for kind in ("part", "assembly"):
+        assert first[kind]["Revision"] == "DEV"
+        assert first[kind]["Generator"] == "harmonic-analyzer"
+        assert first[kind]["COPYRIGHT_YEAR"] == "2026"
+    assert first["drawing"]["BUILD_ID"] == "DEV"
 
 
-def test_build_id_translates_a_failed_dirty_probe(monkeypatch):
-    import subprocess
+def test_build_stamp_helpers_never_read_release_or_commit_identity():
+    """The release number and commit identity left the build helpers entirely."""
+    import inspect
 
-    import pytest
-
+    import _assembly
     import _common
+    import _drawing_common
 
-    def fake_run(command, **_kwargs):
-        raise subprocess.CalledProcessError(128, command, stderr="not a git repo")
-
-    monkeypatch.setattr(subprocess, "run", fake_run)
-    with pytest.raises(
-        RuntimeError, match="cannot determine Git working-tree state"
-    ) as error:
-        _common._build_id()
-    assert isinstance(error.value.__cause__, subprocess.CalledProcessError)
+    assert not hasattr(_common, "_git_sha")
+    assert not hasattr(_common, "_build_id")
+    for module in (_common, _assembly, _drawing_common):
+        source = inspect.getsource(module)
+        assert "release_revision" not in source, module.__name__
+        assert "rev-parse" not in source, module.__name__
 
 
 def test_assembly_title_properties_never_read_part_registry_fields():
@@ -1877,16 +1890,14 @@ def test_assembly_title_properties_never_read_part_registry_fields():
         "THREAD_CLASS",
     }
     assert props["Title"] == "frame"
-    import _config
-
-    assert props["Revision"] == _config.release_revision()
-    assert props["Generator"].startswith("harmonic-analyzer @ ")
+    assert props["Revision"] == "DEV"
+    assert props["Generator"] == "harmonic-analyzer"
 
 
-def test_part_properties_use_release_revision():
-    import _config
-
-    assert part_properties("platen-guide")["Revision"] == _config.release_revision()
+def test_part_properties_use_the_build_revision():
+    props = part_properties("platen-guide")
+    assert props["Revision"] == "DEV"
+    assert props["Generator"] == "harmonic-analyzer"
 
 
 def test_config_syntax_is_reused_by_content_not_source_path():
