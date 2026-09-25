@@ -33,6 +33,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
 from alignment_pinion_spec import (
+    ARBOR_BORE_CALLOUT,
     BORE_DIA,
     DRAWING_PRECISION_BY_NAME,
     SURFACE_FINISHES,
@@ -77,7 +78,7 @@ RIGHT_KEEP = {
     "FaceWidth": (RIGHT_CENTER[0], 0.125),
 }
 DIMENSION_CALLOUTS = {
-    "ArborBoreDia": "REAM THRU",
+    "ArborBoreDia": ARBOR_BORE_CALLOUT,
     "FaceWidth": "OVERALL; TEETH FULL LENGTH",
 }
 

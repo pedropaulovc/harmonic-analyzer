@@ -122,10 +122,12 @@ GEAR_DATA = gear_data_note(
 )
 
 # Rule 6: notes never carry a dimension.  MHA-102 owns its bond-zone band
-# natively (BondZoneDia); the hand slide is this part's functional acceptance.
+# natively (BondZoneDia).  The hand slide is this part's matched-fit
+# acceptance, so it rides the reamed bore's callout, not a general note
+# (Codex P2 on #832).
+ARBOR_BORE_CALLOUT = "REAM THRU\nSLIDES ON MHA-102 BY HAND"
 DRAWING_NOTES = "\n".join(
     (
-        "DRUM SHALL SLIDE ON MHA-102 BY HAND.",
         f"ON ASSEMBLY: BOND TO MHA-102 WITH {RETAINING_COMPOUND} AT THE "
         "DRUM STATION ON MHA-102.",
         "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND.",

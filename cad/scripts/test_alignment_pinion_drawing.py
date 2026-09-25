@@ -72,13 +72,13 @@ def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None
 
 def test_notes_bond_the_drum_at_the_station_mha102_owns() -> None:
     notes = spec.DRAWING_NOTES
-    # Rule 6 (R3): three notes.  The drum is symmetric, so no orientation
+    # Rule 6 (R3): two notes.  The drum is symmetric, so no orientation
     # note; its axial station is stated once, on MHA-102, never re-derived
     # here from j=19.  The MHA-102 bond-zone band is MHA-102's own native
-    # dimension (Codex P1 on #814), so it is not restated here.
-    assert len(notes.splitlines()) == 3
+    # dimension (Codex P1 on #814), so it is not restated here, and the hand
+    # slide rides the bore callout (Codex P2 on #832).
+    assert len(notes.splitlines()) == 2
     assert "BOND ZONE" not in notes
-    assert "DRUM SHALL SLIDE ON MHA-102 BY HAND." in notes
     assert "ARBOR JOURNAL" not in notes
     assert (
         "ON ASSEMBLY: BOND TO MHA-102 WITH LOCTITE 638 AT THE "
@@ -159,7 +159,19 @@ def test_tooth_thickness_is_controlled_by_the_model_base_tangent_span() -> None:
 def test_fit_bore_callout_names_its_process() -> None:
     import draw_alignment_pinion as draw
 
-    assert draw.DIMENSION_CALLOUTS["ArborBoreDia"] == "REAM THRU"
+    assert draw.DIMENSION_CALLOUTS["ArborBoreDia"].splitlines()[0] == "REAM THRU"
+
+
+def test_hand_slide_fit_rides_the_bore_callout_not_a_note() -> None:
+    """Rule 6: a matched-fit acceptance belongs on the feature callout or an
+    assembly step, never in a general note (Codex P2 on #832)."""
+    import draw_alignment_pinion as draw
+
+    callout = draw.DIMENSION_CALLOUTS["ArborBoreDia"]
+    assert callout == spec.ARBOR_BORE_CALLOUT
+    assert "SLIDES ON MHA-102 BY HAND" in callout
+    for line in spec.DRAWING_NOTES.splitlines():
+        assert "SLIDE" not in line and "BY HAND" not in line, line
 
 
 def test_od_at_the_general_band_keeps_tip_clearance_and_contact() -> None:
