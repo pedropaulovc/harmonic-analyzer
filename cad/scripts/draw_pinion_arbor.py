@@ -86,7 +86,8 @@ DETAIL_LABEL_XY = (
     - DETAIL_LABEL_DROP,
 )
 # The head and neck diameters live in end-on Front-plane profile sketches, so
-# the end-on donor imports them and each moves onto the 1:1 profile.  The Ø8
+# the end-on donor imports them: the head's moves onto the 1:1 profile, the
+# neck's into detail A (DETAIL_DIAMETER_POSITIONS says why).  The Ø8
 # is dimensioned on the profile itself, from the bond zone's flank.
 DONOR_KEEP = {
     "NeckDia": (0.055, 0.145),
@@ -224,8 +225,8 @@ PRINCIPAL_KEEP = {
     "BackCapR": (0.045, 0.140),
     # R1a's collar pin hole (x 0.269) sits over the front land's Ra symbol,
     # so both its dimensions stand ABOVE the shaft: the station from the head
-    # rear face in a row over the neck's Ø10.5, and the hole's leader rising
-    # left of that row's witness, above the 19.0's right arrow tail.
+    # rear face in a row over the Ø15's, and the hole's leader rising left of
+    # that row's witness, above the 19.0's right arrow tail.
     "PinStationFromHeadRear": (0.288, 0.207),
     "PinHoleDia": (0.250, 0.222),
 }
@@ -236,23 +237,54 @@ DETAIL_KEEP = {
     # Above the hole's centre line, so the leader drops onto the hole edge.
     "CrossHoleDia": (0.245, 0.256),
 }
-# The head and neck sit inside detail A's fence at the right end of the
-# profile (x 0.296-0.320, axis y 0.171): each diameter's dimension line stands
-# inside the fence and runs up to its text above it.  The head's line sits
+# The head sits inside detail A's fence at the right end of the profile (the
+# fence spans x 0.298-0.328 on the axis, y 0.170): the Ø15's dimension line
+# stands inside the fence and runs up to its text above it.  The line sits
 # between the crown apex (x 0.3215) and the fence (x 0.3262 at the head's
 # top and bottom edges), so its witnesses stay inside the circle: they used
 # to run out through it to x 0.340, reading as part of the detail callout
 # with the "A" label between them (Fable r-delta).
-# The neck's Ø10.5 block (27 mm wide, its right edge 11.5 mm right of the
-# dimension line) is wider than the 11.3 mm neck, so centred on the neck it
-# ran over the head-rear-face witness of R1a's collar-pin station (x 0.3076,
-# stacktop-dbe47ae3 layout audit).  Its line stands just ahead of the neck's
-# front shoulder (x 0.2967) instead, with short witnesses, so the block ends
-# 1.6 mm short of that witness.
-NECK_DIA_TEXT_RIGHT_FROM_LINE = 0.0115
 DIAMETER_POSITIONS = {
     "HeadDia": (0.3238, 0.192),
-    "NeckDia": (0.2945, 0.194),
+}
+# The neck's Ø10.5 has no place on the 1:1 profile.  The layout audit boxes
+# its text from 15.6 mm left of the dimension line to 11.5 mm right of it,
+# 2.8 mm below the text position to 0.7 mm above (stacktop-dbe47ae3 read
+# [284.4,191.2]..[311.5,194.7] mm for text at (0.300, 0.194)).  Two gates
+# then leave no x for the line:
+# - the collar-pin station's head-rear-face witness rises through that row
+#   at x 0.3076, so the box must end left of it: line x < 0.2961
+#   (stacktop-dbe47ae3);
+# - the witnesses overshoot the line by 1 mm (c486b6e1: line 294.5, witness
+#   ends 293.5), and at the neck's edges (5.25 mm off the axis) they must
+#   stay inside detail A's 15 mm fence round the head centre (x 0.3132):
+#   line x >= 0.300 (c486b6e1 failed at 0.2945).
+# Above the station row the line would cross the station's own dimension
+# line into its "COLLAR PIN" text; below the shaft the head-rear-face
+# station witnesses and the neck-end witness drop through the row.  So the
+# neck is dimensioned inside detail A, which shows it from the fence to the
+# head rear face (Main's ruling).
+NECK_DIA_TEXT_BOX_FROM_POSITION = (-0.0156, 0.0115, -0.0028, 0.0007)
+DETAIL_RATIO = DETAIL_SCALE[0] / DETAIL_SCALE[1]
+
+
+def _detail_x(model_z: float) -> float:
+    """Sheet x of a model station inside detail A (head centre at its centre)."""
+    return DETAIL_CENTER[0] + DETAIL_RATIO * (
+        _sheet_x(model_z) - _sheet_x(HEAD_CENTER_Z)
+    )
+
+
+# In detail A the neck runs from the fence (x ~0.137 at its edges) to the
+# head rear face (x 0.1545), its Ø10.5 at y 0.2245-0.2455.  Its end-on
+# circle is on the Front plane (model z 0, x 0.152), where the witnesses
+# start, so a line at x 0.140 on the neck's fence side keeps both witnesses
+# on the neck.  The text runs on past the line, away from that circle (the
+# profile rendered it left of its line at a1a694a6), so it rides above-left
+# of the fence, clear of the circle like every other detail-A callout; the
+# line crosses the fence once, square, to reach it.
+DETAIL_DIAMETER_POSITIONS = {
+    "NeckDia": (0.140, 0.2575),
 }
 DIMENSION_CALLOUTS = {
     # One name for the axial datum every station runs from (Fable m1): the
@@ -674,24 +706,29 @@ async def build(adapter: Any) -> dict[str, str]:
             kept=len(kept),
             names=",".join(names),
         )
+    diameter_targets = {
+        **{name: ("principal", principal, xy) for name, xy in DIAMETER_POSITIONS.items()},
+        **{name: ("detail", detail, xy) for name, xy in DETAIL_DIAMETER_POSITIONS.items()},
+    }
     moved_diameters = []
+    moves = []
     for annotation in donor_annotations:
         name = dimension_name(adapter, annotation)
+        label, target, text_xy = diameter_targets[name]
         moved_diameters.append(
-            _move_dimension(
-                adapter,
-                annotation,
-                principal,
-                DIAMETER_POSITIONS[name],
-                source_view=donor,
-            )
+            _move_dimension(adapter, annotation, target, text_xy, source_view=donor)
         )
+        moves.append(f"{name} -> {label} ({text_xy[0] * 1000:.1f}, {text_xy[1] * 1000:.1f}) mm")
     principal_count = len(_early_bound(principal, "IView").GetAnnotations() or ())
+    detail_count = len(_early_bound(detail, "IView").GetAnnotations() or ())
     _telemetry.info(
-        f"pinion-arbor moved {len(moved_diameters)} diameters donor -> principal; "
-        f"principal now carries {principal_count} annotations",
+        f"pinion-arbor moved {len(moved_diameters)} diameters off the donor: "
+        f"{'; '.join(moves)}; principal now carries {principal_count} "
+        f"annotations, detail {detail_count}",
         moved=len(moved_diameters),
+        moves="; ".join(moves),
         principal_annotations=principal_count,
+        detail_annotations=detail_count,
     )
     donor_name = view_name(adapter, donor)
     delete_view(adapter, donor)
@@ -781,6 +818,38 @@ async def build(adapter: Any) -> dict[str, str]:
         center=fence_center,
         radius=DETAIL_RADIUS_MM / 1000.0,
         arrows=arrows,
+        axis=_unit(far_on_axis[0] - fence_center[0], far_on_axis[1] - fence_center[1]),
+    )
+    # The diameters moved INTO detail A answer to its own circle: their
+    # witnesses stay on the part inside it, only the dimension line leaves
+    # for the text.  The detail's other callouts are leaders and axial
+    # stations that leave it by design, so they are not judged here.
+    detail_name = view_name(adapter, detail)
+    detail_diameters = [
+        annotation
+        for sheet in sheets
+        for annotation in sheet.annotations
+        if annotation.owner == detail_name
+        and annotation.kind == "dim"
+        and annotation.label in DETAIL_DIAMETER_POSITIONS
+    ]
+    for annotation in detail_diameters:
+        boxes = " ".join(box.format_mm() for box in annotation.text_boxes) or "(no text)"
+        runs = " ".join(segment.format_mm() for segment in annotation.segments)
+        _telemetry.info(
+            f"pinion-arbor: detail-A {annotation.label} text {boxes}; runs {runs}",
+            label=annotation.label,
+        )
+    if len(detail_diameters) != len(DETAIL_DIAMETER_POSITIONS):
+        raise RuntimeError(
+            f"pinion-arbor: detail A carries {len(detail_diameters)} of its "
+            f"{len(DETAIL_DIAMETER_POSITIONS)} moved diameters in the layout audit"
+        )
+    _assert_witnesses_clear_of_detail_fence(
+        detail_diameters,
+        center=DETAIL_CENTER,
+        radius=DETAIL_RATIO * DETAIL_RADIUS_MM / 1000.0,
+        arrows=_dimension_arrows(adapter, detail),
         axis=_unit(far_on_axis[0] - fence_center[0], far_on_axis[1] - fence_center[1]),
     )
 
