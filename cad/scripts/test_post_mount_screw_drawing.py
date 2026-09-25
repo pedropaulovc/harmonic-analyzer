@@ -11,6 +11,7 @@ import build_post_mount_screw as part
 import cone_pivot_post_spec as post
 import cone_swing_platform_spec as platform
 import draw_post_mount_screw as drawing
+from _fit_limits import deviations
 import post_mount_screw_spec as spec
 from _drawing_contract import drawing_specification_violations
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -65,10 +66,15 @@ def test_no_fixed_cut_length_fits_both_in_band_corners() -> None:
     assert (low, high) == pytest.approx((78.67, 81.29))
     thin = platform.PLATE_THICKNESS - spec.PLATE_STOCK_BAND_MM
     assert spec.FIXED_LENGTH_FLUSH_MAX_MM == pytest.approx(low + thin)
-    need = high + 0.90 * part.SHANK_DIA + 2 * spec.EDGE_BREAK_MAX_MM
+    need = (
+        high
+        + 0.90 * part.SHANK_DIA
+        + spec.POST_MOUNT_TAP_EDGE_BREAK
+        + spec.CUT_END_BREAK_MAX_MM
+    )
     assert spec.FIXED_LENGTH_ENGAGEMENT_MIN_MM == pytest.approx(need)
     assert spec.FIXED_LENGTH_FLUSH_MAX_MM == pytest.approx(84.89)
-    assert spec.FIXED_LENGTH_ENGAGEMENT_MIN_MM == pytest.approx(87.505)
+    assert spec.FIXED_LENGTH_ENGAGEMENT_MIN_MM == pytest.approx(87.205)
     assert spec.FIXED_LENGTH_ENGAGEMENT_MIN_MM > spec.FIXED_LENGTH_FLUSH_MAX_MM
     assert spec.FIXED_CUT_LENGTH_EXISTS is False
 
@@ -80,7 +86,10 @@ def test_cut_length_prints_as_a_reference_without_a_band() -> None:
     assert not hasattr(spec, "CUT_LENGTH_BAND")
     assert not hasattr(drawing, "EXPECTED_CONTROLS")
     builder = Path(part.__file__).read_text(encoding="utf-8")
-    assert "set_dimension_bilateral_tolerance(" not in builder
+    # The one band in the builder is the cut end's break, never the length.
+    calls = builder.split("set_dimension_bilateral_tolerance(")[1:]
+    assert len(calls) == 1
+    assert calls[0].split(")")[0].split(",")[1].strip() == "CUT_END_BREAK_SKETCH"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_reference_dimension(" in source
     assert "swTolNONE" in source
@@ -97,15 +106,56 @@ def test_cut_to_fit_allowance_is_exported_once() -> None:
 def test_cut_length_is_a_model_owned_drawing_dimension() -> None:
     """Rule 2: the value and places are the part's; the sheet imports the
     one marked dimension from its hidden reference sketch and re-reads it."""
-    assert spec.DRAWING_DIMENSIONS == {"CutLengthReference": {"CutLength"}}
-    assert spec.REFERENCE_SKETCHES == ("CutLengthReference",)
-    assert spec.DRAWING_PRECISION_BY_NAME == {"CutLength": 1}
-    assert set(drawing.FRONT_KEEP) == {"CutLength"}
+    assert spec.DRAWING_DIMENSIONS == {
+        "CutLengthReference": {"CutLength"},
+        "CutEndBreakReference": {"CutEndBreak"},
+    }
+    assert spec.REFERENCE_SKETCHES == ("CutLengthReference", "CutEndBreakReference")
+    assert spec.DRAWING_PRECISION_BY_NAME == {"CutLength": 1, "CutEndBreak": 1}
+    assert set(drawing.FRONT_KEEP) == {"CutLength", "CutEndBreak"}
     builder = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in builder
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "hidden_sketches.curate_view_dimensions" in source
     assert "assert_imported_precision" in source
+
+
+def test_cut_end_break_is_a_model_owned_deburr_of_at_most_0_1() -> None:
+    """Main's engagement ruling: the cut end's break is 0.1 max (a deburr,
+    not the title block's 0.25), banded on the model's CutEndBreak dimension
+    and re-read on the sheet; the note stays digit-free."""
+    lower, upper = deviations(spec.CUT_END_BREAK_BAND)
+    assert spec.CUT_END_BREAK_MM + upper <= 0.1 + 1e-12
+    assert spec.CUT_END_BREAK_MM + lower >= 0.0
+    assert spec.CUT_END_BREAK_MAX_MM == spec.CUT_END_BREAK_MM + upper
+    assert spec.POST_MOUNT_TAP_EDGE_BREAK <= 0.1
+    builder = Path(part.__file__).read_text(encoding="utf-8")
+    assert "lower, upper = deviations(CUT_END_BREAK_BAND)" in builder
+    assert "CUT_END_BREAK_DIMENSION" in builder
+    nominal, low, high = drawing.BREAK_CONTROLS["CutEndBreak"]
+    assert (nominal, low, high) == pytest.approx(
+        (spec.CUT_END_BREAK_MM / 1000, lower / 1000, upper / 1000)
+    )
+    assert drawing.BREAK_TOLERANCE_TYPES == {"CutEndBreak": 2}  # swTolBILAT
+    assert not any(ch.isdigit() for ch in spec.MANUFACTURING_NOTES)
+
+
+def test_worst_case_engagement_holds_the_named_minimum() -> None:
+    """Cut to fit, the plate limits engagement: thinnest stock, the full
+    fit-to-hole allowance, the tap's entry deburr and the cut end's break,
+    both at their maximum.  Recomputed here from the chain: 5.72 = 0.90D."""
+    lower, upper = deviations(spec.CUT_END_BREAK_BAND)
+    worst = (
+        platform.PLATE_THICKNESS
+        - spec.PLATE_STOCK_BAND_MM
+        - spec.POST_SCREW_CUT_TO_FIT_SHORT
+        - spec.POST_MOUNT_TAP_EDGE_BREAK
+        - (spec.CUT_END_BREAK_MM + upper)
+    )
+    assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(worst)
+    assert worst == pytest.approx(5.72)
+    assert worst / part.SHANK_DIA >= 0.90
+    assert spec.POST_MOUNT_ENGAGEMENT_PRINTED >= 0.90
 
 
 def test_finish_oils_the_bare_cut_end() -> None:
@@ -154,6 +204,11 @@ def test_sheet_layout_keeps_notes_clear_of_the_view() -> None:
     widest = max(len(line) for line in drawing.DIMENSION_CALLOUTS["CutLength"].splitlines())
     assert x + widest * 0.00285 / 2.0 < drawing.FRONT_CENTER[0] - part.HEAD_DIA / 2000.0 - 0.003
     assert x - widest * 0.00285 / 2.0 > 0.015  # inside the border
+    # The break's leadered text: right of the shank, above the note block.
+    text_x, text_y = drawing.BREAK_TEXT
+    assert text_x - 0.004 > drawing.FRONT_CENTER[0] + part.SHANK_DIA / 2000.0 + 0.010
+    assert text_y - 0.004 > notes_y + 0.004
+    assert text_y < drawing.TIP_Y
 
 
 def test_stock_build_uses_its_registered_recipe() -> None:
