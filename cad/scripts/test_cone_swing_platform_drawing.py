@@ -745,17 +745,115 @@ def test_the_d382_33_00_tail_stands_under_the_8_00() -> None:
     ))
 
 
-def test_the_8_00_rises_clear_of_the_33_00_tail() -> None:
-    """At y 0.2605 the glyphs stand 3.1 mm over the tail and its shoulder
-    2.5 mm over the 33.00 line.  They still overlap along x (shoulder from
-    ~0.2750, tail to 0.2797): the separation is the vertical one."""
+def test_the_33_00_tail_has_no_value_over_it() -> None:
+    """The Ø8.00 left the notch plan: nothing stands over the 33.00's tail."""
     ink = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY)
-    (tail,) = ink.arrows["CapECx"]
-    glyphs = ink.texts["CapEDia"]
-    assert _drawing_leaders.distance_to_box(tail, glyphs) >= 0.0025 + drawing.NOTCH_ANGLE_ARROW_HALF_WIDTH
-    shoulder_y = drawing.NOTCH_KEEP["CapEDia"][1] - drawing.DIMENSION_TEXT_BREAK
-    assert shoulder_y - tail[0][1] >= 0.0024
+    assert "CapEDia" not in ink.texts
+    assert "CapEDia" not in drawing.NOTCH_KEEP
+    assert drawing.DIMENSION_OWNER["CapEDia"] == "profile plan"
     assert not any("CapECx" in f for f in drawing.sheet_ink_collisions(ink))
+
+
+# The profile plan's ink around the lock-notch cap, as d382 printed it
+# (C:/src/dt-logs/spring/tipslot-d382-leaf.log:309-331; PROFILE_KEEP's other
+# entries are unchanged since): the R5.0 (CornerSWR) leader from its arrow
+# tip on the corner to its shoulder, its text; the 37.0 (SouthWestX) right
+# witness and its line with the extension under its text; the 24.0
+# (SouthEastX) line; the x 71.8 pivot witness both share.
+# Their texts (estimated boxes) stay out of the audited ink: each sits on
+# its own shoulder, which the audit would read as a line through it.
+_D382_PROFILE_TEXTS = {
+    "CornerSWR": (0.1041, 0.2462, 0.1192, 0.2497),
+    "SouthWestX": (0.0982, 0.2552, 0.1133, 0.2587),
+}
+_D382_PROFILE_INK = drawing.SheetInk(
+    texts={},
+    lines={
+        "SouthWestX": [
+            ((0.0903, 0.2468), (0.0903, 0.2562)),
+            ((0.0718, 0.1337), (0.0718, 0.2562)),
+            ((0.0903, 0.2552), (0.0718, 0.2552)),
+            ((0.0903, 0.2552), (0.1098, 0.2552)),
+        ],
+        "SouthEastX": [((0.0598, 0.2562), (0.0718, 0.2562)), ((0.0598, 0.2562), (0.0392, 0.2562))],
+        "CornerSWR": [
+            ((0.0875, 0.2433), (0.0899, 0.2438)),
+            ((0.0899, 0.2438), (0.1025, 0.2462)),
+            ((0.1025, 0.2462), (0.1159, 0.2462)),
+        ],
+    },
+    arcs={},
+    arrows={"CornerSWR": [((0.0875, 0.2433), (0.0908, 0.2440))]},
+    leaders={},
+)
+
+
+def _profile_with_cap_dia(text_xy: tuple[float, float]) -> drawing.SheetInk:
+    leader, arrow = drawing.cap_dia_ink(text_xy)
+    ink = _D382_PROFILE_INK
+    return drawing.SheetInk(
+        texts={**ink.texts, "CapEDia": drawing.cap_dia_glyphs(text_xy)},
+        lines=ink.lines,
+        arcs=ink.arcs,
+        arrows={**ink.arrows, "CapEDia": [arrow]},
+        leaders={"CapEDia": leader},
+    )
+
+
+def test_the_profile_cap_is_where_the_seat_put_it() -> None:
+    """The model's cap centre and radius against d382's notch-plan Ø8.00
+    (the same projection, 185 mm left): its diameter ran (273.1, 238.6) to
+    (273.5, 242.6) through (273.25, 240.57)."""
+    cap = drawing.PROFILE_CAP_XY
+    assert cap[0] + 0.185 == pytest.approx(0.27325, abs=5e-5)
+    assert cap[1] == pytest.approx(0.24057, abs=5e-5)
+    assert math.dist((0.2731, 0.2386), (0.2735, 0.2426)) / 2.0 == pytest.approx(
+        drawing.CAP_ARC_RADIUS, abs=5e-5
+    )
+    # d382's arrow ends lay on the drawn half (the rails' tangent points).
+    notch_cap = (cap[0] + 0.185, cap[1])
+    for tip in ((0.2731, 0.2386), (0.2735, 0.2426)):
+        assert drawing.on_drawn_cap_arc(tip, notch_cap)
+
+
+def test_the_8_00_stands_east_of_the_profile_2_mm_off_its_neighbours() -> None:
+    """The value below the R5.0, its leader out through the notch mouth:
+    2 mm or more to every neighbour, the arrow on the drawn arc, the
+    diameter's near end (where a first arrow would land) in the mouth."""
+    text = drawing.PROFILE_KEEP["CapEDia"]
+    ink = _profile_with_cap_dia(text)
+    assert drawing.sheet_ink_collisions(ink) == []
+    leader, arrow = drawing.cap_dia_ink(text)
+    glyphs = ink.texts["CapEDia"]
+    r5_text = _D382_PROFILE_TEXTS["CornerSWR"]
+    (r5_arrow,) = ink.arrows["CornerSWR"]
+    gaps = {
+        "R5.0 arrow to the leader": min(
+            _drawing_leaders.distance_to_point(s, r5_arrow[0]) for s in leader
+        ) - drawing.NOTCH_ANGLE_ARROW_HALF_WIDTH,
+        "R5.0 leader to the glyphs": min(
+            _drawing_leaders.distance_to_box(s, glyphs) for s in ink.lines["CornerSWR"]
+        ),
+        "R5.0 text to the glyphs": _box_gap(r5_text, glyphs),
+        "R5.0 text to the leader": min(_drawing_leaders.distance_to_box(s, r5_text) for s in leader),
+        "37.0 witness to the glyphs": _drawing_leaders.distance_to_box(
+            ink.lines["SouthWestX"][0], glyphs
+        ),
+    }
+    gaps["37.0 text to the glyphs"] = _box_gap(_D382_PROFILE_TEXTS["SouthWestX"], glyphs)
+    assert min(gaps.values()) >= 0.0022, gaps
+    assert drawing.on_drawn_cap_arc(arrow[0])
+    cap = drawing.PROFILE_CAP_XY
+    near = (2.0 * cap[0] - arrow[0][0], 2.0 * cap[1] - arrow[0][1])
+    assert not drawing.on_drawn_cap_arc(near)
+
+
+def test_an_8_00_leader_up_the_drawn_side_crosses_the_37_0() -> None:
+    """Fail-first for the placement: with the text above the cap -- the way
+    whose near end stays on the drawn arc -- the leader crosses the 37.0's
+    line and runs within 2 mm of its witness."""
+    findings = drawing.sheet_ink_collisions(_profile_with_cap_dia((0.098, 0.2590)))
+    assert "leader-on-ink: CapEDia's leader crosses SouthWestX lines" in findings
 
 
 def test_the_arc_tail_crossing_the_205_81_witness_is_named_and_far_from_the_value() -> None:

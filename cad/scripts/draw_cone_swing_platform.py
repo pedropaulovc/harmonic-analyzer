@@ -151,6 +151,17 @@ PROFILE_KEEP = {
     "CornerNWR": (0.135, 0.118),
     "CornerSWR": (0.110, 0.249),
     "CornerSER": (0.040, 0.2435),
+    # The lock-notch cap's size prints here, not on the notch plan: there
+    # the 33.00 and 205.81 witnesses both start ~1 mm off the cap centre,
+    # inside the arc, and a diameter leader runs through that centre, so
+    # every direction passed within 1.05 mm of both (MHA-091 item 3; the
+    # sweep test).  Here the value stands east of the plate, below the R5.0,
+    # its leader out through the notch mouth along the slot; the far-side
+    # arrow on the drawn arc is pinned in code (_pin_cap_dia_far_arrow).
+    # Every direction whose near end is on the drawn half crosses the
+    # 37.0 / 24.0 lines or the x 71.8 pivot witness, or passes 1.35 mm from
+    # the 37.0 witness.
+    "CapEDia": (0.1149, 0.2417),
 }
 FEATURE_KEEP = {
     # Short lines (12 characters, ~34 mm at most) between the 195.09 line
@@ -199,6 +210,16 @@ def _plan_east_edge_x(z_mm: float) -> float:
 # the text break carries a 3.4 mm head.
 _NOTCH_SLOT_XY = plan_xy(NOTCH_CENTER, -TIP_SCREW_HALF_TRAVEL, TIP_SCREW_LOCAL_Z)
 _NOTCH_PIVOT_XY = plan_xy(NOTCH_CENTER, 0.0, 0.0)
+# The lock-notch cap on the profile plan: its centre, its radius on the
+# sheet and the slot's direction out of it toward the mouth (sheet +x is
+# model +x, sheet +y model -z).  Only the half of the cap circle away from
+# the mouth is drawn.
+PROFILE_CAP_XY = plan_xy(PROFILE_CENTER, _part.SLOT_E_X, _part.SLOT_E_Z)
+CAP_ARC_RADIUS = _part.SLOT_W / 2.0 * PLAN_SCALE
+CAP_MOUTH_AXIS = (
+    _part._SLOT_TX / math.hypot(_part._SLOT_TX, _part._SLOT_TZ),
+    -_part._SLOT_TZ / math.hypot(_part._SLOT_TX, _part._SLOT_TZ),
+)
 TIP_SLOT_Z_LINE_X = plan_xy(NOTCH_CENTER, _plan_east_edge_x(TIP_SCREW_LOCAL_Z), 0.0)[0] - 0.009
 # The run angle's vertex on the notch plan (plan_xy agrees with the seat to
 # 0.05 mm), and the in-wedge anchor that picks its acute sector.  The arc
@@ -228,12 +249,6 @@ NOTCH_KEEP = {
     # view's box.  The lower witness (y 0.1377) passes 2.4 mm over A-A's
     # "(6.35)" (top 0.1353) and the lower arrowhead 2.9 mm right of it.
     "CapECz": (0.327, 0.170),
-    # y 0.2605, not d382's 0.259: there the 33.00's outside tail (y 0.2552,
-    # out to 0.2795) ran 1.6 mm under the "Ø8.00" glyphs (layoutcheck
-    # c5 #2, gating: an outside tail within 2 mm of foreign text).  1.5 mm up
-    # gives 3.1 (2.7 past the arrowhead's half-width); the text top stays
-    # 5 mm under the border.
-    "CapEDia": (0.285, 0.2605),
     # The run angle (PR #830, Codex P1: without it the rails had no
     # direction).  Its vertex is the north rail's closed-end corner.  This is
     # the ANCHOR only, on the bisector inside the 9.11 deg wedge -- a text
@@ -633,6 +648,15 @@ PIVOT_WITNESS_START = 0.0040
 # right arrow sits outside, on the cap-centre witness, tail running right.
 CAP_E_DIA_GLYPHS = (-0.00614, -0.00217, 0.00690, 0.00223)
 CAP_E_CX_LINE_BELOW_TEXT = 0.0028
+# The Ø8.00's shoulder about its text position: 10.0 mm left to 8.5 mm
+# right, 2.8 mm under it (d382 dump: text at (285, 259), shoulder from 275.0
+# to 293.5 at 256.2); the leader runs from the arc through the cap centre
+# to the shoulder's end nearer the cap.
+CAP_E_DIA_SHOULDER = (-0.0100, 0.0085)
+CAP_E_DIA_SHOULDER_DROP = 0.0028
+# An arrow tip lies on the drawn cap arc: this close to its circle, on the
+# closed side of the diameter across the mouth.
+CAP_ARC_TIP_TOLERANCE = 0.00025
 # layoutcheck's gating rule: an outside arrow's tail counts as arrow ink
 # for its first 6.35 mm.
 OUTSIDE_ARROW_TAIL = 0.00635
@@ -719,14 +743,15 @@ def notch_angle_ink(
     iso_note_xy: tuple[float, float] | None = None,
 ) -> SheetInk:
     """The notch plan's ink around the run angle, predicted: the angle, the
-    205.81 (both legs and witnesses), the 33.00's outside tail under the
-    "Ø8.00", the 27.70 inside its span, and the lock-notch and isometric
+    205.81 (both legs and witnesses), the 33.00's outside tail, the 27.70
+    inside its span, and the lock-notch and isometric
     captions (property-linked notes, boxed from their measured extents).
 
     ``anchor_xy`` sets the arc's radius; ``text_xy`` is the offset value's
     centre, ``None`` leaving it at the anchor (the d382 sheet, with d382's
-    anchor).  ``cap_text_xy`` places the 205.81, ``cap_dia_text_xy`` the
-    Ø8.00 and ``iso_note_xy`` the isometric caption (the layout's by
+    anchor).  ``cap_text_xy`` places the 205.81, ``cap_dia_text_xy`` a
+    Ø8.00 on this plan (d382's; it now prints on the profile) and
+    ``iso_note_xy`` the isometric caption (the layout's by
     default).  The run points sheet-down-right, NOTCH_RUN_DEG below the ray.
     """
     vertex = NOTCH_ANGLE_VERTEX_XY
@@ -775,13 +800,7 @@ def notch_angle_ink(
     iso_note = ISO_NOTE_UPPER_LEFT if iso_note_xy is None else iso_note_xy
     cx_line_y = NOTCH_KEEP["CapECx"][1] - CAP_E_CX_LINE_BELOW_TEXT
     cx_tail = ((cap[0], cx_line_y), (cap[0] + OUTSIDE_ARROW_TAIL, cx_line_y))
-    dia = NOTCH_KEEP["CapEDia"] if cap_dia_text_xy is None else cap_dia_text_xy
-    dia_box = (
-        dia[0] + CAP_E_DIA_GLYPHS[0],
-        dia[1] + CAP_E_DIA_GLYPHS[1],
-        dia[0] + CAP_E_DIA_GLYPHS[2],
-        dia[1] + CAP_E_DIA_GLYPHS[3],
-    )
+    dia_box = {} if cap_dia_text_xy is None else {"CapEDia": cap_dia_glyphs(cap_dia_text_xy)}
     centre = anchor_xy if text_xy is None else text_xy
     leaders = (
         [] if text_xy is None else notch_angle_leader(_polar(vertex, radius, run / 2.0), text_xy)
@@ -790,7 +809,7 @@ def notch_angle_ink(
         texts={
             "NotchRunAngle": _centred_box(centre, NOTCH_ANGLE_TEXT_SIZE),
             "CapECz": _centred_box(cap_text, CAP_EC_Z_TEXT_SIZE),
-            "CapEDia": dia_box,
+            **dia_box,
             "TipSlotZ": _centred_box(slot_z, CAP_EC_Z_TEXT_SIZE),
             "Notch View Note": _anchored_box(NOTCH_CAPTION_UPPER_LEFT, NOTCH_NOTE_EXTENT),
             "Isometric View Note": _anchored_box(iso_note, ISO_NOTE_EXTENT),
@@ -809,6 +828,38 @@ def notch_angle_ink(
         },
         leaders={"NotchRunAngle": leaders},
     )
+
+
+def cap_dia_glyphs(text_xy: tuple[float, float]) -> _drawing_leaders.Box:
+    """The "Ø8.00" glyph box about its text position."""
+    return _anchored_box(text_xy, CAP_E_DIA_GLYPHS)
+
+
+def cap_dia_ink(
+    text_xy: tuple[float, float], cap_xy: tuple[float, float] = PROFILE_CAP_XY
+) -> tuple[list[_drawing_leaders.Segment], _drawing_leaders.Segment]:
+    """The Ø8.00's leader, predicted: from the arc through the cap centre to
+    the shoulder's near end, then the shoulder under the value; and the far
+    arrow, tip on the arc where the leader enters it, head along the leader."""
+    shoulder_y = text_xy[1] - CAP_E_DIA_SHOULDER_DROP
+    ends = [(text_xy[0] + dx, shoulder_y) for dx in CAP_E_DIA_SHOULDER]
+    knee, far = sorted(ends, key=lambda end: math.dist(end, cap_xy))
+    length = math.dist(knee, cap_xy)
+    ux, uy = (knee[0] - cap_xy[0]) / length, (knee[1] - cap_xy[1]) / length
+    root = (cap_xy[0] - CAP_ARC_RADIUS * ux, cap_xy[1] - CAP_ARC_RADIUS * uy)
+    head = (root[0] + NOTCH_ANGLE_ARROW_LENGTH * ux, root[1] + NOTCH_ANGLE_ARROW_LENGTH * uy)
+    return [(root, knee), (knee, far)], (root, head)
+
+
+def on_drawn_cap_arc(
+    tip: tuple[float, float], cap_xy: tuple[float, float] = PROFILE_CAP_XY
+) -> bool:
+    """Whether an arrow tip lies on the drawn half of the cap circle, not
+    out in the notch mouth."""
+    dx, dy = tip[0] - cap_xy[0], tip[1] - cap_xy[1]
+    if abs(math.hypot(dx, dy) - CAP_ARC_RADIUS) > CAP_ARC_TIP_TOLERANCE:
+        return False
+    return dx * CAP_MOUTH_AXIS[0] + dy * CAP_MOUTH_AXIS[1] <= CAP_ARC_TIP_TOLERANCE
 
 
 def _grown(box: _drawing_leaders.Box, margin: float) -> _drawing_leaders.Box:
@@ -1042,6 +1093,79 @@ def _pin_tip_slot_z_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
     _telemetry.info(f"TipSlotZ inside its span: text={position} strokes_left_of_line={shoulder}")
     if shoulder:
         raise RuntimeError(f"TipSlotZ still draws ink left of its line: {shoulder}")
+
+
+def _pin_cap_dia_far_arrow(adapter: Any, annotations: list[Any]) -> None:
+    """Put the Ø8.00's arrow on the drawn arc and audit its ink on the seat.
+
+    The value stands east of the cap, so the leader's near end falls in the
+    open notch mouth.  SetSecondArrow enables the diameter's "second outside
+    arrow ... on the opposite side of the arc from the dimension text" -- the
+    drawn, closed end.  Arrows outside, read back; then every arrowhead the
+    dimension draws must stand on the drawn arc (a head in the mouth points
+    at nothing), and its leader and glyphs keep 2 mm off every other profile
+    dimension's lines, arcs and arrows."""
+    by_name = {dimension_name(adapter, item): _early_bound(item, "IAnnotation") for item in annotations}
+    annotation = by_name["CapEDia"]
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.ArrowSide = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+    display.SetSecondArrow(False, True)
+    rebuild_drawing(adapter, label="lock notch diameter far arrow")
+    state = (
+        int(display.ArrowSide),
+        bool(display.GetUseDocSecondArrow()),
+        bool(display.GetSecondArrow()),
+    )
+    styles = display.GetArrowHeadStyle2()
+    position = tuple(float(v) for v in annotation.GetPosition())[:2]
+    strokes = _notch_strokes(annotation)
+    data = _display_data(annotation)
+    tips = []
+    for index in range(int(data.GetArrowHeadCount())):
+        values = [float(v) for v in (data.GetArrowHeadAtIndex2(index) or ())]
+        if len(values) < 2:
+            raise RuntimeError(f"CapEDia arrowhead {index} is unreadable: {values}")
+        tips.append((values[0], values[1]))
+    others = [name for name in by_name if name != "CapEDia"]
+    ink = SheetInk(
+        texts={"CapEDia": cap_dia_glyphs(position)},
+        lines={name: _notch_strokes(by_name[name]) for name in others},
+        arcs={name: _arc_chords(by_name[name]) for name in others},
+        arrows={name: _arrow_segments(by_name[name]) for name in by_name},
+        leaders={"CapEDia": strokes},
+    )
+    findings = sheet_ink_collisions(ink)
+    glyphs = ink.texts["CapEDia"]
+    for name in others:
+        for kind, segments in (
+            ("line", ink.lines[name]),
+            ("arc", ink.arcs[name]),
+            ("arrow", ink.arrows[name]),
+        ):
+            gap = min(
+                (_drawing_leaders.distance_to_box(s, glyphs) for s in segments), default=math.inf
+            )
+            if gap < LEADER_INK_CLEARANCE:
+                findings.append(
+                    f"text-near-ink: {name}'s {kind} {gap * 1000.0:.2f} mm from 'CapEDia'"
+                )
+    off_arc = [tip for tip in tips if not on_drawn_cap_arc(tip)]
+    _telemetry.info(
+        f"CapEDia on the profile: text={position} arrow_side/use_doc_second/second={state} "
+        f"arrowhead_styles={styles} tips={tips} off_arc={off_arc} strokes={strokes} "
+        f"arrows={ink.arrows['CapEDia']} findings={findings}"
+    )
+    if state != (1, False, True):
+        raise RuntimeError(f"CapEDia did not keep outside arrows with its second arrow: {state}")
+    if math.dist(position, PROFILE_KEEP["CapEDia"]) > 0.0005:
+        raise RuntimeError(f"CapEDia text at {position}, not {PROFILE_KEEP['CapEDia']}")
+    if not tips or off_arc:
+        raise RuntimeError(
+            "CapEDia draws an arrowhead off the drawn cap arc (in the notch mouth): "
+            f"tips={tips}, off the arc={off_arc}"
+        )
+    if findings:
+        raise RuntimeError("CapEDia ink collides on the profile: " + "; ".join(findings))
 
 
 def _assert_notch_captions_clear(
@@ -2087,6 +2211,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _hide_profile_cosmetic_threads(adapter, profile)
+    _pin_cap_dia_far_arrow(adapter, profile_annotations)
     feature_annotations = curate_view_dimensions(
         adapter,
         feature,
