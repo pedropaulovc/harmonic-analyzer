@@ -1301,6 +1301,13 @@ def test_review_run_fails_when_the_pdf_changed_before_it_could_be_recorded(
     assert not ledger_path.exists()
 
 
+def test_review_and_ledger_share_one_pdfium_lock() -> None:
+    # machinist_review renders in pool threads while its main thread records
+    # passing reviews, which renders again through the ledger. PDFium is
+    # process-global and not thread-safe, so both must take the same lock.
+    assert mr._PDFIUM_LOCK is ml._PDFIUM_LOCK
+
+
 def test_the_ledger_tests_run_under_the_recipe_gate() -> None:
     dodo = (ml.REPO_ROOT / "dodo.py").read_text(encoding="utf-8")
     assert 'SCRIPTS_DIR / "test_machinist_ledger.py"' in dodo

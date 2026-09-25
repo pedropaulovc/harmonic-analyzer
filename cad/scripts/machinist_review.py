@@ -65,7 +65,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -101,7 +100,8 @@ FINDING_KEYS = ("blockers", "over_specification", "clarity", "minor")
 GATING_KEYS = ("blockers", "over_specification", "clarity")
 # PDFium's native API is process-global and not thread-safe.  Hold this only while
 # opening/counting/rendering/closing PDFs; Codex review subprocesses remain parallel.
-_PDFIUM_LOCK = threading.Lock()
+# The ledger renders too (recording a passing review), so it is the ledger's lock.
+_PDFIUM_LOCK = machinist_ledger._PDFIUM_LOCK
 
 
 # Event/item types that indicate tool or command activity. Claude permits only
