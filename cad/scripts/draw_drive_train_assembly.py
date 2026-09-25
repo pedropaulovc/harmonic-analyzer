@@ -267,6 +267,7 @@ BOM_PART_NUMBERS = {
     "pinion-lever-pin": "MHA-135",
     "pinion-handle": "MHA-058",
     "pinion-arbor": "MHA-102",
+    "pinion-arbor-collar": "MHA-144",
     "slotted-screw": "MHA-101",
 }
 BOM_DESCRIPTIONS = {
@@ -311,6 +312,7 @@ BOM_DESCRIPTIONS = {
     "pinion-lever-pin": "PINION LEVER PIN, 1/16 X 13 STEEL",
     "pinion-handle": "PINION GRIP CROSSROD",
     "pinion-arbor": "INTEGRAL PINION ARBOR AND GRIP HEAD",
+    "pinion-arbor-collar": "PINION ARBOR RETENTION COLLAR",
     "slotted-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A199",
 }
 if set(BOM_DESCRIPTIONS) != set(BOM_PART_NUMBERS):
@@ -445,10 +447,12 @@ RIG_STEPS = "\n".join(
         "10. PRESS {cam_pins}X MHA-116 INTO THE MHA-056 SEATS PER ITS PRINT.",
         "11. MATCH-REAM THE MHA-102 HEAD TO MHA-058; PRESS MHA-058 (NO TURN OR",
         "    SLIDE BY HAND).",
-        # R1a (user): pinned retention collar MHA-144. Placeholder until the
-        # collar PR lands; the integration gate forbids shipping it.
-        "12. [PENDING: MHA-144 COLLAR - SLIDE IT ON FROM THE MHA-102 BACK END,",
-        "    PAST BOTH JOURNALS, TO ITS STATION; DRIVE ITS 1/16 SPRING PIN.]",
+        # R1a (user): pinned retention collar MHA-144 (#860). It goes on
+        # before the arbor is journalled (pinion_arbor_collar_spec); the pin
+        # is the rig's 1/16 x 1/2 slotted spring pin, never proud of the Ø15.
+        "12. SLIDE MHA-144 ON FROM THE MHA-102 BACK END, PAST BOTH JOURNALS,",
+        "    TO THE MHA-102 PIN HOLE; DRIVE ONE 1/16 X 1/2 SPRING PIN THROUGH",
+        "    BOTH, SUB-FLUSH.",
         "13. PASS MHA-102, BACK END FIRST, THROUGH THE FRONT MHA-056 TOP BORE",
         "    FROM THE HEAD SIDE.",
         "14. FIT MHA-002 ON MHA-102 PER THE MHA-102 PRINT.",
@@ -458,14 +462,13 @@ RIG_STEPS = "\n".join(
         # after the hang: MHA-062 is drilled off the machine (the cams sit
         # ~18.5 west of the foot), and once the cams are on, the pin's west
         # edge has 0.38 of air to the MHA-104 collar. Wording from
-        # pinioncluster (dt-torque-shaft-pin-fitup-steps-20260924.md);
-        # PENDING until #858 merges.
-        "16. [PENDING: PUSH THE HUNG CLUSTER HARD ON THE BACK MHA-061; SET",
+        # pinioncluster (dt-torque-shaft-pin-fitup-steps-20260924.md), #858.
+        "16. PUSH THE HUNG CLUSTER HARD ON THE BACK MHA-061; SET",
         "    MHA-062 FLUSH WITH ITS OUTER FACE. TRANSFER-PUNCH MHA-062 THROUGH",
         "    EACH MHA-056 CROSS HOLE; WITHDRAW IT AND DRILL 1/16 THRU AT EACH",
         "    MARK (V-BLOCK). REFIT MHA-062 FLUSH END BACK; DRIVE ONE 1/16 X 1/2",
         "    SPRING PIN PER STRAP, SUB-FLUSH BOTH EDGES. THE CLUSTER SWINGS",
-        "    FREELY AND MHA-062 TURNS WITH IT IN BOTH MHA-061.]",
+        "    FREELY AND MHA-062 TURNS WITH IT IN BOTH MHA-061.",
         "17. FIT {cams}X MHA-104 AND MHA-059 ON MHA-060 IN THE MHA-061 LIFT",
         "    BORES. PARK EACH CAM ECCENTRIC DOWN; LOCK IT WITH THE M2.5 SET",
         "    SCREW SUPPLIED WITH MHA-104. SEAT MHA-059 ON MHA-060 TO THE BORE",
@@ -527,7 +530,6 @@ CHECKS = "\n".join(
         "   MHA-002 BY MHA-058 UNTIL ALL NOTCHES POINT UP (COSINES) OR 90 DEG",
         "   (SINES). RETURN MHA-059 TO PARK; RE-ENGAGE THE CONE SET.",
         "6. PARKED, MHA-114 HOLDS MHA-002 CLEAR OF EVERY MHA-027.",
-        "   [PENDING: PINION BRACKET PLACEMENT AND TOOTH-COUNT RULINGS]",
         "7. PARKED, PINS ON THE CAMS: A 2.5 FEELER IS SNUG TIP TO TIP AT THE",
         "   FRONT AND BACK STATIONS; ACCEPT 2.3-2.7 (SHEET 7, STEP 19).",
     )
@@ -568,12 +570,11 @@ CONSUMABLES_NOTES = "\n".join(
 FIT_PLACEHOLDER = "\n".join(
     (
         # U31 (pivot): the bored spacing fixes the mesh; check 2 proves it.
+        # The rest of the old placeholder is owned elsewhere now: each cone
+        # gear's mesh by the MHA-013 print (check 2), the pinion engagement
+        # by steps 18-19 and check 7, the taper pin by step 6.
         "16T:64T CENTRE DISTANCE FIXED BY MHA-016 BORE SPACING; VERIFY BY",
         "BACKLASH (CHECK 2).",
-        "MESH + FIT DETAILS - PENDING",
-        "CONE/CYLINDER STATION MESH, ALIGNMENT PINION ENGAGEMENT AND",
-        "TAPER-PIN STATION DETAILS FOLLOW THE PINION BRACKET AND TOOTH-COUNT",
-        "RULINGS.",
     )
 )
 

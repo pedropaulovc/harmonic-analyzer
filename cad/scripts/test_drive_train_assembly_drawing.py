@@ -24,7 +24,7 @@ EXTERNAL_NUMBERS = frozenset({"MHA-035"})
 # 2026-09-23: drawing-only rulings commit). The integration commit that adds
 # the rows deletes this set; the test below fails once a row lands anyway.
 PRE_REGISTERED_NUMBERS = frozenset(
-    {"MHA-139", "MHA-140", "MHA-141", "MHA-142", "MHA-143", "MHA-144"}
+    {"MHA-139", "MHA-140", "MHA-141", "MHA-142", "MHA-143"}
 )
 
 
@@ -202,11 +202,9 @@ def test_pending_families_join_the_plan_when_they_land() -> None:
         *census,
         spec.Instance("crank-hub-1", "crank-hub", (-129.3, 129.9, -170.0)),
         spec.Instance("crank-hub-pin-1", "crank-hub-pin", (-129.3, 122.0, -170.0)),
-        spec.Instance("pinion-lever-pin-1", "pinion-lever-pin", (0.4, 64.7, -108.0)),
     ]
     moved = {step.label: names for step, names in spec.plan_explode(landed)}
     assert "crank-hub-1" in moved["crank arm group"]
-    assert "pinion-lever-pin-1" in moved["pinion lever"]
 
 
 def test_explode_families_are_either_moved_or_stationary_never_both() -> None:

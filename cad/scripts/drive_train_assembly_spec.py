@@ -17,10 +17,10 @@ from typing import Literal, Sequence
 EXPLODED_VIEW_NAME = "DRIVE_TRAIN_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
 
-# Families still arriving from sibling branches (crank-hub cluster MHA-137/138,
-# pinion-lever pin MHA-135). They are classified now so the integration head
-# needs no plan edit; an absent pending family is not an error.
-PENDING_STEMS = frozenset({"crank-hub", "crank-hub-pin", "pinion-lever-pin"})
+# Families still arriving from a sibling branch (crank-hub cluster MHA-137/138,
+# #831). They are classified now so the integration head needs no plan edit;
+# an absent pending family is not an error.
+PENDING_STEMS = frozenset({"crank-hub", "crank-hub-pin"})
 # Retired by the integral-arbor ruling (U11); refused if it reappears.
 RETIRED_STEMS = frozenset({"pinion-handle-pin"})
 
@@ -72,6 +72,7 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "pinion-lever-pin",
         "pinion-handle",
         "pinion-arbor",
+        "pinion-arbor-collar",
         "slotted-screw",
         "foot-screw",
     ),
@@ -152,7 +153,13 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         "spring foot screw lifts", ("foot-screw",), "y", 25.0, ("off-drum-axis",)
     ),
     ExplodeStep("pinion lever", ("pinion-lever", "pinion-lever-pin"), "z", -40.0),
-    ExplodeStep("pinion arbor", ("pinion-arbor", "pinion-handle"), "z", -50.0),
+    # The MHA-144 collar is pinned to the arbor, so it comes out with it.
+    ExplodeStep(
+        "pinion arbor",
+        ("pinion-arbor", "pinion-arbor-collar", "pinion-handle"),
+        "z",
+        -50.0,
+    ),
     ExplodeStep("grip crossrod", ("pinion-handle",), "y", 25.0),
 )
 
