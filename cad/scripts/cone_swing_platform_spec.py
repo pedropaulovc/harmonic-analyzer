@@ -195,6 +195,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "PostMountEastX",
         "PostMountEastZ",
     },
+    # The closed-end cap locates the notch; the run angle gives its rails a
+    # direction (the chord the lock stud follows).  Without it the sheet
+    # defines where the notch starts but not which way it runs.
+    "LockNotchProfile": {"NotchRunAngle"},
     "LockNotchCapEProfile": {"CapECx", "CapECz", "CapEDia"},
     "TipScrewSlotProfile": {"TipSlotEastCx", "TipSlotWestCx", "TipSlotZ", "TipSlotW"},
     "TipScrewCboreProfile": {"TipCboreW"},
@@ -233,6 +237,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PostMountEastX": 2,
         "PostMountEastZ": 2,
     },
+    # Angles take the title block's flat +/-1 deg whatever their places, so
+    # two places only print the chord's ruled value (9.11, the old note's
+    # figure) rather than rounding it to 9: the band is the block's either way.
+    "LockNotchProfile": {"NotchRunAngle": 2},
     "LockNotchCapEProfile": {"CapECx": 2, "CapECz": 2, "CapEDia": 2},
     # The slot ends are .XX so the +/-2.25 fit-up travel keeps >= +/-1.74.
     "TipScrewSlotProfile": {

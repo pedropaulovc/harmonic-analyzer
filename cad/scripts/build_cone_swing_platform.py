@@ -240,6 +240,14 @@ _SLOT_OUT_Z = SLOT_E_Z + (NOTCH_EXIT_TRAVEL + _MOUTH_OVERSHOOT) * _SLOT_TZ
 # is what the sketch geometry pins.
 NOTCH_RUN_DEG = math.degrees(math.atan2(_SLOT_TZ, _SLOT_TX))
 _NOTCH_ANGLE_RAY_MM = 20.0
+# The angle's vertex is the NORTH rail's closed-end corner (local x, z).  The
+# wedge then opens north of the cap centre, clear of the 205.81 cap-centre
+# witness that runs west from the cap on the notch plan; off the south rail
+# the angle text had to sit on that witness (PR #830, Codex P1).
+NOTCH_ANGLE_VERTEX_XZ = (
+    SLOT_E_X - _SLOT_TZ * SLOT_W / 2.0,
+    SLOT_E_Z + _SLOT_TX * SLOT_W / 2.0,
+)
 
 
 async def _add_notch_run_angle(
@@ -247,8 +255,9 @@ async def _add_notch_run_angle(
 ) -> None:
     """Author the notch run's plan angle as a driven dimension on its sketch.
 
-    A horizontal construction ray leaves the run's closed-end corner toward
-    the west; the angle between it and the run is the one the print carries.
+    A horizontal construction ray leaves the run's closed-end corner (the END
+    of ``run_line``, at ``vertex``) toward the west; the angle between it and
+    the run is the one the print carries.
     ``AddSpecificDimension`` picks whichever of the four angle regions holds
     its text point, so the text goes on the bisector inside the acute wedge,
     with sketch y in both the y and the -z slots (a Top-plane sketch's y is
@@ -280,7 +289,7 @@ async def _add_notch_run_angle(
     check(
         "notch angle ray start -> run corner",
         await adapter.add_sketch_constraint(
-            f"{ray}.start", f"{run_line}.start", "coincident"
+            f"{ray}.start", f"{run_line}.end", "coincident"
         ),
     )
     check(
@@ -937,7 +946,14 @@ async def build(adapter) -> dict[str, str]:
     # follows, tangent to the swing arc about the pivot).  A construction ray
     # from the run's closed-end corner gives that angle a second line; the
     # angle itself is DRIVEN, so it reports the chord and can never bend it.
-    await _add_notch_run_angle(adapter, slot_lines[0], slot_pts[0], slot)
+    # The north rail runs from the mouth (slot_pts[2]) to the closed end
+    # (slot_pts[3]), the vertex NOTCH_ANGLE_VERTEX_XZ names for the drawing.
+    north_corner = (NOTCH_ANGLE_VERTEX_XZ[0], -NOTCH_ANGLE_VERTEX_XZ[1])
+    if math.dist(slot_pts[3], north_corner) > 1e-9:
+        raise AssertionError(
+            f"notch north closed-end corner {slot_pts[3]} != {north_corner}"
+        )
+    await _add_notch_run_angle(adapter, slot_lines[2], slot_pts[3], slot)
     await ensure_fully_defined(adapter, "lock notch sketch")
     check("exit_sketch lock notch", await adapter.exit_sketch())
     name_last_feature(adapter, "LockNotchProfile")

@@ -160,6 +160,16 @@ NOTCH_KEEP = {
     "CapECx": (0.2652, 0.258),
     "CapECz": (0.305, 0.180),
     "CapEDia": (0.285, 0.259),
+    # The run angle (PR #830, Codex P1: without it the rails had no
+    # direction).  Its vertex is the north rail's closed-end corner, sheet
+    # ~(0.2730, 0.2386) with the pivot at (0.2568, 0.1377); the text sits on
+    # the bisector 24 mm out, inside the 9.11 deg wedge -- a text point
+    # outside it selects the supplement or the opposite sector (d22701cf8's
+    # sheet-spanning arc).  A ~11.8 x 3.8 mm "9.11°" box there keeps ~2.0 mm
+    # under the 205.81 cap-centre witness (y 0.2406) and ~2.2 mm left of that
+    # dimension's line (x 0.305).  Laid out from those figures, NOT from a
+    # render; _assert_notch_angle_in_wedge proves the sector on the sheet.
+    "NotchRunAngle": (0.2969, 0.2367),
 }
 SECTION_KEEP = {
     # Outside its witnesses, the text hangs LEFT of the dimension line (away
@@ -382,6 +392,59 @@ def slot_section_line_model_points() -> tuple[tuple[float, float, float], ...]:
 
 
 _COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
+
+
+def _assert_notch_angle_in_wedge(
+    adapter: Any, view: Any, annotations: list[Any]
+) -> None:
+    """Prove the run angle's text sits in its acute 9.11 deg sector.
+
+    An angular dimension measures the sector that holds its text, so a text
+    point beside the wedge prints the supplement (170.89) or the vertically
+    opposite sector's arc.  The sector is re-derived from the model through
+    the placed view, not from the layout's own sheet figures.
+    """
+    matches = [
+        item for item in annotations if dimension_name(adapter, item) == "NotchRunAngle"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one NotchRunAngle annotation, found {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    text = tuple(float(value) for value in annotation.GetPosition())
+    vx, vz = _part.NOTCH_ANGLE_VERTEX_XZ
+    run = math.radians(_part.NOTCH_RUN_DEG)
+    y = PLATE_THICKNESS / 1000.0
+
+    def sheet(x_mm: float, z_mm: float, label: str) -> tuple[float, float]:
+        return model_point_in_view(
+            adapter, view, (x_mm / 1000.0, y, z_mm / 1000.0), label=label
+        )
+
+    vertex = sheet(vx, vz, "notch angle vertex")
+    ray_end = sheet(vx + 10.0, vz, "notch angle ray")
+    run_end = sheet(vx + 10.0 * math.cos(run), vz + 10.0 * math.sin(run), "notch run")
+    ray = (ray_end[0] - vertex[0], ray_end[1] - vertex[1])
+    run_dir = (run_end[0] - vertex[0], run_end[1] - vertex[1])
+    to_text = (text[0] - vertex[0], text[1] - vertex[1])
+
+    def cross(a: tuple[float, float], b: tuple[float, float]) -> float:
+        return a[0] * b[1] - a[1] * b[0]
+
+    turn = cross(ray, run_dir)
+    inside = (
+        cross(ray, to_text) * turn > 0.0
+        and cross(to_text, run_dir) * turn > 0.0
+        and ray[0] * to_text[0] + ray[1] * to_text[1] > 0.0
+    )
+    _telemetry.info(
+        f"NotchRunAngle text={text[:2]} vertex={vertex} ray={ray_end} "
+        f"run={run_end} inside_acute_sector={inside}"
+    )
+    if not inside:
+        raise RuntimeError(
+            f"NotchRunAngle text {text[:2]} is outside its acute sector at "
+            f"{vertex}; it would print the supplement or the opposite arc"
+        )
 
 
 def _hide_profile_cosmetic_threads(adapter: Any, view: Any) -> None:
@@ -1267,6 +1330,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="notch plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    _assert_notch_angle_in_wedge(adapter, notch, notch_annotations)
     section_annotations = curate_view_dimensions(
         adapter,
         section,

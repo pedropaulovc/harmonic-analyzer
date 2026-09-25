@@ -294,6 +294,86 @@ def test_lock_notch_caption_sits_under_its_own_view() -> None:
     assert _boxes_overlap(old, label)
 
 
+def _notch_plan_sheet(x_mm: float, z_mm: float) -> tuple[float, float]:
+    """Model plan (x, z) on the notch plan: sheet +x is west, +y is south.
+
+    The notch plan is the profile's *Top view at 1:2, so its pivot sits at the
+    profile's measured pivot offset from its own view centre.
+    """
+    pivot = (
+        drawing.NOTCH_CENTER[0] + drawing.PROFILE_PIVOT_XY[0] - drawing.PROFILE_CENTER[0],
+        drawing.NOTCH_CENTER[1] + drawing.PROFILE_PIVOT_XY[1] - drawing.PROFILE_CENTER[1],
+    )
+    return (pivot[0] + x_mm / 2000.0, pivot[1] - z_mm / 2000.0)
+
+
+def _angle_text_box(center: tuple[float, float]) -> tuple[float, float, float, float]:
+    """ "9.11°" at the dimension glyph size, centred on its text point."""
+    half_w = len(f"{part.NOTCH_RUN_DEG:.2f}°") * _CHAR_W / 2.0
+    return (
+        center[0] - half_w,
+        center[1] - _GLYPH_H / 2.0,
+        center[0] + half_w,
+        center[1] + _GLYPH_H / 2.0,
+    )
+
+
+def _distance_to_line(
+    point: tuple[float, float], start: tuple[float, float], direction: tuple[float, float]
+) -> float:
+    dx, dy = point[0] - start[0], point[1] - start[1]
+    return abs(dx * direction[1] - dy * direction[0]) / math.hypot(*direction)
+
+
+def test_notch_run_angle_gives_the_rails_their_direction() -> None:
+    """PR #830 Codex P1: the notch plan printed where the notch starts, not
+    which way it runs.  92a84f6dc replaced the "AXIS 9.11 DEG" note with the
+    model-owned NotchRunAngle; abde20e3c dropped it from all three contracts
+    and nothing took its place.  It is marked, carries its places, and is
+    kept on the notch plan with its text inside the acute sector (a text
+    point outside prints the supplement: d22701cf8's sheet-spanning arc).
+    """
+    assert "NotchRunAngle" in spec.DRAWING_DIMENSIONS["LockNotchProfile"]
+    assert spec.DRAWING_PRECISION_BY_NAME["NotchRunAngle"] == 2
+    assert f"{part.NOTCH_RUN_DEG:.2f}" == "9.11"
+    text = drawing.NOTCH_KEEP["NotchRunAngle"]
+
+    # The vertex is the north rail's closed-end corner: the cap centre less
+    # half the slot width along the run's left normal (-TZ, TX).
+    half_w = part.SLOT_W / 2.0
+    assert part.NOTCH_ANGLE_VERTEX_XZ == pytest.approx(
+        (part.SLOT_E_X - part._SLOT_TZ * half_w, part.SLOT_E_Z + part._SLOT_TX * half_w)
+    )
+    vertex = _notch_plan_sheet(*part.NOTCH_ANGLE_VERTEX_XZ)
+    run = math.radians(part.NOTCH_RUN_DEG)
+    ray = (1.0, 0.0)  # model west
+    run_dir = (math.cos(run), -math.sin(run))  # west and north: sheet down
+    to_text = (text[0] - vertex[0], text[1] - vertex[1])
+    assert to_text[0] * ray[1] - to_text[1] * ray[0] > 0.0  # below the ray
+    assert run_dir[0] * to_text[1] - run_dir[1] * to_text[0] > 0.0  # above the run
+    # 1 mm from both sides, so a 0.5 mm view drift cannot leave the sector.
+    assert _distance_to_line(text, vertex, ray) >= 0.001
+    assert _distance_to_line(text, vertex, run_dir) >= 0.001
+
+    # The text clears the 205.81 cap-centre witness and that dimension's line.
+    box = _angle_text_box(text)
+    cap_witness_y = _notch_plan_sheet(part.SLOT_E_X, part.SLOT_E_Z)[1]
+    cap_dimension_x = drawing.NOTCH_KEEP["CapECz"][0]
+    assert cap_witness_y - box[3] >= 0.0018
+    assert cap_dimension_x - box[2] >= 0.0018
+    west_edge_x = _notch_plan_sheet(part._west_edge_x(part.SLOT_E_Z), 0.0)[0]
+    assert box[0] - west_edge_x >= 0.005
+
+    # Positive control: off the SOUTH rail's corner the same bisector point
+    # lands on the witness -- why the vertex moved to the north rail.
+    south = _notch_plan_sheet(
+        part.SLOT_E_X + part._SLOT_TZ * half_w, part.SLOT_E_Z - part._SLOT_TX * half_w
+    )
+    south_text = (south[0] + to_text[0], south[1] + to_text[1])
+    south_box = _angle_text_box(south_text)
+    assert south_box[1] < cap_witness_y < south_box[3]
+
+
 def test_section_a_a_group_stays_inside_the_border() -> None:
     """Shifted 10 mm right, A-A's ink and its audited Ra box stay inside.
 
