@@ -394,8 +394,10 @@ FOOT_SCREW_DRILL_DEPTH = 11.3
 # the drive train's stations): the drum axis x, and z = each strap inner face
 # (the drive train's end-disc stations -72.652 / +75.202) -+ the 19.0 from
 # that face to the ledge hole. The seats are TRANSFERRED from the fitted
-# pedestals at assembly, so the print gives no position; the drive train
-# asserts these nominal stations against its own derivation.
+# pedestals at assembly, so the print gives no position. These are literals
+# because the base cannot import the drive train (it imports the base); the
+# drive train asserts them against its own derivation within 0.05 and
+# test_drive_train_support_layout pins them within 0.005.
 _DRUM_AXIS_X = -54.7 + MECHANISM_X_SHIFT
 _PEDESTAL_STRAP_FACE_Z = (-72.652, 75.202)
 _PEDESTAL_LEDGE_OFFSET = PEDESTAL_STRAP_INNER_Z - PEDESTAL_LEDGE_SCREW_Z  # 19.0
@@ -512,6 +514,19 @@ PEDESTAL_SEAT_SPEC = HoleSpec(
     thread_class="2B",
     overrides_mm={"ThreadDepth": PEDESTAL_SCREW_HOLE_DEPTH},
 )
+# Rule 12 (E15) at the printed worst case, not just the nominal the stock-fit
+# guard checks: the shallowest drill still keeps two pitches of bottoming-tap
+# lead past the deepest thread (the reach side is asserted by the drive train
+# against BASE_PEDESTAL_HOLE_DEPTH).
+_PEDESTAL_DEPTH_BAND = 0.8  # .X
+_PEDESTAL_TAP_LEAD = 2 * 25.4 / float(PEDESTAL_SEAT_SPEC.size.rsplit("-", 1)[1])
+if (
+    PEDESTAL_SCREW_DRILL_DEPTH - _PEDESTAL_DEPTH_BAND
+    < PEDESTAL_SCREW_HOLE_DEPTH + _PEDESTAL_DEPTH_BAND + _PEDESTAL_TAP_LEAD
+):
+    raise AssertionError(
+        "pedestal hold-down drill loses the bottoming-tap lead at the worst case"
+    )
 NAMEPLATE_SEAT_SPEC = HoleSpec(
     "tapped_bottoming",
     "#4-40",
