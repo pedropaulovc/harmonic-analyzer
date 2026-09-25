@@ -447,7 +447,7 @@ expect(
     DT,
     "pinion-lift-rod-1",
     [d.LIFT_X, d.LIFT_Y, d.LIFT_ROD_Z0],
-    IDENTITY,
+    d.LIFT_ROD_ROWS,
     "pinion-lift-rod",
 )
 expect(
@@ -472,23 +472,23 @@ expect(
     "pinion-cam-pin back",
 )
 expect(
-    DT, "pinion-cam-1", [d.LIFT_X, d.LIFT_Y, d.CAM_Z0[0]], IDENTITY, "pinion-cam front"
+    DT, "pinion-cam-1", [d.LIFT_X, d.LIFT_Y, d.CAM_Z0[0]], d.PINION_CAM_ROWS, "pinion-cam front"
 )
 expect(
-    DT, "pinion-cam-2", [d.LIFT_X, d.LIFT_Y, d.CAM_Z0[1]], IDENTITY, "pinion-cam back"
+    DT, "pinion-cam-2", [d.LIFT_X, d.LIFT_Y, d.CAM_Z0[1]], d.PINION_CAM_ROWS, "pinion-cam back"
 )
 expect(
     DT,
     "pinion-lever-1",
     [d.LIFT_X, d.LIFT_Y, d.LEVER_Z],
-    d.rot_z_rows(d.LEVER_TILT_DEG),
+    d.LEVER_ROWS,
     "pinion-lever",
 )
 expect(
     DT,
     "pinion-handle-1",
     [d.APINION_X, d.APINION_Y, d.HANDLE_Z],
-    d.rot_z_rows(d.HANDLE_TILT_DEG),
+    d.HANDLE_ROWS,
     "pinion-handle",
 )
 expect(
