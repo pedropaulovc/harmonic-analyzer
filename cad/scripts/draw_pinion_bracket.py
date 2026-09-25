@@ -144,9 +144,11 @@ LEFT_KEEP = {
     # text's left end to the seat, crossing only the bottom outline.
     "PinSeatDia": (0.125, 0.082),
     # Option E-a: the cross-hole mouth sits on the flank at the pivot-bore
-    # axis height, below the seat.  Its four-line callout goes in the clear
-    # field left of the view, leader rising right to the mouth.
-    "CrossHoleDia": (0.030, 0.098),
+    # axis height, below the seat.  pc-ea eye pass: left of the view its
+    # 32-character line ran off the sheet's left border, so the callout sits
+    # in the clear field under the view, left of the follower-seat callout's
+    # underline, and its leader rises to the mouth.
+    "CrossHoleDia": (0.053, 0.045),
 }
 SECTION_CENTER = (0.350, 0.115)
 # Right of the seat's witness lines (x <= 0.3394), callout below the value:
