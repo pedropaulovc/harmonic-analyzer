@@ -609,6 +609,8 @@ _FLIP_INVERT: frozenset[str] = frozenset(
         "swing stop screw datum Z",
         "tip block axial seat",
         "tip bushing axial seat",
+        # Option E-a: the pinned torque shaft's axial station (pc-ea run).
+        "torque shaft axial",
     }
 )
 
