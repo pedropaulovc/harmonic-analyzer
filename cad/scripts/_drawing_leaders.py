@@ -43,7 +43,7 @@ What a seat has shown, and what it has not yet:
 from __future__ import annotations
 
 import math
-from typing import Any, Mapping, Sequence
+from typing import Any, Collection, Mapping, Sequence
 
 import _telemetry
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
@@ -121,8 +121,12 @@ def parse_section_line_info(values: Sequence[float]) -> list[Segment]:
 
     Layout: [count, layer, then per line: nSegments, nSegments x (lineType,
     start[3], end[3]), arrow1 (start[3], end[3], width, height, style), arrow2
-    (same), text1[3], text2[3], textHeight]. The chain-line segments and both
-    arrow shafts come back; the labels' text points do not.
+    (same), text1[3], text2[3], textHeight]. The chain-line segments, both
+    arrow shafts and both arrowheads' outlines come back; the labels' text
+    points do not. Each head is tipped at the shaft end AWAY from the chain
+    line: the end that meets a chain-segment endpoint is the tail. A shaft
+    with neither or both ends on the chain raises with its raw values rather
+    than guessing.
     """
     values = [float(v) for v in values]
     if not values:
@@ -131,18 +135,72 @@ def parse_section_line_info(values: Sequence[float]) -> list[Segment]:
     for _ in range(count):
         n = int(values[index])
         index += 1
+        chain_ends: list[Point] = []
         for _ in range(n):
             start, end = values[index + 1 : index + 3], values[index + 4 : index + 6]
             segments.append(((start[0], start[1]), (end[0], end[1])))
+            chain_ends.extend(((start[0], start[1]), (end[0], end[1])))
             index += 7
-        for _ in range(2):
-            start, end = values[index : index + 2], values[index + 3 : index + 5]
-            segments.append(((start[0], start[1]), (end[0], end[1])))
+        for arrow in (1, 2):
+            raw = values[index : index + 9]
+            start, end = (raw[0], raw[1]), (raw[3], raw[4])
+            width, height = raw[6], raw[7]
+            segments.append((start, end))
+            segments.extend(
+                arrowhead_outline(_tail_first(start, end, chain_ends, arrow, raw), width, height)
+            )
             index += 9
         index += 7
     if index != len(values):
         raise RuntimeError(f"section-line info has {len(values)} values, parsed {index}")
     return segments
+
+
+def _tail_first(
+    start: Point, end: Point, chain_ends: Sequence[Point], arrow: int, raw: Sequence[float]
+) -> Segment:
+    """The arrow shaft ordered tail (on the chain line) to tip."""
+    on_chain = [
+        any(math.dist(point, chain) <= COLLINEAR_TOLERANCE for chain in chain_ends)
+        for point in (start, end)
+    ]
+    if on_chain == [True, False]:
+        orientation, shaft = "start on chain, tip at end", (start, end)
+    elif on_chain == [False, True]:
+        orientation, shaft = "end on chain, tip at start", (end, start)
+    else:
+        raise RuntimeError(
+            f"section arrow {arrow}: cannot tell its tip -- start on chain "
+            f"{on_chain[0]}, end on chain {on_chain[1]}; raw {list(raw)}, "
+            f"chain ends {list(chain_ends)}"
+        )
+    _telemetry.debug(f"section arrow {arrow}: {orientation}")
+    return shaft
+
+
+def arrowhead_outline(shaft: Segment, width: float, height: float) -> list[Segment]:
+    """The outline of an arrowhead whose tip is the shaft's end.
+
+    The API names the head's two sizes but not which one runs along the
+    shaft, so both readings are returned -- a head ``width`` long and
+    ``height`` across, and ``height`` long and ``width`` across -- and a
+    crossing with either counts.  Each reading is three strokes: the two
+    wings from the tip back to the base corners, and the base across the
+    shaft between them.
+    """
+    (x0, y0), (x1, y1) = shaft
+    length = math.dist((x0, y0), (x1, y1))
+    if length == 0.0:
+        return []
+    ux, uy = (x1 - x0) / length, (y1 - y0) / length
+    wings = []
+    for along, across in ((width, height), (height, width)):
+        bx, by = x1 - ux * along, y1 - uy * along
+        half = across / 2.0
+        left = (bx - uy * half, by + ux * half)
+        right = (bx + uy * half, by - ux * half)
+        wings.extend((((x1, y1), left), ((x1, y1), right), (left, right)))
+    return wings
 
 
 def section_line_segments(view: Any) -> list[Segment]:
@@ -210,20 +268,45 @@ def _collinear_overlap(first: Segment, second: Segment, tolerance: float) -> boo
     return min(length, max(tc, td)) - max(0.0, min(tc, td)) > tolerance
 
 
-def segments_cross(
-    first: Segment, second: Segment, tolerance: float = COLLINEAR_TOLERANCE
-) -> bool:
-    """True when the segments properly intersect or one lies along the other.
+def _ends_on_interior(segment: Segment, other: Segment, tolerance: float) -> bool:
+    """True when an end of ``segment`` lands on ``other`` away from its ends."""
+    for end in segment:
+        if min(math.dist(end, other[0]), math.dist(end, other[1])) <= tolerance:
+            continue
+        if distance_to_point(other, end) <= tolerance:
+            return True
+    return False
 
-    A shared endpoint is not a crossing; a leader laid along another line for
-    more than ``tolerance`` is, since the two strokes print as one.
+
+def segments_cross(
+    first: Segment,
+    second: Segment,
+    tolerance: float = COLLINEAR_TOLERANCE,
+    *,
+    touching: str = "crossing",
+) -> bool:
+    """True when the segments intersect, meet in a T or one lies along the other.
+
+    Only a shared endpoint (within ``tolerance``) is exempt.  A stroke that
+    ends on another's interior -- a T-junction -- is a crossing unless the
+    caller declares the pair ``touching="allowed"`` (a leader tip landed on
+    its own feature line); a proper crossing and a collinear overlap longer
+    than ``tolerance`` always count, since the strokes print as one.
     """
+    if touching not in ("crossing", "allowed"):
+        raise ValueError(f"touching must be 'crossing' or 'allowed', not {touching!r}")
     (a, b), (c, d) = first, second
     d1, d2 = _orientation(c, d, a), _orientation(c, d, b)
     d3, d4 = _orientation(a, b, c), _orientation(a, b, d)
     if d1 * d2 < 0.0 and d3 * d4 < 0.0:
         return True
-    return _collinear_overlap(first, second, tolerance) or _collinear_overlap(
+    if _collinear_overlap(first, second, tolerance) or _collinear_overlap(
+        second, first, tolerance
+    ):
+        return True
+    if touching == "allowed":
+        return False
+    return _ends_on_interior(first, second, tolerance) or _ends_on_interior(
         second, first, tolerance
     )
 
@@ -267,14 +350,24 @@ def distance_to_box(segment: Segment, box: Box) -> float:
     )
 
 
-def leader_crossings(groups: Mapping[str, Sequence[Segment]]) -> list[tuple[str, str]]:
-    """Every pair of named annotations whose ink crosses."""
+def leader_crossings(
+    groups: Mapping[str, Sequence[Segment]],
+    touching: Collection[frozenset[str]] = (),
+) -> list[tuple[str, str]]:
+    """Every pair of named annotations whose ink crosses.
+
+    ``touching`` lists the pairs (as frozensets of two names) declared to meet
+    in a T -- one's tip landed on the other's line; they still may not cross.
+    """
     names = list(groups)
     crossings = []
     for i, first in enumerate(names):
         for second in names[i + 1 :]:
+            mode = "allowed" if frozenset((first, second)) in touching else "crossing"
             if any(
-                segments_cross(a, b) for a in groups[first] for b in groups[second]
+                segments_cross(a, b, touching=mode)
+                for a in groups[first]
+                for b in groups[second]
             ):
                 crossings.append((first, second))
     return crossings
@@ -321,6 +414,7 @@ def assert_leaders_clear(
     keep_out: Mapping[str, float],
     lands_within: Mapping[str, tuple[float, float]],
     label: str,
+    touching: Collection[frozenset[str]] = (),
 ) -> None:
     """Fail unless every named annotation lands at its feature and none cross.
 
@@ -328,7 +422,9 @@ def assert_leaders_clear(
     lies that far from ``centre`` (its rim, or the centre itself). Every
     annotation must have a band, which proves the segments are sheet metres
     before the crossing and keep-out checks can pass. ``keep_out[name]``: no
-    segment of it comes closer to ``centre`` than that.
+    segment of it comes closer to ``centre`` than that. ``touching``: pairs
+    declared to meet in a T (``leader_crossings``); every other T is a
+    crossing.
     """
     missing = sorted(set(groups) - set(lands_within))
     if missing:
@@ -344,7 +440,7 @@ def assert_leaders_clear(
         for name, distance in landings.items()
         if not lands_within[name][0] <= distance <= lands_within[name][1]
     }
-    crossings = leader_crossings(groups)
+    crossings = leader_crossings(groups, touching)
     intrusions = {
         name: min(distance_to_point(segment, centre) for segment in groups[name])
         for name, radius in keep_out.items()
