@@ -40,10 +40,14 @@ from _common import (
     POLISHED_STEEL,
     SketchDims,
     _early_bound,
+    _read_member,
+    anchor_point_to_origin,
     apply_color,
     apply_material,
+    blank_sketch,
     check,
     define_circle,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -86,6 +90,7 @@ from pinion_bracket_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     PIN_SEAT_DIA_BAND,
+    PIN_SEAT_STATION_BAND,
     PIVOT_BORE_BAND,
     SURFACE_FINISHES,
 )
@@ -490,6 +495,61 @@ async def build(adapter) -> dict[str, str]:
     )
     expected -= v_cross
 
+    # The cross hole's height is a relation (ON the pivot-bore axis) with no
+    # dimension to print, and the bore is hidden in the side view.  Codex #858
+    # P2, user ruling (a): a REFERENCE sketch owns it as a model dimension --
+    # one construction line on the Right Plane from the hole's centre to the
+    # pivot-bore wall, whose single marked dimension CrossHoleFromBoreWall is
+    # "PivotBore" / 2 (the harmonic base's reference-sketch idiom; policy rule
+    # 2).  It is BLANKED once built so it never renders in an assembly, and
+    # the drawing shows it in the side view only
+    # (_drawing_hidden_sketches.curate_view_dimensions).
+    check(
+        "create_sketch cross-hole axis reference", await adapter.create_sketch("Right")
+    )
+    # Direct-to-DB: the line starts ON the sketch X axis and runs vertically,
+    # so creation-time inference would add exactly the relations placed below
+    # and leave the sketch over-defined.
+    set_sketch_direct_db(adapter, True)
+    wall_ref = check(
+        "cross-hole axis reference line",
+        await adapter.add_line(
+            -THICKNESS / 2.0, 0.0, -THICKNESS / 2.0, -PIVOT_BORE / 2.0
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[wall_ref], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("cross-hole axis reference did not take the construction flag")
+    check(
+        "cross-hole axis reference vertical",
+        await adapter.add_sketch_constraint(wall_ref, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{wall_ref}.start",
+        f"{wall_ref}.end",
+        "vertical_distance",
+        PIVOT_BORE / 2.0,
+        "cross hole from pivot-bore wall",
+    )
+    await anchor_point_to_origin(
+        adapter, f"{wall_ref}.start", -THICKNESS / 2.0, 0.0, "cross-hole axis reference"
+    )
+    await ensure_fully_defined(adapter, "cross-hole axis reference sketch")
+    check("exit_sketch cross-hole axis reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "CrossHoleAxisReference")
+    wall_dims = name_dimensions(
+        adapter,
+        "CrossHoleAxisReference",
+        ["CrossHoleFromBoreWall", "CrossHoleAxisRefCz"],
+    )
+    drive_jobs += [
+        (wall_dims[0], '"PivotBore" / 2'),
+        (wall_dims[1], '"StrapThickness" / 2'),
+    ]
+
     # Named bore axes for the assembly: the pivot bore (Axis1) rides the torque
     # shaft, the arbor bore (Axis2) journals the pinion. The p2 swing group keys
     # off these (concentric to the shaft + lock the pinion in -- build_drive_train).
@@ -530,6 +590,11 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "PinSeatProfile", "PinSeatDia", *deviations(PIN_SEAT_DIA_BAND)
     )
+    # User ruling (a): the seat's station from broad face A, tightened for
+    # its far-face web (pinion_bracket_spec.PIN_SEAT_WEB_WORST).
+    set_dimension_bilateral_tolerance(
+        adapter, "PinSeatProfile", "PinSeatCz", *deviations(PIN_SEAT_STATION_BAND)
+    )
     set_dimension_bilateral_tolerance(
         adapter, "CrossHoleProfile", "CrossHoleDia", *deviations(CROSS_HOLE_BAND)
     )
@@ -545,6 +610,15 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
     apply_drawing_properties(adapter, PART_NAME)
+    blank_sketch(adapter, "CrossHoleAxisReference")
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    visible = int(
+        _read_member(part.FeatureByName("CrossHoleAxisReference"), "Visible")
+    )
+    if visible != 1:  # swVisibilityState_e: 1 hidden
+        raise RuntimeError(
+            f"cross-hole axis reference still visible after blanking ({visible})"
+        )
     blank_reference_geometry(
         adapter,
         (

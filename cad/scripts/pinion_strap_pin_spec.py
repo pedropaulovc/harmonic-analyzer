@@ -41,21 +41,26 @@ if not (0.062 * INCH <= HOLE_DIA and HOLE_MAX <= 0.065 * INCH):
 
 # Title-block general grades the hole's surroundings print at.
 DOT_X_BAND = 0.8  # .X: strap thickness and end-cap radius
-DOT_XX_BAND = 0.51  # .XX: an implied-zero location read against the general grade
+DOT_XX_BAND = 0.51  # .XX: the printed station and the printed offset from the bore wall
 
-# Web from the centred cross hole to either broad strap face (rule 12 pattern:
-# half the thickness at its .X minus band, the hole's upper-limit radius and
-# the 0.05 drilled-hole allowance).
-STRAP_FACE_WEB_WORST = (THICKNESS - DOT_X_BAND) / 2.0 - HOLE_MAX / 2.0 - 0.05
+# Web from the cross hole to the FAR broad face (Codex #858 P2).  MHA-056
+# prints the hole's station from broad face A at .XX (the model's own
+# CrossHoleCz, half the thickness), so the far face sees the thinnest bar (.X
+# minus band) less the station at its .XX maximum, the hole's upper-limit
+# radius and the 0.05 drilled-hole allowance.  The near-face web is larger.
+STRAP_FACE_WEB_WORST = (
+    (THICKNESS - DOT_X_BAND) - (THICKNESS / 2.0 + DOT_XX_BAND) - HOLE_MAX / 2.0 - 0.05
+)
 # Ligament from the cross hole to the MHA-116 follower seat 7 above it.
 FOLLOWER_SEAT_LIGAMENT = abs(PIN_DROP) - HOLE_MAX / 2.0 - PIN_BORE / 2.0
 # Shaft wall beside the match-drilled hole.  The hole must cross the shaft
-# axis: an offset e from it thins one side by e.  The strap hole is printed
-# ON the pivot-bore axis with no dimension of its own, so the offset is read
-# against the full general .XX grade -- the worst case below, which still
-# clears the 1.5 floor, so no tighter band (and no position frame, which
-# rule 3 bars on a bracket) is needed.  A V-block set-up holding 0.25 leaves
-# SHAFT_LIGAMENT_QUARTER.
+# axis: an offset e from it thins one side by e.  MHA-056 prints the strap
+# hole's height as its distance from the pivot-bore wall (the model's own
+# "PivotBore" / 2 reference, Codex #858 P2 user ruling (a)) at .XX, so the
+# offset is read against the full general .XX grade -- the worst case below,
+# which still clears the 1.5 floor, so no tighter band (and no position
+# frame, which rule 3 bars on a bracket) is needed.  A V-block set-up holding
+# 0.25 leaves SHAFT_LIGAMENT_QUARTER.
 # The MHA-062 shaft is the pivot bore's own nominal (a lockstep test pins it).
 _SHAFT_MIN = PIVOT_BORE + SHAFT_H[1]
 SHAFT_LIGAMENT_CENTRED = (_SHAFT_MIN - HOLE_MAX) / 2.0
