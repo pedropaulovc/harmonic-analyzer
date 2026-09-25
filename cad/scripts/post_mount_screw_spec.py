@@ -5,8 +5,11 @@ length: a MODIFIED purchased part.  Its head seats on the MHA-016
 counterbore floor and the shank threads through the MHA-091 plate, which
 swings over the base, so the cut end must never stand proud of the plate's
 underside.  The cut length is therefore a real, model-owned dimension on the
-sheet, with the band that chain allows (policy rule 2), not a number in an
-installation note (rule 6, Main's eye pass of warm-c486).
+sheet (policy rule 2), not a number in an installation note (rule 6, Main's
+eye pass of warm-c486).  Across the printed post and plate bands no single
+length both stays flush and keeps the engagement minimum (U27 check below),
+so the length prints as a REFERENCE and each screw is cut to its own hole at
+assembly.
 
 The engagement this leaves is the named rule-12 exception in
 ``cad/docs/drawing-simplicity-policy.md``; it is held here as a model
@@ -15,8 +18,7 @@ assert, not printed on the part sheet.
 
 from __future__ import annotations
 
-import math
-
+import _config
 import cone_pivot_post_spec as post
 import cone_swing_platform_spec as platform
 from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
@@ -45,39 +47,81 @@ DRAWING_PRECISION_BY_NAME = {
 }
 REFERENCE_SKETCHES = (CUT_LENGTH_SKETCH,)
 
-# (upper, lower), the _fit_limits convention.  The nominal 86.0 (U37c) is
-# the shortest acceptable cut; the upper deviation reaches toward flush,
-# FLOORED at the dimension's own places so a rounded limit can never let the
-# end stand proud.  At the model's nominal post and plate that reads flush to
-# 0.3 short of the MHA-091 underside.
-_PLACES = DRAWING_PRECISION[CUT_LENGTH_SKETCH][CUT_LENGTH_DIMENSION]
-_SCALE = 10**_PLACES
-CUT_LENGTH_BAND = (
-    math.floor((FLUSH_LENGTH_MM - CUT_LENGTH_MM) * _SCALE + 1e-9) / _SCALE,
-    0.0,
+# --- U27: can one fixed cut length serve every in-band post and plate? ---
+# The printed bands, as the shop reads them off the title block: the post's
+# overall height is a .X dimension, its counterbore depth a .XX callout, and
+# the plate is 1/4 flat bar as supplied (U41) at its mill tolerance.
+_GENERAL_1PL_MM = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
+_GENERAL_2PL_MM = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+_POST_HEIGHT_PRINTED = round(post.BLOCK_HEIGHT, 1)
+_CBORE_DEPTH_PRINTED = round(post.ATTACHMENT_CBORE_DEPTH, 2)
+# U41: 1/4 plate as supplied.  Integ carries the same mill band as
+# cone_swing_platform_spec.PLATE_STOCK_BAND; this branch predates it.
+PLATE_STOCK_BAND_MM = 0.13
+# Title block: REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX.
+# Two breaks eat thread: the tap's entry at the plate top and the screw's
+# chamfered cut end (the cut-end chamfer carries no size, so the title block
+# limits it).
+EDGE_BREAK_MAX_MM = float(_config.title_block("edge_break")["chamfer_max_mm"])
+ENGAGEMENT_BREAKS_MM = 2.0 * EDGE_BREAK_MAX_MM
+
+# Counterbore floor above PlateTop (the post foot seats on it), both ends.
+FLOOR_LOW_MM = (_POST_HEIGHT_PRINTED - _GENERAL_1PL_MM) - (
+    _CBORE_DEPTH_PRINTED + _GENERAL_2PL_MM
 )
-CUT_LENGTH_MAX_MM = CUT_LENGTH_MM + CUT_LENGTH_BAND[0]
-CUT_LENGTH_MIN_MM = CUT_LENGTH_MM + CUT_LENGTH_BAND[1]
-if CUT_LENGTH_MAX_MM > FLUSH_LENGTH_MM + 1e-9:
-    raise ValueError(
-        f"MHA-142 long limit {CUT_LENGTH_MAX_MM:.2f} stands proud of the "
-        f"MHA-091 underside ({FLUSH_LENGTH_MM:.2f})"
-    )
-if CUT_LENGTH_BAND[0] <= CUT_LENGTH_BAND[1]:
-    raise ValueError(f"MHA-142 cut-length band is empty: {CUT_LENGTH_BAND!r}")
+FLOOR_HIGH_MM = (_POST_HEIGHT_PRINTED + _GENERAL_1PL_MM) - (
+    _CBORE_DEPTH_PRINTED - _GENERAL_2PL_MM
+)
+PLATE_THIN_MM = platform.PLATE_THICKNESS - PLATE_STOCK_BAND_MM
+PLATE_THICK_MM = platform.PLATE_THICKNESS + PLATE_STOCK_BAND_MM
 
 # The named rule-12 exception (User, U37c/U41): 0.90D minimum engagement.
-# Enforced here at the short limit; never printed on the part sheet.
 MIN_ENGAGEMENT_DIAMETERS = 0.90
-ENGAGEMENT_MIN_MM = CUT_LENGTH_MIN_MM - GRIP_MM
-if ENGAGEMENT_MIN_MM / THREAD_DIA_MM < MIN_ENGAGEMENT_DIAMETERS:
+MIN_ENGAGEMENT_MM = MIN_ENGAGEMENT_DIAMETERS * THREAD_DIA_MM
+# Corner 1, never proud: lowest floor on the thinnest plate.  A fixed length
+# must not exceed this.
+FIXED_LENGTH_FLUSH_MAX_MM = FLOOR_LOW_MM + PLATE_THIN_MM
+# Corner 2, enough thread: highest floor, thickest plate.  A fixed length
+# must reach at least this, after both edge breaks.  The thick plate does not
+# cap it: cut flush there, the plate still holds the minimum.
+FIXED_LENGTH_ENGAGEMENT_MIN_MM = FLOOR_HIGH_MM + MIN_ENGAGEMENT_MM + ENGAGEMENT_BREAKS_MM
+if FIXED_LENGTH_ENGAGEMENT_MIN_MM > FLOOR_HIGH_MM + PLATE_THICK_MM:
+    raise ValueError("the thick plate cannot hold 0.90D even when cut flush")
+# No single length satisfies both corners (84.89 vs 87.51 at the current
+# bands), so the shop cannot cut to a print band: each screw is cut to its
+# own hole at assembly (MHA-A03), and the sheet prints the modelled length as
+# a REFERENCE dimension with no band.  If the bands ever tighten enough for a
+# fixed length to exist, this raises and the sheet should carry that band.
+FIXED_CUT_LENGTH_EXISTS = FIXED_LENGTH_ENGAGEMENT_MIN_MM <= FIXED_LENGTH_FLUSH_MAX_MM
+if FIXED_CUT_LENGTH_EXISTS:
     raise ValueError(
-        f"MHA-142 engagement {ENGAGEMENT_MIN_MM:.2f} at the short limit is "
-        f"under {MIN_ENGAGEMENT_DIAMETERS:.2f}D"
+        "a fixed MHA-142 cut length now fits both corners "
+        f"({FIXED_LENGTH_ENGAGEMENT_MIN_MM:.2f}..{FIXED_LENGTH_FLUSH_MAX_MM:.2f}): "
+        "print it with its band instead of a reference length"
+    )
+
+# The fit-to-hole allowance (MHA-A03): each screw is cut flush to this much
+# short of its own MHA-091 underside, never proud.  The one copy: integ's
+# platform engagement stack and drive-train assembly step import it.
+POST_SCREW_CUT_TO_FIT_SHORT = 0.3
+
+# The model as built, on the nominal chain: the reference length never
+# stands proud, and still holds the exception's minimum.
+if CUT_LENGTH_MM > FLUSH_LENGTH_MM:
+    raise ValueError(
+        f"MHA-142 modelled length {CUT_LENGTH_MM} stands proud of the nominal "
+        f"MHA-091 underside ({FLUSH_LENGTH_MM:.2f})"
+    )
+ENGAGEMENT_NOMINAL_MM = CUT_LENGTH_MM - GRIP_MM
+if ENGAGEMENT_NOMINAL_MM < MIN_ENGAGEMENT_MM:
+    raise ValueError(
+        f"MHA-142 nominal engagement {ENGAGEMENT_NOMINAL_MM:.2f} is under "
+        f"{MIN_ENGAGEMENT_DIAMETERS:.2f}D"
     )
 
 # Rule 6: no dimension, no tolerance, no installation sequence.  The cut
-# length is the dimension above; how the screws go in is an MHA-A03 step.
+# length is the reference dimension above; cutting each screw to its hole is
+# an MHA-A03 step.
 MANUFACTURING_NOTES = (
     "CHAMFER CUT END.\nUNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."
 )

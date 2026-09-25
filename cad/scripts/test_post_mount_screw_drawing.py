@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import _config
 import build_post_mount_screw as part
 import cone_pivot_post_spec as post
@@ -46,47 +48,80 @@ def test_nominal_end_sits_short_of_the_platform_underside() -> None:
     assert engagement / part.SHANK_DIA >= 0.90
 
 
-def test_cut_length_band_is_derived_from_the_post_and_plate_chain() -> None:
-    """Modified purchased part: the cut is a real dimension whose band keeps
-    the end between the nominal cut and flush, never proud of MHA-091."""
-    assert spec.GRIP_MM == GRIP
-    assert spec.FLUSH_LENGTH_MM == GRIP + platform.PLATE_THICKNESS
+def test_no_fixed_cut_length_fits_both_in_band_corners() -> None:
+    """U27, geometry first: across the printed post and plate bands, the
+    never-proud corner (lowest counterbore floor, thin plate) caps a fixed
+    length below what the 0.90D corner (highest floor, after both edge
+    breaks) needs.  So no band can go on the print."""
+    one = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
+    two = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+    low = (round(post.BLOCK_HEIGHT, 1) - one) - (
+        round(post.ATTACHMENT_CBORE_DEPTH, 2) + two
+    )
+    high = (round(post.BLOCK_HEIGHT, 1) + one) - (
+        round(post.ATTACHMENT_CBORE_DEPTH, 2) - two
+    )
+    assert (spec.FLOOR_LOW_MM, spec.FLOOR_HIGH_MM) == pytest.approx((low, high))
+    assert (low, high) == pytest.approx((78.67, 81.29))
+    thin = platform.PLATE_THICKNESS - spec.PLATE_STOCK_BAND_MM
+    assert spec.FIXED_LENGTH_FLUSH_MAX_MM == pytest.approx(low + thin)
+    need = high + 0.90 * part.SHANK_DIA + 2 * spec.EDGE_BREAK_MAX_MM
+    assert spec.FIXED_LENGTH_ENGAGEMENT_MIN_MM == pytest.approx(need)
+    assert spec.FIXED_LENGTH_FLUSH_MAX_MM == pytest.approx(84.89)
+    assert spec.FIXED_LENGTH_ENGAGEMENT_MIN_MM == pytest.approx(87.505)
+    assert spec.FIXED_LENGTH_ENGAGEMENT_MIN_MM > spec.FIXED_LENGTH_FLUSH_MAX_MM
+    assert spec.FIXED_CUT_LENGTH_EXISTS is False
+
+
+def test_cut_length_prints_as_a_reference_without_a_band() -> None:
+    """No fixed length exists, so the model's 86.0 prints as "(86.0)" with
+    no tolerance, and the fit-to-hole rule stays in the assembly steps."""
     assert spec.CUT_LENGTH_MM == part.SHANK_LEN == 86.0
-    upper, lower = spec.CUT_LENGTH_BAND
-    assert (upper, lower) == (0.3, 0.0)
-    assert spec.CUT_LENGTH_MIN_MM == spec.CUT_LENGTH_MM
-    assert spec.CUT_LENGTH_MAX_MM <= spec.FLUSH_LENGTH_MM  # never proud
-    # The band is stated at the dimension's own places, floored toward flush.
-    places = spec.DRAWING_PRECISION_BY_NAME["CutLength"]
-    assert places == 1
-    assert round(upper, places) == upper
-    assert spec.FLUSH_LENGTH_MM - spec.CUT_LENGTH_MAX_MM < 10.0**-places
+    assert not hasattr(spec, "CUT_LENGTH_BAND")
+    assert not hasattr(drawing, "EXPECTED_CONTROLS")
+    builder = Path(part.__file__).read_text(encoding="utf-8")
+    assert "set_dimension_bilateral_tolerance(" not in builder
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_reference_dimension(" in source
+    assert "swTolNONE" in source
+    callout = drawing.DIMENSION_CALLOUTS["CutLength"]
+    assert " ".join(callout.split()) == "CUT TO FIT AT ASSEMBLY"
+    assert not any(ch.isdigit() for ch in callout)
+
+
+def test_cut_to_fit_allowance_is_exported_once() -> None:
+    """The per-hole allowance MHA-A03 and the platform stack consume."""
+    assert spec.POST_SCREW_CUT_TO_FIT_SHORT == 0.3
 
 
 def test_cut_length_is_a_model_owned_drawing_dimension() -> None:
-    """Rule 2: the value, places and band are the part's; the sheet imports
-    the one marked dimension from its hidden reference sketch and re-reads it."""
+    """Rule 2: the value and places are the part's; the sheet imports the
+    one marked dimension from its hidden reference sketch and re-reads it."""
     assert spec.DRAWING_DIMENSIONS == {"CutLengthReference": {"CutLength"}}
     assert spec.REFERENCE_SKETCHES == ("CutLengthReference",)
+    assert spec.DRAWING_PRECISION_BY_NAME == {"CutLength": 1}
     assert set(drawing.FRONT_KEEP) == {"CutLength"}
-    nominal, low, high = drawing.EXPECTED_CONTROLS["CutLength"]
-    assert nominal == spec.CUT_LENGTH_MM / 1000
-    assert (low, high) == (0.0, spec.CUT_LENGTH_BAND[0] / 1000)
-    assert drawing.TOLERANCE_TYPES == {"CutLength": 2}  # swTolBILAT
     builder = Path(part.__file__).read_text(encoding="utf-8")
-    assert "set_dimension_bilateral_tolerance(" in builder
-    assert "*deviations(CUT_LENGTH_BAND)" in builder
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in builder
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "hidden_sketches.curate_view_dimensions" in source
-    assert "verify_machining_controls" in source
+    assert "assert_imported_precision" in source
+
+
+def test_finish_oils_the_bare_cut_end() -> None:
+    """Rule 1: bare-surface protection is the Finish field's, worded like the
+    boss hook's (MHA-005), never a note."""
+    finish = _config.parts(part.PART_NAME)["finish"]
+    boss = _config.parts("boss-hook")["finish"]
+    assert finish == boss == "SUPPLIED ZINC PLATING; OIL BARE CUT END"
+    assert "OIL" not in spec.MANUFACTURING_NOTES
 
 
 def test_sheet_notes_carry_no_dimension_rule_or_sequence() -> None:
     """Main's eye pass of warm-c486 (rule 6): the old INSTALLATION block
     printed "(NOMINAL 86.0)", "0.90D MIN" and "NAMED EXCEPTION TO RULE 12".
-    The cut length is now the dimension, engagement a model assert and the
-    sequence an MHA-A03 step, so no part note carries a number."""
+    The cut length is now a reference dimension, engagement a model assert
+    and the sequence an MHA-A03 step, so no part note carries a number."""
     row = _config.parts(part.PART_NAME)
     assert "installation_notes" not in row
     notes = spec.MANUFACTURING_NOTES
@@ -98,10 +133,10 @@ def test_sheet_notes_carry_no_dimension_rule_or_sequence() -> None:
 
 
 def test_engagement_exception_is_held_by_the_model() -> None:
-    """The named rule-12 exception (0.90D) is asserted at the short limit."""
+    """The named rule-12 exception (0.90D) is a model assert on the chain."""
     assert spec.MIN_ENGAGEMENT_DIAMETERS == 0.90
-    assert spec.ENGAGEMENT_MIN_MM == spec.CUT_LENGTH_MIN_MM - GRIP
-    assert spec.ENGAGEMENT_MIN_MM / part.SHANK_DIA >= 0.90
+    assert spec.ENGAGEMENT_NOMINAL_MM == spec.CUT_LENGTH_MM - GRIP
+    assert spec.ENGAGEMENT_NOMINAL_MM / part.SHANK_DIA >= 0.90
 
 
 def test_sheet_layout_keeps_notes_clear_of_the_view() -> None:
@@ -113,8 +148,12 @@ def test_sheet_layout_keeps_notes_clear_of_the_view() -> None:
     assert notes_y + 0.004 < view_bottom
     lines = len(spec.MANUFACTURING_NOTES.splitlines())
     assert notes_y - lines * 0.0045 > max(y for _, _, y in drawing.STOCK_ROWS) + 0.003
+    # The widest callout line (~2.85 mm per capital, warm-c486) clears the
+    # head's silhouette, the widest part of the view.
     x, _ = drawing.FRONT_KEEP["CutLength"]
-    assert x < drawing.FRONT_CENTER[0] - part.HEAD_DIA / 2000.0 - 0.010
+    widest = max(len(line) for line in drawing.DIMENSION_CALLOUTS["CutLength"].splitlines())
+    assert x + widest * 0.00285 / 2.0 < drawing.FRONT_CENTER[0] - part.HEAD_DIA / 2000.0 - 0.003
+    assert x - widest * 0.00285 / 2.0 > 0.015  # inside the border
 
 
 def test_stock_build_uses_its_registered_recipe() -> None:
