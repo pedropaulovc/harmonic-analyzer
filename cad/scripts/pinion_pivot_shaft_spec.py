@@ -13,13 +13,25 @@ from __future__ import annotations
 from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from pinion_rig_layout import TORQUE_SHAFT_LEN
 
 SHAFT_DIA = 6.35  # 1/4 in: rides both pivot blocks' east bores and the straps
-SHAFT_LEN = 192.0  # ends flush with the pivot blocks' outer faces
+# Ends flush with the pivot blocks' outer faces; ruling (c) moved the front
+# block inboard to the front strap (pinion_rig_layout), 192 -> 182.0
+# (the physical stack, never the model pose's air: Codex #854).
+SHAFT_LEN = TORQUE_SHAFT_LEN
 CAP_SAG = 1.2  # shallow spherical crown height at each end
 CAP_RADIUS = ((SHAFT_DIA / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
 SHAFT_DIA_BAND = SHAFT_H
-SHAFT_LENGTH_TOLERANCE_MM = 0.25
+# U27 (Main, 2026-09-24): the length carries the title-block .X band (+/-0.8),
+# not a tight one.  Set back-flush, the front end stands at worst 0.85 proud
+# of the front block, the SR crown apex 2.05.  Nothing stands on the shaft's
+# axis past either block: the nearest body, the MHA-059 lever, rides the lift
+# rod 18.63 off it -- hub 8.95 radial clear, arm >= 12.42 clear over the -82
+# degree throw (test_drive_train_support_layout::
+# test_torque_shaft_length_band_clears_both_ends).  Each block still bears
+# >= 9.5 of its 10.25.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {"Shaft": {"Depth": 1}}
 
 SURFACE_FINISHES = (
     SurfaceFinishControl("bearing", MACHINED_UM, CylinderFace(SHAFT_DIA)),
