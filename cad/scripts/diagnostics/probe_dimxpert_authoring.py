@@ -29,7 +29,7 @@ Stages (run each as its OWN process, in this order; stop at the first wedge):
     uv run python cad/scripts/diagnostics/probe_dimxpert_authoring.py datum
         The wedge repro WITH the doc-derived delta applied (DatumLength set
         exactly as the official example does).  WEDGE-RISKY: run last, with a
-        driver-side timeout, and keep ``_sw_lifecycle.force_recover()`` handy.
+        driver-side timeout, and keep ``_sw_lifecycle.force_recover("manual")`` handy.
     uv run python cad/scripts/diagnostics/probe_dimxpert_authoring.py datum-nolength
         Control for root-cause attribution: the ORIGINAL wedge form (no
         DatumLength).  Only worth running if ``datum`` PASSES — a pass/wedge
@@ -68,7 +68,7 @@ Every stage PASSES; the wedge did not reproduce in ANY form:
   ~0.5 s either way, ``Datum19@Plane1(A)`` created.  The DatumLength delta is
   therefore NOT the wedge cause: the wedge was that session's SolidWorks
   state, not the call shape.  A recurrence is a session-health event —
-  ``_sw_lifecycle.force_recover()`` — not a reason to change the call.
+  ``_sw_lifecycle.force_recover("manual")`` — not a reason to change the call.
 * ``gtol`` — ``InsertGtol(Cylindricity)`` with NO preceding datum returns an
   annotation: the form-control path needs no datum, as documented.
 
@@ -85,7 +85,7 @@ binding; see probe_dimxpert_gtol.py Q1 notes).
    not run them during a build.  Recover with::
 
        uv run python -c "import sys; sys.path.insert(0, 'cad/scripts'); \
-           import _sw_lifecycle; print(_sw_lifecycle.force_recover())"
+           import _sw_lifecycle; print(_sw_lifecycle.force_recover(\"manual\"))"
 """
 
 from __future__ import annotations
