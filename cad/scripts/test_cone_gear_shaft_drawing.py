@@ -10,29 +10,65 @@ import build_cone_gear_shaft as part
 import build_drive_train_assembly as drive
 import cone_gear_shaft_spec
 import cone_pivot_post_installation
+import cone_tip_block_spec
 import draw_cone_gear_shaft as drawing
 import pytest
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
+# Which NAMED band each land rides (U27, 2026-09-23): the two running lands
+# keep the shared h band, the three soldered seats open to GEAR_SEAT_BAND.
+_EXPECTED_LAND_BANDS = (
+    ("RUNNING_DIA_BAND", _fit_limits.SHAFT_H),
+    ("GEAR_SEAT_BAND", cone_gear_shaft_spec.GEAR_SEAT_BAND),
+    ("GEAR_SEAT_BAND", cone_gear_shaft_spec.GEAR_SEAT_BAND),
+    ("GEAR_SEAT_BAND", cone_gear_shaft_spec.GEAR_SEAT_BAND),
+    ("RUNNING_DIA_BAND", _fit_limits.SHAFT_H),
+)
+
+
+def _lands_ride_named_bands(bands: tuple[tuple[float, float], ...]) -> bool:
+    """True when every land's band IS its named class, not an equal retype."""
+    return len(bands) == len(_EXPECTED_LAND_BANDS) and all(
+        band is getattr(cone_gear_shaft_spec, name) is expected
+        for band, (name, expected) in zip(bands, _EXPECTED_LAND_BANDS)
+    )
+
+
 def test_section_fits_are_toleranced_on_the_model() -> None:
-    """All five turned lands ride ONE shared fit class, applied to the model.
+    """Each turned land rides its NAMED fit class, applied to the model.
 
     Spelled as callout text the band is frozen: SolidWorks prints it verbatim
     and never re-renders it, so the mm->inch flip in issue #290 would leave
     "+0.00/-0.02" reading as inches on every land. The identity assertion also
-    stops a local retype from silently forking the shared class.
+    stops a local retype from silently forking a named class.
     """
-    assert cone_gear_shaft_spec.SECTION_DIA_BAND is _fit_limits.SHAFT_H
-    # Applied in a loop over the five sections, so the AST reports the f-string
-    # source rather than five literal keys.
+    spec = cone_gear_shaft_spec
+    assert spec.RUNNING_DIA_BAND is _fit_limits.SHAFT_H
+    assert spec.GEAR_SEAT_BAND == (0.000, -0.050)
+    assert _lands_ride_named_bands(spec.SECTION_DIA_BANDS)
+    # Positive control: an equal-valued local retype of either class is caught.
+    forked = list(spec.SECTION_DIA_BANDS)
+    forked[2] = (0.000, -0.050)
+    assert forked[2] == spec.GEAR_SEAT_BAND
+    assert not _lands_ride_named_bands(tuple(forked))
+    forked = list(spec.SECTION_DIA_BANDS)
+    forked[0] = (0.000, -0.020)
+    assert not _lands_ride_named_bands(tuple(forked))
+    # The running tip land still clears the bushing bore it turns in.
+    import build_cone_tip_bushing as bushing
+
+    tip_max = spec.SECTION_DIAS[-1] + spec.SECTION_DIA_BANDS[-1][0]
+    assert bushing.BORE_DIA + bushing.BORE_DIA_BAND[1] - tip_max >= 0.0
+    # Applied in ONE loop over the named bands, so the AST reports the
+    # f-string source rather than five literal keys.
     assert model_toleranced_dimensions(part) == {
-        ("f'Sec{section}Profile'", "f'Sec{section}Dia'"): (
-            "*deviations(SECTION_DIA_BAND)"
-        )
+        ("f'Sec{section}Profile'", "f'Sec{section}Dia'"): "*deviations(band)"
     }
-    assert "for section in range(5)" in Path(part.__file__).read_text(encoding="utf-8")
+    assert "for section, band in enumerate(SECTION_DIA_BANDS)" in Path(
+        part.__file__
+    ).read_text(encoding="utf-8")
 
 
 def test_display_precision_is_owned_by_the_part() -> None:
@@ -195,32 +231,42 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     assert cone_gear_shaft_spec.TIP_BLOCK_NORTH_FACE_STATION == pytest.approx(
         147.27232594770454
     )
-    assert cone_gear_shaft_spec.ADJUSTER_EMBED == pytest.approx(6.0)
+    # Rule-12 E11: #10-32 94025A164 at the block spec's 9.5 fit-up embed.
+    assert cone_gear_shaft_spec.ADJUSTER_EMBED == cone_tip_block_spec.ADJUSTER_EMBED
     assert cone_gear_shaft_spec.ADJUSTER_CUP_RIM_STATION == pytest.approx(
-        141.27232594770454
+        137.77232594770454
     )
-    assert cone_gear_shaft_spec.MCM_94025A150_CUP_DEPTH == pytest.approx(1.98755)
-    assert cone_gear_shaft_spec.T006_TIP_STATION == pytest.approx(143.25987594770454)
+    # Vendor Sketch2 Line7 (harvested 2026-09-24): 45 deg cup, depth = rim radius.
+    assert cone_gear_shaft_spec.MCM_94025A164_CUP_DEPTH == pytest.approx(1.2065)
+    assert cone_gear_shaft_spec.T006_TIP_STATION == pytest.approx(138.97882594770454)
     assert cone_gear_shaft_spec.SHAFT_LENGTH == (
         cone_gear_shaft_spec.FRONT_STUB + cone_gear_shaft_spec.T006_TIP_STATION
     )
-    # The journal and all preceding gear-seat endpoints stay put; only the
-    # terminal 1/16-in endpoint follows the stock cup apex.
+    # U40 (option S1, 2026-09-23): each gear-seat shoulder sits one seat
+    # station nearer the big end than the old (154.2, 161.1, 168.0) map,
+    # so the 1/16-in land carries T012 and T006; the terminal endpoint still
+    # follows the stock cup apex and the overall length is unchanged.
     stub_delta = cone_gear_shaft_spec.FRONT_STUB - 12.3
     assert ends[1:-1] == pytest.approx(
         tuple(
             old_end + stub_delta + cone_gear_shaft_spec.GEAR_AXIS_SHIFT
-            for old_end in (154.2, 161.1, 168.0)
+            for old_end in (147.3, 154.2, 161.1)
         )
     )
+    # Printed baseline stations from the big (journal) end, as ruled; the
+    # overall length follows the E11 #10-32 cup apex (202.267 before E11).
+    assert ends[1:] == pytest.approx((163.792, 170.692, 177.592, 200.886), abs=1e-3)
     assert ends[-1] == pytest.approx(
-        cone_gear_shaft_spec.FRONT_STUB + 143.25987594770454
+        cone_gear_shaft_spec.FRONT_STUB + 138.97882594770454
     )
-    # The shortened terminal stub still supports the entire 4 mm bushing.
+    # The longer terminal stub still supports the entire 4 mm bushing.
     assert cone_gear_shaft_spec.TIP_STUB_START_STATION == pytest.approx(
-        122.5853574197016
+        115.6853574197016
     )
-    assert cone_gear_shaft_spec.TIP_STUB_LENGTH == pytest.approx(20.6745185280)
+    assert cone_gear_shaft_spec.TIP_STUB_LENGTH == pytest.approx(23.293468528)
+    assert ends[-1] - ends[-2] == pytest.approx(
+        cone_gear_shaft_spec.TIP_STUB_LENGTH
+    )
     assert (
         cone_gear_shaft_spec.TIP_STUB_START_STATION
         <= cone_gear_shaft_spec.TIP_BUSHING_START_STATION
@@ -243,9 +289,14 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     # One feature, one dimension, one quantity prefix -- not four dimensions.
     assert drawing.DIMENSION_CALLOUTS == {"ShoulderR": "4X"}
     # The old "SHOULDER ROOTS R0.10 MAX" note is gone.  What remains names
-    # the mates behind the h band and the three-place stations (rule 2)
-    # without adding a check of its own (no MUST), and carries no number
-    # but the mate's part number, no tolerance, datum or method word.
+    # the mate behind the gear-seat band -- the solder gap (rule 2; codex
+    # 375a122c) -- without adding a check of its own (no MUST), and carries
+    # no number but the mate's part number, no tolerance, datum or method
+    # word -- except the tailstock line, a user-ruled process requirement
+    # (U40, 2026-09-23: the 23.293 mm Ø1.588 tip land at L/D 14.7 is only
+    # turnable supported), so "TURN" is allowed in that one line only.  The
+    # three-place-stations lines went in the U27 round: the places already
+    # say it.
     notes = cone_gear_shaft_spec.DRAWING_NOTES
     assert 1 <= len(notes.splitlines()) <= 4
     # The sheet's note text runs ~2.7 mm per character; a line from the
@@ -256,6 +307,8 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     )
     mate_number = _config.parts("cone-gear")["number"]
     assert not any(character.isdigit() for character in notes.replace(mate_number, ""))
+    tailstock = [line for line in notes.splitlines() if "TAILSTOCK" in line.upper()]
+    assert len(tailstock) == 1
     for forbidden in (
         "R0.",
         "MAX",
@@ -263,12 +316,13 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
         "DATUM",
         "BASIC",
         "FINISH",
-        "TURN",
         "GRIND",
     ):
         assert forbidden not in notes.upper()
-    assert "SLIP FIT" in notes and f"CONE GEAR BORES, {mate_number}" in notes
-    assert "SOLDERED CONE GEAR SEATS" in notes
+    # U40: "TURN" appears only in the ruled tailstock line.
+    assert "TURN" not in notes.upper().replace(tailstock[0].upper(), "")
+    assert "SOLDER GAP" in notes and f"CONE GEAR BORES, {mate_number}" in notes
+    assert "THREE-PLACE" not in notes
     assert (
         'apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})'
         in source

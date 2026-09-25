@@ -17,13 +17,15 @@ recipes:
 |---|---|---|
 | 90114A511 | `fillister-screw` | Brass Fillister Head Slotted Screw |
 | 90126A211 | `knife-hanger-washer` | Zinc-Plated Steel SAE Washer |
-| 90280A108 | `cone-tip-pinch-screw`, `foot-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A108 | `foot-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A110 | `cone-tip-pinch-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A194 | `bracket-screw`, `frame-side-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A197 | `pedestal-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A199 | `swing-stop-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A201 | `clamp-screw`, `slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 91247A720 | `knife-hanger-stud` | Medium-Strength Grade 5 Steel Hex Head Screw |
+| 91255A148 | `cone-tip-block-screw` | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91410A538 | `gooseneck-set-screw` | Steel Square-Head Cup-Point Set Screw |
 | 92240A539 | `lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A560 | `cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
@@ -32,7 +34,8 @@ recipes:
 | 9275K141 | `tube-frame-cap` | Metal Round Cap |
 | 92865A585 | `hex-bolt` | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 93075A194 | `hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
-| 94025A150 | `cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
+| 94025A150 | — (diagnostic recipe; `cone-tip-adjuster` until rule-12 E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
+| 94025A164 | `cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 99607A213 | `pen-set-screw` | Stainless Steel Flared-Collar Knurled-Head Thumb Screw |
 
 The cone-lock and swing-stop selections follow `cad/scripts/build_cone_lock_knob.py`
@@ -79,6 +82,25 @@ Catalog specifications checked on September 10, 2026:
   harvested 90280A194 and 90280A199, so the shared fillister family recipe
   builds it from the length alone. No vendor SLDPRT has been harvested for
   this length yet.
+- [91255A148](https://www.mcmaster.com/91255A148/) is the #6-32 x 1/2 in
+  black-oxide alloy steel button head hex drive screw that holds the cone tip
+  block (U30, rule-12 W22). Source: the McMaster product page, supplied by
+  the user on September 24, 2026 (an agent fetch that day was refused, HTTP
+  403): #6-32 UNC-3A, right hand, flat tip, head Ø0.262 in x 0.073 in, 5/64
+  hex drive, 1/2 in under the head, fully threaded, 140 ksi, ASME B18.3 /
+  ASTM F835. The catalog fixes the identity; the geometry is the vendor
+  model's own. `diag_build_91255A148.py` replays the dimensions and solved
+  sketch geometry read from `91255A148.SLDPRT` (the read-only dump
+  `cad/out/reports/mcmaster-91255A148-dump.json`): the 7/64 flat top and
+  R3.941216 dome, the 10 deg edge band and its R0.09271 fillets, the 5/64
+  hex socket 1.01981 deep with its 60 deg countersink, and the thread, tip
+  chamfer and 45 deg neck; its docstring lists each value. The vendor file is
+  local-only (© McMaster, gitignored). The replica gate against it passed on
+  September 25, 2026: volume 130.7034 vs 130.7033 mm^3, area 291.3955 mm^2
+  on both, 26 faces each with the same face-area multiset, and matching
+  centre of mass (`cad/out/reference/91255A148-replica-report.json`).
+  Evidence SHA-256: native SLDPRT
+  `4b8dac17c6b7e77499209a399342aa51780743b657aec0df7175f227b54e59a0`.
 
 Ground rules (mirrored in the diagnostics themselves): the vendor files are
 opened read-only and NEVER saved or modified; everything derived from them

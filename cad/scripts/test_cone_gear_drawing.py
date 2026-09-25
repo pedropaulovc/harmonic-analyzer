@@ -90,7 +90,7 @@ def test_bore_band_is_the_explicit_soldered_seat_band() -> None:
     # 0 to 0.10 diametral, the gap the solder or retaining compound fills.
     assert part.BORE_DIA_BAND is spec.BORE_DIA_BAND
     assert spec.BORE_DIA_BAND == (0.05, 0.0)
-    land_upper, land_lower = cone_gear_shaft_spec.SECTION_DIA_BAND
+    land_upper, land_lower = cone_gear_shaft_spec.GEAR_SEAT_BAND
     assert spec.BORE_DIA_BAND[1] - land_upper == pytest.approx(0.0)
     assert 0.0 < spec.BORE_DIA_BAND[0] - land_lower <= 0.10
     source = Path(part.__file__).read_text(encoding="utf-8")

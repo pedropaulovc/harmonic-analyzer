@@ -978,13 +978,15 @@ from build_cone_pivot_post import (  # noqa: E402
 from cone_tip_block_spec import (  # noqa: E402
     ADJUSTER_BORE_SPEC as TIP_ADJ_BORE_SPEC,
     ADJUSTER_AXIS_HEIGHT as TIP_ADJUSTER_AXIS_HEIGHT,
-    ADJUSTER_DEPTH as TIP_ADJ_BORE_DEPTH,
+    ADJUSTER_EMBED as TIP_ADJ_EMBED,
+    ADJUSTER_EMBED_WINDOW as TIP_ADJ_EMBED_WINDOW,
     BLOCK_X as TIP_BLOCK_X,
     BLOCK_Z as TIP_BLOCK_Z,
     PINCH_BORE_SPEC as TIP_PINCH_BORE_SPEC,
     PINCH_CLEARANCE_SPEC as TIP_PINCH_CLEARANCE_SPEC,
     PINCH_HEIGHT as TIP_PINCH_Y,
     SHAFT_PASSAGE_DIA as TIP_SHAFT_PASSAGE_DIA,
+    SHIM_NOMINAL as TIP_SHIM_NOMINAL,
     SLIT_W as TIP_SLIT_W,
 )
 from build_cone_tip_bushing import (  # noqa: E402
@@ -1037,7 +1039,10 @@ PIVOT_STATION = TIP_BLOCK_STATION + 11.0
 # thickness under each foot + bore height = 54 above the base top.
 if (
     abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + POST_BORE_HEIGHT)) > 1e-9
-    or abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + TIP_ADJUSTER_AXIS_HEIGHT)) > 1e-9
+    or abs(
+        (Y_DRIVE - Y_BASE_TOP) - (PLAT_T + TIP_SHIM_NOMINAL + TIP_ADJUSTER_AXIS_HEIGHT)
+    )
+    > 1e-9
 ):
     raise AssertionError("cone axis height drifted between platform/post/block")
 # The shaft is placed by its front stub end; keep the station in lockstep with
@@ -1073,15 +1078,12 @@ for _lbl, _s0, _hx, _hz in (
             raise AssertionError(
                 f"{_lbl} overhangs the swing platform at station {_end:g}"
             )
-# The shaft's tip reaches through the block to the adjuster cup (>= 5 inside
-# the block envelope, end short of the north face).
+# Where the tip ends is owned by the end-play stack below: it sits on the
+# adjuster's cup apex, and the cup rim stays inside the adjuster's working
+# window.  (The former ">= 5 inside the block" floor was the tip-JOURNAL
+# engagement of ada675b1, when the block was the tip bearing; f4462091 moved
+# radial support to the brass bushing and left the number behind.)
 _TIP_END_STATION = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-1][1]
-if not (
-    TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0 + 5.0
-    <= _TIP_END_STATION
-    <= TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 - 0.5
-):
-    raise AssertionError("shaft tip end does not reach the tip-block adjuster")
 # The stub end stands 1.0 mm proud of the post's inclined journal face.
 _STUB_END_Z = cone_station(SHAFT_FRONT_STATION)[2]
 _POST_SOUTH_STATION = POST_STATION - POST_CONE_BOSS_LENGTH / 2.0
@@ -1093,12 +1095,13 @@ if SHAFT_FRONT_STATION > _POST_SOUTH_STATION - 1.0 + 1e-9:
     )
 # --- tip end-play stack (item 5, v4_t00471 / 7:49) ---------------------------
 # Along the axis, south to north: T006 gear | brass bushing | block | shaft tip
-# | the 94025A150 adjuster's conical cup. The shaft's flat 1/16-in end cannot
-# reach the cup apex: it seats on the ring where its end edge meets the cone
-# wall, ADJ_SEAT_DEPTH short of the apex (end radius / tan of the vendor cup's
-# half-angle). The adjuster therefore backs out from the nominal 6 mm embed by
+# | the 94025A164 adjuster's conical cup, its #10-32 thread tapped through the
+# block (rule-12 E11/W1). The shaft's flat 1/16-in end cannot reach the cup
+# apex: it seats on the ring where its end edge meets the cone wall,
+# ADJ_SEAT_DEPTH short of the apex (end radius / tan of the vendor cup's
+# half-angle). The adjuster therefore backs out from the nominal ADJ_EMBED by
 # that depth (Main ruling 2026-09-23; burying the apex left 1.05 mm^3 of
-# overlap once the journal grew from 1/32 in). The top slit and 90280A108 pinch
+# overlap once the journal grew from 1/32 in). The top slit and 90280A110 pinch
 # screw lock that setting.
 TIP_SOUTH_STATION = TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0
 BUSH_STATION = T006_NORTH_FACE
@@ -1112,13 +1115,21 @@ ADJ_HEAD_STATION = (
 _ADJ_CUP_RIM = ADJ_HEAD_STATION - ADJ_LEN
 _ADJ_CUP_APEX = _ADJ_CUP_RIM + ADJ_CUP_DEPTH
 _STUB_START = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-2][1]
-if BUSH_STATION < _STUB_START + 1.0:
-    raise AssertionError("tip bushing rides off the 1/16in tip journal")
+# tip_stub_radially_supported: the brass bushing is the tip's only radial
+# bearing, so its whole length rides the stub section on a matching bore.
+if not (
+    _STUB_START + 1.0 <= BUSH_STATION
+    and BUSH_STATION + BUSH_LEN <= _TIP_END_STATION
+):
+    raise AssertionError("tip stub is not radially supported: bushing rides off the stub")
 if abs(BUSH_BORE_DIA - _STUB_DIA) > 0.05:
     raise AssertionError("tip-bushing bore does not match the tip stub dia")
 _require_tapped_thread("cone-tip adjuster", ADJ_THREAD, TIP_ADJ_BORE_SPEC)
-if ADJ_EMBED > TIP_ADJ_BORE_DEPTH - 0.5:
-    raise AssertionError("adjuster bottoms out in the block tapped hole")
+# adjuster_cup_in_working_window: the fit-up embed is the block spec's.
+if ADJ_EMBED != TIP_ADJ_EMBED or not (
+    TIP_ADJ_EMBED_WINDOW[0] <= ADJ_EMBED <= TIP_ADJ_EMBED_WINDOW[1]
+):
+    raise AssertionError("adjuster cup rim is outside its working window")
 if not 0.0 < ADJ_CUP_DEPTH < ADJ_LEN:
     raise AssertionError("adjuster cup depth is outside the stock body")
 if ADJ_CUP_DIA < _STUB_DIA + 0.25:
@@ -2482,10 +2493,15 @@ async def build(adapter) -> dict[str, str]:
         label="cone-pivot-post (v2 Ry180, big-end journal, on the plate)",
     )
     ptip = cone_station(TIP_BLOCK_STATION)
+    # U30: the block stands on the nominal MHA-141 fit-up shim pack, so its
+    # foot sits TIP_SHIM_NOMINAL above PlateTop (the axis-height assert above
+    # already counts it).  The shim is the integrator's; until it is inserted
+    # the block floats that far above the plate.
+    tip_foot_y = Y_BASE_TOP + PLAT_T + TIP_SHIM_NOMINAL
     tip_block = await place_component(
         adapter,
         "cone-tip-block",
-        [ptip[0], Y_BASE_TOP + PLAT_T, ptip[2]],
+        [ptip[0], tip_foot_y, ptip[2]],
         [0.0, INCLINE_DEG, 0.0],
         ROT_Y_INCLINE,
         ground=False,
@@ -2520,7 +2536,7 @@ async def build(adapter) -> dict[str, str]:
         "cone-tip-pinch-screw",
         [
             ptip[0] - (TIP_BLOCK_X / 2.0) * COS_I,
-            Y_BASE_TOP + PLAT_T + TIP_PINCH_Y,
+            tip_foot_y + TIP_PINCH_Y,
             ptip[2] + (TIP_BLOCK_X / 2.0) * SIN_I,
         ],
         PINCH_WEST_EULER,
@@ -3200,9 +3216,10 @@ async def build(adapter) -> dict[str, str]:
     # Tip block: aligned to the shaft/adjuster axis (which the post + platform
     # already carry) + an axial seat + a
     # parallel anti-spin against the PLATFORM (not the spinning shaft). Its
-    # height falls out of the coaxial (bore height + plate = drive height,
-    # asserted at import), so its foot lands ON PlateTop with no seat mate --
-    # contact, not constraint. It follows the p1 swing through the shaft.
+    # height falls out of the coaxial (plate + shim + axis height = drive
+    # height, asserted at import), so its foot sits the nominal shim pack
+    # above PlateTop with no seat mate; the shim (MHA-141) is the
+    # integrator's. It follows the p1 swing through the shaft.
     tb_o = _org(adapter, tip_block)
     tb_axial = sum((tb_o[k] - cone_o[k]) * cone_axis_dir[k] for k in range(3))
     await coincident_mate(

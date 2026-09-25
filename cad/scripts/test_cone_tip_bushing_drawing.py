@@ -47,7 +47,7 @@ def test_model_owns_the_printed_precision() -> None:
 def test_bore_band_is_derived_live_from_the_enlarged_tip_journal_and_fit() -> None:
     assert _config.parts("cone-tip-bushing")["fit_class"] == "shaft_in_bushing"
     minimum, maximum = _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
-    journal_upper, journal_lower = cone_gear_shaft_spec.SECTION_DIA_BAND
+    journal_upper, journal_lower = cone_gear_shaft_spec.SECTION_DIA_BANDS[-1]
     assert spec.BORE_DIA == pytest.approx(1.5875)
     assert spec.BORE_DIA == pytest.approx(cone_gear_shaft_spec.SECTION_DIAS[-1])
     assert part.BORE_DIA_BAND == (

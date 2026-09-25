@@ -106,11 +106,21 @@ _CRANK_PIN_SHAFT_MM3 = _pin_overlap(_CS_S0, _CS_S1, _CS_PILOT)
 
 # Independent SolidWorks-kernel observations for the exact stock bodies in
 # their production receivers.  The 90280A108's modeled helical thread and
-# under-head runout overlap the native #4-40 far jaw by 6.47 mm3; the cup-tip
-# adjuster makes its intended thrust contact with the shaft end at 0.13 mm3.
-# Ten-percent bounded headroom still fails any materially deeper insertion.
-_TIP_PINCH_GATE_LIMIT_MM3 = 6.47 * 1.10
-_ADJUSTER_THRUST_GATE_LIMIT_MM3 = 0.13 * 1.10
+# under-head runout overlapped the native #4-40 far jaw by 6.47 mm3 over its
+# 2.625 of far-jaw engagement; the cup-tip adjuster makes its intended thrust
+# contact with the shaft end at 0.13 mm3.  That is the 45 deg cup's analytic
+# (2/3)*pi*r^3 for the 0.79 stub (0.131); rule-12 E11's 94025A164 cup is also
+# 45 deg (vendor Sketch2).  The 1/16 in tip land doubles the stub radius, so
+# the contact scales by r^3: 0.13 * 8 = 1.04 (analytic 1.047) until the next
+# drive-train build re-observes it.  Rule-12 E1 lengthened the pinch
+# screw to the 12.7 90280A110 (5.80 in the far jaw), so its limit scales that
+# observation by engagement -- an over-estimate, since the runout share does
+# not grow -- until the next drive-train build re-observes it.  Ten-percent
+# bounded headroom still fails any materially deeper insertion.
+# 6.47 * 5.80 / 2.625 = 14.296, rounded up.
+_TIP_PINCH_OBSERVED_MM3 = 14.30
+_TIP_PINCH_GATE_LIMIT_MM3 = _TIP_PINCH_OBSERVED_MM3 * 1.10
+_ADJUSTER_THRUST_GATE_LIMIT_MM3 = 0.13 * 8.0 * 1.10
 
 _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(("crank-pin-1", "crank-arm-1")): 1.10 * _CRANK_PIN_ARM_MM3,
@@ -119,8 +129,10 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(("fillister-screw-1", "crank-arm-1")): _smooth_annulus_limit_mm3(
         2.8448, 2.261, 5.33
     ),
+    # Rule-12 E11: #10-32 94025A164 (major 4.826) in the #21 (4.0386) tap
+    # drill, ADJUSTER_EMBED 9.5 deep.
     frozenset(("cone-tip-adjuster-1", "cone-tip-block-1")): _smooth_annulus_limit_mm3(
-        7.9502, 6.528, 6.0
+        4.826, 4.0386, 9.5
     ),
     frozenset(
         ("cone-tip-pinch-screw-1", "cone-tip-block-1")
