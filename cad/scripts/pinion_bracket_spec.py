@@ -25,6 +25,9 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_bracket_geometry import (
     ARBOR_BORE as ARBOR_BORE,
     C2C as C2C,
+    CROSS_HOLE_CZ_PLACES,
+    CROSS_HOLE_FROM_BORE_WALL_PLACES,
+    END_RADIUS_PLACES,
     HALF_WIDTH as HALF_WIDTH,
     OVERALL_LENGTH as OVERALL_LENGTH,
     PIN_BORE as PIN_BORE,
@@ -34,6 +37,7 @@ from pinion_bracket_geometry import (
     R_END as R_END,
     THICKNESS as THICKNESS,
     THICKNESS_BAND as THICKNESS_BAND,
+    THICKNESS_PLACES,
     WIDTH as WIDTH,
 )
 import pinion_strap_pin_spec as _strap_pin
@@ -145,17 +149,19 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PivotBoreDia": 2,
         "ArborBoreDia": 2,
         "ArborBoreCz": 2,
-        "BottomCapRadius": 1,
-        "TopCapRadius": 1,
+        "BottomCapRadius": END_RADIUS_PLACES,
+        "TopCapRadius": END_RADIUS_PLACES,
     },
-    "Strap": {"Depth": 1},
+    "Strap": {"Depth": THICKNESS_PLACES},
     # Two places on PinSeatCz resolve its +/-0.10 band.
     "PinSeatProfile": {"PinSeatDia": 2, "PinSeatCy": 3, "PinSeatCz": 2},
     "PinSeat": {"PinSeatDepth": 1},
     # Two places resolve the spring pin's +0.06/0 hole band; both locations
     # are routine .XX (their worst cases clear the 1.5 floor at that grade).
-    "CrossHoleProfile": {"CrossHoleDia": 2, "CrossHoleCz": 2},
-    "CrossHoleAxisReference": {"CrossHoleFromBoreWall": 2},
+    "CrossHoleProfile": {"CrossHoleDia": 2, "CrossHoleCz": CROSS_HOLE_CZ_PLACES},
+    "CrossHoleAxisReference": {
+        "CrossHoleFromBoreWall": CROSS_HOLE_FROM_BORE_WALL_PLACES
+    },
 }
 
 _PRECISION_NAMES = [

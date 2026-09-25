@@ -353,7 +353,13 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
     bore_r = (geometry.PIVOT_BORE + pinion_bracket_spec.PIVOT_BORE_BAND[0]) / 2.0
     shaft_min = shaft.SHAFT_DIA + shaft.SHAFT_DIA_BAND[1]
     half = geometry.THICKNESS / 2.0
-    hole_height = _printed_band("CrossHoleFromBoreWall")
+    # The bore-wall offset's nominal (3.175) does not print exactly at two
+    # places, so the offset carries its rounding too (restricted review).
+    places = pinion_bracket_spec.DRAWING_PRECISION_BY_NAME["CrossHoleFromBoreWall"]
+    wall = geometry.PIVOT_BORE / 2.0
+    hole_height = _printed_band("CrossHoleFromBoreWall") + abs(
+        round(wall, places) - wall
+    )
     seat_height = _printed_band("PinSeatCy")
     worst = {
         # Cross hole to the far and the near broad face.
@@ -395,7 +401,19 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
         worst["seat near face"], pinion_bracket_spec.PIN_SEAT_NEAR_WEB_WORST
     )
     assert math.isclose(worst["shaft wall"], pin.SHAFT_LIGAMENT_WORST)
+    # Restricted review (ruling 3): the places the web gates read are the
+    # sheet's own, stated once in pinion_bracket_geometry.
+    for name, places in (
+        ("Depth", geometry.THICKNESS_PLACES),
+        ("CrossHoleCz", geometry.CROSS_HOLE_CZ_PLACES),
+        ("CrossHoleFromBoreWall", geometry.CROSS_HOLE_FROM_BORE_WALL_PLACES),
+        ("BottomCapRadius", geometry.END_RADIUS_PLACES),
+        ("TopCapRadius", geometry.END_RADIUS_PLACES),
+    ):
+        assert pinion_bracket_spec.DRAWING_PRECISION_BY_NAME[name] == places, name
+    pin_source = Path(pin.__file__).read_text(encoding="utf-8")
+    assert "DOT_X_BAND" not in pin_source and "DOT_XX_BAND" not in pin_source
     # The values the ruling approved.
     assert math.isclose(worst["cross hole far face"], 2.316, abs_tol=5e-4)
     assert math.isclose(worst["seat far face"], 1.544, abs_tol=5e-4)
-    assert math.isclose(worst["shaft wall"], 1.831, abs_tol=5e-4)
+    assert math.isclose(worst["shaft wall"], 1.826, abs_tol=5e-4)

@@ -679,7 +679,7 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     assert math.isclose(pin.STRAP_FACE_WEB_WORST, 2.316, abs_tol=5e-4)
     assert pin.STRAP_FACE_WEB_WORST >= 2.0
     assert pin.FOLLOWER_SEAT_LIGAMENT >= 2.0
-    assert math.isclose(pin.SHAFT_LIGAMENT_WORST, 1.831, abs_tol=5e-4)
+    assert math.isclose(pin.SHAFT_LIGAMENT_WORST, 1.826, abs_tol=5e-4)
     assert pin.SHAFT_LIGAMENT_WORST >= 1.5
     assert math.isclose(pin.SHAFT_LIGAMENT_QUARTER, 2.091, abs_tol=5e-4)
 
