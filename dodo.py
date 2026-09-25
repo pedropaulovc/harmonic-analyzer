@@ -602,6 +602,8 @@ def _stage_name(label: str) -> str:
         return "preflight"
     if label == "gallery":
         return "gallery"
+    if label.startswith("diag:"):
+        return "diag"
     if label.startswith("export"):
         return "export"
     return "harmonic-analyzer"
@@ -2607,6 +2609,46 @@ def task_verify_soundness():
             "clean": True,
             "verbosity": 2,
         }
+
+
+def task_diag():
+    """Throwaway diagnostic renders (diag/dt-rig-render, never merged): oblique
+    close-ups of the pinion rig in the built drive-train, captured on a seat and
+    cached like any COM leaf so a farm worker can produce them."""
+    script = SCRIPTS_DIR / "diagnostics" / "diag_render_drive_train_rig.py"
+    out_dir = CAD_OUT / "png" / "diag" / "drive-train-rig"
+    outputs = [
+        out_dir / name
+        for name in (
+            "drive-train-rig-a-spring-behind-back-strap.png",
+            "drive-train-rig-b-collar-pin.png",
+            "drive-train-rig-c-rig-context.png",
+            "drive-train-rig.json",
+        )
+    ]
+    deps = [
+        str(script.resolve()),
+        _sldasm("drive_train"),
+        _assembly_execution_token("drive_train"),
+    ]
+    yield {
+        "name": "drive_train_rig",
+        "file_dep": deps,
+        "targets": [str(path.resolve()) for path in outputs],
+        "actions": [
+            (
+                _cached_com_action,
+                [
+                    "diag:drive_train_rig",
+                    [sys.executable, str(script)],
+                    deps,
+                    outputs,
+                    "diag-drive-train-rig",
+                ],
+            )
+        ],
+        "verbosity": 2,
+    }
 
 
 def task_verify():
