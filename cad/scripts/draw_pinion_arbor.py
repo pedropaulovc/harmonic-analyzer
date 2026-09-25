@@ -973,8 +973,8 @@ def back_crown_landing_problems(
     angle = math.degrees(math.atan2(landing[1] - center[1], center[0] - landing[0]))
     if abs(angle) >= BACK_CAP_HALF_ANGLE_DEG:
         problems.append(
-            f"lands {angle:.1f}° off the axis, outside the crown's "
-            f"±{BACK_CAP_HALF_ANGLE_DEG:.1f}° arc"
+            f"lands {angle:.1f}° off the axis, outside the crown's arc "
+            f"(half-angle {BACK_CAP_HALF_ANGLE_DEG:.1f}°)"
         )
     return problems
 
@@ -1844,7 +1844,7 @@ def _assert_back_crown_radius_lands(sheets: list[Any], center: tuple[float, floa
     _telemetry.info(
         f"pinion-arbor: SR7.3 lands at ({landing[0] * 1000:.2f}, {landing[1] * 1000:.2f}) mm, "
         f"{reach * 1000:.3f} mm from the crown centre ({center[0] * 1000:.2f}, "
-        f"{center[1] * 1000:.2f}) at {angle:.1f}° (arc ±{BACK_CAP_HALF_ANGLE_DEG:.1f}°); "
+        f"{center[1] * 1000:.2f}) at {angle:.1f}° (arc half-angle {BACK_CAP_HALF_ANGLE_DEG:.1f}°); "
         f"({proof}); {len(runs)} strokes {[_fmt_line(run) for run in runs]}",
         reach_mm=reach * 1000,
         angle_deg=angle,
