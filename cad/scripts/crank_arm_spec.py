@@ -91,7 +91,7 @@ ANCHOR_SCREW_X = 20.0
 ANCHOR_SCREW_Y = 4.5
 ANCHOR_HOLE_SPEC = HoleSpec("tapped", "#4-40")
 
-# MHA-020 is match-fitted to MHA-137 and pinned; nothing runs in this part.
+# MHA-137 is a light press in MHA-020 and pinned; nothing runs in this part.
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 # Derived spans.
@@ -114,8 +114,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
 }
 
-# Decimal places are authored on the model.  The match-fitted hub seat is a
-# one-place nominal; the actual assigned MHA-137 governs its final size.
+# Decimal places are authored on the model.  The hub seat bore is a one-place
+# reference nominal: it is bored first, and MHA-137 is turned to suit it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ArmOutline": {"ArmEndX": 1, "BossRadius": 1},
     "Arm": {"Depth": 1},
