@@ -42,12 +42,18 @@ from pinion_pivot_block_geometry import (
 )
 from pinion_spring_geometry import WIDTH as SPRING_W
 
-# The back block is the axial reference: its outer face stays at the released
-# machine z 88.  At fit-up the cluster is pushed hard against its inner face,
-# so the back strap, the drum and the front strap close up line to line behind
-# it and every other station below derives from this one.
-BACK_BLOCK_OUTER_Z = 88.0 + MECHANISM_Z_SHIFT
-BACK_BLOCK_Z0 = BACK_BLOCK_OUTER_Z - BLOCK_DEPTH
+# BACK_STOP_Z, the back block's inner face and the cluster's back stop, is the
+# one axial reference.  At fit-up the cluster is pushed hard against it, so the
+# back strap, the drum and the front strap close up in front of it and every
+# other station below derives from it.  It is where the U28 block put it (its
+# outer face at the released machine z 88); the E-a re-size deepened MHA-061
+# OUTWARD, so the cluster, the strap cross holes and the shaft holes drilled
+# through them did not move, and the back block's outer face stands the extra
+# depth aft of 88 (nothing sits on the axis there,
+# test_drive_train_support_layout).
+BACK_STOP_Z = 77.75 + MECHANISM_Z_SHIFT
+BACK_BLOCK_Z0 = BACK_STOP_Z
+BACK_BLOCK_OUTER_Z = BACK_BLOCK_Z0 + BLOCK_DEPTH
 
 # MHA-002 drum.  The length is alignment_pinion_spec.FACE_WIDTH (a drawing
 # contract this module must not import); a lockstep test pins the two.  It is
@@ -141,6 +147,36 @@ if sum(TORQUE_SHAFT_BEARING_STACK.values()) < FRONT_BLOCK_MIN_BEARING - 1e-9:
         f"{_stack_text(TORQUE_SHAFT_BEARING_STACK)} < {FRONT_BLOCK_MIN_BEARING}"
     )
 TORQUE_SHAFT_Z0 = BACK_BLOCK_OUTER_Z - TORQUE_SHAFT_LEN
+
+# Option E-a (pinion_strap_pin_spec): pinned to the straps, the shaft rides the
+# cluster's end play.  Match-drilled flush with the back block's outer face at
+# the back stop, it retreats up to the widest feeler setting into the back
+# block when the cluster runs forward to the front block, so the shallowest
+# printed back block must still give it the front block's floor (rule 12's
+# 1.5 D on the 1/4 in shaft).  Geometry, not a tighter band, carries it:
+# BLOCK_DEPTH.
+BACK_BLOCK_MIN_BEARING = FRONT_BLOCK_MIN_BEARING
+
+
+def torque_shaft_back_bearing_stack() -> dict[str, float]:
+    """Worst-case engagement of the pinned torque shaft in the back block."""
+    return {
+        "MHA-061 back block depth": BLOCK_DEPTH,
+        "MHA-061 back block depth .XX": printed_deviations(
+            BLOCK_DEPTH, BLOCK_DEPTH_PLACES
+        )[0],
+        "MHA-A03 feeler, widest (the E-a shaft's end play)": -(
+            FRONT_BLOCK_FEELER + FRONT_BLOCK_FEELER_BAND
+        ),
+    }
+
+
+TORQUE_SHAFT_BACK_BEARING_STACK = torque_shaft_back_bearing_stack()
+if sum(TORQUE_SHAFT_BACK_BEARING_STACK.values()) < BACK_BLOCK_MIN_BEARING - 1e-9:
+    raise AssertionError(
+        "pinned torque shaft bearing in the back block, worst case: "
+        f"{_stack_text(TORQUE_SHAFT_BACK_BEARING_STACK)} < {BACK_BLOCK_MIN_BEARING}"
+    )
 
 # The rod floats north until the back MHA-104 collar lands on the back block;
 # the MHA-059 lever hub must never be that stop.  The back collar is set to its
