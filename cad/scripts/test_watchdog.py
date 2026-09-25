@@ -26,6 +26,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 import _common
+import _seat_forensics  # noqa: E402
 import _telemetry
 import _watchdog
 from _watchdog import EXIT_CRASH, EXIT_MODAL_DIALOG, EXIT_OP_TIMEOUT, Watchdog
@@ -399,7 +400,7 @@ def _session(
     # Seat provenance is resolved once per PROCESS and cached in a module
     # global, so one session's reading (or its failure) would otherwise leak
     # into every later test in the same pytest run.
-    monkeypatch.setattr(_common, "_seat_identity", {})
+    monkeypatch.setattr(_seat_forensics, "_seat_identity", {})
     monkeypatch.setattr(_common._telemetry, "shutdown", Mock())
     monkeypatch.setattr(sys, "argv", ["build_probe.py"])
     monkeypatch.delenv("TRACEPARENT", raising=False)
@@ -431,7 +432,7 @@ def test_teardown_moves_the_seat_out_of_the_checkout(
     # TEMP sits under FARM_WORK_ROOT the two differ, and check:watchdog runs
     # on workers. Hard-coding gettempdir() would fail for an environmental
     # reason rather than a behavioural one.
-    temp = str(_common._seat_park_directory())
+    temp = str(_seat_forensics._seat_park_directory())
     parked = str(_common.CAD_ROOT / "out" / "sldprt")
     adapter, app = _seat(parked)
 
@@ -454,7 +455,7 @@ def test_a_seat_left_in_a_sibling_source_root_is_unparked_too(
     # fa07428b, the pinned root 6621e07a). A teardown that only left its own
     # checkout would leave that root pinned until the seat died, so the seat is
     # parked unconditionally.
-    temp = str(_common._seat_park_directory())
+    temp = str(_seat_forensics._seat_park_directory())
     sibling = r"C:\harmonic\work\sources\6621e07aabfb412916eeae68\workspace\cad\out"
     adapter, app = _seat(sibling)
 
@@ -466,7 +467,7 @@ def test_a_seat_left_in_a_sibling_source_root_is_unparked_too(
 def test_a_seat_already_parked_there_is_left_alone(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    adapter, app = _seat(str(_common._seat_park_directory()))
+    adapter, app = _seat(str(_seat_forensics._seat_park_directory()))
 
     assert _session(monkeypatch, adapter).warnings == []
 
@@ -504,7 +505,7 @@ def test_an_unreadable_working_directory_is_not_papered_over() -> None:
         SetCurrentWorkingDirectory=Mock(),
     )
     with pytest.raises(RuntimeError, match="unreadable"):
-        _common.release_seat_working_directory(app)
+        _seat_forensics.release_seat_working_directory(app)
     app.SetCurrentWorkingDirectory.assert_not_called()
 
 
@@ -516,17 +517,17 @@ def test_an_empty_readback_from_the_park_directory_is_not_a_move(
     # from there -- and a seat that cannot say where it is would be reported as
     # parked. Reachable off the farm: gettempdir() falls back to the process
     # directory with TMPDIR/TEMP/TMP unusable, which makes target == cwd.
-    monkeypatch.setattr(_common.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.setattr(_seat_forensics.tempfile, "gettempdir", lambda: str(tmp_path))
     monkeypatch.chdir(tmp_path)
     # The precondition that makes the hole reachable, asserted so this test
     # cannot quietly stop exercising it.
-    assert _common._normal_path("") == _common._normal_path(
-        _common._seat_park_directory()
+    assert _seat_forensics._normal_path("") == _seat_forensics._normal_path(
+        _seat_forensics._seat_park_directory()
     )
     _adapter, app = _seat(str(_common.CAD_ROOT / "out" / "sldprt"), moved="blank")
 
     with pytest.raises(RuntimeError, match="unreadable after move"):
-        _common.release_seat_working_directory(app)
+        _seat_forensics.release_seat_working_directory(app)
 
     app.SetCurrentWorkingDirectory.assert_called_once_with(str(tmp_path))
 
@@ -544,15 +545,15 @@ def test_an_empty_reading_before_the_move_is_not_already_parked(
     # Passing None would only exercise the ``type(before) is not str`` clause;
     # this pins ``not before``, so deleting it fails here instead of silently
     # skipping the move.
-    monkeypatch.setattr(_common.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.setattr(_seat_forensics.tempfile, "gettempdir", lambda: str(tmp_path))
     monkeypatch.chdir(tmp_path)
-    assert _common._normal_path("") == _common._normal_path(
-        _common._seat_park_directory()
+    assert _seat_forensics._normal_path("") == _seat_forensics._normal_path(
+        _seat_forensics._seat_park_directory()
     )
     _adapter, app = _seat("")
 
     with pytest.raises(RuntimeError, match="unreadable"):
-        _common.release_seat_working_directory(app)
+        _seat_forensics.release_seat_working_directory(app)
 
     app.SetCurrentWorkingDirectory.assert_not_called()
 
@@ -577,17 +578,17 @@ def test_a_temp_directory_inside_this_checkout_is_never_the_park_target(
     inside = checkout / "cad" / "out"
     inside.mkdir(parents=True)
     monkeypatch.setattr(_common, "CAD_ROOT", checkout / "cad")
-    monkeypatch.setattr(_common.tempfile, "gettempdir", lambda: str(inside))
+    monkeypatch.setattr(_seat_forensics.tempfile, "gettempdir", lambda: str(inside))
     # Without this the candidate is skipped as a non-directory and the
     # disposable filter never runs at all.
     assert inside.is_dir()
 
-    target = _common._seat_park_directory()
+    target = _seat_forensics._seat_park_directory()
 
     assert target.is_dir()
-    assert _common._normal_path(target) != _common._normal_path(inside)
+    assert _seat_forensics._normal_path(target) != _seat_forensics._normal_path(inside)
     assert (
-        _common._normal_path(checkout) not in _common._normal_path(target).parents
+        _seat_forensics._normal_path(checkout) not in _seat_forensics._normal_path(target).parents
     )
     adapter, app = _seat(str(inside / "sldprt"))
     assert _session(monkeypatch, adapter).warnings == []
@@ -608,11 +609,11 @@ def test_a_sibling_source_root_is_not_a_park_target_either(
     sibling.mkdir(parents=True)
     monkeypatch.setattr(_common, "CAD_ROOT", mine / "cad")
     monkeypatch.setenv("FARM_WORK_ROOT", str(work_root))
-    monkeypatch.setattr(_common.tempfile, "gettempdir", lambda: str(sibling))
+    monkeypatch.setattr(_seat_forensics.tempfile, "gettempdir", lambda: str(sibling))
 
-    target = _common._normal_path(_common._seat_park_directory())
+    target = _seat_forensics._normal_path(_seat_forensics._seat_park_directory())
 
-    assert _common._normal_path(work_root) not in target.parents
+    assert _seat_forensics._normal_path(work_root) not in target.parents
 
 
 def test_a_close_that_fails_still_moves_the_seat_out_of_the_checkout(
@@ -628,7 +629,7 @@ def test_a_close_that_fails_still_moves_the_seat_out_of_the_checkout(
     # implementation reorders or adds a read, and then fails as a
     # ``StopIteration`` that ``_release_seat``'s ``except Exception`` turns
     # into a warning -- surfacing as a confusing assert on the setter.
-    target = str(_common._seat_park_directory())
+    target = str(_seat_forensics._seat_park_directory())
     _adapter, app = _seat(str(_common.CAD_ROOT / "out" / "sldasm"))
     monkeypatch.setattr(
         package_native,
@@ -677,7 +678,7 @@ def test_connect_is_split_into_dispatch_identity_and_discard(
 
     monkeypatch.setattr(_common._telemetry, "span", record_span)
     monkeypatch.setattr(_common._telemetry, "aspan", record_aspan)
-    adapter, _app = _seat(str(_common._seat_park_directory()))
+    adapter, _app = _seat(str(_seat_forensics._seat_park_directory()))
 
     _session(monkeypatch, adapter)
 

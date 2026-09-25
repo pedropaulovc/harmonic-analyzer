@@ -845,6 +845,14 @@ def references_of(asm_stem: str) -> list[str]:
     return [stem for stem in candidates if stem in found]
 
 
+# Observation-only modules no recipe folds in: an edit to one re-keys nothing.
+# Each is imported by tracked code (``_common`` imports ``_seat_forensics``) but
+# can never change a saved artefact, which ``check:inert`` (test_recipe_inert.py)
+# enforces -- pinned call sites, no COM mutator before a save -- and derives its
+# scope from this constant. See AGENTS.md, "Recipe-inert modules".
+RECIPE_INERT_MODULES = frozenset({"_seat_forensics.py"})
+
+
 @functools.lru_cache(maxsize=1)
 def _local_modules() -> dict[str, Path]:
     """Every local importable module a build script may pull in transitively,
@@ -880,6 +888,11 @@ def _local_modules() -> dict[str, Path]:
     also imported by ``_common``, it only ever aborts-or-logs (crash/idle/hung
     detection) -- a build it kills produces NO artefact at all, so its content can
     never change saved CAD bytes either (codex #344).
+
+    :data:`RECIPE_INERT_MODULES` are excluded on the same argument, but theirs is
+    ENFORCED rather than argued: ``check:inert`` proves each one is reached only
+    from pinned call sites and runs no COM mutator that could land in a saved
+    artefact.
     """
     skip = {
         "_buildgraph.py",
@@ -887,6 +900,7 @@ def _local_modules() -> dict[str, Path]:
         "_rewrite_imports.py",
         "_telemetry.py",
         "_watchdog.py",
+        *RECIPE_INERT_MODULES,
     }
     out: dict[str, Path] = {}
     for path in sorted(SCRIPTS_DIR.rglob("*.py")):
