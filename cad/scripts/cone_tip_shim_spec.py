@@ -69,11 +69,13 @@ if min(LEAF_STOCK_MM) > STACK_RANGE_MM[0]:
     raise ValueError("the thinnest leaf cannot reach the minimum stack")
 
 # Rule 6: at most four short lines.  The leaf stock is the material
-# specification; blackening is the finish.
+# specification; blackening is the finish.  The pack requirement stays here;
+# how the leaves go in (screw backed off, leaves slid under the foot) is a
+# fit-up step, so it lives in the drive-train sheet's MHA-A03 sequence, not
+# on the part print (Codex P2 on #857).
 MANUFACTURING_NOTES = (
     f"SHIM PACK, STACK TO FIT {STACK_RANGE_MM[0]:.2f}-{STACK_RANGE_MM[1]:.2f}, "
-    f"NOMINAL {SHIM_T:.2f}.\n"
-    "HORSESHOE; SLIDE LEAVES IN WITH SCREW BACKED OFF."
+    f"NOMINAL {SHIM_T:.2f}."
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

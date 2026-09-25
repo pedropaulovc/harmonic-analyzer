@@ -66,11 +66,12 @@ def test_slot_opens_away_from_the_drum() -> None:
     assert part.CUT_DEPTH / 2.0 > spec.SHIM_T
 
 
-def test_notes_state_the_stack_range_nominal_and_the_horseshoe() -> None:
+def test_notes_state_the_stack_range_and_nominal_only() -> None:
     lines = spec.MANUFACTURING_NOTES.splitlines()
-    assert len(lines) <= 4
-    assert lines[0] == "SHIM PACK, STACK TO FIT 0.05-2.20, NOMINAL 1.10."
-    assert lines[1] == "HORSESHOE; SLIDE LEAVES IN WITH SCREW BACKED OFF."
+    assert lines == ["SHIM PACK, STACK TO FIT 0.05-2.20, NOMINAL 1.10."]
+    # The fitting procedure is an assembly step (MHA-A03), not a part note.
+    for method in ("SLIDE", "BACK", "SCREW", "INSTALL", "ADJUST"):
+        assert method not in spec.MANUFACTURING_NOTES
 
 
 def test_registry_row_is_the_bom_shim_pack() -> None:
