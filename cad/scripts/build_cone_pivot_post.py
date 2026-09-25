@@ -337,7 +337,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # above the foot only follows it.
     await set_global(adapter, "CrankAxisY", '"JournalAxisY" + "CrankAboveCone"')
 
-    drive_jobs: list[tuple[str, str]] = []
+    # ConeShaftNormal's angle is the incline every inclined feature (cone boss,
+    # journal bore, journal axis, the named cone view) is built on, so the
+    # ``ConeIncline`` global drives it as well as the printed plan angle: a GUI
+    # edit then turns the geometry and the print together.  The plane stores
+    # the positive magnitude with its flip bit set (see the create call), so
+    # the positive global drives it.
+    drive_jobs: list[tuple[str, str]] = [("D1@ConeShaftNormal", '"ConeIncline"')]
 
     # 1. Main O42.011 body, y=0..86.
     main = SketchDims()
@@ -822,6 +828,7 @@ async def build(adapter: Any) -> dict[str, str]:
         CONE_BOSS_DIA / 2.0,
         "journal axis",
     )
+    _assert_journal_axis_direction(adapter)
     for label, x in (("mount west", ATTACHMENT_X), ("mount east", -ATTACHMENT_X)):
         await name_bore_axis(
             adapter, "Front Plane", 0.0, "Right Plane", x, label
@@ -972,6 +979,49 @@ def _create_feature_cylinder_axis(
         f"axis {label} from {feature_name} r={radius_mm:g} mm "
         f"({len(candidates)} candidate face(s))"
     )
+
+
+def _journal_axis_misalignment(vector: tuple[float, float, float]) -> float:
+    """Sine of the angle between ``vector`` and the designed journal axis.
+
+    The journal runs along model ``(sin i, 0, cos i)`` for the ``ConeIncline``
+    angle ``i`` (the named cone view's +Z row).  An axis is sign-free, so only
+    the cross product counts.  The mirrored yaw ``(-sin i, 0, cos i)``, which
+    ConeShaftNormal's other angle solution gives and which the volume gate
+    cannot see, reads ``sin 2i``.
+    """
+    length = math.sqrt(sum(value * value for value in vector))
+    if length <= 1e-12:
+        return 1.0
+    x, y, z = (value / length for value in vector)
+    incline = math.radians(INCLINE_DEG)
+    ex, ez = math.sin(incline), math.cos(incline)
+    cross = (y * ez, z * ex - x * ez, -y * ex)
+    return math.sqrt(sum(value * value for value in cross))
+
+
+@_telemetry.traced("reference.journal_axis_direction")
+def _assert_journal_axis_direction(adapter: Any) -> None:
+    """Fail loud unless the built journal axis lies on the ConeIncline yaw."""
+    from solidworks_mcp.adapters import sw_type_info
+
+    part = sw_type_info.early_bound_doc(adapter.currentModel)
+    feature = part.FeatureByName("journal axis")
+    if feature is None:
+        raise RuntimeError("journal axis: reference axis not found")
+    feature = _early_bound(feature, "IFeature")
+    axis = _early_bound(feature.GetSpecificFeature2(), "IRefAxis")
+    points = tuple(float(value) for value in axis.GetRefAxisParams())
+    if len(points) != 6 or not all(math.isfinite(value) for value in points):
+        raise RuntimeError(f"journal axis: invalid axis endpoints {points!r}")
+    vector = (points[3] - points[0], points[4] - points[1], points[5] - points[2])
+    error = _journal_axis_misalignment(vector)
+    if error > 1e-6:
+        raise RuntimeError(
+            f"journal axis {vector!r} is off the {INCLINE_DEG} deg incline "
+            f"(sin error {error:.3g}): ConeShaftNormal took the wrong solution"
+        )
+    _telemetry.success(f"journal axis on the {INCLINE_DEG} deg incline")
 
 
 @_telemetry.traced("appearance.hide_reference_geometry")

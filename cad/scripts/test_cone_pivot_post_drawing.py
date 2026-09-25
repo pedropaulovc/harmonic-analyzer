@@ -519,3 +519,34 @@ def test_dimension_catalog_row_matches_the_spec() -> None:
     assert f"Ø{spec.BLOCK_DIA:g} × {spec.BLOCK_HEIGHT:.1f} tall" in dims
     assert f"bore on the body centreline at y {spec.CRANK_BORE_HEIGHT:g}" in dims
     assert "42.7506" not in " ".join(rows[0])
+
+
+def test_cone_incline_drives_the_plane_the_inclined_features_are_built_on() -> None:
+    # Codex PRRT_kwDOPHDy386l5WL2: ConeShaftNormal was created from the literal
+    # -INCLINE_DEG and never bound, so a GUI edit of ConeIncline turned the
+    # printed plan angle but not the cone boss, bore, journal axis or view.
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '("D1@ConeShaftNormal", \'"ConeIncline"\')' in source
+    assert "_assert_journal_axis_direction(adapter)" in source
+
+
+def test_journal_axis_check_rejects_the_mirrored_plane_solution() -> None:
+    import math
+
+    incline = math.radians(spec.INCLINE_DEG)
+    designed = (math.sin(incline), 0.0, math.cos(incline))
+    assert part._journal_axis_misalignment(designed) < 1e-12
+    assert part._journal_axis_misalignment(tuple(-v for v in designed)) < 1e-12
+    assert part._journal_axis_misalignment(tuple(40.0 * v for v in designed)) < 1e-12
+    mirrored = (-math.sin(incline), 0.0, math.cos(incline))
+    assert math.isclose(
+        part._journal_axis_misalignment(mirrored), math.sin(2.0 * incline)
+    )
+    assert part._journal_axis_misalignment((0.0, 0.0, 1.0)) > 1e-6
+    assert part._journal_axis_misalignment((0.0, 0.0, 0.0)) == 1.0
+
+
+def test_registry_titles_the_part_for_the_title_block() -> None:
+    import _config
+
+    assert _config.parts("cone-pivot-post")["title"] == "Cone Pivot Post"
