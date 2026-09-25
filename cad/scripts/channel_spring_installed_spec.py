@@ -29,4 +29,10 @@ MAXIMUM_LOAD_N = float(_PART["maximum_load_n"])
 # Supplier-stated scatter.  This is catalogue acceptance data, not the tighter
 # 20-spring common-set matching requirement used by the analyzer.
 SPRING_RATE_TOLERANCE_FRACTION = float(_PART["spring_rate_tolerance_fraction"])
+# The SET QC matching limit: each spring's rate within this percentage of the
+# common set mean.  It is also the error budget's spring_rate allocation, read
+# from here by error_budget.load_budget, so there is one source.  It lives in
+# this module, not in parts/channel-spring-installed.yaml: counter_spring reads
+# that yaml too, so a budget-driven edit there would re-key it as well.
+MATCHED_SET_RATE_TOLERANCE_PCT = 1.25
 INITIAL_TENSION_TOLERANCE_N = float(_PART["initial_tension_tolerance_n"])

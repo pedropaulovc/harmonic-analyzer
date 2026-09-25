@@ -33,6 +33,7 @@ CLI::
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import math
 import sys
@@ -1044,8 +1045,18 @@ def finite_difference_check(
 
 
 def load_budget(path: Path = BUDGET_YAML) -> dict[str, Any]:
-    """The allocation config (cad/config/error_budget.yaml)."""
-    return yaml.safe_load(path.read_text(encoding="utf-8"))
+    """The allocation config (cad/config/error_budget.yaml), with every
+    ``tolerance`` given as a ``module.SYMBOL`` reference resolved to that
+    symbol's value: a limit the drawing also prints lives with its part (the
+    spring's SET QC limit in its spec module), so the budget reads it rather than
+    holding a copy -- and no build script ever needs this file."""
+    budget = yaml.safe_load(path.read_text(encoding="utf-8"))
+    for feature in budget["critical_features"].values():
+        ref = feature["tolerance"]
+        if isinstance(ref, str):
+            module, attr = ref.rsplit(".", 1)
+            feature["tolerance"] = float(getattr(importlib.import_module(module), attr))
+    return budget
 
 
 def _channel_model(

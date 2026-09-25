@@ -9,6 +9,7 @@ from channel_spring_installed_spec import (
     INITIAL_TENSION_TOLERANCE_N,
     INSTALLED_LENGTH_MM,
     MAXIMUM_LOAD_N,
+    MATCHED_SET_RATE_TOLERANCE_PCT,
     MAX_LENGTH_MM,
     SPRING_RATE_N_PER_MM,
     SPRING_RATE_TOLERANCE_FRACTION,
@@ -22,9 +23,6 @@ _QC_PIN_DIA_MM = 2.0
 _MATCHED_SET_SIZE = len(_config.channels())
 _QC_FORCE_1_N = channel_force_n(_QC_LENGTH_1_MM)
 _QC_FORCE_2_N = channel_force_n(_QC_LENGTH_2_MM)
-_MATCH_TOLERANCE_PERCENT = float(
-    _config._doc("error_budget")["critical_features"]["spring_rate"]["tolerance"]
-)
 
 DRAWING_NOTES = "\n".join(
     (
@@ -48,7 +46,7 @@ DRAWING_NOTES = "\n".join(
         f"  NOMINAL F60/F80 = {_QC_FORCE_1_N:.3f}/{_QC_FORCE_2_N:.3f} N.",
         "  RATE = (F80-F60)/20.00 MM.",
         "  READ EACH FORCE 30 S AFTER LOADING.",
-        f"  EACH SPRING RATE WITHIN +/-{_MATCH_TOLERANCE_PERCENT:.2f}%",
+        f"  EACH SPRING RATE WITHIN +/-{MATCHED_SET_RATE_TOLERANCE_PCT:.2f}%",
         "  OF THE COMMON SET MEAN RATE.",
         "  RECORD F60/F80; MATCH RATES, NOT FORCES.",
         f"  CATALOG +/-{100.0 * SPRING_RATE_TOLERANCE_FRACTION:.0f}% "

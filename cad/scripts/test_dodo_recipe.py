@@ -2609,3 +2609,36 @@ def test_check_gates_depend_on_everything_they_execute():
         f"check:{name} misses {len(paths)}: {', '.join(paths)}"
         for name, paths in sorted(gaps.items())
     )
+
+
+def test_no_build_task_reads_the_error_budget():
+    """cad/config/error_budget.yaml is the tolerance ALLOCATION: check:budget's
+    input, READ BY NO BUILD SCRIPT (its header). A build script that reads it
+    puts the whole budget into that task's recipe, so every allocation edit
+    re-keys a CAD artefact and its drawing. That happened once:
+    channel_spring_installed_notes printed the spring_rate tolerance from it,
+    and each mesh-lag budget edit re-keyed part:channel_spring_installed. A
+    limit a drawing also prints lives with its part and error_budget.py reads
+    it from there."""
+    dodo = _load_dodo()
+    budget = (REPO_ROOT / "cad" / "config" / "error_budget.yaml").resolve()
+    tasks = [
+        (f"{prefix}:{task['name']}", task)
+        for prefix, gen in (
+            ("part", dodo.task_part),
+            ("assembly", dodo.task_assembly),
+            ("drawing", dodo.task_drawing),
+            ("verify_soundness", dodo.task_verify_soundness),
+            ("verify", dodo.task_verify),
+            ("package", dodo.task_package),
+        )
+        for task in gen()
+    ]
+    tasks += [("export", dodo.task_export()), ("preflight", dodo.task_preflight())]
+    assert len(tasks) > 100, len(tasks)
+    readers = [
+        label
+        for label, task in tasks
+        if any(Path(dep).resolve() == budget for dep in task["file_dep"])
+    ]
+    assert not readers, f"build tasks depend on error_budget.yaml: {readers}"

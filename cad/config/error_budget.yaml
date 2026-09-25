@@ -3,13 +3,12 @@
 # from the whole-device benchmark in cad/docs/michelson-1898-trial-accuracy.md.
 # Method and the resulting guidance: cad/docs/tolerance-policy.md.
 #
-# This file holds allocation (how much of the output error each feature may
-# consume), not geometry. It is still a BUILD INPUT on one path:
-# channel_spring_installed_notes reads critical_features.spring_rate for the
-# spring's SET QC note, and config dependencies are per file, so ANY edit here
-# re-keys part:channel_spring_installed and everything downstream of it (the
-# channel assembly and drawing, the top assembly, export). The nominal each
-# feature is toleranced against stays in the
+# This file is READ BY NO BUILD SCRIPT: it holds allocation (how much of the
+# output error each feature may consume), not geometry, so editing it never
+# rebuilds CAD. A limit a drawing also prints lives with its part and is
+# referenced here by symbol (spring_rate -> channel_spring_installed_spec),
+# never copied; test_dodo_recipe fails if any build task's file_dep includes
+# this file. The nominal each feature is toleranced against stays in the
 # spec module named under `nominal` -- check:budget fails if that symbol moves.
 # The drawing-facing limits (tolerances.yaml, title_block.yaml, *_spec.py notes)
 # must agree with the `tolerance` here; check:budget pins the ones it can read.
@@ -170,12 +169,13 @@ critical_features:
     class: channel
     holds: "half of the 0.30 spring-hole pattern position zone (summing_lever_spec.GEOMETRIC_TOLERANCES_MM), normal to the knife line"
   spring_rate:
-    tolerance: 1.25
+    # the part's SET QC limit, by symbol (error_budget.load_budget resolves it)
+    tolerance: channel_spring_installed_spec.MATCHED_SET_RATE_TOLERANCE_PCT
     unit: pct
     nominal: channel_spring_installed_spec.SPRING_RATE_N_PER_MM
     quantity: gain
     class: channel
-    holds: "MATCHED, not machined: measure every channel spring and bin the 20 within +/-1.25 % of their common mean; SET QC uses 60/80 mm inside-hook lengths (58/78 mm pin centres with diameter 2 mm pins); catalog rates scatter +/-10 %"
+    holds: "MATCHED, not machined: measure every channel spring and bin the 20 within the part's matched-set limit of their common mean; SET QC uses 60/80 mm inside-hook lengths (58/78 mm pin centres with diameter 2 mm pins); catalog rates scatter +/-10 %"
   spring_initial_tension:
     tolerance: 0.27
     unit: N

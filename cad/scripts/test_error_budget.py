@@ -1462,3 +1462,23 @@ def test_procedures_specify_the_lubrication_the_toggle_is_scored_at(budget):
         if line.startswith("| flank toggle (bench repro) |")
     )
     assert "dry" in trial and "MODELLED, NOT PROVEN" in trial
+
+
+def test_spring_rate_allocation_is_the_parts_matched_set_limit(budget):
+    """The spring_rate allocation and the SET QC limit the spring drawing prints
+    are one number held on the part: the budget names the spec symbol rather
+    than copying the value, so the drawing never has to read the budget."""
+    import channel_spring_installed_notes as notes
+    from channel_spring_installed_spec import MATCHED_SET_RATE_TOLERANCE_PCT
+
+    raw = eb.yaml.safe_load(eb.BUDGET_YAML.read_text(encoding="utf-8"))
+    assert raw["critical_features"]["spring_rate"]["tolerance"] == (
+        "channel_spring_installed_spec.MATCHED_SET_RATE_TOLERANCE_PCT"
+    )
+    assert budget["critical_features"]["spring_rate"]["tolerance"] == (
+        MATCHED_SET_RATE_TOLERANCE_PCT
+    )
+    assert f"WITHIN +/-{MATCHED_SET_RATE_TOLERANCE_PCT:.2f}%" in notes.DRAWING_NOTES
+    assert "error_budget" not in pathlib.Path(notes.__file__).read_text(
+        encoding="utf-8"
+    )
