@@ -264,9 +264,12 @@ def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
         abs_tol=1e-9,
     )
     assert math.isclose(min(backs) - g19_back, drive.J19_FULL_FACE_MARGIN, abs_tol=1e-9)
-    assert math.isclose(drive.J19_FULL_FACE_MARGIN, 0.026, abs_tol=5e-4)
-    assert drive.J19_FULL_FACE_MARGIN - RIG.RIG_AFT_SHIFT_STEP < 0.0
-    assert (RIG.RIG_AFT_SHIFT, RIG.RIG_AFT_SHIFT_STEP) == (1.25, 0.25)
+    # Main (#858): the shift is the smallest step that leaves every rig margin
+    # RIG_MARGIN_SPARE over its floor; one step less leaves j = 19 thin.
+    assert math.isclose(drive.J19_FULL_FACE_MARGIN, 0.326, abs_tol=5e-4)
+    assert drive.J19_FULL_FACE_MARGIN >= RIG.RIG_MARGIN_SPARE
+    assert drive.J19_FULL_FACE_MARGIN - RIG.RIG_AFT_SHIFT_STEP < RIG.RIG_MARGIN_SPARE
+    assert (RIG.RIG_AFT_SHIFT, RIG.RIG_AFT_SHIFT_STEP) == (1.75, 0.25)
     # j = 0 at the front: the drum's front end never uncovers gear 0, even
     # hard aft (the pose) with the thinnest back strap and the shortest drum.
     g0_front = drive.Z_DRUM0 - drive.DRUM_FACE / 2.0
@@ -276,7 +279,7 @@ def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
     )
     assert slack >= 0.0, slack
     assert math.isclose(slack, drive.J0_SLACK_WORST, abs_tol=1e-9)
-    assert math.isclose(slack, 2.0, abs_tol=5e-3)
+    assert math.isclose(slack, 1.5, abs_tol=5e-3)
 
 
 def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
@@ -345,14 +348,16 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
     for stations in (front, back):
         assert min(stations) >= 1.0, stations
         assert max(stations) <= drive.CAM_LEN - 1.0, stations
-    assert math.isclose(min(front), 2.15, abs_tol=5e-3)
+    # 1.90: the back collar's pin plane moved to 6.25 (Main, #858), so its
+    # gap -- the rod's north float -- grew by 0.25.
+    assert math.isclose(min(front), 1.9, abs_tol=5e-3)
     # 2.75, not the old 3.10: at the thickest back strap and the late set,
     # the 2.05 hub gap used to stop the rod before the 2.4 back collar did
     # (Codex #837).  The hub now never is the stop, so the collar's whole gap
     # applies.
     assert math.isclose(min(back), 2.75, abs_tol=5e-3)
     # North float at the nominal set: the back collar lands first.
-    assert math.isclose(_back_collar_gap(drive.STRAP_T, 0.0), 1.5, abs_tol=5e-3)
+    assert math.isclose(_back_collar_gap(drive.STRAP_T, 0.0), 1.75, abs_tol=5e-3)
     assert _back_collar_gap(drive.STRAP_T, 0.0) < _hub_gap() - 0.25
     # A perfectly set back collar sits >= 1.0 off the back block; it lands
     # there only as the rod's north stop.
@@ -419,8 +424,8 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     from pinion_lever_geometry import BORE_DEPTH
 
     assert not hasattr(RIG, "STACK_BAND")  # the stacks name every term
-    assert (RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN) == (186.3, 198.8)
-    assert math.isclose(RIG.BACK_COLLAR_GAP_MAX, 2.4, abs_tol=1e-9)
+    assert (RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN) == (187.0, 199.5)
+    assert math.isclose(RIG.BACK_COLLAR_GAP_MAX, 2.65, abs_tol=1e-9)
     bearing_min = math.inf
     hub_margin_min = math.inf
     nominal_inner = RIG.FRONT_BLOCK_Z0 + RIG.BLOCK_DEPTH
@@ -450,12 +455,12 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
             for e in (-_BACK_CAM_SET_ERR, _BACK_CAM_SET_ERR):
                 margin = hub_gap - _back_collar_gap(t_b, e)
                 hub_margin_min = min(hub_margin_min, margin)
-    assert bearing_min >= RIG.FRONT_BLOCK_MIN_BEARING - 1e-9
+    assert bearing_min >= RIG.FRONT_BLOCK_MIN_BEARING + RIG.BLOCK_BEARING_MARGIN - 1e-9
     # The sweep's minimum is the layout's named-term budget, term for term.
     assert math.isclose(
         bearing_min, sum(RIG.TORQUE_SHAFT_BEARING_STACK.values()), abs_tol=1e-9
     )
-    assert math.isclose(bearing_min, 9.59, abs_tol=5e-3)
+    assert math.isclose(bearing_min, 10.09, abs_tol=5e-3)
     assert hub_margin_min >= RIG.HUB_STOP_MARGIN - 1e-9
     assert math.isclose(
         hub_margin_min,
@@ -464,7 +469,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
         + RIG.HUB_STOP_MARGIN,
         abs_tol=1e-9,
     )
-    assert math.isclose(hub_margin_min, 0.28, abs_tol=5e-3)
+    assert math.isclose(hub_margin_min, 0.53, abs_tol=5e-3)
 
 
 def test_lever_station_clears_at_both_rod_extremes() -> None:
@@ -495,9 +500,9 @@ def test_lift_rod_length_band_clears_past_the_back_block() -> None:
     # The SR crown stands CAP_SAG beyond that (Codex #855 P2), and the envelope
     # runs to the crown's apex.
     body_end = rig.BACK_BLOCK_OUTER_Z + _ROD_LEN_BAND + rig.BACK_COLLAR_GAP_MAX
-    assert math.isclose(body_end - rig.BACK_BLOCK_OUTER_Z, 3.2, abs_tol=5e-3)
+    assert math.isclose(body_end - rig.BACK_BLOCK_OUTER_Z, 3.45, abs_tol=5e-3)
     reach = body_end + CAP_SAG
-    assert math.isclose(reach - rig.BACK_BLOCK_OUTER_Z, 4.4, abs_tol=5e-3)
+    assert math.isclose(reach - rig.BACK_BLOCK_OUTER_Z, 4.65, abs_tol=5e-3)
     band = (rig.BACK_BLOCK_OUTER_Z, reach + 0.25)
     # Occupants of that z band near the rod axis (drive_train + frame):
     # the north arbor pedestal stands on the drum axis, well west of the rod.
@@ -538,7 +543,7 @@ def test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack() -> None:
     # Main (#858): a real margin, >= 0.5 over the floor, from geometry (the
     # 11.0 block), with every band kept; the 10.5 block left 0.04.
     assert bearing >= 9.5 + 0.5 - 1e-9, bearing
-    assert RIG.BACK_BLOCK_BEARING_MARGIN == 0.5
+    assert RIG.BLOCK_BEARING_MARGIN == 0.5
     assert RIG.BACK_BLOCK_MIN_BEARING == RIG.FRONT_BLOCK_MIN_BEARING == 9.5
     # The layout's named-term stack is this sweep, term for term.
     assert math.isclose(
@@ -556,7 +561,7 @@ def test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack() -> None:
 def test_torque_shaft_length_band_clears_both_ends() -> None:
     # MHA-062 at the title-block .X band (U27), set back-flush: at the
     # shortest stack (both blocks thin, Codex #854 P1) the longest shaft's
-    # body end stands 7.02 proud of the front block, and its SR crown 1.2
+    # body end stands 7.52 proud of the front block, and its SR crown 1.2
     # beyond that (Codex #837 P1).
     import arbor_pedestal_spec as ped
     import pinion_lever_geometry as lever
@@ -576,15 +581,15 @@ def test_torque_shaft_length_band_clears_both_ends() -> None:
     )
     shortest_outer = rig.FRONT_BLOCK_Z0 + shrink
     proud = shortest_outer - front_end
-    assert math.isclose(proud, 7.02, abs_tol=5e-3)
-    assert math.isclose(proud + CAP_SAG, 8.22, abs_tol=5e-3)
+    assert math.isclose(proud, 7.52, abs_tol=5e-3)
+    assert math.isclose(proud + CAP_SAG, 8.72, abs_tol=5e-3)
     assert math.isclose(
         max(outer for _i, outer, _t in _stack_vertices()), shortest_outer, abs_tol=1e-9
     )
     # Option E-a: pinned to the straps, the shaft rides the cluster's end play
     # from its back-flush drilling station to the front stop.
-    assert math.isclose(proud + _P_MAX, 7.37, abs_tol=5e-3)
-    assert math.isclose(proud + _P_MAX + CAP_SAG, 8.57, abs_tol=5e-3)
+    assert math.isclose(proud + _P_MAX, 7.87, abs_tol=5e-3)
+    assert math.isclose(proud + _P_MAX + CAP_SAG, 9.07, abs_tol=5e-3)
     # Its back end then sits P_MAX inside the back block, bearing
     # test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack.
     # South of the front block nothing stands on the shaft's axis at any z.

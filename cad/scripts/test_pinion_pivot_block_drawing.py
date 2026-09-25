@@ -212,7 +212,9 @@ def test_rig_layout_sets_the_front_block_by_feeler_off_the_back_stop() -> None:
     assert (rig.DRUM_FRONT_Z - rig.DRUM_END_SHIM, rig.DRUM_BACK_Z) == pytest.approx(
         rig.STRAP_Z_INNER, abs=1e-9
     )
-    assert rig.DRUM_END_SHIM == rig.FRONT_BLOCK_FEELER  # the one feeler
+    # The drum shim is its own 0.45 blade (Main, #858: the 0.25 feeler left the
+    # drum 0.05 over its end-play floor).
+    assert rig.DRUM_END_SHIM == 0.45
     assert not hasattr(rig, "STRAP_AIR")
     assert rig.STRAP_Z_OUTER[1] - rig.STRAP_Z_INNER[1] == THICKNESS
 
@@ -236,7 +238,7 @@ def test_rig_layout_shaft_and_rod_are_set_back_flush() -> None:
     assert rig.LEVER_SEAT_PROUD - 1e-9 <= proud <= rig.LEVER_SEAT_PROUD + 0.1
     # Both are budgeted on the worst fitted stack (their own tests); at
     # nominal each stands that allowance proud of the front block.
-    assert (SHAFT_LEN, ROD_LEN) == (186.3, 198.8)
+    assert (SHAFT_LEN, ROD_LEN) == (187.0, 199.5)
 
 
 def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
@@ -327,6 +329,12 @@ def test_front_block_feeler_setting_is_the_ruled_band() -> None:
     assert fitup.FRONT_BLOCK_FEELER is rig.FRONT_BLOCK_FEELER
     assert fitup.FRONT_BLOCK_FEELER_BAND is rig.FRONT_BLOCK_FEELER_BAND
     assert (fitup.FRONT_BLOCK_FEELER, fitup.FRONT_BLOCK_FEELER_BAND) == (0.25, 0.10)
+    # Main (#858): both feelers are stock leaves of one purchased set.
+    assert fitup.DRUM_END_SHIM == 0.45
+    assert fitup.FEELER_GAGE_LEAVES_MM[4] == 0.25
+    assert fitup.FEELER_GAGE_LEAVES_MM[8] == 0.45
+    assert len(fitup.FEELER_GAGE_LEAVES_MM) == 20
+    assert "66MA" in fitup.FEELER_GAGE
     assert 0.0 < fitup.FRONT_BLOCK_FEELER - fitup.FRONT_BLOCK_FEELER_BAND
     assert fitup.FRONT_BLOCK_FEELER_BAND < fitup.FRONT_BLOCK_FEELER
 
@@ -398,15 +406,17 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     )
     bearing = shortest_shaft - longest_span - 0.10
     assert bearing == pytest.approx(sum(rig.TORQUE_SHAFT_BEARING_STACK.values()))
-    assert bearing >= rig.FRONT_BLOCK_MIN_BEARING == 9.5
-    # The smallest .X length that does it: 0.1 shorter falls under 9.5.
-    assert bearing - 0.1 < rig.FRONT_BLOCK_MIN_BEARING
+    required = rig.FRONT_BLOCK_MIN_BEARING + rig.BLOCK_BEARING_MARGIN
+    assert bearing >= required and rig.FRONT_BLOCK_MIN_BEARING == 9.5
+    # The smallest .X length that does it (Main, #858: with 0.5 over the 9.5
+    # floor): 0.1 shorter falls under it.
+    assert bearing - 0.1 < required
     # Other extreme: the longest shaft in the shortest stack stands proud of
     # the front block, and nothing sits on its axis there -- the MHA-059 lever
     # hub rides the lift rod, which the blocks carry off the shaft axis.
     longest_shaft = rig.TORQUE_SHAFT_LEN + x_band
     shortest_outer = 2.0 * (depth - xx_band) + rig.INNER_SPAN - 2.6
-    assert longest_shaft - shortest_outer == pytest.approx(7.02, abs=5e-3)
+    assert longest_shaft - shortest_outer == pytest.approx(7.52, abs=5e-3)
     hub_clear = (
         math.hypot(LIFT_BORE_SPACING, LIFT_BORE_RISE) - (HUB_OD + SHAFT_DIA) / 2.0
     )

@@ -17,7 +17,12 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_bracket_geometry import THICKNESS as STRAP_T
 from pinion_bracket_geometry import THICKNESS_BAND as STRAP_T_BAND
 from pinion_handle_geometry import ROD_DIA, ROD_DIA_BAND
-from pinion_rig_layout import DRUM_END_SHIM, DRUM_END_SHIM_SET_ERROR, DRUM_LEN
+from pinion_rig_layout import (
+    DRUM_END_SHIM,
+    DRUM_END_SHIM_SET_ERROR,
+    DRUM_LEN,
+    RIG_MARGIN_SPARE,
+)
 
 SHAFT_DIA = 8.0
 SHAFT_LEN = 226.25  # unchanged origin-to-back-crown-root station
@@ -68,7 +73,7 @@ DRUM_STATION_BAND = LINEAR_X_BAND
 # The assembly shows the drilling set-up, the drum hard on the back strap
 # (pinion_rig_layout).  The drum hard forward and hard aft are the two stops.
 STRAP_AXIAL_LOCATION = "pinned-shim-set"
-END_PLAY = DRUM_END_SHIM  # the rig's one fit-up feeler (pinion_rig_layout)
+END_PLAY = DRUM_END_SHIM  # the shaft's drilling shim (pinion_rig_layout)
 END_PLAY_SET_ERROR = DRUM_END_SHIM_SET_ERROR
 MIN_END_PLAY = 0.1  # the drum never binds between the straps
 LAND_FINISH_RUNOUT = 2.0  # the Ra 1.6 pass runs out this far past the land
@@ -137,10 +142,16 @@ def worst_land_margins(
     return worst
 
 
+# The novice-margin rule (Main, restricted review of #858): the lands keep
+# RIG_MARGIN_SPARE over the floor too.  With the 0.45 drum shim the 19 land
+# left 0.70 at the drum-forward stop, 0.20 over it.
+LAND_OVER_STRAP_REQUIRED = MIN_LAND_OVER_STRAP + RIG_MARGIN_SPARE
+
+
 def land_margin_slack(journal_len: float) -> float:
-    """Worst land-over-strap margin above the floor, both stops, printed bands."""
+    """Worst land-over-strap margin above the floor and its spare, both stops."""
     margins = worst_land_margins(journal_len, DRUM_STATION_BAND)
-    return min(margins.values()) - MIN_LAND_OVER_STRAP
+    return min(margins.values()) - LAND_OVER_STRAP_REQUIRED
 
 
 def _smallest_journal_len() -> float:
@@ -157,8 +168,11 @@ LAND_MARGINS_AT_STOPS = {
     for stop in STOPS
 }
 for _stop, _margins in LAND_MARGINS_AT_STOPS.items():
-    if min(_margins.values()) < MIN_LAND_OVER_STRAP - 1e-9:
-        raise AssertionError(f"journal land margins at {_stop}: {_margins} under 0.5")
+    if min(_margins.values()) < LAND_OVER_STRAP_REQUIRED - 1e-9:
+        raise AssertionError(
+            f"journal land margins at {_stop}: {_margins} under "
+            f"{LAND_OVER_STRAP_REQUIRED}"
+        )
 if END_PLAY - END_PLAY_SET_ERROR < MIN_END_PLAY:
     raise AssertionError("the drum can bind between the straps")
 BACK_CAP_SAG = 1.2
