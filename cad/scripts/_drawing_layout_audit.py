@@ -101,19 +101,26 @@ class _Reader:
         return self.call(fn, default, name=name, required=True)
 
     def first(self, fns: list[Callable[[], Any]], *, name: str) -> Any:
-        """The first overload that answers; one refusal counted only when all do
+        """The first of some ARRAY-returning overloads that answers (a scalar 0
+        or False would read as empty: never route a scalar getter here); one
+        refusal counted only when all do
         (``GetLineAtIndex3`` refusing before ``GetLineAtIndex2`` answers is the
-        expected path, not a lost primitive). Raising or answering None is a
-        refusal; an empty answer is an answer."""
+        expected path, not a lost primitive). An empty answer falls through to
+        the next overload, but is returned, uncounted, when none answers with
+        data; only raising or None from every overload is a refusal."""
+        empty = None
         for fn in fns:
             try:
                 value = fn()
             except Exception:
                 continue
-            if value is not None:
+            if value:
                 return value
-        self._count(name)
-        return None
+            if value is not None and empty is None:
+                empty = value
+        if empty is None:
+            self._count(name)
+        return empty
 
     def bind(self, obj: Any, interface: str) -> Any:
         if obj is None:
