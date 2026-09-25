@@ -28,9 +28,10 @@ TOP_THICKNESS = 1.5 * MM_PER_IN  # 38.1
 # TOP_WIDTH = TOP_LENGTH - 2 * (197 - 112) = 274.5. The former 10.5 in pad
 # (266.7) left 1.6 mm of land in Z against 5.5 in X, and the 2026-09 blind
 # machinist review rejected that asymmetry as a blocker: no tolerance stack
-# behind the hole-table coordinate scheme can hold the 1.0 MIN finished land
-# DRAWING_NOTES demands off a 1.6 mm nominal. build_harmonic_base asserts the
-# land is equal on both axes -- it owns COLUMN_X and the socket stations, so
+# behind the hole-table coordinate scheme can hold a 1.0 MIN finished land
+# off a 1.6 mm nominal. build_harmonic_base asserts the land is equal on
+# both axes and proves its worst case -- it owns COLUMN_X and the socket
+# stations, so
 # deriving TOP_WIDTH from them here would be circular.
 TOP_WIDTH = 274.5
 # The flange keeps the same 0.25 in reveal per side that it has in X.
@@ -146,6 +147,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Rim": {"RimHeight"},
     "RimWidthReference": {"RimWidth"},
     "HeightReference": {"FlangeToRim"},
+    "CrossTapReference": {"CrossTapX", "CrossTapPitch"},
     "TopRimBreaks": {"TopRimChamfer"},
     "BottomEdgeBreak": {"BottomEdgeChamfer"},
     "BaseSpotFaceRearProfile": {"SpotFaceDia", "Spot0Y"},
@@ -172,6 +174,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Rim": {"RimHeight": 1},
     "RimWidthReference": {"RimWidth": 1},
     "HeightReference": {"FlangeToRim": 1},
+    "CrossTapReference": {"CrossTapX": 1, "CrossTapPitch": 1},
     "TopRimBreaks": {"TopRimChamfer": 1},
     "BottomEdgeBreak": {"BottomEdgeChamfer": 1},
     "BaseSpotFaceRearProfile": {"SpotFaceDia": 1, "Spot0Y": 1},
@@ -188,7 +191,7 @@ DRAWING_REFERENCE_PRECISION = 1
 # A spotface only has to clean the cast face under a screw head: deeper is
 # harmless, shallower leaves an unfaced ring the head would rock on, so the
 # general .X band is wrong in one direction here. The model carries the band.
-SPOTFACE_DEPTH_BAND_MM = (0.0, 0.5)  # (lower, upper) deviation
+SPOTFACE_DEPTH_BAND_MM = (0.5, 0.0)  # (upper, lower) deviations, like _fit_limits
 
 _PRECISION_NAMES = [
     (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
@@ -204,18 +207,10 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
-# Keep this block to short, part-specific facts that are not already legible
-# in a native dimension, hole table, or feature callout.  Finish and masking
-# live in the registry's Finish field.
-# Finished-part acceptance couples the otherwise independent dimensional
-# limits. This does not change nominal CAD geometry or the assigned-tube fit.
-# The requirement only: inspection, coordination and "limits still apply" are
-# what a MIN callout plus the title block already mean.
-DRAWING_NOTES = (
-    "A1-A4: 1.0 MIN CONTINUOUS FINISHED DECK LAND\n"
-    "BETWEEN EACH BORE AND RIM INNER FACE\n"
-    "AFTER MATCHING AND EDGE BREAK."
-)
+# No Manufacturing Notes block. The one note it carried, a 1.0 MIN finished
+# deck land between each bore and the rim, put a dimension in a note; the
+# land is now a design guarantee that build_harmonic_base proves at import
+# from every tolerance the sheet prints (hb-render-4 eye pass).
 
 
 # Base/frame parts carry no datums or feature-control frames under the drawing
