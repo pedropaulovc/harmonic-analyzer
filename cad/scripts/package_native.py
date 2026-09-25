@@ -120,10 +120,14 @@ SW_DOC_ASSEMBLY = 2  # swDocumentTypes_e.swDocASSEMBLY
 SW_DOC_DRAWING = 3  # swDocumentTypes_e.swDocDRAWING
 SW_OPEN_SILENT = 1  # swOpenDocOptions_e.swOpenDocOptions_Silent
 SW_SAVE_SILENT = 1  # swSaveAsOptions_e.swSaveAsOptions_Silent
-# swFileLoadWarning_e bits that mean a reference did not load: a silent open
-# still hands back the parent, which would then be packaged or stamped without it.
-SW_OPEN_UNLOADED_REFERENCES = {
+# swFileLoadWarning_e bits that mean a reference did not resolve as saved: a
+# silent open still hands back the parent, which would then be packaged or
+# stamped without it -- or, for a missing configuration, with SolidWorks' active
+# one substituted, so a released view would depict the wrong configuration.
+SW_OPEN_UNRESOLVED_REFERENCES = {
     0x40: "BasePartNotLoaded",
+    0x400: "ViewMissingReferencedConfig",
+    0x8000: "ComponentMissingReferencedConfig",
     0x100000: "MissingExternalReferences",
 }
 # Every other swFileLoadWarning_e bit an open may raise, named for the warn line.
@@ -133,13 +137,11 @@ SW_OPEN_WARNINGS = {
     0x4: "SharingViolation",
     0x20: "NeedsRegen",
     0x80: "AlreadyOpen",
-    0x400: "ViewMissingReferencedConfig",
     0x2000: "ModelOutOfDate",
     0x4000: "DimensionsReferencedIncorrectlyToModels",
-    0x8000: "ComponentMissingReferencedConfig",
     0x40000: "AutomaticRepair",
     0x80000: "CriticalDataRepair",
-    **SW_OPEN_UNLOADED_REFERENCES,
+    **SW_OPEN_UNRESOLVED_REFERENCES,
 }
 SW_CUSTOM_TEXT = 30  # swCustomInfoType_e.swCustomInfoText
 SW_PROP_REPLACE = 2  # swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
@@ -620,12 +622,13 @@ def assert_contained(sw: Any, tree: Path, tree_names: set[str]) -> set[str]:
 
 
 def open_silently(sw: Any, path: Path, doc_type: int) -> None:
-    """``OpenDoc6`` without dialogs; fail on a load error or an unloaded reference.
+    """``OpenDoc6`` without dialogs; fail on a load error or an unresolved reference.
 
     comtypes returns the [in, out] Errors and Warnings ahead of the document, in
     declaration order (pinned against the typelib in test_release_stamp.py). A
-    silent open reports a component that did not load only there: the parent
-    still opens, and the resident walk cannot see a document that never loaded.
+    silent open reports a component that did not load, or a configuration it
+    had to substitute, only there: the parent still opens, and the resident walk
+    cannot see a document that never loaded.
     Other warnings are logged, not fatal: the warn line names the document, the
     warning bits and every reference resident with it, since OpenDoc6 does not
     say which reference an IdMismatch came from.
@@ -633,10 +636,12 @@ def open_silently(sw: Any, path: Path, doc_type: int) -> None:
     errors, warnings, _document = sw.OpenDoc6(str(path), doc_type, SW_OPEN_SILENT, "", 0, 0)
     if errors:
         raise RuntimeError(f"OpenDoc6 {path.name}: swFileLoadError_e {errors:#x}")
-    unloaded = [name for bit, name in SW_OPEN_UNLOADED_REFERENCES.items() if warnings & bit]
-    if unloaded:
+    unresolved = [
+        name for bit, name in SW_OPEN_UNRESOLVED_REFERENCES.items() if warnings & bit
+    ]
+    if unresolved:
         raise RuntimeError(
-            f"OpenDoc6 {path.name}: references did not load ({', '.join(unloaded)}, "
+            f"OpenDoc6 {path.name}: references did not resolve ({', '.join(unresolved)}, "
             f"swFileLoadWarning_e {warnings:#x})"
         )
     if not warnings:

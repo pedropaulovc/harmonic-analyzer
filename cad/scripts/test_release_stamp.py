@@ -266,14 +266,21 @@ def _opened(tmp_path: Path, errors: int, warnings: int) -> tuple[_Session, Path]
 
 @pytest.mark.parametrize(
     ("warnings", "named"),
-    [(0x100000, "MissingExternalReferences"), (0x40, "BasePartNotLoaded")],
+    [
+        (0x100000, "MissingExternalReferences"),
+        (0x40, "BasePartNotLoaded"),
+        (0x400, "ViewMissingReferencedConfig"),
+        (0x8000, "ComponentMissingReferencedConfig"),
+    ],
 )
-def test_an_open_whose_references_did_not_load_fails(tmp_path, warnings, named):
+def test_an_open_whose_references_did_not_resolve_fails(tmp_path, warnings, named):
     """Codex on #876: a silent open hands back the parent even when a component
-    did not load, and the resident walk cannot see what never loaded."""
+    did not load, and the resident walk cannot see what never loaded. A missing
+    referenced configuration (round 3) substitutes the active one, so a released
+    view would show the wrong configuration."""
     session, assembly = _opened(tmp_path, 0, warnings)
 
-    with pytest.raises(RuntimeError, match=rf"references did not load \({named}"):
+    with pytest.raises(RuntimeError, match=rf"references did not resolve \({named}"):
         package_native.open_silently(session, assembly, package_native.SW_DOC_ASSEMBLY)
 
 
