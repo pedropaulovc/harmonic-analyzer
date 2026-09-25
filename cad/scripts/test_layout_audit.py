@@ -1782,6 +1782,17 @@ def test_an_empty_answer_is_not_a_refused_read():
     assert reader.take_errors() == {"GetPolylineAtIndex2": 1}
 
 
+def test_an_empty_answer_falls_through_to_the_next_overload():
+    """GetLineAtIndex3 answering () must not hide the primitive
+    GetLineAtIndex2 holds: that ink is what the overload chain is for."""
+    from _drawing_layout_audit import _Reader
+
+    reader = _Reader(adapter=None)
+    line = (0.0, 0.0, 0.0, 0.0, 0.1, 0.1, 0.0, 0.2, 0.1, 0.0)
+    assert reader.first([lambda: (), lambda: line], name="GetLineAtIndex3/GetLineAtIndex2") == line
+    assert reader.take_errors() == {}
+
+
 def test_a_path_inside_a_form_xobject_fails_rather_than_misplace_ink():
     import pypdfium2.raw as pdfium_raw
     from _pdf_ink import _strokes
