@@ -372,6 +372,14 @@ family (claude and gpt), so one of them is cross-family whoever wrote the
 script; each is filed in its own `both_families_<family>` slot. The command is a
 dry run that prints a per-drawing table unless given `--apply`, and it must run
 against a render of the head being released (`--checkout`).
+A review, and a ledger match, is always judged against the release render.
+Renders of the same drawing from different hosts can differ in ink (glyph
+rasterization in view labels, for one: the #857 screw sheet had digest
+`f15e0a9bf12a` rendered locally and `f7036a4d4edb` on the farm). A digest
+that differs because the render host differs is therefore neither a pass nor
+a spurious failure: it means the sheet needs review on the release render,
+and `check` and `backfill` report it as drift or unreviewed so that it gets
+one.
 Part and assembly packages render every native PDF page at 300 dpi and submit
 all sheet images to one review, using the rubric for that package kind. A
 downscaled contact-sheet preview is not a substitute for reviewing every page.
