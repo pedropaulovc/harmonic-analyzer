@@ -27,14 +27,16 @@ BLOCK_EAST = 14.0  # pivot bore -> east end: 3.0 web past the east screw hole
 BLOCK_WEST = 26.0  # pivot bore -> west end: 4.3 web past the lift bore
 BLOCK_WIDTH = BLOCK_EAST + BLOCK_WEST  # 40.0 (photo ~38-41)
 BLOCK_HEIGHT = 20.5  # lift bore keeps 3.2 (2.1 worst) of web under the top
-BLOCK_DEPTH = 10.5  # U28: 12 -> 10.25; ruling (c) then put the back strap hard
+BLOCK_DEPTH = 11.0  # U28: 12 -> 10.25; ruling (c) then put the back strap hard
 # on this block and pinion_rig_layout sizes the shafts from the worst stack.
 # Option E-a (Main, Codex #858): the strap-pinned torque shaft retreats up to
 # the widest feeler setting (0.35) into the back block, so the shallowest
 # printed block (depth - .XX row) must still bear the 9.5 floor: 10.25 bore
-# 9.39, so the depth grew to the round 10.5 (9.54 worst, the shaft's flush
-# setting included), outward, so the cluster and its drilled stations stay
-# put (pinion_rig_layout).
+# 9.39, and 10.5 only 9.54 once the shaft's flush setting was booked.  Main
+# (#858) asked for a real margin, >= 0.5 over the floor with the bands kept,
+# so the depth grew to 11.0 (10.04 worst), outward from both block faces the
+# cluster sits against, so the cluster and its drilled stations stay put
+# (pinion_rig_layout).
 # Depth prints at the drawing document's two places: MHA-061's sheet is not
 # precision-migrated (_drawing_contract), so the title block's .XX row governs
 # it, and the rig's worst fitted stack reads that printed row (Main, Codex #854

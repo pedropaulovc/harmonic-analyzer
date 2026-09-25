@@ -1405,8 +1405,9 @@ BLOCK_FRONT_Z0 = RIG.FRONT_BLOCK_Z0  # one 0.25 feeler off the front strap
 BLOCK_BACK_Z0 = RIG.BACK_BLOCK_Z0  # the (c) back stop, the rig's reference
 # U28 thinned the blocks (12 -> 10.25); ruling (c) then put the back strap hard
 # on the back block, and pinion_rig_layout sizes the shaft and rod from the
-# worst fitted stack (Codex #837).  Option E-a deepened them outward to 10.5
-# so the strap-pinned shaft still bears the back block (Codex #858).
+# worst fitted stack (Codex #837).  Option E-a deepened them outward, to 10.5
+# and then 11.0, so the strap-pinned shaft bears the back block with 0.5 to
+# spare over its floor (Codex #858, Main).
 LEVER_TILT_DEG = 10.0  # parked, from vertical toward machine -X
 # ch25 p.68 page002_img08 is explicitly the FRONT side and shows the
 # disengaged lever only about 10 degrees from vertical, with its tip to image

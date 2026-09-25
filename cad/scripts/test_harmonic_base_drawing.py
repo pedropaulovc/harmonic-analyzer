@@ -324,10 +324,11 @@ def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
         (x + MECHANISM_X_SHIFT, z) for z in rig.BLOCK_SEAT_Z for x in former_block_x
     )
     # Option E-a deepened the blocks outward from the back stop (10.25 ->
-    # 10.5), so the back seats moved 0.125 aft of the released 82.875, and
-    # RIG_AFT_SHIFT (Main, #858: j = 19's full face) moved the rig 1.25 aft.
+    # 10.5 -> 11.0), so the back seats moved 0.375 aft of the released
+    # 82.875, and RIG_AFT_SHIFT (Main, #858: j = 19's full face) moved the
+    # rig 1.25 aft.
     assert rig.BLOCK_SEAT_Z[1] == pytest.approx(
-        83.0 + rig.RIG_AFT_SHIFT + MECHANISM_Z_SHIFT
+        83.25 + rig.RIG_AFT_SHIFT + MECHANISM_Z_SHIFT
     )
     # Codex #854 P1: the front seats are cut at the fit-up station -- one
     # block, the solid stack and one feeler off the back seats -- not at a
@@ -335,9 +336,10 @@ def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
     assert rig.BLOCK_SEAT_Z[1] - rig.BLOCK_SEAT_Z[0] == pytest.approx(
         pinion_pivot_block_depth() + rig.INNER_SPAN, abs=1e-9
     )
-    # Ruling 3's drum shim puts the front seats one more feeler forward.
+    # Ruling 3's drum shim puts the front seats one more feeler forward, and
+    # the 11.0 block half its extra depth.
     assert rig.BLOCK_SEAT_Z[0] == pytest.approx(
-        -89.2 + rig.RIG_AFT_SHIFT + MECHANISM_Z_SHIFT
+        -89.45 + rig.RIG_AFT_SHIFT + MECHANISM_Z_SHIFT
     )
     assert part.FOOT_SCREW_XZ == tuple(
         (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in former_feet
