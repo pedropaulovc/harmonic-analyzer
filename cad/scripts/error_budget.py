@@ -47,6 +47,9 @@ import _config
 import amplitude_bar_spec
 import channel_lever_spec
 import channel_spring_installed_spec
+import cone_drum_mesh
+import cone_gear_shaft_spec
+import cone_gear_spec
 import connecting_rod_spec
 import counter_spring_spec
 import cylinder_gear_spec
@@ -508,6 +511,205 @@ class CycleTable:
         bot = c[s0 + 1, a0] * (1.0 - af) + c[s0 + 1, a1] * af
         return top * (1.0 - sf) + bot * sf
 
+# --------------------------------------------------------------------------
+# The cone<->drum mesh: lag, runout, float and flank toggle
+# --------------------------------------------------------------------------
+#
+# Each channel's cam turns with its drum (MHA-027), which its cone gear drives
+# through a backlash B. Phase is measured from the CAD's CENTRED tooth-in-gap
+# pose. On the drive flank the drum lags by B/(2R); where the channel spring
+# drives the drum forward harder than the strap-on-cam and arbor friction hold
+# it back, the drum overruns onto the other flank and leads by B/(2R) (the
+# FLANK TOGGLE, +B/R one-sided from the drive flank). The channel spring's
+# torque on the drum is F*e*sin(lobe) against a drag mu*F*(R_cam + r_arbor),
+# so the overrun happens where |sin(lobe)| > mu*(R_cam + r_arbor)/e and the
+# spring is releasing. That is STATICS ONLY -- no bench repro -- and is
+# modelled, not proven (error_budget.yaml flank_toggle).
+#
+# The nominal drive-flank lag -B_nom/(2R) is common to every channel (the
+# mesh is cut to the same tight limit on all 20) and scored as a systematic
+# common cam phase beside #749 (``mean_mesh_lag``). Everything else is drawn:
+# the tooth-thickness window, both bore-on-land/arbor runouts, both journal
+# floats (radial parts change B through 2 tan(alpha_w), tangential parts move
+# the drum directly), and the friction behind the toggle -- one B per draw,
+# so the toggle amplitude and the lag spread come from the same gap.
+
+MESH_FEATURES = (
+    "mesh_lag_thickness",
+    "cone_bore_runout",
+    "drum_bore_runout",
+    "cone_journal_float",
+    "arbor_journal_float",
+    "flank_toggle",
+)
+# columns each mesh feature draws: runouts and floats are (radial,
+# tangential) pairs -- the bounding square of the clearance disc, as a
+# position zone -- and the cone shaft's float is one pair per support
+# (pivot-post journal, tip bushing), shared by every gear on the shaft
+MESH_AXES = {
+    "mesh_lag_thickness": 1,
+    "cone_bore_runout": 2,
+    "drum_bore_runout": 2,
+    "cone_journal_float": 4,
+    "arbor_journal_float": 2,
+    "flank_toggle": 1,
+}
+
+
+@dataclass(frozen=True)
+class MeshTrain:
+    """Per channel i = 1..20 (cone T(6i) on seat 20 - i): the nominal mesh."""
+
+    pitch_r: float  # drum pitch radius: mm at the mesh -> rad of drum
+    backlash: tuple[float, ...]  # nominal B_i, mid tooth at the nominal centre
+    tan_working: tuple[float, ...]  # tan of each mesh's working pressure angle
+    tip_share: tuple[float, ...]  # gear station between post (0) and tip bushing (1)
+    drag_arm: float  # R_cam + r_arbor: mm of friction arm per unit mu
+    friction_nominal: float  # mid of the cited friction range (flank_toggle)
+
+    @property
+    def mean_lag_rad(self) -> float:
+        return float(np.mean(self.backlash)) / (2.0 * self.pitch_r)
+
+
+def mesh_train(budget: dict[str, Any] | None = None) -> MeshTrain:
+    """The nominal mesh the lag terms perturb, from the spec modules."""
+    budget = load_budget() if budget is None else budget
+    backlash, tan_w, share = [], [], []
+    post = -cone_gear_shaft_spec.FRONT_STUB + cone_gear_shaft_spec.JOURNAL_END / 2.0
+    tip = (
+        cone_gear_shaft_spec.TIP_BUSHING_START_STATION
+        + cone_gear_shaft_spec.TIP_BUSHING_END_STATION
+    ) / 2.0
+    for i in range(1, N_ELEMENTS + 1):
+        teeth = 6 * i
+        thickest = cone_gear_spec.DEEPENED_MESH_MM[teeth][1]
+        mid = thickest - cone_gear_spec.TOOTH_THICKNESS_BAND[0]
+        centre = cone_drum_mesh.centre(teeth)
+        backlash.append(cone_drum_mesh.backlash(teeth, mid, centre))
+        tan_w.append(math.tan(cone_drum_mesh.working_angle(teeth, centre)))
+        south, north = cone_gear_shaft_spec.gear_faces(N_ELEMENTS - i)
+        share.append(((south + north) / 2.0 - post) / (tip - post))
+    return MeshTrain(
+        pitch_r=cone_drum_mesh.DRUM_PITCH_R,
+        backlash=tuple(backlash),
+        tan_working=tuple(tan_w),
+        tip_share=tuple(share),
+        drag_arm=cylinder_gear_spec.CAM_DIA / 2.0 + cylinder_gear_spec.BORE_DIA / 2.0,
+        friction_nominal=float(budget["critical_features"]["flank_toggle"]["nominal_friction"]),
+    )
+
+
+def draw_size(
+    key: str, f: dict[str, Any], axes: dict[str, Any], draws: int
+) -> tuple[int, ...]:
+    """Shape of one feature's draws: one column per channel (one per machine
+    for ``class: machine``) and one per axis it moves (``feature_axes``,
+    ``MESH_AXES``)."""
+    n_axes = MESH_AXES.get(key) or len(axes.get(key, ((key, 1.0),)))
+    per = 1 if f["class"] == "machine" else N_ELEMENTS
+    return (draws, per) if n_axes == 1 else (draws, per, n_axes)
+
+
+def _rotated(pair: np.ndarray, angle: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """(radial, tangential) of a body-fixed offset ``pair`` (..., 2) turned by
+    ``angle``: a runout rides its gear round, so at angle a the centre's line-of-
+    centres and tangential components are the offset rotated by a."""
+    r, t = pair[..., 0], pair[..., 1]
+    return r * np.cos(angle) - t * np.sin(angle), r * np.sin(angle) + t * np.cos(angle)
+
+
+def mesh_phase(
+    dev: dict[str, np.ndarray],
+    mt: MeshTrain,
+    drum: np.ndarray,
+    cone: np.ndarray,
+    releasing: np.ndarray,
+    ecc: float,
+    cam_home_deg: float = 0.0,
+) -> np.ndarray:
+    """Phase (rad of drum; + = ahead) each channel's cam carries from the mesh,
+    about the nominal drive-flank lag, at drum angles ``drum`` (..., 20) and
+    cone angles ``cone`` (broadcast against it). ``dev`` holds the drawn mesh
+    features (draws x 20[, axes]; the cone journal draws x 1 x 4);
+    ``releasing`` is where the channel spring gives energy back (the drum
+    torque it applies points forward). Returns draws x ... x 20."""
+    R = mt.pitch_r
+    B0 = np.asarray(mt.backlash)
+    tan_w = np.asarray(mt.tan_working)
+    f = np.asarray(mt.tip_share)
+
+    def expand(v: np.ndarray) -> np.ndarray:  # draws x 20[, a] -> draws x ... x 20[, a]
+        extra = drum.ndim - 1
+        return v.reshape(v.shape[:1] + (1,) * extra + v.shape[1:])
+
+    draws = next(iter(dev.values())).shape[0] if dev else 1
+    opening = np.zeros((draws,) + drum.shape)  # centre distance, + opens the mesh
+    along = np.zeros((draws,) + drum.shape)  # drum-tooth displacement at the mesh
+    dB = np.zeros((draws,) + drum.shape)
+    if "mesh_lag_thickness" in dev:
+        dB = dB + expand(dev["mesh_lag_thickness"])
+    if "cone_bore_runout" in dev:
+        r, t = _rotated(expand(dev["cone_bore_runout"]), cone[None, ...])
+        opening, along = opening + r, along + t
+    if "drum_bore_runout" in dev:
+        r, t = _rotated(expand(dev["drum_bore_runout"]), drum[None, ...])
+        opening, along = opening + r, along - t
+    if "cone_journal_float" in dev:
+        v = dev["cone_journal_float"]  # draws x 1 x 4: post (r, t), tip (r, t)
+        r = (1.0 - f) * v[..., 0] + f * v[..., 2]
+        t = (1.0 - f) * v[..., 1] + f * v[..., 3]
+        opening, along = opening + expand(r), along + expand(t)
+    if "arbor_journal_float" in dev:
+        v = expand(dev["arbor_journal_float"])
+        opening, along = opening + v[..., 0], along - v[..., 1]
+    B = B0 + dB + 2.0 * tan_w * opening
+    phase = -(B - B0) / (2.0 * R) + along / R
+    if "flank_toggle" in dev:
+        mu = mt.friction_nominal + expand(dev["flank_toggle"])
+        lobe = drum - math.radians(cam_home_deg)
+        overrun = releasing & (ecc * np.abs(np.sin(lobe))[None, ...] > mu * mt.drag_arm)
+        phase = phase + np.where(overrun, B / R, 0.0)
+    return phase
+
+
+def _releasing(t: CycleTable, d: np.ndarray, drum: np.ndarray) -> np.ndarray:
+    """Where the channel spring gives energy back to the drum: its hook is
+    falling. The spring hangs from the lever hole to an anchor BELOW it
+    (spring_mount_geom.channel_pose), so a rising hook stretches it -- work the
+    crank does, drive flank -- and a falling hook lets it pull the drum on."""
+    h = 1e-3
+    return t.sample(d, drum + h) < t.sample(d, drum - h)
+
+
+def channel_phase_trial(
+    dev: dict[str, np.ndarray], mt: MeshTrain, nom: Nominal, coverage: float
+) -> dict[str, float]:
+    """The assembled-machine channel-phase trial (tolerance-policy.md): each bar
+    alone at full scale, its zero crossings timed against the expected. Every
+    channel crosses at drum angles pi/2 + n pi, 2i times per period (the cone
+    then at 20/i of that), so the phase it shows there is its cam phase plus
+    the mesh terms at that drum and cone angle -- the flank toggle included,
+    since |sin(lobe)| is 1 at a crossing. The acceptance is the ``coverage``
+    quantile of |phase| over draws, channels and crossings."""
+    n = np.arange(2 * N_ELEMENTS)
+    drum = (math.pi / 2.0 + math.pi * n)[:, None] * np.ones(N_ELEMENTS)[None, :]
+    cone = 20.0 * drum / HARMONICS[None, :]
+    valid = n[:, None] < 2 * HARMONICS[None, :]
+    t = cycle_table(nom)
+    releasing = _releasing(t, np.full(drum.shape, nom.d_max), drum)[None, ...]
+    mesh = {k: v for k, v in dev.items() if k in MESH_AXES}
+    phase = mesh_phase(mesh, mt, drum, cone, releasing, nom.ecc, nom.cam_home_deg)
+    if "cam_phase" in dev:
+        phase = phase + np.radians(dev["cam_phase"])[:, None, :]
+    shown = np.degrees(np.abs(phase))[:, valid]
+    quantile = float(np.quantile(shown, coverage))
+    return {
+        "coverage": coverage,
+        "quantile_deg": quantile,
+        "acceptance_deg": math.ceil(quantile * 100.0 - 1e-9) / 100.0,
+    }
+
 
 def _station_grid(nom: Nominal, step_mm: float) -> np.ndarray:
     """The regular grid through the last multiple of ``step_mm`` NOT past the
@@ -853,6 +1055,7 @@ def _channel_model(
     sens: dict[str, float],
     setting_tol: float = 0.0,
     scale: float = 1.0,
+    mt: MeshTrain | None = None,
 ) -> np.ndarray:
     """A_k read from a machine whose channel i has gain g_i and phase phi_i
     built from the drawn deviations ``dev[feature]`` (draws x 20), applied to
@@ -878,8 +1081,11 @@ def _channel_model(
     axes = feature_axes(nom)
     d = np.broadcast_to(scale * x * nom.d_max, (draws, N_ELEMENTS)).copy()
     bias = np.zeros(N_ELEMENTS)
+    mesh: dict[str, np.ndarray] = {}
     for key, v in dev.items():
-        if key in axes:
+        if key in MESH_AXES:
+            mesh[key] = v
+        elif key in axes:
             # the linearised deviated cycle: its gain AND its shape, per axis
             # (a one-axis feature may arrive as draws x 20)
             comps = v[..., None] if v.ndim == 2 else v
@@ -887,7 +1093,7 @@ def _channel_model(
                 shape[field] = shape.get(field, 0.0) + per_mm * comp
         elif key in sens:
             log_g += np.log1p(sens[key] / 100.0 * v)
-        elif key in ("cam_phase", "mesh_lag_spread"):
+        elif key == "cam_phase":
             phi += np.radians(v)
         elif key == "station_setting":
             # A bar can be set neither below the pivot (build_channel_assembly
@@ -911,6 +1117,16 @@ def _channel_model(
             raise KeyError(f"no model for feature {key}")
     g = np.exp(log_g)
     t = cycle_table(nom)
+    if mesh:
+        # the mesh phase varies with k: the cone runout rides the cone (at
+        # every reading it sits at k*pi), the drum runout its drum, and the
+        # flank toggles with the spring's torque at each stop
+        mt = mesh_train() if mt is None else mt
+        drum = HARMONICS[None, :] * THETA_K[:, None]
+        releasing = _releasing(t, d[:, None, :], drum[None, ...])
+        phi = phi[:, None, :] + mesh_phase(
+            mesh, mt, drum, 20.0 * THETA_K[:, None], releasing, nom.ecc, nom.cam_home_deg
+        )
     set_stations = scale * x * nom.d_max
     # the operator's table row: at the mean biased station when a bar sits at
     # an end of the scale (READOUT.md step 1), else the set station
@@ -952,10 +1168,15 @@ def _read_draws(
     nominal cycle plus, per ``shape`` entry (a ``cycle_derivatives`` table and
     the draws x 20 deviations in that feature's unit), the table times the
     deviation --
-    read at j_i theta_k + phi_i with gain g_i, off each draw's own mean line;
+    read at j_i theta_k + phi_i with gain g_i (``phi`` draws x 20, or draws x
+    K+1 x 20 when the phase varies with the reading), off each draw's own
+    nominal mean line -- a phase that varies within the cycle moves the true
+    period mean only at second order, which the model accepts;
     then s = r0/(S + C2), the kappa correction and the read-vs-set vector with
     the operator's recorded ``x_read``/``kappa``. Returns O_k, shape (draws, K+1)."""
-    alpha = HARMONICS[None, None, :] * THETA_K[None, :, None] + phi[:, None, :]
+    if phi.ndim == 2:  # one phase per channel; else draws x k x channel
+        phi = phi[:, None, :]
+    alpha = HARMONICS[None, None, :] * THETA_K[None, :, None] + phi
     u = t.sample(d[:, None, :], alpha)  # draws,k,i
     mean = np.interp(d, t.stations, t.mean)
     for dt, v in (shape or {}).values():
@@ -999,26 +1220,27 @@ def monte_carlo(
     # trial (the operator resets the bars), so each reference input gets its
     # own draw and the pooled worst coefficient sees independent settings.
     for key, f in feats.items():
-        if f["class"] not in ("channel", "setup"):
+        if f["class"] not in ("channel", "setup", "machine"):
             raise ValueError(
-                f"{key}: class must be channel or setup, got {f['class']!r}"
+                f"{key}: class must be channel, setup or machine, got {f['class']!r}"
             )
 
     axes = feature_axes(nom)
 
     def draw(key: str, f: dict[str, Any]) -> np.ndarray:
         # one column per axis the feature moves: a position zone's radial AND
-        # tangential offsets, each uniform within +/-tol (feature_axes)
-        n_axes = len(axes.get(key, ((key, 1.0),)))
-        size = (draws, N_ELEMENTS) if n_axes == 1 else (draws, N_ELEMENTS, n_axes)
-        return rng.uniform(-f["tolerance"], f["tolerance"], size=size)
+        # tangential offsets, each uniform within +/-tol (feature_axes,
+        # MESH_AXES); ``class: machine`` is one draw shared by every channel
+        # (the cone shaft's float at its two supports)
+        return rng.uniform(
+            -f["tolerance"], f["tolerance"], size=draw_size(key, f, axes, draws)
+        )
 
     all_dev = {
-        key: draw(key, f)
-        if f["class"] == "channel"
-        else {n: draw(key, f) for n in names}
+        key: {n: draw(key, f) for n in names} if f["class"] == "setup" else draw(key, f)
         for key, f in feats.items()
     }
+    mt = mesh_train(budget)
 
     def stats(dev: dict[str, Any]) -> dict[str, Any]:
         per_input = {}
@@ -1031,6 +1253,7 @@ def monte_carlo(
                 sens,
                 feats["station_setting"]["tolerance"],
                 setups[name].ordinate_scale,
+                mt,
             )
             per_input[name] = {
                 "mae": float(np.mean(np.abs(e))),
@@ -1055,9 +1278,18 @@ def monte_carlo(
     for key, s in per_feature.items():
         pair = s["per_input"]["pair_1_20"]["p99_max"]
         factor = min(share["mae_fs_pct"] / s["mae"], share["pair_p99_pct"] / pair)
-        s["allowable_tolerance"] = feats[key]["tolerance"] * factor
+        # the share this feature ALONE consumes, as a multiple of its allocation
+        s["share_used"] = 1.0 / factor
+        # the toggle's error is not linear in its friction band (it switches
+        # on and off with mu), so it gets no proportional allowable
+        s["allowable_tolerance"] = (
+            None if key == "flank_toggle" else feats[key]["tolerance"] * factor
+        )
     combined = stats(all_dev)
-    return {"per_feature": per_feature, "combined": combined}
+    trial = channel_phase_trial(
+        all_dev, mt, nom, float(budget["channel_phase_trial"]["coverage"])
+    )
+    return {"per_feature": per_feature, "combined": combined, "channel_phase_trial": trial}
 
 
 # --------------------------------------------------------------------------
@@ -1493,8 +1725,7 @@ def pair_joint_worst(
     scale = setups[pair].ordinate_scale
     dev = {}
     for key, f in feats.items():
-        n_axes = len(axes.get(key, ((key, 1.0),)))
-        size = (draws, N_ELEMENTS) if n_axes == 1 else (draws, N_ELEMENTS, n_axes)
+        size = draw_size(key, f, axes, draws)
         dev[key] = rng.uniform(-f["tolerance"], f["tolerance"], size=size)
     scatter = _channel_model(
         x,
@@ -1503,6 +1734,7 @@ def pair_joint_worst(
         gain_sensitivities(nom),
         feats["station_setting"]["tolerance"],
         scale,
+        mt=mesh_train(budget),
     )
     residual = coefficient_errors_pct(
         NominalTrial(nom).readout(
@@ -1629,12 +1861,26 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
         # shipped correction is scored as-built here and, beside it, with the
         # lobe cut half a pitch from the crest so the lock leaves it up -- the
         # CAD fix (#749) the waiver below makes the closure conditional on.
+        #
+        # The mesh adds its own common phase: every drum lags its cone by half
+        # the nominal backlash on the drive flank, against the CAD's centred
+        # tooth-in-gap pose (``mean_mesh_lag``). It is not waivable -- no cam
+        # recut removes it -- so the credited residual carries it on top of
+        # whichever lobe phase is credited.
         "cam_home_phase": {
             "deg": as_built.cam_home_deg,
+            "mesh_lag_deg": (lag := math.degrees(mesh_train(budget).mean_lag_rad)),
             "residual_as_built": nominal_design_errors(
-                as_built, correct_second_harmonic=True, calibrated_stick=True
+                replace(as_built, cam_home_deg=as_built.cam_home_deg + lag),
+                correct_second_harmonic=True,
+                calibrated_stick=True,
             ),
             "residual_lobe_up": nominal_design_errors(
+                replace(as_built, cam_home_deg=lag),
+                correct_second_harmonic=True,
+                calibrated_stick=True,
+            ),
+            "residual_lobe_up_without_mesh_lag": nominal_design_errors(
                 replace(as_built, cam_home_deg=0.0),
                 correct_second_harmonic=True,
                 calibrated_stick=True,
@@ -1723,9 +1969,14 @@ def _print_report(r: dict[str, Any], budget: dict[str, Any]) -> None:
     mc = r["monte_carlo"]
     for key, s in mc["per_feature"].items():
         unit = feats[key].get("unit", "mm")
+        allowable = (
+            f"{s['allowable_tolerance']:>10.3f}"
+            if s["allowable_tolerance"] is not None
+            else f"{'x' + format(s['share_used'], '.2f'):>10}"
+        )
         p(
             f"{key:<24} {feats[key]['tolerance']:>6.3f} {unit:<3}{s['mae']:>7.3f} {s['rms']:>7.3f} {s['p99_max']:>8.3f} "
-            f"{s['per_input']['pair_1_20']['p99_max']:>9.3f} {s['allowable_tolerance']:>10.3f}"
+            f"{s['per_input']['pair_1_20']['p99_max']:>9.3f} {allowable}"
         )
     c = mc["combined"]
     p(
@@ -1740,6 +1991,12 @@ def _print_report(r: dict[str, Any], budget: dict[str, Any]) -> None:
     p(
         f"targets: scatter MAE <= {t['scatter_mae_fs_pct']}  p99 max <= {t['scatter_p99_max_fs_pct']}  "
         f"pair expected worst <= {t['pair_consistency_max_fs_pct']}   (benchmark MAE {r['benchmark']['mae_fs_pct']}, max {r['benchmark']['max_fs_pct']})"
+    )
+    tr = mc["channel_phase_trial"]
+    p(
+        f"channel-phase trial acceptance: {tr['acceptance_deg']:.2f} deg "
+        f"(the {100.0 * tr['coverage']:.0f} % quantile of cam phase + mesh terms at "
+        f"every zero crossing, {tr['quantile_deg']:.3f} deg)"
     )
     p("\n## 4. Terms that are not part tolerances")
     p(json.dumps(r["closed_form"], indent=2))
@@ -1786,6 +2043,10 @@ def closure(r: dict[str, Any], budget: dict[str, Any]) -> dict[str, Any]:
     broad = [n for n in budget["reference_inputs"] if n != "pair_1_20"]
     terms = {
         "nominal_residual_mae": max(nde[n]["mae"] for n in broad),
+        # the part of it the mesh's common drive-flank lag adds (scored, and
+        # inside the residual's allowance, never waived)
+        "mean_mesh_lag_mae": max(nde[n]["mae"] for n in broad)
+        - max(home["residual_lobe_up_without_mesh_lag"][n]["mae"] for n in broad),
         "nominal_residual_mae_as_built": max(
             home["residual_as_built"][n]["mae"] for n in broad
         ),
@@ -2120,7 +2381,8 @@ $P(f)$ for 20 bars set at $f$ (from the table; check your arithmetic against it)
 
 ## 2. Run and read
 
-Crank in ONE direction only (a reversal re-seats every mesh on the other flank).
+Crank in ONE direction only. If you overshoot a crank index, go on round to it
+again; never back the crank off.
 Take the zero of each trial as the mean line of the trace over one full period.
 Read the pen at each $\\theta_k$ to +/-{cf["readout"]["assumed_reading_uncertainty_mm"]:.3f} mm
 (half the line width against the grid), the magnifier set as in step 1 so the

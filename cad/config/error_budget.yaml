@@ -3,9 +3,13 @@
 # from the whole-device benchmark in cad/docs/michelson-1898-trial-accuracy.md.
 # Method and the resulting guidance: cad/docs/tolerance-policy.md.
 #
-# This file is READ BY NO BUILD SCRIPT: it holds allocation (how much of the
-# output error each feature may consume), not geometry, so editing it never
-# rebuilds CAD. The nominal each feature is toleranced against stays in the
+# This file holds allocation (how much of the output error each feature may
+# consume), not geometry. It is still a BUILD INPUT on one path:
+# channel_spring_installed_notes reads critical_features.spring_rate for the
+# spring's SET QC note, and config dependencies are per file, so ANY edit here
+# re-keys part:channel_spring_installed and everything downstream of it (the
+# channel assembly and drawing, the top assembly, export). The nominal each
+# feature is toleranced against stays in the
 # spec module named under `nominal` -- check:budget fails if that symbol moves.
 # The drawing-facing limits (tolerances.yaml, title_block.yaml, *_spec.py notes)
 # must agree with the `tolerance` here; check:budget pins the ones it can read.
@@ -118,6 +122,12 @@ reserved:
     # balancing load. Catalog force AND length limits are hard gates; no waiver.
     # Zero-setting slides the gooseneck to include measured preloads and weight.
 
+# The assembled-machine channel-phase trial (tolerance-policy.md): its
+# acceptance is this quantile of |cam phase + mesh terms| at every zero
+# crossing, from the Monte Carlo draws -- the budget's p99 coverage.
+channel_phase_trial:
+  coverage: 0.99
+
 monte_carlo:
   draws: 4000
   seed: 20260912
@@ -180,13 +190,50 @@ critical_features:
     quantity: phase
     class: channel
     holds: "cam-lobe direction vs the alignment-notch centreline, both on the cylinder gear: index on the same setup (rotary table/dividing head)"
-  mesh_lag_spread:
-    tolerance: 0.14
-    unit: deg
+  # The cone<->drum mesh (error_budget.py MESH_FEATURES / mesh_phase). Phase is
+  # taken from the CAD's centred tooth-in-gap pose; the common drive-flank lag
+  # (half the nominal backlash) is scored in the closure as mean_mesh_lag, not
+  # drawn. The channel spring's torque on each drum reverses twice a turn, so
+  # nothing here assumes the mesh stays on one flank (Main, 2026-09-25).
+  mesh_lag_thickness:
+    tolerance: 0.075
     nominal: null
-    quantity: phase
+    quantity: mesh
     class: channel
-    holds: "derived: half the cone<->cylinder gear_mesh backlash band (tolerances.yaml 0.05..0.20 mm) at the 120T pitch radius, one-directional cranking"
+    holds: "derived: half the cone<->cylinder gear_mesh backlash window (tolerances.yaml 0.05..0.20 = cone_gear_spec.TOOTH_THICKNESS_BAND), mm of backlash; on either flank the drum moves half of it"
+  cone_bore_runout:
+    tolerance: 0.05
+    nominal: null
+    quantity: mesh
+    class: channel
+    holds: "derived: the bonded bore's play on its seat land, (cone_gear_spec.BORE_DIA_BAND upper - cone_shaft_land_bands.GEAR_SEAT_BAND lower)/2; rides the cone, which sits at k*pi at every reading"
+  drum_bore_runout:
+    tolerance: 0.035
+    nominal: null
+    quantity: mesh
+    class: channel
+    holds: "derived: cylinder_gear_spec.BORE_DIAMETRAL_CLEARANCE_MM upper/2; rides the drum"
+  cone_journal_float:
+    tolerance: 0.0375
+    nominal: null
+    quantity: mesh
+    class: machine
+    holds: "derived: tolerances.yaml shaft_in_bushing clearance upper/2 at the post journal and at the tip bushing; one shaft, so one draw per machine, each gear between its two supports; constant within a run"
+  arbor_journal_float:
+    tolerance: 0.0375
+    nominal: null
+    quantity: mesh
+    class: channel
+    holds: "derived: tolerances.yaml shaft_in_bushing clearance upper/2 of the drum arbor in its pedestal; constant within a run"
+  flank_toggle:
+    tolerance: 0.04
+    unit: mu
+    nominal: null
+    nominal_friction: 0.15
+    quantity: mesh
+    class: channel
+    status: "MODELLED, NOT PROVEN: statics only (channel-spring torque F e sin(lobe) against mu F (R_cam + r_arbor)); no bench repro"
+    holds: "friction of the steel connecting-rod strap on the C36000 brass cam and of the arbor journal, lubricated: brass on steel 0.19 greased, 0.11 castor oil (Engineering ToolBox, 'Friction - Coefficients for Common Materials and Surfaces', https://www.engineeringtoolbox.com/friction-coefficients-d_778.html). Dry brass on steel is 0.44 kinetic / 0.51 static, which would hold one flank (mu >= 0.43)."
   station_setting:
     tolerance: 0.25
     nominal: null

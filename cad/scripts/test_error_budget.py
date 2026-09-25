@@ -79,7 +79,7 @@ def test_every_toleranced_nominal_is_the_cad_constant(budget, nom):
     budget cannot silently drift from the geometry it tolerances."""
     for key, feat in budget["critical_features"].items():
         if feat["nominal"] is None:
-            assert key in ("cam_phase", "mesh_lag_spread", "station_setting"), key
+            assert key in ("cam_phase", "station_setting", *eb.MESH_FEATURES), key
             continue
         assert key in NOMINAL_FIELD, f"{key}: no Nominal field mapped"
         assert _resolve(feat["nominal"]) == pytest.approx(
@@ -274,6 +274,7 @@ def test_budget_closes(report):
     assert eb.budget_closes(report) == []
     assert set(report["closure"]) == {
         "nominal_residual_mae",
+        "mean_mesh_lag_mae",
         "scatter_mae",
         "readout",
         "timebase",
@@ -630,10 +631,12 @@ def test_cam_home_phase_is_scored_as_built_and_fails_unless_waived(budget, repor
 
     assert phase_deg(as_built) == pytest.approx(1.5, abs=0.02)
     assert abs(phase_deg(nom)) < 0.02
-    # the analytic size of the leak: h * sum x sin(i theta_k) on all-ones
+    # the analytic size of the leak: h * sum x sin(i theta_k) on all-ones, h
+    # the lobe's 1.5 deg plus the mesh's common drive-flank lag
     x = eb.reference_inputs()["all_ones"]
-    leak = math.radians(1.5) * (np.sin(np.outer(eb.THETA_K, eb.HARMONICS)) @ x)
     home = report["cam_home_phase"]
+    h = math.radians(1.5 + home["mesh_lag_deg"])
+    leak = h * (np.sin(np.outer(eb.THETA_K, eb.HARMONICS)) @ x)
     assert home["residual_as_built"]["all_ones"]["max"] == pytest.approx(
         100.0 * np.max(np.abs(leak)) / eb.N_ELEMENTS, rel=0.1
     )
@@ -767,6 +770,7 @@ def test_shipped_readout_procedure_carries_every_correction(report, nom):
     assert f"\\kappa \\cdot x^{{read}} = {rows[0][2] * rows[0][1]:+.4f}" in doc
     assert "crank stopped on its index" in doc
     assert "ONE direction" in doc
+    assert "never back the crank off" in doc
     # the one-sided setting bias at the ends of the scale is published, so the
     # read-vs-set vector the operator subtracts is the one the Monte Carlo does
     tol = report["station_setting_tolerance_mm"]
@@ -1215,15 +1219,23 @@ def test_drawing_limits_agree_with_the_budget(budget):
             f"+/-{feats[feature]['tolerance']} on {feature}"
         )
     backlash_lo, backlash_hi = eb._config.fit("gear_mesh", "backlash_mm")
-    pitch_r = (
-        eb.cylinder_gear_spec.TEETH
-        / (2.0 * eb.cylinder_gear_spec.DIAMETRAL_PITCH)
-        * 25.4
+    feats = budget["critical_features"]
+    assert feats["mesh_lag_thickness"]["tolerance"] == pytest.approx(
+        (backlash_hi - backlash_lo) / 2.0
     )
-    spread_deg = math.degrees((backlash_hi - backlash_lo) / 2.0 / pitch_r)
-    assert budget["critical_features"]["mesh_lag_spread"]["tolerance"] == pytest.approx(
-        spread_deg, abs=0.01
+    thickness_upper, thickness_lower = eb.cone_gear_spec.TOOTH_THICKNESS_BAND
+    assert thickness_upper - thickness_lower == pytest.approx(backlash_hi - backlash_lo)
+    seat_lower = eb.cone_gear_shaft_spec.GEAR_SEAT_BAND[1]
+    assert feats["cone_bore_runout"]["tolerance"] == pytest.approx(
+        (eb.cone_gear_spec.BORE_DIA_BAND[0] - seat_lower) / 2.0
     )
+    assert feats["drum_bore_runout"]["tolerance"] == pytest.approx(
+        eb.cylinder_gear_spec.BORE_DIAMETRAL_CLEARANCE_MM[1] / 2.0
+    )
+    journal = max(eb._config.fit("shaft_in_bushing")["diametral_clearance_mm"]) / 2.0
+    assert feats["cone_journal_float"]["tolerance"] == pytest.approx(journal)
+    assert feats["arbor_journal_float"]["tolerance"] == pytest.approx(journal)
+    assert feats["cone_journal_float"]["class"] == "machine"
 
 
 def test_unsupported_distribution_fails_loud(budget, nom):
@@ -1263,9 +1275,9 @@ def test_setup_class_deviations_are_redrawn_per_trial(budget, nom, monkeypatch):
 
     real = eb._channel_model
 
-    def spy(x, nom_, dev, sens, tol, scale):
+    def spy(x, nom_, dev, sens, tol, scale, mt=None):
         seen.setdefault(len(seen), {k: v.copy() for k, v in dev.items()})
-        return real(x, nom_, dev, sens, tol, scale)
+        return real(x, nom_, dev, sens, tol, scale, mt)
 
     monkeypatch.setattr(eb, "_channel_model", spy)
     eb.monte_carlo(small, nom, setups)
@@ -1290,3 +1302,129 @@ def test_setup_class_deviations_are_redrawn_per_trial(budget, nom, monkeypatch):
     }
     with pytest.raises(ValueError, match="class"):
         eb.monte_carlo(bad, nom, setups)
+
+
+# --------------------------------------------------------------------------
+# The cone<->drum mesh: lag, runout, float and flank toggle (Main, 2026-09-25)
+# --------------------------------------------------------------------------
+
+
+def test_flank_toggle_samples_the_cited_lubricated_friction_range(budget):
+    """The toggle is statics only, so the yaml records it as modelled, not
+    proven, and samples mu over lubricated brass on steel (0.11 castor oil to
+    0.19 greased, Engineering ToolBox) -- a range whose top stays below the
+    friction that would hold one flank."""
+    f = budget["critical_features"]["flank_toggle"]
+    lo = f["nominal_friction"] - f["tolerance"]
+    hi = f["nominal_friction"] + f["tolerance"]
+    assert (lo, hi) == pytest.approx((0.11, 0.19))
+    assert "MODELLED, NOT PROVEN" in f["status"]
+    assert "engineeringtoolbox.com/friction-coefficients" in f["holds"]
+    mt = eb.mesh_train(budget)
+    hold = eb.cylinder_gear_spec.ECCENTRICITY / mt.drag_arm
+    assert hold == pytest.approx(0.43, abs=0.005)
+    assert hi < hold
+
+
+def _one(budget, key, value, draws=1):
+    """A single deviation of ``key`` on every channel, the rest nominal."""
+    f = budget["critical_features"][key]
+    size = eb.draw_size(key, f, {}, draws)
+    return {key: np.broadcast_to(np.asarray(value, dtype=float), size).copy()}
+
+
+def test_cone_runout_enters_each_reading_as_minus_one_to_the_k(budget, nom):
+    """The cone turns 20 theta, so at theta_k = k pi/20 it sits at k pi: a
+    tangential cone-bore offset c moves every drum by (-1)^k c/R, and a radial
+    one opens the backlash, which puts the drive flank (-1)^k tan(alpha_w) c/R
+    further behind."""
+    mt = eb.mesh_train(budget)
+    drum = eb.HARMONICS[None, :] * eb.THETA_K[:, None]
+    cone = 20.0 * eb.THETA_K[:, None] * np.ones((1, eb.N_ELEMENTS))
+    none = np.zeros((1,) + drum.shape, dtype=bool)
+    c = 0.05
+    sign = (-1.0) ** np.arange(eb.K_MAX + 1)[:, None]
+    tangential = eb.mesh_phase(
+        _one(budget, "cone_bore_runout", [0.0, c]), mt, drum, cone, none, nom.ecc
+    )[0]
+    assert tangential == pytest.approx(
+        sign * c / mt.pitch_r * np.ones(eb.N_ELEMENTS), abs=1e-12
+    )
+    radial = eb.mesh_phase(
+        _one(budget, "cone_bore_runout", [c, 0.0]), mt, drum, cone, none, nom.ecc
+    )[0]
+    tan_w = np.asarray(mt.tan_working)
+    assert radial == pytest.approx(-sign * tan_w * c / mt.pitch_r, abs=1e-12)
+
+
+def test_flank_toggle_leads_by_the_backlash_only_where_the_spring_overruns(budget, nom):
+    """On the drive flank the toggle adds nothing; where the spring is releasing
+    and e |sin(lobe)| beats mu (R_cam + r_arbor) the drum leads by B/R. At a
+    friction that holds (mu above e / drag arm) it never toggles."""
+    mt = eb.mesh_train(budget)
+    drum = np.linspace(0.0, 2.0 * math.pi, 721)[:, None] * np.ones((1, eb.N_ELEMENTS))
+    cone = np.zeros_like(drum)
+    t = eb.cycle_table(nom)
+    releasing = eb._releasing(t, np.full(drum.shape, nom.d_max), drum)[None, ...]
+    # the spring gives energy back over half the turn
+    assert releasing.mean() == pytest.approx(0.5, abs=0.01)
+    base = mt.friction_nominal
+    lead = eb.mesh_phase(
+        _one(budget, "flank_toggle", 0.0), mt, drum, cone, releasing, nom.ecc
+    )[0]
+    B = np.asarray(mt.backlash)
+    overrun = releasing[0] & (nom.ecc * np.abs(np.sin(drum)) > base * mt.drag_arm)
+    assert lead == pytest.approx(np.where(overrun, B / mt.pitch_r, 0.0))
+    assert overrun.mean() > 0.3  # most of the releasing half at mu 0.15
+    held = eb.mesh_phase(
+        _one(budget, "flank_toggle", 0.5 - base), mt, drum, cone, releasing, nom.ecc
+    )[0]
+    assert not held.any()
+
+
+def test_mean_mesh_lag_is_half_the_nominal_backlash_and_scored(budget, report):
+    """The drive flank sits B/(2R) behind the CAD's centred tooth-in-gap pose on
+    every channel: a common cam phase (like #749) the closure carries in the
+    credited residual, never waived."""
+    mt = eb.mesh_train(budget)
+    lag = report["cam_home_phase"]["mesh_lag_deg"]
+    assert lag == pytest.approx(math.degrees(np.mean(mt.backlash) / (2.0 * mt.pitch_r)))
+    assert 0.15 < lag < 0.2
+    cl = report["closure"]
+    assert cl["mean_mesh_lag_mae"] > 0.0
+    assert (
+        cl["nominal_residual_mae"]
+        <= report["reserved_allowance"]["nominal_residual_mae"]
+    )
+
+
+def test_channel_phase_acceptance_is_derived_from_the_draws(budget, report):
+    """The assembled-machine channel-phase acceptance is the budget's p99 of
+    |cam phase + mesh terms| at every zero crossing, rounded up to 0.01 deg --
+    never a literal -- and tolerance-policy.md prints that number."""
+    trial = report["monte_carlo"]["channel_phase_trial"]
+    assert trial["coverage"] == budget["channel_phase_trial"]["coverage"] == 0.99
+    assert trial["acceptance_deg"] == pytest.approx(
+        math.ceil(trial["quantile_deg"] * 100.0 - 1e-9) / 100.0
+    )
+    assert trial["acceptance_deg"] > 0.4  # the retired literal left out the mesh
+    policy = (eb._config.CONFIG_DIR.parent / "docs" / "tolerance-policy.md").read_text(
+        encoding="utf-8"
+    )
+    row = next(
+        line for line in policy.splitlines() if line.startswith("| channel phase |")
+    )
+    assert f"≤ {trial['acceptance_deg']:.2f}°" in row
+
+
+def test_procedures_never_back_the_crank_off():
+    """Overshooting an index and backing off re-seats every mesh on the other
+    flank; both procedure documents say to go on round instead."""
+    docs = eb._config.CONFIG_DIR.parent / "docs"
+    sentence = (
+        "If you overshoot a crank index, go on round to it again; "
+        "never back the crank off."
+    )
+    for name in ("device-operation.md", "tolerance-policy.md"):
+        text = " ".join((docs / name).read_text(encoding="utf-8").split())
+        assert sentence in text, name
