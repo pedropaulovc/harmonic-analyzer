@@ -91,9 +91,10 @@ GEAR_DATA = gear_data_note(
 # its preposition so any replacement still reads as a sentence.
 ATTACHMENT_PROCESS = "SOLDER OR SILVER-BRAZE TO"
 
-# The user-approved alternative (2026-09-21): a Ø9.525 H-band slip joint with
-# a 0.025..0.075 mm diametral clearance is inside the cure gap of both
-# high-strength retaining compounds, so the shop may pick either route. It is
+# The user-approved alternative (2026-09-21): the bore's bonded-joint fit
+# (retained_joint_fit, 0.025..0.105 mm diametral on its land) is inside the
+# gap-fill limits of both high-strength retaining compounds (648: 0.15,
+# 638: 0.25), so the shop may pick either route. It is
 # stated as a permission, not an instruction -- the requirement is that the
 # gear ends up fixed to the seat.
 ATTACHMENT_ALTERNATIVE = "LOCTITE 638 OR 648 RETAINING COMPOUND ACCEPTABLE"

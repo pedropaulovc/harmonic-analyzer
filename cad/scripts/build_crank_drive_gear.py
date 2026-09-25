@@ -38,10 +38,11 @@ small gears; engineerguy v4_t00399/v2_t00069 showing the south face within
 ~1 mm of the pivot post, i.e. no room for a boss) says the 64T is fixed like
 the 20 cone gears: soldered or silver-brazed to its 3/8" seat on
 build_cone_gear_shaft's journal, so the brazed joint carries the whole crank
-torque. The bore therefore keeps its slip band (0.025..0.075 diametral
-clearance is inside both the capillary window a silver-braze filler needs and
-the cure gap of a high-strength retaining compound, so the USER also approved
-Loctite 638/648 as an acceptable alternative to filler metal, 2026-09-21);
+torque. The bore therefore takes the shared bonded-joint fit
+(retained_joint_fit: 0.025..0.105 diametral clearance on its land, inside both
+the capillary window a silver-braze filler needs and the gap-fill limits of
+the high-strength retaining compounds, so the USER also approved Loctite
+638/648 as an acceptable alternative to filler metal, 2026-09-21);
 the print says so in crank_drive_gear_notes.DRAWING_NOTES. The gear is NOT
 butted against T120: build_drive_train_assembly.GEAR64_STATION holds the
 rederived 19.9 mm centre against a frozen 10.0 mm reference face, so the real
@@ -64,7 +65,7 @@ import sys
 
 import _config
 import _telemetry
-import cone_gear_shaft_spec
+import cone_shaft_land_bands
 from _common import (
     IN,
     SketchDims,
@@ -95,6 +96,7 @@ from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _part_pmi import author_part_pmi
 from crank_drive_gear_notes import DRAWING_NOTES, GEAR_DATA
+from retained_joint_fit import RETAINED_JOINT_CLEARANCE, bonded_bore_band
 from crank_drive_gear_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -158,24 +160,34 @@ BORE_DIAMETER = 0.375 * IN  # snug on the 3/8" journal
 HELIX_DEG = _config.machine("gear_train", "crank_drive_helix_deg")
 BACKLASH_MM = _config.machine("gear_train", "crank_drive_backlash_mm")
 
-# The bore over the cone gear shaft is this part's ONE critical fit, and a slip
-# fit exists only if the size limits on BOTH mating features are narrower than
-# the clearance band it claims (cad/docs/tolerance-policy.md step 6b). So the
-# band is DERIVED -- never a per-part number -- from the named fit class and the
-# shaft land's own published limits: bore_min = shaft_max + clearance_min,
-# bore_max = shaft_min + clearance_max. Move either input and this moves with
-# it. It lives in the BUILD script, not in the shared spec: reading a fit class
-# in crank_drive_gear_spec would put tolerances.yaml in the import closure of
-# every assembly that imports OUTSIDE_DIA from it (test_dodo_recipe's
-# fine-grained-config contract), and only the part needs the limits.
-_CLEARANCE_MIN, _CLEARANCE_MAX = _config.fit("shaft_in_bushing")[
-    "diametral_clearance_mm"
-]
-_LAND_UPPER, _LAND_LOWER = cone_gear_shaft_spec.SECTION_DIA_BANDS[1]
-BORE_DIA_BAND = (  # (upper, lower) deviations
-    round(_LAND_LOWER + _CLEARANCE_MAX, 3),
-    round(_LAND_UPPER + _CLEARANCE_MIN, 3),
+# The bore over the cone gear shaft is this part's ONE critical fit: a bonded
+# joint (solder, silver-braze or Loctite 638/648) on MHA-014's Sec1 gear-seat
+# land, the same land the T030-T120 cone gears bond to.  It takes the shared
+# retained-joint fit class (retained_joint_fit, Main ruling 2026-09-25) from
+# that land's own published limits: bore_min = land_max + clearance_min,
+# bore_max = land_min + clearance_max, so moving either input moves the bore.
+# The former shaft_in_bushing running fit, applied to the 0.05-wide land,
+# left a ZERO-width bore band (+0.025/+0.025), which no reamer holds.  It
+# lives in the BUILD script, not the shared spec, so the assemblies that
+# import OUTSIDE_DIA from crank_drive_gear_spec never re-key on a fit edit.
+_LAND_UPPER, _LAND_LOWER = cone_shaft_land_bands.SECTION_DIA_BANDS[1]
+if (_LAND_UPPER, _LAND_LOWER) != cone_shaft_land_bands.GEAR_SEAT_BAND:
+    raise AssertionError("the 64T no longer rides a gear-seat land")
+BORE_DIA_BAND = bonded_bore_band(cone_shaft_land_bands.GEAR_SEAT_BAND)  # (upper, lower)
+# The diametral gap the printed limits actually give, and its three checks:
+# a band a reamer can hold, never over Loctite 648's 0.15 gap-fill limit (with
+# 0.02 margin), and never under the floor that lets the gear start on its land.
+BORE_DIAMETRAL_GAP = (
+    round(BORE_DIA_BAND[1] - _LAND_UPPER, 6),
+    round(BORE_DIA_BAND[0] - _LAND_LOWER, 6),
 )
+LOCTITE_648_GAP_FILL_MAX = 0.15
+if BORE_DIA_BAND[0] - BORE_DIA_BAND[1] < 0.02:
+    raise AssertionError(f"64T bore band {BORE_DIA_BAND} is narrower than 0.02")
+if BORE_DIAMETRAL_GAP[1] > LOCTITE_648_GAP_FILL_MAX - 0.02:
+    raise AssertionError(f"64T bond gap {BORE_DIAMETRAL_GAP} nears the 648 fill limit")
+if BORE_DIAMETRAL_GAP[0] < RETAINED_JOINT_CLEARANCE[0]:
+    raise AssertionError(f"64T bond gap {BORE_DIAMETRAL_GAP} is under the start floor")
 
 
 async def build(adapter) -> dict[str, str]:
