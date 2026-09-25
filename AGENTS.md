@@ -501,7 +501,8 @@ anyway. Pinned by `test_dodo_recipe.py` (`check:recipe`).
 `watchdog_signal` attribute, so `logs.jsonl` yields the full story with one
 filter (`rg watchdog_signal … | jq …`): one "COM watchdog armed" info per COM
 session (timeout/poll/baseline pids — its absence means the session ran
-unprotected), throttled hung-window warns with `hung_s`/`idle_s`, a "responsive
+unprotected) and one "COM watchdog disarmed after <s>" info (`armed_s`) closing
+that window, throttled hung-window warns with `hung_s`/`idle_s`, a "responsive
 again" info closing each hung episode, and on a fatal an error carrying
 `reason`/`idle_s`/`last_op`/`exit_code`. Fatals ALSO emit a `watchdog.abort`
 ERROR span (same attrs) so `traces.jsonl` shows the abort even though the

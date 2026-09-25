@@ -307,6 +307,28 @@ def test_start_logs_the_armed_configuration(monkeypatch: pytest.MonkeyPatch) -> 
     )
 
 
+def test_stop_logs_the_disarmed_window(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The armed window is recorded at both ends, not inferred from the next
+    # span; the line is a watchdog self-log, so it cannot poke the heartbeat.
+    monkeypatch.delenv("HARMONIC_COM_WATCHDOG", raising=False)
+    monkeypatch.setattr(_watchdog, "_WINDOWS", True)
+    infos: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        _watchdog._telemetry, "info", lambda msg, **f: infos.append((msg, f))
+    )
+    _watchdog.stop()  # nothing armed: nothing to record
+    assert infos == []
+
+    assert _watchdog.start() is not None
+    _watchdog.stop()
+    _watchdog.stop()  # idempotent: one disarmed line per armed window
+
+    (armed, _), (disarmed, fields) = infos
+    assert armed.startswith("COM watchdog armed")
+    assert disarmed.startswith("COM watchdog disarmed after ")
+    assert fields["watchdog_signal"] is True and fields["armed_s"] >= 0
+
+
 def test_run_build_cleans_up_when_session_setup_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

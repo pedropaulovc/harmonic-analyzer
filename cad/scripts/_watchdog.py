@@ -414,6 +414,7 @@ class Watchdog:
 
 
 _active: Watchdog | None = None
+_active_since = 0.0
 
 
 def start() -> Watchdog | None:
@@ -422,7 +423,7 @@ def start() -> Watchdog | None:
     a long SolidWorks-free tail (pure-python post-processing) can't trip the
     idle timeout. Returns ``None`` when disabled (``HARMONIC_COM_WATCHDOG=0``)
     or off-Windows."""
-    global _active
+    global _active, _active_since
     if not _WINDOWS:
         return None
     if os.environ.get("HARMONIC_COM_WATCHDOG", "1").lower() in {"0", "off", "false"}:
@@ -442,6 +443,7 @@ def start() -> Watchdog | None:
         poll = _POLL_INTERVAL
     _active = Watchdog(op_timeout=timeout, poll_interval=poll)
     _active.start()
+    _active_since = time.monotonic()
     # One armed line per COM session so any post-hoc read of logs.jsonl can
     # tell whether -- and with what limits -- the session was protected.
     _info(
@@ -457,7 +459,15 @@ def start() -> Watchdog | None:
 
 
 def stop() -> None:
+    """Stop the process-wide watchdog; log the end of the armed window.
+
+    The disarmed line pairs with the armed one, so logs.jsonl records the
+    window the session was protected for instead of leaving it to be
+    inferred from the next span."""
     global _active
-    if _active is not None:
-        _active.stop()
-        _active = None
+    if _active is None:
+        return
+    _active.stop()
+    armed_s = time.monotonic() - _active_since
+    _active = None
+    _info(f"COM watchdog disarmed after {armed_s:.1f}s", armed_s=round(armed_s, 1))
