@@ -17,6 +17,7 @@ import hashlib
 import math
 import sys
 from datetime import UTC, datetime
+from itertools import combinations
 from pathlib import Path
 from typing import Any, Callable, Literal, Sequence
 
@@ -25,6 +26,7 @@ from _common import OUT_FAILURES, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     _balloon_item_number,
+    _leader_segments_of,
     _spread_balloons,
     add_component_bom_balloons,
     check_drawing_layout,
@@ -882,9 +884,18 @@ def _caption_under(adapter: Any, view: Any, text: str, *, label: str) -> None:
     )
 
 
-# Readback drift above this is logged loud: the leader start SolidWorks
-# reports should sit on the balloon rim facing the attachment.
-LEADER_START_DRIFT_WARN_M = 0.001
+# A balloon's ``GetPosition`` is an anchor, not its circle centre: integ3 (farm
+# run 20260925T012343624Z, key d7ea6d8d9e79) read the centre behind every leader
+# start at a constant (+4.0, -1.7) mm from it, sd 0.3 mm over 40 balloons. One
+# balloon whose offset strays this far from its sheet's mean is logged loud.
+BALLOON_ANCHOR_SCATTER_WARN_M = 0.001
+# Leaders this close count as crossed in both uncross passes. The audit calls a
+# crossing only past 0.1 mm, and integ1's 375/385 was 0.32 mm past, so sub-mm
+# scatter between two reads must not decide whether a pair gets swapped.
+UNCROSS_NEAR_MARGIN_M = 0.001
+# A near (not crossed) pair is swapped only when that shortens the two leaders
+# by more than this; the strict decrease is what bounds the swap count.
+UNCROSS_MIN_GAIN_M = 1e-5
 
 
 def _balloon_annotations(balloons: list[Any]) -> dict[str, Any]:
@@ -898,107 +909,25 @@ def _balloon_annotations(balloons: list[Any]) -> dict[str, Any]:
     return annotations
 
 
-def _balloon_rim_start(
-    annotation: Any, name: str
-) -> tuple[tuple[float, float], tuple[float, float], tuple[float, float]]:
-    """``(rim start, attachment, reported start)`` of one balloon, sheet meters.
-
-    The attachment (last leader point) is stable: integ1's verify event and its
-    audit read the same attachments 90 s apart. The leader START is not: after
-    ``SetPosition`` + ``EditRebuild3``, ``GetLeaderPointsAtIndex`` can still
-    report the old start, which is how integ1 (leaf 20260925T000314Z-1-c91d9a33)
-    missed a 375/385 crossing its audit then found, while integ2 caught the same
-    pair. So the start is rebuilt from ``GetPosition`` (what was just set): the
-    rim point on the line toward the attachment.
-    """
+def _balloon_attachment(annotation: Any, name: str) -> tuple[float, float]:
+    """The last point of a balloon's leader, sheet meters: where it lands."""
     points = tuple(float(value) for value in (annotation.GetLeaderPointsAtIndex(0) or ()))
     if len(points) < 6:
         raise RuntimeError(f"{name}: balloon leader is unreadable: {points!r}")
-    centre = tuple(float(value) for value in annotation.GetPosition())[:2]
-    attach = (points[-3], points[-2])
-    reported = (points[0], points[1])
-    dx, dy = attach[0] - centre[0], attach[1] - centre[1]
-    reach = math.hypot(dx, dy)
-    radius = BALLOON_DIAMETER / 2.0
-    if reach <= radius:
-        return centre, attach, reported
-    start = (centre[0] + dx * radius / reach, centre[1] + dy * radius / reach)
-    return start, attach, reported
+    return points[-3], points[-2]
 
 
-def _balloon_leader(annotation: Any, name: str) -> LeaderSegment:
-    """A balloon's straight leader from current state: rim -> attachment."""
-    start, attach, _ = _balloon_rim_start(annotation, name)
-    return LeaderSegment(name, "note", *start, *attach)
-
-
-def _swap_balloon_slots(adapter: Any, a: Any, b: Any, *, label: str, names: str) -> None:
-    pa = tuple(float(value) for value in a.GetPosition())
-    pb = tuple(float(value) for value in b.GetPosition())
-    if not (a.SetPosition(*pb) and b.SetPosition(*pa)):
-        raise RuntimeError(f"{label}: cannot swap balloons {names}")
-    rebuild_drawing(adapter, label=f"{label} swap")
-
-
-def _log_leader_start_drift(annotations: dict[str, Any], *, label: str) -> None:
-    """Record GetPosition-derived vs reported leader starts; WARN on drift."""
-    rows = []
+def _placed_balloon_leaders(
+    adapter: Any, annotations: dict[str, Any]
+) -> dict[str, list[LeaderSegment]]:
+    """Each balloon's leader through the layout audit's own reader."""
+    leaders = {}
     for name, annotation in annotations.items():
-        start, _, reported = _balloon_rim_start(annotation, name)
-        drift = math.hypot(start[0] - reported[0], start[1] - reported[1])
-        rows.append(
-            (
-                name,
-                round(start[0] * 1000.0, 2),
-                round(start[1] * 1000.0, 2),
-                round(reported[0] * 1000.0, 2),
-                round(reported[1] * 1000.0, 2),
-                round(drift * 1000.0, 2),
-            )
-        )
-    _telemetry.event("drawing.balloon_leader_start", label=label, starts=tuple(rows))
-    stale = [row for row in rows if row[5] > LEADER_START_DRIFT_WARN_M * 1000.0]
-    if not stale:
-        _telemetry.info(f"{label}: {len(rows)} balloon leader start(s) match their positions")
-        return
-    listed = ", ".join(f"{row[0]} {row[5]:.2f} mm" for row in stale)
-    _telemetry.warn(
-        f"{label}: {len(stale)} balloon leader start(s) read off their set positions: {listed}"
-    )
-
-
-def _uncross_balloon_leaders(adapter: Any, balloons: list[Any], *, label: str) -> None:
-    """Swap the ring slots of any two balloons whose leaders cross.
-
-    Swapping the slots of two crossing straight leaders strictly shortens
-    their summed length (triangle inequality), so the swaps cannot cycle; the
-    count is bounded by the inversions, under the quadratic cap. Leaders are
-    built from ``GetPosition`` (see ``_balloon_rim_start``), and the reported
-    starts are logged against them so a stale readback shows in task.log.
-    """
-    annotations = _balloon_annotations(balloons)
-    _log_leader_start_drift(annotations, label=label)
-    swaps = []
-    crossings = ()
-    for _attempt in range(len(annotations) ** 2):
-        segments = [_balloon_leader(annotation, name) for name, annotation in annotations.items()]
-        crossings = find_leader_leader_crossings(segments)
-        if not crossings:
-            break
-        first, second = crossings[0].a.label, crossings[0].b.label
-        _swap_balloon_slots(
-            adapter,
-            annotations[first],
-            annotations[second],
-            label=label,
-            names=f"{first} and {second}",
-        )
-        swaps.append((first, second))
-    _telemetry.event("drawing.balloon_uncross", label=label, swaps=tuple(swaps))
-    _telemetry.info(f"{label}: uncrossed balloon leaders with {len(swaps)} swap(s)")
-    if crossings:
-        pairs = ", ".join(f"{c.a.label}/{c.b.label}" for c in crossings)
-        _telemetry.warn(f"{label}: leaders still cross after {len(swaps)} swap(s): {pairs}")
+        segments = _leader_segments_of(adapter, annotation, label=name, kind="note", owner="")
+        if not segments:
+            raise RuntimeError(f"{name}: balloon leader is unreadable")
+        leaders[name] = segments
+    return leaders
 
 
 def _audit_leader_segments(adapter: Any, sheet_name: str) -> list[LeaderSegment]:
@@ -1010,17 +939,228 @@ def _audit_leader_segments(adapter: Any, sheet_name: str) -> list[LeaderSegment]
     return segments
 
 
-def _balloon_crossings(
+def _audit_balloon_leaders(
     segments: list[LeaderSegment], annotations: dict[str, Any]
-) -> list[tuple[str, str]]:
-    """Crossing balloon pairs by note name; audit labels read ``DetailItemN '11'``."""
-    pairs = []
-    for crossing in find_leader_leader_crossings(segments):
-        first = crossing.a.label.split(" ", 1)[0]
-        second = crossing.b.label.split(" ", 1)[0]
-        if first in annotations and second in annotations:
-            pairs.append((first, second))
-    return pairs
+) -> dict[str, list[LeaderSegment]]:
+    """The balloons' leaders out of an audit read; its labels read ``DetailItemN '11'``."""
+    leaders: dict[str, list[LeaderSegment]] = {}
+    for segment in segments:
+        name = segment.label.split(" ", 1)[0]
+        if name in annotations:
+            leaders.setdefault(name, []).append(
+                LeaderSegment(
+                    name, segment.kind, segment.x0, segment.y0, segment.x1, segment.y1
+                )
+            )
+    return leaders
+
+
+def _leader_ends(segments: list[LeaderSegment]) -> tuple[tuple[float, float], tuple[float, float]]:
+    """``(start on the balloon rim, attachment)`` of one balloon's leader."""
+    return (segments[0].x0, segments[0].y0), (segments[-1].x1, segments[-1].y1)
+
+
+def _leader_centre(segments: list[LeaderSegment]) -> tuple[float, float]:
+    """The balloon centre behind its leader: SolidWorks starts it on the rim, radially."""
+    (sx, sy), (ax, ay) = _leader_ends(segments)
+    reach = math.hypot(ax - sx, ay - sy)
+    if reach == 0.0:
+        return sx, sy
+    radius = BALLOON_DIAMETER / 2.0
+    return sx - (ax - sx) * radius / reach, sy - (ay - sy) * radius / reach
+
+
+def _point_segment_gap(x: float, y: float, segment: LeaderSegment) -> float:
+    dx, dy = segment.x1 - segment.x0, segment.y1 - segment.y0
+    span = dx * dx + dy * dy
+    t = 0.0 if span == 0.0 else ((x - segment.x0) * dx + (y - segment.y0) * dy) / span
+    t = min(1.0, max(0.0, t))
+    return math.hypot(x - segment.x0 - t * dx, y - segment.y0 - t * dy)
+
+
+def _turn(ax: float, ay: float, bx: float, by: float, cx: float, cy: float) -> float:
+    return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+
+
+def _segment_gap(a: LeaderSegment, b: LeaderSegment) -> float:
+    """Closest approach of two segments; 0 when they cross."""
+    d1 = _turn(b.x0, b.y0, b.x1, b.y1, a.x0, a.y0)
+    d2 = _turn(b.x0, b.y0, b.x1, b.y1, a.x1, a.y1)
+    d3 = _turn(a.x0, a.y0, a.x1, a.y1, b.x0, b.y0)
+    d4 = _turn(a.x0, a.y0, a.x1, a.y1, b.x1, b.y1)
+    if d1 * d2 < 0.0 and d3 * d4 < 0.0:
+        return 0.0
+    return min(
+        _point_segment_gap(a.x0, a.y0, b),
+        _point_segment_gap(a.x1, a.y1, b),
+        _point_segment_gap(b.x0, b.y0, a),
+        _point_segment_gap(b.x1, b.y1, a),
+    )
+
+
+def _crossed_balloons(leaders: dict[str, list[LeaderSegment]]) -> list[tuple[str, str]]:
+    """Balloon pairs the audit's own predicate calls crossed."""
+    segments = [segment for run in leaders.values() for segment in run]
+    return [(c.a.label, c.b.label) for c in find_leader_leader_crossings(segments)]
+
+
+def _near_balloons(
+    leaders: dict[str, list[LeaderSegment]],
+) -> list[tuple[float, float, str, str]]:
+    """``(gap, swap gain, a, b)`` for leaders within the near margin, closest first.
+
+    Leaders sharing an attachment converge by design (the audit exempts them),
+    so they are not near pairs. The gain is how much a slot swap would shorten
+    the two centre-to-attachment runs.
+    """
+    near = []
+    for first, second in combinations(sorted(leaders), 2):
+        a_start, a_attach = _leader_ends(leaders[first])
+        b_start, b_attach = _leader_ends(leaders[second])
+        if math.dist(a_attach, b_attach) < UNCROSS_NEAR_MARGIN_M:
+            continue
+        gap = min(_segment_gap(a, b) for a in leaders[first] for b in leaders[second])
+        if gap >= UNCROSS_NEAR_MARGIN_M:
+            continue
+        a_centre = _leader_centre(leaders[first])
+        b_centre = _leader_centre(leaders[second])
+        gain = (math.dist(a_centre, a_attach) + math.dist(b_centre, b_attach)) - (
+            math.dist(b_centre, a_attach) + math.dist(a_centre, b_attach)
+        )
+        near.append((gap, gain, first, second))
+    return sorted(near)
+
+
+def _next_balloon_swap(
+    leaders: dict[str, list[LeaderSegment]],
+) -> tuple[str, str, str] | None:
+    """``(a, b, reason)`` of the next slot swap, or None when the ring is settled.
+
+    A crossed pair always goes: swapping two crossing straight leaders strictly
+    shortens their summed length (triangle inequality). A near pair goes only
+    when the swap shortens them by ``UNCROSS_MIN_GAIN_M``, so every swap lowers
+    the ring's total leader length and the swaps cannot cycle.
+    """
+    crossed = _crossed_balloons(leaders)
+    if crossed:
+        return (*crossed[0], "crossing")
+    for _gap, gain, first, second in _near_balloons(leaders):
+        if gain > UNCROSS_MIN_GAIN_M:
+            return first, second, "near"
+    return None
+
+
+def _swap_balloon_slots(adapter: Any, a: Any, b: Any, *, label: str, names: str) -> None:
+    pa = tuple(float(value) for value in a.GetPosition())
+    pb = tuple(float(value) for value in b.GetPosition())
+    if not (a.SetPosition(*pb) and b.SetPosition(*pa)):
+        raise RuntimeError(f"{label}: cannot swap balloons {names}")
+    rebuild_drawing(adapter, label=f"{label} swap")
+
+
+def _uncross_balloons(
+    adapter: Any,
+    annotations: dict[str, Any],
+    read: Callable[[], dict[str, list[LeaderSegment]]],
+    *,
+    label: str,
+) -> tuple[list[tuple[str, str, str]], dict[str, list[LeaderSegment]]]:
+    """Swap slots until no pair is crossed or swappably near; the final read too."""
+    swaps: list[tuple[str, str, str]] = []
+    leaders = read()
+    for _attempt in range(len(annotations) ** 2):
+        swap = _next_balloon_swap(leaders)
+        if swap is None:
+            break
+        first, second, reason = swap
+        _swap_balloon_slots(
+            adapter,
+            annotations[first],
+            annotations[second],
+            label=label,
+            names=f"{first} and {second}",
+        )
+        swaps.append(swap)
+        leaders = read()
+    return swaps, leaders
+
+
+def _log_balloon_anchor_offsets(
+    annotations: dict[str, Any], leaders: dict[str, list[LeaderSegment]], *, label: str
+) -> None:
+    """Record each balloon's centre-behind-its-leader minus its ``GetPosition``.
+
+    The offset is expected constant across a sheet (integ3); one balloon off the
+    sheet mean by over ``BALLOON_ANCHOR_SCATTER_WARN_M`` is a leader the audit
+    and the ring disagree on, so it WARNs by name.
+    """
+    offsets = []
+    for name, annotation in annotations.items():
+        centre = _leader_centre(leaders[name])
+        anchor = tuple(float(value) for value in annotation.GetPosition())[:2]
+        offsets.append((name, centre[0] - anchor[0], centre[1] - anchor[1]))
+    if not offsets:
+        return
+    mean_x = sum(row[1] for row in offsets) / len(offsets)
+    mean_y = sum(row[2] for row in offsets) / len(offsets)
+    rows = tuple(
+        (
+            name,
+            round(dx * 1000.0, 2),
+            round(dy * 1000.0, 2),
+            round(math.hypot(dx - mean_x, dy - mean_y) * 1000.0, 2),
+        )
+        for name, dx, dy in offsets
+    )
+    sd = math.sqrt(sum((row[3] / 1000.0) ** 2 for row in rows) / len(rows))
+    _telemetry.event(
+        "drawing.balloon_anchor_offset",
+        label=label,
+        mean_dx_mm=round(mean_x * 1000.0, 2),
+        mean_dy_mm=round(mean_y * 1000.0, 2),
+        sd_mm=round(sd * 1000.0, 2),
+        max_deviation_mm=max(row[3] for row in rows),
+        offsets=rows,
+    )
+    stray = [row for row in rows if row[3] > BALLOON_ANCHOR_SCATTER_WARN_M * 1000.0]
+    summary = (
+        f"{label}: {len(rows)} balloon centre(s) sit ({mean_x * 1000.0:+.2f}, "
+        f"{mean_y * 1000.0:+.2f}) mm off their anchors, sd {sd * 1000.0:.2f} mm"
+    )
+    if not stray:
+        _telemetry.info(summary)
+        return
+    listed = ", ".join(f"{row[0]} {row[3]:.2f} mm" for row in stray)
+    _telemetry.warn(f"{summary}; off the sheet mean: {listed}")
+
+
+def _describe_near(near: list[tuple[float, float, str, str]]) -> str:
+    return ", ".join(f"{a}/{b} {gap * 1000.0:.2f} mm" for gap, _gain, a, b in near)
+
+
+def _uncross_balloon_leaders(adapter: Any, balloons: list[Any], *, label: str) -> None:
+    """Swap the ring slots of any two balloons whose leaders cross or nearly do.
+
+    Leaders are read exactly as the layout audit reads them
+    (``_leader_segments_of``); ``_final_balloon_uncross`` stays the authority.
+    """
+    annotations = _balloon_annotations(balloons)
+    swaps, leaders = _uncross_balloons(
+        adapter,
+        annotations,
+        lambda: _placed_balloon_leaders(adapter, annotations),
+        label=label,
+    )
+    _log_balloon_anchor_offsets(annotations, leaders, label=label)
+    _telemetry.event("drawing.balloon_uncross", label=label, swaps=tuple(swaps))
+    _telemetry.info(f"{label}: uncrossed balloon leaders with {len(swaps)} swap(s)")
+    crossed = _crossed_balloons(leaders)
+    if crossed:
+        pairs = ", ".join(f"{a}/{b}" for a, b in crossed)
+        _telemetry.warn(f"{label}: leaders still cross after {len(swaps)} swap(s): {pairs}")
+    near = _near_balloons(leaders)
+    if near:
+        _telemetry.warn(f"{label}: leaders left within the near margin: {_describe_near(near)}")
 
 
 def _final_balloon_uncross(
@@ -1034,29 +1174,28 @@ def _final_balloon_uncross(
 
     One predicate, one reader: the audit's ``collect_layout_elements`` after
     ``_activate_sheet``, exactly as ``_check_package_layout`` will read it. A
-    crossing the placement-time pass could not see (a stale leader, a view
-    regenerated since) is swapped here; one that survives the quadratic cap
-    raises by name. Crossings with non-balloon leaders are the audit's to report.
+    crossing the placement-time pass could not see (a view regenerated since,
+    sub-mm scatter between reads) is swapped here; one that survives the
+    quadratic cap raises by name. A near pair the swap would not shorten is
+    only warned: the audit does not call it. Crossings with non-balloon leaders
+    are the audit's to report.
     """
-    swaps = []
-    pairs: list[tuple[str, str]] = []
-    for _attempt in range(len(annotations) ** 2):
-        pairs = _balloon_crossings(read_segments(adapter, sheet_name), annotations)
-        if not pairs:
-            break
-        first, second = pairs[0]
-        _swap_balloon_slots(
-            adapter,
-            annotations[first],
-            annotations[second],
-            label=sheet_name,
-            names=f"{first} and {second}",
-        )
-        swaps.append((first, second))
+    swaps, leaders = _uncross_balloons(
+        adapter,
+        annotations,
+        lambda: _audit_balloon_leaders(read_segments(adapter, sheet_name), annotations),
+        label=sheet_name,
+    )
     _telemetry.event("drawing.balloon_final_uncross", sheet=sheet_name, swaps=tuple(swaps))
     _telemetry.info(f"{sheet_name}: final uncross on audit geometry, {len(swaps)} swap(s)")
-    if pairs:
-        listed = ", ".join(f"{a}/{b}" for a, b in pairs)
+    near = _near_balloons(leaders)
+    if near:
+        _telemetry.warn(
+            f"{sheet_name}: balloon leaders left within the near margin: {_describe_near(near)}"
+        )
+    crossed = _crossed_balloons(leaders)
+    if crossed:
+        listed = ", ".join(f"{a}/{b}" for a, b in crossed)
         raise RuntimeError(
             f"{sheet_name}: balloon leaders still cross after {len(swaps)} swap(s): {listed}"
         )
@@ -1229,14 +1368,14 @@ def _verify_balloon_attachments(
                 continue
             components.append(_component_name(component))
             stems.append(_component_stem(component))
-        leader = _balloon_leader(annotation, name)
+        attach = _balloon_attachment(annotation, name)
         records.append((name, item, tuple(sorted(set(stems)))))
         evidence.append(
             {
                 "balloon": name,
                 "item": item,
                 "components": tuple(components),
-                "attach_mm": (leader.x1 * 1000.0, leader.y1 * 1000.0),
+                "attach_mm": (attach[0] * 1000.0, attach[1] * 1000.0),
             }
         )
     violations = balloon_attachment_violations(records, dict(items))

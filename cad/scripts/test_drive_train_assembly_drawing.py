@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import math
 import re
 from pathlib import Path
 
@@ -394,6 +395,9 @@ class _Annotation:
         self.position = (x, y)
         return True
 
+    def GetLeaderCount(self) -> int:
+        return 1
+
     def GetLeaderPointsAtIndex(self, index):
         return (*self.position, 0.0, self.attach, 0.0, 0.0)
 
@@ -418,6 +422,14 @@ class _RebuildModel:
 class _RebuildAdapter:
     currentModel = _RebuildModel()
 
+    def _attempt(self, call, default=None):
+        return call()
+
+
+def _placed(annotations: dict[str, _Annotation]):
+    leaders = drawing._placed_balloon_leaders(_RebuildAdapter(), annotations)
+    return [segment for run in leaders.values() for segment in run]
+
 
 def test_uncross_needs_more_than_one_swap_per_balloon_and_still_converges() -> None:
     """Six fully reversed leaders cross pairwise: 15 swaps, not 6 (integ1)."""
@@ -425,37 +437,76 @@ def test_uncross_needs_more_than_one_swap_per_balloon_and_still_converges() -> N
     annotations = [_Annotation(float(i), float(count - 1 - i)) for i in range(count)]
     balloons = [_Balloon(str(i), a) for i, a in enumerate(annotations)]
     drawing._uncross_balloon_leaders(_RebuildAdapter(), balloons, label="test")
-    segments = [drawing._balloon_leader(a, str(i)) for i, a in enumerate(annotations)]
-    assert not drawing.find_leader_leader_crossings(segments)
+    assert not drawing.find_leader_leader_crossings(
+        _placed({str(i): a for i, a in enumerate(annotations)})
+    )
 
 
-class _StaleAnnotation(_Annotation):
-    """Reports its leader from where it USED to be, as integ1's readback did."""
+def _near_pair(past_m: float) -> dict[str, _Annotation]:
+    """Leader 2's end sits ``past_m`` beyond leader 1's line (negative: short of it).
 
-    def __init__(self, x: float, attach: float, stale_x: float) -> None:
-        super().__init__(x, attach)
-        self.stale_x = stale_x
+    Leader 1 runs (0, 1) -> (1, 0); leader 2 comes down the diagonal from (1, 1)
+    and stops ``past_m`` measured perpendicular to that line.
+    """
+    tip = (1.0 - past_m * math.sqrt(2.0)) / 2.0
+    first = _Annotation(0.0, 1.0)
+    second = _Annotation(1.0, 0.0)
+    second.position = (1.0, 1.0)
 
-    def GetLeaderPointsAtIndex(self, index):
-        return (self.stale_x, 1.0, 0.0, self.attach, 0.0, 0.0)
+    def second_points(index):
+        return (*second.position, 0.0, tip, tip, 0.0)
 
-
-def test_uncross_builds_leaders_from_the_set_position_not_a_stale_start() -> None:
-    annotation = _StaleAnnotation(4.0, 0.0, stale_x=0.0)
-    start, attach, reported = drawing._balloon_rim_start(annotation, "b")
-    assert reported == (0.0, 1.0)
-    assert attach == (0.0, 0.0)
-    radius = drawing.BALLOON_DIAMETER / 2.0
-    reach = (4.0**2 + 1.0**2) ** 0.5
-    assert start == pytest.approx((4.0 - 4.0 * radius / reach, 1.0 - radius / reach))
+    second.GetLeaderPointsAtIndex = second_points
+    return {"DetailItem1": first, "DetailItem2": second}
 
 
-def test_uncross_sees_a_crossing_hidden_by_a_stale_leader_start() -> None:
-    # Set positions cross (0 -> 1, 1 -> 0); the stale starts would not.
-    crossed = [_StaleAnnotation(0.0, 1.0, stale_x=1.0), _StaleAnnotation(1.0, 0.0, stale_x=0.0)]
-    balloons = [_Balloon(str(i), a) for i, a in enumerate(crossed)]
+@pytest.mark.parametrize("past_m", [0.0003, -0.0003, 0.00005, -0.00005])
+def test_uncross_swaps_a_near_crossing_the_audit_tolerance_could_miss(past_m) -> None:
+    """integ1's 375/385 was 0.32 mm past; scatter must not decide a swap."""
+    annotations = _near_pair(past_m)
+    balloons = [_Balloon(name, a) for name, a in annotations.items()]
     drawing._uncross_balloon_leaders(_RebuildAdapter(), balloons, label="test")
-    assert [a.position[0] for a in crossed] == [1.0, 0.0]
+    assert annotations["DetailItem1"].position == (1.0, 1.0)
+    assert annotations["DetailItem2"].position == (0.0, 1.0)
+
+
+def test_near_margin_leaves_a_pair_whose_swap_would_lengthen_it() -> None:
+    # Parallel leaders 0.5 mm apart: near, but swapping cannot shorten them.
+    annotations = {"DetailItem1": _Annotation(0.0, 0.0), "DetailItem2": _Annotation(0.0005, 0.0)}
+    annotations["DetailItem2"].GetLeaderPointsAtIndex = lambda index: (
+        *annotations["DetailItem2"].position,
+        0.0,
+        0.0005,
+        0.5,
+        0.0,
+    )
+    leaders = drawing._placed_balloon_leaders(_RebuildAdapter(), annotations)
+    assert [pair[2:] for pair in drawing._near_balloons(leaders)] == [
+        ("DetailItem1", "DetailItem2")
+    ]
+    assert drawing._next_balloon_swap(leaders) is None
+
+
+def test_near_margin_ignores_leaders_sharing_an_attachment() -> None:
+    annotations = {"DetailItem1": _Annotation(0.0, 0.0), "DetailItem2": _Annotation(0.0002, 0.0)}
+    leaders = drawing._placed_balloon_leaders(_RebuildAdapter(), annotations)
+    assert drawing._near_balloons(leaders) == []
+
+
+def test_anchor_offsets_warn_only_on_a_balloon_off_the_sheet_mean(monkeypatch) -> None:
+    warnings = []
+    monkeypatch.setattr(drawing._telemetry, "warn", warnings.append)
+    # Every leader starts 4 m right of its anchor: a constant offset, no warning.
+    annotations = {str(i): _Annotation(float(i), float(i)) for i in range(3)}
+    leaders = {
+        name: [drawing.LeaderSegment(name, "note", a.position[0] + 4.0, 1.0, a.attach, 0.0)]
+        for name, a in annotations.items()
+    }
+    drawing._log_balloon_anchor_offsets(annotations, leaders, label="t")
+    assert warnings == []
+    leaders["2"] = [drawing.LeaderSegment("2", "note", 2.0 + 4.002, 1.0, 2.0, 0.0)]
+    drawing._log_balloon_anchor_offsets(annotations, leaders, label="t")
+    assert len(warnings) == 1 and "2 " in warnings[0].split("off the sheet mean:")[1]
 
 
 def _audit_reader(attach_after_activation: dict[str, float], annotations: dict[str, _Annotation]):
@@ -478,8 +529,7 @@ def test_final_uncross_swaps_a_crossing_only_the_audit_geometry_shows() -> None:
     annotations = {"DetailItem1": _Annotation(0.0, 0.0), "DetailItem2": _Annotation(1.0, 1.0)}
     # Placement-time leaders are parallel; after activation the attachments
     # have moved so the leaders cross, as the audit read integ1's 375/385.
-    placement = [drawing._balloon_leader(a, n) for n, a in annotations.items()]
-    assert not drawing.find_leader_leader_crossings(placement)
+    assert not drawing.find_leader_leader_crossings(_placed(annotations))
     read, reads = _audit_reader({"DetailItem1": 1.0, "DetailItem2": 0.0}, annotations)
     drawing._final_balloon_uncross(_RebuildAdapter(), "SHEET", annotations, read_segments=read)
     assert annotations["DetailItem1"].position[0] == 1.0
