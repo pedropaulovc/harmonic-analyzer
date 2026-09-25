@@ -1657,6 +1657,65 @@ def test_every_cache_phase_span_names_its_cache_key(monkeypatch):
     }
 
 
+def test_after_seat_work_runs_once_the_seat_is_released_and_before_the_store(
+    monkeypatch,
+):
+    """#887: the release prints need no SolidWorks, so they run AFTER the seat is
+    released -- no other COM task waits on them -- and BEFORE the publish, so the
+    cached tree carries them. A HIT skips them with the COM work."""
+    dodo = _load_dodo()
+    events: list[str] = []
+
+    @contextlib.contextmanager
+    def seat(label):
+        events.append("seat.acquire")
+        yield 0.0
+        events.append("seat.release")
+
+    monkeypatch.setattr(dodo, "_cache_key", lambda file_deps, label: "k" * 64)
+    monkeypatch.setattr(dodo._cache, "restore", lambda *args: False)
+    monkeypatch.setattr(dodo._cache, "store", lambda *args: events.append("store") or "stored")
+    monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
+    monkeypatch.setattr(dodo, "_com_seat", seat)
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    monkeypatch.setattr(dodo, "_exec_com", lambda cmd, *a, **k: events.append(f"com {cmd[-1]}"))
+    monkeypatch.setattr(
+        dodo, "_run", lambda cmd, label, *a, **k: events.append(f"run {cmd[-1]} [{label}]")
+    )
+
+    dodo._cached_com_action(
+        "package:release", ["pkg", "com"], [], [], "package-release", after_seat=["pkg", "prints"]
+    )
+
+    assert events == [
+        "seat.acquire",
+        "com com",
+        "seat.release",
+        "run prints [package:release after-seat]",
+        "store",
+    ]
+
+    events.clear()
+    monkeypatch.setattr(dodo._cache, "restore", lambda *args: True)
+    dodo._cached_com_action(
+        "package:release", ["pkg", "com"], [], [], "package-release", after_seat=["pkg", "prints"]
+    )
+    assert events == []
+
+
+def test_package_release_prints_after_the_seat():
+    """package:release runs its COM phase on the seat and its prints phase as the
+    seat-free after_seat step, both through the one cached action."""
+    dodo = _load_dodo()
+    (task,) = list(dodo.task_package())
+    ((action, args, kwargs),) = task["actions"]
+
+    assert action is dodo._cached_com_action
+    assert args[1][-2:] == ["--phase", "com"]
+    assert kwargs["after_seat"][-2:] == ["--phase", "prints"]
+    assert dodo._stage_name("package:release after-seat") == "release"
+
+
 def test_farm_restore_span_names_its_cache_key(monkeypatch):
     """Under ``--executor farm`` the submitter's phases are ``cache.probe`` then
     ``cache.restore`` (the worker publishes, this side downloads). The restore is

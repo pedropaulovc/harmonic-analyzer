@@ -602,7 +602,7 @@ def _stage_name(label: str) -> str:
         return "verify-" + label.split(None, 2)[1]
     if label.startswith("check "):
         return "check-" + label.split(None, 2)[1]
-    if label.startswith("cut release") or label in ("release", "package:release"):
+    if label.startswith(("cut release", "package:release")) or label == "release":
         return "release"
     if label == "preflight":
         return "preflight"
@@ -2103,6 +2103,7 @@ def _cached_com_action(
     outputs: list[Path],
     log_stem: str,
     stamp: str | None = None,
+    after_seat: list[str] | None = None,
 ) -> None:
     """THE one way a COM subprocess runs: remote-cache probe, farm dispatch, or the
     local seat -- for every SolidWorks-touching task (parts, assemblies, drawings,
@@ -2121,7 +2122,13 @@ def _cached_com_action(
     ``cad/out/reports/<gate>.ok`` writes it HERE, after the gate passed, so a failed
     gate leaves no stamp (it stays stale and re-runs) while a cached gate restores
     the stamp instead of reopening the models. Every ``outputs`` path MUST live
-    under ``cad/out`` -- the cache refuses to extract anything else."""
+    under ``cad/out`` -- the cache refuses to extract anything else.
+
+    ``after_seat`` is a SolidWorks-free follow-up command that finishes the
+    outputs once the seat is RELEASED and before they are published (#887: the
+    release prints are CPU-only, and holding the seat through them blocked the
+    next COM task). It runs as its own ``task <label> after-seat`` span; a HIT
+    skips it, since the cached outputs already carry its work."""
     with _telemetry.span(
         f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as probe:
@@ -2148,6 +2155,9 @@ def _cached_com_action(
             _exec_com(cmd, label, log_stem=log_stem)
             if stamp is not None:
                 _write_stamp(label, stamp)
+
+    if after_seat is not None:
+        _run(after_seat, f"{label} after-seat", f"{log_stem}-after-seat", task=label)
 
     # Publish OUTSIDE the seat -- an Azure upload is network, not COM, so it must
     # not hold the seat the next task is waiting for.
@@ -3420,11 +3430,15 @@ def task_package():
                 _cached_com_action,
                 [
                     "package:release",
-                    [sys.executable, str(PACKAGE_NATIVE_PY)],
+                    [sys.executable, str(PACKAGE_NATIVE_PY), "--phase", "com"],
                     deps,
                     [native],
                     "package-release",
                 ],
+                # The release prints (sanitize, text-check, rasterize ~96 PDFs;
+                # 66 s on the 2026-09-25 farm leaf) need no SolidWorks: run them
+                # after the seat is released, before the tree is published.
+                {"after_seat": [sys.executable, str(PACKAGE_NATIVE_PY), "--phase", "prints"]},
             )
         ],
         "clean": True,

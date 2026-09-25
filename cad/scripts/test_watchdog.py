@@ -778,8 +778,9 @@ def test_package_native_arms_the_watchdog_around_the_seat_session_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Armed before attach, disarmed after the seat is released (Pack-and-Go AND
-    the release stamping are inside), and NOT armed for the SolidWorks-free print
-    checks and sidecar write -- the order run_build keeps."""
+    the release stamping are inside) -- the order run_build keeps. The
+    SolidWorks-free prints and sidecar are finish_package's, a separate phase
+    package:release runs after the seat is released (#887)."""
     import package_native
 
     events: list[str] = []
@@ -808,20 +809,9 @@ def test_package_native_arms_the_watchdog_around_the_seat_session_only(
     monkeypatch.setattr(
         package_native, "_release_seat", lambda _sw: events.append("release")
     )
-    monkeypatch.setattr(
-        package_native,
-        "finish_release_prints",
-        lambda *_a: (events.append("prints"), {})[1],
-    )
-    monkeypatch.setattr(
-        package_native,
-        "write_sidecar",
-        lambda *_a, **_k: (events.append("sidecar"), {"solidworks_revision": "34.0"})[1],
-    )
 
     package_native.package_native(out)
 
     assert events == [
         "arm", "attach", "release", "top", "drawings", "stamp", "release", "disarm",
-        "prints", "sidecar",
     ]

@@ -112,7 +112,7 @@ endpoint, so ad-hoc COM code becomes one cache-keyed task, on a branch you
 throw away afterwards. Non-negotiable shape:
 
 1. **Route it through `_cached_com_action(label, cmd, file_deps, outputs,
-   log_stem, stamp=None)`.** It is the only way in (§2).
+   log_stem, stamp=None, after_seat=None)`.** It is the only way in (§2).
 2. **Name it under an admitted prefix.** The worker rejects anything else
    (`execute_rejected`): `part:`, `assembly:`, `drawing:`, `verify:`,
    `verify_soundness:`, `check:`, `package:`, or the bare names `export` /

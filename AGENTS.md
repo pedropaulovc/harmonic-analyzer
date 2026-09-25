@@ -369,7 +369,8 @@ ordering to serialization. See `memory/com-seat-lock.md`.) The one COM-to-COM
 what puts the leaves inside the graph the farm packages.
 
 **Invariant:** there is exactly ONE way to run SolidWorks from a task —
-`_cached_com_action(label, cmd, file_deps, outputs, log_stem, stamp=None)`. It
+`_cached_com_action(label, cmd, file_deps, outputs, log_stem, stamp=None,
+after_seat=None)`. It
 probes the remote cache, dispatches a farm leaf when the executor is `farm`, and
 otherwise takes `_com_seat(...)`, re-probes under the lock, runs `_exec_com` and
 stores the result. `_run`/`_run_stamped` have NO `com` parameter (and no seat
@@ -379,6 +380,10 @@ route it through `_cached_com_action` (a part/assembly/drawing keeps its
 A cache-keyed COM task must therefore declare its inputs as machine-stable
 `file_dep`s and its outputs under `cad/out/`; a gate whose only output is a
 verdict passes its stamp path as `stamp=` and that stamp IS the cached artefact.
+SolidWorks-free work that finishes a COM task's outputs goes in `after_seat=`, a
+command run once the seat is released and before the store: `package:release`
+renders its release prints there (`package_native.py --phase prints`), so no
+other COM task waits behind a CPU-only step.
 This is enforced loud at runtime: a doit-launched build that reaches
 `sw.connect` without `HARMONIC_COM_SEAT` set raises in `_common.run_build` (the
 successor to the removed `_assert_spine_complete` tripwire). The cache RESTORE/STORE

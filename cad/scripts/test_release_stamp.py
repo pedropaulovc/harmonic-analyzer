@@ -17,6 +17,7 @@ document.
 from __future__ import annotations
 
 import ctypes
+import json
 import sys
 from pathlib import Path
 
@@ -605,7 +606,11 @@ def test_package_native_empties_the_seat_before_wiping_the_prepared_tree(
     monkeypatch.setattr(
         package_native, "attach_solidworks", lambda: (events.append("attach"), (object(), "34.0"))[1]
     )
-    monkeypatch.setattr(package_native, "prepare_out", lambda _out: events.append("wipe"))
+    monkeypatch.setattr(
+        package_native,
+        "prepare_out",
+        lambda out: (events.append("wipe"), out.mkdir(parents=True)),
+    )
     monkeypatch.setattr(
         package_native, "package_top_assembly", lambda _sw, _out: (events.append("top"), ())[1]
     )
@@ -618,3 +623,64 @@ def test_package_native_empties_the_seat_before_wiping_the_prepared_tree(
     package_native.package_native(tmp_path / "release" / "native")
 
     assert events == ["attach", "release", "wipe", "top", "release"]
+
+
+def test_the_com_phase_hands_off_and_the_prints_phase_finishes_the_tree(
+    tmp_path: Path, monkeypatch
+):
+    """#887: package_native (the seat phase) stops at a hand-off instead of
+    rendering prints; finish_package (seat-free) renders them, writes the sidecar
+    from the hand-off and removes it, so the published tree never carries it."""
+    out = tmp_path / "release" / "native"
+    sldasm = tmp_path / "sldasm"
+    sldasm.mkdir()
+    (sldasm / f"{package_native.TOP_ASSEMBLY}.SLDASM").write_bytes(b"asm")
+    monkeypatch.setattr(package_native, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(package_native, "OUT_SLDASM", sldasm)
+    monkeypatch.setattr(package_native, "RELEASE_DIR", tmp_path / "release")
+    monkeypatch.setattr(package_native._config, "release_revision", lambda: "v37")
+    monkeypatch.setattr(package_native._watchdog, "start", lambda: None)
+    monkeypatch.setattr(package_native._watchdog, "stop", lambda: None)
+    monkeypatch.setattr(package_native, "attach_solidworks", lambda: (object(), "34.3.0"))
+    monkeypatch.setattr(package_native, "_release_seat", lambda _sw: None)
+    top_source = sldasm / "frame.SLDPRT"
+    monkeypatch.setattr(package_native, "package_top_assembly", lambda _sw, _out: (top_source,))
+    drawing = {"source": "cad/out/sldprt/frame.SLDPRT", "sources": []}
+    monkeypatch.setattr(
+        package_native, "package_drawings", lambda *_a: {"frame": dict(drawing)}
+    )
+    pdf = out / package_native.PDF_SUBDIR / "frame.pdf"
+    monkeypatch.setattr(
+        package_native,
+        "stamp_release",
+        lambda *_a: {"revision": "v37", "trees": {}, "pdfs": {"frame": pdf}},
+    )
+    rendered: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        package_native,
+        "finish_release_prints",
+        lambda _out, revision, pdfs: rendered.append((revision, pdfs))
+        or {"frame": {"pdf": "p", "png": "q"}},
+    )
+
+    package_native.package_native(out)
+
+    handoff = out / package_native.PENDING_NAME
+    assert rendered == [] and handoff.is_file()
+    assert not (out / package_native.SIDECAR_NAME).exists()
+
+    package = package_native.finish_package(out)
+
+    assert rendered == [("v37", {"frame": pdf})]
+    assert not handoff.exists()
+    assert package["cad_revision"] == "v37"
+    assert package["solidworks_revision"] == "34.3.0"
+    assert package["top_assembly_sources"] == ["sldasm/frame.SLDPRT"]
+    assert package["drawings"]["frame"]["png"] == "q"
+    written = json.loads((out / package_native.SIDECAR_NAME).read_text(encoding="utf-8"))
+    assert written["drawings"] == package["drawings"]
+
+
+def test_the_prints_phase_refuses_a_tree_without_a_hand_off(tmp_path: Path):
+    with pytest.raises(RuntimeError, match="run the COM phase"):
+        package_native.finish_package(tmp_path)

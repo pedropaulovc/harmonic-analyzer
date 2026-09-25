@@ -2,7 +2,7 @@ r"""Pack-and-Go the native SolidWorks release tree -- the release's only COM wor
 
 doit task: ``package:release``. Runnable standalone:
 
-    uv run python cad\scripts\package_native.py [--out <dir>]
+    uv run python cad\scripts\package_native.py [--out <dir>] [--phase all|com|prints]
 
 ``cut_release.py`` publishes a release from a machine with NO SolidWorks seat, so
 every SolidWorks document a release opens is opened HERE, on the COM seat (a farm
@@ -32,8 +32,12 @@ saves it, and exports the release PDF from the portable copy.  Every document
 SolidWorks resolves while a copy is open must be that tree's own copy; one
 loaded from anywhere else (the ``cad/out`` original, a sibling source root)
 fails the leaf, because a stamp written through a foreign reference would ship
-unstamped.  The re-exported PDFs are then sanitized, rendered to PNG and
-text-checked offline: every page must name ``vNN`` and none may say ``DEV``.
+unstamped.  That is the COM phase (``--phase com``); it ends by handing its
+facts to ``.native-package.pending.json``.  The prints phase (``--phase
+prints``), which ``package:release`` runs after the seat is released, then
+sanitizes, renders and text-checks the re-exported PDFs offline -- every page
+must name ``vNN`` and none may say ``DEV`` -- and writes the sidecar.  A
+standalone run does both in turn.
 
 ``<out>`` is wiped and recreated on every run, so a rerun can never inherit a
 stale member, and the transient Pack-and-Go ``.zip`` archives are deleted again:
@@ -105,6 +109,10 @@ DRAWING_SUBDIR = "slddrw"
 PDF_SUBDIR = "pdf"
 PNG_SUBDIR = "png"
 SIDECAR_NAME = "native-package.json"
+# The COM phase's hand-off to the seat-free prints phase: everything the sidecar
+# needs that only the seat could produce. Consumed (and deleted) by
+# ``finish_package``, so a published tree never carries it.
+PENDING_NAME = ".native-package.pending.json"
 SIDECAR_SCHEMA = 2
 DRAWING_OUTPUTS = {drawing.name: drawing.outputs for drawing in DRAWINGS}
 # The model each drawing documents (its $PRPSHEET REV source), by filename.
@@ -1073,7 +1081,12 @@ def write_sidecar(
 
 
 def package_native(out: Path) -> dict[str, Any]:
-    """Produce the whole prepared tree + sidecar under ``out``."""
+    """The COM phase: Pack-and-Go and stamp ``out``, then hand off to the prints.
+
+    Everything the seat produces lands in ``out`` plus :data:`PENDING_NAME`; the
+    SolidWorks-free release prints and the sidecar are :func:`finish_package`'s,
+    which ``package:release`` runs AFTER the seat is released (#887), so seat
+    time is COM time only."""
     top = OUT_SLDASM / f"{TOP_ASSEMBLY}.SLDASM"
     if not top.exists():
         raise SystemExit(f"!!  {top} not built -- run doit first")
@@ -1091,17 +1104,49 @@ def package_native(out: Path) -> dict[str, Any]:
         )
     finally:
         _watchdog.stop()
-    prints = finish_release_prints(out, cad_revision, stamped["pdfs"])
+    pending = {
+        "solidworks_revision": revision,
+        "cad_revision": cad_revision,
+        "documents": [_repo_relative(path) for path in documents],
+        "drawings": drawings,
+        "stamped": {
+            **stamped,
+            "pdfs": {name: _repo_relative(pdf) for name, pdf in stamped["pdfs"].items()},
+        },
+    }
+    (out / PENDING_NAME).write_text(
+        json.dumps(pending, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return pending
+
+
+def finish_package(out: Path) -> dict[str, Any]:
+    """The seat-free phase: release prints and the sidecar from the COM hand-off.
+
+    Sanitizes, text-checks and renders every stamped release PDF, then writes
+    ``native-package.json`` and removes the hand-off, so the tree the cache
+    stores is exactly the one the publisher reads."""
+    handoff = out / PENDING_NAME
+    if not handoff.is_file():
+        raise RuntimeError(
+            f"{handoff} is missing -- run the COM phase (--phase com) first"
+        )
+    pending = json.loads(handoff.read_text(encoding="utf-8"))
+    stamped = pending["stamped"]
+    pdfs = {name: REPO_ROOT / path for name, path in stamped["pdfs"].items()}
+    prints = finish_release_prints(out, pending["cad_revision"], pdfs)
     with _telemetry.span("package.sidecar"):
-        return write_sidecar(
+        package = write_sidecar(
             out,
-            revision,
-            documents,
-            drawings,
-            cad_revision=cad_revision,
-            stamped=stamped,
+            pending["solidworks_revision"],
+            tuple(REPO_ROOT / path for path in pending["documents"]),
+            pending["drawings"],
+            cad_revision=pending["cad_revision"],
+            stamped={**stamped, "pdfs": pdfs},
             prints=prints,
         )
+    handoff.unlink()
+    return package
 
 
 def _package_with_seat(
@@ -1159,6 +1204,13 @@ def main() -> int:
         default=NATIVE_DIR,
         help=f"prepared-tree directory (default: {NATIVE_DIR.relative_to(REPO_ROOT)})",
     )
+    ap.add_argument(
+        "--phase",
+        choices=("all", "com", "prints"),
+        default="all",
+        help="com: Pack-and-Go and stamp on the seat; prints: the seat-free release "
+        "prints and sidecar; all (default, standalone): both in turn",
+    )
     opts = ap.parse_args()
 
     out = opts.out.resolve()
@@ -1176,7 +1228,7 @@ def main() -> int:
                 f"!!  --out must be {native} or a new path under {release} -- "
                 f"it is wiped before packaging: {out}"
             ) from None
-        if out.exists():
+        if out.exists() and opts.phase != "prints":
             raise SystemExit(
                 f"!!  --out already exists and is not the dedicated "
                 f"{native} -- refusing to wipe it: {out}"
@@ -1189,11 +1241,13 @@ def main() -> int:
     # run_pipeline_span extracts the TRACEPARENT dodo._run injected (under
     # `doit package:release`), so this COM work continues the doit task span
     # instead of tracing detached.
-    with _telemetry.run_pipeline_span("package_native", out=out.name) as root:
-        _telemetry.info(f"packaging the native release tree into {out}")
+    with _telemetry.run_pipeline_span(
+        "package_native", out=out.name, phase=opts.phase
+    ) as root:
+        _telemetry.info(f"packaging the native release tree into {out} ({opts.phase})")
         started = time.perf_counter()
         try:
-            package = package_native(out)
+            package = _run_phase(opts.phase, out)
         except Exception as exc:
             # Mark the span ERROR before the early return, else the caught failure
             # would exit the span cleanly and trace as success.
@@ -1206,6 +1260,15 @@ def main() -> int:
         _telemetry.info(f"stamped:  {package['cad_revision']}")
         _telemetry.info(f"tree:     {out}")
         return 0
+
+
+def _run_phase(phase: str, out: Path) -> dict[str, Any]:
+    if phase == "com":
+        return package_native(out)
+    if phase == "prints":
+        return finish_package(out)
+    package_native(out)
+    return finish_package(out)
 
 
 if __name__ == "__main__":
