@@ -184,7 +184,6 @@ CASES = (
                         + crankshaft_spec.JOURNAL_LENGTH / 2.0
                     ),
                 ),
-                production_method="BEARING JOURNAL",
             ),
         ),
     ),

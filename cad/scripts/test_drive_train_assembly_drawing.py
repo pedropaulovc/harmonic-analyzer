@@ -195,16 +195,16 @@ def test_explode_plan_refuses_unknown_retired_and_missing_families() -> None:
         spec.plan_explode(census)
 
 
-def test_pending_families_join_the_plan_when_they_land() -> None:
+def test_built_families_are_no_longer_pending() -> None:
+    """A family the builder inserts has landed: it must not stay excused as pending."""
+    assert not _builder_stems() & spec.PENDING_STEMS
+
+
+def test_crank_hub_families_explode_with_the_crank_arm() -> None:
     census = _instances()
-    assert not {i.stem for i in census} & spec.PENDING_STEMS
-    landed = [
-        *census,
-        spec.Instance("crank-hub-1", "crank-hub", (-129.3, 129.9, -170.0)),
-        spec.Instance("crank-hub-pin-1", "crank-hub-pin", (-129.3, 122.0, -170.0)),
-    ]
-    moved = {step.label: names for step, names in spec.plan_explode(landed)}
-    assert "crank-hub-1" in moved["crank arm group"]
+    assert {"crank-hub", "crank-hub-pin"} <= {i.stem for i in census}
+    moved = {step.label: names for step, names in spec.plan_explode(census)}
+    assert {"crank-hub-1", "crank-hub-pin-1"} <= set(moved["crank arm group"])
 
 
 def test_explode_families_are_either_moved_or_stationary_never_both() -> None:

@@ -24,15 +24,13 @@ above the 6.35-mm swing plate fixes the drive plane at y = 90.518):
   journal + crank pedestal, ONE casting riding the swing plate), ABOVE the
   64T (ch30 GT:
   the crank axle triangulates to y 144.8 -- a near-vertical 16T:64T mesh):
-  crank arm + handle at the front and the 16T pinion inboard. (The T12
+  crank arm, separate through hub, handle and 16T pinion inboard. (The T12
   removable crank chain wheel -- ch. 23, the roller chain rides its m2 teeth
   -- is NOT placed here: paper-drive now owns the whole crank->paper chain
   drive, so the single crank wheel lives there, avoiding a duplicate at the
-  top level -- codex #189 :605. MHA-024 IS inserted: MHA-020 and MHA-026
-  retain their coaxial straight pilot holes in this as-machined model, the
-  nominal taper overlaps them as volume-bounded allowed pairs, and the
-  released drawings require their shared 1:48 taper to be match-reamed at
-  assembly.)
+  top level -- codex #189 :605.  Removable MHA-024 crosses hub MHA-137 and
+  shaft MHA-026 behind the arm; axial MHA-138 keys only the arm/hub seam at
+  six o'clock.)
 * alignment pinion (ch. 25): the 32T zeroing drum + its swing rig, parked
   DISENGAGED, inboard of the drum and level with the drive axis (GT).
 
@@ -111,15 +109,14 @@ the horizontal mesh; see the derivation at the constant).
 Mated-DOF strategy (M6 operation simulation): the structure -- the
 stationary arbor and the pedestals -- is grounded; the swing platform
 is floated (its riders seat on it and follow the p1 swing); the crank
-chain, the cone cluster and the 20 cylinder
-gears are inserted on their exact machine transforms (so mate
-flip-recovery has a clean reference and the tuned tooth phases are
-preserved) and joined by real kinematic joints. The crankshaft and the
-cone shaft each get a revolute (coincident axis-to-axis + an axial plane
-distance); the crank arm/handle/T12 wheel/16T pinion are keyed to the
-crankshaft and the 64T + 20 cone gears keyed to the cone shaft (lock
-mates); a 16T:64T gear mate drives the cone cluster from the crank, and
-each cylinder gear meshes its cone gear k at ratio [120-6k : 120]. The
+chain, the cone cluster and the 20 cylinder gears are inserted on their
+exact machine transforms, so mate flip-recovery has a clean reference and
+the tuned tooth phases are preserved, then joined by real kinematic joints.
+The crankshaft and cone shaft each get a revolute; the crank hub, arm,
+handle and 16T pinion are keyed to the crankshaft, while the 64T and 20 cone
+gears are keyed to the cone shaft. A 16T:64T gear mate drives the cone cluster
+from the crank, and each cylinder gear meshes its cone gear k at ratio
+[120-6k : 120]. The
 gear mate is each cylinder gear's sole rotational constraint, so it
 holds the cosine-setup phase without nudging the gear. The whole train
 is left with exactly ONE operational DOF -- the crank angle.
@@ -485,39 +482,51 @@ ARBOR_LENGTH = 187.0  # north end at z +132.415: 7.5 seated in the NORTH
 # base-standing north clamp restored as a second, mirrored pedestal with its
 # foot just clear of the rocker-arm-support footprint). Must match
 # cylinder-gear-shaft SHAFT_LENGTH; the pedestal geometry is asserted below.
-CRANKSHAFT_Z0 = -175.0  # outboard (crank) end (was -160: the crank plane moved
-# south with the ch30 GT re-read -- arm hub -175..-167, GT axle bolt -189 +- 2.7)
-CRANKSHAFT_LENGTH = 122.0  # 2026-09 re-derive: -175..-53 ends 6.2 past the
-# 16T pinion's north face (-59.2) -- ch12 page002_img02 shows a short capped
-# end right behind the pinion, not a 34 mm bare stub out the column's back.
-CRANK_ARM_Z0 = CRANKSHAFT_Z0  # arm PLATE south face: the hub band is
-# -175..-167 at the shaft's south end, in FRONT of (south of) the T12 chain
-# wheel (-157.5..-152.5): the arm + the handle (its grip extends -Z, further
-# south) then sweep entirely south of the chain plane (-155) and cannot foul
-# the chain when the crank turns (user, book p005). The placed pose composes a
-# Ry(180) (the plate's local +z extrusion runs machine -z), so the component
-# ORIGIN sits at the north face -- see CRANK_ARM_ORIGIN_Z.
+from crank_hub_geometry import (  # noqa: E402
+    AXIAL_PIN_LENGTH,
+    AXIAL_PIN_RADIUS_FROM_AXIS,
+    HUB_BARREL_DIA,
+    HUB_LENGTH,
+    HUB_SEAT_LENGTH,
+)
 from crank_arm_spec import (  # noqa: E402
     ANCHOR_HOLE_SPEC,
     ANCHOR_SCREW_X,
     ANCHOR_SCREW_Y,
-    ANCHOR_THREAD_DEPTH,
     ARM_C2C,
     ARM_THICKNESS,
     ARM_WIDTH,
 )
-from crankshaft_spec import PIN_HOLE_HEIGHT  # noqa: E402  # 75: handle pivot from the
+from crankshaft_spec import PIN_HOLE_HEIGHT  # noqa: E402
 
-# shaft axis (2026-09 front-view re-derive, see crank_arm_spec; was 66 from the
-# perspective-magnified side view, 150 before that)
-REMOVABLE_Z0 = -157.5  # mounted T12 (face 5.0): band -157.5..-152.5, mid -155 =
-# the front chain plane (ch30 GT: solved-camera z-ticks bracket the physical
-# chain run at -153 +- 3), between the merged crank column (south flank -98.6,
-# even at the disengaged swing) and the crank arm (-175..-167). The plane
-# clears the paper-drive stub disc
-# (-134.5..-137.5) by 15; the arm sits 9.5 SOUTH of the wheel so the rotating
-# arm/handle never crosses it. The small removable gear is the chain wheel
-# (ch. 23 -- bead chain on its m2 teeth; v2_gears_010).
+CRANK_FACE_Z = -183.0
+CRANKSHAFT_Z0 = CRANK_FACE_Z
+CRANKSHAFT_LENGTH = 130.0
+CRANK_ARM_Z0 = CRANK_FACE_Z
+CRANK_HUB_Z0 = CRANK_FACE_Z
+CRANK_ARM_ORIGIN_Z = CRANK_ARM_Z0 + ARM_THICKNESS
+CRANK_HUB_REAR_Z = CRANK_HUB_Z0 + HUB_LENGTH
+CRANK_HUB_PIN_ORIGIN = [
+    X_CRANK,
+    Y_CRANK - AXIAL_PIN_RADIUS_FROM_AXIS,
+    CRANK_FACE_Z,
+]
+# The +8-mm crank-face shift is matched by +8 in the shaft's local stations,
+# preserving the T12, pinion, bearing and far-end world positions.  The arm
+# occupies -183..-175, the hub continues behind it to -163, and the shaft
+# cylinder begins flush at -183; only its integral dome projects outboard.
+if abs(CRANK_ARM_ORIGIN_Z - (CRANK_FACE_Z + HUB_SEAT_LENGTH)) > 1e-9:
+    raise AssertionError("arm inboard face left the hub shoulder station")
+
+# T12 remains on its established world station after the crank-face shift.
+REMOVABLE_Z0 = -157.5  # mounted T12 band -157.5..-152.5, centre -155
+# This is the front chain plane (ch30 GT: solved-camera z-ticks bracket the
+# physical chain run at -153 +- 3), between the merged crank column and the
+# arm/hub cluster.  The separate hub ends at -163, leaving 5.5 axial air.
+if abs(REMOVABLE_Z0 - CRANK_HUB_REAR_Z - 5.5) > 1e-9:
+    raise AssertionError("crank hub rear/T12 air gap drifted")
+# The small removable gear is the chain wheel (ch. 23 -- bead chain on its
+# m2 teeth; v2_gears_010).
 ARBOR_PEDESTAL_Z = 90.5 - MECHANISM_Z_SHIFT
 # Its complete footing follows the translated cylinder/arbor family.
 ARBOR_PEDESTAL_NORTH_Z = 97.5 + MECHANISM_Z_SHIFT
@@ -577,19 +586,15 @@ if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
     raise AssertionError("crankshaft too short for the M6.7 pinion station")
 # The crankshaft's named seat datums (the flip-free coincident seats for the
 # keyed chain -- see _seat_on_crank) must sit exactly at this module's
-# authored stations.
-from _hole_spec import DRILL_POINT_H, blind_cut_dia_mm  # noqa: E402
+# authored stations.  Hub and arm seat to one another at the shaft origin.
 from build_crankshaft import (  # noqa: E402
-    SEAT_ARM as CS_SEAT_ARM,
     SEAT_PINION as CS_SEAT_PINION,
     SEAT_T12 as CS_SEAT_T12,
     SHAFT_LENGTH as CS_SHAFT_LENGTH,
 )
 
-CRANK_ARM_ORIGIN_Z = CRANK_ARM_Z0 + ARM_THICKNESS  # the arm origin's world z
 # Crank taper pin + keeper ring (ch11 p.14): pin axis along machine X through
-# the arm hub's mid-thickness (= the crankshaft's PIN_HOLE_HEIGHT above its
-# outboard end), big end PIN_PROUD outside the hub's -X face.
+# MHA-137's rear barrel and the crankshaft at station 12, behind the arm.
 from crank_pin_spec import (  # noqa: E402
     PIN_LENGTH as CRANK_PIN_LENGTH,
     RING_HOLE_DIA as PIN_RING_HOLE_DIA,
@@ -608,17 +613,19 @@ from build_fillister_screw import (  # noqa: E402
 
 CRANK_RING_ARM_CLEARANCE = 0.25
 PIN_PROUD = PIN_RING_HOLE_X + CRANK_RING_WIRE_DIA / 2.0 + CRANK_RING_ARM_CLEARANCE
-CRANK_PIN_Z = CRANK_ARM_Z0 + ARM_THICKNESS / 2.0  # -171: hub mid-thickness
-CRANK_PIN_X0 = X_CRANK - ARM_WIDTH / 2.0 - PIN_PROUD  # big end, -X of the hub
+CRANK_PIN_Z = CRANK_FACE_Z + PIN_HOLE_HEIGHT  # -171: behind the 8-mm arm
+CRANK_PIN_X0 = X_CRANK - HUB_BARREL_DIA / 2.0 - PIN_PROUD
 # The ring lies in machine YZ. Its straight local-Z leg is concentric with the
 # pin's machine-Z cross-hole; its bends and return hang toward machine -Y.
 CRANK_RING_Y = Y_CRANK
 if (PIN_RING_HOLE_DIA - CRANK_RING_WIRE_DIA) / 2.0 < 0.1:
     raise AssertionError("keeper-ring wire does not clear the crank-pin cross-hole")
 if abs((CRANKSHAFT_Z0 + PIN_HOLE_HEIGHT) - CRANK_PIN_Z) > 1e-6:
-    raise AssertionError("crankshaft cross-hole is not at the arm hub's mid-thickness")
-if CRANK_PIN_X0 + CRANK_PIN_LENGTH < X_CRANK + ARM_WIDTH / 2.0 + 2.0:
+    raise AssertionError("shaft and hub MHA-024 stations do not coincide")
+if CRANK_PIN_X0 + CRANK_PIN_LENGTH < X_CRANK + HUB_BARREL_DIA / 2.0 + 2.0:
     raise AssertionError("crank pin does not run out the far side of the hub")
+if abs(AXIAL_PIN_LENGTH - ARM_THICKNESS / 2.0) > 1e-9:
+    raise AssertionError("MHA-138 no longer has half-arm-thickness engagement")
 # Keeper-ring anchor (ch11 p.14): the arm's front (south, machine -z) face is
 # CRANK_ARM_Z0; arm local (x, y) -> machine (X_CRANK - y, Y_CRANK - x) (the
 # placed rows: local +x -> -Y, local +y -> -X). The brass eyelet lies flat on
@@ -636,22 +643,17 @@ EYE_CENTER_Y = ANCHOR_SCREW_XY[1] - (
     ANCHOR_SCREW_SHANK_DIA / 2.0 + ANCHOR_AIR + EYE_TAIL_LEN + EYE_LOOP_R
 )
 ANCHOR_THREAD_ENGAGEMENT = ANCHOR_HEAD_Z + ANCHOR_SCREW_SHANK_LEN - CRANK_ARM_Z0
-ANCHOR_BOTTOM_CLEARANCE = ANCHOR_HOLE_SPEC.depth_mm - ANCHOR_THREAD_ENGAGEMENT
-ANCHOR_BACK_WALL = ARM_THICKNESS - (
-    ANCHOR_HOLE_SPEC.depth_mm + blind_cut_dia_mm(ANCHOR_HOLE_SPEC) / 2.0 * DRILL_POINT_H
-)
-if ANCHOR_THREAD_ENGAGEMENT > ANCHOR_THREAD_DEPTH:
-    raise AssertionError("anchor screw bottoms in the crank arm's tap")
+# The #4-40 is tapped THRU the arm (rule 12, W7): nothing to bottom on; the
+# screw tip must stay short of the inboard face.
+ANCHOR_TIP_RESERVE = ARM_THICKNESS - ANCHOR_THREAD_ENGAGEMENT
+if ANCHOR_HOLE_SPEC.end != "through_all":
+    raise AssertionError("crank-arm anchor tap is no longer through the arm")
 if ANCHOR_THREAD_ENGAGEMENT < 2.0:
     raise AssertionError("anchor screw has under 2.0 thread engagement in the arm")
-if ANCHOR_BOTTOM_CLEARANCE < 0.5:
-    raise AssertionError("anchor screw has under 0.5 clearance to the drill shoulder")
-if ANCHOR_BACK_WALL < 0.5:
-    raise AssertionError("anchor tap drill leaves under 0.5 back-face wall")
-# = the plate's NORTH face (-167): the placed rows compose a Ry(180), so the
-# +z-extruded plate fills CRANK_ARM_Z0..here running machine -z from the
-# origin. Both the place_component z and the crankshaft's SeatArm datum
-# station (asserted below) use THIS value.
+if ANCHOR_TIP_RESERVE < 0.5:
+    raise AssertionError("anchor screw tip stands within 0.5 of the arm's inboard face")
+# The plate origin is its inboard face (-175): the Ry(180)-composed pose maps
+# the +z extrusion toward machine -z, filling the arm from -175 to -183.
 
 if abs(CS_SHAFT_LENGTH - CRANKSHAFT_LENGTH) > 1e-9:
     raise AssertionError("crankshaft part length does not cover the moved pinion")
@@ -659,8 +661,6 @@ if abs((CRANKSHAFT_Z0 + CS_SEAT_T12) - REMOVABLE_Z0) > 1e-6:
     raise AssertionError("crankshaft SeatT12 datum off the REMOVABLE_Z0 station")
 if abs((CRANKSHAFT_Z0 + CS_SEAT_PINION) - (PINION_TOOTH_Z - PINION_FACE / 2.0)) > 1e-6:
     raise AssertionError("crankshaft SeatPinion datum off the 16T station")
-if abs((CRANKSHAFT_Z0 + CS_SEAT_ARM) - CRANK_ARM_ORIGIN_Z) > 1e-6:
-    raise AssertionError("crankshaft SeatArm datum off the arm origin station")
 # Pinion retention pin (ch12 p.19): a plain 1/8 in straight pin through the
 # pinion's hub boss and the crankshaft, match-drilled at assembly. The hole is
 # on the pinion's local -X at the boss's mid-length; the crankshaft's hole is
@@ -1936,19 +1936,20 @@ for _lo, _hi, _what in (
     (PIVOT_SHAFT_Z0, PIVOT_SHAFT_Z0 + RIG.TORQUE_SHAFT_LEN, "pivot shaft"),
     (APINION_Z_FRONT - STRAP_T - STRAP_AIR, APINION_Z_FRONT, "front strap"),
     (REMOVABLE_Z0, REMOVABLE_Z0 + 5.0, "T12 chain wheel"),
-    (CRANK_ARM_Z0, CRANK_ARM_Z0 + ARM_THICKNESS, "crank arm hub"),
+    (CRANK_ARM_Z0, CRANK_ARM_Z0 + ARM_THICKNESS, "crank arm"),
+    (CRANK_HUB_Z0, CRANK_HUB_REAR_Z, "crank hub"),
 ):
     if _GRIP_ROD_Z[1] > _lo - 0.25 and _GRIP_ROD_Z[0] < _hi + 0.25:
         raise AssertionError(f"grip-crossrod sweep band reaches the {_what}")
 # The head's wider z band clips the T12 plane, so use radial clearance instead.
-# The crank-arm/handle sweep is axially disjoint from the integral head.
+# The crank arm/hub/handle sweep is axially disjoint from the integral head.
 if (
     math.hypot(X_CRANK - APINION_X, Y_CRANK - APINION_Y)
     < ARBOR_HEAD_DIA / 2.0 + 16.0 + 0.25
 ):  # T12 OD/2 ~14 + margin
     raise AssertionError("integral grip head reaches the T12 chain wheel")
-if _GRIP_HEAD_Z[0] < CRANK_ARM_Z0 + ARM_THICKNESS + 0.25:
-    raise AssertionError("integral grip-head band reaches the crank arm sweep")
+if _GRIP_HEAD_Z[0] < CRANK_HUB_REAR_Z + 0.25:
+    raise AssertionError("integral grip-head band reaches the crank hub")
 
 # Lever full throw: sample the solved cam-contact path from the photographed
 # +10-degree parked pose to about -72 degrees engaged.  Clearance improves
@@ -2104,6 +2105,7 @@ for _want, _have in zip(_FOOT_SCREW_XZ, BASE_FOOT_XZ, strict=True):
 
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+CRANK_HUB_PIN_ROWS = IDENTITY
 ROT_X_POS90 = [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]]
 ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
 # Cam-follower pin pose (PR8): part +Z (root -> dome) -> WEST along -N,
@@ -2228,7 +2230,7 @@ async def _key_to_shaft(
         adapter,
         named_ref(f"Right Plane@{part}", "PLANE"),
         named_ref(f"Right Plane@{shaft}", "PLANE"),
-        label=f"{label} anti-spin (keyed phase)",
+        label=f"{label} anti-spin",
         verify=(part, p_o),
     )
 
@@ -2242,17 +2244,13 @@ async def _seat_on_crank(
     seat_plane,
     alignment: str = "closest",
 ) -> list[float]:
-    """Journal a crank-chain part on the crankshaft via SEMANTIC mates: coaxial
-    on the crank axis + an axial seat -- the part's Z-normal Front plane
-    COINCIDENT to the crankshaft's named seat datum ('SeatT12'/'SeatPinion'/
-    'SeatArm'). Coincident replaces the old
-    UNSIGNED plane-plane distance, whose two solution branches let the free-
-    spinning crank family reflect about the shaft origin on a re-solve: the
-    16T rendered floating ~200 south of its seat with every gate green
-    (render-gate catch, 2026-07-04). The seat must reference the crankshaft,
-    NOT a world datum (a world plane pins the crank axis to machine z and
-    through it the whole p1 swing). Leaves ONLY spin -- the caller pins it
-    with a per-part anti-spin. Returns the part's live origin."""
+    """Journal a keyed crank part with semantic mates.
+
+    The part is coaxial on the crank axis and its Z-normal Front plane seats
+    coincident to a named crankshaft datum (SeatT12 or SeatPinion).  Coincident
+    avoids the reflected branch of an unsigned plane distance.  The caller
+    supplies the anti-spin, leaving only the shared crank rotation.
+    """
     o = _org(adapter, part)
     await coincident_mate(
         adapter,
@@ -2776,20 +2774,36 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="crank-pinion (centred on the 64T contact tooth)",
     )
+    hub = await place_component(
+        adapter,
+        "crank-hub",
+        [X_CRANK, Y_CRANK, CRANK_HUB_Z0],
+        [90.0, 0.0, 0.0],
+        ROT_X_POS90,
+        ground=False,
+        label="MHA-137 through hub",
+    )
+    seam_pin = await place_component(
+        adapter,
+        "crank-hub-pin",
+        CRANK_HUB_PIN_ORIGIN,
+        [0.0, 0.0, 0.0],
+        CRANK_HUB_PIN_ROWS,
+        ground=False,
+        label="MHA-138 six-o'clock axial seam pin",
+    )
     # The crank-end T12 chain wheel is NOT placed here: paper-drive now OWNS the
     # whole crank->paper chain drive (both sprockets + roller chain + belt), so the
     # single crank chain wheel lives in paper-drive (codex #189 :605). Placing it
     # here too made two coincident T12 wheels at the crank centre once both
-    # subassemblies are inserted at the top level -> interference. drive-train keeps
-    # only the crankshaft, arm, handle and 16T pinion; the crank spin DOF is
-    # unchanged (crankshaft/arm, free_dof_key="crank_angle").
+    # subassemblies are inserted at the top level -> interference. Drive-train
+    # keeps the shaft, hub, arm, handle, both crank pins and 16T pinion; the
+    # crank spin DOF remains keyed through the arm.
     # Crank rest pose: the arm hangs straight DOWN (ch30 eight-views -- the
     # handle reads "down" in all eight roll angles, which only a -Y arm does,
     # since a downward vector lies on the views' vertical rotation axis). The
-    # arm part extrudes along its local +X; rot_z(-90) maps that to assembly
-    # -Y, and the composed Ry(180) flips the plate's local +z extrusion to run
-    # machine -z: the origin sits at the plate's NORTH face
-    # (CRANK_ARM_ORIGIN_Z, -167) with the plate band filling -175..-167.
+    # arm's local +x maps to machine -Y, while local +z maps toward machine -Z;
+    # its origin is the inboard face at -175 and the plate fills -183..-175.
     arm = await place_component(
         adapter,
         "crank-arm",
@@ -2798,14 +2812,12 @@ async def build(adapter) -> dict[str, str]:
         compose_rows(rot_z_rows(-90.0), ROT_Y_180),
         ground=False,
     )
-    # Taper pin (2026-09-02, ch11 p.14): through the arm hub + the crankshaft
-    # cross-hole along machine X at the arm's mid-thickness, big end PIN_PROUD
-    # proud of the hub's outer (-X) face, the small end running out the far
-    # side; the brass keeper ring hangs from the head's cross-hole (0.25 air
-    # under the hole's bottom edge). Both lock to the arm so they spin with the
-    # crank. The pin's nominal taper is larger than the arm's #14 / shaft's #9
-    # pilot holes (they are taper-reamed together at assembly), so the two
-    # overlaps are volume-bounded allowed pairs in _interference_contracts.
+    # Taper pin MHA-024 crosses the separate hub's rear barrel and crankshaft
+    # at station -171, behind the arm.  Its big end stands PIN_PROUD outside
+    # the hub's -X face; the brass keeper ring hangs from the head cross-hole.
+    # The hub #14 and shaft #9 pilots are match-reamed together to the pin's
+    # 1:48 taper, so those two overlaps alone are volume-bounded allowed pairs
+    # in _interference_contracts.
     pin = await place_component(
         adapter,
         "crank-pin",
@@ -2818,8 +2830,8 @@ async def build(adapter) -> dict[str, str]:
     await lock_mate(
         adapter,
         named_ref(f"Front Plane@{pin}", "PLANE"),
-        named_ref(f"Front Plane@{arm}", "PLANE"),
-        label="crank pin locked to the arm",
+        named_ref(f"Front Plane@{hub}", "PLANE"),
+        label="MHA-024 locked to the crank hub",
     )
     ring = await place_component(
         adapter,
@@ -2929,12 +2941,11 @@ async def build(adapter) -> dict[str, str]:
         label=f"crankshaft axial d={_cs_axial:.2f} (on the plate)",
         verify=(crankshaft, cs_o),
     )
-    # Keyed crank rig: the 16T pinion and the arm turn rigidly WITH the crankshaft;
-    # the handle rides the arm's pivot pin. Each lock is replaced by a SEMANTIC
-    # keyed joint -- coaxial + axial seat + an anti-spin -- so they share the
-    # crankshaft's single spin DOF with no lock/fix. The suppressible crank ANGLE
-    # DRIVER below pins that spin (via the arm). (The T12 chain wheel that used to
-    # be keyed here now lives in paper-drive -- codex #189 :605.)
+    # Keyed crank rig: the 16T pinion, separate hub and matched arm rotate with
+    # the crankshaft; the handle rides the arm pivot.  Semantic coaxial, axial
+    # seat and anti-spin mates retain the single crankshaft spin DOF without
+    # grounding the swing rig.  The suppressible crank angle driver below pins
+    # that spin via the arm.  The T12 chain wheel lives in paper-drive.
     crank_axis = named_ref(f"Axis1@{crankshaft}", "AXIS")
     cs_right = named_ref(f"Right Plane@{crankshaft}", "PLANE")
 
@@ -2960,27 +2971,85 @@ async def build(adapter) -> dict[str, str]:
         verify=(pinion, pn_o),
     )
 
-    # Crank arm (rest pose -Y, rot_z -90): its Top plane is parallel to the
-    # crankshaft's Right at the keyed phase. The crank angle driver below pins the
-    # arm -- hence the whole keyed chain -- to the assembly.
-    # The arm's Ry(180)-composed pose turns its Front normal to machine -z
-    # against SeatArm's +z: the seat holds at the as-built pose only
-    # ANTI-aligned. Pin it explicitly rather than trust CLOSEST.
-    arm_o = await _seat_on_crank(
+    # MHA-137 seats directly on the shaft's common outboard plane.  The
+    # through bore leaves the service pair removable after MHA-024 is tapped
+    # out; the Right-plane anti-spin represents that installed taper pin.
+    hub_o = _org(adapter, hub)
+    hub_axis = named_ref(f"Axis1@{hub}", "AXIS")
+    await coincident_mate(
         adapter,
-        arm,
-        "Axis1",
+        hub_axis,
         crank_axis,
-        crankshaft,
-        "SeatArm",
-        alignment="anti_aligned",
+        label="MHA-137 coaxial on crankshaft",
+        verify=(hub, hub_o),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"Top Plane@{hub}", "PLANE"),
+        named_ref(f"Top Plane@{crankshaft}", "PLANE"),
+        label="MHA-137 flush on shaft cylinder face",
+        alignment="aligned",
+        verify=(hub, hub_o),
     )
     await parallel_mate(
         adapter,
-        named_ref(f"Top Plane@{arm}", "PLANE"),
+        named_ref(f"Right Plane@{hub}", "PLANE"),
         cs_right,
-        label="crank-arm anti-spin (keyed phase)",
+        label="MHA-137 anti-spin (MHA-024)",
+        verify=(hub, hub_o),
+    )
+
+    # MHA-020 is a matched light press fit onto the 15-mm hub seat and butts
+    # against ArmShoulder at local station 8.  Its local +x hangs machine -Y,
+    # putting the seam at six o'clock.
+    arm_o = _org(adapter, arm)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{arm}", "AXIS"),
+        hub_axis,
+        label="crank arm matched on MHA-137 seat",
         verify=(arm, arm_o),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"Front Plane@{arm}", "PLANE"),
+        named_ref(f"ArmShoulder@{hub}", "PLANE"),
+        label="crank arm inboard face on hub shoulder",
+        alignment="anti_aligned",
+        verify=(arm, arm_o),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{arm}", "PLANE"),
+        named_ref(f"Front Plane@{hub}", "PLANE"),
+        label="crank arm six-o'clock phase on hub",
+        verify=(arm, arm_o),
+    )
+
+    # MHA-138 runs axially from the common outboard face for 4 mm and keys only
+    # the arm/hub seam; it never crosses the shaft bore.
+    seam_o = _org(adapter, seam_pin)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{seam_pin}", "AXIS"),
+        named_ref(f"Axis2@{hub}", "AXIS"),
+        label="MHA-138 coaxial with six-o'clock seam",
+        verify=(seam_pin, seam_o),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"Front Plane@{seam_pin}", "PLANE"),
+        named_ref(f"Top Plane@{hub}", "PLANE"),
+        label="MHA-138 seated at outboard face",
+        alignment="aligned",
+        verify=(seam_pin, seam_o),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{seam_pin}", "PLANE"),
+        named_ref(f"Right Plane@{hub}", "PLANE"),
+        label="MHA-138 rotational closure",
+        verify=(seam_pin, seam_o),
     )
 
     # Crank handle: rides the arm's PIVOT pin (Axis2@arm), NOT the crankshaft --
@@ -3009,8 +3078,8 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Right Plane@{handle}", "PLANE"),
         named_ref(f"HandleSeat@{arm}", "PLANE"),
         label="handle axial seat on arm south face (coincident, flip-free)",
-        # Both normals read machine -z (Ry(180)-composed poses): pin the
-        # alignment rather than trust CLOSEST (see the SeatArm note above).
+        # Both normals read machine -z in the composed handle/arm poses; pin
+        # the alignment rather than trusting the closest-solution heuristic.
         alignment="aligned",
         verify=(handle, hd_o),
     )

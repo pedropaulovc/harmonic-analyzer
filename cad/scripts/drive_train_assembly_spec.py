@@ -17,10 +17,10 @@ from typing import Literal, Sequence
 EXPLODED_VIEW_NAME = "DRIVE_TRAIN_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
 
-# Families still arriving from a sibling branch (crank-hub cluster MHA-137/138,
-# #831). They are classified now so the integration head needs no plan edit;
-# an absent pending family is not an error.
-PENDING_STEMS = frozenset({"crank-hub", "crank-hub-pin"})
+# Families still arriving from a sibling branch, classified ahead of time so
+# the integration head needs no plan edit; an absent pending family is not an
+# error. Empty since the crank-hub cluster (MHA-137/138, #831) landed.
+PENDING_STEMS: frozenset[str] = frozenset()
 # Retired by the integral-arbor ruling (U11); refused if it reappears.
 RETIRED_STEMS = frozenset({"pinion-handle-pin"})
 

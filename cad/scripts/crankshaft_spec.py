@@ -2,32 +2,43 @@ r"""Pure-data dimensional contract shared by the crankshaft and its drawing."""
 
 from __future__ import annotations
 
-from _hole_spec import HoleSpec
+from _hole_spec import HoleSpec, drill_process
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from crank_hub_geometry import (
+    CRANK_FACE_SHIFT,
+    FIDUCIAL_MODEL_DEPTH,
+    FIDUCIAL_MODEL_DIA,
+    SERVICE_PIN_STATION,
+    SHAFT_DIA,
+    SHAFT_DIA_BAND,
+    SHAFT_DOME_HEIGHT,
+    SHAFT_FIDUCIAL_RADIUS,
+)
 
 
-MM_PER_IN = 25.4
+SHAFT_LENGTH = 122.0 + CRANK_FACE_SHIFT
+# The common arm/hub/shaft cylinder face moved 8 mm outboard.  Adding the same
+# shift to all inboard stations preserves every established bearing, T12 and
+# pinion world interface and keeps the far end at its prior world coordinate.
 
-SHAFT_DIA = 0.375 * MM_PER_IN  # 9.525: ch11 legacy ShaftDiameter, uncontradicted
-SHAFT_DIA_BAND = (0.00, -0.02)  # (upper, lower) deviations
-SHAFT_LENGTH = 122.0  # 2026-09 re-derive: ends 6.2 past the 16T pinion's north
-# face (ch12 page002_img02 shows a short capped end right behind the pinion,
-# not the 34 mm bare stub the 150 left poking out the column's back)
-
-# The installed v2 pivot post is turned end-for-end and remains fixed at its
-# ch30-fitted world placement. Its Ø11.438 bore therefore spans world
-# z -142.244894428..-70.210494428.  The crank/chain plane stays photo-anchored
-# at the existing world z=-175 shaft origin, so the integral running journal
-# occupies these local stations.  The 0.05 mm diametral clearance is
-# intentional; the surrounding shaft remains
-# the existing 3/8-in OD for the T12, pinion, and crank-arm fits.
+# The installed v2 pivot post remains fixed.  Its Ø11.438 bore spans world
+# z -142.244894428..-70.210494428.  Moving the common crank face from -175 to
+# -183 and adding the same 8 mm to local stations leaves that journal, the T12
+# and the pinion in their established world positions.
+# The 0.05-mm journal clearance is intentional; the surrounding shaft remains
+# the existing 3/8-in OD for the T12, pinion and through-hub fits.
 JOURNAL_BORE_DIA = 11.438
 JOURNAL_CLEARANCE = 0.05
 JOURNAL_DIA = JOURNAL_BORE_DIA - JOURNAL_CLEARANCE
 JOURNAL_DIA_BAND = (0.00, -0.02)  # (upper, lower) deviations
-JOURNAL_START = 32.755105572
-JOURNAL_END = 104.789505572
+JOURNAL_START = 32.755105572 + CRANK_FACE_SHIFT
+# The post bore ends 0.25 short of the pinion seat (station 113.04), too
+# narrow a land to turn.  The journal stops at 110.2 instead: a 2.84 land,
+# still 2.0 at the .X band on its far-end station, and the last 2.6 of the
+# bore rides over the Ø9.525 shaft (96% of the bore still bears).  No gear,
+# bearing or seat moves.
+JOURNAL_END = 110.2
 JOURNAL_LENGTH = JOURNAL_END - JOURNAL_START
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -37,44 +48,63 @@ SURFACE_FINISHES = (
             JOURNAL_DIA,
             contains_y_mm=JOURNAL_START + JOURNAL_LENGTH / 2.0,
         ),
-        production_method="BEARING JOURNAL",
     ),
 )
-# Tapered-pin cross-hole: a native number drill radially through the crank seat
-# (axis along Z).
+# MHA-024 hub-to-shaft cross-hole behind the crank arm.
 PIN_HOLE_SPEC = HoleSpec("drilled_number", "#9")
-PIN_HOLE_HEIGHT = 4.0  # arm mid-plane above the outboard end
+PIN_HOLE_HEIGHT = SERVICE_PIN_STATION
 
+# Every printed axial station is a baseline from ONE origin: the FAR END, the
+# one faced end the shop zeroes on (policy rule 7).  The features themselves
+# measure from the dome root, so the far-end stations, the overall and the
+# dome's spherical radius live on a construction-only StationReference sketch
+# driven by the same globals (no geometry).  Depth (far end to dome root) and
+# DomeHeight complete the chain; the overall and SR are references.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDiaDim"},
     "Shaft": {"Depth"},
-    "JournalStartPlane": {"JournalStart"},
+    "ShaftDomeProfile": {"DomeHeight"},
     "JournalProfile": {"JournalDiaDim"},
-    "Journal": {"JournalLength"},
+    "StationReference": {
+        "OverallLength",
+        "JournalInboardStation",
+        "JournalOutboardStation",
+        "PinHoleStation",
+        "DomeSphereRadius",
+    },
 }
-# The cross-hole's Ø/THRU callout comes from the associative native Hole Wizard
-# annotation. Its axial station is a drawing-native basic dimension from the
-# crank-end face to the hole axis.
-
-# Lines kept short (<~66 chars) so the left-anchored block stays clear of the
-# title block (x >= 0.264 m); it grows DOWNWARD from its anchor.
-DRAWING_NOTES = "\n".join(
-    (
-        "THE CROSS-HOLE CALLOUT IS THE FINISHED SIZE FOR THIS PART.",
-        "MATCH-REAM WITH CRANK ARM MHA-020 TO FIT CUSTOM TAPER PIN",
-        "MHA-024; ASSEMBLY OPERATION OUTSIDE THIS PART DRAWING.",
-        f"DIA {JOURNAL_DIA:.3f} BEARING JOURNAL RUNS IN DIA",
-        f"{JOURNAL_BORE_DIA:.3f} POST BORE: "
-        f"{JOURNAL_CLEARANCE:.2f} DIAMETRAL CLEARANCE.",
-        "KEEP DIA 9.525 ON T12, PINION, AND CRANK-ARM SEATS.",
-    )
-)
-END_VIEW_NOTE = "CRANK-END VIEW SCALE 2:1"
-CRANK_END_NOTE = "CRANK / OUTBOARD END = LOWER END OF LENGTH VIEW"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "end-face perpendicularity": "0.05",
-    "cross-hole true position": "0.20",
+# Decimal places ARE the tolerance (policy rule 2).  The two diameters are
+# functional fits and keep their three-place size bands; every length on this
+# hand-cranked shaft is routine (.X).
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "ShaftProfile": {"ShaftDiaDim": 3},
+    "Shaft": {"Depth": 1},
+    "ShaftDomeProfile": {"DomeHeight": 1},
+    "JournalProfile": {"JournalDiaDim": 3},
+    "StationReference": {
+        "OverallLength": 1,
+        "JournalInboardStation": 1,
+        "JournalOutboardStation": 1,
+        "PinHoleStation": 1,
+        "DomeSphereRadius": 1,
+    },
 }
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
+}
+if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
+    raise AssertionError("every marked crankshaft dimension needs authored places")
+# Read-only restatements: the overall is Depth + DomeHeight, and a spherical
+# cap of DomeHeight on the Ø9.525 end already fixes its radius.
+REFERENCE_DIMENSIONS = frozenset({"OverallLength", "DomeSphereRadius"})
+SPHERICAL_DIMENSIONS = frozenset({"DomeSphereRadius"})
+
+# The native cross-hole callout's process prefix: the drill reads first; the
+# taper-ream prose under it lives in crankshaft_notes (drawing-only).
+CROSS_HOLE_PROCESS = drill_process(PIN_HOLE_SPEC)
+# The punch mark is a visual witness: its clocking to the cross-hole shows in
+# the end view's hidden lines, and its exact spot is deliberately free.
+DRAWING_NOTES = "PUNCH FIDUCIAL MARK ON DOME WHERE SHOWN; LOCATE BY EYE."
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:1"
