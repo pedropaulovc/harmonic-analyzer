@@ -37,7 +37,6 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "JournalInboardStation",
         "JournalOutboardStation",
         "PinHoleStation",
-        "PinionPinHoleStation",
         "DomeSphereRadius",
     }
     # Diameters are imported in the end view only to be dragged onto the
@@ -169,7 +168,7 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         drawing.END_CENTER,
         drawing.ISO_CENTER,
         drawing.HOLE_CALLOUT_XY,
-        drawing.PINION_HOLE_CALLOUT_XY,
+        drawing.PINION_PIN_NOTE_XY,
         drawing.NOTES_XY,
         drawing.ISO_NOTE_XY,
         drawing.FINISH_SYMBOL,
@@ -232,44 +231,52 @@ def test_pinion_land_is_turnable_at_the_printed_band() -> None:
     assert spec.JOURNAL_LENGTH / post_bore > 0.96
 
 
-def test_pinion_pin_hole_is_printed_with_the_process_the_part_carries() -> None:
-    """Codex #813 (PRRT_kwDOPHDy386l4ZrZ): MHA-026 cut the PinionPinHole and
-    stored its "Pinion Pin Hole Process", but the sheet printed neither.  Its
-    size and station now come from the model (Main, 2026-09-25): the native
-    Hole Wizard callout and a far-end reference station, with no typed note."""
+def test_pinion_pin_hole_is_shown_as_a_transfer_from_the_pinion() -> None:
+    """Codex #813 (PRRT_kwDOPHDy386l4ZrZ): MHA-026 cut the PinionPinHole but
+    the sheet did not show it.  The hole is match-drilled through the seated
+    pinion's boss at assembly (crank_pinion_spec), so -- like MHA-061's
+    transfer seats on the base (U28) -- the sheet names its source and prints
+    no size and no station (Main, 2026-09-25).  run1-61671871a proved a native
+    Hole Wizard callout cannot bind to the saddle rim of a radial hole in a
+    round shaft."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"Pinion Pin Hole Process"' in source
-    assert "add_leader_note" not in source
-    assert "edge=_visible_cross_hole_edge(adapter, side, PINION_PIN_DIA)" in source
-    assert "process=PINION_PIN_PROCESS" in source
-    assert "_set_callout_below(pinion_hole, PINION_PIN_NOTE," in source
-    assert drawing.PINION_PIN_PROCESS == "1/8 DRILL"
-    # The station prints from the far end, as a reference: the pinion's boss
-    # locates the match-drilled hole.
-    assert "PinionPinHoleStation" in spec.DRAWING_DIMENSIONS["StationReference"]
-    assert "PinionPinHoleStation" in spec.REFERENCE_DIMENSIONS
+    assert "add_attached_note(" in source
+    assert "text=PINION_PIN_TRANSFER_NOTE," in source
+    assert "entity=_visible_cross_hole_edge(adapter, side, PINION_PIN_DIA)," in source
+    # One native callout on the sheet, the MHA-024 cross-hole's; none here.
+    assert source.count("add_native_hole_callout(\n") == 1
+    assert "PINION_PIN_PROCESS" not in source
+    # No station: neither a marked model dimension nor a sheet placement.
+    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert all("Pinion" not in name for name in marked)
+    assert all("Pinion" not in name for name in drawing.SIDE_KEEP)
     build = Path(part.__file__).read_text(encoding="utf-8")
-    assert '\'"ShaftLength" - "PinionPinStation"\'' in build
-    assert spec.SHAFT_LENGTH - part.PINION_PIN_STATION_Y == pytest.approx(2.9205, abs=1e-3)
-    # Same words as the property the build writes, only re-wrapped short.
-    assert notes.PINION_PIN_NOTE.split() == notes.CRANKSHAFT_PIN_HOLE_PROCESS.split()
-    lines = notes.PINION_PIN_NOTE.split("\n")
-    assert max(map(len, lines)) <= notes.PINION_PIN_NOTE_WIDTH
+    assert '"ShaftLength" - "PinionPinStation"' not in build
+    # The text is the transfer, from the spec's own part number; the assembly
+    # procedure stays in CRANKSHAFT_PIN_HOLE_PROCESS for MHA-A03 (rule 6).
+    pinion_number = notes.PINION_NUMBER
+    assert notes.PINION_PIN_TRANSFER_NOTE == f"TRANSFER FROM {pinion_number}\nAT ASSEMBLY"
+    lines = notes.PINION_PIN_TRANSFER_NOTE.split("\n")
+    assert len(lines) <= 4
+    assert not any(ch.isdigit() for ch in notes.PINION_PIN_TRANSFER_NOTE.replace(pinion_number, ""))
+    # The build still stores the full process on the part for the assembly.
+    assert '"Pinion Pin Hole Process"' in source
     assert drawing.PINION_PIN_X == pytest.approx(
         drawing.DOME_ROOT_X + part.PINION_PIN_STATION_Y * drawing.SHEET_SCALE[0] / 1000.0
     )
     assert drawing.JOURNAL_END_X < drawing.PINION_PIN_X < drawing.FAR_END_X
-    # The callout text (centred on its point, ~2.7 mm a character and ~4.3 mm
-    # a line at the callout height, measured off the MHA-024 callout) stays
-    # right of the Ø11.388 text, above its row and left of the isometric.
-    char_w, line_h = 0.0027, 0.0043
-    cx, cy = drawing.PINION_HOLE_CALLOUT_XY
-    half_w = char_w * max(map(len, lines)) / 2.0
-    half_h = line_h * (len(lines) + 1) / 2.0
-    assert cx - half_w > drawing.DIAMETER_POSITIONS["JournalDiaDim"][0] + 0.030
-    assert cx + half_w < drawing.ISO_CENTER[0] - 0.012
-    assert cy - half_h > drawing.DIAMETER_POSITIONS["JournalDiaDim"][1] + 0.010
-    assert cy + half_h < 0.2667 - 0.005
-    # Its far-end reference station sits on the first row, right of the end.
-    x, y = drawing.SIDE_KEEP["PinionPinHoleStation"]
-    assert x > drawing.FAR_END_X and y == drawing._ROW_Y[0]
+    # The note block (top-left anchored; sized for up to 3.5 mm note text)
+    # stays inside its field: right of the Ø11.388 text, above its row,
+    # left of the isometric and inside the border.
+    height = 0.0035
+    char_w, line_h = 0.8 * height, 1.7 * height
+    x0, y0 = drawing.PINION_PIN_NOTE_XY
+    right = x0 + char_w * max(map(len, lines))
+    bottom = y0 - line_h * len(lines)
+    field_x0, field_y0, field_x1, field_y1 = drawing.PINION_PIN_NOTE_FIELD
+    assert field_x0 == pytest.approx(drawing.DIAMETER_POSITIONS["JournalDiaDim"][0] + 0.010)
+    assert field_x1 == pytest.approx(drawing.ISO_CENTER[0] - 0.012)
+    assert field_y1 < 0.2667
+    assert field_x0 < x0 and right < field_x1
+    assert y0 <= field_y1
+    assert bottom > drawing.DIAMETER_POSITIONS["JournalDiaDim"][1] + 0.010

@@ -178,6 +178,19 @@ def test_pin_hole_is_match_drilled_to_the_named_pin() -> None:
     assert spec.PIN_CLOCKING_DEG == pytest.approx(13.703608450714796)
 
 
+def test_pin_hole_note_names_the_operation_and_leaves_the_procedure_to_assembly() -> None:
+    # Rule 6 (Main, 2026-09-25): a part print carries at most four note lines.
+    # The six-line match-drill procedure is MHA-A03 assembly work; the sheet
+    # prints its first two lines -- the operation, where it runs and the mate.
+    note = drawing.PIN_HOLE_NOTE.split("\n")
+    assert note == spec.PIN_HOLE_PROCESS.split("\n")[:2]
+    assert len(note) <= 4
+    assert note[0].startswith("MATCH DRILL")
+    assert spec.CRANKSHAFT_NUMBER in note[1]
+    source = _source().replace("\r\n", "\n")
+    assert "PIN_HOLE_NOTE,\n        text_xy=PIN_HOLE_CALLOUT," in source
+
+
 def test_the_bore_is_the_only_feature_that_earns_a_band() -> None:
     # cad/docs/tolerance-policy.md: a feature is toleranced tighter than its
     # title-block general grade only through the named chain. On this part

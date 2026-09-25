@@ -70,7 +70,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "JournalInboardStation",
         "JournalOutboardStation",
         "PinHoleStation",
-        "PinionPinHoleStation",
         "DomeSphereRadius",
     },
 }
@@ -87,7 +86,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "JournalInboardStation": 1,
         "JournalOutboardStation": 1,
         "PinHoleStation": 1,
-        "PinionPinHoleStation": 1,
         "DomeSphereRadius": 1,
     },
 }
@@ -99,12 +97,8 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked crankshaft dimension needs authored places")
 # Read-only restatements: the overall is Depth + DomeHeight, and a spherical
-# cap of DomeHeight on the Ø9.525 end already fixes its radius.  The 16T pin
-# hole's station is match-drilled through the seated pinion's boss at
-# assembly, so the pinion locates it and the shaft print only restates it.
-REFERENCE_DIMENSIONS = frozenset(
-    {"OverallLength", "DomeSphereRadius", "PinionPinHoleStation"}
-)
+# cap of DomeHeight on the Ø9.525 end already fixes its radius.
+REFERENCE_DIMENSIONS = frozenset({"OverallLength", "DomeSphereRadius"})
 SPHERICAL_DIMENSIONS = frozenset({"DomeSphereRadius"})
 
 # The native cross-hole callout's process prefix: the drill reads first; the

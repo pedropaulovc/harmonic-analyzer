@@ -217,6 +217,9 @@ PIN_HOLE_EDGE = (
     RIGHT_CENTER[1] + PIN_DIA * VIEW_SCALE[0] / 2000.0,
 )
 PIN_HOLE_CALLOUT = (0.260, RIGHT_CENTER[1] + HALF_OD + 0.056)
+# The operation, where it runs and its mate: the spec process's first two
+# lines.  The rest (ream, seat, flush) is the MHA-A03 assembly step.
+PIN_HOLE_NOTE = "\n".join(PIN_HOLE_PROCESS.split("\n")[:2])
 _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
 _BORE_GAP_ANGLE_RAD = math.radians(168.75)
 BORE_FIT_NOTE = (0.016, 0.174)
@@ -317,14 +320,16 @@ async def build(adapter: Any) -> dict[str, str]:
         label="crank pinion axis",
     )
     # The cross-hole is governed by a matched fit, not the model's nominal
-    # drill diameter. Attach the operation and acceptance directly to its rim:
-    # drill both seated parts together, ream to the named pin and finish flush.
+    # drill diameter. The pinion's boss guides the drill, so its rim carries
+    # the operation, where it runs and the mating part; the ream, seat and
+    # flush procedure is assembly work (PIN_HOLE_PROCESS, for MHA-A03), not
+    # part-print prose (rule 6).
     # A longitudinal section presents the radial through-hole as cut edges, not
     # a selectable model circle, so this view-owned pointer names its cut
     # location without dimensioning that hole.
     add_leader_note(
         adapter,
-        PIN_HOLE_PROCESS,
+        PIN_HOLE_NOTE,
         text_xy=PIN_HOLE_CALLOUT,
         attach_xy=PIN_HOLE_EDGE,
         label="retention-pin matched cross-hole",

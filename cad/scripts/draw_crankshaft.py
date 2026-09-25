@@ -29,6 +29,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_attached_note,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
@@ -47,7 +48,7 @@ from _drawing_common import (
     view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _hole_spec import blind_cut_dia_mm, drill_process
+from _hole_spec import blind_cut_dia_mm
 from _surface_finish import surface_finish_by_key
 from crankshaft_spec import (
     CROSS_HOLE_PROCESS,
@@ -66,8 +67,7 @@ from crankshaft_spec import (
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from build_crankshaft import PINION_PIN_DIA, PINION_PIN_STATION_Y
 from crank_pinion_spec import CRANKSHAFT_PIN_HOLE_PROCESS
-from crank_pinion_spec import PIN_HOLE_SPEC as PINION_PIN_HOLE_SPEC
-from crankshaft_notes import CROSS_HOLE_CALLOUT, PINION_PIN_NOTE
+from crankshaft_notes import CROSS_HOLE_CALLOUT, PINION_PIN_TRANSFER_NOTE
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -125,10 +125,9 @@ JOURNAL_FLANK_Y = _sheet_y(JOURNAL_DIA / 2.0)
 # Baseline rows below the profile, all from the FAR END and stacked
 # shortest-first so no extension line crosses a dimension line; rows are 13
 # mm apart because the text sits ~3 mm above its requested point and the
-# dimension line ~5 mm below it.  The first row carries the two short ends:
-# the 2.0 dome height at the far left and the 16T pin hole's reference
-# station at the far right, where no other baseline reaches.
-_ROW_Y = (0.150, 0.137, 0.124, 0.111, 0.098, 0.085)
+# dimension line ~5 mm below it.  The 2.0 dome height shares the first row at
+# the far left, where no baseline reaches.
+_ROW_Y = (0.150, 0.137, 0.124, 0.111, 0.096)
 # The two diameters are authored in end-profile sketches; the end view
 # receives them first and they are then dragged onto the profile (rule 7:
 # diameters on the side view).  Their temporary end-view spots are clear of
@@ -139,14 +138,11 @@ END_KEEP = {
 }
 SIDE_KEEP = {
     "DomeHeight": (DOME_TIP_X - 0.016, _ROW_Y[0]),
-    # Its 5.8-mm span is too short for its text, which sits outside to the
-    # right of the far end.
-    "PinionPinHoleStation": (FAR_END_X + 0.012, _ROW_Y[0]),
-    "JournalInboardStation": ((JOURNAL_END_X + FAR_END_X) / 2.0 + 0.004, _ROW_Y[1]),
-    "JournalOutboardStation": ((JOURNAL_START_X + FAR_END_X) / 2.0 - 0.020, _ROW_Y[2]),
-    "PinHoleStation": ((PIN_X + FAR_END_X) / 2.0, _ROW_Y[3]),
-    "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0, _ROW_Y[4]),
-    "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0, _ROW_Y[5]),
+    "JournalInboardStation": ((JOURNAL_END_X + FAR_END_X) / 2.0 + 0.004, _ROW_Y[0]),
+    "JournalOutboardStation": ((JOURNAL_START_X + FAR_END_X) / 2.0 - 0.020, _ROW_Y[1]),
+    "PinHoleStation": ((PIN_X + FAR_END_X) / 2.0, _ROW_Y[2]),
+    "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0, _ROW_Y[3]),
+    "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0, _ROW_Y[4]),
     # Above-left of the dome, where no extension line rises: the radial
     # leader runs down-right to the dome silhouette.
     "DomeSphereRadius": (DOME_TIP_X - 0.022, 0.205),
@@ -174,16 +170,24 @@ FINISH_SYMBOL = (JOURNAL_START_X + 0.050, 0.203)
 # line rather than a near parallel one (run 20260923T030252135Z-49e46990),
 # left of the Ø9.525 text and clear of the SR on the left.
 HOLE_CALLOUT_XY = (PIN_X + 0.054, 0.247)
-# The 16T retention-pin hole, 2.9 from the far end.  Its size is the native
-# Hole Wizard callout (the 1/8 drill first) and its station the reference
-# PinionPinHoleStation above, both read from the model; the match-drill
-# prose reads under the size, as on the MHA-024 cross-hole.  The text is
-# centred in the free field above the far-end seat, right of the Ø11.388
-# text and left of the isometric, so its leader runs down to the hole
-# without crossing a dimension.
+# The 16T retention-pin hole, 2.9 from the far end, is match-drilled through
+# the seated pinion's boss at assembly (crank_pinion_spec), so the sheet
+# shows the modelled hole and names where it comes from -- no size, no
+# station -- exactly as MHA-061's transfer seats on the base (U28).  The
+# note is attached to the hole's own visible rim edge: a radial hole in a
+# round shaft has a saddle rim, not a circle, so a native Hole Wizard
+# callout cannot bind to it (run1-61671871a).  It sits, anchored upper-left,
+# in the free field above the far-end seat, right of the Ø11.388 text and
+# left of the isometric; its read-back extent, leader included, must stay
+# in that field.
 PINION_PIN_X = _sheet_x(PINION_PIN_STATION_Y)
-PINION_PIN_PROCESS = drill_process(PINION_PIN_HOLE_SPEC)
-PINION_HOLE_CALLOUT_XY = (0.325, 0.236)
+PINION_PIN_NOTE_XY = (0.300, 0.250)
+PINION_PIN_NOTE_FIELD = (
+    DIAMETER_POSITIONS["JournalDiaDim"][0] + 0.010,
+    SIDE_CENTER[1],
+    ISO_CENTER[0] - 0.012,
+    0.2657,  # 1 mm inside the ASME B inner border
+)
 NOTES_XY = (0.016, 0.062)
 ISO_NOTE_XY = (0.368, 0.108)
 
@@ -453,15 +457,27 @@ async def build(adapter: Any) -> dict[str, str]:
         process=CROSS_HOLE_PROCESS,
     )
     _set_callout_below(cross_hole, CROSS_HOLE_CALLOUT, "tapered-pin cross-hole")
-    pinion_hole = add_native_hole_callout(
+    pinion_note = add_attached_note(
         adapter,
         side,
-        callout_xy=PINION_HOLE_CALLOUT_XY,
-        label="16T retention-pin cross-hole",
-        edge=_visible_cross_hole_edge(adapter, side, PINION_PIN_DIA),
-        process=PINION_PIN_PROCESS,
+        text=PINION_PIN_TRANSFER_NOTE,
+        entity=_visible_cross_hole_edge(adapter, side, PINION_PIN_DIA),
+        note_xy=PINION_PIN_NOTE_XY,
+        label="16T retention-pin transfer",
     )
-    _set_callout_below(pinion_hole, PINION_PIN_NOTE, "16T retention-pin cross-hole")
+    drawing_model.GraphicsRedraw2()
+    extent = tuple(
+        float(value) for value in (_early_bound(pinion_note, "INote").GetExtent() or ())
+    )
+    _telemetry.info(f"16T retention-pin transfer note extent {extent}")
+    x0, y0, x1, y1 = PINION_PIN_NOTE_FIELD
+    if len(extent) < 5 or not (
+        x0 <= extent[0] and y0 <= extent[1] and extent[3] <= x1 and extent[4] <= y1
+    ):
+        raise RuntimeError(
+            f"16T retention-pin transfer note extent {extent} left its field "
+            f"{PINION_PIN_NOTE_FIELD}"
+        )
     add_surface_finish(
         adapter,
         side,
