@@ -1,0 +1,21 @@
+{
+  "outages": [
+    {
+      "id": "codex-401-2026-09-25",
+      "reviewer": "codex",
+      "fallback_reviewer": "claude",
+      "fallback_model": "claude-fable-5-1",
+      "directed_by": "user, via team-lead (Main)",
+      "quote": "codex having outage use fable machinist review",
+      "directed_at": "2026-09-25",
+      "started_at": "2026-09-25T22:46:00+00:00",
+      "ended_at": null,
+      "evidence": {
+        "path": "C:/src/dt-logs/mreview-i31/pms857-772d/post_mount_screw.attempts/machrev-hnvh1z54/stdout.txt",
+        "report": "C:/src/dt-logs/mreview-i31/pms857-772d/post_mount_screw.json",
+        "excerpt": "{\"type\":\"error\",\"message\":\"Reconnecting... 1/5 (unexpected status 401 Unauthorized: Incorrect API key provided: sk-<redacted>. You can find your API key at https://platform.openai.com/account/api-keys., url: https://chatgpt.com/backend-api/codex/responses, cf-ray: a40d8fbd795bb99f-SEA, request id: 74534002-f091-44e1-8ea7-0cfd29a9f724)\"}",
+        "note": "The local Codex CLI has returned 401 since about 22:46Z (swing's post_mount_screw run, reviewed_at 2026-09-25T22:46:42+00:00), and GitHub @codex reviews error too. The key fragment is redacted."
+      }
+    }
+  ]
+}

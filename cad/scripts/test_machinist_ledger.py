@@ -1151,8 +1151,8 @@ def test_cli_exit_status_is_the_gate(tmp_path: Path, registry: Path, capsys) -> 
     captured = capsys.readouterr()
     assert json.loads(captured.out)[0]["state"] == "ok"
     assert (
-        "1/1 drawings match an accepted review (0 via last resort, 0 accepted with rulings)"
-        in captured.err
+        "1/1 drawings match an accepted review (0 via last resort, 0 accepted with rulings, "
+        "0 via outage fallback)" in captured.err
     )
 
     assert ml.main(["--ledger", ledger, "check", "not-a-drawing"]) == 2
@@ -1537,3 +1537,199 @@ def test_no_build_task_reads_the_ledger() -> None:
 def test_the_tracked_ledger_matches_this_checkouts_fingerprint_settings() -> None:
     ledger = ml.load_ledger(ml.LEDGER_PATH)
     assert ledger["fingerprint"] == ml.empty_ledger()["fingerprint"]
+
+
+# --- outage fallback -----------------------------------------------------------------
+
+OUTAGE_QUOTE = "codex having outage use fable machinist review"
+
+
+def _outages(tmp_path: Path, **change) -> Path:
+    """An outage record like the tracked one: codex down, Fable the directed fallback."""
+    outage = {
+        "id": "codex-401-test",
+        "reviewer": "codex",
+        "fallback_reviewer": "claude",
+        "fallback_model": "claude-fable-5-1",
+        "directed_by": "user, via team-lead (Main)",
+        "quote": OUTAGE_QUOTE,
+        "directed_at": NOW.date().isoformat(),
+        "started_at": (NOW - timedelta(hours=2)).isoformat(),
+        "ended_at": None,
+        "evidence": {
+            "path": "C:/src/dt-logs/example/stdout.txt",
+            "excerpt": "unexpected status 401 Unauthorized: Incorrect API key provided",
+        },
+        **change,
+    }
+    path = tmp_path / "outages.json"
+    path.write_text(json.dumps({"outages": [outage]}), encoding="utf-8")
+    return path
+
+
+def test_an_outage_fallback_counts_only_while_its_outage_is_open(
+    tmp_path: Path, registry: Path
+) -> None:
+    pdf = _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+    outages = ml.load_outages(_outages(tmp_path))
+    fable = _review(pdf, reviewer="claude")  # same family as a Claude author
+
+    recorded = ml.record_review(
+        fable,
+        pdf,
+        author_family="claude",
+        provenance={},
+        ledger_path=ledger_path,
+        outage=outages["codex-401-test"],
+    )
+
+    assert (recorded.slot, recorded.counts) == (ml.OUTAGE_FALLBACK, True)
+    entry = ml.load_ledger(ledger_path)["drawings"]["crank_arm"][ml.OUTAGE_FALLBACK]
+    assert entry["outage"]["quote"] == OUTAGE_QUOTE
+    assert "401" in entry["outage"]["evidence"]["excerpt"]
+    [status] = ml.check(["crank_arm"], ledger_path=ledger_path, outages=outages)
+    assert (status.state, status.via) == (
+        ml.State.OK,
+        "outage_fallback ship (codex-401-test)",
+    )
+
+    # Codex is back: every sheet shipped on the fallback needs a cross-family review.
+    ended = ml.load_outages(_outages(tmp_path, ended_at=NOW.isoformat()))
+    [status] = ml.check(["crank_arm"], ledger_path=ledger_path, outages=ended)
+    assert status.state == ml.State.UNREVIEWED
+    assert "outage codex-401-test ended" in status.detail
+    assert "cross-family re-review" in status.detail
+
+
+@pytest.mark.parametrize(
+    ("review", "author_family", "change", "error"),
+    [
+        ({"reviewer": "codex"}, "claude", {}, "a cross-family review needs no outage"),
+        (
+            {},
+            "claude",
+            {"reviewer": "claude", "fallback_reviewer": "codex"},
+            "not the cross-family reviewer",
+        ),
+        ({"model": "claude-opus-5-5"}, "claude", {}, "not the directed fallback"),
+        ({"reviewed_at": "2020-01-01T00:00:00+00:00"}, "claude", {}, "outside"),
+    ],
+)
+def test_only_the_directed_fallback_during_the_outage_is_recorded(
+    tmp_path: Path, registry: Path, review: dict, author_family: str, change, error
+) -> None:
+    pdf = _sheet(registry)
+    outage = ml.load_outages(_outages(tmp_path, **change))["codex-401-test"]
+    record = {**_review(pdf, reviewer=review.pop("reviewer", "claude")), **review}
+    with pytest.raises(ValueError, match=error):
+        ml.record_review(
+            record,
+            pdf,
+            author_family=author_family,
+            provenance={},
+            ledger_path=tmp_path / "ledger.json",
+            outage=outage,
+        )
+
+
+def test_a_same_family_review_without_an_outage_is_still_only_a_last_resort(
+    tmp_path: Path, registry: Path
+) -> None:
+    pdf = _sheet(registry)
+    recorded = ml.record_review(
+        _review(pdf, reviewer="claude"),
+        pdf,
+        author_family="claude",
+        provenance={},
+        ledger_path=tmp_path / "ledger.json",
+    )
+    assert (recorded.slot, recorded.counts) == (ml.LAST_RESORT, False)
+
+
+@pytest.mark.parametrize(
+    ("change", "error"),
+    [
+        ({"quote": ""}, r"lacks \['quote'\]"),
+        ({"evidence": {"path": "x", "excerpt": ""}}, "evidence"),
+        ({"reviewer": "gemini"}, "reviewer"),
+        ({"fallback_reviewer": "codex"}, "same family"),
+        ({"ended_at": "2020-01-01T00:00:00+00:00"}, "before it started"),
+    ],
+)
+def test_an_outage_record_needs_its_quote_evidence_and_window(
+    tmp_path: Path, change: dict, error: str
+) -> None:
+    with pytest.raises(ValueError, match=error):
+        ml.load_outages(_outages(tmp_path, **change))
+
+
+def test_the_tracked_codex_outage_quotes_the_user_and_redacts_the_key() -> None:
+    outage = ml.load_outages()["codex-401-2026-09-25"]
+    assert outage["quote"] == OUTAGE_QUOTE
+    assert (outage["reviewer"], outage["fallback_model"]) == (
+        "codex",
+        "claude-fable-5-1",
+    )
+    assert "401" in outage["evidence"]["excerpt"]
+    assert "sk-svc" not in json.dumps(outage)  # no key fragment in a tracked file
+
+
+def test_ingest_and_check_surface_the_sheets_on_outage_fallback(
+    tmp_path: Path, registry: Path, capsys
+) -> None:
+    pdf = _sheet(registry)
+    mr.write_review(mr.Review(**_review(pdf, reviewer="claude")), tmp_path / "reports")
+    ledger = ["--ledger", str(tmp_path / "ledger.json")]
+    outages = ["--outages", str(_outages(tmp_path))]
+    report = str(tmp_path / "reports" / "crank_arm.json")
+
+    code = ml.main(
+        [*ledger, "ingest", report, "--author-family", "claude",
+         "--outage", "codex-401-test", *outages]
+    )  # fmt: skip
+    assert code == 0
+    assert "recorded crank_arm as outage_fallback ship" in capsys.readouterr().out
+
+    assert ml.main([*ledger, "check", "crank_arm", *outages]) == 0
+    err = capsys.readouterr().err
+    assert "1 via outage fallback" in err
+    assert (
+        "on outage fallback, re-review cross-family when codex recovers: crank_arm"
+        in err
+    )
+
+
+def test_machinist_review_runs_the_directed_fallback_during_an_outage(
+    tmp_path: Path, registry: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    pdf = _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+    fable = ["crank_arm", "--reviewer", "claude", "--author-family", "claude"]
+    common = ["--ledger", str(ledger_path), "--report-dir", str(tmp_path / "reports")]
+    open_outage = ["--outage", "codex-401-test", "--outages", str(_outages(tmp_path))]
+
+    monkeypatch.setattr(
+        mr, "review_package", lambda *a, **k: pytest.fail("reviewer ran")
+    )
+    (tmp_path / "ended").mkdir()
+    ended = _outages(tmp_path / "ended", ended_at=NOW.isoformat())
+    refused = [
+        ([*fable, *common], "--outage <id> during a named outage"),
+        ([*fable, *common, "--outage", "codex-401-test", "--outages", str(ended)],
+         "ended at"),
+        ([*fable, *common, *open_outage, "--model", "claude-opus-5-5"],
+         "not the directed fallback"),
+        ([*fable, *common, *open_outage, "--last-resort"], "pick one"),
+        (["crank_arm", "--reviewer", "codex", "--author-family", "claude", *common,
+          *open_outage], "only to a same-family review"),
+    ]  # fmt: skip
+    for argv, message in refused:
+        assert mr.main(argv) == 2, message
+        assert message in capsys.readouterr().err
+
+    _fake_run(monkeypatch, pdf, lambda: mr.Review(**_review(pdf, reviewer="claude")))
+    assert mr.main([*fable, *common, *open_outage]) == 0
+    entry = ml.load_ledger(ledger_path)["drawings"]["crank_arm"]
+    assert list(entry) == [ml.OUTAGE_FALLBACK]
+    assert entry[ml.OUTAGE_FALLBACK]["outage"]["quote"] == OUTAGE_QUOTE

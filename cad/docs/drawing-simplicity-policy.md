@@ -325,6 +325,17 @@ refused in turn is kept beside it and never replaces the evidence a retry
 needs. A same-family `--last-resort` run is refused before
 any reviewer runs unless that refusal is under 24 h old and the trailer's model
 and the reviewer meet the tier rule.
+An outage is different evidence from a quota refusal. When the user directs a
+same-family fallback because the cross-family reviewer is down, the outage is
+recorded in `cad/reviews/outages.json`: its id, the reviewer that is down, the
+directed fallback reviewer and model, the user's words and date, the start
+time, `ended_at` (null while open) and a redacted excerpt of the failing
+output. A review run with `--outage <id>` (or ingested with it) by exactly that
+fallback, inside the window, is recorded as `outage_fallback` and carries the
+outage record. `check` accepts it only while the outage is open, and prints
+the drawings on each outage's fallback. Closing the outage (setting
+`ended_at`) turns every one of them into an unreviewed drawing that needs a
+cross-family re-review before release.
 Every accepted registry-drawing review is recorded in the tracked ledger
 `cad/reviews/machinist-ledger.json`, together with the exact PDF it saw
 (`cad/reviews/sheets/<sha256>.pdf`). Accepted means `SHIP`, or

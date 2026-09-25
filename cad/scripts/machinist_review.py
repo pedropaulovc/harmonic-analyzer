@@ -15,7 +15,11 @@ cross-family reviewer's quota refusal for that drawing, which this tool keeps as
 ``<name>.<reviewer>.quota-refused.json`` (one per reviewer, so a refused
 last-resort run never replaces it) when a run is refused for usage limits, and an
 author model (read from the draw script's last commit trailer) that meets the
-tier rule; otherwise it is refused before any reviewer runs. ``--rebuttals``
+tier rule; otherwise it is refused before any reviewer runs. ``--outage <id>``
+is the other same-family path: during a named outage of the cross-family
+reviewer, recorded with the user's direction in ``cad/reviews/outages.json``,
+the directed fallback (reviewer and model) reviews and is recorded as
+``outage_fallback``, which counts only while that outage is open. ``--rebuttals``
 answers a FIX verdict's gating findings with cited user rulings, recording it
 as ``accepted_with_rulings``. Registry part and assembly
 PDFs are split into full-resolution page images and every page is supplied
@@ -925,6 +929,14 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "this drawing on quota; recorded as last_resort",
     )
     parser.add_argument(
+        "--outage",
+        metavar="ID",
+        help="allow a same-family review by the fallback the user directed during "
+        "this named outage of the cross-family reviewer (cad/reviews/outages.json); "
+        "recorded as outage_fallback, which counts only while the outage is open",
+    )
+    parser.add_argument("--outages", type=Path, default=machinist_ledger.OUTAGES_PATH)
+    parser.add_argument(
         "--author-model",
         help="cross-check for the model in the draw script's last commit trailer",
     )
@@ -987,17 +999,31 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 2
     same_family = machinist_ledger.reviewer_family(args.reviewer) == args.author_family
-    if same_family and not args.last_resort:
+    if same_family and not (args.last_resort or args.outage):
         print(
             f"--reviewer {args.reviewer} is the same family as the {args.author_family} "
             "author, so its verdict is not the gate; use the other reviewer "
-            "(or --last-resort to record it as last_resort)",
+            "(or --last-resort to record it as last_resort, or --outage <id> during a "
+            "named outage)",
             file=sys.stderr,
         )
         return 2
-    if args.last_resort and not same_family:
-        print("--last-resort applies only to a same-family review", file=sys.stderr)
+    if args.last_resort and args.outage:
+        print(
+            "--last-resort and --outage are different evidence; pick one",
+            file=sys.stderr,
+        )
         return 2
+    for flag, used in (("--last-resort", args.last_resort), ("--outage", args.outage)):
+        if used and not same_family:
+            print(f"{flag} applies only to a same-family review", file=sys.stderr)
+            return 2
+    args.outage_record = None
+    if args.outage:
+        problem = _outage_problem(args)
+        if problem:
+            print(f"--outage refused: {problem}", file=sys.stderr)
+            return 2
     args.refusal = None
     if args.rebuttals is not None and (args.png or args.all or len(args.names) != 1):
         print("--rebuttals applies to exactly one registry drawing", file=sys.stderr)
@@ -1125,6 +1151,7 @@ def _record_in_ledger(
                 "report": (args.report_dir / f"{review.name}.json").resolve().as_posix(),
             },
             ledger_path=args.ledger,
+            outage=args.outage_record,
         )
     except (OSError, ValueError) as exc:
         print(f"{review.name}: not recorded in the ledger: {exc}", file=sys.stderr)
@@ -1169,6 +1196,41 @@ def _keep_quota_refusal(review: Review, report_dir: Path) -> None:
         "evidence a same-family --last-resort run needs",
         file=sys.stderr,
     )
+
+
+def _outage_problem(args: argparse.Namespace) -> str:
+    """Why this run is not the fallback its outage directed; "" when it is.
+
+    Checked before any reviewer runs.  Sets ``args.outage_record``.
+    """
+    if args.png:
+        return "an arbitrary --png package is not the gate"
+    if args.prompt_file is not None:
+        return "a rubric override is not the gate"
+    try:
+        outage = machinist_ledger.load_outages(args.outages).get(args.outage)
+    except (OSError, ValueError) as exc:
+        return str(exc)
+    if outage is None:
+        return f"no outage {args.outage!r} in {args.outages}"
+    if outage.get("ended_at"):
+        return (
+            f"outage {args.outage} ended at {outage['ended_at']}; review with "
+            f"{outage['reviewer']} again"
+        )
+    if machinist_ledger.reviewer_family(outage["reviewer"]) == args.author_family:
+        return (
+            f"outage {args.outage} is of {outage['reviewer']}, not the cross-family "
+            f"reviewer of a {args.author_family} author"
+        )
+    model = args.model or DEFAULT_MODELS[args.reviewer]
+    directed = (outage["fallback_reviewer"], outage["fallback_model"])
+    if (args.reviewer, model) != directed:
+        return (
+            f"{args.reviewer}/{model} is not the directed fallback {'/'.join(directed)}"
+        )
+    args.outage_record = outage
+    return ""
 
 
 def _last_resort_problem(args: argparse.Namespace) -> str:
