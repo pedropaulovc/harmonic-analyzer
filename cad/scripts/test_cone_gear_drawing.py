@@ -85,15 +85,12 @@ def test_each_configuration_sheet_carries_its_own_drawing_number() -> None:
     assert '"Number": configuration_number(part_number, teeth)' in source
 
 
-def test_bore_band_is_the_explicit_soldered_seat_band() -> None:
-    # Main (2026-09-23): MHA-013 bores print +0.05/0 on their shaft land's
-    # nominal; the soldered seats go to 0/-0.05 (#839), so the pair spans
-    # 0 to 0.10 diametral, the gap the solder or retaining compound fills.
+def test_bore_band_is_the_derived_retained_joint_band() -> None:
+    # Main (2026-09-25): every bonded bore takes the shared retained-joint fit
+    # against its land (retained_joint_fit); the family's one BoreCutDia band
+    # is +0.050/+0.025 (test_cone_gear_seat_fit proves every seat).
     assert part.BORE_DIA_BAND is spec.BORE_DIA_BAND
-    assert spec.BORE_DIA_BAND == (0.05, 0.0)
-    land_upper, land_lower = cone_gear_shaft_spec.GEAR_SEAT_BAND
-    assert spec.BORE_DIA_BAND[1] - land_upper == pytest.approx(0.0)
-    assert 0.0 < spec.BORE_DIA_BAND[0] - land_lower <= 0.10
+    assert spec.BORE_DIA_BAND == (0.05, 0.025)
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"BoreProfile", "BoreCutDia", *deviations(BORE_DIA_BAND)' in source
 
