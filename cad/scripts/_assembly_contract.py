@@ -1,11 +1,13 @@
 """Per-assembly build contracts: ``cad/config/assemblies/<dashed-stem>.yaml``.
 
-Data that belongs to ONE assembly -- its learned flip-seed polarities and the
-component families allowed to read under-constrained -- used to live in shared
-module-level tables in ``_assembly.py``. Every assembly's recipe carries that
-module, so a one-line seed for drive-train re-keyed all eight assemblies and
-every gate downstream of them. One file per assembly lets ``dodo.py`` depend
-each assembly task (and its soundness gate) on its OWN file only: any script
+Data that belongs to ONE assembly -- its learned flip-seed polarities and its
+free-DOF contract (freed DOF count, required and allowed under-constrained
+families) -- used to live in shared module-level tables in ``_assembly.py`` and
+``verify.py``. Every assembly's recipe carries the former and every soundness
+gate the latter, so a one-line seed for drive-train re-keyed all eight
+assemblies and every gate downstream of them. One file per assembly lets
+``dodo.py`` depend each assembly task (and its soundness gate) on its OWN file
+only: any script
 whose import closure reaches this module gets the ``"assemblies/*"`` config
 token, which dodo narrows to the task's own row (see ``_config_deps``).
 
@@ -23,8 +25,10 @@ import yaml
 
 CONTRACT_DIR = Path(__file__).resolve().parent.parent / "config" / "assemblies"
 
-_REQUIRED_KEYS = frozenset({"flip_invert", "allowed_free_stems"})
-_KNOWN_KEYS = _REQUIRED_KEYS
+_REQUIRED_KEYS = frozenset(
+    {"flip_invert", "allowed_free_stems", "required_free_stems", "free_dof"}
+)
+_KNOWN_KEYS = _REQUIRED_KEYS | {"free_dof_per_active_channel"}
 
 
 @dataclass(frozen=True)
@@ -38,12 +42,19 @@ class AssemblyContract:
     ``allowed_free_stems``: the exact component families allowed to read
     under-constrained (freed operational DOF plus everything coupled to them),
     shared by the incremental refresh and the ``verify:soundness`` gate.
+    ``required_free_stems``: one family per freed DOF that must ITSELF read
+    under-constrained (the necessity direction of the soundness gate).
+    ``free_dof`` (+ ``free_dof_per_active_channel`` x the active channel count):
+    the operational DOF the saved model ships free.
     """
 
     stem: str
     path: Path
     flip_invert: frozenset[str]
     allowed_free_stems: tuple[str, ...]
+    required_free_stems: tuple[str, ...]
+    free_dof: int
+    free_dof_per_active_channel: int
 
 
 def contract_path(stem: str) -> Path:
@@ -58,6 +69,12 @@ def _string_list(path: Path, key: str, value: object) -> tuple[str, ...]:
     if duplicates:
         raise ValueError(f"{path}: {key} lists {duplicates} more than once")
     return tuple(value)
+
+
+def _count(path: Path, key: str, value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{path}: {key} must be a non-negative integer")
+    return value
 
 
 @functools.lru_cache(maxsize=None)
@@ -84,6 +101,15 @@ def assembly_contract(stem: str) -> AssemblyContract:
         flip_invert=frozenset(_string_list(path, "flip_invert", doc["flip_invert"])),
         allowed_free_stems=_string_list(
             path, "allowed_free_stems", doc["allowed_free_stems"]
+        ),
+        required_free_stems=_string_list(
+            path, "required_free_stems", doc["required_free_stems"]
+        ),
+        free_dof=_count(path, "free_dof", doc["free_dof"]),
+        free_dof_per_active_channel=_count(
+            path,
+            "free_dof_per_active_channel",
+            doc.get("free_dof_per_active_channel", 0),
         ),
     )
 

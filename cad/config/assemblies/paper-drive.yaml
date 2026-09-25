@@ -13,6 +13,10 @@
 # allowed_free_stems: the exact component families allowed to read
 #   under-constrained (freed operational DOF + everything coupled to them).
 #   Shared by the incremental refresh and verify:soundness.
+# required_free_stems: one family per freed DOF that must itself read
+#   under-constrained (verify:soundness necessity).
+# free_dof (+ free_dof_per_active_channel x active channels): the operational
+#   DOF the saved model ships free (verify:soundness).
 flip_invert:
   - crank wheel axial
   - knob wheel axial
@@ -34,3 +38,12 @@ allowed_free_stems:
   - transgear-pinion
   - transgear-removable
   - transgear-thumbnut  # rides the free knob shaft (lock-mated), 2026-09-02
+# One freed DOF (the crank T12 spin). paper-drive is checked by INSTANCE, not
+# this stem (verify._required_free_instances) -- three transgear-removable
+# siblings share the stem, so a stem check passes even if T12 is pinned and
+# T24/T18 is loose (codex #189 :679). Kept as reference data only.
+required_free_stems:
+  - transgear-removable
+# The freed crank (T12) spin; the knob T24 is belt-coupled and the platen is
+# rack-coupled (no DOF of their own).
+free_dof: 1

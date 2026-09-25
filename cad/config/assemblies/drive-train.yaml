@@ -13,6 +13,10 @@
 # allowed_free_stems: the exact component families allowed to read
 #   under-constrained (freed operational DOF + everything coupled to them).
 #   Shared by the incremental refresh and verify:soundness.
+# required_free_stems: one family per freed DOF that must itself read
+#   under-constrained (verify:soundness necessity).
+# free_dof (+ free_dof_per_active_channel x active channels): the operational
+#   DOF the saved model ships free (verify:soundness).
 flip_invert:
   - alignment pinion axial
   - axial seat
@@ -57,3 +61,12 @@ allowed_free_stems:
   - pinion-handle
   - pinion-lever
   - pinion-lift-rod
+# One family per freed DOF that must ITSELF read under-constrained.
+required_free_stems:
+  - crankshaft
+  - cone-swing-platform
+  - pinion-bracket
+  - pinion-lift-rod
+# The crank spin, the cone-platform swing, the pinion engage swing and the
+# lift-rod/cam spin (PR8).
+free_dof: 4

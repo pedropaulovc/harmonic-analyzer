@@ -614,11 +614,13 @@ new `_config` accessor without mapping it in `_buildgraph` (`check:graph`'s
 coverage test fails loud otherwise).
 
 **Per-assembly contracts — `cad/config/assemblies/<dashed-stem>.yaml`.** Data
-that belongs to ONE assembly (its learned `flip_invert` seeds and its
-`allowed_free_stems` set) lives in its own file, read through
-`_assembly_contract.py` — never as a stem-keyed table in `_assembly.py`, which is
-on every assembly's recipe (one drive-train seed there used to re-key all eight
-assemblies and every gate behind them). Any closure reaching `_assembly_contract`
+that belongs to ONE assembly (its learned `flip_invert` seeds and its free-DOF
+contract: `free_dof`/`free_dof_per_active_channel`, `required_free_stems`,
+`allowed_free_stems`) lives in its own file, read through
+`_assembly_contract.py` — never as a stem-keyed table in `_assembly.py` (on every
+assembly's recipe: one drive-train seed there used to re-key all eight
+assemblies and every gate behind them) or `verify.py` (on every soundness
+gate's). Any closure reaching `_assembly_contract`
 gets the `assemblies/*` token; `dodo._config_deps` narrows it to the task's OWN
 file for an assembly task, and `_soundness_file_deps` adds the gate's own file.
 Each `build_<stem>_assembly.build()` opens with

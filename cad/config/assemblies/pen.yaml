@@ -13,6 +13,10 @@
 # allowed_free_stems: the exact component families allowed to read
 #   under-constrained (freed operational DOF + everything coupled to them).
 #   Shared by the incremental refresh and verify:soundness.
+# required_free_stems: one family per freed DOF that must itself read
+#   under-constrained (verify:soundness necessity).
+# free_dof (+ free_dof_per_active_channel x active channels): the operational
+#   DOF the saved model ships free (verify:soundness).
 flip_invert:
   - hanger screw head plane
   # (was "pen rod travel snapshot" -- the label gained the PARK-driver tag
@@ -27,3 +31,18 @@ allowed_free_stems:
   - pen-v-block
   - pen-frame
   - pen-set-screw
+# One freed DOF (the carriage travel); the lock-mated carriage (v-block,
+# marker, stirrup frame + its thumb screw) and the pen-wire must ride it --
+# with the neutral preset the motion sweep reads got == want == 0 even if a
+# rider were disconnected (codex #201).
+required_free_stems:
+  - pen-rod
+  - pen-marker
+  - pen-wire
+  - pen-v-block
+  - pen-frame
+  - pen-set-screw
+# The freed carriage travel; the marker + pen-wire are lock-mated and ride
+# it. The F5 pen-driver equation is installed transiently by
+# verify:kinematics on the replayed drive mate.
+free_dof: 1

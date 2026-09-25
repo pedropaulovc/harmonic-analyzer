@@ -13,6 +13,10 @@
 # allowed_free_stems: the exact component families allowed to read
 #   under-constrained (freed operational DOF + everything coupled to them).
 #   Shared by the incremental refresh and verify:soundness.
+# required_free_stems: one family per freed DOF that must itself read
+#   under-constrained (verify:soundness necessity).
+# free_dof (+ free_dof_per_active_channel x active channels): the operational
+#   DOF the saved model ships free (verify:soundness).
 flip_invert:
   - frame side screw datum x
   - frame side screw datum y
@@ -31,3 +35,15 @@ allowed_free_stems:
   - connecting-rod
   - amplitude-bar
   - channel-lever
+# Rocker swing + rod follow + bar amplitude, plus the channel lever which
+# must read under-constrained WITH the chain (closed by the J5 foot-on-arc
+# coupling off the rocker -- a frozen lever means the coupling died).
+required_free_stems:
+  - rocker-arm
+  - connecting-rod
+  - amplitude-bar
+  - channel-lever
+# 3 DOF per active channel: rocker swing + connecting-rod follow +
+# amplitude-bar slide.
+free_dof: 0
+free_dof_per_active_channel: 3

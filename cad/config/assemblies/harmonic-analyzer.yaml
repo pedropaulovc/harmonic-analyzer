@@ -13,5 +13,11 @@
 # allowed_free_stems: the exact component families allowed to read
 #   under-constrained (freed operational DOF + everything coupled to them).
 #   Shared by the incremental refresh and verify:soundness.
+# required_free_stems: one family per freed DOF that must itself read
+#   under-constrained (verify:soundness necessity).
+# free_dof (+ free_dof_per_active_channel x active channels): the operational
+#   DOF the saved model ships free (verify:soundness).
 flip_invert: []
 allowed_free_stems: []
+required_free_stems: []
+free_dof: 0

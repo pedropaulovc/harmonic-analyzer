@@ -13,8 +13,20 @@
 # allowed_free_stems: the exact component families allowed to read
 #   under-constrained (freed operational DOF + everything coupled to them).
 #   Shared by the incremental refresh and verify:soundness.
+# required_free_stems: one family per freed DOF that must itself read
+#   under-constrained (verify:soundness necessity).
+# free_dof (+ free_dof_per_active_channel x active channels): the operational
+#   DOF the saved model ships free (verify:soundness).
 flip_invert:
   - summing lever axial
 allowed_free_stems:
   - summing-lever
   - boss-hook
+# One freed DOF (the lever knife-edge rock); the lock-mated boss-hook must
+# read under-constrained WITH it (a grounded/fixed regression would freeze
+# the counter-spring anchor while the lever still swings, codex #201).
+required_free_stems:
+  - summing-lever
+  - boss-hook
+# The freed lever knife-edge rock; the boss-hook is lock-mated and rides it.
+free_dof: 1

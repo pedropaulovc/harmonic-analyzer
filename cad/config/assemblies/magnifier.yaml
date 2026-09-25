@@ -13,6 +13,10 @@
 # allowed_free_stems: the exact component families allowed to read
 #   under-constrained (freed operational DOF + everything coupled to them).
 #   Shared by the incremental refresh and verify:soundness.
+# required_free_stems: one family per freed DOF that must itself read
+#   under-constrained (verify:soundness necessity).
+# free_dof (+ free_dof_per_active_channel x active channels): the operational
+#   DOF the saved model ships free (verify:soundness).
 flip_invert:
   - mag lever depth @npn
   - mag lever knife line across @npn
@@ -25,3 +29,15 @@ allowed_free_stems:
   - magnifying-wheel
   - output-fixture
   - thumb-screw
+# Three freed DOF (lever knife-rock + wire swing/spin); the yoke-coupled
+# wheel must read under-constrained WITH them, else the coupling died -- and
+# so must the lock-mated bracket (it AFFIXES the rod to the rocking summing
+# bar; a regression to grounded re-creates the collar clipping, codex #201).
+required_free_stems:
+  - magnifying-lever
+  - magnifying-wheel
+  - lever-wire
+  - magnifying-bracket
+# The freed lever knife-rock + the articulated lever-wire's swing/spin; the
+# wheel is COUPLED by the WIRE-1 yoke (no DOF of its own).
+free_dof: 3

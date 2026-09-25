@@ -227,10 +227,9 @@ class MockModel:
         # allowed set (cycling), which also covers the required stems (they
         # are a subset); index 0 stays the grounded "-1" seed (IsFixed).
         # Only an assembly has a contract; the mock also models part documents.
-        contract = verify.allowed_free_stems(name) if name in _ASSEMBLIES else ()
-        allowed = (contract
-                   or verify._REQUIRED_FREE_STEMS.get(name, ()))
-        required = verify._REQUIRED_FREE_STEMS.get(name, ())
+        is_assembly = name in _ASSEMBLIES
+        required = verify._required_free_stems(name) if is_assembly else ()
+        allowed = (verify.allowed_free_stems(name) if is_assembly else ()) or required
         stems = list(required) + [s for s in allowed if s not in required]
         for j in range(1, len(self._comps)):
             if stems:

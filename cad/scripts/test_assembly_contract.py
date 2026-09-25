@@ -36,8 +36,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DASHED = tuple(stem.replace("_", "-") for stem in ASSEMBLY_ORDER)
 STEM_NAMES = frozenset(ASSEMBLY_ORDER) | frozenset(DASHED)
 # Shared modules on every assembly's (or every soundness gate's) recipe: a
-# per-assembly table here re-keys the whole fleet of assemblies on each edit.
-SHARED_MODULES = ("_assembly.py",)
+# per-assembly table here re-keys the whole fleet of assemblies (or of soundness
+# gates) on each edit.
+SHARED_MODULES = ("_assembly.py", "verify.py")
+# Stem-keyed tables deliberately left in place: no gate reads them.
+REFERENCE_ONLY = {
+    # Component-count bands: the gate was removed (every failure was a stale
+    # band); kept as reference data and mock sizing for test_verify_telemetry.
+    "verify.py": {"_COMPONENT_BAND"},
+}
 
 
 @pytest.fixture(scope="module")
@@ -77,7 +84,8 @@ def _stem_keyed_tables(path: Path) -> list[str]:
 
 @pytest.mark.parametrize("module", SHARED_MODULES)
 def test_shared_module_holds_no_per_assembly_table(module):
-    tables = _stem_keyed_tables(SCRIPTS_DIR / module)
+    tables = set(_stem_keyed_tables(SCRIPTS_DIR / module))
+    tables -= REFERENCE_ONLY.get(module, set())
     assert not tables, (
         f"{module} holds per-assembly table(s) {tables}: move the data to "
         "cad/config/assemblies/<stem>.yaml (see _assembly_contract) so an edit "
@@ -112,18 +120,38 @@ def test_contract_schema_rejects_unknown_and_duplicate(tmp_path, monkeypatch):
     _assembly_contract.assembly_contract.cache_clear()
     try:
         (tmp_path / "bad-key.yaml").write_text(
-            "flip_invert: []\nallowed_free_stems: []\nflip_seeds: []\n",
+            "flip_invert: []\nallowed_free_stems: []\nrequired_free_stems: []\n"
+            "free_dof: 0\nflip_seeds: []\n",
             encoding="utf-8",
         )
         with pytest.raises(ValueError, match="unknown keys"):
             _assembly_contract.assembly_contract("bad-key")
         (tmp_path / "dupe.yaml").write_text(
-            "flip_invert: [a, a]\nallowed_free_stems: []\n", encoding="utf-8"
+            "flip_invert: [a, a]\nallowed_free_stems: []\nrequired_free_stems: []\n"
+            "free_dof: 0\n",
+            encoding="utf-8",
         )
         with pytest.raises(ValueError, match="more than once"):
             _assembly_contract.assembly_contract("dupe")
+        (tmp_path / "bool-dof.yaml").write_text(
+            "flip_invert: []\nallowed_free_stems: []\nrequired_free_stems: []\n"
+            "free_dof: true\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="non-negative integer"):
+            _assembly_contract.assembly_contract("bool-dof")
     finally:
         _assembly_contract.assembly_contract.cache_clear()
+
+
+@pytest.mark.parametrize("stem", DASHED)
+def test_free_dof_contract_is_self_consistent(stem):
+    """Freed DOF <=> required families; every required family is allowed."""
+    contract = _assembly_contract.assembly_contract(stem)
+    frees = bool(contract.free_dof or contract.free_dof_per_active_channel)
+    assert frees == bool(contract.required_free_stems), stem
+    assert frees == bool(contract.allowed_free_stems), stem
+    assert set(contract.required_free_stems) <= set(contract.allowed_free_stems), stem
 
 
 @pytest.mark.parametrize("stem", ASSEMBLY_ORDER)
@@ -241,6 +269,9 @@ def test_seed_audit_logs_queries_and_warns_on_dead_entries(
             path=contract.path,
             flip_invert=contract.flip_invert | {"never queried seat"},
             allowed_free_stems=contract.allowed_free_stems,
+            required_free_stems=contract.required_free_stems,
+            free_dof=contract.free_dof,
+            free_dof_per_active_channel=contract.free_dof_per_active_channel,
         ),
     )
     _assembly.audit_flip_seeds("summing")
