@@ -72,12 +72,35 @@ SURFACE_FINISHES = (
     SurfaceFinishControl("foot_seat", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
 )
 
+# Hidden reference sketches (#810 Codex l4afp, policy rule 2): the strap band,
+# the hold-down hole's station off the foot's far face and both lateral
+# locations off the west side face are manufacturing dimensions under the
+# .X band, yet no feature dimension measures them -- the strap band is an
+# offset extrude, the hole is placed from the origin in the strap band and the
+# profiles are X-centred. Each therefore gets a one-line construction sketch,
+# lying on the part outline so it prints no line of its own, whose single
+# driving dimension IS the value, equation-bound to the same globals the
+# features use. The part saves them blanked; the drawing shows each in the one
+# view that dimensions it (_drawing_hidden_sketches.curate_view_dimensions).
+REFERENCE_SKETCHES = (
+    "StrapDepthReference",
+    "HoldDownReference",
+    "HoleLateralReference",
+    "BoreLateralReference",
+)
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FootProfile": {"Width", "Depth"},
     "Foot": {"FootHt"},
     # BoreHeight plus a concentric R10 crown and tangent sides defines the
     # complete upright profile without redundant endpoint widths.
     "BoreProfile": {"BoreDia", "BoreHeight"},
+    # The crown: the dome boss's own diameter, printed radial on the arc.
+    "DomeProfile": {"DomeDia"},
+    "StrapDepthReference": {"StrapDepth"},
+    "HoldDownReference": {"HoldDownLocation"},
+    "HoleLateralReference": {"HoleLateral"},
+    "BoreLateralReference": {"BoreLateral"},
 }
 
 # Decimal places ARE the tolerance statement (drawing-simplicity policy rule
@@ -94,30 +117,31 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FootProfile": {"Width": 1, "Depth": 1},
     "Foot": {"FootHt": 1},
     "BoreProfile": {"BoreDia": 2, "BoreHeight": 2},
-}
-
-# Places for the six dimensions the SHEET derives, keyed by the recipe's own
-# label.  Each is a distance no single model dimension expresses (the strap
-# band between two faces, the hold-down hole off the foot's far face), the
-# crown radius a full-circle boss carries as a diameter, or the parenthesised
-# overall height.  Those places are still specification, so the PART owns the
-# digit and the sheet passes it through instead of writing a literal.
-DRAWING_REFERENCE_PRECISION: dict[str, int] = {
-    # Two places, like the axis height it is the sum of: a one-place (49.7)
-    # next to 39.72 + R10.0 reads as an arithmetic error on the print.
-    "overall height": 2,
-    "crown radius": 1,
-    "strap depth": 1,
+    # One place (R10.0): the crown is a cosmetic envelope that only has to
+    # meet the tangent flanks; nothing mates to it.
+    "DomeProfile": {"DomeDia": 1},
+    "StrapDepthReference": {"StrapDepth": 1},
     # One place (.X, ±0.8): the base seat is transferred from this hole at
     # assembly, so its location only has to keep the webs, and the U27 worst
     # case at ±0.8 still leaves 5.0 to the strap root and to the ledge end.
-    "hold-down hole location": 1,
+    "HoldDownReference": {"HoldDownLocation": 1},
     # Both lateral locations run off the foot's west side face (policy rule 7:
     # an origin is a feature, not the symmetry axis). One place: the drum x is
     # set with the arbor itself at assembly (DRO edge-find), so neither hole's
     # side offset feeds a fit, and the crown is concentric with the bore.
-    "bore lateral location": 1,
-    "hold-down hole lateral location": 1,
+    "HoleLateralReference": {"HoleLateral": 1},
+    "BoreLateralReference": {"BoreLateral": 1},
+}
+
+# Places for the one dimension the SHEET still derives, keyed by the recipe's
+# own label: the parenthesised overall height, a band-free restatement of the
+# axis height plus the crown.  Its places are still specification, so the
+# spec owns the digit and the sheet passes it through instead of writing a
+# literal.
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {
+    # Two places, like the axis height it is the sum of: a one-place (49.7)
+    # next to 39.72 + R10.0 reads as an arithmetic error on the print.
+    "overall height": 2,
 }
 
 _PRECISION_NAMES = [
