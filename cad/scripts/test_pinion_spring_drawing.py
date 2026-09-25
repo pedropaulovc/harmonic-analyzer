@@ -114,9 +114,10 @@ def test_free_form_prints_from_the_hidden_reference_sketch() -> None:
     # O2 (a): the installed solid plus the FreeForm phantom; the free crest and
     # tip print from the hidden sketch, which the part blanks and the front
     # view shows through the opt-in hidden-sketch curation.
-    assert pinion_spring_spec.REFERENCE_SKETCHES == ("FreeForm",)
+    assert pinion_spring_spec.REFERENCE_SKETCHES == ("FreeForm", "FootHoleReference")
     build_source = Path(spring.__file__).read_text(encoding="utf-8")
-    assert "blank_sketch(adapter, FREE_FORM_SKETCH)" in build_source
+    assert "for sketch in REFERENCE_SKETCHES:" in build_source
+    assert "blank_sketch(adapter, sketch)" in build_source
     assert 'prefix="Free", construction=True' in build_source
     draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "hidden_sketches.curate_view_dimensions(" in draw_source
@@ -134,7 +135,8 @@ def test_views_are_projected_and_hidden_lines_removed() -> None:
     assert "process=HOLE_PROCESS" in source
     assert drawing.HOLE_PROCESS == "#30 DRILL"
     assert geometry.HOLE_DIA == pytest.approx(0.1285 * 25.4, abs=1e-3)  # No. 30 drill
-    assert source.count("add_edge_dimension(") == 1  # the two hole locations
+    # The two hole locations are model dimensions now (#843 Codex aB7).
+    assert "add_edge_dimension(" not in source
 
 
 def test_notes_carry_no_dimension_and_stay_short() -> None:
@@ -159,3 +161,38 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert "0.5 mm (0.020 in)" in spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 1
+
+
+def test_hole_locations_are_model_dimensions() -> None:
+    """#843 Codex aB7, policy rule 2: the hole's locations off the foot's free
+    end and the pad's lower edge are .XX manufacturing dimensions, so the part
+    owns them in its hidden FootHoleReference sketch and the top view imports
+    them verbatim -- never picked off view edges."""
+    spec = pinion_spring_spec
+    assert spec.DRAWING_DIMENSIONS["FootHoleReference"] == {"HoleFromEnd", "HoleFromEdge"}
+    assert spec.DRAWING_PRECISION["FootHoleReference"] == {
+        "HoleFromEnd": 2,
+        "HoleFromEdge": 2,
+    }
+    assert {"HoleFromEnd", "HoleFromEdge"} <= set(drawing.TOP_KEEP)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_hole_locations" not in source
+    assert source.count("hidden_sketches.curate_view_dimensions(") == 2
+
+
+def test_foot_hole_reference_lines_restate_the_hole_on_the_pad_outline() -> None:
+    """Each line lies on the pad outline and starts on a pad edge (rule 7);
+    its value is the spec's, and its equation-bound anchors evaluate to the
+    as-built coordinates."""
+    lines = {row[0]: row for row in spring.FOOT_HOLE_LINES}
+    half = geometry.PAD_WIDTH / 2.0
+    end_x = geometry.FOOT_END[0]
+    _, start, stop, orientation, value, drives = lines["HoleFromEnd"]
+    assert orientation == "horizontal" and value == geometry.HOLE_FROM_END
+    assert start == (end_x, half) and stop == (end_x - geometry.HOLE_FROM_END, half)
+    assert end_x - geometry.HOLE_FROM_END == pytest.approx(geometry.HOLE_X)
+    assert drives == (None, None, '"PadWidth" / 2')
+    _, start, stop, orientation, value, drives = lines["HoleFromEdge"]
+    assert orientation == "vertical" and value == half
+    assert start == (end_x, -half) and stop == (end_x, 0.0)
+    assert drives == ('"PadWidth" / 2', None, '"PadWidth" / 2')
