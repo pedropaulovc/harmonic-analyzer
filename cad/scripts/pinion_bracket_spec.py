@@ -33,6 +33,7 @@ from pinion_bracket_geometry import (
     PIVOT_BORE as PIVOT_BORE,
     R_END as R_END,
     THICKNESS as THICKNESS,
+    THICKNESS_BAND as THICKNESS_BAND,
     WIDTH as WIDTH,
 )
 
@@ -53,7 +54,6 @@ PIN_SEAT_DIA_BAND = REAM_H7
 # either broad face: half the thickness at its .X minus band, minus the seat's
 # upper-limit radius and the 0.05 drilled-hole allowance.  Printed from one
 # face at .XX it was 1.18; centred it clears the 2.0 target.
-THICKNESS_BAND = 0.8  # Depth prints .X
 PIN_SEAT_WEB_WORST = (
     (THICKNESS - THICKNESS_BAND) / 2.0
     - (PIN_BORE + PIN_SEAT_DIA_BAND[0]) / 2.0
