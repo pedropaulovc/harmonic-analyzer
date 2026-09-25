@@ -22,6 +22,12 @@ checkout rendered at the release head:
   the policy's last resort; otherwise the drawing is left ``refused`` and
   retried after ``--quota-backoff`` minutes (``--quota-retries`` times in this
   run, and on every resume).
+* **Outage** -- with ``--outage <id>`` (a named outage in
+  ``cad/reviews/outages.json`` that is still open), a drawing routed to the
+  reviewer that is down goes straight to the fallback reviewer and model the
+  user directed, and a pass is recorded as ``outage_fallback`` with that
+  outage.  A both-families drawing never takes it: the family that is down is
+  left ``reviewer-down`` (retried on resume) once the other has run.
 * **Ingest** -- a passing review is recorded in the ledger through
   ``record_review``, so the family rule and the last-resort evidence are the
   ones every other entry meets.  A FIX is left for the author, with its counts.
@@ -88,6 +94,7 @@ class State(StrEnum):
     REFUSED = "refused"  # quota; retried after the backoff
     ERROR = "error"  # no verdict for another reason; retried on resume
     UNROUTED = "unrouted"  # no author family on record; never guessed
+    DOWN = "reviewer-down"  # its reviewer is in an outage no fallback may serve
 
 
 # Settled for these PDF bytes: resuming does not spend another review on them.
@@ -297,6 +304,7 @@ class Wave:
     retries: int = 1
     backoff: timedelta = QUOTA_BACKOFF
     rulings: ml.AuthorRulings = field(default_factory=ml.load_author_rulings)
+    outage: dict[str, Any] | None = None  # open; the user directed its fallback
     ledger_lock: threading.Lock = field(default_factory=threading.Lock)
 
     def run_one(self, route: Route) -> State:
@@ -304,27 +312,44 @@ class Wave:
 
         A both-families drawing gets one review per family it lacks, in turn,
         each recorded as cross-family to the other family; it stops at the
-        first that is not ingested.
+        first that is not ingested.  A family whose reviewer is down is left
+        for later: an outage fallback does not stand in for it.
         """
         if not route.families:
             return self._run_one(route)
         state = State.INGESTED
+        down: list[str] = []
         for family in route.families:
             author = ml.other_family(family)
+            reviewer = ml.cross_family_reviewer(author)
+            if self._down(reviewer):
+                down.append(family)
+                continue
             state = self._run_one(
-                replace(
-                    route,
-                    author_family=author,
-                    reviewer=ml.cross_family_reviewer(author),
-                )
+                replace(route, author_family=author, reviewer=reviewer)
             )
             if state != State.INGESTED:
                 return state
-        return state
+        if not down:
+            return state
+        self.manifest.update(
+            route.name,
+            state=State.DOWN,
+            pdf_sha256=ml.sha256_file(route.pdf),
+            detail=f"both families required; the {', '.join(down)} reviewer is "
+            f"down (outage {self.outage['id']}), and an outage fallback does not "
+            "stand in for it",
+        )
+        return State.DOWN
+
+    def _down(self, reviewer: str | None) -> bool:
+        return self.outage is not None and reviewer == self.outage["reviewer"]
 
     def _run_one(self, route: Route) -> State:
         pdf_sha = ml.sha256_file(route.pdf)
         self.manifest.update(route.name, state=State.RUNNING, pdf_sha256=pdf_sha)
+        if self._down(route.reviewer):
+            return self._run_fallback(route)
         review = self._attempt(route, route.reviewer, slot=ml.CROSS_FAMILY)
         if not self._quota_refused(review):
             return self._settle(route, review, None)
@@ -343,6 +368,21 @@ class Wave:
         if self._quota_refused(review):
             return self._refused(route, "both reviewer families refused on quota")
         return self._settle(route, review, refusal)
+
+    def _run_fallback(self, route: Route) -> State:
+        """The same-family review the user directed while the cross reviewer is down."""
+        outage = self.outage
+        reviewer = outage["fallback_reviewer"]
+        review = self._attempt(
+            route, reviewer, slot=ml.OUTAGE_FALLBACK, model=outage["fallback_model"]
+        )
+        if self._quota_refused(review):
+            return self._refused(
+                route,
+                f"{outage['reviewer']} is down (outage {outage['id']}) and its "
+                f"fallback {reviewer} refused on quota",
+            )
+        return self._settle(route, review, None, outage=outage)
 
     def _refused(self, route: Route, detail: str) -> State:
         retry = datetime.now(timezone.utc) + self.backoff
@@ -494,7 +534,12 @@ class Wave:
         return (reviewer, model, effort), ""
 
     def _settle(
-        self, route: Route, review: mr.Review, refusal: dict[str, Any] | None
+        self,
+        route: Route,
+        review: mr.Review,
+        refusal: dict[str, Any] | None,
+        *,
+        outage: dict[str, Any] | None = None,
     ) -> State:
         if review.verdict is None:
             self.manifest.update(route.name, state=State.ERROR, detail=review.error)
@@ -514,6 +559,7 @@ class Wave:
                     route.pdf,
                     author_family=route.author_family or "",
                     refusal=refusal if slot == ml.LAST_RESORT else None,
+                    outage=outage,
                     provenance={
                         "wave": self.manifest.data["wave"],
                         "checkout_head": self.manifest.data.get("head"),
@@ -683,6 +729,13 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "history)",
     )
     parser.add_argument("--author-rulings", type=Path, default=ml.AUTHOR_RULINGS_PATH)
+    parser.add_argument(
+        "--outage",
+        metavar="ID",
+        help="an open outage in --outages: its reviewer's drawings go to the "
+        "fallback the user directed",
+    )
+    parser.add_argument("--outages", type=Path, default=ml.OUTAGES_PATH)
     commands = parser.add_subparsers(dest="command", required=True)
 
     plan = commands.add_parser("plan", help="route the blocked drawings; review none")
@@ -733,14 +786,18 @@ def _run(args: argparse.Namespace) -> int:
             "name the drawings to review, or pass --all-blocked (not both)"
         )
     rulings = ml.load_author_rulings(args.author_rulings)
+    outage = _open_outage(args.outage, args.outages) if args.outage else None
     failing, unrendered = blocked(args.checkout, args.ledger, args.names, rulings)
     routes = route(failing, args.checkout, rulings)
     if unrendered:
         print(f"unrendered, not reviewed: {', '.join(unrendered)}", file=sys.stderr)
     if args.command == "plan":
         for r in routes:
+            reviewer = r.reviewer or "UNROUTED"
+            if outage is not None and r.reviewer == outage["reviewer"]:
+                reviewer = "down" if r.families else outage["fallback_reviewer"]
             print(
-                f"{r.name:<32} {r.reviewer or 'UNROUTED':<8} author "
+                f"{r.name:<32} {reviewer:<8} author "
                 f"{r.author_family or '?'} ({r.author_source or r.problem})"
             )
         by = Counter(r.reviewer or "unrouted" for r in routes)
@@ -757,6 +814,7 @@ def _run(args: argparse.Namespace) -> int:
             "checkout": args.checkout.resolve().as_posix(),
             "head": ml._checkout_head(args.checkout),
             "ledger": args.ledger.resolve().as_posix(),
+            "outage": args.outage,
             "created_at": _now(),
         },
     )
@@ -769,6 +827,7 @@ def _run(args: argparse.Namespace) -> int:
         retries=args.retries,
         backoff=timedelta(minutes=args.quota_backoff),
         rulings=rulings,
+        outage=outage,
     )
     with _telemetry.span(
         "machinist.wave", wave=args.wave, drawings=len(routes), jobs=args.jobs
@@ -778,6 +837,17 @@ def _run(args: argparse.Namespace) -> int:
         )
     print(table(manifest.data))
     return 0 if all(state == State.INGESTED for state in outcome.values()) else 1
+
+
+def _open_outage(outage_id: str, path: Path) -> dict[str, Any]:
+    outage = ml.load_outages(path).get(outage_id)
+    if outage is None:
+        raise ValueError(f"no outage {outage_id!r} in {path}")
+    if outage.get("ended_at"):
+        raise ValueError(
+            f"outage {outage_id} ended at {outage['ended_at']}: route cross-family"
+        )
+    return outage
 
 
 if __name__ == "__main__":

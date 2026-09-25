@@ -18,7 +18,7 @@ import pytest
 import machinist_ledger as ml
 import machinist_review as mr
 import machinist_wave as mw
-from test_machinist_ledger import CODEX_REFUSAL, _sheet, _verdict
+from test_machinist_ledger import CODEX_REFUSAL, _outages, _sheet, _verdict
 
 NAMES = ("crank_arm", "pen_rod")
 
@@ -113,6 +113,7 @@ def _wave(
     fake: FakeReviewer,
     wave: str = "w1",
     rulings: ml.AuthorRulings | None = None,
+    outage: dict | None = None,
 ):
     directory = mw.WAVE_ROOT / wave
     manifest = mw.Manifest.open(
@@ -125,6 +126,7 @@ def _wave(
         checkout,
         review=fake,
         rulings=rulings or ml.AuthorRulings(),
+        outage=outage,
     )
 
 
@@ -259,6 +261,83 @@ def test_a_both_families_drawing_lacking_both_runs_each_and_takes_no_last_resort
         ["crank_arm"], ledger_path=tmp_path / "ledger.json", rulings=rulings
     )
     assert (status.state, status.missing) == (ml.State.UNREVIEWED, ("gpt",))
+
+
+def test_an_outage_sends_the_down_reviewers_drawings_to_the_directed_fallback(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # crank_arm: a Claude author, so codex would review it -- but codex is down.
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    outage = ml.load_outages(_outages(tmp_path))["codex-401-test"]
+    fake = FakeReviewer(
+        {("crank_arm", "claude"): "ship", ("pen_rod", "claude"): "ship"}
+    )
+    wave = _wave(tmp_path, checkout, fake, outage=outage)
+
+    outcome = mw.run_wave(_routes(checkout, tmp_path), wave, jobs=1)
+
+    assert outcome == {"crank_arm": mw.State.INGESTED, "pen_rod": mw.State.INGESTED}
+    assert ("crank_arm", "claude", "claude-fable-5-1") in [c[:3] for c in fake.calls]
+    assert all(call[1] == "claude" for call in fake.calls)  # codex never ran
+    ledger = ml.load_ledger(tmp_path / "ledger.json")["drawings"]
+    assert list(ledger["crank_arm"]) == [ml.OUTAGE_FALLBACK]
+    assert ledger["crank_arm"][ml.OUTAGE_FALLBACK]["outage"]["id"] == "codex-401-test"
+    assert list(ledger["pen_rod"]) == [ml.CROSS_FAMILY]
+    [attempt] = wave.manifest.drawings["crank_arm"]["attempts"]
+    assert attempt["slot"] == ml.OUTAGE_FALLBACK
+
+
+def test_a_both_families_drawing_waits_for_the_reviewer_that_is_down(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _authors(monkeypatch, crank_arm=None, pen_rod=None)
+    both = {"drawing": "crank_arm", "family": "gpt", "commit": "c" * 40}
+    both["both_families"] = BOTH
+    rulings = ml.AuthorRulings({"crank_arm": both})
+    [crank] = [
+        r for r in _routes(checkout, tmp_path, {"crank_arm": both}) if r.families
+    ]
+    outage = ml.load_outages(_outages(tmp_path))["codex-401-test"]
+    fake = FakeReviewer({("crank_arm", "claude"): "ship"})
+    wave = _wave(tmp_path, checkout, fake, rulings=rulings, outage=outage)
+
+    assert mw.run_wave([crank], wave, jobs=1) == {"crank_arm": mw.State.DOWN}
+    # The claude half ran; the gpt half waits for codex, with no fallback.
+    assert [call[:2] for call in fake.calls] == [("crank_arm", "claude")]
+    entry = ml.load_ledger(tmp_path / "ledger.json")["drawings"]["crank_arm"]
+    assert list(entry) == ["both_families_claude"]
+    detail = wave.manifest.drawings["crank_arm"]["detail"]
+    assert "gpt reviewer is down" in detail and "does not stand in" in detail
+    assert mw.due(
+        wave.manifest.drawings["crank_arm"],
+        ml.sha256_file(crank.pdf),
+        datetime.now(timezone.utc),
+    )
+
+
+def test_only_an_open_outage_reroutes_the_wave(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    monkeypatch.setattr(mr, "review_package", pytest.fail)
+    argv = ["--checkout", str(checkout), "--ledger", str(tmp_path / "l.json")]
+    argv += ["--outages", str(_outages(tmp_path))]
+
+    assert mw.main([*argv, "--outage", "codex-401-test", "plan", *NAMES]) == 0
+    out = capsys.readouterr().out
+    assert [line.split()[:2] for line in out.splitlines()] == [
+        ["crank_arm", "claude"],
+        ["pen_rod", "claude"],
+    ]
+    assert mw.main([*argv, "--outage", "nope", "plan"]) == 2
+    assert "no outage 'nope'" in capsys.readouterr().err
+
+    ended = [
+        "--outages",
+        str(_outages(tmp_path, ended_at=datetime.now(timezone.utc).isoformat())),
+    ]
+    assert mw.main([*argv, *ended, "--outage", "codex-401-test", "plan"]) == 2
+    assert "route cross-family" in capsys.readouterr().err
 
 
 def test_a_ship_is_ingested_and_a_fix_is_left_with_its_counts(
