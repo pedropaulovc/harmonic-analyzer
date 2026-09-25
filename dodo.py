@@ -2869,6 +2869,8 @@ def task_check():
         # Drawing infrastructure and cross-sheet contracts do not follow the
         # per-sheet test_*_drawing.py suffix, so enroll them explicitly.
         SCRIPTS_DIR / "test_drawing_marks.py",
+        # The opt-in import of part-hidden reference sketches (shown per view).
+        SCRIPTS_DIR / "test_drawing_hidden_sketches.py",
         SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
         SCRIPTS_DIR / "test_fastener_catalog.py",
         # Fleet-wide manufacturing ownership/validation contracts are standalone
