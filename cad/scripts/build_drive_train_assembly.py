@@ -620,7 +620,7 @@ from build_fillister_screw import (  # noqa: E402
 
 CRANK_RING_ARM_CLEARANCE = 0.25
 PIN_PROUD = PIN_RING_HOLE_X + CRANK_RING_WIRE_DIA / 2.0 + CRANK_RING_ARM_CLEARANCE
-CRANK_PIN_Z = CRANK_FACE_Z + PIN_HOLE_HEIGHT  # -171: behind the 8-mm arm
+CRANK_PIN_Z = CRANK_FACE_Z + PIN_HOLE_HEIGHT  # -169.4: behind the 8-mm arm
 CRANK_PIN_X0 = X_CRANK - HUB_BARREL_DIA / 2.0 - PIN_PROUD
 # The ring lies in machine YZ. Its straight local-Z leg is concentric with the
 # pin's machine-Z cross-hole; its bends and return hang toward machine -Y.
@@ -2843,7 +2843,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
     )
     # Taper pin MHA-024 crosses the separate hub's rear barrel and crankshaft
-    # at station -171, behind the arm.  Its big end stands PIN_PROUD outside
+    # at station -169.4, behind the arm.  Its big end stands PIN_PROUD outside
     # the hub's -X face; the brass keeper ring hangs from the head cross-hole.
     # The hub #14 and shaft #9 pilots are match-reamed together to the pin's
     # 1:48 taper, so those two overlaps alone are volume-bounded allowed pairs
