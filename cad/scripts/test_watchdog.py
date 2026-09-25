@@ -713,11 +713,13 @@ async def test_an_idle_abort_inside_an_adapter_open_names_the_file(
     assert fields["last_op"] == "span-start sw.open magnifier-assembly.SLDDRW"
 
 
-def test_each_discarded_document_is_its_own_span(
+def test_each_discarded_document_is_named_before_its_close(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # A close that wedges on a modal must name its document as last_op, not
-    # the enclosing seat.discard.
+    # the enclosing seat.discard -- through a debug line, not a span per close
+    # (a discard after a pack-and-go closes 100+ documents). The count rides
+    # the caller's span.
     titles = ["summing.SLDASM", "cone-gear.SLDPRT"]
     during: list[str] = []
 
@@ -744,11 +746,13 @@ def test_each_discarded_document_is_its_own_span(
         ),
     )
 
-    _common.discard_open_documents(adapter)
+    with _telemetry.span("seat.discard") as discard:
+        _common.discard_open_documents(adapter)
 
+    assert discard.attributes["closed"] == 2
     assert during == [
-        "span-start seat.close summing.SLDASM",
-        "span-start seat.close cone-gear.SLDPRT",
+        "log closing summing.SLDASM",
+        "log closing cone-gear.SLDPRT",
         "span-start seat.close_all",
     ]
 

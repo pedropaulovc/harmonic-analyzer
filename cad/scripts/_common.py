@@ -2349,9 +2349,11 @@ def discard_open_documents(adapter: Any) -> None:
     ``CloseAllDocuments(True)`` as a backstop with nothing dirty left to prompt
     about. Bounded so a misbehaving session can't spin; an empty title is
     refused (``CloseDoc("")`` silently no-ops on assemblies and would leave the
-    document resident). Each close is its own span named for the document, so
-    a close that wedges on a modal is the watchdog's ``last_op``, not the
-    enclosing ``seat.discard``."""
+    document resident). Each close logs ``closing <title>`` first, so a close
+    that wedges on a modal is the watchdog's ``last_op``; the count rides the
+    caller's span (``seat.discard`` in ``run_build``), not a span per close --
+    a discard after a pack-and-go can close 100+ documents."""
+    closed = 0
     for _ in range(500):
         doc = adapter._attempt(lambda: _read_member(adapter.swApp, "IActiveDoc2"),
                                default=None)
@@ -2363,8 +2365,10 @@ def discard_open_documents(adapter: Any) -> None:
                 "active document has an empty title -- refusing CloseDoc(''), which "
                 "silently no-ops on assemblies and would leave the document resident"
             )
-        with _telemetry.span(f"seat.close {title}", document=title):
-            adapter._attempt(lambda t=title: adapter.swApp.CloseDoc(t), default=None)
+        _telemetry.debug(f"closing {title}")
+        adapter._attempt(lambda t=title: adapter.swApp.CloseDoc(t), default=None)
+        closed += 1
+    _telemetry.annotate(closed=closed)
     with _telemetry.span("seat.close_all"):
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 

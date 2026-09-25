@@ -512,9 +512,9 @@ abort names the COM operation it was wedged inside, no scrollback needed.
 The heartbeat is a span processor, so it counts every OTel span in the process,
 not only `_telemetry.span`: the connector's `sw.open <file>` / `sw.preload
 <file>` spans around each `OpenDoc6` and its loguru INFO lines ("opening
-<file>") poke it too, and so does each `seat.close <title>` /
-`seat.close_all` step of `_common.discard_open_documents`. A wedged open or
-close names its file.
+<file>") poke it too, and so does the "closing <title>" debug line before each
+`CloseDoc` in `_common.discard_open_documents` (one line per document, not a
+span: a discard can close 100+). A wedged open or close names its file.
 
 ## Incremental rebuilds — refresh vs full
 
