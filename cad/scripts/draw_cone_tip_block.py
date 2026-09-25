@@ -41,7 +41,10 @@ from cone_tip_block_spec import (
     BLOCK_Z,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    FOOT_BORE_DIA,
+    FLANGE_LEN,
+    FLANGE_SLOT_CTOC,
+    FLANGE_SLOT_Z,
+    FLANGE_T,
     HEEL_RELIEF_HEIGHT,
     PINCH_BORE_DIA,
     PINCH_CLEARANCE_DIA,
@@ -71,22 +74,39 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (2.0, 1.0)
-_S = SHEET_SCALE[0] / 1000.0
+# I31: the foot flange runs the block 20.8 further south, 32.8 long in all;
+# at 2:1 the plan and the side views no longer fit between the front view's
+# dimensions and the sheet edge, so the sheet drops to 3:2.
+SHEET_SCALE = (3.0, 2.0)
+_S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
 FRONT_CENTER = (0.072, 0.129)
-TOP_CENTER = (FRONT_CENTER[0], 0.225)
+TOP_CENTER = (FRONT_CENTER[0], 0.222)
 RIGHT_CENTER = (0.166, FRONT_CENTER[1])
 LEFT_CENTER = (0.238, FRONT_CENTER[1])
 BACK_CENTER = (0.310, FRONT_CENTER[1])
 SECTION_CENTER = (0.190, 0.225)
 ISO_CENTER = (0.350, 0.215)
-# U30 hold-down tap: the only feature on the foot, so the bottom view sits in
-# the free band under the front view and carries just its callout.
-BOTTOM_CENTER = (FRONT_CENTER[0], 0.040)
+# A view centres on the part's box.  Along the cone axis that box runs from
+# the north face to the flange's south end, so the block's own centre (the
+# model origin) sits Z_MID north of each view's centre.
+Z_NORTH = BLOCK_Z / 2.0
+Z_SOUTH = -BLOCK_Z / 2.0 - FLANGE_LEN
+Z_MID = (Z_NORTH + Z_SOUTH) / 2.0
+FLANGE_SLOT_CENTER_Z = -BLOCK_Z / 2.0 - FLANGE_SLOT_Z
 
 
 def _elevation_y(model_y: float, center: tuple[float, float]) -> float:
     return center[1] + (model_y - BLOCK_HEIGHT / 2.0) * _S
+
+
+def _plan_y(model_z: float) -> float:
+    """Sheet y of a model station in the plan (*Top shows +Z, north, down)."""
+    return TOP_CENTER[1] - (model_z - Z_MID) * _S
+
+
+def _right_x(model_z: float) -> float:
+    """Sheet x of a model station in the right view (north on the left)."""
+    return RIGHT_CENTER[0] - (model_z - Z_MID) * _S
 
 
 # Imported value text measured on run 5637ac42: a four-character value
@@ -96,9 +116,10 @@ def _elevation_y(model_y: float, center: tuple[float, float]) -> float:
 # (d976281d ruling: no text on a line), so the values below are placed from
 # these sizes rather than centred on a feature.
 VALUE_TEXT_HALF_WIDTH = 0.0046
+VALUE_TEXT_HALF_HEIGHT = 0.0019
 ARROW_LENGTH = 0.0034
 TEXT_CLEARANCE = 0.0015
-# The 1.2 slot prints 2.4 mm wide, narrower than its value, so the arrows
+# The 1.2 slot prints 1.8 mm wide, narrower than its value, so the arrows
 # stand outside the slot walls and the text sits left of the left arrow's
 # tail on the extended dimension line.  Left, because on the adjuster
 # elevation PassageCenter's 7.50 span occupies the slot's right.
@@ -110,13 +131,47 @@ FRONT_KEEP = {
     "BlockHt": (FRONT_CENTER[0] - 0.033, FRONT_CENTER[1]),
     "SlitW": (
         FRONT_CENTER[0] - SLIT_TEXT_OFFSET,
-        _elevation_y(BLOCK_HEIGHT, FRONT_CENTER) + 0.014,
+        _elevation_y(BLOCK_HEIGHT, FRONT_CENTER) + 0.012,
     ),
 }
+# PassageCenter stands above SlitW on the adjuster elevation; the plan's
+# north edge is the ceiling for both.
+PASSAGE_CENTER_RISE = 0.024
 # swDimArrowsOutside: set, not left to the document's smart arrows.
-ARROWS_OUTSIDE = ("SlitW", "HeelReliefDepth")
+ARROWS_OUTSIDE = ("SlitW", "HeelReliefDepth", "FlangeSlotW")
 _DIM_ARROWS_OUTSIDE = 1
-TOP_KEEP = {"Depth": (TOP_CENTER[0] - 0.035, TOP_CENTER[1])}
+# The plan.  Left of it: the block depth and the flange length, chained on
+# one line, and the slot's arc-centre spacing between that line and the
+# part.  Right of it: the slot's station from the body's south face, and the
+# slot width's value (arrows outside) level with the slot's south half, past
+# the end of that station's span.  Above the flange's south end, higher than
+# the A-A cutting-plane arrow and its letter at that end: the slot's location
+# from the +X face.
+_PLAN_LEFT = TOP_CENTER[0] - BLOCK_X * _S / 2.0
+_PLAN_RIGHT = TOP_CENTER[0] + BLOCK_X * _S / 2.0
+PLAN_CHAIN_X = TOP_CENTER[0] - 0.030
+FLANGE_SLOT_W_Z = FLANGE_SLOT_CENTER_Z - FLANGE_SLOT_CTOC * 0.4
+FLANGE_SLOT_X_RISE = 0.016
+TOP_KEEP = {
+    "Depth": (PLAN_CHAIN_X, _plan_y(0.0)),
+    "FlangeLen": (PLAN_CHAIN_X, _plan_y((-BLOCK_Z / 2.0 + Z_SOUTH) / 2.0)),
+    "FlangeSlotCtoC": (
+        (PLAN_CHAIN_X + _PLAN_LEFT) / 2.0,
+        _plan_y(FLANGE_SLOT_CENTER_Z),
+    ),
+    "FlangeSlotZ": (
+        TOP_CENTER[0] + 0.022,
+        _plan_y(-BLOCK_Z / 2.0 - FLANGE_SLOT_Z / 2.0),
+    ),
+    "FlangeSlotW": (
+        _PLAN_RIGHT + ARROW_LENGTH + TEXT_CLEARANCE + VALUE_TEXT_HALF_WIDTH,
+        _plan_y(FLANGE_SLOT_W_Z),
+    ),
+    "FlangeSlotX": (
+        TOP_CENTER[0] + BLOCK_X * _S / 4.0,
+        _plan_y(Z_SOUTH) + FLANGE_SLOT_X_RISE,
+    ),
+}
 # The part-hidden reference sketch section A dimensions (PinchRise).
 SECTION_SKETCHES = ("PinchRiseReference",)
 SECTION_KEEP = {
@@ -128,69 +183,65 @@ SECTION_KEEP = {
         ),
     )
 }
-# The half-block stations below run from a block edge to the hole centre, so
-# each value sits midway along its span, a quarter block from the centre.
-# Centred on the hole (run 5637ac42), the witness and centreline ended in the
-# decimal point.  PinchDepthCenter rides as high above the right view as
-# FootTapX does above the bottom one: at +0.003 its dimension line printed on
-# the block's top edge.
+# The half-block station below runs from the north face to the pinch-hole
+# centre, so its value sits midway along its span.  Centred on the hole (run
+# 5637ac42), the witness and centreline ended in the decimal point; at +0.003
+# its dimension line printed on the block's top edge.
+#
+# I31 heel relief: the right view has north on the left, so the step is its
+# lower-left notch.  The depth's dimension line runs through the notch's air
+# half way up (at 3:2 the notch is only 8.3 mm tall), arrows outside, its value left of the north face;
+# the height stands further left, so the depth's value sits between the
+# height's two extension lines.  The flange thickness stands past the
+# flange's south end, on the right.
+_RIGHT_NORTH_X = _right_x(Z_NORTH)
+HEEL_DEPTH_TEXT_X = _RIGHT_NORTH_X - ARROW_LENGTH - TEXT_CLEARANCE - VALUE_TEXT_HALF_WIDTH
+HEEL_HEIGHT_LINE_X = HEEL_DEPTH_TEXT_X - VALUE_TEXT_HALF_WIDTH - 0.008
 RIGHT_KEEP = {
     "PinchDepthCenter": (
-        RIGHT_CENTER[0] - BLOCK_Z * _S / 4.0,
+        _right_x(BLOCK_Z / 4.0),
         _elevation_y(BLOCK_HEIGHT, RIGHT_CENTER) + 0.007,
-    )
-}
-# I31 heel relief, dimensioned in VIEW B, which looks at the -X face with
-# north on the right, so the step is the view's lower-right notch.  The depth's
-# dimension line runs through the notch's air, a third of the way up, with its
-# arrows outside and its value right of the north face.  The height stands
-# further right, so the depth's value sits between its two extension lines.
-_LEFT_NORTH_X = LEFT_CENTER[0] + BLOCK_Z * _S / 2.0
-HEEL_DEPTH_TEXT_X = _LEFT_NORTH_X + ARROW_LENGTH + TEXT_CLEARANCE + VALUE_TEXT_HALF_WIDTH
-HEEL_HEIGHT_LINE_X = HEEL_DEPTH_TEXT_X + VALUE_TEXT_HALF_WIDTH + 0.008
-LEFT_KEEP: dict[str, tuple[float, float]] = {
+    ),
     "HeelReliefDepth": (
         HEEL_DEPTH_TEXT_X,
-        _elevation_y(HEEL_RELIEF_HEIGHT / 3.0, LEFT_CENTER),
+        _elevation_y(HEEL_RELIEF_HEIGHT / 2.0, RIGHT_CENTER),
     ),
     "HeelReliefHt": (
         HEEL_HEIGHT_LINE_X,
-        _elevation_y(HEEL_RELIEF_HEIGHT / 2.0, LEFT_CENTER),
+        _elevation_y(HEEL_RELIEF_HEIGHT / 2.0, RIGHT_CENTER),
+    ),
+    "FlangeT": (
+        _right_x(Z_SOUTH) + 0.010,
+        _elevation_y(FLANGE_T / 2.0, RIGHT_CENTER),
     ),
 }
-# The foot tap's two locations: FootTapX above the bottom view (between it and
-# the front view's 15.0), FootTapZ to its left; the view caption moves under it.
-# At the tap's height FootTapZ's witness ran into the end of its "6.0".
-BOTTOM_KEEP = {
-    "FootTapX": (
-        BOTTOM_CENTER[0] - BLOCK_X * _S / 4.0,
-        BOTTOM_CENTER[1] + BLOCK_Z * _S / 2.0 + 0.007,
-    ),
-    "FootTapZ": (
-        BOTTOM_CENTER[0] - BLOCK_X * _S / 2.0 - 0.009,
-        BOTTOM_CENTER[1] + BLOCK_Z * _S / 4.0,
-    ),
-}
+LEFT_KEEP: dict[str, tuple[float, float]] = {}
+# The bottom-row captions sit just under the views' feet.
+CAPTION_Y = _elevation_y(0.0, FRONT_CENTER) - 0.004
 # A centreline runs a short way past the part it marks.
 AXIS_OVERRUN = 0.002
 # Review C1: the left and rear views sit right of the right view, out of
 # third-angle order, so each is a removed view named by a letter arrow on the
 # view that shows the face it looks at.  VIEW B looks at the -X (pinch-thread)
-# face: the arrow meets the front view's left edge above the 46.83 and 32.27
-# extension lines.  VIEW C looks at the -Z (shaft-entry) face, which is the top
-# view's upper edge, left of the A-A cutting-plane stem.  Each pair is
-# (note upper-left, leader tip), sheet metres.
+# face: the arrow meets the front view's left edge between the 32.27 and
+# 46.83 extension lines.  VIEW C looks at the -Z (shaft-entry) face, from
+# the plan's upper (south) end, left of the A-A cutting-plane stem.  Each pair
+# is (note upper-left, leader tip), sheet metres.
 # The letters match the A-A cutting-plane letters (~5 mm, run 6cab17f6), and
 # each note sits square to its face so the leader reads as a viewing arrow:
 # B level with its tip, C centred above its tip.
 VIEW_LETTER_HEIGHT = 0.005
+_VIEW_B_TIP_Y = _elevation_y((ADJUSTER_AXIS_HEIGHT + BLOCK_HEIGHT) / 2.0, FRONT_CENTER)
 VIEW_B_ARROW = (
-    (FRONT_CENTER[0] - BLOCK_X * _S / 2.0 - 0.013, 0.160 + VIEW_LETTER_HEIGHT / 2.0),
-    (FRONT_CENTER[0] - BLOCK_X * _S / 2.0, 0.160),
+    (
+        FRONT_CENTER[0] - BLOCK_X * _S / 2.0 - 0.013,
+        _VIEW_B_TIP_Y + VIEW_LETTER_HEIGHT / 2.0,
+    ),
+    (FRONT_CENTER[0] - BLOCK_X * _S / 2.0, _VIEW_B_TIP_Y),
 )
 VIEW_C_ARROW = (
-    (TOP_CENTER[0] - 0.010 - 0.0018, TOP_CENTER[1] + BLOCK_Z * _S / 2.0 + 0.013),
-    (TOP_CENTER[0] - 0.010, TOP_CENTER[1] + BLOCK_Z * _S / 2.0),
+    (TOP_CENTER[0] - 0.006 - 0.0018, _plan_y(Z_SOUTH) + 0.013),
+    (TOP_CENTER[0] - 0.006, _plan_y(Z_SOUTH)),
 )
 DIMENSION_CALLOUTS = {
     "SlitDepth": "SLOT DEPTH",
@@ -254,7 +305,7 @@ def _add_adjuster_axis(adapter: Any, section: Any) -> None:
     the view sketch's ModelToSketchTransform, and colour the segment black
     (a sketch line otherwise prints in the under-defined blue).
     """
-    half = BLOCK_Z / 2000.0 + AXIS_OVERRUN / SHEET_SCALE[0]
+    half = BLOCK_Z / 2000.0 + AXIS_OVERRUN * SHEET_SCALE[1] / SHEET_SCALE[0]
     ends = [
         model_point_in_view(
             adapter,
@@ -595,8 +646,7 @@ async def build(adapter: Any) -> dict[str, str]:
     left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=SHEET_SCALE)
     back = place_view(adapter, str(SOURCE), "*Back", *BACK_CENTER, scale=SHEET_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=SHEET_SCALE)
-    bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=SHEET_SCALE)
-    for view in (front, top, right, left, back, iso, bottom):
+    for view in (front, top, right, left, back, iso):
         set_hidden_lines_removed(adapter, view)
 
     # The top-view cutting plane passes through both orthogonal bore axes.  The
@@ -615,8 +665,8 @@ async def build(adapter: Any) -> dict[str, str]:
         section = create_section_view(
             adapter,
             top,
-            line_start=(TOP_CENTER[0], TOP_CENTER[1] - BLOCK_Z * _S / 2.0 - 0.004),
-            line_end=(TOP_CENTER[0], TOP_CENTER[1] + BLOCK_Z * _S / 2.0 + 0.004),
+            line_start=(TOP_CENTER[0], _plan_y(Z_NORTH) - 0.004),
+            line_end=(TOP_CENTER[0], _plan_y(Z_SOUTH) + 0.004),
             view_xy=SECTION_CENTER,
             section_label="A",
             scale=SHEET_SCALE,
@@ -649,13 +699,6 @@ async def build(adapter: Any) -> dict[str, str]:
         center_y_mm=PINCH_HEIGHT,
         label="pinch entry-jaw clearance",
     )
-    foot_tap_edge = _circle_entity(
-        adapter,
-        bottom,
-        radius_mm=FOOT_BORE_DIA / 2.0,
-        center_y_mm=0.0,
-        label="foot hold-down thread",
-    )
     pinch_thread_edge = _circle_entity(
         adapter,
         left,
@@ -673,7 +716,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         "PassageCenter": (
             adjuster_center[0] + plus_x_side * BLOCK_X * _S / 4.0,
-            _elevation_y(BLOCK_HEIGHT, adjuster_center) + 0.030,
+            _elevation_y(BLOCK_HEIGHT, adjuster_center) + PASSAGE_CENTER_RISE,
         ),
         "SlitDepth": (
             adjuster_center[0] + 0.043,
@@ -699,7 +742,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="adjuster entry elevation",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    top_annotations = curate_view_dimensions(
+    top_annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         top,
         keep=TOP_KEEP,
@@ -727,15 +770,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="adjuster threaded entry",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    bottom_annotations = hidden_sketches.curate_view_dimensions(
-        adapter,
-        bottom,
-        keep=BOTTOM_KEEP,
-        view_label="foot hold-down entry",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
     annotations = [
-        *bottom_annotations,
         *front_annotations,
         *top_annotations,
         *section_annotations,
@@ -752,7 +787,6 @@ async def build(adapter: Any) -> dict[str, str]:
         (right, "pinch clearance entry"),
         (left, "pinch threaded entry"),
         (back, "adjuster threaded entry"),
-        (bottom, "foot hold-down entry"),
     ):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add centre marks to {label} view")
@@ -792,31 +826,18 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pinch opposite-jaw thread",
     )
     _set_pinch_thread_callout_text(pinch_thread_callout)
-    foot_tap_callout = add_native_hole_callout(
-        adapter,
-        bottom,
-        edge=foot_tap_edge,
-        callout_xy=(BOTTOM_CENTER[0] + 0.040, BOTTOM_CENTER[1] + 0.004),
-        label="foot hold-down thread",
-    )
-    set_hole_callout_precision(
-        foot_tap_callout,
-        {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
-        label="foot tap depths",
-    )
     _audit_isometric_annotation_provenance(adapter, iso)
     # Main eye-pass af561fa7: the shaded pictorial carries no thread ink.
     _hide_cosmetic_threads(adapter, iso, label="isometric")
 
     _hide_cosmetic_threads(adapter, section, label="section")
     for text, x, y in (
-        ("VIEW C\nSHAFT ENTRY", shaft_entry_center[0] - 0.021, 0.078),
-        ("RIGHT VIEW\nPINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.026, 0.078),
-        ("VIEW B\nPINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023, 0.078),
+        ("VIEW C\nSHAFT ENTRY", shaft_entry_center[0] - 0.021, CAPTION_Y),
+        ("RIGHT VIEW\nPINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.026, CAPTION_Y),
+        ("VIEW B\nPINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023, CAPTION_Y),
         # Review: named beside the thread callout it describes (the callout
         # text starts ~0.018 right of the adjuster axis, top at ~0.120).
         ("ADJUSTER ENTRY", adjuster_center[0] + 0.023, 0.1285),
-        ("BOTTOM VIEW", BOTTOM_CENTER[0] - 0.012, BOTTOM_CENTER[1] - 0.016),
     ):
         if add_note(adapter, text, x, y) is None:
             raise RuntimeError(f"failed to add {text.lower()} view caption")
@@ -892,7 +913,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Annotation insertion can regenerate a view with inherited display state;
     # every manufacturing view is explicitly HLR at export.
-    for view in (front, top, right, left, back, section, bottom):
+    for view in (front, top, right, left, back, section):
         set_hidden_lines_removed(adapter, view)
 
     return await finalize_drawing(
@@ -902,10 +923,10 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         # SolidWorks auto-inserts one descriptive "... Tapped Hole" note per
-        # tapped Hole Wizard hole it shows: the adjuster's, and since U30 the
-        # #6-32 foot tap's (run 66084ed9 removed 2 against an expected 1).
+        # tapped Hole Wizard hole it shows: the adjuster's (I31 retired the
+        # U30 foot tap, the second one run 66084ed9 counted).
         redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=2,
+        expected_redundant_notes=1,
     )
 
 
