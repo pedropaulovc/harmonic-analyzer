@@ -180,29 +180,6 @@ HEAD_FRONT_Z = HEAD_CENTER_Z - HEAD_LEN / 2.0
 NECK_DIA = 10.5
 NECK_END_Z = 10.0
 NECK_LEN = NECK_END_Z - HEAD_REAR_Z
-# The neck's Ø10.5 is printed in detail A (2:1), which cannot take a dimension
-# moved in from another view: move, copy and a centre drop all failed, from its
-# parent profile too, and its own import skipped the end-on NeckProfile circle
-# (farm bisect neckbisect-ecef, 2026-09-25).  A hidden Top-plane reference
-# sketch carries it instead, like the bond zone's: the turning axis from the
-# head rear face to a short construction witness on the neck flank, and the
-# diametric dimension between them.  The witness stands this far from the head
-# rear face and runs NECK_DIA_WITNESS_LEN back towards the head, so the whole
-# sketch lies inside detail A's 15 mm fence round the head centre.
-NECK_DIA_WITNESS_FROM_HEAD_REAR = 6.0
-NECK_DIA_WITNESS_LEN = 1.0
-NECK_DIA_WITNESS_Z = HEAD_REAR_Z + NECK_DIA_WITNESS_FROM_HEAD_REAR
-if not (
-    HEAD_REAR_Z
-    < NECK_DIA_WITNESS_Z - NECK_DIA_WITNESS_LEN
-    < NECK_DIA_WITNESS_Z
-    < NECK_END_Z
-):
-    raise AssertionError("the neck-diameter witness must lie on the neck")
-NECK_REFERENCE_SKETCH = "NeckReference"
-# Construction-only sketches the part saves hidden; the drawing shows them in
-# memory while it creates and dimensions detail A (_drawing_hidden_sketches).
-REFERENCE_SKETCHES = (NECK_REFERENCE_SKETCH,)
 EXPOSED_SHAFT_LEN = SHAFT_LEN - NECK_END_Z
 # R1 (U27 precedent, Main 2026-09-24): a stock 6 mm reamer cuts 6.000-6.015
 # and as-received bar is at most 6.000, so a novice cannot make the old 0.0125
@@ -296,17 +273,14 @@ SURFACE_FINISHES = tuple(
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    # The head diameter is a Front-plane circle: imported end-on on the donor
-    # view and moved onto the 1:1 profile (5cc191fb's proven path; a detail
-    # silhouette screen pick is seat-dependent and failed on w6).  The neck's
-    # is printed in detail A from the hidden NeckReference sketch (see
-    # NECK_DIA_WITNESS_FROM_HEAD_REAR); the neck circle's own diameter is
-    # NeckProfileDia, unmarked, and both follow the NeckDia global.  The Ø8
-    # is not a circle dimension either: its circle's witnesses crossed the
-    # neck face, so the bond zone carries its own flank diameter
+    # Head and neck diameters are Front-plane circles: imported end-on and
+    # printed on the sheet's end view (draw_pinion_arbor.END_KEEP), where they
+    # show true; neither fits the 1:1 profile or takes a move into detail A.
+    # The Ø8 is not a circle dimension on the sheet: its circle's witnesses
+    # crossed the neck face, so the bond zone carries its own flank diameter
     # (BondZoneReference).
     "HeadProfile": {"HeadDia"},
-    NECK_REFERENCE_SKETCH: {"NeckDia"},
+    "NeckProfile": {"NeckDia"},
     "Head": {"HeadLen"},
     "Neck": {"NeckLen"},
     "BondZoneReference": {"BondZoneDia"},
@@ -336,7 +310,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HeadProfile": {"HeadDia": 1},
-    NECK_REFERENCE_SKETCH: {"NeckDia": 1},
+    "NeckProfile": {"NeckDia": 1},
     "Head": {"HeadLen": 1},
     "Neck": {"NeckLen": 2},
     "BondZoneReference": {"BondZoneDia": 2},

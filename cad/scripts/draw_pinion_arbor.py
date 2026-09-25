@@ -7,7 +7,6 @@ import math
 import sys
 from typing import Any
 
-import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
@@ -33,10 +32,10 @@ from _layout_geometry import audit_sheet, format_findings
 from _surface_finish import surface_finish_by_key
 from pinion_arbor_pin_spec import PIN_HOLE_CALLOUT
 from pinion_arbor_spec import (
+    BACK_CAP_SAG,
     BACK_JOURNAL_Z,
     BOND_ZONE_DIA_Z,
     CROSS_HOLE_CALLOUT,
-    DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRUM_STATION,
     FRONT_JOURNAL_Z,
@@ -47,10 +46,7 @@ from pinion_arbor_spec import (
     HEAD_REAR_Z,
     JOURNAL_LEN,
     NECK_DIA,
-    NECK_DIA_WITNESS_LEN,
-    NECK_DIA_WITNESS_Z,
     OVERALL_LEN,
-    REFERENCE_SKETCHES,
     SHAFT_DIA,
     SURFACE_FINISHES,
 )
@@ -58,7 +54,6 @@ from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
-    delete_view,
     iter_views,
     place_view,
 )
@@ -77,6 +72,7 @@ ISO_CENTER = (0.365, 0.225)
 DETAIL_CENTER = (0.165, 0.235)
 DETAIL_SCALE = (2, 1)
 DETAIL_RADIUS_MM = 15.0
+DETAIL_RATIO = DETAIL_SCALE[0] / DETAIL_SCALE[1]
 # The native "DETAIL A / SCALE 2:1" label sits centred under its own detail
 # circle, this far below it (the label's anchor is its top edge): clear of the
 # HeadLen text that rides the circle's lower edge.
@@ -87,14 +83,6 @@ DETAIL_LABEL_XY = (
     - DETAIL_RADIUS_MM * DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
     - DETAIL_LABEL_DROP,
 )
-# The head diameter lives in an end-on Front-plane profile sketch, so the
-# end-on donor imports it and it moves onto the 1:1 profile.  The neck's is
-# imported straight into detail A from the part's hidden NeckReference sketch
-# (DETAIL_DIAMETER_POSITIONS says why), and the Ø8 is dimensioned on the
-# profile itself, from the bond zone's flank.
-DONOR_KEEP = {
-    "HeadDia": (0.030, 0.215),
-}
 # Profile scale is 1:1 with the head to the right, so model z maps to sheet
 # x = 0.200 - (z - 106.725) / 1000.  The lands are centred on their straps, so
 # their centres (x 0.252 front, 0.099 back) hold whatever the derived land
@@ -103,6 +91,8 @@ DONOR_KEEP = {
 # BACK_JOURNAL_TEXT_X).  The stations from the Ø15 head rear face stack
 # below the shaft.
 MODEL_Z_AT_SHEET_ORIGIN_X = 106.725
+# The back crown's apex, the profile's left end (x 0.0793).
+BACK_APEX_Z = HEAD_FRONT_Z - HEAD_CAP_SAG + OVERALL_LEN
 
 
 def _sheet_x(model_z: float) -> float:
@@ -192,19 +182,6 @@ REFERENCE_WITNESSES = {
     ),
     "BondZoneReference": (BOND_ZONE_DIA_Z, BOND_ZONE_DIA_Z + BOND_ZONE_WITNESS_LEN),
 }
-# Detail A shows the NeckReference sketch (it is created while the part shows
-# it), and its short construction witness lies on the lower Ø10.5 outline:
-# at 2:1 the same grey break, so it is drawn black there too.
-DETAIL_REFERENCE_WITNESSES = {
-    "NeckReference": (NECK_DIA_WITNESS_Z - NECK_DIA_WITNESS_LEN, NECK_DIA_WITNESS_Z),
-}
-# The profile should not show NeckReference: the part saves it hidden, and
-# the profile exists before the drawing shows it in memory.  That is not
-# measured, so the raster gate reads its span on the profile's neck too, and
-# a grey witness there fails loud.
-PROFILE_NECK_WITNESS = "NeckReference (profile)"
-# A witness's two sheet endpoints (m).
-Span = tuple[tuple[float, float], tuple[float, float]]
 SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
 REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the witnesses are fully defined sketch lengths
 # Exported-raster proof that the outline stays unbroken over each witness:
@@ -240,8 +217,8 @@ PRINCIPAL_KEEP = {
     "BackCapR": (0.045, 0.140),
     # R1a's collar pin hole (x 0.269) sits over the front land's Ra symbol,
     # so both its dimensions stand ABOVE the shaft: the station from the head
-    # rear face in a row over the Ø15's, and the hole's leader rising left of
-    # that row's witness, above the 19.0's right arrow tail.
+    # rear face in a row well over the Ø15 head, and the hole's leader rising
+    # left of that row's witness, above the 19.0's right arrow tail.
     "PinStationFromHeadRear": (0.288, 0.207),
     "PinHoleDia": (0.250, 0.222),
 }
@@ -252,61 +229,246 @@ DETAIL_KEEP = {
     # Above the hole's centre line, so the leader drops onto the hole edge.
     "CrossHoleDia": (0.245, 0.256),
 }
-# The head sits inside detail A's fence at the right end of the profile (the
-# fence spans x 0.298-0.328 on the axis, y 0.170): the Ø15's dimension line
-# stands inside the fence and runs up to its text above it.  The line sits
-# between the crown apex (x 0.3215) and the fence (x 0.3262 at the head's
-# top and bottom edges), so its witnesses stay inside the circle: they used
-# to run out through it to x 0.340, reading as part of the detail callout
-# with the "A" label between them (Fable r-delta).
-DIAMETER_POSITIONS = {
-    "HeadDia": (0.3238, 0.192),
+# The Ø15 head and the Ø10.5 neck are Front-plane circles, so they print
+# where they show true: on an END view (Main's option C, 2026-09-25).  They
+# fit nowhere else.  On the 1:1 profile the Ø10.5 has no x: its text must end
+# left of the collar-pin station witness (x 0.3076, stacktop-dbe47ae3) while
+# its witnesses must stay inside detail A's fence (x >= 0.300, c486b6e1).
+# Detail A takes a moved dimension in no form (move, copy and a centre drop
+# all refused, farm bisect neckbisect-ecef, run 20260925T134711864Z-47d629b0),
+# and a hidden reference sketch's diameter never arrived in its import
+# (84e55ff68, leaf neckref-84e5).  The end-on view that imported both as the
+# old donor (824056ef9) therefore stays on the sheet as a real projected view.
+#
+# ASME third angle: *Front looks along -Z, from the +Z end.  The profile runs
+# +Z to the LEFT (the back crown is its left end, x 0.0793), so this is the
+# profile's LEFT view: left of it, on its row (the axis at the profile's y),
+# at its 1:1 scale, and turned like the profile so model +X points down the
+# sheet in both and +Y (towards the profile's viewer) points at the profile.
+# From the back end every step grows towards the head, so the Ø8, Ø10.5 and
+# Ø15 all show as visible circles; from the head end the Ø15 hides the neck.
+END_CENTER = (0.047, PRINCIPAL_CENTER[1])
+END_SCALE = SHEET_SCALE
+VIEW_ANGLE = -math.pi / 2.0
+# Both diameters stand above the view, their leaders running down through the
+# common centre (the two lines cross there, as concentric diameters do): the
+# Ø15 up-left towards the border, the Ø10.5 up-right towards the profile, the
+# rows 8 mm apart so no text shares a height with the other.
+END_KEEP = {
+    "HeadDia": (0.030, 0.196),
+    "NeckDia": (0.062, 0.188),
 }
-# The neck's Ø10.5 has no place on the 1:1 profile.  The layout audit boxes
-# its text from 15.6 mm left of the dimension line to 11.5 mm right of it,
-# 2.8 mm below the text position to 0.7 mm above (stacktop-dbe47ae3 read
-# [284.4,191.2]..[311.5,194.7] mm for text at (0.300, 0.194)).  Two gates
-# then leave no x for the line:
-# - the collar-pin station's head-rear-face witness rises through that row
-#   at x 0.3076, so the box must end left of it: line x < 0.2961
-#   (stacktop-dbe47ae3);
-# - the witnesses overshoot the line by 1 mm (c486b6e1: line 294.5, witness
-#   ends 293.5), and at the neck's edges (5.25 mm off the axis) they must
-#   stay inside detail A's 15 mm fence round the head centre (x 0.3132):
-#   line x >= 0.300 (c486b6e1 failed at 0.2945).
-# Above the station row the line would cross the station's own dimension
-# line into its "COLLAR PIN" text; below the shaft the head-rear-face
-# station witnesses and the neck-end witness drop through the row.  So the
-# neck is dimensioned inside detail A, which shows it from the fence to the
-# head rear face (Main's ruling).
-NECK_DIA_TEXT_BOX_FROM_POSITION = (-0.0156, 0.0115, -0.0028, 0.0007)
-DETAIL_RATIO = DETAIL_SCALE[0] / DETAIL_SCALE[1]
+END_VIEW_LABEL = "integral-arbor end view"
+# The sheet position tolerance for the end view's centre after placement.
+END_CENTER_TOL_M = 1e-5
+
+# ---------------------------------------------------------------------------
+# End-view ink audit
+#
+# The layout audit this module gates (_assert_no_text_on_line) compares text
+# with lines and text with text, but no text with a view's model outline, and
+# the shared layout check boxes every dimension as a nominal 8 mm
+# CollisionScope.NONE square (_drawing_common._dim_element), so it compares
+# no dimension text at all.  So the end view's corner of the sheet audits its
+# own ink before any COM work (cone-tip-block's sheet_ink_collisions, 287c5cf6a):
+# the two diameters' text blocks against each other, the neighbouring profile
+# callouts, every view's outline, the lines that stand in that corner and the
+# sheet border.
+#
+# Extents are (left, down, right, up) of the printed ink from the position the
+# module commands, in sheet metres.  A circle diameter prints its text about
+# its position with the leader's shoulder ~2 mm past each end (wheel-axle's
+# Ø35.00: ±8.3 mm by -2.3/+2.1 mm, rk3 render), while the layout audit boxed
+# the profile's Ø10.5 from 15.6 mm left of its position to 11.5 mm right,
+# 2.8 mm down and 0.7 mm up (stacktop-dbe47ae3).  The end-view box covers
+# both, 15.6 mm to either side.
+END_DIA_TEXT_EXTENT = (0.0156, 0.0030, 0.0156, 0.0025)
+# Where the leader leaves the shoulder: its circle-side end, this far along
+# and below the text position (wheel-axle's shoulders end ~1.5 mm past a
+# ~7 mm half-text, ~2.5 mm under its centre).
+END_DIA_SHOULDER = (0.0090, 0.0025)
+# The profile's callouts in that corner, measured on the a1a694a6 render
+# (4.63 px/mm): "SR7.3" x 38.9-50.7, y 137.3-142.3 mm with its shelf to 54 mm;
+# "(1.2) / BACK CROWN" x 38.9-71.2, y 214.6-225.0 mm with its shelf to 77 mm;
+# the back JOURNAL block right of its line (DIAMETER_BLOCK_SIZE).
+NEIGHBOUR_TEXT_EXTENTS = {
+    "BackCapR": (0.0065, 0.0030, 0.0095, 0.0025),
+    "BackCapSagDim": (0.0165, 0.0060, 0.0225, 0.0055),
+    "BackJournalDia": (0.0010, 0.0075, 0.0270, 0.0075),
+}
+# The SR7.3 leader leaves its shelf end for the crown 2.9 mm under the axis.
+BACK_CAP_R_LEADER_DROP = 0.0029
+# A text block keeps this much air to another text block, and to any view's
+# model outline, line or the sheet's inner border.
+END_TEXT_CLEARANCE = 0.0010
+END_OUTLINE_CLEARANCE = 0.0010
+# The landscape B sheet's inner border, measured on the a1a694a6 render.
+SHEET_INNER_LEFT = 0.0125
+
+InkBox = tuple[float, float, float, float]
+InkLine = tuple[tuple[float, float], tuple[float, float]]
 
 
-def _detail_x(model_z: float) -> float:
-    """Sheet x of a model station inside detail A (head centre at its centre)."""
-    return DETAIL_CENTER[0] + DETAIL_RATIO * (
-        _sheet_x(model_z) - _sheet_x(HEAD_CENTER_Z)
+def _ink_box(point: tuple[float, float], extent: tuple[float, float, float, float]) -> InkBox:
+    left, down, right, up = extent
+    return (point[0] - left, point[1] - down, point[0] + right, point[1] + up)
+
+
+def _circle_box(center: tuple[float, float], radius: float) -> InkBox:
+    return (center[0] - radius, center[1] - radius, center[0] + radius, center[1] + radius)
+
+
+def end_view_text_boxes(keep: dict[str, tuple[float, float]] = END_KEEP) -> dict[str, InkBox]:
+    """The end view's diameter texts and the profile callouts beside them."""
+    boxes = {name: _ink_box(point, END_DIA_TEXT_EXTENT) for name, point in keep.items()}
+    for name, extent in NEIGHBOUR_TEXT_EXTENTS.items():
+        boxes[name] = _ink_box(PRINCIPAL_KEEP[name], extent)
+    return boxes
+
+
+def sheet_view_outlines(end_center: tuple[float, float] = END_CENTER) -> dict[str, InkBox]:
+    """Each view's model outline: the end view's Ø15, the profile, detail A."""
+    axis_y = PRINCIPAL_CENTER[1]
+    head_r = HEAD_DIA / 2000.0
+    return {
+        "end view": _circle_box(end_center, head_r),
+        "profile": (
+            _sheet_x(BACK_APEX_Z),
+            axis_y - head_r,
+            _sheet_x(HEAD_FRONT_Z - HEAD_CAP_SAG),
+            axis_y + head_r,
+        ),
+        "detail A": _circle_box(DETAIL_CENTER, DETAIL_RATIO * DETAIL_RADIUS_MM / 1000.0),
+    }
+
+
+def _diameter_line(
+    text_xy: tuple[float, float], center: tuple[float, float], diameter: float
+) -> InkLine:
+    """A circle diameter's line: from its shoulder, through the centre, to the far arrow."""
+    toward = 1.0 if text_xy[0] < center[0] else -1.0
+    start = (
+        text_xy[0] + toward * END_DIA_SHOULDER[0],
+        text_xy[1] - END_DIA_SHOULDER[1],
     )
+    dx, dy = center[0] - start[0], center[1] - start[1]
+    length = math.hypot(dx, dy)
+    radius = diameter / 2000.0
+    return start, (center[0] + dx / length * radius, center[1] + dy / length * radius)
 
 
-# In detail A the neck runs from the fence (x ~0.137 at its edges) to the
-# head rear face (x 0.1545), its Ø10.5 at y 0.2245-0.2455.  Detail A takes
-# no dimension moved in from another view (move, copy and a centre drop all
-# failed, from its parent too: farm bisect neckbisect-ecef), so the Ø10.5 is
-# imported into it from the part's hidden NeckReference sketch, whose witness
-# stands NECK_DIA_WITNESS_Z on the neck (x 0.1425).  A line at x 0.140, fence
-# side of it, keeps both witnesses on the neck.  The text runs on past the
-# line (the profile rendered it left of its line at a1a694a6), so it rides
-# above-left of the fence, clear of the circle like every other detail-A
-# callout; the line crosses the fence once, square, to reach it.
-DETAIL_DIAMETER_POSITIONS = {
-    "NeckDia": (0.140, 0.2575),
-}
-# Everything detail A prints, imported feature by feature
-# (_drawing_hidden_sketches.curate_view_dimensions) while the part shows
-# REFERENCE_SKETCHES.
-DETAIL_A_KEEP = {**DETAIL_KEEP, **DETAIL_DIAMETER_POSITIONS}
+def sheet_corner_lines(
+    keep: dict[str, tuple[float, float]] = END_KEEP,
+    end_center: tuple[float, float] = END_CENTER,
+) -> dict[str, InkLine]:
+    """The lines standing in the end view's corner, keyed by their owner."""
+    axis_y = PRINCIPAL_CENTER[1]
+    shaft_top = axis_y + SHAFT_DIA / 2000.0
+    sag_x, sag_y = PRINCIPAL_KEEP["BackCapSagDim"]
+    witness_top = sag_y - NEIGHBOUR_TEXT_EXTENTS["BackCapSagDim"][1] + 0.0005
+    radius_x, radius_y = PRINCIPAL_KEEP["BackCapR"]
+    extent = NEIGHBOUR_TEXT_EXTENTS["BackCapR"]
+    diameters = {"HeadDia": HEAD_DIA, "NeckDia": NECK_DIA}
+    return {
+        "BackCapSagDim apex witness": (
+            (_sheet_x(BACK_APEX_Z), shaft_top),
+            (_sheet_x(BACK_APEX_Z), witness_top),
+        ),
+        "BackCapSagDim root witness": (
+            (_sheet_x(BACK_APEX_Z - BACK_CAP_SAG), shaft_top),
+            (_sheet_x(BACK_APEX_Z - BACK_CAP_SAG), witness_top),
+        ),
+        "BackCapR": (
+            (radius_x + extent[2], radius_y - extent[1]),
+            (_sheet_x(BACK_APEX_Z), axis_y - BACK_CAP_R_LEADER_DROP),
+        ),
+        **{
+            name: _diameter_line(xy, end_center, diameters[name])
+            for name, xy in keep.items()
+        },
+    }
+
+
+def _box_gap(a: InkBox, b: InkBox) -> float:
+    """Air between two boxes along their clearer axis; negative when they overlap."""
+    return max(b[0] - a[2], a[0] - b[2], b[1] - a[3], a[1] - b[3])
+
+
+def _line_meets_box(line: InkLine, box: InkBox) -> bool:
+    """Liang-Barsky: whether any part of ``line`` lies inside ``box``."""
+    (x0, y0), (x1, y1) = line
+    dx, dy = x1 - x0, y1 - y0
+    t0, t1 = 0.0, 1.0
+    for p, q in ((-dx, x0 - box[0]), (dx, box[2] - x0), (-dy, y0 - box[1]), (dy, box[3] - y0)):
+        if p == 0.0:
+            if q < 0.0:
+                return False
+            continue
+        t = q / p
+        if p < 0.0:
+            t0 = max(t0, t)
+        else:
+            t1 = min(t1, t)
+        if t0 > t1:
+            return False
+    return True
+
+
+def _grown(box: InkBox, by: float) -> InkBox:
+    return (box[0] - by, box[1] - by, box[2] + by, box[3] + by)
+
+
+def end_view_ink_collisions(
+    texts: dict[str, InkBox],
+    outlines: dict[str, InkBox],
+    lines: dict[str, InkLine],
+    *,
+    audited: tuple[str, ...] = tuple(END_KEEP),
+) -> list[str]:
+    """Every ``audited`` text too near another text, an outline, a foreign line
+    or the sheet's inner border."""
+    findings: list[str] = []
+    for name in audited:
+        box = texts[name]
+        for other, other_box in sorted(texts.items()):
+            if other == name or (other in audited and other < name):
+                continue
+            gap = _box_gap(box, other_box)
+            if gap < END_TEXT_CLEARANCE:
+                findings.append(
+                    f"text-on-text: {name!r} and {other!r} stand {gap * 1000.0:.2f} mm apart"
+                )
+        for view, outline in sorted(outlines.items()):
+            gap = _box_gap(box, outline)
+            if gap < END_OUTLINE_CLEARANCE:
+                findings.append(
+                    f"text-on-outline: {name!r} stands {gap * 1000.0:.2f} mm from the "
+                    f"{view} outline"
+                )
+        for owner, line in sorted(lines.items()):
+            if owner != name and _line_meets_box(line, _grown(box, END_TEXT_CLEARANCE)):
+                findings.append(f"text-on-line: {owner}'s line runs through {name!r}")
+        if box[0] - SHEET_INNER_LEFT < END_OUTLINE_CLEARANCE:
+            findings.append(
+                f"outside-border: {name!r} starts {(box[0] - SHEET_INNER_LEFT) * 1000.0:.2f} "
+                "mm inside the sheet's inner border"
+            )
+    return findings
+
+
+def assert_end_view_ink_clear() -> None:
+    """Refuse an end-view placement whose own text collides, before any COM work."""
+    findings = end_view_ink_collisions(
+        end_view_text_boxes(), sheet_view_outlines(), sheet_corner_lines()
+    )
+    if findings:
+        raise RuntimeError(
+            "pinion-arbor end-view ink collides:\n"
+            + "\n".join(f"  - {finding}" for finding in findings)
+        )
+    _telemetry.debug("pinion-arbor end-view ink clear")
+
+
 DIMENSION_CALLOUTS = {
     # One name for the axial datum every station runs from (Fable m1): the
     # head end has two shoulders, Ø8-Ø10.5 and Ø10.5-Ø15.
@@ -336,46 +498,147 @@ JOURNAL_FINISHES = {
 }
 
 
-def _move_dimension(
-    adapter: Any,
-    annotation: Any,
-    target: Any,
-    text_xy: tuple[float, float],
-    *,
-    source_view: Any,
-) -> Any:
-    """Move a native model dimension and verify its new drawing-view owner."""
-    name = dimension_name(adapter, annotation)
+def _orient_like_profile(view: Any, *, label: str) -> None:
+    """Turn a view so model +X points down the sheet, as on the profile."""
+    native = _early_bound(view, "IView")
+    native.Angle = VIEW_ANGLE
+    if abs(math.remainder(float(native.Angle) - VIEW_ANGLE, 2.0 * math.pi)) > 1e-9:
+        raise RuntimeError(f"failed to orient the {label}")
+
+
+def _place_end_view(adapter: Any) -> Any:
+    """Place the profile's third-angle left view with its axis on END_CENTER.
+
+    The view is placed on its geometry's centre, which for the end-on arbor is
+    the turning axis; the turn and any residual offset are measured, not
+    assumed, and a view still off END_CENTER after one correction fails loud.
+    """
     draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, source_view)):
-        raise RuntimeError(f"{name}: failed to activate source dimension view")
-    draw.ClearSelection2(True)
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    selection_name = str(display.GetNameForSelection() or "")
-    if not selection_name or not draw.Extension.SelectByID2(
-        selection_name,
-        "DIMENSION",
-        0.0,
-        0.0,
-        0.0,
-        False,
-        0,
-        null_callout(),
-        0,
-    ):
-        raise RuntimeError(f"failed to select model dimension {name}: {selection_name!r}")
-    drawing.DragModelDimension(view_name(adapter, target), 2, text_xy[0], text_xy[1], 0.0)
-    draw.ClearSelection2(True)
+    end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=END_SCALE)
+    _orient_like_profile(end, label=END_VIEW_LABEL)
     draw.EditRebuild3()
-    matches = [
-        _early_bound(item, "IAnnotation")
-        for item in (_early_bound(target, "IView").GetAnnotations() or ())
-        if dimension_name(adapter, _early_bound(item, "IAnnotation")) == name
-    ]
-    if len(matches) != 1:
-        raise RuntimeError(f"{name}: native dimension did not move into target view")
-    return matches[0]
+    center = model_point_in_view(adapter, end, (0.0, 0.0, 0.0), label="end view axis")
+    if math.dist(center, END_CENTER) > END_CENTER_TOL_M:
+        native = _early_bound(end, "IView")
+        position = tuple(float(value) for value in native.Position)
+        target = [position[axis] + END_CENTER[axis] - center[axis] for axis in range(2)]
+        if not native.SetViewPosition(double_array(target), False):
+            raise RuntimeError(f"failed to centre the {END_VIEW_LABEL}")
+        draw.EditRebuild3()
+        center = model_point_in_view(adapter, end, (0.0, 0.0, 0.0), label="end view axis")
+    if math.dist(center, END_CENTER) > END_CENTER_TOL_M:
+        raise RuntimeError(
+            f"{END_VIEW_LABEL} axis sits at ({center[0] * 1000:.2f}, "
+            f"{center[1] * 1000:.2f}) mm, not on END_CENTER"
+        )
+    return end
+
+
+def end_view_projection_problems(
+    end: dict[str, tuple[float, float]],
+    profile: dict[str, tuple[float, float]],
+    *,
+    radius: float,
+    tol: float = END_CENTER_TOL_M,
+) -> list[str]:
+    """Why the end view is not the profile's third-angle left view, if it is not.
+
+    ``end`` holds the end view's sheet points for the model origin (``"axis"``),
+    ``(radius, 0, 0)`` (``"+x"``) and ``(0, radius, 0)`` (``"+y"``); ``profile``
+    the profile's for the origin (``"axis"``), ``(radius, 0, 0)`` (``"+x"``)
+    and the back-crown apex on the axis (``"left end"``).  Both views are 1:1.
+    """
+    problems = []
+    axis = end["axis"]
+    if abs(axis[1] - profile["axis"][1]) > tol:
+        problems.append(
+            f"axis at y {axis[1] * 1000:.2f} mm, off the profile's row "
+            f"(y {profile['axis'][1] * 1000:.2f} mm)"
+        )
+    if axis[0] >= profile["left end"][0]:
+        problems.append("not left of the profile's +Z (back-crown) end")
+    for key, want in (("+x", (0.0, -radius)), ("+y", (radius, 0.0))):
+        got = (end[key][0] - axis[0], end[key][1] - axis[1])
+        if math.dist(got, want) > tol:
+            problems.append(
+                f"model {key} maps to ({got[0] * 1000:.2f}, {got[1] * 1000:.2f}) mm, "
+                f"want ({want[0] * 1000:.2f}, {want[1] * 1000:.2f})"
+            )
+    profile_x = (
+        profile["+x"][0] - profile["axis"][0],
+        profile["+x"][1] - profile["axis"][1],
+    )
+    if math.dist(profile_x, (0.0, -radius)) > tol:
+        problems.append(
+            f"the profile maps model +x to ({profile_x[0] * 1000:.2f}, "
+            f"{profile_x[1] * 1000:.2f}) mm, not straight down"
+        )
+    return problems
+
+
+def _assert_end_view_projects_the_profile(adapter: Any, end: Any, principal: Any) -> None:
+    radius = HEAD_DIA / 2000.0
+    end_points = {
+        key: model_point_in_view(adapter, end, xyz, label=f"end view {key}")
+        for key, xyz in (
+            ("axis", (0.0, 0.0, 0.0)),
+            ("+x", (radius, 0.0, 0.0)),
+            ("+y", (0.0, radius, 0.0)),
+        )
+    }
+    profile_points = {
+        key: model_point_in_view(adapter, principal, xyz, label=f"profile {key}")
+        for key, xyz in (
+            ("axis", (0.0, 0.0, 0.0)),
+            ("+x", (radius, 0.0, 0.0)),
+            ("left end", (0.0, 0.0, BACK_APEX_Z / 1000.0)),
+        )
+    }
+    problems = end_view_projection_problems(end_points, profile_points, radius=radius)
+    if problems:
+        raise RuntimeError(
+            f"pinion-arbor: the {END_VIEW_LABEL} is not the profile's left view: "
+            + "; ".join(problems)
+        )
+    _telemetry.success(
+        f"pinion-arbor: {END_VIEW_LABEL} projects the profile's +Z end on its row, axis at "
+        f"({end_points['axis'][0] * 1000:.2f}, {end_points['axis'][1] * 1000:.2f}) mm"
+    )
+
+
+def end_view_owner_problems(
+    names_by_view: dict[str, list[str]], end_name: str
+) -> list[str]:
+    """Each end-view diameter must print once, on the end view, and nowhere else."""
+    problems = []
+    for name in END_KEEP:
+        owners = [view for view, names in names_by_view.items() for item in names if item == name]
+        if owners != [end_name]:
+            problems.append(f"{name} printed on {owners}, want [{end_name!r}]")
+    return problems
+
+
+def _assert_end_view_owns_its_diameters(adapter: Any, end: Any) -> None:
+    names_by_view = {
+        view_name(adapter, view): sorted(
+            dimension_name(adapter, annotation)
+            for annotation in (
+                _early_bound(item, "IAnnotation")
+                for item in (_early_bound(view, "IView").GetAnnotations() or ())
+            )
+            if int(annotation.GetType()) == _SW_DISPLAY_DIMENSION
+        )
+        for view in iter_views(adapter)
+    }
+    end_name = view_name(adapter, end)
+    _telemetry.info(
+        "pinion-arbor dimensions by view: "
+        + "; ".join(f"{view}: {names}" for view, names in names_by_view.items())
+    )
+    problems = end_view_owner_problems(names_by_view, end_name)
+    if problems:
+        raise RuntimeError("pinion-arbor end-view diameters: " + "; ".join(problems))
+    _telemetry.success(f"pinion-arbor: {sorted(END_KEEP)} print on {end_name} only")
 
 
 def _head_detail(adapter: Any, parent_view: Any) -> Any:
@@ -442,70 +705,6 @@ def _head_detail(adapter: Any, parent_view: Any) -> Any:
     return detail
 
 
-DETAIL_A_LABEL = "integral-arbor head detail"
-
-
-def _logged_detail_arrivals(adapter: Any, detail: Any) -> list[str]:
-    """Log and return the model dimensions detail A owns, sorted: the farm
-    leaf's evidence of what the import delivered, whichever way it went."""
-    arrived = sorted(
-        dimension_name(adapter, annotation)
-        for annotation in (
-            _early_bound(item, "IAnnotation")
-            for item in (_early_bound(detail, "IView").GetAnnotations() or ())
-        )
-        if int(annotation.GetType()) == _SW_DISPLAY_DIMENSION
-    )
-    _telemetry.info(
-        f"pinion-arbor detail A after its import: arrived={arrived}, "
-        f"expected={sorted(DETAIL_A_KEEP)}",
-        arrived=",".join(arrived),
-    )
-    return arrived
-
-
-def _dimensioned_head_detail(
-    adapter: Any, source_model: Any, principal: Any
-) -> tuple[Any, list[Any], dict[str, Span]]:
-    """Create detail A and dimension it while the part shows NeckReference.
-
-    A detail takes a hidden sketch's visibility from the part when it is
-    created and refuses the per-view override (_drawing_hidden_sketches), so
-    it is created, imported feature by feature, and has its neck witness
-    drawn black inside ``part_sketches_shown``.  Returns the detail, its kept
-    dimensions and the witness's sheet span.  An import that misses NeckDia
-    fails with one message naming what did arrive.
-    """
-    detail = None
-    try:
-        with hidden_sketches.part_sketches_shown(
-            adapter, source_model, REFERENCE_SKETCHES, label="detail A neck diameter"
-        ):
-            detail = _head_detail(adapter, principal)
-            set_hidden_lines_removed(adapter, detail)
-            annotations = hidden_sketches.curate_view_dimensions(
-                adapter,
-                detail,
-                keep=DETAIL_A_KEEP,
-                view_label=DETAIL_A_LABEL,
-                dimensions_by_feature=DRAWING_DIMENSIONS,
-            )
-            _logged_detail_arrivals(adapter, detail)
-            spans = _blacken_reference_witnesses(
-                adapter, detail, DETAIL_REFERENCE_WITNESSES, flank_dia=NECK_DIA
-            )
-    except RuntimeError as error:
-        if detail is None:
-            raise
-        arrived = _logged_detail_arrivals(adapter, detail)
-        if "NeckDia" in arrived:
-            raise
-        raise RuntimeError(
-            f"NeckDia did not import into detail A: arrived={arrived}; {error}"
-        ) from error
-    return detail, annotations, spans
-
-
 def _add_turning_axis(adapter: Any, view: Any) -> None:
     """Draw one centreline over the whole turned axis.
 
@@ -549,40 +748,25 @@ def _add_turning_axis(adapter: Any, view: Any) -> None:
     draw.EditRebuild3()
 
 
-def _flank_span(
-    adapter: Any, view: Any, flank_dia: float, z0: float, z1: float, *, label: str
-) -> Span:
-    """Sheet endpoints of a run of the lower flank (model +x) from z0 to z1 mm."""
-    flank_x = flank_dia / 2000.0
-    first, second = (
-        model_point_in_view(adapter, view, (flank_x, 0.0, z / 1000.0), label=label)
-        for z in (z0, z1)
-    )
-    return first, second
-
-
 def _blacken_reference_witnesses(
-    adapter: Any,
-    view: Any,
-    witnesses: dict[str, tuple[float, float]],
-    *,
-    flank_dia: float,
-) -> dict[str, Span]:
+    adapter: Any, view: Any
+) -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
     """Draw each reference sketch's flank witness in the outline's black.
 
-    ``witnesses`` maps each sketch to its witness's model z span (mm), on the
-    lower flank of the ``flank_dia`` diameter.  Returns each witness's sheet
-    endpoints for the exported-raster check.
+    Returns each witness's sheet endpoints for the exported-raster check.
     """
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
-    label = view_name(adapter, view)
-    if not drawing.ActivateView(label):
-        raise RuntimeError(f"failed to activate {label} for its reference witnesses")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the integral-arbor profile for its witnesses")
+    flank_x = SHAFT_DIA / 2000.0
     spans = {}
-    for sketch_name, (z0, z1) in witnesses.items():
-        ends = _flank_span(
-            adapter, view, flank_dia, z0, z1, label=f"{sketch_name} witness end"
+    for sketch_name, (z0, z1) in REFERENCE_WITNESSES.items():
+        ends = tuple(
+            model_point_in_view(
+                adapter, view, (flank_x, 0.0, z / 1000.0), label=f"{sketch_name} witness end"
+            )
+            for z in (z0, z1)
         )
         mid = ((ends[0][0] + ends[1][0]) / 2.0, (ends[0][1] + ends[1][1]) / 2.0)
         draw.ClearSelection2(True)
@@ -599,8 +783,8 @@ def _blacken_reference_witnesses(
         # Identify the pick by its own length, not its sketch's name: an
         # ISketch is not an IFeature dispatch, so rebinding it reads another
         # member (7885c0d9 got a 16-double matrix back for ``Name``).  The
-        # only other flank construction segment on the profile is the front
-        # land's 19 mm witness; detail A has none but the neck's.
+        # only other flank construction segment here is the front land's
+        # 19 mm witness.
         name = str(segment.GetName())
         length = float(segment.GetLength()) * 1000.0
         expected = z1 - z0
@@ -614,10 +798,9 @@ def _blacken_reference_witnesses(
         draw.ClearSelection2(True)
         spans[sketch_name] = ends
         _telemetry.info(
-            f"pinion-arbor: {sketch_name} flank witness drawn black in {label} "
-            f"at sheet ({mid[0] * 1000:.1f}, {mid[1] * 1000:.1f}) mm",
+            f"pinion-arbor: {sketch_name} flank witness drawn black at sheet "
+            f"({mid[0] * 1000:.1f}, {mid[1] * 1000:.1f}) mm",
             sketch=sketch_name,
-            view=label,
         )
     draw.EditRebuild3()
     return spans
@@ -625,7 +808,7 @@ def _blacken_reference_witnesses(
 
 def _broken_outline_columns(
     raster: Any,
-    spans: dict[str, Span],
+    spans: dict[str, tuple[tuple[float, float], tuple[float, float]]],
     sheet_size: tuple[float, float],
 ) -> dict[str, list[int]]:
     """Return, per witness, the raster columns where the outline is not dark."""
@@ -647,7 +830,7 @@ def _broken_outline_columns(
 
 def _assert_outline_unbroken(
     png: Any,
-    spans: dict[str, Span],
+    spans: dict[str, tuple[tuple[float, float], tuple[float, float]]],
     sheet_size: tuple[float, float],
 ) -> None:
     from PIL import Image
@@ -659,10 +842,9 @@ def _assert_outline_unbroken(
             f"{name}: {len(columns)} column(s) from x={columns[0]} px"
             for name, columns in broken.items()
         )
-        raise RuntimeError(f"pinion-arbor: outline broken over reference witness: {detail}")
+        raise RuntimeError(f"pinion-arbor: Ø8 outline broken over reference witness: {detail}")
     _telemetry.info(
-        f"pinion-arbor: outline unbroken over {len(spans)} reference witnesses: "
-        f"{sorted(spans)}",
+        f"pinion-arbor: Ø8 outline unbroken over {len(spans)} reference witnesses",
         witnesses=len(spans),
     )
 
@@ -690,9 +872,9 @@ def _position_detail_label(adapter: Any, detail: Any) -> None:
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
+    assert_end_view_ink_clear()
 
     check("open pinion-arbor source", await adapter.open_model(str(SOURCE)))
-    source_model = adapter.currentModel
     read_required_properties(
         adapter.currentModel,
         (
@@ -729,30 +911,36 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    donor = place_view(adapter, str(SOURCE), "*Front", 0.030, 0.180, scale=(2, 1))
+    # The end view is placed first, where the old donor was: its whole-model
+    # import is the path that delivered HeadDia and NeckDia end-on (824056ef9).
+    end = _place_end_view(adapter)
     # Looking along model Y presents the reamed cross-hole as a true
     # circle while retaining the entire turned profile in one horizontal view.
     principal = place_view(
         adapter, str(SOURCE), "*Top", *PRINCIPAL_CENTER, scale=SHEET_SCALE
     )
-    native_principal = _early_bound(principal, "IView")
-    native_principal.Angle = -math.pi / 2.0
-    if abs(math.remainder(float(native_principal.Angle) + math.pi / 2.0, 2.0 * math.pi)) > 1e-9:
-        raise RuntimeError("failed to orient the integral arbor horizontally")
+    _orient_like_profile(principal, label="integral arbor horizontally")
     drawing_model.EditRebuild3()
+    _assert_end_view_projects_the_profile(adapter, end, principal)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    for view in (donor, principal, iso):
+    for view in (end, principal, iso):
         set_hidden_lines_removed(adapter, view)
 
-    donor_annotations = curate_view_dimensions(
-        adapter, donor, keep=DONOR_KEEP, view_label="diameter donor"
+    detail = _head_detail(adapter, principal)
+    set_hidden_lines_removed(adapter, detail)
+    end_annotations = curate_view_dimensions(
+        adapter, end, keep=END_KEEP, view_label=END_VIEW_LABEL
     )
     principal_annotations = curate_view_dimensions(
         adapter, principal, keep=PRINCIPAL_KEEP, view_label="integral-arbor profile"
     )
+    detail_annotations = curate_view_dimensions(
+        adapter, detail, keep=DETAIL_KEEP, view_label="integral-arbor head detail"
+    )
     for label, kept in (
-        ("donor", donor_annotations),
+        ("end", end_annotations),
         ("principal", principal_annotations),
+        ("detail", detail_annotations),
     ):
         names = sorted(dimension_name(adapter, annotation) for annotation in kept)
         _telemetry.info(
@@ -761,33 +949,9 @@ async def build(adapter: Any) -> dict[str, str]:
             kept=len(kept),
             names=",".join(names),
         )
-    moved_diameters = []
-    moves = []
-    for annotation in donor_annotations:
-        name = dimension_name(adapter, annotation)
-        text_xy = DIAMETER_POSITIONS[name]
-        moved_diameters.append(
-            _move_dimension(adapter, annotation, principal, text_xy, source_view=donor)
-        )
-        moves.append(f"{name} -> principal ({text_xy[0] * 1000:.1f}, {text_xy[1] * 1000:.1f}) mm")
-    principal_count = len(_early_bound(principal, "IView").GetAnnotations() or ())
-    _telemetry.info(
-        f"pinion-arbor moved {len(moved_diameters)} diameters off the donor: "
-        f"{'; '.join(moves)}; principal now carries {principal_count} annotations",
-        moved=len(moved_diameters),
-        moves="; ".join(moves),
-        principal_annotations=principal_count,
-    )
-    donor_name = view_name(adapter, donor)
-    delete_view(adapter, donor)
-    if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
-        raise RuntimeError("failed to delete the empty diameter donor view")
-
-    detail, detail_annotations, detail_spans = _dimensioned_head_detail(
-        adapter, source_model, principal
-    )
+    _assert_end_view_owns_its_diameters(adapter, end)
     annotations = [
-        *moved_diameters,
+        *end_annotations,
         *principal_annotations,
         *detail_annotations,
     ]
@@ -810,19 +974,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
         raise RuntimeError("failed to add center mark to the detailed grip cross-hole")
     _add_turning_axis(adapter, principal)
-    witness_spans = {
-        **_blacken_reference_witnesses(
-            adapter, principal, REFERENCE_WITNESSES, flank_dia=SHAFT_DIA
-        ),
-        **detail_spans,
-        PROFILE_NECK_WITNESS: _flank_span(
-            adapter,
-            principal,
-            NECK_DIA,
-            *DETAIL_REFERENCE_WITNESSES["NeckReference"],
-            label="profile neck witness span",
-        ),
-    }
+    witness_spans = _blacken_reference_witnesses(adapter, principal)
     for key, (station_z, symbol_xy, flank) in JOURNAL_FINISHES.items():
         land_x, axis_y = model_point_in_view(
             adapter,
@@ -845,6 +997,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _position_detail_label(adapter, detail)
     rebuild_drawing(adapter, label="pinion arbor layout audit")
     sheets = collect_document(adapter)
+    _log_end_view_ink(sheets, view_name(adapter, end))
     _assert_no_text_on_line([f for sheet in sheets for f in audit_sheet(sheet)])
     fence_center = model_point_in_view(
         adapter,
@@ -884,38 +1037,6 @@ async def build(adapter: Any) -> dict[str, str]:
         arrows=arrows,
         axis=_unit(far_on_axis[0] - fence_center[0], far_on_axis[1] - fence_center[1]),
     )
-    # The diameters printed in detail A answer to its own circle: their
-    # witnesses stay on the part inside it, only the dimension line leaves
-    # for the text.  The detail's other callouts are leaders and axial
-    # stations that leave it by design, so they are not judged here.
-    detail_name = view_name(adapter, detail)
-    detail_diameters = [
-        annotation
-        for sheet in sheets
-        for annotation in sheet.annotations
-        if annotation.owner == detail_name
-        and annotation.kind == "dim"
-        and annotation.label in DETAIL_DIAMETER_POSITIONS
-    ]
-    for annotation in detail_diameters:
-        boxes = " ".join(box.format_mm() for box in annotation.text_boxes) or "(no text)"
-        runs = " ".join(segment.format_mm() for segment in annotation.segments)
-        _telemetry.info(
-            f"pinion-arbor: detail-A {annotation.label} text {boxes}; runs {runs}",
-            label=annotation.label,
-        )
-    if len(detail_diameters) != len(DETAIL_DIAMETER_POSITIONS):
-        raise RuntimeError(
-            f"pinion-arbor: detail A carries {len(detail_diameters)} of its "
-            f"{len(DETAIL_DIAMETER_POSITIONS)} diameters in the layout audit"
-        )
-    _assert_witnesses_clear_of_detail_fence(
-        detail_diameters,
-        center=DETAIL_CENTER,
-        radius=DETAIL_RATIO * DETAIL_RADIUS_MM / 1000.0,
-        arrows=_dimension_arrows(adapter, detail),
-        axis=_unit(far_on_axis[0] - fence_center[0], far_on_axis[1] - fence_center[1]),
-    )
 
     sheet = _early_bound(
         _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(), "ISheet"
@@ -952,10 +1073,15 @@ def _assert_no_text_on_line(findings: list[Any]) -> None:
     Text on text is gated too, since the bond-zone callout moved above the
     shaft beside the DETAIL A label.  The audit's other finding kinds are
     logged, not gated: the diametric Ø6 leader crossing the SR10.9 leader
-    inside detail A is conventional ink.
+    inside detail A is conventional ink, and so is the one crossing two
+    concentric diameters must make on the end view (_is_end_view_centre_crossing).
     """
-    blocking = [f for f in findings if f.kind in BLOCKING_LAYOUT_FINDINGS]
-    advisory = [f for f in findings if f.kind not in BLOCKING_LAYOUT_FINDINGS]
+    blocking = [
+        f
+        for f in findings
+        if f.kind in BLOCKING_LAYOUT_FINDINGS and not _is_end_view_centre_crossing(f)
+    ]
+    advisory = [f for f in findings if f not in blocking]
     if advisory:
         _telemetry.warn(
             f"pinion-arbor layout audit: {len(advisory)} advisory finding(s)\n"
@@ -971,6 +1097,41 @@ def _assert_no_text_on_line(findings: list[Any]) -> None:
         f"pinion-arbor layout audit: no text on a foreign line or text "
         f"({len(advisory)} advisory)"
     )
+
+
+def _is_end_view_centre_crossing(finding: Any) -> bool:
+    """The Ø15 and Ø10.5 lines crossing at the end view's common centre.
+
+    Both run through the centre of their concentric circles, so they cross
+    there wherever their texts stand; ASME diameter lines do.  Only that pair,
+    only a leader crossing, and only inside the Ø10.5 is excused: a crossing
+    anywhere else, or by any other annotation, still blocks.
+    """
+    if finding.kind != "leader-crosses-leader" or finding.at_mm is None:
+        return False
+    if {finding.a, finding.b} != set(END_KEEP):
+        return False
+    center_mm = (END_CENTER[0] * 1000.0, END_CENTER[1] * 1000.0)
+    return math.dist(finding.at_mm, center_mm) <= NECK_DIA / 2.0
+
+
+def _log_end_view_ink(sheets: list[Any], end_name: str) -> None:
+    """Log the end view's diameters as the layout audit read them: the rendered
+    ink behind END_DIA_TEXT_EXTENT, for the eye pass to calibrate it."""
+    for annotation in (
+        annotation
+        for sheet in sheets
+        for annotation in sheet.annotations
+        if annotation.owner == end_name and annotation.label in END_KEEP
+    ):
+        boxes = " ".join(box.format_mm() for box in annotation.text_boxes) or "(no text)"
+        runs = " ".join(
+            f"{segment.role}:{segment.format_mm()}" for segment in annotation.segments
+        )
+        _telemetry.info(
+            f"pinion-arbor: end-view {annotation.label} text {boxes}; runs {runs}",
+            label=annotation.label,
+        )
 
 
 FENCE_TOL_M = 0.0002

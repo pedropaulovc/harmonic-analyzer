@@ -17,11 +17,9 @@ from _common import (
     SketchDims,
     _early_bound,
     _feature_by_name,
-    _read_member,
     anchor_point_to_origin,
     apply_color,
     apply_material,
-    blank_sketch,
     check,
     define_circle,
     drive_dimension,
@@ -40,7 +38,6 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
-    _named_dimension,
     add_diametric_linear_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
@@ -63,6 +60,7 @@ from pinion_arbor_spec import (
     BACK_JOURNAL_FROM_HEAD_REAR,
     BACK_JOURNAL_Z,
     BOND_ZONE_DIA_FROM_HEAD_REAR,
+    BOND_ZONE_DIA_Z,
     CROSS_HOLE_DIA,
     CROSS_HOLE_DIA_BAND,
     DRAWING_DIMENSIONS,
@@ -84,15 +82,11 @@ from pinion_arbor_spec import (
     JOURNAL_DIA_BAND,
     JOURNAL_LEN,
     NECK_DIA,
-    NECK_DIA_WITNESS_FROM_HEAD_REAR,
-    NECK_DIA_WITNESS_LEN,
     NECK_END_Z,
     NECK_LEN,
-    NECK_REFERENCE_SKETCH,
     OVERALL_LEN,
     PIN_STATION_FROM_HEAD_REAR,
     PIN_Z,
-    REFERENCE_SKETCHES,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHAFT_LEN,
@@ -141,10 +135,6 @@ DRUM_STATION_POINT_X = SHAFT_R
 DRUM_STATION_POINT_LEN = 1.0
 # The bond-zone diameter's construction witness: a short run of the flank.
 BOND_ZONE_WITNESS_LEN = 4.0
-# The neck circle's own dimension is NeckProfileDia, unmarked; the sheet
-# prints NeckDia@NeckReference.  The NeckDia global owns both, one equation
-# each, as ShaftDia owns the shaft circle and the bond-zone diameter.
-NECK_DIA_OWNED = (("NeckProfile", "NeckProfileDia"), (NECK_REFERENCE_SKETCH, "NeckDia"))
 
 
 def _perpendicular_cylinder_intersection(hole_radius: float, body_radius: float) -> float:
@@ -461,28 +451,18 @@ async def _add_journal_land(
     return drive_jobs
 
 
-async def _add_flank_diameter_reference(
-    adapter,
-    *,
-    feature_name: str,
-    station_from_head_rear: float,
-    flank_r: float,
-    witness_run: float,
-    dimension_name: str,
-    drive_expression: str,
-) -> list[tuple[str, str]]:
-    """Dimension a turned diameter on its own flank, like a journal land.
+async def _add_bond_zone_reference(adapter) -> list[tuple[str, str]]:
+    """Dimension the Ø8 bond zone on its own flank, like a journal land.
 
     A Top-plane sketch with no model geometry: the turning axis from the head
-    shoulder to the station, a construction witness on the flank there, and
-    the diameter between them.  The witness runs ``witness_run`` along the
-    axis from the station (positive: away from the head).  The view prints it
-    as a local diameter whose witnesses stay on the feature, where an end-on
-    circle's ran along a shoulder face and out through the detail fence (the
-    Ø8 shaft circle's did, run 492a7be5).
+    shoulder to the bond-zone station, a construction witness on the flank
+    there, and the diameter between them.  The profile view prints it as a
+    local diameter whose witnesses stay on the bond zone, where the end-on
+    shaft circle's ran along the neck face and out through the detail fence.
     """
+    feature_name = "BondZoneReference"
     start_v = -HEAD_REAR_Z
-    end_v = -(HEAD_REAR_Z + station_from_head_rear)
+    end_v = -BOND_ZONE_DIA_Z
     dims = SketchDims()
     check(f"create sketch {feature_name}", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
@@ -492,7 +472,7 @@ async def _add_flank_diameter_reference(
     )
     witness = check(
         f"{feature_name} flank witness",
-        await adapter.add_line(flank_r, end_v, flank_r, end_v - witness_run),
+        await adapter.add_line(SHAFT_R, end_v, SHAFT_R, end_v - BOND_ZONE_WITNESS_LEN),
     )
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[witness], "ISketchSegment")
@@ -517,14 +497,14 @@ async def _add_flank_diameter_reference(
     check(
         f"{feature_name} station",
         await adapter.add_sketch_dimension(
-            f"{axis}.start", f"{axis}.end", "vertical_distance", station_from_head_rear
+            f"{axis}.start", f"{axis}.end", "vertical_distance", BOND_ZONE_DIA_FROM_HEAD_REAR
         ),
     )
     dims.record(None, None)
     check(
         f"{feature_name} witness length",
         await adapter.add_sketch_dimension(
-            f"{witness}.start", f"{witness}.end", "vertical_distance", abs(witness_run)
+            f"{witness}.start", f"{witness}.end", "vertical_distance", BOND_ZONE_WITNESS_LEN
         ),
     )
     dims.record(None, None)
@@ -532,99 +512,14 @@ async def _add_flank_diameter_reference(
         adapter,
         axis,
         f"{witness}.start",
-        (flank_r + 5.0, end_v),
-        dimension_name,
+        (SHAFT_R + 5.0, end_v),
+        "BondZoneDia",
     )
-    dims.record(dimension_name, drive_expression)
+    dims.record("BondZoneDia", '"ShaftDia"')
     await ensure_fully_defined(adapter, feature_name)
     check(f"exit sketch {feature_name}", await adapter.exit_sketch())
     name_last_feature(adapter, feature_name)
     return dims.apply(adapter, feature_name)
-
-
-def equation_owners(equations: list[str]) -> dict[str, list[str]]:
-    """Each equation's left-hand name -> its right-hand sides.
-
-    The name is the quoted left side cut to ``dimension@feature``, so a
-    model-qualified ``"NeckDia@NeckReference@pinion-arbor.Part"`` keys like
-    the ``"NeckDia@NeckReference"`` that drive_dimension wrote.
-    """
-    owners: dict[str, list[str]] = {}
-    for equation in equations:
-        left, sign, right = equation.partition("=")
-        if not sign:
-            raise RuntimeError(f"unreadable equation {equation!r}")
-        name = "@".join(left.strip().strip('"').split("@")[:2])
-        owners.setdefault(name, []).append(right.strip())
-    return owners
-
-
-def assert_single_owner(
-    owners: dict[str, list[str]], global_name: str, dimensions: tuple[str, ...]
-) -> None:
-    """One global owns ``dimensions``: the global is set by exactly one
-    equation, and each dimension by exactly one that reads the global alone."""
-    problems = []
-    if len(owners.get(global_name, ())) != 1:
-        problems.append(f"global {global_name}: {owners.get(global_name, [])}")
-    for dimension in dimensions:
-        rights = owners.get(dimension, [])
-        if [right.replace(" ", "") for right in rights] != [f'"{global_name}"']:
-            problems.append(f"{dimension}: {rights}")
-    if problems:
-        raise RuntimeError(
-            f"{global_name} must own {list(dimensions)} through one equation "
-            f"each: {'; '.join(problems)}"
-        )
-
-
-def _assert_neck_dia_single_owner(adapter) -> None:
-    """The NeckDia global owns both the neck circle and the printed Ø10.5.
-
-    Once an equation owns a dimension it reads DrivenState 1, so the gate is
-    ownership, not DrivenState == 2 (knife-cc-5): one equation each on the
-    same global, the same driven state, neither a reference dimension, and
-    both at the neck's nominal.
-    """
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    manager = _early_bound(model.GetEquationMgr(), "IEquationMgr")
-    count = int(_read_member(manager, "GetCount") or 0)
-    equations = [str(manager.Equation(index) or "") for index in range(count)]
-    owned = tuple(f"{name}@{feature}" for feature, name in NECK_DIA_OWNED)
-    owners = equation_owners(equations)
-    _telemetry.info(
-        "pinion-arbor NeckDia equations: "
-        + "; ".join(f"{name} = {owners.get(name)}" for name in ("NeckDia", *owned))
-    )
-    assert_single_owner(owners, "NeckDia", owned)
-    states = {}
-    for feature, name in NECK_DIA_OWNED:
-        _, dimension = _named_dimension(adapter, feature, name)
-        dimension = _early_bound(dimension, "IDimension")
-        if bool(dimension.IsReference()):
-            raise RuntimeError(f"{name}@{feature} reads as a reference dimension")
-        value_mm = float(dimension.SystemValue) * 1000.0
-        if abs(value_mm - NECK_DIA) > 1e-6:
-            raise RuntimeError(f"{name}@{feature} reads {value_mm:.4f} mm, not {NECK_DIA}")
-        states[f"{name}@{feature}"] = int(dimension.DrivenState)
-    if len(set(states.values())) != 1:
-        raise RuntimeError(f"NeckDia's two dimensions differ in driven state: {states}")
-    _telemetry.success(f"NeckDia owns both neck diameters: DrivenState {states}")
-
-
-def _blank_reference_sketches(adapter, sketches: tuple[str, ...]) -> None:
-    """Hide the reference sketches in the part so no instance renders them.
-
-    The drawing shows them in memory while it creates detail A
-    (_drawing_hidden_sketches.part_sketches_shown).
-    """
-    part_doc = _early_bound(adapter.currentModel, "IPartDoc")
-    for sketch in sketches:
-        blank_sketch(adapter, sketch)
-        feature = _early_bound(part_doc.FeatureByName(sketch), "IFeature")
-        state = int(_read_member(feature, "Visible"))
-        if state != 1:  # swVisibilityStateHide
-            raise RuntimeError(f"{sketch} still visible after BlankSketch (state {state})")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -669,7 +564,7 @@ async def build(adapter) -> dict[str, str]:
         NECK_R,
         "integral neck",
         dims=neck,
-        names=("NeckCx", "NeckCz", "NeckProfileDia"),
+        names=("NeckCx", "NeckCz", "NeckDia"),
         drives=(None, None, '"NeckDia"'),
     )
     await ensure_fully_defined(adapter, "integral-neck sketch")
@@ -983,26 +878,7 @@ async def build(adapter) -> dict[str, str]:
     )
     if len(_shaft_faces(adapter)) != 5:
         raise RuntimeError("the Ø8 shaft must read as two journal lands and three plain zones")
-    drive_jobs += await _add_flank_diameter_reference(
-        adapter,
-        feature_name="BondZoneReference",
-        station_from_head_rear=BOND_ZONE_DIA_FROM_HEAD_REAR,
-        flank_r=SHAFT_R,
-        witness_run=BOND_ZONE_WITNESS_LEN,
-        dimension_name="BondZoneDia",
-        drive_expression='"ShaftDia"',
-    )
-    # The neck's Ø10.5 for detail A: its witness runs back towards the head,
-    # so the whole sketch lies inside the detail fence (pinion_arbor_spec).
-    drive_jobs += await _add_flank_diameter_reference(
-        adapter,
-        feature_name=NECK_REFERENCE_SKETCH,
-        station_from_head_rear=NECK_DIA_WITNESS_FROM_HEAD_REAR,
-        flank_r=NECK_R,
-        witness_run=-NECK_DIA_WITNESS_LEN,
-        dimension_name="NeckDia",
-        drive_expression='"NeckDia"',
-    )
+    drive_jobs += await _add_bond_zone_reference(adapter)
 
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
@@ -1012,7 +888,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven integral arbor (equations neutral)", V_TOTAL, 0.005 * V_SHAFT
     )
     _require_one_solid_body(adapter, label="driven integral pinion arbor")
-    _assert_neck_dia_single_owner(adapter)
 
     set_dimension_bilateral_tolerance(
         adapter, "BondZoneReference", "BondZoneDia", *deviations(SHAFT_DIA_BAND)
@@ -1033,7 +908,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "BackJournalReference", "BackJournalDia", *deviations(JOURNAL_DIA_BAND)
     )
     # A diametric linear dimension on a side-view sketch prints no Ø by itself.
-    for prefix in ("FrontJournal", "BackJournal", "BondZone", "Neck"):
+    for prefix in ("FrontJournal", "BackJournal", "BondZone"):
         set_dimension_prefix(adapter, f"{prefix}Reference", f"{prefix}Dia", "<MOD-DIAM>")
     set_dimension_prefix(adapter, "FrontCapProfile", "HeadCapR", "SR")
     set_dimension_prefix(adapter, "BackCapProfile", "BackCapR", "SR")
@@ -1042,7 +917,6 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
-    _blank_reference_sketches(adapter, REFERENCE_SKETCHES)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
