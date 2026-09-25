@@ -26,7 +26,6 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
     add_native_hole_callout,
     add_property_linked_note,
     assert_imported_precision,
@@ -52,7 +51,6 @@ from pinion_spring_geometry import (
     HOLE_FROM_END,
     KINK_C,
     PAD_LEN,
-    PAD_WIDTH,
     R_KINK,
     THICK,
 )
@@ -131,11 +129,17 @@ FRONT_KEEP = {
     "FreeTipH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.038),
 }
 _PAD_EAST = _front_x(FOOT_END[0])
+HOLE_END_TEXT_XY = (_front_x(FOOT_END[0] - HOLE_FROM_END / 2.0), TOP_CENTER[1] + 0.031)
+HOLE_EDGE_TEXT_XY = (_PAD_EAST + 0.012, TOP_CENTER[1] + 0.004)
 TOP_KEEP = {
     "PadLen": (_front_x(FOOT_END[0] - PAD_LEN / 2.0), TOP_CENTER[1] + 0.021),
     # Outboard of the hole-edge 4.75 (HOLE_EDGE_TEXT_XY) so the two stack apart.
     "PadWidth": (_PAD_EAST + 0.030, TOP_CENTER[1]),
     "StripWidth": (_front_x(_PROFILE_MIN_X) - 0.018, TOP_CENTER[1]),
+    # The hole off the foot's free end and off the pad's lower edge: owned by
+    # the part's hidden FootHoleReference sketch (#843 Codex aB7).
+    "HoleFromEnd": HOLE_END_TEXT_XY,
+    "HoleFromEdge": HOLE_EDGE_TEXT_XY,
 }
 DETAIL_KEEP = {
     # The flick turns right (east) in this view: the radius leader goes
@@ -149,8 +153,6 @@ DIMENSION_CALLOUTS = {
     "FreeKinkV": "FREE, TO KINK TANGENT",
     "FreeTipH": "FREE, TO TIP",
 }
-HOLE_END_TEXT_XY = (_front_x(FOOT_END[0] - HOLE_FROM_END / 2.0), TOP_CENTER[1] + 0.031)
-HOLE_EDGE_TEXT_XY = (_PAD_EAST + 0.012, TOP_CENTER[1] + 0.004)
 # Below the pad: above it the leader crossed the 4.50 and 9.50 pad
 # dimensions on its way down to the hole.  The note centres on this point, so
 # it sits east of the pad, clear of the FREE, TO TIP text below the top view.
@@ -245,75 +247,6 @@ def _kink_detail(adapter: Any, front: Any) -> Any:
     return detail
 
 
-def _hole_locations(adapter: Any, top: Any) -> None:
-    """Locate the pad hole from the foot's free end and the pad's lower edge.
-
-    The Hole Wizard placement sketch cannot carry a datum point (rule 7), so the
-    print dimensions the hole from the blank's own edges with driven sheet
-    dimensions picked on both features; they print at the .XX row.
-    """
-    hole_x = (FOOT_END[0] - HOLE_FROM_END) / 1000.0
-    hole_r = HOLE_DIA / 2000.0
-    top_y = THICK / 1000.0
-    edge_picks = {
-        sign: model_point_in_view(
-            adapter,
-            top,
-            (hole_x, top_y, sign * PAD_WIDTH / 2000.0),
-            label=f"pad long edge z{sign:+g}",
-        )
-        for sign in (-1.0, 1.0)
-    }
-    lower = min(edge_picks, key=lambda sign: edge_picks[sign][1])
-    locations = (
-        (
-            "hole from the foot's free end",
-            model_point_in_view(
-                adapter,
-                top,
-                (FOOT_END[0] / 1000.0, top_y, -lower * PAD_WIDTH / 4000.0),
-                label="pad free end",
-            ),
-            model_point_in_view(
-                adapter, top, (hole_x + hole_r, top_y, 0.0), label="hole east edge"
-            ),
-            HOLE_END_TEXT_XY,
-            "horizontal",
-            HOLE_FROM_END,
-        ),
-        (
-            "hole from the pad's lower edge",
-            (edge_picks[lower][0] - 0.004, edge_picks[lower][1]),
-            model_point_in_view(
-                adapter,
-                top,
-                (hole_x, top_y, lower * hole_r),
-                label="hole lower edge",
-            ),
-            HOLE_EDGE_TEXT_XY,
-            "vertical",
-            PAD_WIDTH / 2.0,
-        ),
-    )
-    for label, p0, p1, text_xy, orientation, expected in locations:
-        display = add_edge_dimension(
-            adapter,
-            top,
-            p0=p0,
-            p1=p1,
-            text_xy=text_xy,
-            label=label,
-            orientation=orientation,
-        )
-        display = _early_bound(display, "IDisplayDimension")
-        dimension = _early_bound(display.GetDimension2(0), "IDimension")
-        measured_mm = abs(float(dimension.SystemValue) * 1000.0)
-        if abs(measured_mm - expected) > 1e-5:
-            raise RuntimeError(
-                f"{label} measured {measured_mm:g}, expected {expected:g} mm"
-            )
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -373,7 +306,9 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="formed profile",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    top_annotations = curate_view_dimensions(
+    # The hole locations come from the part-hidden FootHoleReference sketch,
+    # shown in this view only by the same opt-in curation.
+    top_annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         top,
         keep=TOP_KEEP,
@@ -395,7 +330,6 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
-    _hole_locations(adapter, top)
     hole_edge = model_point_in_view(
         adapter,
         top,

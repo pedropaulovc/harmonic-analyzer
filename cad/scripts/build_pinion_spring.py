@@ -80,12 +80,14 @@ from pinion_spring_spec import (
     FLAT_LEN,
     FOOT_LEN,
     FORMED_DIMENSIONS,
+    FOOT_HOLE_SKETCH,
     FORMED_TOLERANCE_MM,
     FREE_FORM_SKETCH,
     ISOMETRIC_VIEW_NOTE,
     PAD_LEN,
     PAD_WIDTH,
     R_BEND,
+    REFERENCE_SKETCHES,
     R_KINK,
     THICK,
     WIDTH,
@@ -170,6 +172,37 @@ FREE_PATH = {
     "kink_start": FREE_KINK_START,
     "bend_exit": FREE_BEND_EXIT,
 }
+
+
+# FootHoleReference (#843 Codex aB7): (dimension, start, end, orientation,
+# value, drives) per line, in Top-plane sketch coordinates (v = -z; a *Top
+# view prints model -Z UP). Both lines lie on the pad outline, so the view
+# that shows the sketch prints no extra line, and both start on a pad edge
+# (rule 7): the hole off the foot's free end runs along the pad's upper edge,
+# the hole off the pad's lower edge runs up the free end to the hole's
+# centreline. ``drives`` binds, in creation order, the value and then the
+# start point's two origin anchors to the part's globals. FOOT_END's x is
+# derived from the blade geometry, so the "FootEndX" global carries it and
+# drives the pad's free-end anchor too: the reference lines cannot drift off
+# the pad they restate (Main, #843 aB7 review).
+FOOT_HOLE_LINES = (
+    (
+        "HoleFromEnd",
+        (FOOT_END[0], PAD_WIDTH / 2.0),
+        (FOOT_END[0] - HOLE_FROM_END, PAD_WIDTH / 2.0),
+        "horizontal",
+        HOLE_FROM_END,
+        ('"HoleFromEnd"', '"FootEndX"', '"PadWidth" / 2'),
+    ),
+    (
+        "HoleFromEdge",
+        (FOOT_END[0], -PAD_WIDTH / 2.0),
+        (FOOT_END[0], 0.0),
+        "vertical",
+        PAD_WIDTH / 2.0,
+        ('"PadWidth" / 2', '"FootEndX"', '"PadWidth" / 2'),
+    ),
+)
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -312,6 +345,10 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "StripWidth", f"{WIDTH}mm")
     await set_global(adapter, "PadWidth", f"{PAD_WIDTH}mm")
     await set_global(adapter, "PadLength", f"{PAD_LEN}mm")
+    # The foot's free end and the hole's station off it: the pad and the
+    # FootHoleReference sketch both hang off these (#843 aB7).
+    await set_global(adapter, "FootEndX", f"{FOOT_END[0]}mm")
+    await set_global(adapter, "HoleFromEnd", f"{HOLE_FROM_END}mm")
 
     # Open inside-surface path, drawn from the free tip DOWN (_formed_path).
     check("create_sketch spring", await adapter.create_sketch("Front"))
@@ -375,7 +412,7 @@ async def build(adapter) -> dict[str, str]:
         label="pad",
         dims=pad,
         names=["PadLen", "PadWidth", "PadEndX", "PadEdgeZ"],
-        drives=['"PadLength"', '"PadWidth"', None, '"PadWidth" / 2'],
+        drives=['"PadLength"', '"PadWidth"', '"FootEndX"', '"PadWidth" / 2'],
     )
     await ensure_fully_defined(adapter, "pad sketch")
     check("exit_sketch pad", await adapter.exit_sketch())
@@ -421,6 +458,46 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, FREE_FORM_SKETCH)
     drive_jobs += free.apply(adapter, FREE_FORM_SKETCH)
 
+    # #843 Codex aB7: the hole locations the print carries, owned by the part.
+    check("create_sketch foot-hole reference", await adapter.create_sketch("Top"))
+    names: list[str] = []
+    drives: list[str | None] = []
+    for dimension, start, end, orientation, value, line_drives in FOOT_HOLE_LINES:
+        # Direct-to-DB: each line lies on a pad outline station along a
+        # sketch axis direction, so inference would snap in the relations
+        # added below and over-define the sketch.
+        set_sketch_direct_db(adapter, True)
+        line = check(f"{dimension} line", await adapter.add_line(*start, *end))
+        set_sketch_direct_db(adapter, False)
+        _as_construction(adapter, line)
+        check(
+            f"{dimension} {orientation}",
+            await adapter.add_sketch_constraint(line, None, orientation),
+        )
+        await dimension_between(
+            adapter,
+            f"{line}.start",
+            f"{line}.end",
+            f"{orientation}_distance",
+            value,
+            dimension,
+        )
+        await anchor_point_to_origin(adapter, f"{line}.start", *start, dimension)
+        names += [dimension, f"{dimension}AnchorX", f"{dimension}AnchorY"]
+        drives += list(line_drives)
+    await ensure_fully_defined(adapter, "foot-hole reference sketch")
+    check("exit_sketch foot-hole reference", await adapter.exit_sketch())
+    name_last_feature(adapter, FOOT_HOLE_SKETCH)
+    full = name_dimensions(adapter, FOOT_HOLE_SKETCH, names)
+    for (dimension, *_rest, value, _drives) in FOOT_HOLE_LINES:
+        raw = adapter.currentModel.Parameter(f"{dimension}@{FOOT_HOLE_SKETCH}")
+        measured = float(_early_bound(raw, "IDimension").SystemValue) * 1000.0
+        if abs(measured - value) > 1e-6:
+            raise RuntimeError(f"{dimension} measures {measured:g}, expected {value:g}")
+    drive_jobs += [
+        (name, expr) for name, expr in zip(full, drives, strict=True) if expr is not None
+    ]
+
     # Deferred drive equations, then re-check neutrality (each evaluates to
     # the as-built value, so the geometry must not move).
     await force_rebuild(adapter)
@@ -444,12 +521,14 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
 
-    # Hidden so no assembly instance renders it; the drawing shows it per view.
-    blank_sketch(adapter, FREE_FORM_SKETCH)
+    # Hidden so no assembly instance renders them; the drawing shows each in
+    # the one view that dimensions it.
     part_doc = _early_bound(adapter.currentModel, "IPartDoc")
-    feature = _early_bound(part_doc.FeatureByName(FREE_FORM_SKETCH), "IFeature")
-    if int(feature.Visible) != 1:  # swVisibilityStateHide
-        raise RuntimeError(f"{FREE_FORM_SKETCH} still visible after BlankSketch")
+    for sketch in REFERENCE_SKETCHES:
+        blank_sketch(adapter, sketch)
+        feature = _early_bound(part_doc.FeatureByName(sketch), "IFeature")
+        if int(feature.Visible) != 1:  # swVisibilityStateHide
+            raise RuntimeError(f"{sketch} still visible after BlankSketch")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
