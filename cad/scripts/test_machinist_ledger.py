@@ -163,6 +163,9 @@ def registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def _trailer(monkeypatch: pytest.MonkeyPatch, model: str | None) -> None:
     author = ml.Author(model, "c" * 40, "cad/scripts/draw_crank_arm.py")
     monkeypatch.setattr(ml, "draw_script_author", lambda name: author)
+    monkeypatch.setattr(
+        ml, "draw_script_authors", lambda names: {n: author for n in names}
+    )
 
 
 def _only(pdf: Path) -> ml.Sheet:
@@ -559,9 +562,123 @@ def test_author_model_comes_from_the_draw_scripts_commit_trailer(
     with pytest.raises(ValueError, match="several models"):
         ml.script_author(script, repo=repo)
 
+    # The batch form answers every script in a fixed number of git calls.
+    other = repo / "draw_pen_rod.py"
+    _commit(
+        repo, other, "draw: pen rod\n\nCo-Authored-By: GPT-6 Sol <noreply@openai.com>"
+    )
+    batch = ml.script_authors([script, other, repo / "draw_never.py"], repo=repo)
+    assert isinstance(batch[script], ValueError)
+    assert batch[other].model == "gpt-6-sol"
+    assert "has no commit" in str(batch[repo / "draw_never.py"])
+
     script.write_text("edited, not committed\n", encoding="utf-8")
     with pytest.raises(ValueError, match="uncommitted"):
         ml.script_author(script, repo=repo)
+
+
+def _repo_with_history(tmp_path: Path) -> tuple[Path, Path, Path]:
+    """Old commits, then the draw script's trailered commit on top of them."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _commit(repo, repo / "README", "base")
+    old = repo / "draw_pen_rod.py"
+    _commit(
+        repo, old, "draw: pen rod\n\nCo-Authored-By: GPT-6 Sol <noreply@openai.com>"
+    )
+    script = repo / "draw_crank_arm.py"
+    _commit(
+        repo,
+        script,
+        "draw: crank arm\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+    )
+    return repo, script, old
+
+
+def test_the_author_walk_stops_at_each_scripts_latest_commit(tmp_path: Path) -> None:
+    repo, script, _ = _repo_with_history(tmp_path)
+    base = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "HEAD~2"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    # Older objects missing, as in a partial clone: a walk past the latest
+    # commit that touched the script would fail on them.
+    obj = repo / ".git" / "objects" / base[:2] / base[2:]
+    obj.chmod(0o666)  # git writes loose objects read-only
+    obj.unlink()
+
+    author = ml.script_author(script, repo=repo)
+
+    assert author.model == "claude-opus-5-5"
+
+
+def test_a_shallow_clone_names_no_author_instead_of_erroring(tmp_path: Path) -> None:
+    repo, script, old = _repo_with_history(tmp_path)
+    clone = tmp_path / "clone"
+    subprocess.run(
+        ["git", "clone", "-q", "--depth", "1", repo.resolve().as_uri(), str(clone)],
+        check=True,
+        capture_output=True,
+    )
+
+    authors = ml.script_authors([clone / script.name, clone / old.name], repo=clone)
+
+    # The depth-1 root diffs against nothing, so it lists every file whether or
+    # not it touched them: pen_rod's GPT commit is past the boundary and must
+    # not read as HEAD's Claude trailer, and nothing tells crank_arm apart.
+    for path in (clone / script.name, clone / old.name):
+        missing = authors[path]
+        assert isinstance(missing, ValueError)
+        assert "shallow" in str(missing)
+    status = ml.Status("crank_arm", ml.State.UNREVIEWED, "", "", "-")
+    assert "--author-family <family>" in ml.fix_command(status, missing)
+
+
+def test_the_author_is_the_commit_that_produced_the_scripts_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Integ's draw_cone_tip_bushing.py: a newer side-branch edit (6b993ef73) that
+    # the merge did not take read as the author of the older content it kept.
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    script, other = repo / "draw_crank_arm.py", repo / "notes.py"
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2026-09-20T00:00:00Z")
+    _commit(repo, other, "base")
+    _git(repo, "checkout", "-q", "-b", "side")
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2026-09-22T00:00:00Z")
+    _commit(repo, script, "side edit\n\nCo-Authored-By: GPT-6 Sol <noreply@openai.com>")
+    _commit(repo, other, "side notes\n\nCo-Authored-By: GPT-6 Sol <noreply@openai.com>")
+    _git(repo, "checkout", "-q", "main")
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2026-09-21T00:00:00Z")
+    _commit(
+        repo,
+        script,
+        "kept edit\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+    )
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2026-09-23T00:00:00Z")
+    # A merge that takes the side's notes and keeps main's script.
+    _git(repo, "merge", "-q", "-s", "ours", "--no-commit", "side")
+    _git(repo, "checkout", "side", "--", other.name)
+    _git(
+        repo,
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@example.com",
+        "commit",
+        "-q",
+        "-m",
+        "merge side's notes, keeping main's script",
+    )
+
+    authors = ml.script_authors([script, other], repo=repo)
+
+    assert authors[script].model == "claude-opus-5-5"
+    assert authors[other].model == "gpt-6-sol"
 
 
 def test_claims_must_agree_with_the_trailer(
@@ -1075,6 +1192,11 @@ def test_check_reports_drift_and_writes_the_diff(
     assert status.detail.startswith("sheet 1 (")
     assert "2 text changes" in status.detail
     assert "since codex/gpt-6-astra" in status.detail
+    reviewed = ml.load_ledger(ledger_path)["drawings"]["crank_arm"][ml.CROSS_FAMILY]
+    current = ml.fingerprint(registry)[0]
+    assert (
+        f"reviewed {reviewed['sheets'][0][:12]} -> now {current[:12]}" in status.detail
+    )
     assert [Path(path).name for path in status.diff_files] == [
         "crank_arm-sheet1-diff.png",
         "crank_arm-diff.txt",
@@ -1480,11 +1602,11 @@ def test_the_ledger_tests_run_under_the_recipe_gate() -> None:
     assert 'SCRIPTS_DIR / "test_machinist_review.py"' in dodo
 
 
-def test_no_build_task_reads_the_ledger() -> None:
-    """Recording a review must never re-key a build: only these tools import it.
+def test_only_the_review_tools_and_the_release_gate_read_the_ledger() -> None:
+    """Naming a test file (``test_machinist_ledger.py``) to enroll it is not a read.
 
-    Naming a test file (``test_machinist_ledger.py``) to enroll it in a gate is
-    not a read of the ledger.
+    dodo.py reads it only for ``check:machinist``; the next test proves no
+    cache-keyed build task does.
     """
     import re
 
@@ -1495,12 +1617,143 @@ def test_no_build_task_reads_the_ledger() -> None:
         if reads.search(path.read_text(encoding="utf-8"))
     }
     assert readers == {
+        "dodo.py",
         "machinist_ledger.py",
         "machinist_review.py",
         "test_machinist_ledger.py",
     }
 
 
+def _load_dodo():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("dodo", ml.REPO_ROOT / "dodo.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_release_is_gated_on_the_ledger_and_no_build_task_is_keyed_on_it() -> None:
+    dodo = _load_dodo()
+    gate = next(task for task in dodo.task_check() if task["name"] == "machinist")
+    ledger = str(ml.LEDGER_PATH.resolve())
+    pdfs = {str(spec.outputs["pdf"].resolve()) for spec in ml.DRAWINGS}
+
+    # SolidWorks-free, but ordered after (and re-run by) every rendered sheet.
+    assert ledger in gate["file_dep"]
+    assert pdfs <= set(gate["file_dep"])
+    assert str((ml.SCRIPTS_DIR / "machinist_ledger.py").resolve()) in gate["file_dep"]
+    assert "check:machinist" in dodo.task_release()["task_dep"]
+    # In build it would fail every build between a drawing edit and its re-review.
+    assert "check:machinist" not in dodo.task_build()["task_dep"]
+    # Always run: a stored reviewed PDF deleted after a green run must be
+    # re-verified, never excused by a stale stamp.
+    assert gate["uptodate"] == [False]
+
+    reviews = str((ml.CAD_ROOT / "reviews").resolve())
+    tool = str((ml.SCRIPTS_DIR / "machinist_ledger.py").resolve())
+    keyed = [
+        (label, dep)
+        for label, deps in dodo._cache_rows()
+        for dep in deps
+        if str(Path(dep).resolve()).startswith(reviews)
+        or str(Path(dep).resolve()) == tool
+    ]
+    assert keyed == []
+
+
+def test_a_drawing_whose_ink_moved_fails_with_its_sheet_and_digest_pair(
+    tmp_path: Path, registry: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    ledger_path = tmp_path / "ledger.json"
+    reviewed = _sheet(registry)
+    ml.record_review(
+        _review(reviewed),
+        reviewed,
+        author_family="claude",
+        provenance={},
+        ledger_path=ledger_path,
+    )
+    before = ml.fingerprint(registry)[0]
+    _sheet(
+        registry, edge_x=40.0 + 6 * PT_PER_PX
+    )  # a view edge 6 px over: beyond tolerance
+    after = ml.fingerprint(registry)[0]
+    _trailer(monkeypatch, "claude-opus-5-5")
+
+    assert (
+        ml.main(
+            [
+                "--ledger",
+                str(ledger_path),
+                "check",
+                "crank_arm",
+                "--report-dir",
+                str(tmp_path / "r"),
+            ]
+        )
+        == 1
+    )
+
+    err = capsys.readouterr().err
+    assert "crank_arm (drift: sheet 1 (" in err
+    assert f"reviewed {before[:12]} -> now {after[:12]}" in err
+    assert "--reviewer codex --author-family claude" in err
+
+
+def test_failing_check_lists_each_blocked_drawing_with_its_fix(
+    tmp_path: Path, registry: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    ledger = str(tmp_path / "ledger.json")
+    _sheet(registry)
+    _trailer(monkeypatch, "claude-opus-5-5")
+
+    assert ml.main(["--ledger", ledger, "check", "crank_arm"]) == 1
+    err = capsys.readouterr().err
+    assert "1 drawings have no counting machinist review" in err
+    assert (
+        "  crank_arm (unreviewed): uv run cad/scripts/machinist_review.py crank_arm "
+        "--reviewer codex --author-family claude"
+    ) in err
+
+    assert ml.main(["--ledger", ledger, "check", "crank_arm", "--json"]) == 1
+    row = json.loads(capsys.readouterr().out)[0]
+    assert row["fix"].endswith("--reviewer codex --author-family claude")
+
+
+@pytest.mark.parametrize(
+    ("state", "author", "fix"),
+    [
+        (
+            ml.State.UNRENDERED,
+            "claude-opus-5-5",
+            "uv run python -m doit drawing:crank_arm, then uv run cad/scripts/"
+            "machinist_review.py crank_arm --reviewer codex --author-family claude",
+        ),
+        (ml.State.DRIFT, "gpt-6-sol", "--reviewer claude --author-family gpt"),
+        (ml.State.UNREVIEWED, None, "(its last commit names no model)"),
+        (
+            ml.State.UNREVIEWED,
+            ValueError("draw_crank_arm.py has uncommitted changes"),
+            "uncommitted",
+        ),
+    ],
+)
+def test_fix_command(registry: Path, state, author, fix: str) -> None:
+    if isinstance(author, str) or author is None:
+        author = ml.Author(author, "c" * 40, "cad/scripts/draw_crank_arm.py")
+    status = ml.Status("crank_arm", state, "", "", "-")
+
+    assert fix in ml.fix_command(status, author)
+
+
 def test_the_tracked_ledger_matches_this_checkouts_fingerprint_settings() -> None:
     ledger = ml.load_ledger(ml.LEDGER_PATH)
     assert ledger["fingerprint"] == ml.empty_ledger()["fingerprint"]
+
+
+def test_no_failing_drawing_means_no_git_call(monkeypatch: pytest.MonkeyPatch) -> None:
+    # An empty pathspec would walk the whole history instead of nothing.
+    monkeypatch.setattr(ml, "_git", lambda *a, **k: pytest.fail(f"git {a}"))
+    assert ml.draw_script_authors([]) == {}
+    assert ml.script_authors([]) == {}

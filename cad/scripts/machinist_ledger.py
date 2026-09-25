@@ -38,8 +38,10 @@ sheet a reviewer passed.  This module is that link.
   within 0.06 mm.  Text is compared exactly because a dropped decimal point or
   a 3/8 swap on small text can hide inside the 2 px ink tolerance.
 * **Drift check** -- ``check`` lists every drawing whose current sheets match
-  no accepted, counting entry, and writes the leftover pixels (red) and the
-  text difference of each changed sheet under ``--report-dir``.
+  no accepted, counting entry, with the command that clears each, and writes
+  the leftover pixels (red) and the text difference of each changed sheet
+  under ``--report-dir``.  ``release`` depends on it as ``check:machinist``
+  (``dodo.py``), which reads the rendered ``cad/out/pdf`` sheets as file_deps.
 
 No build task reads the ledger, so recording a review never re-keys a build.
 
@@ -342,33 +344,37 @@ class SheetDifference:
     index: int  # 1-based sheet number
     pixels: int  # leftover ink pixels; -1 when the sheet size changed
     text: list[str]
+    reviewed: str  # masked-ink sha256 of the reviewed sheet
+    current: str  # and of the sheet now rendered
     mask: Any = field(repr=False, default=None)
 
     def summary(self) -> str:
+        pair = f"reviewed {self.reviewed[:12]} -> now {self.current[:12]}"
         if self.pixels < 0:
-            return f"{self.index} (sheet size changed)"
+            return f"{self.index} (sheet size changed; {pair})"
         parts = [f"{self.pixels} px"]
         if self.text:
             parts.append(
                 f"{len(self.text)} text change{'s' if len(self.text) != 1 else ''}"
             )
-        return f"{self.index} ({', '.join(parts)})"
+        return f"{self.index} ({', '.join(parts)}; {pair})"
 
 
 def sheet_difference(
     reference: Sheet, current: Sheet, *, index: int
 ) -> SheetDifference | None:
     """None when ``current`` matches ``reference`` under rule (a) or (b)."""
-    if sheet_digest(reference.ink) == sheet_digest(current.ink):
+    reviewed, now = sheet_digest(reference.ink), sheet_digest(current.ink)
+    if reviewed == now:
         return None
     text = text_difference(reference.text, current.text)
     if reference.ink.shape != current.ink.shape:
-        return SheetDifference(index, -1, text)
+        return SheetDifference(index, -1, text, reviewed, now)
     mask = residual_mask(reference.ink, current.ink)
     pixels = int(mask.sum())
     if not pixels and not text:
         return None
-    return SheetDifference(index, pixels, text, mask)
+    return SheetDifference(index, pixels, text, reviewed, now, mask)
 
 
 def write_diff(
@@ -541,25 +547,146 @@ class Author:
     script: str
 
 
+_OBJECT_ID = re.compile(r"^[0-9a-f]{40}([0-9a-f]{24})?$")
+
+
+def _last_commits(blobs: dict[str, str], repo: Path) -> dict[str, str]:
+    """The newest commit that produced each path's HEAD blob; stops once all are seen.
+
+    Matching the blob, not just "touched the path", is what keeps a newer edit
+    on a side branch that a merge did not take from reading as the author of
+    the content the merge kept.  Every blob in ``blobs`` is committed, so an
+    unbounded walk would only read older history -- which a shallow or partial
+    clone (a farm worker's depth-1 fetch) does not have, making git fail or
+    fetch its way back.
+    """
+    last: dict[str, str] = {}
+    if not blobs:
+        return last
+    proc = subprocess.Popen(
+        # -c: a merge whose result differs from every parent produced its blob
+        [
+            "git",
+            "-C",
+            str(repo),
+            "log",
+            "--format=%x00%H",
+            "--raw",
+            "-c",
+            "--no-abbrev",
+            "--no-renames",
+            "--",
+            *blobs,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
+    try:
+        commit = ""
+        for line in proc.stdout or ():
+            line = line.rstrip("\n")
+            if line.startswith("\x00"):
+                commit = line[1:]
+                continue
+            meta, tab, path = line.partition("\t")
+            if not tab or path not in blobs:
+                continue
+            ids = [token for token in meta.split() if _OBJECT_ID.match(token)]
+            if ids and ids[-1] == blobs[path]:  # the post-image
+                last.setdefault(path, commit)
+                if len(last) == len(blobs):
+                    break
+    finally:
+        proc.kill()
+        proc.wait()
+    return last
+
+
+def _shallow_boundary(repo: Path) -> set[str]:
+    """Commits whose parents this clone lacks; their diff lists every file."""
+    shallow = _git("rev-parse", "--git-path", "shallow", repo=repo)
+    path = repo / shallow if shallow else None
+    if path is None or not path.is_file():
+        return set()
+    return set(path.read_text(encoding="utf-8").split())
+
+
+def script_authors(
+    paths: Sequence[Path], *, repo: Path = REPO_ROOT
+) -> dict[Path, Author | ValueError]:
+    """The model named by the last commit that touched each path.
+
+    A fixed number of git calls for any number of paths: a drift check that
+    lists every unreviewed drawing must not spawn git per drawing.
+    """
+    if not paths:  # an empty pathspec would make git walk every file's history
+        return {}
+    rels = {
+        path: path.resolve().relative_to(repo.resolve()).as_posix() for path in paths
+    }
+    status = _git("status", "--porcelain", "--", *rels.values(), repo=repo) or ""
+    dirty = {line.split(maxsplit=1)[-1] for line in status.splitlines()}  # "XY path"
+    tree = _git("ls-tree", "HEAD", "--", *rels.values(), repo=repo) or ""
+    blobs = {  # "<mode> blob <id>\t<path>"
+        line.partition("\t")[2]: line.split()[2] for line in tree.splitlines()
+    }
+    last = _last_commits(
+        {rel: blob for rel, blob in blobs.items() if rel not in dirty}, repo
+    )
+    boundary = _shallow_boundary(repo) if last else set()
+    bodies: dict[str, str] = {}
+    if last:
+        shown = _git(
+            "log", "--no-walk", "--format=%x00%H%n%B", *set(last.values()), repo=repo
+        )
+        for block in (shown or "").split("\x00")[1:]:
+            commit, _, body = block.partition("\n")
+            bodies[commit.strip()] = body
+    authors: dict[Path, Author | ValueError] = {}
+    for path, rel in rels.items():
+        commit = last.get(rel)
+        if rel in dirty:
+            authors[path] = ValueError(
+                f"{rel} has uncommitted changes; commit it so its author is on record"
+            )
+        elif commit is None:
+            authors[path] = ValueError(
+                f"{rel} has no commit; its author is not on record"
+            )
+        elif commit in boundary:
+            authors[path] = ValueError(
+                f"{rel}: this clone is shallow and its history stops at "
+                f"{commit[:12]}, so the commit that last touched it is not on record"
+            )
+        else:
+            trailers = _TRAILER.findall(bodies.get(commit, ""))
+            models = sorted({model_key(m) for m in trailers if model_family(m)})
+            if len(models) > 1:
+                authors[path] = ValueError(
+                    f"{rel}: commit {commit[:12]} names several models {models}"
+                )
+            else:
+                authors[path] = Author(models[0] if models else None, commit, rel)
+    return authors
+
+
 def script_author(path: Path, *, repo: Path = REPO_ROOT) -> Author:
     """The model named by the last commit that touched ``path``."""
-    rel = path.resolve().relative_to(repo.resolve()).as_posix()
-    if _git("status", "--porcelain", "--", rel, repo=repo):
-        raise ValueError(
-            f"{rel} has uncommitted changes; commit it so its author is on record"
-        )
-    commit = _git("log", "-1", "--format=%H", "--", rel, repo=repo)
-    if not commit:
-        raise ValueError(f"{rel} has no commit; its author is not on record")
-    body = _git("log", "-1", "--format=%B", commit, repo=repo) or ""
-    models = sorted({model_key(m) for m in _TRAILER.findall(body) if model_family(m)})
-    if len(models) > 1:
-        raise ValueError(f"{rel}: commit {commit[:12]} names several models {models}")
-    return Author(models[0] if models else None, commit, rel)
+    author = script_authors([path], repo=repo)[path]
+    if isinstance(author, ValueError):
+        raise author
+    return author
 
 
 def draw_script_author(name: str) -> Author:
     return script_author(SCRIPTS_DIR / DRAWINGS_BY_NAME[name].script_name)
+
+
+def draw_script_authors(names: Sequence[str]) -> dict[str, Author | ValueError]:
+    paths = {name: SCRIPTS_DIR / DRAWINGS_BY_NAME[name].script_name for name in names}
+    found = script_authors(list(paths.values()))
+    return {name: found[path] for name, path in paths.items()}
 
 
 def resolve_author(
@@ -1133,8 +1260,10 @@ def drawing_status(
     pdf = pdf or DRAWINGS_BY_NAME[name].outputs["pdf"]
     if not pdf.is_file():
         return Status(name, State.UNRENDERED, f"no rendered PDF at {pdf}", "", "-")
-    current = read_sheets(pdf)
     entry = ledger["drawings"].get(name, {})
+    if not entry:  # nothing to compare against: skip the 300 dpi render
+        return Status(name, State.UNREVIEWED, "no accepted review recorded", "", "-")
+    current = read_sheets(pdf)
     cross, last = entry.get(CROSS_FAMILY), entry.get(LAST_RESORT)
     cross_cmp = None if cross is None else _compare(cross, current, references)
     last_cmp = None if last is None else _compare(last, current, references)
@@ -1196,6 +1325,36 @@ def check(
         drawing_status(name, ledger, references=references, report_dir=report_dir)
         for name in selected
     ]
+
+
+_REVIEWER_FOR = {"claude": "codex", "gpt": "claude", "mimo": "claude"}
+
+
+def fix_command(status: Status, author: Author | ValueError | None = None) -> str:
+    """The commands that clear a failing drawing: render it if needed, then review it."""
+    review = _review_command(status.name, author)
+    if status.state == State.UNRENDERED:
+        return f"uv run python -m doit drawing:{status.name}, then {review}"
+    return review
+
+
+def _review_command(name: str, author: Author | ValueError | None) -> str:
+    review = f"uv run cad/scripts/machinist_review.py {name}"
+    script = DRAWINGS_BY_NAME[name].script_name
+    if author is None:
+        try:
+            author = draw_script_author(name)
+        except ValueError as exc:
+            author = exc
+    if isinstance(author, ValueError):
+        return f"{author}; then {review} --reviewer <other family> --author-family <family>"
+    family = None if author.model is None else model_family(author.model)
+    if family is None:
+        return (
+            f"{review} --reviewer <other family> --author-family <family that last "
+            f"edited {script}> (its last commit names no model)"
+        )
+    return f"{review} --reviewer {_REVIEWER_FOR[family]} --author-family {family}"
 
 
 # --- CLI ---------------------------------------------------------------------------
@@ -1289,7 +1448,19 @@ def _run(args: argparse.Namespace) -> int:
 
     statuses = check(args.names, ledger_path=args.ledger, report_dir=args.report_dir)
     if args.json:
-        rows = [{**status.__dict__, "state": str(status.state)} for status in statuses]
+        authors = draw_script_authors(
+            [status.name for status in statuses if status.state != State.OK]
+        )
+        rows = [
+            {
+                **status.__dict__,
+                "state": str(status.state),
+                "fix": None
+                if status.state == State.OK
+                else fix_command(status, authors[status.name]),
+            }
+            for status in statuses
+        ]
         print(json.dumps(rows, indent=2))
     else:
         for status in statuses:
@@ -1309,6 +1480,21 @@ def _run(args: argparse.Namespace) -> int:
         f"({last_resort} via last resort, {rulings} accepted with rulings)",
         file=sys.stderr,
     )
+    if failing:
+        print(
+            f"{len(failing)} drawings have no counting machinist review of the sheet "
+            "now rendered; each blocks the release until its command runs:",
+            file=sys.stderr,
+        )
+        authors = draw_script_authors([status.name for status in failing])
+        for status in failing:
+            fix = fix_command(status, authors[status.name])
+            why = (
+                f"drift: {status.detail}"
+                if status.state == State.DRIFT
+                else status.state
+            )
+            print(f"  {status.name} ({why}): {fix}", file=sys.stderr)
     return 1 if failing else 0
 
 
