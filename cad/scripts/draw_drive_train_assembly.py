@@ -484,7 +484,16 @@ RIG_STEPS = "\n".join(
         "19. FACE A MHA-002 TOOTH TIP TO A MHA-027 TOOTH TIP ON THE LEVEL",
         "    LINE OF CENTRES. SLIDE THE RIG IN UNTIL A 2.5 FEELER (E.G. 2.00",
         "    + 0.50 LEAVES) IS SNUG; ACCEPT 2.3-2.7. SET IT AT THE FRONT AND",
-        "    BACK STATIONS TO SQUARE BOTH MHA-061 TO THE DRUM; CLAMP.",
+        "    BACK STATIONS TO SQUARE BOTH MHA-061 TO THE DRUM.",
+        # #854 Codex P1: the front-block end-play feeler is set here, before
+        # the clamp and before step 20 spots the seats. Wording from
+        # pinioncluster; the band is pinion_rig_layout FRONT_BLOCK_FEELER
+        # 0.25 with FRONT_BLOCK_FEELER_BAND 0.10, printed as limits (the purity
+        # gate keeps bilateral bands in the spec). PENDING until #854 lands,
+        # when the limits are generated from those two constants.
+        "    [PENDING: WITH THE CLUSTER HARD ON THE BACK MHA-061, STAND THE",
+        "    FRONT MHA-061 0.15-0.35 OFF THE FRONT MHA-056 OUTER FACE",
+        "    (FEELER).] CLAMP.",
         # Seat depths from the base's own seat specs (build_harmonic_base
         # BLOCK_/FOOT_SCREW_DRILL_DEPTH and _HOLE_DEPTH; the #8-32 pair is the
         # rule-12 E10 re-derive on dt-pinion-lever-pin #844). FOOT_HOLE_DEPTH
