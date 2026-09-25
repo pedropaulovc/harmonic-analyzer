@@ -463,10 +463,13 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
         spec.DRUM_STATION_AS_BUILT + spec.DRUM_AFT_SHIFT
     )
 
-    assert spec.JOURNAL_LEN == pytest.approx(19.0)
+    # 20, not 19: the 0.45 drum shim widened the drum's play, and the lands
+    # keep RIG_MARGIN_SPARE over their 0.5 floor (Main, #858).
+    assert spec.JOURNAL_LEN == pytest.approx(20.0)
+    assert spec.LAND_OVER_STRAP_REQUIRED == pytest.approx(0.75)
     assert spec.DRUM_STATION == pytest.approx(61.55)
     assert spec.DRUM_STATION_BAND == spec.LINEAR_X_BAND == pytest.approx(0.8)
-    assert spec.END_PLAY == 0.25 and spec.END_PLAY_SET_ERROR == 0.10
+    assert spec.END_PLAY == 0.45 and spec.END_PLAY_SET_ERROR == 0.10
     # Codex #854 review (Main): no copies of values the rig and the title block
     # own -- the spec reads them, so a feeler or row change reaches the lands.
     import inspect
@@ -491,8 +494,8 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     ):
         assert literal not in spec_source, literal
     assert (spec.FRONT_JOURNAL_FROM_HEAD_REAR, spec.BACK_JOURNAL_FROM_HEAD_REAR) == (
-        pytest.approx(47.4),
-        pytest.approx(199.9),
+        pytest.approx(46.8),
+        pytest.approx(199.5),
     )
     assert set(spec.LAND_MARGINS_AT_STOPS) == {"drum forward", "drum aft"}
     for margins in spec.LAND_MARGINS_AT_STOPS.values():
@@ -670,7 +673,7 @@ def test_journal_lands_cover_their_straps_in_the_pose() -> None:
     assert min(margins) >= spec.MIN_LAND_OVER_STRAP
     # The pose is the drilling set-up: the drum hard on the back strap and
     # the front strap one shim ahead of the drum (Main, #858 ruling 3).
-    assert margins == pytest.approx([4.9, 5.1, 4.85, 5.15], abs=5e-3)
+    assert margins == pytest.approx([5.3, 5.7, 5.25, 5.75], abs=5e-3)
     source = inspect.getsource(assembly)
     assert "falls short of the back strap" not in source
     assert "journal land misses its strap" in source
@@ -683,20 +686,23 @@ def test_drum_runs_in_the_shim_the_straps_were_drilled_on() -> None:
     # the drum's front end, which MHA-062's drilling note prints; the drum
     # then runs in 0.25 +/- 0.10 of end play and never binds.  Before the
     # ruling the straps closed line to line on the drum, and drum_total_air
-    # still read the block-stop model (0.0 up to the whole feeler).
+    # still read the block-stop model (0.0 up to the whole feeler).  The shim
+    # is a 0.45 blade, not the rig's 0.25 feeler: the drum keeps its 0.1
+    # floor with RIG_MARGIN_SPARE to spare (Main, #858).
     import pinion_pivot_shaft_spec as shaft
     import pinion_rig_layout as rig
 
-    assert spec.drum_total_air() == pytest.approx((0.15, 0.35))
+    assert spec.drum_total_air() == pytest.approx((0.35, 0.55))
     assert spec.drum_total_air()[0] >= spec.MIN_END_PLAY
     assert rig.STRAP_Z_INNER[1] - rig.STRAP_Z_INNER[0] == pytest.approx(
-        rig.DRUM_LEN + rig.FRONT_BLOCK_FEELER, abs=1e-9
+        rig.DRUM_LEN + 0.45, abs=1e-9
     )
     assert rig.DRUM_BACK_Z == rig.STRAP_Z_INNER[1]
     assert (rig.DRUM_END_SHIM, rig.DRUM_END_SHIM_SET_ERROR) == (
-        rig.FRONT_BLOCK_FEELER,
+        0.45,
         rig.FRONT_BLOCK_FEELER_BAND,
     )
+    assert spec.drum_total_air()[0] - spec.MIN_END_PLAY >= rig.RIG_MARGIN_SPARE - 1e-9
     assert rig.DRUM_FRONT_Z - rig.STRAP_Z_INNER[0] == pytest.approx(rig.DRUM_END_SHIM)
     # The drilling pose is printed on the part that is drilled.
     callout = shaft.PIN_HOLE_CALLOUT.split("\n")
@@ -705,7 +711,7 @@ def test_drum_runs_in_the_shim_the_straps_were_drilled_on() -> None:
         "IN MHA-056 CROSS HOLES, 2 PL:",
         "REAR END FLUSH WITH MHA-061 REAR FACE +/-0.10,",
         "STRAPS ON BACK STOP, MHA-002 ON BACK STRAP,",
-        "0.25 FEELER AT MHA-002 FRONT END",
+        "0.45 FEELER AT MHA-002 FRONT END",
     ]
     # Both bearing stacks carry the flush setting, and the front one the
     # shim's set error, by name.

@@ -14,7 +14,9 @@ ROD_DIA = 6.35
 # worst fitted stack, both blocks' .XX depth bands included
 # (pinion_rig_layout.lift_rod_seat_stack, Codex #837/#854), then 197.5 for
 # the deeper E-a blocks (Codex #858), then 197.8 for the drum's end shim
-# (Main, #858 ruling 3), then 198.8 for the 11.0 blocks.
+# (Main, #858 ruling 3), then 198.8 for the 11.0 blocks, then 199.5 for the
+# 0.45 drum shim, the 6.25 back-collar pin plane and RIG_MARGIN_SPARE past
+# the lever seat (Main, #858).
 ROD_LEN = LIFT_ROD_LEN
 CAP_SAG = 1.2
 CAP_R = round((ROD_DIA**2 / 4.0 + CAP_SAG**2) / (2.0 * CAP_SAG), 2)  # 4.80

@@ -514,6 +514,7 @@ ARBOR_PEDESTAL_NORTH_Z = 97.5 + MECHANISM_Z_SHIFT
 # about Y so its strap looks SOUTH at the drum.  After the fixed-post recenter
 # its foot spans z 92.588..108.588, still north of the unchanged rocker support.
 from build_arbor_pedestal import FOOT_DEPTH as ARBOR_PED_DEPTH  # noqa: E402
+from build_cylinder_end_disc import DISC_DIA as END_DISC_DIA  # noqa: E402
 from build_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E402
 
 # Cylinder END DISCS (2026-09, ch13 page002_img01/img03, ch25 page001_img02):
@@ -805,8 +806,11 @@ from pinion_arbor_spec import (  # noqa: E402
     CROSS_HOLE_DIA as ARBOR_CROSS_HOLE_DIA,
     BACK_JOURNAL_Z as ARBOR_BACK_JOURNAL_Z,
     DRUM_STATION as ARBOR_DRUM_STATION,
+    drum_total_air as ARBOR_DRUM_TOTAL_AIR,
     FRONT_JOURNAL_Z as ARBOR_FRONT_JOURNAL_Z,
     JOURNAL_LEN as ARBOR_JOURNAL_LEN,
+    LAND_MARGINS_AT_STOPS as ARBOR_LAND_MARGINS_AT_STOPS,
+    MIN_END_PLAY as ARBOR_MIN_END_PLAY,
     MIN_LAND_OVER_STRAP as ARBOR_MIN_LAND_OVER_STRAP,
     RETAINING_COMPOUND_MAX_GAP_MM as ARBOR_BOND_MAX_GAP,
     HEAD_CAP_SAG as ARBOR_HEAD_CAP_SAG,
@@ -1398,7 +1402,7 @@ PIVOT_SHAFT_Z0 = RIG.TORQUE_SHAFT_Z0
 # Ø6.35 torque shaft, set back-flush; its front end stands the worst-stack
 # allowance proud of the front block (pinion_rig_layout).
 LIFT_ROD_Z0 = RIG.LIFT_ROD_Z0
-# front end LEVER_SEAT_PROUD (15.10) south of the front block -- the lever
+# front end LEVER_SEAT_PROUD (15.60) south of the front block -- the lever
 # hub's seat, sized so the hub never stops the rod (pinion_rig_layout)
 BLOCK_X = PIVOT_X  # block local origin ON the pivot bore (datum B, U28)
 BLOCK_FRONT_Z0 = RIG.FRONT_BLOCK_Z0  # one 0.25 feeler off the front strap
@@ -1448,9 +1452,10 @@ if Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 > APINION_Z_BACK + 0.5:
     raise AssertionError("alignment pinion misses the j = 19 station")
 # Worst stack at both ends (RIG_AFT_SHIFT, Main on #858): the drum's back end
 # advances from the pose by DRUM_BACK_ADVANCE_STACK and must still cover all of
-# g19's face (so j = 19 engages >= 2.0 a fortiori), by less than one grid step
-# (the shift is the smallest that does it); its front end retreats by
-# DRUM_FRONT_RETREAT_STACK and must stay 1.0 south of g0's front face.
+# g19's face (so j = 19 engages >= 2.0 a fortiori); its front end retreats by
+# DRUM_FRONT_RETREAT_STACK and must stay 1.0 south of g0's front face.  Both
+# spares join RIG_MARGINS (below), and one step less shift would leave
+# j = 19 short of RIG_MARGIN_SPARE (the shift is the smallest that holds).
 _G19_FACE_Z = (
     Z_DRUM0 + 19 * Z_PITCH - DRUM_FACE / 2.0,
     Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0,
@@ -1464,7 +1469,7 @@ if J19_FULL_FACE_MARGIN < -1e-9:
     raise AssertionError(
         f"j = 19 loses {-J19_FULL_FACE_MARGIN:.3f} of its full face at the worst stack"
     )
-if J19_FULL_FACE_MARGIN >= RIG.RIG_AFT_SHIFT_STEP:
+if J19_FULL_FACE_MARGIN - RIG.RIG_AFT_SHIFT_STEP >= RIG.RIG_MARGIN_SPARE:
     raise AssertionError("RIG_AFT_SHIFT is more than the smallest step for j = 19")
 APINION_FRONT_WORST_Z = APINION_Z_FRONT + sum(RIG.DRUM_FRONT_RETREAT_STACK.values())
 J0_SLACK_WORST = (Z_DRUM0 - DRUM_FACE / 2.0 - 1.0) - APINION_FRONT_WORST_Z
@@ -1672,7 +1677,7 @@ _FPIN_Y_AT_CAM = _FPIN_C[1] - _S_CAM * _SPR_N[1]  # 64.04
 # the thinnest strap (test_drive_train_support_layout).
 _STRAP_MID_Z = tuple(
     z + s * STRAP_T / 2.0 for z, s in zip(STRAP_Z_INNER, (-1.0, 1.0), strict=True)
-)  # -74.862, +77.588 (pinion_rig_layout)
+)  # -74.562, +78.088 (pinion_rig_layout)
 CAM_PIN_STATION = (STRAP_T / 2.0, RIG.BACK_CAM_PIN_STATION)  # pin plane, from each collar front face
 CAM_Z0 = tuple(z - s for z, s in zip(_STRAP_MID_Z, CAM_PIN_STATION, strict=True))
 for _z0 in CAM_Z0:
@@ -1901,6 +1906,68 @@ if _LEV_Z[1] > PIVOT_SHAFT_Z0 - 0.25:
     raise AssertionError("lever throw plane reaches the pivot shaft front end")
 if _LEV_Z[0] < _GRIP_HEAD_Z[1] + 0.25:
     raise AssertionError("lever throw plane reaches the integral grip head")
+
+# The novice-margin rule (Main, restricted review of #858): every rig-scope
+# margin -- the fit-up stacks, the drum's gears and end play, and each
+# clearance the rig's axial stations set against its neighbours -- stands at
+# least RIG_MARGIN_SPARE over its floor.  name -> (worst value, floor).
+RIG_MARGINS = {
+    "j = 19 past its full face": (J19_FULL_FACE_MARGIN, 0.0),
+    "j = 0 drum overhang slack": (J0_SLACK_WORST, 0.0),
+    "torque shaft bearing in the front block": (
+        sum(RIG.TORQUE_SHAFT_BEARING_STACK.values()),
+        RIG.FRONT_BLOCK_MIN_BEARING,
+    ),
+    "torque shaft bearing in the back block": (
+        sum(RIG.TORQUE_SHAFT_BACK_BEARING_STACK.values()),
+        RIG.BACK_BLOCK_MIN_BEARING,
+    ),
+    "lift rod seat past the front block": (
+        sum(RIG.LIFT_ROD_SEAT_STACK.values()),
+        RIG.LEVER_SEAT_MIN,
+    ),
+    "drum end play": (ARBOR_DRUM_TOTAL_AIR()[0], ARBOR_MIN_END_PLAY),
+    "MHA-102 journal land over its strap": (
+        min(min(stop.values()) for stop in ARBOR_LAND_MARGINS_AT_STOPS.values()),
+        ARBOR_MIN_LAND_OVER_STRAP,
+    ),
+    "back collar to the back block": (RIG.BACK_COLLAR_GAP_MIN, RIG.BACK_COLLAR_MIN_GAP),
+    "spring blade on the back strap flank": (
+        RIG.SPRING_BLADE_ON_FLANK_WORST,
+        RIG.SPRING_BLADE_MIN_ON_FLANK,
+    ),
+    "spring foot pad to the back block": (
+        BLOCK_BACK_Z0 - (SPRING_Z + (SPR_PAD_WIDTH + 0.51) / 2.0),
+        0.25,
+    ),
+    "grip crossrod to the T12 chain wheel": (
+        _GRIP_ROD_Z[0] - (REMOVABLE_Z0 + 5.0),
+        0.25,
+    ),
+    "grip head to the crank arm": (
+        _GRIP_HEAD_Z[0] - (CRANK_ARM_Z0 + ARM_THICKNESS),
+        0.25,
+    ),
+    "lever throw plane to the grip head": (_LEV_Z[0] - _GRIP_HEAD_Z[1], 0.25),
+    "lever throw plane to the torque shaft's front end": (
+        PIVOT_SHAFT_Z0 - _LEV_Z[1],
+        0.25,
+    ),
+    "engaged drum tips to the north end disc": (
+        ENGAGED_C2C - TIP_APINION - END_DISC_DIA / 2.0,
+        0.25,
+    ),
+}
+_THIN = {
+    name: (value, floor)
+    for name, (value, floor) in RIG_MARGINS.items()
+    if value < floor + RIG.RIG_MARGIN_SPARE - 1e-9
+}
+if _THIN:
+    raise AssertionError(
+        "rig margins under their floor + RIG_MARGIN_SPARE: "
+        + "; ".join(f"{n} {v:.3f} (floor {f})" for n, (v, f) in _THIN.items())
+    )
 
 # (The PR5 rod-pin throw checks died with the pins; the cam block above
 # bounds the collar sweep against the base, spring foot and shaft.)

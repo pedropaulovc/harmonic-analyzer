@@ -336,10 +336,10 @@ def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
     assert rig.BLOCK_SEAT_Z[1] - rig.BLOCK_SEAT_Z[0] == pytest.approx(
         pinion_pivot_block_depth() + rig.INNER_SPAN, abs=1e-9
     )
-    # Ruling 3's drum shim puts the front seats one more feeler forward, and
+    # Ruling 3's 0.45 drum shim puts the front seats that much forward, and
     # the 11.0 block half its extra depth.
     assert rig.BLOCK_SEAT_Z[0] == pytest.approx(
-        -89.45 + rig.RIG_AFT_SHIFT + MECHANISM_Z_SHIFT
+        -89.65 + rig.RIG_AFT_SHIFT + MECHANISM_Z_SHIFT
     )
     assert part.FOOT_SCREW_XZ == tuple(
         (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in former_feet
