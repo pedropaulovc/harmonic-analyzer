@@ -46,11 +46,35 @@ PIN_LEN_TOL = _pin.PIN_LEN_BAND
 
 ARBOR_NUMBER = "MHA-102"
 STRAP_NUMBER = "MHA-056"
-# Drilled Ø8 slide fit over the arbor (Ø8 -0.01/-0.10, lands -0.01/-0.03):
-# the title block's DRILLED HOLES band, printed on the dimension.
+# Drilled Ø8 slide fit over the arbor (Ø8 -0.01/-0.10, lands -0.01/-0.03).
+# The title block's DRILLED HOLES row (+0.10/0) governs it and is NOT printed
+# on the dimension (policy rule 1); the band is restated here only for the
+# stacks below, and a test pins it to title_block.yaml's drilled_hole row.
 BORE_BAND = (0.10, 0.0)  # (upper, lower) deviations
 OD_BAND = LINEAR_X_BAND
 LEN_BAND = LINEAR_X_BAND
+# PinHoleCz prints at one place from one end face, independently of Depth.
+PIN_HOLE_Z_BAND = LINEAR_X_BAND
+
+
+def pin_to_face_distances() -> tuple[float, float]:
+    """Least and greatest distance from the pin hole's axis to either end
+    face, over every corner of the printed length and pin-station bands.
+
+    The station is printed from one face (PinHoleCz), the other face sits the
+    length away, and the collar goes on either way round, so both faces can
+    end up inboard.
+    """
+    distances = []
+    for length, station in product(
+        (COLLAR_LEN - LEN_BAND, COLLAR_LEN + LEN_BAND),
+        (PIN_HOLE_Z - PIN_HOLE_Z_BAND, PIN_HOLE_Z + PIN_HOLE_Z_BAND),
+    ):
+        distances.extend((station, length - station))
+    return min(distances), max(distances)
+
+
+PIN_TO_FACE_MIN, PIN_TO_FACE_MAX = pin_to_face_distances()
 SLIDE_CLEARANCE_MIN = round(BORE + BORE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]), 6)
 if SLIDE_CLEARANCE_MIN <= 0.0:
     raise AssertionError("the collar no longer slides over the arbor")
@@ -64,10 +88,12 @@ def collar_strap_gaps() -> tuple[float, float]:
 
     Stations run from MHA-102's head rear face toward the back.  The strap's
     outer face sits DRUM_STATION less the drum's front air and the strap
-    thickness; the collar's inboard face sits half its length past the pin.
+    thickness; the collar's inboard face sits one pin-to-face distance past
+    the pin, and that distance runs over the length AND pin-station bands
+    (pin_to_face_distances), not just half the length.
     """
     gaps = []
-    for station, air, strap, pin, length in product(
+    for station, air, strap, pin, to_face in product(
         (DRUM_STATION - DRUM_STATION_BAND, DRUM_STATION + DRUM_STATION_BAND),
         drum_total_air(),
         (STRAP_T - STRAP_T_BAND, STRAP_T + STRAP_T_BAND),
@@ -75,10 +101,10 @@ def collar_strap_gaps() -> tuple[float, float]:
             PIN_STATION_FROM_HEAD_REAR - PIN_STATION_BAND,
             PIN_STATION_FROM_HEAD_REAR + PIN_STATION_BAND,
         ),
-        (COLLAR_LEN - LEN_BAND, COLLAR_LEN + LEN_BAND),
+        (PIN_TO_FACE_MIN, PIN_TO_FACE_MAX),
     ):
         strap_outer = station - air - strap
-        collar_inboard = pin + length / 2.0
+        collar_inboard = pin + to_face
         gaps.append(strap_outer - collar_inboard)
     return min(gaps), max(gaps)
 
@@ -92,7 +118,7 @@ if GAP_MIN <= MIN_GAP:
 
 # Rule 12 webs at the printed worst case (U27 target 2.0, floor 1.5).
 COLLAR_WALL_WORST = (COLLAR_OD - OD_BAND - (BORE + BORE_BAND[0])) / 2.0
-PIN_TO_END_WEB_WORST = (COLLAR_LEN - LEN_BAND) / 2.0 - PIN_HOLE_MAX / 2.0
+PIN_TO_END_WEB_WORST = PIN_TO_FACE_MIN - PIN_HOLE_MAX / 2.0
 for _name, _web in (
     ("collar wall", COLLAR_WALL_WORST),
     ("pin hole to collar end face", PIN_TO_END_WEB_WORST),
