@@ -17,9 +17,10 @@ foot also runs INBOARD under the outer arms. Ry180 about the part origin
 keeps the bore at (x 72.9, y 253.8, z mount_z) exactly (the bore is on the
 part's y axis), so PIVOT/SUPPORT_APEX_Y/PIVOT_BRACKET_Z are unchanged; the
 _locate_to_datum "pivot bracket datum x/z" distance mates then see flipped
-Right/Front normals on that instance (a "@<diag>" flip-seed suffix may be
-needed in _assembly._FLIP_INVERT -- learn it from the first build's
-"flip-seed MISS" warn).
+Right/Front normals on that instance. The channel assembly's flip seeds
+carry its orientation-suffixed entry ("pivot bracket datum y @npn", the
+Ry180 diagonal); a new pose's suffix is learned from the build's
+"flip-seed MISS" error, which names the seed and where to toggle it.
 
 Why INBOARD, when the plate shows the foot running outboard from the ear:
 the modelled rocker-arm-support is 177.8 long (z -88.9..+88.9) and the ears
