@@ -208,9 +208,23 @@ farm (`--executor farm`, which is how a seatless machine runs them).
 harness deadline.** `scripts/farm-run.ps1` started with `hub` (`persist: true`)
 is the only sanctioned way for an agent to submit `--executor farm` work; the
 full contract, parameters, run records and recovery procedure live in
-[`DEVELOPING.md`](DEVELOPING.md#supervised-farm-launches). Four rules bind every
+[`DEVELOPING.md`](DEVELOPING.md#supervised-farm-launches). Five rules bind every
 such build:
 
+- A launch builds the caller's **committed, pushed HEAD** and nothing else. The
+  launcher runs the submitter in a disposable detached worktree under
+  `<WorkRoot>` (default `C:\src\fw\<8 hex>`), with its own `.venv`, an empty
+  `cad/out` and a fresh `.doit.db`, then copies `cad/out` back to the caller,
+  drops the caller's `.doit.db` records for the tasks it touched (all of them
+  after a failed build that copied outputs back), and removes the build
+  worktree. Concurrent launches
+  from one caller harvest one at a time under `cad/out/.farm-harvest.lock`;
+  `scripts/farm-prune.ps1` removes build worktrees a finished or killed launch
+  left behind. Uncommitted edits, a stale `.doit.db` or old artefacts in
+  the caller can no longer move a cache key, and editing the caller mid-run
+  cannot reach the build. A dirty caller is warned about (`caller_dirty` in the
+  record), not refused: those edits are **not** built. `release` and `gallery`
+  are refused as launcher targets.
 - No finite local timer. A cold leaf has measured 61.5 min and a full closure
   runs for hours, so a Bash job or a 300 s tool deadline kills a still-valid
   build and leaves the remote workflow running.

@@ -39,6 +39,7 @@ import argparse
 import copy
 import functools
 import getopt
+import hashlib
 import json
 import os
 import subprocess
@@ -147,11 +148,71 @@ def main(argv: Sequence[str] | None = None) -> int:
     os.environ["HARMONIC_EXECUTOR"] = options.executor
 
     doit = _FarmDoitMain() if options.executor == "farm" else DoitMain()
+    executing = _executing_command(doit_args, doit)
+    if executing is None:
+        return doit.run(doit_args)
     if options.executor == "farm":
-        executing = _executing_command(doit_args, doit)
-        if executing is not None:
-            doit_args = _with_farm_parallelism(doit_args, *executing)
-    return doit.run(doit_args)
+        doit_args = _with_farm_parallelism(doit_args, *executing)
+    before = _tree_state()
+    code = doit.run(doit_args)
+    _warn_on_tree_drift(before, _tree_state())
+    return code
+
+
+def _tree_state() -> str | None:
+    """One digest of what a build can read from this tree.
+
+    doit keys each task lazily, from the files as they are when that task runs,
+    so an edit, checkout or merge in this tree mid-run can leave ``cad/out``
+    and ``.doit.db`` recording a mix of two states. The digest covers HEAD,
+    status, the tracked diff with dirty submodule content expanded
+    (``--submodule=diff``; a plain diff only says "modified content", so a
+    second edit to an already-dirty ``SolidworksMCP-python`` would compare
+    equal), and the bytes of every untracked, non-ignored file in the tree and
+    its initialized submodules. Best effort: a tree git cannot read yields
+    ``None`` and no warning, never a failed build.
+    """
+    try:
+        digest = hashlib.sha256()
+        for args in (
+            ("rev-parse", "HEAD"),
+            ("status", "--porcelain=v1", "--untracked-files=all"),
+            ("diff", "--no-ext-diff", "--binary", "--submodule=diff", "HEAD"),
+        ):
+            digest.update(_git_bytes(REPO_ROOT, *args))
+        submodules = _git_bytes(REPO_ROOT, "submodule", "status", "--recursive")
+        digest.update(submodules)
+        roots = [REPO_ROOT] + [
+            REPO_ROOT / line[1:].split()[1]
+            for line in submodules.decode("utf-8", "replace").splitlines()
+            if line and not line.startswith("-")
+        ]
+        for root in roots:
+            listing = _git_bytes(root, "ls-files", "-z", "--others", "--exclude-standard")
+            for name in sorted(filter(None, listing.split(b"\0"))):
+                digest.update(name + b"\0")
+                digest.update(hashlib.sha256((root / os.fsdecode(name)).read_bytes()).digest())
+        return digest.hexdigest()
+    except Exception:
+        return None
+
+
+def _git_bytes(root: Path, *args: str) -> bytes:
+    return subprocess.run(
+        ["git", *args], cwd=root, capture_output=True, check=True
+    ).stdout
+
+
+def _warn_on_tree_drift(before: str | None, after: str | None) -> None:
+    if before is None or after is None or before == after:
+        return
+    print(
+        "build: WARNING the working tree changed while this build ran (HEAD, "
+        "status or tracked content). Outputs and cad/out/.doit.db may record a mix "
+        "of both states: `doit forget` the tasks you touched, then rebuild, before "
+        "trusting them.",
+        file=sys.stderr,
+    )
 
 
 def _isolated_tasks(task_list):

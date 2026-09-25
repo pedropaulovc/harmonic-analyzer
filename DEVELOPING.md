@@ -22,11 +22,112 @@ may still run `build.py` directly; everything below is the contract for an
 agent-driven launch.
 
 The launcher is a foreground runner, not a second scheduler: it validates its
-inputs, writes a startup record, runs exactly one `uv run … build.py` child,
-tees its output to a log outside the worktree, and writes a terminal record
-carrying the child's own exit code. It never retries, never cancels a remote
-workflow, never detaches and never imposes a local deadline. Cancelling a farm
-workflow is always a separate, explicit `farm.py cancel`.
+inputs, writes a startup record, builds the caller's committed HEAD in a
+disposable worktree, runs exactly one `uv run … build.py` child there, tees its
+output to a log outside the worktree, copies the outputs back and writes a
+terminal record carrying the child's own exit code. It never retries, never
+cancels a remote workflow, never detaches and never imposes a local deadline.
+Cancelling a farm workflow is always a separate, explicit `farm.py cancel`.
+
+### A launch is a function of the commit
+
+A run is a pure function of (commit SHA, targets, leaf budget, pool and cache
+environment). Farm leaves were always pinned: each worker fetches the exact SHA
+into a disposable root. The submitter used to run inside the caller's worktree
+instead, and doit derives each task's cache key lazily, from the live files, the
+worktree's `cad/out/.doit.db` and the artefacts already in `cad/out`. That broke
+twice on 2026-09-22 (records in `C:/src/dt-logs/farm-runs/`):
+
+- `20260922T202702438Z-4ea2fe43…`: an in-worktree merge dirtied inputs mid-run.
+  The worker stored the drawing under one key, the submitter expected another,
+  and the run failed `cache_missing`.
+- `20260922T203057806Z-347ffb07…`, a clean HEAD: the previous run had left
+  `.doit.db` recording `part:knife_mount` as up to date against the dirty YAML,
+  beside a stale local `.SLDPRT`. The submitter skipped the part, derived the
+  drawing key from the stale artefact, and missed again.
+
+So the submitter no longer runs in the caller's worktree. The launcher:
+
+1. resolves the caller's HEAD and requires it on `origin`;
+2. runs `git worktree add --detach <WorkRoot>\<8 hex> <sha>` (a short path;
+   long paths break git and SolidWorks on Windows);
+3. initializes every submodule the commit pins except those its own
+   `.farm-sources.json` excludes, borrowing objects from the caller's clone
+   (`--reference`) when it has one; the checkout is still the pinned gitlink;
+4. clears `VIRTUAL_ENV` and `UV_PROJECT_ENVIRONMENT` and runs the child from
+   that worktree, so `uv run --frozen` syncs the worktree's own `.venv`;
+5. takes the caller's harvest lock and re-reads the caller's HEAD. If it is no
+   longer the built commit (a checkout, rebase or newer launch during the
+   run), it copies nothing and touches no record, warns, and records
+   `harvest_skipped`; the artefacts stay in the remote cache for a launch at
+   the new HEAD. Otherwise it continues;
+6. deletes, from the caller's `cad/out/.doit.db`, the records of every task the
+   run touched. The artefacts about to be copied may disagree with what the
+   caller had recorded for them, which is exactly the second failure above;
+   without a record, the caller's next local `doit` re-derives those keys from
+   its own inputs and restores or rebuilds. After a failed build that has
+   outputs to copy back, every caller record goes, because doit drops a failed
+   task's record and the build database can no longer name every task whose
+   outputs come back. A failure before any output existed (a submodule or `uv`
+   that would not start) leaves the caller's records alone. This happens
+   *before* any file is replaced, so a copy-back that dies halfway leaves
+   missing records (a cache re-probe), never a stale record beside a new
+   artefact;
+7. copies every non-dot entry of the build's `cad/out` into the caller's
+   `cad/out`, dotfiles within them included (`.execution` tokens, `.dof.json`
+   sidecars). `*.jsonl` journals (telemetry, `cache.jsonl`) are appended rather
+   than overwritten. The build's `.doit.db` and `.drawing-registry/` are never
+   copied: they are doit state keyed to the build worktree's absolute paths.
+   A directory one level below an output kind (`png/<stem>/`,
+   `release/native/`) belongs to the one task that wrote it, so the caller's
+   copy is mirrored: files the build did not produce are removed first
+   (`outputs_removed`). Flat kind directories (`sldprt/`, `stl/`) are shared
+   by every task and only overlaid, and `reports/` and `logs/` accumulate;
+8. removes the build worktree (`git worktree remove --force`, then `prune`).
+
+The overlay cannot tell an obsolete file in a flat directory from another
+task's output. The one family that matters today is `assembly:channel`'s
+glob-discovered `channel-spring-installed-stretch*.SLDPRT` variants: a variant
+an older commit produced stays in the caller's `sldprt/`, as it already did
+when the submitter restored in place. `doit clean assembly:channel` removes
+them (`_clean_assembly`).
+
+Nothing in the caller's worktree (uncommitted edits, `.doit.db`, `cad/out`)
+can reach a key, and nothing done to it during the run can reach the build.
+Two launches from one caller get distinct build worktrees and never share doit
+state.
+
+The build worktree is removed on success **and** on a failed build. Its
+`cad/out` has already been copied back, except `.doit.db`, which is the one
+thing nobody should reuse; to reproduce a failure, relaunch the same commit.
+The single exception is a failed copy-back (a `PermissionError` from a document
+open in the caller's `cad/out`, say): the run fails with the reason in the log
+and the build worktree stays for inspection. Remove it afterwards with
+[`scripts/farm-prune.ps1`](#removing-leftover-build-worktrees).
+
+Measured overhead on this machine (warm uv cache): about 1.6 s for
+`worktree add`, 1.5 s for the `SolidworksMCP-python` submodule, and 6.2 s for
+the `.venv` sync. The record's `phase_s` reports each run's own
+`prepare`/`build`/`harvest`/`cleanup` split. A shared environment keyed on
+`uv.lock` was rejected: the project installs `SolidworksMCP-python` as an
+editable path source, so a shared environment imports the submodule from
+whichever checkout synced it last, possibly one already removed.
+
+`release` and `gallery` are refused as targets. They run on the submitter, read
+the excluded `references` submodule, and `release` advances the tracked
+`cad/config/release.yaml`, which would vanish with the build worktree. Run them
+from an attended terminal.
+
+An attended `build.py` run in your own worktree keeps the old exposure: it
+keys tasks from the live tree and its own `.doit.db`. `build.py` therefore
+digests HEAD, `git status`, the tracked diff with dirty submodule content
+expanded (`--submodule=diff`) and the bytes of every untracked, non-ignored
+file, in the tree and its initialized submodules, before and after every
+task-executing command and prints `build: WARNING the working tree changed
+while this build ran` when they differ. It warns rather than fails because a
+`release` legitimately advances a tracked file. After that warning, or after
+reverting an edit a previous build saw, `doit forget` the affected tasks before
+trusting `cad/out`.
 
 ### Prerequisites
 
@@ -37,8 +138,19 @@ workflow is always a separate, explicit `farm.py cancel`.
   approved repository, so the launcher refuses a HEAD that no locally known
   `origin/*` ref reaches: `HEAD is not known on origin; fetch and push before
   launching`. Fetch and push first; the launcher does neither for you.
-- **A clean worktree.** `build.py`'s farm preflight refuses dirty project inputs
-  or dirty initialized submodules.
+- **Commit what you mean to build.** Only the committed HEAD is built. A dirty
+  caller worktree no longer blocks a launch, because nothing uncommitted can
+  reach the build; the launcher prints a `farm-launch WARNING … does NOT build`
+  line to the console and the log, and lists those paths in the record's
+  `caller_dirty`. (`build.py`'s own dirty-tree preflight still runs, inside the
+  build worktree, where it always passes.)
+- **No local `doit` in the caller while a launch finishes.** The copy-back
+  overwrites outputs and edits `cad/out/.doit.db`. Harvests from concurrent
+  launches into one caller are serialized by an exclusive handle on
+  `cad/out/.farm-harvest.lock` (the log says `farm-launch waiting for …` while
+  one queues; it gives up after 600 s and fails the run, keeping its build
+  worktree), so they cannot restore each other's dropped records. doit itself
+  takes no lock, so a local `doit` running at that moment would still race.
 - **A protocol-compatible pool checkout** at `-PoolHome`, holding `farm.py`, and
   Azure credentials for the cache (`az login`; `off` is refused).
 - **A log directory outside the worktree.** Run records and logs must never land
@@ -48,12 +160,13 @@ workflow is always a separate, explicit `farm.py cancel`.
 
 | parameter | required | meaning |
 |---|:---:|---|
-| `-Worktree` | yes | absolute path to the checkout that supplies `build.py` and the environment; the build runs from here |
+| `-Worktree` | yes | absolute path to the caller checkout: its committed HEAD is built, and its `cad/out` receives the outputs. The build itself runs in a disposable worktree |
 | `-PoolHome` | yes | absolute path to the `solidworks-pool` checkout; exported as `SOLIDWORKS_POOL_HOME` |
 | `-LogDirectory` | yes | absolute path for the log and the run records; created if missing, and rejected if it resolves inside `-Worktree` |
 | `-Targets` | yes | doit task names as ONE comma-separated string (`part:pen_rod,part:cone_gear`) |
 | `-LeafTimeout` | yes | per-attempt remote leaf budget in minutes, 1–180 |
 | `-Tag` | no | label recorded with the run (letters, digits, `_`, `-`); defaults to `run` |
+| `-WorkRoot` | no | parent directory of the disposable build worktrees; defaults to `fw` beside the main checkout (`C:\src\fw` for `C:\src\harmonic-analyzer`), and must lie outside `-Worktree` |
 
 Targets are *selections*, not variables, and they arrive as one string. `pwsh
 -File` binds a single token per parameter, so a repeated `-Targets` or a
@@ -67,7 +180,8 @@ build. Task names use underscores (`part:pen_rod`), never dashes — a dashed
 name is rejected by `build.py` before the fleet is contacted.
 
 The launcher sets `SOLIDWORKS_POOL_HOME`, `HARMONIC_REMOTE_CACHE_MODE=rw` and
-`PYTHONUNBUFFERED=1`, then runs, from the worktree:
+`PYTHONUNBUFFERED=1`, clears `VIRTUAL_ENV` and `UV_PROJECT_ENVIRONMENT`, then
+runs, from the build worktree:
 
 ```
 uv run --frozen python build.py --executor farm --leaf-timeout <minutes> \
@@ -142,9 +256,14 @@ farm-launch started 20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516 C:\src\
   "tag": "smoke",
   "argv": ["uv", "run", "--frozen", "python", "build.py", "--executor", "farm",
            "--leaf-timeout", "90", "--verbosity", "info", "-n", "4",
-           "--continue", "part:pen_rod"]
+           "--continue", "part:pen_rod"],
+  "build_worktree": "C:\\src\\fw\\3f7b1c9a",
+  "caller_dirty": []
 }
 ```
+
+`worktree` stays the caller; `build_worktree` is where the child runs, named
+by the first eight characters of the run's GUID.
 
 Validation failures happen *before* that record: they print a diagnostic and
 exit nonzero without claiming a build started. Once the startup record exists,
@@ -159,9 +278,23 @@ one compressed JSON line):
   "...": "the identity fields from the startup record, unchanged",
   "exit_code": 0,
   "elapsed_s": 1487.216,
-  "finished_at": "2026-09-20T17:54:58.6980000Z"
+  "finished_at": "2026-09-20T17:54:58.6980000Z",
+  "harvest_skipped": null,
+  "outputs_copied_to": "C:\\src\\harmonic-smoke\\cad\\out",
+  "outputs_copied": 14,
+  "outputs_removed": 0,
+  "caller_tasks_forgotten": ["part:pen_rod"],
+  "build_worktree_changes": [],
+  "build_worktree_removed": true,
+  "phase_s": {"prepare": 9.8, "build": 1466.3, "harvest": 0.4, "cleanup": 1.1}
 }
 ```
+
+`build_worktree_changes` lists any file the build wrote outside `cad/out` (it is
+discarded with the build worktree, and the launcher warns). A
+`build_worktree_removed: false` is a warning, not a failure: run
+[`scripts/farm-prune.ps1`](#removing-leftover-build-worktrees) once nothing
+holds it open.
 
 Only exit 0 is `succeeded`; a wrapper exception is `failed` with exit 1 and its
 diagnostic in the log. A run ID is
@@ -200,7 +333,10 @@ Read the records first, in this order:
    *unknown*. It is not a cancellation, and it is not permission to relaunch.
    The remote work is very likely still running: `_farm.run_leaf` shares
    workflows by ID (`USE_EXISTING`), so killing the submitter never cancelled
-   anything.
+   anything. The record's `build_worktree` is left behind and nothing was
+   copied back. Removing it does not touch the remote workflows, so
+   `scripts/farm-prune.ps1` may remove it at any time; recover the workflows
+   below all the same.
 
 In case 3, harvest every workflow ID the log recorded — both
 `Farm workflow requested: <id>` and `Farm workflow attached: <id>` lines, for
@@ -212,7 +348,7 @@ uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py 
 ```
 
 Follow a RUNNING workflow under a supervised monitor until it is terminal, then
-finish the bookkeeping with the *unchanged* worktree, HEAD, targets and leaf
+finish the bookkeeping with the *unchanged* commit, targets and leaf
 budget. The leaf budget is part of the workflow ID, so changing it during
 recovery creates a different workflow instead of rejoining the one already
 running. Never cancel a shared workflow automatically.
@@ -222,9 +358,32 @@ authenticated `NOT_FOUND` for an ID that was *requested* but never *attached*.
 That pair of log lines exists precisely for the window between server acceptance
 and the submitter's acknowledgement. Everything else stays unresolved and blocks
 an automatic relaunch: `NOT_FOUND` for an attached ID, a missing or unreadable
-identifier, a changed worktree or cache environment, or a `status` call that
+identifier, a changed commit or cache environment, or a `status` call that
 failed on authentication, network or CLI error. An auth or network failure is
 never a `NOT_FOUND`.
+
+### Removing leftover build worktrees
+
+A build worktree survives a failed copy-back, a failed removal or a killed
+launcher. `scripts/farm-prune.ps1` reads the launch records and removes each
+record's `build_worktree` once its run is over: the `.done` exists (`done`), or
+there is no `.done` and the recorded launcher PID has exited or now belongs to
+a younger process (`launcher-gone`). A worktree whose launcher is still running
+is left alone. A record is untrusted input, so the path is removed only when
+git lists it as a detached linked worktree of the record's caller repository
+and its name is the run GUID's first eight characters; anything else is
+reported as `unverified` with a warning and left in place. Preview first, then
+remove:
+
+```powershell
+pwsh -NoProfile -File C:/src/harmonic-analyzer/scripts/farm-prune.ps1 -LogDirectory C:/src/dt-logs/farm-runs -WhatIf
+pwsh -NoProfile -File C:/src/harmonic-analyzer/scripts/farm-prune.ps1 -LogDirectory C:/src/dt-logs/farm-runs
+```
+
+It prints one `run_id`/`build_worktree`/`reason`/`removed` object per
+candidate. Pass several log directories as one comma-separated `-LogDirectory`
+string, as `-Targets` takes its list. A directory under
+`-WorkRoot` with no record in the directories you pass is not touched.
 
 ## Remote build-artifact cache
 
