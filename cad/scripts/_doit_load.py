@@ -5,9 +5,10 @@ That load is pure CPU that runs before any task span opens: measured at 16-28 s
 of every farm leaf (worker ``execute`` minus the leaf's ``task`` span), paid again
 by every submitter command, with nothing in the trace to say so.
 
-``dodo`` stamps its own first line (:class:`LoadStamp`) and calls
-:func:`install`, which wraps doit's ``DodoTaskLoader.load_tasks`` once per
-process. The wrapper finds the stamp in the namespace it just loaded, so
+``dodo`` stamps its own first line (:class:`LoadStamp`), calls
+:func:`watch_import` so a failure in the rest of its own import is still
+recorded, and calls :func:`install`, which wraps doit's
+``DodoTaskLoader.load_tasks`` once per process. The wrapper finds the stamp in the namespace it just loaded, so
 ``python -m doit``, ``build.py`` and a farm leaf's ``build.py run -n 0 <task>``
 all emit the span from this one place and none of them can emit it twice.
 
@@ -21,24 +22,90 @@ load.
 from __future__ import annotations
 
 import functools
+import inspect
 import sys
 import time
 
 from doit.cmd_base import DodoTaskLoader
 
 STAMP_NAME = "_DOIT_LOAD"
+_TOOL_NAME = "harmonic-doit-load"
 
 
 class LoadStamp:
     """One graph load's start, taken once: a cached ``dodo`` module that doit
-    loads again in the same process never reports a load from its stale import."""
+    loads again in the same process never reports a load from its stale import.
+    Taking it also ends any :func:`watch_import` on the module."""
 
     def __init__(self, started_ns: int) -> None:
         self._started_ns: int | None = started_ns
+        self._unwatch = None
 
     def take(self) -> int | None:
         started, self._started_ns = self._started_ns, None
+        unwatch, self._unwatch = self._unwatch, None
+        if unwatch is not None:
+            unwatch()
         return started
+
+
+def watch_import(stamp: LoadStamp) -> None:
+    """Record the load, ERROR, if the caller's module body fails to import.
+
+    An exception in ``dodo`` after this call (a helper import, a module-level
+    computation) unwinds dodo's own frame inside doit's ``setup``, before
+    ``load_tasks`` ever runs, so the :func:`install` wrapper never sees it.
+    ``sys.monitoring`` ``PY_UNWIND`` does: it is a global-only event, so the
+    callback ignores every frame but the caller's module code and writes the
+    span, with the exception, when that frame unwinds. A ``PY_RETURN`` of that
+    code (the import completed) ends the watch, so the global event is armed
+    only while dodo's own body runs, never for the rest of a process that
+    imports dodo without loading it through doit.
+    Best-effort: no free monitoring tool id means no watch."""
+    monitoring = getattr(sys, "monitoring", None)
+    frame = inspect.currentframe()
+    caller = frame.f_back if frame is not None else None
+    if monitoring is None or caller is None:
+        return
+    code = caller.f_code
+    tool = next((i for i in range(6) if monitoring.get_tool(i) is None), None)
+    if tool is None:
+        return
+    unwind, returned = monitoring.events.PY_UNWIND, monitoring.events.PY_RETURN
+    watching = [True]
+
+    def unwatch() -> None:
+        if not watching:
+            return
+        watching.clear()
+        stamp._unwatch = None
+        monitoring.set_events(tool, 0)
+        monitoring.set_local_events(tool, code, 0)
+        monitoring.register_callback(tool, unwind, None)
+        monitoring.register_callback(tool, returned, None)
+        monitoring.free_tool_id(tool)
+
+    def unwound(unwinding, _offset, exc) -> None:
+        if unwinding is not code:
+            return
+        unwatch()
+        record(
+            stamp.take(), command="import", targets=[], task_names=None, error=exc
+        )
+
+    def imported(_code, _offset, _value) -> None:
+        unwatch()
+
+    try:
+        monitoring.use_tool_id(tool, _TOOL_NAME)
+        monitoring.register_callback(tool, unwind, unwound)
+        monitoring.register_callback(tool, returned, imported)
+        monitoring.set_events(tool, unwind)
+        monitoring.set_local_events(tool, code, returned)
+    except Exception:  # noqa: BLE001 - telemetry never fails the graph load
+        unwatch()
+        return
+    stamp._unwatch = unwatch
 
 
 def install() -> None:
