@@ -12,7 +12,9 @@ import contextlib
 import json
 import math
 import os
+import re
 import sys
+import time
 from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
@@ -4807,6 +4809,60 @@ def isolate_drawing_view_components(
     _telemetry.success(f"{label}: isolated {', '.join(sorted(found))}")
 
 
+# At or below this many visible edges, a balloon's anchor edge is chosen by
+# geometry; above it, the first enumerated edge is kept and flagged unsorted.
+# The geometry read is a GetCurve + GetCurveParams2 pair per edge -- 24.6 ms +
+# 2.6 ms, each MEASURED on this seat -- so 64 edges cost ~1.7 s, while a gear
+# end view (481-1442 visible edges) would cost 13-39 s per balloon.
+ANCHOR_EDGE_SORT_LIMIT = 64
+
+
+def _natural_sort_key(name: str) -> tuple[Any, ...]:
+    """``cone-gear-2`` before ``cone-gear-19``: digit runs compare as numbers."""
+    return tuple(
+        (0, int(part)) if part.isdigit() else (1, part.casefold())
+        for part in re.split(r"(\d+)", name)
+        if part
+    )
+
+
+def _anchor_edge_order(key: tuple[float, ...]) -> tuple[float, ...]:
+    """Longest chord first, then the chord midpoint, then the raw endpoints.
+
+    The chord is the straight distance between the edge's model-space
+    endpoints: its length for a line, shorter for an arc, zero for a closed
+    circle -- which puts full circles last, behind any open edge. The midpoint
+    and endpoints make the order total, so two edges never tie on geometry.
+    """
+    sx, sy, sz, ex, ey, ez = key[:6]
+    # Rounded to a nanometre so float noise between equal-length edges cannot
+    # outrank the midpoint.
+    chord = round(math.dist((sx, sy, sz), (ex, ey, ez)), 9)
+    return (-chord, (sx + ex) / 2.0, (sy + ey) / 2.0, (sz + ez) / 2.0, *key[:6])
+
+
+def _choose_anchor_edge(
+    adapter: Any, edges: Sequence[Any]
+) -> tuple[Any, int, tuple[float, ...] | None, bool]:
+    """``(edge, index, endpoint key, sorted)`` for one instance's visible edges.
+
+    At or under :data:`ANCHOR_EDGE_SORT_LIMIT` every edge's endpoints are read
+    and the :func:`_anchor_edge_order` minimum wins, whatever order
+    ``GetVisibleEntities2`` returned them in. Above the limit, or when no edge
+    yields geometry, ``edges[0]`` is kept unsorted.
+    """
+    if len(edges) <= ANCHOR_EDGE_SORT_LIMIT:
+        keyed = [
+            (key, index)
+            for index, edge in enumerate(edges)
+            if (key := _edge_endpoint_key(adapter, edge)) is not None
+        ]
+        if keyed:
+            key, index = min(keyed, key=lambda item: _anchor_edge_order(item[0]))
+            return edges[index], index, key, True
+    return edges[0], 0, _edge_endpoint_key(adapter, edges[0]), False
+
+
 @_telemetry.traced("drawing.pick_balloon_anchor", label_param="stem")
 def _pick_component_anchor_edge(
     adapter: Any, view: Any, *, stem: str, label: str
@@ -4817,37 +4873,36 @@ def _pick_component_anchor_edge(
     :func:`_spread_balloons` assigns ring slots in the attachments' angular
     order, so an anchor that moves between runs can reorder two balloons
     attached at nearly the same angle and turn their leaders into a crossing.
-    The drive-train sheet built clean on one fleet pass and failed
-    ``check_drawing_layout`` with "1 leader crossing(s)" between items 5 and 27
-    on the next, same commit, same cached assembly -- and ``GetVisibleEntities2``
-    documents no ordering, which makes a moving anchor the obvious suspect.
 
-    **Suspect, not culprit -- so this MEASURES before it pays.** Ordering the
-    edges by geometry would settle it, and was tried: it costs a ``GetCurve`` +
-    ``GetCurveParams2`` pair per visible edge -- 24.6 ms + 2.6 ms, MEASURED per
-    call, not inferred from a paired total. A gear end view carries 481-577
-    visible edges, so that is ~13 s per balloon and ~7 min for the 32-balloon
-    sheet, which is why it never finished. Far too much to spend defending
-    against an unproven hypothesis.
+    **Measured, then paid for where it is cheap.** The earlier version kept
+    ``edges[0]`` of the first matching leaf and logged ``drawing.balloon_anchor``
+    so two passes could be diffed. The diff came in: dtasm-integ1 and -integ2
+    (same commit, same cached drive-train assembly) disagreed on 6 of 39
+    anchors, for two separate reasons:
 
-    So the pick stays ``edges[0]`` of the first matching leaf -- ONE geometry
-    read, on the chosen edge only, to record WHERE it landed. Diff the
-    ``drawing.balloon_anchor`` events of two passes and the question answers
-    itself: identical anchors mean the enumeration is stable and the crossing
-    came from somewhere else; different anchors prove the instability and earn
-    the cost of fixing it. Nothing in the logs could answer that the first time.
+    * **Instance.** The drawing-component tree does not enumerate its children
+      in a stable order, so the first match was ``cylinder-gear-1`` on one pass
+      and ``cylinder-gear-18`` on the next (also cone-gear 1/19, cylinder-end-disc
+      2/1, slotted-screw 3/1). The walk now visits every leaf -- names only, no
+      geometry -- and takes the matching instance with the lowest natural-sorted
+      name, falling through to the next when an instance shows no visible edge
+      (a component hidden by the explode).
+    * **Edge.** ``GetVisibleEntities2`` documents no order, and the same
+      instance's ``edges[0]`` moved (pinion-pivot-block-2, 20 edges;
+      pinion-lever-1, 10 edges). Ordering by geometry costs a
+      GetCurve + GetCurveParams2 pair per edge (see
+      :data:`ANCHOR_EDGE_SORT_LIMIT`), so it is paid only at or under that many
+      edges. A gear view keeps ``edges[0]``, flagged ``edges_sorted=False``: in
+      the integ1/integ2 diff no high-edge instance moved its anchor once the
+      instance was the same, and the flag lets later telemetry show if one does.
 
-    The traversal order is deterministic given the tree, and the ring sort in
-    :func:`_spread_balloons` no longer breaks ties on arrival order, so those
-    two sources are closed regardless of what the measurement says.
+    The event and span carry the chosen instance, its edge count, the chosen
+    edge's index, whether it was sorted, and the sort time.
     """
     root = adapter._attempt(lambda: view.RootDrawingComponent2(False), default=None)
     if root is None:
         raise RuntimeError(f"{label}: drawing view has no root component")
-    selected_edge: Any | None = None
-    chosen_name = ""
-    edge_count = 0
-    enumerated: list[str] = []
+    matching: list[tuple[str, Any]] = []
     visited = 0
     pending = list(_drawing_component_children(root))
     while pending:
@@ -4861,46 +4916,49 @@ def _pick_component_anchor_edge(
             adapter, drawing_component, frozenset({stem})
         ):
             continue
-        chosen_name = str(drawing_component.Name or "")
-        enumerated.append(chosen_name)
+        matching.append((str(drawing_component.Name or ""), drawing_component))
+    matching.sort(key=lambda item: _natural_sort_key(item[0]))
+
+    chosen_name = ""
+    edges: Sequence[Any] = ()
+    for chosen_name, drawing_component in matching:
         component = adapter._attempt(
             lambda dc=drawing_component: dc.Component, default=None
         )
-        edges = (
+        edges = tuple(
             adapter._attempt(lambda: view.GetVisibleEntities2(component, 1), default=())
             or ()
         )
-        if not edges:
-            continue
-        edge_count = len(edges)
-        selected_edge = edges[0]
-        break
-    if selected_edge is None:
+        if edges:
+            break
+    if not edges:
         raise RuntimeError(
-            f"{label}: {stem} has no visible edge; matching={enumerated}"
+            f"{label}: {stem} has no visible edge; matching={[name for name, _ in matching]}"
         )
-    # One geometry read, on the winner only -- the whole point is that this is
-    # cheap enough to leave on in every build, so two passes are comparable
-    # without re-running anything under a special flag.
-    key = _edge_endpoint_key(adapter, selected_edge) or ()
+    started = time.perf_counter()
+    selected_edge, edge_index, key, edges_sorted = _choose_anchor_edge(adapter, edges)
+    sort_ms = (time.perf_counter() - started) * 1000.0
     # On the SPAN as well as the event: an event's attributes do not appear in
-    # the span lines the profiling workflow reads, and this span exists so one
-    # component's scan can be timed and attributed on its own rather than
-    # disappearing into the whole-sheet balloon span.
-    #
-    # `visited` is every leaf the walk TOUCHED -- that is the workload, and it is
-    # what the duration has to be read against. `matched` is almost always 1,
-    # because the walk stops at the first component of the requested family, so
-    # reporting only that made the attribute useless for comparing two scans
-    # (Codex P2): a span that traversed 80 leaves and one that traversed 3 both
-    # read "1".
-    _span_scan_attrs(visited=visited, matched=len(enumerated), edges=edge_count)
+    # the span lines the profiling workflow reads. `visited` is every leaf the
+    # walk touched (the workload the duration is read against); `matched` is
+    # how many instances of the family it found.
+    _span_scan_attrs(
+        visited=visited,
+        matched=len(matching),
+        edges=len(edges),
+        edge_index=edge_index,
+        edges_sorted=edges_sorted,
+        sort_ms=sort_ms,
+    )
     _telemetry.event(
         "drawing.balloon_anchor",
         stem=stem,
         component=chosen_name,
-        edges=edge_count,
-        anchor=",".join(f"{value:.6f}" for value in key),
+        edges=len(edges),
+        edge_index=edge_index,
+        edges_sorted=edges_sorted,
+        sort_ms=round(sort_ms, 1),
+        anchor=",".join(f"{value:.6f}" for value in (key or ())),
     )
     return selected_edge
 

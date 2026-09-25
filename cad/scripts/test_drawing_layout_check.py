@@ -12,7 +12,9 @@ print.
 
 from __future__ import annotations
 
+import itertools
 import math as _math
+import random
 import sys
 from types import SimpleNamespace
 
@@ -1799,21 +1801,104 @@ def _edge(x):
     return _FakeEdge((x, 0.0, 0.0, x + 0.01, 0.0, 0.0))
 
 
-def test_anchor_reads_geometry_once_not_once_per_visible_edge():
-    """The measurement must stay cheap enough to leave on in every build.
+def _edges(count):
+    """``count`` equal-length edges at distinct midpoints, in ascending x."""
+    return [_edge(0.001 * (index + 1)) for index in range(count)]
 
-    Ordering the edges by geometry WAS tried, to make the anchor deterministic
-    by construction. It costs a GetCurve + GetCurveParams2 pair per visible
-    edge -- 24.6 ms + 2.6 ms, each MEASURED on this seat rather than inferred
-    from a paired total. A gear end view carries 481-577 visible edges, so that
-    is ~13 s per balloon and ~7 min for the 32-balloon drive-train sheet, which
-    is why it never finished. This pins the cost at O(1) per balloon so the
-    regression cannot come back quietly.
+
+def test_anchor_above_the_sort_limit_reads_one_edge_and_keeps_the_first():
+    """Above the limit the cost stays O(1) per balloon.
+
+    Ordering by geometry costs a GetCurve + GetCurveParams2 pair per visible
+    edge -- 24.6 ms + 2.6 ms, each MEASURED on this seat. A gear end view
+    carries 481-1442 visible edges, 13-39 s per balloon, so above
+    ANCHOR_EDGE_SORT_LIMIT the first enumerated edge is kept and only the
+    winner's endpoints are read, for the telemetry.
     """
-    low, mid, high = _edge(0.01), _edge(0.02), _edge(0.03)
-    picked = _anchor({"cone-gear": [low, mid, high]})
-    assert picked is low
-    assert [e.curve_reads for e in (low, mid, high)] == [1, 0, 0]
+    edges = _edges(drawing_common.ANCHOR_EDGE_SORT_LIMIT + 1)
+    picked = _anchor({"cone-gear": edges})
+    assert picked is edges[0]
+    assert sum(e.curve_reads for e in edges) == 1
+
+
+def test_anchor_at_or_under_the_sort_limit_takes_the_longest_edge():
+    short = _FakeEdge((0.0, 0.0, 0.0, 0.01, 0.0, 0.0))
+    long_ = _FakeEdge((0.0, 0.0, 0.0, 0.0, 0.03, 0.0))
+    circle = _FakeEdge((0.02, 0.0, 0.0, 0.02, 0.0, 0.0))
+    assert _anchor({"cone-gear": [circle, short, long_]}) is long_
+    assert [e.curve_reads for e in (circle, short, long_)] == [1, 1, 1]
+
+
+def test_equal_length_edges_break_on_the_midpoint():
+    edges = _edges(4)
+    assert _anchor({"cone-gear": list(reversed(edges))}) is edges[0]
+
+
+def _pick_by_name(instances, order):
+    """Pick from leaves named ``order``; every leaf is a ``cone-gear`` part."""
+    leaves = []
+    for name in order:
+        leaf = _FakeDrawingComponent(f"drive-train/{name}@dt")
+        leaf.Component = SimpleNamespace(GetPathName=lambda: "C:/x/cone-gear.SLDPRT", name=name)
+        leaves.append(leaf)
+    root = _FakeDrawingComponent("dt", children=leaves)
+    view = SimpleNamespace(
+        RootDrawingComponent2=lambda _resolve: root,
+        GetVisibleEntities2=lambda component, _kind: instances[component.name],
+    )
+    return drawing_common._pick_component_anchor_edge(
+        _FakeAdapter(None), view, stem="cone-gear", label="dt"
+    )
+
+
+def test_instance_is_the_lowest_natural_name_whatever_the_tree_order():
+    """integ1 picked cone-gear-1 and integ2 cone-gear-19: the tree order moved."""
+    instances = {"cone-gear-19": _edges(1), "cone-gear-2": _edges(1), "cone-gear-1": _edges(1)}
+    for order in itertools.permutations(instances):
+        assert _pick_by_name(instances, list(order)) is instances["cone-gear-1"][0]
+
+
+def test_natural_sort_puts_instance_2_before_19():
+    names = ["dt/cone-gear-19", "dt/cone-gear-2", "dt/cone-gear-10"]
+    ordered = sorted(names, key=drawing_common._natural_sort_key)
+    assert ordered == ["dt/cone-gear-2", "dt/cone-gear-10", "dt/cone-gear-19"]
+
+
+def test_a_hidden_lowest_instance_falls_through_to_the_next():
+    """integ1: foot-screw-2 showed 0 visible edges inside the explode."""
+    three = _edges(1)
+    instances = {"cone-gear-2": [], "cone-gear-3": three}
+    assert _pick_by_name(instances, ["cone-gear-2", "cone-gear-3"]) is three[0]
+
+
+def test_shuffled_leaves_and_edges_pick_the_same_instance_and_edge_under_the_limit():
+    rng = random.Random(20260925)
+    base = {name: _edges(12) for name in ("cone-gear-1", "cone-gear-7", "cone-gear-19")}
+    expected = _pick_by_name(base, list(base))
+    for _trial in range(20):
+        order = list(base)
+        rng.shuffle(order)
+        shuffled = {name: rng.sample(edges, len(edges)) for name, edges in base.items()}
+        assert _pick_by_name(shuffled, order) is expected
+
+
+def test_shuffled_leaves_above_the_limit_keep_the_instance_not_the_edge():
+    """Above ANCHOR_EDGE_SORT_LIMIT only the INSTANCE is stable, not the edge.
+
+    The edge there is whatever GetVisibleEntities2 lists first -- the cost
+    trade the limit makes. This proves the instance cannot move; an edge that
+    moves above the limit shows as edges_sorted=False in the anchor event.
+    """
+    rng = random.Random(20260925)
+    count = drawing_common.ANCHOR_EDGE_SORT_LIMIT + 5
+    base = {name: _edges(count) for name in ("cone-gear-1", "cone-gear-19")}
+    for _trial in range(10):
+        order = list(base)
+        rng.shuffle(order)
+        shuffled = {name: rng.sample(edges, len(edges)) for name, edges in base.items()}
+        picked = _pick_by_name(shuffled, order)
+        assert picked in base["cone-gear-1"]
+        assert picked is shuffled["cone-gear-1"][0]
 
 
 def test_anchor_records_where_it_landed():
@@ -1832,6 +1917,10 @@ def test_anchor_records_where_it_landed():
     assert attrs["stem"] == "cone-gear"
     assert attrs["edges"] == 1
     assert attrs["anchor"].startswith("0.020000,0.000000")
+    assert attrs["component"] == "cone-gear-1@drive-train"
+    assert attrs["edge_index"] == 0
+    assert attrs["edges_sorted"] is True
+    assert attrs["sort_ms"] >= 0.0
 
 
 def test_anchor_survives_an_edge_whose_geometry_will_not_read():
