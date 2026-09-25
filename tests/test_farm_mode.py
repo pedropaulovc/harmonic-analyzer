@@ -41,6 +41,8 @@ def _load_dodo():
     json_dump = JsonDB.dump
     missing = object()
     content_checker = CHECKERS.get("content", missing)
+    loader = _doit_cmd_base.DodoTaskLoader
+    load_tasks = vars(loader).get("load_tasks", missing)
     try:
         spec = importlib.util.spec_from_file_location("dodo", REPO_ROOT / "dodo.py")
         assert spec is not None and spec.loader is not None
@@ -54,6 +56,10 @@ def _load_dodo():
             CHECKERS.pop("content", None)
         else:
             CHECKERS["content"] = content_checker
+        if load_tasks is not missing:
+            loader.load_tasks = load_tasks
+        elif "load_tasks" in vars(loader):
+            del loader.load_tasks
 
 
 def _leaf_result(**overrides):
