@@ -860,6 +860,9 @@ from pinion_lever_geometry import (  # noqa: E402
     WALL_T as LEVER_WALL_T,
 )
 from pinion_pivot_shaft_spec import PIN_HOLE_Z as SHAFT_PIN_HOLE_Z  # noqa: E402
+from pinion_lever_pin_geometry import (  # noqa: E402
+    INSTALLED_CONFIG as LEVER_PIN_INSTALLED_CONFIG,
+)
 from pinion_handle_geometry import ROD_DIA as HANDLE_ROD_DIA  # noqa: E402
 from pinion_spring_geometry import (  # noqa: E402
     AXIS_OFFSET as SPRING_AXIS_OFF,
@@ -2510,7 +2513,9 @@ async def build(adapter) -> dict[str, str]:
     )
     # MHA-135: the 1/16 pin driven through the match-drilled hub and rod holes.
     # Its axis is its local X, so it takes the rod's phase and sits centred on
-    # the rod's "lever pin" station.
+    # the rod's "lever pin" station.  The INSTALLED configuration is the pin
+    # trimmed and peened flush with the hub (Codex #858 P2), not the overlength
+    # cut the part's drawing prints.
     lever_pin = await place_component(
         adapter,
         "pinion-lever-pin",
@@ -2518,6 +2523,7 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 0.0, LEVER_TILT_DEG],
         LIFT_ROD_ROWS,
         ground=False,
+        configuration=LEVER_PIN_INSTALLED_CONFIG,
         label="pinion-lever-pin (MHA-135 through hub and rod)",
     )
     grip_crossrod = await place_component(
