@@ -43,11 +43,10 @@ import json
 import os
 import subprocess
 import sys
-import time
 from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 
-from doit.cmd_base import DodoTaskLoader, get_loader
+from doit.cmd_base import get_loader
 from doit.cmdparse import CmdParseError
 from doit.control import TaskControl
 from doit.doit_cmd import DoitMain
@@ -148,71 +147,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     os.environ["HARMONIC_EXECUTOR"] = options.executor
 
     doit = _FarmDoitMain() if options.executor == "farm" else DoitMain()
-    if doit.task_loader is None and "loader" not in doit.config.get("GLOBAL", {}):
-        # Exactly the loader doit would pick (get_loader's default), timed.
-        doit.task_loader = _TimedDodoTaskLoader()
     if options.executor == "farm":
         executing = _executing_command(doit_args, doit)
         if executing is not None:
             doit_args = _with_farm_parallelism(doit_args, *executing)
     return doit.run(doit_args)
-
-
-class _TimedDodoTaskLoader(DodoTaskLoader):
-    """doit's own dodo.py loader, with the graph load recorded as a span.
-
-    Importing ``dodo`` and generating every task is pure CPU that runs before
-    any task span opens -- measured at 16-28 s of every farm leaf (worker
-    ``execute`` minus the leaf's ``task`` span) with nothing in the trace to
-    say so. ``doit.load`` covers ``setup`` (the dodo import) through
-    ``load_tasks`` (every ``task_*`` generator). It is back-dated with OTel's
-    creation-time ``start_time``, as ``proc.startup`` is, because telemetry is
-    only importable once dodo has put ``cad/scripts`` on the path. It lands on
-    the ``build-infra`` resource: graph loading is no pipeline stage's work.
-    Best-effort -- telemetry can never fail the load.
-    """
-
-    def setup(self, opt_values):
-        self._load_started_ns = time.time_ns()
-        return super().setup(opt_values)
-
-    def load_tasks(self, cmd, pos_args):
-        tasks = super().load_tasks(cmd, pos_args)
-        _record_graph_load(
-            getattr(self, "_load_started_ns", None),
-            command=cmd.get_name() if hasattr(cmd, "get_name") else str(cmd),
-            targets=list(pos_args or ()),
-            task_names={task.name for task in tasks},
-        )
-        return tasks
-
-
-def _record_graph_load(started_ns, *, command, targets, task_names) -> None:
-    telemetry = sys.modules.get("_telemetry")
-    if started_ns is None or telemetry is None:
-        return
-    try:
-        from opentelemetry.trace import Status, StatusCode
-
-        attributes = {
-            "harmonic.depth": 0,
-            "doit.command": command,
-            "doit.targets": " ".join(targets),
-            "doit.tasks": len(task_names),
-        }
-        if len(targets) == 1 and targets[0] in task_names:
-            # One named task (a farm leaf's ``run -n 0 part:x``): the same
-            # ``label`` its task and cache phase spans carry.
-            attributes["label"] = targets[0]
-        # Under a farm leaf the helper injects TRACEPARENT: land in that trace.
-        parent = getattr(telemetry, "_parent_context_from_env", lambda: None)()
-        span = telemetry.get_tracer(service=telemetry.BUILD_INFRA_SERVICE).start_span(
-            "doit.load", context=parent, start_time=started_ns, attributes=attributes
-        )
-        span.set_status(Status(StatusCode.OK))
-        span.end(end_time=time.time_ns())
-    except Exception:  # noqa: BLE001 - telemetry never fails the graph load
-        return
 
 
 def _isolated_tasks(task_list):
