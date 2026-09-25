@@ -33,10 +33,13 @@ CLI::
 from __future__ import annotations
 
 import argparse
+import copy
 import importlib
 import json
 import math
+import os
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, astuple, dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
@@ -194,19 +197,24 @@ def pen_gain(nom: Nominal, lever_r: float) -> float:
 
 
 def _bisect(
-    f: Callable[[np.ndarray], np.ndarray], lo: float, hi: float, n: int, iters: int = 50
+    f: Callable[[np.ndarray], np.ndarray],
+    lo: float,
+    hi: float,
+    n: int | tuple[int, ...],
+    iters: int = 50,
 ) -> np.ndarray:
-    """Vectorised bisection of ``f`` on [lo, hi] for ``n`` independent roots."""
+    """Vectorised bisection of ``f`` on [lo, hi] for ``n`` independent roots
+    (a count, or an array shape)."""
     lo_a = np.full(n, lo)
     hi_a = np.full(n, hi)
-    f_lo = f(lo_a)
+    neg_lo = f(lo_a) < 0  # only the sign at the low end is ever compared
     for _ in range(iters):
         mid = 0.5 * (lo_a + hi_a)
-        f_mid = f(mid)
-        same = (f_mid < 0) == (f_lo < 0)
-        lo_a = np.where(same, mid, lo_a)
-        f_lo = np.where(same, f_mid, f_lo)
-        hi_a = np.where(same, hi_a, mid)
+        neg_mid = f(mid) < 0
+        same = neg_mid == neg_lo
+        np.copyto(lo_a, mid, where=same)
+        np.copyto(hi_a, mid, where=~same)
+        np.copyto(neg_lo, neg_mid, where=same)
     return 0.5 * (lo_a + hi_a)
 
 
@@ -255,10 +263,12 @@ def _lever_pin_gap(
     return np.hypot(tx - nom.fulcrum_dx, ty - nom.fulcrum_dy) - nom.bar_pin_arm
 
 
-def rest_contact(d: float, nom: Nominal) -> tuple[float, float]:
-    """Where the bar's notch roof sits on the R800 arc at station ``d`` (foot-axis
-    x from the pivot), arm level -- solve_state's rest pose: the contact rides
-    the arc and the top pin the lever circle, the bar tilt closes the loop."""
+def rest_contacts(d: np.ndarray, nom: Nominal) -> tuple[np.ndarray, np.ndarray]:
+    """Where the bar's notch roof sits on the R800 arc at each station ``d``
+    (foot-axis x from the pivot), arm level -- solve_state's rest pose: the
+    contact rides the arc and the top pin the lever circle, the bar tilt closes
+    the loop. One bisection for every station."""
+    d = np.asarray(d, dtype=float)
 
     def contact(beta: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         kx = d + nom.contact_dx * np.cos(beta) - nom.contact_dy * np.sin(beta)
@@ -269,9 +279,57 @@ def rest_contact(d: float, nom: Nominal) -> tuple[float, float]:
         kx, ky = contact(beta)
         return _lever_pin_gap(kx, ky, beta, nom)
 
-    beta = _bisect(gap, -0.4, 0.4, 1)
-    kx, ky = contact(beta)
-    return float(kx[0]), float(ky[0])
+    return contact(_bisect(gap, -0.4, 0.4, d.shape))
+
+
+def lever_tilts(
+    theta: np.ndarray,
+    stations: np.ndarray,
+    nom: Nominal,
+    tr: np.ndarray | None = None,
+) -> np.ndarray:
+    """The channel lever's tilt for every station at once: shape (stations,)
+    + theta.shape. The rocker angle depends on theta alone, so it is solved
+    once (or passed in as ``tr``). The bar tilt is a bisection per station and
+    angle, elementwise, so the stations are split into chunks solved side by
+    side (``_SOLVES``) and joined: the same numbers as one pass."""
+    theta = np.asarray(theta)
+    stations = np.asarray(stations, dtype=float)
+    tr = rocker_angle(theta, nom) if tr is None else tr
+    per = max(1, _CHUNK_ELEMENTS // max(1, theta.size))
+    if len(stations) <= per:
+        return _lever_tilts(theta, stations, nom, tr)
+    chunks = [stations[i : i + per] for i in range(0, len(stations), per)]
+    return np.concatenate(
+        list(_SOLVES.map(lambda c: _lever_tilts(theta, c, nom, tr), chunks))
+    )
+
+
+def hook_cycles(
+    theta: np.ndarray,
+    stations: np.ndarray,
+    nom: Nominal,
+    tr: np.ndarray | None = None,
+) -> np.ndarray:
+    """``hook_displacement`` for every station at once: shape (stations,) +
+    theta.shape (``lever_tilts``, then the hook on its arm)."""
+    phi = lever_tilts(theta, stations, nom, tr)
+    return nom.hook_arm * np.sin(phi + nom.hook_skew)
+
+
+def _lever_tilts(
+    theta: np.ndarray, stations: np.ndarray, nom: Nominal, tr: np.ndarray
+) -> np.ndarray:
+    k0x, k0y = rest_contacts(stations, nom)
+    k0x = k0x.reshape(k0x.shape + (1,) * theta.ndim)
+    k0y = k0y.reshape(k0y.shape + (1,) * theta.ndim)
+    kx = k0x * np.cos(tr) - k0y * np.sin(tr)
+    ky = k0x * np.sin(tr) + k0y * np.cos(tr)
+    beta = _bisect(lambda b: _lever_pin_gap(kx, ky, b, nom), -0.4, 0.4, kx.shape)
+    s, c = np.sin(beta), np.cos(beta)
+    tx = kx - (nom.contact_dx * c - nom.contact_dy * s) + nom.bar_len * s
+    ty = ky - (nom.contact_dx * s + nom.contact_dy * c) + nom.bar_len * c
+    return np.arctan2(ty - nom.fulcrum_dy, nom.fulcrum_dx - tx)  # lever tilt
 
 
 def hook_displacement(theta: np.ndarray, d: float, nom: Nominal) -> np.ndarray:
@@ -282,16 +340,8 @@ def hook_displacement(theta: np.ndarray, d: float, nom: Nominal) -> np.ndarray:
     spring load normal to the arc, so the foot does not slide) and rides the
     rocker's rotation; the rigid bar re-tilts so its top pin stays on the lever
     circle, and the hook follows the lever."""
-    tr = rocker_angle(theta, nom)
-    k0x, k0y = rest_contact(d, nom)
-    kx = k0x * np.cos(tr) - k0y * np.sin(tr)
-    ky = k0x * np.sin(tr) + k0y * np.cos(tr)
-    beta = _bisect(lambda b: _lever_pin_gap(kx, ky, b, nom), -0.4, 0.4, theta.size)
-    s, c = np.sin(beta), np.cos(beta)
-    tx = kx - (nom.contact_dx * c - nom.contact_dy * s) + nom.bar_len * s
-    ty = ky - (nom.contact_dx * s + nom.contact_dy * c) + nom.bar_len * c
-    phi = np.arctan2(ty - nom.fulcrum_dy, nom.fulcrum_dx - tx)  # lever tilt
-    return nom.hook_arm * np.sin(phi + nom.hook_skew)
+    return hook_cycles(theta, np.array([d], dtype=float), nom)[0]
+
 
 
 def linear_gain(nom: Nominal) -> float:
@@ -434,6 +484,20 @@ def read_ordinates(x: np.ndarray, nom: Nominal) -> np.ndarray:
 _READ_TABLES: dict[tuple, tuple[np.ndarray, np.ndarray]] = {}
 _CYCLE_TABLES: dict[tuple, "CycleTable"] = {}
 _CYCLE_DERIVATIVES: dict[tuple, dict[str, "CycleTable"]] = {}
+_TILT_TABLES: dict[tuple, np.ndarray] = {}
+
+# numpy releases the GIL inside its array loops, so threads run the budget's
+# independent solves side by side. Every job is a pure function of its inputs
+# (the Monte Carlo draws are all taken before any job starts), so the numbers
+# are the serial ones whatever order the jobs finish in. Two pools, so that no
+# job ever waits on a queue its own caller is holding: _SOLVES runs station
+# chunks of one kinematic solve and submits nothing; _JOBS runs whole Monte
+# Carlo and setup evaluations, which may hand chunks to _SOLVES.
+_WORKERS = max(1, min(16, os.cpu_count() or 1))
+_SOLVES = ThreadPoolExecutor(_WORKERS, thread_name_prefix="budget-solve")
+_JOBS = ThreadPoolExecutor(_WORKERS, thread_name_prefix="budget-job")
+_CHUNK_ELEMENTS = 16384  # smallest station x angle block worth a thread
+_DRAW_BLOCK = 250  # Monte Carlo draws per job: (21 x 20) x 250 doubles < 1 MB
 
 # Budget features that perturb the channel's KINEMATICS (the Nominal field each
 # one moves, radially): their deviation changes the hook waveform's shape --
@@ -498,19 +562,57 @@ class CycleTable:
         """Bilinear lookup of the cycle at stations ``d`` and angles ``alpha``
         (rad, any real; periodic), broadcast together. Station brackets come
         from the station array itself (the last interval may be short)."""
-        d, alpha = np.broadcast_arrays(d, alpha)
+        return self.at(self.lookup(d, alpha))
+
+    def lookup(self, d: np.ndarray, alpha: np.ndarray) -> _Lookup:
+        """The brackets and weights ``sample`` interpolates with. Every table
+        on the same station grid and angle count shares them, so a batch of
+        tables (``_read_draws``) finds them once. The station bracket is found
+        at ``d``'s own shape, before it is broadcast against ``alpha``."""
+        d = np.asarray(d, dtype=float)
         st = self.stations
         s0 = np.clip(np.searchsorted(st, d, side="right") - 1, 0, len(st) - 2)
         sf = np.clip((d - st[s0]) / (st[s0 + 1] - st[s0]), 0.0, 1.0)
         n = self.cycles.shape[1]
-        ai = (alpha % (2.0 * math.pi)) / (2.0 * math.pi) * n
-        a0 = ai.astype(int) % n
-        af = ai - ai.astype(int)
+        ai = (np.asarray(alpha) % (2.0 * math.pi)) / (2.0 * math.pi) * n
+        whole = ai.astype(int)
+        a0 = whole % n
+        af = ai - whole
         a1 = (a0 + 1) % n
-        c = self.cycles
-        top = c[s0, a0] * (1.0 - af) + c[s0, a1] * af
-        bot = c[s0 + 1, a0] * (1.0 - af) + c[s0 + 1, a1] * af
-        return top * (1.0 - sf) + bot * sf
+        row0 = s0 * n
+        row1 = row0 + n
+        return _Lookup(
+            self.stations, n, row0 + a0, row0 + a1, row1 + a0, row1 + a1, af, sf
+        )
+
+    def at(self, lk: _Lookup) -> np.ndarray:
+        """The cycle interpolated at a ``lookup`` (flat indices into
+        ``cycles``: the same bilinear sum, term for term)."""
+        c = self.cycles.ravel()
+        rest = 1.0 - lk.af
+        top = c.take(lk.i00) * rest + c.take(lk.i01) * lk.af
+        bot = c.take(lk.i10) * rest + c.take(lk.i11) * lk.af
+        return top * (1.0 - lk.sf) + bot * lk.sf
+
+    def shares(self, lk: _Lookup) -> bool:
+        """Whether ``lk`` indexes this table's grid."""
+        return self.cycles.shape[1] == lk.n and (
+            self.stations is lk.stations or np.array_equal(self.stations, lk.stations)
+        )
+
+
+@dataclass(frozen=True)
+class _Lookup:
+    """``CycleTable.lookup``: flat corner indices and the two weights."""
+
+    stations: np.ndarray
+    n: int
+    i00: np.ndarray
+    i01: np.ndarray
+    i10: np.ndarray
+    i11: np.ndarray
+    af: np.ndarray
+    sf: np.ndarray
 
 # --------------------------------------------------------------------------
 # The cone<->drum mesh: lag, runout, float and flank toggle
@@ -680,7 +782,12 @@ def _releasing(t: CycleTable, d: np.ndarray, drum: np.ndarray) -> np.ndarray:
     (spring_mount_geom.channel_pose), so a rising hook stretches it -- work the
     crank does, drive flank -- and a falling hook lets it pull the drum on."""
     h = 1e-3
-    return t.sample(d, drum + h) < t.sample(d, drum - h)
+    shape = np.broadcast_shapes(np.shape(d), np.shape(drum))
+    if np.ndim(d) and np.shape(d)[0] > 1 and np.all(d == d[:1]):
+        # every draw sets the bars alike (no station_setting drawn): solve one
+        # row and broadcast it
+        d = d[:1]
+    return np.broadcast_to(t.sample(d, drum + h) < t.sample(d, drum - h), shape)
 
 
 def channel_phase_trial(
@@ -724,7 +831,14 @@ def _station_grid(nom: Nominal, step_mm: float) -> np.ndarray:
 
 
 def _cycles_at(stations: np.ndarray, nom: Nominal) -> np.ndarray:
-    return np.array([hook_displacement(_READ_GRID, float(d), nom) for d in stations])
+    """The table rows at ``stations``. The lever tilt does not depend on the
+    hook's arm or skew, so the hook_arm and hook_skew derivative tables reuse
+    the nominal tilt instead of re-solving it."""
+    stations = np.asarray(stations, dtype=float)
+    key = (astuple(replace(nom, hook_arm=0.0, hook_skew=0.0)), stations.tobytes())
+    if key not in _TILT_TABLES:
+        _TILT_TABLES[key] = lever_tilts(_READ_GRID, stations, nom)
+    return nom.hook_arm * np.sin(_TILT_TABLES[key] + nom.hook_skew)
 
 
 def cycle_table(nom: Nominal, step_mm: float = 0.25) -> CycleTable:
@@ -820,12 +934,23 @@ class NominalTrial:
     def __init__(self, nom: Nominal) -> None:
         self.nom = nom
         self.grid = np.arange(1440) * 2.0 * math.pi / 1440
+        self._rocker = rocker_angle(self.grid, nom)
         self._cycle: dict[float, np.ndarray] = {}
+        self._setups: dict[bytes, MagnifierSetup] = {}
         self.f_full = self.fundamental(nom.d_max)
 
+    def _solve(self, stations: np.ndarray) -> None:
+        """Solve every station not yet cached in one vectorised pass."""
+        missing = list(
+            dict.fromkeys(float(d) for d in stations if float(d) not in self._cycle)
+        )
+        if not missing:
+            return
+        cycles = hook_cycles(self.grid, np.array(missing), self.nom, self._rocker)
+        self._cycle.update(zip(missing, cycles))
+
     def one_cycle(self, d: float) -> np.ndarray:
-        if d not in self._cycle:
-            self._cycle[d] = hook_displacement(self.grid, d, self.nom)
+        self._solve(np.array([d]))
         return self._cycle[d]
 
     def fundamental(self, d: float) -> float:
@@ -833,6 +958,7 @@ class NominalTrial:
 
     def kappa(self, stations: np.ndarray) -> np.ndarray:
         """The table's c2/c1 at each bar's station."""
+        self._solve(stations)
         return np.array(
             [
                 second_harmonic(self.one_cycle(float(d)), self.grid)
@@ -843,11 +969,13 @@ class NominalTrial:
 
     def x_read(self, stations: np.ndarray) -> np.ndarray:
         """The table's read ordinate at each bar's station (signed)."""
+        self._solve(stations)
         return np.array([self.fundamental(float(d)) / self.f_full for d in stations])
 
     def trace(self, stations: np.ndarray, th: np.ndarray) -> np.ndarray:
         """The pen trace y(theta) (hook-displacement units) -- channel j runs
         j cycles per fundamental period."""
+        self._solve(stations)
         y = np.zeros_like(th)
         for j, d in zip(HARMONICS, stations):
             y += np.interp(
@@ -931,6 +1059,12 @@ class NominalTrial:
         the peak the pen holds at minimum magnification) with the clamp at the
         collar; above the maximum the reading falls short of the stroke by
         ``stroke_fill``."""
+        key = np.asarray(x, dtype=float).tobytes()
+        if key not in self._setups:
+            self._setups[key] = self._magnifier_setup(x)
+        return self._setups[key]
+
+    def _magnifier_setup(self, x: np.ndarray) -> MagnifierSetup:
         nom = self.nom
         pen_per_bar = pen_gain(nom, 1.0) * abs(self.f_full)  # per lever mm
         peak = self.peak_bars(x * nom.d_max)
@@ -949,6 +1083,20 @@ class NominalTrial:
             1.0,
             pen_per_bar * nom.lever_r_min * self.peak_bars(f * x * nom.d_max),
         )
+
+
+_TRIALS: dict[tuple, NominalTrial] = {}
+
+
+def nominal_trial(nom: Nominal) -> NominalTrial:
+    """The ``NominalTrial`` for ``nom``, shared: its per-station cycles and
+    magnifier setups are pure functions of the nominal, so every report on the
+    same machine (the gate's negative tests rebuild it several times) reuses
+    them."""
+    key = astuple(nom)
+    if key not in _TRIALS:
+        _TRIALS[key] = NominalTrial(nom)
+    return _TRIALS[key]
 
 
 def nominal_design_errors(
@@ -975,7 +1123,7 @@ def nominal_design_errors(
     channel's fundamental is read as the ordinate the calibration table
     assigns its station, so the machine-hand gain curvature (-1.010 at the
     null to -1.025 at full scale) is removed."""
-    trial = NominalTrial(nom)
+    trial = nominal_trial(nom)
     out: dict[str, dict[str, float]] = {}
     for name, x in reference_inputs().items():
         measured = trial.readout(
@@ -1164,6 +1312,11 @@ def _channel_model(
     return 100.0 * (measured - base) / fs
 
 
+def _rows_equal(a: np.ndarray) -> bool:
+    """Whether every draw (leading row) of ``a`` is the first one."""
+    return a.shape[0] == 1 or bool(np.all(a == a[:1]))
+
+
 def _read_draws(
     x: np.ndarray,
     t: CycleTable,
@@ -1187,11 +1340,20 @@ def _read_draws(
     the operator's recorded ``x_read``/``kappa``. Returns O_k, shape (draws, K+1)."""
     if phi.ndim == 2:  # one phase per channel; else draws x k x channel
         phi = phi[:, None, :]
-    alpha = HARMONICS[None, None, :] * THETA_K[None, :, None] + phi
-    u = t.sample(d[:, None, :], alpha)  # draws,k,i
+    draws = g.shape[0]
+    # A deviation that moves neither the phase nor the station (a gain, a
+    # waveform shape) reads every draw's cycle at the same points: look them
+    # up once and repeat the row -- the same numbers, one draw's work.
+    uniform = _rows_equal(phi) and _rows_equal(d)
+    rows = slice(0, 1) if uniform else slice(None)
+    alpha = HARMONICS[None, None, :] * THETA_K[None, :, None] + phi[rows]
+    lk = t.lookup(d[rows, None, :], alpha)
+    full = (draws, K_MAX + 1, N_ELEMENTS)
+    u = np.broadcast_to(t.at(lk), full).copy()  # draws,k,i
     mean = np.interp(d, t.stations, t.mean)
     for dt, v in (shape or {}).values():
-        u = u + v[:, None, :] * dt.sample(d[:, None, :], alpha)
+        du = dt.at(lk) if dt.shares(lk) else dt.sample(d[rows, None, :], alpha)
+        u = u + v[:, None, :] * du
         mean = mean + v * np.interp(d, dt.stations, dt.mean)
     r = np.einsum("di,dki->dk", g, u)
     zero = np.einsum("di,di->d", g, mean)
@@ -1202,6 +1364,21 @@ def _read_draws(
     return measured - ideal_coefficients(x_read - x)[None, :]
 
 
+# The budget sections the Monte Carlo reads. It is handed only these, so a
+# read of any other section fails loud, and its result is memoised on exactly
+# them: a report that differs only in its reserved allowances, waivers or
+# targets (the gate's negative tests) reuses the draws instead of redrawing
+# the same numbers.
+_MC_SECTIONS = (
+    "monte_carlo",
+    "critical_features",
+    "reference_inputs",
+    "allocation_share",
+    "channel_phase_trial",
+)
+_MC_RESULTS: dict[tuple, dict[str, Any]] = {}
+
+
 def monte_carlo(
     budget: dict[str, Any], nom: Nominal, setups: dict[str, MagnifierSetup]
 ) -> dict[str, Any]:
@@ -1209,8 +1386,26 @@ def monte_carlo(
     critical feature drawn uniformly within its tolerance, per channel, on the
     budget's reference inputs through the calibrated readout, each input at the
     ordinate scale its ``MagnifierSetup`` fits to the pen."""
+    sections = {k: budget[k] for k in _MC_SECTIONS}
+    inputs = reference_inputs()
+    key = (
+        json.dumps(sections, sort_keys=True, default=repr),
+        tuple(inputs[n].tobytes() if n in inputs else n for n in sections["reference_inputs"]),
+        astuple(nom),
+        tuple((name, astuple(setup)) for name, setup in sorted(setups.items())),
+    )
+    if key not in _MC_RESULTS:
+        _MC_RESULTS[key] = _monte_carlo(copy.deepcopy(sections), nom, setups)
+    return copy.deepcopy(_MC_RESULTS[key])
+
+
+def _monte_carlo(
+    budget: dict[str, Any], nom: Nominal, setups: dict[str, MagnifierSetup]
+) -> dict[str, Any]:
     mc = budget["monte_carlo"]
-    rng = np.random.default_rng(int(mc["seed"]))
+    # The bit generator is named, not left to default_rng, so a numpy release
+    # that changes its default cannot change the draws the report is pinned on.
+    rng = np.random.Generator(np.random.PCG64(int(mc["seed"])))
     draws = int(mc["draws"])
     if mc["distribution"] != "uniform":
         raise ValueError(
@@ -1253,19 +1448,41 @@ def monte_carlo(
     }
     mt = mesh_train(budget)
 
-    def stats(dev: dict[str, Any]) -> dict[str, Any]:
+    def errors(dev: dict[str, Any], name: str, rows: slice) -> np.ndarray:
+        return _channel_model(
+            inputs[name],
+            nom,
+            {k: (v[name] if isinstance(v, dict) else v)[rows] for k, v in dev.items()},
+            sens,
+            feats["station_setting"]["tolerance"],
+            setups[name].ordinate_scale,
+            mt,
+        )
+
+    # Every draw is its own machine -- nothing in the channel model mixes two
+    # draws -- so each evaluation runs as blocks of draws, joined in order: the
+    # same numbers, in arrays small enough to stay in cache.
+    blocks = [
+        slice(lo, min(lo + _DRAW_BLOCK, draws)) for lo in range(0, draws, _DRAW_BLOCK)
+    ]
+
+    # every (feature, input) evaluation, and the combined machine, at once:
+    # the tables they share are solved first, so no job builds them
+    cycle_table(nom)
+    cycle_derivatives(nom)
+    runs = {key: {key: all_dev[key]} for key in feats}
+    runs[None] = all_dev
+    jobs = {
+        (key, name): [_JOBS.submit(errors, dev, name, rows) for rows in blocks]
+        for key, dev in runs.items()
+        for name in names
+    }
+
+    def stats(key: str | None) -> dict[str, Any]:
         per_input = {}
         pooled = []
         for name in names:
-            e = _channel_model(
-                inputs[name],
-                nom,
-                {k: v[name] if isinstance(v, dict) else v for k, v in dev.items()},
-                sens,
-                feats["station_setting"]["tolerance"],
-                setups[name].ordinate_scale,
-                mt,
-            )
+            e = np.concatenate([job.result() for job in jobs[key, name]])
             per_input[name] = {
                 "mae": float(np.mean(np.abs(e))),
                 "rms": float(np.sqrt(np.mean(e * e))),
@@ -1281,7 +1498,7 @@ def monte_carlo(
             "p99_max": float(np.percentile(np.max(np.abs(e_all), axis=1), 99)),
         }
 
-    per_feature = {key: stats({key: all_dev[key]}) for key in feats}
+    per_feature = {key: stats(key) for key in feats}
     # Errors scale linearly with a feature's tolerance (uniform draws, small
     # deviations), so the tolerance at which a feature ALONE would consume its
     # allocation share follows by proportion -- the number a drawing may relax to.
@@ -1296,7 +1513,7 @@ def monte_carlo(
         s["allowable_tolerance"] = (
             None if key == "flank_toggle" else feats[key]["tolerance"] * factor
         )
-    combined = stats(all_dev)
+    combined = stats(None)
     trial = channel_phase_trial(
         all_dev, mt, nom, float(budget["channel_phase_trial"]["coverage"])
     )
@@ -1550,7 +1767,7 @@ def closed_form_terms(
     # the sum, so the pair gate does not combine per-source maxima: it draws
     # every source jointly (``pair_joint_worst``).
     reading = float(res["readout"]["reading_uncertainty_mm"])
-    trial = NominalTrial(nom)
+    trial = nominal_trial(nom)
     share = {}
     scale = {}
     for n in scored:
@@ -1729,7 +1946,7 @@ def pair_joint_worst(
     per-k slope at the index (``pct_fs_per_rad_physical_per_input``)."""
     mc = budget["monte_carlo"]
     draws = int(mc["draws"])
-    rng = np.random.default_rng(int(mc["seed"]) + 1)
+    rng = np.random.Generator(np.random.PCG64(int(mc["seed"]) + 1))
     feats = budget["critical_features"]
     axes = feature_axes(nom)
     x = reference_inputs()[pair]
@@ -1748,7 +1965,7 @@ def pair_joint_worst(
         mt=mesh_train(budget),
     )
     residual = coefficient_errors_pct(
-        NominalTrial(nom).readout(
+        nominal_trial(nom).readout(
             x, correct_second_harmonic=True, calibrated_stick=True
         ),
         x,
@@ -1835,11 +2052,14 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
     nom = credited_nominal(budget)
     d0 = null_station(nom)
     stations = [nom.d_max, nom.d_max / 2, nom.d_max / 4, 10.0]  # lifting side only
-    trial = NominalTrial(nom)
-    setups = {
-        name: trial.magnifier_setup(reference_inputs()[name])
-        for name in budget["reference_inputs"]
-    }
+    trial = nominal_trial(nom)
+    names = list(budget["reference_inputs"])
+    setups = dict(
+        zip(
+            names,
+            _JOBS.map(trial.magnifier_setup, [reference_inputs()[n] for n in names]),
+        )
+    )
     r = {
         "nominal": nom.__dict__,
         "linear_gain_mm_per_mm": linear_gain(nom),
@@ -2221,7 +2441,7 @@ def readout_procedure(r: dict[str, Any]) -> str:
     mag = cf["magnifier"]
     rows = calibration_table(nom)
     lift = r["null_lift_ordinate"]
-    trial = NominalTrial(nom)
+    trial = nominal_trial(nom)
     ones = np.ones(N_ELEMENTS)
     scale_all = trial.ordinate_scale_for(ones, mag["ordinate_capacity_full_scale_bars"])
     naive_all = mag["ordinate_capacity_full_scale_bars"] / trial.peak_bars(

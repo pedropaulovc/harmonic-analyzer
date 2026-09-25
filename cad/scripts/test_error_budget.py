@@ -380,7 +380,7 @@ def test_magnifier_setup_fits_reference_inputs_to_reachable_stroke(report, nom):
             assert 0.0 < setup["ordinate_scale"] < 1.0
             assert setup["lever_r"] == nom.lever_r_min
 
-    trial = eb.NominalTrial(nom)
+    trial = eb.nominal_trial(nom)
     for name, setup in mag["per_input"].items():
         x = eb.reference_inputs()[name]
         stations = setup["ordinate_scale"] * x * nom.d_max
@@ -396,7 +396,7 @@ def test_scale_rule_solves_the_table_instead_of_scaling_by_proportion(report, no
     A proportional estimate ignores the fixed idle-bar lift and overdrives the
     stroke."""
     cap = report["closed_form"]["magnifier"]["ordinate_capacity_full_scale_bars"]
-    trial = eb.NominalTrial(nom)
+    trial = eb.nominal_trial(nom)
     for name, setup in report["closed_form"]["magnifier"]["per_input"].items():
         x = eb.reference_inputs()[name]
         solved = trial.ordinate_scale_for(x, cap)
@@ -420,7 +420,7 @@ def test_reduced_ordinate_scale_costs_setting_and_knife_proportionally(report, n
     cf = report["closed_form"]
     mag, knife = cf["magnifier"], cf["knife"]
     cap = mag["ordinate_capacity_full_scale_bars"]
-    trial = eb.NominalTrial(nom)
+    trial = eb.nominal_trial(nom)
     for name, s in mag["per_input"].items():
         if s["ordinate_scale"] < 1.0:
             x = eb.reference_inputs()[name]
@@ -587,7 +587,7 @@ def test_counter_spring_catalog_range_gates_every_station_case(
     assert nom.counter_initial_tension <= old_neutral_force <= old_available_force
 
     monkeypatch.setattr(eb._config, "amplitudes", lambda: loaded_stations.tolist())
-    trial = eb.NominalTrial(boundary_nom)
+    trial = eb.nominal_trial(boundary_nom)
     setups = {
         name: trial.magnifier_setup(eb.reference_inputs()[name])
         for name in budget["reference_inputs"]
@@ -820,7 +820,7 @@ def test_scaled_trial_needs_the_division_to_keep_step_4_a_small_known_vector(
         "ordinate_scale"
     ]
     assert 0.0 < f < 1.0
-    trial = eb.NominalTrial(nom)
+    trial = eb.nominal_trial(nom)
     stations = f * x * nom.d_max
     table = trial.x_read(stations)  # what the operator looks up
     kappa = trial.kappa(stations)
@@ -878,7 +878,7 @@ def test_timebase_is_scored_on_the_physical_trace(report, nom):
     assert tb["pct_fs"] == phys[tb["worst_input"]]
     # and the mechanism: an off-index read of the nominal trial moves every
     # coefficient by the trace's slope there, an on-index read by nothing
-    trial = eb.NominalTrial(nom)
+    trial = eb.nominal_trial(nom)
     x = eb.reference_inputs()["all_ones"]
     assert np.allclose(trial.readout(x, theta_error=0.0), trial.readout(x))
     assert (
@@ -897,7 +897,7 @@ def test_monte_carlo_perturbs_the_physical_waveform_not_a_cosine(nom):
     the fit is 10x worse. A zero deviation scores exactly zero (the nominal
     residual is the closure's own term, not scatter)."""
     x = eb.reference_inputs()["all_ones"]
-    trial = eb.NominalTrial(nom)
+    trial = eb.nominal_trial(nom)
     f = trial.magnifier_setup(x).ordinate_scale
     t = eb.cycle_table(nom)
     st = f * x * nom.d_max
@@ -951,7 +951,7 @@ def test_kinematic_deviations_reshape_the_waveform_not_just_its_gain(nom):
     # through the model: an eccentricity draw on channel 1 must leave a
     # second-harmonic residual the fixed kappa correction cannot remove
     x = eb.reference_inputs()["all_ones"]
-    f = eb.NominalTrial(nom).magnifier_setup(x).ordinate_scale
+    f = eb.nominal_trial(nom).magnifier_setup(x).ordinate_scale
     sens = eb.gain_sensitivities(nom)
     dev = {"cam_eccentricity": np.zeros((1, eb.N_ELEMENTS))}
     dev["cam_eccentricity"][0, 0] = tol
@@ -1008,7 +1008,7 @@ def test_position_zones_draw_both_axes_through_the_kinematics(budget, nom):
     assert 0.0 < tangential < radial  # ~0.25x with the shaft axis fixed by the frame
     # the sampler: a tangential-only draw moves the reading, by less than the radial one
     x = eb.reference_inputs()["all_ones"]
-    f = eb.NominalTrial(nom).magnifier_setup(x).ordinate_scale
+    f = eb.nominal_trial(nom).magnifier_setup(x).ordinate_scale
     sens = eb.gain_sensitivities(nom)
     both = np.zeros((2, eb.N_ELEMENTS, 2))
     both[0, 0, 0] = 0.1  # radial on channel 1, draw 0
@@ -1020,7 +1020,7 @@ def test_position_zones_draw_both_axes_through_the_kinematics(budget, nom):
         {**budget, "monte_carlo": {**budget["monte_carlo"], "draws": 20}},
         nom,
         {
-            n: eb.NominalTrial(nom).magnifier_setup(eb.reference_inputs()[n])
+            n: eb.nominal_trial(nom).magnifier_setup(eb.reference_inputs()[n])
             for n in budget["reference_inputs"]
         },
     )
@@ -1242,13 +1242,49 @@ def test_drawing_limits_agree_with_the_budget(budget):
 def test_unsupported_distribution_fails_loud(budget, nom):
     """A distribution the model does not implement raises instead of sampling uniform."""
     bad = {**budget, "monte_carlo": {**budget["monte_carlo"], "distribution": "normal"}}
-    trial = eb.NominalTrial(nom)
+    trial = eb.nominal_trial(nom)
     setups = {
         n: trial.magnifier_setup(eb.reference_inputs()[n])
         for n in budget["reference_inputs"]
     }
     with pytest.raises(ValueError, match="distribution"):
         eb.monte_carlo(bad, nom, setups)
+
+
+def test_monte_carlo_draws_come_from_pcg64_at_the_budget_seed(budget, nom, monkeypatch):
+    """The draws are PCG64 at the yaml's seed, named explicitly: the first
+    feature's deviations are the generator's first uniform call, so a numpy
+    whose default_rng moved to another bit generator could not silently move
+    every number the report pins."""
+    small = {
+        **budget,
+        "monte_carlo": {**budget["monte_carlo"], "draws": 40},
+        "reference_inputs": ["all_ones", "pair_1_20"],
+    }
+    trial = eb.nominal_trial(nom)
+    setups = {
+        n: trial.magnifier_setup(eb.reference_inputs()[n])
+        for n in small["reference_inputs"]
+    }
+    first, f = next(iter(small["critical_features"].items()))
+    seen = []  # list.append is atomic: the Monte Carlo runs its jobs in threads
+    real = eb._channel_model
+
+    def spy(x, nom_, dev, sens, tol, scale, mt=None):
+        seen.append((x.copy(), {k: v.copy() for k, v in dev.items()}))
+        return real(x, nom_, dev, sens, tol, scale, mt)
+
+    monkeypatch.setattr(eb, "_channel_model", spy)
+    eb.monte_carlo(small, nom, setups)
+    ones = eb.reference_inputs()["all_ones"]
+    drawn = next(
+        dev[first] for x, dev in seen if set(dev) == {first} and np.array_equal(x, ones)
+    )
+    rng = np.random.Generator(np.random.PCG64(int(budget["monte_carlo"]["seed"])))
+    size = eb.draw_size(first, f, eb.feature_axes(nom), 40)
+    assert np.array_equal(
+        drawn, rng.uniform(-f["tolerance"], f["tolerance"], size=size)
+    )
 
 
 def test_setup_class_deviations_are_redrawn_per_trial(budget, nom, monkeypatch):
@@ -1267,17 +1303,17 @@ def test_setup_class_deviations_are_redrawn_per_trial(budget, nom, monkeypatch):
         "monte_carlo": {**budget["monte_carlo"], "draws": 50},
         "reference_inputs": ["all_ones", "twin", "pair_1_20"],
     }
-    trial = eb.NominalTrial(nom)
+    trial = eb.nominal_trial(nom)
     setups = {
         n: trial.magnifier_setup(eb.reference_inputs()[n])
         for n in small["reference_inputs"]
     }
-    seen = {}
+    seen = []  # list.append is atomic: the Monte Carlo runs its jobs in threads
 
     real = eb._channel_model
 
     def spy(x, nom_, dev, sens, tol, scale, mt=None):
-        seen.setdefault(len(seen), {k: v.copy() for k, v in dev.items()})
+        seen.append({k: v.copy() for k, v in dev.items()})
         return real(x, nom_, dev, sens, tol, scale, mt)
 
     monkeypatch.setattr(eb, "_channel_model", spy)
@@ -1285,11 +1321,11 @@ def test_setup_class_deviations_are_redrawn_per_trial(budget, nom, monkeypatch):
     channel = [
         k for k, f in small["critical_features"].items() if f["class"] == "channel"
     ][0]
-    per_feature = [v for v in seen.values() if set(v) == {channel}]
+    per_feature = [v for v in seen if set(v) == {channel}]
     assert np.array_equal(
         per_feature[0][channel], per_feature[1][channel]
     )  # all_ones, twin
-    setup = [v for v in seen.values() if set(v) == {"station_setting"}]
+    setup = [v for v in seen if set(v) == {"station_setting"}]
     assert not np.array_equal(setup[0]["station_setting"], setup[1]["station_setting"])
     bad = {
         **small,
