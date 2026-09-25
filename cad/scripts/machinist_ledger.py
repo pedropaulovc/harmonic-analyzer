@@ -778,14 +778,24 @@ class AuthorRulings:
     drawings: dict[str, dict[str, Any]] = field(default_factory=dict)
     untrailered: dict[str, Any] | None = None
 
-    def both_families(self, name: str) -> str:
+    def both_families_ruled(self, name: str) -> str:
+        """The ``both_families`` reason on ``name``'s ruling row, whatever its commit."""
+        return (self.drawings.get(name) or {}).get("both_families", "")
+
+    def both_families(self, name: str, author: Author) -> str:
         """Why ``name`` needs a counting review from every reviewer family; "" if not.
 
         Set on a drawing whose per-drawing ruling and class rule disagree on
         the author: one of the two reviews is then cross-family whoever wrote
-        it.  It holds whatever the script's last commit, so it fails closed.
+        it.  Like the ruling, it covers only the exact commit it judged, and
+        only while that commit names no model: a trailer wins.
         """
-        return (self.drawings.get(name) or {}).get("both_families", "")
+        ruling = self.drawings.get(name)
+        if ruling is None or author.model is not None:
+            return ""
+        if author.commit != ruling["commit"]:
+            return ""
+        return ruling.get("both_families", "")
 
 
 class Ruled(NamedTuple):
@@ -1312,8 +1322,9 @@ def record_review(
         if why:
             raise ValueError(f"{name}: not an outage fallback: {why}")
         slot = OUTAGE_FALLBACK
+    script_author = known_author or draw_script_author(name, repo=repo)
     rulings = load_author_rulings() if rulings is None else rulings
-    both_families = rulings.both_families(name)
+    both_families = rulings.both_families(name, script_author)
     if both_families and outage is not None:
         raise ValueError(
             f"{name}: both families are required ({both_families}); an outage "
@@ -1322,7 +1333,7 @@ def record_review(
     if both_families:  # either family's review counts; drawing_status needs each
         slot = f"{BOTH_FAMILIES}_{reviewer_family(review['reviewer'])}"
     author = resolve_author(
-        name, author_family, author_model, repo=repo, known=known_author
+        name, author_family, author_model, repo=repo, known=script_author
     )
     problem = None
     if slot == LAST_RESORT:
@@ -1674,6 +1685,47 @@ def _both_families_status(
     )
 
 
+def gate_status(
+    name: str,
+    ledger: dict[str, Any],
+    *,
+    references: _References,
+    rulings: AuthorRulings,
+    pdf: Path | None = None,
+    report_dir: Path | None = None,
+    author: Author | ValueError | None = None,
+    repo: Path = REPO_ROOT,
+    outages: dict[str, dict[str, Any]] | None = None,
+) -> Status:
+    """``drawing_status`` under the author rulings: the gate's one verdict.
+
+    A drawing whose ruling row requires both families is judged that way; a
+    review from each family satisfies any author, so the draw script's author
+    is walked (unless given) only when that bar is not met, to learn whether
+    the ruling still covers it.  An author that cannot be read keeps the bar.
+    """
+    reason = rulings.both_families_ruled(name)
+    kwargs = {
+        "references": references,
+        "pdf": pdf,
+        "report_dir": report_dir,
+        "outages": outages,
+    }
+    if not reason:
+        return drawing_status(name, ledger, **kwargs)
+    status = drawing_status(name, ledger, both_families=reason, **kwargs)
+    if status.state in (State.OK, State.UNRENDERED):
+        return status
+    if author is None:
+        try:
+            author = draw_script_author(name, repo=repo)
+        except ValueError as exc:
+            author = exc
+    if isinstance(author, ValueError) or rulings.both_families(name, author):
+        return status
+    return drawing_status(name, ledger, **kwargs)
+
+
 def check(
     names: Iterable[str] = (),
     *,
@@ -1691,13 +1743,13 @@ def check(
         raise ValueError(f"unknown drawing names: {unknown}")
     references = _References(sheets_dir(ledger_path))
     return [
-        drawing_status(
+        gate_status(
             name,
             ledger,
             references=references,
+            rulings=rulings,
             report_dir=report_dir,
             outages=outages,
-            both_families=rulings.both_families(name),
         )
         for name in selected
     ]
@@ -2091,7 +2143,7 @@ def _try(
         return Tried(candidate, Backfill.CONTRADICTED, f"{matched}; {objection}")
     if isinstance(author, ValueError):
         return Tried(candidate, Backfill.AUTHOR_UNKNOWN, f"{matched}; {author}")
-    both_families = rulings.both_families(drawing)
+    both_families = rulings.both_families(drawing, author)
     if both_families:  # counts for its reviewer's family, whoever the author was
         family = other_family(reviewer_family(review["reviewer"]))
         source, ruling = BOTH_FAMILIES, rulings.drawings[drawing]
@@ -2255,19 +2307,32 @@ def _backfill_drawings(
                     BackfillRow(name, Backfill.UNRENDERED, f"no rendered PDF at {pdf}")
                 )
                 continue
-            status = drawing_status(
+            status = gate_status(
                 name,
                 ledger,
                 references=references,
+                rulings=rulings,
                 pdf=pdf,
-                both_families=rulings.both_families(name),
+                author=authors.get(name),
+                repo=repo,
             )
             if status.state == State.OK:
-                slot = status.via.split()[0]
-                entry = ledger["drawings"][name][slot]
-                recorded = Candidate(ledger_path, entry, name)
-                objection = _objection(recorded, _Matcher(pdf, cache), found)
-                if not objection:
+                # Every entry the acceptance rests on: both, for a both-families one.
+                matcher = _Matcher(pdf, cache)
+                objected = {
+                    slot: objection
+                    for slot in (part.split()[0] for part in status.via.split(" + "))
+                    if (
+                        objection := _objection(
+                            Candidate(
+                                ledger_path, ledger["drawings"][name][slot], name
+                            ),
+                            matcher,
+                            found,
+                        )
+                    )
+                }
+                if not objected:
                     rows.append(
                         BackfillRow(
                             name, Backfill.RECORDED, f"{status.via} {status.detail}"
@@ -2276,15 +2341,20 @@ def _backfill_drawings(
                     continue
                 # A newer failing verdict of these sheets withdraws the entry.
                 dropped = "dropped from the ledger" if apply else "to drop (--apply)"
+                why = "; ".join(
+                    f"recorded {slot}: {objection}"
+                    for slot, objection in objected.items()
+                )
                 rows.append(
                     BackfillRow(
                         name,
                         Backfill.CONTRADICTED,
-                        f"recorded {slot} {status.detail}: {objection}; {dropped}",
+                        f"{why} ({status.detail}); {dropped}",
                     )
                 )
                 if apply:
-                    del ledger["drawings"][name][slot]
+                    for slot in objected:
+                        del ledger["drawings"][name][slot]
                     if not ledger["drawings"][name]:
                         del ledger["drawings"][name]
                     save_ledger(ledger, ledger_path)

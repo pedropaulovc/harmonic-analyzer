@@ -2287,6 +2287,94 @@ def test_a_both_families_drawing_is_blocked_until_each_family_has_reviewed_it(
     assert (drifted.state, drifted.missing) == (ml.State.DRIFT, ("claude", "gpt"))
 
 
+def test_a_both_families_ruling_covers_only_its_untrailered_commit(
+    tmp_path: Path, registry: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rulings = ml.load_author_rulings(
+        _author_rulings(tmp_path, family="gpt", both_families=BOTH_REASON)
+    )
+    script = "cad/scripts/draw_crank_arm.py"
+    assert rulings.both_families("crank_arm", ml.Author(None, "c" * 40, script))
+    assert not rulings.both_families("crank_arm", ml.Author(None, "d" * 40, script))
+    assert not rulings.both_families(
+        "crank_arm", ml.Author("claude-opus-5-5", "c" * 40, script)
+    )
+
+    # A trailer on the script's commit wins: one cross-family review is the bar.
+    _trailer(monkeypatch, "gpt-6-sol")
+    pdf = _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+    recorded = ml.record_review(
+        _review(pdf, reviewer="claude"),
+        pdf,
+        author_family="gpt",
+        provenance={},
+        ledger_path=ledger_path,
+        rulings=rulings,
+    )
+    assert recorded.slot == ml.CROSS_FAMILY
+    [status] = ml.check(["crank_arm"], ledger_path=ledger_path, rulings=rulings)
+    assert (status.state, status.missing) == (ml.State.OK, ())
+
+
+def test_a_satisfied_both_families_drawing_reads_no_author(
+    tmp_path: Path, registry: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rulings = ml.load_author_rulings(
+        _author_rulings(tmp_path, family="gpt", both_families=BOTH_REASON)
+    )
+    pdf = _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+    for reviewer, author_family in (("claude", "gpt"), ("codex", "claude")):
+        ml.record_review(
+            _review(pdf, reviewer=reviewer),
+            pdf,
+            author_family=author_family,
+            provenance={},
+            ledger_path=ledger_path,
+            rulings=rulings,
+        )
+
+    def walked(name, **_):
+        raise AssertionError(f"{name}: walked git although both families passed")
+
+    monkeypatch.setattr(ml, "draw_script_author", walked)
+    [status] = ml.check(["crank_arm"], ledger_path=ledger_path, rulings=rulings)
+    assert status.state == ml.State.OK
+
+
+def test_backfill_rechecks_every_entry_a_both_families_acceptance_rests_on(
+    tmp_path: Path, registry: Path, records: Path
+) -> None:
+    rulings = ml.load_author_rulings(
+        _author_rulings(tmp_path, family="gpt", both_families=BOTH_REASON)
+    )
+    pdf = _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+    t1, t2, t3 = ((NOW - timedelta(hours=h)).isoformat() for h in (3, 2, 1))
+    for reviewer, author_family, at in (("codex", "claude", t1), ("claude", "gpt", t3)):
+        ml.record_review(
+            _review(pdf, reviewer=reviewer, reviewed_at=at),
+            pdf,
+            author_family=author_family,
+            provenance={},
+            ledger_path=ledger_path,
+            rulings=rulings,
+        )
+    # A codex FIX of the same sheets, newer than the GPT SHIP, older than the Claude one.
+    _on_record(records, "wt-fix", reviewer="codex", passed=False, reviewed_at=t2)
+
+    row = _backfill(tmp_path, records, rulings=rulings, apply=True)
+
+    assert row.outcome == ml.Backfill.CONTRADICTED, row.detail
+    assert "recorded both_families_gpt" in row.detail
+    assert "both_families_claude:" not in row.detail
+    entry = ml.load_ledger(ledger_path)["drawings"]["crank_arm"]
+    assert list(entry) == ["both_families_claude"]
+    [status] = ml.check(["crank_arm"], ledger_path=ledger_path, rulings=rulings)
+    assert (status.state, status.missing) == (ml.State.UNREVIEWED, ("gpt",))
+
+
 def test_backfill_adds_only_the_family_a_both_families_drawing_lacks(
     tmp_path: Path, registry: Path, records: Path
 ) -> None:
@@ -2334,7 +2422,7 @@ def test_the_tracked_author_rulings_load() -> None:
         assert ml.DRAWINGS_BY_NAME[name]  # a registry drawing
         assert ruling["evidence"]
     # Main, 2026-09-25: where a ruling and the class rule disagree, both review.
-    both = {name for name in rulings.drawings if rulings.both_families(name)}
+    both = {name for name in rulings.drawings if rulings.both_families_ruled(name)}
     assert both == {"counter_spring", "crank_pinion"}
 
 
