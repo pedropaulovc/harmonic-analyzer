@@ -290,9 +290,12 @@ def test_cut_end_features_are_driven_by_the_model_dimensions() -> None:
         "_check_removed(\"trim to cut length\"",
         "_break_cut_end(adapter)",
         "CUT_END_BREAK_SKETCH, CUT_END_BREAK_DIMENSION",
-        "MAJOR_RADIUS_MM - brk",
+        "assert_break_removed_metal(rim_before, rim_after, brk)",
     ):
         assert step in body, step
+    # The rim is read on the trimmed end BEFORE the break, then after it.
+    assert body.index('phase="trimmed"') < body.index("_break_cut_end(adapter)")
+    assert body.index("_break_cut_end(adapter)") < body.index('phase="broken"')
     wrapper = source.split("async def _cut_to_length", 1)[1]
     assert wrapper.index("_supplied_stock_length()") < wrapper.index("_modify_stock")
     # The trimmed tip cannot reach into what the stock carries: the cut
@@ -396,3 +399,37 @@ def test_standalone_recipe_run_is_catalog_only() -> None:
     assert "run_build(build_catalog)" in source
     assert "diag_build_40923898.py" in (recipe.__doc__ or "")
     assert "catalog-only" in (recipe.__doc__ or "")
+
+
+# The first seat leaf of part:post_mount_screw on 198071f23 (farm log
+# pms857-leaf.log, lines 310-373): stock-less-trimmed and stock-less-finished
+# as SolidWorks' mass properties read them.
+_LEAF_TRIM_REMOVED_MM3 = 67.4463
+_LEAF_TRIM_AND_BREAK_REMOVED_MM3 = 67.4189
+
+
+def test_the_break_is_below_the_volume_reads_resolution() -> None:
+    """The analytic break (~0.015 mm^3) is smaller than the leaf's own
+    mass-property residual on the trim alone, so no volume comparison can
+    prove it: that leaf read the broken screw 0.027 mm^3 LARGER."""
+    residual = abs(_LEAF_TRIM_REMOVED_MM3 - spec.TRIM_REMOVED_MM3)
+    assert spec.CUT_END_DEBURR_REMOVED_MM3 < residual / 5.0
+    assert _LEAF_TRIM_AND_BREAK_REMOVED_MM3 < _LEAF_TRIM_REMOVED_MM3
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    body = source.split("async def _modify_stock", 1)[1].split("\ndef ", 1)[0]
+    assert "finished < trimmed" not in body
+
+
+def test_break_gate_decides_on_the_rim_before_and_after() -> None:
+    """The leaf's break was right (profile r 3.075..3.675 at y -86); the gate
+    must accept it from the exact rim reads, and still reject a break that
+    cut nothing or cut the wrong depth."""
+    major, brk = spec.MAJOR_RADIUS_MM, spec.CUT_END_BREAK_MM
+    assert part.assert_break_removed_metal(major, major - brk, brk) == pytest.approx(brk)
+    with pytest.raises(RuntimeError, match="removed no metal"):
+        part.assert_break_removed_metal(major, major, brk)
+    with pytest.raises(RuntimeError, match="less the"):
+        part.assert_break_removed_metal(major, major - brk / 2.0, brk)
+    with pytest.raises(RuntimeError, match="is not the major"):
+        part.assert_break_removed_metal(major - brk, major - brk, brk)
+    assert part.RIM_TOL_MM == 1e-4

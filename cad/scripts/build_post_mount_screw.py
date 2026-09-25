@@ -110,6 +110,8 @@ TRIM_OVERRUN_MM = SHANK_DIA
 # The sweep route under-removes ~0.4% of the groove
 # (diag_mcmaster_lib.thread_sweep_cut_modern): inside 0.5% of the trim.
 TRIM_VOLUME_TOL_MM3 = 0.005 * TRIM_REMOVED_MM3
+# The end face's rim is a B-rep vertex read: exact to the kernel.
+RIM_TOL_MM = 1e-4
 
 
 @contextmanager
@@ -242,9 +244,46 @@ def _model_dimension_mm(adapter, sketch: str, dimension: str) -> float:
     return float(_early_bound(raw, "IDimension").SystemValue) * 1000.0
 
 
-def _end_face_rim_radius_mm(adapter, end_y_mm: float) -> float:
+def assert_break_removed_metal(
+    rim_before_mm: float, rim_after_mm: float, break_mm: float
+) -> float:
+    """Prove the cut-end break from the end face's rim, not from volume.
+
+    Before the break the trimmed end face reaches the thread's major radius
+    (its crest arcs); after it, the rim sits at the major radius less the
+    model's CutEndBreak.  Both reads are B-rep vertices, exact to the kernel,
+    so the gate resolves the 0.1 break that two cumulative mass-property
+    reads (0.13-0.18 mm^3 residual) cannot.  Returns how far the rim moved in.
+    """
+    if abs(rim_before_mm - MAJOR_RADIUS_MM) > RIM_TOL_MM:
+        raise RuntimeError(
+            f"trimmed end face rim radius {rim_before_mm:.5f} is not the "
+            f"major {MAJOR_RADIUS_MM}"
+        )
+    cut_in = rim_before_mm - rim_after_mm
+    if not cut_in > RIM_TOL_MM:
+        raise RuntimeError(
+            f"the cut-end break removed no metal: end face rim {rim_before_mm:.5f} "
+            f"before the break, {rim_after_mm:.5f} after"
+        )
+    if abs(rim_after_mm - (MAJOR_RADIUS_MM - break_mm)) > RIM_TOL_MM:
+        raise RuntimeError(
+            f"end face rim radius {rim_after_mm:.5f}, expected the major "
+            f"{MAJOR_RADIUS_MM} less the {break_mm} break"
+        )
+    return cut_in
+
+
+def _end_face_rim_radius_mm(adapter, end_y_mm: float, *, phase: str) -> float:
     """The largest radius on the planar end face, from its edges' vertices:
-    the 45 deg break's rim arcs are where the maximum sits."""
+    the crest arcs before the break, the 45 deg break's rim arcs after it."""
+    with _telemetry.span("cut_end.rim", phase=phase, end_y_mm=end_y_mm) as sp:
+        rim = _read_end_face_rim_radius_mm(adapter, end_y_mm)
+        sp.set_attribute("rim_mm", rim)
+        return rim
+
+
+def _read_end_face_rim_radius_mm(adapter, end_y_mm: float) -> float:
     part = _early_bound(adapter.currentModel, "IPartDoc")
     radii: list[float] = []
     faces = 0
@@ -407,6 +446,7 @@ async def _modify_stock(adapter) -> None:
     await force_rebuild(adapter)
     trimmed = await _volume_mm3(adapter)
     _check_removed("trim to cut length", stock, trimmed, TRIM_REMOVED_MM3)
+    rim_before = _end_face_rim_radius_mm(adapter, -CUT_LENGTH_MM, phase="trimmed")
     await _break_cut_end(adapter)
     await force_rebuild(adapter)
     finished = await _volume_mm3(adapter)
@@ -416,19 +456,25 @@ async def _modify_stock(adapter) -> None:
         finished,
         TRIM_REMOVED_MM3 + CUT_END_DEBURR_REMOVED_MM3,
     )
-    if not finished < trimmed:
-        raise RuntimeError("the cut-end break removed no metal")
-    # The break is too small for a volume gate to resolve (~0.015 mm^3); the
-    # end face's rim is exact: the major radius less the model's CutEndBreak.
+    # The break is too small for a volume gate to resolve: ~0.015 mm^3
+    # against a mass-properties residual of 0.13-0.18 mm^3 on this threaded
+    # body (the first seat leaf of 198071f23 read the finished screw 0.027
+    # mm^3 LARGER than the trimmed one).  The end face's rim is exact, so it
+    # proves the break on its own, before against after.
     brk = _model_dimension_mm(adapter, CUT_END_BREAK_SKETCH, CUT_END_BREAK_DIMENSION)
-    rim = _end_face_rim_radius_mm(adapter, -CUT_LENGTH_MM)
-    if abs(rim - (MAJOR_RADIUS_MM - brk)) > 1e-4:
-        raise RuntimeError(
-            f"end face rim radius {rim:.5f}, expected the major "
-            f"{MAJOR_RADIUS_MM} less the {brk} break"
-        )
+    rim_after = _end_face_rim_radius_mm(adapter, -CUT_LENGTH_MM, phase="broken")
+    with _telemetry.span(
+        "cut_end.break_proof",
+        rim_before_mm=rim_before,
+        rim_after_mm=rim_after,
+        break_mm=brk,
+        volume_delta_mm3=trimmed - finished,
+        volume_expected_mm3=CUT_END_DEBURR_REMOVED_MM3,
+    ):
+        cut_in = assert_break_removed_metal(rim_before, rim_after, brk)
     _telemetry.success(
-        f"cut end: rim radius {rim:.4f} = major less CutEndBreak {brk:g}"
+        f"cut end: rim radius {rim_before:.4f} -> {rim_after:.4f}, "
+        f"major less CutEndBreak {brk:g} (cut in {cut_in:.4f})"
     )
 
 
