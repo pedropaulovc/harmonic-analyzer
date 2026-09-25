@@ -77,6 +77,10 @@ TOOTH_THICKNESS_BAND = (0.075, -0.075)
 # places.
 BACKLASH_ACCEPTANCE_MM = (0.06, 0.38)
 CONTACT_RATIO_EXCEPTION_TEETH = (6, 12, 18, 24, 30, 36, 42)
+# The recorded range of that exception: these gears stay below it at the
+# worst case and every other gear meets it (test_cone_gear_mesh_design).  The
+# sheets state the exception in words only; the number lives here.
+CONTACT_RATIO_EXCEPTION_CEILING = 1.1
 # teeth: (tip diameter, thickest circular tooth thickness at the standard
 # pitch circle), mm.
 DEEPENED_MESH_MM: dict[int, tuple[float, float]] = {

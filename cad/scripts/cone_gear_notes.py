@@ -70,32 +70,17 @@ def gear_data(teeth: int) -> str:
 ATTACHMENT = "SOLDER, SILVER-BRAZE OR LOCTITE 638/648"
 SHAFT_MATE_NUMBER = "MHA-014"
 
-# Named rule-12 exceptions (user rulings U42 and U40, 2026-09-23), each
-# printed only on the sheets it covers: the blind review reads every other
-# sheet without it.  Rule 6 caps the notes at four lines, so T006, which
-# carries both, states them on one line.
-CONTACT_RATIO_EXCEPTION = (
-    f"CONTACT RATIO BELOW 1.1 ON T{spec.CONTACT_RATIO_EXCEPTION_TEETH[0]:03d}"
-    f"-T{spec.CONTACT_RATIO_EXCEPTION_TEETH[-1]:03d}: "
-    "ACCEPTED EXCEPTION (BOOK FIDELITY)."
+# Named exceptions (user rulings U42 and U40, 2026-09-23), each printed only
+# on the sheets it covers, in plain shop words: no rule numbers and no
+# dimensions (policy, Named exceptions).  The recorded ranges live in the spec
+# (CONTACT_RATIO_EXCEPTION_CEILING, WEB_EXCEPTIONS_MM) and its tests.  Rule 6
+# caps the notes at four lines, so T006, which carries both, states them on
+# one line.
+CONTACT_RATIO_EXCEPTION = "LOW CONTACT RATIO: ACCEPTED EXCEPTION (BOOK FIDELITY)."
+WEB_EXCEPTION = "THIN ROOT-TO-BORE WEB: ACCEPTED EXCEPTION (BOOK FIDELITY)."
+BOTH_EXCEPTIONS = (
+    "LOW CONTACT RATIO, THIN ROOT-TO-BORE WEB: ACCEPTED EXCEPTIONS (BOOK FIDELITY)."
 )
-
-
-def web_exception(teeth: int) -> str:
-    """Return the sheet line naming one gear's accepted thin web."""
-    return (
-        f"ROOT-TO-BORE WEB {spec.WEB_EXCEPTIONS_MM[teeth]:.2f} MIN: "
-        "ACCEPTED EXCEPTION (BOOK FIDELITY)."
-    )
-
-
-def both_exceptions(teeth: int) -> str:
-    """Return the one sheet line naming a gear's thin web and low CR."""
-    return (
-        "CONTACT RATIO BELOW 1.1, "
-        f"ROOT-TO-BORE WEB {spec.WEB_EXCEPTIONS_MM[teeth]:.2f} MIN: "
-        "ACCEPTED EXCEPTIONS (BOOK FIDELITY)."
-    )
 
 
 _COMMON_NOTES = (
@@ -112,9 +97,9 @@ def drawing_notes(teeth: int) -> str:
     lines = list(_COMMON_NOTES)
     low_contact_ratio = teeth in spec.CONTACT_RATIO_EXCEPTION_TEETH
     if low_contact_ratio and teeth in spec.WEB_EXCEPTIONS_MM:
-        lines.append(both_exceptions(teeth))
+        lines.append(BOTH_EXCEPTIONS)
     elif teeth in spec.WEB_EXCEPTIONS_MM:
-        lines.append(web_exception(teeth))
+        lines.append(WEB_EXCEPTION)
     elif low_contact_ratio:
         lines.append(CONTACT_RATIO_EXCEPTION)
     return "\n".join(lines)
