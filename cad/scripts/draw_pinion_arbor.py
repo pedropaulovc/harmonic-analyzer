@@ -239,9 +239,16 @@ DETAIL_KEEP = {
 # top and bottom edges), so its witnesses stay inside the circle: they used
 # to run out through it to x 0.340, reading as part of the detail callout
 # with the "A" label between them (Fable r-delta).
+# The neck's Ø10.5 block (27 mm wide, its right edge 11.5 mm right of the
+# dimension line) is wider than the 11.3 mm neck, so centred on the neck it
+# ran over the head-rear-face witness of R1a's collar-pin station (x 0.3076,
+# stacktop-dbe47ae3 layout audit).  Its line stands just ahead of the neck's
+# front shoulder (x 0.2967) instead, with short witnesses, so the block ends
+# 1.6 mm short of that witness.
+NECK_DIA_TEXT_RIGHT_FROM_LINE = 0.0115
 DIAMETER_POSITIONS = {
     "HeadDia": (0.3238, 0.192),
-    "NeckDia": (0.300, 0.194),
+    "NeckDia": (0.2945, 0.194),
 }
 DIMENSION_CALLOUTS = {
     # One name for the axial datum every station runs from (Fable m1): the

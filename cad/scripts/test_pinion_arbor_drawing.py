@@ -670,3 +670,12 @@ def test_collar_pin_dimensions_stand_above_the_shaft_clear_of_the_front_ra() -> 
     assert dia_y > station_y + 0.010
     assert dia_y > drawing.PRINCIPAL_KEEP["FrontJournalLen"][1] + 0.030
     assert min(station_y, dia_y) > axis_y
+
+
+def test_neck_diameter_text_ends_short_of_the_collar_pin_station_witness() -> None:
+    """The station's head-rear-face witness rises through the neck's text row
+    up to the station line, so the neck's Ø10.5 block must end left of it
+    (stacktop-dbe47ae3 failed its layout audit on exactly this crossing)."""
+    neck_x = drawing.DIAMETER_POSITIONS["NeckDia"][0]
+    witness_x = drawing._sheet_x(spec.HEAD_REAR_Z)
+    assert neck_x + drawing.NECK_DIA_TEXT_RIGHT_FROM_LINE < witness_x - 0.001
