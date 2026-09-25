@@ -82,10 +82,10 @@ from _common import (
     run_build,
 )
 from _assembly import (
-    _ALLOWED_FREE_STEMS,
     _export_assembly_images,
     _invalidate_massprops_proof,
     _massprops_sidecar,
+    allowed_free_stems,
     assert_components_fully_defined,
     assert_free_dof_necessity,
     assert_model_healthy,
@@ -98,6 +98,7 @@ from _assembly import (
     save_assembly_in_place,
     whats_wrong,
 )
+from _assembly_contract import assembly_contract
 from _assembly_postbuild import (
     author_dof_drives,
     load_dof_manifest,
@@ -624,84 +625,21 @@ def _assert_fresh(name: str, report: Report) -> bool:
 
 
 def _expected_free_dof(name: str) -> int:
-    """Free operational DOF expected in ``name``'s AS-SAVED model.
-
-    drive-train frees the crank spin, the cone-platform swing, the pinion
-    engage swing and the lift-rod/cam spin (4 DOF, PR8); channel frees 3 DOF
-    per active channel (rocker swing + connecting-rod follow + amplitude-bar
-    slide). Each freed DOF's drive spec is recorded in the assembly's DOF
-    manifest, never authored. Every other assembly stays fully defined (0).
-    """
-    if name == "drive-train":
-        return 4
-    if name == "channel":
-        return 3 * _config.active_count()
-    if name == "magnifier":
-        # The freed lever knife-rock + the articulated lever-wire's swing/spin;
-        # the wheel is COUPLED by the WIRE-1 yoke (no DOF of its own).
-        return 3
-    if name == "paper-drive":
-        # The freed crank (T12) spin; the knob T24 is belt-coupled and the platen
-        # is rack-coupled (no DOF of their own).
-        return 1
-    if name == "summing":
-        # The freed lever knife-edge rock; the boss-hook is lock-mated and rides it.
-        return 1
-    if name == "pen":
-        # The freed carriage travel; the marker + pen-wire are lock-mated and
-        # ride it. The F5 pen-driver equation is installed transiently by
-        # verify:kinematics on the replayed drive mate.
-        return 1
-    return 0
+    """Free operational DOF expected in ``name``'s AS-SAVED model, from its
+    contract (``free_dof`` + ``free_dof_per_active_channel`` x the active
+    channel count; cad/config/assemblies/<name>.yaml). Each freed DOF's drive
+    spec is recorded in the assembly's DOF manifest, never authored. An
+    assembly with nothing freed stays fully defined (0)."""
+    contract = assembly_contract(name)
+    per_channel = contract.free_dof_per_active_channel
+    return contract.free_dof + per_channel * _config.active_count()
 
 
-# One component family per freed DOF that must ITSELF read under-constrained
-# (assert_free_dof_necessity required_stems): the aggregate count check alone
-# cannot distinguish which DOF is free.
-_REQUIRED_FREE_STEMS = {
-    "drive-train": (
-        "crankshaft",
-        "cone-swing-platform",
-        "pinion-bracket",
-        "pinion-lift-rod",
-    ),
-    # Rocker swing + rod follow + bar amplitude, plus the channel lever which
-    # must read under-constrained WITH the chain (closed by the J5 foot-on-arc
-    # coupling off the rocker -- a frozen lever means the coupling died).
-    "channel": ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever"),
-    # Three freed DOF (lever knife-rock + wire swing/spin); the yoke-coupled
-    # wheel must read under-constrained WITH them, else the coupling died --
-    # and so must the lock-mated bracket (it AFFIXES the rod to the rocking
-    # summing bar; a regression to grounded re-creates the collar clipping,
-    # codex #201).
-    "magnifier": (
-        "magnifying-lever",
-        "magnifying-wheel",
-        "lever-wire",
-        "magnifying-bracket",
-    ),
-    # One freed DOF (the crank T12 spin). paper-drive is handled by INSTANCE, not
-    # this stem (see _required_free_instances) -- three transgear-removable siblings
-    # share the stem, so a stem check passes even if T12 is pinned and T24/T18 is
-    # loose (codex #189 :679). Kept as reference data only.
-    "paper-drive": ("transgear-removable",),
-    # One freed DOF (the lever knife-edge rock); the lock-mated boss-hook must
-    # read under-constrained WITH it (a grounded/fixed regression would freeze
-    # the counter-spring anchor while the lever still swings, codex #201).
-    "summing": ("summing-lever", "boss-hook"),
-    # One freed DOF (the carriage travel); the lock-mated carriage (v-block,
-    # marker, stirrup frame + its thumb screw) and the pen-wire must ride it --
-    # with the neutral preset the motion sweep reads got == want == 0 even if a
-    # rider were disconnected (codex #201).
-    "pen": (
-        "pen-rod",
-        "pen-marker",
-        "pen-wire",
-        "pen-v-block",
-        "pen-frame",
-        "pen-set-screw",
-    ),
-}
+def _required_free_stems(name: str) -> tuple[str, ...]:
+    """One component family per freed DOF that must ITSELF read
+    under-constrained (assert_free_dof_necessity required_stems): the aggregate
+    count check alone cannot distinguish which DOF is free. From the contract."""
+    return assembly_contract(name).required_free_stems
 
 
 def _required_free_instances(name: str) -> tuple[str, ...]:
@@ -911,7 +849,7 @@ def _run_soundness_battery(
                 ),
             )
         else:
-            stems = () if insts else _REQUIRED_FREE_STEMS.get(name, ())
+            stems = () if insts else _required_free_stems(name)
             report.gate(
                 f"{name}:dof-free-necessity",
                 lambda: assert_free_dof_necessity(
@@ -920,7 +858,7 @@ def _run_soundness_battery(
                     resolve=False,
                     required_stems=stems,
                     required_instances=insts,
-                    allowed_stems=_ALLOWED_FREE_STEMS.get(name, ()),
+                    allowed_stems=allowed_free_stems(name),
                 ),
             )
     else:
@@ -1048,7 +986,7 @@ async def _verify_static_one(
                 ),
             )
         else:
-            stems = () if insts else _REQUIRED_FREE_STEMS.get(name, ())
+            stems = () if insts else _required_free_stems(name)
             report.gate(
                 f"{name}:dof-free-necessity",
                 lambda: assert_free_dof_necessity(
@@ -1057,7 +995,7 @@ async def _verify_static_one(
                     resolve=False,
                     required_stems=stems,
                     required_instances=insts,
-                    allowed_stems=_ALLOWED_FREE_STEMS.get(name, ()),
+                    allowed_stems=allowed_free_stems(name),
                 ),
             )
     else:

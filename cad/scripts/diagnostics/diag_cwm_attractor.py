@@ -61,6 +61,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
 
 from _assembly import (  # noqa: E402
+    activate_assembly_contract,
     bore_axis_ref,
     coincident_mate,
     component_names,
@@ -71,6 +72,10 @@ from _assembly import (  # noqa: E402
     place_component,
     spin_driver,
 )
+
+# Distance drivers seed their side from channel's flip seeds
+# (cad/config/assemblies/channel.yaml), the assembly this probe mirrors.
+activate_assembly_contract("channel")
 from _assembly_postbuild import discard_open_documents  # noqa: E402
 from _common import _flag_only, check, log, run_build  # noqa: E402
 from _cwm import (  # noqa: E402
@@ -92,7 +97,7 @@ SHAFT_R = 6.35 / 2.0
 PIVOT_Y = _mid_y(0.0)  # 8.0 -- rocker pivot bore at local (0, 8)
 # Dim VALUES stay positive; the flip rule's natural side for these distance
 # refs is -Z (measured: seeding at +Z0 raised flip-seed MISS off by 2*Z0), so
-# the design frame marches -Z. Don't touch _FLIP_INVERT for a diagnostic.
+# the design frame marches -Z. Don't touch the channel flip seeds for a diagnostic.
 Z0 = 10.0  # seed station depth (shaft spans +/-101.6, stations stay inside)
 PITCH = 7.0565
 ROD_DZ = 2.5  # rod Front plane offset off the rocker's (production J2 axial)

@@ -7,7 +7,7 @@ from pathlib import Path
 import build_cone_pivot_post as part
 import cone_pivot_post_spec as spec
 import draw_cone_pivot_post as drawing
-from _assembly import _seed_flip
+from _assembly import _seed_flip, activate_assembly_contract
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -146,6 +146,7 @@ def test_part_exposes_semantic_mating_references() -> None:
 
 
 def test_rotated_post_reverses_the_cone_shaft_axial_mate_side() -> None:
+    activate_assembly_contract("drive-train")
     assert not _seed_flip("cone-shaft axial d=22.01", 22.01)
 
 

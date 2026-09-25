@@ -34,6 +34,10 @@ from typing import NamedTuple
 SCRIPTS_DIR = Path(__file__).resolve().parent
 CAD_OUT = SCRIPTS_DIR.parent / "out"
 CONFIG_DIR = SCRIPTS_DIR.parent / "config"
+# Per-assembly contracts (flip seeds, free-DOF sets): see _assembly_contract.
+ASSEMBLY_CONTRACT_DIR = CONFIG_DIR / "assemblies"
+ASSEMBLY_CONTRACT_PY = (SCRIPTS_DIR / "_assembly_contract.py").resolve()
+ASSEMBLY_CONTRACTS_TOKEN = "assemblies/*"
 REFERENCES_DIR = SCRIPTS_DIR.parent / "references"
 
 # Vendored input artefacts (DXF/DWG) a build imports at run time. A build that
@@ -1742,10 +1746,12 @@ def data_deps_of(script: Path) -> list[str]:
 # or one of four dynamic tokens -- ``"machine/*"`` (whole machine family, for a
 # dynamic subsystem), ``"parts/*"`` (whole parts registry, for the dynamic part
 # name in ``_common.part_properties``), ``"title_block"`` (title_block.yaml,
-# but only for tasks that stamp part properties), ``"**"`` (whole config, the
-# fallback). dodo.py expands these, narrowing ``"parts/*"``/``"title_block"``
-# per task: a part to its OWN row, an assembly to the rows it actually stamps
-# (see _config_deps in dodo.py).
+# but only for tasks that stamp part properties), ``"assemblies/*"`` (the
+# per-assembly contracts, for any closure reaching ``_assembly_contract``),
+# ``"**"`` (whole config, the fallback). dodo.py expands these, narrowing
+# ``"parts/*"``/``"title_block"`` per task: a part to its OWN row, an assembly
+# to the rows it actually stamps; and ``"assemblies/*"`` to an assembly's OWN
+# contract (see _config_deps in dodo.py).
 
 # Accessors that read a FIXED file (no argument resolution needed). Derived from
 # _config.py; kept in sync by test_config_accessor_coverage. Note active_count
@@ -1973,6 +1979,10 @@ def config_files_of(script: Path) -> frozenset[str]:
             tokens |= _config_tokens_in_source(src)
         except (_UnknownConfigUse, SyntaxError, OSError):
             return frozenset({"**"})  # conservative: the whole config
+    # The per-assembly contracts are read by stem at run time (the building
+    # assembly activates its own), so the closure edge IS the read-set edge.
+    if ASSEMBLY_CONTRACT_PY in sources:
+        tokens.add(ASSEMBLY_CONTRACTS_TOKEN)
     return frozenset(tokens)
 
 
@@ -1994,6 +2004,21 @@ def parts_registry_files() -> list[str]:
     expansion (dodo.py narrows this per task)."""
     d = CONFIG_DIR / "parts"
     return sorted(str(_resolved(p)) for p in d.glob("*.yaml")) if d.is_dir() else []
+
+
+def assembly_contract_file(stem: str) -> str:
+    """One assembly's contract (``stem`` dashed or underscored) -- the narrowed
+    ``"assemblies/*"`` expansion for that assembly's own tasks. Listed whether
+    or not it exists, so a missing contract fails the task loud."""
+    dashed = stem.replace("_", "-")
+    return str((ASSEMBLY_CONTRACT_DIR / f"{dashed}.yaml").resolve())
+
+
+def assembly_contract_files() -> list[str]:
+    """Every assembly contract -- the conservative ``"assemblies/*"``
+    expansion for a consumer that is not one assembly's task."""
+    d = ASSEMBLY_CONTRACT_DIR
+    return sorted(str(p.resolve()) for p in d.glob("*.yaml")) if d.is_dir() else []
 
 
 def part_row_files(dashed_name: str) -> list[str]:

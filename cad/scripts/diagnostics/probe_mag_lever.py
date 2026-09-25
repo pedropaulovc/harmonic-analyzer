@@ -15,6 +15,7 @@ from _common import (
     run_build,
 )
 from _assembly import (
+    activate_assembly_contract,
     angle_driver,
     coincident_mate,
     component_transform,
@@ -23,6 +24,10 @@ from _assembly import (
     place_component,
     world_point,
 )
+
+# Distance drivers seed their side from magnifier's flip seeds
+# (cad/config/assemblies/magnifier.yaml), the assembly this probe mirrors.
+activate_assembly_contract("magnifier")
 
 LEVER_ROD_Y = 985.0
 LEVER_ROD_Z = -85.0
