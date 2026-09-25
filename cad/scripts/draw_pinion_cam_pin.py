@@ -81,8 +81,10 @@ RIGHT_CENTER = (0.250, 0.160)
 ISO_CENTER = (0.360, 0.205)
 
 
+# r6 eye-pass: at (0.035, 0.255) the four-line callout stacked up past the
+# sheet border; below the end view it has the whole left field.
 FRONT_KEEP = {
-    "PinDia": (0.035, 0.255),
+    "PinDia": (0.060, 0.150),
 }
 # Both lengths sit LEFT of the elevation (Depth inner, the reference overall
 # outer) so the crown's radius and roughness leaders reach it from the right
@@ -223,6 +225,7 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "crown"),
         label="cam-pin crown finish",
         entity_type="SILHOUETTE",
+        char_height=0.0025,  # the pivot-block size; the default read oversized at 8:1
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.058)

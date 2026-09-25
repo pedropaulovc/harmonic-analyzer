@@ -49,6 +49,21 @@ ARBOR_BORE_BAND = REAM_SLIDE  # pinion arbor turns in it
 # 638 (U27; pinion_cam_pin_spec proves the 0.000-0.042 bond gap).
 PIN_SEAT_DIA_BAND = REAM_H7
 
+# Rule 12 (#842, U27; audit W23) worst-case web from the centred blind seat to
+# either broad face: half the thickness at its .X minus band, minus the seat's
+# upper-limit radius and the 0.05 drilled-hole allowance.  Printed from one
+# face at .XX it was 1.18; centred it clears the 2.0 target.
+THICKNESS_BAND = 0.8  # Depth prints .X
+PIN_SEAT_WEB_WORST = (
+    (THICKNESS - THICKNESS_BAND) / 2.0
+    - (PIN_BORE + PIN_SEAT_DIA_BAND[0]) / 2.0
+    - 0.05
+)
+if PIN_SEAT_WEB_WORST < 1.5:
+    raise AssertionError(
+        f"follower-seat web {PIN_SEAT_WEB_WORST:.2f} is under the 1.5 floor"
+    )
+
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_pinion_bracket`` marks exactly these; ``draw_pinion_bracket``
 # keeps exactly their union across its per-view ``keep`` maps. The offline test
@@ -62,9 +77,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "TopCapRadius",
     },
     "Strap": {"Depth"},
-    # PinSeatCz locates the blind follower seat THROUGH the bar thickness, so
-    # the seat is fully located rather than merely drawn centred.
-    "PinSeatProfile": {"PinSeatDia", "PinSeatCy", "PinSeatCz"},
+    # Rule 12 (audit W23): the seat is printed CENTRED on the bar thickness
+    # (its callout says so) instead of located by a .XX station from one face,
+    # so only the .X thickness band reaches the web -- see PIN_SEAT_WEB_WORST.
+    "PinSeatProfile": {"PinSeatDia", "PinSeatCy"},
     "PinSeat": {"PinSeatDepth"},
 }
 
@@ -90,7 +106,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "TopCapRadius": 1,
     },
     "Strap": {"Depth": 1},
-    "PinSeatProfile": {"PinSeatDia": 2, "PinSeatCy": 3, "PinSeatCz": 2},
+    "PinSeatProfile": {"PinSeatDia": 2, "PinSeatCy": 3},
     "PinSeat": {"PinSeatDepth": 1},
 }
 

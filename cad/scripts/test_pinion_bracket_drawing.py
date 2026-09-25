@@ -135,7 +135,15 @@ def test_blind_seat_dimensions_are_assigned_to_readable_views() -> None:
     # location without dimensioning hidden lines.
     assert set(drawing.SECTION_KEEP) == {"PinSeatDepth"}
     assert pinion_bracket_geometry.PIN_SEAT < pinion_bracket_geometry.WIDTH
-    assert set(drawing.LEFT_KEEP) == {"PinSeatDia", "PinSeatCy", "PinSeatCz", "Depth"}
+    assert set(drawing.LEFT_KEEP) == {"PinSeatDia", "PinSeatCy", "Depth"}
+
+
+def test_follower_seat_is_printed_centred_with_a_rule_12_web() -> None:
+    # Rule 12 (audit W23): centred on the thickness, only the .X Depth band
+    # reaches the web -- 2.04 worst case against the 2.0 target.
+    assert "CENTRED ON THICKNESS" in drawing.DIMENSION_CALLOUTS["PinSeatDia"]
+    assert "PinSeatCz" not in pinion_bracket_spec.DRAWING_PRECISION_BY_NAME
+    assert pinion_bracket_spec.PIN_SEAT_WEB_WORST >= 2.0
 
 
 

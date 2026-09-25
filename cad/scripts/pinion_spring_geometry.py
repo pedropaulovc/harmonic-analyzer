@@ -12,8 +12,10 @@ from _hole_spec import HoleSpec, blind_cut_dia_mm
 
 THICK = 0.8
 WIDTH = 4.0
-FOOT_LEN = 34.0  # foot runs under the lift rod; its screw head clears the rod flank
-# (U28: +6 for the lift rod's move from 12.5 to 18.5 off the pivot)
+FOOT_LEN = 35.4  # foot runs under the lift rod; its screw head clears the rod flank
+# (U28: +6 for the lift rod's move from 12.5 to 18.5 off the pivot; r7: +1.4 so
+# the hole moved in from the free end keeps its machine station, and with it the
+# base's transferred seat)
 R_BEND = 2.0
 R_KINK = 1.5
 KINK_DEG = 20.0
@@ -29,7 +31,13 @@ KINK_T = 18.0  # crest below the arbor cap; stays 0.9 clear of the drum tips
 FOOT_Y = 0.8
 HOLE_SPEC = HoleSpec("clearance", "#4")
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
-HOLE_FROM_END = 3.1
+HOLE_FROM_END = 4.5
+# Screw-down pad (U27 rule 11, Main's option iii): a #4 clearance centred in the
+# 4.0 strip left 0.37 side webs.  The foot's free end widens to a square pad cut
+# with the blank, so every web around the hole clears 2.0 at the worst case of
+# the printed .XX bands (test_pinion_spring_drawing).
+PAD_WIDTH = 9.5
+PAD_LEN = 9.5
 
 _TH = math.radians(BLADE_TILT_DEG)
 _U = (math.sin(_TH), math.cos(_TH))
@@ -68,3 +76,4 @@ PATH_LEN = (
 )
 _ARC_SIDE = (math.radians(KINK_DEG) + _BEND_SWEEP) * (THICK / 2.0) * THICK
 VOLUME = (PATH_LEN * THICK + _ARC_SIDE) * WIDTH
+PAD_VOLUME = (PAD_WIDTH - WIDTH) * PAD_LEN * THICK  # the wings beside the strip

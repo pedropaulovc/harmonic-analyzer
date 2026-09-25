@@ -22,11 +22,12 @@ Layout (sketch on the Front plane; the assembly seats the part at machine
 part-local -x reads machine WEST -- direction words below are MACHINE
 directions; the part is
 an exact mid-plane z-extrude, so the Ry(180)'s z-flip is immaterial):
-strip centreline path = 25.4 foot at y 0.8 pointing
+strip inside-surface path = FOOT_LEN foot at y 0.8 pointing
 WEST of the bend, r 2.0 bend (77.62 deg sweep), blade up-east at the
 strap's parked lean (BLADE_TILT_DEG) to t KINK_T along the strap axis, r 1.5 x
 20 deg WEST kink, 2.0 flat to the free tip.
-Thin mid-plane extrude, width 4.0 symmetric about z 0. The thin side is
+Thin mid-plane extrude, width 4.0 symmetric about z 0, plus a square screw
+pad (PAD_WIDTH x PAD_LEN) at the foot's free end, cut with the flat blank. The thin side is
 ONE-sided and orientation-dependent (RevThinDir 0 -- see the SolidworksMCP
 u-bracket tutorial); every assembly clearance is designed worst-case with
 the full 0.8 on either side (build_drive_train_assembly SPRING_* asserts).
@@ -45,13 +46,16 @@ import sys
 
 from _common import (
     SketchDims,
+    add_line_chain,
     anchor_point_to_origin,
     apply_material,
     check,
+    define_rectilinear_chain,
     dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -62,6 +66,7 @@ from _common import (
 )
 from _holes import blind_cut_dia_mm, wizard_holes
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -69,16 +74,18 @@ from _drawing_marks import (
 )
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_spring_spec import (
-    BEND_RADIUS_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     FLAT_LEN,
     FOOT_LEN,
-    FOOT_LENGTH_TOLERANCE_MM,
+    FORMED_DIMENSIONS,
+    FORMED_TOLERANCE_MM,
     ISOMETRIC_VIEW_NOTE,
+    PAD_LEN,
+    PAD_WIDTH,
     R_BEND,
     R_KINK,
-    KINK_RADIUS_TOLERANCE_MM,
     THICK,
     WIDTH,
 )
@@ -96,6 +103,7 @@ from pinion_spring_geometry import (
     KINK_C,
     KINK_EXIT,
     KINK_START,
+    PAD_VOLUME,
     VOLUME,
     _BLADE_LEN as _BLADE_LEN,
 )
@@ -137,6 +145,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "FlatLength", f"{FLAT_LEN}mm")
     await set_global(adapter, "StripThickness", f"{THICK}mm")
     await set_global(adapter, "StripWidth", f"{WIDTH}mm")
+    await set_global(adapter, "PadWidth", f"{PAD_WIDTH}mm")
+    await set_global(adapter, "PadLength", f"{PAD_LEN}mm")
 
     # Open centreline path: foot -> bend -> blade -> kink -> flat, endpoints
     # merged at creation. Inference OFF: the foot endpoints sit near the origin.
@@ -178,8 +188,10 @@ async def build(adapter) -> dict[str, str]:
 
     # Shape: the foot is horizontal, each arc is tangent to its neighbouring
     # line at the merged endpoint. Position: foot free end anchored to the
-    # origin, foot length, both radii, blade top anchored (the two literal
-    # tilt-dependent dims), and the flat tip's x fixing the kink sweep side.
+    # origin, foot length, both radii, then the kink start (the two literal
+    # tilt-dependent dims) and the flat tip's x, which fixes the kink sweep.
+    # The print baselines the formed profile from the foot's free end (policy
+    # rule 7), so those locations dimension from foot.start, not the origin.
     check(
         "foot horizontal", await adapter.add_sketch_constraint(foot, None, "horizontal")
     )
@@ -210,9 +222,24 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(bend, None, "radial", R_BEND),
     )
     spring.record("BendR", '"BendRadius"')
-    await anchor_point_to_origin(adapter, f"{blade}.end", *KINK_START, "kink start")
-    spring.record("KinkStartX")
-    spring.record("KinkStartY")
+    await dimension_between(
+        adapter,
+        f"{foot}.start",
+        f"{blade}.end",
+        "horizontal_distance",
+        KINK_START[0] - FOOT_END[0],
+        "kink start from the free end",
+    )
+    spring.record("KinkH")
+    await dimension_between(
+        adapter,
+        f"{foot}.start",
+        f"{blade}.end",
+        "vertical_distance",
+        KINK_START[1] - FOOT_END[1],
+        "kink start above the foot",
+    )
+    spring.record("KinkV")
     check(
         "kink radius",
         await adapter.add_sketch_dimension(kink, None, "radial", R_KINK),
@@ -225,13 +252,13 @@ async def build(adapter) -> dict[str, str]:
     spring.record("FlatLen", '"FlatLength"')
     await dimension_between(
         adapter,
+        f"{foot}.start",
         f"{flat}.end",
-        "origin",
         "horizontal_distance",
-        abs(FLAT_TIP[0]),
-        "flat tip",
+        FLAT_TIP[0] - FOOT_END[0],
+        "flat tip from the free end",
     )
-    spring.record("FlatTipX")
+    spring.record("TipH")
 
     await ensure_fully_defined(adapter, "spring sketch")
     check("exit_sketch spring", await adapter.exit_sketch())
@@ -252,7 +279,51 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Spring")
+    drive_jobs += [
+        (name_dimensions(adapter, "Spring", ["StripWidth"])[0], '"StripWidth"')
+    ]
     volume = await volume_check(adapter, "spring", VOLUME, 0.01 * VOLUME)
+
+    # Screw pad: a PAD_WIDTH x PAD_LEN square from the foot's free end,
+    # symmetric about the strip (Top-plane sketch v = -z, so the symmetric pad
+    # needs no sign), extruded the strip thickness up from the foot's underside
+    # (y 0, the gated side of the one-sided thin wall) so it merges with the
+    # foot. The volume gate proves the merge: a pad on the wrong side would add
+    # its whole footprint, not just the two wings beside the strip.
+    pad = SketchDims()
+    check("create_sketch pad", await adapter.create_sketch("Top"))
+    x0 = FOOT_END[0]
+    pad_pts = [
+        (x0, -PAD_WIDTH / 2.0),
+        (x0 + PAD_LEN, -PAD_WIDTH / 2.0),
+        (x0 + PAD_LEN, PAD_WIDTH / 2.0),
+        (x0, PAD_WIDTH / 2.0),
+    ]
+    pad_lines = await add_line_chain(adapter, pad_pts)
+    await define_rectilinear_chain(
+        adapter,
+        pad_lines,
+        pad_pts,
+        anchor=0,
+        label="pad",
+        dims=pad,
+        names=["PadLen", "PadWidth", "PadEndX", "PadEdgeZ"],
+        drives=['"PadLength"', '"PadWidth"', None, '"PadWidth" / 2'],
+    )
+    await ensure_fully_defined(adapter, "pad sketch")
+    check("exit_sketch pad", await adapter.exit_sketch())
+    name_last_feature(adapter, "PadProfile")
+    drive_jobs += pad.apply(adapter, "PadProfile")
+    check(
+        "extrude pad",
+        await adapter.create_extrusion(ExtrusionParameters(depth=THICK)),
+    )
+    name_last_feature(adapter, "Pad")
+    drive_jobs += [
+        (name_dimensions(adapter, "Pad", ["PadThk"])[0], '"StripThickness"')
+    ]
+    volume += PAD_VOLUME
+    await volume_check(adapter, "pad", volume, 0.02 * PAD_VOLUME)
 
     # Foot screw hole (PR7 item 11): ONE native Hole Wizard #4 clearance feature
     # (through-all along Y) through the foot strip near its free end, drilled
@@ -284,20 +355,18 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven spring (equations neutral)", volume, 0.01 * VOLUME
     )
 
-    # Manufacturing drawing support: mark exactly the print's dimensions and
-    # stamp the make-critical title-block properties.
-    set_dimension_symmetric_tolerance(
-        adapter, "SpringProfile", "FootLen", FOOT_LENGTH_TOLERANCE_MM
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "SpringProfile", "BendR", BEND_RADIUS_TOLERANCE_MM
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "SpringProfile", "KinkR", KINK_RADIUS_TOLERANCE_MM
-    )
+    # Manufacturing drawing support: every hand-formed feature carries the one
+    # formed band; the blank's cut features ride the title-block .XX row. The
+    # part authors the decimal places and the drawing reads them back.
+    for feature_name, dimension_names in FORMED_DIMENSIONS.items():
+        for name in sorted(dimension_names):
+            set_dimension_symmetric_tolerance(
+                adapter, feature_name, name, FORMED_TOLERANCE_MM
+            )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

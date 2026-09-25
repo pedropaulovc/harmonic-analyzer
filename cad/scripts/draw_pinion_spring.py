@@ -1,11 +1,11 @@
 r"""Create the curated machinist drawing for the pinion return leaf spring.
 
-NOT a coil spring: a bent brass leaf.  A 0.8 x 4.0 half-hard brass strip formed
-as a flat screw-down foot (31 long, with a #4 foot-screw clearance hole), an R2
-bend up to a blade following the parked strap lean, then a subtle R1.5 kink
-(~20 deg back) to a short free flat.  The profile sketches on the Front plane so
-every marked dimension (foot length, both bend radii, the flat) imports into the
-front profile view; the top view shows the 4.0-wide foot and the screw hole.
+NOT a coil spring: a bent brass leaf.  A 0.8 brass blank -- a 4.0 strip with a
+square screw pad at its free end -- formed as a flat screw-down foot, an R2 bend
+up to a blade following the parked strap lean, then a subtle R1.5 kink (~20 deg
+back) to a short free flat.  The formed profile is baselined from the foot's
+free end in the front view; the projected top view carries the blank's pad,
+strip width and hole; a 5:1 detail carries the kink.
 
 Run with SolidWorks open::
 
@@ -15,43 +15,42 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
-from pinion_spring_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_attached_note,
-    add_feature_control_frame,
+    add_edge_dimension,
     add_native_hole_callout,
     add_property_linked_note,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
+    view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from pinion_spring_geometry import (
-    BEND_EXIT,
     FLAT_TIP,
     FOOT_END,
-    FOOT_TAN,
-    FOOT_Y,
     HOLE_DIA,
     HOLE_FROM_END,
-    KINK_EXIT,
+    KINK_C,
     KINK_START,
+    PAD_WIDTH,
+    THICK,
 )
-from pinion_spring_spec import TERMINAL_CALLOUT
+from pinion_spring_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION_BY_NAME
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     auto_center_marks,
     place_view,
 )
@@ -70,38 +69,205 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (2.0, 1.0)
+_S = SHEET_SCALE[0] / 1000.0
 
-# Front view (XY): the checkmark profile -- the foot runs along the bottom, the
-# blade rises to the upper right.  Centre it on the profile's y midspan.
-FRONT_BBOX_CX = (FOOT_END[0] + max(BEND_EXIT[0], KINK_START[0], FLAT_TIP[0])) / 2.0
-FRONT_BBOX_CY = (FOOT_Y + FLAT_TIP[1]) / 2.0
-FRONT_CENTER = (0.130, 0.150)
-# Put the narrow top view in the open right-hand field, above the title block
-# and clear of the lower-left manufacturing-note band.
-TOP_CENTER = (0.300, 0.100)
-ISO_CENTER = (0.320, 0.190)
+# Front view (XY): the checkmark profile -- the foot along the bottom, the
+# blade rising to the upper right.  Views centre on their bounding boxes; the
+# profile spans the foot's free end to the blade's east face and the foot's
+# underside to the free tip.
+FRONT_BBOX_CX = (FOOT_END[0] + KINK_START[0] + THICK) / 2.0
+FRONT_BBOX_CY = (FLAT_TIP[1] + THICK) / 2.0
+FRONT_CENTER = (0.110, 0.118)
+# Third-angle projection: the top view sits ABOVE the front and shares its X
+# station (both views span the same model x range), so the pad and hole read
+# straight up from the profile's free end.
+TOP_CENTER = (FRONT_CENTER[0], 0.205)
+ISO_CENTER = (0.350, 0.150)
+DETAIL_CENTER = (0.240, 0.195)
+DETAIL_SCALE = (5, 1)
+# The kink detail's fence: centred between the kink centre and the free tip,
+# large enough to take the whole R1.5 arc and the flat.
+DETAIL_FOCUS = (
+    (KINK_C[0] + FLAT_TIP[0]) / 2.0,
+    (KINK_C[1] + FLAT_TIP[1]) / 2.0,
+)
+DETAIL_RADIUS_MM = 3.5
+DETAIL_LABEL_XY = (0.222, 0.160)
 
 
 def _front_x(model_x_mm: float) -> float:
-    return FRONT_CENTER[0] + (model_x_mm - FRONT_BBOX_CX) * SHEET_SCALE[0] / 1000.0
+    return FRONT_CENTER[0] + (model_x_mm - FRONT_BBOX_CX) * _S
 
 
 def _front_y(model_y_mm: float) -> float:
-    return FRONT_CENTER[1] + (model_y_mm - FRONT_BBOX_CY) * SHEET_SCALE[0] / 1000.0
+    return FRONT_CENTER[1] + (model_y_mm - FRONT_BBOX_CY) * _S
 
 
-_FOOT_MID_X = (FOOT_END[0] + FOOT_TAN[0]) / 2.0
+_FOOT_MID_X = (FOOT_END[0] + KINK_START[0]) / 2.0
 FRONT_KEEP = {
-    "FootLen": (_front_x(_FOOT_MID_X), 0.088),
-    "BendR": (0.036, 0.120),
-    "KinkR": (0.070, 0.215),
+    "FootLen": (_front_x(_FOOT_MID_X), 0.074),
+    "BendR": (0.172, 0.080),
+    "KinkV": (0.176, 0.120),
+    "KinkH": (_front_x(_FOOT_MID_X), 0.160),
+    "TipH": (_front_x(_FOOT_MID_X), 0.170),
 }
-TOP_KEEP: dict[str, tuple[float, float]] = {}
-DIMENSION_CALLOUTS: dict[str, str] = {
-    "FootLen": "TRUE LENGTH\nFREE END TO BEND TANGENCY",
-    "BendR": "INSIDE RADIUS",
-    "KinkR": "INSIDE RADIUS",
+TOP_KEEP = {
+    "PadLen": (_front_x(FOOT_END[0] + 4.75), 0.226),
+    "PadWidth": (0.046, TOP_CENTER[1]),
+    "StripWidth": (0.172, TOP_CENTER[1]),
 }
+DETAIL_KEEP = {
+    "KinkR": (0.278, 0.212),
+    "FlatLen": (0.278, 0.182),
+}
+DIMENSION_CALLOUTS = {
+    "FootLen": "TO BEND TANGENT",
+    "KinkH": "TO KINK TANGENT",
+    "KinkV": "TO KINK TANGENT",
+    "TipH": "TO FREE TIP",
+}
+HOLE_END_TEXT_XY = (_front_x(FOOT_END[0] + 2.25), 0.236)
+HOLE_EDGE_TEXT_XY = (0.056, TOP_CENTER[1] + 0.004)
+HOLE_CALLOUT_XY = (0.045, 0.250)
+
+
+def _kink_detail(adapter: Any, front: Any) -> Any:
+    """Enlarge the formed kink and the free flat in a native 5:1 detail."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(front, "IView")
+    if not drawing.ActivateView(view_name(adapter, front)):
+        raise RuntimeError("failed to activate kink-detail parent")
+    draw.ClearSelection2(True)
+    center = model_point_in_view(
+        adapter,
+        front,
+        (DETAIL_FOCUS[0] / 1000.0, DETAIL_FOCUS[1] / 1000.0, 0.0),
+        label="kink detail centre",
+    )
+    radius = DETAIL_RADIUS_MM * _S
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("failed to create kink-detail fence")
+    detail = drawing.CreateDetailViewAt4(
+        *DETAIL_CENTER,
+        0.0,
+        0,  # swDetViewSTANDARD
+        *DETAIL_SCALE,
+        "A",
+        1,  # swDetCircleCIRCLE
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("failed to create kink detail")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("kink detail has invalid bounds")
+    target = [
+        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position kink detail")
+    draw.EditRebuild3()
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native detail label, found {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    label_xyz = (*DETAIL_LABEL_XY, 0.0)
+    if not annotation.SetPosition2(*label_xyz):
+        raise RuntimeError("failed to position kink detail label")
+    draw.EditRebuild3()
+    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
+    if math.dist(actual, label_xyz) > 1e-8:
+        raise RuntimeError(f"kink detail label position did not persist: {actual}")
+    return detail
+
+
+def _hole_locations(adapter: Any, top: Any) -> None:
+    """Locate the pad hole from the foot's free end and the pad's lower edge.
+
+    The Hole Wizard placement sketch cannot carry a datum point (rule 7), so the
+    print dimensions the hole from the blank's own edges with driven sheet
+    dimensions picked on both features; they print at the .XX row.
+    """
+    hole_x = (FOOT_END[0] + HOLE_FROM_END) / 1000.0
+    hole_r = HOLE_DIA / 2000.0
+    top_y = THICK / 1000.0
+    edge_picks = {
+        sign: model_point_in_view(
+            adapter,
+            top,
+            (hole_x, top_y, sign * PAD_WIDTH / 2000.0),
+            label=f"pad long edge z{sign:+g}",
+        )
+        for sign in (-1.0, 1.0)
+    }
+    lower = min(edge_picks, key=lambda sign: edge_picks[sign][1])
+    locations = (
+        (
+            "hole from the foot's free end",
+            model_point_in_view(
+                adapter,
+                top,
+                (FOOT_END[0] / 1000.0, top_y, -lower * PAD_WIDTH / 4000.0),
+                label="pad free end",
+            ),
+            model_point_in_view(
+                adapter, top, (hole_x - hole_r, top_y, 0.0), label="hole west edge"
+            ),
+            HOLE_END_TEXT_XY,
+            "horizontal",
+            HOLE_FROM_END,
+        ),
+        (
+            "hole from the pad's lower edge",
+            (edge_picks[lower][0] - 0.004, edge_picks[lower][1]),
+            model_point_in_view(
+                adapter,
+                top,
+                (hole_x, top_y, lower * hole_r),
+                label="hole lower edge",
+            ),
+            HOLE_EDGE_TEXT_XY,
+            "vertical",
+            PAD_WIDTH / 2.0,
+        ),
+    )
+    for label, p0, p1, text_xy, orientation, expected in locations:
+        display = add_edge_dimension(
+            adapter,
+            top,
+            p0=p0,
+            p1=p1,
+            text_xy=text_xy,
+            label=label,
+            orientation=orientation,
+        )
+        display = _early_bound(display, "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        measured_mm = abs(float(dimension.SystemValue) * 1000.0)
+        if abs(measured_mm - expected) > 1e-5:
+            raise RuntimeError(
+                f"{label} measured {measured_mm:g}, expected {expected:g} mm"
+            )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -130,7 +296,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
         ),
     )
-    drawing_model, sheet = new_project_drawing(
+    drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
@@ -140,81 +306,69 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Pinion Return Leaf Spring Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "pinion return spring; bent brass leaf; formed strip",
+            3: "pinion return spring; bent brass leaf; formed blank",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    set_hidden_lines_removed(adapter, iso)
-    for view in (front, top):
-        set_hidden_lines_visible(adapter, view)
+    # Rule 7: nothing on this part is communicated by a hidden line -- the
+    # hole is defined by its callout -- so every view is hidden-lines-removed.
+    for view in (front, top, iso):
+        set_hidden_lines_removed(adapter, view)
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
-    if TOP_KEEP:
-        curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
-    else:
-        curate_view_dimensions(adapter, top, keep={}, view_label="top")
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    terminal_mid = (
-        (KINK_EXIT[0] + FLAT_TIP[0]) / 2.0,
-        (KINK_EXIT[1] + FLAT_TIP[1]) / 2.0,
-    )
-    add_attached_note(
         adapter,
         front,
-        text=TERMINAL_CALLOUT,
-        entity_xy=(_front_x(terminal_mid[0]), _front_y(terminal_mid[1])),
-        note_xy=(0.215, 0.215),
-        label="spring short terminal inside edge",
+        keep=FRONT_KEEP,
+        view_label="formed profile",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    top_annotations = curate_view_dimensions(
+        adapter,
+        top,
+        keep=TOP_KEEP,
+        view_label="blank top",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    detail = _kink_detail(adapter, front)
+    set_hidden_lines_removed(adapter, detail)
+    detail_annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="kink detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    annotations = [*front_annotations, *top_annotations, *detail_annotations]
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
-
-    hole_center_x = _front_x(FOOT_END[0] + HOLE_FROM_END) + (
-        TOP_CENTER[0] - FRONT_CENTER[0]
+    _hole_locations(adapter, top)
+    hole_edge = model_point_in_view(
+        adapter,
+        top,
+        (
+            (FOOT_END[0] + HOLE_FROM_END) / 1000.0,
+            THICK / 1000.0,
+            HOLE_DIA / 2000.0,
+        ),
+        label="pad hole edge",
     )
     add_native_hole_callout(
         adapter,
         top,
-        edge_xy=(hole_center_x + HOLE_DIA * SHEET_SCALE[0] / 2000.0, TOP_CENTER[1]),
-        callout_xy=(0.235, 0.135),
-        label="spring foot clearance hole",
+        edge_xy=hole_edge,
+        callout_xy=HOLE_CALLOUT_XY,
+        label="spring pad clearance hole",
+        process="DRILL",
     )
 
-    # Pick the rectangular screw-down foot face away from its hole so the
-    # leader cannot attach to the cylindrical hole wall. Flatness needs no
-    # datum reference and remains valid after the in-plane forming bends.
-    top_face = (TOP_CENTER[0] + 0.020, TOP_CENTER[1])
-    add_feature_control_frame(
-        adapter,
-        top,
-        edge_xy=top_face,
-        frame_xy=(0.305, 0.122),
-        characteristic="flatness",
-        tolerance=GEOMETRIC_TOLERANCES_MM["spring screw-down foot flatness"],
-        quantity="FOOT BROAD FACE",
-        label="spring screw-down foot flatness",
-        entity_type="FACE",
-    )
-    if add_note(adapter, "FORMED PROFILE - FRONT VIEW SCALE 2:1", 0.085, 0.078) is None:
-        raise RuntimeError("failed to label spring front view")
-    if (
-        add_note(
-            adapter,
-            "TOP VIEW - LOOKING AT SCREW-DOWN FOOT BROAD FACE - SCALE 2:1",
-            0.245,
-            0.078,
-        )
-        is None
-    ):
-        raise RuntimeError("failed to label spring top view")
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)
-    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.164)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.058)
+    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.115)
 
     return await finalize_drawing(
         adapter,

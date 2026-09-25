@@ -27,10 +27,10 @@ C2C = 28.0
 # Solving 15*cos(t) + T*sin(t) = (face + edge)/7.76 for each end's own view angle
 # (cos t = face/(15*7.76)) gives T = 9.4 front, 7.6 back.  U28 (user, 2026-09-23)
 # sets 9.0, inside that photo band: it leaves (9 - 4)/2 = 2.5 mm of web each side
-# of the O4 blind follower-stud seat, 1.59 at the printed worst case (Depth .X,
-# PinSeatCz .XX).  That is a NAMED book-fidelity exception to the 2.0 target --
-# the 2.0 target would need ~9.6, outside the photo band -- not a loosened
-# threshold; the 1.5 floor holds.
+# of the O4 blind follower-stud seat.  Rule 12 (audit W23) found 1.18 at the
+# worst case when the seat was printed from one face (Depth .X, PinSeatCz .XX);
+# it is now printed CENTRED on the thickness, which leaves 2.04 at the worst
+# case (pinion_bracket_spec.PIN_SEAT_WEB_WORST) with no exception needed.
 THICKNESS = 9.0
 PIVOT_BORE = 6.35
 ARBOR_BORE = 8.0
