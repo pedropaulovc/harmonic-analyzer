@@ -1181,3 +1181,8 @@ def test_deck_land_worst_case_is_proven_instead_of_noted() -> None:
         assert sum(stack.values()) == pytest.approx(2.35)
     # The same stack on the rejected 1.6 mm pad land would fail the 1.0 MIN.
     assert sum(part.column_socket_land_stack(1.6).values()) < part.COLUMN_SOCKET_LAND_MIN
+    # Main's rider: the Ø26.0 ceiling is a functional judgement, so the
+    # stack reports how much bore the land could still absorb.
+    assert part.COLUMN_SOCKET_BREAK_EVEN_BORE == pytest.approx(28.7)
+    rejected = part.column_socket_land_stack(1.6)
+    assert part.column_socket_break_even_bore(rejected) < part.COLUMN_SOCKET_MATCH_BORE_MAX

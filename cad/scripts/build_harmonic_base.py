@@ -646,11 +646,29 @@ COLUMN_SOCKET_LAND_STACKS = {
     "x": column_socket_land_stack(COLUMN_SOCKET_LAND_X),
     "z": column_socket_land_stack(COLUMN_SOCKET_LAND_Z),
 }
+
+
+def column_socket_break_even_bore(stack: dict[str, float]) -> float:
+    """The largest matched bore for which ``stack`` still leaves the minimum
+    land: the ceiling plus twice the stack's radial slack over the minimum.
+    It shows how far COLUMN_SOCKET_MATCH_BORE_MAX, a functional judgement
+    rather than a printed or vendor limit, sits inside what the land allows.
+    """
+    return COLUMN_SOCKET_MATCH_BORE_MAX + 2.0 * (
+        sum(stack.values()) - COLUMN_SOCKET_LAND_MIN
+    )
+
+
+COLUMN_SOCKET_BREAK_EVEN_BORE = min(
+    column_socket_break_even_bore(stack) for stack in COLUMN_SOCKET_LAND_STACKS.values()
+)
 for _axis, _stack in COLUMN_SOCKET_LAND_STACKS.items():
     if sum(_stack.values()) < COLUMN_SOCKET_LAND_MIN:
         raise AssertionError(
             f"base deck land ({_axis}), worst case: {_stack_text(_stack)} "
-            f"< {COLUMN_SOCKET_LAND_MIN}"
+            f"< {COLUMN_SOCKET_LAND_MIN}; break-even matched bore "
+            f"{column_socket_break_even_bore(_stack):.2f} is under the "
+            f"{COLUMN_SOCKET_MATCH_BORE_MAX} ceiling"
         )
 
 

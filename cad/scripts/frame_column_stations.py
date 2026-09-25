@@ -21,8 +21,10 @@ COLUMN_X = 197.0
 # actual MHA-083 tubes, not to a fixed diameter band.
 COLUMN_SOCKET_DEPTH = 25.4
 COLUMN_SOCKET_DIAMETER = 25.5
-# The largest bore a match can produce. Not a fit band and never printed: a
-# socket 0.6 over the 1.000 in tube's nominal OD rocks visibly, so no close
-# hand-slip match with no perceptible rock reaches it. It exists so the
-# casting's worst-case deck land (build_harmonic_base) has a bore to stack.
+# Functional ceiling, not a vendor tolerance, and never printed: a slip fit
+# on a 1 in tube looser than 0.6 diametral is rejected at fit-up (it rocks,
+# where the sheet asks for a close hand-slip with no perceptible rock). It
+# exists so the casting's worst-case deck land (build_harmonic_base) has a
+# bore to stack; that assert also reports the break-even bore, the largest
+# matched bore that still leaves the minimum land.
 COLUMN_SOCKET_MATCH_BORE_MAX = 26.0
