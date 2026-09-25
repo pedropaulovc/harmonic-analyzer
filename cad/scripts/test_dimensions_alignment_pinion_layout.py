@@ -13,6 +13,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import yaml
+
 import build_drive_train_assembly as dt
 import pinion_bracket_geometry as strap
 import pinion_spring_geometry as spring
@@ -20,10 +22,24 @@ import pinion_spring_geometry as spring
 DIMENSIONS = Path(__file__).resolve().parents[1] / "config" / "dimensions.yaml"
 
 
+def _strings(node: object) -> list[str]:
+    if isinstance(node, str):
+        return [node]
+    if isinstance(node, dict):
+        return [s for key, value in node.items() for s in _strings(key) + _strings(value)]
+    if isinstance(node, list):
+        return [s for item in node for s in _strings(item)]
+    return []
+
+
 def _prose() -> str:
-    """The whole record with every whitespace run collapsed, so line wraps
-    in the YAML block scalar do not split a fragment."""
-    return re.sub(r"\s+", " ", DIMENSIONS.read_text(encoding="utf-8"))
+    """Every string in the PARSED record, whitespace runs collapsed.
+
+    Parsing first means a row that breaks the YAML (an unquoted ``r7: +1.4``
+    once did, and only check:config noticed) fails here too, and quoting or
+    escaping a row can never hide or fake a fragment."""
+    record = yaml.safe_load(DIMENSIONS.read_text(encoding="utf-8"))
+    return re.sub(r"\s+", " ", " ".join(_strings(record)))
 
 
 def _mm(value: float, places: int = 3) -> str:
