@@ -26,6 +26,7 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
     model_point_in_view,
@@ -33,7 +34,6 @@ from _drawing_common import (
     read_required_properties,
     set_arc_endpoints_to_max,
     set_dimension_callouts,
-    set_dimension_precision,
     set_hidden_lines_removed,
     set_reference_dimension,
     stamp_drawing_summary,
@@ -43,10 +43,11 @@ from _surface_finish import surface_finish_by_key
 from pinion_cam_pin_spec import (
     CAP_RADIUS,
     CAP_SAG,
+    DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     PIN_DIA as PIN_DIA,
+    PIN_DIA_CALLOUT,
     PIN_LEN,
-    SEAT_NUMBER,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -97,7 +98,7 @@ RIGHT_KEEP = {
 }
 OVERALL_TEXT_XY = (0.160, 0.165)
 DIMENSION_CALLOUTS = {
-    "PinDia": f"DRILL ROD; SLIP FIT IN\n{SEAT_NUMBER} FOLLOWER SEAT",
+    "PinDia": PIN_DIA_CALLOUT,
     "Depth": "SEATED FLAT END\nTO CROWN ROOT",
     "CapR": "OUTER CROWN",
 }
@@ -198,10 +199,9 @@ async def build(adapter: Any) -> dict[str, str]:
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
-    set_dimension_callouts(
-        adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
-    )
-    set_dimension_precision(adapter, front_annotations, {"PinDia": 2})
+    annotations = [*front_annotations, *right_annotations]
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pin end view")
 

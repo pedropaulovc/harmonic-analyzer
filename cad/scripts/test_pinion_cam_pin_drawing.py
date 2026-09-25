@@ -145,3 +145,47 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["finish"]
     assert "fit_class" not in spec
     assert int(spec["quantity"]) == 2
+
+
+def test_pin_diameter_callout_names_the_title_block_stock() -> None:
+    """Codex P2 on #814: the PinDia callout said drill rod while the title
+    block said AISI 1018 rod.  Both now read the registry row, and the h9
+    bonded slip fit assumes the drill rod it names."""
+    import _config
+
+    row = _config.parts("pinion-cam-pin")
+    callout = drawing.DIMENSION_CALLOUTS["PinDia"]
+    assert callout is pinion_cam_pin_spec.PIN_DIA_CALLOUT
+    stock, fit = callout.split(";\n")
+    assert stock == row["material_specification"].upper()
+    assert "drill rod" in row["material_specification"].lower()
+    assert fit == f"SLIP FIT IN {pinion_cam_pin_spec.SEAT_NUMBER} FOLLOWER SEAT"
+    assert "drill rod" in row["process"]
+
+
+def test_the_part_owns_the_printed_precision() -> None:
+    """Codex P2 on #814: the sheet set PinDia's places itself.  The part now
+    authors every marked dimension's places and the sheet only asserts them."""
+    from _drawing_contract import (
+        PRECISION_MIGRATED_DRAWINGS,
+        drawing_specification_violations,
+    )
+
+    precision = pinion_cam_pin_spec.DRAWING_PRECISION
+    assert {
+        feature: set(names) for feature, names in precision.items()
+    } == pinion_cam_pin_spec.DRAWING_DIMENSIONS
+    assert pinion_cam_pin_spec.DRAWING_PRECISION_BY_NAME == {
+        "PinDia": 2,
+        "Depth": 2,
+        "CapR": 2,
+    }
+    build_source = Path(pin.__file__).read_text(encoding="utf-8")
+    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in build_source
+    draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert (
+        "assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)"
+        in draw_source
+    )
+    assert "draw_pinion_cam_pin.py" in PRECISION_MIGRATED_DRAWINGS
+    assert not drawing_specification_violations(draw_source, filename=drawing.__file__)

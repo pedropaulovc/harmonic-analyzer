@@ -1,9 +1,9 @@
 pinion-cam-pin:
   title: Pinion Cam Follower Pin
   number: MHA-116
-  material: AISI 1018 cold-finished steel rod
-  material_specification: AISI 1018 cold-finished steel rod
-  finish: smooth turned; protect with ISO VG 32 machine-oil film
+  material: AISI O1 drill rod
+  material_specification: AISI O1 drill rod
+  finish: as-received drill rod; crown turned; protect with ISO VG 32 machine-oil film
   quantity: 2
   tolerance_class: machined_block
-  process: "machined (steel)"
+  process: "cut from drill rod; crown turned"

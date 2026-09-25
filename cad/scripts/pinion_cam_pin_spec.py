@@ -10,6 +10,7 @@ marked-dimension map keeps the part marks and drawing keeps in lockstep
 
 from __future__ import annotations
 
+import _config
 from _fit_limits import REAM_H7
 from _gtol_spec import SphereFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -38,6 +39,28 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Pin": {"Depth"},
     "CapProfile": {"CapR"},
 }
+# Decimal places ARE the tolerance statement (policy rule 2): the h9 stock
+# band and the two +/-0.05 bands are all hundredths.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "PinProfile": {"PinDia": 2},
+    "Pin": {"Depth": 2},
+    "CapProfile": {"CapR": 2},
+}
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
+}
+if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
+    raise AssertionError("every marked dimension must state its decimal places")
+
+# The stock is the registry row's material (the title block's Material cell),
+# so the diameter callout can never name a different bar than the title block
+# (Codex P2 on #814).  The h9 slip fit above assumes that drill rod.
+STOCK = _config.parts("pinion-cam-pin")["material"]
+if "drill rod" not in STOCK.lower():
+    raise AssertionError(f"the h9 bonded slip fit assumes drill rod, not {STOCK!r}")
+PIN_DIA_CALLOUT = f"{STOCK.upper()};\nSLIP FIT IN {SEAT_NUMBER} FOLLOWER SEAT"
 
 # Rule 5: the crown is the surface that runs (it rides the cam OD); the
 # bonded shank is a static seat and carries no symbol.
