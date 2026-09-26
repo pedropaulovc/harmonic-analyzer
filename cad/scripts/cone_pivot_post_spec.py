@@ -154,7 +154,7 @@ JOURNAL_REFERENCE_Z = JOURNAL_REFERENCE_LENGTH * math.cos(math.radians(INCLINE_D
 CRANK_BOSS_NEAR_Z = abs(CRANK_BOSS_START_Z)
 
 SURFACE_FINISHES = (
-    # The post is a casting that may be left as-cast everywhere else; the three
+    # The post is a casting that may be left as-cast everywhere else; the
     # faces that MUST be cut say so on the face (the title block's surface row
     # is the process statement "CAST/MACHINED", not a grade).
     SurfaceFinishControl("foot_seat", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
@@ -167,6 +167,21 @@ SURFACE_FINISHES = (
         "journal_bore",
         MACHINED_UM,
         CylinderFace(BORE_DIA, contains_y_mm=BORE_HEIGHT),
+    ),
+    # The cone shaft's thrust collar runs on the north cone-boss end face
+    # (#914), so it is a running face.  Part-local normal: Ry(180) maps it to
+    # machine +Z, the direction cone stations grow toward the gears.
+    SurfaceFinishControl(
+        "cone_boss_north_face",
+        MACHINED_UM,
+        PlanarFace(
+            (
+                -math.sin(math.radians(INCLINE_DEG)),
+                0.0,
+                -math.cos(math.radians(INCLINE_DEG)),
+            ),
+            CONE_BOSS_LENGTH / 2.0,
+        ),
     ),
 )
 
