@@ -241,6 +241,7 @@ if abs(Z0 - CHANNEL_Z0) > 1e-9:
         f"channels.station_z0_mm {Z0:g} != installation contract {CHANNEL_Z0:g}"
     )
 from rocker_bank_layout import ARM_MID_DZ  # noqa: E402  (arm/bar/lever mid-planes at z_j + 0.8)
+
 # End-for-end cylinder gear: the cam / rod-ring mid-plane sits half the gear's
 # overall (stacking) thickness south of z_j, centred in the closed rod slot
 # between gear j's web and gear j-1's back face (#743 solid stack).
@@ -325,9 +326,13 @@ from pivot_shaft_spec import JOURNAL_LENGTH as _PIVOT_JOURNAL  # noqa: E402
 # The pivot shaft's origin is its NORTH cylinder end (its body runs -Z).
 PIVOT_SHAFT_Z = PIVOT_SHAFT_NORTH_Z
 if abs(_STACK_MID_Z - (Z0 + ARM_MID_DZ + 19 * PITCH / 2.0)) > 1e-9:
-    raise AssertionError("rocker_bank_layout's stack mid-plane is not the channel stations'")
+    raise AssertionError(
+        "rocker_bank_layout's stack mid-plane is not the channel stations'"
+    )
 if any(abs(hub_mid_z(j) - (Z0 + PITCH * j + ARM_MID_DZ)) > 1e-9 for j in (0, 19)):
-    raise AssertionError("rocker_bank_layout's hub stations are not the channel stations")
+    raise AssertionError(
+        "rocker_bank_layout's hub stations are not the channel stations"
+    )
 # The shaft is the fixed seed, so a wrong origin would fail silently.
 if abs(PIVOT_SHAFT_Z - _PIVOT_JOURNAL - SHOULDER_Z[1]) > 1e-9:
     raise AssertionError("pivot shaft shoulder is not on the north ear's inner face")
@@ -338,9 +343,13 @@ from rocker_arm_spec import HUB_LENGTH as _ROCKER_HUB_LENGTH  # noqa: E402
 from rocker_thrust_washer_spec import THICKNESS as _WASHER_THICK  # noqa: E402
 
 if abs(SOUTH_WASHER_Z[1] - SOUTH_WASHER_Z[0] - _WASHER_THICK) > 1e-9:
-    raise AssertionError("south thrust washer is not rocker_thrust_washer_spec's thickness")
+    raise AssertionError(
+        "south thrust washer is not rocker_thrust_washer_spec's thickness"
+    )
 if abs(SOUTH_WASHER_Z[1] - (hub_mid_z(0) - _ROCKER_HUB_LENGTH / 2.0)) > 1e-9:
-    raise AssertionError("south thrust washer's north face is not on hub 0's south face")
+    raise AssertionError(
+        "south thrust washer's north face is not on hub 0's south face"
+    )
 RAIL_TOP_Y = 1036.2  # new top-frame casting top face (was 1040.7; the rederive
 # dropped the rail top 4.5 -- the ball-mount seats and the whole fulcrum chain
 # follow)
