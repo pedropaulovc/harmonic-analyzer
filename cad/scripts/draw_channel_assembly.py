@@ -24,8 +24,10 @@ from _drawing_common import (
     read_required_properties,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from pivot_shaft_spec import DOME_HEIGHT
 from rocker_bank_layout import (
     COUNT,
+    PLAIN_END_CUT_BAND,
     ROCKER_END_FEELER,
     ROCKER_END_PLAY,
     STACK_L20_ACCEPT,
@@ -69,6 +71,12 @@ def _fitup_steps() -> str:
     play_low, play_high = ROCKER_END_PLAY
     stack_low, stack_high = STACK_L20_ACCEPT
     feeler_step = steps.step_number("south-bracket-feeler-set")
+    # The pivot shaft is supplied long, its plain end uncut (pivot_shaft_spec):
+    # the cylinder ends PLAIN_END_CUT_BAND past the south ear's outer face and
+    # the dome stands DOME_HEIGHT beyond that, so the saw cut sits that far
+    # past a scribe on the ear face. The shoulder cannot pass either ear or a
+    # hub bore, so the shaft comes out only with the south bracket off.
+    cut_low, cut_high = (DOME_HEIGHT + band for band in reversed(PLAIN_END_CUT_BAND))
     text = {
         "rocker-stack-accepted": (
             f"STACK THE {COUNT} {arm} ROCKERS ON THE {shaft} SHAFT, HUB {last} "
@@ -86,6 +94,16 @@ def _fitup_steps() -> str:
             "BETWEEN THE WASHER AND ITS EAR, BANK PUSHED NORTH. CLAMP IT, "
             f"TRANSFER ITS SEATS INTO THE {support} RAIL, SCREW IT DOWN AT THE "
             "FEELER, THEN PULL THE FEELER."
+        ),
+        "shaft-cut-to-fit": (
+            f"SHOULDER PUSHED NORTH, SCRIBE THE {shaft} SHAFT AT THE SOUTH "
+            f"EAR'S OUTER FACE. UNSCREW THE SOUTH {bracket} AND SLIDE IT AND "
+            "THE WASHER OFF; DRAW THE "
+            "SHAFT AND ROCKERS SOUTH OUT OF THE NORTH EAR AND SLIDE THE "
+            f"ROCKERS OFF IN ORDER. CUT THE PLAIN END {cut_low:.1f} TO "
+            f"{cut_high:.1f} PAST THE SCRIBE AND DOME IT {DOME_HEIGHT:.1f} "
+            f"(SEE {shaft}). REFIT IN REVERSE ORDER; SCREW THE SOUTH {bracket} "
+            f"DOWN AT THE FEELER AS STEP {feeler_step}."
         ),
         "end-play-accepted": (
             f"ACCEPT: BANK END PLAY {play_low:.2f} TO {play_high:.2f} BY "

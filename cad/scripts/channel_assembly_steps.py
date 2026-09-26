@@ -22,6 +22,7 @@ SEQUENCE: tuple[str, ...] = (
     "north-ear-datum",
     "south-washer-fitted",
     "south-bracket-feeler-set",
+    "shaft-cut-to-fit",
     "end-play-accepted",
 )
 
