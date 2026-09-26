@@ -1583,8 +1583,12 @@ def test_drive_train_screw_keeps_1_5d_past_the_far_wall() -> None:
 
 
 def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
-    """The hardware follows the ruling: 91794A112 everywhere, 15.875 under
-    the head, and the BOM says stainless over steel is fine here."""
+    """The hardware follows the ruling: 91794A112 everywhere and 15.875 under
+    the head.  The stainless-over-steel (galvanic) choice is design
+    rationale, not a machinist instruction: the material rides the title
+    block and the purchased-part ID, so the installation note no longer
+    restates it.  The sentence was deleted per the codex machinist review
+    of MHA-098 and Main's ruling (a)."""
     import _config
     from _fastener_catalog import fastener
     from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
@@ -1592,9 +1596,10 @@ def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
     config = _config.parts("cone-tip-pinch-screw")
     assert config["supplier_skus"] == ["91794A112"]
     assert "18-8 stainless" in config["material"]
-    assert "STAINLESS OVER\nSTEEL IS FINE FOR THIS #4-40 PINCH SCREW" in (
-        config["installation_notes"]
-    )
+    notes = config["installation_notes"].upper()
+    assert "STAINLESS" not in notes
+    assert "18-8" not in notes
+    assert " STEEL" not in notes
     assert fastener("cone-tip-pinch-screw").skus == ("91794A112",)
     assert fastener("cone-tip-pinch-screw").material == "AISI 304"
     assert FILLISTER_SIZES["91794A112"][1] == cone_tip_block_spec.PINCH_SCREW_LENGTH

@@ -4,14 +4,15 @@ cone-tip-pinch-screw:
   stock_name: 18-8 Stainless Steel Fillister Head Slotted Screw
   supplier: McMaster-Carr
   supplier_skus: [91794A112]
+  # 18-8 stainless over steel: design ruling on galvanic acceptability for the
+  # #4-40 pinch; rationale, not a sheet note.
   material: 18-8 stainless steel
   material_specification: 18-8 stainless steel, McMaster-Carr 91794A112 (#4-40 x 5/8 in)
   finish: plain
   installation_notes: |-
     INSTALLATION - CONE TIP BLOCK MHA-092 PINCH
     HEAD ON THE CLEARANCE-HOLE JAW; THREADS
-    INTO THE FAR JAW ONLY. 18-8 STAINLESS OVER
-    STEEL IS FINE FOR THIS #4-40 PINCH SCREW.
+    INTO THE FAR JAW ONLY.
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
