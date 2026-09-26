@@ -64,10 +64,13 @@ from __future__ import annotations
 
 import math
 import sys
+from typing import Any
 
+import _telemetry
 from _common import (
     IN,
     SketchDims,
+    _early_bound,
     apply_material,
     name_bore_axis,
     check,
@@ -138,7 +141,9 @@ async def build(adapter) -> dict[str, str]:
     # to inches by the pure-data spec). The end stations are extrude DEPTHS
     # (feature parameters); each is named Sec{i}End and driven by its SecEnd{i}
     # global below, so the knobs really reshape the shaft AND the stations are
-    # markable manufacturing dimensions for the drawing.
+    # markable manufacturing dimensions for the drawing. A land sketched on its
+    # own offset plane has that plane's offset driven by the same SecEnd{i}, so
+    # the knob moves the shoulder and the depth back to the large end together.
     for i, (dia_in, end_z) in enumerate(SECTIONS):
         await set_global(adapter, f"SecDia{i}", f"{dia_in * IN}mm")
         await set_global(adapter, f"SecEnd{i}", f"{end_z}mm")
@@ -175,6 +180,8 @@ async def build(adapter) -> dict[str, str]:
             )
             plane_name = f"Sec{i}EndPlane"
             name_last_feature(adapter, plane_name)
+            plane_dim = name_dimensions(adapter, plane_name, [f"Sec{i}Station"])
+            drive_jobs += [(plane_dim[0], f'"SecEnd{i}"')]
         # On-axis circle (centre at the origin): define_circle records ONLY the
         # diameter dim (the X/Z centre slots are relations, not display dims).
         sec = SketchDims()
@@ -237,6 +244,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven cone-gear shaft (equations neutral)", volume, 0.005 * volume
     )
+    _assert_shoulder_planes_single_owned(adapter)
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train).
@@ -264,6 +272,95 @@ async def build(adapter) -> dict[str, str]:
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     return await save_part_and_images(adapter, PART_NAME)
+
+
+def _equations_for(adapter: Any, lhs: str) -> list[str]:
+    """Every equation whose left-hand side is exactly ``lhs``."""
+    from solidworks_mcp.adapters.solidworks.parametrics import (
+        _equation_manager,
+        _read_member,
+    )
+
+    manager = _equation_manager(adapter)
+    matches = []
+    for index in range(int(_read_member(manager, "GetCount") or 0)):
+        text = str(manager.Equation(index) or "")
+        if text.partition("=")[0].strip() == lhs:
+            matches.append(text)
+    return matches
+
+
+# A linear global keeps 8 document (inch) places: 5e-9 in, 1.3e-7 mm.
+_STATION_TOLERANCE_MM = 1e-6
+
+
+@_telemetry.traced("dim.shoulder_plane_ownership")
+def _assert_shoulder_planes_single_owned(adapter: Any) -> None:
+    """After the deferred equations and the final rebuild.
+
+    SecEnd{i} must be the ONE owner of both the offset plane land i is
+    sketched on and that land's depth back to the large end (Codex #839).  An
+    equation-owned dimension reads DrivenState 1 (driven), never 2, so the gate
+    is single ownership, checked on the plane AND the depth alike: SecEnd{i}
+    is defined once; each dimension has exactly one equation, whose
+    right-hand side is SecEnd{i}; both read the same DrivenState; neither is a
+    reference dimension; and both still read the as-built station (the drive
+    is neutral) to the global's 8 inch places.  Each reading is logged, so the
+    leaf log is the evidence.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    problems: list[str] = []
+    for i, (_dia_in, end_z) in enumerate(SECTIONS):
+        if i == 0:
+            continue
+        owner = f'"SecEnd{i}"'
+        globals_ = _equations_for(adapter, owner)
+        _telemetry.info(f"shoulder plane ownership SecEnd{i} definition {globals_}")
+        if len(globals_) != 1:
+            problems.append(f"SecEnd{i}: expected one definition, found {globals_}")
+        states = {}
+        for name in (f"Sec{i}Station@Sec{i}EndPlane", f"Sec{i}End@Sec{i}"):
+            problems += _single_owner_problems(model, adapter, name, owner, end_z)
+            dimension = model.Parameter(name)
+            if dimension is not None:
+                states[name] = int(_early_bound(dimension, "IDimension").DrivenState)
+        if len(set(states.values())) > 1:
+            problems.append(f"SecEnd{i}: plane and depth DrivenState differ {states}")
+    if problems:
+        raise RuntimeError("SecEnd ownership: " + "; ".join(problems))
+    _telemetry.success(f"SecEnd owns {len(SECTIONS) - 1} shoulder planes and depths")
+
+
+def _single_owner_problems(
+    model: Any, adapter: Any, name: str, owner: str, end_z: float
+) -> list[str]:
+    """Why ``name`` is not singly owned by ``owner`` at ``end_z`` (empty if it is)."""
+    dimension = model.Parameter(name)
+    if dimension is None:
+        return [f"{name} not found"]
+    dimension = _early_bound(dimension, "IDimension")
+    equations = _equations_for(adapter, f'"{name}"')
+    evidence = {
+        "dimension": name,
+        "equations": equations,
+        "driven_state": int(dimension.DrivenState),
+        "is_reference": bool(dimension.IsReference()),
+        "value_mm": 1000.0 * float(dimension.SystemValue),
+        "station_mm": end_z,
+    }
+    _telemetry.info(f"shoulder plane ownership {evidence}")
+    problems = []
+    if len(equations) != 1:
+        problems.append(f"{name}: expected one equation, found {equations}")
+    elif equations[0].partition("=")[2].strip() != owner:
+        problems.append(f"{name}: owned by {equations[0]!r}, not {owner}")
+    if evidence["is_reference"]:
+        problems.append(f"{name}: became a reference dimension")
+    if abs(evidence["value_mm"] - end_z) > _STATION_TOLERANCE_MM:
+        problems.append(
+            f"{name}: reads {evidence['value_mm']:.9f} mm, {owner} is {end_z}"
+        )
+    return problems
 
 
 if __name__ == "__main__":

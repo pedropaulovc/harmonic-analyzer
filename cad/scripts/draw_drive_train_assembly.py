@@ -287,7 +287,7 @@ BOM_DESCRIPTIONS = {
     "cone-tip-block": "CONE TIP BLOCK",
     "cone-tip-bushing": "CONE TIP BUSHING",
     "cone-tip-adjuster": "CUP-TIP SET SCREW, MCMASTER 94025A164",
-    "cone-tip-pinch-screw": "#4-40 FILLISTER SCREW, MCMASTER 90280A110",
+    "cone-tip-pinch-screw": "#4-40 FILLISTER SCREW, MCMASTER 91794A112",
     "cone-lock-knob": "KNURLED THUMB SCREW, MCMASTER 91882A425",
     "cone-pivot-screw": "SHOULDER SCREW, MCMASTER 91829A560",
     "swing-stop-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A199",

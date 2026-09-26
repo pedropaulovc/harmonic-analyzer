@@ -1,0 +1,13 @@
+cone-tip-block-nut:
+  title: Cone Tip Block Hold-Down Nut
+  number: MHA-146
+  stock_name: Zinc-Plated Steel Nylon-Insert Locknut
+  supplier: McMaster-Carr
+  supplier_skus: [90631A007]
+  material: Plain Carbon Steel
+  material_specification: Zinc-plated steel with nylon insert, McMaster-Carr 90631A007
+  finish: zinc plated
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

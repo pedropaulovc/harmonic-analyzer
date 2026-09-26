@@ -280,7 +280,9 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
 
 Accepted shortfalls against rule 12. Each is specific to the parts named; it
 is not precedent for anything else. Every sheet a row affects should state
-the exception itself; the table is the backstop. The blind reviewer sees only the sheets,
+the exception itself; the table is the backstop. A sheet states it as a plain
+manufacturing fact, the shortfall and its value, and never cites a rule
+number, a ruling id, or the words EXCEPTION, ACCEPTED, RULING or POLICY. The blind reviewer sees only the sheets,
 so it reports a row's shortfall as a blocker unless the package itself states
 the exception. A blocker that matches a row (same parts, shortfall within the
 recorded range) is recorded against that row by the person running the gate

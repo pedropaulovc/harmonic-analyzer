@@ -105,21 +105,28 @@ _CRANK_PIN_ARM_MM3 = _pin_overlap(_ARM_S0, _BORE_S0, _ARM_PILOT) + _pin_overlap(
 _CRANK_PIN_SHAFT_MM3 = _pin_overlap(_CS_S0, _CS_S1, _CS_PILOT)
 
 # Independent SolidWorks-kernel observations for the exact stock bodies in
-# their production receivers.  The 90280A108's modeled helical thread and
-# under-head runout overlapped the native #4-40 far jaw by 6.47 mm3 over its
-# 2.625 of far-jaw engagement; the cup-tip adjuster makes its intended thrust
-# contact with the shaft end at 0.13 mm3.  That is the 45 deg cup's analytic
-# (2/3)*pi*r^3 for the 0.79 stub (0.131); rule-12 E11's 94025A164 cup is also
-# 45 deg (vendor Sketch2).  The 1/16 in tip land doubles the stub radius, so
-# the contact scales by r^3: 0.13 * 8 = 1.04 (analytic 1.047) until the next
-# drive-train build re-observes it.  Rule-12 E1 lengthened the pinch
-# screw to the 12.7 90280A110 (5.80 in the far jaw), so its limit scales that
-# observation by engagement -- an over-estimate, since the runout share does
-# not grow -- until the next drive-train build re-observes it.  Ten-percent
-# bounded headroom still fails any materially deeper insertion.
-# 6.47 * 5.80 / 2.625 = 14.296, rounded up.
-_TIP_PINCH_OBSERVED_MM3 = 14.30
+# their production receivers, each with ten-percent bounded headroom so any
+# materially deeper insertion fails.  The cup-tip adjuster makes its intended
+# thrust contact with the shaft end at 0.13 mm3: the 45 deg cup's analytic
+# (2/3)*pi*r^3 for the 0.79 stub (0.131), re-read at 0.1309 by the
+# mha092-r3-8b1b drive-train leaf on rule-12 E11's 94025A164.  The 1/16 in
+# tip land doubles the stub radius, so the contact scales by r^3: 0.13 * 8 =
+# 1.04 (analytic 1.047) until the next drive-train build re-observes it.
+#
+# The tip block's two threaded pairs were read by that same leaf (8b1bdef31,
+# farm run 20260925T225229777Z; assembly:drive_train log line 333/335,
+# verify_soundness:drive_train line 115/117):
+# - 91794A112 pinch screw (15.875, 17-wide block): 7.8008 mm3.  It replaces
+#   the analytic 22.78 (6.47 read on the 14-wide block, scaled by far-jaw
+#   length), which ran 2.9x high: the per-length scaling does not hold.
+# - 94025A164 adjuster (#10-32, 9.5 embed): 16.4412 mm3 over its 13 thread
+#   bodies.  It replaces the smooth-annulus bound (major 4.826 in the #21
+#   4.0386 drill, 9.5 deep: 57.29), 3.5x the reading, loose enough to hide a
+#   regression.
+_TIP_PINCH_OBSERVED_MM3 = 7.8008
 _TIP_PINCH_GATE_LIMIT_MM3 = _TIP_PINCH_OBSERVED_MM3 * 1.10
+_TIP_ADJUSTER_OBSERVED_MM3 = 16.4412
+_TIP_ADJUSTER_GATE_LIMIT_MM3 = _TIP_ADJUSTER_OBSERVED_MM3 * 1.10
 _ADJUSTER_THRUST_GATE_LIMIT_MM3 = 0.13 * 8.0 * 1.10
 
 _DRIVE_TRAIN_ALLOWED_PAIRS = {
@@ -129,11 +136,10 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(("fillister-screw-1", "crank-arm-1")): _smooth_annulus_limit_mm3(
         2.8448, 2.261, 5.33
     ),
-    # Rule-12 E11: #10-32 94025A164 (major 4.826) in the #21 (4.0386) tap
-    # drill, ADJUSTER_EMBED 9.5 deep.
-    frozenset(("cone-tip-adjuster-1", "cone-tip-block-1")): _smooth_annulus_limit_mm3(
-        4.826, 4.0386, 9.5
-    ),
+    # Rule-12 E11: #10-32 94025A164 in the tapped block, observed above.
+    frozenset(
+        ("cone-tip-adjuster-1", "cone-tip-block-1")
+    ): _TIP_ADJUSTER_GATE_LIMIT_MM3,
     frozenset(
         ("cone-tip-pinch-screw-1", "cone-tip-block-1")
     ): _TIP_PINCH_GATE_LIMIT_MM3,
