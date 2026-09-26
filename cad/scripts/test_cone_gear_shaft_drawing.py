@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import _config
@@ -456,6 +457,11 @@ def test_part_stamps_make_critical_properties() -> None:
     config = _config.parts("cone-gear-shaft")
     assert "1018" in str(config["material_specification"])
     assert "1018" in str(config["material"])
+    # The MATERIAL cell holds one line and names the material only; the 5/8
+    # bar is not used as supplied (the collar is turned down from it), so its
+    # size stays in cone_gear_shaft_spec (STOCK_DIA), off the title block.
+    for field in ("material", "material_specification"):
+        assert not re.search(r"\d+/\d+|\bin\b|\bround\b", str(config[field])), field
     assert config["finish"]
     assert int(config["quantity"]) == 1
 
@@ -650,7 +656,6 @@ def test_collar_bears_on_the_boss_annulus_and_turns_from_five_eighths_bar() -> N
     assert spec.STOCK_DIA == pytest.approx(0.625 * 25.4)
     assert spec.STOCK_DIA - spec.COLLAR_DIA >= 0.8
     assert max(spec.SECTION_DIAS) < spec.COLLAR_DIA
-    assert "5/8" in str(_config.parts("cone-gear-shaft")["material"])
 
 
 def _stubbed_build(monkeypatch):
