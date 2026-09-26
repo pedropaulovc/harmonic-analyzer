@@ -1185,7 +1185,7 @@ def _registered_leaders(annotation: Mapping[str, Any]) -> list[Segment]:
     return segments
 
 
-def _classify(
+def classify_segments(
     kind: str,
     annotation: Mapping[str, Any],
     segments: list[Segment],
@@ -1276,7 +1276,7 @@ def annotation_geometry(
     # A plain dimension's text sits on its own DIMENSION line; only a callout
     # (hole callout, leadered note) has a shoulder under its text.
     shoulders = _shoulders(segments, items) if kind in ("hole-callout", "note") else []
-    segments = _classify(kind, annotation, segments, shoulders)
+    segments = classify_segments(kind, annotation, segments, shoulders)
     tails: list[Segment] = []
     if kind == "dim":
         segments = _split_dimension_lines(segments, display.get("arrows", ()))

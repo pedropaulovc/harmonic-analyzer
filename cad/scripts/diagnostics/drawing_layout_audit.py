@@ -127,6 +127,7 @@ from _layout_geometry import (  # noqa: E402
     estimate_text_box,
     format_findings,
 )
+from _layout_audit import classify_segments as classify_callout_segments  # noqa: E402
 
 # swAnnotationType_e (enums/swAnnotationType_e.md)
 _ANNOT_DATUM = 2
@@ -374,7 +375,9 @@ def _display_text_boxes(
     return boxes, samples
 
 
-def _classify_segments(segments: list[Segment], text_boxes: list[Box]) -> list[Segment]:
+def _classify_segments(
+    segments: list[Segment], text_boxes: list[Box], *, hole_callout: bool = False
+) -> list[Segment]:
     """Mark the runs that reach the annotation's own text as its LEADER.
 
     ``IDisplayData`` does not label a line's purpose, and the leader is the one
@@ -383,7 +386,17 @@ def _classify_segments(segments: list[Segment], text_boxes: list[Box]) -> list[S
     leader is what touches the text.  With no text box -- a bare centre mark,
     a symbol-only annotation -- nothing is promoted, so no phantom leader is
     fed to the crossing audit.
+
+    A hole callout is not classified here: the attach run from the rim to
+    the shelf need not touch the text (MHA-091 RD1's did not, so a leader
+    crossing it went unreported; swing, #902 case 2), and the shared audit
+    already owns that rule (``_layout_audit.classify_segments``: every line
+    is leader).  This audit has no shoulder role, so the shelf stays leader.
     """
+    if hole_callout:
+        return classify_callout_segments(
+            "hole-callout", {"dim": {"hole_callout": True}}, segments, ()
+        )
     if not text_boxes:
         return segments
     grown = [
@@ -435,6 +448,14 @@ def _registered_leader_segments(adapter: Any, annotation: Any) -> list[Segment]:
                 Segment(start[0], start[1], end[0], end[1], _LEADER_ROLE)
             )
     return segments
+
+
+def _is_hole_callout(adapter: Any, annotation: Any) -> bool:
+    """``IDisplayDimension::IsHoleCallout`` for a dimension annotation."""
+    display = _bind(
+        _attempt(adapter, lambda: annotation.GetSpecificAnnotation()), "IDisplayDimension"
+    )
+    return display is not None and bool(_get(adapter, display, "IsHoleCallout", False))
 
 
 def _note_box(adapter: Any, annotation: Any) -> Box | None:
@@ -561,7 +582,11 @@ def _annotation_geometry(
         # the border and keep-out audits rather than vanishing from them.
         text_boxes = [Box(anchor[0], anchor[1], anchor[0], anchor[1])]
 
-    segments = _classify_segments(segments, text_boxes)
+    segments = _classify_segments(
+        segments,
+        text_boxes,
+        hole_callout=kind_code == _ANNOT_DIM and _is_hole_callout(adapter, annotation),
+    )
     segments.extend(_registered_leader_segments(adapter, annotation))
 
     return (
