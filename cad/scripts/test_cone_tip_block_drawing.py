@@ -536,7 +536,13 @@ _R3_RETIRED = frozenset({"FlangeSlotZ", "FlangeSlotCtoC"})
 # Where the adjuster callout, its ADJUSTER ENTRY name and the right-hand view
 # row stood from I31's round 1 (287c) to 9a0f50b1c, before #946 derived them
 # from the hole: the callout below-right of the hole, its name over it, the
-# right view at 0.171.
+# right view at 0.171 and section A-A at 0.190.
+_RD1_ENTRY_DX = """ADJUSTER_ENTRY_DX = _ADJUSTER_SHOULDER_DX + (
+    ADJUSTER_CALLOUT_EXTENT[0] + ADJUSTER_CALLOUT_EXTENT[2] - ADJUSTER_ENTRY_EXTENT[2]
+) / 2.0"""
+_RD1_ENTRY_Y = (
+    "ADJUSTER_ENTRY_Y = _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH, FRONT_CENTER) - ADJUSTER_FLOOR_GAP"
+)
 _RD1_PLACEMENT = {
     "RIGHT_CENTER = (_RIGHT_NORTH_FACE_X + (Z_NORTH - Z_MID) * _S,": "RIGHT_CENTER = (0.171,",
     "LEFT_CENTER = (RIGHT_CENTER[0] + VIEW_ROW_PITCH,": "LEFT_CENTER = (0.243,",
@@ -547,10 +553,10 @@ _RD1_PLACEMENT = {
     "ADJUSTER_CALLOUT_Y = ADJUSTER_SHOULDER_Y + ADJUSTER_CALLOUT_EXTENT[1]": (
         "ADJUSTER_CALLOUT_Y = 0.121"
     ),
-    "ADJUSTER_ENTRY_DX = _ADJUSTER_SHOULDER_DX": "ADJUSTER_ENTRY_DX = 0.023",
-    "ADJUSTER_ENTRY_Y = ADJUSTER_SHOULDER_Y - TEXT_CLEARANCE - ROUND_OUT": (
-        "ADJUSTER_ENTRY_Y = ADJUSTER_CALLOUT_Y + 0.0135"
-    ),
+    _RD1_ENTRY_DX: "ADJUSTER_ENTRY_DX = 0.023",
+    # The name stood 13.5 mm over the callout's point.
+    _RD1_ENTRY_Y: "ADJUSTER_ENTRY_Y = 0.121 + 0.0135",
+    "SECTION_CENTER = (RIGHT_CENTER[0] + 0.019,": "SECTION_CENTER = (0.190,",
 }
 # What the 287c sheet commanded at 287c5cf6a, expressed against today's
 # module: the r3 lines that replaced a 287c placement map back to it, the
@@ -603,6 +609,7 @@ _I31_PLACEMENT = {
     "ADJUSTER_CALLOUT_Y = ADJUSTER_SHOULDER_Y + ADJUSTER_CALLOUT_EXTENT[1]": (
         "ADJUSTER_CALLOUT_Y = 0.115"
     ),
+    _RD1_ENTRY_Y: "ADJUSTER_ENTRY_Y = 0.115 + 0.0135",
 }
 # The whole-sheet audit of the 287c placement.  287c also reported three
 # findings on the 10.7 (retired by r3): its line through "3.97", its witness
