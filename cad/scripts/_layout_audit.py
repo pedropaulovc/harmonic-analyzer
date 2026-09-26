@@ -463,11 +463,12 @@ def _move_ring(
 ) -> list[Segment]:
     """``segments`` with the balloon's own body moved onto the ``printed`` ring.
 
-    The body is every non-leader segment lying within the COM circle: the
+    The body is every plain ``line`` segment lying within the COM circle: the
     circumference and, for a split-circle balloon, its rim-to-rim separator.
     Each is mapped by the similarity that takes the COM circle onto the
     printed one, so the balloon as an obstacle reads where it printed. A
-    leader leaves the rim outward and keeps its (exact) registered geometry.
+    leader, shoulder or arrowhead keeps its (exact) registered geometry, even
+    when a short leader puts an arrowhead's base inside the circle.
     """
     if printed == com:
         return list(segments)
@@ -483,7 +484,7 @@ def _move_ring(
 
     out = []
     for segment in segments:
-        if segment.role == "leader" or not (inside(segment.x0, segment.y0) and inside(segment.x1, segment.y1)):
+        if segment.role != "line" or not (inside(segment.x0, segment.y0) and inside(segment.x1, segment.y1)):
             out.append(segment)
             continue
         out.append(Segment(*moved(segment.x0, segment.y0), *moved(segment.x1, segment.y1), segment.role))
