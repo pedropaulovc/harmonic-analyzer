@@ -53,8 +53,9 @@ COLLAR_THICKNESS = COLLAR_END_STATION - COLLAR_START_STATION
 STOCK_DIA = 0.625 * MM_PER_IN
 STOCK_DIA_BAND = (0.0, -0.002 * MM_PER_IN)
 COLLAR_DIA = STOCK_DIA
-# The post's journal bore band: cone_pivot_post_spec.RUNNING_BORE_BAND on the
-# #877 integration branch (#833); this branch predates it.
+# The post's journal bore band.  DUPLICATE of cone_pivot_post_spec.
+# RUNNING_BORE_BAND (#833, on the #877 integration branch), which this branch
+# predates: replace at integ merge with that import (Main, 2026-09-26).
 POST_JOURNAL_BORE_BAND = (0.005, -0.025)
 # The thrust ring: the collar's south face on the post boss, between the bore
 # and the collar OD.  Held to rule 12's 1.5 floor (user ruling 2026-09-26)
