@@ -36,6 +36,7 @@ against the leaf's own vector PDF; the constants say what they were set from.
 
 from __future__ import annotations
 
+import functools
 import math
 import os
 import re
@@ -1524,23 +1525,33 @@ def _arrowless_ends(
     lands where its registered points end.
 
     One arrowhead ends one leader: each ``(tip, head length)`` of ``arrows``
-    claims at most one end within its head's length, the nearest pairs
-    first, so an arrowless sibling ending near an arrow tip stays a leader
-    of its own (Codex P2 on 27173c6ee)."""
-    pairs = sorted(
-        (math.hypot(end[0] - tip[0], end[1] - tip[1]), e, a)
-        for e, end in enumerate(ends)
-        for a, (tip, head) in enumerate(arrows)
-        if math.hypot(end[0] - tip[0], end[1] - tip[1]) <= head
-    )
-    claimed_ends: set[int] = set()
-    claimed_arrows: set[int] = set()
-    for _distance, e, a in pairs:
-        if e in claimed_ends or a in claimed_arrows:
-            continue
-        claimed_ends.add(e)
-        claimed_arrows.add(a)
-    return [end for e, end in enumerate(ends) if e not in claimed_ends]
+    claims at most one end within its head's length, so an arrowless sibling
+    ending near an arrow tip stays a leader of its own (Codex P2 on
+    27173c6ee). The claims are the most arrows matched, then the least total
+    distance: a nearest-first pass can take the one end a second arrow could
+    reach (Codex P2 on 3b7ef9d3b: ends at 0 and 3 mm, heads at 1 and -2 mm).
+    An annotation carries a handful of leaders, so the search is exact."""
+    reach = [
+        [(d, e) for e, end in enumerate(ends) if (d := math.hypot(end[0] - tip[0], end[1] - tip[1])) <= head]
+        for tip, head in arrows
+    ]
+
+    @functools.cache
+    def best(a: int, used: frozenset[int]) -> tuple[int, float, frozenset[int]]:
+        """The most matches, then least distance, for arrows ``a`` onward."""
+        if a == len(reach):
+            return 0, 0.0, frozenset()
+        choice = best(a + 1, used)
+        for distance, e in reach[a]:
+            if e in used:
+                continue
+            count, total, matched = best(a + 1, used | {e})
+            if (count + 1, -(total + distance)) > (choice[0], -choice[1]):
+                choice = (count + 1, total + distance, matched | {e})
+        return choice
+
+    _count, _total, claimed = best(0, frozenset())
+    return [end for e, end in enumerate(ends) if e not in claimed]
 
 
 def classify_segments(

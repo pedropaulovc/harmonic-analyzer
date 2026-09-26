@@ -3289,21 +3289,43 @@ def test_an_arrowless_leader_beside_an_arrowed_one_is_measured():
 
 
 @pytest.mark.parametrize(
-    ("arrows", "arrowless"),
+    ("ends", "arrows", "arrowless"),
     [
-        pytest.param([((0.0, 0.0), 0.003556)], [(0.002, 0.0)], id="one-arrow-two-ends"),
-        pytest.param([((0.0, 0.0), 0.003556), ((0.002, 0.0), 0.003556)], [], id="two-arrows-two-ends"),
+        pytest.param(
+            [(0.0, 0.0), (0.002, 0.0)], [((0.0, 0.0), 0.003556)], [(0.002, 0.0)], id="one-arrow-two-ends"
+        ),
+        pytest.param(
+            [(0.0, 0.0), (0.002, 0.0)],
+            [((0.0, 0.0), 0.003556), ((0.002, 0.0), 0.003556)],
+            [],
+            id="two-arrows-two-ends",
+        ),
+        # Codex P2 on 3b7ef9d3b (PRRT_kwDOPHDy386mU9Pg): nearest-first gives
+        # the 1 mm head the 0 mm end, and the -2 mm head reaches nothing else.
+        pytest.param(
+            [(0.0, 0.0), (0.003, 0.0)],
+            [((0.001, 0.0), 0.003556), ((-0.002, 0.0), 0.003556)],
+            [],
+            id="greedy-strands-an-end",
+        ),
+        # Where every arrow has its own end, the least total distance wins.
+        pytest.param(
+            [(0.0, 0.0), (0.003, 0.0), (0.009, 0.0)],
+            [((0.0005, 0.0), 0.003556), ((0.0028, 0.0), 0.003556)],
+            [(0.009, 0.0)],
+            id="greedy-and-optimal-agree",
+        ),
     ],
 )
-def test_one_arrowhead_claims_one_leader_end(arrows, arrowless):
+def test_one_arrowhead_claims_one_leader_end(ends, arrows, arrowless):
     """Codex P2 on 27173c6ee (PRRT_kwDOPHDy386mUWM-): one arrowhead claimed
     every registered end within its head's length, so an arrowless sibling
     ending 2 mm from an arrow tip vanished from both _landings and
-    _leader_paths. Arrowheads match ends one to one, nearest first; two
-    arrows claim both ends."""
+    _leader_paths. Arrowheads match ends one to one: the most matches, then
+    the least total distance."""
     from _layout_audit import _arrowless_ends
 
-    assert _arrowless_ends([(0.0, 0.0), (0.002, 0.0)], arrows) == arrowless
+    assert _arrowless_ends(ends, arrows) == arrowless
 
 
 def test_a_textless_branch_is_measured_from_its_own_registered_attachment():
