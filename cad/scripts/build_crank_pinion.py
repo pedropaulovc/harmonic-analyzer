@@ -362,8 +362,19 @@ async def build(adapter) -> dict[str, str]:
     # DIAG (#906, not for merge): rebuild after each equation and dump
     # SolidWorks' What's Wrong table on the first failure.
     from _common import _seat_error_state
-    import _telemetry
 
+    def _dump_equations(tag: str) -> None:
+        try:
+            mgr = adapter.currentModel.GetEquationMgr()
+            for index in range(int(mgr.GetCount())):
+                _telemetry.info(
+                    f"DIAG {tag} eq[{index}] {mgr.Equation(index)!r} = "
+                    f"{mgr.Value(index)!r}"
+                )
+        except Exception as exc:  # diagnostic only
+            _telemetry.warn(f"DIAG {tag} equation dump failed: {exc!r}")
+
+    _dump_equations("before drives")
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
         ok = await adapter.rebuild_model()
@@ -372,8 +383,10 @@ async def build(adapter) -> dict[str, str]:
                 f"DIAG rebuild failed after {dim_name} = {expr}: "
                 f"{_seat_error_state(adapter)!r}"
             )
+            _dump_equations("at failure")
             raise RuntimeError(f"DIAG rebuild failed after {dim_name}")
         _telemetry.info(f"DIAG rebuild OK after {dim_name} = {expr}")
+    _dump_equations("after drives")
     await force_rebuild(adapter)
     set_dimension_bilateral_tolerance(
         adapter, "BossProfile", "BoreDia", *deviations(BORE_DIA_BAND)
