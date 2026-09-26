@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import math
 import re
 from pathlib import Path
@@ -41,7 +42,10 @@ def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
     assert kept == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert not hasattr(spec, "DRAWING_REFERENCE_PRECISION")
-    assert {"HeadDia", "NeckDia"} == set(drawing.DONOR_KEEP)
+    # The donor carries the head diameter only; the neck's imports straight
+    # into detail A.
+    assert {"HeadDia"} == set(drawing.DONOR_KEEP)
+    assert "NeckDia" in drawing.DETAIL_KEEP
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
@@ -251,12 +255,9 @@ def test_every_post_import_name_is_carried_by_a_kept_or_moved_dimension() -> Non
     assert set(drawing.DIMENSION_CALLOUTS) <= carried
     assert set(spec.DRAWING_PRECISION_BY_NAME) == carried
     assert set(drawing.DIAMETER_POSITIONS) <= carried
-    assert set(drawing.DETAIL_DIAMETER_POSITIONS) <= carried
-    # Every donor diameter has exactly one destination view.
-    assert set(drawing.DIAMETER_POSITIONS).isdisjoint(drawing.DETAIL_DIAMETER_POSITIONS)
-    assert set(drawing.DIAMETER_POSITIONS) | set(drawing.DETAIL_DIAMETER_POSITIONS) == set(
-        drawing.DONOR_KEEP
-    )
+    # Every donor diameter moves to the profile, and nothing else moves.
+    assert set(drawing.DIAMETER_POSITIONS) == set(drawing.DONOR_KEEP)
+    assert not hasattr(drawing, "DETAIL_DIAMETER_POSITIONS")
     assert {"CrossHoleDia", "HeadCapSagDim", "BackCapSagDim", "OverallLen"} <= carried
 
 
@@ -315,7 +316,7 @@ def test_back_journal_diameter_hangs_above_clear_of_the_crown_witnesses() -> Non
     # 12 -> 15 mm: the back Ra symbol now sits between block and shaft.
     assert 0.003 <= (y - height / 2.0) - shaft_top <= 0.015
     assert x - 0.081 >= 0.010  # clear of the crown witnesses rising to the sag
-    detail_left = drawing.DETAIL_LABEL_XY[0] - 0.017
+    detail_left = drawing.DETAIL_LABEL_XY[0] - drawing.DETAIL_LABEL_HALF_WIDTH
     assert detail_left - (x + width) >= 0.010
     # The 19.0 sits below, clear of the land's crown-side end.
     len_x, _len_y = drawing.PRINCIPAL_KEEP["BackJournalLen"]
@@ -347,7 +348,9 @@ def test_back_ra_symbol_hangs_above_the_shaft_clear_of_every_witness() -> None:
     dia_bottom = drawing.PRINCIPAL_KEEP["BackJournalDia"][1] - height / 2.0
     assert dia_bottom - (symbol_y + top) >= 0.002
     # Clear of the DETAIL A label to its right.
-    assert (drawing.DETAIL_LABEL_XY[0] - 0.017) - (symbol_x + right) >= 0.005
+    assert (drawing.DETAIL_LABEL_XY[0] - drawing.DETAIL_LABEL_HALF_WIDTH) - (
+        symbol_x + right
+    ) >= 0.005
     assert "leader-crosses-leader" in drawing.BLOCKING_LAYOUT_FINDINGS
 
 
@@ -364,11 +367,13 @@ def test_bond_zone_callout_sits_above_the_shaft_clear_of_its_neighbours() -> Non
     assert 0.003 <= bottom - shaft_top <= 0.012
     # Right of the DETAIL A label and the detail circle.
     detail_x, detail_y = drawing.DETAIL_CENTER
-    detail_r = drawing.DETAIL_RADIUS_MM * 2 / 1000.0
+    detail_r = drawing.DETAIL_CROP_RADIUS
     near_x = max(left - detail_x, 0.0, detail_x - right)
     near_y = max(bottom - detail_y, 0.0, detail_y - top)
     assert (near_x**2 + near_y**2) ** 0.5 - detail_r >= 0.010
-    assert left - (drawing.DETAIL_LABEL_XY[0] + 0.017) >= 0.010
+    assert (
+        left - (drawing.DETAIL_LABEL_XY[0] + drawing.DETAIL_LABEL_HALF_WIDTH) >= 0.010
+    )
     # Short of the front land's 19.0 witness and its outside arrow tail.
     front_land_end = drawing._sheet_x(spec.FRONT_JOURNAL_Z + spec.JOURNAL_LEN)
     assert front_land_end - 0.006 - right >= 0.005
@@ -1094,11 +1099,11 @@ def test_neck_diameter_is_dimensioned_on_the_neck_inside_detail_a() -> None:
     """Detail A (2:1) holds the neck from the fence to the head rear face.
     The line stands on that stretch, fence side of the end-on circle its
     witnesses start from (Front plane, model z 0), with both witnesses and
-    their overshoot inside the circle."""
-    assert set(drawing.DETAIL_DIAMETER_POSITIONS) == {"NeckDia"}
-    x, _ = drawing.DETAIL_DIAMETER_POSITIONS["NeckDia"]
+    their overshoot inside the crop circle."""
+    x, y = drawing.DETAIL_KEEP["NeckDia"]
+    assert (x, y) == drawing.NECK_DIA_XY
     cx, cy = drawing.DETAIL_CENTER
-    radius = drawing.DETAIL_RATIO * drawing.DETAIL_RADIUS_MM / 1000.0
+    radius = drawing.DETAIL_CROP_RADIUS
     half = drawing.DETAIL_RATIO * spec.NECK_DIA / 2000.0
     # The head centre sits at the detail's centre.
     assert drawing._detail_x(spec.HEAD_CENTER_Z) == pytest.approx(cx)
@@ -1114,20 +1119,20 @@ def test_neck_diameter_is_dimensioned_on_the_neck_inside_detail_a() -> None:
     # In profile terms the line stands on the neck, inside the 1:1 fence.
     profile_x = drawing._sheet_x(spec.HEAD_CENTER_Z) + (x - cx) / drawing.DETAIL_RATIO
     assert drawing._sheet_x(spec.NECK_END_Z) < profile_x < drawing._sheet_x(spec.HEAD_REAR_Z)
-    assert cy + half < drawing.DETAIL_DIAMETER_POSITIONS["NeckDia"][1]
+    assert cy + half < y
 
 
 def test_neck_diameter_text_rides_clear_of_detail_a_and_its_callouts() -> None:
-    """The neck's text hangs above-left of the fence like the detail's other
-    callouts: its audit box stays above the head's top edge, left of the
-    SR10.9 leader (which leaves the head's top front corner) and inside the
-    sheet border, and the rendered text, left of its line, clears the circle.
-    The collar-pin station witness (stacktop-dbe47ae3) is on the profile, not
-    here."""
-    xy = drawing.DETAIL_DIAMETER_POSITIONS["NeckDia"]
+    """The neck's text hangs above-left of the crop circle like the detail's
+    other callouts: its audit box stays above the head's top edge, left of
+    the SR10.9 leader (which leaves the head's top front corner) and inside
+    the sheet border, and the rendered text, left of its line, clears the
+    circle.  The collar-pin station witness (stacktop-dbe47ae3) is on the
+    profile, not here."""
+    xy = drawing.DETAIL_KEEP["NeckDia"]
     left, right, bottom, top = _neck_text_box(xy)
     cx, cy = drawing.DETAIL_CENTER
-    radius = drawing.DETAIL_RATIO * drawing.DETAIL_RADIUS_MM / 1000.0
+    radius = drawing.DETAIL_CROP_RADIUS
     head_top = cy + drawing.DETAIL_RATIO * spec.HEAD_DIA / 2000.0
     assert bottom > head_top + 0.003
     assert right < drawing._detail_x(spec.HEAD_FRONT_Z) - 0.010
@@ -1138,7 +1143,7 @@ def test_neck_diameter_text_rides_clear_of_detail_a_and_its_callouts() -> None:
     glyph_right, glyph_bottom = xy[0] - 0.0013, xy[1] - 0.0019
     assert math.hypot(cx - glyph_right, glyph_bottom - cy) > radius + 0.002
     # The line leaves the circle square: at its x the circle's top is below
-    # the text row, so the jog to the text sits outside the fence.
+    # the text row, so the jog to the text sits outside the crop.
     circle_top = cy + (radius**2 - (cx - xy[0]) ** 2) ** 0.5
     assert xy[1] - 0.003 > circle_top + 0.002
     # The detail's own callouts sit right of and below the neck text.
@@ -1146,3 +1151,514 @@ def test_neck_diameter_text_rides_clear_of_detail_a_and_its_callouts() -> None:
         assert drawing.DETAIL_KEEP[name][0] > right + 0.030
     for name in ("HeadLen", "HeadCapSagDim"):
         assert drawing.DETAIL_KEEP[name][1] < bottom - 0.030
+
+
+# ---------------------------------------------------------------------------
+# Detail A is a cropped 2:1 MODEL view.  On this arbor's native detail view no
+# dimension could be moved in under any variant tried (neckbisect-ecef,
+# neckref-84e5, and leaf 20260926T141154Z-1-b0f89771, which failed "NeckDia:
+# native dimension did not move into target view" on f0faedc51).
+
+
+def _detail_sheet_point(z_mm: float, r_mm: float) -> tuple[float, float]:
+    """Sheet position of the model point at axial station ``z_mm``, ``r_mm``
+    off the axis (upwards), inside detail A."""
+    return (
+        drawing._detail_x(z_mm),
+        drawing.DETAIL_CENTER[1] + drawing.DETAIL_RATIO * r_mm / 1000.0,
+    )
+
+
+def test_detail_a_crop_circle_holds_the_neck_and_every_head_reference() -> None:
+    """A cropped view drops a dimension whose reference lies outside the crop
+    (tipslot-2762), so the crop circle, the 15 mm fence at 2:1 round the head
+    centre, holds both ends of the neck's end-on Front-plane circle and every
+    head point the detail's dimensions measure, with 2 mm to spare."""
+    assert drawing.DETAIL_CROP_RADIUS == pytest.approx(
+        drawing.DETAIL_RATIO * drawing.DETAIL_RADIUS_MM / 1000.0
+    )
+    assert drawing.DETAIL_CROP_RADIUS == pytest.approx(0.030)
+    apex_z = spec.HEAD_FRONT_Z - spec.HEAD_CAP_SAG
+    references = {
+        # NeckDia: both ends of the Front-plane circle (model z 0).
+        "neck edge upper": (0.0, spec.NECK_DIA / 2.0),
+        "neck edge lower": (0.0, -spec.NECK_DIA / 2.0),
+        # HeadLen: the Ø15 cylinder's two faces, at the rim.
+        "head front rim": (spec.HEAD_FRONT_Z, spec.HEAD_DIA / 2.0),
+        "head rear rim": (spec.HEAD_REAR_Z, -spec.HEAD_DIA / 2.0),
+        # HeadCapR / HeadCapSagDim: the crown's arc from rim to apex.
+        "crown apex": (apex_z, 0.0),
+        # CrossHoleDia: the true-circle hole at the head centre.
+        "cross-hole edge": (
+            spec.HEAD_CENTER_Z - spec.CROSS_HOLE_DIA / 2.0,
+            spec.CROSS_HOLE_DIA / 2.0,
+        ),
+    }
+    for name, (z, r) in references.items():
+        point = _detail_sheet_point(z, r)
+        reach = math.dist(point, drawing.DETAIL_CENTER)
+        assert reach <= drawing.DETAIL_CROP_RADIUS - 0.002, (name, reach)
+    # The crop shows the neck between the fence and the head rear face.
+    fence_x = drawing.DETAIL_CENTER[0] - drawing.DETAIL_CROP_RADIUS
+    assert fence_x < _detail_sheet_point(0.0, 0.0)[0]
+
+
+def test_detail_a_imports_its_dimensions_by_feature_before_any_other_view() -> None:
+    """Detail A takes all five of its dimensions by targeted import, from the
+    features that own them, before the donor's whole-model import can take
+    NeckDia or CrossHoleDia (a dimension on the sheet is not imported again,
+    memory model-annotations-import-once)."""
+    import _drawing_common as dc
+
+    assert set(drawing.DETAIL_KEEP) == {
+        "HeadLen",
+        "HeadCapR",
+        "HeadCapSagDim",
+        "CrossHoleDia",
+        "NeckDia",
+    }
+    owners = dc._features_owning(
+        spec.DRAWING_DIMENSIONS, drawing.DETAIL_KEEP, view_label="detail A"
+    )
+    assert owners == ("CrossHoleProfile", "FrontCapProfile", "Head", "NeckProfile")
+    # None is a part-hidden reference sketch, so the plain import needs no
+    # per-view show.
+    assert not set(owners) & set(spec.REFERENCE_SKETCHES)
+    source = inspect.getsource(drawing.build)
+    detail = re.search(
+        r"curate_view_dimensions\(\s*adapter,\s*detail,\s*keep=DETAIL_KEEP,([^)]*)\)",
+        source,
+    )
+    assert detail is not None
+    assert "dimensions_by_feature=DRAWING_DIMENSIONS" in detail.group(1)
+    crop = source.index("_cropped_head_view(adapter, principal)")
+    assert crop < detail.start() < source.index("keep=DONOR_KEEP")
+    assert detail.start() < source.index("keep=PRINCIPAL_KEEP")
+
+
+def test_no_dimension_is_dragged_into_a_detail_view() -> None:
+    """DragModelDimension into this arbor's detail view is dead under every
+    variant tried, so the script builds no native detail and its one drag
+    helper only ever moves the donor's diameters onto the 1:1 profile."""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "CreateDetailView" not in source
+    assert source.count("DragModelDimension(") == 1
+    helper = inspect.getsource(drawing._move_dimension)
+    assert "DragModelDimension(" in helper
+    build = inspect.getsource(drawing.build)
+    targets = re.findall(r"_move_dimension\(\s*adapter,\s*annotation,\s*(\w+),", build)
+    assert targets == ["principal"]
+    assert set(drawing.DIAMETER_POSITIONS) == set(drawing.DONOR_KEEP) == {"HeadDia"}
+
+
+def test_detail_a_label_and_letter_read_like_the_native_detail() -> None:
+    """A model view has no native label, so the view owns a note in the
+    native label's words, centred under its crop circle; the profile's mark
+    carries the letter where the native detail put it (pc-p1 render)."""
+    assert drawing.DETAIL_LABEL_TEXT == "DETAIL A\nSCALE 2 : 1"
+    assert drawing.DETAIL_LETTER == "A"
+    cx, cy = drawing.DETAIL_CENTER
+    label_x, label_top = drawing.DETAIL_LABEL_XY
+    assert label_x == cx
+    # Below the crop circle, and below the HeadLen text that rides its edge.
+    assert label_top < cy - drawing.DETAIL_CROP_RADIUS - 0.010
+    assert drawing.DETAIL_KEEP["HeadLen"][1] - 0.002 - label_top >= 0.004
+    # Two text lines (about 12 mm) stay above the profile's bond-zone callout
+    # row and the shaft's top edge.
+    shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
+    assert label_top - 0.012 > shaft_top + 0.005
+    # The letter rides the axis right of the mark circle, clear of the axis
+    # end, the Ø15 witnesses' overshoot and the Ø15 text row, inside the sheet.
+    fence_x = drawing._sheet_x(spec.HEAD_CENTER_Z)
+    letter_x = fence_x + drawing.DETAIL_LETTER_OFFSET[0]
+    letter_y = drawing.PRINCIPAL_CENTER[1] + drawing.DETAIL_LETTER_OFFSET[1]
+    letter_half = 0.002
+    assert letter_x - letter_half > fence_x + drawing.DETAIL_RADIUS_MM / 1000.0 + 0.002
+    axis_end = drawing._sheet_x(
+        spec.HEAD_FRONT_Z - spec.HEAD_CAP_SAG - drawing.AXIS_OVERSHOOT_MM
+    )
+    assert letter_x - letter_half > axis_end + 0.003
+    head_dia_x, head_dia_y = drawing.DIAMETER_POSITIONS["HeadDia"]
+    assert letter_x - letter_half > head_dia_x + WITNESS_OVERSHOOT_M + 0.003
+    assert letter_y + 0.003 < head_dia_y - 0.010
+    assert letter_x + letter_half < 0.410
+
+
+def test_detail_a_fence_gate_judges_every_detail_dimension_on_its_crop() -> None:
+    """The detail's own gate: a diameter across the axis keeps both witnesses
+    inside the crop circle, a station along the axis may drop its witnesses
+    out to its text, and a dimension line may leave for its text."""
+    from _layout_geometry import Segment
+
+    cx, cy = drawing.DETAIL_CENTER
+    radius = drawing.DETAIL_CROP_RADIUS
+    fence = {"center": (cx, cy), "radius": radius, "axis": (-1.0, 0.0)}
+    x, text_y = drawing.DETAIL_KEEP["NeckDia"]
+    upper, lower = (
+        _detail_sheet_point(0.0, s * spec.NECK_DIA / 2.0)[1] for s in (1, -1)
+    )
+    start = drawing._detail_x(0.0) - 0.0015
+    neck = _fence_dim(
+        "NeckDia",
+        Segment(start, upper, x - WITNESS_OVERSHOOT_M, upper),
+        Segment(start, lower, x - WITNESS_OVERSHOOT_M, lower),
+        Segment(x, upper, x, text_y),  # the line, up out of the circle
+    )
+    neck_arrows = {"NeckDia": ((x, upper), (0.0, -1.0))}
+    drawing._assert_witnesses_clear_of_detail_fence([neck], arrows=neck_arrows, **fence)
+
+    front, rear = (
+        drawing._detail_x(spec.HEAD_FRONT_Z),
+        drawing._detail_x(spec.HEAD_REAR_Z),
+    )
+    rim = _detail_sheet_point(spec.HEAD_FRONT_Z, -spec.HEAD_DIA / 2.0)[1]
+    head_len_y = drawing.DETAIL_KEEP["HeadLen"][1]
+    station = _fence_dim(
+        "HeadLen",
+        Segment(front, rim, front, head_len_y - 0.001),
+        Segment(rear, rim, rear, head_len_y - 0.001),
+        Segment(rear, head_len_y, front, head_len_y),
+    )
+    station_arrows = {"HeadLen": ((rear, head_len_y), (1.0, 0.0))}
+    drawing._assert_witnesses_clear_of_detail_fence(
+        [station], arrows=station_arrows, **fence
+    )
+
+    # f0faedc51's neck line on the 1:1 profile, replayed at 2:1: the line
+    # ahead of the neck runs both witnesses out through the circle.
+    outside = cx - radius - 0.004
+    stray = _fence_dim(
+        "NeckDia",
+        Segment(start, upper, outside - WITNESS_OVERSHOOT_M, upper),
+        Segment(start, lower, outside - WITNESS_OVERSHOOT_M, lower),
+        Segment(outside, upper, outside, text_y),
+    )
+    with pytest.raises(RuntimeError, match="NeckDia' extension-line"):
+        drawing._assert_witnesses_clear_of_detail_fence(
+            [stray], arrows={"NeckDia": ((outside, upper), (0.0, -1.0))}, **fence
+        )
+
+
+def test_view_dimensions_reads_only_one_views_dimensions() -> None:
+    from _layout_geometry import AnnotationGeometry
+
+    owned = AnnotationGeometry(label="NeckDia", kind="dim", owner="Drawing View4")
+    other = AnnotationGeometry(label="HeadDia", kind="dim", owner="Drawing View2")
+    note = AnnotationGeometry(label="DETAIL A", kind="note", owner="Drawing View4")
+    sheets = [SimpleNamespace(annotations=[owned, other, note])]
+    assert drawing._view_dimensions(sheets, "Drawing View4") == [owned]
+
+
+# --- seat fakes: the cropped view, the profile mark and the notes -----------
+
+
+class _DoubleArray(tuple):
+    """What the fake double_array hands COM: a bare list must never reach
+    CreatePoint or SetViewPosition (a real seat reads it as zeros)."""
+
+
+def _require_double_array(values, what: str) -> None:
+    if not isinstance(values, _DoubleArray):
+        raise TypeError(f"{what} got {type(values).__name__}, not a double_array")
+
+
+class _Point:
+    def __init__(self, xyz) -> None:
+        self.ArrayData = tuple(xyz)
+
+    def MultiplyTransform(self, transform):  # noqa: N802 - the COM member name
+        return _Point(transform(self.ArrayData))
+
+
+class _Utility:
+    def CreatePoint(self, xyz):  # noqa: N802 - the COM member name
+        _require_double_array(xyz, "CreatePoint")
+        return _Point(xyz)
+
+
+class _ViewSketch:
+    # A sheet point maps to its view-sketch point x1000 (any affine map works).
+    ModelToSketchTransform = staticmethod(lambda xyz: tuple(v * 1000.0 for v in xyz))
+
+
+class _Segment:
+    def __init__(self, seat: "_ArborSeat", keep_colour: bool = True) -> None:
+        self.seat = seat
+        self.keep_colour = keep_colour
+        self._color = 0x0000FF
+
+    @property
+    def Color(self):  # noqa: N802 - the COM member name
+        return self._color
+
+    @Color.setter
+    def Color(self, value):  # noqa: N802 - the COM member name
+        if self.keep_colour:
+            self._color = value
+
+
+class _ArborView:
+    """IView stand-in: model z maps to sheet x leftwards at ``scale`` when the
+    view is turned -90 deg like the profile, upwards when it is not."""
+
+    def __init__(self, name: str, seat: "_ArborSeat", scale: float, **kw) -> None:
+        self.name = name
+        self.seat = seat
+        self.ScaleRatio = (scale, 1.0)
+        self.Angle = kw.get("angle", 0.0)
+        self.Position = kw.get("position", (0.2, 0.17))
+        self.cropped = kw.get("cropped", True)
+        self.turns = kw.get("turns", True)
+        self.status = kw.get("status", 1)
+
+    def __setattr__(self, name, value):
+        if name == "Angle" and not getattr(self, "turns", True):
+            return
+        super().__setattr__(name, value)
+
+    def sheet_point(self, xyz) -> tuple[float, float]:
+        along = -self.ScaleRatio[0] * xyz[2]
+        # 0.05 m between the view's Position and the model origin.
+        if abs(math.remainder(self.Angle + math.pi / 2.0, 2.0 * math.pi)) < 1e-9:
+            return (self.Position[0] + along + 0.05, self.Position[1])
+        return (self.Position[0], self.Position[1] - along + 0.05)
+
+    def SetViewPosition(self, position, move_children):  # noqa: N802
+        _require_double_array(position, "SetViewPosition")
+        self.seat.log.append(("move", self.name, tuple(position), move_children))
+        self.Position = tuple(position)
+        return True
+
+    def GetSketch(self):  # noqa: N802
+        return _ViewSketch()
+
+    def Crop2(self, jagged, no_outline, intensity):  # noqa: N802
+        self.seat.log.append(("crop2", self.name, jagged, no_outline, intensity))
+        return self.status
+
+    def IsCropped(self):  # noqa: N802
+        return self.cropped
+
+    def UpdateViewDisplayGeometry(self):  # noqa: N802
+        return True
+
+    def GetOutline(self):  # noqa: N802
+        cx, cy = drawing.DETAIL_CENTER
+        r = drawing.DETAIL_CROP_RADIUS
+        if not self.cropped:
+            return (-0.2, cy - r, 0.5, cy + r)
+        return (cx - r, cy - r, cx + r, cy + r)
+
+    def GetNotes(self):  # noqa: N802
+        return tuple(note for note in self.seat.notes if note.owner == self.name)
+
+
+class _NoteAnnotation:
+    def __init__(self, note: "_ArborNote") -> None:
+        self.note = note
+
+    def GetPosition(self):  # noqa: N802
+        return (*self.note.anchor, 0.0)
+
+    def SetPosition2(self, x, y, z):  # noqa: N802
+        if self.note.moves:
+            self.note.anchor = (x, y)
+        return True
+
+
+class _ArborNote:
+    """A note whose rendered box hangs from its anchor, like a top-left
+    attached note: 2.5 mm per character wide, 4 mm per line tall."""
+
+    def __init__(self, text: str, owner: str, x: float, y: float, moves: bool) -> None:
+        self.text = text
+        self.owner = owner
+        self.anchor = (x, y)
+        self.moves = moves
+
+    def GetText(self):  # noqa: N802
+        return self.text
+
+    def GetAnnotation(self):  # noqa: N802
+        return _NoteAnnotation(self)
+
+    def GetExtent(self):  # noqa: N802
+        lines = self.text.split("\n")
+        width = 0.0025 * max(len(line) for line in lines)
+        x, y = self.anchor
+        return (x, y - 0.004 * len(lines), 0.0, x + width, y, 0.0)
+
+
+class _ArborSeat:
+    """IModelDoc2 + IDrawingDoc + ISketchManager + ISheet + adapter, recorded."""
+
+    def __init__(self, *, notes_move: bool = True, keep_colour: bool = True) -> None:
+        self.log: list[tuple] = []
+        self.notes: list[_ArborNote] = []
+        self.active = ""
+        self.notes_move = notes_move
+        self.keep_colour = keep_colour
+        self.AddToDB = False
+        self.currentModel = self
+        self.SketchManager = self
+        self.swApp = self
+
+    def GetMathUtility(self):  # noqa: N802
+        return _Utility()
+
+    def ActivateView(self, name):  # noqa: N802
+        self.log.append(("activate", name))
+        self.active = name
+        return True
+
+    def ClearSelection2(self, _all):  # noqa: N802
+        return True
+
+    def EditRebuild3(self):  # noqa: N802
+        return True
+
+    def CreateCircle(self, *xyz):  # noqa: N802
+        self.log.append(
+            ("circle", self.active, tuple(v / 1000.0 for v in xyz), self.AddToDB)
+        )
+        return _Segment(self, self.keep_colour)
+
+    def CreateDetailViewAt4(self, *args):  # noqa: N802
+        raise AssertionError("detail A must not be a native detail view")
+
+    def GetCurrentSheet(self):  # noqa: N802
+        return self
+
+    def SetScale(self, *args):  # noqa: N802
+        return True
+
+
+def _arbor_seat(monkeypatch, **kw):
+    seat = _ArborSeat(
+        notes_move=kw.pop("notes_move", True), keep_colour=kw.pop("keep_colour", True)
+    )
+    principal = _ArborView(
+        "Drawing View2", seat, 1.0, angle=-math.pi / 2.0, position=(0.2, 0.17)
+    )
+    detail = _ArborView(
+        "Drawing View4", seat, 2.0, position=drawing.DETAIL_CENTER, **kw
+    )
+    placed: list[tuple] = []
+
+    def place(adapter, source, orientation, x, y, *, scale=None):
+        placed.append((orientation, x, y, scale))
+        return detail
+
+    def note(adapter, text, x, y, **_kwargs):
+        made = _ArborNote(text, seat.active, x, y, seat.notes_move)
+        seat.notes.append(made)
+        seat.log.append(("note", seat.active, text))
+        return made
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(drawing, "double_array", lambda values: _DoubleArray(values))
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(
+        drawing,
+        "model_point_in_view",
+        lambda adapter, view, xyz, *, label: view.sheet_point(xyz),
+    )
+    monkeypatch.setattr(drawing, "view_name", lambda adapter, view: view.name)
+    monkeypatch.setattr(drawing, "add_note", note)
+    return seat, principal, detail, placed
+
+
+def test_detail_a_is_a_cropped_2_to_1_model_view_turned_like_the_profile(
+    monkeypatch,
+) -> None:
+    seat, principal, detail, placed = _arbor_seat(monkeypatch)
+    assert drawing._cropped_head_view(seat, principal) is detail
+    assert placed == [("*Top", *drawing.DETAIL_CENTER, drawing.DETAIL_SCALE)]
+    assert detail.Angle == principal.Angle == -math.pi / 2.0
+    # Moved once, so the head centre lands where detail A sits.
+    moves = [entry for entry in seat.log if entry[0] == "move"]
+    assert len(moves) == 1 and moves[0][3] is False
+    head = detail.sheet_point((0.0, 0.0, spec.HEAD_CENTER_Z / 1000.0))
+    assert head == pytest.approx(drawing.DETAIL_CENTER)
+    # The crop circle is sketched in detail A itself, centred on the head at
+    # the fence's 2:1 radius, still selected (not direct-to-database), and
+    # Crop2 runs straight after it.
+    kinds = [entry[0] for entry in seat.log]
+    assert kinds[-3:] == ["activate", "circle", "crop2"]
+    assert seat.log[-3] == ("activate", "Drawing View4")
+    _, owner, xyz, add_to_db = seat.log[-2]
+    assert owner == "Drawing View4" and add_to_db is False
+    cx, cy, _, px, py, _ = xyz
+    assert (cx, cy) == pytest.approx(drawing.DETAIL_CENTER)
+    assert math.dist((cx, cy), (px, py)) == pytest.approx(drawing.DETAIL_CROP_RADIUS)
+    assert seat.log[-1] == ("crop2", "Drawing View4", False, False, 5)
+    assert seat.AddToDB is False
+
+
+@pytest.mark.parametrize(
+    ("kw", "match"),
+    [
+        ({"cropped": False}, "not cropped"),
+        ({"status": 2}, "not cropped"),
+        ({"turns": False}, "turn detail A"),
+    ],
+)
+def test_detail_a_fails_loud_when_the_crop_or_the_turn_did_not_take(
+    monkeypatch, kw, match
+) -> None:
+    seat, principal, _detail, _placed = _arbor_seat(monkeypatch, **kw)
+    with pytest.raises(RuntimeError, match=match):
+        drawing._cropped_head_view(seat, principal)
+
+
+def test_profile_marks_detail_a_with_a_black_fence_circle(monkeypatch) -> None:
+    seat, principal, _detail, _placed = _arbor_seat(monkeypatch)
+    center = drawing._mark_detail_on_profile(seat, principal)
+    head = principal.sheet_point((0.0, 0.0, spec.HEAD_CENTER_Z / 1000.0))
+    assert center == pytest.approx(head)
+    circles = [entry for entry in seat.log if entry[0] == "circle"]
+    assert len(circles) == 1
+    _, owner, xyz, add_to_db = circles[0]
+    assert owner == "Drawing View2" and add_to_db is True
+    cx, cy, _, px, py, _ = xyz
+    assert (cx, cy) == pytest.approx(head)
+    assert math.dist((cx, cy), (px, py)) == pytest.approx(
+        drawing.DETAIL_RADIUS_MM / 1000.0
+    )
+    assert seat.AddToDB is False  # restored
+    seat_grey, principal_grey, _d, _p = _arbor_seat(monkeypatch, keep_colour=False)
+    with pytest.raises(RuntimeError, match="colour did not persist"):
+        drawing._mark_detail_on_profile(seat_grey, principal_grey)
+
+
+def test_detail_a_label_and_letter_are_owned_and_centred(monkeypatch) -> None:
+    seat, principal, detail, _placed = _arbor_seat(monkeypatch)
+    mark = (0.3132, 0.170)
+    drawing._label_detail(seat, detail, principal, mark)
+    owned = [(note.owner, note.text) for note in seat.notes]
+    assert owned == [
+        ("Drawing View4", drawing.DETAIL_LABEL_TEXT),
+        ("Drawing View2", drawing.DETAIL_LETTER),
+    ]
+    label, letter = (drawing._note_box(note, label="t") for note in seat.notes)
+    assert (label[0] + label[2]) / 2.0 == pytest.approx(drawing.DETAIL_LABEL_XY[0])
+    assert label[3] == pytest.approx(drawing.DETAIL_LABEL_XY[1])
+    assert (letter[0] + letter[2]) / 2.0 == pytest.approx(
+        mark[0] + drawing.DETAIL_LETTER_OFFSET[0]
+    )
+    assert (letter[1] + letter[3]) / 2.0 == pytest.approx(
+        mark[1] + drawing.DETAIL_LETTER_OFFSET[1]
+    )
+
+
+def test_detail_a_label_fails_loud_when_it_does_not_move(monkeypatch) -> None:
+    seat, principal, detail, _placed = _arbor_seat(monkeypatch, notes_move=False)
+    with pytest.raises(RuntimeError, match="did not centre"):
+        drawing._label_detail(seat, detail, principal, (0.3132, 0.170))
+
+
+def test_detail_a_label_fails_loud_when_it_lands_in_another_view(monkeypatch) -> None:
+    seat, principal, detail, _placed = _arbor_seat(monkeypatch)
+    monkeypatch.setattr(seat, "ActivateView", lambda name: True)  # stays inactive
+    with pytest.raises(RuntimeError, match="did not land in its view"):
+        drawing._label_detail(seat, detail, principal, (0.3132, 0.170))
