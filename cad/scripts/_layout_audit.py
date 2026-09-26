@@ -201,6 +201,12 @@ LINE_ROLES = frozenset({"line", "dim-line", "ext-line"})
 # Annotation ink a leader may cross (see ``find_leader_across_lines``).
 _NOT_CROSSING_TARGETS = frozenset({"geometry", "detail-circle"})
 # swAnnotationVisibilityState_e: 2 = half hidden, 3 = hidden.
+# Two annotations of one type anchored within this of each other print on top
+# of each other. Every coincident pair on the run-2 calibration sheets
+# (95a9e97ca: 30 centre-mark pairs over 5 drawings, #913) was exact, 0.0 um
+# apart with identical display data; 0.01 mm leaves room for float noise only.
+DUPLICATE_POSITION_TOL_M = 1e-5
+
 _HIDDEN_STATES = (2, 3)
 _OWNER_DRAWING_SHEET = 1
 
@@ -2080,6 +2086,47 @@ def find_read_errors(dump: Mapping[str, Any]) -> list[Finding]:
     ]
 
 
+def find_duplicate_annotations(
+    dump: Mapping[str, Any], *, tol: float = DUPLICATE_POSITION_TOL_M
+) -> list[Finding]:
+    """Two visible annotations of the same type, owned by the same view (or
+    the sheet), anchored at the same position: the second prints over the
+    first. Every cone-gear sheet carried its centre mark twice (#913), and
+    the overdraw thickens the ink a reader sees."""
+    owners = [(str(view.get("name", "")), view.get("annotations") or ()) for view in dump.get("views", ())]
+    owners.append(("sheet", dump.get("sheet_annotations") or ()))
+    findings = []
+    for owner, annotations in owners:
+        placed = [
+            (annotation, _floats(annotation.get("pos")))
+            for annotation in annotations
+            if int(annotation.get("visible", 1) or 1) not in _HIDDEN_STATES
+        ]
+        placed = [(annotation, pos) for annotation, pos in placed if len(pos) >= 2]
+        for (first, a), (second, b) in combinations(placed, 2):
+            if int(first.get("type", 0)) != int(second.get("type", 0)):
+                continue
+            if math.hypot(a[0] - b[0], a[1] - b[1]) > tol:
+                continue
+            kind = ANNOTATION_KINDS.get(int(first.get("type", 0)), "other")
+            findings.append(
+                Finding(
+                    kind="duplicate-annotation",
+                    sheet=str(dump.get("sheet", "")),
+                    a=f"{kind} {first.get('name', '')}",
+                    b=f"{kind} {second.get('name', '')}",
+                    detail=(
+                        f"{kind} {first.get('name', '')!r} and {second.get('name', '')!r} in {owner!r} are "
+                        f"anchored at the same point ({a[0] * MM:.2f},{a[1] * MM:.2f})mm: one prints over the other"
+                        + ("" if first.get("display") != second.get("display") else ", identically")
+                    ),
+                    at_mm=(a[0] * MM, a[1] * MM),
+                    extra={"owner": owner, "identical": first.get("display") == second.get("display")},
+                )
+            )
+    return findings
+
+
 def find_unmatched_text(model: SheetModel) -> list[Finding]:
     """COM text the printed PDF has no text object for: the audit is blind there.
 
@@ -2115,6 +2162,7 @@ GATING_KINDS = frozenset(
         "pdf-text-unclaimed",
         "view-edges-missing",
         "com-read-errors",
+        "duplicate-annotation",
         "leader-crosses-section-line",
         "dim-line-crosses-extension-at-text",
         "line-on-dimension-line",
@@ -2175,6 +2223,7 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
         *find_unclaimed_text(model),
         *find_edgeless_views(model),
         *find_read_errors(dump),
+        *find_duplicate_annotations(dump),
         *(f for f in find_text_separation(sheet) if frozenset((f.a, f.b)) not in reported),
     ])
 
