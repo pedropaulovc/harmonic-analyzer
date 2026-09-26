@@ -3226,6 +3226,11 @@ def _adopt(tried: Tried, name: str, ledger: dict[str, Any], ledger_path: Path) -
 _REVIEWER_FOR = {"claude": "codex", "gpt": "claude", "mimo": "claude"}
 
 
+def cross_family_reviewer(author_family: str) -> str:
+    """The reviewer whose family differs from the author's."""
+    return _REVIEWER_FOR[author_family]
+
+
 def fix_command(status: Status, author: Author | ValueError | None = None) -> str:
     """The commands that clear a failing drawing: render it if needed, then review it."""
     review = _review_command(status.name, author)
