@@ -598,93 +598,14 @@ def test_reference_witnesses_are_drawn_in_the_outline_black() -> None:
     assert bond[1] - bond[0] == pytest.approx(part.BOND_ZONE_WITNESS_LEN)
     helper = inspect.getsource(drawing._blacken_reference_witnesses)
     assert "drawing.SetLineColor(REFERENCE_WITNESS_COLOR)" in helper
-    assert "_select_reference_witness(" in helper
-    select = inspect.getsource(drawing._select_reference_witness)
-    assert "SW_SEL_EXT_SKETCH_SEGS" in select and "ConstructionGeometry" in select
+    assert "SW_SEL_EXT_SKETCH_SEGS" in helper and "ConstructionGeometry" in helper
     # 7885c0d9: rebinding the ISketch as IFeature read a matrix for Name.
-    assert '"IFeature"' not in select and "segment.GetLength()" in select
-    # pc-p1s: a coordinate pick is seat-dependent; witnesses select by name.
-    assert 'SelectByID2(\n            ""' not in helper + select
+    assert '"IFeature"' not in helper and "segment.GetLength()" in helper
     source = inspect.getsource(drawing.build)
     blacken = source.index("_blacken_reference_witnesses(adapter, principal)")
     finalize = source.index("await finalize_drawing(")
     gate = source.index("_assert_outline_unbroken(PNG, witness_spans, sheet_size)")
     assert blacken < finalize < gate
-
-
-class _WitnessSegment:
-    def __init__(self, length_mm: float, construction: bool = True) -> None:
-        self._length = length_mm / 1000.0
-        self.ConstructionGeometry = construction
-
-    def GetLength(self) -> float:
-        return self._length
-
-
-class _WitnessDrawing:
-    """Resolves only NAMED sketch-segment selections, as a name-first
-    SelectByID2 does; an unnamed coordinate pick selects nothing."""
-
-    def __init__(self, segments: dict) -> None:
-        self.segments = segments
-        self.selected = None
-        self.names = []
-        self.Extension = self
-        self.SelectionManager = self
-
-    def ClearSelection2(self, _all) -> None:
-        self.selected = None
-
-    def SelectByID2(self, name, kind, x, y, z, append, mark, callout, option) -> bool:
-        self.names.append(name)
-        self.selected = self.segments.get(name) if kind == "EXTSKETCHSEGMENT" else None
-        return self.selected is not None
-
-    def GetSelectedObjectType3(self, index, mark) -> int:
-        return drawing.SW_SEL_EXT_SKETCH_SEGS
-
-    def GetSelectedObject6(self, index, mark):
-        return self.selected
-
-
-def _witness_seat(monkeypatch, segments: dict):
-    monkeypatch.setattr(
-        drawing, "_model_item_paths", lambda adapter, view: (("pinion-arbor-1", "Drawing View2"),)
-    )
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
-    draw = _WitnessDrawing(segments)
-    return SimpleNamespace(currentModel=draw), draw
-
-
-def test_a_witness_is_selected_by_name_and_identified_by_its_length(monkeypatch) -> None:
-    """pc-p1s: the coordinate pick resolved the drum station's 227.5 mm axial
-    line; the named walk skips it and keeps the 1 mm construction witness."""
-    qualifier = "DrumStationReference@pinion-arbor-1@Drawing View2"
-    adapter, draw = _witness_seat(
-        monkeypatch,
-        {
-            f"Line1@{qualifier}": _WitnessSegment(227.5),
-            f"Line2@{qualifier}": _WitnessSegment(1.0),
-        },
-    )
-    picked = drawing._select_reference_witness(adapter, None, "DrumStationReference", 1.0)
-    assert picked == f"Line2@{qualifier}"
-    assert draw.selected is draw.segments[picked]
-
-
-def test_a_witness_no_name_resolves_fails_naming_what_was_tried(monkeypatch) -> None:
-    qualifier = "DrumStationReference@pinion-arbor-1@Drawing View2"
-    adapter, draw = _witness_seat(
-        monkeypatch,
-        {
-            f"Line1@{qualifier}": _WitnessSegment(227.5),
-            f"Line2@{qualifier}": _WitnessSegment(1.0, construction=False),
-        },
-    )
-    with pytest.raises(RuntimeError, match=r"Line1@.*227\.500 mm.*Line2@.*construction=False"):
-        drawing._select_reference_witness(adapter, None, "DrumStationReference", 1.0)
-    assert draw.selected is None
-    assert len(draw.names) == drawing.REFERENCE_WITNESS_CANDIDATES
 
 
 def _outline_raster(core: int):

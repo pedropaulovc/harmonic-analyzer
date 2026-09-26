@@ -11,7 +11,6 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    _model_item_paths,
     add_property_linked_note,
     add_surface_finish,
     assert_imported_precision,
@@ -190,8 +189,6 @@ REFERENCE_WITNESSES = {
     "BondZoneReference": (BOND_ZONE_DIA_Z, BOND_ZONE_DIA_Z + BOND_ZONE_WITNESS_LEN),
 }
 SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
-# Line1..Line<n> of a reference sketch are tried by name; each holds a few lines.
-REFERENCE_WITNESS_CANDIDATES = 6
 REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the witnesses are fully defined sketch lengths
 # Exported-raster proof that the outline stays unbroken over each witness:
 # the grey witness core measured 107-128 and the black outline 0 (5471a6ef
@@ -419,50 +416,6 @@ def _add_turning_axis(adapter: Any, view: Any) -> None:
     draw.EditRebuild3()
 
 
-def _select_reference_witness(
-    adapter: Any, view: Any, sketch_name: str, expected: float
-) -> str:
-    """Select ``sketch_name``'s flank witness BY NAME and return that name.
-
-    A sheet-coordinate pick hit-tests with a pixel tolerance mapped through the
-    window's zoom (``new_project_drawing``), so it is seat-dependent: pc-p1's
-    seat resolved the 1 mm drum-station witness, while pc-p1s's
-    (swmaker000008, f8721f3cc) resolved the same pick to that sketch's
-    227.5 mm axial line, 4 mm away on the axis.  Each ``Line<i>`` of the
-    sketch is addressed through the view's qualifiers instead, and only the
-    segment whose own length and construction flag identify the witness is
-    kept selected.  Identify it by length, not its sketch's name: an ISketch
-    is not an IFeature dispatch (7885c0d9 got a 16-double matrix back for
-    ``Name``).
-    """
-    draw = adapter.currentModel
-    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    tried = []
-    for component, in_view in _model_item_paths(adapter, view):
-        for index in range(1, REFERENCE_WITNESS_CANDIDATES + 1):
-            name = f"Line{index}@{sketch_name}@{component}@{in_view}"
-            draw.ClearSelection2(True)
-            if not draw.Extension.SelectByID2(
-                name, "EXTSKETCHSEGMENT", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
-            ):
-                continue
-            kind = int(selection.GetSelectedObjectType3(1, -1))
-            if kind != SW_SEL_EXT_SKETCH_SEGS:
-                tried.append(f"{name}: type {kind}")
-                continue
-            segment = _early_bound(selection.GetSelectedObject6(1, -1), "ISketchSegment")
-            length = float(segment.GetLength()) * 1000.0
-            construction = bool(segment.ConstructionGeometry)
-            if abs(length - expected) <= REFERENCE_WITNESS_LEN_TOL and construction:
-                return name
-            tried.append(f"{name}: {length:.3f} mm, construction={construction}")
-    draw.ClearSelection2(True)
-    raise RuntimeError(
-        f"{sketch_name}: no {expected:.3f} mm construction witness selectable by "
-        f"name; tried {tried or 'nothing that selected'}"
-    )
-
-
 def _blacken_reference_witnesses(
     adapter: Any, view: Any
 ) -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
@@ -484,14 +437,37 @@ def _blacken_reference_witnesses(
             for z in (z0, z1)
         )
         mid = ((ends[0][0] + ends[1][0]) / 2.0, (ends[0][1] + ends[1][1]) / 2.0)
+        draw.ClearSelection2(True)
         _early_bound(view, "IView").UpdateViewDisplayGeometry()
-        picked = _select_reference_witness(adapter, view, sketch_name, z1 - z0)
+        if not draw.Extension.SelectByID2(
+            "", "EXTSKETCHSEGMENT", mid[0], mid[1], 0.0, False, 0, null_callout(), 0
+        ):
+            raise RuntimeError(f"failed to select the {sketch_name} flank witness")
+        selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        kind = int(selection.GetSelectedObjectType3(1, -1))
+        if kind != SW_SEL_EXT_SKETCH_SEGS:
+            raise RuntimeError(f"{sketch_name} witness pick resolved to type {kind}")
+        segment = _early_bound(selection.GetSelectedObject6(1, -1), "ISketchSegment")
+        # Identify the pick by its own length, not its sketch's name: an
+        # ISketch is not an IFeature dispatch, so rebinding it reads another
+        # member (7885c0d9 got a 16-double matrix back for ``Name``).  The
+        # only other flank construction segment here is the front land's
+        # 19 mm witness.
+        name = str(segment.GetName())
+        length = float(segment.GetLength()) * 1000.0
+        expected = z1 - z0
+        construction = bool(segment.ConstructionGeometry)
+        if abs(length - expected) > REFERENCE_WITNESS_LEN_TOL or not construction:
+            raise RuntimeError(
+                f"{sketch_name} witness pick resolved to {name} "
+                f"({length:.3f} mm, want {expected:.3f}; construction={construction})"
+            )
         drawing.SetLineColor(REFERENCE_WITNESS_COLOR)
         draw.ClearSelection2(True)
         spans[sketch_name] = ends
         _telemetry.info(
-            f"pinion-arbor: {sketch_name} flank witness {picked} drawn black at "
-            f"sheet ({mid[0] * 1000:.1f}, {mid[1] * 1000:.1f}) mm",
+            f"pinion-arbor: {sketch_name} flank witness drawn black at sheet "
+            f"({mid[0] * 1000:.1f}, {mid[1] * 1000:.1f}) mm",
             sketch=sketch_name,
         )
     draw.EditRebuild3()
