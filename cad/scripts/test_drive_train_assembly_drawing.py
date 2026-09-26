@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+import _drawing_common
 import draw_drive_train_assembly as drawing
 import drive_train_assembly_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -129,7 +130,7 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
 
 
 def test_note_lines_fit_a_half_sheet_field() -> None:
-    """3.5 mm text renders about 2.63 mm per character; a field is 194 mm wide."""
+    """Every line fits a half-sheet field, 194 mm wide, at the default note size."""
     for text in (
         drawing.CONE_CRANK_STEPS,
         drawing.BANK_STEPS,
@@ -150,7 +151,7 @@ def test_note_lines_fit_a_half_sheet_field() -> None:
             foot=1,
             hold_down=2,
         ).splitlines():
-            assert len(line) <= 70, line
+            assert len(line) * _drawing_common.DEFAULT_NOTE_CHAR_WIDTH_M <= 0.194, line
 
 
 def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:

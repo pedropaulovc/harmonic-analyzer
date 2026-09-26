@@ -1929,6 +1929,15 @@ _LEADER_STRAIGHT = 1  # swLeaderStyle_e.swSTRAIGHT
 
 _OWNER_DRAWING_VIEW = 0  # swAnnotationOwner_e.swAnnotationOwner_DrawingView
 
+# add_note and add_leader_note size nothing: a note takes the document's
+# default note format. Measured on r743-rocker-fix3's render (leaf
+# 20260926T112244Z-1-a884759d): "TRANSFER FROM MHA-123", 21 characters,
+# spanned 57.6 mm and five lines stepped 4.45 mm. Every extent test of a
+# default-format note sizes it with these; a note given its own CharHeight
+# is measured on its own.
+DEFAULT_NOTE_CHAR_WIDTH_M = 0.00276
+DEFAULT_NOTE_LINE_PITCH_M = 0.0045
+
 
 @_telemetry.traced("drawing.leader_note", label_param="label")
 def add_leader_note(
@@ -1939,7 +1948,6 @@ def add_leader_note(
     attach_xy: tuple[float, float],
     label: str,
     view: Any = None,
-    height: float | None = None,
 ) -> Any:
     """A free note with one straight leader whose tip sits at ``attach_xy``.
 
@@ -1964,7 +1972,7 @@ def add_leader_note(
         name = view_name(adapter, view)
         if not ddoc.ActivateView(name):
             raise RuntimeError(f"{label}: failed to activate view {name!r} for the note")
-    note = add_note(adapter, text, *text_xy, height=height)
+    note = add_note(adapter, text, *text_xy)
     if note is None:
         raise RuntimeError(f"{label}: failed to insert the note {text!r}")
     annotation = _sw_type_info.early_bound_or_flag(
