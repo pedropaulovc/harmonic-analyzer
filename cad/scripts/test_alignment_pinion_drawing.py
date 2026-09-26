@@ -192,7 +192,13 @@ def test_hand_slide_fit_rides_the_bore_callout_not_a_note() -> None:
 
     callout = draw.DIMENSION_CALLOUTS["ArborBoreDia"]
     assert callout == spec.ARBOR_BORE_CALLOUT
-    assert "SLIDES ON MHA-102 BY HAND" in callout
+    arbor = _config.parts("pinion-arbor")
+    assert callout.splitlines()[1:] == [
+        f"SLIDES BY HAND ON {arbor['number']}",
+        arbor["title"].upper(),
+    ]
+    assert arbor["number"] == "MHA-102"
+    assert "PINION ARBOR" in callout
     for line in spec.DRAWING_NOTES.splitlines():
         assert "SLIDE" not in line and "BY HAND" not in line, line
 
@@ -240,3 +246,113 @@ def test_no_note_line_carries_a_dimension() -> None:
         text = re.sub(r"MHA-\d+", "", line).replace(spec.RETAINING_COMPOUND, "")
         assert not re.search(r"\d", text), line
 
+
+# --- The end-face finishes attach to an edge OF the face ----------------------
+# Leaf 20260926T113807Z-1-194b1994 (7b21b56c0): a point pick on the back face's
+# edge-on line took a longitudinal tooth edge ending there, and the control
+# check refused it.  These fakes stand in for the profile's edge scan and the
+# faces each edge bounds.
+
+
+class _Surface:
+    def __init__(self, identity: int, **params) -> None:
+        self.Identity = identity
+        for name, value in params.items():
+            setattr(self, name, value)
+
+
+class _Face:
+    def __init__(
+        self, surface: _Surface, box: tuple[float, ...], *, reversed_sense=False
+    ):
+        self.surface = surface
+        self.box = box
+        self.reversed_sense = reversed_sense
+
+    def GetSurface(self):
+        return self.surface
+
+    def GetBox(self):
+        return self.box
+
+    def FaceInSurfaceSense(self):
+        return self.reversed_sense
+
+
+class _Edge:
+    def __init__(self, *faces: _Face) -> None:
+        self.faces = faces
+
+    def GetTwoAdjacentFaces2(self):
+        return self.faces
+
+
+def _profile_faces() -> dict[str, _Face]:
+    from _part_pmi import _SURFACE_CYLINDER, _SURFACE_PLANE
+
+    tip_r = spec.OUTSIDE_DIA / 2000.0
+    length = spec.FACE_WIDTH / 1000.0
+    return {
+        "tip": _Face(
+            _Surface(_SURFACE_CYLINDER, CylinderParams=(0, 0, length, 0, 0, -1, tip_r)),
+            (-tip_r, -tip_r, 0.0, tip_r, tip_r, length),
+        ),
+        # A tooth flank: neither the tip cylinder nor an end plane.
+        "flank": _Face(_Surface(4009), (0.0, 0.0, 0.0, tip_r, tip_r, length)),
+        "back": _Face(
+            _Surface(_SURFACE_PLANE, PlaneParams=(0, 0, 1, 0, 0, length)),
+            (-tip_r, -tip_r, length, tip_r, tip_r, length),
+        ),
+        "front": _Face(
+            _Surface(_SURFACE_PLANE, PlaneParams=(0, 0, -1, 0, 0, 0)),
+            (-tip_r, -tip_r, 0.0, tip_r, tip_r, 0.0),
+        ),
+    }
+
+
+def _profile_scan(faces: dict[str, _Face]):
+    from _drawing_common import ViewEdge, ViewEdges
+
+    tip_r = spec.OUTSIDE_DIA / 2.0
+    rise = spec.OUTSIDE_DIA / 4.0  # the leader lands this high on the edge-on line
+    flank = ViewEdge(
+        edge=_Edge(faces["tip"], faces["flank"]),
+        line=((0.0, rise, 0.0), (0.0, rise, spec.FACE_WIDTH)),
+        circle=None,
+        vertices=None,
+    )
+    arcs = {
+        name: ViewEdge(
+            edge=_Edge(faces["tip"], faces[name]),
+            line=None,
+            circle=(0.0, 0.0, z, 0.0, 0.0, 1.0, tip_r),
+            vertices=None,
+        )
+        for name, z in (("back", spec.FACE_WIDTH), ("front", 0.0))
+    }
+    return ViewEdges("drum profile", (flank, arcs["back"], arcs["front"])), flank, arcs
+
+
+@pytest.mark.parametrize(("face", "z_mm"), [("back", spec.FACE_WIDTH), ("front", 0.0)])
+def test_end_face_finish_attaches_to_an_edge_of_its_own_face(face, z_mm) -> None:
+    import _drawing_common as dc
+    import draw_alignment_pinion as drawing
+    from _surface_finish import surface_finish_by_key
+
+    faces = _profile_faces()
+    scan, flank, arcs = _profile_scan(faces)
+    control = surface_finish_by_key(spec.SURFACE_FINISHES, f"{face}_end_face")
+    # A point pick at the leader's landing on the edge-on line meets the
+    # flank edge, which ENDS there -- and the control check refuses it.
+    leader = (0.0, spec.OUTSIDE_DIA / 4.0, z_mm)
+    assert leader in flank.line
+    with pytest.raises(RuntimeError, match="does not touch controlled"):
+        dc._validate_surface_finish_control_face(
+            flank.edge, entity_type="EDGE", control=control, label="point pick"
+        )
+    # The drawing's pick is the tip arc in that face, which the check accepts.
+    picked = drawing._end_face_tip_arc(scan, z_mm, label=f"{face} end face tip arc")
+    assert picked is arcs[face].edge
+    dc._validate_surface_finish_control_face(
+        picked, entity_type="EDGE", control=control, label="tip arc"
+    )
