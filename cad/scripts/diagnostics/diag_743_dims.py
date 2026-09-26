@@ -188,3 +188,113 @@ def set_display_mode(view: Any, mode: int, *, tag: str) -> None:
 def finish() -> None:
     _log(f"SUMMARY {len(_results)} lines")
     raise RuntimeError("DIAG743 probe complete (deliberate stop; nothing saved)")
+
+
+# --- rim-chamfer bisect inside de9db7ec3 (Main GO 2026-09-26) ---------------
+SW_SUPPRESS, SW_UNSUPPRESS = 0, 1  # swFeatureSuppressionAction_e
+SW_ALL_CONFIGURATIONS = 2  # swInConfigurationOpts_e
+
+
+def _part(view: Any) -> Any:
+    return _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
+
+
+def log_dim_annotation(view: Any, feature: str, *, tag: str) -> None:
+    """Where the part keeps each of the feature's display dims (its annotation
+    position and owning view plane), since GetAttachedEntities3 reads none."""
+    try:
+        feat = _early_bound(_early_bound(_part(view), "IPartDoc").FeatureByName(feature), "IFeature")
+        disp = feat.GetFirstDisplayDimension()
+        while disp is not None:
+            dd = _early_bound(disp, "IDisplayDimension")
+            dim = _early_bound(dd.GetDimension2(0), "IDimension")
+            ann = _early_bound(dd.GetAnnotation(), "IAnnotation")
+            position = ann.GetPosition()
+            _log(
+                f"{tag} annotation {dim.FullName} position_mm="
+                f"{_round(position[:3]) if position else None} "
+                f"type={dd.Type2} attached_count={len(ann.GetAttachedEntityTypes() or ())}"
+            )
+            disp = feat.GetNextDisplayDimension(disp)
+    except Exception as exc:  # noqa: BLE001
+        _log(f"{tag} annotation read failed: {exc!r}")
+
+
+def log_feature_state(view: Any, features: Sequence[str], *, tag: str) -> None:
+    part = _early_bound(_part(view), "IPartDoc")
+    for name in features:
+        try:
+            feat = _early_bound(part.FeatureByName(name), "IFeature")
+            code, warning = feat.GetErrorCode2()
+            _log(f"{tag} feature {name} suppressed={feat.IsSuppressed()} error={code} warning={warning}")
+        except Exception as exc:  # noqa: BLE001
+            _log(f"{tag} feature {name} state read failed: {exc!r}")
+
+
+def per_view_imports(adapter: Any, views: dict[str, Any], *, tag: str) -> None:
+    """Targeted RimChamfer, then entire-model, into each view in turn
+    (DuplicateDims is on, so one view's import does not starve the next)."""
+    for label, view in views.items():
+        import_variant(adapter, view, ["RimChamfer"], tag=f"{tag}-{label}-targeted")
+    for label, view in views.items():
+        import_variant(adapter, view, [], tag=f"{tag}-{label}-entire", option=FROM_ENTIRE_MODEL)
+
+
+def log_edge_visibility(adapter: Any, views: dict[str, Any], *, tag: str) -> None:
+    """Whether each view shows the rim chamfer's edges: the chamfer faces'
+    edges that lie in the web faces (|z| = 3.175 +/- 1.27) against each view's
+    visible edges."""
+    try:
+        body = _early_bound(_early_bound(_part(views["front"]), "IPartDoc").GetBodies2(0, True)[0], "IBody2")
+        feat = _early_bound(_early_bound(_part(views["front"]), "IPartDoc").FeatureByName("RimChamfer"), "IFeature")
+        faces = list(feat.GetFaces() or ())
+        chamfer_edges = set()
+        for face in faces:
+            for edge in _early_bound(face, "IFace2").GetEdges() or ():
+                chamfer_edges.add(_edge_key(edge))
+        _log(f"{tag} RimChamfer faces={len(faces)} edges={len(chamfer_edges)} body={body is not None}")
+        for label, view in views.items():
+            seen = _visible_edge_keys(view)
+            _log(f"{tag} view {label} shows {len(chamfer_edges & seen)}/{len(chamfer_edges)} chamfer-face edges")
+    except Exception as exc:  # noqa: BLE001
+        _log(f"{tag} edge visibility failed: {exc!r}")
+
+
+def _rebuild(adapter: Any, view: Any, *, tag: str) -> None:
+    part = _part(view)
+    ok_part = part.ForceRebuild3(False)
+    ok_draw = adapter.currentModel.ForceRebuild3(False)
+    _log(f"{tag} rebuild part={ok_part} drawing={ok_draw}")
+
+
+def set_suppressed(adapter: Any, view: Any, feature: str, suppressed: bool, *, tag: str) -> None:
+    try:
+        feat = _early_bound(_early_bound(_part(view), "IPartDoc").FeatureByName(feature), "IFeature")
+        action = SW_SUPPRESS if suppressed else SW_UNSUPPRESS
+        ok = feat.SetSuppression2(action, SW_ALL_CONFIGURATIONS, None)
+        _log(f"{tag} SetSuppression2({feature}, {action}) -> {ok}")
+        _rebuild(adapter, view, tag=tag)
+        _log(f"{tag} {feature} now suppressed={feat.IsSuppressed()}")
+    except Exception as exc:  # noqa: BLE001
+        _log(f"{tag} suppress {feature} failed: {exc!r}")
+
+
+def set_global(adapter: Any, view: Any, name: str, value: str, *, tag: str) -> None:
+    """Rewrite one equation-manager global on the open part (unsaved)."""
+    try:
+        part = _part(view)
+        manager = _sw_type_info.early_bound_or_flag(part.GetEquationMgr(), "IEquationMgr", "SetEquation", "Equation", "Value", "GetCount")
+        count = int(_read_member(manager, "GetCount") or 0)
+        lhs = f'"{name}"'
+        for index in range(count):
+            text = str(manager.Equation(index) or "")
+            if text.partition("=")[0].strip() == lhs:
+                manager.SetEquation(index, f"{lhs} = {value}")
+                _log(f"{tag} equation {text!r} -> {manager.Equation(index)!r} value={manager.Value(index)}")
+                break
+        else:
+            _log(f"{tag} global {name} not found in {count} equations")
+            return
+        _rebuild(adapter, view, tag=tag)
+    except Exception as exc:  # noqa: BLE001
+        _log(f"{tag} set global {name} failed: {exc!r}")

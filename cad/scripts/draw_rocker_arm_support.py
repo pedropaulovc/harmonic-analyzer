@@ -347,10 +347,20 @@ async def build(adapter: Any) -> dict[str, str]:
     # DIAG743 (throwaway): RimChamferSize's state and imports, then stop.
     from diagnostics import diag_743_dims as d743
 
-    d743.log_view_mode(front, tag="R0")
-    d743.log_feature_dims(adapter, front, "RimChamfer", tag="R0")
-    d743.import_variant(adapter, front, [], tag="R1-entire", option=d743.FROM_ENTIRE_MODEL)
-    d743.import_variant(adapter, front, ["RimChamfer"], tag="R3-targeted")
+    # Bisect inside de9db7ec3 (Main GO): B0 as built, B1 BracketSeats
+    # suppressed, B2 seats back and the rail at the source's 6.35. Unsaved.
+    views = {"front": front, "section": right, "bottom": bottom}
+    watched = ("WindowCut1", "WindowCut2", "RimChamfer", "BracketSeats")
+    d743.log_dim_annotation(front, "RimChamfer", tag="B0")
+    for tag in ("B0", "B1", "B2"):
+        if tag == "B1":
+            d743.set_suppressed(adapter, front, "BracketSeats", True, tag=tag)
+        if tag == "B2":
+            d743.set_suppressed(adapter, front, "BracketSeats", False, tag=tag)
+            d743.set_global(adapter, front, "RailDepth", "6.35mm", tag=tag)
+        d743.log_feature_state(front, watched, tag=tag)
+        d743.log_edge_visibility(adapter, views, tag=tag)
+        d743.per_view_imports(adapter, views, tag=tag)
     d743.finish()
 
     front_dimensions = curate_view_dimensions(
