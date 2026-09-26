@@ -1713,9 +1713,20 @@ def test_note_read_back_tolerates_how_a_multi_line_note_returns() -> None:
 
 
 class _RadiusDisplay:
-    def __init__(self, keeps: bool) -> None:
+    def __init__(self, keeps: bool, keeps_leader: bool) -> None:
         self.keeps = keeps
+        self.keeps_leader = keeps_leader
         self._side = 0  # swDimArrowsSmart
+        self._solid = True  # pc-r8: the line ran on through the hole
+
+    @property
+    def SolidLeader(self):  # noqa: N802 - the COM member name
+        return self._solid
+
+    @SolidLeader.setter
+    def SolidLeader(self, value):  # noqa: N802 - the COM member name
+        if self.keeps_leader:
+            self._solid = value
 
     @property
     def ArrowSide(self):  # noqa: N802 - the COM member name
@@ -1728,9 +1739,9 @@ class _RadiusDisplay:
 
 
 class _RadiusAnnotation:
-    def __init__(self, name: str, keeps: bool = True) -> None:
+    def __init__(self, name: str, keeps: bool = True, keeps_leader: bool = True) -> None:
         self.name = name
-        self.display = _RadiusDisplay(keeps)
+        self.display = _RadiusDisplay(keeps, keeps_leader)
 
     def GetSpecificAnnotation(self):  # noqa: N802 - the COM member name
         return self.display
@@ -1738,18 +1749,42 @@ class _RadiusAnnotation:
 
 def test_sr_leader_reaches_the_crown_from_outside(monkeypatch) -> None:
     """F2 (Main, pc-r6): the SR10.9 leader ran from the crown's centre through
-    the cross hole; its arrow now sits outside the arc, and a seat that drops
-    the setting fails loud."""
+    the cross hole; its arrow now sits outside the arc with no solid line on
+    to the centre (pc-r8 kept that line through the hole with the arrow
+    outside), and a seat that drops either setting fails loud."""
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
     monkeypatch.setattr(drawing, "dimension_name", lambda adapter, a: a.name)
     annotations = [_RadiusAnnotation("HeadLen"), _RadiusAnnotation("HeadCapR")]
     drawing._radius_leader_outside(None, annotations, "HeadCapR")
     assert annotations[1].display.ArrowSide == 1  # swDimArrowsOutside
+    assert annotations[1].display.SolidLeader is False
     assert annotations[0].display.ArrowSide == 0
+    assert annotations[0].display.SolidLeader is True
     stuck = [_RadiusAnnotation("HeadCapR", keeps=False)]
     with pytest.raises(RuntimeError, match="arrow outside the arc"):
         drawing._radius_leader_outside(None, stuck, "HeadCapR")
+    solid = [_RadiusAnnotation("HeadCapR", keeps_leader=False)]
+    with pytest.raises(RuntimeError, match="solid leader to the centre"):
+        drawing._radius_leader_outside(None, solid, "HeadCapR")
     with pytest.raises(RuntimeError, match="expected one HeadCapR"):
         drawing._radius_leader_outside(None, annotations[:1], "HeadCapR")
     source = inspect.getsource(drawing.build)
     assert '_radius_leader_outside(adapter, detail_annotations, "HeadCapR")' in source
+
+
+def test_sr_leader_aims_at_the_crown_arc_not_its_corner() -> None:
+    """pc-r8 eye pass: from (0.195, 0.262) the SR10.9 arrow met the crown at
+    its top corner, where the arc meets the head's flat, 38 degrees off the
+    axis at the text's centre but 43 as rendered (SolidWorks leads from the
+    text's near end).  The text now aims well inside the arc's half angle,
+    with more than that offset to spare."""
+    cx, cy = drawing.DETAIL_CENTER
+    centre_x = drawing._detail_x(spec.HEAD_FRONT_Z) - (
+        drawing.DETAIL_RATIO * (spec.HEAD_CAP_R - spec.HEAD_CAP_SAG) / 1000.0
+    )
+    half_angle = math.degrees(math.asin(spec.HEAD_DIA / 2.0 / spec.HEAD_CAP_R))
+    x, y = drawing.DETAIL_KEEP["HeadCapR"]
+    aim = math.degrees(math.atan2(y - cy, x - centre_x))
+    assert 0.0 < aim < half_angle - 15.0, (aim, half_angle)
+    # Left of the cross-hole callout's text, so its leader cannot cross it.
+    assert x < drawing.DETAIL_KEEP["CrossHoleDia"][0] - 0.030
