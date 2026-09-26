@@ -2845,6 +2845,10 @@ def task_check():
         # certify only through native evaluations, whatever ClosestDistance says.
         SCRIPTS_DIR / "test_vertical_spring_anchors.py",
         SCRIPTS_DIR / "test_seat_search.py",
+        # #923: every drawing prints a nil tolerance deviation as a bare 0, and
+        # no drawing text may add a signed nil band (the burn-down allowlist).
+        SCRIPTS_DIR / "test_tolerance_zero_display.py",
+        SCRIPTS_DIR / "test_fit_limits.py",
         # The [out]-param binding rule is ENFORCED, not just documented: no
         # VT_BYREF on the (uniformly early-bound) build path, late-bound probes
         # declare themselves, and _early_bound never falls back to a raw

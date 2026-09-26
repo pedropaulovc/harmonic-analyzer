@@ -50,7 +50,7 @@ def test_a_band_quotes_its_nominals_places():
 # --------------------------------------------------------------------------
 
 SCRIPTS = Path(__file__).resolve().parent
-BAND = re.compile(r"[+-]\d+\.\d+/[+-]\d+\.\d+")
+BAND = re.compile(r"[+-]\d+\.\d+\s*/\s*[+-]\d+\.\d+")
 SIGNED_NIL = re.compile(r"^[+-]0\.0+$")
 
 # (module, band text) -> (sites, owning PR)
@@ -92,7 +92,9 @@ def _strings(value: object, seen: set[int]):
 
 
 def _nil_bands(text: str) -> list[str]:
-    return [band for band in BAND.findall(text) if any(SIGNED_NIL.match(side) for side in band.split("/"))]
+    """Signed-nil bands in ``text``, normalized to ``upper/lower`` without spaces."""
+    bands = ["/".join(side.strip() for side in band.split("/")) for band in BAND.findall(text)]
+    return [band for band in bands if any(SIGNED_NIL.match(side) for side in band.split("/"))]
 
 
 def _signed_nil_bands() -> Counter[tuple[str, str]]:
@@ -142,6 +144,11 @@ def test_the_burn_down_detector_sees_a_band_an_f_string_assembles():
     rows = {"BASE-TANGENT SPAN": f"{3.964:.3f} +{band[0]:.3f}/{band[1]:.3f}"}
     assert [b for text in _strings(rows, set()) for b in _nil_bands(text)] == ["+0.000/-0.100"]
     assert _nil_bands(f"3.964 {band_text(band, decimals=3)}") == []
+
+
+def test_the_burn_down_detector_reads_through_spaces_around_the_slash():
+    """Codex P2 on #923: ``+0.000 / -0.100`` is the same band."""
+    assert _nil_bands(f"3.964 +{0.0:.3f} / {-0.1:.3f}") == ["+0.000/-0.100"]
 
 
 def test_the_burn_down_detector_sees_a_band_in_an_f_string_piece():
