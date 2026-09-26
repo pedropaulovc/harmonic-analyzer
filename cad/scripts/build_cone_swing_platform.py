@@ -370,7 +370,7 @@ NOTCH_RUN_DEG = math.degrees(math.atan2(_SLOT_TZ, _SLOT_TX))
 # mouth (cone_swing_platform_spec.NOTCH_MOUTH_ANGLE_DEG): both legs are real
 # edges, the vertex the mouth's SOUTH corner, whose material wedge -- the
 # inward rail against the edge running south -- is the acute one.  The stud's
-# chord makes NOTCH_CHORD_MOUTH_DEG (87.40) with it; the spec rounds that to
+# chord makes NOTCH_CHORD_MOUTH_DEG (87.38) with it; the spec rounds that to
 # the whole degree and the notch is CUT along the rounded angle (direction
 # NOTCH_CUT_U), so a protractor on the part reads the printed number.  The
 # stud still runs the chord: the rounding offset is a term of the stud stack.

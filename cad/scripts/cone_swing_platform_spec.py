@@ -124,6 +124,9 @@ POST_MOUNT_ENGAGEMENT_NOTE = (
 # one hex width across, so its walls stop the head turning while the nut is
 # tightened from above.
 #
+# The title block's location bands by decimal places.
+TITLE_BLOCK_BAND_BY_PLACES = {1: 0.8, 2: 0.51}
+
 # The block's own geometry, mirrored here because the plate may not import
 # cone_tip_block_spec; build_drive_train_assembly asserts each one equal to
 # the block spec's.  The block centre stands 11.0 south of the pivot (the
@@ -137,9 +140,25 @@ TIP_FLANGE_SLOT_X = 7.5
 TIP_FLANGE_SLOT_Z = 10.7  # FLANGE_SLOT_Z, from the block's south face
 # FLANGE_SLOT_FLOAT: the screw's float across the 5/32 +0.10/0 flange slot.
 TIP_FLANGE_SLOT_FLOAT = (5.0 / 32.0 * 25.4 + 0.10 - 3.505) / 2.0
-# How far north the shaft tip can set the block's north face: the shaft's
-# overall length Sec4End at .X (the heel-relief check's HEEL_TIP_TRAVEL).
-TIP_BLOCK_NORTH_TRAVEL = 0.8
+# How far north the shaft tip can set the block's north face (#917 S1: the
+# shaft is located by its collar against the post's cone boss, and the post by
+# transfer at fit-up):
+#   - the tip from the collar face, the shaft's Sec4End at .X (the heel-relief
+#     check's HEEL_TIP_TRAVEL; a literal, the plate may not import the shaft
+#     spec);
+#   - the post's cone-boss face-to-face (ConeBossLen) at its printed grade,
+#     read from the post's own precision;
+#   - the post's transfer at fit-up (the plan's T-A TRANSFER_POST_LATERAL).
+_TIP_FROM_COLLAR_BAND = 0.8
+_POST_CONE_BOSS_BAND = TITLE_BLOCK_BAND_BY_PLACES[
+    cone_pivot_post_spec.DRAWING_PRECISION_BY_NAME["ConeBossLen"]
+]
+_POST_TRANSFER = 0.05
+TIP_BLOCK_NORTH_TRAVEL = _TIP_FROM_COLLAR_BAND + _POST_CONE_BOSS_BAND + _POST_TRANSFER
+if round(TIP_BLOCK_NORTH_TRAVEL, 2) != 1.65:
+    raise AssertionError(
+        f"tip block north travel reads {TIP_BLOCK_NORTH_TRAVEL:.3f}, not the ruled 1.65"
+    )
 # The lateral slot sits under the flange slot's centre.
 TIP_SCREW_LOCAL_Z = TIP_BLOCK_LOCAL_Z - (TIP_BLOCK_HALF_DEPTH + TIP_FLANGE_SLOT_Z)
 # Both slots share two end centres TIP_SCREW_HALF_TRAVEL either side of the
@@ -170,7 +189,7 @@ TIP_CBORE_W = 6.5
 TIP_SLOT_W_BAND = (0.10, 0.0)
 TIP_CBORE_W_BAND = (0.10, 0.0)
 TIP_CBORE_DEPTH = 3.00  # .XX
-_XX = 0.51
+_XX = TITLE_BLOCK_BAND_BY_PLACES[2]
 _TIP_SLOT_W_LOWER, _TIP_SLOT_W_UPPER = deviations(TIP_SLOT_W_BAND)
 _TIP_CBORE_W_LOWER, _TIP_CBORE_W_UPPER = deviations(TIP_CBORE_W_BAND)
 TIP_SLOT_W_MIN = TIP_SLOT_W + _TIP_SLOT_W_LOWER
@@ -384,22 +403,21 @@ NOTCH_W_MIN = NOTCH_W + _NOTCH_W_LOWER
 # McMaster 91882A425 (the cone lock knob): a 1/4-20 stud, basic major 6.35;
 # build_cone_swing_platform asserts it equals build_cone_lock_knob.STUD_DIA.
 LOCK_STUD_MAJOR = 0.25 * 25.4
-# The title block's location bands by decimal places, and its flat angular
-# band.
-TITLE_BLOCK_BAND_BY_PLACES = {1: 0.8, 2: _XX}
+# The title block's flat angular band (its location bands are above).
 TITLE_BLOCK_ANGLE_BAND_DEG = 1.0
 # The notch's run is set on the print by its angle to the plate's WEST edge
 # at the mouth -- both legs drawn, the vertex the real mouth corner, a
 # protractor check (Main, MHA-091 round 6; the old angle ran from a hidden
 # east-west construction ray).  The stud's own path is the chord tangent to
-# its swing arc, 87.40 deg off that edge (the edge leans 6.51 deg off the
+# its swing arc, 87.38 deg off that edge (the edge leans 6.53 deg off the
 # plate axis, the chord 9.11 deg off east-west); build_cone_swing_platform
 # derives it.  The angle is not critical (the channel keeps ~0.2 of slack,
 # some 4.6 deg over the 2.78 exit travel), so the notch is authored at the
-# whole degree and cut along it: the 0.40 deg offset joins the title block's
+# whole degree and cut along it: the 0.38 deg offset joins the title block's
 # band in the stud stack below.  #917 S1's wider north-west (WEST_HALF_N
-# 11.0 -> 11.5, for the +/-2.5 tip slot) tilted the edge 0.13 deg, taking the
-# chord from 87.53 to 87.40 deg: the whole degree went 88 -> 87.
+# 11.0 -> 11.6, for the +/-2.5 tip slot and the block's 1.65 north travel)
+# tilted the edge 0.15 deg, taking the chord from 87.53 to 87.38 deg: the
+# whole degree went 88 -> 87.
 NOTCH_MOUTH_ANGLE_DEG = 87.0
 
 

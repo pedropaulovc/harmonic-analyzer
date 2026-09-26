@@ -187,7 +187,7 @@ def test_a7_post_dowel_webs() -> None:
             "plate tap major": 14.253,
             "plate south edge": 9.472,
             "east edge": 18.153,
-            "west edge": 31.028,
+            "west edge": 31.035,
             "notch cap E": 24.212,
             "knob collar in plan": 22.157,
             "journal bore vertical": 18.725,
