@@ -2760,3 +2760,68 @@ def test_a_hole_callout_over_the_top_border_gates_estimated_or_printed():
     assert severity(estimated) is FindingSeverity.GATING
     [printed] = breaches(_dump(views=[view], strokes=_edges((0.06, 0.06, 0.09, 0.06))))
     assert printed.b == "top border"
+
+
+def test_every_auto_center_marks_call_records_its_counts(monkeypatch):
+    """#913 (2): _drawing_common registers the submodule's observer, and each
+    call lands as a center_marks.auto_insert span event."""
+    import _drawing_common
+    import _telemetry
+    from solidworks_mcp.adapters.solidworks import drawing as sw_drawing
+
+    assert sw_drawing.CENTER_MARK_OBSERVER is _drawing_common._record_center_marks
+    events = []
+    monkeypatch.setattr(_telemetry, "event", lambda name, **attrs: events.append((name, attrs)))
+    marks = ["template-mark"]
+
+    class View:
+        def AutoInsertCenterMarks2(self, *_args):  # noqa: N802 - COM name
+            marks.append("explicit-mark")
+            return True
+
+        def GetAnnotationsByType(self, kind):  # noqa: N802 - COM name
+            return tuple(marks) if kind == 13 else ()
+
+        def GetName2(self):  # noqa: N802 - COM name
+            return "Drawing View1"
+
+    class Adapter:
+        @staticmethod
+        def _attempt(fn, default=None):
+            try:
+                return fn()
+            except Exception:
+                return default
+
+    assert sw_drawing.auto_center_marks(Adapter(), View(), holes=True) is True
+    assert events == [
+        (
+            "center_marks.auto_insert",
+            {"view": "Drawing View1", "before": 1, "after": 2, "holes": True, "slots": False, "ok": True},
+        )
+    ]
+
+
+def test_a_refused_center_mark_count_is_sent_as_a_primitive(monkeypatch):
+    """OTel drops None attribute values: a count whose read raised goes out as
+    -1 and is named in read_failed; the view is its name string."""
+    import _drawing_common
+    import _telemetry
+
+    events = []
+    monkeypatch.setattr(_telemetry, "event", lambda name, **attrs: events.append((name, attrs)))
+    _drawing_common._record_center_marks(
+        {"view": "Drawing View2", "before": None, "after": 3, "holes": True, "slots": False, "ok": True}
+    )
+    [(name, attrs)] = events
+    assert name == "center_marks.auto_insert"
+    assert attrs == {
+        "view": "Drawing View2",
+        "before": -1,
+        "after": 3,
+        "holes": True,
+        "slots": False,
+        "ok": True,
+        "read_failed": ["before"],
+    }
+    assert all(isinstance(value, (str, bool, int, float, list)) for value in attrs.values())
