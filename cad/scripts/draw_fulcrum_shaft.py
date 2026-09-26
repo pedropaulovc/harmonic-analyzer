@@ -71,9 +71,9 @@ ISO_SCALE = (1, 2)
 # horizontally through the centre instead of diagonally.  x=0.030, not the old
 # bbox-derived 0.0173: the callout is centred on its anchor and ~22 mm wide now
 # that it renders horizontally, so 0.0173 printed it across the border rule at
-# ~0.0126.  The layout audit cannot catch that: it boxes a dim as a nominal 4 mm
-# half-square (_NOMINAL_DIM_HALF_M), far narrower than the real text, and even
-# that box cleared the 12.7 mm zone margin at 0.0173.
+# ~0.0126.  The layout audit of the time missed it: it boxed a dim as a nominal
+# 4 mm half-square, far narrower than the real text, and even that box cleared
+# the 12.7 mm zone margin at 0.0173 (the shared audit now boxes the real text).
 FRONT_KEEP = {
     "ShaftDia": (0.030, FRONT_CENTER[1]),
 }
