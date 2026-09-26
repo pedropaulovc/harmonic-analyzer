@@ -1542,6 +1542,33 @@ def test_print_worst_containment_fails_loud_on_the_east_datum() -> None:
     ) in source
 
 
+def test_print_worst_containment_fails_off_the_plate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CodeRabbit (#838): the print-worst check read the plate's side edges by
+    extrapolating them, so a flange run off the plate's south end still found
+    'plate' there, and the extrapolated edges widen southwards.  A station off
+    the plate must fail loud, as the nominal loop's _plat_half_width does."""
+    import build_drive_train_assembly as drive_train
+
+    south_end = (
+        drive_train.PIVOT_STATION + drive_train.PLAT_OVERHANG - drive_train.PLAT_LEN
+    )
+    flange_south = (
+        drive_train.TIP_BLOCK_STATION
+        - drive_train.TIP_BLOCK_Z / 2.0
+        - drive_train.TIP_FLANGE_LEN
+    )
+    past_the_end = drive_train.TIP_FLANGE_LEN + (flange_south - south_end) + 1.0
+    monkeypatch.setattr(drive_train, "TIP_FLANGE_LEN", past_the_end)
+    with pytest.raises(AssertionError, match="overhang the swing platform"):
+        drive_train.tip_block_print_worst_containment_mm({"+X": 1.0, "-X": 1.0})
+    assert drive_train._plat_side_half_widths(south_end - 1.0) == {"+X": -1.0, "-X": -1.0}
+    assert drive_train._plat_side_half_widths(
+        drive_train.PIVOT_STATION + drive_train.PLAT_OVERHANG + 1.0
+    ) == {"+X": -1.0, "-X": -1.0}
+
+
 def test_drive_train_screw_keeps_1_5d_past_the_far_wall() -> None:
     """The drive train's own check read the NEAR jaw at nominal (12.7 -
     (15 - 1.2)/2 >= 1.5 mm).  The placed screw keeps 1.5D past the printed

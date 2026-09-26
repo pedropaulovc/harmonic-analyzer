@@ -935,19 +935,27 @@ if abs(SHAFT_FRONT_STATION + SHAFT_FRONT_STUB) > 1e-9:
     raise AssertionError("SHAFT_FRONT_STATION out of sync with the shaft FRONT_STUB")
 
 
+def _plat_side_half_widths(s: float) -> dict[str, float]:
+    """The plate's own east (+X) and west (-X) half-widths at cone station
+    ``s``; both negative if s is off the plate, so a rider run past either
+    end fails its containment check instead of reading extrapolated edges."""
+    z_local = s - PIVOT_STATION  # platform local z (+ along increasing station)
+    if not (PLAT_OVERHANG - PLAT_LEN - 1e-9 <= z_local <= PLAT_OVERHANG + 1e-9):
+        return {"+X": -1.0, "-X": -1.0}
+    frac = (PLAT_OVERHANG - z_local) / PLAT_LEN
+    return {
+        "+X": PLAT_EAST_N + (PLAT_EAST_S - PLAT_EAST_N) * frac,
+        "-X": PLAT_WEST_N + (PLAT_WEST_S - PLAT_WEST_N) * frac,
+    }
+
+
 def _plat_half_width(s: float) -> float:
     """Platform MIN half-width at cone station s: the narrower of the east
     taper and the west flare (the west-tip trim makes the WEST side the
     narrow one near the north end -- 8 vs 12); negative if s is off the
     plate. Riders are centred on the shaft plan line (local x 0), so the
     narrower side at each station bounds their containment."""
-    z_local = s - PIVOT_STATION  # platform local z (+ along increasing station)
-    if not (PLAT_OVERHANG - PLAT_LEN - 1e-9 <= z_local <= PLAT_OVERHANG + 1e-9):
-        return -1.0
-    frac = (PLAT_OVERHANG - z_local) / PLAT_LEN
-    east = PLAT_EAST_N + (PLAT_EAST_S - PLAT_EAST_N) * frac
-    west = PLAT_WEST_N + (PLAT_WEST_S - PLAT_WEST_N) * frac
-    return min(east, west)
+    return min(_plat_side_half_widths(s).values())
 
 
 # Both riders stand fully ON the plate (plan, in the platform's own inclined
@@ -977,15 +985,6 @@ for _lbl, _s0, _hx, _hz in (
 # to the foot flange's south end (the flange is the block's full width, and
 # the plate's edges run straight between those stations).
 TIP_PRINT_WORST_MARGIN_MM = 0.25
-
-
-def _plat_side_half_widths(s: float) -> dict[str, float]:
-    """The plate's own east and west half-widths at cone station ``s``."""
-    frac = (PLAT_OVERHANG - (s - PIVOT_STATION)) / PLAT_LEN
-    return {
-        "+X": PLAT_EAST_N + (PLAT_EAST_S - PLAT_EAST_N) * frac,
-        "-X": PLAT_WEST_N + (PLAT_WEST_S - PLAT_WEST_N) * frac,
-    }
 
 
 def tip_block_print_worst_containment_mm(half_widths: dict[str, float]) -> float:
