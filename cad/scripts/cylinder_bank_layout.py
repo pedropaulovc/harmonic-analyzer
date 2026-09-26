@@ -23,9 +23,12 @@ strap.
   The feeler is chosen by the rule ``pinion_rig_layout`` uses for its drum
   shim: the smallest 0.05 blade whose tightest setting keeps MIN_END_PLAY with
   MARGIN_SPARE to spare.
-* Every gear's overall thickness is +0.05/0 on its print. A fit-up acceptance
-  on the measured 20-gear stack (STACK_L20_ACCEPT) caps the cumulative excess,
-  so g0's position relative to g19 never carries 19 per-gear bands.
+* Every gear's overall thickness is +/-0.025 on its print (user ruling L20
+  d'). A fit-up acceptance on the measured 20-gear stack (STACK_L20_ACCEPT,
+  +/-0.20) caps the cumulative deviation, so g0's position relative to g19
+  never carries 19 per-gear bands. A part of the stack is not capped by the
+  acceptance alone: its gears may all lean one way while the rest lean the
+  other (partial_stack_band).
 
 The bank is not preloaded. So in service any one gear interface can open by up
 to E_b max, and a connecting-rod ring pressed toward the gear in front of it
@@ -44,6 +47,7 @@ import math
 import _config
 import arbor_pedestal_spec as _pedestal
 import arbor_set_screw_spec as _screw
+import connecting_rod_spec as _rod
 import cylinder_gear_shaft_spec as _shaft
 from cylinder_end_disc_spec import (
     WASHER_THICK,
@@ -106,13 +110,43 @@ THERMAL_END_PLAY_DRIFT = (19e-6 - 11e-6) * OVERALL_THICKNESS * COUNT * 15.0
 
 # --- stack length acceptance -------------------------------------------------
 STACK_L20 = COUNT * OVERALL_THICKNESS  # g0 cam face to g19 back face
-STACK_L20_ACCEPT_BAND = (0.20, 0.0)  # (upper, lower): re-face a long stack
+# (upper, lower): re-face a long stack; remake the thinnest gear of a short
+# one, which no re-facing can lengthen (user ruling L20 d', #743).
+STACK_L20_ACCEPT_BAND = (0.20, -0.20)
 STACK_L20_ACCEPT = (
     STACK_L20 + STACK_L20_ACCEPT_BAND[1],
     STACK_L20 + STACK_L20_ACCEPT_BAND[0],
 )
-if OVERALL_THICKNESS_BAND[1] < 0.0:
-    raise AssertionError("a thin gear cannot be fixed at fit-up; keep T +/0")
+# Each gear's mic acceptance at fit-up, the print's band.
+GEAR_THICKNESS_ACCEPT = (
+    OVERALL_THICKNESS + OVERALL_THICKNESS_BAND[1],
+    OVERALL_THICKNESS + OVERALL_THICKNESS_BAND[0],
+)
+# Was "keep T +/0: a thin gear cannot be fixed at fit-up". Under d' a thin
+# gear is in band, which holds only while both bands stay centred, so an
+# in-band stack sits about nominal and the acceptance rejects it either way.
+# (The thinnest in-band cam must still hold the whole ring: RING_SLOT_MARGIN.)
+if (
+    OVERALL_THICKNESS_BAND[0] != -OVERALL_THICKNESS_BAND[1]
+    or STACK_L20_ACCEPT_BAND[0] != -STACK_L20_ACCEPT_BAND[1]
+):
+    raise AssertionError(
+        "gear thickness and 20-gear stack bands must both be centred: "
+        f"T {OVERALL_THICKNESS_BAND}, L20 {STACK_L20_ACCEPT_BAND}"
+    )
+
+
+def partial_stack_band(n: int) -> tuple[float, float]:
+    """(upper, lower) summed thickness deviation of any n gears of an
+    accepted stack: each gear inside its band, all COUNT inside the
+    acceptance, so the other COUNT - n may lean the opposite way."""
+    upper, lower = OVERALL_THICKNESS_BAND
+    accept_upper, accept_lower = STACK_L20_ACCEPT_BAND
+    rest = COUNT - n
+    return (
+        min(n * upper, accept_upper - rest * lower),
+        max(n * lower, accept_lower - rest * upper),
+    )
 
 # --- nominal stations (bank pushed back against the datum) -----------------
 G19_BACK_FACE_Z = station_z(COUNT - 1) + FACE_WIDTH / 2.0
@@ -168,39 +202,52 @@ if SET_SCREW_POINT_MARGIN < SET_SCREW_POINT_MARGIN_MIN:
     )
 
 # --- g0 -> g19 pitch-stack band ---------------------------------------------
-# g0's tooth-front face sits at g19's back face - L20 + (T0 - FW0).
+# g0's tooth-front face sits at g19's back face - L20 + (T0 - FW0), i.e. g19's
+# back face less gears 1-19 and gear 0's face width.
 G0_FRONT_FROM_G19_BACK = G0_TOOTH_FRONT_Z - G19_BACK_FACE_Z
+_G1_G19_BAND = partial_stack_band(COUNT - 1)
 G0_FRONT_SOUTH_STACK = {
-    "20-gear stack acceptance (L20 +0.20/0)": STACK_L20_ACCEPT_BAND[0],
+    "gears 1-19 overall thickness, long (L20 +/-0.20)": _G1_G19_BAND[0],
     "gear 0 face width (+0.05)": FACE_WIDTH_TOLERANCE_MM,
     "bank end play E_b max": BANK_END_PLAY[1],
 }
 G0_FRONT_NORTH_STACK = {
-    "gear 0 overall thickness (+0.05/0)": OVERALL_THICKNESS_BAND[0],
+    "gears 1-19 overall thickness, short (L20 +/-0.20)": -_G1_G19_BAND[1],
     "gear 0 face width (-0.05)": FACE_WIDTH_TOLERANCE_MM,
 }
 # The pitch-stack band alone (without end play), south / north of nominal.
 G0_G19_BAND = (
-    -(STACK_L20_ACCEPT_BAND[0] + FACE_WIDTH_TOLERANCE_MM),
-    OVERALL_THICKNESS_BAND[0] + FACE_WIDTH_TOLERANCE_MM,
+    -(_G1_G19_BAND[0] + FACE_WIDTH_TOLERANCE_MM),
+    -_G1_G19_BAND[1] + FACE_WIDTH_TOLERANCE_MM,
 )
 # g19 is the datum: the rig sets its leaf D off g19's back face with the bank
 # pushed back (north), so g19 can only move south of that, by the end play.
 G19_BACK_NORTH_STACK: dict[str, float] = {}
 G19_BACK_SOUTH_STACK = {"bank end play E_b max": BANK_END_PLAY[1]}
-# Any intermediate gear's tooth-face mid-plane against its nominal, bank
-# pushed back: the acceptance caps the excess of the gears north of it.
+# Any gear's tooth-face mid-plane against its nominal, bank pushed back: the
+# gears north of it, capped by partial_stack_band, not by the acceptance. With
+# centred bands the worst station is not g0 but the one with 14 gears north.
+_NORTH_OF_STATION = [partial_stack_band(COUNT - 1 - j) for j in range(COUNT)]
 STATION_STACK_BAND = (
-    -(STACK_L20_ACCEPT_BAND[0] + FACE_WIDTH_TOLERANCE_MM / 2.0),
-    FACE_WIDTH_TOLERANCE_MM / 2.0,
+    -(max(upper for upper, _ in _NORTH_OF_STATION) + FACE_WIDTH_TOLERANCE_MM / 2.0),
+    -min(lower for _, lower in _NORTH_OF_STATION) + FACE_WIDTH_TOLERANCE_MM / 2.0,
 )
 
 # --- ring support -----------------------------------------------------------
 # A closed slot IS the cam: gear j's web to gear j-1's back face. Its smallest
-# width is the thinnest cam (T at nominal, FW at its top).
+# width is the thinnest cam (T at its bottom, FW at its top).
 SLOT_MIN = OVERALL_THICKNESS + OVERALL_THICKNESS_BAND[1] - (
     FACE_WIDTH + FACE_WIDTH_TOLERANCE_MM
 )
+# The thinnest in-band cam still holds the thickest ring with the novice spare
+# (the restated "keep T +/0": a thin gear is in band only while this holds).
+RING_MAX = _rod.RING_THICKNESS + _rod.RING_THICKNESS_BAND[0]
+RING_SLOT_MARGIN = SLOT_MIN - RING_MAX
+if RING_SLOT_MARGIN < MARGIN_SPARE:
+    raise AssertionError(
+        f"the thinnest cam slot {SLOT_MIN:.4f} holds the thickest ring "
+        f"{RING_MAX:.3f} by {RING_SLOT_MARGIN:.3f} < {MARGIN_SPARE}"
+    )
 RING_OVERHANG_MAX = BANK_END_PLAY[1]
 
 # --- datum chain for the cone-mesh axial budget -----------------------------
@@ -245,7 +292,10 @@ __all__ = [
     "G19_BACK_FACE_Z",
     "G19_BACK_NORTH_STACK",
     "G19_BACK_SOUTH_STACK",
+    "GEAR_THICKNESS_ACCEPT",
+    "RING_MAX",
     "RING_OVERHANG_MAX",
+    "RING_SLOT_MARGIN",
     "SLOT_MIN",
     "STACK_L20",
     "STACK_L20_ACCEPT",
@@ -253,5 +303,6 @@ __all__ = [
     "STATION_Z0",
     "STRAP_INNER_SPAN",
     "THERMAL_END_PLAY_DRIFT",
+    "partial_stack_band",
     "station_z",
 ]

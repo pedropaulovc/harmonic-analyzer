@@ -583,8 +583,9 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "CamProfile", "CamDia", *deviations(CAM_DIA_BAND)
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "CamBoss", "OverallThickness", *deviations(OVERALL_THICKNESS_BAND)
+    # Centred (cylinder_bank_layout asserts it), so it prints +/-.
+    set_dimension_symmetric_tolerance(
+        adapter, "CamBoss", "OverallThickness", OVERALL_THICKNESS_BAND[0]
     )
     set_dimension_symmetric_tolerance(
         adapter,

@@ -68,8 +68,9 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
     """Policy rule 2: places are the tolerance, so the .SLDPRT carries them.
 
     Three places only where a three-place band rides the dimension (the
-    matched bore's reference nominal, the cam eccentricity, the stacking
-    thickness that sets the station pitch, #743); the cam thickness is the one
+    matched bore's reference nominal, the cam eccentricity); four on the
+    stacking thickness that sets the station pitch, 7.0565 +/-0.025, exact
+    only at four (#743, user ruling L20 d'); the cam thickness is the one
     sheet-derived value, a parenthesised reference.
     """
     by_name = spec.DRAWING_PRECISION_BY_NAME
@@ -77,6 +78,8 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
     assert {name for name, places in by_name.items() if places == 3} == {
         "BoreDia",
         "CamCy",
+    }
+    assert {name for name, places in by_name.items() if places == 4} == {
         "OverallThickness",
     }
     assert spec.DRAWING_REFERENCE_PRECISION == {"cam thickness reference": 2}
@@ -111,9 +114,9 @@ def test_stacking_thickness_is_the_held_marked_dimension() -> None:
     import cylinder_gear_notes as notes
 
     # The overall thickness sets every station of the solid bank (#743), so it
-    # is a marked model dimension printed to three places with its own band;
+    # is a marked model dimension printed to four places with its own band;
     # the cam thickness between it and the face width is only a reference.
     assert spec.DRAWING_DIMENSIONS["CamBoss"] == {"OverallThickness"}
-    assert spec.DRAWING_PRECISION_BY_NAME["OverallThickness"] == 3
+    assert spec.DRAWING_PRECISION_BY_NAME["OverallThickness"] == 4
     assert "OverallThickness" in drawing.RIGHT_KEEP
     assert f"{bank.RING_OVERHANG_MAX:.2f}" in notes.STACK_FIT_CALLOUT
