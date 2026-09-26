@@ -415,6 +415,64 @@ def _verify_tip_view(adapter: Any, front: Any, tip: Any) -> None:
             f"{parenthesis}), expected {CUT_END_BREAK_TEXT!r}"
         )
     _telemetry.success(f"tip view {ratio[0]:g}:{ratio[1]:g} reads {text}")
+    _probe_max_text(adapter, annotation)
+
+
+# diag (#923 MAX/MIN, never merge): what prints the break's "max." text.
+_PREF_INTS = {"swDetailingDimensionStandard": 13}
+_PREF_STRINGS = {"swDetailingDimensionStandardName": 65, "swFileLocationsDraftingStandard": 64}
+_PREF_TOGGLES = {
+    "swDetailingAllUpperCase": 538,
+    "swDraftingStandardUppercase": 552,
+    "swDraftingStandardAllUppercaseForDimensionsAndHoleCallouts": 754,
+}
+
+
+def _probe_max_text(adapter: Any, annotation: Any) -> None:
+    """Log the drafting-standard prefs and the break's rendered strings under
+    each variant; restores every pref it touched. Never raises."""
+    draw = adapter.currentModel
+    ext = draw.Extension
+
+    def rendered() -> list[str]:
+        data = _early_bound(annotation, "IAnnotation").GetDisplayData()
+        if data is None:
+            return ["<no display data>"]
+        data = _early_bound(data, "IDisplayData")
+        return [str(data.GetTextAtIndex(i)) for i in range(int(data.GetTextCount()))]
+
+    def prefs() -> dict[str, object]:
+        out: dict[str, object] = {}
+        for name, pref in _PREF_INTS.items():
+            out[name] = int(ext.GetUserPreferenceInteger(pref, 0))
+        for name, pref in _PREF_STRINGS.items():
+            out[name] = str(ext.GetUserPreferenceString(pref, 0))
+        for name, pref in _PREF_TOGGLES.items():
+            out[name] = bool(ext.GetUserPreferenceToggle(pref, 0))
+        return out
+
+    def log(variant: str) -> None:
+        draw.EditRebuild3()
+        _telemetry.info(f"maxmin-diag {variant}: texts={rendered()!r} prefs={prefs()!r}")
+
+    try:
+        import socket
+
+        _telemetry.info(f"maxmin-diag host={socket.gethostname()}")
+        base = prefs()
+        log("baseline")
+        for name in ("swDraftingStandardAllUppercaseForDimensionsAndHoleCallouts", "swDetailingAllUpperCase"):
+            pref = _PREF_TOGGLES[name]
+            ok = ext.SetUserPreferenceToggle(pref, 0, True)
+            log(f"{name}=True (set {ok!r})")
+            ext.SetUserPreferenceToggle(pref, 0, bool(base[name]))
+        for standard in (1, 2):  # swDetailingStandardANSI, swDetailingStandardISO
+            ok = ext.SetUserPreferenceInteger(13, 0, standard)
+            log(f"swDetailingDimensionStandard={standard} (set {ok!r})")
+        ext.SetUserPreferenceInteger(13, 0, int(base["swDetailingDimensionStandard"]))
+        log("restored")
+    except Exception as exc:  # noqa: BLE001 - diagnostic must never fail the leaf
+        _telemetry.warn(f"maxmin-diag failed: {exc!r}")
 
 
 def _reference_cut_length(adapter: Any, annotations: list[Any]) -> None:
