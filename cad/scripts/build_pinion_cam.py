@@ -16,7 +16,7 @@ stated 0.575-mm wall over the Ø6.37 bore; the former Ø9.2 literal left only
 Layout: bore axis Z through the ORIGIN (rides the rod), authored in the
 PARK pose -- collar centre at (0, -ECC), heavy side and the set-pin
 boss straight DOWN, so the OD top is at its lowest (disengaged rest).
-Collar z 0..9; boss along -Y at z 2.5, 2.0 proud of the OD.
+Collar z 0..9; boss along -Y at z 3.0, nominally 0.5 proud of the OD.
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 
@@ -51,6 +51,7 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -71,15 +72,14 @@ from pinion_cam_geometry import (
     ECC,
     TAP_DRILL_DIA,
 )
+from _named_views import name_octant_views
 from pinion_cam_spec import (
     BORE_BAND,
-    BOSS_DIA_TOLERANCE_MM,
-    BOSS_PROJECTION_TOLERANCE_MM,
     COLLAR_AXIS_TOLERANCE_MM,
-    COLLAR_DEPTH_TOLERANCE_MM,
     COLLAR_OD_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     SURFACE_FINISHES,
 )
@@ -220,8 +220,8 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "bore", V_COLLAR, 0.005 * V_COLLAR)
 
     # Set-pin boss (item 8b): a radial stub straight DOWN the heavy side,
-    # 2.0 proud of the OD -- the img01 dome. Top sketch (u, v) -> (X, -Z);
-    # extruded -Y from an anchor plane fully inside the collar.
+    # nominally 0.5 proud of the OD -- the img01 dome. Top sketch (u, v) ->
+    # (X, -Z); extruded -Y from an anchor plane fully inside the collar.
     boss = SketchDims()
     check("create_sketch boss", await adapter.create_sketch("Top"))
     await define_circle(
@@ -242,9 +242,9 @@ async def build(adapter) -> dict[str, str]:
     extrude_at_offset(adapter, _BOSS_TOP_Y - boss_root_y, boss_root_y)
     name_last_feature(adapter, "SetPinBossRoot")
 
-    # A second, coaxial extrusion carries only the projection beyond the OD's
-    # lowest tangent plane. Its depth is therefore the actual make-critical
-    # projection, not prose derived from the full embedded boss length.
+    # A second, coaxial extrusion carries the nominal cosmetic projection
+    # beyond the OD's lowest tangent plane.  The drawing prints this model
+    # value as reference rather than inventing a tight projection band.
     projection = SketchDims()
     check("create_sketch boss projection", await adapter.create_sketch("Top"))
     await define_circle(
@@ -329,8 +329,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven cam (equations neutral)", volume, 0.01 * V_COLLAR
     )
 
-    # Manufacturing drawing support: mark exactly the print's dimensions and
-    # stamp the make-critical title-block properties.
+    # Manufacturing drawing support: the bands and decimal places live on the
+    # model dimensions (policy rule 2 -- the places are the tolerance, so the
+    # sheet reads them back instead of rewriting them); mark exactly the
+    # print's dimensions and stamp the make-critical title-block properties.
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *deviations(BORE_BAND)
     )
@@ -340,18 +342,8 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "CollarProfile", "CollarCy", COLLAR_AXIS_TOLERANCE_MM
     )
-    set_dimension_symmetric_tolerance(
-        adapter, "Collar", "Depth", COLLAR_DEPTH_TOLERANCE_MM
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "BossProfile", "BossDia", BOSS_DIA_TOLERANCE_MM
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "SetPinBossProjection",
-        "BossProjection",
-        BOSS_PROJECTION_TOLERANCE_MM,
-    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    name_octant_views(adapter, label=PART_NAME)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

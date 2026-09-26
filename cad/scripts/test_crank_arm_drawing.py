@@ -9,9 +9,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import crank_arm_spec
 import draw_crank_arm as drawing
 import build_crank_arm as arm
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm, drill_process
 
@@ -49,44 +52,52 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert crank_arm_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
 
 
-def test_notes_are_specific_and_never_repeat_the_title_block() -> None:
-    notes = crank_arm_spec.DRAWING_NOTES
-    assert "HANDLE PIVOT" not in notes
-    assert "HANDLE PIVOT CENTRED" not in notes
-    assert "FINISHED SIZE FOR THIS PART" in notes
-    assert "MHA-026" not in notes and "MHA-024" not in notes
-    assert "OUTSIDE THIS PART DRAWING" not in notes
-    assert "MATCH-REAM" not in notes
-    assert "NOT INDIVIDUAL PART ACCEPTANCE" not in notes
-    assert "NO. 2" not in notes
-    assert "DATUM AXIS" not in notes
-    # General tolerances live in the title block ONLY -- a second general
-    # tolerance in the notes would conflict with it.
-    assert "LINEAR +/-" not in notes
-    assert "HOLE CENTRES" not in notes
-    # Pedro 2026-07-10: drawings spec the closest US-customary fastener, not
-    # the period British Association series.
-    assert "BA" not in notes
-    assert "X.XX" not in notes
-    source = _source()
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+def test_part_needs_no_redundant_manufacturing_note() -> None:
+    assert crank_arm_spec.DRAWING_NOTES == ""
 
 
-def test_hole_callouts_state_size_and_process() -> None:
+
+def test_hole_callouts_state_size_process_and_fit() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
+    assert "AnchorOffset" not in callouts
     assert callouts["ShaftBoreDia"].startswith("REAM THRU")
     assert "3/8 IN" in callouts["ShaftBoreDia"]
-    assert callouts["DimpleDia"] == "FLAT-BOTTOM 0.50 DEEP"  # .XX -> block tol
+    assert "0.00-0.12 DIAMETRAL" in callouts["ShaftBoreDia"]
+    assert "CLEARANCE ON MHA-026" in callouts["ShaftBoreDia"]
+    # U13: the fiducial is a punched alignment mark with no manufacturing depth.
+    assert "DimpleDia" not in callouts
     assert blind_cut_dia_mm(crank_arm_spec.PIN_HOLE_SPEC) == 4.623
     assert blind_cut_dia_mm(crank_arm_spec.HANDLE_PIVOT_HOLE_SPEC) == 5.953
-    assert drill_process(crank_arm_spec.PIN_HOLE_SPEC) == "#14 DRILL"
+    assert drawing.PIN_HOLE_CALLOUT_PREFIX == "#14 DRILL\nON SHAFT-BORE CL"
     assert drill_process(crank_arm_spec.HANDLE_PIVOT_HOLE_SPEC) == "15/64 DRILL"
-    source = _source()
-    assert source.count("add_native_hole_callout(") == 2
-    assert 'label="crank-arm cross-hole"' in source
-    assert 'label="handle pivot hole"' in source
-    assert source.count("process=drill_process(") == 2
+    # The anchor is tapped: a drill-size prefix does not exist for it (this
+    # raised on the farm, iter2) and the requirement it carries is the tap.
+    with pytest.raises(ValueError):
+        drill_process(crank_arm_spec.ANCHOR_HOLE_SPEC)
+    assert crank_arm_spec.ANCHOR_HOLE_SPEC.kind == "tapped_bottoming"
 
+
+def test_anchor_callout_defers_its_thread_class_to_the_title_block() -> None:
+    class NativeCallout:
+        def __init__(self) -> None:
+            self.definition = (
+                "<hw-threaddesc> <hw-threadclass> <HOLE-DEPTH> "
+                "<hw-threaddepth>"
+            )
+
+        def GetText(self, part: int) -> str:
+            assert part == 5
+            return self.definition
+
+        def SetText(self, part: int, text: str) -> None:
+            assert part == 1
+            self.definition = text
+
+    callout = NativeCallout()
+    drawing._omit_title_block_thread_class(callout)
+    assert callout.definition == (
+        "<hw-threaddesc> <HOLE-DEPTH> <hw-threaddepth>"
+    )
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
     # drawing-simplicity-policy.md rule 3-5: a pinned hand-crank lever is not
@@ -108,22 +119,64 @@ def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
     )
 
 
-def test_only_the_reamed_bore_prints_three_decimals() -> None:
-    source = _source()
-    assert drawing.DIMENSION_PRECISION == {"ShaftBoreDia": 3}
-    assert source.count("set_dimension_precision(") == 1
-    assert "DIMENSION_PRECISION," in source
-    assert crank_arm_spec.SHAFT_BORE_BAND == (0.05, 0.00)
+def test_the_part_owns_every_printed_decimal_place() -> None:
+    """Policy rule 2: places are the tolerance, so the .SLDPRT carries them.
+
+    The bore's three places are the ONE exception: 9.525 is the exact 3/8 in
+    conversion its callout cites.  Every other feature on this arm is
+    noncritical, so it prints one place and takes the title block's .X row
+    rather than the tighter .XX default (cad/docs/tolerance-policy.md).
+    """
+    by_name = crank_arm_spec.DRAWING_PRECISION_BY_NAME
+    assert {name for name, places in by_name.items() if places != 1} == {"ShaftBoreDia"}
+    assert by_name["ShaftBoreDia"] == 3
+    assert crank_arm_spec.DRAWING_REFERENCE_PRECISION == {"overall length reference": 1}
     build_source = Path(arm.__file__).read_text(encoding="utf-8")
-    assert "set_dimension_bilateral_tolerance(" in build_source
-
-
-def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in build_source
     source = _source()
-    assert (
-        "for view in (front, top, right):\n        set_hidden_lines_visible" in source
-    )
-    assert "set_hidden_lines_removed(adapter, iso)" in source
+    # The sheet reads the places back and never rewrites them.
+    assert "set_dimension_precision" not in source
+    assert "_set_primary_precision" not in source
+    assert "assert_imported_precision(" in source
+    assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
+    # No per-part band survives on this part: a pinned lever has no running fit
+    # and nothing here traces to a named fit class (tolerance-policy rule 11).
+    assert not hasattr(crank_arm_spec, "SHAFT_BORE_BAND")
+    assert model_toleranced_dimensions(arm) == {}
+
+
+def test_every_location_is_a_model_dimension_from_a_feature() -> None:
+    """Rule 7 (one feature origin per view) meets rule 2 (the model owns it).
+
+    The pivot and anchor stations, common-axis offset, stock width and the
+    cross-hole station are values no feature dimension carries,
+    so the part's reference sketches own them and the print imports them --
+    nothing on the sheet is built from view picks except the parenthesised
+    overall.
+    """
+    stations = crank_arm_spec.DRAWING_DIMENSIONS["StationReference"]
+    assert stations == {
+        "PivotStation",
+        "AnchorStation",
+        "AnchorOffset",
+        "AxisOffset",
+        "Width",
+    }
+    assert crank_arm_spec.DRAWING_DIMENSIONS["PinStationReference"] == {"PinStation"}
+    assert stations <= set(drawing.FRONT_KEEP)
+    assert set(drawing.TOP_KEEP) == {"PinStation"}
+    # The baseline chain below the view stacks smallest span nearest the arm.
+    chain = [
+        drawing.FRONT_KEEP[name][1]
+        for name in ("AnchorStation", "DimpleX", "PivotStation", "ArmEndX")
+    ]
+    assert chain == sorted(chain, reverse=True)
+    assert crank_arm_spec.HALF_WIDTH - crank_arm_spec.ANCHOR_SCREW_Y == 3.5
+    source = _source()
+    assert source.count("add_edge_dimension(") == 1
+    assert 'label="overall length reference"' in source
+
+
 
 
 def test_dimple_is_shown_where_it_is_visible() -> None:
@@ -148,15 +201,10 @@ def test_overall_length_is_a_conspicuous_reference() -> None:
     assert crank_arm_spec.ARM_END_X + crank_arm_spec.HALF_WIDTH == 93.0
 
 
-def test_one_origin_per_view_and_the_cross_hole_station() -> None:
-    source = _source()
-    assert 'label="shaft-to-handle-pivot location"' in source
-    assert "pin_station = add_edge_dimension(" in source
-    assert 'label="cross-hole station from broad face"' in source
-    assert "find_edge_near(" in source
-    assert crank_arm_spec.ARM_THICKNESS / 2.0 == 4.0
-    assert crank_arm_spec.DIMPLE_X == 30.0
-    assert '"DimpleX":' in source
+def test_common_axis_has_an_edge_referenced_model_dimension() -> None:
+    assert "AxisOffset" in crank_arm_spec.DRAWING_DIMENSIONS["StationReference"]
+    assert crank_arm_spec.HALF_WIDTH == crank_arm_spec.ARM_WIDTH / 2.0 == 8.0
+    assert "AxisOffset" in drawing.FRONT_KEEP
 
 
 def test_dimple_has_both_nominal_location_coordinates() -> None:

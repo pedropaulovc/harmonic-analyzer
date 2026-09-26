@@ -298,16 +298,17 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
 
 
 def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
-    # 2026-09 short-strap pinion rig: blocks at machine x -5.863 +/- 13.5,
-    # spring foot screw at 7.486 (build_drive_train_assembly derives both).
+    # The 32T coherent-placement cutover shifts the block centre and spring
+    # foot with the pinion rig while the arbor-pedestal seats stay on the
+    # unchanged cylinder-drum axis.
     former_blocks = (
-        (-13.669764612476252, -98.0),
-        (13.33023538752375, -98.0),
-        (-13.669764612476252, 82.0),
-        (13.33023538752375, 82.0),
+        (-16.218941649810656, -98.0),
+        (10.781058350189346, -98.0),
+        (-16.218941649810656, 82.0),
+        (10.781058350189346, 82.0),
     )
     former_feet = (
-        (13.179270253802283, 70.95),
+        (10.630093216467879, 70.95),
         (-54.7, -95.5),
         (-54.7, 102.5),
     )

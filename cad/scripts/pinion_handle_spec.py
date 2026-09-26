@@ -1,50 +1,42 @@
-r"""Pure-data dimensional contract shared by the pinion turning handle and its
-manufacturing drawing.
+r"""Pure-data contract for the separate MHA-058 pinion grip crossrod.
 
-PURE DATA, no SolidWorks/COM imports.  A turned tee: a fat grip cylinder with a
-domed cap, a cross rod through the grip, and a blind tubular hub that seats over
-the pinion arbor stub.  The nominals drive the part's named equation globals AND
-the drawing's coordinate math; the marked-dimension map keeps the part marks and
-drawing keeps in lockstep (``test_pinion_handle_drawing.py``).
+The registry slug remains ``pinion-handle`` because this is the operator's grip
+component, but it is only the cold-finished crossrod.  The turned head, neck,
+cross-hole, and arbor are one integral MHA-102 part.
 """
 
 from __future__ import annotations
 
-from _fit_limits import REAM_SLIDE
 from pinion_handle_geometry import (
-    CAP_RADIUS as CAP_RADIUS,
-    CAP_SAG as CAP_SAG,
-    GRIP_DIA as GRIP_DIA,
-    GRIP_LEN as GRIP_LEN,
     ROD_DIA as ROD_DIA,
     ROD_DOWN as ROD_DOWN,
-    ROD_HOLE_DIA as ROD_HOLE_DIA,
     ROD_SPAN as ROD_SPAN,
     ROD_UP as ROD_UP,
-    TUBE_ID as TUBE_ID,
-    TUBE_LEN as TUBE_LEN,
-    TUBE_OD as TUBE_OD,
-    WALL_T as WALL_T,
 )
 
-# Match the cross rod to its body for a light press fit. Only the arbor socket
-# and its seating depth require native size tolerances.
-TUBE_ID_BAND = REAM_SLIDE
-TUBE_LENGTH_BAND = (0.10, 0.00)
-
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "GripProfile": {"GripDia"},
-    "CapProfile": {"CapR"},
-    "TubeProfile": {"TubeOd", "TubeId"},
-    "Tube": {"TubeLen"},
     "RodProfile": {"RodDia"},
     "Rod": {"RodSpan"},
-    "RodHoleProfile": {"RodHoleDia"},
 }
 
-# The handle and arbor rotate together. This static socket is not a running
-# bearing, so it has no local roughness requirement under the simplicity policy.
-SURFACE_FINISHES = ()
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "RodProfile": {"RodDia": 1},
+    "Rod": {"RodSpan": 1},
+}
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
+}
+if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
+    raise AssertionError("every marked crossrod dimension needs authored places")
 
-DRAWING_NOTES = "MATCH CROSS ROD TO BODY FOR LIGHT PRESS FIT."
+SURFACE_FINISHES = ()
+DRAWING_NOTES = "\n".join(
+    (
+        "USE COLD-FINISHED DIA 6 BAR AS RECEIVED.",
+        "MHA-102 HEAD IS MATCH-REAMED TO THIS ACTUAL ROD.",
+        "INSTALLED ROD SHALL NOT TURN OR SLIDE BY HAND.",
+    )
+)
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
