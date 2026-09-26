@@ -1029,6 +1029,41 @@ def ink_row_boxes(
     return boxes
 
 
+def _text_runs(display: Mapping[str, Any]) -> list[tuple[TextItem, float]]:
+    """Each drawn text run with the width SolidWorks reports for it (``w``,
+    ``GetTextInBoxWidthAtIndex``), 0.0 where it reported none."""
+    runs = []
+    for raw in display.get("texts", ()):
+        for item in text_items({"texts": [raw]}):
+            runs.append((item, max(float(raw.get("w") or 0.0), 0.0)))
+    return runs
+
+
+def estimated_text_runs(display: Mapping[str, Any]) -> int:
+    """How many of ``display_box``'s text runs had no reported width."""
+    return sum(1 for _item, width in _text_runs(display) if not width)
+
+
+def display_box(display: Mapping[str, Any], *, advance: float = DEFAULT_ADVANCE_RATIO) -> Box | None:
+    """Everything one annotation's display data draws, as one sheet-space box.
+
+    Every line, arc, polyline, polygon, triangle and arrowhead, plus each text
+    run from its lower-left along its baseline, its cap height tall and as
+    wide as SolidWorks reports (``w``). A run with no reported width is
+    ESTIMATED at ``advance`` per glyph (``estimated_text_runs`` counts them):
+    MHA-062's "BOTH CROWNS" reported 34.1 mm, where the estimate made 23.1.
+    ``None`` when the display data draws nothing.
+    """
+    boxes = [
+        Box(min(s.x0, s.x1), min(s.y0, s.y1), max(s.x0, s.x1), max(s.y0, s.y1))
+        for s in _display_segments(display)
+    ]
+    for item, width in _text_runs(display):
+        width = width or advance * item.height * glyph_count(item.text.rstrip())
+        boxes.append(_rotated_hull(item, width))
+    return _union(boxes) if boxes else None
+
+
 def row_boxes(
     items: Sequence[TextItem],
     *,

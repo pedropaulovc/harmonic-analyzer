@@ -150,6 +150,15 @@ def _accessor(fn: Callable[[], Any]) -> str:
     return fn.__code__.co_names[-1] if fn.__code__.co_names else "?"
 
 
+def _optional(fn: Callable[[], Any]) -> Any:
+    """A read whose refusal loses nothing (the audit falls back), so it is
+    never counted as a ``com-read-errors`` refusal."""
+    try:
+        return fn()
+    except Exception:
+        return None
+
+
 def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
     data = reader.bind(data, "IDisplayData")
     if data is None:
@@ -182,9 +191,26 @@ def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
                 "ls": round(float(reader.call(lambda i=index: data.GetTextLineSpacingAtIndex(i), 0.0)), 7),
             }
         )
+        # The run's own width (MHA-062, gdtdiag2: "BOTH CROWNS" 34.1 mm, as
+        # printed). Its GetTextInBoxHeightAtIndex twin read 0.0 there, so the
+        # height stays GetTextHeightAtIndex.
+        width = _optional(lambda i=index: data.GetTextInBoxWidthAtIndex(i))
+        if width:
+            texts[-1]["w"] = round(float(width), 7)
     if texts:
         out["texts"] = texts
     return out
+
+
+def annotation_display(adapter: Any, annotation: Any) -> tuple[dict[str, Any], dict[str, int]]:
+    """One annotation's ``IAnnotation::GetDisplayData`` in the dump shape the
+    audit reads, with every read SolidWorks refused (accessor -> count)."""
+    reader = _Reader(adapter)
+    bound = reader.bind(annotation, "IAnnotation")
+    if bound is None:
+        return {}, reader.take_errors()
+    display = _dump_display(reader, reader.need(lambda: bound.GetDisplayData()))
+    return display, reader.take_errors()
 
 
 def _dump_annotation(reader: _Reader, raw: Any) -> dict[str, Any] | None:
