@@ -1021,6 +1021,56 @@ def test_a_detail_circle_is_no_leader_target_and_its_label_is_the_printed_one():
     assert [f.kind for f in estimated if "detail-circle" in f.a + f.b] == ["text-on-line"]
 
 
+def test_every_labelled_detail_circle_of_a_view_is_parsed():
+    """Codex P1 on f81d7ff3a: the label's span index overwrote the cursor into
+    GetDetailCircleInfo2, so a view's second labelled circle parsed from the
+    wrong offset (or raised when the first label had no printed span)."""
+    record = CSP_DETAIL_B[1:]
+    shift = [0.030 if k in (1, 4, 7, 11) else 0.0 for k in range(len(record))]
+    second = [value + delta for value, delta in zip(record, shift)]
+    info = [2.0, *record, *second]
+    span_c = ["C", CSP_DETAIL_B_SPAN[1] + 0.030, *CSP_DETAIL_B_SPAN[2:3], CSP_DETAIL_B_SPAN[3] + 0.030,
+              CSP_DETAIL_B_SPAN[4]]
+    view = _view("Drawing View2", (0.15, 0.12, 0.25, 0.26), [], detail_circles_info=info)
+    for spans in ([["10.50", 0.1650, 0.1500, 0.1700, 0.1530], CSP_DETAIL_B_SPAN, span_c], []):
+        circles = [
+            a for a in sheet_model(_dump(views=[view], spans=spans)).geometry.annotations
+            if a.kind == "detail-circle"
+        ]
+        assert [a.label for a in circles] == [
+            "detail-circle Drawing View2 #1",
+            "detail-circle Drawing View2 #2",
+        ]
+        centres = [round(min(s.x0 for s in a.segments) * 1000, 1) for a in circles]
+        assert centres[1] - centres[0] == pytest.approx(30.0, abs=0.2)
+
+
+def test_arrow_clearance_to_a_balloon_is_measured_to_its_ring():
+    """Codex P2 on f81d7ff3a: a 5 mm balloon's bounding square put an arrow
+    7.5 mm out along the diagonal 0.4 mm from "text" -- 2.5 mm from the ring,
+    past the 2 mm rule. Square-side arrows keep gating as before."""
+    from _layout_audit import find_arrows_near_text, find_extensions_near_text
+    from _layout_geometry import AnnotationGeometry, SheetGeometry
+
+    cx, cy, radius = 0.200, 0.150, 0.005
+    balloon = AnnotationGeometry(
+        "balloon 17", "balloon", "v", (Box(cx - radius, cy - radius, cx + radius, cy + radius),),
+        circle=(cx, cy, radius),
+    )
+
+    def sheet(point, role):
+        x, y = point
+        segment = Segment(x, y, x + 0.002, y + 0.002, role)
+        return SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (balloon, AnnotationGeometry(
+            "dim 10.5", "dim", "v", (), (segment,))), 0.6)
+
+    diagonal = (cx + 0.0075 / math.sqrt(2), cy + 0.0075 / math.sqrt(2))
+    assert find_arrows_near_text(sheet(diagonal, "arrow")) == []
+    assert find_extensions_near_text(sheet(diagonal, "ext-line")) == []
+    [near] = find_arrows_near_text(sheet((cx + radius + 0.0015, cy), "arrow"))
+    assert near.extra["gap_mm"] == pytest.approx(1.5)
+
+
 def test_a_leader_across_a_section_cutting_line_gates():
     """Main's ruling: gating -- the MHA-025 finish leader was moved off its
     A-A line for exactly this."""

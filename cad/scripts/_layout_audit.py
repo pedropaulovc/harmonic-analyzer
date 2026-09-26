@@ -66,6 +66,7 @@ from _layout_geometry import (
     find_leader_crossings,
     find_text_on_line,
     segment_box_distance,
+    segment_circle_distance,
     text_overlap,
     union_boxes,
 )
@@ -1258,14 +1259,16 @@ def _detail_circle_geometries(
         rows = ()
         label = f"detail-circle {owner} #{number + 1}"
         if height > 0.0:
-            index = _detail_label_box(text_pt, height, spans, claimed) if spans else None
-            if spans and index is None and unmatched is not None:
+            # ``index`` is the cursor into ``info``; the label's span is a
+            # separate index, or the next circle parses from a wrong offset.
+            printed = _detail_label_box(text_pt, height, spans, claimed) if spans else None
+            if spans and printed is None and unmatched is not None:
                 unmatched.append((label, "label"))
-            if index is not None and claimed is not None:
-                claimed.add(index)
+            if printed is not None and claimed is not None:
+                claimed.add(printed)
             rows = (
-                spans[index].box
-                if index is not None
+                spans[printed].box
+                if printed is not None
                 else Box(text_pt[0], text_pt[1] - height, text_pt[0] + advance * height, text_pt[1]),
             )
         geometries.append(
@@ -1979,7 +1982,8 @@ def _near_foreign_text(
     clearance: float,
 ) -> list[Finding]:
     """Each (source, text owner) pair where a source segment stands nearer
-    than ``clearance`` to ANOTHER annotation's text box, at its nearest."""
+    than ``clearance`` to ANOTHER annotation's text box, at its nearest. A
+    balloon is measured to its printed ring, not the ring's bounding square."""
     grid = SegmentGrid(sources)
     nearest: dict[tuple[int, int], tuple[float, Segment, Box]] = {}
     for target_index, target in enumerate(sheet.annotations):
@@ -1990,7 +1994,11 @@ def _near_foreign_text(
             for owner, segment in grid.near(reach):
                 if sheet.annotations[owner].label == target.label:
                     continue
-                gap = segment_box_distance(segment, box)
+                gap = (
+                    segment_circle_distance(segment, target.circle)
+                    if target.circle is not None
+                    else segment_box_distance(segment, box)
+                )
                 key = (owner, target_index)
                 if gap < clearance and (key not in nearest or gap < nearest[key][0]):
                     nearest[key] = (gap, segment, box)
