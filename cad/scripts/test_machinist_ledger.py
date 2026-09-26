@@ -837,6 +837,86 @@ def test_a_qualifying_last_resort_counts(
     assert (status.state, status.via) == (ml.State.OK, "last_resort ship")
 
 
+def _recorded_entry(ledger_path: Path, slot: str) -> tuple[dict, dict]:
+    ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+    return ledger, ledger["drawings"]["crank_arm"][slot]
+
+
+@pytest.mark.parametrize(
+    ("edit", "reason"),
+    [
+        (lambda e: e["author"].update(family="gpt"), "is not cross-family"),
+        (lambda e: e.update(reviewer_family="claude"), "is not cross-family"),
+        (lambda e: e.pop("reviewed_at"), "malformed: it lacks reviewed_at"),
+        (lambda e: e.update(pdf="not-a-sha"), "malformed: pdf"),
+        (lambda e: e.update(status="approved"), "malformed: status"),
+    ],
+    ids=["author-edited", "family-edited", "no-time", "bad-pdf", "bad-status"],
+)
+def test_a_recorded_entry_is_rechecked_when_the_gate_reads_it(
+    tmp_path: Path, registry: Path, edit, reason: str
+) -> None:
+    pdf = _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+    ml.record_review(
+        _review(pdf),
+        pdf,
+        author_family="claude",
+        provenance={},
+        ledger_path=ledger_path,
+    )
+    ledger, entry = _recorded_entry(ledger_path, ml.CROSS_FAMILY)
+    edit(entry)
+    ledger_path.write_text(json.dumps(ledger), encoding="utf-8")
+
+    [status] = ml.check(["crank_arm"], ledger_path=ledger_path)
+
+    assert status.state == ml.State.UNREVIEWED
+    assert reason in status.detail
+
+
+def test_a_last_resort_entry_is_rechecked_not_trusted_by_its_counts_flag(
+    tmp_path: Path, registry: Path, monkeypatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    ledger_path = tmp_path / "ledger.json"
+    pdf = _sheet(registry)
+    refusal = ml.quota_refusal(
+        _refused(tmp_path, pdf), name="crank_arm", author_family="claude"
+    )
+    ml.record_review(
+        _review(pdf, reviewer="claude", effort="medium"),
+        pdf,
+        author_family="claude",
+        refusal=refusal,
+        provenance={},
+        ledger_path=ledger_path,
+    )
+    ledger, entry = _recorded_entry(ledger_path, ml.LAST_RESORT)
+    entry["quota_refusal"]["refused_at"] = (NOW - timedelta(hours=30)).isoformat()
+    ledger_path.write_text(json.dumps(ledger), encoding="utf-8")
+
+    [status] = ml.check(["crank_arm"], ledger_path=ledger_path)
+
+    assert status.state == ml.State.UNREVIEWED
+    assert "not within 24 h" in status.detail
+
+
+def test_a_ledger_that_is_not_drawings_of_slots_is_refused(tmp_path: Path) -> None:
+    path = tmp_path / "ledger.json"
+    for drawings, error in (
+        ([], "drawings is not an object"),
+        ({"crank_arm": []}, "crank_arm is not an object of slots"),
+        ({"crank_arm": {"favourite": {}}}, "unknown slot 'favourite'"),
+        ({"crank_arm": {"cross_family": "ship"}}, "cross_family is not an object"),
+    ):
+        path.write_text(
+            json.dumps({**ml.empty_ledger(), "drawings": drawings}), encoding="utf-8"
+        )
+        with pytest.raises(ValueError, match=error):
+            ml.load_ledger(path)
+
+
 @pytest.mark.parametrize(
     ("trailer", "refused_at", "effort", "reason"),
     [
@@ -1048,6 +1128,29 @@ def test_an_uncited_finding_keeps_the_drawing_failing(
             ledger_path=ledger_path,
         )
     assert not ledger_path.exists()
+
+
+def test_an_acceptance_falls_when_its_ruling_is_withdrawn(
+    tmp_path: Path, registry: Path
+) -> None:
+    ledger_path = tmp_path / "ledger.json"
+    pdf = _sheet(registry)
+    log = _rulings_log(tmp_path)
+    ml.record_review(
+        _review(pdf, passed=False),
+        pdf,
+        author_family="claude",
+        rebuttals=_rebuttals(log),
+        provenance={},
+        ledger_path=ledger_path,
+    )
+    assert ml.check(["crank_arm"], ledger_path=ledger_path)[0].state == ml.State.OK
+
+    _rulings_log(tmp_path, U31_ROW)  # U37 withdrawn
+
+    [status] = ml.check(["crank_arm"], ledger_path=ledger_path)
+    assert status.state == ml.State.UNREVIEWED
+    assert "U37" in status.detail and "no longer a ruling on crank_arm" in status.detail
 
 
 def test_a_rebuttal_must_cite_the_drawings_row_in_the_finding_rulings(
@@ -1727,6 +1830,9 @@ def test_release_is_gated_on_the_ledger_and_no_build_task_is_keyed_on_it() -> No
     # The rulings raise the bar, and closing an outage withdraws its fallbacks.
     assert str(ml.AUTHOR_RULINGS_PATH.resolve()) in gate["file_dep"]
     assert str(ml.OUTAGES_PATH.resolve()) in gate["file_dep"]
+    # A ruling withdrawn from the file withdraws what it accepted.
+    rulings = ml.CAD_ROOT / "reviews" / "finding-rulings.md"  # the tracked one
+    assert str(rulings.resolve()) in gate["file_dep"]
     assert "check:machinist" in dodo.task_release()["task_dep"]
     # In build it would fail every build between a drawing edit and its re-review.
     assert "check:machinist" not in dodo.task_build()["task_dep"]
@@ -1904,6 +2010,38 @@ def test_an_outage_fallback_counts_only_while_its_outage_is_open(
     assert status.state == ml.State.UNREVIEWED
     assert "outage codex-401-test ended" in status.detail
     assert "cross-family re-review" in status.detail
+
+
+@pytest.mark.parametrize(
+    ("change", "reason"),
+    [
+        ({"fallback_model": "claude-opus-5-5"}, "not the directed fallback"),
+        ({"fallback_reviewer": "codex", "reviewer": "claude"}, "not the cross-family"),
+        ({"started_at": (NOW + timedelta(minutes=1)).isoformat()}, "outside outage"),
+    ],
+    ids=["model-corrected", "reviewer-corrected", "window-corrected"],
+)
+def test_an_outage_fallback_is_rechecked_against_the_current_outage(
+    tmp_path: Path, registry: Path, change: dict, reason: str
+) -> None:
+    pdf = _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+    ml.record_review(
+        _review(pdf, reviewer="claude"),
+        pdf,
+        author_family="claude",
+        provenance={},
+        ledger_path=ledger_path,
+        outage=ml.load_outages(_outages(tmp_path))["codex-401-test"],
+    )
+    # The outage stays open, but its record was corrected after the review.
+    corrected = ml.load_outages(_outages(tmp_path, **change))
+
+    [status] = ml.check(["crank_arm"], ledger_path=ledger_path, outages=corrected)
+
+    assert status.state == ml.State.UNREVIEWED
+    assert "no longer satisfies outage codex-401-test" in status.detail
+    assert reason in status.detail
 
 
 @pytest.mark.parametrize(
@@ -2230,6 +2368,49 @@ def _author_rulings(
     path = tmp_path / "author-rulings.json"
     path.write_text(json.dumps({"rulings": [ruling]}), encoding="utf-8")
     return path
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"reviewed_at": None},
+        {"source_sha256": []},
+        {"verdict": "SHIP"},
+        {"sources": "crank-arm.pdf"},
+        {"reviewed_at": "2026-09-25T10:00:00"},  # naive: cannot be ordered
+    ],
+    ids=["no-time", "no-sha", "verdict-not-object", "sources-not-list", "naive-time"],
+)
+def test_a_malformed_record_is_listed_not_fatal_to_the_backfill(
+    tmp_path: Path,
+    registry: Path,
+    records: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    broken: dict,
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    _on_record(records, "wt-good")
+    _on_record(records, "wt-bad", reviewed_at=REVIEWED_AT)
+    report = records / "wt-bad" / "cad" / "out" / "reports" / "machinist-review"
+    report = report / "crank_arm.json"
+    data = json.loads(report.read_text(encoding="utf-8"))
+    for key, value in broken.items():
+        if value is None:
+            del data[key]
+        else:
+            data[key] = value
+    report.write_text(json.dumps(data), encoding="utf-8")
+    _sheet(registry)
+
+    result = ml.backfill(
+        [records], ledger_path=tmp_path / "ledger.json", cache_path=None, outages={}
+    )
+
+    [row] = result.rows
+    assert row.outcome == ml.Backfill.INGESTED, row.detail
+    assert "wt-good" in row.detail
+    [(path, problem)] = result.malformed
+    assert "wt-bad" in path.as_posix() and problem
 
 
 def test_backfill_needs_a_ruling_where_no_trailer_names_the_author(

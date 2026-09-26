@@ -476,7 +476,35 @@ def load_ledger(path: Path = LEDGER_PATH) -> dict[str, Any]:
             f"{path}: recorded with fingerprint settings {ledger.get('fingerprint')}, "
             f"this checkout uses {empty_ledger()['fingerprint']}"
         )
+    problem = _ledger_structure_problem(ledger)
+    if problem:
+        raise ValueError(f"{path}: {problem}")
     return ledger
+
+
+def _known_slot(slot: str) -> bool:
+    families = {f"{BOTH_FAMILIES}_{family}" for family in REVIEW_FAMILIES}
+    return slot in {CROSS_FAMILY, LAST_RESORT, OUTAGE_FALLBACK} | families
+
+
+def _ledger_structure_problem(ledger: dict[str, Any]) -> str | None:
+    """Why the ledger is not drawings of slots of entries; None when it is.
+
+    Field-level checks are ``entry_problem``'s, so one bad entry fails its own
+    drawing rather than the whole gate.
+    """
+    drawings = ledger.get("drawings")
+    if not isinstance(drawings, dict):
+        return "drawings is not an object"
+    for name, slots in drawings.items():
+        if not isinstance(slots, dict):
+            return f"{name} is not an object of slots"
+        for slot, entry in slots.items():
+            if not _known_slot(slot):
+                return f"{name}: unknown slot {slot!r}"
+            if not isinstance(entry, dict):
+                return f"{name}: {slot} is not an object"
+    return None
 
 
 def save_ledger(ledger: dict[str, Any], path: Path = LEDGER_PATH) -> None:
@@ -1641,8 +1669,11 @@ def drawing_status(
     report_dir: Path | None = None,
     outages: dict[str, dict[str, Any]] | None = None,
     both_families: str = "",
+    finding_rulings: dict[str, dict[str, Any]] | None = None,
 ) -> Status:
     """Where ``name``'s current sheets stand against its recorded reviews.
+
+    Every entry is re-proved by ``entry_problem`` before it may count.
 
     An ``outage_fallback`` entry of the current sheets is accepted only while
     its outage (``outages``, default: the tracked file) is open; once it is
@@ -1659,10 +1690,34 @@ def drawing_status(
         return Status(
             name, State.UNREVIEWED, "no accepted review recorded", "", "-", (), missing
         )
+    outages = load_outages() if outages is None else outages
+    finding_rulings = (
+        load_finding_rulings() if finding_rulings is None else finding_rulings
+    )
+    problems = {
+        slot: entry_problem(
+            name, slot, recorded, outages=outages, finding_rulings=finding_rulings
+        )
+        for slot, recorded in entry.items()
+    }
+    # A malformed entry cannot even be compared: it is set aside, and named
+    # when nothing else is left to accept the drawing.
+    malformed = {
+        slot: problems[slot]
+        for slot, recorded in entry.items()
+        if _entry_schema_problem(recorded)
+    }
+    entry = {
+        slot: recorded for slot, recorded in entry.items() if slot not in malformed
+    }
+    if not entry:
+        missing = REVIEW_FAMILIES if both_families else ()
+        detail = "; ".join(malformed.values())
+        return Status(name, State.UNREVIEWED, detail, "", "-", (), missing)
     current = read_sheets(pdf)
     if both_families:
         return _both_families_status(
-            name, entry, current, references, both_families, report_dir
+            name, entry, current, references, both_families, report_dir, problems
         )
     cross, last = entry.get(CROSS_FAMILY), entry.get(LAST_RESORT)
     cross_cmp = None if cross is None else _compare(cross, current, references)
@@ -1670,7 +1725,7 @@ def drawing_status(
     last_resort = (
         "-" if last_cmp is None else "drift" if last_cmp.problem else "matches"
     )
-    if cross_cmp is not None and not cross_cmp.problem:
+    if cross_cmp is not None and not cross_cmp.problem and not problems[CROSS_FAMILY]:
         return Status(
             name,
             State.OK,
@@ -1679,7 +1734,7 @@ def drawing_status(
             last_resort,
             accepting=(CROSS_FAMILY,),
         )
-    if last_resort == "matches" and last["counts"]:
+    if last_resort == "matches" and last["counts"] and not problems[LAST_RESORT]:
         return Status(
             name,
             State.OK,
@@ -1690,17 +1745,11 @@ def drawing_status(
         )
     fallback = entry.get(OUTAGE_FALLBACK)
     if fallback is not None and not _compare(fallback, current, references).problem:
-        outage_id = fallback["outage"]["id"]
-        outage = (load_outages() if outages is None else outages).get(outage_id)
-        if outage is None:
-            reason = f"shipped on outage fallback {outage_id}, which is not on record"
-            return Status(name, State.UNREVIEWED, reason, "", last_resort)
-        if outage.get("ended_at"):
-            reason = (
-                f"shipped on outage fallback: outage {outage_id} ended at "
-                f"{outage['ended_at']}, so it needs a cross-family re-review"
+        if problems[OUTAGE_FALLBACK]:
+            return Status(
+                name, State.UNREVIEWED, problems[OUTAGE_FALLBACK], "", last_resort
             )
-            return Status(name, State.UNREVIEWED, reason, "", last_resort)
+        outage_id = fallback["outage"]["id"]
         return Status(
             name,
             State.OK,
@@ -1709,9 +1758,13 @@ def drawing_status(
             last_resort,
             accepting=(OUTAGE_FALLBACK,),
         )
+    if cross_cmp is not None and not cross_cmp.problem:  # matched, but no longer counts
+        return Status(name, State.UNREVIEWED, problems[CROSS_FAMILY], "", last_resort)
     if cross_cmp is None and last is not None and not last["counts"]:
         reason = f"last-resort review does not count: {last['not_counted_because']}"
         return Status(name, State.UNREVIEWED, reason, "", last_resort)
+    if last_resort == "matches" and problems[LAST_RESORT]:
+        return Status(name, State.UNREVIEWED, problems[LAST_RESORT], "", last_resort)
     if cross_cmp is None and last_cmp is None:
         return Status(
             name, State.UNREVIEWED, "no accepted review recorded", "", last_resort
@@ -1732,6 +1785,139 @@ def drawing_status(
     )
 
 
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _aware_time_problem(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return "is not a time"
+    try:
+        when = datetime.fromisoformat(value)
+    except ValueError:
+        return f"{value!r} is not ISO"
+    return None if when.tzinfo is not None else f"{value!r} has no UTC offset"
+
+
+def _entry_schema_problem(entry: dict[str, Any]) -> str | None:
+    """Why a recorded entry is not the shape record_review writes; None if it is."""
+    for key in (
+        "status",
+        "counts",
+        "pdf",
+        "sheets",
+        "reviewer",
+        "reviewer_family",
+        "model",
+        "effort",
+        "author",
+        "reviewed_at",
+        "verdict",
+    ):
+        if key not in entry:
+            return f"it lacks {key}"
+    if entry["status"] not in (SHIP, ACCEPTED_WITH_RULINGS):
+        return f"status {entry['status']!r} is not {SHIP} or {ACCEPTED_WITH_RULINGS}"
+    if not isinstance(entry["counts"], bool):
+        return "counts is not true or false"
+    if not isinstance(entry["pdf"], str) or not _SHA256.match(entry["pdf"]):
+        return f"pdf {entry['pdf']!r} is not a sha256"
+    sheets = entry["sheets"]
+    if (
+        not isinstance(sheets, list)
+        or not sheets
+        or not all(isinstance(sheet, str) for sheet in sheets)
+    ):
+        return "sheets is not a list of sheet digests"
+    if entry["reviewer"] not in REVIEWER_FAMILIES:
+        return f"reviewer {entry['reviewer']!r} is unknown"
+    for key in ("model", "effort", "verdict"):
+        if not isinstance(entry[key], str) or not entry[key]:
+            return f"{key} is not a name"
+    author = entry["author"]
+    if not isinstance(author, dict) or not isinstance(author.get("family"), str):
+        return "author has no family"
+    when = _aware_time_problem(entry["reviewed_at"])
+    return f"reviewed_at {when}" if when else None
+
+
+def entry_problem(
+    name: str,
+    slot: str,
+    entry: dict[str, Any],
+    *,
+    outages: dict[str, dict[str, Any]],
+    finding_rulings: dict[str, dict[str, Any]],
+) -> str | None:
+    """Why a recorded entry does not count now; None when it does.
+
+    Every slot is re-proved from what the entry records against today's
+    truth -- never taken from its ``counts`` flag or an id alone: the family
+    rule, the last-resort evidence and tier rule, the current record of an
+    outage fallback's outage, and each cited ruling still being a row on this
+    drawing.
+    """
+    schema = _entry_schema_problem(entry)
+    if schema:
+        return f"recorded {slot} is malformed: {schema}"
+    reviewer, author = entry["reviewer"], entry["author"]
+    family = reviewer_family(reviewer)
+    if entry["reviewer_family"] != family:
+        return (
+            f"recorded {slot}: a {reviewer} review is {family}, not "
+            f"{entry['reviewer_family']}, so it is not cross-family"
+        )
+    view = {
+        "reviewer": reviewer,
+        "model": entry["model"],
+        "effort": entry["effort"],
+        "reviewed_at": entry["reviewed_at"],
+        "source_sha256": [entry["pdf"]],
+    }
+    if slot == CROSS_FAMILY:
+        if review_slot(reviewer, author["family"]) != CROSS_FAMILY:
+            return (
+                f"recorded {slot}: a {reviewer} review of a {author['family']} "
+                "author is not cross-family"
+            )
+    elif slot == LAST_RESORT:
+        if review_slot(reviewer, author["family"]) != LAST_RESORT:
+            return (
+                f"recorded {slot}: a {reviewer} review of a {author['family']} author"
+            )
+        refusal = entry.get("quota_refusal")
+        why = _last_resort_problem(view, author, refusal)
+        if why:
+            return f"last-resort review does not count: {why}"
+    elif slot == OUTAGE_FALLBACK:
+        outage_id = (entry.get("outage") or {}).get("id")
+        outage = outages.get(outage_id)
+        if outage is None:
+            return f"shipped on outage fallback {outage_id}, which is not on record"
+        if outage.get("ended_at"):
+            return (
+                f"shipped on outage fallback: outage {outage_id} ended at "
+                f"{outage['ended_at']}, so it needs a cross-family re-review"
+            )
+        why = outage_problem(view, author["family"], outage)
+        if why:
+            return f"recorded {slot} no longer satisfies outage {outage_id}: {why}"
+    elif slot != f"{BOTH_FAMILIES}_{family}":
+        return f"recorded {slot} holds a {family} review"
+    if entry["status"] == ACCEPTED_WITH_RULINGS:
+        rebuttals = entry.get("rebuttals")
+        if not isinstance(rebuttals, list) or not rebuttals:
+            return f"recorded {slot} is accepted with rulings but cites none"
+        for rebuttal in rebuttals:
+            ruling = rebuttal.get("ruling") if isinstance(rebuttal, dict) else None
+            row = finding_rulings.get(ruling)
+            if row is None or row["drawing"] != name:
+                return (
+                    f"recorded {slot} cites {ruling}, which is no longer a ruling on "
+                    f"{name} in {FINDING_RULINGS_PATH.name}"
+                )
+    return None
+
+
 def _both_families_status(
     name: str,
     entry: dict[str, Any],
@@ -1739,6 +1925,7 @@ def _both_families_status(
     references: _References,
     reason: str,
     report_dir: Path | None,
+    problems: dict[str, str | None],
 ) -> Status:
     """OK only when a counting review from every reviewer family matches."""
     matched: dict[str, str] = {}  # reviewer family -> "<slot> <status>"
@@ -1747,7 +1934,7 @@ def _both_families_status(
     for slot, recorded in entry.items():
         # An outage fallback never stands in for a family (see record_review),
         # even one recorded before the drawing's both-families ruling.
-        if slot == OUTAGE_FALLBACK or not recorded.get("counts"):
+        if slot == OUTAGE_FALLBACK or not recorded.get("counts") or problems[slot]:
             continue
         comparison = _compare(recorded, current, references)
         if comparison.problem:
@@ -1809,6 +1996,7 @@ def gate_status(
     author: Author | ValueError | None = None,
     repo: Path = REPO_ROOT,
     outages: dict[str, dict[str, Any]] | None = None,
+    finding_rulings: dict[str, dict[str, Any]] | None = None,
 ) -> Status:
     """``drawing_status`` under the author rulings: the gate's one verdict.
 
@@ -1823,6 +2011,7 @@ def gate_status(
         "pdf": pdf,
         "report_dir": report_dir,
         "outages": outages,
+        "finding_rulings": finding_rulings,
     }
     if not reason:
         return drawing_status(name, ledger, **kwargs)
@@ -1849,6 +2038,7 @@ def check(
 ) -> list[Status]:
     outages = load_outages() if outages is None else outages
     rulings = load_author_rulings() if rulings is None else rulings
+    finding_rulings = load_finding_rulings()
     ledger = load_ledger(ledger_path)
     selected = list(names) or [spec.name for spec in DRAWINGS]
     unknown = [name for name in selected if name not in DRAWINGS_BY_NAME]
@@ -1863,6 +2053,7 @@ def check(
             rulings=rulings,
             report_dir=report_dir,
             outages=outages,
+            finding_rulings=finding_rulings,
         )
         for name in selected
     ]
@@ -1926,6 +2117,7 @@ class BackfillResult:
     head: str | None
     rows: list[BackfillRow]
     skipped: list[Candidate]  # SHIPs that cannot be ingested whatever the sheets
+    malformed: list[tuple[Path, str]] = field(default_factory=list)  # not records
 
 
 @dataclass
@@ -1936,6 +2128,7 @@ class Found:
     objections: list[Candidate]  # failing verdicts (FIX, or SHIP with findings)
     refusals: list[tuple[Path, dict[str, Any]]]
     pdfs: _PdfIndex
+    malformed: list[tuple[Path, str]] = field(default_factory=list)
 
 
 class BackfillCache:
@@ -2105,12 +2298,44 @@ def _objection_problem(review: dict[str, Any], drawing: str) -> str:
         return f"not a valid review: {exc}"
 
 
+def review_record_problem(review: dict[str, Any]) -> str | None:
+    """Why a verdict record on disk is not a machinist_review record; None if it is.
+
+    Checked before any field is used, so an old, truncated or hand-edited
+    report is listed and skipped instead of aborting the backfill.
+    """
+    for key in ("name", "kind", "reviewer", "model", "effort", "prompt_sha256"):
+        if not isinstance(review.get(key), str) or not review[key]:
+            return f"{key} is missing or not a string"
+    sources, digests = review.get("sources"), review.get("source_sha256")
+    if not isinstance(sources, list) or not all(isinstance(x, str) for x in sources):
+        return "sources is not a list of paths"
+    if (
+        not isinstance(digests, list)
+        or len(digests) != len(sources)
+        or not digests
+        or not all(isinstance(x, str) and _SHA256.match(x) for x in digests)
+    ):
+        return "source_sha256 is not one sha256 per source"
+    verdict = review.get("verdict")
+    if not isinstance(verdict, dict) or not isinstance(verdict.get("verdict"), str):
+        return "verdict is not a verdict object"
+    for key in ("passed", "blind"):
+        if not isinstance(review.get(key), bool):
+            return f"{key} is not true or false"
+    if not isinstance(review.get("sheet_count"), int):
+        return "sheet_count is not a number"
+    when = _aware_time_problem(review.get("reviewed_at"))
+    return f"reviewed_at {when}" if when else None
+
+
 def find_reviews(roots: Sequence[Path], cache: BackfillCache | None = None) -> Found:
     """Every machinist_review record under ``roots``: verdicts and quota refusals."""
     by_pdf = {spec.outputs["pdf"].name: name for name, spec in DRAWINGS_BY_NAME.items()}
     candidates: list[Candidate] = []
     objections: list[Candidate] = []
     refusals: list[tuple[Path, dict[str, Any]]] = []
+    malformed: list[tuple[Path, str]] = []
     pdfs = _PdfIndex(cache)
     seen: set[Path] = set()
     for path, size, mtime_ns in _walk(roots):
@@ -2138,6 +2363,10 @@ def find_reviews(roots: Sequence[Path], cache: BackfillCache | None = None) -> F
             if review.get("name") and quota_evidence(review, path) is not None:
                 refusals.append((path, review))
             continue
+        problem = review_record_problem(review)
+        if problem:
+            malformed.append((path, problem))
+            continue
         drawing = _registry_name(review, by_pdf)
         skip = _skip_reason(review, drawing)
         if (
@@ -2148,7 +2377,7 @@ def find_reviews(roots: Sequence[Path], cache: BackfillCache | None = None) -> F
             objections.append(Candidate(path, review, drawing))
         if verdict.get("verdict") == "SHIP":
             candidates.append(Candidate(path, review, drawing, skip=skip))
-    return Found(candidates, objections, refusals, pdfs)
+    return Found(candidates, objections, refusals, pdfs, malformed)
 
 
 class _Located(_References):
@@ -2179,7 +2408,11 @@ def _refusal_for(
             refusal = quota_refusal(
                 path, name=data["name"], author_family=author_family
             )
-        except ValueError:
+        except (
+            KeyError,
+            TypeError,
+            ValueError,
+        ):  # a malformed refusal licenses nothing
             continue
         if not refusal_problem(
             refusal,
@@ -2617,7 +2850,7 @@ def _backfill_drawings(
                 for attempt in ingested:
                     _adopt(attempt, name, ledger, ledger_path)
     skipped = [candidate for candidate in found.candidates if candidate.skip]
-    return BackfillResult(repo, head, rows, skipped)
+    return BackfillResult(repo, head, rows, skipped, found.malformed)
 
 
 def _backfill_row(
@@ -2851,6 +3084,8 @@ def _print_backfill(result: BackfillResult, args: argparse.Namespace) -> None:
                 f"{'skipped':<16} {candidate.review.get('name')!s:<32} "
                 f"{candidate.skip} [{candidate.report.as_posix()}]"
             )
+        for path, problem in result.malformed:
+            print(f"{'malformed':<16} {'-':<32} {problem} [{path.as_posix()}]")
     counts = Counter(row.outcome for row in result.rows)
     mode = "applied" if args.apply else "dry run, nothing written"
     print(
@@ -2860,7 +3095,8 @@ def _print_backfill(result: BackfillResult, args: argparse.Namespace) -> None:
     )
     print(
         ", ".join(f"{outcome}: {counts[outcome]}" for outcome in _BACKFILL_ORDER)
-        + f"; {len(result.skipped)} SHIP records skipped",
+        + f"; {len(result.skipped)} SHIP records skipped"
+        + f"; {len(result.malformed)} malformed records ignored",
         file=sys.stderr,
     )
 

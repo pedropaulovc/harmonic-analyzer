@@ -3240,6 +3240,8 @@ def task_check():
                     ),
                     # an outage fallback counts only while its outage is open
                     str((REPO_ROOT / "cad" / "reviews" / "outages.json").resolve()),
+                    # a withdrawn ruling withdraws what it accepted
+                    str((REPO_ROOT / "cad" / "reviews" / "finding-rulings.md").resolve()),
                     *(
                         str(DRAWINGS_BY_NAME[name].outputs["pdf"].resolve())
                         for name in _drawing_order()

@@ -348,7 +348,12 @@ evidence, one row per ruling (`ruled_by` is `user` or `Main`). A ruling on
 another drawing, or an id that merely appears in some other file, answers
 nothing. A finding with no recorded ruling keeps the drawing failing.
 `uv run cad/scripts/machinist_ledger.py check [<name>...]` exits nonzero for any
-drawing whose current PDF matches no accepted, counting review. Sheets match on
+drawing whose current PDF matches no accepted, counting review. Each recorded
+entry is re-proved every time the gate reads it, never taken from its `counts`
+flag or an id alone: the family rule, a last resort's refusal evidence and tier
+rule, an outage fallback against the current record of its outage, and each
+cited ruling still being a row on that drawing. A malformed entry does not
+count, and says why. Sheets match on
 identical masked ink, or on an identical text layer (every string, positions
 within 0.12 mm) plus ink within 2 px, so re-render noise passes and a changed
 character does not. On a mismatch it writes the leftover pixels and the text
@@ -361,7 +366,9 @@ the ledger is entered with `machinist_ledger.py ingest <verdict.json>
 `machinist_ledger.py backfill <root>...` does that for every `SHIP` on record
 under the roots. It finds the exact PDF each one reviewed by sha256 wherever it
 now lives, and ingests the newest `SHIP` whose sheets match the current render
-under the same rule and that counts under the family rule. A newer failing
+under the same rule and that counts under the family rule. A record that is not a
+machinist_review record (missing or mistyped fields, a naive time) is listed as
+malformed and ignored, never fatal. A newer failing
 verdict that reviewed the same sheets, or whose reviewed PDF is lost, blocks
 the older `SHIP`, and `--apply` drops a recorded entry it contradicts. Only a
 verdict the gate would weigh objects: a blind review of the registry drawing
