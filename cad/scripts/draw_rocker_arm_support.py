@@ -20,16 +20,19 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
 
+import _config
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
     add_leader_note,
+    add_native_hole_callout,
     add_surface_finish,
     create_section_view,
     create_view_theoretical_datum,
@@ -39,6 +42,7 @@ from _drawing_common import (
     insert_hole_table,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
@@ -47,6 +51,9 @@ from _drawing_common import (
     view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gtol_spec import CylinderFace
+from _hole_spec import blind_cut_dia_mm
+from _part_pmi import _resolve_faces
 from _surface_finish import surface_finish_by_key
 from build_rocker_arm_support import (
     BIG,
@@ -63,14 +70,13 @@ from build_rocker_arm_support import (
 from rocker_arm_support_drawing_spec import SURFACE_FINISHES
 from rocker_bracket_seat_layout import (
     RAIL_DEPTH,
-    SCREW_THREAD,
-    SEAT_DRILL_DEPTH,
-    SEAT_DRILL_NAME,
     SEAT_LOCAL_X,
-    SEAT_THREAD_DEPTH,
+    SEAT_SPEC,
     WINDOW_TOP_Y,
 )
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -154,25 +160,40 @@ def imported_precision() -> dict[str, int]:
     }
 
 
-# The bracket seats: located by transfer, so the print gives their thread,
-# depths and process only. A view-owned pointer to the rail's top edge over
-# the outermost seat, left of the front view and clear of the Depth callout.
-# add_note leaves text at the sheet's default height (its height argument is
-# not applied), which r743-rocker-fix3's render measured at ~2.76 mm per
-# character and a 4.5 mm line pitch. The 21-character wrap still crossed the
-# Depth extension line at x 0.0605, so no line exceeds 15 characters: the
-# note fills the column left of the front view, above the R6.35 callout.
-SEAT_NOTE = (
-    f"{len(SEAT_LOCAL_X)}X {SCREW_THREAD} UNC-2B\n"
-    f"{SEAT_THREAD_DEPTH:.1f} DEEP\n"
-    f"{SEAT_DRILL_NAME} DRILL\n"
-    f"{SEAT_DRILL_DEPTH:.1f} DEEP\n"
-    "TRANSFER FROM\nMHA-123 AT\nASSEMBLY"
+# The bracket seats print as ONE native Hole Wizard callout (Codex #936,
+# PRRT_kwDOPHDy386mRSOJ): SolidWorks reads the count, thread and both depths
+# from BracketSeats, so a model change moves the print. Only the transfer
+# instruction is text, and its closing line break puts the native size on a
+# row of its own (13be2ca03).
+SEAT_CALLOUT_PROCESS = (
+    f"TRANSFER FROM {_config.parts('pivot-bracket')['number']}\nAT ASSEMBLY;\n"
 )
-SEAT_NOTE_XY = (0.016, 0.262)
-SEAT_NOTE_ATTACH = (
-    FRONT_CENTER[0] + min(SEAT_LOCAL_X) * VIEW_SCALE / 1000.0,
-    FRONT_CENTER[1] + HALF_Y * VIEW_SCALE / 1000.0,
+SEAT_CALLOUT_X_MM = max(SEAT_LOCAL_X)
+# The seats are drilled from the rail top, which no principal view shows, so
+# they get VIEW B (Main's ruling): a partial top view of the rail strip,
+# relocated to the band below Section A-A and right of the bottom view, named
+# by a letter arrow looking down on the front view's top edge. The crop keeps
+# the rail top (half-width NARROW) inside the foot (WIDE). The callout text sits
+# right of VIEW B, between the hole table and the title block; its rows
+# centre on its y.
+VIEW_B_CENTER = (0.210, 0.108)
+VIEW_B_CROP_HALF_Z_MM = 16.0
+VIEW_B_CAPTION = f"VIEW B\nSCALE {SHEET_SCALE[0]:g}:{SHEET_SCALE[1]:g}"
+VIEW_B_CAPTION_XY = (
+    VIEW_B_CENTER[0] - BOSS_DEPTH / 2.0 * VIEW_SCALE / 1000.0,
+    VIEW_B_CENTER[1] - VIEW_B_CROP_HALF_Z_MM * VIEW_SCALE / 1000.0 - 0.004,
+)
+SEAT_CALLOUT_XY = (0.300, 0.081)
+# The letter matches the section's A (~5 mm) and stands square above its
+# tip, clear of the section line (the cone-tip-block pattern). VIEW_B_ARROW
+# is (note upper-left, leader tip) in sheet metres.
+VIEW_LETTER_HEIGHT = 0.005
+VIEW_B_ARROW = (
+    (
+        FRONT_CENTER[0] - 0.020 - 0.36 * VIEW_LETTER_HEIGHT,
+        FRONT_CENTER[1] + HALF_Y * VIEW_SCALE / 1000.0 + 0.013,
+    ),
+    (FRONT_CENTER[0] - 0.020, FRONT_CENTER[1] + HALF_Y * VIEW_SCALE / 1000.0),
 )
 # Section A-A pick for the rail depth: 5 mm off the centreline hits both the
 # top face (half-width NARROW less the rim chamfer) and the pocket's top face
@@ -222,6 +243,107 @@ def _bottom_sheet_xy(hole_xz: tuple[float, float]) -> tuple[float, float]:
         BOTTOM_CENTER[0] + x_mm * VIEW_SCALE / 1000.0,
         BOTTOM_CENTER[1] + (z_mm + HOLE_DIA / 2.0) * VIEW_SCALE / 1000.0,
     )
+
+
+def _seat_entry_edge(view: Any) -> Any:
+    """The east seat's entry rim on the rail top, as a part edge.
+
+    Resolved through the part's typed seat cylinder rather than a sheet pick:
+    the four seats pair up a few millimetres apart on a 1:2 sheet. It is the
+    drill-diameter circle on the top face, not the one where the drill point
+    starts.
+    """
+    model = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
+    diameter = blind_cut_dia_mm(SEAT_SPEC)
+    face = _resolve_faces(
+        model, {"seat": CylinderFace(diameter, contains_x_mm=SEAT_CALLOUT_X_MM)}
+    )["seat"]
+    matches = []
+    for raw in _early_bound(face, "IFace2").GetEdges() or ():
+        edge = _early_bound(raw, "IEdge")
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        if not curve.IsCircle():
+            continue
+        _x, centre_y, _z, *_axis, radius = (float(v) for v in curve.CircleParams)
+        if abs(radius - diameter / 2000.0) > 1e-7:
+            continue
+        if abs(centre_y - HALF_Y / 1000.0) > 1e-7:
+            continue
+        matches.append(edge)
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one east-seat entry rim, found {len(matches)}")
+    return matches[0]
+
+
+def _crop_view_b_to_rail(adapter: Any, view: Any) -> None:
+    """Crop VIEW B to the rail strip: the whole rail length and the rail top
+    with the upper slopes, not the full 63.5 mm foot width."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    native_view = _early_bound(view, "IView")
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate VIEW B for its crop")
+    draw.ClearSelection2(True)
+    half_len = (BOSS_DEPTH / 2.0 + 2.0) * VIEW_SCALE / 1000.0
+    half_z = VIEW_B_CROP_HALF_Z_MM * VIEW_SCALE / 1000.0
+    sketch = _early_bound(native_view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    corners = []
+    for x, y in (
+        (VIEW_B_CENTER[0] - half_len, VIEW_B_CENTER[1] + half_z),
+        (VIEW_B_CENTER[0] + half_len, VIEW_B_CENTER[1] - half_z),
+    ):
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        corners.append(tuple(float(value) for value in projected.ArrayData))
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if not sketch_manager.CreateCornerRectangle(*corners[0], *corners[1]):
+        raise RuntimeError("failed to sketch the VIEW B crop fence")
+    # IView.Crop2 returns swCropViewErrors_e, where 1 is NoError.
+    if int(native_view.Crop2(False, True, 0)) != 1:
+        raise RuntimeError("failed to crop VIEW B to the rail strip")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    native_view.UpdateViewDisplayGeometry()
+    if not bool(native_view.IsCropped()):
+        raise RuntimeError("VIEW B did not retain its crop")
+    outline = tuple(float(value) for value in native_view.GetOutline())
+    _telemetry.info(f"VIEW B outline after crop: {outline!r}")
+    if (
+        len(outline) != 4
+        or outline[3] - outline[1] > 2.0 * half_z + 0.004
+        or outline[2] - outline[0] < BOSS_DEPTH * VIEW_SCALE / 1000.0 - 0.004
+    ):
+        raise RuntimeError(f"VIEW B crop is not the rail strip: outline={outline!r}")
+
+
+def _add_view_b_arrow(adapter: Any, front: Any) -> None:
+    """The letter arrow on the front view that names VIEW B."""
+    text_xy, tip_xy = VIEW_B_ARROW
+    note = add_leader_note(
+        adapter,
+        "B",
+        text_xy=text_xy,
+        attach_xy=tip_xy,
+        view=front,
+        label="view B viewing arrow",
+    )
+    # add_note leaves text at the document height; size the letter here and
+    # prove the leader tip did not move with it.
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError("view B arrow note has no text format")
+    text_format.CharHeight = VIEW_LETTER_HEIGHT
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError("failed to size the view B arrow letter")
+    rebuild_drawing(adapter, label="view B arrow letter")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
+        raise RuntimeError("view B arrow tip moved when its letter was sized")
 
 
 def _mirror_right_end_hole_tags(view: Any) -> dict[str, tuple[float, float]]:
@@ -562,14 +684,6 @@ async def build(adapter: Any) -> dict[str, str]:
     rail_dimension.SetPrecision3(DIMENSION_PRECISION["RailDepth"], -1, -1, -1)
     if rail_dimension.GetPrimaryPrecision2() != DIMENSION_PRECISION["RailDepth"]:
         raise RuntimeError("section rail dimension precision did not persist")
-    add_leader_note(
-        adapter,
-        SEAT_NOTE,
-        text_xy=SEAT_NOTE_XY,
-        attach_xy=SEAT_NOTE_ATTACH,
-        label="rocker-bracket seats",
-        view=front,
-    )
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to bottom view")
 
@@ -621,6 +735,22 @@ async def build(adapter: Any) -> dict[str, str]:
     # The drawing-sketch datum and hole table leave the bottom view's HLV edge
     # set stale, so restore its complete projected edge set before export.
     set_hidden_lines_visible(adapter, bottom)
+    view_b = place_view(adapter, str(SOURCE), "*Top", *VIEW_B_CENTER, scale=(1, 2))
+    set_hidden_lines_removed(adapter, view_b)
+    _crop_view_b_to_rail(adapter, view_b)
+    if not auto_center_marks(adapter, view_b, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center marks to VIEW B")
+    if add_note(adapter, VIEW_B_CAPTION, *VIEW_B_CAPTION_XY) is None:
+        raise RuntimeError("failed to caption VIEW B")
+    _add_view_b_arrow(adapter, front)
+    add_native_hole_callout(
+        adapter,
+        view_b,
+        edge=_seat_entry_edge(view_b),
+        callout_xy=SEAT_CALLOUT_XY,
+        label="rocker-bracket transfer seats",
+        process=SEAT_CALLOUT_PROCESS,
+    )
 
     # Materialize the iso's cosmetic threads before the strict final note
     # cleanup, so BracketSeats' descriptive label exists when it is counted

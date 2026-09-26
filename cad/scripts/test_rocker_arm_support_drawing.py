@@ -531,21 +531,6 @@ def test_section_picks_land_on_the_rail_and_the_lower_web() -> None:
     assert 'label="section rail depth"' in source
 
 
-def test_seat_note_names_the_transfer_and_both_depths() -> None:
-    assert drawing.SEAT_NOTE == (
-        "4X #8-32 UNC-2B\n14.7 DEEP\n#29 DRILL\n18.0 DEEP\n"
-        "TRANSFER FROM\nMHA-123 AT\nASSEMBLY"
-    )
-    # The leader lands on the rail's top edge over the outermost seat.
-    assert drawing.SEAT_NOTE_ATTACH == pytest.approx(
-        (
-            drawing.FRONT_CENTER[0]
-            + min(seats.SEAT_LOCAL_X) * drawing.VIEW_SCALE / 1000,
-            drawing.FRONT_CENTER[1] + support.HALF_Y * drawing.VIEW_SCALE / 1000,
-        )
-    )
-
-
 def test_rim_chamfer_is_placed_on_the_section_by_a_targeted_import() -> None:
     """#743: the front view only ever got RimChamferSize from the entire-model
     import, and the rail took it away (r743-diag-a/b). A targeted RimChamfer
@@ -671,24 +656,6 @@ def _boxes_clear(a: tuple[float, ...], b: tuple[float, ...], gap: float) -> bool
         or a[3] + gap <= b[1]
         or b[3] + gap <= a[1]
     )
-
-
-def test_seat_note_stays_in_the_column_left_of_the_front_view() -> None:
-    """r743-rocker-fix3 printed the 21-character wrap across the Depth
-    extension line at the front view's left edge. At the measured text size the
-    note must end 2 mm short of that edge, and sit above every front-view
-    callout that shares the column."""
-    lines = drawing.SEAT_NOTE.splitlines()
-    left, top = drawing.SEAT_NOTE_XY
-    right = left + max(map(len, lines)) * NOTE_CHAR_WIDTH
-    bottom = top - len(lines) * NOTE_LINE_PITCH
-    front_left = drawing.FRONT_CENTER[0] - support.HALF_Y * drawing.VIEW_SCALE / 1000
-    assert right < front_left - 0.002
-    column = [xy for xy in drawing.FRONT_KEEP.values() if xy[0] < front_left]
-    assert column  # the radius callouts
-    for xy in column:
-        assert bottom > _text_box("R00.00\n0X", xy)[3] + 0.005
-    assert top <= 0.263
 
 
 def test_rim_chamfer_callout_clears_the_rail_depth_text() -> None:
@@ -852,3 +819,200 @@ def test_right_end_hole_tag_mover_fails_loud(monkeypatch) -> None:
     )
     with pytest.raises(RuntimeError, match="not at the right end"):
         drawing._mirror_right_end_hole_tags(left_a4)
+
+
+def test_seats_print_as_one_native_callout_with_only_the_transfer_as_text() -> None:
+    """Codex #936 (PRRT_kwDOPHDy386mRSOJ): the seat note retyped BracketSeats'
+    thread and depths, so a model change would leave the print stale. The
+    native callout reads count, thread and both depths from the Hole Wizard
+    feature; the transfer instruction is the only text, ending in a line
+    break so the native size starts its own row (13be2ca03)."""
+    bracket = _config.parts("pivot-bracket")["number"]
+    assert drawing.SEAT_CALLOUT_PROCESS == f"TRANSFER FROM {bracket}\nAT ASSEMBLY;\n"
+    assert not hasattr(drawing, "SEAT_NOTE")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for retyped in ("UNC-2B", " DEEP", "SEAT_THREAD_DEPTH", "SEAT_DRILL_DEPTH"):
+        assert retyped not in source, retyped
+    assert "process=SEAT_CALLOUT_PROCESS" in source
+    assert drawing.SEAT_CALLOUT_X_MM == max(seats.SEAT_LOCAL_X)
+
+
+# Measured on the fix4 render (leaf 20260926T141000Z-1-f32d205b), sheet metres.
+SECTION_CAPTION_BOTTOM = 0.1211  # "SECTION A-A" under the section
+HOLE_TABLE_BOTTOM = 0.0967
+TITLE_BLOCK_TOP, TITLE_BLOCK_LEFT = 0.0649, 0.2183
+DEPTH_DIM_LINE_Y = 0.2549  # the 177.8 above the front view
+
+
+def test_view_b_is_a_cropped_rail_strip_in_the_band_below_the_section() -> None:
+    """Main's ruling on Codex PRRT_kwDOPHDy386mRSOJ: the seats get a visible
+    circle to carry the callout, in a relocated partial top view (VIEW B) of
+    the rail strip, below Section A-A and right of the bottom view."""
+    scale = drawing.VIEW_SCALE / 1000
+    bottom_right = drawing.BOTTOM_CENTER[0] + support.BOSS_DEPTH / 2 * scale
+    x, y = drawing.VIEW_B_CENTER
+    half_len = support.BOSS_DEPTH / 2 * scale
+    half_crop = drawing.VIEW_B_CROP_HALF_Z_MM * scale
+    # The crop keeps the whole rail top (its half-width) and stays inside the
+    # foot, so only rail-strip ink survives.
+    assert support.NARROW < drawing.VIEW_B_CROP_HALF_Z_MM < support.WIDE
+    assert x - half_len > bottom_right + 0.010
+    assert x + half_len < drawing.HOLE_TABLE_ANCHOR[0] - 0.010
+    assert y + half_crop < SECTION_CAPTION_BOTTOM - 0.003
+    caption_left, caption_top = drawing.VIEW_B_CAPTION_XY
+    caption_lines = drawing.VIEW_B_CAPTION.splitlines()
+    assert caption_lines == ["VIEW B", "SCALE 1:2"]
+    assert caption_top < y - half_crop - 0.002
+    assert caption_left >= x - half_len
+    caption_right = caption_left + max(map(len, caption_lines)) * NOTE_CHAR_WIDTH
+    assert caption_right < TITLE_BLOCK_LEFT - 0.003
+
+
+def test_seat_callout_text_sits_between_the_hole_table_and_the_title_block() -> None:
+    """The callout's rows centre on its y; whichever side of its x the text
+    falls, five rows of up to 24 characters clear view B, the hole table and
+    the title block."""
+    scale = drawing.VIEW_SCALE / 1000
+    x, y = drawing.SEAT_CALLOUT_XY
+    width, half_h = 24 * NOTE_CHAR_WIDTH, 5 * NOTE_LINE_PITCH / 2
+    assert y + half_h < HOLE_TABLE_BOTTOM - 0.001
+    assert y - half_h > TITLE_BLOCK_TOP + 0.002
+    view_b_bottom = drawing.VIEW_B_CENTER[1] - drawing.VIEW_B_CROP_HALF_Z_MM * scale
+    assert y + half_h < view_b_bottom - 0.003
+    assert x - width > drawing.BOTTOM_CENTER[0] + support.BOSS_DEPTH / 2 * scale
+    assert x + width < 0.415  # the right border
+
+
+def test_view_b_arrow_looks_down_on_the_rail_from_above_the_front_view() -> None:
+    scale = drawing.VIEW_SCALE / 1000
+    text_xy, tip_xy = drawing.VIEW_B_ARROW
+    front_top = drawing.FRONT_CENTER[1] + support.HALF_Y * scale
+    assert tip_xy[1] == pytest.approx(front_top)
+    assert abs(tip_xy[0] - drawing.FRONT_CENTER[0]) < support.BOSS_DEPTH / 2 * scale
+    # The letter stands square above its tip, under the 177.8 dimension line.
+    assert text_xy[1] - drawing.VIEW_LETTER_HEIGHT > tip_xy[1] + 0.004
+    assert text_xy[1] < DEPTH_DIM_LINE_Y - 0.002
+    assert abs(text_xy[0] + drawing.VIEW_LETTER_HEIGHT * 0.36 - tip_xy[0]) < 0.001
+    # Clear of the section's own A arrow on the centreline.
+    assert abs(tip_xy[0] - drawing.FRONT_CENTER[0]) > 0.015
+
+
+def _circle_edge(x_mm: float, y_mm: float, radius_mm: float):
+    curve = SimpleNamespace(
+        IsCircle=lambda: True,
+        CircleParams=(x_mm / 1000, y_mm / 1000, 0.0, 0.0, 1.0, 0.0, radius_mm / 1000),
+    )
+    return SimpleNamespace(GetCurve=lambda: curve, name=(x_mm, y_mm, radius_mm))
+
+
+def test_seat_entry_edge_is_the_east_seats_rim_on_the_rail_top(monkeypatch) -> None:
+    """The edge comes from the part through the typed seat cylinder: the one
+    drill-diameter circle of the east seat on the rail top, never the rim
+    where the drill point starts."""
+    from _hole_spec import blind_cut_dia_mm
+
+    radius = blind_cut_dia_mm(seats.SEAT_SPEC) / 2
+    east = max(seats.SEAT_LOCAL_X)
+    entry = _circle_edge(east, support.HALF_Y, radius)
+    face = SimpleNamespace(
+        GetEdges=lambda: (
+            _circle_edge(east, support.HALF_Y - seats.SEAT_DRILL_DEPTH, radius),
+            entry,
+            SimpleNamespace(GetCurve=lambda: SimpleNamespace(IsCircle=lambda: False)),
+        )
+    )
+    requested = {}
+
+    def resolve(model, requests):
+        requested.update(requests)
+        return {"seat": face}
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(drawing, "_resolve_faces", resolve)
+    view = SimpleNamespace(ReferencedDocument=object())
+    assert drawing._seat_entry_edge(view) is entry
+    (spec,) = requested.values()
+    assert spec.diameter_mm == pytest.approx(2 * radius)
+    assert spec.contains_x_mm == east
+
+
+class _CropSeat:
+    """Just enough of IDrawingDoc/IView to run the VIEW B crop offline."""
+
+    def __init__(self, crop_result: int = 1, cropped: bool = True) -> None:
+        self.rectangle = None
+        self.crop_calls = []
+        self.crop_result = crop_result
+        self.cropped = cropped
+        identity = SimpleNamespace()
+        self.sketch = SimpleNamespace(ModelToSketchTransform=identity)
+        self.model = SimpleNamespace(
+            ActivateView=lambda _name: True,
+            ClearSelection2=lambda _all: None,
+            EditRebuild3=lambda: True,
+            SketchManager=SimpleNamespace(CreateCornerRectangle=self._rectangle),
+        )
+        math_utility = SimpleNamespace(
+            CreatePoint=lambda data: SimpleNamespace(
+                MultiplyTransform=lambda _t: SimpleNamespace(ArrayData=tuple(data))
+            )
+        )
+        self.adapter = SimpleNamespace(
+            currentModel=self.model,
+            swApp=SimpleNamespace(GetMathUtility=lambda: math_utility),
+        )
+        self.view = SimpleNamespace(
+            GetSketch=lambda: self.sketch,
+            Crop2=self._crop,
+            UpdateViewDisplayGeometry=lambda: None,
+            IsCropped=lambda: self.cropped,
+            GetOutline=self._outline,
+        )
+
+    def _rectangle(self, *coords):
+        self.rectangle = coords
+        return (object(),) * 4
+
+    def _crop(self, *args):
+        self.crop_calls.append(args)
+        return self.crop_result
+
+    def _outline(self):
+        x1, y1, _z1, x2, y2, _z2 = self.rectangle
+        return (min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
+
+
+def _patch_crop_seat(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, _view: "VIEW B")
+    monkeypatch.setattr(drawing, "double_array", list)
+
+
+def test_view_b_crop_fence_is_the_rail_strip_across_the_whole_rail(monkeypatch) -> None:
+    _patch_crop_seat(monkeypatch)
+    seat = _CropSeat()
+    drawing._crop_view_b_to_rail(seat.adapter, seat.view)
+    scale = drawing.VIEW_SCALE / 1000
+    x1, y1, _z1, x2, y2, _z2 = seat.rectangle
+    cx, cy = drawing.VIEW_B_CENTER
+    assert min(x1, x2) < cx - support.BOSS_DEPTH / 2 * scale
+    assert max(x1, x2) > cx + support.BOSS_DEPTH / 2 * scale
+    assert (min(y1, y2), max(y1, y2)) == pytest.approx(
+        (
+            cy - drawing.VIEW_B_CROP_HALF_Z_MM * scale,
+            cy + drawing.VIEW_B_CROP_HALF_Z_MM * scale,
+        )
+    )
+    # Straight-edged crop with no outline (swCropViewErrors_e NoError = 1).
+    assert seat.crop_calls == [(False, True, 0)]
+
+
+@pytest.mark.parametrize(
+    ("crop_result", "cropped", "message"),
+    ((0, True, "failed to crop"), (1, False, "did not retain")),
+)
+def test_view_b_crop_fails_loud(monkeypatch, crop_result, cropped, message) -> None:
+    _patch_crop_seat(monkeypatch)
+    seat = _CropSeat(crop_result=crop_result, cropped=cropped)
+    with pytest.raises(RuntimeError, match=message):
+        drawing._crop_view_b_to_rail(seat.adapter, seat.view)
