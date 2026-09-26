@@ -9,12 +9,21 @@ spring's formed profile re-keys neither the layout importers nor the base.
 
 from __future__ import annotations
 
-# C51000 phosphor bronze, spring temper, 0.020 in strip.  O1-b, user
-# 2026-09-24, supersedes 0.5 x 5.0: the 6.0 width lets the preset clear both
-# the 1.5x preload margin at the formed band's low end and SF 1.5 on yield
-# engaged, which 5.0 could not do at once.
-THICK = 0.5
-WIDTH = 6.0
+MM_PER_IN = 25.4
+
+# 17-7 PH (UNS S17700) Condition C strip, 0.015 in thick, sheared 1/4 in wide
+# from McMaster-Carr 2325K19 (6 in x 50 in roll).  #859 ruling 4 (Main,
+# 2026-09-25) supersedes the C51000 H08 0.020 x 6.0 strip of O1-b: at that
+# stock's thickness band no preset cleared both SF 1.5 on yield at the stiff
+# corner and the 1.5x preload margin at the soft corner under the CAD-derived
+# gravity moments (ruling 3 material search).
+THICK = 0.015 * MM_PER_IN  # 0.381
+WIDTH = 0.25 * MM_PER_IN  # 6.35
+# The thickness band is (upper, lower) deviations in mm, read through
+# ``_fit_limits.deviations``: 2325K19 lists -0.00075 to +0.00075 in (vendor
+# page read 2026-09-25).  The sheared width prints at .XX, so its readers take
+# the band that print states (``_printed_tolerance.printed_deviations``).
+THICK_BAND = (0.00075 * MM_PER_IN, -0.00075 * MM_PER_IN)
 WIDTH_PLACES = 2  # StripWidth prints .XX (pinion_spring_spec)
 
 # Screw-down pad width (pinion_spring_geometry has the rest of the pad).

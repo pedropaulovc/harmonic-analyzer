@@ -74,6 +74,17 @@ def test_blind_seats_keep_stock_in_full_threads_above_the_tap_lead(
         part.require_blind_seat_fit("short lead", short_lead, engagement)
 
 
+def test_foot_seat_names_its_bottoming_tap_runout() -> None:
+    # Main (#859 restricted review, change 6): the foot seat's drill runs a
+    # named bottoming-tap runout past its full threads, at least two pitches.
+    pitch = 25.4 / 40.0  # #4-40
+    assert part.FOOT_SCREW_PITCH == pytest.approx(pitch)
+    assert part.FOOT_SCREW_TAP_RUNOUT >= 2.0 * pitch
+    assert part.FOOT_SCREW_DRILL_DEPTH == pytest.approx(
+        part.FOOT_SCREW_HOLE_DEPTH + part.FOOT_SCREW_TAP_RUNOUT
+    )
+
+
 def test_pivot_rejects_former_full_threads_to_drill_bottom() -> None:
     old_seat = replace(
         part.PIVOT_SEAT_SPEC, kind="tapped", depth_mm=11.525, overrides_mm={}

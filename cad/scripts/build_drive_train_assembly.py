@@ -911,9 +911,11 @@ from pinion_spring_geometry import (  # noqa: E402
 )
 from pinion_spring_section import (  # noqa: E402
     THICK as SPRING_T,
+    THICK_BAND as SPRING_T_BAND,
     WIDTH as SPRING_W,
     WIDTH_PLACES as SPRING_W_PLACES,
 )
+from _fit_limits import deviations  # noqa: E402
 from build_slotted_screw import (  # noqa: E402
     HEAD_DIA as BSCREW_HEAD_DIA,
     SHANK_LEN as BSCREW_SHANK_LEN,
@@ -1910,12 +1912,49 @@ if SPRING_TO_LIFT_ROD < 0.25:
 # The strap swings 0 -> _PHI_ENG CCW into the blade.  The leaf deflects by the
 # crest's penetration into the swung flank on top of its PRESET (the free form
 # stands PRESET into the parked flank; the model hovers PARKED_AIR off it).
-# Gravity moments about the pivot (handoff estimate from the part volumes:
-# drum 175 g + arbor 65 g at the arbor axis, straps 80 g at mid-length) --
-# parked, then engaged, N.mm.  Both turn the cluster INTO mesh.
-_SWING_GRAVITY_NMM = (10.9, 19.2)
-_PRELOAD_MARGIN = 1.5  # over gravity, at the formed band's low end
-_STRESS_SF = 1.5  # on yield, at the nominal preset
+# Gravity moments of the swing cluster about the pivot, parked then engaged,
+# N.mm; both turn it INTO mesh.  CAD-derived (#859, 2026-09-25; re-derived
+# 2026-09-26): each part's centroid from the STLs of the warm integration
+# build (c486, cad/out/stl) placed on this module's own analytic transforms,
+# its mass from the volume in SWING_GRAVITY_BASIS at the SolidWorks library
+# densities.  The arbor, its collar and the torque shaft have moved since
+# c486 (#858, #860): their basis volumes are their parts' current analytic
+# volumes, and each keeps its centroid on its axis.  Brass density 8400
+# gives (13.95, 24.94).  The gates below use the 8800 corner.
+SWING_GRAVITY_NMM = (14.04, 25.10)
+SWING_GRAVITY_CORNER_NMM = (14.32, 25.58)  # brass at 8800 kg/m^3
+# The basis those moments were computed at: part -> (count, volume mm^3,
+# density kg/m^3).  The drum's and the strap's volumes are computed inside
+# their builds, so theirs are the c486 meshes (the drum's reads 23382.7
+# against its analytic 23374.1).  test_drive_train_support_layout holds every
+# entry to the current part and fails naming both moment constants when one
+# moves.
+SWING_GRAVITY_BASIS = {
+    "alignment-pinion": (1, 23382.7, 8500.0),
+    "pinion-arbor": (1, 13702.96, 7800.0),
+    "pinion-pivot-shaft": (1, 5937.02, 7800.0),
+    "pinion-bracket": (2, 4563.7, 7800.0),
+    "pinion-arbor-collar": (1, 2135.74, 7800.0),
+    "pinion-handle": (1, 1837.83, 7800.0),
+    "pinion-cam-pin": (2, 256.62, 7800.0),
+}
+SWING_GRAVITY_MASS_G = 458.14
+if (
+    abs(
+        sum(n * v * rho * 1e-6 for n, v, rho in SWING_GRAVITY_BASIS.values())
+        - SWING_GRAVITY_MASS_G
+    )
+    > 0.01
+):
+    raise AssertionError("SWING_GRAVITY_BASIS no longer sums to its mass")
+_PRELOAD_MARGIN = 1.5  # over gravity, at the soft corner
+_STRESS_SF = 1.5  # on yield, at the stiff corner
+# Stock corners (#859 ruling 1): the leaf is formed to the nominal inside
+# profile, so a thicker strip moves the contact face into the flank by the
+# thickness excess.  Soft: thinnest, narrowest strip at the formed band's low
+# end.  Stiff: thickest strip at the band's high end.
+_SPR_T_LO, _SPR_T_HI = (SPRING_T + _d for _d in deviations(SPRING_T_BAND))
+_SPR_W_LO = SPRING_W + printed_deviations(SPRING_W, SPRING_W_PLACES)[0]
 _SPR_STEPS = 1 + math.ceil(math.degrees(_PHI_ENG) / 0.25)
 _SPR_BLADE_SAMPLES = 16
 _SPR_CREST_OUTER_R = SPR_R_KINK + SPRING_T  # the crest's contact-face radius
@@ -1959,18 +1998,31 @@ for _i in range(_SPR_STEPS):
     _spr_deflection.append(SPR_PRESET + SPR_PARKED_AIR - (_n - STRAP_R_END))
     _spr_station.append(_t)
 SPRING_DEFLECTION = (_spr_deflection[0], _spr_deflection[-1])  # parked, engaged
-for _label, _d, _t, _m in zip(
-    ("parked", "engaged"),
-    SPRING_DEFLECTION,
-    (_spr_station[0], _spr_station[-1]),
-    _SWING_GRAVITY_NMM,
-):
-    if spr_contact_force(_d - SPR_FORMED_BAND) * _t < _PRELOAD_MARGIN * _m:
+SPRING_PRELOAD_RATIO = tuple(
+    spr_contact_force(
+        _d - SPR_FORMED_BAND + (_SPR_T_LO - SPRING_T), _SPR_T_LO, _SPR_W_LO
+    )
+    * _t
+    / _m
+    for _d, _t, _m in zip(
+        SPRING_DEFLECTION,
+        (_spr_station[0], _spr_station[-1]),
+        SWING_GRAVITY_CORNER_NMM,
+        strict=True,
+    )
+)  # parked, engaged: soft-corner moment over gravity
+for _label, _ratio in zip(("parked", "engaged"), SPRING_PRELOAD_RATIO, strict=True):
+    if _ratio < _PRELOAD_MARGIN:
         raise AssertionError(
-            f"spring preload loses to gravity {_label} at the formed band's low end"
+            f"spring preload {_ratio:.2f}x loses to gravity {_label} at the soft corner"
         )
-if SPR_YIELD_MPA / spr_root_stress(SPRING_DEFLECTION[1]) < _STRESS_SF:
-    raise AssertionError("spring root stress over yield / SF at the engaged pose")
+SPRING_STRESS_SF = SPR_YIELD_MPA / spr_root_stress(
+    SPRING_DEFLECTION[1] + SPR_FORMED_BAND + (_SPR_T_HI - SPRING_T), _SPR_T_HI
+)
+if SPRING_STRESS_SF < _STRESS_SF:
+    raise AssertionError(
+        f"spring root stress SF {SPRING_STRESS_SF:.2f} engaged at the stiff corner"
+    )
 # The engaged blade flexes east toward the cylinder drum: the crest and the
 # flick tip, carried east by the extra deflection, keep 0.25 to the north end
 # disc beside them (the gears themselves end axially short of the leaf).
@@ -1978,7 +2030,7 @@ _spr_push = SPRING_DEFLECTION[1] - SPRING_DEFLECTION[0]
 for _label, _p in (("crest", SPRING_CREST), ("flick tip", SPRING_FLAT_TIP)):
     _q = (_p[0] + _spr_push * _SPR_N[0], _p[1] + _spr_push * _SPR_N[1])
     if (
-        math.hypot(X_DRUM - _q[0], Y_DRIVE - _q[1]) - SPRING_T
+        math.hypot(X_DRUM - _q[0], Y_DRIVE - _q[1]) - _SPR_T_HI
         < END_DISC_DIA / 2.0 + 0.25
     ):
         raise AssertionError(f"engaged spring {_label} reaches the drum end disc")
@@ -2362,7 +2414,9 @@ _require_tapped_thread(
 )
 if FSCREW_SHANK_LEN - ARBOR_PED_FLANGE_T < 2.0:
     raise AssertionError("foot screw barely engages the base at the pedestal")
-if FSCREW_SHANK_LEN - SPRING_T > BASE_FOOT_HOLE_DEPTH - 0.25:
+# The thinnest strip lets the screw deepest.  The base sizes the seat from
+# the same stock band, so its 0.25 tip reserve holds line to line.
+if BASE_FOOT_HOLE_DEPTH - (FSCREW_SHANK_LEN - _SPR_T_LO) < 0.25 - 1e-9:
     raise AssertionError("foot screw bottoms out in the base spring seat")
 # Head fits the pedestal's exposed flange strip (local z -8..-2, centre -5).
 if FSCREW_HEAD_DIA / 2.0 > min(

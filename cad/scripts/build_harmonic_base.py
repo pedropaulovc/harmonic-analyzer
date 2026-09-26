@@ -125,6 +125,7 @@ from build_swing_stop_screw import (
 )
 from build_slotted_screw import SHANK_LEN as BLOCK_SCREW_LEN
 from build_foot_screw import SHANK_LEN as FOOT_SCREW_LEN
+from build_foot_screw import THREAD as FOOT_SCREW_THREAD
 from build_fillister_screw import SHANK_LEN as NAMEPLATE_SCREW_LEN
 from build_swing_stop_screw import EMBED_LEN as STOP_ENGAGEMENT
 from build_lag_screw import (
@@ -133,8 +134,12 @@ from build_lag_screw import (
 )
 from pinion_pivot_block_geometry import BLOCK_HEIGHT, SCREW_HALF_SPACING
 from pinion_rig_layout import BLOCK_SEAT_Z, SPRING_PAD_Z
-from pinion_spring_section import SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST
-from pinion_spring_section import THICK as SPRING_THICKNESS
+from pinion_spring_section import (
+    SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST,
+    THICK as SPRING_THICKNESS,
+    THICK_BAND as SPRING_THICKNESS_BAND,
+)
+from _fit_limits import deviations
 from arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS
 from build_rocker_arm_support import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
 from rocker_arm_support_spec import SUPPORT_HOLD_DOWN_XZ
@@ -385,10 +390,22 @@ _FORMER_FOOT_SCREW_XZ = (
 FOOT_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_FOOT_SCREW_XZ
 )
-# The stock 9.525-mm foot screw penetrates 9.025 mm below the 0.5-mm spring.
-FOOT_SCREW_HOLE_DEPTH = 9.275  # stock engagement + 0.25 tip reserve
-FOOT_SCREW_DRILL_DEPTH = 11.3
-# Bottoming tap: 2.025 mm runout exceeds two #4-40 pitches (1.27 mm).
+# The stock 9.525-mm foot screw penetrates deepest below the THINNEST spring
+# strip the stock band allows (#859 ruling 4: 17-7 PH 0.015 in, 2325K19); the
+# full threads take that engagement plus the 0.25 tip reserve the blind-seat
+# check below demands, and the drill runs the bottoming-tap lead beyond.
+FOOT_SCREW_TIP_RESERVE = 0.25
+SPRING_THICKNESS_MIN = SPRING_THICKNESS + deviations(SPRING_THICKNESS_BAND)[0]
+FOOT_SCREW_HOLE_DEPTH = (
+    FOOT_SCREW_LEN - SPRING_THICKNESS_MIN + FOOT_SCREW_TIP_RESERVE
+)  # 9.413
+# Bottoming tap: the drill runs this runout past the full threads, which
+# must hold at least two pitches of the foot screw's thread.
+FOOT_SCREW_TAP_RUNOUT = 2.025
+FOOT_SCREW_PITCH = IN / int(FOOT_SCREW_THREAD.rsplit("-", 1)[1])  # #4-40: 0.635
+if FOOT_SCREW_TAP_RUNOUT < 2.0 * FOOT_SCREW_PITCH:
+    raise AssertionError("the foot seat's tap runout is under two pitches")
+FOOT_SCREW_DRILL_DEPTH = FOOT_SCREW_HOLE_DEPTH + FOOT_SCREW_TAP_RUNOUT
 
 # Maker's nameplate seats (2026-09-02 ch26 p.71 re-derive: four brass slotted
 # fillister-head screws hold the plate at its corners), blind from the TOP face
@@ -578,7 +595,7 @@ for _label, _seat, _engagement in (
     ("cone lock", LOCK_SEAT_SPEC, LOCK_STUD_LEN),
     ("swing stop", STOP_SEAT_SPEC, STOP_ENGAGEMENT),
     ("pinion block", BLOCK_SEAT_SPEC, BLOCK_SCREW_LEN - BLOCK_HEIGHT),
-    ("spring foot", FOOT_SEAT_SPEC, FOOT_SCREW_LEN - SPRING_THICKNESS),
+    ("spring foot", FOOT_SEAT_SPEC, FOOT_SCREW_LEN - SPRING_THICKNESS_MIN),
     ("pedestal foot", FOOT_SEAT_SPEC, FOOT_SCREW_LEN - PEDESTAL_FLANGE_THICKNESS),
     (
         "nameplate",

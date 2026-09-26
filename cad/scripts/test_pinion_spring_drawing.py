@@ -10,9 +10,11 @@ import _config
 import build_pinion_spring as spring
 import draw_pinion_spring as drawing
 import pinion_spring_geometry as geometry
+import pinion_spring_section as section
 import pinion_spring_spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _printed_tolerance import printed_deviations
 
 _XX_BAND = float(_config.title_block("linear_2pl")["value_in"]) * 25.4
 _HOLE_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
@@ -155,7 +157,37 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     # The title-block cell holds one line (<= 30 characters); the full
     # stock callout stays in the material specification.
     assert len(spec["material"]) <= 30
-    assert "C51000" in spec["material"] and "spring temper" in spec["material"]
-    assert "0.5 mm (0.020 in)" in spec["material_specification"]
+    assert "17-7 PH" in spec["material"] and "Cond C" in spec["material"]
+    assert "0.015 in (0.381 mm)" in spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 1
+
+
+def test_registry_names_the_stock_the_section_models() -> None:
+    # #859 ruling 4: 17-7 PH Condition C, 0.015 in, McMaster-Carr 2325K19
+    # (+/-0.00075 in on the vendor page), sheared 1/4 in wide.  The width is a
+    # sheared, .XX-printed dimension, so its band is the title block's.
+    spec = _config.parts("pinion-spring")["material_specification"]
+    assert "McMaster-Carr 2325K19" in spec and "ASTM A693" in spec
+    assert "Condition C" in spec and "+/-0.00075 in" in spec
+    assert section.THICK == pytest.approx(0.015 * 25.4)
+    assert section.THICK_BAND == pytest.approx((0.00075 * 25.4, -0.00075 * 25.4))
+    assert section.WIDTH == pytest.approx(0.25 * 25.4)
+    assert printed_deviations(section.WIDTH, section.WIDTH_PLACES) == pytest.approx(
+        (-_XX_BAND, _XX_BAND), abs=0.005
+    )
+    assert pinion_spring_spec.DRAWING_PRECISION_BY_NAME["StripWidth"] == 2
+    assert spring.MATERIAL == "AISI 304"  # the library's stainless stand-in
+
+
+def test_every_inside_radius_meets_the_17_7_ph_bend_minimum() -> None:
+    # No 17-7 PH source publishes a Condition C bend radius; the proxy is NASA
+    # SP-5089 (1968) Table XXXI, 17-7 PH (STA) 0.012-0.016 in: R 0.13 in.
+    # Condition C is less ductile than STA, so the bend trial is still due
+    # (cad/docs/tolerance-policy.md).
+    proxy = 0.13 * 25.4
+    assert min(geometry.R_BEND, geometry.R_KINK) >= proxy - 1e-9
+    assert geometry.MIN_INSIDE_BEND_R == pytest.approx(proxy)
+    # The larger bend keeps the blade inside O5's 9-13 deg only with the bend
+    # starting at the pad's edge.
+    assert geometry.FOOT_FLAT == 0.0
