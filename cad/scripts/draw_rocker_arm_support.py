@@ -34,9 +34,11 @@ from _drawing_common import (
     add_leader_note,
     add_native_hole_callout,
     add_surface_finish,
+    assert_imported_precision,
     create_section_view,
     create_view_theoretical_datum,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     import_cosmetic_threads,
     insert_hole_table,
@@ -72,6 +74,7 @@ from build_rocker_arm_support import (
 from rocker_arm_support_drawing_spec import SURFACE_FINISHES
 from rocker_bracket_seat_layout import (
     RAIL_DEPTH,
+    RAIL_DEPTH_PLACES,
     SEAT_LOCAL_X,
     SEAT_SPEC,
     WINDOW_TOP_Y,
@@ -147,15 +150,15 @@ DIMENSION_PRECISION = {
     "RimChamferSize": 2,
     "WebThickness": 2,  # a held thickness: 6.35, routine ±0.51
     "FootThickness": 2,
-    "RailDepth": 1,  # the seats' drill point needs the .X band (seat layout)
 }
 
 
 def imported_precision() -> dict[str, int]:
-    """Precision for the imported model dimensions only. The sheet-made ones
-    (web, foot, rail depth) set their own when they are created, after the
+    """Precision for the imported model dimensions the sheet still sets. The
+    sheet-made ones (web, foot) set their own when they are created, after the
     import; set_dimension_precision fails on a name it cannot find, which
-    is how the #743 rail's RailDepth entry broke r743-rocker-fix."""
+    is how the #743 rail's RailDepth entry broke r743-rocker-fix. RailDepth is
+    part-owned (MODEL_OWNED_PRECISION): the sheet only asserts it."""
     kept = set(FRONT_KEEP) | set(RIGHT_KEEP)
     return {
         name: digits for name, digits in DIMENSION_PRECISION.items() if name in kept
@@ -204,10 +207,9 @@ VIEW_B_ARROW = (
     ),
     (FRONT_CENTER[0] - 0.020, FRONT_CENTER[1] + HALF_Y * VIEW_SCALE / 1000.0),
 )
-# Section A-A pick for the rail depth: 5 mm off the centreline hits both the
-# top face (half-width NARROW less the rim chamfer) and the pocket's top face
-# (WEB out to the wall).
-RAIL_PICK_Z = 5.0
+# RailDepth carries the seat stack's .X band, so its places are the part's
+# (Codex #936 PRRT_kwDOPHDy386mTMXw); the sheet imports and asserts them.
+MODEL_OWNED_PRECISION = {"RailDepth": RAIL_DEPTH_PLACES}
 # The web thickness text sits right of the section, clear of the slanted
 # wall (x ~0.2187 at y 0.157) and of the 177.8 dimension line at x 0.240;
 # at x 0.221 it printed across the wall line (fix3 render).
@@ -231,6 +233,7 @@ RIGHT_KEEP = {
     # Below the rail-depth dimension, whose rail depth sits at y 0.224 in the same
     # lane: at 0.225 the two ran together ("X 45 DEG21.0", fix3 render).
     "RimChamferSize": (0.165, 0.200),
+    "RailDepth": RAIL_TEXT_XY,
 }
 
 # Top-left anchor; the native four-row table grows down and right while
@@ -489,22 +492,6 @@ def _right_seat_edge(adapter: Any, view: Any) -> Any:
     return edge
 
 
-def _right_rail_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
-    """The rail's top face and the window's top face, as model edges along Z
-    in section A-A. Coordinate picks there returned a 2225.98 mm "rail depth"
-    (r743-rocker-fix2, leaf 20260926T101855Z-1-f5fea24f), so the rail depth is
-    dimensioned between these exact entities instead."""
-    top_span, top = _longest_right_z_edge(adapter, view, HALF_Y, label="rail top-face")
-    window_span, window = _longest_right_z_edge(
-        adapter, view, WINDOW_TOP_Y, label="window top-face"
-    )
-    _telemetry.info(
-        f"section rail edges: top face {top_span * 1000.0:.3f} mm long at y {HALF_Y}, "
-        f"window top {window_span * 1000.0:.3f} mm long at y {WINDOW_TOP_Y}"
-    )
-    return top, window
-
-
 def _longest_right_z_edge(
     adapter: Any, view: Any, y_mm: float, *, label: str
 ) -> tuple[float, Any]:
@@ -652,6 +639,23 @@ async def build(adapter: Any) -> dict[str, str]:
     dimensions = [*front_dimensions, *right_dimensions]
     set_dimension_callouts(adapter, dimensions, DIMENSION_CALLOUTS)
     set_dimension_precision(adapter, dimensions, imported_precision())
+    assert_imported_precision(adapter, right_dimensions, MODEL_OWNED_PRECISION)
+    rail_dimensions = [
+        annotation
+        for annotation in right_dimensions
+        if dimension_name(adapter, annotation) == "RailDepth"
+    ]
+    if len(rail_dimensions) != 1:
+        raise RuntimeError("section A-A does not carry exactly one rail depth")
+    rail_display = _early_bound(
+        _early_bound(rail_dimensions[0], "IAnnotation").GetSpecificAnnotation(),
+        "IDisplayDimension",
+    )
+    measured = float(
+        _early_bound(rail_display.GetDimension2(0), "IDimension").SystemValue
+    )
+    if abs(measured * 1000.0 - RAIL_DEPTH) > 1e-5:
+        raise RuntimeError(f"section rail dimension measured {measured * 1000.0:.6f} mm")
     _create_view_centerline(
         adapter,
         front,
@@ -725,32 +729,6 @@ async def build(adapter: Any) -> dict[str, str]:
             f"section foot dimension measured {measured * 1000.0:.6f} mm"
         )
     foot_dimension.SetPrecision3(DIMENSION_PRECISION["FootThickness"], -1, -1, -1)
-    # The rail: top face down to the window's top face, between the exact
-    # model edges (the coordinate picks still locate the view, not the ends).
-    rail_pick_x = RIGHT_CENTER[0] - RAIL_PICK_Z * VIEW_SCALE / 1000.0
-    rail_dimension = _early_bound(
-        add_edge_dimension(
-            adapter,
-            right,
-            p0=(rail_pick_x, RIGHT_CENTER[1] + HALF_Y * VIEW_SCALE / 1000.0),
-            p1=(rail_pick_x, RIGHT_CENTER[1] + WINDOW_TOP_Y * VIEW_SCALE / 1000.0),
-            text_xy=RAIL_TEXT_XY,
-            orientation="vertical",
-            label="section rail depth",
-            entities=_right_rail_edges(adapter, right),
-        ),
-        "IDisplayDimension",
-    )
-    measured = float(
-        _early_bound(rail_dimension.GetDimension2(0), "IDimension").SystemValue
-    )
-    if abs(measured * 1000.0 - RAIL_DEPTH) > 1e-5:
-        raise RuntimeError(
-            f"section rail dimension measured {measured * 1000.0:.6f} mm"
-        )
-    rail_dimension.SetPrecision3(DIMENSION_PRECISION["RailDepth"], -1, -1, -1)
-    if rail_dimension.GetPrimaryPrecision2() != DIMENSION_PRECISION["RailDepth"]:
-        raise RuntimeError("section rail dimension precision did not persist")
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to bottom view")
 
