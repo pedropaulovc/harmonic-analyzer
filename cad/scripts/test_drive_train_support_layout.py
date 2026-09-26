@@ -1110,6 +1110,33 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
     assert "MHA-A03 prints" not in (FITUP.__doc__ or "")
 
 
+def test_the_rig_assembly_sequence_carries_each_part_step_verbatim() -> None:
+    # #814 moved the rule-6 assembly notes off MHA-116, MHA-058, MHA-102,
+    # MHA-002 and MHA-135 into ASSEMBLY_STEP constants. The sequence imports
+    # them (identity, not a retyped copy), bonds before RIG SET, pin last.
+    import pinion_arbor_spec
+    import pinion_cam_pin_spec
+    import pinion_handle_spec
+    import pinion_lever_pin_spec
+
+    assert FITUP.ASSEMBLY_SEQUENCE == (
+        pinion_arbor_spec.ASSEMBLY_STEP,
+        pinion_handle_spec.ASSEMBLY_STEP,
+        pinion_cam_pin_spec.ASSEMBLY_STEP,
+        FITUP.RIG_SET_STEP,
+        FITUP.COLLAR_SET_STEP,
+        pinion_lever_pin_spec.ASSEMBLY_STEP,
+    )
+    assert FITUP.ASSEMBLY_SEQUENCE[0] is pinion_arbor_spec.ASSEMBLY_STEP
+    assert FITUP.ASSEMBLY_SEQUENCE[-1] is pinion_lever_pin_spec.ASSEMBLY_STEP
+    bonds = FITUP.ASSEMBLY_SEQUENCE[:3]
+    assert all("LOCTITE 638" in step for step in bonds)
+    assert {"MHA-102", "MHA-002", "MHA-058", "MHA-116"} <= {
+        word for step in bonds for word in step.replace(";", " ").split()
+    }
+    assert FITUP.ASSEMBLY_SEQUENCE.index(FITUP.RIG_SET_STEP) > 2
+
+
 def test_rig_margin_table_is_logged_at_build() -> None:
     # Main (restricted review of #858): the margin table is visible in the
     # task log, one line per row, not only asserted at import.

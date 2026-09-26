@@ -23,10 +23,17 @@ import it.
   rule 6, as MHA-061 keeps its feeler off its own print).
 - The MHA-114 foot pad is set SPRING_PAD_LEAF off the back block before its
   seat is transferred (the same RIG SET note).
+- ASSEMBLY_SEQUENCE orders the rig's assembly steps.  The bonds and the
+  MHA-135 drive-through are each part spec's ASSEMBLY_STEP (policy rule 6
+  moved them off the part sheets, #814), imported here, never retyped.
 """
 
 from __future__ import annotations
 
+import pinion_arbor_spec
+import pinion_cam_pin_spec
+import pinion_handle_spec
+import pinion_lever_pin_spec
 from pinion_rig_layout import (
     BACK_COLLAR_LEAF_F,
     DRUM_END_SHIM,
@@ -114,7 +121,21 @@ COLLAR_SET_STEP = (
     f"  BACK COLLAR BACK FACE {BACK_COLLAR_LEAF_F:.2f} OFF BACK MHA-061."
 )
 
+# The rig's assembly steps in order.  The three LOCTITE 638 bonds come first:
+# RIG SET measures from the drum's back end, so the drum joint must be made
+# before it.  MHA-135 is driven last, through the lever hub and lift rod
+# match-drilled with the grip parked, once the collars are set.
+ASSEMBLY_SEQUENCE = (
+    pinion_arbor_spec.ASSEMBLY_STEP,
+    pinion_handle_spec.ASSEMBLY_STEP,
+    pinion_cam_pin_spec.ASSEMBLY_STEP,
+    RIG_SET_STEP,
+    COLLAR_SET_STEP,
+    pinion_lever_pin_spec.ASSEMBLY_STEP,
+)
+
 __all__ = [
+    "ASSEMBLY_SEQUENCE",
     "BACK_COLLAR_LEAF_F",
     "COLLAR_SET_STEP",
     "DRUM_END_SHIM",
