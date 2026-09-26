@@ -2387,3 +2387,30 @@ def test_a_dimensions_own_extension_line_through_its_text_gates():
     assert finding.extra["overlap_mm"] == pytest.approx(3.5 - 0.4, abs=0.01)
     touching = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (dim(0.1150),), 0.6)
     assert find_extension_through_own_text(touching) == []
+
+
+def test_a_hole_callout_over_the_top_border_gates_estimated_or_printed():
+    """swing's S1 case (#929 ac4fa6dd0, cone_swing_platform leaf 81d64de9faef):
+    RD2, a four-row native hole callout, printed its top row to y 269.9 mm,
+    3.2 mm past the 266.7 inner border, and main's element audit read "0
+    border crossing(s)": it gives dimensions no box. The shared audit boxes
+    the rows and gates the breach whether they are estimated from COM
+    positions or measured from the printed glyphs."""
+    rows = [
+        ("C'BORE TRANSFER", 0.1781, 0.2664),
+        ("2X <MOD-DIAM>6.76 THRU", 0.1710, 0.2608),
+        ("5/16-18 UNC - 2B THRU", 0.1559, 0.2552),
+        ("90° CSK <MOD-DIAM>9.0", 0.1623, 0.2496),
+    ]
+    callout = _hole_callout("RD2", [(0.180, 0.230, 0.200, 0.248), (0.155, 0.248, 0.250, 0.248)], rows)
+    view = _view("Drawing View2", (0.1594, 0.1286, 0.2006, 0.2514), [callout])
+
+    def breaches(dump):
+        return [f for f in audit_dump(dump) if f.kind == "outside-border" and " RD2 " in f" {f.a} "]
+
+    [estimated] = breaches(_dump(views=[view]))
+    assert estimated.b == "top border"
+    assert estimated.extra["breach_mm"] > 3.0
+    assert severity(estimated) is FindingSeverity.GATING
+    [printed] = breaches(_dump(views=[view], strokes=_edges((0.06, 0.06, 0.09, 0.06))))
+    assert printed.b == "top border"
