@@ -52,6 +52,7 @@ from build_rocker_arm_support import (
     BOSS_DEPTH,
     CAV,
     CHAMFER,
+    DRAWING_DIMENSIONS,
     HALF_Y,
     HOLES,
     HOLE_DIA,
@@ -101,14 +102,13 @@ ISO_CENTER = (0.350, 0.201)
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position (meters). Every front-view callout is outside the part silhouette:
-# overall size above, nested pocket sizes below, radii left, chamfer right.
+# overall size above, nested pocket sizes below, radii left.
 FRONT_KEEP = {
     "Depth": (0.105, 0.258),
     "PocketRadius": (0.035, 0.150),
     "CavityRadius": (0.035, 0.190),
     "WinWidth": (0.105, 0.118),
     "CavWidth": (0.105, 0.128),
-    "RimChamferSize": (0.165, 0.225),
 }
 DIMENSION_CALLOUTS = {
     "PocketRadius": "8X",
@@ -148,10 +148,16 @@ SEAT_NOTE_ATTACH = (
 # top face (half-width NARROW less the rim chamfer) and the pocket's top face
 # (WEB out to the wall).
 RAIL_PICK_Z = 5.0
+# The section cuts the window rim in profile, and it is the one view where a
+# targeted import of RimChamfer delivers RimChamferSize (r743-diag-c, leaf
+# 20260926T100550Z-1-829fb125). The front view only ever got it as a side
+# effect of the entire-model import, which the #743 rail took away. The callout
+# keeps the lane between the front view and the section.
 RIGHT_KEEP = {
     "WallHeight": (0.240, 0.185),
     "FootSpan": (0.205, 0.133),
     "TopSpan": (0.205, 0.238),
+    "RimChamferSize": (0.165, 0.225),
 }
 
 # Top-left anchor; the native four-row table grows down and right while
@@ -348,7 +354,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
     right_dimensions = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="right"
+        adapter,
+        right,
+        keep=RIGHT_KEEP,
+        view_label="right",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     dimensions = [*front_dimensions, *right_dimensions]
     set_dimension_callouts(adapter, dimensions, DIMENSION_CALLOUTS)
