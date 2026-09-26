@@ -1186,6 +1186,12 @@ def capture_com_failure(
     raise exc_type(message)
 
 
+def _describe_rows(rows: list[dict[str, Any]]) -> str:
+    return "; ".join(
+        f"{row['feature']} ({row['error']}, code {row['code']})" for row in rows
+    ) or "none reported"
+
+
 def capture_rebuild_failure(adapter: Any, message: str) -> NoReturn:
     """Name the features behind a refused rebuild, capture the seat, then raise.
 
@@ -1198,14 +1204,22 @@ def capture_rebuild_failure(adapter: Any, message: str) -> NoReturn:
     (:func:`capture_com_failure`: What's Wrong again, the session messages, the
     document copy) follows and raises ``RuntimeError(message)``.
     """
-    faults: list[dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     with contextlib.suppress(Exception):
-        faults = list(_whats_wrong_table(adapter).get("whats_wrong") or [])
-    features = "; ".join(
-        f"{fault['feature']} ({fault['error']}, code {fault['code']})" for fault in faults
-    ) or "none reported"
+        rows = list(_whats_wrong_table(adapter).get("whats_wrong") or [])
+    # What's Wrong also lists warning-only rows; they did not fail the rebuild,
+    # so they ride the event apart from the failures.
+    faults = [row for row in rows if not row.get("warning")]
+    warnings = [row for row in rows if row.get("warning")]
+    features = _describe_rows(faults)
     with contextlib.suppress(Exception):
-        _telemetry.event("rebuild.failed", failing_features=features, fault_count=len(faults))
+        _telemetry.event(
+            "rebuild.failed",
+            failing_features=features,
+            fault_count=len(faults),
+            warning_features=_describe_rows(warnings),
+            warning_count=len(warnings),
+        )
     title = "document"
     with contextlib.suppress(Exception):
         title = str(_common._read_member(adapter.currentModel, "GetTitle") or title)

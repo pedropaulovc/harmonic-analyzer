@@ -51,9 +51,15 @@ CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
     # A failed drive-train package audit: the evidence PDF's directory, read
     # after the failure, nothing read back into the model.
     ("draw_drive_train_assembly.py", "_export_failure_pdf"): frozenset({"OUT_FAILURES"}),
+    # A refused rebuild: reads the What's Wrong table, then raises through
+    # capture_com_failure.  Nothing after it runs.
+    ("_common.py", "force_rebuild"): frozenset({"capture_rebuild_failure"}),
 }
 # Allowed anywhere, but only as a statement whose value is the call: it always raises.
-TERMINAL = frozenset({"capture_com_failure", "capture_rebuild_failure"})
+TERMINAL = frozenset({"capture_com_failure"})
+# Pinned captures that must raise like a terminal, though only their CALL_SITES
+# may name them.
+PINNED_TERMINALS = frozenset({"capture_rebuild_failure"})
 
 # Rule 3: the COM mutators an inert module may call, and the function that calls each.
 MUTATOR = re.compile(
@@ -218,6 +224,16 @@ def _call_site_violations(path: Path, rel: str) -> list[str]:
     return violations
 
 
+def test_pinned_terminals_are_defined_and_pinned():
+    # Rule 3 holds each to NoReturn only where it is defined; a rename must not
+    # leave the check with nothing to hold.
+    defined = {name for path in INERT.values() for name in _functions(_tree(path))}
+    assert PINNED_TERMINALS <= defined, sorted(PINNED_TERMINALS - defined)
+    pinned = set().union(*CALL_SITES.values())
+    assert PINNED_TERMINALS <= pinned, sorted(PINNED_TERMINALS - pinned)
+    assert not PINNED_TERMINALS & TERMINAL
+
+
 def test_rule2_tracked_code_reaches_inert_modules_only_at_pinned_sites():
     violations = [
         violation
@@ -266,9 +282,10 @@ def test_rule3_inert_module_runs_no_com_mutator_before_a_save(name):
         stray = callers - roots
         if stray:
             violations.append(f"{holder} (a pinned mutator) is reached from {sorted(stray)}")
-    # A terminal call is allowed anywhere only because it always raises: each
-    # ends in a raise, or in a call to another terminal that does.
-    for terminal in TERMINAL & set(functions):
+    # A terminal call is allowed anywhere only because it always raises, and a
+    # pinned capture is held to the same: each ends in a raise, or in a call to
+    # a terminal that does.
+    for terminal in (TERMINAL | PINNED_TERMINALS) & set(functions):
         capture = functions[terminal]
         returns = ast.unparse(capture.returns) if capture.returns is not None else ""
         last = capture.body[-1]

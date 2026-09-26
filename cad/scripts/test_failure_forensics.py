@@ -1691,16 +1691,25 @@ class _Named:
 
 class _RebuildExtension:
     """What's Wrong as the crank pinion's refused rebuild left it: the pin hole
-    and two tooth cuts, early-bound (the outs ride the return tuple)."""
+    and two tooth cuts, early-bound (the outs ride the return tuple), plus a
+    warning-only row that did not fail the rebuild."""
 
-    FAULTS = (("PinHole", 1), ("ToothGap12", 2), ("ToothGap13", 2))
+    ROWS = (
+        ("PinHole", 1, False),
+        ("EdgeBreak3", 4, True),
+        ("ToothGap12", 2, False),
+        ("ToothGap13", 2, False),
+    )
+
+    def __init__(self, rows=ROWS) -> None:
+        self.rows = rows
 
     def GetWhatsWrongCount(self) -> int:
-        return len(self.FAULTS)
+        return len(self.rows)
 
     def GetWhatsWrong(self):
-        names, codes = zip(*self.FAULTS)
-        return True, [_Named(name) for name in names], list(codes), [False] * len(codes)
+        names, codes, warnings = zip(*self.rows)
+        return True, [_Named(name) for name in names], list(codes), list(warnings)
 
 
 class _MessagingSeat(_Seat):
@@ -1716,9 +1725,11 @@ class _RebuildResult:
 
 
 class _RebuildAdapter(_Adapter):
-    def __init__(self, tmp_path: Path, error: str | None) -> None:
+    def __init__(
+        self, tmp_path: Path, error: str | None, rows=_RebuildExtension.ROWS
+    ) -> None:
         model = _Model(tmp_path)
-        model.Extension = _RebuildExtension()
+        model.Extension = _RebuildExtension(rows)
         super().__init__(sw=_MessagingSeat(), model=model)
         self._result = _RebuildResult(error)
 
@@ -1751,15 +1762,22 @@ def test_a_refused_rebuild_names_its_features_captures_and_raises(
         "ToothGap13 (rebuild-error, code 2)"
     )
     assert event.attributes["fault_count"] == 3
+    # The warning-only row rides the event apart: it did not fail the rebuild.
+    assert event.attributes["warning_features"] == "EdgeBreak3 (dangling-has-members, code 4)"
+    assert event.attributes["warning_count"] == 1
 
     (captured,) = sorted((tmp_path / "failures").glob("*/*/capture.json"))
     report = json.loads(captured.read_text())
     assert report["api"] == "IModelDoc2.ForceRebuild3"
     assert report["label"] == "rebuild 91247A720"
-    assert [row["feature"] for row in report["error_state"]["whats_wrong"]] == [
-        "PinHole",
-        "ToothGap12",
-        "ToothGap13",
+    # The capture keeps the whole table, warning flags included.
+    assert [
+        (row["feature"], row["warning"]) for row in report["error_state"]["whats_wrong"]
+    ] == [
+        ("PinHole", False),
+        ("EdgeBreak3", True),
+        ("ToothGap12", False),
+        ("ToothGap13", False),
     ]
     assert report["error_state"]["error_messages"] == [
         "PinHole: could not be inserted due to geometry conditions"
@@ -1767,6 +1785,28 @@ def test_a_refused_rebuild_names_its_features_captures_and_raises(
     assert report["context"]["failing_features"] == event.attributes["failing_features"]
     bodies = [str(r.log_record.body) for r in logs.get_finished_logs()]
     assert any(body.startswith("[forensics] rebuild 91247A720:") for body in bodies)
+
+
+def test_a_warning_only_table_names_no_failing_feature(
+    tmp_path, monkeypatch, capture_telemetry
+):
+    import asyncio
+
+    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    spans, _logs = capture_telemetry
+    adapter = _RebuildAdapter(
+        tmp_path, "Error in rebuild_model: Failed to rebuild model", rows=(("EdgeBreak3", 4, True),)
+    )
+
+    with pytest.raises(RuntimeError, match=r"^rebuild failed: "):
+        asyncio.run(_common.force_rebuild(adapter))
+
+    (rebuild,) = [s for s in spans.get_finished_spans() if s.name == "feature.rebuild"]
+    (event,) = [e for e in rebuild.events if e.name == "rebuild.failed"]
+    assert event.attributes["failing_features"] == "none reported"
+    assert event.attributes["fault_count"] == 0
+    assert event.attributes["warning_features"] == "EdgeBreak3 (dangling-has-members, code 4)"
+    assert event.attributes["warning_count"] == 1
 
 
 def test_a_clean_rebuild_captures_nothing(tmp_path, monkeypatch, capture_telemetry):
