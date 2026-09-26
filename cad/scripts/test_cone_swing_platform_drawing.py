@@ -203,25 +203,17 @@ def _plate_thickness_text_box(
 def test_plate_thickness_text_sits_beside_section_a_a() -> None:
     """The (6.35) stock callout stays in the pocket left of section A-A.
 
-    Above it: the notch plan's 205.81 witness (y 0.1379) and the 7.0 arrow at
-    x 0.2697, both measured on the 81788ce9 render; below it the relocated
-    section C-C label.  Its keep y must stay above the top witness (plate top
-    0.1265) so SolidWorks keeps the text outside, not centred on the line.
+    Its keep y must stay above the top witness (plate top 0.1265) so
+    SolidWorks keeps the text outside, not centred on the line.  The notch
+    plan's 205.81 witness and 7.0 arrow above it and the C-C label below it
+    (81788ce9) print on the other sheet since #917 S1 moved A-A with the
+    hole-location plan it is cut from.
     """
+    assert drawing.VIEW_SHEETS["pivot section"] != drawing.VIEW_SHEETS["notch plan"]
+    assert drawing.VIEW_SHEETS["pivot section"] != drawing.VIEW_SHEETS["tip screw slot section"]
     box = _plate_thickness_text_box()
-    witness_205 = (0.2690, 0.1374, 0.3060, 0.1384)
-    arrow_7 = (0.2692, 0.1280, 0.2702, 0.1379)
-    lx, ly = drawing.SLOT_SECTION_LABEL_LOWER_LEFT
-    cc_label = (lx, ly, lx + 0.0465, ly + 0.0162)
-    for other in (witness_205, arrow_7, cc_label):
-        assert not _boxes_overlap(box, other), other
     assert drawing.SECTION_KEEP["PlateThk"][1] > 0.1265 + 0.001
     assert box[2] < drawing.SECTION_CENTER[0] - 0.02  # left of the cut edge
-    # Positive control: 81788ce9's one-line callout at its old keep crossed
-    # the 205.81 witness (and touched the 7.0 arrow).
-    old = _plate_thickness_text_box((0.320, 0.135), "1/4 PLATE AS SUPPLIED")
-    assert abs((old[2] - old[0]) - 0.0496) < 0.001
-    assert _boxes_overlap(old, witness_205)
 
 
 # Section C-C's 2.80 depth dimension parks its text right of the strip; its
@@ -236,28 +228,20 @@ def _cc_depth_line(center: tuple[float, float] | None = None) -> tuple[float, ..
     return (x - 0.0003, cy, x + 0.0003, cy + _CC_DEPTH_LINE_TOP_DY)
 
 
-def test_plate_thickness_text_clears_the_cc_depth_line_and_its_own_arrow() -> None:
+def test_plate_thickness_text_clears_its_own_arrow() -> None:
     """aa9766da: the 2.80 arrow line ran up between "AS" and "SUPPLIED".
 
-    The stock text keeps 2 mm from that line, and the line beside the 6.35
-    dimension's top arrowhead is the short one, set back from the arrow by
-    at least 1.5 mm (there "AS SUPPLIED" ran its D into the arrowhead).
+    C-C's 2.80 prints on the other sheet since #917 S1; the line beside the
+    6.35 dimension's top arrowhead is still the short one, set back from the
+    arrow by at least 1.5 mm (there "AS SUPPLIED" ran its D into the
+    arrowhead).
     """
-    box = _plate_thickness_text_box()
-    line = _cc_depth_line()
-    assert box[0] - line[2] >= 0.002
-    assert line[3] > box[1]  # the line does reach the text's height
+    assert drawing.VIEW_SHEETS["pivot section"] != drawing.VIEW_SHEETS["tip screw slot section"]
     callout = spec.PLATE_STOCK_CALLOUT.split("\n")
     widest = max(len(text) for text in ("(6.35)", *callout))
     setback = (widest - len(callout[-1])) * _CHAR_W / 2.0
     assert setback >= 0.0015
-    # Positive controls: aa9766da's shift crossed the line, and its callout
-    # put the widest line beside the arrow.
-    old_keep = (drawing.SECTION_KEEP["PlateThk"][0] - (drawing.SECTION_SHIFT[0] - 0.020),
-                drawing.SECTION_KEEP["PlateThk"][1])
-    old_box = _plate_thickness_text_box(old_keep, "1/4 PLATE\nAS SUPPLIED")
-    old_line = _cc_depth_line((0.279, 0.1109))
-    assert _boxes_overlap(old_box, old_line)
+    # Positive control: aa9766da's callout put the widest line beside the arrow.
     assert len("AS SUPPLIED") == max(len(t) for t in ("(6.35)", "1/4 PLATE", "AS SUPPLIED"))
 
 
@@ -284,7 +268,8 @@ def test_lock_notch_caption_sits_under_its_own_view() -> None:
     label = (lx, ly, lx + 0.0465, ly + 0.0162)
     assert box[1] - label[3] >= 0.015
     assert not _boxes_overlap(box, _cc_depth_line())
-    assert not _boxes_overlap(box, _plate_thickness_text_box())
+    # A-A's (6.35) sat below it until #917 S1 moved A-A to the other sheet.
+    assert drawing.caption_sheet("Notch View Note") != drawing.VIEW_SHEETS["pivot section"]
     # Positive control: aa9766da's caption on the plan row sat 1.2 mm under
     # its C-C label, and would now overlap the lowered label outright.
     old = (0.2448, 0.0805, 0.3045, 0.0853)
@@ -520,7 +505,6 @@ _D382_ISO_VIEW_BOX = (0.3160, 0.1793, 0.3940, 0.2307)
 _D382_ISO_NOTE_ANCHOR = (0.315, 0.158)
 _D382_ISO_NOTE_BOX = (0.3147, 0.1536, 0.3748, 0.1585)
 _D382_NOTCH_NOTE_BOX = (0.2298, 0.1215, 0.2899, 0.1258)
-_PLATE_THK_TOP_LINE_BOX = (0.3095, 0.1318, 0.3246, 0.1353)
 _SHEET_BORDER_RIGHT = 0.4189
 
 
@@ -580,24 +564,17 @@ def test_the_fix4b_caption_fails_the_ink_audit() -> None:
 def test_the_moved_205_81_clears_the_isometric_and_the_section_note() -> None:
     """The 205.81 at x 0.327 and its neighbours, 2 mm apart: both legs pass
     left of the isometric view and its caption, its text sits under the view,
-    its lower witness and arrowhead clear A-A's "(6.35)", and the view stays
-    inside the border."""
+    and the view stays inside the border.  A-A's "(6.35)" under its lower
+    witness prints on the other sheet since #917 S1."""
+    assert drawing.VIEW_SHEETS["notch plan"] != drawing.VIEW_SHEETS["pivot section"]
     view = _iso_view_box()
     ink = drawing.notch_plan_ink()
     caption = ink.texts["Isometric View Note"]
     witness, line, lower_leg, lower_witness = ink.lines["CapECz"]
-    cap_x = drawing.NOTCH_KEEP["CapECz"][0]
-    lower_arrow = ((cap_x, lower_witness[0][1]), (cap_x, lower_witness[0][1] + 0.0034))
     for keep_out in (view, caption):
         for stroke in (witness, line, lower_leg, lower_witness):
             assert _drawing_leaders.distance_to_box(stroke, keep_out) >= 0.002
         assert _box_gap(ink.texts["CapECz"], keep_out) >= 0.002
-    assert _drawing_leaders.distance_to_box(lower_witness, _PLATE_THK_TOP_LINE_BOX) >= 0.002
-    assert (
-        _drawing_leaders.distance_to_box(lower_arrow, _PLATE_THK_TOP_LINE_BOX)
-        - drawing.DIMENSION_ARROW_HALF_WIDTH
-        >= 0.002
-    )
     assert _SHEET_BORDER_RIGHT - view[2] >= 0.002
     assert _SHEET_BORDER_RIGHT - caption[2] >= 0.002
 
@@ -675,20 +652,12 @@ def test_the_notch_plan_prints_clear() -> None:
     assert "NotchRunAngle" not in drawing.NOTCH_KEEP
 
 
-# The fields detail D shares, as d382/fix4b printed them: the isometric's
-# padded view box with ISO_CENTER (_iso_view_box), the 205.81's upper
-# witness end (x 0.3283 at the cap's y), the zone frame (d382 dump:
-# [12.7, 12.7]..[419.1, 266.7] mm), detail B's label box size (31.5 x
-# 16.4 mm, :512), and on the hole-location plan the 2X Ø5.11 callout's
-# shoulder (y 0.2524, x 0.1702..0.2282, :393) and the 189.26's hole witness
-# (y 0.2323, x 0.1869..0.2260, :360).  The 205.81's dimension line stands at
-# x 0.327 (NOTCH_KEEP) from that witness down, and the 33.00's text sits
-# at (0.2652, 0.258).
+# Detail D's field, as d382/fix4b printed it: the zone frame (d382 dump:
+# [12.7, 12.7]..[419.1, 266.7] mm) and detail B's label box size (31.5 x
+# 16.4 mm, :512).  Its neighbours then -- the isometric and the notch plan's
+# 205.81 -- print on the plans sheet since #917 S1.
 _ZONE_FRAME = (0.0127, 0.0127, 0.4191, 0.2667)
-_D382_205_81_WITNESS_END = (0.3283, 0.24057)
 _DETAIL_LABEL_SIZE = (0.0315, 0.0164)
-_D382_RD2_SHOULDER = ((0.1702, 0.2524), (0.2282, 0.2524))
-_D382_189_26_HOLE_WITNESS = ((0.1869, 0.2323), (0.2260, 0.2323))
 # Dimension glyphs: "9.11°" measured 10.6 x 3.5 mm (d382), so ~2.12 mm a
 # character; a stacked +0.10/0 adds ~7 mm and stands ~4.5 mm tall.
 _DIM_CHAR_W, _DIM_GLYPH_H = 0.00212, 0.0035
@@ -749,22 +718,18 @@ def _width_witnesses() -> list[tuple[tuple[float, float], tuple[float, float]]]:
 
 
 def test_detail_d_fits_the_field_over_the_isometric() -> None:
-    """Outline inside the zone frame, the circle over the isometric's box
-    and 2 mm off the 205.81, the label LEFT of the outline -- in the field
-    the Ø8.00 and the run angle's leader left -- above the 205.81's witness
-    and dimension line, inside the frame."""
+    """Outline inside the zone frame, the label LEFT of the outline, inside
+    the frame.  The isometric and the notch plan's 205.81 and 33.00 it was
+    fitted between print on the other sheet since #917 S1 (detail D is cut
+    from the hole-location plan), so they no longer bound it; its features
+    sheet neighbours are judged in test_cone_swing_platform_sheets_drawing."""
+    assert drawing.VIEW_SHEETS["lock notch cap detail"] != drawing.VIEW_SHEETS["isometric"]
+    assert drawing.VIEW_SHEETS["lock notch cap detail"] != drawing.VIEW_SHEETS["notch plan"]
     outline = _cap_detail_outline()
     assert outline[3] <= _ZONE_FRAME[3]
-    cx, cy = drawing.CAP_DETAIL_CENTER
-    radius = drawing.CAP_DETAIL_SHEET_RADIUS
-    assert cy - radius > _iso_view_box()[3]
-    assert math.dist((cx, cy), _D382_205_81_WITNESS_END) - radius >= 0.002
     label = _cap_detail_label()
     assert outline[0] - label[2] >= 0.0012  # detail B's own gap (47.9 -> 49.1)
     assert _ZONE_FRAME[3] - label[3] >= 0.004
-    assert label[1] - _D382_205_81_WITNESS_END[1] >= 0.005
-    cap_ecx = drawing._centred_box(drawing.NOTCH_KEEP["CapECx"], drawing.CAP_EC_Z_TEXT_SIZE)
-    assert _box_gap(label, cap_ecx) >= 0.005
     # Positive control: 63fb3bd2d's label right of the outline sits on the
     # width's south witness, where it now runs out through the mouth.
     old = (0.3808, 0.236, 0.3808 + _DETAIL_LABEL_SIZE[0], 0.236 + _DETAIL_LABEL_SIZE[1])
@@ -773,12 +738,15 @@ def test_detail_d_fits_the_field_over_the_isometric() -> None:
     )
 
 
-def test_detail_d_circle_on_the_hole_location_plan_clears_its_neighbours() -> None:
+def test_detail_d_circle_centres_on_the_cap_in_the_hole_location_plan() -> None:
+    """Where the circle stands on its parent plan.  d382's neighbours there
+    (the 2X Ø5.11 shoulder and the 189.26 witness) are gone: #917 S1 dropped
+    the plan's stations and moved the tap callout off the plan to sheet 2,
+    where test_cone_swing_platform_sheets_drawing clears the circles of the
+    seeded callouts."""
     cap = drawing.plan_xy(drawing.FEATURE_CENTER, part.SLOT_E_X, part.SLOT_E_Z)
     assert cap == pytest.approx((0.19325, 0.24057), abs=5e-5)
-    radius = drawing.CAP_DETAIL_RADIUS_MM * drawing.PLAN_SCALE
-    for stroke in (_D382_RD2_SHOULDER, _D382_189_26_HOLE_WITNESS):
-        assert _drawing_leaders.distance_to_point(stroke, cap) - radius >= 0.004
+    assert drawing.FEATURE_KEEP == {}
 
 
 def test_detail_d_states_width_angle_and_r_clear_of_each_other() -> None:
@@ -796,7 +764,6 @@ def test_detail_d_states_width_angle_and_r_clear_of_each_other() -> None:
         assert _box_off_circle(box, centre) - circle >= 0.002, name
         assert _ZONE_FRAME[3] - box[3] >= 0.002, name
         assert _ZONE_FRAME[2] - box[2] >= 0.002, name
-        assert box[1] - _iso_view_box()[3] >= 0.002, name
     # The angle's value lies in the material wedge, the acute 88.
     angle = drawing.CAP_DETAIL_KEEP["NotchMouthAngle"]
     vertex = drawing.MOUTH_ANGLE_VERTEX_XY
@@ -1071,10 +1038,12 @@ def test_detail_band_clears_border_title_block_and_captions() -> None:
     caption, which the audit's nominal dimension boxes cannot see (#852).
     """
     border_bottom, title_block = 0.0127, (0.216, 0.0, 0.4318, 0.066)
-    captions = (
-        (0.0449, 0.0805, 0.1059, 0.0853),
-        (0.1497, 0.0805, 0.2185, 0.0853),
-    )
+    # Detail B prints on the features sheet with the hole-location plan's
+    # caption; the profile's caption (0.0449, 0.0805, 0.1059, 0.0853) is on
+    # the other sheet since #917 S1.
+    assert drawing.caption_sheet("Profile View Note") != drawing.VIEW_SHEETS["tip screw slot detail"]
+    assert drawing.caption_sheet("Feature View Note") == drawing.VIEW_SHEETS["tip screw slot detail"]
+    captions = ((0.1497, 0.0805, 0.2185, 0.0853),)
     label_x, label_y = drawing.DETAIL_LABEL_LOWER_LEFT
     label = (label_x, label_y, label_x + 0.0315, label_y + 0.0162)
     note_x, note_y = drawing.RELIEF_NOTE_XY
@@ -1128,7 +1097,7 @@ def test_detail_band_clears_border_title_block_and_captions() -> None:
     old_cbore = (0.196, 0.072 - 0.016, 0.196 + 0.042, 0.072 + 0.015)
     assert old_label[1] < border_bottom
     assert _boxes_overlap(old_cbore, title_block)
-    assert _boxes_overlap(old_cbore, captions[1])
+    assert _boxes_overlap(old_cbore, captions[0])
 
 
 def test_detail_dimension_text_sits_outside_its_own_lines() -> None:
@@ -1565,17 +1534,16 @@ def test_slot_section_pocket_clears_its_neighbours() -> None:
     text is its rendered extent (see the test below), not the audit's
     nominal box (#852).
     """
-    # Section A-A's boxes were logged at SECTION_SHIFT x 0.020; they move
-    # with the shift.
-    dx_aa = drawing.SECTION_SHIFT[0] - 0.020
+    # The hole-location plan's caption and RD1, and section A-A with its
+    # finish and thickness, bounded this pocket until #917 S1 moved them to
+    # the features sheet; C-C stays on the plans sheet.
+    cc = drawing.VIEW_SHEETS["tip screw slot section"]
+    assert drawing.VIEW_SHEETS["pivot section"] != cc
+    assert drawing.caption_sheet("Feature View Note") != cc
+    assert drawing.VIEW_SHEETS["notch plan"] == drawing.caption_sheet("Notch View Note") == cc
     neighbours = {
         "notch view": (0.2394, 0.1286, 0.2806, 0.2514),
         "notch caption": _notch_caption_box(),
-        "hole caption": (0.1497, 0.0805, 0.2185, 0.0853),
-        "RD1": (0.1900, 0.1042, 0.2460, 0.1077),
-        "section A-A": (0.3246 + dx_aa, 0.1081, 0.3854 + dx_aa, 0.1319),
-        "A-A finish": (0.3160 + dx_aa, 0.1056, 0.3276 + dx_aa, 0.1081),
-        "A-A thickness": _plate_thickness_text_box(),
         "title block": (0.216, 0.0, 0.4318, 0.066),
     }
     z = spec.TIP_SCREW_LOCAL_Z

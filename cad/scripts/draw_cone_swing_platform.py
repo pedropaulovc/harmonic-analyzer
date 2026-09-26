@@ -19,6 +19,11 @@ along the slot for the counterbore depth.  Notch detail D enlarges the
 notch's closed end at 2:1: its width, its angle to the west edge at the
 mouth and its full R.  The isometric runs 1:3.
 
+Two sheets.  Sheet 1 (PLANS): the profile and lock-notch plans, the
+isometric and section C-C.  Sheet 2 (FEATURES): the hole-location plan with
+its three hole callouts, and section A-A and details B and D, which are cut
+from that plan.  Every view keeps its sheet position.
+
 Run with SolidWorks open::
 
     uv run python cad\scripts\draw_cone_swing_platform.py cone-swing-platform
@@ -29,8 +34,8 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-from dataclasses import dataclass
-from collections.abc import Collection, Sequence
+from dataclasses import dataclass, replace
+from collections.abc import Callable, Collection, Sequence
 from typing import Any
 
 import _drawing_leaders
@@ -46,6 +51,7 @@ from _drawing_common import (
     assert_imported_precision,
     create_section_view,
     check_drawing_layout,
+    create_blank_drawing_sheets,
     curate_view_dimensions,
     finalize_drawing,
     rebuild_drawing,
@@ -64,6 +70,7 @@ import build_cone_swing_platform as _part
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -86,7 +93,22 @@ from cone_swing_platform_spec import (
     TIP_SCREW_LOCAL_Z,
     TIP_SLOT_W,
 )
-from diagnostics.drawing_layout_audit import collect_document, describe_sheet
+from _drawing_layout_check import LeaderSegment
+from _layout_geometry import AnnotationGeometry, Box, SheetGeometry
+from _layout_planner import (
+    HoleCallout,
+    SheetObstacles,
+    box_conflict,
+    leader_conflict,
+    leader_conflicts,
+    sheet_obstacles,
+    shift_candidates,
+)
+from diagnostics.drawing_layout_audit import (
+    annotation_geometry,
+    collect_document,
+    describe_sheet,
+)
 
 
 SPEC = DRAWINGS_BY_NAME["cone_swing_platform"]
@@ -103,10 +125,87 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 2.0)  # title block states the principal (plan) scale; iso and section carry their own
 
+# Two sheets (#917 S1, Main's ruling on PR #929): the hole-location plan
+# could not carry its three native callouts beside the profile and notch
+# plans -- every sheet-1 spot for the tap and dowel callouts ran a leader
+# across a neighbouring plan or out through the border.  It moves to sheet 2
+# at the same 1:2, taking every view cut or detailed FROM it (section A-A and
+# details B and D are children of that plan: SolidWorks creates a child view
+# on its parent's sheet, and no API moves one across).  Positions are
+# unchanged; each sheet keeps the other's views' old place empty.
+PLANS_SHEET = "PLANS"
+FEATURES_SHEET = "FEATURES"
+SHEET_NAMES = (PLANS_SHEET, FEATURES_SHEET)
+SHEET_LAYOUTS = {name: SPEC.layout for name in SHEET_NAMES}
+SHEET_SCALES = {name: SHEET_SCALE for name in SHEET_NAMES}
+# Every view, by the recipe's own name for it, and the sheet it lives on.
+VIEW_SHEETS = {
+    "profile plan": PLANS_SHEET,
+    "notch plan": PLANS_SHEET,
+    "isometric": PLANS_SHEET,
+    "tip screw slot section": PLANS_SHEET,
+    "feature plan": FEATURES_SHEET,
+    "pivot section": FEATURES_SHEET,
+    "tip screw slot detail": FEATURES_SHEET,
+    "lock notch cap detail": FEATURES_SHEET,
+}
+# Each derived view and the view it is cut or detailed from.
+VIEW_PARENTS = {
+    "tip screw slot section": "profile plan",
+    "pivot section": "feature plan",
+    "tip screw slot detail": "feature plan",
+    "lock notch cap detail": "feature plan",
+}
+# Each property-linked caption and the view it names.
+CAPTION_VIEWS = {
+    "Profile View Note": "profile plan",
+    "Feature View Note": "feature plan",
+    "Notch View Note": "notch plan",
+    "Isometric View Note": "isometric",
+    "Pivot Relief Fit": "pivot section",
+}
+# Each sheet's "SHEET n OF N" seed, read back and moved to the nearest clear
+# place.  Sheet 1 keeps the multi-sheet part drawings' spot (draw_harmonic_base,
+# draw_top_frame); detail D covers it on the features sheet, so that one sits
+# left of D's label on the same line.
+SHEET_NUMBER_XY = {
+    PLANS_SHEET: (0.350, 0.263),
+    FEATURES_SHEET: (0.265, 0.263),
+}
+
+
+def sheet_contract_errors() -> list[str]:
+    """Why the sheet split cannot be built as declared, or nothing.
+
+    A derived view must share its parent's sheet (SolidWorks puts it there),
+    a caption must share its view's, and both sheets must carry a view."""
+    errors = []
+    for child, parent in sorted(VIEW_PARENTS.items()):
+        if VIEW_SHEETS[child] != VIEW_SHEETS[parent]:
+            errors.append(
+                f"{child} is on {VIEW_SHEETS[child]} but its parent {parent} "
+                f"is on {VIEW_SHEETS[parent]}"
+            )
+    for caption, view in sorted(CAPTION_VIEWS.items()):
+        if view not in VIEW_SHEETS:
+            errors.append(f"{caption} names no known view ({view!r})")
+    for name in SHEET_NAMES:
+        if name not in VIEW_SHEETS.values():
+            errors.append(f"sheet {name} carries no view")
+    unknown = sorted(set(VIEW_SHEETS.values()) - set(SHEET_NAMES))
+    if unknown:
+        errors.append(f"views on undeclared sheets: {unknown}")
+    return errors
+
+
+def caption_sheet(caption: str) -> str:
+    return VIEW_SHEETS[CAPTION_VIEWS[caption]]
+
 # Sheet layout (meters).  Three 1:2 plan views separate the profile, hole
 # pattern and lock-notch definitions instead of routing unrelated leaders
 # through one narrow 224-mm wedge.  The section and pictorial occupy the
-# right-hand field.
+# right-hand field.  The hole-location plan and its family print on sheet 2
+# at these same positions (see SHEET_NAMES).
 PROFILE_CENTER = (0.075, 0.190)
 FEATURE_CENTER = (0.180, 0.190)
 NOTCH_CENTER = (0.260, 0.190)
@@ -175,11 +274,17 @@ FEATURE_KEEP: dict[str, tuple[float, float]] = {}
 # The locating instruction ahead of the native tap callout, in the harmonic
 # base's #837 form: the semicolon separates it from "1/4-20 UNC - 2B".
 POST_MOUNT_TRANSFER_CALLOUT = "TRANSFER FROM MHA-016\nAT ASSEMBLY;"
-# The dowel callout, in the band left of the plan's south half, between the
-# profile's west-side dimensions and the plate's east edge (~x 0.165 there);
-# its leader runs right to the north dowel's rim.  Provisional until a seat
-# render: nothing was measured here.
-PLATE_DOWEL_CALLOUT_XY = (0.117, 0.222)
+# Nominal callout anchors on the features sheet.  Each is read back and moved
+# to the nearest clear spot (``plan_shift``), so these only seed the search;
+# the offline dump test proves the seed is already clear.  The pivot callout
+# stays below the plan between the A-A arrows.  With the profile and notch
+# plans gone from this sheet, the tap callout sits right of the plan just
+# below its holes, a text height clear of detail D's label (the planner's
+# view-crowding rule), and the dowel callout left of the plan's south half,
+# its right end 2 mm clear of the view.
+PIVOT_CALLOUT_XY = (0.215, 0.107)
+POST_MOUNT_CALLOUT_XY = (0.250, 0.217)
+PLATE_DOWEL_CALLOUT_XY = (0.1075, 0.222)
 # The three 1:2 plans centre on the plate's plan box; sheet +x is model +x
 # (west), sheet +y model -z (south).
 PLAN_SCALE = 0.0005
@@ -1036,6 +1141,138 @@ def assert_notch_plan_ink_clear() -> None:
         raise RuntimeError("notch plan ink collides: " + "; ".join(findings))
 
 
+# --- read-back placement --------------------------------------------------------
+# A note or callout is inserted at a nominal anchor, read back with the layout
+# audit's own reader, and moved rigidly to the nearest spot the planner's rules
+# accept (``_layout_planner``: its box rule, including view crowding, and its
+# leader rule, with a hole callout's leader redrawn by ``HoleCallout``).  The
+# move is then read back and judged again.
+
+
+def _text_union(geometry: AnnotationGeometry) -> Box:
+    if not geometry.text_boxes:
+        raise ValueError(f"{geometry.label} has no text to place")
+    return Box(
+        min(box.xmin for box in geometry.text_boxes),
+        min(box.ymin for box in geometry.text_boxes),
+        max(box.xmax for box in geometry.text_boxes),
+        max(box.ymax for box in geometry.text_boxes),
+    )
+
+
+def _moved(box: Box, dx: float, dy: float) -> Box:
+    return Box(box.xmin + dx, box.ymin + dy, box.xmax + dx, box.ymax + dy)
+
+
+def _crowding_owner(geometry: AnnotationGeometry) -> str | None:
+    """The view whose annotations may crowd this one's, as the audit reads it."""
+    return None if geometry.owner in ("", "sheet") else geometry.owner
+
+
+def hole_callout(
+    geometry: AnnotationGeometry, *, rim: tuple[float, float, float]
+) -> HoleCallout:
+    """A read-back hole callout as the planner models it: its text, its shelf
+    (the longest horizontal run, under the text) and the rim it points at."""
+    shelves = [s for s in geometry.segments if abs(s.y0 - s.y1) < 1e-9 and s.length > 0.0]
+    if not shelves:
+        raise ValueError(f"{geometry.label}: no shelf among {geometry.segments}")
+    return HoleCallout(
+        label=geometry.label,
+        owner=geometry.owner,
+        text=_text_union(geometry),
+        shelf=max(shelves, key=lambda s: s.length),
+        rim=rim,
+    )
+
+
+def callout_conflict(
+    callout: HoleCallout, dx: float, dy: float, obstacles: SheetObstacles
+) -> str | None:
+    """Why the callout's text moved by (dx, dy), with the leader SolidWorks
+    then draws, may not sit there; None when it may."""
+    return box_conflict(
+        _moved(callout.text, dx, dy), obstacles, owner=callout.owner
+    ) or leader_conflict(callout.leader(dx, dy, (0.0, 0.0)), obstacles)
+
+
+def text_conflict(
+    geometry: AnnotationGeometry, dx: float, dy: float, obstacles: SheetObstacles
+) -> str | None:
+    """Why a leaderless note moved by (dx, dy) may not sit there, or None."""
+    if geometry.leader_segments():
+        raise ValueError(f"{geometry.label} has a leader; place it as a callout")
+    return box_conflict(
+        _moved(_text_union(geometry), dx, dy), obstacles, owner=_crowding_owner(geometry)
+    )
+
+
+def plan_shift(
+    label: str,
+    box: Box,
+    conflict: Callable[[float, float], str | None],
+    obstacles: SheetObstacles,
+) -> tuple[float, float]:
+    """The nearest grid shift of ``box`` that ``conflict`` clears (the seed
+    first, so a clear seed never moves), or a loud failure naming the seed's
+    blocker and every box on the sheet."""
+    for dx, dy in shift_candidates(box, obstacles.region):
+        if conflict(dx, dy) is None:
+            return dx, dy
+    raise RuntimeError(
+        f"{label}: no clear spot on the sheet for {box.format_mm()}; at its seed: "
+        f"{conflict(0.0, 0.0)}. Sheet: {obstacles.describe()}"
+    )
+
+
+def placed_conflicts(geometry: AnnotationGeometry, obstacles: SheetObstacles) -> list[str]:
+    """Every reason a READ-BACK annotation is not clear where it sits: the
+    box rule on its text, the leader rule on the leaders the audit reads."""
+    found = []
+    reason = box_conflict(_text_union(geometry), obstacles, owner=_crowding_owner(geometry))
+    if reason is not None:
+        found.append(f"text {_text_union(geometry).format_mm()}: {reason}")
+    found.extend(
+        leader_conflicts(
+            [
+                LeaderSegment(
+                    geometry.label, geometry.kind, s.x0, s.y0, s.x1, s.y1, geometry.owner
+                )
+                for s in geometry.leader_segments()
+            ],
+            obstacles,
+        )
+    )
+    return found
+
+
+def plate_thickness_annotation(
+    sheets: Sequence[SheetGeometry], section_view: str
+) -> AnnotationGeometry:
+    """The package's one plate thickness, on the sheet carrying section A-A.
+
+    Exactly one ``PlateThk`` across every sheet, never zero or a duplicate on
+    either sheet; and its sheet must carry the pivot section it dimensions."""
+    found = [
+        (sheet, item)
+        for sheet in sheets
+        for item in sheet.annotations
+        if item.label == "PlateThk"
+    ]
+    if len(found) != 1:
+        raise RuntimeError(
+            "expected one plate thickness in the package, found "
+            f"{[sheet.name for sheet, _ in found]}"
+        )
+    sheet, item = found[0]
+    if section_view not in {view.name for view in sheet.views}:
+        raise RuntimeError(
+            f"the plate thickness sits on {sheet.name!r}, not on the sheet "
+            f"carrying {section_view!r}"
+        )
+    return item
+
+
 def _display_data(annotation: Any) -> Any:
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     return _early_bound(display.GetDisplayData(), "IDisplayData")
@@ -1317,6 +1554,140 @@ def _position_view_label(
     if max(abs(lower_left[0] - extent[0]), abs(lower_left[1] - extent[1])) > 0.0005:
         raise RuntimeError(
             f"native {label} landed at {extent[:2]}, requested {lower_left}"
+        )
+
+
+def _activate_sheet(adapter: Any, name: str) -> None:
+    """Make ``name`` the current sheet, read back: views, notes and callouts
+    land on the current sheet."""
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not ddoc.ActivateSheet(name):
+        raise RuntimeError(f"failed to activate drawing sheet {name!r}")
+    current = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
+    if current is None:
+        raise RuntimeError("drawing has no current sheet after activation")
+    actual = str(current.GetName() or "")
+    if actual != name:
+        raise RuntimeError(f"active drawing sheet is {actual!r}, expected {name!r}")
+
+
+def _on_sheet_of(adapter: Any, view_key: str) -> None:
+    """Activate the sheet ``view_key`` lives on, before touching that view."""
+    _activate_sheet(adapter, VIEW_SHEETS[view_key])
+
+
+def _read_back(
+    adapter: Any, annotation: Any, *, owner: str, advance_ratio: float, label: str
+) -> AnnotationGeometry:
+    geometry = annotation_geometry(
+        adapter, annotation, owner=owner, advance_ratio=advance_ratio
+    )
+    if geometry is None:
+        raise RuntimeError(f"{label}: the layout reader returned nothing for it")
+    return geometry
+
+
+@_telemetry.traced("drawing.place_clear", label_param="label")
+def _place_clear(
+    adapter: Any,
+    annotation: Any,
+    *,
+    sheet: SheetGeometry,
+    label: str,
+    owner: str | None,
+    conflict_for: Callable[
+        [AnnotationGeometry, SheetObstacles], Callable[[float, float], str | None]
+    ],
+) -> SheetGeometry:
+    """Move one annotation of ``sheet`` (the current sheet) to its nearest
+    clear spot, read the move back and judge it again; return the sheet as
+    it now is.  ``sheet`` is a read that already holds the annotation.
+
+    Found by name AND owning view: SolidWorks names hole callouts per view
+    (an RD1 on two views of one drawing).  ``owner`` None accepts any owner
+    but still demands exactly one annotation of that name on the sheet."""
+    annotation = _early_bound(annotation, "IAnnotation")
+    name = str(annotation.GetName() or "")
+    seeds = [
+        item
+        for item in sheet.annotations
+        if item.label == name and (owner is None or item.owner == owner)
+    ]
+    if not name or len(seeds) != 1:
+        raise RuntimeError(
+            f"{label}: annotation {name!r} of {owner or 'any owner'} is read "
+            f"{len(seeds)} times on {sheet.name!r}"
+        )
+    seed = seeds[0]
+    others = tuple(item for item in sheet.annotations if item is not seed)
+    obstacles = sheet_obstacles(replace(sheet, annotations=others))
+    dx, dy = plan_shift(label, _text_union(seed), conflict_for(seed, obstacles), obstacles)
+    if dx or dy:
+        position = tuple(float(v) for v in _read_member(annotation, "GetPosition"))
+        if not annotation.SetPosition2(position[0] + dx, position[1] + dy, 0.0):
+            raise RuntimeError(f"{label}: failed to move it by ({dx}, {dy})")
+        adapter.currentModel.EditRebuild3()
+    placed = _read_back(
+        adapter, annotation, owner=seed.owner, advance_ratio=sheet.advance_ratio, label=label
+    )
+    _telemetry.info(
+        f"{label}: {name} moved ({dx * 1000:+.1f}, {dy * 1000:+.1f}) mm, read back "
+        f"{_text_union(placed).format_mm()}"
+    )
+    _telemetry.event(
+        "drawing.placement", label=label, annotation=name, sheet=sheet.name, dx=dx, dy=dy
+    )
+    conflicts = placed_conflicts(placed, obstacles)
+    if conflicts:
+        raise RuntimeError(
+            f"{label}: read back where it was moved, {name} is not clear: "
+            f"{conflicts}. Sheet: {obstacles.describe()}"
+        )
+    return replace(sheet, annotations=(*others, placed))
+
+
+def _callout_rule(
+    rim: tuple[float, float, float],
+) -> Callable[[AnnotationGeometry, SheetObstacles], Callable[[float, float], str | None]]:
+    def rule(seed: AnnotationGeometry, obstacles: SheetObstacles):
+        callout = hole_callout(seed, rim=rim)
+        return lambda dx, dy: callout_conflict(callout, dx, dy, obstacles)
+
+    return rule
+
+
+def _text_rule(
+    seed: AnnotationGeometry, obstacles: SheetObstacles
+) -> Callable[[float, float], str | None]:
+    return lambda dx, dy: text_conflict(seed, dx, dy, obstacles)
+
+
+def _rim_on_sheet(
+    adapter: Any, view: Any, edge: Any, *, label: str
+) -> tuple[float, float, float]:
+    """A plan hole's rim on the sheet: centre x, y and radius."""
+    curve = _early_bound(_early_bound(edge, "IEdge").GetCurve(), "ICurve")
+    values = tuple(float(value) for value in curve.CircleParams)
+    center = model_point_in_view(adapter, view, values[:3], label=f"{label} hole centre")
+    scale = tuple(float(value) for value in _read_member(view, "ScaleRatio"))
+    return center[0], center[1], values[6] * scale[0] / scale[1]
+
+
+def check_every_sheet_layout(adapter: Any) -> None:
+    """The layout audit on every sheet; fail when ANY sheet fails, naming each."""
+    failures = []
+    for number, name in enumerate(SHEET_NAMES, start=1):
+        _activate_sheet(adapter, name)
+        try:
+            check_drawing_layout(
+                adapter, layout=SHEET_LAYOUTS[name], stem=f"{PART_STEM} sheet {number} {name}"
+            )
+        except RuntimeError as exc:
+            failures.append(f"sheet {number} {name}: {exc}")
+    if failures:
+        raise RuntimeError(
+            f"{PART_STEM} layout audit failed on {len(failures)} of "
+            f"{len(SHEET_NAMES)} sheets:\n" + "\n".join(failures)
         )
 
 
@@ -2033,9 +2404,14 @@ async def build(adapter: Any) -> dict[str, str]:
             "Pivot Relief Fit",
         ),
     )
+    errors = sheet_contract_errors()
+    if errors:
+        raise RuntimeError("cone-swing-platform sheet split is inconsistent: " + "; ".join(errors))
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    # Before the first view: the template's one sheet must still be blank to copy.
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="cone-swing-platform package")
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -2047,17 +2423,29 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
+    # The recipe's own COM order is kept (imports de-duplicate in creation
+    # order); each step first activates the sheet its view lives on.
+    _on_sheet_of(adapter, "profile plan")
     profile = place_view(
         adapter, str(SOURCE), "*Top", *PROFILE_CENTER, scale=(1, 2)
     )
+    _on_sheet_of(adapter, "feature plan")
     feature = place_view(
         adapter, str(SOURCE), "*Top", *FEATURE_CENTER, scale=(1, 2)
     )
+    _on_sheet_of(adapter, "notch plan")
     notch = place_view(adapter, str(SOURCE), "*Top", *NOTCH_CENTER, scale=(1, 2))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
-    for view in (profile, feature, notch, iso):
+    for key, view in (
+        ("profile plan", profile),
+        ("feature plan", feature),
+        ("notch plan", notch),
+        ("isometric", iso),
+    ):
+        _on_sheet_of(adapter, key)
         set_hidden_lines_removed(adapter, view)
 
+    _on_sheet_of(adapter, "pivot section")
     pivot_xy = model_point_in_view(
         adapter, feature, (0.0, 0.0, 0.0), label="pivot section station"
     )
@@ -2106,6 +2494,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="lock notch cap detail",
     )
     set_hidden_lines_removed(adapter, cap_detail)
+    _on_sheet_of(adapter, "tip screw slot section")
     profile_pivot = model_point_in_view(
         adapter, profile, (0.0, PLATE_THICKNESS / 1000.0, 0.0), label="profile pivot"
     )
@@ -2136,6 +2525,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _look_slot_section_south(adapter, profile, slot_section, slot_cut)
     set_hidden_lines_removed(adapter, slot_section)
 
+    _on_sheet_of(adapter, "profile plan")
     profile_annotations = curate_view_dimensions(
         adapter,
         profile,
@@ -2144,6 +2534,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _hide_profile_cosmetic_threads(adapter, profile)
+    _on_sheet_of(adapter, "feature plan")
     feature_annotations = curate_view_dimensions(
         adapter,
         feature,
@@ -2151,6 +2542,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="feature plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    _on_sheet_of(adapter, "notch plan")
     notch_annotations = curate_view_dimensions(
         adapter,
         notch,
@@ -2159,6 +2551,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _pin_tip_slot_z_arrows_inside(adapter, notch_annotations)
+    _on_sheet_of(adapter, "pivot section")
     section_annotations = curate_view_dimensions(
         adapter,
         section,
@@ -2217,6 +2610,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, thickness_annotations, {"PlateThk": PLATE_STOCK_CALLOUT}
     )
+    _on_sheet_of(adapter, "tip screw slot section")
     slot_section_annotations = curate_view_dimensions(
         adapter,
         slot_section,
@@ -2225,6 +2619,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _keep_depth_on_its_attached_end(adapter, slot_section_annotations)
+    _on_sheet_of(adapter, "pivot section")
     relief_annotations = [
         item for item in section_annotations
         if dimension_name(adapter, item) == "PivotBearingReliefDepth"
@@ -2247,11 +2642,12 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to feature plan")
 
     pivot_edge, mount_edge, dowel_edge = _visible_plan_controls(adapter, feature)
-    # Below the section line, between the A arrows.
-    add_native_hole_callout(
+    # Seeded at their nominal anchors; each is read back and placed clear once
+    # every other annotation on the features sheet exists (see the end).
+    pivot_callout = add_native_hole_callout(
         adapter,
         feature,
-        callout_xy=(0.215, 0.107),
+        callout_xy=PIVOT_CALLOUT_XY,
         label="pivot close-clearance hole",
         edge=pivot_edge,
         process="DRILL",
@@ -2259,7 +2655,7 @@ async def build(adapter: Any) -> dict[str, str]:
     tap_callout = add_native_hole_callout(
         adapter,
         feature,
-        callout_xy=(0.200, 0.258),
+        callout_xy=POST_MOUNT_CALLOUT_XY,
         label="v2 post-mount tapped holes",
         edge=mount_edge,
         process=POST_MOUNT_TRANSFER_CALLOUT,
@@ -2307,18 +2703,24 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=_section_edge_midpoint(adapter, section, slide_edge, label="base slide"),
     )
 
+    _activate_sheet(adapter, caption_sheet("Profile View Note"))
     add_property_linked_note(adapter, "Profile View Note", 0.045, 0.085)
+    _activate_sheet(adapter, caption_sheet("Feature View Note"))
     add_property_linked_note(adapter, "Feature View Note", 0.150, 0.085)
+    _activate_sheet(adapter, caption_sheet("Notch View Note"))
     notch_note = add_property_linked_note(adapter, "Notch View Note", *NOTCH_CAPTION_UPPER_LEFT)
+    _activate_sheet(adapter, caption_sheet("Isometric View Note"))
     iso_note = add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_UPPER_LEFT)
     _assert_notch_captions_clear(
         adapter,
         notch_annotations,
         {"Notch View Note": notch_note, "Isometric View Note": iso_note},
     )
+    _activate_sheet(adapter, caption_sheet("Pivot Relief Fit"))
     add_property_linked_note(
         adapter, "Pivot Relief Fit", *RELIEF_NOTE_XY, char_height=0.0025
     )
+    _on_sheet_of(adapter, "tip screw slot detail")
     cutter_notes = [
         _add_arc_note(adapter, detail, cutter_note) for cutter_note in CUTTER_NOTES
     ]
@@ -2326,10 +2728,20 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_arc_note(adapter, feature, RELIEF_ID_NOTE)
 
     # Annotation insertion can invalidate the exported display geometry.
-    for view in (profile, feature, notch, section, slot_section, iso, cap_detail):
+    for key, view in (
+        ("profile plan", profile),
+        ("feature plan", feature),
+        ("notch plan", notch),
+        ("pivot section", section),
+        ("tip screw slot section", slot_section),
+        ("isometric", iso),
+        ("lock notch cap detail", cap_detail),
+    ):
+        _on_sheet_of(adapter, key)
         set_hidden_lines_removed(adapter, view)
     # Re-assert after the dimensions attach: the shared helper passes through
     # HLR, so the dashed edge set is regenerated, not a same-mode no-op.
+    _on_sheet_of(adapter, "tip screw slot detail")
     set_hidden_lines_visible(adapter, detail)
     # Last, after every annotation and display-mode regen could re-lay it.
     _position_view_label(
@@ -2339,12 +2751,14 @@ async def build(adapter: Any) -> dict[str, str]:
         label="detail B label",
         added_notes=cutter_notes,
     )
+    _on_sheet_of(adapter, "tip screw slot section")
     _position_view_label(
         adapter,
         slot_section,
         SLOT_SECTION_LABEL_LOWER_LEFT,
         label="section C-C label",
     )
+    _on_sheet_of(adapter, "lock notch cap detail")
     _position_view_label(
         adapter,
         cap_detail,
@@ -2364,6 +2778,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # the sheet literals these replaced went stale when I31 widened the
     # north-west (the NW centre moved 1.39 mm on the sheet, past the 1 mm
     # match window: "expected 2 owned visible CornerNWR arc(s) ... found 0").
+    _on_sheet_of(adapter, "profile plan")
     for label, _x, _z, radius_mm in _part._CORNERS:
         model_center = corner_station_model_m(label)
         station_xy = model_point_in_view(
@@ -2393,6 +2808,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if cut.GetDisplayOnlySurfaceCut() is not True:
         raise RuntimeError("pivot section lost its cut-only display after annotation")
+    _on_sheet_of(adapter, "pivot section")
     for face_name, model_y in (
         ("post_seat", PLATE_THICKNESS / 1000.0),
         ("base_slide", 0.0),
@@ -2413,28 +2829,64 @@ async def build(adapter: Any) -> dict[str, str]:
         f"predicted={pivot_section_pivot_x():.5f} "
         f"strip_mm={pivot_section_strip_mm()} witness_end_x={witness_end_x:.5f}"
     )
-    for sheet_geometry in collect_document(adapter):
+    # Each sheet's number, then every placement from ONE read of both sheets:
+    # the callouts wait until every other annotation on their sheet exists.
+    sheet_numbers = {}
+    for number, name in enumerate(SHEET_NAMES, start=1):
+        _activate_sheet(adapter, name)
+        note = add_note(
+            adapter, f"SHEET {number} OF {len(SHEET_NAMES)}", *SHEET_NUMBER_XY[name]
+        )
+        if note is None:
+            raise RuntimeError(f"failed to add the sheet number on {name}")
+        sheet_numbers[name] = _early_bound(note, "INote").GetAnnotation()
+    rebuild_drawing(adapter, label="sheet numbers")
+    sheets = {sheet.name: sheet for sheet in collect_document(adapter)}
+    if tuple(sorted(sheets)) != tuple(sorted(SHEET_NAMES)):
+        raise RuntimeError(f"the layout reader found sheets {sorted(sheets)}, not {SHEET_NAMES}")
+    _on_sheet_of(adapter, "feature plan")
+    for display, edge, label in (
+        (pivot_callout, pivot_edge, "pivot close-clearance hole"),
+        (tap_callout, mount_edge, "v2 post-mount tapped holes"),
+        (dowel_callout, dowel_edge, "post dowel reamed holes"),
+    ):
+        sheets[FEATURES_SHEET] = _place_clear(
+            adapter,
+            _early_bound(display, "IDisplayDimension").GetAnnotation(),
+            sheet=sheets[FEATURES_SHEET],
+            label=f"{label} callout",
+            owner=view_name(adapter, feature),
+            conflict_for=_callout_rule(_rim_on_sheet(adapter, feature, edge, label=label)),
+        )
+    for name in SHEET_NAMES:
+        _activate_sheet(adapter, name)
+        sheets[name] = _place_clear(
+            adapter,
+            sheet_numbers[name],
+            sheet=sheets[name],
+            label=f"{name} sheet number",
+            owner=None,
+            conflict_for=_text_rule,
+        )
+    # The dump is that read with every placed annotation re-read in place.
+    for sheet_geometry in sheets.values():
         print(describe_sheet(sheet_geometry))
-        thickness_geometry = [
-            item for item in sheet_geometry.annotations if item.label == "PlateThk"
-        ]
-        if len(thickness_geometry) != 1:
-            raise RuntimeError("expected one measured plate thickness annotation")
-        witnesses = [
-            segment for segment in thickness_geometry[0].segments
-            if abs(segment.y0 - segment.y1) < 1e-8
-            and any(
-                abs(segment.y0 - SECTION_SHIFT[1] - level) < 0.0001
-                for level in (0.09865, 0.11135)
-            )
-        ]
-        if len(witnesses) != 2 or any(
-            abs(max(segment.x0, segment.x1) - witness_end_x) > 0.0005
-            or abs(min(segment.x0, segment.x1) - SECTION_SHIFT[0] - 0.299) > 0.0005
-            for segment in witnesses
-        ):
-            raise RuntimeError(f"plate thickness witnesses did not shorten to the cut edge: {witnesses}")
-    check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
+    thickness = plate_thickness_annotation(list(sheets.values()), view_name(adapter, section))
+    witnesses = [
+        segment for segment in thickness.segments
+        if abs(segment.y0 - segment.y1) < 1e-8
+        and any(
+            abs(segment.y0 - SECTION_SHIFT[1] - level) < 0.0001
+            for level in (0.09865, 0.11135)
+        )
+    ]
+    if len(witnesses) != 2 or any(
+        abs(max(segment.x0, segment.x1) - witness_end_x) > 0.0005
+        or abs(min(segment.x0, segment.x1) - SECTION_SHIFT[0] - 0.299) > 0.0005
+        for segment in witnesses
+    ):
+        raise RuntimeError(f"plate thickness witnesses did not shorten to the cut edge: {witnesses}")
+    check_every_sheet_layout(adapter)
 
     return await finalize_drawing(
         adapter,
@@ -2442,6 +2894,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Cone Swing Platform Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        expected_sheet_names=SHEET_NAMES,
+        sheet_layouts=SHEET_LAYOUTS,
+        sheet_scales=SHEET_SCALES,
     )
 
 

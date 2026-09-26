@@ -578,6 +578,25 @@ def _annotation_geometry(
     )
 
 
+def annotation_geometry(
+    adapter: Any, annotation: Any, *, owner: str, advance_ratio: float
+) -> AnnotationGeometry | None:
+    """One annotation read exactly as :func:`collect_document` reads it.
+
+    The same reader, not a second one: ``collect_sheet`` calls this function's
+    body for every annotation of a sheet, so a recipe that re-reads one note or
+    callout after moving it gets the box the audit will see.  Pass the owner
+    and the sheet's calibrated ``advance_ratio`` from that sheet's
+    ``SheetGeometry``; None for an annotation the audit skips (hidden, or not
+    a text-bearing kind).  One annotation costs one annotation's COM reads,
+    where ``collect_document`` re-reads every sheet.
+    """
+    geometry, _samples = _annotation_geometry(
+        adapter, annotation, owner=owner, advance_ratio=advance_ratio
+    )
+    return geometry
+
+
 def _view_geometry(adapter: Any, view: Any, name: str) -> ViewGeometry:
     outline = _floats(_get(adapter, view, "GetOutline"))
     scale = _floats(_get(adapter, view, "ScaleRatio"))
