@@ -1338,6 +1338,7 @@ async def save_part_and_images(
     # summary Title, not its same-named custom property. Keep both identities
     # sourced from part_properties so a registry title override cannot split.
     apply_summary_info(adapter, title=properties["Title"])
+    require_one_material(adapter, part_name)
     rebuild_stale_configurations(adapter, part_name)
     check(
         f"re-save with properties -> {part_path}",
@@ -1851,13 +1852,65 @@ async def apply_material(adapter: Any, material: str) -> None:
     hardware, gray cast iron for the castings (base, levers, supports),
     plain carbon steel for shafts/pins/bars, alloy steel for spring wire,
     oak for the stained-wood crank handle (see DIMENSIONS.md per chapter).
-    """
-    from solidworks_mcp.adapters.base import ApplyMaterialParameters
 
-    check(
-        f"apply_material {material}",
-        await adapter.apply_material(ApplyMaterialParameters(material=material)),
+    Material is per configuration, and IPartDoc::SetMaterialPropertyName2
+    documents no all-configurations name, so it is set on every configuration
+    by name and read back per configuration. The adapter's apply_material
+    sets only the active one and reads back only the active one (MaterialIdName):
+    MHA-135 applied it after its INSTALLED split, and INSTALLED read no material
+    at all (pc-lever-pin-diag2b).
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    for name in names:
+        part.SetMaterialPropertyName2(name, "", material)
+    wrong = {
+        name: got
+        for name, got in configuration_materials(part, names).items()
+        if got != material
+    }
+    if wrong:
+        raise RuntimeError(f"apply_material {material}: configurations read {wrong}")
+    model.EditRebuild3()  # the active configuration's mass follows the density
+    _telemetry.success(f"apply_material {material} ({len(names)} configuration(s))")
+
+
+def configuration_materials(part: Any, names: Iterable[str]) -> dict[str, str]:
+    """Material name per configuration; "" where none is applied.
+
+    Early-bound IPartDoc::GetMaterialPropertyName2 returns the retval, then the
+    [out] database (pc-lever-pin-diag2b read both on a seat). Each reading is
+    logged before any caller raises, so a failing leaf shows every one.
+    """
+    materials: dict[str, str] = {}
+    for name in names:
+        material, database = part.GetMaterialPropertyName2(name)
+        materials[name] = str(material or "")
+        _telemetry.debug(f"material in {name}: {material!r} (database {database!r})")
+    return materials
+
+
+@_telemetry.traced("save.material_gate", label_param="part_name")
+def require_one_material(adapter: Any, part_name: str) -> None:
+    """Fail the save unless every configuration carries the same material.
+
+    An assembly places a part in a named configuration and takes that
+    configuration's material, so a configuration left blank or stale by an
+    edit made while another one was active ships the wrong material.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    materials = configuration_materials(
+        _early_bound(adapter.currentModel, "IPartDoc"), names
     )
+    found = set(materials.values())
+    _telemetry.annotate(config_count=len(names), materials=",".join(sorted(found)))
+    if "" in found or len(found) != 1:
+        raise RuntimeError(
+            f"{part_name}: every configuration must carry one material, read {materials}"
+        )
+    _telemetry.success(f"{part_name}: {found.pop()} in {len(names)} configuration(s)")
 
 
 CASTING_GREEN = (0.03, 0.45, 0.38)  # re-sampled from the ch30/ch17/ch18 plates
