@@ -139,6 +139,7 @@ def _wave(
         review=fake,
         rulings=rulings or ml.AuthorRulings(),
         outage=outage,
+        outages_path=tmp_path / "outages.json",  # where _outages writes
     )
 
 
@@ -799,6 +800,98 @@ def test_plan_lists_every_review_a_route_will_run(
     out, err = capsys.readouterr()
     assert "claude+down" in out
     assert "1 blocked, 2 reviews: claude 1, down 1" in err
+
+
+def test_a_pass_recorded_before_a_crash_then_withdrawn_is_reviewed_afresh(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    fake = FakeReviewer({("crank_arm", "codex"): "ship"})
+    [crank] = [r for r in _routes(checkout, tmp_path) if r.name == "crank_arm"]
+    real = ml.record_review
+
+    def recorded_then_dies(*args, **kwargs):
+        real(*args, **kwargs)  # the ledger is saved ...
+        raise Crash()  # ... and the process dies before the manifest says so
+
+    monkeypatch.setattr(ml, "record_review", recorded_then_dies)
+    with pytest.raises(Crash):
+        mw.run_wave([crank], _wave(tmp_path, checkout, fake))
+    monkeypatch.setattr(ml, "record_review", real)
+    (tmp_path / "ledger.json").unlink()  # the acceptance is withdrawn since
+    fake.calls.clear()
+
+    assert mw.run_wave([crank], _wave(tmp_path, checkout, fake)) == {
+        "crank_arm": mw.State.INGESTED
+    }
+    assert len(fake.calls) == 1  # a fresh review, not the withdrawn one
+
+
+def test_a_ledger_write_that_failed_is_still_recorded_from_its_report(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The control for the test above: an OSError is a write that did not
+    # happen, so the report is still good and the resume costs no review.
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    fake = FakeReviewer({("crank_arm", "codex"): "ship"})
+    [crank] = [r for r in _routes(checkout, tmp_path) if r.name == "crank_arm"]
+    real = ml.record_review
+
+    def locked(*args, **kwargs):
+        raise PermissionError("the ledger is locked by another process")
+
+    monkeypatch.setattr(ml, "record_review", locked)
+    mw.run_wave([crank], _wave(tmp_path, checkout, fake))
+    monkeypatch.setattr(ml, "record_review", real)
+    fake.calls.clear()
+
+    assert mw.run_wave([crank], _wave(tmp_path, checkout, fake)) == {
+        "crank_arm": mw.State.INGESTED
+    }
+    assert fake.calls == []
+
+
+def test_a_refusal_written_before_its_checkpoint_is_recovered_not_re_requested(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # crank_arm: an Opus author, so codex reviews it and Fable is its last resort.
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    fake = FakeReviewer(
+        {("crank_arm", "codex"): "quota", ("crank_arm", "claude"): "ship"}
+    )
+    [crank] = [r for r in _routes(checkout, tmp_path) if r.name == "crank_arm"]
+
+    def dies(*args, **kwargs):
+        raise Crash()
+
+    with monkeypatch.context() as patched, pytest.raises(Crash):
+        patched.setattr(mr, "_keep_quota_refusal", dies)  # before it is kept
+        mw.run_wave([crank], _wave(tmp_path, checkout, fake))
+    fake.calls.clear()
+
+    assert mw.run_wave([crank], _wave(tmp_path, checkout, fake)) == {
+        "crank_arm": mw.State.INGESTED
+    }
+    assert [call[1] for call in fake.calls] == ["claude"]  # codex not asked again
+
+
+def test_an_outage_closed_during_the_review_is_not_recorded(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    outage = ml.load_outages(_outages(tmp_path))["codex-401-test"]
+    fake = FakeReviewer({("crank_arm", "claude"): "ship"})
+
+    def reviewing(package, **kwargs):
+        _outages(tmp_path, ended_at=datetime.now(timezone.utc).isoformat())
+        return fake(package, **kwargs)
+
+    [crank] = [r for r in _routes(checkout, tmp_path) if r.name == "crank_arm"]
+    wave = _wave(tmp_path, checkout, reviewing, outage=outage)
+
+    assert mw.run_wave([crank], wave) == {"crank_arm": mw.State.ERROR}
+    assert "ended" in wave.manifest.drawings["crank_arm"]["detail"]
+    assert not (tmp_path / "ledger.json").exists()
 
 
 def test_a_reused_report_is_not_charged_again(

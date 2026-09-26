@@ -44,7 +44,14 @@ checkout rendered at the release head:
   the blind-review rules, or whose pass could not be written to the ledger,
   is an error, retried on resume (the second from its report, at no cost; a
   last-resort pass is recovered together with the kept refusal that licensed
-  it, without asking the cross-family reviewer again).  A manifest or report
+  it, without asking the cross-family reviewer again).  Every durable write
+  that a checkpoint follows resumes from what is on disk: a report the crash
+  left unrecorded is adopted (a quota refusal too, while it can still license
+  a last resort); a ledger write in flight is marked first, and a resume whose
+  ledger does not hold that entry (never written, or withdrawn since) reviews
+  afresh.  An outage fallback is recorded only under the outage as it reads
+  when the review ends: closed or withdrawn meanwhile, it is an error, retried
+  on resume under the routing then in force.  A manifest or report
   on disk that is not one this driver wrote is refused (the manifest) or
   reviewed again (a report), never used.  The run succeeds only when every
   drawing the gate blocks now is ingested: entries it no longer blocks stay
@@ -310,6 +317,16 @@ def manifest_problem(data: Any) -> str | None:
         stale = entry.get("stale_reports", [])
         if not isinstance(stale, list) or not all(isinstance(x, str) for x in stale):
             return f"{name}: stale_reports is not a list of sha256"
+        recording = entry.get("recording")
+        if recording is not None and not (
+            isinstance(recording, dict)
+            and all(
+                isinstance(recording.get(key), str)
+                for key in ("reviewer", "reviewed_at", "pdf")
+            )
+            and isinstance(recording.get("report_sha256") or "", str)
+        ):
+            return f"{name}: recording is not an interrupted ledger write"
         if entry.get("name") != name:
             return f"{name}: its entry names {entry.get('name')!r}"
     return None
@@ -420,6 +437,7 @@ class Wave:
     backoff: timedelta = QUOTA_BACKOFF
     rulings: ml.AuthorRulings = field(default_factory=ml.load_author_rulings)
     outage: dict[str, Any] | None = None  # open; the user directed its fallback
+    outages_path: Path = ml.OUTAGES_PATH  # re-read before a fallback is recorded
     ledger_lock: threading.Lock = field(default_factory=threading.Lock)
 
     def run_one(self, route: Route) -> State:
@@ -469,18 +487,29 @@ class Wave:
             # by digest in the same save that marks it running, so a crash
             # before the fresh review cannot bring the old report back.
             stale |= self._report_digests(route.name)
+        recording = entry.get("recording")
+        if recording and recording.get("report_sha256"):
+            if not self._ledger_holds(route.name, recording):
+                # A crash between the ledger write and its checkpoint, and the
+                # ledger does not hold that entry now: never written, or
+                # withdrawn since.  Either way its report does not come back.
+                stale.add(recording["report_sha256"])
+        interrupted = entry.get("state") == State.RUNNING
         self.manifest.update(
             route.name,
             state=State.RUNNING,
             pdf_sha256=pdf_sha,
             stale_reports=sorted(stale),
+            recording=None,
         )
         if self._down(route.reviewer):
             return self._run_fallback(route)
         recovered = self._recovered_last_resort(route, pdf_sha)
         if recovered is not None:  # a pass the ledger could not take last time
             return self._settle(route, *recovered)
-        review = self._attempt(route, route.reviewer, slot=ml.CROSS_FAMILY)
+        review = self._attempt(
+            route, route.reviewer, slot=ml.CROSS_FAMILY, unkept_refusal=interrupted
+        )
         if not self._quota_refused(review):
             return self._settle(route, review, None)
         refusal = self._refusal(route, review)
@@ -547,7 +576,13 @@ class Wave:
         slot: str,
         model: str | None = None,
         effort: str | None = None,
+        unkept_refusal: bool = False,
     ) -> mr.Review:
+        """One reviewer run, or the report a crash left behind for it.
+
+        ``unkept_refusal`` also adopts a quota refusal the reviewer wrote before
+        a crash kept it: asking again would only replace it.
+        """
         model = model or mr.DEFAULT_MODELS[reviewer]
         effort = effort or mr.DEFAULT_EFFORTS[reviewer]
         package = mr.ReviewPackage(
@@ -565,6 +600,8 @@ class Wave:
             author_family=route.author_family,
         ) as span:
             review = self._finished(route, reviewer, model, effort)
+            if review is None and unkept_refusal:
+                review = self._unkept_refusal(route, reviewer, model, effort)
             reused = review is not None
             if review is None:
                 review = self.review(
@@ -668,6 +705,55 @@ class Wave:
             and review.blind
         )
         return review if same else None
+
+    def _unkept_refusal(
+        self, route: Route, reviewer: str, model: str, effort: str
+    ) -> mr.Review | None:
+        """A quota refusal of these bytes that a crash left on disk unkept.
+
+        Adopted only while it still licenses a last resort; an older one is
+        asked again rather than refused on.
+        """
+        report = self._report(reviewer, route.name)
+        if not report.is_file():
+            return None
+        entry = self.manifest.drawings.get(route.name) or {}
+        if ml.sha256_file(report) in (entry.get("stale_reports") or []):
+            return None
+        pdf_sha = ml.sha256_file(route.pdf)
+        try:
+            data = json.loads(report.read_text(encoding="utf-8"))
+            if ml.refusal_record_problem(data) or data.get("verdict") is not None:
+                return None  # not a refusal this driver wrote
+            evidence = ml.quota_evidence(data, report)
+            if evidence is None or ml.refusal_problem(
+                evidence, pdf_sha256=pdf_sha, reviewed_at=_now()
+            ):
+                return None  # an error, or a refusal too old to act on
+            review = mr.Review(**data)
+        except (AttributeError, KeyError, OSError, TypeError, ValueError):
+            return None
+        same = (
+            review.name == route.name
+            and review.kind == DRAWINGS_BY_NAME[route.name].source_kind
+            and review.source_sha256 == [pdf_sha]
+            and (review.model, review.effort) == (model, effort)
+        )
+        return review if same else None
+
+    def _ledger_holds(self, name: str, recording: dict[str, Any]) -> bool:
+        """Whether the ledger holds the entry an interrupted write was recording."""
+        try:
+            slots = ml.load_ledger(self.ledger_path)["drawings"].get(name) or {}
+        except (KeyError, OSError, TypeError, ValueError):
+            return False
+        wanted = (recording["reviewer"], recording["reviewed_at"], recording["pdf"])
+        return any(
+            isinstance(entry, dict)
+            and (entry.get("reviewer"), entry.get("reviewed_at"), entry.get("pdf"))
+            == wanted
+            for entry in slots.values()
+        )
 
     def _refusal(self, route: Route, review: mr.Review) -> dict[str, Any] | None:
         """The cross-family refusal, kept where no later run overwrites it."""
@@ -778,6 +864,27 @@ class Wave:
             )
             return State.FIX
         slot = ml.review_slot(review.reviewer, route.author_family or "")
+        if outage is not None:
+            # The review ran for minutes: record under the outage as it is now.
+            why, outage = self._current_outage(outage["id"])
+            if why:
+                self.manifest.update(
+                    route.name,
+                    state=State.ERROR,
+                    detail=f"{why}; not recorded, retried on resume",
+                )
+                return State.ERROR
+        # In flight: a crash after the ledger write but before the outcome below
+        # leaves this marker, and the resume checks the ledger against it.
+        self.manifest.update(
+            route.name,
+            recording={
+                "reviewer": review.reviewer,
+                "reviewed_at": review.reviewed_at,
+                "pdf": review.source_sha256[0],
+                "report_sha256": self._report_digest(review.reviewer, route.name),
+            },
+        )
         try:
             with self.ledger_lock:  # the ledger file is read-modify-written
                 recorded = ml.record_review(
@@ -795,29 +902,49 @@ class Wave:
                     repo=self.checkout,
                     rulings=self.rulings,
                 )
-        except OSError as exc:  # the pass stands; resume records it from the report
+        except OSError as exc:  # not written (the save is atomic): resume records it
             self.manifest.update(
                 route.name,
                 state=State.ERROR,
                 detail=f"the pass could not be written to the ledger: {exc}",
+                recording=None,
             )
             return State.ERROR
         except ValueError as exc:
-            self.manifest.update(route.name, state=State.NOT_COUNTED, detail=str(exc))
+            self.manifest.update(
+                route.name, state=State.NOT_COUNTED, detail=str(exc), recording=None
+            )
             return State.NOT_COUNTED
         if not recorded.counts:
             self.manifest.update(
                 route.name,
                 state=State.NOT_COUNTED,
                 detail=f"{recorded.slot}: {recorded.problem}",
+                recording=None,
             )
             return State.NOT_COUNTED
         self.manifest.update(
             route.name,
             state=State.INGESTED,
             detail=f"{recorded.slot} {recorded.status}",
+            recording=None,
         )
         return State.INGESTED
+
+    def _current_outage(self, outage_id: str) -> tuple[str, dict[str, Any] | None]:
+        """The named outage as recorded now, or why it no longer directs anything."""
+        try:
+            outage = ml.load_outages(self.outages_path).get(outage_id)
+        except (OSError, ValueError) as exc:
+            return f"outage {outage_id} could not be read again: {exc}", None
+        if outage is None:
+            return f"outage {outage_id} is no longer in {self.outages_path}", None
+        if outage.get("ended_at"):
+            return (
+                f"outage {outage_id} ended at {outage['ended_at']} during the review",
+                None,
+            )
+        return "", outage
 
 
 def _findings(review: mr.Review) -> dict[str, int]:
@@ -1078,6 +1205,7 @@ def _run(args: argparse.Namespace) -> int:
         backoff=timedelta(minutes=args.quota_backoff),
         rulings=rulings,
         outage=outage,
+        outages_path=args.outages,
     )
     for name in unrendered:  # blocked by the gate too: the run cannot succeed
         pdf = ml._current_pdf(name, args.checkout)
