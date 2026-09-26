@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 
+from _fit_limits import deviations
 from _gtol_spec import PlanarFace
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
@@ -42,9 +43,12 @@ PIVOT_BEARING_RELIEF_DEPTH = 0.25  # Reference nominal; the finished matched fit
 PIVOT_HEAD_RADIAL_CLEARANCE = 0.4875
 PIVOT_BEARING_THICKNESS = PLATE_THICKNESS - PIVOT_BEARING_RELIEF_DEPTH
 # User decision relayed by Main, 2026-09-22: fit the actual purchased shoulder
-# and finished plate; do not invent a numerical axial-clearance band.
+# and finished plate; do not invent a numerical axial-clearance band.  The
+# wording is the user's; only its prefix names the feature as the sheet's
+# leadered ID does ("TOP RELIEF", MHA-091 round 6 -- the Fable review's
+# request for a numeric axial band is answered by this decision).
 PIVOT_RELIEF_FIT_REQUIREMENT = (
-    "TOP PIVOT RELIEF: MATCH DEPTH TO FINISHED PLATE\n"
+    "TOP RELIEF: MATCH DEPTH TO FINISHED PLATE\n"
     "AND McMASTER 91829A560 CONE-PIVOT-SCREW.\n"
     "WITH SHOULDER SEATED ON BASE, LOCK KNOB RELEASED:\n"
     "PLATFORM SWINGS FREELY WITH MINIMAL AXIAL PLAY."
@@ -111,36 +115,73 @@ POST_MOUNT_ENGAGEMENT_NOTE = (
 )
 
 
-# U30 (2026-09-23): the cone tip block is held by one hidden #6-32 x 1/2
-# BUTTON-head socket cap screw (McMaster 91255A148, black-oxide alloy steel;
-# rule-12 audit W22, Main 2026-09-23: the low head leaves a 2.9 ledge where a
-# socket head's 4.2 counterbore left 1.51) coming up from under the plate
-# through a lateral slot; a counterbored slot sinks the head below the slide
-# face. The slot runs across the cone axis so the block can be shifted +/-2.25
-# at fit-up; a shim pack under the foot sets its height. Both slots share the
-# same two end centres, TIP_SCREW_HALF_TRAVEL either side of the cone axis, at
-# the tip block's station (11.0 south of the pivot, from the drive-train
-# layout: PIVOT_STATION = TIP_BLOCK_STATION + 11.0).
-TIP_SCREW_LOCAL_Z = -11.0
+# I31 option 1 (Main, 2026-09-25): the cone tip block is held down by one
+# #6-32 x 5/8 hex head screw (McMaster 93075A150, low-strength zinc-plated
+# steel) rising from under the plate through a lateral slot, through the shim
+# pack and the block's south foot flange (an axial slot), into a nylon-insert
+# locknut on the flange top.  The plate slot lets the block move across the
+# cone axis, the flange slot along it.  The head sits in a counterbored slot
+# one hex width across, so its walls stop the head turning while the nut is
+# tightened from above.
+#
+# The block's own geometry, mirrored here because the plate may not import
+# cone_tip_block_spec; build_drive_train_assembly asserts each one equal to
+# the block spec's.  The block centre stands 11.0 south of the pivot (the
+# drive-train layout: PIVOT_STATION = TIP_BLOCK_STATION + 11.0).
+TIP_BLOCK_LOCAL_Z = -11.0
+TIP_BLOCK_HALF_DEPTH = 6.0  # BLOCK_Z / 2
+TIP_BLOCK_HALF_WIDTH = 7.5  # BLOCK_X / 2
+# FLANGE_SLOT_X: the flange slot's centre from the block's +X face, which is
+# its west face (the block and the plate share the inclined frame).
+TIP_FLANGE_SLOT_X = 7.5
+TIP_FLANGE_SLOT_Z = 10.7  # FLANGE_SLOT_Z, from the block's south face
+# FLANGE_SLOT_FLOAT: the screw's float across the 5/32 +0.10/0 flange slot.
+TIP_FLANGE_SLOT_FLOAT = (5.0 / 32.0 * 25.4 + 0.10 - 3.505) / 2.0
+# How far north the shaft tip can set the block's north face: the shaft's
+# overall length Sec4End at .X (the heel-relief check's HEEL_TIP_TRAVEL).
+TIP_BLOCK_NORTH_TRAVEL = 0.8
+# The lateral slot sits under the flange slot's centre.
+TIP_SCREW_LOCAL_Z = TIP_BLOCK_LOCAL_Z - (TIP_BLOCK_HALF_DEPTH + TIP_FLANGE_SLOT_Z)
+# Both slots share two end centres TIP_SCREW_HALF_TRAVEL either side of the
+# cone axis.
 TIP_SCREW_HALF_TRAVEL = 2.0
 TIP_SCREW_MAJOR = 3.505  # #6-32 basic major
-# McMaster 91255A148 lists one head size, 0.262 dia x 0.073 high, taken as the
-# max; the B18.3 #6 button-head minimum diameter, 0.250, bounds the bearing.
-TIP_SCREW_HEAD_DIA = (0.250 * 25.4, 0.262 * 25.4)
-TIP_SCREW_HEAD_H_MAX = 0.073 * 25.4
+# McMaster 93075A150 (product page read 2026-09-25): head 1/4 wide x 3/32
+# high.  ASME B18.6.3 bounds the #6 hex head at 0.244-0.250 across the flats
+# and 0.272 min across the corners; the catalogue height is taken as the max.
+TIP_SCREW_HEAD_AF = (0.244 * 25.4, 0.250 * 25.4)
+TIP_SCREW_HEAD_AC_MIN = 0.272 * 25.4
+TIP_SCREW_HEAD_H_MAX = 3.0 / 32.0 * 25.4
 # The slot widths are cut in one pass by an end mill of that size, so they
 # carry the same one-sided +0.10/0 band as the title block's DRILLED HOLES
-# row: the cutter makes the size, the machinist holds nothing tight.
+# row: the cutter makes the size, the machinist holds nothing tight.  Each
+# band is written (upper, lower) like every _fit_limits band and is only ever
+# read through _fit_limits.deviations -- here and on the model -- never by
+# index: a raw [1] read the flipped band's lower deviation as its upper and
+# made the head bearing 0.05 a side too generous with no failure (dtscout).
 TIP_SLOT_W = 4.0
-TIP_CBORE_W = 7.94  # a 5/16 end mill
-TIP_SLOT_W_BAND = (0.0, 0.10)
-TIP_CBORE_DEPTH = 2.8  # .XX
+# I31 (Main, 2026-09-25): a 6.5 end mill, not the 1/4 one the head's across
+# flats would need line to line: the widest head runs in the narrowest slot
+# and the smallest head's corners still cannot turn in the widest one.
+TIP_CBORE_W = 6.5
+TIP_SLOT_W_BAND = (0.10, 0.0)
+TIP_CBORE_W_BAND = (0.10, 0.0)
+TIP_CBORE_DEPTH = 3.00  # .XX
 _XX = 0.51
-TIP_SLOT_SCREW_CLEARANCE = TIP_SLOT_W - TIP_SCREW_MAJOR
-TIP_SLOT_HEAD_BEARING = (
-    TIP_SCREW_HEAD_DIA[0] - (TIP_SLOT_W + TIP_SLOT_W_BAND[1])
-) / 2.0
-TIP_CBORE_HEAD_CLEARANCE = TIP_CBORE_W - TIP_SCREW_HEAD_DIA[1]
+_TIP_SLOT_W_LOWER, _TIP_SLOT_W_UPPER = deviations(TIP_SLOT_W_BAND)
+_TIP_CBORE_W_LOWER, _TIP_CBORE_W_UPPER = deviations(TIP_CBORE_W_BAND)
+TIP_SLOT_W_MIN = TIP_SLOT_W + _TIP_SLOT_W_LOWER
+TIP_SLOT_W_MAX = TIP_SLOT_W + _TIP_SLOT_W_UPPER
+TIP_CBORE_W_MIN = TIP_CBORE_W + _TIP_CBORE_W_LOWER
+TIP_CBORE_W_MAX = TIP_CBORE_W + _TIP_CBORE_W_UPPER
+TIP_SLOT_SCREW_CLEARANCE = TIP_SLOT_W_MIN - TIP_SCREW_MAJOR
+TIP_SLOT_FLOAT_MAX = (TIP_SLOT_W_MAX - TIP_SCREW_MAJOR) / 2.0
+TIP_SLOT_HEAD_BEARING = (TIP_SCREW_HEAD_AF[0] - TIP_SLOT_W_MAX) / 2.0
+# The head runs in the counterbored slot at its narrowest against the widest
+# head, and cannot turn in it at its widest against the smallest head.
+TIP_CBORE_HEAD_ENTRY = TIP_CBORE_W_MIN - TIP_SCREW_HEAD_AF[1]
+TIP_CBORE_ANTI_TURN_MIN = 0.25
+TIP_CBORE_HEAD_TURN_MARGIN = TIP_SCREW_HEAD_AC_MIN - TIP_CBORE_W_MAX
 TIP_HEAD_RECESS = TIP_CBORE_DEPTH - _XX - TIP_SCREW_HEAD_H_MAX
 # Ledge under the head: the stock plate less the .XX counterbore depth, both
 # bands (rule-12 audit W22: the first cut left out the plate's band).
@@ -148,16 +189,45 @@ TIP_LEDGE_RANGE = (
     PLATE_THICKNESS - PLATE_STOCK_BAND - TIP_CBORE_DEPTH - _XX,
     PLATE_THICKNESS + PLATE_STOCK_BAND - TIP_CBORE_DEPTH + _XX,
 )
+# Lateral fit-up travel either side of the cone axis: the end centres plus
+# the screw's float in the narrowest slot, which is the nominal 4.0 (+/-2.25),
+# and with the .XX centres at their short limit (+/-1.74).
+TIP_LATERAL_TRAVEL = TIP_SCREW_HALF_TRAVEL + TIP_SLOT_SCREW_CLEARANCE / 2.0
+TIP_LATERAL_TRAVEL_WORST = TIP_LATERAL_TRAVEL - _XX
+if (round(TIP_LATERAL_TRAVEL, 2), round(TIP_LATERAL_TRAVEL_WORST, 2)) != (2.25, 1.74):
+    raise AssertionError("tip-block lateral travel no longer reads +/-2.25 (1.74 worst)")
 if TIP_SLOT_SCREW_CLEARANCE < 0.25:
     raise AssertionError("tip-block screw slot does not clear the #6-32 major")
 if TIP_SLOT_HEAD_BEARING < 0.5:
     raise AssertionError("tip-block screw head bears on under 0.5 mm per side")
-if TIP_CBORE_HEAD_CLEARANCE < 0.25:
-    raise AssertionError("tip-block counterbore slot does not clear the screw head")
+if TIP_CBORE_HEAD_ENTRY <= 0.0:
+    raise AssertionError("the widest hex head has no running clearance in the counterbored slot")
+if TIP_CBORE_HEAD_TURN_MARGIN < TIP_CBORE_ANTI_TURN_MIN:
+    raise AssertionError(
+        "the smallest hex head's corners overlap the widest counterbored slot "
+        f"by {TIP_CBORE_HEAD_TURN_MARGIN:.3f} (< {TIP_CBORE_ANTI_TURN_MIN})"
+    )
 if TIP_HEAD_RECESS < 0.1:
     raise AssertionError("tip-block screw head can stand proud of the slide face")
 if TIP_LEDGE_RANGE[0] < 2.0:
     raise AssertionError("tip-block counterbore ledge is below the U27 2.0 target")
+# The block's farthest reach west of the cone axis, at full west travel with
+# every float and location band taken up: the plate slot's west end centre
+# (TipSlotWestCx, .XX), the screw's float in the widest plate slot, its float
+# in the widest flange slot, and the flange slot's location from the block's
+# west face (FlangeSlotX, .XX on the block).  Its north face stands
+# TIP_BLOCK_NORTH_TRAVEL north, set by the shaft tip.  build_cone_swing_platform
+# derives the plate's north-west half-width from it with the outline's own
+# bands (Main, I31 item 8: the U30 slot let the block hang 0.19 over the west
+# edge; 2026-09-25: the location bands belong in the stack).
+TIP_BLOCK_WEST_REACH = (
+    (TIP_SCREW_HALF_TRAVEL + _XX)
+    + TIP_SLOT_FLOAT_MAX
+    + TIP_FLANGE_SLOT_FLOAT
+    + (TIP_FLANGE_SLOT_X + _XX)
+)
+TIP_BLOCK_NORTH_REACH_Z = TIP_BLOCK_LOCAL_Z + TIP_BLOCK_HALF_DEPTH + TIP_BLOCK_NORTH_TRAVEL
+TIP_BLOCK_EDGE_MARGIN = 0.25
 
 
 # Only functional sliding/locating surfaces carry roughness.  The existing
@@ -195,7 +265,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "PostMountEastX",
         "PostMountEastZ",
     },
-    "LockNotchCapEProfile": {"CapECx", "CapECz", "CapEDia"},
+    # The closed-end cap locates the notch; the run angle gives its rails a
+    # direction (the chord the lock stud follows).  Without it the sheet
+    # defines where the notch starts but not which way it runs.
+    # The notch is a slot: one width across its rails (NotchW) and a full
+    # radius at the closed end, located at that radius's centre (rule 7).
+    # The cap's diameter is SlotW by equation and prints as "R" only, so the
+    # 8.00 is stated once (MHA-091 Fable review, 63fb3bd2d; Main round 6).
+    "LockNotchProfile": {"NotchMouthAngle", "NotchW"},
+    "LockNotchCapEProfile": {"CapECx", "CapECz"},
     "TipScrewSlotProfile": {"TipSlotEastCx", "TipSlotWestCx", "TipSlotZ", "TipSlotW"},
     "TipScrewCboreProfile": {"TipCboreW"},
     "TipScrewCbore": {"TipCboreDepth"},
@@ -215,6 +293,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # .XX grade. Relief
 # depth is a reference nominal governed by the matched fit above. The Hole
 # Wizard owns the pivot-hole size/callout.
+#
+# The tapped pair's per-axis .XX is NOT what closes it against the post: the
+# pitch that mates is cone_post_mount_interface's (#833, e93b658da), one
+# direct tap-to-tap dimension at +/-0.25 (PLATFORM_PITCH_BAND) against 0.79
+# of screw clearance.  Per-axis stations give about +/-1.22 of pitch at .XX
+# and more at .X, so neither grade closes it; the direct pitch lands with
+# #830's rebase onto #833 (merge rider).  Until then the stations keep .XX,
+# the tighter of the two (MHA-091 Fable review asked for .X).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {
         "NorthEastX": 1,
@@ -233,8 +319,14 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PostMountEastX": 2,
         "PostMountEastZ": 2,
     },
-    "LockNotchCapEProfile": {"CapECx": 2, "CapECz": 2, "CapEDia": 2},
-    # The slot ends are .XX so the +/-2.25 fit-up travel keeps >= +/-1.74.
+    # The mouth angle is authored at a whole degree and prints as one (the
+    # title block's flat +/-1 deg); NotchW carries its end-mill band natively
+    # (NOTCH_W_BAND); the cap centre stays .XX -- at .X the stud-in-cap stack
+    # fails (below).
+    "LockNotchProfile": {"NotchMouthAngle": 0, "NotchW": 2},
+    "LockNotchCapEProfile": {"CapECx": 2, "CapECz": 2},
+    # The slot ends are .XX so the +/-2.25 fit-up travel keeps >= +/-1.74
+    # (TIP_LATERAL_TRAVEL, TIP_LATERAL_TRAVEL_WORST).
     "TipScrewSlotProfile": {
         "TipSlotEastCx": 2,
         "TipSlotWestCx": 2,
@@ -269,6 +361,106 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+
+
+# --- Lock notch: the cone-lock-knob stud in the notch -----------------------
+# The notch is cut in one pass by an end mill of its width, so the width
+# carries the tip slots' one-sided band: the cutter makes the size.  At the
+# title block's .XX (+/-0.51) the narrowest notch (7.49) left the stud 0.552
+# of radial room against 0.721 of cap-centre error: the stack failed as
+# printed until 63fb3bd2d (Main, MHA-091 round 6).
+NOTCH_W = 8.0
+NOTCH_W_BAND = (0.10, 0.0)
+_NOTCH_W_LOWER, _NOTCH_W_UPPER = deviations(NOTCH_W_BAND)
+NOTCH_W_MIN = NOTCH_W + _NOTCH_W_LOWER
+# McMaster 91882A425 (the cone lock knob): a 1/4-20 stud, basic major 6.35;
+# build_cone_swing_platform asserts it equals build_cone_lock_knob.STUD_DIA.
+LOCK_STUD_MAJOR = 0.25 * 25.4
+# The title block's location bands by decimal places, and its flat angular
+# band.
+TITLE_BLOCK_BAND_BY_PLACES = {1: 0.8, 2: _XX}
+TITLE_BLOCK_ANGLE_BAND_DEG = 1.0
+# The notch's run is set on the print by its angle to the plate's WEST edge
+# at the mouth -- both legs drawn, the vertex the real mouth corner, a
+# protractor check (Main, MHA-091 round 6; the old angle ran from a hidden
+# east-west construction ray).  The stud's own path is the chord tangent to
+# its swing arc, 87.53 deg off that edge (the edge leans 6.64 deg off the
+# plate axis, the chord 9.11 deg off east-west); build_cone_swing_platform
+# derives it.  The angle is not critical (the channel keeps ~0.2 of slack,
+# some 4.6 deg over the 2.76 exit travel), so the notch is authored at the
+# whole degree and cut along it: the 0.47 deg offset joins the title block's
+# band in the stud stack below.
+NOTCH_MOUTH_ANGLE_DEG = 88.0
+
+
+def notch_stud_stack(
+    run_deg: float,
+    exit_travel: float,
+    run_radius: float,
+    angle_offset_deg: float,
+    edge_angle_error_deg: float,
+) -> dict[str, float]:
+    """The stud's worst case in the notch, from the notch's own geometry.
+
+    The stud is fixed on the base; the notch must take it at the engaged
+    seat (the closed end's full radius) and let it run out along the chord
+    to the mouth.  Terms, all worst case: the cap centre off by its printed
+    band on BOTH axes (CapECx, CapECz: radial at the seat, projected across
+    the run in the channel); the cut's angle off the stud's chord -- the
+    whole-degree rounding (``angle_offset_deg``), the title block's band, and
+    the reference edge's own tilt within the outline's band
+    (``edge_angle_error_deg``) -- over the exit travel; the chord's sagitta
+    against the stud's true arc.  Room is the narrowest notch less the
+    stud's major, a side.
+    """
+    band = TITLE_BLOCK_BAND_BY_PLACES[
+        min(DRAWING_PRECISION_BY_NAME["CapECx"], DRAWING_PRECISION_BY_NAME["CapECz"])
+    ]
+    run = math.radians(run_deg)
+    room = (NOTCH_W_MIN - LOCK_STUD_MAJOR) / 2.0
+    seat_error = math.hypot(band, band)
+    across_error = band * (abs(math.sin(run)) + abs(math.cos(run)))
+    angle_error = exit_travel * math.tan(
+        math.radians(
+            abs(angle_offset_deg) + TITLE_BLOCK_ANGLE_BAND_DEG + abs(edge_angle_error_deg)
+        )
+    )
+    sagitta = exit_travel**2 / (2.0 * run_radius)
+    return {
+        "location band": band,
+        "room at the seat": room,
+        "cap centre error at the seat": seat_error,
+        "room in the channel": room - sagitta,
+        "cap centre error across the run": across_error,
+        "run angle error at the mouth": angle_error,
+    }
+
+
+def assert_notch_stud_stack(
+    run_deg: float,
+    exit_travel: float,
+    run_radius: float,
+    angle_offset_deg: float,
+    edge_angle_error_deg: float,
+) -> dict[str, float]:
+    """Raise unless the stud seats and runs out at the printed bands.
+
+    build_cone_swing_platform calls this at import with its notch geometry
+    (this module cannot import the part back).  At .X the seat term alone
+    is 1.13 against 0.825 -- why the cap centre stays .XX."""
+    terms = notch_stud_stack(
+        run_deg, exit_travel, run_radius, angle_offset_deg, edge_angle_error_deg
+    )
+    seat = terms["room at the seat"] - terms["cap centre error at the seat"]
+    channel = terms["room in the channel"] - (
+        terms["cap centre error across the run"] + terms["run angle error at the mouth"]
+    )
+    if seat < 0.0 or channel < 0.0:
+        raise AssertionError(
+            f"lock stud does not fit the notch (seat {seat:+.3f}, channel {channel:+.3f}): "
+            + "; ".join(f"{name} {value:.3f}" for name, value in terms.items())
+        )
+    return terms
 
 
 # View scales differ from the sheet scale and therefore remain property-linked

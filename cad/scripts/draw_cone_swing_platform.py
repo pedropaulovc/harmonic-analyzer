@@ -9,12 +9,14 @@ model.
 The platform is an asymmetric steel wedge with a 1/4-in close-clearance pivot
 hole over the stock screw shoulder, paired 1/4-20 post-mount taps, an open
 west-edge lock notch, four rounded plan corners and the counterbored slot
-for the tip block's hidden hold-down screw (U30).  The three plan views run
-1:2 and pivot section A-A 2:1.  Slot detail B enlarges a 12 mm radius
-around the pivot-to-slot region at 2:1, hidden lines dashed, at sheet
-(88, 44) mm, its cutters named by leadered notes; section C-C (1:1),
-cut on the plate-profile plan, runs along the slot for the counterbore
-depth.  The isometric runs 1:3.
+for the tip block's hold-down screw (I31).  The three plan views run 1:2
+and pivot section A-A 2:1; the lock-notch plan also carries the slot's
+station from the pivot.  Slot detail B enlarges a 12 mm radius around the
+slot at 2:1, hidden lines dashed, at sheet (88, 44) mm, its slots named by
+leadered notes; section C-C (1:1), cut on the plate-profile plan, runs
+along the slot for the counterbore depth.  Notch detail D enlarges the
+notch's closed end at 2:1: its width, its angle to the west edge at the
+mouth and its full R.  The isometric runs 1:3.
 
 Run with SolidWorks open::
 
@@ -27,9 +29,10 @@ import argparse
 import math
 import sys
 from dataclasses import dataclass
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from typing import Any
 
+import _drawing_leaders
 import _telemetry
 from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
@@ -69,12 +72,14 @@ from _surface_finish import surface_finish_by_key
 from cone_swing_platform_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    PIVOT_BEARING_RELIEF_DIAMETER,
     PIVOT_HOLE_DIA,
     PLATE_STOCK_CALLOUT,
     PLATE_THICKNESS,
     POST_MOUNT_SPEC,
     SURFACE_FINISHES,
     TIP_CBORE_W,
+    TIP_SCREW_HALF_TRAVEL,
     TIP_SCREW_LOCAL_Z,
     TIP_SLOT_W,
 )
@@ -102,7 +107,20 @@ SHEET_SCALE = (1.0, 2.0)  # title block states the principal (plan) scale; iso a
 PROFILE_CENTER = (0.075, 0.190)
 FEATURE_CENTER = (0.180, 0.190)
 NOTCH_CENTER = (0.260, 0.190)
-ISO_CENTER = (0.355, 0.205)
+# x 0.370, not d382's 0.355: the notch plan's 205.81 dimension line runs at
+# x 0.327 (NOTCH_KEEP) to give the run angle's leader room, and it must pass
+# 2 mm left of this view (d382 box [0.316, 0.394] at 0.355) and of its
+# "ISOMETRIC VIEW" label ([0.3147, 0.3748]); +15 mm leaves the box 9.9 mm
+# inside the border.
+ISO_CENTER = (0.370, 0.205)
+# Its "ISOMETRIC VIEW SCALE 1:3" caption is a property-linked note at a
+# fixed sheet point, not the view's own label: it does NOT follow the view.
+# fix4b (2c406e963) left it at d382's (0.315, 0.158) and the 205.81 line ran
+# through it.  Anchored on the view now: 40 mm left of its centre, as d382
+# had it.  ISO_NOTE_EXTENT is its exact box about that anchor (d382
+# INote.GetExtent, [0.3147, 0.3748] x [0.1536, 0.1585] at (0.315, 0.158)).
+ISO_NOTE_UPPER_LEFT = (ISO_CENTER[0] - 0.040, 0.158)
+ISO_NOTE_EXTENT = (-0.0003, -0.0044, 0.0598, 0.0005)
 # The section group sits up and right in the open field below the isometric,
 # clear of the lock-notch caption; every section annotation shares this shift.
 # x 0.030, not 0.020: at 0.020 section C-C's 2.80 arrow line ran up through
@@ -132,34 +150,77 @@ PROFILE_KEEP = {
     # R12 shelves sit just above horizontal enough to land inside their arcs
     # while clearing the 223.4 witness lines.
     "CornerNER": (0.045, 0.139),
-    "CornerNWR": (0.135, 0.118),
+    # By its corner, down-right of the arc (MHA-091 Fable review, 63fb3bd2d:
+    # at (0.135, 0.118) the leader ran ~58 mm across the 11.0's field).  The
+    # ray meets the fillet at ~-27 deg and passes 2.8 mm off the 11.0's
+    # witness top (x 0.0773, y 0.1332); the text sits 12 mm over its value.
+    "CornerNWR": (0.102, 0.130),
     "CornerSWR": (0.110, 0.249),
     "CornerSER": (0.040, 0.2435),
+    # The top relief's width, over its U: the dimension line 3.6 mm above the
+    # pivot (1 mm over the round end), the value outside the right witness,
+    # past the plate's west edge -- 8 mm off the R8.0, above the 11.0's witness
+    # top (0.1332) and 10 mm under the C-C line.  On the hole-location plan the
+    # same line fenced the U on three sides, so no leader could name the
+    # feature without crossing it (MHA-091 round 6, B1).
+    "PivotBearingReliefDia": (0.090, 0.1413),
 }
 FEATURE_KEEP = {
-    # Short lines (12 characters, ~34 mm at most) between the 195.09 line
-    # (x 0.130) and the plate's west edge (x 0.1679): on three the 50 mm
-    # "OPEN TO NORTH EDGE" ran through both (8783776d).  The block stands on
-    # its shelf (y 0.1438) and grows up, 5.6 mm a line, under the 13.12 row.
-    "PivotBearingReliefDia": (0.1490, 0.155),
     "PostMountWestX": (0.150, 0.185),
     "PostMountWestZ": (0.225, 0.175),
     "PostMountEastX": (0.205, 0.185),
     "PostMountEastZ": (0.130, 0.175),
 }
-# Named by features on the sheet, not a compass: to a blind reader of
-# 68565ace "OPEN TO NORTH EDGE" contradicted a relief opening toward the
-# sheet's lower edge, since sheet-down is model north (codex blocker B2; B3's
-# phantom 0.695 lip followed from it).
-RELIEF_WIDTH_CALLOUT = "TOP RELIEF\nCTR ON PIVOT\nOPEN THRU\nPIVOT END"
+# The three 1:2 plans centre on the plate's plan box; sheet +x is model +x
+# (west), sheet +y model -z (south).
+PLAN_SCALE = 0.0005
+_PLAN_MID_X = (_part.WEST_HALF_S - _part.EAST_HALF_S) / 2.0
+_PLAN_MID_Z = _part.NORTH_OVERHANG - _part.PLATE_LEN / 2.0
+
+
+def plan_xy(center: tuple[float, float], x_mm: float, z_mm: float) -> tuple[float, float]:
+    """Sheet point of plate-local (x, z) on the 1:2 plan centred at ``center``."""
+    return (
+        center[0] + (x_mm - _PLAN_MID_X) * PLAN_SCALE,
+        center[1] - (z_mm - _PLAN_MID_Z) * PLAN_SCALE,
+    )
+
+
+def _plan_east_edge_x(z_mm: float) -> float:
+    run = (_part.NORTH_OVERHANG - z_mm) / _part.PLATE_LEN
+    return -(_part.HALF_WIDTH_N + (_part.EAST_HALF_S - _part.HALF_WIDTH_N) * run)
+
+
+# I31 moved the tip slot 27.7 south of the pivot, out of reach of one detail
+# circle, so its station prints here: on the plan's open east side, sharing
+# nothing with the NorthEdgeZ/CapECz witnesses on the west.  The dimension
+# line stands 9 mm (sheet) off the plate's east edge at the slot; its text
+# sits inside the span, centred on the line (the 205.81's form).  d382 hung
+# it left of the line just south of the span, on a shoulder that ended in a
+# T on the hole-location plan's 189.26 line (x 0.225; Main's MHA-091 eye
+# pass of fix4b).  The arrows are pinned inside: 4.1 mm of line each side of
+# the text break carries a 3.4 mm head.
+_NOTCH_SLOT_XY = plan_xy(NOTCH_CENTER, -TIP_SCREW_HALF_TRAVEL, TIP_SCREW_LOCAL_Z)
+_NOTCH_PIVOT_XY = plan_xy(NOTCH_CENTER, 0.0, 0.0)
+# The notch's cut direction out of the cap toward the mouth, on the sheet
+# (sheet +x is model +x, sheet +y model -z).  Only the half of the cap circle
+# away from the mouth is drawn.
+CAP_MOUTH_AXIS = (_part.NOTCH_CUT_U[0], -_part.NOTCH_CUT_U[1])
+TIP_SLOT_Z_LINE_X = plan_xy(NOTCH_CENTER, _plan_east_edge_x(TIP_SCREW_LOCAL_Z), 0.0)[0] - 0.009
 NOTCH_KEEP = {
     # Pivot-to-north-edge lives here, sharing the 205.81 pivot witness: in the
     # profile the R8 corner ray has no path that clears this dimension.
     "NorthEdgeZ": (0.270, 0.150),
     # Text between its witnesses: outside, it read as spanning from the corner.
     "CapECx": (0.2652, 0.258),
-    "CapECz": (0.305, 0.180),
-    "CapEDia": (0.285, 0.259),
+    # 22 mm right of d382's 0.305: it made room for the notch run angle's
+    # leader (tipslot-fix3/4), which moved to detail D as the mouth angle in
+    # MHA-091 round 6; the layout the eye passes cleared stands.  The text
+    # sits at y 0.170, 7.5 mm under the isometric's box.  The lower witness
+    # (y 0.1377) passes 2.4 mm over A-A's "(6.35)" (top 0.1353) and the lower
+    # arrowhead 2.9 mm right of it.
+    "CapECz": (0.327, 0.170),
+    "TipSlotZ": (TIP_SLOT_Z_LINE_X, (_NOTCH_SLOT_XY[1] + _NOTCH_PIVOT_XY[1]) / 2.0),
 }
 SECTION_KEEP = {
     # Outside its witnesses, the text hangs LEFT of the dimension line (away
@@ -173,8 +234,8 @@ SECTION_KEEP = {
     "PivotBearingReliefDepth": _shifted(0.365, 0.115),
 }
 
-# U30 tip-block hold-down slot: too small to dimension at 1:2, so DETAIL B
-# enlarges the pivot-to-slot region of the hole-location plan to 2:1, with
+# I31 tip-block hold-down slot: too small to dimension at 1:2, so DETAIL B
+# enlarges the slot on the hole-location plan to 2:1, with
 # hidden lines shown so the underside counterbored slot reads dashed.  At
 # 1:1 (run 7959e994) five dimensions and two cutter callouts crowded a 24 mm
 # circle, texts over the outline and each other; 2:1 gives them the room.
@@ -189,7 +250,9 @@ SECTION_KEEP = {
 # A vertical dimension's text hangs outward from its dimension line (the
 # e86bf319 extents: left of a left-side line, right of a right-side one).
 # Sheet +x is model +x (west) and sheet +y is model -z (south) in these plans.
-DETAIL_MODEL_Z = -6.0  # detail circle centre, between the pivot and the slot
+# I31: centred on the slot.  Until then the circle took in the pivot as
+# well; 27.7 south, the slot's station from it prints on the notch plan.
+DETAIL_MODEL_Z = TIP_SCREW_LOCAL_Z
 DETAIL_RADIUS_MM = 12.0
 DETAIL_SCALE = (2, 1)
 _DETAIL_S = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
@@ -201,24 +264,89 @@ _DETAIL_S = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 # captions (80.5) and 2.1 short of the note.
 DETAIL_CENTER = (0.0835, 0.045)
 DETAIL_OUTLINE_PAD = 0.0104
+# DETAIL D: the lock notch's closed end and mouth at 2:1.  The notch is a
+# slot: its width (NotchW, 8.00 +0.10/0, the end mill's band), a full R at
+# the closed end, located at that R's centre on the notch plan (33.00,
+# 205.81), and its run as the angle between the south rail and the plate's
+# west edge at the mouth -- both legs real edges, the vertex the mouth's
+# south corner, a protractor check (MHA-091 round 6; the old 9.11 deg ran
+# from a hidden east-west ray on the notch plan).  The R is a leadered note:
+# the width states the size once (the Ø8.00 restated it).
+# Circled on the hole-location plan (cap at (193.25, 240.57) mm, its 3 mm
+# circle 8.8 mm under the 2X Ø5.11 shoulder and 5.3 over the 189.26's
+# witness), drawn in the open field over the isometric: the outline (circle
+# + DETAIL_OUTLINE_PAD) tops out at 266.4 mm, the circle's foot 1.3 mm over
+# the isometric's padded box (pictorial: the audit does not collide it; its
+# part stands ~20 mm lower here).  In the detail the notch opens sheet-right
+# (the plate's west edge runs nearly sheet-up through the mouth) and the
+# plate's material lies left of that edge.
+CAP_DETAIL_SCALE = (2, 1)
+_CAP_DETAIL_S = CAP_DETAIL_SCALE[0] / CAP_DETAIL_SCALE[1] / 1000.0
+CAP_DETAIL_RADIUS_MM = 6.0
+CAP_DETAIL_CENTER = (0.357, 0.244)
+CAP_DETAIL_SHEET_RADIUS = CAP_DETAIL_RADIUS_MM * _CAP_DETAIL_S
+CAP_DETAIL_ARC_RADIUS = _part.SLOT_W / 2.0 * _CAP_DETAIL_S
+
+
+def cap_detail_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
+    """Sheet point of plate-local (x, z) in detail D (centred on the cap)."""
+    return (
+        CAP_DETAIL_CENTER[0] + (x_mm - _part.SLOT_E_X) * _CAP_DETAIL_S,
+        CAP_DETAIL_CENTER[1] - (z_mm - _part.SLOT_E_Z) * _CAP_DETAIL_S,
+    )
+
+
+# The mouth angle's vertex (the south rail meets the west edge) and a point
+# along each leg: the rail back into the plate, the edge running south.
+MOUTH_ANGLE_VERTEX_XY = cap_detail_xy(*_part.NOTCH_CUT_POINTS["mouth_s"])
+MOUTH_ANGLE_RAIL_XY = cap_detail_xy(
+    _part.NOTCH_CUT_POINTS["mouth_s"][0] - _part.NOTCH_CUT_U[0],
+    _part.NOTCH_CUT_POINTS["mouth_s"][1] - _part.NOTCH_CUT_U[1],
+)
+MOUTH_ANGLE_EDGE_XY = cap_detail_xy(
+    _part.NOTCH_CUT_POINTS["mouth_s"][0] + _part._EDGE_SX,
+    _part.NOTCH_CUT_POINTS["mouth_s"][1] + _part._EDGE_SZ,
+)
+CAP_DETAIL_KEEP = {
+    # Above the circle, in the material wedge (up-left of the south mouth
+    # corner, between the rail running back and the edge running south): an
+    # angular dimension prints the sector that holds its text, so here it is
+    # the acute 88, not the 92 supplement.  The arc runs ~10.7 mm out, its
+    # top 4.5 mm under the zone frame; the glyphs stand 2 mm off the circle.
+    "NotchMouthAngle": (0.3575, 0.2600),
+    # Right of the circle, above the width's span: its witnesses extend the
+    # rails out through the mouth, and a near-vertical dimension's value hangs
+    # outward (right) of its line, beside it, outside the span (detail B's
+    # TipSlotW form) -- between the witnesses the line would run through it.
+    "NotchW": (0.3865, 0.2560),
+}
+# "DETAIL D / SCALE 2 : 1", left of the outline (detail B's 1.2 mm gap
+# plus 0.4): its box is 31.5 x 16.4 mm (d382 INote.GetExtent), in the field
+# the Ø8.00 and the run angle's leader left, 5.4 mm over the 205.81's upper
+# witness (y 0.2406) and above its dimension line (x 0.327).
+CAP_DETAIL_LABEL_SIZE = (0.0315, 0.0164)
+CAP_DETAIL_LABEL_LOWER_LEFT = (
+    CAP_DETAIL_CENTER[0]
+    - CAP_DETAIL_SHEET_RADIUS
+    - DETAIL_OUTLINE_PAD
+    - 0.0016
+    - CAP_DETAIL_LABEL_SIZE[0],
+    0.246,
+)
 DETAIL_SHEET_RADIUS = DETAIL_RADIUS_MM * _DETAIL_S
-_PIVOT_Y = DETAIL_CENTER[1] + DETAIL_MODEL_Z * _DETAIL_S
 _SLOT_Y = DETAIL_CENTER[1] + (DETAIL_MODEL_Z - TIP_SCREW_LOCAL_Z) * _DETAIL_S
 # Between its extension lines a vertical dimension's text is CENTRED on its
 # dimension line, which then runs through it (81788ce9: "SLOT|THRU",
 # "11.|00"); outside them the text hangs outward, one edge on the line,
 # centred on the keep y.  So every vertical dimension here parks its text
-# OUTSIDE its span.  The three spans all overlap (pivot-to-slot 33..55,
-# counterbore 47..63, slot 51..59), so no layout of them is crossing-free:
-# the one left is the slot's dimension line running down past the
-# counterbore's lower extension line to its text.  The slot sits nearest
+# OUTSIDE its span.  The two width spans overlap (counterbore 38.7..51.3,
+# slot 41..49), so the slot's dimension line runs up past the
+# counterbore's upper extension line to its text (below the spans the
+# detail's own label sits, since I31 centred the circle on the slot).  The slot sits nearest
 # the part, the counterbore outboard (its extension lines then never cross
-# the slot's dimension line inside the slot's span), and pivot-to-slot alone
-# on the right.  The cutters are named by leadered notes, not dimension text.
+# the slot's dimension line inside the slot's span).  The slots are named
+# by leadered notes, not dimension text.
 DETAIL_KEEP = {
-    # Right, alone: text above the slot-centre extension line (0.055),
-    # hanging right, under the cutter notes' leaders (>= 0.063 here).
-    "TipSlotZ": (DETAIL_CENTER[0] + 0.030, _SLOT_Y + 0.0045),
     # Above the circle, each 2.00 outside its own extension lines and under
     # the plan caption row (y >= 0.0805).  The west one sits in toward the
     # circle, left of the through-slot leader's path.
@@ -230,17 +358,20 @@ DETAIL_KEEP = {
         DETAIL_CENTER[0] + 0.0135,
         DETAIL_CENTER[1] + DETAIL_SHEET_RADIUS + 0.005,
     ),
-    # Left, nearest the circle: the through slot, text below its span
-    # (under the counterbore's lower extension line at 0.047).
-    "TipSlotW": (DETAIL_CENTER[0] - 0.0275, _SLOT_Y - 0.014),
-    # Left, outboard: the counterbored slot, text above its span (0.063).
-    "TipCboreW": (DETAIL_CENTER[0] - 0.0465, _SLOT_Y + 0.0135),
+    # Left, nearest the circle: the through slot, text above both spans
+    # (over the counterbore's upper extension line).
+    "TipSlotW": (DETAIL_CENTER[0] - 0.0275, _SLOT_Y + 0.0125),
+    # Left, outboard: the counterbored slot, text above the slot's.
+    "TipCboreW": (DETAIL_CENTER[0] - 0.0465, _SLOT_Y + 0.0225),
 }
 # Arrowheads inside the extension lines: outside, the slot's 8 mm span put
 # an arrow tail across the counterbore's upper extension line (81788ce9).
 DETAIL_ARROWS_INSIDE = ("TipSlotW", "TipCboreW")
-# The cutter that sets each +0.10/0 width band, named by a leadered note
-# (2.5 mm text, anchored upper-left) in the open field right of the circle.
+# Each slot named by a leadered note (2.5 mm text, anchored upper-left) in
+# the open field right of the circle.  Feature identification only: the
+# banded 4.0 and 6.50 +0.1/0 dimensions own the widths, and a cutter is a
+# method (MHA-091 Fable review, 63fb3bd2d: "Ø4 END MILL" restated the 4.0 in
+# another spelling and band).
 # Each leader tip lands on the WEST (sheet-right) end arc of its slot, at a
 # sheet angle from that arc's centre.  A leadered note's INote.GetExtent --
 # what the layout audit boxes -- runs from its leader tip to its text, so two
@@ -250,64 +381,136 @@ DETAIL_ARROWS_INSIDE = ("TipSlotW", "TipCboreW")
 # to text below, its leader crossing pivot-to-slot's dimension line (the only
 # path: below that line's foot sits the relief note).
 _WEST_ARC_CENTER = (DETAIL_CENTER[0] + 2.0 * _DETAIL_S, _SLOT_Y)
+# The leader roots on the note's FIRST line, on the side toward its tip
+# (d382 leaf log :519: the C'BORE note's text top at 44.5 mm, its leader at
+# 43.1), and a 2.5 mm line pitches 3.35 mm (the same note: two lines,
+# 37.8..44.5).
+NOTE_LEADER_ROOT_DROP = 0.0014
+NOTE_LINE_PITCH = 0.00335
 
 
 @dataclass(frozen=True)
-class CutterNote:
-    """One leadered cutter note: ``text`` at ``text_xy`` pointing at an arc."""
+class ArcNote:
+    """One leadered note: ``text`` at ``text_xy`` pointing at a circular edge.
+
+    The edge is ``feature``'s circle of ``radius_mm`` about the plate-local
+    ``arc_center_mm`` (x, z), drawn in a plan-oriented view whose image of
+    that centre is ``sheet_center`` at ``sheet_scale`` sheet metres per model
+    mm (sheet +x = +x, sheet +y = -z)."""
 
     key: str
     text: str
     text_xy: tuple[float, float]
-    feature: str  # the native cut whose end arc the leader names
+    feature: str  # the native cut whose arc the leader names
     radius_mm: float
-    tip_deg: float  # sheet angle of the tip on the west end arc
+    tip_deg: float  # sheet angle of the tip on the arc
     model_y_mm: float | None  # the arc's face; None = either coincident arc
+    arc_center_mm: tuple[float, float]
+    sheet_center: tuple[float, float]
+    sheet_scale: float
 
 
 CUTTER_NOTES = (
-    CutterNote(
+    ArcNote(
         "slot",
-        f"<MOD-DIAM>{TIP_SLOT_W:g} END MILL SLOT THRU",
+        "SLOT THRU",
         (0.121, 0.0785),
         "TipScrewSlot",
         TIP_SLOT_W / 2.0,
         60.0,
         PLATE_THICKNESS,  # the visible top-face arc, not the hidden floor one
+        (TIP_SCREW_HALF_TRAVEL, TIP_SCREW_LOCAL_Z),
+        _WEST_ARC_CENTER,
+        _DETAIL_S,
     ),
-    CutterNote(
+    ArcNote(
         "cbore",
-        f"<MOD-DIAM>{TIP_CBORE_W:g} END MILL C'BORE SLOT\nFROM UNDERSIDE",
-        (0.121, 0.047),
+        "C'BORE SLOT\nFROM UNDERSIDE",
+        # I31: 2.5 mm lower than 0.047, so its extent stays 3 mm under the
+        # slot note's, whose tip came down 10 mm with the re-centred slot.
+        (0.121, 0.0445),
         "TipScrewCbore",
         TIP_CBORE_W / 2.0,
         -35.0,
         None,  # the dashed arc: underside outline and floor edge project as one
+        (TIP_SCREW_HALF_TRAVEL, TIP_SCREW_LOCAL_Z),
+        _WEST_ARC_CENTER,
+        _DETAIL_S,
     ),
+)
+# Detail D's full R: "R" alone (ASME: a full radius is stated, its size is
+# the width's), in the mouth right of the circle between the width's
+# witnesses; its leader runs back along the notch, clear of the cap centre,
+# to the drawn (closed) half of the cap arc up-left.
+CAP_R_NOTE = ArcNote(
+    "cap",
+    "R",
+    (0.3730, 0.2455),
+    "LockNotchCapE",
+    _part.SLOT_W / 2.0,
+    150.0,
+    PLATE_THICKNESS,
+    (_part.SLOT_E_X, _part.SLOT_E_Z),
+    CAP_DETAIL_CENTER,
+    _CAP_DETAIL_S,
+)
+# The top relief named on the hole-location plan (MHA-091 round 6, B1): a
+# feature identification, not a size -- the profile's 10.50 is the width,
+# the fit note its depth.  Named by features, not a compass: to a blind
+# reader of 68565ace "OPEN TO NORTH EDGE" contradicted a relief opening
+# toward the sheet's lower edge (sheet-down is model north; codex B2).  The
+# block stands where the 10.50's callout stood, left of the plate between
+# the 195.09 line (x 0.130) and the plate's east edge, its first line --
+# where the leader roots -- at y 0.153, its last 4 mm over the 195.09's
+# pivot witness (y 0.1377).  The leader drops right to the U's round end at
+# 135 deg, clear of detail B's circle; nothing else fences the U here.
+RELIEF_ID_NOTE = ArcNote(
+    "relief",
+    "TOP RELIEF\nFULL R ON PIVOT\nOPEN THRU\nPIVOT END",
+    (0.1330, 0.1544),
+    "PivotBearingRelief",
+    PIVOT_BEARING_RELIEF_DIAMETER / 2.0,
+    135.0,
+    PLATE_THICKNESS,
+    (0.0, 0.0),
+    plan_xy(FEATURE_CENTER, 0.0, 0.0),
+    PLAN_SCALE,
 )
 CUTTER_NOTE_CHAR_HEIGHT = 0.0025
 # Physical-edge bound on a leader tip, model metres (the R8 proof's bound).
 LEADER_TIP_BOUND_M = 0.00001
 
 
-def cutter_note_tip(note: CutterNote) -> tuple[float, float]:
-    """The sheet point on ``note``'s west end arc its leader must touch."""
+def arc_note_tip(note: ArcNote) -> tuple[float, float]:
+    """The sheet point on ``note``'s arc its leader must touch."""
     angle = math.radians(note.tip_deg)
-    r = note.radius_mm * _DETAIL_S
+    r = note.radius_mm * note.sheet_scale
     return (
-        _WEST_ARC_CENTER[0] + r * math.cos(angle),
-        _WEST_ARC_CENTER[1] + r * math.sin(angle),
+        note.sheet_center[0] + r * math.cos(angle),
+        note.sheet_center[1] + r * math.sin(angle),
     )
 
 
-def cutter_note_model_tip(note: CutterNote) -> tuple[float, float, float]:
-    """``cutter_note_tip`` in part metres (sheet +x = +x, sheet +y = -z)."""
+def arc_note_model_tip(note: ArcNote) -> tuple[float, float, float]:
+    """``arc_note_tip`` in part metres (sheet +x = +x, sheet +y = -z)."""
     angle = math.radians(note.tip_deg)
+    cx, cz = note.arc_center_mm
     return (
-        (2.0 + note.radius_mm * math.cos(angle)) / 1000.0,
+        (cx + note.radius_mm * math.cos(angle)) / 1000.0,
         (note.model_y_mm if note.model_y_mm is not None else PLATE_THICKNESS) / 1000.0,
-        (TIP_SCREW_LOCAL_Z - note.radius_mm * math.sin(angle)) / 1000.0,
+        (cz - note.radius_mm * math.sin(angle)) / 1000.0,
     )
+
+
+def arc_note_leader(note: ArcNote, text_width: float) -> _drawing_leaders.Segment:
+    """The leader as SolidWorks roots it: the first line's side toward the
+    tip, ``NOTE_LEADER_ROOT_DROP`` under the text's top, to the tip."""
+    tip = arc_note_tip(note)
+    right = note.text_xy[0] + text_width
+    x = note.text_xy[0] if abs(tip[0] - note.text_xy[0]) < abs(tip[0] - right) else right
+    return ((x, note.text_xy[1] - NOTE_LEADER_ROOT_DROP), tip)
+
+
 # The native "DETAIL B / SCALE 2:1" label, moved by its measured extent:
 # lower left of its box, in the band's lower-left corner under the slot text.
 DETAIL_LABEL_LOWER_LEFT = (0.016, 0.015)
@@ -326,17 +529,20 @@ ENGAGEMENT_NOTE_XY = (0.222, 0.0795)
 # plan, not in detail B: in the detail it lay ON the slot centreline, so
 # pivot-to-slot's extension line ran along it and its arrows sat in every
 # width extension's path.  On the plan the default arrows (looking north,
-# sheet-down) ran beside the 8.0 extension line and through the R8 leader,
+# sheet-down) ran beside the NorthWestX extension line and through the R8 leader,
 # so the cut looks SOUTH (arrows sheet-up).
 #
-# The line runs PAST both plate edges (a full section, 26.98 mm across at
-# the slot station): as a +-9 mm partial cut its sheet-up arrows sat inside
-# the plate, and the west letter, 42..55 mm south of the cut where the plate
+# The line runs PAST both plate edges (a full section across the slot
+# station): as a +-9 mm partial cut its sheet-up arrows sat inside the
+# plate, and the west letter, 31..44 mm south of the cut where the plate
 # flares, landed on the sloped west edge (Main's eye-pass of 8783776d).
 # Each end clears its edge at the letter's far station by the letter's half
-# width (5.5 model mm at 1:2) plus 1.5.
-SLOT_SECTION_LINE_X_MM = (-26.0, 24.0)
-# 1:1, full width: the strip is the plate edge-on, 26.98 x 6.35, in the
+# width (5.5 model mm at 1:2) plus 1.5 -- SLOT_SECTION_LINE_X_MM, derived
+# below from the plate's edges.
+CC_LETTER_TOP_SHEET = 0.022  # a letter's far side above the line (8783776d)
+CC_LETTER_HALF_W_MM = 5.5
+CC_LETTER_EDGE_CLEAR_MM = 1.5
+# 1:1, full width: the strip is the plate edge-on x 6.35, in the
 # pocket right of the drill callout RD1 (x <= 0.246), under the notch plan
 # (y >= 0.1286) and its lifted caption (y >= 0.1207), with its native label
 # centred directly under it, right of the plan caption row (x <= 0.2185)
@@ -350,6 +556,39 @@ SLOT_SECTION_KEEP = {
     "TipCboreDepth": (SLOT_SECTION_CENTER[0] - 0.0205, SLOT_SECTION_CENTER[1]),
 }
 SLOT_SECTION_DEPTH_RIGHT = (SLOT_SECTION_CENTER[0] + 0.0205, SLOT_SECTION_CENTER[1])
+
+# The view that owns each kept model dimension: it prints once, there.  A
+# targeted import brings a feature's every marked dimension, so a view that
+# shares a feature with another (the notch plan and detail B both import
+# TipScrewSlotProfile) receives the other's dimensions and must delete them;
+# the sheet-wide walk after curation proves the deletion held.
+VIEW_KEEPS: dict[str, dict[str, tuple[float, float]]] = {
+    "profile plan": PROFILE_KEEP,
+    "feature plan": FEATURE_KEEP,
+    "notch plan": NOTCH_KEEP,
+    "pivot section": SECTION_KEEP,
+    "tip screw slot detail": DETAIL_KEEP,
+    "lock notch cap detail": CAP_DETAIL_KEEP,
+    "tip screw slot section": SLOT_SECTION_KEEP,
+}
+DIMENSION_OWNER: dict[str, str] = {
+    name: view for view, keep in VIEW_KEEPS.items() for name in keep
+}
+if len(DIMENSION_OWNER) != sum(len(keep) for keep in VIEW_KEEPS.values()):
+    raise AssertionError("a kept dimension is kept by two views")
+
+
+def dimension_placement_errors(seen: dict[str, Sequence[str]]) -> list[str]:
+    """Kept dimensions not printed exactly once, on their owning view.
+
+    ``seen`` maps each view label to the model-dimension names its
+    annotations carry; names no view keeps (hole callouts) are ignored."""
+    errors = []
+    for name, owner in sorted(DIMENSION_OWNER.items()):
+        places = [view for view, names in seen.items() for item in names if item == name]
+        if places != [owner]:
+            errors.append(f"{name}: expected once on {owner}, found on {places}")
+    return errors
 # The native label box measured 46.5 x 16.2 mm; centred under the strip.
 SLOT_SECTION_LABEL_LOWER_LEFT = (SLOT_SECTION_CENTER[0] - 0.02325, 0.0815)
 # The lock-notch caption sits directly under its own view, not on the plan
@@ -358,9 +597,22 @@ SLOT_SECTION_LABEL_LOWER_LEFT = (SLOT_SECTION_CENTER[0] - 0.02325, 0.0815)
 # anchored upper-left and centred under the notch plan, clears the 7.0
 # arrow tip (y 0.1276) above and the C-C strip (ink top ~0.1152) below.
 NOTCH_CAPTION_UPPER_LEFT = (NOTCH_CENTER[0] - 0.02985, 0.1255)
-# The pivot on the profile plan, from the NE/NW corner-radius stations below
-# (their fillet centres sit at model (-6.35, -3) and (0.97, -1) mm).
+# Its exact box about that anchor (d382 INote.GetExtent,
+# [0.2298, 0.2899] x [0.1215, 0.1258]).
+NOTCH_NOTE_EXTENT = (-0.00035, -0.0040, 0.05975, 0.0003)
+# The pivot on the profile plan, as the farm measured it (plan_xy agrees to
+# 0.05 mm; the corner stations below are projected, not read off a render).
 PROFILE_PIVOT_XY = (0.0718, 0.1377)
+
+
+def corner_station_model_m(label: str) -> tuple[float, float, float]:
+    """Model point (m) of a corner fillet's centre on the plate top.
+
+    The profile's radius proof matches each owned arc against this point
+    projected into the view, so the station follows the outline whenever the
+    part moves a corner."""
+    x, z = _part.corner_fillet_center(label)
+    return (x / 1000.0, PLATE_THICKNESS / 1000.0, z / 1000.0)
 
 
 def plate_edge_mm(z_mm: float, side: int) -> float:
@@ -369,6 +621,74 @@ def plate_edge_mm(z_mm: float, side: int) -> float:
     if side < 0:
         return -(_part.HALF_WIDTH_N + (_part.EAST_HALF_S - _part.HALF_WIDTH_N) * run)
     return _part.WEST_HALF_N + (_part.WEST_HALF_S - _part.WEST_HALF_N) * run
+
+
+def plate_outline_x_mm(z_mm: float, side: int) -> float:
+    """Model x of the finished outline, north corner rounds included, at ``z_mm``.
+
+    North of where a north corner's round meets its side edge the outline is
+    the round, not the straight edge ``plate_edge_mm`` gives: at the pivot
+    station the NE R10 trims the east end to -15.89 (the straight edge would
+    read -16.25)."""
+    label = "NE" if side < 0 else "NW"
+    labels = [corner[0] for corner in _part._CORNERS]
+    index = labels.index(label)
+    _label, x, z, radius = _part._CORNERS[index]
+    south = _part._CORNERS[index - 1 if side < 0 else (index + 1) % 4]
+    dx, dz = south[1] - x, south[2] - z
+    length = math.hypot(dx, dz)
+    cx, cz = _part.corner_fillet_center(label)
+    # The round meets the side edge at the centre's foot on that edge.
+    tangent_z = z + ((cx - x) * dx + (cz - z) * dz) / length * dz / length
+    if z_mm <= tangent_z:
+        return x + (z_mm - z) / dz * dx
+    return cx + side * math.sqrt(radius * radius - (z_mm - cz) ** 2)
+
+
+# Section A-A cuts across the plan at the pivot (model z 0) at 2:1 and shows
+# only the cut face, so SolidWorks centres that strip on SECTION_CENTER.  The
+# PlateThk witnesses stop PLATE_THK_WITNESS_SET_BACK short of the strip's
+# east end.  I31's wider north-west lengthened the strip 2.9 mm west, which
+# moves the pivot and the east end 2.9 mm (sheet) left; the witness origin
+# (the plate's south-west extreme, x415 before I31) moves with them, so the
+# gap holds and only the absolute end moves.  Before I31 the east end was
+# x310.2 -- test_pivot_section_east_end_matches_the_pre_i31_measurement.
+PIVOT_SECTION_SCALE = 2.0 / 1000.0
+PLATE_THK_WITNESS_SET_BACK = 0.0012
+
+
+def pivot_section_strip_mm() -> tuple[float, float]:
+    """Model x of section A-A's east and west cut ends (the pivot station)."""
+    return (plate_outline_x_mm(0.0, -1), plate_outline_x_mm(0.0, +1))
+
+
+def pivot_section_pivot_x() -> float:
+    """Sheet x of the pivot in section A-A (sheet +x is model +x, west)."""
+    east, west = pivot_section_strip_mm()
+    return SECTION_CENTER[0] - (east + west) / 2.0 * PIVOT_SECTION_SCALE
+
+
+def plate_thk_witness_end_x(pivot_x: float) -> float:
+    """Sheet x where the PlateThk witnesses should stop, given the pivot's."""
+    east, _west = pivot_section_strip_mm()
+    return pivot_x + east * PIVOT_SECTION_SCALE - PLATE_THK_WITNESS_SET_BACK
+
+
+_CC_LETTER_FAR_Z = TIP_SCREW_LOCAL_Z - CC_LETTER_TOP_SHEET / PLAN_SCALE
+SLOT_SECTION_LINE_X_MM = tuple(
+    side
+    * math.ceil(
+        (
+            abs(plate_edge_mm(_CC_LETTER_FAR_Z, side))
+            + CC_LETTER_HALF_W_MM
+            + CC_LETTER_EDGE_CLEAR_MM
+        )
+        * 10.0
+        - 1e-6
+    )
+    / 10.0
+    for side in (-1, 1)
+)
 
 
 def slot_section_line_model_points() -> tuple[tuple[float, float, float], ...]:
@@ -382,6 +702,473 @@ def slot_section_line_model_points() -> tuple[tuple[float, float, float], ...]:
 
 
 _COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
+
+
+# --- the notch plan's ink, predicted -----------------------------------------
+# Ink the d382 render (300 dpi) and the d382/fix3 leaf dumps measured, sheet
+# metres: an arrowhead's length and half width, and a shouldered leader's
+# shoulder under its value (the R8.0's).
+DIMENSION_ARROW_LENGTH = 0.0034
+DIMENSION_ARROW_HALF_WIDTH = 0.0004
+LEADER_SHOULDER_DROP = 0.00278  # below the value's centre
+LEADER_SHOULDER_HALF = 0.00675  # either side of it
+CAP_EC_Z_WITNESS_START = 0.0010  # past the cap centre
+CAP_EC_Z_WITNESS_PAST_LINE = 0.0010
+CAP_EC_Z_TEXT_SIZE = (0.0120, 0.0035)
+# A linear dimension's line stops this far either side of its text's
+# anchor (d382 dump: 205.81 at 0.180 breaks at 0.1772 and 0.1828).
+DIMENSION_TEXT_BREAK = 0.0028
+# The pivot's witnesses start this far east of it (d382: 0.2607 at 0.25675).
+PIVOT_WITNESS_START = 0.0040
+# The 33.00 (CapECx) dimension line, 2.8 mm under its text like the
+# 205.81's.  Its right arrow sits outside, on the cap-centre witness, tail
+# running right.
+CAP_E_CX_LINE_BELOW_TEXT = 0.0028
+# An arrow tip lies on the drawn cap arc: this close to its circle, on the
+# closed side of the diameter across the mouth.
+CAP_ARC_TIP_TOLERANCE = 0.00025
+# layoutcheck's gating rule: an outside arrow's tail counts as arrow ink
+# for its first 6.35 mm.
+OUTSIDE_ARROW_TAIL = 0.00635
+# A line nearer a text block than this reads as touching it.
+LINE_TEXT_CLEARANCE = 0.0005
+ARROW_TEXT_CLEARANCE = _drawing_leaders.ARROW_TEXT_CLEARANCE
+# A leader keeps this far off every stroke it does not cross or root on
+# (Main's floor, tipslot-fix4).
+LEADER_INK_CLEARANCE = 0.0020
+# Tipslot ruling (b): another annotation's line may cross a moved value's
+# dimension ink only farther than half the value's text height from it, and
+# only as a named, expected crossing (reported, not gated).
+DIMENSION_CROSSING_TEXT_FRACTION = 0.5
+EXPECTED_DIMENSION_CROSSINGS: dict[frozenset[str], str] = {}
+
+
+@dataclass(frozen=True)
+class SheetInk:
+    """One neighbourhood's ink, keyed by annotation, in sheet metres.
+
+    ``lines`` are dimension and extension lines, ``arcs`` dimension arcs (as
+    chords), ``arrows`` arrowheads along their axis, ``leaders`` offset-text
+    leaders."""
+
+    texts: dict[str, _drawing_leaders.Box]
+    lines: dict[str, list[_drawing_leaders.Segment]]
+    arcs: dict[str, list[_drawing_leaders.Segment]]
+    arrows: dict[str, list[_drawing_leaders.Segment]]
+    leaders: dict[str, list[_drawing_leaders.Segment]]
+
+
+def _centred_box(
+    xy: tuple[float, float], size: tuple[float, float]
+) -> _drawing_leaders.Box:
+    return (
+        xy[0] - size[0] / 2.0,
+        xy[1] - size[1] / 2.0,
+        xy[0] + size[0] / 2.0,
+        xy[1] + size[1] / 2.0,
+    )
+
+
+def _anchored_box(
+    anchor: tuple[float, float], extent: tuple[float, float, float, float]
+) -> _drawing_leaders.Box:
+    return (
+        anchor[0] + extent[0],
+        anchor[1] + extent[1],
+        anchor[0] + extent[2],
+        anchor[1] + extent[3],
+    )
+
+
+def notch_plan_ink(
+    cap_text_xy: tuple[float, float] | None = None,
+    iso_note_xy: tuple[float, float] | None = None,
+) -> SheetInk:
+    """The notch plan's ink around the cap, predicted: the 205.81 (both legs
+    and witnesses), the 33.00's outside tail, the 27.70 inside its span, and
+    the lock-notch and isometric captions (property-linked notes, boxed from
+    their measured extents).
+
+    ``cap_text_xy`` places the 205.81 and ``iso_note_xy`` the isometric
+    caption (the layout's by default).
+    """
+    cap = plan_xy(NOTCH_CENTER, _part.SLOT_E_X, _part.SLOT_E_Z)
+    cap_text = NOTCH_KEEP["CapECz"] if cap_text_xy is None else cap_text_xy
+    cap_x = cap_text[0]
+    witness = (
+        (cap[0] + CAP_EC_Z_WITNESS_START, cap[1]),
+        (cap_x + CAP_EC_Z_WITNESS_PAST_LINE, cap[1]),
+    )
+    # The dump's 205.81 line stops 2.8 mm either side of its text's anchor;
+    # the lower leg runs on to the pivot's witness.
+    pivot = _NOTCH_PIVOT_XY
+    cap_line = ((cap_x, cap[1]), (cap_x, cap_text[1] + DIMENSION_TEXT_BREAK))
+    cap_lower_leg = ((cap_x, cap_text[1] - DIMENSION_TEXT_BREAK), (cap_x, pivot[1]))
+    cap_lower_witness = (
+        (pivot[0] + PIVOT_WITNESS_START, pivot[1]),
+        (cap_x + CAP_EC_Z_WITNESS_PAST_LINE, pivot[1]),
+    )
+    cap_arrow = ((cap_x, cap[1]), (cap_x, cap[1] - DIMENSION_ARROW_LENGTH))
+    slot_z = NOTCH_KEEP["TipSlotZ"]
+    slot_y = _NOTCH_SLOT_XY[1]
+    slot_z_lines = [
+        ((slot_z[0], pivot[1]), (slot_z[0], slot_z[1] - DIMENSION_TEXT_BREAK)),
+        ((slot_z[0], slot_z[1] + DIMENSION_TEXT_BREAK), (slot_z[0], slot_y)),
+    ]
+    slot_z_arrows = [
+        ((slot_z[0], pivot[1]), (slot_z[0], pivot[1] + DIMENSION_ARROW_LENGTH)),
+        ((slot_z[0], slot_y), (slot_z[0], slot_y - DIMENSION_ARROW_LENGTH)),
+    ]
+    iso_note = ISO_NOTE_UPPER_LEFT if iso_note_xy is None else iso_note_xy
+    cx_line_y = NOTCH_KEEP["CapECx"][1] - CAP_E_CX_LINE_BELOW_TEXT
+    cx_tail = ((cap[0], cx_line_y), (cap[0] + OUTSIDE_ARROW_TAIL, cx_line_y))
+    return SheetInk(
+        texts={
+            "CapECz": _centred_box(cap_text, CAP_EC_Z_TEXT_SIZE),
+            "TipSlotZ": _centred_box(slot_z, CAP_EC_Z_TEXT_SIZE),
+            "Notch View Note": _anchored_box(NOTCH_CAPTION_UPPER_LEFT, NOTCH_NOTE_EXTENT),
+            "Isometric View Note": _anchored_box(iso_note, ISO_NOTE_EXTENT),
+        },
+        lines={
+            "CapECz": [witness, cap_line, cap_lower_leg, cap_lower_witness],
+            "TipSlotZ": slot_z_lines,
+        },
+        arcs={},
+        arrows={
+            "CapECz": [cap_arrow],
+            "CapECx": [cx_tail],
+            "TipSlotZ": slot_z_arrows,
+        },
+        leaders={},
+    )
+
+
+def on_drawn_cap_arc(
+    tip: tuple[float, float],
+    cap_xy: tuple[float, float],
+    radius: float,
+) -> bool:
+    """Whether a leader tip lies on the drawn half of the cap circle, not
+    out in the notch mouth."""
+    dx, dy = tip[0] - cap_xy[0], tip[1] - cap_xy[1]
+    if abs(math.hypot(dx, dy) - radius) > CAP_ARC_TIP_TOLERANCE:
+        return False
+    return dx * CAP_MOUTH_AXIS[0] + dy * CAP_MOUTH_AXIS[1] <= CAP_ARC_TIP_TOLERANCE
+
+
+def in_acute_sector(
+    point: tuple[float, float],
+    vertex: tuple[float, float],
+    first: tuple[float, float],
+    second: tuple[float, float],
+) -> bool:
+    """Whether ``point`` lies strictly inside the sector from ``vertex``
+    between the rays through ``first`` and ``second`` (under 180 deg)."""
+
+    def cross(a: tuple[float, float], b: tuple[float, float]) -> float:
+        return a[0] * b[1] - a[1] * b[0]
+
+    ray = (first[0] - vertex[0], first[1] - vertex[1])
+    other = (second[0] - vertex[0], second[1] - vertex[1])
+    to_point = (point[0] - vertex[0], point[1] - vertex[1])
+    turn = cross(ray, other)
+    return cross(ray, to_point) * turn > 0.0 and cross(to_point, other) * turn > 0.0
+
+
+def _grown(box: _drawing_leaders.Box, margin: float) -> _drawing_leaders.Box:
+    return (box[0] - margin, box[1] - margin, box[2] + margin, box[3] + margin)
+
+
+def _segment_gap(first: _drawing_leaders.Segment, second: _drawing_leaders.Segment) -> float:
+    """Distance between two segments that do not cross: the nearest of each
+    one's ends to the other."""
+    return min(
+        *(_drawing_leaders.distance_to_point(first, end) for end in second),
+        *(_drawing_leaders.distance_to_point(second, end) for end in first),
+    )
+
+
+def _strokes(ink: SheetInk, owners: Collection[str]) -> list[tuple[str, _drawing_leaders.Segment]]:
+    return [
+        (f"{owner} {kind}", segment)
+        for kind, strokes in (("lines", ink.lines), ("arcs", ink.arcs))
+        for owner in sorted(owners)
+        for segment in strokes.get(owner, ())
+    ]
+
+
+def dimension_crossings(ink: SheetInk) -> tuple[list[str], list[str]]:
+    """(findings, reported): other annotations' lines across a moved value's
+    dimension ink.
+
+    Only annotations with an offset leader are checked.  A crossing within
+    DIMENSION_CROSSING_TEXT_FRACTION of the value's text height of the value,
+    or one not in EXPECTED_DIMENSION_CROSSINGS, is a finding; a named one
+    farther out is reported.  The distance taken is the nearer of the two
+    crossing segments' to the value's box -- never farther than the crossing
+    point itself, so a pass is proven."""
+    findings, reported = [], []
+    for owner in sorted(name for name, leaders in ink.leaders.items() if leaders):
+        box = ink.texts[owner]
+        limit = DIMENSION_CROSSING_TEXT_FRACTION * (box[3] - box[1])
+        others = {*ink.lines, *ink.arcs} - {owner}
+        nearest: dict[tuple[str, str], float] = {}
+        for mine, first in _strokes(ink, [owner]):
+            for theirs, second in _strokes(ink, others):
+                if not _drawing_leaders.segments_cross(first, second):
+                    continue
+                gap = min(
+                    _drawing_leaders.distance_to_box(first, box),
+                    _drawing_leaders.distance_to_box(second, box),
+                )
+                nearest[(mine, theirs)] = min(gap, nearest.get((mine, theirs), math.inf))
+        for (mine, theirs), gap in sorted(nearest.items()):
+            reason = EXPECTED_DIMENSION_CROSSINGS.get(frozenset((mine, theirs)))
+            where = f"{mine} x {theirs}, at least {gap * 1000.0:.2f} mm from {owner!r}"
+            if gap <= limit:
+                findings.append(
+                    f"dimension-crossing: {where}, within {limit * 1000.0:.2f} mm "
+                    f"(half its text height)"
+                )
+            elif reason is None:
+                findings.append(f"dimension-crossing: {where}, not an expected crossing")
+            else:
+                reported.append(f"{where}: {reason}")
+    return findings, reported
+
+
+def sheet_ink_collisions(ink: SheetInk) -> list[str]:
+    """Text a line touches, arrows at text, leaders across or near ink,
+    dimension ink crossed at a moved value.
+
+    * text-on-line: any annotation's dimension, extension or arc line -- its
+      own included -- within LINE_TEXT_CLEARANCE of a text block;
+    * arrow-near-text: an arrowhead within ARROW_TEXT_CLEARANCE of another
+      annotation's text (``_drawing_leaders.arrows_near_text``);
+    * leader-on-ink: an offset leader crossing, or ending in a T on, any line
+      or arc (``_drawing_leaders.leader_crossings``: a T is a crossing), or a
+      foreign arrow, or running through foreign text.  One pair is declared
+      touching: a leader and its own dimension arc, where SolidWorks roots it.
+      Its own arrowheads stay out of the leader test -- their outside halves
+      are the arc tails, which are in it;
+    * leader-near-ink: a leader within LEADER_INK_CLEARANCE of any of those
+      strokes it does not cross (its own arc excepted);
+    * dimension-crossing: ``dimension_crossings``.
+    """
+    findings = []
+    for name, box in sorted(ink.texts.items()):
+        guard = _grown(box, LINE_TEXT_CLEARANCE)
+        for kind, strokes in (("line", ink.lines), ("arc", ink.arcs)):
+            for owner, segments in sorted(strokes.items()):
+                if any(_drawing_leaders.distance_to_box(s, guard) == 0.0 for s in segments):
+                    findings.append(f"text-on-line: {owner}'s {kind} runs through {name!r}")
+    for owner, name, gap in _drawing_leaders.arrows_near_text(
+        ink.arrows,
+        ink.texts,
+        clearance=ARROW_TEXT_CLEARANCE,
+        half_width=DIMENSION_ARROW_HALF_WIDTH,
+    ):
+        findings.append(
+            f"arrow-near-text: {owner}'s arrow stands {gap * 1000.0:.2f} mm from {name!r}"
+        )
+    for owner, leaders in sorted(ink.leaders.items()):
+        if leaders:
+            findings.extend(_leader_findings(ink, owner, leaders))
+    findings.extend(dimension_crossings(ink)[0])
+    return findings
+
+
+def _leader_findings(
+    ink: SheetInk, owner: str, leaders: list[_drawing_leaders.Segment]
+) -> list[str]:
+    leader = f"{owner} leader"
+    groups = {leader: list(leaders)}
+    for other in sorted({*ink.lines, *ink.arcs, *ink.arrows}):
+        groups[f"{other} lines"] = list(ink.lines.get(other, ()))
+        groups[f"{other} arcs"] = list(ink.arcs.get(other, ()))
+        if other != owner:
+            groups[f"{other} arrows"] = list(ink.arrows.get(other, ()))
+    # The one declared touch: an offset leader roots on its own arc.
+    own_arcs = f"{owner} arcs"
+    findings = []
+    crossed = set()
+    for first, second in _drawing_leaders.leader_crossings(groups, {frozenset((leader, own_arcs))}):
+        if leader in (first, second):
+            other = second if first == leader else first
+            crossed.add(other)
+            findings.append(f"leader-on-ink: {owner}'s leader crosses {other}")
+    for other, segments in groups.items():
+        if other in (leader, own_arcs) or other in crossed or not segments:
+            continue
+        gap = min(_segment_gap(a, b) for a in leaders for b in segments)
+        if gap < LEADER_INK_CLEARANCE:
+            findings.append(
+                f"leader-near-ink: {owner}'s leader passes {gap * 1000.0:.2f} mm from {other}"
+            )
+    for name, box in sorted(ink.texts.items()):
+        if name != owner and any(_drawing_leaders.distance_to_box(s, box) == 0.0 for s in leaders):
+            findings.append(f"leader-on-ink: {owner}'s leader runs through {name!r}")
+    return findings
+
+
+def assert_notch_plan_ink_clear() -> None:
+    """Refuse the notch plan's layout before any COM work is spent."""
+    findings = sheet_ink_collisions(notch_plan_ink())
+    if findings:
+        raise RuntimeError("notch plan ink collides: " + "; ".join(findings))
+
+
+def _display_data(annotation: Any) -> Any:
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    return _early_bound(display.GetDisplayData(), "IDisplayData")
+
+
+def _arcs(annotation: Any) -> list[tuple[_drawing_leaders.Segment, tuple[float, float]]]:
+    """A dimension's arcs as (start->end chord, centre), sheet metres.
+
+    ``GetArcAtIndex2`` -> [color, lineType, unused, unused, start[3], end[3],
+    centre[3], normal[3], rotationDir]."""
+    data = _display_data(annotation)
+    arcs = []
+    for index in range(int(data.GetArcCount())):
+        values = [float(v) for v in (data.GetArcAtIndex2(index) or ())]
+        if len(values) < 13:
+            raise RuntimeError(f"display arc {index} is incomplete: {values}")
+        arcs.append((((values[4], values[5]), (values[7], values[8])), (values[10], values[11])))
+    return arcs
+
+
+def _arc_chords(annotation: Any) -> list[_drawing_leaders.Segment]:
+    return [chord for chord, _centre in _arcs(annotation)]
+
+
+def _arrow_segments(annotation: Any) -> list[_drawing_leaders.Segment]:
+    """Each arrowhead as a segment through its tip along its axis.
+
+    ``GetArrowHeadAtIndex2`` -> [tip[3], dir[3], width, height, style,
+    normal[3]], width measured along the direction.  Which way the head
+    extends from its tip is not seat-proven here, so the segment spans the
+    width both ways: stricter, never blind."""
+    data = _display_data(annotation)
+    arrows = []
+    for index in range(int(data.GetArrowHeadCount())):
+        values = [float(v) for v in (data.GetArrowHeadAtIndex2(index) or ())]
+        if len(values) < 8:
+            raise RuntimeError(f"arrowhead {index} is incomplete: {values}")
+        (x, y), (dx, dy), width = values[0:2], values[3:5], values[6]
+        length = math.hypot(dx, dy) or 1.0
+        ux, uy = dx / length * width, dy / length * width
+        arrows.append(((x - ux, y - uy), (x + ux, y + uy)))
+    return arrows
+
+
+def _notch_strokes(annotation: Any) -> list[_drawing_leaders.Segment]:
+    """A dimension's display lines plus any API leader polyline."""
+    return _drawing_leaders.dimension_segments(annotation) + _drawing_leaders.leader_segments(
+        annotation
+    )
+
+
+def _pin_tip_slot_z_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
+    """The 27.70 prints inside its span; smart arrows could flip out and run
+    ~6.3 mm tails past both witnesses, so pin them inside and read it back."""
+    matches = [item for item in annotations if dimension_name(adapter, item) == "TipSlotZ"]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one TipSlotZ annotation, found {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.ArrowSide = 0  # swDimensionArrowsSide_e.swDimArrowsInside
+    rebuild_drawing(adapter, label="tip slot z arrows inside")
+    if int(display.ArrowSide) != 0:
+        raise RuntimeError("TipSlotZ did not keep its arrows inside")
+    position = tuple(float(v) for v in annotation.GetPosition())[:2]
+    if math.dist(position, NOTCH_KEEP["TipSlotZ"]) > 0.0005:
+        raise RuntimeError(f"TipSlotZ text at {position}, not {NOTCH_KEEP['TipSlotZ']}")
+    shoulder = [
+        segment
+        for segment in _notch_strokes(annotation)
+        # Its witnesses run 1.0 mm past the line; d382's shoulder ran 14 mm.
+        if min(segment[0][0], segment[1][0]) < TIP_SLOT_Z_LINE_X - 0.002
+    ]
+    _telemetry.info(f"TipSlotZ inside its span: text={position} strokes_left_of_line={shoulder}")
+    if shoulder:
+        raise RuntimeError(f"TipSlotZ still draws ink left of its line: {shoulder}")
+
+
+def _assert_notch_captions_clear(
+    adapter: Any, annotations: list[Any], captions: dict[str, Any]
+) -> None:
+    """No notch-plan dimension line, arc or arrow on a caption.
+
+    The captions are property-linked notes at fixed sheet points; fix4b's
+    205.81 line ran through "ISOMETRIC VIEW SCALE 1:3" because no caption was
+    in the audit's text set.  Their boxes are read off the seat
+    (``INote.GetExtent``), after the rebuild that resolves their text."""
+    rebuild_drawing(adapter, label="captions placed")
+    texts = {}
+    for name, note in captions.items():
+        values = [float(v) for v in (_early_bound(note, "INote").GetExtent() or ())]
+        if len(values) < 6:
+            raise RuntimeError(f"{name} has no extent: {values}")
+        texts[name] = (
+            min(values[0], values[3]),
+            min(values[1], values[4]),
+            max(values[0], values[3]),
+            max(values[1], values[4]),
+        )
+    by_name = {dimension_name(adapter, item): _early_bound(item, "IAnnotation") for item in annotations}
+    ink = SheetInk(
+        texts=texts,
+        lines={name: _notch_strokes(item) for name, item in by_name.items()},
+        arcs={name: _arc_chords(item) for name, item in by_name.items()},
+        arrows={name: _arrow_segments(item) for name, item in by_name.items()},
+        leaders={},
+    )
+    findings = sheet_ink_collisions(ink)
+    _telemetry.info(f"notch captions: boxes={texts} findings={findings}")
+    if findings:
+        raise RuntimeError("notch plan ink collides with a caption: " + "; ".join(findings))
+
+
+def _assert_mouth_angle_in_wedge(
+    adapter: Any, view: Any, annotations: list[Any]
+) -> None:
+    """Prove the mouth angle's text sits in its acute 88 deg sector.
+
+    An angular dimension draws the sector that holds its text, so a text
+    point beside the wedge prints the 92 supplement or the vertically
+    opposite sector's arc.  The sector is re-derived from the model through
+    the placed view, not from the layout's own sheet figures.
+    """
+    matches = [
+        item for item in annotations if dimension_name(adapter, item) == "NotchMouthAngle"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one NotchMouthAngle annotation, found {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    text = tuple(float(value) for value in annotation.GetPosition())[:2]
+    vx, vz = _part.NOTCH_CUT_POINTS["mouth_s"]
+    ux, uz = _part.NOTCH_CUT_U
+    y = PLATE_THICKNESS / 1000.0
+
+    def sheet(x_mm: float, z_mm: float, label: str) -> tuple[float, float]:
+        return model_point_in_view(
+            adapter, view, (x_mm / 1000.0, y, z_mm / 1000.0), label=label
+        )[:2]
+
+    vertex = sheet(vx, vz, "mouth angle vertex")
+    rail = sheet(vx - 3.0 * ux, vz - 3.0 * uz, "mouth angle rail")
+    edge = sheet(vx + 3.0 * _part._EDGE_SX, vz + 3.0 * _part._EDGE_SZ, "mouth angle edge")
+    inside = in_acute_sector(text, vertex, rail, edge)
+    _telemetry.info(
+        f"NotchMouthAngle text={text} vertex={vertex} rail={rail} edge={edge} "
+        f"inside_acute_sector={inside} predicted_vertex={MOUTH_ANGLE_VERTEX_XY}"
+    )
+    if not inside:
+        raise RuntimeError(
+            f"NotchMouthAngle text {text} is outside its acute sector at {vertex}; "
+            "it would print the supplement or the opposite arc"
+        )
 
 
 def _hide_profile_cosmetic_threads(adapter: Any, view: Any) -> None:
@@ -773,55 +1560,55 @@ def _plan_basis_to_model(
     )
 
 
-def _add_cutter_note(adapter: Any, view: Any, note: CutterNote) -> Any:
-    """Place one leadered cutter note, then prove its tip is on its arc.
+def _add_arc_note(adapter: Any, view: Any, note: ArcNote) -> Any:
+    """Place one leadered note, then prove its tip is on its arc.
 
     Same proof as the R8 radius: the leader tip read back off the sheet is
     inverted through the view's measured plan basis at each candidate edge's
     model Y, and the trimmed physical edge (``IEdge::GetClosestPointOn``) must
     lie within ``LEADER_TIP_BOUND_M`` of it.  Candidates are the named cut's
-    own edges on the west end circle (radius and centre to 1e-6 m), limited
+    own edges on the note's circle (radius and centre to 1e-6 m), limited
     to ``note.model_y_mm`` when the note names one face.
     """
     tip_xy = model_point_in_view(
-        adapter, view, cutter_note_model_tip(note), label=f"{note.key} note tip"
+        adapter, view, arc_note_model_tip(note), label=f"{note.key} note tip"
     )
-    drift = math.dist(tip_xy[:2], cutter_note_tip(note))
-    # The detail's centre lands within 0.5 mm of DETAIL_CENTER (asserted by
+    drift = math.dist(tip_xy[:2], arc_note_tip(note))
+    # A detail's centre lands within 0.5 mm of its layout point (asserted by
     # _create_detail_view); the layout was checked against that point.
     if drift > 0.0006:
         raise RuntimeError(
             f"{note.key} note tip projects to {tip_xy[:2]}, layout expects "
-            f"{cutter_note_tip(note)} ({drift * 1000:.3f} mm off)"
+            f"{arc_note_tip(note)} ({drift * 1000:.3f} mm off)"
         )
     created = add_leader_note(
         adapter,
         note.text,
         text_xy=note.text_xy,
         attach_xy=(tip_xy[0], tip_xy[1]),
-        label=f"{note.key} cutter note",
+        label=f"{note.key} note",
         view=view,
     )
     annotation = _early_bound(_early_bound(created, "INote").GetAnnotation(), "IAnnotation")
     text_format = annotation.GetTextFormat(0)
     if text_format is None:
-        raise RuntimeError(f"{note.key} cutter note has no text format")
+        raise RuntimeError(f"{note.key} note has no text format")
     text_format.CharHeight = CUTTER_NOTE_CHAR_HEIGHT
     if not annotation.SetTextFormat(0, False, text_format):
-        raise RuntimeError(f"failed to size the {note.key} cutter note")
-    rebuild_drawing(adapter, label=f"{note.key} cutter note text height")
+        raise RuntimeError(f"failed to size the {note.key} note")
+    rebuild_drawing(adapter, label=f"{note.key} note text height")
 
     points = [float(v) for v in (annotation.GetLeaderPointsAtIndex(0) or ())]
     if len(points) < 6:
-        raise RuntimeError(f"{note.key} cutter note leader is unreadable")
+        raise RuntimeError(f"{note.key} note leader is unreadable")
     tip = (points[-3], points[-2])
     document = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
     feature = _early_bound(
         _early_bound(document, "IPartDoc").FeatureByName(note.feature), "IFeature"
     )
     radius_m = note.radius_mm / 1000.0
-    center_x = 0.002  # the west end arc's centre, +TIP_SCREW_HALF_TRAVEL
-    center_z = TIP_SCREW_LOCAL_Z / 1000.0
+    center_x = note.arc_center_mm[0] / 1000.0
+    center_z = note.arc_center_mm[1] / 1000.0
     candidates: list[tuple[Any, tuple[float, ...]]] = []
     for raw_face in feature.GetFaces() or ():
         for raw_edge in _early_bound(raw_face, "IFace2").GetEdges() or ():
@@ -845,7 +1632,7 @@ def _add_cutter_note(adapter: Any, view: Any, note: CutterNote) -> Any:
                 continue
             candidates.append((edge, circle))
     if not candidates:
-        raise RuntimeError(f"{note.feature} has no west end arc for the {note.key} note")
+        raise RuntimeError(f"{note.feature} has no matching arc for the {note.key} note")
     distances = []
     for edge, circle in candidates:
         model_tip = _plan_basis_to_model(
@@ -855,17 +1642,17 @@ def _add_cutter_note(adapter: Any, view: Any, note: CutterNote) -> Any:
         distance = math.dist(model_tip, closest[:3])
         distances.append(distance)
         print(
-            f"{note.key} cutter note: tip_sheet_m={tip} arc_center_m={circle[:3]} "
+            f"{note.key} note: leader_sheet_m={points} arc_center_m={circle[:3]} "
             f"radius_m={circle[6]} tip_model_m={model_tip} "
             f"closest_model_m={closest[:3]} distance_m={distance}"
         )
     if not min(distances) <= LEADER_TIP_BOUND_M:
         raise RuntimeError(
-            f"{note.key} cutter note leader misses its {note.feature} end arc "
+            f"{note.key} note leader misses its {note.feature} arc "
             f"by {min(distances) * 1000:.4f} mm"
         )
     _telemetry.info(
-        f"{note.key} cutter note leader lands on {note.feature}'s west end arc "
+        f"{note.key} note leader lands on {note.feature}'s arc "
         f"({len(candidates)} candidate edge(s), {min(distances) * 1e6:.2f} um)"
     )
     return created
@@ -1114,7 +1901,28 @@ def _assert_corner_radius_attachment(
     )
 
 
+def _assert_each_kept_dimension_once(adapter: Any, views: dict[str, Any]) -> None:
+    """Walk every view's annotations: each kept dimension once, on its owner.
+
+    ``curate_view_dimensions`` deletes a view's unrequested imports and drops
+    them from the list it returns, so a deletion that did not hold would
+    otherwise print a duplicate unseen."""
+    seen: dict[str, list[str]] = {}
+    for label, view in views.items():
+        names = []
+        for raw in _early_bound(view, "IView").GetAnnotations() or ():
+            name = dimension_name(adapter, _early_bound(raw, "IAnnotation"))
+            if name:
+                names.append(name)
+        seen[label] = sorted(names)
+        print(f"{label} dimensions: {seen[label]}")
+    errors = dimension_placement_errors(seen)
+    if errors:
+        raise RuntimeError("kept dimensions misplaced on the sheet: " + "; ".join(errors))
+
+
 async def build(adapter: Any) -> dict[str, str]:
+    assert_notch_plan_ink_clear()
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
@@ -1208,6 +2016,17 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Hidden edges dashed, so the underside counterbored slot reads.
     set_hidden_lines_visible(adapter, detail)
+    cap_detail = _create_detail_view(
+        adapter,
+        feature,
+        model_center_mm=(_part.SLOT_E_X, PLATE_THICKNESS, _part.SLOT_E_Z),
+        radius_mm=CAP_DETAIL_RADIUS_MM,
+        view_xy=CAP_DETAIL_CENTER,
+        detail_label="D",
+        scale=CAP_DETAIL_SCALE,
+        label="lock notch cap detail",
+    )
+    set_hidden_lines_removed(adapter, cap_detail)
     profile_pivot = model_point_in_view(
         adapter, profile, (0.0, PLATE_THICKNESS / 1000.0, 0.0), label="profile pivot"
     )
@@ -1253,13 +2072,6 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="feature plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # Name the relief so the reader ties the width to the fit note; it is
-    # open through the north edge (rule-12 W18), round-ended at the pivot.
-    set_dimension_callouts(
-        adapter,
-        feature_annotations,
-        {"PivotBearingReliefDia": RELIEF_WIDTH_CALLOUT},
-    )
     notch_annotations = curate_view_dimensions(
         adapter,
         notch,
@@ -1267,6 +2079,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="notch plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    _pin_tip_slot_z_arrows_inside(adapter, notch_annotations)
     section_annotations = curate_view_dimensions(
         adapter,
         section,
@@ -1282,8 +2095,10 @@ async def build(adapter: Any) -> dict[str, str]:
                 if ok is not True:
                     raise RuntimeError("plate thickness witness gap could not be read")
                 # Measured native witness origin is x415; the actual cut edge
-                # is x310.2. Leave a visible 1.2 mm gap at x309, without
-                # changing the model dimension or hiding either witness.
+                # was x310.2 (before I31). Leave a visible 1.2 mm gap short of
+                # the cut edge, without changing the model dimension or hiding
+                # either witness. Origin and cut end move together with the
+                # strip (see PLATE_THK_WITNESS_SET_BACK), so the gap is fixed.
                 gap = float(old_gap) + 0.106
                 if display.SetWitnessLineGap(witness_index, False, gap) is not True:
                     raise RuntimeError("plate thickness witness gap was refused")
@@ -1300,6 +2115,16 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _set_arrows_inside(adapter, detail_annotations, DETAIL_ARROWS_INSIDE)
+    # Detail D alone imports the notch sketch (NotchW and the mouth angle);
+    # the notch plan keeps only the cap sketch's centre.
+    cap_detail_annotations = curate_view_dimensions(
+        adapter,
+        cap_detail,
+        keep=CAP_DETAIL_KEEP,
+        view_label="lock notch cap detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    _assert_mouth_angle_in_wedge(adapter, cap_detail, cap_detail_annotations)
     # U41: the thickness is the stock's, a reference with no band.
     thickness_annotations = [
         item for item in section_annotations
@@ -1336,6 +2161,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *notch_annotations,
         *section_annotations,
         *detail_annotations,
+        *cap_detail_annotations,
         *slot_section_annotations,
     ]
     if not auto_center_marks(adapter, feature, holes=True, size=0.0025):
@@ -1388,8 +2214,13 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Profile View Note", 0.045, 0.085)
     add_property_linked_note(adapter, "Feature View Note", 0.150, 0.085)
-    add_property_linked_note(adapter, "Notch View Note", *NOTCH_CAPTION_UPPER_LEFT)
-    add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.158)
+    notch_note = add_property_linked_note(adapter, "Notch View Note", *NOTCH_CAPTION_UPPER_LEFT)
+    iso_note = add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_UPPER_LEFT)
+    _assert_notch_captions_clear(
+        adapter,
+        notch_annotations,
+        {"Notch View Note": notch_note, "Isometric View Note": iso_note},
+    )
     add_property_linked_note(
         adapter, "Post Mount Engagement", *ENGAGEMENT_NOTE_XY, char_height=0.0025
     )
@@ -1397,11 +2228,13 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, "Pivot Relief Fit", *RELIEF_NOTE_XY, char_height=0.0025
     )
     cutter_notes = [
-        _add_cutter_note(adapter, detail, cutter_note) for cutter_note in CUTTER_NOTES
+        _add_arc_note(adapter, detail, cutter_note) for cutter_note in CUTTER_NOTES
     ]
+    cap_r_note = _add_arc_note(adapter, cap_detail, CAP_R_NOTE)
+    _add_arc_note(adapter, feature, RELIEF_ID_NOTE)
 
     # Annotation insertion can invalidate the exported display geometry.
-    for view in (profile, feature, notch, section, slot_section, iso):
+    for view in (profile, feature, notch, section, slot_section, iso, cap_detail):
         set_hidden_lines_removed(adapter, view)
     # Re-assert after the dimensions attach: the shared helper passes through
     # HLR, so the dashed edge set is regenerated, not a same-mode no-op.
@@ -1420,6 +2253,13 @@ async def build(adapter: Any) -> dict[str, str]:
         SLOT_SECTION_LABEL_LOWER_LEFT,
         label="section C-C label",
     )
+    _position_view_label(
+        adapter,
+        cap_detail,
+        CAP_DETAIL_LABEL_LOWER_LEFT,
+        label="detail D label",
+        added_notes=[cap_r_note],
+    )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if (str(relief_reference.GetText(1)), str(relief_reference.GetText(2))) != ("(", ")"):
         raise RuntimeError("pivot relief reference state did not persist")
@@ -1428,16 +2268,37 @@ async def build(adapter: Any) -> dict[str, str]:
         str(thickness_reference.GetText(2)),
     ) != ("(", ")"):
         raise RuntimeError("stock plate thickness reference state did not persist")
-    for name, feature_name, radius_m, station_xy in (
-        ("CornerSWR", "CornerSW", 0.005, (0.0875, 0.2433)),
-        ("CornerNWR", "CornerNW", 0.008, (0.0723, 0.1382)),
-        ("CornerNER", "CornerNE", 0.010, (0.0686, 0.1392)),
-        ("CornerSER", "CornerSE", 0.012, (0.0660, 0.2398)),
-    ):
+    # Each corner's station is its fillet centre projected into the profile:
+    # the sheet literals these replaced went stale when I31 widened the
+    # north-west (the NW centre moved 1.39 mm on the sheet, past the 1 mm
+    # match window: "expected 2 owned visible CornerNWR arc(s) ... found 0").
+    for label, _x, _z, radius_mm in _part._CORNERS:
+        model_center = corner_station_model_m(label)
+        station_xy = model_point_in_view(
+            adapter, profile, model_center, label=f"Corner{label} fillet centre"
+        )[:2]
+        print(
+            f"Corner{label}R station: fillet_centre_model_m={model_center} "
+            f"sheet_m=({station_xy[0]:.5f},{station_xy[1]:.5f})"
+        )
         _assert_corner_radius_attachment(
             adapter, profile, profile_annotations,
-            name=name, feature_name=feature_name, radius_m=radius_m, station_xy=station_xy,
+            name=f"Corner{label}R", feature_name=f"Corner{label}",
+            radius_m=radius_mm / 1000.0, station_xy=station_xy,
         )
+    _assert_each_kept_dimension_once(
+        adapter,
+        {
+            "profile plan": profile,
+            "feature plan": feature,
+            "notch plan": notch,
+            "isometric": iso,
+            "pivot section": section,
+            "tip screw slot detail": detail,
+            "lock notch cap detail": cap_detail,
+            "tip screw slot section": slot_section,
+        },
+    )
     if cut.GetDisplayOnlySurfaceCut() is not True:
         raise RuntimeError("pivot section lost its cut-only display after annotation")
     for face_name, model_y in (
@@ -1451,6 +2312,15 @@ async def build(adapter: Any) -> dict[str, str]:
             f"section face {face_name}: model_y_mm={model_y * 1000:.3f} "
             f"sheet_xy_mm=({projected[0] * 1000:.3f},{projected[1] * 1000:.3f})"
         )
+    section_pivot_x = model_point_in_view(
+        adapter, section, (0.0, 0.0, 0.0), label="pivot in section A-A"
+    )[0]
+    witness_end_x = plate_thk_witness_end_x(section_pivot_x)
+    print(
+        f"section A-A pivot sheet_x={section_pivot_x:.5f} "
+        f"predicted={pivot_section_pivot_x():.5f} "
+        f"strip_mm={pivot_section_strip_mm()} witness_end_x={witness_end_x:.5f}"
+    )
     for sheet_geometry in collect_document(adapter):
         print(describe_sheet(sheet_geometry))
         thickness_geometry = [
@@ -1467,7 +2337,7 @@ async def build(adapter: Any) -> dict[str, str]:
             )
         ]
         if len(witnesses) != 2 or any(
-            abs(max(segment.x0, segment.x1) - SECTION_SHIFT[0] - 0.309) > 0.0005
+            abs(max(segment.x0, segment.x1) - witness_end_x) > 0.0005
             or abs(min(segment.x0, segment.x1) - SECTION_SHIFT[0] - 0.299) > 0.0005
             for segment in witnesses
         ):
