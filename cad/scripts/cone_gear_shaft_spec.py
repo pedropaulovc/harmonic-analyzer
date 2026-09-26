@@ -165,6 +165,10 @@ SOLDER_T006_STATION = (
     - CONE_GEAR_FACE_WIDTH
     - DATUM_STATION
 )
+# The construction sketch that owns the two station dimensions.  The part
+# saves it hidden (no render shows it); the drawing's side view shows it
+# back to import them (_drawing_hidden_sketches).
+SOLDER_STATION_SKETCH = "SolderStations"
 
 # Diameter bands, one NAMED class per land, applied to the model dimension
 # by build_cone_gear_shaft -- never "+0.00/-0.02" typed as sheet callout text.

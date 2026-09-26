@@ -345,10 +345,73 @@ def test_the_collar_diameter_draws_nothing_inside_the_ring() -> None:
     assert 'set_near_side_diameter(moved, f"{name} near-side diameter")' in source
 
 
-def test_the_pictorial_hides_the_solder_station_witnesses() -> None:
+class _FakePart:
+    """A part document that records a sketch blank and reports its visibility."""
+
+    def __init__(self, *, hides: bool) -> None:
+        self.hides = hides
+        self.selected: list[tuple[str, str]] = []
+        self.blanked = False
+        self.Extension = self
+
+    def ClearSelection2(self, _all: bool) -> None:
+        pass
+
+    def SelectByID2(self, name: str, kind: str, *_args: object) -> bool:
+        self.selected.append((name, kind))
+        return True
+
+    def BlankSketch(self) -> None:
+        self.blanked = True
+
+    def FeatureByName(self, name: str) -> object:
+        assert name == cone_gear_shaft_spec.SOLDER_STATION_SKETCH
+        # swVisibilityState_e: 1 hidden, 2 shown
+        return type("Feature", (), {"Visible": 1 if self.blanked and self.hides else 2})
+
+
+class _FakeAdapter:
+    def __init__(self, model: _FakePart) -> None:
+        self.currentModel = model
+
+
+def test_the_part_saves_the_solder_station_witnesses_hidden() -> None:
+    """Codex P1 on #916: a sketch hidden only in the drawing's pictorial still
+    renders in the part images and every assembly instance, so the part
+    blanks it before its save and reads the blank back."""
+    assert set(cone_gear_shaft_spec.DRAWING_DIMENSIONS[
+        cone_gear_shaft_spec.SOLDER_STATION_SKETCH
+    ]) == {"T120Station", "T006Station"}
+    model = _FakePart(hides=True)
+    part._blank_solder_stations(_FakeAdapter(model))
+    assert model.selected == [(cone_gear_shaft_spec.SOLDER_STATION_SKETCH, "SKETCH")]
+    assert model.blanked
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    build_body = source[source.index("async def build(") :]
+    assert build_body.index("_blank_solder_stations(adapter)") < build_body.index(
+        "save_part_and_images("
+    )
+
+
+def test_a_blank_that_does_not_take_fails_the_part_build() -> None:
+    with pytest.raises(RuntimeError, match="still visible after BlankSketch"):
+        part._blank_solder_stations(_FakeAdapter(_FakePart(hides=False)))
+
+
+def test_only_the_side_view_shows_the_part_hidden_stations() -> None:
+    """The station dimensions live on the side view, which takes the opt-in
+    import; no other view opts in, so the pictorial shows the part as saved."""
+    stations = cone_gear_shaft_spec.DRAWING_DIMENSIONS[
+        cone_gear_shaft_spec.SOLDER_STATION_SKETCH
+    ]
+    assert set(stations) <= set(drawing.SIDE_KEEP)
+    assert not set(stations) & set(drawing.DONOR_KEEP)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert drawing.SOLDER_STATION_SKETCH == "SolderStations"
-    assert "_hide_reference_sketch(adapter, iso, " in source
+    body = source[source.index("async def build(") :]
+    assert body.count("hidden_sketches.curate_view_dimensions(") == 1
+    side_call = body[body.index("hidden_sketches.curate_view_dimensions(") :]
+    assert side_call.index("side,") < side_call.index(")")
+    assert "BlankSketch" not in source
 
 
 def test_stacked_tip_diameters_never_run_a_line_through_a_text() -> None:

@@ -71,6 +71,7 @@ from _common import (
     SketchDims,
     _early_bound,
     apply_material,
+    blank_sketch,
     name_bore_axis,
     check,
     define_circle,
@@ -110,6 +111,7 @@ from cone_gear_shaft_spec import (
     SECTION_KNOBS,
     SECTION_ORIGINS,
     SECTIONS,
+    SOLDER_STATION_SKETCH,
     SOLDER_T006_STATION,
     SOLDER_T120_STATION,
     SURFACE_FINISHES,
@@ -335,8 +337,8 @@ async def build(adapter) -> dict[str, str]:
 
     # Solder stations (#914): model-owned, measured from the collar face.
     stations = await _author_solder_stations(adapter)
-    name_last_feature(adapter, "SolderStations")
-    drive_jobs += stations.apply(adapter, "SolderStations")
+    name_last_feature(adapter, SOLDER_STATION_SKETCH)
+    drive_jobs += stations.apply(adapter, SOLDER_STATION_SKETCH)
 
     # Shoulder roots.  ONE constant-radius fillet over the three gear-seat
     # step edges, each picked by a point on the SMALLER land's circle at that
@@ -397,7 +399,22 @@ async def build(adapter) -> dict[str, str]:
     # feature-control frames (drawing-simplicity policy rule 3).
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
+    _blank_solder_stations(adapter)
     return await save_part_and_images(adapter, PART_NAME)
+
+
+def _blank_solder_stations(adapter: Any) -> None:
+    """Save the solder-station witness sketch hidden, so no part image or
+    assembly instance renders it; the drawing's side view shows it back
+    through _drawing_hidden_sketches to import the station dimensions."""
+    blank_sketch(adapter, SOLDER_STATION_SKETCH)
+    part_doc = _early_bound(adapter.currentModel, "IPartDoc")
+    feature = _early_bound(part_doc.FeatureByName(SOLDER_STATION_SKETCH), "IFeature")
+    state = int(feature.Visible)
+    if state != 1:  # swVisibilityStateHide
+        raise RuntimeError(
+            f"{SOLDER_STATION_SKETCH} still visible after BlankSketch ({state})"
+        )
 
 
 def _as_construction(adapter: Any, entity_id: str) -> None:

@@ -23,12 +23,11 @@ import argparse
 import sys
 from typing import Any
 
+import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    _model_item_paths,
-    _select_model_feature,
     add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
@@ -48,6 +47,7 @@ from _drawing_leaders import set_near_side_diameter
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from cone_gear_shaft_spec import (
+    DRAWING_DIMENSIONS,
     DRAWING_REFERENCE_PRECISION,
     FILLET_CALLOUT,
     JOURNAL_DIA,
@@ -166,35 +166,6 @@ DIMENSION_CALLOUTS = {"ShoulderR": FILLET_CALLOUT, "T006Station": "20X EQ SP"}
 # The pivot-journal finish symbol, left of which the collar diameter's text
 # must end.
 PIVOT_FINISH_XY = (0.2400, 0.1800)
-# The part's solder-station witness sketch (#914): shown in the side view,
-# whose station dimensions it owns; hidden in the pictorial.
-SOLDER_STATION_SKETCH = "SolderStations"
-
-
-def _hide_reference_sketch(adapter: Any, view: Any, label: str) -> None:
-    """Hide the part's solder-station witness sketch in one drawing view.
-
-    ``IModelDoc2::BlankSketch`` on a sketch selected through a view hides it
-    in that view only, as the cone gear hides its thickness witness; blanking
-    it in the part would also drop the side view's station dimensions.
-    """
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    name = view_name(adapter, view)
-    if not ddoc.ActivateView(name):
-        raise RuntimeError(f"{label}: failed to activate {name!r}")
-    draw.ClearSelection2(True)
-    selected = _select_model_feature(
-        adapter, SOLDER_STATION_SKETCH, paths=_model_item_paths(adapter, view)
-    )
-    if not selected.startswith("SKETCH"):
-        draw.ClearSelection2(True)
-        raise RuntimeError(f"{label}: witness resolved as {selected!r}, not a sketch")
-    draw.BlankSketch()
-    draw.ClearSelection2(True)
-    _telemetry.debug(f"{label}: hid {SOLDER_STATION_SKETCH} ({selected})")
-
-
 @_telemetry.traced("drawing.cylindrical_face_scan")
 def _cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
     """Return the visible cylindrical face for one shaft diameter."""
@@ -419,7 +390,6 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (side, donor):
         set_hidden_lines_removed(adapter, view)
-    _hide_reference_sketch(adapter, iso, "isometric")
 
     pivot_face = _cylindrical_face(adapter, side, JOURNAL_DIA)
     tip_face = _cylindrical_face(adapter, side, SECTION_DIAS[-1])
@@ -430,8 +400,15 @@ async def build(adapter: Any) -> dict[str, str]:
     donor_annotations = curate_view_dimensions(
         adapter, donor, keep=DONOR_KEEP, view_label="diameter donor"
     )
-    side_annotations = curate_view_dimensions(
-        adapter, side, keep=SIDE_KEEP, view_label="side"
+    # The part saves its SolderStations witness sketch hidden, so the side
+    # view, which owns the two station dimensions, takes the opt-in import
+    # that shows it in this view only; the pictorial shows the part as saved.
+    side_annotations = hidden_sketches.curate_view_dimensions(
+        adapter,
+        side,
+        keep=SIDE_KEEP,
+        view_label="side",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = list(side_annotations)
     for annotation in donor_annotations:
