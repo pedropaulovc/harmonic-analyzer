@@ -141,8 +141,7 @@ def test_the_scan_reaches_known_printed_text() -> None:
     strict=True,
     reason="#929 (S1) states the post-mount floor plainly on the platform note and "
     "step 2; #857 deletes post-mount-screw installation_notes (b8355fcde); "
-    "#834 drops cone_gear_notes' ACCEPTED EXCEPTION lines (b8406ef77); "
-    "knife_mount_spec's 'ACCEPTED BY DESIGN' still needs rewording (Main to route)",
+    "#834 drops cone_gear_notes' ACCEPTED EXCEPTION lines (b8406ef77)",
 )
 def test_no_printed_text_cites_an_internal_rule_or_ruling() -> None:
     assert not _internal_hits({**printed_constants(), **printed_registry_fields()})
