@@ -16,8 +16,10 @@ yellow metal soldered on.
 
 Sections, FRONT STUB end at z = 0.  The v2 post puts that end at cone
 station -61.9068609979, 1.0 mm proud of the post front face.  An integral
-Ø12.2308 journal runs to z = 43.011 in the post's Ø12.2808 bore, then
-steps to the existing 3/8 in gear-seat shaft. M6.7
+Ø12.2308 journal runs to z = 43.011 in the post's Ø12.2808 bore, where an
+integral thrust collar (#914), the 5/8 bar's own Ø15.875 as supplied (#916),
+fills the 1.681 to the 64T and bears on
+the post's north boss face, then steps to the existing 3/8 in gear-seat shaft. M6.7
 (true-cone mesh, see the assembly docstring): gear seats at the
 exact-tracking stack pitch 6.8889 mm (= drum z-pitch 7.0565 x
 cos 12.52 deg), seat centres at FRONT_STUB + 28.25 + 6.8889 j, gear
@@ -70,9 +72,11 @@ from _common import (
     SketchDims,
     _early_bound,
     apply_material,
+    blank_sketch,
     name_bore_axis,
     check,
     define_circle,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -82,6 +86,7 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
 )
 from _drawing_marks import (
     apply_drawing_precision,
@@ -94,14 +99,25 @@ from _fit_limits import deviations
 from _gear import volume_check
 from _part_pmi import author_part_pmi
 from cone_gear_shaft_spec import (
+    COLLAR_DIA,
+    COLLAR_END_STATION,
+    COLLAR_START_STATION,
+    COLLAR_THICKNESS,
+    DATUM_STATION,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FILLET_RADIUS,
     SECTION_DIA_BANDS,
+    SECTION_KNOBS,
+    SECTION_ORIGINS,
     SECTIONS,
+    SOLDER_STATION_SKETCH,
+    SOLDER_T006_STATION,
+    SOLDER_T120_STATION,
     SURFACE_FINISHES,
 )
+from solidworks_mcp.adapters.com_variant import double_array
 
 PART_NAME = "cone-gear-shaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
@@ -125,6 +141,41 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 # T006 OD is now 4.08 mm.  The terminal land stops at 1/16": below that the
 # T006 rim gains little and the journal becomes unturnable (L/D 31 at 1/32").
 
+# Every length knob and the dimensions it is the ONE owner of (the seat-side
+# gate proves it): SecEnd{i} owns land i's end plane and its depth, SecEnd0
+# the journal and the CollarFace plane, CollarWidth the collar's plane and
+# web, and the two solder knobs their reference-sketch stations (#914
+# option A: all of them but the journal and the overall length measured from
+# the collar face).
+STATION_OWNERS: tuple[tuple[str, float, tuple[str, ...]], ...] = (
+    (
+        "SecEnd0",
+        SECTION_KNOBS[0],
+        (
+            "Sec0End@Sec0",
+            "CollarFaceStation@CollarFace",
+            "DatumStation@SolderStations",
+        ),
+    ),
+    *(
+        (
+            f"SecEnd{i}",
+            SECTION_KNOBS[i],
+            (f"Sec{i}Station@Sec{i}EndPlane", f"Sec{i}End@Sec{i}"),
+        )
+        for i in range(1, len(SECTIONS))
+    ),
+    (
+        "CollarWidth",
+        COLLAR_THICKNESS,
+        ("CollarStation@CollarEndPlane", "CollarWidth@Collar"),
+    ),
+    ("SolderT120", SOLDER_T120_STATION, ("T120Station@SolderStations",)),
+    ("SolderT006", SOLDER_T006_STATION, ("T006Station@SolderStations",)),
+)
+# Height of the solder-station witness lines, up from the axis.
+STATION_WITNESS_HEIGHT = 4.0
+
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
@@ -140,20 +191,46 @@ async def build(adapter) -> dict[str, str]:
     # global below, so the knobs really reshape the shaft AND the stations are
     # markable manufacturing dimensions for the drawing. A land sketched on its
     # own offset plane has that plane's offset driven by the same SecEnd{i}, so
-    # the knob moves the shoulder and the depth back to the large end together.
-    for i, (dia_in, end_z) in enumerate(SECTIONS):
+    # the knob moves the shoulder and the depth back to its origin together.
+    # Option A (#914): the collar's thrust face is the one length origin, so
+    # SecEnd1..3 are shoulder stations FROM the collar face; SecEnd0 is the
+    # journal (front stub to collar face) and SecEnd4 the overall length.
+    for i, (dia_in, _end_z) in enumerate(SECTIONS):
         await set_global(adapter, f"SecDia{i}", f"{dia_in * IN}mm")
-        await set_global(adapter, f"SecEnd{i}", f"{end_z}mm")
+        await set_global(adapter, f"SecEnd{i}", f"{SECTION_KNOBS[i]}mm")
+    await set_global(adapter, "CollarDia", f"{COLLAR_DIA}mm")
+    await set_global(adapter, "CollarWidth", f"{COLLAR_THICKNESS}mm")
+    await set_global(adapter, "SolderT120", f"{SOLDER_T120_STATION}mm")
+    await set_global(adapter, "SolderT006", f"{SOLDER_T006_STATION}mm")
 
     drive_jobs: list[tuple[str, str]] = []
+
+    # The collar's south face -- the thrust face the post bears on and the
+    # drawing's one length origin -- as a named plane, placed from the front
+    # face by the journal and owned like the journal by SecEnd0.  The drive
+    # train seats on it by name: a point pick there is ambiguous (the post
+    # face lies under it).
+    check(
+        "create_plane CollarFace",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Front Plane", offset=COLLAR_START_STATION
+            )
+        ),
+    )
+    name_last_feature(adapter, "CollarFace")
+    face_dim = name_dimensions(adapter, "CollarFace", ["CollarFaceStation"])
+    drive_jobs += [(face_dim[0], '"SecEnd0"')]
 
     volume = 0.0
     prev_end = 0.0
     for i, (dia_in, end_z) in enumerate(SECTIONS):
         label = f"section d{dia_in:g}in to z={end_z:g}"
-        # Each land is a cylinder from the large-end face to its own end
-        # station, so every smaller land is contained in its larger neighbour
-        # and the running volume stays exact per section.
+        knob = SECTION_KNOBS[i]
+        # Each land is a cylinder from its origin (the large-end face, or the
+        # collar face for the gear-seat lands) to its own end station, so
+        # every smaller land is contained in its larger neighbour and the
+        # running volume stays exact per section.
         #
         # WHERE the profile circle sits is a drawing decision: a diameter
         # dimension can only be dragged into the side view at the station its
@@ -162,7 +239,7 @@ async def build(adapter) -> dict[str, str]:
         # used to pile them as leadered callouts beside an end view.  Land 0
         # is sketched on the Front plane (its circle IS the large-end face);
         # every other land is sketched on an offset plane AT ITS END STATION
-        # and extruded BACK to that face, which leaves each diameter on its
+        # and extruded BACK to its origin, which leaves each diameter on its
         # own shoulder while the extrude depth is still the station itself.
         if i == 0:
             plane_name = "Front"
@@ -171,7 +248,7 @@ async def build(adapter) -> dict[str, str]:
                 f"create_plane end of {label}",
                 await adapter.create_plane(
                     CreatePlaneParameters(
-                        mode="offset", base_plane="Front Plane", offset=end_z
+                        mode="offset", base_plane=SECTION_ORIGINS[i], offset=knob
                     )
                 ),
             )
@@ -200,7 +277,7 @@ async def build(adapter) -> dict[str, str]:
         check(
             f"extrude {label}",
             await adapter.create_extrusion(
-                ExtrusionParameters(depth=end_z, reverse_direction=i > 0)
+                ExtrusionParameters(depth=knob, reverse_direction=i > 0)
             ),
         )
         name_last_feature(adapter, f"Sec{i}")
@@ -213,14 +290,69 @@ async def build(adapter) -> dict[str, str]:
         await volume_check(adapter, label, volume, 0.005 * volume)
         prev_end = end_z
 
-    # Shoulder roots.  ONE constant-radius fillet over all four internal step
-    # edges, each picked by a point on the SMALLER land's circle at that
+    # Thrust collar (#914): the ring from the collar face to the 64T, the one
+    # land that is not contained in its neighbour, so it is sketched on a
+    # plane one web north of the collar face and extruded back onto it.
+    # CollarWidth drives both, so the knob moves the collar rather than only a
+    # depth.
+    label = f"collar d{COLLAR_DIA:g}mm to z={COLLAR_END_STATION:g}"
+    check(
+        f"create_plane end of {label}",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="CollarFace", offset=COLLAR_THICKNESS
+            )
+        ),
+    )
+    name_last_feature(adapter, "CollarEndPlane")
+    plane_dim = name_dimensions(adapter, "CollarEndPlane", ["CollarStation"])
+    drive_jobs += [(plane_dim[0], '"CollarWidth"')]
+    collar = SketchDims()
+    check(f"create_sketch {label}", await adapter.create_sketch("CollarEndPlane"))
+    await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        COLLAR_DIA / 2.0,
+        label,
+        dims=collar,
+        names=("CollarCx", "CollarCz", "CollarDia"),
+        drives=(None, None, '"CollarDia"'),
+    )
+    await ensure_fully_defined(adapter, f"{label} sketch")
+    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    name_last_feature(adapter, "CollarProfile")
+    drive_jobs += collar.apply(adapter, "CollarProfile")
+    check(
+        f"extrude {label}",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=COLLAR_THICKNESS, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, "Collar")
+    width_dim = name_dimensions(adapter, "Collar", ["CollarWidth"])
+    drive_jobs += [(width_dim[0], '"CollarWidth"')]
+    land_dia = SECTIONS[1][0] * IN
+    volume += math.pi / 4.0 * (COLLAR_DIA**2 - land_dia**2) * COLLAR_THICKNESS
+    await volume_check(adapter, label, volume, 0.005 * volume)
+
+    # Solder stations (#914): model-owned, measured from the collar face.
+    stations = await _author_solder_stations(adapter)
+    name_last_feature(adapter, SOLDER_STATION_SKETCH)
+    drive_jobs += stations.apply(adapter, SOLDER_STATION_SKETCH)
+
+    # Shoulder roots.  ONE constant-radius fillet over the three gear-seat
+    # step edges, each picked by a point on the SMALLER land's circle at that
     # station; the nearest other edge is 0.79 mm away radially and 6.9 mm
     # axially.  Tangent propagation is off: every seed is already a complete
-    # closed circle.
+    # closed circle.  The collar's two roots stay sharp: the post boss and the
+    # 64T bear flat against its faces, and a root radius would stand on the
+    # post bore's and the 64T bore's edges -- the title block's edge break on
+    # those parts is what clears the tool's nose radius.  (The old journal
+    # step edge is buried under the collar.)
     fillet_edges = [
         [SECTIONS[i + 1][0] * IN / 2.0, 0.0, end_z]
-        for i, (_dia_in, end_z) in enumerate(SECTIONS[:-1])
+        for i, (_dia_in, end_z) in enumerate(SECTIONS[1:-1], start=1)
     ]
     check(
         "fillet shoulder roots",
@@ -228,7 +360,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "ShoulderFillets")
     name_dimensions(adapter, "ShoulderFillets", ["ShoulderR"])
-    # Four R0.10 rounds add ~0.15 mm^3 to a ~13000 mm^3 shaft: this checks
+    # Three R0.10 rounds add ~0.1 mm^3 to a ~13000 mm^3 shaft: this checks
     # that the fillet did not eat a land, not that it moved the number.
     await volume_check(adapter, "shoulder fillets", volume, 0.005 * volume)
 
@@ -241,7 +373,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven cone-gear shaft (equations neutral)", volume, 0.005 * volume
     )
-    _assert_shoulder_planes_single_owned(adapter)
+    _assert_stations_single_owned(adapter)
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train).
@@ -268,7 +400,124 @@ async def build(adapter) -> dict[str, str]:
     # feature-control frames (drawing-simplicity policy rule 3).
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
+    _blank_solder_stations(adapter)
     return await save_part_and_images(adapter, PART_NAME)
+
+
+def _blank_solder_stations(adapter: Any) -> None:
+    """Save the solder-station witness sketch hidden, so no part image or
+    assembly instance renders it; the drawing's side view shows it back
+    through _drawing_hidden_sketches to import the station dimensions."""
+    blank_sketch(adapter, SOLDER_STATION_SKETCH)
+    part_doc = _early_bound(adapter.currentModel, "IPartDoc")
+    feature = _early_bound(part_doc.FeatureByName(SOLDER_STATION_SKETCH), "IFeature")
+    state = int(feature.Visible)
+    if state != 1:  # swVisibilityStateHide
+        raise RuntimeError(
+            f"{SOLDER_STATION_SKETCH} still visible after BlankSketch ({state})"
+        )
+
+
+def _as_construction(adapter: Any, entity_id: str) -> None:
+    """Make a registered sketch line construction-only and prove the flag."""
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+def _sketch_x_per_model_z(adapter: Any) -> float:
+    """+1 or -1: the active sketch's x per model +Z.
+
+    The Right plane's sketch x runs along the shaft axis; which way is the
+    sketch's to state (ModelToSketchTransform), not ours to assume.
+    """
+    sketch = _early_bound(adapter.currentModel.SketchManager.ActiveSketch, "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    mapped = []
+    for z in (0.0, 0.001):
+        point = _early_bound(
+            utility.CreatePoint(double_array([0.0, 0.0, z])), "IMathPoint"
+        )
+        if abs(float(point.ArrayData[2]) - z) > 1e-12:
+            raise RuntimeError(f"CreatePoint did not echo z={z}: {point.ArrayData}")
+        moved = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        mapped.append(tuple(float(value) for value in moved.ArrayData))
+    dx = mapped[1][0] - mapped[0][0]
+    if abs(abs(dx) - 0.001) > 1e-9:
+        raise RuntimeError(f"sketch x is not along model Z: {mapped}")
+    return math.copysign(1.0, dx)
+
+
+async def _author_solder_stations(adapter: Any) -> SketchDims:
+    """Model-owned solder-station dimensions (#914 option A).
+
+    Policy rule 2's authoring reference sketch, as the cone gear's tooth
+    thickness: construction witness lines stand on the axis at the collar face
+    and at T120's and T006's south faces, and the two stations are dimensioned
+    from the collar-face line, which the sketch origin places by SecEnd0.  The
+    witnesses are volume-neutral; the drawing hides the sketch in its
+    pictorial.
+    """
+    stations = SketchDims()
+    check("create_sketch solder stations", await adapter.create_sketch("Right"))
+    sign = _sketch_x_per_model_z(adapter)
+    witnesses = {}
+    for key, z in (
+        ("Datum", DATUM_STATION),
+        ("T120", DATUM_STATION + SOLDER_T120_STATION),
+        ("T006", DATUM_STATION + SOLDER_T006_STATION),
+    ):
+        set_sketch_direct_db(adapter, True)
+        line = check(
+            f"{key} witness",
+            await adapter.add_line(sign * z, 0.0, sign * z, STATION_WITNESS_HEIGHT),
+        )
+        set_sketch_direct_db(adapter, False)
+        _as_construction(adapter, line)
+        check(
+            f"{key} witness vertical",
+            await adapter.add_sketch_constraint(line, None, "vertical"),
+        )
+        check(
+            f"{key} witness on the axis",
+            await adapter.add_sketch_constraint(
+                f"{line}.start", "origin", "horizontal_points"
+            ),
+        )
+        await dimension_between(
+            adapter,
+            f"{line}.start",
+            f"{line}.end",
+            "vertical_distance",
+            STATION_WITNESS_HEIGHT,
+            f"{key} witness height",
+        )
+        stations.record(f"{key}WitnessHeight")
+        witnesses[key] = line
+    await dimension_between(
+        adapter,
+        f"{witnesses['Datum']}.start",
+        "origin",
+        "horizontal_distance",
+        DATUM_STATION,
+        "collar face",
+    )
+    stations.record("DatumStation", '"SecEnd0"')
+    for key, station in (("T120", SOLDER_T120_STATION), ("T006", SOLDER_T006_STATION)):
+        await dimension_between(
+            adapter,
+            f"{witnesses[key]}.start",
+            f"{witnesses['Datum']}.start",
+            "horizontal_distance",
+            station,
+            f"{key} solder station",
+        )
+        stations.record(f"{key}Station", f'"Solder{key}"')
+    await ensure_fully_defined(adapter, "solder-station reference sketch")
+    check("exit_sketch solder stations", await adapter.exit_sketch())
+    return stations
 
 
 def _equations_for(adapter: Any, lhs: str) -> list[str]:
@@ -291,47 +540,49 @@ def _equations_for(adapter: Any, lhs: str) -> list[str]:
 _STATION_TOLERANCE_MM = 1e-6
 
 
-@_telemetry.traced("dim.shoulder_plane_ownership")
-def _assert_shoulder_planes_single_owned(adapter: Any) -> None:
+@_telemetry.traced("dim.station_ownership")
+def _assert_stations_single_owned(adapter: Any) -> None:
     """After the deferred equations and the final rebuild.
 
-    SecEnd{i} must be the ONE owner of both the offset plane land i is
-    sketched on and that land's depth back to the large end (Codex #839).  An
-    equation-owned dimension reads DrivenState 1 (driven), never 2, so the gate
-    is single ownership, checked on the plane AND the depth alike: SecEnd{i}
-    is defined once; each dimension has exactly one equation, whose
-    right-hand side is SecEnd{i}; both read the same DrivenState; neither is a
-    reference dimension; and both still read the as-built station (the drive
-    is neutral) to the global's 8 inch places.  Each reading is logged, so the
-    leaf log is the evidence.
+    Each STATION_OWNERS knob must be the ONE owner of every dimension that
+    carries it (Codex #839; #914 adds the collar face, the collar and the
+    solder stations).  An equation-owned dimension reads DrivenState 1
+    (driven), never 2, so the gate is single ownership: the knob is defined
+    once; each dimension has exactly one equation, whose right-hand side is
+    the knob; the knob's dimensions share one DrivenState; none is a
+    reference dimension; and each still reads the as-built value (the drive
+    is neutral) to the global's 8 inch places.  Each reading is logged, so
+    the leaf log is the evidence.
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     problems: list[str] = []
-    for i, (_dia_in, end_z) in enumerate(SECTIONS):
-        if i == 0:
-            continue
-        owner = f'"SecEnd{i}"'
-        globals_ = _equations_for(adapter, owner)
-        _telemetry.info(f"shoulder plane ownership SecEnd{i} definition {globals_}")
-        if len(globals_) != 1:
-            problems.append(f"SecEnd{i}: expected one definition, found {globals_}")
+    for global_name, value, names in STATION_OWNERS:
+        owner = f'"{global_name}"'
+        definitions = _equations_for(adapter, owner)
+        _telemetry.info(f"station ownership {global_name} definition {definitions}")
+        if len(definitions) != 1:
+            problems.append(
+                f"{global_name}: expected one definition, found {definitions}"
+            )
         states = {}
-        for name in (f"Sec{i}Station@Sec{i}EndPlane", f"Sec{i}End@Sec{i}"):
-            problems += _single_owner_problems(model, adapter, name, owner, end_z)
+        for name in names:
+            problems += _single_owner_problems(model, adapter, name, owner, value)
             dimension = model.Parameter(name)
             if dimension is not None:
                 states[name] = int(_early_bound(dimension, "IDimension").DrivenState)
         if len(set(states.values())) > 1:
-            problems.append(f"SecEnd{i}: plane and depth DrivenState differ {states}")
+            problems.append(f"{global_name}: DrivenState differs {states}")
     if problems:
-        raise RuntimeError("SecEnd ownership: " + "; ".join(problems))
-    _telemetry.success(f"SecEnd owns {len(SECTIONS) - 1} shoulder planes and depths")
+        raise RuntimeError("station ownership: " + "; ".join(problems))
+    _telemetry.success(
+        f"{len(STATION_OWNERS)} length knobs singly own their dimensions"
+    )
 
 
 def _single_owner_problems(
-    model: Any, adapter: Any, name: str, owner: str, end_z: float
+    model: Any, adapter: Any, name: str, owner: str, value: float
 ) -> list[str]:
-    """Why ``name`` is not singly owned by ``owner`` at ``end_z`` (empty if it is)."""
+    """Why ``name`` is not singly owned by ``owner`` at ``value`` (empty if it is)."""
     dimension = model.Parameter(name)
     if dimension is None:
         return [f"{name} not found"]
@@ -343,9 +594,9 @@ def _single_owner_problems(
         "driven_state": int(dimension.DrivenState),
         "is_reference": bool(dimension.IsReference()),
         "value_mm": 1000.0 * float(dimension.SystemValue),
-        "station_mm": end_z,
+        "expected_mm": value,
     }
-    _telemetry.info(f"shoulder plane ownership {evidence}")
+    _telemetry.info(f"station ownership {evidence}")
     problems = []
     if len(equations) != 1:
         problems.append(f"{name}: expected one equation, found {equations}")
@@ -353,9 +604,9 @@ def _single_owner_problems(
         problems.append(f"{name}: owned by {equations[0]!r}, not {owner}")
     if evidence["is_reference"]:
         problems.append(f"{name}: became a reference dimension")
-    if abs(evidence["value_mm"] - end_z) > _STATION_TOLERANCE_MM:
+    if abs(evidence["value_mm"] - value) > _STATION_TOLERANCE_MM:
         problems.append(
-            f"{name}: reads {evidence['value_mm']:.9f} mm, {owner} is {end_z}"
+            f"{name}: reads {evidence['value_mm']:.9f} mm, {owner} is {value}"
         )
     return problems
 

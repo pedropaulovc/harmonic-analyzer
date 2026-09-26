@@ -2,11 +2,15 @@ r"""Pure-data dimensional contract shared by the cone gear shaft and drawing."""
 
 from __future__ import annotations
 
+import math
+
 from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 from cone_pivot_post_installation import GEAR_AXIS_SHIFT
+from cone_gear_spec import FACE_WIDTH as CONE_GEAR_FACE_WIDTH
+from crank_drive_gear_spec import FACE_WIDTH as GEAR64_FACE_WIDTH
 
 
 MM_PER_IN = 25.4
@@ -25,6 +29,59 @@ JOURNAL_END = 43.011
 # 1.0 mm makes the shaft end proud at -61.9068609979.  The part origin is that front end and all
 # stations below are measured from it.
 FRONT_STUB = 61.9068609979
+
+# Axial capture (#914, user ruling 2026-09-25).  The tip adjuster pushes the
+# shaft south, toward the post; nothing reacted it until the 64T met the post
+# boss 1.681 further on.  An integral collar now fills that gap: its south
+# face bears on the post's north boss face (flush with the journal end) and
+# the 64T is soldered against its north face, so no station moves.  The web is
+# the gap, 1.681 -- above the 1.5 floor, accepted by the user rather than
+# moving the 64T.  The collar bears on the boss annulus outside the
+# Ø12.2808 bore and inside the Ø17.2 boss.  The 64T centre is the
+# drive-train's GEAR64_STATION (the shaft tests pin the two equal).
+GEAR64_CENTER_STATION = 19.9 + GEAR_AXIS_SHIFT
+COLLAR_START_STATION = JOURNAL_END
+COLLAR_END_STATION = FRONT_STUB + GEAR64_CENTER_STATION - GEAR64_FACE_WIDTH / 2.0
+COLLAR_THICKNESS = COLLAR_END_STATION - COLLAR_START_STATION
+
+# The collar's diameter is the 5/8 in cold-finished bar's own, as supplied:
+# never turned (user ruling 2026-09-26 on Codex P1 #916).  The turned Ø15.0 it
+# replaced printed .X, and at 14.2 it left a 0.96 thrust ring on the boss.
+# The shaft is turned from this bar, so the collar is also its largest
+# diameter.  ASTM A108 cold-finished rounds take ASTM A29's cold-drawn size
+# tolerance: over 1/2 through 1 in, +0 / -0.002 in.
+STOCK_DIA = 0.625 * MM_PER_IN
+STOCK_DIA_BAND = (0.0, -0.002 * MM_PER_IN)
+COLLAR_DIA = STOCK_DIA
+# The post's journal bore band.  DUPLICATE of cone_pivot_post_spec.
+# RUNNING_BORE_BAND (#833, on the #877 integration branch), which this branch
+# predates: replace at integ merge with that import (Main, 2026-09-26).
+POST_JOURNAL_BORE_BAND = (0.005, -0.025)
+# The thrust ring: the collar's south face on the post boss, between the bore
+# and the collar OD.  Held to rule 12's 1.5 floor (user ruling 2026-09-26)
+# with BOTH bounding edges broken at the worst case: the collar's OD edge and
+# the post's bore rim.  The title block's 0.25 break would take the 1.77 ring
+# to 1.27, so both edges print a smaller break, derived from
+# ring - 2 x break >= floor and rounded DOWN to one printable place (0.1).
+THRUST_RING_FLOOR = 1.5
+THRUST_RING_MIN = (
+    (STOCK_DIA + STOCK_DIA_BAND[1]) - (JOURNAL_BORE_DIA + POST_JOURNAL_BORE_BAND[0])
+) / 2.0
+THRUST_EDGE_BREAK_MAX = (
+    math.floor((THRUST_RING_MIN - THRUST_RING_FLOOR) / 2.0 * 10.0 + 1e-9) / 10.0
+)
+if THRUST_RING_MIN - 2.0 * THRUST_EDGE_BREAK_MAX < THRUST_RING_FLOOR - 1e-9:
+    raise AssertionError(
+        f"thrust ring {THRUST_RING_MIN:.3f} less two {THRUST_EDGE_BREAK_MAX} "
+        f"breaks is under the {THRUST_RING_FLOOR} floor"
+    )
+# The callout under the collar's reference diameter: the stock statement in
+# the U41 plate's form ("1/4 PLATE AS SUPPLIED"), so the bar size stays out
+# of the MATERIAL cell, and the collar's own edge break, tighter than the
+# title block's.
+COLLAR_STOCK_CALLOUT = (
+    f"5/8 BAR AS SUPPLIED\nEDGE BREAK {THRUST_EDGE_BREAK_MAX:.1f} MAX"
+)
 
 # T006's north face starts the 4 mm bushing, followed by 2 mm clearance and
 # the 12 mm tip block.  Rule-12 E11 replaced the 5/16-18 94025A150 with the
@@ -96,6 +153,61 @@ SECTION_DIAS = tuple(dia_in * MM_PER_IN for dia_in, _end in SECTIONS)
 SECTION_ENDS = tuple(end for _dia_in, end in SECTIONS)
 SHAFT_LENGTH = SECTION_ENDS[-1]
 
+# One length origin (#914 option A, Main ruling 2026-09-25): the collar's
+# thrust face, the face the post bears on.  Drawing policy rule 8 allows one
+# origin per view, baseline from it.  The journal runs back from it to the
+# front stub, and the three gear-seat shoulders, the solder stations and
+# the tip run forward from it.  Measuring shoulders and gears from the same
+# face keeps the journal's .X length out from between them.  The tip is a
+# station too (#917 R5 (a), Main 2026-09-26): the collar is what the tip
+# cup, the tip block's heel relief and its fit-up slot are set against, and
+# front-to-tip as the controlling length stacked the journal's .X on the
+# overall's, doubling the collar-to-tip band; the front-to-tip overall is a
+# reference.  Each land's end plane is offset from SECTION_ORIGINS[i] by
+# SECTION_KNOBS[i], the value its SecEnd{i} global carries; land 0 is the
+# journal, extruded from the front face.
+DATUM_STATION = COLLAR_START_STATION
+SECTION_ORIGINS = (
+    "Front Plane",
+    "CollarFace",
+    "CollarFace",
+    "CollarFace",
+    "CollarFace",
+)
+SECTION_KNOBS = tuple(
+    end if origin == "Front Plane" else end - DATUM_STATION
+    for end, origin in zip(SECTION_ENDS, SECTION_ORIGINS)
+)
+
+# Solder stations (#914 user ruling: +-0.13 from the collar face).  #834
+# narrows each cone gear from its SOUTH face only, so the north faces stay on
+# the 6.5 reference face and a station is the gear's south face, the face a
+# spacer set on the collar meets.  The twenty seats are equally spaced at the
+# exact-tracking seat pitch, so the print gives the first and the last with
+# "20X EQ SP".  T120's reference centre is the drive train's
+# SHAFT_T120_STATION (the shaft tests pin the two equal).
+CONE_FACE_REFERENCE = T006_FACE_WIDTH
+T120_CENTER_STATION = 28.25 + GEAR_AXIS_SHIFT
+SOLDER_STATION_COUNT = 20
+SOLDER_T120_STATION = (
+    FRONT_STUB
+    + T120_CENTER_STATION
+    + CONE_FACE_REFERENCE / 2.0
+    - CONE_GEAR_FACE_WIDTH
+    - DATUM_STATION
+)
+SOLDER_T006_STATION = (
+    FRONT_STUB
+    + T006_CENTER_STATION
+    + CONE_FACE_REFERENCE / 2.0
+    - CONE_GEAR_FACE_WIDTH
+    - DATUM_STATION
+)
+# The construction sketch that owns the two station dimensions.  The part
+# saves it hidden (no render shows it); the drawing's side view shows it
+# back to import them (_drawing_hidden_sketches).
+SOLDER_STATION_SKETCH = "SolderStations"
+
 # Diameter bands, one NAMED class per land, applied to the model dimension
 # by build_cone_gear_shaft -- never "+0.00/-0.02" typed as sheet callout text.
 #
@@ -128,8 +240,9 @@ SECTION_DIA_BANDS: tuple[tuple[float, float], ...] = (
 # tool nose radius that clears.  Modelled as geometry and dimensioned once,
 # not written as a process note.
 FILLET_RADIUS = 0.10
-# Four identical shoulder roots, one fillet feature, one radius dimension.
-FILLET_CALLOUT = "4X"
+# Three identical gear-seat shoulder roots (the collar's roots stay sharp,
+# build_cone_gear_shaft), one fillet feature, one radius dimension.
+FILLET_CALLOUT = "3X"
 
 # Surface texture, on the two lands that RUN: the Ø12.2308 journal turns in
 # the pivot post bore and the terminal land turns in the cone tip bushing.
@@ -145,20 +258,19 @@ SURFACE_FINISHES = (
 )
 
 # What the native dimensions cannot say (drawing-simplicity policy rule 2: a
-# fit requirement names its mate).  The gear-seat limits are what leaves the
-# solder gap in the cone gears' bores; the printed limits govern, so the note
-# is a reason, not a fitting instruction (review 2026-09-23).  The old lines
-# explaining the three-place stations went: the places already say it.  No
-# check the shop cannot make (codex, 375a122c), no digits but the mate's
-# number, no method words but one.  Lines stay short: the note block starts
-# 58 mm in and the title block begins at 216 mm.  The tailstock line is that
-# one process word, by user ruling (U40, 2026-09-23): the 23.293 mm
-# Ø1.588 terminal land (L/D 14.7) cannot be turned unsupported, so the
-# support IS the requirement (rule 6's exception), not a method preference.
+# fit requirement names its mate).  The gear seats name the bores they fit;
+# why their band sits below nominal (the joint gap) is GEAR_SEAT_BAND's
+# comment, and the joint method lives only at the drive-train assembly step
+# (cone_gear_notes.ATTACHMENT) -- rule 6 keeps both off the sheet (Main,
+# 2026-09-26).  No check the shop cannot make (codex, 375a122c), no digits but
+# the mate's number, no method words but one.  Lines stay short: the note
+# block starts 58 mm in and the title block begins at 216 mm.  The tailstock
+# line is that one process word, by user ruling (U40, 2026-09-23): the
+# 23.293 mm Ø1.588 terminal land (L/D 14.7) cannot be turned unsupported, so
+# the support IS the requirement (rule 6's exception), not a method preference.
 DRAWING_NOTES = "\n".join(
     (
-        "GEAR SEAT LIMITS LEAVE A SOLDER GAP",
-        "IN THE CONE GEAR BORES, MHA-013.",
+        "GEAR SEATS MATE MHA-013 BORES.",
         "TURN THE TIP JOURNAL WITH TAILSTOCK SUPPORT.",
     )
 )
@@ -175,6 +287,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Sec3": {"Sec3End"},
     "Sec4": {"Sec4End"},
     "ShoulderFillets": {"ShoulderR"},
+    "CollarProfile": {"CollarDia"},
+    "Collar": {"CollarWidth"},
+    "SolderStations": {"T120Station", "T006Station"},
 }
 
 # Display precision is a MODEL property (drawing-simplicity policy rule 2):
@@ -195,13 +310,19 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # could not pass the land to reach its pitch station.  The R0.10 root radius
 # eats a further 0.10 of the outboard margin, which a bore edge break covers.
 #
-# Journal length Sec0End and overall length Sec4End: one place, the routine
-# grade the fleet's plain lengths print.  The journal is 1.0 mm proud of the
-# post front face, the post bore ends flush with its shoulder, and the 64T
-# crank-drive gear beside that shoulder is soldered with ~1.7 mm of air to the
-# step, so +-0.8 on the length touches nothing; the tip end meets an
-# adjustable cup-point screw that takes up any length error.  Shoulder
+# Journal length Sec0End (collar face back to the front stub) and tip
+# station Sec4End (collar face to the tip): one place, the routine grade the
+# fleet's plain lengths print.  The journal only sets how far the stub stands
+# proud of the post's south face (the collar face bears on its north face),
+# and the tip end meets an adjustable cup-point screw; the tip block's fit-up
+# chain and heel relief carry this band (cone_tip_block_spec).  Shoulder
 # radius: two places; nothing depends on it beyond clearing the gear faces.
+#
+# Collar (#914): the diameter is the bar's as supplied (STOCK_DIA), so it
+# prints as a two-place reference, 15.88, the bar's own size; the web
+# prints three places, because at .XX the 1.681 web could fall to 1.17, under
+# the 1.5 floor the user accepted it against.  Solder stations: three places,
+# the +-0.13 the user ruled.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Sec0Profile": {"Sec0Dia": 3},
     "Sec1Profile": {"Sec1Dia": 3},
@@ -214,7 +335,14 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Sec3": {"Sec3End": 3},
     "Sec4": {"Sec4End": 1},
     "ShoulderFillets": {"ShoulderR": 2},
+    "CollarProfile": {"CollarDia": 2},
+    "Collar": {"CollarWidth": 3},
+    "SolderStations": {"T120Station": 3, "T006Station": 3},
 }
+# The front-to-tip overall (#917 R5 (a)) is the sheet's one reference
+# dimension, the read-only sum of the journal and the tip station: one place,
+# the grade of the two lengths it sums.
+DRAWING_REFERENCE_PRECISION = 1
 
 _PRECISION_NAMES = [
     (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names

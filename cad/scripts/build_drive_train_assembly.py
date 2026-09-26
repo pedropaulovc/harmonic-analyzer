@@ -180,6 +180,7 @@ from _assembly import (
     apply_component_color,
     assert_component_placed,
     assert_free_dof_necessity,
+    bore_axis_ref,
     check_no_interference,
     coincident_mate,
     component_transform,
@@ -378,7 +379,8 @@ for _j in range(20):
 
 # 64T crank-drive gear: perpendicular on the pivot journal, directly beside
 # T120 (p.20).  Its station remains the rederived 19.9 mm centre; narrowing
-# the face symmetrically increases the axial air to T120 and the post to 1.1 mm.
+# the face symmetrically left 1.1 mm of air to T120.  Its south face now sits
+# on the shaft's thrust collar (#914), which fills the 1.681 to the post boss.
 GEAR64_STATION = (
     SHAFT_T120_STATION - (CONE_FACE + GEAR64_CENTRE_REFERENCE_FACE) / 2.0 - 0.1
 )  # 19.9
@@ -842,6 +844,7 @@ from build_cone_pivot_post import (  # noqa: E402
     CRANK_BOSS_START_Z as POST_CRANK_BOSS_START_Z,
 )
 from cone_pivot_post_spec import (  # noqa: E402
+    CONE_BOSS_DIA as POST_CONE_BOSS_DIA,
     GEOMETRIC_TOLERANCES_MM as POST_GEOMETRIC_TOLERANCES_MM,
 )
 from cone_tip_block_spec import (  # noqa: E402
@@ -881,6 +884,9 @@ from build_cone_tip_pinch_screw import (  # noqa: E402
 )
 from cone_gear_shaft_spec import (  # noqa: E402
     ADJUSTER_EMBED as ADJ_EMBED,
+    COLLAR_DIA as SHAFT_COLLAR_DIA,
+    COLLAR_END_STATION as SHAFT_COLLAR_END,
+    COLLAR_START_STATION as SHAFT_COLLAR_START,
     FRONT_STUB as SHAFT_FRONT_STUB,
     SECTIONS as SHAFT_SECTIONS,
 )
@@ -1028,6 +1034,40 @@ if SHAFT_FRONT_STATION > _POST_SOUTH_STATION - 1.0 + 1e-9:
         f"cone-shaft stub end {_STUB_END_Z:.2f} not proud of the post's south "
         f"flank {_POST_SOUTH_Z:.2f}"
     )
+# Axial capture (#914): the tip adjuster pushes the shaft south; the collar's
+# south face bears on the post's north boss face and the 64T sits on its north
+# face.  The mates below are contacts, so the spec must put both faces there.
+_POST_NORTH_STATION = POST_STATION + POST_CONE_BOSS_LENGTH / 2.0
+if abs(SHAFT_FRONT_STATION + SHAFT_COLLAR_START - _POST_NORTH_STATION) > 1e-9:
+    raise AssertionError("cone-shaft collar face is not on the post's north boss face")
+_GEAR64_SOUTH_STATION = GEAR64_STATION + GEAR_AXIS_SHIFT - GEAR64_FACE / 2.0
+if abs(SHAFT_FRONT_STATION + SHAFT_COLLAR_END - _GEAR64_SOUTH_STATION) > 1e-9:
+    raise AssertionError("64T south face is not on the cone-shaft collar")
+# The post face is picked by a point on the boss annulus OUTSIDE the collar
+# (the collar covers the inner ring, so a point there is ambiguous), offset
+# horizontally off the axis: vertically it would sit on the body cylinder's
+# tangent line.
+_POST_BOSS_PICK_R = (SHAFT_COLLAR_DIA + POST_CONE_BOSS_DIA) / 4.0
+if not (
+    SHAFT_COLLAR_DIA / 2.0 + 0.25
+    < _POST_BOSS_PICK_R
+    < POST_CONE_BOSS_DIA / 2.0 - 0.25
+):
+    raise AssertionError("post boss pick point is not clear of the collar and rim")
+_POST_BOSS_NORTH_PICK = [
+    cone_station(_POST_NORTH_STATION)[0] + _POST_BOSS_PICK_R * COS_I,
+    Y_DRIVE,
+    cone_station(_POST_NORTH_STATION)[2] - _POST_BOSS_PICK_R * SIN_I,
+]
+# The pick must lie IN the boss face plane: its offset from the face centre is
+# perpendicular to the inclined cone axis (SIN_I, 0, COS_I) in plan.  verify=
+# would only catch a wrong face on the seat; this fails the premise offline.
+_PICK_AXIAL = sum(
+    (_POST_BOSS_NORTH_PICK[k] - cone_station(_POST_NORTH_STATION)[k]) * d
+    for k, d in enumerate((SIN_I, 0.0, COS_I))
+)
+if abs(_PICK_AXIAL) > 1e-9:
+    raise AssertionError(f"post boss pick is {_PICK_AXIAL:.3g} mm off the face plane")
 # --- tip end-play stack (item 5, v4_t00471 / 7:49) ---------------------------
 # Along the axis, south to north: T006 gear | brass bushing | block | shaft tip
 # | the adjuster's conical cup. The shaft terminal meets the vendor cup apex
@@ -2044,15 +2084,18 @@ async def _key_to_shaft(
     shaft_o,
     axis_dir,
     label,
+    *,
+    seat_plane: str = "",
 ) -> None:
     """Key a gear rigidly onto a shaft via SEMANTIC mates, replacing a lock:
-    coaxial (collinear axes) + an axial seat (Front-plane distance along the
-    shaft axis, read live) + a parallel anti-spin. The gear and shaft share the
-    inclined orientation (ROT_Y_INCLINE), so their Right planes are parallel at
-    the keyed phase -- the parallel pins the spin with no tuned angle (the
-    lag-screw idiom). Removes the same 6 DOF the lock did; no fix/lock."""
+    coaxial (collinear axes) + an axial seat + a parallel anti-spin. The gear
+    and shaft share the inclined orientation (ROT_Y_INCLINE), so their Right
+    planes are parallel at the keyed phase -- the parallel pins the spin with
+    no tuned angle (the lag-screw idiom). Removes the same 6 DOF the lock did;
+    no fix/lock.  The seat is a Front-plane distance along the shaft axis
+    (read live) unless ``seat_plane`` names the shaft plane the gear's south
+    face sits ON (see :func:`_axial_seat`)."""
     p_o = _org(adapter, part)
-    d_axial = sum((p_o[k] - shaft_o[k]) * axis_dir[k] for k in range(3))
     await coincident_mate(
         adapter,
         named_ref(f"{part_axis}@{part}", "AXIS"),
@@ -2060,19 +2103,38 @@ async def _key_to_shaft(
         label=f"{label} coaxial",
         verify=(part, p_o),
     )
+    await _axial_seat(adapter, part, shaft, shaft_o, axis_dir, p_o, label, seat_plane)
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{part}", "PLANE"),
+        named_ref(f"Right Plane@{shaft}", "PLANE"),
+        label=f"{label} anti-spin (keyed phase)",
+        verify=(part, p_o),
+    )
+
+
+async def _axial_seat(
+    adapter, part, shaft, shaft_o, axis_dir, p_o, label, seat_plane
+) -> None:
+    """A gear's axial seat on its shaft: contact with a named shaft plane (a
+    gear located by a shoulder -- the 64T on the thrust collar, #914), else the
+    Front-plane distance at its as-placed station."""
+    if seat_plane:
+        await coincident_mate(
+            adapter,
+            named_ref(f"Front Plane@{part}", "PLANE"),
+            named_ref(f"{seat_plane}@{shaft}", "PLANE"),
+            label=f"{label} axial seat on {seat_plane}",
+            verify=(part, p_o),
+        )
+        return
+    d_axial = sum((p_o[k] - shaft_o[k]) * axis_dir[k] for k in range(3))
     await distance_driver(
         adapter,
         named_ref(f"Front Plane@{part}", "PLANE"),
         named_ref(f"Front Plane@{shaft}", "PLANE"),
         d_axial,
         label=f"{label} axial seat d={d_axial:.2f}",
-        verify=(part, p_o),
-    )
-    await parallel_mate(
-        adapter,
-        named_ref(f"Right Plane@{part}", "PLANE"),
-        named_ref(f"Right Plane@{shaft}", "PLANE"),
-        label=f"{label} anti-spin (keyed phase)",
         verify=(part, p_o),
     )
 
@@ -2905,17 +2967,13 @@ async def build(adapter) -> dict[str, str]:
         verify=(pivot_post, post_o),
     )
 
-    # Cone shaft revolute in the black pivot post: coincident + an axial plane
-    # distance along the inclined axis (the shaft's local Z, read live). Its
-    # spin is driven by the 16T -> 64T mesh, not pinned here.
+    # Cone shaft revolute in the black pivot post: coincident axes + the
+    # thrust collar ON the post's north boss face (#914) -- the contact that
+    # reacts the tip adjuster's preload.  Its spin is driven by the 16T -> 64T
+    # mesh, not pinned here.
     a_s = component_transform(adapter, cone_shaft)
     cone_o = [a_s[9] * 1000.0, a_s[10] * 1000.0, a_s[11] * 1000.0]
     cone_axis_dir = [a_s[6], a_s[7], a_s[8]]  # image of local Z = inclined shaft axis
-    post_o = _org(adapter, pivot_post)
-    # Ry180 reverses ConeShaftNormal's directed normal.  The physical plane and
-    # undirected journal line are unchanged, but the signed distance side must
-    # reverse to keep the shaft Front plane at the same decreasing station.
-    d_axial = -sum((cone_o[k] - post_o[k]) * cone_axis_dir[k] for k in range(3))
     await coincident_mate(
         adapter,
         named_ref(f"Axis1@{cone_shaft}", "AXIS"),
@@ -2923,12 +2981,11 @@ async def build(adapter) -> dict[str, str]:
         label="cone-shaft radial",
         verify=(cone_shaft, cone_o),
     )
-    await distance_driver(
+    await coincident_mate(
         adapter,
-        named_ref(f"Front Plane@{cone_shaft}", "PLANE"),
-        named_ref(f"ConeShaftNormal@{pivot_post}", "PLANE"),
-        d_axial,
-        label=f"cone-shaft axial d={d_axial:.2f}",
+        named_ref(f"CollarFace@{cone_shaft}", "PLANE"),
+        bore_axis_ref(_POST_BOSS_NORTH_PICK, "FACE"),
+        label="cone-shaft collar on the post's north boss face",
         verify=(cone_shaft, cone_o),
     )
     # Tip block: aligned to the shaft/adjuster axis (which the post + platform
@@ -3049,6 +3106,10 @@ async def build(adapter) -> dict[str, str]:
     # cluster KEYED to the cone shaft -- each via coaxial + axial seat + parallel
     # anti-spin (see _key_to_shaft), replacing its lock with no fix/lock/tuned
     # angle. The 64T uses its Axis2 central axis, the cone gears their Axis1.
+    # The 64T seat is a contact: its Front plane IS its south face (the blank
+    # is sketched on Front and extruded +z by the face width, and
+    # _place_on_shaft puts that origin face/2 south of the gear's centre), so
+    # Front coincident with the collar's north plane sits the gear ON it.
     cone_axis = named_ref(f"Axis1@{cone_shaft}", "AXIS")
     await _key_to_shaft(
         adapter,
@@ -3059,6 +3120,7 @@ async def build(adapter) -> dict[str, str]:
         cone_o,
         cone_axis_dir,
         "64T",
+        seat_plane="CollarEndPlane",
     )
     # Key the T120 seed, then REPLICATE stations 1..19 from it (#228): one
     # CopyWithMates2 per station with the axial-seat slot laddered by

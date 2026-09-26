@@ -1,8 +1,9 @@
 r"""Create the cone-gear-shaft manufacturing drawing under the simplicity policy.
 
 The turned shaft is shown horizontally at 1:1 with baseline lengths from the
-large (faced) end below it and every diameter above it on that same side
-view, each dimension line inside the land it measures.  The two short lands
+collar's thrust face below it and every diameter above it on that same side
+view, each dimension line inside the land it measures (the 1.7 mm collar
+instead takes one near-side arrow on its rim).  The two short lands
 ahead of the tip are 6.9 mm long, so the three tip-end diameter texts climb
 in steps: the tip's line rises highest and each text hangs to the RIGHT of
 its line above every line it spans.  A standard isometric supplies pictorial
@@ -22,10 +23,12 @@ import argparse
 import sys
 from typing import Any
 
+import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
@@ -35,13 +38,18 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_reference_dimension,
     stamp_drawing_summary,
     view_name,
     visible_view_entities,
 )
+from _drawing_leaders import set_near_side_diameter
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from cone_gear_shaft_spec import (
+    COLLAR_STOCK_CALLOUT,
+    DRAWING_DIMENSIONS,
+    DRAWING_REFERENCE_PRECISION,
     FILLET_CALLOUT,
     JOURNAL_DIA,
     SECTION_DIAS,
@@ -91,20 +99,36 @@ NOTES_XY = (0.058, 0.060)
 # belongs to, and this view is then deleted.
 DONOR_CENTER = (0.360, 0.090)
 
-# Axial step stations (extrude depths Sec{i}End), all measured from the
-# large-end datum face: baseline dimensioning below the shaft, shortest
-# nearest the part, each text centred between the big end and its shoulder.
-# The one radius rides above the journal shoulder it
-# attaches to (the fillet feature's first edge), its leader dropping straight
-# to that corner, right of the Ø9.525 text and left of the pivot finish.
+# Lengths (option A, #914): ONE origin, the collar's thrust face at sheet x
+# 0.2096.  Everything measured from it is baseline below the shaft, one tier
+# per dimension, the shortest nearest the part: the collar web, the T120
+# solder station, the three gear-seat shoulders, the T006 station with its
+# 20X EQ SP, then the tip (#917 R5 (a)).  The journal runs the other way from
+# the same origin on the first tier, and the front-to-tip overall, a
+# reference, hangs lowest, above the title block.  A station's text is
+# centred in its span when it fits there with STATION_TEXT_CLEARANCE to spare;
+# the web's 1.68 and the T120's 10.78 spans are narrower than their texts, so
+# both texts stand stacked LEFT of the T120 extension line (the 916a render
+# had the datum line strike "10.781" and the web text touch the collar's
+# witness line).  The one radius rides above the 3/8-to-1/4 in step it
+# attaches to (the fillet's first edge), right of the Ø6.350 line.
 SIDE_KEEP = {
+    "CollarWidth": (0.1895, 0.1355),
     "Sec0End": (0.2311, 0.1355),
-    "Sec1End": (0.1707, 0.1265),
-    "Sec2End": (0.1672, 0.1175),
-    "Sec3End": (0.1638, 0.1085),
-    "Sec4End": (0.1499, 0.0995),
-    "ShoulderR": (0.2000, 0.1920),
+    "T120Station": (0.1895, 0.1275),
+    "Sec1End": (0.1492, 0.1195),
+    "Sec2End": (0.1457, 0.1115),
+    "Sec3End": (0.1423, 0.1035),
+    "T006Station": (0.1388, 0.0955),
+    "Sec4End": (0.1307, 0.0875),
+    "ShoulderR": (0.1000, 0.1640),
 }
+OVERALL_REFERENCE_TEXT_XY = (0.1515, 0.0795)
+# Sheet width of one length digit or point at the dimension font (the 916a
+# render measured "10.781" at 13.4 mm, 2.2 mm a character), and the ink every
+# length text keeps from any extension line crossing its tier.
+LENGTH_CHAR_WIDTH = 0.0023
+STATION_TEXT_CLEARANCE = 0.002
 # Diameters, imported on the donor and dragged onto the side view.  A vertical
 # linear dimension's line sits at its text x and the text hangs to the RIGHT
 # of that line (~32 mm wide with its stacked band), so each x lies INSIDE the
@@ -122,15 +146,35 @@ SIDE_DIAMETERS = {
     "Sec2Dia": (0.0853, 0.1760),
     "Sec3Dia": (0.0785, 0.1880),
     "Sec4Dia": (0.0520, 0.2000),
+    # #914: the collar ring is 1.681 wide, too narrow for a dimension line
+    # and two arrows inside it, so the collar alone takes the near-side
+    # diametric style: one arrow on the top rim from outside, leader up to
+    # the text, nothing drawn inside the ring.
+    "CollarDia": (0.2088, 0.1760),
 }
+NEAR_SIDE_DIAMETERS = ("CollarDia",)
+# The collar is the 5/8 bar's OD as supplied (user ruling 2026-09-26), so
+# its diameter prints as a reference with the stock statement beside it,
+# the U41 plate's form.
+REFERENCE_DIAMETERS = ("CollarDia",)
 # Sheet width of one diameter text with its stacked band, for the layout test.
 DIAMETER_TEXT_WIDTH = 0.032
+# The collar's reference diameter, "(Ø15.88)": eight characters on one line.
+COLLAR_DIA_TEXT_WIDTH = 0.019
 DONOR_KEEP = {
     name: (DONOR_CENTER[0], DONOR_CENTER[1] - 0.012 * index)
     for index, name in enumerate(SIDE_DIAMETERS)
 }
-# Four identical shoulder roots, one modelled fillet, one radius dimension.
-DIMENSION_CALLOUTS = {"ShoulderR": FILLET_CALLOUT}
+# Three identical gear-seat shoulder roots, one modelled fillet, one radius
+# dimension (the collar's roots stay sharp, #914).
+DIMENSION_CALLOUTS = {
+    "ShoulderR": FILLET_CALLOUT,
+    "T006Station": "20X EQ SP",
+    "CollarDia": COLLAR_STOCK_CALLOUT,
+}
+# The pivot-journal finish symbol, left of which the collar diameter's text
+# must end.
+PIVOT_FINISH_XY = (0.2400, 0.1800)
 
 
 @_telemetry.traced("drawing.cylindrical_face_scan")
@@ -157,6 +201,82 @@ def _cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
             f"nearest is {radius_mm:.4f} mm"
         )
     return face
+
+
+@_telemetry.traced("drawing.end_face_circle", label_param="label")
+def _end_circle(view: Any, *, station_mm: float, diameter_mm: float, label: str) -> Any:
+    """The one visible end-face circle at ``station_mm`` of ``diameter_mm``.
+
+    The journal's circle also stands at the collar face and the tip land's at
+    its own start, so the pick is by station AND diameter.  The station is
+    matched on |z|: the shaft runs along model Z from the front face, and the
+    sign of that axis is the part's, not an assumption made here.
+    """
+    matches: list[Any] = []
+    for raw in visible_view_entities(view, 1, label=f"{label} edges"):
+        curve = _early_bound(raw, "IEdge").GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) for value in curve.CircleParams)
+        if abs(abs(params[2]) * 1000.0 - station_mm) > 1e-3:
+            continue
+        if abs(params[6] * 2000.0 - diameter_mm) > 1e-3:
+            continue
+        matches.append(raw)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{label}: {len(matches)} end-face circles at z {station_mm:g} "
+            f"of Ø{diameter_mm:g}, expected 1"
+        )
+    return matches[0]
+
+
+def _add_overall_reference(adapter: Any, side: Any) -> Any:
+    """Dimension front stub to tip as a REFERENCE (#917 R5 (a)).
+
+    The tip is a station from the collar face, so the overall is the
+    read-only sum of the journal and the tip station: a sheet-derived
+    dimension between the two end faces, parenthesized, with the places the
+    spec hands over, and its value proved against the part.
+    """
+    front = _end_circle(
+        side, station_mm=0.0, diameter_mm=SECTION_DIAS[0], label="front end face"
+    )
+    tip = _end_circle(
+        side,
+        station_mm=SHAFT_LENGTH,
+        diameter_mm=SECTION_DIAS[-1],
+        label="tip end face",
+    )
+    display = add_edge_dimension(
+        adapter,
+        side,
+        p0=(0.0, 0.0),
+        p1=(0.0, 0.0),
+        text_xy=OVERALL_REFERENCE_TEXT_XY,
+        label="front-to-tip overall",
+        orientation="horizontal",
+        entities=(front, tip),
+    )
+    display = _early_bound(display, "IDisplayDimension")
+    measured = abs(
+        float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue)
+    )
+    if abs(measured * 1000.0 - SHAFT_LENGTH) > 1e-4:
+        raise RuntimeError(
+            f"front-to-tip overall measured {measured * 1000.0:.4f} mm, "
+            f"expected {SHAFT_LENGTH:.4f}"
+        )
+    set_reference_dimension(
+        adapter, display.GetAnnotation(), label="front-to-tip overall reference"
+    )
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
+        raise RuntimeError("front-to-tip overall reference precision did not persist")
+    return display
 
 
 # A centreline runs a short way past the part it marks.
@@ -291,17 +411,29 @@ async def build(adapter: Any) -> dict[str, str]:
     donor_annotations = curate_view_dimensions(
         adapter, donor, keep=DONOR_KEEP, view_label="diameter donor"
     )
-    side_annotations = curate_view_dimensions(
-        adapter, side, keep=SIDE_KEEP, view_label="side"
+    # The part saves its SolderStations witness sketch hidden, so the side
+    # view, which owns the two station dimensions, takes the opt-in import
+    # that shows it in this view only; the pictorial shows the part as saved.
+    side_annotations = hidden_sketches.curate_view_dimensions(
+        adapter,
+        side,
+        keep=SIDE_KEEP,
+        view_label="side",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = list(side_annotations)
     for annotation in donor_annotations:
         name = dimension_name(adapter, annotation)
-        annotations.append(
-            _move_dimension(
-                adapter, annotation, side, SIDE_DIAMETERS[name], source_view=donor
-            )
+        moved = _move_dimension(
+            adapter, annotation, side, SIDE_DIAMETERS[name], source_view=donor
         )
+        if name in NEAR_SIDE_DIAMETERS:
+            set_near_side_diameter(moved, f"{name} near-side diameter")
+        if name in REFERENCE_DIAMETERS:
+            set_reference_dimension(
+                adapter, moved, label=f"{name} stock reference", diameter=True
+            )
+        annotations.append(moved)
     # Every diameter is now native to the view that shows its shoulder; an
     # empty end view carries no manufacturing information.
     donor_name = view_name(adapter, donor)
@@ -309,6 +441,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
         raise RuntimeError("failed to delete the empty diameter donor view")
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _add_overall_reference(adapter, side)
 
     # Leader anchors for the two lands that RUN (sheet metres).  The tip
     # symbol stands above the tip with its glyph LEFT of the Ø1.588 dimension
@@ -326,7 +459,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         side,
-        symbol_xy=(0.2400, 0.1800),
+        symbol_xy=PIVOT_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_journal"),
         label="pivot journal finish",
         char_height=0.0025,
