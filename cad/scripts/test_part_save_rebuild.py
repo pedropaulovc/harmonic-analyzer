@@ -1,17 +1,17 @@
-"""SolidWorks-free contract for ``_common.rebuild_all_configurations``.
+"""SolidWorks-free contract for ``_common.rebuild_stale_configurations``.
 
 pc-p1r: drive-train.SLDASM opened with NeedsRebuild2=1 because MHA-135's
 INSTALLED configuration, the one the assembly places, was saved stale (amet
 probe, dt-logs/pc-p1r/probe-saved-rebuild.jsonl).  The shared part-save
-chokepoint now rebuilds every configuration after the last edit, restores the
-active one, and refuses to save a configuration that still reads stale.
+chokepoint reads every configuration first and leaves a clean part alone.  A
+stale one gets exactly one EditRebuildAll, with no configuration switch, and
+the chokepoint refuses to save a refused rebuild, a hard fault, or a
+configuration still stale.
 """
 
 from __future__ import annotations
 
-import asyncio
 import inspect
-from types import SimpleNamespace
 
 import pytest
 
@@ -23,17 +23,47 @@ class _Config:
         self.NeedsRebuild = stale
 
 
+class _Extension:
+    def __init__(self, part: _Part) -> None:
+        self.part = part
+
+    def EditRebuildAll(self) -> bool:  # noqa: N802
+        self.part.log.append("EditRebuildAll")
+        for name, config in self.part.configs.items():
+            if name not in self.part.stuck:
+                config.NeedsRebuild = False
+        return self.part.rebuild_result
+
+    def GetWhatsWrong(self):  # noqa: N802
+        names, codes, warnings = (
+            zip(*self.part.faults) if self.part.faults else ((), (), ())
+        )
+        return True, [_Feature(name) for name in names], list(codes), list(warnings)
+
+
+class _Feature:
+    def __init__(self, name: str) -> None:
+        self.Name = name
+
+
 class _Part:
-    """An IModelDoc2 double: configurations, the active one, and rebuilds that
-    clear the active configuration's flag unless it is stuck."""
+    """An IModelDoc2 double.  It records every rebuild or activation call, so a
+    test can prove which ones the chokepoint made."""
 
     def __init__(
-        self, stale: dict[str, bool], active: str, stuck: tuple[str, ...] = ()
-    ):
+        self,
+        stale: dict[str, bool],
+        *,
+        stuck: tuple[str, ...] = (),
+        rebuild_result: bool = True,
+        faults: tuple[tuple[str, int, bool], ...] = (),
+    ) -> None:
         self.configs = {name: _Config(flag) for name, flag in stale.items()}
-        self.active = active
         self.stuck = set(stuck)
+        self.rebuild_result = rebuild_result
+        self.faults = faults
         self.log: list[str] = []
+        self.Extension = _Extension(self)
 
     def GetConfigurationNames(self):  # noqa: N802
         return tuple(self.configs)
@@ -41,10 +71,16 @@ class _Part:
     def GetConfigurationByName(self, name):  # noqa: N802
         return self.configs[name]
 
+    def ShowConfiguration2(self, name):  # noqa: N802
+        self.log.append(f"ShowConfiguration2 {name}")
+        return True
+
     def EditRebuild3(self) -> bool:  # noqa: N802
-        self.log.append(f"rebuild {self.active}")
-        if self.active not in self.stuck:
-            self.configs[self.active].NeedsRebuild = False
+        self.log.append("EditRebuild3")
+        return True
+
+    def ForceRebuild3(self, _top_only) -> bool:  # noqa: N802
+        self.log.append("ForceRebuild3")
         return True
 
 
@@ -52,93 +88,89 @@ class _Adapter:
     def __init__(self, part: _Part) -> None:
         self.currentModel = part
 
+    def _attempt(self, fn, default=None):
+        return fn()
+
     async def set_active_configuration(self, name: str):
         self.currentModel.log.append(f"activate {name}")
-        self.currentModel.active = name
-        return SimpleNamespace(is_success=True, data={"name": name}, error=None)
+        raise AssertionError("the save chokepoint must not switch configurations")
 
 
 @pytest.fixture
 def seat(monkeypatch):
     monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(
-        _common,
-        "active_configuration_name",
-        lambda adapter: adapter.currentModel.active,
-    )
 
-    def make(stale, active, stuck=()):
-        part = _Part(stale, active, stuck)
+    def make(stale, **kwargs):
+        part = _Part(stale, **kwargs)
         return _Adapter(part), part
 
     return make
 
 
-def test_a_stale_inactive_configuration_is_rebuilt_and_the_active_restored(
-    seat,
-) -> None:
-    adapter, part = seat({"Default": False, "INSTALLED": True}, "Default")
-    asyncio.run(_common.rebuild_all_configurations(adapter, "pinion-lever-pin"))
-    assert part.log == [
-        "activate INSTALLED",
-        "rebuild INSTALLED",
-        "activate Default",
-        "rebuild Default",
-    ]
-    assert part.active == "Default"
+CONE_GEAR = ("Default", *(f"T{teeth:03d}" for teeth in range(6, 121, 6)))
+
+
+def test_a_clean_part_gets_no_rebuild_call_at_all(seat) -> None:
+    adapter, part = seat({name: False for name in CONE_GEAR})
+    _common.rebuild_stale_configurations(adapter, "cone-gear")
+    assert part.log == []
+
+
+def test_a_stale_configuration_gets_one_edit_rebuild_all_and_no_switch(seat) -> None:
+    adapter, part = seat({"Default": False, "INSTALLED": True})
+    _common.rebuild_stale_configurations(adapter, "pinion-lever-pin")
+    assert part.log == ["EditRebuildAll"]
     assert not any(config.NeedsRebuild for config in part.configs.values())
 
 
-def test_a_single_configuration_part_pays_one_rebuild_and_no_activation(seat) -> None:
-    adapter, part = seat({"Default": False}, "Default")
-    asyncio.run(_common.rebuild_all_configurations(adapter, "crank-pin"))
-    assert part.log == ["rebuild Default"]
+def test_many_stale_configurations_still_get_exactly_one_rebuild(seat) -> None:
+    adapter, part = seat({name: True for name in CONE_GEAR})
+    _common.rebuild_stale_configurations(adapter, "cone-gear")
+    assert part.log == ["EditRebuildAll"]
 
 
-def test_every_one_of_n_configurations_is_rebuilt_active_last(seat) -> None:
-    names = ("Default", *(f"T{teeth:03d}" for teeth in range(6, 31, 6)))
-    adapter, part = seat({name: True for name in names}, "T012")
-    asyncio.run(_common.rebuild_all_configurations(adapter, "cone-gear"))
-    rebuilt = [line.removeprefix("rebuild ") for line in part.log if "rebuild" in line]
-    assert sorted(rebuilt) == sorted(names)
-    assert rebuilt[-1] == "T012"
-    assert part.active == "T012"
-
-
-def test_configurations_still_stale_after_their_rebuild_raise_naming_part_and_all(
+def test_configurations_still_stale_after_the_rebuild_raise_naming_part_and_all(
     seat,
 ) -> None:
-    names = ("Default", "T006", "T012", "T018", "T024")
-    adapter, _part = seat(
-        {name: True for name in names}, "Default", stuck=("T006", "T018")
-    )
+    adapter, part = seat({name: True for name in CONE_GEAR[:5]}, stuck=("T006", "T018"))
     with pytest.raises(
         RuntimeError, match=r"cone-gear: configurations \['T006', 'T018'\]"
     ):
-        asyncio.run(_common.rebuild_all_configurations(adapter, "cone-gear"))
+        _common.rebuild_stale_configurations(adapter, "cone-gear")
+    assert part.log == ["EditRebuildAll"]
 
 
-def test_the_read_back_reads_every_configuration_and_passes_when_clean() -> None:
-    part = _Part({"Default": False, "INSTALLED": False}, "Default")
-    _common.require_configurations_rebuilt(
-        part, "pinion-lever-pin", ("Default", "INSTALLED")
-    )
+def test_a_refused_rebuild_raises_even_when_the_flags_read_clean(seat) -> None:
+    # Codex P1 on #928: a feature that fails to rebuild can leave NeedsRebuild
+    # false, so the rebuild's own verdict is enforced, not just recorded.
+    adapter, _part = seat({"Default": False, "INSTALLED": True}, rebuild_result=False)
+    with pytest.raises(RuntimeError, match=r"pinion-lever-pin: EditRebuildAll refused"):
+        _common.rebuild_stale_configurations(adapter, "pinion-lever-pin")
 
 
-def test_the_save_chokepoint_rebuilds_every_configuration_right_before_its_final_save() -> (
+def test_a_hard_fault_after_the_rebuild_raises_but_a_warning_does_not(seat) -> None:
+    adapter, _part = seat({"INSTALLED": True}, faults=(("Pin", 2, False),))
+    with pytest.raises(RuntimeError, match=r"left faults \['Pin \(rebuild-error\)'\]"):
+        _common.rebuild_stale_configurations(adapter, "pinion-lever-pin")
+    adapter, part = seat({"INSTALLED": True}, faults=(("Pin", 1, True),))
+    _common.rebuild_stale_configurations(adapter, "pinion-lever-pin")
+    assert part.log == ["EditRebuildAll"]
+
+
+def test_the_save_chokepoint_checks_every_configuration_right_before_its_final_save() -> (
     None
 ):
-    # Inside save_part_and_images, so after every caller edit and every edit
-    # the chokepoint itself makes (block tolerances, properties, summary info),
-    # and nothing runs between it and the re-save that persists the part.
+    # Inside save_part_and_images: after every caller edit and every edit the
+    # chokepoint itself makes (block tolerances, properties, summary info), and
+    # nothing runs between it and the re-save that persists the part.
     source = inspect.getsource(_common.save_part_and_images)
-    call = "await rebuild_all_configurations(adapter, part_name)"
-    rebuild = source.index(call)
+    call = "rebuild_stale_configurations(adapter, part_name)"
+    guard = source.index(call)
     for edit in (
         "apply_block_tolerances(",
         "apply_custom_properties(",
         "apply_summary_info(",
     ):
-        assert source.index(edit) < rebuild
-    between = source[rebuild + len(call) : source.index('f"re-save with properties')]
+        assert source.index(edit) < guard
+    between = source[guard + len(call) : source.index('f"re-save with properties')]
     assert between.split() == ["check("]
