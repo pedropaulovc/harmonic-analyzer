@@ -23,6 +23,8 @@ from pinion_arbor_collar_geometry import (
     COLLAR_OD as COLLAR_OD,
     PIN_HOLE_Z as PIN_HOLE_Z,
 )
+from pinion_arbor_pin_spec import PIN_HOLE_CALLOUT as PIN_HOLE_CALLOUT
+from pinion_arbor_pin_spec import PIN_NUMBER as PIN_NUMBER
 from pinion_arbor_spec import (
     DRUM_STATION,
     DRUM_STATION_BAND,
@@ -174,9 +176,9 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 
 # The pin is the stock MHA-145 (McMaster 98296A027): its own BOM line and a
 # modelled drive-train component.  So the collar sheet carries no supply note
-# (the MHA-056 strap precedent); the hole callout names the pin it takes.
-PIN_NUMBER = "MHA-145"
-PIN_HOLE_CALLOUT = f"{_pin.DRILL_THRU_CALLOUT}\nFOR {PIN_NUMBER} SPRING PIN"
+# (the MHA-056 strap precedent); the hole callout names the pin it takes,
+# the same callout MHA-102 prints for the same pin (PIN_NUMBER and
+# PIN_HOLE_CALLOUT come from pinion_arbor_pin_spec).
 BORE_CALLOUT = f"DRILL THRU\nSLIDES ON {ARBOR_NUMBER}"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
