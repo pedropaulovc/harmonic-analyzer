@@ -358,6 +358,11 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
+    # DIAG (#834 gap-floor B probe, never merge): always raises.
+    from probe_gap_floor_tolerance import probe
+
+    await probe(adapter, SOURCE)
+
     check("open cone-gear source", await adapter.open_model(str(SOURCE)))
     await assert_saved_configuration_topology(adapter, phase="drawing source")
     read_required_properties(
