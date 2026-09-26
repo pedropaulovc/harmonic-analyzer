@@ -2059,8 +2059,44 @@ def _balloon_17_dump(balloon=DTA_BALLOON_17):
 
 
 def test_a_balloon_takes_the_ring_it_printed():
+    """Codex P2 on 1fdd5c833: the ring's own ink moves too, so the balloon as
+    an OBSTACLE (a foreign line past it) reads the printed ring."""
     [balloon] = [a for a in sheet_model(_balloon_17_dump()).geometry.annotations if a.kind == "balloon"]
     assert balloon.circle == pytest.approx(DTA_BALLOON_17_RING, abs=2e-5)
+    def on(circle):
+        cx, cy, radius = circle
+        return [
+            s for s in balloon.segments
+            if all(abs(math.hypot(x - cx, y - cy) - radius) < 1e-7 for x, y in ((s.x0, s.y0), (s.x1, s.y1)))
+        ]
+
+    com = balloon_circle(DTA_BALLOON_17["display"])
+    assert len(on(balloon.circle)) >= 32
+    assert on(com) == []
+
+
+def test_a_split_circle_balloons_separator_moves_with_its_ring():
+    """Codex P2 on the ring move: a swBS_SplitCirc balloon's rim-to-rim
+    separator is the balloon's own ink too; it moves, it is not dropped."""
+    cx, cy, radius = balloon_circle(DTA_BALLOON_17["display"])
+    split = {
+        **DTA_BALLOON_17,
+        "display": {
+            **DTA_BALLOON_17["display"],
+            "lines": [
+                *DTA_BALLOON_17["display"]["lines"],
+                [0.0, 0.0, 0.0, 0.0, cx - radius, cy, 0.0, cx + radius, cy, 0.0],
+            ],
+        },
+    }
+    [balloon] = [a for a in sheet_model(_balloon_17_dump(split)).geometry.annotations if a.kind == "balloon"]
+    px, py, pr = balloon.circle
+    separators = [s for s in balloon.segments if s.length > 0.9 * 2 * pr]
+    assert len(separators) == 1
+    [separator] = separators
+    assert (separator.x0, separator.y0, separator.x1, separator.y1) == pytest.approx(
+        (px - pr, py, px + pr, py), abs=1e-7
+    )
 
 
 def test_a_balloon_leader_leaving_its_ring_and_an_edge_past_its_corner_are_not_findings():
