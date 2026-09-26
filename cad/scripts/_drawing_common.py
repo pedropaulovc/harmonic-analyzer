@@ -1746,6 +1746,16 @@ def add_attached_note(
     return note
 
 
+def compose_hole_callout_prefix(process: str, existing: str) -> str:
+    """The hole callout's prefix definition: ``process`` ahead of the native
+    format text.  A process ending in a line break puts the native size on
+    its own row; otherwise the two join with one space.  (Stripping the
+    break put the post's whole size row on one 117 mm line: RD1 probe,
+    917-s1-rd1probe.)"""
+    separator = "\n" if process.rstrip(" ").endswith("\n") else " "
+    return process.rstrip() + separator + existing.lstrip()
+
+
 @_telemetry.traced("drawing.hole_callout", label_param="label")
 def add_native_hole_callout(
     adapter: Any,
@@ -1856,7 +1866,7 @@ def add_native_hole_callout(
         existing = str(display.GetText(5) or "")  # swDimensionTextPrefixDefinition
         if not existing.strip():
             raise RuntimeError(f"hole callout has no format text to prefix ({label})")
-        prefix = process.rstrip() + " " + existing.lstrip()
+        prefix = compose_hole_callout_prefix(process, existing)
         display.SetText(1, prefix)
         if str(display.GetText(5) or "") != prefix:
             raise RuntimeError(
