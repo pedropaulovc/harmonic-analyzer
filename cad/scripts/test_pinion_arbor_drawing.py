@@ -1111,6 +1111,24 @@ def test_collar_pin_leader_drops_square_over_the_hole() -> None:
     assert elbow_x == pytest.approx(arrow_x, abs=1e-9)
 
 
+# pc-r11 (0c5636eab) render, sheet mm: detail A's "(3.0)" text set at
+# (0.205, 0.210) boxed [200.3,207.9]..[209.6,211.2]; the collar-pin underline
+# at 211.9 began at 210.4, so the (3.0) read as the callout's first word.
+CROWN_SAG_TEXT_TOP_FROM_POSITION = 0.0012
+UNDERLINE_OVER_TEXT_CLEARANCE = 0.003
+
+
+def test_collar_pin_underline_stands_clear_above_the_crown_sag_text() -> None:
+    sag_top = (
+        drawing.DETAIL_KEEP["HeadCapSagDim"][1] + CROWN_SAG_TEXT_TOP_FROM_POSITION
+    )
+    underline = _pin_leader_elbow(drawing.PRINCIPAL_KEEP["PinHoleDia"])[1]
+    assert underline - sag_top >= UNDERLINE_OVER_TEXT_CLEARANCE
+    # Positive control: pc-r11's y 0.222 sat 0.7 mm over the text.
+    pc_r11 = _pin_leader_elbow((drawing.PRINCIPAL_KEEP["PinHoleDia"][0], 0.222))[1]
+    assert pc_r11 - sag_top < UNDERLINE_OVER_TEXT_CLEARANCE
+
+
 def test_collar_pin_leader_drops_clear_of_the_station_text() -> None:
     """pc-r10's blocking finding: the MHA-145 line widened the callout, its
     leader's elbow moved right with it, and the leader crossed "COLLAR PIN".
