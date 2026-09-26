@@ -1351,19 +1351,24 @@ async def save_part_and_images(
     OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
     part_path = (OUT_SLDPRT / f"{part_name}.SLDPRT").resolve()
     set_isometric_view(adapter)  # save on isometric so the .SLDPRT opens isometric
+    diag_stale_probe(adapter, "set_isometric_view")
     check(f"save_file -> {part_path}", await adapter.save_file(str(part_path)))
+    diag_stale_probe(adapter, "first save_file")
 
     png_dir = OUT_PNG / part_name
     png_dir.mkdir(parents=True, exist_ok=True)
     views = list(views)
     _prune_stale_part_views(png_dir, part_name, views)
     apply_block_tolerances(adapter)
+    diag_stale_probe(adapter, "apply_block_tolerances")
     properties = part_properties(part_name)
     apply_custom_properties(adapter, properties)
+    diag_stale_probe(adapter, "apply_custom_properties")
     # The drawing template's PART cell resolves the linked model's document
     # summary Title, not its same-named custom property. Keep both identities
     # sourced from part_properties so a registry title override cannot split.
     apply_summary_info(adapter, title=properties["Title"])
+    diag_stale_probe(adapter, "apply_summary_info")
     rebuild_stale_configurations(adapter, part_name)
     check(
         f"re-save with properties -> {part_path}",
@@ -1448,6 +1453,20 @@ def rebuild_stale_configurations(adapter: Any, part_name: str) -> None:
         )
     _telemetry.success(
         f"{part_name}: rebuilt stale configuration(s) {stale_before} before save"
+    )
+
+
+def diag_stale_probe(adapter: Any, step: str) -> None:
+    """DIAG ONLY (diag/pc-lever-pin-stale-step, never merged): after each
+    step, log which configurations read IConfiguration.NeedsRebuild, plus the
+    active configuration and the document-level NeedsRebuild2."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    ext = _early_bound(_read_member(model, "Extension"), "IModelDocExtension")
+    _telemetry.warn(
+        f"DIAG-STALE after {step}: stale={stale_configurations(model, names)} "
+        f"active={active_configuration_name(adapter)} "
+        f"NeedsRebuild2={_read_member(ext, 'NeedsRebuild2')}"
     )
 
 

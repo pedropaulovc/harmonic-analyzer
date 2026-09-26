@@ -38,6 +38,7 @@ from _common import (
     name_last_feature,
     report_mass_properties,
     run_build,
+    diag_stale_probe,
     save_part_and_images,
     set_global,
     volume_check,
@@ -165,12 +166,14 @@ async def build(adapter) -> dict[str, str]:
     )
     await force_rebuild(adapter)
     await volume_check(adapter, "installed pin", V_INSTALLED, 0.005 * V_INSTALLED)
+    diag_stale_probe(adapter, "activate INSTALLED + rebuild + volume")
     check(
         f"re-activate {default_config}",
         await adapter.set_active_configuration(default_config),
     )
     await force_rebuild(adapter)
     await volume_check(adapter, "manufactured pin (default)", volume, 0.005 * V_PIN)
+    diag_stale_probe(adapter, "re-activate Default + rebuild + volume")
     grouped_spec = _config.parts(PART_NAME)
     apply_grouped_bom_properties(
         adapter,
@@ -178,20 +181,28 @@ async def build(adapter) -> dict[str, str]:
         part_number=str(grouped_spec["number"]),
         description=str(grouped_spec["title"]),
     )
+    diag_stale_probe(adapter, "apply_grouped_bom_properties")
 
     # Manufacturing drawing support: the stock band, the marked set and the
     # model-owned decimal places.
     set_dimension_bilateral_tolerance(
         adapter, "PinProfile", "PinDia", *deviations(PIN_DIA_BAND)
     )
+    diag_stale_probe(adapter, "set_dimension_bilateral_tolerance")
     clear_dimensions_for_drawing(adapter)
+    diag_stale_probe(adapter, "clear_dimensions_for_drawing")
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+        diag_stale_probe(adapter, "mark_dimensions_for_drawing")
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    diag_stale_probe(adapter, "apply_drawing_precision")
 
     await apply_material(adapter, MATERIAL)
+    diag_stale_probe(adapter, "apply_material")
     await apply_color(adapter, POLISHED_STEEL)
+    diag_stale_probe(adapter, "apply_color")
     await report_mass_properties(adapter)
+    diag_stale_probe(adapter, "report_mass_properties")
     apply_drawing_properties(
         adapter,
         PART_NAME,
@@ -200,6 +211,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+    diag_stale_probe(adapter, "apply_drawing_properties")
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
