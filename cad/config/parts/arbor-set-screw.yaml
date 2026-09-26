@@ -1,0 +1,13 @@
+arbor-set-screw:
+  title: Arbor Set Screw
+  number: MHA-147
+  stock_name: Alloy Steel Cup-Tip Set Screw
+  supplier: McMaster-Carr
+  supplier_skus: [91375A106]
+  material: Alloy Steel
+  material_specification: "Alloy steel, black oxide, Rockwell C45; McMaster-Carr 91375A106"
+  finish: black oxide
+  quantity: 2
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

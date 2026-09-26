@@ -1,16 +1,18 @@
-r"""Reproduction script: cylinder end disc (book ch. 13 pp. 22-25, ch. 25 p. 67; 2 used).
+r"""Reproduction script: cylinder-bank end thrust washer (#743; 2 used).
 
-The plain brass disc that closes each end of the cylinder-gear sandwich: ch13
-page002_img01 ("back side") and page002_img03 ("front side") both show a
-toothless brass washer, a shade smaller than the 120T gears, sitting on the
-arbor between the outermost station and the arbor pedestal; ch25
-page001_img02 shows the back one edge-on next to the pedestal strap. It gives
-the gear/rod stack a flat face to bear on at each end (the "notch" label on
-p. 25 sits on the toothed gear behind it, not on this disc).
+The turned steel washer at each end of the solid cylinder-gear stack, between
+the end gear and its arbor-pedestal strap. The back-side photographs (ch13
+page002_img01, ch25 page002_img03) show a grey annulus of about 2.6x the ~O10
+arbor dome between the strap and gear 19 (inferred, photo-scaled); the front
+side shows gear 0's cam and rod directly behind the strap with no large disc,
+so the former O55 brass "end disc" is retired (user ruling on #743, Q2). The
+back washer's thickness sits in the bank's axial datum chain
+(cylinder_bank_layout), so it carries a held band. The dimensions live in
+cylinder_end_disc_spec.
 
-Layout: Front-plane annulus at the origin (OD DISC_DIA, bore BORE_DIA) extruded
-+Z by DISC_THICK. The drive-train assembly seats one 0.5 inboard of each
-pedestal strap on the cylinder arbor and locks it to the arbor.
+Layout: Front-plane annulus at the origin (OD WASHER_OD, bore WASHER_BORE)
+extruded +Z by WASHER_THICK. The drive-train assembly seats one against each
+end gear and locks it to the arbor.
 
 Run (SolidWorks already open)::
 
@@ -30,6 +32,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -37,15 +40,30 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_precision,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
+from _fit_limits import deviations
+from cylinder_end_disc_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    WASHER_BORE,
+    WASHER_BORE_BAND,
+    WASHER_OD,
+    WASHER_THICK,
+    WASHER_THICK_TOLERANCE_MM,
+)
 
 PART_NAME = "cylinder-end-disc"
-MATERIAL = "Brass"  # ch13 p.23/25: same bright brass as the gears
+MATERIAL = "Plain Carbon Steel"  # the photographed annulus reads grey steel
 
-DISC_DIA = 55.0  # ch13 page002_img01 reads ~0.9 of the 62.2 gear OD (photo-scaled,
-# low); capped so the north disc clears the cone-tip bushing beside gear 19 by
-# 1.0 (a O60 disc grazed it -- drive-train interference gate, 2026-09)
-DISC_THICK = 3.0  # ch25 page001_img02 edge-on: a gear-face-thick washer (low)
-BORE_DIA = 9.6  # slips on the O9.525 (3/8 in) cylinder arbor
+DISC_DIA = WASHER_OD
+DISC_THICK = WASHER_THICK
+BORE_DIA = WASHER_BORE
 
 V_DISC = math.pi * ((DISC_DIA / 2.0) ** 2 - (BORE_DIA / 2.0) ** 2) * DISC_THICK
 
@@ -97,7 +115,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=DISC_THICK)),
     )
     name_last_feature(adapter, "Disc")
-    drive_jobs.append(("D1@Disc", '"DiscThick"'))
+    disc_depth = name_dimensions(adapter, "Disc", ["DiscThick"])
+    drive_jobs.append((disc_depth[0], '"DiscThick"'))
     await volume_check(adapter, "disc", V_DISC, 0.005 * V_DISC)
 
     # Deferred drive equations, then re-check neutrality.
@@ -109,6 +128,16 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    set_dimension_bilateral_tolerance(
+        adapter, "RingProfile", "BoreDia", *deviations(WASHER_BORE_BAND)
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "Disc", "DiscThick", WASHER_THICK_TOLERANCE_MM
+    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     return await save_part_and_images(adapter, PART_NAME)
 
 

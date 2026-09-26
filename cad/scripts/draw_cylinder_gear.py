@@ -30,7 +30,6 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_visible,
-    set_reference_dimension,
     set_reference_dimensions,
     stamp_drawing_summary,
     view_name,
@@ -38,7 +37,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
-from cylinder_gear_notes import BORE_FIT_CALLOUT, CAM_AXIAL_FIT_CALLOUT
+from cylinder_gear_notes import BORE_FIT_CALLOUT, STACK_FIT_CALLOUT
 from cylinder_gear_spec import (
     BORE_DIA,
     CAM_DIA,
@@ -99,7 +98,7 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP = {
     "FaceWidth": (0.205, 0.220),
-    "CamThickness": (0.205, 0.360),
+    "OverallThickness": (0.205, 0.360),
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_FIT_CALLOUT,
@@ -294,8 +293,9 @@ def _checked_edge_dimension(
 
     Every controlling dimension is a model dimension whose places the part
     authored and ``assert_imported_precision`` reads back; the one dimension
-    built here is the parenthesised end-to-end stack, a read-only sum with no
-    model dimension to import, so its places come from the spec's
+    built here is the parenthesised cam thickness (the stacking thickness less
+    the face width, #743), a read-only difference with no model dimension to
+    import, so its places come from the spec's
     ``DRAWING_REFERENCE_PRECISION`` keyed by ``label`` -- never a literal.
     """
     display = add_edge_dimension(
@@ -442,51 +442,54 @@ async def build(adapter: Any) -> dict[str, str]:
         {"FaceWidth": (0.225, 0.220)},
     )
     _leader_outside_arrow(adapter, front_annotations, "CamDia")
-    cam_thickness_annotations = [
+    overall_annotations = [
         annotation
         for annotation in right_annotations
-        if dimension_name(adapter, annotation) == "CamThickness"
+        if dimension_name(adapter, annotation) == "OverallThickness"
     ]
-    if len(cam_thickness_annotations) != 1:
-        raise RuntimeError("expected one cam thickness reference dimension")
-    cam_thickness_display = set_reference_dimension(
-        adapter, cam_thickness_annotations[0], label="cam thickness reference"
+    if len(overall_annotations) != 1:
+        raise RuntimeError("expected one overall (stacking) thickness dimension")
+    overall_display = _early_bound(
+        overall_annotations[0].GetSpecificAnnotation(), "IDisplayDimension"
     )
-    # Keep the fit with the nominal in the linear dimension's primary text.
-    # Its callout-above slot did not render in the native export.
-    cam_thickness_prefix = f"{CAM_AXIAL_FIT_CALLOUT}\n("
-    cam_thickness_display.SetText(1, cam_thickness_prefix)
+    # Keep the stacking requirement with the toleranced nominal in the linear
+    # dimension's primary text.  Its callout-above slot did not render in the
+    # native export (the former cam-thickness fit callout).
+    overall_prefix = f"{STACK_FIT_CALLOUT}\n"
+    overall_display.SetText(1, overall_prefix)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to cam-side front view")
 
-    # Face width is controlled; cam thickness is fitted to the connecting rod.
-    # Show the measured nominal end-to-end stack as a checked REFERENCE overall.
+    # Face width and the overall (stacking) thickness are controlled; the cam
+    # thickness between them is their difference.  Show it as a checked
+    # REFERENCE from the gear's rear face (below the cam) to the cam's rear face.
     cam_bore_wall = CAM_DIA / 2.0 - ECCENTRICITY - BORE_DIA / 2.0
-    overall_pick_y = -(BORE_DIA / 2.0 + cam_bore_wall / 2.0)
-    overall = _checked_edge_dimension(
+    cam_pick_y = -(BORE_DIA / 2.0 + cam_bore_wall / 2.0)
+    gear_rear_pick_y = -(CAM_DIA / 2.0 - ECCENTRICITY + 5.0)
+    cam_reference = _checked_edge_dimension(
         adapter,
         right,
         p0=_project_mm(
             adapter,
             right,
-            (0.0, overall_pick_y, 0.0),
-            label="overall gear front edge",
+            (0.0, gear_rear_pick_y, FACE_WIDTH),
+            label="gear rear face below the cam",
         ),
         p1=_project_mm(
             adapter,
             right,
-            (0.0, overall_pick_y, OVERALL_THICKNESS),
-            label="overall cam rear edge",
+            (0.0, cam_pick_y, OVERALL_THICKNESS),
+            label="cam rear edge",
         ),
         text_xy=(RIGHT_CENTER[0] + 0.020, 0.200),
-        label="overall axial thickness",
-        expected_mm=OVERALL_THICKNESS,
+        label="cam thickness reference",
+        expected_mm=CAM_THICKNESS,
         orientation="horizontal",
     )
-    overall.ShowParenthesis = True
-    if not overall.ShowParenthesis:
-        raise RuntimeError("overall axial thickness was not shown as reference")
+    cam_reference.ShowParenthesis = True
+    if not cam_reference.ShowParenthesis:
+        raise RuntimeError("cam thickness was not shown as reference")
 
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
     # Leader attaches at the bore's 225-degree point and runs down-left. The
@@ -549,11 +552,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # Check the complete native requirement after all annotation formatting.
     drawing_model.EditRebuild3()
     drawing_model.GraphicsRedraw2()
-    if (
-        str(cam_thickness_display.GetText(1) or "") != cam_thickness_prefix
-        or str(cam_thickness_display.GetText(2) or "") != ")"
-    ):
-        raise RuntimeError("cam thickness reference/axial-fit text did not persist")
+    if str(overall_display.GetText(1) or "") != overall_prefix:
+        raise RuntimeError("overall thickness stacking text did not persist")
     return await finalize_drawing(
         adapter,
         OUTPUTS,

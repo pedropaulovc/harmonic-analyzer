@@ -329,10 +329,11 @@ def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
         (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in former_feet
     )
     # U34c: the arbor pedestals left the #4-40 foot group for their own #8-32
-    # seats, 19.0 outboard of each strap inner face on the unshifted drum axis.
-    expected = ((-54.7 + MECHANISM_X_SHIFT, -91.652), (-54.7 + MECHANISM_X_SHIFT, 94.202))
+    # seats, 19.0 outboard of each strap inner face on the unshifted drum axis;
+    # #743's solid bank puts those faces at -71.519 / +73.062.
+    expected = ((-54.7 + MECHANISM_X_SHIFT, -90.519), (-54.7 + MECHANISM_X_SHIFT, 92.062))
     for actual, wanted in zip(part.PEDESTAL_SCREW_XZ, expected, strict=True):
-        assert actual == pytest.approx(wanted)
+        assert actual == pytest.approx(wanted, abs=5e-4)
 
 
 def _socket_bore_geometry(x_mm: float, z_mm: float):
