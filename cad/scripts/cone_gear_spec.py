@@ -176,21 +176,20 @@ def chord_floor_radius_mm(
 #   also print a MAX (Main, 2026-09-23): the drum tip clears them by as
 #   little as 0.02, so a shallow plunge would rub.  MAX is the shallowest
 #   floor that keeps 0.02 of drum-tip clearance with every runout and the
-#   fit-up residual closing.  MIN is the web limit on T006 and T012: T006
-#   keeps the 0.621 web the user ruled on as its named exception (U40); T012
-#   trades its web from 2.12 down to 2.05, still over the 2.0 target, for a
-#   wider window.  T018's MIN is the shallowest floor its drum tip clears by
-#   the 0.10 every chord floor keeps; its web stays over 2.8.  T006's MIN and
-#   MAX predate the fit-up residual, which leaves them no 0.04 window; they
-#   stay as printed until the user rules on T006 (its drum-clearance check is
-#   a strict xfail in ``test_cone_gear_mesh_design``).
+#   fit-up residual closing.  T006's MIN sits exactly 0.04 below its MAX,
+#   the window a hand plunge can hold; the user ruled that over keeping the
+#   old 2.880 MIN (C2, 2026-09-26), which moved T006's named web exception
+#   (U40) from 0.621 to 0.606.  T012's MIN is its web limit: it trades its web
+#   from 2.12 down to 2.05, still over the 2.0 target, for a wider window.
+#   T018's MIN is the shallowest floor its drum tip clears by the 0.10 every
+#   chord floor keeps; its web stays over 2.8.
 # * T024-T042: the chord between the flank feet on the base circle.
 # * T048-T120: the flanks start at ``GAP_FLOOR_TMIN`` above the base circle,
 #   which raises the floor until the drum tip clears it by 0.30 at the worst
 #   case.  The gap is then shallower and wider at the floor, so one fly
 #   cutter at least 0.43 wide fits every gear.
 FLOOR_LIMITS_MM: dict[int, tuple[float, float]] = {
-    6: (2.880, 2.929),
+    6: (2.849, 2.889),
     12: (5.738, 5.947),
     18: (8.845, 9.005),
 }
@@ -261,10 +260,13 @@ FAMILY_BORES_MM = {teeth: bore_dia_mm(teeth) for teeth in CONFIGURATION_TEETH}
 # 1.5 mm, between the printed MIN floor diameter and the maximum bore.  U40
 # (user, 2026-09-23): T012, T018 and T024 each drop one shaft land so their
 # webs meet the target; T006 has no compliant construction (its floor sits at
-# r 1.44) and its web is the one named exception (book fidelity).
+# r 1.42) and its web is the one named exception (book fidelity).  The user's
+# C2 ruling (2026-09-26) amended it from 0.621 to 0.606 when T006's floor MIN
+# moved to 2.849: 0.60575 at the +0.050 bore upper, named half a thousandth
+# under that (as 0.621 was under 0.62125) so the bore band keeps +0.050.
 MACHINED_WEB_FLOOR_MM = 1.5
 MACHINED_WEB_TARGET_MM = 2.0
-WEB_EXCEPTIONS_MM: dict[int, float] = {6: 0.621}
+WEB_EXCEPTIONS_MM: dict[int, float] = {6: 0.6055}
 
 # Printed places of the bore band (model-owned, DRAWING_PRECISION).
 BORE_BAND_PLACES = 3
@@ -274,7 +276,7 @@ BORE_BAND_PLACES = 3
 # dimension across all 20 configurations, and SOLIDWORKS 2026 rejects the
 # per-configuration IDimensionTolerance.SetValues2 on some dimension types
 # (_drawing_marks).  And T006's named web (U40) caps the largest bore under its
-# printed MIN floor: a per-land +0.085 would cut that web to 0.604.  So the one
+# printed MIN floor: a per-land +0.085 would cut that web to 0.588.  So the one
 # band is the intersection of the shared retained-joint fit (Main,
 # 2026-09-25) over every land that carries a gear, with its upper limit the
 # lower of two named limits.

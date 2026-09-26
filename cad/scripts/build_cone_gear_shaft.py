@@ -37,8 +37,8 @@ legacy pivot end):
   (2026-09-23) moved every small land one station toward the big end at
   unchanged overall length, so this land now also carries T012 and runs at
   L/D 14.5; it is turned with tailstock support (a drawing note).  The
-  1/16 in step leaves T006 the 0.621 mm worst-case web accepted as its named
-  exception (U40) -- see cone_gear_shaft_spec.SECTIONS.
+  1/16 in step leaves T006 the worst-case web accepted as its named exception
+  (U40, cone_gear_spec.WEB_EXCEPTIONS_MM) -- see cone_gear_shaft_spec.SECTIONS.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 12" -- the journal comes from the
 manually rederived v2 post bore and its 42.011 axial body; the gear-seat

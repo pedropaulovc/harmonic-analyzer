@@ -338,7 +338,7 @@ sections:
       - - Gear bores (configured `BoreDia`)
         - 'snug on the stepped shaft (M6.7 perpendicular seats) AND inside each gear''s root circle: 9.525 (3/8") T030–T120; 6.350 (1/4") T024; 3.175 (1/8") T018; 1.588 (1/16") T006–T012; no keyway'
         - —
-        - 'Appendix C #7: bore = shaft section at the seat (perpendicular gears need no ellipse margin). At the finer module T006 takes a 1/16" bore. Its gap floor is printed at 2.880 mm MIN diameter (U40), so the nominal bore leaves a 0.646 mm radial web and the maximum allowed bore 0.621 mm, the one named web exception (cone_gear_spec.WEB_EXCEPTIONS_MM). The p.21 macro shows solder blobs fixing the small gears — no keyway evidence anywhere.'
+        - 'Appendix C #7: bore = shaft section at the seat (perpendicular gears need no ellipse margin). At the finer module T006 takes a 1/16" bore. Its gap floor is printed at 2.849 mm MIN diameter (U40 as amended by the C2 user ruling, 2026-09-26), so the nominal bore leaves a 0.631 mm radial web and the maximum allowed bore 0.606 mm, the one named web exception (cone_gear_spec.WEB_EXCEPTIONS_MM). The p.21 macro shows solder blobs fixing the small gears — no keyway evidence anywhere.'
         - derived
         - low
       - - Crank-drive gear (dark steel gear at the large end, "This gear engages the crank" p.20)

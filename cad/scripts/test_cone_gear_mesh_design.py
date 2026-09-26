@@ -346,26 +346,13 @@ def test_gap_floor_fits_one_cutter(teeth: int) -> None:
     assert _floor_width(teeth, spec.DEEPENED_MESH_MM[teeth][1]) >= 0.43
 
 
-# What sets each two-sided floor's MIN: the web (T006's named exception,
-# T012's 2.05), or the 0.10 drum-tip clearance every chord floor keeps.
-FLOOR_MIN_RULE = {6: "web", 12: "web", 18: "drum"}
-T006_FLOOR_PENDING = pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "T006's floor limits predate the fit-up residual and leave no 0.04 "
-        "window; morning-brief-20260926.md § Decision: T006 cone-gear floor "
-        "under the fit-up residual (C2)"
-    ),
-)
+# What sets each two-sided floor's MIN: the 0.04 window below MAX (T006, by
+# the user's C2 ruling, which moved its named web with it), the web (T012's
+# 2.05), or the 0.10 drum-tip clearance every chord floor keeps (T018).
+FLOOR_MIN_RULE = {6: "window", 12: "web", 18: "drum"}
 
 
-@pytest.mark.parametrize(
-    "teeth",
-    [
-        pytest.param(teeth, marks=T006_FLOOR_PENDING) if teeth == 6 else teeth
-        for teeth in spec.CONFIGURATION_TEETH
-    ],
-)
+@pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
 def test_gap_floor_clears_the_drum(teeth: int) -> None:
     tip_dia, thickest = spec.DEEPENED_MESH_MM[teeth]
     clearance = _worst(teeth, tip_dia, thickest)["cone_floor"]
@@ -380,7 +367,10 @@ def test_gap_floor_clears_the_drum(teeth: int) -> None:
         assert drum_path - maximum / 2.0 >= 0.02
         assert drum_path - (maximum + 0.001) / 2.0 < 0.02
         # Main: the window must be at least 0.04 on diameter.
-        assert maximum - minimum >= 0.04
+        assert maximum - minimum >= 0.04 - 1e-9
+        if FLOOR_MIN_RULE[teeth] == "window":
+            # User (C2): exactly the 0.04 window, no deeper.
+            assert maximum - minimum == pytest.approx(0.04, abs=1e-9)
         if FLOOR_MIN_RULE[teeth] == "drum":
             # The shallowest MIN keeping the chord floors' 0.10.
             assert drum_path - minimum / 2.0 >= 0.10

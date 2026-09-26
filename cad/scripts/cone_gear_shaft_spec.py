@@ -105,9 +105,9 @@ TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 # section at the seat" first produced.  At DP 49.82 / PA 14.5 a 6-tooth gear
 # is cut as involute flanks closed by a chord on the base circle -- the
 # project's own DXF profile, cut with a self-made form cutter.  T006's gap
-# floor is printed at 2.880 mm MIN diameter (U40), so a 1/16 in bore leaves a
-# 0.646 mm nominal web, 0.621 mm at maximum bore -- the one named web
-# exception (cone_gear_spec.WEB_EXCEPTIONS_MM) -- on a soldered, keyless,
+# floor is printed as a MIN diameter (cone_gear_spec.FLOOR_LIMITS_MM), so a
+# 1/16 in bore leaves the one named web exception at maximum bore
+# (cone_gear_spec.WEB_EXCEPTIONS_MM, U40 as amended) -- on a soldered, keyless,
 # near-torque-free gear.  Since U40 the land
 # carries T012 as well, so it runs 23.04 mm at L/D 14.5 up to the E11 cup
 # apex (it was 17.775 at L/D 11 before U40; at 1/32 in it would be L/D 29).  A manual lathe turns that only with

@@ -15,10 +15,10 @@ geometry is casting-shaped, not milling-shaped.
 ## The headlines (read these first)
 
 - **Three parts carry the whole risk. Everything else is generous.**
-  1. **`cone-gear` T006** — nominal root-to-bore wall **0.646 mm** on a **~4.28 mm OD / Ø1.588 mm bore** gear
-     (**0.621 mm** at the maximum allowed bore, the one named web exception, U40).
+  1. **`cone-gear` T006** — nominal root-to-bore wall **0.631 mm** on a **~4.26 mm OD / Ø1.588 mm bore** gear
+     (**0.606 mm** at the maximum allowed bore, the one named web exception, U40 as amended by C2).
      The single hardest part in the machine. These teeth are cut as involute flanks closed by a gap
-     floor printed as a MIN diameter; T006's floor is Ø2.880 MIN / Ø2.929 MAX. After a forced T006
+     floor printed as a MIN diameter; T006's floor is Ø2.849 MIN / Ø2.889 MAX. After a forced T006
      rebuild, `build_cone_gear.py` measures the native floor edges and requires them at the printed
      MIN radius within 0.002 mm. The other tip-gear webs meet the 2.0 target on the S1 bores.
      Period mitigation: the tip gears were a harder yellow metal.
@@ -112,7 +112,7 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`cone-gear`** ×20 (T006→T120) | round brass bar, extruded disc, face 6.0, long-addendum OD printed per gear at DP 49.82 → **4.28 (T006) → 62.93 (T120)** (same DP as the 120T cylinder gear it meshes; `cone_gear_spec.DEEPENED_MESH_MM`); tip gears T006–T024 harder yellow metal | 1 central through-bore, **bonded (solder, silver-braze or Loctite 638/648), no key**; bore Ø by config (T006/T012 **1.588**/1/16″, T018 3.175, T024 6.350, T030+ 9.525); 6–120 involute teeth PA14.5°, 2.5D through-cut; gap floor printed as a MIN diameter, any shape | **T006 wall 0.646 mm nominal / 0.621 mm at maximum bore** (headline); T006 whole gear tiny → brutal workholding; the floor may take any shape above its MIN diameter, so the flank↔floor corner needs no radius control | ~2 (lathe OD/face/bore; teeth) | **single-point fly cutter ground to the gap form, indexed** (in-house; plunge to the floor, widen by indexing — no catalogue cutter fits DP 49.82); T006 = hardest part — on enlarging tip gears see gap #5 (DP caveat) |
+| **`cone-gear`** ×20 (T006→T120) | round brass bar, extruded disc, face 6.0, long-addendum OD printed per gear at DP 49.82 → **4.26 (T006) → 63.00 (T120)** (same DP as the 120T cylinder gear it meshes; `cone_gear_spec.DEEPENED_MESH_MM`); tip gears T006–T024 harder yellow metal | 1 central through-bore, **bonded (solder, silver-braze or Loctite 638/648), no key**; bore Ø by config (T006/T012 **1.588**/1/16″, T018 3.175, T024 6.350, T030+ 9.525); 6–120 involute teeth PA14.5°, 2.5D through-cut; gap floor printed as a MIN diameter, any shape | **T006 wall 0.631 mm nominal / 0.606 mm at maximum bore** (headline); T006 whole gear tiny → brutal workholding; the floor may take any shape above its MIN diameter, so the flank↔floor corner needs no radius control | ~2 (lathe OD/face/bore; teeth) | **single-point fly cutter ground to the gap form, indexed** (in-house; plunge to the floor, widen by indexing — no catalogue cutter fits DP 49.82); T006 = hardest part — on enlarging tip gears see gap #5 (DP caveat) |
 | **`cone-gear-shaft`** ×1 | stepped steel bar ~252; integral Ø12.2308 post journal then 3/8→1/4→1/8→1/16″ | 5 turned diameter steps; **no keyseat** (gears soldered); finish the Ø12.2308 journal for 0.05 diametral clearance in the v2 post bore | **Ø1.588×23.0 tip journal in steel, L/D 14.5** (tailstock-supported, U40) → was 29:1 at Ø0.79; long slender overall | 1 (single-axis turn from one end) | manual lathe **+ steady/follower**; light finish on both bearing journals |
 
 ### Pivots, bushings, shafts (T1 — the 19-channel stacks)
@@ -139,7 +139,7 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
    rebuild, `build_cone_gear.py` measures the native floor edges directly, requires the printed MIN
    floor radius (`cone_gear_spec.floor_radius_mm`) within 0.002 mm and at least one floor edge per
    tooth, and rejects a non-positive web at the maximum allowed bore; `test_cone_gear_drawing` pins
-   the T006 web at ≥ 0.621. Keep both when changing the tooth profile or bore bands.
+   the T006 web at ≥ its named exception (0.606). Keep both when changing the tooth profile or bore bands.
 2. **Decide the `summing-lever` fabrication method** (cast / fabricate / hog) and the **knife-edge
    insert** now — it drives whether this is a 5-setup nightmare or two simple operations, and it is the
    critical interface.
@@ -180,7 +180,7 @@ steps instead of one big engagement.
 
 - **DFMPro (SW add-in) and Xometry auto-DFM — false-green here (observed).** Both passed *every* SLDPRT
   — yet the model is full of sharp internal corners (every gear-tooth root, the cam notch) a round tool
-  cannot cut, plus the T006 **0.621 mm minimum root-to-bore web**. Their rule sets are tuned for
+  cannot cut, plus the T006 **0.62 mm minimum root-to-bore web** (then; 0.606 since C2). Their rule sets are tuned for
   moulding / sheet / generic 3-axis and don't flag manual-machining hazards. **A green from these
   means little — trust it for nothing on the corners or walls.**
 - **Fusion 360 CAM verify/simulate — the one worth banking on, with a known edge.** Because it
@@ -190,7 +190,7 @@ steps instead of one big engagement.
   the **majority of tool-access & gouge issues is reasonable** — it's a real simulation, not a
   rule-of-thumb checker.
   - **But its blind spot is exactly where the worst risk lives.** Fusion treats geometry as **rigid**
-  and stock as **held**, so it will *not* warn that the **T006 0.621 mm minimum web** breaks in
+  and stock as **held**, so it will *not* warn that the **T006 0.606 mm minimum web** breaks in
   workholding, the **Ø1.588 × 23.0 mm shaft tip** whips, the **1.90 mm cam wall** is fragile, or that
   a ~4 mm gear can't be gripped. Thin-wall / fragile-feature / fixturing failures are not modelled
   by CAM sim. **A clean Fusion sim is not a substitute for a first cut on the fragile parts.**

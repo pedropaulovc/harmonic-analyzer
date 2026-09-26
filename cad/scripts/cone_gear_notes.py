@@ -7,6 +7,8 @@ own native dimensions and a tooth-system block for that configuration.
 
 from __future__ import annotations
 
+import math
+
 import cone_gear_spec as spec
 
 
@@ -81,10 +83,15 @@ CONTACT_RATIO_EXCEPTION = (
 )
 
 
+def _web_min(teeth: int) -> str:
+    """The named web as a printed MIN: floored, never rounded up past it."""
+    return f"{math.floor(spec.WEB_EXCEPTIONS_MM[teeth] * 100.0) / 100.0:.2f}"
+
+
 def web_exception(teeth: int) -> str:
     """Return the sheet line naming one gear's accepted thin web."""
     return (
-        f"ROOT-TO-BORE WEB {spec.WEB_EXCEPTIONS_MM[teeth]:.2f} MIN: "
+        f"ROOT-TO-BORE WEB {_web_min(teeth)} MIN: "
         "ACCEPTED EXCEPTION (BOOK FIDELITY)."
     )
 
@@ -93,7 +100,7 @@ def both_exceptions(teeth: int) -> str:
     """Return the one sheet line naming a gear's thin web and low CR."""
     return (
         "CONTACT RATIO BELOW 1.1, "
-        f"ROOT-TO-BORE WEB {spec.WEB_EXCEPTIONS_MM[teeth]:.2f} MIN: "
+        f"ROOT-TO-BORE WEB {_web_min(teeth)} MIN: "
         "ACCEPTED EXCEPTIONS (BOOK FIDELITY)."
     )
 
