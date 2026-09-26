@@ -231,15 +231,10 @@ def test_notes_define_only_the_approved_plain_bore_attachment() -> None:
         "PLAIN BORE, NO KEYWAY; SOLDER, SILVER-BRAZE OR LOCTITE 638/648 TO "
         "MHA-014 AT ASSEMBLY.",
     ]
-    # Named exceptions print only on the sheets they cover, with no ruling ids;
-    # T006 carries both on one line.
-    cr_line = (
-        "CONTACT RATIO BELOW 1.1 ON T006-T042: ACCEPTED EXCEPTION (BOOK FIDELITY)."
-    )
-    both_line = (
-        "CONTACT RATIO BELOW 1.1, ROOT-TO-BORE WEB 0.62 MIN: "
-        "ACCEPTED EXCEPTIONS (BOOK FIDELITY)."
-    )
+    # The accepted shortfalls print as plain facts only on the sheets they
+    # cover; T006 carries both on one line.
+    cr_line = "CONTACT RATIO BELOW 1.1 ON T006-T042."
+    both_line = "CONTACT RATIO BELOW 1.1, ROOT-TO-BORE WEB 0.62 MIN."
     for teeth in spec.CONFIGURATION_TEETH:
         text = notes.drawing_notes(teeth)
         lines = text.splitlines()

@@ -2941,6 +2941,9 @@ def task_check():
         SCRIPTS_DIR / "prompts" / "machinist_review_part.md",
         SCRIPTS_DIR / "prompts" / "machinist_review_assembly.md",
         SCRIPTS_DIR / "prompts" / "machinist_review_schema.json",
+        # test_printed_text_rulings reads the Named exceptions table: a new or
+        # removed row must rerun its tagged-emitter check.
+        SCRIPTS_DIR.parent / "docs" / "drawing-simplicity-policy.md",
     ]
     # test_out_param_binding SCANS sources instead of importing them (it reads
     # every top-level build script and every diagnostics/*.py looking for

@@ -209,9 +209,9 @@ PROUD_INBOARD_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS, 6)
 # stays here; it means nothing to the book's reader.
 # A MIN never rounds up: 1.155 prints 1.15, floored to two places.
 FULL_THREAD_WORST_DIAMETERS_PRINTED = math.floor(FULL_THREAD_WORST_DIAMETERS * 100.0) / 100.0
+# Named exception: MHA-139 engagement (drawing-simplicity-policy.md, "Named exceptions").
 DRAWING_NOTES = (
-    f"THREAD ENGAGEMENT {FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D MIN: "
-    "NAMED EXCEPTION TO RULE 12."
+    f"THREAD ENGAGEMENT {FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D MIN."
 )
 
 # Flat seat annulus that bears on the arm face, outside the 45-degree lead:

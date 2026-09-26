@@ -102,11 +102,11 @@ POST_MOUNT_ENGAGEMENT_PRINTED = (
 # band must not print below it without a new ruling.
 if POST_MOUNT_ENGAGEMENT_PRINTED < 0.87:
     raise AssertionError("MHA-142 engagement fell below the audited 0.87D floor")
-# The sheet states the named exception, worded like MHA-139's, over the
-# break override it depends on: one line each.
+# The sheet states the shortfall as a plain fact, worded like MHA-139's,
+# over the break override it depends on: one line each.
+# Named exception: MHA-142 engagement (drawing-simplicity-policy.md, "Named exceptions").
 POST_MOUNT_ENGAGEMENT_NOTE = (
-    f"1/4-20 THREAD ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN (MHA-142): "
-    "NAMED EXCEPTION TO RULE 12.\n"
+    f"1/4-20 THREAD ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN (MHA-142).\n"
     f"{POST_MOUNT_TAP_BREAK_NOTE}"
 )
 

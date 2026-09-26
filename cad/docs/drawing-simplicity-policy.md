@@ -286,16 +286,19 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
 
 Accepted shortfalls against rule 12. Each is specific to the parts named; it
 is not precedent for anything else. Every sheet a row affects should state
-the exception itself; the table is the backstop. A sheet states it as a plain
-manufacturing fact, the shortfall and its value, and never cites a rule
-number, a ruling id, or the words EXCEPTION, ACCEPTED, RULING or POLICY. The blind reviewer sees only the sheets,
-so it reports a row's shortfall as a blocker unless the package itself states
-the exception. A blocker that matches a row (same parts, shortfall within the
-recorded range) is recorded against that row by the person running the gate
-rather than fixed; any other finding on those parts still gates. The reviewer
-cannot see this table either, so it files any exception a sheet states under
-minor. The person running the gate checks each such minor entry against the
-table; a stated exception with no matching row gates like a blocker.
+the shortfall itself; the table is the backstop. A sheet states it as a plain
+manufacturing fact, the shortfall and its value (for example "ENGAGEMENT
+5.92-6.35 (0.93-1.0D)"), and never cites a rule number, a ruling id, or the
+words EXCEPTION, ACCEPTED, RULING, POLICY or BOOK FIDELITY
+(test_printed_text_rulings enforces this); this table is where the governance
+lives. The blind reviewer sees only the sheets, so it may still report a row's
+stated shortfall. A finding that matches a row (same parts, shortfall within
+the recorded range) is recorded against that row by the person running the
+gate rather than fixed; any other finding on those parts still gates, and a
+stated shortfall with no matching row gates like a blocker. In code, the emitter
+that prints a row's shortfall carries the comment `# Named exception:
+MHA-nnn <shortfall>`, naming its row; test_printed_text_rulings requires a
+tagged emitter for every row, printing the shortfall it names.
 
 | parts | shortfall | why accepted | ruled |
 |---|---|---|---|

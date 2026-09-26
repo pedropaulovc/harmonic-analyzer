@@ -430,10 +430,9 @@ def test_notes_carry_only_the_tooth_edge_and_boss_wall_exceptions() -> None:
     # worst-case wall (drawing-simplicity-policy.md, "Named exceptions").
     assert lines == [
         "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
-        f"BOSS WALL {spec.BOSS_WALL_WORST:.2f} MIN AT BORE: "
-        "ACCEPTED EXCEPTION (GEAR CUTTER RUNOUT).",
+        f"BOSS WALL {spec.BOSS_WALL_WORST:.2f} MIN AT BORE.",
     ]
-    assert lines[1] == "BOSS WALL 1.67 MIN AT BORE: ACCEPTED EXCEPTION (GEAR CUTTER RUNOUT)."
+    assert lines[1] == "BOSS WALL 1.67 MIN AT BORE."
     assert len(lines) <= 4
     policy = (
         Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"

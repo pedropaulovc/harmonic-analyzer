@@ -221,6 +221,7 @@ if POST_MOUNT_ENGAGEMENT_PRINTED < MIN_ENGAGEMENT_DIAMETERS:
 # Provenance stays here: the User's U37c/U41 ruling admits 0.90D under the
 # 1.5D rule.  The wording follows S1's drive-train step ("ENGAGEMENT 0.90D
 # MIN.").
+# Named exception: MHA-142 engagement (drawing-simplicity-policy.md, "Named exceptions").
 CUT_TO_FIT_CALLOUT = (
     "CUT TO FIT AT ASSEMBLY\n"
     f"END FLUSH TO {POST_SCREW_CUT_TO_FIT_SHORT:.{_FIT_PLACES}f} SHORT\n"

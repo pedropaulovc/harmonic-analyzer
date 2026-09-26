@@ -358,6 +358,7 @@ CONE_CRANK_STEPS = "\n".join(
         # ruling 2026-09-26, test_printed_text_rulings).
         "2. SCREW MHA-016 TO MHA-091 WITH 2X MHA-142 FROM THE TOP. CUT EACH TO",
         "   FIT AND CHAMFER THE END: FLUSH TO 0.3 SHORT OF THE MHA-091",
+        # Named exception: MHA-142 engagement (drawing-simplicity-policy.md, "Named exceptions").
         "   UNDERSIDE, NEVER PROUD (NOMINAL LENGTH 86.0). ENGAGEMENT 5.92-6.35",
         "   (0.93-1.0D).",
         # U30 (user, 2026-09-23, option (a)): one #6-32 button-head screw (W22)

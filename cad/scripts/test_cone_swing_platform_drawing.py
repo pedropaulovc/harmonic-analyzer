@@ -342,8 +342,7 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     assert f"{printed:.2f}" == "0.90"
     engagement, override = spec.POST_MOUNT_ENGAGEMENT_NOTE.split("\n")
     assert engagement == (
-        f"1/4-20 THREAD ENGAGEMENT {printed:.2f}D MIN (MHA-142): "
-        "NAMED EXCEPTION TO RULE 12."
+        f"1/4-20 THREAD ENGAGEMENT {printed:.2f}D MIN (MHA-142)."
     )
     # The break the derivation counts is the break the note allows.
     assert spec.POST_MOUNT_TAP_EDGE_BREAK == 0.1
