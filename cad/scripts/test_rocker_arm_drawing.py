@@ -99,7 +99,10 @@ def test_native_gdt_and_finish_present() -> None:
     assert 'characteristic="position"' in source
     assert "add_surface_finish(" in source
     assert "add_native_hole_callout(" in source
-    assert source.count("edge_xy=rod_rim") == 2
+    # r743-p1s-B: both rod-pin annotations take the diameter-picked edge.
+    assert "edge_xy=rod_rim" not in source
+    assert source.count("edge=rod_hole_edge") == 1
+    assert source.count("edge_entity=rod_hole_edge") == 1
 
 
 def test_large_radius_values_are_note_only() -> None:
@@ -180,3 +183,47 @@ def test_hub_length_prints_its_one_sided_band() -> None:
     )
     assert rocker_arm_spec.HUB_LENGTH_BAND == (0.05, 0.0)
     assert f"{rocker_arm_spec.HUB_LENGTH:.2f}" not in rocker_arm_notes.DRAWING_NOTES
+
+
+def test_both_bores_are_picked_by_diameter_not_by_a_rim_coordinate() -> None:
+    """r743-p1s-B: a coordinate pick on the #47 rod-hole rim resolved to the
+    strap's tapered end-face line, so AddHoleCallout2 returned None. Every
+    annotation on the rod-pin hole takes the diameter-picked edge."""
+    import ast
+
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    picks = {}
+    uses = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
+            call = node.value
+            if (
+                isinstance(call.func, ast.Name)
+                and call.func.id == "visible_circle_edge"
+            ):
+                picks[node.targets[0].id] = ast.unparse(call.args[2])
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            keywords = {k.arg: ast.unparse(k.value) for k in node.keywords}
+            if keywords.get("label", "").startswith("'rod-pin") or keywords.get(
+                "label", ""
+            ).startswith('"rod-pin'):
+                if node.func.id != "set_basic_dimension":
+                    uses.append((node.func.id, keywords))
+    assert picks == {
+        "rod_hole_edge": "_ROD_HOLE_DIA",
+        "pivot_bore_edge": "PIVOT_HOLE_DIA",
+    }
+    kinds = {name for name, _ in uses}
+    assert kinds == {
+        "add_native_hole_callout",
+        "add_edge_dimension",
+        "add_feature_control_frame",
+    }
+    for name, keywords in uses:
+        assert "edge_xy" not in keywords, name
+        if name == "add_native_hole_callout":
+            assert keywords["edge"] == "rod_hole_edge"
+        elif name == "add_edge_dimension":
+            assert keywords["entities"] == "(pivot_bore_edge, rod_hole_edge)"
+        else:
+            assert keywords["edge_entity"] == "rod_hole_edge"
