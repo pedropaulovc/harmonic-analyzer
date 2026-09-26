@@ -569,7 +569,8 @@ def match_ink_indices(
     constrained item needed. Symbol-only items
     (``<MOD-DIAM>``) print as paths, not text, and never match. A run with a
     symbol INSIDE it may print as one text object per side of the symbol's
-    path; it then matches those pieces left to right along its baseline.
+    path; it then matches those pieces left to right along its baseline,
+    every such run at once (``_pack_chains``) for the same reason.
     """
     used = set(taken)
     by_key: dict[str, list[int]] = {}
@@ -593,33 +594,107 @@ def match_ink_indices(
         for key, index in _assign(group):
             matched[key] = (index,)
             used.add(index)
-    for key, item in items:
-        if key in matched:
-            continue
-        parts = [ink_key(part) for part in _TOKEN.split(item.text) if ink_key(part)]
-        if len(parts) < 2:
-            continue
-        window = INK_MATCH_WINDOW_M + item.height
-        left, right = item.x - window, item.x + (glyph_count(item.text) + 1) * item.height
-        chosen: list[int] = []
-        for part in parts:
-            candidates = [
-                index
-                for index in by_key.get(part, ())
-                if index not in used
-                and index not in chosen
-                and left <= spans[index].box.xmin <= right
-                and abs(spans[index].box.ymin - item.y) < window
-            ]
-            if not candidates:
-                break
-            best = min(candidates, key=lambda index: spans[index].box.xmin)
-            chosen.append(best)
-            left = spans[best].box.xmax - INK_MATCH_WINDOW_M
-        else:
-            matched[key] = tuple(chosen)
-            used.update(chosen)
+    chains = {
+        key: _split_chains(item, spans, by_key, used)
+        for key, item in items
+        if key not in matched
+    }
+    matched.update(_pack_chains(chains))
     return matched
+
+
+def _split_chains(
+    item: TextItem,
+    spans: Sequence[InkSpan],
+    by_key: Mapping[str, Sequence[int]],
+    used: set[int],
+) -> list[tuple[tuple[int, ...], float]]:
+    """Every way a run split by an inline symbol can print: one free span per
+    piece, left to right along its baseline, each starting where the last one
+    ended. Cost: the first piece's offset from the run's start, plus each gap
+    and each baseline offset."""
+    parts = [ink_key(part) for part in _TOKEN.split(item.text) if ink_key(part)]
+    if len(parts) < 2:
+        return []
+    window = INK_MATCH_WINDOW_M + item.height
+    right = item.x + (glyph_count(item.text) + 1) * item.height
+    chains: list[tuple[tuple[int, ...], float]] = []
+
+    def extend(chain: tuple[int, ...], left: float, anchor: float, cost: float) -> None:
+        if len(chain) == len(parts):
+            chains.append((chain, cost))
+            return
+        for index in by_key.get(parts[len(chain)], ()):
+            box = spans[index].box
+            if index in used or index in chain:
+                continue
+            if not left <= box.xmin <= right or abs(box.ymin - item.y) >= window:
+                continue
+            step = abs(box.xmin - anchor) + abs(box.ymin - item.y)
+            extend((*chain, index), box.xmax - INK_MATCH_WINDOW_M, box.xmax, cost + step)
+
+    extend((), item.x - window, item.x, 0.0)
+    return chains
+
+
+def _pack_chains(
+    chains: Mapping[Any, Sequence[tuple[tuple[int, ...], float]]],
+) -> dict[Any, tuple[int, ...]]:
+    """The most split runs matched with no span shared, then the least total
+    cost: an exact search over each group of runs that compete for a span.
+    A split run is a set of spans, so this is packing, not the bipartite
+    ``_assign``; the groups are the few symbol runs printed near each other."""
+    keys = [key for key, options in chains.items() if options]
+    parent = {key: key for key in keys}
+
+    def find(key: Any) -> Any:
+        while parent[key] != key:
+            parent[key] = parent[parent[key]]
+            key = parent[key]
+        return key
+
+    owner: dict[int, Any] = {}
+    for key in keys:
+        for indices, _cost in chains[key]:
+            for index in indices:
+                if index not in owner:
+                    owner[index] = key
+                    continue
+                parent[find(key)] = find(owner[index])
+    groups: dict[Any, list[Any]] = {}
+    for key in keys:
+        groups.setdefault(find(key), []).append(key)
+    packed: dict[Any, tuple[int, ...]] = {}
+    for group in groups.values():
+        packed.update(_pack_group(group, chains))
+    return packed
+
+
+def _pack_group(
+    group: Sequence[Any],
+    chains: Mapping[Any, Sequence[tuple[tuple[int, ...], float]]],
+) -> dict[Any, tuple[int, ...]]:
+    best: dict[str, Any] = {"count": 0, "cost": 0.0, "pick": {}}
+    pick: dict[Any, tuple[int, ...]] = {}
+
+    def search(position: int, taken: frozenset[int], cost: float) -> None:
+        if len(pick) + len(group) - position < best["count"]:
+            return
+        if position == len(group):
+            if len(pick) > best["count"] or cost < best["cost"]:
+                best.update(count=len(pick), cost=cost, pick=dict(pick))
+            return
+        key = group[position]
+        for indices, step in sorted(chains[key], key=lambda option: option[1]):
+            if not taken.isdisjoint(indices):
+                continue
+            pick[key] = indices
+            search(position + 1, taken | frozenset(indices), cost + step)
+            del pick[key]
+        search(position + 1, taken, cost)
+
+    search(0, frozenset(), 0.0)
+    return best["pick"]
 
 
 def _assign(costs: Mapping[tuple[Any, int], float]) -> list[tuple[Any, int]]:
@@ -1582,7 +1657,10 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
     edgeless = tuple(
         (view.name, view.pictorial)
         for view in view_geometry
-        if printed_page and view.outline is not None and not edges.get(view.name)
+        if printed_page
+        and view.outline is not None
+        and not edges.get(view.name)
+        and not hidden.get(view.name)
     )
     return SheetModel(geometry, advance, tuple(unmatched), unclaimed, edgeless)
 
