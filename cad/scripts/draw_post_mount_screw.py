@@ -31,13 +31,15 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import json
+import math
 import sys
 from typing import Any
 
 import _drawing_hidden_sketches as hidden_sketches
 import _stock_trim_drawing as trim_drawing
 import _telemetry
-from _common import _early_bound, check, run_build
+from _common import OUT_FAILURES, _early_bound, capture_com_failure, check, run_build
 import _drawing_common
 from _drawing_common import (
     DrawingOutputs,
@@ -67,7 +69,8 @@ from post_mount_screw_spec import (
     HEAD_H_MM,
     THREAD_DIA_MM,
 )
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import place_view, view_name
 
 SPEC = DRAWINGS_BY_NAME["post_mount_screw"]
 PART_STEM = SPEC.artifact_stem
@@ -164,6 +167,158 @@ def _curate_tip_detail(adapter: Any, detail: Any) -> list[Any]:
     return _drawing_common.curate_view_dimensions(
         adapter, detail, keep=DETAIL_KEEP, view_label="tip detail break"
     )
+
+
+# --- TEMPORARY DIAGNOSTIC (diag/k857-tip-detail; never merged) -----------
+# Three leaves (pms857-f543, -56f7, -6099) got NOTHING into the tip detail
+# under both owners and both import sources.  This logs what the detail
+# actually is -- crop in model coordinates, visible edges/vertices inside
+# it, parent and scale, dimension counts around the import -- and saves the
+# SLDDRW + sheet image to failures/ before the raise.  Log only.
+
+
+def _diag(label: str, fn):
+    try:
+        return fn()
+    except Exception as exc:  # noqa: BLE001 - diagnostics must never mask
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def _view_to_model(adapter: Any, view: Any, xy: tuple[float, float]) -> list[float]:
+    transform = _early_bound(
+        _early_bound(view, "IView").ModelToViewTransform, "IMathTransform"
+    )
+    inverse = _early_bound(transform.Inverse(), "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    point = _early_bound(
+        utility.CreatePoint(double_array([xy[0], xy[1], 0.0])), "IMathPoint"
+    )
+    moved = _early_bound(point.MultiplyTransform(inverse), "IMathPoint")
+    return [round(float(v) * 1000.0, 4) for v in moved.ArrayData]
+
+
+def _crop_in_model(adapter: Any, front: Any) -> dict[str, Any]:
+    info = [float(v) for v in (_early_bound(front, "IView").GetDetailCircleInfo2() or ())]
+    if not info:
+        return {"detail_circles": 0}
+    center, start = (info[2], info[3]), (info[5], info[6])
+    center_model = _view_to_model(adapter, front, center)
+    start_model = _view_to_model(adapter, front, start)
+    return {
+        "detail_circles": int(info[0]),
+        "center_sheet_m": [round(v, 6) for v in center],
+        "start_sheet_m": [round(v, 6) for v in start],
+        "center_model_mm": center_model,
+        "start_model_mm": start_model,
+        "radius_model_mm": round(
+            math.dist(center_model[:2], start_model[:2]), 4
+        ),
+    }
+
+
+def _visible_entities(view: Any) -> dict[str, Any]:
+    view = _early_bound(view, "IView")
+    components = list(view.GetVisibleComponents() or ()) or [None]
+    edges: list[dict[str, Any]] = []
+    vertices: list[list[float]] = []
+    for component in components:
+        for raw in view.GetVisibleEntities2(component, 1) or ():  # Edge
+            edge = _early_bound(raw, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if curve.IsCircle():
+                c = [float(v) for v in curve.CircleParams]
+                edges.append(
+                    {
+                        "circle_r_mm": round(c[6] * 1000.0, 4),
+                        "center_y_mm": round(c[1] * 1000.0, 4),
+                    }
+                )
+            else:
+                edges.append({"type": int(curve.Identity())})
+        for raw in view.GetVisibleEntities2(component, 2) or ():  # Vertex
+            point = _early_bound(raw, "IVertex").GetPoint()
+            vertices.append([round(float(v) * 1000.0, 4) for v in point])
+    chamfer = {
+        "inner_rim_r3.075_y-86": any(
+            abs(e.get("circle_r_mm", 0) - 3.075) < 1e-3
+            and abs(e.get("center_y_mm", 0) + 86.0) < 1e-3
+            for e in edges
+        ),
+        "outer_rim_r3.175_y-85.9": any(
+            abs(e.get("circle_r_mm", 0) - 3.175) < 1e-3
+            and abs(e.get("center_y_mm", 0) + 85.9) < 1e-3
+            for e in edges
+        ),
+    }
+    return {
+        "components": len(components),
+        "edge_count": len(edges),
+        "vertex_count": len(vertices),
+        "circles": [e for e in edges if "circle_r_mm" in e][:40],
+        "vertices_mm": vertices[:40],
+        "chamfer_edges_visible": chamfer,
+    }
+
+
+def _detail_facts(adapter: Any, front: Any, detail: Any) -> dict[str, Any]:
+    view = _early_bound(detail, "IView")
+    base = view.GetBaseView()
+    return {
+        "detail_name": _diag("name", lambda: view_name(adapter, detail)),
+        "detail_type": _diag("type", lambda: int(view.Type)),
+        "detail_scale": _diag("scale", lambda: list(view.ScaleRatio)),
+        "detail_outline_m": _diag("outline", lambda: list(view.GetOutline())),
+        "detail_position_m": _diag("position", lambda: list(view.Position)),
+        "parent_name": _diag("parent", lambda: view_name(adapter, base)),
+        "parent_scale": _diag(
+            "pscale", lambda: list(_early_bound(base, "IView").ScaleRatio)
+        ),
+        "crop": _diag("crop", lambda: _crop_in_model(adapter, front)),
+        "visible": _diag("visible", lambda: _visible_entities(detail)),
+    }
+
+
+def _dimension_count(view: Any) -> Any:
+    return _diag(
+        "dims", lambda: int(_early_bound(view, "IView").GetDisplayDimensionCount())
+    )
+
+
+def _save_sheet_image(adapter: Any) -> dict[str, Any]:
+    out_dir = OUT_FAILURES / "tip-detail-diagnostic"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    target = out_dir / "post-mount-screw_sheet.png"
+    target.unlink(missing_ok=True)
+    model = adapter.currentModel
+    adapter._attempt(lambda: model.SaveAs3(str(target), 0, 2), default=None)
+    return {"sheet_png": str(target) if target.exists() else None}
+
+
+def _diagnosed_tip_detail(adapter: Any, front: Any, detail: Any) -> list[Any]:
+    with _telemetry.span("diag.tip_detail") as sp:
+        facts = _detail_facts(adapter, front, detail)
+        facts["detail_dims_before"] = _dimension_count(detail)
+        facts["front_dims_before"] = _dimension_count(front)
+        try:
+            annotations = _curate_tip_detail(adapter, detail)
+        except RuntimeError as exc:
+            facts["detail_dims_after"] = _dimension_count(detail)
+            facts["front_dims_after"] = _dimension_count(front)
+            facts["sheet_image"] = _diag("png", lambda: _save_sheet_image(adapter))
+            _telemetry.error(f"DIAG tip detail: {json.dumps(facts, default=str)}")
+            sp.set_attribute("diag", json.dumps(facts, default=str)[:8000])
+            capture_com_failure(
+                adapter,
+                "tip-detail-break",
+                str(exc),
+                api="IDrawingDoc.InsertModelAnnotations3",
+                diag=json.dumps(facts, default=str)[:4000],
+            )
+        facts["detail_dims_after"] = _dimension_count(detail)
+        facts["front_dims_after"] = _dimension_count(front)
+        _telemetry.info(f"DIAG tip detail: {json.dumps(facts, default=str)}")
+        sp.set_attribute("diag", json.dumps(facts, default=str)[:8000])
+        return annotations
 
 
 def _view_dimension_names(adapter: Any, view: Any) -> list[str]:
@@ -321,7 +476,7 @@ async def build(adapter: Any) -> dict[str, str]:
         detail = trim_drawing.end_detail(adapter, front, TIP_DETAIL)
         set_hidden_lines_removed(adapter, detail)
         _early_bound(detail, "IView").UpdateViewDisplayGeometry()
-        detail_annotations = _curate_tip_detail(adapter, detail)
+        detail_annotations = _diagnosed_tip_detail(adapter, front, detail)
         assert_imported_precision(adapter, detail_annotations, DETAIL_PRECISION)
         _verify_tip_detail(adapter, front, detail)
 
