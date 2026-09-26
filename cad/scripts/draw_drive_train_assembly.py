@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any, Callable, Literal, Sequence
 
 import _telemetry
+import channel_assembly_steps as channel_steps
 import connecting_rod_spec as rod
 import cylinder_bank_layout as bank
 from _common import OUT_FAILURES, _early_bound, check, run_build
@@ -222,7 +223,7 @@ REFERENCE_ISO_CENTER = (0.380, 0.110)
 # needs for its title-block property links (finalize_drawing refuses a sheet
 # without a view: r8, leaf 20260923T214354Z-1-4126331f). Sheet 6 carries steps
 # 1-7 and the general notes on the left, its right field kept free for D1; the
-# bank's steps 8-9F fill sheet 7's left field; steps 10-21 continue on sheet 8
+# bank's steps 8-9G fill sheet 7's left field; steps 10-21 continue on sheet 8
 # beside the station table (Main, B1 re-ruling 2026-09-26).
 ISO_RIGHT_FIELD = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
@@ -482,6 +483,20 @@ BANK_STEPS = "\n".join(
         # the back washer; pulled forward it reads nothing.
         "9F. THE BANK TURNS FREE BY HAND. BANK PUSHED BACK:",
         "   A 0.35 LEAF ENTERS AT THE FRONT MHA-121, A 0.55 LEAF DOES NOT.",
+        # #936 P1 b, option A (user ruling 2026-09-26): the north MHA-123 ear
+        # is the rocker bank's axial datum (rocker_bank_layout), set here on
+        # the 9A DRO zero so the cams and the rocker stations share one datum.
+        # Y is the hole-table rear-face distance of the ear inner face,
+        # BOTTOM_REAR_Z - NORTH_EAR_INNER_Z = 67.711, held to the same
+        # BACK_STRAP_LOCATE_BAND edge-find as 9A. Channel assembly MHA-A02
+        # cites this head through channel_steps.NORTH_BRACKET_SET_REF. The
+        # band the rod pins need from it is open: #948.
+        f"{channel_steps.NORTH_BRACKET_SET_STEP}. MHA-089 SCREWED DOWN ON THE BASE"
+        " (FRAME ASSEMBLY MHA-A04 STEP 8),",
+        "   DRO STILL ZEROED AS 9A. STAND THE NORTH MHA-123 ON THE MHA-089",
+        "   RAIL, EAR TO THE BACK. SET ITS EAR INNER FACE TO Y 67.62-67.81;",
+        "   CLAMP. DRILL AND TAP THE RAIL THROUGH ITS FEET PER THE MHA-089 SEAT",
+        "   CALLOUT (VIEW B); SCREW IT DOWN AND RECHECK Y.",
         f"   PINION RIG: CONT. ON SHEET {FIT_SHEET}.",
     )
 )

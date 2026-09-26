@@ -18,7 +18,8 @@ SCRIPTS = Path(__file__).resolve().parent
 PARTS = SCRIPTS.parent / "config" / "parts"
 BUILDER = SCRIPTS / "build_drive_train_assembly.py"
 # Installation interfaces the package may cite without owning a BOM row.
-EXTERNAL_NUMBERS = frozenset({"MHA-035"})
+# Step 9G sets the channel's north MHA-123 on the frame's MHA-089 (#936 P1 b).
+EXTERNAL_NUMBERS = frozenset({"MHA-035", "MHA-089", "MHA-123"})
 # Ruled hardware the sequence already names while its BOM row, cluster stem and
 # explode step wait for the drive-train integrator's single re-key (Main,
 # 2026-09-23: drawing-only rulings commit). The integration commit that adds
@@ -642,6 +643,7 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
 
     import cylinder_bank_layout as bank
     import harmonic_base_spec as base
+    import rocker_bank_layout as rockers
 
     def limits(low: float, high: float, places: int) -> str:
         scale = 10**places
@@ -661,6 +663,9 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
     back_y = base.BOTTOM_REAR_Z - bank.BACK_STRAP_INNER_Z
     band = bank.BACK_STRAP_LOCATE_BAND
     assert f"Y {limits(back_y - band, back_y + band, 2)}" in steps
+    # 9G: the north MHA-123 ear inner face on the same DRO zero and band.
+    ear_y = base.BOTTOM_REAR_Z - rockers.NORTH_EAR_INNER_Z
+    assert f"EAR INNER FACE TO Y {limits(ear_y - band, ear_y + band, 2)}" in steps
     assert f"A {bank.BANK_END_FEELER:.2f} LEAF" in steps
     assert f"A {bank.BANK_END_PLAY[0]:.2f} LEAF ENTERS" in steps
     assert steps.index("BANK PUSHED BACK:") < steps.index(

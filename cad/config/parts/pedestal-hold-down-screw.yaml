@@ -7,7 +7,7 @@ pedestal-hold-down-screw:
   material: Plain Carbon Steel
   material_specification: Steel, McMaster-Carr 90280A197
   finish: zinc plated
-  quantity: 2
+  quantity: 6
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased

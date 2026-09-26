@@ -110,8 +110,8 @@ _INSERTED_SOURCES = {
     "pinion_cam_pin pinion_handle pinion_lever pinion_lever_pin pinion_lift_rod "
     "pinion_pivot_block pinion_pivot_shaft pinion_spring slotted_screw swing_stop_screw",
     "channel": "amplitude_bar channel_lever channel_spring_installed connecting_rod "
-    "frame_side_screw fulcrum_keeper fulcrum_shaft pivot_bracket pivot_shaft "
-    "rocker_arm spring_hook",
+    "frame_side_screw fulcrum_keeper fulcrum_shaft pedestal_hold_down_screw pivot_bracket "
+    "pivot_shaft rocker_arm rocker_thrust_washer spring_hook",
     "summing": "boss_hook counter_spring gooseneck knife_hanger_stud knife_hanger_washer knife_mount summing_lever",
     "magnifier": "clamp_screw column_clamp_back column_clamp_front lever_wire "
     "magnifying_bracket magnifying_clamp magnifying_lever magnifying_vertical_rod "
