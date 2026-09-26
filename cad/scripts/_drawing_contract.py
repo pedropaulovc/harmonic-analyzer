@@ -46,6 +46,7 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
     {
         "draw_cone_gear_shaft.py",
         "draw_cone_tip_block.py",
+        "draw_cone_tip_bushing.py",
         "draw_harmonic_base.py",
         "draw_top_frame.py",
         "draw_tube_frame.py",

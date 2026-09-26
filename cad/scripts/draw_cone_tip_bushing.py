@@ -1,4 +1,19 @@
-r"""Create the curated machinist drawing for the cone-tip spacer bushing."""
+r"""Create the curated machinist drawing for the cone-tip spacer bushing.
+
+Recreated under ``cad/docs/drawing-simplicity-policy.md``. A plain sleeve uses
+two orthographic views plus an isometric and three native model dimensions --
+OD, reamed bore, and length -- with one fit-identification note. The OD and
+the length sit on the side view (policy rule 7, turned parts: diameters on the
+side view); the end view keeps only the reamed-bore callout and its finish, so
+no two diametric leaders cross at the centre. There are no
+datums or feature-control frames: a spacer bushing is not on the GD&T allowlist,
+and the retired OD-runout and end-face-parallelism frames said nothing a hobby
+shop could hold that turning the OD, bore, and faces in one chucking does not
+already give. The sole roughness symbol is rule 5's running-surface case: the
+bore runs on the shaft's tip journal. Decimal places are the part's
+(``cone_tip_bushing_spec.DRAWING_PRECISION``, applied natively by
+``build_cone_tip_bushing``); this script only reads them back off the sheet.
+"""
 
 from __future__ import annotations
 
@@ -6,30 +21,37 @@ import argparse
 import sys
 from typing import Any
 
-from cone_tip_bushing_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
+    assert_imported_precision,
+    check_drawing_layout,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
+    rebuild_drawing,
     read_required_properties,
     set_dimension_callouts,
-    set_dimension_precision,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
+    view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
-from cone_tip_bushing_spec import BORE_DIA, LENGTH, OUTER_DIA, SURFACE_FINISHES
+from cone_tip_bushing_spec import (
+    BORE_DIA,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    LENGTH,
+    OUTER_DIA,
+    SURFACE_FINISHES,
+)
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -53,29 +75,78 @@ PNG = OUTPUTS.png
 # Top plane (axis along Y), so the circular end view is *Top and the side
 # view is *Front (axis vertical on the sheet).
 SHEET_SCALE = (8.0, 1.0)
-END_CENTER = (0.085, 0.190)
-SIDE_CENTER = (0.190, 0.190)
-ISO_CENTER = (0.315, 0.205)
+VIEW_SCALE = (8, 1)
+# The group sits at mid-height with the fit note just below it, so the usable
+# field is balanced instead of leaving an empty band under high views (codex).
+END_CENTER = (0.085, 0.160)
+SIDE_CENTER = (0.190, 0.160)
+ISO_CENTER = (0.315, 0.170)
+MANUFACTURING_NOTES_POS = (0.022, 0.115)
 
+OUTER_R = OUTER_DIA * VIEW_SCALE[0] / 2000.0  # 0.024
+BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0  # 0.00635
+
+HALF_LENGTH = LENGTH * VIEW_SCALE[0] / 2000.0  # 0.016: side view half height
+
+# The circle's ODDim imports only on the end view (its sketch plane), so it is
+# imported there as a donor and dragged onto the side view -- the pattern the
+# cone-gear-shaft sheet proved natively.  The ~33 mm stacked bore callout is
+# centred right of and below the OD circle, clear of it and of the side view.
 END_KEEP = {
-    "ODDim": (
-        END_CENTER[0] - 0.035,
-        END_CENTER[1] + 0.010,
-    ),
+    "ODDim": (END_CENTER[0] - 0.040, END_CENTER[1] + 0.030),
     "BoreDiaDim": (
-        END_CENTER[0] + OUTER_DIA * SHEET_SCALE[0] / 1000.0 + 0.005,
-        END_CENTER[1] - 0.010,
+        END_CENTER[0] + OUTER_R + 0.022,
+        END_CENTER[1] - 0.020,
     ),
 }
 SIDE_KEEP = {
     "Depth": (SIDE_CENTER[0] + 0.036, SIDE_CENTER[1]),
 }
+# Horizontal OD dimension above the side view (axis vertical on the sheet).
+SIDE_OD_XY = (SIDE_CENTER[0], SIDE_CENTER[1] + HALF_LENGTH + 0.010)
+# Surface-finish symbol (anchor = lower-left of the glyph) above-right of the
+# end view; its leader lands on the bore's right quadrant, away from the bore
+# callout's lower-right leader and left of the side view.
+BORE_FINISH_XY = (END_CENTER[0] + OUTER_R + 0.006, END_CENTER[1] + 0.012)
 DIMENSION_CALLOUTS = {
-    "BoreDiaDim": "1/16 IN THRU",
+    "BoreDiaDim": "REAM THRU",
 }
-# The bore is an exact inch conversion (1/16 in = 1.588); the sheet default of
-# 2 decimals (1.59) would contradict the note, so this one dim displays 3.
-DIMENSION_PRECISION = {"BoreDiaDim": 3}
+
+
+def _move_dimension(
+    adapter: Any,
+    annotation: Any,
+    target: Any,
+    text_xy: tuple[float, float],
+    *,
+    source_view: Any,
+) -> Any:
+    """Move, never copy, a model dimension and verify its new owner view."""
+    name = dimension_name(adapter, annotation)
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, source_view)):
+        raise RuntimeError(f"{name}: failed to activate source dimension view")
+    draw.ClearSelection2(True)
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    selection_name = str(display.GetNameForSelection() or "")
+    if not selection_name or not draw.Extension.SelectByID2(
+        selection_name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(
+            f"failed to select model dimension {name}: {selection_name!r}"
+        )
+    ddoc.DragModelDimension(view_name(adapter, target), 2, text_xy[0], text_xy[1], 0.0)
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    annotations = [
+        _early_bound(item, "IAnnotation")
+        for item in (_early_bound(target, "IView").GetAnnotations() or ())
+    ]
+    matches = [item for item in annotations if dimension_name(adapter, item) == name]
+    if len(matches) != 1:
+        raise RuntimeError(f"{name}: native dimension did not move into target view")
+    return matches[0]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -117,28 +188,50 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=(8, 1))
-    side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=(8, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(8, 1))
-    for view in (end, iso):
+    end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=VIEW_SCALE)
+    side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=VIEW_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
+    # The end view and native REAM THRU callout fully define the bore; dashed
+    # bore lines in the side view add no manufacturing fact.
+    for view in (end, side, iso):
         set_hidden_lines_removed(adapter, view)
-    set_hidden_lines_visible(adapter, side)
 
     end_annotations = curate_view_dimensions(
-        adapter, end, keep=END_KEEP, view_label="end"
+        adapter,
+        end,
+        keep=END_KEEP,
+        view_label="end",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     side_annotations = curate_view_dimensions(
-        adapter, side, keep=SIDE_KEEP, view_label="side"
+        adapter,
+        side,
+        keep=SIDE_KEEP,
+        view_label="side",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    annotations = [*end_annotations, *side_annotations]
+    bore_annotations = [
+        annotation
+        for annotation in end_annotations
+        if dimension_name(adapter, annotation) == "BoreDiaDim"
+    ]
+    od_annotations = [
+        annotation
+        for annotation in end_annotations
+        if dimension_name(adapter, annotation) == "ODDim"
+    ]
+    if len(bore_annotations) != 1 or len(od_annotations) != 1:
+        raise RuntimeError("end view must import exactly one OD and one bore dimension")
+    od_annotation = _move_dimension(
+        adapter, od_annotations[0], side, SIDE_OD_XY, source_view=end
+    )
+    annotations = [*bore_annotations, *side_annotations, od_annotation]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to end view")
-    # Axis centerline of the OD cylinder in the side view: with the axis
-    # vertical, it marks which edge pair is the end faces (datum B and the
-    # parallelism frame attach there) vs the OD silhouette. Pick the cylindrical
-    # face between the left silhouette and the bore's hidden lines.
+    # Axis centerline of the OD cylinder in the side view, selected through its
+    # projected cylindrical face rather than by a hidden bore edge.
     add_view_centerline(
         adapter,
         side,
@@ -146,98 +239,23 @@ async def build(adapter: Any) -> dict[str, str]:
         label="bushing side-view axis centerline",
     )
 
-    # The OD runout attaches at the OD's UPPER-LEFT 45 deg point, NOT its 12
-    # o'clock -- and this is the whole reason the frame's own anchor is up-left.
-    #
-    # Datum A (below) leaders RADIALLY out of the bore at 12 o'clock, so it is a
-    # vertical line along x = END_CENTER[0]. The OD's 12 o'clock lies exactly ON
-    # that line, so an `outer_top` pick put the runout's arrowhead on top of the
-    # datum leader: measured on the 2026-07-16 render, arrow tip (0.0852, 0.2146)
-    # against the datum leader at x=0.0850 -- 0.2 mm apart, the stacked-arrowhead
-    # tell. 45 deg moves the arrow to (0.0680, 0.2070), a clear 17 mm away, and
-    # keeps the leader radial (it approaches the OD from OUTSIDE, so it never
-    # crosses the circle). This is draw_pivot_bushing.py's `outer_edge_upper`
-    # spelling and its stated rationale -- "so the four leaders do not converge
-    # on one spot".
-    _diag = 2.0**-0.5
-    _outer_r = OUTER_DIA * SHEET_SCALE[0] / 2000.0
-    outer_upper_left = (
-        END_CENTER[0] - _outer_r * _diag,
-        END_CENTER[1] + _outer_r * _diag,
-    )
-    bore_edge = (
-        END_CENTER[0] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
-        END_CENTER[1],
-    )
-    half_length = LENGTH * SHEET_SCALE[0] / 2000.0
-    bottom_end = (SIDE_CENTER[0], SIDE_CENTER[1] - half_length)
-    top_end = (SIDE_CENTER[0], SIDE_CENTER[1] + half_length)
-    # Pick the bore at 12 o'clock so A's leader runs radially above it.
-    # A concentric bore-to-symbol ray necessarily crosses the OD; the runout
-    # arrow uses the separate upper-left point to avoid stacking on that leader.
-    # SetPosition2's anchor is where the leader hits the symbol, not the box
-    # centre: +0.037 puts the box's bottom edge at y=0.227, below the runout frame.
-    # Native insertion starts with a forced shoulder. The shared helper settles
-    # its removal on this vertical ray before enforcing the requested position.
-    bore_top = (
-        END_CENTER[0],
-        END_CENTER[1] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
-    )
-    # Retain the existing 0.1 mm sheet-placement bound; no geometry tolerance
-    # or requested coordinate is adjusted for the initial leader-mode offset.
-    add_datum_feature(
-        adapter,
-        end,
-        edge_xy=bore_top,
-        symbol_xy=(END_CENTER[0], END_CENTER[1] + 0.037),
-        datum="A",
-        label="bushing bore axis",
-    )
-    add_datum_feature(
-        adapter,
-        side,
-        edge_xy=bottom_end,
-        symbol_xy=(SIDE_CENTER[0] - 0.012, bottom_end[1] - 0.020),
-        datum="B",
-        label="bushing reference end",
-    )
-    add_feature_control_frame(
-        adapter,
-        end,
-        edge_xy=outer_upper_left,
-        frame_xy=(0.072, 0.254),
-        characteristic="circular_runout",
-        tolerance=GEOMETRIC_TOLERANCES_MM["bushing OD runout"],
-        datums=("A",),
-        label="bushing OD runout",
-    )
-    add_feature_control_frame(
-        adapter,
-        side,
-        edge_xy=top_end,
-        frame_xy=(SIDE_CENTER[0] + 0.016, top_end[1] + 0.024),
-        characteristic="parallelism",
-        tolerance=GEOMETRIC_TOLERANCES_MM["bushing end-face parallelism"],
-        datums=("B",),
-        label="bushing end-face parallelism",
-    )
-    # Right of the end view at just above bore height, not up at (0.148, 0.234):
-    # that was ~50 mm from the bore it annotates and dragged a long diagonal
-    # leader back across the view.  The symbol's ARM extends left of the anchor
-    # and its TEXT renders ABOVE the arm and to the RIGHT (ASME Y14.36), so it
-    # occupies roughly x=0.112..0.151 / y=0.200..0.215 -- right of the OD circle
-    # (which ends at x=0.109), clear of the BoreDiaDim callout below it (that
-    # text tops out at y=0.190) and well left of the side view (x=0.166).
+    # Above-right of the end view: right of the OD circle (x <= 0.109), above
+    # the bore callout (top ~0.147) and left of the side view (x >= 0.166).
+    # Same glyph height as the cone-gear sheets -- the default rendered ~2x
+    # every other annotation (codex/eye pass, 2026-09-23).
     add_surface_finish(
         adapter,
         end,
-        edge_xy=bore_edge,
-        symbol_xy=(0.115, 0.200),
+        edge_xy=(END_CENTER[0] + BORE_R, END_CENTER[1]),
+        symbol_xy=BORE_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "bushing_bore"),
         label="bushing bore finish",
+        char_height=0.0025,
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.022, 0.095)
+    add_property_linked_note(adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_POS)
+    rebuild_drawing(adapter, label="cone-tip-bushing layout audit")
+    check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
