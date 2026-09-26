@@ -87,6 +87,7 @@ from cone_swing_platform_spec import (
     TIP_SLOT_W,
 )
 from diagnostics.drawing_layout_audit import collect_document, describe_sheet
+from diagnostics import mha091_callout_probe  # diag, never merge
 
 
 SPEC = DRAWINGS_BY_NAME["cone_swing_platform"]
@@ -2434,6 +2435,16 @@ async def build(adapter: Any) -> dict[str, str]:
             for segment in witnesses
         ):
             raise RuntimeError(f"plate thickness witnesses did not shorten to the cut edge: {witnesses}")
+    # diag (MHA-091 RD3 callout probe, never merge): before the layout audit the
+    # ac4f leaf fails; discards every document unsaved, then always raises.
+    mha091_callout_probe.run(
+        adapter,
+        source=SOURCE,
+        slddrw=SLDDRW,
+        dowel_callout=dowel_callout,
+        process=PLATE_DOWEL_CALLOUT,
+        out_dir=CAD_ROOT / "out" / "reports" / "mha091-probe",
+    )
     check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
 
     return await finalize_drawing(
