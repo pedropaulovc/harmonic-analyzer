@@ -533,7 +533,7 @@ def test_section_picks_land_on_the_rail_and_the_lower_web() -> None:
 
 def test_seat_note_names_the_transfer_and_both_depths() -> None:
     assert drawing.SEAT_NOTE == (
-        "4X #8-32 UNC-2B, 14.7 DEEP\n#29 DRILL 18.0 DEEP\n"
+        "4X #8-32 UNC-2B\n14.7 DEEP\n#29 DRILL 18.0 DEEP\n"
         "TRANSFER FROM MHA-123\nAT ASSEMBLY"
     )
     # The leader lands on the rail's top edge over the outermost seat.
@@ -595,3 +595,65 @@ def test_precision_reaches_every_dimension_exactly_once() -> None:
     assert own == {"WebThickness", "FootThickness", "RailDepth"}
     assert not own & set(bulk)
     assert own | set(bulk) == set(drawing.DIMENSION_PRECISION)
+
+
+def _z_line(y_mm: float, z0_mm: float, z1_mm: float, *, direction=(0.0, 0.0, 1.0)):
+    points = [(0.0, y_mm / 1000.0, z0_mm / 1000.0), (0.0, y_mm / 1000.0, z1_mm / 1000.0)]
+    curve = SimpleNamespace(
+        IsLine=lambda: True, LineParams=(*points[0], *direction)
+    )
+    return SimpleNamespace(
+        GetCurve=lambda: curve,
+        GetStartVertex=lambda: SimpleNamespace(GetPoint=lambda: points[0]),
+        GetEndVertex=lambda: SimpleNamespace(GetPoint=lambda: points[1]),
+        name=f"y{y_mm} z{z0_mm}..{z1_mm}",
+    )
+
+
+def test_rail_depth_is_dimensioned_between_exact_section_edges(monkeypatch) -> None:
+    """r743-rocker-fix2 (2570b5251): the coordinate picks for the rail depth
+    produced "section rail dimension measured 2225.982125 mm". The section now
+    hands add_edge_dimension the longest visible model lines along Z on the top
+    face and on the window's top face."""
+    arc = SimpleNamespace(GetCurve=lambda: SimpleNamespace(IsLine=lambda: False))
+    edges = [
+        _z_line(support.HALF_Y, -7.2, 7.2),
+        _z_line(support.HALF_Y, -1.0, 1.0),
+        _z_line(seats.WINDOW_TOP_Y, -9.9, -3.175),
+        _z_line(seats.WINDOW_TOP_Y, 3.175, 5.0),
+        _z_line(seats.WINDOW_TOP_Y, -50.0, 50.0, direction=(1.0, 0.0, 0.0)),
+        arc,
+    ]
+    view = SimpleNamespace(
+        GetVisibleComponents=lambda: ("support",),
+        GetVisibleEntities2=lambda component, kind: tuple(edges),
+    )
+    adapter = SimpleNamespace(_attempt=lambda call, default=None: call())
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    top, window = drawing._right_rail_edges(adapter, view)
+    assert top.name == f"y{support.HALF_Y} z-7.2..7.2"
+    assert window.name == f"y{seats.WINDOW_TOP_Y} z-9.9..-3.175"
+
+    edges[:] = [_z_line(support.HALF_Y, -7.2, 7.2)]
+    with pytest.raises(RuntimeError, match="window top-face"):
+        drawing._right_rail_edges(adapter, view)
+
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "entities=_right_rail_edges(adapter, right)" in source
+
+
+def test_seat_note_stays_left_of_the_depth_callout_and_above_the_view() -> None:
+    """Offline extent check after r743-rocker-fix2: at ~0.75 x height per
+    character (the drive-train package's measured 2.63 mm at 3.5 mm) and
+    ~1.3 x height per line (its 4.525 mm pitch), the note ends left of the
+    front view's left edge, where the Depth extension line runs, and above the
+    view's top edge, under the top zone border."""
+    height = drawing.SEAT_NOTE_HEIGHT
+    lines = drawing.SEAT_NOTE.splitlines()
+    right = drawing.SEAT_NOTE_XY[0] + max(map(len, lines)) * 0.75 * height
+    bottom = drawing.SEAT_NOTE_XY[1] - len(lines) * 1.3 * height
+    front_left = drawing.FRONT_CENTER[0] - support.HALF_Y * drawing.VIEW_SCALE / 1000
+    front_top = drawing.FRONT_CENTER[1] + support.HALF_Y * drawing.VIEW_SCALE / 1000
+    assert right < front_left - 0.002
+    assert bottom > front_top + 0.002
+    assert drawing.SEAT_NOTE_XY[1] <= 0.263

@@ -145,12 +145,16 @@ def imported_precision() -> dict[str, int]:
 # The bracket seats: located by transfer, so the print gives their thread,
 # depths and process only. A view-owned pointer to the rail's top edge over
 # the outermost seat, left of the front view and clear of the Depth callout.
+# Wrapped to 21 characters: at ~0.75 x height per character a 26-character
+# first line ran to x ~0.065, into the Depth extension line at 0.0605.
 SEAT_NOTE = (
-    f"{len(SEAT_LOCAL_X)}X {SCREW_THREAD} UNC-2B, {SEAT_THREAD_DEPTH:.1f} DEEP\n"
+    f"{len(SEAT_LOCAL_X)}X {SCREW_THREAD} UNC-2B\n"
+    f"{SEAT_THREAD_DEPTH:.1f} DEEP\n"
     f"{SEAT_DRILL_NAME} DRILL {SEAT_DRILL_DEPTH:.1f} DEEP\n"
     "TRANSFER FROM MHA-123\nAT ASSEMBLY"
 )
 SEAT_NOTE_XY = (0.016, 0.262)
+SEAT_NOTE_HEIGHT = 0.0025
 SEAT_NOTE_ATTACH = (
     FRONT_CENTER[0] + min(SEAT_LOCAL_X) * VIEW_SCALE / 1000.0,
     FRONT_CENTER[1] + HALF_Y * VIEW_SCALE / 1000.0,
@@ -228,6 +232,32 @@ def _bottom_datum_axes(adapter: Any, view: Any) -> tuple[Any, Any]:
 
 def _right_seat_edge(adapter: Any, view: Any) -> Any:
     """Return the longest right-view edge on the mounting-face plane."""
+    span, edge = _longest_right_z_edge(adapter, view, -HALF_Y, label="mounting-face")
+    if span < (2.0 * WIDE - 2.0 * CHAMFER - 0.1) / 1000.0:
+        raise RuntimeError(f"mounting-face edge spans only {span * 1000.0:.3f} mm")
+    return edge
+
+
+def _right_rail_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
+    """The rail's top face and the window's top face, as model edges along Z
+    in section A-A. Coordinate picks there returned a 2225.98 mm "rail depth"
+    (r743-rocker-fix2, leaf 20260926T101855Z-1-f5fea24f), so the rail depth is
+    dimensioned between these exact entities instead."""
+    top_span, top = _longest_right_z_edge(adapter, view, HALF_Y, label="rail top-face")
+    window_span, window = _longest_right_z_edge(
+        adapter, view, WINDOW_TOP_Y, label="window top-face"
+    )
+    _telemetry.info(
+        f"section rail edges: top face {top_span * 1000.0:.3f} mm long at y {HALF_Y}, "
+        f"window top {window_span * 1000.0:.3f} mm long at y {WINDOW_TOP_Y}"
+    )
+    return top, window
+
+
+def _longest_right_z_edge(
+    adapter: Any, view: Any, y_mm: float, *, label: str
+) -> tuple[float, Any]:
+    """The longest visible model line along Z lying at local height ``y_mm``."""
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     candidates: list[tuple[float, Any]] = []
     for component in components:
@@ -244,17 +274,14 @@ def _right_seat_edge(adapter: Any, view: Any) -> Any:
             if not curve.IsLine():
                 continue
             parameters = tuple(float(value) for value in curve.LineParams)
-            if abs(parameters[1] + HALF_Y / 1000.0) > 2e-6 or abs(parameters[5]) < 0.99:
+            if abs(parameters[1] - y_mm / 1000.0) > 2e-6 or abs(parameters[5]) < 0.99:
                 continue
             start = _early_bound(edge.GetStartVertex(), "IVertex").GetPoint()
             end = _early_bound(edge.GetEndVertex(), "IVertex").GetPoint()
             candidates.append((abs(float(end[2]) - float(start[2])), edge))
     if not candidates:
-        raise RuntimeError("right view has no model edge on the mounting-face plane")
-    span, edge = max(candidates, key=lambda item: item[0])
-    if span < (2.0 * WIDE - 2.0 * CHAMFER - 0.1) / 1000.0:
-        raise RuntimeError(f"mounting-face edge spans only {span * 1000.0:.3f} mm")
-    return edge
+        raise RuntimeError(f"right view has no model edge on the {label} plane")
+    return max(candidates, key=lambda item: item[0])
 
 
 @_telemetry.traced("drawing.planar_centerline", label_param="label")
@@ -447,8 +474,8 @@ async def build(adapter: Any) -> dict[str, str]:
             f"section foot dimension measured {measured * 1000.0:.6f} mm"
         )
     foot_dimension.SetPrecision3(DIMENSION_PRECISION["FootThickness"], -1, -1, -1)
-    # The rail: top face down to the pocket's top face, on the section's -z
-    # side inside the top face's chamfered width and the pocket floor's run.
+    # The rail: top face down to the window's top face, between the exact
+    # model edges (the coordinate picks still locate the view, not the ends).
     rail_pick_x = RIGHT_CENTER[0] - RAIL_PICK_Z * VIEW_SCALE / 1000.0
     rail_dimension = _early_bound(
         add_edge_dimension(
@@ -459,6 +486,7 @@ async def build(adapter: Any) -> dict[str, str]:
             text_xy=(RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] + 0.039),
             orientation="vertical",
             label="section rail depth",
+            entities=_right_rail_edges(adapter, right),
         ),
         "IDisplayDimension",
     )
@@ -479,7 +507,7 @@ async def build(adapter: Any) -> dict[str, str]:
         attach_xy=SEAT_NOTE_ATTACH,
         label="rocker-bracket seats",
         view=front,
-        height=0.0025,
+        height=SEAT_NOTE_HEIGHT,
     )
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to bottom view")
