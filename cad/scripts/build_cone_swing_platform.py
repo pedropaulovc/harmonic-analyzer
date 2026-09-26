@@ -277,6 +277,11 @@ if POST_DOWEL_PATTERN_ERROR > 6e-4:
     raise AssertionError(
         f"POST_DOWEL_PLATE_XZ is {POST_DOWEL_PATTERN_ERROR:.4f} off the post's pattern"
     )
+# The named reference axis through each ream, for the drive-train's pin mates.
+POST_DOWEL_AXES = (
+    ("post dowel north", POST_DOWEL_PLATE_XZ[0]),
+    ("post dowel south", POST_DOWEL_PLATE_XZ[1]),
+)
 # Reamed through the plate from underneath, at the reamer's nominal; its
 # +.0002/0 band rides the hole feature.
 PLATE_DOWEL_HOLE_SPEC = HoleSpec(
@@ -1449,6 +1454,11 @@ async def build(adapter) -> dict[str, str]:
             adapter, "Front Plane", mount_z, "Right Plane", mount_x, axis_name
         )
         name_last_feature(adapter, axis_name)
+    for axis_name, (dowel_x, dowel_z) in POST_DOWEL_AXES:
+        await name_bore_axis(
+            adapter, "Front Plane", dowel_z, "Right Plane", dowel_x, axis_name
+        )
+        name_last_feature(adapter, axis_name)
 
     # Rounded plan corners LAST (they consume the sharp corner edges; the
     # notch-mouth edges and the axis construction are already in place).
@@ -1529,12 +1539,19 @@ async def build(adapter) -> dict[str, str]:
             ("Plane8", "PLANE"),
             ("Plane9", "PLANE"),
             ("Plane10", "PLANE"),
+            # ... and the two post dowel axes'.
+            ("Plane11", "PLANE"),
+            ("Plane12", "PLANE"),
+            ("Plane13", "PLANE"),
+            ("Plane14", "PLANE"),
             ("PlateTop", "PLANE"),
             (swing_axis, "AXIS"),
             (anchor_axis, "AXIS"),
             ("crank axis", "AXIS"),
             ("post mount west", "AXIS"),
             ("post mount east", "AXIS"),
+            ("post dowel north", "AXIS"),
+            ("post dowel south", "AXIS"),
         ),
     )
     return await save_part_and_images(adapter, PART_NAME)

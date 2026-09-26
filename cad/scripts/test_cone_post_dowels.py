@@ -256,3 +256,22 @@ def test_both_parts_model_the_holes_at_nominal() -> None:
         -deviations(dowel.DOWEL_REAM_BAND)[0],
         deviations(dowel.DOWEL_REAM_BAND)[1],
     )
+
+
+def test_plate_names_each_dowel_axis_for_the_assembly() -> None:
+    """The drive-train mates each MHA-151 pin coaxial with its plate ream, so
+    the plate names both axes (north first: plate-local +z is north) and
+    blanks them with its other reference geometry.  Each axis costs two
+    unnamed offset planes after the post-mount pair's Plane7..Plane10."""
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert part.POST_DOWEL_AXES == (
+        ("post dowel north", dowel.POST_DOWEL_PLATE_XZ[0]),
+        ("post dowel south", dowel.POST_DOWEL_PLATE_XZ[1]),
+    )
+    north, south = (xz for _name, xz in part.POST_DOWEL_AXES)
+    assert north[1] > south[1]
+    assert "for axis_name, (dowel_x, dowel_z) in POST_DOWEL_AXES:" in source
+    for name in ("post dowel north", "post dowel south"):
+        assert f'("{name}", "AXIS"),' in source
+    for plane in ("Plane11", "Plane12", "Plane13", "Plane14"):
+        assert f'("{plane}", "PLANE"),' in source
