@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import _config
 import pinion_pivot_block_spec
 import draw_pinion_pivot_block as drawing
 import build_pinion_pivot_block as block
@@ -75,8 +76,14 @@ def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> 
     # callouts; they name each running bore's mate (rule 2).
     assert "Ø4.978" not in notes
     assert "REAM" not in notes
-    assert "MHA-062 TORQUE SHAFT" in notes
-    assert "MHA-060 LIFT ROD" in notes
+    # Each mate is named exactly as its own title block reads (pc-r7 eye
+    # pass: "TORQUE SHAFT" had drifted from MHA-062's title).
+    assert "MHA-062 PINION PIVOT SHAFT" in notes
+    assert "MHA-060 PINION LIFT ROD" in notes
+    assert "TORQUE SHAFT" not in notes
+    for part in ("pinion-pivot-shaft", "pinion-lift-rod"):
+        row = _config.parts(part)
+        assert f"{row['number']} {str(row['title']).upper()}" in notes
     assert "TURNS FREELY BY HAND" in notes
     # R2 (converged-r7): REAM_SLIDE, one fit per shaft with MHA-056; the
     # stock 1/4 in reamer wording went with the line-to-line band.
