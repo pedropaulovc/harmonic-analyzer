@@ -43,9 +43,12 @@ PIVOT_BEARING_RELIEF_DEPTH = 0.25  # Reference nominal; the finished matched fit
 PIVOT_HEAD_RADIAL_CLEARANCE = 0.4875
 PIVOT_BEARING_THICKNESS = PLATE_THICKNESS - PIVOT_BEARING_RELIEF_DEPTH
 # User decision relayed by Main, 2026-09-22: fit the actual purchased shoulder
-# and finished plate; do not invent a numerical axial-clearance band.
+# and finished plate; do not invent a numerical axial-clearance band.  The
+# wording is the user's; only its prefix names the feature as the sheet's
+# leadered ID does ("TOP RELIEF", MHA-091 round 6 -- the Fable review's
+# request for a numeric axial band is answered by this decision).
 PIVOT_RELIEF_FIT_REQUIREMENT = (
-    "TOP PIVOT RELIEF: MATCH DEPTH TO FINISHED PLATE\n"
+    "TOP RELIEF: MATCH DEPTH TO FINISHED PLATE\n"
     "AND McMASTER 91829A560 CONE-PIVOT-SCREW.\n"
     "WITH SHOULDER SEATED ON BASE, LOCK KNOB RELEASED:\n"
     "PLATFORM SWINGS FREELY WITH MINIMAL AXIAL PLAY."
@@ -265,8 +268,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # The closed-end cap locates the notch; the run angle gives its rails a
     # direction (the chord the lock stud follows).  Without it the sheet
     # defines where the notch starts but not which way it runs.
-    "LockNotchProfile": {"NotchRunAngle"},
-    "LockNotchCapEProfile": {"CapECx", "CapECz", "CapEDia"},
+    # The notch is a slot: one width across its rails (NotchW) and a full
+    # radius at the closed end, located at that radius's centre (rule 7).
+    # The cap's diameter is SlotW by equation and prints as "R" only, so the
+    # 8.00 is stated once (MHA-091 Fable review, 63fb3bd2d; Main round 6).
+    "LockNotchProfile": {"NotchMouthAngle", "NotchW"},
+    "LockNotchCapEProfile": {"CapECx", "CapECz"},
     "TipScrewSlotProfile": {"TipSlotEastCx", "TipSlotWestCx", "TipSlotZ", "TipSlotW"},
     "TipScrewCboreProfile": {"TipCboreW"},
     "TipScrewCbore": {"TipCboreDepth"},
@@ -286,6 +293,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # .XX grade. Relief
 # depth is a reference nominal governed by the matched fit above. The Hole
 # Wizard owns the pivot-hole size/callout.
+#
+# The tapped pair's per-axis .XX is NOT what closes it against the post: the
+# pitch that mates is cone_post_mount_interface's (#833, e93b658da), one
+# direct tap-to-tap dimension at +/-0.25 (PLATFORM_PITCH_BAND) against 0.79
+# of screw clearance.  Per-axis stations give about +/-1.22 of pitch at .XX
+# and more at .X, so neither grade closes it; the direct pitch lands with
+# #830's rebase onto #833 (merge rider).  Until then the stations keep .XX,
+# the tighter of the two (MHA-091 Fable review asked for .X).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {
         "NorthEastX": 1,
@@ -304,11 +319,12 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PostMountEastX": 2,
         "PostMountEastZ": 2,
     },
-    # Angles take the title block's flat +/-1 deg whatever their places, so
-    # two places only print the chord's ruled value (9.11, the old note's
-    # figure) rather than rounding it to 9: the band is the block's either way.
-    "LockNotchProfile": {"NotchRunAngle": 2},
-    "LockNotchCapEProfile": {"CapECx": 2, "CapECz": 2, "CapEDia": 2},
+    # The mouth angle is authored at a whole degree and prints as one (the
+    # title block's flat +/-1 deg); NotchW carries its end-mill band natively
+    # (NOTCH_W_BAND); the cap centre stays .XX -- at .X the stud-in-cap stack
+    # fails (below).
+    "LockNotchProfile": {"NotchMouthAngle": 0, "NotchW": 2},
+    "LockNotchCapEProfile": {"CapECx": 2, "CapECz": 2},
     # The slot ends are .XX so the +/-2.25 fit-up travel keeps >= +/-1.74
     # (TIP_LATERAL_TRAVEL, TIP_LATERAL_TRAVEL_WORST).
     "TipScrewSlotProfile": {
@@ -345,6 +361,106 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+
+
+# --- Lock notch: the cone-lock-knob stud in the notch -----------------------
+# The notch is cut in one pass by an end mill of its width, so the width
+# carries the tip slots' one-sided band: the cutter makes the size.  At the
+# title block's .XX (+/-0.51) the narrowest notch (7.49) left the stud 0.552
+# of radial room against 0.721 of cap-centre error: the stack failed as
+# printed until 63fb3bd2d (Main, MHA-091 round 6).
+NOTCH_W = 8.0
+NOTCH_W_BAND = (0.10, 0.0)
+_NOTCH_W_LOWER, _NOTCH_W_UPPER = deviations(NOTCH_W_BAND)
+NOTCH_W_MIN = NOTCH_W + _NOTCH_W_LOWER
+# McMaster 91882A425 (the cone lock knob): a 1/4-20 stud, basic major 6.35;
+# build_cone_swing_platform asserts it equals build_cone_lock_knob.STUD_DIA.
+LOCK_STUD_MAJOR = 0.25 * 25.4
+# The title block's location bands by decimal places, and its flat angular
+# band.
+TITLE_BLOCK_BAND_BY_PLACES = {1: 0.8, 2: _XX}
+TITLE_BLOCK_ANGLE_BAND_DEG = 1.0
+# The notch's run is set on the print by its angle to the plate's WEST edge
+# at the mouth -- both legs drawn, the vertex the real mouth corner, a
+# protractor check (Main, MHA-091 round 6; the old angle ran from a hidden
+# east-west construction ray).  The stud's own path is the chord tangent to
+# its swing arc, 87.53 deg off that edge (the edge leans 6.64 deg off the
+# plate axis, the chord 9.11 deg off east-west); build_cone_swing_platform
+# derives it.  The angle is not critical (the channel keeps ~0.2 of slack,
+# some 4.6 deg over the 2.76 exit travel), so the notch is authored at the
+# whole degree and cut along it: the 0.47 deg offset joins the title block's
+# band in the stud stack below.
+NOTCH_MOUTH_ANGLE_DEG = 88.0
+
+
+def notch_stud_stack(
+    run_deg: float,
+    exit_travel: float,
+    run_radius: float,
+    angle_offset_deg: float,
+    edge_angle_error_deg: float,
+) -> dict[str, float]:
+    """The stud's worst case in the notch, from the notch's own geometry.
+
+    The stud is fixed on the base; the notch must take it at the engaged
+    seat (the closed end's full radius) and let it run out along the chord
+    to the mouth.  Terms, all worst case: the cap centre off by its printed
+    band on BOTH axes (CapECx, CapECz: radial at the seat, projected across
+    the run in the channel); the cut's angle off the stud's chord -- the
+    whole-degree rounding (``angle_offset_deg``), the title block's band, and
+    the reference edge's own tilt within the outline's band
+    (``edge_angle_error_deg``) -- over the exit travel; the chord's sagitta
+    against the stud's true arc.  Room is the narrowest notch less the
+    stud's major, a side.
+    """
+    band = TITLE_BLOCK_BAND_BY_PLACES[
+        min(DRAWING_PRECISION_BY_NAME["CapECx"], DRAWING_PRECISION_BY_NAME["CapECz"])
+    ]
+    run = math.radians(run_deg)
+    room = (NOTCH_W_MIN - LOCK_STUD_MAJOR) / 2.0
+    seat_error = math.hypot(band, band)
+    across_error = band * (abs(math.sin(run)) + abs(math.cos(run)))
+    angle_error = exit_travel * math.tan(
+        math.radians(
+            abs(angle_offset_deg) + TITLE_BLOCK_ANGLE_BAND_DEG + abs(edge_angle_error_deg)
+        )
+    )
+    sagitta = exit_travel**2 / (2.0 * run_radius)
+    return {
+        "location band": band,
+        "room at the seat": room,
+        "cap centre error at the seat": seat_error,
+        "room in the channel": room - sagitta,
+        "cap centre error across the run": across_error,
+        "run angle error at the mouth": angle_error,
+    }
+
+
+def assert_notch_stud_stack(
+    run_deg: float,
+    exit_travel: float,
+    run_radius: float,
+    angle_offset_deg: float,
+    edge_angle_error_deg: float,
+) -> dict[str, float]:
+    """Raise unless the stud seats and runs out at the printed bands.
+
+    build_cone_swing_platform calls this at import with its notch geometry
+    (this module cannot import the part back).  At .X the seat term alone
+    is 1.13 against 0.825 -- why the cap centre stays .XX."""
+    terms = notch_stud_stack(
+        run_deg, exit_travel, run_radius, angle_offset_deg, edge_angle_error_deg
+    )
+    seat = terms["room at the seat"] - terms["cap centre error at the seat"]
+    channel = terms["room in the channel"] - (
+        terms["cap centre error across the run"] + terms["run angle error at the mouth"]
+    )
+    if seat < 0.0 or channel < 0.0:
+        raise AssertionError(
+            f"lock stud does not fit the notch (seat {seat:+.3f}, channel {channel:+.3f}): "
+            + "; ".join(f"{name} {value:.3f}" for name, value in terms.items())
+        )
+    return terms
 
 
 # View scales differ from the sheet scale and therefore remain property-linked

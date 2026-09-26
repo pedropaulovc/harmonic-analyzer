@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import dataclasses
+import inspect
 import math
 from pathlib import Path
 
 import _config
 import _drawing_leaders
+import build_cone_lock_knob
 import build_cone_pivot_screw
 import build_cone_swing_platform as part
 import cone_pivot_post_spec
@@ -31,7 +33,9 @@ def test_every_marked_model_dimension_has_one_view_and_native_precision() -> Non
     assert sum(len(names) for names in view_sets) == len(kept)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert spec.DRAWING_PRECISION_BY_NAME["PlateLenDim"] == 1
-    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {1, 2}
+    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {0, 1, 2}
+    # Whole degrees are for the one angle only (MHA-091 round 6).
+    assert [n for n, p in spec.DRAWING_PRECISION_BY_NAME.items() if p == 0] == ["NotchMouthAngle"]
 
 
 def test_pivot_preserves_native_close_clearance_hole() -> None:
@@ -122,7 +126,7 @@ def test_pivot_relief_runs_out_through_the_north_edge() -> None:
         spec.PIVOT_HEAD_RADIAL_CLEARANCE - 1e-9
     )
     assert spec.PIVOT_RELIEF_FIT_REQUIREMENT.startswith(
-        "TOP PIVOT RELIEF: MATCH DEPTH TO FINISHED PLATE"
+        "TOP RELIEF: MATCH DEPTH TO FINISHED PLATE"
     )
     # Only the NW fillet reaches over the 10.50 strip, and only by a sliver.
     overlaps = {
@@ -290,298 +294,180 @@ def test_lock_notch_caption_sits_under_its_own_view() -> None:
     assert _boxes_overlap(old, label)
 
 
-def _notch_plan_sheet(x_mm: float, z_mm: float) -> tuple[float, float]:
-    """Model plan (x, z) on the notch plan: sheet +x is west, +y is south.
+def test_the_notch_is_a_banded_width_and_a_full_r() -> None:
+    """MHA-091 Fable review (63fb3bd2d) B2: at the title block's .XX the
+    narrowest notch (7.49) left the 1/4-20 stud 0.552 a side against 0.721 of
+    cap-centre error -- the stack failed as printed.  The notch is cut by one
+    end mill, so its width carries the tip slots' +0.10/0; the cap's Ø8.00
+    restated that size and is no longer marked (detail D prints "R")."""
+    assert spec.DRAWING_DIMENSIONS["LockNotchProfile"] == {"NotchMouthAngle", "NotchW"}
+    assert spec.DRAWING_DIMENSIONS["LockNotchCapEProfile"] == {"CapECx", "CapECz"}
+    assert spec.DRAWING_PRECISION_BY_NAME["NotchW"] == 2
+    assert spec.NOTCH_W_BAND == (0.10, 0.0)
+    assert spec.NOTCH_W_MIN == pytest.approx(spec.NOTCH_W)
+    assert part.SLOT_W == spec.NOTCH_W
+    assert spec.LOCK_STUD_MAJOR == pytest.approx(build_cone_lock_knob.STUD_DIA)
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '("LockNotchProfile", "NotchW", NOTCH_W_BAND),' in source
 
-    The notch plan is the profile's *Top view at 1:2, so its pivot sits at the
-    profile's measured pivot offset from its own view centre.
-    """
-    pivot = (
-        drawing.NOTCH_CENTER[0] + drawing.PROFILE_PIVOT_XY[0] - drawing.PROFILE_CENTER[0],
-        drawing.NOTCH_CENTER[1] + drawing.PROFILE_PIVOT_XY[1] - drawing.PROFILE_CENTER[1],
+
+def test_the_run_is_its_whole_degree_angle_to_the_west_edge() -> None:
+    """Main, MHA-091 round 6: the run prints as its angle to the plate's
+    WEST edge at the mouth -- both legs real edges, the vertex the south
+    mouth corner -- not off a hidden east-west ray.  The stud's chord makes
+    87.53 with that edge; the spec rounds it to 88 and the notch is cut at
+    88.00, the 0.47 joining the stud stack."""
+    assert spec.NOTCH_MOUTH_ANGLE_DEG == 88.0
+    assert spec.DRAWING_PRECISION_BY_NAME["NotchMouthAngle"] == 0
+    assert abs(part.NOTCH_CHORD_MOUTH_DEG) == pytest.approx(87.53, abs=0.005)
+    assert round(abs(part.NOTCH_CHORD_MOUTH_DEG)) == spec.NOTCH_MOUTH_ANGLE_DEG
+    assert part.NOTCH_MOUTH_ANGLE_OFFSET_DEG == pytest.approx(0.47, abs=0.005)
+    ux, uz = part.NOTCH_CUT_U
+    inward_vs_south = math.degrees(math.acos(-(ux * part._EDGE_SX + uz * part._EDGE_SZ)))
+    assert inward_vs_south == pytest.approx(88.0, abs=1e-9)
+    # The cut turned toward the edge by the offset, off the stud's chord.
+    assert part.NOTCH_RUN_DEG - part.NOTCH_CUT_DEG == pytest.approx(
+        part.NOTCH_MOUTH_ANGLE_OFFSET_DEG, abs=1e-9
     )
-    return (pivot[0] + x_mm / 2000.0, pivot[1] - z_mm / 2000.0)
-
-
-def _angle_text_box(center: tuple[float, float]) -> tuple[float, float, float, float]:
-    """ "9.11°" at the dimension glyph size, centred on its text point."""
-    half_w = len(f"{part.NOTCH_RUN_DEG:.2f}°") * _CHAR_W / 2.0
-    return (
-        center[0] - half_w,
-        center[1] - _GLYPH_H / 2.0,
-        center[0] + half_w,
-        center[1] + _GLYPH_H / 2.0,
-    )
-
-
-def _distance_to_line(
-    point: tuple[float, float], start: tuple[float, float], direction: tuple[float, float]
-) -> float:
-    dx, dy = point[0] - start[0], point[1] - start[1]
-    return abs(dx * direction[1] - dy * direction[0]) / math.hypot(*direction)
-
-
-def test_notch_run_angle_gives_the_rails_their_direction() -> None:
-    """PR #830 Codex P1: the notch plan printed where the notch starts, not
-    which way it runs.  92a84f6dc replaced the "AXIS 9.11 DEG" note with the
-    model-owned NotchRunAngle; abde20e3c dropped it from all three contracts
-    and nothing took its place.  It is marked, carries its places, and is
-    kept on the notch plan with its anchor inside the acute sector (a text
-    point outside prints the supplement: d22701cf8's sheet-spanning arc).
-    Since tipslot-d382 the value itself prints on a leader at
-    NOTCH_ANGLE_TEXT_XY; that is what must clear the 205.81.
-    """
-    assert "NotchRunAngle" in spec.DRAWING_DIMENSIONS["LockNotchProfile"]
-    assert spec.DRAWING_PRECISION_BY_NAME["NotchRunAngle"] == 2
-    assert f"{part.NOTCH_RUN_DEG:.2f}" == "9.11"
-    text = drawing.NOTCH_KEEP["NotchRunAngle"]
-
-    # The vertex is the north rail's closed-end corner: the cap centre less
-    # half the slot width along the run's left normal (-TZ, TX).
-    half_w = part.SLOT_W / 2.0
-    assert part.NOTCH_ANGLE_VERTEX_XZ == pytest.approx(
-        (part.SLOT_E_X - part._SLOT_TZ * half_w, part.SLOT_E_Z + part._SLOT_TX * half_w)
-    )
-    vertex = _notch_plan_sheet(*part.NOTCH_ANGLE_VERTEX_XZ)
-    run = math.radians(part.NOTCH_RUN_DEG)
-    ray = (1.0, 0.0)  # model west
-    run_dir = (math.cos(run), -math.sin(run))  # west and north: sheet down
-    to_text = (text[0] - vertex[0], text[1] - vertex[1])
-    assert to_text[0] * ray[1] - to_text[1] * ray[0] > 0.0  # below the ray
-    assert run_dir[0] * to_text[1] - run_dir[1] * to_text[0] > 0.0  # above the run
-    # 1 mm from both sides, so a 0.5 mm view drift cannot leave the sector.
-    assert _distance_to_line(text, vertex, ray) >= 0.001
-    assert _distance_to_line(text, vertex, run_dir) >= 0.001
-
-    # The printed value clears the 205.81 cap-centre witness and that
-    # dimension's line.
-    box = _angle_text_box(drawing.NOTCH_ANGLE_TEXT_XY)
-    cap_witness_y = _notch_plan_sheet(part.SLOT_E_X, part.SLOT_E_Z)[1]
-    cap_dimension_x = drawing.NOTCH_KEEP["CapECz"][0]
-    assert cap_witness_y - box[3] >= 0.0018
-    assert cap_dimension_x - box[2] >= 0.0018
-    west_edge_x = _notch_plan_sheet(part._west_edge_x(part.SLOT_E_Z), 0.0)[0]
-    assert box[0] - west_edge_x >= 0.005
-
-    # Positive control: off the SOUTH rail's corner the same bisector point
-    # lands on the witness -- why the vertex moved to the north rail.
-    south = _notch_plan_sheet(
-        part.SLOT_E_X + part._SLOT_TZ * half_w, part.SLOT_E_Z - part._SLOT_TX * half_w
-    )
-    south_text = (south[0] + to_text[0], south[1] + to_text[1])
-    south_box = _angle_text_box(south_text)
-    assert south_box[1] < cap_witness_y < south_box[3]
-
-
-# tipslot-d382 (d38223cf9) as it printed, sheet metres: the "9.11°" glyphs,
-# measured off the 300-dpi render
-# (C:/src/dt-logs/tipslot-d382/platform-crop-notch-angle-300dpi.png), and the
-# run angle's and the 205.81's ink from the leaf's describe_sheet dump
-# (C:/src/dt-logs/spring/tipslot-d382-leaf.log:408-427).
-_D382_NOTCH_INK = drawing.SheetInk(
-    texts={"NotchRunAngle": (0.29169, 0.23500, 0.30226, 0.23850)},
-    lines={
-        "NotchRunAngle": [
-            ((0.2840, 0.2386), (0.2980, 0.2386)),  # the ray's extension
-            ((0.2773, 0.2379), (0.2977, 0.2346)),  # the run's extension
-        ],
-        "CapECz": [
-            ((0.2743, 0.2406), (0.3060, 0.2406)),  # the upper witness
-            ((0.3050, 0.2406), (0.3050, 0.1828)),  # the dimension line
-            ((0.3050, 0.1772), (0.3050, 0.1377)),  # its lower leg, under the text
-            ((0.2607, 0.1377), (0.3060, 0.1377)),  # the pivot's witness
-        ],
-    },
-    arcs={
-        "NotchRunAngle": [
-            ((0.2970, 0.2386), (0.2962, 0.2448)),
-            ((0.2967, 0.2348), (0.2949, 0.2288)),
-        ]
-    },
-    arrows={
-        "NotchRunAngle": [
-            ((0.29690, 0.23859), (0.29666, 0.24199)),
-            ((0.29667, 0.23478), (0.29590, 0.23148)),
-        ],
-        "CapECz": [((0.3050, 0.24058), (0.3050, 0.23707))],
-    },
-    leaders={},
-)
-
-# tipslot-fix3 (31620449b) as the seat read it back after the offset, sheet
-# metres, verbatim from C:/src/dt-logs/spring/tipslot-fix3-leaf.log: line 256
-# (text position, arcs_after, lines_before) and line 224 (the leader the
-# offset added, and the angle's arrowheads spanned both ways).  The arcs are
-# listed twice, as the seat returned them.
-_FIX3_TEXT_XY = (0.29533335673167244, 0.23599046239978697)
-_FIX3_LEAF_INK = drawing.SheetInk(
-    texts={"NotchRunAngle": drawing._centred_box(_FIX3_TEXT_XY, drawing.NOTCH_ANGLE_TEXT_SIZE)},
-    lines={
-        "NotchRunAngle": [
-            ((0.27730084362274565, 0.237897309256219), (0.28774487224137074, 0.23622267237731215)),
-            ((0.28397792979966785, 0.2385904623656956), (0.28793349794352835, 0.2385904623656956)),
-        ]
-    },
-    arcs={
-        "NotchRunAngle": [
-            ((0.2844536244334673, 0.23064903208584542), (0.28675748464768946, 0.23638099401147591)),
-            ((0.28693349794352835, 0.2385904623656956), (0.28556618852945975, 0.24461488137251708)),
-            ((0.2844536244334673, 0.23064903208584542), (0.28675748464768946, 0.23638099401147591)),
-            ((0.28693349794352835, 0.2385904623656956), (0.28556618852945975, 0.24461488137251708)),
-        ]
-    },
-    arrows={
-        "NotchRunAngle": [
-            ((0.2877529809078759, 0.23979480759688956), (0.28576198838750305, 0.23296718042606226)),
-            ((0.28737595805481936, 0.2350620965896009), (0.28649103783223734, 0.24211882814179028)),
-        ]
-    },
-    leaders={
-        "NotchRunAngle": [
-            ((0.28688942502648596, 0.23748222828746463), (0.2885812731879844, 0.23321233740425734)),
-            ((0.2885812731879844, 0.23321233740425734), (0.30208544027536055, 0.23321233740425734)),
-        ]
-    },
-)
-
-
-def _same_stroke(got, want, tolerance: float = 0.0003) -> bool:
-    """One segment on another, either way round (the seat lists an arc from
-    its tail end or from its arrow)."""
-    forward = max(math.dist(got[0], want[0]), math.dist(got[1], want[1]))
-    backward = max(math.dist(got[0], want[1]), math.dist(got[1], want[0]))
-    return min(forward, backward) < tolerance
-
-
-def test_the_fix3_leaf_fails_the_ink_audit() -> None:
-    """tipslot-fix3-3162 failed on the seat, and the audit was right: the
-    leader's leg to its knee crosses the run's extension line."""
-    findings = drawing.sheet_ink_collisions(_FIX3_LEAF_INK)
-    assert "leader-on-ink: NotchRunAngle's leader crosses NotchRunAngle lines" in findings
-    leg = _FIX3_LEAF_INK.leaders["NotchRunAngle"][0]
-    run = _FIX3_LEAF_INK.lines["NotchRunAngle"][0]
-    assert _drawing_leaders.segments_cross(leg, run)
-
-
-def test_the_notch_ink_model_reproduces_fix3() -> None:
-    """At fix3's 14 mm anchor and text, the model draws the seat's ink --
-    the leader rooted at the arc's midpoint, its knee under the value's near
-    end, the shoulder under the value, the ~6.2 mm tails -- and fails the
-    same way.  fix3's model (a straight leader to the nearest point of the
-    value) did not; the extension lines' 1 mm overshoot was already in it."""
-    vertex = drawing.NOTCH_ANGLE_VERTEX_XY
-    anchor = drawing._polar(vertex, 0.014, -part.NOTCH_RUN_DEG / 2.0)
-    text = (vertex[0] + 0.0224, vertex[1] - 0.0026)
-    assert math.dist(text, _FIX3_TEXT_XY) < 0.0001
-    predicted = drawing.notch_angle_ink(text, anchor_xy=anchor, cap_text_xy=(0.305, 0.180))
-    for got, want in zip(
-        predicted.leaders["NotchRunAngle"], _FIX3_LEAF_INK.leaders["NotchRunAngle"], strict=True
+    pts = part.NOTCH_CUT_POINTS
+    for key in ("mouth_s", "mouth_n"):
+        assert pts[key][0] == pytest.approx(part._west_edge_x(pts[key][1]), abs=1e-9)
+    assert math.dist(pts["closed_s"], pts["closed_n"]) == pytest.approx(part.SLOT_W)
+    middle = tuple((a + b) / 2.0 for a, b in zip(pts["closed_s"], pts["closed_n"]))
+    assert middle == pytest.approx((part.SLOT_E_X, part.SLOT_E_Z))
+    for first, second in (
+        ("closed_s", "mouth_s"),
+        ("mouth_s", "out_s"),
+        ("out_n", "mouth_n"),
+        ("mouth_n", "closed_n"),
     ):
-        assert _same_stroke(got, want), (got, want)
-    for field in ("lines", "arcs"):
-        model = getattr(predicted, field)["NotchRunAngle"]
-        measured = getattr(_FIX3_LEAF_INK, field)["NotchRunAngle"]
-        assert all(any(_same_stroke(m, w) for m in model) for w in measured), field
-        assert all(any(_same_stroke(m, w) for w in measured) for m in model), field
-    assert "leader-on-ink: NotchRunAngle's leader crosses NotchRunAngle lines" in (
-        drawing.sheet_ink_collisions(predicted)
+        dx, dz = pts[second][0] - pts[first][0], pts[second][1] - pts[first][1]
+        assert abs(dx * uz - dz * ux) < 1e-9, (first, second)
+    # South is the south rail and its material wedge the acute one.
+    assert pts["closed_s"][1] < pts["closed_n"][1]
+    assert part.NOTCH_CUT_TRAVEL == pytest.approx(part.NOTCH_EXIT_TRAVEL, abs=0.01)
+
+
+def test_the_notch_sketch_drives_its_width_and_mouth_angle() -> None:
+    """The width is SlotW by equation, the angle DRIVES the rails (added
+    while their direction is free, read back driving), and the west-edge
+    reference sits on the plate's own globals."""
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    body = source[
+        source.index("    # Lock notch: open-ended channel") : source.index(
+            "    # Closed-end cap at the engaged seat"
+        )
+    ]
+    width = body.index("""slot.record("NotchW", '"SlotW"')""")
+    angle = body.index("await _add_notch_mouth_angle(adapter, edge_mouth, rail_in_s, slot)")
+    overshoot = body.index('"lock notch mouth overshoot"')
+    assert width < angle < overshoot
+    for drive in ("'\"WestHalfN\"'", "'\"NorthOverhang\"'", "'\"WestHalfS\"'"):
+        assert drive in body, drive
+    assert """'"PlateLen" - "NorthOverhang"'""" in body
+    assert "NotchRunAngle" not in source
+    helper = inspect.getsource(part._add_notch_mouth_angle)
+    assert "3,  # swDimensionType_e.swAngularDimension" in helper
+    assert "driven_state != 2" in helper
+    assert "DrivenState = 1" not in helper
+    # The text point that picks the sector lies in the material wedge.
+    tx, ty = part.notch_mouth_angle_text_point()
+    vx, vz = part.NOTCH_CUT_POINTS["mouth_s"]
+    ux, uz = part.NOTCH_CUT_U
+    rail = (vx - ux, vz - uz)
+    edge = (vx + part._EDGE_SX, vz + part._EDGE_SZ)
+    assert drawing.in_acute_sector((tx, -ty), (vx, vz), rail, edge)
+    # Positive control: mirrored across the edge it is in the 92 sector.
+    assert not drawing.in_acute_sector(
+        (2.0 * vx - tx, 2.0 * vz + ty), (vx, vz), rail, edge
     )
 
 
-def test_the_d382_run_angle_fails_the_ink_audit() -> None:
-    """Main's eye pass of tipslot-d382: the value's own run line struck
-    through it, the ray's ran over it.  Planted as measured, the audit the
-    build now runs names both."""
-    findings = drawing.sheet_ink_collisions(_D382_NOTCH_INK)
-    assert "text-on-line: NotchRunAngle's line runs through 'NotchRunAngle'" in findings
-    # The strike itself: the run's extension crosses the glyphs.
-    ray, run = _D382_NOTCH_INK.lines["NotchRunAngle"]
-    box = _D382_NOTCH_INK.texts["NotchRunAngle"]
-    assert _drawing_leaders.distance_to_box(run, box) == 0.0
-    assert _drawing_leaders.distance_to_box(ray, box) < drawing.LINE_TEXT_CLEARANCE
+def _stack_args() -> tuple[float, float, float, float, float]:
+    return (
+        part.NOTCH_CUT_DEG,
+        part.NOTCH_EXIT_TRAVEL,
+        part.SLOT_R,
+        part.NOTCH_MOUTH_ANGLE_OFFSET_DEG,
+        part.WEST_EDGE_ANGLE_ERROR_DEG,
+    )
 
 
-def test_the_notch_ink_model_reproduces_d382() -> None:
-    """The predicted ink, at d382's anchor, lands on what d382 printed --
-    so the model the placement is checked against is the sheet's."""
-    predicted = drawing.notch_angle_ink(
-        None, anchor_xy=(0.2969, 0.2367), cap_text_xy=(0.305, 0.180)
+def _slacks(terms: dict[str, float]) -> tuple[float, float]:
+    seat = terms["room at the seat"] - terms["cap centre error at the seat"]
+    channel = terms["room in the channel"] - (
+        terms["cap centre error across the run"] + terms["run angle error at the mouth"]
     )
-    for field in ("lines", "arcs", "arrows"):
-        for owner, measured in getattr(_D382_NOTCH_INK, field).items():
-            model = getattr(predicted, field)[owner]
-            assert len(model) == len(measured), (field, owner)
-            for got, want in zip(model, measured):
-                for end in (0, 1):
-                    assert math.dist(got[end], want[end]) < 0.0003, (field, owner, got, want)
-    text = predicted.texts["NotchRunAngle"]
-    assert all(
-        abs(a - b) < 0.0003 for a, b in zip(text, _D382_NOTCH_INK.texts["NotchRunAngle"])
-    )
-    assert drawing.sheet_ink_collisions(predicted) != []
+    return seat, channel
 
 
-def test_the_run_angle_value_prints_clear_on_its_leader() -> None:
-    """The fix: a 32 mm arc from the in-wedge anchor, the value low and far
-    out, short of the 205.81 line.  Nothing touches it, no foreign arrow is
-    within 2 mm, and the seat's leader shape -- arc midpoint, knee, shoulder
-    -- crosses nothing, meets nothing in a T and keeps LEADER_INK_CLEARANCE
-    (Main's 2.0 mm) off every stroke."""
-    ink = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY)
-    assert drawing.sheet_ink_collisions(ink) == []
-    assert drawing.LEADER_INK_CLEARANCE == 0.002
-    box = ink.texts["NotchRunAngle"]
-    ray, run = ink.lines["NotchRunAngle"]
-    # Past both extension lines' ends, 2.5 mm under the 205.81 witness
-    # (Main, tipslot-fix4), and its arrowhead's 2 mm + half-width off the value.
-    assert box[0] - max(ray[1][0], run[1][0]) >= 0.002
-    cap_witness_y = ink.lines["CapECz"][0][0][1]
-    assert cap_witness_y - box[3] >= 0.0025
-    assert drawing.NOTCH_KEEP["CapECz"][0] - box[2] >= (
-        drawing.ARROW_TEXT_CLEARANCE + drawing.NOTCH_ANGLE_ARROW_HALF_WIDTH
+def test_the_stud_seats_and_runs_out_at_the_printed_bands() -> None:
+    """The build asserts it at import; the slack is pinned here."""
+    terms = spec.assert_notch_stud_stack(*_stack_args())
+    assert terms == part.NOTCH_STUD_STACK
+    seat, channel = _slacks(terms)
+    assert round(seat, 3) == 0.104
+    assert round(channel, 3) == 0.136
+    # The angle term: the 0.47 rounding, the block's 1 deg and the edge's own
+    # 0.41 (two .X ends over its 224.9 mm) over the 2.76 exit travel.
+    assert part.WEST_EDGE_ANGLE_ERROR_DEG == pytest.approx(0.408, abs=0.001)
+    assert terms["run angle error at the mouth"] == pytest.approx(
+        part.NOTCH_EXIT_TRAVEL * math.tan(math.radians(0.4697 + 1.0 + 0.4077)), abs=1e-4
     )
-    (root, knee), (_knee, far) = ink.leaders["NotchRunAngle"]
-    assert math.dist(root, drawing.NOTCH_ANGLE_VERTEX_XY) == pytest.approx(
-        drawing.NOTCH_ANGLE_ARC_RADIUS
-    )
-    # The knee lies past both extension lines' ends, the shoulder short of
-    # the 205.81 line: the leg leaves the wedge through its open end.
-    assert knee[0] > max(ray[1][0], run[1][0])
-    assert drawing.NOTCH_KEEP["CapECz"][0] - far[0] >= drawing.LEADER_INK_CLEARANCE
-    # The margins the layout was solved for (tipslot-fix4 reply to Main).
-    assert drawing._segment_gap((root, knee), run) >= 0.0022
-    assert drawing._segment_gap((root, knee), ray) >= 0.0025
-    # The anchor still selects the acute sector, and its arc sits past the
-    # hidden 10 mm construction ray, where the ray's extension line is drawn.
-    assert drawing.NOTCH_KEEP["NotchRunAngle"] == drawing.NOTCH_ANGLE_ANCHOR_XY
-    assert drawing.NOTCH_ANGLE_ARC_RADIUS > drawing.NOTCH_ANGLE_RAY_START + 0.002
 
 
 @pytest.mark.parametrize(
-    ("radius", "text_offset", "cap_text_xy", "gap_mm"),
+    ("change", "failing"),
     [
-        # d382's 205.81 at x 0.305: the best any arc/value gave.
-        (0.0115, (0.0242, -0.0018), (0.305, 0.180), "0.45"),
-        # dbfc81fb2 (fix4 as first committed): 205.81 at x 0.313.
-        (0.018, (0.0320, -0.0018), (0.313, 0.180), "1.13"),
+        # 63fb3bd2d as printed: the width at the plain .XX.
+        ({"NOTCH_W_MIN": 8.0 - 0.51}, "seat"),
+        # The cap centre at .X, as the Fable review proposed: 1.13 vs 0.825.
+        ({"CapECx": 1, "CapECz": 1}, "seat"),
     ],
 )
-def test_the_leader_clearance_is_why_the_205_81_moved(
-    radius: float, text_offset: tuple[float, float], cap_text_xy: tuple[float, float], gap_mm: str
-) -> None:
-    """With the 205.81 at x 0.305 or 0.313 the best layout left the leg
-    0.45 / 1.13 mm off the run's extension line's end: legal for the
-    crossing rule, a near-miss on the sheet.  The clearance gate names it."""
-    vertex = drawing.NOTCH_ANGLE_VERTEX_XY
-    anchor = drawing._polar(vertex, radius, -part.NOTCH_RUN_DEG / 2.0)
-    text = (vertex[0] + text_offset[0], vertex[1] + text_offset[1])
-    ink = drawing.notch_angle_ink(text, anchor_xy=anchor, cap_text_xy=cap_text_xy)
-    findings = drawing.sheet_ink_collisions(ink)
-    assert not any(f.startswith("leader-on-ink") for f in findings)
-    assert (
-        f"leader-near-ink: NotchRunAngle's leader passes {gap_mm} mm from NotchRunAngle lines"
-        in findings
-    )
+def test_the_stud_stack_fails_at_the_rejected_grades(monkeypatch, change, failing) -> None:
+    for name, value in change.items():
+        if name == "NOTCH_W_MIN":
+            monkeypatch.setattr(spec, name, value)
+        else:
+            monkeypatch.setitem(spec.DRAWING_PRECISION_BY_NAME, name, value)
+    seat, _channel = _slacks(spec.notch_stud_stack(*_stack_args()))
+    assert seat < 0.0, failing
+    with pytest.raises(AssertionError, match="lock stud does not fit the notch"):
+        spec.assert_notch_stud_stack(*_stack_args())
+
+
+def test_the_stud_stack_fails_when_the_cut_leaves_the_chord() -> None:
+    """Positive control for the angle term: a cut 5 deg off the chord eats
+    the channel's slack at the mouth."""
+    args = list(_stack_args())
+    args[3] = 5.0
+    _seat, channel = _slacks(spec.notch_stud_stack(*args))
+    assert channel < 0.0
+    with pytest.raises(AssertionError):
+        spec.assert_notch_stud_stack(*args)
+
+
+def test_post_mount_stations_stay_xx_until_the_direct_pitch_lands() -> None:
+    """MHA-091 Fable review asked for .X taps.  Neither grade closes the
+    pair against the post: what mates is the tap-to-tap pitch, which
+    cone_post_mount_interface (#833) bands at +/-0.25 (PLATFORM_PITCH_BAND)
+    and #830's rebase prints directly (merge rider).  Until then the
+    stations keep the tighter .XX."""
+    names = ("PostMountWestX", "PostMountWestZ", "PostMountEastX", "PostMountEastZ")
+    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 2 for name in names)
+    source = Path(spec.__file__).read_text(encoding="utf-8")
+    for token in ("cone_post_mount_interface", "PLATFORM_PITCH_BAND", "merge rider"):
+        assert token in source, token
+    # Per-axis stations: both taps off by the band on both axes, opposite.
+    wx, wz = part.POST_MOUNT_WEST_XZ
+    ex, ez = part.POST_MOUNT_EAST_XZ
+    pitch = math.hypot(wx - ex, wz - ez)
+    ux, uz = (wx - ex) / pitch, (wz - ez) / pitch
+    xx = spec.TITLE_BLOCK_BAND_BY_PLACES[2]
+    per_axis = 2.0 * xx * (abs(ux) + abs(uz))
+    assert per_axis > 0.25  # PLATFORM_PITCH_BAND at e93b658da
+    assert 2.0 * spec.TITLE_BLOCK_BAND_BY_PLACES[1] * (abs(ux) + abs(uz)) > per_axis
 
 
 # The isometric VIEW as d382 printed it (describe_sheet,
@@ -647,7 +533,7 @@ def test_the_fix4b_caption_fails_the_ink_audit() -> None:
     assert "text-on-line: CapECz's line runs through 'Isometric View Note'" in (
         drawing.sheet_ink_collisions(_FIX4B_CAPTION_INK)
     )
-    fix4b = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY, iso_note_xy=_D382_ISO_NOTE_ANCHOR)
+    fix4b = drawing.notch_plan_ink(iso_note_xy=_D382_ISO_NOTE_ANCHOR)
     assert "text-on-line: CapECz's line runs through 'Isometric View Note'" in (
         drawing.sheet_ink_collisions(fix4b)
     )
@@ -659,7 +545,7 @@ def test_the_moved_205_81_clears_the_isometric_and_the_section_note() -> None:
     its lower witness and arrowhead clear A-A's "(6.35)", and the view stays
     inside the border."""
     view = _iso_view_box()
-    ink = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY)
+    ink = drawing.notch_plan_ink()
     caption = ink.texts["Isometric View Note"]
     witness, line, lower_leg, lower_witness = ink.lines["CapECz"]
     cap_x = drawing.NOTCH_KEEP["CapECz"][0]
@@ -671,7 +557,7 @@ def test_the_moved_205_81_clears_the_isometric_and_the_section_note() -> None:
     assert _drawing_leaders.distance_to_box(lower_witness, _PLATE_THK_TOP_LINE_BOX) >= 0.002
     assert (
         _drawing_leaders.distance_to_box(lower_arrow, _PLATE_THK_TOP_LINE_BOX)
-        - drawing.NOTCH_ANGLE_ARROW_HALF_WIDTH
+        - drawing.DIMENSION_ARROW_HALF_WIDTH
         >= 0.002
     )
     assert _SHEET_BORDER_RIGHT - view[2] >= 0.002
@@ -702,7 +588,7 @@ def test_the_d382_27_70_shoulder_tees_into_the_189_26() -> None:
 def test_the_27_70_prints_inside_its_span() -> None:
     """Centred on its line between the witnesses: no shoulder, 2 mm clear of
     the 189.26 line and of every notch-plan stroke, the inside arrows fit."""
-    ink = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY)
+    ink = drawing.notch_plan_ink()
     text = drawing.NOTCH_KEEP["TipSlotZ"]
     assert text[0] == drawing.TIP_SLOT_Z_LINE_X
     lower, upper = ink.lines["TipSlotZ"]
@@ -710,7 +596,7 @@ def test_the_27_70_prints_inside_its_span() -> None:
     box = ink.texts["TipSlotZ"]
     assert box[0] - _D382_TIP_SLOT_Z_INK["PostMountWestZ lines"][0][0][0] >= 0.002
     for piece in (lower, upper):
-        assert abs(piece[1][1] - piece[0][1]) >= drawing.NOTCH_ANGLE_ARROW_LENGTH + 0.0005
+        assert abs(piece[1][1] - piece[0][1]) >= drawing.DIMENSION_ARROW_LENGTH + 0.0005
     assert drawing.sheet_ink_collisions(ink) == []
 
 
@@ -733,107 +619,22 @@ def test_the_d382_33_00_tail_stands_under_the_8_00() -> None:
     )
     assert [(owner, name) for owner, name, _gap in near] == [("CapECx", "CapEDia")]
     assert near[0][2] == pytest.approx(0.00159, abs=0.00005)
-    model = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY, cap_dia_text_xy=(0.285, 0.259))
-    assert any(f.startswith("arrow-near-text: CapECx's arrow") for f in (
-        drawing.sheet_ink_collisions(model)
-    ))
 
 
-def test_the_33_00_tail_has_no_value_over_it() -> None:
-    """The Ø8.00 left the notch plan: nothing stands over the 33.00's tail."""
-    ink = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY)
-    assert "CapEDia" not in ink.texts
-    assert "CapEDia" not in drawing.NOTCH_KEEP
-    assert drawing.DIMENSION_OWNER["CapEDia"] == "lock notch cap detail"
+def test_the_cap_diameter_is_not_restated() -> None:
+    """The Ø8.00 is gone from every view (the width states the size once,
+    MHA-091 round 6): nothing stands over the 33.00's tail."""
+    marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
+    assert "CapEDia" not in marked
+    assert "CapEDia" not in drawing.DIMENSION_OWNER
+    ink = drawing.notch_plan_ink()
     assert not any("CapECx" in f for f in drawing.sheet_ink_collisions(ink))
+    assert drawing.CAP_R_NOTE.text == "R"
 
 
-# The profile plan's ink around the lock-notch cap, as d382 printed it
-# (C:/src/dt-logs/spring/tipslot-d382-leaf.log:309-331; PROFILE_KEEP's other
-# entries are unchanged since): the R5.0 (CornerSWR) leader from its arrow
-# tip on the corner to its shoulder, its text; the 37.0 (SouthWestX) right
-# witness and its line with the extension under its text; the 24.0
-# (SouthEastX) line; the x 71.8 pivot witness both share.
-# Their texts (estimated boxes) stay out of the audited ink: each sits on
-# its own shoulder, which the audit would read as a line through it.
-_D382_PROFILE_TEXTS = {
-    "CornerSWR": (0.1041, 0.2462, 0.1192, 0.2497),
-    "SouthWestX": (0.0982, 0.2552, 0.1133, 0.2587),
-}
-_D382_PROFILE_INK = drawing.SheetInk(
-    texts={},
-    lines={
-        "SouthWestX": [
-            ((0.0903, 0.2468), (0.0903, 0.2562)),
-            ((0.0718, 0.1337), (0.0718, 0.2562)),
-            ((0.0903, 0.2552), (0.0718, 0.2552)),
-            ((0.0903, 0.2552), (0.1098, 0.2552)),
-        ],
-        "SouthEastX": [((0.0598, 0.2562), (0.0718, 0.2562)), ((0.0598, 0.2562), (0.0392, 0.2562))],
-        "CornerSWR": [
-            ((0.0875, 0.2433), (0.0899, 0.2438)),
-            ((0.0899, 0.2438), (0.1025, 0.2462)),
-            ((0.1025, 0.2462), (0.1159, 0.2462)),
-        ],
-    },
-    arcs={},
-    arrows={"CornerSWR": [((0.0875, 0.2433), (0.0908, 0.2440))]},
-    leaders={},
-)
-
-
-def _profile_with_cap_dia(text_xy: tuple[float, float]) -> drawing.SheetInk:
-    leader, near_tip, _far_tip = drawing.cap_dia_ink(text_xy)
-    ink = _D382_PROFILE_INK
-    return drawing.SheetInk(
-        texts={**ink.texts, "CapEDia": drawing.cap_dia_glyphs(text_xy)},
-        lines=ink.lines,
-        arcs=ink.arcs,
-        arrows={**ink.arrows, "CapEDia": [(near_tip, near_tip)]},
-        leaders={"CapEDia": leader},
-    )
-
-
-def test_the_profile_cap_is_where_the_seat_put_it() -> None:
-    """The model's cap centre and radius against d382's notch-plan Ø8.00
-    (the same projection, 185 mm left): its diameter ran (273.1, 238.6) to
-    (273.5, 242.6) through (273.25, 240.57)."""
-    cap = drawing.PROFILE_CAP_XY
-    assert cap[0] + 0.185 == pytest.approx(0.27325, abs=5e-5)
-    assert cap[1] == pytest.approx(0.24057, abs=5e-5)
-    assert math.dist((0.2731, 0.2386), (0.2735, 0.2426)) / 2.0 == pytest.approx(
-        drawing.CAP_ARC_RADIUS, abs=5e-5
-    )
-    # d382's arrow ends lay on the drawn half (the rails' tangent points).
-    notch_cap = (cap[0] + 0.185, cap[1])
-    for tip in ((0.2731, 0.2386), (0.2735, 0.2426)):
-        assert drawing.on_drawn_cap_arc(tip, notch_cap)
-
-
-# tipslot-r5-7630 (C:/src/dt-logs/spring/tipslot-r5-7630-leaf.log:221): the
-# Ø8.00 east of the profile at (0.1149, 0.2417), SetSecondArrow on.  The far
-# arrow stood on the drawn arc; the first stayed at the diameter's near end,
-# out in the notch mouth -- SetSecondArrow adds an arrow, it moves none.
-_R5_7630_PROFILE_TIPS = ((0.08630467, 0.24076592), (0.09028448, 0.24036455))
-
-
-def test_the_profile_placement_left_its_first_arrow_in_the_mouth() -> None:
-    """Planted from the seat: the hard tip gate names the near arrow, and the
-    model put both ends within 0.05 mm of where the seat drew them."""
-    far, near = _R5_7630_PROFILE_TIPS
-    assert drawing.on_drawn_cap_arc(far)
-    assert not drawing.on_drawn_cap_arc(near)
-    _leader, near_model, far_model = drawing.cap_dia_ink((0.1149, 0.2417))
-    assert math.dist(near_model, near) < 0.00005
-    assert math.dist(far_model, far) < 0.00005
-
-
-def test_an_8_00_leader_up_the_drawn_side_crosses_the_37_0() -> None:
-    """Fail-first for the placement: with the text above the cap -- the way
-    whose near end stays on the drawn arc -- the leader crosses the 37.0's
-    line and runs within 2 mm of its witness."""
-    findings = drawing.sheet_ink_collisions(_profile_with_cap_dia((0.098, 0.2590)))
-    assert "leader-on-ink: CapEDia's leader crosses SouthWestX lines" in findings
+def test_the_notch_plan_prints_clear() -> None:
+    assert drawing.sheet_ink_collisions(drawing.notch_plan_ink()) == []
+    assert "NotchRunAngle" not in drawing.NOTCH_KEEP
 
 
 # The fields detail D shares, as d382/fix4b printed them: the isometric's
@@ -842,12 +643,18 @@ def test_an_8_00_leader_up_the_drawn_side_crosses_the_37_0() -> None:
 # [12.7, 12.7]..[419.1, 266.7] mm), detail B's label box size (31.5 x
 # 16.4 mm, :512), and on the hole-location plan the 2X Ø5.11 callout's
 # shoulder (y 0.2524, x 0.1702..0.2282, :393) and the 189.26's hole witness
-# (y 0.2323, x 0.1869..0.2260, :360).
+# (y 0.2323, x 0.1869..0.2260, :360).  The 205.81's dimension line stands at
+# x 0.327 (NOTCH_KEEP) from that witness down, and the 33.00's text sits
+# at (0.2652, 0.258).
 _ZONE_FRAME = (0.0127, 0.0127, 0.4191, 0.2667)
 _D382_205_81_WITNESS_END = (0.3283, 0.24057)
 _DETAIL_LABEL_SIZE = (0.0315, 0.0164)
 _D382_RD2_SHOULDER = ((0.1702, 0.2524), (0.2282, 0.2524))
 _D382_189_26_HOLE_WITNESS = ((0.1869, 0.2323), (0.2260, 0.2323))
+# Dimension glyphs: "9.11°" measured 10.6 x 3.5 mm (d382), so ~2.12 mm a
+# character; a stacked +0.10/0 adds ~7 mm and stands ~4.5 mm tall.
+_DIM_CHAR_W, _DIM_GLYPH_H = 0.00212, 0.0035
+_TOLERANCE_W, _TOLERANCE_H = 0.0070, 0.0045
 
 
 def _cap_detail_outline() -> tuple[float, float, float, float]:
@@ -856,21 +663,76 @@ def _cap_detail_outline() -> tuple[float, float, float, float]:
     return (cx - half, cy - half, cx + half, cy + half)
 
 
+def _cap_detail_label() -> tuple[float, float, float, float]:
+    x, y = drawing.CAP_DETAIL_LABEL_LOWER_LEFT
+    return (x, y, x + _DETAIL_LABEL_SIZE[0], y + _DETAIL_LABEL_SIZE[1])
+
+
+def _cap_detail_texts() -> dict[str, tuple[float, float, float, float]]:
+    """Detail D's texts: the angle centred on its point, the width hanging
+    right of its line (its value plus the stacked band), the R note."""
+    angle = drawing.CAP_DETAIL_KEEP["NotchMouthAngle"]
+    width_x, width_y = drawing.CAP_DETAIL_KEEP["NotchW"]
+    return {
+        "NotchMouthAngle": drawing._centred_box(
+            angle, (len(f"{spec.NOTCH_MOUTH_ANGLE_DEG:.0f}°") * _DIM_CHAR_W, _DIM_GLYPH_H)
+        ),
+        "NotchW": (
+            width_x,
+            width_y - _TOLERANCE_H / 2.0,
+            width_x + len(f"{spec.NOTCH_W:.2f}") * _DIM_CHAR_W + _TOLERANCE_W,
+            width_y + _TOLERANCE_H / 2.0,
+        ),
+        "R": _note_box(drawing.CAP_R_NOTE),
+    }
+
+
+def _box_off_circle(box: tuple[float, ...], centre: tuple[float, float]) -> float:
+    """How far a box stands outside a circle about ``centre`` (its nearest
+    point's distance from the centre, less nothing: the caller subtracts)."""
+    nearest = (
+        min(max(centre[0], box[0]), box[2]),
+        min(max(centre[1], box[1]), box[3]),
+    )
+    return math.dist(centre, nearest)
+
+
+def _width_witnesses() -> list[tuple[tuple[float, float], tuple[float, float]]]:
+    """The width's witness lines: each rail extended from its closed-end
+    corner out to 1 mm past the dimension line at the text's x."""
+    ux, uy = drawing.CAP_MOUTH_AXIS
+    reach_x = drawing.CAP_DETAIL_KEEP["NotchW"][0] + 0.001
+    lines = []
+    for key in ("closed_s", "closed_n"):
+        start = drawing.cap_detail_xy(*part.NOTCH_CUT_POINTS[key])
+        t = (reach_x - start[0]) / ux
+        lines.append((start, (start[0] + t * ux, start[1] + t * uy)))
+    return lines
+
+
 def test_detail_d_fits_the_field_over_the_isometric() -> None:
     """Outline inside the zone frame, the circle over the isometric's box
-    and 2 mm off the 205.81, the label right of the outline inside the
-    border, all clear of each other."""
+    and 2 mm off the 205.81, the label LEFT of the outline -- in the field
+    the Ø8.00 and the run angle's leader left -- above the 205.81's witness
+    and dimension line, inside the frame."""
     outline = _cap_detail_outline()
     assert outline[3] <= _ZONE_FRAME[3]
     cx, cy = drawing.CAP_DETAIL_CENTER
     radius = drawing.CAP_DETAIL_SHEET_RADIUS
     assert cy - radius > _iso_view_box()[3]
     assert math.dist((cx, cy), _D382_205_81_WITNESS_END) - radius >= 0.002
-    lower_left = drawing.CAP_DETAIL_LABEL_LOWER_LEFT
-    label = (*lower_left, lower_left[0] + _DETAIL_LABEL_SIZE[0], lower_left[1] + _DETAIL_LABEL_SIZE[1])
-    assert label[0] - outline[2] >= 0.0012  # detail B's own gap (47.9 -> 49.1)
-    assert _ZONE_FRAME[2] - label[2] >= 0.002
-    assert label[1] - _iso_view_box()[3] >= 0.002
+    label = _cap_detail_label()
+    assert outline[0] - label[2] >= 0.0012  # detail B's own gap (47.9 -> 49.1)
+    assert _ZONE_FRAME[3] - label[3] >= 0.004
+    assert label[1] - _D382_205_81_WITNESS_END[1] >= 0.005
+    cap_ecx = drawing._centred_box(drawing.NOTCH_KEEP["CapECx"], drawing.CAP_EC_Z_TEXT_SIZE)
+    assert _box_gap(label, cap_ecx) >= 0.005
+    # Positive control: 63fb3bd2d's label right of the outline sits on the
+    # width's south witness, where it now runs out through the mouth.
+    old = (0.3808, 0.236, 0.3808 + _DETAIL_LABEL_SIZE[0], 0.236 + _DETAIL_LABEL_SIZE[1])
+    assert any(
+        _drawing_leaders.distance_to_box(witness, old) == 0.0 for witness in _width_witnesses()
+    )
 
 
 def test_detail_d_circle_on_the_hole_location_plan_clears_its_neighbours() -> None:
@@ -881,110 +743,116 @@ def test_detail_d_circle_on_the_hole_location_plan_clears_its_neighbours() -> No
         assert _drawing_leaders.distance_to_point(stroke, cap) - radius >= 0.004
 
 
-def test_the_8_00_in_detail_d_lands_its_arrow_on_the_drawn_arc() -> None:
-    """The leader leaves the cap on its drawn side: the first arrow (the
-    near end) is on the arc, the far end across the mouth -- why the second
-    arrow is switched off -- and the value stands off the circle and the
-    border."""
-    text = drawing.CAP_DETAIL_KEEP["CapEDia"]
-    cap = drawing.CAP_DETAIL_CENTER
-    radius = drawing.CAP_DETAIL_ARC_RADIUS
-    leader, near_tip, far_tip = drawing.cap_dia_ink(text, cap, radius)
-    assert drawing.on_drawn_cap_arc(near_tip, cap, radius)
-    assert not drawing.on_drawn_cap_arc(far_tip, cap, radius)
-    glyphs = drawing.cap_dia_glyphs(text)
+def test_detail_d_states_width_angle_and_r_clear_of_each_other() -> None:
+    """The three facts, each off the circle, apart, inside the frame; the
+    angle in its acute sector; the width's value outside its span."""
+    centre = drawing.CAP_DETAIL_CENTER
     circle = drawing.CAP_DETAIL_SHEET_RADIUS
-    assert _drawing_leaders.distance_to_point(((glyphs[0], glyphs[1]), (glyphs[2], glyphs[1])), cap) - circle >= 0.002
-    assert _drawing_leaders.distance_to_point(((glyphs[2], glyphs[1]), (glyphs[2], glyphs[3])), cap) - circle >= 0.002
-    assert _ZONE_FRAME[3] - glyphs[3] >= 0.004
-    # The shoulder stays clear of the 205.81's upper witness.
-    shoulder = leader[1]
-    assert _drawing_leaders.distance_to_point(shoulder, _D382_205_81_WITNESS_END) >= 0.010
+    texts = _cap_detail_texts()
+    boxes = {**texts, "label": _cap_detail_label()}
+    names = list(boxes)
+    for i, first in enumerate(names):
+        for second in names[i + 1 :]:
+            assert _box_gap(boxes[first], boxes[second]) >= 0.002, (first, second)
+    for name, box in texts.items():
+        assert _box_off_circle(box, centre) - circle >= 0.002, name
+        assert _ZONE_FRAME[3] - box[3] >= 0.002, name
+        assert _ZONE_FRAME[2] - box[2] >= 0.002, name
+        assert box[1] - _iso_view_box()[3] >= 0.002, name
+    # The angle's value lies in the material wedge, the acute 88.
+    angle = drawing.CAP_DETAIL_KEEP["NotchMouthAngle"]
+    vertex = drawing.MOUTH_ANGLE_VERTEX_XY
+    assert drawing.in_acute_sector(
+        angle, vertex, drawing.MOUTH_ANGLE_RAIL_XY, drawing.MOUTH_ANGLE_EDGE_XY
+    )
+    assert vertex == pytest.approx((0.36337, 0.25112), abs=1e-5)
+    # Its arc (radius = the value's distance) tops out under the frame.
+    assert vertex[1] + math.dist(angle, vertex) <= _ZONE_FRAME[3] - 0.002
+    # The width: right of the circle, its value above the witnesses' span.
+    south, north = _width_witnesses()
+    assert texts["NotchW"][1] - max(south[1][1], north[1][1]) >= 0.002
+    assert texts["NotchW"][0] - (centre[0] + circle) >= 0.010
+    # The R sits between those witnesses, 2 mm off both.
+    for witness in (south, north):
+        assert _drawing_leaders.distance_to_box(witness, texts["R"]) >= 0.002
+
+
+def test_the_r_note_names_the_drawn_cap_arc() -> None:
+    """ASME's full R: "R" with its leader on the drawn (closed) half of the
+    cap -- not across the open mouth -- clear of the cap centre, and
+    crossing neither rail."""
+    note = drawing.CAP_R_NOTE
+    assert note.text == "R"
+    assert note.feature == "LockNotchCapE"
+    assert note.radius_mm == part.SLOT_W / 2.0
+    assert note.arc_center_mm == (part.SLOT_E_X, part.SLOT_E_Z)
+    tip = drawing.arc_note_tip(note)
+    assert drawing.on_drawn_cap_arc(
+        tip, drawing.CAP_DETAIL_CENTER, drawing.CAP_DETAIL_ARC_RADIUS
+    )
+    model = drawing.arc_note_model_tip(note)
+    assert drawing.cap_detail_xy(model[0] * 1000.0, model[2] * 1000.0) == pytest.approx(tip)
+    box = _note_box(note)
+    leader = drawing.arc_note_leader(note, box[2] - box[0])
+    assert leader[0][0] == box[0]  # the tip is left: the leader roots left
+    assert _drawing_leaders.distance_to_point(leader, drawing.CAP_DETAIL_CENTER) >= 0.002
+    pts = {key: drawing.cap_detail_xy(*xz) for key, xz in part.NOTCH_CUT_POINTS.items()}
+    for rail in ((pts["closed_s"], pts["mouth_s"]), (pts["closed_n"], pts["mouth_n"])):
+        assert not _drawing_leaders.segments_cross(leader, rail)
+        assert _drawing_leaders.distance_to_point(rail, leader[0]) >= 0.002
+    # Positive control: a tip out in the mouth is off the drawn arc.
+    mouth = dataclasses.replace(note, tip_deg=0.0)
+    assert not drawing.on_drawn_cap_arc(
+        drawing.arc_note_tip(mouth), drawing.CAP_DETAIL_CENTER, drawing.CAP_DETAIL_ARC_RADIUS
+    )
 
 
 def test_the_build_wires_detail_d() -> None:
-    import inspect
-
     build = inspect.getsource(drawing.build)
     assert 'detail_label="D"' in build
-    assert "_pin_cap_dia_arrow(adapter, cap_detail_annotations)" in build
     assert build.index("keep=NOTCH_KEEP") < build.index("keep=CAP_DETAIL_KEEP")
-    pin = inspect.getsource(drawing._pin_cap_dia_arrow)
-    assert "SetSecondArrow(False, False)" in pin
-    assert "on_drawn_cap_arc(tip, CAP_DETAIL_CENTER, CAP_DETAIL_ARC_RADIUS)" in pin
-
-
-def test_the_arc_tail_crossing_the_205_81_witness_is_named_and_far_from_the_value() -> None:
-    """Ruling (b): the ray-side tail crosses the 205.81 witness.  At least
-    2 mm from the value -- beyond half its 3.5 mm text height -- so it is a
-    named, reported crossing; nearer, or unnamed, it gates."""
-    ink = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY)
-    findings, reported = drawing.dimension_crossings(ink)
-    assert findings == []
-    assert len(reported) == 1
-    head = "NotchRunAngle arcs x CapECz lines, at least "
-    assert reported[0].startswith(head)
-    gap_mm = float(reported[0][len(head) :].split(" mm", 1)[0])
-    assert gap_mm > 0.5 * drawing.NOTCH_ANGLE_TEXT_SIZE[1] * 1000.0 + 0.5
-    assert frozenset(("NotchRunAngle arcs", "CapECz lines")) in drawing.EXPECTED_DIMENSION_CROSSINGS
-    # The value moved onto the crossing: it gates.
-    witness_y = ink.lines["CapECz"][0][0][1]
-    tail = ink.arcs["NotchRunAngle"][0]
-    onto = drawing._centred_box((tail[0][0], witness_y + 0.002), drawing.NOTCH_ANGLE_TEXT_SIZE)
-    at_value = dataclasses.replace(ink, texts={**ink.texts, "NotchRunAngle": onto})
-    assert any(
-        f.startswith("dimension-crossing: NotchRunAngle arcs x CapECz lines") and "within 1.75" in f
-        for f in drawing.dimension_crossings(at_value)[0]
-    )
-    # An unnamed crossing gates wherever it is.
-    ray = ink.lines["NotchRunAngle"][0]
-    mid_x = (ray[0][0] + ray[1][0]) / 2.0
-    stray = dataclasses.replace(
-        ink, lines={**ink.lines, "Stray": [((mid_x, ray[0][1] - 0.003), (mid_x, ray[0][1] + 0.001))]}
-    )
-    assert any(
-        f.startswith("dimension-crossing: NotchRunAngle lines x Stray lines")
-        and f.endswith("not an expected crossing")
-        for f in drawing.sheet_ink_collisions(stray)
-    )
+    assert "_assert_mouth_angle_in_wedge(adapter, cap_detail, cap_detail_annotations)" in build
+    assert "_add_arc_note(adapter, cap_detail, CAP_R_NOTE)" in build
+    assert "added_notes=[cap_r_note]" in build
+    assert "_add_arc_note(adapter, feature, RELIEF_ID_NOTE)" in build
+    assert "_pin_cap_dia_arrow" not in build
+    assert "RELIEF_WIDTH_CALLOUT" not in build
+    wedge = inspect.getsource(drawing._assert_mouth_angle_in_wedge)
+    assert "in_acute_sector(text, vertex, rail, edge)" in wedge
+    assert "model_point_in_view(" in wedge
 
 
 def test_the_leader_audit_counts_a_t_and_allows_its_own_arc() -> None:
     """_drawing_leaders' T rule (e33969f40): a leader ending on another line
     is a crossing; the one declared touch is the leader's own arc."""
-    ink = drawing.notch_angle_ink(drawing.NOTCH_ANGLE_TEXT_XY)
-    ray = ink.lines["NotchRunAngle"][0]
-    on_ray = ((ray[0][0] + ray[1][0]) / 2.0, ray[0][1])
-    tee = dataclasses.replace(
-        ink, leaders={"NotchRunAngle": [(on_ray, (on_ray[0] + 0.004, on_ray[1] - 0.003))]}
+    ink = drawing.notch_plan_ink()
+    witness = ink.lines["CapECz"][0]
+    on_witness = ((witness[0][0] + witness[1][0]) / 2.0, witness[0][1])
+    arc = ((on_witness[0], on_witness[1] - 0.006), (on_witness[0] + 0.003, on_witness[1] - 0.009))
+    probe_box = drawing._centred_box((on_witness[0] + 0.012, on_witness[1] - 0.012), (0.006, 0.003))
+    base = dataclasses.replace(
+        ink,
+        texts={**ink.texts, "Probe": probe_box},
+        arcs={**ink.arcs, "Probe": [arc]},
     )
-    assert "leader-on-ink: NotchRunAngle's leader crosses NotchRunAngle lines" in (
+    tee = dataclasses.replace(
+        base, leaders={"Probe": [(on_witness, (on_witness[0] + 0.004, on_witness[1] - 0.003))]}
+    )
+    assert "leader-on-ink: Probe's leader crosses CapECz lines" in (
         drawing.sheet_ink_collisions(tee)
     )
-    arc = ink.arcs["NotchRunAngle"][0]
-    on_arc = ((arc[0][0] + arc[1][0]) / 2.0, (arc[0][1] + arc[1][1]) / 2.0)
     rooted = dataclasses.replace(
-        ink, leaders={"NotchRunAngle": [(on_arc, (on_arc[0] + 0.004, on_arc[1] + 0.001))]}
+        base, leaders={"Probe": [(arc[0], (arc[0][0] + 0.009, arc[0][1] - 0.006))]}
     )
-    assert not any("NotchRunAngle arcs" in f for f in drawing.sheet_ink_collisions(rooted))
-    # Across the 205.81's line is a crossing too: why the value stops short.
-    across = dataclasses.replace(
-        ink,
-        leaders={"NotchRunAngle": [(drawing.NOTCH_ANGLE_TEXT_XY, (0.335, 0.230))]},
-    )
-    assert "leader-on-ink: NotchRunAngle's leader crosses CapECz lines" in (
-        drawing.sheet_ink_collisions(across)
-    )
+    assert not any("Probe arcs" in f for f in drawing.sheet_ink_collisions(rooted))
 
 
-def test_the_build_audits_the_run_angle_ink_on_the_sheet() -> None:
-    import inspect
-
+def test_the_build_audits_the_notch_plan_ink_on_the_sheet() -> None:
     build = inspect.getsource(drawing.build)
-    assert build.index("assert_notch_angle_ink_clear()") < build.index("open_model")
-    wedge = build.index("_assert_notch_angle_in_wedge(adapter, notch, notch_annotations)")
-    assert build.index("_offset_notch_angle_text(adapter, notch_annotations)") > wedge
-    assert wedge < build.index("_pin_tip_slot_z_arrows_inside(adapter, notch_annotations)")
+    assert build.index("assert_notch_plan_ink_clear()") < build.index("open_model")
+    assert build.index("_pin_tip_slot_z_arrows_inside(adapter, notch_annotations)") > build.index(
+        "keep=NOTCH_KEEP"
+    )
     # The captions go into the live text set once they exist.
     iso = build.index('"Isometric View Note", *ISO_NOTE_UPPER_LEFT)')
     captions = build.index("_assert_notch_captions_clear(")
@@ -993,10 +861,6 @@ def test_the_build_audits_the_run_angle_ink_on_the_sheet() -> None:
     audit = inspect.getsource(drawing._assert_notch_captions_clear)
     assert "GetExtent()" in audit and "sheet_ink_collisions(ink)" in audit
     assert "leader_segments(" in inspect.getsource(drawing._notch_strokes)
-    offset = inspect.getsource(drawing._offset_notch_angle_text)
-    assert 'offset_dimension_text(adapter, [angle], {"NotchRunAngle": NOTCH_ANGLE_TEXT_XY})' in offset
-    assert "sheet_ink_collisions(ink)" in offset
-    assert "dimension_crossings(ink)[1]" in offset
     audit = "".join(
         inspect.getsource(function)
         for function in (
@@ -1121,21 +985,21 @@ def _detail_text_boxes(keep: dict[str, tuple[float, float]]) -> dict[str, tuple]
     }
 
 
-def _note_box(note: drawing.CutterNote) -> tuple[float, float, float, float]:
+def _note_box(note: drawing.ArcNote) -> tuple[float, float, float, float]:
     lines = note.text.replace("<MOD-DIAM>", "D").split("\n")
     x, y = note.text_xy
     width = max(len(line) for line in lines) * _NOTE_CHAR_W
     return (x, y - len(lines) * _NOTE_LINE_H, x + width, y)
 
 
-def _note_extent(note: drawing.CutterNote) -> tuple[float, float, float, float]:
+def _note_extent(note: drawing.ArcNote) -> tuple[float, float, float, float]:
     """What INote.GetExtent -- the audit's box -- spans: text plus leader tip.
 
     ec70186e logged the one-line slot note as [89.2, 59.1]..[158.9, 79.1] mm:
     its leader tip on the arc up to 0.6 mm above its text anchor.
     """
     x0, y0, x1, y1 = _note_box(note)
-    tip = drawing.cutter_note_tip(note)
+    tip = drawing.arc_note_tip(note)
     return (min(x0, tip[0]), min(y0, tip[1]), max(x1, tip[0]), max(y1 + 0.0006, tip[1]))
 
 
@@ -1156,9 +1020,9 @@ def _segment_hits_box(segment, box) -> bool:
     return any(_segments_cross(segment, edge) for edge in edges)
 
 
-def _leader_fan(note: drawing.CutterNote):
+def _leader_fan(note: drawing.ArcNote):
     """The leader from its arc tip to each end of the note's left edge."""
-    tip = drawing.cutter_note_tip(note)
+    tip = drawing.arc_note_tip(note)
     box = _note_box(note)
     return [(tip, (box[0], box[1])), (tip, (box[0], box[3]))]
 
@@ -1293,10 +1157,10 @@ def test_cutter_note_leaders_reach_their_arcs_without_crossing() -> None:
     assert drawing.LEADER_TIP_BOUND_M == 0.00001
     centre = (drawing.DETAIL_CENTER[0] + 0.004, drawing._SLOT_Y)
     for note in drawing.CUTTER_NOTES:
-        tip = drawing.cutter_note_tip(note)
+        tip = drawing.arc_note_tip(note)
         assert math.dist(tip, centre) == pytest.approx(note.radius_mm * 0.002)
         assert -90.0 < note.tip_deg < 90.0  # the west (sheet-right) end arc
-        model = drawing.cutter_note_model_tip(note)
+        model = drawing.arc_note_model_tip(note)
         assert math.hypot(
             model[0] - spec.TIP_SCREW_HALF_TRAVEL / 1000.0,
             model[2] - spec.TIP_SCREW_LOCAL_Z / 1000.0,
@@ -1304,7 +1168,7 @@ def test_cutter_note_leaders_reach_their_arcs_without_crossing() -> None:
     # The slot note rises from the upper quadrant, the counterbore note drops
     # from the lower one (their audit extents must not nest, ec70186e).
     assert by_key["slot"].tip_deg > 0.0 > by_key["cbore"].tip_deg
-    assert drawing.cutter_note_tip(by_key["slot"])[1] > drawing._SLOT_Y
+    assert drawing.arc_note_tip(by_key["slot"])[1] > drawing._SLOT_Y
     boxes = _detail_text_boxes(drawing.DETAIL_KEEP)
     obstacles = {name: boxes[name] for name in ("TipSlotEastCx", "TipSlotWestCx")}
     fans = {note.key: _leader_fan(note) for note in drawing.CUTTER_NOTES}
@@ -1587,6 +1451,8 @@ def test_every_kept_dimension_prints_once_on_its_owning_view() -> None:
     for name in ("TipSlotEastCx", "TipSlotWestCx", "TipSlotW", "TipCboreW"):
         assert owner[name] == "tip screw slot detail", name
     assert owner["TipCboreDepth"] == "tip screw slot section"
+    assert owner["NotchW"] == owner["NotchMouthAngle"] == "lock notch cap detail"
+    assert owner["PivotBearingReliefDia"] == "profile plan"
     # Every dimension the part marks for drawing has one owning view.
     marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
     assert set(owner) == marked
@@ -1712,36 +1578,80 @@ def test_slot_section_pocket_clears_its_neighbours() -> None:
     assert _boxes_overlap(moved, neighbours["notch caption"])
 
 
-def test_relief_width_text_sits_between_its_neighbours() -> None:
-    """The 10.50 relief text clears the 195.09 line and the plate's west edge.
+def test_relief_id_names_the_feature_without_a_compass_or_a_size() -> None:
+    """MHA-091 round 6, B1: the relief is named by a leadered ID, not by a
+    callout stacked on its 10.50 (Fable review, 63fb3bd2d).  The ID carries
+    no value -- the 10.50 is the only size (rule 6) -- and names its open
+    end by a feature: sheet-down is model north, so "OPEN TO NORTH EDGE"
+    contradicted a relief opening toward the sheet's lower edge (codex B2 on
+    68565ace; Main kept the ban in round 6)."""
+    note = drawing.RELIEF_ID_NOTE
+    lines = note.text.split("\n")
+    assert lines == ["TOP RELIEF", "FULL R ON PIVOT", "OPEN THRU", "PIVOT END"]
+    assert not any(ch.isdigit() for ch in note.text)
+    assert not any(word in note.text for word in ("NORTH", "SOUTH", "EAST", "WEST"))
+    assert "PIVOT" in lines[-1]
+    assert spec.PIVOT_RELIEF_FIT_REQUIREMENT.startswith("TOP RELIEF: ")
+    assert not hasattr(drawing, "RELIEF_WIDTH_CALLOUT")
+    assert note.feature == "PivotBearingRelief"
+    assert note.radius_mm == spec.PIVOT_BEARING_RELIEF_DIAMETER / 2.0
+    assert note.arc_center_mm == (0.0, 0.0)
 
-    8783776d: centred at x 0.150, "OPEN TO NORTH EDGE" (50.4 mm, 2.8 mm a
-    character) ran through the 195.09 line (x 0.1300) and the plate's west
-    edge (x 0.1679 at that height).  Short lines keep the block ~34 mm wide
-    at most; five of them still clear the 13.12 row above.
-    """
-    lines = ("10.50", *drawing.RELIEF_WIDTH_CALLOUT.split("\n"))
-    line_195, west_edge, char_w = 0.1300, 0.1679, 0.0028
 
-    def block(x: float, texts) -> tuple[float, float]:
-        width = max(len(text) for text in texts) * char_w
-        return (x - width / 2.0, x + width / 2.0)
+def test_relief_id_leader_reaches_the_u_unfenced() -> None:
+    """The block stands where the 10.50's callout stood (left of the plate,
+    right of the 195.09 line, over its pivot witness); its leader roots on
+    the first line and drops to the U's round end at 135 deg, clear of
+    detail B's circle.  With the 10.50 on the hole-location plan its line
+    fenced the U on three sides: this leader crossed it."""
+    note = drawing.RELIEF_ID_NOTE
+    box = _note_box(note)
+    line_195, pivot_witness_y = 0.1300, 0.13766
+    assert box[0] - line_195 >= 0.002
+    assert box[1] - pivot_witness_y >= 0.002
+    east_edge = min(
+        drawing.plan_xy(drawing.FEATURE_CENTER, drawing.plate_edge_mm(z, -1), z)[0]
+        for z in (0.0, -(box[3] - pivot_witness_y) / drawing.PLAN_SCALE)
+    )
+    assert east_edge - box[2] >= 0.002
+    pivot = drawing.plan_xy(drawing.FEATURE_CENTER, 0.0, 0.0)
+    tip = drawing.arc_note_tip(note)
+    assert math.dist(tip, pivot) == pytest.approx(
+        spec.PIVOT_BEARING_RELIEF_DIAMETER / 2.0 * drawing.PLAN_SCALE
+    )
+    assert tip[1] > pivot[1]  # the round end, over the pivot
+    leader = drawing.arc_note_leader(note, box[2] - box[0])
+    assert leader[0] == (box[2], box[3] - drawing.NOTE_LEADER_ROOT_DROP)
+    detail_b = drawing.plan_xy(drawing.FEATURE_CENTER, 0.0, spec.TIP_SCREW_LOCAL_Z)
+    b_radius = drawing.DETAIL_RADIUS_MM * drawing.PLAN_SCALE
+    assert _drawing_leaders.distance_to_point(leader, detail_b) - b_radius >= 0.002
+    assert "PivotBearingReliefDia" not in drawing.FEATURE_KEEP
+    # Positive control: the 10.50's line where it stood on this plan (y
+    # 0.1413, from its left tail to a value at x 0.195).
+    old_line = ((0.1678, 0.1413), (0.195, 0.1413))
+    assert _drawing_leaders.segments_cross(leader, old_line)
 
-    x = drawing.FEATURE_KEEP["PivotBearingReliefDia"][0]
-    left, right = block(x, lines)
-    assert line_195 + 0.002 < left and right < west_edge - 0.002
-    # Positive control: 8783776d's three lines at x 0.150 hit both.
-    old_left, old_right = block(0.150, ("10.50", "TOP RELIEF", "OPEN TO NORTH EDGE"))
-    assert old_left < line_195 and old_right > west_edge
-    # The block stands on its shelf and grows up (aa9766da render: shelf
-    # 0.1438, 5.6 mm a line); the five lines top out under the 13.12 row's
-    # dimension line (0.1821) with 5 mm to spare.
-    shelf, pitch, row_13_12 = 0.1438, 0.0056, 0.1821
-    top = shelf + len(lines) * pitch
-    assert len(lines) == 5 and top <= row_13_12 - 0.005
-    # No compass word: sheet-down is model north (codex B2 on 68565ace).
-    assert not any(word in drawing.RELIEF_WIDTH_CALLOUT for word in ("NORTH", "SOUTH"))
-    assert "PIVOT" in drawing.RELIEF_WIDTH_CALLOUT.split("\n")[-1]
+
+def test_the_10_50_prints_over_the_profile_u() -> None:
+    """On the profile the 10.50 stands 1 mm over the relief's round end,
+    its value right of the plate: clear of the R8.0, above the 11.0's
+    witness top, well under the C-C line."""
+    assert drawing.DIMENSION_OWNER["PivotBearingReliefDia"] == "profile plan"
+    x, y = drawing.PROFILE_KEEP["PivotBearingReliefDia"]
+    pivot = drawing.PROFILE_PIVOT_XY
+    half = spec.PIVOT_BEARING_RELIEF_DIAMETER / 2.0 * drawing.PLAN_SCALE
+    assert y - (pivot[1] + half) == pytest.approx(0.001, abs=2e-4)
+    text = drawing._centred_box((x, y), (len("10.50") * _DIM_CHAR_W, _DIM_GLYPH_H))
+    assert text[0] - (pivot[0] + half) >= 0.004
+    west_edge = drawing.plan_xy(
+        drawing.PROFILE_CENTER, drawing.plate_edge_mm(-(y - pivot[1]) / drawing.PLAN_SCALE, 1), 0.0
+    )[0]
+    assert text[0] - west_edge >= 0.002
+    r8 = drawing._centred_box(drawing.PROFILE_KEEP["CornerNWR"], (0.0151, 0.0035))
+    assert _box_gap(text, r8) >= 0.005
+    assert text[1] - _D382_NORTH_WEST_X_WITNESS[1][1] >= 0.004
+    cc_y = drawing.plan_xy(drawing.PROFILE_CENTER, 0.0, spec.TIP_SCREW_LOCAL_Z)[1]
+    assert cc_y - text[3] >= 0.004
 
 
 def test_tip_slot_station_prints_on_the_notch_plan_off_the_plate() -> None:
@@ -1928,53 +1838,52 @@ def test_north_west_half_width_keeps_the_block_on_the_plate_at_full_west_travel(
     assert part.WEST_HALF_S == 37.0
 
 
-# The two location dimensions' witnesses at the notch-plan cap, as d382
-# printed them (C:/src/dt-logs/spring/tipslot-d382-leaf.log:418 and :425):
-# the 33.00 (CapECx) rises from (273.3, 241.6) and the 205.81 (CapECz) runs
-# east from (274.3, 240.6), both ~1 mm off the cap centre, inside its arc.
-_D382_CAP_WITNESS_STARTS = {
-    "CapECx": (0.2733, 0.2416),
-    "CapECz": (0.2743, 0.2406),
-}
+def test_detail_b_callouts_identify_features_without_size_or_cutter() -> None:
+    """MHA-091 Fable review (63fb3bd2d): "END MILL" is a process, and the
+    Ø4 / Ø6.5 callouts restated the banded 4.0 and 6.50 dimensions in another
+    spelling.  The banded model dimensions own the widths; each leadered
+    note only names its feature."""
+    by_key = {note.key: note for note in drawing.CUTTER_NOTES}
+    assert by_key["slot"].text == "SLOT THRU"
+    assert by_key["cbore"].text == "C'BORE SLOT\nFROM UNDERSIDE"
+    for note in drawing.CUTTER_NOTES:
+        assert "END MILL" not in note.text
+        assert "<MOD-DIAM>" not in note.text
+        assert not any(ch.isdigit() for ch in note.text)
+    widths = spec.DRAWING_DIMENSIONS
+    assert "TipSlotW" in widths["TipScrewSlotProfile"]
+    assert "TipCboreW" in widths["TipScrewCboreProfile"]
 
 
-def test_no_diameter_leader_on_the_notch_plan_clears_the_cap_witnesses() -> None:
-    """MHA-091 item 3's fence, swept: a diameter leader runs the full
-    diameter through the cap centre toward its text.  Both witnesses start
-    inside the arc (1.03 and 1.05 mm out), so for EVERY leader direction the
-    ink passes within ~1.05 mm of both starts: at the printed ~1 mm witness
-    gaps no placement of the Ø8.00 on the notch plan reaches the 2 mm floor,
-    so it leaves the view."""
-    cap = drawing.plan_xy(drawing.NOTCH_CENTER, part.SLOT_E_X, part.SLOT_E_Z)
-    radius = part.SLOT_W / 2.0 * drawing.PLAN_SCALE
-    reach = 0.050  # past any text position on the sheet
-    worst = {name: 0.0 for name in _D382_CAP_WITNESS_STARTS}
-    for step in range(720):
-        theta = math.radians(step / 2.0)
-        direction = (math.cos(theta), math.sin(theta))
-        leader = (
-            (cap[0] - radius * direction[0], cap[1] - radius * direction[1]),
-            (cap[0] + reach * direction[0], cap[1] + reach * direction[1]),
-        )
-        for name, start in _D382_CAP_WITNESS_STARTS.items():
-            gap = _drawing_leaders.distance_to_point(leader, start)
-            worst[name] = max(worst[name], gap)
-    for name, start in _D382_CAP_WITNESS_STARTS.items():
-        assert math.dist(start, cap) < radius
-        assert worst[name] == pytest.approx(math.dist(start, cap), abs=2e-5)
-        assert worst[name] < 0.0011 < drawing.LEADER_INK_CLEARANCE
+# The profile's pivot end as d382 printed it (tipslot-d382-leaf.log:261 and
+# :302-342): the R8.0 fillet centre, and the 11.0 (NorthWestX) with its west
+# witness at x 0.0773 rising to 0.1332 under the corner.
+_D382_NW_FILLET_CENTRE = (0.07373, 0.13816)
+_D382_NORTH_WEST_X_WITNESS = ((0.0773, 0.1112), (0.0773, 0.1332))
+_D382_NORTH_WEST_X_TEXT = (0.0942, 0.1122, 0.1093, 0.1157)
 
 
-class _GeneratedArrowStyleWrapper:
-    """GetArrowHeadStyle2 as the generated sldworks wrapper declares it: two
-    by-reference in/out ints; a call without them is what the seat refused
-    with 'Type mismatch.' in tipslot-r5-e7d8."""
-
-    def GetArrowHeadStyle2(self, *args: object) -> tuple[bool, int, int]:
-        if len(args) != 2 or not all(isinstance(value, int) for value in args):
-            raise TypeError("Type mismatch.")
-        return True, 1, 1
-
-
-def test_arrowhead_styles_seeds_both_by_reference_ints() -> None:
-    assert drawing.arrowhead_styles(_GeneratedArrowStyleWrapper()) == (1, 1)
+def test_the_r8_0_stands_near_its_corner() -> None:
+    """MHA-091 Fable review minor: the R8.0 leader ran ~58 mm from the corner
+    across the 11.0's field (d382: shoulder to x 0.1409).  Its text now sits
+    by the corner: the ray still meets the fillet between its tangents, the
+    leader stays 2 mm off the 11.0's witness top and text."""
+    text = drawing.PROFILE_KEEP["CornerNWR"]
+    centre = _D382_NW_FILLET_CENTRE
+    shoulder_y = text[1] - drawing.LEADER_SHOULDER_DROP
+    knee = (text[0] - drawing.LEADER_SHOULDER_HALF, shoulder_y)
+    far = (text[0] + drawing.LEADER_SHOULDER_HALF, shoulder_y)
+    angle = math.degrees(math.atan2(knee[1] - centre[1], knee[0] - centre[0]))
+    assert -80.0 < angle < -10.0
+    unit = ((knee[0] - centre[0]), (knee[1] - centre[1]))
+    length = math.hypot(*unit)
+    radius = 8.0 * drawing.PLAN_SCALE
+    arc_point = (centre[0] + radius * unit[0] / length, centre[1] + radius * unit[1] / length)
+    leader = [(arc_point, knee), (knee, far)]
+    assert far[0] - arc_point[0] < 0.035  # d382: 0.0674
+    for segment in leader:
+        assert _drawing_leaders.distance_to_point(segment, _D382_NORTH_WEST_X_WITNESS[1]) >= 0.002
+        assert _drawing_leaders.distance_to_box(segment, _D382_NORTH_WEST_X_TEXT) >= 0.002
+        assert not _drawing_leaders.segments_cross(segment, _D382_NORTH_WEST_X_WITNESS)
+    box = drawing._centred_box(text, (0.0151, 0.0035))
+    assert _box_gap(box, _D382_NORTH_WEST_X_TEXT) >= 0.005
