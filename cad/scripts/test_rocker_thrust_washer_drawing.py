@@ -57,21 +57,48 @@ def test_registry_row_is_the_turned_mha_148() -> None:
     assert "turned" in str(row["process"])
 
 
-def test_part_stamps_the_title_block_properties_before_saving() -> None:
-    """r743-p1s-A: the MHA-148 drawing refused its source part, which carried
-    no Material Specification, Finish or Quantity (the build never stamped
-    them)."""
-    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
-    calls = {
+def _calls(path: str) -> dict[str, ast.Call]:
+    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
+    return {
         node.func.id: node
         for node in ast.walk(tree)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     }
-    stamp = calls["apply_drawing_properties"]
-    assert [ast.unparse(a) for a in stamp.args] == ["adapter", "PART_NAME"]
-    assert stamp.lineno < calls["save_part_and_images"].lineno
-    row = _config.parts(part.PART_NAME)
-    assert all(row[key] for key in ("material_specification", "finish", "quantity"))
+
+
+def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
+    """r743-p1s-A: the MHA-148 drawing refused its source part, which carried
+    no Material Specification, Finish or Quantity: the build never stamped
+    them. The properties the part carries are the save's own set
+    (part_properties) plus, when the build calls it before saving,
+    apply_drawing_properties' set; every property the drawing requires must be
+    among them and non-blank."""
+    import _common
+    import _drawing_marks
+
+    required = ast.literal_eval(
+        next(
+            k.value
+            for k in _calls(drawing.__file__)["read_required_properties"].keywords
+            if k.arg == "required"
+        )
+    )
+    carried = dict(_common.part_properties(part.PART_NAME))
+    build_calls = _calls(part.__file__)
+    stamp = build_calls.get("apply_drawing_properties")
+    if stamp is not None:
+        assert [ast.unparse(a) for a in stamp.args] == ["adapter", "PART_NAME"]
+        assert stamp.lineno < build_calls["save_part_and_images"].lineno
+        stamped = {}
+        monkeypatch.setattr(
+            _drawing_marks,
+            "apply_custom_properties",
+            lambda _adapter, props: stamped.update(props),
+        )
+        _drawing_marks.apply_drawing_properties(None, part.PART_NAME)
+        carried.update(stamped)
+    missing = [name for name in required if not str(carried.get(name) or "").strip()]
+    assert missing == []
 
 
 def test_both_running_faces_carry_the_machined_finish() -> None:
