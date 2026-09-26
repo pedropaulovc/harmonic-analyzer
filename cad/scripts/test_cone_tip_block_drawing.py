@@ -470,6 +470,28 @@ def test_plan_values_stand_off_the_part_and_each_other() -> None:
     assert letter[2] <= drawing.TOP_CENTER[0]
 
 
+def test_slot_location_witness_clears_the_section_line_overshoot() -> None:
+    """Main (a1b154f69 review): FlangeSlotX's witness leaves the slot centre,
+    on section A-A's chain line (the cutting plane is X = 0), so drawn over
+    the chain line's south overshoot the two read as one stroke.  The witness
+    starts EXTENSION_GAP past the overshoot's end, and the gap the build sets
+    from the slot centre lands it exactly there."""
+    x = drawing.TOP_CENTER[0]
+    tail = drawing.sheet_section_arrows()["section A south"][0]
+    assert tail[0] == pytest.approx(x)
+    witnesses = [
+        segment
+        for segment in drawing.sheet_dimension_ink()["FlangeSlotX"].lines
+        if all(abs(px - x) < 1e-9 for px, _py in segment)
+    ]
+    assert len(witnesses) == 1
+    start = min(py for _px, py in witnesses[0])
+    assert start >= tail[1] + drawing.EXTENSION_GAP - 1e-12
+    assert drawing._plan_y(
+        drawing.FLANGE_SLOT_CENTER_Z
+    ) + drawing.FLANGE_SLOT_X_CENTRE_WITNESS_GAP == pytest.approx(start)
+
+
 # Ink measured on the I31 farm render (7ab69742b, cone-tip-block_drawing.png,
 # 5100 x 3300 px = 431.8 x 279.4 mm, 11.81 px/mm): connected-component boxes
 # of the dark pixels (< 128), converted to sheet mm with y up from the sheet's
@@ -571,7 +593,7 @@ _R287_PLACEMENT = {
         'h, (ax, ax + plus_x * half_x), (top, top), drop("PassageCenter"), out'
     ),
     "TOP_CENTER[0] - BLOCK_X * _S / 4.0,": "TOP_CENTER[0] + BLOCK_X * _S / 4.0,",
-    'h, (_PLAN_LEFT, tc), (_plan_y(Z_SOUTH),) * 2, drop("FlangeSlotX"), out': (
+    'h, (_PLAN_LEFT, tc), (_plan_y(Z_SOUTH), SECTION_SOUTH_OVERSHOOT_END_Y), drop("FlangeSlotX"), out': (
         'h, (tc, _PLAN_RIGHT), (_plan_y(Z_SOUTH),) * 2, drop("FlangeSlotX"), out'
     ),
     "FRONT_CENTER[0] + SLIT_TEXT_OFFSET,": "FRONT_CENTER[0] - SLIT_TEXT_OFFSET,",
