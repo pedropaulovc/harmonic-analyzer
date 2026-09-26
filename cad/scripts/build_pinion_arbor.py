@@ -100,10 +100,6 @@ PART_NAME = "pinion-arbor"
 # and why.  Delete an entry once the part hides that sketch; the release
 # refuses to start while any part lists one (visibility_debt).
 SHOWN_SKETCH_ALLOWANCES = {
-    "BackJournalReference": (
-        "pinioncluster: carries the drawing's marked dimensions; hide it once "
-        "the sheet imports them from the hidden sketch"
-    ),
     "BackRimReference": (
         "pinioncluster: carries the drawing's marked dimensions; hide it once "
         "the sheet imports them from the hidden sketch"
@@ -113,10 +109,6 @@ SHOWN_SKETCH_ALLOWANCES = {
         "the sheet imports them from the hidden sketch"
     ),
     "DrumStationReference": (
-        "pinioncluster: carries the drawing's marked dimensions; hide it once "
-        "the sheet imports them from the hidden sketch"
-    ),
-    "FrontJournalReference": (
         "pinioncluster: carries the drawing's marked dimensions; hide it once "
         "the sheet imports them from the hidden sketch"
     ),

@@ -300,11 +300,9 @@ def test_every_standalone_save_path_runs_the_check() -> None:
 # their parts; nobody adds one.  Shrink this snapshot along with the list.
 _SNAPSHOT = {
     "pinion-arbor": {
-        "BackJournalReference",
         "BackRimReference",
         "BondZoneReference",
         "DrumStationReference",
-        "FrontJournalReference",
         "OverallReference",
         "PinStationReference",
     },
