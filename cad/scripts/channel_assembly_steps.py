@@ -8,14 +8,15 @@ only the order. Pure data: no SolidWorks, no config reads.
 
 from __future__ import annotations
 
+import drive_train_steps
+
 DRAWING_NUMBER = "MHA-A02"
 # The north pivot bracket is set by DRO in the drive-train fit-up, off the
 # located drum bank's datum (user ruling on #936 P1 b, option A), so this sheet
-# points there. MHA-A03 prints NORTH_BRACKET_SET_STEP as that step's head, so
-# the pointer and the head cannot drift apart.
-FITUP_DRAWING_NUMBER = "MHA-A03"
-NORTH_BRACKET_SET_STEP = "9G"
-NORTH_BRACKET_SET_REF = f"{FITUP_DRAWING_NUMBER} STEP {NORTH_BRACKET_SET_STEP}"
+# points there by key: MHA-A03 prints the same key's number as the step head,
+# so the pointer follows any renumbering of MHA-A03.
+NORTH_BRACKET_SET_KEY = "north-pivot-bracket-set"
+NORTH_BRACKET_SET_REF = drive_train_steps.step_ref(NORTH_BRACKET_SET_KEY)
 
 SEQUENCE: tuple[str, ...] = (
     "rocker-stack-accepted",

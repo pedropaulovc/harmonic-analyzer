@@ -22,6 +22,10 @@ SEQUENCE: tuple[str, ...] = (
     # Cylinder bank (BANK_STEPS).
     "cylinder-stack-accepted",
     "cylinder-bank-located",
+    # #936 P1 b (user ruling, option A): the rocker bank's north MHA-123 is
+    # set on the bank's DRO zero, so it closes BANK_STEPS. Channel assembly
+    # MHA-A02 cites it by key (channel_assembly_steps).
+    "north-pivot-bracket-set",
     # Pinion rig (RIG_STEPS).
     "cam-pins-seated",
     "crossrod-fitted",
@@ -48,5 +52,5 @@ def step_number(key: str) -> int:
 
 
 def step_ref(key: str) -> str:
-    """A pointer another sheet prints, e.g. ``MHA-A03 STEP 19``."""
+    """A pointer another sheet prints, e.g. ``MHA-A03 STEP 20``."""
     return f"{DRAWING_NUMBER} STEP {step_number(key)}"

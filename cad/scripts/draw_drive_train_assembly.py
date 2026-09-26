@@ -24,9 +24,10 @@ from typing import Any, Callable, Literal, Sequence
 
 import _seat_forensics
 import _telemetry
-import channel_assembly_steps as channel_steps
 import connecting_rod_spec as rod
 import cylinder_bank_layout as bank
+import drive_train_steps as steps
+from channel_assembly_steps import NORTH_BRACKET_SET_KEY
 from _common import _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
@@ -225,7 +226,7 @@ REFERENCE_ISO_CENTER = (0.380, 0.110)
 # needs for its title-block property links (finalize_drawing refuses a sheet
 # without a view: r8, leaf 20260923T214354Z-1-4126331f). Sheet 6 carries steps
 # 1-7 and the general notes on the left, its right field kept free for D1; the
-# bank's steps 8-9G fill sheet 7's left field; steps 10-21 continue on sheet 8
+# bank's steps 8-10 fill sheet 7's left field; steps 11-22 continue on sheet 8
 # beside the station table (Main, B1 re-ruling 2026-09-26).
 ISO_RIGHT_FIELD = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
@@ -501,9 +502,9 @@ BANK_STEPS = "\n".join(
         # Y is the hole-table rear-face distance of the ear inner face,
         # BOTTOM_REAR_Z - NORTH_EAR_INNER_Z = 67.711, held to the same
         # BACK_STRAP_LOCATE_BAND edge-find as 9A. Channel assembly MHA-A02
-        # cites this head through channel_steps.NORTH_BRACKET_SET_REF. The
+        # cites this step by key (channel_steps.NORTH_BRACKET_SET_REF). The
         # band the rod pins need from it is open: #948.
-        f"{channel_steps.NORTH_BRACKET_SET_STEP}. MHA-089 SCREWED DOWN ON THE BASE"
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}. MHA-089 SCREWED DOWN ON THE BASE"
         " (FRAME ASSEMBLY MHA-A04 STEP 8),",
         "   DRO STILL ZEROED AS 9A. STAND THE NORTH MHA-123 ON THE MHA-089",
         "   RAIL, EAR TO THE BACK. SET ITS EAR INNER FACE TO Y 67.62-67.81;",
@@ -520,32 +521,32 @@ RIG_STEPS = "\n".join(
         # bonded, the drum blocks MHA-102 from the north and its 15 mm head
         # from the south. So the arbor passes the front strap bare, back end
         # first, and the drum is bonded after (reviewfirst, Main 2026-09-24).
-        "10. PRESS {cam_pins}X MHA-116 INTO THE MHA-056 SEATS PER ITS PRINT.",
-        "11. MATCH-REAM THE MHA-102 HEAD TO MHA-058; PRESS MHA-058 (NO TURN OR",
+        "11. PRESS {cam_pins}X MHA-116 INTO THE MHA-056 SEATS PER ITS PRINT.",
+        "12. MATCH-REAM THE MHA-102 HEAD TO MHA-058; PRESS MHA-058 (NO TURN OR",
         "    SLIDE BY HAND).",
         # R1a (user): pinned retention collar MHA-144 (#860). It goes on
         # before the arbor is journalled (pinion_arbor_collar_spec); the pin
         # is the rig's 1/16 x 1/2 slotted spring pin, never proud of the Ø15.
-        "12. SLIDE MHA-144 ON FROM THE MHA-102 BACK END, PAST BOTH JOURNALS,",
+        "13. SLIDE MHA-144 ON FROM THE MHA-102 BACK END, PAST BOTH JOURNALS,",
         "    TO THE MHA-102 PIN HOLE; DRIVE ONE 1/16 X 1/2 SPRING PIN THROUGH",
         "    BOTH, SUB-FLUSH.",
-        "13. PASS MHA-102, BACK END FIRST, THROUGH THE FRONT MHA-056 TOP BORE",
+        "14. PASS MHA-102, BACK END FIRST, THROUGH THE FRONT MHA-056 TOP BORE",
         "    FROM THE HEAD SIDE.",
-        "14. FIT MHA-002 ON MHA-102 PER THE MHA-102 PRINT.",
-        "15. JOURNAL THE MHA-102 BACK END IN THE BACK MHA-056 TOP BORE; HANG",
+        "15. FIT MHA-002 ON MHA-102 PER THE MHA-102 PRINT.",
+        "16. JOURNAL THE MHA-102 BACK END IN THE BACK MHA-056 TOP BORE; HANG",
         "    BOTH MHA-056 ON MHA-062 THROUGH {pivot_blocks}X MHA-061.",
         # E-a (user): the strap feet are pinned to the torque shaft. Right
         # after the hang: MHA-062 is drilled off the machine (the cams sit
         # ~18.5 west of the foot), and once the cams are on, the pin's west
         # edge has 0.38 of air to the MHA-104 collar. Wording from
         # pinioncluster (dt-torque-shaft-pin-fitup-steps-20260924.md), #858.
-        "16. PUSH THE HUNG CLUSTER HARD ON THE BACK MHA-061; SET",
+        "17. PUSH THE HUNG CLUSTER HARD ON THE BACK MHA-061; SET",
         "    MHA-062 FLUSH WITH ITS OUTER FACE. TRANSFER-PUNCH MHA-062 THROUGH",
         "    EACH MHA-056 CROSS HOLE; WITHDRAW IT AND DRILL 1/16 THRU AT EACH",
         "    MARK (V-BLOCK). REFIT MHA-062 FLUSH END BACK; DRIVE ONE 1/16 X 1/2",
         "    SPRING PIN PER STRAP, SUB-FLUSH BOTH EDGES. THE CLUSTER SWINGS",
         "    FREELY AND MHA-062 TURNS WITH IT IN BOTH MHA-061.",
-        "17. FIT {cams}X MHA-104 AND MHA-059 ON MHA-060 IN THE MHA-061 LIFT",
+        "18. FIT {cams}X MHA-104 AND MHA-059 ON MHA-060 IN THE MHA-061 LIFT",
         "    BORES. PARK EACH CAM ECCENTRIC DOWN; LOCK IT WITH THE M2.5 SET",
         "    SCREW SUPPLIED WITH MHA-104. SEAT MHA-059 ON MHA-060 TO THE BORE",
         "    FLOOR, GRIP AT ITS PARK ANGLE; AT 3 O'CLOCK MATCH-DRILL 1/16",
@@ -556,16 +557,16 @@ RIG_STEPS = "\n".join(
         # TRANSFER FROM MHA-061. The level line of centres makes block travel
         # equal gap change; 2.5 is the physical rest gap, not the CAD gap
         # (pinioncluster, PR #837).
-        "18. LOCATE THE RIG ON BASE MHA-035 (FRAME ASSEMBLY MHA-A04); ITS",
+        "19. LOCATE THE RIG ON BASE MHA-035 (FRAME ASSEMBLY MHA-A04); ITS",
         "    SEATS ARE TRANSFERRED, NOT PRE-DRILLED. SET BOTH MHA-061 LOOSE",
         "    ON THE BASE WITH MHA-114 FITTED.",
         "    PARK MHA-059: THE MHA-116 PINS REST ON THE CAMS UNDER THE SPRING.",
-        "19. FACE A MHA-002 TOOTH TIP TO A MHA-027 TOOTH TIP ON THE LEVEL",
+        "20. FACE A MHA-002 TOOTH TIP TO A MHA-027 TOOTH TIP ON THE LEVEL",
         "    LINE OF CENTRES. SLIDE THE RIG IN UNTIL A 2.5 FEELER (E.G. 2.00",
         "    + 0.50 LEAVES) IS SNUG; ACCEPT 2.3-2.7. SET IT AT THE FRONT AND",
         "    BACK STATIONS TO SQUARE BOTH MHA-061 TO THE DRUM.",
         # #854 Codex P1: the front-block end-play feeler is set here, before
-        # the clamp and before step 20 spots the seats. Wording from
+        # the clamp and before step 21 spots the seats. Wording from
         # pinioncluster; the band is pinion_rig_layout FRONT_BLOCK_FEELER
         # 0.25 with FRONT_BLOCK_FEELER_BAND 0.10, printed as limits (the purity
         # gate keeps bilateral bands in the spec). PENDING until #854 lands,
@@ -577,12 +578,12 @@ RIG_STEPS = "\n".join(
         # BLOCK_/FOOT_SCREW_DRILL_DEPTH and _HOLE_DEPTH; the #8-32 pair is the
         # rule-12 E10 re-derive on dt-pinion-lever-pin #844). FOOT_HOLE_DEPTH
         # 8.975 prints as 9.0: .X +/-0.8 is the honest band for a tap depth.
-        "20. SPOT MHA-035 THROUGH THE MHA-061 HOLES; DRILL #29 X 15.0, TAP",
+        "21. SPOT MHA-035 THROUGH THE MHA-061 HOLES; DRILL #29 X 15.0, TAP",
         "    #8-32 X 12.75 (PLUG, THEN BOTTOMING), {slotted} PLACES. SET",
         "    MHA-114 WITH ITS TERMINAL FLAT ON THE PARKED BACK MHA-056; SPOT",
         "    THROUGH ITS FOOT HOLE; DRILL #43 X 11.0, TAP #4-40 X 9.0 (PLUG,",
         "    THEN BOTTOMING), 1 PLACE. FIT {slotted}X MHA-101 AND 1X MHA-103.",
-        f"21. OTHER BASE MOUNTING: SEE SHEET {CHECKS_SHEET}, EXTERNAL INTERFACES.",
+        f"22. OTHER BASE MOUNTING: SEE SHEET {CHECKS_SHEET}, EXTERNAL INTERFACES.",
     )
 )
 
@@ -618,7 +619,7 @@ CHECKS = "\n".join(
         "   (SINES). RETURN MHA-059 TO PARK; RE-ENGAGE THE CONE SET.",
         "6. PARKED, MHA-114 HOLDS MHA-002 CLEAR OF EVERY MHA-027.",
         "7. PARKED, PINS ON THE CAMS: A 2.5 FEELER IS SNUG TIP TO TIP AT THE",
-        f"   FRONT AND BACK STATIONS; ACCEPT 2.3-2.7 (SHEET {FIT_SHEET}, STEP 19).",
+        f"   FRONT AND BACK STATIONS; ACCEPT 2.3-2.7 (SHEET {FIT_SHEET}, STEP 20).",
     )
 )
 

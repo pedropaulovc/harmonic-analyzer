@@ -20,7 +20,7 @@ SCRIPTS = Path(__file__).resolve().parent
 PARTS = SCRIPTS.parent / "config" / "parts"
 BUILDER = SCRIPTS / "build_drive_train_assembly.py"
 # Installation interfaces the package may cite without owning a BOM row.
-# Step 9G sets the channel's north MHA-123 on the frame's MHA-089 (#936 P1 b).
+# Step 10 sets the channel's north MHA-123 on the frame's MHA-089 (#936 P1 b).
 EXTERNAL_NUMBERS = frozenset({"MHA-035", "MHA-089", "MHA-123"})
 # Ruled hardware the sequence already names while its BOM row, cluster stem and
 # explode step wait for the drive-train integrator's single re-key (Main,
@@ -195,8 +195,8 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
     steps = drawing.RIG_STEPS
     for phrase in ("TRANSFERRED", "2.5 FEELER", "ACCEPT 2.3-2.7", "#8-32", "#4-40"):
         assert phrase in steps, phrase
-    assert f"ACCEPT 2.3-2.7 (SHEET {drawing.FIT_SHEET}, STEP 19)" in drawing.CHECKS
-    assert "19. FACE A MHA-002 TOOTH TIP" in steps
+    assert f"ACCEPT 2.3-2.7 (SHEET {drawing.FIT_SHEET}, STEP 20)" in drawing.CHECKS
+    assert "20. FACE A MHA-002 TOOTH TIP" in steps
     assert f"SEE SHEET {drawing.CHECKS_SHEET}" in drawing.ASSEMBLED_HEADING
     assert f"SEE SHEET {drawing.CHECKS_SHEET}, EXTERNAL" in drawing.RIG_STEPS
     assert f"PINION RIG: CONT. ON SHEET {drawing.FIT_SHEET}." in drawing.BANK_STEPS
@@ -696,7 +696,7 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
     back_y = base.BOTTOM_REAR_Z - bank.BACK_STRAP_INNER_Z
     band = bank.BACK_STRAP_LOCATE_BAND
     assert f"Y {limits(back_y - band, back_y + band, 2)}" in steps
-    # 9G: the north MHA-123 ear inner face on the same DRO zero and band.
+    # Step 10: the north MHA-123 ear inner face on the same DRO zero and band.
     ear_y = base.BOTTOM_REAR_Z - rockers.NORTH_EAR_INNER_Z
     assert f"EAR INNER FACE TO Y {limits(ear_y - band, ear_y + band, 2)}" in steps
     assert f"A {bank.BANK_END_FEELER:.2f} LEAF" in steps
