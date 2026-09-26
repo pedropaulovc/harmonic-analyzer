@@ -82,9 +82,10 @@ DUMP_SCHEMA = 1
 class LayoutAuditMode(Enum):
     """What finalize_drawing does with findings.
 
-    REPORT logs every finding and never fails the leaf: it exists so one fleet
-    run can size the blast radius and hand each owner a finding list before the
-    audit gates anything. GATE raises on any gating finding.
+    REPORT logs every finding and fails the leaf only on ``ENFORCED_KINDS``:
+    it exists so one fleet run can size the blast radius and hand each owner a
+    finding list before the audit gates everything. GATE raises on any gating
+    finding.
     """
 
     REPORT = "report"
@@ -1420,14 +1421,29 @@ def classify_segments(
       from ``GetLeaderPointsAtIndex`` (``_registered_leaders``), and the
       display-data copy of each leader run is dropped (``_same_run``), so a
       leader is not reported twice, as line and as leader.
+    * Except a line that meets the annotation's own arrowhead or triangle
+      (not a dimension's: its dimension lines end at its arrows). That line
+      carries the annotation to its feature, so it is a leader, whether or
+      not COM registers it: knife-mount's datum tag A registers none, and
+      its display data runs one line from the tag's frame to its datum
+      triangle (d09c2b9eb, Codex P2 on #901).
     """
     shoulder_ids = {id(s) for s in shoulders}
     hole_callout = bool((annotation.get("dim") or {}).get("hole_callout"))
+    arrows = [s for s in segments if s.role == "arrow"] if kind != "dim" else []
+
+    def meets_arrow(segment: Segment) -> bool:
+        return any(
+            point_segment_distance(end, arrow) <= COLLINEAR_TOL_M
+            for end in ((segment.x0, segment.y0), (segment.x1, segment.y1))
+            for arrow in arrows
+        )
+
     roles = []
     for segment in segments:
         if id(segment) in shoulder_ids:
             role = "shoulder"
-        elif hole_callout and segment.role == "line":
+        elif segment.role == "line" and (hole_callout or meets_arrow(segment)):
             role = "leader"
         else:
             role = segment.role
@@ -3308,10 +3324,27 @@ GATING_KINDS = frozenset(
 )
 
 
+# Gating kinds that fail the leaf in every mode, REPORT included. a5563c7a0
+# retired check_drawing_layout's nominal dimension box, whose border and
+# title-block checks failed the build; this audit took them over, so they
+# must not drop to a log line while it reports (Codex P2 on #901,
+# PRRT_kwDOPHDy386mTiwV). None fired on the layoutcal2 / c2 / b49e1 replay
+# (9 drawings). A kind joins once its fleet count is zero; GATE is this set
+# grown to GATING_KINDS.
+ENFORCED_KINDS = frozenset({"outside-border", "keep-out"})
+
+
 def severity(finding: Finding) -> FindingSeverity:
     if finding.kind in GATING_KINDS:
         return FindingSeverity.GATING
     return FindingSeverity.ADVISORY
+
+
+def enforced(mode: LayoutAuditMode, gating: Sequence[Finding]) -> list[Finding]:
+    """The gating findings that fail the leaf under ``mode``."""
+    if mode is LayoutAuditMode.GATE:
+        return list(gating)
+    return [finding for finding in gating if finding.kind in ENFORCED_KINDS]
 
 
 def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:

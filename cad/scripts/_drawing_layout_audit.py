@@ -46,6 +46,7 @@ from _layout_audit import (
     LAYOUT_AUDIT_MODE,
     LayoutAuditMode,
     audit_report,
+    enforced,
     layered_items,
     replace_text,
 )
@@ -516,7 +517,9 @@ def run_layout_audit(
     is_pictorial: Callable[[str], bool],
     mode: LayoutAuditMode = LAYOUT_AUDIT_MODE,
 ) -> None:
-    """Dump and audit every sheet, write ``report``; under GATE, raise on a gating finding.
+    """Dump and audit every sheet, write ``report``; raise on a finding
+    ``enforced`` under ``mode`` (every gating one under GATE, the
+    ``ENFORCED_KINDS`` under REPORT).
 
     A collector or audit fault fails the drawing in every mode: a report that
     silently skipped a sheet would under-count the fleet calibration. The
@@ -562,8 +565,9 @@ def run_layout_audit(
             f"layout audit {stem}: {summary['sheets']} sheet(s), {summary['gating']} gating, "
             f"{summary['findings']} -> {report}"
         )
-        if gating and mode is LayoutAuditMode.GATE:
+        failing = enforced(mode, gating)
+        if failing:
             raise RuntimeError(
-                f"drawing layout audit failed for {stem}: {len(gating)} gating finding(s):\n"
-                + "\n".join(f"  - {finding.format()}" for finding in gating)
+                f"drawing layout audit failed for {stem} ({mode.value} mode): {len(failing)} "
+                f"enforced finding(s):\n" + "\n".join(f"  - {finding.format()}" for finding in failing)
             )

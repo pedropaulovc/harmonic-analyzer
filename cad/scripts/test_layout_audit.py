@@ -3371,6 +3371,67 @@ def test_one_thread_is_one_callout_only_within_one_hole_group(extra_rings, tip, 
     assert [f.extra.get("association") for f in duplicates] == ([association] if association else [])
 
 
+@pytest.mark.parametrize(
+    ("x", "y", "kind"),
+    [(0.418, 0.200, "outside-border"), (0.300, 0.040, "keep-out")],
+    ids=["past-the-border", "on-the-title-block"],
+)
+def test_a_dimension_past_the_border_or_on_the_title_block_fails_in_report_mode(x, y, kind):
+    """Codex P2 on #901 (PRRT_kwDOPHDy386mTiwV): a5563c7a0 retired the
+    nominal dimension box whose border and title-block checks failed the
+    build, and under REPORT this audit only logged them. They are
+    ENFORCED_KINDS now: they fail the leaf in every mode, while any other
+    gating kind still only reports."""
+    from _layout_audit import enforced
+    from _layout_geometry import Finding
+
+    dump = _dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [_dim("Stray", "20.0", x, y)])])
+    findings = [f for f in audit_dump(dump) if "Stray" in f.a or "Stray" in f.b]
+    assert kind in _kinds(findings)
+    assert [f.kind for f in enforced(LayoutAuditMode.REPORT, findings)] == [kind]
+    clearance = Finding(kind="text-clearance", sheet="Sheet2", a="dim A", b="dim B", detail="")
+    assert enforced(LayoutAuditMode.REPORT, [clearance]) == []
+    assert enforced(LayoutAuditMode.GATE, [clearance]) == [clearance]
+
+
+# knife-mount's datum tag A (d09c2b9eb c2 dump, DetailItem350, verbatim): COM
+# registers no leader, and its display data runs one line from the tag's
+# frame down to its datum triangle.
+KM_DATUM_A = {
+    "type": 2,
+    "name": "DetailItem350",
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.115, 0.18737, 0.014],
+    "layer": "",
+    "display": {
+        "lines": [
+            [0.0, 0.0, 0.0, 0.0, 0.115, 0.169366, 0.014, 0.115, 0.18737, 0.014],
+            [0.0, 0.0, 0.0, 0.0, 0.1185, 0.18737, 0.014, 0.1115, 0.18737, 0.014],
+            [0.0, 0.0, 0.0, 0.0, 0.1115, 0.18737, 0.014, 0.1115, 0.19437, 0.014],
+            [0.0, 0.0, 0.0, 0.0, 0.1115, 0.19437, 0.014, 0.1185, 0.19437, 0.014],
+            [0.0, 0.0, 0.0, 0.0, 0.1185, 0.19437, 0.014, 0.1185, 0.18737, 0.014],
+        ],
+        "triangles": [[0.1164, 0.169366, 0.014, 0.1136, 0.169366, 0.014, 0.115, 0.171816, 0.014, 1.0, 0.0]],
+        "texts": [{"t": "A", "pos": [0.1132743, 0.1880919, 0.014], "h": 0.0035, "ref": 1, "ang": 0.0}],
+    },
+}
+
+
+def test_a_datum_tags_display_only_leader_is_a_leader():
+    """Codex P2 on #901 (PRRT_kwDOPHDy386mTiwX): a leader that exists only in
+    display data kept the ``line`` role, so no leader check saw it. Datum
+    tag A's line to its triangle is its leader: a foreign dimension's
+    extension line across it is a leader crossing a line. Its frame is not."""
+    foreign = _dim("Width", "20.0", 0.140, 0.200, lines=[(0.105, 0.178, 0.125, 0.178)])
+    view = _view("Drawing View1", (0.085412, 0.105046, 0.144588, 0.174954), [KM_DATUM_A, foreign])
+    geometry = sheet_model(_dump(views=[view])).geometry
+    [datum] = [a for a in geometry.annotations if "DetailItem350" in a.label]
+    assert [s.format_mm() for s in datum.segments if s.role == "leader"] == ["(115.0,169.4)->(115.0,187.4)mm"]
+    crossings = [f for f in audit_dump(_dump(views=[view])) if f.kind == "leader-crosses-line"]
+    assert [(f.a, f.b) for f in crossings] == [(datum.label, "dim Width '20.0'")]
+
+
 def test_a_mixed_notes_arrowless_branch_restating_a_callouts_thread_gates():
     """Codex P2 on b2b4f8e66 (PRRT_kwDOPHDy386mTebe): DetailItem357 with a
     second, arrowed leader off the plate. Its arrowless branch still lands on
