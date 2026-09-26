@@ -453,8 +453,15 @@ def _gate_fixture(monkeypatch, dims, equations):
     return adapter
 
 
-def _as_built(i: int, *, owner: str | None = None, state: int = 1):
+def _as_built(
+    i: int,
+    *,
+    owner: str | None = None,
+    depth_owner: str | None = None,
+    state: int = 1,
+):
     end = cone_gear_shaft_spec.SECTIONS[i][1]
+    own = f'"SecEnd{i}"'
     return (
         {
             f"Sec{i}Station@Sec{i}EndPlane": _Dim(end, state),
@@ -462,9 +469,10 @@ def _as_built(i: int, *, owner: str | None = None, state: int = 1):
         },
         {
             f'"Sec{i}Station@Sec{i}EndPlane"': [
-                f'"Sec{i}Station@Sec{i}EndPlane" = {owner or f"{chr(34)}SecEnd{i}{chr(34)}"}'
+                f'"Sec{i}Station@Sec{i}EndPlane" = {owner or own}'
             ],
-            f'"SecEnd{i}"': [f'"SecEnd{i}" = {end}mm'],
+            f'"Sec{i}End@Sec{i}"': [f'"Sec{i}End@Sec{i}" = {depth_owner or own}'],
+            own: [f"{own} = {end}mm"],
         },
     )
 
@@ -492,8 +500,8 @@ def test_shoulder_plane_gate_accepts_single_ownership_at_driven_state_1(
 @pytest.mark.parametrize(
     ("override", "message"),
     [
-        ({2: {"owner": '"SecEnd1"'}}, "not SecEnd2"),
-        ({3: {"state": 2}}, "DrivenState 2 differs"),
+        ({2: {"owner": '"SecEnd1"'}}, 'not "SecEnd2"'),
+        ({3: {"state": 2}}, "plane and depth DrivenState differ"),
     ],
 )
 def test_shoulder_plane_gate_rejects_a_wrong_owner_or_state(
@@ -512,4 +520,21 @@ def test_shoulder_plane_gate_rejects_a_missing_or_moved_plane(monkeypatch) -> No
     adapter = _gate_fixture(monkeypatch, dims, equations)
     with pytest.raises(RuntimeError, match="expected one equation") as raised:
         part._assert_shoulder_planes_single_owned(adapter)
-    assert "Sec4Station@Sec4EndPlane: plane reads" in str(raised.value)
+    assert "Sec4Station@Sec4EndPlane: reads" in str(raised.value)
+
+
+def test_shoulder_plane_gate_proves_the_depth_owner_too(monkeypatch) -> None:
+    """Codex #839 P2: a depth that keeps its as-built value and DrivenState
+    but is driven by the wrong global, or has lost its equation, must fail --
+    as must a SecEnd global defined twice."""
+    dims, equations = _machine({2: {"depth_owner": '"SecEnd1"'}})
+    del equations['"Sec3End@Sec3"']
+    equations['"SecEnd4"'] *= 2
+    adapter = _gate_fixture(monkeypatch, dims, equations)
+    with pytest.raises(RuntimeError) as raised:
+        part._assert_shoulder_planes_single_owned(adapter)
+    message = str(raised.value)
+    assert "Sec2End@Sec2: owned by" in message
+    assert "Sec3End@Sec3: expected one equation" in message
+    assert "SecEnd4: expected one definition" in message
+    assert "Sec1" not in message.replace("SecEnd1", "")
