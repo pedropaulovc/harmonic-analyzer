@@ -581,24 +581,42 @@ def match_ink_indices(
     another "A" would serve it.
     """
     used = set(taken)
+    by_key = _spans_by_key(spans)
+    options = {key: ink_options(item, spans, by_key, used) for key, item in items}
+    return _assign_all({key: found for key, found in options.items() if found})
+
+
+def _spans_by_key(spans: Sequence[InkSpan]) -> dict[str, list[int]]:
     by_key: dict[str, list[int]] = {}
     for index, span in enumerate(spans):
         by_key.setdefault(span.key, []).append(index)
-    options: dict[Any, list[tuple[tuple[int, ...], float]]] = {}
-    for key, item in items:
-        wanted = ink_key(item.text)
-        if not wanted:
+    return by_key
+
+
+def ink_options(
+    item: TextItem,
+    spans: Sequence[InkSpan],
+    by_key: Mapping[str, Sequence[int]],
+    used: Iterable[int] = (),
+) -> list[tuple[tuple[int, ...], float]]:
+    """Every way ``item`` can have printed, as ``(span indices, cost)`` for
+    ``_assign_all``: a whole span of its ink string within the match window of
+    its reference point, or its pieces either side of an inline symbol."""
+    used = set(used)
+    wanted = ink_key(item.text)
+    if not wanted:
+        return []
+    window = INK_MATCH_WINDOW_M + item.height
+    options: list[tuple[tuple[int, ...], float]] = []
+    for index in by_key.get(wanted, ()):
+        if index in used:
             continue
-        window = INK_MATCH_WINDOW_M + item.height
-        for index in by_key.get(wanted, ()):
-            if index in used:
-                continue
-            ax, ay = _anchor(spans[index].box, item.reference)
-            dx, dy = abs(ax - item.x), abs(ay - item.y)
-            if dx < window and dy < window:
-                options.setdefault(key, []).append(((index,), dx + dy))
-        options.setdefault(key, []).extend(_split_chains(item, spans, by_key, used))
-    return _assign_all({key: found for key, found in options.items() if found})
+        ax, ay = _anchor(spans[index].box, item.reference)
+        dx, dy = abs(ax - item.x), abs(ay - item.y)
+        if dx < window and dy < window:
+            options.append(((index,), dx + dy))
+    options.extend(_split_chains(item, spans, by_key, used))
+    return options
 
 
 def _split_chains(
@@ -1368,6 +1386,17 @@ def annotation_geometry(
     )
 
 
+def _section_label_items(section: Mapping[str, Any]) -> list[TextItem]:
+    """A section line's labels as text items: its letter at each
+    ``GetTextInfo`` upper-left origin, ``CharHeight`` tall."""
+    label = str(section.get("label") or "")
+    height = float(section.get("text_height") or 0.0)
+    if not label or height <= 0.0:
+        return []
+    texts = _floats(section.get("texts"))
+    return [TextItem(label, texts[i], texts[i + 1] - height, height) for i in range(0, len(texts) - 2, 3)]
+
+
 def _section_geometry(
     section: Mapping[str, Any],
     *,
@@ -1375,7 +1404,7 @@ def _section_geometry(
     advance: float,
     spans: Sequence[InkSpan] = (),
     unmatched: list[tuple[str, str]] | None = None,
-    claimed: set[int] | None = None,
+    printed: Mapping[int, tuple[int, ...]] | None = None,
 ) -> AnnotationGeometry | None:
     """A section line: cutting line + arrows as ink, its two labels as text.
 
@@ -1384,8 +1413,9 @@ def _section_geometry(
     x 72 mm), so the cutting line is drawn between the two arrows' tails,
     which ``GetArrowInfo`` gives in sheet space. ``GetTextInfo`` gives each
     label's UPPER-LEFT origin (types/IDrSection/GetTextInfo.md); the label's
-    box is the PDF text object printed there, else ``CharHeight`` estimated
-    and the label counted in ``unmatched``.
+    box is the PDF text object ``printed`` gives for it (label index -> spans,
+    from the sheet's one joint assignment), else ``CharHeight`` estimated and
+    the label counted in ``unmatched``.
     """
     segments = []
     arrows = _floats(section.get("arrows"))
@@ -1396,23 +1426,16 @@ def _section_geometry(
     if len(tails) == 2:
         segments.append(Segment(*tails[0], *tails[1], "line"))
     label = str(section.get("label") or "")
-    height = float(section.get("text_height") or 0.0)
-    texts = _floats(section.get("texts"))
     rows = []
-    if label and height > 0.0:
-        width = advance * height * max(1, glyph_count(label))
-        for i in range(0, len(texts) - 2, 3):
-            x, y = texts[i], texts[i + 1]
-            item = TextItem(label, x, y - height, height)
-            printed = match_ink_indices([(0, item)], spans, taken=claimed or ())
-            if spans and 0 not in printed and unmatched is not None:
-                unmatched.append((f"section-line {label}", label))
-            if 0 in printed:
-                if claimed is not None:
-                    claimed.update(printed[0])
-                rows.append(_union(spans[index].box for index in printed[0]))
-                continue
-            rows.append(Box(x, y - height, x + width, y))
+    for i, item in enumerate(_section_label_items(section)):
+        chosen = (printed or {}).get(i)
+        if spans and chosen is None and unmatched is not None:
+            unmatched.append((f"section-line {label}", label))
+        if chosen is not None:
+            rows.append(_union(spans[index].box for index in chosen))
+            continue
+        width = advance * item.height * max(1, glyph_count(label))
+        rows.append(Box(item.x, item.y, item.x + width, item.y + item.height))
     if not segments and not rows:
         return None
     return AnnotationGeometry(
@@ -1424,24 +1447,49 @@ def _section_geometry(
     )
 
 
-def _detail_label_box(
-    text_pt: tuple[float, float], height: float, spans: Sequence[InkSpan], claimed: set[int] | None = None
-) -> int | None:
-    """The PDF text object printing a detail circle's label at ``text_pt``.
+def _detail_label_options(
+    text_pt: tuple[float, float], height: float, spans: Sequence[InkSpan]
+) -> list[tuple[tuple[int, ...], float]]:
+    """The PDF text objects that may print a detail circle's label at
+    ``text_pt``, as ``_assign_all`` options costed by distance.
 
     ``GetDetailCircleInfo2`` gives the label's position but not its letter, so
-    the candidates are the short all-letter runs a label prints as, nearest
-    first within the match window.
+    the candidates are the short all-letter runs a label prints as, within
+    the match window.
     """
     x, y = text_pt[0], text_pt[1] - height
     window = INK_MATCH_WINDOW_M + height
-    candidates = [
-        (abs(span.box.xmin - x) + abs(span.box.ymin - y), index)
+    return [
+        ((index,), abs(span.box.xmin - x) + abs(span.box.ymin - y))
         for index, span in enumerate(spans)
-        if 0 < len(span.key) <= 2 and span.key.isalpha() and index not in (claimed or ())
+        if 0 < len(span.key) <= 2 and span.key.isalpha()
         and abs(span.box.xmin - x) < window and abs(span.box.ymin - y) < window
     ]
-    return min(candidates)[1] if candidates else None
+
+
+def _detail_circles(info: Sequence[float]) -> list[tuple[tuple[float, float], ...]]:
+    """``(center, start, end, text_pt, (height, 0))`` per circle of
+    ``IView::GetDetailCircleInfo2``."""
+    values = _floats(info)
+    if not values:
+        return []
+    count = int(values[0])
+    index = 1
+    circles = []
+    for _number in range(count):
+        if index + 15 > len(values):
+            break
+        circles.append(
+            (
+                (values[index + 1], values[index + 2]),
+                (values[index + 4], values[index + 5]),
+                (values[index + 7], values[index + 8]),
+                (values[index + 11], values[index + 12]),
+                (values[index + 14], 0.0),
+            )
+        )
+        index += 16 + int(values[index + 15]) * 9
+    return circles
 
 
 def _detail_circle_geometries(
@@ -1451,30 +1499,17 @@ def _detail_circle_geometries(
     advance: float,
     spans: Sequence[InkSpan] = (),
     unmatched: list[tuple[str, str]] | None = None,
-    claimed: set[int] | None = None,
+    printed: Mapping[int, tuple[int, ...]] | None = None,
 ) -> list[AnnotationGeometry]:
     """``IView::GetDetailCircleInfo2``: [n, (layer, center3, start3, end3,
     lineType, textPt3, textHeight, numArrows, (tip3, comp3, w, h, style)*)*].
 
-    The label is boxed from its printed PDF text object when the sheet has
-    one (``_detail_label_box``); else estimated and counted in ``unmatched``.
+    The label is boxed from the PDF text object ``printed`` gives for it
+    (circle number -> span, from the sheet's one joint assignment over
+    ``_detail_label_options``); else estimated and counted in ``unmatched``.
     """
-    values = _floats(info)
-    if not values:
-        return []
-    count = int(values[0])
-    index = 1
     geometries = []
-    for number in range(count):
-        if index + 15 > len(values):
-            break
-        center = (values[index + 1], values[index + 2])
-        start = (values[index + 4], values[index + 5])
-        end = (values[index + 7], values[index + 8])
-        text_pt = (values[index + 11], values[index + 12])
-        height = values[index + 14]
-        arrows = int(values[index + 15])
-        index += 16 + arrows * 9
+    for number, (center, start, end, text_pt, (height, _)) in enumerate(_detail_circles(info)):
         points = _arc_points(center, start, end, ccw=True)
         segments = tuple(
             Segment(a[0], a[1], b[0], b[1], "line") for a, b in zip(points, points[1:])
@@ -1482,16 +1517,12 @@ def _detail_circle_geometries(
         rows = ()
         label = f"detail-circle {owner} #{number + 1}"
         if height > 0.0:
-            # ``index`` is the cursor into ``info``; the label's span is a
-            # separate index, or the next circle parses from a wrong offset.
-            printed = _detail_label_box(text_pt, height, spans, claimed) if spans else None
-            if spans and printed is None and unmatched is not None:
+            chosen = (printed or {}).get(number)
+            if spans and chosen is None and unmatched is not None:
                 unmatched.append((label, "label"))
-            if printed is not None and claimed is not None:
-                claimed.add(printed)
             rows = (
-                spans[printed].box
-                if printed is not None
+                spans[chosen[0]].box
+                if chosen is not None
                 else Box(text_pt[0], text_pt[1] - height, text_pt[0] + advance * height, text_pt[1]),
             )
         geometries.append(
@@ -1588,13 +1619,29 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
             f"layout audit: sheet {dump.get('sheet')!r} has {len(matchable)} COM text item(s) "
             "but its PDF page has no text"
         )
-    indices = match_ink_indices(keyed, spans) if spans else {}
+    # Every text-to-ink claim on the sheet is ONE assignment: annotation
+    # runs, section-line labels and detail-circle labels compete for the
+    # same spans, so none may take a span another needed when a different
+    # one would have served it (Codex, #902).
+    by_key = _spans_by_key(spans)
+    options: dict[Any, list[tuple[tuple[int, ...], float]]] = {
+        key: ink_options(item, spans, by_key) for key, item in keyed
+    }
+    for v, view in enumerate(views):
+        for s, section in enumerate(view.get("sections", ())):
+            for t, item in enumerate(_section_label_items(section)):
+                options[("section", v, s, t)] = ink_options(item, spans, by_key)
+        for number, (*_arc, text_pt, (height, _)) in enumerate(_detail_circles(view.get("detail_circles_info") or ())):
+            if height > 0.0:
+                options[("detail", v, number)] = _detail_label_options(text_pt, height, spans)
+    chosen_all = _assign_all({key: found for key, found in options.items() if found}) if spans else {}
+    indices = {key: chosen for key, chosen in chosen_all.items() if not isinstance(key[0], str)}
     if spans and len(matchable) >= 5 and len(indices) < MIN_MATCH_SHARE * len(matchable):
         raise ValueError(
             f"layout audit: sheet {dump.get('sheet')!r}: only {len(indices)} of {len(matchable)} COM "
             "strings found their printed text; the PDF page does not line up with the sheet"
         )
-    claimed = {index for chosen in indices.values() for index in chosen}
+    claimed = {index for chosen in chosen_all.values() for index in chosen}
     printed = {key: _union(spans[index].box for index in chosen) for key, chosen in indices.items()}
 
     def ink_of(annotation: Mapping[str, Any]) -> dict[int, Box] | None:
@@ -1619,7 +1666,7 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
 
     view_geometry = []
     annotations: list[AnnotationGeometry] = []
-    for view in views:
+    for v, view in enumerate(views):
         name = str(view.get("name", ""))
         outline = _floats(view.get("outline"))
         view_geometry.append(
@@ -1635,9 +1682,14 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
             )
             if item is not None:
                 annotations.append(item)
-        for section in view.get("sections", ()):
+        for s, section in enumerate(view.get("sections", ())):
             item = _section_geometry(
-                section, owner=name, advance=advance, spans=spans, unmatched=unmatched, claimed=claimed
+                section,
+                owner=name,
+                advance=advance,
+                spans=spans,
+                unmatched=unmatched,
+                printed={key[3]: chosen for key, chosen in chosen_all.items() if key[:3] == ("section", v, s)},
             )
             if item is not None:
                 annotations.append(item)
@@ -1648,7 +1700,7 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
                 advance=advance,
                 spans=spans,
                 unmatched=unmatched,
-                claimed=claimed,
+                printed={key[2]: chosen for key, chosen in chosen_all.items() if key[:2] == ("detail", v)},
             )
         )
         if edges.get(name):
