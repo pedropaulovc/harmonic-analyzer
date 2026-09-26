@@ -6,9 +6,11 @@ shared sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
 The support is a painted gray-iron frame with a trapezoidal wall, two opposed
-pockets leaving a central web, a through cavity, a chamfered window rim, and
-four 5/16 clearance holes through its mounting foot. The sheet runs 1:2, with
-each view's scale pinned explicitly.
+pockets leaving a central web, a through cavity, a chamfered window rim,
+four 5/16 clearance holes through its mounting foot, and a 21.0-deep top rail
+carrying the rocker brackets' four #8-32 seats (#743), transferred from the set
+brackets at assembly. The sheet runs 1:2, with each view's scale pinned
+explicitly.
 
 Run with SolidWorks open::
 
@@ -27,6 +29,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
+    add_leader_note,
     add_surface_finish,
     create_section_view,
     create_view_theoretical_datum,
@@ -56,6 +59,15 @@ from build_rocker_arm_support import (
     WIDE,
 )
 from rocker_arm_support_drawing_spec import SURFACE_FINISHES
+from rocker_bracket_seat_layout import (
+    RAIL_DEPTH,
+    SCREW_THREAD,
+    SEAT_DRILL_DEPTH,
+    SEAT_DRILL_NAME,
+    SEAT_LOCAL_X,
+    SEAT_THREAD_DEPTH,
+    WINDOW_TOP_Y,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -101,7 +113,7 @@ FRONT_KEEP = {
 DIMENSION_CALLOUTS = {
     "PocketRadius": "8X",
     "CavityRadius": "4X",
-    "WinWidth": "SQ POCKET",
+    "WinWidth": " POCKET",
     "CavWidth": "SQ CAVITY THRU",
     "RimChamferSize": " X 45 DEG\n2 FACES",
 }
@@ -117,7 +129,25 @@ DIMENSION_PRECISION = {
     "RimChamferSize": 2,
     "WebThickness": 2,  # a held thickness: 6.35, routine ±0.51
     "FootThickness": 2,
+    "RailDepth": 1,  # the seats' drill point needs the .X band (seat layout)
 }
+# The bracket seats: located by transfer, so the print gives their thread,
+# depths and process only. A view-owned pointer to the rail's top edge over
+# the outermost seat, left of the front view and clear of the Depth callout.
+SEAT_NOTE = (
+    f"{len(SEAT_LOCAL_X)}X {SCREW_THREAD} UNC-2B, {SEAT_THREAD_DEPTH:.1f} DEEP\n"
+    f"{SEAT_DRILL_NAME} DRILL {SEAT_DRILL_DEPTH:.1f} DEEP\n"
+    "TRANSFER FROM MHA-123\nAT ASSEMBLY"
+)
+SEAT_NOTE_XY = (0.016, 0.262)
+SEAT_NOTE_ATTACH = (
+    FRONT_CENTER[0] + min(SEAT_LOCAL_X) * VIEW_SCALE / 1000.0,
+    FRONT_CENTER[1] + HALF_Y * VIEW_SCALE / 1000.0,
+)
+# Section A-A pick for the rail depth: 5 mm off the centreline hits both the
+# top face (half-width NARROW less the rim chamfer) and the pocket's top face
+# (WEB out to the wall).
+RAIL_PICK_Z = 5.0
 RIGHT_KEEP = {
     "WallHeight": (0.240, 0.185),
     "FootSpan": (0.205, 0.133),
@@ -352,9 +382,10 @@ async def build(adapter: Any) -> dict[str, str]:
         end_xy=(0.0, HALF_Y / 1000.0),
         label="section web",
     )
-    # Pick the two cut pocket floors in the upper web band, outside the
-    # through cavity. HLR ensures the selected edges are visible section edges.
-    web_y = RIGHT_CENTER[1] + (BIG + CAV) / 2.0 * VIEW_SCALE / 1000.0
+    # Pick the two cut pocket floors in the LOWER web band, between the cavity
+    # and the foot: the upper band is solid rail since #743. HLR ensures the
+    # selected edges are visible section edges.
+    web_y = RIGHT_CENTER[1] - (BIG + CAV) / 2.0 * VIEW_SCALE / 1000.0
     half_web = WEB * VIEW_SCALE / 1000.0
     web_dimension = _early_bound(
         add_edge_dimension(
@@ -362,7 +393,7 @@ async def build(adapter: Any) -> dict[str, str]:
             right,
             p0=(RIGHT_CENTER[0] - half_web, web_y),
             p1=(RIGHT_CENTER[0] + half_web, web_y),
-            text_xy=(RIGHT_CENTER[0] + 0.012, RIGHT_CENTER[1] + 0.022),
+            text_xy=(RIGHT_CENTER[0] + 0.016, RIGHT_CENTER[1] - 0.028),
             orientation="horizontal",
             label="section web thickness",
         ),
@@ -403,6 +434,40 @@ async def build(adapter: Any) -> dict[str, str]:
             f"section foot dimension measured {measured * 1000.0:.6f} mm"
         )
     foot_dimension.SetPrecision3(DIMENSION_PRECISION["FootThickness"], -1, -1, -1)
+    # The rail: top face down to the pocket's top face, on the section's -z
+    # side inside the top face's chamfered width and the pocket floor's run.
+    rail_pick_x = RIGHT_CENTER[0] - RAIL_PICK_Z * VIEW_SCALE / 1000.0
+    rail_dimension = _early_bound(
+        add_edge_dimension(
+            adapter,
+            right,
+            p0=(rail_pick_x, RIGHT_CENTER[1] + HALF_Y * VIEW_SCALE / 1000.0),
+            p1=(rail_pick_x, RIGHT_CENTER[1] + WINDOW_TOP_Y * VIEW_SCALE / 1000.0),
+            text_xy=(RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] + 0.039),
+            orientation="vertical",
+            label="section rail depth",
+        ),
+        "IDisplayDimension",
+    )
+    measured = float(
+        _early_bound(rail_dimension.GetDimension2(0), "IDimension").SystemValue
+    )
+    if abs(measured * 1000.0 - RAIL_DEPTH) > 1e-5:
+        raise RuntimeError(
+            f"section rail dimension measured {measured * 1000.0:.6f} mm"
+        )
+    rail_dimension.SetPrecision3(DIMENSION_PRECISION["RailDepth"], -1, -1, -1)
+    if rail_dimension.GetPrimaryPrecision2() != DIMENSION_PRECISION["RailDepth"]:
+        raise RuntimeError("section rail dimension precision did not persist")
+    add_leader_note(
+        adapter,
+        SEAT_NOTE,
+        text_xy=SEAT_NOTE_XY,
+        attach_xy=SEAT_NOTE_ATTACH,
+        label="rocker-bracket seats",
+        view=front,
+        height=0.0025,
+    )
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to bottom view")
 
