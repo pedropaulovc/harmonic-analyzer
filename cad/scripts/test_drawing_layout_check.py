@@ -1951,3 +1951,40 @@ def test_drawing_revision_must_match_current_release():
             ("Revision",),
             required=("Revision",),
         )
+
+
+_ZERO_LINE = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+# cone_pivot_post's MainBodyHt, GetLineAtIndex3 verbatim from the probe leaf
+# (diag/cone-pivot-origin-probe fc2212cd6, leaf run 20260926T205141966Z): two
+# extension lines, the 15 zero-length records #906 brought, and the two
+# dimension-line pieces either side of the text.
+MAIN_BODY_HT_LINES = [
+    [0.0, 0.0, 0.0, 0.0, 0.1180055, 0.069, -0.0140445, 0.039, 0.069, -0.0140445],
+    [0.0, 0.0, 0.0, 0.0, 0.1180055, 0.155, -0.0140445, 0.039, 0.155, -0.0140445],
+    *([_ZERO_LINE] * 15),
+    [0.0, 0.0, 0.0, 0.0, 0.04, 0.069, -0.0140445, 0.04, 0.1092219, -0.0140445],
+    [0.0, 0.0, 0.0, 0.0, 0.04, 0.155, -0.0140445, 0.04, 0.1147781, -0.0140445],
+]
+
+
+def test_a_zero_length_display_line_is_not_ink():
+    """The diagnostics collector's line reader: a record whose ends coincide
+    draws nothing, so it can't put a dimension's box at the sheet origin
+    (the cone_pivot_post integ blocker). Each drop is reported, for
+    collect_sheet's span."""
+    from _layout_geometry import union_boxes
+    from diagnostics.drawing_layout_audit import _display_lines
+
+    class Data:
+        def GetLineCount(self):
+            return len(MAIN_BODY_HT_LINES)
+
+        def GetLineAtIndex3(self, index):
+            return MAIN_BODY_HT_LINES[index]
+
+    dropped: list[int] = []
+    segments = _display_lines(object(), Data(), dropped)
+    assert len(segments) == 4
+    box = union_boxes([segment.box() for segment in segments])
+    assert (box.xmin, box.ymin) == pytest.approx((0.039, 0.069))
+    assert dropped == list(range(2, 17))
