@@ -458,6 +458,38 @@ def printed_circle(
     return circle
 
 
+def _move_ring(
+    segments: Sequence[Segment], com: tuple[float, float, float], printed: tuple[float, float, float]
+) -> list[Segment]:
+    """``segments`` with the balloon's own body moved onto the ``printed`` ring.
+
+    The body is every non-leader segment lying within the COM circle: the
+    circumference and, for a split-circle balloon, its rim-to-rim separator.
+    Each is mapped by the similarity that takes the COM circle onto the
+    printed one, so the balloon as an obstacle reads where it printed. A
+    leader leaves the rim outward and keeps its (exact) registered geometry.
+    """
+    if printed == com:
+        return list(segments)
+    cx, cy, radius = com
+    px, py, pr = printed
+    scale = pr / radius
+
+    def inside(x: float, y: float) -> bool:
+        return math.hypot(x - cx, y - cy) <= radius + 1e-7
+
+    def moved(x: float, y: float) -> tuple[float, float]:
+        return (px + (x - cx) * scale, py + (y - cy) * scale)
+
+    out = []
+    for segment in segments:
+        if segment.role == "leader" or not (inside(segment.x0, segment.y0) and inside(segment.x1, segment.y1)):
+            out.append(segment)
+            continue
+        out.append(Segment(*moved(segment.x0, segment.y0), *moved(segment.x1, segment.y1), segment.role))
+    return out
+
+
 def ink_edges(dump: Mapping[str, Any]) -> list[Segment]:
     """The page's model-edge strokes (``MODEL_EDGE_WIDTH_M``, solid black)."""
     low, high = MODEL_EDGE_WIDTH_M
@@ -1053,7 +1085,9 @@ def annotation_geometry(
     rows: list[tuple[str, Box]]
     circle = balloon_circle(display) if note.get("balloon") else None
     if circle is not None and strokes:
-        circle = printed_circle(circle, strokes)
+        printed = printed_circle(circle, strokes)
+        segments = _move_ring(segments, circle, printed)
+        circle = printed
     if circle is not None:
         # A BOM balloon's GetExtent includes its leader; its rendered
         # full-circle arc is the balloon (``rendered_balloon_circle``).
