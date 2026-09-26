@@ -20,6 +20,7 @@ import pinion_lever_pin_spec
 import pinion_lever_spec
 import pinion_pivot_shaft_spec
 import pinion_spring_spec
+import post_mount_screw_spec
 from _buildgraph import module_deps_of
 
 
@@ -330,6 +331,16 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             # full thread past the 1.5 relief plus the 0.5 lead cone.
             frozenset(("crank-handle-pivot-screw-1", "crank-arm-1")): _annulus_limit(
                 4.166, 3.454, 7.0
+            ),
+            # U30 I22: each MHA-142 1/4-20 in its #7 MHA-091 tap, its cut
+            # length past the post's grip deep.
+            **_expected_numbered_pairs(
+                "post-mount-screw",
+                (1, 2),
+                "cone-swing-platform",
+                6.35,
+                5.105,
+                post_mount_screw_spec.CUT_LENGTH_MM - post_mount_screw_spec.GRIP_MM,
             ),
             # R1: MHA-058 is a bonded slip fit modelled line to line in the
             # MHA-102 cross-hole, so the pair needs no interference allowance.

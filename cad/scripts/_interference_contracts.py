@@ -40,6 +40,8 @@ from frame_cross_screw_spec import SHANK_DIA as _FRAME_CROSS_DIA
 from frame_cross_screw_spec import SHANK_LEN as _FRAME_CROSS_LENGTH
 from frame_cross_screw_spec import THREAD as _FRAME_CROSS_THREAD
 from _hole_spec import TAP_DRILL_MM
+from post_mount_screw_spec import CUT_LENGTH_MM as _POST_SCREW_CUT_LENGTH
+from post_mount_screw_spec import GRIP_MM as _POST_SCREW_GRIP
 
 
 def _smooth_annulus_limit_mm3(
@@ -157,6 +159,18 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(
         ("cone-tip-adjuster-1", "cone-gear-shaft-1")
     ): _ADJUSTER_THRUST_GATE_LIMIT_MM3,
+    # U30 (I22): each MHA-142 (1/4-20 MSC 40923898, major 6.35) in its #7
+    # (5.105) MHA-091 tap, as deep as the cut length runs past the post's
+    # grip (the counterbore floor).  The smooth-annulus upper bound until the
+    # first drive-train build observes the helical overlap.
+    **_numbered_pairs(
+        "post-mount-screw",
+        (1, 2),
+        "cone-swing-platform",
+        _smooth_annulus_limit_mm3(
+            6.35, 5.105, _POST_SCREW_CUT_LENGTH - _POST_SCREW_GRIP
+        ),
+    ),
 }
 
 # Minimum socket chord across the screw's complete major-diameter envelope.

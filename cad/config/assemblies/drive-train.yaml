@@ -45,6 +45,7 @@ allowed_free_stems:
   - cone-tip-block
   - cone-tip-bushing
   - cone-tip-pinch-screw
+  - cone-tip-shim
   - crank-arm
   - crank-drive-gear
   - crank-handle
@@ -66,6 +67,7 @@ allowed_free_stems:
   - pinion-cam-pin
   - pinion-handle
   - pinion-lever
+  - post-mount-screw
   # MHA-135: locked to the lift rod, it turns with the freed rod spin.
   - pinion-lever-pin
   - pinion-lift-rod
