@@ -41,6 +41,9 @@ def test_part_registry_row_is_the_made_screw() -> None:
     assert int(row["quantity"]) == 1
     assert row["fit_class"] == "shaft_in_bushing"
     assert row["process"] != "purchased"
+    # The SLDPRT Process property comes from this row (Codex review of #921):
+    # it names the thread the spec cuts.
+    assert row["process"] == f"turned slotted shoulder screw; die-cut {spec.THREAD_SIZE} thread"
 
 
 def test_spec_is_the_single_source_of_marked_dimensions() -> None:
