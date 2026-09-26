@@ -506,6 +506,23 @@ def test_the_modelled_length_is_a_cut_the_sheet_accepts() -> None:
     assert part.SHANK_LEN == spec.CUT_LENGTH_MM
 
 
+def test_policy_exception_row_names_the_length_constant_not_a_number() -> None:
+    """Codex P2 on #857 (PRRT_kwDOPHDy386mRsWJ): the policy's named-exception
+    row still read "nominal 86.0" after the model moved to 86.2.  The row
+    names the spec constant and its rule, so it carries no number that can
+    drift from the model."""
+    policy = Path(part.__file__).resolve().parents[1] / "docs" / "drawing-simplicity-policy.md"
+    rows = [
+        line
+        for line in policy.read_text(encoding="utf-8").splitlines()
+        if line.startswith("| MHA-142 ")
+    ]
+    assert len(rows) == 1, rows
+    assert "post_mount_screw_spec.CUT_LENGTH_MM" in rows[0]
+    assert not re.search(r"nominal \d", rows[0]), rows[0]
+    assert f"{spec.CUT_LENGTH_MM:.1f}" not in rows[0]
+
+
 def test_engagement_exception_is_held_by_the_model() -> None:
     """The named rule-12 exception (0.90D) is a model assert on the chain;
     the sheet prints it on the cut-length callout
