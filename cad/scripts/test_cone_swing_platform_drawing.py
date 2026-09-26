@@ -953,15 +953,19 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     """Codex review of 68565ace (B1): the sheet must state MHA-142's exception.
 
     U37 accepts short engagement for the 1/4-20 post screws. The printed worst
-    case is the thinnest stock plate (U41 band), less the 0.3 cut-to-fit
-    allowance and the local 0.1 break at each end of the tap, floored:
-    5.72 mm = 0.90D, never under the rule-12 audit's E7 floor of 0.87D.
+    case is the thinnest stock plate (U41 band), less the tap's 0.1 entry
+    break and the deeper of its 0.1 exit break and the screw's 0.3 cut-to-fit
+    plus 0.1 cut-end break, floored: 5.72 mm = 0.90D, never under the
+    rule-12 audit's E7 floor of 0.87D.
     """
     worst = (
         spec.PLATE_THICKNESS
         - spec.PLATE_STOCK_BAND
-        - spec.POST_SCREW_CUT_TO_FIT_SHORT
-        - 2.0 * spec.POST_MOUNT_TAP_EDGE_BREAK
+        - spec.POST_MOUNT_TAP_EDGE_BREAK
+        - max(
+            spec.POST_MOUNT_TAP_EDGE_BREAK,
+            spec.POST_SCREW_CUT_TO_FIT_SHORT + spec.POST_SCREW_CUT_END_BREAK_MAX,
+        )
     )
     assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(worst)
     diameters = worst / (0.25 * 25.4)
@@ -1990,3 +1994,39 @@ def test_feature_plan_caption_names_what_the_view_carries() -> None:
     assert "LOCATION" not in spec.FEATURE_VIEW_NOTE
     assert spec.FEATURE_VIEW_NOTE == "HOLES — SCALE 1:2"
     assert not any(ch.isdigit() for ch in spec.FEATURE_VIEW_NOTE.split("SCALE")[0])
+
+
+def test_post_screw_engagement_stack_reads_the_screw_specs_terms() -> None:
+    """#917 S1 (b), Main: the plate's engagement stack is the screw spec's --
+    plate less its stock band, less the tap's entry break, less the deeper of
+    the tap's exit break and the screw's cut-to-fit short plus its cut-end
+    break.  2 x the tap break matched only while every break was 0.1."""
+    f = spec.post_mount_engagement_worst
+    assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(
+        f(
+            spec.PLATE_THICKNESS,
+            spec.PLATE_STOCK_BAND,
+            spec.POST_MOUNT_TAP_EDGE_BREAK,
+            spec.POST_MOUNT_TAP_EDGE_BREAK,
+            spec.POST_SCREW_CUT_TO_FIT_SHORT,
+            spec.POST_SCREW_CUT_END_BREAK_MAX,
+        )
+    )
+    assert spec.POST_SCREW_CUT_END_BREAK_MAX == 0.1
+    assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(6.35 - 0.13 - 0.1 - 0.4)
+    # The exit side spends the deeper of its two terms, not their sum...
+    assert f(6.35, 0.13, 0.1, 0.25, 0.0, 0.1) == pytest.approx(6.35 - 0.13 - 0.1 - 0.25)
+    assert f(6.35, 0.13, 0.1, 0.25, 0.3, 0.1) == pytest.approx(6.35 - 0.13 - 0.1 - 0.4)
+    # ... and the entry break always counts.
+    assert f(6.35, 0.13, 0.2, 0.1, 0.3, 0.1) == pytest.approx(6.35 - 0.13 - 0.2 - 0.4)
+
+
+def test_post_screw_engagement_terms_match_the_screw_spec() -> None:
+    """The platform mirrors the screw spec's terms literally (it may not
+    import the screw's builder); where the stack carries post_mount_screw_spec
+    the two must agree."""
+    screw = pytest.importorskip("post_mount_screw_spec")
+    assert spec.POST_SCREW_CUT_END_BREAK_MAX == screw.CUT_END_BREAK_MAX_MM
+    assert spec.POST_SCREW_CUT_TO_FIT_SHORT == screw.POST_SCREW_CUT_TO_FIT_SHORT
+    assert spec.POST_MOUNT_TAP_EDGE_BREAK == screw.POST_MOUNT_TAP_EDGE_BREAK
+    assert spec.PLATE_STOCK_BAND == pytest.approx(screw.PLATE_STOCK_BAND_MM)

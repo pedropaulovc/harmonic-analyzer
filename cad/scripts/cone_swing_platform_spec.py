@@ -84,16 +84,47 @@ POST_MOUNT_TAP_EDGE_BREAK = 0.1
 POST_MOUNT_TAP_BREAK_NOTE = (
     f"1/4-20 TAPPED HOLES: DEBURR ONLY, {POST_MOUNT_TAP_EDGE_BREAK:.1f} MAX BREAK EACH END."
 )
+# The screw's cut end is deburred to this break at most
+# (post_mount_screw_spec.CUT_END_BREAK_MAX_MM, mirrored: the platform may not
+# import the screw's builder; the stack's cross-check test compares them).
+POST_SCREW_CUT_END_BREAK_MAX = 0.1
+
+
+def post_mount_engagement_worst(
+    plate_t: float,
+    stock_band: float,
+    tap_entry_break: float,
+    tap_exit_break: float,
+    cut_to_fit_short: float,
+    cut_end_break: float,
+) -> float:
+    """MHA-142's worst-case thread in the plate, post_mount_screw_spec's stack:
+    the thinnest plate, less the tap's entry break (the screw comes in from
+    the top), less the deeper of the tap's exit break and the screw's
+    cut-to-fit short plus its cut-end break (whichever ends the thread first
+    at the underside)."""
+    return (
+        plate_t
+        - stock_band
+        - tap_entry_break
+        - max(tap_exit_break, cut_to_fit_short + cut_end_break)
+    )
+
+
 # U37 (2026-09-23): the user accepted short engagement for MHA-142 as a named
 # exception to rule 12's 1.5D; the plate slides on the deck, so no boss can
-# add thread.  Worst case: the thinnest stock plate (U41) less the cut-to-fit
-# allowance and the break at both ends of the tap, counted as MHA-139 counts
-# its exit break.  A MIN never rounds up, so the print floors to two places.
+# add thread.  Worst case: the thinnest stock plate (U41) through the stack
+# above; the tap's break is the same at both ends.  A MIN never rounds up, so
+# the print floors to two places.
 POST_MOUNT_ENGAGEMENT_WORST = round(
-    PLATE_THICKNESS
-    - PLATE_STOCK_BAND
-    - POST_SCREW_CUT_TO_FIT_SHORT
-    - 2.0 * POST_MOUNT_TAP_EDGE_BREAK,
+    post_mount_engagement_worst(
+        PLATE_THICKNESS,
+        PLATE_STOCK_BAND,
+        POST_MOUNT_TAP_EDGE_BREAK,
+        POST_MOUNT_TAP_EDGE_BREAK,
+        POST_SCREW_CUT_TO_FIT_SHORT,
+        POST_SCREW_CUT_END_BREAK_MAX,
+    ),
     6,
 )
 POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS = (
