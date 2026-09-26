@@ -157,6 +157,19 @@ def test_a_hard_fault_after_the_rebuild_raises_but_a_warning_does_not(seat) -> N
     assert part.log == ["EditRebuildAll"]
 
 
+def test_code_one_is_a_fault_unless_what_s_wrong_flags_it_a_warning(seat) -> None:
+    # swFeatureError_e 1 is swFeatureErrorUnknown, not a warning: the warning
+    # verdict comes only from GetWhatsWrong's is_warning array, as verify.py
+    # and _assembly's health gates read it (Main's #928 review).
+    adapter, _part = seat({"INSTALLED": True}, faults=(("Pin", 1, False),))
+    with pytest.raises(RuntimeError, match=r"left faults \['Pin \(unknown-error\)'\]"):
+        _common.rebuild_stale_configurations(adapter, "pinion-lever-pin")
+    adapter, part = seat({"INSTALLED": True}, faults=(("Pin", 1, True),))
+    _common.rebuild_stale_configurations(adapter, "pinion-lever-pin")
+    assert part.log == ["EditRebuildAll"]
+    assert _common._FEATURE_ERROR[1] == "unknown-error"
+
+
 def test_the_save_chokepoint_checks_every_configuration_right_before_its_final_save() -> (
     None
 ):
