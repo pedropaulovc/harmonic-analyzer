@@ -610,14 +610,15 @@ def _split_chains(
     used: set[int],
 ) -> list[tuple[tuple[int, ...], float]]:
     """Every way a run split by an inline symbol can print: one free span per
-    piece, left to right along its baseline, each starting where the last one
-    ended. Cost: the first piece's offset from the run's start, plus each gap
-    and each baseline offset."""
+    piece, in reading order along its baseline, each starting where the last
+    one ended. Cost: the first piece's offset from the run's start, plus each
+    gap and each baseline offset. Measured in the run's own frame
+    (``_baseline_extent``), so a rotated run reads its pieces up the page."""
     parts = [ink_key(part) for part in _TOKEN.split(item.text) if ink_key(part)]
     if len(parts) < 2:
         return []
     window = INK_MATCH_WINDOW_M + item.height
-    right = item.x + (glyph_count(item.text) + 1) * item.height
+    right = (glyph_count(item.text) + 1) * item.height
     chains: list[tuple[tuple[int, ...], float]] = []
 
     def extend(chain: tuple[int, ...], left: float, anchor: float, cost: float) -> None:
@@ -625,16 +626,39 @@ def _split_chains(
             chains.append((chain, cost))
             return
         for index in by_key.get(parts[len(chain)], ()):
-            box = spans[index].box
             if index in used or index in chain:
                 continue
-            if not left <= box.xmin <= right or abs(box.ymin - item.y) >= window:
+            start, end, low, _high = _baseline_extent(item, spans[index].box)
+            if not left <= start <= right or abs(low) >= window:
                 continue
-            step = abs(box.xmin - anchor) + abs(box.ymin - item.y)
-            extend((*chain, index), box.xmax - INK_MATCH_WINDOW_M, box.xmax, cost + step)
+            step = abs(start - anchor) + abs(low)
+            extend((*chain, index), end - INK_MATCH_WINDOW_M, end, cost + step)
 
-    extend((), item.x - window, item.x, 0.0)
+    extend((), -window, 0.0, 0.0)
     return chains
+
+
+def _baseline_extent(item: TextItem, box: Box) -> tuple[float, float, float, float]:
+    """``box`` in the run's frame, from its start: ``(start, end)`` along the
+    baseline and ``(low, high)`` across it. At angle 0 this is the box less
+    the run's position."""
+    cos_a, sin_a = math.cos(item.angle), math.sin(item.angle)
+    corners = [(x - item.x, y - item.y) for x in (box.xmin, box.xmax) for y in (box.ymin, box.ymax)]
+    along = [x * cos_a + y * sin_a for x, y in corners]
+    across = [y * cos_a - x * sin_a for x, y in corners]
+    return min(along), max(along), min(across), max(across)
+
+
+def _from_baseline(item: TextItem, start: float, end: float, low: float, high: float) -> Box:
+    """The page box around a rectangle given in the run's frame."""
+    cos_a, sin_a = math.cos(item.angle), math.sin(item.angle)
+    return Box.from_points(
+        [
+            (item.x + u * cos_a - v * sin_a, item.y + u * sin_a + v * cos_a)
+            for u in (start, end)
+            for v in (low, high)
+        ]
+    )
 
 
 def _pack_chains(
@@ -857,13 +881,16 @@ def _with_symbols(item: TextItem, box: Box, advance: float) -> Box:
     ``"<MOD-DIAM>12.00"`` prints its text as a PDF text object and its "Ø" as
     a path the text object does not cover: a leading symbol reaches back to
     the run's COM start, a trailing one one glyph advance per token past it.
+    Both reach along the run's baseline, so a rotated run grows up the page.
     """
     text = item.text.strip()
     lead = re.match(r"(?:<[^<>]+>\s*)*", text).group(0)
     trail = re.search(r"(?:\s*<[^<>]+>)*$", text[len(lead):]).group(0)
-    xmin = min(box.xmin, item.x) if lead and item.reference in (-1, 0, 1) else box.xmin
-    xmax = box.xmax + len(_TOKEN.findall(trail)) * advance * item.height
-    return Box(xmin, box.ymin, xmax, box.ymax)
+    start, end, low, high = _baseline_extent(item, box)
+    if lead and item.reference in (-1, 0, 1):
+        start = min(start, 0.0)
+    end += len(_TOKEN.findall(trail)) * advance * item.height
+    return box.union(_from_baseline(item, start, end, low, high))
 
 
 def ink_row_boxes(
