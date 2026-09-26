@@ -703,11 +703,14 @@ def test_iso_tapped_hole_label_is_materialized_then_removed() -> None:
     }
     assert kwargs == {
         "redundant_note_substrings": ("Tapped Hole",),
-        "expected_redundant_notes": 1,
+        "expected_redundant_notes": 2,
     }
-    (threads,) = [c for c in calls if c.func.id == "import_cosmetic_threads"]
-    assert [ast.unparse(a) for a in threads.args] == ["adapter", "iso"]
-    assert threads.lineno < finalize.lineno
+    threads = [c for c in calls if c.func.id == "import_cosmetic_threads"]
+    assert [[ast.unparse(a) for a in c.args] for c in threads] == [
+        ["adapter", "iso"],
+        ["adapter", "view_b"],
+    ]
+    assert all(c.lineno < finalize.lineno for c in threads)
 
 
 def test_stacked_pocket_widths_keep_separate_bands() -> None:
@@ -936,14 +939,24 @@ def test_seat_entry_edge_is_the_east_seats_rim_on_the_rail_top(monkeypatch) -> N
     assert spec.contains_x_mm == east
 
 
+# r743-p1s-A: VIEW B's GetOutline right after its crop, which had not
+# narrowed it; the fake serves it as the uncropped outline.
+UNCROPPED_VIEW_B_OUTLINE = (0.15183, 0.09033, 0.26817, 0.12565)
+# The view border GetOutline adds around what a crop keeps (fake only).
+BORDER = (0.012, 0.002)
+
+
 class _CropSeat:
     """Just enough of IDrawingDoc/IView to run the VIEW B crop offline."""
 
-    def __init__(self, crop_result: int = 1, cropped: bool = True) -> None:
+    def __init__(
+        self, crop_result: int = 1, cropped: bool = True, crop_lands: bool = True
+    ) -> None:
         self.rectangle = None
         self.crop_calls = []
         self.crop_result = crop_result
         self.cropped = cropped
+        self.crop_lands = crop_lands
         identity = SimpleNamespace()
         self.sketch = SimpleNamespace(ModelToSketchTransform=identity)
         self.model = SimpleNamespace(
@@ -967,6 +980,8 @@ class _CropSeat:
             UpdateViewDisplayGeometry=lambda: None,
             IsCropped=lambda: self.cropped,
             GetOutline=self._outline,
+            ScaleDecimal=0.5,
+            Position=drawing.VIEW_B_CENTER,
         )
 
     def _rectangle(self, *coords):
@@ -978,8 +993,16 @@ class _CropSeat:
         return self.crop_result
 
     def _outline(self):
+        if not (self.crop_calls and self.crop_lands):
+            return UNCROPPED_VIEW_B_OUTLINE
         x1, y1, _z1, x2, y2, _z2 = self.rectangle
-        return (min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
+        bx, by = BORDER
+        return (
+            min(x1, x2) - bx,
+            min(y1, y2) - by,
+            max(x1, x2) + bx,
+            max(y1, y2) + by,
+        )
 
 
 def _patch_crop_seat(monkeypatch) -> None:
@@ -1008,11 +1031,19 @@ def test_view_b_crop_fence_is_the_rail_strip_across_the_whole_rail(monkeypatch) 
 
 
 @pytest.mark.parametrize(
-    ("crop_result", "cropped", "message"),
-    ((0, True, "failed to crop"), (1, False, "did not retain")),
+    ("crop_result", "cropped", "crop_lands", "message"),
+    (
+        (0, True, True, "failed to crop"),
+        (1, False, True, "did not retain"),
+        # Crop2 and IsCropped both report success, but the outline is the
+        # uncropped view's.
+        (1, True, False, "not the rail strip"),
+    ),
 )
-def test_view_b_crop_fails_loud(monkeypatch, crop_result, cropped, message) -> None:
+def test_view_b_crop_fails_loud(
+    monkeypatch, crop_result, cropped, crop_lands, message
+) -> None:
     _patch_crop_seat(monkeypatch)
-    seat = _CropSeat(crop_result=crop_result, cropped=cropped)
+    seat = _CropSeat(crop_result=crop_result, cropped=cropped, crop_lands=crop_lands)
     with pytest.raises(RuntimeError, match=message):
         drawing._crop_view_b_to_rail(seat.adapter, seat.view)

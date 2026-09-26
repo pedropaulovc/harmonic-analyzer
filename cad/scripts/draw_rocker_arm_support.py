@@ -286,6 +286,7 @@ def _crop_view_b_to_rail(adapter: Any, view: Any) -> None:
     draw.ClearSelection2(True)
     half_len = (BOSS_DEPTH / 2.0 + 2.0) * VIEW_SCALE / 1000.0
     half_z = VIEW_B_CROP_HALF_Z_MM * VIEW_SCALE / 1000.0
+    before = tuple(float(value) for value in native_view.GetOutline())
     sketch = _early_bound(native_view.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
@@ -299,6 +300,12 @@ def _crop_view_b_to_rail(adapter: Any, view: Any) -> None:
         )
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         corners.append(tuple(float(value) for value in projected.ArrayData))
+    _telemetry.info(
+        f"VIEW B before crop: outline={before!r}, "
+        f"scale={float(native_view.ScaleDecimal)!r}, "
+        f"position={tuple(native_view.Position)!r}, "
+        f"fence corners in view-sketch space={corners!r}"
+    )
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
     if not sketch_manager.CreateCornerRectangle(*corners[0], *corners[1]):
         raise RuntimeError("failed to sketch the VIEW B crop fence")
@@ -312,12 +319,20 @@ def _crop_view_b_to_rail(adapter: Any, view: Any) -> None:
         raise RuntimeError("VIEW B did not retain its crop")
     outline = tuple(float(value) for value in native_view.GetOutline())
     _telemetry.info(f"VIEW B outline after crop: {outline!r}")
+    # r743-p1s-A read 0.116 x 0.035 here, larger than the 0.089 x 0.032 top
+    # view itself, so GetOutline's absolute size cannot prove the fence. The
+    # crop is proved against the same view's outline before it: narrower
+    # across the rail (the fence runs 2 mm past each end, so the length is
+    # not compared) and still centred where the view was placed.
+    centre = ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
     if (
         len(outline) != 4
-        or outline[3] - outline[1] > 2.0 * half_z + 0.004
-        or outline[2] - outline[0] < BOSS_DEPTH * VIEW_SCALE / 1000.0 - 0.004
+        or outline[3] - outline[1] >= before[3] - before[1] - 0.002
+        or math.dist(centre, VIEW_B_CENTER) > 0.001
     ):
-        raise RuntimeError(f"VIEW B crop is not the rail strip: outline={outline!r}")
+        raise RuntimeError(
+            f"VIEW B crop is not the rail strip: before={before!r}, after={outline!r}"
+        )
 
 
 def _add_view_b_arrow(adapter: Any, front: Any) -> None:
@@ -735,6 +750,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # The drawing-sketch datum and hole table leave the bottom view's HLV edge
     # set stale, so restore its complete projected edge set before export.
     set_hidden_lines_visible(adapter, bottom)
+    _telemetry.info(
+        f"bottom view outline (uncropped 1:2 control): "
+        f"{tuple(_early_bound(bottom, 'IView').GetOutline())!r}"
+    )
     view_b = place_view(adapter, str(SOURCE), "*Top", *VIEW_B_CENTER, scale=(1, 2))
     set_hidden_lines_removed(adapter, view_b)
     _crop_view_b_to_rail(adapter, view_b)
@@ -755,7 +774,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # Materialize the iso's cosmetic threads before the strict final note
     # cleanup, so BracketSeats' descriptive label exists when it is counted
     # rather than first appearing during the native drawing save.
+    # VIEW B shows the same seats face-on, so it gets the same treatment:
+    # its thread label is materialized here and removed with the iso's.
     import_cosmetic_threads(adapter, iso)
+    import_cosmetic_threads(adapter, view_b)
 
     return await finalize_drawing(
         adapter,
@@ -767,7 +789,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # right border (fix3 render); the seat note already states it. One
         # label per tapped Hole Wizard feature per view that shows it.
         redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=1,
+        expected_redundant_notes=2,
     )
 
 
