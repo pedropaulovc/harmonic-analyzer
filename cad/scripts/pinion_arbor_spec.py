@@ -12,9 +12,12 @@ import math
 from itertools import product
 
 from _gtol_spec import CylinderFace
+from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_bracket_geometry import THICKNESS as STRAP_T
+from pinion_bracket_geometry import THICKNESS_BAND as STRAP_T_BAND
 from pinion_handle_geometry import ROD_DIA, ROD_DIA_BAND
+from pinion_rig_layout import DRUM_LEN, FRONT_BLOCK_FEELER, FRONT_BLOCK_FEELER_BAND
 
 SHAFT_DIA = 8.0
 SHAFT_LEN = 226.25  # unchanged origin-to-back-crown-root station
@@ -72,11 +75,10 @@ EXPOSED_SHAFT_LEN = SHAFT_LEN - NECK_END_Z
 # JOURNAL_LEN is the smallest whole millimetre that keeps every margin with it;
 # no band is tightened to make it fit (U27, Main 2026-09-24: a longer land
 # rather than a tighter station).
-LINEAR_X_BAND = 0.8  # .X title-block row
-# MHA-056 prints its thickness at .X (pinion_bracket_spec.THICKNESS_BAND,
-# pinned equal by test).  Not imported: the drive-train recipe reads this spec
-# and must not depend on the bracket's drawing contract.
-STRAP_T_BAND = LINEAR_X_BAND
+LINEAR_X_BAND = printed_band_mm(1)  # .X title-block row, 0.8
+# MHA-056's thickness band (STRAP_T_BAND) and the MHA-002 drum length come from
+# their geometry owners, pinion_bracket_geometry and pinion_rig_layout, not
+# their drawing contracts: the drive-train recipe reads this spec.
 # User ruling 2026-09-24: the drum is bonded 0.3 further aft than the as-built
 # station so MHA-027 gear j=19 reads its full 3.0 face at nominal.  The
 # as-built drum front sits at a fixed arbor-local z (BDT APINION_Z_FRONT -
@@ -87,7 +89,6 @@ DRUM_FRONT_Z_AS_BUILT = 60.0
 DRUM_STATION_AS_BUILT = DRUM_FRONT_Z_AS_BUILT - HEAD_REAR_Z
 DRUM_AFT_SHIFT = 0.3
 DRUM_STATION = DRUM_STATION_AS_BUILT + DRUM_AFT_SHIFT
-DRUM_LEN = 143.2  # MHA-002 FACE_WIDTH
 DRUM_LEN_BAND = (LINEAR_X_BAND, -LINEAR_X_BAND)  # general .X
 MIN_LAND_OVER_STRAP = 0.5
 DRUM_STATION_BAND = LINEAR_X_BAND
@@ -97,12 +98,12 @@ DRUM_STATION_BAND = LINEAR_X_BAND
 # That total play is shared by the cluster's four axial gaps (front block to
 # front strap, front strap to drum, drum to back strap, back strap to back
 # block), each >= 0 and split any way, so the two drum-end airs together run
-# from 0 (all the play at the blocks) up to the whole play.  The model's
-# STRAP_AIR is only a pose and never enters this stack (pinioncluster,
-# 2026-09-24).  The drum hard forward and hard aft are the two stops.
+# from 0 (all the play at the blocks) up to the whole play.  The assembly
+# shows the fit-up stack, both drum-end airs at 0 (pinion_rig_layout).  The
+# drum hard forward and hard aft are the two stops.
 STRAP_AXIAL_LOCATION = "block-stop-slot-set"
-END_PLAY = 0.25
-END_PLAY_SET_ERROR = 0.10
+END_PLAY = FRONT_BLOCK_FEELER  # the rig's one fit-up feeler (pinion_rig_layout)
+END_PLAY_SET_ERROR = FRONT_BLOCK_FEELER_BAND
 MIN_END_PLAY = 0.1  # the drum never binds between the straps
 LAND_FINISH_RUNOUT = 2.0  # the Ra 1.6 pass runs out this far past the land
 LAND_ENDS = ("front inboard", "front outboard", "back inboard", "back outboard")
@@ -212,7 +213,7 @@ BACK_JOURNAL_Z = HEAD_REAR_Z + BACK_JOURNAL_FROM_HEAD_REAR
 
 # Rule 12 worst-case web from the centred crossrod hole to either head face:
 # the .X HeadLen band split over both sides, the hole at its upper limit.
-HEAD_LEN_BAND = 0.8  # .X title-block row
+HEAD_LEN_BAND = LINEAR_X_BAND  # .X title-block row
 CROSS_HOLE_WEB_WORST = (
     (HEAD_LEN - HEAD_LEN_BAND) / 2.0 - (CROSS_HOLE_DIA + CROSS_HOLE_DIA_BAND[0]) / 2.0
 )

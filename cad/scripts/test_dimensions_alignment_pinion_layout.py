@@ -17,6 +17,7 @@ import yaml
 
 import build_drive_train_assembly as dt
 import pinion_bracket_geometry as strap
+from pinion_arbor_spec import SHAFT_LEN as ARBOR_LEN
 import pinion_spring_geometry as spring
 
 DIMENSIONS = Path(__file__).resolve().parents[1] / "config" / "dimensions.yaml"
@@ -58,7 +59,7 @@ def _expected_fragments() -> list[str]:
         f"+ {dt.APINION_GAP} disengaged gap",
         f"drum z {_mm(dt.APINION_Z_FRONT)}..+{dt.APINION_Z_BACK:.3f}",
         f"face {dt.APINION_Z_BACK - dt.APINION_Z_FRONT:.1f}",
-        f"root z {_mm(dt.ARBOR_Z0)}..+{dt.ARBOR_Z0 + dt.ARBOR_LEN:.3f}",
+        f"root z {_mm(dt.ARBOR_Z0)}..+{dt.ARBOR_Z0 + ARBOR_LEN:.3f}",
         f"head/crossrod axis z {_mm(dt.HANDLE_Z)}",
         f"crossrod at +{dt.HANDLE_TILT_DEG:g}°",
         f"Straps: {strap.WIDTH:g} wide × {strap.THICKNESS:g} thick with "

@@ -5,8 +5,8 @@ parallel under the alignment-pinion drum through both pivot blocks'
 east bores (p. 68 close-ups; the engage lever and its cam pins live on
 the SEPARATE lift rod in the west bores -- build_pinion_lift_rod.py).
 
-Layout: shaft axis Z, z 0..192 (PR7: ends FLUSH with the pivot blocks'
-outer faces, machine -104/+88, instead of 2 proud), each end crowned by
+Layout: shaft axis Z, z 0..SHAFT_LEN (PR7: ends FLUSH with the pivot blocks'
+outer faces -- pinion_rig_layout -- instead of 2 proud), each end crowned by
 a shallow spherical cap (sagitta 1.2 -- the p.69 close-up's domed end
 visible inside the strap bore).
 
@@ -43,11 +43,11 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
@@ -56,12 +56,12 @@ from pinion_pivot_shaft_spec import (
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     END_VIEW_NOTE,
     ISO_VIEW_NOTE,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHAFT_LEN,
-    SHAFT_LENGTH_TOLERANCE_MM,
     SURFACE_FINISHES,
 )
 
@@ -250,9 +250,7 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "ShaftProfile", "ShaftDia", *deviations(SHAFT_DIA_BAND)
     )
-    set_dimension_symmetric_tolerance(
-        adapter, "Shaft", "Depth", SHAFT_LENGTH_TOLERANCE_MM
-    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)  # length at .X (U27)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

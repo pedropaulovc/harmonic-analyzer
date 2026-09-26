@@ -13,13 +13,26 @@ from __future__ import annotations
 from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from pinion_rig_layout import TORQUE_SHAFT_LEN
 
 SHAFT_DIA = 6.35  # 1/4 in: rides both pivot blocks' east bores and the straps
-SHAFT_LEN = 192.0  # ends flush with the pivot blocks' outer faces
+# Set back-flush with the back block's outer face; ruling (c) moved the front
+# block inboard to the front strap (pinion_rig_layout), 192 -> 182.0, then
+# the worst fitted stack (Codex #854 P1) made it long enough that the
+# shortest shaft still bears 9.5 of the front block
+# (pinion_rig_layout.torque_shaft_bearing_stack).
+SHAFT_LEN = TORQUE_SHAFT_LEN
 CAP_SAG = 1.2  # shallow spherical crown height at each end
 CAP_RADIUS = ((SHAFT_DIA / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
 SHAFT_DIA_BAND = SHAFT_H
-SHAFT_LENGTH_TOLERANCE_MM = 0.25
+# U27 (Main, 2026-09-24): the length carries the title-block .X band (+/-0.8),
+# not a tight one.  Set back-flush, the longest shaft in the shortest stack
+# stands proud of the front block; nothing stands on the shaft's axis past
+# either block -- the nearest body, the MHA-059 lever hub, rides the lift rod
+# 18.63 off it, 8.95 radially clear.  Both are proven in
+# test_pinion_pivot_block_drawing::
+# test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {"Shaft": {"Depth": 1}}
 
 SURFACE_FINISHES = (
     SurfaceFinishControl("bearing", MACHINED_UM, CylinderFace(SHAFT_DIA)),

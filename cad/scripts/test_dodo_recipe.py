@@ -2562,6 +2562,28 @@ def test_export_cache_ships_every_file_it_certifies():
     )
 
 
+def test_title_block_geometry_readers_keep_the_title_block_without_stamping(
+    monkeypatch,
+) -> None:
+    # Codex #854 review (Main): pinion_rig_layout sizes the torque shaft and the
+    # lift rod from the title block's printed rows (_printed_tolerance), so a
+    # row edit moves drive-train placements.  The title_block token must
+    # survive for such an assembly even if it stopped stamping; only a
+    # stamp-free assembly that reads no geometry from it drops the token.
+    import _buildgraph
+
+    dodo = _load_dodo()
+    drive_train = dodo.script_for("drive_train")
+    channel = dodo.script_for("channel")
+    assert _buildgraph.reads_title_block_geometry(drive_train)
+    monkeypatch.setattr(dodo, "stamps_title_block_properties", lambda _script: False)
+    assert dodo._expand_title_block_token("assembly", drive_train)
+    # Every assembly reaches a geometry reader today, so a stamp-free, geometry-
+    # free one is simulated to prove the drop branch.
+    monkeypatch.setattr(dodo, "reads_title_block_geometry", lambda _script: False)
+    assert dodo._expand_title_block_token("assembly", channel) == []
+
+
 def test_check_gates_depend_on_everything_they_execute():
     """Every ``check:*`` stamp must go stale when code or config it EXECUTES
     changes, or the gate reports green without running.
@@ -2756,3 +2778,28 @@ def test_every_subprocess_launch_names_a_task_the_guard_can_map():
         for action, args in task["actions"]:
             if action is dodo._run_stamped:
                 dodo._fastener_rows_env(args[3])  # raises on an unmappable task
+
+
+def test_every_title_block_reader_is_classified() -> None:
+    # Main (restricted review of #854): the title_block token survives for a
+    # stamp-free assembly only through TITLE_BLOCK_GEOMETRY_MODULES, so a module
+    # that reads the printed rows for geometry and is missing from it would
+    # silently drop title_block.yaml from an assembly recipe.  Every module that
+    # calls the accessor is either one of the TOL_* stampers, a drawing script
+    # (drawing tasks always keep the token), or a geometry reader in the set.
+    import _buildgraph
+
+    stampers = {"_config", "_common", "_assembly"}  # the accessor and TOL_* stamping
+    readers = {
+        path.stem
+        for path in (REPO_ROOT / "cad" / "scripts").glob("*.py")
+        if not path.stem.startswith(("test_", "draw_"))
+        and re.search(r"\btitle_block\(", path.read_text(encoding="utf-8"))
+    }
+    unclassified = sorted(readers - stampers - _buildgraph.TITLE_BLOCK_GEOMETRY_MODULES)
+    assert not unclassified, (
+        "modules read _config.title_block but are not in "
+        f"TITLE_BLOCK_GEOMETRY_MODULES: {unclassified}"
+    )
+    stale = sorted(_buildgraph.TITLE_BLOCK_GEOMETRY_MODULES - readers)
+    assert not stale, f"TITLE_BLOCK_GEOMETRY_MODULES names non-readers: {stale}"

@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 import build_drive_train_assembly as drive
+import pinion_rig_fitup as FITUP
 from pinion_pivot_block_geometry import BLOCK_EAST
 from rocker_arm_support_spec import SUPPORT_WORLD_X
 
@@ -127,3 +128,79 @@ def test_rod_phase_leaves_the_cams_parked_ecc_down() -> None:
         drive.LIFT_ROD_PARK_DEG, 90.0 + drive.LEVER_TILT_DEG, abs_tol=1e-9
     )
     assert math.isclose(drive._PARK_GAP, 0.1606, abs_tol=5e-4)
+
+
+# Ruling (c) worst-case stack (user, 2026-09-24).  Physical end play is ONE
+# feeler setting, P = 0.25 +/- 0.10, shared by the four axial gaps (front
+# block/strap g_f, strap/drum g_df, drum/strap g_db, strap/back block g_b), each
+# >= 0; the saved pose is the fit-up vertex, all of P at the front block.  The
+# lift rod is captured on the front block between the lever hub and the front
+# cam collar, whose feeler leaves the same 0.10..0.35 of rod play.  Every
+# quantity below is linear in the gaps, so the extremes sit at the vertices
+# swept here.
+_P_MAX = FITUP.FRONT_BLOCK_FEELER + FITUP.FRONT_BLOCK_FEELER_BAND
+_ROD_PLAY_MAX = FITUP.FRONT_BLOCK_FEELER + FITUP.FRONT_BLOCK_FEELER_BAND
+_BACK_CAM_SET_ERR = 0.5  # the back collar is set to its pin by eye
+
+
+def _strap_t_band() -> tuple[float, float]:
+    from pinion_bracket_spec import THICKNESS_BAND
+
+    return (drive.STRAP_T - THICKNESS_BAND, drive.STRAP_T + THICKNESS_BAND)
+
+
+def test_j19_keeps_two_thirds_face_at_the_worst_stack() -> None:
+    # The drum's back end is located from the back block through the back
+    # strap: worst when the strap is thickest and all the play sits behind the
+    # drum.  Floor 2.0 of the 3.0 face (Main, 2026-09-24: lightly loaded train).
+    g19_front = drive.Z_DRUM0 + 19 * drive.Z_PITCH - drive.DRUM_FACE / 2.0
+    g19_back = g19_front + drive.DRUM_FACE
+    worst = min(
+        min(drive.BLOCK_BACK_Z0 - t - g, g19_back) - g19_front
+        for t in _strap_t_band()
+        for g in (0.0, _P_MAX)
+    )
+    assert worst >= 2.0, worst
+    assert math.isclose(worst, 2.126, abs_tol=5e-3)
+    # j = 0 at the front: the drum's front end never uncovers gear 0.
+    g0_front = drive.Z_DRUM0 - drive.DRUM_FACE / 2.0
+    face_min = drive.APINION_DRUM_LEN - 0.8
+    for t in _strap_t_band():
+        assert drive.BLOCK_BACK_Z0 - t - face_min <= g0_front - 1.0
+
+
+def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
+    import itertools
+
+    # Front: collar set off the front block's inner face (rod-play gap c),
+    # strap one gap g_f off it; the pin rides the strap's mid-plane.
+    front = [
+        g_f + t / 2.0 - c
+        for g_f, t, c in itertools.product(
+            (0.0, _P_MAX), _strap_t_band(), (0.0, _ROD_PLAY_MAX)
+        )
+    ]
+    # Back: collar set to its pin at the model station with the cluster hard
+    # back; the strap then moves forward by g_b, the rod by up to its play.
+    back = [
+        drive.CAM_PIN_STATION[1] - g_b + dr + e
+        for g_b, dr, e in itertools.product(
+            (0.0, _P_MAX), (0.0, _ROD_PLAY_MAX), (-_BACK_CAM_SET_ERR, _BACK_CAM_SET_ERR)
+        )
+    ]
+    assert math.isclose(drive.CAM_PIN_STATION[0], drive.STRAP_T / 2.0)
+    for stations in (front, back):
+        assert min(stations) >= 1.0, stations
+        assert max(stations) <= drive.CAM_LEN - 1.0, stations
+    # The back collar, set to its pin with the cluster hard back, never
+    # reaches the back block (the rod only moves forward from there).
+    for t in _strap_t_band():
+        collar_back = (
+            drive.BLOCK_BACK_Z0 - t / 2.0 + (drive.CAM_LEN - drive.CAM_PIN_STATION[1])
+        )
+        assert drive.BLOCK_BACK_Z0 - collar_back >= 1.0
+    # The model front collar is flush with the strap's outer face, one feeler
+    # off the block.
+    assert math.isclose(
+        drive.CAM_Z0[0] - (drive.BLOCK_FRONT_Z0 + drive.BLOCK_DEPTH), 0.25, abs_tol=1e-9
+    )
