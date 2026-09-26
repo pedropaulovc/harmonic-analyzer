@@ -2304,6 +2304,126 @@ def test_machinist_review_runs_the_directed_fallback_during_an_outage(
     assert entry[ml.OUTAGE_FALLBACK]["outage"]["quote"] == OUTAGE_QUOTE
 
 
+@pytest.mark.parametrize(
+    ("change", "reason"),
+    [
+        ({"ended_at": NOW.isoformat()}, "ended at"),
+        ({"fallback_model": "claude-opus-5-5"}, "not the directed fallback"),
+        ({"id": "renamed"}, "no outage"),
+    ],
+    ids=["closed", "fallback-corrected", "withdrawn"],
+)
+def test_machinist_review_rereads_the_outage_before_it_records(
+    tmp_path: Path,
+    registry: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys,
+    change: dict,
+    reason: str,
+) -> None:
+    pdf = _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+    outages = _outages(tmp_path)
+    argv = ["crank_arm", "--reviewer", "claude", "--author-family", "claude"]
+    argv += ["--ledger", str(ledger_path), "--report-dir", str(tmp_path / "reports")]
+    argv += ["--outage", "codex-401-test", "--outages", str(outages)]
+
+    def reviewing():
+        # The outage record is corrected while the (long) review runs.
+        _outages(tmp_path, **change)
+        return mr.Review(**_review(pdf, reviewer="claude"))
+
+    _fake_run(monkeypatch, pdf, reviewing)
+
+    assert mr.main(argv) == 1
+    assert not ledger_path.exists()
+    assert reason in capsys.readouterr().err
+
+
+def test_a_failed_ledger_save_leaves_the_previous_ledger_whole(
+    tmp_path: Path, registry: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pdf = _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+    ml.record_review(
+        _review(pdf),
+        pdf,
+        author_family="claude",
+        provenance={},
+        ledger_path=ledger_path,
+    )
+    before = ledger_path.read_bytes()
+
+    def dies(*args, **kwargs):
+        raise OSError("the process died mid-save")
+
+    monkeypatch.setattr(ml.os, "replace", dies)
+    ledger = ml.load_ledger(ledger_path)
+    ledger["drawings"]["crank_arm"]["cross_family"]["summary"] = "x" * 10_000
+    with pytest.raises(OSError):
+        ml.save_ledger(ledger, ledger_path)
+
+    assert ledger_path.read_bytes() == before  # never half-written
+
+
+def test_a_truncated_stored_pdf_is_replaced_not_trusted(
+    tmp_path: Path, registry: Path
+) -> None:
+    pdf = _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+    sha = ml.sha256_file(pdf)
+    stored = ml.sheets_dir(ledger_path) / f"{sha}.pdf"
+    stored.parent.mkdir(parents=True)
+    stored.write_bytes(pdf.read_bytes()[:100])  # a copy a crash cut short
+
+    ml.record_review(
+        _review(pdf),
+        pdf,
+        author_family="claude",
+        provenance={},
+        ledger_path=ledger_path,
+    )
+
+    assert ml.sha256_file(stored) == sha
+
+
+def _dies(*args, **kwargs):
+    raise OSError("the process died mid-write")
+
+
+def test_a_failed_report_write_leaves_the_previous_report_whole(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pdf = _sheet(tmp_path / "sheet.pdf")
+    mr.write_review(mr.Review(**_review(pdf)), tmp_path / "reports")
+    report = tmp_path / "reports" / "crank_arm.json"
+    before = report.read_bytes()
+
+    monkeypatch.setattr(mr.os, "replace", _dies)
+    with pytest.raises(OSError):
+        mr.write_review(mr.Review(**_review(pdf, passed=False)), tmp_path / "reports")
+
+    assert report.read_bytes() == before
+
+
+def test_a_failed_refusal_keep_leaves_the_kept_evidence_whole(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pdf = _sheet(tmp_path / "sheet.pdf")
+    report = _refused(tmp_path, pdf)
+    refused = mr.Review(**json.loads(report.read_text(encoding="utf-8")))
+    mr._keep_quota_refusal(refused, report.parent)
+    kept = mr.quota_refused_path(report.parent, "crank_arm", "codex")
+    before = kept.read_bytes()
+    report.write_text(report.read_text(encoding="utf-8") + " ", encoding="utf-8")
+
+    monkeypatch.setattr(mr.os, "replace", _dies)
+    with pytest.raises(OSError):
+        mr._keep_quota_refusal(refused, report.parent)
+
+    assert kept.read_bytes() == before
+
+
 # --- backfill ----------------------------------------------------------------------
 
 EARLIER = (NOW - timedelta(hours=5)).isoformat()

@@ -507,12 +507,29 @@ def _ledger_structure_problem(ledger: dict[str, Any]) -> str | None:
     return None
 
 
+def store_pdf(source: Path, stored: Path, sha: str) -> None:
+    """Keep ``source`` as ``stored``: whole, and only if the store lacks these bytes.
+
+    The store is keyed by content, so a file already there is trusted only when
+    it still hashes to its name -- a copy a crash cut short is replaced.
+    """
+    if stored.is_file() and sha256_file(stored) == sha:
+        return
+    stored.parent.mkdir(parents=True, exist_ok=True)
+    tmp = stored.with_suffix(".pdf.tmp")
+    shutil.copyfile(source, tmp)
+    os.replace(tmp, stored)
+
+
 def save_ledger(ledger: dict[str, Any], path: Path = LEDGER_PATH) -> None:
     """Write the ledger and drop reviewed PDFs no entry points at any more."""
     ledger["drawings"] = dict(sorted(ledger["drawings"].items()))
     path.parent.mkdir(parents=True, exist_ok=True)
     text = json.dumps(ledger, indent=2, ensure_ascii=False) + "\n"
-    path.write_text(text, encoding="utf-8", newline="\n")
+    # Written whole or not at all: a crash mid-save leaves the previous ledger.
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(text, encoding="utf-8", newline="\n")
+    os.replace(tmp, path)
     referenced = {
         entry["pdf"]
         for slots in ledger["drawings"].values()
@@ -1519,10 +1536,7 @@ def record_review(
     prompt = prompt_problem(review)
     if prompt:
         raise ValueError(f"{name}: not recorded: {prompt}")
-    stored = sheets_dir(ledger_path) / f"{actual}.pdf"
-    if not stored.is_file():
-        stored.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(pdf, stored)
+    store_pdf(pdf, sheets_dir(ledger_path) / f"{actual}.pdf", actual)
     verdict = review["verdict"]
     entry: dict[str, Any] = {
         "status": status,
@@ -3200,9 +3214,12 @@ def _adopt(tried: Tried, name: str, ledger: dict[str, Any], ledger_path: Path) -
     scratch = load_ledger(tried.scratch)["drawings"][name]
     ledger["drawings"].setdefault(name, {}).update(scratch)
     for entry in scratch.values():
-        stored = sheets_dir(ledger_path) / f"{entry['pdf']}.pdf"
-        stored.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(sheets_dir(tried.scratch) / stored.name, stored)
+        stored = f"{entry['pdf']}.pdf"
+        store_pdf(
+            sheets_dir(tried.scratch) / stored,
+            sheets_dir(ledger_path) / stored,
+            entry["pdf"],
+        )
     save_ledger(ledger, ledger_path)
 
 

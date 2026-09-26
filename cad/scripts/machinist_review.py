@@ -66,6 +66,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -818,14 +819,17 @@ def review_package(
     return review
 
 
+def _write_whole(path: Path, text: str) -> None:
+    """Write ``text`` to ``path`` whole or not at all (a crash keeps the old file)."""
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
+
+
 def write_review(review: Review, report_dir: Path) -> None:
     report_dir.mkdir(parents=True, exist_ok=True)
-    (report_dir / f"{review.name}.json").write_text(
-        json.dumps(asdict(review), indent=2), encoding="utf-8"
-    )
-    (report_dir / f"{review.name}.md").write_text(
-        render_markdown(review), encoding="utf-8"
-    )
+    _write_whole(report_dir / f"{review.name}.json", json.dumps(asdict(review), indent=2))
+    _write_whole(report_dir / f"{review.name}.md", render_markdown(review))
 
 
 def render_markdown(review: Review) -> str:
@@ -1137,6 +1141,15 @@ def _record_in_ledger(
         return False
     if not review.passed and args.rebuttals is None:
         return False
+    outage = args.outage_record
+    if outage is not None:
+        # A review can run for many minutes: the outage it ran under is read
+        # again now, so a record closed or corrected meanwhile is what counts.
+        why = _current_outage_problem(args)
+        if why:
+            print(f"{review.name}: not recorded in the ledger: {why}", file=sys.stderr)
+            return None
+        outage = args.outage_record
     try:
         recorded = machinist_ledger.record_review(
             asdict(review),
@@ -1152,7 +1165,7 @@ def _record_in_ledger(
                 "report": (args.report_dir / f"{review.name}.json").resolve().as_posix(),
             },
             ledger_path=args.ledger,
-            outage=args.outage_record,
+            outage=outage,
         )
     except (OSError, ValueError) as exc:
         print(f"{review.name}: not recorded in the ledger: {exc}", file=sys.stderr)
@@ -1191,12 +1204,28 @@ def _keep_quota_refusal(review: Review, report_dir: Path) -> None:
     if machinist_ledger.quota_evidence(asdict(review), report) is None:
         return
     kept = quota_refused_path(report_dir, review.name, review.reviewer)
-    shutil.copyfile(report, kept)
+    tmp = kept.with_name(kept.name + ".tmp")
+    shutil.copyfile(report, tmp)
+    os.replace(tmp, kept)  # the evidence is whole or absent, never cut short
     print(
         f"{review.name}: {review.reviewer} refused on quota; kept {kept} as the "
         "evidence a same-family --last-resort run needs",
         file=sys.stderr,
     )
+
+
+def _current_outage_problem(args: argparse.Namespace) -> str:
+    """Why the named outage no longer directs this run; refreshes ``args.outage_record``."""
+    try:
+        outage = machinist_ledger.load_outages(args.outages).get(args.outage)
+    except (OSError, ValueError) as exc:
+        return str(exc)
+    if outage is None:
+        return f"no outage {args.outage!r} in {args.outages} any more"
+    if outage.get("ended_at"):
+        return f"outage {args.outage} ended at {outage['ended_at']} during the review"
+    args.outage_record = outage  # record_review re-checks reviewer, model and window
+    return ""
 
 
 def _outage_problem(args: argparse.Namespace) -> str:
