@@ -172,8 +172,8 @@ tolerance.**
    a single unified DP would force distinct non-meshing systems to the wrong pitch. (My earlier draft
    had the cone/cylinder train at DP 30 — that was backwards; the rack is the DP-30 system.)
 
-4. **The Ø6-tooth gear is marginal by construction.** T006's gap floor is printed at Ø2.880 MIN
-   (U40), which leaves a **0.621 mm minimum web** to the maximum allowed 1/16 in bore (0.646 mm
+4. **The Ø6-tooth gear is marginal by construction.** T006's gap floor is printed at Ø2.849 MIN
+   (U40 as amended by C2), which leaves a **0.606 mm minimum web** to the maximum allowed 1/16 in bore (0.631 mm
    nominal), the one named web exception. That is a real machining hazard, not a CAD
    artifact — call it out as the hardest part to make, and note the period-correct mitigation: the
    four tip gears were a **harder yellow metal** (Muntz/manganese bronze), which is why they show

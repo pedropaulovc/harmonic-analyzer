@@ -105,9 +105,9 @@ TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 # section at the seat" first produced.  At DP 49.82 / PA 14.5 a 6-tooth gear
 # is cut as involute flanks closed by a chord on the base circle -- the
 # project's own DXF profile, cut with a self-made form cutter.  T006's gap
-# floor is printed at 2.880 mm MIN diameter (U40), so a 1/16 in bore leaves a
-# 0.646 mm nominal web, 0.621 mm at maximum bore -- the one named web
-# exception (cone_gear_spec.WEB_EXCEPTIONS_MM) -- on a soldered, keyless,
+# floor is printed as a MIN diameter (cone_gear_spec.FLOOR_LIMITS_MM), so a
+# 1/16 in bore leaves the one named web exception at maximum bore
+# (cone_gear_spec.WEB_EXCEPTIONS_MM, U40 as amended) -- on a soldered, keyless,
 # near-torque-free gear.  Since U40 the land
 # carries T012 as well, so it runs 23.04 mm at L/D 14.5 up to the E11 cup
 # apex (it was 17.775 at L/D 11 before U40; at 1/32 in it would be L/D 29).  A manual lathe turns that only with
@@ -115,8 +115,8 @@ TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 # which is why the tailstock note below is a requirement (U40), not a method.
 # The shaft still decreases monotonically toward the tip: the cone is
 # assembled tip-first, and every gear's tip diameter exceeds the next inboard
-# gear's bore (T006 4.28 > T012 bore 1.5875; T012 7.55 > T018 3.175; T018
-# 10.74 > T024 6.35; T024 13.90 > T030 9.525; asserted below from
+# gear's bore (T006's tip over T012's 1/16 in bore, T012's over T018's 1/8,
+# T018's over T024's 1/4, T024's over T030's 3/8; asserted below from
 # cone_gear_spec.DEEPENED_MESH_MM), so no single gear can be made integral
 # with the shaft unless all twenty are.
 SECTIONS: tuple[tuple[float, float], ...] = (

@@ -50,7 +50,10 @@ STANDARD_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
 # bore-on-land and drum bore-on-arbor runouts closing the deep-edge centre
 # distance at the as-posed interleave.  The cone runout is sized for the
 # 0/-0.05 soldered shaft seats (#839) under this +0.05/0 bore: 0.05 radial.
-# Least engagement adds the journal and arbor float opening.  Each OD is the
+# Least engagement adds the journal and arbor float opening.  Both cases also
+# carry the fit-up residual at that gear's station (#917 R1): what is left of
+# the mesh setting after the backlash is read and the post re-seats on its
+# dowels, 0.020 at T006 rising to 0.028 at T120.  Each OD is the
 # smallest that reaches worst-case CR 1.20 (T060+), else the largest
 # that keeps the tip land >= 0.10 at the thinnest tooth and largest OD and the
 # cone tip >= 0.10 off the drum's chord floor (T006-T054).  ODs print two
@@ -59,47 +62,51 @@ STANDARD_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
 # constraint from these printed values.
 #
 # Contact ratio stays below 1.1 at the worst case of the printed bands on
-# T006-T042: the tooth comes to a point before it reaches deeper.  The user
-# accepted that as a named book-fidelity exception (U42): it costs wear on the
-# tooth-tip corners, not position error (rigid transmission error at most
-# 0.023 mm at the drum pitch line, on T006; <= 0.004 on the rest).
+# T006-T048: the tooth comes to a point before it reaches deeper.  The user
+# accepted that as a named book-fidelity exception (U42, T006-T042): it costs
+# wear on the tooth-tip corners, not position error (the U42 study put the
+# rigid transmission error at most 0.023 mm at the drum pitch line, on T006;
+# <= 0.004 on the rest).  T048 joined it when the fit-up residual opened its
+# worst case to about 1.06 (#917 R3).
 MESH_BACKLASH_MIN_MM = 0.06
 # (upper, lower) about the modelled mid thickness.  The 0.15 window is the
 # configured cone<->cylinder backlash window (tolerances.yaml gear_mesh
 # 0.05..0.20) that error_budget.yaml's tooth-thickness mesh-lag term is
 # derived from.
 TOOTH_THICKNESS_BAND = (0.075, -0.075)
-# Backlash with MHA-027, rocked by hand over a full turn at assembly, swing
-# stop set.  The acceptance is that measurement's worst case and nothing more:
-# thickest tooth with both runouts closing, to thinnest tooth with both runouts
-# and both journal floats opening (rocking takes up the cone-shaft journal and
-# drum-arbor clearances).  The upper, 0.374 on T006, is rounded up to two
-# places.
-BACKLASH_ACCEPTANCE_MM = (0.06, 0.38)
-CONTACT_RATIO_EXCEPTION_TEETH = (6, 12, 18, 24, 30, 36, 42)
+# Backlash with MHA-027, rocked by hand over a full turn at assembly.  The
+# acceptance is that measurement's worst case and nothing more: thickest tooth
+# with both runouts and the fit-up residual closing, to thinnest tooth with
+# both runouts, both journal floats and the fit-up residual opening (rocking
+# takes up the cone-shaft journal and drum-arbor clearances).  Rounded
+# outward to two places, so the band covers every derived case: the lower
+# down, the upper (0.4015 on T006) up.  ``test_cone_gear_mesh_design``
+# asserts both from the derivation.
+BACKLASH_ACCEPTANCE_MM = (0.06, 0.41)
+CONTACT_RATIO_EXCEPTION_TEETH = (6, 12, 18, 24, 30, 36, 42, 48)
 # teeth: (tip diameter, thickest circular tooth thickness at the standard
 # pitch circle), mm.
 DEEPENED_MESH_MM: dict[int, tuple[float, float]] = {
-    6: (4.28, 1.006),
-    12: (7.55, 1.005),
-    18: (10.74, 1.004),
-    24: (13.90, 1.003),
-    30: (17.04, 1.002),
-    36: (20.17, 1.001),
-    42: (23.29, 1.001),
-    48: (26.39, 1.000),
-    54: (29.49, 0.999),
-    60: (32.52, 0.999),
-    66: (35.55, 0.998),
-    72: (38.58, 0.998),
-    78: (41.62, 0.997),
-    84: (44.66, 0.997),
-    90: (47.70, 0.996),
-    96: (50.74, 0.996),
-    102: (53.79, 0.995),
-    108: (56.84, 0.995),
-    114: (59.88, 0.995),
-    120: (62.93, 0.994),
+    6: (4.26, 0.993),
+    12: (7.53, 0.992),
+    18: (10.72, 0.991),
+    24: (13.88, 0.990),
+    30: (17.02, 0.989),
+    36: (20.14, 0.988),
+    42: (23.26, 0.987),
+    48: (26.36, 0.986),
+    54: (29.46, 0.986),
+    60: (32.56, 0.985),
+    66: (35.61, 0.984),
+    72: (38.64, 0.983),
+    78: (41.68, 0.983),
+    84: (44.72, 0.982),
+    90: (47.76, 0.981),
+    96: (50.80, 0.981),
+    102: (53.85, 0.980),
+    108: (56.90, 0.980),
+    114: (59.95, 0.979),
+    120: (63.00, 0.979),
 }
 
 
@@ -162,37 +169,44 @@ def chord_floor_radius_mm(
 # the cutter, so the floor does not move with the tooth band.  Three
 # constructions, all one six-entity gap sketch:
 #
-# * T006, T012: the thicker tooth's chord would sit in the drum tip's path
-#   (+0.030 at T006), so the floor bows below the feet chord to the printed
-#   MIN.  These two also print a MAX (Main, 2026-09-23): the drum tip clears
-#   them by as little as 0.05, so a shallow plunge would rub.  MAX is the
-#   shallowest floor that keeps 0.02 of drum-tip clearance with every runout
-#   closing.  MIN is the web limit: T006 keeps the 0.621 web the user ruled
-#   on as its named exception (U40); T012 trades its web from 2.12 down to
-#   2.05, still over the 2.0 target, for a 0.25 window instead of 0.11.
-# * T018-T042: the chord between the flank feet on the base circle.
+# * T006, T012, T018: with every runout and the fit-up residual closing, the
+#   drum tip passes the feet chord by less than the 0.10 every chord floor
+#   keeps (0.019, 0.049 and 0.091), so the floor bows below the chord to the
+#   printed MIN.  These
+#   also print a MAX (Main, 2026-09-23): the drum tip clears them by as
+#   little as 0.02, so a shallow plunge would rub.  MAX is the shallowest
+#   floor that keeps 0.02 of drum-tip clearance with every runout and the
+#   fit-up residual closing.  T006's MIN sits exactly 0.04 below its MAX,
+#   the window a hand plunge can hold; the user ruled that over keeping the
+#   old 2.880 MIN (C2, 2026-09-26), which moved T006's named web exception
+#   (U40) from 0.621 to 0.606.  T012's MIN is its web limit: it trades its web
+#   from 2.12 down to 2.05, still over the 2.0 target, for a wider window.
+#   T018's MIN is the shallowest floor its drum tip clears by the 0.10 every
+#   chord floor keeps; its web stays over 2.8.
+# * T024-T042: the chord between the flank feet on the base circle.
 # * T048-T120: the flanks start at ``GAP_FLOOR_TMIN`` above the base circle,
 #   which raises the floor until the drum tip clears it by 0.30 at the worst
 #   case.  The gap is then shallower and wider at the floor, so one fly
 #   cutter at least 0.43 wide fits every gear.
 FLOOR_LIMITS_MM: dict[int, tuple[float, float]] = {
-    6: (2.880, 2.929),
-    12: (5.738, 5.988),
+    6: (2.849, 2.889),
+    12: (5.738, 5.947),
+    18: (8.845, 9.005),
 }
 GAP_FLOOR_TMIN: dict[int, float] = {
-    48: 0.0900,
-    54: 0.1200,
-    60: 0.1400,
-    66: 0.1540,
-    72: 0.1650,
-    78: 0.1740,
-    84: 0.1815,
-    90: 0.1875,
-    96: 0.1925,
-    102: 0.1970,
-    108: 0.2010,
-    114: 0.2040,
-    120: 0.2070,
+    48: 0.0650,
+    54: 0.1045,
+    60: 0.1280,
+    66: 0.1440,
+    72: 0.1565,
+    78: 0.1665,
+    84: 0.1745,
+    90: 0.1810,
+    96: 0.1865,
+    102: 0.1915,
+    108: 0.1955,
+    114: 0.1995,
+    120: 0.2025,
 }
 
 
@@ -246,10 +260,13 @@ FAMILY_BORES_MM = {teeth: bore_dia_mm(teeth) for teeth in CONFIGURATION_TEETH}
 # 1.5 mm, between the printed MIN floor diameter and the maximum bore.  U40
 # (user, 2026-09-23): T012, T018 and T024 each drop one shaft land so their
 # webs meet the target; T006 has no compliant construction (its floor sits at
-# r 1.44) and its web is the one named exception (book fidelity).
+# r 1.42) and its web is the one named exception (book fidelity).  The user's
+# C2 ruling (2026-09-26) amended it from 0.621 to 0.606 when T006's floor MIN
+# moved to 2.849: 0.60575 at the +0.050 bore upper, named half a thousandth
+# under that (as 0.621 was under 0.62125) so the bore band keeps +0.050.
 MACHINED_WEB_FLOOR_MM = 1.5
 MACHINED_WEB_TARGET_MM = 2.0
-WEB_EXCEPTIONS_MM: dict[int, float] = {6: 0.621}
+WEB_EXCEPTIONS_MM: dict[int, float] = {6: 0.6055}
 
 # Printed places of the bore band (model-owned, DRAWING_PRECISION).
 BORE_BAND_PLACES = 3
@@ -259,7 +276,7 @@ BORE_BAND_PLACES = 3
 # dimension across all 20 configurations, and SOLIDWORKS 2026 rejects the
 # per-configuration IDimensionTolerance.SetValues2 on some dimension types
 # (_drawing_marks).  And T006's named web (U40) caps the largest bore under its
-# printed MIN floor: a per-land +0.085 would cut that web to 0.604.  So the one
+# printed MIN floor: a per-land +0.085 would cut that web to 0.588.  So the one
 # band is the intersection of the shared retained-joint fit (Main,
 # 2026-09-25) over every land that carries a gear, with its upper limit the
 # lower of two named limits.

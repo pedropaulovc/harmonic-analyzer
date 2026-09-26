@@ -189,8 +189,8 @@ def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates
 
 
 def test_gap_floor_constructions() -> None:
-    # T006/T012 keep the standard tooth's base chord (the drum tip would rub a
-    # risen chord); T018-T042 take the thicker tooth's chord; T048+ raise it.
+    # T006-T018 bow below the thicker tooth's chord (the drum tip passes it
+    # by less than 0.10); T024-T042 take that chord; T048+ raise it.
     for teeth in spec.CONFIGURATION_TEETH:
         chord = spec.chord_floor_radius_mm(
             teeth,
@@ -207,7 +207,7 @@ def test_gap_floor_constructions() -> None:
         assert spec.floor_radius_mm(teeth) == pytest.approx(chord)
         assert spec.floor_dip_mm(teeth) == pytest.approx(0.0)
         assert (spec.floor_tmin(teeth) > 0.0) == (teeth >= 48)
-    assert set(spec.FLOOR_LIMITS_MM) == {6, 12}
+    assert set(spec.FLOOR_LIMITS_MM) == {6, 12, 18}
 
 
 def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> None:
@@ -234,10 +234,10 @@ def test_notes_define_only_the_approved_plain_bore_attachment() -> None:
     # Named exceptions print only on the sheets they cover, with no ruling ids;
     # T006 carries both on one line.
     cr_line = (
-        "CONTACT RATIO BELOW 1.1 ON T006-T042: ACCEPTED EXCEPTION (BOOK FIDELITY)."
+        "CONTACT RATIO BELOW 1.1 ON T006-T048: ACCEPTED EXCEPTION (BOOK FIDELITY)."
     )
     both_line = (
-        "CONTACT RATIO BELOW 1.1, ROOT-TO-BORE WEB 0.62 MIN: "
+        "CONTACT RATIO BELOW 1.1, ROOT-TO-BORE WEB 0.60 MIN: "
         "ACCEPTED EXCEPTIONS (BOOK FIDELITY)."
     )
     for teeth in spec.CONFIGURATION_TEETH:
@@ -249,7 +249,7 @@ def test_notes_define_only_the_approved_plain_bore_attachment() -> None:
         expected = list(common)
         if teeth == 6:
             expected.append(both_line)
-        elif teeth <= 42:
+        elif teeth <= 48:
             expected.append(cr_line)
         assert lines == expected
         assert "U4" not in text and "BY DESIGN" not in text
@@ -362,11 +362,15 @@ def test_root_to_bore_webs_meet_u27_except_the_named_t006() -> None:
     assert spec.floor_radius_mm(12) - t012_bore >= 2.05
     assert (spec.FLOOR_LIMITS_MM[12][0] - 0.001) / 2.0 - t012_bore < 2.05
     assert set(spec.WEB_EXCEPTIONS_MM) == {6}
-    # U40: the user ruled T006's exception at a 0.621 worst-case web; any
-    # drift below it needs a new ruling, not a quiet edit.
+    # U40, amended by the user's C2 ruling (2026-09-26): T006's floor MIN
+    # moved to 2.849 to keep a 0.04 window under the fit-up residual, so its
+    # worst-case web is 0.606 (0.60575 at the +0.050 bore upper; the named
+    # value sits half a thousandth under it, as 0.621 did under 0.62125).
+    # Any drift below it needs a new ruling, not a quiet edit.
     t006_web = spec.floor_radius_mm(6) - (spec.bore_dia_mm(6) + upper) / 2.0
-    assert t006_web >= 0.621 - 1e-9
-    assert spec.WEB_EXCEPTIONS_MM[6] == 0.621
+    assert t006_web >= 0.6055 - 1e-9
+    assert spec.WEB_EXCEPTIONS_MM[6] == 0.6055
+    assert upper == 0.050
     assert [spec.bore_dia_mm(t) for t in (6, 12, 18, 24, 30)] == pytest.approx(
         [1.5875, 1.5875, 3.175, 6.35, 9.525]
     )
