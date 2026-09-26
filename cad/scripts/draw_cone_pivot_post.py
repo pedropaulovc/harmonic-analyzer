@@ -687,21 +687,6 @@ def _show_section_scale_in_caption(adapter: Any, view: Any) -> None:
         raise RuntimeError("native cone-section scale caption did not persist")
 
 
-def foot_caption_shift(
-    border_top: float, foot: Any, caption: Any, gap: float
-) -> tuple[float, float, float]:
-    """``(dx, dy, view_dy)`` for the foot caption, from read-back boxes.
-
-    The caption's box moves so its top sits ``gap`` under the inner border
-    and its left edge on the foot view's; ``view_dy`` (never positive) is how
-    far the foot view must then drop so its outline stays ``gap`` under the
-    caption."""
-    dx = foot.xmin - caption.xmin
-    dy = (border_top - gap) - caption.ymax
-    view_dy = min(0.0, (caption.ymin + dy) - gap - foot.ymax)
-    return dx, dy, view_dy
-
-
 def foot_callout_shift(
     plan: Any,
     foot: Any,
@@ -765,13 +750,15 @@ def _move_annotation(annotation: Any, delta: tuple[float, float], *, label: str)
         raise RuntimeError(f"{label}: moved to {after[:2]!r}, expected {target!r}")
 
 
-def _sheet_border_top(adapter: Any) -> float:
-    from diagnostics.drawing_layout_audit import collect_document
+def _collect_sheet(adapter: Any, *, label: str) -> Any:
+    """The one sheet, as the layout audit reads it; its full dump at info."""
+    from diagnostics.drawing_layout_audit import collect_document, describe_sheet
 
     sheets = collect_document(adapter)
     if len(sheets) != 1:
         raise RuntimeError(f"cone pivot post must have one drawing sheet: {len(sheets)}")
-    return float(sheets[0].region.ymax)
+    _telemetry.info(f"cone pivot post sheet at {label}:\n{describe_sheet(sheets[0])}")
+    return sheets[0]
 
 
 def _annotation_text_box(adapter: Any, name: str) -> Any:
@@ -802,33 +789,46 @@ def _place_foot_group(
     """Caption the foot view and call out one dowel ream, both placed from the
     sheet's read-back boxes (FOOT_LAYOUT_GAP clear of the border and of every
     neighbouring view), then log every box the placement read."""
+    from _layout_planner import plan_caption, sheet_obstacles
+
     gap = FOOT_LAYOUT_GAP
     rebuild_drawing(adapter, label="foot view outline")
-    border_top = _sheet_border_top(adapter)
+    foot_name = str(_early_bound(foot, "IView").Name)
+    obstacles = sheet_obstacles(
+        _collect_sheet(adapter, label="foot view placement"), skip_views=(foot_name,)
+    )
     foot_box = _outline_box(foot)
-    note = add_note(adapter, FOOT_VIEW_NOTE, foot_box.xmin, border_top - gap)
+    note = add_note(adapter, FOOT_VIEW_NOTE, foot_box.xmin, foot_box.ymax)
     if note is None:
         raise RuntimeError("foot view caption was not created")
     caption = _note_box(note)
-    dx, dy, view_dy = foot_caption_shift(border_top, foot_box, caption, gap)
-    _move_annotation(_early_bound(note, "INote").GetAnnotation(), (dx, dy), label="foot caption")
-    if view_dy < 0.0:
+    # Main's order: the caption over its view (the view slid sideways, nearest
+    # first), then beside it; loud, naming every box, when nothing is clear.
+    placement = plan_caption(
+        foot_box, (caption.width, caption.height), obstacles, label="foot view", gap=gap
+    )
+    if placement.view_dx or placement.view_dy:
         bound = _early_bound(foot, "IView")
         position = tuple(float(value) for value in bound.Position)
-        target = [position[0], position[1] + view_dy]
+        target = [position[0] + placement.view_dx, position[1] + placement.view_dy]
         if not bound.SetViewPosition(double_array(target), False):
             raise RuntimeError(f"foot view: SetViewPosition refused {target!r}")
-        rebuild_drawing(adapter, label="foot view under its caption")
+        rebuild_drawing(adapter, label="foot view placed")
         foot_box = _outline_box(foot)
-    journal_box = _outline_box(journal)
-    if foot_box.ymin < journal_box.ymax + gap and not (
-        foot_box.xmax < journal_box.xmin or foot_box.xmin > journal_box.xmax
-    ):
-        raise RuntimeError(
-            f"foot view {foot_box.format_mm()} dropped onto the journal view "
-            f"{journal_box.format_mm()} under its caption"
-        )
+        if max(
+            abs(foot_box.xmin - placement.view.xmin), abs(foot_box.ymax - placement.view.ymax)
+        ) > 0.0002:
+            raise RuntimeError(
+                f"foot view landed at {foot_box.format_mm()}, planned "
+                f"{placement.view.format_mm()}"
+            )
+    _move_annotation(
+        _early_bound(note, "INote").GetAnnotation(),
+        (placement.caption.xmin - caption.xmin, placement.caption.ymax - caption.ymax),
+        label="foot caption",
+    )
     caption = _note_box(note)
+    journal_box = _outline_box(journal)
 
     # One named dowel, the one lower on the sheet (further from the plan's
     # counterbore callout above): the pair differs only in z, so an unnamed
@@ -868,9 +868,9 @@ def _place_foot_group(
     rebuild_drawing(adapter, label="post dowel callout placed")
     placed = _annotation_text_box(adapter, name)
     _telemetry.info(
-        "foot view group placed from read-back boxes: "
-        f"border top {border_top * 1000.0:.2f} mm; foot {foot_box.format_mm()} "
-        f"(moved {view_dy * 1000.0:.2f} mm); caption {caption.format_mm()}; "
+        f"foot view group placed from read-back boxes ({placement.how}): "
+        f"foot {foot_box.format_mm()} (moved {placement.view_dx * 1000.0:.1f}, "
+        f"{placement.view_dy * 1000.0:.1f} mm); caption {caption.format_mm()}; "
         f"plan {plan_box.format_mm()}; journal {journal_box.format_mm()}; "
         f"counterbore callout text bottom {ceiling * 1000.0:.2f} mm; "
         f"dowel callout {name} {placed.format_mm()} at dowel y {dowel_y * 1000.0:.2f} mm"
@@ -891,12 +891,7 @@ def _assert_native_layout(
         format_findings,
         segment_box_overlap_length,
     )
-    from diagnostics.drawing_layout_audit import collect_document
-
-    sheets = collect_document(adapter)
-    if len(sheets) != 1:
-        raise RuntimeError(f"cone pivot post must have one drawing sheet: {len(sheets)}")
-    sheet = sheets[0]
+    sheet = _collect_sheet(adapter, label="final layout")
 
     journal_values = tuple(float(value) for value in journal.GetOutline())
     if len(journal_values) != 4:

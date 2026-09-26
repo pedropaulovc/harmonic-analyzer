@@ -599,10 +599,7 @@ def test_foot_view_group_is_placed_from_read_back_boxes() -> None:
     the foot caption (DetailItem378, [212.0,259.0]..[244.8,268.2] mm) crossed
     the top inner border by 1.46 mm, and the dowel callout (RD1) ran its
     leader across the plan (Drawing View2).  Both came from unmeasured
-    literals (FOOT_NOTE_XY, FOOT_DOWEL_CALLOUT_XY).  They are now placed
-    from the sheet's read-back boxes: the caption's top under the border and
-    its bottom clear of the foot view's outline, the callout's text between
-    the plan's outline and the foot view's, on the named dowel's height."""
+    literals (FOOT_NOTE_XY, FOOT_DOWEL_CALLOUT_XY); both are gone."""
     import inspect
 
     from _layout_geometry import Box
@@ -610,19 +607,7 @@ def test_foot_view_group_is_placed_from_read_back_boxes() -> None:
     assert not hasattr(drawing, "FOOT_NOTE_XY")
     assert not hasattr(drawing, "FOOT_DOWEL_CALLOUT_XY")
     gap = drawing.FOOT_LAYOUT_GAP
-    # The leaf's caption box and the border it crossed (268.2 - 1.46).
-    caption = Box(0.2120, 0.2590, 0.2448, 0.2682)
-    border_top = 0.26674
     foot = Box(0.2050, 0.2150, 0.2510, 0.2555)
-    dx, dy, view_dy = drawing.foot_caption_shift(border_top, foot, caption, gap)
-    placed = Box(caption.xmin + dx, caption.ymin + dy, caption.xmax + dx, caption.ymax + dy)
-    assert placed.ymax == pytest.approx(border_top - gap)
-    assert placed.xmin == pytest.approx(foot.xmin)
-    assert placed.ymin >= foot.ymax + view_dy + gap - 1e-12
-    assert view_dy <= 0.0
-    # A short foot view needs no move.
-    assert drawing.foot_caption_shift(border_top, Box(0.205, 0.215, 0.251, 0.240), caption, gap)[2] == 0.0
-
     plan = Box(0.0600, 0.1700, 0.1500, 0.2700)
     callout = Box(0.1760, 0.2150, 0.2260, 0.2290)
     dowel_y = 0.2313
@@ -639,3 +624,93 @@ def test_foot_view_group_is_placed_from_read_back_boxes() -> None:
         drawing.foot_callout_shift(Box(0.06, 0.17, 0.19, 0.27), foot, callout, dowel_y, gap)
     # The callout names ONE dowel: the edge pick breaks the z tie.
     assert "center_z_mm" in inspect.signature(drawing._circular_edge).parameters
+
+
+# S1 leaf 917-s1-ac4f (drawing:cone_pivot_post): the caption-over-view plan
+# with the view dropped under it landed the foot view on the journal view:
+# "foot view [211.4,205.9]..[244.6,253.6]mm dropped onto the journal view
+# [200.0,111.4]..[270.0,208.6]mm under its caption".  Border top 266.7; the
+# caption (5974's box) 32.8 x 9.2 mm; gaps 2 mm: 62.9 mm needed, 58.1 there.
+_AC4F_BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
+_AC4F_JOURNAL = (0.2000, 0.1114, 0.2700, 0.2086)
+_AC4F_FOOT_UNDROPPED = (0.2114, 0.21415, 0.2446, 0.26185)
+_AC4F_FOOT_DROPPED = (0.2114, 0.2059, 0.2446, 0.2536)
+_AC4F_CAPTION = (0.0328, 0.0092)
+
+
+def _obstacles(*views: tuple[str, tuple[float, float, float, float]], texts=()):
+    from _drawing_layout_check import DrawableRegion
+    from _layout_geometry import Box
+    from _layout_planner import SheetObstacles
+
+    x0, y0, x1, y1 = _AC4F_BORDER
+    return SheetObstacles(
+        region=DrawableRegion(x0, y0, x1, y1),
+        views=tuple((name, Box(*box), False) for name, box in views),
+        texts=tuple((name, Box(*box)) for name, box in texts),
+    )
+
+
+def test_foot_caption_plan_rejects_the_ac4f_drop_and_slides_the_view() -> None:
+    """Main's order: first the caption over its view with the view slid
+    sideways (nearest first), then the caption beside the view."""
+    from _layout_geometry import Box
+    from _layout_planner import box_conflict, plan_caption
+
+    obstacles = _obstacles(("Drawing View3", _AC4F_JOURNAL))
+    # The ac4f outcome is rejected, naming the journal view.
+    assert "Drawing View3" in (box_conflict(Box(*_AC4F_FOOT_DROPPED), obstacles) or "")
+    plan = plan_caption(
+        Box(*_AC4F_FOOT_UNDROPPED), _AC4F_CAPTION, obstacles, label="foot view"
+    )
+    assert plan.how == "caption over the view"
+    assert plan.view_dx != 0.0
+    # Nearest clear slide: left, until the view clears the journal by 2 mm.
+    assert plan.view.xmax == pytest.approx(_AC4F_JOURNAL[0] - 0.002, abs=0.001)
+    assert plan.caption.ymax <= _AC4F_BORDER[3] - 0.002 + 1e-9
+    assert plan.caption.ymin >= plan.view.ymax + 0.002 - 1e-9
+    assert box_conflict(plan.view, obstacles) is None
+    assert box_conflict(plan.caption, obstacles) is None
+
+
+def test_foot_caption_falls_back_beside_the_view_then_fails_naming_every_box() -> None:
+    from _layout_geometry import Box
+    from _layout_planner import plan_caption
+
+    # A journal band across the whole sheet: no slide clears it under a drop.
+    wide = ("wide journal", (0.0127, 0.1114, 0.4191, 0.2086))
+    plan = plan_caption(
+        Box(*_AC4F_FOOT_UNDROPPED), _AC4F_CAPTION, _obstacles(wide), label="foot view"
+    )
+    assert plan.how == "caption beside the view, left"
+    assert plan.view_dx == plan.view_dy == 0.0
+    assert plan.caption.ymax == pytest.approx(_AC4F_FOOT_UNDROPPED[3])
+    assert plan.caption.xmax == pytest.approx(_AC4F_FOOT_UNDROPPED[0] - 0.002)
+    # Text filling both sides too: nothing fits, and the failure names it all.
+    left = ("left text", (0.10, 0.23, 0.2090, 0.2665))
+    right = ("right text", (0.2470, 0.23, 0.40, 0.2665))
+    with pytest.raises(RuntimeError, match="no clear place") as failure:
+        plan_caption(
+            Box(*_AC4F_FOOT_UNDROPPED),
+            _AC4F_CAPTION,
+            _obstacles(wide, texts=(left, right)),
+            label="foot view",
+        )
+    message = str(failure.value)
+    for name in ("wide journal", "left text", "right text", "border"):
+        assert name in message
+
+
+
+def test_post_places_its_foot_caption_with_the_planner() -> None:
+    """The ac4f drop rule (foot_caption_shift) is gone; the build asks the
+    planner, with the whole sheet as obstacles, and dumps the sheet."""
+    import inspect
+
+    assert not hasattr(drawing, "foot_caption_shift")
+    source = inspect.getsource(drawing._place_foot_group)
+    assert "plan_caption(" in source
+    assert "sheet_obstacles(" in source
+    assert "_collect_sheet(" in source
+    assert "_collect_sheet(" in inspect.getsource(drawing._assert_native_layout)
+    assert "describe_sheet(" in inspect.getsource(drawing._collect_sheet)
