@@ -2509,13 +2509,14 @@ def test_backfill_withdraws_a_contradicted_half_before_completing_a_pair(
 
     row = _backfill(tmp_path, records, rulings=rulings, apply=True)
 
-    assert row.outcome == ml.Backfill.CONTRADICTED, row.detail
+    # The GPT half is withdrawn, and the newer Claude SHIP still fills its own
+    # half in the same run; the pair then waits for a new GPT review.
+    assert row.outcome == ml.Backfill.INGESTED, row.detail
     assert "recorded both_families_gpt" in row.detail
-    assert "both_families_gpt" not in ml.load_ledger(ledger_path)["drawings"].get(
-        "crank_arm", {}
-    )
+    entry = ml.load_ledger(ledger_path)["drawings"]["crank_arm"]
+    assert list(entry) == ["both_families_claude"]
     [status] = ml.check(["crank_arm"], ledger_path=ledger_path, rulings=rulings)
-    assert status.state != ml.State.OK
+    assert (status.state, status.missing) == (ml.State.UNREVIEWED, ("gpt",))
 
 
 def test_an_untrailered_scripts_family_comes_from_the_rulings_not_the_caller(
@@ -2572,6 +2573,42 @@ def test_an_outage_fallback_on_record_is_no_half_of_a_both_families_pair(
     )
 
     assert (status.state, status.missing) == (ml.State.UNREVIEWED, ("claude", "gpt"))
+
+
+def test_backfill_replaces_a_withdrawn_entry_with_a_newer_ship_in_one_run(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    pdf = _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+    t1, t2, t3 = ((NOW - timedelta(hours=h)).isoformat() for h in (3, 2, 1))
+    ml.record_review(
+        _review(pdf, reviewed_at=t1),
+        pdf,
+        author_family="claude",
+        provenance={},
+        ledger_path=ledger_path,
+    )
+    # A newer FIX of these sheets withdraws the t1 entry; a still newer SHIP stands.
+    _on_record(records, "wt-fix", passed=False, reviewed_at=t2)
+    _on_record(records, "wt-ship", reviewed_at=t3)
+
+    dry = _backfill(tmp_path, records)
+    assert dry.outcome == ml.Backfill.INGESTED, dry.detail
+    assert "recorded cross_family" in dry.detail and "wt-ship" in dry.detail
+    assert (
+        ml.load_ledger(ledger_path)["drawings"]["crank_arm"]["cross_family"][
+            "reviewed_at"
+        ]
+        == t1
+    )  # a dry run changes nothing
+
+    row = _backfill(tmp_path, records, apply=True)
+    assert row.outcome == ml.Backfill.INGESTED, row.detail
+    entry = ml.load_ledger(ledger_path)["drawings"]["crank_arm"]["cross_family"]
+    assert entry["reviewed_at"] == t3
+    [status] = ml.check(["crank_arm"], ledger_path=ledger_path)
+    assert status.state == ml.State.OK
 
 
 def test_backfill_withdraws_a_contradicted_outage_fallback(

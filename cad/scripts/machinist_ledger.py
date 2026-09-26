@@ -2507,31 +2507,46 @@ def _backfill_drawings(
             objected = _objections_to_recorded(
                 name, status, ledger, ledger_path, _Matcher(pdf, cache), found
             )
+            withdrawn = ""
             if objected:
-                # A newer failing verdict of these sheets withdraws each entry.
+                # A newer failing verdict of these sheets withdraws each entry;
+                # a still newer SHIP on record may replace it in this same run.
                 dropped = "dropped from the ledger" if apply else "to drop (--apply)"
                 why = "; ".join(
                     f"recorded {slot}: {objection}"
                     for slot, objection in objected.items()
                 )
-                rows.append(
-                    BackfillRow(
-                        name,
-                        Backfill.CONTRADICTED,
-                        f"{why} ({status.detail}); {dropped}",
-                    )
+                withdrawn = f"{why} ({status.detail}); {dropped}"
+                kept = {
+                    slot: entry
+                    for slot, entry in ledger["drawings"][name].items()
+                    if slot not in objected
+                }
+                view = (
+                    ledger if apply else {**ledger, "drawings": {**ledger["drawings"]}}
                 )
+                view["drawings"][name] = kept
+                if not kept:
+                    del view["drawings"][name]
                 if apply:
-                    for slot in objected:
-                        del ledger["drawings"][name][slot]
-                    if not ledger["drawings"][name]:
-                        del ledger["drawings"][name]
                     save_ledger(ledger, ledger_path)
-                continue
+                status = gate_status(
+                    name,
+                    view,
+                    references=references,
+                    rulings=rulings,
+                    pdf=pdf,
+                    author=authors.get(name),
+                    repo=repo,
+                    outages=outages,
+                )
             if status.state == State.OK:
                 rows.append(
-                    BackfillRow(
-                        name, Backfill.RECORDED, f"{status.via} {status.detail}"
+                    _backfill_row(
+                        name,
+                        Backfill.RECORDED,
+                        f"{status.via} {status.detail}",
+                        withdrawn,
                     )
                 )
                 continue
@@ -2545,7 +2560,7 @@ def _backfill_drawings(
                 detail = "no passing SHIP on record"
                 if status.missing:
                     detail = f"{status.detail}; no passing SHIP from it on record"
-                rows.append(BackfillRow(name, Backfill.NO_SHIP, detail))
+                rows.append(_backfill_row(name, Backfill.NO_SHIP, detail, withdrawn))
                 continue
             matcher = _Matcher(pdf, cache)
             tried: list[Tried] = []
@@ -2587,13 +2602,14 @@ def _backfill_drawings(
             best = min(tried, key=lambda t: _BACKFILL_ORDER.index(t.outcome))
             shown = ingested or [best]
             rows.append(
-                BackfillRow(
+                _backfill_row(
                     name,
                     best.outcome,
                     " + ".join(
                         f"{t.detail} [{t.candidate.report.resolve().as_posix()}]"
                         for t in shown
                     ),
+                    withdrawn,
                     tried,
                 )
             )
@@ -2602,6 +2618,25 @@ def _backfill_drawings(
                     _adopt(attempt, name, ledger, ledger_path)
     skipped = [candidate for candidate in found.candidates if candidate.skip]
     return BackfillResult(repo, head, rows, skipped)
+
+
+def _backfill_row(
+    name: str,
+    outcome: Backfill,
+    detail: str,
+    withdrawn: str,
+    tried: list[Tried] | None = None,
+) -> BackfillRow:
+    """One drawing's row; an entry withdrawn first is always named in it.
+
+    A withdrawal that no newer SHIP replaced leaves the drawing
+    ``contradicted``, whatever else was tried.
+    """
+    if withdrawn:
+        detail = f"{withdrawn}; then {detail}"
+        if outcome != Backfill.INGESTED:
+            outcome = Backfill.CONTRADICTED
+    return BackfillRow(name, outcome, detail, tried or [])
 
 
 def _adopt(tried: Tried, name: str, ledger: dict[str, Any], ledger_path: Path) -> None:
