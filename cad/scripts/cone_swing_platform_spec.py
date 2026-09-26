@@ -115,6 +115,10 @@ POST_MOUNT_ENGAGEMENT_NOTE = (
 )
 
 
+# The title block's location bands by decimal places.
+TITLE_BLOCK_BAND_BY_PLACES = {1: 0.8, 2: 0.51}
+
+
 # I31 option 1 (Main, 2026-09-25): the cone tip block is held down by one
 # #6-32 x 5/8 hex head screw (McMaster 93075A150, low-strength zinc-plated
 # steel) rising from under the plate through a lateral slot, through the shim
@@ -124,13 +128,12 @@ POST_MOUNT_ENGAGEMENT_NOTE = (
 # one hex width across, so its walls stop the head turning while the nut is
 # tightened from above.
 #
-# The title block's location bands by decimal places.
-TITLE_BLOCK_BAND_BY_PLACES = {1: 0.8, 2: 0.51}
-
 # The block's own geometry, mirrored here because the plate may not import
-# cone_tip_block_spec; build_drive_train_assembly asserts each one equal to
-# the block spec's.  The block centre stands 11.0 south of the pivot (the
-# drive-train layout: PIVOT_STATION = TIP_BLOCK_STATION + 11.0).
+# cone_tip_block_spec.  In the #917 stack, build_drive_train_assembly asserts
+# each mirror equal to the block spec's from conegear's (b) (7ab69742b)
+# upward; below it nothing checks them.  The block centre stands 11.0 south
+# of the pivot (the drive-train layout: PIVOT_STATION = TIP_BLOCK_STATION +
+# 11.0).
 TIP_BLOCK_LOCAL_Z = -11.0
 TIP_BLOCK_HALF_DEPTH = 6.0  # BLOCK_Z / 2
 TIP_BLOCK_HALF_WIDTH = 7.5  # BLOCK_X / 2
