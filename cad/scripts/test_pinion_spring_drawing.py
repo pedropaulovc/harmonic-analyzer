@@ -155,11 +155,34 @@ def test_views_are_projected_and_hidden_lines_removed() -> None:
     assert source.count("add_edge_dimension(") == 1  # the two hole locations
 
 
+def test_bend_coupon_qualifies_the_tightest_accepted_radius() -> None:
+    # Codex #859 (PRRT_kwDOPHDy386mTao0): both R3.3 bends may be formed at
+    # R3.3 - band, so the mandatory coupon bends over that low limit or under
+    # it, never the nominal.  The mandrel is a 7/32 in drill rod.
+    policy = (Path(__file__).parents[1] / "docs" / "tolerance-policy.md").read_text(
+        encoding="utf-8"
+    )
+    mandrel_r = 7.0 / 32.0 * 25.4 / 2.0
+    assert "7/32 in (Ø5.56) drill-rod mandrel, R2.78" in policy
+    assert round(mandrel_r, 2) == 2.78
+    low_limit = min(geometry.R_BEND, geometry.R_KINK) - geometry.FORMED_BAND_MM
+    assert mandrel_r <= low_limit
+    # Positive control: the nominal R3.3 mandrel the coupon used to name misses it.
+    assert geometry.MIN_INSIDE_BEND_R > low_limit
+
+
 def test_notes_carry_no_dimension_and_stay_short() -> None:
     notes = pinion_spring_spec.DRAWING_NOTES
     assert len(notes.splitlines()) <= 4
     assert "TEMPLATE" in notes and "FORM" in notes
     assert "COIL" not in notes
+    # The blank's orientation is the coupon's (Codex #859, PRRT_kwDOPHDy386mTtoA).
+    assert "ALONG ROLL LENGTH (BENDS ACROSS ROLLING DIRECTION)" in notes
+    policy = (Path(__file__).parents[1] / "docs" / "tolerance-policy.md").read_text(
+        encoding="utf-8"
+    )
+    assert "bend line across the rolling direction, as the part is cut" in policy
+    assert max(len(line) for line in notes.splitlines()) <= 63
     assert not any(ch.isdigit() for ch in notes)
     assert "+/-" not in "\n".join(drawing.DIMENSION_CALLOUTS.values())
 
