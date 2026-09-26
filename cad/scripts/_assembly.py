@@ -25,11 +25,13 @@ from _common import (
     _CHAIN_LINK_PREFIXES,
     _FEATURE_ERROR,
     _MATE_TOL_MM,
+    _SUMMARY_TITLE,
     _git_commit_year,
     _git_sha,
     _early_bound,
     _read_member,
     apply_custom_properties,
+    apply_summary_info,
     active_configuration_name,
     check,
     log,
@@ -83,6 +85,27 @@ def _ensure_assembly_revision(adapter: Any, model: Any = None) -> bool:
         revision=expected,
     )
     log(f"assembly Revision {current!r} -> {expected}")
+    return True
+
+
+@_telemetry.traced("assembly.ensure_title")
+def _ensure_assembly_title(adapter: Any, asm_name: str, model: Any = None) -> bool:
+    """Restamp an assembly's document summary Title with its slug if stale.
+
+    The drawing template's PART cell resolves the summary Title, and every
+    sheet prints the slug (user ruling 2026-09-26).  Both save chokepoints call
+    this beside ``_ensure_assembly_revision``, so a refresh restamps a file
+    saved under an older title as surely as a full build stamps a new one.
+    """
+    target = _early_bound(adapter.currentModel if model is None else model, "IModelDoc2")
+    current = str(
+        adapter._attempt(lambda: target.SummaryInfo(_SUMMARY_TITLE), default="") or ""
+    )
+    if current == asm_name:
+        return False
+    apply_summary_info(adapter, title=asm_name, model=target)
+    _telemetry.event("assembly.title_restamped", previous=current, title=asm_name)
+    log(f"assembly summary Title {current!r} -> {asm_name!r}")
     return True
 
 
@@ -2285,6 +2308,9 @@ def _save_new_assembly_as_copy(adapter: Any, asm_path: Any) -> None:
     is gated on this call producing a new, non-empty target file.
     """
     _ensure_assembly_revision(adapter)
+    # The PART cell prints the bare slug, the same convention as every part
+    # sheet (user ruling 2026-09-26); the MHA-A## number marks an assembly.
+    _ensure_assembly_title(adapter, asm_path.stem)
     options = 1 | 2 | 8
     model = adapter.currentModel
     if asm_path.exists():
@@ -2705,7 +2731,8 @@ def save_assembly_in_place(
     ``repro_inplace_save.py`` (ret=True, err=0, warn=0, the active config persists
     on reopen).
 
-    ``geometry_changed`` or a stale Revision gates the bump. Every in-place
+    ``geometry_changed``, a stale Revision or a stale summary Title gates the
+    bump. Every in-place
     ``Save3`` rewrites fresh save metadata -> a new md5, and the parent's doit dep
     is this file's md5. When neither changed, the save is skipped so a no-op
     refresh leaves the ``.SLDASM`` byte-identical. When either changed, we force
@@ -2714,13 +2741,14 @@ def save_assembly_in_place(
     """
     asm = _early_bound(adapter.currentModel if model is None else model, "IModelDoc2")
     revision_changed = _ensure_assembly_revision(adapter, asm)
-    must_save = geometry_changed or revision_changed
+    title_changed = _ensure_assembly_title(adapter, asm_name, asm)
+    must_save = geometry_changed or revision_changed or title_changed
     sldasm = OUT_SLDASM / f"{asm_name}.SLDASM"
     if not must_save:
-        # No-op refresh: resolved geometry and Revision are identical to the last
-        # save. Do NOT rewrite -- a fresh md5 here would invalidate the parent.
+        # No-op refresh: resolved geometry, Revision and Title are identical to
+        # the last save. Do NOT rewrite -- a fresh md5 would invalidate the parent.
         log(
-            f"{sldasm.name}: geometry and Revision unchanged -- .SLDASM left "
+            f"{sldasm.name}: geometry, Revision and Title unchanged -- .SLDASM left "
             "intact (no md5 bump)"
         )
         return False
