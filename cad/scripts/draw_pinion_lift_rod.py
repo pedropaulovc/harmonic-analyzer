@@ -19,6 +19,7 @@ import sys
 from typing import Any
 
 import _telemetry
+from _diag_gdt_ink import dump_sheet_gdt
 from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_annotation_extent import place_callout_clear
 from _drawing_common import (
@@ -304,6 +305,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Under the 1:2 isometric (x 0.098-0.172, bottom y ~0.104).
     add_property_linked_note(adapter, "Isometric View Note", 0.105, 0.097)
 
+    dump_sheet_gdt(adapter, label="MHA-060")
     return await finalize_drawing(
         adapter,
         OUTPUTS,

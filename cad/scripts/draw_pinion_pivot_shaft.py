@@ -20,6 +20,7 @@ from typing import Any
 from pinion_pivot_shaft_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
+from _diag_gdt_ink import dump_sheet_gdt
 from _common import CAD_ROOT, check, run_build
 from _drawing_annotation_extent import gdt_box, place_callout_clear
 from _drawing_common import (
@@ -252,6 +253,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "End View Note", 0.020, 0.140)
     add_property_linked_note(adapter, "Iso View Note", 0.325, 0.157)
 
+    dump_sheet_gdt(adapter, label="MHA-062")
     return await finalize_drawing(
         adapter,
         OUTPUTS,
