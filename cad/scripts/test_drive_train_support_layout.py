@@ -331,7 +331,7 @@ def test_rig_set_leaf_d_derives_the_shift_and_leaves_743_open() -> None:
     # print must say so, or the stack would have to carry E_b max.
     assert RIG.DRUM_BACK_ADVANCE_OPEN_TERMS == ()
     assert FITUP.RIG_SET_BANK_PRECONDITION == "BANK PUSHED NORTH"
-    assert FITUP.RIG_SET_STEP.endswith(",\nBANK PUSHED NORTH;")
+    assert "NORTH MHA-027 BACK FACE, BANK PUSHED NORTH;" in FITUP.RIG_SET_STEP
     assert RIG.DRUM_FRONT_RETREAT_OPEN_TERMS == (
         "MHA-027 bank end play E_b (#743)",
         "MHA-027 g0 -> g19 pitch stack (#743)",
@@ -1093,12 +1093,13 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
     assert FITUP.BACK_COLLAR_LEAF_F == 0.90
     assert FITUP.FRONT_COLLAR_LEAF == FITUP.FRONT_BLOCK_FEELER
     assert FITUP.RIG_SET_STEP == (
-        "RIG SET: MHA-002 BACK END\n1.00 + 0.25 LEAVES OFF\n"
-        "NORTH MHA-027 BACK FACE,\nBANK PUSHED NORTH;"
+        "RIG SET, BEFORE SPOTTING THE TRANSFER SEATS:\n"
+        "MHA-002 BACK END 1.00 + 0.25 LEAVES OFF\n"
+        "NORTH MHA-027 BACK FACE, BANK PUSHED NORTH;\n"
+        "MHA-114 PAD 1.00 LEAF OFF MHA-061."
     )
-    assert base_sheet.TRANSFER_BLOCK_CALLOUT.startswith(FITUP.RIG_SET_STEP)
-    assert base_sheet.TRANSFER_SPRING_NOTE.startswith(FITUP.SPRING_SET_STEP)
-    assert FITUP.SPRING_SET_STEP == "PAD 1.00 LEAF OFF MHA-061;"
+    for callout in (base_sheet.TRANSFER_BLOCK_CALLOUT, base_sheet.TRANSFER_SPRING_NOTE):
+        assert FITUP.TRANSFER_AFTER_RIG_SET in callout
     # The collars' set is an assembly step: nothing is cut, so MHA-104's own
     # print stays free of it (policy rule 6, as MHA-061 keeps its feeler).
     assert "LEAF" not in pinion_cam_spec.DRAWING_NOTES

@@ -443,19 +443,69 @@ def test_transferred_pinion_block_seats_print_no_station() -> None:
     assert set(sheet.TRANSFER_BLOCK_HOLES) == block_seats
     assert not block_seats & set(sheet.TABLE_HOLES)
     # User ruling P1-2: nothing in the frame fixes the rig along the bank
-    # until the fitter sets it, so the callout leads with that set-up (the
-    # drum's back end on leaf D off the north gear), then the transfer.
-    import pinion_rig_fitup as fitup
-
-    assert sheet.TRANSFER_BLOCK_CALLOUT == (
-        f"{fitup.RIG_SET_STEP}\nTRANSFER FROM MHA-061\nAT ASSEMBLY;"
+    # until the fitter sets it, so both callouts name the RIG SET note that
+    # states it (the drum's back end on leaf D off the north gear).
+    assert sheet.TRANSFER_BLOCK_CALLOUT == "TRANSFER FROM MHA-061\nAFTER RIG SET;"
+    assert sheet.TRANSFER_SPRING_NOTE == (
+        "TRANSFER FROM MHA-114\nAFTER RIG SET; SIZE AS E1"
     )
-    assert sheet.TRANSFER_BLOCK_CALLOUT.startswith("RIG SET: MHA-002 BACK END")
-    assert sheet.TRANSFER_SPRING_NOTE.startswith("PAD 1.00 LEAF OFF MHA-061;")
-    assert "TRANSFER FROM MHA-114" in sheet.TRANSFER_SPRING_NOTE
     # The front pair sits one feeler off the fit-up stack, with no pose air.
     front_seat = rig.BACK_BLOCK_Z0 - rig.INNER_SPAN - BLOCK_DEPTH / 2.0
     assert rig.BLOCK_SEAT_Z[0] == pytest.approx(front_seat, abs=1e-9)
+
+
+# Measured on the pc-p1 render of sheet 2 (5100 x 3300 px, two 431.8 mm
+# sheets: 5.906 px/mm): the sheet's 3.5 mm notes advance 2.69 mm a character
+# (the A1-A4 bore note's 46-character line spans 123.7 mm) and 4.58 mm a line.
+_NOTE_CHAR_MM = 2.69
+_NOTE_LINE_MM = 4.58
+# The pre-P1 callouts that rendered clean: the block callout between the top
+# border and the TOP VIEW caption, the spring note's first line ending just
+# short of section arrow A (2 mm) and its second line above the MHA-132
+# callout.
+_ACCEPTED_BLOCK_CALLOUT = ("TRANSFER FROM MHA-061", "AT ASSEMBLY;")
+_ACCEPTED_SPRING_NOTE = ("TRANSFER FROM MHA-114", "AT ASSEMBLY; SIZE AS E1")
+# Sheet-2 free field for the RIG SET note, from the same render: the hole
+# table ends at y 0.1209, the 38.1 cross-screw-axis callout's text starts at
+# x 0.152 (top y 0.089), and the A1-A4 bore note starts at y 0.073.
+_HOLE_TABLE_BOTTOM_Y = 0.1209
+_CROSS_AXIS_CALLOUT_X = 0.152
+_BORE_NOTE_TOP_Y = 0.073
+
+
+def test_rig_set_callouts_and_note_fit_the_accepted_sheet_2_layout() -> None:
+    # Main (pc-p1 eye pass): printed on the callouts, the RIG SET step ran
+    # the block callout through the top border and over the TOP VIEW caption,
+    # and the spring note into section arrow A and the MHA-132 callout.  Each
+    # callout now keeps the accepted two lines with its first line unchanged
+    # (the spring note's first line is the one that nearly meets arrow A), and
+    # a second line at most two characters longer; the note fits the free
+    # field under the hole table.
+    import draw_harmonic_base as sheet
+    import pinion_rig_fitup as fitup
+
+    for text, accepted in (
+        (sheet.TRANSFER_BLOCK_CALLOUT, _ACCEPTED_BLOCK_CALLOUT),
+        (sheet.TRANSFER_SPRING_NOTE, _ACCEPTED_SPRING_NOTE),
+    ):
+        lines = text.split("\n")
+        assert len(lines) == len(accepted), text
+        assert lines[0] == accepted[0]
+        assert len(lines[1]) <= len(accepted[1]) + 2, lines[1]
+        assert fitup.RIG_SET_NAME in lines[1]
+    assert sheet.TRANSFER_AFTER_RIG_SET == "AFTER RIG SET;"
+    note = fitup.RIG_SET_STEP.split("\n")
+    assert note[0].startswith(fitup.RIG_SET_NAME + ",")
+    x0, y_top = sheet.RIG_SET_NOTE_XY
+    width = max(len(line) for line in note) * _NOTE_CHAR_MM / 1000.0
+    height = len(note) * _NOTE_LINE_MM / 1000.0
+    assert x0 + width <= _CROSS_AXIS_CALLOUT_X - 0.010, x0 + width
+    assert y_top <= _HOLE_TABLE_BOTTOM_Y - 0.010
+    assert y_top - height >= _BORE_NOTE_TOP_Y + 0.010, y_top - height
+    # The note carries both settings the transfers need.
+    assert "1.00 + 0.25 LEAVES OFF" in fitup.RIG_SET_STEP
+    assert "BANK PUSHED NORTH" in fitup.RIG_SET_STEP
+    assert "MHA-114 PAD 1.00 LEAF OFF MHA-061." in fitup.RIG_SET_STEP
 
 
 def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
