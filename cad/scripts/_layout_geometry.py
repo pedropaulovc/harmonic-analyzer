@@ -553,7 +553,10 @@ def find_text_on_line(
                         ),
                         at_mm=(mid[0] * MM, mid[1] * MM),
                         move_target_mm=_free_direction_mm(box, segment.box()),
-                        extra={"overlap_mm": length * MM},
+                        extra={
+                            "overlap_mm": length * MM,
+                            "segment": (segment.x0, segment.y0, segment.x1, segment.y1),
+                        },
                     )
                 )
     return findings

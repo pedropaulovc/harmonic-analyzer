@@ -1725,7 +1725,11 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
     seen = set()
     for source, leader in leaders:
         for target, line in lines:
-            if target.label == source.label or (source.label, target.label) in seen:
+            # One crossing per line of the pair (audit_dump keeps one per
+            # pair and kind): the dedupe against text-on-line needs to see
+            # each line that crosses.
+            key = (source.label, target.label, (line.x0, line.y0, line.x1, line.y1))
+            if target.label == source.label or key in seen:
                 continue
             point = _proper_crossing(
                 LeaderSegment(source.label, source.kind, leader.x0, leader.y0, leader.x1, leader.y1),
@@ -1742,7 +1746,7 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
             elif _converging(point, landings[source.label], line):
                 kind = "leader-converges-at-landing"
             if kind != "leader-converges-at-landing":
-                seen.add((source.label, target.label))
+                seen.add(key)
             findings.append(
                 Finding(
                     kind=kind,
@@ -1754,6 +1758,7 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
                         f"{target.label!r}'s line {line.format_mm()}"
                     ),
                     at_mm=(point[0] * MM, point[1] * MM),
+                    extra={"line": (line.x0, line.y0, line.x1, line.y1)},
                 )
             )
     return findings
@@ -2094,12 +2099,22 @@ def find_duplicate_annotations(
     first. Every cone-gear sheet carried its centre mark twice (#913), and
     the overdraw thickens the ink a reader sees."""
     owners = [(str(view.get("name", "")), view.get("annotations") or ()) for view in dump.get("views", ())]
-    owners.append(("sheet", dump.get("sheet_annotations") or ()))
+    # Template annotations are the title block's, not the drawing's.
+    owners.append(
+        (
+            "sheet",
+            [
+                annotation
+                for annotation in dump.get("sheet_annotations") or ()
+                if int(annotation.get("owner_type", _OWNER_DRAWING_SHEET)) == _OWNER_DRAWING_SHEET
+            ],
+        )
+    )
     findings = []
-    for owner, annotations in owners:
+    for owner, members in owners:
         placed = [
             (annotation, _floats(annotation.get("pos")))
-            for annotation in annotations
+            for annotation in members
             if int(annotation.get("visible", 1) or 1) not in _HIDDEN_STATES
         ]
         placed = [(annotation, pos) for annotation, pos in placed if len(pos) >= 2]
@@ -2199,6 +2214,7 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
     reported = touching | {frozenset((f.a, f.b)) for f in merged}
     on_line = find_text_on_line(unled)
     through = {frozenset((f.a, f.b)) for f in on_line}
+    through_lines = {(frozenset((f.a, f.b)), tuple(f.extra["segment"])) for f in on_line}
     return _one_per_pair([
         *clearance,
         *merged,
@@ -2207,11 +2223,13 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
         *find_text_on_view(sheet),
         *find_leader_through_text(sheet),
         # A line through a callout's text crosses the shoulder under it too:
-        # one defect, reported as text-on-line.
+        # one defect, reported as text-on-line. Only the SAME line: another
+        # line of that annotation crossing the shoulder is its own defect.
         *(
             f
             for f in find_leader_across_lines(sheet)
-            if f.kind != "shoulder-crosses-line" or frozenset((f.a, f.b)) not in through
+            if f.kind != "shoulder-crosses-line"
+            or (frozenset((f.a, f.b)), tuple(f.extra["line"])) not in through_lines
         ),
         *find_dimension_line_crossings(sheet),
         *find_lines_on_dimension_lines(sheet),
