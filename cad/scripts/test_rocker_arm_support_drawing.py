@@ -966,10 +966,24 @@ class _CropSeat:
     """Just enough of IDrawingDoc/IView to run the VIEW B crop offline."""
 
     def __init__(
-        self, crop_result: int = 1, cropped: bool = True, crop_lands: bool = True
+        self,
+        crop_result: int = 1,
+        cropped: bool = True,
+        crop_lands: bool = True,
+        origin: tuple[float, float] = drawing.VIEW_B_CENTER,
+        end_run: float | None = None,
     ) -> None:
         self.rectangle = None
         self.crop_calls = []
+        self.selected = []
+        self.selected_at_crop = None
+        self.rebuilds = []
+        self.origin = origin
+        self.end_run = (
+            support.BOSS_DEPTH / 2 * drawing.VIEW_SCALE / 1000
+            if end_run is None
+            else end_run
+        )
         self.crop_result = crop_result
         self.cropped = cropped
         self.crop_lands = crop_lands
@@ -980,6 +994,9 @@ class _CropSeat:
             ClearSelection2=lambda _all: None,
             EditRebuild3=lambda: True,
             SketchManager=SimpleNamespace(CreateCornerRectangle=self._rectangle),
+            SelectionManager=SimpleNamespace(
+                GetSelectedObjectCount2=lambda _mark: len(self.selected)
+            ),
         )
         math_utility = SimpleNamespace(
             CreatePoint=lambda data: SimpleNamespace(
@@ -1002,11 +1019,25 @@ class _CropSeat:
 
     def _rectangle(self, *coords):
         self.rectangle = coords
-        return (object(),) * 4
+        return tuple(
+            SimpleNamespace(
+                Select4=lambda append, _data, i=i: self.selected.append(i) or True
+            )
+            for i in range(4)
+        )
 
     def _crop(self, *args):
         self.crop_calls.append(args)
+        self.selected_at_crop = sorted(self.selected)
         return self.crop_result
+
+    def project(self, _adapter, _view, xyz, *, label):
+        # *Top at 1:2: model +X runs along the sheet from the part origin.
+        del label
+        return (
+            self.origin[0] + xyz[0] / (support.BOSS_DEPTH / 2000) * self.end_run,
+            self.origin[1],
+        )
 
     def _outline(self):
         if not (self.crop_calls and self.crop_lands):
@@ -1021,16 +1052,26 @@ class _CropSeat:
         )
 
 
-def _patch_crop_seat(monkeypatch) -> None:
+def _patch_crop_seat(monkeypatch, seat: _CropSeat) -> None:
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
     monkeypatch.setattr(drawing, "view_name", lambda _adapter, _view: "VIEW B")
     monkeypatch.setattr(drawing, "double_array", list)
+    monkeypatch.setattr(drawing, "model_point_in_view", seat.project)
+    monkeypatch.setattr(
+        drawing,
+        "rebuild_drawing",
+        lambda _adapter, *, label: seat.rebuilds.append(label),
+    )
 
 
 def test_view_b_crop_fence_is_the_rail_strip_across_the_whole_rail(monkeypatch) -> None:
-    _patch_crop_seat(monkeypatch)
     seat = _CropSeat()
+    _patch_crop_seat(monkeypatch, seat)
     drawing._crop_view_b_to_rail(seat.adapter, seat.view)
+    # Rebuilt after placement, before the fence is located (positive control).
+    assert seat.rebuilds == ["VIEW B placement"]
+    # Crop2 is handed the whole closed fence.
+    assert seat.selected_at_crop == [0, 1, 2, 3]
     scale = drawing.VIEW_SCALE / 1000
     x1, y1, _z1, x2, y2, _z2 = seat.rectangle
     cx, cy = drawing.VIEW_B_CENTER
@@ -1059,7 +1100,35 @@ def test_view_b_crop_fence_is_the_rail_strip_across_the_whole_rail(monkeypatch) 
 def test_view_b_crop_fails_loud(
     monkeypatch, crop_result, cropped, crop_lands, message
 ) -> None:
-    _patch_crop_seat(monkeypatch)
     seat = _CropSeat(crop_result=crop_result, cropped=cropped, crop_lands=crop_lands)
+    _patch_crop_seat(monkeypatch, seat)
     with pytest.raises(RuntimeError, match=message):
         drawing._crop_view_b_to_rail(seat.adapter, seat.view)
+
+
+def test_view_b_fence_follows_the_part_origin_it_measured(monkeypatch) -> None:
+    offset = (drawing.VIEW_B_CENTER[0] + 0.0006, drawing.VIEW_B_CENTER[1] - 0.0004)
+    seat = _CropSeat(origin=offset)
+    _patch_crop_seat(monkeypatch, seat)
+    drawing._crop_view_b_to_rail(seat.adapter, seat.view)
+    x1, y1, _z1, x2, y2, _z2 = seat.rectangle
+    assert ((x1 + x2) / 2, (y1 + y2) / 2) == pytest.approx(offset)
+
+
+@pytest.mark.parametrize(
+    ("origin", "end_run"),
+    (
+        # The part landed off VIEW_B_CENTER.
+        ((drawing.VIEW_B_CENTER[0] + 0.003, drawing.VIEW_B_CENTER[1]), None),
+        # The view came out 1:1, not 1:2.
+        (drawing.VIEW_B_CENTER, support.BOSS_DEPTH / 2 / 1000),
+    ),
+)
+def test_view_b_refuses_a_misplaced_or_misscaled_view(
+    monkeypatch, origin, end_run
+) -> None:
+    seat = _CropSeat(origin=origin, end_run=end_run)
+    _patch_crop_seat(monkeypatch, seat)
+    with pytest.raises(RuntimeError, match="not the rail at 1:2"):
+        drawing._crop_view_b_to_rail(seat.adapter, seat.view)
+    assert seat.crop_calls == []
