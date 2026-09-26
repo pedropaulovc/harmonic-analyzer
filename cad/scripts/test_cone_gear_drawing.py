@@ -157,13 +157,14 @@ def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates
         assert "PRESSURE ANGLE" in data
         assert "INVOLUTE FLANKS" in data
         assert f"CYLINDER GEAR {notes.CYLINDER_MATE_NUMBER}" in data
-        # U40: the floor is a MIN limit, and the tooth reaches its thickness
-        # by widening the gap, never by sinking the cutter below it.
+        # U40: the floor is a MIN limit; the tooth form and the floor limits
+        # state the result, so no row says how to cut it (rule 6).
         assert (
             f"GAP FLOOR DIAMETER (mm):  {2.0 * spec.floor_radius_mm(teeth):.3f} MIN"
         ) in data
         assert ("MAX" in data) == (teeth in spec.FLOOR_LIMITS_MM)
-        assert "CUTTING:  PLUNGE TO FLOOR; WIDEN BY INDEXING, NEVER BY SINKING" in data
+        for method in ("CUTTING", "CUTTER", "PLUNGE", "INDEXING", "SINKING"):
+            assert method not in data
         assert spec.TOOTH_FORM in data
         assert "FULL DEPTH" not in data
         assert "WHOLE DEPTH" not in data
@@ -186,8 +187,6 @@ def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates
             drawing.GEAR_DATA_POS[0] + widest * 0.00185 < drawing.SHEET_COUNT_POS[0] - 0.003
         )
         assert "OPERATING MESH:  LONG ADDENDUM, PARTIAL DEPTH ON INCLINED AXES" in data
-        # The thickened tooth retires the catalogue-cutter allowance.
-        assert "GAP CUTTER:  SINGLE-POINT FLY CUTTER GROUND TO THE GAP FORM" in data
         assert "48 DP" not in data
         # These values are native imported dimensions, never parallel typed rows.
         for duplicate in (
@@ -236,36 +235,32 @@ def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> 
         assert spec.material_specification(teeth) == expected
 
 
-def test_notes_define_only_the_approved_plain_bore_attachment() -> None:
-    common = [
+def test_notes_state_only_the_plain_bore_with_no_method_or_review_record() -> None:
+    # Rule 6: the joint is a method (it moves to the drive-train assembly
+    # step, which imports ATTACHMENT), and the U42/U40 book-fidelity
+    # exceptions are a design-review record the machinist cannot act on (they
+    # stay in cone_gear_spec's exception lists).  Every sheet prints the same
+    # three lines.
+    expected = [
         "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
         "MAKE ONE GEAR FROM EACH SHEET IN THIS PACKAGE.",
-        "PLAIN BORE, NO KEYWAY; SOLDER, SILVER-BRAZE OR LOCTITE 638/648 TO "
-        "MHA-014 AT ASSEMBLY.",
+        "PLAIN BORE, NO KEYWAY.",
     ]
-    # Named exceptions print only on the sheets they cover, with no ruling ids;
-    # T006 carries both on one line.
-    cr_line = (
-        "CONTACT RATIO BELOW 1.1 ON T006-T042: ACCEPTED EXCEPTION (BOOK FIDELITY)."
-    )
-    both_line = (
-        "CONTACT RATIO BELOW 1.1, ROOT-TO-BORE WEB 0.62 MIN: "
-        "ACCEPTED EXCEPTIONS (BOOK FIDELITY)."
-    )
+    assert notes.DRAWING_NOTES.splitlines() == expected
     for teeth in spec.CONFIGURATION_TEETH:
         text = notes.drawing_notes(teeth)
-        lines = text.splitlines()
-        # Policy rule 6: at most four short lines on every sheet.
-        assert len(lines) <= 4
-        assert all(len(line) <= 90 for line in lines)
-        expected = list(common)
-        if teeth == 6:
-            expected.append(both_line)
-        elif teeth <= 42:
-            expected.append(cr_line)
-        assert lines == expected
-        assert "U4" not in text and "BY DESIGN" not in text
-        assert notes.ATTACHMENT in text
+        assert text.splitlines() == expected
+        for review_or_method in (
+            notes.ATTACHMENT,
+            "SOLDER",
+            "LOCTITE",
+            "AT ASSEMBLY",
+            "EXCEPTION",
+            "BOOK FIDELITY",
+            "CONTACT RATIO",
+            "WEB",
+        ):
+            assert review_or_method not in text
         for unsupported in ("PIN", "SET SCREW", "HUB"):
             assert unsupported not in text
         for retired in ("RUNOUT", "DATUM", "+/-", "PITCH DIA="):
@@ -275,6 +270,16 @@ def test_notes_define_only_the_approved_plain_bore_attachment() -> None:
     assert notes.SHAFT_MATE_NUMBER == _config.parts("cone-gear-shaft")["number"]
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"Manufacturing Notes": drawing_notes(teeth)' in source
+
+
+def test_book_fidelity_exceptions_are_recorded_in_the_spec_not_on_a_sheet() -> None:
+    # U42 (contact ratio below 1.1) and U40 (T006's thin web) are exact sets:
+    # test_cone_gear_mesh_design and the root-to-bore web test re-derive which
+    # gears need them, so a new exception needs a new ruling, not a quiet edit.
+    assert spec.CONTACT_RATIO_EXCEPTION_TEETH == (6, 12, 18, 24, 30, 36, 42)
+    assert spec.WEB_EXCEPTIONS_MM == {6: 0.621}
+    for retired in ("CONTACT_RATIO_EXCEPTION", "web_exception", "both_exceptions"):
+        assert not hasattr(notes, retired)
 
 
 def test_no_gdt_and_only_the_fitted_bore_has_a_surface_finish() -> None:
