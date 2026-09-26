@@ -93,7 +93,11 @@ so this rests on the docs. A section's cutting line is drawn between its two
 arrow tails: `IDrSection::GetLineInfo` answers in the view's model space.
 A dimension's straight lines split into `dim-line` (parallel to an arrow and
 through its tip, including the run out to parked text) and `ext-line`
-(every other line). `IDisplayDimension::GetDisplayData` is not read: it
+(every other line), except a horizontal run on the lowest text baseline that
+continues a dimension line: that is the text's `shoulder`, as on a callout
+(knife-mount's Ø12.00 / THRU). A line through a callout's text crosses its
+shoulder too, so `shoulder-crosses-line` is not reported for a pair already
+reported as `text-on-line`. `IDisplayDimension::GetDisplayData` is not read: it
 equalled `IAnnotation::GetDisplayData` for all 72 dimensions on the
 calibration leaves.
 
