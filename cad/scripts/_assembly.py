@@ -34,6 +34,7 @@ from _common import (
     check,
     log,
     set_isometric_view,
+    whats_wrong,
 )
 
 
@@ -1945,40 +1946,6 @@ def check_no_interference(
         if details:
             raise RuntimeError(f"{len(details)} interference(s): " + "; ".join(details))
         _telemetry.success("interference check: none found")
-
-
-def whats_wrong(adapter: Any, model: Any) -> list[tuple[str, int, bool]]:
-    """Return ``[(feature_name, error_code, is_warning), ...]`` for a model.
-
-    Reads the What's Wrong dialog via ``GetWhatsWrong``. Early-bound
-    ``IModelDocExtension::GetWhatsWrong`` collects its three ``out object`` arrays
-    into the return tuple ``(retval, features, codes, warnings)`` -- pass nothing
-    and consume the tuple. The old byref-VARIANT idiom leaves those VARIANTs
-    UNWRITTEN under InvokeTypes, so it silently reported every model clean (a
-    broken assembly would slip the deep-health gate). Empty when the model is
-    clean or the call is unavailable.
-    """
-    ext = _read_member(model, "Extension")
-    if ext is None:
-        return []
-    ext = _early_bound(ext, "IModelDocExtension")
-    res = adapter._attempt(lambda: ext.GetWhatsWrong(), default=None)
-    if not res:
-        return []
-    _retval, feats, codes, warns = res
-    feats = list(feats or [])
-    codes = list(codes or [])
-    warns = list(warns or [])
-    out: list[tuple[str, int, bool]] = []
-    for i, feat in enumerate(feats):
-        name = "?"
-        if feat is not None:
-            feat = _early_bound(feat, "IFeature")
-            name = str(_read_member(feat, "Name"))
-        code = int(codes[i]) if i < len(codes) else -1
-        warn = bool(warns[i]) if i < len(warns) else False
-        out.append((name, code, warn))
-    return out
 
 
 _REBUILD_UNSET: Any = object()
