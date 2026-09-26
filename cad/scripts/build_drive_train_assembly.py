@@ -629,8 +629,8 @@ if abs(ARBOR_STRAP_NORTH_Z - (END_DISC_NORTH_Z0 + END_DISC_THICK)) > 1e-9:
 # 104.65 about SUPPORT_WORLD_X, z +-88.9): the north foot shares its z band but
 # stands ~89.5 away in x (study rev 3 section 6; the z-only test fired falsely).
 from build_arbor_pedestal import FOOT_WIDTH as _PED_FOOT_WIDTH  # noqa: E402
-from build_rocker_arm_support import WIDE as _SUPPORT_FOOT_HALF_X  # noqa: E402
 from rocker_arm_support_spec import (  # noqa: E402
+    WIDE as _SUPPORT_FOOT_HALF_X,
     SUPPORT_HALF_MACHINE_Z as _SUPPORT_FOOT_HALF_Z,
     SUPPORT_WORLD_X as _SUPPORT_X,
     SUPPORT_WORLD_Z as _SUPPORT_Z,

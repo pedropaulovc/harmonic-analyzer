@@ -151,6 +151,8 @@ from nameplate_spec import (
     PLATE_THICKNESS as NAMEPLATE_THICKNESS,
 )
 from rocker_arm_support_spec import (
+    FOOT_THICKNESS as LAG_FOOT_THICKNESS,
+    HOLE_DIA as LAG_SUPPORT_CLEARANCE_DIA,
     SUPPORT_HOLD_DOWN_XZ,
     SUPPORT_WORLD_SEAT_Y,
     SUPPORT_WORLD_X,
@@ -173,11 +175,6 @@ from build_lag_screw import (
     THREAD_LEN as LAG_THREAD_LEN,
     THREAD_SIZE as LAG_THREAD_SIZE,
 )
-from build_rocker_arm_support import (
-    FOOT_THICKNESS as LAG_FOOT_THICKNESS,
-    HOLE_DIA as LAG_SUPPORT_CLEARANCE_DIA,
-)
-
 from build_top_frame import SIDE_TAP_SPEC as TOP_CROSS_TAP_SPEC
 from frame_attachment_spec import (
     BASE_SCREW_SEAT_Z,

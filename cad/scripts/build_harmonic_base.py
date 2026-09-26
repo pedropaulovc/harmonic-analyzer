@@ -142,8 +142,10 @@ from arbor_pedestal_spec import (
     SCREW_Z as PEDESTAL_LEDGE_SCREW_Z,
     STRAP_INNER_Z as PEDESTAL_STRAP_INNER_Z,
 )
-from build_rocker_arm_support import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
-from rocker_arm_support_spec import SUPPORT_HOLD_DOWN_XZ
+from rocker_arm_support_spec import (
+    FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS,
+    SUPPORT_HOLD_DOWN_XZ,
+)
 from frame_attachment_spec import (
     BASE_SCREW_SEAT_Z,
     BASE_SCREW_Y,

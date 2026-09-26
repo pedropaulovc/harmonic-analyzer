@@ -93,14 +93,22 @@ from _common import (
     set_global,
     volume_check,
 )
-from _holes import FRACTIONAL_DRILL_MM, HoleSpec, wizard_holes
+from _holes import wizard_holes
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
 from _part_pmi import author_part_pmi
-from rocker_arm_support_drawing_spec import HALF_Y, SURFACE_FINISHES
+from rocker_arm_support_drawing_spec import SURFACE_FINISHES
+from rocker_arm_support_spec import (
+    FOOT_THICKNESS,
+    HALF_Y,
+    HOLE_DIA,
+    HOLE_SPEC,
+    NARROW,
+    WIDE,
+)
 
 PART_NAME = "rocker-arm-support"
 # The source repro was authored in steel, but this casting is now the machine's
@@ -109,18 +117,15 @@ PART_NAME = "rocker-arm-support"
 # materials.yaml casting_green_parts) so it renders green, not steel-grey.
 MATERIAL = "Gray Cast Iron"
 
-# Trapezoid (Sketch1) -- wide foot / narrow top, half-extents in mm. On the
-# Right plane: sketch-x -> model Z (taper), sketch-y -> model Y (height).
-WIDE = 31.75  # foot half-width (Z) at Y=-88.9
-NARROW = 8.4665  # top half-width (Z) at Y=+88.9
-# HALF_Y (trapezoid half-height, Y) is imported from the drawing spec: the
-# foot-seat finish control is pinned to that plane.
+# Trapezoid (Sketch1) -- wide foot / narrow top: WIDE / NARROW / HALF_Y are
+# rocker_arm_support_spec's (pure data, so the base, frame and drive train
+# read them without importing this COM script). On the Right plane: sketch-x
+# -> model Z (taper), sketch-y -> model Y (height).
 BOSS_DEPTH = 177.8  # mid-plane extrude along X (X ±88.9)
 
 CAV = 63.5  # 127 mm square half (Cut-Extrude2)
-BIG = 82.55  # 165.1 mm square half (Cut-Extrude3/4)
+BIG = round(HALF_Y - FOOT_THICKNESS, 6)  # 82.55: 165.1 mm square half (Cut-Extrude3/4)
 WEB = 3.175  # window-cut start-offset; the 2*WEB band left as the web
-FOOT_THICKNESS = HALF_Y - BIG
 
 FILLET_R = 12.7
 FILLET_EDGES = [  # four inner-frame corner edges (run along Z through the web)
@@ -163,9 +168,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PocketCornerFillet": {"PocketRadius"},
     "RimChamfer": {"RimChamferSize"},
 }
-
-HOLE_SPEC = HoleSpec("drilled_fractional", "5/16")
-HOLE_DIA = FRACTIONAL_DRILL_MM[HOLE_SPEC.size]
 
 # Measured PocketCornerFillet volume minus four through clearance drills.
 # The window-rim chamfer removal is measured from that post-hole state.
