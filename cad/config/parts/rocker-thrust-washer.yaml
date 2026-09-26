@@ -1,0 +1,9 @@
+rocker-thrust-washer:
+  number: MHA-148
+  title: Rocker Bank Thrust Washer
+  material: Plain Carbon Steel
+  material_specification: SAE 1018 CF bar, ASTM A108-24
+  finish: oiled
+  tolerance_class: machined_block
+  quantity: 1
+  process: "turned (steel)"

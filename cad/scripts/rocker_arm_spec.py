@@ -83,6 +83,10 @@ PIVOT_MID_Y = ARM_DEPTH / 2.0  # 8.0
 # bar's foot cheeks pass 5.63 above the shaft axis, so OD < ~11.25.
 HUB_DIA = 10.0
 HUB_LENGTH = 7.0565  # == machine channels.station_pitch_mm (asserted by the build)
+# (upper, lower) on the printed hub length (#743 PR2): a hub may only come out
+# long, and the 20-arm stack's acceptance (rocker_bank_layout.STACK_L20_ACCEPT)
+# caps the sum, as the cylinder gears' overall thickness does.
+HUB_LENGTH_BAND = (0.05, 0.0)
 
 # Manufacturing GD&T limits consumed by the part's drawing projection.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {

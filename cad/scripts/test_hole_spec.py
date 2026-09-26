@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-import build_pivot_bracket
+import pivot_bracket_spec
 import crank_arm_spec
 from _hole_spec import HoleSpec, blind_cut_dia_mm, drill_process
 
@@ -22,5 +22,5 @@ def test_drill_process_rejects_non_drill_holes() -> None:
 
 
 def test_pivot_bracket_is_a_true_number_19_drill() -> None:
-    assert build_pivot_bracket.HOLD_DOWN_HOLE_SPEC == HoleSpec("drilled_number", "#19")
-    assert build_pivot_bracket.HOLE_DIA == 4.216
+    assert pivot_bracket_spec.HOLD_DOWN_HOLE_SPEC == HoleSpec("drilled_number", "#19")
+    assert pivot_bracket_spec.HOLE_DIA == 4.216
