@@ -13,6 +13,7 @@ from typing import Any
 
 import _drawing_hidden_sketches as hidden_sketches
 import _drawing_leaders
+import _maxmin_blast  # diag, never merge
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -1712,7 +1713,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, top, right, left, back, section):
         set_hidden_lines_removed(adapter, view)
 
-    return await finalize_drawing(
+    artifacts = await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Cone Tip Block Manufacturing Drawing",
@@ -1724,6 +1725,8 @@ async def build(adapter: Any) -> dict[str, str]:
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=1,
     )
+    _telemetry.info(f"maxmin-blast slddrw post-close {_maxmin_blast.file_stamp(OUTPUTS.slddrw)}")
+    return artifacts
 
 
 def _parse_args() -> argparse.Namespace:
