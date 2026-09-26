@@ -366,6 +366,35 @@ def test_text_crossed_by_a_foreign_view_edge_is_found():
     assert len(hits) == 1
 
 
+def test_text_crossed_by_a_hidden_edge_is_found_but_not_by_its_own_centre_mark():
+    """Codex P2 on d9c5fbb88: Hidden Lines Visible edges print as 0.18 mm
+    DASHED strokes, and the solid-only model-edge filter dropped them, so text
+    over a hidden edge never gated. A dashed stroke lying on an annotation's
+    own segment (a centre mark here) is that annotation's ink, not an edge."""
+    right_view = _view("right", (0.128, 0.078, 0.170, 0.162))
+    callout = _hole_callout(
+        "ADJ",
+        [(0.080, 0.100, 0.100, 0.118), (0.100, 0.118, 0.140, 0.118)],
+        [("ADJUSTER ENTRY", 0.100, 0.118)],
+    )
+    front = _view("front", (0.060, 0.080, 0.100, 0.160), [callout])
+    printed = [["ADJUSTER ENTRY", 0.1002, 0.1189, 0.1400, 0.1222]]
+    hidden = _edges((0.130, 0.080, 0.130, 0.160), width=0.00018, dashed=1)
+
+    def hits(dump):
+        return [f for f in audit_dump(dump) if f.kind == "text-on-line" and "view right geometry" in f.b]
+
+    assert len(hits(_dump(views=[front, right_view], strokes=hidden, spans=printed))) == 1
+    mark = {
+        "type": 13,
+        "name": "CM1",
+        "visible": 1,
+        "display": {"lines": [_line(0.130, 0.080, 0.130, 0.160)], "texts": []},
+    }
+    marked = _view("right", (0.128, 0.078, 0.170, 0.162), [mark])
+    assert hits(_dump(views=[front, marked], strokes=hidden, spans=printed)) == []
+
+
 def _mha_092_pre_287c_sheet():
     """MHA-092's three collisions as Main's I31 eye pass measured them, rebuilt
     as display data (the calibration run's own dump replaces this once logged):
@@ -813,6 +842,19 @@ def test_ink_matching_is_one_to_one_nearest_first_and_same_string_only():
     assert matched["L"].xmin == pytest.approx(0.1003)
     assert matched["R"].xmin == pytest.approx(0.1012)
     assert "S" not in matched and "O" not in matched
+
+
+def test_ink_matching_completes_before_it_is_short():
+    """Codex P2 on d9c5fbb88: nearest-first gave the flexible item A the one
+    span (X) the constrained item B could reach, stranding B as unmatched
+    and Y as unclaimed although A->Y, B->X matches both."""
+    h = 0.0035
+    flexible = TextItem("0.50", 0.1015, 0.1000, h)
+    constrained = TextItem("0.50", 0.1000, 0.1000, h)
+    spans = [_ink_span("0.50", 0.1010, 0.0991), _ink_span("0.50", 0.1070, 0.0991)]
+    matched = match_ink([("A", flexible), ("B", constrained)], spans)
+    assert matched["B"].xmin == pytest.approx(0.1010)
+    assert matched["A"].xmin == pytest.approx(0.1070)
 
 
 def _ink_span(text, x, y, width=0.008, height=0.0033):
