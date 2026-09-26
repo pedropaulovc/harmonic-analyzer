@@ -347,6 +347,28 @@ def test_touching_dimension_texts_fail_the_clearance():
     assert findings[0].extra["gap_mm"] == pytest.approx(0.0, abs=1e-6)
 
 
+@pytest.mark.parametrize(
+    ("note_x", "expected"),
+    [(0.1010, ["text-clearance"]), (0.1150, [])],  # over the "12.0"; clear of it
+)
+def test_a_dimension_text_under_a_note_fails_the_clearance(note_x, expected):
+    """Main's gate-gap sweep (1): the pre-save element gate boxes every
+    dimension as a NONE-scope placeholder (``_dim_element``), so a dimension's
+    text was never compared with a note's (rocker fix3's seat note). The
+    shared audit compares their real boxes: a free note printed over the
+    "12.0" gates, and one a clear word space away does not."""
+    dim = _dim("SeatDepth", "12.0", 0.1000, 0.1500)
+    note = _note("SeatNote", "SEAT", (note_x, 0.1505, note_x + 0.0090, 0.1540))
+    dump = _dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [dim])], sheet_annotations=[note])
+    clearance = [
+        f.kind
+        for f in audit_dump(dump)
+        if f.kind == "text-clearance" and {"SeatDepth", "SeatNote"} <= set((f.a + " " + f.b).split())
+    ]
+    assert clearance == expected
+    assert all(severity(f) is FindingSeverity.GATING for f in audit_dump(dump) if f.kind == "text-clearance")
+
+
 def test_text_crossed_by_a_foreign_view_edge_is_found():
     """MHA-092's ADJUSTER ENTRY: a callout's text crossed by ANOTHER view's
     outline edge. Model edges are the PDF's 0.25 mm solid strokes."""
@@ -2213,6 +2235,65 @@ def test_a_required_read_answering_none_is_a_read_error(monkeypatch):
     assert reader.call(lambda: None, "") == "" and reader.take_errors() == {}
 
 
+@pytest.mark.parametrize(
+    ("kind", "errors"),
+    [(1, {}), (15, {}), (6, {"GetPosition": 1}), (5, {"GetPosition": 1})],
+    ids=["cosmetic-thread", "centerline", "note", "gtol"],
+)
+def test_only_a_cosmetic_thread_or_centerline_may_have_no_position(monkeypatch, kind, errors):
+    """On the b49e13940 leaves every cosmetic thread and centerline answered
+    GetPosition None (cone-swing-platform 15, top_frame 98), each a gating
+    com-read-errors count. For those two kinds None is their answer, not a
+    refusal; any other annotation's None position still counts."""
+    import _drawing_layout_audit as collector
+
+    monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
+
+    class Annotation:
+        Visible = 1
+        OwnerType = 0
+        Layer = ""
+
+        def GetType(self):
+            return kind
+
+        def GetName(self):
+            return "Item1"
+
+        def GetPosition(self):
+            return None
+
+        def GetLeaderCount(self):
+            return 0
+
+        def GetDisplayData(self):
+            return Data()
+
+        def GetSpecificAnnotation(self):
+            return Note()
+
+    class Data:
+        def __getattr__(self, name):
+            if name.endswith("Count"):
+                return lambda: 0
+            raise AttributeError(name)
+
+    class Note:
+        def GetText(self):
+            return "1/4-20 Tapped Hole"
+
+        def GetExtent(self):
+            return (0.1, 0.1, 0.0, 0.12, 0.11, 0.0)
+
+        def IsBomBalloon(self):
+            return False
+
+    reader = collector._Reader(adapter=None)
+    record = collector._dump_annotation(reader, Annotation())
+    assert record is not None and record["pos"] == []
+    assert reader.take_errors() == errors
+
+
 def test_a_primitive_count_answering_none_is_a_read_error(monkeypatch):
     """Codex P2 on 7e08a6b17: a count getter answering None read as zero
     primitives, so that ink left the audit while com-read-errors stayed
@@ -2709,7 +2790,7 @@ def test_a_dimensions_own_extension_line_through_its_text_gates():
     extension lines, printed with its own collar-face witness line through
     "0" and "7". text-on-line skips an annotation's own ink, so nothing saw
     it. A witness line that only touches a row's corner is not a strike."""
-    from _layout_audit import find_extension_through_own_text
+    from _layout_audit import find_lines_through_own_text
     from _layout_geometry import AnnotationGeometry, SheetGeometry
 
     text = Box(0.1000, 0.1000, 0.1150, 0.1035)
@@ -2727,12 +2808,286 @@ def test_a_dimensions_own_extension_line_through_its_text_gates():
         )
 
     struck = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (dim(0.1080),), 0.6)
-    [finding] = find_extension_through_own_text(struck)
+    [finding] = find_lines_through_own_text(struck)
     assert finding.kind == "extension-through-own-text"
     assert severity(finding) is FindingSeverity.GATING
     assert finding.extra["overlap_mm"] == pytest.approx(3.5 - 0.4, abs=0.01)
     touching = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (dim(0.1150),), 0.6)
-    assert find_extension_through_own_text(touching) == []
+    assert find_lines_through_own_text(touching) == []
+
+
+def test_a_dimensions_own_dimension_line_through_its_text_gates():
+    """Main's gate-gap sweep (2): a dimension line struck through its own
+    text had no finder -- text-on-line skips an annotation's own ink and the
+    own-text finders covered only witness lines and leaders. The line the
+    text sits on (along the row's baseline) is not a strike, and nor is a
+    line clear of the row."""
+    from _layout_audit import find_lines_through_own_text
+    from _layout_geometry import AnnotationGeometry, SheetGeometry
+
+    text = Box(0.1000, 0.1000, 0.1150, 0.1035)
+
+    def dim(line_y):
+        return AnnotationGeometry(
+            "dim Chamfer '21.0'",
+            "dim",
+            "v",
+            (text,),
+            (
+                Segment(0.0950, line_y, 0.1200, line_y, "dim-line"),
+                Segment(0.0950, 0.0900, 0.0950, 0.1100, "ext-line"),
+            ),
+        )
+
+    struck = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (dim(0.1017),), 0.6)
+    [finding] = find_lines_through_own_text(struck)
+    assert finding.kind == "dim-line-through-own-text"
+    assert severity(finding) is FindingSeverity.GATING
+    assert finding.extra["overlap_mm"] == pytest.approx(15.0 - 0.4, abs=0.01)
+    for clear in (0.1000, 0.0995):  # on the baseline, below the row
+        sheet = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (dim(clear),), 0.6)
+        assert find_lines_through_own_text(sheet) == []
+
+
+# cone-gear-shaft Sheet1's "Ra 1.6" finish symbol (DetailItem351) as the
+# layoutcal2 leaf dumped it (95a9e97ca): its registered leader, the display
+# copy of that leader's two runs (first two lines), the symbol's own strokes.
+FINISH_LEADER = [0.24125, 0.18, 0.0, 0.23365, 0.18, 0.0, 0.2326, 0.1561154, 0.0]
+FINISH_SYMBOL_LINES = [
+    (0.24, 0.18, 0.237835, 0.18375),
+    (0.242165, 0.18375, 0.237835, 0.18375),
+    (0.24, 0.18, 0.2442135, 0.1871425),
+    (0.2415305, 0.1856117, 0.2384695, 0.1856117),
+    (0.2442135, 0.1871425, 0.2546457, 0.1871425),
+]
+
+
+def _finish_symbol(leader):
+    runs = [(leader[i], leader[i + 1], leader[i + 3], leader[i + 4]) for i in range(0, len(leader) - 3, 3)]
+    return {
+        "type": 7,
+        "name": "DetailItem351",
+        "visible": 1,
+        "owner_type": 0,
+        "pos": [0.24, 0.18, 0.0],
+        "leaders": [list(leader)],
+        "display": {
+            "lines": [_line(*line) for line in (*runs, *FINISH_SYMBOL_LINES)],
+            "arrows": [[0.2326, 0.1561154, 0.0, 0.043919, 0.9990351, -0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]],
+            "texts": [{"t": "Ra 1.6", "pos": [0.245, 0.1835713, 0.0], "h": 0.0025, "ref": 1, "ang": 0.0}],
+        },
+    }
+
+
+def test_a_finish_symbols_leader_through_its_own_text_gates():
+    """Main's gate-gap sweep (3), MHA-116's crown Ra: a finish symbol's leader
+    reaches the audit as ``leader`` (its registered GetLeaderPointsAtIndex
+    runs; the display copy is dropped), so a leader struck back through its
+    own "Ra" text is leader-through-own-text. The real symbol, leader clear
+    of its text, is the positive control."""
+    view = (0.15, 0.10, 0.30, 0.25)
+
+    def own_strikes(annotation):
+        dump = _dump(views=[_view("v", view, [annotation])])
+        return [f for f in audit_dump(dump) if f.kind == "leader-through-own-text"]
+
+    assert own_strikes(_finish_symbol(FINISH_LEADER)) == []
+    # Attached right of the text, the leader runs back left along the row
+    # at mid-height before it drops to the face.
+    struck = [0.2570, 0.1855, 0.0, 0.2430, 0.1855, 0.0, 0.2326, 0.1561154, 0.0]
+    [finding] = own_strikes(_finish_symbol(struck))
+    assert finding.a == finding.b
+    assert "surface-finish" in finding.a
+    assert severity(finding) is FindingSeverity.GATING
+
+
+def test_mha116s_crown_finish_leader_through_its_ra_text_gates():
+    """reviewfirst's case packet (layout-blindspots/mha116-crown-ra): at
+    7b21b56c0 the pinion-cam-pin crown's "Ra 1.6" finish leader ran from the
+    shelf end (126.4, 140.0) mm to the crown (152.6, 159.0) mm straight
+    through its own ".6"; the pre-save gate passed the sheet and the
+    machinist review flagged it (fixed in 0007c8d93). Geometry is the
+    packet's, hand-measured on the 300 dpi render (+/-0.2 mm), with the
+    printed "Ra 1.6" as one PDF text object over the measured box. The
+    fix (symbol 10 mm higher, same crown point) is the control."""
+    mm = 0.001
+
+    def strikes(rise):
+        y = 140.0 + rise
+        return _crown_finish_strikes(mm, y)
+
+    [finding] = strikes(0.0)
+    assert "surface-finish" in finding.a and finding.a == finding.b
+    assert severity(finding) is FindingSeverity.GATING
+    # The packet measured 3.2 mm inside the box; the own-row inset trims the ends.
+    assert 2.5 < finding.extra["overlap_mm"] < 3.3
+    assert strikes(10.0) == []
+
+
+def _crown_finish_strikes(mm, y):
+    """leader-through-own-text on MHA-116's crown finish symbol rooted at
+    (120, ``y``) mm, its leader running to the crown point (152.6, 159.0)."""
+    symbol = {
+        "type": 7,
+        "name": "DetailItem crown",
+        "visible": 1,
+        "owner_type": 0,
+        "pos": [120.0 * mm, y * mm, 0.0],
+        "leaders": [[121.0 * mm, y * mm, 0.0, 126.4 * mm, y * mm, 0.0, 152.6 * mm, 159.0 * mm, 0.0]],
+        "display": {
+            "lines": [
+                _line(117.0 * mm, y * mm, 126.4 * mm, y * mm),  # shelf, V's point to leader
+                _line(120.0 * mm, y * mm, 117.5 * mm, (y + 4.3) * mm),  # V, short arm
+                _line(120.0 * mm, y * mm, 124.3 * mm, (y + 7.4) * mm),  # V, long arm to the bar
+                _line(124.3 * mm, (y + 7.4) * mm, 135.0 * mm, (y + 7.4) * mm),  # bar over the Ra text
+            ],
+            "texts": [{"t": "Ra 1.6", "pos": [125.3 * mm, (y + 4.2) * mm, 0.0], "h": 2.5 * mm, "ref": 1, "ang": 0.0}],
+        },
+    }
+    view = _view("Drawing View on RIGHT_CENTER", (0.10, 0.10, 0.30, 0.25), [symbol])
+    spans = [["Ra 1.6", 125.3 * mm, (y + 4.2) * mm, 134.8 * mm, (y + 7.0) * mm]]
+    findings = audit_dump(_dump(views=[view], spans=spans, print_rest=False))
+    return [f for f in findings if f.kind == "leader-through-own-text"]
+
+
+# --------------------------------------------------------------------------
+# Real cases: MHA-089 rocker-arm-support, rocker fix3 (6a5d8dd5c)
+# --------------------------------------------------------------------------
+#
+# reviewfirst's packet (dt-logs/layout-blindspots/mha089-rocker/cases.json):
+# six defects the pre-save gate passed on fix3's sheet, restored from the
+# build cache (key 1bdade086456). Text boxes are pdfium glyph rects and lines
+# the PDF's own path segments, in sheet mm. Each case also carries its
+# control: fix4 (65db4585c, key 52595f0a368e), clean for A-E. F is unchanged
+# on fix4; its control is 60fef5e3b's intent (the text printed above its
+# extension lines), which has not been rendered yet.
+
+_MM = 0.001
+
+
+def _rocker_arrow(x, y, dx, dy):
+    return [x * _MM, y * _MM, 0.0, dx, dy, 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]
+
+
+def _rocker_dim(name, text, box, *, lines=(), arrows=()):
+    (x0, y0), (_x1, y1) = box
+    dim = _dim(name, text, x0 * _MM, y0 * _MM, lines=[tuple(v * _MM for v in line) for line in lines], height=(y1 - y0) * _MM)
+    if arrows:
+        dim["display"]["arrows"] = list(arrows)
+    return dim
+
+
+def _rocker_span(text, box):
+    (x0, y0), (x1, y1) = box
+    return [text, x0 * _MM, y0 * _MM, x1 * _MM, y1 * _MM]
+
+
+def _rocker_seat_note(fixed):
+    """A: the plan's 177.8 left extension line (x 60.54) through the seat
+    note's "TRANSFER FROM MHA-123"; fixed by wrapping the note (widest row
+    ends at x 52.1)."""
+    row = ((16.1, 244.8), (52.1 if fixed else 73.7, 248.4))
+    note = _note("SeatNote", "TRANSFER FROM MHA-123", (row[0][0] * _MM, row[0][1] * _MM, row[1][0] * _MM, row[1][1] * _MM))
+    width = _rocker_dim("Depth", "177.8", ((95.0, 258.0), (105.0, 261.5)), lines=[(60.54, 141.53, 60.54, 256.19)])
+    spans = [_rocker_span("TRANSFER FROM MHA-123", row), _rocker_span("177.8", ((95.0, 258.0), (105.0, 261.5)))]
+    return _dump(views=[_view("plan", (0.010, 0.130, 0.200, 0.265), [width])], sheet_annotations=[note], spans=spans, print_rest=False)
+
+
+def _rocker_chamfer(fixed):
+    """B: RimChamferSize's "X 45 DEG" over the rail's "21.0" by 1.5 x 2.5 mm
+    (the glyphs touch); fixed by moving the chamfer rows to y 192.6-207.3."""
+    chamfer = ((154.0, 203.8), (175.7, 207.3)) if fixed else ((154.0, 223.2), (175.7, 226.7))
+    rail = ((174.2, 222.2), (185.8, 225.7))
+    dims = [_rocker_dim("RimChamferSize", "X 45 DEG", chamfer), _rocker_dim("Rail", "21.0", rail)]
+    spans = [_rocker_span("X 45 DEG", chamfer), _rocker_span("21.0", rail)]
+    return _dump(views=[_view("front", (0.140, 0.180, 0.200, 0.240), dims)], spans=spans, print_rest=False)
+
+
+def _rocker_cavity(fixed):
+    """C: CavWidth's 127.0 dimension line (y 122.41) along the top of
+    WinWidth's "165.1", only 0.09 mm inside its glyph rect but striking the
+    glyph tops; fixed by moving WinWidth to y 110.9-114.5."""
+    pocket = ((99.8, 110.9), (109.8, 114.5)) if fixed else ((99.8, 118.9), (109.8, 122.5))
+    cavity = ((80.0, 123.2), (90.0, 126.7))
+    width = _rocker_dim(
+        "CavWidth",
+        "127.0",
+        cavity,
+        lines=[(73.24, 122.41, 136.74, 122.41)],
+        arrows=[_rocker_arrow(73.24, 122.41, -1.0, 0.0), _rocker_arrow(136.74, 122.41, 1.0, 0.0)],
+    )
+    view = _view("plan", (0.060, 0.100, 0.150, 0.135), [width, _rocker_dim("WinWidth", "165.1", pocket)])
+    return _dump(views=[view], spans=[_rocker_span("165.1", pocket), _rocker_span("127.0", cavity)], print_rest=False)
+
+
+def _rocker_tapped_hole(fixed, *, seen_by_com):
+    """D: the iso's "#8-32 Tapped Hole", which the native save materialized
+    after the pre-save audit, 9.5 mm past the frame's right border. Whether
+    or not COM lists it after the save, the post-save audit sees it: as an
+    annotation over the border, or as printed text nothing claims. Fixed by
+    removing the note."""
+    box = ((386.1, 233.0), (428.6, 237.4))
+    ref = ((350.0, 250.0), (358.4, 253.5))
+    notes = []
+    if seen_by_com and not fixed:
+        notes = [_note("TappedHole", "#8-32 Tapped Hole", (386.1 * _MM, 233.0 * _MM, 428.6 * _MM, 237.4 * _MM))]
+    spans = [_rocker_span("12.0", ref)] + ([] if fixed else [_rocker_span("#8-32 Tapped Hole", box)])
+    view = _view("iso", (0.330, 0.190, 0.415, 0.260), [_rocker_dim("IsoRef", "12.0", ref)])
+    return _dump(views=[view], sheet_annotations=notes, spans=spans, print_rest=False)
+
+
+def _rocker_web(fixed):
+    """E: SECTION A-A's tapered wall (two model edges) through the web's
+    "6.35", across the "6"; fixed by moving the text to x 225.2-236.8."""
+    web = ((225.2, 155.2), (236.8, 158.7)) if fixed else ((215.2, 155.2), (226.8, 158.7))
+    edges = _edges(
+        (219.39 * _MM, 146.90 * _MM, 210.36 * _MM, 215.76 * _MM),
+        (211.00 * _MM, 215.83 * _MM, 220.03 * _MM, 146.97 * _MM),
+    )
+    view = _view("SECTION A-A", (0.200, 0.140, 0.245, 0.220), [_rocker_dim("Web", "6.35", web)])
+    return _dump(views=[view], spans=[_rocker_span("6.35", web)], strokes=edges, print_rest=False)
+
+
+def _rocker_foot(fixed):
+    """F: the foot's "6.35" between its own extension lines, 3.17 mm apart
+    for 3.5 mm text; the lower line 0.35 mm inside the rect over 6.8 mm. The
+    control prints it above both lines, as 60fef5e3b intends."""
+    text = ((174.2, 144.3), (185.8, 147.8)) if fixed else ((174.2, 140.2), (185.8, 143.7))
+    lines = [(188.74, 140.55, 179.00, 140.55), (205.56, 143.72, 179.00, 143.72), (187.5, 135.0, 187.5, 149.0)]
+    arrows = [_rocker_arrow(187.5, 140.55, 0.0, 1.0), _rocker_arrow(187.5, 143.72, 0.0, -1.0)]
+    dim = _rocker_dim("Foot", "6.35", text, lines=lines, arrows=arrows)
+    return _dump(views=[_view("SECTION A-A", (0.165, 0.130, 0.210, 0.160), [dim])], spans=[_rocker_span("6.35", text)], print_rest=False)
+
+
+@pytest.mark.parametrize(
+    ("build", "kind", "a", "b"),
+    [
+        pytest.param(_rocker_seat_note, "text-on-line", "SeatNote", "Depth", id="A-seat-note-on-extension-line"),
+        pytest.param(_rocker_chamfer, "text-clearance", "RimChamferSize", "Rail", id="B-chamfer-text-on-21.0"),
+        pytest.param(_rocker_cavity, "text-on-line", "WinWidth", "CavWidth", id="C-127.0-dim-line-on-165.1"),
+        pytest.param(
+            lambda fixed: _rocker_tapped_hole(fixed, seen_by_com=True),
+            "outside-border", "TappedHole", "right border", id="D-tapped-hole-listed-by-com",
+        ),
+        pytest.param(
+            lambda fixed: _rocker_tapped_hole(fixed, seen_by_com=False),
+            "pdf-text-unclaimed", "TAPPEDHOLE", "", id="D-tapped-hole-print-only",
+        ),
+        pytest.param(_rocker_web, "text-on-line", "Web", "SECTION A-A geometry", id="E-web-6.35-on-section-wall"),
+        pytest.param(_rocker_foot, "extension-through-own-text", "Foot", "Foot", id="F-foot-6.35-on-own-extension"),
+    ],
+)
+def test_rocker_fix3_defects_gate_in_the_shared_audit(build, kind, a, b):
+    """Main's gate-gap sweep: each defect on rocker fix3's sheet that the
+    pre-save gate passed is a gating finding of the shared audit, and its
+    control is clean of it."""
+
+    def hits(dump):
+        return [f for f in audit_dump(dump) if f.kind == kind and a in f.a and b in f.b]
+
+    [finding] = hits(build(False))
+    assert severity(finding) is FindingSeverity.GATING
+    assert hits(build(True)) == []
 
 
 def test_a_hole_callout_over_the_top_border_gates_estimated_or_printed():
@@ -2760,3 +3115,404 @@ def test_a_hole_callout_over_the_top_border_gates_estimated_or_printed():
     assert severity(estimated) is FindingSeverity.GATING
     [printed] = breaches(_dump(views=[view], strokes=_edges((0.06, 0.06, 0.09, 0.06))))
     assert printed.b == "top border"
+
+
+# --------------------------------------------------------------------------
+# swing's 917-s1 sheet 2 eye pass (cone_swing_platform leaf 917-s1-sheet2-24cb,
+# key f1615b4b73f0 at 24cbab237; fix 4dda16fd5). Lines, arrows and edges are
+# the leaf's own PDF strokes in sheet mm (restored from the build cache,
+# dt-logs/layout-blindspots/swing-24cb-raw); leaders and note text are the
+# leaf's COM inventory (dt-logs/917-s1-sheet2/leaf-24cb.log).
+# --------------------------------------------------------------------------
+
+SWING_VIEW2 = (0.1594, 0.1286, 0.2006, 0.2514)
+# The plate's tapered sides and top edge, and the printed rings of the two
+# countersunk 1/4-20 holes (outer 1.64, inner 1.27 mm radius) and the dowel
+# hole between them (0.79 mm).
+SWING_PLATE_EDGES = _edges(
+    (0.18299, 0.13769, 0.19442, 0.23834),
+    (0.16499, 0.23961, 0.16859, 0.13896),
+    (0.19248, 0.24582, 0.17099, 0.24582),
+    *_ring(0.17022, 0.23520, 0.00164),
+    *_ring(0.17022, 0.23520, 0.00127),
+    *_ring(0.18334, 0.23229, 0.00164),
+    *_ring(0.18334, 0.23229, 0.00127),
+    *_ring(0.17533, 0.22719, 0.00079),
+)
+SWING_RD2_ROWS = [
+    ("2X ", 0.2283, 0.2264),
+    ("<MOD-DIAM>", 0.2350, 0.2264),
+    (" 5.11 THRU ALL", 0.2416, 0.2264),
+    ("AT ASSEMBLY; 1/4-20 UNC - 2B THRU ALL", 0.2060, 0.2148),
+]
+
+
+def _swing_rd2(fixed):
+    """RD2's leader, shoulder and arrow as printed: at 24cbab237 to the left
+    1/4-20 hole across 28 mm of plate; at 4dda16fd5 to the right one."""
+    tip, end, base = ((0.18408, 0.23125), (0.18260, 0.23333), (0.18616, 0.22835)) if fixed else (
+        (0.17113, 0.23431), (0.16930, 0.23608), (0.173725, 0.23188)
+    )
+    callout = _hole_callout(
+        "RD2",
+        [(*tip, 0.20433, 0.20302), (*end, *tip), (0.20433, 0.20302, 0.29404, 0.20302)],
+        SWING_RD2_ROWS,
+    )
+    callout["display"]["arrows"] = [
+        [*tip, 0.0, base[0] - tip[0], base[1] - tip[1], 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]
+    ]
+    return callout
+
+
+def test_a_leader_running_over_the_part_gates():
+    """(a) RD2's leader crossed the plate's right edge at 24cbab237 and ran
+    28.2 mm over the plate to a hole 6.1 mm from the plate's side: a 22 mm
+    detour, reading as an edge of the part. The fix at 4dda16fd5 lands on the
+    nearer hole, 14.1 mm over the plate for a 10.3 mm approach, and is clear.
+    Both land on a countersink's inner ring, 0.37 mm inside the outer one:
+    that crossing is under the arrowhead, so each counts one edge."""
+
+    def over(fixed):
+        view = _view("Drawing View2", SWING_VIEW2, [_swing_rd2(fixed)])
+        findings = audit_dump(_dump(views=[view], strokes=SWING_PLATE_EDGES))
+        return [f for f in findings if f.kind.startswith("leader-over-part") and "RD2" in f.a]
+
+    [finding] = over(False)
+    assert finding.kind == "leader-over-part"
+    assert severity(finding) is FindingSeverity.GATING
+    assert 27.5 < finding.extra["over_part_mm"] < 29.0
+    assert 21.0 < finding.extra["detour_mm"] < 23.5
+    assert finding.extra["edge_crossings"] == 1
+    assert over(True) == []
+
+
+def test_a_long_leader_by_the_shortest_route_is_advisory():
+    """cone-gear's Ra 1.6 leaders run 27-39 mm over the gear to its bore, the
+    shortest route there is (layoutcal2-a T072..T120, detour -5..-2 mm): no
+    placement shortens them, so they are reported but do not gate. Here an
+    80 mm square part with a 5 mm bore at its centre, the leader in from the
+    left edge: 35 mm over the part, 35 mm approach."""
+    ring = _ring(0.200, 0.150, 0.005)
+    part = _box_edges(0.160, 0.110, 0.240, 0.190)
+    tip = (0.195, 0.150)
+    note = {
+        "type": 6,
+        "name": "Finish",
+        "visible": 1,
+        "owner_type": 0,
+        "leaders": [[0.140, 0.150, 0.0, *tip, 0.0]],
+        "display": {
+            "arrows": [[*tip, 0.0, -1.0, 0.0, 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]],
+            "texts": [{"t": "Ra 1.6", "pos": [0.125, 0.151, 0.0], "h": 0.0025}],
+        },
+        "note": {"text": "Ra 1.6", "balloon": False},
+    }
+    view = _view("Gear", (0.155, 0.105, 0.245, 0.195), [note])
+    findings = audit_dump(_dump(views=[view], strokes=[*part, *_edges(*ring)]))
+    [finding] = [f for f in findings if f.kind.startswith("leader-over-part")]
+    assert finding.kind == "leader-over-part-direct"
+    assert severity(finding) is FindingSeverity.ADVISORY
+    assert finding.extra["over_part_mm"] == pytest.approx(35.0, abs=0.1)
+    assert finding.extra["detour_mm"] == pytest.approx(0.0, abs=0.1)
+
+
+def _arrow_at(tip, toward):
+    """A GetArrowHeadAtIndex2 record at ``tip``, its base toward ``toward``."""
+    dx, dy = toward[0] - tip[0], toward[1] - tip[1]
+    length = math.hypot(dx, dy)
+    return [*tip, 0.0, dx / length, dy / length, 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]
+
+
+def test_each_branch_of_a_two_arrow_leader_is_measured_from_its_own_attachment():
+    """Codex P2 on b49e13940 (PRRT_kwDOPHDy386mTArq): a note's two leaders
+    share their attach point. Walking from one tip to the node farthest from
+    it ran on through the shared attachment into the sibling's elbow, so
+    the sibling's crossing was measured as this branch's route. Here the
+    short branch lands 7.6 mm inside the part's left edge, and the long
+    branch runs 47 mm to a feature 45 mm deep (a direct route, advisory). The
+    old walk measured the short branch from the long one's crossing: a
+    22.8 mm phantom detour, gating."""
+    attach, short_tip, elbow, long_tip = (0.092, 0.150), (0.105, 0.165), (0.140, 0.150), (0.145, 0.155)
+    note = {
+        "type": 6,
+        "name": "Branched",
+        "visible": 1,
+        "owner_type": 0,
+        "leaders": [[*attach, 0.0, *short_tip, 0.0], [*attach, 0.0, *elbow, 0.0, *long_tip, 0.0]],
+        "display": {
+            "arrows": [_arrow_at(short_tip, attach), _arrow_at(long_tip, elbow)],
+            "texts": [{"t": "Ra 3.2", "pos": [0.075, 0.149, 0.0], "h": 0.0025}],
+        },
+        "note": {"text": "Ra 3.2", "balloon": False},
+    }
+    view = _view("Block", (0.095, 0.095, 0.205, 0.205), [note])
+    findings = audit_dump(_dump(views=[view], strokes=_box_edges(0.100, 0.100, 0.200, 0.200)))
+    [finding] = [f for f in findings if f.kind.startswith("leader-over-part")]
+    assert finding.kind == "leader-over-part-direct"
+    assert finding.extra["over_part_mm"] == pytest.approx(47.1, abs=0.2)
+
+
+def test_an_arrowless_leader_running_over_the_part_gates():
+    """Codex P2 on b294b7f5f (PRRT_kwDOPHDy386mTPic): a cosmetic-thread
+    callout dumps its registered leader and no display data (DetailItem357),
+    so it has no arrowhead to walk to and was never measured. It ends where
+    its registered points end. Here it enters the plate across its right
+    edge and runs 22.2 mm to hole A's outer ring, 6.9 mm from the plate's
+    left side: a 15.3 mm detour."""
+    tip = (0.17022 + 0.00164, 0.23520)
+    note = {**SWING_TAPPED_HOLE, "leaders": [[0.2000, 0.2352, 0.0, *tip, 0.0]]}
+    view = _view("Drawing View2", SWING_VIEW2, [note])
+    findings = audit_dump(_dump(views=[view], strokes=SWING_PLATE_EDGES))
+    [finding] = [f for f in findings if f.kind.startswith("leader-over-part")]
+    assert finding.kind == "leader-over-part"
+    assert finding.extra["over_part_mm"] == pytest.approx(22.2, abs=0.2)
+    assert finding.extra["detour_mm"] == pytest.approx(15.3, abs=0.2)
+
+
+def test_an_arrowless_leader_beside_an_arrowed_one_is_measured():
+    """Arrow style is per leader (IAnnotation::SetArrowHeadStyleAtIndex), so
+    one note can carry an arrowed leader and an arrowless one (Main on the
+    TPic fix). The arrowed branch stops outside the plate; the arrowless one
+    runs the 22.2 mm to hole A and gates."""
+    attach, arrowed_tip = (0.2000, 0.2352), (0.1960, 0.2300)
+    tip = (0.17022 + 0.00164, 0.23520)
+    note = {
+        **SWING_TAPPED_HOLE,
+        "leaders": [[*attach, 0.0, *arrowed_tip, 0.0], [*attach, 0.0, *tip, 0.0]],
+        "display": {"arrows": [_arrow_at(arrowed_tip, attach)]},
+    }
+    view = _view("Drawing View2", SWING_VIEW2, [note])
+    findings = audit_dump(_dump(views=[view], strokes=SWING_PLATE_EDGES))
+    [finding] = [f for f in findings if f.kind.startswith("leader-over-part")]
+    assert finding.kind == "leader-over-part"
+    assert finding.extra["over_part_mm"] == pytest.approx(22.2, abs=0.2)
+
+
+# DetailItem357, the model's cosmetic-thread callout on View2: COM text and
+# leader verbatim; like its View1 twin (layoutcal2-a DetailItem349) it dumps
+# no display data.
+SWING_TAPPED_HOLE = {
+    "type": 6,
+    "name": "DetailItem357",
+    "visible": 1,
+    "owner_type": 0,
+    "layer": "",
+    "leaders": [[0.1960, 0.2459, 0.0, 0.1896, 0.2459, 0.0, 0.1834, 0.2339, 0.0]],
+    "display": {},
+    "note": {"text": "1/4-20 Tapped Hole", "balloon": False},
+}
+# A general note naming the same thread, with no leader (layoutcal2-a
+# DetailItem372's second row).
+SWING_DEBURR_NOTE = {
+    "type": 6,
+    "name": "DetailItem372",
+    "visible": 1,
+    "owner_type": 0,
+    "display": {"texts": [{"t": "1/4-20 TAPPED HOLES: DEBURR ONLY, 0.1 MAX BREAK EACH END.", "pos": [0.2225, 0.0729, 0.0], "h": 0.0025}]},
+    "note": {"text": "1/4-20 TAPPED HOLES: DEBURR ONLY, 0.1 MAX BREAK EACH END.", "balloon": False},
+}
+
+
+def test_a_second_callout_of_one_thread_in_a_view_gates():
+    """(b) At 24cbab237 the cosmetic-thread callout "1/4-20 Tapped Hole"
+    printed beside RD2's "2X ... 1/4-20 UNC - 2B THRU ALL", its leader on the
+    other hole of RD2's pair. 4dda16fd5 removed it. A general note naming the
+    thread, with no leader, calls out no hole and is no duplicate; nor are
+    two hole callouts of one thread (harmonic-base's 2X and 4X 8-32 groups,
+    test_gate_mode_passes_a_sheet_with_only_advisories). The two are one
+    group because RD2's "2X" names exactly the view's two holes of the size
+    both leaders land on, so the fixture prints the plate's rings."""
+
+    def duplicates(members):
+        view = _view("Drawing View2", SWING_VIEW2, members)
+        findings = audit_dump(_dump(views=[view], strokes=SWING_PLATE_EDGES))
+        return [f for f in findings if f.kind == "duplicate-thread-callout"]
+
+    [finding] = duplicates([_swing_rd2(False), SWING_TAPPED_HOLE, SWING_DEBURR_NOTE])
+    assert {finding.a, finding.b} == {"hole-callout RD2", "note DetailItem357"}
+    assert finding.extra["thread"] == "1/4-20"
+    assert finding.extra.get("association") == "same 2X group"
+    assert severity(finding) is FindingSeverity.GATING
+    assert duplicates([_swing_rd2(True), SWING_DEBURR_NOTE]) == []
+
+
+def _tapped_hole_note(tip):
+    """DetailItem357 with its leader's last run ending at ``tip``."""
+    return {**SWING_TAPPED_HOLE, "leaders": [[0.1960, 0.2459, 0.0, 0.1896, 0.2459, 0.0, *tip, 0.0]]}
+
+
+@pytest.mark.parametrize(
+    ("extra_rings", "tip", "association"),
+    [
+        # On RD2's own hole: the same feature, whatever the count.
+        ((), (0.17022 + 0.00164, 0.23520), "same hole"),
+        # Codex P2 on b49e13940 (PRRT_kwDOPHDy386mTAro): the view prints two
+        # more countersunk holes, so RD2's 2X is one pair of four and the
+        # note's hole may be the other pair's.
+        (
+            (*_ring(0.17600, 0.20000, 0.00164), *_ring(0.17600, 0.20000, 0.00127),
+             *_ring(0.17800, 0.17000, 0.00164), *_ring(0.17800, 0.17000, 0.00127)),
+            (0.18334, 0.23229 + 0.00164),
+            None,
+        ),
+        # On the dowel hole: another size, so another group.
+        ((), (0.17533 + 0.00079, 0.22719), None),
+        # On no printed ring: nothing associates the two.
+        ((), (0.18000, 0.21000), None),
+    ],
+    ids=["same-hole", "one-of-two-pairs", "other-size", "no-ring"],
+)
+def test_one_thread_is_one_callout_only_within_one_hole_group(extra_rings, tip, association):
+    """A second callout of RD2's thread duplicates it only on RD2's hole
+    group: one thread can name two groups in one view."""
+    view = _view("Drawing View2", SWING_VIEW2, [_swing_rd2(False), _tapped_hole_note(tip)])
+    findings = audit_dump(_dump(views=[view], strokes=[*SWING_PLATE_EDGES, *_edges(*extra_rings)]))
+    duplicates = [f for f in findings if f.kind == "duplicate-thread-callout"]
+    assert [f.extra.get("association") for f in duplicates] == ([association] if association else [])
+
+
+def test_a_sheet_note_restating_a_view_callouts_thread_gates():
+    """Codex P2 on b294b7f5f (PRRT_kwDOPHDy386mTPiZ): the 24cb duplicate
+    with DetailItem357 owned by the sheet instead of View2. The sheet note
+    and the view's callout sat in separate owner groups and were never
+    compared, though the note's leader lands on View2's hole B."""
+    view = _view("Drawing View2", SWING_VIEW2, [_swing_rd2(False)])
+    note = {**SWING_TAPPED_HOLE, "owner_type": 1}
+    findings = audit_dump(_dump(views=[view], sheet_annotations=[note], strokes=SWING_PLATE_EDGES))
+    [finding] = [f for f in findings if f.kind == "duplicate-thread-callout"]
+    assert {finding.a, finding.b} == {"hole-callout RD2", "note DetailItem357"}
+    assert finding.extra.get("association") == "same 2X group"
+    assert finding.extra.get("owner") == "Drawing View2"
+
+
+@pytest.mark.parametrize(
+    ("text", "threads"),
+    [
+        ("AT ASSEMBLY; 1/4-20 UNC - 2B THRU ALL", ["1/4-20"]),
+        ("#8-32 Tapped Hole", ["#8-32"]),
+        ("4X M6x1.0 - 6H", ["M6"]),
+        ("1018 CF FLAT 1/4 x 2-1/2 in", []),
+        ("TRANSFER FROM MHA-016", []),
+        ("DIMENSIONING AND TOLERANCING PER ASME Y14.5-2018", []),
+    ],
+)
+def test_thread_designations_are_read_from_callout_text(text, threads):
+    from _layout_audit import _THREAD
+
+    assert [m.group(1).upper() for m in _THREAD.finditer(text)] == [t.upper() for t in threads]
+
+
+# layoutcal2-a cone-swing-platform DetailItem349, verbatim: the profile view's
+# cosmetic-thread callout, which draw_cone_swing_platform put on the hidden
+# COSMETIC-THREADS-HIDDEN layer. COM reads it Visible 1 with a registered
+# leader and no display data; the PDF prints none of it (24cbab237's
+# DetailItem351, swing's 917-s1 sheet 1 eye pass).
+SWING_HIDDEN_TAPPED_HOLE = {
+    "type": 6,
+    "name": "DetailItem349",
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.0918458, 0.2473492, -0.0015875],
+    "layer": "COSMETIC-THREADS-HIDDEN",
+    "leaders": [[0.0913007, 0.2455784, -0.0015875, 0.0849507, 0.2455784, -0.0015875, 0.0783754, 0.2338789, -0.0015875]],
+    "display": {},
+    "note": {
+        "text": "1/4-20 Tapped Hole",
+        "extent": [0.0782569, 0.2342918, -0.0, 0.1358608, 0.2476316, -0.0],
+        "balloon": False,
+    },
+}
+
+
+@pytest.mark.parametrize(
+    ("state", "audited"),
+    [
+        pytest.param({"visible": False, "printable": False}, False, id="hidden-layer"),
+        pytest.param({"visible": True, "printable": False}, False, id="non-printing-layer"),
+        pytest.param({"visible": True, "printable": True}, True, id="printing-layer"),
+    ],
+)
+def test_an_annotation_on_a_non_printing_layer_is_counted_not_audited(state, audited):
+    """Main's ruling (Option A): the audit judges what prints. An annotation
+    on a layer that does not print leaves no ink, so its leader is no obstacle
+    and no finding names it; the report counts it per sheet instead."""
+    from _layout_audit import audit_report
+
+    view = _view("Drawing View1", (0.0544, 0.1286, 0.0956, 0.2514), [SWING_HIDDEN_TAPPED_HOLE])
+    dump = {**_dump(views=[view]), "layers": {"COSMETIC-THREADS-HIDDEN": state}}
+    labels = {a.label for a in sheet_model(dump).geometry.annotations}
+    assert any("DetailItem349" in label for label in labels) is audited
+    report, _gating = audit_report("cone-swing-platform", LayoutAuditMode.REPORT, [dump])
+    assert report["summary"]["hidden_layer"] == ({} if audited else {"Sheet2": 1})
+
+
+def test_the_collector_records_each_annotation_layers_print_state(monkeypatch):
+    """Option A's collector half: each named layer the sheet's annotations sit
+    on, read once through ILayerMgr::GetLayer, Visible then Printable. A name
+    GetLayer cannot resolve is left out (audited as printed), not a refusal."""
+    import _drawing_layout_audit as collector
+
+    monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
+    asked = []
+
+    class Layer:
+        Visible = False
+        Printable = False
+
+    class Manager:
+        def GetLayer(self, name):
+            asked.append(name)
+            return Layer() if name == "COSMETIC-THREADS-HIDDEN" else None
+
+    class Model:
+        def GetLayerManager(self):
+            return Manager()
+
+    class Adapter:
+        currentModel = Model()
+
+    dump = _dump(
+        views=[_view("Drawing View1", (0.05, 0.12, 0.10, 0.25), [SWING_HIDDEN_TAPPED_HOLE, {"type": 6, "name": "Gone", "layer": "FORMAT"}])],
+        sheet_annotations=[{"type": 6, "name": "Plain", "layer": ""}],
+    )
+    reader = collector._Reader(adapter=Adapter())
+    assert collector._layer_states(reader, dump) == {"COSMETIC-THREADS-HIDDEN": {"visible": False, "printable": False}}
+    assert asked == ["COSMETIC-THREADS-HIDDEN", "FORMAT"]
+    assert reader.take_errors() == {}
+
+
+# layoutcal2-a cone-swing-platform DetailItem374, verbatim: like every
+# leadered note, its display data opens with a zero-length line at the attach
+# point, and the PDF prints it as a zero-length 0.18 mm stroke (five such on
+# 24cbab237's FEATURES sheet and five on the fixed 4dda16fd5's).
+SWING_SLOT_NOTE = {
+    "type": 6,
+    "name": "DetailItem374",
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.121, 0.0785, 0.0],
+    "layer": "",
+    "leaders": [[0.1204851, 0.0770861, -0.0, 0.0895, 0.0584641, 0.0]],
+    "display": {
+        "lines": [
+            [0.0, 0.0, 0.0, 0.0, 0.1202019, 0.0776806, -0.0, 0.1202019, 0.0776806, -0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.1202019, 0.0776806, -0.0, 0.0895, 0.0584641, 0.0],
+        ],
+        "arrows": [[0.0895, 0.0584641, 0.0, 0.8476532, 0.5305507, -0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]],
+        "texts": [
+            {"t": "<MOD-DIAM>", "pos": [0.121, 0.075, 0.0], "h": 0.0025, "ref": 1, "ang": 0.0},
+            {"t": "4 END MILL SLOT THRU", "pos": [0.1247703, 0.075, 0.0], "h": 0.0025, "ref": 1, "ang": 0.0},
+        ],
+    },
+    "note": {"text": "<MOD-DIAM>4 END MILL SLOT THRU", "extent": [0.0891713, 0.0590545, -0.0, 0.1589024, 0.0790643, -0.0], "balloon": False},
+}
+
+
+def test_a_leadered_notes_zero_length_attach_stub_is_no_finding():
+    """Main's ruling on swing's third case (b3): the zero-length leader
+    segment is SolidWorks' attach stub, printed for every leadered note, so
+    it is a contract, not a defect: the note audits clean."""
+    view = _view("Detail View B (2 : 1)", (0.0491, 0.0106, 0.1179, 0.0794), [SWING_SLOT_NOTE])
+    stub = _edges((0.1202019, 0.0776806, 0.1202019, 0.0776806), width=0.00018)
+    findings = audit_dump(_dump(views=[view], strokes=stub))
+    assert [f for f in findings if "DetailItem374" in f.a or "DetailItem374" in f.b] == []
