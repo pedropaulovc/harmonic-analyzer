@@ -83,6 +83,22 @@ def test_pad_webs_clear_two_millimetres_at_the_printed_worst_case() -> None:
     assert min(webs.values()) >= _WEB_TARGET, webs
 
 
+def test_hole_callout_picks_the_hole_rim_where_the_pad_puts_it() -> None:
+    # pc-r11 (0c5636eab): the callout picked z HOLE_DIA/2, the rim of a hole on
+    # the strip's centre plane.  The pad stands PAD_Z off it, so the point fell
+    # inside the hole and SelectByID2 found no edge.  The pick must lie on the
+    # rim of the hole the Hole Wizard places at the pad's centre.
+    centre = (geometry.HOLE_X, geometry.FOOT_Y, geometry.PAD_Z)
+    assert drawing.HOLE_CENTER == pytest.approx(centre)
+    x, y, z = drawing.HOLE_EDGE_PICK
+    assert (x, y) == pytest.approx(centre[:2])
+    assert abs(z - centre[2]) == pytest.approx(geometry.HOLE_DIA / 2.0)
+    assert abs(z - geometry.PAD_Z) < geometry.PAD_WIDTH / 2.0
+    # Positive control: the pc-r11 pick is nowhere near the rim.
+    stale = abs(geometry.HOLE_DIA / 2.0 - centre[2])
+    assert geometry.HOLE_DIA / 2.0 - stale > 1.0
+
+
 def test_screw_stands_outboard_east_of_the_back_strap() -> None:
     # 2026-09-24 re-derive: img01's far-left screw is on the DRUM side (east).
     # The base's seat is transferred from this hole: it stands 20.0 east of
