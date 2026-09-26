@@ -44,6 +44,28 @@ def root_to_bore_web_min_mm(teeth: int) -> float:
     return (floor_min - (spec.bore_dia_mm(teeth) + spec.BORE_DIA_BAND[0])) / 2.0
 
 
+# The named shortfalls print as plain facts on the sheets they affect, so a
+# blind reviewer reads them off the package; the governance lives in the
+# policy's Named exceptions table and in these tags, never on the sheet.  The
+# row says HOLE, not BORE: the bore is a native dimension, and GEAR DATA
+# carries no parallel BORE row.
+# Named exception: MHA-013 web (drawing-simplicity-policy.md, "Named exceptions").
+def web_row(teeth: int) -> tuple[str, str]:
+    """Return the GEAR DATA row stating one gear's thinnest web as a MIN."""
+    # rounded DOWN: the sheet never states more web than the limits give
+    web = math.floor(root_to_bore_web_min_mm(teeth) * 100.0) / 100.0
+    return ("WEB, GAP FLOOR TO HOLE (mm, REF)", f"{web:.2f} MIN")
+
+
+# Named exception: MHA-013 contact ratio (drawing-simplicity-policy.md, "Named exceptions").
+def contact_ratio_row(teeth: int) -> tuple[str, str]:
+    """Return the GEAR DATA row stating one gear's worst-case contact ratio."""
+    return (
+        f"CONTACT RATIO WITH {CYLINDER_MATE_NUMBER}, WORST CASE (REF)",
+        f"{WORST_CONTACT_RATIO[teeth]:.2f}",
+    )
+
+
 def gear_data(teeth: int) -> str:
     """Return the complete tooth-system block for one configuration sheet."""
     if teeth not in spec.CONFIGURATION_TEETH:
@@ -82,22 +104,10 @@ def gear_data(teeth: int) -> str:
         # whole acceptance for the thickened tooth's narrow gap.
         ("TOOTH THICKNESS IN VIEW", "ARC LENGTH AT PITCH DIAMETER"),
     )
-    # The named rule-12 shortfalls (U40, U42) print as plain facts on the
-    # sheets they affect, so a blind reviewer reads them off the package;
-    # the ruling itself never prints (policy, named exceptions).
     if teeth in spec.WEB_EXCEPTIONS_MM:
-        web = root_to_bore_web_min_mm(teeth)
-        # rounded DOWN: the sheet never states more wall than the limits give
-        web = math.floor(web * 100.0) / 100.0
-        rows += (("WALL, GAP FLOOR TO HOLE (mm, REF)", f"{web:.2f} MIN"),)
+        rows += (web_row(teeth),)
     if teeth in WORST_CONTACT_RATIO:
-        ratio = WORST_CONTACT_RATIO[teeth]
-        rows += (
-            (
-                f"CONTACT RATIO WITH {CYLINDER_MATE_NUMBER}, WORST CASE (REF)",
-                f"{ratio:.2f}",
-            ),
-        )
+        rows += (contact_ratio_row(teeth),)
     return "\n".join(["GEAR DATA", *(f"{label}:  {value}" for label, value in rows)])
 
 
@@ -109,9 +119,9 @@ def gear_data(teeth: int) -> str:
 ATTACHMENT = "SOLDER, SILVER-BRAZE OR LOCTITE 638/648"
 SHAFT_MATE_NUMBER = "MHA-014"
 
-# The named rule-12 exceptions (user rulings U42 and U40, 2026-09-23) print
-# only as facts, in gear_data(); the ruling itself, a design-review record the
-# machinist cannot act on, stays in cone_gear_spec (CONTACT_RATIO_EXCEPTION_TEETH,
+# The named shortfalls (user rulings U42 and U40, 2026-09-23) print once each,
+# as GEAR DATA rows (web_row, contact_ratio_row), never again in these notes.
+# Which gears carry them stays in cone_gear_spec (CONTACT_RATIO_EXCEPTION_TEETH,
 # WEB_EXCEPTIONS_MM); each printed value is pinned to its derivation by
 # test_cone_gear_mesh_design and test_cone_gear_drawing.
 DRAWING_NOTES = "\n".join(
