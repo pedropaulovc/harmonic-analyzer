@@ -682,6 +682,22 @@ def test_web_thickness_text_clears_the_wall_and_the_height_dimension() -> None:
     assert web[2] < drawing.RIGHT_KEEP["WallHeight"][0] - 0.002
 
 
+def test_foot_thickness_text_sits_above_its_extension_lines() -> None:
+    """The foot's 6.35 spans 3.2 mm of sheet. At y 0.142 its text sat between
+    the extension lines with the dimension line through it (fix4 render), so
+    it prints above the top extension line, left of the slanted wall and
+    right of the front view."""
+    scale = drawing.VIEW_SCALE / 1000
+    foot = _text_box(f"{support.HALF_Y - support.BIG:.2f}", drawing.FOOT_TEXT_XY)
+    foot_top_y = drawing.RIGHT_CENTER[1] - support.BIG * scale
+    assert foot[1] > foot_top_y + 0.002
+    lowest_local_y = (foot[1] - drawing.RIGHT_CENTER[1]) / scale
+    wall_x = drawing.RIGHT_CENTER[0] - support._wall_half_z_at(lowest_local_y) * scale
+    assert foot[2] < wall_x - 0.002
+    front_right = drawing.FRONT_CENTER[0] + support.BOSS_DEPTH / 2 * scale
+    assert foot[0] > front_right + 0.003
+
+
 def test_iso_tapped_hole_label_is_materialized_then_removed() -> None:
     """r743-rocker-fix3's isometric carried SolidWorks' own "#8-32 Tapped
     Hole" label past the right border. The seat note already states the thread,

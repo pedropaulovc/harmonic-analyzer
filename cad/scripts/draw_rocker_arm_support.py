@@ -204,6 +204,12 @@ RAIL_PICK_Z = 5.0
 # at x 0.221 it printed across the wall line (fix3 render).
 WEB_TEXT_XY = (RIGHT_CENTER[0] + 0.026, RIGHT_CENTER[1] - 0.028)
 RAIL_TEXT_XY = (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] + 0.039)
+# The foot's 6.35 spans only 3.2 mm of sheet, too little for its text: at
+# y 0.142 the text sat between the extension lines with its own dimension
+# line through it (fix4 render). It prints just above the foot's top
+# extension line instead, in the gap between the front view and the
+# section's slanted wall.
+FOOT_TEXT_XY = (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] - 0.0365)
 # The section cuts the window rim in profile, and it is the one view where a
 # targeted import of RimChamfer delivers RimChamferSize (r743-diag-c, leaf
 # 20260926T100550Z-1-829fb125). The front view only ever got it as a side
@@ -659,7 +665,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 foot_pick_x,
                 RIGHT_CENTER[1] - BIG * VIEW_SCALE / 1000.0,
             ),
-            text_xy=(RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] - 0.043),
+            text_xy=FOOT_TEXT_XY,
             orientation="vertical",
             label="section foot thickness",
         ),
