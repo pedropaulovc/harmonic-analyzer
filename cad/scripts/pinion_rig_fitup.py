@@ -14,7 +14,7 @@ import it.
 - The rig's axial datum (user ruling P1-2): with the cylinder-gear bank
   pushed north, the drum's back end is set RIG_SET_LEAF_D off the north
   MHA-027's back face before the block seats are transferred (the base's
-  transfer callout, RIG_SET_STEP).  The bank pushed north is what keeps its end
+  RIG SET note, RIG_SET_STEP, which both transfer callouts name).  The bank pushed north is what keeps its end
   play out of j = 19's stack (#743), so the step says so.
 - The MHA-104 collars (user ruling P1-1): the front collar's front face
   FRONT_COLLAR_LEAF off the front block, the back collar's back face
@@ -22,7 +22,7 @@ import it.
   there, so it is a drive-train assembly step, never an MHA-104 note (policy
   rule 6, as MHA-061 keeps its feeler off its own print).
 - The MHA-114 foot pad is set SPRING_PAD_LEAF off the back block before its
-  seat is transferred (the base's spring note, SPRING_SET_STEP).
+  seat is transferred (the same RIG SET note).
 """
 
 from __future__ import annotations
@@ -91,15 +91,23 @@ def _leaves_text(leaves: tuple[float, ...]) -> str:
     return " + ".join(f"{leaf:.2f}" for leaf in leaves)
 
 
-# The step each print carries, uppercase to match the sheets.  The base's
-# transfer callouts carry the set-up their seats are spotted in (as MHA-062's
-# drilling note does), and they prefix the native tap line, so each ends in a
-# semicolon.
-RIG_SET_STEP = (
-    f"RIG SET: MHA-002 BACK END\n{_leaves_text(RIG_SET_LEAVES)} LEAVES OFF\n"
-    f"NORTH MHA-027 BACK FACE,\n{RIG_SET_BANK_PRECONDITION};"
+# The step each print carries, uppercase to match the sheets.  The base
+# carries the set-up its transfer seats are spotted in (as MHA-062's drilling
+# note does): RIG_SET_STEP is a note named by its first words, and both
+# transfer callouts name it (TRANSFER_AFTER_RIG_SET).  On the callouts it
+# overflowed the sheet (pc-p1 render: through the top border, over the TOP
+# VIEW caption, section arrow A and the MHA-132 callout), and the sheet takes
+# no numbered notes (Main), so the name is the reference.
+RIG_SET_NAME = "RIG SET"
+RIG_SET_STEP = "\n".join(
+    (
+        f"{RIG_SET_NAME}, BEFORE SPOTTING THE TRANSFER SEATS:",
+        f"MHA-002 BACK END {_leaves_text(RIG_SET_LEAVES)} LEAVES OFF",
+        f"NORTH MHA-027 BACK FACE, {RIG_SET_BANK_PRECONDITION};",
+        f"MHA-114 PAD {SPRING_PAD_LEAF:.2f} LEAF OFF MHA-061.",
+    )
 )
-SPRING_SET_STEP = f"PAD {SPRING_PAD_LEAF:.2f} LEAF OFF MHA-061;"
+TRANSFER_AFTER_RIG_SET = f"AFTER {RIG_SET_NAME};"
 COLLAR_SET_STEP = (
     f"SET MHA-104 COLLARS ON {FEELER_GAGE_NAME} LEAVES, LOCK SCREWS:\n"
     f"  FRONT COLLAR FRONT FACE {FRONT_COLLAR_LEAF:.2f} OFF FRONT MHA-061;\n"
@@ -121,8 +129,9 @@ __all__ = [
     "RIG_SET_BANK_PRECONDITION",
     "RIG_SET_LEAF_D",
     "RIG_SET_LEAVES",
+    "RIG_SET_NAME",
     "RIG_SET_STEP",
     "SINGLE_LEAF_SETTINGS",
     "SPRING_PAD_LEAF",
-    "SPRING_SET_STEP",
+    "TRANSFER_AFTER_RIG_SET",
 ]
