@@ -122,6 +122,9 @@ DIMENSION_CALLOUTS = {CUT_LENGTH_DIMENSION: CUT_TO_FIT_CALLOUT}
 DETAIL_SCALE = (10.0, 1.0)
 DETAIL_FENCE_MM = 3.6
 DETAIL_OFFSET_MM = 1.0
+# A sheet circle (the tip crop fence, the Front's tip mark) must land within
+# this of its ask, in sheet metres; a snapped circle misses by a millimetre.
+CIRCLE_TOL_M = 0.00005
 DETAIL_CENTER = (0.190, 0.175)
 DETAIL_RADIUS = DETAIL_FENCE_MM * DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 TIP_DETAIL = TrimSheet(
@@ -191,6 +194,13 @@ def _sketch_circle(
     (the cylinder-gear notch-fence recipe), so the circle lands where the
     sheet says whatever the view's scale.  The caller activates the view;
     the new circle is left SELECTED, which is what Crop2 consumes.
+
+    The circle goes straight to the sketch database (AddToDB): with
+    inference on, SolidWorks snaps the points onto nearby model edges within
+    a screen-pixel tolerance, so the result depends on the seat.  r857-6e65
+    drew the Front's tip mark at ~1.5 mm radius on the cut end where eae5
+    drew the 3.6 mm fence 1 mm above it, from the same code.  The made
+    circle is read back and must sit within CIRCLE_TOL_M of the sheet ask.
     """
     sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
@@ -203,9 +213,27 @@ def _sketch_circle(
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
     manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
-    circle = manager.CreateCircle(*points[0], *points[1])
+    prior = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        circle = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = prior
     if circle is None:
         raise RuntimeError(f"cannot sketch the {label} circle")
+    # Sketch units per sheet metre: the ask's radius in each space.
+    asked = math.dist(points[0][:2], points[1][:2])
+    tol = CIRCLE_TOL_M * asked / radius
+    arc = _early_bound(circle, "ISketchArc")
+    made = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    off = math.dist((float(made.X), float(made.Y)), points[0][:2])
+    made_radius = float(arc.GetRadius())
+    if off > tol or abs(made_radius - asked) > tol:
+        raise RuntimeError(
+            f"{label} circle landed off its ask: centre {off / asked * radius * 1000.0:.3f} mm "
+            f"away, radius {made_radius / asked * radius * 1000.0:.3f} mm for "
+            f"{radius * 1000.0:.3f} mm (tolerance {CIRCLE_TOL_M * 1000.0:.2f} mm)"
+        )
     return circle
 
 

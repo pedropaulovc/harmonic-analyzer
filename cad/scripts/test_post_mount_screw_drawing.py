@@ -723,6 +723,25 @@ class _Utility:
         return _Point(xyz)
 
 
+class _SketchPoint:
+    def __init__(self, xyz) -> None:
+        self.X, self.Y, self.Z = xyz
+
+
+class _Arc:
+    """ISketchArc stand-in: what the seat actually made."""
+
+    def __init__(self, center, radius: float) -> None:
+        self.center = center
+        self.radius = radius
+
+    def GetCenterPoint2(self):
+        return _SketchPoint(self.center)
+
+    def GetRadius(self):
+        return self.radius
+
+
 class _Sketch:
     # A sheet point maps to its view-sketch point x1000 (any affine map works).
     ModelToSketchTransform = staticmethod(lambda xyz: tuple(v * 1000.0 for v in xyz))
@@ -780,6 +799,13 @@ class _Seat:
         self.currentModel = self
         self.SketchManager = self
         self.swApp = self
+        self.AddToDB = False
+        # (dx, dy, radius factor), in the fake sketch space (sheet mm), applied
+        # when AddToDB is off (or ignored); the 6e65 leaf's Front mark read
+        # ~1.5 mm for 3.6, centred on the cut end.
+        self.snap: tuple[float, float, float] | None = None
+        self.honours_add_to_db = True
+        self.add_to_db_seen: list[bool] = []
 
     def GetMathUtility(self):
         return _Utility()
@@ -797,7 +823,14 @@ class _Seat:
 
     def CreateCircle(self, *xyz):
         self.log.append(("circle", self.active, tuple(round(v, 9) for v in xyz)))
-        return object()
+        self.add_to_db_seen.append(self.AddToDB)
+        cx, cy, cz, px, py, _pz = xyz
+        radius = math.dist((cx, cy), (px, py))
+        if self.snap is not None and not (self.AddToDB and self.honours_add_to_db):
+            # Sketch inference: the points land on nearby geometry instead.
+            dx, dy, factor = self.snap
+            cx, cy, radius = cx + dx, cy + dy, radius * factor
+        return _Arc((cx, cy, cz), radius)
 
     def CreateDetailViewAt4(self, *args):
         raise AssertionError("the tip must not be a detail view")
@@ -1213,3 +1246,30 @@ def test_activate_front_for_notes_activates_the_front_by_name(monkeypatch) -> No
     assert activated == ["Drawing View1"]
     with pytest.raises(RuntimeError, match="Front view"):
         drawing.activate_front_for_notes(_Adapter(), "Detail View A (10 : 1)")
+
+
+def test_front_tip_mark_is_sketched_with_inference_off(monkeypatch) -> None:
+    """r857-6e65 (docstring-only change) drew the Front's tip mark at ~1.5 mm
+    radius on the cut end; eae5 drew it at the 3.6 mm fence, 1 mm above.
+    Nothing read it back.  The circle goes straight to the sketch database
+    (AddToDB), the prior setting comes back, and the made circle is read."""
+    seat, _tip, front, _placed = _tip_seat(monkeypatch)
+    seat.snap = (0.0, -1.0, 0.43)
+    seat.AddToDB = False
+    drawing.mark_tip_on_front(seat, front)
+    assert seat.add_to_db_seen == [True]
+    assert seat.AddToDB is False
+
+
+def test_a_circle_the_seat_moved_raises(monkeypatch) -> None:
+    seat, _tip, front, _placed = _tip_seat(monkeypatch)
+    seat.snap = (0.0, -1.0, 0.43)
+    seat.honours_add_to_db = False
+    with pytest.raises(RuntimeError, match="Front tip mark circle"):
+        drawing.mark_tip_on_front(seat, front)
+    assert seat.AddToDB is False
+    seat, _tip, _front, _placed = _tip_seat(monkeypatch)
+    seat.snap = (0.5, 0.0, 1.0)
+    seat.honours_add_to_db = False
+    with pytest.raises(RuntimeError, match="tip view crop circle"):
+        drawing.cropped_tip_view(seat)
