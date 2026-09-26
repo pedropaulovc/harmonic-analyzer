@@ -139,8 +139,12 @@ GEAR_DATA = gear_data_note(
 # Rule 6: notes never carry a dimension.  MHA-102 owns its bond-zone band
 # natively (BondZoneDia).  The hand slide is this part's matched-fit
 # acceptance, so it rides the reamed bore's callout, not a general note
-# (Codex P2 on #832).
-ARBOR_BORE_CALLOUT = "REAM THRU\nSLIDES ON MHA-102 BY HAND"
+# (Codex P2 on #832).  It names the mating part as well as its number
+# (codex machinist review of f0faedc51), both from the part registry.
+_ARBOR = _config.parts("pinion-arbor")
+ARBOR_BORE_CALLOUT = (
+    f"REAM THRU\nSLIDES BY HAND ON {_ARBOR['number']}\n{_ARBOR['title'].upper()}"
+)
 # Rule 6: the bond to MHA-102 is an assembly step (pinion_arbor_spec
 # ASSEMBLY_STEP owns the drum joint), not a part note.
 DRAWING_NOTES = "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND."

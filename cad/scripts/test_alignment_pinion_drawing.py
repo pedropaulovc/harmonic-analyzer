@@ -191,7 +191,13 @@ def test_hand_slide_fit_rides_the_bore_callout_not_a_note() -> None:
 
     callout = draw.DIMENSION_CALLOUTS["ArborBoreDia"]
     assert callout == spec.ARBOR_BORE_CALLOUT
-    assert "SLIDES ON MHA-102 BY HAND" in callout
+    arbor = _config.parts("pinion-arbor")
+    assert callout.splitlines()[1:] == [
+        f"SLIDES BY HAND ON {arbor['number']}",
+        arbor["title"].upper(),
+    ]
+    assert arbor["number"] == "MHA-102"
+    assert "PINION ARBOR" in callout
     for line in spec.DRAWING_NOTES.splitlines():
         assert "SLIDE" not in line and "BY HAND" not in line, line
 
