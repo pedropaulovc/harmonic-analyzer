@@ -20,7 +20,7 @@ is the other same-family path: during a named outage of the cross-family
 reviewer, recorded with the user's direction in ``cad/reviews/outages.json``,
 the directed fallback (reviewer and model) reviews and is recorded as
 ``outage_fallback``, which counts only while that outage is open. ``--rebuttals``
-answers a FIX verdict's gating findings with cited user rulings, recording it
+answers a FIX verdict's gating findings with cited rulings, recording it
 as ``accepted_with_rulings``. Registry part and assembly
 PDFs are split into full-resolution page images and every page is supplied
 to one reviewer invocation. The schema-validated verdict and its
@@ -949,7 +949,8 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--rebuttals",
         type=Path,
-        help="cited user rulings answering every gating finding of this run's verdict",
+        help="cited rulings (cad/reviews/finding-rulings.md) answering every gating "
+        "finding of this run's verdict",
     )
     parser.add_argument("--ledger", type=Path, default=machinist_ledger.LEDGER_PATH)
     parser.add_argument(

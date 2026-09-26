@@ -340,8 +340,11 @@ Every accepted registry-drawing review is recorded in the tracked ledger
 `cad/reviews/machinist-ledger.json`, together with the exact PDF it saw
 (`cad/reviews/sheets/<sha256>.pdf`). Accepted means `SHIP`, or
 `accepted_with_rulings`: a verdict whose every gating finding is answered, via
-`--rebuttals <file>`, by a user ruling id plus the file and line that record it.
-A finding with no cited ruling keeps the drawing failing.
+`--rebuttals <file>`, by a ruling id plus the file and line that record it.
+A ruling is the user's, or Main's adjudication under the user's standing
+delegation; an adjudication counts only when it is recorded with its evidence,
+one row per ruling, in `cad/reviews/finding-rulings.md` (`ruled_by` is `user`
+or `Main`). A finding with no cited ruling keeps the drawing failing.
 `uv run cad/scripts/machinist_ledger.py check [<name>...]` exits nonzero for any
 drawing whose current PDF matches no accepted, counting review. Sheets match on
 identical masked ink, or on an identical text layer (every string, positions
@@ -389,8 +392,8 @@ all sheet images to one review, using the rubric for that package kind. A
 downscaled contact-sheet preview is not a substitute for reviewing every page.
 A package passes when
 the verdict is `SHIP` with no blocker, no over-specification and no clarity
-finding. A `FIX` whose gating findings are each answered by a user ruling or a
-named exception is accepted only through `--rebuttals`, which cites the ruling
+finding. A `FIX` whose gating findings are each answered by a recorded ruling
+(the user's, or Main's adjudication) or a named exception is accepted only through `--rebuttals`, which cites the ruling
 or row for every finding and records the verdict as `accepted_with_rulings`;
 without it the runner passes `SHIP` only. The durable cure is still stating the
 exception on the sheet so the reviewer files it under minor. Minor findings are recorded, not gating. Regression tests must defend

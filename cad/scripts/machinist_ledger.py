@@ -21,7 +21,7 @@ sheet a reviewer passed.  This module is that link.
   false`` and the reason, and is never accepted.
 * **Accepted** -- a ``SHIP``, or ``accepted_with_rulings``: a verdict whose
   every blocker, over-specification and clarity finding is rebutted by a cited
-  user ruling (ruling id plus the file and line recording it).  The rebuttal
+  recorded ruling (ruling id plus the file and line recording it).  The rebuttal
   and the cited line are kept in the entry.  An unrebutted finding keeps the
   drawing failing.
 * **Sheet content** -- each PDF page rendered at the review's 300 dpi,
@@ -2598,7 +2598,8 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     ingest_cmd.add_argument(
         "--rebuttals",
         type=Path,
-        help="cited user rulings answering every gating finding",
+        help="cited rulings (cad/reviews/finding-rulings.md) answering every "
+        "gating finding",
     )
     ingest_cmd.add_argument(
         "--pdf", type=Path, help="the reviewed PDF, if it moved since"

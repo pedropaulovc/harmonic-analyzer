@@ -2618,6 +2618,27 @@ def test_an_author_ruling_needs_its_family_commit_and_evidence(
         ml.load_author_rulings(_author_rulings(tmp_path, **change))
 
 
+def test_every_tracked_finding_ruling_is_citable() -> None:
+    path = ml.CAD_ROOT / "reviews" / "finding-rulings.md"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    rows = [
+        (number, [cell.strip() for cell in line.strip("|").split("|")])
+        for number, line in enumerate(lines, 1)
+        if line.startswith("| MR-")
+    ]
+    assert rows, "finding-rulings.md records no ruling"
+    ids = [cells[0] for _, cells in rows]
+    assert len(ids) == len(set(ids))
+    for number, cells in rows:
+        ruling, drawing, finding, decision, evidence, ruled_by, date = cells
+        assert drawing.split()[0] in ml.DRAWINGS_BY_NAME
+        assert finding and decision and evidence
+        assert ruled_by in ("user", "Main")  # Main adjudicates by delegation
+        datetime.fromisoformat(date)
+        citation = f"{path.relative_to(ml.REPO_ROOT).as_posix()}:{number}"
+        assert ruling in ml._cited_excerpt(ruling, citation)
+
+
 def test_the_tracked_author_rulings_load() -> None:
     rulings = ml.load_author_rulings()
     assert rulings.untrailered, "cad/reviews/author-rulings.json lacks its class rule"
