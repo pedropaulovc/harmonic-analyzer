@@ -137,7 +137,7 @@ RUNNING_BORE_BAND = (0.005, -0.025)
 # 0.28 - 0.517 * (0.002 + 0.078 + 0.043) = 0.216, and at +0.368 it is
 # 0.28 + 0.517 * (0.364 + 0.078 + 0.048) = 0.533: the drive-train sheet's
 # 0.20-0.55 acceptance.  Printed 39.33 +0.37/0 (aim 39.51) is the post's one
-# tight band, held by boring both journals in one setup (DRAWING_NOTES); a
+# tight band; how the shop holds it is theirs (policy rule 6); a
 # post bored outside it is rescued by opening the crank bore for an eccentric
 # bushing, not scrapped.
 CRANK_ABOVE_CONE = CRANK_BORE_HEIGHT - BORE_HEIGHT
@@ -237,7 +237,6 @@ DRAWING_NOTES = "\n".join(
     (
         "CRANK BORE CARRIES MHA-026, CONE BORE MHA-014; FOOT ON MHA-091.",
         "CONE BOSS END FACES ARE SYMMETRIC ABOUT THE POST AXIS.",
-        "BORE BOTH IN ONE SETUP; INSPECT BORE-TO-BORE BEFORE UNCLAMPING.",
         "DRILL MOUNTING HOLES FROM TOP FACE; CHECK CONE BORE AT BREAKOUT.",
     )
 )

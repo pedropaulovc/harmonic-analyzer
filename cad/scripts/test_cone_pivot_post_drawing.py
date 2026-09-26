@@ -450,8 +450,9 @@ def test_crank_bore_is_located_from_the_cone_bore_inside_the_mesh_window() -> No
     assert 'label="crank axis height reference"' in drawing_source
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert """set_global(adapter, "CrankAxisY", '"JournalAxisY" + "CrankAboveCone"')""" in source
-    assert "ONE SETUP" in spec.DRAWING_NOTES
-    assert "BORE-TO-BORE" in spec.DRAWING_NOTES
+    # Rule 6: the spacing band is a dimension, never a setup method.
+    assert "ONE SETUP" not in spec.DRAWING_NOTES
+    assert "BORE-TO-BORE" not in spec.DRAWING_NOTES
 
 
 def test_deep_mounting_holes_carry_a_drilling_note() -> None:
