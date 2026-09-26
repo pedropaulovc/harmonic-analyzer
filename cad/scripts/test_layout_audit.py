@@ -1851,6 +1851,23 @@ def test_split_runs_are_matched_as_a_complete_assignment():
     assert (matched["A"].xmin, matched["A"].xmax) == pytest.approx((0.137, 0.148))
 
 
+
+def test_whole_and_split_matches_are_assigned_together():
+    """Codex P2 on 7e08a6b17: the plain "A" took its nearest "A" (P) before
+    split runs were considered, and "A <MOD-DIAM> B" -- whose "B" only P
+    can precede -- went text-unmatched although the plain "A" had another
+    "A" (Q) in reach."""
+    plain = TextItem("A", 0.1020, 0.100, 0.0035)
+    split = TextItem("A <MOD-DIAM> B", 0.1000, 0.100, 0.0035)
+    spans = [
+        _ink_span("A", 0.1002, 0.1009, width=0.0015),  # P
+        _ink_span("B", 0.1030, 0.1009, width=0.0015),
+        _ink_span("A", 0.1060, 0.1009, width=0.0015),  # Q: past the "B"
+    ]
+    matched = match_ink([("plain", plain), ("split", split)], spans)
+    assert (matched["split"].xmin, matched["split"].xmax) == pytest.approx((0.1002, 0.1045))
+    assert matched["plain"].xmin == pytest.approx(0.1060)
+
 @pytest.mark.parametrize(
     ("angle", "pieces", "expected"),
     [
@@ -2028,6 +2045,28 @@ def test_a_required_read_answering_none_is_a_read_error(monkeypatch):
     }
     # An optional read answering None is not a refusal.
     assert reader.call(lambda: None, "") == "" and reader.take_errors() == {}
+
+
+def test_a_primitive_count_answering_none_is_a_read_error(monkeypatch):
+    """Codex P2 on 7e08a6b17: a count getter answering None read as zero
+    primitives, so that ink left the audit while com-read-errors stayed
+    clean. A count is required like the rows it guards; zero still is not a
+    refusal."""
+    import _drawing_layout_audit as collector
+
+    monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
+
+    class Data:
+        def __getattr__(self, name):
+            if name == "GetLineCount":
+                return lambda: None
+            if name.endswith("Count"):
+                return lambda: 0
+            raise AttributeError(name)
+
+    reader = collector._Reader(adapter=None)
+    assert collector._dump_display(reader, Data()) == {}
+    assert reader.take_errors() == {"GetLineCount": 1}
 
 
 def test_a_run_meeting_a_leader_end_to_end_is_not_its_copy():

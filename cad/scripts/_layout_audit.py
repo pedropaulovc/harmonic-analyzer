@@ -575,14 +575,16 @@ def match_ink_indices(
     constrained item needed. Symbol-only items
     (``<MOD-DIAM>``) print as paths, not text, and never match. A run with a
     symbol INSIDE it may print as one text object per side of the symbol's
-    path; it then matches those pieces left to right along its baseline,
-    every such run at once (``_pack_chains``) for the same reason.
+    path; it then matches those pieces in order along its baseline. Whole and
+    split matches are chosen together (``_assign_all``), for the same reason:
+    a plain "A" must not take the one "A" a split "A<TOKEN>B" needed when
+    another "A" would serve it.
     """
     used = set(taken)
     by_key: dict[str, list[int]] = {}
     for index, span in enumerate(spans):
         by_key.setdefault(span.key, []).append(index)
-    costs: dict[str, dict[tuple[Any, int], float]] = {}
+    options: dict[Any, list[tuple[tuple[int, ...], float]]] = {}
     for key, item in items:
         wanted = ink_key(item.text)
         if not wanted:
@@ -594,19 +596,9 @@ def match_ink_indices(
             ax, ay = _anchor(spans[index].box, item.reference)
             dx, dy = abs(ax - item.x), abs(ay - item.y)
             if dx < window and dy < window:
-                costs.setdefault(wanted, {})[(key, index)] = dx + dy
-    matched: dict[Any, tuple[int, ...]] = {}
-    for group in costs.values():
-        for key, index in _assign(group):
-            matched[key] = (index,)
-            used.add(index)
-    chains = {
-        key: _split_chains(item, spans, by_key, used)
-        for key, item in items
-        if key not in matched
-    }
-    matched.update(_pack_chains(chains))
-    return matched
+                options.setdefault(key, []).append(((index,), dx + dy))
+        options.setdefault(key, []).extend(_split_chains(item, spans, by_key, used))
+    return _assign_all({key: found for key, found in options.items() if found})
 
 
 def _split_chains(
@@ -667,14 +659,17 @@ def _from_baseline(item: TextItem, start: float, end: float, low: float, high: f
     )
 
 
-def _pack_chains(
-    chains: Mapping[Any, Sequence[tuple[tuple[int, ...], float]]],
+def _assign_all(
+    options: Mapping[Any, Sequence[tuple[tuple[int, ...], float]]],
 ) -> dict[Any, tuple[int, ...]]:
-    """The most split runs matched with no span shared, then the least total
-    cost: an exact search over each group of runs that compete for a span.
-    A split run is a set of spans, so this is packing, not the bipartite
-    ``_assign``; the groups are the few symbol runs printed near each other."""
-    keys = [key for key, options in chains.items() if options]
+    """The most items matched with no span shared, then the least total cost,
+    over every item's options: a whole match is one span, a split run's is a
+    set of spans (``_split_chains``). Items compete only within a group that
+    shares candidate spans. A group with no split option is bipartite
+    (``_assign``); one with split options is searched exactly over its split
+    choices, the rest of it assigned bipartitely for each (``_pack_group``).
+    """
+    keys = list(options)
     parent = {key: key for key in keys}
 
     def find(key: Any) -> Any:
@@ -685,7 +680,7 @@ def _pack_chains(
 
     owner: dict[int, Any] = {}
     for key in keys:
-        for indices, _cost in chains[key]:
+        for indices, _cost in options[key]:
             for index in indices:
                 if index not in owner:
                     owner[index] = key
@@ -694,29 +689,47 @@ def _pack_chains(
     groups: dict[Any, list[Any]] = {}
     for key in keys:
         groups.setdefault(find(key), []).append(key)
-    packed: dict[Any, tuple[int, ...]] = {}
+    matched: dict[Any, tuple[int, ...]] = {}
     for group in groups.values():
-        packed.update(_pack_group(group, chains))
-    return packed
+        matched.update(_pack_group(group, options))
+    return matched
 
 
 def _pack_group(
     group: Sequence[Any],
-    chains: Mapping[Any, Sequence[tuple[tuple[int, ...], float]]],
+    options: Mapping[Any, Sequence[tuple[tuple[int, ...], float]]],
 ) -> dict[Any, tuple[int, ...]]:
-    best: dict[str, Any] = {"count": 0, "cost": 0.0, "pick": {}}
+    """One group's best assignment: each split-capable item takes one of its
+    split options or none, exhaustively, and every other item then takes a
+    whole match from what is left, bipartitely."""
+    split_keys = [key for key in group if any(len(indices) > 1 for indices, _ in options[key])]
+
+    def whole(taken: frozenset[int], skip: Mapping[Any, Any]) -> tuple[list[tuple[Any, int]], float]:
+        costs = {
+            (key, indices[0]): cost
+            for key in group
+            if key not in skip
+            for indices, cost in options[key]
+            if len(indices) == 1 and indices[0] not in taken
+        }
+        pairs = _assign(costs) if costs else []
+        return pairs, sum(costs[pair] for pair in pairs)
+
+    best: dict[str, Any] = {"count": -1, "cost": 0.0, "pick": {}}
     pick: dict[Any, tuple[int, ...]] = {}
 
     def search(position: int, taken: frozenset[int], cost: float) -> None:
         if len(pick) + len(group) - position < best["count"]:
             return
-        if position == len(group):
-            if len(pick) > best["count"] or cost < best["cost"]:
-                best.update(count=len(pick), cost=cost, pick=dict(pick))
+        if position == len(split_keys):
+            pairs, whole_cost = whole(taken, pick)
+            count, total = len(pick) + len(pairs), cost + whole_cost
+            if count > best["count"] or (count == best["count"] and total < best["cost"]):
+                best.update(count=count, cost=total, pick={**pick, **{key: (index,) for key, index in pairs}})
             return
-        key = group[position]
-        for indices, step in sorted(chains[key], key=lambda option: option[1]):
-            if not taken.isdisjoint(indices):
+        key = split_keys[position]
+        for indices, step in sorted(options[key], key=lambda option: option[1]):
+            if len(indices) < 2 or not taken.isdisjoint(indices):
                 continue
             pick[key] = indices
             search(position + 1, taken | frozenset(indices), cost + step)
