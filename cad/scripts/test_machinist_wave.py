@@ -55,7 +55,7 @@ class FakeReviewer:
     """Stands in for review_package: a verdict per (drawing, reviewer), or quota."""
 
     def __init__(self, outcomes: dict[tuple[str, str], str]) -> None:
-        self.outcomes = outcomes  # "ship" | "fix" | "quota"
+        self.outcomes = outcomes  # "ship" | "fix" | "quota" | "sighted"
         self.calls: list[tuple[str, str, str, str]] = []
 
     def __call__(self, package, *, reviewer, model, effort, report_dir, **_):
@@ -70,7 +70,7 @@ class FakeReviewer:
             stdout.write_text(CODEX_REFUSAL + "\n", encoding="utf-8")
             extra = {"evidence": {"attempts": [{"stdout_file": str(stdout)}]}}
         else:
-            verdict = _verdict(passed=outcome == "ship")
+            verdict = _verdict(passed=outcome in ("ship", "sighted"))
         events = report_dir / f"{package.name}.events.jsonl"
         report_dir.mkdir(parents=True, exist_ok=True)
         events.write_text(
@@ -90,8 +90,8 @@ class FakeReviewer:
             source_sha256=[ml.sha256_file(pdf)],
             verdict=verdict,
             passed=outcome == "ship",
-            blind=True,
-            tool_events=0,
+            blind=outcome != "sighted",  # a SHIP from a run that used a tool
+            tool_events=int(outcome == "sighted"),
             reviewer=reviewer,
             model=model,
             effort=effort,
@@ -466,6 +466,97 @@ def test_resume_reviews_only_what_is_not_settled_for_these_bytes(
     assert fake.calls == []  # both FIXed against the bytes rendered now
 
 
+def test_an_ingested_drawing_blocked_again_gets_a_fresh_review(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    path = _outages(tmp_path)
+    outage = ml.load_outages(path)["codex-401-test"]
+    fake = FakeReviewer(
+        {("crank_arm", "claude"): "ship", ("crank_arm", "codex"): "ship"}
+    )
+    ledger_path = tmp_path / "ledger.json"
+
+    def routes(outages: dict) -> list[mw.Route]:
+        failing, _ = mw.blocked(checkout, ledger_path, ("crank_arm",), None, outages)
+        return mw.route(failing, checkout, ml.AuthorRulings())
+
+    wave = _wave(tmp_path, checkout, fake, outage=outage)
+    assert mw.run_wave(routes({outage["id"]: outage}), wave) == {
+        "crank_arm": mw.State.INGESTED
+    }
+    assert routes({outage["id"]: outage}) == []  # accepted while the outage is open
+
+    # Codex is back: the fallback no longer counts, so the same wave resumes it.
+    ended = ml.load_outages(
+        _outages(tmp_path, ended_at=datetime.now(timezone.utc).isoformat())
+    )
+    [crank] = routes(ended)
+    fake.calls.clear()
+    resumed = _wave(tmp_path, checkout, fake)
+    assert mw.run_wave([crank], resumed) == {"crank_arm": mw.State.INGESTED}
+    assert [call[:2] for call in fake.calls] == [("crank_arm", "codex")]
+    entry = ml.load_ledger(ledger_path)["drawings"]["crank_arm"]
+    assert ml.CROSS_FAMILY in entry
+
+
+def test_a_ship_from_a_review_that_was_not_blind_is_retried_not_a_fix(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    outcomes = {("crank_arm", "codex"): "sighted"}
+    fake = FakeReviewer(outcomes)
+    [crank] = [r for r in _routes(checkout, tmp_path) if r.name == "crank_arm"]
+
+    wave = _wave(tmp_path, checkout, fake)
+    assert mw.run_wave([crank], wave) == {"crank_arm": mw.State.ERROR}
+    assert "not blind" in wave.manifest.drawings["crank_arm"]["detail"]
+
+    outcomes[("crank_arm", "codex")] = "ship"
+    fake.calls.clear()
+    assert mw.run_wave([crank], _wave(tmp_path, checkout, fake)) == {
+        "crank_arm": mw.State.INGESTED
+    }
+    assert len(fake.calls) == 1  # reviewed again; the sighted report is not adopted
+
+
+def test_a_pass_the_ledger_could_not_take_is_recorded_on_resume_for_free(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    fake = FakeReviewer({("crank_arm", "codex"): "ship"})
+    [crank] = [r for r in _routes(checkout, tmp_path) if r.name == "crank_arm"]
+    real = ml.record_review
+
+    def locked(*args, **kwargs):
+        raise PermissionError("the ledger is locked by another process")
+
+    monkeypatch.setattr(ml, "record_review", locked)
+    wave = _wave(tmp_path, checkout, fake)
+    assert mw.run_wave([crank], wave) == {"crank_arm": mw.State.ERROR}
+    assert "could not be written" in wave.manifest.drawings["crank_arm"]["detail"]
+
+    monkeypatch.setattr(ml, "record_review", real)
+    fake.calls.clear()
+    resumed = _wave(tmp_path, checkout, fake)
+    assert mw.run_wave([crank], resumed) == {"crank_arm": mw.State.INGESTED}
+    assert fake.calls == []
+    assert resumed.manifest.drawings["crank_arm"]["attempts"][-1]["reused_report"]
+
+
+def test_the_usage_examples_parse() -> None:
+    usage = mw.__doc__.split("Usage")[1]
+    lines = [
+        line.split("machinist_wave.py", 1)[1].split()
+        for line in usage.splitlines()
+        if "machinist_wave.py" in line
+    ]
+    assert len(lines) == 4
+    for argv in lines:
+        argv = [arg.strip("[]") for arg in argv]  # an optional part, as typed
+        mw._parse_args(["x" if arg.startswith("<") else arg for arg in argv])
+
+
 def test_due_honours_the_refusal_backoff() -> None:
     now = datetime.now(timezone.utc)
     later = (now + timedelta(minutes=5)).isoformat()
@@ -473,7 +564,9 @@ def test_due_honours_the_refusal_backoff() -> None:
     assert not mw.due(refused, "s", now)
     assert mw.due(refused, "s", now + timedelta(minutes=6))
     assert mw.due(refused, "other bytes", now)
-    assert not mw.due({"state": "ship-ingested", "pdf_sha256": "s"}, "s", now)
+    assert not mw.due({"state": "fix", "pdf_sha256": "s"}, "s", now)
+    # Routed again only when the gate blocks it again: its acceptance lapsed.
+    assert mw.due({"state": "ship-ingested", "pdf_sha256": "s"}, "s", now)
     assert mw.due({"state": "running", "pdf_sha256": "s"}, "s", now)
 
 

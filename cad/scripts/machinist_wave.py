@@ -33,19 +33,26 @@ checkout rendered at the release head:
   ones every other entry meets.  A FIX is left for the author, with its counts.
 * **Checkpoint** -- ``cad/out/reports/machinist-wave/<wave>/manifest.json`` is
   rewritten atomically on every state change.  Re-running the same ``--wave``
-  resumes: a drawing already ingested or FIXed against the same PDF bytes is
-  not reviewed again; anything else (pending, interrupted, refused, errored,
-  or re-rendered since) is.
+  resumes: a drawing FIXed (or not counted) against the same PDF bytes is not
+  reviewed again; anything else (pending, interrupted, refused, errored, or
+  re-rendered since) is.  An ingested drawing is only ever routed again when
+  the gate blocks it again -- its outage closed, or its entry was withdrawn --
+  and then it gets a fresh review, not its old report.  A review that broke
+  the blind-review rules, or whose pass could not be written to the ledger,
+  is an error, retried on resume (the second from its report, at no cost).
 * **Telemetry** -- one ``machinist.review`` span per reviewer run, carrying the
   drawing, reviewer, model, tier, effort, slot, verdict, duration and cost
   (Claude's reported USD; Codex's token counts).
 
 Usage (SolidWorks-free; the checkout's ``cad/out/pdf`` must be rendered)::
 
-    uv run cad/scripts/machinist_wave.py plan [--checkout <dir>]
-    uv run cad/scripts/machinist_wave.py run --wave <id> --all-blocked [--jobs 6]
-    uv run cad/scripts/machinist_wave.py run --wave <id> crank_arm pen_rod
+    uv run cad/scripts/machinist_wave.py --checkout <dir> plan
+    uv run cad/scripts/machinist_wave.py --checkout <dir> run --wave <id> --all-blocked --jobs 6
+    uv run cad/scripts/machinist_wave.py --checkout <dir> run --wave <id> crank_arm pen_rod
     uv run cad/scripts/machinist_wave.py table --wave <id>
+
+(``--checkout``, ``--ledger``, ``--author-rulings``, ``--outage`` and
+``--outages`` go before the subcommand.)
 
 ``run`` reviews only the drawings it is given, or every blocked one with
 ``--all-blocked``: there is no default that spends reviewer quota.
@@ -98,7 +105,10 @@ class State(StrEnum):
 
 
 # Settled for these PDF bytes: resuming does not spend another review on them.
-SETTLED = {State.INGESTED, State.FIX, State.NOT_COUNTED}
+# INGESTED is not: the wave routes only drawings the gate blocks now, so an
+# ingested one routed again has lost its acceptance (its outage closed, its
+# entry was withdrawn) and needs a fresh review.
+SETTLED = {State.FIX, State.NOT_COUNTED}
 
 
 @dataclass(frozen=True)
@@ -119,6 +129,7 @@ def blocked(
     ledger_path: Path,
     names: Sequence[str] = (),
     rulings: ml.AuthorRulings | None = None,
+    outages: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[dict[str, tuple[str, ...]], list[str]]:
     """Drawings the release gate blocks at ``checkout``, and those not rendered.
 
@@ -133,7 +144,13 @@ def blocked(
     for name in names or list(DRAWINGS_BY_NAME):
         pdf = ml._current_pdf(name, checkout)
         status = ml.gate_status(
-            name, ledger, references=references, rulings=rulings, pdf=pdf, repo=checkout
+            name,
+            ledger,
+            references=references,
+            rulings=rulings,
+            pdf=pdf,
+            repo=checkout,
+            outages=outages,
         )
         if status.state == ml.State.UNRENDERED:
             unrendered.append(name)
@@ -305,6 +322,7 @@ class Wave:
     backoff: timedelta = QUOTA_BACKOFF
     rulings: ml.AuthorRulings = field(default_factory=ml.load_author_rulings)
     outage: dict[str, Any] | None = None  # open; the user directed its fallback
+    lapsed: set[str] = field(default_factory=set)  # ingested, then blocked again
     ledger_lock: threading.Lock = field(default_factory=threading.Lock)
 
     def run_one(self, route: Route) -> State:
@@ -347,6 +365,9 @@ class Wave:
 
     def _run_one(self, route: Route) -> State:
         pdf_sha = ml.sha256_file(route.pdf)
+        entry = self.manifest.drawings.get(route.name) or {}
+        if entry.get("state") == State.INGESTED and entry.get("pdf_sha256") == pdf_sha:
+            self.lapsed.add(route.name)  # its old report no longer counts
         self.manifest.update(route.name, state=State.RUNNING, pdf_sha256=pdf_sha)
         if self._down(route.reviewer):
             return self._run_fallback(route)
@@ -486,7 +507,7 @@ class Wave:
         instead of spending the review again.
         """
         report = self._report(reviewer, route.name)
-        if not report.is_file():
+        if route.name in self.lapsed or not report.is_file():
             return None
         try:
             review = mr.Review(**json.loads(report.read_text(encoding="utf-8")))
@@ -496,6 +517,7 @@ class Wave:
             review.source_sha256 == [ml.sha256_file(route.pdf)]
             and (review.model, review.effort) == (model, effort)
             and review.verdict is not None
+            and review.blind
         )
         return review if same else None
 
@@ -544,6 +566,15 @@ class Wave:
         if review.verdict is None:
             self.manifest.update(route.name, state=State.ERROR, detail=review.error)
             return State.ERROR
+        if not review.blind:  # a broken review, not a finding for the author
+            self.manifest.update(
+                route.name,
+                state=State.ERROR,
+                detail=f"{review.verdict.get('verdict')} from a review that was not "
+                "blind (a tool event, or sheets it did not prove it read); retried "
+                "on resume",
+            )
+            return State.ERROR
         if not review.passed:
             self.manifest.update(
                 route.name,
@@ -569,7 +600,14 @@ class Wave:
                     repo=self.checkout,
                     rulings=self.rulings,
                 )
-        except (OSError, ValueError) as exc:
+        except OSError as exc:  # the pass stands; resume records it from the report
+            self.manifest.update(
+                route.name,
+                state=State.ERROR,
+                detail=f"the pass could not be written to the ledger: {exc}",
+            )
+            return State.ERROR
+        except ValueError as exc:
             self.manifest.update(route.name, state=State.NOT_COUNTED, detail=str(exc))
             return State.NOT_COUNTED
         if not recorded.counts:
@@ -787,7 +825,9 @@ def _run(args: argparse.Namespace) -> int:
         )
     rulings = ml.load_author_rulings(args.author_rulings)
     outage = _open_outage(args.outage, args.outages) if args.outage else None
-    failing, unrendered = blocked(args.checkout, args.ledger, args.names, rulings)
+    failing, unrendered = blocked(
+        args.checkout, args.ledger, args.names, rulings, ml.load_outages(args.outages)
+    )
     routes = route(failing, args.checkout, rulings)
     if unrendered:
         print(f"unrendered, not reviewed: {', '.join(unrendered)}", file=sys.stderr)
