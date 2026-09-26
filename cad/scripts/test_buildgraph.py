@@ -967,8 +967,8 @@ _SOURCE_VALUE_IMPORTS = {
         "KNIFE_CONTACT_Y",
     },
     ("build_paper_drive_assembly", "build_drive_train_assembly"): {
-        "X_CRANK",
-        "Y_CRANK",
+        "X_CRANK_FIT",
+        "Y_CRANK_FIT",
     },
 }
 
@@ -1373,7 +1373,7 @@ def test_assemblies_depend_on_assembly_helpers():
     [
         ("_assembly_patterns", {"drive_train", "frame", "magnifier", "paper_drive"}),
         ("_assembly_couplings", {"drive_train", "paper_drive"}),
-        # paper_drive imports the drive-train builder for X_CRANK/Y_CRANK.
+        # paper_drive imports the drive-train builder for X_CRANK_FIT/Y_CRANK_FIT.
         ("_drive_train_explode", {"drive_train", "paper_drive"}),
     ],
 )

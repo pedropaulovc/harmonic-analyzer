@@ -144,20 +144,23 @@ def test_bore_band_is_derived_from_its_fit_class_not_written_by_hand() -> None:
     assert "_config.fit(" not in Path(spec.__file__).read_text(encoding="utf-8")
 
 
-def test_outside_diameter_stays_at_the_general_grade() -> None:
-    # The tip circle is NOT an accuracy feature (tolerance-policy.md scores
-    # gear runout below 0.1 %/mm and the one-sided-load bullets forbid
-    # tightening a clearance for accuracy). The crossed mesh is built with
-    # fits.crank_mesh's 0.25 mm of centre-distance slack ON TOP of the tooth
-    # system's own tip clearance, so the general .XX grade fits inside the
-    # radial room and the tips still cannot bottom.
-    assert not hasattr(spec, "OUTSIDE_DIA_BAND")
+def test_outside_diameter_prints_the_tip_band_the_mesh_stack_takes() -> None:
+    # #906 R1 (user, 2026-09-26): at the title block's .XX +/-0.51 a tip could
+    # reach the 16T's root at the worst accepted fit-up, so the tip diameter
+    # prints +/-0.10 of its own on the reference sketch the sheet imports, and
+    # the stack takes that band.
+    import crank_mesh_stack
+
+    assert spec.OUTSIDE_DIA_TOLERANCE_MM == 0.10
     assert spec.DRAWING_PRECISION["OutsideDiaReference"]["OutsideDia"] == 2
-    slack = _config.fit("crank_mesh")["c2c_slack_mm"]
     assert spec.TIP_CLEARANCE_MM == pytest.approx(0.152, abs=0.001)
-    radial_room = slack + spec.TIP_CLEARANCE_MM
-    general_radial = _config.title_block("linear_2pl")["value_in"] * 25.4 / 2.0
-    assert general_radial < radial_room
+    assert crank_mesh_stack.TIP_ROOT_BAND_RADIAL >= spec.OUTSIDE_DIA_TOLERANCE_MM / 2.0
+    assert crank_mesh_stack.TIP_CLEARANCE_MM <= spec.TIP_CLEARANCE_MM
+    assert crank_mesh_stack.TIP_ROOT_AIR_WORST > 0.0
+    assert (
+        'set_dimension_symmetric_tolerance(\n        adapter, "OutsideDiaReference", '
+        '"OutsideDia", OUTSIDE_DIA_TOLERANCE_MM\n    )'
+    ) in _build_source()
     # The face width is the one free length: one place, so the title block's
     # .X grade is the band it claims, and the mating pinion's face is wider
     # than this one by more than that band at every allowed axial position.

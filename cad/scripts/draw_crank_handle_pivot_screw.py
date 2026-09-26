@@ -33,7 +33,6 @@ from _drawing_common import (
     add_surface_finish,
     add_view_centerline,
     assert_imported_precision,
-    curate_view_dimensions,
     dimension_name,
     finalize_drawing,
     new_project_drawing,
@@ -44,6 +43,7 @@ from _drawing_common import (
     set_reference_dimension,
     stamp_drawing_summary,
 )
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from crank_handle_pivot_screw_spec import (

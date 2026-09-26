@@ -17,7 +17,6 @@ from _drawing_common import (
     add_property_linked_note,
     add_view_centerline,
     assert_imported_precision,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -27,6 +26,7 @@ from _drawing_common import (
     set_reference_dimensions,
     stamp_drawing_summary,
 )
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm, drill_process
 from crank_hub_spec import (
@@ -39,7 +39,6 @@ from crank_hub_spec import (
     HUB_LENGTH,
     HUB_SEAT_DIA,
     HUB_SEAT_LENGTH,
-    ISOMETRIC_VIEW_NOTE,
     REFERENCE_DIMENSIONS,
     SERVICE_PIN_HOLE_SPEC,
     SERVICE_PIN_STATION,

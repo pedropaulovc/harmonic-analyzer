@@ -115,6 +115,7 @@ from cone_swing_platform_spec import (
     TIP_SLOT_W,
     TIP_SLOT_W_BAND,
 )
+from crank_mesh_stack import FITUP_AXIS_DX, FITUP_AXIS_DY
 
 PART_NAME = "cone-swing-platform"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel plate (p.18 dark wedge)
@@ -612,8 +613,27 @@ def _corner_fillet_area(label: str, r: float) -> float:
 # sits EAST of the pivot. This part-local separation is invariant under the
 # v2 installation translation and is asserted against the live cone geometry
 # in the assembly.
-CRANK_AXIS_OFF = 41.6536661190548
-CRANK_AXIS_Y = 79.05  # Y_CRANK 129.85 - Y_BASE_TOP 50.8 (above plate BOTTOM)
+#
+# The axis is the crank's NOMINAL FIT-UP line, not the frame's: the eccentric
+# bushing throws the crank off the post bore to set the mesh backlash, and the
+# crank train mates here (user ruling R1, 2026-09-26, #906).  The frame line
+# is pivot.x - X_CRANK east and Y_CRANK 129.85 - Y_BASE_TOP 50.8 up; the fit-up
+# moves it by crank_mesh_stack's FITUP_AXIS_DX/DY (machine +x is west).
+_CRANK_AXIS_OFF_FRAME = 41.6536661190548
+_CRANK_AXIS_Y_FRAME = 79.05
+CRANK_AXIS_OFF = _CRANK_AXIS_OFF_FRAME - FITUP_AXIS_DX
+CRANK_AXIS_Y = _CRANK_AXIS_Y_FRAME + FITUP_AXIS_DY
+# The crank axis is construction for mates only.  No printed dimension is
+# taken off it: the sheet keeps exactly DRAWING_DIMENSIONS, so moving it can
+# change nothing the drawing prints.
+_CRANK_AXIS_FEATURES = frozenset(
+    {"crank anchor (vertical)", "CrankAxisVert", "CrankAxisHigh", "CrankAxisSeat", "crank axis"}
+)
+if not _CRANK_AXIS_FEATURES.isdisjoint(DRAWING_DIMENSIONS):
+    raise AssertionError(
+        "a printed platform dimension is taken off the crank-axis construction: "
+        f"{sorted(_CRANK_AXIS_FEATURES & set(DRAWING_DIMENSIONS))}"
+    )
 # Construction: a vertical REFERENCE AXIS through the crank axis's plan
 # point (the foot of the pivot's perpendicular onto the axis line), built
 # as the intersection of two principal-plane offsets -- name-selected and
@@ -625,7 +645,7 @@ CRANK_AXIS_Y = 79.05  # Y_CRANK 129.85 - Y_BASE_TOP 50.8 (above plate BOTTOM)
 # CrankAxisSeat = "Front Plane" rotated the same way about the same axis,
 # so it passes through CRANK_SEAT_ANCHOR -- the anchor the assembly's
 # axial-distance mates reference (via _plate_local_to_machine; its machine
-# point lands ON the crank axis, x = X_CRANK, asserted SolidWorks-free at
+# point lands ON the crank axis, x = X_CRANK_FIT, asserted SolidWorks-free at
 # assembly import). The angle's FLIP side is
 # the one remaining EMPIRICAL sign -- flip on assembly crankshaft-mate
 # verify failure.

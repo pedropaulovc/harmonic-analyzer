@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import math
 
+import _config
 from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
@@ -38,8 +39,18 @@ HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
 # corrected source dimension in inches: 2.8360 in replaces the 2.85086614 in
 # initial derivation.
 CRANK_BOSS_DIA = 21.93
-CRANK_BORE_DIA = 11.438
-CRANK_BORE_HEIGHT = 72.7
+# #906 R1: the crank bore is bored out to an H7 seat for the MHA-149 eccentric
+# bushing; the crankshaft runs in the bushing, whose throw takes up the 16T:64T
+# centre distance at fit-up.  The whole crank boss sits CRANK_BORE_DROP below
+# the frame's crank axis (CRANK_AXIS_HEIGHT, where build_drive_train_assembly
+# lays the crank train out), because the mesh stack's fit-up window is not
+# centred on the frame: crank_mesh_stack sizes both and asserts the throw
+# reaches each end.  The boss moves with the bore, so the casting keeps its
+# shape and every harvested volume below holds.
+CRANK_BORE_DIA = 14.6
+CRANK_AXIS_HEIGHT = 72.7
+CRANK_BORE_DROP = 0.21
+CRANK_BORE_HEIGHT = CRANK_AXIS_HEIGHT - CRANK_BORE_DROP
 CRANK_BORE_OFFSET = 0.0
 # The boss's near face is a MACHINED SPOT FACE, not the rim of the cast
 # collar: it is stationed from the post axis and the print dimensions it that
@@ -69,7 +80,7 @@ CONE_BOSS_LENGTH = BLOCK_DIA
 # ruling U37c) cut to 86.0 at assembly.  Its ASME B18.6.3 head (dia 9.1-9.5 x
 # 5.5 overall) sits about 0.5 below the top face in the dia 11.509 x 6.02
 # counterbore.  Deepening the counterbore for a shorter screw is not an
-# option: at 16.15 it would pass the crank bore with a 1.20 worst-case web.
+# option: at 16.15 it would break into the crank bore at print-worst.
 ATTACHMENT_SPACING = 26.88704
 ATTACHMENT_X = ATTACHMENT_SPACING / 2.0
 ATTACHMENT_THRU_DIA = 7.14248
@@ -84,34 +95,41 @@ ATTACHMENT_CBORE_DEPTH = 6.0198
 #   collar    pi*(22^2 - 21.0055^2)*26.6            = +  3 574.0470
 #   crank boss outside the collar cylinder          = + 11 215.7157
 #   spot face (collar proud of z=-21.3753 in disc)  = -     93.1451
-#   crank bore pi*5.719^2*72.0344                   = -  7 401.6752
+#   crank bore pi*7.3^2*72.0344                     = - 12 059.6731
 #   cone pads outside the body cylinder             = +    209.0550
 #   cone bore pi*6.1404^2*42.011                    = -  4 976.2960
 #   2x (thru pi*3.57124^2*79.9802 + cbore pi*5.75437^2*6.0198) = - 7 661.5921
-#                                                   = 114 076.5723
+#                                                   = 109 418.5741
 #
-# The 2026-09-21 farm build of the previous recipe read 121 575.3: it had
+# (#906 R1 bored the crank bore out from Ø11.438 to Ø14.6: 114 076.5723
+# before.  Lowering the crank boss by CRANK_BORE_DROP changes no term: the
+# boss stays inside the collar's 59.4..86 height band.)  The 2026-09-21 farm build of the previous recipe read 121 575.3: it had
 # never bored the crank boss (7 401.7) and had only nicked the 45 mm^3 collar
 # sliver behind the spot-face plane inside the bore disc -- a cut whose
 # default direction (opposite the sketch normal) found the Ø44 collar to bite
 # instead of auto-flipping into the boss.  Mass at gray iron 7.20 g/cc.
-HARVESTED_VOLUME_MM3 = 114_076.5723
-HARVESTED_MASS_KG = 0.821351
+HARVESTED_VOLUME_MM3 = 109_418.5741
+HARVESTED_MASS_KG = 0.787814
 
-# Both bores are running journals, so both carry the SAME size band -- the one
-# the `shaft_in_bushing` fit class needs and no tighter (tolerance-policy.md,
-# "How a critical-feature tolerance is decided", step 6b).  Each mating shaft
-# is turned to (bore nominal - 0.05) with the fleet's `SHAFT_H` (0/-0.020)
-# band, so a bore held +0.005/-0.025 delivers exactly the class's 0.025..0.075
-# mm diametral clearance:
+# The cone journal bore is a running journal, so it carries the band the
+# `shaft_in_bushing` fit class needs and no tighter (tolerance-policy.md,
+# "How a critical-feature tolerance is decided", step 6b).  The cone shaft is
+# turned to (bore nominal - 0.05) with the fleet's `SHAFT_H` (0/-0.020) band,
+# so a bore held +0.005/-0.025 delivers exactly the class's 0.025..0.075 mm
+# diametral clearance:
 #
-#   crank:   shaft 11.368..11.388  bore 11.413..11.443  (crankshaft MHA-026)
 #   journal: shaft 12.2108..12.2308 bore 12.2558..12.2858 (cone shaft MHA-014)
 #
-# Apart from the spacing between them (below), nothing else on this casting is
-# an accuracy feature, so nothing else carries a band: the title block's
-# general grades govern.
+# The crank bore no longer runs anything: it seats the MHA-149 bushing, bored
+# H7 (ISO 286, 10-18 mm: +0.018/0), the fit the user ruled for the bushing.  The
+# bushing's OD band is derived from it (build_crank_eccentric_bushing), and
+# every web around it below is taken at its H7 maximum.
+#
+# Apart from these two and the spacing between them (below), nothing else on
+# this casting is an accuracy feature, so nothing else carries a band: the
+# title block's general grades govern.
 RUNNING_BORE_BAND = (0.005, -0.025)
+CRANK_BORE_BAND = (0.018, 0.0)  # (upper, lower): H7
 
 # Crank-above-cone bore spacing (user ruling U31, 2026-09-23, option 3a).  The
 # crank axis is located FROM THE CONE AXIS, not from the foot: the 16T:64T
@@ -137,11 +155,54 @@ RUNNING_BORE_BAND = (0.005, -0.025)
 # 0.28 - 0.517 * (0.002 + 0.078 + 0.043) = 0.216, and at +0.368 it is
 # 0.28 + 0.517 * (0.364 + 0.078 + 0.048) = 0.533: the drive-train sheet's
 # 0.20-0.55 acceptance.  Printed 39.33 +0.37/0 (aim 39.51) is the post's one
-# tight band; how the shop holds it is theirs (policy rule 6); a
-# post bored outside it is rescued by opening the crank bore for an eccentric
-# bushing, not scrapped.
+# tight band; how the shop holds it is theirs (policy rule 6).
+#
+# #906 R1: the MHA-149 eccentric bushing now takes up the mesh at fit-up, and
+# crank_mesh_stack carries this printed band as one of its terms, with the
+# bore CRANK_BORE_DROP below the frame; the band itself is U31's, unchanged.
 CRANK_ABOVE_CONE = CRANK_BORE_HEIGHT - BORE_HEIGHT
 CRANK_ABOVE_CONE_BAND = (0.37, 0.0)
+
+# #906 R1: webs around the Ø14.6 H7 crank bore, at print-worst (policy rule
+# 12: 2.0 target, 1.5 floor; R1 holds the target).  The bore is centred on the post's symmetry
+# plane, which is what keeps the two mounting holes beside it workable; its
+# worst case is the H7 maximum with the crank axis at its highest (the cone
+# axis .XX high plus the whole +0.37 spacing band).  Holes are drilled
+# (+0.10/0), their stations and the counterbore depth print .XX, the top face
+# and the boss diameter .X.
+WEB_FLOOR_MM = 1.5
+
+
+def _row(places: int) -> float:
+    return float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
+
+
+_DRILL_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
+_CRANK_BORE_R_MAX = (CRANK_BORE_DIA + CRANK_BORE_BAND[0]) / 2.0
+_CRANK_AXIS_Y_MAX = CRANK_BORE_HEIGHT + _row(2) + CRANK_ABOVE_CONE_BAND[0]
+_HOLE_X_MIN = ATTACHMENT_X - _row(2)
+_CBORE_CORNER = (
+    _HOLE_X_MIN - (ATTACHMENT_CBORE_DIA + _DRILL_OVERSIZE) / 2.0,
+    BLOCK_HEIGHT - ATTACHMENT_CBORE_DEPTH - _row(2) - _CRANK_AXIS_Y_MAX,
+)
+CRANK_BORE_WEBS_WORST = {
+    "mounting thru hole": _HOLE_X_MIN
+    - (ATTACHMENT_THRU_DIA + _DRILL_OVERSIZE) / 2.0
+    - _CRANK_BORE_R_MAX,
+    # the counterbore's bottom inner corner sits above and beside the bore
+    "mounting counterbore": math.hypot(*_CBORE_CORNER) - _CRANK_BORE_R_MAX,
+    "top face": BLOCK_HEIGHT - _row(1) - _CRANK_AXIS_Y_MAX - _CRANK_BORE_R_MAX,
+    "crank boss OD": (CRANK_BOSS_DIA - _row(1)) / 2.0 - _CRANK_BORE_R_MAX,
+}
+if _CBORE_CORNER[1] <= 0.0:
+    raise AssertionError("the mounting counterbore reaches below the crank axis")
+for _name, _web in CRANK_BORE_WEBS_WORST.items():
+    if _web < WEB_FLOOR_MM:
+        raise AssertionError(
+            f"Ø{CRANK_BORE_DIA} H7 crank bore leaves {_web:.3f} to the {_name} at "
+            f"print-worst, under the {WEB_FLOOR_MM} floor; the H7 upper limit is "
+            "load-bearing here, so the bore cannot take a looser class"
+        )
 
 # Journal-plan reference sketch (Top plane, all construction).  The 12.5182 deg
 # plan angle between the crank axis and the cone-journal axis is REAL model
@@ -158,9 +219,11 @@ SURFACE_FINISHES = (
     # faces that MUST be cut say so on the face (the title block's surface row
     # is the process statement "CAST/MACHINED", not a grade).
     SurfaceFinishControl("foot_seat", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
+    # #906 A2: the crank bore seats the MHA-149 bushing and runs nothing, so
+    # it is a locating seat (rule 5), not a journal.
     SurfaceFinishControl(
         "crank_bore",
-        MACHINED_UM,
+        SEAT_UM,
         CylinderFace(CRANK_BORE_DIA, contains_y_mm=CRANK_BORE_HEIGHT),
     ),
     SurfaceFinishControl(
@@ -197,9 +260,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # repeats only as a reference, the two mounting-hole stations and the machined
 # spot-face station take two.  The plan angle takes
 # one: the title block holds angles to +/-1 deg, so a second place would only
-# suggest a precision nobody sets up for.  Only the two running bores take
-# three, and only because their size limits are what deliver the
-# `shaft_in_bushing` clearance band.
+# suggest a precision nobody sets up for.  Only the two bores take three: the
+# cone journal because its size limits deliver the `shaft_in_bushing`
+# clearance band, the crank bore because it prints its H7 limits.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "MainBodyProfile": {"MainBodyDia": 1},
     "MainBody": {"MainBodyHt": 1},
@@ -237,7 +300,7 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # dimension or native symbol (drawing-simplicity-policy rules 1 and 6).
 DRAWING_NOTES = "\n".join(
     (
-        "CRANK BORE CARRIES MHA-026, CONE BORE MHA-014; FOOT ON MHA-091.",
+        "CRANK BORE CARRIES MHA-149, CONE BORE MHA-014; FOOT ON MHA-091.",
         "CONE BOSS END FACES ARE SYMMETRIC ABOUT THE POST AXIS.",
         "DRILL MOUNTING HOLES FROM TOP FACE; CHECK CONE BORE AT BREAKOUT.",
     )

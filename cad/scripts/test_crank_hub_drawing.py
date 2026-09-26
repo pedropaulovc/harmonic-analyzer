@@ -277,3 +277,17 @@ def test_u29_walls_hold_at_the_seat_bores_printed_limits() -> None:
     assert web >= geometry.WALL_TARGET_MM
     assert geometry.ARM_CHEEK_WORST_MM == pytest.approx(cheek)
     assert geometry.SEAM_WEB_WORST_MM == pytest.approx(web)
+
+
+def test_service_pin_station_reference_is_saved_hidden_and_imported_per_view() -> None:
+    # #880: a reference sketch owns printed dimensions but no geometry, so the
+    # part saves it hidden (no assembly instance renders it) and the drawing
+    # shows it per view through _drawing_hidden_sketches to import them.
+    build = Path(drawing.__file__).with_name("build_crank_hub.py").read_text(encoding="utf-8")
+    blank = 'blank_sketch(adapter, "ServicePinStationReference")'
+    assert blank in build
+    assert build.index(blank) < build.rindex("save_part_and_images(adapter, PART_NAME)")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
+    assert "    curate_view_dimensions,\n" not in source.replace("\r\n", "\n")
+    assert "ServicePinStationReference" in crank_hub_spec.DRAWING_DIMENSIONS

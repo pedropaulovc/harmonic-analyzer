@@ -99,4 +99,4 @@ def test_crank_keeper_ring_threads_the_pin_hole_clear_of_the_arm() -> None:
         + ring.WIRE_DIA / 2.0
         + drive.CRANK_RING_ARM_CLEARANCE
     )
-    assert drive.CRANK_RING_Y == pytest.approx(drive.Y_CRANK)
+    assert drive.CRANK_RING_Y == pytest.approx(drive.Y_CRANK_FIT)

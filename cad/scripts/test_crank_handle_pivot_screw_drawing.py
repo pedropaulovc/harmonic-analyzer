@@ -448,3 +448,17 @@ def test_worst_engagement_clears_the_novice_margin_by_geometry() -> None:
     assert spec.RELIEF_WIDTH_MAX == pytest.approx(
         spec.RELIEF_WIDTH + geometry.GENERAL_2PL_TOL_MM
     )
+
+
+def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
+    # #880: a reference sketch owns printed dimensions but no geometry, so the
+    # part saves it hidden (no assembly instance renders it) and the drawing
+    # shows it per view through _drawing_hidden_sketches to import them.
+    build = Path(drawing.__file__).with_name("build_crank_handle_pivot_screw.py").read_text(encoding="utf-8")
+    blank = 'blank_sketch(adapter, "StationReference")'
+    assert blank in build
+    assert build.index(blank) < build.rindex("save_part_and_images(adapter, PART_NAME)")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
+    assert "    curate_view_dimensions,\n" not in source.replace("\r\n", "\n")
+    assert "StationReference" in spec.DRAWING_DIMENSIONS

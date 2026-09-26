@@ -224,15 +224,15 @@ sections:
         - scaled + stated topology
         - med
       - - Crankshaft diameter
-        - 9.525 mm (3/8") on the T12 and crank-hub seats; the 16T pinion sits on a Ø9.0 seat step (local 112.7)
+        - 9.525 mm (3/8") on the T12 and crank-hub seats and through the MHA-149 bushing; the 16T pinion sits on a Ø9.0 seat step (local 112.7)
         - '0.375'
-        - legacy `parameters.kcl` ShaftDiameter; retained outside the v2-post bearing journal and through MHA-137 so fitted parts keep their existing bores and world stations. #906 ruling (b), Main 2026-09-26: the single-cutter 16T's smaller root needs the Ø9.0 seat to keep its boss wall over 1.5 at print-worst
+        - legacy `parameters.kcl` ShaftDiameter; retained through the MHA-149 bushing (#906 R1) and MHA-137 so fitted parts keep their existing bores and world stations. #906 ruling (b), Main 2026-09-26: the single-cutter 16T's smaller root needs the Ø9.0 seat to keep its boss wall over 1.5 at print-worst
         - legacy
         - med
-      - - Crankshaft bearing journal
-        - 'Ø11.388 × 68.3449 mm; local stations 40.755105572..109.1 (world z −142.244894428..−73.9)'
+      - - Crankshaft bearing
+        - 'plain Ø9.525 core in the MHA-149 bushing; local stations 32.789505572..112.789505572 (world z −150.210494428..−70.210494428)'
         - —
-        - 'derived from the manually rederived `cone-pivot-post-v2` Ø11.438 crank bore with 0.05 mm diametral running clearance; the +8 local shift exactly offsets the shaft origin move from world z −175 to −183. #906: bears on two 15-mm lands at the MHA-149 bushing ends, Ø10.4 relief between (local 55.8..94.1).'
+        - '#906 R1: the integral Ø11.388 journal and its relief are gone; the core runs in the eccentric bushing''s Ø9.575 bore at the shaft_in_bushing clearance. The bushing''s north end is flush with the boss spot face; its south end stands 5.0 proud of the boss.'
         - derived
         - high
       - - Arm thickness
@@ -586,11 +586,11 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - 'along Z at (x, y) = (−129.336, 129.850), the Ry180-installed v2 casting''s unchanged straight crank bore; 16T:64T c2c 39.735 = radii + 0.25 slack at DP25.7311. The single-cutter pair (#906) keeps that frame c2c with 0.423 slack. The 136.8-mm cylinder spans z −183..−46.2 with a 2-mm integral dome outboard; +8-shifted local seats preserve T12 at z −155 and the pinion centre at z −64.560. The 2.8360-in boss remains z −142.245..−70.210, leaving 10.255 mm to T12 and 0.250 mm to the pinion. The Ø11.388 journal stops at z −73.9 (local 109.1), 3.7 inside the boss, bearing on two 15-mm lands with a Ø10.4 relief between; the Ø9.525 web to the Ø9.0 pinion seat step (local 112.7) is 3.6, 2.0 with both stations at their .X rows (U27, #906).'
+        - 'along Z at the R1 nominal fit-up (x, y) = (−128.733, 129.805): the MHA-149 throw (0.625 at 15.27°) about the v2 casting''s straight crank bore, which sits 0.21 below the frame axis (−129.336, 129.850); fit-up 16T:64T c2c 39.611. The frame c2c 39.735 = radii + 0.25 slack at DP25.7311. The single-cutter pair (#906) keeps that frame c2c with 0.423 slack. The 136.8-mm cylinder spans z −183..−46.2 with a 2-mm integral dome outboard; +8-shifted local seats preserve T12 at z −155 and the pinion centre at z −64.560. The 2.8360-in boss remains z −142.245..−70.210, leaving 10.255 mm to T12 and 0.250 mm to the pinion. The Ø9.525 core runs in the MHA-149 eccentric bushing, whose north end is flush with the spot face at z −70.210 (local 112.79); the Ø9.0 pinion seat step is at local 112.7 (#906 R1).'
         - 'cone-pivot-post-v2 is the physical authority for x/y. The ch30 GT crank_sprocket result (−122.84, 144.78) remains independent image evidence, while the primary crank construction photo governs the separate through hub and flush outboard face. The crossed-helical accommodation and 0.25 mm mesh slack remain.'
         - high (GT + mesh)
       - - Chain run
-        - crank T12 sprocket (−129.336, 129.850, z −155 chain plane) up to the transgear knob-shaft T24; 66 ANSI #25 links, solved sag 16.471 mm
+        - crank T12 sprocket (−128.733, 129.805, z −155 chain plane; the R1 fit-up axis) up to the transgear knob-shaft T24; 66 ANSI #25 links, solved sag 17.495 mm
         - v2 cast-in crank-axis cascade; chain remains in the z −155 plane (T12 band −157.5..−152.5)
         - med
       - - Cone pivot
@@ -614,12 +614,12 @@ sections:
         - ch30 GT (cyl_front); shape from still t00393 / v4_pinion_008 (base:top taper ~1.2, scaled off the 120T OD 62.2)
         - med (GT height; shape photo-scaled)
       - - '`cone-swing-platform` (p1 swing bracket; the p.18 wedge plate)'
-        - 'black steel wedge plate 6.35 thick, ASYMMETRIC trapezoid — half-width 16 east / 8 west (north, pivot) → east 24 / west 37 (south, big end) over 223.354 along the cone axis; south edge leaves 3.175 mm (1/8 in) beyond the Ø42.011 cone-pivot-post south rim; two native 1/4-20 UNC-2B through taps derive from the post''s 26.88704 attachment pitch; the north-west trim leaves 0.370 mm exact plan clearance to the recentered north arbor pedestal; plan corners are NE R10 / NW R8 / SW R5 / SE R12; native 1/4-in close-clearance pivot hole Ø6.756 clears the pivot screw''s stock Ø6.35 shoulder without imposing an unsupported precision bearing fit; Ø10.50 × 0.25-deep top relief leaves 6.10 local pivot-bearing thickness; 8-wide OPEN lock notch follows the R208.436 swing chord from its closed centre 33.00 west / 205.808 south of the pivot; carries the part-local crank-axis reference 41.654 east of the pivot and 79.05 above the plate bottom (installed X_CRANK −129.336, Y_CRANK 129.85); plate top remains y 57.15'
+        - 'black steel wedge plate 6.35 thick, ASYMMETRIC trapezoid — half-width 16 east / 8 west (north, pivot) → east 24 / west 37 (south, big end) over 223.354 along the cone axis; south edge leaves 3.175 mm (1/8 in) beyond the Ø42.011 cone-pivot-post south rim; two native 1/4-20 UNC-2B through taps derive from the post''s 26.88704 attachment pitch; the north-west trim leaves 0.370 mm exact plan clearance to the recentered north arbor pedestal; plan corners are NE R10 / NW R8 / SW R5 / SE R12; native 1/4-in close-clearance pivot hole Ø6.756 clears the pivot screw''s stock Ø6.35 shoulder without imposing an unsupported precision bearing fit; Ø10.50 × 0.25-deep top relief leaves 6.10 local pivot-bearing thickness; 8-wide OPEN lock notch follows the R208.436 swing chord from its closed centre 33.00 west / 205.808 south of the pivot; carries the part-local crank-axis reference 41.051 east of the pivot and 79.005 above the plate bottom (the R1 nominal fit-up axis X_CRANK_FIT −128.733, Y_CRANK_FIT 129.805; the frame axis is 41.654 / 79.05); plate top remains y 57.15'
         - 'FLOATED, pivot at cone station 152.272 = (−87.683, +96.019) with the plate rotated to the cone incline, swinging ON the cone-pivot-screw; the merged crank column, cone shaft, tip block and crank rig all ride it. The p1 disengage DOF remains FREE by default and sweeps 4.250°. The post and carrier retain their rederived world placement; only the working cone/cylinder/channel family is recentered along the unchanged cone-bore line. The base preserves its front edge and extends only at the rear.'
         - p.18 top-down (the "pivot" label at the TIP; dark wedge under the whole cone set) + v4 stills; v2 envelope/mount cascade from cone-pivot-post-v2.SLDPRT, whose height was manually rederived from ch30 Eight Views image 2 (page003_img01.png) and whose proportions follow ch11 page002_img05.jpeg / page002_img06.jpeg
         - med (role high, dims low)
       - - '`cone-pivot-post` (ONE green column: big-end journal + crank pedestal, on the plate)'
-        - 'v2 green cast body: Ø42.011 × 86.0 tall, with an as-cast Ø44.0 ± 0.4 × 26.6 upper collar (y 59.4..86, a real 0.8-1.27 radial step at the cast/turned seam; one-place reference size); straight crank/sprocket boss Ø21.93 with Ø11.438 bore on the body centreline at y 72.7, length 2.8360 in (72.0344 mm); inclined cone-shaft boss Ø17.2 with Ø12.2808 journal at y 33.368, its axis yawed 12.5182° about the vertical body axis; 2× vertical ANSI-inch 1/4 fillister counterbores on 26.88704 centres (Ø7.14248 thru, Ø11.50874 × 6.0198 deep).'
+        - 'v2 green cast body: Ø42.011 × 86.0 tall, with an as-cast Ø44.0 ± 0.4 × 26.6 upper collar (y 59.4..86, a real 0.8-1.27 radial step at the cast/turned seam; one-place reference size); straight crank/sprocket boss Ø21.93 with Ø14.6 H7 bore on the body centreline at y 72.49 (#906 R1: boss and bore 0.21 below the frame''s crank axis at 72.7; the bore seats the MHA-149 eccentric bushing, e 0.60, whose Ø9.575 bore runs on the 3/8 in crankshaft core), length 2.8360 in (72.0344 mm); inclined cone-shaft boss Ø17.2 with Ø12.2808 journal at y 33.368, its axis yawed 12.5182° about the vertical body axis; 2× vertical ANSI-inch 1/4 fillister counterbores on 26.88704 centres (Ø7.14248 thru, Ø11.50874 × 6.0198 deep).'
         - 'stands on the cone swing platform at exact Ry180, cross-pairing the two mounting-hole axes and putting the crank boss outside the machine. The post and carrier retain the ch30-fitted +1.484 X / +35.415 Z world placement. The working cone/cylinder/channel family is independently recentered 33.115 mm toward the post along its unchanged inclined bore; the post fit is not a machine-wide translation.'
         - 'manual height rederivation from ch30 Eight Views station 2 (references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png); proportions from ch11 references/albert-michelsons-harmonic-analyzer/ch11_images/page002_img05.jpeg and page002_img06.jpeg; collar Ø44.0 measured from the cast/turned seam in ch11 page002_img04/05/06 and ch30 page003_img01 (`cad/scripts/cone_pivot_post_spec.py` HEAD_DIA); other feature dimensions harvested from cone-pivot-post-v2.SLDPRT'
         - 'med (86 mm height, proportions and Ø44.0 as-cast collar photo-derived; other v2 feature dimensions exact)'
@@ -1629,7 +1629,7 @@ sections:
         - counted + scaled
         - med
       - - Drive chain (roller chain; paper-drive rework 2026-07-07)
-        - 'real roller chain (alternating `chain-inner-link`/`chain-outer-link` through the native connected-linkage pattern): pitch-circle centres are knob T24 (−42.575, 252.367) and v2-derived crank T12 (−129.336, 129.850); the exact ANSI #25 closure selects 66 links and 16.471 mm sag. Link pin plane remains z −155.'
+        - 'real roller chain (alternating `chain-inner-link`/`chain-outer-link` through the native connected-linkage pattern): pitch-circle centres are knob T24 (−42.575, 252.367) and crank T12 at the R1 fit-up axis (−128.733, 129.805); the exact ANSI #25 closure selects 66 links and 17.495 mm sag. Link pin plane remains z −155.'
         - —
         - ch30 p002/p005/p006 (taut run + visibly drooping slack run) + ch. 23 p.58-59 (chain wider than the wheel); crank centre from ch30 GT; knob centre = stud + latch c2c 44.766 @ −18°
         - scaled + derived
@@ -2134,7 +2134,8 @@ sections:
          axis at (−129.336, 129.850), closing the DP25.7311 pair at c2c 39.735
          (0.25 slack; #906 then cut both gears with one DP 26.306 normal
          cutter at that same frame c2c, leaving 0.423 slack and a 2.4-deg free
-         window centred at −1.42; zero collision must be rechecked over
+         window centred at −1.42; #906 R1 places the crank at the nominal
+         fit-up, c2c 39.611, where the window is 1.9 deg centred at −1.24; zero collision must be rechecked over
          a full crank-pitch phase sweep with ±0.4° seed margin —
          `diagnostics/crossed_mesh_study.py`; the fit re-arbitrated
          2026-07-14 from the interim K=12-slice cut stack's 0.40/0.60 after
