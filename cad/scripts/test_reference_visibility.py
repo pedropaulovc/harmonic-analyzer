@@ -352,6 +352,27 @@ def test_each_listed_part_passes_its_allowance_to_the_save() -> None:
     assert passing == set(_allowances())
 
 
+def test_only_a_command_that_executes_release_is_refused(monkeypatch) -> None:
+    """``info``/``clean``/``forget release`` publish nothing (Codex on #880)."""
+    monkeypatch.setattr(build, "_visibility_debt", lambda: "release blocked")
+    doit = build.DoitMain()
+
+    def refusal(*argv: str) -> str | None:
+        args = list(argv)
+        return build._release_refusal(args, build._executing_command(args, doit))
+
+    for argv in (["release"], ["run", "release"], ["release", "--", "v22"]):
+        assert refusal(*argv) == "release blocked", argv
+    for argv in (
+        ["info", "release"],
+        ["clean", "release"],
+        ["forget", "release"],
+        ["list"],
+        ["build", "--", "release"],
+    ):
+        assert refusal(*argv) is None, argv
+
+
 def test_release_refuses_to_start_while_any_allowance_remains(tmp_path) -> None:
     assert _allowances(), "no debt left; keep only the clean half of this test"
     assert build._selects_release(["release", "--", "v22"])
