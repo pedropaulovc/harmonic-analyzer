@@ -127,6 +127,28 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
     )
 
 
+# Pivot-bore Ra. The symbol's body always draws up-right of its leader end.
+# From the old 7:30 rim the leader ran up through the body, and the
+# default-height "Ra 1.6" sat across the strap's bottom edge and the centre
+# mark (r743-p1s-B2 render). The leader now lands on the rim at 1:30 --
+# oblique to both centre-mark axes like datum A -- and runs down-left from a
+# symbol up-right of it, above the strap. Note text height, as on the other
+# part sheets.
+PIVOT_FINISH_ANGLE = math.radians(45.0)
+PIVOT_FINISH_OFFSET = (0.012, 0.011)
+PIVOT_FINISH_CHAR_HEIGHT = 0.0025
+
+
+def _pivot_finish_placement() -> tuple[tuple[float, float], tuple[float, float]]:
+    """Sheet (rim, symbol) points of the pivot-bore finish leader."""
+    radius = PIVOT_HOLE_DIA / 2.0
+    rim = _sheet_xy(
+        radius * math.cos(PIVOT_FINISH_ANGLE),
+        _PIVOT_MID_Y + radius * math.sin(PIVOT_FINISH_ANGLE),
+    )
+    return rim, (rim[0] + PIVOT_FINISH_OFFSET[0], rim[1] + PIVOT_FINISH_OFFSET[1])
+
+
 # The large concentric radii are carried in the manufacturing note: imported
 # radius dimensions retain off-sheet centre witnesses even in shortened-radius
 # mode.  Keeping them as notes avoids clipped geometry without losing values.
@@ -335,30 +357,19 @@ async def build(adapter: Any) -> dict[str, str]:
         # 0.0109 mm from the request.
         position_tolerance_m=0.010,
     )
-    # Ra on the bore rim at 1:30 -- oblique to both centre-mark axes like the
-    # datum above -- with the symbol up-right of it, over the strap. The
-    # symbol's body always draws up-right of its leader end, so the leader has
-    # to run DOWN-left into the rim to stay off the body. From the old 7:30
-    # rim, low-left, it ran up through the symbol, whose default-height
-    # "Ra 1.6" sat across the strap's bottom edge and the centre mark
-    # (r743-p1s-B2 render). Note text height, as on the other part sheets.
-    pivot_finish_angle = math.radians(45.0)
-    pivot_finish_rim = _sheet_xy(
-        pivot_radius * math.cos(pivot_finish_angle),
-        _PIVOT_MID_Y + pivot_radius * math.sin(pivot_finish_angle),
-    )
     # The bore circle picked by DIAMETER above (the visible-entity walk the
     # cone-gear drawing uses): a coordinate pick on the concentric O6.5 / O10
     # rims resolves to the hub's outer circle within SolidWorks' tolerance.
+    pivot_finish_rim, pivot_finish_symbol = _pivot_finish_placement()
     add_surface_finish(
         adapter,
         front,
         edge_entity=pivot_bore_edge,
-        symbol_xy=(pivot_finish_rim[0] + 0.012, pivot_finish_rim[1] + 0.011),
+        symbol_xy=pivot_finish_symbol,
         leader_attach_xy=pivot_finish_rim,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
-        char_height=0.0025,
+        char_height=PIVOT_FINISH_CHAR_HEIGHT,
     )
     # Then a position FCF tying the rod-pin hole to the complete A-B-C frame.
     # Datum B (broad face, on the end view) orients the hole axes; datum C
