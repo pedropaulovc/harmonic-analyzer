@@ -356,24 +356,21 @@ def test_collar_diameter_lives_on_its_plan_circle() -> None:
 
 
 def test_cone_boss_end_faces_are_located_by_symmetry() -> None:
-    line = next(
-        line for line in spec.DRAWING_NOTES.splitlines() if "CONE BOSS ENDS" in line
-    )
-    assert "SYMMETRIC ABOUT" in line and "POST AXIS" in line
+    assert "CONE BOSS END FACES ARE SYMMETRIC ABOUT THE POST AXIS." in spec.DRAWING_NOTES
 
 
-def test_cone_boss_ends_are_faced_in_the_boring_setup() -> None:
-    """#914: the north boss end is the shaft collar's thrust face.
+def test_collar_thrust_face_adds_no_setup_note() -> None:
+    """#914: the collar face gets a finish symbol, not a method note (rule 6).
 
-    Facing both ends in the setup that bores the journal keeps them square to
-    it without a frame (rule 3), so the note says so and nothing else does.
+    Squareness of the north boss end is not functional (the journal locates
+    the shaft), so no note may prescribe facing it or a setup for it; the one
+    SETUP line is the bore-to-bore requirement that predates the collar.
     """
     lines = spec.DRAWING_NOTES.splitlines()
-    facing = [line for line in lines if line.startswith("FACE CONE BOSS ENDS")]
-    assert len(facing) == 1
-    assert "THAT SETUP" in facing[0]
-    # "THAT SETUP" must refer back to the boring setup on the line before it.
-    assert "BORE BOTH IN ONE SETUP" in lines[lines.index(facing[0]) - 1]
+    assert not [line for line in lines if line.startswith("FACE")]
+    assert [line for line in lines if "SETUP" in line] == [
+        line for line in lines if line.startswith("BORE BOTH IN ONE SETUP")
+    ]
     assert spec.GEOMETRIC_TOLERANCES_MM == {}
 
 
