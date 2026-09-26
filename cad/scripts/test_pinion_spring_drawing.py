@@ -142,6 +142,26 @@ def test_free_form_prints_from_the_hidden_reference_sketch() -> None:
     assert "FREE FORM" in pinion_spring_spec.DRAWING_NOTES
 
 
+def test_front_qualifier_text_clears_its_rows_extension_lines() -> None:
+    # pc-r12's render struck FREE, BEND and TANGENT through with the front
+    # view's vertical extension lines: each qualified text now sits wholly
+    # between or wholly outside the lines at its row.
+    for name, lines in drawing.FRONT_ROW_EXTENSION_X.items():
+        text = drawing.DIMENSION_CALLOUTS[name]
+        half = drawing.QUALIFIER_HALF_WIDTH[text]
+        x = drawing.FRONT_KEEP[name][0]
+        crossed = [line for line in lines if x - half < line < x + half]
+        assert not crossed, (name, text, crossed)
+    assert set(drawing.FRONT_ROW_EXTENSION_X) == set(drawing.DIMENSION_CALLOUTS)
+    # Positive control: pc-r12's centred kink-row text crossed both lines.
+    old_x = drawing._front_x(drawing._FOOT_MID_X)
+    half = drawing.QUALIFIER_HALF_WIDTH["FREE, TO KINK TANGENT"]
+    assert all(
+        old_x - half < line < old_x + half
+        for line in drawing.FRONT_ROW_EXTENSION_X["FreeKinkH"]
+    )
+
+
 def test_views_are_projected_and_hidden_lines_removed() -> None:
     assert drawing.TOP_CENTER[0] == drawing.FRONT_CENTER[0]
     assert drawing.TOP_CENTER[1] > drawing.FRONT_CENTER[1]
