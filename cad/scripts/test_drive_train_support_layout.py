@@ -380,7 +380,8 @@ def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
         drive.RIG_MARGINS["grip crossrod to the T12 chain wheel"][0]
         >= 0.25 + RIG.RIG_MARGIN_SPARE
     )
-    assert drive._GRIP_HEAD_Z[0] - (drive.CRANK_ARM_Z0 + drive.ARM_THICKNESS) >= 21.5
+    # 21.06 at the 11.5 head (afe7ea283): its crown sits 0.5 further forward.
+    assert drive._GRIP_HEAD_Z[0] - (drive.CRANK_ARM_Z0 + drive.ARM_THICKNESS) >= 21.0
     # The base rim still stands far past the rod's reach and every seat.
     assert base.TOP_WIDTH / 2.0 - base.LIP_W - RIG.BACK_BLOCK_OUTER_Z >= 25.0
 
@@ -1020,7 +1021,10 @@ def test_rig_anchors_are_named_not_literal() -> None:
         arbor.RELEASED_DRUM_FRONT_Z - arbor.RELEASED_ARBOR_ROOT_Z - arbor.HEAD_REAR_Z,
         abs_tol=1e-12,
     )
-    assert math.isclose(arbor.DRUM_STATION_AS_BUILT, 61.25, abs_tol=1e-12)
+    # The drum front is a fixed arbor-local 60.0; the station follows the
+    # head rear face (61.25 at the 10.5 head, 60.75 at 11.5).
+    assert math.isclose(arbor.DRUM_FRONT_Z_AS_BUILT, 60.0, abs_tol=1e-12)
+    assert math.isclose(arbor.DRUM_STATION_AS_BUILT, 60.75, abs_tol=1e-12)
 
 
 def test_spring_pad_books_its_printed_width_band() -> None:

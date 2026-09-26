@@ -416,6 +416,41 @@ def _add_turning_axis(adapter: Any, view: Any) -> None:
     draw.EditRebuild3()
 
 
+def _reference_witness_in_view(view: Any, sketch_name: str, length_mm: float) -> Any:
+    """The drawing-view instance of one reference sketch's flank witness.
+
+    Chosen on the model -- the named sketch's one construction segment of the
+    witness's length -- then mapped into ``view``.  A point pick at the
+    witness's midpoint twice resolved to BackRimReference's 227.5 line on the
+    same flank (w8 at 437c56d4c, w7 at 7f7fc1717), and the user ruled that a
+    fragile pick selects the model entity instead.
+    """
+    native = _early_bound(view, "IView")
+    model = native.ReferencedDocument
+    if model is None:
+        raise RuntimeError(f"{sketch_name}: the profile view references no model")
+    feature = _early_bound(model, "IPartDoc").FeatureByName(sketch_name)
+    if feature is None:
+        raise RuntimeError(f"{sketch_name}: no such feature in the arbor model")
+    sketch = _early_bound(_early_bound(feature, "IFeature").GetSpecificFeature2(), "ISketch")
+    matches = []
+    for raw in sketch.GetSketchSegments() or ():
+        segment = _early_bound(raw, "ISketchSegment")
+        length = float(segment.GetLength()) * 1000.0
+        construction = bool(segment.ConstructionGeometry)
+        if construction and abs(length - length_mm) <= REFERENCE_WITNESS_LEN_TOL:
+            matches.append(segment)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{sketch_name}: {len(matches)} construction segments are "
+            f"{length_mm:.3f} mm long; the witness must be exactly one"
+        )
+    in_view = native.GetCorresponding(matches[0])
+    if in_view is None:
+        raise RuntimeError(f"{sketch_name}: the witness has no instance in the profile view")
+    return _early_bound(in_view, "ISketchSegment")
+
+
 def _blacken_reference_witnesses(
     adapter: Any, view: Any
 ) -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
@@ -437,25 +472,24 @@ def _blacken_reference_witnesses(
             for z in (z0, z1)
         )
         mid = ((ends[0][0] + ends[1][0]) / 2.0, (ends[0][1] + ends[1][1]) / 2.0)
+        expected = z1 - z0
+        witness = _reference_witness_in_view(view, sketch_name, expected)
         draw.ClearSelection2(True)
-        _early_bound(view, "IView").UpdateViewDisplayGeometry()
-        if not draw.Extension.SelectByID2(
-            "", "EXTSKETCHSEGMENT", mid[0], mid[1], 0.0, False, 0, null_callout(), 0
-        ):
-            raise RuntimeError(f"failed to select the {sketch_name} flank witness")
         selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        selection_data = selection.CreateSelectData()
+        selection_data.View = view
+        if not witness.Select4(False, selection_data):
+            raise RuntimeError(f"failed to select the {sketch_name} flank witness")
         kind = int(selection.GetSelectedObjectType3(1, -1))
         if kind != SW_SEL_EXT_SKETCH_SEGS:
             raise RuntimeError(f"{sketch_name} witness pick resolved to type {kind}")
         segment = _early_bound(selection.GetSelectedObject6(1, -1), "ISketchSegment")
-        # Identify the pick by its own length, not its sketch's name: an
-        # ISketch is not an IFeature dispatch, so rebinding it reads another
-        # member (7885c0d9 got a 16-double matrix back for ``Name``).  The
-        # only other flank construction segment here is the front land's
-        # 19 mm witness.
+        # Re-check what the selection holds by its own length, not its
+        # sketch's name: an ISketch is not an IFeature dispatch, so rebinding
+        # it reads another member (7885c0d9 got a 16-double matrix back for
+        # ``Name``).
         name = str(segment.GetName())
         length = float(segment.GetLength()) * 1000.0
-        expected = z1 - z0
         construction = bool(segment.ConstructionGeometry)
         if abs(length - expected) > REFERENCE_WITNESS_LEN_TOL or not construction:
             raise RuntimeError(

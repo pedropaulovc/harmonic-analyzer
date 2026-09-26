@@ -9,7 +9,9 @@ mid-engagement, then trimmed and peened flush at both ends.  Webs at the worst c
 
 Layout: pin axis along local X, centred on the origin (x +-PIN_LEN/2), so the
 assembly seats it on the lift rod's "lever pin" axis with its Right Plane on
-the rod's Right Plane.
+the rod's Right Plane.  The pin is a Front-plane half-profile revolved about
+that axis (the crank-pinion-pin idiom), so its diameter and length both
+import into the *Front side view (rule 7, turned parts).
 
 Run (SolidWorks already open)::
 
@@ -28,23 +30,25 @@ from _common import (
     _early_bound,
     SketchDims,
     active_configuration_name,
+    add_line_chain,
     apply_color,
     apply_material,
     check,
-    define_circle,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
-    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
     volume_check,
 )
 from _drawing_marks import (
+    add_diametric_linear_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -82,7 +86,7 @@ V_INSTALLED = math.pi * PIN_R**2 * INSTALLED_LEN
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreateConfigurationParameters,
-        ExtrusionParameters,
+        RevolveParameters,
         SetGlobalVariableParameters,
     )
 
@@ -93,32 +97,56 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PinDia", f"{PIN_DIA}mm")
     await set_global(adapter, "PinLen", f"{PIN_LEN}mm")
 
-    # On-axis pin on the Right Plane (normal X), extruded mid-plane so the
-    # origin sits at the pin's middle -- the lift rod's axis in the assembly.
+    # Half-profile on the Front Plane (sketch x -> model X, y -> model Y): the
+    # axis centerline along X through the origin and the rectangle above it,
+    # centred on the origin -- the lift rod's axis in the assembly.  Its two
+    # dimensions are the print's two: the length along the outline and the
+    # diameter as a doubled centerline-to-outline dim.
+    half = PIN_LEN / 2.0
     pin = SketchDims()
-    check("create_sketch pin", await adapter.create_sketch("Right"))
-    await define_circle(
+    check("create_sketch pin", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    axis = check("axis centerline", await adapter.add_centerline(-half, 0.0, half, 0.0))
+    profile_pts = [(-half, 0.0), (-half, PIN_R), (half, PIN_R), (half, 0.0)]
+    profile_lines = await add_line_chain(adapter, profile_pts)
+    set_sketch_direct_db(adapter, False)
+    n = len(profile_lines)
+    for i, line in enumerate(profile_lines):
+        (_, y1), (_, y2) = profile_pts[i], profile_pts[(i + 1) % n]
+        direction = "horizontal" if y1 == y2 else "vertical"
+        check(
+            f"pin {direction} {line}",
+            await adapter.add_sketch_constraint(line, None, direction),
+        )
+    outline = profile_lines[1]
+    await dimension_between(
         adapter,
-        0.0,
-        0.0,
-        PIN_R,
-        "pin",
-        dims=pin,
-        names=("PinCz", "PinCy", "PinDia"),
-        drives=(None, None, '"PinDia"'),
+        f"{outline}.start",
+        f"{outline}.end",
+        "horizontal_distance",
+        PIN_LEN,
+        "pin PinLen",
     )
+    pin.record("PinLen", '"PinLen"')
+    await add_diametric_linear_dimension(
+        adapter, axis, outline, (-half / 2.0, PIN_R + 4.0), "PinDia"
+    )
+    pin.record("PinDia", '"PinDia"')
+    start = f"{profile_lines[0]}.start"
+    check(
+        "pin end on the axis",
+        await adapter.add_sketch_constraint(start, "origin", "horizontal_points"),
+    )
+    await dimension_between(
+        adapter, start, "origin", "horizontal_distance", half, "pin centred on origin"
+    )
+    pin.record("PinHalfLen", '"PinLen" / 2')
     await ensure_fully_defined(adapter, "pin sketch")
     check("exit_sketch pin", await adapter.exit_sketch())
     name_last_feature(adapter, "PinProfile")
     drive_jobs = pin.apply(adapter, "PinProfile")
-    check(
-        "extrude pin",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=PIN_LEN, both_directions=True)
-        ),
-    )
+    check("revolve pin", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Pin")
-    drive_jobs += [(name_dimensions(adapter, "Pin", ["Depth"])[0], '"PinLen"')]
     volume = await volume_check(adapter, "pin", V_PIN, 0.005 * V_PIN)
     res = await adapter.get_mass_properties()
     com = res.data.center_of_mass

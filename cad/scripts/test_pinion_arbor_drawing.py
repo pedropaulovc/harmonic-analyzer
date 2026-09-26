@@ -45,37 +45,81 @@ def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
 
 
 def test_integral_arbor_keeps_the_released_stations_around_a_longer_head() -> None:
-    # Rule 12 (audit W6): the head grows 9.0 -> 10.5 about the released
-    # crossrod station; the neck shoulder, shaft and back crown stay put.
+    # Rule 12 (audit W6) grew the head 9.0 -> 10.5, and the machinist review of
+    # 7f7fc1717 (Main's option 2) to 11.5, each time about the released
+    # crossrod station; the shaft and back crown stay put.  The neck shoulder
+    # moves 0.25 forward so every length but the drum station prints at .X.
     assert spec.HEAD_CENTER_Z == pytest.approx(-6.5)
-    assert spec.HEAD_FRONT_Z == pytest.approx(-11.75)
-    assert spec.HEAD_REAR_Z == pytest.approx(-1.25)
-    assert spec.NECK_END_Z == pytest.approx(10.0)
+    assert spec.HEAD_LEN == pytest.approx(11.5)
+    assert spec.HEAD_FRONT_Z == pytest.approx(spec.HEAD_CENTER_Z - spec.HEAD_LEN / 2.0)
+    assert spec.HEAD_REAR_Z == pytest.approx(spec.HEAD_CENTER_Z + spec.HEAD_LEN / 2.0)
+    assert spec.NECK_END_Z == pytest.approx(9.75)
     assert spec.SHAFT_LEN == pytest.approx(226.25)
-    assert spec.HEAD_FRONT_Z - spec.HEAD_CAP_SAG == pytest.approx(-14.75)
     assert spec.SHAFT_LEN + spec.BACK_CAP_SAG == pytest.approx(227.45)
-    assert spec.OVERALL_LEN == pytest.approx(242.2)
-    assert spec.EXPOSED_SHAFT_LEN == pytest.approx(216.25)
-    assert spec.BACK_RIM_FROM_HEAD_REAR == pytest.approx(227.5)
+    assert spec.OVERALL_LEN == pytest.approx(
+        spec.SHAFT_LEN + spec.BACK_CAP_SAG - (spec.HEAD_FRONT_Z - spec.HEAD_CAP_SAG)
+    )
+    assert spec.EXPOSED_SHAFT_LEN == pytest.approx(spec.SHAFT_LEN - spec.NECK_END_Z)
+    assert spec.BACK_RIM_FROM_HEAD_REAR == pytest.approx(spec.SHAFT_LEN - spec.HEAD_REAR_Z)
+
+
+def test_only_the_drum_station_prints_two_places() -> None:
+    """Machinist review of 7f7fc1717: NeckLen printed 11.25 at .XX.  Every
+    station runs from the head rear face, so the head and neck shoulder are
+    chosen so every turned length lands on .X; the drum station, an assembly
+    station, is the one .XX length (as at 61.55)."""
+    lengths = {
+        "HeadLen": spec.HEAD_LEN,
+        "NeckLen": spec.NECK_LEN,
+        "BackRimFromHeadRear": spec.BACK_RIM_FROM_HEAD_REAR,
+        "OverallLen": spec.OVERALL_LEN,
+        "FrontJournalFromHeadRear": spec.FRONT_JOURNAL_FROM_HEAD_REAR,
+        "BackJournalFromHeadRear": spec.BACK_JOURNAL_FROM_HEAD_REAR,
+        "FrontJournalLen": spec.JOURNAL_LEN,
+        "BackJournalLen": spec.JOURNAL_LEN,
+        "DrumStationFromHeadRear": spec.DRUM_STATION,
+    }
+    two_places = {
+        name for name in lengths if spec.DRAWING_PRECISION_BY_NAME[name] == 2
+    }
+    assert two_places == {"DrumStationFromHeadRear"}
+    for name, value in lengths.items():
+        if name in two_places:
+            assert value != pytest.approx(round(value, 1), abs=1e-9), name
 
 
 def test_crossrod_hole_is_centred_with_a_rule_12_web() -> None:
-    # Printed centred on the head length: only HeadLen's .X band reaches the
-    # web, never a separate station band.
+    # Printed centred on the Ø15 cylinder's length: only HeadLen's .X band
+    # reaches the web, never a separate station band.  The machinist review of
+    # 7f7fc1717 holds the web to the novice-machinist 2.0 target.
     assert "CrossHoleReference" not in spec.DRAWING_DIMENSIONS
-    assert "CENTRED ON HEAD LENGTH" in spec.CROSS_HOLE_CALLOUT
-    assert spec.CROSS_HOLE_WEB_WORST == pytest.approx(1.80)
-    assert spec.CROSS_HOLE_WEB_WORST >= 1.5
+    assert f"CENTRED ON<MOD-DIAM>{spec.HEAD_DIA:.0f} CYLINDER LENGTH" in (
+        spec.CROSS_HOLE_CALLOUT
+    )
+    assert spec.CROSS_HOLE_WEB_WORST == pytest.approx(
+        (spec.HEAD_LEN - spec.HEAD_LEN_BAND) / 2.0
+        - (spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[0]) / 2.0
+    )
+    assert spec.CROSS_HOLE_WEB_TARGET == 2.0
+    assert spec.CROSS_HOLE_WEB_WORST >= spec.CROSS_HOLE_WEB_TARGET
+
+
+def test_cross_hole_callout_names_the_cylinder_not_the_crowned_head() -> None:
+    """Machinist review of 7f7fc1717 (blocker): "CENTRED ON HEAD LENGTH" could
+    mean the straight Ø15 cylinder or the whole crowned head.  The callout
+    names the cylinder, its Ø read from the spec rather than typed."""
+    assert "HEAD LENGTH" not in spec.CROSS_HOLE_CALLOUT
+    assert f"<MOD-DIAM>{spec.HEAD_DIA:.0f} CYLINDER" in spec.CROSS_HOLE_CALLOUT
+    assert "15" not in spec.CROSS_HOLE_CALLOUT.replace(f"{spec.HEAD_DIA:.0f}", "", 1)
 
 
 def test_integral_head_owns_the_crossrod_interface() -> None:
     assert spec.HEAD_DIA == pytest.approx(15.0)
-    assert spec.HEAD_LEN == pytest.approx(10.5)
     assert spec.NECK_DIA == pytest.approx(10.5)
-    assert spec.NECK_LEN == pytest.approx(11.25)
+    assert spec.NECK_LEN == pytest.approx(spec.NECK_END_Z - spec.HEAD_REAR_Z)
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
     assert callout is spec.CROSS_HOLE_CALLOUT
-    assert callout == "REAM THRU,\nCENTRED ON HEAD LENGTH"
+    assert callout == "REAM THRU,\nCENTRED ON<MOD-DIAM>15 CYLINDER LENGTH"
     # Fable r-delta (Main ruling B): MHA-058's bond and acceptance are
     # instructions for a part not on this print; MHA-058 carries both.
     assert "MHA-058" not in spec.DRAWING_NOTES
@@ -468,7 +512,12 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     # keep RIG_MARGIN_SPARE over their 0.5 floor (Main, #858).
     assert spec.JOURNAL_LEN == pytest.approx(20.0)
     assert spec.LAND_OVER_STRAP_REQUIRED == pytest.approx(0.75)
-    assert spec.DRUM_STATION == pytest.approx(61.55)
+    # The drum's world station is fixed; the printed station is that position
+    # from the head rear face, so it follows the face (61.55 at the 10.5 head).
+    assert spec.DRUM_STATION_AS_BUILT == pytest.approx(
+        spec.DRUM_FRONT_Z_AS_BUILT - spec.HEAD_REAR_Z
+    )
+    assert spec.DRUM_STATION == pytest.approx(61.05)
     assert spec.DRUM_STATION_BAND == spec.LINEAR_X_BAND == pytest.approx(0.8)
     assert spec.END_PLAY == 0.45 and spec.END_PLAY_SET_ERROR == 0.10
     # Codex #854 review (Main): no copies of values the rig and the title block
@@ -495,8 +544,14 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     ):
         assert literal not in spec_source, literal
     assert (spec.FRONT_JOURNAL_FROM_HEAD_REAR, spec.BACK_JOURNAL_FROM_HEAD_REAR) == (
-        pytest.approx(46.8),
-        pytest.approx(199.5),
+        pytest.approx(46.3),
+        pytest.approx(199.0),
+    )
+    # The lands did not move in the world when the head grew: 46.8 / 199.5
+    # from the old -1.25 rear face.
+    assert (spec.FRONT_JOURNAL_Z, spec.BACK_JOURNAL_Z) == (
+        pytest.approx(46.8 - 1.25),
+        pytest.approx(199.5 - 1.25),
     )
     assert set(spec.LAND_MARGINS_AT_STOPS) == {"drum forward", "drum aft"}
     for margins in spec.LAND_MARGINS_AT_STOPS.values():
@@ -604,11 +659,96 @@ def test_reference_witnesses_are_drawn_in_the_outline_black() -> None:
     assert "SW_SEL_EXT_SKETCH_SEGS" in helper and "ConstructionGeometry" in helper
     # 7885c0d9: rebinding the ISketch as IFeature read a matrix for Name.
     assert '"IFeature"' not in helper and "segment.GetLength()" in helper
+    # w8 (437c56d4c) and w7 (7f7fc1717): the point pick landed on the 227.5
+    # BackRimReference line.  The witness is chosen on the model and mapped.
+    assert "SelectByID2" not in helper
+    assert "_reference_witness_in_view(view, sketch_name, expected)" in helper
     source = inspect.getsource(drawing.build)
     blacken = source.index("_blacken_reference_witnesses(adapter, principal)")
     finalize = source.index("await finalize_drawing(")
     gate = source.index("_assert_outline_unbroken(PNG, witness_spans, sheet_size)")
     assert blacken < finalize < gate
+
+
+class _FakeSegment:
+    def __init__(self, length_mm: float, construction: bool) -> None:
+        self.length_mm = length_mm
+        self.ConstructionGeometry = construction
+
+    def GetLength(self) -> float:
+        return self.length_mm / 1000.0
+
+
+class _FakeSketch:
+    def __init__(self, segments: list[_FakeSegment]) -> None:
+        self.segments = segments
+
+    def GetSketchSegments(self) -> tuple[_FakeSegment, ...]:
+        return tuple(self.segments)
+
+
+class _FakeFeature:
+    def __init__(self, sketch: _FakeSketch) -> None:
+        self.sketch = sketch
+
+    def GetSpecificFeature2(self) -> _FakeSketch:
+        return self.sketch
+
+
+class _FakePart:
+    def __init__(self, features: dict[str, _FakeFeature]) -> None:
+        self.features = features
+
+    def FeatureByName(self, name: str) -> _FakeFeature | None:
+        return self.features.get(name)
+
+
+class _FakeView:
+    def __init__(self, part: _FakePart) -> None:
+        self.ReferencedDocument = part
+        self.mapped: list[_FakeSegment] = []
+
+    def GetCorresponding(self, segment: _FakeSegment) -> tuple[str, _FakeSegment]:
+        self.mapped.append(segment)
+        return ("in view", segment)
+
+
+def test_reference_witness_is_chosen_on_the_model_not_by_a_point_pick() -> None:
+    """The user's ruling on the w8/w7 mis-picks: the DrumStationReference
+    witness is its sketch's one 1 mm construction segment, mapped into the
+    view; the 227.5 BackRimReference line (the old pick's victim) and the
+    sketch's own axis centerline can never be chosen."""
+    witness = _FakeSegment(part.DRUM_STATION_POINT_LEN, True)
+    sketch = _FakeSketch(
+        [
+            _FakeSegment(spec.DRUM_STATION, True),  # the station's centerline
+            witness,
+            _FakeSegment(part.DRUM_STATION_POINT_LEN, False),  # not construction
+        ]
+    )
+    back_rim = _FakeSketch([_FakeSegment(spec.BACK_RIM_FROM_HEAD_REAR, True)])
+    view = _FakeView(
+        _FakePart(
+            {
+                "DrumStationReference": _FakeFeature(sketch),
+                "BackRimReference": _FakeFeature(back_rim),
+            }
+        )
+    )
+    chosen = drawing._reference_witness_in_view(
+        view, "DrumStationReference", part.DRUM_STATION_POINT_LEN
+    )
+    assert chosen == ("in view", witness)
+    assert view.mapped == [witness]
+    with pytest.raises(RuntimeError, match="must be exactly one"):
+        drawing._reference_witness_in_view(
+            view, "BackRimReference", part.DRUM_STATION_POINT_LEN
+        )
+    sketch.segments.append(_FakeSegment(part.DRUM_STATION_POINT_LEN, True))
+    with pytest.raises(RuntimeError, match="2 construction segments"):
+        drawing._reference_witness_in_view(
+            view, "DrumStationReference", part.DRUM_STATION_POINT_LEN
+        )
 
 
 def _outline_raster(core: int):
@@ -810,3 +950,41 @@ def test_profile_imports_the_hidden_reference_dimensions_per_view() -> None:
     assert reference_dims <= set(drawing.PRINCIPAL_KEEP)
     assert not reference_dims & (set(drawing.DONOR_KEEP) | set(drawing.DETAIL_KEEP))
     assert "part_sketches_shown" not in source
+
+
+def test_head_neighbours_are_each_proved_by_a_named_assembly_assert() -> None:
+    """Main's ruling on the 11.5 head: every assembly body around the arbor
+    head keeps a named clearance assert.  Forward, the crank-arm sweep;
+    radially, the T12 chain wheel; aft, the lever throw plane; and the
+    swing-rig bodies (lever hub, front pivot block, lift rod, pivot shaft,
+    front strap) against the head's own band, which only the crossrod band
+    was checked against before."""
+    import build_drive_train_assembly as assembly
+
+    source = Path(assembly.__file__).read_text(encoding="utf-8")
+    for message in (
+        "integral grip-head band reaches the crank arm sweep",
+        "integral grip head reaches the T12 chain wheel",
+        "lever throw plane reaches the integral grip head",
+        'f"integral grip-head band reaches the {_what}"',
+        "grip crossrod is not centred in the integral head",
+    ):
+        assert message in source, message
+    head_lo, head_hi = assembly._GRIP_HEAD_Z
+    assert head_lo == pytest.approx(
+        assembly.ARBOR_Z0 + spec.HEAD_FRONT_Z - spec.HEAD_CAP_SAG
+    )
+    assert head_hi == pytest.approx(assembly.ARBOR_Z0 + spec.NECK_END_Z)
+    crank = head_lo - (assembly.CRANK_ARM_Z0 + assembly.ARM_THICKNESS)
+    lever_plane = assembly._LEV_Z[0] - head_hi
+    names = {what for _lo, _hi, what in assembly._SWING_RIG_BANDS}
+    assert names == {
+        "lever hub",
+        "front pivot block",
+        "lift rod",
+        "pivot shaft",
+        "front strap",
+    }
+    rig = min(lo - head_hi for lo, _hi, _what in assembly._SWING_RIG_BANDS)
+    for margin in (crank, lever_plane, rig):
+        assert margin >= 0.25

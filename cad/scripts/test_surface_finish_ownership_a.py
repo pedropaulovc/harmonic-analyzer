@@ -47,6 +47,14 @@ CASES = (
             SurfaceFinishControl(
                 "drum_bore", MACHINED_UM, CylinderFace(alignment_pinion_spec.BORE_DIA)
             ),
+            SurfaceFinishControl(
+                "front_end_face", MACHINED_UM, PlanarFace((0, 0, -1), 0.0)
+            ),
+            SurfaceFinishControl(
+                "back_end_face",
+                MACHINED_UM,
+                PlanarFace((0, 0, 1), alignment_pinion_spec.FACE_WIDTH),
+            ),
         ),
     ),
     (

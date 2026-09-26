@@ -46,12 +46,22 @@ JOURNAL_DIA_BAND = (-0.010, -0.030)
 # Former handle-body envelope, turned integrally with the arbor.  Rule 12
 # (audit W6, 2026-09-23): the Ø6 crossrod hole left 1.50 of wall to each face
 # of the 9.0 head at nominal and -0.10 at the printed worst case (HeadLen and
-# the hole station both .X).  The head grows to 10.5 about the unchanged
-# crossrod station (world z -6.5), and the hole is printed CENTRED on the head
-# length rather than located by a .X station, so only the HeadLen band reaches
-# the web: (10.5 - 0.8) / 2 - 6.10 / 2 = 1.80 worst case.
+# the hole station both .X).  The head grew to 10.5 about the unchanged
+# crossrod station (world z -6.5), and the hole is printed CENTRED on the Ø15
+# cylinder's length rather than located by a .X station, so only the HeadLen
+# band reaches the web.  The machinist review of 7f7fc1717 then flagged that
+# web, (10.5 - 0.8) / 2 - 6.10 / 2 = 1.80, under the novice-machinist 2.0
+# target; Main's ruling (option 2) grows the head to 11.5, again about the
+# crossrod station: 2.30 worst case (CROSS_HOLE_WEB_WORST below).
+#
+# Every station on the print runs from the head rear face, so its position
+# decides which lengths print exactly at .X.  With SHAFT_LEN released, the
+# 11.5 head puts the rear face at -0.75, where the back-rim length (227.0) and
+# the overall (242.7) are .X; the neck shoulder moves 0.25 forward, 10.0 ->
+# 9.75, so the neck (10.5, flagged at 11.25) is .X too.  The drum station
+# (61.05) is the one .XX length, as it was at 61.55.
 HEAD_DIA = 15.0
-HEAD_LEN = 10.5
+HEAD_LEN = 11.5
 HEAD_CAP_SAG = 3.0
 HEAD_CAP_R = ((HEAD_DIA / 2.0) ** 2 + HEAD_CAP_SAG**2) / (2.0 * HEAD_CAP_SAG)
 HEAD_CENTER_Z = -6.5  # the released crossrod station
@@ -77,11 +87,15 @@ LINEAR_X_BAND = printed_band_mm(1)  # .X title-block row, 0.8
 # User ruling 2026-09-24: the drum is bonded 0.3 further aft than the as-built
 # station so MHA-027 gear j=19 reads its full 3.0 face at nominal.
 # The released (pre-ruling) pose, before MECHANISM_Z_SHIFT: the drum front
-# end at z -75.0 and the arbor root at z -135.0, so the drum sat 61.25 from
-# the head shoulder.
+# end at z -75.0 and the arbor root at z -135.0, so the drum front sits at a
+# fixed arbor-local 60.0 (BDT APINION_Z_FRONT - ARBOR_Z0 before the aft
+# shift, pinned by test).  The station is that position from the head rear
+# face, so it follows the face whenever the head changes (61.25 at the 10.5
+# head, 60.75 at 11.5) and the drum itself never moves in the world.
 RELEASED_DRUM_FRONT_Z = -75.0
 RELEASED_ARBOR_ROOT_Z = -135.0
-DRUM_STATION_AS_BUILT = RELEASED_DRUM_FRONT_Z - RELEASED_ARBOR_ROOT_Z - HEAD_REAR_Z
+DRUM_FRONT_Z_AS_BUILT = RELEASED_DRUM_FRONT_Z - RELEASED_ARBOR_ROOT_Z
+DRUM_STATION_AS_BUILT = DRUM_FRONT_Z_AS_BUILT - HEAD_REAR_Z
 DRUM_AFT_SHIFT = 0.3
 DRUM_STATION = DRUM_STATION_AS_BUILT + DRUM_AFT_SHIFT
 DRUM_LEN_BAND = (LINEAR_X_BAND, -LINEAR_X_BAND)  # general .X
@@ -203,7 +217,7 @@ BACK_CAP_SAG = 1.2
 BACK_CAP_R = (SHAFT_DIA / 2.0) ** 2 / (2.0 * BACK_CAP_SAG) + BACK_CAP_SAG / 2.0
 
 NECK_DIA = 10.5
-NECK_END_Z = 10.0
+NECK_END_Z = 9.75
 NECK_LEN = NECK_END_Z - HEAD_REAR_Z
 EXPOSED_SHAFT_LEN = SHAFT_LEN - NECK_END_Z
 # R1 (U27 precedent, Main 2026-09-24): a stock 6 mm reamer cuts 6.000-6.015
@@ -223,7 +237,7 @@ BACK_JOURNAL_Z = HEAD_REAR_Z + BACK_JOURNAL_FROM_HEAD_REAR
 # the .X HeadLen band split over both sides, the hole at its upper limit.
 HEAD_LEN_PLACES = 1  # HeadLen
 HEAD_CAP_SAG_PLACES = 1  # HeadCapSagDim
-NECK_LEN_PLACES = 2  # NeckLen
+NECK_LEN_PLACES = 1  # NeckLen
 HEAD_LEN_BAND = printed_band_mm(HEAD_LEN_PLACES)  # .X title-block row
 CROSS_HOLE_WEB_WORST = (HEAD_LEN - HEAD_LEN_BAND) / 2.0 - (
     CROSS_HOLE_DIA + CROSS_HOLE_DIA_BAND[0]
@@ -236,9 +250,13 @@ CROSSROD_MIN_CLEARANCE = (CROSS_HOLE_DIA + CROSS_HOLE_DIA_BAND[1]) - (
 CROSSROD_MAX_CLEARANCE = (CROSS_HOLE_DIA + CROSS_HOLE_DIA_BAND[0]) - (
     ROD_DIA + ROD_DIA_BAND[1]
 )
-if CROSS_HOLE_WEB_WORST < 1.5:
+# U27 novice-machinist webs: 2.0 target, 1.5 floor.  The machinist review of
+# 7f7fc1717 held this web to the target, not the floor.
+CROSS_HOLE_WEB_TARGET = 2.0
+if CROSS_HOLE_WEB_WORST < CROSS_HOLE_WEB_TARGET:
     raise AssertionError(
-        f"crossrod hole web {CROSS_HOLE_WEB_WORST:.2f} is under the 1.5 floor"
+        f"crossrod hole web {CROSS_HOLE_WEB_WORST:.2f} is under the "
+        f"{CROSS_HOLE_WEB_TARGET} target"
     )
 if CROSSROD_MIN_CLEARANCE < 0.0:
     raise AssertionError("MHA-058 crossrod no longer enters its reamed hole")

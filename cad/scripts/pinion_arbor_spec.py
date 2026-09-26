@@ -25,10 +25,12 @@ from pinion_arbor_geometry import (
     BOND_ZONE_LAND_CLEARANCE as BOND_ZONE_LAND_CLEARANCE,
     CROSS_HOLE_DIA as CROSS_HOLE_DIA,
     CROSS_HOLE_DIA_BAND as CROSS_HOLE_DIA_BAND,
+    CROSS_HOLE_WEB_TARGET as CROSS_HOLE_WEB_TARGET,
     CROSS_HOLE_WEB_WORST as CROSS_HOLE_WEB_WORST,
     CROSSROD_MAX_CLEARANCE as CROSSROD_MAX_CLEARANCE,
     CROSSROD_MIN_CLEARANCE as CROSSROD_MIN_CLEARANCE,
     DRUM_AFT_SHIFT as DRUM_AFT_SHIFT,
+    DRUM_FRONT_Z_AS_BUILT as DRUM_FRONT_Z_AS_BUILT,
     DRUM_LEN_BAND as DRUM_LEN_BAND,
     DRUM_STATION as DRUM_STATION,
     DRUM_STATION_AS_BUILT as DRUM_STATION_AS_BUILT,
@@ -164,9 +166,13 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked integral-arbor dimension needs authored places")
 
+# Machinist review of 7f7fc1717 (blocker): "HEAD LENGTH" did not say whether
+# it meant the straight Ø15 cylinder or the whole crowned head, which put the
+# hole in two places.  It names the cylinder the HeadLen dimension measures.
+# <MOD-DIAM> carries its own leading gap, so no space before it.
 CROSS_HOLE_CALLOUT = (
     "REAM THRU,\n"
-    "CENTRED ON HEAD LENGTH"
+    f"CENTRED ON<MOD-DIAM>{HEAD_DIA:.0f} CYLINDER LENGTH"
 )
 # Notes never carry dimensions (Codex P1 on #814): the drum station is the
 # model's DrumStationFromHeadRear, printed on the profile as "DRUM STATION"

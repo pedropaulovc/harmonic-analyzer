@@ -106,14 +106,16 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     # x follows the drum's parked station: U28 (2026-09-23) parks it with a
     # 2.2425 tip gap to the review-first 32T drum's 8.667 tip radius.
     expected_axis = (-18.383940352466745, 90.518, -137.18811169145133)
-    # Rule 12 (audit W6): the head grows 9.0 -> 10.5 about the released
-    # centre, so both faces and the crown move 0.75 out; the neck shoulder
-    # (the released head rear + 2 wall + 10) stays put.
+    # Rule 12 (audit W6) grew the head 9.0 -> 10.5 and the machinist review of
+    # 7f7fc1717 (Main's option 2) to 11.5, each about the released centre, so
+    # both faces and the crown move 1.25 out.  The neck shoulder (the released
+    # head rear + 2 wall + 10) moves 0.25 forward, so every turned length on
+    # the MHA-102 print lands on .X.
     released_head_stations = (
-        released_origin[2] - 10.5 / 2.0,
-        released_origin[2] + 10.5 / 2.0,
-        released_origin[2] - (10.5 / 2.0 + 3.0),
-        released_origin[2] + 9.0 / 2.0 + 2.0 + 10.0,
+        released_origin[2] - 11.5 / 2.0,
+        released_origin[2] + 11.5 / 2.0,
+        released_origin[2] - (11.5 / 2.0 + 3.0),
+        released_origin[2] + 9.0 / 2.0 + 2.0 + 10.0 - 0.25,
     )
     integral_head_stations = (
         assembly.ARBOR_Z0 + arbor.HEAD_FRONT_Z,
@@ -126,10 +128,10 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     )
     assert integral_head_stations == pytest.approx(
         (
-            -142.43811169145133,
-            -131.93811169145133,
-            -145.43811169145133,
-            -120.68811169145133,
+            -142.93811169145133,
+            -131.43811169145133,
+            -145.93811169145133,
+            -120.93811169145133,
         ),
         abs=1e-12,
     )
@@ -167,6 +169,22 @@ def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
     assert marked == kept == {"RodDia", "RodSpan"}
     assert spec.DRAWING_PRECISION_BY_NAME == {"RodDia": 1, "RodSpan": 1}
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
+
+
+def test_view_group_is_centred_on_the_sheet_field() -> None:
+    """Machinist review of 7f7fc1717: the profile, dimensions and isometric
+    sat low and right.  The group's vertical span now centres on the field
+    between the title block and the inner border."""
+    lowest = drawing.PRINCIPAL_KEEP["RodSpan"][1]
+    highest = max(drawing.ROD_DIAMETER_XY[1], drawing.ISO_NOTE_XY[1])
+    field_mid = sum(drawing.FIELD_Y) / 2.0
+    assert abs((lowest + highest) / 2.0 - field_mid) <= 0.005
+    assert drawing.PRINCIPAL_CENTER[1] == pytest.approx(field_mid, abs=0.010)
+    # The profile's left end stands in the left half of the sheet's width.
+    from pinion_handle_geometry import ROD_SPAN
+
+    rod_half = ROD_SPAN * drawing.SHEET_SCALE[0] / 2000.0
+    assert drawing.PRINCIPAL_CENTER[0] - rod_half < 0.110
 
 
 def test_retired_head_socket_and_retention_exports_are_absent() -> None:
