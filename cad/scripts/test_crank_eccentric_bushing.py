@@ -109,11 +109,23 @@ def test_part_and_spec_share_one_dimension_contract() -> None:
     }
 
 
-def test_notes_identify_both_mates_and_print_no_exception_or_size() -> None:
-    """Exception and ruling provenance never prints (fleet ruling 2026-09-26):
-    the thin wall's acceptance lives in the policy row, not on the sheet."""
+def test_notes_identify_both_mates_and_state_the_thin_wall_as_a_fact() -> None:
+    """The policy requires the sheet to state its named exception (Codex #857
+    P2), but exception and ruling labels never print (fleet ruling
+    2026-09-26): the thin wall prints as a plain fact from the print-worst
+    wall, rounded down, and the acceptance stays in the policy row."""
     text = spec.DRAWING_NOTES
     assert len(text.splitlines()) == 1
+    printed = part.MANUFACTURING_NOTES.splitlines()
+    assert printed == [
+        text,
+        f"WALL {math.floor(part.WALL_WORST * 100.0) / 100.0:.2f} MIN AT THROW.",
+    ]
+    assert printed[1] == "WALL 1.87 MIN AT THROW."
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '{"Manufacturing Notes": MANUFACTURING_NOTES}' in source
+    for internal in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "RULE "):
+        assert internal not in part.MANUFACTURING_NOTES
     assert spec.SHAFT_MATE_NUMBER == _config.parts("crankshaft")["number"]
     assert spec.POST_MATE_NUMBER == _config.parts("cone-pivot-post")["number"]
     assert not hasattr(spec, "WALL_EXCEPTION")

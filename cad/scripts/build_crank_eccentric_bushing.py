@@ -101,6 +101,10 @@ if OD_SEAT_CLEARANCE[0] <= 0.0:
 _BORE_MAX = BORE_DIA + BORE_DIA_BAND[0]
 _THROW_MAX = ECCENTRICITY + ECCENTRICITY_BAND[0]
 WALL_WORST = (OUTER_DIA + OD_BAND[1]) / 2.0 - _THROW_MAX - _BORE_MAX / 2.0
+# The sheet states the thin side as a plain fact, never as an exception
+# label; the minimum rounds DOWN so the print never claims more wall.
+WALL_NOTE = f"WALL {math.floor(WALL_WORST * 100.0) / 100.0:.2f} MIN AT THROW."
+MANUFACTURING_NOTES = "\n".join((DRAWING_NOTES, WALL_NOTE))
 _FLATS_ROW = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
 FLATS_WALL_WORST = (
     (FLATS_ACROSS - _FLATS_ROW) / 2.0 - _THROW_MAX * FLATS_THROW_LEAN - _BORE_MAX / 2.0
@@ -238,7 +242,7 @@ async def build(adapter) -> dict[str, str]:
         surface_finishes=SURFACE_FINISHES,
     )
     apply_drawing_properties(
-        adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
+        adapter, PART_NAME, {"Manufacturing Notes": MANUFACTURING_NOTES}
     )
     return await save_part_and_images(adapter, PART_NAME)
 

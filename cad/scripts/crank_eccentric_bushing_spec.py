@@ -129,8 +129,10 @@ POST_MATE_NUMBER = "MHA-016"
 
 # The thin wall at the throw is the policy's named MHA-149 exception
 # (drawing-simplicity-policy.md, "Named exceptions"; DRAFT pending the R1
-# ruling).  Exception and ruling provenance never prints on a sheet, so it
-# lives in that row and here, and the notes carry only the part facts.
+# ruling).  The policy requires the sheet to state it, but exception and
+# ruling labels never print, so the build appends the shortfall as a plain
+# fact (``build_crank_eccentric_bushing.WALL_NOTE``, from its print-worst
+# wall) and this row and comment keep the provenance.
 DRAWING_NOTES = (
     f"BORE RUNS ON THE {SHAFT_MATE_NUMBER} SHAFT; OD SEATS IN THE "
     f"{POST_MATE_NUMBER} CRANK BORE."
