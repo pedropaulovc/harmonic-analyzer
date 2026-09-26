@@ -183,10 +183,18 @@ def test_part_stamps_make_critical_properties() -> None:
     config = _config.parts("cone-swing-platform")
     assert config["material"] == config["material_specification"]
     assert (
-        "astm a830/a830m gr 1018 hr steel plate"
-        in str(config["material_specification"]).lower()
+        config["material_specification"]
+        == "ASTM A830/A830M Grade 1018 hot-rolled steel plate"
     )
-    assert "5/16 in minimum stock" in str(config["material_specification"]).lower()
+    # 1ca66ac34 pinned "5/16 in minimum stock" in the material. The MATERIAL
+    # cell holds the alloy only, so the stock allowance is its own note (policy
+    # lines 105-108 permit one): machining both broad faces to 6.35 +/-0.10
+    # needs cleanup stock that nominal 1/4 in plate does not have (Main, #932).
+    from cone_swing_platform_spec import DRAWING_NOTES, PLATE_THICKNESS
+
+    assert PLATE_THICKNESS == 6.35
+    assert "MACHINE BOTH BROAD FACES; FINISHED THICKNESS 6.35 +/-0.10." in DRAWING_NOTES
+    assert "9. 5/16 IN STOCK MIN." in DRAWING_NOTES.splitlines()
     finish = str(config["finish"]).lower()
     assert "mil-dtl-13924 class 1" in finish
     assert "oil seal" in finish

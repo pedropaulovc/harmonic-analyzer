@@ -55,7 +55,11 @@ SPECIFIED**; `.XX` / `.XXX` / angular / surface finish, linked to the source
 part's `TOL_LIN_XX` / `TOL_LIN_XXX` / `TOL_ANG` / `TOL_SURFACE` custom
 properties from `cad/config/title_block.yaml`); the edge-break note; FINISH;
 MATERIAL; the ASME Y14.5-2018 interpretation note; DO NOT SCALE DRAWING; and
-the third-angle projection symbol. Right side: project title; PART name; DWG.
+the third-angle projection symbol. The saved MATERIAL cell links the short
+`Material`; `finalize_drawing` retargets it on every sheet to the source
+part's `Material Specification` (the alloy a machinist buys) and reads
+MATERIAL and FINISH back against the view's configuration, then the file.
+Right side: project title; PART name; DWG.
 NO. (`Number`, the MHA-### registry id); REV (the release tag); scale; UNIT;
 copyright + CC BY-SA mark. The source part supplies the linked `$PRPSHEET`
 fields. `_common.part_properties` stamps `Number`, `Revision`, `Title`, and

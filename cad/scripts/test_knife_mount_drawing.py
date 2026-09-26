@@ -56,9 +56,11 @@ def test_linked_notes_expose_the_stud_tap_and_hardened_knife_seat() -> None:
     assert "KNIFE-HANGER STUD" in notes
     assert "TAP-DRILL POINT BREAKS INTO THE BORE CROWN" in notes
     # ch18 p.42 (2026-09-02): the block IS the hardened knife seat -- the old
-    # "no hardened seat / do not release" hold is gone.
-    assert "HARDEN AND TEMPER TO 58-60 HRC AFTER MACHINING" in notes
-    assert "LEAVE UNPAINTED" in notes
+    # "no hardened seat / do not release" hold is gone. The hardness and the
+    # unpainted requirement print in FINISH (policy rule 1), never again here.
+    assert "THE BORE UPPER WALL IS THE HARDENED KNIFE SEAT." in notes
+    for line in notes.splitlines():
+        assert "HRC" not in line.upper() and "UNPAINTED" not in line.upper(), line
     assert "NO HARDENED KNIFE SEAT" not in notes
     assert "DO NOT RELEASE" not in notes
     # Title block owns the alloy callout (test_magnifier_drawing_metadata).
@@ -90,9 +92,11 @@ def test_part_stamps_make_critical_properties() -> None:
     # ch18 p.42 (2026-09-02): unpainted heat-treated steel, not brass.
     assert part.MATERIAL == "Plain Carbon Steel"
     assert config["material"] == "Plain Carbon Steel"
-    assert "O1 tool steel" in config["material_specification"]
-    assert "58-60 HRC" in config["material_specification"]
-    assert "Brass" not in config["material_specification"]
+    # The alloy is the MATERIAL cell; the hardness is a finished-part state,
+    # the FINISH cell's (Main, #923 fleet: the combined wording overflowed).
+    assert config["material_specification"] == "AISI O1 tool steel"
+    assert "58-60 HRC" in str(config["finish"])
+    assert "hardened and tempered, 58-60 HRC" in str(config["finish"])
     assert "unpainted" in str(config["finish"]).lower()
     assert int(config["quantity"]) == 2
     source = Path(part.__file__).read_text(encoding="utf-8")

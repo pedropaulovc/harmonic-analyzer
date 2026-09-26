@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import _config
 import _telemetry
@@ -14,10 +14,13 @@ from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
     assert_asme_b_sheet,
+    box_inside,
     finalize_drawing,
+    native_box,
     new_project_drawing,
     property_link,
     read_required_properties,
+    retarget_title_block_links,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     sheet_drawable_region,
@@ -54,36 +57,12 @@ _PROPERTIES = (
     "Number",
     "Revision",
     "Title",
-    "Material",
+    "Material Specification",
     "Stock Name",
     "Supplier",
     "Supplier SKUs",
     *TITLE_BLOCK_TOLERANCE_PROPERTIES,
 )
-
-
-def _box(
-    values: Any, *, label: str, kind: Literal["view", "note"] = "view"
-) -> tuple[float, float, float, float]:
-    """Decode documented IView.GetOutline / INote.GetExtent sheet coordinates."""
-    coordinates = tuple(float(value) for value in (values or ()))
-    expected = 6 if kind == "note" else 4
-    if len(coordinates) != expected or not all(map(math.isfinite, coordinates)):
-        raise RuntimeError(f"{label}: invalid native extent {coordinates!r}")
-    if kind == "note":
-        coordinates = (coordinates[0], coordinates[1], coordinates[3], coordinates[4])
-    if coordinates[0] >= coordinates[2] or coordinates[1] >= coordinates[3]:
-        raise RuntimeError(f"{label}: empty or inverted native extent {coordinates!r}")
-    return coordinates
-
-
-def _inside(box: tuple[float, ...], container: tuple[float, ...]) -> bool:
-    return (
-        box[0] >= container[0]
-        and box[1] >= container[1]
-        and box[2] <= container[2]
-        and box[3] <= container[3]
-    )
 
 
 def _rebuild(draw: Any, *, phase: str) -> None:
@@ -102,7 +81,7 @@ def _fit_views(draw: Any, views: list[Any], cells: tuple) -> tuple[int, int]:
             raise RuntimeError(
                 f"{name}: initial 1:1 view scale did not persist: {ratio!r}"
             )
-        _box(view.GetOutline(), label=name)
+        native_box(view.GetOutline(), label=name)
     for scale in _SCALES:
         with _telemetry.span(
             "drawing.purchased_scale_candidate", scale=f"{scale[0]}:{scale[1]}"
@@ -112,7 +91,7 @@ def _fit_views(draw: Any, views: list[Any], cells: tuple) -> tuple[int, int]:
                 view.ScaleRatio = double_array([float(scale[0]), float(scale[1])])
             _rebuild(draw, phase="apply common view scale")
             bounds = [
-                _box(view.GetOutline(), label=name)
+                native_box(view.GetOutline(), label=name)
                 for view, (name, _, _) in zip(views, cells, strict=True)
             ]
             if any(
@@ -145,13 +124,13 @@ def _fit_views(draw: Any, views: list[Any], cells: tuple) -> tuple[int, int]:
                     raise RuntimeError(
                         f"{name}: independent view scale did not persist: {ratio!r}"
                     )
-                box = _box(view.GetOutline(), label=name)
+                box = native_box(view.GetOutline(), label=name)
                 if (
                     abs((box[0] + box[2]) / 2 - center[0]) > 1e-6
                     or abs((box[1] + box[3]) / 2 - center[1]) > 1e-6
                 ):
                     raise RuntimeError(f"{name}: native view failed to center: {box!r}")
-                fits = fits and _inside(box, cell)
+                fits = fits and box_inside(box, cell)
             if fits:
                 return scale
     raise RuntimeError(
@@ -178,59 +157,19 @@ def _literal_note(adapter: Any, text: str, x: float, y: float) -> Any:
 
 
 @_telemetry.traced("drawing.purchased_title_block")
-def _purchased_title_block(
-    adapter: Any,
-    draw: Any,
-    *,
-    material: str,
-    finish: str,
-    material_property: str = "Material",
-) -> list[tuple[Any, str, str]]:
-    """Retarget this drawing's material/finish cells, never the saved template."""
+def _purchased_title_block(adapter: Any, draw: Any, *, finish: str) -> list[tuple[Any, str, str]]:
+    """Point FINISH at this drawing's own Finish, never the saved template.
+
+    MATERIAL is finalize_drawing's, as on every sheet: the part's Material
+    Specification.
+    """
     apply_custom_properties(adapter, {"Finish": finish}, model=draw)
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    sheet_view = ddoc.GetFirstView()
-    if sheet_view is None:
-        raise RuntimeError("purchased drawing template has no sheet view")
-    sheet_view = _early_bound(sheet_view, "IView")
-    replacements = {
-        property_link("Material"): (property_link(material_property), material),
-        property_link("Finish"): ('$PRP:"Finish"', finish),
-    }
-    matched = {token: 0 for token in replacements}
-    notes = []
-    for annotation in sheet_view.GetAnnotations() or ():
-        annotation = _early_bound(annotation, "IAnnotation")
-        if annotation.GetType() != 6:  # swAnnotationType_e.swNote
-            continue
-        specific = annotation.GetSpecificAnnotation()
-        if specific is None:
-            raise RuntimeError("purchased title-block note has no INote")
-        note = _early_bound(specific, "INote")
-        raw = str(note.PropertyLinkedText)
-        linked_text = raw
-        resolved_text = raw
-        for token, (replacement, value) in replacements.items():
-            occurrences = raw.count(token)
-            if occurrences:
-                matched[token] += occurrences
-                linked_text = linked_text.replace(token, replacement)
-                resolved_text = resolved_text.replace(token, value)
-        if resolved_text == raw:
-            continue
-        # Preserve the existing note, annotation formatting and all surrounding
-        # label text; only these exact property-link tokens change ownership.
-        if linked_text != raw:
-            note.PropertyLinkedText = linked_text
-        if note.PropertyLinkedText != linked_text:
-            raise RuntimeError(f"purchased title-block link did not persist: {raw!r}")
-        notes.append((note, linked_text, resolved_text))
-    if any(count != 1 for count in matched.values()):
-        raise RuntimeError(
-            "purchased template must contain exactly one Material "
-            f"and one Finish property link: {matched!r}"
+    return [
+        (note, linked, linked.replace('$PRP:"Finish"', finish))
+        for note, linked in retarget_title_block_links(
+            draw, {property_link("Finish"): '$PRP:"Finish"'}, label="purchased title block"
         )
-    return notes
+    ]
 
 
 async def build_purchased_fastener_drawing(
@@ -261,7 +200,7 @@ async def build_purchased_fastener_drawing(
         expected = {
             "Number": str(registry["number"]),
             "Title": str(registry["title"]),
-            "Material": str(registry["material"]),
+            "Material Specification": str(registry["material_specification"]),
             "Stock Name": stock.stock_name,
             "Supplier": stock.supplier,
             "Supplier SKUs": ", ".join(stock.skus),
@@ -292,14 +231,13 @@ async def build_purchased_spring_drawing(
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     if Path(model.GetPathName()).resolve() != source.resolve():
         raise RuntimeError(f"opened purchased spring is not {source}")
-    names = (*_PROPERTIES, "Material Specification", "Finish", "Manufacturing Notes")
+    names = (*_PROPERTIES, "Finish", "Manufacturing Notes")
     properties = read_required_properties(model, names, required=names)
     return await _build_reference_sheet(
         adapter,
         spec,
         properties=properties,
         finish=properties["Finish"],
-        material_property="Material Specification",
         reference_notes=properties["Manufacturing Notes"],
     )
 
@@ -310,7 +248,6 @@ async def _build_reference_sheet(
     *,
     properties: dict[str, str],
     finish: str,
-    material_property: str = "Material",
     installation_notes: str = "",
     reference_notes: str = "",
 ) -> dict[str, str]:
@@ -318,13 +255,7 @@ async def _build_reference_sheet(
     template = DRAWING_TEMPLATES[spec.layout]
     cells = _SPRING_VIEW_CELLS if reference_notes else _VIEW_CELLS
     draw, sheet = new_project_drawing(adapter, layout=spec.layout)
-    title_block_notes = _purchased_title_block(
-        adapter,
-        draw,
-        material=properties[material_property],
-        finish=finish,
-        material_property=material_property,
-    )
+    title_block_notes = _purchased_title_block(adapter, draw, finish=finish)
     title = f"{properties['Title']} — Purchased Part Reference Drawing"
     with _telemetry.span("drawing.purchased_summary"):
         stamp_drawing_summary(
@@ -409,7 +340,7 @@ async def _build_reference_sheet(
                 else cell[1] - 0.006
             )
             note = _literal_note(adapter, label, center[0], label_y)
-            bounds = _box(note.GetExtent(), label=label, kind="note")
+            bounds = native_box(note.GetExtent(), label=label, kind="note")
             annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
             x = 2 * center[0] - (bounds[0] + bounds[2]) / 2
             if not annotation.SetPosition(x, label_y, 0.0):
@@ -508,8 +439,8 @@ async def _build_reference_sheet(
                 raise RuntimeError(f"{name}: purchased view references the wrong model")
             if tuple(view.ScaleRatio) != scale:
                 raise RuntimeError(f"{name}: final purchased view scale changed")
-            box = _box(view.GetOutline(), label=name)
-            if not _inside(box, cell) or not _inside(box, border):
+            box = native_box(view.GetOutline(), label=name)
+            if not box_inside(box, cell) or not box_inside(box, border):
                 raise RuntimeError(
                     f"{name}: purchased view leaves its cell/border: {box!r}"
                 )
@@ -526,8 +457,8 @@ async def _build_reference_sheet(
                     f"actual link={actual_link!r}, expected text={resolved_text!r}, "
                     f"actual text={actual_text!r}"
                 )
-            box = _box(note.GetExtent(), label=linked_text, kind="note")
-            if not _inside(box, cell) or not _inside(box, border):
+            box = native_box(note.GetExtent(), label=linked_text, kind="note")
+            if not box_inside(box, cell) or not box_inside(box, border):
                 raise RuntimeError(
                     f"purchased note leaves its reserved space/border: {linked_text!r}: {box!r}"
                 )

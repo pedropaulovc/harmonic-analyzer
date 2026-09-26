@@ -1,7 +1,7 @@
 cone-pivot-post:
   number: MHA-016
   material_family: ferrous_noncritical
-  finish: RAL 6005 alkyd enamel, SSPC-SP 3, 50-75 um DFT; mask datum A, machined boss faces, bores and counterbores
+  finish: RAL 6005 alkyd enamel, SSPC-SP 3, 50-75 um DFT; foot seat, boss faces, bores, counterbores unpainted
   quantity: 1
   tolerance_class: machined_block
   process: "machined from solid stock or casting"
