@@ -220,9 +220,11 @@ JOURNAL_KEEP = {
 }
 # Both chained heights share the dimension line at JOURNAL_KEEP's x, and the
 # crank spacing's extension line runs up it past the 33.37's text, so that text
-# must end left of the line.  Its box runs 13.6 mm left and 20.4 mm right of
-# the offset point (the ±0.25 stack; measured on leaf w3-1026, where at 0.190
-# it spanned 176.4..210.4 mm and the 208.0 line crossed it).
+# must end left of the line.  Its text box (value plus the ±0.25 stack) runs
+# 20.4 mm right of the offset point: the layout check on leaf w3-1026 read the
+# box as 176.4..210.4 mm with the offset point at 190.0, so 210.4 - 190.0
+# (a measured box, not a per-character estimate), and the 208.0 line crossed
+# it.
 _JOURNAL_AXIS_TEXT_RIGHT = 0.0204
 _TEXT_LINE_CLEARANCE = 0.002
 JOURNAL_TEXT_OFFSETS = {
