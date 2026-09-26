@@ -8,14 +8,14 @@ bank's end-play leaf is set (cylinder_bank_layout).
 PURCHASED: McMaster-Carr 91375A106, alloy steel cup-tip set screw, black
 oxide, Class 3A, Rockwell C45, 0.050 in hex drive (ASME B18.3 / ASTM F912).
 The C45 cup bites the spotted steel arbor where an 18-8 (B80) cup would not.
-The model is ASME B18.3 nominal geometry, not a replica of the vendor model:
-the native comparison against the 91375A106 file is a release requirement
-(the 90280A837 / 90280A110 precedent in diag_build_mcmaster).
+
+The part is the vendor replica (diagnostics/diag_build_91375A106). These are
+the few of its dimensions the layout reads, restated here so the pedestal
+parts never import a SolidWorks recipe; test_arbor_set_screw pins the two in
+lockstep.
 """
 
 from __future__ import annotations
-
-import math
 
 from _hole_spec import THREAD_MAJOR_MM
 from arbor_pedestal_spec import SET_SCREW_THREAD
@@ -24,21 +24,11 @@ MM_PER_IN = 25.4
 
 THREAD = SET_SCREW_THREAD  # #4-40 UNC-2A
 MAJOR_DIA = THREAD_MAJOR_MM[THREAD]  # 0.112 in
-LENGTH = 0.250 * MM_PER_IN  # nominal length, point to socket face
-# ASME B18.3 hex socket set screw, #4 row (nominal/mid values): hex key
-# 0.050 in across flats; cup point 0.054-0.061 in; the point's 118-degree
-# included cone from the major diameter down to the cup rim.
+LENGTH = 0.250 * MM_PER_IN  # nominal length, cup end to socket face
 HEX_AF = 0.050 * MM_PER_IN
-SOCKET_DEPTH = 0.045 * MM_PER_IN
-CUP_DIA = 0.0575 * MM_PER_IN
-POINT_HALF_ANGLE_DEG = 59.0
-POINT_LENGTH = (MAJOR_DIA - CUP_DIA) / 2.0 / math.tan(
-    math.radians(POINT_HALF_ANGLE_DEG)
-)
-CUP_DEPTH = 0.30  # the cup's own conical recess at the point
-SOCKET_CHAMFER = 0.25  # 45-degree chamfer at the socket face
+# The vendor's cup-end chamfer, 45 deg x one pitch: the plain point below the
+# first full thread, which must span the arbor's running clearance.
+POINT_LENGTH = MM_PER_IN / 40.0
 
-if POINT_LENGTH + SOCKET_CHAMFER >= LENGTH:
-    raise AssertionError("set-screw point and chamfer overrun its length")
-if HEX_AF / math.sqrt(3.0) >= MAJOR_DIA / 2.0 - SOCKET_CHAMFER:
-    raise AssertionError("hex socket corners break out of the socket face")
+if POINT_LENGTH >= LENGTH:
+    raise AssertionError("set-screw point overruns its length")
