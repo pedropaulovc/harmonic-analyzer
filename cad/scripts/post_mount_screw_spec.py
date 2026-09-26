@@ -31,9 +31,6 @@ from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 
 SKU = "40923898"
 THREAD_DIA_MM, STOCK_LENGTH_MM, HEAD_H_MM, _HEAD_DIA, _PITCH = FILLISTER_SIZES[SKU]
-# The cut-to-fit nominal: MHA-142's own length, applied by its trim.  The
-# shared size row stays the supplied screw.
-CUT_LENGTH_MM = 86.0
 
 # Head seated on the MHA-016 counterbore floor: the under-head face to the
 # plate's top face, at the model's nominal post.
@@ -188,6 +185,20 @@ _FIT_PLACES = DRAWING_PRECISION[CUT_LENGTH_SKETCH][CUT_LENGTH_DIMENSION]
 if round(POST_SCREW_CUT_TO_FIT_SHORT, _FIT_PLACES) != POST_SCREW_CUT_TO_FIT_SHORT:
     raise ValueError("the cut-to-fit allowance does not print at the cut length's places")
 
+# The cut-to-fit nominal: MHA-142's own length, applied by its trim (the
+# shared size row stays the supplied screw).  It is the nominal post and
+# plate's flush length less the middle of the fit-to-hole allowance, at the
+# length's printed places, so the model is itself a cut the sheet accepts
+# (Codex P2 on #857: a typed 86.0 ended 0.33 short, outside 0.3).
+CUT_LENGTH_MM = round(FLUSH_LENGTH_MM - POST_SCREW_CUT_TO_FIT_SHORT / 2.0, _FIT_PLACES)
+CUT_SHORT_NOMINAL_MM = FLUSH_LENGTH_MM - CUT_LENGTH_MM
+if not 0.0 <= CUT_SHORT_NOMINAL_MM <= POST_SCREW_CUT_TO_FIT_SHORT:
+    raise ValueError(
+        f"MHA-142 modelled length {CUT_LENGTH_MM} ends {CUT_SHORT_NOMINAL_MM:.3f} "
+        f"short of the nominal MHA-091 underside, outside flush to "
+        f"{POST_SCREW_CUT_TO_FIT_SHORT} short"
+    )
+
 # The named exception's worst case, cut to fit: unlike the fixed-length
 # corner above, the floor drops out (each screw is cut to its own hole), so
 # the plate limits it -- the thinnest stock, the full fit-to-hole allowance,
@@ -229,13 +240,8 @@ CUT_TO_FIT_CALLOUT = (
     f"ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN"
 )
 
-# The model as built, on the nominal chain: the reference length never
-# stands proud, and still holds the exception's minimum.
-if CUT_LENGTH_MM > FLUSH_LENGTH_MM:
-    raise ValueError(
-        f"MHA-142 modelled length {CUT_LENGTH_MM} stands proud of the nominal "
-        f"MHA-091 underside ({FLUSH_LENGTH_MM:.2f})"
-    )
+# The model as built, on the nominal chain (its cut end is inside the
+# acceptance, checked above), still holds the exception's minimum.
 ENGAGEMENT_NOMINAL_MM = CUT_LENGTH_MM - GRIP_MM
 if ENGAGEMENT_NOMINAL_MM < MIN_ENGAGEMENT_MM:
     raise ValueError(

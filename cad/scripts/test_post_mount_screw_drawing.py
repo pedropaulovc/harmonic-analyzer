@@ -33,11 +33,11 @@ GRIP = post.BLOCK_HEIGHT - post.ATTACHMENT_CBORE_DEPTH
 
 
 def test_recipe_is_the_u37c_screw() -> None:
-    """1/4-20, ASME B18.6.3 1/4 fillister head maximum, 86.0 cut length."""
+    """1/4-20, ASME B18.6.3 1/4 fillister head maximum, 86.2 cut length."""
     assert part.THREAD == platform.POST_MOUNT_SPEC.size == "1/4-20"
     assert part.SHANK_DIA == THREAD_MAJOR_MM[part.THREAD]
     assert part.THREAD_PITCH == IN / 20.0
-    assert part.SHANK_LEN == 86.0
+    assert part.SHANK_LEN == 86.2
     assert part.HEAD_DIA == 0.414 * IN
     assert part.HEAD_H == 0.237 * IN
 
@@ -87,10 +87,10 @@ def test_no_fixed_cut_length_fits_both_in_band_corners() -> None:
 
 
 def test_cut_length_prints_as_a_reference_without_a_band() -> None:
-    """No fixed length exists, so the model's 86.0 prints as "(86.0)" with
+    """No fixed length exists, so the model's 86.2 prints as "(86.2)" with
     no tolerance; the callout beneath it carries the fit-to-hole acceptance
     (see test_cut_to_fit_acceptance_prints_on_the_delegating_callout)."""
-    assert spec.CUT_LENGTH_MM == part.SHANK_LEN == 86.0
+    assert spec.CUT_LENGTH_MM == part.SHANK_LEN == 86.2
     assert not hasattr(spec, "CUT_LENGTH_BAND")
     assert not hasattr(drawing, "EXPECTED_CONTROLS")
     builder = Path(part.__file__).read_text(encoding="utf-8")
@@ -357,14 +357,14 @@ def test_shared_fillister_recipe_is_untouched() -> None:
 
 def test_catalog_row_is_the_supplied_stock_and_only_the_part_is_cut() -> None:
     """Codex P2 on #857 (PRRT_kwDOPHDy386mP6Dj): the MSC 40923898 row held
-    the 86.0 cut length, so the catalog build (40923898-catalog.SLDPRT) and
+    the cut length, so the catalog build (40923898-catalog.SLDPRT) and
     any direct stock consumer got the modified length labelled as supplier
     stock; only MHA-142's builder swapped in 3-1/2 in.  The row is the
     supplied screw; the cut-to-fit length is MHA-142's own spec, applied by
     its trim, and the builder never mutates the shared row."""
     assert FILLISTER_SIZES["40923898"][1] == pytest.approx(3.5 * 25.4)
     assert spec.STOCK_LENGTH_MM == FILLISTER_SIZES["40923898"][1]
-    assert part.SHANK_LEN == spec.CUT_LENGTH_MM == 86.0
+    assert part.SHANK_LEN == spec.CUT_LENGTH_MM == 86.2
     assert not hasattr(part, "_supplied_stock_length")
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "FILLISTER_SIZES[SKU] =" not in source
@@ -408,7 +408,7 @@ def test_analytic_removal_volumes_match_a_brute_force_integral() -> None:
     trim, deburr = _independent_removal()
     assert spec.TRIM_REMOVED_MM3 == pytest.approx(trim, rel=1e-4)
     assert spec.CUT_END_DEBURR_REMOVED_MM3 == pytest.approx(deburr, rel=1e-3)
-    assert spec.TRIM_REMOVED_MM3 == pytest.approx(67.581, abs=1e-3)
+    assert spec.TRIM_REMOVED_MM3 == pytest.approx(62.733, abs=1e-3)
     assert spec.CUT_END_DEBURR_REMOVED_MM3 == pytest.approx(0.0153, abs=1e-4)
 
 
@@ -469,6 +469,41 @@ def test_sheet_notes_carry_no_dimension_rule_or_sequence() -> None:
     for word in ("RULE", "EXCEPTION", "ENGAGEMENT", "NOMINAL", "INSTALL", "MHA-"):
         assert word not in notes
     assert len(notes.splitlines()) <= 4
+
+
+def _printed_cut_short_allowance() -> float:
+    """The acceptance the sheet prints: "END FLUSH TO <x> SHORT"."""
+    match = re.search(r"END FLUSH TO (\d+(?:\.\d+)?) SHORT", spec.CUT_TO_FIT_CALLOUT)
+    assert match, spec.CUT_TO_FIT_CALLOUT
+    return float(match.group(1))
+
+
+def _short_of_underside(length_mm: float) -> float:
+    """How far a screw of this length ends short of the MHA-091 underside on
+    the nominal post and plate (negative: proud)."""
+    return GRIP + platform.PLATE_THICKNESS - length_mm
+
+
+def test_the_modelled_length_is_a_cut_the_sheet_accepts() -> None:
+    """Codex P2 on #857 (PRRT_kwDOPHDy386mRhqY): the source CAD must satisfy
+    its own sheet.  On the nominal post and plate the flush length is
+    86.0 - 6.0198 + 6.35 = 86.3302, so the old 86.0 ended 0.33 short --
+    outside the callout's "END FLUSH TO 0.3 SHORT".  The modelled length is
+    the flush length less the allowance's midpoint, at its printed places."""
+    allowance = _printed_cut_short_allowance()
+    assert allowance == 0.3
+
+    def accepted(length_mm: float) -> bool:
+        return 0.0 <= _short_of_underside(length_mm) <= allowance
+
+    assert not accepted(86.0)
+    assert accepted(spec.CUT_LENGTH_MM)
+    assert spec.CUT_LENGTH_MM == 86.2
+    places = spec.DRAWING_PRECISION_BY_NAME[spec.CUT_LENGTH_DIMENSION]
+    assert spec.CUT_LENGTH_MM == round(
+        _short_of_underside(0.0) - allowance / 2.0, places
+    )
+    assert part.SHANK_LEN == spec.CUT_LENGTH_MM
 
 
 def test_engagement_exception_is_held_by_the_model() -> None:
