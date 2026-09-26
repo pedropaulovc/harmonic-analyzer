@@ -358,6 +358,7 @@ async def build(adapter: Any) -> dict[str, str]:
         if tag == "B2":
             d743.set_suppressed(adapter, front, "BracketSeats", False, tag=tag)
             d743.set_global(adapter, front, "RailDepth", "6.35mm", tag=tag)
+        d743.log_global(front, "RailDepth", tag=tag)
         d743.log_feature_state(front, watched, tag=tag)
         d743.log_edge_visibility(adapter, views, tag=tag)
         d743.per_view_imports(adapter, views, tag=tag)

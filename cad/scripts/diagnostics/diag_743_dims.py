@@ -298,3 +298,22 @@ def set_global(adapter: Any, view: Any, name: str, value: str, *, tag: str) -> N
         _rebuild(adapter, view, tag=tag)
     except Exception as exc:  # noqa: BLE001
         _log(f"{tag} set global {name} failed: {exc!r}")
+
+
+def log_global(view: Any, name: str, *, tag: str) -> None:
+    """The value SolidWorks holds for one global, as read back (globals round
+    to the document's decimal places)."""
+    try:
+        part = _part(view)
+        manager = _sw_type_info.early_bound_or_flag(
+            part.GetEquationMgr(), "IEquationMgr", "Equation", "Value", "GetCount"
+        )
+        lhs = f'"{name}"'
+        for index in range(int(_read_member(manager, "GetCount") or 0)):
+            text = str(manager.Equation(index) or "")
+            if text.partition("=")[0].strip() == lhs:
+                _log(f"{tag} global {text!r} holds {manager.Value(index)}")
+                return
+        _log(f"{tag} global {name} not found")
+    except Exception as exc:  # noqa: BLE001
+        _log(f"{tag} global {name} read failed: {exc!r}")
