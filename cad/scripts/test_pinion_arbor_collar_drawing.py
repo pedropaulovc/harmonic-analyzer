@@ -63,6 +63,8 @@ def test_collar_pin_is_the_stock_mha145_named_on_the_hole_not_a_note() -> None:
         f"{strap_pin.DRILL_THRU_CALLOUT}\nFOR {row['number']} SPRING PIN"
     )
     assert drawing.DIMENSION_CALLOUTS["PinHoleDia"] == spec.PIN_HOLE_CALLOUT
+    # One callout for the one pin, on both sheets that drill for it.
+    assert spec.PIN_HOLE_CALLOUT is arbor_pin.PIN_HOLE_CALLOUT
     assert not hasattr(spec, "DRAWING_NOTES")
     for script in (collar, drawing):
         assert "Manufacturing Notes" not in Path(script.__file__).read_text(
