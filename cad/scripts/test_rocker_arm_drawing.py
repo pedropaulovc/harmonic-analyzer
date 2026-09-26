@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import ast
 import math
+import re
 from pathlib import Path
 
 import rocker_arm_notes
@@ -83,7 +85,9 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert re.search(
+        r'add_property_linked_note\(\s*adapter, "Manufacturing Notes"', source
+    )
 
 
 def test_native_gdt_and_finish_present() -> None:
@@ -227,3 +231,61 @@ def test_both_bores_are_picked_by_diameter_not_by_a_rim_coordinate() -> None:
             assert keywords["entities"] == "(pivot_bore_edge, rod_hole_edge)"
         else:
             assert keywords["edge_entity"] == "rod_hole_edge"
+
+
+# Measured on the r743-p1s-B2 render (5100x3300 px on 431.8x279.4 mm): the
+# drawable region ends 12.7 mm above the sheet's bottom edge, the linked
+# notes pitch ~4.14 mm a line, and the iso caption runs ~2.5 mm a character.
+BORDER_BOTTOM = 0.0127
+NOTE_LINE_PITCH = 0.0042
+CAPTION_CHAR_WIDTH = 0.0026
+RIGHT_BORDER = 0.415
+
+
+def test_general_notes_are_seated_on_the_border_under_the_front_view() -> None:
+    """r743-p1s-B2: anchored by its top at 0.082, the 18-line block ran two
+    lines past the bottom border. The build now seats its MEASURED bottom on
+    the drawable region and fails if it then reaches the front view's
+    annotations; this pins that the block fits that band at all."""
+    lines = rocker_arm_notes.DRAWING_NOTES.splitlines()
+    bottom = BORDER_BOTTOM + drawing.NOTES_BORDER_CLEARANCE
+    assert bottom + len(lines) * NOTE_LINE_PITCH < drawing.NOTES_CEILING - 0.010
+    # The old top anchor: the same block reached below the border.
+    assert 0.082 - len(lines) * NOTE_LINE_PITCH < BORDER_BOTTOM
+    assert drawing.NOTES_CEILING < 0.117  # the front view's O6.50 text
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_seat_notes_on_border(adapter, notes, sheet)" in source
+    assert "check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)" in source
+
+
+def test_iso_caption_sits_under_the_iso_clear_of_the_frame_and_end_view() -> None:
+    caption = rocker_arm_notes.ISOMETRIC_VIEW_NOTE
+    left, top = drawing.ISO_CAPTION_XY
+    right = left + len(caption) * CAPTION_CHAR_WIDTH
+    fcf_bottom = drawing.FCF_XY[1] - 0.007
+    assert top < fcf_bottom - 0.003
+    assert left > drawing.RIGHT_CENTER[0] + 0.015  # the end view and its +0.05
+    assert right < RIGHT_BORDER - 0.005
+    # Under the iso: the caption's span overlaps the iso's.
+    assert left < drawing.ISO_CENTER[0] < right
+
+
+def test_pivot_finish_is_note_height_with_its_leader_running_down_left() -> None:
+    """r743-p1s-B2: the default-height Ra 1.6 sat across the strap and the
+    centre mark, its leader running up through the symbol. The body draws
+    up-right of its leader end, so the symbol sits up-right of its rim point."""
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    (call,) = (
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", "") == "add_surface_finish"
+    )
+    keywords = {k.arg: ast.unparse(k.value) for k in call.keywords}
+    assert keywords["char_height"] == "0.0025"
+    assert keywords["leader_attach_xy"] == "pivot_finish_rim"
+    assert keywords["symbol_xy"] == (
+        "(pivot_finish_rim[0] + 0.012, pivot_finish_rim[1] + 0.011)"
+    )
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "pivot_finish_angle = math.radians(45.0)" in source
