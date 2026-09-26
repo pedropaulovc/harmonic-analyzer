@@ -87,6 +87,9 @@ RAIL_DEPTH = round(
     / 10.0,
     1,
 )  # 22.7, .X on the print
+# The print carries RAIL_DEPTH at .X, the band SEAT_FLOOR_MIN assumes; the
+# part owns those places (Codex #936 PRRT_kwDOPHDy386mTMXw).
+RAIL_DEPTH_PLACES = 1
 WINDOW_TOP_Y = HALF_Y - RAIL_DEPTH  # local 66.2 (machine y 205.9)
 WINDOW_BOTTOM_Y = FOOT_THICKNESS - HALF_Y  # local -82.55, unchanged
 WINDOW_HEIGHT = WINDOW_TOP_Y - WINDOW_BOTTOM_Y  # 148.75
@@ -150,6 +153,7 @@ __all__ = [
     "LINEAR_1PL",
     "LINEAR_2PL",
     "RAIL_DEPTH",
+    "RAIL_DEPTH_PLACES",
     "RAIL_WALL",
     "SCREW_LENGTH",
     "SCREW_REACH_MAX",

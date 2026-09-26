@@ -90,6 +90,7 @@ from _common import (
     define_centered_rectangle,
     define_polygon_chain,
     define_rectilinear_chain,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -98,12 +99,14 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_sketch_direct_db,
     set_global,
     volume_check,
 )
 from _holes import blind_hole_volume_mm3, wizard_holes
 from _drawing_marks import (
     apply_drawing_properties,
+    apply_drawing_precision,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
@@ -120,6 +123,7 @@ from rocker_arm_support_spec import (
 )
 from rocker_bracket_seat_layout import (
     RAIL_DEPTH,
+    RAIL_DEPTH_PLACES,
     SEAT_LOCAL_X,
     SEAT_SPEC,
     WINDOW_TOP_Y,
@@ -219,7 +223,7 @@ HOLES = [(60.32, 17.46), (-60.32, 17.46), (60.32, -17.46), (-60.32, -17.46)]
 # The manufacturing print's dimension set (draw_rocker_arm_support.py imports
 # exactly these marked dimensions; its keep maps must stay in lockstep).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "WallProfile": {"FootSpan", "TopSpan", "WallHeight"},
+    "WallProfile": {"FootSpan", "TopSpan", "WallHeight", "RailDepth"},
     "Wall": {"Depth"},
     # A single associative size plus an SQ callout defines each square.
     "WindowProfile": {"WinWidth"},
@@ -438,6 +442,37 @@ async def build(adapter) -> dict[str, str]:
             '2 * "TopHalf"',
         ],
     )
+    # The rail depth as a model dimension (Codex #936 PRRT_kwDOPHDy386mTMXw):
+    # a construction line across the trapezoid at the window's top edge,
+    # RailDepth under its top edge. It drives no solid (WindowProfile runs off
+    # the same global), and Section A-A, parallel to this Right-plane sketch,
+    # imports it with the other WallProfile dimensions.
+    rail_half = _wall_half_z_at(WINDOW_TOP_Y)
+    set_sketch_direct_db(adapter, True)
+    rail = check(
+        "rail depth line",
+        await adapter.add_centerline(-rail_half, WINDOW_TOP_Y, rail_half, WINDOW_TOP_Y),
+    )
+    set_sketch_direct_db(adapter, False)
+    check("rail depth line level", await adapter.add_sketch_constraint(rail, None, "horizontal"))
+    left_slant, right_slant, top = trap_lines[3], trap_lines[1], trap_lines[2]
+    check(
+        "rail depth line on the left wall",
+        await adapter.add_sketch_constraint(f"{rail}.start", left_slant, "coincident"),
+    )
+    check(
+        "rail depth line on the right wall",
+        await adapter.add_sketch_constraint(f"{rail}.end", right_slant, "coincident"),
+    )
+    await dimension_between(
+        adapter,
+        f"{rail}.end",
+        f"{top}.start",
+        "vertical_distance",
+        RAIL_DEPTH,
+        "trapezoid RailDepth",
+    )
+    trap.record("RailDepth", '"RailDepth"')
     await ensure_fully_defined(adapter, "trapezoid")
     check("exit boss", await adapter.exit_sketch())
     name_last_feature(adapter, "WallProfile")
@@ -615,6 +650,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, {"WallProfile": {"RailDepth": RAIL_DEPTH_PLACES}})
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
     await apply_material(adapter, MATERIAL)

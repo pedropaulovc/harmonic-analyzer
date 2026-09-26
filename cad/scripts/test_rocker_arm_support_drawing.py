@@ -31,6 +31,7 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
         "PocketRadius",
         "CavityRadius",
         "RimChamferSize",
+        "RailDepth",
     }
     marked = set().union(*support.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
@@ -43,13 +44,14 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
         "RimChamferSize": " X 45 DEG\n2 FACES",
     }
     assert drawing.DIMENSION_PRECISION == {
-        **dict.fromkeys(expected - {"PocketRadius", "RimChamferSize"}, 1),
+        **dict.fromkeys(expected - {"PocketRadius", "RimChamferSize", "RailDepth"}, 1),
         "PocketRadius": 2,
         "RimChamferSize": 2,
         "WebThickness": 2,
         "FootThickness": 2,
-        "RailDepth": 1,
     }
+    # The rail depth's places are the part's (Codex #936 PRRT_kwDOPHDy386mTMXw).
+    assert drawing.MODEL_OWNED_PRECISION == {"RailDepth": seats.RAIL_DEPTH_PLACES}
 
 
 def test_pocket_and_cavity_reliefs_are_distinct() -> None:
@@ -515,20 +517,20 @@ def test_bracket_screw_stack_holds_at_the_printed_worst_case() -> None:
     assert seats.RAIL_WALL >= 2.0
 
 
-def test_section_picks_land_on_the_rail_and_the_lower_web() -> None:
-    def wall(y: float) -> float:
-        return support.WIDE + (support.NARROW - support.WIDE) * (
-            (y + support.HALF_Y) / (2.0 * support.HALF_Y)
-        )
-
-    # Top face: half-width NARROW less the rim chamfer. Pocket top face: from
-    # the web face out to the chamfered wall.
-    z = drawing.RAIL_PICK_Z
-    assert z < support.NARROW - support.CHAMFER
-    assert support.WEB < z < wall(seats.WINDOW_TOP_Y) - support.CHAMFER
+def test_rail_depth_is_a_model_dimension_on_the_section_plane() -> None:
+    """Codex #936 PRRT_kwDOPHDy386mTMXw: the rail depth the seat stack's
+    worst case rests on is a marked WallProfile dimension (the Right-plane
+    trapezoid Section A-A is parallel to), carried at the layout's .X places
+    by the part and only asserted by the sheet."""
+    assert "RailDepth" in support.DRAWING_DIMENSIONS["WallProfile"]
+    assert drawing.RIGHT_KEEP["RailDepth"] == drawing.RAIL_TEXT_XY
+    assert seats.RAIL_DEPTH_PLACES == 1
+    assert round(seats.RAIL_DEPTH, seats.RAIL_DEPTH_PLACES) == seats.RAIL_DEPTH
+    # The construction line it measures to spans the wall at the window top.
+    assert 0.0 < support._wall_half_z_at(seats.WINDOW_TOP_Y) < support.WIDE
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "RIGHT_CENTER[1] - (BIG + CAV) / 2.0" in source
-    assert 'label="section rail depth"' in source
+    assert "SetPrecision3(DIMENSION_PRECISION[\"RailDepth\"]" not in source
+    assert 'label="section rail depth"' not in source
 
 
 def test_rim_chamfer_is_placed_on_the_section_by_a_targeted_import() -> None:
@@ -561,13 +563,15 @@ def test_rim_chamfer_is_placed_on_the_section_by_a_targeted_import() -> None:
 def test_precision_reaches_every_dimension_exactly_once() -> None:
     """r743-rocker-fix (53cb9ad5b) failed "dimension precision not applied:
     ['RailDepth']": the bulk call covers only imported dimensions, and the
-    sheet-made ones (web, foot, rail depth) set their own after the import.
-    Every DIMENSION_PRECISION name goes through exactly one of the two."""
+    sheet-made ones (web, foot) set their own after the import. Every
+    DIMENSION_PRECISION name goes through exactly one of the two; the
+    part-owned rail depth goes through neither."""
     import ast
 
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     bulk = drawing.imported_precision()
     assert set(bulk) == kept & set(drawing.DIMENSION_PRECISION)
+    assert not set(bulk) & set(drawing.MODEL_OWNED_PRECISION)
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     own = {
         node.slice.value
@@ -577,7 +581,7 @@ def test_precision_reaches_every_dimension_exactly_once() -> None:
         and node.value.id == "DIMENSION_PRECISION"
         and isinstance(node.slice, ast.Constant)
     }
-    assert own == {"WebThickness", "FootThickness", "RailDepth"}
+    assert own == {"WebThickness", "FootThickness"}
     assert not own & set(bulk)
     assert own | set(bulk) == set(drawing.DIMENSION_PRECISION)
 
@@ -594,38 +598,6 @@ def _z_line(y_mm: float, z0_mm: float, z1_mm: float, *, direction=(0.0, 0.0, 1.0
         GetEndVertex=lambda: SimpleNamespace(GetPoint=lambda: points[1]),
         name=f"y{y_mm} z{z0_mm}..{z1_mm}",
     )
-
-
-def test_rail_depth_is_dimensioned_between_exact_section_edges(monkeypatch) -> None:
-    """r743-rocker-fix2 (2570b5251): the coordinate picks for the rail depth
-    produced "section rail dimension measured 2225.982125 mm". The section now
-    hands add_edge_dimension the longest visible model lines along Z on the top
-    face and on the window's top face."""
-    arc = SimpleNamespace(GetCurve=lambda: SimpleNamespace(IsLine=lambda: False))
-    edges = [
-        _z_line(support.HALF_Y, -7.2, 7.2),
-        _z_line(support.HALF_Y, -1.0, 1.0),
-        _z_line(seats.WINDOW_TOP_Y, -9.9, -3.175),
-        _z_line(seats.WINDOW_TOP_Y, 3.175, 5.0),
-        _z_line(seats.WINDOW_TOP_Y, -50.0, 50.0, direction=(1.0, 0.0, 0.0)),
-        arc,
-    ]
-    view = SimpleNamespace(
-        GetVisibleComponents=lambda: ("support",),
-        GetVisibleEntities2=lambda component, kind: tuple(edges),
-    )
-    adapter = SimpleNamespace(_attempt=lambda call, default=None: call())
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
-    top, window = drawing._right_rail_edges(adapter, view)
-    assert top.name == f"y{support.HALF_Y} z-7.2..7.2"
-    assert window.name == f"y{seats.WINDOW_TOP_Y} z-9.9..-3.175"
-
-    edges[:] = [_z_line(support.HALF_Y, -7.2, 7.2)]
-    with pytest.raises(RuntimeError, match="window top-face"):
-        drawing._right_rail_edges(adapter, view)
-
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "entities=_right_rail_edges(adapter, right)" in source
 
 
 # Sheet-default note text as rendered by r743-rocker-fix3 (leaf
