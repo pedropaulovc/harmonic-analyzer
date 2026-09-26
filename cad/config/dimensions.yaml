@@ -472,18 +472,18 @@ sections:
         - 'derived: 134 stack (20 × 7.06 Z-pitch) + journal/clamp each end (eight-views 8/8 pedestals)'
         - derived
         - low
-      - - Cylinder end discs ×2 (2026-09)
-        - Ø55 × 3 brass annulus, Ø9.6 bore, 0.5 outboard of gears 0 and 19 on the arbor
-        - '2.17'
-        - 'p.23 "back side" / p.25 "front side" + ch25 p.67 edge-on: a toothless brass washer closes each end of the sandwich (~0.9 of the gear OD; Ø55 since a Ø60 grazed the cone-tip bushing) (`build_cylinder_end_disc.py`)'
-        - scaled
-        - low
-      - - Pedestal dome cap screws ×2 (2026-09)
-        - Ø10 × 3 spherical crown with a Ø5 × 2 spigot, on the arbor axis on each pedestal's outer strap face
-        - '0.39'
-        - 'p.23/25 + ch25 p.67: a bright domed head closes the blind arbor bore on each pedestal (`build_dome_cap_screw.py`)'
-        - scaled
-        - low
+      - - Cylinder bank thrust washers ×2 (#743, 2026-09-25)
+        - Ø25 × Ø9.6 × 1.50 ±0.05 turned steel washer, one between each end gear and its arbor-pedestal strap (MHA-121)
+        - '0.98'
+        - 'p.23 "back side" / p.25 "front side" + ch25 p.67 edge-on: a plain annulus closes each end of the gear/rod sandwich. #743 closes the stack: each gear is one station pitch thick, the back washer bears on the DRO-located back strap, the front one is feeler-set 0.45 off the front strap (`cylinder_bank_layout.py`, `build_cylinder_end_disc.py`). Supersedes the Ø55 × 3 brass disc'
+        - derived
+        - med
+      - - Arbor ends and set screws (#743, 2026-09-25)
+        - arbor ends domed, 1.5 proud of each strap; one #4-40 × 1/4 cup-point set screw in each pedestal crown apex (MHA-147)
+        - '0.06'
+        - 'p.23/25 + ch25 p.67: the bright dome on each pedestal is the arbor end; ch12 p.18 and the user ruling on #743 (Q3) put a set screw at each strap apex. Supersedes the Ø10 dome cap screw MHA-125 (`build_dome_cap_screw.py`, deleted)'
+        - derived
+        - med
   - prose: |2
 
       Notes: set is a sandwich — shiny brass gears alternating with black rough-finished
@@ -796,8 +796,8 @@ sections:
         - original support placement retained; apex top at y = 228.6
         - med
       - - Hold-down hex-head screws ×4 (M6.10)
-        - 'McMaster 92240A539 18-8 stainless hex-head screws install top-down: 1/4-20 UNC-2A, 5/8 in nominal under-head length, fully threaded, 7/16 in across flats × 5/32 in head, ASME B18.2.1. Each exact vendor-modeled 0.277813 mm under-head washer transition bears on the support; the shank passes through a 5/16 drill in the 6.35-thick foot into a blind 1/4-20 UNC-2B base seat at machine (x, z) = (55.44 or 90.36, −60.32 or +60.32). Installed engagement is 9.247187 mm (1.456D); usable full thread is 9.497187 mm; cylindrical tap-drill depth is 15.847187 mm (full thread + five 1.27 mm pitches). No underside counterbore.'
-        - 'four-hole pattern and foot thickness from `cad/scripts/build_rocker_arm_support.py`; base thread/drill contract from `cad/scripts/build_harmonic_base.py`; purchased identity from `cad/scripts/build_lag_screw.py`; supplied vendor SLDPRT harvested read-only and matched by `cad/scripts/diagnostics/diag_build_92240A539.py`; placed in frame.SLDASM'
+        - 'McMaster 92240A540 18-8 stainless hex-head screws install top-down: 1/4-20 UNC-2A, 3/4 in nominal under-head length, fully threaded, 7/16 in across flats × 5/32 in head, ASME B18.2.1. Each exact vendor-modeled 0.277813 mm under-head washer transition bears on the support; the shank passes through a 5/16 drill in the 6.35-thick foot into a blind 1/4-20 UNC-2B base seat at machine (x, z) = (55.44 or 90.36, −60.32 or +60.32). Installed engagement is 12.422187 mm (1.956D); the seat is sized at its printed .XX worst case: full thread 13.20 mm (engagement + 0.25 tip reserve + 0.51 band, rounded up to 0.05), cylindrical tap-drill depth 20.60 mm (full thread + 2 x 0.51 band + five 1.27 mm pitches). No underside counterbore.'
+        - 'four-hole pattern and foot thickness from `cad/scripts/build_rocker_arm_support.py`; base thread/drill contract from `cad/scripts/build_harmonic_base.py`; purchased identity from `cad/scripts/build_lag_screw.py`; supplied vendor SLDPRT harvested read-only and matched by `cad/scripts/diagnostics/diag_build_92240A540.py`; placed in frame.SLDASM'
         - high (catalog + native vendor model + assembly contract)
       - - Pivot brackets ×2 (replaced the chrome ball mounts 2026-09)
         - 'black L-bracket (2026-09-02, was a T): foot 16 wide (fits the support''s 16.93 apex) × 6 × 24 running INBOARD from the ear with two Ø4.2 holes on its centreline, ear stub 14 × 6 carrying a Ø16 chrome ball at 25.2 above the foot with the Ø6.5 shaft bore through the ball; north bracket turned Ry180 in channel.SLDASM'

@@ -54,7 +54,7 @@ def test_shaft_band_closes_the_configured_running_fit() -> None:
 
 def test_the_part_owns_display_precision_and_the_sheet_only_asserts_it() -> None:
     assert part.DRAWING_PRECISION is spec.DRAWING_PRECISION
-    assert spec.DRAWING_PRECISION_BY_NAME == {"ShaftDia": 3, "Depth": 1}
+    assert spec.DRAWING_PRECISION_BY_NAME == {"ShaftDia": 3, "Depth": 1, "DomeHeight": 1}
     assert "draw_cylinder_gear_shaft.py" in PRECISION_MIGRATED_DRAWINGS
     # 3/8 in = 9.525 exactly: rounding the O.D. to 9.53 would contradict the
     # native bearing size every mating bore is built from.
@@ -98,17 +98,33 @@ def test_the_isometric_note_states_the_only_off_sheet_scale() -> None:
 
 
 def test_the_length_is_a_cut_to_fit_reference() -> None:
-    """U34b: the fitter cuts the arbor to the span over both pedestals.
+    """#743 (superseding U34b's "span less 6.0"): the arbor fills both strap
+    bores, so its cylinder IS the span over both installed pedestals -- a REF
+    value the callout under it governs -- and each end is domed proud."""
+    import cylinder_bank_layout as bank
 
-    The modelled length is that nominal span less the fit shortfall, so the
-    REF value the sheet prints agrees with the callout that governs it.
-    """
-    strap_span = 75.202 - (-72.652)
-    outer_span = strap_span + 2 * arbor_pedestal_spec.STRAP_T
-    assert round(outer_span - spec.FIT_SHORTFALL, 1) == spec.SHAFT_LENGTH
+    outer_span = bank.STRAP_INNER_SPAN + 2 * arbor_pedestal_spec.STRAP_T
+    assert part.SHAFT_LENGTH == bank.ARBOR_LENGTH == outer_span
+    assert part.DOME_HEIGHT == bank.ARBOR_DOME_HEIGHT
+    assert not hasattr(spec, "FIT_SHORTFALL")
     assert spec.DRAWING_PRECISION_BY_NAME["Depth"] == 1
-    assert "CUT TO FIT" in spec.LENGTH_CALLOUT
-    assert "MHA-004" in spec.LENGTH_CALLOUT
+    assert spec.LENGTH_CALLOUT == "CUT TO FIT: SPAN OVER BOTH MHA-004"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'set_reference_dimension(adapter, length_annotations[0]' in source
     assert '{"Depth": LENGTH_CALLOUT}' in source
+
+
+def test_both_ends_are_domed_and_the_height_is_model_owned() -> None:
+    """The bright dome on each pedestal is the arbor end (#743, MHA-125
+    deleted). InsertDome states no markable height, so a hidden reference
+    sketch owns it, as the pedestal's locations are owned."""
+    assert spec.REFERENCE_SKETCHES == ("DomeReference",)
+    assert spec.DRAWING_DIMENSIONS["DomeReference"] == {"DomeHeight"}
+    assert spec.DRAWING_PRECISION_BY_NAME["DomeHeight"] == 1
+    assert spec.DOME_CALLOUT == "BOTH ENDS"
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '_dome_end(adapter, 0.0, "SouthDome")' in source
+    assert '_dome_end(adapter, SHAFT_LENGTH, "NorthDome")' in source
+    assert "_hide_reference_sketches(adapter)" in source
+    assert part.DOME_SPHERE_RADIUS > part.SHAFT_RADIUS
+    assert "NO FLATS" in spec.DRAWING_NOTES

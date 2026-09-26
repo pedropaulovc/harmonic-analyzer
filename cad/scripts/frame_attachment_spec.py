@@ -25,7 +25,9 @@ SCREW_SPOTFACE_DIAMETER = 9.0
 # The casting is tapped continuously across the interrupted column socket.
 # Tube walls are clearance-drilled separately after matching their positions.
 CASTING_FULL_THREAD_DEPTH = 46.0
-CASTING_TAP_DRILL_DEPTH = 48.0
+# 49 MIN: the tap drill keeps two bottoming-tap pitches past the deepest
+# printed thread (46.00 + 0.51 .XX band), not just past its nominal.
+CASTING_TAP_DRILL_DEPTH = 49.0
 TUBE_CROSS_HOLE_DIAMETER = 5.0
 
 CAP_TOP_Y = 1044.8

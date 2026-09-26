@@ -344,6 +344,17 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
             # R1: MHA-058 is a bonded slip fit modelled line to line in the
             # MHA-102 cross-hole, so the pair needs no interference allowance.
+            # #743 Q3: MHA-147 #4-40 x 1/4 in each pedestal crown tap (the
+            # _hole_spec major 2.845 in the #43 tap drill, over its length).
+            **_expected_numbered_pairs(
+                "arbor-set-screw",
+                range(1, 3),
+                "arbor-pedestal",
+                2.845,
+                2.261,
+                6.35,
+                second_number=None,
+            ),
         },
         "frame": {
             **_expected_numbered_pairs(
@@ -352,7 +363,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "harmonic-base",
                 6.35,
                 5.105,
-                9.2471875,
+                12.4221875,
             ),
             # MHA-132 / 90280A837: #10-32 major 4.826, #21 drill 4.0386.
             # The 44.45-mm shank crosses a 25.5-mm socket. Its shortest

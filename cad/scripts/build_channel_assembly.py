@@ -50,7 +50,8 @@ axis (Ry(-90), machine frame) so its end slots and O2 top pin hole run
 across Z, straddling the 2.5 arm / 3.0 lever; the spring's end-hook ring
 lies perpendicular to the lever face. Channel
 stations: z_j = -64.0124 + 7.0565 j, arm/bar/lever mid-planes at z_j + 0.8,
-cam/rod plane z_j - 3.25 (rod tip strap face-flush against the arm).
+cam/rod plane z_j - 3.528 (half the cylinder gear's 7.0565 stacking
+thickness: the ring centred in its closed slot, #743).
 
 Operational DOF use semantic contact mates; fixed hardware and the static
 spring bank retain their measured transforms. Radial joints are concentric
@@ -182,6 +183,8 @@ from build_fulcrum_keeper import (
     CBORE_DEPTH_MM as KEEPER_CBORE_DEPTH,
     FOOT_H as KEEPER_FOOT_H,
 )
+from cylinder_gear_spec import CAM_THICKNESS as CYL_CAM_THICKNESS
+from cylinder_gear_spec import FACE_WIDTH as CYL_FACE_WIDTH
 from cylinder_gear_spec import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
 
 # imported, NOT copied, so the rod ring stays concentric with the cam when the
@@ -236,7 +239,10 @@ if abs(Z0 - CHANNEL_Z0) > 1e-9:
         f"channels.station_z0_mm {Z0:g} != installation contract {CHANNEL_Z0:g}"
     )
 ARM_MID_DZ = 0.8  # arm/bar/lever mid-planes at z_j + 0.8
-CAM_DZ = -3.25  # end-for-end cylinder gear: cam / rod-ring plane at z_j - 3.25
+# End-for-end cylinder gear: the cam / rod-ring mid-plane sits half the gear's
+# overall (stacking) thickness south of z_j, centred in the closed rod slot
+# between gear j's web and gear j-1's back face (#743 solid stack).
+CAM_DZ = -(CYL_FACE_WIDTH + CYL_CAM_THICKNESS) / 2.0
 
 # --- rocker bank ------------------------------------------------------------
 # PIVOT (72.9, 253.8): the rocker pivot shaft axis -- imported from channel_frame_geom.

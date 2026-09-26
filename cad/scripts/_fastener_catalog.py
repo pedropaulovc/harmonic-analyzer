@@ -33,6 +33,14 @@ def _stock(
 
 
 FASTENERS: dict[str, PurchasedFastenerSpec] = {
+    # #743: C45 alloy cup point, black oxide -- it bites the spotted steel
+    # arbor where an 18-8 (B80) cup would not.
+    "arbor-set-screw": _stock(
+        "arbor-set-screw",
+        "Alloy Steel Cup-Tip Set Screw",
+        "91375A106",
+        material="Alloy Steel",
+    ),
     "bracket-screw": _stock(
         "bracket-screw",
         "Steel Narrow Fillister Head Slotted Screw",
@@ -125,7 +133,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "lag-screw": _stock(
         "lag-screw",
         "18-8 Stainless Steel Hex Head Screw",
-        "92240A539",
+        "92240A540",
         material="AISI 304",
     ),
     "pedestal-hold-down-screw": _stock(
