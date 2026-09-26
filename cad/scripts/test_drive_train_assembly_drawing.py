@@ -169,6 +169,14 @@ def test_bom_descriptions_keep_one_line() -> None:
         assert len(text) <= drawing.BOM_DESCRIPTION_MAX_CHARS, stem
 
 
+def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
+    """MHA-095 bounds the DISENGAGE swing; engaged, the plate stands off it."""
+    check = drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0]
+    to_stop = check.index("TO\n   THE MHA-095 STOP, CLEAR OF EVERY MHA-027")
+    assert to_stop < check.index("SWING IT BACK") < check.index("RE-ENGAGE")
+    assert "RETURN IT TO THE MHA-095" not in check
+
+
 def test_rig_is_located_by_its_parked_tip_gap() -> None:
     steps = drawing.RIG_STEPS
     for phrase in ("TRANSFERRED", "2.5 FEELER", "ACCEPT 2.3-2.7", "#8-32", "#4-40"):

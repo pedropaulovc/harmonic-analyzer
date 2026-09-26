@@ -524,9 +524,12 @@ CHECKS = "\n".join(
         "3. EACH MHA-027 TURNS FREELY ON MHA-028 WITHOUT AXIAL BINDING.",
         "   A CONNECTING-ROD RING MAY OVERHANG ITS CAM UP TO 0.56 (AT LEAST",
         "   81% OF THE RING WIDTH STAYS ON THE CAM).",
-        "4. CONE SWING (P1): LOOSEN MHA-093; THE CONE SET SWINGS ON MHA-094",
-        "   CLEAR OF EVERY MHA-027. RETURN IT TO THE MHA-095 STOP AND",
-        "   TIGHTEN MHA-093; ALL {cone_gears} MESHES RE-ENGAGE.",
+        # MHA-095 is the DISENGAGED stop (build_cone_swing_platform
+        # swing_hardware_geometry): engaged, the plate edge stands >= 2.0 off
+        # it, so the cone set comes back on its meshes, not on the stop.
+        "4. CONE SWING (P1): LOOSEN MHA-093; SWING THE CONE SET ON MHA-094 TO",
+        "   THE MHA-095 STOP, CLEAR OF EVERY MHA-027. SWING IT BACK UNTIL ALL",
+        "   {cone_gears} MESHES RE-ENGAGE; TIGHTEN MHA-093.",
         "5. ZEROING (P2), CONE SET SWUNG CLEAR: TURN EACH MHA-027 BY HAND",
         "   UNTIL ITS NOTCH LINES UP. TURN MHA-059 TO ENGAGE MHA-002; TURN",
         "   MHA-002 BY MHA-058 UNTIL ALL NOTCHES POINT UP (COSINES) OR 90 DEG",
