@@ -5,16 +5,23 @@ tooth limit.  These tests rebuild the planar involute mesh at the deep edge of
 each drum face -- the slice that carries the load -- from the assembly pose and
 the printed bands, and check the design rules the table was sized to:
 
-* tightest case (thickest tooth, runouts closing): backlash >= BL_MIN;
-* loosest case (thinnest tooth, runouts and journal float opening): backlash
-  inside the printed acceptance, whose upper is that limit;
+* tightest case (thickest tooth, runouts and fit-up residual closing):
+  backlash >= BL_MIN;
+* loosest case (thinnest tooth, runouts, journal float and fit-up residual
+  opening): backlash inside the printed acceptance, whose limits are the
+  derived extremes rounded outward;
 * thinnest tooth at the largest tip: tip land >= 0.10;
-* largest tip, runouts closing: cone tip >= 0.10 off the drum's chord floor,
-  and the drum tip clear of the printed cone floor (0.30 where it is raised);
+* largest tip, closing: cone tip >= 0.10 off the drum's chord floor, and the
+  drum tip clear of the printed cone floor (0.30 where it is raised);
 * one fly cutter at least 0.43 wide fits every gap at the thickest tooth;
-* least engagement (smallest tips, all float opening): contact ratio >= 1.1
+* least engagement (smallest tips, everything opening): contact ratio >= 1.1
   except on the named book-fidelity exception gears;
 * each printed value is the limit, not an arbitrary point inside it.
+
+The fit-up residual (#917 R1, budget row A5) is what the assembly's mesh
+setting leaves: one backlash reading's resolution, plus the post re-seating on
+its dowel pair, which swings the shaft about the tip cup and so moves each gear
+by its lever from the cup.  It is taken per station.
 
 Planar, rigid: the U38 slice sweep found the 3-D stretch costs at most
 0.005 of backlash, which is why BL_MIN is 0.06 and not 0.05.
@@ -56,6 +63,13 @@ RUNOUT = CONE_RUNOUT + DRUM_RUNOUT
 # Cone-shaft journal in its post, and the drum arbor in its pedestal.
 FLOAT = RUNOUT + 2.0 * _JOURNAL
 
+# Fit-up residual inputs (#917 R1).  The post is set and re-seated between
+# the tip cup (MHA-097's apex) and its own station.
+BACKLASH_READ = 0.01  # resolution of one backlash reading
+DOWEL_REPEAT = 0.01  # lateral repeat of the post re-seating on its dowels
+S_CUP = assembly._ADJ_CUP_APEX
+S_POST = assembly.POST_STATION
+
 LAND_MIN = 0.10
 DRUM_FLOOR_MIN = 0.10
 CR_EXCEPTION = 1.1
@@ -64,6 +78,54 @@ CR_TARGET = 1.20
 
 def _inv(angle: float) -> float:
     return math.tan(angle) - angle
+
+
+def _station(teeth: int) -> float:
+    """Shaft station of the gear's deep-edge transverse slice."""
+    j = (120 - teeth) // 6
+    return (
+        assembly.SHAFT_T120_STATION
+        + assembly.GEAR_AXIS_SHIFT
+        + (assembly.CONE_FACE_STATION_REFERENCE - assembly.CONE_FACE) / 2.0
+        + j * assembly.SEAT_PITCH
+    )
+
+
+def _fitup_residual_terms(teeth: int) -> dict[str, float]:
+    """The fit-up residual at this gear's station, term by term."""
+    return {
+        "backlash read": BACKLASH_READ / (2.0 * math.tan(PRESSURE_ANGLE)),
+        "dowel re-seat": DOWEL_REPEAT
+        / assembly.COS_I
+        * (S_CUP - _station(teeth))
+        / (S_CUP - S_POST),
+    }
+
+
+def _closing_terms(teeth: int) -> dict[str, float]:
+    """Everything that can close the mesh from its nominal centre distance."""
+    return {
+        "cone runout": CONE_RUNOUT,
+        "drum runout": DRUM_RUNOUT,
+        **_fitup_residual_terms(teeth),
+    }
+
+
+def _opening_terms(teeth: int) -> dict[str, float]:
+    """Everything that can open it: the closing terms plus both floats."""
+    return {
+        **_closing_terms(teeth),
+        "cone journal float": _JOURNAL,
+        "drum arbor float": _JOURNAL,
+    }
+
+
+def _closing(teeth: int) -> float:
+    return sum(_closing_terms(teeth).values())
+
+
+def _opening(teeth: int) -> float:
+    return sum(_opening_terms(teeth).values())
 
 
 def _interleave(teeth: int) -> float:
@@ -78,14 +140,7 @@ def _interleave(teeth: int) -> float:
     e1 = np.cross(axis, [0.0, 1.0, 0.0])
     e1 /= np.linalg.norm(e1)
     e2 = np.cross(axis, e1)
-    centre = np.array(
-        assembly.cone_station(
-            assembly.SHAFT_T120_STATION
-            + assembly.GEAR_AXIS_SHIFT
-            + (assembly.CONE_FACE_STATION_REFERENCE - assembly.CONE_FACE) / 2.0
-            + j * assembly.SEAT_PITCH
-        )
-    )
+    centre = np.array(assembly.cone_station(_station(teeth)))
     z0 = assembly.Z_DRUM0 + assembly.Z_PITCH * j
     tip_r = teeth * M / 2.0 + M
     theta = np.radians(np.linspace(0.0, 360.0, 36001))
@@ -150,10 +205,11 @@ def _worst(teeth: int, tip_dia: float, thickest: float) -> dict[str, float]:
     thinnest = thickest - (spec.TOOTH_THICKNESS_BAND[0] - spec.TOOTH_THICKNESS_BAND[1])
     od_upper, od_lower = spec.BLANK_DIA_BAND
     nominal = _centre(teeth)
-    closing = nominal - RUNOUT
+    closing = nominal - _closing(teeth)
+    opening = nominal + _opening(teeth)
     return {
         "tight_backlash": _backlash(teeth, thickest, closing),
-        "loose_backlash": _backlash(teeth, thinnest, nominal + FLOAT),
+        "loose_backlash": _backlash(teeth, thinnest, opening),
         "tip_land": _tip_land(teeth, thinnest, (tip_dia + od_upper) / 2.0),
         "drum_floor": closing - (tip_dia + od_upper) / 2.0 - DRUM_FLOOR_R,
         "cone_floor": closing
@@ -163,7 +219,7 @@ def _worst(teeth: int, tip_dia: float, thickest: float) -> dict[str, float]:
             teeth,
             (tip_dia + od_lower) / 2.0,
             DRUM_TIP_R - DRUM_OD_LOWER / 2.0,
-            nominal + FLOAT,
+            opening,
         ),
     }
 
@@ -203,15 +259,58 @@ def test_printed_mesh_meets_its_design_rules(teeth: int) -> None:
     assert worst["contact_ratio"] > standard["contact_ratio"]
 
 
-def test_backlash_acceptance_upper_is_the_loosest_printed_mesh() -> None:
+def test_each_mesh_allowance_counts_once() -> None:
+    # #917 C2 (Main): the fit-up residual adds once to each side, on top of
+    # RUNOUT and FLOAT; FLOAT already carries both journal clearances
+    # (bf1dbc8c2).  A term added twice, or a second float, shows up here by
+    # name.
+    for teeth in spec.CONFIGURATION_TEETH:
+        assert list(_closing_terms(teeth)) == [
+            "cone runout",
+            "drum runout",
+            "backlash read",
+            "dowel re-seat",
+        ]
+        assert list(_opening_terms(teeth)) == [
+            *_closing_terms(teeth),
+            "cone journal float",
+            "drum arbor float",
+        ]
+        residual = sum(_fitup_residual_terms(teeth).values())
+        assert _closing(teeth) == pytest.approx(RUNOUT + residual)
+        assert _opening(teeth) == pytest.approx(FLOAT + residual)
+
+
+def test_fitup_residual_matches_the_917_budget() -> None:
+    # Budget row A5: reading backlash to 0.01 is 0.019 of centre distance at
+    # 14.5 deg; a 0.01 dowel re-seat at the post adds 0.008 at T120, whose
+    # lever from the tip cup is longest, and under 0.001 at T006.
+    read = _fitup_residual_terms(120)["backlash read"]
+    assert read == pytest.approx(0.0193, abs=0.00005)
+    residual = {
+        teeth: sum(_fitup_residual_terms(teeth).values()) for teeth in (6, 120)
+    }
+    assert residual[120] == pytest.approx(0.0276, abs=0.00005)
+    assert residual[6] == pytest.approx(0.0201, abs=0.00005)
+    stations = [_station(teeth) for teeth in spec.CONFIGURATION_TEETH]
+    assert S_POST < min(stations) and max(stations) < S_CUP
+
+
+def test_backlash_acceptance_is_the_derived_band_rounded_outward() -> None:
     # The separating tooth load takes up both journal clearances while the
     # mesh is rocked, so the loosest reading includes FLOAT, not only RUNOUT.
-    loosest = max(
-        _worst(teeth, *spec.DEEPENED_MESH_MM[teeth])["loose_backlash"]
+    # Rounded outward to the printed two places so the band always covers the
+    # derived worst cases: the upper up, the lower down.
+    worst = [
+        _worst(teeth, *spec.DEEPENED_MESH_MM[teeth])
         for teeth in spec.CONFIGURATION_TEETH
-    )
-    high = spec.BACKLASH_ACCEPTANCE_MM[1]
+    ]
+    loosest = max(case["loose_backlash"] for case in worst)
+    tightest = min(case["tight_backlash"] for case in worst)
+    low, high = spec.BACKLASH_ACCEPTANCE_MM
     assert high == math.ceil(loosest * 100.0) / 100.0, loosest
+    assert low == math.floor(tightest * 100.0) / 100.0, tightest
+    assert low == spec.MESH_BACKLASH_MIN_MM
 
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
@@ -242,22 +341,50 @@ def _floor_width(teeth: int, thickest: float) -> float:
 
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
-def test_gap_floor_clears_the_drum_and_fits_one_cutter(teeth: int) -> None:
+def test_gap_floor_fits_one_cutter(teeth: int) -> None:
+    # Main: one fly cutter at least 0.43 wide fits every gap.
+    assert _floor_width(teeth, spec.DEEPENED_MESH_MM[teeth][1]) >= 0.43
+
+
+# What sets each two-sided floor's MIN: the web (T006's named exception,
+# T012's 2.05), or the 0.10 drum-tip clearance every chord floor keeps.
+FLOOR_MIN_RULE = {6: "web", 12: "web", 18: "drum"}
+T006_FLOOR_PENDING = pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "T006's floor limits predate the fit-up residual and leave no 0.04 "
+        "window; morning-brief-20260926.md § Decision: T006 cone-gear floor "
+        "under the fit-up residual (C2)"
+    ),
+)
+
+
+@pytest.mark.parametrize(
+    "teeth",
+    [
+        pytest.param(teeth, marks=T006_FLOOR_PENDING) if teeth == 6 else teeth
+        for teeth in spec.CONFIGURATION_TEETH
+    ],
+)
+def test_gap_floor_clears_the_drum(teeth: int) -> None:
     tip_dia, thickest = spec.DEEPENED_MESH_MM[teeth]
     clearance = _worst(teeth, tip_dia, thickest)["cone_floor"]
-    # Main: one fly cutter at least 0.43 wide fits every gap.
-    assert _floor_width(teeth, thickest) >= 0.43
+    drum_path = _centre(teeth) - _closing(teeth) - DRUM_TIP_R
+    assert set(FLOOR_MIN_RULE) == set(spec.FLOOR_LIMITS_MM)
     if teeth in spec.FLOOR_LIMITS_MM:
         # Two-sided floor: MAX is the shallowest floor keeping 0.02 of
-        # drum-tip clearance with every runout closing (a shallow plunge would
-        # rub); MIN is the web limit.
+        # drum-tip clearance with everything closing (a shallow plunge would
+        # rub).
         minimum, maximum = spec.FLOOR_LIMITS_MM[teeth]
-        drum_path = _centre(teeth) - RUNOUT - DRUM_TIP_R
-        assert clearance > 0.04  # +0.045 at T006, +0.076 at T012
+        assert clearance > 0.04
         assert drum_path - maximum / 2.0 >= 0.02
         assert drum_path - (maximum + 0.001) / 2.0 < 0.02
-        # Main: T006's window must be at least 0.04 on diameter.
+        # Main: the window must be at least 0.04 on diameter.
         assert maximum - minimum >= 0.04
+        if FLOOR_MIN_RULE[teeth] == "drum":
+            # The shallowest MIN keeping the chord floors' 0.10.
+            assert drum_path - minimum / 2.0 >= 0.10
+            assert drum_path - (minimum + 0.001) / 2.0 < 0.10
         return
     if spec.floor_tmin(teeth) == 0.0:
         assert clearance >= 0.10
@@ -269,13 +396,13 @@ def test_gap_floor_clears_the_drum_and_fits_one_cutter(teeth: int) -> None:
         thickness_mm=spec.tooth_thickness_mm(teeth),
         tmin=spec.floor_tmin(teeth) + 0.0005,
     )
-    assert _centre(teeth) - RUNOUT - DRUM_TIP_R - higher < 0.30
+    assert drum_path - higher < 0.30
 
 
 def test_drive_train_clearance_scans_use_the_printed_cone_tip() -> None:
     # Codex (#834): the T120/16T scan kept the standard pitch radius +
-    # addendum (Ø62.20) after the long-addendum blank grew the printed tip to
-    # Ø62.93.  Every cone-tip clearance check reads the printed OD at its
+    # addendum (Ø62.20) after the long-addendum blank grew the printed tip
+    # past it.  Every cone-tip clearance check reads the printed OD at its
     # upper limit, and the 16T keeps its 0.25 axial air at that tip.
     assert assembly._TIP120 == pytest.approx(
         (spec.outside_dia_mm(120) + spec.BLANK_DIA_BAND[0]) / 2.0

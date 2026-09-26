@@ -115,8 +115,8 @@ TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 # which is why the tailstock note below is a requirement (U40), not a method.
 # The shaft still decreases monotonically toward the tip: the cone is
 # assembled tip-first, and every gear's tip diameter exceeds the next inboard
-# gear's bore (T006 4.28 > T012 bore 1.5875; T012 7.55 > T018 3.175; T018
-# 10.74 > T024 6.35; T024 13.90 > T030 9.525; asserted below from
+# gear's bore (T006's tip over T012's 1/16 in bore, T012's over T018's 1/8,
+# T018's over T024's 1/4, T024's over T030's 3/8; asserted below from
 # cone_gear_spec.DEEPENED_MESH_MM), so no single gear can be made integral
 # with the shaft unless all twenty are.
 SECTIONS: tuple[tuple[float, float], ...] = (

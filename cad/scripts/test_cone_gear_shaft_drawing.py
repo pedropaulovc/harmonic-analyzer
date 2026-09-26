@@ -433,16 +433,3 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "1018" in str(config["material"])
     assert config["finish"]
     assert int(config["quantity"]) == 1
-
-
-def test_prose_quotes_the_printed_tip_gear_diameters() -> None:
-    """The shaft prose cites the cone gears' deepened-mesh tip diameters."""
-    import cone_gear_spec
-
-    t006 = f"{cone_gear_spec.DEEPENED_MESH_MM[6][0]:.2f}"
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert part_source.count(f"T006 OD is {t006} mm") == 1
-    assert f"T006 OD is now {t006} mm" in part_source
-    spec_source = Path(cone_gear_shaft_spec.__file__).read_text(encoding="utf-8")
-    for teeth in (6, 12, 18, 24):
-        assert f"{cone_gear_spec.DEEPENED_MESH_MM[teeth][0]:.2f}" in spec_source

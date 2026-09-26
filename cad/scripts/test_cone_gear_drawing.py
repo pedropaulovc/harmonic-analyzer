@@ -189,8 +189,8 @@ def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates
 
 
 def test_gap_floor_constructions() -> None:
-    # T006/T012 keep the standard tooth's base chord (the drum tip would rub a
-    # risen chord); T018-T042 take the thicker tooth's chord; T048+ raise it.
+    # T006-T018 bow below the thicker tooth's chord (the drum tip passes it
+    # by less than 0.10); T024-T042 take that chord; T048+ raise it.
     for teeth in spec.CONFIGURATION_TEETH:
         chord = spec.chord_floor_radius_mm(
             teeth,
@@ -207,7 +207,7 @@ def test_gap_floor_constructions() -> None:
         assert spec.floor_radius_mm(teeth) == pytest.approx(chord)
         assert spec.floor_dip_mm(teeth) == pytest.approx(0.0)
         assert (spec.floor_tmin(teeth) > 0.0) == (teeth >= 48)
-    assert set(spec.FLOOR_LIMITS_MM) == {6, 12}
+    assert set(spec.FLOOR_LIMITS_MM) == {6, 12, 18}
 
 
 def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> None:
@@ -234,7 +234,7 @@ def test_notes_define_only_the_approved_plain_bore_attachment() -> None:
     # Named exceptions print only on the sheets they cover, with no ruling ids;
     # T006 carries both on one line.
     cr_line = (
-        "CONTACT RATIO BELOW 1.1 ON T006-T042: ACCEPTED EXCEPTION (BOOK FIDELITY)."
+        "CONTACT RATIO BELOW 1.1 ON T006-T048: ACCEPTED EXCEPTION (BOOK FIDELITY)."
     )
     both_line = (
         "CONTACT RATIO BELOW 1.1, ROOT-TO-BORE WEB 0.62 MIN: "
@@ -249,7 +249,7 @@ def test_notes_define_only_the_approved_plain_bore_attachment() -> None:
         expected = list(common)
         if teeth == 6:
             expected.append(both_line)
-        elif teeth <= 42:
+        elif teeth <= 48:
             expected.append(cr_line)
         assert lines == expected
         assert "U4" not in text and "BY DESIGN" not in text

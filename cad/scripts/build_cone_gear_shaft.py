@@ -6,9 +6,9 @@ pivot post and its thin end located by the external spacer and cup-ended
 adjuster -- the post and adjuster carrier both stand on the swing platform,
 so the whole set pivots out of engagement as one
 unit (ch. 25; p. 18 "pivot"). At the finer module DP 49.82 (ch13 OD 62.2) the
-tip gears are tiny -- T006 OD is 4.28 mm -- so the shaft steps down far
-more at the thin end to match the configured gear bores AND stay inside
-each gear's root circle (`build_cone_gear.py` ``BoreDia``, DIMENSIONS.md
+tip gears are tiny (cone_gear_spec.DEEPENED_MESH_MM) -- so the shaft steps
+down far more at the thin end to match the configured gear bores AND stay
+inside each gear's root circle (`build_cone_gear.py` ``BoreDia``, DIMENSIONS.md
 Appendix C #7). Gears attach by means the book never shows (p.21 macro
 shows solder blobs at the small gears) -- no keyseat, the shaft steps are
 plain; the four yellow tip gears (T006..T024) are a harder high-zinc
@@ -121,9 +121,10 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 # step station is centred in the ~0.89 air gap between faces (T030 north
 # 134.83 | 135.28 | T024 south 135.72, and so on; U40).
 # Diameters agree with build_cone_gear.bore_dia_in (snug perpendicular seats),
-# stepping much finer than the old DP 30 shaft because the tip gears shrank:
-# T006 OD is now 4.28 mm.  The terminal land stops at 1/16": below that the
-# T006 rim gains little and the journal becomes unturnable (L/D 31 at 1/32").
+# stepping much finer than the old DP 30 shaft because the tip gears shrank
+# (cone_gear_spec.DEEPENED_MESH_MM).  The terminal land stops at 1/16": below
+# that the T006 rim gains little and the journal becomes unturnable (L/D 31 at
+# 1/32").
 
 
 async def build(adapter) -> dict[str, str]:
