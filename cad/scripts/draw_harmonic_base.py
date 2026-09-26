@@ -1188,7 +1188,9 @@ def _check_hole_sheet_callouts(
     sheet_view = ddoc.GetFirstView()  # the sheet itself: its free notes and tables
     for view in (sheet_view, *views.values()):
         for element, annotation in _iter_view_annotations(adapter, view):
-            if element.kind != "note":
+            # Display dimensions come back as (None, annotation) (#902); only
+            # notes are measured here.
+            if element is None or element.kind != "note":
                 continue
             # The check runs before finalize_drawing deletes the Hole Wizard
             # "Tapped Hole" notes (hb-render-3 flagged leaders over them), so

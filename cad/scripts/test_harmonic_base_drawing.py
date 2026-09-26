@@ -915,6 +915,66 @@ def test_only_notes_that_reach_the_final_sheet_are_obstacles() -> None:
     )
 
 
+def _drive_hole_sheet_callout_check(monkeypatch, note_box) -> None:
+    """Run _check_hole_sheet_callouts on fakes: one callout, one sheet note at
+    ``note_box`` and a display dimension, which _iter_view_annotations yields
+    as ``(None, annotation)`` since #902 (a5563c7a0)."""
+    from types import SimpleNamespace
+
+    import draw_harmonic_base as sheet
+
+    def annotations(_adapter, view):
+        if view != "sheet":
+            return iter(())
+        return iter(
+            (
+                (None, "display dimension"),
+                (SimpleNamespace(kind="note", label="D1", box=note_box), "note"),
+            )
+        )
+
+    for name, value in {
+        "_callout_display_data": lambda display, label: (None, (), ()),
+        "callout_text_box": lambda anchor, lines, texts, label: (0.100, 0.100, 0.130, 0.110),
+        "leader_segments": lambda lines: [],
+        "callout_text_rows": lambda lines, texts, label: {},
+        "_sheet_frame_obstacles": lambda adapter, ddoc: {},
+        "_view_geometry_box": lambda adapter, view, label: (0.300, 0.150, 0.400, 0.250),
+        "_early_bound": lambda obj, interface: obj,
+        "datum_origin_boxes": lambda points: {},
+        "_section_line_obstacles": lambda views: {},
+        "_iter_view_annotations": annotations,
+        "_note_text": lambda adapter, annotation: "D1",
+        "_iter_tables": lambda adapter, view: (
+            [SimpleNamespace(label="holes", box=(0.020, 0.020, 0.090, 0.060))]
+            if view == "sheet"
+            else []
+        ),
+    }.items():
+        monkeypatch.setattr(sheet, name, value)
+    ddoc = SimpleNamespace(ActivateSheet=lambda name: True, GetFirstView=lambda: "sheet")
+    sheet._check_hole_sheet_callouts(
+        object(),
+        ddoc,
+        callouts={"pedestal": object()},
+        views={"top": "top view"},
+        datum_origin=SimpleNamespace(GetAxisPoints2=lambda: ()),
+    )
+
+
+def test_hole_sheet_callout_check_skips_display_dimensions(monkeypatch) -> None:
+    # layoutcal2 (harmonic_base-task.log:280): with #902 the dimension row
+    # raised AttributeError on None.kind before any clash was measured.
+    _drive_hole_sheet_callout_check(monkeypatch, (0.200, 0.200, 0.220, 0.210))
+
+
+def test_hole_sheet_callout_check_still_measures_notes_beside_dimensions(
+    monkeypatch,
+) -> None:
+    with pytest.raises(RuntimeError, match="callout pedestal vs note D1"):
+        _drive_hole_sheet_callout_check(monkeypatch, (0.110, 0.102, 0.120, 0.108))
+
+
 def test_section_line_boxes_cover_arrows_and_labels_in_sheet_space() -> None:
     import draw_harmonic_base as sheet
 
