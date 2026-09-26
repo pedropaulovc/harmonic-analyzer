@@ -99,6 +99,7 @@ from _part_pmi import author_part_pmi
 from cone_gear_notes import drawing_notes, gear_data
 from cone_gear_spec import (
     BLANK_DIA_BAND,
+    FACE_WIDTH_BAND,
     BORE_DIA_BAND,
     CONFIGURATION_TEETH,
     DRAWING_DIMENSIONS,
@@ -1306,6 +1307,9 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     set_dimension_bilateral_tolerance(
         adapter, "BlankProfile", "BlankDia", *deviations(BLANK_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "Blank", "FaceWidth", *deviations(FACE_WIDTH_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreCutDia", *deviations(BORE_DIA_BAND)

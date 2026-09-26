@@ -127,8 +127,14 @@ BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
 # U27 face width (Main ruling, 2026-09-23): 6.0 at the .X band keeps the
 # widest gear (6.8) inside the 6.889 seat pitch; 6.5 +/-0.51 could reach
 # 7.01 and overlap a neighbour.  The drum's engaged zone spans
-# [-0.75, +1.35] mm about the narrowed gear's centre, inside the 5.2 minimum.
+# [-0.75, +1.35] mm about the narrowed gear's centre.
 FACE_WIDTH = 6.0
+# #914 (user ruling, 2026-09-25): the face is the cone set's axial margin
+# against the drum.  At the .X minimum (5.2) the north side keeps only 1.25,
+# which the cylinder bank's 1.175 all but consumes; +/-0.10 (5.9 minimum)
+# keeps 1.60, leaving ~0.425 for the cone set's own Z.  Facing both sides to
+# a micrometer is a novice-holdable step.
+FACE_WIDTH_BAND = (0.10, -0.10)
 
 
 def chord_floor_radius_mm(
@@ -353,11 +359,10 @@ def configuration_number(part_number: str, teeth: int) -> str:
 # Policy rule 2: places and bands are model properties.  Three places belong
 # on the two fit dimensions: the bore and circular tooth thickness.  Tip
 # diameter prints two places with its own BLANK_DIA_BAND (below); face
-# width takes one place, the loosest title-block band (.X +/-0.8), which the
-# 6.0 nominal clears against the 6.889 seat pitch.
+# width prints two places with its FACE_WIDTH_BAND (#914).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlankProfile": {"BlankDia": 2},
-    "Blank": {"FaceWidth": 1},
+    "Blank": {"FaceWidth": 2},
     "BoreProfile": {"BoreCutDia": 3},
     "ToothThicknessReference": {"ToothThickness": 3},
 }

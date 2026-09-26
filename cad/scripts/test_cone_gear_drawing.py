@@ -54,7 +54,7 @@ def test_part_and_drawing_share_the_complete_native_dimension_contract() -> None
 def test_model_owns_precision_for_both_fit_dimensions() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "BlankDia": 2,
-        "FaceWidth": 1,
+        "FaceWidth": 2,
         "BoreCutDia": 3,
         "ToothThickness": 3,
     }
@@ -71,6 +71,17 @@ def test_tip_diameter_carries_its_own_mesh_depth_band() -> None:
     assert (
         '"BlankProfile", "BlankDia", *deviations(BLANK_DIA_BAND)' in source
     )
+
+
+def test_face_width_carries_the_cone_set_z_band() -> None:
+    # User ruling (#914, 2026-09-25): the .X +/-0.8 face let a 5.2 gear eat
+    # the cone set's whole axial allowance against the drum; +/-0.10 leaves
+    # ~0.425 after the bank's 1.175.  Applied on the model like the others.
+    assert spec.FACE_WIDTH_BAND == (0.10, -0.10)
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '"Blank", "FaceWidth", *deviations(FACE_WIDTH_BAND)' in source
+    # still inside the 6.889 seat pitch at the upper limit
+    assert spec.FACE_WIDTH + spec.FACE_WIDTH_BAND[0] < 6.889 - 0.5
 
 
 def test_each_configuration_sheet_carries_its_own_drawing_number() -> None:
