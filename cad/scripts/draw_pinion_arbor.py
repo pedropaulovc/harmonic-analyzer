@@ -264,9 +264,13 @@ PRINCIPAL_KEEP = {
     # R1a's collar pin hole (x 0.269) sits over the front land's Ra symbol,
     # so both its dimensions stand ABOVE the shaft: the station from the head
     # rear face in a row over the Ø15's, and the hole's leader rising left of
-    # that row's witness, above the 19.0's right arrow tail.
+    # that row's witness, above the 19.0's right arrow tail.  The hole's
+    # leader leaves its callout's underline at the block's right end, so the
+    # three-line MHA-145 callout (60 mm wide) stands left enough that its
+    # elbow sits over the hole and the leader drops clear of the station's
+    # text (pc-r10: at x 0.250 it crossed "COLLAR PIN" by 3.6 mm).
     "PinStationFromHeadRear": (0.288, 0.207),
-    "PinHoleDia": (0.250, 0.222),
+    "PinHoleDia": (0.243, 0.222),
 }
 # In detail A the neck runs from the fence (x ~0.137 at its edges) to the
 # head rear face (x 0.1545), its Ø10.5 at y 0.2245-0.2455.  Its end-on
