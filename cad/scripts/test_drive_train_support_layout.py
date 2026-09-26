@@ -284,19 +284,24 @@ def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
     assert (RIG.RIG_SET_LEAF_D, RIG.RIG_SET_LEAVES) == (1.25, (1.00, 0.25))
     # j = 0 at the front: the drum's front end never uncovers gear 0, even
     # with the thickest leaf D and the shortest drum (the drum hard aft, the
-    # pose).
+    # pose), while g0 walks south by the bank's widest end play and a long
+    # g0 -> g19 pitch stack (Codex #858, PRRT_kwDOPHDy386mUjhU).
     g0_front = drive.Z_DRUM0 - drive.DRUM_FACE / 2.0
+    g0_south = sum(RIG.G0_FRONT_SOUTH_STACK.values())
+    assert math.isclose(g0_south, 0.825, abs_tol=1e-9)
     face_min = drive.APINION_DRUM_LEN - RIG.DRUM_LEN_BAND
     slack = min(
-        (g0_front - 1.0) - (g19_back + RIG.RIG_SET_LEAF_D + d - face_min)
+        (g0_front - g0_south - 1.0) - (g19_back + RIG.RIG_SET_LEAF_D + d - face_min)
         for d in (-_LEAF_ERR, _LEAF_ERR)
     )
-    assert slack >= 0.0, slack
+    assert slack >= RIG.RIG_MARGIN_SPARE, slack
     assert math.isclose(slack, drive.J0_SLACK_WORST, abs_tol=1e-9)
-    assert math.isclose(slack, 2.976, abs_tol=5e-4)
+    assert math.isclose(slack, 2.151, abs_tol=5e-4)
+    # Positive control: without the bank terms the row read 2.976 (163435c4f).
+    assert math.isclose(slack + g0_south, 2.976, abs_tol=5e-4)
 
 
-def test_rig_set_leaf_d_derives_the_shift_and_leaves_743_open() -> None:
+def test_rig_set_leaf_d_derives_the_shift_and_books_the_743_terms() -> None:
     # User ruling P1-2 (D primary, s derived): the drum's back end is set off
     # g19 directly, so neither the strap thickness nor g19's own station is a
     # term of either stack, and RIG_AFT_SHIFT is what the set-up leaves.
@@ -327,24 +332,41 @@ def test_rig_set_leaf_d_derives_the_shift_and_leaves_743_open() -> None:
     g19_back = drive.Z_DRUM0 + 19 * drive.Z_PITCH + drive.DRUM_FACE / 2.0
     assert math.isclose(RIG.G19_BACK_FACE_Z, g19_back, abs_tol=1e-9)
     # User ruling (E_b): the bank's own terms come from the #743 retention
-    # design.  Until then they are named, open, and never valued.
+    # design, booked by name in their own stack.
     # D is set with the bank pushed north (#743 rider): g19 then never sits
     # north of the datum, so the bank adds nothing to the advance -- and the
     # print must say so, or the stack would have to carry E_b max.
     assert RIG.DRUM_BACK_ADVANCE_OPEN_TERMS == ()
     assert FITUP.RIG_SET_BANK_PRECONDITION == "BANK PUSHED NORTH"
     assert "NORTH MHA-027 BACK FACE, BANK PUSHED NORTH;" in FITUP.RIG_SET_STEP
-    assert RIG.DRUM_FRONT_RETREAT_OPEN_TERMS == (
-        "MHA-027 bank end play E_b (#743)",
-        "MHA-027 g0 -> g19 pitch stack (#743)",
-    )
+    # The bank's terms at the front are booked by name in their own stack,
+    # never mixed into the rig's (Codex #858, PRRT_kwDOPHDy386mUjhU).
+    assert RIG.DRUM_FRONT_RETREAT_OPEN_TERMS == ()
+    assert all(name.startswith("MHA-027 ") for name in RIG.G0_FRONT_SOUTH_STACK)
+    assert any("E_b" in name for name in RIG.G0_FRONT_SOUTH_STACK)
     for stack in (RIG.DRUM_BACK_ADVANCE_STACK, RIG.DRUM_FRONT_RETREAT_STACK):
         assert not any("E_b" in name or "#743" in name for name in stack)
     rows = [name for name in drive.RIG_MARGINS if name.startswith(("j = 19", "j = 0"))]
     assert rows == [
         "j = 19 past its full face (bank pushed north)",
-        "j = 0 drum overhang slack (rig terms; #743 open)",
+        "j = 0 drum overhang slack (rig and bank terms)",
     ]
+
+
+def test_g0_bank_terms_match_the_743_bank_layout() -> None:
+    # pinion_rig_layout books #743's g0 terms as numbers because this
+    # branch's base lacks cylinder_bank_layout; wherever it lands, the two
+    # must agree term for term.
+    bank = pytest.importorskip(
+        "cylinder_bank_layout",
+        reason=(
+            "#743's cylinder_bank_layout is not on this base; the lockstep "
+            "goes live on integ, where the literals become a direct import"
+        ),
+    )
+    assert sorted(RIG.G0_FRONT_SOUTH_STACK.values()) == pytest.approx(
+        sorted(bank.G0_FRONT_SOUTH_STACK.values()), abs=1e-9
+    )
 
 
 def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
@@ -1121,6 +1143,7 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
     assert FITUP.FRONT_COLLAR_LEAF == FITUP.FRONT_BLOCK_FEELER
     assert FITUP.RIG_SET_STEP == (
         "RIG SET, BEFORE SPOTTING THE TRANSFER SEATS:\n"
+        "FRONT MHA-061 0.25 LEAF OFF FRONT MHA-056;\n"
         "MHA-002 BACK END 1.00 + 0.25 LEAVES OFF\n"
         "NORTH MHA-027 BACK FACE, BANK PUSHED NORTH;\n"
         "MHA-114 PAD 1.00 LEAF OFF MHA-061."

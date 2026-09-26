@@ -1469,9 +1469,10 @@ if Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 > APINION_Z_BACK + 0.5:
 # and must stay 1.0 south of g0's front face.  Both spares join RIG_MARGINS
 # (below), and one leaf step thinner would leave j = 19 short of
 # RIG_MARGIN_SPARE (D is the thinnest setting that holds).  D is set with the
-# bank pushed north, so the bank adds nothing to j = 19; its own terms at the
-# front (E_b and the g0 -> g19 pitch stack) are open until #743 lands
-# (RIG.DRUM_FRONT_RETREAT_OPEN_TERMS), so the j = 0 row is rig terms only.
+# bank pushed north, so the bank adds nothing to j = 19; at the front g0
+# itself walks south by the bank's end play and a long g0 -> g19 pitch stack
+# (RIG.G0_FRONT_SOUTH_STACK, #743), so the j = 0 row carries those beside the
+# drum's own retreat (Codex #858, PRRT_kwDOPHDy386mUjhU).
 _G19_FACE_Z = (
     Z_DRUM0 + 19 * Z_PITCH - DRUM_FACE / 2.0,
     Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0,
@@ -1494,7 +1495,8 @@ if abs(_G19_FACE_Z[1] - RIG.G19_BACK_FACE_Z) > 1e-9:
 if abs(APINION_Z_BACK - _G19_FACE_Z[1] - RIG.RIG_SET_LEAF_D) > 1e-9:
     raise AssertionError("the drum's back end is not RIG_SET_LEAF_D off g19")
 APINION_FRONT_WORST_Z = APINION_Z_FRONT + sum(RIG.DRUM_FRONT_RETREAT_STACK.values())
-J0_SLACK_WORST = (Z_DRUM0 - DRUM_FACE / 2.0 - 1.0) - APINION_FRONT_WORST_Z
+G0_FRONT_WORST_Z = Z_DRUM0 - DRUM_FACE / 2.0 - sum(RIG.G0_FRONT_SOUTH_STACK.values())
+J0_SLACK_WORST = (G0_FRONT_WORST_Z - 1.0) - APINION_FRONT_WORST_Z
 if J0_SLACK_WORST < 0.0:
     raise AssertionError(f"the drum uncovers j = 0 by {-J0_SLACK_WORST:.3f} at the worst stack")
 if (
@@ -2004,7 +2006,7 @@ def _worst(nominal: float, *stacks: dict[str, float]) -> float:
 # least RIG_MARGIN_SPARE over its floor.  name -> (worst value, floor).
 RIG_MARGINS = {
     "j = 19 past its full face (bank pushed north)": (J19_FULL_FACE_MARGIN, 0.0),
-    "j = 0 drum overhang slack (rig terms; #743 open)": (J0_SLACK_WORST, 0.0),
+    "j = 0 drum overhang slack (rig and bank terms)": (J0_SLACK_WORST, 0.0),
     "torque shaft bearing in the front block": (
         sum(RIG.TORQUE_SHAFT_BEARING_STACK.values()),
         RIG.FRONT_BLOCK_MIN_BEARING,

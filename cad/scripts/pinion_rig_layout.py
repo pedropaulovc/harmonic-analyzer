@@ -131,10 +131,23 @@ DRUM_OD_PLACES = 2  # OutsideDia prints .XX (alignment_pinion_spec)
 # end play, and the leaf itself sets to its band.  j = 19 keeps its FULL 3.0
 # face with RIG_MARGIN_SPARE to spare, so D is the thinnest gage setting that
 # covers the advance plus the spare.
-# TODO(#743): the cylinder-gear bank's end play (E_b) and its g0 -> g19
-# pitch-stack band come from the bank retention design
-# (cylinder_bank_layout.G0_FRONT_SOUTH_STACK) and join the front stack below
-# as named terms; until that module lands they are listed, never valued.
+# At the front the bank's own terms do reach the drum (Codex #858,
+# PRRT_kwDOPHDy386mUjhU): the drum is fixed to the rig, set from g19, and g0
+# walks south of its nominal by the bank's end play and a long g0 -> g19
+# pitch stack.  They are #743's (cylinder_bank_layout.G0_FRONT_SOUTH_STACK),
+# which this branch's base does not carry, so G0_FRONT_SOUTH_STACK below
+# books them as named numbers, valued by running that module at integ
+# fb3a52c04 (identical at a8626a861 and 354da2150), and a lockstep test holds
+# them to the module wherever it is importable (the G19_BACK_FACE_Z
+# precedent).  Once the cascade reaches integ, where the module lives, the
+# numbers give way to a direct import and the lockstep test goes.
+# In service the bank may walk south of the set by up to E_b.  That moves g19
+# south too, away from the drum's back end, so it only grows
+# J19_FULL_FACE_MARGIN; at g0 the same walk is the E_b term booked below.
+# The rig itself cannot sit north of its set (cluster hard back, drum hard on
+# the back strap) beyond the leaf's set error, which DRUM_FRONT_RETREAT_STACK
+# books; its float south is DRUM_BACK_ADVANCE_STACK at j = 19 and
+# grows the drum's overhang at j = 0.
 G19_BACK_FACE_Z = (
     71.56188830854866  # Z_DRUM0 + 19 Z_PITCH + 1.5 (the drive train pins it)
 )
@@ -150,10 +163,16 @@ DRUM_FRONT_RETREAT_STACK = {
     "MHA-002 drum length .X": -printed_deviations(DRUM_LEN, DRUM_LEN_PLACES)[0],
     "rig-set leaf D, thickest setting": FEELER_SET_ERROR,
 }
-DRUM_FRONT_RETREAT_OPEN_TERMS = (
-    "MHA-027 bank end play E_b (#743)",
-    "MHA-027 g0 -> g19 pitch stack (#743)",
-)
+# g0's front face south of nominal, bank pushed north at the set: gears 1-19
+# long inside the L20 +/-0.20 acceptance (partial_stack_band(19)), gear 0's
+# face width at +0.05, and the bank's end play E_b at its widest (0.45
+# feeler + 0.10 set error).
+G0_FRONT_SOUTH_STACK = {
+    "MHA-027 gears 1-19 overall thickness, long (L20 +/-0.20)": 0.225,
+    "MHA-027 gear 0 face width (+0.05)": 0.05,
+    "MHA-027 bank end play E_b max": 0.55,
+}
+DRUM_FRONT_RETREAT_OPEN_TERMS: tuple[str, ...] = ()  # booked in G0_FRONT_SOUTH_STACK
 RIG_SET_LEAF_D = smallest_leaf_setting(
     sum(DRUM_BACK_ADVANCE_STACK.values()) + RIG_MARGIN_SPARE
 )  # 1.25

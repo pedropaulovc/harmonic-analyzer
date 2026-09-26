@@ -502,7 +502,12 @@ def test_rig_set_callouts_and_note_fit_the_accepted_sheet_2_layout() -> None:
     assert x0 + width <= _CROSS_AXIS_CALLOUT_X - 0.010, x0 + width
     assert y_top <= _HOLE_TABLE_BOTTOM_Y - 0.010
     assert y_top - height >= _BORE_NOTE_TOP_Y + 0.010, y_top - height
-    # The note carries both settings the transfers need.
+    # The note carries every setting the transfers need, the front block's
+    # feeler included: it fixes FRONT_BLOCK_Z0, so the front seats with it
+    # (Codex #858, PRRT_kwDOPHDy386mUjhS).
+    feeler = f"FRONT MHA-061 {fitup.FRONT_BLOCK_FEELER:.2f} LEAF OFF FRONT MHA-056;"
+    assert feeler in note
+    assert note.index(feeler) == 1
     assert "1.00 + 0.25 LEAVES OFF" in fitup.RIG_SET_STEP
     assert "BANK PUSHED NORTH" in fitup.RIG_SET_STEP
     assert "MHA-114 PAD 1.00 LEAF OFF MHA-061." in fitup.RIG_SET_STEP

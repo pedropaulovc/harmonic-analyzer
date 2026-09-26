@@ -8,7 +8,8 @@ gage, and words the step each print carries.  Only tests and drawing steps
 import it.
 
 - The front block is set FRONT_BLOCK_FEELER off the front strap (+/- BAND;
-  MHA-061 and the MHA-A03 fit-up), which sets the pinned cluster's end play.
+  the base's RIG SET note, before its seats are transferred), which sets the
+  pinned cluster's end play.
 - MHA-062 is match-drilled on a DRUM_END_SHIM leaf at the drum's front end
   (SHAFT_DRILL_STEP), which sets the drum's end play.
 - The rig's axial datum (user ruling P1-2): with the cylinder-gear bank
@@ -110,6 +111,7 @@ RIG_SET_NAME = "RIG SET"
 RIG_SET_STEP = "\n".join(
     (
         f"{RIG_SET_NAME}, BEFORE SPOTTING THE TRANSFER SEATS:",
+        f"FRONT MHA-061 {FRONT_BLOCK_FEELER:.2f} LEAF OFF FRONT MHA-056;",
         f"MHA-002 BACK END {_leaves_text(RIG_SET_LEAVES)} LEAVES OFF",
         f"NORTH MHA-027 BACK FACE, {RIG_SET_BANK_PRECONDITION};",
         f"MHA-114 PAD {SPRING_PAD_LEAF:.2f} LEAF OFF MHA-061.",
