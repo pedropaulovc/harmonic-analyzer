@@ -592,6 +592,16 @@ UNDERSIDE_CENTER = (0.262, 0.160)
 # TIP_SCREW_HALF_TRAVEL + TIP_CBORE_W / 2 from the slot centre, with 3 to spare.
 UNDERSIDE_CROP_RADIUS_MM = TIP_SCREW_HALF_TRAVEL + TIP_CBORE_W / 2.0 + 3.0
 UNDERSIDE_SHEET_RADIUS = UNDERSIDE_CROP_RADIUS_MM * _UNDERSIDE_S
+# SolidWorks reports the cropped view's outline this far outside its crop
+# circle on every side (leaf 917-s1-sheet2-0123 read 9.088 mm on all four),
+# and the layout audit boxes the view by that outline, not by the circle.
+UNDERSIDE_OUTLINE_PAD = 0.00909
+UNDERSIDE_OUTLINE = (
+    UNDERSIDE_CENTER[0] - UNDERSIDE_SHEET_RADIUS - UNDERSIDE_OUTLINE_PAD,
+    UNDERSIDE_CENTER[1] - UNDERSIDE_SHEET_RADIUS - UNDERSIDE_OUTLINE_PAD,
+    UNDERSIDE_CENTER[0] + UNDERSIDE_SHEET_RADIUS + UNDERSIDE_OUTLINE_PAD,
+    UNDERSIDE_CENTER[1] + UNDERSIDE_SHEET_RADIUS + UNDERSIDE_OUTLINE_PAD,
+)
 
 
 def underside_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
@@ -627,11 +637,12 @@ UNDERSIDE_CBORE_NOTE = ArcNote(
     facing="bottom",
 )
 # A model view has no native label: the caption states the direction and
-# scale in the plan captions' form, centred under the crop.
+# scale in the plan captions' form, centred under the view's outline (a free
+# note inside it fails the audit, as leaf 0123 did 5 mm under the circle).
 UNDERSIDE_CAPTION = "UNDERSIDE — SCALE 2:1"
 UNDERSIDE_CAPTION_UPPER_LEFT = (
     UNDERSIDE_CENTER[0] - 0.0265,
-    UNDERSIDE_CENTER[1] - UNDERSIDE_SHEET_RADIUS - 0.004,
+    UNDERSIDE_OUTLINE[1] - 0.003,
 )
 # Detail D's full R: "R" alone (ASME: a full radius is stated, its size is
 # the width's), in the mouth right of the circle between the width's
@@ -2016,13 +2027,14 @@ def _place_underside_view(adapter: Any) -> Any:
         raise RuntimeError("the underside view did not retain its crop")
     outline = tuple(float(value) for value in native.GetOutline())
     print(f"underside view: cropped outline={outline}")
-    r = UNDERSIDE_SHEET_RADIUS
-    circle = (UNDERSIDE_CENTER[0] - r, UNDERSIDE_CENTER[1] - r, UNDERSIDE_CENTER[0] + r, UNDERSIDE_CENTER[1] + r)
-    # The outline holds the crop circle and not much more: uncropped, the
-    # 2:1 plate runs ~450 mm.
-    slack = [circle[0] - outline[0], circle[1] - outline[1], outline[2] - circle[2], outline[3] - circle[3]]
-    if len(outline) != 4 or not all(-0.0005 <= side <= 0.012 for side in slack):
-        raise RuntimeError(f"the underside crop outline {outline} does not hug its circle {circle}")
+    # The outline is the crop circle's box plus SolidWorks' pad (uncropped,
+    # the 2:1 plate runs ~450 mm); the caption is placed against it.
+    if len(outline) != 4 or any(
+        abs(got - want) > 0.0005 for got, want in zip(outline, UNDERSIDE_OUTLINE)
+    ):
+        raise RuntimeError(
+            f"the underside crop outline {outline} is not the laid-out {UNDERSIDE_OUTLINE}"
+        )
     centre = model_point_in_view(adapter, view, slot_m, label="cropped underside slot centre")[:2]
     if math.dist(centre, UNDERSIDE_CENTER) > 0.0002:
         raise RuntimeError(f"the crop moved the underside slot centre to {centre}")

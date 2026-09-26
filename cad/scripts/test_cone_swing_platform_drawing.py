@@ -1211,6 +1211,13 @@ def _underside_boxes() -> dict[str, tuple[float, float, float, float]]:
     }
 
 
+# Leaf 917-s1-sheet2-0123's cropped outline (leaf-0123.log), sheet metres: the
+# box the layout audit held the caption against.
+_UNDERSIDE_OUTLINE_0123 = (0.235412, 0.133412, 0.288588, 0.186588)
+# Its caption, 5 mm under the circle and so inside that box.
+_UNDERSIDE_CAPTION_0123 = (0.2353, 0.1342, 0.2893, 0.1391)
+
+
 def test_the_underside_view_prints_the_counterbore_width_on_solid_lines() -> None:
     """C1: detail B dimensioned the counterbore's 6.50 to dashed edges, and
     section C-C cuts along the slot, so it cannot show the width.  The width
@@ -1248,8 +1255,16 @@ def test_the_underside_view_sits_clear_on_the_features_sheet() -> None:
             if {first, second} == {"crop", "cbore note"}:
                 continue  # its leader tip is inside the crop by design
             assert not _boxes_overlap(boxes[first], boxes[second]), (first, second)
-    # The caption sits under the crop, centred on it.
+    # The audit boxes the view by SolidWorks' outline, not the circle: the
+    # laid-out outline is the one the seat read, and the caption clears it.
+    outline = drawing.UNDERSIDE_OUTLINE
+    assert outline == pytest.approx(_UNDERSIDE_OUTLINE_0123, abs=0.0002)
+    for other, obstacle in _FEATURES_OBSTACLES.items():
+        assert not _boxes_overlap(outline, obstacle), other
     caption = boxes["caption"]
+    assert caption[3] <= outline[1] - 0.002
+    # Positive control: leaf 0123's caption sat inside the outline.
+    assert _boxes_overlap(_UNDERSIDE_CAPTION_0123, outline)
     assert caption[3] < boxes["crop"][1]
     assert (caption[0] + caption[2]) / 2.0 == pytest.approx(drawing.UNDERSIDE_CENTER[0], abs=0.002)
     # Positive control: the view at the tap callout's height collides.
