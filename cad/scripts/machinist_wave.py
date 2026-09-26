@@ -305,6 +305,8 @@ def manifest_problem(data: Any) -> str | None:
                 return f"{name}: an attempt's report_sha256 is not a sha256"
         if not isinstance(entry.get("pdf_sha256", ""), str):
             return f"{name}: pdf_sha256 is not a sha256"
+        if not isinstance(entry.get("refused_outage") or "", str):
+            return f"{name}: refused_outage is not an outage id"
         stale = entry.get("stale_reports", [])
         if not isinstance(stale, list) or not all(isinstance(x, str) for x in stale):
             return f"{name}: stale_reports is not a list of sha256"
@@ -326,16 +328,50 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def due(entry: dict[str, Any] | None, pdf_sha256: str, now: datetime) -> bool:
-    """Whether a drawing needs a review run now, given its manifest entry."""
+def due(
+    entry: dict[str, Any] | None,
+    pdf_sha256: str,
+    now: datetime,
+    outage: str | None = None,
+) -> bool:
+    """Whether a drawing needs a review run now, given its manifest entry.
+
+    A quota backoff waits out the reviewer that refused.  It holds only under
+    the routing it was refused in: a run under another ``outage`` (by id, or
+    none) sends the drawing elsewhere, so it is due at once.
+    """
     if entry is None or entry.get("pdf_sha256") != pdf_sha256:
         return True
     state = State(entry["state"])
     if state in SETTLED:
         return False
     if state == State.REFUSED and entry.get("retry_after"):
+        if entry.get("refused_outage") != outage:
+            return True
         return now >= datetime.fromisoformat(entry["retry_after"])
     return True
+
+
+def planned_reviews(route: Route, outage: dict[str, Any] | None) -> list[str]:
+    """The reviewer runs ``run`` makes for ``route``, as ``run_one`` makes them.
+
+    One per family a both-families drawing lacks ("down" for a family whose
+    reviewer is out: no fallback stands in); otherwise the routed reviewer, or
+    the directed fallback while it is down.  A quota last resort is not
+    planned: it runs only on a refusal.
+    """
+    if route.reviewer is None:
+        return ["unrouted"]
+    down = outage["reviewer"] if outage is not None else None
+    if route.families:
+        reviewers = [
+            ml.cross_family_reviewer(ml.other_family(family))
+            for family in route.families
+        ]
+        return ["down" if reviewer == down else reviewer for reviewer in reviewers]
+    if route.reviewer == down:
+        return [outage["fallback_reviewer"]]
+    return [route.reviewer]
 
 
 # --- one drawing -------------------------------------------------------------------
@@ -490,6 +526,7 @@ class Wave:
             state=State.REFUSED,
             detail=detail,
             retry_after=retry.isoformat(timespec="seconds"),
+            refused_outage=self.outage["id"] if self.outage else None,
         )
         return State.REFUSED
 
@@ -617,6 +654,8 @@ class Wave:
             data = json.loads(report.read_text(encoding="utf-8"))
             if not isinstance(data, dict) or ml.review_record_problem(data):
                 return None  # not a record this driver wrote: review again
+            if ml.prompt_problem(data):
+                return None  # a custom rubric is not the gate's review
             review = mr.Review(**data)
         except (OSError, ValueError, TypeError):
             return None
@@ -824,7 +863,10 @@ def run_wave(
             route
             for route in pending
             if due(
-                wave.manifest.drawings.get(route.name), ml.sha256_file(route.pdf), now
+                wave.manifest.drawings.get(route.name),
+                ml.sha256_file(route.pdf),
+                now,
+                wave.outage["id"] if wave.outage else None,
             )
         ]
         with _telemetry.span("machinist.wave.round", round=round_, drawings=len(todo)):
@@ -999,17 +1041,18 @@ def _run(args: argparse.Namespace) -> int:
     if unrendered:
         print(f"unrendered, not reviewed: {', '.join(unrendered)}", file=sys.stderr)
     if args.command == "plan":
+        by: Counter[str] = Counter()
         for r in routes:
-            reviewer = r.reviewer or "UNROUTED"
-            if outage is not None and r.reviewer == outage["reviewer"]:
-                reviewer = "down" if r.families else outage["fallback_reviewer"]
+            runs = planned_reviews(r, outage)
+            by.update(runs)
+            shown = "+".join(runs) if r.reviewer else "UNROUTED"
             print(
-                f"{r.name:<32} {reviewer:<8} author "
+                f"{r.name:<32} {shown:<13} author "
                 f"{r.author_family or '?'} ({r.author_source or r.problem})"
             )
-        by = Counter(r.reviewer or "unrouted" for r in routes)
         print(
-            f"{len(routes)} blocked: " + ", ".join(f"{k} {v}" for k, v in by.items()),
+            f"{len(routes)} blocked, {sum(by.values())} reviews: "
+            + ", ".join(f"{k} {v}" for k, v in by.items()),
             file=sys.stderr,
         )
         return 0

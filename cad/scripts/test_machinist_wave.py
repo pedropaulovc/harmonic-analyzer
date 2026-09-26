@@ -18,7 +18,13 @@ import pytest
 import machinist_ledger as ml
 import machinist_review as mr
 import machinist_wave as mw
-from test_machinist_ledger import CODEX_REFUSAL, _outages, _sheet, _verdict
+from test_machinist_ledger import (
+    CODEX_REFUSAL,
+    _author_rulings,
+    _outages,
+    _sheet,
+    _verdict,
+)
 
 NAMES = ("crank_arm", "pen_rod")
 
@@ -728,6 +734,73 @@ def test_a_later_uncheckpointed_report_is_charged_though_it_looks_like_an_old_on
     assert "claude: 2 runs, $0.50 total" in mw.table(resumed.manifest.data)
 
 
+def test_a_custom_rubric_report_is_not_adopted_on_resume(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    fake = FakeReviewer({("crank_arm", "codex"): "fix"})
+    [crank] = [r for r in _routes(checkout, tmp_path) if r.name == "crank_arm"]
+    wave = _wave(tmp_path, checkout, fake)
+    mw.run_wave([crank], wave)
+    report = mw.WAVE_ROOT / "w1" / "reviews" / "codex" / "crank_arm.json"
+    data = json.loads(report.read_text(encoding="utf-8"))
+    custom = "a custom rubric: be terse"  # what --prompt-file would have sent
+    data["extra"]["evidence"]["effective_prompt"] = custom
+    data["prompt_sha256"] = hashlib.sha256(custom.encode("utf-8")).hexdigest()
+    report.write_text(json.dumps(data), encoding="utf-8")
+    wave.manifest.update("crank_arm", state=mw.State.RUNNING)  # a crash
+    fake.calls.clear()
+
+    mw.run_wave([crank], _wave(tmp_path, checkout, fake))
+
+    assert len(fake.calls) == 1  # a calibrated review, not the custom one
+
+
+def test_a_new_outage_routes_a_refused_drawing_past_its_backoff(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # pen_rod: untrailered, so Claude's by the class rule; codex reviews it,
+    # and with no trailer there is no last resort.
+    rule = {"family": "claude", "ruled_by": "user", "ruled_at": "2026-09-25"}
+    rulings = ml.AuthorRulings({}, rule)
+    _authors(monkeypatch, crank_arm="gpt-6-sol", pen_rod=None)
+    [pen] = [
+        r for r in _routes(checkout, tmp_path, untrailered=rule) if r.name == "pen_rod"
+    ]
+    fake = FakeReviewer({("pen_rod", "codex"): "quota", ("pen_rod", "claude"): "ship"})
+    assert mw.run_wave([pen], _wave(tmp_path, checkout, fake, rulings=rulings)) == {
+        "pen_rod": mw.State.REFUSED
+    }
+
+    # Before its retry time, the user directs a fallback for the codex outage.
+    outage = ml.load_outages(_outages(tmp_path))["codex-401-test"]
+    resumed = _wave(tmp_path, checkout, fake, rulings=rulings, outage=outage)
+
+    assert mw.run_wave([pen], resumed) == {"pen_rod": mw.State.INGESTED}
+    assert fake.calls[-1][:2] == ("pen_rod", "claude")
+
+
+def test_plan_lists_every_review_a_route_will_run(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    _authors(monkeypatch, crank_arm=None, pen_rod=None)
+    rulings = _author_rulings(tmp_path, family="gpt", both_families=BOTH)
+    monkeypatch.setattr(mr, "review_package", pytest.fail)
+    argv = ["--checkout", str(checkout), "--ledger", str(tmp_path / "l.json")]
+    argv += ["--author-rulings", str(rulings)]
+
+    assert mw.main([*argv, "plan", "crank_arm"]) == 0
+    out, err = capsys.readouterr()
+    assert "claude+codex" in out
+    assert "1 blocked, 2 reviews: claude 1, codex 1" in err
+
+    argv += ["--outages", str(_outages(tmp_path)), "--outage", "codex-401-test"]
+    assert mw.main([*argv, "plan", "crank_arm"]) == 0
+    out, err = capsys.readouterr()
+    assert "claude+down" in out
+    assert "1 blocked, 2 reviews: claude 1, down 1" in err
+
+
 def test_a_reused_report_is_not_charged_again(
     tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -973,7 +1046,7 @@ def test_plan_routes_without_reviewing(
     out, err = capsys.readouterr()
     assert "crank_arm" in out and "codex" in out
     assert "UNROUTED" in out
-    assert "2 blocked: codex 1, unrouted 1" in err
+    assert "2 blocked, 2 reviews: codex 1, unrouted 1" in err
 
 
 def test_the_wave_tests_run_under_the_recipe_gate() -> None:
