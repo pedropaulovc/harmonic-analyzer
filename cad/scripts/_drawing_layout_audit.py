@@ -11,6 +11,9 @@ by the sheet's own view):
   and per type: a note's text/extent/balloon flag, a display dimension's
   hole-callout flag and its own ``IDisplayDimension::GetDisplayData``, a datum
   origin's ``GetAxisPoints2`` and labels;
+* the Visible/Printable state of each layer those annotations sit on: an
+  annotation on a layer that does not print is left out of the audit and
+  counted per sheet in the report's summary (``hidden_layer``);
 * every view's outline and orientation;
 * section lines (``IDrSection`` line, arrows, label origins, text height) and
   detail circles (``IView::GetDetailCircleInfo2``);
@@ -78,9 +81,11 @@ class _Reader:
     None is the documented empty answer (``GetAnnotations``,
     ``GetSectionLines``, ``GetTableAnnotations``, ``GetDetailCircleInfo2``,
     ``GetSplitInformation`` on an unsplit table), where the value is not
-    consumed by the audit (font, line spacing, layer, scale, display mode,
-    datum-origin axes and labels), or where a fallback read follows
-    (``GetName2`` before ``Name``).
+    consumed by the audit (font, line spacing, scale, display mode,
+    datum-origin axes and labels), where the default is the conservative
+    answer (an annotation's layer name, or a layer ``GetLayer`` cannot
+    resolve: its annotations are audited as printed), or where a fallback
+    read follows (``GetName2`` before ``Name``).
 
     Every refusal is counted per sheet under the accessor's name. A refused
     read can drop an annotation's ink or text from the audit, so any count is
@@ -236,6 +241,41 @@ def _dump_annotation(reader: _Reader, raw: Any) -> dict[str, Any] | None:
                 "y_label": str(reader.call(lambda: origin.YLabel, "")),
             }
     return record
+
+
+def _layer_states(reader: _Reader, dump: Mapping[str, Any]) -> dict[str, dict[str, bool]]:
+    """``ILayer`` Visible/Printable of each named layer the sheet's
+    annotations sit on. An annotation on a hidden or non-printing layer
+    reads ``Visible`` 1 through COM but prints nothing (cone-swing-platform's
+    profile thread callout on COSMETIC-THREADS-HIDDEN, 24cbab237), so the
+    audit needs the layer to know what printed. A name ``GetLayer`` does not
+    resolve is left out, and its annotations are audited as printed."""
+    names = sorted(
+        {
+            str(annotation.get("layer") or "")
+            for annotations in (
+                *(view.get("annotations") or () for view in dump.get("views", ())),
+                dump.get("sheet_annotations") or (),
+            )
+            for annotation in annotations
+        }
+        - {""}
+    )
+    if not names:
+        return {}
+    manager = reader.bind(reader.need(lambda: reader.adapter.currentModel.GetLayerManager()), "ILayerMgr")
+    if manager is None:
+        return {}
+    states = {}
+    for name in names:
+        layer = reader.bind(reader.call(lambda n=name: manager.GetLayer(n)), "ILayer")
+        if layer is None:
+            continue
+        states[name] = {
+            "visible": bool(reader.need(lambda: layer.Visible, True)),
+            "printable": bool(reader.need(lambda: layer.Printable, True)),
+        }
+    return states
 
 
 def _table_record(reader: _Reader, raw: Any) -> dict[str, Any] | None:
@@ -433,6 +473,7 @@ def _dump_sheet(
             if item is not None
         ],
     }
+    dump["layers"] = _layer_states(reader, dump)
     if template is not None:
         dump["title_block"] = _round(
             (template.title_block_left_m, 0.0, width, template.title_block_top_m)
@@ -503,6 +544,10 @@ def run_layout_audit(
         span.set_attribute("sheets", summary["sheets"])
         span.set_attribute("gating", summary["gating"])
         span.set_attribute("collect_s", summary["collect_s"])
+        hidden = sum(summary["hidden_layer"].values())
+        span.set_attribute("hidden_layer", hidden)
+        if hidden:
+            _telemetry.info(f"layout audit {stem}: annotations on non-printing layers, not audited: {summary['hidden_layer']}")
         read_errors = sum(sum(d["read_errors"].values()) for d in dumps)
         span.set_attribute("read_errors", read_errors)
         if read_errors:

@@ -3056,3 +3056,279 @@ def test_a_hole_callout_over_the_top_border_gates_estimated_or_printed():
     assert severity(estimated) is FindingSeverity.GATING
     [printed] = breaches(_dump(views=[view], strokes=_edges((0.06, 0.06, 0.09, 0.06))))
     assert printed.b == "top border"
+
+
+# --------------------------------------------------------------------------
+# swing's 917-s1 sheet 2 eye pass (cone_swing_platform leaf 917-s1-sheet2-24cb,
+# key f1615b4b73f0 at 24cbab237; fix 4dda16fd5). Lines, arrows and edges are
+# the leaf's own PDF strokes in sheet mm (restored from the build cache,
+# dt-logs/layout-blindspots/swing-24cb-raw); leaders and note text are the
+# leaf's COM inventory (dt-logs/917-s1-sheet2/leaf-24cb.log).
+# --------------------------------------------------------------------------
+
+SWING_VIEW2 = (0.1594, 0.1286, 0.2006, 0.2514)
+# The plate's tapered sides and top edge, and the printed rings of the two
+# countersunk 1/4-20 holes (outer 1.64, inner 1.27 mm radius) and the dowel
+# hole between them (0.79 mm).
+SWING_PLATE_EDGES = _edges(
+    (0.18299, 0.13769, 0.19442, 0.23834),
+    (0.16499, 0.23961, 0.16859, 0.13896),
+    (0.19248, 0.24582, 0.17099, 0.24582),
+    *_ring(0.17022, 0.23520, 0.00164),
+    *_ring(0.17022, 0.23520, 0.00127),
+    *_ring(0.18334, 0.23229, 0.00164),
+    *_ring(0.18334, 0.23229, 0.00127),
+    *_ring(0.17533, 0.22719, 0.00079),
+)
+SWING_RD2_ROWS = [
+    ("2X ", 0.2283, 0.2264),
+    ("<MOD-DIAM>", 0.2350, 0.2264),
+    (" 5.11 THRU ALL", 0.2416, 0.2264),
+    ("AT ASSEMBLY; 1/4-20 UNC - 2B THRU ALL", 0.2060, 0.2148),
+]
+
+
+def _swing_rd2(fixed):
+    """RD2's leader, shoulder and arrow as printed: at 24cbab237 to the left
+    1/4-20 hole across 28 mm of plate; at 4dda16fd5 to the right one."""
+    tip, end, base = ((0.18408, 0.23125), (0.18260, 0.23333), (0.18616, 0.22835)) if fixed else (
+        (0.17113, 0.23431), (0.16930, 0.23608), (0.173725, 0.23188)
+    )
+    callout = _hole_callout(
+        "RD2",
+        [(*tip, 0.20433, 0.20302), (*end, *tip), (0.20433, 0.20302, 0.29404, 0.20302)],
+        SWING_RD2_ROWS,
+    )
+    callout["display"]["arrows"] = [
+        [*tip, 0.0, base[0] - tip[0], base[1] - tip[1], 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]
+    ]
+    return callout
+
+
+def test_a_leader_running_over_the_part_gates():
+    """(a) RD2's leader crossed the plate's right edge at 24cbab237 and ran
+    28.2 mm over the plate to a hole 6.1 mm from the plate's side: a 22 mm
+    detour, reading as an edge of the part. The fix at 4dda16fd5 lands on the
+    nearer hole, 14.1 mm over the plate for a 10.3 mm approach, and is clear.
+    Both land on a countersink's inner ring, 0.37 mm inside the outer one:
+    that crossing is under the arrowhead, so each counts one edge."""
+
+    def over(fixed):
+        view = _view("Drawing View2", SWING_VIEW2, [_swing_rd2(fixed)])
+        findings = audit_dump(_dump(views=[view], strokes=SWING_PLATE_EDGES))
+        return [f for f in findings if f.kind.startswith("leader-over-part") and "RD2" in f.a]
+
+    [finding] = over(False)
+    assert finding.kind == "leader-over-part"
+    assert severity(finding) is FindingSeverity.GATING
+    assert 27.5 < finding.extra["over_part_mm"] < 29.0
+    assert 21.0 < finding.extra["detour_mm"] < 23.5
+    assert finding.extra["edge_crossings"] == 1
+    assert over(True) == []
+
+
+def test_a_long_leader_by_the_shortest_route_is_advisory():
+    """cone-gear's Ra 1.6 leaders run 27-39 mm over the gear to its bore, the
+    shortest route there is (layoutcal2-a T072..T120, detour -5..-2 mm): no
+    placement shortens them, so they are reported but do not gate. Here an
+    80 mm square part with a 5 mm bore at its centre, the leader in from the
+    left edge: 35 mm over the part, 35 mm approach."""
+    ring = _ring(0.200, 0.150, 0.005)
+    part = _box_edges(0.160, 0.110, 0.240, 0.190)
+    tip = (0.195, 0.150)
+    note = {
+        "type": 6,
+        "name": "Finish",
+        "visible": 1,
+        "owner_type": 0,
+        "leaders": [[0.140, 0.150, 0.0, *tip, 0.0]],
+        "display": {
+            "arrows": [[*tip, 0.0, -1.0, 0.0, 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]],
+            "texts": [{"t": "Ra 1.6", "pos": [0.125, 0.151, 0.0], "h": 0.0025}],
+        },
+        "note": {"text": "Ra 1.6", "balloon": False},
+    }
+    view = _view("Gear", (0.155, 0.105, 0.245, 0.195), [note])
+    findings = audit_dump(_dump(views=[view], strokes=[*part, *_edges(*ring)]))
+    [finding] = [f for f in findings if f.kind.startswith("leader-over-part")]
+    assert finding.kind == "leader-over-part-direct"
+    assert severity(finding) is FindingSeverity.ADVISORY
+    assert finding.extra["over_part_mm"] == pytest.approx(35.0, abs=0.1)
+    assert finding.extra["detour_mm"] == pytest.approx(0.0, abs=0.1)
+
+
+# DetailItem357, the model's cosmetic-thread callout on View2: COM text and
+# leader verbatim; like its View1 twin (layoutcal2-a DetailItem349) it dumps
+# no display data.
+SWING_TAPPED_HOLE = {
+    "type": 6,
+    "name": "DetailItem357",
+    "visible": 1,
+    "owner_type": 0,
+    "layer": "",
+    "leaders": [[0.1960, 0.2459, 0.0, 0.1896, 0.2459, 0.0, 0.1834, 0.2339, 0.0]],
+    "display": {},
+    "note": {"text": "1/4-20 Tapped Hole", "balloon": False},
+}
+# A general note naming the same thread, with no leader (layoutcal2-a
+# DetailItem372's second row).
+SWING_DEBURR_NOTE = {
+    "type": 6,
+    "name": "DetailItem372",
+    "visible": 1,
+    "owner_type": 0,
+    "display": {"texts": [{"t": "1/4-20 TAPPED HOLES: DEBURR ONLY, 0.1 MAX BREAK EACH END.", "pos": [0.2225, 0.0729, 0.0], "h": 0.0025}]},
+    "note": {"text": "1/4-20 TAPPED HOLES: DEBURR ONLY, 0.1 MAX BREAK EACH END.", "balloon": False},
+}
+
+
+def test_a_second_callout_of_one_thread_in_a_view_gates():
+    """(b) At 24cbab237 the cosmetic-thread callout "1/4-20 Tapped Hole"
+    printed beside RD2's "2X ... 1/4-20 UNC - 2B THRU ALL", its leader on the
+    other hole of RD2's pair. 4dda16fd5 removed it. A general note naming the
+    thread, with no leader, calls out no hole and is no duplicate; nor are
+    two hole callouts of one thread (harmonic-base's 2X and 4X 8-32 groups,
+    test_gate_mode_passes_a_sheet_with_only_advisories)."""
+
+    def duplicates(members):
+        view = _view("Drawing View2", SWING_VIEW2, members)
+        return [f for f in audit_dump(_dump(views=[view])) if f.kind == "duplicate-thread-callout"]
+
+    [finding] = duplicates([_swing_rd2(False), SWING_TAPPED_HOLE, SWING_DEBURR_NOTE])
+    assert {finding.a, finding.b} == {"hole-callout RD2", "note DetailItem357"}
+    assert finding.extra["thread"] == "1/4-20"
+    assert severity(finding) is FindingSeverity.GATING
+    assert duplicates([_swing_rd2(True), SWING_DEBURR_NOTE]) == []
+
+
+@pytest.mark.parametrize(
+    ("text", "threads"),
+    [
+        ("AT ASSEMBLY; 1/4-20 UNC - 2B THRU ALL", ["1/4-20"]),
+        ("#8-32 Tapped Hole", ["#8-32"]),
+        ("4X M6x1.0 - 6H", ["M6"]),
+        ("1018 CF FLAT 1/4 x 2-1/2 in", []),
+        ("TRANSFER FROM MHA-016", []),
+        ("DIMENSIONING AND TOLERANCING PER ASME Y14.5-2018", []),
+    ],
+)
+def test_thread_designations_are_read_from_callout_text(text, threads):
+    from _layout_audit import _THREAD
+
+    assert [m.group(1).upper() for m in _THREAD.finditer(text)] == [t.upper() for t in threads]
+
+
+# layoutcal2-a cone-swing-platform DetailItem349, verbatim: the profile view's
+# cosmetic-thread callout, which draw_cone_swing_platform put on the hidden
+# COSMETIC-THREADS-HIDDEN layer. COM reads it Visible 1 with a registered
+# leader and no display data; the PDF prints none of it (24cbab237's
+# DetailItem351, swing's 917-s1 sheet 1 eye pass).
+SWING_HIDDEN_TAPPED_HOLE = {
+    "type": 6,
+    "name": "DetailItem349",
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.0918458, 0.2473492, -0.0015875],
+    "layer": "COSMETIC-THREADS-HIDDEN",
+    "leaders": [[0.0913007, 0.2455784, -0.0015875, 0.0849507, 0.2455784, -0.0015875, 0.0783754, 0.2338789, -0.0015875]],
+    "display": {},
+    "note": {
+        "text": "1/4-20 Tapped Hole",
+        "extent": [0.0782569, 0.2342918, -0.0, 0.1358608, 0.2476316, -0.0],
+        "balloon": False,
+    },
+}
+
+
+@pytest.mark.parametrize(
+    ("state", "audited"),
+    [
+        pytest.param({"visible": False, "printable": False}, False, id="hidden-layer"),
+        pytest.param({"visible": True, "printable": False}, False, id="non-printing-layer"),
+        pytest.param({"visible": True, "printable": True}, True, id="printing-layer"),
+    ],
+)
+def test_an_annotation_on_a_non_printing_layer_is_counted_not_audited(state, audited):
+    """Main's ruling (Option A): the audit judges what prints. An annotation
+    on a layer that does not print leaves no ink, so its leader is no obstacle
+    and no finding names it; the report counts it per sheet instead."""
+    from _layout_audit import audit_report
+
+    view = _view("Drawing View1", (0.0544, 0.1286, 0.0956, 0.2514), [SWING_HIDDEN_TAPPED_HOLE])
+    dump = {**_dump(views=[view]), "layers": {"COSMETIC-THREADS-HIDDEN": state}}
+    labels = {a.label for a in sheet_model(dump).geometry.annotations}
+    assert any("DetailItem349" in label for label in labels) is audited
+    report, _gating = audit_report("cone-swing-platform", LayoutAuditMode.REPORT, [dump])
+    assert report["summary"]["hidden_layer"] == ({} if audited else {"Sheet2": 1})
+
+
+def test_the_collector_records_each_annotation_layers_print_state(monkeypatch):
+    """Option A's collector half: each named layer the sheet's annotations sit
+    on, read once through ILayerMgr::GetLayer, Visible then Printable. A name
+    GetLayer cannot resolve is left out (audited as printed), not a refusal."""
+    import _drawing_layout_audit as collector
+
+    monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
+    asked = []
+
+    class Layer:
+        Visible = False
+        Printable = False
+
+    class Manager:
+        def GetLayer(self, name):
+            asked.append(name)
+            return Layer() if name == "COSMETIC-THREADS-HIDDEN" else None
+
+    class Model:
+        def GetLayerManager(self):
+            return Manager()
+
+    class Adapter:
+        currentModel = Model()
+
+    dump = _dump(
+        views=[_view("Drawing View1", (0.05, 0.12, 0.10, 0.25), [SWING_HIDDEN_TAPPED_HOLE, {"type": 6, "name": "Gone", "layer": "FORMAT"}])],
+        sheet_annotations=[{"type": 6, "name": "Plain", "layer": ""}],
+    )
+    reader = collector._Reader(adapter=Adapter())
+    assert collector._layer_states(reader, dump) == {"COSMETIC-THREADS-HIDDEN": {"visible": False, "printable": False}}
+    assert asked == ["COSMETIC-THREADS-HIDDEN", "FORMAT"]
+    assert reader.take_errors() == {}
+
+
+# layoutcal2-a cone-swing-platform DetailItem374, verbatim: like every
+# leadered note, its display data opens with a zero-length line at the attach
+# point, and the PDF prints it as a zero-length 0.18 mm stroke (five such on
+# 24cbab237's FEATURES sheet and five on the fixed 4dda16fd5's).
+SWING_SLOT_NOTE = {
+    "type": 6,
+    "name": "DetailItem374",
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.121, 0.0785, 0.0],
+    "layer": "",
+    "leaders": [[0.1204851, 0.0770861, -0.0, 0.0895, 0.0584641, 0.0]],
+    "display": {
+        "lines": [
+            [0.0, 0.0, 0.0, 0.0, 0.1202019, 0.0776806, -0.0, 0.1202019, 0.0776806, -0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.1202019, 0.0776806, -0.0, 0.0895, 0.0584641, 0.0],
+        ],
+        "arrows": [[0.0895, 0.0584641, 0.0, 0.8476532, 0.5305507, -0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]],
+        "texts": [
+            {"t": "<MOD-DIAM>", "pos": [0.121, 0.075, 0.0], "h": 0.0025, "ref": 1, "ang": 0.0},
+            {"t": "4 END MILL SLOT THRU", "pos": [0.1247703, 0.075, 0.0], "h": 0.0025, "ref": 1, "ang": 0.0},
+        ],
+    },
+    "note": {"text": "<MOD-DIAM>4 END MILL SLOT THRU", "extent": [0.0891713, 0.0590545, -0.0, 0.1589024, 0.0790643, -0.0], "balloon": False},
+}
+
+
+def test_a_leadered_notes_zero_length_attach_stub_is_no_finding():
+    """Main's ruling on swing's third case (b3): the zero-length leader
+    segment is SolidWorks' attach stub, printed for every leadered note, so
+    it is a contract, not a defect: the note audits clean."""
+    view = _view("Detail View B (2 : 1)", (0.0491, 0.0106, 0.1179, 0.0794), [SWING_SLOT_NOTE])
+    stub = _edges((0.1202019, 0.0776806, 0.1202019, 0.0776806), width=0.00018)
+    findings = audit_dump(_dump(views=[view], strokes=stub))
+    assert [f for f in findings if "DetailItem374" in f.a or "DetailItem374" in f.b] == []
