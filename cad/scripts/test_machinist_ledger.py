@@ -1170,6 +1170,56 @@ def test_an_uncited_finding_keeps_the_drawing_failing(
     assert not ledger_path.exists()
 
 
+@pytest.mark.parametrize(
+    ("data", "error"),
+    [
+        ([], "not an object"),
+        ({"drawing": "crank_arm", "rebuttals": ["U37"]}, "rebuttal 0 is not an object"),
+        (
+            {
+                "drawing": "crank_arm",
+                "rebuttals": [{"category": "blockers", "index": [0]}],
+            },
+            "rebuttal 0: index",
+        ),
+        (
+            {"drawing": "crank_arm", "rebuttals": [{"category": 3, "index": 0}]},
+            "rebuttal 0: category",
+        ),
+    ],
+    ids=["list", "string-item", "list-index", "int-category"],
+)
+def test_a_malformed_rebuttals_file_is_refused_not_fatal(
+    tmp_path: Path, data, error: str
+) -> None:
+    path = tmp_path / "rebuttals.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=error):
+        ml.load_rebuttals(path, name="crank_arm")
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [{"sources": "crank-arm.pdf"}, {"verdict": "SHIP"}, {"reviewer": "gemini"}],
+    ids=["sources-str", "verdict-str", "unknown-reviewer"],
+)
+def test_ingest_refuses_a_verdict_record_that_is_malformed(
+    tmp_path: Path, registry: Path, broken: dict
+) -> None:
+    pdf = _sheet(registry)
+    report = tmp_path / "review.json"
+    report.write_text(json.dumps({**_review(pdf), **broken}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="not a machinist_review record"):
+        ml.ingest(
+            report,
+            author_family="claude",
+            pdf=pdf,
+            ledger_path=tmp_path / "ledger.json",
+        )
+
+
 def test_an_acceptance_falls_when_its_ruling_is_withdrawn(
     tmp_path: Path, registry: Path
 ) -> None:

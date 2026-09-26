@@ -1221,7 +1221,10 @@ def prompt_problem(review: dict[str, Any]) -> str | None:
 
 
 def load_rebuttals(path: Path, *, name: str) -> list[dict[str, Any]]:
+    """The rebuttals file for ``name``, refused unless every entry is well formed."""
     data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"{path}: the rebuttals file is not an object")
     if data.get("drawing") != name:
         raise ValueError(
             f"{path}: rebuttals are for {data.get('drawing')!r}, not {name!r}"
@@ -1229,6 +1232,19 @@ def load_rebuttals(path: Path, *, name: str) -> list[dict[str, Any]]:
     rebuttals = data.get("rebuttals")
     if not isinstance(rebuttals, list) or not rebuttals:
         raise ValueError(f"{path}: no rebuttals listed")
+    for number, rebuttal in enumerate(rebuttals):
+        if not isinstance(rebuttal, dict):
+            raise ValueError(f"{path}: rebuttal {number} is not an object")
+        if rebuttal.get("category") not in GATING_KEYS:
+            raise ValueError(
+                f"{path}: rebuttal {number}: category {rebuttal.get('category')!r} "
+                f"is not one of {GATING_KEYS}"
+            )
+        index = rebuttal.get("index")
+        if not isinstance(index, int) or isinstance(index, bool) or index < 0:
+            raise ValueError(
+                f"{path}: rebuttal {number}: index {index!r} is not a count"
+            )
     return rebuttals
 
 
@@ -1570,6 +1586,11 @@ def ingest(
 ) -> Recorded:
     """Record an EXISTING verdict JSON against the exact PDF it reviewed."""
     review = json.loads(report.read_text(encoding="utf-8"))
+    problem = (
+        review_record_problem(review) if isinstance(review, dict) else "not an object"
+    )
+    if problem:
+        raise ValueError(f"{report}: not a machinist_review record: {problem}")
     sources = review.get("sources") or []
     if len(sources) != 1 or not str(sources[0]).lower().endswith(".pdf"):
         raise ValueError(f"{report}: expected one registry PDF, got {sources}")
