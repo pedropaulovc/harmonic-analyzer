@@ -109,6 +109,13 @@ DETAIL_LABEL_HALF_WIDTH = 0.017
 DETAIL_LETTER_OFFSET = (DETAIL_RADIUS_MM / 1000.0 + 0.006, 0.0)
 # swCropViewErrors_e.swCropViewErrors_NoError
 CROP_NO_ERROR = 1
+# The crop boundary where it cuts the neck.  Drawn plain, it was a smooth arc
+# with the same curvature sense as the SR10.9 crown, so the neck read as
+# domed (Main's F1 on pc-r6).  A thin full boundary circle would cross the
+# Ø10.5 dimension line and run through the (3.0) arrowhead, so the neck's
+# cut end is drawn as a freehand break instead: Crop2's jagged outline, at
+# this shape intensity (1 most .. 5 least).
+DETAIL_BREAK_INTENSITY = 3
 # The head centre must land within 0.1 mm of DETAIL_CENTER after the move
 # (draw_post_mount_screw's tip-view tolerance).
 DETAIL_POSITION_TOL_M = 1e-4
@@ -496,8 +503,9 @@ def _cropped_head_view(adapter: Any, principal: Any) -> Any:
     way at twice its scale; move it so the head centre lands on DETAIL_CENTER
     (ModelToViewTransform, SetViewPosition); ActivateView; a circle of the
     fence's 2:1 radius in the view's own sketch; IView.Crop2 straight after
-    it while the circle is still selected (swCropViewErrors_NoError); an
-    IsCropped read-back that raises.
+    it while the circle is still selected (swCropViewErrors_NoError), with
+    the jagged outline that draws the neck's cut end as a freehand break;
+    IsCropped and outline-style read-backs that raise.
     """
     draw = adapter.currentModel
     view = _early_bound(
@@ -540,7 +548,7 @@ def _cropped_head_view(adapter: Any, principal: Any) -> Any:
     uncropped = tuple(float(value) for value in view.GetOutline())
     name = _activate_view(adapter, view, label="detail-A view")
     _sketch_circle(adapter, view, center, DETAIL_CROP_RADIUS, label="detail-A crop")
-    status = int(view.Crop2(False, False, 5))
+    status = int(view.Crop2(True, False, DETAIL_BREAK_INTENSITY))
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     view.UpdateViewDisplayGeometry()
@@ -568,7 +576,38 @@ def _cropped_head_view(adapter: Any, principal: Any) -> Any:
         raise RuntimeError(
             f"detail-A crop did not take: outline {outline!r}, before {uncropped!r}"
         )
+    boundary = (
+        bool(view.CropViewJaggedOutline),
+        bool(view.CropViewNoOutline),
+        int(view.CropViewJaggedShapeIntensity),
+    )
+    if boundary != (True, False, DETAIL_BREAK_INTENSITY):
+        raise RuntimeError(
+            f"detail A's crop boundary is not the freehand break: jagged, "
+            f"no-outline, intensity {boundary!r}"
+        )
     return view
+
+
+def _radius_leader_outside(adapter: Any, annotations: list[Any], name: str) -> None:
+    """Put a radius's arrow outside its arc (swDimArrowsOutside).
+
+    Drawn from the arc's centre, the SR10.9 leader ran through the Ø6 cross
+    hole and its centre mark (Main's F2 on pc-r6).  With the arrow outside,
+    the leader reaches the crown from its text and never enters the part.
+    """
+    matches = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == name
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.ArrowSide = 1  # swDimArrowsOutside
+    if int(display.ArrowSide) != 1:
+        raise RuntimeError(f"{name} did not keep its arrow outside the arc")
 
 
 def _plain_text(text: str) -> str:
@@ -1028,6 +1067,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *detail_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _radius_leader_outside(adapter, detail_annotations, "HeadCapR")
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     for name, label in {
         "HeadCapSagDim": "front-crown height reference",
@@ -1173,8 +1213,8 @@ def _assert_no_text_on_line(findings: list[Any]) -> None:
     that defect is now a build failure with sheet-millimetre fix coordinates.
     Text on text is gated too, since the bond-zone callout moved above the
     shaft beside the DETAIL A label.  The audit's other finding kinds are
-    logged, not gated: the diametric Ø6 leader crossing the SR10.9 leader
-    inside detail A is conventional ink.
+    logged, not gated: a diametric leader crossing another inside a detail
+    is conventional ink.
     """
     blocking = [f for f in findings if f.kind in BLOCKING_LAYOUT_FINDINGS]
     advisory = [f for f in findings if f.kind not in BLOCKING_LAYOUT_FINDINGS]
