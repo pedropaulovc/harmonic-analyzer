@@ -332,7 +332,7 @@ def test_dowel_pair_prints_on_a_foot_view_with_its_match_ream_callout() -> None:
     and its prefix names the mating platform and the reamer."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '"*Bottom"' in source
-    assert "process=POST_DOWEL_CALLOUT" in source
+    assert "process=FOOT_DOWEL_PREFIX" in source
     assert '{"hw-diam": 3, "hw-depth": 1}' in source
     assert 'label="post dowel reamed holes"' in source
     assert drawing.FOOT_VIEW_NOTE == "VIEW C - FOOT\nSCALE 1:2"
@@ -608,6 +608,16 @@ def test_foot_view_group_is_placed_from_read_back_boxes() -> None:
     assert not hasattr(drawing, "foot_callout_shift")
     # The callout names ONE dowel: the edge pick breaks the z tie.
     assert "center_z_mm" in inspect.signature(drawing._circular_edge).parameters
+
+
+def test_foot_dowel_prefix_is_a_rewrap_not_new_words() -> None:
+    """The break at the prefix's end puts the native size/band/depth on its
+    own row: joined to "REAM (...) FROM FOOT" that row ran ~120 mm, wider
+    than any free field on the sheet.  Same words, same order."""
+    from cone_post_dowel_spec import POST_DOWEL_CALLOUT
+
+    assert drawing.FOOT_DOWEL_PREFIX.endswith("\n")
+    assert drawing.FOOT_DOWEL_PREFIX.split() == POST_DOWEL_CALLOUT.split()
 
 
 # S1 leaf 917-s1-9eb0 (drawing:cone_pivot_post): the sheet at the foot view's

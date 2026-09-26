@@ -124,6 +124,11 @@ FOOT_VIEW_NOTE = "VIEW C - FOOT\nSCALE 1:2"
 # Clearance between read-back boxes: caption to border, caption to its view,
 # callout text to either neighbouring view outline.
 FOOT_LAYOUT_GAP = 0.002
+# The dowel callout's prefix, re-wrapped (same words, same order): the break
+# at its end puts the native size/band/depth on a row of its own.  Joined to
+# "REAM (...) FROM FOOT" that row ran ~120 mm, wider than any free field on
+# the sheet (offline search on the 917-s1-9eb0 dump: no spot above ~100 mm).
+FOOT_DOWEL_PREFIX = POST_DOWEL_CALLOUT + "\n"
 
 # The checked-in landscape template's FINISH value cell, measured between its
 # authored sheet-format rules.  Its linked INote extent is checked natively
@@ -815,7 +820,7 @@ def _place_foot_group(adapter: Any, foot: Any) -> None:
         # Provisional: the plan below moves it once its real box is read.
         callout_xy=(foot_box.xmin - gap, dowel_xy[1]),
         label="post dowel reamed holes",
-        process=POST_DOWEL_CALLOUT,
+        process=FOOT_DOWEL_PREFIX,
     )
     set_hole_callout_precision(
         dowel_callout, {"hw-diam": 3, "hw-depth": 1}, label="post dowel ream"

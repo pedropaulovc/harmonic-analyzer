@@ -104,9 +104,11 @@ def test_both_ream_callouts_name_the_mating_part_on_their_sheets() -> None:
     assert dowel.POST_DOWEL_CALLOUT.startswith("MATCH-DRILL/REAM WITH\nMHA-091")
     for module, name in (
         (draw_cone_swing_platform, "PLATE_DOWEL_CALLOUT"),
-        (draw_cone_pivot_post, "POST_DOWEL_CALLOUT"),
+        (draw_cone_pivot_post, "FOOT_DOWEL_PREFIX"),
     ):
         assert f"process={name}," in Path(module.__file__).read_text(encoding="utf-8")
+    # The post's prefix is the spec's, re-wrapped: same words, same order.
+    assert draw_cone_pivot_post.FOOT_DOWEL_PREFIX.split() == dowel.POST_DOWEL_CALLOUT.split()
 
 
 def test_step_2_dowels_the_post_before_the_screws_are_tightened() -> None:
