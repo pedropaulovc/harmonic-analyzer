@@ -1,9 +1,9 @@
 r"""Create the curated machinist drawing for the pinion return leaf spring.
 
-NOT a coil spring: a bent phosphor-bronze leaf.  A 0.5 blank -- a 5.0 strip
-with a square screw pad at its free end -- formed as a flat screw-down foot, an
-R2 bend up to a blade leaning back over the foot's bend, then an R1.5 crest
-turning 25 deg out to a short free flat.  The solid is the installed shape;
+NOT a coil spring: a bent 17-7 PH stainless leaf.  A 0.381 blank -- a 6.35
+strip with a square screw pad at its free end -- formed as a flat screw-down
+foot, an R3.3 bend up to a blade leaning back over the foot's bend, then an
+R3.3 crest turning 25 deg out to a short free flat.  The solid is the installed shape;
 the front view also shows the part's hidden FreeForm reference sketch as the
 phantom free form, and the free crest and tip are baselined from the foot's
 free end on it.  The projected top view carries the blank's pad, strip width
@@ -96,7 +96,7 @@ ISO_CENTER = (0.350, 0.150)
 DETAIL_CENTER = (0.240, 0.195)
 DETAIL_SCALE = (5, 1)
 # The kink detail's fence: centred between the kink centre and the free tip,
-# large enough to take the whole R1.5 arc and the flat.
+# large enough to take the whole kink arc and the flat (3.06 at R3.3).
 DETAIL_FOCUS = (
     (KINK_C[0] + FLAT_TIP[0]) / 2.0,
     (KINK_C[1] + FLAT_TIP[1]) / 2.0,
@@ -358,7 +358,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Pinion Return Leaf Spring Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "pinion return spring; bent brass leaf; formed blank",
+            3: "pinion return spring; bent stainless leaf; formed blank",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
