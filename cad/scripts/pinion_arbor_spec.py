@@ -67,6 +67,9 @@ from pinion_arbor_geometry import (
     NECK_LEN as NECK_LEN,
     NECK_LEN_PLACES as NECK_LEN_PLACES,
     OVERALL_LEN as OVERALL_LEN,
+    PIN_STATION_BAND as PIN_STATION_BAND,
+    PIN_STATION_FROM_HEAD_REAR as PIN_STATION_FROM_HEAD_REAR,
+    PIN_Z as PIN_Z,
     RELEASED_ARBOR_ROOT_Z as RELEASED_ARBOR_ROOT_Z,
     RELEASED_DRUM_FRONT_Z as RELEASED_DRUM_FRONT_Z,
     RETAINING_COMPOUND as RETAINING_COMPOUND,
@@ -109,6 +112,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FrontCapProfile": {"HeadCapR", "HeadCapSagDim"},
     "BackCapProfile": {"BackCapR", "BackCapSagDim"},
     "CrossHoleProfile": {"CrossHoleDia"},
+    # R1a: the collar's spring-pin hole, from the same head rear face.
+    "PinHoleProfile": {"PinHoleDia"},
+    "PinStationReference": {"PinStationFromHeadRear"},
     "BackRimReference": {"BackRimFromHeadRear"},
     "OverallReference": {"OverallLen"},
     "FrontJournalReference": {
@@ -132,6 +138,7 @@ REFERENCE_SKETCHES = (
     "BackRimReference",
     "BondZoneReference",
     "DrumStationReference",
+    "PinStationReference",
     "OverallReference",
 )
 
@@ -145,6 +152,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FrontCapProfile": {"HeadCapR": 1, "HeadCapSagDim": HEAD_CAP_SAG_PLACES},
     "BackCapProfile": {"BackCapR": 1, "BackCapSagDim": 1},
     "CrossHoleProfile": {"CrossHoleDia": 2},
+    "PinHoleProfile": {"PinHoleDia": 2},
+    "PinStationReference": {"PinStationFromHeadRear": 1},
     "BackRimReference": {"BackRimFromHeadRear": 1},
     "OverallReference": {"OverallLen": 1},
     "FrontJournalReference": {

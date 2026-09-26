@@ -164,6 +164,7 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
         ("BondZoneReference", "BondZoneDia"): "*deviations(SHAFT_DIA_BAND)",
         ("DrumStationReference", "DrumStationFromHeadRear"): "DRUM_STATION_BAND",
         ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_DIA_BAND)",
+        ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
         ("FrontJournalReference", "FrontJournalDia"): "*deviations(JOURNAL_DIA_BAND)",
         ("BackJournalReference", "BackJournalDia"): "*deviations(JOURNAL_DIA_BAND)",
     }
@@ -902,6 +903,7 @@ def test_every_dimension_carrying_reference_sketch_is_saved_hidden() -> None:
         "BackRimReference",
         "BondZoneReference",
         "DrumStationReference",
+        "PinStationReference",
         "OverallReference",
     }
     assert set(spec.REFERENCE_SKETCHES) == expected
@@ -988,3 +990,50 @@ def test_head_neighbours_are_each_proved_by_a_named_assembly_assert() -> None:
     rig = min(lo - head_hi for lo, _hi, _what in assembly._SWING_RIG_BANDS)
     for margin in (crank, lever_plane, rig):
         assert margin >= 0.25
+def test_collar_pin_hole_is_a_drilled_spring_pin_hole_clear_of_the_front_land() -> None:
+    """R1a (user, 2026-09-24): the MHA-144 collar's 1/16 in spring-pin hole.
+
+    It prints the rig's functional band (not the title block's drilled-hole
+    band), stands at a .X station from the head rear face, never enters the
+    front land or its Ra 1.6 run-out at the worst corner, and leaves the U27
+    2.0 web target of steel beside it.
+    """
+    import pinion_arbor_pin_spec as pin_hole
+    import pinion_strap_pin_spec as strap_pin
+
+    # One pin family and one drill for the whole rig (pinioncluster's E-a).
+    assert pin_hole.PIN_HOLE_DIA == strap_pin.HOLE_DIA == pytest.approx(25.4 / 16.0)
+    assert pin_hole.PIN_HOLE_DIA_BAND == strap_pin.HOLE_BAND == (0.06, 0.0)
+    assert pin_hole.PIN_HOLE_CALLOUT == strap_pin.DRILL_THRU_CALLOUT
+    assert spec.PIN_STATION_FROM_HEAD_REAR == 39.0
+    assert spec.PIN_STATION_BAND == spec.LINEAR_X_BAND
+    assert spec.PIN_Z == pytest.approx(spec.HEAD_REAR_Z + 39.0)
+    assert pin_hole.PIN_HOLE_LAND_CLEARANCE >= 2.0
+    assert pin_hole.PIN_HOLE_NECK_CLEARANCE >= 2.0
+    assert pin_hole.PIN_HOLE_LIGAMENT_WORST == pytest.approx(3.126, abs=1e-3)
+    assert pin_hole.PIN_HOLE_LIGAMENT_WORST >= 2.0
+    assert spec.DRAWING_DIMENSIONS["PinHoleProfile"] == {"PinHoleDia"}
+    assert spec.DRAWING_DIMENSIONS["PinStationReference"] == {"PinStationFromHeadRear"}
+    assert spec.DRAWING_PRECISION_BY_NAME["PinHoleDia"] == 2
+    assert spec.DRAWING_PRECISION_BY_NAME["PinStationFromHeadRear"] == 1
+    assert drawing.DIMENSION_CALLOUTS["PinHoleDia"] == "1/16 DRILL THRU"
+    assert drawing.DIMENSION_CALLOUTS["PinStationFromHeadRear"] == "COLLAR PIN"
+    assert part.V_PIN_HOLE > 0.0
+
+
+def test_collar_pin_dimensions_stand_above_the_shaft_clear_of_the_front_ra() -> None:
+    """Below the shaft at x 0.269 is the front land's Ra symbol, so the pin
+    hole's station and diameter both stand above it: the station over the
+    neck's Ø10.5 text, the diameter's leader left of the station witness and
+    above the 19.0 land length."""
+    pin_x = drawing._sheet_x(spec.PIN_Z)
+    head_rear_x = drawing._sheet_x(spec.HEAD_REAR_Z)
+    axis_y = drawing.PRINCIPAL_CENTER[1]
+    station_x, station_y = drawing.PRINCIPAL_KEEP["PinStationFromHeadRear"]
+    dia_x, dia_y = drawing.PRINCIPAL_KEEP["PinHoleDia"]
+    assert pin_x < station_x < head_rear_x
+    assert station_y > drawing.DIAMETER_POSITIONS["NeckDia"][1] + 0.010
+    assert dia_x < pin_x
+    assert dia_y > station_y + 0.010
+    assert dia_y > drawing.PRINCIPAL_KEEP["FrontJournalLen"][1] + 0.030
+    assert min(station_y, dia_y) > axis_y
