@@ -956,7 +956,7 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     case is the thinnest stock plate (U41 band), less the tap's 0.1 entry
     break and the deeper of its 0.1 exit break and the screw's 0.3 cut-to-fit
     plus 0.1 cut-end break, floored: 5.72 mm = 0.90D, never under the
-    rule-12 audit's E7 floor of 0.87D.
+    user's 0.90D floor (U37c/U41; it replaced E7's 0.87D in #917 S1).
     """
     worst = (
         spec.PLATE_THICKNESS
@@ -970,7 +970,7 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(worst)
     diameters = worst / (0.25 * 25.4)
     printed = math.floor(diameters * 100.0) / 100.0
-    assert printed <= diameters and printed >= 0.87
+    assert printed <= diameters and printed >= spec.POST_MOUNT_ENGAGEMENT_MIN_DIAMETERS
     assert f"{printed:.2f}" == "0.90"
     engagement, override = spec.POST_MOUNT_ENGAGEMENT_NOTE.split("\n")
     assert engagement == (
@@ -982,11 +982,11 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     assert override == "1/4-20 TAPPED HOLES: DEBURR ONLY, 0.1 MAX BREAK EACH END."
     assert f"{spec.POST_MOUNT_TAP_EDGE_BREAK:.1f} MAX BREAK" in override
     # Positive control: the title block's 0.25 break at both ends would print
-    # under the audit floor, which is why the override exists.
+    # under the floor, which is why the override exists.
     title_block = (
         spec.PLATE_THICKNESS - spec.PLATE_STOCK_BAND - spec.POST_SCREW_CUT_TO_FIT_SHORT - 0.5
     ) / (0.25 * 25.4)
-    assert title_block < 0.87
+    assert title_block < spec.POST_MOUNT_ENGAGEMENT_MIN_DIAMETERS
     # The note sits in the empty band above the title block (2.5 mm text,
     # ~1.93 mm a character, 4.4 mm a line).
     x, y = drawing.ENGAGEMENT_NOTE_XY
@@ -2030,3 +2030,15 @@ def test_post_screw_engagement_terms_match_the_screw_spec() -> None:
     assert spec.POST_SCREW_CUT_TO_FIT_SHORT == screw.POST_SCREW_CUT_TO_FIT_SHORT
     assert spec.POST_MOUNT_TAP_EDGE_BREAK == screw.POST_MOUNT_TAP_EDGE_BREAK
     assert spec.PLATE_STOCK_BAND == pytest.approx(screw.PLATE_STOCK_BAND_MM)
+    assert spec.POST_MOUNT_ENGAGEMENT_MIN_DIAMETERS == screw.MIN_ENGAGEMENT_DIAMETERS
+
+
+def test_post_screw_engagement_floor_is_the_users_ruling() -> None:
+    """#917 S1 (c), Main: one floor for one joint.  The platform guarded
+    MHA-142 at E7's 0.87D (#846); the screw holds the user's U37c/U41 0.90D.
+    The user's ruling is tighter and binds both parts."""
+    assert spec.POST_MOUNT_ENGAGEMENT_MIN_DIAMETERS == 0.90
+    assert spec.POST_MOUNT_ENGAGEMENT_PRINTED >= spec.POST_MOUNT_ENGAGEMENT_MIN_DIAMETERS
+    source = Path(spec.__file__).read_text(encoding="utf-8")
+    assert "0.87" not in source
+    assert "< POST_MOUNT_ENGAGEMENT_MIN_DIAMETERS" in source

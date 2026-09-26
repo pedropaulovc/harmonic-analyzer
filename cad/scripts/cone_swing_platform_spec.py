@@ -78,7 +78,7 @@ POST_MOUNT_TAP_DIA = blind_cut_dia_mm(POST_MOUNT_SPEC)
 POST_SCREW_CUT_TO_FIT_SHORT = 0.3
 POST_MOUNT_THREAD_DIA = 0.25 * 25.4
 # The title block's R0.25/0.25 edge break would take up to 0.25 of thread off
-# each end of the through tap (0.85D worst case, under the audit floor), so the
+# each end of the through tap (0.85D worst case, under the floor), so the
 # two tapped holes carry a local override: deburr only (Main, 2026-09-24).
 POST_MOUNT_TAP_EDGE_BREAK = 0.1
 POST_MOUNT_TAP_BREAK_NOTE = (
@@ -133,10 +133,16 @@ POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS = (
 POST_MOUNT_ENGAGEMENT_PRINTED = (
     math.floor(POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS * 100.0) / 100.0
 )
-# The rule-12 audit's E7 floor (0.87D, at the old .XX plate band): the stock
-# band must not print below it without a new ruling.
-if POST_MOUNT_ENGAGEMENT_PRINTED < 0.87:
-    raise AssertionError("MHA-142 engagement fell below the audited 0.87D floor")
+# One floor for the joint: the user's U37c/U41 named exception, 0.90D
+# (post_mount_screw_spec.MIN_ENGAGEMENT_DIAMETERS, mirrored; the stack's
+# cross-check test compares them).  It replaced the rule-12 audit's looser E7
+# floor (#846), which only the platform carried (Main, #917 S1).
+POST_MOUNT_ENGAGEMENT_MIN_DIAMETERS = 0.90
+if POST_MOUNT_ENGAGEMENT_PRINTED < POST_MOUNT_ENGAGEMENT_MIN_DIAMETERS:
+    raise AssertionError(
+        f"MHA-142 engagement fell below the user's "
+        f"{POST_MOUNT_ENGAGEMENT_MIN_DIAMETERS:.2f}D floor"
+    )
 # The sheet states the named exception, worded like MHA-139's, over the
 # break override it depends on: one line each.
 POST_MOUNT_ENGAGEMENT_NOTE = (
