@@ -143,9 +143,22 @@ def gdt_box(adapter: Any, annotation: Any, *, label: str) -> Box:
 
 
 def sheet_region(adapter: Any) -> DrawableRegion:
-    """The current sheet's region inside its zone frame, as the audit reads it."""
-    sheet = _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet()
-    properties = [float(value) for value in sheet.GetProperties()]
+    """The current sheet's region inside its zone frame, as the audit reads it.
+
+    ``IDrawingDoc::GetCurrentSheet`` hands back a late-bound dispatch even from
+    the early-bound document, and late binding auto-invokes a zero-argument
+    method on attribute access: ``sheet.GetProperties`` is already the tuple,
+    so calling it raised ``'tuple' object is not callable`` (pc-858x928, both
+    MHA-062 and MHA-060).  Bind the sheet like every other object here.
+    """
+    sheet = _sw_type_info.early_bound_or_flag(
+        _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(),
+        "ISheet",
+        "GetProperties2",
+    )
+    # GetProperties2 -> [paperSize, templateIn, scale1, scale2, firstAngle,
+    # width, height, sameCustomProp].
+    properties = [float(value) for value in sheet.GetProperties2()]
     return sheet_drawable_region(
         adapter, sheet, width=properties[5], height=properties[6]
     )

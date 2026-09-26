@@ -195,6 +195,45 @@ def test_the_callout_moves_above_the_ra_lane_and_right_of_the_end_view_frames(
         assert extent.boxes_clear(placed.text, box)
 
 
+class _LateBoundSheet:
+    """A pywin32 dynamic dispatch: a zero-argument method is auto-invoked on
+    attribute access (the value, not a callable) until ``_FlagAsMethod`` names
+    it.  GetCurrentSheet hands one back on a seat (pc-858x928)."""
+
+    def __init__(self) -> None:
+        self.flagged: set[str] = set()
+
+    def _FlagAsMethod(self, *names: str) -> None:
+        self.flagged.update(names)
+
+    def __getattr__(self, name: str):
+        if name not in ("GetProperties", "GetProperties2"):
+            raise AttributeError(name)
+        value = (12.0, 12.0, 1.0, 1.0, 0.0, 0.4318, 0.2794, 1.0)
+        if name in self.flagged:
+            return lambda: value
+        return value
+
+    def GetZoneMargin(self, _side: int) -> float:
+        return 0.0127
+
+
+def test_the_sheet_region_reads_a_late_bound_sheet() -> None:
+    import _drawing_annotation_extent as extent
+    from types import SimpleNamespace
+
+    sheet = _LateBoundSheet()
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(GetCurrentSheet=lambda: sheet),
+        _attempt=lambda call: call(),
+    )
+    region = extent.sheet_region(adapter)
+    assert "GetProperties2" in sheet.flagged
+    assert region.xmin == pytest.approx(0.0127)
+    assert region.xmax == pytest.approx(0.4318 - 0.0127)
+    assert region.ymax == pytest.approx(0.2794 - 0.0127)
+
+
 def test_a_callout_too_long_to_fit_fails_loud_instead_of_re_colliding(
     monkeypatch,
 ) -> None:
