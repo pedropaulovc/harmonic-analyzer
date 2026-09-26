@@ -2143,7 +2143,7 @@ if _GRIP_HEAD_Z[0] < CRANK_HUB_REAR_Z + 0.25:
     raise AssertionError("integral grip-head band reaches the crank hub")
 
 # MHA-139 handle pivot screw (U33): the shoulder seats on the arm's outboard
-# face and the #10-24 thread runs inboard through the arm's tapped hole, so
+# face and its thread runs inboard through the arm's tapped hole, so
 # its tip stands proud of the arm's inboard face and sweeps the r = ARM_C2C
 # circle with the crank.  At its longest thread in the thinnest (stock 5/16)
 # arm the tip reaches CRANK_ARM_Z0 + THREAD_LENGTH_MAX; that is the axial

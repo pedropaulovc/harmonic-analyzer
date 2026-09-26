@@ -7,4 +7,4 @@ crank-handle-pivot-screw:
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "turned slotted shoulder screw; die-cut #10-24 thread"
+  process: "turned slotted shoulder screw; die-cut #8-32 thread"

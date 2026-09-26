@@ -30,6 +30,7 @@ import math
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SurfaceFinishControl
 from crank_handle_pivot_screw_spec import FULL_THREAD_WORST_DIAMETERS_PRINTED
+from crank_handle_pivot_screw_spec import THREAD_SIZE as PIVOT_SCREW_THREAD_SIZE
 from crank_hub_geometry import (
     ARM_FIDUCIAL_RADIUS,
     ARM_STOCK_THICKNESS,
@@ -60,7 +61,7 @@ if abs(ARM_STOCK_THICKNESS - ARM_THICKNESS) > GENERAL_1PL_TOL_MM:
 # U33: the MHA-139 slotted shoulder screw threads through the arm and carries
 # the handle.  Its tapped web to the square end is judged at the .X worst case
 # of both stations (U27).
-HANDLE_PIVOT_HOLE_SPEC = HoleSpec("tapped", "#10-24")
+HANDLE_PIVOT_HOLE_SPEC = HoleSpec("tapped", PIVOT_SCREW_THREAD_SIZE)
 _PIVOT_THREAD_R = THREAD_MAJOR_MM[HANDLE_PIVOT_HOLE_SPEC.size] / 2.0
 PIVOT_END_WEB_NOMINAL = SQUARE_END_OVERHANG - _PIVOT_THREAD_R
 PIVOT_END_WEB_WORST = PIVOT_END_WEB_NOMINAL - 2.0 * GENERAL_1PL_TOL_MM
@@ -121,7 +122,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 
 # Decimal places are authored on the model.  The hub seat bore is a one-place
-# reference nominal: it is bored first, and MHA-137 is turned to suit it.
+# .X size: it is bored first, and MHA-137 is turned to suit it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ArmOutline": {"ArmEndX": 1, "BossRadius": 1},
     "Arm": {"Depth": 1},

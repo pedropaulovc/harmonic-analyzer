@@ -2,7 +2,7 @@ r"""Pure-data contract for MHA-139, the crank handle pivot screw (user ruling U3
 
 A made slotted shoulder screw turned from 3/8-in cold-finished rod.  The oak
 handle MHA-022 spins on the shoulder; the thread screws into the crank arm
-MHA-020's #10-24 tapped through hole and the shoulder seats tight on the arm
+MHA-020's #8-32 tapped through hole and the shoulder seats tight on the arm
 face, so the shoulder length alone sets the handle's end play.
 
 Local frame: the axis is local +Z.  The slotted head face is at z=0, the head
@@ -55,42 +55,51 @@ SHOULDER_DIA_BAND = (-0.03, -0.08)
 SHOULDER_LENGTH = 58.50
 SHOULDER_LENGTH_TOL = 0.25
 
-THREAD_SIZE = "#10-24"
-# The threaded section is modelled as a plain cylinder at the basic #10 major
+# #8-32, not U33's #10-24 (Main, U29/1.25D follow-up, 2026-09-25): the arm
+# governs the worst-case engagement, so the only lever on its D count at the
+# current bands is D itself.  #10-24 gave 1.15D, 0.005D over the U33b floor;
+# #8-32 gives 1.34D with the same relief width and thread length.
+THREAD_SIZE = "#8-32"
+# The threaded section is modelled as a plain cylinder at the basic #8 major
 # diameter, the fleet convention for a stock screw in a tap-drill-modelled hole.
 THREAD_MODEL_DIA = THREAD_MAJOR_MM[THREAD_SIZE]
 # 9.0 +0/-0.5 (Main, on U33b): the shortest thread section, 8.5, less the
-# 0.5 tip chamfer still carries full thread across the arm's 7.94 (5/16-in)
+# 0.4 tip chamfer still carries full thread across the arm's 7.94 (5/16-in)
 # stock thickness, so the ARM governs the worst-case engagement, not the
 # screw.  Fixed by geometry, not a tighter relief band (U27).  The price is a
 # tip standing up to PROUD_INBOARD_MAX past the arm's inboard face.
 THREAD_LENGTH = 9.0
 THREAD_LENGTH_BAND = (0.0, -0.5)
-# 45-degree thread-start chamfer on the tip, about the thread depth.  Like the
-# relief lead, the model holds the 45 degrees by equation and the print gives
-# the axial leg with an "X 45 DEG" callout.
-TIP_CHAMFER = 0.5
+# 45-degree thread-start chamfer on the tip, inside the 0.49 thread depth.
+# Like the relief lead, the model holds the 45 degrees by equation and the
+# print gives the axial leg with an "X 45 DEG" callout.
+TIP_CHAMFER = 0.4
 # The title block states the UN thread class, so the callout names no class.
 THREAD_CALLOUT = f"{THREAD_SIZE} UNC"
-THREAD_PITCH = MM_PER_IN / 24.0
-# #10-24 external minor diameter.  ASSUMPTION, not sourced from ASME B1.1 in
+THREADS_PER_IN = 32
+THREAD_PITCH = MM_PER_IN / THREADS_PER_IN
+# #8-32 external minor diameter.  ASSUMPTION, not sourced from ASME B1.1 in
 # this repo: the UN basic profile with its P/8 root flat puts the root at
-# major - 1.5 H = major - 1.299038 P = 3.451, which is exactly the root the
-# McMaster 91829A560 vendor model cuts (diagnostics/diag_build_91829A560.py,
-# ROOT_R 1.7256).  The UNR-2A reference maximum, major max 0.1890 in less
-# 1.226869 P (17/24 H each side), is 0.1379 in = 3.503.  The relief floor sits
-# at or below the smaller of the two so the die's incomplete threads clear it.
+# major - 1.5 H = major - 1.299038 P = 3.135 (the same construction gives
+# #10-24's 3.451, the root the McMaster 91829A560 vendor model cuts).  The
+# UNR-2A reference maximum, 2A major max 0.1631 in (0.164 basic less the
+# 0.0009 allowance) less 1.226869 P (17/24 H each side), is 0.1248 in =
+# 3.169.  The relief floor sits at or below the smaller of the two so the
+# die's incomplete threads clear it.
+THREAD_MAJOR_2A_MAX_IN = 0.1631
 THREAD_MINOR_BASIC_ROOT = THREAD_MODEL_DIA - 1.5 * math.sqrt(3.0) / 2.0 * THREAD_PITCH
-THREAD_MINOR_UNR_2A_MAX = (0.1890 - 1.226869 / 24.0) * MM_PER_IN
-# Thread relief (Main's ruling on the die-runout doubt, amended to Ø3.4): a
-# groove in the first RELIEF_WIDTH of the threaded section, against the seat
-# face, so the die's incomplete lead threads run out into air and the shoulder
+THREAD_MINOR_UNR_2A_MAX = (
+    THREAD_MAJOR_2A_MAX_IN - 1.226869 / THREADS_PER_IN
+) * MM_PER_IN
+# Thread relief (Main's ruling on the die-runout doubt; Ø3.0 under the #8-32
+# root): a groove in the first RELIEF_WIDTH of the threaded section, against
+# the seat face, so the die's incomplete lead threads run out into air and the shoulder
 # pulls down tight on the arm face.  Routine (.X) sizes under the title-block
 # band.
-RELIEF_DIA = 3.4
+RELIEF_DIA = 3.0
 RELIEF_WIDTH = 1.5
 # A 45-degree lead from the relief floor up into the seat face, so the groove
-# leaves no sharp inside corner.  0.5 keeps the lead inside the Ø4.826 thread
+# leaves no sharp inside corner.  0.5 keeps the lead inside the Ø4.166 thread
 # major, i.e. inside the arm's tapped hole, so the whole seat annulus that
 # bears on the arm face stays flat.  The 45 degrees is enforced in the model by
 # an equation, and printed as a callout on the lead's axial size.
@@ -213,12 +222,12 @@ SEAT_FLAT_ANNULUS_AREA_MIN = (
     / 4.0
     * ((SHOULDER_DIA_MIN - 2.0 * EDGE_BREAK_MAX_MM) ** 2 - SEAT_FLAT_INNER_DIA**2)
 )
-# The relief neck is the screw's weakest section: pi/4 x 3.4^2 = 9.08 mm^2
-# against the #10-24 UNC tensile stress area of 0.0175 in^2 = 11.29 mm^2, about
-# 80 percent.  Seating torque is therefore limited by the neck, not the thread;
+# The relief neck is the screw's weakest section: pi/4 x 3.0^2 = 7.07 mm^2
+# against the #8-32 UNC tensile stress area of 0.0140 in^2 = 9.03 mm^2, about
+# 78 percent.  Seating torque is therefore limited by the neck, not the thread;
 # the handle's working load is a hand grip and never loads it axially.
 NECK_AREA = math.pi / 4.0 * RELIEF_DIA**2
-TENSILE_STRESS_AREA = 0.0175 * MM_PER_IN**2
+TENSILE_STRESS_AREA = 0.0140 * MM_PER_IN**2
 NECK_TO_STRESS_AREA = NECK_AREA / TENSILE_STRESS_AREA
 
 # User ruling 2026-09-25 (MHA-020 review B2): the exception stands because a
@@ -237,7 +246,7 @@ for _ok, _what in (
     (DIAMETRAL_CLEARANCE_MIN > 0.0, "shoulder can bind in the oak bore"),
     (
         RELIEF_DIA <= min(THREAD_MINOR_BASIC_ROOT, THREAD_MINOR_UNR_2A_MAX),
-        "relief floor stands above the #10-24 external minor diameter",
+        f"relief floor stands above the {THREAD_SIZE} external minor diameter",
     ),
     (RELIEF_WIDTH < THREAD_LENGTH, "relief consumes the whole thread section"),
     (RELIEF_LEAD < RELIEF_WIDTH, "relief lead consumes the relief floor"),
@@ -260,7 +269,7 @@ for _ok, _what in (
     ),
     (
         TIP_CHAMFER <= 0.61343 * THREAD_PITCH,
-        "tip chamfer cuts deeper than the #10-24 thread (17/24 H)",
+        f"tip chamfer cuts deeper than the {THREAD_SIZE} thread (17/24 H)",
     ),
     (
         TIP_CHAMFER + RELIEF_WIDTH < THREAD_LENGTH_MIN,

@@ -4,10 +4,11 @@ The outboard photograph supplies only unitless proportions.  Scaling its
 3.14:2.60:1.65:0.59 arm/hub/shaft/key-pin ratios to the authoritative 3/8-in
 shaft gives 18.13:15.01:9.525:3.405 mm, which left a 0.5-mm hub wall between
 the seam pin and the bore.  User ruling U29 (2026-09-23) enlarges the outboard
-set about the fixed shaft instead: hub and seam pin 1.3x (Ø19.5 seat, Ø4
-dowel stock) and the arm unmachined 1-in cold-finished flat bar (25.4).  The
-arm-to-hub width ratio is therefore a named deviation from the photograph
-(``ARM_TO_HUB_RATIO`` vs ``PHOTO_ARM_TO_HUB_RATIO``).
+set about the fixed shaft instead: hub and seam pin 1.3x (Ø19.4 seat, 0.1
+under the photograph's 19.5; Ø4 dowel stock) and the arm unmachined 1-in
+cold-finished flat bar (25.4).  The arm-to-hub width ratio is therefore a named
+deviation from the photograph (``ARM_TO_HUB_RATIO`` vs
+``PHOTO_ARM_TO_HUB_RATIO``).
 
 Local axial station zero is the common outboard plane: the through hub and
 crank arm are flush there, the shaft cylinder terminates there, and only the
@@ -30,10 +31,14 @@ PHOTO_ARM, PHOTO_HUB, PHOTO_SHAFT, PHOTO_PIN = 3.14, 2.60, 1.65, 0.59
 PHOTO_MM_PER_UNIT = SHAFT_DIA / PHOTO_SHAFT
 OUTBOARD_SCALE = 1.3
 
-# The arm is 1 x 5/16-in cold-finished flat bar with its width left as rolled;
-# the mill holds that width to 0.003 in, minus only, far inside the .X band.
+# The arm is 1 x 5/16-in cold-finished flat bar with its width left as rolled.
+# On cold-finished flats the width sets the mill tolerance, and a 1-in bar is
+# held to 0.004 in (OnlineMetals cold-roll steel tolerances, "over 0.75 to 1.5
+# incl., +/-0.004"; Speedy Metals 1018, "-0.004"; both 2026-09-25) -- far
+# inside the .X band.  The minus side is what the U29 cheek reads.
 ARM_WIDTH = 1.0 * MM_PER_IN
-ARM_WIDTH_STOCK_MINUS = 0.08
+ARM_STOCK_MILL_MINUS_IN = Fraction(4, 1000)
+ARM_WIDTH_STOCK_MINUS = float(ARM_STOCK_MILL_MINUS_IN) * MM_PER_IN
 ARM_THICKNESS = 8.0
 # The bar's as-supplied thickness, which the tapped MHA-139 pivot engages
 # (crank_handle_pivot_screw_spec) and the arm's stock note names
@@ -47,15 +52,22 @@ ARM_STOCK_THICKNESS = float(ARM_STOCK_THICKNESS_IN) * MM_PER_IN
 # flats the WIDTH sets the tolerance for width and thickness alike, and a
 # 1-in-wide bar is held to 0.004 in (OnlineMetals cold-roll steel tolerances,
 # "over 0.75 to 1.5 incl., +/-0.004"; Speedy Metals 1018, "-0.004"; both
-# 2026-09-25).  The minus side is what engagement stacks read.
-ARM_STOCK_MILL_MINUS_IN = Fraction(4, 1000)
+# 2026-09-25; ARM_STOCK_MILL_MINUS_IN above).  The minus side is what
+# engagement stacks read.
 ARM_STOCK_THICKNESS_MIN = float(ARM_STOCK_THICKNESS_IN - ARM_STOCK_MILL_MINUS_IN) * MM_PER_IN
-HUB_SEAT_DIA = round(PHOTO_HUB * PHOTO_MM_PER_UNIT * OUTBOARD_SCALE, 1)
+# The photograph gives 19.5 at the U29 enlargement.  MHA-020 bores the seat
+# first at the title block's .X band and MHA-137 is turned to suit it, so the
+# bore's printed limits are the seat's real limits.  At the sourced 0.004-in
+# width tolerance, a 19.5 bore at +0.8 leaves the arm cheek 1.999 -- under
+# U29's 2.0 -- so the seat is drawn 0.1 under the photograph: a named
+# deviation, inside the photograph's own rounding.
+PHOTO_HUB_SEAT_DIA = round(PHOTO_HUB * PHOTO_MM_PER_UNIT * OUTBOARD_SCALE, 1)
+HUB_SEAT_DIA = round(PHOTO_HUB_SEAT_DIA - 0.1, 1)
 HUB_BARREL_DIA = ARM_WIDTH
 HUB_SEAT_LENGTH = ARM_THICKNESS
 HUB_LENGTH = 20.0
 HUB_SHOULDER_STATION = HUB_SEAT_LENGTH
-# Named ratio deviation (U29): the stock arm stands 1.303x the hub seat where
+# Named ratio deviation (U29): the stock arm stands 1.309x the hub seat where
 # the photograph shows 1.208x; the extra width is what gives the arm cheek
 # around the seat a 2-mm wall.
 ARM_TO_HUB_RATIO = ARM_WIDTH / HUB_SEAT_DIA
@@ -103,7 +115,9 @@ SHAFT_FIDUCIAL_RADIUS = 2.5
 
 # U27: the two thin walls of the matched arm/hub/pin set -- the hub web between
 # the seam pin and the bore, and the arm cheek around the hub seat -- are judged
-# at the worst case of the printed bands after both edge breaks.
+# at the worst case of the printed bands after both edge breaks.  The seat's
+# printed band is MHA-020's .X bore; MHA-137's seat is turned to suit it for a
+# press, so it is never under the bore's minimum.
 WALL_TARGET_MM = 2.0
 GENERAL_1PL_TOL_MM = round(
     float(_config.title_block("linear_1pl")["value_in"]) * MM_PER_IN, 1

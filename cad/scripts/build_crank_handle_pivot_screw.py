@@ -1,7 +1,7 @@
 r"""Build MHA-139, the crank handle pivot screw (user ruling U33).
 
 A made slotted shoulder screw turned from 3/8-in cold-finished rod.  The oak
-handle MHA-022 spins on the Ø6 shoulder; the #10-24 thread screws into the
+handle MHA-022 spins on the Ø6 shoulder; the #8-32 thread screws into the
 crank arm MHA-020's tapped through hole and the shoulder seats tight on the
 arm face.  Dimensions and the derived fit facts live in
 ``crank_handle_pivot_screw_spec``.

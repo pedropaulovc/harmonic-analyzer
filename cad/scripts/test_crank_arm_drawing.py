@@ -28,7 +28,7 @@ def test_required_drawing_paths() -> None:
 def test_arm_is_a_matched_receiver_for_the_separate_hub() -> None:
     assert spec.ARM_WIDTH == geometry.ARM_WIDTH == pytest.approx(25.4)
     assert spec.ARM_THICKNESS == geometry.ARM_THICKNESS == 8.0
-    assert spec.HUB_SEAT_DIA == geometry.HUB_SEAT_DIA == 19.5
+    assert spec.HUB_SEAT_DIA == geometry.HUB_SEAT_DIA == 19.4
     assert spec.HALF_WIDTH == pytest.approx(12.7)
     assert "1 x 5/16 IN CF FLAT BAR AS SUPPLIED" in spec.DRAWING_NOTES
     # The arm bore is made first; the hub is turned to suit it (B1, Main
@@ -47,10 +47,10 @@ def test_arm_is_a_matched_receiver_for_the_separate_hub() -> None:
 def test_axial_seam_key_is_six_oclock_and_stops_halfway_through_arm() -> None:
     assert spec.AXIAL_PIN_DIA == geometry.AXIAL_PIN_DIA == 4.0
     assert spec.AXIAL_PIN_LENGTH == geometry.AXIAL_PIN_LENGTH == spec.ARM_THICKNESS / 2.0
-    assert spec.AXIAL_PIN_X == geometry.AXIAL_PIN_RADIUS_FROM_AXIS == 9.75
+    assert spec.AXIAL_PIN_X == geometry.AXIAL_PIN_RADIUS_FROM_AXIS == 9.7
     assert spec.AXIAL_PIN_Y == 0.0
     assert drive.CRANK_HUB_PIN_ORIGIN == pytest.approx(
-        [drive.X_CRANK, drive.Y_CRANK - 9.75, drive.CRANK_FACE_Z]
+        [drive.X_CRANK, drive.Y_CRANK - 9.7, drive.CRANK_FACE_Z]
     )
     assert drive.CRANK_HUB_PIN_ROWS == drive.IDENTITY
 
@@ -238,14 +238,14 @@ def test_hub_seat_leader_lands_near_side_clear_of_r127_and_the_centre() -> None:
     assert 'set_near_side_diameter(hub_seat, "hub seat diameter")' in source
 
 
-def test_hub_seat_is_a_reference_nominal_under_its_match_fit_note() -> None:
-    # 2026-09-23 review: a plain one-place Ø19.5 takes the title block's
-    # +/-0.8 while the note makes it a match fit; the note alone governs.
+def test_hub_seat_keeps_its_printed_band_under_the_fit_note() -> None:
+    # The 2026-09-23 review printed the bore as a reference so the note alone
+    # governed.  Main 2026-09-25 (U29 follow-up): the bore is made first, so
+    # its .X band is the cheek's real limit and stays printed; the note states
+    # the fit MHA-137 is turned to (policy rule 2: retained limits still apply).
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert (
-        'set_reference_dimension(adapter, hub_seat, label="hub seat nominal", diameter=True)'
-        in source
-    )
+    assert "hub seat nominal" not in source
+    assert spec.DRAWING_PRECISION["HubSeatProfile"]["HubSeatDia"] == 1
     assert "LIGHT" in notes.HUB_SEAT_CALLOUT and "PRESS FIT" in notes.HUB_SEAT_CALLOUT
 
 
@@ -269,9 +269,11 @@ def test_no_front_dimension_text_sits_on_the_arm() -> None:
 
 def test_handle_pivot_is_tapped_for_the_mha139_screw_with_a_2mm_web() -> None:
     assert spec.HANDLE_PIVOT_HOLE_SPEC.kind == "tapped"
-    assert spec.HANDLE_PIVOT_HOLE_SPEC.size == "#10-24"
+    import crank_handle_pivot_screw_spec as screw
+
+    assert spec.HANDLE_PIVOT_HOLE_SPEC.size == screw.THREAD_SIZE == "#8-32"
     assert spec.HANDLE_PIVOT_HOLE_SPEC.end == "through_all"
-    assert spec.PIVOT_END_WEB_NOMINAL == pytest.approx(7.587)
+    assert spec.PIVOT_END_WEB_NOMINAL == pytest.approx(7.917)
     assert spec.PIVOT_END_WEB_WORST >= 2.0
 
 
@@ -295,9 +297,9 @@ def test_arm_states_the_mha139_engagement_exception_it_is_tapped_for() -> None:
     import crank_handle_pivot_screw_spec as screw
 
     assert spec.DRAWING_NOTES.splitlines()[-1] == screw.DRAWING_NOTES.replace(
-        "THREAD ENGAGEMENT", "#10-24 THREAD ENGAGEMENT"
+        "THREAD ENGAGEMENT", f"{screw.THREAD_SIZE} THREAD ENGAGEMENT"
     )
-    assert "1.15D MIN: NAMED EXCEPTION TO RULE 12." in spec.DRAWING_NOTES
+    assert "#8-32 THREAD ENGAGEMENT 1.33D MIN: NAMED EXCEPTION TO RULE 12." in spec.DRAWING_NOTES
     # The stock line comes from the one stock constant.
     assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
     assert spec.STOCK_NOTE == "25.4 x 8.0 SECTION: 1 x 5/16 IN CF FLAT BAR AS SUPPLIED."

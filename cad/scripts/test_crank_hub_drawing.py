@@ -18,20 +18,22 @@ def test_outboard_proportions_follow_the_u29_enlargement() -> None:
     unit = geometry.SHAFT_DIA / geometry.PHOTO_SHAFT
     scale = geometry.OUTBOARD_SCALE
     assert scale == 1.3
-    assert geometry.HUB_SEAT_DIA == 19.5
-    assert geometry.HUB_SEAT_DIA == pytest.approx(2.60 * unit * scale, abs=0.05)
+    assert geometry.PHOTO_HUB_SEAT_DIA == 19.5
+    assert geometry.PHOTO_HUB_SEAT_DIA == pytest.approx(2.60 * unit * scale, abs=0.05)
+    # Named deviation: 0.1 under the photograph keeps the U29 cheek at 2.0.
+    assert geometry.HUB_SEAT_DIA == 19.4
     # Stock sizes: the pin is the dowel just under 1.3x, the arm is 1-in bar.
     assert geometry.AXIAL_PIN_DIA == 4.0 < 0.59 * unit * scale
     assert geometry.ARM_WIDTH == pytest.approx(25.4)
     # Named ratio deviation from the photograph (U29).
-    assert geometry.ARM_TO_HUB_RATIO == pytest.approx(1.303, abs=1e-3)
+    assert geometry.ARM_TO_HUB_RATIO == pytest.approx(1.309, abs=1e-3)
     assert geometry.PHOTO_ARM_TO_HUB_RATIO == pytest.approx(1.208, abs=1e-3)
 
 
 def test_u27_walls_hold_two_millimetres_at_the_printed_bands() -> None:
     assert geometry.WALL_TARGET_MM == 2.0
-    assert geometry.SEAM_WEB_WORST_MM == pytest.approx(2.054, abs=1e-3)
-    assert geometry.ARM_CHEEK_WORST_MM == pytest.approx(2.01, abs=1e-3)
+    assert geometry.SEAM_WEB_WORST_MM == pytest.approx(2.004, abs=1e-3)
+    assert geometry.ARM_CHEEK_WORST_MM == pytest.approx(2.049, abs=1e-3)
 
 
 def test_mha024_ream_ligaments_meet_rule_12_at_the_printed_bands() -> None:
@@ -254,3 +256,24 @@ CALLOUT_LINE_CAP = 4
 )
 def test_every_generated_callout_stays_within_four_lines(name: str, text: str) -> None:
     assert len(text.splitlines()) <= CALLOUT_LINE_CAP, (name, text.splitlines())
+
+
+def test_u29_walls_hold_at_the_seat_bores_printed_limits() -> None:
+    # Main 2026-09-25: the arm is 1-in CF flat, held to 0.004 in on width
+    # (OnlineMetals, Speedy Metals), not 0.003; and the cheek must come from
+    # the seat bore's REAL limits. MHA-020 bores the seat first at .X; the
+    # MHA-137 seat is turned to suit it for a press, so it is never smaller.
+    mm = 25.4
+    assert geometry.ARM_WIDTH_STOCK_MINUS == pytest.approx(0.004 * mm)
+    bore_max = geometry.HUB_SEAT_DIA + geometry.GENERAL_1PL_TOL_MM
+    bore_min = geometry.HUB_SEAT_DIA - geometry.GENERAL_1PL_TOL_MM
+    cheek = geometry.wall_after_edge_break(
+        geometry.ARM_WIDTH - geometry.ARM_WIDTH_STOCK_MINUS, bore_max
+    )
+    web = geometry.wall_after_edge_break(
+        bore_min - geometry.AXIAL_PIN_DIA_STOCK_MAX, geometry.HUB_BORE_DIA_MAX
+    )
+    assert cheek >= geometry.WALL_TARGET_MM == 2.0
+    assert web >= geometry.WALL_TARGET_MM
+    assert geometry.ARM_CHEEK_WORST_MM == pytest.approx(cheek)
+    assert geometry.SEAM_WEB_WORST_MM == pytest.approx(web)

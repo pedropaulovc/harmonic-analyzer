@@ -63,6 +63,7 @@ from crank_handle_pivot_screw_spec import (
     SURFACE_FINISHES,
     THREAD_CALLOUT,
     THREAD_MODEL_DIA,
+    THREAD_SIZE,
     TIP_CHAMFER,
 )
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
@@ -225,7 +226,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Crank Handle Pivot Screw Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "crank handle pivot; slotted shoulder screw; #10-24; steel",
+            3: f"crank handle pivot; slotted shoulder screw; {THREAD_SIZE}; steel",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
