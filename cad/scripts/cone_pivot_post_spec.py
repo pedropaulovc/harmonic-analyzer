@@ -324,7 +324,10 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # dimension or native symbol (drawing-simplicity-policy rules 1 and 6).
 DRAWING_NOTES = "\n".join(
     (
-        "CRANK BORE CARRIES MHA-149, CONE BORE MHA-014; FOOT ON MHA-091.",
+        # MHA-149's sheet is not in the package yet (#952 b); when it ships,
+        # "(DRAWING PENDING)" goes.  Two lines: the notes run 64 wide.
+        "CRANK BORE CARRIES MHA-149 ECCENTRIC BUSHING (DRAWING PENDING);",
+        "CONE BORE MHA-014; FOOT ON MHA-091.",
         "CONE BOSS END FACES ARE SYMMETRIC ABOUT THE POST AXIS.",
         "DRILL MOUNTING HOLES FROM TOP FACE; CHECK CONE BORE AT BREAKOUT.",
     )
