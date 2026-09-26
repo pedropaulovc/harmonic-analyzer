@@ -291,9 +291,12 @@ PRINCIPAL_KEEP = {
     # R1a's collar pin hole (x 0.269) sits over the front land's Ra symbol,
     # so both its dimensions stand ABOVE the shaft: the station from the head
     # rear face in a row over the Ø15's, and the hole's leader rising left of
-    # that row's witness, above the 19.0's right arrow tail.
+    # that row's witness, above the 19.0's right arrow tail.  The hole's
+    # underline stands clear above detail A's (3.0): at y 0.222 (pc-r11) it
+    # ran 0.7 mm over that text's top and began 0.9 mm right of it, so the
+    # (3.0) read as the callout's first word.
     "PinStationFromHeadRear": (0.288, 0.207),
-    "PinHoleDia": (PIN_HOLE_CALLOUT_X, 0.222),
+    "PinHoleDia": (PIN_HOLE_CALLOUT_X, 0.226),
 }
 # In detail A the neck runs from the fence (x ~0.137 at its edges) to the
 # head rear face (x 0.1545), its Ø10.5 at y 0.2245-0.2455.  Its end-on
