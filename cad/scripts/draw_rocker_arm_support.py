@@ -818,8 +818,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # Materialize the iso's cosmetic threads before the strict final note
     # cleanup, so BracketSeats' descriptive label exists when it is counted
     # rather than first appearing during the native drawing save.
-    # VIEW B shows the same seats face-on, so it gets the same treatment:
-    # its thread label is materialized here and removed with the iso's.
+    # VIEW B shows the same seats face-on, so its cosmetic threads are
+    # imported too (the thread circles print; nothing is left for the save to
+    # add). r743-p1s-B showed the import brings NO label in that top view:
+    # finalize removed exactly the iso's one.
     import_cosmetic_threads(adapter, iso)
     import_cosmetic_threads(adapter, view_b)
 
@@ -831,9 +833,10 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         # BracketSeats' descriptive label on the isometric ran past the
         # right border (fix3 render); the seat note already states it. One
-        # label per tapped Hole Wizard feature per view that shows it.
+        # label per tapped Hole Wizard feature, and only the iso draws one
+        # (r743-p1s-B: VIEW B's import brought none).
         redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=2,
+        expected_redundant_notes=1,
     )
 
 

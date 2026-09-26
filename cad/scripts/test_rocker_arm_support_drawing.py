@@ -719,7 +719,7 @@ def test_iso_tapped_hole_label_is_materialized_then_removed() -> None:
     }
     assert kwargs == {
         "redundant_note_substrings": ("Tapped Hole",),
-        "expected_redundant_notes": 2,
+        "expected_redundant_notes": 1,
     }
     threads = [c for c in calls if c.func.id == "import_cosmetic_threads"]
     assert [[ast.unparse(a) for a in c.args] for c in threads] == [
