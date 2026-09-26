@@ -150,10 +150,10 @@ HARVESTED_MASS_KG = 0.820338
 #   crank:   shaft 11.368..11.388  bore 11.413..11.443  (crankshaft MHA-026)
 #   journal: shaft 12.2108..12.2308 bore 12.2558..12.2858 (cone shaft MHA-014)
 #
-# Apart from the spacing between them (below) and #917's dowel reams (their
-# band is the reamer's, carried on the hole feature), nothing else on this
-# casting is an accuracy feature, so nothing else carries a band: the title
-# block's general grades govern.
+# Apart from the spacing between them and the cone-axis height (both below)
+# and #917's dowel reams (their band is the reamer's, carried on the hole
+# feature), nothing else on this casting is an accuracy feature, so nothing
+# else carries a band: the title block's general grades govern.
 RUNNING_BORE_BAND = (0.005, -0.025)
 
 # The title block's general grades, mirrored here (the spec does not read the
