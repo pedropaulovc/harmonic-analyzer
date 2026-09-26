@@ -1118,7 +1118,10 @@ def test_rig_margin_table_is_logged_at_build() -> None:
     assert len(lines) == len(drive.RIG_MARGINS)
     for name, line in zip(drive.RIG_MARGINS, lines, strict=True):
         assert line.startswith(name), line
-    assert "rig_margin_lines()" in inspect.getsource(drive.build)
+    source = inspect.getsource(drive.build)
+    assert "rig_margin_lines()" in source
+    # At info, so the farm leaf log (run at info) carries it.
+    assert '_telemetry.info(f"rig margin {line}")' in source
 
 
 def test_strap_pin_guard_reads_the_strap_parts_cross_holes() -> None:

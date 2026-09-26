@@ -2411,9 +2411,11 @@ async def build(adapter) -> dict[str, str]:
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
     reset_dof_manifest()
-    # The rig's worst-case margin table (asserted at import), in the task log.
+    # The rig's worst-case margin table (asserted at import), in the task log at
+    # info: the farm leaf log runs at info, and a debug line never reached it
+    # (pc-p1 leaf, 2026-09-25).
     for line in rig_margin_lines():
-        log(f"rig margin {line}")
+        _telemetry.info(f"rig margin {line}")
     check("create_assembly", await adapter.create_assembly())
 
     # =================== structure (static lock + moving joints) ===========
