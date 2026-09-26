@@ -2892,6 +2892,10 @@ def task_check():
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.
         SCRIPTS_DIR / "test_machinist_review.py",
+        # The machinist-review ledger tool and its drift check: the sheet
+        # match rule, the stored-PDF integrity check, rulings and the last-resort
+        # evidence rules are pinned offline.
+        SCRIPTS_DIR / "test_machinist_ledger.py",
         # The settings-independence contracts this PR adds.  All three are
         # pure Python (no COM), and unenrolled they would be exactly the
         # "green gate that checks nothing" the comments above warn about: the
