@@ -11,6 +11,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import re
+from collections import Counter
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -24,9 +25,54 @@ import visibility_debt
 SCRIPTS = Path(__file__).resolve().parent
 HIDE, SHOWN = 1, 2
 
+# The SolidWorks 2026 type library's dispids and invoke flags (1 method,
+# 2 property get) for the members the save check reads.  Written out here, not
+# read from ``_visibility``, so the fake checks the invocations the check
+# records off the generated wrapper instead of mirroring them.
+_DISPIDS = {
+    (66304, 2): "FeatureManager",
+    (114, 1): "GetFeatures",
+    (103, 1): "GetTypeName2",
+    (91, 2): "Visible",
+    (1, 2): "Name",
+}
+# Every call on a fake dispatch is one COM round trip; tests clear it first.
+_ROUND_TRIPS: Counter[str] = Counter()
 
-class _Feature:
+
+class _Dispatch:
+    """The raw IDispatch surface.  Each call counts as one round trip, so a
+    hidden one (pywin32 reading type info, or a QueryInterface) shows up."""
+
+    members: frozenset[str] = frozenset()
+
+    def InvokeTypes(self, dispid, _lcid, flags, _ret, _arg_types, *args):
+        _ROUND_TRIPS["InvokeTypes"] += 1
+        member = _DISPIDS.get((dispid, flags))
+        if member not in self.members:
+            raise AssertionError(f"{type(self).__name__}: dispid {dispid} ({flags})")
+        value = getattr(self, member)
+        return value(*args) if callable(value) else value
+
+    def GetIDsOfNames(self, _lcid, name):
+        _ROUND_TRIPS["GetIDsOfNames"] += 1
+        return {member: dispid for (dispid, _), member in _DISPIDS.items()}[name]
+
+    def GetTypeInfo(self, *_args):
+        _ROUND_TRIPS["GetTypeInfo"] += 1
+
+    def QueryInterface(self, *_args):
+        _ROUND_TRIPS["QueryInterface"] += 1
+        return self
+
+    def Invoke(self, *_args):
+        _ROUND_TRIPS["Invoke"] += 1
+
+
+class _Feature(_Dispatch):
     """The IFeature surface the check walks; no ``_oleobj_``, so no binding."""
+
+    members = frozenset({"GetTypeName2", "Visible", "Name"})
 
     def __init__(self, name: str, kind: str, visible: int = HIDE, subs=()) -> None:
         self.Name = name
@@ -77,7 +123,9 @@ _SELECT_TYPES = {
 _SKETCHES = {"ProfileFeature", "3DProfileFeature"}
 
 
-class _FeatureManager:
+class _FeatureManager(_Dispatch):
+    members = frozenset({"GetFeatures"})
+
     def __init__(self, model: _Model) -> None:
         self.model = model
         self.get_features_calls = 0
@@ -98,7 +146,9 @@ class _FeatureManager:
         return tuple(found)
 
 
-class _Model:
+class _Model(_Dispatch):
+    members = frozenset({"FeatureManager"})
+
     def __init__(self, *features: _Feature, blank_works: bool = True) -> None:
         self.features = list(features)
         for first, second in zip(self.features, self.features[1:], strict=False):
@@ -416,51 +466,62 @@ def test_name_bore_axis_hides_the_planes_and_axis_it_creates() -> None:
     assert _visibility.visible_reference_geometry(model) == []
 
 
-class _CountingFeature(_Feature):
-    """Counts the COM reads the save check makes on it."""
-
-    reads: dict[str, int] = {}
-
-    def __getattribute__(self, name: str):
-        if name in ("Name", "Visible", "GetTypeName2"):
-            reads = _CountingFeature.reads
-            reads[name] = reads.get(name, 0) + 1
-        return super().__getattribute__(name)
-
-
-def test_the_check_reads_one_member_per_feature_and_logs_its_cost(monkeypatch) -> None:
-    """#880's save bar: one GetFeatures call, then GetTypeName2 per feature,
-    Visible only on reference types and Name only on a shown one; the size
-    and cost reach the task.log, the only telemetry a farm leaf uploads."""
+def _scan(model: _Model, monkeypatch, allowed=None) -> tuple[str, dict]:
+    """Run the save check once; its one scan log line and the round trips."""
     lines: list[tuple[str, dict]] = []
     monkeypatch.setattr(
         _visibility._telemetry, "info", lambda msg, **attrs: lines.append((msg, attrs))
     )
-    features = [
-        _CountingFeature("Front Plane", "RefPlane"),
-        _CountingFeature(
-            "Boss",
-            "Extrusion",
-            SHOWN,
-            subs=[_CountingFeature("Sketch1", "ProfileFeature")],
-        ),
-        _CountingFeature("Fillet1", "Fillet", SHOWN),
-        _CountingFeature("StationReference", "ProfileFeature", SHOWN),
-    ]
-    model = _Model(*features)
-    _CountingFeature.reads = {}  # the fake's own setup read every Name
-    allowed = {"StationReference": "crankhub: reason"}
+    _ROUND_TRIPS.clear()
     _visibility.assert_reference_geometry_hidden(_adapter(model), "crank-arm", allowed)
-    assert model.FeatureManager.get_features_calls == 1
-    assert _CountingFeature.reads == {"GetTypeName2": 5, "Visible": 3, "Name": 1}
     scans = [
         (msg, attrs) for msg, attrs in lines if attrs.get("walk_purpose") == "check"
     ]
     assert len(scans) == 1
-    msg, attrs = scans[0]
-    assert msg.startswith("crank-arm: check scanned 5 features with 11 COM calls")
-    assert attrs["features_visited"] == 5 and attrs["com_calls"] == 11
+    return scans[0]
+
+
+def test_the_check_costs_one_round_trip_per_feature_and_logs_it(monkeypatch) -> None:
+    """#880's save bar: FeatureManager, one GetFeatures, one GetIDsOfNames
+    proving the elements are IFeature, then GetTypeName2 per feature, Visible
+    only on reference types and Name only on a shown one.  Nothing else
+    crosses: no type-info read or QueryInterface per element.  The size and
+    cost reach the task.log, the only telemetry a farm leaf uploads."""
+    model = _Model(
+        _Feature("Front Plane", "RefPlane"),
+        _Feature(
+            "Boss", "Extrusion", SHOWN, subs=[_Feature("Sketch1", "ProfileFeature")]
+        ),
+        _Feature("Fillet1", "Fillet", SHOWN),
+        _Feature("StationReference", "ProfileFeature", SHOWN),
+    )
+    allowed = {"StationReference": "crankhub: reason"}
+    msg, attrs = _scan(model, monkeypatch, allowed)
+    assert model.FeatureManager.get_features_calls == 1
+    # 3 per check + 5 types + 3 Visible (two sketches, a plane) + 1 Name
+    assert _ROUND_TRIPS == {"InvokeTypes": 11, "GetIDsOfNames": 1}
+    assert msg.startswith("crank-arm: check scanned 5 features with 12 COM calls")
+    assert attrs["features_visited"] == 5 and attrs["com_calls"] == 12
     assert 0.0 <= attrs["fetch_s"] <= attrs["walk_s"]
+
+
+def test_a_tree_without_reference_features_costs_one_round_trip_each(
+    monkeypatch,
+) -> None:
+    solids = [_Feature(f"Boss{i}", "Extrusion", SHOWN) for i in range(40)]
+    _msg, attrs = _scan(_Model(*solids), monkeypatch)
+    assert sum(_ROUND_TRIPS.values()) == attrs["com_calls"] == 40 + 3
+
+
+def test_elements_answering_another_interface_fail_the_check(monkeypatch) -> None:
+    """GetFeatures' array is untyped.  Read by IFeature's dispids, a foreign
+    dispatch would report no reference type at all, so the check would pass
+    without having looked; the dispid probe makes that loud."""
+    model = _part_tree()
+    first = model.features[0]
+    monkeypatch.setattr(first, "GetIDsOfNames", lambda _lcid, _name: 7)
+    with pytest.raises(RuntimeError, match="GetTypeName2 is dispid 7, not IFeature"):
+        _visibility.assert_reference_geometry_hidden(_adapter(model), "p")
 
 
 def test_shared_reference_creators_hide_what_they_create() -> None:

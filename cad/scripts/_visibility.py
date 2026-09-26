@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Iterator, Mapping
+from types import SimpleNamespace
 from typing import Any
 
 from opentelemetry import trace
@@ -98,44 +99,102 @@ class FeatureWalk:
         yield from siblings(_read_member(self.model, "FirstFeature"), "GetNextFeature")
 
 
+class _RecordedCall:
+    """Stands in for a raw dispatch, so a generated member hands over its call."""
+
+    def __init__(self) -> None:
+        self.args: tuple[Any, ...] = ()
+
+    def InvokeTypes(self, *args: Any) -> None:
+        self.args = args
+
+
+_INVOCATIONS: dict[tuple[str, str], tuple[Any, ...]] = {}
+
+
+def _invocation(interface: str, member: str, *args: Any) -> tuple[Any, ...]:
+    """The ``InvokeTypes`` arguments ``interface``'s generated wrapper sends for
+    ``member`` (called with ``args``), recorded once per process.
+
+    The dispid, flags and types come from the type-library wrapper, never from
+    a hand-written number, and recording them makes no COM call: the wrapper
+    is built on a stand-in that keeps the call instead of sending it.  The
+    tuple ends with ``args``, which never changes per key here."""
+    from _common import _early_bound
+
+    key = (interface, member)
+    if key not in _INVOCATIONS:
+        recorded = _RecordedCall()
+        wrapper = _early_bound(SimpleNamespace(_oleobj_=recorded), interface)
+        value = getattr(wrapper, member)  # a property sends its call here
+        if callable(value):
+            value(*args)
+        if not recorded.args:
+            raise RuntimeError(f"{interface}.{member}: the wrapper sent no call")
+        _INVOCATIONS[key] = recorded.args
+    return _INVOCATIONS[key]
+
+
+def _dispatch(obj: Any) -> Any:
+    """The raw IDispatch under a pywin32 wrapper (a test double is its own)."""
+    return getattr(obj, "_oleobj_", obj)
+
+
 def visible_reference_geometry(model: Any, label: str = "") -> list[tuple[str, str]]:
     """``(name, kind)`` of every shown sketch, plane, axis, point or curve.
 
     One ``IFeatureManager.GetFeatures(False)`` call returns every feature and
     child feature, and none inside an assembly's components (the SolidWorks
-    API reference), so nothing is walked.  Each feature then costs ONE COM
-    call, ``GetTypeName2``; ``Visible`` is read only on the reference types and
-    ``Name`` only on a shown one.  ``_early_bound`` is local (it wraps the raw
-    dispatch in the generated class, no round trip) and keeps each read a
-    single by-dispid Invoke instead of a name lookup plus the call.  #880's
-    save bar is <= 1 s, and the tree walk it replaces cost 49 ms per feature
-    on a farm seat (harmonic_base: 107 features, 5.6 s)."""
-    from _common import _early_bound, _read_member
+    API reference), so nothing is walked.  Every call after the first hop goes
+    straight to a RAW dispatch by dispid (``_invocation``), because pywin32
+    wraps what a wrapper returns, and each wrap costs round trips: it reads
+    the element's type info (GetTypeInfo, GetTypeAttr), and the generated
+    class it builds runs a QueryInterface in its constructor, as
+    ``_early_bound`` does on a raw dispatch.  Three per ``GetFeatures``
+    element: 1.94 s of harmonic_base's 3.18 s check on a farm seat (~6-9 ms
+    a round trip).
+
+    So each feature costs one round trip, ``GetTypeName2``; ``Visible`` is read
+    only on the reference types and ``Name`` only on a shown one.  Plus three
+    per check: ``FeatureManager``, ``GetFeatures``, and a ``GetIDsOfNames`` on
+    the first feature proving the elements answer ``IFeature``'s dispids (the
+    array is untyped, and a foreign table would read every type as unknown,
+    so the check would pass blind).  #880's save bar is <= 1 s."""
+    from _common import _early_bound
 
     started = time.perf_counter()
-    manager = _early_bound(
-        _read_member(_early_bound(model, "IModelDoc2"), "FeatureManager"),
-        "IFeatureManager",
+    manager = _dispatch(_early_bound(model, "IModelDoc2")).InvokeTypes(
+        *_invocation("IModelDoc2", "FeatureManager")
     )
-    features = tuple(manager.GetFeatures(False) or ())
-    # pywin32 wraps each returned dispatch on the way out (its type info is
-    # read per element), so the fetch is timed apart from the per-feature reads.
+    features = tuple(
+        manager.InvokeTypes(*_invocation("IFeatureManager", "GetFeatures", False)) or ()
+    )
     fetch_s = time.perf_counter() - started
     com_calls = 2
     if len(features) > _MAX_FEATURES:
         raise RuntimeError(f"{label}: {len(features)} features exceed {_MAX_FEATURES}")
+    type_name = _invocation("IFeature", "GetTypeName2")
+    if features:
+        answered = features[0].GetIDsOfNames(0, "GetTypeName2")
+        com_calls += 1
+        if answered != type_name[0]:
+            raise RuntimeError(
+                f"{label}: GetFeatures returned a dispatch whose GetTypeName2 is "
+                f"dispid {answered}, not IFeature's {type_name[0]}"
+            )
+    visible = _invocation("IFeature", "Visible")
+    feature_name = _invocation("IFeature", "Name")
     shown: list[tuple[str, str]] = []
     seen: set[str] = set()
-    for raw in features:
-        feature = _early_bound(raw, "IFeature")
-        kind = REFERENCE_FEATURE_KINDS.get(str(feature.GetTypeName2()))
+    for feature in features:
+        kind = REFERENCE_FEATURE_KINDS.get(str(feature.InvokeTypes(*type_name)))
         com_calls += 1
         if kind is None:
             continue
         com_calls += 1
-        if int(feature.Visible) != _SHOWN:
+        if int(feature.InvokeTypes(*visible)) != _SHOWN:
             continue
-        name = str(feature.Name)
+        name = str(feature.InvokeTypes(*feature_name))
         com_calls += 1
         if name in seen:
             continue
