@@ -3371,6 +3371,97 @@ def test_one_thread_is_one_callout_only_within_one_hole_group(extra_rings, tip, 
     assert [f.extra.get("association") for f in duplicates] == ([association] if association else [])
 
 
+def test_a_mixed_notes_arrowless_branch_restating_a_callouts_thread_gates():
+    """Codex P2 on b2b4f8e66 (PRRT_kwDOPHDy386mTebe): DetailItem357 with a
+    second, arrowed leader off the plate. Its arrowless branch still lands on
+    hole B, RD2's pair; the landings kept only the arrow tips once any arrow
+    existed, so the duplicate went unpaired."""
+    attach, arrowed_tip = (0.1960, 0.2459), (0.1990, 0.2400)
+    note = {
+        **SWING_TAPPED_HOLE,
+        "leaders": [[*attach, 0.0, *arrowed_tip, 0.0], *SWING_TAPPED_HOLE["leaders"]],
+        "display": {"arrows": [_arrow_at(arrowed_tip, attach)]},
+    }
+    view = _view("Drawing View2", SWING_VIEW2, [_swing_rd2(False), note])
+    findings = audit_dump(_dump(views=[view], strokes=SWING_PLATE_EDGES))
+    [finding] = [f for f in findings if f.kind == "duplicate-thread-callout"]
+    assert finding.extra.get("association") == "same 2X group"
+
+
+@pytest.mark.parametrize(
+    ("state", "audited"),
+    [
+        pytest.param({"visible": False, "printable": True}, False, id="hidden-layer"),
+        pytest.param({"visible": True, "printable": True}, True, id="printing-layer"),
+    ],
+)
+def test_a_table_on_a_non_printing_layer_is_counted_not_audited(state, audited):
+    """Codex P2 on b2b4f8e66 (PRRT_kwDOPHDy386mTebd): tables come from
+    GetTableAnnotations, apart from the views' annotations, and were audited
+    whatever their layer. A BOM run past the sheet's right edge gates only
+    when its layer prints; on a hidden layer it is counted instead."""
+    from _layout_audit import audit_report
+
+    table = {"name": "BOM", "box": [0.400, 0.200, 0.440, 0.250], "layer": "BOM-HIDDEN"}
+    dump = {**_dump(tables=[table]), "layers": {"BOM-HIDDEN": state}}
+    named = [f for f in audit_dump(dump) if "table BOM" in (f.a, f.b)]
+    assert bool(named) is audited
+    report, _gating = audit_report("fixture", LayoutAuditMode.REPORT, [dump])
+    assert report["summary"]["hidden_layer"] == ({} if audited else {"Sheet2": 1})
+
+
+def test_the_collector_records_a_tables_layer(monkeypatch):
+    """A table's layer is its IAnnotation's, read like an annotation's
+    (optional: an unread layer is audited as printed)."""
+    import _drawing_layout_audit as collector
+
+    monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
+
+    class Inner:
+        Layer = "BOM-HIDDEN"
+
+        def GetPosition(self):
+            return (0.30, 0.25, 0.0)
+
+        def GetName(self):
+            return "BOM"
+
+    class Table:
+        RowCount = 2
+        ColumnCount = 1
+
+        def GetAnnotation(self):
+            return Inner()
+
+        def GetSplitInformation(self, *_args):
+            return None
+
+        def GetColumnWidth(self, _index):
+            return 0.10
+
+        def GetRowHeight(self, _index):
+            return 0.025
+
+    reader = collector._Reader(adapter=None)
+    record = collector._table_record(reader, Table())
+    assert record == {"name": "BOM", "box": [0.3, 0.2, 0.4, 0.25], "layer": "BOM-HIDDEN"}
+    assert reader.take_errors() == {}
+
+    # A refused layer read (the wrong interface raises) is a com-read-error,
+    # not a silent "" that audits the table as printed.
+    class Refusing(Inner):
+        @property
+        def Layer(self):
+            raise AttributeError("Layer")
+
+    class RefusingTable(Table):
+        def GetAnnotation(self):
+            return Refusing()
+
+    assert collector._table_record(reader, RefusingTable())["layer"] == ""
+    assert reader.take_errors() == {"Layer": 1}
+
+
 def test_a_sheet_note_restating_a_view_callouts_thread_gates():
     """Codex P2 on b294b7f5f (PRRT_kwDOPHDy386mTPiZ): the 24cb duplicate
     with DetailItem357 owned by the sheet instead of View2. The sheet note
@@ -3474,10 +3565,12 @@ def test_the_collector_records_each_annotation_layers_print_state(monkeypatch):
     dump = _dump(
         views=[_view("Drawing View1", (0.05, 0.12, 0.10, 0.25), [SWING_HIDDEN_TAPPED_HOLE, {"type": 6, "name": "Gone", "layer": "FORMAT"}])],
         sheet_annotations=[{"type": 6, "name": "Plain", "layer": ""}],
+        # A table's layer is read too (Codex P2 on b2b4f8e66).
+        tables=[{"name": "BOM", "box": [0.3, 0.2, 0.4, 0.25], "layer": "BOM-LAYER"}],
     )
     reader = collector._Reader(adapter=Adapter())
     assert collector._layer_states(reader, dump) == {"COSMETIC-THREADS-HIDDEN": {"visible": False, "printable": False}}
-    assert asked == ["COSMETIC-THREADS-HIDDEN", "FORMAT"]
+    assert asked == ["BOM-LAYER", "COSMETIC-THREADS-HIDDEN", "FORMAT"]
     assert reader.take_errors() == {}
 
 

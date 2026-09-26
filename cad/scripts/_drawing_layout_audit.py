@@ -46,6 +46,7 @@ from _layout_audit import (
     LAYOUT_AUDIT_MODE,
     LayoutAuditMode,
     audit_report,
+    layered_items,
     replace_text,
 )
 
@@ -253,22 +254,13 @@ def _dump_annotation(reader: _Reader, raw: Any) -> dict[str, Any] | None:
 
 def _layer_states(reader: _Reader, dump: Mapping[str, Any]) -> dict[str, dict[str, bool]]:
     """``ILayer`` Visible/Printable of each named layer the sheet's
-    annotations sit on. An annotation on a hidden or non-printing layer
+    annotations and tables sit on (``layered_items``, so a dumped item's
+    layer can't go unread). An annotation on a hidden or non-printing layer
     reads ``Visible`` 1 through COM but prints nothing (cone-swing-platform's
     profile thread callout on COSMETIC-THREADS-HIDDEN, 24cbab237), so the
     audit needs the layer to know what printed. A name ``GetLayer`` does not
     resolve is left out, and its annotations are audited as printed."""
-    names = sorted(
-        {
-            str(annotation.get("layer") or "")
-            for annotations in (
-                *(view.get("annotations") or () for view in dump.get("views", ())),
-                dump.get("sheet_annotations") or (),
-            )
-            for annotation in annotations
-        }
-        - {""}
-    )
+    names = sorted({str(item.get("layer") or "") for item in layered_items(dump)} - {""})
     if not names:
         return {}
     manager = reader.bind(reader.need(lambda: reader.adapter.currentModel.GetLayerManager()), "ILayerMgr")
@@ -313,6 +305,7 @@ def _table_record(reader: _Reader, raw: Any) -> dict[str, Any] | None:
     return {
         "name": str(reader.need(lambda: inner.GetName(), "table")),
         "box": _round((x, y - height, x + width, y)),
+        "layer": str(reader.call(lambda: inner.Layer, "")),
     }
 
 
@@ -481,7 +474,6 @@ def _dump_sheet(
             if item is not None
         ],
     }
-    dump["layers"] = _layer_states(reader, dump)
     if template is not None:
         dump["title_block"] = _round(
             (template.title_block_left_m, 0.0, width, template.title_block_top_m)
@@ -494,6 +486,7 @@ def _dump_sheet(
             if record is not None:
                 tables[record["name"]] = record
     dump["tables"] = list(tables.values())
+    dump["layers"] = _layer_states(reader, dump)
     page = dump["page"]
     if not 0 <= page < len(pages):
         raise RuntimeError(

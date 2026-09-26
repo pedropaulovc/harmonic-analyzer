@@ -46,7 +46,7 @@ from heapq import heappop, heappush
 from itertools import combinations, product
 from pathlib import Path
 from statistics import median
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 from _drawing_layout_check import (
     DEFAULT_CROSSING_INSET_M,
@@ -275,7 +275,8 @@ def _prints(annotation: Mapping[str, Any], layers: Mapping[str, Mapping[str, boo
 
 
 def printed_dump(dump: Mapping[str, Any]) -> Mapping[str, Any]:
-    """The dump without the annotations on a layer that does not print.
+    """The dump without the annotations and tables on a layer that does not
+    print (``layered_items``).
 
     COM reads such an annotation ``Visible`` 1, but it leaves no ink: the
     audit judges what prints (Main's ruling on cone-swing-platform's profile
@@ -292,20 +293,26 @@ def printed_dump(dump: Mapping[str, Any]) -> Mapping[str, Any]:
             for view in dump.get("views", ())
         ],
         "sheet_annotations": [a for a in dump.get("sheet_annotations") or () if _prints(a, layers)],
+        "tables": [t for t in dump.get("tables") or () if _prints(t, layers)],
     }
 
 
+def layered_items(dump: Mapping[str, Any]) -> Iterator[Mapping[str, Any]]:
+    """Every dumped item that sits on a layer: each view's annotations, the
+    sheet's, and the tables, which ``GetTableAnnotations`` collects apart
+    (Codex P2 on b2b4f8e66). The collector reads the layers of exactly
+    these, and ``printed_dump`` filters exactly these."""
+    for view in dump.get("views", ()):
+        yield from view.get("annotations") or ()
+    yield from dump.get("sheet_annotations") or ()
+    yield from dump.get("tables") or ()
+
+
 def hidden_layer_count(dump: Mapping[str, Any]) -> int:
-    """How many of the sheet's annotations sit on a non-printing layer."""
+    """How many of the sheet's annotations and tables sit on a non-printing
+    layer."""
     layers = dump.get("layers") or {}
-    return sum(
-        not _prints(annotation, layers)
-        for annotations in (
-            *(view.get("annotations") or () for view in dump.get("views", ())),
-            dump.get("sheet_annotations") or (),
-        )
-        for annotation in annotations
-    )
+    return sum(not _prints(item, layers) for item in layered_items(dump))
 
 
 def audited_annotations(dump: Mapping[str, Any]) -> list[Mapping[str, Any]]:
@@ -1383,6 +1390,21 @@ def _leader_ends(annotation: Mapping[str, Any]) -> list[tuple[float, float]]:
     return ends
 
 
+def _arrowless_ends(
+    ends: Sequence[tuple[float, float]], arrows: Sequence[tuple[tuple[float, float], float]]
+) -> list[tuple[float, float]]:
+    """The registered leader ``ends`` no arrowhead lands on: each ``(tip,
+    head length)`` of ``arrows`` claims the ends within its head's length.
+    Arrow style is per leader (IAnnotation::SetArrowHeadStyleAtIndex,
+    swNO_ARROWHEAD), so one annotation can mix arrowed and arrowless
+    leaders; each arrowless one lands where its registered points end."""
+    return [
+        end
+        for end in ends
+        if not any(math.hypot(end[0] - tip[0], end[1] - tip[1]) <= head for tip, head in arrows)
+    ]
+
+
 def classify_segments(
     kind: str,
     annotation: Mapping[str, Any],
@@ -2426,10 +2448,8 @@ def _leader_paths(annotation: AnnotationGeometry) -> list[tuple[list[tuple[float
 
     A leader drawing no arrowhead ends where its registered points end, with
     no head: a cosmetic-thread callout dumps its leader points and no display
-    data (DetailItem357, Codex P2 on b294b7f5f). Arrow style is per leader
-    (IAnnotation::SetArrowHeadStyleAtIndex, swNO_ARROWHEAD), so one
-    annotation can mix both: a registered end farther than an arrowhead's
-    length from every arrow tip is an arrowless leader of its own.
+    data (DetailItem357, Codex P2 on b294b7f5f). One annotation can mix
+    both (``_arrowless_ends``, which ``_landings`` shares).
     """
     runs = [s for s in annotation.segments if s.role in ("leader", "shoulder") and s.length > 0.0]
     heads = _arrow_heads(annotation)
@@ -2467,12 +2487,9 @@ def _leader_paths(annotation: AnnotationGeometry) -> list[tuple[list[tuple[float
             base = (sum(v[0] for v in others) / len(others), sum(v[1] for v in others) / len(others))
             tips.append((hit, math.hypot(base[0] - nodes[hit][0], base[1] - nodes[hit][1])))
             break
-    arrowed = list(tips)
-    for end in ends:
+    for end in _arrowless_ends(ends, [(nodes[tip], head) for tip, head in tips]):
         hit = node_at(end)
         if hit is None or any(hit == tip for tip, _head in tips):
-            continue
-        if any(math.hypot(end[0] - nodes[tip][0], end[1] - nodes[tip][1]) <= head for tip, head in arrowed):
             continue
         tips.append((hit, 0.0))
     paths = []
@@ -2707,14 +2724,17 @@ def printed_holes(edges: Sequence[Segment]) -> list[PrintedHole]:
 
 
 def _landings(annotation: Mapping[str, Any]) -> list[tuple[float, float]]:
-    """Where an annotation's leaders end: its arrow tips, else the last
-    point of each COM leader (a cosmetic-thread callout dumps no display
-    data, DetailItem357)."""
-    arrows = (annotation.get("display") or {}).get("arrows") or ()
-    tips = [(float(arrow[0]), float(arrow[1])) for arrow in arrows if len(arrow) >= 2]
-    if tips:
-        return tips
-    return _leader_ends(annotation)
+    """Where an annotation's leaders end: its arrow tips, plus the last
+    point of each COM leader no arrowhead lands on (``_arrowless_ends``; a
+    cosmetic-thread callout dumps no display data, DetailItem357). A
+    GetArrowHeadAtIndex2 record's width (index 6) is its head's length along
+    the shaft (``arrowhead_segments``)."""
+    arrows = [
+        ((float(arrow[0]), float(arrow[1])), float(arrow[6]) if len(arrow) > 6 else 0.0)
+        for arrow in (annotation.get("display") or {}).get("arrows") or ()
+        if len(arrow) >= 2
+    ]
+    return [tip for tip, _head in arrows] + _arrowless_ends(_leader_ends(annotation), arrows)
 
 
 def _landed_hole(point: tuple[float, float], holes: Sequence[PrintedHole]) -> int | None:
