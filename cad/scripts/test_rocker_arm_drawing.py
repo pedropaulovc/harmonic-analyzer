@@ -185,8 +185,11 @@ def test_every_view_keep_map_is_curated_on_its_own_view() -> None:
             continue
         assert keep_name in curated, keep_name
         assert curated[keep_name][0] == view
-    # The end view imports by feature: only Hub's dimensions arrive there.
+    # Both views import by feature: only Hub's dimensions arrive in the end
+    # view, only the pivot bore's in the front (r743-3: the front's
+    # entire-model fallback warned on the leaf).
     assert curated["RIGHT_KEEP"][1]["dimensions_by_feature"] == "DRAWING_DIMENSIONS"
+    assert curated["FRONT_KEEP"][1]["dimensions_by_feature"] == "DRAWING_DIMENSIONS"
     assert drawing.DRAWING_DIMENSIONS is rocker_arm_notes.DRAWING_DIMENSIONS
 
 
@@ -532,6 +535,23 @@ def test_general_notes_bottom_is_seated_inside_the_frame(
     assert y1 < drawing.NOTES_CEILING
     # The old top anchor: the same block reached below the border.
     assert 0.082 - lines * NOTE_LINE_PITCH < BORDER_BOTTOM
+
+
+# r743-3 (4ca562169, w4): the 21-line block rendered 16.06..110.76 mm, i.e.
+# 94.70 mm tall, 0.76 over NOTES_CEILING -- ~4.51 mm a line of rendered
+# extent (box margins included), well above the 4.14 line pitch B2 measured.
+R743_3_RENDERED_PITCH = 0.09470 / 21
+
+
+def test_general_notes_leave_a_full_line_of_headroom() -> None:
+    """Main (r743-3): the line estimate undercounted, so the block must fit
+    the band with one full rendered line to spare at the measured pitch."""
+    lines = len(rocker_arm_notes.DRAWING_NOTES.splitlines())
+    band = drawing.NOTES_CEILING - DRAWABLE.ymin - drawing.NOTES_BORDER_CLEARANCE
+    assert (lines + 1) * R743_3_RENDERED_PITCH <= band
+    # Every line stays within the widest line r743-2R already rendered
+    # clear of the front view.
+    assert max(len(line) for line in rocker_arm_notes.DRAWING_NOTES.splitlines()) <= 42
 
 
 def test_general_notes_too_tall_for_the_band_fail_the_build(

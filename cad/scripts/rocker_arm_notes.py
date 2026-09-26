@@ -59,11 +59,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        "1. PROFILE MIRROR-SYMMETRIC ABOUT THE",
-        "   PIVOT-BORE AXIS; ROD-PIN HOLE AT ONE",
-        "   END ONLY (1X), THE END SHOWN.",
-        "2. STRAP 2.50 THICK; ALL HOLES THRU",
-        "   THE THICKNESS.",
+        # r743-3: the 21-line block rendered 0.76 over NOTES_CEILING; notes
+        # 1-2 say the same in two fewer lines (test_rocker_arm_drawing keeps a
+        # full line of headroom at the measured pitch).
+        "1. MIRROR-SYMMETRIC ABOUT THE PIVOT AXIS;",
+        "   ROD-PIN HOLE (1X) AT THE END SHOWN.",
+        "2. STRAP 2.50 THICK; ALL HOLES THRU.",
         f"3. TOP EDGE R{R_TOP:.2f}, BOTTOM EDGE R{R_BOTTOM:.2f},",
         "   CONCENTRIC; COMMON CENTRE ON THE",
         f"   MIRROR AXIS, {CENTER_Y - PIVOT_MID_Y:.2f} REF FROM THE PIVOT",

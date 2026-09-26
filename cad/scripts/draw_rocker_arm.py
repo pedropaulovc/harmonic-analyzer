@@ -397,7 +397,15 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    # By feature, like the end view: only PivotHoleProfile's O6.50 arrives,
+    # so the note-only radii are never imported to be deleted again.
+    curate_view_dimensions(
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     # The hub length only shows its length in the end view; the front looks
     # down the hub's axis. Codex #936 (PRRT_kwDOPHDy386mRk__): RIGHT_KEEP was
     # declared but never curated, so the +0.05/0 band that sets all 20
