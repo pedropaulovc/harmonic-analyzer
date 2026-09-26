@@ -2711,6 +2711,37 @@ def task_drawing():
             "clean": [(_clean_drawing, [stem])],
             "verbosity": 2,
         }
+    # diag (never merge): the true-ANSI template re-base leaf (#923).
+    script = SCRIPTS_DIR / "diagnostics" / "diag_ansi_template_rebase.py"
+    for layout in ("landscape",):
+        template = CAD_ROOT / "templates" / f"harmonic-analyzer-{layout}.DRWDOT"
+        out_dir = CAD_OUT / "templates"
+        outputs = [
+            out_dir / template.name,
+            out_dir / f"{template.stem}-rebase-report.json",
+            out_dir / "probe-rebased.pdf",
+            out_dir / "probe-original.pdf",
+        ]
+        deps = sorted({str(template), str(script), *_helper_deps(script)})
+        label = f"drawing:ansi_template_{layout}"
+        yield {
+            "name": f"ansi_template_{layout}",
+            "file_dep": deps,
+            "targets": [str(path) for path in outputs],
+            "actions": [
+                (
+                    _cached_com_action,
+                    [
+                        label,
+                        [sys.executable, str(script), layout],
+                        deps,
+                        outputs,
+                        f"drawing-ansi-template-{layout}",
+                    ],
+                )
+            ],
+            "verbosity": 2,
+        }
 
 
 def task_verify_soundness():
