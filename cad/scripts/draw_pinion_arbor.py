@@ -412,6 +412,101 @@ def _add_turning_axis(adapter: Any, view: Any) -> None:
     draw.EditRebuild3()
 
 
+# diag (#923 determinism pair, never merge): log what the witness pick saw.
+SW_SKETCH_LINE = 0  # swSketchSegments_e.swSketchLINE
+PICK_DIAG_RADIUS_M = 0.003  # sheet metres; candidates this close to the pick
+
+
+def _sheet_distance(point, a, b) -> float:
+    ax, ay = a
+    bx, by = b
+    dx, dy = bx - ax, by - ay
+    span = dx * dx + dy * dy
+    t = 0.0 if span == 0.0 else max(0.0, min(1.0, ((point[0] - ax) * dx + (point[1] - ay) * dy) / span))
+    return math.hypot(point[0] - (ax + t * dx), point[1] - (ay + t * dy))
+
+
+def _segment_sheet_ends(adapter: Any, view: Any, sketch: Any, segment: Any, label: str):
+    line = _early_bound(segment, "ISketchLine")
+    to_model = _early_bound(_early_bound(sketch, "ISketch").ModelToSketchTransform, "IMathTransform").Inverse()
+    to_model = _early_bound(to_model, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    ends = []
+    for getter in (line.GetStartPoint2, line.GetEndPoint2):
+        point = _early_bound(getter(), "ISketchPoint")
+        local = _early_bound(utility.CreatePoint(double_array([point.X, point.Y, point.Z])), "IMathPoint")
+        model = _early_bound(local.MultiplyTransform(to_model), "IMathPoint")
+        ends.append(model_point_in_view(adapter, view, tuple(model.ArrayData)[:3], label=label))
+    return tuple(ends)
+
+
+def _log_witness_pick(adapter: Any, view: Any, sketch_name: str, mid, segment: Any) -> None:
+    """Log the pick's context; never raises (diagnostic only)."""
+    import socket
+
+    def mm(point):
+        return f"({point[0] * 1000:.3f}, {point[1] * 1000:.3f})"
+
+    try:
+        draw = adapter.currentModel
+        view_dispatch = _early_bound(view, "IView")
+        header = f"host={socket.gethostname()} pick={mm(mid)} view_scale={view_dispatch.ScaleDecimal!r}"
+        try:
+            model_view = _early_bound(draw.ActiveView, "IModelView")
+            header += (
+                f" zoom={model_view.Scale2!r} frame={model_view.FrameWidth}x{model_view.FrameHeight}"
+            )
+        except Exception as exc:  # noqa: BLE001 - diagnostic
+            header += f" zoom=<{exc!r}>"
+        _telemetry.info(f"pick-diag {sketch_name}: {header}", sketch=sketch_name)
+        if segment is not None:
+            chosen = _early_bound(segment, "ISketchSegment")
+            detail = (
+                f"name={chosen.GetName()} type={chosen.GetType()} "
+                f"len={float(chosen.GetLength()) * 1000:.3f} construction={bool(chosen.ConstructionGeometry)}"
+            )
+            try:
+                ends = _segment_sheet_ends(adapter, view, chosen.GetSketch(), chosen, "pick-diag selected")
+                detail += f" sheet={mm(ends[0])}->{mm(ends[1])} dist={_sheet_distance(mid, *ends) * 1000:.3f}"
+            except Exception as exc:  # noqa: BLE001 - diagnostic
+                detail += f" sheet=<{exc!r}>"
+            _telemetry.info(f"pick-diag {sketch_name}: selected {detail}", sketch=sketch_name)
+        part = _early_bound(view_dispatch.ReferencedDocument, "IModelDoc2")
+        features = _early_bound(part.FeatureManager, "IFeatureManager").GetFeatures(False) or ()
+        seen = 0
+        for raw in features:
+            feature = _early_bound(raw, "IFeature")
+            if str(feature.GetTypeName2()) not in ("ProfileFeature", "3DProfileFeature"):
+                continue
+            sketch = _early_bound(feature.GetSpecificFeature2(), "ISketch")
+            for raw_segment in sketch.GetSketchSegments() or ():
+                candidate = _early_bound(raw_segment, "ISketchSegment")
+                if int(candidate.GetType()) != SW_SKETCH_LINE:
+                    continue
+                seen += 1
+                try:
+                    ends = _segment_sheet_ends(adapter, view, sketch, candidate, "pick-diag candidate")
+                except Exception as exc:  # noqa: BLE001 - diagnostic
+                    _telemetry.info(
+                        f"pick-diag {sketch_name}: candidate {feature.Name}/{candidate.GetName()} <{exc!r}>",
+                        sketch=sketch_name,
+                    )
+                    continue
+                distance = _sheet_distance(mid, *ends)
+                if distance > PICK_DIAG_RADIUS_M:
+                    continue
+                _telemetry.info(
+                    f"pick-diag {sketch_name}: candidate {feature.Name}/{candidate.GetName()} "
+                    f"len={float(candidate.GetLength()) * 1000:.3f} "
+                    f"construction={bool(candidate.ConstructionGeometry)} "
+                    f"sheet={mm(ends[0])}->{mm(ends[1])} dist={distance * 1000:.3f}",
+                    sketch=sketch_name,
+                )
+        _telemetry.info(f"pick-diag {sketch_name}: {seen} sketch lines scanned", sketch=sketch_name)
+    except Exception as exc:  # noqa: BLE001 - diagnostic must never fail the leaf
+        _telemetry.warn(f"pick-diag {sketch_name}: logging failed: {exc!r}", sketch=sketch_name)
+
+
 def _blacken_reference_witnesses(
     adapter: Any, view: Any
 ) -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
@@ -441,6 +536,13 @@ def _blacken_reference_witnesses(
             raise RuntimeError(f"failed to select the {sketch_name} flank witness")
         selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
         kind = int(selection.GetSelectedObjectType3(1, -1))
+        _log_witness_pick(
+            adapter,
+            view,
+            sketch_name,
+            mid,
+            selection.GetSelectedObject6(1, -1) if kind == SW_SEL_EXT_SKETCH_SEGS else None,
+        )
         if kind != SW_SEL_EXT_SKETCH_SEGS:
             raise RuntimeError(f"{sketch_name} witness pick resolved to type {kind}")
         segment = _early_bound(selection.GetSelectedObject6(1, -1), "ISketchSegment")
