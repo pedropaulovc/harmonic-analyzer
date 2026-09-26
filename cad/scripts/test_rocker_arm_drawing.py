@@ -99,7 +99,8 @@ def test_native_gdt_and_finish_present() -> None:
     # A = pivot bore axis, B = broad face (right end view), C = rod-side tip
     # face; the rod-pin position frame references all three.
     assert source.count("add_datum_feature(") == 3
-    assert "pivot_datum_angle = math.radians(135.0)" in source
+    # Datum A's leader runs oblique, 45 deg off both centre-mark axes.
+    assert math.degrees(drawing.PIVOT_DATUM_ANGLE) % 90.0 == pytest.approx(45.0)
     assert 'label="pivot bore cylindrical datum feature"' in source
     assert source.count("shoulder=True") == 1
     assert source.count("add_feature_control_frame(") == 1
@@ -216,6 +217,77 @@ def test_datum_a_is_the_pivot_bore_picked_by_its_diameter() -> None:
     assert edge is not None and "edge_xy" not in datums["A"]
     assert picks[edge] == "PIVOT_HOLE_DIA"
     assert rocker_arm_spec.PIVOT_HOLE_DIA < rocker_arm_spec.HUB_DIA
+
+
+def _datum_readback(radius_m: float, bearing_deg: float) -> tuple[float, float]:
+    centre = drawing._sheet_xy(0.0, rocker_arm_spec.PIVOT_MID_Y)
+    bearing = math.radians(bearing_deg)
+    return (
+        centre[0] + radius_m * math.cos(bearing),
+        centre[1] + radius_m * math.sin(bearing),
+    )
+
+
+_PIVOT_CENTRE = drawing._sheet_xy(0.0, rocker_arm_spec.PIVOT_MID_Y)
+_TRIANGLE_M = 0.00209 - drawing.PIVOT_BORE_SHEET_R  # r743-3C: rim to readback
+
+
+def test_datum_a_on_the_bore_passes() -> None:
+    """r743-3C's readback: 2.09 mm from the pivot at 135.4 deg, the bore rim
+    plus the triangle on the requested ray."""
+    drawing._require_pivot_datum_on_bore(_datum_readback(0.00209, 135.4), _PIVOT_CENTRE)
+    drawing._require_pivot_datum_on_bore(
+        _datum_readback(drawing.PIVOT_BORE_SHEET_R, 135.0), _PIVOT_CENTRE
+    )
+
+
+def test_datum_a_on_the_hub_fails() -> None:
+    hub_readback = drawing.PIVOT_HUB_SHEET_R + _TRIANGLE_M
+    with pytest.raises(RuntimeError, match="hub rim"):
+        drawing._require_pivot_datum_on_bore(
+            _datum_readback(hub_readback, 135.0), _PIVOT_CENTRE
+        )
+    # Even a bare hub-rim readback, with no triangle, is not the bore.
+    with pytest.raises(RuntimeError, match="hub rim"):
+        drawing._require_pivot_datum_on_bore(
+            _datum_readback(drawing.PIVOT_HUB_SHEET_R, 135.0), _PIVOT_CENTRE
+        )
+
+
+def test_datum_a_off_its_ray_fails() -> None:
+    # On the horizontal centre-mark axis: the leader no longer reads oblique.
+    with pytest.raises(RuntimeError, match="swung"):
+        drawing._require_pivot_datum_on_bore(_datum_readback(0.00209, 180.0), _PIVOT_CENTRE)
+    with pytest.raises(RuntimeError, match="swung"):
+        drawing._require_pivot_datum_on_bore(_datum_readback(0.00209, 315.0), _PIVOT_CENTRE)
+
+
+def test_datum_a_read_at_the_tag_or_inside_the_bore_fails() -> None:
+    """A leaderless tag reads at the tag, a stand-off out; neither it nor a
+    point inside the bore is a leader end on the bore."""
+    tag = drawing.PIVOT_BORE_SHEET_R + drawing.PIVOT_DATUM_STANDOFF
+    with pytest.raises(RuntimeError, match="hub rim"):
+        drawing._require_pivot_datum_on_bore(_datum_readback(tag, 135.0), _PIVOT_CENTRE)
+    with pytest.raises(RuntimeError, match="bore rim"):
+        drawing._require_pivot_datum_on_bore(
+            _datum_readback(drawing.PIVOT_BORE_SHEET_R / 2.0, 135.0), _PIVOT_CENTRE
+        )
+
+
+def test_datum_a_gross_bound_is_the_request_to_centre_distance() -> None:
+    """add_datum_feature's own bound only guards against an ignored move: a
+    bore readback anywhere in the checked sector is nearer the request than
+    the pivot centre is, and the default drop (40 mm+) is not."""
+    reach = drawing.PIVOT_BORE_SHEET_R + drawing.PIVOT_DATUM_STANDOFF
+    request = _datum_readback(reach, 135.0)
+    worst = max(
+        math.dist(request, _datum_readback(radius, 135.0 + sign * swing))
+        for radius in (drawing.PIVOT_BORE_SHEET_R, drawing.PIVOT_HUB_SHEET_R)
+        for sign in (-1.0, 1.0)
+        for swing in (math.degrees(drawing.PIVOT_DATUM_BEARING_TOLERANCE),)
+    )
+    assert worst <= drawing.PIVOT_DATUM_POSITION_TOLERANCE
+    assert drawing.PIVOT_DATUM_POSITION_TOLERANCE == pytest.approx(reach)
 
 
 def test_pivot_diameter_text_is_clear_of_the_rod_pin_x_dimension() -> None:
