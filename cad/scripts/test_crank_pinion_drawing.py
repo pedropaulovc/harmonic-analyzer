@@ -329,17 +329,19 @@ def test_bore_band_is_derived_from_its_fit_class_not_written_by_hand() -> None:
 def test_outside_diameter_stays_at_the_general_grade() -> None:
     # The tip circle is NOT an accuracy feature (tolerance-policy.md scores
     # gear runout below 0.1 %/mm and the one-sided-load bullets forbid
-    # tightening a clearance for accuracy). The crossed mesh is built with
-    # fits.crank_mesh's 0.25 mm of centre-distance slack ON TOP of the tooth
-    # system's own tip clearance, so the general .XX grade fits inside the
-    # radial room and the tips still cannot bottom.
+    # tightening a clearance for accuracy). #906 R1: the fit-up bushing
+    # closes the mesh to its backlash acceptance, so the radial room is the
+    # stack's worst tip-root air, taken with the general .XX grade on the tip
+    # circle; the tips still cannot bottom.
+    import crank_mesh_stack
+
     assert not hasattr(spec, "OUTSIDE_DIA_BAND")
     assert spec.DRAWING_PRECISION_BY_NAME["OutsideDia"] == 2
-    assert spec.MESH_C2C_SLACK_MM == _config.fit("crank_mesh")["c2c_slack_mm"]
     assert spec.TIP_CLEARANCE_MM == pytest.approx(0.152, abs=0.001)
-    radial_room = spec.MESH_C2C_SLACK_MM + spec.TIP_CLEARANCE_MM
     general_radial = _config.title_block("linear_2pl")["value_in"] * 25.4 / 2.0
-    assert general_radial < radial_room
+    assert crank_mesh_stack.TIP_ROOT_BAND_RADIAL == pytest.approx(general_radial, abs=0.005)
+    assert crank_mesh_stack.TIP_CLEARANCE_MM <= spec.TIP_CLEARANCE_MM
+    assert crank_mesh_stack.TIP_ROOT_AIR_WORST > 0.0
     # The face width is the one free length: one place, so the title block's
     # .X grade is the band it claims, and nothing contradicts it.
     assert spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 1

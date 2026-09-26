@@ -80,13 +80,15 @@ NORMAL_CIRCULAR_TOOTH_THICKNESS = TRANSVERSE_CIRCULAR_TOOTH_THICKNESS * _COS_HEL
 # The blank's outside diameter is the one tooth-system number the turner sets
 # before a cutter touches the part, so it prints as a NATIVE dimension instead
 # of as text in the data block -- but at the title block's general .XX grade,
-# with no band of its own. The crossed 16T:64T mesh keeps at least
-# ``fits.crank_mesh.c2c_slack_mm`` 0.25 mm of centre-distance slack (the frame
-# leaves the single-cutter pair more) on top of the tooth system's own tip
-# clearance below, so the tip circle has over 0.40 mm of radial room: the
-# general +/-0.51 diametral is +/-0.255 radial, inside it. A tighter band here
-# would be a habit, not a requirement (cad/docs/tolerance-policy.md, "Fit
-# classes" and the one-sided-load bullets).
+# with no band of its own. #906 R1: the MHA-149 bushing closes the crossed
+# 16T:64T mesh at fit-up until the backlash reads its acceptance, so the
+# frame's ``fits.crank_mesh.c2c_slack_mm`` is not what keeps a tip off the
+# mating root.  The radial room is what is left at the worst fit-up on top of
+# the tooth system's own tip clearance below; ``crank_mesh_stack.
+# TIP_ROOT_AIR_WORST`` takes it with this general band on the tip circle and
+# asserts it above zero. A tighter band here would be a habit, not a
+# requirement (cad/docs/tolerance-policy.md, "Fit classes" and the one-sided-
+# load bullets).
 TIP_CLEARANCE_MM = 0.157 * NORMAL_MODULE_MM
 
 # The cone shaft's 3/8" gear land. The bore over it is the part's one critical

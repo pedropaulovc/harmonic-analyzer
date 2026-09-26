@@ -290,11 +290,15 @@ _LOOSE_NET_DC = (
         -pinion.TOOTH_THICKNESS_LOWER_DEVIATION,
     )
 ) / KC
+# Either gear's tip into the other's root: the smaller tooth-system tip
+# clearance, less the general .XX band on a tip circle, taken radially.
+TIP_CLEARANCE_MM = min(pinion.TIP_CLEARANCE_MM, gear64.TIP_CLEARANCE_MM)
+TIP_ROOT_BAND_RADIAL = _ROW_2 / 2.0
 TIP_ROOT_AIR_WORST = (
     _EXTRA_NOMINAL
     + _LOOSE_NET_DC
-    + pinion.TIP_CLEARANCE_MM
-    - _ROW_2 / 2.0
+    + TIP_CLEARANCE_MM
+    - TIP_ROOT_BAND_RADIAL
     - TOOTH_RUNOUT_TIR_MM / 2.0
 )
 if TIP_ROOT_AIR_WORST <= 0.0:
