@@ -574,6 +574,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="rocker_thrust_washer",
+        part="rocker_thrust_washer",
+        artifact_stem="rocker-thrust-washer",
+        script_name="draw_rocker_thrust_washer.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="arbor_pedestal",
         part="arbor_pedestal",
         artifact_stem="arbor-pedestal",
