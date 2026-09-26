@@ -10,6 +10,7 @@ hb-render-4 drawing-task.log, supports' "callout ... display data" lines and
 
 from __future__ import annotations
 
+import math
 
 import pytest
 
@@ -2001,3 +2002,132 @@ def test_a_note_leader_is_one_leader_not_also_a_line():
     geometry = annotation_geometry(note, owner="v", advance=0.6)
     long_runs = [(s.role, round(s.x0 * 1000, 2)) for s in geometry.segments if s.length > 0.001]
     assert long_runs == [("leader", 120.49)]
+
+
+# --------------------------------------------------------------------------
+# layoutcal2-c (f31db84eb) drive-train-assembly: balloons are circles, a table
+# is one owner. All 36 of its findings were these two false-positive classes.
+# --------------------------------------------------------------------------
+
+# drive-train-assembly "ALIGNMENT PINION RIG EXPLODED", balloon 17, verbatim.
+DTA_BALLOON_17 = {
+    "type": 6,
+    "name": "DetailItem394",
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.1597687, 0.1070215, 0.051225],
+    "leaders": [[0.1659001, 0.1095358, 0.051225, 0.1676521, 0.1137831, 0.051225]],
+    "display": {
+        "lines": [[0.0, 0.0, 0.0, 0.0, 0.1658344, 0.1099698, 0.051225, 0.1676521, 0.1137831, 0.051225]],
+        "arcs": [[0.0, 0.0, -1.0, -1.0, 0.1593408, 0.1033526, -0.0, 0.1593408, 0.1033526, -0.0,
+                  0.1637253, 0.1055448, -0.0, 0.0, 0.0, 1.0, 1.0]],
+        "arrows": [[0.1676521, 0.1137831, 0.051225, -0.4302722, -0.9026992, -0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]],
+        "texts": [{"t": "17", "pos": [0.1611392, 0.1027295, -0.0], "h": 0.0035, "ref": 1, "ang": 0.0}],
+    },
+    "note": {"text": "17", "extent": [0.1593408, 0.1015555, -0.0, 0.1681097, 0.1138319, -0.0], "balloon": True},
+}
+# Where the PDF printed its ring: 0.57 mm off the GetDisplayData circle
+# (163.73, 105.54) r 4.90, while the leader starts ON the printed ring.
+DTA_BALLOON_17_RING = (0.16404, 0.10506, 0.00484)
+# Its printed leader + arrowhead (0.18 mm) and the view edge that passes it
+# (0.25 mm), verbatim from the PDF.
+DTA_BALLOON_17_LEADER_INK = [
+    (0.16764, 0.113771, 0.166617, 0.110349),
+    (0.165911, 0.110631, 0.16764, 0.113771),
+    (0.165876, 0.109502, 0.16764, 0.113771),
+]
+DTA_BALLOON_17_EDGES = [(0.177553, 0.10414, 0.163407, 0.112324), (0.163407, 0.112324, 0.163407, 0.120685)]
+
+
+def _ring(cx, cy, radius, sides=48):
+    points = [
+        (cx + radius * math.cos(2 * math.pi * k / sides), cy + radius * math.sin(2 * math.pi * k / sides))
+        for k in range(sides + 1)
+    ]
+    return [(*a, *b) for a, b in zip(points, points[1:])]
+
+
+def _balloon_17_dump(balloon=DTA_BALLOON_17):
+    return _dump(
+        views=[_view("Drawing View8", (0.12, 0.08, 0.30, 0.20), [balloon])],
+        spans=[["17", 0.1618, 0.1034, 0.1662, 0.1069]],
+        strokes=[
+            *_edges(*_ring(*DTA_BALLOON_17_RING), *DTA_BALLOON_17_LEADER_INK, width=0.00018),
+            *_edges(*DTA_BALLOON_17_EDGES),
+        ],
+    )
+
+
+def test_a_balloon_takes_the_ring_it_printed():
+    [balloon] = [a for a in sheet_model(_balloon_17_dump()).geometry.annotations if a.kind == "balloon"]
+    assert balloon.circle == pytest.approx(DTA_BALLOON_17_RING, abs=2e-5)
+
+
+def test_a_balloon_leader_leaving_its_ring_and_an_edge_past_its_corner_are_not_findings():
+    """28 leader-through-own-text on drive-train-assembly: the balloon's text
+    box was the COM circle's bounding square, so every leader leaving the rim
+    clipped a corner (or the COM circle's 0.5 mm offset). The view edge
+    through that square's corner misses the printed ring by 1.1 mm."""
+    findings = audit_dump(_balloon_17_dump())
+    assert not [f for f in findings if "DetailItem394" in f.a or "DetailItem394" in f.b]
+
+
+def test_a_leader_through_its_own_balloon_is_still_found():
+    """Positive control: a leader that starts on the far rim and crosses the
+    digits is ink through the balloon's own text."""
+    cx, cy, radius = DTA_BALLOON_17_RING
+    through = {
+        **DTA_BALLOON_17,
+        "leaders": [[cx - radius, cy, 0.051225, 0.1676521, 0.1137831, 0.051225]],
+        "display": {
+            **DTA_BALLOON_17["display"],
+            "lines": [[0.0, 0.0, 0.0, 0.0, cx - radius, cy, 0.051225, 0.1676521, 0.1137831, 0.051225]],
+        },
+    }
+    findings = audit_dump(_balloon_17_dump(through))
+    assert [f.kind for f in findings if f.kind == "leader-through-own-text"] == ["leader-through-own-text"]
+
+
+def test_diagonal_balloons_are_separated_by_their_circles():
+    """6 text-separation on drive-train-assembly: balloons set diagonally have
+    bounding-square corners 2 mm apart and circles 7 mm apart. At 0.5 mm the
+    squares would fail text-clearance; the circles are still 4.9 mm apart."""
+
+    def balloon(name, cx, cy):
+        arc = [0, 0, 0, 0, cx + 0.005, cy, 0.0, cx + 0.005, cy, 0.0, cx, cy, 0.0, 0.0, 0.0, 1.0, 1.0]
+        return {
+            "type": 6,
+            "name": name,
+            "visible": 1,
+            "display": {"arcs": [arc], "texts": [{"t": name, "pos": [cx - 0.001, cy - 0.00175, 0.0], "h": 0.0035}]},
+            "note": {"balloon": True, "text": name},
+        }
+
+    for corner_gap in (0.00207, 0.0005):
+        other = 0.150 + 0.010 + corner_gap
+        dump = _dump(views=[_view("v", (0.02, 0.02, 0.07, 0.07), [balloon("1", 0.150, 0.150), balloon("2", other, other)])])
+        findings = audit_dump(dump)
+        assert not [f for f in findings if f.kind in ("text-separation", "text-clearance")], corner_gap
+
+
+def test_a_tables_own_grid_line_is_not_a_line_through_its_text():
+    """drive-train-assembly's BOM: the table came back as a sheet annotation
+    labelled with its first row AND as ``tables`` ``table <name>``, so its own
+    column rule read as a foreign line through the table."""
+    table = {
+        "type": 14,
+        "name": "DetailItem359",
+        "visible": 1,
+        "owner_type": 1,
+        "pos": [0.19, 0.252, 0.0],
+        "display": {
+            "lines": [_line(0.202, 0.252, 0.202, 0.2418)],
+            "texts": [{"t": "ITEM", "pos": [0.192, 0.244, 0.0], "h": 0.0035}],
+        },
+    }
+    dump = _dump(
+        sheet_annotations=[table],
+        tables=[{"name": "DetailItem359", "box": [0.190, 0.1158, 0.354, 0.252]}],
+    )
+    findings = audit_dump(dump)
+    assert not [f for f in findings if f.kind == "text-on-line"]

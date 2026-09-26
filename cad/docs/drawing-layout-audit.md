@@ -109,7 +109,15 @@ drawing's `layout.audit` span has three children: `layout.read_pdf`,
 `layout.collect_com` and `layout.findings` (`findings_s` and the per-kind
 counts).
 
-A balloon keeps its rendered circle. The COM row model (exact item widths,
+A balloon is its printed circle. `GetDisplayData` puts the circle up to
+0.57 mm off the ring the PDF draws, so the audit fits the ring from the
+page's annotation strokes and keeps the COM circle only when no closed ring
+prints within 1 mm of it. Lines, leaders and gaps are then measured against
+the circle, not its bounding square, whose corners are blank paper
+(layoutcal2-c: 35 of drive-train-assembly's 36 findings; the 36th was the
+table below). A table is one
+owner: its sheet annotation and its `tables` box share the label
+`table <name>`, so its own rules are not foreign lines. The COM row model (exact item widths,
 per-sheet glyph advance, supports' shoulder-centred callout rows) remains
 only for a dump with no PDF text, i.e. the offline fixtures.
 
