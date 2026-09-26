@@ -53,6 +53,12 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91829A560",
         material="AISI 304",
     ),
+    "cone-post-dowel": _stock(
+        "cone-post-dowel",
+        "Black-Oxide Alloy Steel Dowel Pin",
+        "98381A304",
+        material="Alloy Steel",
+    ),
     "cone-tip-block-screw": _stock(
         "cone-tip-block-screw",
         "Black-Oxide Alloy Steel Button Head Hex Drive Screw",
