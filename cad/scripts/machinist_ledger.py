@@ -2491,10 +2491,19 @@ def review_record_problem(review: dict[str, Any]) -> str | None:
     when = _aware_time_problem(review.get("reviewed_at"))
     if when:
         return f"reviewed_at {when}"
+    import machinist_review  # imports this module; a top-level import would cycle
+
     try:
-        verdict_passes(review)  # the verdict is valid and its passed flag agrees
+        verdict = machinist_review.validate_verdict(review["verdict"])
     except (KeyError, TypeError, ValueError) as exc:
-        return str(exc)
+        return f"its verdict is malformed: {exc}"
+    # machinist_review writes passed = a passing verdict AND a blind run, so a
+    # sighted SHIP says false; any other disagreement is an edited record.
+    if review["passed"] != (machinist_review.is_pass(verdict) and review["blind"]):
+        return (
+            f"its passed flag ({review['passed']}) contradicts its "
+            f"{verdict['verdict']} verdict (blind: {review['blind']})"
+        )
     return None
 
 

@@ -3207,6 +3207,30 @@ def test_a_newer_failing_verdict_can_overrule_a_ship(
         assert "newer codex/gpt-6-astra" in row.detail and "wt-fix" in row.detail
 
 
+def test_a_sighted_ship_is_skipped_not_listed_as_malformed(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # machinist_review writes passed = SHIP and blind, so a sighted SHIP says
+    # passed: false. That is a well-formed record the gate does not count.
+    _trailer(monkeypatch, "claude-opus-5-5")
+    _on_record(records, "wt-sighted", reviewed_at=REVIEWED_AT)
+    report = records / "wt-sighted" / "cad" / "out" / "reports" / "machinist-review"
+    report = report / "crank_arm.json"
+    data = json.loads(report.read_text(encoding="utf-8"))
+    report.write_text(
+        json.dumps({**data, "blind": False, "passed": False}), encoding="utf-8"
+    )
+    _sheet(registry)
+
+    result = ml.backfill(
+        [records], ledger_path=tmp_path / "ledger.json", cache_path=None, outages={}
+    )
+
+    assert result.malformed == []
+    [row] = result.rows
+    assert row.outcome == ml.Backfill.NO_SHIP, row.detail
+
+
 @pytest.mark.parametrize(
     "change",
     [
