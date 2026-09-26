@@ -99,8 +99,7 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert seat.splitlines() == [
         "TURN TO SUIT MHA-020 BORE",
         f"FOR LIGHT PRESS: {low:.3f}-{high:.3f}",
-        "DIAMETRAL INTERFERENCE",
-        "ARBOR-PRESS TO SHOULDER",
+        "DIAMETRAL INTERFERENCE;",
         "FACES FLUSH",
     ]
     assert "MATCH-FIT" not in seat
@@ -236,3 +235,22 @@ def test_callout_prose_stays_out_of_every_part_recipe() -> None:
     assert "crank_hub_notes" in reached("draw_crank_hub")
     assert "crank_arm_notes" in reached("draw_crank_arm")
     assert "crankshaft_notes" in reached("draw_crankshaft")
+
+
+# Drawing-simplicity policy rule 6: at most four short lines. Codex #892
+# (PRRT_kwDOPHDy386mMQpe): the generated seat callout printed five.
+CALLOUT_LINE_CAP = 4
+
+
+@pytest.mark.parametrize(
+    "name, text",
+    [
+        ("SEAT_CALLOUT", crank_hub_notes.SEAT_CALLOUT),
+        ("SEAM_CALLOUT", crank_hub_notes.SEAM_CALLOUT),
+        ("BORE_CALLOUT", crank_hub_notes.BORE_CALLOUT),
+        ("CROSS_HOLE_CALLOUT", crank_hub_notes.CROSS_HOLE_CALLOUT),
+        ("seat_bore_callout", crank_hub_notes.seat_bore_callout("MHA-137")),
+    ],
+)
+def test_every_generated_callout_stays_within_four_lines(name: str, text: str) -> None:
+    assert len(text.splitlines()) <= CALLOUT_LINE_CAP, (name, text.splitlines())

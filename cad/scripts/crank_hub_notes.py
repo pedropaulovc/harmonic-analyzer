@@ -34,14 +34,17 @@ SEAT_PRESS_INTERFERENCE = (0.010, 0.030)  # diametral, mm (min, max)
 
 
 def seat_callout(mate: str) -> str:
-    """Hub-seat fit on MHA-137, turned second to press into ``mate``'s bore."""
+    """Hub-seat fit on MHA-137, turned second to press into ``mate``'s bore.
+
+    Four lines (policy rule 6). FACES FLUSH is the acceptance; how the hub
+    gets there (an arbor press) is a method, so the sheet does not say it.
+    """
     low, high = SEAT_PRESS_INTERFERENCE
     return "\n".join(
         (
             f"TURN TO SUIT {mate} BORE",
             f"FOR LIGHT PRESS: {low:.3f}-{high:.3f}",
-            "DIAMETRAL INTERFERENCE",
-            "ARBOR-PRESS TO SHOULDER",
+            "DIAMETRAL INTERFERENCE;",
             "FACES FLUSH",
         )
     )
