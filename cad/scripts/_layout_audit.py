@@ -356,15 +356,34 @@ def line_segment(raw: Sequence[float], role: str = "line") -> Segment | None:
     """``GetLineAtIndex3`` ([4 scalars, start3, end3]) or ``GetLineAtIndex2``.
 
     The start index is read from the array LENGTH: both overloads end with the
-    two points, and they differ only in how many scalars lead.
+    two points, and they differ only in how many scalars lead. A record whose
+    ends coincide on the sheet draws no ink: None, wherever it lies
+    (``degenerate_line_count`` keeps the drop visible).
     """
     values = _floats(raw)
     if len(values) < 8:
         return None
     start = len(values) - 6
-    return Segment(
+    segment = Segment(
         values[start], values[start + 1], values[start + 3], values[start + 4], role
     )
+    return segment if segment.length > 0.0 else None
+
+
+def degenerate_line_count(dump: Mapping[str, Any]) -> int:
+    """How many display line records on the sheet's printed annotations have
+    coinciding ends. Since #906 every linear dimension on cone_pivot_post
+    reads back 15, ``[0, swLF_VISIBLE, swLineHIDDEN, swLW_THIN, (0,0,0),
+    (0,0,0)]``, between its extension and dimension lines
+    (diag/cone-pivot-origin-probe fc2212cd6, leaf run 20260926T205141966Z);
+    taken as ink, each dimension's box ran from the sheet origin."""
+    count = 0
+    for annotation in audited_annotations(printed_dump(dump)):
+        for raw in (annotation.get("display") or {}).get("lines") or ():
+            values = _floats(raw)
+            if len(values) >= 8 and line_segment(values) is None:
+                count += 1
+    return count
 
 
 def _arc_points(
@@ -3502,6 +3521,11 @@ def audit_report(
                 str(dump.get("sheet", "")): hidden
                 for dump in dumps
                 if (hidden := hidden_layer_count(dump))
+            },
+            "degenerate_lines": {
+                str(dump.get("sheet", "")): degenerate
+                for dump in dumps
+                if (degenerate := degenerate_line_count(dump))
             },
         },
         "findings": records,

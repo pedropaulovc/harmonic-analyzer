@@ -552,6 +552,10 @@ def run_layout_audit(
         span.set_attribute("hidden_layer", hidden)
         if hidden:
             _telemetry.info(f"layout audit {stem}: annotations on non-printing layers, not audited: {summary['hidden_layer']}")
+        degenerate = sum(summary["degenerate_lines"].values())
+        span.set_attribute("degenerate_lines", degenerate)
+        if degenerate:
+            _telemetry.info(f"layout audit {stem}: zero-length display lines, no ink: {summary['degenerate_lines']}")
         read_errors = sum(sum(d["read_errors"].values()) for d in dumps)
         span.set_attribute("read_errors", read_errors)
         if read_errors:

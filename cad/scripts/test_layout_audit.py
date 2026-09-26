@@ -3420,6 +3420,49 @@ def test_a_dimension_past_the_border_or_on_the_title_block_fails_in_report_mode(
     assert enforced(LayoutAuditMode.GATE, [clearance]) == [clearance]
 
 
+_ZERO_LINE = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+# cone_pivot_post's MainBodyHt, display data verbatim from the probe leaf
+# (diag/cone-pivot-origin-probe fc2212cd6, leaf run 20260926T205141966Z): two
+# extension lines, the 15 zero-length records #906 brought, two dimension-line pieces.
+CPP_MAIN_BODY_HT = {
+    "type": 4,
+    "name": "MainBodyHt",
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.04, 0.112, -0.0140445],
+    "layer": "",
+    "display": {
+        "lines": [
+            [0.0, 0.0, 0.0, 0.0, 0.1180055, 0.069, -0.0140445, 0.039, 0.069, -0.0140445],
+            [0.0, 0.0, 0.0, 0.0, 0.1180055, 0.155, -0.0140445, 0.039, 0.155, -0.0140445],
+            *([_ZERO_LINE] * 15),
+            [0.0, 0.0, 0.0, 0.0, 0.04, 0.069, -0.0140445, 0.04, 0.1092219, -0.0140445],
+            [0.0, 0.0, 0.0, 0.0, 0.04, 0.155, -0.0140445, 0.04, 0.1147781, -0.0140445],
+        ],
+        "arrows": [
+            [0.04, 0.069, -0.0140445, 0.0, 1.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+            [0.04, 0.155, -0.0140445, -0.0, -1.0, -0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+        ],
+        "texts": [{"t": " 86.0 ", "pos": [0.0341812, 0.1092219, -0.0140445], "h": 0.0035, "ref": 1.0}],
+    },
+}
+
+
+def test_a_zero_length_display_line_is_no_ink_and_is_counted():
+    """The cone_pivot_post integ blocker (probe fc2212cd6): since #906 every
+    linear dimension there reads back 15 line records with both ends at
+    (0,0,0). Taken as ink they put the dimension's box at the sheet origin,
+    an ENFORCED outside-border and keep-out. A zero-length record draws
+    nothing, wherever it lies; the report counts the drop per sheet."""
+    from _layout_audit import audit_report
+
+    dump = _dump(views=[_view("Drawing View1", (0.030, 0.060, 0.125, 0.165), [CPP_MAIN_BODY_HT])])
+    findings = [f for f in audit_dump(dump) if "MainBodyHt" in f.a or "MainBodyHt" in f.b]
+    assert not {"outside-border", "keep-out"} & set(_kinds(findings))
+    report, _gating = audit_report("cone-pivot-post", LayoutAuditMode.REPORT, [dump])
+    assert report["summary"]["degenerate_lines"] == {"Sheet2": 15}
+
+
 # knife-mount's datum tag A (d09c2b9eb c2 dump, DetailItem350, verbatim): COM
 # registers no leader, and its display data runs one line from the tag's
 # frame down to its datum triangle.
