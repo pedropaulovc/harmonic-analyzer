@@ -8,7 +8,7 @@ above the 6.35-mm swing plate fixes the drive plane at y = 90.518):
   seated perpendicular to the stepped shaft (p.18/p.20 photos), the
   shaft inclined in PLAN and carried at BOTH ends ON the cone swing
   platform (p.18: the wedge plate labelled "pivot" at its tip): big end
-  journaled in the green pivot post, thin 1/32" tip end-play located by the
+  journaled in the green pivot post, thin 1/16" tip end-play located by the
   external spacer and cup-ended adjuster carried in the black tip block (the GT tip post at world
   (-81, 105, +102), realized at station
   185). The plate pivots about a vertical axis at its TIP end, so the
