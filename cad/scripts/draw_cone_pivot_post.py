@@ -77,6 +77,7 @@ from cone_pivot_post_spec import (
     DRAWING_PRECISION_BY_NAME,
     INCLINE_DEG,
     POST_DOWEL_REAM_DIA,
+    POST_DOWEL_XZ,
     SURFACE_FINISHES,
 )
 from cone_post_dowel_spec import POST_DOWEL_CALLOUT
@@ -113,13 +114,17 @@ SECTION_LABEL_SCALE_TEXT = "SCALE"
 SECTION_SCALE = (1, 1)
 # #917 S1: the dowel pair opens only on the foot, so a foot view (looking up
 # at it, 1:2) carries its callout, in the open field between the plan's
-# counterbore callout and section A-A.  Provisional until a seat render:
-# nothing here was measured.
+# counterbore callout and section A-A.  Its caption and the dowel callout are
+# placed from the sheet's READ-BACK boxes (_place_foot_group): the S1 leaf
+# 917-s1-5974 failed on the literal guesses they replace -- the caption
+# crossed the top inner border by 1.46 mm and the callout's leader crossed
+# the plan (Drawing View2).
 FOOT_CENTER = (0.228, 0.238)
 FOOT_SCALE = (1, 2)
 FOOT_VIEW_NOTE = "VIEW C - FOOT\nSCALE 1:2"
-FOOT_NOTE_XY = (0.212, 0.268)
-FOOT_DOWEL_CALLOUT_XY = (0.176, 0.222)
+# Clearance between read-back boxes: caption to border, caption to its view,
+# callout text to either neighbouring view outline.
+FOOT_LAYOUT_GAP = 0.002
 
 # The checked-in landscape template's FINISH value cell, measured between its
 # authored sheet-format rules.  Its linked INote extent is checked natively
@@ -234,13 +239,15 @@ def _circular_edge(
     radius_mm: float,
     center_y_mm: float,
     center_x_mm: float | None = None,
+    center_z_mm: float | None = None,
 ) -> Any:
     """Return the model circular edge matching a radius and a model-Y height.
 
     ``center_x_mm`` breaks the tie between the two mounting counterbores,
     which differ only in X; without it the scan returns whichever SolidWorks
     enumerated first, and a leader routed for one hole then crosses the plan
-    to reach the other.
+    to reach the other.  ``center_z_mm`` does the same for the dowel pair,
+    which differ only in Z.
     """
     candidates: list[tuple[float, Any]] = []
     for raw in visible_view_entities(view, 1, label="pivot-post circular edges"):
@@ -257,6 +264,8 @@ def _circular_edge(
         )
         if center_x_mm is not None:
             error += abs(params[0] * 1000.0 - center_x_mm)
+        if center_z_mm is not None:
+            error += abs(params[2] * 1000.0 - center_z_mm)
         candidates.append((error, edge))
     if not candidates:
         raise RuntimeError("view has no circular model edges")
@@ -265,6 +274,8 @@ def _circular_edge(
         where = f"at height {center_y_mm:.4f} mm"
         if center_x_mm is not None:
             where += f", x {center_x_mm:.4f} mm"
+        if center_z_mm is not None:
+            where += f", z {center_z_mm:.4f} mm"
         raise RuntimeError(
             f"no circular edge matches radius {radius_mm:.4f} mm {where}"
         )
@@ -676,6 +687,196 @@ def _show_section_scale_in_caption(adapter: Any, view: Any) -> None:
         raise RuntimeError("native cone-section scale caption did not persist")
 
 
+def foot_caption_shift(
+    border_top: float, foot: Any, caption: Any, gap: float
+) -> tuple[float, float, float]:
+    """``(dx, dy, view_dy)`` for the foot caption, from read-back boxes.
+
+    The caption's box moves so its top sits ``gap`` under the inner border
+    and its left edge on the foot view's; ``view_dy`` (never positive) is how
+    far the foot view must then drop so its outline stays ``gap`` under the
+    caption."""
+    dx = foot.xmin - caption.xmin
+    dy = (border_top - gap) - caption.ymax
+    view_dy = min(0.0, (caption.ymin + dy) - gap - foot.ymax)
+    return dx, dy, view_dy
+
+
+def foot_callout_shift(
+    plan: Any,
+    foot: Any,
+    callout: Any,
+    dowel_y: float,
+    gap: float,
+    ceiling: float | None = None,
+) -> tuple[float, float]:
+    """``(dx, dy)`` for the dowel callout, from read-back boxes.
+
+    Its text box ends ``gap`` short of the foot view's outline, centred on the
+    named dowel's sheet height, so its leader runs across open sheet to the
+    rim -- but no higher than ``gap`` under ``ceiling`` (the bottom of the
+    plan's counterbore callout text, which shares this field).  The text must
+    then clear the plan's outline by ``gap``, or the sheet has no room for it
+    here and the build fails naming every box."""
+    dx = (foot.xmin - gap) - callout.xmax
+    dy = dowel_y - (callout.ymin + callout.ymax) / 2.0
+    if ceiling is not None:
+        dy = min(dy, (ceiling - gap) - callout.ymax)
+    if callout.xmin + dx < plan.xmax + gap:
+        raise RuntimeError(
+            "post dowel callout does not fit between the plan and the foot "
+            f"view: text {callout.format_mm()}, plan {plan.format_mm()}, "
+            f"foot {foot.format_mm()}"
+        )
+    return dx, dy
+
+
+def _outline_box(view: Any) -> Any:
+    from _layout_geometry import Box
+
+    values = tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
+    if len(values) != 4 or values[2] <= values[0] or values[3] <= values[1]:
+        raise RuntimeError(f"view has an invalid outline {values!r}")
+    return Box(*values)
+
+
+def _note_box(note: Any) -> Any:
+    from _layout_geometry import Box
+
+    extent = tuple(float(value) for value in _early_bound(note, "INote").GetExtent())
+    if len(extent) != 6:
+        raise RuntimeError(f"note has an invalid extent {extent!r}")
+    return Box(
+        min(extent[0], extent[3]),
+        min(extent[1], extent[4]),
+        max(extent[0], extent[3]),
+        max(extent[1], extent[4]),
+    )
+
+
+def _move_annotation(annotation: Any, delta: tuple[float, float], *, label: str) -> None:
+    annotation = _early_bound(annotation, "IAnnotation")
+    before = tuple(float(value) for value in annotation.GetPosition())
+    target = (before[0] + delta[0], before[1] + delta[1])
+    if not annotation.SetPosition2(target[0], target[1], 0.0):
+        raise RuntimeError(f"{label}: SetPosition2 refused {target!r}")
+    after = tuple(float(value) for value in annotation.GetPosition())
+    if math.dist(after[:2], target) > 1e-6:
+        raise RuntimeError(f"{label}: moved to {after[:2]!r}, expected {target!r}")
+
+
+def _sheet_border_top(adapter: Any) -> float:
+    from diagnostics.drawing_layout_audit import collect_document
+
+    sheets = collect_document(adapter)
+    if len(sheets) != 1:
+        raise RuntimeError(f"cone pivot post must have one drawing sheet: {len(sheets)}")
+    return float(sheets[0].region.ymax)
+
+
+def _annotation_text_box(adapter: Any, name: str) -> Any:
+    """The union of a named annotation's rendered text boxes, as the layout
+    audit reads them."""
+    from _layout_geometry import Box
+    from diagnostics.drawing_layout_audit import collect_document
+
+    boxes = [
+        box
+        for annotation in collect_document(adapter)[0].annotations
+        if annotation.label == name
+        for box in annotation.text_boxes
+    ]
+    if not boxes:
+        raise RuntimeError(f"no rendered text read back for annotation {name!r}")
+    return Box(
+        min(box.xmin for box in boxes),
+        min(box.ymin for box in boxes),
+        max(box.xmax for box in boxes),
+        max(box.ymax for box in boxes),
+    )
+
+
+def _place_foot_group(
+    adapter: Any, foot: Any, plan: Any, journal: Any, *, cbore_callout: str
+) -> None:
+    """Caption the foot view and call out one dowel ream, both placed from the
+    sheet's read-back boxes (FOOT_LAYOUT_GAP clear of the border and of every
+    neighbouring view), then log every box the placement read."""
+    gap = FOOT_LAYOUT_GAP
+    rebuild_drawing(adapter, label="foot view outline")
+    border_top = _sheet_border_top(adapter)
+    foot_box = _outline_box(foot)
+    note = add_note(adapter, FOOT_VIEW_NOTE, foot_box.xmin, border_top - gap)
+    if note is None:
+        raise RuntimeError("foot view caption was not created")
+    caption = _note_box(note)
+    dx, dy, view_dy = foot_caption_shift(border_top, foot_box, caption, gap)
+    _move_annotation(_early_bound(note, "INote").GetAnnotation(), (dx, dy), label="foot caption")
+    if view_dy < 0.0:
+        bound = _early_bound(foot, "IView")
+        position = tuple(float(value) for value in bound.Position)
+        target = [position[0], position[1] + view_dy]
+        if not bound.SetViewPosition(double_array(target), False):
+            raise RuntimeError(f"foot view: SetViewPosition refused {target!r}")
+        rebuild_drawing(adapter, label="foot view under its caption")
+        foot_box = _outline_box(foot)
+    journal_box = _outline_box(journal)
+    if foot_box.ymin < journal_box.ymax + gap and not (
+        foot_box.xmax < journal_box.xmin or foot_box.xmin > journal_box.xmax
+    ):
+        raise RuntimeError(
+            f"foot view {foot_box.format_mm()} dropped onto the journal view "
+            f"{journal_box.format_mm()} under its caption"
+        )
+    caption = _note_box(note)
+
+    # One named dowel, the one lower on the sheet (further from the plan's
+    # counterbore callout above): the pair differs only in z, so an unnamed
+    # pick was whichever SolidWorks enumerated first.
+    heights = {
+        (x, z): model_point_in_view(
+            adapter, foot, (x / 1000.0, 0.0, z / 1000.0), label=f"foot dowel z {z:.3f}"
+        )[1]
+        for x, z in POST_DOWEL_XZ
+    }
+    (dowel_x, dowel_z), dowel_y = min(heights.items(), key=lambda item: item[1])
+    plan_box = _outline_box(plan)
+    ceiling = _annotation_text_box(adapter, cbore_callout).ymin
+    dowel_callout = add_native_hole_callout(
+        adapter,
+        foot,
+        edge=_circular_edge(
+            foot,
+            radius_mm=POST_DOWEL_REAM_DIA / 2.0,
+            center_y_mm=0.0,
+            center_x_mm=dowel_x,
+            center_z_mm=dowel_z,
+        ),
+        callout_xy=(plan_box.xmax + gap, dowel_y),
+        label="post dowel reamed holes",
+        process=POST_DOWEL_CALLOUT,
+    )
+    set_hole_callout_precision(
+        dowel_callout, {"hw-diam": 3, "hw-depth": 1}, label="post dowel ream"
+    )
+    rebuild_drawing(adapter, label="post dowel callout text")
+    annotation = _early_bound(dowel_callout.GetAnnotation(), "IAnnotation")
+    name = str(annotation.GetName())
+    text = _annotation_text_box(adapter, name)
+    shift = foot_callout_shift(plan_box, foot_box, text, dowel_y, gap, ceiling)
+    _move_annotation(annotation, shift, label="post dowel callout")
+    rebuild_drawing(adapter, label="post dowel callout placed")
+    placed = _annotation_text_box(adapter, name)
+    _telemetry.info(
+        "foot view group placed from read-back boxes: "
+        f"border top {border_top * 1000.0:.2f} mm; foot {foot_box.format_mm()} "
+        f"(moved {view_dy * 1000.0:.2f} mm); caption {caption.format_mm()}; "
+        f"plan {plan_box.format_mm()}; journal {journal_box.format_mm()}; "
+        f"counterbore callout text bottom {ceiling * 1000.0:.2f} mm; "
+        f"dowel callout {name} {placed.format_mm()} at dowel y {dowel_y * 1000.0:.2f} mm"
+    )
+
+
 def _assert_native_layout(
     adapter: Any,
     journal: Any,
@@ -982,7 +1183,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="cone-axis auxiliary-view direction",
     )
 
-    add_native_hole_callout(
+    cbore_callout = add_native_hole_callout(
         adapter,
         top,
         edge=_circular_edge(
@@ -996,26 +1197,16 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # #917 S1: the blind dowel reams.  Size, band and depth stay native (the
     # depth at the part's .X); the prefix names the mating platform and the
-    # reamer.  Either dowel's rim: both sit on the foot at x = 0.
-    dowel_callout = add_native_hole_callout(
+    # reamer.  Caption and callout are placed from read-back boxes.
+    _place_foot_group(
         adapter,
         foot,
-        edge=_circular_edge(
-            foot,
-            radius_mm=POST_DOWEL_REAM_DIA / 2.0,
-            center_y_mm=0.0,
-            center_x_mm=0.0,
-        ),
-        callout_xy=FOOT_DOWEL_CALLOUT_XY,
-        label="post dowel reamed holes",
-        process=POST_DOWEL_CALLOUT,
-    )
-    set_hole_callout_precision(
-        dowel_callout, {"hw-diam": 3, "hw-depth": 1}, label="post dowel ream"
+        top,
+        journal,
+        cbore_callout=str(_early_bound(cbore_callout.GetAnnotation(), "IAnnotation").GetName()),
     )
     if not auto_center_marks(adapter, foot, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the foot view")
-    add_note(adapter, FOOT_VIEW_NOTE, *FOOT_NOTE_XY)
 
     # The seat is the elevation's bottom line: the O42.011 foot rim seen
     # edge-on.  A coordinate pick on that line failed on the farm (the two

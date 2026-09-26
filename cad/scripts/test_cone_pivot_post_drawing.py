@@ -592,3 +592,50 @@ def test_mount_holes_clear_the_journal_bore_at_print_worst() -> None:
     # the bore's top.
     cbore_floor = spec.BLOCK_HEIGHT - spec.ATTACHMENT_CBORE_DEPTH
     assert cbore_floor - (spec.BORE_HEIGHT + 12.2858 / 2.0) > 40.0
+
+
+def test_foot_view_group_is_placed_from_read_back_boxes() -> None:
+    """S1 leaf 917-s1-5974 failed drawing:cone_pivot_post's layout audit:
+    the foot caption (DetailItem378, [212.0,259.0]..[244.8,268.2] mm) crossed
+    the top inner border by 1.46 mm, and the dowel callout (RD1) ran its
+    leader across the plan (Drawing View2).  Both came from unmeasured
+    literals (FOOT_NOTE_XY, FOOT_DOWEL_CALLOUT_XY).  They are now placed
+    from the sheet's read-back boxes: the caption's top under the border and
+    its bottom clear of the foot view's outline, the callout's text between
+    the plan's outline and the foot view's, on the named dowel's height."""
+    import inspect
+
+    from _layout_geometry import Box
+
+    assert not hasattr(drawing, "FOOT_NOTE_XY")
+    assert not hasattr(drawing, "FOOT_DOWEL_CALLOUT_XY")
+    gap = drawing.FOOT_LAYOUT_GAP
+    # The leaf's caption box and the border it crossed (268.2 - 1.46).
+    caption = Box(0.2120, 0.2590, 0.2448, 0.2682)
+    border_top = 0.26674
+    foot = Box(0.2050, 0.2150, 0.2510, 0.2555)
+    dx, dy, view_dy = drawing.foot_caption_shift(border_top, foot, caption, gap)
+    placed = Box(caption.xmin + dx, caption.ymin + dy, caption.xmax + dx, caption.ymax + dy)
+    assert placed.ymax == pytest.approx(border_top - gap)
+    assert placed.xmin == pytest.approx(foot.xmin)
+    assert placed.ymin >= foot.ymax + view_dy + gap - 1e-12
+    assert view_dy <= 0.0
+    # A short foot view needs no move.
+    assert drawing.foot_caption_shift(border_top, Box(0.205, 0.215, 0.251, 0.240), caption, gap)[2] == 0.0
+
+    plan = Box(0.0600, 0.1700, 0.1500, 0.2700)
+    callout = Box(0.1760, 0.2150, 0.2260, 0.2290)
+    dowel_y = 0.2313
+    cx, cy = drawing.foot_callout_shift(plan, foot, callout, dowel_y, gap)
+    moved = Box(callout.xmin + cx, callout.ymin + cy, callout.xmax + cx, callout.ymax + cy)
+    assert moved.xmax == pytest.approx(foot.xmin - gap)
+    assert (moved.ymin + moved.ymax) / 2.0 == pytest.approx(dowel_y)
+    assert moved.xmin >= plan.xmax + gap
+    # Under the plan's counterbore callout text, which shares the field.
+    ceiling = 0.2400
+    cx, cy = drawing.foot_callout_shift(plan, foot, callout, dowel_y, gap, ceiling)
+    assert callout.ymax + cy == pytest.approx(ceiling - gap)
+    with pytest.raises(RuntimeError, match="does not fit between"):
+        drawing.foot_callout_shift(Box(0.06, 0.17, 0.19, 0.27), foot, callout, dowel_y, gap)
+    # The callout names ONE dowel: the edge pick breaks the z tie.
+    assert "center_z_mm" in inspect.signature(drawing._circular_edge).parameters
