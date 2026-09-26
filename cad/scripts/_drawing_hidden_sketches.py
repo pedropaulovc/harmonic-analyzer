@@ -33,6 +33,18 @@ The measured behaviour this code rests on (summing lever, SolidWorks 2026):
   created.  A detail created while the part shows the sketch imports its
   dimensions, and they stay visible after the part blanks it again.  Hence
   ``part_sketches_shown`` around creating and dimensioning such a view.
+- Production, twice (post_mount_screw f54309af5, leaf pms857-f543; pinion
+  lever 43bc0677a, run pc-p1r leaf 20260926T001853Z-1-52f2808a): the part
+  showed the sketch while the detail was created and curated (the detail
+  read it Visible=2, children=0), yet the targeted import delivered none of
+  its dimensions.  A derived view's items select through its BASE view's
+  qualifier (``_drawing_common._model_item_paths``), and in both drawings
+  that projected base was created while the part hid the sketch.  So the
+  r22 claim above is dead under {part shown at the detail's creation, base
+  view created hidden, targeted import}.  ``base_view`` adds the variable
+  those runs lacked: the per-view override, measured working on a projected
+  view (67cebdcd), shows the sketches in the base view too.  Untested: an
+  entire-model import into the detail.
 - r18/r19 went silent: a raw dispatch answered ``getattr(doc,
   "FeatureByName", None)`` with None, and the check returned nothing.  Every
   read is therefore logged at INFO, and nothing defaults silently.
@@ -331,9 +343,37 @@ def _set_part_sketches(
     adapter.currentModel.EditRebuild3()
 
 
+def _show_base_view_sketches(
+    adapter: Any, view: Any, sketches: Sequence[str], *, label: str
+) -> None:
+    """Show ``sketches`` per view, for good, in the projected view a derived
+    view is cut from: the derived view's items select through it."""
+    name = _dc.view_name(adapter, view)
+    orientation = str(adapter._get_attr_or_call(view, "GetOrientationName") or "")
+    if _dc.is_pictorial_orientation(orientation):
+        raise RuntimeError(
+            f"{label}: a pictorial base view {name} ({orientation}) must never "
+            f"show a reference sketch, but {list(sketches)} were asked for"
+        )
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
+        raise RuntimeError(f"failed to activate drawing view {name!r}")
+    _show_view_sketches(
+        adapter.currentModel,
+        sketches,
+        paths=_dc._model_item_paths(adapter, view),
+        label=name,
+    )
+    _telemetry.info(f"{label}: sketches {list(sketches)} shown in base view {name}")
+
+
 @contextlib.contextmanager
 def part_sketches_shown(
-    adapter: Any, part_model: Any, sketches: Sequence[str], *, label: str
+    adapter: Any,
+    part_model: Any,
+    sketches: Sequence[str],
+    *,
+    label: str,
+    base_view: Any | None = None,
 ) -> Iterator[None]:
     """Show part-hidden ``sketches`` in the drawing's open part, in memory, for
     the life of the block, then blank them again.
@@ -343,13 +383,20 @@ def part_sketches_shown(
     ``curate_view_dimensions``.  The view takes the sketches as the part
     shows them at creation, and keeps both them and their dimensions after
     the re-blank.  Every sketch the block shows must be dimensioned by a
-    curate inside it, or the block raises.  The drawing saves only itself
+    curate inside it, or the block raises.
+
+    ``base_view`` is the projected view the derived view is cut from.  The
+    derived view's items select through it, so it shows the sketches too,
+    per view, before the part does.  They stay shown there for good: r21
+    measured that a per-view re-blank hides what the import delivered.  The drawing saves only itself
     (``SaveAs3`` options 0), and the part file's SHA-256 is checked before
     and after: a change raises, because the drawing must never save the part.
     """
     path = Path(str(_early_bound(part_model, "IModelDoc2").GetPathName()))
     before = hashlib.sha256(path.read_bytes()).hexdigest()
     block = _PartShown(sketches, label)
+    if base_view is not None:
+        _show_base_view_sketches(adapter, base_view, sketches, label=label)
     _set_part_sketches(adapter, part_model, sketches, shown=True)
     _telemetry.info(f"{label}: part sketches {list(sketches)} shown in memory")
     _PART_SHOWN.append(block)
