@@ -887,12 +887,14 @@ from pinion_handle_geometry import (  # noqa: E402
 )
 from pinion_spring_geometry import (  # noqa: E402
     BEND_EXIT as SPR_BEND_EXIT_L,
+    BLADE_ARM as SPR_BLADE_ARM,
     CONTACT_T as SPR_CONTACT_T,
     CREST as SPR_CREST_L,
     FLAT_TIP as SPR_FLAT_TIP_L,
     FOOT_END as SPR_FOOT_END_L,
     FOOT_TAN as SPR_FOOT_TAN_L,
     FORMED_BAND_MM as SPR_FORMED_BAND,
+    FORMED_CORNERS as SPR_FORMED_CORNERS,
     HOLE_SPEC as SPR_HOLE_SPEC,
     HOLE_X as SPR_HOLE_X_L,
     KINK_C as SPR_KINK_C_L,
@@ -907,6 +909,7 @@ from pinion_spring_geometry import (  # noqa: E402
     STRAP_LEAN_DEG as SPR_STRAP_LEAN_DEG,
     YIELD_MPA as SPR_YIELD_MPA,
     contact_force as spr_contact_force,
+    formed_contact as spr_formed_contact,
     root_stress as spr_root_stress,
 )
 from pinion_spring_section import (  # noqa: E402
@@ -1953,8 +1956,8 @@ _PRELOAD_MARGIN = 1.5  # over gravity, at the soft corner
 _STRESS_SF = 1.5  # on yield, at the stiff corner
 # Stock corners (#859 ruling 1): the leaf is formed to the nominal inside
 # profile, so a thicker strip moves the contact face into the flank by the
-# thickness excess.  Soft: thinnest, narrowest strip at the formed band's low
-# end.  Stiff: thickest strip at the band's high end.
+# thickness excess.  Soft: thinnest, narrowest strip.  Stiff: thickest strip.
+# Each is then walked over every formed corner (below).
 _SPR_T_LO, _SPR_T_HI = (SPRING_T + _d for _d in deviations(SPRING_T_BAND))
 _SPR_W_LO = SPRING_W + printed_deviations(SPRING_W, SPRING_W_PLACES)[0]
 _SPR_STEPS = 1 + math.ceil(math.degrees(_PHI_ENG) / 0.25)
@@ -2000,26 +2003,55 @@ for _i in range(_SPR_STEPS):
     _spr_deflection.append(SPR_PRESET + SPR_PARKED_AIR - (_n - STRAP_R_END))
     _spr_station.append(_t)
 SPRING_DEFLECTION = (_spr_deflection[0], _spr_deflection[-1])  # parked, engaged
+# Every accepted formed profile (Codex #859, PRRT_kwDOPHDy386mTao2): the print
+# holds FootLen, BendR, FreeKinkH, FreeKinkV and KinkR to the formed band each,
+# independently, so each gate walks all 32 sign corners.  A corner moves the
+# free crest's penetration, the arm and the contact station by what it moves
+# them in the free profile (spr_formed_contact); those changes ride the
+# installed nominal the swing above computes.  The swing's own penetration
+# grows with the station, so a corner scales it by its station.  The stock
+# corners stay: the soft gate forms a thin, narrow strip, the stiff gate a
+# thick one (the thickness moves the crest's contact face with it).
+_SPR_FREE_NOM = spr_formed_contact()
+_SPR_SWING_DEFLECTION = SPRING_DEFLECTION[1] - SPRING_DEFLECTION[0]
+_SPR_SWING_STATION = _spr_station[-1] - _spr_station[0]
+
+
+def _spring_corner(deviations: dict[str, float], thick: float):
+    """(parked, engaged) deflection, arm, and (parked, engaged) station."""
+    penetration, arm, station = spr_formed_contact(deviations, thick)
+    parked = SPRING_DEFLECTION[0] + penetration - _SPR_FREE_NOM[0]
+    station_p = _spr_station[0] + station - _SPR_FREE_NOM[2]
+    engaged = parked + _SPR_SWING_DEFLECTION * station_p / _spr_station[0]
+    return (
+        (parked, engaged),
+        SPR_BLADE_ARM + arm - _SPR_FREE_NOM[1],
+        (station_p, station_p + _SPR_SWING_STATION),
+    )
+
+
+_spr_ratios = []
+for _dev in SPR_FORMED_CORNERS:
+    _defl, _arm, _stations = _spring_corner(_dev, _SPR_T_LO)
+    _spr_ratios.append(
+        tuple(
+            spr_contact_force(_d, _SPR_T_LO, _SPR_W_LO, _arm) * _t / _m
+            for _d, _t, _m in zip(_defl, _stations, SWING_GRAVITY_CORNER_NMM, strict=True)
+        )
+    )
 SPRING_PRELOAD_RATIO = tuple(
-    spr_contact_force(
-        _d - SPR_FORMED_BAND + (_SPR_T_LO - SPRING_T), _SPR_T_LO, _SPR_W_LO
-    )
-    * _t
-    / _m
-    for _d, _t, _m in zip(
-        SPRING_DEFLECTION,
-        (_spr_station[0], _spr_station[-1]),
-        SWING_GRAVITY_CORNER_NMM,
-        strict=True,
-    )
-)  # parked, engaged: soft-corner moment over gravity
+    min(_r[_k] for _r in _spr_ratios) for _k in range(2)
+)  # parked, engaged: the softest corner's moment over gravity
 for _label, _ratio in zip(("parked", "engaged"), SPRING_PRELOAD_RATIO, strict=True):
     if _ratio < _PRELOAD_MARGIN:
         raise AssertionError(
             f"spring preload {_ratio:.2f}x loses to gravity {_label} at the soft corner"
         )
-SPRING_STRESS_SF = SPR_YIELD_MPA / spr_root_stress(
-    SPRING_DEFLECTION[1] + SPR_FORMED_BAND + (_SPR_T_HI - SPRING_T), _SPR_T_HI
+SPRING_STRESS_SF = min(
+    SPR_YIELD_MPA / spr_root_stress(_defl[1], _SPR_T_HI, _arm)
+    for _defl, _arm, _ in (
+        _spring_corner(_dev, _SPR_T_HI) for _dev in SPR_FORMED_CORNERS
+    )
 )
 if SPRING_STRESS_SF < _STRESS_SF:
     raise AssertionError(
