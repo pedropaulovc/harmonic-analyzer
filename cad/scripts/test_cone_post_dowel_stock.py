@@ -103,3 +103,19 @@ def test_vendor_readme_lists_the_dowel() -> None:
     readme = (_MCMASTER / "README.md").read_text(encoding="utf-8")
     assert "| 98381A304 | `cone-post-dowel` |" in readme
     assert "35fe64b899c1807f6e88b717a781138962a78c24e92e548b1f0d4b250a27c6cb" in readme
+
+
+def test_drawing_is_the_purchased_reference_sheet() -> None:
+    from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
+    from _drawing_registry import DRAWINGS_BY_NAME
+
+    import draw_cone_post_dowel as drawing
+
+    spec = DRAWINGS_BY_NAME["cone_post_dowel"]
+    assert drawing.SPEC is spec
+    assert spec.artifact_stem == part.PART_NAME
+    assert spec.script == Path(drawing.__file__).resolve()
+    assert "build_purchased_fastener_drawing" in Path(drawing.__file__).read_text(
+        encoding="utf-8"
+    )
+    assert "draw_cone_post_dowel.py" in PRECISION_MIGRATED_DRAWINGS
