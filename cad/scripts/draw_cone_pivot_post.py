@@ -780,6 +780,257 @@ def _hole_callout_shelf(annotation: Any, *, label: str) -> Any:
     return shelves[0]
 
 
+# --- DIAG (diag/917-s1-rd1-width) -------------------------------------------
+# Leaf 917-s1-568f failed plan_view_group's no-fit with RD1 read as
+# 135.7 x 18.1 mm, while SolidWorks' own shelf under it runs 118.6 mm.  Is the
+# native size row really that wide, or is the audit's per-run width ESTIMATE
+# inflated?  This probe logs every display-data text run with the width
+# SolidWorks reports for it (GetTextInBoxWidthAtIndex -- layoutcheck's
+# MHA-062 reader), the audit's estimate beside it, the ink the exported PDF
+# actually printed, then raises so no cache entry is stored.  Not for merge.
+
+_PROBE_DIR = "rd1-probe"
+
+
+def _probe_pdf_spans(pdf: Any) -> list[tuple[str, float, float, float, float]]:
+    """Every PDF text object as ``(text, xmin, ymin, xmax, ymax)`` in sheet
+    metres (lower-left origin) -- origin/drawing/gdt-frame-box
+    ``_pdf_ink._text_runs``, inlined for the probe."""
+    import ctypes
+
+    import pypdfium2 as pdfium
+    import pypdfium2.raw as pdfium_raw
+
+    point_m = 0.0254 / 72.0
+    document = pdfium.PdfDocument(str(pdf))
+    try:
+        page = document[0]
+        text_page = page.get_textpage()
+        by_object: dict[int, list[tuple[str, float, float, float, float]]] = {}
+        order: list[int] = []
+        for index in range(text_page.count_chars()):
+            char = text_page.get_text_range(index, 1)
+            if (
+                not char
+                or char.isspace()
+                or pdfium_raw.FPDFText_IsGenerated(text_page.raw, index) == 1
+            ):
+                continue
+            left, bottom, right, top = text_page.get_charbox(index)
+            if right <= left or top <= bottom:
+                continue
+            owner = pdfium_raw.FPDFText_GetTextObject(text_page.raw, index)
+            key = ctypes.cast(owner, ctypes.c_void_p).value or 0
+            if key not in by_object:
+                by_object[key] = []
+                order.append(key)
+            by_object[key].append(
+                (char, left * point_m, bottom * point_m, right * point_m, top * point_m)
+            )
+    finally:
+        document.close()
+    return [
+        (
+            "".join(g[0] for g in by_object[key]),
+            min(g[1] for g in by_object[key]),
+            min(g[2] for g in by_object[key]),
+            max(g[3] for g in by_object[key]),
+            max(g[4] for g in by_object[key]),
+        )
+        for key in order
+    ]
+
+
+def _probe_rd1_width(
+    adapter: Any,
+    dowel_callout: Any,
+    annotation: Any,
+    audit: Any,
+    *,
+    name: str,
+    owner: str,
+    advance_ratio: float,
+) -> None:
+    """Measure the foot dowel callout's rows, export the sheet, then raise."""
+    import json
+    from datetime import UTC, datetime
+
+    from _common import OUT_FAILURES, capture_com_failure
+    from _drawing_common import render_pdf_png
+    from _layout_geometry import estimate_text_box
+    from diagnostics.drawing_layout_audit import _attempt, _display_data, _floats
+    from solidworks_mcp.adapters.solidworks.drawing import save_drawing
+
+    mm = 1000.0
+    runs: list[dict[str, Any]] = []
+    data = _display_data(adapter, annotation)
+    if data is None:
+        _telemetry.warn(f"rd1 probe: {owner}'s {name!r} has no IDisplayData")
+    count = int(_attempt(adapter, lambda: data.GetTextCount(), 0) or 0) if data else 0
+    for index in range(count):
+        text = str(_attempt(adapter, lambda i=index: data.GetTextAtIndex(i)) or "")
+        pos = _floats(_attempt(adapter, lambda i=index: data.GetTextPositionAtIndex(i)))
+        height = float(_attempt(adapter, lambda i=index: data.GetTextHeightAtIndex(i), 0.0) or 0.0)
+        ref = int(_attempt(adapter, lambda i=index: data.GetTextRefPositionAtIndex(i), -1) or 0)
+        angle = float(_attempt(adapter, lambda i=index: data.GetTextAngleAtIndex(i), 0.0) or 0.0)
+        width = _attempt(adapter, lambda i=index: data.GetTextInBoxWidthAtIndex(i))
+        box_height = _attempt(adapter, lambda i=index: data.GetTextInBoxHeightAtIndex(i))
+        box_style = _attempt(adapter, lambda i=index: data.GetTextInBoxStyleAtIndex(i))
+        font = _attempt(adapter, lambda i=index: data.GetTextFontAtIndex(i))
+        estimate = (
+            estimate_text_box(
+                text,
+                anchor=(pos[0], pos[1]),
+                height=height,
+                reference=ref if 0 <= ref <= 5 else 0,
+                angle=angle,
+                advance_ratio=advance_ratio,
+            )
+            if text.strip() and height > 0 and len(pos) >= 2
+            else None
+        )
+        run = {
+            "i": index,
+            "text": text,
+            "pos_mm": [round(v * mm, 2) for v in pos[:2]],
+            "h_mm": round(height * mm, 3),
+            "ref": ref,
+            "angle": round(angle, 5),
+            "font": None if font is None else str(font),
+            "inbox_w_mm": None if width is None else round(float(width) * mm, 2),
+            "inbox_h_mm": None if box_height is None else round(float(box_height) * mm, 2),
+            "inbox_style": None if box_style is None else int(box_style),
+            "est_box_mm": None if estimate is None else [round(v * mm, 1) for v in (
+                estimate.xmin, estimate.ymin, estimate.xmax, estimate.ymax
+            )],
+            "est_w_mm": None if estimate is None else round(estimate.width * mm, 2),
+        }
+        runs.append(run)
+        _telemetry.warn(f"rd1 probe run: {json.dumps(run)}")
+
+    # Row bound for every run but a row's last: where the next run starts.
+    rows: dict[float, list[dict[str, Any]]] = {}
+    for run in runs:
+        if run["est_box_mm"] is None:
+            continue
+        key = next((y for y in rows if abs(y - run["pos_mm"][1]) < 1.0), run["pos_mm"][1])
+        rows.setdefault(key, []).append(run)
+    for y, row in sorted(rows.items(), reverse=True):
+        row.sort(key=lambda r: r["pos_mm"][0])
+        for this, nxt in zip(row, row[1:]):
+            this["next_start_gap_mm"] = round(nxt["pos_mm"][0] - this["pos_mm"][0], 2)
+        est = (min(r["est_box_mm"][0] for r in row), max(r["est_box_mm"][2] for r in row))
+        measured = [
+            (r["pos_mm"][0], r["pos_mm"][0] + r["inbox_w_mm"])
+            for r in row
+            if r["inbox_w_mm"]
+        ]
+        _telemetry.warn(
+            f"rd1 probe row y={y:.1f}mm: {''.join(r['text'] for r in row)!r} "
+            f"estimate {est[0]:.1f}..{est[1]:.1f} ({est[1] - est[0]:.1f} mm); "
+            f"reported widths {[r['inbox_w_mm'] for r in row]} "
+            f"(span {min(m[0] for m in measured):.1f}..{max(m[1] for m in measured):.1f} mm)"
+            if measured
+            else f"rd1 probe row y={y:.1f}mm: {''.join(r['text'] for r in row)!r} "
+            f"estimate {est[0]:.1f}..{est[1]:.1f} ({est[1] - est[0]:.1f} mm); no reported widths"
+        )
+
+    # The DisplayDimension's own text parts (documented as not supporting
+    # hole callouts -- logged for whatever comes back).
+    parts = {
+        part: _attempt(adapter, lambda p=value: dowel_callout.GetText(p))
+        for part, value in (("prefix", 1), ("suffix", 2), ("above", 3), ("below", 4))
+    }
+    parts["lower"] = _attempt(adapter, lambda: dowel_callout.GetLowerText())
+    parts["hole_callout_variables"] = len(
+        _attempt(adapter, lambda: dowel_callout.GetHoleCalloutVariables()) or ()
+    )
+    _telemetry.warn(f"rd1 probe dimension text parts: {json.dumps(parts, default=str)}")
+
+    shelf = _hole_callout_shelf(audit, label="rd1 probe")
+    shelf_mm = (min(shelf.x0, shelf.x1) * mm, max(shelf.x0, shelf.x1) * mm)
+    audit_union = (
+        min(b.xmin for b in audit.text_boxes) * mm,
+        min(b.ymin for b in audit.text_boxes) * mm,
+        max(b.xmax for b in audit.text_boxes) * mm,
+        max(b.ymax for b in audit.text_boxes) * mm,
+    )
+    _telemetry.warn(
+        f"rd1 probe audit: {owner}'s {name!r} text union "
+        f"[{audit_union[0]:.1f},{audit_union[1]:.1f}]..[{audit_union[2]:.1f},{audit_union[3]:.1f}]mm "
+        f"({audit_union[2] - audit_union[0]:.1f} x {audit_union[3] - audit_union[1]:.1f}); "
+        f"shelf {shelf_mm[0]:.1f}..{shelf_mm[1]:.1f} ({shelf_mm[1] - shelf_mm[0]:.1f} mm); "
+        f"boxes {[box.format_mm() for box in audit.text_boxes]}"
+    )
+
+    # The sheet as printed, where dodo ships failures/ beside the leaf log.
+    out_dir = OUT_FAILURES / _PROBE_DIR / datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    pdf = out_dir / "cone-pivot-post-rd1-probe.pdf"
+    png = out_dir / "cone-pivot-post-rd1-probe.png"
+    pdf_rows: list[str] = []
+    try:
+        save_drawing(adapter, "", pdf_path=str(pdf))
+        _telemetry.warn(f"rd1 probe: sheet PDF exported to {pdf}")
+        region = (
+            audit_union[0] - 5.0,
+            audit_union[1] - 5.0,
+            audit_union[2] + 5.0,
+            audit_union[3] + 5.0,
+        )
+        for text, x0, y0, x1, y1 in _probe_pdf_spans(pdf):
+            box = (x0 * mm, y0 * mm, x1 * mm, y1 * mm)
+            if box[2] < region[0] or box[0] > region[2] or box[3] < region[1] or box[1] > region[3]:
+                continue
+            line = (
+                f"{text!r} [{box[0]:.1f},{box[1]:.1f}]..[{box[2]:.1f},{box[3]:.1f}]mm "
+                f"w {box[2] - box[0]:.1f}"
+            )
+            pdf_rows.append(line)
+            _telemetry.warn(f"rd1 probe PDF span: {line}")
+    except Exception as exc:  # noqa: BLE001 - the probe must still raise below
+        _telemetry.warn(f"rd1 probe: PDF export/read failed: {type(exc).__name__}: {exc}")
+    try:
+        render_pdf_png(pdf, png, layout=SPEC.layout)
+        _telemetry.warn(f"rd1 probe: sheet PNG rendered to {png}")
+    except Exception as exc:  # noqa: BLE001 - the PDF is the artefact that matters
+        _telemetry.warn(f"rd1 probe: PNG render failed: {type(exc).__name__}: {exc}")
+    try:
+        (out_dir / "rd1-probe.json").write_text(
+            json.dumps(
+                {
+                    "annotation": name,
+                    "owner": owner,
+                    "advance_ratio": advance_ratio,
+                    "runs": runs,
+                    "dimension_text": parts,
+                    "audit_union_mm": audit_union,
+                    "shelf_mm": shelf_mm,
+                    "pdf_spans": pdf_rows,
+                },
+                indent=2,
+                default=str,
+            ),
+            encoding="utf-8",
+        )
+    except Exception as exc:  # noqa: BLE001
+        _telemetry.warn(f"rd1 probe: JSON write failed: {exc}")
+
+    summary = "; ".join(
+        f"{r['text']!r} est {r['est_w_mm']} reported {r['inbox_w_mm']}"
+        f"{'' if 'next_start_gap_mm' not in r else ' next+' + str(r['next_start_gap_mm'])}"
+        for r in runs
+    )
+    capture_com_failure(
+        adapter,
+        "rd1-probe cone-pivot-post",
+        f"DIAG rd1 probe (deliberate, no cache entry): {owner}'s {name!r} audit "
+        f"text {audit_union[2] - audit_union[0]:.1f} mm wide vs shelf "
+        f"{shelf_mm[1] - shelf_mm[0]:.1f} mm; PDF spans {pdf_rows}; runs: {summary}",
+        api="IDisplayData.GetTextInBoxWidthAtIndex",
+        probe_dir=str(out_dir),
+    )
+
+
 def _place_foot_group(adapter: Any, foot: Any) -> None:
     """Caption the foot view and call out one dowel ream, all three planned
     together from the sheet's read-back boxes.
@@ -834,9 +1085,8 @@ def _place_foot_group(adapter: Any, foot: Any) -> None:
     rebuild_drawing(adapter, label="post dowel callout text")
     annotation = _early_bound(dowel_callout.GetAnnotation(), "IAnnotation")
     name = str(annotation.GetName())
-    read = _owned_annotations(
-        _collect_sheet(adapter, label="post dowel callout read-back"), name, foot_name
-    )
+    read_sheet = _collect_sheet(adapter, label="post dowel callout read-back")
+    read = _owned_annotations(read_sheet, name, foot_name)
     if len(read) != 1 or not read[0].text_boxes:
         raise RuntimeError(f"post dowel callout {name!r} was not read back: {read!r}")
     boxes = read[0].text_boxes
@@ -845,6 +1095,15 @@ def _place_foot_group(adapter: Any, foot: Any) -> None:
         min(box.ymin for box in boxes),
         max(box.xmax for box in boxes),
         max(box.ymax for box in boxes),
+    )
+    _probe_rd1_width(
+        adapter,
+        dowel_callout,
+        annotation,
+        read[0],
+        name=name,
+        owner=foot_name,
+        advance_ratio=read_sheet.advance_ratio,
     )
     scale = FOOT_SCALE[0] / FOOT_SCALE[1]
     plan = plan_view_group(
