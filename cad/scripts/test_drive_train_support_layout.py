@@ -629,7 +629,7 @@ def test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack() -> None:
     # the 1.5 D floor the front block keeps (rule 12).  The retired check read
     # the nominal depth only (10.25 - 0.35 = 9.90); at the printed worst case
     # the U28 block bore 9.39.  Main (#858, ruling 2): the flush setting it is
-    # drilled at carries its own error, printed on MHA-062's drilling note.
+    # drilled at carries its own error, printed on MHA-A03's SHAFT DRILL SET.
     from _printed_tolerance import printed_band_mm
     from pinion_pivot_block_geometry import BLOCK_DEPTH_PLACES
 
@@ -1123,6 +1123,7 @@ def test_the_rig_assembly_sequence_carries_each_part_step_verbatim() -> None:
         pinion_arbor_spec.ASSEMBLY_STEP,
         pinion_handle_spec.ASSEMBLY_STEP,
         pinion_cam_pin_spec.ASSEMBLY_STEP,
+        FITUP.SHAFT_DRILL_STEP,
         FITUP.RIG_SET_STEP,
         FITUP.COLLAR_SET_STEP,
         pinion_lever_pin_spec.ASSEMBLY_STEP,
@@ -1135,6 +1136,58 @@ def test_the_rig_assembly_sequence_carries_each_part_step_verbatim() -> None:
         word for step in bonds for word in step.replace(";", " ").split()
     }
     assert FITUP.ASSEMBLY_SEQUENCE.index(FITUP.RIG_SET_STEP) > 2
+    # The pins freeze the strap spacing RIG SET measures the drum from.
+    assert FITUP.ASSEMBLY_SEQUENCE.index(
+        FITUP.SHAFT_DRILL_STEP
+    ) < FITUP.ASSEMBLY_SEQUENCE.index(FITUP.RIG_SET_STEP)
+
+
+def test_the_shaft_drilling_pose_prints_once_on_the_rig_step() -> None:
+    # Main's re-ruling (2026-09-26): the pose is an assembly set-up, printed
+    # on MHA-A03 where the fitter drills, and nowhere else; MHA-062's callout
+    # carries the hole specification (its step pointer lands at integration).
+    import importlib
+    from pathlib import Path
+
+    import _config
+    import draw_pinion_pivot_shaft
+
+    pose = (
+        "REAR END FLUSH WITH MHA-061 REAR FACE",
+        "STRAPS ON BACK STOP, MHA-002 ON BACK STRAP",
+        "FEELER AT MHA-002 FRONT END",
+    )
+    scripts = Path(FITUP.__file__).resolve().parent
+    for phrase in pose:
+        # One source spells it: the step itself.
+        sources = [
+            path.name
+            for path in scripts.glob("*.py")
+            if not path.name.startswith("test_")
+            and phrase in path.read_text(encoding="utf-8")
+        ]
+        assert sources == ["pinion_rig_fitup.py"], (phrase, sources)
+        # One printed constant carries it across every part spec and the
+        # fit-up module: SHAFT_DRILL_STEP.
+        printed = [
+            f"{module.__name__}.{name}"
+            for module in (
+                FITUP,
+                *(
+                    importlib.import_module(path.stem)
+                    for path in sorted(scripts.glob("pinion_*_spec.py"))
+                ),
+            )
+            for name, value in vars(module).items()
+            if isinstance(value, str) and phrase in value
+        ]
+        assert printed == ["pinion_rig_fitup.SHAFT_DRILL_STEP"], (phrase, printed)
+    callout = draw_pinion_pivot_shaft.DIMENSION_CALLOUTS["PinHoleDia"]
+    assert not any(phrase in callout for phrase in pose)
+    assert callout.startswith("MATCH-DRILL THRU AT ASSEMBLY")
+    assert FITUP.SHAFT_DRILL_STEP.startswith(f"{FITUP.SHAFT_DRILL_NAME}: MATCH-DRILL")
+    # The step's pin number is the registry's.
+    assert FITUP.STRAP_PIN_NUMBER == _config.parts("pinion-strap-pin")["number"]
 
 
 def test_rig_margin_table_is_logged_at_build() -> None:

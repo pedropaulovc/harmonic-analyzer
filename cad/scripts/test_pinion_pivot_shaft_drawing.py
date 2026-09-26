@@ -129,9 +129,12 @@ def test_set_pin_holes_print_only_size_and_the_match_drill() -> None:
     assert not any(name.startswith("PinHole") and name.endswith("Z") for name in marked)
     callout = drawing.DIMENSION_CALLOUTS["PinHoleDia"]
     assert callout is pinion_pivot_shaft_spec.PIN_HOLE_CALLOUT
-    assert "MATCH-DRILL THRU AT ASSEMBLY" in callout
-    assert "MHA-056" in callout
-    assert "2 PL" in callout
+    # The hole specification only (Main's re-ruling, 2026-09-26): the
+    # drilling pose is MHA-A03's SHAFT DRILL SET.
+    assert callout.split("\n") == [
+        "MATCH-DRILL THRU AT ASSEMBLY",
+        "IN MHA-056 CROSS HOLES, 2 PL",
+    ]
     assert pinion_pivot_shaft_spec.PIN_HOLE_DIA == 25.4 / 16.0
     assert pinion_pivot_shaft_spec.PIN_HOLE_BAND == (0.06, 0.0)
 

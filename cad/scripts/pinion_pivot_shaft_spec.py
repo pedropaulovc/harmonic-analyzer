@@ -15,8 +15,6 @@ from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 import pinion_strap_pin_spec as _strap_pin
 from pinion_rig_layout import (
-    DRUM_END_SHIM,
-    FLUSH_SET_ERROR,
     TORQUE_SHAFT_LEN,
     TORQUE_SHAFT_PIN_HOLE_Z,
 )
@@ -59,16 +57,16 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 PIN_HOLE_DIA = _strap_pin.HOLE_DIA
 PIN_HOLE_BAND = _strap_pin.HOLE_BAND  # the spring pin's functional band
 PIN_HOLE_Z = TORQUE_SHAFT_PIN_HOLE_Z  # (front, back), pinion_rig_layout
-# The drilling set-up the pin-hole stations and both bearing stacks assume
-# (Main, restricted review of #858, rulings 2 and 3): printed on the part that
-# is drilled, not deferred to an assembly sheet.
+# The hole specification only.  The drilling set-up the pin-hole stations
+# and both bearing stacks assume is an assembly step: Main's re-ruling
+# (2026-09-26) moved it from this callout to MHA-A03's SHAFT DRILL SET
+# (pinion_rig_fitup.SHAFT_DRILL_STEP), where the fitter drills, superseding
+# the #858 restricted review's rulings 2 and 3.  The pointer to that step
+# lands at integration, from the assembly step registry.
 PIN_HOLE_CALLOUT = "\n".join(
     (
         "MATCH-DRILL THRU AT ASSEMBLY",
-        "IN MHA-056 CROSS HOLES, 2 PL:",
-        f"REAR END FLUSH WITH MHA-061 REAR FACE +/-{FLUSH_SET_ERROR:.2f},",
-        "STRAPS ON BACK STOP, MHA-002 ON BACK STRAP,",
-        f"{DRUM_END_SHIM:.2f} FEELER AT MHA-002 FRONT END",
+        "IN MHA-056 CROSS HOLES, 2 PL",
     )
 )
 

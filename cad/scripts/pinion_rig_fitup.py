@@ -10,7 +10,7 @@ import it.
 - The front block is set FRONT_BLOCK_FEELER off the front strap (+/- BAND;
   MHA-061 and the MHA-A03 fit-up), which sets the pinned cluster's end play.
 - MHA-062 is match-drilled on a DRUM_END_SHIM leaf at the drum's front end
-  (MHA-062's drilling note), which sets the drum's end play.
+  (SHAFT_DRILL_STEP), which sets the drum's end play.
 - The rig's axial datum (user ruling P1-2): with the cylinder-gear bank
   pushed north, the drum's back end is set RIG_SET_LEAF_D off the north
   MHA-027's back face before the block seats are transferred (the base's
@@ -41,6 +41,7 @@ from pinion_rig_layout import (
     FEELER_LEAF_MAX,
     FEELER_LEAF_STEP,
     FEELER_SET_ERROR,
+    FLUSH_SET_ERROR,
     FRONT_BLOCK_FEELER,
     FRONT_BLOCK_FEELER_BAND,
     RIG_SET_LEAF_D,
@@ -99,9 +100,9 @@ def _leaves_text(leaves: tuple[float, ...]) -> str:
 
 
 # The step each print carries, uppercase to match the sheets.  The base
-# carries the set-up its transfer seats are spotted in (as MHA-062's drilling
-# note does): RIG_SET_STEP is a note named by its first words, and both
-# transfer callouts name it (TRANSFER_AFTER_RIG_SET).  On the callouts it
+# carries the set-up its transfer seats are spotted in: RIG_SET_STEP is a
+# note named by its first words, and both transfer callouts name it
+# (TRANSFER_AFTER_RIG_SET).  On the callouts it
 # overflowed the sheet (pc-p1 render: through the top border, over the TOP
 # VIEW caption, section arrow A and the MHA-132 callout), and the sheet takes
 # no numbered notes (Main), so the name is the reference.
@@ -121,14 +122,38 @@ COLLAR_SET_STEP = (
     f"  BACK COLLAR BACK FACE {BACK_COLLAR_LEAF_F:.2f} OFF BACK MHA-061."
 )
 
+# MHA-062's drilling pose.  Main's re-ruling (2026-09-26, after the
+# pc-858x928b eye pass; it supersedes the #858 restricted review's rulings 2
+# and 3 that printed it on MHA-062): the fitter match-drills the shaft
+# working from MHA-A03, and the machinist making MHA-062 never drills those
+# holes, so the pose is printed where it is performed, once (policy rule 6,
+# as #857's shim note).  MHA-062's callout keeps the hole specification; its
+# "SEE MHA-A03 STEP n" pointer lands at integration, generated from the
+# assembly step registry, never a hand-typed step name or number.  The pose
+# is what fixes the pin-hole stations -- the shaft prints none -- and its two
+# set errors ride the bearing stacks by name (pinion_rig_layout).
+SHAFT_DRILL_NAME = "SHAFT DRILL SET"
+STRAP_PIN_NUMBER = "MHA-145"
+SHAFT_DRILL_STEP = "\n".join(
+    (
+        f"{SHAFT_DRILL_NAME}: MATCH-DRILL MHA-062 THRU MHA-056 CROSS HOLES, 2 PL,",
+        f"MHA-062 REAR END FLUSH WITH MHA-061 REAR FACE +/-{FLUSH_SET_ERROR:.2f},",
+        "STRAPS ON BACK STOP, MHA-002 ON BACK STRAP,",
+        f"{DRUM_END_SHIM:.2f} FEELER AT MHA-002 FRONT END; DRIVE {STRAP_PIN_NUMBER} PINS.",
+    )
+)
+
 # The rig's assembly steps in order.  The three LOCTITE 638 bonds come first:
-# RIG SET measures from the drum's back end, so the drum joint must be made
-# before it.  MHA-135 is driven last, through the lever hub and lift rod
-# match-drilled with the grip parked, once the collars are set.
+# the shaft is drilled with MHA-002 on the back strap, and RIG SET measures
+# from the drum's back end, so the drum joint must be made before either.
+# The shaft is pinned before RIG SET: the pins freeze the strap spacing the
+# drum's back end is set from.  MHA-135 is driven last, through the lever hub
+# and lift rod match-drilled with the grip parked, once the collars are set.
 ASSEMBLY_SEQUENCE = (
     pinion_arbor_spec.ASSEMBLY_STEP,
     pinion_handle_spec.ASSEMBLY_STEP,
     pinion_cam_pin_spec.ASSEMBLY_STEP,
+    SHAFT_DRILL_STEP,
     RIG_SET_STEP,
     COLLAR_SET_STEP,
     pinion_lever_pin_spec.ASSEMBLY_STEP,
@@ -152,7 +177,10 @@ __all__ = [
     "RIG_SET_LEAVES",
     "RIG_SET_NAME",
     "RIG_SET_STEP",
+    "SHAFT_DRILL_NAME",
+    "SHAFT_DRILL_STEP",
     "SINGLE_LEAF_SETTINGS",
     "SPRING_PAD_LEAF",
+    "STRAP_PIN_NUMBER",
     "TRANSFER_AFTER_RIG_SET",
 ]

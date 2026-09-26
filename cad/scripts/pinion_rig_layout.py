@@ -66,7 +66,7 @@ FRONT_BLOCK_FEELER = 0.25
 FRONT_BLOCK_FEELER_BAND = 0.10
 # The drum turns between the pinned straps, so it needs running clearance:
 # the shaft is match-drilled with a feeler as a shim at the drum's FRONT end
-# (MHA-062's drilling note), freezing the strap spacing at the drum plus the
+# (MHA-A03's SHAFT DRILL SET), freezing the strap spacing at the drum plus the
 # shim.  The drum then runs in DRUM_END_SHIM +/- DRUM_END_SHIM_SET_ERROR of end
 # play (pinion_arbor_geometry.drum_total_air), set with the same band as the
 # front-block feeler.  The shim is the smallest 0.05 blade whose tightest
@@ -77,7 +77,7 @@ DRUM_END_SHIM = 0.45
 DRUM_END_SHIM_SET_ERROR = FRONT_BLOCK_FEELER_BAND
 # The shaft is set for that drill with its rear end flush with MHA-061's rear
 # face.  The SR crown keeps a straightedge off the crown root, so the setting
-# carries its own error, printed on the drilling note.
+# carries its own error, printed on that step.
 FLUSH_SET_ERROR = 0.10
 
 # Every fit-up setting is a stock leaf (or a pair of leaves) of one purchased

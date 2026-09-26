@@ -687,13 +687,12 @@ def test_drum_runs_in_the_shim_the_straps_were_drilled_on() -> None:
     # Main (#858, ruling 3): the E-a pins freeze the strap spacing where the
     # shaft is match-drilled, so the drum's running clearance is whatever the
     # drilling set-up leaves.  It is set with the rig's one feeler as a shim at
-    # the drum's front end, which MHA-062's drilling note prints; the drum
+    # the drum's front end, which MHA-A03's SHAFT DRILL SET prints; the drum
     # then runs in 0.25 +/- 0.10 of end play and never binds.  Before the
     # ruling the straps closed line to line on the drum, and drum_total_air
     # still read the block-stop model (0.0 up to the whole feeler).  The shim
     # is a 0.45 blade, not the rig's 0.25 feeler: the drum keeps its 0.1
     # floor with RIG_MARGIN_SPARE to spare (Main, #858).
-    import pinion_pivot_shaft_spec as shaft
     import pinion_rig_layout as rig
 
     assert spec.drum_total_air() == pytest.approx((0.35, 0.55))
@@ -708,14 +707,15 @@ def test_drum_runs_in_the_shim_the_straps_were_drilled_on() -> None:
     )
     assert spec.drum_total_air()[0] - spec.MIN_END_PLAY >= rig.RIG_MARGIN_SPARE - 1e-9
     assert rig.DRUM_FRONT_Z - rig.STRAP_Z_INNER[0] == pytest.approx(rig.DRUM_END_SHIM)
-    # The drilling pose is printed on the part that is drilled.
-    callout = shaft.PIN_HOLE_CALLOUT.split("\n")
-    assert callout == [
-        "MATCH-DRILL THRU AT ASSEMBLY",
-        "IN MHA-056 CROSS HOLES, 2 PL:",
-        "REAR END FLUSH WITH MHA-061 REAR FACE +/-0.10,",
+    # The drilling pose is printed where the fitter drills: MHA-A03's
+    # SHAFT DRILL SET (Main's re-ruling, 2026-09-26).
+    import pinion_rig_fitup as fitup
+
+    assert fitup.SHAFT_DRILL_STEP.split("\n") == [
+        "SHAFT DRILL SET: MATCH-DRILL MHA-062 THRU MHA-056 CROSS HOLES, 2 PL,",
+        "MHA-062 REAR END FLUSH WITH MHA-061 REAR FACE +/-0.10,",
         "STRAPS ON BACK STOP, MHA-002 ON BACK STRAP,",
-        "0.45 FEELER AT MHA-002 FRONT END",
+        "0.45 FEELER AT MHA-002 FRONT END; DRIVE MHA-145 PINS.",
     ]
     # Both bearing stacks carry the flush setting, and the front one the
     # shim's set error, by name.
