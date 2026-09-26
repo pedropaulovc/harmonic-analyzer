@@ -19,14 +19,14 @@ from _hole_spec import THREAD_MAJOR_MM
 
 def test_pack_is_cut_to_the_block_foot_face_at_the_nominal_stack() -> None:
     """U30 / handoff item 3 / I31: the block's width, from the foot flange's
-    south end to the heel relief's inner face (15.0 x 31.27), at
+    south end to the heel relief's inner face (15.0 x 32.97), at
     SHIM_NOMINAL."""
     assert spec.SHIM_X == block.BLOCK_X
     assert spec.SHIM_SOUTH_Z == pytest.approx(-block.BLOCK_Z / 2.0 - block.FLANGE_LEN)
     assert spec.SHIM_NORTH_Z == pytest.approx(
         block.BLOCK_Z / 2.0 - block.HEEL_RELIEF_DEPTH
     )
-    assert spec.SHIM_Z == pytest.approx(31.27)
+    assert spec.SHIM_Z == pytest.approx(32.97)
     assert spec.SHIM_T == block.SHIM_NOMINAL == 1.10
     assert spec.STACK_RANGE_MM == block.FOOT_SHIM_RANGE_MM
     low, high = spec.STACK_RANGE_MM
@@ -61,7 +61,7 @@ def test_closed_end_stays_north_of_every_screw_position() -> None:
     reach north of that edge runs through the block's printed bands and its
     float in the flange slot.  The radius end, at its narrowest and at its
     location's long limit, still passes it."""
-    nominal = (12.0 - 1.53) + 10.7 - 8.42 / 2.0
+    nominal = (12.0 - 1.53) + 11.5 - 10.12 / 2.0
     assert spec.FLANGE_SLOT_NORTH_CENTRE_FROM_NORTH == pytest.approx(nominal)
     reach = nominal - (0.51 + 0.8 + 0.8 + 0.51 / 2.0 + block.FLANGE_SLOT_FLOAT)
     assert spec.SCREW_NORTH_REACH_FROM_NORTH == pytest.approx(reach)

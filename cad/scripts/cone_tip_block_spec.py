@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 import _config
+import cone_pivot_post_spec
 from _fit_limits import deviations
 from _gtol_spec import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
@@ -44,11 +45,12 @@ SLIT_DEPTH = BLOCK_HEIGHT - SLIT_FLOOR
 # both mouths, and no block growth.  A through tap has no floor to break out
 # and no tap lead to deduct; the shaft tip enters through the same thread.
 # The cup rim sits ADJUSTER_EMBED in from the north face (the 3/8 screw stands
-# 0.03 proud).  Worst case at the printed bands: the tip station can come
-# 0.8 north (the shaft's .X overall length), and the north countersink eats
-# its depth, so engagement is min(L, embed - 0.8) - countersink >= 1.5D.  The
-# block's own axial location is set at fit-up (integration item "tip-block
-# axial fit-up slot"), not stacked.
+# 0.03 proud).  The block's own axial location is set at fit-up: it slides in
+# its flange slot until the cup, at ADJUSTER_EMBED, seats on the tip, so every
+# pre-fit-up band is taken by the slot (FIT_UP_CHAIN_MM below), not by the
+# cup.  What the cup still sees is EMBED_RESIDUAL_MM, and the north
+# countersink eats its depth, so engagement is
+# min(L, embed - residual) - countersink >= 1.5D.
 ADJUSTER_THREAD = "#10-32"
 ADJUSTER_SCREW_LENGTH = 9.525
 ADJUSTER_EMBED = 9.5
@@ -172,9 +174,19 @@ if WORST_PINCH_ENGAGEMENT_MM < 1.5 * THREAD_MAJOR_MM[PINCH_THREAD]:
     )
 if PINCH_SCREW_LENGTH > round(BLOCK_X, 1) - _GENERAL_1PL_MM:
     raise AssertionError("pinch screw can stand proud of the far (-X) face")
+# The post-fit-up residual (#917 (b), Main 2026-09-26).  The fitter slides
+# the block until the cup seats and locks it, to FITUP_SEAT_RESOLUTION; the
+# end play is then set by turning the cup, at most ADJUSTER_END_PLAY_TURNS of
+# its own thread.  The pre-fit-up bands (tip station, post boss face,
+# transfer, block and plate stations) are the flange slot's job, proven
+# against it below, so none of them reaches the cup's window.
+FITUP_SEAT_RESOLUTION = 0.25
+ADJUSTER_END_PLAY_TURNS = 1.0 / 8.0
+ADJUSTER_END_PLAY_MM = ADJUSTER_END_PLAY_TURNS * _ADJ_PITCH_MM
+EMBED_RESIDUAL_MM = FITUP_SEAT_RESOLUTION + ADJUSTER_END_PLAY_MM
 # E11/W1: the through thread is the whole block, so the screw is the limit.
 WORST_ADJUSTER_ENGAGEMENT_MM = (
-    min(ADJUSTER_SCREW_LENGTH, ADJUSTER_EMBED - _GENERAL_1PL_MM) - ADJUSTER_CSK
+    min(ADJUSTER_SCREW_LENGTH, ADJUSTER_EMBED - EMBED_RESIDUAL_MM) - ADJUSTER_CSK
 )
 if WORST_ADJUSTER_ENGAGEMENT_MM < 1.5 * THREAD_MAJOR_MM[ADJUSTER_THREAD]:
     raise AssertionError(
@@ -185,15 +197,15 @@ if WORST_ADJUSTER_ENGAGEMENT_MM < 1.5 * THREAD_MAJOR_MM[ADJUSTER_THREAD]:
 # shallow end = 1.5D of full thread under the north countersink; deep end = the
 # cup rim still on full thread above the south countersink with the block at
 # its .X-short depth.  Fit-up sets the block so the cup seats at
-# ADJUSTER_EMBED; end-play turns (1/8 turn = 0.099) move it inside the window.
+# ADJUSTER_EMBED; the residual above moves it inside the window.
 ADJUSTER_EMBED_WINDOW = (
     1.5 * THREAD_MAJOR_MM[ADJUSTER_THREAD] + ADJUSTER_CSK,
     round(BLOCK_Z, 1) - _GENERAL_1PL_MM - ADJUSTER_CSK,
 )
 if not (
     ADJUSTER_EMBED_WINDOW[0]
-    <= ADJUSTER_EMBED - _GENERAL_1PL_MM
-    <= ADJUSTER_EMBED + _GENERAL_1PL_MM
+    <= ADJUSTER_EMBED - EMBED_RESIDUAL_MM
+    <= ADJUSTER_EMBED + EMBED_RESIDUAL_MM
     <= ADJUSTER_EMBED_WINDOW[1]
 ):
     raise AssertionError("adjuster embed band leaves its working window")
@@ -237,15 +249,23 @@ FLANGE_SLOT_FLOAT = (FLANGE_SLOT_W_MAX - _HOLDDOWN_MAJOR_MM) / 2.0
 # Fit-up chain: how far the screw can sit from where the block needs it,
 # along the axis.  The block's north face follows the shaft tip (the cup seats
 # at ADJUSTER_EMBED), so the chain runs tip -> north face -> south face ->
-# flange-slot centre -> screw -> plate slot centre: the shaft's overall
-# length Sec4End (.X; asserted against the shaft spec in
-# build_drive_train_assembly), the block Depth (.X), FlangeSlotZ (.X), the
-# plate's TipSlotZ station (.XX; asserted against the platform spec there
-# too) and the screw's float across the plate's 4.0 +0.10 slot.
+# flange-slot centre -> screw -> plate slot centre: the shaft's tip station
+# Sec4End (.X, from the collar face since #917 R5 (a); asserted against the
+# shaft spec in build_drive_train_assembly), the block Depth (.X),
+# FlangeSlotZ (.X), the plate's TipSlotZ station (.XX; asserted against the
+# platform spec there too) and the screw's float across the plate's 4.0 +0.10
+# slot.  The shaft itself is located by its collar (#914) on the post's north
+# boss face, so the tip also carries that face's band (ConeBossLen's places,
+# read from the post spec) and the post's own placement, set by gauge pin in
+# the journal when its pattern is transferred to the plate (#917).
 SHAFT_OVERALL_LENGTH_PLACES = 1
 BLOCK_DEPTH_PLACES = 1
 FLANGE_SLOT_Z_PLACES = 1
 PLATE_TIP_SLOT_Z_PLACES = 2
+POST_BOSS_FACE_PLACES = cone_pivot_post_spec.DRAWING_PRECISION["ConeShaftBoss"][
+    "ConeBossLen"
+]
+POST_TRANSFER_MM = 0.05
 PLATE_TIP_SLOT_W = 4.0
 PLATE_TIP_SLOT_W_PLUS = _DRILLED_HOLE_PLUS_MM
 PLATE_TIP_SLOT_FLOAT = (
@@ -257,6 +277,8 @@ FIT_UP_CHAIN_MM = (
     + _BAND_BY_PLACES[FLANGE_SLOT_Z_PLACES]
     + _BAND_BY_PLACES[PLATE_TIP_SLOT_Z_PLACES]
     + PLATE_TIP_SLOT_FLOAT
+    + _BAND_BY_PLACES[POST_BOSS_FACE_PLACES]
+    + POST_TRANSFER_MM
 )
 FIT_UP_MARGIN_MM = 1.0
 FLANGE_SLOT_HALF_TRAVEL = FIT_UP_CHAIN_MM + FIT_UP_MARGIN_MM

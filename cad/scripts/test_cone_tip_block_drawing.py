@@ -37,14 +37,34 @@ def test_adjuster_thread_is_tapped_through_with_no_floor() -> None:
 
 
 def test_adjuster_engagement_closes_at_the_printed_worst_case() -> None:
-    """min(L, embed - .X) - countersink >= 1.5D; the cup stays on full thread."""
+    """min(L, embed - residual) - countersink >= 1.5D; the cup stays on full
+    thread.  #917 (b), Main 2026-09-26: the flange slot takes every
+    pre-fit-up band, so the cup only sees what fit-up leaves -- the fitter's
+    slide-and-seat resolution plus 1/8 turn of end play on the adjuster's
+    own thread."""
     spec = cone_tip_block_spec
-    assert spec.WORST_ADJUSTER_ENGAGEMENT_MM == pytest.approx(8.2193)
+    assert spec.FITUP_SEAT_RESOLUTION == 0.25
+    assert spec.ADJUSTER_END_PLAY_TURNS == 1.0 / 8.0
+    assert spec.ADJUSTER_END_PLAY_MM == pytest.approx(25.4 / 32.0 / 8.0)
+    residual = spec.FITUP_SEAT_RESOLUTION + spec.ADJUSTER_END_PLAY_MM
+    assert spec.EMBED_RESIDUAL_MM == pytest.approx(residual)
+    assert spec.WORST_ADJUSTER_ENGAGEMENT_MM == pytest.approx(
+        min(9.525, 9.5 - residual) - spec.ADJUSTER_CSK
+    )
     assert spec.WORST_ADJUSTER_ENGAGEMENT_MM >= 1.5 * 4.826
     assert spec.ADJUSTER_CSK_DIA > 4.826
     assert spec.ADJUSTER_EMBED_WINDOW == pytest.approx((7.7197, 10.7193))
     low, high = spec.ADJUSTER_EMBED_WINDOW
-    assert low <= spec.ADJUSTER_EMBED - 0.8 <= spec.ADJUSTER_EMBED + 0.8 <= high
+    assert (
+        low
+        <= spec.ADJUSTER_EMBED - residual
+        <= spec.ADJUSTER_EMBED + residual
+        <= high
+    )
+    # Neither the pitch fraction nor the old tip band is typed in.
+    source = Path(spec.__file__).read_text(encoding="utf-8")
+    assert "0.099" not in source
+    assert "ADJUSTER_EMBED - _GENERAL_1PL_MM" not in source
     assert drawing.ADJUSTER_CSK_QUALIFIER == "90° CSK Ø5.0 BOTH ENDS"
 
 
@@ -429,26 +449,40 @@ def test_plan_values_stand_off_the_part_and_each_other() -> None:
 
 
 def test_flange_slot_travel_is_built_from_the_fit_up_chain() -> None:
-    """Main I31 ruling: slot travel +-(3.21 + 1) from named grade constants."""
+    """Main I31 ruling: slot travel +-(chain + 1) from named grade constants.
+    #917 (b): the collar (#914) seats the shaft on the post's north boss face,
+    so the tip station also carries that face's band, and the post is set by
+    gauge pin at the pattern transfer (#917)."""
+    import cone_pivot_post_spec as post
+
     spec = cone_tip_block_spec
     general = {1: 0.8, 2: 0.51}
+    assert (
+        spec.POST_BOSS_FACE_PLACES
+        == post.DRAWING_PRECISION["ConeShaftBoss"]["ConeBossLen"]
+    )
+    assert spec.POST_TRANSFER_MM == 0.05
     chain = (
         general[spec.SHAFT_OVERALL_LENGTH_PLACES]
         + general[spec.BLOCK_DEPTH_PLACES]
         + general[spec.FLANGE_SLOT_Z_PLACES]
         + general[spec.PLATE_TIP_SLOT_Z_PLACES]
         + spec.PLATE_TIP_SLOT_FLOAT
+        + general[spec.POST_BOSS_FACE_PLACES]
+        + spec.POST_TRANSFER_MM
     )
-    assert spec.FIT_UP_CHAIN_MM == pytest.approx(chain) == pytest.approx(3.2075)
+    assert spec.FIT_UP_CHAIN_MM == pytest.approx(chain) == pytest.approx(4.0575)
     assert spec.PLATE_TIP_SLOT_FLOAT == pytest.approx((4.0 + 0.10 - 3.505) / 2.0)
     assert spec.FIT_UP_MARGIN_MM == 1.0
-    assert spec.FLANGE_SLOT_HALF_TRAVEL == pytest.approx(4.2075)
-    assert spec.FLANGE_SLOT_CTOC == 8.42
-    # The spacing's short limit plus the screw's float still spans the chain.
-    assert (8.42 - 0.51) / 2.0 + spec.FLANGE_SLOT_FLOAT >= spec.FIT_UP_CHAIN_MM
+    assert spec.FLANGE_SLOT_HALF_TRAVEL == pytest.approx(5.0575)
+    assert spec.FLANGE_SLOT_CTOC == 10.12
+    # The chain is proven where it is absorbed: the spacing's short limit
+    # plus the screw's float still spans it.
+    assert (10.12 - 0.51) / 2.0 + spec.FLANGE_SLOT_FLOAT >= spec.FIT_UP_CHAIN_MM
     # The literal is never typed: the source builds it from the grades.
     source = Path(spec.__file__).read_text(encoding="utf-8")
-    assert "3.21" not in source
+    assert "4.06" not in source
+    assert "4.0575" not in source
     assert spec.DRAWING_PRECISION["BlockProfile"]["Depth"] == spec.BLOCK_DEPTH_PLACES
     assert (
         spec.DRAWING_PRECISION["FlangeSlotZReference"]["FlangeSlotZ"]
@@ -478,18 +512,18 @@ def test_flange_slot_is_one_pass_of_a_five_thirty_second_end_mill() -> None:
 def test_flange_webs_and_nut_clear_the_2_0_target_at_the_printed_limits() -> None:
     """U27 webs and the nut beside the body's south wall, worst case."""
     spec = cone_tip_block_spec
-    assert (spec.FLANGE_SLOT_Z, spec.FLANGE_LEN, spec.FLANGE_T) == (10.7, 20.8, 3.50)
+    assert (spec.FLANGE_SLOT_Z, spec.FLANGE_LEN, spec.FLANGE_T) == (11.5, 22.5, 3.50)
     slot_max = spec.FLANGE_SLOT_W + 0.10
-    half_ctoc_max = (8.42 + 0.51) / 2.0
+    half_ctoc_max = (10.12 + 0.51) / 2.0
     # The slot is located .XX from +X; the flange's 15.0 width is .X.
     assert spec.WORST_FLANGE_SIDE_WEB_MM == pytest.approx(
         min(7.5 - 0.51, 15.0 - 0.8 - (7.5 + 0.51)) - slot_max / 2.0
     )
     assert spec.WORST_FLANGE_END_WEB_MM == pytest.approx(
-        20.8 - 0.8 - (10.7 + 0.8 + half_ctoc_max + slot_max / 2.0)
+        22.5 - 0.8 - (11.5 + 0.8 + half_ctoc_max + slot_max / 2.0)
     )
     assert spec.WORST_FLANGE_ROOT_WEB_MM == pytest.approx(
-        10.7 - 0.8 - half_ctoc_max - slot_max / 2.0
+        11.5 - 0.8 - half_ctoc_max - slot_max / 2.0
     )
     for web in (
         spec.WORST_FLANGE_SIDE_WEB_MM,
