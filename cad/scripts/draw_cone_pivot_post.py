@@ -33,7 +33,6 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, OUT_FAILURES, _early_bound, check, run_build
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
@@ -42,7 +41,6 @@ from _drawing_common import (
     add_surface_finish,
     add_view_centerline,
     assert_imported_precision,
-    curate_view_dimensions,
     create_section_view,
     dimension_name,
     finalize_drawing,
@@ -60,8 +58,8 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
     stamp_drawing_summary,
     visible_view_entities,
-    view_name,
 )
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from cone_pivot_post_spec import (
@@ -359,35 +357,6 @@ def _model_face_evidence(
             f"cone pivot post final BREP {feature}: {surfaces!r}"
         )
     return rows
-
-
-def _hide_witness_sketch(adapter: Any, view: Any, sketch_name: str) -> None:
-    """Hide one model sketch in one drawing view, retaining imported dimensions."""
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    typed_view = _early_bound(view, "IView")
-    name = view_name(adapter, typed_view)
-    if not drawing.ActivateView(name):
-        raise RuntimeError(f"failed to activate {name!r} to hide {sketch_name}")
-    root = typed_view.RootDrawingComponent2(False)
-    if root is None:
-        raise RuntimeError(f"{name!r} has no drawing component for {sketch_name}")
-    component = str(_early_bound(root, "IDrawingComponent").Name)
-    qualified = f"{sketch_name}@{component}@{name}"
-    draw.ClearSelection2(True)
-    if not draw.Extension.SelectByID2(
-        qualified, "SKETCH", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
-    ):
-        raise RuntimeError(f"failed to select drawing witness sketch {qualified!r}")
-    # BlankSketch is a VT_VOID mutator.  Its drawing-view override has no
-    # corresponding getter: IFeature.Visible reports the model feature's
-    # global state, not the per-view override (and therefore remains "shown").
-    # The selected qualified path above is the API's documented call form; the
-    # exported sheet is the authoritative read-back for this view-local change.
-    draw.BlankSketch()
-    rebuild_drawing(adapter, label=f"hide {sketch_name} in {name}")
-    draw.ClearSelection2(True)
-    _telemetry.info(f"drawing witness sketch blanked in view: {qualified}")
 
 
 def _assert_view_geometry(
@@ -1228,16 +1197,12 @@ async def build(adapter: Any) -> dict[str, str]:
         journal_annotations,
         {"JournalAxisY": (0.190, 0.157), "CrankAboveCone": (0.193, 0.183)},
     )
-    # The plan must retain JournalPlanReference: its two native centreline rays
-    # and imported dimensions carry the spotface station and 12.52-degree bore
-    # azimuth.  Other projections have no use for that witness geometry.
-    for view in (front, journal, iso):
-        _hide_witness_sketch(adapter, view, "JournalPlanReference")
-    # The cone-axis view keeps BoreSpacingReference: its centreline joins the
-    # two bore centres and carries the spacing.  Elsewhere it only doubles the
-    # post axis.
-    for view in (front, top, iso):
-        _hide_witness_sketch(adapter, view, "BoreSpacingReference")
+    # The part saves both reference sketches hidden (#880); the curates above
+    # showed each in the one view that dimensions it.  The plan shows
+    # JournalPlanReference: its two native centreline rays carry the spotface
+    # station and the 12.52-degree bore azimuth.  The cone-axis view shows
+    # BoreSpacingReference: its centreline joins the two bore centres and
+    # carries the spacing.  Every other view keeps the part's hidden state.
     for view, label in ((front, "front"), (top, "top"), (journal, "cone journal")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to the {label} view")

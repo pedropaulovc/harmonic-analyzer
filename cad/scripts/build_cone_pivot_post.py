@@ -33,6 +33,7 @@ from _common import (
     _early_bound,
     apply_color,
     apply_material,
+    blank_sketch,
     check,
     define_circle,
     drive_dimension,
@@ -916,6 +917,11 @@ async def build(adapter: Any) -> dict[str, str]:
             ("mount east", "AXIS"),
         ),
     )
+    # The reference sketches own printed dimensions but no geometry: hide them
+    # so no assembly instance renders them (#880).  The drawing shows each in
+    # the one view that dimensions it through _drawing_hidden_sketches.
+    for sketch in ("JournalPlanReference", "BoreSpacingReference"):
+        blank_sketch(adapter, sketch)
     return await save_part_and_images(adapter, PART_NAME)
 
 

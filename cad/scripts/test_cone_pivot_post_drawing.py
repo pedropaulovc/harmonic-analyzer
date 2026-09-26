@@ -209,10 +209,32 @@ def test_the_plan_angle_is_model_geometry_not_sheet_text() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'plan.record("InclineAngle", \'"ConeIncline"\')' in source
     assert "add_angular_reference_dimension" not in source
-    # A blanked sketch's dimensions never reach InsertModelAnnotations3.
-    assert "JournalPlanReference" not in source.split(
-        "_blank_reference_geometry(\n        adapter,"
-    )[1]
+
+
+def test_part_hidden_reference_sketches_print_from_one_model_view_each() -> None:
+    """The part saves its two reference sketches hidden (#880).
+
+    ``_drawing_hidden_sketches`` shows an owner sketch per view in a MODEL
+    view only: a derived view (the A section) takes the part's hidden state
+    at creation and refuses the per-view show, so it could not print their
+    dimensions.  Each sketch is dimensioned by exactly one view, which is the
+    one view that shows its witness geometry.
+    """
+    assert drawing.curate_view_dimensions.__module__ == "_drawing_hidden_sketches"
+    model_views = {
+        "front": drawing.FRONT_KEEP,
+        "top": drawing.TOP_KEEP,
+        "cone journal": drawing.JOURNAL_KEEP,
+    }
+    shown_in = {}
+    for sketch in ("JournalPlanReference", "BoreSpacingReference"):
+        owned = spec.DRAWING_DIMENSIONS[sketch]
+        assert not owned & set(drawing.SECTION_KEEP), sketch
+        shown_in[sketch] = [view for view, keep in model_views.items() if owned & set(keep)]
+    assert shown_in == {
+        "JournalPlanReference": ["top"],
+        "BoreSpacingReference": ["cone journal"],
+    }
 
 
 def test_machined_faces_are_called_out_on_the_casting() -> None:
