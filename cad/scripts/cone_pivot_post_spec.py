@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import math
 
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
 
@@ -137,7 +137,7 @@ RUNNING_BORE_BAND = (0.005, -0.025)
 # 0.28 - 0.517 * (0.002 + 0.078 + 0.043) = 0.216, and at +0.368 it is
 # 0.28 + 0.517 * (0.364 + 0.078 + 0.048) = 0.533: the drive-train sheet's
 # 0.20-0.55 acceptance.  Printed 39.33 +0.37/0 (aim 39.51) is the post's one
-# tight band, held by boring both journals in one setup (DRAWING_NOTES); a
+# tight band; how the shop holds it is theirs (policy rule 6); a
 # post bored outside it is rescued by opening the crank bore for an eccentric
 # bushing, not scrapped.
 CRANK_ABOVE_CONE = CRANK_BORE_HEIGHT - BORE_HEIGHT
@@ -212,7 +212,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ConeBossProfile": {"JournalAxisY": 2, "ConeBossDia": 1},
     "ConeShaftBoss": {"ConeBossLen": 1},
     "JournalBoreProfile": {"JournalBoreDia": 3},
-    "JournalPlanReference": {"CrankBossStartZ": 2, "InclineAngle": 1},
+    # BASIC since #906: it feeds the crank bore's angularity frame, so it
+    # prints the model's exact angle.
+    "JournalPlanReference": {"CrankBossStartZ": 2, "InclineAngle": 4},
     "BoreSpacingReference": {"CrankAboveCone": 2},
 }
 
@@ -237,12 +239,39 @@ DRAWING_NOTES = "\n".join(
     (
         "CRANK BORE CARRIES MHA-026, CONE BORE MHA-014; FOOT ON MHA-091.",
         "CONE BOSS END FACES ARE SYMMETRIC ABOUT THE POST AXIS.",
-        "BORE BOTH IN ONE SETUP; INSPECT BORE-TO-BORE BEFORE UNCLAMPING.",
         "DRILL MOUNTING HOLES FROM TOP FACE; CHECK CONE BORE AT BREAKOUT.",
     )
 )
 
-# The post carries no datums or feature-control frames under the drawing
-# simplicity policy: nothing on it is the cam/follower mate, and its two
-# running fits are held by size limits, not by position frames.
+# One frame, on the rule-3 allowlist since #906 (USER RULING 2026-09-26,
+# option ii): the crank bore's orientation to the cone journal.  The 16T:64T
+# crossed mesh loses backlash to yaw and tilt of the crank axis -- the #906
+# pose study (dt-logs/crankhub/crank-mesh-angle-20260926.jsonl) measured
+# -0.100 at 1 deg of yaw and -0.041 at 1 deg of tilt, more than the fit-up
+# bushing can spare -- and a +/- on a dimension cannot hold an axis's
+# direction in two planes at once.  A diametral zone of CRANK_BORE_ANGULARITY_MM
+# over the boss holds both to about 0.08 deg; the basic angle is the plan
+# angle the print already carries.  The running fits stay size limits.
+# Datum A alone leaves the zone free to turn about the journal axis, which
+# bounds the plan angle but not tilt; the foot seat as secondary datum B
+# clocks it, so the same zone holds tilt too.
+CRANK_BORE_ANGULARITY_MM = 0.10
+CRANK_BORE_ANGLE_LIMIT_DEG = math.degrees(
+    math.atan(CRANK_BORE_ANGULARITY_MM / CRANK_BOSS_LENGTH)
+)
+PART_DATUMS = (
+    PartDatum("A", CylinderFace(BORE_DIA, contains_y_mm=BORE_HEIGHT)),
+    PartDatum("B", PlanarFace((0, -1, 0), 0.0)),
+)
+GEOMETRIC_CONTROLS = (
+    GeometricControl(
+        "crank_bore_angularity",
+        "angularity",
+        f"{CRANK_BORE_ANGULARITY_MM:.2f}",
+        CylinderFace(CRANK_BORE_DIA, contains_y_mm=CRANK_BORE_HEIGHT),
+        datums=("A", "B"),
+        tolerance_zone="diametral",
+    ),
+)
+BASIC_DIMENSIONS = frozenset({"InclineAngle"})
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {}

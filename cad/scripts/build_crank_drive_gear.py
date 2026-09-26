@@ -99,9 +99,11 @@ from _part_pmi import author_part_pmi
 from crank_drive_gear_notes import DRAWING_NOTES, GEAR_DATA
 from retained_joint_fit import RETAINED_JOINT_CLEARANCE, bonded_bore_band
 from crank_drive_gear_spec import (
+    CUTTER_DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     OUTSIDE_DIA,
+    PRESSURE_ANGLE_DEG,
     SURFACE_FINISHES,
 )
 
@@ -145,7 +147,7 @@ MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass trai
 
 TEETH = 64  # Appendix C #9 estimate, photo-ratified 2026-07-14 (see docstring)
 DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine/gear_train.yaml
-PA_DEG = 14.5
+PA_DEG = PRESSURE_ANGLE_DEG  # transverse, from the normal-plane cutter (spec)
 FACE_WIDTH = 8.0  # mm, p.20 photo-proportioned (low).  Symmetric narrowing
 # retains the rederived centre/mesh axes and clears the fixed v2 post boss.
 # M6.7: seated perpendicular on the cone shaft's 3/8" pivot journal
@@ -210,10 +212,13 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
+    # Normal-defined (#906): the transverse DP/PA place the involute, the
+    # cutter's DP sets the depth.
     volume = await build_fixed_gear(
         adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG,
         helix_deg=HELIX_DEG,
         backlash_mm=BACKLASH_MM, root_relief=True,
+        depth_dp=CUTTER_DIAMETRAL_PITCH,
     )
 
     # build_fixed_gear is shared by five recipes, so it leaves the blank under

@@ -10,6 +10,7 @@ lives in the gear-data block.
 
 from __future__ import annotations
 
+import asyncio
 import math
 from pathlib import Path
 
@@ -156,7 +157,7 @@ def test_pin_hole_is_match_drilled_to_the_named_pin() -> None:
     assert not hasattr(spec, "PIN_DIA_BAND")
     assert "fit_class" not in _config.parts("crank-pinion-pin")
     # The pinion's hole clocking is the assembly's mesh seed, asserted there.
-    assert spec.PIN_CLOCKING_DEG == pytest.approx(13.703608450714796)
+    assert spec.PIN_CLOCKING_DEG == pytest.approx(13.783608450714796)
 
 
 def _assert_four_fact_note(note: str, mate_number: str) -> None:
@@ -314,8 +315,8 @@ def test_bore_band_is_derived_from_its_fit_class_not_written_by_hand() -> None:
     # pins, not the literal pair of numbers.
     low, high = _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
     assert spec.BORE_DIAMETRAL_CLEARANCE == pytest.approx((low, high))
-    shaft_upper, shaft_lower = crankshaft_spec.SHAFT_DIA_BAND
-    assert spec.BORE_DIA == crankshaft_spec.SHAFT_DIA
+    shaft_upper, shaft_lower = crankshaft_spec.PINION_SEAT_DIA_BAND
+    assert spec.BORE_DIA == crankshaft_spec.PINION_SEAT_DIA
     assert spec.BORE_DIA_BAND == (
         pytest.approx(shaft_lower + high),
         pytest.approx(shaft_upper + low),
@@ -336,7 +337,7 @@ def test_outside_diameter_stays_at_the_general_grade() -> None:
     assert not hasattr(spec, "OUTSIDE_DIA_BAND")
     assert spec.DRAWING_PRECISION_BY_NAME["OutsideDia"] == 2
     assert spec.MESH_C2C_SLACK_MM == _config.fit("crank_mesh")["c2c_slack_mm"]
-    assert spec.TIP_CLEARANCE_MM == pytest.approx(0.155, abs=0.001)
+    assert spec.TIP_CLEARANCE_MM == pytest.approx(0.152, abs=0.001)
     radial_room = spec.MESH_C2C_SLACK_MM + spec.TIP_CLEARANCE_MM
     general_radial = _config.title_block("linear_2pl")["value_in"] * 25.4 / 2.0
     assert general_radial < radial_room
@@ -350,7 +351,7 @@ def test_callouts_add_only_what_the_number_cannot_carry() -> None:
     # publishes its shaft limits and states the resulting clearance, so the
     # shop can verify that both statements are the same acceptance criterion.
     low, high = spec.BORE_DIAMETRAL_CLEARANCE
-    shaft_upper, shaft_lower = crankshaft_spec.SHAFT_DIA_BAND
+    shaft_upper, shaft_lower = crankshaft_spec.PINION_SEAT_DIA_BAND
     assert drawing.DIMENSION_CALLOUTS == {
         "BoreDia": spec.BORE_PROCESS_CALLOUT,
     }
@@ -359,7 +360,7 @@ def test_callouts_add_only_what_the_number_cannot_carry() -> None:
         (
             "BORE LIMITS GOVERN",
             f"MATE SHAFT {spec.CRANKSHAFT_NUMBER}",
-            f"(\N{DIAMETER SIGN}{crankshaft_spec.SHAFT_DIA:.3f} "
+            f"(\N{DIAMETER SIGN}{crankshaft_spec.PINION_SEAT_DIA:.3f} "
             f"+{shaft_upper:.3f}/{shaft_lower:.3f})",
             f"(DIA CLR {low:.3f}-{high:.3f} mm)",
         )
@@ -400,10 +401,11 @@ def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
     # margin: it checks nominal 0.150 mm tooth thinning and samples 0.100 mm
     # only at the nominal c2c/helix/shaft/offset/bore stack. Keep the maximum
     # pinion tooth nominal and reuse MHA-021's established 0.020 mm one-sided
-    # tooth-control capability. MHA-021 now publishes only its authoritative
-    # transverse pressure angle and helix angle; derive the corresponding
-    # normal angle here before converting its normal-span lower limit.
-    normal_pressure_angle_rad = math.atan(
+    # tooth-control capability. MHA-021 is cut normal-defined by this gear's
+    # own cutter (#906), so its normal pressure angle IS the cutter's; convert
+    # its normal-span lower limit with it.
+    normal_pressure_angle_rad = math.radians(mate.CUTTER_PRESSURE_ANGLE_DEG)
+    assert math.tan(normal_pressure_angle_rad) == pytest.approx(
         math.tan(math.radians(mate.PRESSURE_ANGLE_DEG))
         * math.cos(math.radians(mate.HELIX_ANGLE_DEG))
     )
@@ -418,26 +420,33 @@ def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
         + mate_extra_thinning
     )
     assert pair_minimum == pytest.approx(0.150)
-    assert pair_maximum == pytest.approx(0.191091, abs=1e-6)
+    assert pair_maximum == pytest.approx(0.191120, abs=1e-6)
 
 
-def test_notes_carry_only_the_tooth_edge_and_boss_wall_exceptions() -> None:
+def test_notes_carry_the_tooth_edge_override_and_the_boss_wall_fact() -> None:
     lines = spec.DRAWING_NOTES.split("\n")
     # The gear-data table already defines the nonstandard tooth system. One
     # note overrides the title block's destructive edge break; the other
-    # states the option-C named exception, its number from the spec's own
-    # worst-case wall (drawing-simplicity-policy.md, "Named exceptions").
+    # states the option-C thin boss wall as a plain fact from the spec's own
+    # worst case, rounded down. The policy requires the sheet to state its
+    # named exception (Codex #857 P2), but exception and ruling labels never
+    # print (fleet ruling, 2026-09-26); the policy row keeps the provenance.
     assert lines == [
         "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
-        f"BOSS WALL {spec.BOSS_WALL_WORST:.2f} MIN AT BORE: "
-        "ACCEPTED EXCEPTION (GEAR CUTTER RUNOUT).",
+        f"BOSS WALL {math.floor(spec.BOSS_WALL_WORST * 100.0) / 100.0:.2f} MIN AT BORE.",
     ]
-    assert lines[1] == "BOSS WALL 1.56 MIN AT BORE: ACCEPTED EXCEPTION (GEAR CUTTER RUNOUT)."
-    assert len(lines) <= 4
+    assert lines[1] == "BOSS WALL 1.67 MIN AT BORE."
+    assert not hasattr(spec, "BOSS_WALL_EXCEPTION")
+    for internal in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "RULE "):
+        assert internal not in spec.DRAWING_NOTES
     policy = (
         Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"
     ).read_text(encoding="utf-8")
-    assert "| MHA-025 crank pinion boss |" in policy
+    row = next(
+        line for line in policy.splitlines()
+        if line.startswith("| MHA-025 crank pinion boss |")
+    )
+    assert f"wall {math.floor(spec.BOSS_WALL_WORST * 1000.0) / 1000.0:.3f}" in row
     notes = spec.DRAWING_NOTES
     assert spec.PIN_NUMBER not in notes
     assert "LIGHT DRIVE FIT" not in notes
@@ -597,6 +606,9 @@ def test_w15_boss_hides_the_shaft_end_and_walls_the_pin_at_every_limit() -> None
     assert sum(edge.values()) >= spec.PIN_EDGE_MIN_WORST
     # The seat gap is a (low, high) range starting at the one feeler MHA-A03
     # sets, not a fit band.
+    # #906 moved the 1.0 upper end into the spec; the value is unchanged, so
+    # sourcing it there left the BDT stacks value-neutral.
+    assert spec.SEAT_GAP_MAX_MM == 1.0
     assert bdt.PINION_BOSS_NORTH_GAP_RANGE == (spec.SEAT_FEELER_MM, 1.0)
     assert not hasattr(bdt, "PINION_BOSS_NORTH_GAP_BAND")
     recess = bdt.PINION_RECESS_STACK
@@ -634,9 +646,130 @@ def test_boss_wall_is_the_ruled_option_c_exception() -> None:
     printed_boss = round(spec.BOSS_DIA, spec.BOSS_DIA_PLACES)
     worst = (printed_boss - 0.8 - (spec.BORE_DIA + bore_upper)) / 2.0
     assert spec.BOSS_DIA == pytest.approx(spec.ROOT_DIA)
-    assert spec.BOSS_WALL_WORST == pytest.approx(worst) == pytest.approx(1.56, abs=1e-3)
+    assert spec.BOSS_WALL_WORST == pytest.approx(worst) == pytest.approx(1.6725, abs=1e-3)
     assert spec.BOSS_WALL_FLOOR_MM <= spec.BOSS_WALL_WORST < 2.0
     assert spec.DRAWING_PRECISION["BossProfile"]["BossDia"] == spec.BOSS_DIA_PLACES
     assert "USER RULING 2026-09-25, MHA-025 boss option C" in Path(spec.__file__).read_text(
         encoding="utf-8"
     )
+
+
+
+def _cylinder(radius_mm: float, z_low: float, z_high: float):
+    from _part_pmi import _SURFACE_CYLINDER, _FaceGeometry
+
+    return _FaceGeometry(
+        face=None,
+        identity=_SURFACE_CYLINDER,
+        parameters=(0.0, 0.0, 0.0, 0.0, 0.0, -1.0, radius_mm / 1000.0),
+        outward_normal=None,
+        box=(-0.009, -0.009, z_low / 1000.0, 0.009, 0.009, z_high / 1000.0),
+    )
+
+
+def test_boss_gate_face_is_the_outboard_stub_not_a_gap_floor() -> None:
+    """The runtime boss gate's decision: the relieved gap floors share the
+    boss radius over the teeth only, so a pinion whose boss dropped (diag v3,
+    d6ca08eb7) has no face the gate accepts; an intact one has exactly one."""
+    from _part_pmi import _face_matches
+
+    radius = spec.BOSS_DIA / 2.0
+    gap_floors = [_cylinder(radius, 0.0, spec.FACE_WIDTH) for _ in range(spec.TEETH)]
+    boss = _cylinder(radius, spec.FACE_WIDTH, spec.OVERALL_LENGTH)
+    bore = _cylinder(spec.BORE_DIA / 2.0, 0.0, spec.OVERALL_LENGTH)
+
+    def accepted(faces):
+        return [face for face in faces if _face_matches(face, part.BOSS_GATE_FACE)]
+
+    assert accepted([*gap_floors, bore, boss]) == [boss]
+    assert accepted([*gap_floors, bore]) == []
+    # A boss short of the gate station, or off-size by more than 1 um, fails.
+    assert accepted([_cylinder(radius, spec.FACE_WIDTH, spec.FACE_WIDTH + 1.0)]) == []
+    assert accepted([_cylinder(radius + 0.001, spec.FACE_WIDTH, spec.OVERALL_LENGTH)]) == []
+    assert part.BOSS_GATE_TOL_MM == 0.001
+    assert spec.FACE_WIDTH < part.BOSS_GATE_FACE.contains_z_mm < spec.OVERALL_LENGTH
+
+
+class _Surface:
+    Identity = 4002  # swSurfaceTypes_e.CYLINDER_TYPE
+
+    def __init__(self, radius_mm: float) -> None:
+        self.CylinderParams = (0.0, 0.0, 0.0, 0.0, 0.0, -1.0, radius_mm / 1000.0)
+
+
+class _Face:
+    def __init__(self, radius_mm: float, z_low: float, z_high: float) -> None:
+        self.surface = _Surface(radius_mm)
+        self.box = (-0.009, -0.009, z_low / 1000.0, 0.009, 0.009, z_high / 1000.0)
+        self.next: _Face | None = None
+
+    def GetSurface(self) -> _Surface:
+        return self.surface
+
+    def GetBox(self) -> tuple[float, ...]:
+        return self.box
+
+    def GetNextFace(self) -> _Face | None:
+        return self.next
+
+
+class _Body:
+    def __init__(self, z_high: float, faces: list[_Face]) -> None:
+        self.z_high = z_high
+        for face, following in zip(faces, [*faces[1:], None]):
+            face.next = following
+        self.first = faces[0] if faces else None
+
+    def GetExtremePoint(self, _x: float, _y: float, z: float):
+        return (True, 0.0, 0.0, self.z_high / 1000.0 if z > 0.0 else 0.0)
+
+    def GetFirstFace(self) -> _Face | None:
+        return self.first
+
+
+class _Seat:
+    def __init__(self, body: _Body) -> None:
+        self.body = body
+        self.currentModel = self
+
+    def GetBodies2(self, _kind: int, _visible_only: bool) -> list[_Body]:
+        return [self.body]
+
+    def _attempt(self, operation, default=None):
+        return operation()
+
+
+@pytest.fixture
+def _plain_binding(monkeypatch):
+    import _common
+    import _part_pmi
+
+    for module in (_common, _part_pmi):
+        monkeypatch.setattr(module, "_early_bound", lambda obj, _interface: obj)
+
+
+def _pinion(z_high: float, *, boss: bool) -> _Seat:
+    radius = spec.BOSS_DIA / 2.0
+    faces = [_Face(radius, 0.0, spec.FACE_WIDTH) for _ in range(spec.TEETH)]
+    faces.append(_Face(spec.BORE_DIA / 2.0, 0.0, z_high))
+    if boss:
+        faces.append(_Face(radius, spec.FACE_WIDTH - 0.05, z_high))
+    return _Seat(_Body(z_high, faces))
+
+
+def test_boss_gate_passes_an_intact_pinion(_plain_binding) -> None:
+    asyncio.run(part.assert_boss_present(_pinion(spec.OVERALL_LENGTH, boss=True), "intact"))
+
+
+def test_boss_gate_fails_loud_on_the_silent_drop_diag_v3_saw(_plain_binding) -> None:
+    # d6ca08eb7 s0: after a ForceRebuild3 that reported success, with What's
+    # Wrong silent about the boss, the solid ended at the tooth face.
+    dropped = _pinion(spec.FACE_WIDTH, boss=False)
+    with pytest.raises(RuntimeError, match="overall length: z-extent"):
+        asyncio.run(part.assert_boss_present(dropped, "dropped"))
+
+
+def test_boss_gate_wants_the_boss_cylinder_not_just_the_length(_plain_binding) -> None:
+    boss_less = _pinion(spec.OVERALL_LENGTH, boss=False)
+    with pytest.raises(RuntimeError, match="hub boss: face spec"):
+        asyncio.run(part.assert_boss_present(boss_less, "boss-less"))

@@ -179,10 +179,12 @@ CASES = (
                 MACHINED_UM,
                 CylinderFace(
                     crankshaft_spec.JOURNAL_DIA,
+                    # #906: the journal is relieved; the finish rides the
+                    # inboard land.
                     contains_y_mm=(
-                        crankshaft_spec.JOURNAL_START
-                        + crankshaft_spec.JOURNAL_LENGTH / 2.0
-                    ),
+                        crankshaft_spec.RELIEF_END + crankshaft_spec.JOURNAL_END
+                    )
+                    / 2.0,
                 ),
             ),
         ),

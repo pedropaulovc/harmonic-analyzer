@@ -34,6 +34,7 @@ from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _drawing_common import (
     DrawingOutputs,
+    PmiDrawingPlacement,
     add_attached_note,
     add_native_hole_callout,
     add_property_linked_note,
@@ -47,8 +48,10 @@ from _drawing_common import (
     model_point_in_view,
     new_project_drawing,
     offset_dimension_text,
+    project_part_pmi,
     read_required_properties,
     rebuild_drawing,
+    set_basic_dimensions,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_reference_dimension,
@@ -62,6 +65,7 @@ from _surface_finish import surface_finish_by_key
 from cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DIA,
     ATTACHMENT_X,
+    BASIC_DIMENSIONS,
     BLOCK_DIA,
     BLOCK_HEIGHT,
     BORE_DIA,
@@ -74,7 +78,9 @@ from cone_pivot_post_spec import (
     CRANK_BOSS_START_Z,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    GEOMETRIC_CONTROLS,
     INCLINE_DEG,
+    PART_DATUMS,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -923,6 +929,8 @@ async def build(adapter: Any) -> dict[str, str]:
     set_reference_dimension(
         adapter, crank_height[0], label="crank axis height reference"
     )
+    # #906: the plan angle feeds the crank bore's angularity frame (rule 4).
+    set_basic_dimensions(adapter, annotations, BASIC_DIMENSIONS)
     # The part authored these places (cone_pivot_post_spec.DRAWING_PRECISION);
     # this sheet only proves they survived the import.  A silent fallback to
     # the drawing document's two places would print the running bores without
@@ -1039,6 +1047,38 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "journal_bore"),
         label="cone journal bore finish",
         char_height=0.0025,
+    )
+    # #906 (USER RULING 2026-09-26): the crank bore's angularity to the cone
+    # journal, model PMI (cone_pivot_post_spec.PART_DATUMS /
+    # GEOMETRIC_CONTROLS) projected here.  Datum A tags the journal bore in
+    # View B, the only view that shows it true; datum B tags the foot seat
+    # edge-on in the elevation, left of the body and clear of the foot-seat
+    # finish on the right; the frame hangs off the crank bore rim in the
+    # elevation, right of the body and below the bore callout.
+    project_part_pmi(
+        adapter,
+        placements={
+            "datum:A": PmiDrawingPlacement(
+                view=journal,
+                position=(0.250, 0.128),
+                edge_entity=_bore_rim_edge(journal, diameter_mm=BORE_DIA),
+            ),
+            "datum:B": PmiDrawingPlacement(
+                view=front,
+                position=(_front_x(-16.0), _front_y(-9.0)),
+                edge_entity=_circular_edge(
+                    front, radius_mm=BLOCK_DIA / 2.0, center_y_mm=0.0
+                ),
+            ),
+            "crank_bore_angularity": PmiDrawingPlacement(
+                view=front,
+                position=(0.160, 0.128),
+                edge_entity=_bore_rim_edge(front, diameter_mm=CRANK_BORE_DIA),
+            ),
+        },
+        datums=PART_DATUMS,
+        controls=GEOMETRIC_CONTROLS,
+        label="cone pivot post PMI",
     )
     add_note(
         adapter,

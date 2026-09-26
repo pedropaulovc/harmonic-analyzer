@@ -27,6 +27,7 @@ from __future__ import annotations
 import math
 
 import _config
+import crank_drive_gear_spec
 import crank_hub_geometry
 from _fit_limits import deviations
 from _gtol_spec import CylinderFace
@@ -37,8 +38,11 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 MM_PER_IN = 25.4
 
 TEETH = 16
-DIAMETRAL_PITCH = 25.73110354953376  # fixed-post recentered mesh
-PRESSURE_ANGLE_DEG = 14.5
+# Cut straight by the 64T's own cutter (#906): a straight gear's transverse
+# section IS its normal section, so the cutter's DP and pressure angle are this
+# gear's, and the pair's normal pitches match.
+DIAMETRAL_PITCH = crank_drive_gear_spec.CUTTER_DIAMETRAL_PITCH  # 26.306
+PRESSURE_ANGLE_DEG = crank_drive_gear_spec.CUTTER_PRESSURE_ANGLE_DEG
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
@@ -59,24 +63,34 @@ TOOTH_THICKNESS_LOWER_DEVIATION = -0.020
 # The blank's outside diameter is the one tooth-system number the turner sets
 # before a cutter touches the part, so it prints as a NATIVE dimension instead
 # of as text in the data block -- but at the title block's general .XX grade,
-# with no band of its own. The crossed 16T:64T mesh is built with
-# ``fits.crank_mesh.c2c_slack_mm`` 0.25 mm of centre-distance slack on top of
-# the tooth system's own 0.157/DP tip clearance (0.155 mm), so the tip circle
-# has 0.405 mm of radial room: +/-0.51 diametral is +/-0.255 radial, inside it.
+# with no band of its own. The crossed 16T:64T mesh keeps at least
+# ``fits.crank_mesh.c2c_slack_mm`` 0.25 mm of centre-distance slack (the frame
+# leaves the single-cutter pair more) on top of the tooth system's own 0.157/DP
+# tip clearance (0.152 mm), so the tip circle has over 0.40 mm of radial room:
+# +/-0.51 diametral is +/-0.255 radial, inside it.
 # A tighter band here would be a habit, not a requirement
 # (cad/docs/tolerance-policy.md, "Fit classes" and the one-sided-load bullets).
 MESH_C2C_SLACK_MM = _config.fit("crank_mesh")["c2c_slack_mm"]
 TIP_CLEARANCE_MM = 0.157 / DIAMETRAL_PITCH * MM_PER_IN
 
-# The bore over the crankshaft is the part's one critical fit, and the only
-# reason anything here prints a third decimal: a slip fit exists only if the
-# size limits on BOTH mating features are narrower than the clearance band it
-# claims (tolerance-policy.md step 6b). The feature callout names the mate and
-# publishes the required diametral-clearance range; the dimensional band is
+# RULING (b), Main 2026-09-26 (#906): the crankshaft steps down to SEAT_DIA
+# under this pinion, and the pinion is bored to match. A smaller 16T cut by
+# the pair's one cutter would leave the boss wall under its 1.5 floor over
+# the 3/8 in shaft; the step gives the wall back without tightening a band.
+# The seat is turned to the through shaft's own size band
+# (crankshaft_spec.PINION_SEAT_DIA_BAND), so the fit below is the class it
+# always was.
+SEAT_DIA = 9.0
+
+# The bore over the crankshaft's seat is the part's one critical fit, and the
+# only reason anything here prints a third decimal: a slip fit exists only if
+# the size limits on BOTH mating features are narrower than the clearance band
+# it claims (tolerance-policy.md step 6b). The feature callout names the mate
+# and publishes the required diametral-clearance range; the dimensional band is
 # DERIVED -- never a per-part number -- from that named fit class and the
-# shaft's own published limits: bore_min = shaft_max + clearance_min,
-# bore_max = shaft_min + clearance_max. Move either input and this moves with it.
-BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8" crankshaft)
+# seat's own published limits: bore_min = seat_max + clearance_min,
+# bore_max = seat_min + clearance_max. Move either input and this moves with it.
+BORE_DIA = SEAT_DIA
 BORE_DIAMETRAL_CLEARANCE = tuple(
     _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
 )
@@ -108,7 +122,7 @@ FACE_WIDTH = 10.4  # spans the 64T row north of the v2 crank boss
 # extruded from the SAME faced end as the teeth, so the print carries one
 # overall length from that end (rule 7: lengths from one faced end, the overall
 # length real and conspicuous), and the toothed length is FaceWidth.
-ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN  # 13.51
+ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN  # 13.21
 BOSS_DIA = ROOT_DIA
 # The boss's outer end edge takes the title block's edge break: the sized
 # chamfer that once imitated the photo's rounding had no function, and at its
@@ -160,7 +174,7 @@ BOSS_DIA_PLACES = 1
 BOSS_WALL_FLOOR_MM = 1.5
 _BORE_LOWER, _BORE_UPPER = deviations(BORE_DIA_BAND)
 _BOSS_DIA_LOWER, _BOSS_DIA_UPPER = printed_deviations(BOSS_DIA, BOSS_DIA_PLACES)
-BOSS_WALL_WORST = (BOSS_DIA + _BOSS_DIA_LOWER - (BORE_DIA + _BORE_UPPER)) / 2.0  # 1.560
+BOSS_WALL_WORST = (BOSS_DIA + _BOSS_DIA_LOWER - (BORE_DIA + _BORE_UPPER)) / 2.0  # 1.6725
 if BOSS_WALL_WORST < BOSS_WALL_FLOOR_MM:
     raise AssertionError(
         f"16T boss worst wall {BOSS_WALL_WORST:.3f} is under the {BOSS_WALL_FLOOR_MM} "
@@ -196,8 +210,11 @@ PIN_EDGE_MIN_WORST = 2.0
 PIN_STATION_LAYOUT_ALLOWANCE_MM = 0.25
 # The pinion is set on its seat with this feeler between its toothed south
 # face and the v2 post boss's spot face (MHA-A03 step 4); the assembly's
-# seat-gap range starts here.
+# seat-gap range starts here, and it may open to SEAT_GAP_MAX_MM before the
+# pinion is re-set: the W15 pin-wall and recess stacks carry the pinion that
+# far north of its nominal seat on the shaft.
 SEAT_FEELER_MM = 0.25
+SEAT_GAP_MAX_MM = 1.0
 # The shaft end stays recessed inside the boss in the worst case too.  The
 # overall length prints at OVERALL_LENGTH_PLACES, so an accepted pinion is as
 # short as the printed row allows (.X +/-0.8).  Nothing else can shallow the
@@ -235,7 +252,7 @@ for _name, _value, _places in (
 # wall alone needed 12.815 (1.23 faces) at the old 0.32 recess; the recess
 # that survives the printed row and an exactly printed shaft adds the rest.
 PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0  # 17.65 from the toothed (south) face
-PIN_CLOCKING_DEG = 13.703608450714796  # = build_drive_train_assembly.PINION_SEED_DEG
+PIN_CLOCKING_DEG = 13.783608450714796  # = build_drive_train_assembly.PINION_SEED_DEG
 if PIN_STATION - PIN_DIA / 2.0 < FACE_WIDTH + 0.5:
     raise AssertionError("retention pin hole breaks into the pinion's tooth face")
 if PIN_STATION + PIN_DIA / 2.0 > OVERALL_LENGTH - 0.5:
@@ -252,7 +269,7 @@ BORE_FIT_CALLOUT = "\n".join(
     (
         "BORE LIMITS GOVERN",
         f"MATE SHAFT {CRANKSHAFT_NUMBER}",
-        f"(\N{DIAMETER SIGN}{crank_hub_geometry.SHAFT_DIA:.3f} "
+        f"(\N{DIAMETER SIGN}{SEAT_DIA:.3f} "
         f"+{_SHAFT_UPPER:.3f}/{_SHAFT_LOWER:.3f})",
         f"(DIA CLR {_CLEARANCE_MIN:.3f}-{_CLEARANCE_MAX:.3f} mm)",
     )
@@ -360,7 +377,10 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
-        ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f} (NONSTANDARD)"),
+        (
+            "DIAMETRAL PITCH",
+            f"{DIAMETRAL_PITCH:.2f} (NONSTANDARD; MHA-021'S CUTTER)",
+        ),
         ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
@@ -381,10 +401,13 @@ GEAR_DATA = gear_data_note(
 # The nonstandard cutter geometry is already explicit in the gear-data block;
 # it needs no duplicate method prohibition.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-# The sheet states its named exception itself (drawing-simplicity-policy.md,
-# "Named exceptions"; USER RULING 2026-09-25, option C), so the blind review
-# reads the thin boss wall as accepted, not as a blocker.
-BOSS_WALL_EXCEPTION = (
-    f"BOSS WALL {BOSS_WALL_WORST:.2f} MIN AT BORE: ACCEPTED EXCEPTION (GEAR CUTTER RUNOUT)."
+# The thin boss wall (BOSS_WALL_WORST) is the policy's named MHA-025
+# exception (drawing-simplicity-policy.md, "Named exceptions"; user, option C,
+# 2026-09-25).  The policy requires the sheet to state it, but exception and
+# ruling labels never print, so the sheet states the shortfall as a plain
+# fact, rounded down so it never claims more wall; this comment and the
+# policy row keep the provenance.
+BOSS_WALL_NOTE = (
+    f"BOSS WALL {math.floor(BOSS_WALL_WORST * 100.0) / 100.0:.2f} MIN AT BORE."
 )
-DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, BOSS_WALL_EXCEPTION))
+DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, BOSS_WALL_NOTE))

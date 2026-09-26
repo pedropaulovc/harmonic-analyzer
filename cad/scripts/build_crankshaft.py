@@ -77,6 +77,12 @@ from crankshaft_spec import (
     JOURNAL_START,
     PIN_HOLE_SPEC,
     PIN_HOLE_HEIGHT,
+    PINION_SEAT_DIA,
+    PINION_SEAT_DIA_BAND,
+    RELIEF_DIA,
+    RELIEF_LENGTH,
+    RELIEF_START,
+    SEAT_STEP,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHAFT_DOME_HEIGHT,
@@ -196,6 +202,90 @@ async def _angled_plane_containing(
     raise RuntimeError(f"{name}: neither angled-plane solution contains {direction}")
 
 
+# Far-end stations the drawing prints (policy rule 7), each drawn on the
+# StationReference sketch from its dome-root station and driven by the same
+# globals as the feature it locates.
+_STATIONS = {
+    "PinionSeatStation": SEAT_STEP,
+    "JournalInboardStation": JOURNAL_START + JOURNAL_LENGTH,
+    "ReliefInboardStation": RELIEF_START + RELIEF_LENGTH,
+    "ReliefOutboardStation": RELIEF_START,
+    "JournalOutboardStation": JOURNAL_START,
+    "PinHoleStation": PIN_HOLE_HEIGHT,
+}
+_STATION_DRIVES = {
+    "PinionSeatStation": '"ShaftLength" - "PinionSeatStep"',
+    "JournalInboardStation": '"ShaftLength" - "JournalStart" - "JournalLength"',
+    "ReliefInboardStation": '"ShaftLength" - "ReliefStart" - "ReliefLength"',
+    "ReliefOutboardStation": '"ShaftLength" - "ReliefStart"',
+    "JournalOutboardStation": '"ShaftLength" - "JournalStart"',
+    "PinHoleStation": '"ShaftLength" - "PinHoleHeight"',
+}
+
+
+async def _cut_annulus_inboard(
+    adapter,
+    name: str,
+    *,
+    start: float,
+    start_global: str,
+    turned_dia: float,
+    inner_dia: float,
+    inner_global: str,
+    length: float,
+    length_expr: str,
+    drive_jobs: list[tuple[str, str]],
+) -> float:
+    """Turn a ``turned_dia`` section down to ``inner_dia`` inboard of ``start``.
+
+    The annulus from ``inner_dia`` out past ``turned_dia`` is cut from a
+    ``<name>StartPlane`` at ``start``; its profile is ``<name>Profile`` with
+    the printed ``<name>DiaDim``.  A mid-body blind cut defaults back toward
+    its base plane, so running AWAY from Top it takes ``reverse_direction``
+    (memory/solidworks-modeling-pitfalls.md); the caller's volume gate fails
+    loud on the wrong side.  Returns the volume removed.
+    """
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
+
+    plane = f"{name}StartPlane"
+    check(
+        f"create_plane {plane}",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=start)
+        ),
+    )
+    name_last_feature(adapter, plane)
+    start_dim = name_dimensions(adapter, plane, [start_global])
+    drive_jobs += [(start_dim[0], f'"{start_global}"')]
+    dims = SketchDims()
+    check(f"create_sketch {name}", await adapter.create_sketch(plane))
+    await define_circle(
+        adapter, 0.0, 0.0, inner_dia / 2.0, f"{name} turned circle",
+        dims=dims,
+        names=(f"{name}Cx", f"{name}Cz", f"{name}DiaDim"),
+        drives=(None, None, f'"{inner_global}"'),
+    )
+    await define_circle(
+        adapter, 0.0, 0.0, turned_dia / 2.0 + 1.0, f"{name} clearance circle",
+        dims=dims,
+        names=(f"{name}OuterCx", f"{name}OuterCz", f"{name}OuterDia"),
+    )
+    await ensure_fully_defined(adapter, f"{name} sketch")
+    check(f"exit_sketch {name}", await adapter.exit_sketch())
+    name_last_feature(adapter, f"{name}Profile")
+    drive_jobs += dims.apply(adapter, f"{name}Profile")
+    check(
+        f"cut {name}",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=length, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, name)
+    length_dim = name_dimensions(adapter, name, [f"{name}Length"])
+    drive_jobs += [(length_dim[0], length_expr)]
+    return math.pi * ((turned_dia / 2.0) ** 2 - (inner_dia / 2.0) ** 2) * length
+
+
 async def _volume(adapter) -> float:
     result = await adapter.get_mass_properties()
     return result.data.volume if result.is_success else float("nan")
@@ -220,6 +310,11 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "JournalDia", f"{JOURNAL_DIA}mm")
     await set_global(adapter, "JournalStart", f"{JOURNAL_START}mm")
     await set_global(adapter, "JournalLength", f"{JOURNAL_LENGTH}mm")
+    await set_global(adapter, "ReliefDia", f"{RELIEF_DIA}mm")
+    await set_global(adapter, "ReliefStart", f"{RELIEF_START}mm")
+    await set_global(adapter, "ReliefLength", f"{RELIEF_LENGTH}mm")
+    await set_global(adapter, "PinionSeatDia", f"{PINION_SEAT_DIA}mm")
+    await set_global(adapter, "PinionSeatStep", f"{SEAT_STEP}mm")
     await set_global(adapter, "PinHoleHeight", f"{PIN_HOLE_HEIGHT}mm")
     await set_global(adapter, "PinionPinStation", f"{PINION_PIN_STATION_Y}mm")
     await set_global(adapter, "DomeHeight", f"{SHAFT_DOME_HEIGHT}mm")
@@ -438,6 +533,42 @@ async def build(adapter) -> dict[str, str]:
         0.005 * v_with_journal,
     )
 
+    # Journal relief (#906): the bushing is reamed plain through, so the shaft
+    # is turned under the middle of the journal, leaving a bearing land at
+    # each end of the bushing.
+    v_with_journal -= await _cut_annulus_inboard(
+        adapter,
+        "Relief",
+        start=RELIEF_START,
+        start_global="ReliefStart",
+        turned_dia=JOURNAL_DIA,
+        inner_dia=RELIEF_DIA,
+        inner_global="ReliefDia",
+        length=RELIEF_LENGTH,
+        length_expr='"ReliefLength"',
+        drive_jobs=drive_jobs,
+    )
+    await volume_check(
+        adapter, "journal relief", v_with_journal, 0.005 * v_with_journal
+    )
+    # The Ø9.0 pinion seat (RULING (b)): the same cut from the seat step to
+    # the far end face.
+    v_with_journal -= await _cut_annulus_inboard(
+        adapter,
+        "PinionSeat",
+        start=SEAT_STEP,
+        start_global="PinionSeatStep",
+        turned_dia=SHAFT_DIA,
+        inner_dia=PINION_SEAT_DIA,
+        inner_global="PinionSeatDia",
+        length=SHAFT_LENGTH - SEAT_STEP,
+        length_expr='"ShaftLength" - "PinionSeatStep"',
+        drive_jobs=drive_jobs,
+    )
+    await volume_check(
+        adapter, "pinion seat step", v_with_journal, 0.005 * v_with_journal
+    )
+
     check(
         "create_plane PinHoleStationPlane",
         await adapter.create_plane(
@@ -521,15 +652,15 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PINION_PIN_HOLE_SPEC,
         [
-            SHAFT_DIA / 2.0 * entry_dir[0],
+            PINION_SEAT_DIA / 2.0 * entry_dir[0],
             PINION_PIN_STATION_Y,
-            SHAFT_DIA / 2.0 * entry_dir[2],
+            PINION_SEAT_DIA / 2.0 * entry_dir[2],
         ],
         "pinion retention-pin cross-hole",
         name="PinionPinHole",
         point_planes=("PinionPinStationPlane", "PinionPinClockingPlane"),
     )
-    v_pinion_pin = cross_hole_volume_mm3(PINION_PIN_DIA, SHAFT_DIA)
+    v_pinion_pin = cross_hole_volume_mm3(PINION_PIN_DIA, PINION_SEAT_DIA)
     v_final -= v_pinion_pin
     await volume_check(adapter, "shaft + pinion pin hole", v_final, 0.02 * v_pinion_pin)
 
@@ -554,11 +685,7 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_line(0.0, -SHAFT_DOME_HEIGHT, 0.0, SHAFT_LENGTH),
     )
     station_lines = {}
-    for name, station in (
-        ("JournalInboardStation", JOURNAL_START + JOURNAL_LENGTH),
-        ("JournalOutboardStation", JOURNAL_START),
-        ("PinHoleStation", PIN_HOLE_HEIGHT),
-    ):
+    for name, station in _STATIONS.items():
         station_lines[name] = check(
             f"{name} reference line",
             await adapter.add_line(0.0, SHAFT_LENGTH, 0.0, station),
@@ -624,36 +751,16 @@ async def build(adapter) -> dict[str, str]:
         "overall length reference",
     )
     stations.record("OverallLength", '"ShaftLength" + "DomeHeight"')
-    for name, line, drive in (
-        (
-            "JournalInboardStation",
-            station_lines["JournalInboardStation"],
-            '"ShaftLength" - "JournalStart" - "JournalLength"',
-        ),
-        (
-            "JournalOutboardStation",
-            station_lines["JournalOutboardStation"],
-            '"ShaftLength" - "JournalStart"',
-        ),
-        (
-            "PinHoleStation",
-            station_lines["PinHoleStation"],
-            '"ShaftLength" - "PinHoleHeight"',
-        ),
-    ):
+    for name, line in station_lines.items():
         await dimension_between(
             adapter,
             f"{line}.start",
             f"{line}.end",
             "vertical_distance",
-            SHAFT_LENGTH - {
-                "JournalInboardStation": JOURNAL_START + JOURNAL_LENGTH,
-                "JournalOutboardStation": JOURNAL_START,
-                "PinHoleStation": PIN_HOLE_HEIGHT,
-            }[name],
+            SHAFT_LENGTH - _STATIONS[name],
             f"{name} reference",
         )
-        stations.record(name, drive)
+        stations.record(name, _STATION_DRIVES[name])
     check(
         "dome radius reference",
         await adapter.add_sketch_dimension(dome_arc, None, "radial", DOME_SPHERE_R),
@@ -694,6 +801,12 @@ async def build(adapter) -> dict[str, str]:
         "JournalProfile",
         "JournalDiaDim",
         *deviations(JOURNAL_DIA_BAND),
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "PinionSeatProfile",
+        "PinionSeatDiaDim",
+        *deviations(PINION_SEAT_DIA_BAND),
     )
     # W15: the length is unilateral (crankshaft_spec.SHAFT_LENGTH_BAND); it
     # prints from the model on the far-end-to-dome-root Depth.

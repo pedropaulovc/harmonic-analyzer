@@ -237,6 +237,8 @@ DP_TRAIN = _config.machine(
     "gear_train", "diametral_pitch"
 )  # cad/config/machine.yaml (DIMENSIONS.md ch12)
 DP_CRANK = _config.machine("gear_train", "crank_drive_diametral_pitch")
+# The pair's one cutter (#906): the 16T's DP and both gears' addendum.
+from crank_drive_gear_spec import CUTTER_DIAMETRAL_PITCH as DP_CRANK_CUTTER  # noqa: E402
 ADDENDUM = 25.4 / DP_TRAIN  # 0.510 at DP 49.82
 
 # The four smallest cone gears read "more yellow ... a harder metal" (ch.12 p.21):
@@ -409,7 +411,7 @@ GEAR64_STATION = (
 )  # 19.9
 GEAR64_SEAT = cone_station(GEAR64_STATION + GEAR_AXIS_SHIFT)
 R64 = (64.0 / DP_CRANK) * 25.4 / 2.0
-R16 = (16.0 / DP_CRANK) * 25.4 / 2.0
+R16 = (16.0 / DP_CRANK_CUTTER) * 25.4 / 2.0
 
 # Crank: ABOVE the 64T (ch30 GT photogrammetry -- the crank axle triangulates
 # to world (-122.84, 144.78, -189.1) +- 1.4: the pedestal axis of the +122
@@ -433,9 +435,18 @@ R16 = (16.0 / DP_CRANK) * 25.4 / 2.0
 # the radial interleave is ~constant across the face and the real constraint
 # is LATERAL flank misregistration, which no radial backoff fixes and the
 # helix + backlash do).
-ADD16 = 25.4 / DP_CRANK  # crank-pinion addendum
-MESH16_C2C_SLACK = _config.fit("crank_mesh", "c2c_slack_mm")  # 0.25, tolerances.yaml
-MESH16_C2C = R64 + R16 + MESH16_C2C_SLACK
+ADD16 = 25.4 / DP_CRANK_CUTTER  # both gears' addendum: one cutter
+# FRAME-FIXED (#906, Main 2026-09-26): nothing in the frame moves for the
+# single-cutter pair. The v2 casting's crank axis and the 64T station keep the
+# centre distance the fixed-post DP was solved for -- both radii at the
+# transverse DP plus tolerances.yaml's 0.25 slack -- and the smaller 16T
+# inherits the difference as slack: 0.423, still engaged 1.5 deep.
+MESH16_C2C = (
+    R64
+    + (16.0 / DP_CRANK) * 25.4 / 2.0
+    + _config.fit("crank_mesh", "c2c_slack_mm")
+)  # 39.735
+MESH16_C2C_SLACK = MESH16_C2C - R64 - R16  # 0.423
 TIP16_C2C = R64 + R16 + 2.0 * ADD16
 CRANK_MESH_DEPTH = TIP16_C2C - MESH16_C2C
 # Depth band: above ~1.2*ADD (really engaged), below 2*ADD minus the root
@@ -471,7 +482,8 @@ PINION_TOOTH_Z = _GEAR64_CONTACT_Z - (PINION_FACE_STATION_REFERENCE - PINION_FAC
 # keyed at its authored phase (a tooth centred at azimuth 0 -- for the helical
 # teeth that is the MID-FACE azimuth, the twist's symmetry plane), so its
 # nearest tooth leads the contact azimuth by DELTA64; the pinion's gap must
-# sit that same contact arc (scaled by R64/R16) past the contact on ITS side.
+# sit that same contact arc (64/16 pinion degrees per 64T degree -- the tooth
+# ratio, whatever the two pitch radii) past the contact on ITS side.
 # At ALPHA = 0 this is exactly 11.25. The formula is then CENTRED in the
 # zero-collision window: at the full-row band the helical twist biases the
 # window negative of the formula (crossed_mesh_study seed sweep 2026-07-14 at
@@ -483,12 +495,13 @@ PINION_TOOTH_Z = _GEAR64_CONTACT_Z - (PINION_FACE_STATION_REFERENCE - PINION_FAC
 _TP64 = 360.0 / 64.0
 DELTA64 = round(ALPHA64 / _TP64) * _TP64 - ALPHA64  # 1.57: 64T tooth lead
 # The v2 post changed the crank-pair DP and therefore the tooth count's phase at
-# the new line of centres.  Re-arbitrated against the exact solid study and the
-# exact-solid phase sweep: -1.50 centres the recentered DP25.742 / 12-degree
-# helix window with +-0.40-degree authoring margin.
-MESH_WINDOW_CENTRE_DEG = -1.50
+# the new line of centres.  Re-arbitrated for the single-cutter pair at the
+# frame's slack (#906; diagnostics/crank_mesh_backlash_study.py, case Bstar0,
+# 9 crank phases): the free window is 2.39..2.45 deg wide and centred at
+# -1.41..-1.44, so -1.42 keeps +-1.2 deg of authoring margin.
+MESH_WINDOW_CENTRE_DEG = -1.42
 PINION_SEED_DEG = (
-    (ALPHA16 + 180.0) - DELTA64 * (R64 / R16) - 22.5 / 2.0
+    (ALPHA16 + 180.0) - DELTA64 * (64.0 / 16.0) - 22.5 / 2.0
 ) % 22.5 + MESH_WINDOW_CENTRE_DEG  # window-centred tooth-in-gap
 
 # ARBOR_SOUTH_Z / ARBOR_LENGTH (the cylinder arbor) follow from the pedestal
@@ -762,6 +775,7 @@ from crank_pinion_spec import (  # noqa: E402
     PIN_STATION as PINION_PIN_STATION,
     PIN_STATION_LAYOUT_ALLOWANCE_MM as PINION_PIN_LAYOUT_ALLOWANCE,
     SEAT_FEELER_MM as PINION_SEAT_FEELER,
+    SEAT_GAP_MAX_MM as PINION_SEAT_GAP_MAX,
     SHAFT_END_RECESS_MIN_WORST as PINION_RECESS_MIN_WORST,
 )
 from build_crankshaft import PINION_PIN_STATION_Y as CS_PINION_PIN_STATION  # noqa: E402
@@ -1246,7 +1260,7 @@ _BOSS_NORTH_GAP = _PINION_SOUTH - _POST_BOSS_NORTH
 # The 16T's south face seats against the post boss's north face across this
 # gap (low, high): the pinion is set on the feeler at the floor, and the gap
 # may open to the ceiling before the pinion is re-set.
-PINION_BOSS_NORTH_GAP_RANGE = (PINION_SEAT_FEELER, 1.0)
+PINION_BOSS_NORTH_GAP_RANGE = (PINION_SEAT_FEELER, PINION_SEAT_GAP_MAX)
 _GAP_LO, _GAP_HI = PINION_BOSS_NORTH_GAP_RANGE
 if min(_BOSS_SOUTH_GAP, _BOSS_NORTH_GAP) < 0.25:
     raise AssertionError("v2 crank boss does not clear its axial hardware")
@@ -1444,7 +1458,7 @@ require_lock_seat_fit(BASE_LOCK_SEAT_SPEC, PLAT_T, KNOB_STUD_LEN)
 # the real solids must therefore have clearance at every tooth phase.
 _KNOB_GEAR_CLEARANCE = 0.25
 _KNOB_R = KNOB_HEAD_DIA / 2.0
-_GEAR64_TIP_R = R64 + 25.4 / DP_CRANK
+_GEAR64_TIP_R = R64 + ADD16
 if (
     math.hypot(KNOB_X - GEAR64_SEAT[0], KNOB_Z - GEAR64_SEAT[2])
     - _KNOB_R

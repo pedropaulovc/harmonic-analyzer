@@ -67,8 +67,10 @@ def test_the_outside_diameter_is_a_native_reference_sketch_dimension() -> None:
     assert "_as_construction(adapter, tip_ref)" in build
     assert '_verify_named_dimension(adapter, "OutsideDia@OutsideDiaReference"' in build
     assert "OutsideDiaReference" in spec.DRAWING_DIMENSIONS
+    # #906: normal-defined -- the transverse pitch circle plus the CUTTER's
+    # addendum on each side.
     assert spec.OUTSIDE_DIA == pytest.approx(
-        (part.TEETH + 2) / part.DP * spec.MM_PER_IN
+        part.TEETH / part.DP * spec.MM_PER_IN + 2.0 * spec.MM_PER_IN / spec.CUTTER_DIAMETRAL_PITCH
     )
     # ... and therefore never as text beside the generating data.
     assert "OUTSIDE DIAMETER" not in notes.GEAR_DATA
@@ -152,7 +154,7 @@ def test_outside_diameter_stays_at_the_general_grade() -> None:
     assert not hasattr(spec, "OUTSIDE_DIA_BAND")
     assert spec.DRAWING_PRECISION["OutsideDiaReference"]["OutsideDia"] == 2
     slack = _config.fit("crank_mesh")["c2c_slack_mm"]
-    assert spec.TIP_CLEARANCE_MM == pytest.approx(0.155, abs=0.001)
+    assert spec.TIP_CLEARANCE_MM == pytest.approx(0.152, abs=0.001)
     radial_room = slack + spec.TIP_CLEARANCE_MM
     general_radial = _config.title_block("linear_2pl")["value_in"] * 25.4 / 2.0
     assert general_radial < radial_room
@@ -233,14 +235,15 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
     for field in (
         "GEAR DATA",
         "NUMBER OF TEETH",
-        "DIAMETRAL PITCH, TRANSVERSE",
-        "MODULE, TRANSVERSE (mm, REF)",
-        "PRESSURE ANGLE, TRANSVERSE",
+        "DIAMETRAL PITCH, NORMAL (CUTTER)",
+        "PRESSURE ANGLE, NORMAL (CUTTER)",
+        "DIAMETRAL PITCH, TRANSVERSE (REF)",
+        "PRESSURE ANGLE, TRANSVERSE (REF)",
         "PITCH DIAMETER (mm, REF)",
         "ROOT DIAMETER (mm, REF)",
         "WHOLE DEPTH (mm, REF)",
         "HELIX ANGLE AT PITCH DIAMETER",
-        "CIRCULAR TOOTH THICKNESS AT PITCH DIA, TRANSVERSE (mm), ACCEPT ON THIS PART",
+        "CIRCULAR TOOTH THICKNESS AT PITCH DIA, NORMAL (mm), ACCEPT ON THIS PART",
         "TRANSVERSE BACKLASH WITH MHA-025, ACCEPT AT ASSEMBLY (mm)",
         "TOOTH FORM",
         "MATES WITH",
@@ -308,7 +311,13 @@ def test_tooth_thickness_is_a_toleranced_requirement_not_a_ref_consequence() -> 
     assert notes.STANDARD_TOOTH_THICKNESS - thickest == pytest.approx(low)
     assert notes.STANDARD_TOOTH_THICKNESS - thinnest == pytest.approx(high)
     data = notes.GEAR_DATA
-    assert f"{spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS:.3f} +0.100 / -0.050" in data
+    # #906: the caliper reads the band square to the helix.
+    assert notes.NORMAL_TOOTH_THICKNESS_DEVIATIONS == (0.098, -0.049)
+    assert f"{spec.NORMAL_CIRCULAR_TOOTH_THICKNESS:.3f} +0.098 / -0.049" in data
+    assert spec.NORMAL_CIRCULAR_TOOTH_THICKNESS == pytest.approx(
+        spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS
+        * math.cos(math.radians(spec.HELIX_ANGLE_DEG))
+    )
     assert f"{low:.2f} TO {high:.2f}" in data
     # The fit-class read stays out of the SPEC for the same reason the bore band
     # does: the assemblies import the spec's tip circle, and a fit class must not
@@ -335,20 +344,32 @@ def test_gear_data_numbers_track_the_part_geometry() -> None:
     assert spec.DIAMETRAL_PITCH == pytest.approx(part.DP)
     assert spec.PRESSURE_ANGLE_DEG == pytest.approx(part.PA_DEG)
     assert spec.PITCH_DIA == pytest.approx(spec.TEETH * spec.MODULE_MM)
-    assert spec.WHOLE_DEPTH == pytest.approx(2.157 * spec.MODULE_MM)
-    assert spec.ROOT_DIA == pytest.approx(
-        (part.TEETH - 2.0 * 1.157) / part.DP * spec.MM_PER_IN
+    # #906: ONE cutter, set over at the helix. Its normal DP and pressure
+    # angle are the pinion's; the transverse ones follow; the depth is the
+    # cutter's, so it is a full-depth tooth of the NORMAL module.
+    cos_helix = math.cos(math.radians(spec.HELIX_ANGLE_DEG))
+    assert spec.CUTTER_DIAMETRAL_PITCH == pytest.approx(spec.DIAMETRAL_PITCH / cos_helix)
+    assert spec.CUTTER_DIAMETRAL_PITCH == pytest.approx(26.30595, abs=1e-5)
+    assert math.tan(math.radians(spec.PRESSURE_ANGLE_DEG)) * cos_helix == pytest.approx(
+        math.tan(math.radians(spec.CUTTER_PRESSURE_ANGLE_DEG))
     )
+    assert spec.CUTTER_DIAMETRAL_PITCH == pinion_spec.DIAMETRAL_PITCH
+    assert spec.CUTTER_PRESSURE_ANGLE_DEG == pinion_spec.PRESSURE_ANGLE_DEG
+    assert 'depth_dp=CUTTER_DIAMETRAL_PITCH' in _build_source()
+    assert spec.WHOLE_DEPTH == pytest.approx(2.157 * spec.NORMAL_MODULE_MM)
+    assert spec.ROOT_DIA == pytest.approx(spec.PITCH_DIA - 2.0 * 1.157 * spec.NORMAL_MODULE_MM)
     assert spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS == pytest.approx(
         math.pi * spec.MODULE_MM / 2.0 - spec.BACKLASH_MM
     )
-    # The mesh invariant the thinning exists for: this gear's tooth plus its
-    # straight pinion's tooth leave exactly the backlash inside one circular
-    # pitch.
+    # The mesh invariant the thinning exists for, in the plane a crossed
+    # helical pair meshes in: this gear's normal tooth plus its straight
+    # pinion's tooth leave exactly the normal backlash inside one normal
+    # circular pitch -- the pinion's own circular pitch.
     assert (
-        spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS
+        spec.NORMAL_CIRCULAR_TOOTH_THICKNESS
         + pinion_spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS
-    ) == pytest.approx(math.pi * spec.MODULE_MM - spec.BACKLASH_MM)
+    ) == pytest.approx(math.pi * spec.NORMAL_MODULE_MM - spec.BACKLASH_MM * cos_helix)
+    assert spec.NORMAL_MODULE_MM == pytest.approx(pinion_spec.MODULE_MM)
 
 
 def test_notes_carry_the_part_specific_facts_and_never_the_title_block() -> None:
@@ -359,17 +380,21 @@ def test_notes_carry_the_part_specific_facts_and_never_the_title_block() -> None
     # the print states the exception.
     assert lines[0] == "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
     # The attachment (rule-11 flag closed 2026-09-21): the bore is the only
-    # attachment feature on the part, so the joint to the shaft land is the
-    # entire torque path -- a machinist who reams the bore and ships it has
-    # made the wrong part. The note must NAME the mate and STATE the joining
-    # methods, which rule 6 allows only because here the process IS the
-    # requirement. Each method is one swappable constant (the user approved a
-    # retaining compound alongside filler metal on 2026-09-21), so this pins
-    # what the sentence has to carry, not the wording of either method.
-    assert "PLAIN BORE, NO KEYWAY" in lines[1]
-    assert notes.ATTACHMENT_PROCESS in lines[1]
-    assert notes.SHAFT_MATE_NUMBER in lines[1]
-    assert notes.ATTACHMENT_ALTERNATIVE in text
+    # attachment feature on the part, so the note names the mate and says the
+    # bore is plain and fixed there. HOW it is fixed is an assembly method
+    # (rule 6; #906, Main 2026-09-26): the solder/braze route and the
+    # retaining-compound permission print on the drive-train sheet's step 1,
+    # from the same two constants.
+    assert lines[1] == (
+        f"PLAIN BORE, NO KEYWAY: FIXED TO THE {notes.SHAFT_MATE_NUMBER} SHAFT SEAT"
+        " AT ASSEMBLY."
+    )
+    assert notes.ATTACHMENT_PROCESS not in text
+    assert notes.ATTACHMENT_ALTERNATIVE not in text
+    import draw_drive_train_assembly as dt
+
+    assert notes.ATTACHMENT_PROCESS in dt.CONE_CRANK_STEPS
+    assert notes.ATTACHMENT_ALTERNATIVE in dt.CONE_CRANK_STEPS
     # Both routes are permitted, so the line that offers the alternative has
     # to read as a permission, not as a second instruction.
     assert "ACCEPTABLE" in notes.ATTACHMENT_ALTERNATIVE
@@ -378,15 +403,12 @@ def test_notes_carry_the_part_specific_facts_and_never_the_title_block() -> None
     assert notes.SHAFT_MATE_NUMBER == _config.parts("cone-gear-shaft")["number"]
     assert notes.SHAFT_MATE_NUMBER != _config.parts("crank-drive-gear")["number"]
     # Rule 6, "never a dimension": the ONLY digits allowed anywhere in the
-    # notes block are the mate's part number and the compound designations. A
-    # size, a limit, a depth or a station typed into a note is what this pins.
-    named = text.replace(notes.SHAFT_MATE_NUMBER, "").replace(
-        notes.ATTACHMENT_ALTERNATIVE, ""
-    )
+    # notes block are the mate's part number.
+    named = text.replace(notes.SHAFT_MATE_NUMBER, "")
     assert not any(ch.isdigit() for ch in named)
     # Rule 6's budget: at most four short lines, each short enough to clear
     # the title-block keep-out from the notes anchor at x = 16 mm.
-    assert len(lines) == 3
+    assert len(lines) == 2
     assert all(len(line) <= 90 for line in lines)
     # The attachment note must not re-print the bore that the face view
     # already dimensions and bands, and must not invent an axial requirement:
