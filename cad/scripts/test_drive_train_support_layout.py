@@ -88,10 +88,17 @@ def test_return_spring_foot_is_outboard_east_of_the_strap_and_block() -> None:
     assert rocker_near_face - drive.SPRING_FOOT_TAN_X >= 0.25
 
 
-def test_return_spring_preload_and_stress_hold_across_the_swing() -> None:
-    # Parked (formed band's low end) the leaf beats gravity, engaged it still
-    # returns the cluster, and the engaged root stress keeps its SF on yield.
+def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
+    # #859 (Codex l4dOj; Main's rulings 1-4): the gates hold at the CORNERS of
+    # the stock and formed bands, not at the nominal.  The leaf is formed to
+    # the nominal inside profile, so a thicker strip shifts the contact face
+    # into the flank by its excess.  Soft corner: thinnest, narrowest strip at
+    # the formed band's low end, against the heavier (brass 8800) gravity.
+    # Stiff corner: thickest strip at the band's high end, engaged.
     import pinion_spring_geometry as leaf
+    import pinion_spring_section as section
+    from _fit_limits import deviations
+    from _printed_tolerance import printed_deviations
 
     parked, engaged = drive.SPRING_DEFLECTION
     assert parked == pytest.approx(leaf.PRESET)
@@ -99,9 +106,102 @@ def test_return_spring_preload_and_stress_hold_across_the_swing() -> None:
         drive._spr_station[-1] * drive._PHI_ENG, rel=0.05
     )
     band = leaf.FORMED_BAND_MM
-    assert leaf.contact_force(parked - band) * 23.0 > drive._SWING_GRAVITY_NMM[0]
-    assert leaf.contact_force(engaged - band) * 23.0 > drive._SWING_GRAVITY_NMM[1]
-    assert leaf.YIELD_MPA / leaf.root_stress(engaged) >= 1.5
+    t_lo, t_hi = (section.THICK + d for d in deviations(section.THICK_BAND))
+    w_lo = section.WIDTH + printed_deviations(section.WIDTH, section.WIDTH_PLACES)[0]
+    assert t_lo < section.THICK < t_hi and w_lo < section.WIDTH
+    gravity = drive.SWING_GRAVITY_CORNER_NMM
+    assert all(c >= n for c, n in zip(gravity, drive.SWING_GRAVITY_NMM, strict=True))
+    for deflection, station, moment in zip(
+        drive.SPRING_DEFLECTION,
+        (drive._spr_station[0], drive._spr_station[-1]),
+        gravity,
+        strict=True,
+    ):
+        soft = deflection - band + (t_lo - section.THICK)
+        assert leaf.contact_force(soft, t_lo, w_lo) * station >= 1.5 * moment
+    stiff = engaged + band + (t_hi - section.THICK)
+    assert leaf.YIELD_MPA / leaf.root_stress(stiff, t_hi) >= 1.5
+    assert min(drive.SPRING_PRELOAD_RATIO) >= 1.5
+    assert drive.SPRING_STRESS_SF >= 1.5
+
+
+def test_swing_gravity_basis_is_the_current_parts() -> None:
+    # Main (#859 restricted review, change 7): the gravity moments were
+    # computed at SWING_GRAVITY_BASIS.  A part whose volume, governing
+    # dimensions or material moved since fails here, naming the constants to
+    # re-measure.
+    import alignment_pinion_spec as drum_spec
+    import build_alignment_pinion as drum
+    import build_pinion_arbor as arbor
+    import build_pinion_arbor_collar as collar
+    import build_pinion_bracket as strap
+    import build_pinion_cam_pin as cam_pin
+    import build_pinion_handle as handle
+    import build_pinion_pivot_shaft as shaft
+    import pinion_bracket_geometry as strap_geometry
+
+    density = {"Brass": 8500.0, "Plain Carbon Steel": 7800.0}
+    materials = {
+        "alignment-pinion": drum.MATERIAL,
+        "pinion-arbor": arbor.MATERIAL,
+        "pinion-pivot-shaft": shaft.MATERIAL,
+        "pinion-bracket": strap.MATERIAL,
+        "pinion-arbor-collar": collar.MATERIAL,
+        "pinion-handle": handle.MATERIAL,
+        "pinion-cam-pin": cam_pin.MATERIAL,
+    }
+    volumes = {
+        "pinion-arbor": arbor.V_TOTAL,
+        "pinion-pivot-shaft": shaft.V_SHAFT
+        + 2.0 * shaft.V_CAP
+        - 2.0 * shaft._pin_hole_removed(),
+        "pinion-arbor-collar": collar.V_COLLAR - collar.V_PIN_HOLE,
+        "pinion-handle": handle.V_ROD,
+        "pinion-cam-pin": cam_pin.V_PIN + cam_pin.V_CAP,
+    }
+    # The drum's and the strap's c486 mesh volumes stand for these dimensions.
+    dimensions = {
+        "alignment-pinion": (
+            (
+                drum_spec.TEETH,
+                drum_spec.DIAMETRAL_PITCH,
+                drum_spec.FACE_WIDTH,
+                drum_spec.BORE_DIA,
+            ),
+            (32, 49.82, 143.2, 8.0),
+        ),
+        "pinion-bracket": (
+            (
+                strap_geometry.WIDTH,
+                strap_geometry.C2C,
+                strap_geometry.THICKNESS,
+                strap_geometry.PIVOT_BORE,
+                strap_geometry.ARBOR_BORE,
+                strap_geometry.PIN_BORE,
+                strap_geometry.PIN_SEAT,
+            ),
+            (15.0, 28.0, 9.0, 6.35, 8.0, 4.0, 4.0),
+        ),
+    }
+    basis = drive.SWING_GRAVITY_BASIS
+    assert set(basis) == set(materials) == set(volumes) | set(dimensions)
+    stale = [
+        name for name, (_n, _v, rho) in basis.items() if density[materials[name]] != rho
+    ]
+    stale += [
+        name
+        for name, volume in volumes.items()
+        if not math.isclose(basis[name][1], volume, abs_tol=0.01)
+    ]
+    stale += [
+        name
+        for name, (now, then) in dimensions.items()
+        if not all(math.isclose(a, b) for a, b in zip(now, then, strict=True))
+    ]
+    assert not stale, (
+        f"{stale} moved since SWING_GRAVITY_BASIS: re-measure SWING_GRAVITY_NMM "
+        "and SWING_GRAVITY_CORNER_NMM, then update the basis"
+    )
 
 
 def test_base_holes_follow_the_rederived_support() -> None:
@@ -1195,6 +1295,21 @@ def test_spring_leaf_clears_the_lift_rod_envelope(monkeypatch) -> None:
     reach = drive.SPRING_TO_LIFT_ROD + leaf.FORMED_BAND_MM
     with pytest.raises(AssertionError, match="lift rod's collar sweep"):
         _drive_with(monkeypatch, leaf, "FORMED_BAND_MM", reach)
+
+
+def test_foot_screw_bottoming_gate_reads_the_thinnest_strip(monkeypatch) -> None:
+    # Main (#859 restricted review, change 4): the bottoming gate booked the
+    # nominal strip.  A seat sized for the nominal strip passes that booking,
+    # but the thinnest strip the stock band allows runs the screw past its
+    # 0.25 tip reserve, and the gate must see it.
+    import build_harmonic_base as base
+
+    assert drive._SPR_T_LO < drive.SPRING_T
+    seat = drive.FSCREW_SHANK_LEN - drive.SPRING_T + 0.25 + 0.005
+    assert seat - (drive.FSCREW_SHANK_LEN - drive.SPRING_T) >= 0.25
+    assert seat - (drive.FSCREW_SHANK_LEN - drive._SPR_T_LO) < 0.25
+    with pytest.raises(AssertionError, match="bottoms out in the base spring seat"):
+        _drive_with(monkeypatch, base, "FOOT_SCREW_HOLE_DEPTH", seat)
 
 
 def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
