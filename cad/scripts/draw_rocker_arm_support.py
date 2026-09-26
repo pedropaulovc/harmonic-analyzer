@@ -103,14 +103,23 @@ ISO_CENTER = (0.350, 0.201)
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position (meters). Every front-view callout is outside the part silhouette:
-# overall size above, nested pocket sizes below, radii left.
+# overall size above, nested pocket sizes below, radii beside their corners.
 FRONT_KEEP = {
     "Depth": (0.105, 0.258),
     "PocketRadius": (0.035, 0.150),
-    "CavityRadius": (0.035, 0.190),
-    "WinWidth": (0.105, 0.118),
+    # CornerFillet's dimension belongs to the cavity's top-right corner (the
+    # fix3 render), so the text sits up-right of that corner, on the arc's
+    # own bisector. From the left column its leader crossed the whole cavity
+    # and landed on the far side of the fillet's circle, off the arc.
+    "CavityRadius": (0.160, 0.240),
+    # Each stacked width prints its text just above its own dimension line,
+    # so the lower one needs a full band: at 0.118 the 127.0 line ran
+    # through "165.1" (fix3 render).
+    "WinWidth": (0.105, 0.110),
     "CavWidth": (0.105, 0.128),
 }
+# The cavity corner CornerFillet's dimension attaches to, as sheet signs.
+CAVITY_RADIUS_CORNER = (1, 1)
 DIMENSION_CALLOUTS = {
     "PocketRadius": "8X",
     "CavityRadius": "4X",
@@ -152,7 +161,7 @@ def imported_precision() -> dict[str, int]:
 # not applied), which r743-rocker-fix3's render measured at ~2.76 mm per
 # character and a 4.5 mm line pitch. The 21-character wrap still crossed the
 # Depth extension line at x 0.0605, so no line exceeds 15 characters: the
-# note fills the column left of the front view, above the R12.7 callout.
+# note fills the column left of the front view, above the R6.35 callout.
 SEAT_NOTE = (
     f"{len(SEAT_LOCAL_X)}X {SCREW_THREAD} UNC-2B\n"
     f"{SEAT_THREAD_DEPTH:.1f} DEEP\n"
@@ -192,6 +201,12 @@ RIGHT_KEEP = {
 # remaining clear of the isometric and title block.
 HOLE_TABLE_ANCHOR = (0.270, 0.130)
 HOLE_TABLE_DATUM_XZ_MM = (-BOSS_DEPTH / 2.0, -WIDE)
+# Native hole tags land up-right of their holes. At the bottom view's right
+# end that printed A3 and A4 across the pocket's hidden end lines (fix3
+# render), so both move to the mirror spot left of their holes: twice the
+# 4.6 mm hole-to-tag gap plus the 5.8 mm tag width, measured on A4 there.
+RIGHT_END_HOLE_TAGS = ("A3", "A4")
+HOLE_TAG_MIRROR_SHIFT = -0.0150
 EXPECTED_HOLE_TABLE_LOCATIONS_MM = (
     (149.22, 49.21),
     (28.58, 49.21),
@@ -207,6 +222,40 @@ def _bottom_sheet_xy(hole_xz: tuple[float, float]) -> tuple[float, float]:
         BOTTOM_CENTER[0] + x_mm * VIEW_SCALE / 1000.0,
         BOTTOM_CENTER[1] + (z_mm + HOLE_DIA / 2.0) * VIEW_SCALE / 1000.0,
     )
+
+
+def _mirror_right_end_hole_tags(view: Any) -> dict[str, tuple[float, float]]:
+    """Shift the right-end hole tags left of their holes; return old -> new x."""
+    moved: dict[str, tuple[float, float]] = {}
+    for raw in _early_bound(view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw, "IAnnotation")
+        if int(annotation.GetType()) != 6:  # swNote
+            continue
+        note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
+        tag = str(note.GetText()).strip()
+        if tag not in RIGHT_END_HOLE_TAGS:
+            continue
+        if tag in moved:
+            raise RuntimeError(f"duplicate bottom-view hole tag {tag}")
+        x, y = (float(value) for value in annotation.GetPosition()[:2])
+        if x < BOTTOM_CENTER[0]:
+            raise RuntimeError(f"hole tag {tag} is not at the right end: x={x:.4f}")
+        target = (x + HOLE_TAG_MIRROR_SHIFT, y)
+        if not annotation.SetPosition2(*target, 0.0):
+            raise RuntimeError(f"failed to move hole tag {tag}")
+        after = tuple(float(value) for value in annotation.GetPosition()[:2])
+        if max(abs(a - b) for a, b in zip(after, target)) > 1e-6:
+            raise RuntimeError(f"hole tag {tag} landed at {after!r}, not {target!r}")
+        if str(note.GetText()).strip() != tag:
+            raise RuntimeError(f"moving hole tag {tag} changed its text")
+        moved[tag] = (x, after[0])
+    if set(moved) != set(RIGHT_END_HOLE_TAGS):
+        raise RuntimeError(
+            f"bottom-view hole tags {sorted(set(RIGHT_END_HOLE_TAGS) - set(moved))} "
+            "not found"
+        )
+    _telemetry.info(f"bottom-view hole tags moved left of their holes: {moved}")
+    return moved
 
 
 def _bottom_datum_axes(adapter: Any, view: Any) -> tuple[Any, Any]:
@@ -568,6 +617,7 @@ async def build(adapter: Any) -> dict[str, str]:
         basic_locations=False,
         label="rocker-arm-support",
     )
+    _mirror_right_end_hole_tags(bottom)
     # The drawing-sketch datum and hole table leave the bottom view's HLV edge
     # set stale, so restore its complete projected edge set before export.
     set_hidden_lines_visible(adapter, bottom)
