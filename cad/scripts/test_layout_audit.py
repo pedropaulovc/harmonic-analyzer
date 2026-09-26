@@ -2709,7 +2709,7 @@ def test_a_dimensions_own_extension_line_through_its_text_gates():
     extension lines, printed with its own collar-face witness line through
     "0" and "7". text-on-line skips an annotation's own ink, so nothing saw
     it. A witness line that only touches a row's corner is not a strike."""
-    from _layout_audit import find_extension_through_own_text
+    from _layout_audit import find_lines_through_own_text
     from _layout_geometry import AnnotationGeometry, SheetGeometry
 
     text = Box(0.1000, 0.1000, 0.1150, 0.1035)
@@ -2727,12 +2727,97 @@ def test_a_dimensions_own_extension_line_through_its_text_gates():
         )
 
     struck = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (dim(0.1080),), 0.6)
-    [finding] = find_extension_through_own_text(struck)
+    [finding] = find_lines_through_own_text(struck)
     assert finding.kind == "extension-through-own-text"
     assert severity(finding) is FindingSeverity.GATING
     assert finding.extra["overlap_mm"] == pytest.approx(3.5 - 0.4, abs=0.01)
     touching = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (dim(0.1150),), 0.6)
-    assert find_extension_through_own_text(touching) == []
+    assert find_lines_through_own_text(touching) == []
+
+
+def test_a_dimensions_own_dimension_line_through_its_text_gates():
+    """Main's gate-gap sweep (2): a dimension line struck through its own
+    text had no finder -- text-on-line skips an annotation's own ink and the
+    own-text finders covered only witness lines and leaders. The line the
+    text sits on (along the row's baseline) is not a strike, and nor is a
+    line clear of the row."""
+    from _layout_audit import find_lines_through_own_text
+    from _layout_geometry import AnnotationGeometry, SheetGeometry
+
+    text = Box(0.1000, 0.1000, 0.1150, 0.1035)
+
+    def dim(line_y):
+        return AnnotationGeometry(
+            "dim Chamfer '21.0'",
+            "dim",
+            "v",
+            (text,),
+            (
+                Segment(0.0950, line_y, 0.1200, line_y, "dim-line"),
+                Segment(0.0950, 0.0900, 0.0950, 0.1100, "ext-line"),
+            ),
+        )
+
+    struck = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (dim(0.1017),), 0.6)
+    [finding] = find_lines_through_own_text(struck)
+    assert finding.kind == "dim-line-through-own-text"
+    assert severity(finding) is FindingSeverity.GATING
+    assert finding.extra["overlap_mm"] == pytest.approx(15.0 - 0.4, abs=0.01)
+    for clear in (0.1000, 0.0995):  # on the baseline, below the row
+        sheet = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (dim(clear),), 0.6)
+        assert find_lines_through_own_text(sheet) == []
+
+
+# cone-gear-shaft Sheet1's "Ra 1.6" finish symbol (DetailItem351) as the
+# layoutcal2 leaf dumped it (95a9e97ca): its registered leader, the display
+# copy of that leader's two runs (first two lines), the symbol's own strokes.
+FINISH_LEADER = [0.24125, 0.18, 0.0, 0.23365, 0.18, 0.0, 0.2326, 0.1561154, 0.0]
+FINISH_SYMBOL_LINES = [
+    (0.24, 0.18, 0.237835, 0.18375),
+    (0.242165, 0.18375, 0.237835, 0.18375),
+    (0.24, 0.18, 0.2442135, 0.1871425),
+    (0.2415305, 0.1856117, 0.2384695, 0.1856117),
+    (0.2442135, 0.1871425, 0.2546457, 0.1871425),
+]
+
+
+def _finish_symbol(leader):
+    runs = [(leader[i], leader[i + 1], leader[i + 3], leader[i + 4]) for i in range(0, len(leader) - 3, 3)]
+    return {
+        "type": 7,
+        "name": "DetailItem351",
+        "visible": 1,
+        "owner_type": 0,
+        "pos": [0.24, 0.18, 0.0],
+        "leaders": [list(leader)],
+        "display": {
+            "lines": [_line(*line) for line in (*runs, *FINISH_SYMBOL_LINES)],
+            "arrows": [[0.2326, 0.1561154, 0.0, 0.043919, 0.9990351, -0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]],
+            "texts": [{"t": "Ra 1.6", "pos": [0.245, 0.1835713, 0.0], "h": 0.0025, "ref": 1, "ang": 0.0}],
+        },
+    }
+
+
+def test_a_finish_symbols_leader_through_its_own_text_gates():
+    """Main's gate-gap sweep (3), MHA-116's crown Ra: a finish symbol's leader
+    reaches the audit as ``leader`` (its registered GetLeaderPointsAtIndex
+    runs; the display copy is dropped), so a leader struck back through its
+    own "Ra" text is leader-through-own-text. The real symbol, leader clear
+    of its text, is the positive control."""
+    view = (0.15, 0.10, 0.30, 0.25)
+
+    def own_strikes(annotation):
+        dump = _dump(views=[_view("v", view, [annotation])])
+        return [f for f in audit_dump(dump) if f.kind == "leader-through-own-text"]
+
+    assert own_strikes(_finish_symbol(FINISH_LEADER)) == []
+    # Attached right of the text, the leader runs back left along the row
+    # at mid-height before it drops to the face.
+    struck = [0.2570, 0.1855, 0.0, 0.2430, 0.1855, 0.0, 0.2326, 0.1561154, 0.0]
+    [finding] = own_strikes(_finish_symbol(struck))
+    assert finding.a == finding.b
+    assert "surface-finish" in finding.a
+    assert severity(finding) is FindingSeverity.GATING
 
 
 def test_a_hole_callout_over_the_top_border_gates_estimated_or_printed():
