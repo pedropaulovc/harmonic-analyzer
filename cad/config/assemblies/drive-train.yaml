@@ -57,6 +57,8 @@ allowed_free_stems:
   - cylinder-gear
   - fillister-screw
   - pinion-arbor
+  # MHA-144: lock-mated to MHA-102, it rides the freed engage swing.
+  - pinion-arbor-collar
   - pinion-bracket
   - pinion-cam
   - pinion-cam-pin

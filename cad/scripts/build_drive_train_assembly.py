@@ -826,7 +826,13 @@ from pinion_arbor_geometry import (  # noqa: E402
     NECK_END_Z as ARBOR_NECK_END_Z,
     NECK_LEN as ARBOR_NECK_LEN,
     NECK_LEN_PLACES as ARBOR_NECK_LEN_PLACES,
+    PIN_Z as ARBOR_PIN_Z,
     SHAFT_DIA as ARBOR_DIA,
+)
+from pinion_arbor_collar_geometry import (  # noqa: E402
+    COLLAR_LEN as ARBOR_COLLAR_LEN,
+    COLLAR_OD as ARBOR_COLLAR_OD,
+    PIN_HOLE_Z as ARBOR_COLLAR_PIN_Z,
 )
 from pinion_bracket_geometry import (  # noqa: E402
     ARBOR_BORE as STRAP_ARBOR_BORE,
@@ -1455,6 +1461,11 @@ HANDLE_ROWS = [
 # one Rz pose; the circular arbor shaft stays on the same machine-Z journal
 # axis while its cross-hole clocks onto the rod.
 ARBOR_ROWS = HANDLE_ROWS
+# R1a (user, 2026-09-24): the MHA-144 collar is spring-pinned to MHA-102 at its
+# printed pin station.  Both pin holes run along their parts' local +Y, so the
+# collar shares the arbor's pose and its centred hole lands on the arbor's.
+ARBOR_COLLAR_Z0 = ARBOR_Z0 + ARBOR_PIN_Z - ARBOR_COLLAR_PIN_Z
+ARBOR_COLLAR_Z = (ARBOR_COLLAR_Z0, ARBOR_COLLAR_Z0 + ARBOR_COLLAR_LEN)
 
 if abs(math.hypot(PIVOT_X - APINION_X, APINION_Y - PIVOT_Y) - STRAP_C2C) > 0.001:
     raise AssertionError("strap c2c does not span pivot -> pinion axis")
@@ -1542,7 +1553,15 @@ else:
     _LEV_STUB_D = math.hypot(
         _LEV_REL[0] - _end * _LEV_U[0], _LEV_REL[1] - _end * _LEV_U[1]
     )
-if _LEV_STUB_D < (ARBOR_DIA + LEVER_ROD_DIA) / 2.0 + 0.25:
+# Where the rod plane shares the collar's z band, the Ø15 collar -- not the
+# Ø8 shaft -- is what the lever passes.
+_LEV_ROD_Z = (LEVER_Z - 3.0, LEVER_Z + 3.0)
+_ARBOR_DIA_AT_LEVER = (
+    ARBOR_COLLAR_OD
+    if _LEV_ROD_Z[0] < ARBOR_COLLAR_Z[1] + 0.25 and _LEV_ROD_Z[1] > ARBOR_COLLAR_Z[0] - 0.25
+    else ARBOR_DIA
+)
+if _LEV_STUB_D < (_ARBOR_DIA_AT_LEVER + LEVER_ROD_DIA) / 2.0 + 0.25:
     raise AssertionError("lever shaft crowds the pinion arbor")
 
 # --- pinion return spring (ch. 25, p.68-69): keeps the drum disengaged -------
@@ -1916,9 +1935,9 @@ for _step in range(_LEV_SWEEP_STEPS + 1):
             _LEV_REL[0] - _end * _u[0],
             _LEV_REL[1] - _end * _u[1],
         )
-    if _d < (ARBOR_DIA + LEVER_ROD_DIA) / 2.0 + 0.25:
+    if _d < (_ARBOR_DIA_AT_LEVER + LEVER_ROD_DIA) / 2.0 + 0.25:
         raise AssertionError("lever shaft crowds the arbor mid-throw")
-_LEV_Z = (LEVER_Z - 3.0, LEVER_Z + 3.0)  # rod plane through the throw
+_LEV_Z = _LEV_ROD_Z  # rod plane through the throw
 if (
     _LEV_Z[0] < BLOCK_FRONT_Z0 + BLOCK_DEPTH + 0.25
     and _LEV_Z[1] > BLOCK_FRONT_Z0 - 0.25
@@ -2092,6 +2111,33 @@ if _THIN:
 # (The PR5 rod-pin throw checks died with the pins; the cam block above
 # bounds the collar sweep against the base, spring foot and shaft.)
 
+# The MHA-144 collar rides the arbor outboard of the front strap.  It must
+# stand clear of the strap's outer face (the printed-band stack lives in
+# pinion_arbor_collar_spec) and of every rig body whose z band it shares:
+# the lift rod and pivot shaft by radial distance between parallel axes (the
+# front pivot block, by height, once BLOCK_TOP_Y is derived below).
+if ARBOR_COLLAR_Z[1] > RIG.STRAP_Z_OUTER[0] - 0.25:
+    raise AssertionError("arbor collar reaches the front strap's outer face")
+if ARBOR_COLLAR_Z[0] < _GRIP_HEAD_Z[1] + 0.25:
+    raise AssertionError("arbor collar reaches the integral grip head's neck")
+for _lo, _hi, _axis_xy, _r, _what in (
+    (LIFT_ROD_Z0, LIFT_ROD_Z0 + RIG.LIFT_ROD_LEN, (LIFT_X, LIFT_Y), 3.175, "lift rod"),
+    (
+        PIVOT_SHAFT_Z0,
+        PIVOT_SHAFT_Z0 + RIG.TORQUE_SHAFT_LEN,
+        (PIVOT_X, PIVOT_Y),
+        3.175,
+        "pivot shaft",
+    ),
+):
+    if _hi < ARBOR_COLLAR_Z[0] - 0.25 or _lo > ARBOR_COLLAR_Z[1] + 0.25:
+        continue
+    if (
+        math.hypot(_axis_xy[0] - APINION_X, _axis_xy[1] - APINION_Y)
+        < ARBOR_COLLAR_OD / 2.0 + _r + 0.25
+    ):
+        raise AssertionError(f"arbor collar crowds the {_what}")
+
 # --- pinion arbor + rig fasteners (PR7 items 2/11/12/14) ---------------------
 # The steel Ø8 arbor slips through the drum (bonded) and journals in both
 # straps' top bores.  Its turned head/neck are integral; MHA-058 is only the
@@ -2159,6 +2205,14 @@ for _want, _have in zip(_BLOCK_SCREW_XZ, BASE_BLOCK_XZ, strict=True):
             f"harmonic-base block-screw hole {_have} != machine derived "
             f"({_want[0]:.3f}, {_want[1]:.3f})"
         )
+# The MHA-144 collar can share the front pivot block's z band; its underside
+# must then clear the block's flat top.
+if (
+    BLOCK_FRONT_Z0 < ARBOR_COLLAR_Z[1] + 0.25
+    and BLOCK_FRONT_Z0 + BLOCK_DEPTH > ARBOR_COLLAR_Z[0] - 0.25
+    and APINION_Y - ARBOR_COLLAR_OD / 2.0 < BLOCK_TOP_Y + 0.25
+):
+    raise AssertionError("arbor collar sits on the front pivot block")
 # Exact 90280A108 #4-40 x 9.525 stock screws pass through the spring and
 # pedestal's normal #4 clearances into the base's #4-40 UNC-2B seats.
 _require_clearance_size("pinion spring foot", FSCREW_THREAD, SPR_HOLE_SPEC)
@@ -2270,6 +2324,16 @@ for _z_strap, _z_hole in zip(
     if abs(PIVOT_SHAFT_Z0 + _z_hole * TORQUE_SHAFT_ROWS[2][2] - _z_strap) > 1e-9:
         raise AssertionError("a strap cross hole is not coaxial with its torque-shaft hole")
 LEVER_ROWS = rot_z_rows(LEVER_TILT_DEG)
+# R1a: the MHA-144 collar's spring pin is the stock MHA-145, whose axis is its
+# local X.  The collar's and MHA-102's pin holes run along their local +Y
+# under ARBOR_ROWS, so the pin turns a further 90 about Z; its centre is the
+# arbor's printed pin station, where the collar's centred hole lands.
+COLLAR_PIN_ROWS = rot_z_rows(HANDLE_TILT_DEG + 90.0)
+COLLAR_PIN_Z = ARBOR_COLLAR_Z0 + ARBOR_COLLAR_PIN_Z
+if any(abs(a - b) > 1e-9 for a, b in zip(COLLAR_PIN_ROWS[0], ARBOR_ROWS[1])):
+    raise AssertionError("collar spring pin axis is not the arbor's pin-hole axis")
+if abs(COLLAR_PIN_Z - (ARBOR_Z0 + ARBOR_PIN_Z)) > 1e-9:
+    raise AssertionError("collar pin hole is off the arbor's pin station")
 PINION_CAM_ROWS = IDENTITY
 # Rod Top-plane normal (local +Y) against the assembly Right normal (+X): the
 # freed pinion_cam spin's rest dihedral -- 90 + LEVER_TILT_DEG.
@@ -2788,6 +2852,25 @@ async def build(adapter) -> dict[str, str]:
         ARBOR_ROWS,
         ground=False,
         label="pinion-arbor (integral steel arbor and grip head)",
+    )
+    arbor_collar = await place_component(
+        adapter,
+        "pinion-arbor-collar",
+        [APINION_X, APINION_Y, ARBOR_COLLAR_Z0],
+        [0.0, 0.0, HANDLE_TILT_DEG],
+        ARBOR_ROWS,
+        ground=False,
+        label="pinion-arbor-collar (spring-pinned walk-out backstop)",
+    )
+    # Its MHA-145 spring pin through collar and arbor.
+    collar_pin = await place_component(
+        adapter,
+        "pinion-strap-pin",
+        [APINION_X, APINION_Y, COLLAR_PIN_Z],
+        euler_from_rows(COLLAR_PIN_ROWS),
+        COLLAR_PIN_ROWS,
+        ground=False,
+        label="pinion-strap-pin collar (MHA-145 through MHA-144 and MHA-102)",
     )
     # Rig hold-downs (PR7 items 2/11/12): physically located seeds are patterned
     # across the repeated block/pedestal stations in the joints section below.
@@ -4342,6 +4425,22 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{grip_crossrod}", "PLANE"),
         named_ref(f"Front Plane@{pinion_arbor}", "PLANE"),
         label="grip crossrod bonded in the integral arbor head",
+    )
+    # R1a: the collar is spring-pinned to the arbor, so it LOCKs to it and
+    # rides the engage swing with no added DOF.
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{arbor_collar}", "PLANE"),
+        named_ref(f"Front Plane@{pinion_arbor}", "PLANE"),
+        label="arbor collar spring-pinned to the arbor",
+    )
+    # Its pin is line-to-line in both 1/16 holes (no interference row, as the
+    # strap pins) and rides the collar.
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{collar_pin}", "PLANE"),
+        named_ref(f"Front Plane@{arbor_collar}", "PLANE"),
+        label="collar spring pin locked in the collar",
     )
 
     # DRIVER #1 (the single machine input): the crank angle. The arm hangs at
