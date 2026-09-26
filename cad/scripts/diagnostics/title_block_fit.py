@@ -38,10 +38,14 @@ def _width(font, text: str) -> float:
 
 
 def lines(font, text: str, width: float = WRAP_PX) -> int:
+    """Greedy word-wrap line count. A word wider than ``width`` cannot wrap
+    at all, so it counts one line past the cell: an overflow, never a fit."""
     count, line = 1, ""
     for word in text.split():
+        if _width(font, word) > width:
+            return count + (2 if line else 1)
         trial = f"{line} {word}".strip()
-        if _width(font, trial) <= width or not line:
+        if _width(font, trial) <= width:
             line = trial
             continue
         count, line = count + 1, word

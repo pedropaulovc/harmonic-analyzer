@@ -293,3 +293,19 @@ def test_both_templates_carry_both_cells_inside_the_title_block():
         assert material[0] >= template.title_block_left_m and material[3] <= template.title_block_top_m
         assert finish[1] == material[3] and finish[3] <= template.title_block_top_m
         assert material[2] - material[0] == pytest.approx(0.0924)
+
+
+def test_the_forecast_never_fits_a_word_wider_than_the_cell():
+    """Codex P2 on 2136fe470: an unbreakable token wider than the wrap was
+    accepted as a first line and read as fitting one line."""
+    PIL = pytest.importorskip("PIL.ImageFont")
+    from diagnostics import title_block_fit
+
+    if not title_block_fit.FONT.is_file():
+        pytest.skip("Century Gothic is not installed")
+    font = PIL.truetype(str(title_block_fit.FONT), 100)
+    token = "X" * 80
+    assert title_block_fit.lines(font, token) == 2
+    assert title_block_fit.lines(font, f"steel {token}") == 3
+    assert title_block_fit.lines(font, "AISI O1 tool steel") == 1
+    assert title_block_fit.lines(font, "AISI O1 tool steel, hardened and tempered to 58-60 HRC after machining") == 2
