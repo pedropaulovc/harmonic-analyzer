@@ -11,9 +11,11 @@ grows with distance from the pivot, so pivoting at the TIP gives the
 big-end gears the largest throw.
 
 Plan shape is the p.18 wedge, ASYMMETRIC about the shaft line: the east
-side tapers 16 -> 24 half-width, the west side flares 8 -> 37 so the
+side tapers 16 -> 24 half-width, the west side flares out to 37 so the
 run from the swing pivot to the cone-lock-knob is SOLID plate (no lobe
-protrusion); the open LOCK NOTCH cuts straight into the west edge. The
+protrusion); the open LOCK NOTCH cuts straight into the west edge.  The
+west edge's north end is derived from the tip block's full west reach
+(I31).  The
 four plan corners are rounded, echoing the hardware each sits beside
 (pivot screw head at the north end, the green column at the south-east,
 the lock-knob head at the south-west). A native close-clearance Ø6.756 pivot
@@ -45,6 +47,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import itertools
 import math
 from dataclasses import dataclass
 import sys
@@ -61,7 +64,6 @@ from _common import (
     apply_material,
     check,
     define_circle,
-    define_polygon_chain,
     dimension_between,
     drive_dimension,
     ensure_fully_defined,
@@ -87,12 +89,17 @@ from _holes import wizard_holes
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from build_cone_lock_knob import HEAD_DIA as LOCK_HEAD_DIA
+from build_cone_lock_knob import STUD_DIA as LOCK_STUD_DIA
 from cone_swing_platform_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FEATURE_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
+    LOCK_STUD_MAJOR,
+    NOTCH_MOUTH_ANGLE_DEG,
     NOTCH_VIEW_NOTE,
+    NOTCH_W,
+    NOTCH_W_BAND,
     PIVOT_BEARING_RELIEF_DEPTH,
     PIVOT_BEARING_RELIEF_DIAMETER,
     PIVOT_BEARING_THICKNESS,
@@ -108,13 +115,21 @@ from cone_swing_platform_spec import (
     POST_MOUNT_TAP_DIA,
     PROFILE_VIEW_NOTE,
     SURFACE_FINISHES,
+    TIP_BLOCK_EDGE_MARGIN,
+    TIP_BLOCK_NORTH_REACH_Z,
+    TIP_BLOCK_WEST_REACH,
     TIP_CBORE_DEPTH,
     TIP_CBORE_W,
+    TIP_CBORE_W_BAND,
+    TIP_CBORE_W_MAX,
     TIP_SCREW_HALF_TRAVEL,
     TIP_SCREW_LOCAL_Z,
     TIP_SLOT_W,
     TIP_SLOT_W_BAND,
+    TITLE_BLOCK_BAND_BY_PLACES,
+    assert_notch_stud_stack,
 )
+from _fit_limits import deviations
 
 PART_NAME = "cone-swing-platform"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel plate (p.18 dark wedge)
@@ -122,9 +137,6 @@ MATERIAL = "Plain Carbon Steel"  # black-finished steel plate (p.18 dark wedge)
 PLATE_T = PLATE_THICKNESS  # 1/4" plate
 HALF_WIDTH_N = 16.0  # north (pivot/tip) half-width, EAST side (the lock-slot
 # region keeps its full seat)
-WEST_HALF_N = 8.0  # north half-width, WEST side.  The recentered north arbor
-# pedestal otherwise clips the flared edge; 8.0 leaves 0.37 mm exact plan
-# clearance while retaining the close photo relationship in ch12 img09.
 EAST_HALF_S = 24.0  # widened for the v2 post's Ø42.011 casting foot
 WEST_HALF_S = 37.0  # west half-width at the south end: the flare that makes
 # the pivot -> lock-knob line solid plate (covers the notch seat + collar)
@@ -155,6 +167,87 @@ POST_LOCAL_Z = POST_STATION - PIVOT_STATION
 POST_SOUTH_MARGIN = 3.175  # 1/8 in clearance beyond the post's south rim
 PLATE_SOUTH_Z = POST_LOCAL_Z - POST_MAIN_DIA / 2.0 - POST_SOUTH_MARGIN
 PLATE_LEN = NORTH_OVERHANG - PLATE_SOUTH_Z
+# North half-width, WEST side (I31 item 8, Main 2026-09-25: widen the plate,
+# do not narrow the block's travel).  The west edge runs straight from here
+# to WEST_HALF_S.  At the tip block's northmost station it keeps
+# TIP_BLOCK_EDGE_MARGIN outside the block's worst-case west reach (every
+# float and location band, cone_swing_platform_spec) with the outline itself
+# at the worst of its printed .X bands: both west corners' half-widths
+# (NorthWestX, SouthWestX), the north edge's station (NorthEdgeZ) and the
+# length to the south edge (PlateLenDim).  Rounded up to the outline's one
+# place.  The drive train proves the arbor pedestals and the base clear the
+# widened edge over the whole p1 swing.
+OUTLINE_BAND = 0.8  # .X title-block band on every outline dimension
+_OUTLINE_BAND_CASES = tuple(
+    itertools.product((-OUTLINE_BAND, OUTLINE_BAND), repeat=4)
+)
+
+
+def edge_half_width_worst(half_n: float, half_s: float, z_local: float) -> float:
+    """Narrowest half-width of one plan side (its north and south corner
+    half-widths given) at plate-local z, over the outline's .X bands."""
+    worst = math.inf
+    for d_xn, d_xs, d_zn, d_len in _OUTLINE_BAND_CASES:
+        z_n = NORTH_OVERHANG + d_zn
+        z_s = z_n - (PLATE_LEN + d_len)
+        run = (z_n - z_local) / (z_n - z_s)
+        x_n, x_s = half_n + d_xn, half_s + d_xs
+        worst = min(worst, x_n + (x_s - x_n) * run)
+    return worst
+
+
+def west_edge_x_worst(west_half_n: float, z_local: float) -> float:
+    """Narrowest west edge at plate-local z over the outline's .X bands."""
+    return edge_half_width_worst(west_half_n, WEST_HALF_S, z_local)
+
+
+def _west_half_n_required(reach: float, z_local: float) -> float:
+    required = -math.inf
+    for d_xn, d_xs, d_zn, d_len in _OUTLINE_BAND_CASES:
+        z_n = NORTH_OVERHANG + d_zn
+        z_s = z_n - (PLATE_LEN + d_len)
+        run = (z_n - z_local) / (z_n - z_s)
+        required = max(
+            required, (reach - (WEST_HALF_S + d_xs) * run) / (1.0 - run) - d_xn
+        )
+    return required
+
+
+TIP_WEST_EDGE_NEED = TIP_BLOCK_WEST_REACH + TIP_BLOCK_EDGE_MARGIN
+_WEST_HALF_N_REQUIRED = _west_half_n_required(TIP_WEST_EDGE_NEED, TIP_BLOCK_NORTH_REACH_Z)
+WEST_HALF_N = math.ceil(_WEST_HALF_N_REQUIRED * 10.0 - 1e-6) / 10.0
+TIP_WEST_EDGE_MARGIN_WORST = (
+    west_edge_x_worst(WEST_HALF_N, TIP_BLOCK_NORTH_REACH_Z) - TIP_BLOCK_WEST_REACH
+)
+if TIP_WEST_EDGE_MARGIN_WORST < TIP_BLOCK_EDGE_MARGIN - 1e-9:
+    raise AssertionError("tip block reaches past the worst-case west edge")
+# The 6.5 counterbored slot's webs at the printed worst case (U27: 2.0
+# target, 1.5 floor): to both plan edges across the slot's station band, and
+# along the axis to the pivot's bearing relief.  The slot's station
+# (TipSlotZ) and end centres (TipSlot*Cx) print .XX.
+_TIP_XX = 0.51
+_CBORE_HALF_Z = TIP_CBORE_W_MAX / 2.0 + _TIP_XX
+_CBORE_REACH_X = TIP_SCREW_HALF_TRAVEL + _TIP_XX + TIP_CBORE_W_MAX / 2.0
+TIP_CBORE_WEBS = {
+    "west edge": min(
+        west_edge_x_worst(WEST_HALF_N, TIP_SCREW_LOCAL_Z + dz)
+        for dz in (-_CBORE_HALF_Z, _CBORE_HALF_Z)
+    )
+    - _CBORE_REACH_X,
+    "east edge": min(
+        edge_half_width_worst(HALF_WIDTH_N, EAST_HALF_S, TIP_SCREW_LOCAL_Z + dz)
+        for dz in (-_CBORE_HALF_Z, _CBORE_HALF_Z)
+    )
+    - _CBORE_REACH_X,
+    "pivot relief": -TIP_SCREW_LOCAL_Z
+    - _CBORE_HALF_Z
+    - (PIVOT_BEARING_RELIEF_DIAMETER / 2.0 + _TIP_XX),
+}
+for _web_name, _web in TIP_CBORE_WEBS.items():
+    if _web < 2.0:
+        raise AssertionError(
+            f"tip counterbored slot leaves {_web:.3f} to the {_web_name} (< 2.0, U27)"
+        )
 POST_MOUNT_HALF_PITCH = POST_ATTACHMENT_SPACING / 2.0
 POST_MOUNT_X = POST_MOUNT_HALF_PITCH * _COS_I
 POST_MOUNT_DZ = POST_MOUNT_HALF_PITCH * _SIN_I
@@ -189,8 +282,10 @@ if POST_MOUNT_HALF_PITCH + POST_MOUNT_TAP_DIA / 2.0 > _POST_R:
 # on disengage the plate swings until its edge passes the stud and collar.
 # Tightened with no plate under it, the collar fences the mouth and locks the
 # plate disengaged; tightened on the plate it clamps the engaged pose.
-# The notch runs along the swing arc's CHORD: at R~192 over ~3 deg to the
-# mouth the sagitta is ~0.07, absorbed by the O6.35-stud-in-8.0 clearance.
+# The stud runs out along the swing arc's CHORD (sagitta ~0.02 at R~208
+# over the 2.76 to the mouth); the notch is cut within half a degree of it,
+# at the whole-degree mouth angle below, and the spec's stud stack carries
+# both against the O6.35-stud-in-8.0 clearance.
 #
 # LOCAL-FRAME CONVENTION: the assembly places this part at Ry(+INCLINE)
 # (train._plate_local_to_machine), under which local +x maps to machine WEST
@@ -213,96 +308,171 @@ _SLOT_TX, _SLOT_TZ = -SLOT_E_Z / SLOT_R, SLOT_E_X / SLOT_R
 
 
 def _west_edge_x(z_local: float) -> float:
-    """Authored x of the west taper edge at local z (linear 8 -> 37)."""
+    """Authored x of the west taper edge at local z (linear WEST_HALF_N -> 37)."""
     return (
         WEST_HALF_N
         + (WEST_HALF_S - WEST_HALF_N) * (NORTH_OVERHANG - z_local) / PLATE_LEN
     )
 
 
+def _exit_travel(x0: float, z0: float, ux: float, uz: float) -> float:
+    """Travel from (x0, z0) along the unit direction (ux, uz) to the west edge."""
+    # solve x0 + t*ux = _west_edge_x(z0 + t*uz) for t (both sides linear)
+    k = (WEST_HALF_S - WEST_HALF_N) / PLATE_LEN
+    return (WEST_HALF_N + k * (NORTH_OVERHANG - z0) - x0) / (ux + k * uz)
+
+
 def _chord_exit_travel(x0: float, z0: float) -> float:
     """Stud travel from (x0, z0) along the chord to the west taper edge."""
-    # solve x0 + t*TX = _west_edge_x(z0 + t*TZ) for t (both sides linear)
-    k = (WEST_HALF_S - WEST_HALF_N) / PLATE_LEN
-    return (WEST_HALF_N + k * (NORTH_OVERHANG - z0) - x0) / (_SLOT_TX + k * _SLOT_TZ)
+    return _exit_travel(x0, z0, _SLOT_TX, _SLOT_TZ)
 
 
 # Stud travel from the engaged seat to the mouth. Past this the stud is out of
 # the plate; the shared hardware calculation adds the exact collar radius to
 # derive the disengaged pose.
 NOTCH_EXIT_TRAVEL = _chord_exit_travel(SLOT_E_X, SLOT_E_Z)
-_MOUTH_OVERSHOOT = 4.0  # cut ends past the edge so the mouth opens clean
-_SLOT_OUT_X = SLOT_E_X + (NOTCH_EXIT_TRAVEL + _MOUTH_OVERSHOOT) * _SLOT_TX
-_SLOT_OUT_Z = SLOT_E_Z + (NOTCH_EXIT_TRAVEL + _MOUTH_OVERSHOOT) * _SLOT_TZ
-# Plan angle of the notch run off the plate's east-west line (the run is the
-# chord the stud follows, so it climbs north as it opens through the west
-# edge).  Printed as a DRIVEN reference on the notch sketch; the chord itself
-# is what the sketch geometry pins.
+# The stud's chord off the plate's east-west line (it climbs north as it
+# opens through the west edge).
 NOTCH_RUN_DEG = math.degrees(math.atan2(_SLOT_TZ, _SLOT_TX))
-_NOTCH_ANGLE_RAY_MM = 20.0
+
+# The print sets the notch's run by its angle to the plate's WEST edge at the
+# mouth (cone_swing_platform_spec.NOTCH_MOUTH_ANGLE_DEG): both legs are real
+# edges, the vertex the mouth's SOUTH corner, whose material wedge -- the
+# inward rail against the edge running south -- is the acute one.  The stud's
+# chord makes NOTCH_CHORD_MOUTH_DEG (87.53) with it; the spec rounds that to
+# the whole degree and the notch is CUT along the rounded angle (direction
+# NOTCH_CUT_U), so a protractor on the part reads the printed number.  The
+# stud still runs the chord: the rounding offset is a term of the stud stack.
+_WEST_EDGE_DX = WEST_HALF_S - WEST_HALF_N
+_WEST_EDGE_DZ = -PLATE_LEN
+WEST_EDGE_LEN = math.hypot(_WEST_EDGE_DX, _WEST_EDGE_DZ)
+_EDGE_SX, _EDGE_SZ = _WEST_EDGE_DX / WEST_EDGE_LEN, _WEST_EDGE_DZ / WEST_EDGE_LEN
+NOTCH_CHORD_MOUTH_DEG = math.degrees(
+    math.atan2(
+        _EDGE_SX * -_SLOT_TZ - _EDGE_SZ * -_SLOT_TX,
+        _EDGE_SX * -_SLOT_TX + _EDGE_SZ * -_SLOT_TZ,
+    )
+)
+if round(abs(NOTCH_CHORD_MOUTH_DEG)) != NOTCH_MOUTH_ANGLE_DEG:
+    raise AssertionError(
+        f"the stud's chord makes {abs(NOTCH_CHORD_MOUTH_DEG):.2f} deg with the west "
+        f"edge; the spec prints {NOTCH_MOUTH_ANGLE_DEG:g} -- re-derive it"
+    )
+NOTCH_MOUTH_ANGLE_OFFSET_DEG = NOTCH_MOUTH_ANGLE_DEG - abs(NOTCH_CHORD_MOUTH_DEG)
+_CUT_INWARD = math.atan2(_EDGE_SZ, _EDGE_SX) + math.copysign(
+    math.radians(NOTCH_MOUTH_ANGLE_DEG), NOTCH_CHORD_MOUTH_DEG
+)
+NOTCH_CUT_U = (-math.cos(_CUT_INWARD), -math.sin(_CUT_INWARD))
+NOTCH_CUT_DEG = math.degrees(math.atan2(NOTCH_CUT_U[1], NOTCH_CUT_U[0]))
+# The reference edge's own direction error: its two ends are located at the
+# outline's grade (NorthWestX, SouthWestX), one band each, over its length.
+WEST_EDGE_ANGLE_ERROR_DEG = math.degrees(
+    math.atan(
+        2.0
+        * TITLE_BLOCK_BAND_BY_PLACES[
+            min(
+                DRAWING_PRECISION["PlateProfile"][name]
+                for name in ("NorthWestX", "SouthWestX")
+            )
+        ]
+        / WEST_EDGE_LEN
+    )
+)
+_MOUTH_OVERSHOOT = 4.0  # rails run past the edge so the mouth opens clean
 
 
-async def _add_notch_run_angle(
-    adapter: Any, run_line: str, vertex: tuple[float, float], dims: SketchDims
+def notch_cut_points() -> dict[str, tuple[float, float]]:
+    """The lock notch's cut outline, local (x, z).
+
+    Closed-end corners either side of the cap centre, the rails' crossings of
+    the west edge (the mouth corners), and the outboard ends
+    _MOUTH_OVERSHOOT past the SOUTH crossing, square to the rails.
+    """
+    ux, uz = NOTCH_CUT_U
+    px, pz = -uz * SLOT_W / 2.0, ux * SLOT_W / 2.0  # toward the north rail
+    closed_s = (SLOT_E_X - px, SLOT_E_Z - pz)
+    closed_n = (SLOT_E_X + px, SLOT_E_Z + pz)
+    a_s = _exit_travel(*closed_s, ux, uz)
+    a_n = _exit_travel(*closed_n, ux, uz)
+    out = a_s + _MOUTH_OVERSHOOT
+    return {
+        "closed_s": closed_s,
+        "mouth_s": (closed_s[0] + a_s * ux, closed_s[1] + a_s * uz),
+        "out_s": (closed_s[0] + out * ux, closed_s[1] + out * uz),
+        "out_n": (closed_n[0] + out * ux, closed_n[1] + out * uz),
+        "mouth_n": (closed_n[0] + a_n * ux, closed_n[1] + a_n * uz),
+        "closed_n": closed_n,
+    }
+
+
+NOTCH_CUT_POINTS = notch_cut_points()
+# In-material length of the cut on its centreline: the rails cross a straight
+# edge symmetrically about it, so the in-plate area is exactly width x this.
+NOTCH_CUT_TRAVEL = _exit_travel(SLOT_E_X, SLOT_E_Z, *NOTCH_CUT_U)
+if (
+    min(
+        math.dist(NOTCH_CUT_POINTS["mouth_n"], NOTCH_CUT_POINTS["out_n"]),
+        math.dist(NOTCH_CUT_POINTS["mouth_s"], NOTCH_CUT_POINTS["out_s"]),
+    )
+    < _MOUTH_OVERSHOOT / 2.0
+):
+    raise AssertionError("lock notch rails do not run clear past the west edge")
+
+# The cut's width IS the spec's banded notch width, and the stud is the lock
+# knob's; the stud must seat and run out at the printed bands.
+if SLOT_W != NOTCH_W:
+    raise AssertionError(f"SLOT_W {SLOT_W} != spec NOTCH_W {NOTCH_W}")
+if abs(LOCK_STUD_MAJOR - LOCK_STUD_DIA) > 1e-9:
+    raise AssertionError(
+        f"spec LOCK_STUD_MAJOR {LOCK_STUD_MAJOR} != lock knob STUD_DIA {LOCK_STUD_DIA}"
+    )
+NOTCH_STUD_STACK = assert_notch_stud_stack(
+    NOTCH_CUT_DEG,
+    NOTCH_EXIT_TRAVEL,
+    SLOT_R,
+    NOTCH_MOUTH_ANGLE_OFFSET_DEG,
+    WEST_EDGE_ANGLE_ERROR_DEG,
+)
+
+
+def _as_construction(adapter: Any, entity_id: str) -> None:
+    """Flag a registered sketch line as construction geometry."""
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if _read_member(segment, "ConstructionGeometry") is not True:
+        raise RuntimeError(f"{entity_id} did not remain construction geometry")
+
+
+def notch_mouth_angle_text_point() -> tuple[float, float]:
+    """Sketch (x, y) of the angle's text: 3 mm out along the bisector of the
+    south mouth corner's material wedge (inward rail vs the edge running
+    south).  A Top-plane sketch's y is local -z."""
+    vx, vz = NOTCH_CUT_POINTS["mouth_s"]
+    bx, bz = _EDGE_SX - NOTCH_CUT_U[0], _EDGE_SZ - NOTCH_CUT_U[1]
+    b = math.hypot(bx, bz)
+    return (vx + 3.0 * bx / b, -(vz + 3.0 * bz / b))
+
+
+async def _add_notch_mouth_angle(
+    adapter: Any, edge_line: str, rail_line: str, dims: SketchDims
 ) -> None:
-    """Author the notch run's plan angle as a driven dimension on its sketch.
+    """Author the notch's DRIVING mouth angle between the west-edge reference
+    and the south rail, at their shared mouth corner.
 
-    A horizontal construction ray leaves the run's closed-end corner toward
-    the west; the angle between it and the run is the one the print carries.
     ``AddSpecificDimension`` picks whichever of the four angle regions holds
-    its text point, so the text goes on the bisector inside the acute wedge,
-    with sketch y in both the y and the -z slots (a Top-plane sketch's y is
-    model -Z, and a z=0 point lands on the sketch x-axis, outside the wedge).
-    The value is checked BEFORE it is made driven, so a supplement fails the
-    build instead of printing 170 degrees.
+    its text point, so the text goes on the material wedge's bisector, with
+    sketch y in both the y and the -z slots (a Top-plane sketch's y is model
+    -Z).  The value is read back at once, so the obtuse supplement fails the
+    build instead of printing 92 degrees; the rotation is still free when the
+    angle is added, so it drives the rails.
     """
     from solidworks_mcp.adapters import sw_type_info as _sw_type_info
     from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
 
-    sketch_mgr = adapter.currentSketchManager
-    prev_add_to_db = bool(_read_member(sketch_mgr, "AddToDB"))
-    sketch_mgr.AddToDB = True
-    try:
-        ray = check(
-            "add notch angle construction ray",
-            await adapter.add_line(
-                vertex[0], vertex[1], vertex[0] + _NOTCH_ANGLE_RAY_MM, vertex[1]
-            ),
-        )
-    finally:
-        sketch_mgr.AddToDB = prev_add_to_db
-    ray_segment = _early_bound(adapter._sketch_entities[ray], "ISketchSegment")
-    ray_segment.ConstructionGeometry = True
-    if _read_member(ray_segment, "ConstructionGeometry") is not True:
-        raise RuntimeError(
-            "notch angle construction ray did not remain construction geometry"
-        )
-    check(
-        "notch angle ray start -> run corner",
-        await adapter.add_sketch_constraint(
-            f"{ray}.start", f"{run_line}.start", "coincident"
-        ),
-    )
-    check(
-        "notch angle ray horizontal",
-        await adapter.add_sketch_constraint(ray, None, "horizontal"),
-    )
-    await dimension_between(
-        adapter,
-        f"{ray}.start",
-        f"{ray}.end",
-        "horizontal_distance",
-        _NOTCH_ANGLE_RAY_MM,
-        "notch angle ray",
-    )
-    dims.record(None)
-
-    half = math.radians(NOTCH_RUN_DEG / 2.0)
-    text_x = (vertex[0] + _NOTCH_ANGLE_RAY_MM * math.cos(half)) / 1000.0
-    text_y = (vertex[1] - _NOTCH_ANGLE_RAY_MM * math.sin(half)) / 1000.0
+    text_x, text_y = (c / 1000.0 for c in notch_mouth_angle_text_point())
     model = adapter.currentModel
     model.ClearSelection2(True)
-    _select_sketch_entities(adapter, [ray, run_line], 0)
+    _select_sketch_entities(adapter, [edge_line, rail_line], 0)
     extension = _sw_type_info.early_bound_or_flag(
         model.Extension, "IModelDocExtension", "AddSpecificDimension"
     )
@@ -315,20 +485,60 @@ async def _add_notch_run_angle(
     )
     model.ClearSelection2(True)
     if display is None:
-        raise RuntimeError(f"notch run angle: AddSpecificDimension failed ({status})")
+        raise RuntimeError(f"notch mouth angle: AddSpecificDimension failed ({status})")
     display = _early_bound(display, "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    expected_rad = math.radians(NOTCH_RUN_DEG)
+    expected_rad = math.radians(NOTCH_MOUTH_ANGLE_DEG)
     actual_rad = abs(float(_read_member(dimension, "SystemValue")))
     if abs(actual_rad - expected_rad) > 1e-8:
         raise RuntimeError(
-            f"notch run angle measured {math.degrees(actual_rad):.6f} deg, "
-            f"expected {NOTCH_RUN_DEG:.6f} deg"
+            f"notch mouth angle measured {math.degrees(actual_rad):.6f} deg, "
+            f"expected {NOTCH_MOUTH_ANGLE_DEG:.6f} deg"
         )
-    dimension.DrivenState = 1  # swDimensionDrivenState_e.swDimensionDriven
-    if int(_read_member(dimension, "DrivenState")) != 1:
-        raise RuntimeError("notch run angle did not become driven")
-    dims.record("NotchRunAngle")
+    driven_state = int(_read_member(dimension, "DrivenState"))
+    if driven_state != 2:  # swDimensionDrivenState_e.swDimensionDriving
+        raise RuntimeError(
+            f"notch mouth angle is not driving (DrivenState {driven_state})"
+        )
+    dims.record("NotchMouthAngle")
+
+
+# The tip slot's end centres are dimensioned to a construction centerline on
+# the cone axis (sketch x = 0), from the origin to this far past the slot's
+# far (south) edge -- not to the origin.  Detail B is centred on the slot,
+# 27.7 south of the origin, and a detail view drops every model dimension
+# whose reference falls outside its crop circle (farm leaf 7ab69742b:
+# "missing model dimensions: ['TipSlotEastCx', 'TipSlotWestCx']"); the
+# centerline's end lies inside it.
+TIP_SLOT_AXIS_RUNOUT = 2.0
+
+# Each tip-slot sketch dimension (name after the prefix, in creation order)
+# and its two sketch references, named as in tip_slot_sketch_points.
+TIP_SLOT_DIMENSION_REFERENCES: dict[str, tuple[str, str]] = {
+    "AxisLen": ("axis_start", "axis_end"),
+    "EastCx": ("east_center", "axis_end"),
+    "Z": ("east_center", "origin"),
+    "WestCx": ("west_center", "axis_end"),
+    "W": ("line_a_start", "line_b_end"),
+}
+
+
+def tip_slot_sketch_points(width: float) -> dict[str, tuple[float, float]]:
+    """The tip slot sketch's named points, Top-plane sketch mm (y is part -Z).
+
+    ``axis_start``/``axis_end`` are the cone-axis centerline's ends; the
+    builder draws and dimensions from these very coordinates."""
+    c, r = TIP_SCREW_HALF_TRAVEL, width / 2.0
+    y = -TIP_SCREW_LOCAL_Z  # sketch y -> part -Z
+    return {
+        "origin": (0.0, 0.0),
+        "axis_start": (0.0, 0.0),
+        "axis_end": (0.0, y + r + TIP_SLOT_AXIS_RUNOUT),
+        "east_center": (-c, y),
+        "west_center": (c, y),
+        "line_a_start": (-c, y - r),
+        "line_b_end": (-c, y + r),
+    }
 
 
 async def _sketch_tip_screw_slot(
@@ -338,11 +548,16 @@ async def _sketch_tip_screw_slot(
 
     Two lines and two end arcs whose centres sit TIP_SCREW_HALF_TRAVEL either
     side of the pivot's cone-axis line, so the shop sets each end from the
-    pivot centre. The width is dimensioned between the two lines (it is the
+    pivot centre.  That line is a construction centerline on sketch x = 0,
+    started at the origin, and each end centre is dimensioned horizontally to
+    its far end (TIP_SLOT_AXIS_RUNOUT past the slot), which detail B's crop
+    takes in; the station (``Z``) stays dimensioned to the origin for the
+    plan.  The width is dimensioned between the two lines (it is the
     end-mill size); tangency makes the arcs full radius."""
     dims = SketchDims()
     c, r = TIP_SCREW_HALF_TRAVEL, width / 2.0
     y = -TIP_SCREW_LOCAL_Z  # sketch y -> part -Z
+    points = tip_slot_sketch_points(width)
     check(f"create_sketch {label}", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     line_a = check(f"{label} line a", await adapter.add_line(-c, y - r, c, y - r))
@@ -353,21 +568,49 @@ async def _sketch_tip_screw_slot(
     arc_e = check(
         f"{label} east arc", await adapter.add_arc(-c, y, -c, y + r, -c, y - r)
     )
+    # Direct-to-DB like the profile: a vertical line from the origin would
+    # otherwise infer the very relations added below and over-define.
+    axis = check(
+        f"{label} cone-axis centerline",
+        await adapter.add_centerline(*points["axis_start"], *points["axis_end"]),
+    )
     set_sketch_direct_db(adapter, False)
-    await anchor_point_to_origin(adapter, f"{arc_e}.center", -c, y, f"{label} east end")
-    dims.record(f"{prefix}EastCx")
-    dims.record(f"{prefix}Z")
+    refs = {
+        "origin": "origin",
+        "axis_start": f"{axis}.start",
+        "axis_end": f"{axis}.end",
+        "east_center": f"{arc_e}.center",
+        "west_center": f"{arc_w}.center",
+        "line_a_start": f"{line_a}.start",
+        "line_b_end": f"{line_b}.end",
+    }
+
+    async def dimension(name: str, kind: str, value: float, what: str) -> None:
+        first, second = TIP_SLOT_DIMENSION_REFERENCES[name]
+        await dimension_between(
+            adapter, refs[first], refs[second], kind, value, f"{label} {what}"
+        )
+        dims.record(f"{prefix}{name}")
+
+    await anchor_point_to_origin(
+        adapter, refs["axis_start"], *points["axis_start"], f"{label} axis start"
+    )
+    check(
+        f"{label} axis vertical",
+        await adapter.add_sketch_constraint(axis, None, "vertical"),
+    )
+    await dimension(
+        "AxisLen", "vertical_distance", points["axis_end"][1], "axis length"
+    )
+    await dimension("EastCx", "horizontal_distance", c, "east end")
+    await dimension("Z", "vertical_distance", y, "station")
     check(
         f"{label} end centres level",
         await adapter.add_sketch_constraint(
-            f"{arc_e}.center", f"{arc_w}.center", "horizontal_points"
+            refs["east_center"], refs["west_center"], "horizontal_points"
         ),
     )
-    await dimension_between(
-        adapter, f"{arc_w}.center", "origin", "horizontal_distance", c,
-        f"{label} west end",
-    )
-    dims.record(f"{prefix}WestCx")
+    await dimension("WestCx", "horizontal_distance", c, "west end")
     check(
         f"horizontal {label} line a",
         await adapter.add_sketch_constraint(line_a, None, "horizontal"),
@@ -382,11 +625,7 @@ async def _sketch_tip_screw_slot(
             f"{label} tangent {junction}",
             await adapter.add_sketch_constraint(e1, e2, "tangent"),
         )
-    await dimension_between(
-        adapter, f"{line_a}.start", f"{line_b}.end", "vertical_distance", width,
-        f"{label} width",
-    )
-    dims.record(f"{prefix}W")
+    await dimension("W", "vertical_distance", width, "width")
     await ensure_fully_defined(adapter, f"{label} sketch")
     check(f"exit_sketch {label}", await adapter.exit_sketch())
     return dims
@@ -581,6 +820,13 @@ _CORNERS = (
     ("SW", WEST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 5.0),
     ("SE", -EAST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 12.0),
 )
+# The NW round must end on the west edge north of the tip block's reach, so
+# the straight edge WEST_HALF_N is derived for is the one beside the block.
+_NW_TURN = math.pi / 2.0 + math.atan((WEST_HALF_S - WEST_HALF_N) / PLATE_LEN)
+_NW_SETBACK = _CORNERS[1][3] / math.tan(_NW_TURN / 2.0)
+NW_ROUND_END_Z = NORTH_OVERHANG - _NW_SETBACK * math.cos(_NW_TURN - math.pi / 2.0)
+if NW_ROUND_END_Z - OUTLINE_BAND < TIP_BLOCK_NORTH_REACH_Z:
+    raise AssertionError("the NW corner round reaches down beside the tip block")
 
 
 def _corner_theta(label: str) -> float:
@@ -593,6 +839,25 @@ def _corner_theta(label: str) -> float:
     v2 = (xn - x, zn - z)
     dot = v1[0] * v2[0] + v1[1] * v2[1]
     return math.acos(dot / (math.hypot(*v1) * math.hypot(*v2)))
+
+
+def corner_fillet_center(label: str) -> tuple[float, float]:
+    """Plan centre (authored x, local z; mm) of the named corner's fillet.
+
+    On the bisector of the corner's two edges, ``r / sin(theta / 2)`` in from
+    the sharp corner, so it is ``r`` from both edges.  The NW corner is not
+    square (``_NW_TURN``), so no corner may assume a 90 deg inset."""
+    idx = [c[0] for c in _CORNERS].index(label)
+    _label, x, z, r = _CORNERS[idx]
+    bisector = [0.0, 0.0]
+    for neighbour in (_CORNERS[idx - 1], _CORNERS[(idx + 1) % 4]):
+        dx, dz = neighbour[1] - x, neighbour[2] - z
+        length = math.hypot(dx, dz)
+        bisector[0] += dx / length
+        bisector[1] += dz / length
+    length = math.hypot(*bisector)
+    inset = r / math.sin(_corner_theta(label) / 2.0)
+    return (x + bisector[0] / length * inset, z + bisector[1] / length * inset)
 
 
 def _corner_fillet_area(label: str, r: float) -> float:
@@ -680,7 +945,7 @@ async def build(adapter) -> dict[str, str]:
     plan_pts = [
         (-HALF_WIDTH_N, -NORTH_OVERHANG),  # north-east (anchor)
         (WEST_HALF_N, -NORTH_OVERHANG),  # north-west (authored +x = west;
-        # trimmed to clear the north arbor pedestal, PR8)
+        # derived from the tip block's west reach, I31)
         (WEST_HALF_S, PLATE_LEN - NORTH_OVERHANG),  # south-west (flare)
         (-EAST_HALF_S, PLATE_LEN - NORTH_OVERHANG),  # south-east
     ]
@@ -855,9 +1120,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, "v2 post mount taps", volume - v_post_mounts, 0.01 * v_post_mounts
     )
 
-    # U30 tip-block hold-down: a through slot for the #6-32 shank, then a
-    # counterbored slot from the underside that sinks the socket head below
-    # the slide face. Same end centres, so the head bears on a uniform ledge.
+    # I31 tip-block hold-down: a through slot for the #6-32 shank, then a
+    # counterbored slot from the underside, one hex width across, that sinks
+    # the hex head below the slide face and stops it turning.  Same end
+    # centres, so the head bears on a uniform ledge.
     tip_slot = await _sketch_tip_screw_slot(
         adapter, width=TIP_SLOT_W, label="tip screw slot", prefix="TipSlot"
     )
@@ -894,50 +1160,105 @@ async def build(adapter) -> dict[str, str]:
         adapter, "tip screw counterbore", volume - v_tip_cbore, 0.01 * v_tip_cbore
     )
 
-    # Lock notch: open-ended channel = rotated rectangle cut (engaged seat ->
-    # past the west edge, opening the mouth) + ONE end-cap circle cut at the
-    # closed engaged end. The mouth crossing is a straight line, so the
-    # in-material rectangle volume is exactly width x NOTCH_EXIT_TRAVEL
-    # (rail crossings symmetric about the chord centreline).
-    _dx, _dy = _SLOT_TX, -_SLOT_TZ
-    _nx, _ny = (-_dy * SLOT_W / 2.0, _dx * SLOT_W / 2.0)
-    _e = (SLOT_E_X, -SLOT_E_Z)
-    _out = (_SLOT_OUT_X, -_SLOT_OUT_Z)
+    # Lock notch: open-ended channel = a rectangle cut from the engaged seat
+    # out past the west edge, split at the edge so the mouth corners are
+    # vertices, plus ONE end-cap circle cut at the closed end.  The sketch
+    # carries the print's facts: the width (NotchW, SlotW by equation) and
+    # the run as its DRIVING angle to the west edge at the south mouth corner
+    # (NotchMouthAngle); the cap sketch carries the closed-end centre.  The
+    # west edge is a construction reference located by the plate's own
+    # globals, split at the two mouth corners so every join is a shared
+    # vertex and both of the angle's legs lie inside detail D's crop.
+    pts = NOTCH_CUT_POINTS
+    order = ("closed_s", "mouth_s", "out_s", "out_n", "mouth_n", "closed_n")
+    slot_pts = [(pts[k][0], -pts[k][1]) for k in order]
+    edge_n = (WEST_HALF_N, -NORTH_OVERHANG)
+    edge_s = (WEST_HALF_S, PLATE_LEN - NORTH_OVERHANG)
+    mouth_s = slot_pts[1]
+    mouth_n = slot_pts[4]
     slot = SketchDims()
     check("create_sketch lock notch", await adapter.create_sketch("Top"))
-    set_sketch_direct_db(adapter, True)
-    slot_pts = [
-        (_e[0] + _nx, _e[1] + _ny),
-        (_out[0] + _nx, _out[1] + _ny),
-        (_out[0] - _nx, _out[1] - _ny),
-        (_e[0] - _nx, _e[1] - _ny),
-    ]
-    slot_lines = await add_line_chain(adapter, slot_pts)
-    set_sketch_direct_db(adapter, False)
-    await define_polygon_chain(
-        adapter,
-        slot_lines,
-        slot_pts,
-        label="lock notch",
-        dims=slot,
-        names=[
-            "SlotAnchorX",
-            "SlotAnchorZ",
-            "SlotRunDx",
-            "SlotRunDy",
-            "SlotEndDx",
-            "SlotEndDy",
-            "SlotBackDx",
-            "SlotBackDy",
-        ],
-        drives=[None] * 8,
+    rail_in_s, rail_out_s, slot_end, rail_out_n, rail_in_n, slot_back = (
+        await add_line_chain(adapter, slot_pts)
     )
-    # The print locates the notch by its closed-end centre and states its run
-    # as the angle off the east-west line (the run is the chord the lock stud
-    # follows, tangent to the swing arc about the pivot).  A construction ray
-    # from the run's closed-end corner gives that angle a second line; the
-    # angle itself is DRIVEN, so it reports the chord and can never bend it.
-    await _add_notch_run_angle(adapter, slot_lines[0], slot_pts[0], slot)
+    sketch_mgr = adapter.currentSketchManager
+    prev_add_to_db = bool(_read_member(sketch_mgr, "AddToDB"))
+    sketch_mgr.AddToDB = True
+    try:
+        edge_to_n = check(
+            "add notch west-edge reference (north)",
+            await adapter.add_line(*edge_n, *mouth_n),
+        )
+        edge_mouth = check(
+            "add notch west-edge reference (mouth)",
+            await adapter.add_line(*mouth_n, *mouth_s),
+        )
+        edge_to_s = check(
+            "add notch west-edge reference (south)",
+            await adapter.add_line(*mouth_s, *edge_s),
+        )
+    finally:
+        sketch_mgr.AddToDB = prev_add_to_db
+    for line in (edge_to_n, edge_mouth, edge_to_s):
+        _as_construction(adapter, line)
+    for what, first, second in (
+        ("north edge -> north mouth corner", f"{edge_to_n}.end", f"{rail_in_n}.start"),
+        ("mouth edge -> north mouth corner", f"{edge_mouth}.start", f"{rail_in_n}.start"),
+        ("mouth edge -> south mouth corner", f"{edge_mouth}.end", f"{rail_out_s}.start"),
+        ("south edge -> south mouth corner", f"{edge_to_s}.start", f"{rail_out_s}.start"),
+    ):
+        check(
+            f"lock notch {what}",
+            await adapter.add_sketch_constraint(first, second, "coincident"),
+        )
+    for what, first, second, relation in (
+        ("west edge straight (north)", edge_to_n, edge_mouth, "parallel"),
+        ("west edge straight (south)", edge_mouth, edge_to_s, "parallel"),
+        ("south rail straight", rail_in_s, rail_out_s, "parallel"),
+        ("north rail straight", rail_out_n, rail_in_n, "parallel"),
+        ("rails parallel", rail_in_n, rail_in_s, "parallel"),
+        ("closed end square", slot_back, rail_in_s, "perpendicular"),
+        ("outboard end square", slot_end, rail_in_s, "perpendicular"),
+    ):
+        check(
+            f"lock notch {what}",
+            await adapter.add_sketch_constraint(first, second, relation),
+        )
+    # The edge reference sits where the plate plan puts the west edge.
+    await anchor_point_to_origin(
+        adapter, f"{edge_to_n}.start", *edge_n, "notch west edge north end"
+    )
+    slot.record("NotchEdgeNX", '"WestHalfN"')
+    slot.record("NotchEdgeNZ", '"NorthOverhang"')
+    await anchor_point_to_origin(
+        adapter, f"{edge_to_s}.end", *edge_s, "notch west edge south end"
+    )
+    slot.record("NotchEdgeSX", '"WestHalfS"')
+    slot.record("NotchEdgeSZ", '"PlateLen" - "NorthOverhang"')
+    await anchor_point_to_origin(
+        adapter, f"{rail_in_s}.start", *slot_pts[0], "lock notch closed corner"
+    )
+    slot.record("SlotAnchorX")
+    slot.record("SlotAnchorZ")
+    await dimension_between(
+        adapter,
+        f"{rail_in_s}.start",
+        f"{slot_back}.start",
+        "distance",
+        SLOT_W,
+        "lock notch width",
+    )
+    slot.record("NotchW", '"SlotW"')
+    await _add_notch_mouth_angle(adapter, edge_mouth, rail_in_s, slot)
+    await dimension_between(
+        adapter,
+        f"{rail_out_s}.start",
+        f"{rail_out_s}.end",
+        "distance",
+        _MOUTH_OVERSHOOT,
+        "lock notch mouth overshoot",
+    )
+    slot.record("SlotMouthOvershoot")
     await ensure_fully_defined(adapter, "lock notch sketch")
     check("exit_sketch lock notch", await adapter.exit_sketch())
     name_last_feature(adapter, "LockNotchProfile")
@@ -949,7 +1270,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "LockNotch")
-    v_slot = NOTCH_EXIT_TRAVEL * SLOT_W * PLATE_T
+    v_slot = NOTCH_CUT_TRAVEL * SLOT_W * PLATE_T
     # The moved notch exits almost tangent to the east taper; SolidWorks' tiny
     # open-edge cut carries about 0.4 mm^3 of B-rep tessellation noise, larger
     # than one percent of this unusually small 6.3 mm^3 removal.
@@ -963,8 +1284,8 @@ async def build(adapter) -> dict[str, str]:
     check("create_sketch notch cap E", await adapter.create_sketch("Top"))
     await define_circle(
         adapter,
-        _e[0],
-        _e[1],
+        SLOT_E_X,
+        -SLOT_E_Z,
         SLOT_W / 2.0,
         "notch cap E",
         dims=cap,
@@ -1088,12 +1409,13 @@ async def build(adapter) -> dict[str, str]:
     # Decimal places for imported model dimensions live on the PART.  The
     # Hole Wizard owns the pivot-hole precision and native size callout.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    for feature_name, dimension_name in (
-        ("TipScrewSlotProfile", "TipSlotW"),
-        ("TipScrewCboreProfile", "TipCboreW"),
+    for feature_name, dimension_name, band in (
+        ("TipScrewSlotProfile", "TipSlotW", TIP_SLOT_W_BAND),
+        ("TipScrewCboreProfile", "TipCboreW", TIP_CBORE_W_BAND),
+        ("LockNotchProfile", "NotchW", NOTCH_W_BAND),
     ):
         set_dimension_bilateral_tolerance(
-            adapter, feature_name, dimension_name, *TIP_SLOT_W_BAND
+            adapter, feature_name, dimension_name, *deviations(band)
         )
     await volume_check(
         adapter, "driven platform (equations neutral)", volume, 0.01 * v_hole
