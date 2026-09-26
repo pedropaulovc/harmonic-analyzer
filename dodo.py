@@ -2911,6 +2911,8 @@ def task_check():
         # ... and the #857 re-merge: its leader-geometry and replica-driver pins.
         SCRIPTS_DIR / "test_drawing_leaders.py",
         SCRIPTS_DIR / "test_mcmaster_replica_driver.py",
+        # ... and #906: the crank native-acceptance record pins.
+        SCRIPTS_DIR / "test_crank_native_acceptance.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.

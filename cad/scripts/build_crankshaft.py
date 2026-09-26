@@ -1,24 +1,16 @@
-r"""Reproduction script: crankshaft (book ch. 11, pp. 12-15; ch. 12 p. 19).
+r"""Build crankshaft MHA-026 with the photographed integral domed nose.
 
-Stepped steel shaft in the green v2 post bearing at the base corner:
-an integral Ø11.388 journal runs over local stations 32.755105572..104.789505572,
-while the crank arm on the outboard end (affixed by a removable tapered
-pin so the crankshaft gear can be changed), chain sprocket and the 4:1
-drive pinion retain their existing 3/8-in seats. Modeled with the
-tapered-pin cross-hole and, near the far end, the 1/8 in straight-pin
-cross-hole that keys the 16T pinion's hub boss to the shaft (ch12 p.19
-page002_img02: the pin head on the boss; crank_pinion_spec owns the pin);
-the crank arm/pin/handle and the gears are separate parts
-(`build_crank_arm.py` etc., gears in M4).
+The cylindrical shaft starts at local y=0, the common outboard plane where
+MHA-020 and through hub MHA-137 finish flush.  Only the shaft's same-diameter
+spherical dome projects outboard (negative Y), so the crank can still withdraw
+through the hub bore after removable taper pin MHA-024 is removed.  The shared
+8-mm face shift is added to every inboard station, preserving all established
+bearing, T12 and pinion world interfaces.  Near the far end, the 1/8 in
+straight-pin cross-hole keys the 16T pinion's hub boss to the shaft (ch12
+p.19 page002_img02; crank_pinion_spec owns the pin), its entry turned
+PIN_CLOCKING_DEG from -X toward -Z about the shaft axis so it meets the
+pinion's own -X hole once the assembly seats the pinion rot_z(-seed).
 
-Dimensions: cad/DIMENSIONS.md "Chapter 11" - dia legacy (med), length
-derived from eight-views 8/8 pedestal proportions (low).
-
-Layout: shaft axis along +Y, outboard (crank) end at the origin;
-tapered-pin cross-hole along Z at the crank-seat height; pinion-pin
-cross-hole at SEAT_PINION + the pinion's PIN_STATION, its entry point
-turned PIN_CLOCKING_DEG from -X toward -Z about the shaft axis so it meets
-the pinion's own -X hole once the assembly seats the pinion rot_z(-seed).
 Run (SolidWorks already open)::
 
     uv run python cad\scripts\build_crankshaft.py
@@ -31,13 +23,15 @@ import sys
 
 import _telemetry
 from _common import (
-    SketchDims,
     _early_bound,
     _feature_by_name,
     _read_member,
+    SketchDims,
+    anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -48,9 +42,11 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
     volume_check,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -64,66 +60,75 @@ from crank_pinion_spec import (
     CRANKSHAFT_PIN_HOLE_PROCESS,
     PIN_CLOCKING_DEG as PINION_PIN_CLOCKING_DEG,
     PIN_DIA as PINION_PIN_DIA,
+    PIN_EDGE_TO_SHAFT_END_NOMINAL,
     PIN_HOLE_SPEC as PINION_PIN_HOLE_SPEC,
     PIN_STATION as PINION_PIN_STATION,
 )
 from crankshaft_spec import (
-    CRANK_END_NOTE,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
+    FIDUCIAL_MODEL_DEPTH,
+    FIDUCIAL_MODEL_DIA,
+    ISOMETRIC_VIEW_NOTE,
     JOURNAL_DIA_BAND,
-    END_VIEW_NOTE,
     JOURNAL_DIA,
     JOURNAL_LENGTH,
     JOURNAL_START,
     PIN_HOLE_SPEC,
     PIN_HOLE_HEIGHT,
+    PINION_SEAT_DIA,
+    PINION_SEAT_DIA_BAND,
+    RELIEF_DIA,
+    RELIEF_LENGTH,
+    RELIEF_START,
+    SEAT_STEP,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
+    SHAFT_DOME_HEIGHT,
+    SHAFT_FIDUCIAL_RADIUS,
+    SEAT_PINION,
     SHAFT_LENGTH,
+    SHAFT_LENGTH_BAND,
     SURFACE_FINISHES,
 )
+from crank_native_acceptance import assert_signed_circle_center
 
 PART_NAME = "crankshaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-# SHAFT_DIA / SHAFT_LENGTH / PIN_HOLE_HEIGHT live in crankshaft_spec (the
-# COM-free contract the drawing shares). Provenance: dia is the ch11 legacy
-# ShaftDiameter (uncontradicted); length was rederived with the ch30 GT re-read
-# (2026-07-02): the crank plane moved south (arm hub at machine z -175..-167,
-# T12 at -157.5, pedestal slab at -145..-125) while the inboard 16T station
-# stayed, so the shaft spans -175..-53 (2026-09: shortened to end 6.2 past
-# the 16T's north face, ch12 page002_img02). The arm/handle sweep entirely in front
-# of the chain plane and cannot foul the chain when turning (book ch30
-# p005/p002). The number-drilled pin cross-hole passes through local X at station
-# 4.0, coaxial with the crank arm's local-Y pilot after the arm's assembly
-# transform. Both are taper-reamed together for MHA-024.
-# Keyed-chain seat stations (local +Y from the outboard origin): named datum
-# planes the T12 chain wheel and the 16T pinion mate COINCIDENT to in the
-# assembly (the frame CboreSeat idiom). Coincident replaces the old unsigned
-# plane-plane DISTANCE seats, whose two solution branches let the free-
-# spinning crank family reflect about the shaft origin on a re-solve (the
-# 16T rendered floating 200 mm south -- render-gate catch, 2026-07-04). The
-# arm seats at SEAT_ARM. build_drive_train asserts these match its
-# REMOVABLE_Z0 / PINION_TOOTH_Z / arm-placement derivations.
-SEAT_T12 = 17.5
-SEAT_PINION = 105.039505572
-# = -31.0252033243 - 10.8/2 - (-175): rear-shifted 16T centred on the 64T row.
-SEAT_ARM = 8.0  # the arm's ORIGIN plane. The arm's placed pose composes a
-# Ry(180), which keeps its 8-thick plate at station 0..8 but puts the
-# AS-BUILT origin at the plate's NORTH face (station 8, machine -167): the
-# plate extrudes machine -z from the origin. Seating the
-# origin at station 0 instead hung the plate at -183..-175 and buried the
-# handle collar in the arm's square end (502 mm^3 -- interference-gate catch
-# 2026-07-05).
+# Dimensions live in crankshaft_spec / crank_hub_geometry.  The common face
+# moved outboard by one arm thickness; all inboard stations and the shaft length
+# carry the same shift, leaving the bearing, T12, pinion and far-end world
+# positions unchanged.  MHA-024 now crosses the separate hub behind the arm.
+SEAT_T12 = 25.5
 # The pinion's retention-pin cross-hole station: the pinion's own PIN_STATION
 # (from its toothed south face) measured from the SeatPinion datum that face
 # sits on. Machine z = CRANKSHAFT_Z0 + this. The recess of the shaft end inside
 # the pinion's boss (build_drive_train_assembly asserts it) is
 # SEAT_PINION + OVERALL_LENGTH - SHAFT_LENGTH.
-PINION_PIN_STATION_Y = SEAT_PINION + PINION_PIN_STATION  # 118.8795
-if PINION_PIN_STATION_Y + PINION_PIN_DIA / 2.0 > SHAFT_LENGTH - 1.0:
-    raise AssertionError("pinion pin hole runs out the crankshaft's north end")
+PINION_PIN_STATION_Y = SEAT_PINION + PINION_PIN_STATION  # 130.690 (+8 face shift)
+PINION_PIN_EDGE_TO_END = SHAFT_LENGTH - (PINION_PIN_STATION_Y + PINION_PIN_DIA / 2.0)
+if PINION_PIN_EDGE_TO_END < PIN_EDGE_TO_SHAFT_END_NOMINAL - 1e-9:
+    raise AssertionError(
+        f"pinion pin hole edge {PINION_PIN_EDGE_TO_END:.3f} from the crankshaft's "
+        f"north end, under W15's {PIN_EDGE_TO_SHAFT_END_NOMINAL}"
+    )
+
+DOME_R = SHAFT_DIA / 2.0
+DOME_SPHERE_R = (DOME_R**2 + SHAFT_DOME_HEIGHT**2) / (2.0 * SHAFT_DOME_HEIGHT)
+V_DOME = (
+    math.pi
+    * SHAFT_DOME_HEIGHT**2
+    * (3.0 * DOME_SPHERE_R - SHAFT_DOME_HEIGHT)
+    / 3.0
+)
+_FIDUCIAL_AXIS = SHAFT_FIDUCIAL_RADIUS / math.sqrt(2.0)
+FIDUCIAL_MODEL_X = -_FIDUCIAL_AXIS
+FIDUCIAL_MODEL_Z = -_FIDUCIAL_AXIS
+FIDUCIAL_SURFACE_Y = DOME_SPHERE_R - SHAFT_DOME_HEIGHT - math.sqrt(
+    DOME_SPHERE_R**2 - SHAFT_FIDUCIAL_RADIUS**2
+)
 
 
 def _plane_normal(adapter, name: str) -> tuple[float, float, float]:
@@ -197,8 +202,101 @@ async def _angled_plane_containing(
     raise RuntimeError(f"{name}: neither angled-plane solution contains {direction}")
 
 
-async def build(adapter) -> dict[str, str]:
+# Far-end stations the drawing prints (policy rule 7), each drawn on the
+# StationReference sketch from its dome-root station and driven by the same
+# globals as the feature it locates.
+_STATIONS = {
+    "PinionSeatStation": SEAT_STEP,
+    "JournalInboardStation": JOURNAL_START + JOURNAL_LENGTH,
+    "ReliefInboardStation": RELIEF_START + RELIEF_LENGTH,
+    "ReliefOutboardStation": RELIEF_START,
+    "JournalOutboardStation": JOURNAL_START,
+    "PinHoleStation": PIN_HOLE_HEIGHT,
+}
+_STATION_DRIVES = {
+    "PinionSeatStation": '"ShaftLength" - "PinionSeatStep"',
+    "JournalInboardStation": '"ShaftLength" - "JournalStart" - "JournalLength"',
+    "ReliefInboardStation": '"ShaftLength" - "ReliefStart" - "ReliefLength"',
+    "ReliefOutboardStation": '"ShaftLength" - "ReliefStart"',
+    "JournalOutboardStation": '"ShaftLength" - "JournalStart"',
+    "PinHoleStation": '"ShaftLength" - "PinHoleHeight"',
+}
+
+
+async def _cut_annulus_inboard(
+    adapter,
+    name: str,
+    *,
+    start: float,
+    start_global: str,
+    turned_dia: float,
+    inner_dia: float,
+    inner_global: str,
+    length: float,
+    length_expr: str,
+    drive_jobs: list[tuple[str, str]],
+) -> float:
+    """Turn a ``turned_dia`` section down to ``inner_dia`` inboard of ``start``.
+
+    The annulus from ``inner_dia`` out past ``turned_dia`` is cut from a
+    ``<name>StartPlane`` at ``start``; its profile is ``<name>Profile`` with
+    the printed ``<name>DiaDim``.  A mid-body blind cut defaults back toward
+    its base plane, so running AWAY from Top it takes ``reverse_direction``
+    (memory/solidworks-modeling-pitfalls.md); the caller's volume gate fails
+    loud on the wrong side.  Returns the volume removed.
+    """
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
+
+    plane = f"{name}StartPlane"
+    check(
+        f"create_plane {plane}",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=start)
+        ),
+    )
+    name_last_feature(adapter, plane)
+    start_dim = name_dimensions(adapter, plane, [start_global])
+    drive_jobs += [(start_dim[0], f'"{start_global}"')]
+    dims = SketchDims()
+    check(f"create_sketch {name}", await adapter.create_sketch(plane))
+    await define_circle(
+        adapter, 0.0, 0.0, inner_dia / 2.0, f"{name} turned circle",
+        dims=dims,
+        names=(f"{name}Cx", f"{name}Cz", f"{name}DiaDim"),
+        drives=(None, None, f'"{inner_global}"'),
+    )
+    await define_circle(
+        adapter, 0.0, 0.0, turned_dia / 2.0 + 1.0, f"{name} clearance circle",
+        dims=dims,
+        names=(f"{name}OuterCx", f"{name}OuterCz", f"{name}OuterDia"),
+    )
+    await ensure_fully_defined(adapter, f"{name} sketch")
+    check(f"exit_sketch {name}", await adapter.exit_sketch())
+    name_last_feature(adapter, f"{name}Profile")
+    drive_jobs += dims.apply(adapter, f"{name}Profile")
+    check(
+        f"cut {name}",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=length, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, name)
+    length_dim = name_dimensions(adapter, name, [f"{name}Length"])
+    drive_jobs += [(length_dim[0], length_expr)]
+    return math.pi * ((turned_dia / 2.0) ** 2 - (inner_dia / 2.0) ** 2) * length
+
+
+async def _volume(adapter) -> float:
+    result = await adapter.get_mass_properties()
+    return result.data.volume if result.is_success else float("nan")
+
+
+async def build(adapter) -> dict[str, str]:
+    from solidworks_mcp.adapters.base import (
+        CreatePlaneParameters,
+        ExtrusionParameters,
+        RevolveParameters,
+    )
 
     check("create_part", await adapter.create_part())
 
@@ -212,9 +310,20 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "JournalDia", f"{JOURNAL_DIA}mm")
     await set_global(adapter, "JournalStart", f"{JOURNAL_START}mm")
     await set_global(adapter, "JournalLength", f"{JOURNAL_LENGTH}mm")
-    # The cross-hole station plane remains an editable equation below.
+    await set_global(adapter, "ReliefDia", f"{RELIEF_DIA}mm")
+    await set_global(adapter, "ReliefStart", f"{RELIEF_START}mm")
+    await set_global(adapter, "ReliefLength", f"{RELIEF_LENGTH}mm")
+    await set_global(adapter, "PinionSeatDia", f"{PINION_SEAT_DIA}mm")
+    await set_global(adapter, "PinionSeatStep", f"{SEAT_STEP}mm")
     await set_global(adapter, "PinHoleHeight", f"{PIN_HOLE_HEIGHT}mm")
     await set_global(adapter, "PinionPinStation", f"{PINION_PIN_STATION_Y}mm")
+    await set_global(adapter, "DomeHeight", f"{SHAFT_DOME_HEIGHT}mm")
+    await set_global(adapter, "FiducialDia", f"{FIDUCIAL_MODEL_DIA}mm")
+    await set_global(adapter, "FiducialDepth", f"{FIDUCIAL_MODEL_DEPTH}mm")
+    # Sketch distance dimensions are unsigned magnitudes; the seeded point
+    # coordinates below retain the witness's quadrant.
+    await set_global(adapter, "FiducialX", f"{abs(FIDUCIAL_MODEL_X)}mm")
+    await set_global(adapter, "FiducialZ", f"{abs(FIDUCIAL_MODEL_Z)}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -245,6 +354,133 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += [(depth_dim[0], '"ShaftLength"')]
     v_shaft = math.pi * (SHAFT_DIA / 2.0) ** 2 * SHAFT_LENGTH
     await volume_check(adapter, "shaft", v_shaft, 0.005 * v_shaft)
+
+    # Integral same-diameter spherical dome on the outboard end.  Its base is
+    # exactly the shaft cylinder, so no mushroom head or removable cap can trap
+    # the crank behind the through hub.
+    dome = SketchDims()
+    check("create_sketch shaft dome", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    dome_axis = check(
+        "dome axis",
+        await adapter.add_centerline(0.0, -SHAFT_DOME_HEIGHT, 0.0, 0.0),
+    )
+    dome_base = check(
+        "dome base", await adapter.add_line(0.0, 0.0, DOME_R, 0.0)
+    )
+    dome_arc = check(
+        "dome arc",
+        await adapter.add_arc(
+            0.0,
+            DOME_SPHERE_R - SHAFT_DOME_HEIGHT,
+            0.0,
+            -SHAFT_DOME_HEIGHT,
+            DOME_R,
+            0.0,
+        ),
+    )
+    dome_close = check(
+        "dome closure",
+        await adapter.add_line(0.0, -SHAFT_DOME_HEIGHT, 0.0, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    for label, first, second in (
+        ("base-arc", f"{dome_base}.end", f"{dome_arc}.end"),
+        ("arc-close", f"{dome_arc}.start", f"{dome_close}.start"),
+        ("close-base", f"{dome_close}.end", f"{dome_base}.start"),
+        ("axis start", f"{dome_axis}.start", f"{dome_arc}.start"),
+        ("axis end", f"{dome_axis}.end", f"{dome_base}.start"),
+    ):
+        check(label, await adapter.add_sketch_constraint(first, second, "coincident"))
+    for label, entity, relation in (
+        ("dome base", dome_base, "horizontal"),
+        ("dome closure", dome_close, "vertical"),
+        ("dome axis", dome_axis, "vertical"),
+    ):
+        check(label, await adapter.add_sketch_constraint(entity, None, relation))
+    await anchor_point_to_origin(
+        adapter, f"{dome_base}.start", 0.0, 0.0, "dome base"
+    )
+    check(
+        "dome base radius",
+        await adapter.add_sketch_dimension(dome_base, None, "linear", DOME_R),
+    )
+    dome.record("DomeBaseR", '"ShaftDia" / 2')
+    check(
+        "dome height",
+        await adapter.add_sketch_dimension(
+            f"{dome_arc}.start", "origin", "vertical_distance", SHAFT_DOME_HEIGHT
+        ),
+    )
+    dome.record("DomeHeight", '"DomeHeight"')
+    check(
+        "dome sphere radius",
+        await adapter.add_sketch_dimension(dome_arc, None, "radial", DOME_SPHERE_R),
+    )
+    dome.record(
+        "DomeSphereR",
+        '("ShaftDia" / 2 * "ShaftDia" / 2 + "DomeHeight" * "DomeHeight") '
+        '/ (2 * "DomeHeight")',
+    )
+    await ensure_fully_defined(adapter, "shaft dome profile")
+    check("exit_sketch shaft dome", await adapter.exit_sketch())
+    name_last_feature(adapter, "ShaftDomeProfile")
+    drive_jobs += dome.apply(adapter, "ShaftDomeProfile")
+    check(
+        "revolve shaft dome",
+        await adapter.create_revolve(RevolveParameters(angle=360.0)),
+    )
+    name_last_feature(adapter, "ShaftDome")
+    await volume_check(
+        adapter,
+        "shaft with integral dome",
+        v_shaft + V_DOME,
+        0.005 * (v_shaft + V_DOME),
+    )
+
+    # Simple punched alignment witness on the dome, angularly aligned with the
+    # arm witness.  The shallow cut is visual-only and never dimensioned.
+    check(
+        "create_plane ShaftFiducialPlane",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset",
+                base_plane="Top Plane",
+                offset=FIDUCIAL_SURFACE_Y,
+            )
+        ),
+    )
+    name_last_feature(adapter, "ShaftFiducialPlane")
+    fiducial = SketchDims()
+    check(
+        "create_sketch shaft fiducial",
+        await adapter.create_sketch("ShaftFiducialPlane"),
+    )
+    await define_circle(
+        adapter,
+        FIDUCIAL_MODEL_X,
+        -FIDUCIAL_MODEL_Z,
+        FIDUCIAL_MODEL_DIA / 2.0,
+        "shaft punch witness",
+        dims=fiducial,
+        names=("FiducialX", "FiducialZ", "FiducialDia"),
+        drives=('"FiducialX"', '"FiducialZ"', '"FiducialDia"'),
+    )
+    await ensure_fully_defined(adapter, "shaft fiducial sketch")
+    check("exit_sketch shaft fiducial", await adapter.exit_sketch())
+    name_last_feature(adapter, "ShaftFiducialProfile")
+    drive_jobs += fiducial.apply(adapter, "ShaftFiducialProfile")
+    check(
+        "cut shaft fiducial",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(
+                depth=2.0 * FIDUCIAL_MODEL_DEPTH,
+                both_directions=True,
+            )
+        ),
+    )
+    name_last_feature(adapter, "PunchedFiducial")
+    v_shaft_nose = await _volume(adapter)
 
     # Integral v2-post bearing journal.  An offset reference plane exposes the
     # start station as a markable manufacturing dimension; the journal then
@@ -287,15 +523,50 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Journal")
     journal_depth_dim = name_dimensions(adapter, "Journal", ["JournalLength"])
     drive_jobs += [(journal_depth_dim[0], '"JournalLength"')]
-    v_with_journal = (
-        v_shaft
-        + math.pi * ((JOURNAL_DIA / 2.0) ** 2 - (SHAFT_DIA / 2.0) ** 2) * JOURNAL_LENGTH
-    )
+    v_with_journal = v_shaft_nose + math.pi * (
+        (JOURNAL_DIA / 2.0) ** 2 - (SHAFT_DIA / 2.0) ** 2
+    ) * JOURNAL_LENGTH
     await volume_check(
         adapter,
         "shaft + bearing journal",
         v_with_journal,
         0.005 * v_with_journal,
+    )
+
+    # Journal relief (#906): the bushing is reamed plain through, so the shaft
+    # is turned under the middle of the journal, leaving a bearing land at
+    # each end of the bushing.
+    v_with_journal -= await _cut_annulus_inboard(
+        adapter,
+        "Relief",
+        start=RELIEF_START,
+        start_global="ReliefStart",
+        turned_dia=JOURNAL_DIA,
+        inner_dia=RELIEF_DIA,
+        inner_global="ReliefDia",
+        length=RELIEF_LENGTH,
+        length_expr='"ReliefLength"',
+        drive_jobs=drive_jobs,
+    )
+    await volume_check(
+        adapter, "journal relief", v_with_journal, 0.005 * v_with_journal
+    )
+    # The Ø9.0 pinion seat (RULING (b)): the same cut from the seat step to
+    # the far end face.
+    v_with_journal -= await _cut_annulus_inboard(
+        adapter,
+        "PinionSeat",
+        start=SEAT_STEP,
+        start_global="PinionSeatStep",
+        turned_dia=SHAFT_DIA,
+        inner_dia=PINION_SEAT_DIA,
+        inner_global="PinionSeatDia",
+        length=SHAFT_LENGTH - SEAT_STEP,
+        length_expr='"ShaftLength" - "PinionSeatStep"',
+        drive_jobs=drive_jobs,
+    )
+    await volume_check(
+        adapter, "pinion seat step", v_with_journal, 0.005 * v_with_journal
     )
 
     check(
@@ -312,11 +583,9 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += [(pin_station_dim[0], '"PinHoleHeight"')]
 
-    # Tapered-pin cross-hole through the crank seat, drilled radially on the
-    # shaft's -X side, away from the +X seam.
-    # Exact host-face selection keeps the hole on the intended Ø9.525 crank
-    # seat. Coincidence to the driven station plane and Front Plane constrains
-    # only axial station and clocking; the radial coordinate follows ShaftDia.
+    # Tapered MHA-024 cross-hole through the shaft and MHA-137 rear barrel.
+    # It sits behind the arm at the shared station plane; Front Plane fixes the
+    # radial clocking while the host face follows ShaftDia.
     pin_hole_dia = blind_cut_dia_mm(PIN_HOLE_SPEC)
     wizard_hole_on_cylinder(
         adapter,
@@ -383,17 +652,128 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PINION_PIN_HOLE_SPEC,
         [
-            SHAFT_DIA / 2.0 * entry_dir[0],
+            PINION_SEAT_DIA / 2.0 * entry_dir[0],
             PINION_PIN_STATION_Y,
-            SHAFT_DIA / 2.0 * entry_dir[2],
+            PINION_SEAT_DIA / 2.0 * entry_dir[2],
         ],
         "pinion retention-pin cross-hole",
         name="PinionPinHole",
         point_planes=("PinionPinStationPlane", "PinionPinClockingPlane"),
     )
-    v_pinion_pin = cross_hole_volume_mm3(PINION_PIN_DIA, SHAFT_DIA)
+    v_pinion_pin = cross_hole_volume_mm3(PINION_PIN_DIA, PINION_SEAT_DIA)
     v_final -= v_pinion_pin
     await volume_check(adapter, "shaft + pinion pin hole", v_final, 0.02 * v_pinion_pin)
+
+    # Drawing-only station reference.  The print baselines every axial
+    # station from the FAR END, the one faced end a machinist zeroes on
+    # (policy rule 7), but the model's features measure from the dome root.
+    # Each construction line's one driving dimension IS the printed value
+    # (policy rule 2), driven by the same globals as the features, so no
+    # geometry moves.  The sketch sits on the Right plane because the *Right
+    # side view prints it (every reference sketch that imports natively sits
+    # on the plane of its view -- build_crank_hub's
+    # ServicePinStationReference), on the shaft axis under the view's
+    # centreline so the construction lines add no visible ink.  A
+    # construction arc over the dome silhouette carries its spherical radius.
+    # Right (u, v) -> (-Z, Y); u < 0 is model +Z, the side the rotated side
+    # view prints UP.
+    stations = SketchDims()
+    check("create_sketch station reference", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    overall_line = check(
+        "overall reference line",
+        await adapter.add_line(0.0, -SHAFT_DOME_HEIGHT, 0.0, SHAFT_LENGTH),
+    )
+    station_lines = {}
+    for name, station in _STATIONS.items():
+        station_lines[name] = check(
+            f"{name} reference line",
+            await adapter.add_line(0.0, SHAFT_LENGTH, 0.0, station),
+        )
+    # Counter-clockwise from the dome root corner down to the tip.
+    dome_arc = check(
+        "dome radius reference arc",
+        await adapter.add_arc(
+            0.0,
+            DOME_SPHERE_R - SHAFT_DOME_HEIGHT,
+            -DOME_R,
+            0.0,
+            0.0,
+            -SHAFT_DOME_HEIGHT,
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    for entity in (overall_line, *station_lines.values(), dome_arc):
+        segment = _early_bound(adapter._sketch_entities[entity], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"station reference {entity} did not take construction flag")
+    check(
+        "overall reference vertical",
+        await adapter.add_sketch_constraint(overall_line, None, "vertical"),
+    )
+    for name, line in station_lines.items():
+        check(
+            f"{name} reference vertical",
+            await adapter.add_sketch_constraint(line, None, "vertical"),
+        )
+        check(
+            f"{name} reference starts at the far end",
+            await adapter.add_sketch_constraint(
+                f"{line}.start", f"{overall_line}.end", "coincident"
+            ),
+        )
+    check(
+        "dome radius reference ends at the tip",
+        await adapter.add_sketch_constraint(
+            f"{dome_arc}.end", f"{overall_line}.start", "coincident"
+        ),
+    )
+    check(
+        "dome radius reference centre on the axis",
+        await adapter.add_sketch_constraint(f"{dome_arc}.center", "origin", "vertical_points"),
+    )
+    check(
+        "dome radius reference starts at the dome root",
+        await adapter.add_sketch_constraint(f"{dome_arc}.start", "origin", "horizontal_points"),
+    )
+    # Dimensions in creation order; SketchDims renames them by that order.
+    await anchor_point_to_origin(
+        adapter, f"{overall_line}.start", 0.0, -SHAFT_DOME_HEIGHT, "dome tip reference"
+    )
+    stations.record(None, '"DomeHeight"')
+    await dimension_between(
+        adapter,
+        f"{overall_line}.start",
+        f"{overall_line}.end",
+        "vertical_distance",
+        SHAFT_LENGTH + SHAFT_DOME_HEIGHT,
+        "overall length reference",
+    )
+    stations.record("OverallLength", '"ShaftLength" + "DomeHeight"')
+    for name, line in station_lines.items():
+        await dimension_between(
+            adapter,
+            f"{line}.start",
+            f"{line}.end",
+            "vertical_distance",
+            SHAFT_LENGTH - _STATIONS[name],
+            f"{name} reference",
+        )
+        stations.record(name, _STATION_DRIVES[name])
+    check(
+        "dome radius reference",
+        await adapter.add_sketch_dimension(dome_arc, None, "radial", DOME_SPHERE_R),
+    )
+    stations.record(
+        "DomeSphereRadius",
+        '("ShaftDia" / 2 * "ShaftDia" / 2 + "DomeHeight" * "DomeHeight") '
+        '/ (2 * "DomeHeight")',
+    )
+    await ensure_fully_defined(adapter, "station reference sketch")
+    check("exit_sketch station reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "StationReference")
+    drive_jobs += stations.apply(adapter, "StationReference")
 
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built
@@ -402,6 +782,17 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
+    assert_signed_circle_center(
+        adapter,
+        "ShaftFiducialProfile",
+        label="MHA-026 punched fiducial",
+        expected_sketch_xy_mm=(FIDUCIAL_MODEL_X, -FIDUCIAL_MODEL_Z),
+        expected_model_xyz_mm=(
+            FIDUCIAL_MODEL_X,
+            FIDUCIAL_SURFACE_Y,
+            FIDUCIAL_MODEL_Z,
+        ),
+    )
     set_dimension_bilateral_tolerance(
         adapter, "ShaftProfile", "ShaftDiaDim", *deviations(SHAFT_DIA_BAND)
     )
@@ -411,18 +802,25 @@ async def build(adapter) -> dict[str, str]:
         "JournalDiaDim",
         *deviations(JOURNAL_DIA_BAND),
     )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "PinionSeatProfile",
+        "PinionSeatDiaDim",
+        *deviations(PINION_SEAT_DIA_BAND),
+    )
+    # W15: the length is unilateral (crankshaft_spec.SHAFT_LENGTH_BAND); it
+    # prints from the model on the far-end-to-dome-root Depth.
+    set_dimension_bilateral_tolerance(
+        adapter, "Shaft", "Depth", *deviations(SHAFT_LENGTH_BAND)
+    )
     await volume_check(adapter, "driven crankshaft (equations neutral)", v_final, 50.0)
 
-    # Keyed-chain SEAT DATUMS (see the constants block): the T12 wheel, the
-    # 16T pinion and the crank arm mate their origin planes COINCIDENT to
-    # these in the assembly -- flip-free, unlike an unsigned plane-plane
-    # distance.
-    from solidworks_mcp.adapters.base import CreatePlaneParameters
+    # Inboard keyed-chain seat datums.  The through hub seats at the shaft's
+    # Top/origin plane, so the retired arm-seat datum is removed.
 
     for seat_name, station in (
         ("SeatT12", SEAT_T12),
         ("SeatPinion", SEAT_PINION),
-        ("SeatArm", SEAT_ARM),
     ):
         check(
             f"create_plane {seat_name} (Top Plane, +{station:.3f})",
@@ -435,24 +833,21 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         name_last_feature(adapter, seat_name)
-
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
-    # "Pinion Pin Hole Process" is the PinionPinHole callout prefix the
-    # crankshaft's sheet must print (crank_pinion_spec owns the wording so the
-    # two prints of one matched fit can never disagree); the drawing reads it
-    # off the part like the other note rows.
     apply_drawing_properties(
         adapter,
         PART_NAME,
         {
-            "Crank End Note": CRANK_END_NOTE,
             "Manufacturing Notes": DRAWING_NOTES,
-            "End View Note": END_VIEW_NOTE,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            # crank_pinion_spec owns the PinionPinHole callout prefix so the two
+            # prints of one matched fit can never disagree.
             "Pinion Pin Hole Process": CRANKSHAFT_PIN_HOLE_PROCESS,
         },
     )

@@ -52,7 +52,6 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 ):
     raise AssertionError("every marked pin dimension needs authored places")
 
-# The one fact the views cannot show (rule 6): where the stock may come from.
-# The drill-rod size is the drawing's own diameter, not a second number; the
-# faced ends are the depicted geometry, so the note does not prescribe them.
-DRAWING_NOTES = "STOCK 1/8 IN DRILL ROD OK."
+# No manufacturing note (rule 6): the title-block MATERIAL "AISI 1018 CF or
+# drill rod, 1/8 in" is the one statement of the stock, and the faced ends are
+# the depicted geometry.

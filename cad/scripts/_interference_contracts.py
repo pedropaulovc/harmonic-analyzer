@@ -20,17 +20,19 @@ from build_harmonic_base import (
     PEDESTAL_SCREW_LEN as _PEDESTAL_SCREW_LEN,
 )
 from _hole_spec import THREAD_MAJOR_MM
-from crank_arm_spec import (
-    ARM_WIDTH as _ARM_W,
-    PIN_HOLE_SPEC as _ARM_PILOT_SPEC,
-    SHAFT_BORE_DIA as _ARM_BORE,
+from crank_hub_spec import (
+    HUB_BARREL_DIA as _HUB_W,
+    HUB_BORE_DIA as _HUB_BORE,
+    SERVICE_PIN_HOLE_SPEC as _HUB_PILOT_SPEC,
 )
 from crank_pin_spec import (
     BIG_END_DIA as _PIN_D0,
     PIN_LENGTH as _PIN_L,
     SMALL_END_DIA as _PIN_D1,
 )
-from crankshaft_spec import SHAFT_DIA as _CS_DIA
+# The shaft diameter's owner, not crankshaft_spec: every assembly imports this
+# module, so a crankshaft length or station edit must not re-key them all.
+from crank_hub_geometry import SHAFT_DIA as _CS_DIA
 import summing_lever_spec
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 from frame_attachment_spec import COLUMN_SOCKET_DIAMETER
@@ -69,11 +71,12 @@ def _numbered_pairs(
     }
 
 
-# Crank taper pin in its PILOT holes (ch11 p.14, 2026-09-02): the released
-# drawings drill the arm #14 (4.623) and the shaft #9 (4.978) and taper-ream
-# them together at assembly, so the nominal 1:48 pin overlaps both pilots.
-# Bound each overlap at 1.10 x the analytic frustum-minus-cylinder volume
-# over the span the pin crosses (arm hub minus its shaft bore; shaft diameter).
+# Crank taper pin in its PILOT holes (ch11 p.14): released drawings drill the
+# separate hub #14 (4.623) and shaft #9 (4.978), then taper-ream them together
+# at assembly.  Bound each overlap at 1.10 x the analytic
+# frustum-minus-cylinder volume over the receiver span (hub barrel minus its
+# through bore; shaft diameter).  The arm is outboard of this station and has
+# no MHA-024 overlap.
 
 _CS_PILOT = 4.978  # #9 drill (build_crankshaft's wizard cross-hole)
 _PIN_PROUD = 3.85  # build_drive_train_assembly.PIN_PROUD (kept in step by test)
@@ -91,16 +94,16 @@ def _pin_overlap(s0: float, s1: float, hole_dia: float) -> float:
     return total
 
 
-_ARM_PILOT = blind_cut_dia_mm(_ARM_PILOT_SPEC)
+_HUB_PILOT = blind_cut_dia_mm(_HUB_PILOT_SPEC)
 
-# hub -X face at s = PIN_PROUD; the shaft bore occupies the middle ARM_BORE of the hub
-_ARM_S0, _ARM_S1 = _PIN_PROUD, _PIN_PROUD + _ARM_W
-_BORE_S0 = _PIN_PROUD + (_ARM_W - _ARM_BORE) / 2.0
-_BORE_S1 = _BORE_S0 + _ARM_BORE
-_CS_S0 = _PIN_PROUD + (_ARM_W - _CS_DIA) / 2.0
+# Hub -X face at s=PIN_PROUD; its axial shaft bore occupies the middle chord.
+_HUB_S0, _HUB_S1 = _PIN_PROUD, _PIN_PROUD + _HUB_W
+_BORE_S0 = _PIN_PROUD + (_HUB_W - _HUB_BORE) / 2.0
+_BORE_S1 = _BORE_S0 + _HUB_BORE
+_CS_S0 = _PIN_PROUD + (_HUB_W - _CS_DIA) / 2.0
 _CS_S1 = _CS_S0 + _CS_DIA
-_CRANK_PIN_ARM_MM3 = _pin_overlap(_ARM_S0, _BORE_S0, _ARM_PILOT) + _pin_overlap(
-    _BORE_S1, _ARM_S1, _ARM_PILOT
+_CRANK_PIN_HUB_MM3 = _pin_overlap(_HUB_S0, _BORE_S0, _HUB_PILOT) + _pin_overlap(
+    _BORE_S1, _HUB_S1, _HUB_PILOT
 )
 _CRANK_PIN_SHAFT_MM3 = _pin_overlap(_CS_S0, _CS_S1, _CS_PILOT)
 
@@ -130,11 +133,19 @@ _TIP_ADJUSTER_GATE_LIMIT_MM3 = _TIP_ADJUSTER_OBSERVED_MM3 * 1.10
 _ADJUSTER_THRUST_GATE_LIMIT_MM3 = 0.13 * 8.0 * 1.10
 
 _DRIVE_TRAIN_ALLOWED_PAIRS = {
-    frozenset(("crank-pin-1", "crank-arm-1")): 1.10 * _CRANK_PIN_ARM_MM3,
+    frozenset(("crank-pin-1", "crank-hub-1")): 1.10 * _CRANK_PIN_HUB_MM3,
     frozenset(("crank-pin-1", "crankshaft-1")): 1.10 * _CRANK_PIN_SHAFT_MM3,
     # Stock 6.35 shank minus the 1.0 eye wire and 0.02 face clearance.
     frozenset(("fillister-screw-1", "crank-arm-1")): _smooth_annulus_limit_mm3(
         2.8448, 2.261, 5.33
+    ),
+    # MHA-139 #8-32 major in the arm's #29 tap drill: the full thread past the
+    # 1.5 relief (6.5 of the 8.0 arm) plus its 0.5 lead cone.  The size is
+    # named here, not imported from crank_handle_pivot_screw_spec, so every
+    # assembly's recipe stays clear of the handle specs; the MHA-139 tests pin
+    # it to that spec's THREAD_SIZE.
+    frozenset(("crank-handle-pivot-screw-1", "crank-arm-1")): _smooth_annulus_limit_mm3(
+        THREAD_MAJOR_MM["#8-32"], TAP_DRILL_MM["#8-32"], 7.0
     ),
     # Rule-12 E11: #10-32 94025A164 in the tapped block, observed above.
     frozenset(

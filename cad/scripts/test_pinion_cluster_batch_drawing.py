@@ -326,6 +326,11 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("fillister-screw-1", "crank-arm-1")): _annulus_limit(
                 2.8448, 2.261, 5.33
             ),
+            # MHA-139 #8-32 major 4.166 in the #29 tap drill 3.454: 6.5 of
+            # full thread past the 1.5 relief plus the 0.5 lead cone.
+            frozenset(("crank-handle-pivot-screw-1", "crank-arm-1")): _annulus_limit(
+                4.166, 3.454, 7.0
+            ),
             # R1: MHA-058 is a bonded slip fit modelled line to line in the
             # MHA-102 cross-hole, so the pair needs no interference allowance.
         },
@@ -554,7 +559,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         frozenset(("pinion-bracket-2", "pinion-cam-pin-2")),
     }
     crank_pairs = {
-        frozenset(("crank-pin-1", "crank-arm-1")),
+        frozenset(("crank-pin-1", "crank-hub-1")),
         frozenset(("crank-pin-1", "crankshaft-1")),
     }
     special_pairs = {
@@ -573,6 +578,11 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     )
     assert not cam_pairs & set(drive_train_allowed)
     crank_allowed = _interference_contracts.allowed_interference_pairs("drive-train")
-    assert all(60.0 < crank_allowed[pair] < 65.0 for pair in crank_pairs)
+    hub_pair = frozenset(("crank-pin-1", "crank-hub-1"))
+    shaft_pair = frozenset(("crank-pin-1", "crankshaft-1"))
+    # The U29 hub barrel (Ø25.4) sets the MHA-024 pilot spans: a longer hub
+    # chord, and the shaft crossing further down the taper.
+    assert 136.0 < crank_allowed[hub_pair] < 137.0
+    assert 53.0 < crank_allowed[shaft_pair] < 54.0
     assert _interference_contracts.allowed_interference_pairs("channel") == {}
     assert _interference_contracts.allowed_interference_pairs("unknown") == {}

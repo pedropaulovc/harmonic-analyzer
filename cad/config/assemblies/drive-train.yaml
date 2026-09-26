@@ -48,6 +48,9 @@ allowed_free_stems:
   - crank-arm
   - crank-drive-gear
   - crank-handle
+  - crank-handle-pivot-screw
+  - crank-hub
+  - crank-hub-pin
   - crank-pin
   - crank-pin-eye
   - crank-pin-ring

@@ -99,14 +99,12 @@ def test_print_carries_no_gdt_roughness_or_callouts() -> None:
     assert "add_view_centerline(" in source
 
 
-def test_notes_say_where_stock_may_come_from_and_nothing_else() -> None:
-    # Rule 6: one stock fact; the faced ends are depicted geometry, not a
-    # method the note prescribes.
-    notes = spec.DRAWING_NOTES
-    assert notes == "STOCK 1/8 IN DRILL ROD OK."
-    assert "\n" not in notes
-    for banned in ("+/-", "MHA-", "MATCH", "PRESS", "HARDEN", "TOLERANCE", "FACE"):
-        assert banned not in notes, banned
+def test_sheet_carries_no_manufacturing_note() -> None:
+    # Rule 6 (Main, 2026-09-25): the stock is stated once, in the title-block
+    # MATERIAL; a note repeating "1/8 IN DRILL ROD" put a dimension in a note.
+    assert not hasattr(spec, "DRAWING_NOTES")
+    assert "Manufacturing Notes" not in _build_source()
+    assert "Manufacturing Notes" not in _source()
 
 
 def test_sheet_runs_at_8_to_1_with_every_view_at_sheet_scale() -> None:
@@ -124,7 +122,6 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     assert drawing.RIGHT_KEEP["PinLen"][1] < drawing.RIGHT_CENTER[1] - drawing.HALF_DIA
     positions = (
         *drawing.RIGHT_KEEP.values(),
-        (0.016, 0.082),  # manufacturing-notes anchor
     )
     for x, y in positions:
         assert 0.012 < x < 0.420
@@ -152,3 +149,19 @@ def test_part_registry_row_is_a_plain_pin() -> None:
     assert 'PART_NAME = "crank-pinion-pin"' in build
     assert "apply_drawing_properties" in build
     assert "clear_dimensions_for_drawing" in build
+
+
+def test_title_block_material_names_the_drill_rod_the_process_allows() -> None:
+    """Codex #813 (PRRT_kwDOPHDy386l4Zrf): the process allows stock drill
+    rod, a tool steel, while the MATERIAL field named only AISI 1018, so one
+    print specified two different stocks.  Both are named where the stock is
+    ordered, the printed field fits its title-block cell, and the sheet
+    prints its registry title instead of the slug."""
+    config = _config.parts("crank-pinion-pin")
+    assert "drill rod" in str(config["process"])
+    assert config["title"] == "Crank Pinion Pin"
+    for field in ("material", "material_specification"):
+        text = str(config[field])
+        assert "1018" in text, field
+        assert "drill rod" in text, field
+    assert len(str(config["material"])) <= 36

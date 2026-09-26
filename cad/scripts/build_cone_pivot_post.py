@@ -86,6 +86,7 @@ from cone_pivot_post_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    GEOMETRIC_CONTROLS,
     HARVESTED_VOLUME_MM3,
     HEAD_BASE_Y,
     HEAD_DIA,
@@ -95,6 +96,7 @@ from cone_pivot_post_spec import (
     JOURNAL_REFERENCE_LENGTH,
     JOURNAL_REFERENCE_X,
     JOURNAL_REFERENCE_Z,
+    PART_DATUMS,
     RUNNING_BORE_BAND,
     SURFACE_FINISHES,
 )
@@ -849,7 +851,12 @@ async def build(adapter: Any) -> dict[str, str]:
     # Decimal places select the title-block general band, so they are product
     # definition the PART owns; the sheet only reads them back.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    author_part_pmi(
+        adapter,
+        datums=PART_DATUMS,
+        controls=GEOMETRIC_CONTROLS,
+        surface_finishes=SURFACE_FINISHES,
+    )
     apply_drawing_properties(
         adapter,
         PART_NAME,
