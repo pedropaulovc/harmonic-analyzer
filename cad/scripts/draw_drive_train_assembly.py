@@ -430,15 +430,21 @@ BANK_STEPS = "\n".join(
         # apex set screws hold. Supersedes U34's disc/feeler end play and
         # its "span -6.0" arbor. Every limit is cylinder_bank_layout's,
         # rounded inward (test_bank_fitup_limits_are_the_layout_bands):
-        # 8: T 7.0565 +0.05/0; L20 141.13 +0.20/0. 9A: Y is the hole-table
-        # rear-face distance of the back strap inner face, 70.538 +/-0.10.
-        # 9F: E_b 0.35-0.55.
+        # 9A: Y is the hole-table rear-face distance of the back strap inner
+        # face, 70.538 +/-0.10. 9F: E_b 0.35-0.55.
+        # 8 (user ruling L20 d'): T 7.0565 +/-0.025 and L20 141.13 +/-0.20,
+        # both exact at the places printed, read from the layout's limits. A
+        # short stack cannot be re-faced longer: its thinnest gear is remade.
         "8. MIC EACH OF {cylinder_gears}X MHA-027, CAM FACE TO BACK FACE:",
-        "   7.057-7.106; RECORD. SLIDE THEM ONTO A 3/8 GROUND SETTING",
+        f"   {bank.GEAR_THICKNESS_ACCEPT[0]:.4f}-{bank.GEAR_THICKNESS_ACCEPT[1]:.4f};"
+        " RECORD. SLIDE THEM ONTO A 3/8 GROUND SETTING",
         "   MANDREL ~190 LONG, ALL ALIKE, CAM SIDE FRONT; ADD EACH CONNECTING",
         "   ROD (CHANNEL ASSEMBLY MHA-A02) ON ITS CAM AS ITS GEAR GOES ON.",
         "   CLAMP LIGHTLY END TO END: GEAR 0 CAM FACE TO GEAR 19 BACK FACE",
-        "   141.13-141.33. LONG: RE-FACE THE THICKEST CAM FACE, REMEASURE.",
+        f"   {bank.STACK_L20_ACCEPT[0]:.2f}-{bank.STACK_L20_ACCEPT[1]:.2f}."
+        " LONG: RE-FACE THE THICKEST CAM FACE, REMEASURE.",
+        f"   SHORT OF {bank.STACK_L20_ACCEPT[0]:.2f}: REMAKE THE THINNEST GEAR,"
+        " REMEASURE.",
         "   SLIDE THE STACK OFF IN ORDER.",
         "9. BASE MHA-035 OUT OF THE FRAME, ON THE MILL TABLE, PAD TRAMMED,",
         "   OVERHANG SUPPORTED; CONE SET (MHA-091) NOT FITTED.",

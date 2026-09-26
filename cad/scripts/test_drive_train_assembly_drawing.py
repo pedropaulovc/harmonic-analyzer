@@ -652,8 +652,12 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
 
     steps = drawing.BANK_STEPS
     thickness = bank.OVERALL_THICKNESS
-    assert limits(thickness, thickness + bank.OVERALL_THICKNESS_BAND[0], 3) in steps
+    upper, lower = bank.OVERALL_THICKNESS_BAND
+    # 7.0565 +/-0.025 is exact at four places (user ruling L20 d').
+    assert limits(thickness + lower, thickness + upper, 4) in steps
     assert limits(*bank.STACK_L20_ACCEPT, 2) in steps
+    short = f"SHORT OF {bank.STACK_L20_ACCEPT[0]:.2f}: REMAKE THE THINNEST GEAR"
+    assert short in " ".join(steps.split())
     back_y = base.BOTTOM_REAR_Z - bank.BACK_STRAP_INNER_Z
     band = bank.BACK_STRAP_LOCATE_BAND
     assert f"Y {limits(back_y - band, back_y + band, 2)}" in steps

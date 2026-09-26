@@ -41,10 +41,13 @@ CAM_DIA_BAND = (0.0, -0.05)  # (upper, lower) deviations
 # channel station pitch (machine channels.station_pitch_mm, pinned by
 # test_cylinder_bank_layout), so neighbouring gears bear cam face on back face
 # and set the stations the way the rocker hubs do (rocker_arm_spec.HUB_LENGTH).
-# The band is one-sided: a long stack is re-faced at fit-up, a thin gear could
-# not be fixed (cylinder_bank_layout.STACK_L20_ACCEPT).
+# The band is centred (user ruling L20 d', #743): the same 0.05 wide as the
+# one-sided +0.05/0 it replaces, so no harder to make, but 20 in-band gears
+# now stack about nominal and the 20-gear acceptance
+# (cylinder_bank_layout.STACK_L20_ACCEPT) passes first time. A long stack is
+# re-faced at fit-up; a short one gets its thinnest gear remade.
 OVERALL_THICKNESS = 7.0565
-OVERALL_THICKNESS_BAND = (0.05, 0.0)  # (upper, lower) deviations
+OVERALL_THICKNESS_BAND = (0.025, -0.025)  # (upper, lower) deviations
 CAM_THICKNESS = OVERALL_THICKNESS - FACE_WIDTH  # reference: the closed rod slot
 ECCENTRICITY = 8.64  # cam axis offset from the bore axis
 ECCENTRICITY_TOLERANCE_MM = 0.025
@@ -99,7 +102,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": 2},
     "BoreProfile": {"BoreDia": 3},
     "CamProfile": {"CamDia": 2, "CamCy": 3},
-    "CamBoss": {"OverallThickness": 3},
+    # Four places: 7.0565 is the station pitch, exact only at four (user
+    # ruling L20 d'); three would round one limit of the band inward.
+    "CamBoss": {"OverallThickness": 4},
     "NotchProfile": {"NotchDepth": 1, "NotchWidth": 2, "NotchPhase": 1},
 }
 
