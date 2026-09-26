@@ -361,3 +361,56 @@ def test_shaft_band_ruling_holds_because_the_general_tolerance_fails_both_stacks
     assert edge < bdt.PINION_PIN_EDGE_MIN_WORST
     assert recess == pytest.approx(-0.461, abs=1e-3)
     assert recess < bdt.PINION_RECESS_MIN_WORST
+
+
+def _dimension_record_rows() -> dict[str, list[str]]:
+    import yaml
+
+    record = yaml.safe_load(
+        (Path(spec.__file__).resolve().parents[1] / "config" / "dimensions.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    rows: dict[str, list[str]] = {}
+    stack = [record]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            stack.extend(node.values())
+            continue
+        if not isinstance(node, list):
+            continue
+        if node and isinstance(node[0], str) and node[0].startswith("Crankshaft"):
+            rows[node[0]] = [str(cell) for cell in node]
+            continue
+        stack.extend(node)
+    return rows
+
+
+def test_dimension_record_rows_follow_the_spec() -> None:
+    # Codex #892 (PRRT_kwDOPHDy386mNCXx): W15 lengthened the cylinder to 136.8
+    # (inboard end z -46.2), but the structured dimensions record still said
+    # 130 ending at -53.  Every crankshaft length and station it states comes
+    # from the spec and the placed shaft origin.
+    import build_drive_train_assembly as bdt
+
+    z0 = bdt.CRANKSHAFT_Z0
+    end = z0 + spec.SHAFT_LENGTH
+    rows = _dimension_record_rows()
+    length = rows["Crankshaft length"]
+    assert length[1] == (
+        f"{spec.SHAFT_LENGTH:g} mm cylindrical length plus "
+        f"{spec.SHAFT_DOME_HEIGHT:g}-mm integral outboard dome"
+    )
+    assert length[2] == f"{spec.SHAFT_LENGTH / 25.4:.2f} + dome"
+    assert f"inboard end sits at z −{-end:g}" in length[3]
+    assert f"{spec.SHAFT_END_RECESS:.2f} inside the 16T pinion's boss" in length[3]
+    placed = rows["Crankshaft"][1]
+    assert f"The {spec.SHAFT_LENGTH:g}-mm cylinder spans z −{-z0:g}..−{-end:g}" in placed
+    assert f"stops at z −{-(z0 + spec.JOURNAL_END):g} (local {spec.JOURNAL_END:g})" in placed
+    journal = rows["Crankshaft bearing journal"][1]
+    assert journal == (
+        f"Ø{spec.JOURNAL_DIA:g} × {spec.JOURNAL_LENGTH:.4f} mm; local stations "
+        f"{spec.JOURNAL_START:.9f}..{spec.JOURNAL_END:g} "
+        f"(world z −{-(z0 + spec.JOURNAL_START):.9f}..−{-(z0 + spec.JOURNAL_END):g})"
+    )
