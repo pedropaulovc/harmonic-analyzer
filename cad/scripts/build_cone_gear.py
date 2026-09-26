@@ -139,6 +139,8 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
+
 # NOTE: the validating ``set_global`` comes from ``involute_gear`` -- it
 # round-trips every gear-math global through the SW equation parser to assert
 # the trig/sqr/pi dialect, which the plain ``_common.set_global`` does not do,
@@ -162,6 +164,15 @@ from involute_gear import (
 )
 
 PART_NAME = "cone-gear"
+# Reference sketches this part still saves shown (#880), each with its owner
+# and why.  Delete an entry once the part hides that sketch; the release
+# refuses to start while any part lists one (visibility_debt).
+SHOWN_SKETCH_ALLOWANCES = {
+    "ToothThicknessReference": (
+        "conegear: carries the print's driving tooth-thickness dimension; "
+        "#834 hides it once the sheet imports it from the hidden sketch"
+    ),
+}
 MATERIAL = "Brass"  # ch. 13 text: polished brass gear stock; cone set matches
 # The four smallest tip gears read "more yellow ... a harder metal" (ch.12 p.21)
 # -- a high-zinc yellow metal (Muntz/manganese bronze). That muntz_yellow tint is
@@ -1040,12 +1051,12 @@ async def build(adapter) -> dict[str, str]:
     # ------------------------------------------------------------------
     from solidworks_mcp.adapters.base import CreateAxisParameters
 
-    check(
+    pattern_axis = check(
         "create_axis Z (Top x Right)",
         await adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
         ),
-    )
+    ).name
     adapter._zoom_to_fit(adapter.currentModel)
     ra_default_mm = facts["Ra"] * 25.4
     candidates = [[0.0, 0.0, FACE_WIDTH / 2.0]]  # on the reference axis
@@ -1074,6 +1085,9 @@ async def build(adapter) -> dict[str, str]:
         _telemetry.debug(f"axis candidate {point} failed: {res.error}")
     if pattern is None:
         raise RuntimeError("circular pattern: no axis candidate selectable")
+    # Hide only now: the pattern picks the axis by screen point, which a
+    # blanked axis would refuse.
+    blank_reference_geometry(adapter, ((pattern_axis, "AXIS"),))
     pattern_name = name_last_feature(adapter, TOOTH_PATTERN_FEATURE)
     count_dim = pattern_count_dimension(adapter, pattern_name, DEFAULT_TEETH)
     check(
@@ -1182,6 +1196,9 @@ async def build(adapter) -> dict[str, str]:
     # sweep can then use IModelDoc2.Save3 directly; the adapter's in-place save
     # deliberately adds AvoidRebuildOnSave, which live probes proved does not
     # persist rebuilt inactive-configuration bodies.
+    # This part saves itself rather than through save_part_and_images, so it
+    # runs that helper's construction-geometry check here.
+    assert_reference_geometry_hidden(adapter, PART_NAME, allowed=SHOWN_SKETCH_ALLOWANCES)
     OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
     part_path = (OUT_SLDPRT / f"{PART_NAME}.SLDPRT").resolve()
     check(

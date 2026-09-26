@@ -181,12 +181,12 @@ sections:
         - '2026-09 re-derive from the ch30 FRONT view (p002 registered pair: 107 px hub-to-pivot vs the model''s 92 px at 66 -> 77, less ~2% perspective) cross-checked on the ch11 p.13 studio photo (~78 at the arm-width scale). The earlier 66 was scaled on the angle-90 side view, where the crank is the closest object to the camera and the base depth it was scaled against sits ~200 mm behind it. The crank hangs straight DOWN; with cone-pivot-post-v2 fixing Y_CRANK = 129.850 the handle axis sits 4.05 mm above the base top, the grip hanging in front of the base. SUPERSEDES 66 and the former ~150.'
         - scaled
         - med
-      - - Taper pin + keeper ring (placed 2026-09-02)
-        - 'the 45-long 1:48 pin (MHA-024) now sits through the arm hub + crankshaft cross-hole along machine X, big end 3 proud of the hub''s outer face; a Ø9 brass wire ring (Ø1.2 wire, `crank-pin-ring` MHA-128) hangs from a Ø1.5 cross-hole 3 from the big end'
+      - - Taper pin + keeper ring (MHA-024)
+        - '45-long 1:48 pin through separate hub MHA-137 + crankshaft only at local station 13.6 (world z −169.4); big end 3.85 proud of the hub barrel; Ø9 brass wire ring (Ø1.2 wire, `crank-pin-ring` MHA-128) in a Ø1.5 cross-hole 3 from the big end'
         - —
-        - 'ch11 p.14 page002_img01 (pin head with its brass ring) + ch30 p002; the ring''s anchor screw + chain on the arm face are NOT modelled -- 2026-09-02: the anchor screw (a brass fillister-screw in a #4-40 tap on the arm''s front face, x 20 from the shaft) and its brass wire eye (`crank-pin-eye` MHA-130, Ø5 loop, Ø1 wire) are now placed; the chain stays lost. The dimple moved to that same front face'
-        - scaled
-        - low
+        - 'ch11 p.14 page002_img01 (removable pin head and brass ring) + primary crank construction photo; the hub #14 and shaft #9 pilots are match-reamed together. The arm is outboard of this station and is not drilled by MHA-024. The fillister anchor and wire eye remain on the arm; the chain is lost.'
+        - scaled + construction
+        - med
       - - Handle length
         - '58 mm (slim egg grip; Ø15 × 7 collar at the arm; 2026-09-02 user re-read: the 44 egg was too stubby)'
         - '2.28'
@@ -199,30 +199,48 @@ sections:
         - ch11 p.14 close-up (2026-09 re-derive, with the handle length)
         - scaled
         - med
+      - - Outboard arm / hub / shaft / axial-pin proportions
+        - '3.14 / 2.60 / 1.65 / 0.59 (unitless)'
+        - —
+        - 'primary outboard photograph; normalized relative diameters/width only. Scaling the 1.65 shaft term to the retained Ø9.525 shaft gives 18.13 / 15.01 / 9.525 / 3.405, which left a 0.5-mm hub web. U29 (2026-09-23) scales hub and pin 1.3x about the fixed shaft and makes the arm 1-in stock: 25.4 / 19.5 / 9.525 / 4.0. The seat is drawn 19.4, 0.1 under the photograph, so the .X bore keeps the arm cheek at 2.0 against the 0.004-in bar width tolerance. Named ratio deviation: arm/hub 1.309 vs the photograph''s 1.208.'
+        - scaled ratio
+        - med
       - - Crank arm width
-        - ~16 mm
-        - ~0.63
-        - p.12 photo
-        - scaled
-        - low
+        - 25.4 mm
+        - '1.000'
+        - 'U29: 1 x 5/16-in cold-finished flat bar, width as supplied; the photograph ratio would give 23.6 at the 1.3x hub scale. Keeps the cheek around the Ø19.4 hub seat at 2.05 worst case (U27).'
+        - user ruling
+        - med
+      - - Separate crank hub MHA-137
+        - 'Ø19.4 × 8 through-seat; Ø25.4 rear barrel/shoulder to overall length 20; Ø9.550 +0.030/−0.000 through bore'
+        - —
+        - 'primary construction photo and user-confirmed through-hub topology. The arm and hub are a matched light arbor-press fit against the shoulder; the bore reuses the project shaft-in-bushing fit, giving 0.025..0.075 diametral shaft clearance.'
+        - derived construction
+        - med
+      - - Axial seam pin MHA-138
+        - 'Ø4 m6 dowel stock × 4.0, parallel to shaft at six o’clock, centre radius 9.7'
+        - —
+        - 'user selected the axial arm↔hub seam key after rejecting radial/Scotch alternatives; diameter is the stock dowel just under the U29 1.3x scale of the primary outboard ratio 0.59 (4.43), leaving a 2.05 worst-case hub web, and length is exactly half the 8-mm arm thickness. It does not intersect the shaft bore.'
+        - scaled + stated topology
+        - med
       - - Crankshaft diameter
-        - 9.525 mm (3/8") on the T12, pinion, and crank-arm seats
+        - 9.525 mm (3/8") on the T12 and crank-hub seats; the 16T pinion sits on a Ø9.0 seat step (local 112.7)
         - '0.375'
-        - legacy `parameters.kcl` ShaftDiameter; retained outside the v2-post bearing journal so all fitted parts keep their existing bores and world stations
+        - legacy `parameters.kcl` ShaftDiameter; retained outside the v2-post bearing journal and through MHA-137 so fitted parts keep their existing bores and world stations. #906 ruling (b), Main 2026-09-26: the single-cutter 16T's smaller root needs the Ø9.0 seat to keep its boss wall over 1.5 at print-worst
         - legacy
         - med
       - - Crankshaft bearing journal
-        - 'Ø11.388 × 72.0344 mm; local stations 32.755105572..104.789505572 (world z −142.244894428..−70.210494428)'
+        - 'Ø11.388 × 68.3449 mm; local stations 40.755105572..109.1 (world z −142.244894428..−73.9)'
         - —
-        - 'derived from the manually rederived `cone-pivot-post-v2` Ø11.438 crank bore with 0.05 mm diametral running clearance; integral with the Ø9.525 shaft, whose world origin remains z −175'
+        - 'derived from the manually rederived `cone-pivot-post-v2` Ø11.438 crank bore with 0.05 mm diametral running clearance; the +8 local shift exactly offsets the shaft origin move from world z −175 to −183. #906: bears on two 15-mm lands at the MHA-149 bushing ends, Ø10.4 relief between (local 55.8..94.1).'
         - derived
         - high
       - - Arm thickness
-        - ~8 mm
-        - ~0.31
-        - p.12 photo, ~half the arm width
+        - 8.0 mm
+        - '0.315'
+        - primary construction photo; also fixes the MHA-137 shoulder station and MHA-138 half-depth
         - scaled
-        - low
+        - med
       - - Square-end overhang past pivot
         - ~10 mm
         - ~0.39
@@ -235,34 +253,36 @@ sections:
         - p.12 photo, proportion of handle dia
         - scaled
         - low
-      - - Fiducial dimple
-        - ~Ø8 × 0.5 deep
+      - - Fiducial punch marks
+        - 'simple un-dimensioned punched witnesses on arm and shaft dome'
         - —
-        - p.15 photo
-        - scaled
-        - low
+        - 'primary construction photo/annotation; these are alignment witnesses, not machined dimples. The CAD uses only a shallow visual representation and the drawings intentionally carry no diameter/depth callout.'
+        - construction
+        - high
       - - Tapered-pin cross-hole
-        - ~Ø5 mm
+        - '~Ø5 mm through MHA-137 rear barrel + shaft at local station 13.6'
         - ~0.20
-        - p.14 photo, pin small end
+        - p.14 photo and removable MHA-024 small end; hub and shaft pilots are match-reamed to the custom 1:48 pin
         - scaled
-        - low
-      - - Crankshaft length
-        - 122 mm
-        - '4.8'
-        - 'shortened 2026-09 (ch12 p.19: the shaft ends just past the inboard pinion with a capped end — no 34 mm bare stub out the column back); the crank plane stays at the ch30 GT read (arm hub z −175..−167, T12 chain wheel −157.5, pedestal cylinder front face −121.4) — the shaft spans z −175..−53 (`crankshaft_spec.py`)'
-        - derived
         - med
+      - - Crankshaft length
+        - 136.8 mm cylindrical length plus 2-mm integral outboard dome
+        - '5.39 + dome'
+        - 'the outboard cylinder/arm/hub plane moves from world z −175 to −183. Every bearing/T12/pinion local station shifts +8, preserving established world interfaces; only the integral dome projects outboard and remains within the through-hub envelope. W15: the inboard end sits at z −46.2, 1.14 inside the 16T pinion''s boss, so the pinion''s retention pin crosses the shaft (length floored to its one printed place, +0/−0.4).'
+        - derived
+        - high
   - prose: |2
 
-      Construction (stated): wooden handle stained black, rotates on a pivot; metal crank
-      arm with fiducial indentations for alignment; tapered pin affixes crank to shaft
-      (removable — crankshaft gear is changeable); small chain eyelet (chain lost).
+      Construction: the wooden handle rotates on the metal arm. The arm is a matched
+      light arbor press fit on separate through hub MHA-137, against its inboard
+      shoulder. Axial pin MHA-138 is driven from the outboard face at six o'clock,
+      parallel to the crankshaft, and keys only the arm/hub seam for 4 mm. Removable
+      taper pin MHA-024 crosses the hub and shaft behind the arm; removing it releases
+      the matched arm/hub assembly for gear service. Simple punched witnesses on the
+      arm and shaft dome aid re-alignment; they are not machined dimples.
 
       Rest pose (ch30 eight-views): the crank arm hangs straight down (−Y), the handle
-      pivot ~66 mm below the crankshaft axis with the grip axis parallel to the shaft —
-      modeled in `build_drive_train_assembly.py` as a −90° arm rotation about the crank
-      axis with the handle relocated below the crankshaft.
+      pivot 75 mm below the crankshaft axis with the grip axis parallel to the shaft.
 - heading: Chapter 12 — Cone Gear Set (pp. 16–21)
   elements:
   - prose: ''
@@ -342,7 +362,7 @@ sections:
         - derived
         - low
       - - Crank-drive gear (dark steel gear at the large end, "This gear engages the crank" p.20)
-        - '64T at DP 25.7311: PD 63.176 mm, OD 65.151 mm; mates a 16T pinion (4:1, PD 15.794, OD 17.768). The fixed v2 post keeps both bore axes; the 64T/cone stack moves 33.115 mm toward it along the inclined shaft and the pair is reclosed at 39.735 mm c2c with 0.25 mm slack. Cut as a true 12.00° helix with 0.15 transverse tooth thinning + root-relieved floors. Held like the 20 cone gears: plain Ø9.525 bore, NO keyway/pin/set screw/hub, soldered or silver-brazed to the shaft''s 3/8" seat (Loctite 638/648 retaining compound an approved alternative, 2026-09-21) — the joint is the gear''s only torque path, so the print states it. Not butted to T120: the 8.0 face against the frozen 10.0 reference face leaves ~1.1 mm of axial air, so the station is an assembly fact.'
+        - '64T at transverse DP 25.7311 (normal DP 26.306, one cutter for the pair, #906): PD 63.176 mm, OD 65.108 mm; mates a 16T pinion cut straight by the same cutter (4:1, PD 15.449, OD 17.380, frame-fixed slack 0.423). The fixed v2 post keeps both bore axes; the 64T/cone stack moves 33.115 mm toward it along the inclined shaft and the pair is reclosed at 39.735 mm c2c with 0.25 mm slack. Cut as a true 12.00° helix with 0.15 transverse tooth thinning + root-relieved floors. Held like the 20 cone gears: plain Ø9.525 bore, NO keyway/pin/set screw/hub, soldered or silver-brazed to the shaft''s 3/8" seat (Loctite 638/648 retaining compound an approved alternative, 2026-09-21) — the joint is the gear''s only torque path, so the print states it. Not butted to T120: the 8.0 face against the frozen 10.0 reference face leaves ~1.1 mm of axial air, so the station is an assembly fact.'
         - —
         - 'p.20 supplies the 4:1 reduction and the visibly coarser pair; the manually rederived v2 post supplies the harder geometric constraint. With its world placement and both bores fixed, the recentered 64T station closes the axes at c2c 39.735, so DP = 25.7311 at the retained 0.25 mm slack. The exact-solid phase sweep rederives the tooth inclination to 12.00°. Attachment (rule-11 flag closed 2026-09-21, dt-logs/geometry-decisions.md): p.20 `page003_img03.jpeg` shows the 64T face-on to T120 with no hub, fillet or pin head, p.21 `page003_img02.jpeg` shows solder at the same shaft''s small gears, and engineerguy `v4_t00399`/`v2_t00069` leave ~1 mm between the far face and the pivot post — no room for a boss either side. Confidence high on no-hub/no-pin; geometry unchanged.'
         - scaled
@@ -566,8 +586,8 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - along Z at (x, y) = (−129.336, 129.850), the Ry180-installed v2 casting's unchanged straight crank bore; 16T:64T c2c 39.735 = radii + 0.25 slack at DP25.7311. The 150-mm shaft keeps T12 at z −155 while its pinion seat moves to z −64.560; the 2.8360-in boss spans z −142.245..−70.210, leaving 10.255 mm to T12 and 0.250 mm to the pinion.
-        - 'cone-pivot-post-v2 is the physical authority for x/y. The ch30 GT crank_sprocket result (−122.84, 144.78) remains independent image evidence, but its uncertainty and feature-centre ambiguity no longer override the manually rederived cast-in bore. The crossed-helical accommodation and 0.25 mm mesh slack remain.'
+        - 'along Z at (x, y) = (−129.336, 129.850), the Ry180-installed v2 casting''s unchanged straight crank bore; 16T:64T c2c 39.735 = radii + 0.25 slack at DP25.7311. The single-cutter pair (#906) keeps that frame c2c with 0.423 slack. The 136.8-mm cylinder spans z −183..−46.2 with a 2-mm integral dome outboard; +8-shifted local seats preserve T12 at z −155 and the pinion centre at z −64.560. The 2.8360-in boss remains z −142.245..−70.210, leaving 10.255 mm to T12 and 0.250 mm to the pinion. The Ø11.388 journal stops at z −73.9 (local 109.1), 3.7 inside the boss, bearing on two 15-mm lands with a Ø10.4 relief between; the Ø9.525 web to the Ø9.0 pinion seat step (local 112.7) is 3.6, 2.0 with both stations at their .X rows (U27, #906).'
+        - 'cone-pivot-post-v2 is the physical authority for x/y. The ch30 GT crank_sprocket result (−122.84, 144.78) remains independent image evidence, while the primary crank construction photo governs the separate through hub and flush outboard face. The crossed-helical accommodation and 0.25 mm mesh slack remain.'
         - high (GT + mesh)
       - - Chain run
         - crank T12 sprocket (−129.336, 129.850, z −155 chain plane) up to the transgear knob-shaft T24; 66 ANSI #25 links, solved sag 16.471 mm
@@ -604,7 +624,7 @@ sections:
         - 'manual height rederivation from ch30 Eight Views station 2 (references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png); proportions from ch11 references/albert-michelsons-harmonic-analyzer/ch11_images/page002_img05.jpeg and page002_img06.jpeg; collar Ø44.0 measured from the cast/turned seam in ch11 page002_img04/05/06 and ch30 page003_img01 (`cad/scripts/cone_pivot_post_spec.py` HEAD_DIA); other feature dimensions harvested from cone-pivot-post-v2.SLDPRT'
         - 'med (86 mm height, proportions and Ø44.0 as-cast collar photo-derived; other v2 feature dimensions exact)'
       - - '`cone-tip-block` (adjuster carrier + end-play lock, on the plate — GT cone_back realized)'
-        - 'black steel block 15 × 12 × 46.83 tall on a 1.10 nominal fit-up shim pack; #10-32 UNF-2B thread tapped THROUGH on the cone axis 32.27 above the foot, with a 90° countersink to Ø5.0 at both ends (rule-12 E11/W1), carrying the cup-ended cone-tip-adjuster from the north face while the shaft tip enters from the south; 1.2-wide top slit with its floor 0.65 below the axis, crossed by a #4-40 pinch joint 8.85 above the axis (McMaster 90280A110, Ø3.264 normal-clearance near jaw). Every web keeps 2.0 at the printed title-block and hole bands.'
+        - 'black steel block 17 × 12 × 46.83 tall on a 1.10 nominal fit-up shim pack; #10-32 UNF-2B thread tapped THROUGH on the cone axis 32.27 above the foot, with a 90° countersink to Ø5.0 at both ends (rule-12 E11/W1), carrying the cup-ended cone-tip-adjuster from the north face while the shaft tip enters from the south; 1.2-wide top slit with its floor 0.65 below the axis, crossed by a #4-40 pinch joint 41.12 above the foot, 8.85 over the axis (McMaster 91794A112; its Ø3.264 normal-clearance near jaw is drilled to the slot, the far jaw tapped through to it; the axis and the flange slot print from the -X face, the pinch screw''s far side). A south foot flange (20.8 × 3.50) carries the hold-down slot, its arc centres 6.5 and 14.9 from the body''s south face. Every web keeps 2.0 at the printed title-block and hole bands.'
         - 'centre (−90.067, +85.281) = cone shaft station 141.272, standing ON the swing platform beside T006; at the 9.5 mm fit-up adjuster engagement (working window 7.72..10.72), the shaft tip contacts the McMaster 94025A164 conical cup apex at station 138.9788259477.'
         - 'ch30 GT (cone_back); p.18 tip clamp + v4_t00471 (7:49 full tip-stack geometry); 2026-09-21 user-approved DFM correction grows only the block top and controls the pinch axis relative to the unchanged adjuster axis'
         - med (GT-anchored)
@@ -634,9 +654,9 @@ sections:
         - v4_t00471 / 7:49 (t00147: hollow slotted screw the cone shaft rests in)
         - med (role high, dims low)
       - - '`cone-tip-pinch-screw` (locks the adjuster)'
-        - 'McMaster-Carr 90280A110 steel narrow fillister-head slotted screw: head Ø4.6482 × 2.7178, #4-40 shank Ø2.8448 × 12.7 (rule-12 E1: 1.77D far-jaw engagement at the printed worst case).'
+        - 'McMaster-Carr 91794A112 18-8 stainless fillister-head slotted screw: head Ø4.6482 × 2.7178, #4-40 shank Ø2.8448 × 15.875 (rule-12 E1: 5.21 = 1.83D of far-jaw thread, from the slit''s far wall, at the printed worst case; tip 0.325 inside the -X face at the width minimum).'
         - 'across the tip block''s top slit (head on the east face, y 110.35): the near jaw is normal-clearance and the far jaw is native #4-40 UNC-2B; tightening pinches the slit closed around the #10-32 adjuster so its end-play setting cannot back off.'
-        - McMaster-Carr 90280A110 recipe + v4_t00471 / 7:49 (small perpendicular screw at the block top)
+        - McMaster-Carr 91794A112 recipe + v4_t00471 / 7:49 (small perpendicular screw at the block top)
         - high (stock dimensions exact; function photo-derived)
   - prose: |2
 
@@ -2112,7 +2132,9 @@ sections:
          backlash + root relief on both. **V2 casting override (2026-07-24):**
          the exact rederived bores keep the drive line at y 90.518 and crank
          axis at (−129.336, 129.850), closing the DP25.7311 pair at c2c 39.735
-         (0.25 slack; zero collision must be rechecked over
+         (0.25 slack; #906 then cut both gears with one DP 26.306 normal
+         cutter at that same frame c2c, leaving 0.423 slack and a 2.4-deg free
+         window centred at −1.42; zero collision must be rechecked over
          a full crank-pitch phase sweep with ±0.4° seed margin —
          `diagnostics/crossed_mesh_study.py`; the fit re-arbitrated
          2026-07-14 from the interim K=12-slice cut stack's 0.40/0.60 after
@@ -2122,8 +2144,8 @@ sections:
          relief pocket — centred in the TRUE casting-to-T120 span
          (z −31.025, centred on the shifted 64T row). The 2.8360-in v2 boss occupies
          z −142.245..−70.210, leaving 10.255 mm to the fixed T12 wheel and
-         33.785 mm to the shifted pinion; the relocated crank axis no longer overlaps the
-         T120 rim radially.
+         0.250 mm to the pinion south face. The 130-mm shaft cylinder moves only
+         its common crank face outboard to z −183; all inboard world stations remain fixed.
       10. **Alignment-pinion mechanism removed (2026-06-18) — RESTORED
          2026-07-02** (ch. 25). The removal-era impossibility used the now-
          superseded pre-correction drum against the 12.56 mm frustum/64T

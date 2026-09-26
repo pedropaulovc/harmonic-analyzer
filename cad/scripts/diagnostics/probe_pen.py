@@ -22,6 +22,7 @@ from _common import (
     run_build,
 )
 from _assembly import (
+    activate_assembly_contract,
     angle_driver,
     component_transform,
     distance_driver,
@@ -30,6 +31,10 @@ from _assembly import (
     place_component,
     world_point,
 )
+
+# Distance drivers seed their side from pen's flip seeds
+# (cad/config/assemblies/pen.yaml), the assembly this probe mirrors.
+activate_assembly_contract("pen")
 
 VBLOCK_POS = (-24.0, 390.0, -159.5)
 PEN_ROD_POS = (-3.0, 398.0, -154.0)

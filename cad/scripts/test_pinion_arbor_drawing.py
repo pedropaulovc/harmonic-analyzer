@@ -10,6 +10,7 @@ import _drawing_marks
 import _fit_limits
 import build_pinion_arbor as part
 import draw_pinion_arbor as drawing
+import pinion_arbor_geometry as arbor_geometry
 import pinion_arbor_spec as spec
 import pinion_handle_geometry as rod_geometry
 import pinion_handle_spec as crossrod
@@ -42,15 +43,15 @@ def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
 def test_integral_arbor_keeps_the_released_stations_around_a_longer_head() -> None:
     # Rule 12 (audit W6): the head grows 9.0 -> 10.5 about the released
     # crossrod station; the neck shoulder, shaft and back crown stay put.
-    assert spec.HEAD_CENTER_Z == pytest.approx(-6.5)
-    assert spec.HEAD_FRONT_Z == pytest.approx(-11.75)
-    assert spec.HEAD_REAR_Z == pytest.approx(-1.25)
-    assert spec.NECK_END_Z == pytest.approx(10.0)
-    assert spec.SHAFT_LEN == pytest.approx(226.25)
-    assert spec.HEAD_FRONT_Z - spec.HEAD_CAP_SAG == pytest.approx(-14.75)
-    assert spec.SHAFT_LEN + spec.BACK_CAP_SAG == pytest.approx(227.45)
+    assert arbor_geometry.HEAD_CENTER_Z == pytest.approx(-6.5)
+    assert arbor_geometry.HEAD_FRONT_Z == pytest.approx(-11.75)
+    assert arbor_geometry.HEAD_REAR_Z == pytest.approx(-1.25)
+    assert arbor_geometry.NECK_END_Z == pytest.approx(10.0)
+    assert arbor_geometry.SHAFT_LEN == pytest.approx(226.25)
+    assert arbor_geometry.HEAD_FRONT_Z - arbor_geometry.HEAD_CAP_SAG == pytest.approx(-14.75)
+    assert arbor_geometry.SHAFT_LEN + spec.BACK_CAP_SAG == pytest.approx(227.45)
     assert spec.OVERALL_LEN == pytest.approx(242.2)
-    assert spec.EXPOSED_SHAFT_LEN == pytest.approx(216.25)
+    assert arbor_geometry.EXPOSED_SHAFT_LEN == pytest.approx(216.25)
     assert spec.BACK_RIM_FROM_HEAD_REAR == pytest.approx(227.5)
 
 
@@ -64,10 +65,10 @@ def test_crossrod_hole_is_centred_with_a_rule_12_web() -> None:
 
 
 def test_integral_head_owns_the_crossrod_interface() -> None:
-    assert spec.HEAD_DIA == pytest.approx(15.0)
-    assert spec.HEAD_LEN == pytest.approx(10.5)
-    assert spec.NECK_DIA == pytest.approx(10.5)
-    assert spec.NECK_LEN == pytest.approx(11.25)
+    assert arbor_geometry.HEAD_DIA == pytest.approx(15.0)
+    assert arbor_geometry.HEAD_LEN == pytest.approx(10.5)
+    assert arbor_geometry.NECK_DIA == pytest.approx(10.5)
+    assert arbor_geometry.NECK_LEN == pytest.approx(11.25)
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
     assert callout is spec.CROSS_HOLE_CALLOUT
     assert callout == "REAM THRU,\nCENTRED ON HEAD LENGTH"
@@ -80,18 +81,18 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
 def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
     """R1 (U27 precedent): a novice's stock reamer and as-received bar give
     clearance, so the hole is banded Ø6.00 +0.10/0 and the rod is bonded."""
-    assert spec.CROSS_HOLE_DIA == pytest.approx(6.0)
+    assert arbor_geometry.CROSS_HOLE_DIA == pytest.approx(6.0)
     assert spec.CROSS_HOLE_DIA_BAND == (0.10, 0.0)
-    assert crossrod.ROD_DIA == pytest.approx(spec.CROSS_HOLE_DIA)  # line to line
+    assert crossrod.ROD_DIA == pytest.approx(arbor_geometry.CROSS_HOLE_DIA)  # line to line
     assert (
         model_toleranced_dimensions(part)[("CrossHoleProfile", "CrossHoleDia")]
         == "*deviations(CROSS_HOLE_DIA_BAND)"
     )
     assert spec.DRAWING_PRECISION_BY_NAME["CrossHoleDia"] == 2
-    tightest = (spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[1]) - (
+    tightest = (arbor_geometry.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[1]) - (
         crossrod.ROD_DIA + rod_geometry.ROD_DIA_BAND[0]
     )
-    loosest = (spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[0]) - (
+    loosest = (arbor_geometry.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[0]) - (
         crossrod.ROD_DIA + rod_geometry.ROD_DIA_BAND[1]
     )
     assert spec.CROSSROD_MIN_CLEARANCE == pytest.approx(tightest)
@@ -126,7 +127,7 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     assert {finish.key for finish in spec.SURFACE_FINISHES} == set(lands)
     for finish in spec.SURFACE_FINISHES:
         assert finish.roughness_um == 1.6
-        assert finish.face.diameter_mm == spec.SHAFT_DIA
+        assert finish.face.diameter_mm == arbor_geometry.SHAFT_DIA
         station = lands[finish.key]
         assert station < finish.face.contains_z_mm < station + spec.JOURNAL_LEN
     assert set(drawing.JOURNAL_FINISHES) == set(lands)
@@ -215,8 +216,8 @@ def test_back_crown_radius_is_the_model_dimension_not_typed_text() -> None:
 def test_every_printed_length_is_exact_at_its_authored_places() -> None:
     """A one-place print of 11.25 reads 11.3: the sheet would not state the model."""
     nominal = {
-        "HeadLen": spec.HEAD_LEN,
-        "NeckLen": spec.NECK_LEN,
+        "HeadLen": arbor_geometry.HEAD_LEN,
+        "NeckLen": arbor_geometry.NECK_LEN,
         "BackRimFromHeadRear": spec.BACK_RIM_FROM_HEAD_REAR,
         "OverallLen": spec.OVERALL_LEN,
         "FrontJournalFromHeadRear": spec.FRONT_JOURNAL_FROM_HEAD_REAR,
@@ -255,7 +256,7 @@ def test_back_journal_diameter_hangs_above_clear_of_the_crown_witnesses() -> Non
     diameter hangs above, text right of the line; its 19.0 goes below."""
     width, height = drawing.DIAMETER_BLOCK_SIZE
     x, y = drawing.PRINCIPAL_KEEP["BackJournalDia"]
-    shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
+    shaft_top = drawing.PRINCIPAL_CENTER[1] + arbor_geometry.SHAFT_DIA / 2000.0
     # 12 -> 15 mm: the back Ra symbol now sits between block and shaft.
     assert 0.003 <= (y - height / 2.0) - shaft_top <= 0.015
     assert x - 0.081 >= 0.010  # clear of the crown witnesses rising to the sag
@@ -279,7 +280,7 @@ def test_back_ra_symbol_hangs_above_the_shaft_clear_of_every_witness() -> None:
     arrow_x = drawing._sheet_x(edge_z)
     assert crown_end < arrow_x < head_end  # the arrow lands on the land
     left, right, top = drawing.RA_SYMBOL_EXTENT
-    shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
+    shaft_top = drawing.PRINCIPAL_CENTER[1] + arbor_geometry.SHAFT_DIA / 2000.0
     # A leader rise long enough to carry its arrowhead.
     assert symbol_y - shaft_top >= 0.004
     # The shoulder runs head side from the arrow, right of the diameter line.
@@ -303,7 +304,7 @@ def test_bond_zone_callout_sits_above_the_shaft_clear_of_its_neighbours() -> Non
     width, height = drawing.DIAMETER_BLOCK_SIZE
     x, y = drawing.PRINCIPAL_KEEP["BondZoneDia"]
     left, right, bottom, top = x, x + width, y - height / 2.0, y + height / 2.0
-    shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
+    shaft_top = drawing.PRINCIPAL_CENTER[1] + arbor_geometry.SHAFT_DIA / 2000.0
     # Short witnesses: the block starts a few mm off the silhouette.
     assert 0.003 <= bottom - shaft_top <= 0.012
     # Right of the DETAIL A label and the detail circle.
@@ -416,16 +417,16 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     assert spec.DRUM_STATION < station < spec.DRUM_STATION + spec.DRUM_LEN
     text_x, _ = drawing.PRINCIPAL_KEEP["BondZoneDia"]
     assert text_x == pytest.approx(drawing._sheet_x(spec.BOND_ZONE_DIA_Z))
-    fence_x = drawing._sheet_x(spec.HEAD_CENTER_Z)
+    fence_x = drawing._sheet_x(arbor_geometry.HEAD_CENTER_Z)
     assert fence_x - text_x > drawing.DETAIL_RADIUS_MM / 1000.0 + 0.050
 
 
 def test_head_diameter_line_stands_between_crown_apex_and_fence() -> None:
     x = drawing.DIAMETER_POSITIONS["HeadDia"][0]
     to_x = lambda z: drawing.PRINCIPAL_CENTER[0] - (z - 106.725) / 1000.0  # noqa: E731
-    apex = to_x(spec.HEAD_FRONT_Z - spec.HEAD_CAP_SAG)
-    center = to_x(spec.HEAD_CENTER_Z)
-    half = spec.HEAD_DIA / 2000.0
+    apex = to_x(arbor_geometry.HEAD_FRONT_Z - arbor_geometry.HEAD_CAP_SAG)
+    center = to_x(arbor_geometry.HEAD_CENTER_Z)
+    half = arbor_geometry.HEAD_DIA / 2000.0
     fence = center + (drawing.DETAIL_RADIUS_MM**2 / 1e6 - half**2) ** 0.5
     assert apex + 0.0015 < x < fence - 0.0020
 
@@ -541,7 +542,7 @@ def test_drum_station_witness_starts_on_the_flank_not_the_axis() -> None:
     4 mm stub inside the Ø8 silhouette that read as a step (Main)."""
     import inspect
 
-    assert part.DRUM_STATION_POINT_X == pytest.approx(spec.SHAFT_DIA / 2.0)
+    assert part.DRUM_STATION_POINT_X == pytest.approx(arbor_geometry.SHAFT_DIA / 2.0)
     source = inspect.getsource(part.build)
     call = source[source.index('feature_name="DrumStationReference"') :]
     call = call[: call.index("\n    )")]
@@ -561,7 +562,7 @@ def test_reference_witnesses_are_drawn_in_the_outline_black() -> None:
     assert drawing.DRUM_STATION_POINT_LEN == part.DRUM_STATION_POINT_LEN
     assert drawing.BOND_ZONE_WITNESS_LEN == part.BOND_ZONE_WITNESS_LEN
     drum = drawing.REFERENCE_WITNESSES["DrumStationReference"]
-    assert drum[1] == pytest.approx(spec.HEAD_REAR_Z + spec.DRUM_STATION)
+    assert drum[1] == pytest.approx(arbor_geometry.HEAD_REAR_Z + spec.DRUM_STATION)
     assert drum[1] - drum[0] == pytest.approx(part.DRUM_STATION_POINT_LEN)
     bond = drawing.REFERENCE_WITNESSES["BondZoneReference"]
     assert bond[0] == pytest.approx(spec.BOND_ZONE_DIA_Z)
@@ -603,7 +604,7 @@ def test_drum_station_text_clears_the_station_stack() -> None:
     that witness and the head face, the neck-end witness drops through."""
     x, y = drawing.PRINCIPAL_KEEP["DrumStationFromHeadRear"]
     half = drawing.DRUM_STATION_TEXT_WIDTH / 2.0
-    drum_end = drawing._sheet_x(spec.HEAD_REAR_Z + spec.DRUM_STATION)
+    drum_end = drawing._sheet_x(arbor_geometry.HEAD_REAR_Z + spec.DRUM_STATION)
     assert x + half <= drum_end - 0.003
     # Between the 47.4 (above) and 199.9 (below) station lines.
     assert drawing.PRINCIPAL_KEEP["BackJournalFromHeadRear"][1] < y
@@ -619,7 +620,7 @@ def test_drum_station_matches_the_assembled_drum_on_the_arbor() -> None:
     aft with ARBOR_Z0 fixed, so the assembly now carries the printed station."""
     import build_drive_train_assembly as assembly
 
-    shoulder_z = assembly.ARBOR_Z0 + spec.HEAD_REAR_Z
+    shoulder_z = assembly.ARBOR_Z0 + arbor_geometry.HEAD_REAR_Z
     assert assembly.APINION_Z_FRONT - shoulder_z == pytest.approx(spec.DRUM_STATION)
 
 
@@ -638,9 +639,9 @@ def test_collar_pin_hole_is_a_drilled_spring_pin_hole_clear_of_the_front_land() 
     assert pin_hole.PIN_HOLE_DIA == strap_pin.HOLE_DIA == pytest.approx(25.4 / 16.0)
     assert pin_hole.PIN_HOLE_DIA_BAND == strap_pin.HOLE_BAND == (0.06, 0.0)
     assert pin_hole.PIN_HOLE_CALLOUT == strap_pin.DRILL_THRU_CALLOUT
-    assert spec.PIN_STATION_FROM_HEAD_REAR == 39.0
+    assert arbor_geometry.PIN_STATION_FROM_HEAD_REAR == 39.0
     assert spec.PIN_STATION_BAND == spec.LINEAR_X_BAND
-    assert spec.PIN_Z == pytest.approx(spec.HEAD_REAR_Z + 39.0)
+    assert arbor_geometry.PIN_Z == pytest.approx(arbor_geometry.HEAD_REAR_Z + 39.0)
     assert pin_hole.PIN_HOLE_LAND_CLEARANCE >= 2.0
     assert pin_hole.PIN_HOLE_NECK_CLEARANCE >= 2.0
     assert pin_hole.PIN_HOLE_LIGAMENT_WORST == pytest.approx(3.126, abs=1e-3)
@@ -659,8 +660,8 @@ def test_collar_pin_dimensions_stand_above_the_shaft_clear_of_the_front_ra() -> 
     hole's station and diameter both stand above it: the station over the
     neck's Ø10.5 text, the diameter's leader left of the station witness and
     above the 19.0 land length."""
-    pin_x = drawing._sheet_x(spec.PIN_Z)
-    head_rear_x = drawing._sheet_x(spec.HEAD_REAR_Z)
+    pin_x = drawing._sheet_x(arbor_geometry.PIN_Z)
+    head_rear_x = drawing._sheet_x(arbor_geometry.HEAD_REAR_Z)
     axis_y = drawing.PRINCIPAL_CENTER[1]
     station_x, station_y = drawing.PRINCIPAL_KEEP["PinStationFromHeadRear"]
     dia_x, dia_y = drawing.PRINCIPAL_KEEP["PinHoleDia"]
@@ -677,5 +678,5 @@ def test_neck_diameter_text_ends_short_of_the_collar_pin_station_witness() -> No
     up to the station line, so the neck's Ø10.5 block must end left of it
     (stacktop-dbe47ae3 failed its layout audit on exactly this crossing)."""
     neck_x = drawing.DIAMETER_POSITIONS["NeckDia"][0]
-    witness_x = drawing._sheet_x(spec.HEAD_REAR_Z)
+    witness_x = drawing._sheet_x(arbor_geometry.HEAD_REAR_Z)
     assert neck_x + drawing.NECK_DIA_TEXT_RIGHT_FROM_LINE < witness_x - 0.001

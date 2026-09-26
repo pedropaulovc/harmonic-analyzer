@@ -34,6 +34,7 @@ from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _drawing_common import (
     DrawingOutputs,
+    PmiDrawingPlacement,
     add_attached_note,
     add_native_hole_callout,
     add_property_linked_note,
@@ -47,8 +48,10 @@ from _drawing_common import (
     model_point_in_view,
     new_project_drawing,
     offset_dimension_text,
+    project_part_pmi,
     read_required_properties,
     rebuild_drawing,
+    set_basic_dimensions,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_reference_dimension,
@@ -62,6 +65,7 @@ from _surface_finish import surface_finish_by_key
 from cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DIA,
     ATTACHMENT_X,
+    BASIC_DIMENSIONS,
     BLOCK_DIA,
     BLOCK_HEIGHT,
     BORE_DIA,
@@ -74,7 +78,9 @@ from cone_pivot_post_spec import (
     CRANK_BOSS_START_Z,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    GEOMETRIC_CONTROLS,
     INCLINE_DEG,
+    PART_DATUMS,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -276,6 +282,66 @@ def _bore_rim_edge(view: Any, *, diameter_mm: float) -> Any:
                 continue
             return edge
     raise RuntimeError(f"view has no rim adjacent to a {diameter_mm:g} mm bore")
+
+
+# The collar's Ra symbol sits up and left of its leader's landing point, clear
+# of the face-to-face dimension on the section's right (sheet metres).
+_NORTH_BOSS_FINISH_OFFSET = (-0.018, 0.006)
+
+
+def _north_boss_end_edge(section: Any) -> Any:
+    """Return the sheet-left cut edge of the north cone-boss end face.
+
+    The A-A cut runs through the journal axis, so the north end face shows as
+    two short edges split by the bore.  Both vertices of each must lie on the
+    controlled plane at the bore height; finding exactly two proves the scan
+    found the boss end and not some other plane.
+    """
+    normal = surface_finish_by_key(SURFACE_FINISHES, "cone_boss_north_face").face.normal
+    offset = CONE_BOSS_LENGTH / 2.0
+    candidates: list[tuple[float, Any]] = []
+    for raw in visible_view_entities(section, 1, label="north cone boss end edges"):
+        edge = _early_bound(raw, "IEdge")
+        start, end = edge.GetStartVertex(), edge.GetEndVertex()
+        if start is None or end is None:
+            continue
+        points = [
+            tuple(float(v) * 1000.0 for v in _early_bound(vertex, "IVertex").GetPoint())
+            for vertex in (start, end)
+        ]
+        if all(
+            abs(sum(p[i] * normal[i] for i in range(3)) - offset)
+            <= _EDGE_MATCH_TOLERANCE_MM
+            and abs(p[1] - BORE_HEIGHT) <= _EDGE_MATCH_TOLERANCE_MM
+            for p in points
+        ):
+            candidates.append((0.5 * (points[0][0] + points[1][0]), edge))
+    if len(candidates) != 2:
+        raise RuntimeError(
+            f"section shows {len(candidates)} north cone boss end edges, expected two"
+        )
+    return min(candidates, key=lambda item: item[0])[1]
+
+
+def _north_boss_finish_anchor(
+    adapter: Any, section: Any, edge: Any
+) -> tuple[float, float]:
+    """Sheet point mid-way along the edge, proven to be the section's top left."""
+    points = [
+        tuple(float(v) for v in _early_bound(vertex, "IVertex").GetPoint())
+        for vertex in (edge.GetStartVertex(), edge.GetEndVertex())
+    ]
+    middle = tuple(0.5 * (points[0][i] + points[1][i]) for i in range(3))
+    anchor = model_point_in_view(adapter, section, middle, label="north boss end midpoint")
+    centre = model_point_in_view(
+        adapter, section, (0.0, BORE_HEIGHT / 1000.0, 0.0), label="cone section centre"
+    )
+    if not (anchor[0] < centre[0] and anchor[1] > centre[1]):
+        raise RuntimeError(
+            f"north cone boss end {anchor!r} is not up-left of the section "
+            f"centre {centre!r}; the symbol offset assumes it is"
+        )
+    return (anchor[0], anchor[1])
 
 
 
@@ -746,10 +812,10 @@ def _assert_native_layout(
         if annotation.kind == "surface-finish"
         for box in annotation.text_boxes
     ]
-    if len(surface_boxes) != 3:
+    if len(surface_boxes) != len(SURFACE_FINISHES):
         raise RuntimeError(
-            "cone pivot post must expose three native Ra text boxes: "
-            f"{len(surface_boxes)}"
+            f"cone pivot post must expose {len(SURFACE_FINISHES)} native Ra "
+            f"text boxes: {len(surface_boxes)}"
         )
     own_overlaps = {}
     for label in ("JournalAxisY", "CrankAboveCone"):
@@ -923,6 +989,8 @@ async def build(adapter: Any) -> dict[str, str]:
     set_reference_dimension(
         adapter, crank_height[0], label="crank axis height reference"
     )
+    # #906: the plan angle feeds the crank bore's angularity frame (rule 4).
+    set_basic_dimensions(adapter, annotations, BASIC_DIMENSIONS)
     # The part authored these places (cone_pivot_post_spec.DRAWING_PRECISION);
     # this sheet only proves they survived the import.  A silent fallback to
     # the drawing document's two places would print the running bores without
@@ -1039,6 +1107,55 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "journal_bore"),
         label="cone journal bore finish",
         char_height=0.0025,
+    )
+    # The shaft collar's thrust face (#914).  Every other view sees it hidden
+    # behind the body, so it is called out on its A-A cut edge.
+    north_edge = _north_boss_end_edge(section)
+    north_anchor = _north_boss_finish_anchor(adapter, section, north_edge)
+    add_surface_finish(
+        adapter,
+        section,
+        symbol_xy=(
+            north_anchor[0] + _NORTH_BOSS_FINISH_OFFSET[0],
+            north_anchor[1] + _NORTH_BOSS_FINISH_OFFSET[1],
+        ),
+        control=surface_finish_by_key(SURFACE_FINISHES, "cone_boss_north_face"),
+        label="north cone boss end finish",
+        char_height=0.0025,
+        entity=north_edge,
+        leader_attach_xy=north_anchor,
+    )
+    # #906 (USER RULING 2026-09-26): the crank bore's angularity to the cone
+    # journal, model PMI (cone_pivot_post_spec.PART_DATUMS /
+    # GEOMETRIC_CONTROLS) projected here.  Datum A tags the journal bore in
+    # View B, the only view that shows it true; datum B tags the foot seat
+    # edge-on in the elevation, left of the body and clear of the foot-seat
+    # finish on the right; the frame hangs off the crank bore rim in the
+    # elevation, right of the body and below the bore callout.
+    project_part_pmi(
+        adapter,
+        placements={
+            "datum:A": PmiDrawingPlacement(
+                view=journal,
+                position=(0.250, 0.128),
+                edge_entity=_bore_rim_edge(journal, diameter_mm=BORE_DIA),
+            ),
+            "datum:B": PmiDrawingPlacement(
+                view=front,
+                position=(_front_x(-16.0), _front_y(-9.0)),
+                edge_entity=_circular_edge(
+                    front, radius_mm=BLOCK_DIA / 2.0, center_y_mm=0.0
+                ),
+            ),
+            "crank_bore_angularity": PmiDrawingPlacement(
+                view=front,
+                position=(0.160, 0.128),
+                edge_entity=_bore_rim_edge(front, diameter_mm=CRANK_BORE_DIA),
+            ),
+        },
+        datums=PART_DATUMS,
+        controls=GEOMETRIC_CONTROLS,
+        label="cone pivot post PMI",
     )
     add_note(
         adapter,

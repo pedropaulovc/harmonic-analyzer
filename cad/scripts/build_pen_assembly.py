@@ -70,6 +70,7 @@ from _common import (
 )
 from _drawing_marks import DRAWN_BY
 from _assembly import (
+    activate_assembly_contract,
     angle_driver,
     assembly_title_properties,
     assert_component_placed,
@@ -88,7 +89,7 @@ from _assembly import (
 )
 from _transforms import IDENTITY, euler_from_rows, rot_z_rows
 from _interference_contracts import allowed_interference_pairs
-from build_hanger_screw import SHANK_LEN as HANGER_SHANK_LEN
+from hanger_screw_spec import SHANK_LEN as HANGER_SHANK_LEN
 from pen_wire_geom import WHEEL_BAR_Y, WHEEL_MID_Z
 from wheel_bar_geom import BAR_DEPTH as WHEEL_BAR_DEPTH
 from wheel_bar_geom import HANGER_SCREW_MACHINE_X
@@ -306,6 +307,8 @@ if HANGER_TIP_TO_RIM <= 0.0:
 
 
 async def build(adapter) -> dict[str, str]:
+    # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
+    activate_assembly_contract(ASM_NAME)
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
     reset_dof_manifest()

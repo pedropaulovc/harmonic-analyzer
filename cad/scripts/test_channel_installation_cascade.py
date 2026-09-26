@@ -14,7 +14,7 @@ import connecting_rod_spec
 import cylinder_bank_layout
 import fulcrum_shaft_spec
 import rocker_bank_layout
-from _assembly import _seed_flip
+from _assembly import _seed_flip, activate_assembly_contract
 from cone_pivot_post_installation import CHANNEL_Z0, DRUM_X, MECHANISM_Z_SHIFT
 
 
@@ -73,6 +73,7 @@ def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
 
 
 def test_positive_fulcrum_station_uses_the_relearned_mate_side() -> None:
+    activate_assembly_contract("channel")
     assert _seed_flip("fulcrum-shaft-1 datum z d=35.41", channel.FULCRUM_SHAFT_Z)
 
 

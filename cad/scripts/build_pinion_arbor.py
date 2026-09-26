@@ -53,6 +53,24 @@ from _part_pmi import _face_geometry, _face_matches, _resolve_faces, author_part
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_arbor_pin_spec import PIN_HOLE_DIA, PIN_HOLE_DIA_BAND
+from pinion_arbor_geometry import (
+    CROSS_HOLE_DIA,
+    EXPOSED_SHAFT_LEN,
+    HEAD_CAP_R,
+    HEAD_CAP_SAG,
+    HEAD_CENTER_Z,
+    HEAD_DIA,
+    HEAD_FRONT_Z,
+    HEAD_LEN,
+    HEAD_REAR_Z,
+    NECK_DIA,
+    NECK_END_Z,
+    NECK_LEN,
+    PIN_STATION_FROM_HEAD_REAR,
+    PIN_Z,
+    SHAFT_DIA,
+    SHAFT_LEN,
+)
 from pinion_arbor_spec import (
     BACK_RIM_FROM_HEAD_REAR,
     BACK_CAP_R,
@@ -61,39 +79,48 @@ from pinion_arbor_spec import (
     BACK_JOURNAL_Z,
     BOND_ZONE_DIA_FROM_HEAD_REAR,
     BOND_ZONE_DIA_Z,
-    CROSS_HOLE_DIA,
     CROSS_HOLE_DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
     DRUM_STATION,
     DRUM_STATION_BAND,
-    EXPOSED_SHAFT_LEN,
     FRONT_JOURNAL_FROM_HEAD_REAR,
     FRONT_JOURNAL_Z,
-    HEAD_CAP_R,
-    HEAD_CAP_SAG,
-    HEAD_CENTER_Z,
-    HEAD_DIA,
-    HEAD_FRONT_Z,
-    HEAD_LEN,
-    HEAD_REAR_Z,
     ISOMETRIC_VIEW_NOTE,
     JOURNAL_DIA_BAND,
     JOURNAL_LEN,
-    NECK_DIA,
-    NECK_END_Z,
-    NECK_LEN,
     OVERALL_LEN,
-    PIN_STATION_FROM_HEAD_REAR,
-    PIN_Z,
-    SHAFT_DIA,
     SHAFT_DIA_BAND,
-    SHAFT_LEN,
     SURFACE_FINISHES,
 )
 
 PART_NAME = "pinion-arbor"
+# Reference sketches this part still saves shown (#880), each with its owner
+# and why.  Delete an entry once the part hides that sketch; the release
+# refuses to start while any part lists one (visibility_debt).
+SHOWN_SKETCH_ALLOWANCES = {
+    "BackRimReference": (
+        "pinioncluster: carries the drawing's marked dimensions; hide it once "
+        "the sheet imports them from the hidden sketch"
+    ),
+    "BondZoneReference": (
+        "pinioncluster: carries the drawing's marked dimensions; hide it once "
+        "the sheet imports them from the hidden sketch"
+    ),
+    "DrumStationReference": (
+        "pinioncluster: carries the drawing's marked dimensions; hide it once "
+        "the sheet imports them from the hidden sketch"
+    ),
+    "OverallReference": (
+        "pinioncluster: carries the drawing's marked dimensions; hide it once "
+        "the sheet imports them from the hidden sketch"
+    ),
+    "PinStationReference": (
+        "pinioncluster: carries the drawing's marked dimensions; hide it once "
+        "the sheet imports them from the hidden sketch"
+    ),
+}
 MATERIAL = "Plain Carbon Steel"
 _SAVED_DRAWING_PROPERTIES = (
     "Number",
@@ -929,7 +956,9 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = await save_part_and_images(
+        adapter, PART_NAME, allowed_shown=SHOWN_SKETCH_ALLOWANCES
+    )
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

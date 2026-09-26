@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 
 import build_paper_drive_assembly as assembly
-import build_platen as platen
+import platen_spec as platen
 import build_platen_clip as clip
 import build_platen_guide as guide
 import build_platen_paper as paper

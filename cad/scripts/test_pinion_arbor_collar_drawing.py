@@ -11,6 +11,7 @@ import build_pinion_arbor_collar as collar
 import draw_pinion_arbor_collar as drawing
 import pinion_arbor_collar_geometry as geometry
 import pinion_arbor_collar_spec as spec
+import pinion_arbor_geometry as arbor_geometry
 import pinion_arbor_spec as arbor
 import pinion_arbor_pin_spec as arbor_pin
 import pinion_strap_pin_spec as strap_pin
@@ -142,7 +143,7 @@ def test_drive_train_places_the_collar_on_the_arbor_pin_station() -> None:
     import build_drive_train_assembly as assembly
 
     assert assembly.ARBOR_COLLAR_Z0 + geometry.PIN_HOLE_Z == pytest.approx(
-        assembly.ARBOR_Z0 + arbor.PIN_Z
+        assembly.ARBOR_Z0 + arbor_geometry.PIN_Z
     )
     strap_outer = assembly.APINION_Z_FRONT - assembly.STRAP_AIR - assembly.STRAP_T
     assert 0.0 < strap_outer - assembly.ARBOR_COLLAR_Z[1] < spec.GAP_MAX

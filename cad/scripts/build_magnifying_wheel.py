@@ -57,6 +57,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _part_pmi import author_part_pmi
+from _visibility import blank_reference_geometry
 from magnifying_wheel_geom import (
     BORE_DIA,
     HUB_AXIAL,
@@ -445,6 +446,8 @@ def _make_yoke_ref_point(adapter) -> None:
     feat.Name = "WireYokePoint"
     if str(_read_member(feat, "Name")) != "WireYokePoint":
         raise RuntimeError("reference point rename failed")
+    # Hidden but still selectable by name for the WIRE-1 yoke mate.
+    blank_reference_geometry(adapter, (("WireYokePoint", "DATUMPOINT"),))
     _telemetry.success("WireYokePoint reference point created")
 
 

@@ -24,7 +24,6 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
     add_view_centerline,
     assert_imported_precision,
     curate_view_dimensions,
@@ -93,14 +92,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -147,7 +144,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="crank pinion pin axis centerline",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.082)
     return await finalize_drawing(
         adapter,
         OUTPUTS,

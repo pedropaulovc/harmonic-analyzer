@@ -10,6 +10,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+import crank_handle_pivot_screw_spec as screw_spec
+import crank_handle_spec as handle_spec
 import draw_drive_train_assembly as drawing
 import drive_train_assembly_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -23,10 +25,11 @@ EXTERNAL_NUMBERS = frozenset({"MHA-035", "MHA-089", "MHA-123"})
 # Ruled hardware the sequence already names while its BOM row, cluster stem and
 # explode step wait for the drive-train integrator's single re-key (Main,
 # 2026-09-23: drawing-only rulings commit). The integration commit that adds
-# the rows deletes this set; the test below fails once a row lands anyway.
-PRE_REGISTERED_NUMBERS = frozenset(
-    {"MHA-139", "MHA-140", "MHA-141", "MHA-142"}
-)
+# a row drops its number here; the test below fails once a row lands anyway.
+# MHA-139 (crank hub) landed with #906, MHA-141/142 with the cone-tip
+# integration; MHA-140 (the I31 hold-down, placed once #925's I31 plate is
+# under it) waits.
+PRE_REGISTERED_NUMBERS = frozenset({"MHA-140"})
 
 
 def _builder_stems() -> set[str]:
@@ -175,6 +178,19 @@ def test_bom_descriptions_keep_one_line() -> None:
         assert len(text) <= drawing.BOM_DESCRIPTION_MAX_CHARS, stem
 
 
+def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
+    """MHA-095 bounds the DISENGAGE swing; engaged, the plate stands off it."""
+    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
+    order = [
+        check.index("TO THE MHA-095 STOP, CLEAR OF EVERY MHA-027"),
+        check.index("SWING IT BACK"),
+        check.index("RE-ENGAGE"),
+        check.index("TIGHTEN MHA-093"),
+    ]
+    assert order == sorted(order), check
+    assert "RETURN IT TO THE MHA-095" not in check
+
+
 def test_rig_is_located_by_its_parked_tip_gap() -> None:
     steps = drawing.RIG_STEPS
     for phrase in ("TRANSFERRED", "2.5 FEELER", "ACCEPT 2.3-2.7", "#8-32", "#4-40"):
@@ -258,16 +274,16 @@ def test_explode_plan_refuses_unknown_retired_and_missing_families() -> None:
         spec.plan_explode(census)
 
 
-def test_pending_families_join_the_plan_when_they_land() -> None:
+def test_built_families_are_no_longer_pending() -> None:
+    """A family the builder inserts has landed: it must not stay excused as pending."""
+    assert not _builder_stems() & spec.PENDING_STEMS
+
+
+def test_crank_hub_families_explode_with_the_crank_arm() -> None:
     census = _instances()
-    assert not {i.stem for i in census} & spec.PENDING_STEMS
-    landed = [
-        *census,
-        spec.Instance("crank-hub-1", "crank-hub", (-129.3, 129.9, -170.0)),
-        spec.Instance("crank-hub-pin-1", "crank-hub-pin", (-129.3, 122.0, -170.0)),
-    ]
-    moved = {step.label: names for step, names in spec.plan_explode(landed)}
-    assert "crank-hub-1" in moved["crank arm group"]
+    assert {"crank-hub", "crank-hub-pin"} <= {i.stem for i in census}
+    moved = {step.label: names for step, names in spec.plan_explode(census)}
+    assert {"crank-hub-1", "crank-hub-pin-1"} <= set(moved["crank arm group"])
 
 
 def test_explode_families_are_either_moved_or_stationary_never_both() -> None:
@@ -634,6 +650,23 @@ def test_final_uncross_leaves_non_balloon_crossings_to_the_audit() -> None:
         _RebuildAdapter(), "SHEET", annotations, read_segments=crossed_with_a_note
     )
     assert annotations["DetailItem1"].position == (0.0, 1.0)
+
+
+def test_handle_pivot_screw_is_built_released_and_backs_out_of_the_handle() -> None:
+    """#831 P1: MHA-139 is a builder family with its BOM row, and its explode
+    carries it with the handle, then clear of the handle's bore."""
+    assert "crank-handle-pivot-screw" in _builder_stems()
+    assert drawing.BOM_PART_NUMBERS["crank-handle-pivot-screw"] == "MHA-139"
+    moved = {step.label: names for step, names in spec.plan_explode(_instances())}
+    screw = "crank-handle-pivot-screw-1"
+    assert screw in moved["crank arm group"]
+    assert screw in moved["crank handle"]
+    steps = {step.label: step for step in spec.EXPLODE_STEPS}
+    back_out = steps["handle screw backs out"]
+    assert back_out.stems == ("crank-handle-pivot-screw",) and back_out.axis == "z"
+    # Relative to the handle, the tip starts THREAD_LENGTH past its inboard
+    # end; it must travel the whole handle and clear it.
+    assert -back_out.distance_mm > screw_spec.THREAD_LENGTH + handle_spec.HANDLE_LENGTH
 
 
 def test_bank_fitup_limits_are_the_layout_bands() -> None:

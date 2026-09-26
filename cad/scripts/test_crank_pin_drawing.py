@@ -32,14 +32,14 @@ def test_end_diameters_are_drawing_native_true_diameter_callouts() -> None:
     assert source.count("_add_end_diameter(") >= 3  # definition + both ends
     assert 'below="BIG END"' in source
     assert 'below="SMALL END"' in source
-    # Custom 1:48 taper over the 45 mm length -> 0.9375 on diameter, matching the
-    # crank-arm cross-hole taper-reamed to the same 1:48 to suit this pin.
+    # Custom 1:48 taper over 45 mm -> 0.9375 on diameter.  MHA-137 and the
+    # shaft are match-reamed together to suit this removable service pin.
     taper_on_dia = crank_pin_spec.BIG_END_DIA - crank_pin_spec.SMALL_END_DIA
     assert round(taper_on_dia, 4) == round(crank_pin_spec.PIN_LENGTH / 48.0, 4)
     assert round(taper_on_dia, 4) == 0.9375
     assert "1:48" in crank_pin_spec.DRAWING_NOTES
     assert "0.9375 ON DIA OVER 45.0" in crank_pin_spec.DRAWING_NOTES
-
+    assert "CRANK-HUB CROSS-HOLE" in crank_pin_spec.DRAWING_NOTES
 
 def test_linked_notes_define_remaining_pin_operations() -> None:
     notes = crank_pin_spec.DRAWING_NOTES

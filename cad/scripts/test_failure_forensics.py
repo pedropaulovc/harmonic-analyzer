@@ -1,4 +1,4 @@
-"""Offline contract for COM failure forensics (_common.capture_com_failure).
+"""Offline contract for COM failure forensics (_seat_forensics.capture_com_failure).
 
 No SolidWorks: the adapter, the seat and the document are test doubles, so the
 assertions read the real OTel records and the real artefact files the capture
@@ -58,6 +58,8 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _common  # noqa: E402
+import _sketch_closure  # noqa: E402
+import _seat_forensics  # noqa: E402
 import _telemetry  # noqa: E402
 import _watchdog  # noqa: E402
 
@@ -246,13 +248,13 @@ def offline_seat(monkeypatch, tmp_path):
     never depends on what runs on the machine.
     """
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
-    monkeypatch.setattr(_common, "OUT_FAILURES", tmp_path / "failures")
-    monkeypatch.setattr(_common, "_sldworks_pids", lambda: {4242})
-    monkeypatch.setattr(_common, "_seat_pids_at_start", frozenset({4242}))
-    monkeypatch.setattr(_common, "_seat_identity", {})
-    monkeypatch.setattr(_common, "_process_started_at", lambda pid: 1_700_000_000.0)
-    monkeypatch.setattr(_common, "_process_memory", lambda pid: (1 << 30, 1 << 29))
-    monkeypatch.setattr(_common, "_process_session_id", lambda pid: 1)
+    monkeypatch.setattr(_seat_forensics, "OUT_FAILURES", tmp_path / "failures")
+    monkeypatch.setattr(_seat_forensics, "_sldworks_pids", lambda: {4242})
+    monkeypatch.setattr(_seat_forensics, "_seat_pids_at_start", frozenset({4242}))
+    monkeypatch.setattr(_seat_forensics, "_seat_identity", {})
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: 1_700_000_000.0)
+    monkeypatch.setattr(_seat_forensics, "_process_memory", lambda pid: (1 << 30, 1 << 29))
+    monkeypatch.setattr(_seat_forensics, "_process_session_id", lambda pid: 1)
     yield
 
 
@@ -314,7 +316,7 @@ def test_capture_raises_the_callers_failure_unchanged(tmp_path):
     """Guarantee 1: the caller's exception type and message survive verbatim."""
     adapter = _unmerged_profile(tmp_path)
     with pytest.raises(RuntimeError, match=r"^logo ring extrude failed$"):
-        _common.capture_com_failure(
+        _seat_forensics.capture_com_failure(
             adapter,
             "logo-ring-extrude",
             "logo ring extrude failed",
@@ -329,18 +331,18 @@ def test_capture_raises_even_when_every_step_fails(tmp_path, monkeypatch):
     Every capture step is broken here -- including the artefact writer and the
     telemetry span itself -- and the caller still sees its own failure.
     """
-    for name in (
-        "seat_provenance",
-        "sketch_authoring_preferences",
-        "_seat_error_state",
-        "_document_state",
-        "_sketch_state",
-        "_save_failure_document",
-        "_save_seat_image",
-        "_write_failure_report",
+    for module, name in (
+        (_seat_forensics, "seat_provenance"),
+        (_seat_forensics, "sketch_authoring_preferences"),
+        (_seat_forensics, "_seat_error_state"),
+        (_seat_forensics, "_document_state"),
+        (_sketch_closure, "_sketch_state"),
+        (_seat_forensics, "_save_failure_document"),
+        (_seat_forensics, "_save_seat_image"),
+        (_seat_forensics, "_write_failure_report"),
     ):
         monkeypatch.setattr(
-            _common,
+            module,
             name,
             lambda *a, **k: (_ for _ in ()).throw(OSError(f"{name} exploded")),
         )
@@ -350,7 +352,7 @@ def test_capture_raises_even_when_every_step_fails(tmp_path, monkeypatch):
         lambda *a, **k: (_ for _ in ()).throw(OSError("span exploded")),
     )
     with pytest.raises(ValueError, match=r"^rib cut failed$"):
-        _common.capture_com_failure(
+        _seat_forensics.capture_com_failure(
             _Adapter(), "rib-cut", "rib cut failed", exc_type=ValueError
         )
 
@@ -358,13 +360,12 @@ def test_capture_raises_even_when_every_step_fails(tmp_path, monkeypatch):
 def test_one_step_failing_does_not_stop_the_others(tmp_path, monkeypatch):
     """A seat that refuses ONE read must still yield the other evidence."""
     monkeypatch.setattr(
-        _common,
-        "_sketch_state",
+        _sketch_closure, "_sketch_state",
         lambda *a, **k: (_ for _ in ()).throw(OSError("sketch gone")),
     )
     adapter = _unmerged_profile(tmp_path)
     with pytest.raises(RuntimeError):
-        _common.capture_com_failure(adapter, "logo-ring-extrude", "boom")
+        _seat_forensics.capture_com_failure(adapter, "logo-ring-extrude", "boom")
 
     report = json.loads((_failure_dir(tmp_path) / "capture.json").read_text())
     assert report["sketch"]["capture_error"].startswith("OSError:")
@@ -377,7 +378,7 @@ def test_artefacts_land_beside_the_report(tmp_path):
     disposable worker must leave behind."""
     adapter = _unmerged_profile(tmp_path)
     with pytest.raises(RuntimeError):
-        _common.capture_com_failure(
+        _seat_forensics.capture_com_failure(
             adapter,
             "logo-ring-extrude",
             "logo ring extrude failed",
@@ -392,8 +393,8 @@ def test_artefacts_land_beside_the_report(tmp_path):
     # headless leaf can never block on a save dialog.
     (_path, version, options) = adapter.currentModel.saved[0]
     assert (version, options) == (
-        _common._SAVE_AS_CURRENT_VERSION,
-        _common._SAVE_AS_SILENT_COPY,
+        _seat_forensics._SAVE_AS_CURRENT_VERSION,
+        _seat_forensics._SAVE_AS_SILENT_COPY,
     )
 
 
@@ -402,7 +403,7 @@ def test_unmerged_endpoints_are_visible_in_the_capture(tmp_path):
     adapter = _unmerged_profile(tmp_path)
     corners = [(0.0, 0.0, 0.0), (0.01, 0.0, 0.0), (0.01, 0.01, 0.0), (0.0, 0.01, 0.0)]
     with pytest.raises(RuntimeError):
-        _common.capture_com_failure(
+        _seat_forensics.capture_com_failure(
             adapter,
             "logo-ring-extrude",
             "logo ring extrude failed",
@@ -424,7 +425,7 @@ def test_merged_profile_reports_no_coincident_pairs(tmp_path):
     corners = [(0.0, 0.0, 0.0), (0.01, 0.0, 0.0), (0.01, 0.01, 0.0), (0.0, 0.01, 0.0)]
     adapter = _unmerged_profile(tmp_path)
     with pytest.raises(RuntimeError):
-        _common.capture_com_failure(
+        _seat_forensics.capture_com_failure(
             adapter,
             "logo-ring-extrude",
             "boom",
@@ -441,13 +442,13 @@ def test_unreadable_preference_is_never_reported_as_false(tmp_path):
     ``False``; a silent one of those sends the next investigation the wrong way.
     """
     adapter = _unmerged_profile(tmp_path)
-    prefs = _common.sketch_authoring_preferences(adapter)
+    prefs = _seat_forensics.sketch_authoring_preferences(adapter)
 
     assert prefs["swSketchInference"] is False  # genuinely read as off
     assert prefs["swSketchAutomaticRelations"] is False
     # Every other toggle either did not resolve or the seat refused it.
-    assert set(prefs) >= set(_common.SKETCH_AUTHORING_TOGGLE_NAMES)
-    for name in _common.SKETCH_AUTHORING_TOGGLE_NAMES:
+    assert set(prefs) >= set(_seat_forensics.SKETCH_AUTHORING_TOGGLE_NAMES)
+    for name in _seat_forensics.SKETCH_AUTHORING_TOGGLE_NAMES:
         if name not in ("swSketchInference", "swSketchAutomaticRelations"):
             assert prefs[name] in ("unresolved", "unreadable"), name
     # The id each name resolved to is recorded, so an id can be CONFIRMED
@@ -463,7 +464,7 @@ def test_capture_emits_one_error_log_and_bounded_span_events(
     spans, logs = capture_telemetry
     adapter = _unmerged_profile(tmp_path)
     with pytest.raises(RuntimeError):
-        _common.capture_com_failure(
+        _seat_forensics.capture_com_failure(
             adapter,
             "logo-ring-extrude",
             "logo ring extrude failed",
@@ -507,7 +508,7 @@ def test_context_kwargs_ride_the_span_and_the_log(tmp_path, capture_telemetry):
     searchable across leaves."""
     spans, logs = capture_telemetry
     with pytest.raises(RuntimeError):
-        _common.capture_com_failure(
+        _seat_forensics.capture_com_failure(
             _unmerged_profile(tmp_path),
             "logo-ring-extrude",
             "boom",
@@ -529,7 +530,7 @@ def test_seat_provenance_names_the_seat_and_its_origin(capture_telemetry):
     spans, logs = capture_telemetry
     adapter = _Adapter(sw=_Seat())
 
-    prov = _common.record_seat_provenance(adapter)
+    prov = _seat_forensics.record_seat_provenance(adapter)
 
     assert prov["seat_pid"] == 4242
     assert prov["seat_pid_source"] == "GetProcessID"
@@ -550,45 +551,44 @@ def test_seat_provenance_records_where_the_seat_is_parked():
     file in it deleted, and the leaf dies carrying no log. Tonight that took a
     PEB probe of every process over run-command to establish; the seat answers
     the same question itself, so record its answer."""
-    prov = _common.seat_provenance(_Adapter(sw=_Seat()))
+    prov = _seat_forensics.seat_provenance(_Adapter(sw=_Seat()))
 
     assert prov["seat_working_directory"].endswith(r"workspace\cad\out\sldprt" + "\\\\")
     # Unreadable is absent, never a fabricated path.
-    assert "seat_working_directory" not in _common.seat_provenance(_Adapter())
+    assert "seat_working_directory" not in _seat_forensics.seat_provenance(_Adapter())
 
 
 def test_seat_origin_distinguishes_a_seat_this_build_started(monkeypatch):
     """A seat on its first document of the process is the leading suspect in any
     first-run-only failure, so "who started it" must not be guessed."""
-    monkeypatch.setattr(_common, "_seat_identity", {})
-    monkeypatch.setattr(_common, "_seat_pids_at_start", frozenset())
-    assert _common.seat_provenance(_Adapter(sw=_Seat()))["seat_origin"] == (
+    monkeypatch.setattr(_seat_forensics, "_seat_identity", {})
+    monkeypatch.setattr(_seat_forensics, "_seat_pids_at_start", frozenset())
+    assert _seat_forensics.seat_provenance(_Adapter(sw=_Seat()))["seat_origin"] == (
         "started-by-build"
     )
 
-    monkeypatch.setattr(_common, "_seat_identity", {})
-    monkeypatch.setattr(_common, "_seat_pids_at_start", None)  # sample never ran
-    assert _common.seat_provenance(_Adapter(sw=_Seat()))["seat_origin"] == "unknown"
+    monkeypatch.setattr(_seat_forensics, "_seat_identity", {})
+    monkeypatch.setattr(_seat_forensics, "_seat_pids_at_start", None)  # sample never ran
+    assert _seat_forensics.seat_provenance(_Adapter(sw=_Seat()))["seat_origin"] == "unknown"
 
 
 def test_pre_connect_scan_failure_leaves_origin_unknown(monkeypatch):
     """The scan is best-effort: if it cannot run, the origin is ``unknown``
     rather than a wrong answer."""
     monkeypatch.setattr(
-        _common,
-        "_sldworks_pids",
+        _seat_forensics, "_sldworks_pids",
         lambda: (_ for _ in ()).throw(OSError("wmi unavailable")),
     )
-    _common.note_seats_before_connect()
-    assert _common._seat_pids_at_start is None
+    _seat_forensics.note_seats_before_connect()
+    assert _seat_forensics._seat_pids_at_start is None
 
 
 def test_unresolvable_seat_pid_is_not_invented(monkeypatch):
     """Several seats running and no ``GetProcessID`` answer: no pid at all beats
     the wrong pid."""
-    monkeypatch.setattr(_common, "_seat_identity", {})
-    monkeypatch.setattr(_common, "_sldworks_pids", lambda: {11780, 13436})
-    prov = _common.seat_provenance(_Adapter(sw=object()))
+    monkeypatch.setattr(_seat_forensics, "_seat_identity", {})
+    monkeypatch.setattr(_seat_forensics, "_sldworks_pids", lambda: {11780, 13436})
+    prov = _seat_forensics.seat_provenance(_Adapter(sw=object()))
 
     assert prov["seat_pid_source"] == "unresolved"
     assert "seat_pid" not in prov
@@ -629,8 +629,7 @@ def test_px_per_mm_is_measured_and_yields_a_snap_floor(tmp_path, monkeypatch):
     competitor, i.e. the crossover this capture exists to make visible.
     """
     monkeypatch.setattr(
-        _common,
-        "_frame_geometry",
+        _seat_forensics, "_frame_geometry",
         lambda adapter: {
             "frame_hwnd": 0x1234,
             "frame_left": 0,
@@ -643,7 +642,7 @@ def test_px_per_mm_is_measured_and_yields_a_snap_floor(tmp_path, monkeypatch):
             "frame_state": "normal",
         },
     )
-    geometry = _common.display_geometry(_unmerged_profile(tmp_path))
+    geometry = _seat_forensics.display_geometry(_unmerged_profile(tmp_path))
 
     assert geometry["px_per_mm"] == 20.0
     assert geometry["px_per_mm_x"] == 20.0
@@ -672,15 +671,15 @@ def test_the_main_window_rect_is_recorded_as_comparable_integers(tmp_path):
             if name in rects:
 
                 def fill(hwnd, pointer, _name=name):
-                    rect = ctypes.cast(pointer, ctypes.POINTER(_common._Rect))[0]
+                    rect = ctypes.cast(pointer, ctypes.POINTER(_seat_forensics._Rect))[0]
                     rect.left, rect.top, rect.right, rect.bottom = rects[_name]
                     return 1
 
                 return fill
             return lambda *args: 0  # IsIconic / IsZoomed: a normal window
 
-    with mock.patch.object(_common.ctypes, "windll", mock.Mock(user32=_User32())):
-        geometry = _common._frame_geometry(_unmerged_profile(tmp_path))
+    with mock.patch.object(_seat_forensics.ctypes, "windll", mock.Mock(user32=_User32())):
+        geometry = _seat_forensics._frame_geometry(_unmerged_profile(tmp_path))
 
     assert geometry["frame_width_px"] == 1024
     assert geometry["frame_height_px"] == 640
@@ -698,9 +697,9 @@ def test_display_geometry_flags_a_session_without_a_display(tmp_path, monkeypatc
     view measurement meaningless -- so it is recorded, not silently reported as
     a healthy 0x0 screen."""
     monkeypatch.setattr(
-        _common.ctypes.windll.user32, "GetSystemMetrics", lambda index: 0
+        _seat_forensics.ctypes.windll.user32, "GetSystemMetrics", lambda index: 0
     )
-    geometry = _common.display_geometry(_unmerged_profile(tmp_path))
+    geometry = _seat_forensics.display_geometry(_unmerged_profile(tmp_path))
 
     assert geometry["screen_px"] == "0x0"
     assert geometry["session_has_display"] is False
@@ -716,7 +715,7 @@ def test_sketch_manager_state_is_captured_separately_from_preferences(tmp_path):
     """
     adapter = _unmerged_profile(tmp_path)
     with pytest.raises(RuntimeError):
-        _common.capture_com_failure(adapter, "logo-ring-extrude", "boom")
+        _seat_forensics.capture_com_failure(adapter, "logo-ring-extrude", "boom")
 
     report = json.loads((_failure_dir(tmp_path) / "capture.json").read_text())
     assert report["sketch_manager"]["AddToDB"] is True
@@ -737,7 +736,7 @@ def test_expected_points_turns_the_census_into_a_verdict(tmp_path):
     """
     places = [(0.001 * n, 0.0, 0.0) for n in range(9)]
     with pytest.raises(RuntimeError):
-        _common.capture_com_failure(
+        _seat_forensics.capture_com_failure(
             _unmerged_profile(tmp_path),
             "logo-ring-extrude",
             "logo ring extrude failed",
@@ -758,7 +757,7 @@ def test_a_merged_profile_reports_no_unmerged_points(tmp_path):
     merge must read zero, or the verdict means nothing."""
     places = [(0.001 * n, 0.0, 0.0) for n in range(9)]
     with pytest.raises(RuntimeError):
-        _common.capture_com_failure(
+        _seat_forensics.capture_com_failure(
             _unmerged_profile(tmp_path),
             "logo-ring-extrude",
             "logo ring extrude failed",
@@ -780,7 +779,7 @@ def test_a_census_that_cannot_be_read_says_so(tmp_path):
             raise OSError("RPC_E_DISCONNECTED")
 
     with pytest.raises(RuntimeError):
-        _common.capture_com_failure(
+        _seat_forensics.capture_com_failure(
             _unmerged_profile(tmp_path),
             "logo-ring-extrude",
             "logo ring extrude failed",
@@ -798,7 +797,7 @@ def test_retry_capture_does_not_erase_the_first_failure(tmp_path):
     retrying -- the exact way tonight's failing leaf log was lost."""
     for _ in range(2):
         with pytest.raises(RuntimeError):
-            _common.capture_com_failure(
+            _seat_forensics.capture_com_failure(
                 _unmerged_profile(tmp_path), "logo-ring-extrude", "boom"
             )
         # The directory is stamped to the second; a same-second retry would
@@ -814,7 +813,7 @@ def test_authoring_context_is_recorded_on_the_success_path(tmp_path, capture_tel
     """A failure-only capture cannot answer "what was different about the run
     that worked?", so the same state bags are recorded per part build."""
     spans, logs = capture_telemetry
-    context = _common.record_authoring_context(_unmerged_profile(tmp_path), "logo_ring")
+    context = _seat_forensics.record_authoring_context(_unmerged_profile(tmp_path), "logo_ring")
 
     assert context["display"]["px_per_mm"] > 0
     assert context["sketch_manager"]["AddToDB"] is True
@@ -1016,7 +1015,7 @@ def test_an_open_sketch_is_reported_at_exit_not_at_the_extrude(capture_telemetry
     places = [(0.001 * n, 0.0, 0.0) for n in range(9)]
     adapter = _Adapter(sw=_Seat(), sketch_manager=_SketchManager())
 
-    verdict = _common.record_sketch_closure(
+    verdict = _sketch_closure.record_sketch_closure(
         adapter,
         "logo",
         _Sketch(contours=0, points=places + places),
@@ -1042,7 +1041,7 @@ def test_a_closed_sketch_records_its_verdict_without_warning(capture_telemetry):
     places = [(0.001 * n, 0.0, 0.0) for n in range(9)]
     adapter = _Adapter(sw=_Seat(), sketch_manager=_SketchManager())
 
-    verdict = _common.record_sketch_closure(
+    verdict = _sketch_closure.record_sketch_closure(
         adapter, "logo", _Sketch(contours=2, points=places), expected_points=9
     )
 
@@ -1062,7 +1061,7 @@ def test_a_closure_verdict_that_cannot_be_read_never_raises(capture_telemetry):
         def __getattr__(self, name):
             raise OSError("RPC_E_DISCONNECTED")
 
-    verdict = _common.record_sketch_closure(_Adapter(sw=_Seat()), "logo", _Hostile())
+    verdict = _sketch_closure.record_sketch_closure(_Adapter(sw=_Seat()), "logo", _Hostile())
 
     assert verdict["closure"] == "unknown"
 
@@ -1091,7 +1090,7 @@ def test_the_census_names_the_sketch_from_its_feature(monkeypatch):
     adapter = _Adapter(sw=_Seat(), model=object())
     monkeypatch.setattr(_common, "_feature_by_name", lambda _a, _n: _Feature())
 
-    state = _common._sketch_state(adapter, "LogoProfile")
+    state = _sketch_closure._sketch_state(adapter, "LogoProfile")
 
     assert state["name"] == "LogoProfile"
     assert state["contour_count"] == 2
@@ -1107,7 +1106,7 @@ def test_a_sketch_nothing_named_reports_no_name_rather_than_a_blank_one(monkeypa
     """
     adapter = _Adapter(sw=_Seat(), model=object())
 
-    state = _common._sketch_state(
+    state = _sketch_closure._sketch_state(
         adapter, _Sketch(contours=1, points=[(0.0, 0.0, 0.0)])
     )
 
@@ -1122,7 +1121,7 @@ def test_authored_profile_geometry_is_logged_for_every_profile(capture_telemetry
     spans, logs = capture_telemetry
     places = [(0.001 * n, 0.0, 0.0) for n in range(9)]
 
-    intent = _common.log_profile_geometry("logo", places + places)
+    intent = _sketch_closure.log_profile_geometry("logo", places + places)
 
     assert intent == {
         "profile": "logo",
@@ -1208,10 +1207,10 @@ def test_success_path_context_never_fails_a_good_build(tmp_path, monkeypatch):
     def explode(_adapter):
         raise RuntimeError("no IModelView wrapper bound")
 
-    monkeypatch.setattr(_common, "display_geometry", explode)
-    monkeypatch.setattr(_common, "sketch_authoring_preferences", explode)
+    monkeypatch.setattr(_seat_forensics, "display_geometry", explode)
+    monkeypatch.setattr(_seat_forensics, "sketch_authoring_preferences", explode)
 
-    context = _common.record_authoring_context(_unmerged_profile(tmp_path), "logo")
+    context = _seat_forensics.record_authoring_context(_unmerged_profile(tmp_path), "logo")
 
     assert "no IModelView wrapper bound" in context["display"]["capture_error"]
     assert "no IModelView wrapper bound" in context["preferences"]["capture_error"]

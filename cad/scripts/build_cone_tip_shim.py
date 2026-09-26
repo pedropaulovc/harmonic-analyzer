@@ -1,17 +1,19 @@
 r"""Reproduction script: MHA-141 cone tip shim pack (U30 fit-up stack).
 
 The blackened carbon-steel shim pack under the cone tip block (MHA-092): a
-15 x 12 pack of leaves cut from shim stock, stacked at fit-up so the block's
-adjuster axis lands on the cone axis, then clamped between the swing
-platform's top face and the block's foot by the MHA-140 hold-down screw. The
-model is ONE solid at the nominal stack (cone_tip_shim_spec.SHIM_T); the
-drawing states the stack range and the leaf stock.
+15 x 31.27 pack of leaves (the block's foot and I31 foot flange, less its
+heel relief) cut from shim stock, stacked at fit-up so the block's adjuster axis lands on the
+cone axis, then clamped between the swing platform's top face and the
+block's foot by the MHA-140 hold-down screw. The model is ONE solid at the
+nominal stack (cone_tip_shim_spec.SHIM_T); the drawing states the stack
+range on the thickness dimension and the leaf stock in the material
+specification.
 
-Layout: origin at the centre of the bottom face, footprint on the Top plane
+Layout: origin on the bottom face under the block's centre (the plan runs
+from the flange's south end to the heel relief), footprint on the Top plane
 (X across the cone shaft, Z along it -- the tip block's own frame), thickness
-up +Y. The horseshoe slot (#6 clearance wide) runs from the -X edge to a
-full radius centred on the Y axis, coaxial with the block's foot tap when
-the pack sits under the block.
+up +Y. The horseshoe slot runs along the block's flange slot from the south
+edge to a full radius north of every place the hold-down screw can reach.
 
 Run (SolidWorks already open)::
 
@@ -33,7 +35,6 @@ from _common import (
     apply_material,
     blank_sketch,
     check,
-    define_centered_rectangle,
     define_circle,
     define_rectilinear_chain,
     dimension_between,
@@ -60,10 +61,14 @@ from cone_tip_shim_spec import (
     DRAWING_PRECISION,
     MANUFACTURING_NOTES,
     REFERENCE_SKETCHES,
+    SHIM_NORTH_Z,
+    SHIM_SOUTH_Z,
     SHIM_T,
     SHIM_X,
     SHIM_Z,
-    SLOT_OPEN_SIDE,
+    SLOT_CENTRE_FROM_NORTH,
+    SLOT_CENTRE_Z,
+    SLOT_OPEN_EDGE,
     SLOT_R,
     SLOT_W,
 )
@@ -87,6 +92,7 @@ async def _author_reference_dimension(
     adapter,
     *,
     start: tuple[float, float],
+    end: tuple[float, float],
     orientation: str,
     value_mm: float,
     feature_name: str,
@@ -94,14 +100,14 @@ async def _author_reference_dimension(
     drive_expression: str,
 ) -> None:
     """One construction-only Top-plane line from a part edge to the slot's
-    radius centre (the origin), carrying a model-owned drawing location.
+    radius centre, carrying a model-owned drawing location.
 
     build_cone_tip_block's FootTapX/FootTapZ pattern; the sketch is saved
     hidden and the drawing imports it through _drawing_hidden_sketches.
     """
     check(f"create_sketch {feature_name}", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
-    reference = check(f"{feature_name} line", await adapter.add_line(*start, 0.0, 0.0))
+    reference = check(f"{feature_name} line", await adapter.add_line(*start, *end))
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, reference)
     check(
@@ -145,25 +151,34 @@ async def build(adapter) -> dict[str, str]:
     # inch document.
     await set_global(adapter, "ShimX", f"{SHIM_X}mm")
     await set_global(adapter, "ShimZ", f"{SHIM_Z}mm")
+    await set_global(adapter, "ShimNorthZ", f"{SHIM_NORTH_Z}mm")
     await set_global(adapter, "ShimT", f"{SHIM_T}mm")
     await set_global(adapter, "SlotW", f"{SLOT_W}mm")
     await set_global(adapter, "SlotCentreX", '"ShimX" / 2')
-    await set_global(adapter, "SlotCentreZ", '"ShimZ" / 2')
+    await set_global(adapter, "SlotCentreZ", f"{SLOT_CENTRE_FROM_NORTH}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
+    # The plan: full block width, from the flange's south end to the heel
+    # relief's inner face (I31), with the origin under the block centre.  A
+    # Top-plane sketch reads model +Z (north) as -y.
     profile = SketchDims()
+    shim_pts = [
+        (-SHIM_X / 2.0, -SHIM_NORTH_Z),
+        (SHIM_X / 2.0, -SHIM_NORTH_Z),
+        (SHIM_X / 2.0, -SHIM_SOUTH_Z),
+        (-SHIM_X / 2.0, -SHIM_SOUTH_Z),
+    ]
     check("create_sketch shim", await adapter.create_sketch("Top"))
-    await define_centered_rectangle(
+    shim_lines = await add_line_chain(adapter, shim_pts)
+    await define_rectilinear_chain(
         adapter,
-        SHIM_X / 2.0,
-        SHIM_Z / 2.0,
-        "shim",
+        shim_lines,
+        shim_pts,
+        label="shim",
         dims=profile,
-        name_width="Width",
-        drive_width='"ShimX"',
-        name_depth="Depth",
-        drive_depth='"ShimZ"',
+        names=["Width", "Depth", "ShimEdgeX", "ShimNorthEdge"],
+        drives=['"ShimX"', '"ShimZ"', '"ShimX" / 2', '"ShimNorthZ"'],
     )
     await ensure_fully_defined(adapter, "shim sketch")
     check("exit_sketch shim", await adapter.exit_sketch())
@@ -179,15 +194,18 @@ async def build(adapter) -> dict[str, str]:
     v_shim = SHIM_X * SHIM_Z * SHIM_T
     volume = await volume_check(adapter, "shim", v_shim, 0.005 * v_shim)
 
-    # Horseshoe (Main's ruling, 2026-09-24): the MHA-140 screw passes the
-    # pack through an open slot, so leaves slide in and out with the screw
-    # backed off.  The platform lock notch's pattern: a straight run from the
-    # screw axis out past the open edge, then one full-radius cap cut on the
-    # axis.  The width is dimensioned across the run's closed end, on the
-    # screw axis, so the print reads it where the radius starts.
+    # Horseshoe (Main's ruling, 2026-09-24; I31): the MHA-140 screw passes
+    # the pack through an open slot along the flange slot.  The platform lock
+    # notch's pattern: a straight run from the radius centre out past the
+    # south edge, then one full-radius cap cut on the centre.  The width is
+    # dimensioned across the run's closed end, so the print reads it where
+    # the radius starts.
+    if SLOT_OPEN_EDGE != "south":
+        raise ValueError(f"shim slot opening {SLOT_OPEN_EDGE!r} is not modelled")
     h = SLOT_W / 2.0
-    run_end = SLOT_OPEN_SIDE * (SHIM_X / 2.0 + SLOT_OVERRUN)
-    slot_pts = [(0.0, -h), (0.0, h), (run_end, h), (run_end, -h)]
+    y_centre = -SLOT_CENTRE_Z
+    run_end = -SHIM_SOUTH_Z + SLOT_OVERRUN
+    slot_pts = [(-h, y_centre), (h, y_centre), (h, run_end), (-h, run_end)]
     slot = SketchDims()
     check("create_sketch shim slot", await adapter.create_sketch("Top"))
     slot_lines = await add_line_chain(adapter, slot_pts)
@@ -197,8 +215,8 @@ async def build(adapter) -> dict[str, str]:
         slot_pts,
         label="shim slot",
         dims=slot,
-        names=["SlotWidth", "SlotRun", "SlotEdge"],
-        drives=['"SlotW"', None, '"SlotW" / 2'],
+        names=["SlotWidth", "SlotRun", "SlotEdge", "SlotStation"],
+        drives=['"SlotW"', None, '"SlotW" / 2', '"SlotCentreZ" - "ShimNorthZ"'],
     )
     await ensure_fully_defined(adapter, "shim slot sketch")
     check("exit_sketch shim slot", await adapter.exit_sketch())
@@ -211,7 +229,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Slot")
-    v_run = SLOT_W * SHIM_X / 2.0 * SHIM_T
+    v_run = SLOT_W * (-SHIM_SOUTH_Z - y_centre) * SHIM_T
     volume = await volume_check(adapter, "shim slot", volume - v_run, 0.01 * v_run)
 
     cap = SketchDims()
@@ -219,12 +237,12 @@ async def build(adapter) -> dict[str, str]:
     await define_circle(
         adapter,
         0.0,
-        0.0,
+        y_centre,
         SLOT_R,
         "slot end",
         dims=cap,
-        names=(None, None, "SlotEndDia"),
-        drives=(None, None, '"SlotW"'),
+        names=(None, "SlotEndStation", "SlotEndDia"),
+        drives=(None, '"SlotCentreZ" - "ShimNorthZ"', '"SlotW"'),
     )
     await ensure_fully_defined(adapter, "slot end sketch")
     check("exit_sketch slot end", await adapter.exit_sketch())
@@ -249,12 +267,13 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven shim (equations neutral)", volume, 0.005 * v_shim
     )
 
-    # The slot radius centre's two print locations.  The closed edge is +X
-    # (the slot opens to SLOT_OPEN_SIDE); the *Top view's lower edge is +Z,
-    # which a Top-plane sketch reads as -y.
+    # The slot radius centre's two print locations, from the +X edge and
+    # the north edge (the *Top view's lower edge is +Z, which a Top-plane
+    # sketch reads as -y).
     await _author_reference_dimension(
         adapter,
-        start=(-SLOT_OPEN_SIDE * SHIM_X / 2.0, 0.0),
+        start=(SHIM_X / 2.0, y_centre),
+        end=(0.0, y_centre),
         orientation="horizontal",
         value_mm=SHIM_X / 2.0,
         feature_name="SlotCentreXReference",
@@ -263,9 +282,10 @@ async def build(adapter) -> dict[str, str]:
     )
     await _author_reference_dimension(
         adapter,
-        start=(0.0, -SHIM_Z / 2.0),
+        start=(0.0, -SHIM_NORTH_Z),
+        end=(0.0, y_centre),
         orientation="vertical",
-        value_mm=SHIM_Z / 2.0,
+        value_mm=SLOT_CENTRE_FROM_NORTH,
         feature_name="SlotCentreZReference",
         dimension_name="SlotCentreZ",
         drive_expression='"SlotCentreZ"',

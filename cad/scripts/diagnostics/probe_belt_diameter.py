@@ -39,12 +39,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
 from _common import check, log, run_build  # noqa: E402
 from _telemetry import info, success, warn  # noqa: E402
 from _assembly import (  # noqa: E402
+    activate_assembly_contract,
     angle_driver,
     component_transform,
     distance_driver,
     named_ref,
     place_component,
 )
+
+# Distance drivers seed their side from paper-drive's flip seeds
+# (cad/config/assemblies/paper-drive.yaml), the assembly this probe mirrors.
+activate_assembly_contract("paper-drive")
 from _transforms import IDENTITY, rot_z_rows  # noqa: E402
 from preflight_release import _discard_open_documents  # noqa: E402
 

@@ -9,7 +9,8 @@ import pytest
 
 import _interference_contracts
 import build_channel_assembly as channel
-import build_pedestal_hold_down_screw as hold_down
+import build_pedestal_hold_down_screw as hold_down_build
+import pedestal_hold_down_screw_spec as hold_down
 import arbor_pedestal_spec as pedestal
 import pivot_bracket_spec as bracket
 import rocker_bracket_seat_layout as seats
@@ -17,7 +18,7 @@ from _hole_spec import DRILL_POINT_H
 
 
 def test_layout_screw_is_the_placed_mha_143() -> None:
-    assert hold_down.SPEC.skus == ("90280A197",)
+    assert hold_down_build.SPEC.skus == ("90280A197",)
     assert seats.SCREW_THREAD == hold_down.THREAD
     assert seats.SCREW_LENGTH == hold_down.SHANK_LEN
     assert seats.SCREW_MAJOR_DIA == pytest.approx(hold_down.SHANK_DIA, abs=1e-3)

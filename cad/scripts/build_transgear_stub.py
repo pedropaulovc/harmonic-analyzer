@@ -60,6 +60,7 @@ from _drawing_marks import (
 )
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
+from _visibility import blank_reference_geometry
 from transgear_stub_spec import (
     BASE_DIA,
     BASE_DIA_BAND,
@@ -351,6 +352,7 @@ async def build(adapter) -> dict[str, str]:
     got = await volume_check(adapter, "stub + cap", expected + v_cap, 0.02 * v_cap + 0.005 * expected)
     if got < expected + 0.5 * v_cap:
         raise RuntimeError("cap extruded the wrong way (into the collar) -- flip the extrude")
+    blank_reference_geometry(adapter, (("CapPlane", "PLANE"),))
     slot = SketchDims()
     check("create_sketch cap slot", await adapter.create_sketch("Front"))
     slot_rect = [

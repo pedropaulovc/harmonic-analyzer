@@ -1,7 +1,9 @@
-r"""Shared recipe for the McMaster 90280A* narrow fillister head screws.
+r"""Shared recipe for the McMaster 90280A* narrow fillister head screws, and
+the 91794A112 stainless fillister screw on the same #4-40 head.
 
 The vendor drives every derived number off 5 named dims via equations,
-reproduced here. The 90280A837 extension awaits its native comparison:
+reproduced here. The 90280A837 and 91794A112 extensions await their native
+comparison:
 
 - slot width = HeadDia*0.135, slot depth = width*1.5 (from the dome apex)
 - head cylinder band = HeadHeight*0.8; dome = spherical cap (centre on
@@ -47,16 +49,19 @@ from frame_cross_screw_spec import HEAD_DIA, HEAD_H, PITCH, SHANK_DIA, SHANK_LEN
 FILLISTER_SIZES = {
     # part:        (major dia, length, head height, head dia, pitch)
     "90280A108": (2.8448, 9.525, 2.7178, 4.6482, 0.635),
-    "90280A110": (2.8448, 12.7, 2.7178, 4.6482, 0.635),
     "90280A194": (4.1656, 12.7, 3.9624, 6.858, 0.79375),
     "90280A197": (4.1656, 19.05, 3.9624, 6.858, 0.79375),
     "90280A199": (4.1656, 25.4, 3.9624, 6.858, 0.79375),
     "90280A201": (4.1656, 31.75, 3.9624, 6.858, 0.79375),
     "90280A837": (SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA, PITCH),
+    # 18-8 stainless fillister, the same 0.183 x 0.107 #4-40 head (McMaster
+    # 91794A product table, read 2026-09-25).
+    "91794A112": (2.8448, 15.875, 2.7178, 4.6482, 0.635),
     # MSC 40923898 (mfr 1456MSL), 1/4-20 x 3-1/2 slotted fillister, fully
     # threaded; MSC lists no head sizes, so the head is ASME B18.6.3's 1/4
-    # maximum (A 0.414, O 0.237).  Modelled at the 86.0 cut-to-fit length.
-    "40923898": (6.35, 86.0, 0.237 * 25.4, 0.414 * 25.4, 25.4 / 20.0),
+    # maximum (A 0.414, O 0.237).  The supplied 3-1/2 in length: MHA-142
+    # (build_post_mount_screw) cuts it to fit, never this row.
+    "40923898": (6.35, 3.5 * 25.4, 0.237 * 25.4, 0.414 * 25.4, 25.4 / 20.0),
 }
 
 

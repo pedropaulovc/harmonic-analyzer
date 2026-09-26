@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from _gtol_spec import PlanarFace
 from _surface_finish import SEAT_UM, SurfaceFinishControl
-from rocker_arm_support_spec import HALF_Y  # the foot is the -Y face at y = -HALF_Y
+from rocker_arm_support_section_spec import HALF_Y
 
 # The foot seats on harmonic-base: the one face that MUST be cut on a part the
 # title block otherwise leaves CAST/MACHINED, so it carries the seat grade.

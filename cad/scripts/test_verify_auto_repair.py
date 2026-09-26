@@ -194,6 +194,8 @@ def test_refresh_dof_gate_uses_saved_manifest(tmp_path, monkeypatch) -> None:
     adapter = _Adapter()
     adapter.currentModel.GetComponents = lambda _top_only: [component]
     monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+    # A synthetic assembly with no contract file pins no exact free set.
+    monkeypatch.setattr(_assembly, "allowed_free_stems", lambda _name: ())
     (tmp_path / ".free.dof.json").write_text(
         json.dumps({"stem": "free", "specs": [{"verify": ["crank-1", []]}]}),
         encoding="utf-8",
@@ -217,6 +219,8 @@ def test_refresh_dof_gate_can_reuse_an_already_resolved_model(
     adapter.currentModel.GetComponents = lambda _top_only: [component]
     adapter.currentModel.ForceRebuild3 = lambda _top_only: rebuilds.append(True) or True
     monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+    # A synthetic assembly with no contract file pins no exact free set.
+    monkeypatch.setattr(_assembly, "allowed_free_stems", lambda _name: ())
     (tmp_path / ".free.dof.json").write_text(
         json.dumps({"stem": "free", "specs": [{"verify": ["crank-1", []]}]}),
         encoding="utf-8",

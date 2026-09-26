@@ -55,6 +55,7 @@ from _common import (
 import settled_spring_seats
 from _drawing_marks import DRAWN_BY
 from _assembly import (
+    activate_assembly_contract,
     angle_driver,
     assembly_title_properties,
     assert_free_dof_necessity,
@@ -258,6 +259,8 @@ def _assert_counter_spring_hang(pose: spring_mounts.SpringPose) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
+    # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
+    activate_assembly_contract(ASM_NAME)
     counter_seat, gooseneck_origin_y = settled_spring_seats.counter_seat()
     counter_pose = counter_seat.pose
     _assert_counter_spring_hang(counter_pose)

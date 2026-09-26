@@ -9,6 +9,7 @@ and mass properties.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 
@@ -61,11 +62,15 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91829A560",
         material="AISI 304",
     ),
+    "cone-tip-block-nut": _stock(
+        "cone-tip-block-nut",
+        "Zinc-Plated Steel Nylon-Insert Locknut",
+        "90631A007",
+    ),
     "cone-tip-block-screw": _stock(
         "cone-tip-block-screw",
-        "Black-Oxide Alloy Steel Button Head Hex Drive Screw",
-        "91255A148",
-        material="Alloy Steel",
+        "Low-Strength Zinc-Plated Steel Hex Head Screw",
+        "93075A150",
     ),
     "cone-tip-adjuster": _stock(
         "cone-tip-adjuster",
@@ -75,8 +80,9 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     ),
     "cone-tip-pinch-screw": _stock(
         "cone-tip-pinch-screw",
-        "Steel Narrow Fillister Head Slotted Screw",
-        "90280A110",
+        "18-8 Stainless Steel Fillister Head Slotted Screw",
+        "91794A112",
+        material="AISI 304",
     ),
     "fillister-screw": _stock(
         "fillister-screw",
@@ -181,7 +187,19 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
 
 
 def fastener(part_name: str) -> PurchasedFastenerSpec:
-    """Return one purchased fastener identity, failing loud if unregistered."""
+    """Return one purchased fastener identity, failing loud if unregistered.
+
+    Under doit, ``HARMONIC_FASTENER_ROWS`` names the only rows this build's cache
+    key folds (``dodo._narrow_fastener_catalog``); reading any other row would
+    let an edit to that row reuse this artefact, so it fails instead.
+    """
+    allowed = os.environ.get("HARMONIC_FASTENER_ROWS")
+    if allowed is not None and part_name not in allowed.split(","):
+        raise KeyError(
+            f"fastener row {part_name!r} is outside this build's cache key "
+            f"(HARMONIC_FASTENER_ROWS={allowed!r}); read it through a literal "
+            "fastener(...) call so the build graph can see it"
+        )
     try:
         return FASTENERS[part_name]
     except KeyError as exc:

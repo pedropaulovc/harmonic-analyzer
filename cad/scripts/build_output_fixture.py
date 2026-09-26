@@ -46,6 +46,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _visibility import blank_reference_geometry
 from output_fixture_spec import (
     COLLAR_DIA,
     COLLAR_HEIGHT,
@@ -281,6 +282,8 @@ def _make_hook_ref_point(adapter) -> None:
     feat.Name = "HookAnchorPoint"
     if str(_read_member(feat, "Name")) != "HookAnchorPoint":
         raise RuntimeError("reference point rename failed")
+    # Hidden but still selectable by name for the lever-wire ball joint.
+    blank_reference_geometry(adapter, (("HookAnchorPoint", "DATUMPOINT"),))
     _telemetry.success("HookAnchorPoint reference point created")
 
 

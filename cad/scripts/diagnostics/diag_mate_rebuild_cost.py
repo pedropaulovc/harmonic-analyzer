@@ -40,11 +40,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
 
 from _common import check, log, run_build  # noqa: E402
 from _assembly import (  # noqa: E402
+    activate_assembly_contract,
     _seed_flip,
     component_transform,
     place_component,
     place_components_batch,
 )
+
+# Distance drivers seed their side from channel's flip seeds
+# (cad/config/assemblies/channel.yaml), the assembly this probe mirrors.
+activate_assembly_contract("channel")
 from build_channel_assembly import (  # noqa: E402
     IDENTITY,
     PIVOT,
@@ -75,8 +80,8 @@ def _probe_params(comp: str, z_mm: float) -> AddMateParameters:
     The flip seed is the PRODUCTION polarity, not the raw sign: the seat this
     probe models (`_seat_bushing_on_shaft`'s axial distance, same
     bushing-Front-Plane <-> assembly-Front-Plane references) goes through
-    `distance_driver`, whose signature "pivot bushing axial z" is in
-    `_FLIP_INVERT` -- so a negative station seeds flip=False (codex #219
+    `distance_driver`, whose signature "pivot bushing axial z" was in the
+    channel flip seeds (now cad/config/assemblies/channel.yaml) -- so a negative station seeds flip=False (codex #219
     round 2). Reusing `_seed_flip` over the same label keeps the probe in
     lockstep with the polarity table instead of shadowing it.
     """

@@ -1,6 +1,7 @@
 r"""Diagnostic: dump the under-constrained component set of each built assembly.
 
-Read-only seat probe backing ``verify._ALLOWED_FREE_STEMS`` (the exact-set
+Read-only seat probe backing each assembly contract's ``allowed_free_stems``
+(cad/config/assemblies/<stem>.yaml, the exact-set
 direction of the free-DOF soundness gate): opens each named assembly, re-solves
 once, prints every top-level component that reads under-constrained plus the
 collapsed stem set, and closes without saving. Run it after a coupling change

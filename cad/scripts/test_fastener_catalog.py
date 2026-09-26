@@ -15,8 +15,9 @@ _EXPECTED = {
     "cone-lock-knob": (("91882A425",), "MHA-093", 1),
     "cone-pivot-screw": (("91829A560",), "MHA-094", 1),
     "cone-tip-adjuster": (("94025A164",), "MHA-097", 1),
-    "cone-tip-block-screw": (("91255A148",), "MHA-140", 1),
-    "cone-tip-pinch-screw": (("90280A110",), "MHA-098", 1),
+    "cone-tip-block-nut": (("90631A007",), "MHA-146", 1),
+    "cone-tip-block-screw": (("93075A150",), "MHA-140", 1),
+    "cone-tip-pinch-screw": (("91794A112",), "MHA-098", 1),
     "fillister-screw": (("90114A511",), "MHA-030", 27),
     "foot-screw": (("90280A108",), "MHA-103", 1),
     "frame-side-screw": (("90280A194",), "MHA-117", 2),
@@ -92,6 +93,24 @@ def test_special_bom_titles_remain_machine_specific() -> None:
     assert _config.parts("knife-hanger-stud")["title"] == "Knife-Hanger Bolt"
     assert _config.parts("knife-hanger-washer")["title"] == "Knife-Hanger Washer"
     assert _config.parts("lag-screw")["title"] == "Rocker-Support Hold-Down Screw"
+
+
+def test_fastener_refuses_rows_outside_the_builds_cache_key(monkeypatch):
+    """Under doit, HARMONIC_FASTENER_ROWS names the rows the task's cache key
+    folds; any other row read must fail rather than reuse a stale artefact."""
+    import pytest
+
+    from _fastener_catalog import fastener
+
+    monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "bracket-screw,clamp-screw")
+    assert fastener("clamp-screw").part_name == "clamp-screw"
+    with pytest.raises(KeyError, match="outside this build's cache key"):
+        fastener("lag-screw")
+    monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "")
+    with pytest.raises(KeyError, match="outside this build's cache key"):
+        fastener("bracket-screw")
+    monkeypatch.delenv("HARMONIC_FASTENER_ROWS")
+    assert fastener("lag-screw").part_name == "lag-screw"
 
 
 def test_vendor_readme_carries_no_unfilled_harvest_evidence() -> None:

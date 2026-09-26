@@ -55,7 +55,8 @@ import traceback
 from pathlib import Path
 from typing import Any
 
-from _common import CAD_ROOT, OUT_SLDASM, log, release_seat_working_directory
+import _seat_forensics
+from _common import CAD_ROOT, OUT_SLDASM, log
 from _drawing_registry import DRAWINGS
 
 import _telemetry
@@ -162,7 +163,7 @@ def _release_seat(sw: Any) -> None:
         # dies mid-teardown is exactly the one that leaves a seat parked in a
         # source root, and the raising close propagates either way.
         try:
-            left = release_seat_working_directory(sw)
+            left = _seat_forensics.release_seat_working_directory(sw)
         except Exception as error:  # noqa: BLE001
             _telemetry.warn(f"seat working directory re-point failed: {error}")
         else:

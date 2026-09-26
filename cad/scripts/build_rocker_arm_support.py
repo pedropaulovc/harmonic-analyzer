@@ -113,14 +113,14 @@ from _drawing_marks import (
 from _hole_spec import blind_cut_dia_mm
 from _part_pmi import author_part_pmi
 from rocker_arm_support_drawing_spec import SURFACE_FINISHES
-from rocker_arm_support_spec import (
+from rocker_arm_support_section_spec import (
+    BIG,
     FOOT_THICKNESS,
     HALF_Y,
-    HOLE_DIA,
-    HOLE_SPEC,
     NARROW,
     WIDE,
 )
+from rocker_arm_support_spec import HOLE_DIA, HOLE_SPEC
 from rocker_bracket_seat_layout import (
     RAIL_DEPTH,
     RAIL_DEPTH_PLACES,
@@ -136,10 +136,11 @@ PART_NAME = "rocker-arm-support"
 # materials.yaml casting_green_parts) so it renders green, not steel-grey.
 MATERIAL = "Gray Cast Iron"
 
-# Trapezoid (Sketch1) -- wide foot / narrow top: WIDE / NARROW / HALF_Y are
-# rocker_arm_support_spec's (pure data, so the base, frame and drive train
-# read them without importing this COM script). On the Right plane: sketch-x
-# -> model Z (taper), sketch-y -> model Y (height).
+# Trapezoid (Sketch1) -- wide foot / narrow top: WIDE / NARROW / HALF_Y, the
+# window half BIG and the FOOT_THICKNESS they leave are
+# rocker_arm_support_section_spec's (pure data, so the base, frame, drive
+# train and drawing spec read them without importing this COM script). On the
+# Right plane: sketch-x -> model Z (taper), sketch-y -> model Y (height).
 BOSS_DEPTH = 177.8  # mid-plane extrude along X (X ±88.9)
 
 CAV = 63.5  # 127 mm square half (Cut-Extrude2)
@@ -147,7 +148,6 @@ CAV = 63.5  # 127 mm square half (Cut-Extrude2)
 # face and its top edge RAIL_DEPTH under the top face (#743: the rail carries
 # the rocker brackets' #8-32 seats, so it grew down into the window from the
 # source's 6.35 -- the window is no longer square).
-BIG = round(HALF_Y - FOOT_THICKNESS, 6)  # 82.55: the window's side and bottom half
 WEB = 3.175  # window-cut start-offset; the 2*WEB band left as the web
 # The cavity's top rim (chamfered on both web faces) must stay a web edge
 # under the rail, not run into the pocket's top face: the 2.7 band keeps it.

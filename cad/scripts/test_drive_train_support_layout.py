@@ -150,7 +150,7 @@ def test_mha135_is_placed_on_the_shared_pin_axis_and_rides_the_rod() -> None:
     # and locks it to the rod, so it joins the freed lift-rod spin family.
     import inspect
 
-    from _assembly import _ALLOWED_FREE_STEMS
+    from _assembly import allowed_free_stems
     from pinion_lever_geometry import ROD_PIN_HOLE_FROM_END
 
     source = inspect.getsource(drive)
@@ -163,7 +163,7 @@ def test_mha135_is_placed_on_the_shared_pin_axis_and_rides_the_rod() -> None:
         [0.0, 0.0, ROD_PIN_HOLE_FROM_END],
     )
     assert all(math.isclose(a, b, abs_tol=1e-9) for a, b in zip(pin_point, rod_point))
-    free = _ALLOWED_FREE_STEMS["drive-train"]
+    free = allowed_free_stems("drive-train")
     assert "pinion-lever-pin" in free and "pinion-lift-rod" in free
 
 
@@ -511,7 +511,7 @@ def test_torque_shaft_is_phased_to_the_straps_and_swings_with_them() -> None:
     # Option E-a: the shaft's pin-hole axis (local X) lies along the straps'
     # cross holes at the park lean, and verify:soundness admits the shaft into
     # the drive train's free swing family.
-    from _assembly import _ALLOWED_FREE_STEMS
+    from _assembly import allowed_free_stems
     from pinion_pivot_shaft_spec import SHAFT_DIA
 
     strap_rows = drive.compose_rows(
@@ -520,5 +520,5 @@ def test_torque_shaft_is_phased_to_the_straps_and_swings_with_them() -> None:
     dot = sum(a * b for a, b in zip(drive.TORQUE_SHAFT_ROWS[0], strap_rows[0]))
     assert math.isclose(abs(dot), 1.0, abs_tol=1e-12)
     assert drive.TORQUE_SHAFT_ROWS[2] == [0.0, 0.0, 1.0]
-    assert "pinion-pivot-shaft" in _ALLOWED_FREE_STEMS["drive-train"]
+    assert "pinion-pivot-shaft" in allowed_free_stems("drive-train")
     assert SHAFT_DIA == drive.STRAP_PIVOT_BORE

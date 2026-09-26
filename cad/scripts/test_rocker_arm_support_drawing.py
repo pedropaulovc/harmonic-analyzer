@@ -14,7 +14,9 @@ import _drawing_common
 import draw_rocker_arm_support as drawing
 import build_rocker_arm_support as support
 import build_frame_assembly as frame
-import build_lag_screw as screw
+import build_lag_screw as stock_screw
+import lag_screw_spec as screw
+import rocker_arm_support_section_spec as section
 import rocker_arm_support_spec as placement
 import rocker_arm_support_drawing_spec as drawing_spec
 import rocker_bracket_seat_layout as seats
@@ -156,9 +158,9 @@ def test_support_has_no_unapproved_gdt_contract() -> None:
 
 
 def test_stock_hold_down_clears_support_and_engages_blind_base_tap() -> None:
-    import build_harmonic_base as base
+    import harmonic_base_fasteners as base
 
-    assert screw.SPEC.skus == ("92240A540",)
+    assert stock_screw.SPEC.skus == ("92240A540",)
     assert screw.THREAD_SIZE == base.HOLD_DOWN_THREAD == "1/4-20"
     assert (screw.THREAD_CLASS, base.HOLD_DOWN_THREAD_CLASS) == ("2A", "2B")
     assert screw.THREAD_LEN == screw.SHANK_LEN
@@ -430,13 +432,19 @@ def test_section_cut_refuses_a_cutting_line_inference_moved(monkeypatch, moved) 
 
 def test_section_constants_live_in_the_pure_data_spec() -> None:
     # The base, frame and drive train read the casting's section from the
-    # spec, so a window or rail edit in the COM builder re-keys none of them.
-    for name in ("WIDE", "NARROW", "HALF_Y", "FOOT_THICKNESS", "HOLE_SPEC", "HOLE_DIA"):
+    # section spec, so a window or rail edit in the COM builder re-keys none
+    # of them; the foot clearances ride the placement spec with the hold-down
+    # pattern they are drilled on.
+    for name in ("WIDE", "NARROW", "HALF_Y", "BIG", "FOOT_THICKNESS"):
+        assert getattr(support, name) is getattr(section, name)
+    for name in ("HOLE_SPEC", "HOLE_DIA"):
         assert getattr(support, name) is getattr(placement, name)
-    assert drawing_spec.HALF_Y is placement.HALF_Y
+    assert drawing_spec.HALF_Y is section.HALF_Y
+    assert frame.LAG_FOOT_THICKNESS is section.FOOT_THICKNESS
+    assert seats.FOOT_THICKNESS is section.FOOT_THICKNESS
     # The base seats key on the foot: it stays exactly the source's 6.35.
-    assert placement.FOOT_THICKNESS == 6.35
-    assert support.BIG == pytest.approx(82.55)
+    assert section.FOOT_THICKNESS == pytest.approx(6.35)
+    assert section.BIG == pytest.approx(82.55)
 
 
 def test_deeper_rail_lowers_only_the_window_top() -> None:

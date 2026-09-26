@@ -36,13 +36,8 @@ from _hole_spec import (
     THREAD_MAJOR_MM,
     HoleSpec,
 )
-from rocker_arm_support_spec import (
-    FOOT_THICKNESS,
-    HALF_Y,
-    NARROW,
-    SUPPORT_WORLD_X,
-    SUPPORT_WORLD_Z,
-)
+from rocker_arm_support_section_spec import FOOT_THICKNESS, HALF_Y, NARROW
+from rocker_arm_support_spec import SUPPORT_WORLD_X, SUPPORT_WORLD_Z
 from rocker_bank_layout import PIVOT_BRACKET_Z, STACK_MID_Z
 
 LINEAR_1PL = 0.8  # title-block .X band

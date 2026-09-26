@@ -49,8 +49,8 @@ from _common import (
     volume_check,
 )
 from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
-from build_fillister_screw import HEAD_DIA, SHANK_DIA, SHANK_LEN
-from build_platen import PLATE_THICKNESS, SOCKET_THREAD_ENGAGEMENT
+from fillister_screw_spec import HEAD_DIA, SHANK_DIA, SHANK_LEN
+from platen_spec import PLATE_THICKNESS, SOCKET_THREAD_ENGAGEMENT
 
 PART_NAME = "platen-clip"
 MATERIAL = "Brass"  # see _common.apply_material docstring
