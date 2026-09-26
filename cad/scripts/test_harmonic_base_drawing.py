@@ -431,8 +431,8 @@ def test_socket_bore_leader_lands_on_bore_clear_of_the_cross_tap() -> None:
 
 def test_transferred_pinion_block_seats_print_no_station() -> None:
     # Codex #855 P1: the four block seats are spotted THROUGH MHA-061 at
-    # assembly (U28 corollary; MHA-061's note "SPOT BASE SEATS THROUGH BLOCK
-    # HOLES AT ASSEMBLY."), so they leave the hole table and their one callout
+    # assembly (U28 corollary; the drive-train RIG_SET_STEP, "BEFORE SPOTTING
+    # THE TRANSFER SEATS"), so they leave the hole table and their one callout
     # names the transfer.  Codex #854 P1: the model seats themselves sit at the
     # fit-up stations, so the modelled holes match the transferred ones.
     import draw_harmonic_base as sheet

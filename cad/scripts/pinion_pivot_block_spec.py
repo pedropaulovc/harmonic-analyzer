@@ -109,10 +109,11 @@ DRAWING_NOTES = "\n".join(
         f"PIVOT BORE RUNS ON {PIVOT_SHAFT_NAME},",
         f"  LIFT BORE ON {LIFT_ROD_NAME};",
         "  EACH SHAFT TURNS FREELY BY HAND.",
-        # Ruling (c): the front block's feeler setting is an ASSEMBLY step
-        # (0.25 +/- 0.10 end play), so it lives on the drive-train assembly
-        # drawing's step list, not in this part's notes (rule 6, Codex #854).
-        "SPOT BASE SEATS THROUGH BLOCK HOLES AT ASSEMBLY.",
+        # Assembly operations are never part notes (rule 6): the front
+        # block's feeler setting is on the drive-train assembly step list
+        # (ruling (c), Codex #854), and spotting the base seats through the
+        # block holes is RIG_SET_STEP plus the harmonic base's
+        # "TRANSFER FROM MHA-061" callout (Main, MHA-061 eye pass).
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

@@ -156,10 +156,15 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert int(spec["quantity"]) == 2  # the book uses two blocks
 
 
-def test_notes_stay_within_policy_and_carry_the_assembly_transfer() -> None:
+def test_notes_stay_within_policy_and_leave_assembly_to_the_assembly() -> None:
     notes = pinion_pivot_block_spec.DRAWING_NOTES.splitlines()
     assert len(notes) <= 4  # policy rule 6
-    assert "SPOT BASE SEATS THROUGH BLOCK HOLES AT ASSEMBLY." in notes
+    # Never a method (rule 6): spotting the base seats through the block
+    # is the rig-set step and the base sheet's transfer callout.
+    assert not any("ASSEMBLY" in line or "SPOT" in line for line in notes)
+    from pinion_rig_fitup import RIG_SET_STEP
+
+    assert "SPOTTING THE TRANSFER SEATS" in RIG_SET_STEP
     # The feeler setting is an assembly step (drive-train assembly drawing),
     # and a note carries no dimension (rule 6, Codex #854).
     assert not any(re.search(r"\d", line) and "MHA-" not in line for line in notes)
