@@ -203,16 +203,14 @@ FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS = (
 )
 # The tip may stand proud of the arm's inboard face by up to this much.
 PROUD_INBOARD_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS, 6)
-# The one manufacturing note: the named exception, stated with the worst-case
-# engagement its policy row records (the stock arm, after the exit break) and
-# worded like the other sheets' rule-12 statements.  The ruling ID (U33b)
-# stays here; it means nothing to the book's reader.
+# The one manufacturing note: the named exception's shortfall, stated as a
+# plain fact with the worst-case engagement its policy row records (the stock
+# arm, after the exit break).  The policy requires the sheet to state it, but
+# exception and ruling labels never print (fleet ruling 2026-09-26, after
+# Codex #857 P2), so the ruling ID (U33b) and the rule number stay here.
 # A MIN never rounds up: 1.155 prints 1.15, floored to two places.
 FULL_THREAD_WORST_DIAMETERS_PRINTED = math.floor(FULL_THREAD_WORST_DIAMETERS * 100.0) / 100.0
-DRAWING_NOTES = (
-    f"THREAD ENGAGEMENT {FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D MIN: "
-    "NAMED EXCEPTION TO RULE 12."
-)
+DRAWING_NOTES = f"THREAD ENGAGEMENT {FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D MIN."
 
 # Flat seat annulus that bears on the arm face, outside the 45-degree lead:
 # nominal, and after the minimum shoulder and the title-block edge break.

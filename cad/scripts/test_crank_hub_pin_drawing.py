@@ -25,6 +25,20 @@ def test_six_oclock_seam_leaves_the_u27_web_without_a_matched_check() -> None:
     assert len(pin_spec.DRAWING_NOTES.splitlines()) <= 4
 
 
+def test_notes_state_the_part_and_leave_the_method_to_the_assembly() -> None:
+    """Rule 6 (#921 follow-up): no drilling, reaming or driving method on the
+    pin's print; the drive-train step carries it, from the outboard face."""
+    import draw_drive_train_assembly as assembly_drawing
+
+    for method in ("MATCH-DRILL", "REAM", "DRIVE", "SHALL NOT"):
+        assert method not in pin_spec.DRAWING_NOTES
+    assert "MHA-020" in pin_spec.DRAWING_NOTES
+    assert "MHA-137" in pin_spec.DRAWING_NOTES
+    step = assembly_drawing.CONE_CRANK_STEPS
+    assert "MATCH-DRILL/REAM SEAM" in step
+    assert "FROM OUTBOARD; DRIVE MHA-138 FLUSH." in step
+
+
 def test_drawing_registry_and_native_dimensions_are_complete() -> None:
     assert DRAWINGS_BY_NAME["crank_hub_pin"].script == Path(drawing.__file__).resolve()
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/crank-hub-pin.SLDDRW")

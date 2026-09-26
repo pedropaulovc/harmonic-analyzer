@@ -25,11 +25,14 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 ):
     raise AssertionError("every marked MHA-138 dimension needs authored places")
 
+# Rule 6: the part facts only.  How the seam is match-drilled and the pin
+# driven is the drive-train sheet's step 6 (the #814 class; #921 follow-up),
+# the fit is the MHA-020/MHA-137 seam callouts', and the six o'clock station
+# is modelled on both parts.  The pin cannot reach the hub bore:
+# crank_hub_geometry.SEAM_WEB_WORST_MM holds the web to the wall target.
 DRAWING_NOTES = "\n".join(
     (
-        "MATCH-DRILL/REAM MHA-020 ARM AND MHA-137 HUB AT SIX O'CLOCK TO",
-        "LIGHT DRIVE FIT ON ACTUAL MHA-138 PIN; DRIVE AXIALLY FROM OUTBOARD FACE;",
-        "OUTER END FLUSH. PIN SHALL NOT ENTER HUB BORE.",
+        "SEAM PIN FOR THE MHA-020 ARM AND MHA-137 HUB, FITTED AT ASSEMBLY.",
         "DIA 4.0: 4 mm m6 DOWEL STOCK AS SUPPLIED.",
     )
 )

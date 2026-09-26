@@ -291,15 +291,23 @@ def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
     assert "StationReference" in spec.DRAWING_DIMENSIONS
 
 
-def test_arm_states_the_mha139_engagement_exception_it_is_tapped_for() -> None:
+def test_arm_states_the_mha139_engagement_fact_it_is_tapped_for() -> None:
     # User ruling 2026-09-25 (MHA-020 review B2): the tapped arm states the
-    # named exception with the same worst case the MHA-139 sheet prints.
+    # named exception's shortfall with the same worst case the MHA-139 sheet
+    # prints -- as a plain fact, since exception and ruling labels never print
+    # (fleet ruling 2026-09-26, after Codex #857 P2).
     import crank_handle_pivot_screw_spec as screw
 
     assert spec.DRAWING_NOTES.splitlines()[-1] == screw.DRAWING_NOTES.replace(
         "THREAD ENGAGEMENT", f"{screw.THREAD_SIZE} THREAD ENGAGEMENT"
     )
-    assert "#8-32 THREAD ENGAGEMENT 1.33D MIN: NAMED EXCEPTION TO RULE 12." in spec.DRAWING_NOTES
+    assert spec.DRAWING_NOTES.splitlines()[-1] == (
+        f"{screw.THREAD_SIZE} THREAD ENGAGEMENT "
+        f"{screw.FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D MIN."
+    )
+    assert spec.DRAWING_NOTES.splitlines()[-1] == "#8-32 THREAD ENGAGEMENT 1.33D MIN."
+    for internal in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "RULE "):
+        assert internal not in spec.DRAWING_NOTES
     # The stock line comes from the one stock constant.
     assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
     assert spec.STOCK_NOTE == "25.4 x 8.0 SECTION: 1 x 5/16 IN CF FLAT BAR AS SUPPLIED."
