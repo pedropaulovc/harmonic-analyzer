@@ -76,7 +76,10 @@ def test_display_precision_is_owned_by_the_part() -> None:
     assert "draw_cone_gear_shaft.py" in PRECISION_MIGRATED_DRAWINGS
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_dimension_precision" not in source
-    assert "SetPrecision3" not in source
+    # The contract's one exception: the front-to-tip REFERENCE (#917 R5 (a))
+    # takes its places from the spec constant, never a literal.
+    assert source.count("SetPrecision3") == 1
+    assert "SetPrecision3(DRAWING_REFERENCE_PRECISION, " in source
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in (
         Path(part.__file__).read_text(encoding="utf-8")
     )
@@ -144,7 +147,7 @@ def test_gear_seat_shoulders_are_held_inside_the_air_gap() -> None:
         assert station + held < south_of_outboard, name
         assert station + grade[2] > south_of_outboard, name
     # The last seat's north face and the tip journal end share the terminal
-    # land: the overall length locates nothing but an adjustable cup point.
+    # land: the tip station locates nothing but an adjustable cup point.
     assert ends[4] > faces[19][1]
 
 
@@ -220,8 +223,9 @@ def test_collar_diameter_stands_on_the_collar() -> None:
 def test_lengths_are_baseline_from_the_collar_face() -> None:
     """Option A (#914): one origin, the collar face.  Every length below the
     shaft that starts there stands on its own tier, the shortest nearest the
-    part; the journal runs the other way on the first tier and the overall
-    length sits lowest, clear of the title block."""
+    part, the tip station (#917 R5 (a)) outermost; the journal runs the other
+    way on the first tier, and the front-to-tip overall, now a REFERENCE,
+    sits lowest, clear of the title block."""
     spec = cone_gear_shaft_spec
     from_datum = {
         "CollarWidth": spec.COLLAR_THICKNESS,
@@ -230,6 +234,7 @@ def test_lengths_are_baseline_from_the_collar_face() -> None:
         "Sec2End": spec.SECTION_KNOBS[2],
         "Sec3End": spec.SECTION_KNOBS[3],
         "T006Station": spec.SOLDER_T006_STATION,
+        "Sec4End": spec.SECTION_KNOBS[4],
     }
     tiers = [
         drawing.SIDE_KEEP[name][1] for name in sorted(from_datum, key=from_datum.get)
@@ -247,8 +252,10 @@ def test_lengths_are_baseline_from_the_collar_face() -> None:
     assert (
         drawing.SIDE_KEEP["CollarWidth"][0] < datum_x - spec.COLLAR_THICKNESS / 1000.0
     )
-    overall = drawing.SIDE_KEEP["Sec4End"][1]
+    overall = drawing.OVERALL_REFERENCE_TEXT_XY[1]
     assert overall < tiers[-1] and overall > 0.066 + 0.008
+    tip_x = big_end - spec.SHAFT_LENGTH / 1000.0
+    assert tip_x < drawing.OVERALL_REFERENCE_TEXT_XY[0] < big_end
     # each station's text stands inside its own span (the web's cannot)
     for name, span in from_datum.items():
         if name == "CollarWidth":
@@ -692,8 +699,8 @@ def test_every_land_is_placed_from_the_one_origin(monkeypatch) -> None:
     """Option A (#914): the collar face is the one length origin.  Its plane
     comes first, from the front face by the journal; lands 1-3 end on planes
     offset from it and extrude back to it, so each depth IS the shoulder's
-    station from the collar face.  The tip land keeps the front-to-tip overall
-    length."""
+    station from the collar face.  The tip land ends on a plane from the same
+    face (#917 R5 (a)); the front-to-tip overall is only a reference."""
     spec = cone_gear_shaft_spec
     adapter, stubs, _dims, _gated = _stubbed_build(monkeypatch)
     planes = _planes(adapter)
@@ -810,14 +817,86 @@ def test_one_length_origin_is_the_collar_face() -> None:
         "CollarFace",
         "CollarFace",
         "CollarFace",
-        "Front Plane",
+        "CollarFace",
     )
     assert spec.SECTION_KNOBS[0] == spec.JOURNAL_END
-    for i in (1, 2, 3):
+    # #917 R5 (a): the tip is a station from the collar face too, so the
+    # collar-to-tip chain is one .X length, not the journal plus the overall.
+    for i in (1, 2, 3, 4):
         assert spec.SECTION_KNOBS[i] == pytest.approx(
             spec.SECTION_ENDS[i] - spec.COLLAR_START_STATION
         )
-    assert spec.SECTION_KNOBS[4] == spec.SHAFT_LENGTH
+    assert spec.DRAWING_PRECISION_BY_NAME["Sec4End"] == 1
+    # The front-to-tip overall is the one sheet-derived dimension: a read-only
+    # sum with its places handed over by the spec (drawing contract).
+    assert spec.DRAWING_REFERENCE_PRECISION == 1
+
+
+class _Curve:
+    def __init__(self, centre_z_m: float, radius_m: float, circle: bool = True):
+        self.CircleParams = (0.0, 0.0, centre_z_m, 0.0, 0.0, 1.0, radius_m)
+        self._circle = circle
+
+    def IsCircle(self) -> bool:
+        return self._circle
+
+
+class _Edge:
+    def __init__(self, curve):
+        self._curve = curve
+
+    def GetCurve(self):
+        return self._curve
+
+
+def test_the_overall_reference_picks_each_end_face_circle(monkeypatch) -> None:
+    """The REF overall runs between the two END-FACE circles, picked by
+    station and diameter: the journal's own circle at the collar face and
+    the tip land's start circle share those diameters at other stations."""
+    spec = cone_gear_shaft_spec
+    length = spec.SHAFT_LENGTH / 1000.0
+    journal_r = spec.SECTION_DIAS[0] / 2000.0
+    tip_r = spec.SECTION_DIAS[-1] / 2000.0
+    front = _Edge(_Curve(0.0, journal_r))
+    tip = _Edge(_Curve(-length, tip_r))  # the sign of model Z is not assumed
+    edges = [
+        _Edge(None),
+        _Edge(_Curve(0.0, journal_r, circle=False)),
+        _Edge(_Curve(spec.COLLAR_START_STATION / 1000.0, journal_r)),
+        _Edge(_Curve(spec.SECTION_ENDS[3] / 1000.0, tip_r)),
+        front,
+        tip,
+    ]
+    monkeypatch.setattr(drawing, "visible_view_entities", lambda *a, **k: edges)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    assert (
+        drawing._end_circle(
+            object(), station_mm=0.0, diameter_mm=spec.SECTION_DIAS[0], label="front"
+        )
+        is front
+    )
+    assert (
+        drawing._end_circle(
+            object(),
+            station_mm=spec.SHAFT_LENGTH,
+            diameter_mm=spec.SECTION_DIAS[-1],
+            label="tip",
+        )
+        is tip
+    )
+    edges.append(_Edge(_Curve(0.0, journal_r)))
+    with pytest.raises(RuntimeError, match="2 end-face circles"):
+        drawing._end_circle(
+            object(), station_mm=0.0, diameter_mm=spec.SECTION_DIAS[0], label="front"
+        )
+
+
+def test_the_overall_is_added_as_a_checked_reference() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_add_overall_reference(adapter, side)" in source
+    assert "set_reference_dimension(" in source
+    assert "SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)" in source
+    assert 'orientation="horizontal"' in source
 
 
 def test_solder_stations_ride_the_drive_train_seat_ladder() -> None:
