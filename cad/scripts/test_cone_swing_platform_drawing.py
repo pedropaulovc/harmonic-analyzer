@@ -183,10 +183,16 @@ def test_part_stamps_make_critical_properties() -> None:
     config = _config.parts("cone-swing-platform")
     assert config["material"] == config["material_specification"]
     assert (
-        "astm a830/a830m gr 1018 hr steel plate"
-        in str(config["material_specification"]).lower()
+        config["material_specification"]
+        == "ASTM A830/A830M Grade 1018 hot-rolled steel plate"
     )
-    assert "5/16 in minimum stock" in str(config["material_specification"]).lower()
+    # 1ca66ac34 pinned "5/16 in minimum stock" in the material. The finished
+    # 6.35 +/-0.10 with both broad faces machined already rules out the
+    # nominal 1/4 in plate, so the constraint lives on that requirement.
+    from cone_swing_platform_spec import DRAWING_NOTES, PLATE_THICKNESS
+
+    assert PLATE_THICKNESS == 6.35
+    assert "MACHINE BOTH BROAD FACES; FINISHED THICKNESS 6.35 +/-0.10." in DRAWING_NOTES
     finish = str(config["finish"]).lower()
     assert "mil-dtl-13924 class 1" in finish
     assert "oil seal" in finish

@@ -90,9 +90,10 @@ def test_part_stamps_make_critical_properties() -> None:
     # ch18 p.42 (2026-09-02): unpainted heat-treated steel, not brass.
     assert part.MATERIAL == "Plain Carbon Steel"
     assert config["material"] == "Plain Carbon Steel"
-    assert "O1 tool steel" in config["material_specification"]
-    assert "58-60 HRC" in config["material_specification"]
-    assert "Brass" not in config["material_specification"]
+    # The alloy is the MATERIAL cell; the hardness is a finished-part state,
+    # the FINISH cell's (Main, #923 fleet: the combined wording overflowed).
+    assert config["material_specification"] == "AISI O1 tool steel"
+    assert "hardened and tempered, 58-60 HRC" in str(config["finish"])
     assert "unpainted" in str(config["finish"]).lower()
     assert int(config["quantity"]) == 2
     source = Path(part.__file__).read_text(encoding="utf-8")

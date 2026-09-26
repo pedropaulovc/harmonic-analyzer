@@ -4,8 +4,7 @@ The SLDPRT remains authoritative.  This recipe supplies only the platform's
 views, the wedge envelope dimensions, and the machining notes; every shared
 sheet/template, import, curation, and export behavior lives in ``_drawing_common``.
 
-The platform is machined from black-oxide 5/16 in minimum steel stock to a
-6.35 mm finished plate: an asymmetric wedge (223.35 long, 20 -> 61 wide) with a
+The platform is a black-oxide 6.35 mm finished steel plate: an asymmetric wedge (223.35 long, 20 -> 61 wide) with a
 Ø6.76 pivot hole at the narrow tip, paired 1/4-20 post-mount taps, an open
 lock notch through the west edge, and rounded plan corners. The main plan and
 end views run 1:2; the isometric runs 1:3.

@@ -221,6 +221,10 @@ def test_part_config_is_a_machined_casting() -> None:
     assert "RAL 6005" in str(config["finish"])
     assert "SSPC-SP 3" in str(config["finish"])
     assert "50-75 um DFT" in str(config["finish"])
-    assert "boss" in str(config["finish"]).lower()
+    # The unpainted surfaces are a requirement note, not part of the FINISH
+    # cell (Main, #923 fleet: the combined wording overflowed the cell).
+    from cone_pivot_post_spec import DRAWING_NOTES
+
+    assert "DATUM A, MACHINED BOSS FACES, BORES AND COUNTERBORES: UNPAINTED." in DRAWING_NOTES
     assert config["process"] == "machined from solid stock or casting"
     assert int(config["quantity"]) == 1
