@@ -1364,6 +1364,7 @@ async def save_part_and_images(
     # summary Title, not its same-named custom property. Keep both identities
     # sourced from part_properties so a registry title override cannot split.
     apply_summary_info(adapter, title=properties["Title"])
+    await rebuild_all_configurations(adapter, part_name)
     check(
         f"re-save with properties -> {part_path}",
         await adapter.save_file(str(part_path)),
@@ -1389,6 +1390,63 @@ async def save_part_and_images(
         )
         artefacts[view] = str(img_path)
     return artefacts
+
+
+@_telemetry.traced("save.rebuild_configs", label_param="part_name")
+async def rebuild_all_configurations(adapter: Any, part_name: str) -> None:
+    """Rebuild every configuration after the caller's last edit, and prove it,
+    right before the part's final save.
+
+    An edit lands in the active configuration and can leave the others stale.
+    Saved that way, an assembly that places a stale configuration opens with
+    NeedsRebuild2=1 and fails verify:soundness's saved-rebuild-clean.  The
+    #267 reconcile re-saves only the assembly, never the child.  The pc-p1r
+    probe (dt-logs/pc-p1r/probe-saved-rebuild.jsonl) read MHA-135's INSTALLED
+    configuration stale in the saved part, and cone-gear's unplaced Default.
+
+    Each other configuration is activated and EditRebuild3'd, then the one
+    active on entry, so the saved views stay where the caller left them.  A
+    single-configuration part pays one EditRebuild3, which rebuilds only
+    features that need it, plus one read.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    active = active_configuration_name(adapter)
+    if active not in names:
+        raise RuntimeError(
+            f"{part_name}: active configuration {active!r} not among {names}"
+        )
+    refused = 0
+    for name in [*(name for name in names if name != active), active]:
+        if len(names) > 1:
+            check(
+                f"{part_name}: activate {name} to rebuild it before the save",
+                await adapter.set_active_configuration(name),
+            )
+        refused += not model.EditRebuild3()
+    _telemetry.annotate(config_count=len(names), active=active, rebuild_false=refused)
+    require_configurations_rebuilt(model, part_name, names)
+
+
+def require_configurations_rebuilt(
+    model: Any, part_name: str, names: Iterable[str]
+) -> None:
+    """Raise, naming the part and configurations, if any configuration still
+    reads IConfiguration.NeedsRebuild.  The read-back is the proof;
+    EditRebuild3's own bool is only recorded."""
+    stale = [
+        name
+        for name in names
+        if bool(
+            _early_bound(model.GetConfigurationByName(name), "IConfiguration").NeedsRebuild
+        )
+    ]
+    _telemetry.annotate(stale_count=len(stale))
+    if stale:
+        raise RuntimeError(
+            f"{part_name}: configurations {stale} still need a rebuild before the "
+            "save; an assembly placing one would open NeedsRebuild2=1"
+        )
 
 
 def _prune_stale_part_views(
