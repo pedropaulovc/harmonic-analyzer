@@ -127,6 +127,14 @@ if FLATS_ACROSS + _FLATS_ROW >= HEAD_DIA - _ROW_1:
 if FLATS_ACROSS - _FLATS_ROW <= OUTER_DIA + OD_BAND[0]:
     raise AssertionError("the wrench flats can reach into the body under the head")
 
+# The bore is cut mid-plane from the Top plane, so it needs no guess at the
+# blind cut's default side -- but a mid-plane depth is the TOTAL, split half
+# to each side (ExtrusionParameters.both_directions), and the whole body lies
+# on one side.  LENGTH + 4 cut only 42 of the 80 mm (leaf crankhub-e12b-r1:
+# 10891.3 mm^3 left against 8155.1).  Each half now runs 2 mm past the far end.
+BORE_CUT_OVERRUN = 2.0
+BORE_CUT_DEPTH = 2.0 * (LENGTH + BORE_CUT_OVERRUN)
+
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
@@ -190,7 +198,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "BoreProfile")
     drive_jobs += bore.apply(adapter, "BoreProfile")
     check("cut bore", await adapter.create_cut_extrude(
-        ExtrusionParameters(depth=LENGTH + 4.0, both_directions=True)))
+        ExtrusionParameters(depth=BORE_CUT_DEPTH, both_directions=True)))
     name_last_feature(adapter, "Bore")
     v_bore = math.pi * (BORE_DIA / 2.0) ** 2 * LENGTH
     volume = await volume_check(adapter, "bore", volume - v_bore, 0.005 * v_bore)

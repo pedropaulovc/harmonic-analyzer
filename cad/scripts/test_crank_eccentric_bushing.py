@@ -170,3 +170,28 @@ def test_the_bore_holds_its_share_of_the_crank_angle_budget() -> None:
     assert "controls=GEOMETRIC_CONTROLS" in source
     policy = _policy()
     assert "MHA-149's bore: one diametral parallelism frame" in policy
+
+
+def _mid_plane_cut_spans_the_body(depth: float) -> bool:
+    """A mid-plane cut from the Top plane reaches depth/2 into the body."""
+    return depth / 2.0 > spec.LENGTH
+
+
+def test_the_bore_cut_runs_the_full_length() -> None:
+    """Leaf crankhub-e12b-r1: the bore cut, mid-plane at LENGTH + 4, reached
+    only 42 of the 80 mm.  Removed 13915.6 - 10891.3 = 3024.3 mm^3, which is
+    pi * 4.7875^2 * 42.0 exactly.  The old depth is the positive control."""
+    assert not _mid_plane_cut_spans_the_body(spec.LENGTH + 4.0)
+    assert _mid_plane_cut_spans_the_body(part.BORE_CUT_DEPTH)
+    removed = math.pi * (spec.BORE_DIA / 2.0) ** 2 * ((spec.LENGTH + 4.0) / 2.0)
+    assert removed == pytest.approx(13915.6 - 10891.3, abs=0.2)
+    # The build's expected volume after the bore, from the spec's own sizes:
+    # body pi*7.3^2*80 + head annulus pi*(9^2 - 7.3^2)*6 - bore pi*4.7875^2*80.
+    body = math.pi * (spec.OUTER_DIA / 2.0) ** 2 * spec.LENGTH
+    head = math.pi * ((spec.HEAD_DIA / 2.0) ** 2 - (spec.OUTER_DIA / 2.0) ** 2) * spec.HEAD_LENGTH
+    bore = math.pi * (spec.BORE_DIA / 2.0) ** 2 * spec.LENGTH
+    assert (body, body + head, body + head - bore) == pytest.approx(
+        (13393.2, 13915.6, 8155.1), abs=0.05
+    )
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "depth=BORE_CUT_DEPTH, both_directions=True" in source
