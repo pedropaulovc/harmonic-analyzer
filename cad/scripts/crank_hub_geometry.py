@@ -42,6 +42,14 @@ ARM_THICKNESS = 8.0
 # floors at import.
 ARM_STOCK_THICKNESS_IN = Fraction(5, 16)
 ARM_STOCK_THICKNESS = float(ARM_STOCK_THICKNESS_IN) * MM_PER_IN
+# The arm prints its thickness as a reference to that stock (crank_arm_spec),
+# so the thinnest arm a shop can hand over is the mill's.  On cold-finished
+# flats the WIDTH sets the tolerance for width and thickness alike, and a
+# 1-in-wide bar is held to 0.004 in (OnlineMetals cold-roll steel tolerances,
+# "over 0.75 to 1.5 incl., +/-0.004"; Speedy Metals 1018, "-0.004"; both
+# 2026-09-25).  The minus side is what engagement stacks read.
+ARM_STOCK_MILL_MINUS_IN = Fraction(4, 1000)
+ARM_STOCK_THICKNESS_MIN = float(ARM_STOCK_THICKNESS_IN - ARM_STOCK_MILL_MINUS_IN) * MM_PER_IN
 HUB_SEAT_DIA = round(PHOTO_HUB * PHOTO_MM_PER_UNIT * OUTBOARD_SCALE, 1)
 HUB_BARREL_DIA = ARM_WIDTH
 HUB_SEAT_LENGTH = ARM_THICKNESS

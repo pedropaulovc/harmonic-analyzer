@@ -297,7 +297,44 @@ def test_arm_states_the_mha139_engagement_exception_it_is_tapped_for() -> None:
     assert spec.DRAWING_NOTES.splitlines()[-1] == screw.DRAWING_NOTES.replace(
         "THREAD ENGAGEMENT", "#10-24 THREAD ENGAGEMENT"
     )
-    assert "1.17D MIN: NAMED EXCEPTION TO RULE 12." in spec.DRAWING_NOTES
+    assert "1.15D MIN: NAMED EXCEPTION TO RULE 12." in spec.DRAWING_NOTES
     # The stock line comes from the one stock constant.
     assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
     assert spec.STOCK_NOTE == "25.4 x 8.0 SECTION: 1 x 5/16 IN CF FLAT BAR AS SUPPLIED."
+
+
+def _thinnest_accepted_arm() -> float:
+    """The thinnest MHA-020 an inspector reading this sheet would accept.
+
+    A toleranced 8.0 takes the title block's .X band. A reference (8.0) under
+    the "AS SUPPLIED" stock line leaves the bar's own mill tolerance.
+    """
+    if "Depth" in getattr(spec, "REFERENCE_DIMENSIONS", frozenset()):
+        return geometry.ARM_STOCK_THICKNESS_MIN
+    return spec.ARM_THICKNESS - geometry.GENERAL_1PL_TOL_MM
+
+
+def test_engagement_exception_holds_at_the_thinnest_accepted_arm() -> None:
+    # Codex #892 (PRRT_kwDOPHDy386mMvsy): at a printed 8.0 +/-0.8 an arm
+    # accepted at 7.2 leaves min(8.0, 7.2 - 0.25) - 2.01 = 4.94 = 1.02D, under
+    # both the note's 1.17D and U33b's 1.15D floor.
+    import crank_handle_pivot_screw_spec as screw
+
+    thinnest = _thinnest_accepted_arm()
+    worst = (
+        min(screw.FULL_THREAD_REACH_MIN, thinnest - screw.TAP_EXIT_BREAK)
+        - screw.RELIEF_WIDTH_MAX
+    )
+    assert worst >= screw.ENGAGEMENT_FLOOR, (thinnest, worst / screw.THREAD_MODEL_DIA)
+    # The note never claims more than the thinnest accepted arm delivers.
+    assert screw.FULL_THREAD_WORST == pytest.approx(worst)
+    assert screw.FULL_THREAD_WORST_DIAMETERS_PRINTED <= worst / screw.THREAD_MODEL_DIA
+
+
+def test_arm_thickness_prints_as_a_reference_to_the_supplied_stock() -> None:
+    # The stock line governs the thickness (the U41 platform precedent), so
+    # the 8.0 is parenthesised rather than taking the .X band.
+    assert spec.REFERENCE_DIMENSIONS == {"Depth"}
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_named(adapter, right_annotations, name)" in source
+    assert 'label="arm stock thickness"' in source

@@ -98,6 +98,12 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 ARM_END_X = ARM_C2C + SQUARE_END_OVERHANG
 HALF_WIDTH = ARM_WIDTH / 2.0
 
+# The thickness prints as a reference, (8.0), under the stock line's "AS
+# SUPPLIED": the bar's mill tolerance governs it, not the title block's .X
+# band, which would accept a 7.2 arm and a 1.02D MHA-139 engagement (Codex
+# #892; the U41 platform precedent).
+REFERENCE_DIMENSIONS = {"Depth"}
+
 # Marked dimensions imported by the drawing.  The punch and axial seam groove
 # are assembly-match features, so their representation geometry carries no
 # independent size or location dimension.

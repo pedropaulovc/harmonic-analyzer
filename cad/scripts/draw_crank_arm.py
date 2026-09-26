@@ -65,6 +65,7 @@ from crank_arm_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
+    REFERENCE_DIMENSIONS,
     HALF_WIDTH,
     HANDLE_PIVOT_HOLE_SPEC,
     HUB_SEAT_DIA,
@@ -338,6 +339,11 @@ async def build(adapter: Any) -> dict[str, str]:
     # The part authored every displayed decimal place.  The hub seat bore
     # remains a one-place reference nominal: MHA-137 is turned to suit it.
     assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
+    # The thickness is the supplied stock's (the stock note governs it).
+    for name in sorted(REFERENCE_DIMENSIONS):
+        set_reference_dimension(
+            adapter, _named(adapter, right_annotations, name), label="arm stock thickness"
+        )
     _hub_seat_leader_clear(adapter, front_annotations)
     _texts_off_the_part(adapter, front_annotations)
 
