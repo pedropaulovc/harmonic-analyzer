@@ -373,7 +373,8 @@ under the same rule and that counts under the family rule. A record that is not 
 machinist_review record (unparseable, missing or mistyped fields, an unknown
 reviewer, a naive time), including a quota report whose refusal cannot be read, is listed
 as malformed and ignored, never fatal. So is a malformed backfill cache: it is
-dropped and the run starts cold. A newer failing
+dropped and the run starts cold. A named search root that is not a directory
+is refused, so a typo cannot read as "no SHIP on record". A newer failing
 verdict that reviewed the same sheets, or whose reviewed PDF is lost, blocks
 the older `SHIP`, and `--apply` drops a recorded entry it contradicts. Only a
 verdict the gate would weigh objects: a blind review of the registry drawing

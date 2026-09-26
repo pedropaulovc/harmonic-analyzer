@@ -2513,9 +2513,17 @@ def review_record_problem(review: dict[str, Any]) -> str | None:
     return None
 
 
-# Top-level keys only a machinist_review record carries (a ledger nests its
-# entries under "drawings", so it is not mistaken for a broken review).
-_REVIEW_KEYS = {"verdict", "sources", "source_sha256", "reviewer", "sheet_count"}
+# Top-level keys a machinist_review record carries; two or more make a JSON
+# review-shaped, so a broken one is listed rather than skipped.  A ledger nests
+# its entries under "drawings", so it is not mistaken for a broken review.
+_REVIEW_KEYS = {
+    "verdict",
+    "sources",
+    "source_sha256",
+    "prompt_sha256",
+    "reviewer",
+    "sheet_count",
+}
 
 
 def find_reviews(roots: Sequence[Path], cache: BackfillCache | None = None) -> Found:
@@ -2539,15 +2547,17 @@ def find_reviews(roots: Sequence[Path], cache: BackfillCache | None = None) -> F
             text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        if '"prompt_sha256"' not in text:
+        # A cheap pre-filter: every machinist_review record hashes its sources,
+        # and an old one may predate prompt hashing -- so either key admits it.
+        if '"source_sha256"' not in text and '"prompt_sha256"' not in text:
             continue
         try:
             review = json.loads(text)
         except json.JSONDecodeError as exc:
             malformed.append((path, f"not valid JSON: {exc}"))
             continue
-        if not isinstance(review, dict) or not _REVIEW_KEYS & review.keys():
-            continue  # another record that mentions a prompt (a ledger, a manifest)
+        if not isinstance(review, dict) or len(_REVIEW_KEYS & review.keys()) < 2:
+            continue  # another record that mentions a digest (a ledger, a manifest)
         if "reviewer" not in review:
             malformed.append((path, "reviewer is missing"))
             continue
@@ -2914,6 +2924,12 @@ def backfill(
     unknown = sorted((excluded | set(rulings.drawings)) - set(DRAWINGS_BY_NAME))
     if unknown:
         raise ValueError(f"unknown drawing names: {unknown}")
+    missing = [root for root in roots if not Path(root).is_dir()]
+    if missing:  # a typo must not read as "no SHIP on record" everywhere
+        raise ValueError(
+            "search roots that are not directories: "
+            + ", ".join(Path(root).as_posix() for root in missing)
+        )
     if checkout is not None:
         problem = checkout_metadata_problem(checkout)
         if problem:

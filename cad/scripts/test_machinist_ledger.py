@@ -2506,6 +2506,7 @@ def _author_rulings(
         {"extra": {"evidence": ["not an object"]}},
         {"extra": {"evidence": {"effective_prompt": 7}}},
         {"passed": False},  # a SHIP whose flag says it failed
+        {"prompt_sha256": None},  # an old record from before prompts were hashed
     ],
     ids=[
         "no-time",
@@ -2517,6 +2518,7 @@ def _author_rulings(
         "evidence-list",
         "prompt-not-text",
         "passed-contradicts-verdict",
+        "no-prompt-sha",
     ],
 )
 def test_a_malformed_record_is_listed_not_fatal_to_the_backfill(
@@ -2731,6 +2733,23 @@ def test_a_broken_review_record_is_listed_not_silently_dropped(
     )
 
     assert [path for path, _ in result.malformed] == ([broken] if listed else [])
+
+
+@pytest.mark.parametrize("kind", ["missing", "a-file"])
+def test_a_search_root_that_is_not_a_directory_is_refused(
+    tmp_path: Path, records: Path, kind: str
+) -> None:
+    root = tmp_path / "dt-logs-typo"
+    if kind == "a-file":
+        root.write_text("not a directory", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="dt-logs-typo"):
+        ml.backfill(
+            [records, root],
+            ledger_path=tmp_path / "ledger.json",
+            cache_path=None,
+            outages={},
+        )
 
 
 def test_upper_case_archive_extensions_are_found(
