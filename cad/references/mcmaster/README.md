@@ -111,8 +111,12 @@ Catalog specifications checked on September 10, 2026:
   axis, a 16 deg lead-in cone to a 1.4605 mm end radius at -Z, and an
   R0.4064 crown blend to a 1.1811 mm end radius at +Z. That is five faces.
   `diag_build_98381A304.py` replays it at nominal diameter, analytically
-  99.943 mm^3 and 139.476 mm^2. There is no `diag_dump_part` harvest yet,
-  and the replica gate has not run on a seat.
+  99.943 mm^3 and 139.476 mm^2. The seat harvest
+  (`cad/out/reports/mcmaster-98381A304-dump.json`) and the replica gate
+  against the vendor file passed on September 26, 2026 with no difference:
+  volume 99.9434 mm^3 and area 139.4763 mm^2 on both, 5 faces each with the
+  same face-area multiset, and matching centre of mass
+  (`cad/out/reference/98381A304-replica-report.json`).
   Evidence SHA-256: native SLDPRT
   `35fe64b899c1807f6e88b717a781138962a78c24e92e548b1f0d4b250a27c6cb`.
 
