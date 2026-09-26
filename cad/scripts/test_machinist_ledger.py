@@ -2468,8 +2468,22 @@ def _author_rulings(
         {"verdict": "SHIP"},
         {"sources": "crank-arm.pdf"},
         {"reviewed_at": "2026-09-25T10:00:00"},  # naive: cannot be ordered
+        {"extra": ["not", "an", "object"]},
+        {"extra": {"evidence": ["not an object"]}},
+        {"extra": {"evidence": {"effective_prompt": 7}}},
+        {"passed": False},  # a SHIP whose flag says it failed
     ],
-    ids=["no-time", "no-sha", "verdict-not-object", "sources-not-list", "naive-time"],
+    ids=[
+        "no-time",
+        "no-sha",
+        "verdict-not-object",
+        "sources-not-list",
+        "naive-time",
+        "extra-list",
+        "evidence-list",
+        "prompt-not-text",
+        "passed-contradicts-verdict",
+    ],
 )
 def test_a_malformed_record_is_listed_not_fatal_to_the_backfill(
     tmp_path: Path,
@@ -2588,6 +2602,70 @@ def test_an_incomplete_quota_report_is_listed_not_fatal(
     assert path == refused and missing in problem
     with pytest.raises(ValueError, match=missing):
         ml.quota_refusal(refused, name="crank_arm", author_family="claude")
+
+
+@pytest.mark.parametrize(
+    "rel",
+    [
+        "cad/scripts/_drawing_registry.py",
+        "cad/scripts/machinist_review.py",
+        "cad/scripts/prompts/machinist_review_part.md",
+    ],
+)
+def test_backfill_refuses_a_checkout_whose_review_metadata_differs(
+    tmp_path: Path, records: Path, rel: str
+) -> None:
+    checkout = tmp_path / "other-branch"
+    for source in (
+        "cad/scripts/_drawing_registry.py",
+        "cad/scripts/machinist_review.py",
+        *(
+            path.relative_to(ml.REPO_ROOT).as_posix()
+            for path in ml.PROMPTS_DIR.iterdir()
+            if path.is_file()
+        ),
+    ):
+        target = checkout / source
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ml.REPO_ROOT / source).read_bytes())
+    (checkout / rel).write_text("# another branch's copy\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=rel.rsplit("/", 1)[-1]):
+        ml.backfill(
+            [records],
+            checkout=checkout,
+            ledger_path=tmp_path / "ledger.json",
+            cache_path=None,
+            outages={},
+        )
+
+
+def test_backfill_refuses_a_checkout_whose_rubric_history_differs(
+    tmp_path: Path, records: Path
+) -> None:
+    # Same files, but not the same committed rubric versions (no history at all).
+    checkout = tmp_path / "copy"
+    for source in (
+        "cad/scripts/_drawing_registry.py",
+        "cad/scripts/machinist_review.py",
+        *(
+            path.relative_to(ml.REPO_ROOT).as_posix()
+            for path in ml.PROMPTS_DIR.iterdir()
+            if path.is_file()
+        ),
+    ):
+        target = checkout / source
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ml.REPO_ROOT / source).read_bytes())
+
+    with pytest.raises(ValueError, match="committed rubric versions"):
+        ml.backfill(
+            [records],
+            checkout=checkout,
+            ledger_path=tmp_path / "ledger.json",
+            cache_path=None,
+            outages={},
+        )
 
 
 def test_backfill_needs_a_ruling_where_no_trailer_names_the_author(

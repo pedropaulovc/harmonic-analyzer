@@ -398,7 +398,10 @@ outage in `cad/reviews/outages.json` directed it, but never as one half of a
 `both_families` drawing: there it is filed as that family's half, and the
 other family still has to review. The command is a
 dry run that prints a per-drawing table unless given `--apply`, and it must run
-against a render of the head being released (`--checkout`).
+against a render of the head being released (`--checkout`). A checkout whose
+drawing registry, prompt builder, prompt files or committed rubric history
+differ from the worktree running the command is refused; run that checkout's
+own copy of the tool instead.
 A review, and a ledger match, is always judged against the release render.
 Renders of the same drawing from different hosts can differ in ink (glyph
 rasterization in view labels, for one: the #857 screw sheet had digest

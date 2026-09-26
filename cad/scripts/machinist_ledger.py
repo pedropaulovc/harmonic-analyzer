@@ -1132,15 +1132,17 @@ def outage_problem(
 
 
 @functools.cache
-def standard_rubrics(kind: str) -> tuple[str, ...]:
+def standard_rubrics(kind: str, repo: Path = REPO_ROOT) -> tuple[str, ...]:
     """Every committed version of the standard rubric for a ``kind`` package."""
     rel = (PROMPTS_DIR / f"machinist_review_{kind}.md").relative_to(REPO_ROOT)
-    commits = (_git("log", "--format=%H", "--", rel.as_posix()) or "").split()
+    commits = (
+        _git("log", "--format=%H", "--", rel.as_posix(), repo=repo) or ""
+    ).split()
     if not commits:
         return ()
     # One process for every version: a git spawn costs ~70 ms on Windows.
     proc = subprocess.run(
-        ["git", "-C", str(REPO_ROOT), "cat-file", "--batch"],
+        ["git", "-C", str(repo), "cat-file", "--batch"],
         input="".join(f"{commit}:{rel.as_posix()}\n" for commit in commits).encode(),
         capture_output=True,
         check=False,
@@ -2477,8 +2479,23 @@ def review_record_problem(review: dict[str, Any]) -> str | None:
             return f"{key} is not true or false"
     if not isinstance(review.get("sheet_count"), int):
         return "sheet_count is not a number"
+    extra = review.get("extra")
+    if extra is not None and not isinstance(extra, dict):
+        return "extra is not an object"
+    evidence = (extra or {}).get("evidence")
+    if evidence is not None and not isinstance(evidence, dict):
+        return "extra.evidence is not an object"
+    prompt = (evidence or {}).get("effective_prompt")
+    if prompt is not None and not isinstance(prompt, str):
+        return "extra.evidence.effective_prompt is not text"
     when = _aware_time_problem(review.get("reviewed_at"))
-    return f"reviewed_at {when}" if when else None
+    if when:
+        return f"reviewed_at {when}"
+    try:
+        verdict_passes(review)  # the verdict is valid and its passed flag agrees
+    except (KeyError, TypeError, ValueError) as exc:
+        return str(exc)
+    return None
 
 
 def find_reviews(roots: Sequence[Path], cache: BackfillCache | None = None) -> Found:
@@ -2798,6 +2815,52 @@ def _try(
     )
 
 
+REVIEW_METADATA = (
+    "cad/scripts/_drawing_registry.py",
+    "cad/scripts/machinist_review.py",
+)
+
+
+def _normalized(path: Path) -> bytes:
+    return path.read_bytes().replace(b"\r\n", b"\n")
+
+
+def checkout_metadata_problem(checkout: Path) -> str | None:
+    """Why this worktree cannot judge ``checkout``; None when it can.
+
+    Backfill reads the registry (drawing names, PDF names, draw scripts) and
+    the committed rubric versions from the worktree it runs in.  Judging
+    another checkout is sound only where those are the same there: the same
+    registry and prompt builder, the same prompt files and the same rubric
+    history.  Otherwise run that checkout's own copy of this tool.
+    """
+    if checkout.resolve() == REPO_ROOT.resolve():
+        return None
+    prompts = PROMPTS_DIR.relative_to(REPO_ROOT).as_posix()
+    ours = sorted(path.name for path in PROMPTS_DIR.iterdir() if path.is_file())
+    their_dir = checkout / prompts
+    theirs = (
+        sorted(path.name for path in their_dir.iterdir() if path.is_file())
+        if their_dir.is_dir()
+        else []
+    )
+    if ours != theirs:
+        return f"its {prompts} holds {theirs}, this worktree's holds {ours}"
+    for rel in (*REVIEW_METADATA, *(f"{prompts}/{name}" for name in ours)):
+        theirs_file = checkout / rel
+        if not theirs_file.is_file() or _normalized(theirs_file) != _normalized(
+            REPO_ROOT / rel
+        ):
+            return f"its {rel} differs from this worktree's"
+    for kind in sorted({spec.source_kind for spec in DRAWINGS}):
+        if standard_rubrics(kind, checkout) != standard_rubrics(kind):
+            return (
+                f"its committed rubric versions for {kind} packages differ from "
+                "this worktree's"
+            )
+    return None
+
+
 def backfill(
     roots: Sequence[Path],
     *,
@@ -2827,6 +2890,13 @@ def backfill(
     unknown = sorted((excluded | set(rulings.drawings)) - set(DRAWINGS_BY_NAME))
     if unknown:
         raise ValueError(f"unknown drawing names: {unknown}")
+    if checkout is not None:
+        problem = checkout_metadata_problem(checkout)
+        if problem:
+            raise ValueError(
+                f"--checkout {checkout}: {problem}; run that checkout's own "
+                "machinist_ledger.py instead"
+            )
     repo = checkout or REPO_ROOT
     cache = BackfillCache(cache_path)
     with _telemetry.span("backfill.discover", roots=len(roots)) as span:
