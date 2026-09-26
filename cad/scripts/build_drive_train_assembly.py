@@ -2318,6 +2318,16 @@ for _z_strap, _z_hole in zip(
     if abs(PIVOT_SHAFT_Z0 + _z_hole * TORQUE_SHAFT_ROWS[2][2] - _z_strap) > 1e-9:
         raise AssertionError("a strap cross hole is not coaxial with its torque-shaft hole")
 LEVER_ROWS = rot_z_rows(LEVER_TILT_DEG)
+# R1a: the MHA-144 collar's spring pin is the stock MHA-145, whose axis is its
+# local X.  The collar's and MHA-102's pin holes run along their local +Y
+# under ARBOR_ROWS, so the pin turns a further 90 about Z; its centre is the
+# arbor's printed pin station, where the collar's centred hole lands.
+COLLAR_PIN_ROWS = rot_z_rows(HANDLE_TILT_DEG + 90.0)
+COLLAR_PIN_Z = ARBOR_COLLAR_Z0 + ARBOR_COLLAR_PIN_Z
+if any(abs(a - b) > 1e-9 for a, b in zip(COLLAR_PIN_ROWS[0], ARBOR_ROWS[1])):
+    raise AssertionError("collar spring pin axis is not the arbor's pin-hole axis")
+if abs(COLLAR_PIN_Z - (ARBOR_Z0 + ARBOR_PIN_Z)) > 1e-9:
+    raise AssertionError("collar pin hole is off the arbor's pin station")
 PINION_CAM_ROWS = IDENTITY
 # Rod Top-plane normal (local +Y) against the assembly Right normal (+X): the
 # freed pinion_cam spin's rest dihedral -- 90 + LEVER_TILT_DEG.
@@ -2845,6 +2855,16 @@ async def build(adapter) -> dict[str, str]:
         ARBOR_ROWS,
         ground=False,
         label="pinion-arbor-collar (spring-pinned walk-out backstop)",
+    )
+    # Its MHA-145 spring pin through collar and arbor.
+    collar_pin = await place_component(
+        adapter,
+        "pinion-strap-pin",
+        [APINION_X, APINION_Y, COLLAR_PIN_Z],
+        euler_from_rows(COLLAR_PIN_ROWS),
+        COLLAR_PIN_ROWS,
+        ground=False,
+        label="pinion-strap-pin collar (MHA-145 through MHA-144 and MHA-102)",
     )
     # Rig hold-downs (PR7 items 2/11/12): physically located seeds are patterned
     # across the repeated block/pedestal stations in the joints section below.
@@ -4407,6 +4427,14 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{arbor_collar}", "PLANE"),
         named_ref(f"Front Plane@{pinion_arbor}", "PLANE"),
         label="arbor collar spring-pinned to the arbor",
+    )
+    # Its pin is line-to-line in both 1/16 holes (no interference row, as the
+    # strap pins) and rides the collar.
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{collar_pin}", "PLANE"),
+        named_ref(f"Front Plane@{arbor_collar}", "PLANE"),
+        label="collar spring pin locked in the collar",
     )
 
     # DRIVER #1 (the single machine input): the crank angle. The arm hangs at
