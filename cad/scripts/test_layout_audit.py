@@ -2315,3 +2315,44 @@ def test_a_tables_own_grid_line_is_not_a_line_through_its_text():
     )
     findings = audit_dump(dump)
     assert not [f for f in findings if f.kind == "text-on-line"]
+
+
+def test_a_rotated_runs_height_is_its_cap_height_not_its_length():
+    """Codex P2 on 7f8ad69fc: a vertical dimension's printed glyph box is the
+    string's length tall; the run's cap height stays the COM height."""
+    from _layout_audit import text_height
+
+    dim = _dim("Height", "12.50", 0.100, 0.100)
+    dim["display"]["texts"][0]["ang"] = math.pi / 2
+    printed = Box(0.0985, 0.1000, 0.1020, 0.1150)
+    geometry = annotation_geometry(dim, owner="v", advance=0.6, ink={0: printed})
+    assert text_height(geometry) == pytest.approx(0.0035)
+
+
+def test_reciprocal_dimension_crossings_are_one_finding_the_worse():
+    """Codex P2 on 7f8ad69fc: A's line over B's extension line and B's line
+    over A's were two findings for one pair; the gating one must win."""
+    from _layout_audit import find_dimension_line_crossings
+    from _layout_geometry import AnnotationGeometry, SheetGeometry
+
+    def dim(label, line_y, ext_x, text):
+        return AnnotationGeometry(
+            label,
+            "dim",
+            "v",
+            (text,),
+            (
+                Segment(0.100, line_y, 0.140, line_y, "dim-line"),
+                Segment(ext_x, 0.090, ext_x, 0.130, "ext-line"),
+            ),
+        )
+
+    far_a = dim("A", 0.100, 0.105, Box(0.300, 0.200, 0.310, 0.2035))
+    far_b = dim("B", 0.120, 0.135, Box(0.300, 0.220, 0.310, 0.2235))
+    sheet = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (far_a, far_b), 0.6)
+    assert [f.kind for f in find_dimension_line_crossings(sheet)] == ["dim-line-crosses-extension"]
+    # B's text sits at A's line crossing B's extension line (0.135, 0.100).
+    near_b = dim("B", 0.120, 0.135, Box(0.136, 0.101, 0.146, 0.1045))
+    sheet = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (far_a, near_b), 0.6)
+    [finding] = find_dimension_line_crossings(sheet)
+    assert (finding.kind, finding.a, finding.b) == ("dim-line-crosses-extension-at-text", "A", "B")
