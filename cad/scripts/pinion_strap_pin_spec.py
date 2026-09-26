@@ -14,6 +14,8 @@ and shaft specs read it, the drive-train assembly never does.
 
 from __future__ import annotations
 
+import math
+
 from _fit_limits import SHAFT_H
 from _printed_tolerance import printed_deviations
 from pinion_bracket_geometry import (
@@ -60,10 +62,6 @@ if not (0.062 * INCH <= HOLE_DIA and HOLE_MAX <= 0.065 * INCH):
 # which the sheet's DRAWING_PRECISION also reads (restricted review).
 _THICKNESS_LOWER = printed_deviations(THICKNESS, THICKNESS_PLACES)[0]
 _CROSS_HOLE_CZ_UPPER = printed_deviations(THICKNESS / 2.0, CROSS_HOLE_CZ_PLACES)[1]
-_BORE_WALL_OFFSET_MAX = max(
-    abs(d)
-    for d in printed_deviations(PIVOT_BORE / 2.0, CROSS_HOLE_FROM_BORE_WALL_PLACES)
-)
 _R_END_LOWER = printed_deviations(R_END, END_RADIUS_PLACES)[0]
 
 # Web from the cross hole to the FAR broad face (Codex #858 P2).  MHA-056
@@ -82,15 +80,30 @@ FOLLOWER_SEAT_LIGAMENT = abs(PIN_DROP) - HOLE_MAX / 2.0 - PIN_BORE / 2.0
 # Shaft wall beside the match-drilled hole.  The hole must cross the shaft
 # axis: an offset e from it thins one side by e.  MHA-056 prints the strap
 # hole's height as its distance from the pivot-bore wall (the model's own
-# "PivotBore" / 2 reference, Codex #858 P2 user ruling (a)) at .XX, so the
-# offset is read against the full general .XX grade -- the worst case below,
-# which still clears the 1.5 floor, so no tighter band (and no position
-# frame, which rule 3 bars on a bracket) is needed.  A V-block set-up holding
-# 0.25 leaves SHAFT_LIGAMENT_QUARTER.
+# "PivotBore" / 2 reference, Codex #858 P2 user ruling (a)), so e is that
+# dimension's band plus the rounding of its 3.175 nominal at .XX.  At the
+# general .XX grade (+/-0.51) the wall came to 1.83, under the 2.0 web target
+# (Codex #858, PRRT_kwDOPHDy386mTvki), and no geometry is free to grow it:
+# the shaft is the ruled 1/4 in, the pin the smallest B18.8.2 size, and the
+# hole band already B18.8.2's window.  So the height carries its own
+# symmetric band, the loosest 0.05 step that keeps the target (no position
+# frame: rule 3 bars one on a bracket).
 # The MHA-062 shaft is the pivot bore's own nominal (a lockstep test pins it).
+SHAFT_LIGAMENT_TARGET = 2.0
 _SHAFT_MIN = PIVOT_BORE + SHAFT_H[1]
 SHAFT_LIGAMENT_CENTRED = (_SHAFT_MIN - HOLE_MAX) / 2.0
-SHAFT_LIGAMENT_QUARTER = SHAFT_LIGAMENT_CENTRED - 0.25
+_BORE_WALL_ROUNDING = abs(
+    round(PIVOT_BORE / 2.0, CROSS_HOLE_FROM_BORE_WALL_PLACES) - PIVOT_BORE / 2.0
+)
+CROSS_HOLE_HEIGHT_TOL = round(
+    math.floor(
+        (SHAFT_LIGAMENT_CENTRED - SHAFT_LIGAMENT_TARGET - _BORE_WALL_ROUNDING) / 0.05
+        + 1e-9
+    )
+    * 0.05,
+    2,
+)
+_BORE_WALL_OFFSET_MAX = CROSS_HOLE_HEIGHT_TOL + _BORE_WALL_ROUNDING
 SHAFT_LIGAMENT_WORST = SHAFT_LIGAMENT_CENTRED - _BORE_WALL_OFFSET_MAX
 # The pin must never stand proud of either strap edge: its west end faces the
 # MHA-104 cam collar with only 0.38 of air at the printed worst case.  The
@@ -108,7 +121,9 @@ if FOLLOWER_SEAT_LIGAMENT < 2.0:
     raise AssertionError(
         f"follower-seat ligament {FOLLOWER_SEAT_LIGAMENT:.2f} is under 2.0"
     )
-if SHAFT_LIGAMENT_WORST < 1.5:
-    raise AssertionError(f"shaft ligament {SHAFT_LIGAMENT_WORST:.2f} is under 1.5")
+if SHAFT_LIGAMENT_WORST < SHAFT_LIGAMENT_TARGET:
+    raise AssertionError(
+        f"shaft ligament {SHAFT_LIGAMENT_WORST:.2f} is under {SHAFT_LIGAMENT_TARGET}"
+    )
 if PIN_BURIED_MARGIN < 0.0:
     raise AssertionError("the longest pin stands proud of the narrowest strap foot")

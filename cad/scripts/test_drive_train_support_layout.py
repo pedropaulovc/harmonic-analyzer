@@ -847,15 +847,18 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     # Engagement in each strap wall past the pivot bore.
     assert pin.PIN_LEN / 2.0 - drive.STRAP_PIVOT_BORE / 2.0 >= 3.0
     # U27 webs: strap faces and follower seat at the 2.0 target (the far
-    # strap face against the .XX-printed station, Codex #858 P2); the shaft
-    # ligament at the FULL general .XX offset meets the 1.5 floor, and a
-    # 0.25 V-block set-up clears the 2.0 target.
+    # strap face against the .XX-printed station, Codex #858 P2).  The shaft
+    # ligament meets the 2.0 target too (Codex #858, PRRT_kwDOPHDy386mTvki):
+    # the general .XX offset left 1.83, so the cross hole's height carries
+    # the loosest 0.05-step band that holds the target, +/-0.30.
     assert math.isclose(pin.STRAP_FACE_WEB_WORST, 2.316, abs_tol=5e-4)
     assert pin.STRAP_FACE_WEB_WORST >= 2.0
     assert pin.FOLLOWER_SEAT_LIGAMENT >= 2.0
-    assert math.isclose(pin.SHAFT_LIGAMENT_WORST, 1.826, abs_tol=5e-4)
-    assert pin.SHAFT_LIGAMENT_WORST >= 1.5
-    assert math.isclose(pin.SHAFT_LIGAMENT_QUARTER, 2.091, abs_tol=5e-4)
+    assert pin.CROSS_HOLE_HEIGHT_TOL == 0.30
+    assert math.isclose(pin.SHAFT_LIGAMENT_WORST, 2.036, abs_tol=5e-4)
+    assert pin.SHAFT_LIGAMENT_WORST >= pin.SHAFT_LIGAMENT_TARGET == 2.0
+    # The next 0.05 step would drop under the target: the band is the loosest.
+    assert pin.SHAFT_LIGAMENT_WORST - 0.05 < pin.SHAFT_LIGAMENT_TARGET
 
 
 def test_mha145_strap_pins_sit_in_both_strap_cross_holes() -> None:

@@ -69,11 +69,13 @@ PIN_SEAT_DIA_BAND = REAM_H7
 # Across the bar the hole sits ON the pivot-bore axis, a relation with no
 # dimension to print, so a hidden construction reference sketch
 # (CrossHoleAxisReference) owns its distance from the pivot-bore wall,
-# CrossHoleFromBoreWall = "PivotBore" / 2, printed at .XX: the
-# SHAFT_LIGAMENT_WORST case.  The diameter carries the spring pin's own
-# functional band (pinion_strap_pin_spec).
+# CrossHoleFromBoreWall = "PivotBore" / 2, printed at .XX with its own
+# symmetric band, CROSS_HOLE_HEIGHT_TOL: the loosest band that keeps
+# SHAFT_LIGAMENT_WORST at the 2.0 target (pinion_strap_pin_spec).  The
+# diameter carries the spring pin's own functional band.
 CROSS_HOLE_DIA = _strap_pin.HOLE_DIA
 CROSS_HOLE_BAND = _strap_pin.HOLE_BAND
+CROSS_HOLE_HEIGHT_TOL = _strap_pin.CROSS_HOLE_HEIGHT_TOL
 # The pin is its own BOM line (MHA-145), so the callout names it
 # instead of supplying one loose with each strap; test_pinion_bracket_drawing
 # keeps the number in step with the parts registry.

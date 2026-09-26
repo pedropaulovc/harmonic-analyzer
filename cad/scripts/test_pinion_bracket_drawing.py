@@ -79,11 +79,15 @@ def test_every_band_traces_to_a_named_fit_class() -> None:
         ("StrapProfile", "ArborBoreDia"): "*deviations(ARBOR_BORE_BAND)",
         ("PinSeatProfile", "PinSeatDia"): "*deviations(PIN_SEAT_DIA_BAND)",
         ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_BAND)",
-        # The one band that is not a fit: user ruling (a) tightened the seat's
-        # printed station for its far-face web (PIN_SEAT_WEB_WORST).
+        # The two bands that are not fits: user ruling (a) tightened the seat's
+        # printed station for its far-face web (PIN_SEAT_WEB_WORST), and the
+        # cross hole's height is banded for the shaft wall beside the
+        # match-drilled hole (Codex #858, SHAFT_LIGAMENT_WORST).
         ("PinSeatProfile", "PinSeatCz"): "PIN_SEAT_STATION_TOL",
+        ("CrossHoleAxisReference", "CrossHoleFromBoreWall"): "CROSS_HOLE_HEIGHT_TOL",
     }
     assert pinion_bracket_spec.PIN_SEAT_STATION_TOL == 0.10
+    assert pinion_bracket_spec.CROSS_HOLE_HEIGHT_TOL == 0.30
     assert pinion_bracket_spec.PIVOT_BORE_BAND is REAM_SLIDE
     assert pinion_bracket_spec.ARBOR_BORE_BAND is REAM_SLIDE
     assert pinion_bracket_spec.PIN_SEAT_DIA_BAND is REAM_H7
@@ -117,6 +121,13 @@ def test_decimal_places_cover_every_marked_dimension_and_resolve_fit_bands() -> 
             (
                 pinion_bracket_spec.PIN_SEAT_STATION_TOL,
                 -pinion_bracket_spec.PIN_SEAT_STATION_TOL,
+            ),
+        ),
+        (
+            "CrossHoleFromBoreWall",
+            (
+                pinion_bracket_spec.CROSS_HOLE_HEIGHT_TOL,
+                -pinion_bracket_spec.CROSS_HOLE_HEIGHT_TOL,
             ),
         ),
     ):
@@ -347,7 +358,10 @@ _WEB_FLOOR = 1.5
 def _printed_band(name: str) -> float:
     """The half-width a location can wander on the print: its own model band
     when it carries one, else its decimal places' general grade."""
-    own = {"PinSeatCz": pinion_bracket_spec.PIN_SEAT_STATION_TOL}
+    own = {
+        "PinSeatCz": pinion_bracket_spec.PIN_SEAT_STATION_TOL,
+        "CrossHoleFromBoreWall": pinion_bracket_spec.CROSS_HOLE_HEIGHT_TOL,
+    }
     if name in own:
         return own[name]
     return _GENERAL_GRADE[pinion_bracket_spec.DRAWING_PRECISION_BY_NAME[name]]
@@ -433,4 +447,6 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
     # The values the ruling approved.
     assert math.isclose(worst["cross hole far face"], 2.316, abs_tol=5e-4)
     assert math.isclose(worst["seat far face"], 1.544, abs_tol=5e-4)
-    assert math.isclose(worst["shaft wall"], 1.826, abs_tol=5e-4)
+    # Codex #858 (PRRT_kwDOPHDy386mTvki): 1.826 at the general .XX grade,
+    # 2.036 with the cross hole's height banded +/-0.30.
+    assert math.isclose(worst["shaft wall"], 2.036, abs_tol=5e-4)

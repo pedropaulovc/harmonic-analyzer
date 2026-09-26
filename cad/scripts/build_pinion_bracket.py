@@ -90,6 +90,7 @@ from pinion_bracket_spec import (
     ARBOR_BORE_BAND,
     CROSS_HOLE_BAND,
     CROSS_HOLE_DIA,
+    CROSS_HOLE_HEIGHT_TOL,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     PIN_SEAT_DIA_BAND,
@@ -627,6 +628,14 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "CrossHoleProfile", "CrossHoleDia", *deviations(CROSS_HOLE_BAND)
     )
+    # The cross hole's height, banded for the shaft wall beside the
+    # match-drilled hole (pinion_strap_pin_spec.SHAFT_LIGAMENT_WORST).
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "CrossHoleAxisReference",
+        "CrossHoleFromBoreWall",
+        CROSS_HOLE_HEIGHT_TOL,
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -634,6 +643,9 @@ async def build(adapter) -> dict[str, str]:
     # the drawing only reads them back (policy rule 2).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _tolerance_at_dimension_places(adapter, "PinSeatProfile", "PinSeatCz")
+    _tolerance_at_dimension_places(
+        adapter, "CrossHoleAxisReference", "CrossHoleFromBoreWall"
+    )
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
     await apply_material(adapter, MATERIAL)
