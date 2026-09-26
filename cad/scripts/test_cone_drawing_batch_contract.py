@@ -7,6 +7,7 @@ import arbor_pedestal_spec
 import cone_gear_shaft_spec
 import cone_pivot_post_spec
 import cone_tip_block_spec
+import cone_swing_platform_spec
 
 
 SHEETS = (
@@ -14,6 +15,7 @@ SHEETS = (
     ("cone-gear-shaft", cone_gear_shaft_spec),
     ("cone-pivot-post", cone_pivot_post_spec),
     ("cone-tip-block", cone_tip_block_spec),
+    ("cone-swing-platform", cone_swing_platform_spec),
 )
 
 TITLE_BLOCK_OWNED_NOTE_TEXT = (

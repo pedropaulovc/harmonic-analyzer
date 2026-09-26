@@ -257,7 +257,7 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
     edge_norm = math.hypot(edge_x, edge_z)
     edge_x, edge_z = edge_x / edge_norm, edge_z / edge_norm
     disengage_rad = (
-        platform.NOTCH_EXIT_TRAVEL + KNOB_COLLAR_DIA / 2.0 + 2.0
+        platform.NOTCH_EXIT_TRAVEL + KNOB_COLLAR_DIA / 2.0 + platform.DISENGAGE_COLLAR_MARGIN
     ) / platform.SLOT_R
     angle = math.radians(platform.INCLINE_DEG) + disengage_rad
     cos_a, sin_a = math.cos(angle), math.sin(angle)
