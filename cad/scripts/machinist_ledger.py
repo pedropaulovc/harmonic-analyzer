@@ -1493,7 +1493,11 @@ def record_review(
         slot = f"{BOTH_FAMILIES}_{reviewer_family(review['reviewer'])}"
     elif script_author.model is None:  # no trailer: a ruling or the class rule decides
         ruled = ruled_family(name, script_author, rulings)
-        if ruled.family is not None and ruled.family != author_family:
+        if ruled.family is None:
+            raise ValueError(
+                f"{name}: no ruling gives its author family: {ruled.problem}"
+            )
+        if ruled.family != author_family:
             raise ValueError(
                 f"{name}: --author-family {author_family} disagrees with the "
                 f"{ruled.source} ({ruled.family}) for {script_author.script} at "
@@ -1937,7 +1941,9 @@ def _recorded_author_problem(
     ruled = ruled_family(
         name, Author(None, author["commit"], author["script"]), rulings
     )
-    if ruled.family is not None and ruled.family != author["family"]:
+    if ruled.family is None:  # fail closed: the claim rests on no ruling now
+        return f"no ruling gives its author family now: {ruled.problem}"
+    if ruled.family != author["family"]:
         return (
             f"the author rulings now give {ruled.family} ({ruled.source}) for "
             f"{author['script']} at {author['commit'][:12]}, not the recorded "
@@ -2381,7 +2387,7 @@ def _walk(roots: Sequence[Path]) -> Iterable[tuple[Path, int, int]]:
             if entry.is_dir(follow_symlinks=False):
                 if entry.name not in _WALK_SKIP:
                     pending.append(Path(entry.path))
-            elif entry.name.endswith((".json", ".pdf")):
+            elif entry.name.lower().endswith((".json", ".pdf")):
                 stat = entry.stat()
                 yield Path(entry.path), stat.st_size, stat.st_mtime_ns
 
@@ -2507,6 +2513,11 @@ def review_record_problem(review: dict[str, Any]) -> str | None:
     return None
 
 
+# Top-level keys only a machinist_review record carries (a ledger nests its
+# entries under "drawings", so it is not mistaken for a broken review).
+_REVIEW_KEYS = {"verdict", "sources", "source_sha256", "reviewer", "sheet_count"}
+
+
 def find_reviews(roots: Sequence[Path], cache: BackfillCache | None = None) -> Found:
     """Every machinist_review record under ``roots``: verdicts and quota refusals."""
     by_pdf = {spec.outputs["pdf"].name: name for name, spec in DRAWINGS_BY_NAME.items()}
@@ -2517,7 +2528,7 @@ def find_reviews(roots: Sequence[Path], cache: BackfillCache | None = None) -> F
     pdfs = _PdfIndex(cache)
     seen: set[Path] = set()
     for path, size, mtime_ns in _walk(roots):
-        if path.suffix == ".pdf":
+        if path.suffix.lower() == ".pdf":
             pdfs.add(path, size, mtime_ns)
             continue
         resolved = path.resolve()
@@ -2532,9 +2543,13 @@ def find_reviews(roots: Sequence[Path], cache: BackfillCache | None = None) -> F
             continue
         try:
             review = json.loads(text)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as exc:
+            malformed.append((path, f"not valid JSON: {exc}"))
             continue
-        if not isinstance(review, dict) or "reviewer" not in review:
+        if not isinstance(review, dict) or not _REVIEW_KEYS & review.keys():
+            continue  # another record that mentions a prompt (a ledger, a manifest)
+        if "reviewer" not in review:
+            malformed.append((path, "reviewer is missing"))
             continue
         verdict = review.get("verdict")
         if verdict is None:

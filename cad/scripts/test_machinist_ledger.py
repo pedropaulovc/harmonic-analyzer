@@ -915,6 +915,40 @@ def test_a_recorded_author_is_rechecked_against_the_current_author_rulings(
     assert "author rulings now give gpt" in status.detail
 
 
+def test_an_entry_whose_author_no_ruling_covers_now_does_not_count(
+    tmp_path: Path, registry: Path
+) -> None:
+    pdf = _sheet(registry)  # its draw commit names no model
+    ledger_path = tmp_path / "ledger.json"
+    claude = ml.load_author_rulings(_author_rulings(tmp_path, family="claude"))
+    ml.record_review(
+        _review(pdf),
+        pdf,
+        author_family="claude",
+        provenance={},
+        ledger_path=ledger_path,
+        rulings=claude,
+    )
+
+    # The ruling is withdrawn and no class rule stands in: the claimed family
+    # is on nobody's authority now.
+    [status] = ml.check(
+        ["crank_arm"], ledger_path=ledger_path, rulings=ml.AuthorRulings()
+    )
+
+    assert status.state == ml.State.UNREVIEWED
+    assert "no ruling" in status.detail
+    with pytest.raises(ValueError, match="no ruling"):
+        ml.record_review(
+            _review(pdf),
+            pdf,
+            author_family="claude",
+            provenance={},
+            ledger_path=tmp_path / "other.json",
+            rulings=ml.AuthorRulings(),
+        )
+
+
 def test_a_last_resort_entry_is_rechecked_not_trusted_by_its_counts_flag(
     tmp_path: Path, registry: Path, monkeypatch
 ) -> None:
@@ -2666,6 +2700,49 @@ def test_backfill_refuses_a_checkout_whose_rubric_history_differs(
             cache_path=None,
             outages={},
         )
+
+
+@pytest.mark.parametrize(
+    ("text", "listed"),
+    [
+        ('{"prompt_sha256": "abc", "verdict": ', True),  # truncated
+        ('{"prompt_sha256": "abc", "name": "crank_arm", "verdict": {}}', True),
+        ('{"drawings": {"x": {"prompt_sha256": "abc"}}, "fingerprint": {}}', False),
+    ],
+    ids=["truncated", "no-reviewer", "a-ledger-not-a-review"],
+)
+def test_a_broken_review_record_is_listed_not_silently_dropped(
+    tmp_path: Path,
+    registry: Path,
+    records: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    text: str,
+    listed: bool,
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    _on_record(records, "wt-good")
+    broken = records / "wt-bad" / "crank_arm.json"
+    broken.parent.mkdir(parents=True)
+    broken.write_text(text, encoding="utf-8")
+    _sheet(registry)
+
+    result = ml.backfill(
+        [records], ledger_path=tmp_path / "ledger.json", cache_path=None, outages={}
+    )
+
+    assert [path for path, _ in result.malformed] == ([broken] if listed else [])
+
+
+def test_upper_case_archive_extensions_are_found(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    _on_record(records, "wt-a", pdf_name="CRANK-ARM.PDF")
+    report = records / "wt-a" / "cad" / "out" / "reports" / "machinist-review"
+    (report / "crank_arm.json").rename(report / "CRANK_ARM.JSON")
+    _sheet(registry)
+
+    assert _backfill(tmp_path, records).outcome == ml.Backfill.INGESTED
 
 
 def test_backfill_needs_a_ruling_where_no_trailer_names_the_author(

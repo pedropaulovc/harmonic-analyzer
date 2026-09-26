@@ -351,7 +351,8 @@ nothing. A finding with no recorded ruling keeps the drawing failing.
 drawing whose current PDF matches no accepted, counting review. Each recorded
 entry is re-proved every time the gate reads it, never taken from its `counts`
 flag or an id alone: the author family under the author rulings in force (an
-untrailered commit's corrected ruling changes it; a trailer cannot), the family
+untrailered commit's corrected ruling changes it, and one no ruling covers any
+longer does not count; a trailer cannot change), the family
 rule, a last resort's refusal evidence and tier rule, an outage fallback
 against the current record of its outage, and each cited ruling still being a
 row on that drawing. A malformed entry does not
@@ -369,8 +370,8 @@ the ledger is entered with `machinist_ledger.py ingest <verdict.json>
 under the roots. It finds the exact PDF each one reviewed by sha256 wherever it
 now lives, and ingests the newest `SHIP` whose sheets match the current render
 under the same rule and that counts under the family rule. A record that is not a
-machinist_review record (missing or mistyped fields, an unknown reviewer, a
-naive time), including a quota report whose refusal cannot be read, is listed
+machinist_review record (unparseable, missing or mistyped fields, an unknown
+reviewer, a naive time), including a quota report whose refusal cannot be read, is listed
 as malformed and ignored, never fatal. So is a malformed backfill cache: it is
 dropped and the run starts cold. A newer failing
 verdict that reviewed the same sheets, or whose reviewed PDF is lost, blocks
