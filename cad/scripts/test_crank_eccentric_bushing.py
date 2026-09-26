@@ -109,12 +109,16 @@ def test_part_and_spec_share_one_dimension_contract() -> None:
     }
 
 
-def test_notes_identify_both_mates_and_state_the_exception_without_a_size() -> None:
+def test_notes_identify_both_mates_and_print_no_exception_or_size() -> None:
+    """Exception and ruling provenance never prints (fleet ruling 2026-09-26):
+    the thin wall's acceptance lives in the policy row, not on the sheet."""
     text = spec.DRAWING_NOTES
-    assert len(text.splitlines()) == 2
+    assert len(text.splitlines()) == 1
     assert spec.SHAFT_MATE_NUMBER == _config.parts("crankshaft")["number"]
     assert spec.POST_MATE_NUMBER == _config.parts("cone-pivot-post")["number"]
-    assert "ACCEPTED EXCEPTION" in text
+    assert not hasattr(spec, "WALL_EXCEPTION")
+    for internal in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY"):
+        assert internal not in text
     stripped = text.replace(spec.SHAFT_MATE_NUMBER, "").replace(
         spec.POST_MATE_NUMBER, ""
     )
