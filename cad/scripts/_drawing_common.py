@@ -6171,6 +6171,24 @@ async def finalize_drawing(
         )
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
+    # DIAGNOSTIC ONLY (diag/tolstack): sweep tolerance-stack display prefs,
+    # then re-save the declared outputs at the candidate.
+    import traceback
+
+    import _diag_tolstack
+
+    try:
+        _diag_tolstack.sweep(
+            adapter, ddoc, tuple(str(n) for n in sheet_names), outputs.pdf, rebuild_drawing
+        )
+    except Exception:  # noqa: BLE001 - a diagnostic must still ship its log
+        _telemetry.warn("TOLSTACK sweep failed:\n" + traceback.format_exc())
+    if not ddoc.ActivateSheet(sheet_names[0]):
+        raise RuntimeError("failed to restore first drawing sheet after tolstack")
+    rebuild_drawing(adapter, label="tolstack.final")
+    artifacts = save_drawing(adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf))
+    if set(artifacts) != {"drawing", "pdf"}:
+        raise RuntimeError(f"tolstack re-save incomplete: {artifacts!r}")
     # The export just computed every view; the precision flag is truthful now.
     assert_precise_isometric_views(adapter, sheet_names)
     sanitize_pdf_metadata(outputs.pdf, title=pdf_title, expected_pages=len(sheet_names))
