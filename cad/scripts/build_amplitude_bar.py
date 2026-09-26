@@ -59,6 +59,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _saved_part_guard import require_saved_drawing_properties
+from _visibility import blank_reference_geometry
 from amplitude_bar_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -284,6 +285,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     drive_jobs.append(('D1@MidWidth', '"BarWidth" / 2'))
+    blank_reference_geometry(adapter, (("MidWidth", "PLANE"),))
 
     # Apply the deferred drive equations now -- after the whole model + a
     # rebuild exists, so every target (BarProfile + TopPinProfile) resolves.

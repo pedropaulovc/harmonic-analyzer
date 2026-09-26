@@ -20,16 +20,16 @@ from _drawing_common import (
     add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
+    assert_imported_precision,
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
+    offset_dimension_text,
     read_required_properties,
     set_dimension_callouts,
-    set_dimension_precision,
     set_hidden_lines_visible,
-    set_reference_dimension,
     set_reference_dimensions,
     stamp_drawing_summary,
     view_name,
@@ -37,11 +37,13 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
-from cylinder_gear_notes import BORE_FIT_CALLOUT, CAM_AXIAL_FIT_CALLOUT
+from cylinder_gear_notes import BORE_FIT_CALLOUT, STACK_FIT_CALLOUT
 from cylinder_gear_spec import (
     BORE_DIA,
     CAM_DIA,
     CAM_THICKNESS,
+    DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     ECCENTRICITY,
     FACE_WIDTH,
     NOTCH_CENTER_X,
@@ -80,19 +82,23 @@ NOTCH_DETAIL_CENTER = (0.060, 0.155)
 NOTCH_DETAIL_SCALE = (6, 1)
 NOTCH_DETAIL_RADIUS_MM = 4.0
 NOTCH_DETAIL_DIMENSIONS = {
-    "NotchWidth": (0.060, 0.188),
+    "NotchWidth": (0.092, 0.188),
     "NotchDepth": (0.025, 0.155),
 }
 
+# The bore-fit note sits LEFT of the notch's vertical, so its leader leaves
+# the bore clear of the notch-phase extension lines.  The cam diameter is
+# dropped outside the gear's lower-right quadrant: its diagonal no longer
+# crosses the bore-fit leader, and the phase text keeps the clear upper lane.
 FRONT_KEEP = {
-    "BoreDia": (0.065, 0.360),
-    "CamDia": (0.175, 0.325),
+    "BoreDia": (0.056, 0.336),
+    "CamDia": (0.175, 0.235),
     "CamCy": (0.175, 0.279),
-    "NotchPhase": (0.140, 0.338),
+    "NotchPhase": (0.152, 0.334),
 }
 RIGHT_KEEP = {
     "FaceWidth": (0.205, 0.220),
-    "CamThickness": (0.205, 0.360),
+    "OverallThickness": (0.205, 0.360),
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_FIT_CALLOUT,
@@ -100,15 +106,8 @@ DIMENSION_CALLOUTS = {
     "NotchDepth": "FROM OD",
     "NotchPhase": "NOTCH CCW FROM CAM LOBE",
 }
-DIMENSION_PRECISION = {
-    "BoreDia": 3,
-    "CamDia": 2,
-    "FaceWidth": 2,
-    "CamCy": 3,
-    "CamThickness": 1,
-    "NotchWidth": 2,
-    "NotchDepth": 1,
-}
+# Decimal places are the part's (cylinder_gear_spec.DRAWING_PRECISION,
+# applied by build_cylinder_gear); the sheet only reads them back.
 
 
 def _project_mm(
@@ -288,10 +287,17 @@ def _checked_edge_dimension(
     text_xy: tuple[float, float],
     label: str,
     expected_mm: float,
-    precision: int,
     orientation: str,
 ) -> Any:
-    """Add one source-geometry dimension and verify its value and precision."""
+    """Add one SHEET-derived reference dimension and verify its value and places.
+
+    Every controlling dimension is a model dimension whose places the part
+    authored and ``assert_imported_precision`` reads back; the one dimension
+    built here is the parenthesised cam thickness (the stacking thickness less
+    the face width, #743), a read-only difference with no model dimension to
+    import, so its places come from the spec's
+    ``DRAWING_REFERENCE_PRECISION`` keyed by ``label`` -- never a literal.
+    """
     display = add_edge_dimension(
         adapter,
         view,
@@ -308,12 +314,46 @@ def _checked_edge_dimension(
         raise RuntimeError(
             f"{label}: measured {measured_mm:g}, expected {expected_mm:g} mm"
         )
-    display.SetPrecision3(precision, -1, -1, -1)
-    if int(display.GetPrimaryPrecision2()) != precision:
+    places = DRAWING_REFERENCE_PRECISION[label]
+    # -1: swDimensionPrecisionSettings_e do-not-change for the dual and both
+    # tolerance places.  The subscript is written out again because
+    # _drawing_contract only accepts a spec lookup here.
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != places:
         raise RuntimeError(
-            f"{label}: precision {display.GetPrimaryPrecision2()} != {precision}"
+            f"{label}: precision {display.GetPrimaryPrecision2()} != {places}"
         )
     return display
+
+
+def _leader_outside_arrow(adapter: Any, annotations: list[Any], name: str) -> None:
+    """Show diameter ``name`` as one outside arrow on the rim, no diametral line.
+
+    Inside arrows draw the dimension line right across the circle, through the
+    gear centre -- where every leader to the eccentric bore from the note
+    lanes above has to cross it (codex iter4).  Outside arrows plus hidden
+    diametral leaders keep the value and its band while leaving a single
+    leader to the rim (draw_tube_frame's OD reference does the same).
+    """
+    matches = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == name
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.ArrowSide = 1  # swDimArrowsOutside
+    display.SetSecondArrow(False, False)
+    display.LeaderVisibility = 3  # swLeaderLineNone; keep only the rim arrow
+    if (
+        int(display.ArrowSide) != 1
+        or bool(display.GetUseDocSecondArrow())
+        or bool(display.GetSecondArrow())
+        or int(display.LeaderVisibility) != 3
+    ):
+        raise RuntimeError(f"{name} did not keep its single outside arrow")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -389,60 +429,77 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     annotations = [*front_annotations, *right_annotations, *detail_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
+    # Every place the part authored (policy rule 2) must have survived the
+    # import: a dimension that fell back to the sheet default would print a
+    # band nobody specified.
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, {"BoreDia"})
-    cam_thickness_annotations = [
+    # Keep the controlled face-width value while moving only its text outside
+    # the side-view extension lines; the offset leader returns to the dimension.
+    offset_dimension_text(
+        adapter,
+        right_annotations,
+        {"FaceWidth": (0.225, 0.220)},
+    )
+    _leader_outside_arrow(adapter, front_annotations, "CamDia")
+    overall_annotations = [
         annotation
         for annotation in right_annotations
-        if dimension_name(adapter, annotation) == "CamThickness"
+        if dimension_name(adapter, annotation) == "OverallThickness"
     ]
-    if len(cam_thickness_annotations) != 1:
-        raise RuntimeError("expected one cam thickness reference dimension")
-    cam_thickness_display = set_reference_dimension(
-        adapter, cam_thickness_annotations[0], label="cam thickness reference"
+    if len(overall_annotations) != 1:
+        raise RuntimeError("expected one overall (stacking) thickness dimension")
+    overall_display = _early_bound(
+        overall_annotations[0].GetSpecificAnnotation(), "IDisplayDimension"
     )
-    # Keep the fit with the nominal in the linear dimension's primary text.
-    # Its callout-above slot did not render in the native export.
-    cam_thickness_prefix = f"{CAM_AXIAL_FIT_CALLOUT}\n("
-    cam_thickness_display.SetText(1, cam_thickness_prefix)
+    # Keep the stacking requirement with the toleranced nominal in the linear
+    # dimension's primary text.  Its callout-above slot did not render in the
+    # native export (the former cam-thickness fit callout).
+    overall_prefix = f"{STACK_FIT_CALLOUT}\n"
+    overall_display.SetText(1, overall_prefix)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to cam-side front view")
 
-    # Face width is controlled; cam thickness is fitted to the connecting rod.
-    # Show the measured nominal end-to-end stack as a checked REFERENCE overall.
+    # Face width and the overall (stacking) thickness are controlled; the cam
+    # thickness between them is their difference.  Show it as a checked
+    # REFERENCE from the gear's rear face (below the cam) to the cam's rear face.
     cam_bore_wall = CAM_DIA / 2.0 - ECCENTRICITY - BORE_DIA / 2.0
-    overall_pick_y = -(BORE_DIA / 2.0 + cam_bore_wall / 2.0)
-    overall = _checked_edge_dimension(
+    cam_pick_y = -(BORE_DIA / 2.0 + cam_bore_wall / 2.0)
+    gear_rear_pick_y = -(CAM_DIA / 2.0 - ECCENTRICITY + 5.0)
+    cam_reference = _checked_edge_dimension(
         adapter,
         right,
         p0=_project_mm(
             adapter,
             right,
-            (0.0, overall_pick_y, 0.0),
-            label="overall gear front edge",
+            (0.0, gear_rear_pick_y, FACE_WIDTH),
+            label="gear rear face below the cam",
         ),
         p1=_project_mm(
             adapter,
             right,
-            (0.0, overall_pick_y, OVERALL_THICKNESS),
-            label="overall cam rear edge",
+            (0.0, cam_pick_y, OVERALL_THICKNESS),
+            label="cam rear edge",
         ),
         text_xy=(RIGHT_CENTER[0] + 0.020, 0.200),
-        label="overall axial thickness",
-        expected_mm=OVERALL_THICKNESS,
-        precision=1,
+        label="cam thickness reference",
+        expected_mm=CAM_THICKNESS,
         orientation="horizontal",
     )
-    overall.ShowParenthesis = True
-    if not overall.ShowParenthesis:
-        raise RuntimeError("overall axial thickness was not shown as reference")
+    cam_reference.ShowParenthesis = True
+    if not cam_reference.ShowParenthesis:
+        raise RuntimeError("cam thickness was not shown as reference")
 
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
+    # Leader attaches at the bore's 225-degree point and runs down-left. The
+    # 135-degree route crossed the <MOD-DIAM>30.60 cam diameter line (its lower
+    # end sits at sheet (0.085, 0.271)); everything below the bore axis is clear
+    # of that dimension and of the eccentricity dimension to its right.
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(0.030, 0.310),
+        symbol_xy=(0.030, 0.240),
         control=surface_finish_by_key(SURFACE_FINISHES, "cylinder_gear_bore"),
         label="cylinder gear bore finish",
         entity=bore_edge,
@@ -451,7 +508,7 @@ async def build(adapter: Any) -> dict[str, str]:
             front,
             (
                 -BORE_DIA / (2.0 * math.sqrt(2.0)),
-                BORE_DIA / (2.0 * math.sqrt(2.0)),
+                -BORE_DIA / (2.0 * math.sqrt(2.0)),
                 0.0,
             ),
             label="bore finish leader attachment",
@@ -495,11 +552,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # Check the complete native requirement after all annotation formatting.
     drawing_model.EditRebuild3()
     drawing_model.GraphicsRedraw2()
-    if (
-        str(cam_thickness_display.GetText(1) or "") != cam_thickness_prefix
-        or str(cam_thickness_display.GetText(2) or "") != ")"
-    ):
-        raise RuntimeError("cam thickness reference/axial-fit text did not persist")
+    if str(overall_display.GetText(1) or "") != overall_prefix:
+        raise RuntimeError("overall thickness stacking text did not persist")
     return await finalize_drawing(
         adapter,
         OUTPUTS,

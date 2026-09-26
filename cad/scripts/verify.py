@@ -1718,11 +1718,11 @@ def verify_base_footprint(report: Report) -> None:
 
     def _mounts_on_plate() -> None:
         import build_arbor_pedestal as arbor_post
-        import build_cone_pivot_screw as pscrew
-        import build_cone_swing_platform as platform
+        import cone_pivot_screw_spec as pscrew
+        import cone_swing_platform_geometry as platform
         import build_drive_train_assembly as train
         import harmonic_base_spec as base
-        import build_swing_stop_screw as sscrew
+        import swing_stop_screw_spec as sscrew
 
         half_len = base.TOP_LENGTH / 2.0
         front_z, rear_z = base.TOP_FRONT_Z, base.TOP_REAR_Z
@@ -1732,17 +1732,19 @@ def verify_base_footprint(report: Report) -> None:
         # cone-pivot-post rides the PLATE, so it is plate-contained at
         # drive-train import, not base-swept here.)
         mounts = (
+            # U34c: each foot runs 28 outboard of its strap inner face, so
+            # its plan centre is the band's mid-point, not the part origin.
             (
                 "arbor-pedestal south",
                 train.X_DRUM,
-                -train.ARBOR_PEDESTAL_Z,
+                sum(train.ARBOR_PED_SOUTH_Z_BAND) / 2.0,
                 arbor_post.FOOT_WIDTH / 2.0,
                 arbor_post.FOOT_DEPTH / 2.0,
             ),
             (
                 "arbor-pedestal north",
                 train.X_DRUM,
-                train.ARBOR_PEDESTAL_NORTH_Z,
+                sum(train.ARBOR_PED_NORTH_Z_BAND) / 2.0,
                 arbor_post.FOOT_WIDTH / 2.0,
                 arbor_post.FOOT_DEPTH / 2.0,
             ),
@@ -1807,8 +1809,7 @@ def verify_base_footprint(report: Report) -> None:
                 f"z {front_z:.2f}..{rear_z:.2f})",
             )
         corners_local = (
-            # The NW corner carries the PR8 trim (WEST_HALF_N 9.5), the NE
-            # keeps HALF_WIDTH_N 12.
+            # The NW corner stands at WEST_HALF_N, the NE at HALF_WIDTH_N.
             ("plate", platform.WEST_HALF_N, platform.NORTH_OVERHANG),
             ("plate", -platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
             (

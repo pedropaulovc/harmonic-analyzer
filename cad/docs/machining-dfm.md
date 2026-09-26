@@ -15,18 +15,20 @@ geometry is casting-shaped, not milling-shaped.
 ## The headlines (read these first)
 
 - **Three parts carry the whole risk. Everything else is generous.**
-  1. **`cone-gear` T006** — root-to-bore wall **0.49 mm** on a **~4.08 mm OD / Ø0.79 mm bore** gear.
-     The single hardest part in the machine. (The build script's header comment saying "0.8 mm" is
-     **stale** — the executable `bore_dia_in` gives 0.49 mm. Every small cone gear is sub-1 mm:
-     T012 0.83, T018 0.78, T024 0.71.) **No executable guard enforces this** — it lives only in a
-     comment. Period mitigation: the tip gears were a harder yellow metal. The script itself notes "a
-     real builder would keep the tip gears larger" — a legitimate DFM deviation to consider.
+  1. **`cone-gear` T006** — nominal root-to-bore wall **0.646 mm** on a **~4.28 mm OD / Ø1.588 mm bore** gear
+     (**0.621 mm** at the maximum allowed bore, the one named web exception, U40).
+     The single hardest part in the machine. These teeth are cut as involute flanks closed by a gap
+     floor printed as a MIN diameter; T006's floor is Ø2.880 MIN / Ø2.929 MAX. After a forced T006
+     rebuild, `build_cone_gear.py` measures the native floor edges and requires them at the printed
+     MIN radius within 0.002 mm. The other tip-gear webs meet the 2.0 target on the S1 bores.
+     Period mitigation: the tip gears were a harder yellow metal.
   2. **`summing-lever` knife edge** — the sharp top-vertex ridge of a hex trunnion that protrudes
      **21.717 mm unsupported** past each end of a casting-shaped organic lever. Delicate (nicks/rounds)
      *and* fixturing-hostile from bar. Per §6 the edge should be a **separate hardened tool-steel
      insert**, not this parent — which also removes it from this part's machining hazard.
-  3. **`cone-gear-shaft` tip** — a **Ø0.79 mm × ~34 mm journal in steel** (43:1 slenderness). Whip
-     city; needs a follower/steady and a very light finishing cut, or enlarge per the T006 note above.
+  3. **`cone-gear-shaft` tip** — a **Ø1.588 mm × 23.0 mm journal in steel** (L/D 14.5, carrying T012 and T006 since U40). Was Ø0.79
+     (L/D 29, whip city); enlarging the T006 bore to 1/16 in bought 16× the bending stiffness and
+     still needs a follower/steady and a light finishing cut.
 
 - **The CNC repeat families (make N identical on the PM-30MV — this is where CNC earns its keep):**
   | family | qty | why CNC |
@@ -53,14 +55,19 @@ geometry is casting-shaped, not milling-shaped.
     before it reaches a drawing (gap below).
 
 - `rocker-arm-support` carries four **5/16 through clearance drills**. Four
-  McMaster 92240A539 1/4-20 UNC-2A × 5/8 in hex-head screws install from the
+  McMaster 92240A540 1/4-20 UNC-2A × 3/4 in hex-head screws install from the
   top into blind UNC-2B taps in `harmonic-base`: the exact vendor under-head
-  washer transition seats on the support, leaving 9.247 mm installed engagement
-  (1.456D), 9.497 mm usable full-thread depth (0.25 mm tip clearance), and
-  15.847 mm cylindrical tap-drill depth (full thread + five 1.27 mm pitches).
+  washer transition seats on the support, leaving 12.422 mm installed
+  engagement (1.956D). The seat is sized at its printed .XX worst case:
+  13.20 mm full thread (0.25 mm tip reserve at the low limit) and 20.60 mm
+  cylindrical tap-drill depth (five 1.27 mm pitches past the thread).
   Other receivers are threaded too; the `knife-mount` hanger-stud seat is one
-  example. No keyways anywhere — gears are **soldered** to their shafts (cone)
-  or ride **free on an arbor** (cylinder).
+  example. No keyways anywhere — gears are **soldered** to their shafts (the 20
+  `cone-gear`s, and the 64T `crank-drive-gear`: plain bore, no keyway,
+  soldered or silver-brazed to the cone shaft's 3/8″ seat, with Loctite
+  638/648 retaining compound an approved alternative — the joint is that
+  gear's whole torque path, so it is stated on its print) or ride **free on
+  an arbor** (cylinder).
 
 ### Blind-thread DFM rule
 
@@ -106,8 +113,8 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`cone-gear`** ×20 (T006→T120) | round brass bar, extruded disc, face 6.5, OD = (N+2)/DP·25.4 at DP 49.82 → **~4.08 (T006) → ~62.2 (T120)** (same DP/OD as the 120T cylinder gear it meshes); tip gears T006–T024 harder yellow metal | 1 central through-bore, **soldered, no key**; bore Ø by config (T006 **0.79**/1/32″, T012 3.18, T018 6.35, T024+ 9.53); 6–120 involute teeth PA14.5°, 2.5D through-cut (DXF profile) | **T006 wall 0.49 mm** (headline); all small gears sub-1 mm; T006 whole gear tiny → brutal workholding; sharp internal corner at flank↔base-chord (wire-EDM/broach = outsource, or accept a corner radius) | ~2 (lathe OD/face/bore; teeth) | **self-made Eureka form cutter, indexed** (in-house; wire-EDM = outsource); T006 = hardest part — on enlarging tip gears see gap #5 (DP caveat) |
-| **`cone-gear-shaft`** ×1 | stepped steel bar ~252; integral Ø12.2308 post journal then 3/8→1/4→1/8→1/32″ | 5 turned diameter steps; **no keyseat** (gears soldered); finish the Ø12.2308 journal for 0.05 diametral clearance in the v2 post bore | **Ø0.79×~34 tip journal in steel, 43:1** → whip; long slender overall | 1 (single-axis turn from one end) | manual lathe **+ steady/follower**; light finish on both bearing journals |
+| **`cone-gear`** ×20 (T006→T120) | round brass bar, extruded disc, face 6.0, long-addendum OD printed per gear at DP 49.82 → **4.28 (T006) → 62.93 (T120)** (same DP as the 120T cylinder gear it meshes; `cone_gear_spec.DEEPENED_MESH_MM`); tip gears T006–T024 harder yellow metal | 1 central through-bore, **bonded (solder, silver-braze or Loctite 638/648), no key**; bore Ø by config (T006/T012 **1.588**/1/16″, T018 3.175, T024 6.350, T030+ 9.525); 6–120 involute teeth PA14.5°, 2.5D through-cut; gap floor printed as a MIN diameter, any shape | **T006 wall 0.646 mm nominal / 0.621 mm at maximum bore** (headline); T006 whole gear tiny → brutal workholding; the floor may take any shape above its MIN diameter, so the flank↔floor corner needs no radius control | ~2 (lathe OD/face/bore; teeth) | **single-point fly cutter ground to the gap form, indexed** (in-house; plunge to the floor, widen by indexing — no catalogue cutter fits DP 49.82); T006 = hardest part — on enlarging tip gears see gap #5 (DP caveat) |
+| **`cone-gear-shaft`** ×1 | stepped steel bar ~252; integral Ø12.2308 post journal then 3/8→1/4→1/8→1/16″ | 5 turned diameter steps; **no keyseat** (gears soldered); finish the Ø12.2308 journal for 0.05 diametral clearance in the v2 post bore | **Ø1.588×23.0 tip journal in steel, L/D 14.5** (tailstock-supported, U40) → was 29:1 at Ø0.79; long slender overall | 1 (single-axis turn from one end) | manual lathe **+ steady/follower**; light finish on both bearing journals |
 
 ### Pivots, bushings, shafts (T1 — the 19-channel stacks)
 
@@ -129,10 +136,11 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 
 ## Recommended actions (gaps this pass surfaced)
 
-1. **Add an executable wall guard for the small cone gears.** The 0.49 mm T006 wall (and 0.71–0.83
-   for T012/T018/T024) exist only as comments — `build_cone_gear.py` has *no* assert enforcing them,
-   and the header comment (0.8 mm) is stale. Add a `min-wall ≥ …` check so a future bore/OD edit can't
-   silently drive it negative, and delete the stale 0.8 mm comment.
+1. **Retain the executable native wall guard for the smallest cone gear.** After a forced T006
+   rebuild, `build_cone_gear.py` measures the native floor edges directly, requires the printed MIN
+   floor radius (`cone_gear_spec.floor_radius_mm`) within 0.002 mm and at least one floor edge per
+   tooth, and rejects a non-positive web at the maximum allowed bore; `test_cone_gear_drawing` pins
+   the T006 web at ≥ 0.621. Keep both when changing the tooth profile or bore bands.
 2. **Decide the `summing-lever` fabrication method** (cast / fabricate / hog) and the **knife-edge
    insert** now — it drives whether this is a 5-setup nightmare or two simple operations, and it is the
    critical interface.
@@ -173,9 +181,9 @@ steps instead of one big engagement.
 
 - **DFMPro (SW add-in) and Xometry auto-DFM — false-green here (observed).** Both passed *every* SLDPRT
   — yet the model is full of sharp internal corners (every gear-tooth root, the cam notch) a round tool
-  cannot cut, and sub-mm walls (T006 **0.49 mm**). Their rule sets are tuned for moulding / sheet /
-  generic 3-axis and don't flag manual-machining hazards. **A green from these means little — trust it
-  for nothing on the corners or walls.**
+  cannot cut, plus the T006 **0.621 mm minimum root-to-bore web**. Their rule sets are tuned for
+  moulding / sheet / generic 3-axis and don't flag manual-machining hazards. **A green from these
+  means little — trust it for nothing on the corners or walls.**
 - **Fusion 360 CAM verify/simulate — the one worth banking on, with a known edge.** Because it
   simulates the *actual tool against the actual solid*, it **surfaces the class DFMPro missed**: an
   internal corner smaller than the smallest endmill shows up as **un-cut stock** (you can't program a
@@ -183,10 +191,10 @@ steps instead of one big engagement.
   the **majority of tool-access & gouge issues is reasonable** — it's a real simulation, not a
   rule-of-thumb checker.
   - **But its blind spot is exactly where the worst risk lives.** Fusion treats geometry as **rigid**
-    and stock as **held**, so it will *not* warn that the **T006 0.49 mm wall** breaks in workholding,
-    the **Ø0.79 × 34 mm shaft** whips, the **1.90 mm cam wall** is fragile, or that a ~4 mm gear can't be
-    gripped. Thin-wall / fragile-feature / fixturing failures are not modelled by CAM sim. **A clean
-    Fusion sim is not a substitute for a first cut on the fragile parts.**
+  and stock as **held**, so it will *not* warn that the **T006 0.621 mm minimum web** breaks in
+  workholding, the **Ø1.588 × 23.0 mm shaft tip** whips, the **1.90 mm cam wall** is fragile, or that
+  a ~4 mm gear can't be gripped. Thin-wall / fragile-feature / fixturing failures are not modelled
+  by CAM sim. **A clean Fusion sim is not a substitute for a first cut on the fragile parts.**
 
 **Order that actually de-risks the build:**
 1. **Fusion CAM verify** — cheap; catches the tool-access/gouge/reach majority, incl. the sharp corners

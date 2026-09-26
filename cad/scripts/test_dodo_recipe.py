@@ -1822,11 +1822,10 @@ def test_config_deps_are_fine_grained():
     cfg = (REPO_ROOT / "cad" / "config").resolve()
     whole = set(dodo._CONFIG_YAMLS)
 
-    # A gear part reads machine("gear_train", ...) -> machine/gear_train.yaml ONLY
-    # (NOT machine/channels.yaml, where active_count lives) + its own registry row
-    # + title_block.yaml (every part stamps the title-block tolerance properties
-    # from _common.part_properties -> _config.title_block) + release.yaml for the
-    # global CAD Revision.
+    # The cone-gear part reads gear_train (through ``involute_gear``), its own
+    # registry row, title-block properties and the global release.  Its bore
+    # and tooth-thickness bands are cone-specific constants in
+    # ``cone_gear_spec`` (U38/U42), so ``tolerances.yaml`` is not an input.
     cone = dodo._config_deps(scripts / "build_cone_gear.py", "cone_gear", "part")
     assert _rel(cone, cfg) == {
         "machine/gear_train.yaml",
@@ -1835,6 +1834,10 @@ def test_config_deps_are_fine_grained():
         "title_block.yaml",
         "release.yaml",
     }, _rel(cone, cfg)
+    cylinder = dodo._config_deps(
+        scripts / "build_cylinder_gear.py", "cylinder_gear", "part"
+    )
+    assert "machine/gear_train.yaml" in _rel(cylinder, cfg)
     assert set(cone) <= whole
 
     # Editing ONE part's registry row rebuilds only that part: a leaf screw depends
@@ -2616,11 +2619,11 @@ def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
     catalog = str(dodo._FASTENER_CATALOG)
     part = dodo._part_file_deps(dodo.SCRIPTS_DIR / "build_bracket_screw.py", "bracket_screw")
     drawing = dodo._drawing_file_deps("bracket_screw")
-    assembly = dodo._recipe_files("channel")
+    assembly = dodo._recipe_files("pen")
     for label, deps in (
         ("part-bracket_screw", part),
         ("drawing-bracket_screw", drawing),
-        ("assembly-channel", assembly),
+        ("assembly-pen", assembly),
     ):
         assert catalog not in deps, label
         assert any(
@@ -2630,9 +2633,9 @@ def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
         ), label
     assert dodo._fastener_rows_env("part:bracket_screw") == "bracket-screw"
     assert dodo._fastener_rows_env("drawing:bracket_screw") == "bracket-screw"
-    # channel's closure imports build_frame_side_screw (through build_fulcrum_keeper)
-    # for its constants; that module's fastener("frame-side-screw") runs on import.
-    assert dodo._fastener_rows_env("assembly:channel") == "frame-side-screw"
+    # pen's closure imports build_pen_set_screw for its constants; that module's
+    # fastener("pen-set-screw") runs on import.
+    assert dodo._fastener_rows_env("assembly:pen") == "pen-set-screw"
     assert dodo._fastener_rows_env("check:math") is None
 
 
@@ -2708,15 +2711,15 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
     keying the guard on the label dropped it for every assembly build. The guard
     is keyed on the doit task instead, whatever the display label says."""
     dodo = _load_dodo()
-    launched = _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, "channel", mode=mode)
+    launched = _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, "pen", mode=mode)
 
     scripts = [name for name, _env in launched]
     if mode == "full":
-        assert scripts == ["build_channel_assembly.py", "hook_probe.py"]
+        assert scripts == ["build_pen_assembly.py", "hook_probe.py"]
     else:
         assert scripts == ["refresh_assembly.py"]
     for name, env in launched:
-        assert env.get("HARMONIC_FASTENER_ROWS") == "frame-side-screw", name
+        assert env.get("HARMONIC_FASTENER_ROWS") == "pen-set-screw", name
 
 
 @pytest.mark.parametrize(

@@ -1,9 +1,10 @@
 r"""Create the curated machinist drawing for the pinion cam-follower pin.
 
-A short Ø4 turned steel stud with a shallow domed outer end.  The sheet runs at
-4:1 (the pin is only 15 mm long): an 8:1 end view carries the diameter, the 4:1
-side view carries the length, and a 4:1 isometric (matching the sheet scale)
-sits clear of the title block.
+A short Ø4 drill-rod stud with a shallow domed outer end, bonded into the
+MHA-056 strap's follower seat.  The sheet runs at 8:1 so the 20.8-long pin
+reads at arm's length: the end view carries the diameter, the side elevation
+carries the length, the crown radius and a reference overall, and a 4:1
+isometric sits clear of the title block.
 
 Run with SolidWorks open::
 
@@ -17,15 +18,11 @@ import math
 import sys
 from typing import Any
 
-from pinion_cam_pin_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_attached_note,
-    add_datum_feature,
-    add_feature_control_frame,
+    add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
@@ -34,9 +31,11 @@ from _drawing_common import (
     model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    set_arc_endpoints_to_max,
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -44,8 +43,10 @@ from _surface_finish import surface_finish_by_key
 from pinion_cam_pin_spec import (
     CAP_RADIUS,
     CAP_SAG,
+    DRAWING_REFERENCE_PRECISION,
     PIN_DIA as PIN_DIA,
     PIN_LEN,
+    SEAT_NUMBER,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -66,27 +67,82 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (4.0, 1.0)
-END_VIEW_SCALE = 8.0
-FRONT_CENTER = (0.070, 0.200)
-RIGHT_CENTER = (
-    FRONT_CENTER[0] + PIN_LEN * SHEET_SCALE[0] / 2000.0 + 0.055,
-    FRONT_CENTER[1],
-)
-ISO_CENTER = (0.320, 0.200)
+# Fable review r4: at 4:1 the pin sat bunched in the top half with a dead
+# field below.  At 8:1 the vertical side elevation spans most of the sheet's
+# height; the end view keeps its upper-left corner and the notes the
+# lower-left strip under the reference overall.
+SHEET_SCALE = (8.0, 1.0)
+_S = SHEET_SCALE[0] / 1000.0
+OVERALL = PIN_LEN + CAP_SAG
+FRONT_CENTER = (0.075, 0.200)
+# The *Top elevation stands the pin axis up the sheet: seated end on top,
+# crown at the bottom.  Its bbox centre is the pin's mid-length.
+RIGHT_CENTER = (0.250, 0.160)
+ISO_CENTER = (0.360, 0.205)
 
+
+# r6 eye-pass: at (0.035, 0.255) the four-line callout stacked up past the
+# sheet border; below the end view it has the whole left field.
 FRONT_KEEP = {
-    "PinDia": (0.030, 0.235),
+    "PinDia": (0.060, 0.150),
 }
+# Both lengths sit LEFT of the elevation (Depth inner, the reference overall
+# outer) so the crown's radius and roughness leaders reach it from the right
+# without crossing a dimension line.
 RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.040),
-    "CapR": (RIGHT_CENTER[0] + 0.035, RIGHT_CENTER[1] + 0.040),
+    "Depth": (0.205, 0.150),
+    # Level with the crown centre and well outside the R2.90 circle: nearer,
+    # the arc extension ran through OUTER CROWN.
+    "CapR": (0.307, 0.100),
 }
+OVERALL_TEXT_XY = (0.160, 0.165)
 DIMENSION_CALLOUTS = {
-    "PinDia": "FINAL SIZE",
-    "Depth": "SEATED FLAT END TO CROWN ROOT",
+    "PinDia": f"DRILL ROD; SLIP FIT IN\n{SEAT_NUMBER} FOLLOWER SEAT",
+    "Depth": "SEATED FLAT END\nTO CROWN ROOT",
     "CapR": "OUTER CROWN",
 }
+
+
+def _crown_point(axial_from_root_mm: float) -> tuple[float, float, float]:
+    """Model point on the crown's +X silhouette, measured from the crown root."""
+    rise = CAP_RADIUS - CAP_SAG + axial_from_root_mm
+    radial = math.sqrt(CAP_RADIUS**2 - rise**2)
+    return (radial / 1000.0, 0.0, (PIN_LEN + axial_from_root_mm) / 1000.0)
+
+
+def _overall_reference(adapter: Any, right: Any) -> None:
+    """The (20.80) overall, seated end to crown apex (rule 7, Harvey #25)."""
+    label = "cam-pin overall length reference"
+    seated_end = model_point_in_view(
+        adapter, right, (PIN_DIA / 4000.0, 0.0, 0.0), label="cam-pin seated end"
+    )
+    apex = model_point_in_view(
+        adapter, right, (0.0, 0.0, OVERALL / 1000.0), label="cam-pin crown apex"
+    )
+    display = add_edge_dimension(
+        adapter,
+        right,
+        p0=seated_end,
+        p1=apex,
+        text_xy=OVERALL_TEXT_XY,
+        label=label,
+        orientation="vertical",
+        entity_types=("EDGE", "SILHOUETTE"),
+    )
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(dimension.SystemValue) * 1000.0)
+    if abs(measured_mm - OVERALL) > 1e-4:
+        # A line-to-arc pick may resolve to the crown's centre; the overall
+        # runs to its far extreme.
+        set_arc_endpoints_to_max(adapter, display, label=label)
+        measured_mm = abs(float(dimension.SystemValue) * 1000.0)
+    if abs(measured_mm - OVERALL) > 1e-4:
+        raise RuntimeError(f"{label} measured {measured_mm:g}, expected {OVERALL:g}")
+    set_reference_dimension(adapter, display.GetAnnotation(), label=label)
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
+        raise RuntimeError(f"{label} precision did not persist")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -104,7 +160,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
+            "Isometric View Note",
         ),
         required=(
             "Number",
@@ -112,7 +168,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
+            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -125,13 +181,13 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Pinion Cam-Follower Pin Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "pinion cam-follower pin; turned stud; steel",
+            3: "pinion cam-follower pin; drill-rod stud; steel",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(8, 1))
-    right = place_view(adapter, str(SOURCE), "*Top", *RIGHT_CENTER, scale=(4, 1))
+    right = place_view(adapter, str(SOURCE), "*Top", *RIGHT_CENTER, scale=(8, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(4, 1))
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
@@ -145,91 +201,37 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
     )
-    set_dimension_precision(adapter, front_annotations, {"PinDia": 3})
+    set_dimension_precision(adapter, front_annotations, {"PinDia": 2})
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pin end view")
 
+    # Before the centreline, so the apex pick cannot land on the axis line.
+    _overall_reference(adapter, right)
     add_view_centerline(
         adapter,
         right,
         face_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.004),
         label="pinion cam-pin shank axis centerline",
     )
-    end_radius = PIN_DIA * END_VIEW_SCALE / 2000.0
-    # SolidWorks restricts this axis-attached tag and live readback normalizes
-    # the intended sheet point by 6.187 mm.  Bound only annotation placement;
-    # part dimensions and GD&T remain unchanged.
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0] + end_radius, FRONT_CENTER[1]),
-        symbol_xy=(0.105, 0.228),
-        datum="A",
-        label="cam-pin cylindrical-shank datum axis",
+    # Rule 5: the crown rides the cam, so it carries the one roughness symbol.
+    # Its leader meets the crown near the apex from the right, below the
+    # CapR leader (which lands at mid-sag).
+    crown_finish_point = model_point_in_view(
+        adapter, right, _crown_point(0.7), label="cam-pin crown finish point"
     )
     add_surface_finish(
         adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0] + end_radius, FRONT_CENTER[1]),
-        symbol_xy=(0.115, 0.180),
-        control=surface_finish_by_key(SURFACE_FINISHES, "finished_shank"),
-        label="cam-pin finished shank",
-    )
-    seated_flat_face = model_point_in_view(
-        adapter,
         right,
-        (PIN_DIA / 2000.0, 0.0, 0.0),
-        label="cam-pin seated flat end",
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=seated_flat_face,
-        frame_xy=(0.220, 0.210),
-        characteristic="flatness",
-        tolerance=GEOMETRIC_TOLERANCES_MM["cam-pin seated-end flatness"],
-        quantity="SEATED END",
-        label="cam-pin seated-end flatness",
+        edge_xy=crown_finish_point,
+        symbol_xy=(0.300, 0.075),
+        control=surface_finish_by_key(SURFACE_FINISHES, "crown"),
+        label="cam-pin crown finish",
         entity_type="SILHOUETTE",
-    )
-    crown_axial = CAP_SAG / 2.0
-    crown_radial = math.sqrt(CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2)
-    outer_crown_face = model_point_in_view(
-        adapter,
-        right,
-        (
-            crown_radial / 1000.0,
-            0.0,
-            (PIN_LEN + crown_axial) / 1000.0,
-        ),
-        label="pinion cam-pin outer crown face",
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=outer_crown_face,
-        frame_xy=(0.245, 0.235),
-        characteristic="profile_surface",
-        tolerance=GEOMETRIC_TOLERANCES_MM["pinion cam-pin crown profile"],
-        datums=(),
-        quantity="OUTER CROWN",
-        label="pinion cam-pin crown profile",
-        entity_type="SILHOUETTE",
-    )
-    add_attached_note(
-        adapter,
-        right,
-        text=(
-            f"OUTER CROWN\n({CAP_SAG:.2f}) REF AXIAL HEIGHT\nCROWN ROOT PLANE TO APEX"
-        ),
-        entity_xy=outer_crown_face,
-        note_xy=(0.250, 0.175),
-        label="cam-pin crown size and height",
-        entity_type="SILHOUETTE",
+        char_height=0.0025,  # the pivot-block size; the default read oversized at 8:1
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.110)
-    add_property_linked_note(adapter, "End View Note", 0.020, 0.168)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.058)
+    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.160)
 
     return await finalize_drawing(
         adapter,

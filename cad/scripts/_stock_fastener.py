@@ -11,7 +11,6 @@ import _telemetry
 from _fastener_catalog import fastener
 from _common import (
     _early_bound,
-    _flag,
     _read_member,
     apply_color,
     apply_custom_properties,
@@ -22,6 +21,7 @@ from _common import (
     report_mass_properties,
     save_part_and_images,
 )
+from _visibility import FeatureWalk
 
 
 type RecipeAuthor = Callable[..., Awaitable[None]]
@@ -44,11 +44,20 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         "90280A194": RecipeMetadata(
             "diagnostics.diag_build_90280A194", "build_90280A194"
         ),
+        "90280A197": RecipeMetadata(
+            "diagnostics.diag_build_90280A197", "build_90280A197"
+        ),
         "90280A837": RecipeMetadata(
             "diagnostics.diag_build_90280A837", "build_90280A837"
         ),
+        "40923898": RecipeMetadata(
+            "diagnostics.diag_build_40923898", "build_40923898"
+        ),
         "90280A201": RecipeMetadata(
             "diagnostics.diag_build_90280A201", "build_90280A201"
+        ),
+        "91255A148": RecipeMetadata(
+            "diagnostics.diag_build_91255A148", "build_91255A148"
         ),
         "91882A425": RecipeMetadata(
             "diagnostics.diag_build_91882A425", "build_91882A425"
@@ -56,11 +65,17 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         "91829A560": RecipeMetadata(
             "diagnostics.diag_build_91829A560", "build_91829A560"
         ),
-        "94025A150": RecipeMetadata(
-            "diagnostics.diag_build_94025A150", "build_94025A150"
+        "94025A164": RecipeMetadata(
+            "diagnostics.diag_build_94025A164", "build_94025A164"
+        ),
+        "91375A106": RecipeMetadata(
+            "diagnostics.diag_build_91375A106", "build_91375A106"
         ),
         "90280A108": RecipeMetadata(
             "diagnostics.diag_build_90280A108", "build_90280A108"
+        ),
+        "91794A112": RecipeMetadata(
+            "diagnostics.diag_build_91794A112", "build_91794A112"
         ),
         "90114A511": RecipeMetadata(
             "diagnostics.diag_build_90114A511", "build_90114A511"
@@ -68,8 +83,14 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         "91410A538": RecipeMetadata(
             "diagnostics.diag_build_91410A538", "build_91410A538"
         ),
+        "93075A150": RecipeMetadata(
+            "diagnostics.diag_build_93075A150", "build_93075A150"
+        ),
         "93075A194": RecipeMetadata(
             "diagnostics.diag_build_93075A194", "build_93075A194"
+        ),
+        "90631A007": RecipeMetadata(
+            "diagnostics.diag_build_90631A007", "build_90631A007"
         ),
         "92865A585": RecipeMetadata(
             "diagnostics.diag_build_92865A585", "build_92865A585"
@@ -80,8 +101,8 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         "90126A211": RecipeMetadata(
             "diagnostics.diag_build_90126A211", "build_90126A211"
         ),
-        "92240A539": RecipeMetadata(
-            "diagnostics.diag_build_92240A539", "build_92240A539"
+        "92240A540": RecipeMetadata(
+            "diagnostics.diag_build_92240A540", "build_92240A540"
         ),
         "99607A213": RecipeMetadata(
             "diagnostics.diag_build_99607A213", "build_99607A213"
@@ -227,23 +248,8 @@ def _blank_recipe_references(adapter: Any) -> None:
     }
     model = adapter.currentModel
     hidden: list[str] = []
-    visited = 0
-
-    def walk_siblings(feature: Any, next_member: str):
-        nonlocal visited
-        while feature:
-            visited += 1
-            if visited > 5000:
-                raise RuntimeError("stock reference traversal exceeded 5000 features")
-            yield feature
-            child = _read_member(feature, "GetFirstSubFeature")
-            if child:
-                yield from walk_siblings(child, "GetNextSubFeature")
-            feature = _read_member(feature, next_member)
-
-    first = _read_member(model, "FirstFeature")
-    for feature in walk_siblings(first, "GetNextFeature"):
-        _flag(feature, "IFeature")
+    walk = FeatureWalk(model)
+    for feature in walk:
         kind = str(_read_member(feature, "GetTypeName2"))
         name = str(_read_member(feature, "Name"))
         select_type = hide_types.get(kind)
@@ -284,7 +290,7 @@ def _blank_recipe_references(adapter: Any) -> None:
     _telemetry.event(
         "fastener.stock.references_hidden",
         count=len(hidden),
-        features_visited=visited,
+        features_visited=walk.visited,
         references=", ".join(hidden),
     )
 

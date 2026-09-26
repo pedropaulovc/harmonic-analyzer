@@ -9,7 +9,7 @@ import draw_fulcrum_keeper as drawing
 import fulcrum_keeper_spec
 import _config
 from _drawing_registry import DRAWINGS_BY_NAME
-from build_frame_side_screw import HEAD_H as FRAME_SIDE_HEAD_H
+from frame_side_screw_spec import HEAD_H as FRAME_SIDE_HEAD_H
 
 
 def test_required_drawing_paths() -> None:

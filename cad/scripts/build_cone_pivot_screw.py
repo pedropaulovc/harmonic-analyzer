@@ -6,28 +6,12 @@ import sys
 
 from _common import run_build
 from _fastener_catalog import fastener
-from _holes import TAP_DRILL_MM
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
-from diagnostics.diag_build_91829A560 import (
-    HEAD_DIA as HEAD_DIA,
-    HEAD_T,
-    SHOULDER_DIA as SHOULDER_DIA,
-    SHOULDER_LEN as SHOULDER_LEN,
-    THREAD_LEN,
-    THREAD_MAJOR,
-    UNDERHEAD_LEN as UNDERHEAD_LEN,
-    build_91829A560,
-)
+from diagnostics.diag_build_91829A560 import build_91829A560
 
 PART_NAME = "cone-pivot-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
-
-THREAD = "#10-24"
-HEAD_H = HEAD_T
-THREAD_TAIL_LEN = THREAD_LEN
-THREAD_SOLID_DIA = THREAD_MAJOR
-THREAD_TAP_DRILL_DIA = TAP_DRILL_MM[THREAD]
 
 
 async def build(adapter) -> dict[str, str]:

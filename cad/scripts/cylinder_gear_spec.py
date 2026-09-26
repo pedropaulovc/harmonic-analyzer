@@ -37,8 +37,18 @@ FACE_WIDTH = 3.0
 FACE_WIDTH_TOLERANCE_MM = 0.05
 CAM_DIA = 30.6  # integral eccentric cam disc
 CAM_DIA_BAND = (0.0, -0.05)  # (upper, lower) deviations
-CAM_THICKNESS = 3.5  # reference nominal; axial fit governs the finished thickness
-OVERALL_THICKNESS = FACE_WIDTH + CAM_THICKNESS
+# Solid stack (#743): the overall thickness, cam face to back face, IS the
+# channel station pitch (machine channels.station_pitch_mm, pinned by
+# test_cylinder_bank_layout), so neighbouring gears bear cam face on back face
+# and set the stations the way the rocker hubs do (rocker_arm_spec.HUB_LENGTH).
+# The band is centred (user ruling L20 d', #743): the same 0.05 wide as the
+# one-sided +0.05/0 it replaces, so no harder to make, but 20 in-band gears
+# now stack about nominal and the 20-gear acceptance
+# (cylinder_bank_layout.STACK_L20_ACCEPT) passes first time. A long stack is
+# re-faced at fit-up; a short one gets its thinnest gear remade.
+OVERALL_THICKNESS = 7.0565
+OVERALL_THICKNESS_BAND = (0.025, -0.025)  # (upper, lower) deviations
+CAM_THICKNESS = OVERALL_THICKNESS - FACE_WIDTH  # reference: the closed rod slot
 ECCENTRICITY = 8.64  # cam axis offset from the bore axis
 ECCENTRICITY_TOLERANCE_MM = 0.025
 SET_ECCENTRICITY_RANGE_MM = 0.025
@@ -70,15 +80,60 @@ SURFACE_FINISHES = (
     SurfaceFinishControl("cam_follower", MACHINED_UM, CylinderFace(CAM_DIA)),
 )
 
-# Marked model dimensions locate the blank, bore, cam and kerf. Bore diameter
-# and cam thickness are reference nominals with finished-fit callouts.
+# Marked model dimensions locate the blank, bore, cam, stacking thickness and
+# kerf. Bore diameter is a reference nominal with a finished-fit callout.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "BoreProfile": {"BoreDia"},
     "CamProfile": {"CamDia", "CamCy"},
-    "CamBoss": {"CamThickness"},
+    "CamBoss": {"OverallThickness"},
     "NotchProfile": {"NotchDepth", "NotchWidth", "NotchPhase"},
 }
+
+# Decimal places ARE the tolerance statement (drawing-simplicity policy rule
+# 2), so the MODEL owns them: build_cylinder_gear applies this map to the
+# .SLDPRT and draw_cylinder_gear only reads it back.  Three places where a
+# three-place band rides the dimension (the matched running bore's reference
+# nominal, the cam eccentricity, the +0.05/0 stacking thickness that sets
+# the station pitch); two where the band is a two-place one (cam OD, face
+# width, kerf width); one on the kerf depth; the notch phase is an angle read
+# to the tenth of a degree.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "GearBlank": {"FaceWidth": 2},
+    "BoreProfile": {"BoreDia": 3},
+    "CamProfile": {"CamDia": 2, "CamCy": 3},
+    # Four places: 7.0565 is the station pitch, exact only at four (user
+    # ruling L20 d'); three would round one limit of the band inward.
+    "CamBoss": {"OverallThickness": 4},
+    "NotchProfile": {"NotchDepth": 1, "NotchWidth": 2, "NotchPhase": 1},
+}
+
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+if any(
+    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
+    for feature, name in _PRECISION_NAMES
+):
+    raise AssertionError("DRAWING_PRECISION names a dimension the part never marks")
+if any(
+    name not in {name for names in DRAWING_PRECISION.values() for name in names}
+    for names in DRAWING_DIMENSIONS.values()
+    for name in names
+):
+    raise AssertionError("a marked dimension prints without part-authored places")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+
+# The one sheet-derived dimension: the parenthesised cam thickness (overall
+# less face width, #743), a read-only difference with no model dimension to
+# import.  Two places: it is the closed rod slot, and one place would print
+# 4.1 for the 4.0565 the ring runs in.  Its places are still specification,
+# so the sheet reads them here.
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {"cam thickness reference": 2}
 
 
 def matched_bore_limits(finished_shaft_dia_mm: float) -> tuple[float, float]:

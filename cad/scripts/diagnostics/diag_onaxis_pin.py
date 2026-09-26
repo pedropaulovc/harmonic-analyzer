@@ -102,7 +102,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # F: fresh part with equation-manager globals (the gear scripts set ~12
     # before any geometry), then the repro sequence.
-    from build_cone_gear import set_global
+    from involute_gear import set_global
 
     check("create_part F", await adapter.create_part())
     await set_global(adapter, "ToothCount", "24", 24.0)

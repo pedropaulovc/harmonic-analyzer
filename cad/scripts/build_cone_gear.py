@@ -1,12 +1,12 @@
 r"""Reproduction script: cone gear (book ch. 12, pp. 16-21) -- parametric prototype.
 
-One part, configuration-driven tooth count (plan M4: prototype 3 configs
-before committing to the full 6..120-step-6 set of 20). All config-varying
-geometry is equation-driven so a configuration switch regenerates the gear
-from ``ToothCount``/``DP``/``PA`` alone:
+One part, configuration-driven tooth count across the full T006..T120-by-six
+family. All configuration-varying geometry is equation-driven so a switch
+regenerates the gear from ``ToothCount``/``DP``/``PA`` alone:
 
 * Equation-manager globals carry the involute math (base/tip radii in
-  INCHES, involute parameter span, tooth-gap angles). Two parser facts
+  INCHES, involute parameter span, tooth-gap angles; ``involute_gear`` holds
+  the Python mirror and the validating helpers). Two parser facts
   probed live on SW 2026: the equation manager evaluates trig in DEGREES
   (``atn`` returns degrees too), and ``CreateEquationSpline2`` expressions
   evaluate lengths in DOCUMENT units (the configured part template is IPS),
@@ -29,33 +29,46 @@ from ``ToothCount``/``DP``/``PA`` alone:
 Tooth-gap profile derivation (standard involute, polar form): a point of the
 involute of base radius ``Rb`` at parameter t sits at radius ``Rb*sqrt(1+t^2)``
 and polar angle ``phi - atan(t)`` where ``phi`` is the rolling angle offset.
-With ``Delta = pi/(2N) + inv(PA)`` (half tooth angular thickness at the base
-circle, ``inv`` the involute function), the gap between tooth 0 (centred on
+With ``Delta = s/(2r) + inv(PA)`` (half tooth angular thickness at the base
+circle for circular thickness ``s`` at pitch radius ``r``, ``inv`` the
+involute function; ``pi/(2N) + inv(PA)`` for the standard tooth), the gap between tooth 0 (centred on
 +X) and tooth 1 is bounded below by tooth 0's upper flank (the mirrored
 involute starting at angle ``+Delta``) and above by tooth 1's lower flank
 (the involute starting at ``Gamma - Delta``, ``Gamma = 2*pi/N``).
 
 Prototype scope notes:
 
-* **Configured bore, no keyway** (Appendix C #7 resolution): at DP 30 the
-  small gears cannot clear the 9.5 mm shaft (6T OD is 6.77 mm), so the
-  shaft steps down at the tip (`build_cone_gear_shaft.py`) and the bore
-  diameter is a configured global ``BoreDia``: 3/8" for T024..T120, then
-  1/4" (T018), 3/16" (T012), 1/8" (T006) -- the 6T wall comes out 0.8 mm,
-  matching the visibly thin tip rod in the p.18 photos. The bore circle is
-  origin-centred with a DRIVING diameter dimension equation-linked to
-  ``BoreDia`` (an origin-snapped circle + driving dim is fully defined and
-  config-drivable -- probed live; the fix+driven-dim recipe is not). No
-  keyway: the book never shows the attachment, and the p.21 macro shows
-  solder at the small gears -- key hardware stays out of scope.
-* Root geometry is simplified: the gap floor is the chord at the base
-  circle, not the true root circle + trochoid fillet (for N >= 96 the base
-  circle is slightly inside root, for small N teeth come out stub-form --
-  the 6T gear is severely undercut at standard proportions anyway).
+* **Configured bore, no keyway** (Appendix C #7 resolution): the shaft steps
+  down toward the tip and each bore matches its seat (U40 S1): 3/8" for
+  T030..T120, 1/4" for T024, 1/8" for T018, and 1/16" for T012 and T006 on
+  the 24.7 mm terminal land (L/D 15.5).
+  The bore circle is origin-centred with a DRIVING diameter dimension linked
+  to the configured ``BoreDia`` global.  The p.21 macro shows solder at the
+  smallest gears; no evidence supports a key, pin, set screw, or hub.
+* Circular tooth thickness is a native DRIVING dimension in a construction
+  authoring sketch.  Its witness is the pitch chord of the +X tooth -- the
+  tooth every configuration seeds on local +X, so the witness brackets a
+  TOOTH for every even count (the retired bottom chord at 270 deg bracketed a
+  GAP whenever N/2 is odd: T006, T018 ... T114).  The chord is the sketch's
+  only line: no radial construction line runs through the bore and body.  It
+  carries the cone-specific deepened-mesh band; it is not a drawing/model
+  reference-status dimension.
+* **Deepened mesh** (U38 option 1b, user ruling U42): each configuration's tip
+  radius ``Ra`` and circular tooth thickness ``ToothThickness`` are
+  configuration literals from ``cone_gear_spec.DEEPENED_MESH_MM`` -- an
+  oversize blank (long addendum) and a thicker tooth -- and ``Delta`` solves
+  from ``ToothThickness``, so the printed thickness IS the modelled flank
+  spacing.
+* Root geometry is simplified: the gap floor joins the flank feet, not the
+  true root circle + trochoid fillet.  ``Tmin`` starts the flanks above the
+  base circle to raise the floor (T048+), and ``FloorDip`` bows it down to
+  the standard tooth's base chord (T006, T012); see
+  ``cone_gear_spec.floor_radius_mm``.  The sheet prints that floor as a MIN
+  diameter.
 
-Dimensions: cad/DIMENSIONS.md "Chapter 12" -- DP 30 / PA 14.5 deg (module
-resolved M4 prep), face width 6.5 mm (M6.7 mesh packing; annotated 7 is
-inconsistent with the drum grid, see FACE_WIDTH comment), tooth counts 6k.
+Dimensions: cad/DIMENSIONS.md "Chapter 12" -- DP 49.82 / PA 14.5 deg, face
+width 6.5 mm (M6.7 mesh packing; annotated 7 is inconsistent with the drum
+grid), tooth counts 6k.
 
 Layout: gear axis = Z through the origin, blank extruded +Z from the Front
 plane (z = 0..7 mm).
@@ -69,50 +82,97 @@ from __future__ import annotations
 
 import math
 import sys
+import time
 from typing import Any
 
 import _config
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _grouped_bom_properties import apply_grouped_bom_properties
 from _part_pmi import author_part_pmi
+from cone_gear_notes import drawing_notes, gear_data
 from cone_gear_spec import (
+    BLANK_DIA_BAND,
+    BORE_DIA_BAND,
+    CONFIGURATION_TEETH,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
-    GEAR_DATA,
+    DRAWING_PRECISION,
+    FACE_WIDTH,
+    MM_PER_IN,
+    STANDARD_TOOTH_THICKNESS,
     SURFACE_FINISHES,
+    TOOTH_THICKNESS,
+    TOOTH_THICKNESS_BAND,
+    bore_dia_mm,
+    configuration_number,
+    floor_dip_mm,
+    floor_radius_mm,
+    floor_tmin,
+    material_specification,
+    outside_dia_mm,
+    tooth_thickness_mm,
 )
 from _common import (
     OUT_PNG,
+    OUT_SLDPRT,
     SketchDims,
     _early_bound,
     _read_member,
     apply_custom_properties,
     apply_material,
     check,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_sketch_direct_db,
     volume_check,
 )
-# NOTE: this module keeps its OWN validating ``set_global`` (below) -- it
+from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
+
+# NOTE: the validating ``set_global`` comes from ``involute_gear`` -- it
 # round-trips every gear-math global through the SW equation parser to assert
-# the trig/sqr/pi dialect, which the plain ``_common.set_global`` does not do.
-# So we deliberately do NOT import ``_common.set_global`` (it would be shadowed
-# by the local def anyway). The self-naming helpers above drive only the two
+# the trig/sqr/pi dialect, which the plain ``_common.set_global`` does not do,
+# so ``_common.set_global`` is deliberately NOT imported. The self-naming
+# helpers above drive only the two
 # ORDINARY circle dims (blank OD, bore); the involute tooth-gap profile is left
 # undimensioned so it stays free to re-solve from the globals and mesh.
 
 import _telemetry
+from involute_gear import (
+    DP,
+    PA_DEG,
+    PI_LIT,
+    equation_curve,
+    gap_area_in_disc,
+    gear_facts,
+    pattern_count_dimension,
+    read_dimension,
+    set_global,
+    set_global_read,
+)
 
 PART_NAME = "cone-gear"
+# Reference sketches this part still saves shown (#880), each with its owner
+# and why.  Delete an entry once the part hides that sketch; the release
+# refuses to start while any part lists one (visibility_debt).
+SHOWN_SKETCH_ALLOWANCES = {
+    "ToothThicknessReference": (
+        "conegear: carries the print's driving tooth-thickness dimension; "
+        "#834 hides it once the sheet imports it from the hidden sketch"
+    ),
+}
 MATERIAL = "Brass"  # ch. 13 text: polished brass gear stock; cone set matches
 # The four smallest tip gears read "more yellow ... a harder metal" (ch.12 p.21)
 # -- a high-zinc yellow metal (Muntz/manganese bronze). That muntz_yellow tint is
@@ -123,203 +183,539 @@ MATERIAL = "Brass"  # ch. 13 text: polished brass gear stock; cone set matches
 # (export_models comp_rgb -> IComponent2.GetMaterialPropertyValues2). The part
 # itself stays uniformly brass. See cad/config/materials.yaml.
 
-DP = _config.machine("gear_train", "diametral_pitch")  # cad/config/machine.yaml (DIMENSIONS.md ch12)
-PA_DEG = 14.5  # pressure angle, period-typical assumption (low)
 # M6.7: the exact-tracking mesh (assembly docstring) fixes the seat
 # pitch along the shaft at Z_PITCH*cos(12.52 deg) = 6.889 mm (the finer
-# DP 49.82 module gives a shallower incline); face 6.5 leaves 0.39 air,
-# and the photo's 7 mm callout still cannot hold -- the annotated cone
-# figures stay inconsistent with the drum grid, see DIMENSIONS.md ch. 12.
-FACE_WIDTH = 6.5  # mm, derived (photo callout 7, see above)
+# DP 49.82 module gives a shallower incline); face 6.0 (cone_gear_spec,
+# U27: .X band, max 6.8 still clears the pitch) leaves 0.89 air, and the
+# photo's 7 mm callout still cannot hold -- the annotated cone figures stay
+# inconsistent with the drum grid, see DIMENSIONS.md ch. 12.
 
 # Cut clearance radius (inches -- document units, see module docstring)
 # beyond the largest tip radius (120T OD/2 = 2.033") so the gap profile
 # always closes outside the blank.
 R_CLEAR_IN = 60.0 / 25.4
 
-PI_LIT = "3.14159265358979"  # literal pi for equation-manager expressions
-
 # The full cone set: 20 gears, 6..120 teeth step 6 (DIMENSIONS.md ch. 12).
-# The 3-config prototype pass (6/60/120) validated regeneration first, per
-# plan risk #2; the same script now carries all 20 configurations.
-CONFIGS = [(f"T{n:03d}", n) for n in range(6, 121, 6)]
-DEFAULT_TEETH = 120  # globals' all-configuration value at authoring time
-
+CONFIGS = tuple((f"T{n:03d}", n) for n in CONFIGURATION_TEETH)
+DEFAULT_TEETH = CONFIGURATION_TEETH[-1]
+TOOTH_GAP_PROFILE = "ToothGapProfile"
+TOOTH_GAP_CUT = "ToothGapCut"
+TOOTH_PATTERN_FEATURE = "ToothGapPattern"
 
 def bore_dia_in(teeth: int) -> float:
-    """Configured bore diameter (inches) -- snug on the stepped shaft.
-
-    All 20 gears seat PERPENDICULAR to the shaft (true cone, p.18 --
-    M6.7; the M6.6 canted-vertical experiment is retired: it met the
-    interference checker but visibly deformed the cone). At the finer
-    module DP 49.82 (ch13 OD 62.2) the tip gears are tiny -- T006 OD is
-    only 4.08 mm with a 0.89 mm root radius -- so the shaft steps down
-    much further (`build_cone_gear_shaft.py`) and each bore matches its
-    section AND stays inside the gear's root circle:
-      3/8" T024..T120, 1/4" T018, 1/8" T012, 1/32" T006.
-    The four tip gears (T006..T024, more yellow + harder in the book, p.21)
-    are a harder high-zinc yellow metal (Muntz/manganese bronze) cut from
-    drawn rod and SOLDERED to the shaft (p.21 macro shows solder blobs) --
-    no keyway. WARNING: the 1/32" (0.79 mm) tip journal carrying T006 is
-    mechanically marginal; it follows directly from the 62.2 OD anchor
-    (low confidence) and is flagged for Phase 3 rebuild validation.
-    """
-    if teeth <= 6:
-        return 0.03125  # 0.79 mm -- T006 root r 0.89 mm leaves a 0.49 mm wall (marginal)
-    if teeth <= 12:
-        return 0.125  # 3.18 mm -- T012 root r 2.42 mm, 0.83 mm wall
-    if teeth <= 18:
-        return 0.25  # 6.35 mm -- T018 root r 3.95 mm, 0.78 mm wall
-    return 0.375  # 9.53 mm -- T024 root r 5.48 mm, 0.71 mm wall
+    """Configured bore diameter in inches, matching the stepped-shaft seat."""
+    return bore_dia_mm(teeth) / MM_PER_IN
 
 
-def gear_facts(teeth: int, dp: float = DP, pa_deg: float = PA_DEG) -> dict[str, float]:
-    """Python mirror of the equation-manager globals (lengths in inches)."""
-    pa = math.radians(pa_deg)
-    rb = teeth / dp * math.cos(pa) / 2.0
-    ra = (teeth + 2.0) / dp / 2.0
-    tmax = math.sqrt((ra / rb) ** 2 - 1.0)
-    delta = math.pi / (2.0 * teeth) + math.tan(pa) - pa
-    gamma = 2.0 * math.pi / teeth
+def thicken_in(teeth: int) -> float:
+    """Modelled tooth thickness over standard, inches (deepened mesh)."""
+    return (tooth_thickness_mm(teeth) - STANDARD_TOOTH_THICKNESS) / MM_PER_IN
+
+
+def addendum_extra_in(teeth: int) -> float:
+    """Tip radius over the standard ``(N + 2) / DP / 2``, inches."""
+    return outside_dia_mm(teeth) / MM_PER_IN / 2.0 - (teeth + 2.0) / DP / 2.0
+
+
+def _mesh_kwargs(teeth: int) -> dict[str, float]:
     return {
-        "PArad": pa,
-        "Rb": rb,
-        "Ra": ra,
-        "Tmax": tmax,
-        "Delta": delta,
-        "Gamma": gamma,
-        "ThetaL": math.atan(tmax) - tmax + delta,
-        "ThetaU": tmax - math.atan(tmax) - delta + gamma,
+        "thicken_in": thicken_in(teeth),
+        "addendum_extra_in": addendum_extra_in(teeth),
+        "tmin": floor_tmin(teeth),
+        "floor_dip_in": floor_dip_mm(teeth) / MM_PER_IN,
     }
 
 
-def gap_area_in_disc(
-    teeth: int, samples: int = 2000, dp: float = DP, pa_deg: float = PA_DEG
-) -> float:
-    """Exact in-blank area of one tooth gap (in^2), by Green's theorem.
+def cone_facts(teeth: int) -> dict[str, float]:
+    """``gear_facts`` for one configuration of the deepened cone mesh."""
+    return gear_facts(teeth, **_mesh_kwargs(teeth))
 
-    Boundary: lower flank A1->B1, blank-rim arc B1->B2 at ``Ra`` (the
-    beyond-rim part of the cut profile removes nothing), upper flank B2->A2
-    reversed, base chord A2->A1 -- the same parametrisations as the live
-    equation curves, so the expected volume validates the involute shape,
-    not just that "some" cut happened.
+
+def cone_gap_area_in_disc(teeth: int) -> float:
+    """``gap_area_in_disc`` for one configuration of the deepened cone mesh."""
+    return gap_area_in_disc(teeth, **_mesh_kwargs(teeth))
+
+
+def _as_construction(adapter, entity_id: str) -> None:
+    """Make a registered sketch line construction-only and prove the flag."""
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+async def _author_tooth_thickness_reference(adapter: Any) -> SketchDims:
+    """Author the model-owned thickness dimension on the +X tooth's pitch chord.
+
+    Every configuration seeds a tooth centred on local +X, so a vertical chord
+    at x = pitch radius, centred on the X axis, spans a tooth for every even
+    tooth count.  Its lower end is dimensioned straight from the sketch origin
+    (pitch radius across, half thickness down), so the sketch needs no radial
+    construction line through the bore.
     """
-    f = gear_facts(teeth, dp, pa_deg)
-    rb, ra = f["Rb"], f["Ra"]
-    tmax, delta, gamma = f["Tmax"], f["Delta"], f["Gamma"]
-    pts: list[tuple[float, float]] = []
-    for i in range(samples + 1):  # lower flank (mirrored involute)
-        t = tmax * i / samples
-        ph = t - delta
-        pts.append((
-            rb * (math.cos(ph) + t * math.sin(ph)),
-            rb * (t * math.cos(ph) - math.sin(ph)),
-        ))
-    for i in range(1, samples + 1):  # rim arc ThetaL -> ThetaU
-        th = f["ThetaL"] + (f["ThetaU"] - f["ThetaL"]) * i / samples
-        pts.append((ra * math.cos(th), ra * math.sin(th)))
-    for i in range(1, samples + 1):  # upper flank, reversed
-        t = tmax * (samples - i) / samples
-        ph = t - delta + gamma
-        pts.append((
-            rb * (math.cos(ph) + t * math.sin(ph)),
-            rb * (math.sin(ph) - t * math.cos(ph)),
-        ))
-    for i in range(1, samples):  # base chord A2 -> A1
-        s = i / samples
-        pts.append((
-            rb * ((1 - s) * math.cos(gamma - delta) + s * math.cos(delta)),
-            rb * ((1 - s) * math.sin(gamma - delta) + s * math.sin(delta)),
-        ))
-    area = 0.0
-    for (x1, y1), (x2, y2) in zip(pts, pts[1:] + pts[:1], strict=False):
-        area += x1 * y2 - x2 * y1
-    return abs(area) / 2.0
-
-
-async def set_global_read(adapter: Any, name: str, expression: str) -> float:
-    """Upsert a global variable and return the value SolidWorks evaluated."""
-    from solidworks_mcp.adapters.base import SetGlobalVariableParameters
-
-    res = await adapter.set_global_variable(
-        SetGlobalVariableParameters(name=name, expression=expression)
+    tooth_reference = SketchDims()
+    check(
+        "create_sketch tooth-thickness reference",
+        await adapter.create_sketch("Front"),
     )
-    data = check(f"global {name} = {expression}", res)
-    value = data.get("value")
-    if value is None:
-        raise RuntimeError(f"global {name}: no evaluated value returned")
-    return float(value)
+    pitch_radius_mm = DEFAULT_TEETH / DP * 25.4 / 2.0
+    set_sketch_direct_db(adapter, True)
+    tooth_line = check(
+        "tooth-thickness reference line",
+        await adapter.add_line(
+            pitch_radius_mm,
+            -TOOTH_THICKNESS / 2.0,
+            pitch_radius_mm,
+            TOOTH_THICKNESS / 2.0,
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, tooth_line)
+    check(
+        "tooth-thickness reference vertical",
+        await adapter.add_sketch_constraint(tooth_line, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{tooth_line}.start",
+        "origin",
+        "horizontal_distance",
+        pitch_radius_mm,
+        "tooth-thickness pitch radius",
+    )
+    tooth_reference.record(
+        "ToothPitchRadius",
+        '"ToothCount" / "DP" / 2',
+    )
+    await dimension_between(
+        adapter,
+        f"{tooth_line}.start",
+        "origin",
+        "vertical_distance",
+        TOOTH_THICKNESS / 2.0,
+        "tooth-thickness chord centred on the X axis",
+    )
+    tooth_reference.record("ToothHalfThickness", '"ToothThickness" / 2')
+    await dimension_between(
+        adapter,
+        f"{tooth_line}.start",
+        f"{tooth_line}.end",
+        "vertical_distance",
+        TOOTH_THICKNESS,
+        "circular tooth thickness",
+    )
+    tooth_reference.record("ToothThickness", '"ToothThickness"')
+    await ensure_fully_defined(adapter, "tooth-thickness reference sketch")
+    check(
+        "exit_sketch tooth-thickness reference",
+        await adapter.exit_sketch(),
+    )
+    return tooth_reference
 
 
-async def set_global(adapter: Any, name: str, expression: str, expected: float) -> None:
-    """Upsert a global variable and assert SolidWorks evaluated it correctly.
+def _active_configuration(model: Any) -> Any:
+    manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
+    return _early_bound(manager.ActiveConfiguration, "IConfiguration")
 
-    The value round-trip is the live test of the equation parser (trig in
-    DEGREES -- probed live, see ``build`` -- ``sqr`` = square root, literal-pi
-    arithmetic); a mismatch means the expression dialect is wrong and every
-    downstream curve would be silently bogus.
-    """
-    value = await set_global_read(adapter, name, expression)
-    tol = max(1e-9, abs(expected) * 1e-6)
-    if abs(value - expected) > tol:
+
+def _activate_configuration(model: Any, configuration: str) -> Any:
+    """Activate a configuration, accepting SW 2026's already-active False."""
+    active = _active_configuration(model)
+    if str(active.Name) != configuration and not bool(
+        model.ShowConfiguration2(configuration)
+    ):
+        raise RuntimeError(f"failed to activate configuration {configuration}")
+    active = _active_configuration(model)
+    if str(active.Name) != configuration:
         raise RuntimeError(
-            f"global {name}: SolidWorks evaluated {value!r}, expected "
-            f"{expected:.9g} -- equation-parser dialect mismatch"
+            f"active configuration {str(active.Name)!r} != {configuration!r}"
         )
+    return active
 
 
-async def equation_curve(
-    adapter: Any, label: str, x_expr: str, y_expr: str
-) -> str:
-    """Add a parametric equation curve over t in [0, 1]; return its entity ID."""
-    from solidworks_mcp.adapters.base import CreateEquationCurveParameters
-
-    res = await adapter.create_equation_driven_curve(
-        CreateEquationCurveParameters(
-            x_expression=x_expr,
-            y_expression=y_expr,
-            range_start="0",
-            range_end="1",
-        )
+def _expected_configuration_volume(teeth: int) -> float:
+    facts = cone_facts(teeth)
+    radius_mm = facts["Ra"] * 25.4
+    blank_mm3 = math.pi * radius_mm**2 * FACE_WIDTH
+    bore_mm3 = math.pi * (bore_dia_in(teeth) * 12.7) ** 2 * FACE_WIDTH
+    return (
+        blank_mm3
+        - teeth * cone_gap_area_in_disc(teeth) * 25.4**2 * FACE_WIDTH
+        - bore_mm3
     )
-    return check(f"curve {label}", res)
 
 
-def pattern_count_dimension(adapter: Any, feature_name: str, expected: float) -> str:
-    """Find the pattern's instance-count dimension name (``D?@<feature>``).
+def _native_minimum_chord_floor_radius_mm(
+    body: Any, *, teeth: int
+) -> tuple[float, int]:
+    """Measure the minimum radius of the planar BREP root-chord edges.
 
-    The circular-pattern dimension layout (which of D1/D2 is the count vs
-    the angle) is not documented stably across releases, so probe by value:
-    the count dimension is the one reading ``expected`` (the seed count must
-    differ from the 360-degree angle for this to be unambiguous).
+    Root candidates lie on one end plane and have both endpoints on the
+    flank-foot circle (the base circle unless the floor is raised).  This
+    topology filter excludes axial edges
+    and the vertex-free cylindrical bore.  ``IEdge.GetClosestPointOn`` then
+    measures the persisted edge itself without assuming the equation curve was
+    simplified to an analytic line, using screen-space selection, approximate
+    boxes, or substituting a volume proxy.
     """
+    pressure_angle = math.radians(PA_DEG)
+    foot_radius_mm = (
+        teeth / DP * math.cos(pressure_angle) / 2.0 * 25.4
+    ) * math.hypot(1.0, floor_tmin(teeth))
+    candidates: list[float] = []
+    for raw_edge in tuple(_early_bound(body, "IBody2").GetEdges() or ()):
+        edge = _early_bound(raw_edge, "IEdge")
+        raw_start = edge.GetStartVertex()
+        raw_end = edge.GetEndVertex()
+        if raw_start is None or raw_end is None:
+            continue
+        start = tuple(
+            float(value) * 1000.0
+            for value in _early_bound(raw_start, "IVertex").GetPoint()
+        )
+        end = tuple(
+            float(value) * 1000.0
+            for value in _early_bound(raw_end, "IVertex").GetPoint()
+        )
+        if abs(start[2] - end[2]) > 1e-6:
+            continue
+        start_radius = math.hypot(start[0], start[1])
+        end_radius = math.hypot(end[0], end[1])
+        if max(
+            abs(start_radius - foot_radius_mm),
+            abs(end_radius - foot_radius_mm),
+        ) > 0.002:
+            continue
+        closest = tuple(
+            float(value) * 1000.0
+            for value in edge.GetClosestPointOn(
+                0.0,
+                0.0,
+                start[2] / 1000.0,
+            )
+        )
+        if len(closest) < 3:
+            raise RuntimeError(
+                f"T{teeth:03d}: unreadable root-edge closest point "
+                f"{closest!r}"
+            )
+        candidates.append(math.hypot(closest[0], closest[1]))
+    if not candidates:
+        raise RuntimeError(
+            f"T{teeth:03d}: no planar gap-floor edge in solid BREP"
+        )
+    return min(candidates), len(candidates)
+
+
+def _configuration_definition_state(
+    adapter: Any, configuration: str, *, phase: str
+) -> None:
+    """Log the equation, seed-feature and pattern-definition persistence state."""
     model = _early_bound(adapter.currentModel, "IModelDoc2")
-    for dim in ("D1", "D2", "D3", "D4"):
-        full = f"{dim}@{feature_name}"
-        param = adapter._attempt(lambda f=full: model.Parameter(f), default=None)
-        if param is None:
-            continue
+    part = _early_bound(model, "IPartDoc")
+    equation_manager = _early_bound(model.GetEquationMgr(), "IEquationMgr")
+    wanted = {"ToothCount", "BoreDia", "Rb", "Ra", "Rf", "XMax"}
+    equations: dict[str, tuple[str, float]] = {}
+    count = int(_read_member(equation_manager, "GetCount") or 0)
+    for index in range(count):
+        equation = str(equation_manager.Equation(index) or "")
+        left, _, _right = equation.partition("=")
+        name = left.strip().strip('"')
+        if name in wanted:
+            equations[name] = (equation, float(equation_manager.Value(index)))
+
+    feature_states: dict[str, tuple[bool, int, bool]] = {}
+    for name in (TOOTH_GAP_PROFILE, TOOTH_GAP_CUT, TOOTH_PATTERN_FEATURE):
+        raw = part.FeatureByName(name)
+        if raw is None:
+            raise RuntimeError(f"{configuration}: diagnostic feature {name} missing")
+        feature = _early_bound(raw, "IFeature")
+        states = feature.IsSuppressed2(3, [configuration])
+        if not isinstance(states, (list, tuple)):
+            states = (states,)
+        error_result = feature.GetErrorCode2()
+        if not isinstance(error_result, (list, tuple)) or len(error_result) < 2:
+            raise RuntimeError(
+                f"{configuration}: unreadable {name} error state {error_result!r}"
+            )
+        feature_states[name] = (
+            len(states) != 1 or bool(states[0]),
+            int(error_result[0] or 0),
+            bool(error_result[1]),
+        )
+
+    pattern = _early_bound(
+        part.FeatureByName(TOOTH_PATTERN_FEATURE), "IFeature"
+    )
+    definition = _early_bound(
+        pattern.GetDefinition(), "ICircularPatternFeatureData"
+    )
+    _telemetry.info(
+        f"{phase} cone-gear definition state {configuration}: "
+        f"equations={equations!r}, features={feature_states!r}, "
+        f"geometry_pattern={bool(definition.GeometryPattern)}, "
+        f"instances={int(definition.TotalInstances)}"
+    )
+
+
+async def _configuration_topology(
+    adapter: Any,
+    configuration: str,
+    teeth: int,
+    *,
+    phase: str,
+) -> tuple[float, str, tuple[str, ...]]:
+    """Measure one configuration's real pattern and solid-body topology."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    active = _activate_configuration(model, configuration)
+    part = _early_bound(model, "IPartDoc")
+    raw_pattern = part.FeatureByName(TOOTH_PATTERN_FEATURE)
+    if raw_pattern is None:
+        raise RuntimeError(f"{configuration}: {TOOTH_PATTERN_FEATURE} is missing")
+    pattern = _early_bound(raw_pattern, "IFeature")
+    states = pattern.IsSuppressed2(3, [configuration])
+    if not isinstance(states, (list, tuple)):
+        states = (states,)
+    suppressed = len(states) != 1 or bool(states[0])
+    definition = _early_bound(
+        pattern.GetDefinition(), "ICircularPatternFeatureData"
+    )
+    instances = int(definition.TotalInstances)
+    error_result = pattern.GetErrorCode2()
+    if not isinstance(error_result, (list, tuple)) or len(error_result) < 2:
+        raise RuntimeError(
+            f"{configuration}: unreadable pattern error state {error_result!r}"
+        )
+    error_code = int(error_result[0] or 0)
+    is_warning = bool(error_result[1])
+    bodies = tuple(part.GetBodies2(0, False) or ())
+    face_count = (
+        int(_early_bound(bodies[0], "IBody2").GetFaceCount())
+        if len(bodies) == 1
+        else 0
+    )
+    root_observation = ""
+    root_issues: list[str] = []
+    if teeth == CONFIGS[0][1] and len(bodies) == 1:
+        native_root, chord_edges = _native_minimum_chord_floor_radius_mm(
+            bodies[0], teeth=teeth
+        )
+        expected_root = floor_radius_mm(teeth)
+        maximum_bore_radius = (
+            bore_dia_mm(teeth) + BORE_DIA_BAND[0]
+        ) / 2.0
+        minimum_web = native_root - maximum_bore_radius
+        root_observation = (
+            f", native_chord_floor_radius={native_root:.6f}, "
+            f"equivalent_diameter={2.0 * native_root:.6f}, "
+            f"expected_chord_floor_radius={expected_root:.6f}, "
+            f"minimum_bore_web={minimum_web:.6f}, "
+            f"chord_edges={chord_edges}"
+        )
+        if abs(native_root - expected_root) > 0.002:
+            root_issues.append(
+                f"native chord-floor radius {native_root:.6f} differs from "
+                f"source equation {expected_root:.6f}"
+            )
+        if chord_edges < teeth:
+            root_issues.append(
+                f"native chord-edge count {chord_edges} < tooth count {teeth}"
+            )
+        if minimum_web <= 0.0:
+            root_issues.append(
+                f"native minimum bore web is nonpositive: {minimum_web:.6f}"
+            )
+    mass = await adapter.get_mass_properties()
+    if not mass.is_success:
+        raise RuntimeError(f"{configuration}: get_mass_properties failed: {mass.error}")
+    volume = float(mass.data.volume)
+    expected = _expected_configuration_volume(teeth)
+    needs_rebuild = bool(active.NeedsRebuild)
+    save_mark = bool(active.AddRebuildSaveMark)
+    observation = (
+        f"{configuration}: active={str(active.Name)}, "
+        f"needs_rebuild={needs_rebuild}, save_mark={save_mark}, "
+        f"{TOOTH_PATTERN_FEATURE} instances={instances}, "
+        f"suppressed={suppressed}, error={error_code}, warning={is_warning}, "
+        f"bodies={len(bodies)}, faces={face_count}, volume={volume:.1f}, "
+        f"expected={expected:.1f}{root_observation}"
+    )
+    _telemetry.info(f"{phase} cone-gear topology: {observation}")
+    issues: list[str] = []
+    issues.extend(root_issues)
+    if needs_rebuild:
+        issues.append("configuration needs rebuild")
+    if instances != teeth:
+        issues.append(f"pattern instances {instances} != {teeth}")
+    if suppressed:
+        issues.append("pattern is suppressed")
+    if error_code:
+        issues.append(f"pattern error {error_code} warning={is_warning}")
+    if len(bodies) != 1:
+        issues.append(f"solid body count {len(bodies)} != 1")
+    if face_count < 2 * teeth + 4:
+        issues.append(
+            f"solid face count {face_count} < toothed minimum {2 * teeth + 4}"
+        )
+    if abs(volume - expected) > 0.01 * expected:
+        issues.append(f"volume {volume:.1f} outside 1% of {expected:.1f}")
+    if configuration in {CONFIGS[0][0], CONFIGS[-1][0]}:
+        _configuration_definition_state(
+            adapter, configuration, phase=phase
+        )
+    return volume, observation, tuple(issues)
+
+
+def _save3_with_contract(adapter: Any, options: int, *, label: str) -> None:
+    """Save in place and consume Save3's BOOL/errors/warnings tuple exactly."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    started = time.perf_counter()
+    result = model.Save3(options, 0, 0)
+    if isinstance(result, (list, tuple)):
+        ok = bool(result[0])
+        errors = int(result[1] or 0)
+        warnings = int(result[2] or 0)
+    else:
+        ok = bool(result)
+        errors = 0
+        warnings = 0
+    elapsed = time.perf_counter() - started
+    _telemetry.info(
+        f"{label}: Save3(options={options}) ok={ok}, errors={errors}, "
+        f"warnings={warnings}, elapsed={elapsed:.3f}s"
+    )
+    if not ok or errors:
+        raise RuntimeError(
+            f"{label}: Save3 failed: ok={ok}, errors={errors}, "
+            f"warnings={warnings}"
+        )
+
+
+async def assert_saved_configuration_topology(
+    adapter: Any, *, phase: str = "saved"
+) -> dict[str, float]:
+    """Fully solve each reopened configuration, then strictly validate its teeth.
+
+    Before any geometry getter, each saved configuration is activated through
+    the repository's established ``set_active_configuration`` helper.  That
+    helper switches with ``ShowConfiguration2`` and applies its documented
+    full-solve strategy for equation-driven geometry: ``ForceRebuild3(False)``
+    with the existing ``EditRebuild3`` fallback.  The returned ``rebuilt`` flag
+    must be true.
+
+    An earlier b399963e discriminator read T006 before rebuilding and observed
+    pattern error 1 / four faces; that read then lazily changed the state before
+    the following ``EditRebuild3``.  A production closure subsequently proved
+    that ``EditRebuild3`` alone returns False on untouched inactive caches.
+    Those runs are preserved at:
+    C:/src/dt-logs/farm-runs/20260921T224631Z-cone-b399-capture/
+    20260921T225446Z-leaf-part-cone_gear/task.log lines 481-493, and
+    C:/src/dt-logs/farm-runs/20260921T230142Z-cone-closure-capture/
+    20260921T231022Z-leaf-part-cone_gear/task.log lines 480-505.
+
+    This validates the rebuilt saved model, not its cold caches.  A failed
+    activation/rebuild or any post-rebuild error, body, face, volume, or
+    monotonicity mismatch remains fatal.
+    """
+    failures: list[str] = []
+    volumes: dict[str, float] = {}
+    ordered = (CONFIGS[-1], *CONFIGS[:-1])
+    _telemetry.info(
+        f"{phase}: validating all configurations only after the established "
+        "set_active_configuration rebuild; saved cold caches are not being "
+        "validated"
+    )
+    for configuration, teeth in ordered:
         try:
-            value = float(_read_member(param, "Value"))
-        except (TypeError, ValueError):
+            activation_started = time.perf_counter()
+            activation = await adapter.set_active_configuration(configuration)
+            activation_elapsed = time.perf_counter() - activation_started
+            check(f"{phase} activate {configuration}", activation)
+            rebuilt = bool(activation.data.get("rebuilt"))
+            _telemetry.info(
+                f"{phase} {configuration}: "
+                f"set_active_configuration rebuilt={rebuilt}, "
+                f"elapsed={activation_elapsed:.6f}s"
+            )
+            if not rebuilt:
+                failures.append(
+                    f"{configuration}: set_active_configuration returned "
+                    f"rebuilt=False after {activation_elapsed:.6f}s"
+                )
+                continue
+            volume, observation, issues = await _configuration_topology(
+                adapter,
+                configuration,
+                teeth,
+                phase=f"{phase} post-activation-rebuild",
+            )
+        except Exception as exc:
+            failures.append(f"{configuration}: {exc}")
             continue
-        _telemetry.debug(f"{full} reads {value:g}")
-        if abs(value - expected) < 1e-9:
-            return full
-    raise RuntimeError(
-        f"no dimension of {feature_name} reads {expected:g} -- cannot link "
-        "the instance count to ToothCount"
-    )
+        volumes[configuration] = volume
+        if issues:
+            failures.append(f"{observation}; issues={issues!r}")
+
+    try:
+        restore_started = time.perf_counter()
+        restore = await adapter.set_active_configuration(CONFIGS[-1][0])
+        restore_elapsed = time.perf_counter() - restore_started
+        check(f"{phase} restore {CONFIGS[-1][0]}", restore)
+        restore_rebuilt = bool(restore.data.get("rebuilt"))
+        _telemetry.info(
+            f"{phase} restore {CONFIGS[-1][0]}: "
+            f"set_active_configuration rebuilt={restore_rebuilt}, "
+            f"elapsed={restore_elapsed:.6f}s"
+        )
+        if not restore_rebuilt:
+            failures.append(
+                f"restore {CONFIGS[-1][0]}: set_active_configuration "
+                "returned rebuilt=False"
+            )
+    except Exception as exc:
+        failures.append(f"restore {CONFIGS[-1][0]}: {exc}")
+
+    if len(volumes) == len(CONFIGS):
+        family = [volumes[name] for name, _teeth in CONFIGS]
+        if not all(a < b for a, b in zip(family, family[1:], strict=False)):
+            failures.append(f"reopened volumes not monotonic: {volumes!r}")
+    if failures:
+        raise RuntimeError(
+            f"{phase} cone-gear configuration topology is invalid: "
+            + "; ".join(failures)
+        )
+    return volumes
 
 
-def read_dimension(adapter: Any, full_name: str) -> float:
-    """Read a dimension's value in the active configuration."""
-    param = adapter._attempt(
-        lambda: adapter.currentModel.Parameter(full_name), default=None
+def _apply_configuration_properties(
+    adapter: Any, configuration: str, properties: dict[str, str]
+) -> None:
+    """Write and verify configuration-specific title/data-block properties."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    extension = _read_member(model, "Extension")
+    manager = adapter._attempt(
+        lambda: extension.CustomPropertyManager(configuration), default=None
     )
-    if param is None:
-        raise RuntimeError(f"cannot read dimension {full_name}")
-    return float(_read_member(param, "Value"))
+    if manager is None:
+        raise RuntimeError(
+            f"CustomPropertyManager unavailable for configuration {configuration}"
+        )
+    manager = _early_bound(manager, "ICustomPropertyManager")
+    for name, value in properties.items():
+        text = str(value)
+        adapter._attempt(
+            lambda n=name, v=text: manager.Add3(n, 30, v, 2), default=None
+        )
+        observed = str(
+            adapter._attempt(
+                lambda n=name: model.GetCustomInfoValue(configuration, n), default=""
+            )
+        )
+        if observed != text:
+            raise RuntimeError(
+                f"{configuration} property {name!r} readback "
+                f"{observed!r} != {text!r}"
+            )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -341,6 +737,21 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     check("create_part", await adapter.create_part())
+    # Configuration-scoped equation updates only work for rows created by
+    # IEquationMgr.Add3. A one-configuration model makes the adapter fall back
+    # to Add2, whose rows later appeared to update transiently but reopened as
+    # 120T in every configuration. Seed T120 before the first equation so every
+    # global is born through Add3; the remaining configurations are added after
+    # the base geometry exists.
+    name, teeth = CONFIGS[-1]
+    check(
+        f"create_configuration {name}",
+        await adapter.create_configuration(
+            CreateConfigurationParameters(
+                name=name, comment=f"{teeth}-tooth cone gear"
+            )
+        ),
+    )
 
     # ------------------------------------------------------------------
     # Equation-manager globals. Probes first: live-verified on SW 2026, the
@@ -348,7 +759,7 @@ async def build(adapter) -> dict[str, str]:
     # the atn return unit is probed because inverse trig need not match.
     # sqr = square root (VBA-style).
     # ------------------------------------------------------------------
-    facts = gear_facts(DEFAULT_TEETH)
+    facts = cone_facts(DEFAULT_TEETH)
     await set_global(adapter, "TrigProbe", "cos(60)", 0.5)
     await set_global(adapter, "SqrProbe", "sqr(2)", math.sqrt(2.0))
     atn_probe = await set_global_read(adapter, "AtnProbe", "atn(1)")
@@ -363,13 +774,25 @@ async def build(adapter) -> dict[str, str]:
 
     await set_global(adapter, "ToothCount", str(DEFAULT_TEETH), DEFAULT_TEETH)
     await set_global(adapter, "DP", f"{DP:g}", DP)
+    # Tip radius and tooth thickness are configuration literals (set per
+    # configuration below, like BoreDia): the deepened mesh sizes each one
+    # from its own contact-ratio / tip-land / backlash limits
+    # (cone_gear_spec.DEEPENED_MESH_MM), not from a closed form in N.
+    await set_global(
+        adapter,
+        "ToothThickness",
+        f'{facts["ToothThickness"]:.12g}',
+        facts["ToothThickness"],
+    )
     await set_global(adapter, "PA", f"{PA_DEG:g}", PA_DEG)
     await set_global(adapter, "PArad", f'"PA" * {PI_LIT} / 180', facts["PArad"])
     await set_global(
         adapter, "Rb", '"ToothCount" / "DP" * cos("PA") / 2', facts["Rb"]
     )
+    await set_global(adapter, "Ra", f'{facts["Ra"]:.12g}', facts["Ra"])
+    await set_global(adapter, "Tmin", f'{facts["Tmin"]:.12g}', facts["Tmin"])
     await set_global(
-        adapter, "Ra", '("ToothCount" + 2) / "DP" / 2', facts["Ra"]
+        adapter, "FloorDip", f'{facts["FloorDip"]:.12g}', facts["FloorDip"]
     )
     await set_global(
         adapter, "Tmax", 'sqr("Ra" * "Ra" / ("Rb" * "Rb") - 1)', facts["Tmax"]
@@ -377,7 +800,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(
         adapter,
         "Delta",
-        f'{PI_LIT} / (2 * "ToothCount") + tan("PA") - "PArad"',
+        '"ToothThickness" * "DP" / "ToothCount" + tan("PA") - "PArad"',
         facts["Delta"],
     )
     await set_global(adapter, "Gamma", f'2 * {PI_LIT} / "ToothCount"', facts["Gamma"])
@@ -434,6 +857,12 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=FACE_WIDTH)),
     )
     name_last_feature(adapter, "Blank")
+    # The face width is a size the turner sets, so it prints as a NATIVE model
+    # dimension (drawing-simplicity-policy.md rules 1-2): name the extrude
+    # depth so it can be marked and given its decimal places like the two
+    # circle dims. It stays a literal (no drive job): FACE_WIDTH is one value
+    # across all 20 configurations.
+    name_dimensions(adapter, "Blank", ["FaceWidth"])
 
     mass = await adapter.get_mass_properties()
     if not mass.is_success:
@@ -533,10 +962,16 @@ async def build(adapter) -> dict[str, str]:
     # ------------------------------------------------------------------
     # One tooth gap, all six profile entities equation-driven (t in [0,1]).
     # Loop: A1 ->(lower flank)-> B1 ->(radial)-> arc -> (radial)-> B2
-    # ->(upper flank, reversed)-> A2 ->(base chord)-> A1.
+    # ->(upper flank, reversed)-> A2 ->(gap floor)-> A1.  The flanks start at
+    # involute parameter Tmin (0: on the base circle); the floor is the feet
+    # chord bowed down by FloorDip at the gap centre (a parabola through both
+    # feet), so one six-entity sketch carries all three floor constructions.
     # ------------------------------------------------------------------
     check("create_sketch gap", await adapter.create_sketch("Front"))
-    u = '("Tmax" * t)'
+    u = '("Tmin" + ("Tmax" - "Tmin") * t)'
+    foot_low = '("Tmin" - "Delta")'
+    foot_up = '("Tmin" - "Delta" + "Gamma")'
+    bow = '4 * t * (1 - t) * "FloorDip"'
     ph_low = f'({u} - "Delta")'
     ph_up = f'({u} - "Delta" + "Gamma")'
     gap_curves = [
@@ -554,9 +989,13 @@ async def build(adapter) -> dict[str, str]:
         ),
         await equation_curve(
             adapter,
-            "base chord A2->A1",
-            '"Rb" * ((1 - t) * cos("Gamma" - "Delta") + t * cos("Delta"))',
-            '"Rb" * ((1 - t) * sin("Gamma" - "Delta") + t * sin("Delta"))',
+            "gap floor A2->A1",
+            f'"Rb" * ((1 - t) * (cos{foot_up} + "Tmin" * sin{foot_up})'
+            f' + t * (cos{foot_low} + "Tmin" * sin{foot_low}))'
+            f' - {bow} * cos("Gamma" / 2)',
+            f'"Rb" * ((1 - t) * (sin{foot_up} - "Tmin" * cos{foot_up})'
+            f' + t * ("Tmin" * cos{foot_low} - sin{foot_low}))'
+            f' - {bow} * sin("Gamma" / 2)',
         ),
         await equation_curve(
             adapter,
@@ -593,7 +1032,7 @@ async def build(adapter) -> dict[str, str]:
     # UNdimensioned -- pinning a recorded dim on them would break the mesh.
     # (create_cut_extrude still consumes this most-recent sketch by recency,
     # not by name, so the rename is safe.)
-    name_last_feature(adapter, "ToothGapProfile")
+    name_last_feature(adapter, TOOTH_GAP_PROFILE)
     # Single direction: both_directions splits the depth symmetrically about
     # the sketch plane (caught live: a 10 mm both-ways cut covered only
     # z 0..5 of the 7 mm blank, leaving an uncut full disc at z 5..7).
@@ -601,6 +1040,7 @@ async def build(adapter) -> dict[str, str]:
         ExtrusionParameters(depth=FACE_WIDTH + 1.0)
     )
     check("cut tooth gap", gap_cut)
+    gap_cut_name = name_last_feature(adapter, TOOTH_GAP_CUT)
 
     # ------------------------------------------------------------------
     # Pattern the gap about the gear axis; link the instance count to
@@ -611,12 +1051,12 @@ async def build(adapter) -> dict[str, str]:
     # ------------------------------------------------------------------
     from solidworks_mcp.adapters.base import CreateAxisParameters
 
-    check(
+    pattern_axis = check(
         "create_axis Z (Top x Right)",
         await adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
         ),
-    )
+    ).name
     adapter._zoom_to_fit(adapter.currentModel)
     ra_default_mm = facts["Ra"] * 25.4
     candidates = [[0.0, 0.0, FACE_WIDTH / 2.0]]  # on the reference axis
@@ -633,7 +1073,7 @@ async def build(adapter) -> dict[str, str]:
         res = await adapter.circular_pattern_feature(
             CircularPatternParameters(
                 axis_point=point,
-                features=[gap_cut.data.name],
+                features=[gap_cut_name],
                 count=DEFAULT_TEETH,
                 geometry_pattern=True,
             )
@@ -645,7 +1085,11 @@ async def build(adapter) -> dict[str, str]:
         _telemetry.debug(f"axis candidate {point} failed: {res.error}")
     if pattern is None:
         raise RuntimeError("circular pattern: no axis candidate selectable")
-    count_dim = pattern_count_dimension(adapter, pattern.data.name, DEFAULT_TEETH)
+    # Hide only now: the pattern picks the axis by screen point, which a
+    # blanked axis would refuse.
+    blank_reference_geometry(adapter, ((pattern_axis, "AXIS"),))
+    pattern_name = name_last_feature(adapter, TOOTH_PATTERN_FEATURE)
+    count_dim = pattern_count_dimension(adapter, pattern_name, DEFAULT_TEETH)
     check(
         f"link {count_dim} to ToothCount",
         await adapter.create_equation(
@@ -661,20 +1105,30 @@ async def build(adapter) -> dict[str, str]:
     bore_default_mm3 = math.pi * (bore_default_in * 12.7) ** 2 * FACE_WIDTH
     v_gear = (
         expected_blank
-        - DEFAULT_TEETH * gap_area_in_disc(DEFAULT_TEETH) * 25.4**2 * FACE_WIDTH
+        - DEFAULT_TEETH * cone_gap_area_in_disc(DEFAULT_TEETH) * 25.4**2 * FACE_WIDTH
         - bore_default_mm3
     )
     await volume_check(adapter, "cone gear (default config)", v_gear, 0.01 * v_gear)
 
-    # Apply the deferred ORDINARY-circle drive equations now -- after the whole
-    # base model + a rebuild exists, so every target (BlankDia@BlankProfile,
-    # BoreCutDia@BoreProfile) resolves. These REPLACE the old inline
-    # create_equation links and MUST land before the configuration experiment
-    # below, which asserts that the blank OD and volume track ToothCount/BoreDia
-    # per config (it cannot if the equations don't yet exist). Each equation
-    # evaluates to the value just built, so the geometry must not move -- the
-    # re-check is the proof. The tooth-gap profile is absent from drive_jobs by
-    # design (it stays free to mesh).
+    # Native tooth-system acceptance size.  The involute is generated from the
+    # gear equations and exposes no stable feature dimension for circular tooth
+    # thickness, so policy rule 2's authoring-reference-sketch pattern gives the
+    # print one DRIVING model dimension.  The vertical witness is the +X
+    # tooth's pitch chord, a tooth for every even count: the imported
+    # extension lines start on that tooth's flanks.  The construction chord is
+    # volume-neutral; the drawing hides the sketch in its side and isometric
+    # views (blanking it in the part would also suppress the dimension).
+    tooth_reference = await _author_tooth_thickness_reference(adapter)
+    tooth_sketch = name_last_feature(adapter, "ToothThicknessReference")
+    thickness_dim = f"ToothThickness@{tooth_sketch}"
+    drive_jobs += tooth_reference.apply(adapter, tooth_sketch)
+
+    # Apply every deferred drive equation after all targets exist: blank and
+    # bore circle dimensions plus the construction sketch's native circular
+    # tooth thickness.  The configuration sweep below proves the two
+    # configuration-dependent solids still regenerate; the construction
+    # dimension is volume-neutral.  The involute gap profile remains absent
+    # from drive_jobs by design because its flanks must solve from the globals.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
@@ -691,7 +1145,7 @@ async def build(adapter) -> dict[str, str]:
     # and monotonic growth, then return to the first config and require the
     # volume to reproduce (determinism).
     # ------------------------------------------------------------------
-    for name, teeth in CONFIGS:
+    for name, teeth in CONFIGS[:-1]:
         check(
             f"create_configuration {name}",
             await adapter.create_configuration(
@@ -721,12 +1175,36 @@ async def build(adapter) -> dict[str, str]:
                 )
             ),
         )
+        mesh = cone_facts(teeth)
+        for global_name in ("Ra", "ToothThickness", "Tmin", "FloorDip"):
+            value = f"{mesh[global_name]:.12g}"
+            check(
+                f"{global_name} = {value} in {name}",
+                await adapter.set_global_variable(
+                    SetGlobalVariableParameters(
+                        name=global_name, expression=value, configuration=name
+                    )
+                ),
+            )
 
     # Author before the existing 20-configuration regeneration sweep.  This is
     # the live regression gate for the model-owned symbol: a face-attached
     # symbol created in the 120T geometry makes every other configuration's
     # component feature rebuild with swFeatureErrorUnknown.
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    # Establish the final path once while T120 is active. The per-configuration
+    # sweep can then use IModelDoc2.Save3 directly; the adapter's in-place save
+    # deliberately adds AvoidRebuildOnSave, which live probes proved does not
+    # persist rebuilt inactive-configuration bodies.
+    # This part saves itself rather than through save_part_and_images, so it
+    # runs that helper's construction-geometry check here.
+    assert_reference_geometry_hidden(adapter, PART_NAME, allowed=SHOWN_SKETCH_ALLOWANCES)
+    OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
+    part_path = (OUT_SLDPRT / f"{PART_NAME}.SLDPRT").resolve()
+    check(
+        f"establish cone-gear part path -> {part_path}",
+        await adapter.save_file(str(part_path)),
+    )
 
     png_dir = OUT_PNG / PART_NAME
     png_dir.mkdir(parents=True, exist_ok=True)
@@ -744,8 +1222,9 @@ async def build(adapter) -> dict[str, str]:
         # (T006 read 182.7 vs 108.3 -- a partially re-patterned state -- while
         # standalone it reads 108.2 deterministically). Force a full rebuild so the
         # gap pattern is fully applied for THIS config before any measurement.
-        adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
-        adapter._attempt(lambda: adapter.currentModel.EditRebuild3(), default=None)
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        if not bool(model.ForceRebuild3(False)):
+            raise RuntimeError(f"{name}: ForceRebuild3 reported failure")
 
         count = read_dimension(adapter, count_dim)
         if abs(count - teeth) > 1e-9:
@@ -754,30 +1233,16 @@ async def build(adapter) -> dict[str, str]:
             )
         _telemetry.success(f"{name}: pattern count = {count:g}")
 
-        cfg = gear_facts(teeth)
-        ra_mm = cfg["Ra"] * 25.4
-        mass = await adapter.get_mass_properties()
-        if not mass.is_success:
-            raise RuntimeError(f"{name}: get_mass_properties failed: {mass.error}")
-        volume = float(mass.data.volume)
-        blank_mm3 = math.pi * ra_mm**2 * FACE_WIDTH
-        bore_mm3 = math.pi * (bore_dia_in(teeth) * 12.7) ** 2 * FACE_WIDTH
-        expected = (
-            blank_mm3
-            - teeth * gap_area_in_disc(teeth) * 25.4**2 * FACE_WIDTH
-            - bore_mm3
+        volume, observation, issues = await _configuration_topology(
+            adapter,
+            name,
+            teeth,
+            phase="pre-save",
         )
-        if abs(volume - expected) > 0.01 * expected:
-            raise RuntimeError(
-                f"{name}: volume {volume:.1f} mm^3, analytic expectation "
-                f"{expected:.1f} (blank {blank_mm3:.1f}) -- regeneration "
-                "produced wrong geometry"
-            )
+        if issues:
+            raise RuntimeError(f"{observation}; issues={issues!r}")
         volumes[name] = volume
-        _telemetry.success(
-            f"{name}: volume {volume:.1f} mm^3 "
-            f"(analytic {expected:.1f}, blank {blank_mm3:.1f})"
-        )
+        cfg = cone_facts(teeth)
 
         # OD check via the equation-driven diameter dimension (selection-free;
         # the measure tool's point selection proved unreliable on the
@@ -790,6 +1255,17 @@ async def build(adapter) -> dict[str, str]:
                 "regenerate"
             )
         _telemetry.success(f"{name}: blank diameter dim = {od:g}")
+        # The native thickness is the printed acceptance size: prove the
+        # configuration literal reached it (the involute flanks solve from the
+        # same ToothThickness global through Delta).
+        thickness = read_dimension(adapter, thickness_dim)
+        expected_thickness = cfg["ToothThickness"] * dim_unit
+        if abs(thickness - expected_thickness) > 1e-6 * expected_thickness:
+            raise RuntimeError(
+                f"{name}: {thickness_dim} reads {thickness:g}, expected "
+                f"{expected_thickness:g} -- ToothThickness did not regenerate"
+            )
+        _telemetry.success(f"{name}: tooth thickness dim = {thickness:g}")
 
         img = (png_dir / f"{PART_NAME}_{name}_isometric.png").resolve()
         check(
@@ -811,6 +1287,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"volumes not monotonically increasing: {volumes}")
     _telemetry.success(f"volumes monotonic: {ordered}")
 
+
     # Determinism: revisit the first configuration after the full cycle.
     first_name, _ = CONFIGS[0]
     check(f"re-activate {first_name}", await adapter.set_active_configuration(first_name))
@@ -827,28 +1304,97 @@ async def build(adapter) -> dict[str, str]:
 
     check("activate T120 for saved views", await adapter.set_active_configuration("T120"))
     grouped_spec = _config.parts(PART_NAME)
+    part_number = str(grouped_spec.get("number", ""))
     description = str(grouped_spec.get("description", "")).strip()
     apply_grouped_bom_properties(
         adapter,
         [name for name, _teeth in CONFIGS],
-        part_number=str(grouped_spec.get("number", "")),
+        part_number=part_number,
         description=description,
     )
     apply_custom_properties(adapter, {"Description": description})
     await report_mass_properties(adapter)
 
-    # Mark the bore as the single manufacturing model dimension (on the drawn
-    # T120 config) and stamp the title-block + gear-data properties the curated
-    # drawing reads.
+    # Mark the four manufacturing model dimensions.  Both fitted sizes carry
+    # bands derived above; their decimal places live on the model and each
+    # configuration sheet only imports and arranges them.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    set_dimension_bilateral_tolerance(
+        adapter, "BlankProfile", "BlankDia", *deviations(BLANK_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "BoreProfile", "BoreCutDia", *deviations(BORE_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "ToothThicknessReference",
+        "ToothThickness",
+        *deviations(TOOTH_THICKNESS_BAND),
+    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
+        {
+            "Gear Data": gear_data(DEFAULT_TEETH),
+            "Manufacturing Notes": drawing_notes(DEFAULT_TEETH),
+        },
     )
+    for configuration, teeth in CONFIGS:
+        _apply_configuration_properties(
+            adapter,
+            configuration,
+            {
+                # The title block's DWG. NO. reads $PRPSHEET:"Number", and a
+                # configuration property wins over the file one, so each sheet
+                # names its own gear (Fable, 2026-09-23: twenty sheets carried
+                # one number).  The grouped BOM keeps MHA-013 (AlternateName).
+                "Number": configuration_number(part_number, teeth),
+                "Gear Data": gear_data(teeth),
+                "Manufacturing Notes": drawing_notes(teeth),
+                "Material Specification": material_specification(teeth),
+            },
+        )
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
+    part_path = artefacts["part"]
+    # Rebuild every configuration through the API intended for File > Save All
+    # > Rebuild and save document, then serialize all marked configuration
+    # caches in one Save3 call. AddRebuildSaveMark controls which caches are
+    # written; Save3 alone does not rebuild those configurations.
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
+    if not bool(manager.AddRebuildSaveMark(2, "")):
+        raise RuntimeError("failed to set all-configuration rebuild-save marks")
+    for name, _teeth in CONFIGS:
+        raw_configuration = model.GetConfigurationByName(name)
+        if raw_configuration is None:
+            raise RuntimeError(f"{name}: configuration missing while setting save marks")
+        configuration = _early_bound(raw_configuration, "IConfiguration")
+        if not bool(configuration.AddRebuildSaveMark):
+            raise RuntimeError(f"{name}: rebuild-save mark was not set")
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    rebuild_started = time.perf_counter()
+    if not bool(extension.ForceRebuildAll()):
+        raise RuntimeError("ForceRebuildAll failed for cone-gear configurations")
+    _telemetry.info(
+        "rebuilt all cone-gear configurations in "
+        f"{time.perf_counter() - rebuild_started:.3f}s"
+    )
+    _save3_with_contract(
+        adapter,
+        1,
+        label="rebuild and persist all marked configurations",
+    )
+
+    part_title = str(
+        _early_bound(adapter.currentModel, "IModelDoc2").GetTitle()
+    )
+    adapter.swApp.CloseDoc(part_title)
+    adapter.currentModel = None
+    check("reopen saved cone-gear", await adapter.open_model(part_path))
+    await assert_saved_configuration_topology(adapter, phase="reopened")
 
     if findings:
         summary = "; ".join(findings)

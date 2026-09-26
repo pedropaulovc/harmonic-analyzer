@@ -12,25 +12,26 @@ import math
 from collections.abc import Iterable, Mapping
 
 from _hole_spec import blind_cut_dia_mm
-from build_harmonic_base import (
+from harmonic_base_fasteners import (
     HOLD_DOWN_ENGAGEMENT as _HOLD_DOWN_ENGAGEMENT,
     HOLD_DOWN_TAP_DRILL_DIA as _HOLD_DOWN_TAP_DRILL_DIA,
     HOLD_DOWN_THREAD as _HOLD_DOWN_THREAD,
+    PEDESTAL_SCREW_ENGAGEMENT as _PEDESTAL_SCREW_ENGAGEMENT,
 )
 from _hole_spec import THREAD_MAJOR_MM
-from crank_arm_spec import (
-    ARM_WIDTH as _ARM_W,
-    PIN_HOLE_SPEC as _ARM_PILOT_SPEC,
-    SHAFT_BORE_DIA as _ARM_BORE,
+from crank_hub_spec import (
+    HUB_BARREL_DIA as _HUB_W,
+    HUB_BORE_DIA as _HUB_BORE,
+    SERVICE_PIN_HOLE_SPEC as _HUB_PILOT_SPEC,
 )
 from crank_pin_spec import (
     BIG_END_DIA as _PIN_D0,
     PIN_LENGTH as _PIN_L,
     SMALL_END_DIA as _PIN_D1,
 )
-from crankshaft_spec import SHAFT_DIA as _CS_DIA
-from pinion_bracket_geometry import PIN_BORE, PIN_SEAT
-from pinion_cam_pin_geometry import PIN_DIA
+# The shaft diameter's owner, not crankshaft_spec: every assembly imports this
+# module, so a crankshaft length or station edit must not re-key them all.
+from crank_hub_geometry import SHAFT_DIA as _CS_DIA
 import summing_lever_spec
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 from frame_attachment_spec import COLUMN_SOCKET_DIAMETER
@@ -38,6 +39,10 @@ from frame_cross_screw_spec import SHANK_DIA as _FRAME_CROSS_DIA
 from frame_cross_screw_spec import SHANK_LEN as _FRAME_CROSS_LENGTH
 from frame_cross_screw_spec import THREAD as _FRAME_CROSS_THREAD
 from _hole_spec import TAP_DRILL_MM
+from post_mount_screw_spec import CUT_LENGTH_MM as _POST_SCREW_CUT_LENGTH
+from post_mount_screw_spec import GRIP_MM as _POST_SCREW_GRIP
+from arbor_set_screw_spec import LENGTH as _ARBOR_SET_SCREW_LENGTH
+from arbor_set_screw_spec import THREAD as _ARBOR_SET_SCREW_THREAD
 
 
 def _smooth_annulus_limit_mm3(
@@ -69,14 +74,12 @@ def _numbered_pairs(
     }
 
 
-_CAM_PIN_OVERLAP_MM3 = math.pi * (PIN_DIA**2 - PIN_BORE**2) * PIN_SEAT / 4.0
-_CAM_PIN_GATE_LIMIT_MM3 = 1.10 * _CAM_PIN_OVERLAP_MM3
-
-# Crank taper pin in its PILOT holes (ch11 p.14, 2026-09-02): the released
-# drawings drill the arm #14 (4.623) and the shaft #9 (4.978) and taper-ream
-# them together at assembly, so the nominal 1:48 pin overlaps both pilots.
-# Bound each overlap at 1.10 x the analytic frustum-minus-cylinder volume
-# over the span the pin crosses (arm hub minus its shaft bore; shaft diameter).
+# Crank taper pin in its PILOT holes (ch11 p.14): released drawings drill the
+# separate hub #14 (4.623) and shaft #9 (4.978), then taper-ream them together
+# at assembly.  Bound each overlap at 1.10 x the analytic
+# frustum-minus-cylinder volume over the receiver span (hub barrel minus its
+# through bore; shaft diameter).  The arm is outboard of this station and has
+# no MHA-024 overlap.
 
 _CS_PILOT = 4.978  # #9 drill (build_crankshaft's wizard cross-hole)
 _PIN_PROUD = 3.85  # build_drive_train_assembly.PIN_PROUD (kept in step by test)
@@ -94,45 +97,100 @@ def _pin_overlap(s0: float, s1: float, hole_dia: float) -> float:
     return total
 
 
-_ARM_PILOT = blind_cut_dia_mm(_ARM_PILOT_SPEC)
+_HUB_PILOT = blind_cut_dia_mm(_HUB_PILOT_SPEC)
 
-# hub -X face at s = PIN_PROUD; the shaft bore occupies the middle ARM_BORE of the hub
-_ARM_S0, _ARM_S1 = _PIN_PROUD, _PIN_PROUD + _ARM_W
-_BORE_S0 = _PIN_PROUD + (_ARM_W - _ARM_BORE) / 2.0
-_BORE_S1 = _BORE_S0 + _ARM_BORE
-_CS_S0 = _PIN_PROUD + (_ARM_W - _CS_DIA) / 2.0
+# Hub -X face at s=PIN_PROUD; its axial shaft bore occupies the middle chord.
+_HUB_S0, _HUB_S1 = _PIN_PROUD, _PIN_PROUD + _HUB_W
+_BORE_S0 = _PIN_PROUD + (_HUB_W - _HUB_BORE) / 2.0
+_BORE_S1 = _BORE_S0 + _HUB_BORE
+_CS_S0 = _PIN_PROUD + (_HUB_W - _CS_DIA) / 2.0
 _CS_S1 = _CS_S0 + _CS_DIA
-_CRANK_PIN_ARM_MM3 = _pin_overlap(_ARM_S0, _BORE_S0, _ARM_PILOT) + _pin_overlap(
-    _BORE_S1, _ARM_S1, _ARM_PILOT
+_CRANK_PIN_HUB_MM3 = _pin_overlap(_HUB_S0, _BORE_S0, _HUB_PILOT) + _pin_overlap(
+    _BORE_S1, _HUB_S1, _HUB_PILOT
 )
 _CRANK_PIN_SHAFT_MM3 = _pin_overlap(_CS_S0, _CS_S1, _CS_PILOT)
 
 # Independent SolidWorks-kernel observations for the exact stock bodies in
-# their production receivers.  The 90280A108's modeled helical thread and
-# under-head runout overlap the native #4-40 far jaw by 6.47 mm3; the cup-tip
-# adjuster makes its intended thrust contact with the shaft end at 0.13 mm3.
-# Ten-percent bounded headroom still fails any materially deeper insertion.
-_TIP_PINCH_GATE_LIMIT_MM3 = 6.47 * 1.10
-_ADJUSTER_THRUST_GATE_LIMIT_MM3 = 0.13 * 1.10
+# their production receivers, each with ten-percent bounded headroom so any
+# materially deeper insertion fails.  The cup-tip adjuster makes its intended
+# thrust contact with the shaft end at 0.13 mm3: the 45 deg cup's analytic
+# (2/3)*pi*r^3 for the 0.79 stub (0.131), re-read at 0.1309 by the
+# mha092-r3-8b1b drive-train leaf on rule-12 E11's 94025A164.  The 1/16 in
+# tip land doubles the stub radius, so the contact scales by r^3: 0.13 * 8 =
+# 1.04 (analytic 1.047) until the next drive-train build re-observes it.
+#
+# The tip block's two threaded pairs were read by that same leaf (8b1bdef31,
+# farm run 20260925T225229777Z; assembly:drive_train log line 333/335,
+# verify_soundness:drive_train line 115/117):
+# - 91794A112 pinch screw (15.875, 17-wide block): 7.8008 mm3.  It replaces
+#   the analytic 22.78 (6.47 read on the 14-wide block, scaled by far-jaw
+#   length), which ran 2.9x high: the per-length scaling does not hold.
+# - 94025A164 adjuster (#10-32, 9.5 embed): 16.4412 mm3 over its 13 thread
+#   bodies.  It replaces the smooth-annulus bound (major 4.826 in the #21
+#   4.0386 drill, 9.5 deep: 57.29), 3.5x the reading, loose enough to hide a
+#   regression.
+_TIP_PINCH_OBSERVED_MM3 = 7.8008
+_TIP_PINCH_GATE_LIMIT_MM3 = _TIP_PINCH_OBSERVED_MM3 * 1.10
+_TIP_ADJUSTER_OBSERVED_MM3 = 16.4412
+_TIP_ADJUSTER_GATE_LIMIT_MM3 = _TIP_ADJUSTER_OBSERVED_MM3 * 1.10
+_ADJUSTER_THRUST_GATE_LIMIT_MM3 = 0.13 * 8.0 * 1.10
 
 _DRIVE_TRAIN_ALLOWED_PAIRS = {
-    frozenset(("crank-pin-1", "crank-arm-1")): 1.10 * _CRANK_PIN_ARM_MM3,
+    frozenset(("crank-pin-1", "crank-hub-1")): 1.10 * _CRANK_PIN_HUB_MM3,
     frozenset(("crank-pin-1", "crankshaft-1")): 1.10 * _CRANK_PIN_SHAFT_MM3,
     # Stock 6.35 shank minus the 1.0 eye wire and 0.02 face clearance.
     frozenset(("fillister-screw-1", "crank-arm-1")): _smooth_annulus_limit_mm3(
         2.8448, 2.261, 5.33
     ),
-    frozenset(("pinion-bracket-1", "pinion-cam-pin-1")): _CAM_PIN_GATE_LIMIT_MM3,
-    frozenset(("pinion-bracket-2", "pinion-cam-pin-2")): _CAM_PIN_GATE_LIMIT_MM3,
-    frozenset(("cone-tip-adjuster-1", "cone-tip-block-1")): _smooth_annulus_limit_mm3(
-        7.9502, 6.528, 6.0
+    # MHA-139 #8-32 major in the arm's #29 tap drill: the full thread past the
+    # 1.5 relief (6.5 of the 8.0 arm) plus its 0.5 lead cone.  The size is
+    # named here, not imported from crank_handle_pivot_screw_spec, so every
+    # assembly's recipe stays clear of the handle specs; the MHA-139 tests pin
+    # it to that spec's THREAD_SIZE.
+    frozenset(("crank-handle-pivot-screw-1", "crank-arm-1")): _smooth_annulus_limit_mm3(
+        THREAD_MAJOR_MM["#8-32"], TAP_DRILL_MM["#8-32"], 7.0
     ),
+    # Rule-12 E11: #10-32 94025A164 in the tapped block, observed above.
+    frozenset(
+        ("cone-tip-adjuster-1", "cone-tip-block-1")
+    ): _TIP_ADJUSTER_GATE_LIMIT_MM3,
     frozenset(
         ("cone-tip-pinch-screw-1", "cone-tip-block-1")
     ): _TIP_PINCH_GATE_LIMIT_MM3,
     frozenset(
         ("cone-tip-adjuster-1", "cone-gear-shaft-1")
     ): _ADJUSTER_THRUST_GATE_LIMIT_MM3,
+    # U30 (I22): each MHA-142 (1/4-20 MSC 40923898, major 6.35) in its #7
+    # (5.105) MHA-091 tap, as deep as the cut length runs past the post's
+    # grip (the counterbore floor).  The smooth-annulus upper bound until the
+    # first drive-train build observes the helical overlap.
+    **_numbered_pairs(
+        "post-mount-screw",
+        (1, 2),
+        "cone-swing-platform",
+        _smooth_annulus_limit_mm3(
+            6.35, 5.105, _POST_SCREW_CUT_LENGTH - _POST_SCREW_GRIP
+        ),
+    ),
+    # #743 Q3: the MHA-147 #4-40 apex set screw in each pedestal's crown tap,
+    # bounded over its whole length (the crown holds a little less: the cup
+    # point stands in the bore clearance and the socket stands
+    # cylinder_bank_layout.SET_SCREW_SOCKET_PROUD over the apex). Pedestal and
+    # screw are both placed south first, so their suffixes match. #911: this
+    # smooth-annulus bound serves the first build only -- re-pin it to the
+    # measured overlap x 1.10 from the first drive_train leaf, as #838 did for
+    # the tip-block pairs.
+    **_numbered_pairs(
+        "arbor-set-screw",
+        range(1, 3),
+        "arbor-pedestal",
+        _smooth_annulus_limit_mm3(
+            THREAD_MAJOR_MM[_ARBOR_SET_SCREW_THREAD],
+            TAP_DRILL_MM[_ARBOR_SET_SCREW_THREAD],
+            _ARBOR_SET_SCREW_LENGTH,
+        ),
+        second_number=None,
+    ),
 }
 
 # Minimum socket chord across the screw's complete major-diameter envelope.
@@ -312,11 +370,13 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         "frame-1/harmonic-base",
         _smooth_annulus_limit_mm3(4.1656, 3.454, 15.525),
     ),
+    # Rule 12 (audit E10): the 31.75 #8-32 x 1-1/4 block screws pass the
+    # 20.5 pinion block and engage 11.25 of the base seat.
     **_numbered_pairs(
         "drive-train-1/slotted-screw",
         range(1, 5),
         "frame-1/harmonic-base",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 6.65),
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 31.75 - 20.5),
     ),
     **_numbered_pairs(
         "drive-train-1/foot-screw",
@@ -324,11 +384,15 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         "frame-1/harmonic-base",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 8.725),
     ),
+    # U34c: the #8-32 x 3/4 (19.05) MHA-143 hold-downs pass the 5.0 pedestal
+    # ledge and engage 14.05 of the transferred base seats.
     **_numbered_pairs(
-        "drive-train-1/foot-screw",
-        range(2, 4),
+        "drive-train-1/pedestal-hold-down-screw",
+        range(1, 3),
         "frame-1/harmonic-base",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 4.525),
+        _smooth_annulus_limit_mm3(
+            4.1656, 3.454, _PEDESTAL_SCREW_ENGAGEMENT
+        ),
     ),
     **_numbered_pairs(
         "channel-1/frame-side-screw",

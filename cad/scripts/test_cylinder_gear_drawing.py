@@ -10,7 +10,9 @@ import pytest
 
 import _config
 from _buildgraph import module_deps_of
-from build_cone_gear import gear_facts
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
+import build_cylinder_gear as part
+from involute_gear import gear_facts
 import cylinder_gear_shaft_spec as arbor
 import cylinder_gear_spec as spec
 import draw_cylinder_gear as drawing
@@ -60,21 +62,65 @@ def test_every_marked_dimension_has_exactly_one_view_owner() -> None:
     )
     assert ownership == Counter(marked)
     assert set(drawing.DIMENSION_CALLOUTS) <= marked
-    assert set(drawing.DIMENSION_PRECISION) <= marked
+
+
+def test_the_part_owns_every_printed_decimal_place() -> None:
+    """Policy rule 2: places are the tolerance, so the .SLDPRT carries them.
+
+    Three places only where a three-place band rides the dimension (the
+    matched bore's reference nominal, the cam eccentricity); four on the
+    stacking thickness that sets the station pitch, 7.0565 +/-0.025, exact
+    only at four (#743, user ruling L20 d'); the cam thickness is the one
+    sheet-derived value, a parenthesised reference.
+    """
+    by_name = spec.DRAWING_PRECISION_BY_NAME
+    assert set(by_name) == set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert {name for name, places in by_name.items() if places == 3} == {
+        "BoreDia",
+        "CamCy",
+    }
+    assert {name for name, places in by_name.items() if places == 4} == {
+        "OverallThickness",
+    }
+    assert spec.DRAWING_REFERENCE_PRECISION == {"cam thickness reference": 2}
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in part_source
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    # The sheet reads the places back and never rewrites them.
+    assert "set_dimension_precision" not in source
+    assert "assert_imported_precision(" in source
+    assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
 @pytest.mark.parametrize(
-    "assembly_script",
+    ("assembly_script", "reads_cylinder_spec"),
     (
-        "build_channel_assembly.py",
-        "build_drive_train_assembly.py",
-        "build_paper_drive_assembly.py",
+        ("build_channel_assembly.py", True),
+        ("build_drive_train_assembly.py", True),
+        # paper-drive read the cylinder spec only through the drive-train
+        # script; it now takes the crank axis from cone_line (#880).
+        ("build_paper_drive_assembly.py", False),
     ),
 )
-def test_assembly_recipes_exclude_cylinder_drawing_prose(assembly_script: str) -> None:
+def test_assembly_recipes_exclude_cylinder_drawing_prose(
+    assembly_script: str, reads_cylinder_spec: bool
+) -> None:
     dependencies = {
         Path(path).name
         for path in module_deps_of(Path(__file__).with_name(assembly_script))
     }
-    assert "cylinder_gear_spec.py" in dependencies
+    assert ("cylinder_gear_spec.py" in dependencies) is reads_cylinder_spec
     assert dependencies.isdisjoint({"build_cylinder_gear.py", "cylinder_gear_notes.py"})
+
+
+def test_stacking_thickness_is_the_held_marked_dimension() -> None:
+    import cylinder_bank_layout as bank
+    import cylinder_gear_notes as notes
+
+    # The overall thickness sets every station of the solid bank (#743), so it
+    # is a marked model dimension printed to four places with its own band;
+    # the cam thickness between it and the face width is only a reference.
+    assert spec.DRAWING_DIMENSIONS["CamBoss"] == {"OverallThickness"}
+    assert spec.DRAWING_PRECISION_BY_NAME["OverallThickness"] == 4
+    assert "OverallThickness" in drawing.RIGHT_KEEP
+    assert f"{bank.RING_OVERHANG_MAX:.2f}" in notes.STACK_FIT_CALLOUT

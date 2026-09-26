@@ -50,7 +50,7 @@ from _common import (
 )
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _holes import wizard_holes
-from build_clamp_screw import HEAD_H as CLAMP_HEAD_H
+from clamp_screw_spec import HEAD_H as CLAMP_HEAD_H
 
 PART_NAME = "support-bar"
 MATERIAL = "Plain Carbon Steel"

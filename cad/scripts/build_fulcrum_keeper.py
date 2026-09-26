@@ -64,8 +64,8 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _holes import wizard_holes
-from build_frame_side_screw import HEAD_DIA as FRAME_SIDE_HEAD_DIA
-from build_frame_side_screw import SHANK_DIA as FRAME_SIDE_SHANK_DIA
+from frame_side_screw_spec import HEAD_DIA as FRAME_SIDE_HEAD_DIA
+from frame_side_screw_spec import SHANK_DIA as FRAME_SIDE_SHANK_DIA
 from fulcrum_keeper_spec import (
     BALL_DIA,
     BORE_DIA,

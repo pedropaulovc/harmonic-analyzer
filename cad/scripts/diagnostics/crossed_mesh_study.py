@@ -5,7 +5,7 @@ and crank-drive gear are not meshing in model") -- the study behind
 ``gear_train.crank_drive_backlash_mm``, ``fits.crank_mesh.c2c_slack_mm`` and
 the drive-train's ``MESH16_C2C`` / ``Y_CRANK`` / ``MESH_WINDOW_CENTRE_DEG``
 constants. It builds the exact modeled tooth solids -- the involute gap
-profile of ``build_cone_gear.gear_facts`` with the ``_gear.py`` widen /
+profile of ``involute_gear.gear_facts`` with the ``_gear.py`` widen /
 root-relief extensions, the 64T's teeth twisted as the TRUE helix
 ``build_crank_drive_gear`` sweeps (``slices`` optionally quantizes to the
 retired K-slice cut stack) -- places them on the live drive-train geometry
@@ -46,11 +46,15 @@ import _common  # noqa: F401  -- resolves to diagnostics/_common.py, the import
 # real _common (every diag_*/probe_* script here relies on it)
 import build_drive_train_assembly as dta
 from _gear import gap_area_in_disc_ext  # noqa: F401  (re-exported for callers)
-from build_cone_gear import gear_facts
+from involute_gear import PA_DEG, gear_facts
 from build_crank_drive_gear import BACKLASH_MM, HELIX_DEG
+from crank_drive_gear_spec import PRESSURE_ANGLE_DEG as PA64_T  # transverse
 
 IN = 25.4
 DP_CRANK = dta.DP_CRANK
+# #906: one cutter for the pair -- the 16T's DP, and the 64T's normal DP.
+DP_CRANK_CUTTER = dta.DP_CRANK_CUTTER
+ADDENDUM64_EXTRA_IN = 1.0 / DP_CRANK_CUTTER - 1.0 / DP_CRANK
 GEAR64_SEAT = dta.GEAR64_SEAT
 GEAR64_FACE = dta.GEAR64_FACE
 PINION_FACE = dta.PINION_FACE
@@ -64,15 +68,17 @@ PINION_TOOTH_Z = dta.PINION_TOOTH_Z
 
 
 def gap_polygon(teeth: int, dp: float, root_r_mm: float | None = None,
-                widen_mm: float = 0.0, samples: int = 400) -> np.ndarray:
+                widen_mm: float = 0.0, samples: int = 400, *,
+                pa_deg: float = PA_DEG, addendum_extra_in: float = 0.0) -> np.ndarray:
     """One tooth-gap polygon (mm): the exact ``_gear.cut_tooth_gap`` boundary.
 
     ``widen_mm`` is the symmetric flank backlash (circumferential, at pitch
     radius); the mirrored lower flank takes the offset with the OPPOSITE
     phase sign (its azimuth is the negated phase), exactly as the live curve
-    literals do.
+    literals do. ``pa_deg`` and ``addendum_extra_in`` pass through to
+    ``gear_facts`` (a normal-defined helical gear's transverse profile).
     """
-    f = gear_facts(teeth, dp)
+    f = gear_facts(teeth, dp, pa_deg, addendum_extra_in=addendum_extra_in)
     rb, ra = f["Rb"] * IN, f["Ra"] * IN
     tmax, delta, gamma = f["Tmax"], f["Delta"], f["Gamma"]
     rp = teeth / dp / 2.0 * IN
@@ -112,13 +118,15 @@ class GapLookup:
     """Vectorized material test on a fine (theta mod Gamma, r) grid."""
 
     def __init__(self, teeth: int, dp: float, widen_mm: float = 0.0,
-                 root_r_mm: float | None = None):
-        f = gear_facts(teeth, dp)
+                 root_r_mm: float | None = None, *, pa_deg: float = PA_DEG,
+                 addendum_extra_in: float = 0.0):
+        f = gear_facts(teeth, dp, pa_deg, addendum_extra_in=addendum_extra_in)
         self.gamma = f["Gamma"]
         self.ra = f["Ra"] * IN
         self.rmin = (root_r_mm if root_r_mm is not None
                      else f["Rb"] * IN * math.cos((f["Gamma"] - 2 * f["Delta"]) / 2.0) * 0.999)
-        poly = Path(gap_polygon(teeth, dp, root_r_mm, widen_mm))
+        poly = Path(gap_polygon(teeth, dp, root_r_mm, widen_mm, pa_deg=pa_deg,
+                                addendum_extra_in=addendum_extra_in))
         self.nth, self.nr = 2048, 512
         th = np.linspace(0.0, self.gamma, self.nth, endpoint=False)
         rr = np.linspace(self.rmin, self.ra, self.nr)
@@ -170,7 +178,7 @@ def study(y_crank: float, skew_deg: float = 0.0, widen16: float = 0.0,
     alpha16 = math.degrees(math.atan2(dy16, GEAR64_SEAT[0] - X_CRANK))
     tp64 = 360.0 / 64.0
     delta64 = round(alpha64 / tp64) * tp64 - alpha64
-    seed = ((alpha16 + 180.0) - delta64 * (R64 / R16) - 22.5 / 2.0
+    seed = ((alpha16 + 180.0) - delta64 * (64.0 / 16.0) - 22.5 / 2.0
             ) % 22.5 + seed_off
     # Axial placement: the shipped station. It is anchored to the STATIC
     # casting-to-T120 span (see the assembly's span-fit assert), not to the
@@ -180,9 +188,10 @@ def study(y_crank: float, skew_deg: float = 0.0, widen16: float = 0.0,
     k16 = (16, widen16, root16)
     k64 = (64, widen64, root64)
     if k16 not in lut:
-        lut[k16] = GapLookup(16, DP_CRANK, widen16, root16)
+        lut[k16] = GapLookup(16, DP_CRANK_CUTTER, widen16, root16)
     if k64 not in lut:
-        lut[k64] = GapLookup(64, DP_CRANK, widen64, root64)
+        lut[k64] = GapLookup(64, DP_CRANK, widen64, root64, pa_deg=PA64_T,
+                             addendum_extra_in=ADDENDUM64_EXTRA_IN)
     g16, g64 = lut[k16], lut[k64]
 
     xs = np.arange(X_CRANK - g16.ra - 0.3, X_CRANK + g16.ra + 0.3, vox)
