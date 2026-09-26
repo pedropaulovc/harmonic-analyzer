@@ -229,9 +229,9 @@ BOM_PART_NUMBERS = {
     "cylinder-gear-shaft": "MHA-028",
     "arbor-pedestal": "MHA-004",
     "cylinder-end-disc": "MHA-121",
-    "dome-cap-screw": "MHA-125",
     "cylinder-gear": "MHA-027",
     "pedestal-hold-down-screw": "MHA-143",
+    "arbor-set-screw": "MHA-147",
     "foot-screw": "MHA-103",
     "cone-gear-shaft": "MHA-014",
     "cone-gear": "MHA-013",
@@ -274,10 +274,10 @@ BOM_PART_NUMBERS = {
 BOM_DESCRIPTIONS = {
     "cylinder-gear-shaft": "CYLINDER GEAR ARBOR",
     "arbor-pedestal": "ARBOR PEDESTAL",
-    "cylinder-end-disc": "CYLINDER BANK END DISC",
-    "dome-cap-screw": "ARBOR DOME CAP",
+    "cylinder-end-disc": "CYLINDER BANK THRUST WASHER",
     "cylinder-gear": "CYLINDER GEAR WITH CAM, 120T",
     "pedestal-hold-down-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A197",
+    "arbor-set-screw": "#4-40 X 1/4 SET SCREW, MCMASTER 91375A106",
     "foot-screw": "#4-40 FILLISTER SCREW, MCMASTER 90280A108",
     "cone-gear-shaft": "CONE GEAR SHAFT",
     "cone-gear": "CONE GEAR, T006-T120 BY 6; 1 EACH",
@@ -415,26 +415,47 @@ BANK_STEPS = "\n".join(
         # (depthed at assembly) or the pinion rig (feeler-set).
         # The MHA-028 print owns the stock (3/8 1018 CF X 190, long enough for
         # the edge finder) and its cut-to-fit rule (Main, r9).
-        "8. SLIDE {cylinder_gears}X MHA-027 ONTO UNCUT MHA-028 (SEE ITS PRINT),",
-        "   ALL ALIKE, CAM SIDE FRONT; ADD EACH CONNECTING ROD",
-        "   (CHANNEL ASSEMBLY MHA-A02) ON ITS CAM AS ITS GEAR GOES ON. FIT",
-        "   MHA-121 AT EACH END.",
+        # #743 (retention743 plan section 4, user rulings Q1-Q3): the bank is
+        # a solid stack, so fit-up proves the stack length, locates the back
+        # strap as the Z datum, sets the front strap by one 0.45 leaf and
+        # swaps a setting mandrel for the finished arbor, which the MHA-147
+        # apex set screws hold. Supersedes U34's disc/feeler end play and
+        # its "span -6.0" arbor. Every limit is cylinder_bank_layout's,
+        # rounded inward (test_bank_fitup_limits_are_the_layout_bands):
+        # 8: T 7.0565 +0.05/0; L20 141.13 +0.20/0. 9A: Y is the hole-table
+        # rear-face distance of the back strap inner face, 70.538 +/-0.10.
+        # 9F: E_b 0.35-0.55.
+        "8. MIC EACH OF {cylinder_gears}X MHA-027, CAM FACE TO BACK FACE:",
+        "   7.057-7.106; RECORD. SLIDE THEM ONTO A 3/8 GROUND SETTING",
+        "   MANDREL ~190 LONG, ALL ALIKE, CAM SIDE FRONT; ADD EACH CONNECTING",
+        "   ROD (CHANNEL ASSEMBLY MHA-A02) ON ITS CAM AS ITS GEAR GOES ON.",
+        "   CLAMP LIGHTLY END TO END: GEAR 0 CAM FACE TO GEAR 19 BACK FACE",
+        "   141.13-141.33. LONG: RE-FACE THE THICKEST CAM FACE, REMEASURE.",
+        "   SLIDE THE STACK OFF IN ORDER.",
         "9. BASE MHA-035 OUT OF THE FRAME, ON THE MILL TABLE, PAD TRAMMED,",
-        "   OVERHANG SUPPORTED; CONE SET (MHA-091) NOT FITTED. FIT BOTH MHA-004",
-        "   OVER THE ARBOR ENDS AND STAND THE BANK ON THE BASE. PUSH EACH",
-        "   MHA-121 AGAINST ITS END GEAR; SLIDE EACH MHA-004 IN UNTIL A 0.025",
-        "   IN FEELER BETWEEN STRAP AND DISC IS LIGHTLY PINCHED. EDGE-FIND THE",
-        "   MHA-035 PLINTH EAST FACE (HOLE-TABLE DATUM) AND ZERO DRO X. AT EACH",
-        "   END, EDGE-FIND BOTH SIDES OF THE PROTRUDING MHA-028 STOCK AND",
-        "   HALVE; SHIFT THAT MHA-004, FEELER HELD, UNTIL THE STOCK CENTRE",
-        "   READS X 168.11-168.31. HOLD, AND SPOT MHA-035 THROUGH EACH MHA-004",
-        "   FOOT HOLE WITH AN 11/64 TRANSFER PUNCH. LIFT THE BANK AND BOTH",
-        "   MHA-004 OFF. DRILL #29 X 19.5, TAP #8-32 X 16.0 (PLUG, THEN",
-        "   BOTTOMING), 2 PLACES; BLOW OUT CHIPS. REFIT; RE-SET THE FEELER AND",
-        "   X 168.11-168.31 AT BOTH ENDS, THEN TIGHTEN 2X MHA-143 AND RECHECK.",
-        "   MEASURE MHA-004 OUTER FACE TO OUTER FACE; CUT MHA-028 TO THAT -6.0",
-        "   AND FACE BOTH ENDS; IT MUST SLIDE FREELY THROUGH BOTH BORES. FIT",
-        "   MHA-125 IN EACH. END PLAY 0.5-0.8 EACH END.",
+        "   OVERHANG SUPPORTED; CONE SET (MHA-091) NOT FITTED.",
+        "9A. BACK MHA-004 ALONE ON THE MANDREL, ON THE BASE. EDGE-FIND BOTH",
+        "   MHA-035 HOLE-TABLE DATUM FACES (SEE ITS PRINT); ZERO DRO X AND Y.",
+        "   SET THE STRAP INNER FACE TO Y 70.44-70.63 AND THE MANDREL CENTRE",
+        "   (EDGE-FIND BOTH SIDES, HALVE) TO X 168.11-168.31.",
+        "   SPOT MHA-035 THROUGH THE FOOT HOLE WITH AN 11/64 TRANSFER PUNCH;",
+        "   LIFT OFF. DRILL #29 X 19.5, TAP #8-32 X 16.0 (PLUG, THEN",
+        "   BOTTOMING); BLOW OUT CHIPS. REFIT, RE-SET Y AND X, TIGHTEN",
+        "   MHA-143 AND RECHECK.",
+        "9B. FROM THE FRONT, LOAD ONE MHA-121, THE STACK IN ORDER, THEN THE",
+        "   OTHER MHA-121. PUSH THE BANK BACK, CLOSED UP ON THE BACK MHA-121.",
+        "9C. SLIDE THE FRONT MHA-004 ON UNTIL A 0.45 LEAF BETWEEN ITS STRAP",
+        "   AND THE FRONT MHA-121 IS LIGHTLY PINCHED. SET X 168.11-168.31,",
+        "   SPOT, LIFT OFF, DRILL AND TAP AS 9A. REFIT; RE-SET THE LEAF AND X,",
+        "   TIGHTEN MHA-143 AND RECHECK.",
+        "9D. MEASURE MHA-004 OUTER FACE TO OUTER FACE. TURN MHA-028: ITS",
+        "   CYLINDER IS THAT SPAN, PLUS A 1.5 DOME EACH END (SEE ITS PRINT).",
+        "9E. PUSH MHA-028 IN FROM THE BACK, END TO END WITH THE MANDREL, UNTIL",
+        "   THE MANDREL IS OUT AND EACH DOME STANDS 1.5 PROUD (DEPTH GAUGE).",
+        "   SPOT MHA-028 THROUGH EACH CROWN TAP WITH A #43 DRILL, 0.5 DEEP;",
+        "   BLOW OUT CHIPS. RUN THE BACK MHA-147 IN TIGHT, THEN THE FRONT ONE.",
+        "9F. THE BANK TURNS FREE BY HAND; A 0.35 LEAF ENTERS AT THE FRONT",
+        "   MHA-121, A 0.55 LEAF DOES NOT.",
         "   PINION RIG: SHEET 7.",
     )
 )

@@ -8,6 +8,7 @@ from _fastener_catalog import FASTENERS
 
 _EXPECTED = {
     # Stable production stem: (supplier SKU(s), MHA number, fleet quantity).
+    "arbor-set-screw": (("91375A106",), "MHA-147", 2),
     "boss-hook": (("9490T1",), "MHA-005", 1),
     "bracket-screw": (("90280A194",), "MHA-108", 2),
     "clamp-screw": (("90280A201",), "MHA-107", 6),
@@ -98,3 +99,14 @@ def test_vendor_readme_carries_no_unfilled_harvest_evidence() -> None:
     # placeholder token (HARVEST plus underscore) marks one never measured.
     readme = Path(__file__).resolve().parents[1] / "references" / "mcmaster" / "README.md"
     assert "HARVEST" + "_" not in readme.read_text(encoding="utf-8")
+
+
+def test_arbor_set_screw_is_the_verified_black_oxide_cup_point() -> None:
+    """#743: MHA-147 is McMaster 91375A106 (alloy, C45, black oxide, plain
+    cup), which bites the spotted steel arbor where an 18-8 cup would not.
+    No "PN TO VERIFY" survives in its identity."""
+    row = _config.parts("arbor-set-screw")
+    assert FASTENERS["arbor-set-screw"].material == "Alloy Steel"
+    assert "91375A106" in row["material_specification"]
+    for value in row.values():
+        assert "TO VERIFY" not in str(value).upper()

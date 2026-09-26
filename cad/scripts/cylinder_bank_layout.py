@@ -43,6 +43,8 @@ import math
 
 import _config
 import arbor_pedestal_spec as _pedestal
+import arbor_set_screw_spec as _screw
+import cylinder_gear_shaft_spec as _shaft
 from cylinder_end_disc_spec import (
     WASHER_THICK,
     WASHER_THICK_TOLERANCE_MM,
@@ -143,6 +145,27 @@ ARBOR_SOUTH_Z = FRONT_STRAP_INNER_Z - _pedestal.STRAP_T
 ARBOR_OVERALL_LENGTH = ARBOR_LENGTH + 2.0 * ARBOR_DOME_HEIGHT
 FRONT_SET_SCREW_Z = FRONT_PEDESTAL_ORIGIN_Z + _pedestal.SET_SCREW_Z
 BACK_SET_SCREW_Z = BACK_PEDESTAL_ORIGIN_Z - _pedestal.SET_SCREW_Z
+# Each screw stands radially on the arbor's top with its cup rim touching;
+# its socket face then sits this far over the crown apex (nominal arbor
+# concentric in its bore). The drive train places it exactly there.
+SET_SCREW_SOCKET_PROUD = (
+    _screw.LENGTH + _shaft.SHAFT_DIA / 2.0 - _pedestal.TOP_RADIUS
+)
+# Tightened, the screw pushes the arbor to the bottom of its bore. With the
+# largest bore and the smallest arbor the cup rim then sits lowest, and the
+# plain cup point (not the first full thread) must still span the running
+# clearance up to the bore wall, by this margin (the rig's 0.25 spare).
+SET_SCREW_POINT_MARGIN_MIN = 0.25
+_BORE_MAX_R = (_pedestal.BORE_DIA + _pedestal.BORE_DIA_BAND[0]) / 2.0
+_SHAFT_MIN_R = (_shaft.SHAFT_DIA + _shaft.SHAFT_DIA_BAND[1]) / 2.0
+SET_SCREW_POINT_MARGIN = (
+    (2.0 * _SHAFT_MIN_R - _BORE_MAX_R) + _screw.POINT_LENGTH - _BORE_MAX_R
+)
+if SET_SCREW_POINT_MARGIN < SET_SCREW_POINT_MARGIN_MIN:
+    raise AssertionError(
+        f"apex set-screw cup point spans the bore clearance by less than the minimum "
+        f"(margin {SET_SCREW_POINT_MARGIN:.3f} < {SET_SCREW_POINT_MARGIN_MIN})"
+    )
 
 # --- g0 -> g19 pitch-stack band ---------------------------------------------
 # g0's tooth-front face sits at g19's back face - L20 + (T0 - FW0).
@@ -196,6 +219,9 @@ __all__ = [
     "BACK_SET_SCREW_Z",
     "FRONT_PEDESTAL_ORIGIN_Z",
     "FRONT_SET_SCREW_Z",
+    "SET_SCREW_POINT_MARGIN",
+    "SET_SCREW_POINT_MARGIN_MIN",
+    "SET_SCREW_SOCKET_PROUD",
     "STRAP_OUTER_SPAN",
     "BACK_STRAP_INNER_Z",
     "BACK_WASHER_Z",

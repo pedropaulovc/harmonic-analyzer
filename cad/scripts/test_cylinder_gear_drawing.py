@@ -114,6 +114,6 @@ def test_stacking_thickness_is_the_held_marked_dimension() -> None:
     # is a marked model dimension printed to three places with its own band;
     # the cam thickness between it and the face width is only a reference.
     assert spec.DRAWING_DIMENSIONS["CamBoss"] == {"OverallThickness"}
-    assert drawing.DIMENSION_PRECISION["OverallThickness"] == 3
+    assert spec.DRAWING_PRECISION_BY_NAME["OverallThickness"] == 3
     assert "OverallThickness" in drawing.RIGHT_KEEP
     assert f"{bank.RING_OVERHANG_MAX:.2f}" in notes.STACK_FIT_CALLOUT

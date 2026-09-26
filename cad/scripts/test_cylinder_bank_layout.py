@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+import arbor_pedestal_spec
+
 import _config
 import connecting_rod_spec as rod
 import cylinder_bank_layout as bank
@@ -133,3 +135,26 @@ def test_pedestals_anchor_on_the_bank_strap_faces() -> None:
     assert bank.BACK_SET_SCREW_Z == pytest.approx(
         bank.BACK_PEDESTAL_ORIGIN_Z - ped.SET_SCREW_Z
     )
+
+
+def test_apex_set_screw_socket_and_cup_point_are_named() -> None:
+    """Main rider 1 on #743 PR1: the socket's height over the crown apex is a
+    named layout constant (the drive train places it exactly), and the cup
+    point, not the thread, spans the running clearance with the arbor pushed
+    to the bottom of a largest bore on a smallest arbor."""
+    import arbor_set_screw_spec as screw
+    import cylinder_gear_shaft_spec as shaft
+
+    assert bank.SET_SCREW_SOCKET_PROUD == pytest.approx(
+        screw.LENGTH + shaft.SHAFT_DIA / 2.0 - arbor_pedestal_spec.TOP_RADIUS
+    )
+    assert 0.0 < bank.SET_SCREW_SOCKET_PROUD < 0.25
+    bore_max_r = (
+        arbor_pedestal_spec.BORE_DIA + arbor_pedestal_spec.BORE_DIA_BAND[0]
+    ) / 2.0
+    shaft_min_r = (shaft.SHAFT_DIA + shaft.SHAFT_DIA_BAND[1]) / 2.0
+    lowest_tip_r = 2.0 * shaft_min_r - bore_max_r
+    assert bank.SET_SCREW_POINT_MARGIN == pytest.approx(
+        lowest_tip_r + screw.POINT_LENGTH - bore_max_r
+    )
+    assert bank.SET_SCREW_POINT_MARGIN >= bank.SET_SCREW_POINT_MARGIN_MIN == 0.25

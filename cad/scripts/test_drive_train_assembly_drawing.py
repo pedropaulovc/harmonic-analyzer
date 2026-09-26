@@ -51,7 +51,7 @@ def _instances(**overrides) -> list[spec.Instance]:
         "cylinder-gear-shaft": [(drum_x, 90.5, -86.9)],
         "arbor-pedestal": [(drum_x, 50.8, -87.4), (drum_x, 50.8, 100.6)],
         "cylinder-end-disc": [(drum_x, 90.5, -72.5), (drum_x, 90.5, 72.1)],
-        "dome-cap-screw": [(drum_x, 90.5, -89.4), (drum_x, 90.5, 102.6)],
+        "arbor-set-screw": [(drum_x, 95.3, -76.519), (drum_x, 95.3, 78.062)],
         "cylinder-gear": [(drum_x, 90.5, -64.0 + 7.0 * j) for j in range(20)],
         "foot-screw": [(7.49, 52.0, 74.0)],
         "pedestal-hold-down-screw": [(drum_x, 55.8, -91.652), (drum_x, 55.8, 94.202)],
@@ -199,8 +199,17 @@ def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
     plan = spec.plan_explode(_instances())
     assert [step.label for step, _names in plan] == [s.label for s in spec.EXPLODE_STEPS]
     moved = {step.label: names for step, names in plan}
-    assert moved["south pedestal"] == ("arbor-pedestal-1", "pedestal-hold-down-screw-1")
-    assert moved["north pedestal"] == ("arbor-pedestal-2", "pedestal-hold-down-screw-2")
+    assert moved["south pedestal"] == (
+        "arbor-pedestal-1",
+        "arbor-set-screw-1",
+        "pedestal-hold-down-screw-1",
+    )
+    assert moved["north pedestal"] == (
+        "arbor-pedestal-2",
+        "arbor-set-screw-2",
+        "pedestal-hold-down-screw-2",
+    )
+    assert moved["apex set screws lift"] == ("arbor-set-screw-1", "arbor-set-screw-2")
     assert moved["pedestal screws lift"] == (
         "pedestal-hold-down-screw-1",
         "pedestal-hold-down-screw-2",
@@ -592,3 +601,36 @@ def test_final_uncross_leaves_non_balloon_crossings_to_the_audit() -> None:
         _RebuildAdapter(), "SHEET", annotations, read_segments=crossed_with_a_note
     )
     assert annotations["DetailItem1"].position == (0.0, 1.0)
+
+
+def test_bank_fitup_limits_are_the_layout_bands() -> None:
+    """#743 steps 8-9 print cylinder_bank_layout's bands as limits, each
+    rounded inward so a part inside the print is inside the model band."""
+    import math
+
+    import cylinder_bank_layout as bank
+    import harmonic_base_spec as base
+
+    def limits(low: float, high: float, places: int) -> str:
+        scale = 10**places
+        return (
+            f"{math.ceil(low * scale - 1e-9) / scale:.{places}f}-"
+            f"{math.floor(high * scale + 1e-9) / scale:.{places}f}"
+        )
+
+    steps = drawing.BANK_STEPS
+    thickness = bank.OVERALL_THICKNESS
+    assert limits(thickness, thickness + bank.OVERALL_THICKNESS_BAND[0], 3) in steps
+    assert limits(*bank.STACK_L20_ACCEPT, 2) in steps
+    back_y = base.BOTTOM_REAR_Z - bank.BACK_STRAP_INNER_Z
+    band = bank.BACK_STRAP_LOCATE_BAND
+    assert f"Y {limits(back_y - band, back_y + band, 2)}" in steps
+    assert f"A {bank.BANK_END_FEELER:.2f} LEAF" in steps
+    assert f"A {bank.BANK_END_PLAY[0]:.2f} LEAF ENTERS" in steps
+    assert f"A {bank.BANK_END_PLAY[1]:.2f} LEAF DOES NOT" in steps
+    for gone in ("MHA-125", "0.025", "-6.0", "END PLAY 0.5-0.8"):
+        assert gone not in steps, gone
+    assert "MHA-147" in steps
+    dome = f"{bank.ARBOR_DOME_HEIGHT:.1f}"
+    assert f"PLUS A {dome} DOME EACH END" in steps
+    assert f"EACH DOME STANDS {dome} PROUD" in steps
