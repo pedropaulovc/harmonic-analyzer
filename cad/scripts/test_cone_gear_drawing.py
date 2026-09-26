@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -286,6 +287,20 @@ def test_book_fidelity_exceptions_are_recorded_in_the_spec_not_on_a_sheet() -> N
     assert spec.WEB_EXCEPTIONS_MM == {6: 0.621}
     for retired in ("CONTACT_RATIO_EXCEPTION", "web_exception", "both_exceptions"):
         assert not hasattr(notes, retired)
+
+
+_REVIEW_RECORD_TEXT = re.compile(
+    r"RULE \d|U\d\d|EXCEPTION|BOOK FIDELITY|POLICY|RULING"
+)
+
+
+@pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
+def test_no_sheet_prints_a_review_record(teeth: int) -> None:
+    # Rulings, exceptions and policy rules are provenance for the design
+    # review (finding-rulings.md, code comments); a machinist cannot act on
+    # them, so neither printed text block may carry one.
+    for printed in (notes.drawing_notes(teeth), notes.gear_data(teeth)):
+        assert not _REVIEW_RECORD_TEXT.search(printed), printed
 
 
 def test_no_gdt_and_only_the_fitted_bore_has_a_surface_finish() -> None:
