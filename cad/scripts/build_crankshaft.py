@@ -56,6 +56,7 @@ from _fit_limits import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _part_pmi import author_part_pmi
+from _visibility import blank_reference_geometry
 from crank_pinion_spec import (
     CRANKSHAFT_PIN_HOLE_PROCESS,
     PIN_CLOCKING_DEG as PINION_PIN_CLOCKING_DEG,
@@ -95,6 +96,15 @@ from crankshaft_spec import (
 from crank_native_acceptance import assert_signed_circle_center
 
 PART_NAME = "crankshaft"
+# Reference sketches this part still saves shown (#880), each with its owner
+# and why.  Delete an entry once the part hides that sketch; the release
+# refuses to start while any part lists one (visibility_debt).
+SHOWN_SKETCH_ALLOWANCES = {
+    "StationReference": (
+        "crankhub: carries the drawing's marked dimensions; hide it once "
+        "the sheet imports them from the hidden sketch"
+    ),
+}
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 # Dimensions live in crankshaft_spec / crank_hub_geometry.  The common face
@@ -833,6 +843,24 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         name_last_feature(adapter, seat_name)
+    # Every surviving plane (the rejected clocking attempt was deleted); the
+    # seat datums stay selectable by name for the drive-train mates.
+    blank_reference_geometry(
+        adapter,
+        tuple(
+            (name, "PLANE")
+            for name in (
+                "ShaftFiducialPlane",
+                "JournalStartPlane",
+                "PinHoleStationPlane",
+                "PinionPinStationPlane",
+                "PinionPinClockingPlane",
+                "SeatT12",
+                "SeatPinion",
+            )
+        ),
+    )
+
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
@@ -851,7 +879,9 @@ async def build(adapter) -> dict[str, str]:
             "Pinion Pin Hole Process": CRANKSHAFT_PIN_HOLE_PROCESS,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return await save_part_and_images(
+        adapter, PART_NAME, allowed_shown=SHOWN_SKETCH_ALLOWANCES
+    )
 
 
 if __name__ == "__main__":

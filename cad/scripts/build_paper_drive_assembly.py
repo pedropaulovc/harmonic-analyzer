@@ -120,6 +120,7 @@ from _assembly_patterns import (
     PatternDirection,
 )
 from _interference_contracts import allowed_interference_pairs
+from _visibility import blank_reference_geometry
 from _holes import CLEARANCE_MM
 from _transforms import (  # noqa: E402
     IDENTITY,
@@ -177,7 +178,7 @@ BAR_FRONT_Z = BAR_BACK_Z - BAR_DEPTH  # -138.9
 BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.4 bar centre
 
 # --- platen (hangs on the bar) ----------------------------------------------
-from build_platen import (  # noqa: E402
+from platen_spec import (  # noqa: E402
     CBORE_DEPTH as PLATEN_CBORE_DEPTH,
     CBORE_DIA as PLATEN_CBORE_DIA,
     GUIDE_HOLE_DIA as PLATEN_GUIDE_HOLE_DIA,
@@ -224,13 +225,13 @@ from build_bracket_screw import (  # noqa: E402
     SHANK_DIA as BRACKET_SCREW_DIA,
     SHANK_LEN as BRACKET_SCREW_LEN,
 )
-from build_clamp_screw import (  # noqa: E402
+from clamp_screw_spec import (  # noqa: E402
     HEAD_DIA as CLAMP_SCREW_HEAD_DIA,
     HEAD_H as CLAMP_SCREW_HEAD_H,
     SHANK_DIA as CLAMP_SCREW_DIA,
     SHANK_LEN as CLAMP_SCREW_LEN,
 )
-from build_fillister_screw import (  # noqa: E402
+from fillister_screw_spec import (  # noqa: E402
     HEAD_DIA as FILLISTER_HEAD_DIA,
     HEAD_H as FILLISTER_HEAD_H,
     SHANK_DIA as FILLISTER_SHANK_DIA,
@@ -805,7 +806,9 @@ def _assert_chain_layout() -> None:
             f"_chain KNOB_CENTRE {CHAIN_KNOB_CENTRE} != -KNOB_SHAFT_XY"
             f" ({knob_pre[0]:.4f}, {knob_pre[1]:.4f})"
         )
-    from build_drive_train_assembly import X_CRANK, Y_CRANK
+    # cone_line, not the drive-train script: importing the script put the
+    # whole drive-train recipe on this assembly's cache key.
+    from cone_line import X_CRANK, Y_CRANK
 
     if CHAIN_CRANK_CENTRE != (-X_CRANK, Y_CRANK):
         raise RuntimeError(
@@ -975,6 +978,7 @@ async def _insert_roller_chain(adapter) -> None:
     # Hide the path spline: it is construction scaffolding for the pattern, not a
     # rendered feature.
     check("blank chain path sketch", await adapter.blank_sketch("chain-path"))
+    blank_reference_geometry(adapter, ((plane_name, "PLANE"),))
 
     # 4. Gates: enough links, on the chain plane, on the loop centreline.
     links = [

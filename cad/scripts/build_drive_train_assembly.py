@@ -171,6 +171,32 @@ from cone_pivot_post_installation import (
     MECHANISM_Z_SHIFT,
     POST_ROTATION_Y_DEG,
 )
+# The cone journal line and its named stations live in the pure cone_line
+# module, so the base's pivot seat and the paper-drive crank sprocket read the
+# same numbers without importing this script.
+from cone_line import (
+    CONE_FACE_STATION_REFERENCE,
+    COS_I,
+    DP_TRAIN,
+    DRUM_FACE,
+    INCLINE_DEG,
+    PIVOT_STATION,
+    POST_STATION,
+    SEAT_PITCH,
+    SHAFT_T120_STATION,
+    SIN_I,
+    T006_NORTH_FACE,
+    TIP_BLOCK_STATION,
+    X_CRANK,
+    X_DRUM,
+    Y_BASE_TOP,
+    Y_CRANK,
+    Y_DRIVE,
+    Z_DRUM0,
+    Z_PITCH,
+    cone_seat,
+    cone_station,
+)
 from _assembly import (
     activate_assembly_contract,
     angle_driver,
@@ -221,8 +247,6 @@ from _cwm import (  # noqa: E402
 
 ASM_NAME = "drive-train"
 
-Y_BASE_TOP = 50.8  # harmonic-base top face
-Y_DRIVE = Y_BASE_TOP + 6.35 + 33.368  # 90.518: v2 casting's journal axis
 if abs(Y_DRIVE - CAM_SHAFT_XY[1]) > 1e-9 or abs(DRUM_X - CAM_SHAFT_XY[0]) > 1e-9:
     raise AssertionError(
         f"drum shaft axis ({DRUM_X}, {Y_DRIVE}) drifted from channel_frame_geom"
@@ -234,34 +258,17 @@ if abs(Y_DRIVE - CAM_SHAFT_XY[1]) > 1e-9 or abs(DRUM_X - CAM_SHAFT_XY[0]) > 1e-9
 # journal is 33.368 above that seat. The resulting drive line cascades into
 # the arbor pedestals, channel cams and connecting rods below.
 
-DP_TRAIN = _config.machine(
-    "gear_train", "diametral_pitch"
-)  # cad/config/machine.yaml (DIMENSIONS.md ch12)
 DP_CRANK = _config.machine("gear_train", "crank_drive_diametral_pitch")
 # The pair's one cutter (#906): the 16T's DP and both gears' addendum.
 from crank_drive_gear_spec import CUTTER_DIAMETRAL_PITCH as DP_CRANK_CUTTER  # noqa: E402
-ADDENDUM = 25.4 / DP_TRAIN  # 0.510 at DP 49.82
 
 # The four smallest cone gears read "more yellow ... a harder metal" (ch.12 p.21):
 # a high-zinc yellow metal (Muntz/manganese bronze). Tinted per-INSTANCE here (see
 # apply_component_color / build_cone_gear.py rationale), the part stays brass.
 MUNTZ_YELLOW = _config.palette("muntz_yellow")
 TIP_TEETH = {int(c[1:]) for c in _config.materials().get("cone_tip_gear_configs", [])}
-WORKING_DEPTH = 2.0 * ADDENDUM  # 1.020: full tooth interleave depth
-RADIUS_STEP = 3.0 * 25.4 / DP_TRAIN  # 1.5295: pitch-radius step per 6 teeth
-CONE_T120_PITCH_R = (
-    (120.0 / DP_TRAIN) * 25.4 / 2.0
-)  # 30.59: largest cone gear pitch radius
-
-# Shared machine grid: the working train is recentered independently of the
-# fixed post/carrier, along the post's unchanged inclined journal.
-_DRUM_SEAT_NOMINAL = _config.machine(
-    "cone_incline", "drum_seat_nominal_mm"
-)  # 7.2204 (OD 62.2)
-Z_PITCH = _DRUM_SEAT_NOMINAL * math.cos(
-    math.asin(RADIUS_STEP / _DRUM_SEAT_NOMINAL)
-)  # 7.0566: drum z-pitch
-X_DRUM = DRUM_X
+# The drum z-pitch, incline and pitch-radius step come from cone_line (the
+# working train is recentered along the post's unchanged inclined journal).
 if POST_ROTATION_Y_DEG != 180.0:
     raise AssertionError(
         "v2 post installation must preserve the exact Ry180 journal line"
@@ -276,20 +283,14 @@ if POST_ROTATION_Y_DEG != 180.0:
 # The whole cone/64T/crank train cascades rigidly off this (DRUM_TIP_X -> X_PITCH ...).
 # The cone/crank cluster extends EAST of the drum (machine east = -x, the
 # crank side), so every radial x-extent in the cascade below SUBTRACTS.
-Z_DRUM0 = _config.machine("channels", "station_z0_mm")
-# Shared station anchor. Cone seats, cylinder faces, and channels translate as
-# one rigid family without re-indexing the j-to-j pairs.
+# Z_DRUM0 (cone_line) is the shared station anchor. Cone seats, cylinder
+# faces, and channels translate as one rigid family without re-indexing the
+# j-to-j pairs.
 if abs(Z_DRUM0 - CHANNEL_Z0) > 1e-9:
     raise AssertionError("channel station_z0 does not carry the fixed-post recenter")
 
-# True-cone incline (M6.7, exact tracking -- see module docstring). Values are
-# at the OD-62.2 / DP 49.82 re-anchor (was 21.10 deg at the retired DP 30).
-SIN_I = RADIUS_STEP / Z_PITCH  # 0.21675
-COS_I = math.sqrt(1.0 - SIN_I * SIN_I)  # 0.97623
-TAN_I = SIN_I / COS_I
-SEC_I = 1.0 / COS_I
-INCLINE_DEG = math.degrees(math.asin(SIN_I))  # 12.5182
-SEAT_PITCH = Z_PITCH * COS_I  # 6.8888: seat pitch along the shaft
+# True-cone incline (M6.7, exact tracking -- see module docstring): SIN_I,
+# COS_I, TAN_I, SEC_I, INCLINE_DEG and SEAT_PITCH come from cone_line.
 
 from cone_gear_spec import BLANK_DIA_BAND as CONE_GEAR_BLANK_DIA_BAND  # noqa: E402
 from cone_gear_spec import FACE_WIDTH as CONE_GEAR_FACE_WIDTH  # noqa: E402
@@ -313,12 +314,10 @@ def _cone_tip_radius_max(teeth: int) -> float:
 # unchanged; the drum's engaged zone ([-0.50, +1.60] about the reference
 # centre) stays inside the minimum 5.2 face.
 CONE_FACE = CONE_GEAR_FACE_WIDTH
-CONE_FACE_STATION_REFERENCE = 6.5
 GEAR64_FACE = 8.0
 # Preserve the rederived gear centre while narrowing both axial faces equally.
 # The 10 mm reference face is placement history, not current part geometry.
 GEAR64_CENTRE_REFERENCE_FACE = 10.0
-DRUM_FACE = 3.0  # cylinder gear face (gear z = 0..3, cam 3..6.5)
 # The 16T south face stays on the 10.8 reference face centred on the 64T row
 # (the crankshaft's SeatPinion datum); option A (Main, 2026-09-23) shortens
 # the teeth from the NORTH to 10.4 so the deepened T120 tip (#834) keeps
@@ -343,58 +342,25 @@ PINION_FACE_STATION_REFERENCE = 10.8  # re-derived 2026-07-14: fills the casting
 # teeth barely drift out of the drum band) -- 0.15 left <=0.06 mm^3
 # flank slivers at the five smallest stations, 0.35 still skinned the
 # last four.
-DRUM_TIP_X = X_DRUM - (122.0 / DP_TRAIN) * 25.4 / 2.0  # -85.80 at DP 49.82
-PEN_EDGE_SLACK = _config.fit(
-    "cone_drum_oblique_mesh", "edge_slack_mm"
-)  # cad/config/tolerances.yaml
-PEN_MID = WORKING_DEPTH - PEN_EDGE_SLACK - (DRUM_FACE / 2.0) * TAN_I  # 0.565
-X_PITCH = DRUM_TIP_X - ADDENDUM * SEC_I + PEN_MID  # -85.76 at DP 49.82
-
-
-def cone_seat(j: int) -> tuple[float, float]:
-    """(x, z) centre of cone gear j: pitch-projected x, r*sin(i) north."""
-    r = CONE_T120_PITCH_R - RADIUS_STEP * j
-    return X_PITCH - r * COS_I, Z_DRUM0 + Z_PITCH * j + r * SIN_I
-
+# DRUM_TIP_X, PEN_EDGE_SLACK, PEN_MID and X_PITCH (the mesh anchor above)
+# come from cone_line, with cone_seat(j).
 
 # Cone shaft: pivot end at seat station -28.25 from the T120 centre
 # (25 journal + half of the first 6.5 face -- build_cone_gear_shaft.py).
-# CONE_ORIGIN stays the PIVOT END (station 0, the station datum); the physical
-# shaft now runs FRONT_STUB further south (ch30 GT), so the part -- authored
-# from its front stub end -- is PLACED at SHAFT_FRONT_STATION instead.
-SHAFT_T120_STATION = 25.0 + CONE_FACE_STATION_REFERENCE / 2.0  # 28.25
-_GEAR_CONE_ORIGIN = [
-    cone_seat(0)[0] - SHAFT_T120_STATION * SIN_I,
-    Y_DRIVE,
-    cone_seat(0)[1] - SHAFT_T120_STATION * COS_I,
-]
-# The post/carrier axis remains at its ch30-fitted world placement.  The gear
-# family is translated GEAR_AXIS_SHIFT along that same infinite line.
-CONE_ORIGIN = [
-    _GEAR_CONE_ORIGIN[0] - GEAR_AXIS_SHIFT * SIN_I,
-    Y_DRIVE,
-    _GEAR_CONE_ORIGIN[2] - GEAR_AXIS_SHIFT * COS_I,
-]
+# CONE_ORIGIN (cone_line) stays the PIVOT END (station 0, the station datum);
+# the physical shaft now runs FRONT_STUB further south (ch30 GT), so the part
+# -- authored from its front stub end -- is PLACED at SHAFT_FRONT_STATION
+# instead.  The post/carrier axis remains at its ch30-fitted world placement;
+# the gear family is translated GEAR_AXIS_SHIFT along that same infinite line.
 SHAFT_FRONT_STATION = -61.90686099792956
 # = -build_cone_gear_shaft FRONT_STUB (asserted below). The enlarged integral
 # journal runs through the v2 post's 42.011-mm-long inclined bore and stands
 # 1.0 mm proud of its south face.
 
-
-def cone_station(s: float) -> list[float]:
-    """Machine point of the cone-shaft axis at station s (mm from pivot end)."""
-    return [
-        CONE_ORIGIN[0] + s * SIN_I,
-        Y_DRIVE,
-        CONE_ORIGIN[2] + s * COS_I,
-    ]
-
-
-# The corrected 2.8360-in v2 crank boss spans local z
+# POST_STATION (cone_line): the corrected 2.8360-in v2 crank boss spans local z
 # -21.3753..+50.6591. The 16T follows the shifted 64T row while the T12 chain
 # plane remains photo-anchored, so the resulting axial gaps are intentionally
 # unequal; the post station still fixes crank X and the pair DP.
-POST_STATION = -39.90136099792956
 
 
 # Exact-tracking self-check: the 20 mesh-derived seats lie on the shaft.
@@ -454,8 +420,8 @@ CRANK_MESH_DEPTH = TIP16_C2C - MESH16_C2C
 # clearance floor (slack + 0.157*ADD16 of tip-to-root air stays positive).
 if not 1.2 * ADD16 < CRANK_MESH_DEPTH < 2.0 * ADD16 - 0.1:
     raise AssertionError("crank pair mesh depth left its derived band")
-X_CRANK = cone_station(POST_STATION)[0]  # -129.336: Ry180 v2 installation
-Y_CRANK = Y_BASE_TOP + 6.35 + 72.7  # 129.850: v2 cast-in crank-axis height
+# The crank axis (the Ry180 v2 installation's X, the cast-in crank-axis
+# height) is cone_line's X_CRANK / Y_CRANK.
 _DX16 = (GEAR64_SEAT[0] - X_CRANK) * COS_I  # horizontal leg toward the
 # crank (a plane-local magnitude: the azimuth convention below measures from
 # the in-plane horizontal TOWARD the other axis, so it is chirality-free)
@@ -633,7 +599,7 @@ for _label, _end, _outer in (
         raise AssertionError(f"arbor {_label} end is not flush with its strap face")
 # The apex set screws (MHA-147), one per crown at the strap's mid-depth, cup
 # point down on the arbor's top.
-from build_arbor_set_screw import LENGTH as SET_SCREW_LEN  # noqa: E402
+from arbor_set_screw_spec import LENGTH as SET_SCREW_LEN  # noqa: E402
 
 SET_SCREW_SOUTH_Z = _bank.FRONT_SET_SCREW_Z
 SET_SCREW_NORTH_Z = _bank.BACK_SET_SCREW_Z
@@ -705,7 +671,7 @@ from build_crank_pin_eye import (  # noqa: E402
     TAIL_LEN as EYE_TAIL_LEN,
     WIRE_DIA as EYE_WIRE_DIA,
 )
-from build_fillister_screw import (  # noqa: E402
+from fillister_screw_spec import (  # noqa: E402
     SHANK_DIA as ANCHOR_SCREW_SHANK_DIA,
     SHANK_LEN as ANCHOR_SCREW_SHANK_LEN,
 )
@@ -832,16 +798,16 @@ PINION_PIN_EDGE_NOMINAL_ACTUAL = _SHAFT_NORTH_END - (
 # (throw ~ distance from pivot).
 # T006 is the reference gear for the tip-end stack. The bushing sits directly
 # against its north face; the block follows after one bushing-half-width of
-# clearance, and the pivot keeps its established 11 mm offset from the block.
-T006_CENTER_STATION = SHAFT_T120_STATION + GEAR_AXIS_SHIFT + 19 * SEAT_PITCH
-T006_NORTH_FACE = T006_CENTER_STATION + CONE_FACE_STATION_REFERENCE / 2.0
+# clearance, and the pivot keeps its established 11 mm offset from the block
+# (T006_CENTER_STATION, T006_NORTH_FACE, TIP_BLOCK_STATION and PIVOT_STATION
+# come from cone_line; the check below holds them to the parts).
 
 # --- platform <-> riders fit (SolidWorks-free, import-time) ------------------
 # The platform/post/block parts hardcode their envelopes in THEIR part frames;
 # they must agree with the live cone-shaft line placed here. Imported, not
 # copied (the CAM_ECC precedent), and asserted at import so a drifted anchor
 # fails before any COM work.
-from build_cone_swing_platform import (  # noqa: E402
+from cone_swing_platform_geometry import (  # noqa: E402
     CRANK_AXIS_OFF as PLAT_CRANK_OFF,
     CRANK_AXIS_Y as PLAT_CRANK_Y,
     EAST_HALF_S as PLAT_EAST_S,
@@ -856,16 +822,16 @@ from build_cone_swing_platform import (  # noqa: E402
     CRANK_SEAT_ANCHOR as PLAT_SEAT_ANCHOR,
     PLATE_LEN as PLAT_LEN,
     PLATE_T as PLAT_T,
-    PIVOT_BEARING_RELIEF_DIAMETER as PLAT_PIVOT_RELIEF_DIA,
-    PIVOT_BEARING_THICKNESS as PLAT_PIVOT_BEARING_T,
-    PIVOT_HEAD_RADIAL_CLEARANCE as PLAT_PIVOT_HEAD_RADIAL_CLEARANCE,
     SLOT_E_X as PLAT_SLOT_E_X,
     SLOT_E_Z as PLAT_SLOT_E_Z,
     SLOT_W as PLAT_SLOT_W,
     WEST_HALF_S as PLAT_WEST_S,
 )
-from cone_swing_platform_spec import PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA  # noqa: E402
 from cone_swing_platform_spec import (  # noqa: E402
+    PIVOT_BEARING_RELIEF_DIAMETER as PLAT_PIVOT_RELIEF_DIA,
+    PIVOT_BEARING_THICKNESS as PLAT_PIVOT_BEARING_T,
+    PIVOT_HEAD_RADIAL_CLEARANCE as PLAT_PIVOT_HEAD_RADIAL_CLEARANCE,
+    PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA,
     POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS,
     POST_MOUNT_SPEC,
     POST_MOUNT_TAP_EDGE_BREAK,
@@ -878,11 +844,11 @@ from cone_tip_shim_spec import (  # noqa: E402
     SHIM_T as TIP_SHIM_T,
     SHIM_X as TIP_SHIM_X,
 )
-from build_post_mount_screw import (  # noqa: E402
-    SHANK_LEN as POST_SCREW_LEN,
+from post_mount_screw_spec import (  # noqa: E402
+    CUT_LENGTH_MM as POST_SCREW_LEN,
     THREAD as POST_SCREW_THREAD,
 )
-from build_cone_lock_knob import (  # noqa: E402
+from cone_lock_knob_spec import (  # noqa: E402
     HEAD_DIA as KNOB_HEAD_DIA,
     WASHER_DIA as KNOB_WASHER_DIA,  # noqa: F401 - verify footprint contract
     STUD_DIA as KNOB_STUD_DIA,
@@ -890,7 +856,7 @@ from build_cone_lock_knob import (  # noqa: E402
     THREAD as KNOB_THREAD,
     require_seat_fit as require_lock_seat_fit,
 )
-from build_cone_pivot_screw import (  # noqa: E402
+from cone_pivot_screw_spec import (  # noqa: E402
     HEAD_DIA as PSCREW_HEAD_DIA,
     HEAD_H as PSCREW_HEAD_H,
     SHOULDER_DIA as PSCREW_SHOULDER_DIA,
@@ -898,7 +864,7 @@ from build_cone_pivot_screw import (  # noqa: E402
     THREAD as PSCREW_THREAD,
     THREAD_TAIL_LEN as PSCREW_THREAD_TAIL_LEN,
 )
-from build_swing_stop_screw import (  # noqa: E402
+from swing_stop_screw_spec import (  # noqa: E402
     EMBED_LEN as STOP_EMBED_LEN,
     HEAD_DIA as STOP_HEAD_DIA,
     PROUD_LEN as STOP_PROUD_LEN,
@@ -955,11 +921,8 @@ from arbor_pedestal_spec import SCREW_HOLE_SPEC as ARBOR_PED_HOLE_SPEC  # noqa: 
 from build_alignment_pinion import (  # noqa: E402
     BORE_DIA as DRUM_BORE_DIA,
 )
-from pinion_arbor_spec import (  # noqa: E402
-    CROSSROD_MAX_CLEARANCE as ARBOR_CROSSROD_MAX_CLEARANCE,
-    CROSSROD_MIN_CLEARANCE as ARBOR_CROSSROD_MIN_CLEARANCE,
+from pinion_arbor_geometry import (  # noqa: E402
     CROSS_HOLE_DIA as ARBOR_CROSS_HOLE_DIA,
-    RETAINING_COMPOUND_MAX_GAP_MM as ARBOR_BOND_MAX_GAP,
     HEAD_CAP_SAG as ARBOR_HEAD_CAP_SAG,
     HEAD_CENTER_Z as ARBOR_HEAD_CENTER_Z,
     HEAD_DIA as ARBOR_HEAD_DIA,
@@ -1044,18 +1007,18 @@ from pinion_spring_geometry import (  # noqa: E402
     root_stress as spr_root_stress,
 )
 from pinion_spring_section import THICK as SPRING_T, WIDTH as SPRING_W  # noqa: E402
-from build_slotted_screw import (  # noqa: E402
+from slotted_screw_spec import (  # noqa: E402
     HEAD_DIA as BSCREW_HEAD_DIA,
     SHANK_LEN as BSCREW_SHANK_LEN,
     THREAD as BSCREW_THREAD,
 )
 
-from build_foot_screw import (  # noqa: E402
+from foot_screw_spec import (  # noqa: E402
     HEAD_DIA as FSCREW_HEAD_DIA,
     SHANK_LEN as FSCREW_SHANK_LEN,
     THREAD as FSCREW_THREAD,
 )
-from build_pedestal_hold_down_screw import (  # noqa: E402
+from pedestal_hold_down_screw_spec import (  # noqa: E402
     HEAD_DIA as HDSCREW_HEAD_DIA,
     SHANK_DIA as HDSCREW_SHANK_DIA,
     SHANK_LEN as HDSCREW_SHANK_LEN,
@@ -1144,8 +1107,12 @@ def _require_clearance_size(label: str, screw_thread: str, hole_spec) -> None:
         )
 
 
-TIP_BLOCK_STATION = T006_NORTH_FACE + BUSH_LEN + BUSH_LEN / 2.0 + TIP_BLOCK_Z / 2.0
-PIVOT_STATION = TIP_BLOCK_STATION + 11.0
+_TIP_BLOCK_STACK = T006_NORTH_FACE + BUSH_LEN + BUSH_LEN / 2.0 + TIP_BLOCK_Z / 2.0
+if (
+    abs(TIP_BLOCK_STATION - _TIP_BLOCK_STACK) > 1e-9
+    or abs(PIVOT_STATION - (TIP_BLOCK_STATION + 11.0)) > 1e-9
+):
+    raise AssertionError("cone_line tip-end stack drifted from the bushing/block parts")
 # One journal drive height across the platform and both riders: plate
 # thickness under each foot + bore height = 54 above the base top.
 if (
@@ -1563,14 +1530,15 @@ if _ENGAGED < 0.85 * GEAR64_FACE * COS_I:
 # The base's pivot-screw hole sits exactly under the swing pivot -- both are
 # authored in the machine frame, so the coordinates agree directly (pre-#151
 # this module derived in the mirrored frame and the hole's x was the NEGATED
-# pivot x).
+# pivot x).  Both now read cone_line, so the check is exact, not a fit
+# window: it catches the base seat being sourced from anywhere else.
 if (
-    abs(BASE_PIVOT_XZ[0] - _PPIVOT[0]) > 0.05
-    or abs(BASE_PIVOT_XZ[1] - _PPIVOT[2]) > 0.05
+    abs(BASE_PIVOT_XZ[0] - _PPIVOT[0]) > 1e-9
+    or abs(BASE_PIVOT_XZ[1] - _PPIVOT[2]) > 1e-9
 ):
     raise AssertionError(
         f"harmonic-base pivot-screw hole {BASE_PIVOT_XZ} != machine swing pivot "
-        f"({_PPIVOT[0]:.3f}, {_PPIVOT[2]:.3f})"
+        f"({_PPIVOT[0]!r}, {_PPIVOT[2]!r})"
     )
 if PLAT_PIVOT_HOLE_DIA <= PSCREW_SHOULDER_DIA:
     raise AssertionError("platform pivot hole does not clear the screw shoulder")
@@ -2556,16 +2524,11 @@ if abs(ARBOR_Z0 + ARBOR_LEN - (91.25 + MECHANISM_Z_SHIFT)) > 0.01:
     raise AssertionError("arbor back end off the translated p2 station")
 if not (ARBOR_DIA == DRUM_BORE_DIA == STRAP_ARBOR_BORE):
     raise AssertionError("arbor dia disagrees with drum and strap bores")
-# R1: the crossrod is a bonded slip fit, modelled line to line; at the printed
-# limits it must still enter the hole and stay inside the Loctite 638 gap.
+# R1: the crossrod is a bonded slip fit, modelled line to line.  Its printed
+# limits (rod enters, gap inside Loctite 638) are pinion_arbor_spec's asserts;
+# the assembly only needs the shared nominal it places both parts at.
 if abs(HANDLE_ROD_DIA - ARBOR_CROSS_HOLE_DIA) > 1e-9:
     raise AssertionError("grip crossrod and head hole no longer share a nominal")
-if not 0.0 <= ARBOR_CROSSROD_MIN_CLEARANCE <= ARBOR_CROSSROD_MAX_CLEARANCE <= ARBOR_BOND_MAX_GAP:
-    raise AssertionError(
-        "grip crossrod bond clearance "
-        f"{ARBOR_CROSSROD_MIN_CLEARANCE:.3f}-{ARBOR_CROSSROD_MAX_CLEARANCE:.3f} "
-        f"is outside 0-{ARBOR_BOND_MAX_GAP}"
-    )
 if abs(STRAP_PIVOT_BORE - 6.35) > 1e-9:
     raise AssertionError("strap pivot bore no longer rides the O6.35 shaft")
 # Block screws: exact 90280A201 #8-32 x 31.75 stock screws pass through normal

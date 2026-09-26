@@ -31,6 +31,14 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import audit_sheet, format_findings
 from _surface_finish import surface_finish_by_key
 from pinion_arbor_pin_spec import PIN_HOLE_CALLOUT
+from pinion_arbor_geometry import (
+    HEAD_CAP_SAG,
+    HEAD_CENTER_Z,
+    HEAD_DIA,
+    HEAD_FRONT_Z,
+    HEAD_REAR_Z,
+    SHAFT_DIA,
+)
 from pinion_arbor_spec import (
     BACK_JOURNAL_Z,
     BOND_ZONE_DIA_Z,
@@ -38,14 +46,8 @@ from pinion_arbor_spec import (
     DRAWING_PRECISION_BY_NAME,
     DRUM_STATION,
     FRONT_JOURNAL_Z,
-    HEAD_CAP_SAG,
-    HEAD_CENTER_Z,
-    HEAD_DIA,
-    HEAD_FRONT_Z,
-    HEAD_REAR_Z,
     JOURNAL_LEN,
     OVERALL_LEN,
-    SHAFT_DIA,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.com_variant import double_array

@@ -54,6 +54,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _part_pmi import author_part_pmi
+from _visibility import blank_reference_geometry
 from crank_arm_spec import (
     ANCHOR_SCREW_X,
     ANCHOR_SCREW_Y,
@@ -277,6 +278,8 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "PunchedFiducial")
+    # Hidden but still selectable by name for the handle-collar mate.
+    blank_reference_geometry(adapter, (("HandleSeat", "PLANE"),))
     vol = await _volume(adapter)
     _telemetry.info(f"volume after punch witness: {vol:.1f} mm^3")
 

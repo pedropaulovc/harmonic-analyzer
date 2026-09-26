@@ -1310,11 +1310,21 @@ async def export_part_stl(adapter: Any, out_path: Path) -> None:
 
 @_telemetry.traced("export.part_images", label_param="part_name")
 async def save_part_and_images(
-    adapter: Any, part_name: str, views: Iterable[str] = DEFAULT_VIEWS
+    adapter: Any,
+    part_name: str,
+    views: Iterable[str] = DEFAULT_VIEWS,
+    *,
+    allowed_shown: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     """Save the part to ``cad/out/sldprt``, its STL to ``cad/out/stl`` (the
     assembly build reads it for mirror placement), and PNG views to
-    ``cad/out/png``."""
+    ``cad/out/png``.
+
+    The creating helpers hide the planes, axes, points and curves they make;
+    the save fails if anything still shows, including any sketch not listed in
+    ``allowed_shown`` (``reference_visibility_allowances``)."""
+    from _visibility import assert_reference_geometry_hidden
+
     # Recorded BEFORE anything touches the camera: this runs at the end of
     # authoring, and set_isometric_view below (like export_image further down) is
     # the first thing in the whole build path that moves the view, so this is the
@@ -1322,6 +1332,7 @@ async def save_part_and_images(
     # under can still be read. A SUCCESS has to record it too -- otherwise a good
     # run and a bad one cannot be compared (see _seat_forensics.record_authoring_context).
     _seat_forensics.record_authoring_context(adapter, part_name)
+    assert_reference_geometry_hidden(adapter, part_name, allowed_shown)
     OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
     part_path = (OUT_SLDPRT / f"{part_name}.SLDPRT").resolve()
     set_isometric_view(adapter)  # save on isometric so the .SLDPRT opens isometric
@@ -2392,12 +2403,14 @@ async def name_bore_axis(
 
     Returns the new axis's resolved name (e.g. ``"Axis1"``).
     """
+    from _visibility import blank_reference_geometry
     from solidworks_mcp.adapters.base import (
         CreateAxisParameters,
         CreatePlaneParameters,
     )
 
     planes: list[str] = []
+    created: list[tuple[str, str]] = []
     for base, off, tag, drive in (
         (plane_a, offset_a, "A", drive_a),
         (plane_b, offset_b, "B", drive_b),
@@ -2412,14 +2425,19 @@ async def name_bore_axis(
             ),
         ).name
         planes.append(plane_name)
+        created.append((plane_name, "PLANE"))
         if drive is not None and drive_jobs is not None:
             drive_jobs.append((f"D1@{plane_name}", drive))
-    return check(
+    axis_name = check(
         f"axis {label} ({planes[0]} ∩ {planes[1]})",
         await adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=planes)
         ),
     ).name
+    # Hidden at creation, selectable by name: a shown axis or plane prints in
+    # every render of the part and of each assembly that places it.
+    blank_reference_geometry(adapter, (*created, (axis_name, "AXIS")))
+    return axis_name
 
 
 # swFeatureError_e: the codes GetWhatsWrong returns. Whether an entry is a

@@ -12,6 +12,7 @@ import build_drive_train_assembly as assembly
 import build_pinion_handle as part
 import draw_pinion_handle as drawing
 import pinion_handle_geometry as geometry
+import pinion_arbor_geometry as arbor_geometry
 import pinion_arbor_spec as arbor
 import pinion_handle_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
@@ -73,7 +74,7 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     new_head_axis = _world_point(
         (assembly.APINION_X, assembly.APINION_Y, assembly.ARBOR_Z0),
         assembly.ARBOR_ROWS,
-        (0.0, 0.0, arbor.HEAD_CENTER_Z),
+        (0.0, 0.0, arbor_geometry.HEAD_CENTER_Z),
     )
     new_crossrod_axis = _world_point(
         (assembly.APINION_X, assembly.APINION_Y, assembly.HANDLE_Z),
@@ -101,10 +102,10 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
         released_origin[2] + 9.0 / 2.0 + 2.0 + 10.0,
     )
     integral_head_stations = (
-        assembly.ARBOR_Z0 + arbor.HEAD_FRONT_Z,
-        assembly.ARBOR_Z0 + arbor.HEAD_REAR_Z,
-        assembly.ARBOR_Z0 + arbor.HEAD_FRONT_Z - arbor.HEAD_CAP_SAG,
-        assembly.ARBOR_Z0 + arbor.NECK_END_Z,
+        assembly.ARBOR_Z0 + arbor_geometry.HEAD_FRONT_Z,
+        assembly.ARBOR_Z0 + arbor_geometry.HEAD_REAR_Z,
+        assembly.ARBOR_Z0 + arbor_geometry.HEAD_FRONT_Z - arbor_geometry.HEAD_CAP_SAG,
+        assembly.ARBOR_Z0 + arbor_geometry.NECK_END_Z,
     )
     assert integral_head_stations == pytest.approx(
         released_head_stations, abs=1e-12

@@ -149,6 +149,8 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
+
 # NOTE: the validating ``set_global`` comes from ``involute_gear`` -- it
 # round-trips every gear-math global through the SW equation parser to assert
 # the trig/sqr/pi dialect, which the plain ``_common.set_global`` does not do,
@@ -1170,12 +1172,12 @@ async def build(adapter) -> dict[str, str]:
     # ------------------------------------------------------------------
     from solidworks_mcp.adapters.base import CreateAxisParameters
 
-    check(
+    pattern_axis = check(
         "create_axis Z (Top x Right)",
         await adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
         ),
-    )
+    ).name
     adapter._zoom_to_fit(adapter.currentModel)
     ra_default_mm = facts["Ra"] * 25.4
     candidates = [[0.0, 0.0, FACE_WIDTH / 2.0]]  # on the reference axis
@@ -1204,6 +1206,9 @@ async def build(adapter) -> dict[str, str]:
         _telemetry.debug(f"axis candidate {point} failed: {res.error}")
     if pattern is None:
         raise RuntimeError("circular pattern: no axis candidate selectable")
+    # Hide only now: the pattern picks the axis by screen point, which a
+    # blanked axis would refuse.
+    blank_reference_geometry(adapter, ((pattern_axis, "AXIS"),))
     pattern_name = name_last_feature(adapter, TOOTH_PATTERN_FEATURE)
     count_dim = pattern_count_dimension(adapter, pattern_name, DEFAULT_TEETH)
     check(
@@ -1334,8 +1339,10 @@ async def build(adapter) -> dict[str, str]:
     # deliberately adds AvoidRebuildOnSave, which live probes proved does not
     # persist rebuilt inactive-configuration bodies.  The two authoring
     # sketches go hidden first, so no saved image or placing assembly draws
-    # them.
+    # them.  This part saves itself rather than through save_part_and_images,
+    # so it runs that helper's construction-geometry check here.
     _blank_reference_sketches(adapter)
+    assert_reference_geometry_hidden(adapter, PART_NAME)
     OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
     part_path = (OUT_SLDPRT / f"{PART_NAME}.SLDPRT").resolve()
     check(
