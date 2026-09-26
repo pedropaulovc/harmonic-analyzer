@@ -985,6 +985,19 @@ from build_pedestal_hold_down_screw import (  # noqa: E402
     SHANK_LEN as HDSCREW_SHANK_LEN,
     THREAD as HDSCREW_THREAD,
 )
+from build_cone_post_dowel import PIN_END_Y as POST_DOWEL_END_Y  # noqa: E402
+from build_cone_swing_platform import POST_DOWEL_AXES as PLAT_DOWEL_AXES  # noqa: E402
+from cone_pivot_post_spec import (  # noqa: E402
+    POST_DOWEL_BLIND_DEPTH as POST_DOWEL_BLIND_DEPTH_POST,
+    POST_DOWEL_XZ as POST_DOWEL_POST_XZ,
+)
+from cone_post_dowel_spec import (  # noqa: E402
+    POST_DOWEL_CLEARANCE,
+    POST_DOWEL_LENGTH,
+    POST_DOWEL_PLATE_XZ,
+    POST_DOWEL_RECESS,
+    PLATE_DOWEL_INTERFERENCE,
+)
 from build_cone_pivot_post import (  # noqa: E402
     BLOCK_DIA as POST_BLOCK_DIA,
     BORE_HEIGHT as POST_BORE_HEIGHT,
@@ -1379,6 +1392,47 @@ if (
 ):
     raise AssertionError("swing-stop head envelope fouls the lock-knob head")
 _POST_LOCAL_Z = POST_STATION - PIVOT_STATION
+# #917 S1: the MHA-151 dowel pair.  Each pin is pressed up into its plate ream
+# (lead-in end down) until its lower end stands POST_DOWEL_RECESS above the
+# slide face, and its upper end slips into the post's blind ream.  The pin
+# rides the plate, so it is placed on the plate's ream and must land on the
+# post's: the two patterns are one pattern, seen from each part.
+# The pin seats by its part Top Plane, which must be its mid-length plane.
+if POST_DOWEL_END_Y != (-POST_DOWEL_LENGTH / 2.0, POST_DOWEL_LENGTH / 2.0):
+    raise AssertionError(
+        f"MHA-151's Top Plane is not its mid-length plane: ends {POST_DOWEL_END_Y}"
+    )
+_POST_DOWEL_ABOVE_PLATE_TOP = POST_DOWEL_RECESS - POST_DOWEL_END_Y[0] - PLAT_T
+POST_DOWEL_PLATE_ENGAGEMENT = PLAT_T - POST_DOWEL_RECESS
+POST_DOWEL_POST_ENGAGEMENT = POST_DOWEL_LENGTH - POST_DOWEL_PLATE_ENGAGEMENT
+if tuple(xz for _name, xz in PLAT_DOWEL_AXES) != tuple(POST_DOWEL_PLATE_XZ):
+    raise AssertionError("platform dowel axes left the ruled dowel pattern")
+
+
+def _post_local_to_machine(x_l: float, z_l: float) -> tuple[float, float]:
+    """Plan point of the installed post's local (x, z): Ry(POST_ROTATION_Y_DEG)
+    about its origin at POST_STATION."""
+    c = math.cos(math.radians(POST_ROTATION_Y_DEG))
+    s = math.sin(math.radians(POST_ROTATION_Y_DEG))
+    post = cone_station(POST_STATION)
+    return (post[0] + x_l * c + z_l * s, post[2] - x_l * s + z_l * c)
+
+
+# The post rounds its three-place station, so the two images agree to 1e-3.
+POST_DOWEL_PATTERN_MISMATCH = max(
+    math.dist(_plate_local_to_machine(*plate_xz), _post_local_to_machine(*post_xz))
+    for plate_xz, post_xz in zip(POST_DOWEL_PLATE_XZ, POST_DOWEL_POST_XZ, strict=True)
+)
+if POST_DOWEL_PATTERN_MISMATCH > 1e-3:
+    raise AssertionError(
+        f"plate and post dowel reams miss by {POST_DOWEL_PATTERN_MISMATCH:.4f} mm"
+    )
+if not (0.0 < PLATE_DOWEL_INTERFERENCE[0] and 0.0 < POST_DOWEL_CLEARANCE[0]):
+    raise AssertionError("MHA-151 must press into the plate and slip into the post")
+if POST_DOWEL_RECESS <= 0.0:
+    raise AssertionError("an MHA-151 pin would stand on the base slide")
+if POST_DOWEL_POST_ENGAGEMENT >= POST_DOWEL_BLIND_DEPTH_POST:
+    raise AssertionError("an MHA-151 pin bottoms in the post's blind ream")
 _KNOB_HEAD_POST_GAP = (
     math.hypot(PLAT_SLOT_E_X, PLAT_SLOT_E_Z - _POST_LOCAL_Z)
     - KNOB_HEAD_DIA / 2.0
@@ -2513,6 +2567,24 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="cone-pivot-post (v2 Ry180, big-end journal, on the plate)",
     )
+    # #917 S1: the MHA-151 dowel pair, on the plate's reams (lead-in end down).
+    post_dowels: list[tuple[str, str]] = []
+    for axis_name, (dowel_x, dowel_z) in PLAT_DOWEL_AXES:
+        mx, mz = _plate_local_to_machine(dowel_x, dowel_z)
+        post_dowels.append(
+            (
+                await place_component(
+                    adapter,
+                    "cone-post-dowel",
+                    [mx, Y_BASE_TOP + PLAT_T + _POST_DOWEL_ABOVE_PLATE_TOP, mz],
+                    [0.0, 0.0, 0.0],
+                    IDENTITY,
+                    ground=False,
+                    label=f"cone-post-dowel ({axis_name}, pressed in the plate)",
+                ),
+                axis_name,
+            )
+        )
     ptip = cone_station(TIP_BLOCK_STATION)
     # U30: the block stands on the nominal MHA-141 fit-up shim pack, so its
     # foot sits TIP_SHIM_NOMINAL above PlateTop (the axis-height assert above
@@ -3207,6 +3279,43 @@ async def build(adapter) -> dict[str, str]:
         label="cone-post local-west to platform-east mounting axis",
         verify=(pivot_post, post_o),
     )
+    # Each MHA-151 pin rides the plate in its ream: coaxial with the plate's
+    # named ream axis, its centre plane the recess-derived height above
+    # PlateTop, and an anti-spin (the pin is a solid of revolution).
+    for dowel, axis_name in post_dowels:
+        dowel_o = _org(adapter, dowel)
+        await coincident_mate(
+            adapter,
+            named_ref(f"ScrewAxis@{dowel}", "AXIS"),
+            named_ref(f"{axis_name}@{platform}", "AXIS"),
+            label=f"{dowel} in the plate's {axis_name} ream",
+            verify=(dowel, dowel_o),
+        )
+        await distance_driver(
+            adapter,
+            named_ref(f"Top Plane@{dowel}", "PLANE"),
+            named_ref(f"PlateTop@{platform}", "PLANE"),
+            _POST_DOWEL_ABOVE_PLATE_TOP,
+            label=f"{dowel} press depth d={_POST_DOWEL_ABOVE_PLATE_TOP:.2f}",
+            verify=(dowel, dowel_o),
+        )
+        await parallel_mate(
+            adapter,
+            named_ref(f"Front Plane@{dowel}", "PLANE"),
+            named_ref(f"Front Plane@{platform}", "PLANE"),
+            label=f"{dowel} anti-spin",
+            verify=(dowel, dowel_o),
+        )
+        # The mates' verify guard tolerates _MATE_TOL_MM (0.5), exactly what a
+        # flipped 0.25 press-depth distance moves the pin; the interference
+        # gate would not see it either (the pin stays in both reams).  So the
+        # seated height is read back tight.
+        seated = _org(adapter, dowel)
+        if abs(seated[1] - dowel_o[1]) > 1e-3:
+            raise RuntimeError(
+                f"{dowel} seated at y {seated[1]:.4f}, not {dowel_o[1]:.4f}: "
+                "the press-depth distance landed on the wrong side of PlateTop"
+            )
 
     # Cone shaft revolute in the black pivot post: coincident + an axial plane
     # distance along the inclined axis (the shaft's local Z, read live). Its

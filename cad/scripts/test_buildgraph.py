@@ -101,7 +101,7 @@ _INSERTED_SOURCES = {
     "frame": "fillister_screw frame_cross_screw gooseneck_set_screw harmonic_base "
     "lag_screw nameplate rocker_arm_support top_frame tube_frame tube_frame_cap",
     "drive_train": "alignment_pinion arbor_pedestal cone_gear cone_gear_shaft "
-    "cone_lock_knob cone_pivot_post cone_pivot_screw cone_swing_platform "
+    "cone_lock_knob cone_pivot_post cone_pivot_screw cone_post_dowel cone_swing_platform "
     "cone_tip_adjuster cone_tip_block cone_tip_bushing cone_tip_pinch_screw "
     "crank_arm crank_drive_gear crank_handle crank_pin crank_pin_eye crank_pin_ring "
     "crank_pinion crank_pinion_pin crankshaft cylinder_end_disc cylinder_gear "

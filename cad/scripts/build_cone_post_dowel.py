@@ -15,11 +15,17 @@ import sys
 from _common import PANEL_BLACK, run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from diagnostics.diag_build_98381A304 import PIN_END_Y as _RECIPE_PIN_END_Y
 from diagnostics.diag_build_98381A304 import build_98381A304
 
 PART_NAME = "cone-post-dowel"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
+# The recipe is placed untransformed (RigidTransform()), so the part's pin
+# ends are the recipe's: symmetric about the Top Plane, which the drive-train
+# seats the pin by.
+TRANSFORM = RigidTransform()
+PIN_END_Y = _RECIPE_PIN_END_Y
 
 
 async def build(adapter) -> dict[str, str]:
@@ -30,7 +36,7 @@ async def build(adapter) -> dict[str, str]:
             StockComponent(
                 sku="98381A304",
                 author=build_98381A304,
-                transform=RigidTransform(),
+                transform=TRANSFORM,
             ),
         ),
         material=MATERIAL,

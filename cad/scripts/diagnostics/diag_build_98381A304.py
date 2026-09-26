@@ -39,17 +39,20 @@ from diagnostics.diag_mcmaster_lib import no_sketch_inference, replica_main  # n
 MM_PER_IN = 25.4
 PIN_RADIUS = 0.125 * MM_PER_IN / 2.0
 PIN_LENGTH = 0.5 * MM_PER_IN
+# The section spans model Y symmetrically, so the part's Top Plane (y = 0) is
+# the pin's mid-length plane: the assembly seats the pin by it.
+PIN_END_Y = (-PIN_LENGTH / 2.0, PIN_LENGTH / 2.0)
 # -Y end: the lead-in cone.
 LEAD_HALF_ANGLE_DEG = 16.0
 LEAD_RADIAL = 0.005 * MM_PER_IN
 LEAD_END_RADIUS = PIN_RADIUS - LEAD_RADIAL
-LEAD_START_Y = -PIN_LENGTH / 2.0 + LEAD_RADIAL / math.tan(
+LEAD_START_Y = PIN_END_Y[0] + LEAD_RADIAL / math.tan(
     math.radians(LEAD_HALF_ANGLE_DEG)
 )
 # +Y end: the crown blend.
 CROWN_R = 0.016 * MM_PER_IN
 CROWN_CENTRE_R = PIN_RADIUS - CROWN_R
-CROWN_CENTRE_Y = PIN_LENGTH / 2.0 - CROWN_R
+CROWN_CENTRE_Y = PIN_END_Y[1] - CROWN_R
 
 _FLANK = CROWN_CENTRE_Y - LEAD_START_Y
 _LEAD_AXIAL = LEAD_START_Y + PIN_LENGTH / 2.0
@@ -81,12 +84,12 @@ async def build_98381A304(adapter, truth=None):
 
     check("create dowel section", await adapter.create_sketch("Front"))
     sketch = adapter.currentSketchManager
-    top = PIN_LENGTH / 2.0
+    bottom, top = PIN_END_Y
     crown_mid = math.radians(45.0)
     with no_sketch_inference(adapter):
         if (
             sketch.CreateCenterLine(
-                0.0, (-top - 1.0) / 1000.0, 0.0, 0.0, (top + 1.0) / 1000.0, 0.0
+                0.0, (bottom - 1.0) / 1000.0, 0.0, 0.0, (top + 1.0) / 1000.0, 0.0
             )
             is None
         ):
@@ -112,8 +115,8 @@ async def build_98381A304(adapter, truth=None):
             [
                 (CROWN_CENTRE_R, top),
                 (0.0, top),
-                (0.0, -top),
-                (LEAD_END_RADIUS, -top),
+                (0.0, bottom),
+                (LEAD_END_RADIUS, bottom),
                 (PIN_RADIUS, LEAD_START_Y),
                 (PIN_RADIUS, CROWN_CENTRE_Y),
             ],

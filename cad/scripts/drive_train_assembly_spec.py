@@ -40,6 +40,7 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "crank-drive-gear",
         "cone-swing-platform",
         "cone-pivot-post",
+        "cone-post-dowel",
         "cone-tip-block",
         "cone-tip-bushing",
         "cone-tip-adjuster",
@@ -117,7 +118,10 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("north end disc", ("cylinder-end-disc",), "z", 15.0, ("north",)),
     ExplodeStep("pedestal screws lift", ("pedestal-hold-down-screw",), "y", 30.0),
     # cone set: base hardware up, swing plate down
-    ExplodeStep("swing plate drops", ("cone-swing-platform",), "y", -30.0),
+    # The MHA-151 pins are pressed into the plate, so they drop with it.
+    ExplodeStep(
+        "swing plate drops", ("cone-swing-platform", "cone-post-dowel"), "y", -30.0
+    ),
     ExplodeStep("pivot screw lifts", ("cone-pivot-screw",), "y", 35.0),
     ExplodeStep("lock knob lifts", ("cone-lock-knob",), "y", 30.0),
     ExplodeStep("swing stop lifts", ("swing-stop-screw",), "y", 25.0),
