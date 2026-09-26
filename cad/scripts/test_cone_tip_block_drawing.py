@@ -1144,6 +1144,22 @@ def test_flange_webs_and_nut_clear_the_2_0_target_at_the_printed_limits() -> Non
     assert spec.NUT_BEARING_MM >= 1.0
 
 
+def test_flange_length_is_its_rule_plus_a_named_end_allowance() -> None:
+    """The flange length is derived, not typed: the slot's south edge at its
+    printed limits, plus the 2.0 web, plus the length's own .X band, rounded
+    up to .X -- then a named allowance, so the end web sits well clear of
+    the floor for a first-time machinist."""
+    spec = cone_tip_block_spec
+    slot_south_edge_max = 14.9 + 0.8 + (spec.FLANGE_SLOT_W + 0.10) / 2.0
+    by_rule = math.ceil((slot_south_edge_max + 2.0 + 0.8) * 10.0 - 1e-6) / 10.0
+    assert by_rule == pytest.approx(20.6)
+    assert spec.FLANGE_END_ALLOWANCE_MM == 0.2
+    assert spec.FLANGE_LEN == round(by_rule + 0.2, 1) == 20.8
+    assert spec.WORST_FLANGE_END_WEB_MM - spec.MIN_WEB_MM == pytest.approx(
+        0.2 + by_rule - (slot_south_edge_max + 2.0 + 0.8)
+    )
+
+
 def test_holddown_screw_stands_a_pitch_past_the_nut_at_the_thickest_stack() -> None:
     """93075A150 (6-32 x 5/8) into 90631A007: head ledge, shim, flange, nut."""
     spec = cone_tip_block_spec
