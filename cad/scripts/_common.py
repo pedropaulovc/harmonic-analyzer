@@ -1989,7 +1989,10 @@ async def apply_color(adapter: Any, rgb: tuple[float, float, float]) -> None:
     if wrong:
         raise RuntimeError(f"apply_color {rgb}: read back {wrong}")
     adapter.colour_configurations = frozenset(names)
-    log(f"colour override {rgb} ({len(names)} configuration(s), {n_bodies} bodies)")
+    _telemetry.info(
+        f"apply_color {rgb}: {len(names)} configuration(s), "
+        f"{activations} activation(s), {n_bodies} bodies"
+    )
 
 
 _SW_ALL_CONFIGURATIONS = 2  # swInConfigurationOpts_e.swAllConfiguration
