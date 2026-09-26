@@ -12,6 +12,7 @@ import build_pivot_shaft as part
 import draw_pivot_shaft as drawing
 import pivot_bracket_spec
 import pivot_shaft_spec as spec
+import rocker_arm_spec
 import rocker_bank_layout as bank
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -26,10 +27,13 @@ def test_required_drawing_paths() -> None:
 
 def test_every_marked_dimension_lands_on_the_side_view() -> None:
     """Policy rule 7: a turned part's diameters and lengths sit on the side
-    view, and all of them are authored on its Right-plane half-profile."""
+    view, and all of them are authored on Right-plane half-profiles. The
+    shoulder reliefs' own feature lands in the 5:1 detail of that view."""
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.PROFILE_KEEP) == marked
+    assert set(drawing.PROFILE_KEEP) | set(drawing.DETAIL_KEEP) == marked
+    assert not set(drawing.PROFILE_KEEP) & set(drawing.DETAIL_KEEP)
+    assert set(drawing.DETAIL_KEEP) == spec.DRAWING_DIMENSIONS["ReliefProfile"]
     assert marked == {
         "ShaftDia",
         "ShoulderDia",
@@ -37,9 +41,12 @@ def test_every_marked_dimension_lands_on_the_side_view() -> None:
         "ShoulderLength",
         "JournalLength",
         "DomeHeight",
+        "ReliefWidth",
+        "ReliefDia",
     }
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert source.count('create_sketch("Right")') == 2  # the profile + the caps
+    # The profile, the reliefs and the caps.
+    assert source.count('create_sketch("Right")') == 3
     assert "create_revolve(" in source
 
 
@@ -67,6 +74,8 @@ def test_the_part_owns_display_precision_and_the_sheet_only_asserts_it() -> None
         "ShoulderLength": 2,
         "JournalLength": 1,
         "DomeHeight": 1,
+        "ReliefWidth": 1,
+        "ReliefDia": 3,
     }
     assert "draw_pivot_shaft.py" in PRECISION_MIGRATED_DRAWINGS
     digits = spec.DRAWING_PRECISION_BY_NAME["ShaftDia"]
@@ -134,12 +143,25 @@ def test_part_stamps_make_critical_properties() -> None:
     assert int(config["quantity"]) == 1
 
 
-def test_surface_finishes_name_the_body_and_the_journal() -> None:
+def test_surface_finishes_name_the_running_faces() -> None:
     by_key = {control.key: control for control in spec.SURFACE_FINISHES}
-    assert set(by_key) == {"pivot_bearing", "pivot_journal"}
+    assert set(by_key) == {"pivot_bearing", "pivot_journal", "shoulder_thrust"}
     for control in by_key.values():
         assert control.roughness_um == 1.6
-        assert control.face.diameter_mm == spec.SHAFT_DIA
+    for key in ("pivot_bearing", "pivot_journal"):
+        assert by_key[key].face.diameter_mm == spec.SHAFT_DIA
+        # Each probe station is on the O.D., off both reliefs.
+        z = -by_key[key].face.contains_z_mm
+        north_relief = (spec.JOURNAL_LENGTH - spec.RELIEF_WIDTH, spec.JOURNAL_LENGTH)
+        south_face = spec.JOURNAL_LENGTH + spec.SHOULDER_LENGTH
+        south_relief = (south_face, south_face + spec.RELIEF_WIDTH)
+        for low, high in (north_relief, south_relief):
+            assert not low <= z <= high
+    # Codex #936 PRRT_kwDOPHDy386mTMXt: rocker 19's hub rocks on the
+    # shoulder's south face, which looks -Z at the shoulder's south station.
+    thrust = by_key["shoulder_thrust"].face
+    assert thrust.normal == (0, 0, -1)
+    assert thrust.offset_mm == spec.JOURNAL_LENGTH + spec.SHOULDER_LENGTH
     # Part frame: the north end at z 0, the body toward -z.
     body_z = by_key["pivot_bearing"].face.contains_z_mm
     journal_z = by_key["pivot_journal"].face.contains_z_mm
@@ -157,3 +179,50 @@ def test_surface_finishes_name_the_body_and_the_journal() -> None:
             f'control=surface_finish_by_key(SURFACE_FINISHES,"{key}")' in sheet_source
         )
     assert "roughness_ra=" not in sheet_source
+
+
+def test_shoulder_reliefs_clear_the_tool_and_keep_the_seats_flat() -> None:
+    """Codex #936 PRRT_kwDOPHDy386mTMXq, at the printed worst case."""
+    width_low, width_high = spec.RELIEF_WIDTH_RANGE
+    # The .X band as the title block prints it (0.03 in reads +/-0.8).
+    one_place = _config.title_block("linear_1pl")
+    assert one_place["display"] == f"±{spec.LINEAR_1PL}"
+    assert spec.LINEAR_1PL >= one_place["value_in"] * 25.4
+    assert spec.LINEAR_3PL == _config.title_block("linear_3pl")["value_in"] * 25.4
+    assert spec.CORNER_RADIUS_MAX == _config.title_block("edge_break")["radius_mm"]
+    # The narrowest groove still takes in the facing tool's nose.
+    assert width_low >= spec.FACING_NOSE_RADIUS
+    # The shallowest groove keeps the grooving corner under the O.D.
+    assert (spec.RELIEF_DIA + spec.LINEAR_3PL) / 2.0 + spec.CORNER_RADIUS_MAX <= (
+        spec.SHAFT_DIA_MIN / 2.0
+    )
+    # The widest groove leaves the north journal and hub 19 most of their
+    # bearing.
+    assert spec.JOURNAL_LENGTH - width_high >= spec.JOURNAL_LENGTH / 2.0
+    hub = rocker_arm_spec.HUB_LENGTH
+    assert hub - width_high >= hub / 2.0
+    # The reliefs print at the places their sizing assumes.
+    assert spec.DRAWING_PRECISION["ReliefProfile"] == {"ReliefWidth": 1, "ReliefDia": 3}
+    assert round(spec.RELIEF_DIA, 2) == spec.RELIEF_DIA
+
+
+def test_relief_volume_is_two_annular_grooves() -> None:
+    outer = spec.SHAFT_DIA / 2.0
+    inner = spec.RELIEF_DIA / 2.0
+    assert part.V_RELIEFS == 2.0 * math.pi * (outer**2 - inner**2) * spec.RELIEF_WIDTH
+
+
+def test_detail_sits_in_the_open_field() -> None:
+    """Under the profile's length dimension, right of the notes, left of the
+    title block."""
+    radius = drawing.DETAIL_RADIUS_MM * drawing.DETAIL_SCALE[0] / 1000.0
+    left, right = drawing.DETAIL_CENTER[0] - radius, drawing.DETAIL_CENTER[0] + radius
+    top = drawing.DETAIL_CENTER[1] + radius
+    assert top < drawing.PROFILE_KEEP["ShaftLength"][1]
+    assert right < 0.218
+    assert left > 0.12
+    # The fence takes in both grooves and the shoulder O.D.
+    fence = drawing.DETAIL_RADIUS_MM
+    reach = spec.SHOULDER_LENGTH / 2.0 + spec.RELIEF_WIDTH
+    assert reach < fence
+    assert spec.SHOULDER_DIA / 2.0 < fence
