@@ -316,3 +316,261 @@ def test_build_places_both_leaders_from_their_projected_features() -> None:
         "leader_attach_xy=cap_seat_tip,",
     ):
         assert placed in body, placed
+
+
+# #955 section letters.  layoutcheck's replay of b49e1 found three cutting-
+# plane letters printed on ink (B 3.65 mm on the rail edge and the 183.9,
+# E 0.99 on the corner boss, D 6.17 on the hub rail's inner face) and two more
+# under 1 mm off it.  The two 1:3 plans are projected as above (+X right, +Z
+# down the sheet); each letter's box stands about its arrow's tail.
+_PLAN_S = drawing.GEOMETRY_VIEW_SCALE / 1000.0
+_SECTION_PLAN = {
+    "B": drawing.GEOMETRY_TOP_CENTER,
+    "E": drawing.GEOMETRY_TOP_CENTER,
+    "D": drawing.HUB_TOP_CENTER,
+}
+_LETTER_ENDS = ("B-outer", "B-inner", "E-inner", "E-outer", "D-outer", "D-inner")
+# b49e1's cutting-line ends, as the build then typed them, start first.
+_B49E1_CUT_ENDS = {
+    "B": (
+        (part.COLUMN_X / 2.0, drawing.PLAN_HALF_Z + 6.0),
+        (part.COLUMN_X / 2.0, part.INNER_Z - 6.0),
+    ),
+    "E": (
+        (part.BAR_X1 + 6.0, drawing.SIDE_SECTION_Z),
+        (-drawing.PLAN_HALF_X - 6.0, drawing.SIDE_SECTION_Z),
+    ),
+    "D": (
+        (-drawing.PLAN_HALF_X - 6.0, part.GOOSENECK_Z),
+        (-part.INNER_X + 5.0, part.GOOSENECK_Z),
+    ),
+}
+# The letters' ink on the b49e1 render (mm).
+_B49E1_LETTERS = {
+    "B-outer": (193.21, 119.26, 196.86, 125.44),
+    "B-inner": (193.21, 138.30, 196.86, 144.47),
+    "E-inner": (144.18, 202.99, 147.66, 209.17),
+    "E-outer": (67.14, 202.99, 70.63, 209.17),
+    "D-outer": (66.28, 214.80, 71.40, 220.97),
+    "D-inner": (84.34, 214.80, 89.46, 220.97),
+}
+# Dimension ink beside the letters, which #955 leaves where b49e1 printed it
+# (mm): the "183.9" and its line, the 18.0 gusset run's text and witness
+# lines, and the witness lines running off the rear-left corner boss.
+_WINDOW_WIDTH_TEXT = (184.84, 116.16, 195.52, 119.72)
+_WINDOW_WIDTH_LINE = ((143.67, 115.22), (204.97, 115.22))
+_GUSSET_RUN_TEXT = (124.72, 215.88, 165.32, 219.44)
+_GUSSET_RUN_WITNESSES = (((143.67, 194.5), (143.67, 215.94)), ((149.67, 200.5), (149.67, 215.94)))
+_CORNER_WITNESSES = (
+    ((70.63, 206.83), (70.63, 251.94)),  # (446.2)
+    ((72.63, 212.17), (45.0, 212.17)),  # 262.0
+    ((84.03, 199.5), (58.0, 199.5)),  # 186.0
+)
+# SolidWorks' cutting-plane arrowhead is 1/8 in across (cone_tip_block's
+# SECTION_ARROW_HEAD, measured on its renders) on a 12 mm shaft.
+_SECTION_ARROW_LENGTH = 0.012
+_SECTION_ARROW_HALF_WIDTH = 0.003175 / 2.0
+
+
+def _mm(box):
+    return tuple(value / 1000.0 for value in box)
+
+
+def _mm_segment(segment):
+    return tuple(tuple(value / 1000.0 for value in point) for point in segment)
+
+
+def _plan_point(key, x, z):
+    cx, cy = _SECTION_PLAN[key]
+    return (cx + x * _PLAN_S, cy - z * _PLAN_S)
+
+
+def _letter_tails(ends):
+    """Each letter's arrow tail, keyed '<section>-<outer|inner>'; E's cut
+    starts at its inner end, B's and D's at their outer ends."""
+    order = {"B": ("outer", "inner"), "E": ("inner", "outer"), "D": ("outer", "inner")}
+    return {
+        f"{key}-{name}": _plan_point(key, *point)
+        for key, pair in ends.items()
+        for name, point in zip(order[key], pair)
+    }
+
+
+def _letter_boxes(ends):
+    boxes = {}
+    for name, (x, y) in _letter_tails(ends).items():
+        dx0, dy0, dx1, dy1 = drawing.SECTION_LETTER_EXTENTS[name[0]]
+        boxes[name] = (x + dx0, y + dy0, x + dx1, y + dy1)
+    return boxes
+
+
+def _box_point_gap(box, point):
+    x, y = point
+    return math.hypot(max(box[0] - x, 0.0, x - box[2]), max(box[1] - y, 0.0, y - box[3]))
+
+
+def _segment_point_gap(start, end, point):
+    (x0, y0), (x1, y1) = start, end
+    run = ((point[0] - x0) * (x1 - x0) + (point[1] - y0) * (y1 - y0)) / math.dist(start, end) ** 2
+    t = max(0.0, min(1.0, run))
+    return math.dist(point, (x0 + t * (x1 - x0), y0 + t * (y1 - y0)))
+
+
+def _box_segment_gap(box, segment):
+    start, end = segment
+    # A segment through the box is clipped to it (Liang-Barsky).
+    (x0, y0), (x1, y1) = start, end
+    low, high = 0.0, 1.0
+    for p, q in (
+        (x0 - x1, x0 - box[0]), (x1 - x0, box[2] - x0),
+        (y0 - y1, y0 - box[1]), (y1 - y0, box[3] - y0),
+    ):
+        if p == 0.0:
+            if q < 0.0:
+                low, high = 1.0, 0.0
+            continue
+        t = q / p
+        if p < 0.0:
+            low = max(low, t)
+            continue
+        high = min(high, t)
+    if low <= high:
+        return 0.0
+    corners = ((box[0], box[1]), (box[0], box[3]), (box[2], box[1]), (box[2], box[3]))
+    return min(
+        _box_point_gap(box, start),
+        _box_point_gap(box, end),
+        *(_segment_point_gap(start, end, corner) for corner in corners),
+    )
+
+
+def _box_box_gap(a, b):
+    return math.hypot(max(b[0] - a[2], 0.0, a[0] - b[2]), max(b[1] - a[3], 0.0, a[1] - b[3]))
+
+
+def _plan_line(key, a, b):
+    return (_plan_point(key, *a), _plan_point(key, *b))
+
+
+def _segment_ink(what, segment, clearance):
+    return (what, lambda box: _box_segment_gap(box, segment), clearance)
+
+
+def _letter_ink(name):
+    """(what, gap function, clearance) for the ink round one letter: the
+    plan's own edges, projected from the model, and the dimension ink b49e1
+    printed beside it."""
+    ink = drawing.INK_CLEARANCE
+    if name == "B-outer":
+        edge = _plan_line("B", (-part.COLUMN_X, part.OUTER_Z), (part.COLUMN_X, part.OUTER_Z))
+        return (
+            _segment_ink("rail outer edge", edge, drawing.TEXT_CLEARANCE),
+            _segment_ink("183.9 line", _mm_segment(_WINDOW_WIDTH_LINE), drawing.TEXT_CLEARANCE),
+            ("183.9", lambda box: _box_box_gap(box, _mm(_WINDOW_WIDTH_TEXT)), ink),
+        )
+    if name == "B-inner":
+        face = _plan_line("B", (part.BAR_X1, part.INNER_Z), (part.INNER_X, part.INNER_Z))
+        return (_segment_ink("rail inner face", face, ink),)
+    if name == "E-inner":
+        near = -(part.INNER_Z + part.EDGE_CHAMFER)
+        far = -(part.OUTER_Z - part.EDGE_CHAMFER)
+        return (
+            _segment_ink("rail inner edge", _plan_line("E", (part.BAR_X1, near), (part.INNER_X, near)), ink),
+            _segment_ink("rail outer edge", _plan_line("E", (part.BAR_X1, far), (part.INNER_X, far)), ink),
+            *(
+                _segment_ink(f"18.0 witness {i}", _mm_segment(w), ink)
+                for i, w in enumerate(_GUSSET_RUN_WITNESSES)
+            ),
+            ("18.0", lambda box: _box_box_gap(box, _mm(_GUSSET_RUN_TEXT)), ink),
+        )
+    if name == "E-outer":
+        boss = _plan_point("E", -part.COLUMN_X, part.FRONT_COLUMN_Z)
+        boss_r = part.BOSS_DIA / 2.0 * _PLAN_S
+        return (
+            ("corner boss", lambda box: max(0.0, _box_point_gap(box, boss) - boss_r), ink),
+            *(
+                _segment_ink(f"corner witness {i}", _mm_segment(w), ink)
+                for i, w in enumerate(_CORNER_WITNESSES)
+            ),
+        )
+    face_x = {"D-outer": -part.OUTER_X, "D-inner": -part.INNER_X}[name]
+    face = _plan_line("D", (face_x, -part.INNER_Z), (face_x, part.INNER_Z))
+    return (_segment_ink("hub rail face", face, ink),)
+
+
+def _letter_shortfalls(ends, name):
+    """The ink a letter stands too close to, with its gap in mm."""
+    box = _letter_boxes(ends)[name]
+    return {
+        what: round(gap(box) * 1000.0, 2)
+        for what, gap, clearance in _letter_ink(name)
+        if gap(box) < clearance
+    }
+
+
+def test_section_letter_model_reproduces_b49e1() -> None:
+    """At b49e1's ends the letter model covers the letters b49e1 printed,
+    within its 0.1 mm outward rounding, and reproduces the overprints."""
+    boxes = _letter_boxes(_B49E1_CUT_ENDS)
+    for name, printed in _B49E1_LETTERS.items():
+        model, printed = boxes[name], _mm(printed)
+        assert model[0] <= printed[0] and model[1] <= printed[1], name
+        assert model[2] >= printed[2] and model[3] >= printed[3], name
+        assert max(abs(m - p) for m, p in zip(model, printed)) < 0.00015, name
+    shortfalls = {name: _letter_shortfalls(_B49E1_CUT_ENDS, name) for name in _LETTER_ENDS}
+    assert shortfalls["B-outer"]["rail outer edge"] == 0.0
+    assert shortfalls["B-outer"]["183.9"] == 0.0
+    assert shortfalls["E-outer"]["corner boss"] == 0.0
+    assert shortfalls["E-outer"]["corner witness 0"] == 0.0
+    assert shortfalls["D-inner"]["hub rail face"] == 0.0
+
+
+@pytest.mark.parametrize("name", _LETTER_ENDS)
+def test_section_letter_stands_clear_of_its_ink(name: str) -> None:
+    """#955: each cutting-plane letter clears the ink round it by
+    INK_CLEARANCE; B's outer letter, centred in its 9.6 mm band, clears the
+    rail edge and the 183.9's line by TEXT_CLEARANCE."""
+    assert _letter_shortfalls(drawing.section_cut_ends(), name) == {}
+
+
+@pytest.mark.parametrize("name", ("B-outer", "B-inner", "E-inner", "E-outer", "D-inner"))
+def test_b49e1_section_letter_is_what_sat_on_ink(name: str) -> None:
+    """The same check on b49e1's ends fails for every letter #955 moves off
+    ink.  D's outer letter was already 2.2 mm clear; its end only re-derives."""
+    assert _letter_shortfalls(_B49E1_CUT_ENDS, name)
+
+
+def test_b_outer_arrow_keeps_off_the_window_width() -> None:
+    """B's outer arrow runs in the same band: its head clears the 183.9's
+    line and ends an ink clearance short of the value."""
+    tail = _letter_tails(drawing.section_cut_ends())["B-outer"]
+    line_y = _WINDOW_WIDTH_LINE[0][1] / 1000.0
+    assert tail[1] - _SECTION_ARROW_HALF_WIDTH - line_y >= 0.001
+    assert tail[0] + _SECTION_ARROW_LENGTH <= _WINDOW_WIDTH_TEXT[0] / 1000.0 - drawing.INK_CLEARANCE
+
+
+def test_section_cuts_cross_the_same_stock() -> None:
+    """The moved ends keep what each removed section shows: B cuts the
+    rail's plain T between the junction land and the corner boss, E runs
+    from outside the left rail past the central web, D from outside the hub
+    rail past its inner face, each at its own station."""
+    ends = drawing.section_cut_ends()
+    (bx, b_outer), (bx_inner, b_inner) = ends["B"]
+    assert bx == bx_inner and part.LAND_X1 < bx < part.COLUMN_X - part.BOSS_DIA / 2.0
+    assert b_inner < part.INNER_Z and b_outer > drawing.PLAN_HALF_Z
+    (e_inner, ez), (e_outer, ez_outer) = ends["E"]
+    assert ez == ez_outer == drawing.SIDE_SECTION_Z
+    assert e_inner > part.BAR_X1 and e_outer < -drawing.PLAN_HALF_X
+    (d_outer, dz), (d_inner, dz_inner) = ends["D"]
+    assert dz == dz_inner == part.GOOSENECK_Z
+    assert d_outer < -part.OUTER_X and -part.INNER_X < d_inner < part.BAR_X0
+
+
+def test_build_cuts_each_section_at_its_derived_ends() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for placed in (
+        'for x, z in cut_ends["B"]',
+        'for x, z in cut_ends["E"]',
+        'for x, z in section_cut_ends()["D"]',
+    ):
+        assert placed in source, placed

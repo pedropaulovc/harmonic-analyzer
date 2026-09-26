@@ -75,6 +75,7 @@ from build_top_frame import (
     BOSS_BELOW,
     FLANGE,
     FLANGE_BOT_Y,
+    GUSSET,
     EDGE_CHAMFER,
     ROOT_FILLET_R,
     OUTER_Z,
@@ -328,6 +329,39 @@ SIDE_SECTION_SCALE = (1, 4)
 SIDE_SECTION_CAPTION_XY = (0.3183, 0.0915)
 SIDE_SECTION_NOTE_XY = (0.290, 0.133)
 SIDE_WEB_TEXT_XY = (0.335, 0.120)
+
+# #955 (layoutcheck on b49e1): three cutting-plane letters printed on ink.
+# B's outer letter sat on the +Z rail's outer edge and the 183.9, E's outer
+# letter on the corner boss and the (446.2) witness line, and D's inner
+# letter on the hub rail's inner face.  Two more stood under 1 mm off it:
+# B's inner letter off the rail's inner face (0.82), E's inner letter off
+# the 18.0 gusset witness line (0.51).  IDrSection has no letter position;
+# SolidWorks prints each letter past the arrow on its cutting line's end.
+# So section_cut_ends() places each END where its letter clears that ink,
+# and each cut still crosses the same stock.
+#
+# Each letter's ink about its arrow's tail, (dx0, dy0, dx1, dy1) in sheet m,
+# was measured on the b49e1 render and rounded outward.  B's arrows point
+# +X; E's and D's point +Y.  D is the widest glyph.
+SECTION_LETTER_EXTENTS = {
+    "B": (0.0153, -0.0013, 0.0191, 0.0050),
+    "E": (-0.0015, 0.0158, 0.0020, 0.0221),
+    "D": (-0.0024, 0.0158, 0.0028, 0.0221),
+}
+# The two window clear widths print their values on one line across the
+# plan's lower rail.  "183.9" measured on b49e1 about its text point
+# (left, down, right, up), rounded outward.  Its dimension line runs 2.78 mm
+# under the text point, rounded toward the text so the band under the rail
+# is never overstated.
+WINDOW_WIDTH_TEXT_XS = (0.105, 0.190)
+WINDOW_WIDTH_TEXT_Y = 0.118
+WINDOW_WIDTH_TEXT_EXTENT = (0.0052, 0.0019, 0.0056, 0.0018)
+WINDOW_WIDTH_DIM_LINE_DROP = 0.0027
+# B's outer letter has only the 9.6 mm band between that dimension line and
+# the rail's outer edge.  A 6.2 mm letter centred there clears each side by
+# 1.7 mm, so INK_CLEARANCE cannot hold.  It keeps the text clearance the
+# cone-tip-block sheet uses between a letter and a view's edge.
+TEXT_CLEARANCE = 0.0015
 
 # Only views drawn at a scale the title block does not state carry a label,
 # and every label sits under its own view - centred where the dimension
@@ -791,10 +825,10 @@ def _hub_pocket_section(adapter: Any, parent_view: Any) -> Any:
     """
     line = [
         model_point_in_view(
-            adapter, parent_view, (x/1000.0, 0.0, GOOSENECK_Z/1000.0),
+            adapter, parent_view, (x/1000.0, 0.0, z/1000.0),
             label="set-pocket section cutting line",
         )
-        for x in (-PLAN_HALF_X-6.0, -INNER_X+5.0)
+        for x, z in section_cut_ends()["D"]
     ]
     view = create_section_view(
         adapter, parent_view, line_start=line[0], line_end=line[1],
@@ -824,6 +858,7 @@ def _hub_pocket_section(adapter: Any, parent_view: Any) -> Any:
         raise RuntimeError("set-pocket section centre did not persist")
     if not math.isclose(ratio[0]/ratio[1], HUB_SECTION_SCALE[0]/HUB_SECTION_SCALE[1]):
         raise RuntimeError("set-pocket section scale did not persist")
+    _log_section_profile(adapter, view, (-COLUMN_X, 0.0, GOOSENECK_Z), label="D-D")
     _add_view_centerlines(
         adapter, view,
         (
@@ -970,6 +1005,74 @@ def cap_seat_finish_placement(tip: Point, entry: Point) -> Point:
     bend_x = entry[0] - CAP_SEAT_FINISH_INK_PAST_BEND - INK_CLEARANCE - ROUND_OUT
     slope = (entry[1] - tip[1]) / (entry[0] - tip[0])
     return (bend_x - FINISH_LEADER_TAIL, tip[1] + (bend_x - tip[0]) * slope)
+
+
+def section_cut_ends() -> dict[str, tuple[Point, Point]]:
+    """Each removed section's cutting-line (start, end) as plan-model (X, Z) mm.
+
+    Every end stands where its letter (SECTION_LETTER_EXTENTS) clears the
+    nearest ink: an edge of the plan's own stock or a dimension printed
+    beside it.  B, E and D are cut from the two 1:3 plans, so a paper
+    clearance is ``/ s`` model millimetres.
+    """
+    s = GEOMETRY_VIEW_SCALE / 1000.0  # sheet m per model mm
+    clear = INK_CLEARANCE + ROUND_OUT
+    center_y = GEOMETRY_TOP_CENTER[1]
+    # B: the station slides along the +Z rail until the outer letter ends
+    # an ink clearance left of the "183.9", and stays in the rail's plain T,
+    # past the junction land and short of the corner boss.
+    b0, b_down, b1, b_up = SECTION_LETTER_EXTENTS["B"]
+    text_left = WINDOW_WIDTH_TEXT_XS[1] - WINDOW_WIDTH_TEXT_EXTENT[0]
+    rail_x = (text_left - clear - b1 - GEOMETRY_TOP_CENTER[0]) / s
+    if not LAND_X1 < rail_x < COLUMN_X - BOSS_DIA / 2.0:
+        raise ValueError(f"B-B station x {rail_x:.1f} leaves the rail's plain T")
+    # Its outer letter is centred in the band between that dimension's line
+    # and the rail's outer edge; its inner letter clears the rail's inner face.
+    band_low = WINDOW_WIDTH_TEXT_Y - WINDOW_WIDTH_DIM_LINE_DROP
+    band_high = center_y - OUTER_Z * s
+    outer_y = (band_low + band_high - b_down - b_up) / 2.0
+    if outer_y + b_down - band_low < TEXT_CLEARANCE:
+        raise ValueError(f"B's outer letter fits its band by {outer_y + b_down - band_low:.4f} m")
+    inner_y = center_y - INNER_Z * s + clear - b_down
+    # E: the outer letter ends an ink clearance left of the corner boss (and
+    # the (446.2) witness line on its extreme); the inner one starts an ink
+    # clearance right of the 18.0 gusset run's outer witness line.
+    e0, _e_down, e1, _e_up = SECTION_LETTER_EXTENTS["E"]
+    # D: each letter clears the hub rail's face on its own side.
+    d0, _d_down, d1, _d_up = SECTION_LETTER_EXTENTS["D"]
+    return {
+        "B": (
+            (rail_x, (center_y - outer_y) / s),
+            (rail_x, (center_y - inner_y) / s),
+        ),
+        "E": (
+            (BAR_X1 + GUSSET + (clear - e0) / s, SIDE_SECTION_Z),
+            (-PLAN_HALF_X - (clear + e1) / s, SIDE_SECTION_Z),
+        ),
+        "D": (
+            (-OUTER_X - (clear + d1) / s, GOOSENECK_Z),
+            (-INNER_X + (clear - d0) / s, GOOSENECK_Z),
+        ),
+    }
+
+
+def _log_section_profile(
+    adapter: Any, view: Any, model_point: tuple[float, float, float], *, label: str
+) -> None:
+    """Record where a removed section prints its rail centreline.
+
+    #955 lengthened B, E and D's cuts through air only.  On b49e1 each
+    view's outline centre sat within 0.35 mm of its profile's centre, not on
+    the cut's midpoint, so the profiles should not move.  This line is what
+    confirms it against b49e1's ink: B 356.43, E 296.66, D 331.98 mm.
+    """
+    x, y = model_point_in_view(
+        adapter, view, tuple(value/1000.0 for value in model_point), label=label
+    )
+    _telemetry.info(
+        f"{label} rail centreline prints at ({x*1000.0:.2f}, {y*1000.0:.2f}) mm",
+        section_profile=label, sheet_x_mm=round(x*1000.0, 3), sheet_y_mm=round(y*1000.0, 3),
+    )
 
 
 def _model_offset_in_view(
@@ -1299,14 +1402,14 @@ async def build(adapter: Any) -> dict[str, str]:
         suffix="SIDE FLANGE\nWIDTH", edges=geometry_top_edges,
     )
     for left_x, right_x, text_x, label in (
-        (-INNER_X, BAR_X0, 0.105, "left window clear width"),
-        (BAR_X1, INNER_X, 0.190, "right window clear width"),
+        (-INNER_X, BAR_X0, WINDOW_WIDTH_TEXT_XS[0], "left window clear width"),
+        (BAR_X1, INNER_X, WINDOW_WIDTH_TEXT_XS[1], "right window clear width"),
     ):
         _checked_dimension(
             adapter, geometry_top,
             p0=(left_x, HALF_H - EDGE_CHAMFER, 0.0),
             p1=(right_x, HALF_H - EDGE_CHAMFER, 0.0),
-            text_xy=(text_x, 0.118), label=label,
+            text_xy=(text_x, WINDOW_WIDTH_TEXT_Y), label=label,
             expected_mm=right_x-left_x, orientation="horizontal", exact_linear=True,
             edges=geometry_top_edges,
         )
@@ -1322,13 +1425,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # (the -Z rail is its mirror), so the section shows the one T profile the
     # web, flange, chamfer and root dimensions hang on instead of that
     # profile beside an identical twin 80 mm away carrying nothing.
-    rail_cut_x = COLUMN_X / 2.0
+    cut_ends = section_cut_ends()
+    rail_cut_x = cut_ends["B"][0][0]
     rail_cut = [
         model_point_in_view(
-            adapter, geometry_top, (rail_cut_x/1000.0, 0.0, z/1000.0),
+            adapter, geometry_top, (x/1000.0, 0.0, z/1000.0),
             label="front rear rail section station",
         )
-        for z in (PLAN_HALF_Z+6.0, INNER_Z-6.0)
+        for x, z in cut_ends["B"]
     ]
     rail_section = create_section_view(
         adapter, geometry_top,
@@ -1338,6 +1442,9 @@ async def build(adapter: Any) -> dict[str, str]:
         partial=True, label="T rail manufacturing section",
     )
     _orient_cut_section(adapter, rail_section, (0.0, 0.0, 1.0))
+    _log_section_profile(
+        adapter, rail_section, (rail_cut_x, 0.0, abs(FRONT_COLUMN_Z)), label="B-B"
+    )
     # The display mode comes before any pick: ``scan_view_edges``
     # answers for the mode the view is in, so an edge picked while the
     # ghosts were drawn would dimension a line the print does not carry.
@@ -1412,10 +1519,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # web beside it -- not the right rail's identical, unannotated twin.
     side_cut = [
         model_point_in_view(
-            adapter, geometry_top, (x/1000.0, 0.0, SIDE_SECTION_Z/1000.0),
+            adapter, geometry_top, (x/1000.0, 0.0, z/1000.0),
             label="side rail section station",
         )
-        for x in (BAR_X1+6.0, -PLAN_HALF_X-6.0)
+        for x, z in cut_ends["E"]
     ]
     side_section = create_section_view(
         adapter, geometry_top,
@@ -1424,6 +1531,7 @@ async def build(adapter: Any) -> dict[str, str]:
         partial=True, label="side rail manufacturing section",
     )
     _orient_cut_section(adapter, side_section, (1.0, 0.0, 0.0))
+    _log_section_profile(adapter, side_section, (-COLUMN_X, 0.0, SIDE_SECTION_Z), label="E-E")
     set_hidden_lines_removed(adapter, side_section)
     _checked_dimension(
         adapter, side_section,
