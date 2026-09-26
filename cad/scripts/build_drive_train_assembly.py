@@ -808,9 +808,9 @@ from cone_swing_platform_geometry import (  # noqa: E402
     HALF_WIDTH_N as PLAT_EAST_N,  # EAST taper line's north endpoint (12 --
     # the lock-slot side keeps its full seat; feeds the stop-screw/containment
     # east-edge math)
-    WEST_HALF_N as PLAT_WEST_N,  # WEST line's north endpoint (8.0, the
-    # trim; feeds ONLY the west-edge pedestal scan. Aliasing it into the east
-    # math shifted the derived stop point -- Codex catch, 2026-07-05)
+    WEST_HALF_N as PLAT_WEST_N,  # WEST line's north endpoint (the trim;
+    # feeds ONLY the west-edge sweep. Aliasing it into the east math shifted
+    # the derived stop point -- Codex catch, 2026-07-05)
     NORTH_OVERHANG as PLAT_OVERHANG,
     LOCK_HEAD_POST_CLEARANCE as PLAT_LOCK_HEAD_POST_CLEARANCE,
     CRANK_SEAT_ANCHOR as PLAT_SEAT_ANCHOR,
@@ -826,6 +826,21 @@ from cone_swing_platform_spec import (  # noqa: E402
     PIVOT_BEARING_THICKNESS as PLAT_PIVOT_BEARING_T,
     PIVOT_HEAD_RADIAL_CLEARANCE as PLAT_PIVOT_HEAD_RADIAL_CLEARANCE,
     PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA,
+    POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS,
+    POST_MOUNT_SPEC,
+    POST_MOUNT_TAP_EDGE_BREAK,
+    POST_MOUNT_THREAD_DIA,
+    PLATE_STOCK_BAND as PLAT_STOCK_BAND,
+)
+from cone_tip_shim_spec import (  # noqa: E402
+    SHIM_NORTH_Z as TIP_SHIM_NORTH_Z,
+    SHIM_SOUTH_Z as TIP_SHIM_SOUTH_Z,
+    SHIM_T as TIP_SHIM_T,
+    SHIM_X as TIP_SHIM_X,
+)
+from post_mount_screw_spec import (  # noqa: E402
+    CUT_LENGTH_MM as POST_SCREW_LEN,
+    THREAD as POST_SCREW_THREAD,
 )
 from cone_lock_knob_spec import (  # noqa: E402
     HEAD_DIA as KNOB_HEAD_DIA,
@@ -837,6 +852,7 @@ from cone_lock_knob_spec import (  # noqa: E402
 )
 from cone_pivot_screw_spec import (  # noqa: E402
     HEAD_DIA as PSCREW_HEAD_DIA,
+    HEAD_H as PSCREW_HEAD_H,
     SHOULDER_DIA as PSCREW_SHOULDER_DIA,
     SHOULDER_LEN as PSCREW_SHOULDER_LEN,
     THREAD as PSCREW_THREAD,
@@ -870,7 +886,21 @@ from build_harmonic_base import (  # noqa: E402
     SWING_HARDWARE_GEOMETRY as BASE_SWING_HARDWARE,
     require_blind_seat_fit as require_base_seat_fit,
 )
+from build_harmonic_base import (  # noqa: E402
+    HOLE_XZ as BASE_HOLE_XZ,
+    NAMEPLATE_SCREW_XZ as BASE_NAMEPLATE_XZ,
+    SERIAL_HEIGHT_MM as BASE_SERIAL_HEIGHT,
+    SERIAL_XZ as BASE_SERIAL_XZ,
+)
+from frame_column_stations import COLUMN_SOCKET_DIAMETER  # noqa: E402
+from nameplate_spec import (  # noqa: E402
+    PLATE_HEIGHT as NAMEPLATE_HEIGHT,
+    PLATE_WIDTH as NAMEPLATE_WIDTH,
+    mount_point as nameplate_mount_point,
+)
 from harmonic_base_spec import (  # noqa: E402
+    COLUMN_SOCKET_XZ as BASE_COLUMN_SOCKET_XZ,
+    LIP_W as BASE_LIP_W,
     TOP_LENGTH as BASE_TOP_LENGTH,
     TOP_WIDTH as BASE_TOP_WIDTH,
 )
@@ -989,7 +1019,10 @@ from pedestal_hold_down_screw_spec import (  # noqa: E402
     THREAD as HDSCREW_THREAD,
 )
 from build_cone_pivot_post import (  # noqa: E402
+    ATTACHMENT_CBORE_DEPTH as POST_CBORE_DEPTH,
+    ATTACHMENT_X as POST_ATTACHMENT_X,
     BLOCK_DIA as POST_BLOCK_DIA,
+    BLOCK_HEIGHT as POST_BLOCK_HEIGHT,
     BORE_HEIGHT as POST_BORE_HEIGHT,
     CONE_BOSS_LENGTH as POST_CONE_BOSS_LENGTH,
     CRANK_BORE_HEIGHT as POST_CRANK_Y,
@@ -1008,6 +1041,9 @@ from cone_tip_block_spec import (  # noqa: E402
     BLOCK_Z as TIP_BLOCK_Z,
     FIT_UP_SHIM_MARGIN_MM as TIP_FIT_UP_SHIM_MARGIN_MM,
     FLANGE_LEN as TIP_FLANGE_LEN,
+    FOOT_SHIM_RANGE_MM as TIP_FOOT_SHIM_RANGE,
+    HEEL_RELIEF_DEPTH as TIP_HEEL_RELIEF_DEPTH,
+    HEEL_RELIEF_HEIGHT as TIP_HEEL_RELIEF_HEIGHT,
     PASSAGE_CENTER_DATUM as TIP_PASSAGE_CENTER_DATUM,
     PINCH_BORE_SPEC as TIP_PINCH_BORE_SPEC,
     PINCH_CLEARANCE_SPEC as TIP_PINCH_CLEARANCE_SPEC,
@@ -1035,6 +1071,7 @@ from build_cone_tip_pinch_screw import (  # noqa: E402
     THREAD as PINCH_THREAD,
 )
 from cone_gear_shaft_spec import (  # noqa: E402
+    DRAWING_PRECISION_BY_NAME as SHAFT_DRAWING_PRECISION,
     ADJUSTER_EMBED as ADJ_EMBED,
     FRONT_STUB as SHAFT_FRONT_STUB,
     SECTIONS as SHAFT_SECTIONS,
@@ -1086,6 +1123,34 @@ if (
 # common to both riders and cancels.
 if POST_JOURNAL_AXIS_HEIGHT_TOLERANCE_MM > TIP_FIT_UP_SHIM_MARGIN_MM:
     raise AssertionError("the tip-block shim margin no longer covers the post's axis-height band")
+# U30 stack (I24): PlateTop | MHA-141 shim pack | block foot. The shim is
+# modelled at the nominal pack and covers the block's foot face exactly -- the
+# full width, from the I31 foot flange's south end to the heel relief's inner
+# face -- so the foot rests on it across the whole face and nothing reaches
+# under the pivot-screw head the relief clears.
+if abs(TIP_SHIM_T - TIP_SHIM_NOMINAL) > 1e-9:
+    raise AssertionError("MHA-141 shim thickness differs from the block's nominal pack")
+if (
+    abs(TIP_SHIM_X - TIP_BLOCK_X) > 1e-9
+    or abs(TIP_SHIM_SOUTH_Z - (-TIP_BLOCK_Z / 2.0 - TIP_FLANGE_LEN)) > 1e-9
+    or abs(TIP_SHIM_NORTH_Z - (TIP_BLOCK_Z / 2.0 - TIP_HEEL_RELIEF_DEPTH)) > 1e-9
+):
+    raise AssertionError("MHA-141 shim footprint differs from the tip block foot face")
+# U30 post mount (I22): each MHA-142 seats on the MHA-016 counterbore floor and
+# is cut to fit into the MHA-091 tap: never proud of the plate underside, and
+# at least 0.90D of thread (U37c/U41's named exception to rule 12) both at the
+# modelled cut length and at the platform spec's printed worst case.
+_require_tapped_thread("cone-post mount", POST_SCREW_THREAD, POST_MOUNT_SPEC)
+POST_SCREW_SEAT = POST_BLOCK_HEIGHT - POST_CBORE_DEPTH  # above PlateTop
+POST_SCREW_INTO_PLATE = POST_SCREW_LEN - POST_SCREW_SEAT
+if POST_SCREW_INTO_PLATE > PLAT_T:
+    raise AssertionError("MHA-142 stands proud of the MHA-091 underside")
+if (
+    POST_SCREW_INTO_PLATE - 2.0 * POST_MOUNT_TAP_EDGE_BREAK
+    < 0.90 * POST_MOUNT_THREAD_DIA
+    or POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS < 0.90
+):
+    raise AssertionError("MHA-142 engages the MHA-091 tap under 0.90D")
 # The shaft is placed by its front stub end; keep the station in lockstep with
 # the part's FRONT_STUB.
 if abs(SHAFT_FRONT_STATION + SHAFT_FRONT_STUB) > 1e-9:
@@ -1108,8 +1173,8 @@ def _plat_side_half_widths(s: float) -> dict[str, float]:
 
 def _plat_half_width(s: float) -> float:
     """Platform MIN half-width at cone station s: the narrower of the east
-    taper and the west flare (the west-tip trim makes the WEST side the
-    narrow one near the north end -- 8 vs 12); negative if s is off the
+    taper and the west flare (the WEST side is the narrow one near the north
+    end -- WEST_HALF_N vs HALF_WIDTH_N); negative if s is off the
     plate. Riders are centred on the shaft plan line (local x 0), so the
     narrower side at each station bounds their containment."""
     return min(_plat_side_half_widths(s).values())
@@ -1120,11 +1185,22 @@ def _plat_half_width(s: float) -> float:
 # span and the half-width at each end matter), each face at least
 # PLATFORM_CONTAINMENT_FLOOR_MM inside the plate's edge.
 PLATFORM_CONTAINMENT_FLOOR_MM = 0.25
-for _lbl, _s0, _hx, _hz in (
-    ("pivot post", POST_STATION, POST_BLOCK_DIA / 2.0, POST_BLOCK_DIA / 2.0),
-    ("tip block", TIP_BLOCK_STATION, TIP_BLOCK_X / 2.0, TIP_BLOCK_Z / 2.0),
-):
-    for _end in (_s0 - _hz, _s0 + _hz):
+# Each rider's foot: label -> (south station, north station, half-width).
+PLATFORM_RIDER_SPANS: dict[str, tuple[float, float, float]] = {
+    "pivot post": (
+        POST_STATION - POST_BLOCK_DIA / 2.0,
+        POST_STATION + POST_BLOCK_DIA / 2.0,
+        POST_BLOCK_DIA / 2.0,
+    ),
+    # I31: the block's foot runs FLANGE_LEN further south as its flange.
+    "tip block": (
+        TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0 - TIP_FLANGE_LEN,
+        TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0,
+        TIP_BLOCK_X / 2.0,
+    ),
+}
+for _lbl, (_south, _north, _hx) in PLATFORM_RIDER_SPANS.items():
+    for _end in (_south, _north):
         if _plat_half_width(_end) < _hx + PLATFORM_CONTAINMENT_FLOOR_MM:
             raise AssertionError(
                 f"{_lbl} overhangs the swing platform at station {_end:g}"
@@ -1470,14 +1546,51 @@ _require_tapped_thread(
     "cone pivot", PSCREW_THREAD, BASE_PIVOT_SEAT_SPEC, kind="tapped_bottoming"
 )
 require_base_seat_fit("cone pivot", BASE_PIVOT_SEAT_SPEC, PSCREW_THREAD_TAIL_LEN)
-# The pivot-screw head sits on the plate top at station PIVOT_STATION; the
-# tip block (also on the plate) ends at station 191.  The stock 3/8-in head
-# retains at least 0.20 mm air to its north face.
-if (
-    PSCREW_HEAD_DIA / 2.0
-    > (PIVOT_STATION - (TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0)) - 0.20
+# I31 heel relief, judged at the worst case: the pivot-screw head stands on
+# its shoulder at station PIVOT_STATION, only HEEL_NOMINAL_GAP off the block's
+# north face.  At fit-up the block's north face follows the shaft tip (the
+# cup seats at a fixed embed from that face), so it can come north by the
+# shaft's overall-length band (Sec4End); the head floats in the plate's pivot
+# hole (drilled band on the hole, stock shoulder).  The relief must clear the
+# head by HEEL_AIR in plan at that extreme, and in height from the lowest foot
+# (thinnest stock plate, thinnest shim stack) to the head top.  The block
+# spec's printed .XX values must cover both, at their own low limits, and be
+# sized from them (no oversize past one .XX band, rounded up).
+_GENERAL_1PL_MM = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
+_GENERAL_2PL_MM = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+_DRILLED_HOLE_PLUS_MM = float(
+    str(_config.title_block("drilled_hole")["display_plus"]).lstrip("+")
+)
+_BAND_BY_PLACES = {1: _GENERAL_1PL_MM, 2: _GENERAL_2PL_MM}
+HEEL_AIR = 0.20
+HEEL_NOMINAL_GAP = (
+    PIVOT_STATION - (TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0)
+) - PSCREW_HEAD_DIA / 2.0
+HEEL_TIP_TRAVEL = _BAND_BY_PLACES[SHAFT_DRAWING_PRECISION["Sec4End"]]
+HEEL_HEAD_FLOAT = (
+    PLAT_PIVOT_HOLE_DIA + _DRILLED_HOLE_PLUS_MM - PSCREW_SHOULDER_DIA
+) / 2.0
+HEEL_DEPTH_REQUIRED = HEEL_TIP_TRAVEL + HEEL_HEAD_FLOAT + HEEL_AIR - HEEL_NOMINAL_GAP
+HEEL_HEIGHT_REQUIRED = (
+    (PSCREW_SHOULDER_LEN + PSCREW_HEAD_H)
+    - (PLAT_T - PLAT_STOCK_BAND + TIP_FOOT_SHIM_RANGE[0])
+    + HEEL_AIR
+)
+for _lbl, _printed, _required in (
+    ("depth", TIP_HEEL_RELIEF_DEPTH, HEEL_DEPTH_REQUIRED),
+    ("height", TIP_HEEL_RELIEF_HEIGHT, HEEL_HEIGHT_REQUIRED),
 ):
-    raise AssertionError("pivot-screw head reaches the tip block's north face")
+    if _printed - _GENERAL_2PL_MM < _required - 1e-9:
+        raise AssertionError(
+            f"tip-block heel relief {_lbl} {_printed:.2f} .XX does not clear the "
+            f"pivot-screw head at the worst case (needs {_required:.3f} at its "
+            "low limit)"
+        )
+    if _printed > math.ceil((_required + _GENERAL_2PL_MM) * 100.0 - 1e-6) / 100.0:
+        raise AssertionError(
+            f"tip-block heel relief {_lbl} {_printed:.2f} is not sized from the "
+            f"worst-case stack ({_required:.3f} + .XX band)"
+        )
 
 
 # --- cone lock knob and swing stop -------------------------------------------
@@ -1581,34 +1694,142 @@ _ARB_Z_BANDS = (
     (ARBOR_PED_NORTH_Z_BAND, 0.25),
 )
 _EDGE_X_INTERCEPT = PLAT_WEST_N + _K_W * PLAT_OVERHANG
-_EDGE_WORLD_Z_BASE = _PPIVOT[2] - _EDGE_X_INTERCEPT * SIN_I
-_EDGE_WORLD_Z_SLOPE = COS_I + _K_W * SIN_I
-_EDGE_WORLD_X_BASE = _PPIVOT[0] + _EDGE_X_INTERCEPT * COS_I
-_EDGE_WORLD_X_SLOPE = SIN_I - _K_W * COS_I
 _EDGE_LOCAL_Z_MIN = PLAT_OVERHANG - PLAT_LEN
 _EDGE_LOCAL_Z_MAX = PLAT_OVERHANG
-for _ARB_Z, _min_gap in _ARB_Z_BANDS:
-    _zl0 = max(
-        _EDGE_LOCAL_Z_MIN,
-        (_ARB_Z[0] - _EDGE_WORLD_Z_BASE) / _EDGE_WORLD_Z_SLOPE,
-    )
-    _zl1 = min(
-        _EDGE_LOCAL_Z_MAX,
-        (_ARB_Z[1] - _EDGE_WORLD_Z_BASE) / _EDGE_WORLD_Z_SLOPE,
-    )
-    if _zl1 < _zl0:
-        continue
-    _closest_x = max(
-        _EDGE_WORLD_X_BASE + _EDGE_WORLD_X_SLOPE * _zl0,
-        _EDGE_WORLD_X_BASE + _EDGE_WORLD_X_SLOPE * _zl1,
-    )
-    _gap = _ARB_E_X - _closest_x
-    if _gap < _min_gap:
-        raise AssertionError(
-            f"swing-plate west edge within {_gap:.3f} mm of an arbor-pedestal "
-            f"block over world z {_ARB_Z} (needs >= {_min_gap})"
-        )
+_ARB_BAND_NAMES = ("south arbor pedestal", "north arbor pedestal")
 
+
+def west_edge_arbor_gaps(swing_deg: float) -> tuple[float, ...]:
+    """Plan x-gap from the plate's straight WEST edge to each arbor-pedestal
+    block's plate-facing flank, with the plate swung ``swing_deg`` past the
+    engaged incline (the p1 disengage turns it about the pivot).  The edge
+    and its placement are linear, so the exact local interval crossing each
+    block's z band is solved (a coarse sample once stepped over a 0.93 mm
+    overlap the SolidWorks interference gate found).  A band the edge does
+    not cross reads +inf."""
+    angle = math.radians(INCLINE_DEG + swing_deg)
+    c, s = math.cos(angle), math.sin(angle)
+    world_z_base = _PPIVOT[2] - _EDGE_X_INTERCEPT * s
+    world_z_slope = c + _K_W * s
+    world_x_base = _PPIVOT[0] + _EDGE_X_INTERCEPT * c
+    world_x_slope = s - _K_W * c
+    gaps = []
+    for arb_z, _min_gap in _ARB_Z_BANDS:
+        zl0 = max(_EDGE_LOCAL_Z_MIN, (arb_z[0] - world_z_base) / world_z_slope)
+        zl1 = min(_EDGE_LOCAL_Z_MAX, (arb_z[1] - world_z_base) / world_z_slope)
+        if zl1 < zl0:
+            gaps.append(math.inf)
+            continue
+        closest_x = max(
+            world_x_base + world_x_slope * zl0, world_x_base + world_x_slope * zl1
+        )
+        gaps.append(_ARB_E_X - closest_x)
+    return tuple(gaps)
+
+
+def plate_vertices_machine(swing_deg: float) -> tuple[tuple[float, float], ...]:
+    """The plate's four sharp plan vertices in machine (x, z), swung
+    ``swing_deg`` past the engaged incline about the pivot."""
+    angle = math.radians(INCLINE_DEG + swing_deg)
+    c, s = math.cos(angle), math.sin(angle)
+    return tuple(
+        (_PPIVOT[0] + x * c + z * s, _PPIVOT[2] - x * s + z * c)
+        for x, z in _PLATFORM_VERTICES
+    )
+
+
+Plan = tuple[float, float]
+
+
+def _edges(poly: tuple[Plan, ...]) -> list[tuple[Plan, Plan]]:
+    return list(zip(poly, poly[1:] + poly[:1]))
+
+
+def _point_segment_gap(p: Plan, a: Plan, b: Plan) -> float:
+    dx, dz = b[0] - a[0], b[1] - a[1]
+    t = max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / (dx * dx + dz * dz)))
+    return math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dz))
+
+
+def _segments_cross(p1: Plan, p2: Plan, q1: Plan, q2: Plan) -> bool:
+    def side(a: Plan, b: Plan, c: Plan) -> float:
+        return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
+    return (side(q1, q2, p1) > 0) != (side(q1, q2, p2) > 0) and (
+        side(p1, p2, q1) > 0
+    ) != (side(p1, p2, q2) > 0)
+
+
+def _point_in_polygon(point: Plan, poly: tuple[Plan, ...]) -> bool:
+    px, pz = point
+    inside = False
+    for (ax, az), (bx, bz) in _edges(poly):
+        if (az > pz) != (bz > pz) and px < ax + (pz - az) * (bx - ax) / (bz - az):
+            inside = not inside
+    return inside
+
+
+def _plan_gap_polygons(a: tuple[Plan, ...], b: tuple[Plan, ...]) -> float:
+    """Plan distance between two polygon outlines; negative when they
+    overlap (crossing edges, or one inside the other)."""
+    nearest = math.inf
+    for p1, p2 in _edges(a):
+        for q1, q2 in _edges(b):
+            if _segments_cross(p1, p2, q1, q2):
+                nearest = 0.0
+                continue
+            nearest = min(
+                nearest,
+                _point_segment_gap(p1, q1, q2),
+                _point_segment_gap(p2, q1, q2),
+                _point_segment_gap(q1, p1, p2),
+                _point_segment_gap(q2, p1, p2),
+            )
+    overlap = nearest == 0.0 or _point_in_polygon(a[0], b) or _point_in_polygon(b[0], a)
+    return -nearest if overlap else nearest
+
+
+def _plan_gap_to_plate(point: Plan, swing_deg: float) -> float:
+    """Plan distance from a point to the swung plate outline; negative when
+    the point lies under the plate."""
+    poly = plate_vertices_machine(swing_deg)
+    nearest = min(_point_segment_gap(point, a, b) for a, b in _edges(poly))
+    return -nearest if _point_in_polygon(point, poly) else nearest
+
+
+# I31 (Main, 2026-09-25): the plate's north-west edge is proven over the whole
+# p1 swing, not only engaged -- every sampled angle from 0 to DISENGAGE_DEG:
+# - the straight west edge against both arbor-pedestal blocks (their floors
+#   above: 2.0 south, 0.25 north);
+# - every sharp plate vertex inside the base deck, within the green lip;
+# - every other base-fixed occupant clear of the plate outline: see
+#   SWING_OCCUPANT_CLEARANCE, after the rig and spring layout it reads.
+SWING_SAMPLES = 400
+SWING_ANGLES = tuple(DISENGAGE_DEG * k / SWING_SAMPLES for k in range(SWING_SAMPLES + 1))
+SWING_SWEEP: dict[str, float] = {}
+for _k, _swing in enumerate(SWING_ANGLES):
+    for (_arb_z, _floor), _name, _gap in zip(
+        _ARB_Z_BANDS, _ARB_BAND_NAMES, west_edge_arbor_gaps(_swing), strict=True
+    ):
+        SWING_SWEEP[_name] = min(SWING_SWEEP.get(_name, math.inf), _gap)
+        if _gap < _floor:
+            raise AssertionError(
+                f"swing-plate west edge within {_gap:.3f} mm of the {_name} "
+                f"block at swing {_swing:.3f} deg (needs >= {_floor})"
+            )
+    for _label, (_vx, _vz) in zip(
+        ("NE", "NW", "SW", "SE"), plate_vertices_machine(_swing), strict=True
+    ):
+        _margin = min(
+            _BASE_X_LIMIT - BASE_LIP_W - abs(_vx), _BASE_Z_LIMIT - BASE_LIP_W - abs(_vz)
+        )
+        _key = f"{_label} corner inside the lip"
+        SWING_SWEEP[_key] = min(SWING_SWEEP.get(_key, math.inf), _margin)
+        if _margin < 0.0:
+            raise AssertionError(
+                f"swing-plate {_label} corner crosses the base lip by {-_margin:.3f} "
+                f"at swing {_swing:.3f} deg"
+            )
 # --- alignment pinion (ch. 25): RESTORED 2026-07-02, carried DISENGAGED ------
 # The rig stays level-inboard of the cylinder bank. Its user-authoritative 32T
 # drum retains the train's DP 49.82, so the drum, pivot blocks and lift axis move
@@ -2338,6 +2559,168 @@ for _want, _have in zip(_BLOCK_SCREW_XZ, BASE_BLOCK_XZ, strict=True):
             f"harmonic-base block-screw hole {_have} != machine derived "
             f"({_want[0]:.3f}, {_want[1]:.3f})"
         )
+# I31 swing sweep, the base-fixed occupants (Main, reviews of 0c1e615c0 and
+# 7240ae0de).  Whatever stands on a base seat keeps
+# SWING_SEAT_RUNNING_CLEARANCE -- the drive train's 2.0 design margin, as the
+# south arbor pedestal and the swing stop keep -- off the swinging plate's
+# plan outline at every SWING_ANGLES sample.  The part standing on a seat,
+# not the screw holding it, is what the plate could hit, so each is checked
+# by its plan footprint; only the column tube, round in its socket, keeps a
+# radius.  Plan-only, so conservative whatever the heights.  The pivot,
+# lock-knob and stop seats meet the plate by design and are proven with their
+# hardware; the arbor pedestals are the blocks proven above.
+SWING_SEAT_RUNNING_CLEARANCE = 2.0
+SWING_COARSE = 10
+# The plate's farthest plan point from its pivot: a vertex of its outline.
+_SWING_REACH = max(math.hypot(x, z) for x, z in _PLATFORM_VERTICES)
+
+
+def _plan_box(x0: float, x1: float, z0: float, z1: float) -> tuple[Plan, ...]:
+    return ((x0, z0), (x1, z0), (x1, z1), (x0, z1))
+
+
+# The spring's formed profile, foot end to flick tip, one strip thickness
+# wider each way; its foot pad is the widest part across z.
+_SPRING_PLAN_X = tuple(
+    SPRING_X - local[0]
+    for local in (
+        SPR_FOOT_END_L,
+        SPR_FOOT_TAN_L,
+        SPR_BEND_EXIT_L,
+        SPR_KINK_START_L,
+        SPR_KINK_C_L,
+        SPR_CREST_L,
+        SPR_FLAT_TIP_L,
+    )
+)
+_SPRING_HALF_Z = max(SPR_PAD_WIDTH, SPRING_W) / 2.0
+_PIVOT_BLOCK_X = (PIVOT_X - BLOCK_EAST, PIVOT_X - BLOCK_EAST + BLOCK_WIDTH)
+SWING_FOOTPRINTS: dict[str, tuple[Plan, ...]] = {
+    # The support's trapezoid is widest at its foot (x +-WIDE, z +-88.9).
+    "rocker-arm support": _plan_box(
+        _SUPPORT_X - _SUPPORT_FOOT_HALF_X,
+        _SUPPORT_X + _SUPPORT_FOOT_HALF_X,
+        _SUPPORT_Z - _SUPPORT_FOOT_HALF_Z,
+        _SUPPORT_Z + _SUPPORT_FOOT_HALF_Z,
+    ),
+    "front pivot block": _plan_box(
+        *_PIVOT_BLOCK_X, BLOCK_FRONT_Z0, BLOCK_FRONT_Z0 + BLOCK_DEPTH
+    ),
+    "back pivot block": _plan_box(*_PIVOT_BLOCK_X, BLOCK_BACK_Z0, BLOCK_BACK_Z0 + BLOCK_DEPTH),
+    "pinion spring": _plan_box(
+        min(_SPRING_PLAN_X) - SPRING_T,
+        max(_SPRING_PLAN_X) + SPRING_T,
+        SPRING_Z - _SPRING_HALF_Z,
+        SPRING_Z + _SPRING_HALF_Z,
+    ),
+    "nameplate": tuple(
+        (corner[0], corner[2])
+        for corner in (
+            nameplate_mount_point((u, v, 0.0))
+            for u, v in (
+                (0.0, 0.0),
+                (NAMEPLATE_WIDTH, 0.0),
+                (NAMEPLATE_WIDTH, NAMEPLATE_HEIGHT),
+                (0.0, NAMEPLATE_HEIGHT),
+            )
+        )
+    ),
+    # The stamp's glyph is narrower than it is tall.
+    "serial stamp": _plan_box(
+        BASE_SERIAL_XZ[0] - BASE_SERIAL_HEIGHT / 2.0,
+        BASE_SERIAL_XZ[0] + BASE_SERIAL_HEIGHT / 2.0,
+        BASE_SERIAL_XZ[1] - BASE_SERIAL_HEIGHT / 2.0,
+        BASE_SERIAL_XZ[1] + BASE_SERIAL_HEIGHT / 2.0,
+    ),
+}
+SWING_ROUND_OCCUPANTS: dict[str, tuple[Plan, float]] = {
+    f"column socket {i}": (xz, COLUMN_SOCKET_DIAMETER / 2.0)
+    for i, xz in enumerate(BASE_COLUMN_SOCKET_XZ)
+}
+# Each footprint must cover the base seats that hold it down: a frame or
+# sign slip would otherwise sweep the wrong rectangle.
+SWING_OCCUPANT_SEATS: dict[str, tuple[Plan, ...]] = {
+    "rocker-arm support": tuple(BASE_HOLE_XZ),
+    "front pivot block": tuple(
+        xz for xz in BASE_BLOCK_XZ if BLOCK_FRONT_Z0 <= xz[1] <= BLOCK_FRONT_Z0 + BLOCK_DEPTH
+    ),
+    "back pivot block": tuple(
+        xz for xz in BASE_BLOCK_XZ if BLOCK_BACK_Z0 <= xz[1] <= BLOCK_BACK_Z0 + BLOCK_DEPTH
+    ),
+    "pinion spring": tuple(BASE_FOOT_XZ),
+    "nameplate": tuple(BASE_NAMEPLATE_XZ),
+    "serial stamp": (BASE_SERIAL_XZ,),
+}
+for _occupant, _seats in SWING_OCCUPANT_SEATS.items():
+    if len(_seats) == 0 or not all(
+        _point_in_polygon(_seat, SWING_FOOTPRINTS[_occupant]) for _seat in _seats
+    ):
+        raise AssertionError(f"the {_occupant} footprint misses its base seats {_seats}")
+if sum(len(_seats) for _seats in SWING_OCCUPANT_SEATS.values()) != (
+    len(BASE_HOLE_XZ) + len(BASE_BLOCK_XZ) + len(BASE_FOOT_XZ) + len(BASE_NAMEPLATE_XZ) + 1
+):
+    raise AssertionError("a base seat is claimed by no swing occupant, or by two")
+
+
+def swing_occupant_clearances(
+    footprints: dict[str, tuple[Plan, ...]],
+    round_occupants: dict[str, tuple[Plan, float]],
+) -> dict[str, tuple[float, float]]:
+    """Each occupant's least plan clearance to the swinging plate over
+    SWING_ANGLES, and the swing angle (deg) where it occurs.
+
+    The plate turns about its pivot, so no plate point moves faster than
+    _SWING_REACH mm per radian and the gap between samples a and b cannot
+    dip below (g(a) + g(b) - reach * (b - a)) / 2.  Every SWING_COARSE-th
+    sample is evaluated first; an interval is filled in only while that
+    bound could still undercut the least gap found -- the same minimum as
+    evaluating every sample, at a fraction of the import time."""
+
+    def gap_at(name: str, k: int) -> float:
+        swing = SWING_ANGLES[k]
+        if name in footprints:
+            return _plan_gap_polygons(plate_vertices_machine(swing), footprints[name])
+        xz, radius = round_occupants[name]
+        return _plan_gap_to_plate(xz, swing) - radius
+
+    reach = _SWING_REACH * math.radians(SWING_ANGLES[1] - SWING_ANGLES[0])
+    coarse = list(range(0, len(SWING_ANGLES), SWING_COARSE))
+    if coarse[-1] != len(SWING_ANGLES) - 1:
+        coarse.append(len(SWING_ANGLES) - 1)
+    worst: dict[str, tuple[float, float]] = {}
+    for name in (*footprints, *round_occupants):
+        gaps = {k: gap_at(name, k) for k in coarse}
+        least = min(gaps.values())
+        for a, b in zip(coarse, coarse[1:]):
+            if (gaps[a] + gaps[b] - reach * (b - a)) / 2.0 >= least:
+                continue
+            for k in range(a + 1, b):
+                gaps[k] = gap_at(name, k)
+                least = min(least, gaps[k])
+        k = min(sorted(gaps), key=gaps.__getitem__)
+        worst[name] = (gaps[k], SWING_ANGLES[k])
+    return worst
+
+
+def require_swing_clearance(
+    footprints: dict[str, tuple[Plan, ...]],
+    round_occupants: dict[str, tuple[Plan, float]],
+) -> dict[str, tuple[float, float]]:
+    """swing_occupant_clearances, failing loud below SWING_SEAT_RUNNING_CLEARANCE."""
+    worst = swing_occupant_clearances(footprints, round_occupants)
+    for name, (gap, swing) in worst.items():
+        if gap < SWING_SEAT_RUNNING_CLEARANCE:
+            raise AssertionError(
+                f"swing plate within {gap:.3f} of the {name} at swing {swing:.3f} "
+                f"deg (needs >= {SWING_SEAT_RUNNING_CLEARANCE})"
+            )
+    return worst
+
+
+SWING_OCCUPANT_CLEARANCE = require_swing_clearance(SWING_FOOTPRINTS, SWING_ROUND_OCCUPANTS)
+SWING_NEAREST_OCCUPANT: tuple[float, str] = min(
+    (gap, name) for name, (gap, _swing) in SWING_OCCUPANT_CLEARANCE.items()
+)
 # The MHA-144 collar can share the front pivot block's z band; its underside
 # must then clear the block's flat top.
 if (
@@ -2727,11 +3110,26 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="cone-pivot-post (v2 Ry180, big-end journal, on the plate)",
     )
+    # I22: the two MHA-142 fillisters, head up on the post's counterbore
+    # floors. The post is turned Ry180, so its local +X "mount west" axis
+    # lands at machine -X of the post origin.
+    post_screws: list[str] = []
+    for tag, dx in (("west", -POST_ATTACHMENT_X), ("east", POST_ATTACHMENT_X)):
+        post_screws.append(
+            await place_component(
+                adapter,
+                "post-mount-screw",
+                [ppost[0] + dx, Y_BASE_TOP + PLAT_T + POST_SCREW_SEAT, ppost[2]],
+                [0.0, 0.0, 0.0],
+                IDENTITY,
+                ground=False,
+                label=f"post-mount-screw {tag} (MHA-142 on the post counterbore)",
+            )
+        )
     ptip = cone_station(TIP_BLOCK_STATION)
     # U30: the block stands on the nominal MHA-141 fit-up shim pack, so its
     # foot sits TIP_SHIM_NOMINAL above PlateTop (the axis-height assert above
-    # already counts it).  The shim is the integrator's; until it is inserted
-    # the block floats that far above the plate.
+    # already counts it); the shim is placed under it below.
     tip_foot_y = Y_BASE_TOP + PLAT_T + TIP_SHIM_NOMINAL
     tip_block = await place_component(
         adapter,
@@ -2741,6 +3139,21 @@ async def build(adapter) -> dict[str, str]:
         ROT_Y_INCLINE,
         ground=False,
         label="cone-tip-block (end-play adjuster support, on the plate)",
+    )
+    # I20: the MHA-141 shim pack on PlateTop under the block's foot, in the
+    # block's own frame (it runs under the I31 foot flange, its horseshoe slot
+    # open south along the flange slot).  The I31 hold-down (MHA-140 through
+    # the flange slot into the MHA-146 locknut) is not placed on this base:
+    # its plate slot still sits under the block centre (U30) until #925's I31
+    # plate lands (test_i31_hold_down_is_placed, strict xfail).
+    tip_shim = await place_component(
+        adapter,
+        "cone-tip-shim",
+        [ptip[0], Y_BASE_TOP + PLAT_T, ptip[2]],
+        [0.0, INCLINE_DEG, 0.0],
+        ROT_Y_INCLINE,
+        ground=False,
+        label="cone-tip-shim (MHA-141 fit-up pack under the tip block)",
     )
     # Tip end-play stack (item 5, v4_t00471): the brass spacer bushing on the
     # tip stub, the axial adjuster screw in the block's counterbore, and the
@@ -3530,6 +3943,14 @@ async def build(adapter) -> dict[str, str]:
         label="cone-post local-west to platform-east mounting axis",
         verify=(pivot_post, post_o),
     )
+    # I22: each MHA-142 clamps the post to the plate.
+    for screw in post_screws:
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{screw}", "PLANE"),
+            named_ref(f"Front Plane@{pivot_post}", "PLANE"),
+            label=f"{screw} clamped in the post counterbore",
+        )
 
     # Cone shaft revolute in the black pivot post: coincident + an axial plane
     # distance along the inclined axis (the shaft's local Z, read live). Its
@@ -3588,6 +4009,33 @@ async def build(adapter) -> dict[str, str]:
         label="tip-block anti-spin (rides the plate)",
         verify=(tip_block, tb_o),
     )
+    # I24: the shim pack is seated face-to-face on PlateTop and squared under
+    # the block's foot (its Front/Right planes are the foot's). The block's
+    # height already comes from the coaxial, so its foot resting on the shim
+    # is contact, proven below and by the interference gate, not a mate.
+    shim_o = _org(adapter, tip_shim)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Top Plane@{tip_shim}", "PLANE"),
+        named_ref(f"PlateTop@{platform}", "PLANE"),
+        label="tip shim seats on the plate (bottom <-> PlateTop)",
+        verify=(tip_shim, shim_o),
+    )
+    for plane in ("Front Plane", "Right Plane"):
+        await coincident_mate(
+            adapter,
+            named_ref(f"{plane}@{tip_shim}", "PLANE"),
+            named_ref(f"{plane}@{tip_block}", "PLANE"),
+            label=f"tip shim squared under the block foot ({plane})",
+            verify=(tip_shim, shim_o),
+        )
+    _shim_y = _org(adapter, tip_shim)[1]
+    _stack = _org(adapter, tip_block)[1] - _shim_y
+    if abs(_stack - TIP_SHIM_T) > 1e-4 or abs(_shim_y - (Y_BASE_TOP + PLAT_T)) > 1e-4:
+        raise AssertionError(
+            f"tip block foot is {_stack:.4f} above the shim's underside, not on its "
+            f"{TIP_SHIM_T:.2f} top"
+        )
     # --- tip end-play stack (item 5): bushing | adjuster | pinch screw --------
     # The bushing spaces the T006 gear off the block's south face: coaxial on
     # the tip stub + an axial seat off the shaft. Free-spinning in reality; its

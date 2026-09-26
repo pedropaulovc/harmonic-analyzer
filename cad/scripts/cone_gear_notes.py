@@ -70,31 +70,30 @@ def gear_data(teeth: int) -> str:
 ATTACHMENT = "SOLDER, SILVER-BRAZE OR LOCTITE 638/648"
 SHAFT_MATE_NUMBER = "MHA-014"
 
-# Named rule-12 exceptions (user rulings U42 and U40, 2026-09-23), each
-# printed only on the sheets it covers: the blind review reads every other
-# sheet without it.  Rule 6 caps the notes at four lines, so T006, which
-# carries both, states them on one line.
-CONTACT_RATIO_EXCEPTION = (
+# The two shortfalls user rulings U42 and U40 (2026-09-23) accept, each
+# printed as a plain fact only on the sheets it covers; the acceptance lives
+# in the policy's Named exceptions table.  Rule 6 caps the notes at four
+# lines, so T006, which carries both, states them on one line.
+# Named exception: MHA-013 contact ratio (drawing-simplicity-policy.md, "Named exceptions").
+CONTACT_RATIO_NOTE = (
     f"CONTACT RATIO BELOW 1.1 ON T{spec.CONTACT_RATIO_EXCEPTION_TEETH[0]:03d}"
-    f"-T{spec.CONTACT_RATIO_EXCEPTION_TEETH[-1]:03d}: "
-    "ACCEPTED EXCEPTION (BOOK FIDELITY)."
+    f"-T{spec.CONTACT_RATIO_EXCEPTION_TEETH[-1]:03d}."
 )
 
 
-def web_exception(teeth: int) -> str:
-    """Return the sheet line naming one gear's accepted thin web."""
-    return (
-        f"ROOT-TO-BORE WEB {spec.WEB_EXCEPTIONS_MM[teeth]:.2f} MIN: "
-        "ACCEPTED EXCEPTION (BOOK FIDELITY)."
-    )
+# Named exception: MHA-013 web (drawing-simplicity-policy.md, "Named exceptions").
+def web_note(teeth: int) -> str:
+    """Return the sheet line stating one gear's thin web."""
+    return f"ROOT-TO-BORE WEB {spec.WEB_EXCEPTIONS_MM[teeth]:.2f} MIN."
 
 
-def both_exceptions(teeth: int) -> str:
-    """Return the one sheet line naming a gear's thin web and low CR."""
+# Named exception: MHA-013 web (drawing-simplicity-policy.md, "Named exceptions").
+# Named exception: MHA-013 contact ratio (drawing-simplicity-policy.md, "Named exceptions").
+def contact_ratio_and_web_note(teeth: int) -> str:
+    """Return the one sheet line stating a gear's low CR and thin web."""
     return (
         "CONTACT RATIO BELOW 1.1, "
-        f"ROOT-TO-BORE WEB {spec.WEB_EXCEPTIONS_MM[teeth]:.2f} MIN: "
-        "ACCEPTED EXCEPTIONS (BOOK FIDELITY)."
+        f"ROOT-TO-BORE WEB {spec.WEB_EXCEPTIONS_MM[teeth]:.2f} MIN."
     )
 
 
@@ -112,9 +111,9 @@ def drawing_notes(teeth: int) -> str:
     lines = list(_COMMON_NOTES)
     low_contact_ratio = teeth in spec.CONTACT_RATIO_EXCEPTION_TEETH
     if low_contact_ratio and teeth in spec.WEB_EXCEPTIONS_MM:
-        lines.append(both_exceptions(teeth))
+        lines.append(contact_ratio_and_web_note(teeth))
     elif teeth in spec.WEB_EXCEPTIONS_MM:
-        lines.append(web_exception(teeth))
+        lines.append(web_note(teeth))
     elif low_contact_ratio:
-        lines.append(CONTACT_RATIO_EXCEPTION)
+        lines.append(CONTACT_RATIO_NOTE)
     return "\n".join(lines)

@@ -244,6 +244,8 @@ BOM_PART_NUMBERS = {
     "cone-tip-bushing": "MHA-096",
     "cone-tip-adjuster": "MHA-097",
     "cone-tip-pinch-screw": "MHA-098",
+    "cone-tip-shim": "MHA-141",
+    "post-mount-screw": "MHA-142",
     "cone-lock-knob": "MHA-093",
     "cone-pivot-screw": "MHA-094",
     "swing-stop-screw": "MHA-095",
@@ -291,6 +293,8 @@ BOM_DESCRIPTIONS = {
     "cone-tip-bushing": "CONE TIP BUSHING",
     "cone-tip-adjuster": "CUP-TIP SET SCREW, MCMASTER 94025A164",
     "cone-tip-pinch-screw": "#4-40 FILLISTER SCREW, MCMASTER 91794A112",
+    "cone-tip-shim": "CONE TIP SHIM PACK, 1.10 NOMINAL",
+    "post-mount-screw": "1/4-20 FILLISTER SCREW, MSC 40923898",
     "cone-lock-knob": "KNURLED THUMB SCREW, MCMASTER 91882A425",
     "cone-pivot-screw": "SHOULDER SCREW, MCMASTER 91829A560",
     "swing-stop-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A199",
@@ -358,6 +362,7 @@ CONE_CRANK_STEPS = "\n".join(
         # ruling 2026-09-26, test_printed_text_rulings).
         "2. SCREW MHA-016 TO MHA-091 WITH 2X MHA-142 FROM THE TOP. CUT EACH TO",
         "   FIT AND CHAMFER THE END: FLUSH TO 0.3 SHORT OF THE MHA-091",
+        # Named exception: MHA-142 engagement (drawing-simplicity-policy.md, "Named exceptions").
         "   UNDERSIDE, NEVER PROUD (NOMINAL LENGTH 86.0). ENGAGEMENT 5.92-6.35",
         "   (0.93-1.0D).",
         # U30 (user, 2026-09-23, option (a)): one #6-32 button-head screw (W22)

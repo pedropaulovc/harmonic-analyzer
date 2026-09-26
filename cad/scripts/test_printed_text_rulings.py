@@ -139,11 +139,6 @@ def test_the_scan_reaches_known_printed_text() -> None:
     assert "knife-mount.material_specification" in printed_registry_fields()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="#929 (S1) states the post-mount floor plainly on the platform note and "
-    "step 2; #834 drops cone_gear_notes' ACCEPTED EXCEPTION lines (b8406ef77)",
-)
 def test_no_printed_text_cites_an_internal_rule_or_ruling() -> None:
     assert not _internal_hits({**printed_constants(), **printed_registry_fields()})
 
@@ -180,3 +175,93 @@ def test_cone_swing_platform_prints_no_minimum_stock_note() -> None:
     assert texts
     for name, text in texts.items():
         assert "5/16 IN STOCK" not in text.upper(), name
+
+
+# Governance for a printed shortfall lives in the policy's Named exceptions
+# table and in a code comment on the emitter that prints it, never on the
+# sheet (user, 2026-09-26): "# Named exception: MHA-nnn <shortfall words> (...)".
+POLICY = SCRIPTS.parent / "docs" / "drawing-simplicity-policy.md"
+EXCEPTION_TAG = re.compile(
+    r"#\s*Named exception:\s*(MHA-\d{3})\s+([a-z][a-z ]*[a-z])\s*\("
+)
+
+
+def named_exception_rows() -> list[tuple[str, str]]:
+    """``(MHA number, row text)`` per Named exceptions row: the first number in
+    its parts cell, and its parts and shortfall cells, lower-cased."""
+    section = POLICY.read_text(encoding="utf-8").split("\n## Named exceptions", 1)[1]
+    section = section.split("\n## ", 1)[0]
+    rows = []
+    for line in section.splitlines():
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) != 4 or cells[0] == "parts" or set(cells[0]) <= {"-"}:
+            continue
+        part = re.search(r"MHA-\d{3}", cells[0])
+        assert part, f"a Named exceptions row names no part number: {line}"
+        rows.append((part.group(0), f"{cells[0]} {cells[1]}".lower()))
+    return rows
+
+
+def tagged_emitters() -> list[tuple[str, str, str, str]]:
+    """``(where, MHA number, shortfall words, printed text)`` per tag.  The
+    printed text is the string literals (docstrings aside) of the assignment,
+    function or string the tag sits directly above."""
+    found = []
+    for path in sorted(SCRIPTS.glob("*.py")):
+        if path.name.startswith("test_"):
+            continue
+        source = path.read_text(encoding="utf-8")
+        if "Named exception:" not in source:
+            continue
+        lines = source.splitlines()
+        tree = ast.parse(source)
+        skip = _docstrings(tree)
+        for index, line in enumerate(lines):
+            tag = EXCEPTION_TAG.search(line)
+            if tag is None:
+                continue
+            below = index + 1
+            while lines[below].strip().startswith("#"):
+                below += 1
+            nodes = [
+                node
+                for node in ast.walk(tree)
+                if isinstance(node, (ast.Assign, ast.FunctionDef, ast.Constant))
+                and getattr(node, "lineno", None) == below + 1
+            ]
+            assert nodes, f"{path.name}:{index + 1}: the tag sits above no emitter"
+            printed = " ".join(
+                child.value
+                for child in ast.walk(nodes[0])
+                if isinstance(child, ast.Constant)
+                and isinstance(child.value, str)
+                and id(child) not in skip
+            )
+            found.append(
+                (f"{path.name}:{index + 1}", tag.group(1), tag.group(2), printed)
+            )
+    return found
+
+
+def _matches(tag: tuple[str, str, str, str], row: tuple[str, str]) -> bool:
+    _where, part, words, _printed = tag
+    return part == row[0] and all(word in row[1] for word in words.split())
+
+
+def test_every_named_exception_has_a_tagged_emitter_that_prints_it() -> None:
+    rows = named_exception_rows()
+    tags = tagged_emitters()
+    assert rows and tags
+    for row in rows:
+        assert any(_matches(tag, row) for tag in tags), (
+            f"no emitter is tagged for the Named exceptions row {row}"
+        )
+    for tag in tags:
+        where, part, words, printed = tag
+        assert any(_matches(tag, row) for row in rows), (
+            f"{where}: '{part} {words}' matches no Named exceptions row"
+        )
+        # The tag sits on the text that states the shortfall on the sheet.
+        assert words.upper() in " ".join(printed.upper().split()), (
+            f"{where}: the tagged emitter does not print {words.upper()!r}"
+        )

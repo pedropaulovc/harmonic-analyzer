@@ -1809,8 +1809,7 @@ def verify_base_footprint(report: Report) -> None:
                 f"z {front_z:.2f}..{rear_z:.2f})",
             )
         corners_local = (
-            # The NW corner carries the PR8 trim (WEST_HALF_N 9.5), the NE
-            # keeps HALF_WIDTH_N 12.
+            # The NW corner stands at WEST_HALF_N, the NE at HALF_WIDTH_N.
             ("plate", platform.WEST_HALF_N, platform.NORTH_OVERHANG),
             ("plate", -platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
             (

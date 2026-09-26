@@ -103,13 +103,15 @@ _INSERTED_SOURCES = {
     "drive_train": "alignment_pinion arbor_pedestal cone_gear cone_gear_shaft "
     "cone_lock_knob cone_pivot_post cone_pivot_screw cone_swing_platform "
     "cone_tip_adjuster cone_tip_block cone_tip_bushing cone_tip_pinch_screw "
+    "cone_tip_shim "
     "crank_arm crank_drive_gear crank_handle crank_handle_pivot_screw crank_hub crank_hub_pin crank_pin "
     "crank_pin_eye crank_pin_ring "
     "crank_pinion crank_pinion_pin crankshaft cylinder_end_disc cylinder_gear "
     "cylinder_gear_shaft "
     "dome_cap_screw fillister_screw foot_screw pedestal_hold_down_screw pinion_arbor pinion_arbor_collar pinion_bracket pinion_cam "
     "pinion_cam_pin pinion_handle pinion_lever pinion_lever_pin pinion_lift_rod "
-    "pinion_pivot_block pinion_pivot_shaft pinion_spring slotted_screw swing_stop_screw",
+    "pinion_pivot_block pinion_pivot_shaft pinion_spring post_mount_screw slotted_screw "
+    "swing_stop_screw",
     "channel": "amplitude_bar channel_lever channel_spring_installed connecting_rod "
     "frame_side_screw fulcrum_keeper fulcrum_shaft pivot_bracket pivot_shaft "
     "rocker_arm spring_hook",

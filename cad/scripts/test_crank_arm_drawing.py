@@ -299,7 +299,7 @@ def test_arm_states_the_mha139_engagement_exception_it_is_tapped_for() -> None:
     assert spec.DRAWING_NOTES.splitlines()[-1] == screw.DRAWING_NOTES.replace(
         "THREAD ENGAGEMENT", f"{screw.THREAD_SIZE} THREAD ENGAGEMENT"
     )
-    assert "#8-32 THREAD ENGAGEMENT 1.33D MIN: NAMED EXCEPTION TO RULE 12." in spec.DRAWING_NOTES
+    assert spec.DRAWING_NOTES.splitlines()[-1] == "#8-32 THREAD ENGAGEMENT 1.33D MIN."
     # The stock line comes from the one stock constant.
     assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
     assert spec.STOCK_NOTE == "25.4 x 8.0 SECTION: 1 x 5/16 IN CF FLAT BAR AS SUPPLIED."

@@ -30,6 +30,7 @@ from _fit_limits import deviations
 from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 
 SKU = "40923898"
+THREAD = "1/4-20"
 THREAD_DIA_MM, STOCK_LENGTH_MM, HEAD_H_MM, _HEAD_DIA, _PITCH = FILLISTER_SIZES[SKU]
 # The cut-to-fit nominal: MHA-142's own length, applied by its trim.  The
 # shared size row stays the supplied screw.
@@ -221,6 +222,7 @@ if POST_MOUNT_ENGAGEMENT_PRINTED < MIN_ENGAGEMENT_DIAMETERS:
 # Provenance stays here: the User's U37c/U41 ruling admits 0.90D under the
 # 1.5D rule.  The wording follows S1's drive-train step ("ENGAGEMENT 0.90D
 # MIN.").
+# Named exception: MHA-142 engagement (drawing-simplicity-policy.md, "Named exceptions").
 CUT_TO_FIT_CALLOUT = (
     "CUT TO FIT AT ASSEMBLY\n"
     f"END FLUSH TO {POST_SCREW_CUT_TO_FIT_SHORT:.{_FIT_PLACES}f} SHORT\n"
