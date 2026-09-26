@@ -1581,6 +1581,37 @@ def test_a_centre_mark_dumped_twice_is_a_gating_duplicate():
     assert findings[0].extra == {"owner": "Drawing View1", "identical": True}
 
 
+def test_another_line_crossing_the_shoulder_is_still_reported():
+    """codex on a0f26c3c1: the dedupe drops a shoulder crossing only when the
+    SAME line runs through the text; a second line of that annotation
+    crossing the shoulder alone is its own defect."""
+    h = 0.0035
+    callout = _hole_callout(
+        "Adjuster",
+        [(0.080, 0.090, 0.100, 0.1000), (0.100, 0.1000, 0.140, 0.1000)],
+        [("THRU ALL", 0.100, 0.1001)],
+        height=h,
+    )
+    heel = _dim("HeelReliefHt", "5.56", 0.150, 0.080, lines=[(0.1190, 0.0875, 0.1190, 0.0990)])
+    heel["display"]["lines"].append(_line(0.1190, 0.0990, 0.1190, 0.1010))  # through the text
+    heel["display"]["lines"].append(_line(0.1350, 0.0990, 0.1350, 0.1002))  # the shoulder only, past the text
+    findings = audit_dump(_dump(views=[_view("front", (0.05, 0.05, 0.2, 0.2), [callout, heel])]))
+    pair = sorted(f.kind for f in findings if {f.a.split()[1], f.b.split()[1]} == {"Adjuster", "HeelReliefHt"})
+    assert pair == ["shoulder-crosses-line", "text-on-line"]
+
+
+def test_a_template_note_is_no_duplicate_of_a_sheet_note():
+    """codex on a0f26c3c1: template annotations (owner_type 2) are the title
+    block's; only drawing-sheet ones are paired."""
+    note = {"type": 6, "visible": 1, "pos": [0.30, 0.02, 0.0], "display": {}}
+    sheet_note = {**note, "name": "DetailItem1", "owner_type": 1}
+    template_note = {**note, "name": "DetailItem2", "owner_type": 2}
+    findings = audit_dump(_dump(sheet_annotations=[sheet_note, template_note]))
+    assert [f for f in findings if f.kind == "duplicate-annotation"] == []
+    twice = audit_dump(_dump(sheet_annotations=[sheet_note, {**sheet_note, "name": "DetailItem3"}]))
+    assert [f.kind for f in twice if f.kind == "duplicate-annotation"] == ["duplicate-annotation"]
+
+
 def test_two_leaders_converging_on_one_landing_are_advisory():
     """cone-gear-shaft (d09c2b9eb): Ra 1.6's leader meets Sec4Dia's dimension
     line 3.7 mm before both arrows land on the shaft's corner. Main's ruling:
