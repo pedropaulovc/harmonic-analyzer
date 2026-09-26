@@ -128,6 +128,7 @@ from _layout_geometry import (  # noqa: E402
     format_findings,
 )
 from _layout_audit import classify_segments as classify_callout_segments  # noqa: E402
+from _layout_audit import replace_text  # noqa: E402
 
 # swAnnotationType_e (enums/swAnnotationType_e.md)
 _ANNOT_DATUM = 2
@@ -970,6 +971,9 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _audit_under_seat(arguments: argparse.Namespace, path: Path) -> int:
+    if arguments.json:
+        # A run that fails must not leave the previous run's dump behind.
+        arguments.json.unlink(missing_ok=True)
     app, document = _attach(None, path)
     try:
         sheets = collect_document(None, document)
@@ -987,7 +991,8 @@ def _audit_under_seat(arguments: argparse.Namespace, path: Path) -> int:
         print(f"\n{len(findings)} finding(s):")
         print(format_findings(findings))
         if arguments.json:
-            arguments.json.write_text(
+            replace_text(
+                arguments.json,
                 json.dumps(
                     {
                         "drawing": str(path),
@@ -996,7 +1001,6 @@ def _audit_under_seat(arguments: argparse.Namespace, path: Path) -> int:
                     },
                     indent=2,
                 ),
-                encoding="utf-8",
             )
             print(f"wrote {arguments.json}")
         return 1 if findings else 0

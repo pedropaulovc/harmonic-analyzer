@@ -43,6 +43,7 @@ from _layout_audit import (
     LAYOUT_AUDIT_MODE,
     LayoutAuditMode,
     audit_report,
+    replace_text,
 )
 
 _ANNOT_DIM = 4
@@ -476,9 +477,12 @@ def run_layout_audit(
     """Dump and audit every sheet, write ``report``; under GATE, raise on a gating finding.
 
     A collector or audit fault fails the drawing in every mode: a report that
-    silently skipped a sheet would under-count the fleet calibration.
+    silently skipped a sheet would under-count the fleet calibration. The
+    previous build's report is removed first, so a fault leaves no stale
+    findings beside the new PDF, and the new one lands atomically.
     """
     with _telemetry.span(f"layout.audit {stem}", stem=stem, mode=mode.value) as span:
+        report.unlink(missing_ok=True)
         started = time.perf_counter()
         dumps = collect_sheet_dumps(
             adapter, stem=stem, pdf=pdf, sheet_layouts=sheet_layouts, is_pictorial=is_pictorial
@@ -493,8 +497,7 @@ def run_layout_audit(
         summary = content["summary"]
         summary["collect_s"] = round(collected, 3)
         summary["total_s"] = round(time.perf_counter() - started, 3)
-        report.parent.mkdir(parents=True, exist_ok=True)
-        report.write_text(json.dumps(content, separators=(",", ":")), encoding="utf-8")
+        replace_text(report, json.dumps(content, separators=(",", ":")))
         for record in content["findings"]:
             _telemetry.debug(f"layout finding {stem}: {record['kind']}: {record['detail']}")
         span.set_attribute("sheets", summary["sheets"])

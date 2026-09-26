@@ -37,10 +37,13 @@ against the leaf's own vector PDF; the constants say what they were set from.
 from __future__ import annotations
 
 import math
+import os
 import re
+import tempfile
 from dataclasses import dataclass, replace
 from enum import Enum
 from itertools import combinations
+from pathlib import Path
 from statistics import median
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -2781,6 +2784,23 @@ def finding_record(stem: str, finding: Finding) -> dict[str, Any]:
 
 
 REPORT_SCHEMA = 1
+
+
+def replace_text(path: Path, text: str) -> None:
+    """Write ``text`` to ``path`` whole or not at all: into a temporary file
+    beside it, then renamed over it. A crash mid-write leaves no torn file
+    at ``path`` and no temporary behind. The caller removes the previous
+    file before the work that produces ``text`` (``run_layout_audit``), so
+    a failed run leaves nothing to be read as its output (Codex, #902)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            stream.write(text)
+        os.replace(temporary, path)
+    except BaseException:
+        Path(temporary).unlink(missing_ok=True)
+        raise
 
 
 def report_sheet(dump: Mapping[str, Any]) -> dict[str, Any]:
