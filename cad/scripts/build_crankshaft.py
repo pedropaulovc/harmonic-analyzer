@@ -29,6 +29,7 @@ from _common import (
     SketchDims,
     anchor_point_to_origin,
     apply_material,
+    blank_sketch,
     check,
     define_circle,
     dimension_between,
@@ -72,17 +73,10 @@ from crankshaft_spec import (
     FIDUCIAL_MODEL_DEPTH,
     FIDUCIAL_MODEL_DIA,
     ISOMETRIC_VIEW_NOTE,
-    JOURNAL_DIA_BAND,
-    JOURNAL_DIA,
-    JOURNAL_LENGTH,
-    JOURNAL_START,
     PIN_HOLE_SPEC,
     PIN_HOLE_HEIGHT,
     PINION_SEAT_DIA,
     PINION_SEAT_DIA_BAND,
-    RELIEF_DIA,
-    RELIEF_LENGTH,
-    RELIEF_START,
     SEAT_STEP,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
@@ -96,15 +90,6 @@ from crankshaft_spec import (
 from crank_native_acceptance import assert_signed_circle_center
 
 PART_NAME = "crankshaft"
-# Reference sketches this part still saves shown (#880), each with its owner
-# and why.  Delete an entry once the part hides that sketch; the release
-# refuses to start while any part lists one (visibility_debt).
-SHOWN_SKETCH_ALLOWANCES = {
-    "StationReference": (
-        "crankhub: carries the drawing's marked dimensions; hide it once "
-        "the sheet imports them from the hidden sketch"
-    ),
-}
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 # Dimensions live in crankshaft_spec / crank_hub_geometry.  The common face
@@ -217,18 +202,10 @@ async def _angled_plane_containing(
 # globals as the feature it locates.
 _STATIONS = {
     "PinionSeatStation": SEAT_STEP,
-    "JournalInboardStation": JOURNAL_START + JOURNAL_LENGTH,
-    "ReliefInboardStation": RELIEF_START + RELIEF_LENGTH,
-    "ReliefOutboardStation": RELIEF_START,
-    "JournalOutboardStation": JOURNAL_START,
     "PinHoleStation": PIN_HOLE_HEIGHT,
 }
 _STATION_DRIVES = {
     "PinionSeatStation": '"ShaftLength" - "PinionSeatStep"',
-    "JournalInboardStation": '"ShaftLength" - "JournalStart" - "JournalLength"',
-    "ReliefInboardStation": '"ShaftLength" - "ReliefStart" - "ReliefLength"',
-    "ReliefOutboardStation": '"ShaftLength" - "ReliefStart"',
-    "JournalOutboardStation": '"ShaftLength" - "JournalStart"',
     "PinHoleStation": '"ShaftLength" - "PinHoleHeight"',
 }
 
@@ -310,19 +287,13 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): shaft and journal dimensions. The
+    # Editable knobs (Tools > Equations): shaft and seat dimensions. The
     # mm suffix is load-bearing -- this is an
     # INCH document and the equation manager reads BARE numbers in document units
     # (an unsuffixed 120 = 120 in, blowing the part up 25.4x). SHAFT_DIA is
     # already mm (0.375 * IN), so it serialises as its mm value.
     await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
     await set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
-    await set_global(adapter, "JournalDia", f"{JOURNAL_DIA}mm")
-    await set_global(adapter, "JournalStart", f"{JOURNAL_START}mm")
-    await set_global(adapter, "JournalLength", f"{JOURNAL_LENGTH}mm")
-    await set_global(adapter, "ReliefDia", f"{RELIEF_DIA}mm")
-    await set_global(adapter, "ReliefStart", f"{RELIEF_START}mm")
-    await set_global(adapter, "ReliefLength", f"{RELIEF_LENGTH}mm")
     await set_global(adapter, "PinionSeatDia", f"{PINION_SEAT_DIA}mm")
     await set_global(adapter, "PinionSeatStep", f"{SEAT_STEP}mm")
     await set_global(adapter, "PinHoleHeight", f"{PIN_HOLE_HEIGHT}mm")
@@ -492,78 +463,10 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "PunchedFiducial")
     v_shaft_nose = await _volume(adapter)
 
-    # Integral v2-post bearing journal.  An offset reference plane exposes the
-    # start station as a markable manufacturing dimension; the journal then
-    # extrudes exactly across the boss span and merges into the 3/8-in core.
-    check(
-        "create_plane JournalStartPlane",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset", base_plane="Top Plane", offset=JOURNAL_START
-            )
-        ),
-    )
-    name_last_feature(adapter, "JournalStartPlane")
-    start_dim = name_dimensions(adapter, "JournalStartPlane", ["JournalStart"])
-    drive_jobs += [(start_dim[0], '"JournalStart"')]
-
-    journal = SketchDims()
-    check(
-        "create_sketch bearing journal",
-        await adapter.create_sketch("JournalStartPlane"),
-    )
-    await define_circle(
-        adapter,
-        0.0,
-        0.0,
-        JOURNAL_DIA / 2.0,
-        "bearing journal circle",
-        dims=journal,
-        names=("JournalCx", "JournalCz", "JournalDiaDim"),
-        drives=(None, None, '"JournalDia"'),
-    )
-    await ensure_fully_defined(adapter, "bearing journal sketch")
-    check("exit_sketch bearing journal", await adapter.exit_sketch())
-    name_last_feature(adapter, "JournalProfile")
-    drive_jobs += journal.apply(adapter, "JournalProfile")
-    check(
-        "extrude bearing journal",
-        await adapter.create_extrusion(ExtrusionParameters(depth=JOURNAL_LENGTH)),
-    )
-    name_last_feature(adapter, "Journal")
-    journal_depth_dim = name_dimensions(adapter, "Journal", ["JournalLength"])
-    drive_jobs += [(journal_depth_dim[0], '"JournalLength"')]
-    v_with_journal = v_shaft_nose + math.pi * (
-        (JOURNAL_DIA / 2.0) ** 2 - (SHAFT_DIA / 2.0) ** 2
-    ) * JOURNAL_LENGTH
-    await volume_check(
-        adapter,
-        "shaft + bearing journal",
-        v_with_journal,
-        0.005 * v_with_journal,
-    )
-
-    # Journal relief (#906): the bushing is reamed plain through, so the shaft
-    # is turned under the middle of the journal, leaving a bearing land at
-    # each end of the bushing.
-    v_with_journal -= await _cut_annulus_inboard(
-        adapter,
-        "Relief",
-        start=RELIEF_START,
-        start_global="ReliefStart",
-        turned_dia=JOURNAL_DIA,
-        inner_dia=RELIEF_DIA,
-        inner_global="ReliefDia",
-        length=RELIEF_LENGTH,
-        length_expr='"ReliefLength"',
-        drive_jobs=drive_jobs,
-    )
-    await volume_check(
-        adapter, "journal relief", v_with_journal, 0.005 * v_with_journal
-    )
+    v_with_seat = v_shaft_nose
     # The Ø9.0 pinion seat (RULING (b)): the same cut from the seat step to
     # the far end face.
-    v_with_journal -= await _cut_annulus_inboard(
+    v_with_seat -= await _cut_annulus_inboard(
         adapter,
         "PinionSeat",
         start=SEAT_STEP,
@@ -576,7 +479,7 @@ async def build(adapter) -> dict[str, str]:
         drive_jobs=drive_jobs,
     )
     await volume_check(
-        adapter, "pinion seat step", v_with_journal, 0.005 * v_with_journal
+        adapter, "pinion seat step", v_with_seat, 0.005 * v_with_seat
     )
 
     check(
@@ -609,7 +512,7 @@ async def build(adapter) -> dict[str, str]:
     # integrated numerically (probe-exact; replaces the old ~178 as-built
     # constant for the retired Ø5.0).
     v_pin = cross_hole_volume_mm3(pin_hole_dia, SHAFT_DIA)
-    v_final = v_with_journal - v_pin
+    v_final = v_with_seat - v_pin
     await volume_check(adapter, "shaft + pin hole", v_final, 0.02 * v_pin)
 
     # Named central axis (shaft axis = local +Y through the origin) so the
@@ -808,12 +711,6 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter,
-        "JournalProfile",
-        "JournalDiaDim",
-        *deviations(JOURNAL_DIA_BAND),
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
         "PinionSeatProfile",
         "PinionSeatDiaDim",
         *deviations(PINION_SEAT_DIA_BAND),
@@ -879,9 +776,11 @@ async def build(adapter) -> dict[str, str]:
             "Pinion Pin Hole Process": CRANKSHAFT_PIN_HOLE_PROCESS,
         },
     )
-    return await save_part_and_images(
-        adapter, PART_NAME, allowed_shown=SHOWN_SKETCH_ALLOWANCES
-    )
+    # The reference sketch owns printed dimensions but no geometry: hide it so
+    # no assembly instance renders it (#880).  The drawing shows it per view
+    # through _drawing_hidden_sketches to import those dimensions.
+    blank_sketch(adapter, "StationReference")
+    return await save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

@@ -175,16 +175,13 @@ CASES = (
         draw_crankshaft,
         (
             SurfaceFinishControl(
-                "bearing_journal",
+                "bearing_core",
                 MACHINED_UM,
                 CylinderFace(
-                    crankshaft_spec.JOURNAL_DIA,
-                    # #906: the journal is relieved; the finish rides the
-                    # inboard land.
-                    contains_y_mm=(
-                        crankshaft_spec.RELIEF_END + crankshaft_spec.JOURNAL_END
-                    )
-                    / 2.0,
+                    crankshaft_spec.SHAFT_DIA,
+                    # #906 R1: the core runs in the MHA-149 bushing; the
+                    # finish rides the middle of the post bore.
+                    contains_y_mm=crankshaft_spec.BEARING_MID_STATION,
                 ),
             ),
         ),

@@ -93,10 +93,12 @@ from cone_swing_platform_drawing_spec import (
     NOTCH_VIEW_NOTE,
     PROFILE_VIEW_NOTE,
 )
-from cone_swing_platform_geometry import (
+from cone_swing_platform_crank_axis import (
     CRANK_AXIS_Y,
     CRANK_PLANE_ANGLE,
     CRANK_SEAT_ANCHOR,
+)
+from cone_swing_platform_geometry import (
     EAST_HALF_S,
     HALF_WIDTH_N,
     NORTH_OVERHANG,
@@ -414,6 +416,20 @@ def _corner_fillet_area(label: str, r: float) -> float:
     """Plan area a radius-r fillet removes at the named sharp corner."""
     theta = _corner_theta(label)
     return r * r * (1.0 / math.tan(theta / 2.0) - (math.pi - theta) / 2.0)
+
+
+# The crank axis (cone_swing_platform_crank_axis: the crank's nominal fit-up
+# line, user ruling R1) is construction for mates only.  No printed dimension is
+# taken off it: the sheet keeps exactly DRAWING_DIMENSIONS, so moving it can
+# change nothing the drawing prints.
+_CRANK_AXIS_FEATURES = frozenset(
+    {"crank anchor (vertical)", "CrankAxisVert", "CrankAxisHigh", "CrankAxisSeat", "crank axis"}
+)
+if not _CRANK_AXIS_FEATURES.isdisjoint(DRAWING_DIMENSIONS):
+    raise AssertionError(
+        "a printed platform dimension is taken off the crank-axis construction: "
+        f"{sorted(_CRANK_AXIS_FEATURES & set(DRAWING_DIMENSIONS))}"
+    )
 
 
 async def build(adapter) -> dict[str, str]:

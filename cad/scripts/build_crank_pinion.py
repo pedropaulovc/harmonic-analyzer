@@ -59,6 +59,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
@@ -78,6 +79,7 @@ from crank_pinion_spec import (
     FACE_WIDTH,
     GEAR_DATA,
     OUTSIDE_DIA,
+    OUTSIDE_DIA_TOLERANCE_MM,
     OVERALL_LENGTH,
     PIN_DIA,
     PIN_HOLE_SPEC,
@@ -406,9 +408,12 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "BossProfile", "BoreDia", *deviations(BORE_DIA_BAND)
     )
-    # No band on the blank's outside diameter: the title block's .XX general
-    # grade fits inside the crossed mesh's radial room (crank_pinion_spec).
-    # None on the boss either -- nothing runs on it.
+    # The tip diameter's own band, on the witness the sheet imports: the
+    # crank-mesh stack's tip-to-root air takes it (crank_pinion_spec).  None on
+    # the boss -- nothing runs on it.
+    set_dimension_symmetric_tolerance(
+        adapter, "BossProfile", "OutsideDia", OUTSIDE_DIA_TOLERANCE_MM
+    )
     await volume_check(
         adapter, "driven crank pinion (equations neutral)", volume, 0.01 * v_bore
     )

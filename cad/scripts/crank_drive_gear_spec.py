@@ -79,14 +79,17 @@ NORMAL_CIRCULAR_TOOTH_THICKNESS = TRANSVERSE_CIRCULAR_TOOTH_THICKNESS * _COS_HEL
 
 # The blank's outside diameter is the one tooth-system number the turner sets
 # before a cutter touches the part, so it prints as a NATIVE dimension instead
-# of as text in the data block -- but at the title block's general .XX grade,
-# with no band of its own. The crossed 16T:64T mesh keeps at least
-# ``fits.crank_mesh.c2c_slack_mm`` 0.25 mm of centre-distance slack (the frame
-# leaves the single-cutter pair more) on top of the tooth system's own tip
-# clearance below, so the tip circle has over 0.40 mm of radial room: the
-# general +/-0.51 diametral is +/-0.255 radial, inside it. A tighter band here
-# would be a habit, not a requirement (cad/docs/tolerance-policy.md, "Fit
-# classes" and the one-sided-load bullets).
+# of as text in the data block. #906 R1: the MHA-149 bushing closes the
+# crossed 16T:64T mesh at fit-up until the backlash reads its acceptance, so
+# the frame's ``fits.crank_mesh.c2c_slack_mm`` is not what keeps a tip off the
+# mating root.  The radial room is what is left at the worst accepted fit-up
+# on top of the tooth system's own tip clearance below; ``crank_mesh_stack.
+# TIP_ROOT_AIR_WORST`` takes it with this band on the tip circle and asserts
+# it above zero.  At the title block's .XX +/-0.51 the air read -0.020; the
+# user ruled +/-0.10 on both gears' tips (2026-09-26, #906), held with a
+# micrometer before cutting, as on the cone gears' blanks.  The air alone would
+# stay positive to about +/-0.46; the ruling is what sets +/-0.10.
+OUTSIDE_DIA_TOLERANCE_MM = 0.10
 TIP_CLEARANCE_MM = 0.157 * NORMAL_MODULE_MM
 
 # The cone shaft's 3/8" gear land. The bore over it is the part's one critical
@@ -133,7 +136,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # reads ``GetPrimaryPrecision2()`` back off the sheet.
 #
 # The bore is the only fit on the part and prints three places with its own
-# band. The outside diameter prints two with none. The face width is a free
+# band. The outside diameter prints two with its own +/-0.10. The face width is a free
 # length between two turned faces: one place, so the title block's .X +/-0.8 is
 # the band it claims -- and that is the band it needs, the mating 16T's face
 # being 2.8 mm wider than this one at every allowed axial position.

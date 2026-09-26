@@ -34,9 +34,10 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
     assert (
         spec.CRANK_BOSS_DIA,
         spec.CRANK_BORE_DIA,
-        spec.CRANK_BORE_HEIGHT,
+        round(spec.CRANK_BORE_HEIGHT, 6),
         spec.CRANK_BORE_OFFSET,
-    ) == (21.93, 11.438, 72.7, 0.0)
+    ) == (21.93, 14.6, 72.49, 0.0)
+    assert (spec.CRANK_AXIS_HEIGHT, spec.CRANK_BORE_DROP) == (72.7, 0.21)
     assert spec.CRANK_BOSS_LENGTH_IN == 2.8360
     assert round(spec.CRANK_BOSS_LENGTH, 4) == 72.0344
     # The spot face is stationed from the post axis, NOT from the cast collar.
@@ -61,7 +62,7 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
     # build) fails at import, so only mass coherence is left to pin here.
     assert spec.HARVESTED_VOLUME_MM3 == round(part._ANALYTIC_FINAL_MM3, 4)
     assert round(spec.HARVESTED_VOLUME_MM3 * 7.2e-6, 6) == spec.HARVESTED_MASS_KG
-    assert round(part.CRANK_BORE_MM3, 1) == 7401.7
+    assert round(part.CRANK_BORE_MM3, 1) == 12059.7
     assert round(part.CRANK_SPOT_FACE_MM3, 1) == 93.1
     assert round(part.ATTACHMENT_HOLES_MM3, 1) == 7661.6
 
@@ -137,8 +138,10 @@ def test_part_owns_every_printed_decimal_place() -> None:
         *spec.DRAWING_DIMENSIONS.values()
     )
     assert "draw_cone_pivot_post.py" in PRECISION_MIGRATED_DRAWINGS
-    # Only the two bores earn a third place, for their limits; the basic plan
-    # angle prints the model's exact value (#906, it feeds the frame).
+    # Only the two bores earn a third place: the cone journal's limits deliver
+    # the shaft_in_bushing clearance band, the crank bore prints its H7; the
+    # basic plan angle prints the model's exact value (#906, it feeds the
+    # frame).
     assert {
         name
         for name, places in spec.DRAWING_PRECISION_BY_NAME.items()
@@ -146,29 +149,45 @@ def test_part_owns_every_printed_decimal_place() -> None:
     } == {"CrankBoreDia", "JournalBoreDia", "InclineAngle"}
 
 
-def test_running_bores_close_the_configured_fit_class() -> None:
+def test_running_bore_closes_the_configured_fit_class() -> None:
     import _config
     import cone_gear_shaft_spec
-    import crankshaft_spec
 
     upper, lower = spec.RUNNING_BORE_BAND
     expected = tuple(_config.fit("shaft_in_bushing", "diametral_clearance_mm"))
-    for bore, shaft_nominal, shaft_band in (
-        (
-            spec.CRANK_BORE_DIA,
-            crankshaft_spec.JOURNAL_DIA,
-            crankshaft_spec.JOURNAL_DIA_BAND,
-        ),
-        (
-            spec.BORE_DIA,
-            cone_gear_shaft_spec.JOURNAL_DIA,
-            cone_gear_shaft_spec.SECTION_DIA_BANDS[0],
-        ),
-    ):
-        shaft_max = shaft_nominal + shaft_band[0]
-        shaft_min = shaft_nominal + shaft_band[1]
-        clearances = (bore + lower - shaft_max, bore + upper - shaft_min)
-        assert tuple(round(value, 3) for value in clearances) == expected
+    shaft_nominal = cone_gear_shaft_spec.JOURNAL_DIA
+    shaft_upper, shaft_lower = cone_gear_shaft_spec.SECTION_DIA_BANDS[0]
+    clearances = (
+        spec.BORE_DIA + lower - (shaft_nominal + shaft_upper),
+        spec.BORE_DIA + upper - (shaft_nominal + shaft_lower),
+    )
+    assert tuple(round(value, 3) for value in clearances) == expected
+
+
+def test_crank_bore_is_an_h7_bushing_seat_with_webs_over_the_floor() -> None:
+    """#906 R1: Ø14.6 H7, on the post's symmetry plane, for MHA-149.
+
+    The web numbers are the print-worst table; each is an import-time assert
+    in the spec against the 1.5 floor, so this pins the table itself.  R1
+    holds the 2.0 target on every web.  The cone axis's own ±0.25 band
+    (JOURNAL_AXIS_HEIGHT_TOLERANCE_MM, the shim pack's range) sets how high
+    the crank axis can print, so the webs above it read against that band,
+    not the ±0.51 .XX grade it replaced.
+    """
+    assert spec.CRANK_BORE_DIA == 14.6
+    assert spec.CRANK_BORE_OFFSET == 0.0
+    assert spec.CRANK_BORE_BAND == (0.018, 0.0)
+    assert spec.WEB_FLOOR_MM == 1.5
+    assert {
+        name: round(web, 2) for name, web in spec.CRANK_BORE_WEBS_WORST.items()
+    } == {
+        "mounting thru hole": 2.0,
+        "mounting counterbore": 2.24,
+        "top face": 4.78,
+        "crank boss OD": 3.26,
+    }
+    assert min(spec.CRANK_BORE_WEBS_WORST.values()) >= 2.0
+    assert "MHA-149" in spec.DRAWING_NOTES.splitlines()[0]
 
 
 def test_nothing_else_on_the_casting_carries_a_band() -> None:
@@ -182,7 +201,8 @@ def test_nothing_else_on_the_casting_carries_a_band() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert source.count("set_dimension_bilateral_tolerance(") == 3
     assert source.count("set_dimension_symmetric_tolerance(") == 1
-    assert source.count("deviations(RUNNING_BORE_BAND)") == 2
+    assert source.count("deviations(RUNNING_BORE_BAND)") == 1
+    assert source.count("deviations(CRANK_BORE_BAND)") == 1
     assert source.count("deviations(CRANK_ABOVE_CONE_BAND)") == 1
     assert not hasattr(spec, "TURNED_DIAMETER_TOLERANCE_MM")
     assert not hasattr(spec, "CRANK_BORE_TOLERANCE_MM")
@@ -241,11 +261,15 @@ def test_machined_faces_are_called_out_on_the_casting() -> None:
         surface_finish_by_key(spec.SURFACE_FINISHES, "foot_seat").roughness_um
         == SEAT_UM
     )
-    for key in ("crank_bore", "journal_bore"):
-        assert (
-            surface_finish_by_key(spec.SURFACE_FINISHES, key).roughness_um
-            == MACHINED_UM
-        )
+    # #906 A2: the crank bore seats the bushing; only the cone journal runs.
+    assert (
+        surface_finish_by_key(spec.SURFACE_FINISHES, "crank_bore").roughness_um
+        == SEAT_UM
+    )
+    assert (
+        surface_finish_by_key(spec.SURFACE_FINISHES, "journal_bore").roughness_um
+        == MACHINED_UM
+    )
     seat = surface_finish_by_key(spec.SURFACE_FINISHES, "foot_seat").face
     assert seat.normal == (0, -1, 0) and seat.offset_mm == 0.0
     crank = surface_finish_by_key(spec.SURFACE_FINISHES, "crank_bore").face
@@ -509,40 +533,18 @@ def test_spotface_station_has_one_driving_global() -> None:
 def test_crank_bore_is_located_from_the_cone_bore_inside_the_mesh_window() -> None:
     """U31: the 16T:64T mesh closes on the bore spacing, so the print states it.
 
-    Re-adds the spec's stated worst-case contributors and proves the printed
-    band, read against the model nominal, stays inside what the centre-distance
-    contract leaves for the spacing.
+    #906 R1: the MHA-149 bushing takes up the mesh at fit-up, and
+    crank_mesh_stack carries the printed spacing band as one of its terms,
+    placed CRANK_BORE_DROP below the frame; its import-time assert is the
+    window check.
     """
-    assert round(spec.CRANK_ABOVE_CONE, 3) == 39.332
+    import crank_mesh_stack
+
+    assert round(spec.CRANK_ABOVE_CONE, 3) == 39.122
     assert spec.CRANK_ABOVE_CONE_BAND == (0.37, 0.0)
-    window_lo, window_hi = -0.150, 0.540
-    crank_float = 0.0375 + 0.075 / 72.03 * 5.65
-    cone_float = 0.0375 + 0.075 / 42.01 * 5.68
-    float_open = crank_float + cone_float
-    plan_angle = 0.063
-    station = 0.015
-    dc_ddy = 39.332 / 39.735
-    lo = (window_lo + plan_angle + station) / dc_ddy
-    hi = (window_hi - float_open - plan_angle - station) / dc_ddy
-    printed = round(spec.CRANK_ABOVE_CONE, 2)
-    upper, lower = spec.CRANK_ABOVE_CONE_BAND
-    assert lo < printed + lower - spec.CRANK_ABOVE_CONE
-    assert printed + upper - spec.CRANK_ABOVE_CONE < hi
-    # The assembly check reads backlash at rest (crank dropped by gravity):
-    # every in-print post must land inside the drive-train sheet's 0.20-0.55.
-    backlash_lo = 0.28 + 0.517 * (
-        dc_ddy * (printed + lower - spec.CRANK_ABOVE_CONE)
-        - plan_angle
-        - station
-        - crank_float
-    )
-    backlash_hi = 0.28 + 0.517 * (
-        dc_ddy * (printed + upper - spec.CRANK_ABOVE_CONE)
-        + plan_angle
-        + station
-        + cone_float
-    )
-    assert 0.20 <= backlash_lo < backlash_hi <= 0.55
+    assert crank_mesh_stack.SPACING_PRINTED == round(spec.CRANK_ABOVE_CONE, 2)
+    assert abs(crank_mesh_stack.FRAME_DY - spec.CRANK_ABOVE_CONE - spec.CRANK_BORE_DROP) < 1e-9
+    assert min(crank_mesh_stack.OPEN_MARGIN, crank_mesh_stack.CLOSE_MARGIN) > 0.0
     # The foot-to-crank height stays on the front view only as a reference.
     assert "CrankAxisY" in drawing.FRONT_KEEP
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")

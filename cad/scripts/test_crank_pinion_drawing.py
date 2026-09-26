@@ -151,13 +151,16 @@ def test_pin_hole_is_match_drilled_to_the_named_pin() -> None:
     assert spec.PIN_DIA == pytest.approx(3.175)
     assert spec.CRANKSHAFT_NUMBER == _config.parts("crankshaft")["number"]
     assert spec.PIN_NUMBER == _config.parts("crank-pinion-pin")["number"]
+    assert spec.PINION_NUMBER == _config.parts("crank-pinion")["number"]
     assert "DRILL" in spec.PIN_HOLE_PROCESS
     assert "1/8" not in spec.PIN_HOLE_PROCESS
     assert f"{spec.PIN_DIA:.2f}" not in spec.PIN_HOLE_PROCESS
     assert not hasattr(spec, "PIN_DIA_BAND")
     assert "fit_class" not in _config.parts("crank-pinion-pin")
-    # The pinion's hole clocking is the assembly's mesh seed, asserted there.
-    assert spec.PIN_CLOCKING_DEG == pytest.approx(13.783608450714796)
+    # The pinion's hole clocking is the assembly's mesh seed, asserted there:
+    # the seed at the R1 fit-up axis, centred in the window measured there
+    # (crank-mesh-R1-fitaxis-20260926.jsonl, centre -1.22..-1.25 deg).
+    assert spec.PIN_CLOCKING_DEG == pytest.approx(18.15033786449369)
 
 
 def _assert_four_fact_note(note: str, mate_number: str) -> None:
@@ -327,20 +330,24 @@ def test_bore_band_is_derived_from_its_fit_class_not_written_by_hand() -> None:
     assert (minimum, maximum) == (pytest.approx(low), pytest.approx(high))
 
 
-def test_outside_diameter_stays_at_the_general_grade() -> None:
-    # The tip circle is NOT an accuracy feature (tolerance-policy.md scores
-    # gear runout below 0.1 %/mm and the one-sided-load bullets forbid
-    # tightening a clearance for accuracy). The crossed mesh is built with
-    # fits.crank_mesh's 0.25 mm of centre-distance slack ON TOP of the tooth
-    # system's own tip clearance, so the general .XX grade fits inside the
-    # radial room and the tips still cannot bottom.
-    assert not hasattr(spec, "OUTSIDE_DIA_BAND")
+def test_outside_diameter_prints_the_tip_band_the_mesh_stack_takes() -> None:
+    # #906 R1 (user, 2026-09-26): at the title block's .XX +/-0.51 a tip could
+    # reach the 64T's root at the worst accepted fit-up, so the tip diameter
+    # prints +/-0.10 of its own -- on the witness the sheet imports -- and the
+    # stack takes that band.
+    import crank_mesh_stack
+
+    assert spec.OUTSIDE_DIA_TOLERANCE_MM == 0.10
     assert spec.DRAWING_PRECISION_BY_NAME["OutsideDia"] == 2
-    assert spec.MESH_C2C_SLACK_MM == _config.fit("crank_mesh")["c2c_slack_mm"]
+    assert "OutsideDia" in spec.DRAWING_DIMENSIONS["BossProfile"]
     assert spec.TIP_CLEARANCE_MM == pytest.approx(0.152, abs=0.001)
-    radial_room = spec.MESH_C2C_SLACK_MM + spec.TIP_CLEARANCE_MM
-    general_radial = _config.title_block("linear_2pl")["value_in"] * 25.4 / 2.0
-    assert general_radial < radial_room
+    assert crank_mesh_stack.TIP_ROOT_BAND_RADIAL >= spec.OUTSIDE_DIA_TOLERANCE_MM / 2.0
+    assert crank_mesh_stack.TIP_CLEARANCE_MM <= spec.TIP_CLEARANCE_MM
+    assert crank_mesh_stack.TIP_ROOT_AIR_WORST > 0.0
+    assert (
+        'set_dimension_symmetric_tolerance(\n        adapter, "BossProfile", "OutsideDia", '
+        "OUTSIDE_DIA_TOLERANCE_MM\n    )"
+    ) in _build_source()
     # The face width is the one free length: one place, so the title block's
     # .X grade is the band it claims, and nothing contradicts it.
     assert spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 1

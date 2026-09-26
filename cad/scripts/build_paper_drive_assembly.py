@@ -806,14 +806,14 @@ def _assert_chain_layout() -> None:
             f"_chain KNOB_CENTRE {CHAIN_KNOB_CENTRE} != -KNOB_SHAFT_XY"
             f" ({knob_pre[0]:.4f}, {knob_pre[1]:.4f})"
         )
-    # cone_line, not the drive-train script: importing the script put the
-    # whole drive-train recipe on this assembly's cache key.
-    from cone_line import X_CRANK, Y_CRANK
+    # crank_fitup_axis, not the drive-train script: importing the script put
+    # the whole drive-train recipe on this assembly's cache key.
+    from crank_fitup_axis import X_CRANK_FIT, Y_CRANK_FIT
 
-    if CHAIN_CRANK_CENTRE != (-X_CRANK, Y_CRANK):
+    if CHAIN_CRANK_CENTRE != (-X_CRANK_FIT, Y_CRANK_FIT):
         raise RuntimeError(
             f"_chain CRANK_CENTRE {CHAIN_CRANK_CENTRE} != -drive-train crank"
-            f" ({-X_CRANK}, {Y_CRANK})"
+            f" ({-X_CRANK_FIT}, {Y_CRANK_FIT})"
         )
     if (TIP_R_T24, TIP_R_T12) != (REMOVABLE_TIP_R["T24"], REMOVABLE_TIP_R["T12"]):
         raise RuntimeError("_chain tip radii diverged from REMOVABLE_TIP_R")
@@ -1619,7 +1619,7 @@ async def build(adapter) -> dict[str, str]:
     # Crank-end T12 removable = the crank-shaft chain wheel, brought over from
     # drive-train so the chain seats on BOTH sprockets locally. Placed at the
     # MACHINE crank centre = -CHAIN_CRANK_CENTRE (the pre-mirror _chain anchor,
-    # == -drive-train (X_CRANK, Y_CRANK); _assert_chain_layout pins this).
+    # == -drive-train (X_CRANK_FIT, Y_CRANK_FIT); _assert_chain_layout pins this).
     # Coplanar with the T24 on the -155 chain plane; a spur gear is symmetric so
     # identity rotation. FREE to spin -- this is the crank input, the single
     # operational DOF.

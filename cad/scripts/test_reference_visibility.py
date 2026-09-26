@@ -357,9 +357,6 @@ _SNAPSHOT = {
         "PinStationReference",
     },
     "pinion-lever": {"GripStationReference", "PinHoleStationReference"},
-    "crank-hub": {"ServicePinStationReference"},
-    "crank-handle-pivot-screw": {"StationReference"},
-    "crankshaft": {"StationReference"},
     "cone-gear": {"ToothThicknessReference"},
     "cone-pivot-post": {"BoreSpacingReference", "JournalPlanReference"},
 }
