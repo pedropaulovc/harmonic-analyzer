@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the pinion engage lever.
 
-A turned hub slipped over the MHA-060 lift rod's front end, with a tapered grip
-rod rising out of it; the MHA-135 pin (U36) match-drilled through hub and rod at
+A turned hub slipped over the MHA-060 lift rod's front end, with a straight Ø6
+grip rod rising out of it; the MHA-135 pin (U36) match-drilled through hub and rod at
 assembly carries the drive.  The 1:1 front view carries the hub and grip sizes,
 the projected top view the crown, and a 3:1 detail of the side view the hub's
 axial stations -- bore depth, end wall, grip axis and pin hole, all baselined
@@ -25,7 +25,6 @@ from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
     assert_imported_precision,
-    curate_view_dimensions,
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
@@ -35,6 +34,7 @@ from _drawing_common import (
     stamp_drawing_summary,
     view_name,
 )
+from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_registry import DRAWINGS_BY_NAME
 from pinion_lever_spec import (
     DRAWING_DIMENSIONS,
@@ -42,6 +42,7 @@ from pinion_lever_spec import (
     HUB_OD,
     LIFT_ROD_NUMBER,
     PIN_HOLE_CALLOUT,
+    REFERENCE_SKETCHES,
     ROD_LEN,
 )
 from solidworks_mcp.adapters.com_variant import double_array
@@ -90,15 +91,14 @@ def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - FRONT_BBOX_CY) * _S
 
 
-ROD_ROOT_TEXT_Y = 20.0  # model height of the root-diameter text, clear of the hub
+ROD_DIA_TEXT_Y = 20.0  # model height of the rod-diameter text, clear of the hub
 
 
 FRONT_KEEP = {
     "HubOd": (0.030, _front_y(-HUB_OD / 2.0) - 0.010),
     "HubBore": (0.105, _front_y(-HUB_OD / 2.0) - 0.014),
     "RodTipY": (0.035, FRONT_CENTER[1] + 0.010),
-    "RodTipDia": (0.100, _front_y(ROD_LEN) + 0.012),
-    "RodRootDia": (0.105, _front_y(ROD_ROOT_TEXT_Y)),
+    "RodDia": (0.105, _front_y(ROD_DIA_TEXT_Y)),
 }
 TOP_KEEP = {"CapR": (0.105, TOP_CENTER[1] + 0.012)}
 # In the side view B (the mouth face, model z +5) is the LEFT end and the
@@ -123,8 +123,6 @@ DIMENSION_CALLOUTS = {
     "BoreDepth": "FLAT BOTTOM",
     "EndWall": "TO CROWN ROOT",
     "RodTipY": "FROM HUB AXIS",
-    "RodTipDia": "AT TIP",
-    "RodRootDia": "AT ROOT",
     "GripFromB": "GRIP AXIS",
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
@@ -200,6 +198,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open pinion-lever source", await adapter.open_model(str(SOURCE)))
+    source_model = adapter.currentModel
     read_required_properties(
         adapter.currentModel,
         (
@@ -231,7 +230,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Pinion Engage Lever Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "pinion engage lever; pinned hub; tapered grip rod",
+            3: "pinion engage lever; pinned hub; straight grip rod",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -259,15 +258,28 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="lever top",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    detail = _hub_detail(adapter, side)
-    set_hidden_lines_removed(adapter, detail)
-    detail_annotations = curate_view_dimensions(
+    # The grip and pin-hole stations live in reference sketches the part saves
+    # hidden (#880).  The detail is created and dimensioned while the part
+    # shows them, and the side view shows them too, because the detail's items
+    # select through it: with only the part showing them, pc-p1r's import
+    # delivered neither station.  The side view prints the same two lines the
+    # detail does, along the hub's silhouette.
+    with part_sketches_shown(
         adapter,
-        detail,
-        keep=DETAIL_KEEP,
-        view_label="hub detail",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
+        source_model,
+        REFERENCE_SKETCHES,
+        label="hub detail stations",
+        base_view=side,
+    ):
+        detail = _hub_detail(adapter, side)
+        set_hidden_lines_removed(adapter, detail)
+        detail_annotations = curate_view_dimensions(
+            adapter,
+            detail,
+            keep=DETAIL_KEEP,
+            view_label="hub detail",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
     annotations = [*front_annotations, *top_annotations, *detail_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)

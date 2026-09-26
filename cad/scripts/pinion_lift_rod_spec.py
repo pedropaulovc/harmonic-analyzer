@@ -12,14 +12,19 @@ ROD_DIA = 6.35
 # front block; ruling (c) moved that block inboard (pinion_rig_layout),
 # 202 -> 192.0 (Codex #854), then 197.0 so the hub clears the block at the
 # worst fitted stack, both blocks' .XX depth bands included
-# (pinion_rig_layout.lift_rod_seat_stack, Codex #837/#854).
+# (pinion_rig_layout.lift_rod_seat_stack, Codex #837/#854), then 197.5 for
+# the deeper E-a blocks (Codex #858), then 197.8 for the drum's end shim
+# (Main, #858 ruling 3), then 198.8 for the 11.0 blocks, then 199.5 for the
+# 0.45 drum shim, the 6.25 back-collar pin plane and RIG_MARGIN_SPARE past
+# the lever seat (Main, #858), then 198.3 once the back collar went on its
+# leaf F (user ruling P1-1): the lever throw plane's air to the torque shaft's
+# front end now sizes it, not the seat.
 ROD_LEN = LIFT_ROD_LEN
 CAP_SAG = 1.2
 CAP_R = round((ROD_DIA**2 / 4.0 + CAP_SAG**2) / (2.0 * CAP_SAG), 2)  # 4.80
 ROD_DIA_BAND = SHAFT_H
 
 LEVER_NUMBER = "MHA-059"
-PIN_NUMBER = "MHA-135"
 
 # Rule 5: the rod turns in the pivot blocks' west bores -- the one running
 # surface on the part.
@@ -58,11 +63,13 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
-# Rule 6: the matched fit rides the pin hole's own callout.
+# Rule 6: the matched fit rides the pin hole's own callout, as the hole
+# specification only; the drive and peen are
+# pinion_lever_pin_spec.ASSEMBLY_STEP (LEVER PIN SET).
 PIN_HOLE_CALLOUT = "\n".join(
     (
-        f"MATCH-DRILL THRU AT ASSEMBLY IN {LEVER_NUMBER}",
-        f"HUB; DRIVE {PIN_NUMBER}, PEEN FLUSH",
+        "MATCH-DRILL THRU AT ASSEMBLY",
+        f"IN {LEVER_NUMBER} HUB",
     )
 )
 DRAWING_NOTES = "BACK-END CROWN BLENDS INTO THE OD WITH NO STEP."

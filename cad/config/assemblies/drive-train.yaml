@@ -33,6 +33,8 @@ flip_invert:
   - pinion cam front set pin axial
   - tip block axial seat
   - tip bushing axial seat
+  # Option E-a: the pinned torque shaft's axial station (pc-ea run).
+  - torque shaft axial
 allowed_free_stems:
   - alignment-pinion
   - cone-gear
@@ -60,7 +62,13 @@ allowed_free_stems:
   - pinion-cam-pin
   - pinion-handle
   - pinion-lever
+  # MHA-135: locked to the lift rod, it turns with the freed rod spin.
+  - pinion-lever-pin
   - pinion-lift-rod
+  # Option E-a: pinned to both straps, the torque shaft swings with them.
+  - pinion-pivot-shaft
+  # MHA-145: locked in each strap's cross hole, it swings with the strap.
+  - pinion-strap-pin
 # One family per freed DOF that must ITSELF read under-constrained.
 required_free_stems:
   - crankshaft

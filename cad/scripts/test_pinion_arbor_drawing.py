@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+
+import _common
 
 import _drawing_marks
 import _fit_limits
 import build_pinion_arbor as part
 import draw_pinion_arbor as drawing
+import pinion_arbor_geometry as geometry
 import pinion_arbor_spec as spec
 import pinion_handle_geometry as rod_geometry
 import pinion_handle_spec as crossrod
@@ -456,7 +461,7 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     clear = spec.BOND_ZONE_LAND_CLEARANCE
     assert spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN + clear <= station
     assert station <= spec.BACK_JOURNAL_FROM_HEAD_REAR - clear
-    assert spec.DRUM_STATION < station < spec.DRUM_STATION + spec.DRUM_LEN
+    assert spec.DRUM_STATION < station < spec.DRUM_STATION + geometry.DRUM_LEN
     text_x, _ = drawing.PRINCIPAL_KEEP["BondZoneDia"]
     assert text_x == pytest.approx(drawing._sheet_x(spec.BOND_ZONE_DIA_Z))
     fence_x = drawing._sheet_x(spec.HEAD_CENTER_Z)
@@ -495,15 +500,18 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     import pinion_bracket_spec
 
     # The stack's inputs are the parts' and the assembly's own values.
-    assert spec.DRUM_LEN == drum.FACE_WIDTH == assembly.APINION_DRUM_LEN
-    assert spec.STRAP_T == strap.THICKNESS == assembly.STRAP_T
-    assert spec.STRAP_T_BAND == pinion_bracket_spec.THICKNESS_BAND
-    assert spec.STRAP_AXIAL_LOCATION == "block-stop-slot-set"
+    assert geometry.DRUM_LEN == drum.FACE_WIDTH == assembly.APINION_DRUM_LEN
+    assert geometry.STRAP_T == strap.THICKNESS == assembly.STRAP_T
+    assert geometry.STRAP_T_BAND == pinion_bracket_spec.THICKNESS_BAND
+    assert spec.STRAP_AXIAL_LOCATION == "pinned-shim-set"
     assert spec.DRUM_STATION == pytest.approx(
         spec.DRUM_STATION_AS_BUILT + spec.DRUM_AFT_SHIFT
     )
 
-    assert spec.JOURNAL_LEN == pytest.approx(19.0)
+    # 20, not 19: the 0.45 drum shim widened the drum's play, and the lands
+    # keep RIG_MARGIN_SPARE over their 0.5 floor (Main, #858).
+    assert spec.JOURNAL_LEN == pytest.approx(20.0)
+    assert spec.LAND_OVER_STRAP_REQUIRED == pytest.approx(0.75)
     # The drum's world station is fixed; the printed station is that position
     # from the head rear face, so it follows the face (61.55 at the 10.5 head).
     assert spec.DRUM_STATION_AS_BUILT == pytest.approx(
@@ -511,7 +519,7 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     )
     assert spec.DRUM_STATION == pytest.approx(61.05)
     assert spec.DRUM_STATION_BAND == spec.LINEAR_X_BAND == pytest.approx(0.8)
-    assert spec.END_PLAY == 0.25 and spec.END_PLAY_SET_ERROR == 0.10
+    assert spec.END_PLAY == 0.45 and spec.END_PLAY_SET_ERROR == 0.10
     # Codex #854 review (Main): no copies of values the rig and the title block
     # own -- the spec reads them, so a feeler or row change reaches the lands.
     import inspect
@@ -520,12 +528,12 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     from _printed_tolerance import printed_band_mm
 
     assert (spec.END_PLAY, spec.END_PLAY_SET_ERROR) == (
-        rig.FRONT_BLOCK_FEELER,
-        rig.FRONT_BLOCK_FEELER_BAND,
+        rig.DRUM_END_SHIM,
+        rig.DRUM_END_SHIM_SET_ERROR,
     )
     assert spec.LINEAR_X_BAND == spec.HEAD_LEN_BAND == printed_band_mm(1)
-    assert spec.DRUM_LEN == rig.DRUM_LEN
-    assert spec.STRAP_T_BAND == strap.THICKNESS_BAND
+    assert geometry.DRUM_LEN == rig.DRUM_LEN
+    assert geometry.STRAP_T_BAND == strap.THICKNESS_BAND
     spec_source = inspect.getsource(spec)
     for literal in (
         "LINEAR_X_BAND = 0.8",
@@ -536,14 +544,14 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     ):
         assert literal not in spec_source, literal
     assert (spec.FRONT_JOURNAL_FROM_HEAD_REAR, spec.BACK_JOURNAL_FROM_HEAD_REAR) == (
-        pytest.approx(46.9),
-        pytest.approx(199.4),
+        pytest.approx(46.3),
+        pytest.approx(199.0),
     )
-    # The lands did not move in the world when the head grew: 47.4 / 199.9
+    # The lands did not move in the world when the head grew: 46.8 / 199.5
     # from the old -1.25 rear face.
     assert (spec.FRONT_JOURNAL_Z, spec.BACK_JOURNAL_Z) == (
-        pytest.approx(47.4 - 1.25),
-        pytest.approx(199.9 - 1.25),
+        pytest.approx(46.8 - 1.25),
+        pytest.approx(199.5 - 1.25),
     )
     assert set(spec.LAND_MARGINS_AT_STOPS) == {"drum forward", "drum aft"}
     for margins in spec.LAND_MARGINS_AT_STOPS.values():
@@ -553,9 +561,9 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     assert spec.land_margin_slack(spec.JOURNAL_LEN - 1.0) < 0.0
     # The drum never binds between the straps.
     assert spec.END_PLAY - spec.END_PLAY_SET_ERROR >= 0.1
-    # The drum-end airs share the cluster's one end play with the block gaps.
+    # The drum-end airs are the shim the pinned straps were drilled on.
     assert spec.drum_total_air() == (
-        0.0,
+        pytest.approx(spec.END_PLAY - spec.END_PLAY_SET_ERROR),
         pytest.approx(spec.END_PLAY + spec.END_PLAY_SET_ERROR),
     )
     # The lands are centred on their straps (to the printed place) with the
@@ -563,8 +571,8 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     air = spec.END_PLAY / 2.0
     front_mid = spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN / 2.0
     back_mid = spec.BACK_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN / 2.0
-    front_strap_mid = spec.DRUM_STATION - air - spec.STRAP_T / 2.0
-    back_strap_mid = spec.DRUM_STATION + spec.DRUM_LEN + air + spec.STRAP_T / 2.0
+    front_strap_mid = spec.DRUM_STATION - air - geometry.STRAP_T / 2.0
+    back_strap_mid = spec.DRUM_STATION + geometry.DRUM_LEN + air + geometry.STRAP_T / 2.0
     assert abs(front_mid - front_strap_mid) <= 0.05 + 1e-9
     assert abs(back_mid - back_strap_mid) <= 0.05 + 1e-9
 
@@ -778,7 +786,6 @@ def test_drum_station_text_clears_the_station_stack() -> None:
     assert back_x + 0.009 + 0.010 <= x - half
 
 
-
 def test_drum_station_matches_the_assembled_drum_on_the_arbor() -> None:
     """The drum is bonded at the printed station, so BDT derives ARBOR_Z0 from
     the fit-up stack's drum station (Codex #854/#858 P1) and the assembly
@@ -808,10 +815,142 @@ def test_journal_lands_cover_their_straps_in_the_pose() -> None:
         start = assembly.ARBOR_Z0 + land_z
         margins += [lo - start, start + spec.JOURNAL_LEN - hi]
     assert min(margins) >= spec.MIN_LAND_OVER_STRAP
-    assert margins == pytest.approx([5.15, 4.85, 4.85, 5.15], abs=5e-3)
+    # The pose is the drilling set-up: the drum hard on the back strap and
+    # the front strap one shim ahead of the drum (Main, #858 ruling 3).
+    assert margins == pytest.approx([5.3, 5.7, 5.25, 5.75], abs=5e-3)
     source = inspect.getsource(assembly)
     assert "falls short of the back strap" not in source
     assert "journal land misses its strap" in source
+
+
+def test_drum_runs_in_the_shim_the_straps_were_drilled_on() -> None:
+    # Main (#858, ruling 3): the E-a pins freeze the strap spacing where the
+    # shaft is match-drilled, so the drum's running clearance is whatever the
+    # drilling set-up leaves.  It is set with the rig's one feeler as a shim at
+    # the drum's front end, which MHA-A03's SHAFT DRILL SET prints; the drum
+    # then runs in 0.25 +/- 0.10 of end play and never binds.  Before the
+    # ruling the straps closed line to line on the drum, and drum_total_air
+    # still read the block-stop model (0.0 up to the whole feeler).  The shim
+    # is a 0.45 blade, not the rig's 0.25 feeler: the drum keeps its 0.1
+    # floor with RIG_MARGIN_SPARE to spare (Main, #858).
+    import pinion_rig_layout as rig
+
+    assert spec.drum_total_air() == pytest.approx((0.35, 0.55))
+    assert spec.drum_total_air()[0] >= spec.MIN_END_PLAY
+    assert rig.STRAP_Z_INNER[1] - rig.STRAP_Z_INNER[0] == pytest.approx(
+        rig.DRUM_LEN + 0.45, abs=1e-9
+    )
+    assert rig.DRUM_BACK_Z == rig.STRAP_Z_INNER[1]
+    assert (rig.DRUM_END_SHIM, rig.DRUM_END_SHIM_SET_ERROR) == (
+        0.45,
+        rig.FRONT_BLOCK_FEELER_BAND,
+    )
+    assert spec.drum_total_air()[0] - spec.MIN_END_PLAY >= rig.RIG_MARGIN_SPARE - 1e-9
+    assert rig.DRUM_FRONT_Z - rig.STRAP_Z_INNER[0] == pytest.approx(rig.DRUM_END_SHIM)
+    # The drilling pose is printed where the fitter drills: MHA-A03's
+    # SHAFT DRILL SET (Main's re-ruling, 2026-09-26).
+    import pinion_rig_fitup as fitup
+
+    assert fitup.SHAFT_DRILL_STEP.split("\n") == [
+        "SHAFT DRILL SET: MATCH-DRILL MHA-062 THRU MHA-056 CROSS HOLES, 2 PL,",
+        "MHA-062 REAR END FLUSH WITH MHA-061 REAR FACE +/-0.10,",
+        "STRAPS ON BACK STOP, MHA-002 ON BACK STRAP,",
+        "0.45 FEELER AT MHA-002 FRONT END; DRIVE MHA-145 PINS.",
+    ]
+    # Both bearing stacks carry the flush setting, and the front one the
+    # shim's set error, by name.
+    assert rig.TORQUE_SHAFT_BEARING_STACK["MHA-062 rear end flush set"] == -0.10
+    assert rig.TORQUE_SHAFT_BACK_BEARING_STACK["MHA-062 rear end flush set"] == -0.10
+    assert rig.TORQUE_SHAFT_BEARING_STACK["MHA-062 drum end shim set error"] == -0.10
+    assert rig.LIFT_ROD_SEAT_STACK["MHA-062 drum end shim set error"] == -0.10
+
+
+class _SketchFeature:
+    def __init__(self) -> None:
+        self.Visible = 2  # swVisibilityState_e: shown
+
+
+class _PartDoc:
+    def __init__(self, names) -> None:
+        self.features = {name: _SketchFeature() for name in names}
+
+    def FeatureByName(self, name):  # noqa: N802 - the COM member name
+        return self.features.get(name)
+
+
+def _run_blank(monkeypatch, module, sketches, *, blanks: bool) -> list[str]:
+    doc = _PartDoc(sketches)
+    blanked: list[str] = []
+
+    def fake_blank(_adapter, name) -> None:
+        blanked.append(name)
+        if blanks:
+            doc.features[name].Visible = 1  # swVisibilityState_e: hidden
+
+    monkeypatch.setattr(module, "blank_sketch", fake_blank)
+    monkeypatch.setattr(module, "_early_bound", lambda obj, _interface: obj)
+    module.blank_reference_sketches(SimpleNamespace(currentModel=doc), sketches)
+    return blanked
+
+
+def test_every_dimension_carrying_reference_sketch_is_saved_hidden() -> None:
+    # #880 (Main, via dtrefactor): the arbor's reference sketches rendered as
+    # grey dots and lines in the drive-train; the part saves them hidden.
+    expected = {
+        "FrontJournalReference",
+        "BackJournalReference",
+        "BackRimReference",
+        "BondZoneReference",
+        "DrumStationReference",
+        "OverallReference",
+    }
+    assert set(spec.REFERENCE_SKETCHES) == expected
+    assert len(spec.REFERENCE_SKETCHES) == len(expected)
+    assert expected == {name for name in spec.DRAWING_DIMENSIONS if name.endswith("Reference")}
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    authored = set(re.findall(r'"(\w+Reference)"', source)) | {
+        f"{prefix}Reference" for prefix in re.findall(r'prefix="(\w+)"', source)
+    }
+    assert authored == expected
+    blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
+    # One shared helper in _common (restricted review), no local copy.
+    assert "def _blank_reference_sketches" not in source
+    assert source.count(blank) == 1
+    assert source.index(blank) < source.rindex("save_part_and_images(adapter, PART_NAME)")
+
+
+def test_reference_sketch_blank_reads_every_sketch_back_hidden(monkeypatch) -> None:
+    blanked = _run_blank(monkeypatch, _common, spec.REFERENCE_SKETCHES, blanks=True)
+    assert blanked == list(spec.REFERENCE_SKETCHES)
+    with pytest.raises(RuntimeError, match="FrontJournalReference still visible"):
+        _run_blank(monkeypatch, _common, spec.REFERENCE_SKETCHES, blanks=False)
+
+
+def test_profile_imports_the_hidden_reference_dimensions_per_view() -> None:
+    # The profile is a projected view: _drawing_hidden_sketches shows each
+    # childless part-hidden owner in that view before its targeted import.
+    source = Path(drawing.__file__).read_text(encoding="utf-8").replace("\r\n", "\n")
+    assert (
+        "from _drawing_hidden_sketches import (\n"
+        "    curate_view_dimensions as curate_hidden_owner_dimensions,\n)"
+    ) in source
+    call = re.search(
+        r"(\w+)\(\s*adapter,\s*principal,\s*keep=PRINCIPAL_KEEP,([^)]*)\)", source
+    )
+    assert call is not None
+    assert call.group(1) == "curate_hidden_owner_dimensions"
+    assert "dimensions_by_feature=DRAWING_DIMENSIONS" in call.group(2)
+    assert drawing.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
+    # Every reference sketch prints on the profile, so each one the view shows
+    # keeps a dimension there; the donor and detail A dimension none of them,
+    # so neither needs the part to show them (no part_sketches_shown).
+    reference_dims = set().union(
+        *(spec.DRAWING_DIMENSIONS[name] for name in spec.REFERENCE_SKETCHES)
+    )
+    assert reference_dims <= set(drawing.PRINCIPAL_KEEP)
+    assert not reference_dims & (set(drawing.DONOR_KEEP) | set(drawing.DETAIL_KEEP))
+    assert "part_sketches_shown" not in source
+
 
 def test_head_neighbours_are_each_proved_by_a_named_assembly_assert() -> None:
     """Main's ruling on the 11.5 head: every assembly body around the arbor

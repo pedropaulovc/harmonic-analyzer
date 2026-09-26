@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import _config
 import build_pinion_lever_pin as pin
 import draw_pinion_lever_pin as drawing
@@ -43,7 +45,7 @@ def test_pin_fills_the_match_drilled_hole_and_spans_the_hub() -> None:
     assert pinion_lever_spec.DRAWING_PRECISION_BY_NAME["HubOd"] == 1
     assert spec.DRAWING_PRECISION_BY_NAME["PinLen"] == 1
     assert (shortest_pin - largest_hub) / 2.0 >= PEEN_ALLOWANCE >= 0.5
-    assert "TRIM AND PEEN" in spec.ASSEMBLY_STEP
+    assert "TRIM BOTH ENDS AND PEEN FLUSH" in spec.ASSEMBLY_STEP
 
 
 def test_cross_hole_webs_clear_two_millimetres_at_the_worst_case() -> None:
@@ -83,21 +85,27 @@ def test_the_diameter_prints_on_the_side_view_beside_the_length() -> None:
 
 def test_the_pin_sheet_has_no_notes_and_the_mates_carry_the_match_drill() -> None:
     """Rule 6 (Main's eye-pass sweep): the drive, trim and peen sequence is
-    the pinion fit-up step; the match-drill rides both mates' hole callouts,
-    so the pin sheet carries no general notes at all."""
+    the pinion fit-up step; the match-drill rides both mates' hole callouts
+    as the hole specification only (Main, 2026-09-26), so the pin sheet
+    carries no general notes at all."""
     import pinion_lever_spec
     import pinion_lift_rod_spec
 
     assert not hasattr(spec, "DRAWING_NOTES")
     step = spec.ASSEMBLY_STEP
-    assert spec.LEVER_NUMBER in step and spec.LIFT_ROD_NUMBER in step
-    assert "MATCH-DRILLED" in step and "PEEN" in step
+    assert step.split("\n") == [
+        "LEVER PIN SET: MATCH-DRILL MHA-059 HUB AND MHA-060 ROD",
+        "TOGETHER, GRIP PARKED; DRIVE MHA-135,",
+        "TRIM BOTH ENDS AND PEEN FLUSH WITH HUB.",
+    ]
+    assert step.startswith(f"{spec.LEVER_PIN_SET_NAME}: ")
+    assert spec.PIN_NUMBER == _config.parts("pinion-lever-pin")["number"]
     for callout in (
         pinion_lever_spec.PIN_HOLE_CALLOUT,
         pinion_lift_rod_spec.PIN_HOLE_CALLOUT,
     ):
-        assert "MATCH-DRILL THRU AT ASSEMBLY" in callout
-        assert "MHA-135" in callout
+        assert callout.startswith("MATCH-DRILL THRU AT ASSEMBLY")
+        assert "MHA-135" not in callout
     for script in (pin, drawing):
         assert "Manufacturing Notes" not in Path(script.__file__).read_text(
             encoding="utf-8"
@@ -105,3 +113,55 @@ def test_the_pin_sheet_has_no_notes_and_the_mates_carry_the_match_drill() -> Non
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_feature_control_frame" not in source
     assert "SetPrecision3" not in source
+
+
+def test_every_model_edit_precedes_the_installed_split() -> None:
+    # pc-lever-pin-diag and -diag2: tolerancing PinDia, then setting the
+    # material, after the INSTALLED configuration was rebuilt left INSTALLED
+    # stale in the saved part.  Every model edit precedes the configuration
+    # split, so both configurations rebuild after the last one.
+    import build_pinion_lever_pin as part
+
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    split = source.index("create_configuration {INSTALLED_CONFIG}")
+    for edit in (
+        "set_dimension_bilateral_tolerance(",
+        "clear_dimensions_for_drawing(adapter)",
+        "mark_dimensions_for_drawing(adapter,",
+        "apply_drawing_precision(adapter,",
+        "apply_material(adapter,",
+        "apply_color(adapter,",
+    ):
+        assert source.count(edit) == 1, edit
+        assert source.index(edit) < split, edit
+
+
+class _MaterialPart:
+    """Early-bound IPartDoc: GetMaterialPropertyName2 returns (name, database)."""
+
+    def __init__(self, materials: dict[str, str]) -> None:
+        self.materials = materials
+
+    def GetMaterialPropertyName2(self, config: str):
+        return self.materials[config], "solidworks materials"
+
+
+def test_every_configuration_must_carry_the_pin_material() -> None:
+    # apply_material sets the active configuration only; a configuration
+    # without it gives drive-train the wrong MHA-135 mass.
+    from types import SimpleNamespace
+
+    import build_pinion_lever_pin as part
+
+    configs = ("Default", part.INSTALLED_CONFIG)
+    good = SimpleNamespace(
+        currentModel=_MaterialPart(dict.fromkeys(configs, part.MATERIAL))
+    )
+    part.require_material_in_every_configuration(good, configs)
+    bare = SimpleNamespace(
+        currentModel=_MaterialPart(
+            {"Default": part.MATERIAL, part.INSTALLED_CONFIG: ""}
+        )
+    )
+    with pytest.raises(RuntimeError, match=part.INSTALLED_CONFIG):
+        part.require_material_in_every_configuration(bare, configs)

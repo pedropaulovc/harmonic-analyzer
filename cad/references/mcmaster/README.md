@@ -32,6 +32,7 @@ recipes:
 | 92865A585 | `hex-bolt` | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 93075A194 | `hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 94025A150 | `cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
+| 98296A027 | `pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 99607A213 | `pen-set-screw` | Stainless Steel Flared-Collar Knurled-Head Thumb Screw |
 
 The cone-lock and swing-stop selections follow `cad/scripts/build_cone_lock_knob.py`
@@ -71,6 +72,14 @@ Catalog specifications checked on September 10, 2026:
   `5bcc08b043bb1e7a8060c75d32db9f30f1528139478ee2a3f35676ab754c05c8`;
   native SLDPRT
   `0e52851776ee9ac5cd03c4d6ad2b1c07715417e4b97b85f032206cd8c2e3fad2`.
+- [98296A027](https://www.mcmaster.com/98296A027/) was read live on
+  September 25, 2026: 1050-1095 spring steel slotted spring pin, 1/16 in
+  diameter, 1/2 in long, 0.012 in wall, for a 0.062-0.065 in hole,
+  ASME B18.8.2, chamfered ends, no finish listed; 430 lbf double shear,
+  Rockwell C43 minimum. `diag_build_98296A027.py` models the pin as
+  installed, a 1/16 in tube with the catalog wall. The page gives no slot
+  or chamfer size, so the recipe models neither. No vendor SLDPRT has been
+  harvested for it yet.
 
 Ground rules (mirrored in the diagnostics themselves): the vendor files are
 opened read-only and NEVER saved or modified; everything derived from them

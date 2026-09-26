@@ -1,23 +1,26 @@
 r"""Reproduction script: pinion engage lever (book ch. 25).
 
-The tapered rod that turns the lift rod (build_pinion_lift_rod.py) to
+The grip rod that turns the lift rod (build_pinion_lift_rod.py) to
 swing the pinion into mesh: a cylindrical HUB at the root seats over
 the lift rod's front end (p.69 ``page002_img07``: a short fat cylinder
-with a slightly domed south cap -- NOT a ball, PR7 review item), the
-rod reaches up-and-out with a visible taper (Ø4 at the root growing
-to ~Ø6 at the tip; the 86 length and taper both re-derived from img07
-against the annotated 6 mm rod). Standing up = disengaged, folded flat
-= engaged; the model carries the DISENGAGED rest pose.
+with a slightly domed south cap -- NOT a ball, PR7 review item), and a
+STRAIGHT Ø6 rod reaches up-and-out.  img07 annotates the rod "6 mm"
+beside the hub, and equal-scale crops of its root and tip read the same
+width, so there is no taper (user ruling 2026-09-24; the earlier Ø4-root
+taper put the thinnest section where the grip load bends it hardest).
+The 86 length is re-derived from img07 against that 6 mm.  Standing up =
+disengaged, folded flat = engaged; the model carries the DISENGAGED
+rest pose.
 
 Layout: hub axis Z centred at the origin (z -5..+5), BLIND bore Ø6.35
 from the +Z face down to z -3 (2 wall behind), domed cap (sagitta 1.5)
 proud of the -Z face -- the lift rod's front end hides inside. Rod: a
-frustum revolved about +Y from y RodY0 (buried in the hub) to 86,
-radius 3 -> 2. Revolve LAST (nothing later crosses its axis -- the
-on-axis-revolve pitfall's safe case).
+radius-3 cylinder revolved about +Y from y RodY0 (buried in the hub) to
+86. Revolve LAST (nothing later crosses its axis -- the on-axis-revolve
+pitfall's safe case).
 
 Volume gate (mm^3): annulus + wall disc + cap (spherical-cap formula)
-+ frustum - frustum/hub-OD overlap (Simpson over circular segments).
++ rod cylinder - rod/hub-OD overlap (Simpson over circular segments).
 
 U36 (MHA-135): a 1/16 in pin hole crosses the hub along local X -- 3 o'clock
 to the grip -- at mid-engagement (4.0 in from the mouth face B).  It is
@@ -45,6 +48,7 @@ from _common import (
     anchor_point_to_origin,
     apply_color,
     apply_material,
+    blank_reference_sketches,
     check,
     define_circle,
     dimension_between,
@@ -63,7 +67,6 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
-    add_angular_reference_dimension,
     add_diametric_linear_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
@@ -89,9 +92,9 @@ from pinion_lever_spec import (
     ISOMETRIC_VIEW_NOTE,
     PIN_HOLE_DIA,
     PIN_HOLE_Z,
+    REFERENCE_SKETCHES,
+    ROD_DIA,
     ROD_LEN,
-    ROD_ROOT_DIA,
-    ROD_TIP_DIA,
     ROD_Y0,
     SURFACE_FINISHES,
     WALL_T,
@@ -108,8 +111,7 @@ _SAVED_DRAWING_PROPERTIES = (
     "Isometric View Note",
 )
 
-ROD_ROOT_R = ROD_ROOT_DIA / 2.0
-ROD_TIP_R = ROD_TIP_DIA / 2.0
+ROD_R = ROD_DIA / 2.0
 HUB_R = HUB_OD / 2.0
 BORE_R = BORE / 2.0
 CAP_R = (HUB_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 14.83 crown sphere radius
@@ -117,16 +119,11 @@ CAP_R = (HUB_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 14.83 crown sphere radius
 V_ANNULUS = math.pi * (HUB_R**2 - BORE_R**2) * (HUB_LEN - WALL_T)
 V_WALL = math.pi * HUB_R**2 * WALL_T
 V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 101.3
-_H = ROD_LEN - ROD_Y0
-V_FRUSTUM = math.pi / 3.0 * _H * (ROD_ROOT_R**2 + ROD_ROOT_R * ROD_TIP_R + ROD_TIP_R**2)
-
-
-def _rod_r(y: float) -> float:
-    return ROD_ROOT_R - (ROD_ROOT_R - ROD_TIP_R) * (y - ROD_Y0) / _H
+V_ROD = math.pi * ROD_R**2 * (ROD_LEN - ROD_Y0)
 
 
 def _hub_overlap() -> float:
-    """Frustum volume already inside the hub OD cylinder: Simpson over
+    """Rod volume already inside the hub OD cylinder: Simpson over
     y in [ROD_Y0, HUB_R] of the disc-segment area |x| <= sqrt(HUB_R^2-y^2)
     on the rod's section disc (the rod's z-extent stays inside the hub)."""
     n = 2000
@@ -134,7 +131,7 @@ def _hub_overlap() -> float:
     h = (y1 - y0) / n
 
     def area(y: float) -> float:
-        r = _rod_r(y)
+        r = ROD_R
         c = math.sqrt(max(HUB_R**2 - y * y, 0.0))
         if c >= r:
             return math.pi * r * r
@@ -146,10 +143,7 @@ def _hub_overlap() -> float:
     return total * h / 3.0
 
 
-V_TOTAL = V_ANNULUS + V_WALL + V_CAP + V_FRUSTUM - _hub_overlap()
-GRIP_HALF_ANGLE_DEG = math.degrees(
-    math.atan((ROD_TIP_DIA - ROD_ROOT_DIA) / (2.0 * (ROD_LEN - ROD_Y0)))
-)
+V_TOTAL = V_ANNULUS + V_WALL + V_CAP + V_ROD - _hub_overlap()
 
 
 def _pin_hole_removed() -> float:
@@ -231,8 +225,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing (INCH
     # document). HubLen/WallT feed extrude DEPTHS (feature parameters).
-    await set_global(adapter, "RodRootDia", f"{ROD_ROOT_DIA}mm")
-    await set_global(adapter, "RodTipDia", f"{ROD_TIP_DIA}mm")
+    await set_global(adapter, "RodDia", f"{ROD_DIA}mm")
     await set_global(adapter, "RodLen", f"{ROD_LEN}mm")
     await set_global(adapter, "RodY0", f"{ROD_Y0}mm")
     await set_global(adapter, "HubOd", f"{HUB_OD}mm")
@@ -375,8 +368,10 @@ async def build(adapter) -> dict[str, str]:
     expected += V_CAP
     await volume_check(adapter, "cap", expected, 0.03 * V_CAP)
 
-    # Tapered grip rod LAST: frustum profile on the Front plane revolved
-    # about +Y (centerline on the axis; nothing later crosses it).
+    # Straight grip rod LAST: rectangle profile on the Front plane revolved
+    # about +Y (centerline on the axis; nothing later crosses it).  The
+    # centerline merges into the on-axis corners at creation (the MHA-075
+    # transgear-stub idiom), and the diameter is a doubled centerline dim.
     rod = SketchDims()
     check("create_sketch rod", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -386,8 +381,8 @@ async def build(adapter) -> dict[str, str]:
     )
     pts = [
         (0.0, ROD_Y0),
-        (ROD_ROOT_R, ROD_Y0),
-        (ROD_TIP_R, ROD_LEN),
+        (ROD_R, ROD_Y0),
+        (ROD_R, ROD_LEN),
         (0.0, ROD_LEN),
         (0.0, ROD_Y0),
     ]
@@ -407,6 +402,10 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_constraint(axis_edge, None, "vertical"),
     )
     check(
+        "rod flank vertical",
+        await adapter.add_sketch_constraint(flank, None, "vertical"),
+    )
+    check(
         "rod base on axis",
         await adapter.add_sketch_constraint(
             f"{r_base}.start", "origin", "vertical_points"
@@ -422,19 +421,11 @@ async def build(adapter) -> dict[str, str]:
     await add_diametric_linear_dimension(
         adapter,
         centerline,
-        f"{r_base}.end",
-        (8.0, ROD_Y0 + 5.0),
-        "rod root diameter",
+        flank,
+        (8.0, (ROD_Y0 + ROD_LEN) / 2.0),
+        "rod diameter",
     )
-    rod.record("RodRootDia", '"RodRootDia"')
-    await add_diametric_linear_dimension(
-        adapter,
-        centerline,
-        f"{r_top}.start",
-        (8.0, ROD_LEN - 5.0),
-        "rod tip diameter",
-    )
-    rod.record("RodTipDia", '"RodTipDia"')
+    rod.record("RodDia", '"RodDia"')
     check(
         "rod length",
         await adapter.add_sketch_dimension(
@@ -442,22 +433,13 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     rod.record("RodTipY", '"RodLen"')
-    await add_angular_reference_dimension(
-        adapter,
-        centerline,
-        flank,
-        (10.0, (ROD_Y0 + ROD_LEN) / 2.0),
-        "grip half-angle",
-        expected_degrees=GRIP_HALF_ANGLE_DEG,
-    )
-    rod.record("GripHalfAngle")
     await ensure_fully_defined(adapter, "rod sketch")
     check("exit_sketch rod", await adapter.exit_sketch())
     name_last_feature(adapter, "RodProfile")
     drive_jobs += rod.apply(adapter, "RodProfile")
     check("revolve rod", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Rod")
-    await volume_check(adapter, "lever", V_TOTAL, 0.01 * V_FRUSTUM)
+    await volume_check(adapter, "lever", V_TOTAL, 0.01 * V_ROD)
 
     # U36 pin hole: a through cross-hole along X at the mid-engagement
     # station, sketched on the Right Plane (normal X; sketch u = -z) and cut
@@ -544,7 +526,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         "driven lever (equations neutral)",
         V_TOTAL - v_hole,
-        0.01 * V_FRUSTUM,
+        0.01 * V_ROD,
     )
 
     # Manufacturing drawing support: the slip bore and the end wall carry the
@@ -572,6 +554,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts

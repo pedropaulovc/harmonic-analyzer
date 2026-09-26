@@ -2,7 +2,7 @@ r"""Pure-data dimensional contract shared by the pinion engage lever and its
 manufacturing drawing.
 
 PURE DATA, no SolidWorks/COM imports.  A hub slipped over the lift rod's front
-end, with a tapered grip rod rising out of it -- turned steel.  The MHA-135 pin
+end, with a straight Ø6 grip rod rising out of it -- turned steel.  The MHA-135 pin
 (U36) match-drilled through hub and rod at assembly carries the drive torque, so
 the bore is a plain slip fit.  The nominals drive the part's named equation
 globals AND the drawing's coordinate math; the marked-dimension map keeps the
@@ -15,22 +15,23 @@ from _fit_limits import REAM_SLIDE
 from pinion_lever_geometry import (
     BORE as BORE,
     BORE_DEPTH as BORE_DEPTH,
+    BORE_DEPTH_PLACES as BORE_DEPTH_PLACES,
     CAP_RADIUS as CAP_RADIUS,
     CAP_SAG as CAP_SAG,
+    GRIP_FROM_B_PLACES as GRIP_FROM_B_PLACES,
     HUB_LEN as HUB_LEN,
     HUB_OD as HUB_OD,
     PIN_HOLE_DIA as PIN_HOLE_DIA,
     PIN_HOLE_FROM_MOUTH as PIN_HOLE_FROM_MOUTH,
     PIN_HOLE_Z as PIN_HOLE_Z,
+    ROD_DIA as ROD_DIA,
+    ROD_DIA_PLACES as ROD_DIA_PLACES,
     ROD_LEN as ROD_LEN,
-    ROD_ROOT_DIA as ROD_ROOT_DIA,
-    ROD_TIP_DIA as ROD_TIP_DIA,
     ROD_Y0 as ROD_Y0,
     WALL_T as WALL_T,
 )
 
 LIFT_ROD_NUMBER = "MHA-060"
-PIN_NUMBER = "MHA-135"
 
 # U36: the pin carries the torque, so the hub only has to slide onto the h-band
 # 6.35 lift rod.  Codex P2 (#844): the former 6.35-6.40 band's minimum met the
@@ -45,10 +46,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarrelProfile": {"HubOd", "HubBore"},
     "Barrel": {"BoreDepth"},
     "Wall": {"EndWall"},
-    # The taper prints as root and tip diameters over the 86.0 height.  The
-    # r7 render showed the 0.7-degree half-angle's extension line running to
-    # the cone's virtual apex, 163 mm below the root and off the sheet.
-    "RodProfile": {"RodTipY", "RodTipDia", "RodRootDia"},
+    # The straight grip rod prints its one diameter and its 86.0 height.
+    "RodProfile": {"RodTipY", "RodDia"},
     "CapProfile": {"CapR"},
     "PinHoleProfile": {"PinHoleDia"},
     # Rule 2 reference sketches: the grip axis and the pin-hole station are
@@ -58,6 +57,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GripStationReference": {"GripFromB"},
     "PinHoleStationReference": {"PinHoleFromB"},
 }
+# Both saved hidden (#880); the drawing's hub detail is created and dimensioned
+# while the part shows them (_drawing_hidden_sketches.part_sketches_shown).
+REFERENCE_SKETCHES = ("GripStationReference", "PinHoleStationReference")
 
 # Decimal places ARE the tolerance statement (policy rule 2); the part authors
 # them and the drawing reads them back.  Three on the banded bore; two on the
@@ -65,12 +67,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # row); one everywhere a turned or hand-finished feature is routine.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BarrelProfile": {"HubOd": 1, "HubBore": 3},
-    "Barrel": {"BoreDepth": 1},
+    "Barrel": {"BoreDepth": BORE_DEPTH_PLACES},
     "Wall": {"EndWall": 2},
-    "RodProfile": {"RodTipY": 1, "RodTipDia": 1, "RodRootDia": 1},
+    "RodProfile": {"RodTipY": 1, "RodDia": ROD_DIA_PLACES},
     "CapProfile": {"CapR": 1},
     "PinHoleProfile": {"PinHoleDia": 2},
-    "GripStationReference": {"GripFromB": 2},
+    "GripStationReference": {"GripFromB": GRIP_FROM_B_PLACES},
     "PinHoleStationReference": {"PinHoleFromB": 1},
 }
 _PRECISION_NAMES = [
@@ -90,12 +92,9 @@ SURFACE_FINISHES = ()
 
 # The match-drill requirement rides the pin hole's own callout (rule 6: matched
 # fits belong on the feature), so the note block keeps only the crown break.
-PIN_HOLE_CALLOUT = "\n".join(
-    (
-        f"MATCH-DRILL THRU AT ASSEMBLY ON {LIFT_ROD_NUMBER},",
-        f"GRIP PARKED; DRIVE {PIN_NUMBER}, PEEN FLUSH",
-    )
-)
+# The callout is the hole specification only: the grip-parked pose and the
+# drive and peen are pinion_lever_pin_spec.ASSEMBLY_STEP (LEVER PIN SET).
+PIN_HOLE_CALLOUT = f"MATCH-DRILL THRU AT ASSEMBLY ON {LIFT_ROD_NUMBER}"
 DRAWING_NOTES = "\n".join(
     (
         "LEAVE THE CROWN ROOT CIRCLE SHARP;",

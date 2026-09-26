@@ -40,10 +40,14 @@ from _common import (
     POLISHED_STEEL,
     SketchDims,
     _early_bound,
+    _read_member,
+    anchor_point_to_origin,
     apply_color,
     apply_material,
+    blank_sketch,
     check,
     define_circle,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -58,11 +62,13 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    _named_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
@@ -71,6 +77,7 @@ from _visibility import blank_reference_geometry
 from pinion_bracket_geometry import (
     ARBOR_BORE,
     C2C,
+    CROSS_HOLE_CZ,
     PIN_BORE,
     PIN_DROP,
     PIN_SEAT,
@@ -81,14 +88,43 @@ from pinion_bracket_geometry import (
 )
 from pinion_bracket_spec import (
     ARBOR_BORE_BAND,
+    CROSS_HOLE_BAND,
+    CROSS_HOLE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     PIN_SEAT_DIA_BAND,
+    PIN_SEAT_STATION_TOL,
     PIVOT_BORE_BAND,
     SURFACE_FINISHES,
 )
 
 import _telemetry
+
+
+def _tolerance_at_dimension_places(
+    adapter: Any, feature_name: str, dimension_name: str
+) -> None:
+    """Print one dimension's tolerance at the dimension's own decimal places.
+
+    The shared setter prints a tolerance at the fewest places that hold it, so
+    PinSeatCz's +/-0.10 read "4.50 +/-0.1" (pc-ra eye pass).  Main's ruling:
+    this one dimension prints "4.50 +/-0.10", at the places the spec already
+    gives it, set here on the model so the drawing imports it verbatim.
+    """
+    places = DRAWING_PRECISION[feature_name][dimension_name]
+    display, _dimension = _named_dimension(adapter, feature_name, dimension_name)
+    display = _early_bound(display, "IDisplayDimension")
+    do_not_change = -1  # swDimensionPrecisionSettings_e
+    display.SetPrecision3(do_not_change, do_not_change, places, do_not_change)
+    applied = int(display.GetPrimaryTolPrecision2())
+    if applied != places:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: tolerance places did not persist: "
+            f"requested {places}, dimension reports {applied}"
+        )
+    _telemetry.success(
+        f"tolerance places {dimension_name}@{feature_name}: {places} decimals"
+    )
 
 
 def _flank_face(model: Any, point_mm: tuple[float, float, float]) -> Any:
@@ -202,6 +238,30 @@ def _pin_bore_removed() -> float:
 
 
 
+def _cross_hole_removed() -> float:
+    """Material the set-pin cross hole takes out of the strap foot.
+
+    The hole runs along X through the pivot-bore axis (y 0), centred on the
+    thickness, so it cuts two walls: for each (dy, dz) point of its disc the
+    removed length runs from the pivot bore x = sqrt(rb^2 - dy^2) out to the
+    strap edge on each side (the straight flank above y 0, the end-cap arc
+    below).  z drops out (the disc's z-chord scales it); Simpson over dy."""
+    r = CROSS_HOLE_DIA / 2.0
+    rb = PIVOT_BORE / 2.0
+    n = 2000
+    h = 2.0 * r / n
+
+    def f(dy: float) -> float:
+        chord = 2.0 * math.sqrt(max(r * r - dy * dy, 0.0))
+        wall = -_edge_x(dy) - math.sqrt(max(rb * rb - dy * dy, 0.0))
+        return chord * 2.0 * max(wall, 0.0)
+
+    total = f(-r) + f(r)
+    for i in range(1, n):
+        total += (4.0 if i % 2 else 2.0) * f(-r + i * h)
+    return total * h / 3.0
+
+
 def _edge_x(y: float) -> float:
     """The strap's -X edge at *y*: the straight flank between the two bores,
     else the end-cap arc about the nearer bore centre."""
@@ -232,6 +292,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PinBore", f"{PIN_BORE}mm")
     await set_global(adapter, "PinDrop", f"{PIN_DROP}mm")
     await set_global(adapter, "PinSeatDepth", f"{PIN_SEAT}mm")
+    await set_global(adapter, "CrossHoleDia", f"{CROSS_HOLE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -417,6 +478,107 @@ async def build(adapter) -> dict[str, str]:
     expected -= v_bore
     await volume_check(adapter, "strap with pin seat", expected, 0.005 * expected)
 
+    # Option E-a set-pin cross hole (pinion_strap_pin_spec): along X through
+    # the pivot-bore axis, centred on the thickness.  Sketched on the Right
+    # Plane (normal X; sketch u = -z) like the MHA-060 pin hole: the centre's
+    # zero height drops out of define_circle as an on-axis relation (the hole
+    # is ON the bore axis), so only its through-thickness station and diameter
+    # are dimensions.  Cut mid-plane well past both edges.  The mirror station
+    # (z -4.5) lies outside the bar, so a wrong side cuts nothing; the removed
+    # volume is gated against the analytic two-wall integral at 5% of the
+    # hole (a whole-part tolerance would pass a missing cut).
+    v_cross = _cross_hole_removed()
+    res = await adapter.get_mass_properties()
+    vol_before = res.data.volume
+    cross = SketchDims()
+    check("create_sketch cross hole", await adapter.create_sketch("Right"))
+    await define_circle(
+        adapter,
+        -CROSS_HOLE_CZ,
+        0.0,
+        CROSS_HOLE_DIA / 2.0,
+        "cross hole",
+        dims=cross,
+        names=("CrossHoleCz", "CrossHoleCy", "CrossHoleDia"),
+        drives=('"StrapThickness" / 2', None, '"CrossHoleDia"'),
+    )
+    await ensure_fully_defined(adapter, "cross hole sketch")
+    check("exit_sketch cross hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "CrossHoleProfile")
+    drive_jobs += cross.apply(adapter, "CrossHoleProfile")
+    cut = await adapter.create_cut_extrude(
+        ExtrusionParameters(depth=2.0 * WIDTH, both_directions=True)
+    )
+    if not cut.is_success:
+        raise RuntimeError(f"cross hole cut failed: {cut.error}")
+    name_last_feature(adapter, "CrossHole")
+    res = await adapter.get_mass_properties()
+    removed = vol_before - res.data.volume
+    if abs(removed - v_cross) > 0.05 * v_cross:
+        raise RuntimeError(
+            f"cross hole removed {removed:.2f} mm^3, expected {v_cross:.2f} "
+            "-- circle misplaced/resized or the cut missed a wall"
+        )
+    _telemetry.success(
+        f"cross hole removed {removed:.2f} mm^3 (analytic {v_cross:.2f})"
+    )
+    expected -= v_cross
+
+    # The cross hole's height is a relation (ON the pivot-bore axis) with no
+    # dimension to print, and the bore is hidden in the side view.  Codex #858
+    # P2, user ruling (a): a REFERENCE sketch owns it as a model dimension --
+    # one construction line on the Right Plane from the hole's centre to the
+    # pivot-bore wall, whose single marked dimension CrossHoleFromBoreWall is
+    # "PivotBore" / 2 (the harmonic base's reference-sketch idiom; policy rule
+    # 2).  It is BLANKED once built so it never renders in an assembly, and
+    # the drawing shows it in the side view only
+    # (_drawing_hidden_sketches.curate_view_dimensions).
+    check(
+        "create_sketch cross-hole axis reference", await adapter.create_sketch("Right")
+    )
+    # Direct-to-DB: the line starts ON the sketch X axis and runs vertically,
+    # so creation-time inference would add exactly the relations placed below
+    # and leave the sketch over-defined.
+    set_sketch_direct_db(adapter, True)
+    wall_ref = check(
+        "cross-hole axis reference line",
+        await adapter.add_line(
+            -THICKNESS / 2.0, 0.0, -THICKNESS / 2.0, -PIVOT_BORE / 2.0
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[wall_ref], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("cross-hole axis reference did not take the construction flag")
+    check(
+        "cross-hole axis reference vertical",
+        await adapter.add_sketch_constraint(wall_ref, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{wall_ref}.start",
+        f"{wall_ref}.end",
+        "vertical_distance",
+        PIVOT_BORE / 2.0,
+        "cross hole from pivot-bore wall",
+    )
+    await anchor_point_to_origin(
+        adapter, f"{wall_ref}.start", -THICKNESS / 2.0, 0.0, "cross-hole axis reference"
+    )
+    await ensure_fully_defined(adapter, "cross-hole axis reference sketch")
+    check("exit_sketch cross-hole axis reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "CrossHoleAxisReference")
+    wall_dims = name_dimensions(
+        adapter,
+        "CrossHoleAxisReference",
+        ["CrossHoleFromBoreWall", "CrossHoleAxisRefCz"],
+    )
+    drive_jobs += [
+        (wall_dims[0], '"PivotBore" / 2'),
+        (wall_dims[1], '"StrapThickness" / 2'),
+    ]
+
     # Named bore axes for the assembly: the pivot bore (Axis1) rides the torque
     # shaft, the arbor bore (Axis2) journals the pinion. The p2 swing group keys
     # off these (concentric to the shaft + lock the pinion in -- build_drive_train).
@@ -457,18 +619,36 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "PinSeatProfile", "PinSeatDia", *deviations(PIN_SEAT_DIA_BAND)
     )
+    # User ruling (a): the seat's station from broad face A, tightened for
+    # its far-face web (pinion_bracket_spec.PIN_SEAT_WEB_WORST).
+    set_dimension_symmetric_tolerance(
+        adapter, "PinSeatProfile", "PinSeatCz", PIN_SEAT_STATION_TOL
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "CrossHoleProfile", "CrossHoleDia", *deviations(CROSS_HOLE_BAND)
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     # Decimal places are the tolerance statement, so the part authors them and
     # the drawing only reads them back (policy rule 2).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _tolerance_at_dimension_places(adapter, "PinSeatProfile", "PinSeatCz")
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
     apply_drawing_properties(adapter, PART_NAME)
+    blank_sketch(adapter, "CrossHoleAxisReference")
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    visible = int(
+        _read_member(part.FeatureByName("CrossHoleAxisReference"), "Visible")
+    )
+    if visible != 1:  # swVisibilityState_e: 1 hidden
+        raise RuntimeError(
+            f"cross-hole axis reference still visible after blanking ({visible})"
+        )
     blank_reference_geometry(
         adapter,
         (

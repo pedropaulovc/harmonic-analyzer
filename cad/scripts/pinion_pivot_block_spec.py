@@ -23,6 +23,7 @@ part marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 
 from __future__ import annotations
 
+import _config
 from _fit_limits import REAM_SLIDE
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -54,14 +55,23 @@ from pinion_pivot_block_geometry import (
 # bore that must turn or slide by hand.
 BORE_DIA_BAND = REAM_SLIDE
 
-# The two reamed bores share a diameter.  The harvested pivot-bore cylinder
+# Both reamed bores are running faces (rule 5): MHA-062 turns in the pivot
+# bore and MHA-060 in the lift bore (Main, MHA-061 eye pass: the lift bore
+# had none).  They share a diameter.  The harvested pivot-bore cylinder
 # spans y=-BORE_DIA/2..+BORE_DIA/2, while the raised lift bore does not reach
-# the pivot bore's lower generator; that point makes this selector exact.
+# the pivot bore's lower generator; that point makes the pivot selector
+# exact.  The lift bore sits LIFT_BORE_SPACING west, beyond the pivot
+# bore's x-span, which makes its selector exact.
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "pivot_bore",
         MACHINED_UM,
         CylinderFace(BORE_DIA, contains_y_mm=-BORE_DIA / 2.0),
+    ),
+    SurfaceFinishControl(
+        "lift_bore",
+        MACHINED_UM,
+        CylinderFace(BORE_DIA, contains_x_mm=-LIFT_BORE_SPACING),
     ),
 )
 
@@ -83,8 +93,21 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Block": {"Depth"},
 }
 
+
+def _registry_name(part: str) -> str:
+    """A mating part as its own sheet names it: number and title, uppercase."""
+    row = _config.parts(part)
+    return f"{row['number']} {str(row['title']).upper()}"
+
+
+# Each running bore's mate is named from the registry, so the note cannot
+# drift from that part's own title block (Main, pc-r7 eye pass: the note said
+# "TORQUE SHAFT" where MHA-062's title reads PINION PIVOT SHAFT).
+PIVOT_SHAFT_NAME = _registry_name("pinion-pivot-shaft")
+LIFT_ROD_NAME = _registry_name("pinion-lift-rod")
+
 # True free-text instructions only. Geometry lives in native dimensions and
-# the one running-bore surface symbol (policy rule 3: a block carries no
+# the two running-bore surface symbols (policy rule 3: a block carries no
 # frames or datums). The part
 # build stamps these strings into the SLDPRT; the drawing displays only
 # $PRPSHEET links, so the print cannot silently diverge from its source model.
@@ -92,12 +115,14 @@ DRAWING_NOTES = "\n".join(
     (
         # Fable review r4 (rule 2): name each running bore's mate and state the
         # functional acceptance; the REAM and hold-down callouts are not repeated.
-        "PIVOT BORE RUNS ON MHA-062 TORQUE SHAFT, LIFT BORE ON",
-        "  MHA-060 LIFT ROD; EACH SHAFT TURNS FREELY BY HAND.",
-        # Ruling (c): the front block's feeler setting is an ASSEMBLY step
-        # (0.25 +/- 0.10 end play), so it lives on the drive-train assembly
-        # drawing's step list, not in this part's notes (rule 6, Codex #854).
-        "SPOT BASE SEATS THROUGH BLOCK HOLES AT ASSEMBLY.",
+        f"PIVOT BORE RUNS ON {PIVOT_SHAFT_NAME},",
+        f"  LIFT BORE ON {LIFT_ROD_NAME};",
+        "  EACH SHAFT TURNS FREELY BY HAND.",
+        # Assembly operations are never part notes (rule 6): the front
+        # block's feeler setting is on the drive-train assembly step list
+        # (ruling (c), Codex #854), and spotting the base seats through the
+        # block holes is RIG_SET_STEP plus the harmonic base's
+        # "TRANSFER FROM MHA-061" callout (Main, MHA-061 eye pass).
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

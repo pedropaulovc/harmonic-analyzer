@@ -50,9 +50,9 @@ def test_pin_hole_sits_at_the_lever_mid_engagement() -> None:
     # hub's bore depth in from the front end, which seats on the bore floor.
     assert lever.ROD_PIN_HOLE_FROM_END == lever.BORE_DEPTH / 2.0 == 4.0
     callout = pinion_lift_rod_spec.PIN_HOLE_CALLOUT
-    assert "MATCH-DRILL" in callout and "AT ASSEMBLY" in callout
+    # The hole specification only; LEVER PIN SET drives and peens the pin.
+    assert callout.split("\n") == ["MATCH-DRILL THRU AT ASSEMBLY", "IN MHA-059 HUB"]
     assert pinion_lift_rod_spec.LEVER_NUMBER in callout
-    assert pinion_lift_rod_spec.PIN_NUMBER in callout
     assert drawing.DIMENSION_CALLOUTS["PinHoleDia"] == callout
 
 
@@ -83,3 +83,14 @@ def test_view_scales_are_explicit() -> None:
     assert "scale=(1, 1)" in source  # side view true scale
     assert pinion_lift_rod_spec.END_VIEW_NOTE == "END VIEW SCALE 2:1"
     assert pinion_lift_rod_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
+
+
+def test_the_end_view_diameter_is_placed_inside_the_zone_frame_from_its_read_back() -> (
+    None
+):
+    # pc-r7 machinist review: its shoulder ran past the inner border.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    call = source[source.index("place_callout_clear(") :]
+    call = call[: call.index("add_property_linked_note")]
+    assert '== "RodDia"' in call
+    assert "front_annotations" in call

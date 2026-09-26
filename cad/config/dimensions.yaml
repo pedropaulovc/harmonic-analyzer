@@ -1877,9 +1877,9 @@ sections:
       user-authoritative 32T count and the U28 2.2425 mm parked tip gap now own
       the derived rig location. Modeled layout (`APINION_*` constants): axis at
       machine (−18.384, 90.518) = X_DRUM + (drum tip 31.100 + pinion tip 8.667 +
-      2.2425 disengaged gap); drum z −71.362..+71.838 (face 143.2, spanning all 20
-      stations), integral steel arbor/head root z −131.662..+94.588,
-      head/crossrod axis z −138.162, and separate MHA-058 crossrod at +65°.
+      2.2425 disengaged gap); drum z −70.388..+72.812 (face 143.2, spanning all 20
+      stations), integral steel arbor/head root z −130.688..+95.562,
+      head/crossrod axis z −137.188, and separate MHA-058 crossrod at +65°.
       Straps: 15 wide × 9 thick with R7.5 ends, plain (no cam relief), pivot
       (−14.420, 62.8), bore-to-bore c2c 28.0, parked at an 8.139° lean; the swing
       rides the setup DOF (a freed operational DOF, its angle drive spec recorded

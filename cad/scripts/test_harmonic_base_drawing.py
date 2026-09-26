@@ -323,14 +323,24 @@ def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
     assert part.BLOCK_SCREW_XZ == tuple(
         (x + MECHANISM_X_SHIFT, z) for z in rig.BLOCK_SEAT_Z for x in former_block_x
     )
-    assert rig.BLOCK_SEAT_Z[1] == pytest.approx(82.875 + MECHANISM_Z_SHIFT)
+    # Option E-a deepened the blocks outward from the back stop (10.25 ->
+    # 10.5 -> 11.0), so the back seats moved 0.375 aft of the released
+    # 82.875, and RIG_AFT_SHIFT (Main, #858: j = 19's full face) moved the
+    # rig 1.25 aft.
+    assert rig.BLOCK_SEAT_Z[1] == pytest.approx(
+        83.25 + rig.RIG_AFT_SHIFT + MECHANISM_Z_SHIFT
+    )
     # Codex #854 P1: the front seats are cut at the fit-up station -- one
     # block, the solid stack and one feeler off the back seats -- not at a
     # pose carrying extra air (-86.237 before the fix).
     assert rig.BLOCK_SEAT_Z[1] - rig.BLOCK_SEAT_Z[0] == pytest.approx(
         pinion_pivot_block_depth() + rig.INNER_SPAN, abs=1e-9
     )
-    assert rig.BLOCK_SEAT_Z[0] == pytest.approx(-88.825 + MECHANISM_Z_SHIFT)
+    # Ruling 3's 0.45 drum shim puts the front seats that much forward, and
+    # the 11.0 block half its extra depth.
+    assert rig.BLOCK_SEAT_Z[0] == pytest.approx(
+        -89.65 + rig.RIG_AFT_SHIFT + MECHANISM_Z_SHIFT
+    )
     assert part.FOOT_SCREW_XZ == tuple(
         (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in former_feet
     )
@@ -421,8 +431,8 @@ def test_socket_bore_leader_lands_on_bore_clear_of_the_cross_tap() -> None:
 
 def test_transferred_pinion_block_seats_print_no_station() -> None:
     # Codex #855 P1: the four block seats are spotted THROUGH MHA-061 at
-    # assembly (U28 corollary; MHA-061's note "SPOT BASE SEATS THROUGH BLOCK
-    # HOLES AT ASSEMBLY."), so they leave the hole table and their one callout
+    # assembly (U28 corollary; the drive-train RIG_SET_STEP, "BEFORE SPOTTING
+    # THE TRANSFER SEATS"), so they leave the hole table and their one callout
     # names the transfer.  Codex #854 P1: the model seats themselves sit at the
     # fit-up stations, so the modelled holes match the transferred ones.
     import draw_harmonic_base as sheet
@@ -432,8 +442,82 @@ def test_transferred_pinion_block_seats_print_no_station() -> None:
     block_seats = {(x, z, part.BLOCK_SCREW_HOLE_DIA) for x, z in part.BLOCK_SCREW_XZ}
     assert set(sheet.TRANSFER_BLOCK_HOLES) == block_seats
     assert not block_seats & set(sheet.TABLE_HOLES)
-    assert sheet.TRANSFER_BLOCK_CALLOUT.startswith("TRANSFER FROM MHA-061")
-    assert "AT ASSEMBLY" in sheet.TRANSFER_BLOCK_CALLOUT
+    # User ruling P1-2: nothing in the frame fixes the rig along the bank
+    # until the fitter sets it, so both callouts name the RIG SET note that
+    # states it (the drum's back end on leaf D off the north gear).
+    assert sheet.TRANSFER_BLOCK_CALLOUT == "TRANSFER FROM MHA-061\nAFTER RIG SET;"
+    assert sheet.TRANSFER_SPRING_NOTE == (
+        "TRANSFER FROM MHA-114\nAFTER RIG SET; SIZE AS E1"
+    )
     # The front pair sits one feeler off the fit-up stack, with no pose air.
     front_seat = rig.BACK_BLOCK_Z0 - rig.INNER_SPAN - BLOCK_DEPTH / 2.0
     assert rig.BLOCK_SEAT_Z[0] == pytest.approx(front_seat, abs=1e-9)
+
+
+# Measured on the pc-p1 render of sheet 2 (5100 x 3300 px, two 431.8 mm
+# sheets: 5.906 px/mm): the sheet's 3.5 mm notes advance 2.69 mm a character
+# (the A1-A4 bore note's 46-character line spans 123.7 mm) and 4.58 mm a line.
+_NOTE_CHAR_MM = 2.69
+_NOTE_LINE_MM = 4.58
+# The pre-P1 callouts that rendered clean: the block callout between the top
+# border and the TOP VIEW caption, the spring note's first line ending just
+# short of section arrow A (2 mm) and its second line above the MHA-132
+# callout.
+_ACCEPTED_BLOCK_CALLOUT = ("TRANSFER FROM MHA-061", "AT ASSEMBLY;")
+_ACCEPTED_SPRING_NOTE = ("TRANSFER FROM MHA-114", "AT ASSEMBLY; SIZE AS E1")
+# Sheet-2 free field for the RIG SET note, from the same render: the hole
+# table ends at y 0.1209, the 38.1 cross-screw-axis callout's text starts at
+# x 0.152 (top y 0.089), and the A1-A4 bore note starts at y 0.073.
+_HOLE_TABLE_BOTTOM_Y = 0.1209
+_CROSS_AXIS_CALLOUT_X = 0.152
+_BORE_NOTE_TOP_Y = 0.073
+
+
+def test_rig_set_callouts_and_note_fit_the_accepted_sheet_2_layout() -> None:
+    # Main (pc-p1 eye pass): printed on the callouts, the RIG SET step ran
+    # the block callout through the top border and over the TOP VIEW caption,
+    # and the spring note into section arrow A and the MHA-132 callout.  Each
+    # callout now keeps the accepted two lines with its first line unchanged
+    # (the spring note's first line is the one that nearly meets arrow A), and
+    # a second line at most two characters longer; the note fits the free
+    # field under the hole table.
+    import draw_harmonic_base as sheet
+    import pinion_rig_fitup as fitup
+
+    for text, accepted in (
+        (sheet.TRANSFER_BLOCK_CALLOUT, _ACCEPTED_BLOCK_CALLOUT),
+        (sheet.TRANSFER_SPRING_NOTE, _ACCEPTED_SPRING_NOTE),
+    ):
+        lines = text.split("\n")
+        assert len(lines) == len(accepted), text
+        assert lines[0] == accepted[0]
+        assert len(lines[1]) <= len(accepted[1]) + 2, lines[1]
+        assert fitup.RIG_SET_NAME in lines[1]
+    assert sheet.TRANSFER_AFTER_RIG_SET == "AFTER RIG SET;"
+    note = fitup.RIG_SET_STEP.split("\n")
+    assert note[0].startswith(fitup.RIG_SET_NAME + ",")
+    x0, y_top = sheet.RIG_SET_NOTE_XY
+    width = max(len(line) for line in note) * _NOTE_CHAR_MM / 1000.0
+    height = len(note) * _NOTE_LINE_MM / 1000.0
+    assert x0 + width <= _CROSS_AXIS_CALLOUT_X - 0.010, x0 + width
+    assert y_top <= _HOLE_TABLE_BOTTOM_Y - 0.010
+    assert y_top - height >= _BORE_NOTE_TOP_Y + 0.010, y_top - height
+    # The note carries both settings the transfers need.
+    assert "1.00 + 0.25 LEAVES OFF" in fitup.RIG_SET_STEP
+    assert "BANK PUSHED NORTH" in fitup.RIG_SET_STEP
+    assert "MHA-114 PAD 1.00 LEAF OFF MHA-061." in fitup.RIG_SET_STEP
+
+
+def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
+    # Main (restricted review of #858): one blanking helper in _common, traced
+    # like every other per-operation helper, and no local copy in the base.
+    import inspect
+
+    import _common
+
+    source = inspect.getsource(part)
+    blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
+    assert "def _hide_reference_sketches" not in source
+    assert source.count(blank) == 1
+    assert part.REFERENCE_SKETCHES == ("RimWidthReference", "HeightReference")
+    assert hasattr(_common.blank_reference_sketches, "__wrapped__")

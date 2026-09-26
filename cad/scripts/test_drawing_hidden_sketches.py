@@ -334,6 +334,67 @@ def test_a_real_curate_inside_the_block_marks_its_owner_dimensioned(
         assert hidden_sketches._PART_SHOWN[-1].dimensioned == {"ArcReference"}
 
 
+class RebuildingHiddenSketchDrawing(HiddenSketchDrawing):
+    """The drawing the block rebuilds, logging onto the part's event log."""
+
+    def __init__(self, part: TogglePart) -> None:
+        super().__init__(part, "Drawing View2", "summing-lever-2")
+        self.events = part.log
+
+    def UnblankSketch(self) -> None:
+        self.events.append("view unblank")
+        super().UnblankSketch()
+
+    def BlankSketch(self) -> None:
+        self.events.append("view blank")
+        super().BlankSketch()
+
+    def EditRebuild3(self) -> bool:
+        self.events.append("rebuild")
+        return True
+
+
+def _base_view_block(tmp_path, orientation: str):
+    part = TogglePart(tmp_path / "lever.SLDPRT", "ArcReference")
+    drawing = RebuildingHiddenSketchDrawing(part)
+    base = ReferencingView("Drawing View2", "summing-lever-2", part, orientation)
+    block = hidden_sketches.part_sketches_shown(
+        FakeAdapter(drawing), part, ["ArcReference"], label="Detail A", base_view=base
+    )
+    return part, drawing, block
+
+
+def test_the_base_view_shows_the_sketches_first_and_keeps_them(tmp_path) -> None:
+    """pc-p1r: a detail's items select through its base view, and with only
+    the part showing the sketches the import delivered nothing.  The base view
+    shows them per view before the part does and is never blanked again."""
+    part, drawing, block = _base_view_block(tmp_path, "*Right")
+    with block:
+        hidden_sketches._PART_SHOWN[-1].dimensioned.add("ArcReference")
+        part.log.append("create + curate")
+    assert part.log == [
+        "view unblank",
+        "part unblank",
+        "rebuild",
+        "create + curate",
+        "part blank",
+        "rebuild",
+    ]
+    sketch = ("ArcReference@summing-lever-2@Drawing View2",)
+    assert drawing.log == [("unblank", sketch)]
+    assert drawing.view_shows_sketch
+
+
+def test_a_pictorial_base_view_never_shows_a_reference_sketch(tmp_path) -> None:
+    part, drawing, block = _base_view_block(tmp_path, "*Isometric")
+    with pytest.raises(RuntimeError, match="pictorial base view"):
+        with block:
+            pass
+    assert part.log == []
+    assert drawing.log == []
+    assert hidden_sketches._PART_SHOWN == []
+
+
 def test_part_sketches_are_blanked_again_when_the_block_fails(tmp_path) -> None:
     part = TogglePart(tmp_path / "lever.SLDPRT")
     adapter = FakeAdapter(RebuildingDrawing(part.log))

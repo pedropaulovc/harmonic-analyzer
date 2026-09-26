@@ -22,3 +22,10 @@ PEEN_ALLOWANCE = 0.5  # minimum stock proud of each hub face, per end
 PIN_LEN = 16.0
 if PIN_LEN - PIN_LEN_BAND < HUB_OD + HUB_OD_BAND + 2.0 * PEEN_ALLOWANCE:
     raise AssertionError("shortest pin cannot be peened flush on the largest hub")
+
+# Installed state (Codex #858 P2): the drive train shows the pin as assembly
+# leaves it, trimmed and peened flush with the hub at both ends.  The part
+# carries that as a second configuration; the manufactured overlength default
+# stays the one the drawing prints.
+INSTALLED_CONFIG = "INSTALLED"
+INSTALLED_LEN = HUB_OD
