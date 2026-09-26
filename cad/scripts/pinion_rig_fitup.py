@@ -24,13 +24,15 @@ import it.
   rule 6, as MHA-061 keeps its feeler off its own print).
 - The MHA-114 foot pad is set SPRING_PAD_LEAF off the back block before its
   seat is transferred (the same RIG SET note).
-- ASSEMBLY_SEQUENCE orders the rig's assembly steps.  The bonds and the
-  MHA-135 drive-through are each part spec's ASSEMBLY_STEP (policy rule 6
-  moved them off the part sheets, #814), imported here, never retyped.
+- ASSEMBLY_SEQUENCE orders the rig's assembly steps.  The MHA-144 collar's
+  install, the bonds and the MHA-135 drive-through are each part spec's
+  ASSEMBLY_STEP (policy rule 6 moved them off the part sheets, #814),
+  imported here, never retyped.
 """
 
 from __future__ import annotations
 
+import pinion_arbor_collar_spec
 import pinion_arbor_spec
 import pinion_cam_pin_spec
 import pinion_handle_spec
@@ -151,13 +153,17 @@ SHAFT_DRILL_STEP = "\n".join(
     )
 )
 
-# The rig's assembly steps in order.  The three LOCTITE 638 bonds come first:
-# the shaft is drilled with MHA-002 on the back strap, and RIG SET measures
-# from the drum's back end, so the drum joint must be made before either.
+# The rig's assembly steps in order.  MHA-144 goes on first, pinned, with the
+# front strap behind it: neither passes the Ø15 head, nor the drum once it is
+# bonded (Codex #860, PRRT_kwDOPHDy386mTbe7).  The three LOCTITE 638 bonds
+# follow: the shaft is drilled with MHA-002 on the back strap, and RIG SET
+# measures from the drum's back end, so the drum joint must be made before
+# either.
 # The shaft is pinned before RIG SET: the pins freeze the strap spacing the
 # drum's back end is set from.  MHA-135 is driven last, through the lever hub
 # and lift rod match-drilled with the grip parked, once the collars are set.
 ASSEMBLY_SEQUENCE = (
+    pinion_arbor_collar_spec.ASSEMBLY_STEP,
     pinion_arbor_spec.ASSEMBLY_STEP,
     pinion_handle_spec.ASSEMBLY_STEP,
     pinion_cam_pin_spec.ASSEMBLY_STEP,
