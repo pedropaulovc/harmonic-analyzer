@@ -26,11 +26,12 @@ from functools import wraps
 import math
 import sys
 
-from _common import _early_bound, _read_member, run_build
+from _common import _early_bound, run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
 from _drawing_marks import (
     _named_dimension,
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -46,7 +47,7 @@ from boss_hook_spec import (
     CHAMFER_ANGLE_DEG,
     CHAMFER_ANGLE_TOLERANCE_DEG,
     DRAWING_DIMENSIONS,
-    DIMENSION_PRECISION,
+    DRAWING_PRECISION,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
 )
@@ -60,26 +61,18 @@ ANCHOR = ANCHOR_9490T1
 
 
 def _manufacturing_controls(adapter) -> None:
-    """Tolerance and mark actual cutting dimensions before the stock helper saves."""
+    """Author and mark the two post-purchase cutting controls."""
     clear_dimensions_for_drawing(adapter)
     for feature, name, nominal in (
         ("StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_MM / 1000),
         ("StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_MM / 1000),
         ("StockDeburrProfile", "ChamferAngle", math.radians(CHAMFER_ANGLE_DEG)),
     ):
-        display, dimension = _named_dimension(adapter, feature, name)
+        _display, dimension = _named_dimension(adapter, feature, name)
         if int(dimension.DrivenState) != 2:
             raise RuntimeError(f"{name}@{feature} must control the cutting sketch")
         if not math.isclose(float(dimension.SystemValue), nominal, abs_tol=1e-9):
             raise RuntimeError(f"{name}@{feature}: modified stock nominal changed")
-        display = _early_bound(display, "IDisplayDimension")
-        digits = DIMENSION_PRECISION[name]
-        result = display.SetPrecision3(digits, -1, -1, -1)
-        if (
-            result is None
-            or int(_read_member(display, "GetPrimaryPrecision2")) != digits
-        ):
-            raise RuntimeError(f"{name}@{feature}: native precision did not persist")
     set_dimension_symmetric_tolerance(
         adapter, "StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_TOLERANCE_MM
     )
@@ -89,8 +82,8 @@ def _manufacturing_controls(adapter) -> None:
     set_dimension_symmetric_angular_tolerance(
         adapter, "StockDeburrProfile", "ChamferAngle", CHAMFER_ANGLE_TOLERANCE_DEG
     )
-    # General dimensions retain their numerical acceptance bands natively;
-    # swTolGeneral omits the redundant printed band in favour of the title block.
+    # Finished overall and angle defer to the title block's general bands; keep
+    # those values on the model so the native dimension remains fully defined.
     for feature, name, band in (
         ("StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_TOLERANCE_MM / 1000),
         (
@@ -112,6 +105,8 @@ def _manufacturing_controls(adapter) -> None:
             or not math.isclose(float(tolerance.GetMaxValue()), band, abs_tol=1e-9)
         ):
             raise RuntimeError(f"{name}@{feature}: general tolerance readback changed")
+    # Decimal places are part properties, never render-time drawing edits.
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     for feature, names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)
     apply_drawing_properties(
