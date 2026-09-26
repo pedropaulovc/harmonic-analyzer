@@ -62,12 +62,11 @@ from _layout_geometry import (
     SegmentGrid,
     SheetGeometry,
     ViewGeometry,
-    clip_segment_to_box,
     find_border_breaches,
     find_leader_crossings,
     find_text_on_line,
     segment_box_distance,
-    segment_box_overlap_length,
+    text_overlap,
     union_boxes,
 )
 
@@ -375,6 +374,88 @@ def ink_spans(dump: Mapping[str, Any]) -> list[InkSpan]:
         text, *box = raw
         spans.append(InkSpan(ink_key(str(text)), Box(*_floats(box)[:4])))
     return spans
+
+
+def ink_annotation_strokes(dump: Mapping[str, Any]) -> list[Segment]:
+    """The page's solid strokes thinner than a model edge: annotation ink."""
+    low, _high = MODEL_EDGE_WIDTH_M
+    return [
+        Segment(*_floats(raw)[:4], "line")
+        for raw in (dump.get("ink") or {}).get("strokes", ())
+        if float(raw[4]) < low and not raw[5]
+    ]
+
+
+# A balloon's GetDisplayData circle sits up to 0.57 mm off the ring the PDF
+# prints (layoutcal2-c, drive-train-assembly: 28 balloons, the COM leader
+# start lands exactly on the printed ring), so the printed ring wins when
+# the page's strokes trace one within this band of the COM circle.
+BALLOON_RING_SEARCH_M = 0.001
+# The printed ring is a polyline; every vertex lies this close to its fit.
+BALLOON_RING_FIT_TOL_M = 0.0001
+
+
+def _fit_circle(points: Sequence[tuple[float, float]]) -> tuple[float, float, float] | None:
+    """Least-squares (Kasa) circle through ``points``; None when degenerate."""
+    n = len(points)
+    mx = sum(x for x, _y in points) / n
+    my = sum(y for _x, y in points) / n
+    # Centred coordinates keep the normal equations well conditioned.
+    suu = svv = suv = suuu = svvv = suvv = svuu = 0.0
+    for x, y in points:
+        u, v = x - mx, y - my
+        suu += u * u
+        svv += v * v
+        suv += u * v
+        suuu += u * u * u
+        svvv += v * v * v
+        suvv += u * v * v
+        svuu += v * u * u
+    determinant = suu * svv - suv * suv
+    if abs(determinant) < 1e-30:
+        return None
+    bu = 0.5 * (suuu + suvv)
+    bv = 0.5 * (svvv + svuu)
+    uc = (bu * svv - bv * suv) / determinant
+    vc = (bv * suu - bu * suv) / determinant
+    radius = math.sqrt(uc * uc + vc * vc + (suu + svv) / n)
+    return (mx + uc, my + vc, radius)
+
+
+def printed_circle(
+    circle: tuple[float, float, float], strokes: Sequence[Segment]
+) -> tuple[float, float, float]:
+    """The ring a balloon PRINTED near its COM ``circle``, else ``circle``.
+
+    Fits a circle to the stroke vertices within ``BALLOON_RING_SEARCH_M`` of
+    the COM ring, dropping the worst-fitting vertex (a leader start or an
+    arrowhead in the band) until every vertex lies within
+    ``BALLOON_RING_FIT_TOL_M`` of the fit. The fit is kept only when it still
+    traces a closed ring: at least 12 vertices, on every side.
+    """
+    cx, cy, radius = circle
+    points = sorted(
+        {
+            point
+            for segment in strokes
+            for point in ((segment.x0, segment.y0), (segment.x1, segment.y1))
+            if abs(math.hypot(point[0] - cx, point[1] - cy) - radius) <= BALLOON_RING_SEARCH_M
+        }
+    )
+    while len(points) >= 12:
+        fit = _fit_circle(points)
+        if fit is None:
+            return circle
+        fx, fy, fr = fit
+        residuals = [abs(math.hypot(x - fx, y - fy) - fr) for x, y in points]
+        worst = max(range(len(points)), key=residuals.__getitem__)
+        if residuals[worst] > BALLOON_RING_FIT_TOL_M:
+            del points[worst]
+            continue
+        if len({(x >= fx, y >= fy) for x, y in points}) < 4:
+            return circle
+        return fit
+    return circle
 
 
 def ink_edges(dump: Mapping[str, Any]) -> list[Segment]:
@@ -932,11 +1013,14 @@ def annotation_geometry(
     owner: str,
     advance: float,
     ink: Mapping[int, Box] | None = None,
+    strokes: Sequence[Segment] = (),
 ) -> AnnotationGeometry | None:
     """One dumped annotation as the audit sees it: text rows plus its own ink.
 
     ``ink`` maps an item's index in ``text_items(display)`` to its printed PDF
     glyph box (``match_ink``); a sheet dumped with its PDF always passes it.
+    ``strokes`` is the page's annotation ink (``ink_annotation_strokes``); a
+    balloon's circle snaps to the ring it traces (``printed_circle``).
     """
     kind = ANNOTATION_KINDS.get(int(annotation.get("type", 0)), "other")
     if int(annotation.get("visible", 1) or 1) in _HIDDEN_STATES:
@@ -968,6 +1052,8 @@ def annotation_geometry(
     exact = False
     rows: list[tuple[str, Box]]
     circle = balloon_circle(display) if note.get("balloon") else None
+    if circle is not None and strokes:
+        circle = printed_circle(circle, strokes)
     if circle is not None:
         # A BOM balloon's GetExtent includes its leader; its rendered
         # full-circle arc is the balloon (``rendered_balloon_circle``).
@@ -1005,14 +1091,19 @@ def annotation_geometry(
     else:
         height = 0.0
     position = _floats(annotation.get("pos"))
+    # A table is also dumped whole under ``tables`` as ``table <name>``; its
+    # grid lines must carry the SAME label or they read as a foreign line
+    # through the table's own text.
+    suffix = f" {rows[0][0]!r}" if rows and rows[0][0] and kind != "table" else ""
     return AuditAnnotation(
-        label=f"{kind} {label}" + (f" {rows[0][0]!r}" if rows and rows[0][0] else ""),
+        label=f"{kind} {label}{suffix}",
         kind=kind,
         owner=owner,
         text_boxes=tuple(box for _text, box in rows),
         segments=tuple(segments),
         position=(position[0], position[1]) if len(position) >= 2 else None,
         exact=exact,
+        circle=circle,
         text_height=height,
         arrow_tails=tuple(tails),
     )
@@ -1263,6 +1354,7 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
         if len(_floats(view.get("outline"))) >= 4
     ]
     edges = view_edges(ink_edges(dump), outlines)
+    annotation_strokes = ink_annotation_strokes(dump)
 
     view_geometry = []
     annotations: list[AnnotationGeometry] = []
@@ -1277,7 +1369,9 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
             )
         )
         for annotation in view.get("annotations", ()):
-            item = annotation_geometry(annotation, owner=name, advance=advance, ink=ink_of(annotation))
+            item = annotation_geometry(
+                annotation, owner=name, advance=advance, ink=ink_of(annotation), strokes=annotation_strokes
+            )
             if item is not None:
                 annotations.append(item)
         for section in view.get("sections", ()):
@@ -1308,7 +1402,9 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
     for annotation in dump.get("sheet_annotations", ()):
         if int(annotation.get("owner_type", _OWNER_DRAWING_SHEET)) != _OWNER_DRAWING_SHEET:
             continue
-        item = annotation_geometry(annotation, owner="sheet", advance=advance, ink=ink_of(annotation))
+        item = annotation_geometry(
+            annotation, owner="sheet", advance=advance, ink=ink_of(annotation), strokes=annotation_strokes
+        )
         if item is not None:
             annotations.append(item)
     for table in dump.get("tables", ()):
@@ -1387,6 +1483,22 @@ def _move_mm(box: Box, other: Box) -> tuple[float, float]:
     return ((x + dx) * MM, (y + dy) * MM)
 
 
+def _shape_gap(first: AnnotationGeometry, a: Box, second: AnnotationGeometry, b: Box) -> float:
+    """``_box_gap`` between two text blocks, measured to a balloon's circle.
+
+    A balloon's block is its circle's bounding square; two balloons set
+    diagonally have square corners 2 mm apart and circles 7 mm apart.
+    """
+    if first.circle is None and second.circle is None:
+        return _box_gap(a, b)
+    if first.circle is not None and second.circle is not None:
+        (x0, y0, r0), (x1, y1, r1) = first.circle, second.circle
+        return math.hypot(x1 - x0, y1 - y0) - r0 - r1
+    circle, box = (first.circle, b) if first.circle is not None else (second.circle, a)
+    cx, cy, radius = circle
+    return math.hypot(max(box.xmin - cx, 0.0, cx - box.xmax), max(box.ymin - cy, 0.0, cy - box.ymax)) - radius
+
+
 def _box_gap(a: Box, b: Box) -> float:
     """Signed clearance: the largest separating gap, negative when overlapping."""
     return max(a.xmin - b.xmax, b.xmin - a.xmax, a.ymin - b.ymax, b.ymin - a.ymax)
@@ -1410,7 +1522,7 @@ def find_text_clearance(
             continue
         rows = [text_height(item) for item in (first, second) if item.kind != "table"]
         clearance = heights * min(rows)
-        gap = _box_gap(box_a, box_b)
+        gap = _shape_gap(first, box_a, second, box_b)
         if gap >= clearance:
             continue
         overlap = Box(
@@ -1464,7 +1576,7 @@ def find_text_separation(
         blocks.append((annotation, block, row_height))
     findings = []
     for (first, a, ha), (second, b, hb) in combinations(blocks, 2):
-        gap = _box_gap(a, b)
+        gap = _shape_gap(first, a, second, b)
         limit = heights * min(ha, hb)
         if gap < TEXT_CLEARANCE_HEIGHTS * min(ha, hb) or gap >= limit:
             continue
@@ -1609,19 +1721,11 @@ def find_leader_through_text(
             continue
         for target, box in items:
             own = target.label == source.label
-            test = (
-                Box(box.xmin + own_inset, box.ymin + own_inset, box.xmax - own_inset, box.ymax - own_inset)
-                if own
-                else box
-            )
-            if test.xmin >= test.xmax or test.ymin >= test.ymax:
-                continue
             for segment in leaders:
-                length = segment_box_overlap_length(segment, test)
+                length, span = text_overlap(segment, target, box, inset=own_inset if own else 0.0)
                 if length <= tol:
                     continue
-                span = clip_segment_to_box(segment, test)
-                mid = segment.point_at(sum(span) / 2.0) if span else test.center()
+                mid = segment.point_at(sum(span) / 2.0) if span else box.center()
                 findings.append(
                     Finding(
                         kind="leader-through-own-text" if own else "leader-through-text",

@@ -245,6 +245,48 @@ def segment_box_overlap_length(segment: Segment, box: Box) -> float:
     return (span[1] - span[0]) * segment.length
 
 
+def clip_segment_to_circle(
+    segment: Segment, circle: tuple[float, float, float]
+) -> tuple[float, float] | None:
+    """The ``[t0, t1]`` parameter range of ``segment`` inside ``circle``'s disk."""
+    cx, cy, radius = circle
+    dx, dy = segment.x1 - segment.x0, segment.y1 - segment.y0
+    fx, fy = segment.x0 - cx, segment.y0 - cy
+    a = dx * dx + dy * dy
+    if a == 0.0:
+        return (0.0, 0.0) if math.hypot(fx, fy) <= radius else None
+    b = 2.0 * (fx * dx + fy * dy)
+    c = fx * fx + fy * fy - radius * radius
+    discriminant = b * b - 4.0 * a * c
+    if discriminant <= 0.0:
+        return None
+    root = math.sqrt(discriminant)
+    t0, t1 = max(0.0, (-b - root) / (2.0 * a)), min(1.0, (-b + root) / (2.0 * a))
+    return (t0, t1) if t0 <= t1 else None
+
+
+def text_overlap(
+    segment: Segment, annotation: AnnotationGeometry, box: Box, *, inset: float = 0.0
+) -> tuple[float, tuple[float, float] | None]:
+    """How much of ``segment`` runs through one of ``annotation``'s text boxes.
+
+    Returns the length in metres and the clipped ``[t0, t1]`` range. ``inset``
+    shrinks the shape first. A balloon is tested against its circle, not
+    against the circle's bounding square: a leader leaving the rim, or a line
+    clipping a corner, crosses only blank paper.
+    """
+    if annotation.circle is not None:
+        cx, cy, radius = annotation.circle
+        span = clip_segment_to_circle(segment, (cx, cy, radius - inset))
+        if span is None:
+            return 0.0, None
+        return (span[1] - span[0]) * segment.length, span
+    test = Box(box.xmin + inset, box.ymin + inset, box.xmax - inset, box.ymax - inset)
+    if test.xmin >= test.xmax or test.ymin >= test.ymax:
+        return 0.0, None
+    return segment_box_overlap_length(segment, test), clip_segment_to_box(segment, test)
+
+
 def segment_box_distance(segment: Segment, box: Box) -> float:
     """Shortest distance from ``segment`` to ``box``; 0 when it touches or
     enters it."""
@@ -383,6 +425,10 @@ class AnnotationGeometry:
     segments: tuple[Segment, ...] = ()
     position: tuple[float, float] | None = None
     exact: bool = False
+    # A BOM balloon's printed body: ``(cx, cy, radius)``. Its one text box is
+    # the circle's bounding square, whose corners are blank paper, so line and
+    # gap tests read the circle instead (``text_overlap``).
+    circle: tuple[float, float, float] | None = None
 
     def box(self) -> Box | None:
         """The annotation's whole footprint: text plus its own ink."""
@@ -534,10 +580,9 @@ def find_text_on_line(
                 source = sheet.annotations[owner]
                 if source.label == target.label:
                     continue
-                length = segment_box_overlap_length(segment, box)
+                length, span = text_overlap(segment, target, box)
                 if length <= tol:
                     continue
-                span = clip_segment_to_box(segment, box)
                 mid = segment.point_at(sum(span) / 2.0) if span else box.center()
                 findings.append(
                     Finding(
