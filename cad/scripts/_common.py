@@ -1364,6 +1364,7 @@ async def save_part_and_images(
     # summary Title, not its same-named custom property. Keep both identities
     # sourced from part_properties so a registry title override cannot split.
     apply_summary_info(adapter, title=properties["Title"])
+    rebuild_stale_configurations(adapter, part_name)
     check(
         f"re-save with properties -> {part_path}",
         await adapter.save_file(str(part_path)),
@@ -1389,6 +1390,110 @@ async def save_part_and_images(
         )
         artefacts[view] = str(img_path)
     return artefacts
+
+
+@_telemetry.traced("save.rebuild_configs", label_param="part_name")
+def rebuild_stale_configurations(adapter: Any, part_name: str) -> None:
+    """Leave no configuration stale in the saved part: read first, rebuild only
+    when dirty, and prove it.
+
+    An edit made after a configuration's last rebuild can leave that
+    configuration stale.  Saved that way, an assembly placing it opens with
+    NeedsRebuild2=1 and fails verify:soundness's saved-rebuild-clean, and the
+    #267 reconcile re-saves only the assembly, never the child.  The pc-p1r
+    probe (dt-logs/pc-p1r/probe-saved-rebuild.jsonl) read MHA-135's INSTALLED
+    configuration stale in the saved part, and cone-gear's unplaced Default.
+
+    Same shape as _assembly.rebuild_if_needed_before_save (1013334c3): every
+    configuration's IConfiguration.NeedsRebuild is read first, and a clean part
+    -- the common case -- gets no rebuild call at all.  A stale one gets ONE
+    IModelDocExtension.EditRebuildAll, which rebuilds what needs it in every
+    configuration without activating any (#271 measured the cost of switching;
+    ForceRebuild3 dirties children, #267).  A refused rebuild, any non-warning
+    What's Wrong entry (the fleet's fault convention), or a configuration still
+    stale after it raises, naming the part.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    stale_before = stale_configurations(model, names)
+    _telemetry.annotate(
+        config_count=len(names),
+        stale_before=len(stale_before),
+        stale_before_names=",".join(stale_before[:8]),
+    )
+    if not stale_before:
+        _telemetry.annotate(rebuild_all="skipped", stale_after=0)
+        _telemetry.success(f"{part_name}: {len(names)} configuration(s) clean before save")
+        return
+    _telemetry.annotate(rebuild_all="ran")
+    extension = _early_bound(_read_member(model, "Extension"), "IModelDocExtension")
+    if not extension.EditRebuildAll():
+        raise RuntimeError(
+            f"{part_name}: EditRebuildAll refused rebuilding stale configurations "
+            f"{stale_before}"
+        )
+    faults = [
+        f"{name} ({_FEATURE_ERROR.get(code, code)})"
+        for name, code, warning in whats_wrong(adapter, model)
+        if not warning
+    ]
+    if faults:
+        raise RuntimeError(f"{part_name}: rebuilding {stale_before} left faults {faults}")
+    stale_after = stale_configurations(model, names)
+    _telemetry.annotate(stale_after=len(stale_after))
+    if stale_after:
+        raise RuntimeError(
+            f"{part_name}: configurations {stale_after} still need a rebuild before "
+            "the save; an assembly placing one would open NeedsRebuild2=1"
+        )
+    _telemetry.success(
+        f"{part_name}: rebuilt stale configuration(s) {stale_before} before save"
+    )
+
+
+def stale_configurations(model: Any, names: Iterable[str]) -> list[str]:
+    """Names of the configurations whose IConfiguration.NeedsRebuild reads true."""
+    return [
+        name
+        for name in names
+        if bool(
+            _early_bound(model.GetConfigurationByName(name), "IConfiguration").NeedsRebuild
+        )
+    ]
+
+
+def whats_wrong(adapter: Any, model: Any) -> list[tuple[str, int, bool]]:
+    """Return ``[(feature_name, error_code, is_warning), ...]`` for a model.
+
+    Reads the What's Wrong dialog via ``GetWhatsWrong``. Early-bound
+    ``IModelDocExtension::GetWhatsWrong`` collects its three ``out object`` arrays
+    into the return tuple ``(retval, features, codes, warnings)`` -- pass nothing
+    and consume the tuple. The old byref-VARIANT idiom leaves those VARIANTs
+    UNWRITTEN under InvokeTypes, so it silently reported every model clean (a
+    broken assembly would slip the deep-health gate). Empty when the model is
+    clean or the call is unavailable.
+    """
+    ext = _read_member(model, "Extension")
+    if ext is None:
+        return []
+    ext = _early_bound(ext, "IModelDocExtension")
+    res = adapter._attempt(lambda: ext.GetWhatsWrong(), default=None)
+    if not res:
+        return []
+    _retval, feats, codes, warns = res
+    feats = list(feats or [])
+    codes = list(codes or [])
+    warns = list(warns or [])
+    out: list[tuple[str, int, bool]] = []
+    for i, feat in enumerate(feats):
+        name = "?"
+        if feat is not None:
+            feat = _early_bound(feat, "IFeature")
+            name = str(_read_member(feat, "Name"))
+        code = int(codes[i]) if i < len(codes) else -1
+        warn = bool(warns[i]) if i < len(warns) else False
+        out.append((name, code, warn))
+    return out
 
 
 def _prune_stale_part_views(
@@ -2343,11 +2448,13 @@ async def name_bore_axis(
     ).name
 
 
-# swFeatureError_e: the codes GetWhatsWrong returns. >1 (warning=False) is a
-# hard rebuild fault; code 1 with the warning flag is informational.
+# swFeatureError_e: the codes GetWhatsWrong returns. Whether an entry is a
+# warning comes from GetWhatsWrong's separate is_warning array, never from
+# the code: every non-warning entry is a fault, code 1 (swFeatureErrorUnknown)
+# included, as verify.py and _assembly's health gates treat them.
 _FEATURE_ERROR = {
     0: "none",
-    1: "warning",
+    1: "unknown-error",
     2: "rebuild-error",
     3: "dangling-no-members",
     4: "dangling-has-members",
