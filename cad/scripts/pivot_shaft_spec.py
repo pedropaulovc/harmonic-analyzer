@@ -80,10 +80,14 @@ if RELIEF_WIDTH_RANGE[0] < FACING_NOSE_RADIUS:
     raise AssertionError("a narrow relief leaves the facing tool's nose radius")
 if (RELIEF_DIA + LINEAR_3PL) / 2.0 + CORNER_RADIUS_MAX > SHAFT_DIA_MIN / 2.0:
     raise AssertionError("a shallow relief leaves its corner radius above the O.D.")
-# What a relieved journal must keep: plain bearings are laid out from L/d 0.5
-# up, and shorter ones guide poorly. The north journal bears over the ear's
-# thickness less the groove at its inner face; hub 19 over its length less
-# the groove at the south face (test_pivot_shaft_drawing checks the hub).
+# What a relieved journal must keep: L/d 0.5, the low end of the plain-bearing
+# range. Childs, Mechanical Design Engineering Handbook, 2nd ed. (2019), ch. 5
+# "Journal bearings": "Typical values for L/D ratios are between 0.5 and 1.5";
+# for boundary-lubricated bearings like these (Childs, Rotating Flow, 2011,
+# 6.5.1): "Common practice is to set the length to diameter ratio between 0.5
+# and 1.5." The north journal bears over the ear's thickness less the groove
+# at its inner face; hub 19 over its length less the groove at the south face
+# (test_pivot_shaft_drawing checks the hub).
 BEARING_LENGTH_MIN = 0.5 * SHAFT_DIA
 if JOURNAL_LENGTH - RELIEF_WIDTH_RANGE[1] < BEARING_LENGTH_MIN:
     raise AssertionError("a wide relief leaves the north journal under L/d 0.5")
