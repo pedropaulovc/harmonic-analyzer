@@ -353,11 +353,15 @@ if abs(SOUTH_WASHER_Z[1] - (hub_mid_z(0) - _ROCKER_HUB_LENGTH / 2.0)) > 1e-9:
         "south thrust washer's north face is not on hub 0's south face"
     )
 # Bracket hold-downs (#743 PR2): two MHA-143 (#8-32 x 3/4 fillister) per
-# bracket, through its #19 foot holes into the support rail's transferred
-# seats. rocker_bracket_seat_layout owns the seats and their worst-case stack;
-# here the screw it assumed must be the part placed, the brackets must stand
-# on the support's centreline, and each head must sit on its foot.
+# bracket, through its #8 close-clearance foot holes into the support rail's
+# transferred seats. rocker_bracket_seat_layout owns the seats and their
+# worst-case stack; here the screw it assumed must be the part placed, the
+# brackets must stand on the support's centreline, each head must sit on its
+# foot, and the hole must clear the screw's under-head junction fillet (P/10
+# in the fillister recipe, diag_mcmaster_fillister), which a #19 caught
+# (r743-3C).
 from build_pedestal_hold_down_screw import (  # noqa: E402
+    _PITCH as _HDSCREW_PITCH,
     HEAD_DIA as _HDSCREW_HEAD_DIA,
     SHANK_LEN as _HDSCREW_LEN,
     THREAD as _HDSCREW_THREAD,
@@ -384,10 +388,16 @@ if (
     raise AssertionError("rocker_bracket_seat_layout's screw is not the MHA-143 placed")
 if abs(PIVOT[0] - _SUPPORT_WORLD_X) > 1e-9:
     raise AssertionError("pivot brackets are off the rocker-arm-support's centreline")
-if _BRACKET_HOLE_SPEC.kind != "drilled_number" or not (
-    _SEAT_SCREW_MAJOR_DIA < _BRACKET_HOLE_DIA < _HDSCREW_HEAD_DIA
+BRACKET_HOLE_FILLET_CLEARANCE = (
+    _BRACKET_HOLE_DIA - _SEAT_SCREW_MAJOR_DIA
+) / 2.0 - _HDSCREW_PITCH / 10.0
+if _BRACKET_HOLE_SPEC.kind != "clearance" or not (
+    BRACKET_HOLE_FILLET_CLEARANCE > 0.0 and _BRACKET_HOLE_DIA < _HDSCREW_HEAD_DIA
 ):
-    raise AssertionError("bracket foot hole does not pass the #8 screw under its head")
+    raise AssertionError(
+        "bracket foot hole does not pass the #8 screw and its junction fillet"
+        " under its head"
+    )
 if min(_BRACKET_HOLE_Z) - _HDSCREW_HEAD_DIA / 2.0 < _BRACKET_EAR_T / 2.0 or (
     max(_BRACKET_HOLE_Z) + _HDSCREW_HEAD_DIA / 2.0 > _BRACKET_FOOT_Z1
 ):

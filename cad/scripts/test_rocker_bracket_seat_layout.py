@@ -12,6 +12,7 @@ import build_channel_assembly as channel
 import build_pedestal_hold_down_screw as hold_down
 import pivot_bracket_spec as bracket
 import rocker_bracket_seat_layout as seats
+from _hole_spec import DRILL_POINT_H
 
 
 def test_layout_screw_is_the_placed_mha_143() -> None:
@@ -80,6 +81,32 @@ def test_seat_stack_margins() -> None:
         pytest.approx(0.342, abs=1e-3)
     )
     assert seats.RAIL_DEPTH - seats.LINEAR_1PL - seats.SEAT_DRILL_BOTTOM_MAX == (
-        pytest.approx(0.362, abs=1e-3)
+        pytest.approx(2.062, abs=1e-3)
     )
     assert seats.SEAT_DRILL_NAME == "#29"
+
+
+def test_seat_drill_point_keeps_the_rail_floor_at_the_printed_worst_case() -> None:
+    """Codex #936 PRRT_kwDOPHDy386mS91G: the rail at its .X low limit over
+    the #29 drill at its .X high limit plus its 118-deg point. The old check
+    only kept the point out of the window; the floor it left was 0.36."""
+    rail_min = seats.RAIL_DEPTH - seats.LINEAR_1PL
+    drill_shoulder_max = seats.SEAT_DRILL_DEPTH + seats.LINEAR_1PL
+    point = seats.SEAT_DRILL_DIA / 2.0 * DRILL_POINT_H
+    floor = rail_min - (drill_shoulder_max + point)
+    assert floor == pytest.approx(seats.SEAT_FLOOR_MIN)
+    assert floor >= seats.RULE12_WEB_TARGET
+    # The print carries each row at its own precision.
+    for value in (seats.RAIL_DEPTH, seats.SEAT_DRILL_DEPTH, seats.SEAT_THREAD_DEPTH):
+        assert round(value, 1) == value
+
+
+def test_bracket_hole_clears_the_screw_junction_fillet() -> None:
+    """r743-3C: MHA-123's #19 hole (0.025 radial over the #8-32 major) cut the
+    fillister's under-head junction fillet, P/10 in diag_mcmaster_fillister's
+    recipe, at the hole mouth: 0.0048 mm^3 per screw in assembly:channel."""
+    fillet = hold_down._PITCH / 10.0
+    radial = (bracket.HOLE_DIA - seats.SCREW_MAJOR_DIA) / 2.0
+    assert radial > fillet
+    assert channel.BRACKET_HOLE_FILLET_CLEARANCE == pytest.approx(radial - fillet)
+    assert bracket.HOLE_DIA < hold_down.HEAD_DIA

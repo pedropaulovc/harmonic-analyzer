@@ -7,7 +7,7 @@ shared sheet/template, import, curation, and export behavior lives in
 
 The support is a painted gray-iron frame with a trapezoidal wall, two opposed
 pockets leaving a central web, a through cavity, a chamfered window rim,
-four 5/16 clearance holes through its mounting foot, and a 21.0-deep top rail
+four 5/16 clearance holes through its mounting foot, and a 22.7-deep top rail
 carrying the rocker brackets' four #8-32 seats (#743), transferred from the set
 brackets at assembly. The sheet runs 1:2, with each view's scale pinned
 explicitly.
@@ -228,7 +228,7 @@ RIGHT_KEEP = {
     "WallHeight": (0.240, 0.185),
     "FootSpan": (0.205, 0.133),
     "TopSpan": (0.205, 0.238),
-    # Below the rail-depth dimension, whose 21.0 sits at y 0.224 in the same
+    # Below the rail-depth dimension, whose rail depth sits at y 0.224 in the same
     # lane: at 0.225 the two ran together ("X 45 DEG21.0", fix3 render).
     "RimChamferSize": (0.165, 0.200),
 }
