@@ -98,7 +98,16 @@ def test_display_precision_is_owned_by_the_part() -> None:
         "Sec3End": 3,
         "Sec4End": 1,
         "ShoulderR": 2,
+        # #914: the collar web holds the 1.5 floor at .XXX (not at .XX), and
+        # the solder stations carry the user-ruled +-0.13.
+        "CollarDia": 1,
+        "CollarWidth": 3,
+        "T120Station": 3,
+        "T006Station": 3,
     }
+    web = cone_gear_shaft_spec.COLLAR_THICKNESS
+    assert web - _config.title_block("linear_3pl")["value_in"] * 25.4 >= 1.5
+    assert web - _config.title_block("linear_2pl")["value_in"] * 25.4 < 1.5
 
 
 def test_gear_seat_shoulders_are_held_inside_the_air_gap() -> None:
@@ -152,8 +161,8 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is cone_gear_shaft_spec.DRAWING_DIMENSIONS
     marked = set().union(*cone_gear_shaft_spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.SIDE_KEEP) | set(drawing.SIDE_DIAMETERS) == marked
-    # Nothing is imported twice, and the donor hands over exactly the five
-    # diameters it was placed for.
+    # Nothing is imported twice, and the donor hands over exactly the six
+    # diameters it was placed for (five lands and the collar, #914).
     assert set(drawing.DONOR_KEEP) == set(drawing.SIDE_DIAMETERS)
     assert not set(drawing.SIDE_KEEP) & set(drawing.DONOR_KEEP)
     assert part.SECTIONS is cone_gear_shaft_spec.SECTIONS
@@ -173,8 +182,8 @@ def test_every_diameter_stands_on_its_own_land() -> None:
     through a bigger neighbour and across its shoulder.
     """
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'mode="offset", base_plane="Front Plane", offset=end_z' in source
-    assert "ExtrusionParameters(depth=end_z, reverse_direction=i > 0)" in source
+    assert "base_plane=SECTION_ORIGINS[i], offset=knob" in source
+    assert "ExtrusionParameters(depth=knob, reverse_direction=i > 0)" in source
     assert "await adapter.create_sketch(plane_name)" in source
 
     ends = cone_gear_shaft_spec.SECTION_ENDS
@@ -191,6 +200,67 @@ def test_every_diameter_stands_on_its_own_land() -> None:
         assert (
             y > drawing.SIDE_CENTER[1] + cone_gear_shaft_spec.SECTION_DIAS[0] / 2000.0
         )
+
+
+def test_collar_diameter_stands_on_the_collar() -> None:
+    """#914: the collar is 1.681 wide, so its diameter line stands inside
+    that ring, above the shaft, clear of the pivot-journal finish symbol."""
+    spec = cone_gear_shaft_spec
+    big_end = drawing.SIDE_CENTER[0] + spec.SHAFT_LENGTH / 2000.0
+    ring = (
+        big_end - spec.COLLAR_END_STATION / 1000.0,
+        big_end - spec.COLLAR_START_STATION / 1000.0,
+    )
+    x, y = drawing.SIDE_DIAMETERS["CollarDia"]
+    assert ring[0] < x < ring[1]
+    assert y > drawing.SIDE_CENTER[1] + spec.COLLAR_DIA / 2000.0 + 0.010
+    assert x + drawing.COLLAR_DIA_TEXT_WIDTH < drawing.PIVOT_FINISH_XY[0] - 0.010
+
+
+def test_lengths_are_baseline_from_the_collar_face() -> None:
+    """Option A (#914): one origin, the collar face.  Every length below the
+    shaft that starts there stands on its own tier, the shortest nearest the
+    part; the journal runs the other way on the first tier and the overall
+    length sits lowest, clear of the title block."""
+    spec = cone_gear_shaft_spec
+    from_datum = {
+        "CollarWidth": spec.COLLAR_THICKNESS,
+        "T120Station": spec.SOLDER_T120_STATION,
+        "Sec1End": spec.SECTION_KNOBS[1],
+        "Sec2End": spec.SECTION_KNOBS[2],
+        "Sec3End": spec.SECTION_KNOBS[3],
+        "T006Station": spec.SOLDER_T006_STATION,
+    }
+    tiers = [
+        drawing.SIDE_KEEP[name][1] for name in sorted(from_datum, key=from_datum.get)
+    ]
+    assert tiers == sorted(tiers, reverse=True)
+    assert len(set(tiers)) == len(tiers)
+    shaft_bottom = drawing.SIDE_CENTER[1] - spec.COLLAR_DIA / 2000.0
+    assert tiers[0] < shaft_bottom - 0.005
+    journal = drawing.SIDE_KEEP["Sec0End"]
+    assert journal[1] == tiers[0]
+    big_end = drawing.SIDE_CENTER[0] + spec.SHAFT_LENGTH / 2000.0
+    datum_x = big_end - spec.DATUM_STATION / 1000.0
+    # the journal's text is right of the datum, the collar web's left of it
+    assert journal[0] > datum_x + 0.010
+    assert (
+        drawing.SIDE_KEEP["CollarWidth"][0] < datum_x - spec.COLLAR_THICKNESS / 1000.0
+    )
+    overall = drawing.SIDE_KEEP["Sec4End"][1]
+    assert overall < tiers[-1] and overall > 0.066 + 0.008
+    # each station's text stands inside its own span (the web's cannot)
+    for name, span in from_datum.items():
+        if name == "CollarWidth":
+            continue
+        assert datum_x - span / 1000.0 < drawing.SIDE_KEEP[name][0] < datum_x, name
+    assert drawing.DIMENSION_CALLOUTS["T006Station"] == "20X EQ SP"
+
+
+def test_the_pictorial_hides_the_solder_station_witnesses() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert drawing.SOLDER_STATION_SKETCH == "SolderStations"
+    assert "_hide_reference_sketch(adapter, iso, " in source
 
 
 def test_stacked_tip_diameters_never_run_a_line_through_a_text() -> None:
@@ -286,7 +356,7 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     assert 'name_dimensions(adapter, "ShoulderFillets", ["ShoulderR"])' in source
     # One feature, one dimension, one quantity prefix -- not three dimensions
     # (the gear-seat steps; the collar's roots stay sharp, #914).
-    assert drawing.DIMENSION_CALLOUTS == {"ShoulderR": "3X"}
+    assert drawing.DIMENSION_CALLOUTS["ShoulderR"] == "3X"
     # The old "SHOULDER ROOTS R0.10 MAX" note is gone.  What remains names
     # the mate behind the gear-seat band -- the solder gap (rule 2; codex
     # 375a122c) -- without adding a check of its own (no MUST), and carries
@@ -379,55 +449,56 @@ def test_part_stamps_make_critical_properties() -> None:
     assert int(config["quantity"]) == 1
 
 
-def test_every_section_knob_drives_its_shoulder_plane_and_depth(monkeypatch) -> None:
-    """SecEnd{i} is a documented knob (Tools > Equations): editing it must move
-    the shoulder, not only the extrude depth back to the large end. Run the
-    real build() against recording stubs and read the drive equations it
-    authors: every land on an offset plane has that plane's offset AND its
-    depth owned by the same SecEnd{i} (Codex #839 PRRT_kwDOPHDy386mKNTW)."""
-    import asyncio
-    import inspect
-    from unittest.mock import AsyncMock, MagicMock
-
-    drives: list[tuple[str, str]] = []
-
-    def name_dimensions(_adapter, feature, names):
-        return [f"{name}@{feature}" for name in names]
-
-    async def drive_dimension(_adapter, dim_name, expr):
-        drives.append((dim_name, expr))
-
-    for attr, value in list(vars(part).items()):
-        if not callable(value) or attr.startswith("__") or attr == "build":
-            continue
-        if getattr(value, "__module__", "") == part.__name__:
-            continue
-        if not inspect.isfunction(value) and not inspect.isclass(value):
-            continue
-        stub = AsyncMock() if inspect.iscoroutinefunction(value) else MagicMock()
-        monkeypatch.setattr(part, attr, stub)
-    monkeypatch.setattr(part, "name_dimensions", name_dimensions)
-    monkeypatch.setattr(part, "drive_dimension", drive_dimension)
-    # the diameter drives ride SketchDims.apply; this test reads the stations
-    sketch_dims = MagicMock()
-    sketch_dims.return_value.apply.return_value = []
-    monkeypatch.setattr(part, "SketchDims", sketch_dims)
-    gated_after: list[int] = []
-    monkeypatch.setattr(
-        part,
-        "_assert_shoulder_planes_single_owned",
-        lambda _adapter: gated_after.append(len(drives)),
-    )
-
-    asyncio.run(part.build(AsyncMock()))
-    # the seat-side ownership gate runs once, after every drive is authored
+def test_every_station_knob_owns_its_plane_and_depth(monkeypatch) -> None:
+    """Every length knob (Tools > Equations) is the ONE owner of each dimension
+    that carries it: SecEnd{i} owns land i's end plane AND its depth (Codex
+    #839 PRRT_kwDOPHDy386mKNTW), SecEnd0 the journal and the CollarFace plane,
+    CollarWidth the collar's plane and web.  Run the real build() against
+    recording stubs; the seat-side ownership gate runs once, after every drive
+    is authored."""
+    _adapter, stubs, sketch_dims, gated_after = _stubbed_build(monkeypatch)
+    drives = stubs["drive_dimension"].call_args_list
     assert gated_after == [len(drives)]
+    owners = {c.args[1]: c.args[2] for c in drives}
+    records = {
+        c.args[0]: c.args[1] if len(c.args) > 1 else None
+        for c in sketch_dims.return_value.record.call_args_list
+    }
+    for global_name, _value, names in part.STATION_OWNERS:
+        for name in names:
+            dim, _, feature = name.partition("@")
+            if feature == "SolderStations":
+                assert records[dim] == f'"{global_name}"', name
+                continue
+            assert owners[name] == f'"{global_name}"', name
+    assert records["DatumStation"] == '"SecEnd0"'
 
-    owners = dict(drives)
-    for i in range(1, len(cone_gear_shaft_spec.SECTIONS)):
-        assert owners[f"Sec{i}Station@Sec{i}EndPlane"] == f'"SecEnd{i}"', i
-        assert owners[f"Sec{i}End@Sec{i}"] == f'"SecEnd{i}"', i
-    assert owners["Sec0End@Sec0"] == '"SecEnd0"'
+
+def test_station_owners_cover_every_knob_once() -> None:
+    spec = cone_gear_shaft_spec
+    rows = {
+        global_name: (value, names) for global_name, value, names in part.STATION_OWNERS
+    }
+    assert len(rows) == len(part.STATION_OWNERS)
+    for i, knob in enumerate(spec.SECTION_KNOBS):
+        assert rows[f"SecEnd{i}"][0] == knob
+    assert rows["SecEnd0"][1] == (
+        "Sec0End@Sec0",
+        "CollarFaceStation@CollarFace",
+        "DatumStation@SolderStations",
+    )
+    assert rows["CollarWidth"] == (
+        spec.COLLAR_THICKNESS,
+        ("CollarStation@CollarEndPlane", "CollarWidth@Collar"),
+    )
+    assert rows["SolderT120"] == (
+        spec.SOLDER_T120_STATION,
+        ("T120Station@SolderStations",),
+    )
+    assert rows["SolderT006"] == (
+        spec.SOLDER_T006_STATION,
+        ("T006Station@SolderStations",),
+    )
 
 
 class _Dim:
@@ -454,90 +525,77 @@ def _gate_fixture(monkeypatch, dims, equations):
     return adapter
 
 
-def _as_built(
-    i: int,
-    *,
-    owner: str | None = None,
-    depth_owner: str | None = None,
-    state: int = 1,
-):
-    end = cone_gear_shaft_spec.SECTIONS[i][1]
-    own = f'"SecEnd{i}"'
-    return (
-        {
-            f"Sec{i}Station@Sec{i}EndPlane": _Dim(end, state),
-            f"Sec{i}End@Sec{i}": _Dim(end),
-        },
-        {
-            f'"Sec{i}Station@Sec{i}EndPlane"': [
-                f'"Sec{i}Station@Sec{i}EndPlane" = {owner or own}'
-            ],
-            f'"Sec{i}End@Sec{i}"': [f'"Sec{i}End@Sec{i}" = {depth_owner or own}'],
-            own: [f"{own} = {end}mm"],
-        },
-    )
-
-
 def _machine(override=None):
+    """As-built dims and equations for every STATION_OWNERS row.  ``override``
+    maps a dimension name to its (right-hand side, DrivenState)."""
     dims, equations = {}, {}
-    for i in range(1, len(cone_gear_shaft_spec.SECTIONS)):
-        d, e = _as_built(i, **(override or {}).get(i, {}))
-        dims.update(d)
-        equations.update(e)
+    for global_name, value, names in part.STATION_OWNERS:
+        equations[f'"{global_name}"'] = [f'"{global_name}" = {value}mm']
+        for name in names:
+            owner, state = (override or {}).get(name, (f'"{global_name}"', 1))
+            dims[name] = _Dim(value, state)
+            equations[f'"{name}"'] = [f'"{name}" = {owner}']
     return dims, equations
 
 
-def test_shoulder_plane_gate_accepts_single_ownership_at_driven_state_1(
+def test_station_gate_accepts_single_ownership_at_driven_state_1(
     monkeypatch, caplog
 ) -> None:
     """Equation-owned dimensions read DrivenState 1 (driven), never 2: the
-    gate compares against the land's equation-owned depth, not a literal.
-    Each SecEnd definition, with its value, lands in the leaf log as evidence."""
+    gate compares the dimensions one knob owns with each other, not with a
+    literal.  Each knob's definition, with its value, lands in the leaf log."""
     dims, equations = _machine()
     with caplog.at_level("INFO"):
-        part._assert_shoulder_planes_single_owned(
-            _gate_fixture(monkeypatch, dims, equations)
-        )
-    for i in range(1, len(cone_gear_shaft_spec.SECTIONS)):
-        assert equations[f'"SecEnd{i}"'][0] in caplog.text
+        part._assert_stations_single_owned(_gate_fixture(monkeypatch, dims, equations))
+    for global_name, _value, _names in part.STATION_OWNERS:
+        assert equations[f'"{global_name}"'][0] in caplog.text
 
 
 @pytest.mark.parametrize(
     ("override", "message"),
     [
-        ({2: {"owner": '"SecEnd1"'}}, 'not "SecEnd2"'),
-        ({3: {"state": 2}}, "plane and depth DrivenState differ"),
+        ({"Sec2Station@Sec2EndPlane": ('"SecEnd1"', 1)}, 'not "SecEnd2"'),
+        (
+            {"Sec3Station@Sec3EndPlane": ('"SecEnd3"', 2)},
+            "SecEnd3: DrivenState differs",
+        ),
+        ({"CollarWidth@Collar": ('"SecEnd0"', 1)}, 'not "CollarWidth"'),
+        ({"T006Station@SolderStations": ('"SolderT120"', 1)}, 'not "SolderT006"'),
     ],
 )
-def test_shoulder_plane_gate_rejects_a_wrong_owner_or_state(
+def test_station_gate_rejects_a_wrong_owner_or_state(
     monkeypatch, override, message
 ) -> None:
     dims, equations = _machine(override)
     adapter = _gate_fixture(monkeypatch, dims, equations)
     with pytest.raises(RuntimeError, match=message):
-        part._assert_shoulder_planes_single_owned(adapter)
+        part._assert_stations_single_owned(adapter)
 
 
-def test_shoulder_plane_gate_rejects_a_missing_or_moved_plane(monkeypatch) -> None:
+def test_station_gate_rejects_a_missing_or_moved_dimension(monkeypatch) -> None:
     dims, equations = _machine()
     del equations['"Sec1Station@Sec1EndPlane"']
-    dims["Sec4Station@Sec4EndPlane"] = _Dim(cone_gear_shaft_spec.SECTIONS[4][1] + 1e-3)
+    dims["Sec4Station@Sec4EndPlane"] = _Dim(
+        cone_gear_shaft_spec.SECTION_KNOBS[4] + 1e-3
+    )
+    del dims["CollarFaceStation@CollarFace"]
     adapter = _gate_fixture(monkeypatch, dims, equations)
     with pytest.raises(RuntimeError, match="expected one equation") as raised:
-        part._assert_shoulder_planes_single_owned(adapter)
+        part._assert_stations_single_owned(adapter)
     assert "Sec4Station@Sec4EndPlane: reads" in str(raised.value)
+    assert "CollarFaceStation@CollarFace not found" in str(raised.value)
 
 
-def test_shoulder_plane_gate_proves_the_depth_owner_too(monkeypatch) -> None:
+def test_station_gate_proves_the_depth_owner_too(monkeypatch) -> None:
     """Codex #839 P2: a depth that keeps its as-built value and DrivenState
     but is driven by the wrong global, or has lost its equation, must fail --
-    as must a SecEnd global defined twice."""
-    dims, equations = _machine({2: {"depth_owner": '"SecEnd1"'}})
+    as must a knob defined twice."""
+    dims, equations = _machine({"Sec2End@Sec2": ('"SecEnd1"', 1)})
     del equations['"Sec3End@Sec3"']
     equations['"SecEnd4"'] *= 2
     adapter = _gate_fixture(monkeypatch, dims, equations)
     with pytest.raises(RuntimeError) as raised:
-        part._assert_shoulder_planes_single_owned(adapter)
+        part._assert_stations_single_owned(adapter)
     message = str(raised.value)
     assert "Sec2End@Sec2: owned by" in message
     assert "Sec3End@Sec3: expected one equation" in message
@@ -585,8 +643,9 @@ def test_collar_bears_on_the_boss_annulus_and_turns_from_five_eighths_bar() -> N
 
 
 def _stubbed_build(monkeypatch):
-    """Run the real build() with every imported helper stubbed; return the
-    adapter mock and the stubs so a test can read what it authored."""
+    """Run the real build() with every imported helper stubbed.  Returns the
+    adapter mock, the stubs by name, the shared SketchDims mock (every sketch's
+    ``record`` calls) and how many drives existed when the gate ran."""
     import asyncio
     import inspect
     from unittest.mock import AsyncMock, MagicMock
@@ -610,21 +669,64 @@ def _stubbed_build(monkeypatch):
     sketch_dims = MagicMock()
     sketch_dims.return_value.apply.return_value = []
     monkeypatch.setattr(part, "SketchDims", sketch_dims)
-    monkeypatch.setattr(part, "_assert_shoulder_planes_single_owned", lambda _a: None)
+    monkeypatch.setattr(part, "_sketch_x_per_model_z", lambda _a: -1.0)
+    gated_after: list[int] = []
+    monkeypatch.setattr(
+        part,
+        "_assert_stations_single_owned",
+        lambda _a: gated_after.append(len(stubs["drive_dimension"].call_args_list)),
+    )
     adapter = AsyncMock()
     asyncio.run(part.build(adapter))
-    return adapter, stubs
+    return adapter, stubs, sketch_dims, gated_after
+
+
+def _planes(adapter) -> list[tuple[str, float]]:
+    return [
+        (c.args[0].base_plane, c.args[0].offset)
+        for c in adapter.create_plane.call_args_list
+    ]
+
+
+def test_every_land_is_placed_from_the_one_origin(monkeypatch) -> None:
+    """Option A (#914): the collar face is the one length origin.  Its plane
+    comes first, from the front face by the journal; lands 1-3 end on planes
+    offset from it and extrude back to it, so each depth IS the shoulder's
+    station from the collar face.  The tip land keeps the front-to-tip overall
+    length."""
+    spec = cone_gear_shaft_spec
+    adapter, stubs, _dims, _gated = _stubbed_build(monkeypatch)
+    planes = _planes(adapter)
+    assert planes[0] == ("Front Plane", spec.COLLAR_START_STATION)
+    for i in range(1, len(spec.SECTIONS)):
+        assert (spec.SECTION_ORIGINS[i], spec.SECTION_KNOBS[i]) in planes, i
+    extrusions = [c.args[0] for c in adapter.create_extrusion.call_args_list]
+    assert [e.depth for e in extrusions[: len(spec.SECTIONS)]] == list(
+        spec.SECTION_KNOBS
+    )
+    assert [e.reverse_direction for e in extrusions[: len(spec.SECTIONS)]] == [
+        False,
+        True,
+        True,
+        True,
+        True,
+    ]
+    knobs = {c.args[1]: c.args[2] for c in stubs["set_global"].call_args_list}
+    for i, knob in enumerate(spec.SECTION_KNOBS):
+        assert knobs[f"SecEnd{i}"] == f"{knob}mm"
+    assert knobs["SolderT120"] == f"{spec.SOLDER_T120_STATION}mm"
+    assert knobs["SolderT006"] == f"{spec.SOLDER_T006_STATION}mm"
+    assert "CollarEnd" not in knobs
 
 
 def test_build_turns_the_collar_between_the_journal_and_the_64t(monkeypatch) -> None:
-    """#914: the collar is its own land -- sketched on a plane at its north
-    face, Ø15.0, extruded back one web.  Its roots stay sharp (the post and
-    the 64T bear flat on its faces) and the old journal-to-3/8 step edge is
-    buried under it."""
+    """#914: the collar is its own land -- sketched on a plane one web north of
+    the collar face, Ø15.0, extruded back one web.  Its roots stay sharp (the
+    post and the 64T bear flat on its faces) and the old journal-to-3/8 step
+    edge is buried under it."""
     spec = cone_gear_shaft_spec
-    adapter, stubs = _stubbed_build(monkeypatch)
-    offsets = [c.args[0].offset for c in adapter.create_plane.call_args_list]
-    assert spec.COLLAR_END_STATION in offsets
+    adapter, stubs, _dims, _gated = _stubbed_build(monkeypatch)
+    assert ("CollarFace", spec.COLLAR_THICKNESS) in _planes(adapter)
     radii = [c.args[3] for c in stubs["define_circle"].call_args_list]
     assert spec.COLLAR_DIA / 2.0 in [pytest.approx(r) for r in radii]
     extrusions = [c.args[0] for c in adapter.create_extrusion.call_args_list]
@@ -637,24 +739,109 @@ def test_build_turns_the_collar_between_the_journal_and_the_64t(monkeypatch) -> 
     assert [land, 0.0, spec.JOURNAL_END] not in edges
     assert len(edges) == len(spec.SECTIONS) - 2
     assert spec.FILLET_CALLOUT == f"{len(edges)}X"
-
-
-def test_build_names_the_collar_thrust_face_for_the_assembly(monkeypatch) -> None:
-    """The drive train mates the collar's south face onto the post boss by a
-    named plane -- a point pick there is ambiguous, the post face lies under
-    it.  SecEnd0 (the journal end) owns the plane, as it owns the journal."""
-    spec = cone_gear_shaft_spec
-    adapter, stubs = _stubbed_build(monkeypatch)
-    offsets = [c.args[0].offset for c in adapter.create_plane.call_args_list]
-    assert spec.COLLAR_START_STATION in offsets
     named = [c.args[1] for c in stubs["name_last_feature"].call_args_list]
     assert "CollarFace" in named
-    drives = dict(
-        (c.args[1], c.args[2]) for c in stubs["drive_dimension"].call_args_list
+
+
+def test_solder_station_witnesses_stand_on_the_axis(monkeypatch) -> None:
+    """The reference sketch's witness lines stand at the collar face and at
+    T120's and T006's south faces, placed along the sketch's own x direction
+    (stubbed -1 here); the stations are measured from the collar-face line."""
+    spec = cone_gear_shaft_spec
+    adapter, stubs, _dims, _gated = _stubbed_build(monkeypatch)
+    xs = [c.args[0] for c in adapter.add_line.call_args_list]
+    datum = spec.DATUM_STATION
+    assert xs == [
+        -datum,
+        -(datum + spec.SOLDER_T120_STATION),
+        -(datum + spec.SOLDER_T006_STATION),
+    ]
+    spans = [
+        c.args[4]
+        for c in stubs["dimension_between"].call_args_list
+        if c.args[3] == "horizontal_distance"
+    ]
+    assert spans == [datum, spec.SOLDER_T120_STATION, spec.SOLDER_T006_STATION]
+
+
+def test_sketch_x_direction_is_read_from_the_sketch(monkeypatch) -> None:
+    """The Right plane's sketch x runs along model Z; its sign comes from the
+    sketch's ModelToSketchTransform, never assumed.  The fake reads a bare
+    list as zeros, as the seat does (memory: COM double[] needs double_array)."""
+    from types import SimpleNamespace
+
+    class _Point:
+        def __init__(self, data):
+            self.ArrayData = tuple(data)
+
+        def MultiplyTransform(self, transform):
+            return _Point(transform(self.ArrayData))
+
+    class _Utility:
+        def CreatePoint(self, values):
+            if isinstance(values, list):
+                return _Point((0.0, 0.0, 0.0))
+            return _Point(values.value)
+
+    def right_plane(xyz):  # Right plane: sketch x = -model Z, y = model Y
+        return (-xyz[2], xyz[1], xyz[0])
+
+    sketch = SimpleNamespace(ModelToSketchTransform=right_plane)
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(
+            SketchManager=SimpleNamespace(ActiveSketch=sketch)
+        ),
+        swApp=SimpleNamespace(GetMathUtility=_Utility),
     )
-    assert drives["CollarFaceStation@CollarFace"] == '"SecEnd0"'
-    assert drives["CollarStation@CollarEndPlane"] == '"CollarEnd"'
-    assert drives["CollarWidth@Collar"] == '"CollarWidth"'
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
+    assert part._sketch_x_per_model_z(adapter) == -1.0
+    sketch.ModelToSketchTransform = lambda xyz: (xyz[2], xyz[1], -xyz[0])
+    assert part._sketch_x_per_model_z(adapter) == 1.0
+    sketch.ModelToSketchTransform = lambda xyz: (xyz[1], xyz[2], xyz[0])
+    with pytest.raises(RuntimeError, match="not along model Z"):
+        part._sketch_x_per_model_z(adapter)
+
+
+def test_one_length_origin_is_the_collar_face() -> None:
+    spec = cone_gear_shaft_spec
+    assert spec.DATUM_STATION == spec.COLLAR_START_STATION
+    assert spec.SECTION_ORIGINS == (
+        "Front Plane",
+        "CollarFace",
+        "CollarFace",
+        "CollarFace",
+        "Front Plane",
+    )
+    assert spec.SECTION_KNOBS[0] == spec.JOURNAL_END
+    for i in (1, 2, 3):
+        assert spec.SECTION_KNOBS[i] == pytest.approx(
+            spec.SECTION_ENDS[i] - spec.COLLAR_START_STATION
+        )
+    assert spec.SECTION_KNOBS[4] == spec.SHAFT_LENGTH
+
+
+def test_solder_stations_ride_the_drive_train_seat_ladder() -> None:
+    """T120 and T006 south faces, from the collar face, where the drive train
+    seats them; the twenty stations between are one exact seat pitch apart."""
+    spec = cone_gear_shaft_spec
+    assert spec.T120_CENTER_STATION == pytest.approx(
+        drive.SHAFT_T120_STATION + drive.GEAR_AXIS_SHIFT, abs=1e-9
+    )
+    span = spec.SOLDER_T006_STATION - spec.SOLDER_T120_STATION
+    assert span == pytest.approx(
+        (spec.SOLDER_STATION_COUNT - 1) * drive.SEAT_PITCH, abs=1e-6
+    )
+    south = (
+        drive.SHAFT_T120_STATION
+        + drive.GEAR_AXIS_SHIFT
+        + spec.CONE_FACE_REFERENCE / 2.0
+        - spec.CONE_GEAR_FACE_WIDTH
+        - drive.SHAFT_FRONT_STATION
+        - spec.DATUM_STATION
+    )
+    assert spec.SOLDER_T120_STATION == pytest.approx(south, abs=1e-9)
+    # the 64T sits between the collar and T120's south face
+    assert spec.SOLDER_T120_STATION > spec.COLLAR_THICKNESS + drive.GEAR64_FACE
 
 
 def test_drive_train_seats_the_shaft_and_64t_on_the_collar(monkeypatch) -> None:
