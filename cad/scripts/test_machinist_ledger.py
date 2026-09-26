@@ -845,13 +845,25 @@ def _recorded_entry(ledger_path: Path, slot: str) -> tuple[dict, dict]:
 @pytest.mark.parametrize(
     ("edit", "reason"),
     [
-        (lambda e: e["author"].update(family="gpt"), "is not cross-family"),
+        (lambda e: e["author"].update(family="gpt"), "author rulings now give claude"),
         (lambda e: e.update(reviewer_family="claude"), "is not cross-family"),
         (lambda e: e.pop("reviewed_at"), "malformed: it lacks reviewed_at"),
         (lambda e: e.update(pdf="not-a-sha"), "malformed: pdf"),
         (lambda e: e.update(status="approved"), "malformed: status"),
+        (lambda e: e["author"].update(family="martian"), "malformed: author family"),
+        (lambda e: e["author"].pop("model_source"), "malformed: author model_source"),
+        (lambda e: e["author"].pop("commit"), "malformed: author commit"),
     ],
-    ids=["author-edited", "family-edited", "no-time", "bad-pdf", "bad-status"],
+    ids=[
+        "author-edited",
+        "family-edited",
+        "no-time",
+        "bad-pdf",
+        "bad-status",
+        "unknown-family",
+        "no-model-source",
+        "no-commit",
+    ],
 )
 def test_a_recorded_entry_is_rechecked_when_the_gate_reads_it(
     tmp_path: Path, registry: Path, edit, reason: str
@@ -873,6 +885,34 @@ def test_a_recorded_entry_is_rechecked_when_the_gate_reads_it(
 
     assert status.state == ml.State.UNREVIEWED
     assert reason in status.detail
+
+
+def test_a_recorded_author_is_rechecked_against_the_current_author_rulings(
+    tmp_path: Path, registry: Path
+) -> None:
+    pdf = _sheet(registry)  # its draw commit names no model
+    ledger_path = tmp_path / "ledger.json"
+    claude = ml.load_author_rulings(_author_rulings(tmp_path, family="claude"))
+    ml.record_review(
+        _review(pdf),
+        pdf,
+        author_family="claude",
+        provenance={},
+        ledger_path=ledger_path,
+        rulings=claude,
+    )
+    assert (
+        ml.check(["crank_arm"], ledger_path=ledger_path, rulings=claude)[0].state
+        == ml.State.OK
+    )
+
+    # The ruling on that exact commit is corrected: GPT wrote it, so the
+    # Codex review is same-family, whatever the ledger recorded then.
+    gpt = ml.load_author_rulings(_author_rulings(tmp_path, family="gpt"))
+    [status] = ml.check(["crank_arm"], ledger_path=ledger_path, rulings=gpt)
+
+    assert status.state == ml.State.UNREVIEWED
+    assert "author rulings now give gpt" in status.detail
 
 
 def test_a_last_resort_entry_is_rechecked_not_trusted_by_its_counts_flag(
@@ -2413,6 +2453,93 @@ def test_a_malformed_record_is_listed_not_fatal_to_the_backfill(
     assert "wt-bad" in path.as_posix() and problem
 
 
+def test_an_unlicensed_same_family_fix_does_not_withdraw_a_ship(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    _on_record(records, "wt-ship")  # the cross-family Codex SHIP
+    _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+    assert _backfill(tmp_path, records, apply=True).outcome == ml.Backfill.INGESTED
+
+    # A newer Claude FIX of the same sheets: no quota refusal, no outage
+    # directed it, so the gate would not count it -- nor may it object.
+    _on_record(
+        records, "wt-fix", reviewer="claude", passed=False, reviewed_at=REVIEWED_AT
+    )
+
+    row = _backfill(tmp_path, records, apply=True)
+    assert row.outcome == ml.Backfill.RECORDED, row.detail
+    assert ml.CROSS_FAMILY in ml.load_ledger(ledger_path)["drawings"]["crank_arm"]
+    (tmp_path / "ledger.json").unlink()
+    assert _backfill(tmp_path, records).outcome == ml.Backfill.INGESTED
+
+
+def test_a_same_family_fix_an_open_outage_directed_still_withdraws_a_ship(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    _on_record(records, "wt-ship")
+    _on_record(
+        records, "wt-fix", reviewer="claude", passed=False, reviewed_at=REVIEWED_AT
+    )
+    _sheet(registry)
+
+    row = _backfill(tmp_path, records, outages=ml.load_outages(_outages(tmp_path)))
+
+    assert row.outcome == ml.Backfill.CONTRADICTED, row.detail
+
+
+def test_a_record_from_an_unknown_reviewer_is_listed_not_fatal(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    _on_record(records, "wt-good")
+    _on_record(records, "wt-bad", reviewed_at=REVIEWED_AT)
+    report = records / "wt-bad" / "cad" / "out" / "reports" / "machinist-review"
+    report = report / "crank_arm.json"
+    data = json.loads(report.read_text(encoding="utf-8"))
+    report.write_text(json.dumps({**data, "reviewer": "gemini"}), encoding="utf-8")
+    _sheet(registry)
+
+    result = ml.backfill(
+        [records], ledger_path=tmp_path / "ledger.json", cache_path=None, outages={}
+    )
+
+    [row] = result.rows
+    assert row.outcome == ml.Backfill.INGESTED, row.detail
+    [(path, problem)] = result.malformed
+    assert "wt-bad" in path.as_posix() and "gemini" in problem
+
+
+@pytest.mark.parametrize("missing", ["model", "effort", "reviewed_at"])
+def test_an_incomplete_quota_report_is_listed_not_fatal(
+    tmp_path: Path,
+    registry: Path,
+    records: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    missing: str,
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    _on_record(records, "wt-good")
+    pdf = _sheet(registry)
+    refused = _refused(records / "wt-refused", pdf)
+    data = json.loads(refused.read_text(encoding="utf-8"))
+    del data[missing]
+    refused.write_text(json.dumps(data), encoding="utf-8")
+
+    result = ml.backfill(
+        [records], ledger_path=tmp_path / "ledger.json", cache_path=None, outages={}
+    )
+
+    [row] = result.rows
+    assert row.outcome == ml.Backfill.INGESTED, row.detail
+    [(path, problem)] = result.malformed
+    assert path == refused and missing in problem
+    with pytest.raises(ValueError, match=missing):
+        ml.quota_refusal(refused, name="crank_arm", author_family="claude")
+
+
 def test_backfill_needs_a_ruling_where_no_trailer_names_the_author(
     tmp_path: Path, registry: Path, records: Path
 ) -> None:
@@ -3116,6 +3243,47 @@ def test_a_warm_backfill_hashes_and_renders_nothing_new(
     # Only record_review's integrity check of the one PDF it would ingest.
     [ingested] = [t for t in row.tried if t.outcome == ml.Backfill.INGESTED]
     assert hashed == [ingested.candidate.pdf]
+
+
+@pytest.mark.parametrize(
+    "cache",
+    [
+        [],
+        {"pdfs": []},
+        {"pdfs": {"x.pdf": [1, 2]}},
+        {"pdfs": {"x.pdf": ["1", 2, "0" * 64]}},
+        {"comparisons": {"a:b": ["", "yes"]}},
+        {"sheets": {"0" * 64: "not-a-list"}},
+        {"sheets": {"0" * 64: ["not-a-digest"]}},
+    ],
+    ids=[
+        "not-object",
+        "pdfs-list",
+        "pdf-short",
+        "pdf-size-str",
+        "exact-not-bool",
+        "sheets-str",
+        "sheet-not-digest",
+    ],
+)
+def test_a_malformed_backfill_cache_is_dropped_not_used(
+    tmp_path: Path,
+    registry: Path,
+    records: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cache,
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    _on_record(records, "wt-a", producer="reviewed render")
+    _sheet(registry)
+    cold = _backfill(tmp_path, records, cache_path=None)
+    if isinstance(cache, dict):
+        cache = {"fingerprint": ml.empty_ledger()["fingerprint"], **cache}
+    (tmp_path / "cache.json").write_text(json.dumps(cache), encoding="utf-8")
+
+    row = _backfill(tmp_path, records)
+
+    assert (row.outcome, row.detail) == (cold.outcome, cold.detail)
 
 
 def test_a_backfill_ingest_reuses_the_authors_it_already_walked(

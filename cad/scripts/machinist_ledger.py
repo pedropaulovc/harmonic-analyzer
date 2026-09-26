@@ -916,6 +916,36 @@ def ruled_family(name: str, author: Author, rulings: AuthorRulings) -> Ruled:
 # --- quota refusal -----------------------------------------------------------------
 
 
+def refusal_record_problem(data: Any) -> str | None:
+    """Why a verdict-less record is not one a refusal can be read from; None if it is."""
+    if not isinstance(data, dict):
+        return "it is not an object"
+    for key in ("name", "reviewer", "model", "effort"):
+        if not isinstance(data.get(key), str) or not data[key]:
+            return f"{key} is missing or not a string"
+    if data["reviewer"] not in REVIEWER_FAMILIES:
+        return (
+            f"reviewer {data['reviewer']!r} is not one of {sorted(REVIEWER_FAMILIES)}"
+        )
+    when = _aware_time_problem(data.get("reviewed_at"))
+    if when:
+        return f"reviewed_at {when}"
+    digests = data.get("source_sha256", [])
+    if not isinstance(digests, list) or not all(
+        isinstance(x, str) and _SHA256.match(x) for x in digests
+    ):
+        return "source_sha256 is not a list of sha256"
+    extra = data.get("extra") or {}
+    evidence = extra.get("evidence", {}) if isinstance(extra, dict) else None
+    if not isinstance(evidence, dict) or not isinstance(
+        evidence.get("attempts", []), list
+    ):
+        return "extra.evidence.attempts is not a list"
+    if not all(isinstance(a, dict) for a in evidence.get("attempts", [])):
+        return "an attempt is not an object"
+    return None
+
+
 def quota_evidence(data: dict[str, Any], report: Path) -> dict[str, Any] | None:
     """A usage-limit refusal in a machinist_review record, or None.
 
@@ -969,6 +999,9 @@ def quota_evidence(data: dict[str, Any], report: Path) -> dict[str, Any] | None:
 def quota_refusal(report: Path, *, name: str, author_family: str) -> dict[str, Any]:
     """Evidence that the cross-family reviewer refused ``name`` on quota."""
     data = json.loads(report.read_text(encoding="utf-8"))
+    problem = refusal_record_problem(data)
+    if problem:
+        raise ValueError(f"{report}: not a refusal record: {problem}")
     if data.get("name") != name:
         raise ValueError(f"{report}: refusal is for {data.get('name')!r}, not {name!r}")
     if reviewer_family(data["reviewer"]) == author_family:
@@ -1670,6 +1703,7 @@ def drawing_status(
     outages: dict[str, dict[str, Any]] | None = None,
     both_families: str = "",
     finding_rulings: dict[str, dict[str, Any]] | None = None,
+    author_rulings: AuthorRulings | None = None,
 ) -> Status:
     """Where ``name``'s current sheets stand against its recorded reviews.
 
@@ -1694,9 +1728,15 @@ def drawing_status(
     finding_rulings = (
         load_finding_rulings() if finding_rulings is None else finding_rulings
     )
+    author_rulings = load_author_rulings() if author_rulings is None else author_rulings
     problems = {
         slot: entry_problem(
-            name, slot, recorded, outages=outages, finding_rulings=finding_rulings
+            name,
+            slot,
+            recorded,
+            outages=outages,
+            finding_rulings=finding_rulings,
+            author_rulings=author_rulings,
         )
         for slot, recorded in entry.items()
     }
@@ -1834,10 +1874,53 @@ def _entry_schema_problem(entry: dict[str, Any]) -> str | None:
         if not isinstance(entry[key], str) or not entry[key]:
             return f"{key} is not a name"
     author = entry["author"]
-    if not isinstance(author, dict) or not isinstance(author.get("family"), str):
-        return "author has no family"
+    if not isinstance(author, dict):
+        return "author is not an object"
+    if author.get("family") not in AUTHOR_FAMILIES:
+        return f"author family {author.get('family')!r} is not one of {AUTHOR_FAMILIES}"
+    for key in ("commit", "script"):
+        if not isinstance(author.get(key), str) or not author[key]:
+            return f"author {key} is not a name"
+    if author.get("model_source") not in ("trailer", "claimed"):
+        return f"author model_source {author.get('model_source')!r} is not trailer or claimed"
+    model = author.get("model")
+    if author["model_source"] == "trailer" and not isinstance(model, str):
+        return "author model is not named, though a trailer is its source"
+    if model is not None and not isinstance(model, str):
+        return "author model is not a name"
     when = _aware_time_problem(entry["reviewed_at"])
     return f"reviewed_at {when}" if when else None
+
+
+def _recorded_author_problem(
+    name: str, author: dict[str, Any], rulings: AuthorRulings
+) -> str | None:
+    """Why the author family an entry records is not the one on record now.
+
+    A trailer names the model in the commit itself, so its family cannot
+    change.  Without one, the family came from a ruling on that exact commit
+    or the class rule; either may since have been corrected, and the entry
+    is judged under the rulings in force -- as ``record_review`` would judge
+    it today.  No git history is read: the entry names the commit.
+    """
+    if author["model_source"] == "trailer":
+        family = model_family(author["model"])
+        if family != author["family"]:
+            return (
+                f"its trailer model {author['model']} is {family}, not the "
+                f"recorded {author['family']}"
+            )
+        return None
+    ruled = ruled_family(
+        name, Author(None, author["commit"], author["script"]), rulings
+    )
+    if ruled.family is not None and ruled.family != author["family"]:
+        return (
+            f"the author rulings now give {ruled.family} ({ruled.source}) for "
+            f"{author['script']} at {author['commit'][:12]}, not the recorded "
+            f"{author['family']}"
+        )
+    return None
 
 
 def entry_problem(
@@ -1847,19 +1930,25 @@ def entry_problem(
     *,
     outages: dict[str, dict[str, Any]],
     finding_rulings: dict[str, dict[str, Any]],
+    author_rulings: AuthorRulings,
 ) -> str | None:
     """Why a recorded entry does not count now; None when it does.
 
     Every slot is re-proved from what the entry records against today's
-    truth -- never taken from its ``counts`` flag or an id alone: the family
-    rule, the last-resort evidence and tier rule, the current record of an
-    outage fallback's outage, and each cited ruling still being a row on this
+    truth -- never taken from its ``counts`` flag or an id alone: the author
+    family under the author rulings in force, the family rule, the
+    last-resort evidence and tier rule, the current record of an outage
+    fallback's outage, and each cited ruling still being a row on this
     drawing.
     """
     schema = _entry_schema_problem(entry)
     if schema:
         return f"recorded {slot} is malformed: {schema}"
     reviewer, author = entry["reviewer"], entry["author"]
+    if not slot.startswith(BOTH_FAMILIES):  # there, either family's review counts
+        why = _recorded_author_problem(name, author, author_rulings)
+        if why:
+            return f"recorded {slot}: {why}"
     family = reviewer_family(reviewer)
     if entry["reviewer_family"] != family:
         return (
@@ -2012,6 +2101,7 @@ def gate_status(
         "report_dir": report_dir,
         "outages": outages,
         "finding_rulings": finding_rulings,
+        "author_rulings": rulings,
     }
     if not reason:
         return drawing_status(name, ledger, **kwargs)
@@ -2131,6 +2221,39 @@ class Found:
     malformed: list[tuple[Path, str]] = field(default_factory=list)
 
 
+def _cache_problem(data: Any) -> str | None:
+    """Why a backfill cache on disk is not one ``BackfillCache.save`` wrote."""
+    if not isinstance(data, dict):
+        return "it is not an object"
+    tables = {k: data.get(k, {}) for k in ("pdfs", "comparisons", "sheets")}
+    for key, table in tables.items():
+        if not isinstance(table, dict):
+            return f"{key} is not an object"
+    for path, row in tables["pdfs"].items():
+        if not (
+            isinstance(row, list)
+            and len(row) == 3
+            and all(isinstance(x, int) and not isinstance(x, bool) for x in row[:2])
+            and isinstance(row[2], str)
+            and _SHA256.match(row[2])
+        ):
+            return f"pdfs[{path}] is not [size, mtime_ns, sha256]"
+    for pair, row in tables["comparisons"].items():
+        if not (
+            isinstance(row, list)
+            and len(row) == 2
+            and isinstance(row[0], str)
+            and isinstance(row[1], bool)
+        ):
+            return f"comparisons[{pair}] is not [problem, exact]"
+    for sha, row in tables["sheets"].items():
+        if not isinstance(row, list) or not all(
+            isinstance(x, str) and _SHA256.match(x) for x in row
+        ):
+            return f"sheets[{sha}] is not a list of sheet digests"
+    return None
+
+
 class BackfillCache:
     """What a backfill already learned, kept between runs.
 
@@ -2151,6 +2274,10 @@ class BackfillCache:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
+            return
+        problem = _cache_problem(data)
+        if problem:  # a cache, not evidence: start cold rather than trust it
+            _telemetry.warn(f"backfill cache {path} dropped: {problem}")
             return
         if data.get("fingerprint") == empty_ledger()["fingerprint"]:
             self.pdfs = data.get("pdfs", {})
@@ -2307,6 +2434,10 @@ def review_record_problem(review: dict[str, Any]) -> str | None:
     for key in ("name", "kind", "reviewer", "model", "effort", "prompt_sha256"):
         if not isinstance(review.get(key), str) or not review[key]:
             return f"{key} is missing or not a string"
+    if review["reviewer"] not in REVIEWER_FAMILIES:
+        return (
+            f"reviewer {review['reviewer']!r} is not one of {sorted(REVIEWER_FAMILIES)}"
+        )
     sources, digests = review.get("sources"), review.get("source_sha256")
     if not isinstance(sources, list) or not all(isinstance(x, str) for x in sources):
         return "sources is not a list of paths"
@@ -2360,7 +2491,14 @@ def find_reviews(roots: Sequence[Path], cache: BackfillCache | None = None) -> F
             continue
         verdict = review.get("verdict")
         if verdict is None:
-            if review.get("name") and quota_evidence(review, path) is not None:
+            problem = refusal_record_problem(review)
+            try:
+                refused = quota_evidence(review, path) is not None
+            except (AttributeError, KeyError, TypeError, ValueError):
+                refused = True  # it found a refusal, then could not read the record
+            if refused and problem:  # a refusal it cannot use is listed, not fatal
+                malformed.append((path, f"quota report: {problem}"))
+            elif refused:
                 refusals.append((path, review))
             continue
         problem = review_record_problem(review)
@@ -2467,18 +2605,57 @@ class _Matcher:
         return problem, exact
 
 
-def _objection(candidate: Candidate, matcher: _Matcher, found: Found) -> str:
+def _objection_counts(
+    other: Candidate,
+    author: dict[str, Any] | None,
+    found: Found,
+    outages: dict[str, dict[str, Any]],
+) -> bool:
+    """Whether the gate would weigh this failing verdict against the drawing's author.
+
+    ``author`` is the family (and trailer model) the drawing is judged under,
+    or None where either family's review counts (both families) or the author
+    is not known -- then every gating verdict weighs.  A same-family verdict
+    weighs only with what would let a same-family SHIP count: a quota refusal
+    within the window and the tier rule, or an open outage that directed it.
+    """
+    if author is None:
+        return True
+    review, family = other.review, author["family"]
+    if review_slot(review["reviewer"], family) == CROSS_FAMILY:
+        return True
+    model = author.get("model") if author.get("model_source") == "trailer" else None
+    if (
+        model is not None
+        and not last_resort_tier_problem(model, review["model"], review["effort"])
+        and _refusal_for(other, other.drawing, family, found) is not None
+    ):
+        return True
+    return _directing_outage(review, family, outages) is not None
+
+
+def _objection(
+    candidate: Candidate,
+    matcher: _Matcher,
+    found: Found,
+    *,
+    author: dict[str, Any] | None,
+    outages: dict[str, dict[str, Any]],
+) -> str:
     """A failing verdict, newer than ``candidate``, that may have seen these sheets.
 
     A later FIX of the sheets now rendered overrides an earlier SHIP of the
     same sheets; so does one whose reviewed PDF is lost, since nothing shows
-    it reviewed other sheets.
+    it reviewed other sheets.  Only a verdict the gate would weigh against
+    ``author`` objects (``_objection_counts``).
     """
     shipped = datetime.fromisoformat(candidate.review["reviewed_at"])
     for other in found.objections:
         if other.drawing != candidate.drawing:
             continue
         if datetime.fromisoformat(other.review["reviewed_at"]) <= shipped:
+            continue
+        if not _objection_counts(other, author, found, outages):
             continue
         what = f"{_reviewed(other.review)} {other.review['verdict']['verdict']}"
         pdf = _locate(other, found.pdfs)
@@ -2523,19 +2700,29 @@ def _try(
         return Tried(candidate, Backfill.DRIFTED, problem)
     match = "exact" if exact else "within tolerance"
     matched = f"{_reviewed(review)} matches ({match})"
-    objection = _objection(candidate, matcher, found)
+    family, source, ruling, unruled = None, "", None, ""
+    both_families = ""
+    if not isinstance(author, ValueError):
+        both_families = rulings.both_families(drawing, author)
+        if both_families:  # counts for its reviewer's family, whoever the author was
+            family = other_family(reviewer_family(review["reviewer"]))
+            source, ruling = BOTH_FAMILIES, rulings.drawings[drawing]
+        elif author.model is not None:
+            family, source = model_family(author.model), "trailer"
+        else:
+            family, source, ruling, unruled = ruled_family(drawing, author, rulings)
+    judged = None  # both families, or no author: every gating verdict weighs
+    if family is not None and not both_families:
+        judged = {
+            "family": family,
+            "model": author.model,
+            "model_source": source,
+        }
+    objection = _objection(candidate, matcher, found, author=judged, outages=outages)
     if objection:
         return Tried(candidate, Backfill.CONTRADICTED, f"{matched}; {objection}")
     if isinstance(author, ValueError):
         return Tried(candidate, Backfill.AUTHOR_UNKNOWN, f"{matched}; {author}")
-    both_families = rulings.both_families(drawing, author)
-    if both_families:  # counts for its reviewer's family, whoever the author was
-        family = other_family(reviewer_family(review["reviewer"]))
-        source, ruling = BOTH_FAMILIES, rulings.drawings[drawing]
-    elif author.model is not None:
-        family, source, ruling = model_family(author.model), "trailer", None
-    else:
-        family, source, ruling, unruled = ruled_family(drawing, author, rulings)
     if family is None:
         return Tried(candidate, Backfill.AUTHOR_UNKNOWN, f"{matched}; {unruled}")
     refusal = outage = None
@@ -2669,6 +2856,7 @@ def _objections_to_recorded(
     ledger_path: Path,
     matcher: _Matcher,
     found: Found,
+    outages: dict[str, dict[str, Any]],
 ) -> dict[str, str]:
     """Each recorded entry ``status`` rests on that a newer failing verdict withdraws.
 
@@ -2679,8 +2867,12 @@ def _objections_to_recorded(
     """
     objected: dict[str, str] = {}
     for slot in status.accepting:
-        recorded = Candidate(ledger_path, ledger["drawings"][name][slot], name)
-        objection = _objection(recorded, matcher, found)
+        entry = ledger["drawings"][name][slot]
+        recorded = Candidate(ledger_path, entry, name)
+        # Judged under the author the entry records (the gate re-proves it);
+        # a both-families half weighs every family's verdict.
+        author = None if slot.startswith(BOTH_FAMILIES) else entry["author"]
+        objection = _objection(recorded, matcher, found, author=author, outages=outages)
         if objection:
             objected[slot] = objection
     return objected
@@ -2738,7 +2930,7 @@ def _backfill_drawings(
                 outages=outages,
             )
             objected = _objections_to_recorded(
-                name, status, ledger, ledger_path, _Matcher(pdf, cache), found
+                name, status, ledger, ledger_path, _Matcher(pdf, cache), found, outages
             )
             withdrawn = ""
             if objected:

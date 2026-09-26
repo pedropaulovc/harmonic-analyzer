@@ -350,9 +350,11 @@ nothing. A finding with no recorded ruling keeps the drawing failing.
 `uv run cad/scripts/machinist_ledger.py check [<name>...]` exits nonzero for any
 drawing whose current PDF matches no accepted, counting review. Each recorded
 entry is re-proved every time the gate reads it, never taken from its `counts`
-flag or an id alone: the family rule, a last resort's refusal evidence and tier
-rule, an outage fallback against the current record of its outage, and each
-cited ruling still being a row on that drawing. A malformed entry does not
+flag or an id alone: the author family under the author rulings in force (an
+untrailered commit's corrected ruling changes it; a trailer cannot), the family
+rule, a last resort's refusal evidence and tier rule, an outage fallback
+against the current record of its outage, and each cited ruling still being a
+row on that drawing. A malformed entry does not
 count, and says why. Sheets match on
 identical masked ink, or on an identical text layer (every string, positions
 within 0.12 mm) plus ink within 2 px, so re-render noise passes and a changed
@@ -367,13 +369,19 @@ the ledger is entered with `machinist_ledger.py ingest <verdict.json>
 under the roots. It finds the exact PDF each one reviewed by sha256 wherever it
 now lives, and ingests the newest `SHIP` whose sheets match the current render
 under the same rule and that counts under the family rule. A record that is not a
-machinist_review record (missing or mistyped fields, a naive time) is listed as
-malformed and ignored, never fatal. A newer failing
+machinist_review record (missing or mistyped fields, an unknown reviewer, a
+naive time), including a quota report whose refusal cannot be read, is listed
+as malformed and ignored, never fatal. So is a malformed backfill cache: it is
+dropped and the run starts cold. A newer failing
 verdict that reviewed the same sheets, or whose reviewed PDF is lost, blocks
 the older `SHIP`, and `--apply` drops a recorded entry it contradicts. Only a
 verdict the gate would weigh objects: a blind review of the registry drawing
-under its kind's committed rubric with a valid, failing verdict. A sighted,
-custom-rubric or wrong-kind run does not. A draw
+under its kind's committed rubric with a valid, failing verdict, from a
+reviewer whose `SHIP` would count: cross-family to the drawing's author, or
+same-family with a qualifying quota refusal and the tier rule, or directed by
+an open outage (either family, on a `both_families` drawing). A sighted,
+custom-rubric or wrong-kind run does not, nor does a same-family run with no
+such evidence. A draw
 script whose last commit names no model takes its family from
 `cad/reviews/author-rulings.json`. A per-drawing ruling names the family, the
 exact commit it judged, who ruled and the evidence; a later commit to the
