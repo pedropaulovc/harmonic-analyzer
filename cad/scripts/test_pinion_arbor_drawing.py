@@ -1629,6 +1629,41 @@ def test_no_or_two_matching_lines_fail_naming_the_candidates(witness_seat) -> No
     assert seat.colored == []
 
 
+# pinioncluster's two fake-seat tests from 4418ef17a (Main's ruling, 2026-09-26:
+# 07afe186b's identity selection is the single implementation), adapted to
+# pin the pure matcher the seat fixtures reach only through
+# _blacken_reference_witnesses.  A pick by coordinates resolved the 227.5 mm
+# axis at pc-p1s (swmaker000008) and 56fa631bc; the matcher never does.
+
+
+def _witness_line(name, length_mm, ends, construction=True):
+    return drawing.WitnessCandidate(
+        name=name, length_mm=length_mm, construction=construction, ends=ends, segment=None
+    )
+
+
+_WITNESS_ENDS = ((0.2000, 0.1660), (0.2010, 0.1660))
+# pc-p1s (swmaker000008) and 56fa631bc: the pick resolved this 227.5 mm axis, 4 mm
+# off the flank witness.
+_AXIS_DECOY = _witness_line("Line1", 227.5, ((0.2000, 0.1700), (0.4275, 0.1700)))
+
+
+def test_the_matcher_keeps_the_flank_witness_and_never_the_axis_decoy() -> None:
+    witness = _witness_line("Line2", 1.0, _WITNESS_ENDS)
+    assert drawing.matching_witnesses([_AXIS_DECOY, witness], _WITNESS_ENDS, 1.0) == [witness]
+    # Ends given in the other order still identify it.
+    reversed_ends = (_WITNESS_ENDS[1], _WITNESS_ENDS[0])
+    assert drawing.matching_witnesses([_AXIS_DECOY, witness], reversed_ends, 1.0) == [witness]
+
+
+def test_a_solid_line_on_the_witness_ends_is_not_a_witness() -> None:
+    # Right length, right ends, but not construction: no match, so
+    # _blacken_reference_witnesses raises and lists every candidate.
+    solid = _witness_line("Line2", 1.0, _WITNESS_ENDS, construction=False)
+    assert drawing.matching_witnesses([_AXIS_DECOY, solid], _WITNESS_ENDS, 1.0) == []
+
+
+
 def test_witness_ranges_are_the_parts_own_flank_lines() -> None:
     """The part authors each witness on a Top-plane sketch, v = -z: the drum
     station's from its station 1 mm back towards the head, the bond zone's
