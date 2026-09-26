@@ -357,6 +357,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="pinion_arbor_collar",
+        part="pinion_arbor_collar",
+        artifact_stem="pinion-arbor-collar",
+        script_name="draw_pinion_arbor_collar.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pinion_bracket",
         part="pinion_bracket",
         artifact_stem="pinion-bracket",
