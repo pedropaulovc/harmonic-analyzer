@@ -22,10 +22,10 @@ EXTERNAL_NUMBERS = frozenset({"MHA-035"})
 # Ruled hardware the sequence already names while its BOM row, cluster stem and
 # explode step wait for the drive-train integrator's single re-key (Main,
 # 2026-09-23: drawing-only rulings commit). The integration commit that adds
-# the rows deletes this set; the test below fails once a row lands anyway.
-PRE_REGISTERED_NUMBERS = frozenset(
-    {"MHA-139", "MHA-140", "MHA-141", "MHA-142"}
-)
+# a row drops its number here; the test below fails once a row lands anyway.
+# MHA-141/142 landed with the cone-tip integration; MHA-139 (crank hub) and
+# MHA-140 (the I31 hold-down, placed once #925's I31 plate is under it) wait.
+PRE_REGISTERED_NUMBERS = frozenset({"MHA-139", "MHA-140"})
 
 
 def _builder_stems() -> set[str]:

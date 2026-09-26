@@ -822,6 +822,22 @@ from build_cone_swing_platform import (  # noqa: E402
     WEST_HALF_S as PLAT_WEST_S,
 )
 from cone_swing_platform_spec import PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA  # noqa: E402
+from cone_swing_platform_spec import (  # noqa: E402
+    POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS,
+    POST_MOUNT_SPEC,
+    POST_MOUNT_TAP_EDGE_BREAK,
+    POST_MOUNT_THREAD_DIA,
+)
+from cone_tip_shim_spec import (  # noqa: E402
+    SHIM_NORTH_Z as TIP_SHIM_NORTH_Z,
+    SHIM_SOUTH_Z as TIP_SHIM_SOUTH_Z,
+    SHIM_T as TIP_SHIM_T,
+    SHIM_X as TIP_SHIM_X,
+)
+from build_post_mount_screw import (  # noqa: E402
+    SHANK_LEN as POST_SCREW_LEN,
+    THREAD as POST_SCREW_THREAD,
+)
 from build_cone_lock_knob import (  # noqa: E402
     HEAD_DIA as KNOB_HEAD_DIA,
     WASHER_DIA as KNOB_WASHER_DIA,  # noqa: F401 - verify footprint contract
@@ -987,7 +1003,10 @@ from build_pedestal_hold_down_screw import (  # noqa: E402
     THREAD as HDSCREW_THREAD,
 )
 from build_cone_pivot_post import (  # noqa: E402
+    ATTACHMENT_CBORE_DEPTH as POST_CBORE_DEPTH,
+    ATTACHMENT_X as POST_ATTACHMENT_X,
     BLOCK_DIA as POST_BLOCK_DIA,
+    BLOCK_HEIGHT as POST_BLOCK_HEIGHT,
     BORE_HEIGHT as POST_BORE_HEIGHT,
     CONE_BOSS_LENGTH as POST_CONE_BOSS_LENGTH,
     CRANK_BORE_HEIGHT as POST_CRANK_Y,
@@ -1006,6 +1025,7 @@ from cone_tip_block_spec import (  # noqa: E402
     BLOCK_Z as TIP_BLOCK_Z,
     FIT_UP_SHIM_MARGIN_MM as TIP_FIT_UP_SHIM_MARGIN_MM,
     FLANGE_LEN as TIP_FLANGE_LEN,
+    HEEL_RELIEF_DEPTH as TIP_HEEL_RELIEF_DEPTH,
     PASSAGE_CENTER_DATUM as TIP_PASSAGE_CENTER_DATUM,
     PINCH_BORE_SPEC as TIP_PINCH_BORE_SPEC,
     PINCH_CLEARANCE_SPEC as TIP_PINCH_CLEARANCE_SPEC,
@@ -1080,6 +1100,34 @@ if (
 # common to both riders and cancels.
 if POST_JOURNAL_AXIS_HEIGHT_TOLERANCE_MM > TIP_FIT_UP_SHIM_MARGIN_MM:
     raise AssertionError("the tip-block shim margin no longer covers the post's axis-height band")
+# U30 stack (I24): PlateTop | MHA-141 shim pack | block foot. The shim is
+# modelled at the nominal pack and covers the block's foot face exactly -- the
+# full width, from the I31 foot flange's south end to the heel relief's inner
+# face -- so the foot rests on it across the whole face and nothing reaches
+# under the pivot-screw head the relief clears.
+if abs(TIP_SHIM_T - TIP_SHIM_NOMINAL) > 1e-9:
+    raise AssertionError("MHA-141 shim thickness differs from the block's nominal pack")
+if (
+    abs(TIP_SHIM_X - TIP_BLOCK_X) > 1e-9
+    or abs(TIP_SHIM_SOUTH_Z - (-TIP_BLOCK_Z / 2.0 - TIP_FLANGE_LEN)) > 1e-9
+    or abs(TIP_SHIM_NORTH_Z - (TIP_BLOCK_Z / 2.0 - TIP_HEEL_RELIEF_DEPTH)) > 1e-9
+):
+    raise AssertionError("MHA-141 shim footprint differs from the tip block foot face")
+# U30 post mount (I22): each MHA-142 seats on the MHA-016 counterbore floor and
+# is cut to fit into the MHA-091 tap: never proud of the plate underside, and
+# at least 0.90D of thread (U37c/U41's named exception to rule 12) both at the
+# modelled cut length and at the platform spec's printed worst case.
+_require_tapped_thread("cone-post mount", POST_SCREW_THREAD, POST_MOUNT_SPEC)
+POST_SCREW_SEAT = POST_BLOCK_HEIGHT - POST_CBORE_DEPTH  # above PlateTop
+POST_SCREW_INTO_PLATE = POST_SCREW_LEN - POST_SCREW_SEAT
+if POST_SCREW_INTO_PLATE > PLAT_T:
+    raise AssertionError("MHA-142 stands proud of the MHA-091 underside")
+if (
+    POST_SCREW_INTO_PLATE - 2.0 * POST_MOUNT_TAP_EDGE_BREAK
+    < 0.90 * POST_MOUNT_THREAD_DIA
+    or POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS < 0.90
+):
+    raise AssertionError("MHA-142 engages the MHA-091 tap under 0.90D")
 # The shaft is placed by its front stub end; keep the station in lockstep with
 # the part's FRONT_STUB.
 if abs(SHAFT_FRONT_STATION + SHAFT_FRONT_STUB) > 1e-9:
@@ -2592,11 +2640,26 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="cone-pivot-post (v2 Ry180, big-end journal, on the plate)",
     )
+    # I22: the two MHA-142 fillisters, head up on the post's counterbore
+    # floors. The post is turned Ry180, so its local +X "mount west" axis
+    # lands at machine -X of the post origin.
+    post_screws: list[str] = []
+    for tag, dx in (("west", -POST_ATTACHMENT_X), ("east", POST_ATTACHMENT_X)):
+        post_screws.append(
+            await place_component(
+                adapter,
+                "post-mount-screw",
+                [ppost[0] + dx, Y_BASE_TOP + PLAT_T + POST_SCREW_SEAT, ppost[2]],
+                [0.0, 0.0, 0.0],
+                IDENTITY,
+                ground=False,
+                label=f"post-mount-screw {tag} (MHA-142 on the post counterbore)",
+            )
+        )
     ptip = cone_station(TIP_BLOCK_STATION)
     # U30: the block stands on the nominal MHA-141 fit-up shim pack, so its
     # foot sits TIP_SHIM_NOMINAL above PlateTop (the axis-height assert above
-    # already counts it).  The shim is the integrator's; until it is inserted
-    # the block floats that far above the plate.
+    # already counts it); the shim is placed under it below.
     tip_foot_y = Y_BASE_TOP + PLAT_T + TIP_SHIM_NOMINAL
     tip_block = await place_component(
         adapter,
@@ -2606,6 +2669,21 @@ async def build(adapter) -> dict[str, str]:
         ROT_Y_INCLINE,
         ground=False,
         label="cone-tip-block (end-play adjuster support, on the plate)",
+    )
+    # I20: the MHA-141 shim pack on PlateTop under the block's foot, in the
+    # block's own frame (it runs under the I31 foot flange, its horseshoe slot
+    # open south along the flange slot).  The I31 hold-down (MHA-140 through
+    # the flange slot into the MHA-146 locknut) is not placed on this base:
+    # its plate slot still sits under the block centre (U30) until #925's I31
+    # plate lands (test_i31_hold_down_is_placed, strict xfail).
+    tip_shim = await place_component(
+        adapter,
+        "cone-tip-shim",
+        [ptip[0], Y_BASE_TOP + PLAT_T, ptip[2]],
+        [0.0, INCLINE_DEG, 0.0],
+        ROT_Y_INCLINE,
+        ground=False,
+        label="cone-tip-shim (MHA-141 fit-up pack under the tip block)",
     )
     # Tip end-play stack (item 5, v4_t00471): the brass spacer bushing on the
     # tip stub, the axial adjuster screw in the block's counterbore, and the
@@ -3286,6 +3364,14 @@ async def build(adapter) -> dict[str, str]:
         label="cone-post local-west to platform-east mounting axis",
         verify=(pivot_post, post_o),
     )
+    # I22: each MHA-142 clamps the post to the plate.
+    for screw in post_screws:
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{screw}", "PLANE"),
+            named_ref(f"Front Plane@{pivot_post}", "PLANE"),
+            label=f"{screw} clamped in the post counterbore",
+        )
 
     # Cone shaft revolute in the black pivot post: coincident + an axial plane
     # distance along the inclined axis (the shaft's local Z, read live). Its
@@ -3344,6 +3430,33 @@ async def build(adapter) -> dict[str, str]:
         label="tip-block anti-spin (rides the plate)",
         verify=(tip_block, tb_o),
     )
+    # I24: the shim pack is seated face-to-face on PlateTop and squared under
+    # the block's foot (its Front/Right planes are the foot's). The block's
+    # height already comes from the coaxial, so its foot resting on the shim
+    # is contact, proven below and by the interference gate, not a mate.
+    shim_o = _org(adapter, tip_shim)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Top Plane@{tip_shim}", "PLANE"),
+        named_ref(f"PlateTop@{platform}", "PLANE"),
+        label="tip shim seats on the plate (bottom <-> PlateTop)",
+        verify=(tip_shim, shim_o),
+    )
+    for plane in ("Front Plane", "Right Plane"):
+        await coincident_mate(
+            adapter,
+            named_ref(f"{plane}@{tip_shim}", "PLANE"),
+            named_ref(f"{plane}@{tip_block}", "PLANE"),
+            label=f"tip shim squared under the block foot ({plane})",
+            verify=(tip_shim, shim_o),
+        )
+    _shim_y = _org(adapter, tip_shim)[1]
+    _stack = _org(adapter, tip_block)[1] - _shim_y
+    if abs(_stack - TIP_SHIM_T) > 1e-4 or abs(_shim_y - (Y_BASE_TOP + PLAT_T)) > 1e-4:
+        raise AssertionError(
+            f"tip block foot is {_stack:.4f} above the shim's underside, not on its "
+            f"{TIP_SHIM_T:.2f} top"
+        )
     # --- tip end-play stack (item 5): bushing | adjuster | pinch screw --------
     # The bushing spaces the T006 gear off the block's south face: coaxial on
     # the tip stub + an axial seat off the shaft. Free-spinning in reality; its
