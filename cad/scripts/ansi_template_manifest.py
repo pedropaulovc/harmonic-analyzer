@@ -7,11 +7,14 @@ ANSI base (= 1), because only a real ISO -> ANSI re-base prints Y14.5's
 20260926T073039391Z-6da20dda and 20260926T075212560Z-476c1f81).
 
 That re-base moves 35 table rows over 34 drafting preferences (61
-preference/option pairs) and 65 text formats. This module lists every one
-of them with three values:
+preference/option pairs) and 65 text formats, measured in v2 on a built
+drawing, plus 26 preference/option pairs over 5 more preferences that only
+the template itself shows (leaf ansi-rebase-4493, run
+20260926T174414121Z-a039eaf0). This module lists every one of them with three
+values:
 
 * ``as_built``    -- the value in the current ISO-based templates;
-* ``iso_to_ansi`` -- the value the re-base itself writes (measured in v2);
+* ``iso_to_ansi`` -- the value the re-base itself writes (measured);
 * ``target``      -- the value the re-based template must carry.
 
 ``decision`` is ``ansi`` where the template takes the ANSI default (arrows,
@@ -64,7 +67,7 @@ class Setting:
     why: str
 
 
-SETTINGS: tuple[Setting, ...] = (
+_V2_SETTINGS: tuple[Setting, ...] = (
     Setting(
         "integer",
         "swDetailingArrowStyleForDimensions",
@@ -1578,6 +1581,91 @@ SETTINGS: tuple[Setting, ...] = (
         "section/detail/weld/surface-finish label keeps its as-built 6.35 mm height",
     ),
 )
+
+# Moved by the re-base on the TEMPLATE but absent from v2's built-drawing
+# delta (leaf ansi-rebase-4493 B0 -> B1). User rulings 2026-09-26: the leader
+# styles take ANSI's 2 (swBrokenLeaderHorizontalText, the style the build pins
+# per dimension type); the alternate (dual) precision is restored to 3, since
+# dual dimensions are off; the primary precision is written back to 2, which a
+# new drawing read anyway (B3) and set_units_mm(decimals=2) sets on every sheet.
+_PER_TYPE = {
+    "swDetailingArcLengthDimension": 202,
+    "swDetailingChamferDimension": 203,
+    "swDetailingDiameterDimension": 204,
+    "swDetailingDimension": 200,
+    "swDetailingHoleDimension": 205,
+    "swDetailingLinearDimension": 206,
+    "swDetailingOrdinateDimension": 207,
+    "swDetailingRadiusDimension": 208,
+}
+_LEADER_SCOPES = {
+    "swDetailingAngleDimension": 201,
+    "swDetailingArcLengthDimension": 202,
+    "swDetailingDiameterDimension": 204,
+    "swDetailingHoleDimension": 205,
+    "swDetailingLinearDimension": 206,
+    "swDetailingRadiusDimension": 208,
+}
+_LEADER_WHY = (
+    "take the ANSI default (broken leader, horizontal text), the build's per-type pin"
+)
+_TEMPLATE_SETTINGS: tuple[Setting, ...] = (
+    *(
+        Setting("integer", name, pref, "-", 0, 1, 2, 2, "ansi", _LEADER_WHY)
+        for name, pref in (
+            ("swDetailingAngularDimLeaderStyle", 20),
+            ("swDetailingDimensionTextAndLeaderStyle", 372),
+            ("swDetailingLinearDimLeaderStyle", 18),
+            ("swDetailingRadialDimLeaderStyle", 19),
+        )
+    ),
+    *(
+        Setting(
+            "integer",
+            "swDetailingDimensionTextAndLeaderStyle",
+            372,
+            option,
+            option_id,
+            1,
+            2,
+            2,
+            "ansi",
+            _LEADER_WHY,
+        )
+        for option, option_id in _LEADER_SCOPES.items()
+    ),
+    *(
+        Setting(
+            "integer",
+            "swDetailingAltLinearDimPrecision",
+            26,
+            option,
+            option_id,
+            3,
+            2,
+            3,
+            "restore",
+            "dual dimensions are off; keep the template's alternate precision",
+        )
+        for option, option_id in _PER_TYPE.items()
+    ),
+    *(
+        Setting(
+            "integer",
+            "swDetailingLinearDimPrecision",
+            24,
+            option,
+            option_id,
+            2,
+            3,
+            2,
+            "restore",
+            "keep 2 places; set_units_mm(decimals=2) sets the same on every sheet",
+        )
+        for option, option_id in _PER_TYPE.items()
+    ),
+)
+SETTINGS: tuple[Setting, ...] = _V2_SETTINGS + _TEMPLATE_SETTINGS
 
 # The re-base must write EXACTLY these; any other preference it moves is a
 # finding, not a tolerance (the leaf fails loud on it).
