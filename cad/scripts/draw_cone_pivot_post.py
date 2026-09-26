@@ -730,6 +730,102 @@ def _show_section_scale_in_caption(adapter: Any, view: Any) -> None:
         raise RuntimeError("native cone-section scale caption did not persist")
 
 
+def _probe_origin_points(adapter: Any, sheet: Any) -> None:
+    """DIAG (never merge): which read puts a dimension's ink at the sheet origin.
+
+    At a403081e2 every linear dimension's box ran from [0,0] (warm build
+    9a0f50b1c); at 8bd56f889 it did not. Logs, for each annotation whose
+    collected segments or text boxes touch the origin, the offending pieces,
+    then every display dimension's raw COM primitives, so the flagged ones can
+    be read against an unflagged control.
+    """
+    import json
+
+    def at_origin(x: float, y: float) -> bool:
+        return abs(x) < 0.0005 and abs(y) < 0.0005  # within 0.5 mm of (0,0)
+
+    flagged = set()
+    for annotation in sheet.annotations:
+        segments = [
+            (s.role, round(s.x0, 6), round(s.y0, 6), round(s.x1, 6), round(s.y1, 6))
+            for s in annotation.segments
+            if at_origin(s.x0, s.y0) or at_origin(s.x1, s.y1)
+        ]
+        boxes = [
+            box.format_mm()
+            for box in annotation.text_boxes
+            if box.xmin <= 0.0005 and box.ymin <= 0.0005
+        ]
+        if segments or boxes:
+            flagged.add(annotation.label)
+            _telemetry.info(
+                "PROBE origin collected "
+                + json.dumps({"label": annotation.label, "kind": annotation.kind, "segments": segments, "text_boxes": boxes})
+            )
+    _telemetry.info(f"PROBE origin flagged {sorted(flagged)}")
+
+    def read(fn: Any) -> Any:
+        try:
+            value = fn()
+        except Exception as exc:  # noqa: BLE001 - a probe logs every refusal
+            return f"raised {type(exc).__name__}: {exc}"
+        if value is None:
+            return None
+        try:
+            return [round(float(v), 7) for v in value]
+        except (TypeError, ValueError):
+            return value
+
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    view = drawing.GetFirstView()
+    while view is not None:
+        view = _early_bound(view, "IView")
+        view_name = str(view.GetName2())
+        for raw in view.GetAnnotations() or ():
+            annotation = _early_bound(raw, "IAnnotation")
+            name = str(annotation.GetName())
+            kind = int(annotation.GetType())
+            if kind != 4 and name not in flagged:
+                continue
+            record: dict[str, Any] = {
+                "view": view_name,
+                "type": kind,
+                "name": name,
+                "flagged": name in flagged,
+                "position": read(lambda a=annotation: a.GetPosition()),
+                "leader_count": read(lambda a=annotation: [a.GetLeaderCount()]),
+            }
+            count = int((record["leader_count"] or [0])[0]) if isinstance(record["leader_count"], list) else 0
+            record["leaders"] = [
+                read(lambda a=annotation, i=i: a.GetLeaderPointsAtIndex(i)) for i in range(count)
+            ]
+            data = annotation.GetDisplayData()
+            if data is not None:
+                data = _early_bound(data, "IDisplayData")
+                lines = int(data.GetLineCount() or 0)
+                arcs = int(data.GetArcCount() or 0)
+                texts = int(data.GetTextCount() or 0)
+                record["lines"] = [read(lambda i=i: data.GetLineAtIndex3(i)) for i in range(lines)]
+                record["arcs"] = [read(lambda i=i: data.GetArcAtIndex2(i)) for i in range(arcs)]
+                record["arrows"] = [
+                    read(lambda i=i: data.GetArrowHeadAtIndex2(i)) for i in range(int(data.GetArrowHeadCount() or 0))
+                ]
+                record["polylines"] = int(data.GetPolyLineCount() or 0)
+                record["texts"] = [
+                    {
+                        "t": read(lambda i=i: data.GetTextAtIndex(i)),
+                        "pos": read(lambda i=i: data.GetTextPositionAtIndex(i)),
+                        "h": read(lambda i=i: [data.GetTextHeightAtIndex(i)]),
+                        "ref": read(lambda i=i: [data.GetTextRefPositionAtIndex(i)]),
+                    }
+                    for i in range(texts)
+                ]
+            else:
+                record["display"] = None
+            _telemetry.info("PROBE origin dim " + json.dumps(record, default=str))
+        view = view.GetNextView()
+
+
 def _assert_native_layout(
     adapter: Any,
     journal: Any,
@@ -750,6 +846,7 @@ def _assert_native_layout(
     if len(sheets) != 1:
         raise RuntimeError(f"cone pivot post must have one drawing sheet: {len(sheets)}")
     sheet = sheets[0]
+    _probe_origin_points(adapter, sheet)
 
     journal_values = tuple(float(value) for value in journal.GetOutline())
     if len(journal_values) != 4:
