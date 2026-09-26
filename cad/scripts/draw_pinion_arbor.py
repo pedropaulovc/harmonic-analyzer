@@ -537,6 +537,7 @@ def _cropped_head_view(adapter: Any, principal: Any) -> Any:
         raise RuntimeError(
             f"detail-A head centre sits at {center!r}, not {DETAIL_CENTER!r}"
         )
+    uncropped = tuple(float(value) for value in view.GetOutline())
     name = _activate_view(adapter, view, label="detail-A view")
     _sketch_circle(adapter, view, center, DETAIL_CROP_RADIUS, label="detail-A crop")
     status = int(view.Crop2(False, False, 5))
@@ -556,14 +557,36 @@ def _cropped_head_view(adapter: Any, principal: Any) -> Any:
         raise RuntimeError(
             f"detail A is not cropped: Crop2 status {status}, IsCropped {cropped}"
         )
-    if len(outline) != 4 or outline[2] - outline[0] > 2.0 * DETAIL_CROP_RADIUS + 0.010:
-        raise RuntimeError(f"detail-A crop did not take: outline {outline!r}")
+    # The uncropped 2:1 view spans the whole ~466 mm arbor and the crop about
+    # 60 mm, so a crop that took at least halves the width (GetOutline's
+    # margin round a cropped view is unmeasured, so no tighter bound).
+    if (
+        len(outline) != 4
+        or len(uncropped) != 4
+        or outline[2] - outline[0] > (uncropped[2] - uncropped[0]) / 2.0
+    ):
+        raise RuntimeError(
+            f"detail-A crop did not take: outline {outline!r}, before {uncropped!r}"
+        )
     return view
 
 
 def _plain_text(text: str) -> str:
     """A note's words with its line breaks and spacing folded to single spaces."""
     return " ".join(str(text).split())
+
+
+def _is_note_text(found: str, text: str) -> bool:
+    """Whether a read-back note text is ``text``.
+
+    A one-line note must read back whole.  A multi-line note is recognised by
+    its first line: how INote.GetText returns the later lines of a
+    multi-line note has never been read on a seat in this repo.
+    """
+    lines = text.split("\n")
+    if len(lines) == 1:
+        return found == _plain_text(text)
+    return found.startswith(_plain_text(lines[0]))
 
 
 def _note_texts(view: Any) -> list[str]:
@@ -655,7 +678,7 @@ def _centred_view_note(
             f"{error_y * 1000:.2f}) mm"
         )
     texts = _note_texts(view)
-    if texts.count(_plain_text(text)) != 1:
+    if sum(_is_note_text(found, text) for found in texts) != 1:
         raise RuntimeError(
             f"{label} note did not land in its view: its notes are {texts!r}"
         )
