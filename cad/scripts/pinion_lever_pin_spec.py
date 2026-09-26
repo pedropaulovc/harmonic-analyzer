@@ -40,11 +40,19 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
-# Rule 6: the pin sheet carries no notes.  The match-drill and drive
-# requirement rides the MHA-059 and MHA-060 hole callouts; the drive, trim and
-# peen sequence is the pinion fit-up step below.
-ASSEMBLY_STEP = (
-    f"DRIVE MHA-135 THROUGH THE HOLE MATCH-DRILLED IN {LEVER_NUMBER} HUB AND "
-    f"{LIFT_ROD_NUMBER} ROD, GRIP PARKED; TRIM AND PEEN BOTH ENDS FLUSH WITH HUB."
+# Rule 6: the pin sheet carries no notes, and the MHA-059 and MHA-060 hole
+# callouts carry only the hole specification (Main, 2026-09-26, as MHA-062's).
+# The grip-parked drilling pose and the drive, trim and peen sequence are
+# performed at assembly, so they print once, on this pinion fit-up step,
+# named by its first words as RIG SET and SHAFT DRILL SET are.  The part
+# callouts' pointers to it land at integration, from the step registry.
+LEVER_PIN_SET_NAME = "LEVER PIN SET"
+PIN_NUMBER = "MHA-135"
+ASSEMBLY_STEP = "\n".join(
+    (
+        f"{LEVER_PIN_SET_NAME}: MATCH-DRILL {LEVER_NUMBER} HUB AND {LIFT_ROD_NUMBER} ROD",
+        f"TOGETHER, GRIP PARKED; DRIVE {PIN_NUMBER},",
+        "TRIM BOTH ENDS AND PEEN FLUSH WITH HUB.",
+    )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"

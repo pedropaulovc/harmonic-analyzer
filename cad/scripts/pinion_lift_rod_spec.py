@@ -25,7 +25,6 @@ CAP_R = round((ROD_DIA**2 / 4.0 + CAP_SAG**2) / (2.0 * CAP_SAG), 2)  # 4.80
 ROD_DIA_BAND = SHAFT_H
 
 LEVER_NUMBER = "MHA-059"
-PIN_NUMBER = "MHA-135"
 
 # Rule 5: the rod turns in the pivot blocks' west bores -- the one running
 # surface on the part.
@@ -64,11 +63,13 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
-# Rule 6: the matched fit rides the pin hole's own callout.
+# Rule 6: the matched fit rides the pin hole's own callout, as the hole
+# specification only; the drive and peen are
+# pinion_lever_pin_spec.ASSEMBLY_STEP (LEVER PIN SET).
 PIN_HOLE_CALLOUT = "\n".join(
     (
-        f"MATCH-DRILL THRU AT ASSEMBLY IN {LEVER_NUMBER}",
-        f"HUB; DRIVE {PIN_NUMBER}, PEEN FLUSH",
+        "MATCH-DRILL THRU AT ASSEMBLY",
+        f"IN {LEVER_NUMBER} HUB",
     )
 )
 DRAWING_NOTES = "BACK-END CROWN BLENDS INTO THE OD WITH NO STEP."

@@ -1142,52 +1142,88 @@ def test_the_rig_assembly_sequence_carries_each_part_step_verbatim() -> None:
     ) < FITUP.ASSEMBLY_SEQUENCE.index(FITUP.RIG_SET_STEP)
 
 
-def test_the_shaft_drilling_pose_prints_once_on_the_rig_step() -> None:
-    # Main's re-ruling (2026-09-26): the pose is an assembly set-up, printed
-    # on MHA-A03 where the fitter drills, and nowhere else; MHA-062's callout
-    # carries the hole specification (its step pointer lands at integration).
+def test_assembly_poses_print_once_on_their_rig_steps() -> None:
+    # Main's re-ruling (2026-09-26): a drilling pose, drive or peen is
+    # performed at assembly, so it prints on MHA-A03 where the fitter works,
+    # and nowhere else; MHA-062's, MHA-059's and MHA-060's pin-hole callouts
+    # carry the hole specification (their step pointers land at integration).
     import importlib
     from pathlib import Path
 
     import _config
-    import draw_pinion_pivot_shaft
+    import pinion_lever_pin_spec
 
-    pose = (
-        "REAR END FLUSH WITH MHA-061 REAR FACE",
-        "STRAPS ON BACK STOP, MHA-002 ON BACK STRAP",
-        "FEELER AT MHA-002 FRONT END",
-    )
+    steps = {
+        "pinion_rig_fitup.SHAFT_DRILL_STEP": (
+            FITUP.SHAFT_DRILL_STEP,
+            (
+                "REAR END FLUSH WITH MHA-061 REAR FACE",
+                "STRAPS ON BACK STOP, MHA-002 ON BACK STRAP",
+                "FEELER AT MHA-002 FRONT END",
+            ),
+        ),
+        "pinion_lever_pin_spec.ASSEMBLY_STEP": (
+            pinion_lever_pin_spec.ASSEMBLY_STEP,
+            ("GRIP PARKED", "DRIVE MHA-135", "PEEN FLUSH"),
+        ),
+    }
     scripts = Path(FITUP.__file__).resolve().parent
-    for phrase in pose:
-        # One source spells it: the step itself.
-        sources = [
-            path.name
-            for path in scripts.glob("*.py")
-            if not path.name.startswith("test_")
-            and phrase in path.read_text(encoding="utf-8")
-        ]
-        assert sources == ["pinion_rig_fitup.py"], (phrase, sources)
-        # One printed constant carries it across every part spec and the
-        # fit-up module: SHAFT_DRILL_STEP.
-        printed = [
-            f"{module.__name__}.{name}"
-            for module in (
-                FITUP,
-                *(
-                    importlib.import_module(path.stem)
-                    for path in sorted(scripts.glob("pinion_*_spec.py"))
-                ),
-            )
-            for name, value in vars(module).items()
-            if isinstance(value, str) and phrase in value
-        ]
-        assert printed == ["pinion_rig_fitup.SHAFT_DRILL_STEP"], (phrase, printed)
-    callout = draw_pinion_pivot_shaft.DIMENSION_CALLOUTS["PinHoleDia"]
-    assert not any(phrase in callout for phrase in pose)
-    assert callout.startswith("MATCH-DRILL THRU AT ASSEMBLY")
+    modules = (
+        FITUP,
+        *(
+            importlib.import_module(path.stem)
+            for pattern in ("pinion_*_spec.py", "draw_pinion_*.py")
+            for path in sorted(scripts.glob(pattern))
+        ),
+    )
+    # Every string a pinion sheet can print: module constants and the
+    # drawings' dimension callouts.
+    printable = [
+        (f"{module.__name__}.{name}", value)
+        for module in modules
+        for name, value in vars(module).items()
+        if isinstance(value, str)
+    ] + [
+        (f"{module.__name__}.DIMENSION_CALLOUTS[{key!r}]", value)
+        for module in modules
+        for key, value in getattr(module, "DIMENSION_CALLOUTS", {}).items()
+    ]
+    for owner, (step, phrases) in steps.items():
+        for phrase in phrases:
+            assert phrase in step, (owner, phrase)
+            # No other printable string carries it (a module re-exporting
+            # the step itself is the same object).
+            strays = [
+                name
+                for name, value in printable
+                if phrase in value and value is not step
+            ]
+            assert strays == [], (phrase, strays)
+            # And no source outside the owner spells it out.
+            owner_file = owner.split(".")[0] + ".py"
+            sources = {
+                path.name
+                for path in scripts.glob("*.py")
+                if not path.name.startswith("test_")
+                and phrase in path.read_text(encoding="utf-8")
+            }
+            assert sources <= {owner_file}, (phrase, sources)
+    for drawing in (
+        "draw_pinion_pivot_shaft",
+        "draw_pinion_lever",
+        "draw_pinion_lift_rod",
+    ):
+        callout = importlib.import_module(drawing).DIMENSION_CALLOUTS["PinHoleDia"]
+        assert callout.startswith("MATCH-DRILL THRU AT ASSEMBLY"), drawing
     assert FITUP.SHAFT_DRILL_STEP.startswith(f"{FITUP.SHAFT_DRILL_NAME}: MATCH-DRILL")
-    # The step's pin number is the registry's.
+    # The steps' pin numbers are the registry's.
     assert FITUP.STRAP_PIN_NUMBER == _config.parts("pinion-strap-pin")["number"]
+    assert (
+        pinion_lever_pin_spec.PIN_NUMBER == _config.parts("pinion-lever-pin")["number"]
+    )
+    assert pinion_lever_pin_spec.ASSEMBLY_STEP.startswith(
+        f"{pinion_lever_pin_spec.LEVER_PIN_SET_NAME}: MATCH-DRILL"
+    )
 
 
 def test_rig_margin_table_is_logged_at_build() -> None:

@@ -32,7 +32,6 @@ from pinion_lever_geometry import (
 )
 
 LIFT_ROD_NUMBER = "MHA-060"
-PIN_NUMBER = "MHA-135"
 
 # U36: the pin carries the torque, so the hub only has to slide onto the h-band
 # 6.35 lift rod.  Codex P2 (#844): the former 6.35-6.40 band's minimum met the
@@ -93,12 +92,9 @@ SURFACE_FINISHES = ()
 
 # The match-drill requirement rides the pin hole's own callout (rule 6: matched
 # fits belong on the feature), so the note block keeps only the crown break.
-PIN_HOLE_CALLOUT = "\n".join(
-    (
-        f"MATCH-DRILL THRU AT ASSEMBLY ON {LIFT_ROD_NUMBER},",
-        f"GRIP PARKED; DRIVE {PIN_NUMBER}, PEEN FLUSH",
-    )
-)
+# The callout is the hole specification only: the grip-parked pose and the
+# drive and peen are pinion_lever_pin_spec.ASSEMBLY_STEP (LEVER PIN SET).
+PIN_HOLE_CALLOUT = f"MATCH-DRILL THRU AT ASSEMBLY ON {LIFT_ROD_NUMBER}"
 DRAWING_NOTES = "\n".join(
     (
         "LEAVE THE CROWN ROOT CIRCLE SHARP;",

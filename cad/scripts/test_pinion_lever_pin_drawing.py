@@ -45,7 +45,7 @@ def test_pin_fills_the_match_drilled_hole_and_spans_the_hub() -> None:
     assert pinion_lever_spec.DRAWING_PRECISION_BY_NAME["HubOd"] == 1
     assert spec.DRAWING_PRECISION_BY_NAME["Depth"] == 1
     assert (shortest_pin - largest_hub) / 2.0 >= PEEN_ALLOWANCE >= 0.5
-    assert "TRIM AND PEEN" in spec.ASSEMBLY_STEP
+    assert "TRIM BOTH ENDS AND PEEN FLUSH" in spec.ASSEMBLY_STEP
 
 
 def test_cross_hole_webs_clear_two_millimetres_at_the_worst_case() -> None:
@@ -71,21 +71,27 @@ def test_marked_set_bands_and_places_come_from_the_spec() -> None:
 
 def test_the_pin_sheet_has_no_notes_and_the_mates_carry_the_match_drill() -> None:
     """Rule 6 (Main's eye-pass sweep): the drive, trim and peen sequence is
-    the pinion fit-up step; the match-drill rides both mates' hole callouts,
-    so the pin sheet carries no general notes at all."""
+    the pinion fit-up step; the match-drill rides both mates' hole callouts
+    as the hole specification only (Main, 2026-09-26), so the pin sheet
+    carries no general notes at all."""
     import pinion_lever_spec
     import pinion_lift_rod_spec
 
     assert not hasattr(spec, "DRAWING_NOTES")
     step = spec.ASSEMBLY_STEP
-    assert spec.LEVER_NUMBER in step and spec.LIFT_ROD_NUMBER in step
-    assert "MATCH-DRILLED" in step and "PEEN" in step
+    assert step.split("\n") == [
+        "LEVER PIN SET: MATCH-DRILL MHA-059 HUB AND MHA-060 ROD",
+        "TOGETHER, GRIP PARKED; DRIVE MHA-135,",
+        "TRIM BOTH ENDS AND PEEN FLUSH WITH HUB.",
+    ]
+    assert step.startswith(f"{spec.LEVER_PIN_SET_NAME}: ")
+    assert spec.PIN_NUMBER == _config.parts("pinion-lever-pin")["number"]
     for callout in (
         pinion_lever_spec.PIN_HOLE_CALLOUT,
         pinion_lift_rod_spec.PIN_HOLE_CALLOUT,
     ):
-        assert "MATCH-DRILL THRU AT ASSEMBLY" in callout
-        assert "MHA-135" in callout
+        assert callout.startswith("MATCH-DRILL THRU AT ASSEMBLY")
+        assert "MHA-135" not in callout
     for script in (pin, drawing):
         assert "Manufacturing Notes" not in Path(script.__file__).read_text(
             encoding="utf-8"

@@ -1384,7 +1384,7 @@ APINION_Y = Y_DRIVE
 # Ruling (c) (user, 2026-09-24): the blocks locate the swing cluster -- every
 # rig z station is pinion_rig_layout's fit-up stack (the cluster hard on the
 # back block, the drum hard on the back strap and one shim off the front one:
-# MHA-062's drilling set-up), shared with the base's transferred seats.
+# MHA-A03's SHAFT DRILL SET), shared with the base's transferred seats.
 APINION_DRUM_LEN = RIG.DRUM_LEN  # build_alignment_pinion FACE_WIDTH
 APINION_Z_FRONT = RIG.DRUM_FRONT_Z
 APINION_Z_BACK = RIG.DRUM_BACK_Z
