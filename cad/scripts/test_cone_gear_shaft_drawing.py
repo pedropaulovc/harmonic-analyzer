@@ -103,8 +103,9 @@ def test_display_precision_is_owned_by_the_part() -> None:
         "Sec4End": 1,
         "ShoulderR": 2,
         # #914: the collar web holds the 1.5 floor at .XXX (not at .XX), and
-        # the solder stations carry the user-ruled +-0.13.
-        "CollarDia": 1,
+        # the solder stations carry the user-ruled +-0.13.  The collar
+        # diameter is the bar's as supplied, a two-place reference (15.88).
+        "CollarDia": 2,
         "CollarWidth": 3,
         "T120Station": 3,
         "T006Station": 3,
@@ -600,9 +601,10 @@ def test_part_stamps_make_critical_properties() -> None:
     config = _config.parts("cone-gear-shaft")
     assert "1018" in str(config["material_specification"])
     assert "1018" in str(config["material"])
-    # The MATERIAL cell holds one line and names the material only; the 5/8
-    # bar is not used as supplied (the collar is turned down from it), so its
-    # size stays in cone_gear_shaft_spec (STOCK_DIA), off the title block.
+    # The MATERIAL cell holds one line and names the material only.  The
+    # collar IS the 5/8 bar's OD as supplied (user ruling 2026-09-26, Codex P1
+    # on #916), so the U41 treatment applies: the size prints beside the
+    # collar's reference diameter (COLLAR_STOCK_CALLOUT), never in this cell.
     for field in ("material", "material_specification"):
         assert not re.search(r"\d+/\d+|\bin\b|\bround\b", str(config[field])), field
     assert config["finish"]
@@ -787,18 +789,46 @@ def test_collar_fills_the_gap_between_the_post_boss_and_the_64t() -> None:
     assert spec.COLLAR_THICKNESS >= 1.5
 
 
-def test_collar_bears_on_the_boss_annulus_and_turns_from_five_eighths_bar() -> None:
+def test_the_collar_is_the_bar_as_supplied_and_its_thrust_ring_holds_the_floor() -> None:
+    """Codex P1 on #916: a turned Ø15.0 at .X could come out Ø14.2 and leave a
+    0.96 thrust ring on the post boss.  User ruling 2026-09-26: the collar is
+    the 5/8 cold-finished bar's own OD, and both edges bounding the ring print
+    a break small enough that the worst-case ring, breaks counted, holds 1.5."""
     import cone_pivot_post_spec as post
 
     spec = cone_gear_shaft_spec
-    assert spec.COLLAR_DIA == 15.0
-    # a real bearing annulus outside the post bore, inside the Ø17.2 boss
-    assert spec.COLLAR_DIA - post.BORE_DIA >= 2.0
-    assert spec.COLLAR_DIA < post.CONE_BOSS_DIA
-    # the collar is the largest diameter, turned from 5/8 in bar with stock left
     assert spec.STOCK_DIA == pytest.approx(0.625 * 25.4)
-    assert spec.STOCK_DIA - spec.COLLAR_DIA >= 0.8
+    assert spec.COLLAR_DIA == spec.STOCK_DIA
+    assert spec.STOCK_DIA_BAND == pytest.approx((0.0, -0.002 * 25.4))
     assert max(spec.SECTION_DIAS) < spec.COLLAR_DIA
+    assert spec.JOURNAL_BORE_DIA == post.BORE_DIA
+    # worst case: the thinnest bar in the widest bore
+    thinnest = spec.STOCK_DIA + spec.STOCK_DIA_BAND[1]
+    widest = post.BORE_DIA + spec.POST_JOURNAL_BORE_BAND[0]
+    ring = (thinnest - widest) / 2.0
+    assert spec.THRUST_RING_MIN == pytest.approx(ring)
+    # the title block's 0.25 break on both edges would take it under the floor
+    assert ring - 2.0 * 0.25 < spec.THRUST_RING_FLOOR
+    # the printed break is the largest one-place value that keeps the floor
+    breaks = spec.THRUST_EDGE_BREAK_MAX
+    assert ring - 2.0 * breaks >= spec.THRUST_RING_FLOOR
+    assert ring - 2.0 * (breaks + 0.1) < spec.THRUST_RING_FLOOR
+    assert breaks == pytest.approx(round(breaks, 1))
+    # the thickest bar still bears inside the boss: no overhang toward the post body
+    assert spec.STOCK_DIA + spec.STOCK_DIA_BAND[0] < post.CONE_BOSS_DIA
+
+
+def test_the_sheet_states_the_collar_as_stock_with_its_break() -> None:
+    """The as-supplied collar prints as a reference diameter with the stock
+    statement and its edge break beside it (the U41 plate's form)."""
+    spec = cone_gear_shaft_spec
+    assert drawing.REFERENCE_DIAMETERS == ("CollarDia",)
+    assert drawing.DIMENSION_CALLOUTS["CollarDia"] is spec.COLLAR_STOCK_CALLOUT
+    callout = spec.COLLAR_STOCK_CALLOUT.upper()
+    assert "5/8" in callout and "AS SUPPLIED" in callout
+    assert f"{spec.THRUST_EDGE_BREAK_MAX:.1f} MAX" in callout
+    assert spec.DRAWING_PRECISION["CollarProfile"]["CollarDia"] == 2
+    assert f"{spec.COLLAR_DIA:.2f}" == "15.88"
 
 
 def _stubbed_build(monkeypatch):
@@ -880,7 +910,7 @@ def test_every_land_is_placed_from_the_one_origin(monkeypatch) -> None:
 
 def test_build_turns_the_collar_between_the_journal_and_the_64t(monkeypatch) -> None:
     """#914: the collar is its own land -- sketched on a plane one web north of
-    the collar face, Ø15.0, extruded back one web.  Its roots stay sharp (the
+    the collar face, at the bar's own Ø15.875, extruded back one web.  Its roots stay sharp (the
     post and the 64T bear flat on its faces) and the old journal-to-3/8 step
     edge is buried under it."""
     spec = cone_gear_shaft_spec

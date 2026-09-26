@@ -17,7 +17,8 @@ yellow metal soldered on.
 Sections, FRONT STUB end at z = 0.  The v2 post puts that end at cone
 station -61.9068609979, 1.0 mm proud of the post front face.  An integral
 Ø12.2308 journal runs to z = 43.011 in the post's Ø12.2808 bore, where an
-integral Ø15.0 thrust collar (#914) fills the 1.681 to the 64T and bears on
+integral thrust collar (#914), the 5/8 bar's own Ø15.875 as supplied (#916),
+fills the 1.681 to the 64T and bears on
 the post's north boss face, then steps to the existing 3/8 in gear-seat shaft. M6.7
 (true-cone mesh, see the assembly docstring): gear seats at the
 exact-tracking stack pitch 6.8889 mm (= drum z-pitch 7.0565 x

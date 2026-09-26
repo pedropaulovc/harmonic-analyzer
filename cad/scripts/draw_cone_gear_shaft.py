@@ -47,6 +47,7 @@ from _drawing_leaders import set_near_side_diameter
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from cone_gear_shaft_spec import (
+    COLLAR_STOCK_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_REFERENCE_PRECISION,
     FILLET_CALLOUT,
@@ -152,20 +153,30 @@ SIDE_DIAMETERS = {
     "CollarDia": (0.2088, 0.1760),
 }
 NEAR_SIDE_DIAMETERS = ("CollarDia",)
+# The collar is the 5/8 bar's OD as supplied (user ruling 2026-09-26), so
+# its diameter prints as a reference with the stock statement beside it,
+# the U41 plate's form.
+REFERENCE_DIAMETERS = ("CollarDia",)
 # Sheet width of one diameter text with its stacked band, for the layout test.
 DIAMETER_TEXT_WIDTH = 0.032
-# The collar's diameter prints one place with no band: a single short line.
-COLLAR_DIA_TEXT_WIDTH = 0.014
+# The collar's reference diameter, "(Ø15.88)": eight characters on one line.
+COLLAR_DIA_TEXT_WIDTH = 0.019
 DONOR_KEEP = {
     name: (DONOR_CENTER[0], DONOR_CENTER[1] - 0.012 * index)
     for index, name in enumerate(SIDE_DIAMETERS)
 }
 # Three identical gear-seat shoulder roots, one modelled fillet, one radius
 # dimension (the collar's roots stay sharp, #914).
-DIMENSION_CALLOUTS = {"ShoulderR": FILLET_CALLOUT, "T006Station": "20X EQ SP"}
+DIMENSION_CALLOUTS = {
+    "ShoulderR": FILLET_CALLOUT,
+    "T006Station": "20X EQ SP",
+    "CollarDia": COLLAR_STOCK_CALLOUT,
+}
 # The pivot-journal finish symbol, left of which the collar diameter's text
 # must end.
 PIVOT_FINISH_XY = (0.2400, 0.1800)
+
+
 @_telemetry.traced("drawing.cylindrical_face_scan")
 def _cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
     """Return the visible cylindrical face for one shaft diameter."""
@@ -387,7 +398,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=SIDE_SCALE)
     donor = place_view(adapter, str(SOURCE), "*Front", *DONOR_CENTER, scale=SIDE_SCALE)
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (side, donor):
         set_hidden_lines_removed(adapter, view)
 
@@ -418,6 +429,10 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         if name in NEAR_SIDE_DIAMETERS:
             set_near_side_diameter(moved, f"{name} near-side diameter")
+        if name in REFERENCE_DIAMETERS:
+            set_reference_dimension(
+                adapter, moved, label=f"{name} stock reference", diameter=True
+            )
         annotations.append(moved)
     # Every diameter is now native to the view that shows its shoulder; an
     # empty end view carries no manufacturing information.

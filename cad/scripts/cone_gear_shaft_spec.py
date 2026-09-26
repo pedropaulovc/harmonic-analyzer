@@ -2,6 +2,8 @@ r"""Pure-data dimensional contract shared by the cone gear shaft and drawing."""
 
 from __future__ import annotations
 
+import math
+
 from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -34,16 +36,51 @@ FRONT_STUB = 61.9068609979
 # face bears on the post's north boss face (flush with the journal end) and
 # the 64T is soldered against its north face, so no station moves.  The web is
 # the gap, 1.681 -- above the 1.5 floor, accepted by the user rather than
-# moving the 64T.  Ø15.0 bears on the boss annulus outside the Ø12.2808 bore
-# and inside the Ø17.2 boss; it is the largest diameter, so the shaft turns
-# from 5/8 in bar.  The 64T centre is the drive-train's GEAR64_STATION (the
-# shaft tests pin the two equal).
+# moving the 64T.  The collar bears on the boss annulus outside the
+# Ø12.2808 bore and inside the Ø17.2 boss.  The 64T centre is the
+# drive-train's GEAR64_STATION (the shaft tests pin the two equal).
 GEAR64_CENTER_STATION = 19.9 + GEAR_AXIS_SHIFT
-COLLAR_DIA = 15.0
 COLLAR_START_STATION = JOURNAL_END
 COLLAR_END_STATION = FRONT_STUB + GEAR64_CENTER_STATION - GEAR64_FACE_WIDTH / 2.0
 COLLAR_THICKNESS = COLLAR_END_STATION - COLLAR_START_STATION
+
+# The collar's diameter is the 5/8 in cold-finished bar's own, as supplied:
+# never turned (user ruling 2026-09-26 on Codex P1 #916).  The turned Ø15.0 it
+# replaced printed .X, and at 14.2 it left a 0.96 thrust ring on the boss.
+# The shaft is turned from this bar, so the collar is also its largest
+# diameter.  ASTM A108 cold-finished rounds take ASTM A29's cold-drawn size
+# tolerance: over 1/2 through 1 in, +0 / -0.002 in.
 STOCK_DIA = 0.625 * MM_PER_IN
+STOCK_DIA_BAND = (0.0, -0.002 * MM_PER_IN)
+COLLAR_DIA = STOCK_DIA
+# The post's journal bore band: cone_pivot_post_spec.RUNNING_BORE_BAND on the
+# #877 integration branch (#833); this branch predates it.
+POST_JOURNAL_BORE_BAND = (0.005, -0.025)
+# The thrust ring: the collar's south face on the post boss, between the bore
+# and the collar OD.  Held to rule 12's 1.5 floor (user ruling 2026-09-26)
+# with BOTH bounding edges broken at the worst case: the collar's OD edge and
+# the post's bore rim.  The title block's 0.25 break would take the 1.77 ring
+# to 1.27, so both edges print a smaller break, derived from
+# ring - 2 x break >= floor and rounded DOWN to one printable place (0.1).
+THRUST_RING_FLOOR = 1.5
+THRUST_RING_MIN = (
+    (STOCK_DIA + STOCK_DIA_BAND[1]) - (JOURNAL_BORE_DIA + POST_JOURNAL_BORE_BAND[0])
+) / 2.0
+THRUST_EDGE_BREAK_MAX = (
+    math.floor((THRUST_RING_MIN - THRUST_RING_FLOOR) / 2.0 * 10.0 + 1e-9) / 10.0
+)
+if THRUST_RING_MIN - 2.0 * THRUST_EDGE_BREAK_MAX < THRUST_RING_FLOOR - 1e-9:
+    raise AssertionError(
+        f"thrust ring {THRUST_RING_MIN:.3f} less two {THRUST_EDGE_BREAK_MAX} "
+        f"breaks is under the {THRUST_RING_FLOOR} floor"
+    )
+# The callout under the collar's reference diameter: the stock statement in
+# the U41 plate's form ("1/4 PLATE AS SUPPLIED"), so the bar size stays out
+# of the MATERIAL cell, and the collar's own edge break, tighter than the
+# title block's.
+COLLAR_STOCK_CALLOUT = (
+    f"5/8 BAR AS SUPPLIED\nEDGE BREAK {THRUST_EDGE_BREAK_MAX:.1f} MAX"
+)
 
 # T006's north face starts the 4 mm bushing, followed by 2 mm clearance and
 # the 12 mm tip block.  Rule-12 E11 replaced the 5/16-18 94025A150 with the
@@ -280,8 +317,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # chain and heel relief carry this band (cone_tip_block_spec).  Shoulder
 # radius: two places; nothing depends on it beyond clearing the gear faces.
 #
-# Collar (#914): the diameter prints one place (.X leaves a 1.0 mm minimum
-# bearing ring outside the post bore, and the 5/8 bar caps the top); the web
+# Collar (#914): the diameter is the bar's as supplied (STOCK_DIA), so it
+# prints as a two-place reference, 15.88, the bar's own size; the web
 # prints three places, because at .XX the 1.681 web could fall to 1.17, under
 # the 1.5 floor the user accepted it against.  Solder stations: three places,
 # the +-0.13 the user ruled.
@@ -297,7 +334,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Sec3": {"Sec3End": 3},
     "Sec4": {"Sec4End": 1},
     "ShoulderFillets": {"ShoulderR": 2},
-    "CollarProfile": {"CollarDia": 1},
+    "CollarProfile": {"CollarDia": 2},
     "Collar": {"CollarWidth": 3},
     "SolderStations": {"T120Station": 3, "T006Station": 3},
 }
