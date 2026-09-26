@@ -32,7 +32,11 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import json
+import math
+import socket
 import sys
+from dataclasses import dataclass, field
 from typing import Any
 
 import _drawing_hidden_sketches as hidden_sketches
@@ -48,8 +52,11 @@ from _drawing_common import (
     new_project_drawing,
     dimension_name,
     read_required_properties,
+    model_point_in_view,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     set_reference_dimension,
     stamp_drawing_summary,
 )
@@ -68,6 +75,7 @@ from post_mount_screw_spec import (
     HEAD_H_MM,
     THREAD_DIA_MM,
 )
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import place_view, view_name
 
 SPEC = DRAWINGS_BY_NAME["post_mount_screw"]
@@ -314,6 +322,532 @@ def _reference_cut_length(adapter: Any, annotations: list[Any]) -> None:
     raise RuntimeError("Front view has no cut length to mark reference")
 
 
+# =====================================================================
+# TEMPORARY DIAGNOSTIC -- branch diag/mha142-bisect, never merged.
+#
+# Five views of the cut tip, each given a FRESH entire-model import of
+# CutEndBreak (the production call, InsertModelAnnotations3(0, ...,
+# DuplicateDims=True)).  DuplicateDims=True drops a dimension any other
+# view already holds, so every successful probe DELETES its import before
+# the next view runs, and every line carries prior_deletes.  The positive
+# control (view 1) runs LAST as the canary: if it imports after N deletes,
+# deletion is proven not to poison a re-import.  Execution order:
+#   5 (replay 9eca, first detail after the Front import, label A, the
+#      production position), 3, 4, 2, 1.
+# Nothing here raises until the end; the build fails only if view 1 did
+# not import (the diag is then invalid).
+# =====================================================================
+
+DIAG = "mha142-bisect"
+# swDisplayMode_e
+_DISPLAY_MODE_NAMES = {
+    -1: "UNKNOWN",
+    0: "WIREFRAME",
+    1: "HLV",
+    2: "HLR",
+    3: "SHADED",
+    4: "FACETED_WIREFRAME",
+    5: "FACETED_HLV",
+    6: "FACETED_HLR",
+    7: "SHADED_EDGES",
+    8: "DEFAULT",
+}
+_CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
+# Sheet layout of the probes (metres).  The production 10:1 detail keeps its
+# centre (DETAIL_CENTER) for the replay; the isometric moves to 1:2 in the
+# free corner above the title block.
+DIAG_ISO_CENTER = (0.390, 0.105)
+DIAG_ISO_SCALE = (1.0, 2.0)
+DIAG_BREAK_TEXT_OFFSET = (-0.006, -0.012)
+
+
+@dataclass(frozen=True)
+class Probe:
+    number: int
+    kind: str  # detail | model-cropped | replay9eca
+    scale: tuple[float, float]
+    center: tuple[float, float]
+    label: str
+    display: str  # hlv | hlr
+
+
+PROBES_IN_ORDER = (
+    Probe(5, "replay9eca", DETAIL_SCALE, DETAIL_CENTER, "A", "hlr"),
+    Probe(3, "detail", (10.0, 1.0), (0.275, 0.175), "B", "hlv"),
+    Probe(4, "model-cropped", (10.0, 1.0), (0.360, 0.175), "", "hlr"),
+    Probe(2, "detail", (5.0, 1.0), (0.190, 0.240), "C", "hlv"),
+    Probe(1, "detail", (2.0, 1.0), (0.260, 0.240), "D", "hlv"),
+)
+
+
+@dataclass
+class ProbeResult:
+    probe: Probe
+    order: int
+    view: Any = None
+    imported: bool = False
+    available: list[str] = field(default_factory=list)
+    error: str = ""
+
+
+def _probe_sheet(probe: Probe) -> TrimSheet:
+    """The production TIP_DETAIL fence and crop, at this probe's centre/scale."""
+    return TrimSheet(
+        sheet_scale=SHEET_SCALE,
+        detail_center=probe.center,
+        detail_scale=probe.scale,
+        fence_radius_mm=DETAIL_FENCE_MM,
+        cut_end_y_mm=-CUT_LENGTH_MM,
+        detail_offset_mm=DETAIL_OFFSET_MM,
+        detail_label_xy=TIP_DETAIL.detail_label_xy,
+        parent_letter_offset=TIP_DETAIL.parent_letter_offset,
+    )
+
+
+def _probe_keep(probe: Probe) -> dict[str, tuple[float, float]]:
+    """CutEndBreak's text below the right-hand rim, in this probe's view."""
+    ratio = probe.scale[0] / probe.scale[1]
+    ref_y = -CUT_LENGTH_MM + DETAIL_OFFSET_MM
+    rim = (
+        probe.center[0] + ratio * (THREAD_DIA_MM / 2.0) / 1000.0,
+        probe.center[1] + ratio * (-CUT_LENGTH_MM - ref_y) / 1000.0,
+    )
+    return {
+        CUT_END_BREAK_DIMENSION: (
+            rim[0] + DIAG_BREAK_TEXT_OFFSET[0],
+            rim[1] + DIAG_BREAK_TEXT_OFFSET[1],
+        )
+    }
+
+
+def _labelled_end_detail(adapter: Any, front: Any, sheet: TrimSheet, label: str) -> Any:
+    """``trim_drawing.end_detail`` verbatim, except the detail label (it
+    hard-codes "A", which the replay keeps)."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(front, "IView")
+    if not ddoc.ActivateView(view_name(adapter, front)):
+        raise RuntimeError("cannot activate cut-end detail parent")
+    draw.ClearSelection2(True)
+    center = model_point_in_view(
+        adapter,
+        front,
+        tuple(value / 1000 for value in sheet.detail_reference_mm),
+        label="cut end detail center",
+    )
+    radius = sheet.fence_radius_mm * sheet.sheet_scale[0] / sheet.sheet_scale[1] / 1000
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("cannot create native cut-end detail fence")
+    detail = ddoc.CreateDetailViewAt4(
+        *sheet.detail_center, 0.0, 0, *sheet.detail_scale, label, 1, True, False, False, 5
+    )
+    if detail is None:
+        raise RuntimeError(f"cannot create native cut-end detail {label}")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array(list(sheet.detail_scale))
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("invalid cut-end detail bounds")
+    target = [
+        position[i] + sheet.detail_center[i] - (outline[i] + outline[i + 2]) / 2
+        for i in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("cannot position cut-end detail")
+    draw.EditRebuild3()
+    if tuple(float(value) for value in detail.ScaleRatio) != sheet.detail_scale:
+        raise RuntimeError("cut-end detail scale did not persist")
+    return detail
+
+
+def _cropped_model_view(adapter: Any, probe: Probe) -> Any:
+    """View 4: a standalone *Front model view at the probe scale (NOT a
+    detail), moved so the tip reference point lands on the probe centre, then
+    cropped by a closed sketch circle of the detail fence's size.
+
+    Crop recipe: IDrawingDoc.ActivateView, ISketchManager.CreateCircle (the
+    new circle stays selected), IView.Crop2(False, False, 5) -- the
+    documented "Crop Drawing View" example shape.  Untested on seat.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    view = _early_bound(
+        place_view(adapter, str(SOURCE), "*Front", *probe.center, scale=probe.scale),
+        "IView",
+    )
+    ratio = tuple(float(value) for value in view.ScaleRatio)
+    reference = tuple(value / 1000 for value in TIP_DETAIL.detail_reference_mm)
+    tip = model_point_in_view(adapter, view, reference, label="model view tip")
+    position = tuple(float(value) for value in view.Position)
+    target = [position[i] + probe.center[i] - tip[i] for i in range(2)]
+    moved = bool(view.SetViewPosition(double_array(target), False))
+    draw.EditRebuild3()
+    tip_after = model_point_in_view(adapter, view, reference, label="model view tip")
+    name = view_name(adapter, view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"cannot activate model view {name!r} for its crop")
+    draw.ClearSelection2(True)
+    radius = DETAIL_FENCE_MM * probe.scale[0] / probe.scale[1] / 1000.0
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (tip_after, (tip_after[0] + radius, tip_after[1])):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("cannot create the model view's crop circle")
+    status = int(view.Crop2(False, False, 5))
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    cropped = bool(view.IsCropped())
+    _telemetry.info(
+        f"{DIAG} view={probe.number} crop: name={name!r} scale_read={ratio} "
+        f"moved={moved} tip_sheet_before={[round(v, 5) for v in tip]} "
+        f"tip_sheet_after={[round(v, 5) for v in tip_after]} "
+        f"crop2_status={status} is_cropped={cropped} "
+        f"outline={[round(float(v), 5) for v in view.GetOutline()]}"
+    )
+    if status != _CROP_NO_ERROR or not cropped:
+        raise RuntimeError(
+            f"model view crop failed: Crop2 status {status}, IsCropped {cropped}"
+        )
+    return view
+
+
+# --- 9eca replay: its diagnostic helpers, copied verbatim from 9eca9e227 ---
+# (draw_post_mount_screw.py, "TEMPORARY DIAGNOSTIC" block), minus the
+# post-import failure capture (capture_com_failure + sheet PNG), which ran
+# only after a failed import and so cannot have changed it.
+
+
+def _diag(label: str, fn):
+    try:
+        return fn()
+    except Exception as exc:  # noqa: BLE001 - diagnostics must never mask
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def _view_to_model(adapter: Any, view: Any, xy: tuple[float, float]) -> list[float]:
+    transform = _early_bound(
+        _early_bound(view, "IView").ModelToViewTransform, "IMathTransform"
+    )
+    inverse = _early_bound(transform.Inverse(), "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    point = _early_bound(
+        utility.CreatePoint(double_array([xy[0], xy[1], 0.0])), "IMathPoint"
+    )
+    moved = _early_bound(point.MultiplyTransform(inverse), "IMathPoint")
+    return [round(float(v) * 1000.0, 4) for v in moved.ArrayData]
+
+
+def _crop_in_model(adapter: Any, front: Any) -> dict[str, Any]:
+    info = [float(v) for v in (_early_bound(front, "IView").GetDetailCircleInfo2() or ())]
+    if not info:
+        return {"detail_circles": 0}
+    center, start = (info[2], info[3]), (info[5], info[6])
+    center_model = _view_to_model(adapter, front, center)
+    start_model = _view_to_model(adapter, front, start)
+    return {
+        "detail_circles": int(info[0]),
+        "center_sheet_m": [round(v, 6) for v in center],
+        "start_sheet_m": [round(v, 6) for v in start],
+        "center_model_mm": center_model,
+        "start_model_mm": start_model,
+        "radius_model_mm": round(
+            math.dist(center_model[:2], start_model[:2]), 4
+        ),
+    }
+
+
+def _visible_entities(view: Any) -> dict[str, Any]:
+    view = _early_bound(view, "IView")
+    components = list(view.GetVisibleComponents() or ()) or [None]
+    edges: list[dict[str, Any]] = []
+    vertices: list[list[float]] = []
+    for component in components:
+        for raw in view.GetVisibleEntities2(component, 1) or ():  # Edge
+            edge = _early_bound(raw, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if curve.IsCircle():
+                c = [float(v) for v in curve.CircleParams]
+                edges.append(
+                    {
+                        "circle_r_mm": round(c[6] * 1000.0, 4),
+                        "center_y_mm": round(c[1] * 1000.0, 4),
+                    }
+                )
+            else:
+                edges.append({"type": int(curve.Identity())})
+        for raw in view.GetVisibleEntities2(component, 2) or ():  # Vertex
+            point = _early_bound(raw, "IVertex").GetPoint()
+            vertices.append([round(float(v) * 1000.0, 4) for v in point])
+    chamfer = {
+        "inner_rim_r3.075_y-86": any(
+            abs(e.get("circle_r_mm", 0) - 3.075) < 1e-3
+            and abs(e.get("center_y_mm", 0) + 86.0) < 1e-3
+            for e in edges
+        ),
+        "outer_rim_r3.175_y-85.9": any(
+            abs(e.get("circle_r_mm", 0) - 3.175) < 1e-3
+            and abs(e.get("center_y_mm", 0) + 85.9) < 1e-3
+            for e in edges
+        ),
+    }
+    return {
+        "components": len(components),
+        "edge_count": len(edges),
+        "vertex_count": len(vertices),
+        "circles": [e for e in edges if "circle_r_mm" in e][:40],
+        "vertices_mm": vertices[:40],
+        "chamfer_edges_visible": chamfer,
+    }
+
+
+def _detail_facts(adapter: Any, front: Any, detail: Any) -> dict[str, Any]:
+    view = _early_bound(detail, "IView")
+    base = view.GetBaseView()
+    return {
+        "detail_name": _diag("name", lambda: view_name(adapter, detail)),
+        "detail_type": _diag("type", lambda: int(view.Type)),
+        "detail_scale": _diag("scale", lambda: list(view.ScaleRatio)),
+        "detail_outline_m": _diag("outline", lambda: list(view.GetOutline())),
+        "detail_position_m": _diag("position", lambda: list(view.Position)),
+        "parent_name": _diag("parent", lambda: view_name(adapter, base)),
+        "parent_scale": _diag(
+            "pscale", lambda: list(_early_bound(base, "IView").ScaleRatio)
+        ),
+        "crop": _diag("crop", lambda: _crop_in_model(adapter, front)),
+        "visible": _diag("visible", lambda: _visible_entities(detail)),
+    }
+
+
+def _dimension_count(view: Any) -> Any:
+    return _diag(
+        "dims", lambda: int(_early_bound(view, "IView").GetDisplayDimensionCount())
+    )
+
+
+# --- per-probe reads ------------------------------------------------------
+
+
+def _display_state(view: Any) -> dict[str, Any]:
+    """IView.GetDisplayMode2 (swDisplayMode_e), GetUseParentDisplayMode,
+    GetDisplayTangentEdges2 (swDisplayTangentEdges_e), GetFacettedHlrDisplay."""
+    bound = _early_bound(view, "IView")
+    mode = _diag("mode", lambda: int(bound.GetDisplayMode2()))
+    return {
+        "display": (
+            f"{_DISPLAY_MODE_NAMES.get(mode, '?')}({mode})"
+            if isinstance(mode, int)
+            else repr(mode)
+        ),
+        "use_parent": _diag("parent", lambda: bool(bound.GetUseParentDisplayMode())),
+        "tangent": _diag("tangent", lambda: int(bound.GetDisplayTangentEdges2())),
+        "faceted": _diag("faceted", lambda: bool(bound.GetFacettedHlrDisplay())),
+    }
+
+
+def _break_annotations(adapter: Any, view: Any) -> list[Any]:
+    return [
+        annotation
+        for annotation in (
+            _early_bound(item, "IAnnotation")
+            for item in (_early_bound(view, "IView").GetAnnotations() or ())
+        )
+        if dimension_name(adapter, annotation) == CUT_END_BREAK_DIMENSION
+    ]
+
+
+def _text_height_mm(adapter: Any, view: Any) -> str:
+    """IAnnotation.GetTextFormat(0) -> ITextFormat.CharHeight (m), plus
+    IAnnotation.GetUseDocTextFormat(0).  Untested on seat."""
+    found = _break_annotations(adapter, view)
+    if not found:
+        return "na"
+    annotation = found[0]
+    height = _diag(
+        "text_h",
+        lambda: round(
+            float(_early_bound(annotation.GetTextFormat(0), "ITextFormat").CharHeight)
+            * 1000.0,
+            3,
+        ),
+    )
+    doc_format = _diag("doc_fmt", lambda: bool(annotation.GetUseDocTextFormat(0)))
+    return f"{height}(doc_default={doc_format})"
+
+
+def _delete_break(adapter: Any, view: Any) -> tuple[bool, list[str]]:
+    """Select2 + EditDelete every CutEndBreak in ``view``, as
+    delete_unnamed_imports does, then re-read the view's dimension names."""
+    draw = adapter.currentModel
+    for annotation in _break_annotations(adapter, view):
+        draw.ClearSelection2(True)
+        if not annotation.Select2(False, 0):
+            raise RuntimeError("failed to select the probe's CutEndBreak")
+        draw.EditDelete()
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="mha142_bisect_delete")
+    remaining = _view_dimension_names(adapter, view)
+    return CUT_END_BREAK_DIMENSION not in remaining, remaining
+
+
+def _create_probe_view(adapter: Any, front: Any, probe: Probe) -> Any:
+    """Create and display-set the probe's view; the replay also logs its
+    initial (pre-HLR) display mode, i.e. what the production detail gets."""
+    if probe.kind == "model-cropped":
+        view = _cropped_model_view(adapter, probe)
+    elif probe.kind == "replay9eca":
+        view = trim_drawing.end_detail(adapter, front, TIP_DETAIL)
+    else:
+        view = _labelled_end_detail(adapter, front, _probe_sheet(probe), probe.label)
+    _telemetry.info(
+        f"{DIAG} view={probe.number} created name={view_name(adapter, view)!r} "
+        f"initial={_display_state(view)}"
+    )
+    if probe.display == "hlv":
+        set_hidden_lines_visible(adapter, view)
+    else:
+        set_hidden_lines_removed(adapter, view)
+    _early_bound(view, "IView").UpdateViewDisplayGeometry()
+    return view
+
+
+def _import_into(adapter: Any, front: Any, probe: Probe, view: Any) -> None:
+    """The import: production's entire-model curate (source 0).  The replay
+    wraps it exactly as 9eca's _diagnosed_tip_detail did (facts, then the
+    detail and Front dimension counts, then the curate, then counts)."""
+    keep = _probe_keep(probe)
+    if probe.kind != "replay9eca":
+        _drawing_common.curate_view_dimensions(
+            adapter, view, keep=keep, view_label=f"{DIAG} view {probe.number}"
+        )
+        return
+    with _telemetry.span("diag.tip_detail") as sp:
+        facts = _detail_facts(adapter, front, view)
+        facts["detail_dims_before"] = _dimension_count(view)
+        facts["front_dims_before"] = _dimension_count(front)
+        try:
+            _drawing_common.curate_view_dimensions(
+                adapter, view, keep=keep, view_label="tip detail break"
+            )
+        finally:
+            facts["detail_dims_after"] = _dimension_count(view)
+            facts["front_dims_after"] = _dimension_count(front)
+            _telemetry.info(f"DIAG tip detail: {json.dumps(facts, default=str)}")
+            sp.set_attribute("diag", json.dumps(facts, default=str)[:8000])
+
+
+def _run_probe(
+    adapter: Any, front: Any, probe: Probe, order: int, prior_deletes: int
+) -> ProbeResult:
+    result = ProbeResult(probe=probe, order=order)
+    ratio = probe.scale[0] / probe.scale[1]
+    try:
+        result.view = _create_probe_view(adapter, front, probe)
+    except Exception as exc:  # noqa: BLE001 - every probe must run
+        result.error = repr(exc)
+        _telemetry.warn(f"{DIAG} view={probe.number} error={exc!r} (creation)")
+        return result
+    try:
+        _import_into(adapter, front, probe, result.view)
+    except Exception as exc:  # noqa: BLE001 - every probe must run
+        result.error = repr(exc)
+        _telemetry.warn(f"{DIAG} view={probe.number} error={exc!r}")
+    names = _diag("names", lambda: _view_dimension_names(adapter, result.view))
+    result.available = [n for n in names if n] if isinstance(names, list) else [repr(names)]
+    result.imported = CUT_END_BREAK_DIMENSION in result.available
+    state = _display_state(result.view)
+    _telemetry.info(
+        f"{DIAG} view={probe.number} order={order} kind={probe.kind} "
+        f"scale={probe.scale[0]:g}:{probe.scale[1]:g} display={state['display']} "
+        f"use_parent={state['use_parent']} tangent={state['tangent']} "
+        f"faceted={state['faceted']} "
+        "source=0/InsertModelAnnotations3(0,marked|hw_loc,False,True,True,False)"
+        f"{'+9eca_prereads' if probe.kind == 'replay9eca' else ''} "
+        f"available={result.available} imported={result.imported} "
+        f"prior_deletes={prior_deletes} "
+        f"sheet_text_h_mm={_diag('text', lambda: _text_height_mm(adapter, result.view))} "
+        f"feature_on_sheet_mm={0.1 * ratio:g}"
+    )
+    if result.imported:
+        deleted = _diag("delete", lambda: _delete_break(adapter, result.view))
+        _telemetry.info(f"{DIAG} view={probe.number} deleted={deleted}")
+    return result
+
+
+def run_bisect(adapter: Any, front: Any) -> dict[int, ProbeResult]:
+    """Run every probe in PROBES_IN_ORDER; never raises."""
+    results: dict[int, ProbeResult] = {}
+    prior_deletes = 0
+    with _telemetry.span("diag.mha142_bisect"):
+        for order, probe in enumerate(PROBES_IN_ORDER, start=1):
+            with _telemetry.span(f"diag.mha142_bisect.view{probe.number}"):
+                result = _run_probe(adapter, front, probe, order, prior_deletes)
+            results[probe.number] = result
+            prior_deletes += int(result.imported)
+    return results
+
+
+def reimport_survivor(adapter: Any, results: dict[int, ProbeResult]) -> str:
+    """Put CutEndBreak back into the first surviving 10:1 view (3, 4, then 5)
+    so the published PDF shows it for the legibility eye pass.  Never fatal."""
+    for number in (3, 4, 5):
+        result = results.get(number)
+        if result is None or not result.imported or result.view is None:
+            continue
+        try:
+            _drawing_common.curate_view_dimensions(
+                adapter,
+                result.view,
+                keep=_probe_keep(result.probe),
+                view_label=f"{DIAG} final view {number}",
+            )
+        except Exception as exc:  # noqa: BLE001 - diagnostics must not mask
+            _telemetry.warn(f"{DIAG} final view={number} error={exc!r}")
+        names = _diag("names", lambda: _view_dimension_names(adapter, result.view))
+        imported = isinstance(names, list) and CUT_END_BREAK_DIMENSION in names
+        _telemetry.info(
+            f"{DIAG} final view={number} imported={imported} available={names} "
+            f"sheet_text_h_mm={_diag('text', lambda: _text_height_mm(adapter, result.view))}"
+        )
+        return str(number)
+    _telemetry.info(f"{DIAG} final view=none (no 10:1 view imported)")
+    return "none"
+
+
+def bisect_summary(results: dict[int, ProbeResult], final: str) -> str:
+    outcomes = " ".join(
+        f"v{number}={'Y' if results[number].imported else 'N'}"
+        + ("(err)" if results[number].error else "")
+        for number in sorted(results)
+    )
+    order = ",".join(str(probe.number) for probe in PROBES_IN_ORDER)
+    return (
+        f"{DIAG} summary host={socket.gethostname()} order={order} {outcomes} "
+        f"final={final}"
+    )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -344,7 +878,11 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=SHEET_SCALE)
+    # DIAG: the isometric moves to 1:2 in the free corner (was ISO_CENTER, 1:1)
+    # so the five probe views fit on the one sheet.
+    iso = place_view(
+        adapter, str(SOURCE), "*Isometric", *DIAG_ISO_CENTER, scale=DIAG_ISO_SCALE
+    )
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
 
@@ -361,15 +899,23 @@ async def build(adapter: Any) -> dict[str, str]:
     _reference_cut_length(adapter, annotations)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
 
-    # The break is the deburr cutter's own dimension, imported into the
-    # detail by the entire-model form (see _curate_tip_detail).
-    with _telemetry.span("drawing.tip_detail", scale=f"{DETAIL_SCALE[0]:g}:1"):
-        detail = trim_drawing.end_detail(adapter, front, TIP_DETAIL)
-        set_hidden_lines_removed(adapter, detail)
-        _early_bound(detail, "IView").UpdateViewDisplayGeometry()
-        detail_annotations = _curate_tip_detail(adapter, detail)
-        assert_imported_precision(adapter, detail_annotations, DETAIL_PRECISION)
-        _verify_tip_detail(adapter, front, detail)
+    # DIAG (diag/mha142-bisect): the production tip detail is replaced by the
+    # five probes (see run_bisect); view 5 is its exact 9eca replay.  The
+    # production detail checks are bypassed on this branch only:
+    # assert_imported_precision + _verify_tip_detail (one CutEndBreak in THE
+    # detail), position_detail_label (exactly one note per detail) and
+    # position_parent_detail_letter (exactly one detail circle on the Front).
+    results = run_bisect(adapter, front)
+    final = _diag("final", lambda: reimport_survivor(adapter, results))
+    summary = bisect_summary(results, str(final))
+    _telemetry.info(summary)
+    if not results[1].imported:
+        raise RuntimeError(
+            f"{DIAG}: positive control (view 1, 2:1 HLV detail) did not import "
+            f"CutEndBreak; the diag is invalid "
+            f"({'after deletes by earlier views' if any(r.imported for r in results.values()) else 'nothing imported into any view on this seat'}): "
+            f"{summary}"
+        )
 
     activate_front_for_notes(adapter, front)
     add_property_linked_note(
@@ -379,17 +925,15 @@ async def build(adapter: Any) -> dict[str, str]:
         add_property_linked_note(adapter, name, x, y, char_height=0.003)
 
     set_hidden_lines_removed(adapter, front)
-    trim_drawing.position_detail_label(adapter, detail, TIP_DETAIL)
-    trim_drawing.position_parent_detail_letter(adapter, front, TIP_DETAIL)
-    # Re-read after the label moves and the last rebuilds, before the save.
-    _verify_tip_detail(adapter, front, detail)
-    return await finalize_drawing(
+    artefacts = await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title=TITLE,
         scale=SHEET_SCALE,
         layout=SPEC.layout,
     )
+    _telemetry.info(summary)
+    return artefacts
 
 
 def _parse_args() -> argparse.Namespace:
