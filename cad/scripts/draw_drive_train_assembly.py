@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Callable, Literal, Sequence
 
 import _telemetry
-from _common import OUT_FAILURES, _early_bound, check, run_build
+from _common import _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     _balloon_item_number,
@@ -43,6 +43,7 @@ from _drawing_common import (
 )
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _seat_forensics import OUT_FAILURES
 from drive_train_assembly_spec import (
     CLUSTERS,
     EXPLODED_VIEW_NAME,
@@ -55,7 +56,6 @@ from drive_train_assembly_spec import (
 )
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
-
 
 SPEC = DRAWINGS_BY_NAME["drive_train_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem
