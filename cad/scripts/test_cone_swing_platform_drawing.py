@@ -2074,3 +2074,75 @@ def countersink_cone_mm3_for(side) -> float:
     from _hole_spec import countersink_cone_mm3
 
     return countersink_cone_mm3(side, spec.POST_MOUNT_TAP_DIA)
+
+
+# The tap callout's variable map exactly as the S1 leaf 917-s1-9094 read it
+# on swmaker000005 (drawing:cone_swing_platform): both countersink diameters
+# already print MAX (swTolType 6).
+_LEAF_TAP_CALLOUT_VARIABLES = {
+    "hw-tapdrldia": 0,
+    "hw-thru": 0,
+    "hw-threaddesc": 0,
+    "hw-threadclass": 0,
+    "hw-nscsdia": 6,
+    "hw-nscsang": 0,
+    "hw-msgnearside": 0,
+    "hw-fscsdia": 6,
+    "hw-fscsang": 0,
+    "hw-msgfarside": 0,
+}
+
+
+class _FakeCalloutVariable:
+    def __init__(self, name: str, tolerance_type: int) -> None:
+        self.VariableName = name
+        self.ToleranceType = tolerance_type
+        self._oleobj_ = self
+
+
+class _FakeHoleCallout:
+    def __init__(self, variables: dict[str, int]) -> None:
+        self._variables = [_FakeCalloutVariable(k, v) for k, v in variables.items()]
+
+    def GetHoleCalloutVariables(self) -> list[_FakeCalloutVariable]:
+        return self._variables
+
+
+def _require_max(monkeypatch: pytest.MonkeyPatch, variables: dict[str, int]) -> None:
+    import win32com.client.dynamic
+
+    monkeypatch.setattr(win32com.client.dynamic, "Dispatch", lambda raw: raw)
+    call = drawing._require_countersink_max
+    fake = _FakeHoleCallout(variables)
+    if "spec" in inspect.signature(call).parameters:
+        call(fake, spec=spec.POST_MOUNT_SPEC, label="v2 post-mount tapped holes")
+    else:
+        call(fake, label="v2 post-mount tapped holes")
+
+
+def test_tap_callout_countersink_max_reads_the_wizard_variable_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """S1 leaf 917-s1-9094 failed "callout countersink diameter(s) {} do not
+    print MAX" on a callout whose hw-nscsdia / hw-fscsdia BOTH read 6: the name
+    match missed the wizard's own variable names, so a proven MAX read as
+    absent."""
+    _require_max(monkeypatch, _LEAF_TAP_CALLOUT_VARIABLES)
+
+
+def test_tap_callout_without_countersink_variables_says_so(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No countersink variable at all is a different fault from a countersink
+    that prints its nominal, and must not read as "not MAX"."""
+    bare = {k: v for k, v in _LEAF_TAP_CALLOUT_VARIABLES.items() if "cs" not in k}
+    with pytest.raises(
+        RuntimeError, match="no countersink-diameter callout variables found; saw"
+    ):
+        _require_max(monkeypatch, bare)
+    one_side = {k: v for k, v in _LEAF_TAP_CALLOUT_VARIABLES.items() if k != "hw-fscsdia"}
+    with pytest.raises(RuntimeError, match="missing .*hw-fscsdia"):
+        _require_max(monkeypatch, one_side)
+    nominal = {**_LEAF_TAP_CALLOUT_VARIABLES, "hw-nscsdia": 0}
+    with pytest.raises(RuntimeError, match=r"hw-nscsdia.*do not print MAX"):
+        _require_max(monkeypatch, nominal)

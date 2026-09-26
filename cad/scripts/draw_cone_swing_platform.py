@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import argparse
 import math
-import re
 import sys
 from dataclasses import dataclass
 from collections.abc import Collection, Sequence
@@ -70,7 +69,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
     view_name,
 )
-from _hole_spec import blind_cut_dia_mm
+from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _surface_finish import surface_finish_by_key
 from cone_post_dowel_spec import PLATE_DOWEL_CALLOUT, PLATE_DOWEL_REAM_DIA
 from cone_swing_platform_spec import (
@@ -1663,16 +1662,22 @@ def _add_arc_note(adapter: Any, view: Any, note: ArcNote) -> Any:
     return created
 
 
-_CSK_VARIABLE = re.compile(r"c'?\s*sink|csk|countersink", re.IGNORECASE)
+# The Hole Wizard callout's countersink-DIAMETER variables, per side, exactly
+# as the S1 leaf 917-s1-9094 read them on seat (swmaker000005): near-side
+# "hw-nscsdia", far-side "hw-fscsdia".  Named, never matched by pattern: a
+# guessed pattern missed both and reported a proven MAX as absent.
+_CSK_DIA_VARIABLE_BY_SIDE = {"near": "hw-nscsdia", "far": "hw-fscsdia"}
 
 
-def _require_countersink_max(display: Any, *, label: str) -> None:
+def _require_countersink_max(display: Any, *, spec: HoleSpec, label: str) -> None:
     """Prove the native tap callout carries the part's MAX-banded countersink.
 
     The break is model-owned (cone_swing_platform_spec.POST_MOUNT_TAP_CSK):
     the part bands each countersink diameter swTolMAX and this sheet authors
     nothing.  The callout variable's own ToleranceType is what prints, so read
-    it back and fail loud unless every countersink diameter reads MAX.
+    back the diameter variable of every side ``spec`` countersinks and fail
+    loud -- distinctly -- when none is there, when a side's is missing, or
+    when a MAX-limited one does not print MAX.
     """
     from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
 
@@ -1680,16 +1685,34 @@ def _require_countersink_max(display: Any, *, label: str) -> None:
     for raw in display.GetHoleCalloutVariables() or ():
         variable = dynamic_dispatch(raw._oleobj_)
         seen[str(variable.VariableName)] = int(variable.ToleranceType)
-    csk = {
-        name: tol
-        for name, tol in seen.items()
-        if _CSK_VARIABLE.search(name) and "dia" in name.lower()
+    wanted = {
+        _CSK_DIA_VARIABLE_BY_SIDE[side]: csk
+        for side, csk in (("near", spec.near_countersink), ("far", spec.far_countersink))
+        if csk is not None
     }
-    if not csk or any(tol != 6 for tol in csk.values()):  # swTolType_e.swTolMAX
+    present = sorted(name for name in wanted if name in seen)
+    if not present:
         raise RuntimeError(
-            f"{label}: callout countersink diameter(s) {csk!r} do not print MAX "
+            f"{label}: no countersink-diameter callout variables found; saw "
+            f"{seen!r} (wanted {sorted(wanted)!r})"
+        )
+    missing = sorted(name for name in wanted if name not in seen)
+    if missing:
+        raise RuntimeError(
+            f"{label}: countersink-diameter callout variable(s) missing "
+            f"{missing!r}; saw {seen!r}"
+        )
+    not_max = {
+        name: seen[name]
+        for name, csk in wanted.items()
+        if csk.max_limit and seen[name] != 6  # swTolType_e.swTolMAX
+    }
+    if not_max:
+        raise RuntimeError(
+            f"{label}: callout countersink diameter(s) {not_max!r} do not print MAX "
             f"(all variables and tolerance types: {seen!r})"
         )
+    _telemetry.info(f"{label}: callout countersink diameter(s) {present} print MAX")
 
 
 def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
@@ -2227,7 +2250,9 @@ async def build(adapter: Any) -> dict[str, str]:
         edge=mount_edge,
         process=POST_MOUNT_TRANSFER_CALLOUT,
     )
-    _require_countersink_max(tap_callout, label="v2 post-mount tapped holes")
+    _require_countersink_max(
+        tap_callout, spec=POST_MOUNT_SPEC, label="v2 post-mount tapped holes"
+    )
     # The dowel pair's size, band and THRU stay native; the prefix names the
     # mating post and the reamer.  A reamed fit prints three places.
     dowel_callout = add_native_hole_callout(
