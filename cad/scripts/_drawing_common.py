@@ -40,7 +40,8 @@ from _drawing_layout_check import (
     audit_layout,
     format_findings,
 )
-from _drawing_layout_audit import run_layout_audit
+from _drawing_layout_audit import annotation_display, run_layout_audit
+from _layout_audit import display_box, estimated_text_runs, line_segment
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, layout_report_path
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import (
@@ -91,13 +92,6 @@ _ANNOT_GTOL = 5
 _ANNOT_SFSYM = 7
 _SEL_DIMENSION = 14  # swSelectType_e.swSelDIMENSIONS
 _GDT_TYPES = frozenset({_ANNOT_DATUM, _ANNOT_GTOL, _ANNOT_SFSYM})
-# The interface each GD&T kind's geometry actually lives on -- reached via
-# IAnnotation::GetSpecificAnnotation, never off IAnnotation itself.
-_GDT_IFACE = {
-    _ANNOT_DATUM: "IDatumTag",
-    _ANNOT_GTOL: "IGtol",
-    _ANNOT_SFSYM: "ISFSymbol",
-}
 # Fallback only, for an annotation whose geometry cannot be read. Every GD&T
 # symbol that CAN be measured is (see _measured_gdt_box) -- a fixed square is
 # wrong for an FCF by construction, since its width tracks its compartments.
@@ -5336,63 +5330,62 @@ def _datum_is_dimension_attached(adapter: Any, annotation: Any) -> bool:
     return _SEL_DIMENSION in (int(value) for value in attachment_types)
 
 
-def _measured_gdt_box(
-    adapter: Any, annotation: Any, kind: int
-) -> tuple[float, float, float, float] | None:
-    """Box a GD&T symbol from the geometry SolidWorks actually renders.
+def _gdt_display(
+    adapter: Any, annotation: Any, kind: int, *, name: str
+) -> dict[str, Any] | None:
+    """A datum tag's or feature-control frame's rendered ink, in sheet space.
 
-    ``IDatumTag`` / ``IGtol`` / ``ISFSymbol`` all expose the symbol's real
-    primitives -- ``GetLineAtIndex(i)`` -> ``[lineType, startPt[3], endPt[3]]``,
-    ``GetTriangleAtIndex(i)`` -> ``[vtx1[3], vtx2[3], vtx3[3], isFilled,
-    lineType]``, ``GetArcAtIndex(i)`` -> ``[lineType, startPt[3], endPt[3],
-    centerPt[3], rotationDir]``. Their union is the symbol's ink, leader
-    included, which is exactly the question an OVERFLOW check asks.
+    ``IAnnotation::GetDisplayData``, read by the shared layout audit's reader
+    (``annotation_display``): lines, arcs, triangles and text runs where
+    SolidWorks draws them. NOT the ``IGtol`` / ``IDatumTag`` primitives
+    (``GetLineAtIndex`` and kin) this used to read -- on MHA-062 at 4:1
+    (pc-gdt-ink-diag, a89a13a7a) a leadered FCF's primitives are a crossed
+    2h x 2h placeholder square at the leader's far end plus the leader's last
+    run, never the frame, and a datum tag's box lies about (-9.9, -5.0) mm off
+    its ink. The display data is where the PDF prints: knife-mount's datum A
+    and its leadered three-compartment FCF match their PDF glyphs within
+    0.15 mm (layoutcal d09c2b9eb).
 
-    They are NOT on ``IAnnotation``: go through ``GetSpecificAnnotation()``
-    first, or every call raises. (``GetExtent`` is not the route -- the type
-    library declares it on ``IBomTable`` and ``INote`` only, verified against a
-    working ``INote.GetExtent()`` in the same probe run.)
+    ``None``, with a ``gdt_box.fallback`` event naming the symbol and the
+    reason, when there is nothing to read; the caller then falls back.
+    A DATUM attached to a display dimension is one such case: its IDatumTag
+    primitives were in the dimension's local frame, and whether its display
+    data is sheet space is unmeasured, so it keeps the nominal box. A frame
+    attached to a dimension reads its display data like any other: a nominal
+    square is wrong for an FCF by construction.
     """
-    if kind == _ANNOT_DATUM:
-        if _datum_is_dimension_attached(adapter, annotation):
-            # A datum attached to a display dimension reports IDatumTag primitive
-            # coordinates in that dimension's local frame, unlike the sheet-space
-            # primitives of an edge-attached tag. Its IAnnotation.GetPosition is
-            # still the documented sheet-space symbol origin, so the nominal datum
-            # box below is the truthful overflow check for this attachment type.
-            return None
+    if kind == _ANNOT_DATUM and _datum_is_dimension_attached(adapter, annotation):
+        reason = "dimension-attached datum"
+    else:
+        display, refused = annotation_display(adapter, annotation)
+        if display:
+            return display
+        reason = f"no display data (refused {refused})" if refused else "no display data"
+    _telemetry.event("gdt_box.fallback", symbol=name, reason=reason)
+    _telemetry.debug(f"{name}: GD&T box falls back to the nominal square: {reason}")
+    return None
 
-    spec = adapter._attempt(
-        lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
-    )
-    if spec is None:
-        return None
-    spec = _sw_type_info.early_bound_or_flag(spec, _GDT_IFACE[kind])
 
-    points: list[tuple[float, float]] = []
-    for count_name, at_name, offsets in (
-        ("GetLineCount", "GetLineAtIndex", ((1, 2), (4, 5))),
-        ("GetArcCount", "GetArcAtIndex", ((1, 2), (4, 5))),
-        ("GetTriangleCount", "GetTriangleAtIndex", ((0, 1), (3, 4), (6, 7))),
-    ):
-        n = (
-            adapter._attempt(
-                lambda c=count_name: int(adapter._get_attr_or_call(spec, c) or 0)
-            )
-            or 0
-        )
-        for i in range(n):
-            raw = adapter._attempt(lambda a=at_name, j=i: getattr(spec, a)(j))
-            if not raw:
-                continue
-            v = [float(t) for t in raw]
-            points.extend((v[ix], v[iy]) for ix, iy in offsets if iy < len(v))
-    if not points:
-        return None
+def _measured_gdt_box(
+    adapter: Any, annotation: Any, kind: int, *, name: str
+) -> tuple[float, float, float, float] | None:
+    """Box a datum tag or feature-control frame from the ink it renders.
 
-    xs = [p[0] for p in points]
-    ys = [p[1] for p in points]
-    return min(xs), min(ys), max(xs), max(ys)
+    ``_gdt_display``'s display data, every primitive and text run
+    (``display_box``). Leader included: that is ink too, and it can cross a
+    border on its own. Text below a frame ("BOTH CROWNS") is inside no frame
+    line, so its run is boxed at the width SolidWorks reports; a run with
+    none is estimated from its glyph count, with a ``gdt_box.text_estimated``
+    event.
+    """
+    display = _gdt_display(adapter, annotation, kind, name=name)
+    box = display_box(display) if display else None
+    if display and box is None:
+        _telemetry.event("gdt_box.fallback", symbol=name, reason="display data draws nothing")
+    estimated = estimated_text_runs(display) if display else 0
+    if estimated:
+        _telemetry.event("gdt_box.text_estimated", symbol=name, runs=estimated)
+    return None if box is None else (box.xmin, box.ymin, box.xmax, box.ymax)
 
 
 def _gdt_element(
@@ -5436,7 +5429,7 @@ def _gdt_element(
             y + _SF_BOX_UP_M,
             scope=CollisionScope.NONE,
         )
-    measured = _measured_gdt_box(adapter, annotation, kind)
+    measured = _measured_gdt_box(adapter, annotation, kind, name=name)
     if measured is not None:
         x0, y0, x1, y1 = measured
         return LayoutElement(name, "gdt", x0, y0, x1, y1, scope=CollisionScope.NONE)
@@ -5596,8 +5589,11 @@ def _datum_leader_segments(
     ``GetLeaderCount()`` returns 0 for every ``swDatumTag`` (measured: 3 tags on
     rocker-arm-support report 0, while a ``swGtol`` on the same sheet reports 1).
 
-    But the leader IS DRAWN, and it IS readable -- as ordinary geometry via
-    ``IDatumTag::GetLineAtIndex``. Without this, a datum tag routed straight
+    But the leader IS DRAWN, and it IS readable -- as the tag's display data
+    (``IAnnotation::GetDisplayData`` lines, sheet space). NOT
+    ``IDatumTag::GetLineAtIndex``: at 4:1 on MHA-062 those primitives drew the
+    box (-9.9, -5.0) mm off its ink and a jog to it the sheet never printed
+    (pc-gdt-ink-diag, a89a13a7a), a phantom leader run. Without this, a datum tag routed straight
     across a neighbouring view is invisible to BOTH audits: its box is
     ``CollisionScope.NONE`` so it is never overlap-checked, and it contributes no
     leader segments so it is never crossing-checked (codex #334). That is not
@@ -5608,22 +5604,12 @@ def _datum_leader_segments(
     if _datum_is_dimension_attached(adapter, annotation):
         return []
 
-    spec = adapter._attempt(
-        lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
-    )
-    if spec is None:
-        return []
-    spec = _sw_type_info.early_bound_or_flag(spec, "IDatumTag")
-    count = int(
-        adapter._attempt(lambda: adapter._get_attr_or_call(spec, "GetLineCount")) or 0
-    )
-    lines: list[tuple[tuple[float, float], tuple[float, float]]] = []
-    for index in range(count):
-        raw = adapter._attempt(lambda i=index: spec.GetLineAtIndex(i))
-        if not raw:
-            continue
-        v = [float(t) for t in raw]  # [lineType, startPt[3], endPt[3]]
-        lines.append(((v[1], v[2]), (v[4], v[5])))
+    display, _refused = annotation_display(adapter, annotation)
+    lines: list[tuple[tuple[float, float], tuple[float, float]]] = [
+        ((segment.x0, segment.y0), (segment.x1, segment.y1))
+        for segment in (line_segment(raw) for raw in display.get("lines", ()))
+        if segment is not None
+    ]
     # Drop the tag's own BOX -- it is not a leader, and a box legitimately abuts
     # its own view. Everything else (the leader run, and the shoulder some tags
     # draw along the attached edge) is a straight run that can cross a view.

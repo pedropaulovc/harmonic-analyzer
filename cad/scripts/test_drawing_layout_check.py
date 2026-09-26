@@ -840,10 +840,46 @@ def test_leader_routed_clear_of_other_views_is_clean():
     assert find_leader_crossings([leader], _views()) == []
 
 
-def _datum_tag(x, y, lines, label="A"):
-    spec = SimpleNamespace(
+def _display_data(lines=(), triangles=(), texts=()):
+    """IDisplayData as ``IAnnotation::GetDisplayData`` hands it back, sheet
+    space: lines as ``GetLineAtIndex2`` ([color, lineType, style, weight,
+    start[3], end[3]]), triangles as [v1[3], v2[3], v3[3], isFilled, lineType],
+    texts as (text, (x, y), height[, width]) lower-left runs; a run with no
+    width refuses ``GetTextInBoxWidthAtIndex``."""
+
+    def width(i):
+        if len(texts[i]) < 4:
+            raise AttributeError("GetTextInBoxWidthAtIndex")
+        return texts[i][3]
+
+    return SimpleNamespace(
         GetLineCount=lambda: len(lines),
-        GetLineAtIndex=lambda i: [1.0, *lines[i][0], 0.0, *lines[i][1], 0.0],
+        GetLineAtIndex2=lambda i: [0.0, 0.0, 0.0, 0.0, *lines[i][0], 0.0, *lines[i][1], 0.0],
+        GetArcCount=lambda: 0,
+        GetArrowHeadCount=lambda: 0,
+        GetPolyLineCount=lambda: 0,
+        GetPolygonCount=lambda: 0,
+        GetTriangleCount=lambda: len(triangles),
+        GetTriangleAtIndex=lambda i: [c for v in triangles[i] for c in (*v, 0.0)] + [1.0, 0.0],
+        GetEllipseCount=lambda: 0,
+        GetTextCount=lambda: len(texts),
+        GetTextAtIndex=lambda i: texts[i][0],
+        GetTextPositionAtIndex=lambda i: [*texts[i][1], 0.0],
+        GetTextHeightAtIndex=lambda i: texts[i][2],
+        GetTextRefPositionAtIndex=lambda i: 1,
+        GetTextAngleAtIndex=lambda i: 0.0,
+        GetTextFontAtIndex=lambda i: "Century Gothic",
+        GetTextLineSpacingAtIndex=lambda i: 0.0,
+        GetTextInBoxWidthAtIndex=width,
+    )
+
+
+def _datum_tag(x, y, lines, label="A", *, primitives=()):
+    """A datum tag whose display data draws ``lines``. ``primitives`` are what
+    its IDatumTag reports, which the audit must NOT read."""
+    spec = SimpleNamespace(
+        GetLineCount=lambda: len(primitives),
+        GetLineAtIndex=lambda i: [0.0, *primitives[i][0], 0.0, *primitives[i][1], 0.0],
     )
     return SimpleNamespace(
         GetPosition=[x, y, 0.0],
@@ -851,6 +887,7 @@ def _datum_tag(x, y, lines, label="A"):
         GetName=lambda: label,
         GetLeaderCount=lambda: 0,  # the whole point: it registers none
         GetSpecificAnnotation=lambda: spec,
+        GetDisplayData=lambda: _display_data(lines),
     )
 
 
@@ -860,7 +897,7 @@ def test_datum_tag_leader_is_collected_even_though_it_registers_none():
     GetLeaderCount() is 0 for every swDatumTag (SetLeader3 never made a leader,
     and cannot for a datum FEATURE symbol), so _leader_segments_of returns
     nothing however badly the tag is routed. The leader is real and drawn --
-    readable only as IDatumTag geometry.
+    readable as the tag's display data.
     """
     ax, ay = 0.2100, 0.1436
     box = [
@@ -1123,29 +1160,31 @@ def test_surface_finish_box_matches_the_measured_symbol_anatomy():
     assert element.xmax - element.xmin > 2 * (element.ymax - element.ymin)
 
 
-def _gdt_with_geometry(x, y, kind, label, lines=(), triangles=()):
-    """A GD&T annotation whose GetSpecificAnnotation exposes real primitives.
+def _gdt_with_geometry(
+    x, y, kind, label, lines=(), triangles=(), texts=(), *, primitives=None, attached_to=()
+):
+    """A GD&T annotation whose display data draws ``lines``/``triangles``/``texts``.
 
-    Mirrors the COM shapes exactly: GetLineAtIndex -> [lineType, startPt[3],
-    endPt[3]], GetTriangleAtIndex -> [vtx1[3], vtx2[3], vtx3[3], isFilled,
-    lineType].
+    ``primitives`` (IGtol/IDatumTag ``GetLineAtIndex`` rows, [lineType,
+    startPt[3], endPt[3]]) is what its specific interface reports; ``None``
+    means no display data at all, only those primitives. ``attached_to`` is
+    ``GetAttachedEntityTypes`` (swSelectType_e codes).
     """
     spec = SimpleNamespace(
-        GetLineCount=lambda: len(lines),
-        GetLineAtIndex=lambda i: [1.0, *lines[i][0], 0.0, *lines[i][1], 0.0],
+        GetLineCount=lambda: len(primitives or ()),
+        GetLineAtIndex=lambda i: primitives[i],
         GetArcCount=lambda: 0,
-        GetArcAtIndex=lambda i: None,
-        GetTriangleCount=lambda: len(triangles),
-        GetTriangleAtIndex=lambda i: (
-            [c for v in triangles[i] for c in (*v, 0.0)] + [1.0, 1.0]
-        ),
+        GetTriangleCount=lambda: 0,
     )
     annotation = SimpleNamespace(
         GetPosition=[x, y, 0.0],
         GetType=lambda k=kind: k,
         GetName=lambda n=label: n,
         GetSpecificAnnotation=lambda: spec,
+        GetAttachedEntityTypes=lambda: list(attached_to),
     )
+    if primitives is None:
+        annotation.GetDisplayData = lambda: _display_data(lines, triangles, texts)
     return drawing_common._gdt_element(_FakeAdapter(None), annotation, label, kind)
 
 
@@ -1207,6 +1246,255 @@ def test_datum_tag_box_spans_its_leader_and_triangle():
     assert el.ymin == pytest.approx(0.1366)  # box bottom
     assert el.ymax == pytest.approx(0.1562)  # triangle tip at the attachment
     assert (el.xmin, el.xmax) == pytest.approx((0.2065, 0.2135))
+
+
+MM = 0.001
+
+# MHA-062 (pc-858x928b at bc942d25f) as pc-gdt-ink-diag a89a13a7a logged it:
+# the cylindricity FCF in the 4:1 end view. GetPosition is its frame's
+# top-left, (0.065, 0.232); the render prints the frame at about
+# (0.0648..0.0853, 0.2250..0.2319). Its IGtol primitives are a crossed 7 mm
+# placeholder square at GetTextPoint (the leader's far end) plus the leader's
+# last run.
+_MHA062_CYLINDRICITY_PRIMITIVES = [
+    [0.0, 0.062883, 0.215112, 0.0, 0.062883, 0.208112, 0.0],
+    [0.0, 0.062883, 0.208112, 0.0, 0.069883, 0.208112, 0.0],
+    [0.0, 0.069883, 0.208112, 0.0, 0.069883, 0.215112, 0.0],
+    [0.0, 0.069883, 0.215112, 0.0, 0.062883, 0.215112, 0.0],
+    [0.0, 0.062883, 0.215112, 0.0, 0.069883, 0.208112, 0.0],
+    [0.0, 0.062883, 0.208112, 0.0, 0.069883, 0.215112, 0.0],
+    [0.0, 0.062883, 0.211612, 0.187, 0.062808, 0.215016, 0.374],
+]
+# Its datum A, same view: IDatumTag lines are a leader up from the triangle,
+# a jog left to x 0.048635 and a box at x 0.041635..0.048635; the render
+# prints the box centred on the leader (x ~0.0514..0.0585) with no jog.
+_MHA062_DATUM_A_PRIMITIVES = [
+    ((0.054991, 0.2177), (0.054985, 0.2277)),
+    ((0.054985, 0.2277), (0.048635, 0.2277)),
+    ((0.048635, 0.2242), (0.041635, 0.2242)),
+    ((0.041635, 0.2242), (0.041635, 0.2312)),
+    ((0.041635, 0.2312), (0.048635, 0.2312)),
+    ((0.048635, 0.2312), (0.048635, 0.2242)),
+]
+
+
+def _recorded_events(monkeypatch):
+    events = []
+    monkeypatch.setattr(
+        drawing_common._telemetry, "event", lambda name, **attrs: events.append((name, attrs))
+    )
+    return events
+
+
+def test_a_leadered_frames_igtol_primitives_never_box_it(monkeypatch):
+    """pc-858x928b: MHA-062's cylindricity frame printed over "STRAPS" and
+    "0.45" while the audit boxed it as the 7 mm placeholder its IGtol
+    primitives draw at the leader's far end, 17 mm below the frame. Those
+    primitives are no longer read: with no display data the symbol keeps the
+    nominal square at its position, and says so in a trace event."""
+    events = _recorded_events(monkeypatch)
+    el = _gdt_with_geometry(
+        0.065, 0.232, drawing_common._ANNOT_GTOL, "cylindricity",
+        primitives=_MHA062_CYLINDRICITY_PRIMITIVES,
+    )
+    placeholder = (0.062808, 0.208112, 0.069883, 0.215112)
+    assert (el.xmin, el.ymin, el.xmax, el.ymax) != pytest.approx(placeholder)
+    half = drawing_common._NOMINAL_GDT_HALF_M
+    assert (el.xmin, el.ymax) == pytest.approx((0.065 - half, 0.232 + half))
+    assert [(name, attrs["symbol"]) for name, attrs in events] == [("gdt_box.fallback", "cylindricity")]
+
+
+def test_a_datum_tags_primitive_jog_is_not_a_leader():
+    """The same tag's IDatumTag jog (x 0.054985 -> 0.048635) is a leader run
+    the sheet never prints; it would be crossing-checked as one. With no
+    display data there is no leader to read."""
+    ann = _datum_tag(0.055, 0.229, [], primitives=_MHA062_DATUM_A_PRIMITIVES)
+    segs = drawing_common._datum_leader_segments(
+        _FakeAdapter(None), ann, label="A", owner="Drawing View1"
+    )
+    assert not [s for s in segs if 0.0486 < min(s.x0, s.x1) < 0.0487]
+
+
+# knife-mount (layoutcal d09c2b9eb), 2:1: display data of datum A and its
+# leadered three-compartment position frame, in mm. Their text runs land on
+# the printed PDF glyphs within 0.15 mm, so this is where the ink is.
+_KNIFE_FCF_LINES = [
+    ((147.0, 161.63), (147.0, 168.63)),
+    ((147.0, 168.63), (154.0, 168.63)),
+    ((154.0, 168.63), (154.0, 161.63)),
+    ((154.0, 161.63), (147.0, 161.63)),
+    ((154.0, 161.63), (154.0, 168.63)),
+    ((154.0, 168.63), (170.12, 168.63)),
+    ((170.12, 168.63), (170.12, 161.63)),
+    ((170.12, 161.63), (154.0, 161.63)),
+    ((170.12, 161.63), (170.12, 168.63)),
+    ((170.12, 168.63), (176.41, 168.63)),
+    ((176.41, 168.63), (176.41, 161.63)),
+    ((176.41, 161.63), (170.12, 161.63)),
+    ((140.65, 165.13), (147.0, 165.13)),  # leader, from the frame's mid-height
+    ((140.65, 165.13), (114.63, 140.63)),
+]
+_KNIFE_FCF_TEXTS = [
+    ("<GTOL-POSI>", (147.88, 163.38), 2.8),
+    ("<MOD-DIAM>", (155.42, 162.5), 2.8),
+    ("0.20", (159.64, 162.35), 3.5),
+    ("A", (171.54, 162.35), 3.5),
+]
+_KNIFE_DATUM_LINES = [
+    ((115.0, 169.37), (115.0, 187.37)),  # leader
+    ((118.5, 187.37), (111.5, 187.37)),
+    ((111.5, 187.37), (111.5, 194.37)),
+    ((111.5, 194.37), (118.5, 194.37)),
+    ((118.5, 194.37), (118.5, 187.37)),
+]
+
+
+def _m(points):
+    return [tuple(tuple(v * MM for v in point) for point in line) for line in points]
+
+
+def test_a_frame_is_boxed_from_its_display_data():
+    """knife-mount's position frame: the frame (147.0..176.41 x 161.63..168.63,
+    top-left at GetPosition) plus its leader down to (114.63, 140.63)."""
+    texts = [(t, (x * MM, y * MM), h * MM) for t, (x, y), h in _KNIFE_FCF_TEXTS]
+    el = _gdt_with_geometry(
+        0.147, 0.16863, drawing_common._ANNOT_GTOL, "position",
+        lines=_m(_KNIFE_FCF_LINES), texts=texts,
+    )
+    assert (el.xmin, el.ymin, el.xmax, el.ymax) == pytest.approx(
+        (0.11463, 0.14063, 0.17641, 0.16863)
+    )
+
+
+def test_a_frame_attached_to_a_dimension_is_boxed_from_its_display_data():
+    """Main's review: the dimension-attached fallback is a DATUM rule. A frame
+    hung under a dimension reads its display data like any other; the nominal
+    square is wrong for an FCF by construction."""
+    dimension = drawing_common._SEL_DIMENSION
+    frame = _gdt_with_geometry(
+        0.147, 0.16863, drawing_common._ANNOT_GTOL, "position",
+        lines=_m(_KNIFE_FCF_LINES), attached_to=(dimension,),
+    )
+    assert (frame.xmin, frame.xmax) == pytest.approx((0.11463, 0.17641))
+    datum = _gdt_with_geometry(
+        0.115, 0.18737, drawing_common._ANNOT_DATUM, "A",
+        lines=_m(_KNIFE_DATUM_LINES), attached_to=(dimension,),
+    )
+    half = drawing_common._NOMINAL_GDT_HALF_M
+    assert (datum.xmin, datum.xmax) == pytest.approx((0.115 - half, 0.115 + half))
+
+
+def test_a_datum_tag_is_boxed_and_led_from_its_display_data():
+    """knife-mount's datum A: box 111.5..118.5 x 187.37..194.37 over an 18 mm
+    leader down to its triangle; the leader is the one run left once the box
+    is set aside."""
+    tri = [((0.1164, 0.16937), (0.1136, 0.16937), (0.1150, 0.17182))]
+    el = _gdt_with_geometry(
+        0.115, 0.18737, drawing_common._ANNOT_DATUM, "A",
+        lines=_m(_KNIFE_DATUM_LINES), triangles=tri,
+        texts=[("A", (0.11327, 0.18809), 0.0035)],
+    )
+    assert (el.xmin, el.ymin, el.xmax, el.ymax) == pytest.approx((0.1115, 0.16937, 0.1185, 0.19437))
+    segs = drawing_common._datum_leader_segments(
+        _FakeAdapter(None), _datum_tag(0.115, 0.18737, _m(_KNIFE_DATUM_LINES)), label="A", owner="Drawing View1"
+    )
+    assert [(s.x0, s.y0, s.x1, s.y1) for s in segs] == [pytest.approx((0.115, 0.16937, 0.115, 0.18737))]
+
+
+# MHA-062 as gdtdiag2 (c7d835ede, run 20260926T100140395Z) logged its display
+# data. Overlaid on the pc-858x928b render (mha062-gdt-overlay.png,
+# mha062-crown-overlay.png) the frames and datum box sit exactly on the ink.
+def _lines(*runs):
+    return [((x0, y0), (x1, y1)) for x0, y0, x1, y1 in runs]
+
+
+_MHA062_CYLINDRICITY = _lines(
+    (0.065, 0.225, 0.065, 0.232), (0.065, 0.232, 0.0734, 0.232),
+    (0.0734, 0.232, 0.0734, 0.225), (0.0734, 0.225, 0.065, 0.225),
+    (0.0734, 0.225, 0.0734, 0.232), (0.0734, 0.232, 0.085295, 0.232),
+    (0.085295, 0.232, 0.085295, 0.225), (0.085295, 0.225, 0.0734, 0.225),
+    (0.05865, 0.2285, 0.065, 0.2285), (0.05865, 0.2285, 0.063047, 0.214826),
+)
+_MHA062_CROWN = _lines(
+    (0.245, 0.221, 0.245, 0.228), (0.245, 0.228, 0.2534, 0.228),
+    (0.2534, 0.228, 0.2534, 0.221), (0.2534, 0.221, 0.245, 0.221),
+    (0.2534, 0.221, 0.2534, 0.228), (0.2534, 0.228, 0.265295, 0.228),
+    (0.265295, 0.228, 0.265295, 0.221), (0.265295, 0.221, 0.2534, 0.221),
+    (0.271645, 0.2245, 0.265295, 0.2245), (0.271645, 0.2245, 0.28745, 0.206399),
+)
+_MHA062_DATUM_A = _lines(
+    (0.055, 0.2177, 0.055, 0.229), (0.0585, 0.229, 0.0515, 0.229),
+    (0.0515, 0.229, 0.0515, 0.236), (0.0515, 0.236, 0.0585, 0.236),
+    (0.0585, 0.236, 0.0585, 0.229),
+)
+
+
+def test_mha062_cylindricity_frame_is_boxed_where_it_prints():
+    """The verification bar: rendered frame (0.0648..0.0853, 0.2250..0.2319).
+    Its display lines put it at 0.0650..0.0853 x 0.2250..0.2320, over
+    "STRAPS" and "0.45"; the box also carries the leader to (0.05865, 0.21483)."""
+    texts = [
+        ("<GTOL-CYL>", (0.0657, 0.22675), 0.0028, 0.007),
+        ("0.01", (0.074822, 0.225722), 0.0035, 0.009051),
+    ]
+    el = _gdt_with_geometry(
+        0.065, 0.232, drawing_common._ANNOT_GTOL, "cylindricity",
+        lines=_MHA062_CYLINDRICITY, texts=texts,
+    )
+    assert (el.xmin, el.ymin, el.xmax, el.ymax) == pytest.approx((0.05865, 0.214826, 0.085295, 0.232))
+
+
+def test_mha062_crown_frame_carries_its_below_frame_text_at_its_own_width(monkeypatch):
+    """"BOTH CROWNS" prints 34.1 mm wide under the frame, reaching x 0.2791;
+    SolidWorks reports that width, and no estimate is logged."""
+    events = _recorded_events(monkeypatch)
+    texts = [
+        ("<GTOL-SPROF>", (0.2457, 0.22275), 0.0028, 0.007),
+        ("0.05", (0.254822, 0.221722), 0.0035, 0.009051),
+        ("BOTH CROWNS", (0.245, 0.215444), 0.0035, 0.034140),
+    ]
+    display = drawing_common.annotation_display(
+        _FakeAdapter(None), SimpleNamespace(GetDisplayData=lambda: _display_data(_MHA062_CROWN, (), texts))
+    )[0]
+    box = drawing_common.display_box({**display, "lines": []})  # the text alone
+    assert (box.xmin, box.xmax) == pytest.approx((0.245, 0.27914))
+    el = _gdt_with_geometry(
+        0.245, 0.228, drawing_common._ANNOT_GTOL, "crown", lines=_MHA062_CROWN, texts=texts
+    )
+    assert (el.xmin, el.ymin, el.xmax, el.ymax) == pytest.approx((0.245, 0.206399, 0.28745, 0.228))
+    assert not [name for name, _attrs in events if name == "gdt_box.text_estimated"]
+
+
+def test_a_run_without_a_reported_width_is_estimated_and_logged(monkeypatch):
+    events = _recorded_events(monkeypatch)
+    _gdt_with_geometry(
+        0.245, 0.228, drawing_common._ANNOT_GTOL, "crown", lines=_MHA062_CROWN,
+        texts=[("BOTH CROWNS", (0.245, 0.215444), 0.0035)],
+    )
+    assert [(name, attrs) for name, attrs in events] == [
+        ("gdt_box.text_estimated", {"symbol": "crown", "runs": 1})
+    ]
+    # A refused width is not a lost read: the layout audit must not gate on it.
+    display, refused = drawing_common.annotation_display(
+        _FakeAdapter(None),
+        SimpleNamespace(GetDisplayData=lambda: _display_data(texts=[("BOTH CROWNS", (0.245, 0.215444), 0.0035)])),
+    )
+    assert "w" not in display["texts"][0] and refused == {}
+
+
+def test_mha062_datum_a_is_boxed_and_led_where_it_prints():
+    """Rendered: box centred on its leader at x 0.055, 0.0514..0.0585 x
+    0.2293..0.2360, no jog. The display data says exactly that."""
+    el = _gdt_with_geometry(
+        0.055, 0.229, drawing_common._ANNOT_DATUM, "A", lines=_MHA062_DATUM_A,
+        triangles=[((0.0564, 0.2177), (0.0536, 0.2177), (0.055, 0.22015))],
+        texts=[("A", (0.053274, 0.229722), 0.0035, 0.003451)],
+    )
+    assert (el.xmin, el.ymin, el.xmax, el.ymax) == pytest.approx((0.0515, 0.2177, 0.0585, 0.236))
+    segs = drawing_common._datum_leader_segments(
+        _FakeAdapter(None), _datum_tag(0.055, 0.229, _MHA062_DATUM_A), label="A", owner="Drawing View1"
+    )
+    assert [(s.x0, s.y0, s.x1, s.y1) for s in segs] == [pytest.approx((0.055, 0.2177, 0.055, 0.229))]
 
 
 def test_unmeasurable_gdt_falls_back_to_the_nominal_square():
