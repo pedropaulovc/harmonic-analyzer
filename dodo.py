@@ -1706,8 +1706,11 @@ def _drawing_file_deps(stem: str) -> list[str]:
 
 
 def _drawing_cache_outputs(stem: str) -> list[Path]:
-    """Native drawing plus every derived manufacturing output it emits."""
-    return [path.resolve() for path in DRAWINGS_BY_NAME[stem].outputs.values()]
+    """Native drawing, every derived manufacturing output it emits, and its
+    layout-audit report -- which rides the remote cache with the sheet, so a
+    restored leaf still carries its findings and sheet dumps."""
+    spec = DRAWINGS_BY_NAME[stem]
+    return [path.resolve() for path in (*spec.outputs.values(), spec.layout_report)]
 
 
 # --- Inputs of the whole-machine COM stages (verify gates, preflight, neutral
@@ -2565,8 +2568,8 @@ def task_assembly():
 
 
 def _clean_drawing(stem: str) -> None:
-    for target in DRAWINGS_BY_NAME[stem].outputs.values():
-        _force_remove(Path(target))
+    for target in _drawing_cache_outputs(stem):
+        _force_remove(target)
 
 
 def task_drawing():
@@ -2578,11 +2581,10 @@ def task_drawing():
     ``drawing:<stem>`` and deliberately excluded from ``build_bare``.
     """
     for stem in _drawing_order():
-        spec = DRAWINGS_BY_NAME[stem]
         yield {
             "name": stem,
             "file_dep": _drawing_file_deps(stem),
-            "targets": [str(path.resolve()) for path in spec.outputs.values()],
+            "targets": [str(path) for path in _drawing_cache_outputs(stem)],
             "actions": [(_cached_drawing_action, [stem])],
             "clean": [(_clean_drawing, [stem])],
             "verbosity": 2,

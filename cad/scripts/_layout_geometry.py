@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from collections.abc import Iterable
 from itertools import combinations, product
 from statistics import median
 
@@ -67,6 +68,13 @@ DEFAULT_TEXT_OVERLAP_TOL_M = 0.0003
 # of landing flush against it: 2 mm reads as deliberate separation at 1:1 and
 # still leaves a 3.5 mm text box room on a dense sheet.
 DEFAULT_MOVE_CLEARANCE_M = 0.002
+
+# An arrowhead, or an outside arrow's tail, nearer another annotation's text
+# than this reads as part of that text (MHA-092 round 2: the 5.56's arrow
+# 0.4 mm from "Ra 3.2", the 10.7's inside the 3.97's tolerance stack). The
+# fleet rule: the layout audit gates on it, and ``_drawing_leaders`` checks
+# placed sheets against it -- one constant, so the two cannot drift.
+ARROW_TEXT_CLEARANCE_M = 0.002
 
 # Fallback glyph advance as a fraction of cap height, used to estimate a text
 # box's WIDTH: no SolidWorks API returns the rendered width of annotation text
@@ -237,6 +245,80 @@ def segment_box_overlap_length(segment: Segment, box: Box) -> float:
     return (span[1] - span[0]) * segment.length
 
 
+def clip_segment_to_circle(
+    segment: Segment, circle: tuple[float, float, float]
+) -> tuple[float, float] | None:
+    """The ``[t0, t1]`` parameter range of ``segment`` inside ``circle``'s disk."""
+    cx, cy, radius = circle
+    dx, dy = segment.x1 - segment.x0, segment.y1 - segment.y0
+    fx, fy = segment.x0 - cx, segment.y0 - cy
+    a = dx * dx + dy * dy
+    if a == 0.0:
+        return (0.0, 0.0) if math.hypot(fx, fy) <= radius else None
+    b = 2.0 * (fx * dx + fy * dy)
+    c = fx * fx + fy * fy - radius * radius
+    discriminant = b * b - 4.0 * a * c
+    if discriminant <= 0.0:
+        return None
+    root = math.sqrt(discriminant)
+    t0, t1 = max(0.0, (-b - root) / (2.0 * a)), min(1.0, (-b + root) / (2.0 * a))
+    return (t0, t1) if t0 <= t1 else None
+
+
+def text_overlap(
+    segment: Segment, annotation: AnnotationGeometry, box: Box, *, inset: float = 0.0
+) -> tuple[float, tuple[float, float] | None]:
+    """How much of ``segment`` runs through one of ``annotation``'s text boxes.
+
+    Returns the length in metres and the clipped ``[t0, t1]`` range. ``inset``
+    shrinks the shape first. A balloon is tested against its circle, not
+    against the circle's bounding square: a leader leaving the rim, or a line
+    clipping a corner, crosses only blank paper.
+    """
+    if annotation.circle is not None:
+        cx, cy, radius = annotation.circle
+        span = clip_segment_to_circle(segment, (cx, cy, radius - inset))
+        if span is None:
+            return 0.0, None
+        return (span[1] - span[0]) * segment.length, span
+    test = Box(box.xmin + inset, box.ymin + inset, box.xmax - inset, box.ymax - inset)
+    if test.xmin >= test.xmax or test.ymin >= test.ymax:
+        return 0.0, None
+    return segment_box_overlap_length(segment, test), clip_segment_to_box(segment, test)
+
+
+def segment_box_distance(segment: Segment, box: Box) -> float:
+    """Shortest distance from ``segment`` to ``box``; 0 when it touches or
+    enters it."""
+    if clip_segment_to_box(segment, box) is not None:
+        return 0.0
+    corners = ((box.xmin, box.ymin), (box.xmax, box.ymin), (box.xmax, box.ymax), (box.xmin, box.ymax))
+    ends = ((segment.x0, segment.y0), (segment.x1, segment.y1))
+    return min(
+        *(_point_segment_distance(corner, segment) for corner in corners),
+        *(math.hypot(max(box.xmin - x, 0.0, x - box.xmax), max(box.ymin - y, 0.0, y - box.ymax)) for x, y in ends),
+    )
+
+
+def point_segment_distance(point: tuple[float, float], segment: Segment) -> float:
+    """Shortest distance from ``point`` to ``segment``."""
+    return _point_segment_distance(point, segment)
+
+
+def segment_circle_distance(segment: Segment, circle: tuple[float, float, float]) -> float:
+    """Shortest distance from ``segment`` to the disc ``(cx, cy, radius)``;
+    0 when it touches or enters it."""
+    cx, cy, radius = circle
+    return max(0.0, _point_segment_distance((cx, cy), segment) - radius)
+
+
+def _point_segment_distance(point: tuple[float, float], segment: Segment) -> float:
+    dx, dy = segment.x1 - segment.x0, segment.y1 - segment.y0
+    squared = dx * dx + dy * dy
+    t = 0.0 if squared == 0.0 else max(0.0, min(1.0, ((point[0] - segment.x0) * dx + (point[1] - segment.y0) * dy) / squared))
+    return math.hypot(segment.x0 + t * dx - point[0], segment.y0 + t * dy - point[1])
+
+
 def _collinear_with_box_edge(segment: Segment, box: Box) -> bool:
     """Axis-parallel ``segment`` lying on one of ``box``'s four edge lines."""
     if abs(segment.y1 - segment.y0) < 1e-12:
@@ -250,10 +332,12 @@ def union_boxes(boxes: list[Box]) -> Box | None:
     """The single box enclosing every box in ``boxes`` (None when empty)."""
     if not boxes:
         return None
-    total = boxes[0]
-    for box in boxes[1:]:
-        total = total.union(box)
-    return total
+    return Box(
+        min(box.xmin for box in boxes),
+        min(box.ymin for box in boxes),
+        max(box.xmax for box in boxes),
+        max(box.ymax for box in boxes),
+    )
 
 
 def estimate_text_box(
@@ -353,6 +437,10 @@ class AnnotationGeometry:
     segments: tuple[Segment, ...] = ()
     position: tuple[float, float] | None = None
     exact: bool = False
+    # A BOM balloon's printed body: ``(cx, cy, radius)``. Its one text box is
+    # the circle's bounding square, whose corners are blank paper, so line and
+    # gap tests read the circle instead (``text_overlap``).
+    circle: tuple[float, float, float] | None = None
 
     def box(self) -> Box | None:
         """The annotation's whole footprint: text plus its own ink."""
@@ -447,6 +535,40 @@ def _free_direction_mm(box: Box, obstacle: Box) -> tuple[float, float]:
     return ((x + dx) * MM, (y + dy) * MM)
 
 
+# Cell size of the segment grid ``find_text_on_line`` buckets ink into: about
+# one row of text, so a box touches a handful of cells.
+SEGMENT_GRID_M = 0.005
+
+
+class SegmentGrid:
+    """Segments bucketed by the grid cells their bounding boxes cover.
+
+    A PDF-measured sheet carries thousands of model-edge pieces; testing
+    every text box against every one of them runs while the build holds the
+    COM seat. ``near(box)`` returns only the segments whose cells the box
+    touches, in insertion order, each once.
+    """
+
+    def __init__(self, segments: Iterable[tuple[int, Segment]], cell: float = SEGMENT_GRID_M) -> None:
+        self.cell = cell
+        self.cells: dict[tuple[int, int], list[int]] = {}
+        self.items: list[tuple[int, Segment]] = []
+        for owner, segment in segments:
+            index = len(self.items)
+            self.items.append((owner, segment))
+            for key in self._keys(segment.box()):
+                self.cells.setdefault(key, []).append(index)
+
+    def _keys(self, box: Box) -> Iterable[tuple[int, int]]:
+        for i in range(math.floor(box.xmin / self.cell), math.floor(box.xmax / self.cell) + 1):
+            for j in range(math.floor(box.ymin / self.cell), math.floor(box.ymax / self.cell) + 1):
+                yield (i, j)
+
+    def near(self, box: Box) -> list[tuple[int, Segment]]:
+        found = sorted({index for key in self._keys(box) for index in self.cells.get(key, ())})
+        return [self.items[index] for index in found]
+
+
 def find_text_on_line(
     sheet: SheetGeometry, *, tol: float = DEFAULT_TEXT_TOUCH_TOL_M
 ) -> list[Finding]:
@@ -459,34 +581,41 @@ def find_text_on_line(
     length rather than something only the PDF can show.
     """
     findings: list[Finding] = []
+    grid = SegmentGrid(
+        (owner, segment)
+        for owner, annotation in enumerate(sheet.annotations)
+        for segment in annotation.segments
+    )
     for target in sheet.annotations:
         for box in target.text_boxes:
-            for source in sheet.annotations:
+            for owner, segment in grid.near(box):
+                source = sheet.annotations[owner]
                 if source.label == target.label:
                     continue
-                for segment in source.segments:
-                    length = segment_box_overlap_length(segment, box)
-                    if length <= tol:
-                        continue
-                    span = clip_segment_to_box(segment, box)
-                    mid = segment.point_at(sum(span) / 2.0) if span else box.center()
-                    findings.append(
-                        Finding(
-                            kind="text-on-line",
-                            sheet=sheet.name,
-                            a=target.label,
-                            b=source.label,
-                            detail=(
-                                f"text of {target.label!r} {box.format_mm()} is "
-                                f"crossed by {source.label!r}'s {segment.role} "
-                                f"{segment.format_mm()} over "
-                                f"{length * MM:.2f}mm"
-                            ),
-                            at_mm=(mid[0] * MM, mid[1] * MM),
-                            move_target_mm=_free_direction_mm(box, segment.box()),
-                            extra={"overlap_mm": length * MM},
-                        )
+                length, span = text_overlap(segment, target, box)
+                if length <= tol:
+                    continue
+                mid = segment.point_at(sum(span) / 2.0) if span else box.center()
+                findings.append(
+                    Finding(
+                        kind="text-on-line",
+                        sheet=sheet.name,
+                        a=target.label,
+                        b=source.label,
+                        detail=(
+                            f"text of {target.label!r} {box.format_mm()} is "
+                            f"crossed by {source.label!r}'s {segment.role} "
+                            f"{segment.format_mm()} over "
+                            f"{length * MM:.2f}mm"
+                        ),
+                        at_mm=(mid[0] * MM, mid[1] * MM),
+                        move_target_mm=_free_direction_mm(box, segment.box()),
+                        extra={
+                            "overlap_mm": length * MM,
+                            "segment": (segment.x0, segment.y0, segment.x1, segment.y1),
+                        },
                     )
+                )
     return findings
 
 
