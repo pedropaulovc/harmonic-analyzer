@@ -599,118 +599,372 @@ def test_foot_view_group_is_placed_from_read_back_boxes() -> None:
     the foot caption (DetailItem378, [212.0,259.0]..[244.8,268.2] mm) crossed
     the top inner border by 1.46 mm, and the dowel callout (RD1) ran its
     leader across the plan (Drawing View2).  Both came from unmeasured
-    literals (FOOT_NOTE_XY, FOOT_DOWEL_CALLOUT_XY); both are gone."""
+    literals (FOOT_NOTE_XY, FOOT_DOWEL_CALLOUT_XY); both are gone, and so is
+    the fixed plan-to-foot slot (foot_callout_shift) the planner replaced."""
     import inspect
-
-    from _layout_geometry import Box
 
     assert not hasattr(drawing, "FOOT_NOTE_XY")
     assert not hasattr(drawing, "FOOT_DOWEL_CALLOUT_XY")
-    gap = drawing.FOOT_LAYOUT_GAP
-    foot = Box(0.2050, 0.2150, 0.2510, 0.2555)
-    plan = Box(0.0600, 0.1700, 0.1500, 0.2700)
-    callout = Box(0.1760, 0.2150, 0.2260, 0.2290)
-    dowel_y = 0.2313
-    cx, cy = drawing.foot_callout_shift(plan, foot, callout, dowel_y, gap)
-    moved = Box(callout.xmin + cx, callout.ymin + cy, callout.xmax + cx, callout.ymax + cy)
-    assert moved.xmax == pytest.approx(foot.xmin - gap)
-    assert (moved.ymin + moved.ymax) / 2.0 == pytest.approx(dowel_y)
-    assert moved.xmin >= plan.xmax + gap
-    # Under the plan's counterbore callout text, which shares the field.
-    ceiling = 0.2400
-    cx, cy = drawing.foot_callout_shift(plan, foot, callout, dowel_y, gap, ceiling)
-    assert callout.ymax + cy == pytest.approx(ceiling - gap)
-    with pytest.raises(RuntimeError, match="does not fit between"):
-        drawing.foot_callout_shift(Box(0.06, 0.17, 0.19, 0.27), foot, callout, dowel_y, gap)
+    assert not hasattr(drawing, "foot_callout_shift")
     # The callout names ONE dowel: the edge pick breaks the z tie.
     assert "center_z_mm" in inspect.signature(drawing._circular_edge).parameters
 
 
-# S1 leaf 917-s1-ac4f (drawing:cone_pivot_post): the caption-over-view plan
-# with the view dropped under it landed the foot view on the journal view:
-# "foot view [211.4,205.9]..[244.6,253.6]mm dropped onto the journal view
-# [200.0,111.4]..[270.0,208.6]mm under its caption".  Border top 266.7; the
-# caption (5974's box) 32.8 x 9.2 mm; gaps 2 mm: 62.9 mm needed, 58.1 there.
-_AC4F_BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
-_AC4F_JOURNAL = (0.2000, 0.1114, 0.2700, 0.2086)
-_AC4F_FOOT_UNDROPPED = (0.2114, 0.21415, 0.2446, 0.26185)
-_AC4F_FOOT_DROPPED = (0.2114, 0.2059, 0.2446, 0.2536)
-_AC4F_CAPTION = (0.0328, 0.0092)
+# S1 leaf 917-s1-9eb0 (drawing:cone_pivot_post): the sheet at the foot view's
+# placement, exactly as collect_document read it (describe_sheet, task log
+# lines 242-366).  The 1-D sweep failed on it: "no clear place for the caption
+# (32.7 x 9.1 mm) and its view [211.4,214.2]..[244.6,261.8]mm".
+_9EB0_SHEET = """\
+sheet 'Sheet1': 431.8 x 279.4 mm
+  inner border (zone margins): [12.7,12.7]..[419.1,266.7]mm
+  glyph advance ratio: 0.746
+  keep-out title-block: [216.0,0.0]..[431.8,66.0]mm
+  view 'Drawing View1': [70.4,63.4]..[125.6,160.6]mm scale 1:1 mode 2 parent-display=False faceted-hlr=False type=7
+  view 'Drawing View2': [70.4,166.9]..[125.6,251.1]mm scale 1:1 mode 2 parent-display=False faceted-hlr=False type=7
+  view 'Drawing View3': [200.0,111.4]..[270.0,208.6]mm scale 1:1 mode 2 parent-display=False faceted-hlr=False type=7
+  view 'Drawing View4': [313.0,85.4]..[407.0,214.6]mm scale 1:1 mode 2 parent-display=False faceted-hlr=False type=7
+  view 'Drawing View5': [211.4,214.2]..[244.6,261.8]mm scale 1:2 mode 2 parent-display=False faceted-hlr=False type=7
+  view 'Section View A-A': [268.4,202.0]..[321.6,258.0]mm scale 1:1 mode 2 parent-display=False faceted-hlr=False type=2
+  dim 'MainBodyDia' owner='Drawing View1' text[estimated]=[142.8,77.2]..[168.9,80.7]mm [148.1,77.2]..[161.2,80.7]mm
+      GetPosition=(150.00,80.00)mm
+      line: (77.0,70.0)->(77.0,78.2)mm
+      line: (119.0,70.0)->(119.0,78.2)mm
+      line: (77.0,77.2)->(70.6,77.2)mm
+      line: (77.0,77.2)->(119.0,77.2)mm
+      leader: (119.0,77.2)->(158.5,77.2)mm
+  dim 'MainBodyHt' owner='Drawing View1' text[estimated]=[34.2,109.2]..[49.8,112.7]mm
+      GetPosition=(40.00,112.00)mm
+      line: (118.0,69.0)->(39.0,69.0)mm
+      line: (118.0,155.0)->(39.0,155.0)mm
+      leader: (40.0,69.0)->(40.0,109.2)mm
+      line: (40.0,155.0)->(40.0,114.8)mm
+  dim 'HeadHt' owner='Drawing View1' text[estimated]=[144.2,138.9]..[159.8,142.4]mm
+      GetPosition=(150.00,141.70)mm
+      line: (121.0,128.4)->(151.0,128.4)mm
+      line: (121.0,155.0)->(151.0,155.0)mm
+      leader: (150.0,128.4)->(150.0,138.9)mm
+      line: (150.0,155.0)->(150.0,144.5)mm
+  dim 'CrankAxisY' owner='Drawing View1' text[estimated]=[51.2,102.6]..[74.7,106.1]mm
+      GetPosition=(60.00,105.35)mm
+      line: (112.5,141.7)->(59.0,141.7)mm
+      line: (97.0,69.0)->(59.0,69.0)mm
+      line: (60.0,141.7)->(60.0,108.1)mm
+      leader: (60.0,69.0)->(60.0,102.6)mm
+  dim 'CrankBossDia' owner='Drawing View1' text[estimated]=[124.8,120.0]..[150.9,123.5]mm [130.1,120.0]..[140.6,123.5]mm [117.5,114.4]..[143.6,117.9]mm
+      GetPosition=(132.00,120.00)mm
+      line: (104.0,132.5)->(115.9,114.4)mm
+      line: (92.0,150.9)->(104.0,132.5)mm
+      line: (115.9,114.4)->(146.5,114.4)mm
+  dim 'CrankBoreDia' owner='Drawing View1' text[estimated]=[131.4,170.3]..[157.5,173.8]mm [136.6,170.3]..[154.9,173.8]mm [152.2,174.8]..[154.8,178.3]mm [152.8,170.3]..[155.4,173.8]mm [155.0,174.8]..[168.0,178.3]mm [155.0,170.3]..[168.0,173.8]mm [128.0,164.7]..[167.2,168.2]mm
+      GetPosition=(149.00,172.00)mm
+      line: (102.4,145.3)->(126.4,164.7)mm
+      line: (93.6,138.1)->(102.4,145.3)mm
+      line: (126.4,164.7)->(170.0,164.7)mm
+  note 'DetailItem371' owner='Drawing View1' text[exact]=[98.3,98.5]..[180.1,112.4]mm
+      GetPosition=(165.00,112.00)mm
+      leader: (164.5,110.7)->(164.5,110.7)mm
+      leader: (164.5,110.7)->(98.4,97.9)mm
+      leader: (164.5,110.7)->(98.4,97.9)mm
+  dim 'CrankBossStartZ' owner='Drawing View2' text[estimated]=[58.4,231.0]..[76.7,234.5]mm
+      GetPosition=(65.50,233.80)mm
+      line: (97.0,244.5)->(64.5,244.5)mm
+      line: (123.5,223.1)->(64.5,223.1)mm
+      line: (65.5,244.5)->(65.5,236.6)mm
+      leader: (65.5,223.1)->(65.5,231.0)mm
+  dim 'InclineAngle' owner='Drawing View2' text[estimated]=[136.5,195.6]..[149.6,199.1]mm [113.0,190.1]..[165.3,193.6]mm
+      GetPosition=(142.00,195.64)mm
+      line: (98.0,171.5)->(98.0,170.3)mm
+      line: (106.9,183.1)->(109.5,171.5)mm
+      line: (98.0,171.3)->(109.2,172.5)mm
+      leader: (109.2,172.5)->(138.0,190.1)mm
+  dim 'HeadDia' owner='Drawing View2' text[estimated]=[63.8,188.0]..[89.9,191.5]mm [69.1,188.0]..[79.6,191.5]mm [61.8,182.4]..[77.4,185.9]mm
+      GetPosition=(71.00,188.00)mm
+      line: (89.9,202.7)->(81.8,182.4)mm
+      line: (106.1,243.6)->(89.9,202.7)mm
+      leader: (81.8,182.4)->(61.8,182.4)mm
+  dim 'CrankBossLen' owner='Drawing View2' text[estimated]=[51.5,209.0]..[61.9,212.5]mm [32.2,203.4]..[76.6,206.9]mm
+      GetPosition=(56.00,209.00)mm
+      line: (108.0,244.5)->(55.0,244.5)mm
+      line: (108.0,172.5)->(55.0,172.5)mm
+      line: (56.0,244.5)->(56.0,214.6)mm
+      leader: (56.0,172.5)->(56.0,203.4)mm
+  dim 'MountWestX' owner='Drawing View2' text[estimated]=[102.9,249.7]..[121.2,253.2]mm
+      GetPosition=(110.00,252.50)mm
+      leader: (111.4,232.4)->(111.4,250.7)mm
+      line: (98.0,248.6)->(98.0,250.7)mm
+      leader: (111.4,249.7)->(117.8,249.7)mm
+      leader: (111.4,249.7)->(98.0,249.7)mm
+      line: (98.0,249.7)->(91.7,249.7)mm
+  dim 'MountEastX' owner='Drawing View2' text[estimated]=[67.9,249.7]..[86.2,253.2]mm
+      GetPosition=(75.00,252.50)mm
+      leader: (84.6,232.4)->(84.6,250.7)mm
+      line: (98.0,248.6)->(98.0,250.7)mm
+      leader: (84.6,249.7)->(67.9,249.7)mm
+      leader: (84.6,249.7)->(98.0,249.7)mm
+  dim 'RD1' owner='Drawing View2' text[estimated]=[138.1,250.1]..[146.0,253.6]mm [144.8,250.0]..[171.0,253.5]mm [150.1,250.1]..[186.7,253.6]mm [137.9,244.4]..[166.6,247.9]mm [147.3,244.4]..[173.4,247.9]mm [152.6,244.4]..[170.9,247.9]mm [166.8,244.4]..[198.1,247.9]mm [171.8,244.4]..[184.9,247.9]mm
+      GetPosition=(160.00,250.00)mm
+      line: (115.8,226.9)->(136.3,244.4)mm
+      line: (107.1,219.4)->(115.8,226.9)mm
+      leader: (136.3,244.4)->(182.1,244.4)mm
+  dim 'JournalBoreDia' owner='Drawing View3' text[estimated]=[274.4,151.3]..[300.5,154.8]mm [279.6,151.3]..[297.9,154.8]mm [295.2,155.8]..[297.8,159.3]mm [295.8,151.3]..[298.4,154.8]mm [298.0,155.8]..[311.0,159.3]mm [298.0,151.3]..[311.0,154.8]mm [272.2,145.7]..[308.8,149.2]mm
+      GetPosition=(292.00,153.00)mm
+      line: (244.1,149.5)->(270.6,145.7)mm
+      line: (232.0,151.2)->(244.1,149.5)mm
+      line: (270.6,145.7)->(311.8,145.7)mm
+  dim 'JournalAxisY' owner='Drawing View3' text[estimated]=[182.9,154.2]..[201.2,157.7]mm
+      GetPosition=(190.00,157.00)mm
+      line: (228.4,150.4)->(207.0,150.4)mm
+      line: (237.1,117.0)->(207.0,117.0)mm
+      line: (208.0,150.4)->(208.0,133.7)mm
+      line: (208.0,117.0)->(208.0,133.7)mm
+      leader: (208.0,133.7)->(197.1,154.2)mm
+      leader: (197.1,154.2)->(182.9,154.2)mm
+  dim 'ConeBossDia' owner='Drawing View3' text[estimated]=[284.8,172.0]..[310.9,175.5]mm [290.1,172.0]..[300.6,175.5]mm [263.1,166.4]..[315.3,169.9]mm
+      GetPosition=(292.00,172.00)mm
+      line: (245.2,155.2)->(261.5,166.4)mm
+      line: (231.0,145.5)->(245.2,155.2)mm
+      line: (261.5,166.4)->(320.9,166.4)mm
+  dim 'CrankAboveCone' owner='Drawing View3' text[estimated]=[179.3,178.5]..[197.6,182.0]mm [193.5,183.0]..[196.1,186.5]mm [196.4,183.0]..[206.8,186.5]mm [196.4,178.5]..[206.8,182.0]mm
+      GetPosition=(193.00,183.00)mm
+      line: (228.4,150.4)->(207.0,150.4)mm
+      line: (237.1,189.7)->(207.0,189.7)mm
+      line: (208.0,150.4)->(208.0,170.0)mm
+      line: (208.0,189.7)->(208.0,170.0)mm
+      leader: (208.0,170.0)->(206.7,178.5)mm
+      leader: (206.7,178.5)->(179.3,178.5)mm
+  dim 'ConeBossLen' owner='Section View A-A' text[estimated]=[350.5,235.0]..[360.9,238.5]mm [324.5,229.4]..[382.0,232.9]mm
+      GetPosition=(355.00,235.00)mm
+      line: (291.4,250.7)->(349.7,263.7)mm
+      line: (300.5,209.7)->(358.8,222.6)mm
+      line: (348.7,263.4)->(353.8,240.6)mm
+      leader: (357.8,222.4)->(356.2,229.4)mm
+  note 'DetailItem360' owner='Section View A-A' text[exact]=[271.7,177.3]..[317.8,193.7]mm
+      GetPosition=(295.00,193.63)mm
+"""
+_9EB0_CAPTION = (0.0327, 0.0091)
+_FOOT = "Drawing View5"
 
 
-def _obstacles(*views: tuple[str, tuple[float, float, float, float]], texts=()):
+def _sheet_from_dump(text: str):
+    """A SheetGeometry from a describe_sheet dump.  The dump has no pictorial
+    flag: the view centred on ISO_CENTER is the isometric."""
     from _drawing_layout_check import DrawableRegion
-    from _layout_geometry import Box
-    from _layout_planner import SheetObstacles
+    from _layout_geometry import AnnotationGeometry, Box, Segment, SheetGeometry, ViewGeometry
 
-    x0, y0, x1, y1 = _AC4F_BORDER
-    return SheetObstacles(
-        region=DrawableRegion(x0, y0, x1, y1),
-        views=tuple((name, Box(*box), False) for name, box in views),
-        texts=tuple((name, Box(*box)) for name, box in texts),
+    box_re = re.compile(r"\[(-?[\d.]+),(-?[\d.]+)\]\.\.\[(-?[\d.]+),(-?[\d.]+)\]")
+    seg_re = re.compile(r"\((-?[\d.]+),(-?[\d.]+)\)->\((-?[\d.]+),(-?[\d.]+)\)")
+    region, keep_outs, views, rows = None, [], [], []
+    for line in text.splitlines():
+        boxes = [Box(*(float(v) / 1000.0 for v in m.groups())) for m in box_re.finditer(line)]
+        if "inner border" in line:
+            region = DrawableRegion(boxes[0].xmin, boxes[0].ymin, boxes[0].xmax, boxes[0].ymax)
+        elif line.startswith("  keep-out "):
+            keep_outs.append((line.split()[1].rstrip(":"), boxes[0]))
+        elif line.startswith("  view '"):
+            centre = boxes[0].center()
+            views.append(
+                ViewGeometry(
+                    line.split("'")[1],
+                    boxes[0],
+                    pictorial=max(abs(a - b) for a, b in zip(centre, drawing.ISO_CENTER)) < 1e-3,
+                )
+            )
+        elif re.match(r"^  [a-z-]+ '", line):
+            owner = re.search(r"owner='([^']*)'", line).group(1)
+            rows.append((line.split("'")[1], line.split()[0], owner, boxes, []))
+        elif re.match(r"^\s+(line|leader):", line):
+            role = line.strip().split(":")[0]
+            values = (float(v) / 1000.0 for v in seg_re.search(line).groups())
+            rows[-1][4].append(Segment(*values, role=role))
+    return SheetGeometry(
+        "Sheet1",
+        0.4318,
+        0.2794,
+        region,
+        tuple(keep_outs),
+        tuple(views),
+        tuple(
+            AnnotationGeometry(label, kind, owner, tuple(boxes), tuple(segments))
+            for label, kind, owner, boxes, segments in rows
+        ),
     )
 
 
-def test_foot_caption_plan_rejects_the_ac4f_drop_and_slides_the_view() -> None:
-    """Main's order: first the caption over its view with the view slid
-    sideways (nearest first), then the caption beside the view."""
-    from _layout_geometry import Box
-    from _layout_planner import box_conflict, plan_caption
+def _9eb0(**skip):
+    from _layout_planner import sheet_obstacles
 
-    obstacles = _obstacles(("Drawing View3", _AC4F_JOURNAL))
-    # The ac4f outcome is rejected, naming the journal view.
-    assert "Drawing View3" in (box_conflict(Box(*_AC4F_FOOT_DROPPED), obstacles) or "")
-    plan = plan_caption(
-        Box(*_AC4F_FOOT_UNDROPPED), _AC4F_CAPTION, obstacles, label="foot view"
+    sheet = _sheet_from_dump(_9EB0_SHEET)
+    foot = next(view.outline for view in sheet.views if view.name == _FOOT)
+    return foot, sheet_obstacles(sheet, skip_views=(_FOOT,), **skip)
+
+
+def test_9eb0_foot_spot_is_rejected_for_every_caption_arrangement() -> None:
+    """(a) Today's spot: over the view the caption crosses the top border,
+    left it lands on RD1 (the plan's counterbore callout -- named by its WHOLE
+    text box, not one row), right on section A-A."""
+    from _layout_planner import box_conflict, caption_boxes
+
+    foot, obstacles = _9eb0()
+    reasons = [
+        box_conflict(caption, obstacles) or ""
+        for _, caption in caption_boxes(foot, _9EB0_CAPTION)
+    ]
+    assert reasons[0].startswith("border")
+    assert reasons[1] == "text RD1 [137.9,244.4]..[198.1,253.6]mm"
+    assert "Section View A-A" in reasons[2]
+
+
+def test_9eb0_foot_group_moves_to_the_nearest_clear_spot() -> None:
+    """(b) The 2-D search finds the nearest legal group, and every box in it
+    clears everything collect_document read."""
+    from _layout_planner import box_conflict, plan_view_group
+
+    foot, obstacles = _9eb0()
+    plan = plan_view_group(
+        foot, _9EB0_CAPTION, obstacles, label="foot view", view_name=_FOOT
     )
-    assert plan.how == "caption over the view"
-    assert plan.view_dx != 0.0
-    # Nearest clear slide: left, until the view clears the journal by 2 mm.
-    assert plan.view.xmax == pytest.approx(_AC4F_JOURNAL[0] - 0.002, abs=0.001)
-    assert plan.caption.ymax <= _AC4F_BORDER[3] - 0.002 + 1e-9
-    assert plan.caption.ymin >= plan.view.ymax + 0.002 - 1e-9
+    assert plan.how == "caption beside the view, left"
+    assert (plan.view_dx, plan.view_dy) == pytest.approx((0.012, 0.0))
     assert box_conflict(plan.view, obstacles) is None
     assert box_conflict(plan.caption, obstacles) is None
 
 
-def test_foot_caption_falls_back_beside_the_view_then_fails_naming_every_box() -> None:
-    from _layout_geometry import Box
-    from _layout_planner import plan_caption
+def test_clear_foot_spot_does_not_move() -> None:
+    """(c) No churn: with RD1 gone the left caption clears where the view
+    stands, and the plan is the current spot."""
+    from _layout_planner import plan_view_group
 
-    # A journal band across the whole sheet: no slide clears it under a drop.
-    wide = ("wide journal", (0.0127, 0.1114, 0.4191, 0.2086))
-    plan = plan_caption(
-        Box(*_AC4F_FOOT_UNDROPPED), _AC4F_CAPTION, _obstacles(wide), label="foot view"
+    foot, obstacles = _9eb0(skip_labels=("RD1",))
+    plan = plan_view_group(
+        foot, _9EB0_CAPTION, obstacles, label="foot view", view_name=_FOOT
     )
+    assert (plan.view_dx, plan.view_dy) == (0.0, 0.0)
+    assert plan.view == foot
     assert plan.how == "caption beside the view, left"
-    assert plan.view_dx == plan.view_dy == 0.0
-    assert plan.caption.ymax == pytest.approx(_AC4F_FOOT_UNDROPPED[3])
-    assert plan.caption.xmax == pytest.approx(_AC4F_FOOT_UNDROPPED[0] - 0.002)
-    # Text filling both sides too: nothing fits, and the failure names it all.
-    left = ("left text", (0.10, 0.23, 0.2090, 0.2665))
-    right = ("right text", (0.2470, 0.23, 0.40, 0.2665))
+
+
+def test_placed_boxes_keep_off_the_isometric_and_other_views_text() -> None:
+    """A pictorial outline excuses a leader clipping its empty corner, not a
+    view or a text block laid over the picture; and text keeps one text
+    height from another view's annotations (the audit's view-crowding)."""
+    from _layout_geometry import Box
+    from _layout_planner import box_conflict
+
+    _, obstacles = _9eb0()
+    iso = next(box for name, box, pictorial in obstacles.views if pictorial)
+    inside = Box(iso.xmin + 0.010, iso.ymin + 0.030, iso.xmin + 0.043, iso.ymin + 0.078)
+    assert (box_conflict(inside, obstacles) or "").startswith("pictorial view Drawing View4")
+    # 3 mm under RD1's text (9.2 mm tall): clear of text, crowded for a
+    # foot-view callout, fine for the plan's own.
+    under = Box(0.140, 0.2414 - 0.0181, 0.180, 0.2414)
+    assert box_conflict(under, obstacles, owner="Drawing View2") is None
+    assert (box_conflict(under, obstacles, owner=_FOOT) or "").startswith("crowding RD1")
+
+
+def _synthetic_callout(width: float):
+    """A foot-view hole callout: rows of ``width`` x 18.1 mm (the platform
+    twin's measured height), its shelf under the text, its rim inside the
+    foot view.  Synthetic: the contract is the search, not a box."""
+    from _layout_geometry import Box, Segment
+    from _layout_planner import HoleCallout
+
+    text = Box(0.150, 0.220, 0.150 + width, 0.2381)
+    return HoleCallout(
+        "RDx",
+        _FOOT,
+        text,
+        Segment(text.xmin, text.ymin, text.xmax, text.ymin, role="leader"),
+        (0.2280, 0.2314, 0.0008),
+    )
+
+
+def test_foot_group_plans_the_dowel_callout_with_its_leader() -> None:
+    from _layout_planner import box_conflict, leader_conflicts, plan_view_group
+
+    foot, obstacles = _9eb0()
+    plan = plan_view_group(
+        foot,
+        _9EB0_CAPTION,
+        obstacles,
+        label="foot view",
+        view_name=_FOOT,
+        callout=_synthetic_callout(0.090),
+    )
+    placed = obstacles.plus(
+        views=((_FOOT, plan.view),), texts=(("foot view caption", plan.caption),)
+    )
+    assert box_conflict(plan.callout_text, placed, owner=_FOOT) is None
+    assert leader_conflicts(plan.callout_leader, placed) == []
+    # SolidWorks' shape: the leader leaves the (moved) rim for the nearer
+    # shelf end.
+    tip = plan.callout_leader[0]
+    rim_x, rim_y = 0.2280 + plan.view_dx, 0.2314 + plan.view_dy
+    assert ((tip.x0 - rim_x) ** 2 + (tip.y0 - rim_y) ** 2) ** 0.5 == pytest.approx(0.0008)
+    assert tip.x1 in (plan.callout_text.xmin, plan.callout_text.xmax)
+
+
+def test_foot_group_fails_loud_naming_the_nearest_rejection() -> None:
+    from _layout_planner import plan_view_group
+
+    foot, obstacles = _9eb0()
     with pytest.raises(RuntimeError, match="no clear place") as failure:
-        plan_caption(
-            Box(*_AC4F_FOOT_UNDROPPED),
-            _AC4F_CAPTION,
-            _obstacles(wide, texts=(left, right)),
+        plan_view_group(
+            foot,
+            _9EB0_CAPTION,
+            obstacles,
             label="foot view",
+            view_name=_FOOT,
+            callout=_synthetic_callout(0.130),
         )
     message = str(failure.value)
-    for name in ("wide journal", "left text", "right text", "border"):
-        assert name in message
+    assert "nearest rejected group: caption over the view" in message
+    assert "RDx (130.0 x 18.1 mm), nearest: caption beside the view, left at shift (+12,+0) mm" in message
+    assert "text RD1 [137.9,244.4]..[198.1,253.6]mm" in message
 
 
+def test_callout_search_is_bounded_by_its_budget() -> None:
+    """The search runs while the build holds the COM seat: a sheet with no
+    room stops after ``callout_budget`` text spots and says so, instead of
+    judging every spot of every group (30 x 14641 on a 2 mm grid)."""
+    from _layout_planner import CALLOUT_BUDGET, plan_view_group
 
-def test_post_places_its_foot_caption_with_the_planner() -> None:
-    """The ac4f drop rule (foot_caption_shift) is gone; the build asks the
-    planner, with the whole sheet as obstacles, and dumps the sheet."""
+    assert CALLOUT_BUDGET <= 40_000
+    foot, obstacles = _9eb0()
+    with pytest.raises(RuntimeError, match="no clear place") as failure:
+        plan_view_group(
+            foot,
+            _9EB0_CAPTION,
+            obstacles,
+            label="foot view",
+            view_name=_FOOT,
+            callout=_synthetic_callout(0.130),
+            callout_budget=500,
+        )
+    assert "1 clear view+caption group(s) and 500 text spot(s) (budget 500)" in str(
+        failure.value
+    )
+
+
+def test_first_leader_conflict_agrees_with_the_full_list() -> None:
+    from _layout_planner import leader_conflict, leader_conflicts
+
+    _, obstacles = _9eb0()
+    callout = _synthetic_callout(0.090)
+    for dx, dy in ((0.0, 0.0), (-0.070, -0.0074), (0.030, 0.040)):
+        leader = callout.leader(dx, dy, (0.0, 0.0))
+        full = leader_conflicts(leader, obstacles)
+        assert leader_conflict(leader, obstacles) == (full[0] if full else None)
+
+
+def test_post_plans_its_foot_group_last() -> None:
+    """The plan reads every box on the sheet, so it runs after the last
+    literal-placed annotation (the Manufacturing Notes block)."""
     import inspect
 
-    assert not hasattr(drawing, "foot_caption_shift")
-    source = inspect.getsource(drawing._place_foot_group)
-    assert "plan_caption(" in source
-    assert "sheet_obstacles(" in source
-    assert "_collect_sheet(" in source
+    build = inspect.getsource(drawing.build)
+    assert build.index('"Manufacturing Notes"') < build.index("_place_foot_group(adapter, foot)")
+    group = inspect.getsource(drawing._place_foot_group)
+    for call in ("plan_view_group(", "sheet_obstacles(", "_collect_sheet(", "HoleCallout("):
+        assert call in group
     assert "_collect_sheet(" in inspect.getsource(drawing._assert_native_layout)
     assert "describe_sheet(" in inspect.getsource(drawing._collect_sheet)
