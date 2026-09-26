@@ -154,8 +154,12 @@ def _pivot_finish_placement() -> tuple[tuple[float, float], tuple[float, float]]
 # The large concentric radii are carried in the manufacturing note: imported
 # radius dimensions retain off-sheet centre witnesses even in shortened-radius
 # mode.  Keeping them as notes avoids clipped geometry without losing values.
+# The O6.50 text sits down-left of the pivot, left of the rod-pin X location
+# dimension (pivot to rod-pin hole, its line at y 0.138): from (0.180, 0.120),
+# straight below the bore, its leader crossed that dimension's line and ran up
+# its extension line (r743-4D render).
 FRONT_KEEP = {
-    "PivotDia": (0.180, 0.120),
+    "PivotDia": (0.130, 0.148),
 }
 NOTE_ONLY_DIMENSIONS = {"TopRadius", "BottomRadius"}
 # The hub length (+0.05/0, #743 PR2) under the end view, where the hub shows
@@ -346,6 +350,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # Datum A identifies the pivot bore's cylindrical surface.  Keep its leader
     # oblique to both centre-mark axes so the triangle unmistakably terminates
     # on the circumference rather than appearing to identify the bore centre.
+    # The bore is picked by DIAMETER, like every other bore annotation here: the
+    # rim-coordinate pick landed the triangle on the concentric O10 hub circle
+    # (r743-4D render), which would make the hub, not the bore, datum A.
     pivot_datum_angle = math.radians(135.0)
     pivot_radius = PIVOT_HOLE_DIA / 2.0
     pivot_datum_rim = _sheet_xy(
@@ -356,7 +363,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=pivot_datum_rim,
+        edge_entity=pivot_bore_edge,
         symbol_xy=(
             pivot_datum_rim[0] + pivot_datum_standoff * math.cos(pivot_datum_angle),
             pivot_datum_rim[1] + pivot_datum_standoff * math.sin(pivot_datum_angle),

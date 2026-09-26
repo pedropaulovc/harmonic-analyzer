@@ -193,6 +193,44 @@ def test_hub_length_prints_its_one_sided_band() -> None:
     assert f"{rocker_arm_spec.HUB_LENGTH:.2f}" not in rocker_arm_notes.DRAWING_NOTES
 
 
+def test_datum_a_is_the_pivot_bore_picked_by_its_diameter() -> None:
+    """r743-4D: the rim-coordinate pick put datum A's triangle on the O10 hub
+    circle, which changes what the A-B-C frame controls. Datum A must attach
+    to the edge picked by the pivot bore's diameter."""
+    import ast
+
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    picks = {
+        node.targets[0].id: ast.unparse(node.value.args[2])
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Call)
+        and getattr(node.value.func, "id", "") == "visible_circle_edge"
+    }
+    datums = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "add_datum_feature":
+            keywords = {k.arg: ast.unparse(k.value) for k in node.keywords}
+            datums[keywords["datum"].strip("'\"")] = keywords
+    edge = datums["A"].get("edge_entity")
+    assert edge is not None and "edge_xy" not in datums["A"]
+    assert picks[edge] == "PIVOT_HOLE_DIA"
+    assert rocker_arm_spec.PIVOT_HOLE_DIA < rocker_arm_spec.HUB_DIA
+
+
+def test_pivot_diameter_text_is_clear_of_the_rod_pin_x_dimension() -> None:
+    """r743-4D: the O6.50 leader, from text straight below the bore, crossed
+    the rod-pin X location dimension. Its text now sits left of that
+    dimension's span (pivot to rod-pin hole) and below the strap."""
+    text_x, text_y = drawing.FRONT_KEEP["PivotDia"]
+    pivot_x, pivot_y = drawing._sheet_xy(0.0, rocker_arm_spec.PIVOT_MID_Y)
+    # Diameter text runs ~2.6 mm a character from its anchor: "O6.50" is 5.
+    assert text_x + 5 * 0.0026 < pivot_x - rocker_arm_spec.HUB_DIA / 2000.0
+    assert text_y < pivot_y - rocker_arm_spec.ARM_DEPTH / 2000.0
+    # Above the notes band.
+    assert text_y > drawing.NOTES_CEILING + 0.010
+
+
 def test_both_bores_are_picked_by_diameter_not_by_a_rim_coordinate() -> None:
     """r743-p1s-B: a coordinate pick on the #47 rod-hole rim resolved to the
     strap's tapered end-face line, so AddHoleCallout2 returned None. Every
