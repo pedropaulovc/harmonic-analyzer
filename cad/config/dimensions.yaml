@@ -202,23 +202,23 @@ sections:
       - - Outboard arm / hub / shaft / axial-pin proportions
         - '3.14 / 2.60 / 1.65 / 0.59 (unitless)'
         - —
-        - 'primary outboard photograph; normalized relative diameters/width only. Scaling the 1.65 shaft term to the retained Ø9.525 shaft gives 18.13 / 15.01 / 9.525 / 3.405, which left a 0.5-mm hub web. U29 (2026-09-23) scales hub and pin 1.3x about the fixed shaft and makes the arm 1-in stock: 25.4 / 19.5 / 9.525 / 4.0. Named ratio deviation: arm/hub 1.303 vs the photograph''s 1.208.'
+        - 'primary outboard photograph; normalized relative diameters/width only. Scaling the 1.65 shaft term to the retained Ø9.525 shaft gives 18.13 / 15.01 / 9.525 / 3.405, which left a 0.5-mm hub web. U29 (2026-09-23) scales hub and pin 1.3x about the fixed shaft and makes the arm 1-in stock: 25.4 / 19.5 / 9.525 / 4.0. The seat is drawn 19.4, 0.1 under the photograph, so the .X bore keeps the arm cheek at 2.0 against the 0.004-in bar width tolerance. Named ratio deviation: arm/hub 1.309 vs the photograph''s 1.208.'
         - scaled ratio
         - med
       - - Crank arm width
         - 25.4 mm
         - '1.000'
-        - 'U29: 1 x 5/16-in cold-finished flat bar, width as supplied; the photograph ratio would give 23.6 at the 1.3x hub scale. Keeps the cheek around the hub seat at 2.01 worst case (U27).'
+        - 'U29: 1 x 5/16-in cold-finished flat bar, width as supplied; the photograph ratio would give 23.6 at the 1.3x hub scale. Keeps the cheek around the Ø19.4 hub seat at 2.05 worst case (U27).'
         - user ruling
         - med
       - - Separate crank hub MHA-137
-        - 'Ø19.5 × 8 through-seat; Ø25.4 rear barrel/shoulder to overall length 20; Ø9.550 +0.030/−0.000 through bore'
+        - 'Ø19.4 × 8 through-seat; Ø25.4 rear barrel/shoulder to overall length 20; Ø9.550 +0.030/−0.000 through bore'
         - —
         - 'primary construction photo and user-confirmed through-hub topology. The arm and hub are a matched light arbor-press fit against the shoulder; the bore reuses the project shaft-in-bushing fit, giving 0.025..0.075 diametral shaft clearance.'
         - derived construction
         - med
       - - Axial seam pin MHA-138
-        - 'Ø4 m6 dowel stock × 4.0, parallel to shaft at six o’clock, centre radius 9.75'
+        - 'Ø4 m6 dowel stock × 4.0, parallel to shaft at six o’clock, centre radius 9.7'
         - —
         - 'user selected the axial arm↔hub seam key after rejecting radial/Scotch alternatives; diameter is the stock dowel just under the U29 1.3x scale of the primary outboard ratio 0.59 (4.43), leaving a 2.05 worst-case hub web, and length is exactly half the 8-mm arm thickness. It does not intersect the shaft bore.'
         - scaled + stated topology

@@ -17,7 +17,7 @@ def test_pin_length_is_half_the_shared_arm_thickness() -> None:
 
 
 def test_six_oclock_seam_leaves_the_u27_web_without_a_matched_check() -> None:
-    assert geometry.HUB_SEAT_DIA_MIN_GENERAL == pytest.approx(18.7)
+    assert geometry.HUB_SEAT_DIA_MIN_GENERAL == pytest.approx(18.6)
     assert geometry.AXIAL_PIN_DIA_STOCK_MAX == pytest.approx(4.012)
     assert geometry.HUB_BORE_DIA_MAX == pytest.approx(9.58)
     assert geometry.SEAM_WEB_WORST_MM >= geometry.WALL_TARGET_MM

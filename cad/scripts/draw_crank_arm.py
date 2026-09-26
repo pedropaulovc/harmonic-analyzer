@@ -237,14 +237,15 @@ def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
 
 
 def _hub_seat_leader_clear(adapter: Any, annotations: list[Any]) -> None:
-    """Mark the hub seat reference and land it on its near rim, clear of R12.7.
+    """Land the hub seat bore on its near rim, clear of R12.7.
 
-    MHA-137 is turned to suit this bore for a light press, so the note under
-    it governs and the bore's nominal prints as a reference, (Ø19.5), not a title-block
-    tolerance (2026-09-23 review).
+    The bore is made first and keeps the title block's .X band: its limits
+    are the U29 cheek's real limits (crank_hub_geometry).  MHA-137 is turned
+    to suit it for a light press, and the note under the value states that
+    fit; the band bounds the bore, the note the fit (policy rule 2: "any
+    retained dimensional limits still apply").
     """
     hub_seat = _named(adapter, annotations, "HubSeatDia")
-    set_reference_dimension(adapter, hub_seat, label="hub seat nominal", diameter=True)
     set_near_side_diameter(hub_seat, "hub seat diameter")
     rebuild_drawing(adapter, label="hub seat near-side leader")
     assert_leaders_clear(
@@ -337,7 +338,7 @@ async def build(adapter: Any) -> dict[str, str]:
     imported_annotations = [*front_annotations, *right_annotations]
     set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
     # The part authored every displayed decimal place.  The hub seat bore
-    # remains a one-place reference nominal: MHA-137 is turned to suit it.
+    # is a one-place .X size: MHA-137 is turned to suit it.
     assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
     # The thickness is the supplied stock's (the stock note governs it).
     for name in sorted(REFERENCE_DIMENSIONS):
