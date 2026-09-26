@@ -42,6 +42,7 @@ import re
 import tempfile
 from dataclasses import dataclass, replace
 from enum import Enum
+from heapq import heappop, heappush
 from itertools import combinations
 from pathlib import Path
 from statistics import median
@@ -217,11 +218,74 @@ DUPLICATE_POSITION_TOL_M = 1e-5
 _HIDDEN_STATES = (2, 3)
 _OWNER_DRAWING_SHEET = 1
 
+# A leader may cross a part's outline to reach a feature inside it. It
+# reads as one of the part's lines when it runs much further over the part
+# than the feature's shortest approach from outside: the tip's distance to
+# the view's printed-edge box. Detour = run over the part minus that
+# approach. PROVISIONAL (Main's ruling, 2026-09-26), from the
+# layoutcal2/c2 replay and swing's 917-s1 sheet 2, in mm of detour: swing's
+# RD2 22.2 at 24cbab237 and 3.8 at its fix 4dda16fd5; cone-gear's nine Ra
+# 1.6 bore leaders -5.1..-1.9; cone-tip-block's RD1 25.9; knife-mount's
+# position frame 9.8 (eyed: readable). The fleet report re-sizes it.
+LEADER_DETOUR_PROVISIONAL_M = 0.010
+# A leader running further than this over the part is reported even with
+# no detour (advisory): 25 mm is the brief's first limit, which swing's 24cb
+# RD2 (28.2 mm) passed and its fix (14.1 mm) cleared.
+LEADER_OVER_PART_M = 0.025
+# Leader ink that never runs to a feature over a view: dimensions draw their
+# own lines, and the rest are construction or view ink.
+_UNLEADERED_KINDS = frozenset({"dim", "geometry", "section-line", "detail-circle", "table", *_MARK_KINDS})
+# A thread designation in callout text, keyed as printed: unified
+# ("1/4-20", "#8-32", "10-24") or metric by its major diameter ("M6" of
+# "M6x1.0"). Two leadered callouts in one view naming one thread call the
+# same holes out twice (cone-swing-platform's "1/4-20 Tapped Hole" beside
+# RD2's "2X ... 1/4-20 UNC - 2B THRU ALL", 24cbab237).
+_THREAD = re.compile(r"(?<![\w/.#])(#?\d+(?:/\d+)?-\d+|M\d+(?:\.\d+)?)(?=[\s,;xX×]|$)")
+
 
 def is_hidden(annotation: Mapping[str, Any]) -> bool:
     """A dumped annotation the sheet does not draw (swAnnotationHidden or
     half-hidden), which the audit leaves out."""
     return int(annotation.get("visible", 1) or 1) in _HIDDEN_STATES
+
+
+def _prints(annotation: Mapping[str, Any], layers: Mapping[str, Mapping[str, bool]]) -> bool:
+    state = layers.get(str(annotation.get("layer") or ""))
+    return state is None or (bool(state.get("visible", True)) and bool(state.get("printable", True)))
+
+
+def printed_dump(dump: Mapping[str, Any]) -> Mapping[str, Any]:
+    """The dump without the annotations on a layer that does not print.
+
+    COM reads such an annotation ``Visible`` 1, but it leaves no ink: the
+    audit judges what prints (Main's ruling on cone-swing-platform's profile
+    thread callout on COSMETIC-THREADS-HIDDEN, 24cbab237). A layer the dump
+    has no state for prints. ``hidden_layer_count`` keeps the drop visible.
+    """
+    layers = dump.get("layers") or {}
+    if not layers:
+        return dump
+    return {
+        **dump,
+        "views": [
+            {**view, "annotations": [a for a in view.get("annotations") or () if _prints(a, layers)]}
+            for view in dump.get("views", ())
+        ],
+        "sheet_annotations": [a for a in dump.get("sheet_annotations") or () if _prints(a, layers)],
+    }
+
+
+def hidden_layer_count(dump: Mapping[str, Any]) -> int:
+    """How many of the sheet's annotations sit on a non-printing layer."""
+    layers = dump.get("layers") or {}
+    return sum(
+        not _prints(annotation, layers)
+        for annotations in (
+            *(view.get("annotations") or () for view in dump.get("views", ())),
+            dump.get("sheet_annotations") or (),
+        )
+        for annotation in annotations
+    )
 
 
 def audited_annotations(dump: Mapping[str, Any]) -> list[Mapping[str, Any]]:
@@ -1635,6 +1699,7 @@ class SheetModel:
 
 def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
     """Parse one sheet dump into the geometry every finder reads."""
+    dump = printed_dump(dump)
     width, height = float(dump["width"]), float(dump["height"])
     zone = dump.get("zone") or {}
     if any(float(zone.get(side, 0.0) or 0.0) for side in ("left", "right", "bottom", "top")):
@@ -2285,6 +2350,278 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
     return findings
 
 
+def _arrow_heads(annotation: AnnotationGeometry) -> list[tuple[tuple[float, float], ...]]:
+    """The vertices of each arrowhead or triangle an annotation drew: its
+    ``arrow`` segments come three to a head (``arrowhead_segments``,
+    ``triangle_segments``)."""
+    arrows = [s for s in annotation.segments if s.role == "arrow"]
+    return [
+        tuple((s.x0, s.y0) for s in arrows[i : i + 3])
+        for i in range(0, len(arrows) - 2, 3)
+    ]
+
+
+def _segment_crossing(a: Segment, b: Segment) -> tuple[float, float] | None:
+    """Where ``a`` meets ``b``, ends included; None when they miss or run
+    parallel. A model edge is a chain of short pieces (an arc flattens to
+    ~0.35 mm ones), so a leader through a joint meets both pieces and the
+    caller merges the two points."""
+    rx, ry = a.x1 - a.x0, a.y1 - a.y0
+    sx, sy = b.x1 - b.x0, b.y1 - b.y0
+    denom = rx * sy - ry * sx
+    if denom == 0.0:
+        return None
+    qx, qy = b.x0 - a.x0, b.y0 - a.y0
+    t = (qx * sy - qy * sx) / denom
+    u = (qx * ry - qy * rx) / denom
+    if not (0.0 <= t <= 1.0 and 0.0 <= u <= 1.0):
+        return None
+    return a.point_at(t)
+
+
+def _leader_paths(annotation: AnnotationGeometry) -> list[tuple[list[tuple[float, float]], float]]:
+    """Each leader run from its text end to an arrow tip, as
+    ``(points from the text end to the tip, arrowhead length)``.
+
+    The leader and shoulder pieces form a small graph. A tip is a node an
+    arrowhead's vertex sits on; the text end is the node farthest along the
+    graph from it that is not another tip. A run past the arrow tip (a hole
+    callout's run on to the hole's centre) is not on that path.
+    """
+    runs = [s for s in annotation.segments if s.role in ("leader", "shoulder") and s.length > 0.0]
+    heads = _arrow_heads(annotation)
+    if not runs or not heads:
+        return []
+    nodes: list[tuple[float, float]] = []
+
+    def node(point: tuple[float, float]) -> int:
+        for index, (x, y) in enumerate(nodes):
+            if math.hypot(point[0] - x, point[1] - y) <= COLLINEAR_TOL_M:
+                return index
+        nodes.append(point)
+        return len(nodes) - 1
+
+    edges: dict[int, list[tuple[int, Segment]]] = {}
+    for segment in runs:
+        a, b = node((segment.x0, segment.y0)), node((segment.x1, segment.y1))
+        edges.setdefault(a, []).append((b, segment))
+        edges.setdefault(b, []).append((a, segment))
+    tips = []
+    for vertices in heads:
+        for k, vertex in enumerate(vertices):
+            hit = next(
+                (i for i, (x, y) in enumerate(nodes) if math.hypot(vertex[0] - x, vertex[1] - y) <= COLLINEAR_TOL_M),
+                None,
+            )
+            if hit is None:
+                continue
+            others = [v for j, v in enumerate(vertices) if j != k]
+            base = (sum(v[0] for v in others) / len(others), sum(v[1] for v in others) / len(others))
+            tips.append((hit, math.hypot(base[0] - nodes[hit][0], base[1] - nodes[hit][1])))
+            break
+    paths = []
+    tip_nodes = {hit for hit, _length in tips}
+    for tip, head in tips:
+        distance = {tip: 0.0}
+        back: dict[int, tuple[int, Segment]] = {}
+        queue = [(0.0, tip)]
+        while queue:
+            here, at = heappop(queue)
+            if here > distance[at]:
+                continue
+            for to, segment in edges.get(at, ()):
+                there = here + segment.length
+                if there < distance.get(to, math.inf):
+                    distance[to] = there
+                    back[to] = (at, segment)
+                    heappush(queue, (there, to))
+        ends = [i for i in distance if i not in tip_nodes]
+        if not ends:
+            continue
+        at = max(ends, key=lambda i: distance[i])
+        points = [nodes[at]]
+        while at != tip:
+            at, _segment = back[at]
+            points.append(nodes[at])
+        paths.append((points, head))
+    return paths
+
+
+def find_leaders_over_part(
+    sheet: SheetGeometry,
+    *,
+    detour_limit: float = LEADER_DETOUR_PROVISIONAL_M,
+    limit: float = LEADER_OVER_PART_M,
+) -> list[Finding]:
+    """A leader running over the part much further than its feature needs.
+
+    ``leader-over-part`` (gating): the run over the part exceeds the tip's
+    shortest approach from outside (its distance to the view's printed-edge
+    box) by more than ``detour_limit``. ``leader-over-part-direct``
+    (advisory): no such detour, but a run over ``limit`` (a bore in the
+    middle of a gear has no shorter route).
+
+    swing's 917-s1 sheet 2 eye pass: cone-swing-platform's RD2 leader crossed
+    the plate's tapered edge and ran 28.2 mm over the plate to its hole, where
+    it reads as an edge of the part. Measured along the leader from its first
+    crossing of a printed model edge (walking from the text) to its arrow tip,
+    against the edges of the leader's own view (every view's, for a sheet
+    annotation). Crossings under the arrowhead are the landing, not the route
+    (RD2 lands on a countersink's inner ring, 0.37 mm inside the outer one).
+    A balloon, and any leader in a pictorial view, is skipped: an assembly
+    balloon reaches its part across the parts in front of it
+    (drive-train-assembly's exploded views, layoutcal2-c).
+
+    The finding carries how many model edges the leader crossed. Crossing
+    more than one is not a finding of its own: neither swing's evidence nor
+    the layoutcal2/c2 replay has a part sheet where it is the defect (the only
+    hits were assembly balloons), and no gate goes in without a positive case
+    (Main's ruling).
+    """
+    pictorial = {view.name for view in sheet.views if view.pictorial}
+    edges_of: dict[str, list[Segment]] = {}
+    for annotation in sheet.annotations:
+        if annotation.kind == "geometry" and annotation.owner not in pictorial:
+            edges_of.setdefault(annotation.owner, []).extend(s for s in annotation.segments if s.role == "geometry")
+    grids = {owner: SegmentGrid(list(enumerate(edges))) for owner, edges in edges_of.items()}
+    boxes = {
+        owner: Box.from_points([p for s in edges for p in ((s.x0, s.y0), (s.x1, s.y1))])
+        for owner, edges in edges_of.items()
+    }
+    every = SegmentGrid(list(enumerate(edge for edges in edges_of.values() for edge in edges)))
+
+    def approach(tip: tuple[float, float], owner: str) -> float:
+        """The tip's distance to the nearest side of its view's edge box: a
+        sheet annotation's view is the smallest box holding the tip."""
+        holding = [boxes[owner]] if owner in boxes else sorted(
+            (b for b in boxes.values() if b.xmin <= tip[0] <= b.xmax and b.ymin <= tip[1] <= b.ymax),
+            key=lambda b: b.width * b.height,
+        )[:1]
+        if not holding:
+            return 0.0
+        [box] = holding
+        return max(0.0, min(tip[0] - box.xmin, box.xmax - tip[0], tip[1] - box.ymin, box.ymax - tip[1]))
+
+    findings = []
+    for annotation in sheet.annotations:
+        if annotation.kind in _UNLEADERED_KINDS or annotation.kind == "balloon":
+            continue
+        grid = every if annotation.owner == "sheet" else grids.get(annotation.owner)
+        if grid is None:
+            continue
+        worst: tuple[float, float, int, tuple[float, float]] | None = None
+        for points, head in _leader_paths(annotation):
+            pieces = [Segment(*a, *b, "leader") for a, b in zip(points, points[1:])]
+            remaining = sum(piece.length for piece in pieces)
+            crossings: list[tuple[float, tuple[float, float]]] = []
+            for piece in pieces:
+                # Each piece runs from the text end toward the tip.
+                for _index, edge in grid.near(piece.box()):
+                    point = _segment_crossing(piece, edge)
+                    if point is None:
+                        continue
+                    to_tip = remaining - math.hypot(point[0] - piece.x0, point[1] - piece.y0)
+                    if to_tip > head:
+                        crossings.append((to_tip, point))
+                remaining -= piece.length
+            crossings.sort(reverse=True)
+            merged = [c for i, c in enumerate(crossings) if i == 0 or crossings[i - 1][0] - c[0] > MODEL_EDGE_WIDTH_M[1]]
+            if not merged:
+                continue
+            detour = merged[0][0] - approach(points[-1], annotation.owner)
+            if worst is None or detour > worst[1]:
+                worst = (merged[0][0], detour, len(merged), merged[0][1])
+        if worst is None:
+            continue
+        over, detour, count, point = worst
+        if detour > detour_limit:
+            kind = "leader-over-part"
+        elif over > limit:
+            kind = "leader-over-part-direct"
+        else:
+            continue
+        findings.append(
+            Finding(
+                kind=kind,
+                sheet=sheet.name,
+                a=annotation.label,
+                b=f"view {annotation.owner}",
+                detail=(
+                    f"leader of {annotation.label!r} crosses a model edge at "
+                    f"({point[0] * MM:.1f},{point[1] * MM:.1f})mm and runs {over * MM:.1f}mm over the part "
+                    f"to its arrow, {detour * MM:.1f}mm further than its feature's shortest approach "
+                    f"(detour limit {detour_limit * MM:.0f}mm), crossing {count} model edge(s)"
+                ),
+                at_mm=(point[0] * MM, point[1] * MM),
+                extra={"over_part_mm": over * MM, "detour_mm": detour * MM, "edge_crossings": count},
+            )
+        )
+    return findings
+
+
+def _callout_text(annotation: Mapping[str, Any]) -> str:
+    """What a callout prints: its display-data rows, else its note text (a
+    cosmetic-thread callout dumps no display data)."""
+    items = [str(item.get("t", "")) for item in (annotation.get("display") or {}).get("texts", ())]
+    text = "\n".join(items) if any(t.strip() for t in items) else str((annotation.get("note") or {}).get("text", ""))
+    return _TOKEN.sub(" ", text)
+
+
+def find_duplicate_thread_callouts(dump: Mapping[str, Any]) -> list[Finding]:
+    """A leadered note restating the thread a hole callout in its view
+    already calls out.
+
+    swing's 917-s1 sheet 2 eye pass: the model's cosmetic-thread callout
+    "1/4-20 Tapped Hole" printed beside RD2's "2X <MOD-DIAM> 5.11 THRU ALL /
+    1/4-20 UNC - 2B THRU ALL", its leader on the other hole of RD2's pair.
+    Two hole callouts naming one thread are two hole groups, not a duplicate
+    (harmonic-base's "2X ... 19.50" and "4X ... 15.00", both 8-32). A note
+    without a leader ("1/4-20 TAPPED HOLES: DEBURR ONLY") calls out no hole.
+    """
+    owners = [(str(view.get("name", "")), view.get("annotations") or ()) for view in dump.get("views", ())]
+    owners.append(
+        (
+            "sheet",
+            [
+                annotation
+                for annotation in dump.get("sheet_annotations") or ()
+                if int(annotation.get("owner_type", _OWNER_DRAWING_SHEET)) == _OWNER_DRAWING_SHEET
+            ],
+        )
+    )
+    def threads(annotation: Mapping[str, Any]) -> list[str]:
+        return list(dict.fromkeys(m.group(1).upper() for m in _THREAD.finditer(_callout_text(annotation))))
+
+    findings = []
+    for owner, members in owners:
+        shown = [annotation for annotation in members if not is_hidden(annotation)]
+        callouts = [a for a in shown if (a.get("dim") or {}).get("hole_callout")]
+        notes = [
+            a
+            for a in shown
+            if ANNOTATION_KINDS.get(int(a.get("type", 0))) == "note"
+            and a.get("leaders")
+            and not (a.get("note") or {}).get("balloon")
+        ]
+        for note in notes:
+            for callout in callouts:
+                for thread in (t for t in threads(note) if t in threads(callout)):
+                    findings.append(
+                        Finding(
+                            kind="duplicate-thread-callout",
+                            sheet=str(dump.get("sheet", "")),
+                            a=f"hole-callout {callout.get('name', '')}",
+                            b=f"note {note.get('name', '')}",
+                            detail=(
+                                f"note {note.get('name', '')!r} in {owner!r} calls out thread {thread}, which "
+                                f"hole callout {callout.get('name', '')!r} already calls out: one feature, called out twice"
+                            ),
+                            extra={"owner": owner, "thread": thread},
+                        )
+                    )
+    return findings
+
+
 def _point_box_distance(point: tuple[float, float], box: Box) -> float:
     dx = max(box.xmin - point[0], 0.0, point[0] - box.xmax)
     dy = max(box.ymin - point[1], 0.0, point[1] - box.ymax)
@@ -2711,6 +3048,8 @@ GATING_KINDS = frozenset(
         "view-edges-missing",
         "com-read-errors",
         "duplicate-annotation",
+        "duplicate-thread-callout",
+        "leader-over-part",
         "leader-crosses-section-line",
         "dim-line-crosses-extension-at-text",
         "line-on-dimension-line",
@@ -2730,6 +3069,7 @@ def severity(finding: Finding) -> FindingSeverity:
 
 def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
     """Every layout finding on one dumped sheet, gating and advisory."""
+    dump = printed_dump(dump)
     model = sheet_model(dump)
     sheet = model.geometry
     # Leaders through text have their own finder (which knows own vs foreign
@@ -2765,6 +3105,7 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
             if f.kind != "shoulder-crosses-line"
             or (frozenset((f.a, f.b)), tuple(f.extra["line"])) not in through_lines
         ),
+        *find_leaders_over_part(sheet),
         *find_dimension_line_crossings(sheet),
         *find_lines_on_dimension_lines(sheet),
         *(f for f in find_arrows_near_text(sheet) if frozenset((f.a, f.b)) not in through),
@@ -2776,6 +3117,7 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
         *find_edgeless_views(model),
         *find_read_errors(dump),
         *find_duplicate_annotations(dump),
+        *find_duplicate_thread_callouts(dump),
         *(f for f in find_text_separation(sheet) if frozenset((f.a, f.b)) not in reported),
     ])
 
@@ -2856,6 +3198,11 @@ def audit_report(
             "sheets": len(dumps),
             "findings": dict(sorted(counts.items())),
             "gating": len(gating),
+            "hidden_layer": {
+                str(dump.get("sheet", "")): hidden
+                for dump in dumps
+                if (hidden := hidden_layer_count(dump))
+            },
         },
         "findings": records,
         "sheets": [report_sheet(dump) for dump in dumps],
