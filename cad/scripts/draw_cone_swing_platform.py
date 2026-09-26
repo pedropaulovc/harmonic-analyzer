@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
 from dataclasses import dataclass
 from collections.abc import Collection, Sequence
@@ -527,12 +528,6 @@ DETAIL_LABEL_LOWER_LEFT = (0.016, 0.015)
 # The pivot relief-fit note (2.5 mm text, ~0.095 x 0.018): anchored by its
 # upper-left corner, lower right of the free band, left of the title block.
 RELIEF_NOTE_XY = (0.120, 0.034)
-# The MHA-142 named-exception note and its tap-break override (2.5 mm text,
-# two lines, ~141 x 8.8 mm), anchored upper-left in the empty band above the
-# title block (0.066): right of the plan caption row (x <= 0.2185), under the
-# C-C label (y >= 0.0815) and the A-A label (y >= 0.0853).  A sheet must state
-# a named exception (codex review of 68565ace, blocker B1).
-ENGAGEMENT_NOTE_XY = (0.222, 0.0795)
 # SECTION C-C cuts across the plate along the slot, so the counterbore's
 # depth is an imported model dimension (drawing-simplicity rule 2: a typed
 # "4.20 DEEP" was not).  Its cutting line lives on the 1:2 plate-profile
@@ -1668,6 +1663,35 @@ def _add_arc_note(adapter: Any, view: Any, note: ArcNote) -> Any:
     return created
 
 
+_CSK_VARIABLE = re.compile(r"c'?\s*sink|csk|countersink", re.IGNORECASE)
+
+
+def _require_countersink_max(display: Any, *, label: str) -> None:
+    """Prove the native tap callout carries the part's MAX-banded countersink.
+
+    The break is model-owned (cone_swing_platform_spec.POST_MOUNT_TAP_CSK):
+    the part bands each countersink diameter swTolMAX and this sheet authors
+    nothing.  The callout variable's own ToleranceType is what prints, so read
+    it back and fail loud unless every countersink diameter reads MAX.
+    """
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
+
+    seen: dict[str, int] = {}
+    for raw in display.GetHoleCalloutVariables() or ():
+        variable = dynamic_dispatch(raw._oleobj_)
+        seen[str(variable.VariableName)] = int(variable.ToleranceType)
+    csk = {
+        name: tol
+        for name, tol in seen.items()
+        if _CSK_VARIABLE.search(name) and "dia" in name.lower()
+    }
+    if not csk or any(tol != 6 for tol in csk.values()):  # swTolType_e.swTolMAX
+        raise RuntimeError(
+            f"{label}: callout countersink diameter(s) {csk!r} do not print MAX "
+            f"(all variables and tolerance types: {seen!r})"
+        )
+
+
 def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
     """Return the pivot, post-mount and north post-dowel rims from the plan.
 
@@ -1959,7 +1983,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Notch View Note",
             "Isometric View Note",
             "Pivot Relief Fit",
-            "Post Mount Engagement",
         ),
         required=(
             "Number",
@@ -1971,7 +1994,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Notch View Note",
             "Isometric View Note",
             "Pivot Relief Fit",
-            "Post Mount Engagement",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -2197,7 +2219,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge=pivot_edge,
         process="DRILL",
     )
-    add_native_hole_callout(
+    tap_callout = add_native_hole_callout(
         adapter,
         feature,
         callout_xy=(0.200, 0.258),
@@ -2205,6 +2227,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge=mount_edge,
         process=POST_MOUNT_TRANSFER_CALLOUT,
     )
+    _require_countersink_max(tap_callout, label="v2 post-mount tapped holes")
     # The dowel pair's size, band and THRU stay native; the prefix names the
     # mating post and the reamer.  A reamed fit prints three places.
     dowel_callout = add_native_hole_callout(
@@ -2253,9 +2276,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         notch_annotations,
         {"Notch View Note": notch_note, "Isometric View Note": iso_note},
-    )
-    add_property_linked_note(
-        adapter, "Post Mount Engagement", *ENGAGEMENT_NOTE_XY, char_height=0.0025
     )
     add_property_linked_note(
         adapter, "Pivot Relief Fit", *RELIEF_NOTE_XY, char_height=0.0025

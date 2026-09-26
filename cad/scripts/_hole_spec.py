@@ -8,6 +8,7 @@ identity without importing COM or duplicating its diameter and process text.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 # Cut diameters (mm) from this seat's wizard database and live feature probes.
@@ -95,6 +96,34 @@ LETTER_DRILL_MM = {"F": 6.528, "V": 9.576}  # V = 0.377in (transgear stud seat)
 DRILL_POINT_H = 0.60086
 
 
+@dataclass(frozen=True)
+class Countersink:
+    """A native Hole Wizard near- or far-side countersink on a tapped hole.
+
+    It is the model-owned edge break at that end of the tap: the callout prints
+    it from the feature, so no note restates it (drawing-simplicity-policy rule
+    6).  ``max_limit`` bands the diameter swTolMAX, so the callout prints the
+    nominal as the limit ("MAX").
+    """
+
+    dia_mm: float
+    angle_deg: float
+    max_limit: bool = False
+
+
+def countersink_thread_loss_mm(csk: Countersink, major_dia_mm: float) -> float:
+    """Axial length of full thread the countersink removes at its end."""
+    return (csk.dia_mm - major_dia_mm) / 2.0 / math.tan(math.radians(csk.angle_deg / 2.0))
+
+
+def countersink_cone_mm3(csk: Countersink, bore_dia_mm: float) -> float:
+    """Volume the countersink removes beyond an already-cut bore."""
+    r_face, r_bore = csk.dia_mm / 2.0, bore_dia_mm / 2.0
+    h = (r_face - r_bore) / math.tan(math.radians(csk.angle_deg / 2.0))
+    frustum = math.pi * h / 3.0 * (r_face**2 + r_face * r_bore + r_bore**2)
+    return frustum - math.pi * r_bore**2 * h
+
+
 @dataclass
 class HoleSpec:
     """One native Hole Wizard definition shared by all feature instances."""
@@ -106,6 +135,10 @@ class HoleSpec:
     thread_class: str = "2B"
     fit: str = "normal"
     overrides_mm: dict[str, float] = field(default_factory=dict)
+    # Tapped holes only: the countersink at the placement face (near) and at
+    # the far face.  Set at creation (HoleWizard5); see _holes.wizard_holes.
+    near_countersink: Countersink | None = None
+    far_countersink: Countersink | None = None
 
 
 def blind_cut_dia_mm(spec: HoleSpec) -> float:

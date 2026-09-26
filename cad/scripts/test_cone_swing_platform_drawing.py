@@ -949,8 +949,8 @@ def test_material_fits_one_title_block_line() -> None:
     assert "flat bar" in str(row["material_specification"])
 
 
-def test_post_screw_engagement_note_states_the_computed_exception() -> None:
-    """Codex review of 68565ace (B1): the sheet must state MHA-142's exception.
+def test_post_screw_engagement_exception_is_stated_where_the_screw_is() -> None:
+    """Codex review of 68565ace (B1): a sheet must state MHA-142's exception.
 
     U37 accepts short engagement for the 1/4-20 post screws. The printed worst
     case is the thinnest stock plate (U41 band), less the tap's 0.1 entry
@@ -972,32 +972,21 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     printed = math.floor(diameters * 100.0) / 100.0
     assert printed <= diameters and printed >= spec.POST_MOUNT_ENGAGEMENT_MIN_DIAMETERS
     assert f"{printed:.2f}" == "0.90"
-    engagement, override = spec.POST_MOUNT_ENGAGEMENT_NOTE.split("\n")
-    assert engagement == (
-        f"1/4-20 THREAD ENGAGEMENT {printed:.2f}D MIN (MHA-142): "
-        "NAMED EXCEPTION TO RULE 12."
-    )
-    # The break the derivation counts is the break the note allows.
+    # #917 S1 (a): the platform no longer prints it as a note (rule 6: no
+    # numbers in notes; the tap break is now the model's countersink).  The
+    # screw's own BOM installation note states the exception at the printed
+    # value.
+    notes = _config.parts("post-mount-screw")["installation_notes"]
+    assert f"ENGAGEMENT {printed:.2f}D MIN: NAMED EXCEPTION TO RULE 12." in notes
+    # The break the derivation counts is the break the model's countersink
+    # takes.
     assert spec.POST_MOUNT_TAP_EDGE_BREAK == 0.1
-    assert override == "1/4-20 TAPPED HOLES: DEBURR ONLY, 0.1 MAX BREAK EACH END."
-    assert f"{spec.POST_MOUNT_TAP_EDGE_BREAK:.1f} MAX BREAK" in override
     # Positive control: the title block's 0.25 break at both ends would print
-    # under the floor, which is why the override exists.
+    # under the floor, which is why the countersinks hold it to 0.1.
     title_block = (
         spec.PLATE_THICKNESS - spec.PLATE_STOCK_BAND - spec.POST_SCREW_CUT_TO_FIT_SHORT - 0.5
     ) / (0.25 * 25.4)
     assert title_block < spec.POST_MOUNT_ENGAGEMENT_MIN_DIAMETERS
-    # The note sits in the empty band above the title block (2.5 mm text,
-    # ~1.93 mm a character, 4.4 mm a line).
-    x, y = drawing.ENGAGEMENT_NOTE_XY
-    lines = spec.POST_MOUNT_ENGAGEMENT_NOTE.split("\n")
-    note = (x, y - 0.0044 * len(lines), x + max(map(len, lines)) * 0.00193, y)
-    lx, ly = drawing.SLOT_SECTION_LABEL_LOWER_LEFT
-    assert note[0] > 0.2185 + 0.002  # plan caption row
-    assert note[3] <= ly - 0.0015  # C-C label
-    assert note[3] <= 0.0853 - 0.004  # A-A label bottom (aa9766da render)
-    assert note[1] >= 0.066 + 0.004  # title block top
-    assert note[2] <= 0.4189 - 0.010  # border
 
 
 # Detail B text extents (sheet metres), from the renders: outside its span a
@@ -2042,3 +2031,46 @@ def test_post_screw_engagement_floor_is_the_users_ruling() -> None:
     source = Path(spec.__file__).read_text(encoding="utf-8")
     assert "0.87" not in source
     assert "< POST_MOUNT_ENGAGEMENT_MIN_DIAMETERS" in source
+
+
+def test_tap_break_is_a_model_countersink_not_a_note() -> None:
+    """#917 S1 (a), Main: rule 6 forbids the free "DEBURR ONLY, 0.1 MAX BREAK
+    EACH END" note.  The break stays 0.1 (the title block's 0.25 at both ends
+    would drop MHA-142 under its floor), so the model owns it: a native near-
+    and far-side Ø6.55 x 90 countersink on both taps, its diameter banded MAX
+    so the callout prints the limit, and no note or property carries it."""
+    from _hole_spec import Countersink, countersink_thread_loss_mm
+
+    csk = Countersink(6.55, 90.0, max_limit=True)
+    assert spec.POST_MOUNT_SPEC.near_countersink == csk
+    assert spec.POST_MOUNT_SPEC.far_countersink == csk
+    for side in (spec.POST_MOUNT_SPEC.near_countersink, spec.POST_MOUNT_SPEC.far_countersink):
+        assert countersink_thread_loss_mm(side, spec.POST_MOUNT_THREAD_DIA) == pytest.approx(
+            spec.POST_MOUNT_TAP_EDGE_BREAK
+        )
+    assert spec.POST_MOUNT_TAP_EDGE_BREAK == pytest.approx(0.1)
+    assert not hasattr(spec, "POST_MOUNT_TAP_BREAK_NOTE")
+    assert not hasattr(spec, "POST_MOUNT_ENGAGEMENT_NOTE")
+    for module in (part, drawing):
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert "Post Mount Engagement" not in source
+        assert "ENGAGEMENT_NOTE" not in source
+    # The volume check counts both cones on both taps.
+    assert part.POST_MOUNT_CSK_MM3 == pytest.approx(
+        2.0
+        * sum(
+            countersink_cone_mm3_for(side)
+            for side in (spec.POST_MOUNT_SPEC.near_countersink, spec.POST_MOUNT_SPEC.far_countersink)
+        )
+    )
+    build_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "volume - v_post_mounts - POST_MOUNT_CSK_MM3" in build_source
+    # The sheet proves the native callout printed the countersink's MAX.
+    draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_require_countersink_max(" in draw_source
+
+
+def countersink_cone_mm3_for(side) -> float:
+    from _hole_spec import countersink_cone_mm3
+
+    return countersink_cone_mm3(side, spec.POST_MOUNT_TAP_DIA)

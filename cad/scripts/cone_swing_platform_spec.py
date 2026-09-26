@@ -13,7 +13,7 @@ import math
 
 from _fit_limits import deviations
 from _gtol_spec import PlanarFace
-from _hole_spec import HoleSpec, blind_cut_dia_mm
+from _hole_spec import Countersink, HoleSpec, blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
 import cone_pivot_post_spec
@@ -71,19 +71,42 @@ if CRANK_GEAR_PLATFORM_CLEARANCE < 0.5:
 # The post's 1/4-in fillister clearance bores mate to these platform threads.
 # The pitch is imported from the post spec; the tapped-hole size is the
 # counterpart required by that purchased screw family.
-POST_MOUNT_SPEC = HoleSpec("tapped", "1/4-20")
+POST_MOUNT_THREAD_DIA = 0.25 * 25.4
+# The title block's R0.25/0.25 edge break would take up to 0.25 of thread off
+# each end of the through tap (0.85D worst case, under the floor), so each
+# end of both taps is broken by a native Hole Wizard countersink, 90 deg, just
+# wide enough to take POST_MOUNT_TAP_EDGE_BREAK of full thread (Main,
+# 2026-09-24; model-owned since #917 S1 -- rule 6 forbids the old "DEBURR
+# ONLY" note).  Its diameter is banded MAX, so the tap callout prints the
+# limit from the part; no note or sheet dimension restates it.
+POST_MOUNT_TAP_EDGE_BREAK = 0.1
+POST_MOUNT_TAP_CSK_ANGLE_DEG = 90.0
+POST_MOUNT_TAP_CSK = Countersink(
+    round(
+        POST_MOUNT_THREAD_DIA
+        + 2.0
+        * POST_MOUNT_TAP_EDGE_BREAK
+        * math.tan(math.radians(POST_MOUNT_TAP_CSK_ANGLE_DEG / 2.0)),
+        6,
+    ),
+    POST_MOUNT_TAP_CSK_ANGLE_DEG,
+    max_limit=True,
+)
+# The callout prints the MAX at two places; the diameter must be exact there.
+if round(POST_MOUNT_TAP_CSK.dia_mm, 2) != POST_MOUNT_TAP_CSK.dia_mm:
+    raise AssertionError(
+        f"tap countersink {POST_MOUNT_TAP_CSK.dia_mm} does not print at two places"
+    )
+POST_MOUNT_SPEC = HoleSpec(
+    "tapped",
+    "1/4-20",
+    near_countersink=POST_MOUNT_TAP_CSK,
+    far_countersink=POST_MOUNT_TAP_CSK,
+)
 POST_MOUNT_TAP_DIA = blind_cut_dia_mm(POST_MOUNT_SPEC)
 # The MHA-142 post screws (MSC 40923898, 1/4-20 fillister, cut to fit, U37c)
 # thread through the plate, flush to this much short of its underside.
 POST_SCREW_CUT_TO_FIT_SHORT = 0.3
-POST_MOUNT_THREAD_DIA = 0.25 * 25.4
-# The title block's R0.25/0.25 edge break would take up to 0.25 of thread off
-# each end of the through tap (0.85D worst case, under the floor), so the
-# two tapped holes carry a local override: deburr only (Main, 2026-09-24).
-POST_MOUNT_TAP_EDGE_BREAK = 0.1
-POST_MOUNT_TAP_BREAK_NOTE = (
-    f"1/4-20 TAPPED HOLES: DEBURR ONLY, {POST_MOUNT_TAP_EDGE_BREAK:.1f} MAX BREAK EACH END."
-)
 # The screw's cut end is deburred to this break at most
 # (post_mount_screw_spec.CUT_END_BREAK_MAX_MM, mirrored: the platform may not
 # import the screw's builder; the stack's cross-check test compares them).
@@ -143,13 +166,6 @@ if POST_MOUNT_ENGAGEMENT_PRINTED < POST_MOUNT_ENGAGEMENT_MIN_DIAMETERS:
         f"MHA-142 engagement fell below the user's "
         f"{POST_MOUNT_ENGAGEMENT_MIN_DIAMETERS:.2f}D floor"
     )
-# The sheet states the named exception, worded like MHA-139's, over the
-# break override it depends on: one line each.
-POST_MOUNT_ENGAGEMENT_NOTE = (
-    f"1/4-20 THREAD ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN (MHA-142): "
-    "NAMED EXCEPTION TO RULE 12.\n"
-    f"{POST_MOUNT_TAP_BREAK_NOTE}"
-)
 
 
 # The title block's location bands by decimal places.

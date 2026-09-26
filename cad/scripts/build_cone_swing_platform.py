@@ -108,7 +108,6 @@ from cone_swing_platform_spec import (
     PIVOT_HOLE_SPEC,
     PIVOT_HEAD_RADIAL_CLEARANCE,  # noqa: F401 -- public verify contract
     PIVOT_RELIEF_FIT_REQUIREMENT,
-    POST_MOUNT_ENGAGEMENT_NOTE,
     PLATE_THICKNESS,
     POST_ATTACHMENT_SPACING,
     POST_BLOCK_DIA,
@@ -131,7 +130,7 @@ from cone_swing_platform_spec import (
     assert_notch_stud_stack,
 )
 from _fit_limits import deviations
-from _hole_spec import HoleSpec
+from _hole_spec import HoleSpec, countersink_cone_mm3
 from cone_post_dowel_spec import (
     DOWEL_REAM_TOLERANCE_MM,
     PLATE_DOWEL_REAM_DIA,
@@ -277,6 +276,12 @@ if POST_DOWEL_PATTERN_ERROR > 6e-4:
     raise AssertionError(
         f"POST_DOWEL_PLATE_XZ is {POST_DOWEL_PATTERN_ERROR:.4f} off the post's pattern"
     )
+# Both taps' edge-break countersinks, near and far, beyond the tap drill.
+POST_MOUNT_CSK_MM3 = 2.0 * sum(
+    countersink_cone_mm3(csk, POST_MOUNT_TAP_DIA)
+    for csk in (POST_MOUNT_SPEC.near_countersink, POST_MOUNT_SPEC.far_countersink)
+    if csk is not None
+)
 # The named reference axis through each ream, for the drive-train's pin mates.
 POST_DOWEL_AXES = (
     ("post dowel north", POST_DOWEL_PLATE_XZ[0]),
@@ -1171,7 +1176,10 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += post_mount_cut.placement_drive_jobs
     v_post_mounts = 2.0 * math.pi * (POST_MOUNT_TAP_DIA / 2.0) ** 2 * PLATE_T
     volume = await volume_check(
-        adapter, "v2 post mount taps", volume - v_post_mounts, 0.01 * v_post_mounts
+        adapter,
+        "v2 post mount taps + edge-break countersinks",
+        volume - v_post_mounts - POST_MOUNT_CSK_MM3,
+        0.01 * (v_post_mounts + POST_MOUNT_CSK_MM3),
     )
 
     # #917 S1: the MHA-151 dowel pair, reamed through for a press fit and
@@ -1521,7 +1529,6 @@ async def build(adapter) -> dict[str, str]:
             "Notch View Note": NOTCH_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Pivot Relief Fit": PIVOT_RELIEF_FIT_REQUIREMENT,
-            "Post Mount Engagement": POST_MOUNT_ENGAGEMENT_NOTE,
         },
     )
     blank_reference_geometry(
