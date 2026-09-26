@@ -448,7 +448,7 @@ def _probe(
     result["limit"] = _limit_probe(adapter, draw, tag)
     result["surface_finish"] = _sf_probe(adapter, draw, tag)
     result["sf_standard_sweep"] = _sf_standard_sweep(draw, tag)
-    pdf = OUT_DIR / f"probe-{tag}.pdf"
+    pdf = OUT_DIR / f"{template.stem}-probe-{tag}.pdf"
     if pdf.exists():
         pdf.unlink()
     draw.SaveAs3(str(pdf), 0, 0)

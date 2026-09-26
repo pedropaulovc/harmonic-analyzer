@@ -2719,8 +2719,8 @@ def task_drawing():
         outputs = [
             out_dir / template.name,
             out_dir / f"{template.stem}-rebase-report.json",
-            out_dir / "probe-rebased.pdf",
-            out_dir / "probe-original.pdf",
+            out_dir / f"{template.stem}-probe-rebased.pdf",
+            out_dir / f"{template.stem}-probe-original.pdf",
         ]
         deps = _ansi_diag_deps(layout)
         label = f"drawing:ansi_template_{layout}"
@@ -3545,6 +3545,9 @@ def task_build():
             + [f"part:{s}" for s in _seat_part_order()]
             + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
             + [f"drawing:{s}" for s in _drawing_order()]
+            # diag (never merge): the worker admits only tasks in the exported
+            # build/release closure (#923).
+            + [f"drawing:ansi_template_{layout}" for layout in _ANSI_DIAG_LAYOUTS]
             + [f"verify:{s}" for s in _VERIFY_NAMES]
         ),
     }
