@@ -1201,6 +1201,16 @@ class AuditAnnotation(AnnotationGeometry):
     arrow_tails: tuple[Segment, ...] = ()
 
 
+def _cap_height(item: TextItem, box: Box) -> float:
+    """One printed run's cap height. A level (or upside-down) run's glyph box
+    is its cap height tall; a rotated run's axis-aligned box spans the
+    string's length instead, so it keeps the COM height (a vertical
+    dimension's text)."""
+    if abs(math.sin(item.angle)) < 1e-6:
+        return box.height
+    return item.height
+
+
 def text_height(annotation: AnnotationGeometry) -> float:
     height = getattr(annotation, "text_height", 0.0)
     if height > 0.0:
@@ -1280,7 +1290,7 @@ def annotation_geometry(
         return None
     heights = [item.height for item in items]
     if ink:
-        height = median(box.height for box in ink.values())
+        height = median(_cap_height(items[index], box) for index, box in ink.items())
     elif heights:
         height = max(heights)
     elif circle is not None:
@@ -2104,7 +2114,8 @@ def find_dimension_line_crossings(
     Main's ruling b: ASME allows it when unavoidable, so it is advisory
     (``dim-line-crosses-extension``), and gating only where the crossing is
     through, or within ``heights`` text heights of, either dimension's text
-    (``dim-line-crosses-extension-at-text``). One finding per pair, the worse.
+    (``dim-line-crosses-extension-at-text``). One finding per pair, the worse,
+    whichever dimension's line crosses the other's extension line.
     """
     def runs(role: str) -> list[tuple[AnnotationGeometry, list[Segment], Box]]:
         found = []
@@ -2114,7 +2125,7 @@ def find_dimension_line_crossings(
                 found.append((annotation, chosen, union_boxes([s.box() for s in chosen])))
         return found
 
-    findings = []
+    worst_of: dict[tuple[str, str], tuple[bool, tuple[float, float], Segment, Segment, str, str]] = {}
     extended = runs("ext-line")
     for source, lines, line_box in runs("dim-line"):
         for target, extensions, extension_box in extended:
@@ -2139,22 +2150,26 @@ def find_dimension_line_crossings(
                         worst = (near, point, line, extension)
             if worst is None:
                 continue
-            near, point, line, extension = worst
-            findings.append(
-                Finding(
-                    kind="dim-line-crosses-extension-at-text" if near else "dim-line-crosses-extension",
-                    sheet=sheet.name,
-                    a=source.label,
-                    b=target.label,
-                    detail=(
-                        f"dimension line of {source.label!r} {line.format_mm()} crosses "
-                        f"{target.label!r}'s extension line {extension.format_mm()}"
-                        + (" at its text" if near else "")
-                    ),
-                    at_mm=(point[0] * MM, point[1] * MM),
-                )
-            )
-    return findings
+            pair = tuple(sorted((source.label, target.label)))
+            kept = worst_of.get(pair)
+            if kept is not None and (kept[0] or not worst[0]):
+                continue
+            worst_of[pair] = (*worst, source.label, target.label)
+    return [
+        Finding(
+            kind="dim-line-crosses-extension-at-text" if near else "dim-line-crosses-extension",
+            sheet=sheet.name,
+            a=a,
+            b=b,
+            detail=(
+                f"dimension line of {a!r} {line.format_mm()} crosses "
+                f"{b!r}'s extension line {extension.format_mm()}"
+                + (" at its text" if near else "")
+            ),
+            at_mm=(point[0] * MM, point[1] * MM),
+        )
+        for near, point, line, extension, a, b in worst_of.values()
+    ]
 
 
 def _near_foreign_text(
