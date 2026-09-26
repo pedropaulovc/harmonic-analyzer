@@ -70,20 +70,21 @@ def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None
     assert spec.BORE_DIA == arbor.SHAFT_DIA  # the CAD models line-to-line
 
 
-def test_notes_bond_the_drum_at_the_station_mha102_owns() -> None:
+def test_the_drum_bond_is_the_fitup_step_not_a_note() -> None:
+    import pinion_arbor_spec as arbor_spec
+
     notes = spec.DRAWING_NOTES
-    # Rule 6 (R3): two notes.  The drum is symmetric, so no orientation
-    # note; its axial station is stated once, on MHA-102, never re-derived
-    # here from j=19.  The MHA-102 bond-zone band is MHA-102's own native
-    # dimension (Codex P1 on #814), so it is not restated here, and the hand
-    # slide rides the bore callout (Codex P2 on #832).
-    assert len(notes.splitlines()) == 2
+    # Rule 6 (R3): one note.  The drum is symmetric, so no orientation note;
+    # its axial station is stated once, on MHA-102.  The MHA-102 bond-zone
+    # band is MHA-102's own native dimension (Codex P1 on #814), the hand
+    # slide rides the bore callout (Codex P2 on #832), and the bond itself is
+    # the pinion fit-up step MHA-102's spec owns (Main's rule-6 sweep).
+    assert notes == "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND."
     assert "BOND ZONE" not in notes
     assert "ARBOR JOURNAL" not in notes
-    assert (
-        "ON ASSEMBLY: BOND TO MHA-102 WITH LOCTITE 638 AT THE "
-        "DRUM STATION ON MHA-102." in notes
-    )
+    assert "LOCTITE" not in notes and "ON ASSEMBLY" not in notes
+    assert "MHA-002" in arbor_spec.ASSEMBLY_STEP
+    assert spec.RETAINING_COMPOUND in arbor_spec.ASSEMBLY_STEP
     assert "j=19" not in notes and "LOCATED FROM" not in notes
     assert "MATES WITH CYLINDER-GEAR BANK" not in notes
     for retired in ("INTERFERENCE", "MATCHED FIT", "ENSURES FULL ENGAGEMENT", "+/-0.5"):

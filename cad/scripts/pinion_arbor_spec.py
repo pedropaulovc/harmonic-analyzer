@@ -333,11 +333,13 @@ CROSS_HOLE_CALLOUT = (
 # Notes never carry dimensions (Codex P1 on #814): the drum station is the
 # model's DrumStationFromHeadRear, printed on the profile as "DRUM STATION"
 # with its .X band, and the note only names it.
-DRAWING_NOTES = "\n".join(
-    (
-        "JOURNALS RUN IN MHA-056 REAMED BORES.",
-        f"SHAFT SLIPS INTO MHA-002; BOND WITH {RETAINING_COMPOUND}, DRUM FRONT END",
-        "  AT DRUM STATION. WIPE SQUEEZE-OUT OFF JOURNAL LANDS.",
-    )
+# Rule 6: assembly requirements belong on the feature callout or the
+# assembly step, never in a part's general notes.  ASSEMBLY_STEP is the
+# pinion fit-up step text (pinion_rig_fitup) that owns this joint.
+# The drum joint's one step covers MHA-002 too (alignment_pinion_spec).
+DRAWING_NOTES = "JOURNALS RUN IN MHA-056 REAMED BORES."
+ASSEMBLY_STEP = (
+    f"SLIDE MHA-102 INTO MHA-002 AND BOND WITH {RETAINING_COMPOUND}, DRUM FRONT "
+    "END AT MHA-102 DRUM STATION; WIPE SQUEEZE-OUT OFF JOURNAL LANDS."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

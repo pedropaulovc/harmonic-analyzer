@@ -51,7 +51,6 @@ from _fit_limits import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_lever_pin_spec import (
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     PIN_DIA,
@@ -66,7 +65,6 @@ _SAVED_DRAWING_PROPERTIES = (
     "Material Specification",
     "Finish",
     "Quantity",
-    "Manufacturing Notes",
     "Isometric View Note",
 )
 
@@ -144,7 +142,6 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
-            "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )

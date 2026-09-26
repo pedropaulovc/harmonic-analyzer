@@ -89,8 +89,13 @@ def test_bonded_slip_fit_replaces_the_press() -> None:
     assert round(seat_min - pin_max, 6) == 0.0
     assert round(seat_max - pin_min, 6) == 0.042
     assert seat_max - pin_min <= pinion_cam_pin_spec.RETAINING_COMPOUND_MAX_GAP_MM
+    # Rule 6 (Main's MHA-116 eye pass): the bond is the fit-up step, not a note.
     notes = pinion_cam_pin_spec.DRAWING_NOTES
-    assert "BOND INTO MHA-056 FOLLOWER SEAT WITH LOCTITE 638" in notes
+    assert "LOCTITE" not in notes and "ON ASSEMBLY" not in notes
+    assert len(notes.splitlines()) == 2
+    assert pinion_cam_pin_spec.ASSEMBLY_STEP == (
+        "BOND MHA-116 INTO MHA-056 FOLLOWER SEAT WITH LOCTITE 638."
+    )
     assert "MHA-056" in drawing.DIMENSION_CALLOUTS["PinDia"]
     assert "SLIP FIT" in drawing.DIMENSION_CALLOUTS["PinDia"]
     import draw_pinion_bracket

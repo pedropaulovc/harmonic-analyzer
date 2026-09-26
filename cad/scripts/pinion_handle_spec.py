@@ -34,11 +34,12 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 SURFACE_FINISHES = ()
 # Rule 6: notes never carry a dimension.  The bar size is the registry's
 # material specification and the imported RodDia.
-DRAWING_NOTES = "\n".join(
-    (
-        "USE COLD-FINISHED BAR AS RECEIVED.",
-        "ON ASSEMBLY: BOND INTO MHA-102 HEAD WITH LOCTITE 638.",
-        "INSTALLED ROD SHALL NOT TURN OR SLIDE BY HAND.",
-    )
+# Rule 6: assembly requirements belong on the feature callout or the
+# assembly step, never in a part's general notes.  ASSEMBLY_STEP is the
+# pinion fit-up step text (pinion_rig_fitup) that owns this joint.
+DRAWING_NOTES = "USE COLD-FINISHED BAR AS RECEIVED."
+ASSEMBLY_STEP = (
+    "BOND MHA-058 INTO MHA-102 HEAD WITH LOCTITE 638; "
+    "INSTALLED ROD SHALL NOT TURN OR SLIDE BY HAND."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

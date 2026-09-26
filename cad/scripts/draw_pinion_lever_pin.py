@@ -84,7 +84,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -92,7 +91,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -143,7 +141,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pinion lever pin axis centerline",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.058)
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.160)
 
     return await finalize_drawing(

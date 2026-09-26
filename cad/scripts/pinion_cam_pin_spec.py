@@ -81,12 +81,18 @@ if BOND_CLEARANCE_MIN < 0.0 or BOND_CLEARANCE_MAX > RETAINING_COMPOUND_MAX_GAP_M
         f" 0-{RETAINING_COMPOUND_MAX_GAP_MM} {RETAINING_COMPOUND} window"
     )
 
+# Rule 6: assembly requirements belong on the feature callout or the
+# assembly step, never in a part's general notes.  ASSEMBLY_STEP is the
+# pinion fit-up step text (pinion_rig_fitup) that owns this joint.
 DRAWING_NOTES = "\n".join(
     (
         "LEAVE THE CROWN ROOT CIRCLE SHARP, NO CHAMFER;",
         "  EXEMPT FROM TITLE-BLOCK EDGE-BREAK REQUIREMENT.",
-        f"ON ASSEMBLY: BOND INTO {SEAT_NUMBER} FOLLOWER SEAT WITH {RETAINING_COMPOUND}.",
     )
+)
+ASSEMBLY_STEP = (
+    f"BOND {_config.parts('pinion-cam-pin')['number']} INTO {SEAT_NUMBER} "
+    f"FOLLOWER SEAT WITH {RETAINING_COMPOUND}."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"
 # The overall (seated end to crown apex) is a pure reference restatement;

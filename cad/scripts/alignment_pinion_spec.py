@@ -126,11 +126,7 @@ GEAR_DATA = gear_data_note(
 # acceptance, so it rides the reamed bore's callout, not a general note
 # (Codex P2 on #832).
 ARBOR_BORE_CALLOUT = "REAM THRU\nSLIDES ON MHA-102 BY HAND"
-DRAWING_NOTES = "\n".join(
-    (
-        f"ON ASSEMBLY: BOND TO MHA-102 WITH {RETAINING_COMPOUND} AT THE "
-        "DRUM STATION ON MHA-102.",
-        "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND.",
-    )
-)
+# Rule 6: the bond to MHA-102 is an assembly step (pinion_arbor_spec
+# ASSEMBLY_STEP owns the drum joint), not a part note.
+DRAWING_NOTES = "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

@@ -40,10 +40,11 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
-DRAWING_NOTES = "\n".join(
-    (
-        f"ON ASSEMBLY: DRIVE THROUGH HOLE MATCH-DRILLED IN {LEVER_NUMBER} HUB",
-        f"  AND {LIFT_ROD_NUMBER} ROD; TRIM AND PEEN BOTH ENDS FLUSH WITH HUB.",
-    )
+# Rule 6: the pin sheet carries no notes.  The match-drill and drive
+# requirement rides the MHA-059 and MHA-060 hole callouts; the drive, trim and
+# peen sequence is the pinion fit-up step below.
+ASSEMBLY_STEP = (
+    f"DRIVE MHA-135 THROUGH THE HOLE MATCH-DRILLED IN {LEVER_NUMBER} HUB AND "
+    f"{LIFT_ROD_NUMBER} ROD, GRIP PARKED; TRIM AND PEEN BOTH ENDS FLUSH WITH HUB."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"

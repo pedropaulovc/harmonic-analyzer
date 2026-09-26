@@ -74,7 +74,7 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
     # Fable r-delta (Main ruling B): MHA-058's bond and acceptance are
     # instructions for a part not on this print; MHA-058 carries both.
     assert "MHA-058" not in spec.DRAWING_NOTES
-    assert "SHALL NOT TURN OR SLIDE BY HAND" in crossrod.DRAWING_NOTES
+    assert "SHALL NOT TURN OR SLIDE BY HAND" in crossrod.ASSEMBLY_STEP
 
 
 def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
@@ -98,7 +98,7 @@ def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
     assert spec.CROSSROD_MAX_CLEARANCE == pytest.approx(loosest)
     assert tightest >= 0.0
     assert loosest <= spec.RETAINING_COMPOUND_MAX_GAP_MM
-    assert "BOND INTO MHA-102 HEAD WITH LOCTITE 638." in crossrod.DRAWING_NOTES
+    assert "INTO MHA-102 HEAD WITH LOCTITE 638" in crossrod.ASSEMBLY_STEP
     for retired in ("MATCH-REAM", "PRESS", "INTERNAL SHOULDERS SHARP"):
         assert retired not in spec.DRAWING_NOTES
         assert retired not in spec.CROSS_HOLE_CALLOUT
@@ -491,21 +491,24 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     assert abs(back_mid - back_strap_mid) <= 0.05 + 1e-9
 
 
-def test_drum_station_is_a_model_dimension_the_note_only_names() -> None:
+def test_drum_station_is_a_model_dimension_the_fitup_step_names() -> None:
     """Codex P1 on #814: notes never carry dimensions.  The drum station is
     the model's own reference dimension from the Ø15 head rear face, printed
-    at .X with the "DRUM STATION" callout the note points to."""
-    assert spec.DRAWING_NOTES.splitlines() == [
-        "JOURNALS RUN IN MHA-056 REAMED BORES.",
-        "SHAFT SLIPS INTO MHA-002; BOND WITH LOCTITE 638, DRUM FRONT END",
-        "  AT DRUM STATION. WIPE SQUEEZE-OUT OFF JOURNAL LANDS.",
-    ]
-    assert f"{spec.DRUM_STATION:.2f}" not in spec.DRAWING_NOTES
-    assert f"{spec.DRUM_STATION_BAND:.1f}" not in spec.DRAWING_NOTES
+    at .X with the "DRUM STATION" callout.  Rule 6 (Main's eye pass): the
+    drum bond is the pinion fit-up step, so the part note keeps only the
+    journal fact."""
+    assert spec.DRAWING_NOTES == "JOURNALS RUN IN MHA-056 REAMED BORES."
+    assert spec.ASSEMBLY_STEP == (
+        "SLIDE MHA-102 INTO MHA-002 AND BOND WITH LOCTITE 638, DRUM FRONT "
+        "END AT MHA-102 DRUM STATION; WIPE SQUEEZE-OUT OFF JOURNAL LANDS."
+    )
+    for text in (spec.DRAWING_NOTES, spec.ASSEMBLY_STEP):
+        assert f"{spec.DRUM_STATION:.2f}" not in text
+        assert f"{spec.DRUM_STATION_BAND:.1f}" not in text
     assert spec.DRAWING_DIMENSIONS["DrumStationReference"] == {"DrumStationFromHeadRear"}
     assert spec.DRAWING_PRECISION_BY_NAME["DrumStationFromHeadRear"] == 2
     assert drawing.DIMENSION_CALLOUTS["DrumStationFromHeadRear"] == "DRUM STATION"
-    assert "DRUM STATION" in spec.DRAWING_NOTES
+    assert "DRUM STATION" in spec.ASSEMBLY_STEP
     assert spec.DRUM_STATION_BAND == spec.LINEAR_X_BAND
 
 
