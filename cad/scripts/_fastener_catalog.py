@@ -115,6 +115,11 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "92240A539",
         material="AISI 304",
     ),
+    "pedestal-hold-down-screw": _stock(
+        "pedestal-hold-down-screw",
+        "Steel Narrow Fillister Head Slotted Screw",
+        "90280A197",
+    ),
     "pen-set-screw": _stock(
         "pen-set-screw",
         "Stainless Steel Flared-Collar Knurled-Head Thumb Screw",
