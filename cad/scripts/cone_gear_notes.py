@@ -2,7 +2,9 @@
 
 This module deliberately performs no ``_config`` reads because the cone-gear
 constants are imported by assemblies.  Every configuration sheet receives its
-own native dimensions and a tooth-system block for that configuration.
+own native dimensions and a tooth-system block for that configuration.  The
+shaft joint's text lives here too, for the drive-train assembly step that makes
+the joint; no part sheet prints it.
 """
 
 from __future__ import annotations
@@ -52,55 +54,34 @@ def gear_data(teeth: int) -> str:
             f"BACKLASH WITH {CYLINDER_MATE_NUMBER}, ACCEPT AT ASSEMBLY (mm)",
             f"{minimum:.2f} TO {maximum:.2f}",
         ),
+        # Rule 6: the sheet states results, never how to cut them.  TOOTH
+        # FORM (floor any shape, not below the floor diameter), the floor
+        # limits, the tooth-thickness band and the assembly backlash are the
+        # whole acceptance for the thickened tooth's narrow gap.
         ("TOOTH THICKNESS IN VIEW", "ARC LENGTH AT PITCH DIAMETER"),
-        # The thickened tooth leaves a gap narrower than any catalogue
-        # cutter's, and no catalogue cutter exists at 49.82 DP: a 48 DP cutter
-        # plunged to this tooth thickness would leave the floor about 0.5 high.
-        # The tooth-thickness band and the assembly backlash are the acceptance.
-        ("GAP CUTTER", "SINGLE-POINT FLY CUTTER GROUND TO THE GAP FORM"),
-        ("CUTTING", "PLUNGE TO FLOOR; WIDEN BY INDEXING, NEVER BY SINKING"),
     )
     return "\n".join(["GEAR DATA", *(f"{label}:  {value}" for label, value in rows)])
 
 
 # The user approved either a metallurgical joint or a retaining-compound joint
-# for every cone gear.  One line states the plain bonded bore and the accepted
-# joint systems without turning one process into the part's definition.  There
-# is no key, pin, set screw, or hub in the evidence or model.
+# for every cone gear.  Joining is a method, so rule 6 keeps it off the part
+# sheets: the drive-train assembly step that fixes each gear to its shaft
+# imports this constant rather than retyping it.  There is no key, pin, set
+# screw, or hub in the evidence or model.
 ATTACHMENT = "SOLDER, SILVER-BRAZE OR LOCTITE 638/648"
 SHAFT_MATE_NUMBER = "MHA-014"
 
-# The two shortfalls user rulings U42 and U40 (2026-09-23) accept, each
-# printed as a plain fact only on the sheets it covers; the acceptance lives
-# in the policy's Named exceptions table.  Rule 6 caps the notes at four
-# lines, so T006, which carries both, states them on one line.
-# Named exception: MHA-013 contact ratio (drawing-simplicity-policy.md, "Named exceptions").
-CONTACT_RATIO_NOTE = (
-    f"CONTACT RATIO BELOW 1.1 ON T{spec.CONTACT_RATIO_EXCEPTION_TEETH[0]:03d}"
-    f"-T{spec.CONTACT_RATIO_EXCEPTION_TEETH[-1]:03d}."
-)
-
-
-# Named exception: MHA-013 web (drawing-simplicity-policy.md, "Named exceptions").
-def web_note(teeth: int) -> str:
-    """Return the sheet line stating one gear's thin web."""
-    return f"ROOT-TO-BORE WEB {spec.WEB_EXCEPTIONS_MM[teeth]:.2f} MIN."
-
-
-# Named exception: MHA-013 web (drawing-simplicity-policy.md, "Named exceptions").
-# Named exception: MHA-013 contact ratio (drawing-simplicity-policy.md, "Named exceptions").
-def contact_ratio_and_web_note(teeth: int) -> str:
-    """Return the one sheet line stating a gear's low CR and thin web."""
-    return (
-        "CONTACT RATIO BELOW 1.1, "
-        f"ROOT-TO-BORE WEB {spec.WEB_EXCEPTIONS_MM[teeth]:.2f} MIN."
+# The named rule-12 exceptions (user rulings U42 and U40, 2026-09-23) are a
+# design-review record the machinist cannot act on, so no sheet prints them.
+# They live in cone_gear_spec as CONTACT_RATIO_EXCEPTION_TEETH and
+# WEB_EXCEPTIONS_MM, each pinned to its derivation by test_cone_gear_mesh_design
+# and test_cone_gear_drawing.
+DRAWING_NOTES = "\n".join(
+    (
+        "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
+        "MAKE ONE GEAR FROM EACH SHEET IN THIS PACKAGE.",
+        "PLAIN BORE, NO KEYWAY.",
     )
-
-
-_COMMON_NOTES = (
-    "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
-    "MAKE ONE GEAR FROM EACH SHEET IN THIS PACKAGE.",
-    f"PLAIN BORE, NO KEYWAY; {ATTACHMENT} TO {SHAFT_MATE_NUMBER} AT ASSEMBLY.",
 )
 
 
@@ -108,12 +89,4 @@ def drawing_notes(teeth: int) -> str:
     """Return one configuration sheet's manufacturing notes."""
     if teeth not in spec.CONFIGURATION_TEETH:
         raise ValueError(f"unsupported cone-gear tooth count {teeth}")
-    lines = list(_COMMON_NOTES)
-    low_contact_ratio = teeth in spec.CONTACT_RATIO_EXCEPTION_TEETH
-    if low_contact_ratio and teeth in spec.WEB_EXCEPTIONS_MM:
-        lines.append(contact_ratio_and_web_note(teeth))
-    elif teeth in spec.WEB_EXCEPTIONS_MM:
-        lines.append(web_note(teeth))
-    elif low_contact_ratio:
-        lines.append(CONTACT_RATIO_NOTE)
-    return "\n".join(lines)
+    return DRAWING_NOTES
