@@ -30,7 +30,10 @@ from _fit_limits import deviations
 from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 
 SKU = "40923898"
-THREAD_DIA_MM, CUT_LENGTH_MM, HEAD_H_MM, _HEAD_DIA, _PITCH = FILLISTER_SIZES[SKU]
+THREAD_DIA_MM, STOCK_LENGTH_MM, HEAD_H_MM, _HEAD_DIA, _PITCH = FILLISTER_SIZES[SKU]
+# The cut-to-fit nominal: MHA-142's own length, applied by its trim.  The
+# shared size row stays the supplied screw.
+CUT_LENGTH_MM = 86.0
 
 # Head seated on the MHA-016 counterbore floor: the under-head face to the
 # plate's top face, at the model's nominal post.
@@ -244,10 +247,11 @@ if ENGAGEMENT_NOMINAL_MM < MIN_ENGAGEMENT_MM:
 # The supplied screw is 3-1/2 in, factory-chamfered at its tip.  Cutting it to
 # fit removes that tip, so the 0.1 break at the new end is MHA-142's own
 # modification, not a property of the fillister family: the builder builds
-# the stock screw at its supplied length through the shared recipe
-# (untouched), then trims it at CutLength and breaks the new end with
+# the stock screw at its supplied length (STOCK_LENGTH_MM, the shared
+# recipe's row), then trims it at CutLength and breaks the new end with
 # CutEndBreak.
-STOCK_LENGTH_MM = 3.5 * 25.4
+if abs(STOCK_LENGTH_MM - 3.5 * 25.4) > 1e-9:
+    raise ValueError("the MSC 40923898 row is not the supplied 3-1/2 in screw")
 # The family's factory tip: 45 deg x 0.7P (diag_mcmaster_fillister's law).
 FACTORY_TIP_CHAMFER_MM = 0.7 * _PITCH
 MAJOR_RADIUS_MM = THREAD_DIA_MM / 2.0

@@ -3,7 +3,7 @@ r"""MSC 40923898 -- 1/4-20 x 3-1/2 zinc-plated steel slotted fillister screw.
 MSC Industrial Supply, manufacturer part 1456MSL (SAE J82 steel, zinc,
 ASME B18.6.3, fully threaded).  MSC publishes no head sizes and no CAD
 model, so the head takes ASME B18.6.3's 1/4 maximum and the length the
-86.0 cut-to-fit nominal (U37c).  Reuses the 90280A* fillister family laws
+supplied 3-1/2 in (MHA-142's builder cuts it to fit).  Reuses the 90280A* fillister family laws
 unchanged, like 90280A837.
 
 With no vendor model there is no replica gate: the standalone run is

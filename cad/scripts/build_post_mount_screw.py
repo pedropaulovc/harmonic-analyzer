@@ -27,7 +27,6 @@ and the end face's rim radius proves the break.
 
 from __future__ import annotations
 
-from contextlib import contextmanager
 from functools import wraps
 import math
 import sys
@@ -88,9 +87,11 @@ SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
 THREAD = "1/4-20"
-SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA, THREAD_PITCH = FILLISTER_SIZES["40923898"]
-if SHANK_LEN != CUT_LENGTH_MM:
-    raise ValueError("the stock recipe length is not the spec's cut length")
+# The shared row is the supplied screw; the part's shank is its cut length.
+SHANK_DIA, _STOCK_LEN, HEAD_H, HEAD_DIA, THREAD_PITCH = FILLISTER_SIZES[SKU]
+if _STOCK_LEN != STOCK_LENGTH_MM:
+    raise ValueError("the stock recipe length is not the supplied length")
+SHANK_LEN = CUT_LENGTH_MM
 
 TRIM_PROFILE = "CutToLengthProfile"
 TRIM_FEATURE = "CutToLength"
@@ -118,22 +119,6 @@ TRIM_OVERRUN_MM = SHANK_DIA
 TRIM_VOLUME_TOL_MM3 = 0.005 * TRIM_REMOVED_MM3
 # The end face's rim is a B-rep vertex read: exact to the kernel.
 RIM_TOL_MM = 1e-4
-
-
-@contextmanager
-def _supplied_stock_length():
-    """Run the shared recipe at the SUPPLIED length for this one build.
-
-    The recipe reads its size row at call time.  Its source stays untouched,
-    and so does every other fillister part's cache key.  The row is restored
-    whatever happens.
-    """
-    modelled = FILLISTER_SIZES[SKU]
-    FILLISTER_SIZES[SKU] = (modelled[0], STOCK_LENGTH_MM, *modelled[2:])
-    try:
-        yield
-    finally:
-        FILLISTER_SIZES[SKU] = modelled
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -543,8 +528,8 @@ def _manufacturing_controls(adapter) -> None:
 
 @wraps(build_40923898)
 async def _cut_to_length(adapter, truth=None, **parameters):
-    with _supplied_stock_length():
-        receipt = await build_40923898(adapter, truth, **parameters)
+    # The shared recipe builds the supplied screw; the trim cuts it to fit.
+    receipt = await build_40923898(adapter, truth, **parameters)
     await _author_cut_controls(adapter)
     await _modify_stock(adapter)
     _manufacturing_controls(adapter)

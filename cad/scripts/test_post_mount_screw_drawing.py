@@ -277,7 +277,9 @@ def test_worst_case_engagement_holds_the_named_minimum() -> None:
 # as its git blob (LF-normalised).  The cut end is MHA-142's modification:
 # it must never leak into it.
 _OWN_RECIPE_BLOBS = {
-    "diagnostics/diag_build_40923898.py": "fed1a2b1c89e1cdf7ddc01baa01980b2aed39470",
+    # Re-pinned for the Codex P2 fix: its docstring now names the supplied
+    # 3-1/2 in length, not the cut length.
+    "diagnostics/diag_build_40923898.py": "0bd238baecda45dbac899bca6326245deb070113",
 }
 # The SHARED fillister family recipe moves with the base (#839 added
 # 91794A112 and dropped 90280A110 under it), so it is checked against the
@@ -350,20 +352,22 @@ def test_shared_fillister_recipe_is_untouched() -> None:
     assert len(rows) == 1, added
     assert all(line.strip().startswith("#") for line in added if line not in rows), added
     assert _functions(base) == _functions(head)
-    assert FILLISTER_SIZES["40923898"][1] == 86.0
+    assert FILLISTER_SIZES["40923898"][1] == spec.STOCK_LENGTH_MM
 
 
-def test_stock_is_built_at_its_supplied_length_then_restored() -> None:
-    """The recipe runs at the supplied 3-1/2 in, so the trim has a factory
-    tip to remove; the size row comes back even if the recipe raises."""
-    assert spec.STOCK_LENGTH_MM == pytest.approx(3.5 * 25.4)
-    modelled = FILLISTER_SIZES["40923898"]
-    with pytest.raises(RuntimeError):
-        with part._supplied_stock_length():
-            assert FILLISTER_SIZES["40923898"][1] == spec.STOCK_LENGTH_MM
-            assert FILLISTER_SIZES["40923898"][0] == modelled[0]
-            raise RuntimeError("recipe failed")
-    assert FILLISTER_SIZES["40923898"] == modelled
+def test_catalog_row_is_the_supplied_stock_and_only_the_part_is_cut() -> None:
+    """Codex P2 on #857 (PRRT_kwDOPHDy386mP6Dj): the MSC 40923898 row held
+    the 86.0 cut length, so the catalog build (40923898-catalog.SLDPRT) and
+    any direct stock consumer got the modified length labelled as supplier
+    stock; only MHA-142's builder swapped in 3-1/2 in.  The row is the
+    supplied screw; the cut-to-fit length is MHA-142's own spec, applied by
+    its trim, and the builder never mutates the shared row."""
+    assert FILLISTER_SIZES["40923898"][1] == pytest.approx(3.5 * 25.4)
+    assert spec.STOCK_LENGTH_MM == FILLISTER_SIZES["40923898"][1]
+    assert part.SHANK_LEN == spec.CUT_LENGTH_MM == 86.0
+    assert not hasattr(part, "_supplied_stock_length")
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "FILLISTER_SIZES[SKU] =" not in source
 
 
 def _independent_removal() -> tuple[float, float]:
@@ -435,7 +439,7 @@ def test_cut_end_features_are_driven_by_the_model_dimensions() -> None:
     assert body.index('phase="trimmed"') < body.index("_break_cut_end(adapter)")
     assert body.index("_break_cut_end(adapter)") < body.index('phase="broken"')
     wrapper = source.split("async def _cut_to_length", 1)[1]
-    assert wrapper.index("_supplied_stock_length()") < wrapper.index("_modify_stock")
+    assert wrapper.index("build_40923898(") < wrapper.index("_modify_stock")
     # The trimmed tip cannot reach into what the stock carries: the cut
     # clears the factory tip, and the volume gate outruns the sweep's slack.
     assert spec.STOCK_LENGTH_MM - spec.FACTORY_TIP_CHAMFER_MM > spec.CUT_LENGTH_MM
