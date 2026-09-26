@@ -415,7 +415,7 @@ def _verify_tip_view(adapter: Any, front: Any, tip: Any) -> None:
             f"{parenthesis}), expected {CUT_END_BREAK_TEXT!r}"
         )
     _telemetry.success(f"tip view {ratio[0]:g}:{ratio[1]:g} reads {text}")
-    _probe_max_text(adapter, annotation)
+    _probe_max_text(adapter, annotation, view)
 
 
 # diag (#923 MAX/MIN, never merge): what prints the break's "max." text.
@@ -428,7 +428,7 @@ _PREF_TOGGLES = {
 }
 
 
-def _probe_max_text(adapter: Any, annotation: Any) -> None:
+def _probe_max_text(adapter: Any, annotation: Any, view: Any) -> None:
     """Log the drafting-standard prefs and the break's rendered strings under
     each variant; restores every pref it touched. Never raises."""
     draw = adapter.currentModel
@@ -459,6 +459,17 @@ def _probe_max_text(adapter: Any, annotation: Any) -> None:
         import socket
 
         _telemetry.info(f"maxmin-diag host={socket.gethostname()}")
+        try:
+            part = _early_bound(view.ReferencedDocument, "IModelDoc2")
+            part_ext = part.Extension
+            _telemetry.info(
+                f"maxmin-diag part {part.GetTitle()!r}: "
+                f"swDetailingDimensionStandard={int(part_ext.GetUserPreferenceInteger(13, 0))} "
+                f"swDetailingDimensionStandardName={str(part_ext.GetUserPreferenceString(65, 0))!r} "
+                f"swDetailingAllUpperCase={bool(part_ext.GetUserPreferenceToggle(538, 0))}"
+            )
+        except Exception as exc:  # noqa: BLE001 - diagnostic
+            _telemetry.warn(f"maxmin-diag part prefs unreadable: {exc!r}")
         base = prefs()
         log("baseline")
         for name in ("swDraftingStandardAllUppercaseForDimensionsAndHoleCallouts", "swDetailingAllUpperCase"):
