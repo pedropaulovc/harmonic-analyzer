@@ -1868,6 +1868,38 @@ def test_whole_and_split_matches_are_assigned_together():
     assert (matched["split"].xmin, matched["split"].xmax) == pytest.approx((0.1002, 0.1045))
     assert matched["plain"].xmin == pytest.approx(0.1060)
 
+
+def test_section_labels_join_the_sheets_one_text_assignment():
+    """Codex P2 on de9d742ab: annotation text was matched first, so a
+    dimension reading "A" took the only "A" (P) section label A could reach
+    although it had another "A" (Q) in its own window; the label then read
+    text-unmatched."""
+    h = 0.0035
+    dim = _dim("DimA", "A", 0.1010, 0.100)
+    section = {"label": "A", "line": [], "arrows": [], "texts": [0.0960, 0.100 + h, 0.0], "text_height": h}
+    view = _view("v", (0.05, 0.05, 0.25, 0.25), [dim], sections=[section])
+    spans = [["A", 0.1002, 0.1009, 0.1017, 0.1042], ["A", 0.1060, 0.1009, 0.1075, 0.1042]]  # P, Q
+    model = sheet_model(_dump(views=[view], spans=spans, print_rest=False))
+    assert model.unmatched == ()
+    [label] = [a for a in model.geometry.annotations if a.kind == "section-line"]
+    assert label.text_boxes[0].xmin == pytest.approx(0.1002)
+
+
+def test_detail_labels_join_the_sheets_one_text_assignment():
+    """The sweep's other label path: a detail circle's label (any short
+    all-letter run in its window) must not lose its only span to annotation
+    text that had another."""
+    h = 0.0035
+    dim = _dim("DimB", "B", 0.1010, 0.100)
+    # One circle: layer, centre, start, end, lineType, label point (upper-left), height, no arrows.
+    info = [1, 0, 0.09, 0.08, 0.0, 0.10, 0.08, 0.0, 0.10, 0.08, 0.0, 0, 0.0960, 0.100 + h, 0.0, h, 0]
+    view = _view("v", (0.05, 0.05, 0.25, 0.25), [dim], detail_circles_info=info)
+    spans = [["B", 0.1002, 0.1009, 0.1017, 0.1042], ["B", 0.1060, 0.1009, 0.1075, 0.1042]]
+    model = sheet_model(_dump(views=[view], spans=spans, print_rest=False))
+    assert model.unmatched == ()
+    [circle] = [a for a in model.geometry.annotations if a.kind == "detail-circle"]
+    assert circle.text_boxes[0].xmin == pytest.approx(0.1002)
+
 @pytest.mark.parametrize(
     ("angle", "pieces", "expected"),
     [
@@ -2067,6 +2099,41 @@ def test_a_primitive_count_answering_none_is_a_read_error(monkeypatch):
     reader = collector._Reader(adapter=None)
     assert collector._dump_display(reader, Data()) == {}
     assert reader.take_errors() == {"GetLineCount": 1}
+
+
+@pytest.mark.parametrize("getter", ["GetTextHeightAtIndex", "GetTextRefPositionAtIndex", "GetTextAngleAtIndex"])
+def test_a_text_run_read_answering_none_is_a_read_error(monkeypatch, getter):
+    """Codex P2 on de9d742ab: a None height read as 0.0, so text_items dropped
+    the run with com-read-errors clean. Every text read the audit consumes is
+    required (the reader sweep); font and line spacing, which it does not
+    consume, stay optional."""
+    import _drawing_layout_audit as collector
+
+    monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
+    answers = {
+        "GetTextCount": 1,
+        "GetTextAtIndex": "12.0",
+        "GetTextPositionAtIndex": (0.1, 0.1, 0.0),
+        "GetTextHeightAtIndex": 0.0035,
+        "GetTextRefPositionAtIndex": 1,
+        "GetTextAngleAtIndex": 0.0,
+        "GetTextFontAtIndex": "Century Gothic",
+        "GetTextLineSpacingAtIndex": 0.0,
+        getter: None,
+    }
+
+    class Data:
+        def __getattr__(self, name):
+            if name in answers:
+                value = answers[name]
+                return lambda *_args: value
+            if name.endswith("Count"):
+                return lambda: 0
+            raise AttributeError(name)
+
+    reader = collector._Reader(adapter=None)
+    collector._dump_display(reader, Data())
+    assert reader.take_errors() == {getter: 1}
 
 
 def test_a_run_meeting_a_leader_end_to_end_is_not_its_copy():

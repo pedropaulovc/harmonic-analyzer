@@ -72,6 +72,15 @@ def _round(values: Any) -> list[float]:
 class _Reader:
     """Tolerant COM reads: an accessor that does not apply returns ``default``.
 
+    Every getter whose answer the audit consumes is ``need``: a scalar, count
+    or geometry read answering None is a refusal. ``call`` is left only where
+    None is the documented empty answer (``GetAnnotations``,
+    ``GetSectionLines``, ``GetTableAnnotations``, ``GetDetailCircleInfo2``,
+    ``GetSplitInformation`` on an unsplit table), where the value is not
+    consumed by the audit (font, line spacing, layer, scale, display mode,
+    datum-origin axes and labels), or where a fallback read follows
+    (``GetName2`` before ``Name``).
+
     Every refusal is counted per sheet under the accessor's name. A refused
     read can drop an annotation's ink or text from the audit, so any count is
     a gating ``com-read-errors`` finding. A read the audit cannot do without
@@ -165,9 +174,9 @@ def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
             {
                 "t": str(reader.need(lambda i=index: data.GetTextAtIndex(i), "")),
                 "pos": _round(reader.need(lambda i=index: data.GetTextPositionAtIndex(i), ())),
-                "h": round(float(reader.call(lambda i=index: data.GetTextHeightAtIndex(i), 0.0)), 7),
-                "ref": int(reader.call(lambda i=index: data.GetTextRefPositionAtIndex(i), -1)),
-                "ang": round(float(reader.call(lambda i=index: data.GetTextAngleAtIndex(i), 0.0)), 7),
+                "h": round(float(reader.need(lambda i=index: data.GetTextHeightAtIndex(i), 0.0)), 7),
+                "ref": int(reader.need(lambda i=index: data.GetTextRefPositionAtIndex(i), -1)),
+                "ang": round(float(reader.need(lambda i=index: data.GetTextAngleAtIndex(i), 0.0)), 7),
                 "font": str(reader.call(lambda i=index: data.GetTextFontAtIndex(i), "")),
                 "ls": round(float(reader.call(lambda i=index: data.GetTextLineSpacingAtIndex(i), 0.0)), 7),
             }
@@ -181,17 +190,17 @@ def _dump_annotation(reader: _Reader, raw: Any) -> dict[str, Any] | None:
     annotation = reader.bind(raw, "IAnnotation")
     if annotation is None:
         return None
-    kind = int(reader.call(lambda: annotation.GetType(), 0))
+    kind = int(reader.need(lambda: annotation.GetType(), 0))
     record: dict[str, Any] = {
         "type": kind,
-        "name": str(reader.call(lambda: annotation.GetName(), "")),
-        "visible": int(reader.call(lambda: annotation.Visible, 1)),
-        "owner_type": int(reader.call(lambda: annotation.OwnerType, -1)),
-        "pos": _round(reader.call(lambda: annotation.GetPosition(), ())),
+        "name": str(reader.need(lambda: annotation.GetName(), "")),
+        "visible": int(reader.need(lambda: annotation.Visible, 1)),
+        "owner_type": int(reader.need(lambda: annotation.OwnerType, -1)),
+        "pos": _round(reader.need(lambda: annotation.GetPosition(), ())),
         "layer": str(reader.call(lambda: annotation.Layer, "")),
     }
     leaders = []
-    for index in range(int(reader.call(lambda: annotation.GetLeaderCount(), 0) or 0)):
+    for index in range(int(reader.need(lambda: annotation.GetLeaderCount(), 0) or 0)):
         points = reader.need(lambda i=index: annotation.GetLeaderPointsAtIndex(i))
         if points:
             leaders.append(_round(points))
@@ -207,16 +216,16 @@ def _dump_annotation(reader: _Reader, raw: Any) -> dict[str, Any] | None:
         note = reader.bind(specific, "INote")
         if note is not None:
             record["note"] = {
-                "text": str(reader.call(lambda: note.GetText(), "")),
-                "extent": _round(reader.call(lambda: note.GetExtent(), ())),
-                "balloon": bool(reader.call(lambda: note.IsBomBalloon(), False)),
+                "text": str(reader.need(lambda: note.GetText(), "")),
+                "extent": _round(reader.need(lambda: note.GetExtent(), ())),
+                "balloon": bool(reader.need(lambda: note.IsBomBalloon(), False)),
             }
     elif kind == _ANNOT_DIM:
         display = reader.bind(specific, "IDisplayDimension")
         if display is not None:
             # IDisplayDimension::GetDisplayData is not read: on the d09c2b9eb
             # calibration leaves it equalled IAnnotation's for all 72 dimensions.
-            record["dim"] = {"hole_callout": bool(reader.call(lambda: display.IsHoleCallout(), False))}
+            record["dim"] = {"hole_callout": bool(reader.need(lambda: display.IsHoleCallout(), False))}
     elif kind == _ANNOT_DATUM_ORIGIN:
         origin = reader.bind(specific, "IDatumOrigin")
         if origin is not None:
@@ -233,14 +242,14 @@ def _table_record(reader: _Reader, raw: Any) -> dict[str, Any] | None:
     table = reader.bind(raw, "ITableAnnotation")
     if table is None:
         return None
-    inner = reader.bind(reader.call(lambda: table.GetAnnotation()), "IAnnotation")
+    inner = reader.bind(reader.need(lambda: table.GetAnnotation()), "IAnnotation")
     if inner is None:
         return None
-    position = _round(reader.call(lambda: inner.GetPosition(), ()))
+    position = _round(reader.need(lambda: inner.GetPosition(), ()))
     if len(position) < 2:
         return None
-    rows = int(reader.call(lambda: table.RowCount, 0) or 0)
-    columns = int(reader.call(lambda: table.ColumnCount, 0) or 0)
+    rows = int(reader.need(lambda: table.RowCount, 0) or 0)
+    columns = int(reader.need(lambda: table.ColumnCount, 0) or 0)
     row_indices = list(range(rows))
     split = reader.call(lambda: table.GetSplitInformation(0, 0, 0, 0))
     if split and len(split) >= 5 and int(split[0]) == 1:
@@ -249,11 +258,11 @@ def _table_record(reader: _Reader, raw: Any) -> dict[str, Any] | None:
             row_indices = list(range(first, last + 1))
             if first > 0:
                 row_indices.insert(0, 0)
-    width = sum(float(reader.call(lambda i=i: table.GetColumnWidth(i), 0.0)) for i in range(columns))
-    height = sum(float(reader.call(lambda i=i: table.GetRowHeight(i), 0.0)) for i in row_indices)
+    width = sum(float(reader.need(lambda i=i: table.GetColumnWidth(i), 0.0)) for i in range(columns))
+    height = sum(float(reader.need(lambda i=i: table.GetRowHeight(i), 0.0)) for i in row_indices)
     x, y = position[0], position[1]
     return {
-        "name": str(reader.call(lambda: inner.GetName(), "table")),
+        "name": str(reader.need(lambda: inner.GetName(), "table")),
         "box": _round((x, y - height, x + width, y)),
     }
 
@@ -262,10 +271,10 @@ def _dump_view(
     reader: _Reader, view: Any, *, is_pictorial: Callable[[str], bool]
 ) -> dict[str, Any]:
     view = reader.bind(view, "IView")
-    orientation = str(reader.call(lambda: view.GetOrientationName(), ""))
+    orientation = str(reader.need(lambda: view.GetOrientationName(), ""))
     record: dict[str, Any] = {
-        "name": str(reader.call(lambda: view.GetName2(), "")),
-        "type": int(reader.call(lambda: view.Type, -1)),
+        "name": str(reader.need(lambda: view.GetName2(), "")),
+        "type": int(reader.need(lambda: view.Type, -1)),
         "orientation": orientation,
         "pictorial": bool(is_pictorial(orientation)),
         "outline": _round(reader.need(lambda: view.GetOutline(), ())),
@@ -285,15 +294,15 @@ def _dump_view(
         section = reader.bind(raw, "IDrSection")
         if section is None:
             continue
-        text_format = reader.bind(reader.call(lambda s=section: s.GetTextFormat()), "ITextFormat")
+        text_format = reader.bind(reader.need(lambda s=section: s.GetTextFormat()), "ITextFormat")
         sections.append(
             {
-                "label": str(reader.call(lambda s=section: s.GetLabel(), "")),
+                "label": str(reader.need(lambda s=section: s.GetLabel(), "")),
                 "line": _round(reader.need(lambda s=section: s.GetLineInfo(), ())),
                 "arrows": _round(reader.need(lambda s=section: s.GetArrowInfo(), ())),
-                "texts": _round(reader.call(lambda s=section: s.GetTextInfo(), ())),
+                "texts": _round(reader.need(lambda s=section: s.GetTextInfo(), ())),
                 "text_height": round(
-                    float(reader.call(lambda: text_format.CharHeight, 0.0)) if text_format else 0.0, 7
+                    float(reader.need(lambda: text_format.CharHeight, 0.0)) if text_format else 0.0, 7
                 ),
             }
         )
@@ -391,16 +400,16 @@ def _dump_sheet(
 ) -> dict[str, Any]:
     """One sheet's dump: ``entries`` is its ``GetViews`` row (sheet view first)."""
     sheet_view = reader.bind(entries[0], "IView")
-    name = str(reader.call(lambda: sheet_view.GetName2(), "") or reader.call(lambda: sheet_view.Name, ""))
-    sheet = reader.bind(reader.call(lambda n=name: ddoc.Sheet(n)), "ISheet")
+    name = str(reader.call(lambda: sheet_view.GetName2(), "") or reader.need(lambda: sheet_view.Name, ""))
+    sheet = reader.bind(reader.need(lambda n=name: ddoc.Sheet(n)), "ISheet")
     if sheet is None:
         raise RuntimeError(f"layout audit cannot reach sheet {name!r}")
-    properties = _round(reader.call(lambda: sheet.GetProperties2(), ()))
+    properties = _round(reader.need(lambda: sheet.GetProperties2(), ()))
     layout = sheet_layouts.get(name)
     template = DRAWING_TEMPLATES[layout] if layout is not None else None
     width, height = properties[5], properties[6]
     zone = {
-        side: float(reader.call(lambda c=code: sheet.GetZoneMargin(c), 0.0))
+        side: float(reader.need(lambda c=code: sheet.GetZoneMargin(c), 0.0))
         for side, code in _ZONE_MARGINS.items()
     }
     dump: dict[str, Any] = {
