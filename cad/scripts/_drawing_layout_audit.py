@@ -145,8 +145,11 @@ def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
     if data is None:
         return {}
     out: dict[str, Any] = {}
+    # A count is required like the rows it guards: a getter answering None
+    # instead of raising would otherwise read as zero primitives, and their
+    # ink would drop out of the audit with com-read-errors still clean.
     for key, count_name, getters in _DISPLAY_PRIMITIVES:
-        count = int(reader.call(lambda c=count_name: getattr(data, c)(), 0, name=count_name) or 0)
+        count = int(reader.need(lambda c=count_name: getattr(data, c)(), 0, name=count_name) or 0)
         rows = []
         for index in range(count):
             raw = reader.first(
@@ -157,7 +160,7 @@ def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
         if rows:
             out[key] = rows
     texts = []
-    for index in range(int(reader.call(lambda: data.GetTextCount(), 0) or 0)):
+    for index in range(int(reader.need(lambda: data.GetTextCount(), 0) or 0)):
         texts.append(
             {
                 "t": str(reader.need(lambda i=index: data.GetTextAtIndex(i), "")),
