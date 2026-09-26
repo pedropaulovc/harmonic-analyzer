@@ -567,3 +567,46 @@ def test_bore_finish_reads_at_note_height_and_no_leader_crosses_at_the_bore() ->
         },
         label="gear bore layout",
     )
+
+
+def test_dimension_record_states_the_pair_slack_the_assembly_builds() -> None:
+    # Codex #906 (PRRT_kwDOPHDy386mTa1J): the record row said both "slack
+    # 0.423" and "reclosed at 39.735 mm c2c with 0.25 mm slack", so a reader
+    # could rebuild two meshes from one row.  The pair states one slack, the
+    # assembly's; the 0.25 appears only as the design slack the c2c was solved
+    # at, and names its config key.
+    import re
+
+    import yaml
+
+    import build_drive_train_assembly as bdt
+
+    record = yaml.safe_load(
+        (Path(spec.__file__).resolve().parents[1] / "config" / "dimensions.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    rows = []
+    stack = [record]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            stack.extend(node.values())
+            continue
+        if not isinstance(node, list):
+            continue
+        if node and isinstance(node[0], str) and node[0].startswith("Crank-drive gear"):
+            rows.append([str(cell) for cell in node])
+            continue
+        stack.extend(node)
+    assert len(rows) == 1
+    value, rationale = rows[0][1], rows[0][3]
+
+    assert f"{bdt.MESH16_C2C:.3f} mm c2c" in value
+    # Any "<number> [mm] [qualifier] slack" phrase counts as a stated slack.
+    stated_slack = re.compile(r"(\d+\.\d+)(?: mm)?(?: [\w-]+)? slack")
+    assert stated_slack.findall(value) == [f"{bdt.MESH16_C2C_SLACK:.3f}"]
+
+    design_slack = _config.fit("crank_mesh")["c2c_slack_mm"]
+    assert stated_slack.findall(rationale) == []
+    assert f"the {design_slack} mm `fits.crank_mesh.c2c_slack_mm` design slack" in rationale

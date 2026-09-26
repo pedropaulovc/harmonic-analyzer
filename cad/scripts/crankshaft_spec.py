@@ -8,13 +8,13 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 import crank_pinion_spec
 from crank_hub_geometry import (
     CRANK_FACE_SHIFT,
-    FIDUCIAL_MODEL_DEPTH,
-    FIDUCIAL_MODEL_DIA,
+    FIDUCIAL_MODEL_DEPTH,  # noqa: F401 -- re-exported to the drawing contract
+    FIDUCIAL_MODEL_DIA,  # noqa: F401 -- re-exported to the drawing contract
     SERVICE_PIN_STATION,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
-    SHAFT_DOME_HEIGHT,
-    SHAFT_FIDUCIAL_RADIUS,
+    SHAFT_DOME_HEIGHT,  # noqa: F401 -- re-exported to the drawing contract
+    SHAFT_FIDUCIAL_RADIUS,  # noqa: F401 -- re-exported to the drawing contract
 )
 
 
@@ -64,8 +64,9 @@ JOURNAL_CLEARANCE = 0.05
 JOURNAL_DIA = JOURNAL_BORE_DIA - JOURNAL_CLEARANCE
 JOURNAL_DIA_BAND = (0.00, -0.02)  # (upper, lower) deviations
 JOURNAL_START = 32.755105572 + CRANK_FACE_SHIFT
-# The MHA-149 bushing lines the post's crank bore end to end, so the journal
-# runs in the bushing from the bore's outboard end to its inboard end here.
+# The MHA-149 bushing lines the post's crank bore end to end, to here.  The
+# journal starts at the bore's outboard end but stops short of this one: see
+# JOURNAL_END below.
 POST_BORE_END = 104.789505572 + CRANK_FACE_SHIFT  # 112.79
 
 # Every axial station prints from the FAR END at one place (policy rule 7), and
@@ -105,7 +106,11 @@ if SEAT_STEP_STANDOFF_WORST > SEAT_GAP_NORTH_RANGE + 1e-9:
 
 # The journal's inboard land ends one turnable land short of the step: the
 # Ø9.525 web between the journal shoulder and the seat step keeps the 2.0 web
-# target with both stations at their printed rows (policy rule 12).
+# target with both stations at their printed rows (policy rule 12).  The step
+# itself sits just inside the bushing (SEAT_STEP < POST_BORE_END) and cannot
+# move north (its standoff is already near the seat gap's north range), so the
+# land ends POST_BORE_END - JOURNAL_END (3.69) short of the bushing's inboard
+# end, and that length of bushing runs over the web, not on a land.
 WEB_TARGET_MM = 2.0
 JOURNAL_INBOARD_STATION = 27.7
 JOURNAL_END = local_station(JOURNAL_INBOARD_STATION)  # 109.1
@@ -120,8 +125,9 @@ if JOURNAL_END + STATION_ROW > POST_BORE_END:
     raise AssertionError("the journal's inboard land can leave the bushing bore")
 
 # Journal relief (Main 2026-09-26, #906): the bushing is reamed plain through,
-# so the shaft carries the relief.  Two lands at the bushing's ends bear; the
-# middle is turned under them.  The relief prints at .X like any free
+# so the shaft carries the relief.  Two lands bear, the outboard one from the
+# bushing's outboard end and the inboard one up to JOURNAL_END; the middle is
+# turned under them.  The relief prints at .X like any free
 # diameter: at the top of its row it still clears the land's lower limit, and
 # at the bottom it never cuts into the 3/8 in core.  Each land keeps at least
 # one journal diameter of length (L/D >= 1) with both of its stations at their

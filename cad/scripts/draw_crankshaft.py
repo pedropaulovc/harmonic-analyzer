@@ -178,8 +178,9 @@ DIAMETER_POSITIONS = {
     "ReliefDiaDim": (RELIEF_START_X + 0.030, _DIAMETER_ROW_Y[0]),
     "PinionSeatDiaDim": (SEAT_STEP_X + 0.010, _DIAMETER_ROW_Y[0]),
 }
-# One Ø9.525 dimension governs both 3/8-in seats.
-CALLOUTS_ABOVE = {"ShaftDiaDim": "2X"}
+# One Ø9.525 dimension governs both 3/8-in seats, and one Ø11.388 governs
+# both journal lands either side of the relief.
+CALLOUTS_ABOVE = {"ShaftDiaDim": "2X", "JournalDiaDim": "2X"}
 CALLOUTS_BELOW = {"OverallLength": "OVERALL"}
 # The finish rides the inboard land (crankshaft_spec.SURFACE_FINISHES).
 FINISH_PICK = (RELIEF_END_X + 0.015, JOURNAL_FLANK_Y)

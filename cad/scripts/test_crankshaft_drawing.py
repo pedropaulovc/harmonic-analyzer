@@ -222,6 +222,10 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     # The journal's own sketch starts on the outboard land, the relief's and
     # the seat's on their own sections.
     assert drawing.JOURNAL_START_X < journal_x < drawing.RELIEF_START_X
+    # One Ø11.388 governs both lands the relief splits the journal into, so
+    # the sheet counts them (the Ø9.525 already does for its two seats).
+    assert spec.JOURNAL_START < spec.RELIEF_START < spec.RELIEF_END < spec.JOURNAL_END
+    assert drawing.CALLOUTS_ABOVE["JournalDiaDim"] == "2X"
     assert drawing.RELIEF_START_X < relief_x < drawing.RELIEF_END_X
     pinion_hole_left = drawing.PINION_PIN_HOLE_WINDOW[0]
     assert drawing.SEAT_STEP_X < seat_x < pinion_hole_left
@@ -243,6 +247,22 @@ def test_journal_fit_and_surface_finish_remain_unchanged() -> None:
     assert len(spec.SURFACE_FINISHES) == 1
     assert spec.SURFACE_FINISHES[0].key == "bearing_journal"
     assert spec.JOURNAL_DIA + spec.JOURNAL_DIA_BAND[0] < spec.JOURNAL_BORE_DIA
+
+
+def test_inboard_land_stops_short_of_the_bushing_by_the_rule_12_web() -> None:
+    # Codex #906 (PRRT_kwDOPHDy386mTa1O): the inboard land ends 3.69 inside
+    # the bushing.  That is the web, not an omission: the Ø9.0 seat step sits
+    # just inside the bushing's inboard end and is pinned there by the seat
+    # gap's north range, and the land keeps exactly the 2.0 web to it at the
+    # printed rows.  R1 (#952) removes the lands altogether.
+    assert spec.SEAT_STEP < spec.POST_BORE_END
+    assert spec.SEAT_STEP_STANDOFF_WORST == pytest.approx(0.7105, abs=5e-4)
+    assert spec.SEAT_GAP_NORTH_RANGE - spec.SEAT_STEP_STANDOFF_WORST < 0.05
+    assert spec.STEP_WEB_WORST == pytest.approx(spec.WEB_TARGET_MM, abs=1e-9)
+    assert spec.JOURNAL_END == pytest.approx(
+        spec.SEAT_STEP - 2.0 * spec.STATION_ROW - spec.WEB_TARGET_MM, abs=1e-9
+    )
+    assert spec.POST_BORE_END - spec.JOURNAL_END == pytest.approx(3.69, abs=5e-3)
 
 
 def test_view_scales_and_linked_notes_are_explicit() -> None:
