@@ -929,8 +929,9 @@ def test_mha145_is_mcmaster_98296a027_and_a_purchased_bom_line() -> None:
     assert pin.PIN_LEN + pin.PIN_LEN_BAND <= pin.STRAP_FOOT_MIN_WIDTH
     row = _config.parts("pinion-strap-pin")
     assert row["number"] == "MHA-145"
-    # Two E-a strap pins plus the R1a arbor-collar pin (#860, Main).
-    assert int(row["quantity"]) == 3
+    # The BOM line counts the pins the drive train places (Codex #858): one
+    # per strap cross hole.
+    assert int(row["quantity"]) == len(drive.STRAP_PIN_Z) == 2
     assert row["process"] == "purchased"
     assert tuple(row["supplier_skus"]) == ("98296A027",)
     assert row["stock_name"] == part.SPEC.stock_name
