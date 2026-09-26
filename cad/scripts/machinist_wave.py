@@ -102,6 +102,7 @@ class State(StrEnum):
     ERROR = "error"  # no verdict for another reason; retried on resume
     UNROUTED = "unrouted"  # no author family on record; never guessed
     DOWN = "reviewer-down"  # its reviewer is in an outage no fallback may serve
+    UNRENDERED = "unrendered"  # no PDF at the checkout: render it, then resume
 
 
 # Settled for these PDF bytes: resuming does not spend another review on them.
@@ -462,7 +463,8 @@ class Wave:
                     timeout_s=self.timeout_s,
                 )
             verdict = (review.verdict or {}).get("verdict")
-            cost = review_cost(review.events_file)
+            # A reused report was paid for by the attempt that produced it.
+            cost = {} if reused else review_cost(review.events_file)
             # The checkpoint first: nothing after the reviewer returns may lose it.
             self.manifest.add_attempt(
                 route.name,
@@ -730,7 +732,9 @@ def table(manifest: dict[str, Any]) -> str:
                 tokens.update(attempt["tokens"])
                 token_runs += 1
         cost = (
-            f"${last['cost_usd']:.2f}"
+            "reused"
+            if last.get("reused_report")
+            else f"${last['cost_usd']:.2f}"
             if "cost_usd" in last
             else f"{(last.get('tokens') or {}).get('output_tokens', '-')} tok"
             if last
@@ -869,6 +873,11 @@ def _run(args: argparse.Namespace) -> int:
         rulings=rulings,
         outage=outage,
     )
+    for name in unrendered:  # blocked by the gate too: the run cannot succeed
+        pdf = ml._current_pdf(name, args.checkout)
+        manifest.update(
+            name, state=State.UNRENDERED, detail=f"no rendered PDF at {pdf}"
+        )
     with _telemetry.span(
         "machinist.wave", wave=args.wave, drawings=len(routes), jobs=args.jobs
     ):

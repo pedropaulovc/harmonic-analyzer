@@ -544,6 +544,43 @@ def test_a_pass_the_ledger_could_not_take_is_recorded_on_resume_for_free(
     assert resumed.manifest.drawings["crank_arm"]["attempts"][-1]["reused_report"]
 
 
+def test_a_requested_drawing_that_is_not_rendered_fails_the_run(
+    tmp_path: Path, checkout: Path
+) -> None:
+    ml._current_pdf("crank_arm", checkout).unlink()
+    argv = ["--checkout", str(checkout), "--ledger", str(tmp_path / "l.json")]
+
+    assert mw.main([*argv, "run", "--wave", "w", "crank_arm"]) == 1
+
+    saved = json.loads((mw.WAVE_ROOT / "w" / "manifest.json").read_text("utf-8"))
+    assert saved["drawings"]["crank_arm"]["state"] == "unrendered"
+    assert "no rendered PDF" in saved["drawings"]["crank_arm"]["detail"]
+
+
+def test_a_reused_report_is_not_charged_again(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    fake = FakeReviewer({("pen_rod", "claude"): "ship"})
+    [pen] = [r for r in _routes(checkout, tmp_path) if r.name == "pen_rod"]
+    real = ml.record_review
+
+    def locked(*args, **kwargs):
+        raise PermissionError("the ledger is locked by another process")
+
+    monkeypatch.setattr(ml, "record_review", locked)
+    assert mw.run_wave([pen], _wave(tmp_path, checkout, fake)) == {
+        "pen_rod": mw.State.ERROR
+    }
+    monkeypatch.setattr(ml, "record_review", real)
+    resumed = _wave(tmp_path, checkout, fake)
+    assert mw.run_wave([pen], resumed) == {"pen_rod": mw.State.INGESTED}
+
+    table = mw.table(resumed.manifest.data)
+    assert "claude: 1 runs, $0.25 total" in table  # one paid review, not two
+    assert "reused" in table
+
+
 def test_the_usage_examples_parse() -> None:
     usage = mw.__doc__.split("Usage")[1]
     lines = [
