@@ -1585,6 +1585,18 @@ DISTINCT_SETTINGS = len({(s.kind, s.name) for s in SETTINGS if s.kind != "text_f
 TEXT_FORMATS = sum(1 for s in SETTINGS if s.kind == "text_format")
 
 
+# Preferences a build re-writes on every drawing after it leaves the template,
+# so the template value never reaches a sheet: ``_drawing_common.
+# _pin_dimension_text_and_leader_style`` sets swDetailingDimensionTextAndLeader-
+# Style (372) to 2 (broken leader, horizontal text) on all ten dimension scopes.
+# v2's ``as_built`` was read off a BUILT drawing, so it shows the pin; the
+# template itself may read differently, and the ANSI re-base's 2 -> 3 / 2 -> 1
+# on these two scopes is overwritten on every sheet either way.
+CODE_PINNED: dict[tuple[int, int], int] = {
+    (372, option): 2 for option in (200, 201, 202, 203, 204, 205, 206, 207, 208, 209)
+}
+
+
 def restores() -> tuple[Setting, ...]:
     """The rows the leaf must WRITE after the re-base (target != iso_to_ansi)."""
     return tuple(s for s in SETTINGS if s.target != s.iso_to_ansi)
