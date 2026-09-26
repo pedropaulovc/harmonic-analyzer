@@ -221,6 +221,24 @@ def is_hidden(annotation: Mapping[str, Any]) -> bool:
     return int(annotation.get("visible", 1) or 1) in _HIDDEN_STATES
 
 
+def audited_annotations(dump: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """Every annotation the audit draws and matches to ink: each view's
+    visible annotations, then the sheet's own visible ones (a sheet
+    annotation owned by a view is already in that view's list). A hidden or
+    template duplicate must not claim a visible annotation's printed text."""
+    return [
+        annotation
+        for view in dump.get("views", ())
+        for annotation in view.get("annotations", ())
+        if not is_hidden(annotation)
+    ] + [
+        annotation
+        for annotation in dump.get("sheet_annotations", ())
+        if not is_hidden(annotation)
+        and int(annotation.get("owner_type", _OWNER_DRAWING_SHEET)) == _OWNER_DRAWING_SHEET
+    ]
+
+
 # --------------------------------------------------------------------------
 # display-data primitives -> segments
 # --------------------------------------------------------------------------
@@ -816,11 +834,49 @@ def _union(boxes: Iterable[Box]) -> Box:
 def match_ink(
     items: Sequence[tuple[Any, TextItem]], spans: Sequence[InkSpan]
 ) -> dict[Any, Box]:
-    """``match_ink_indices`` as glyph boxes: one box per matched item."""
-    return {
-        key: _union(spans[index].box for index in indices)
-        for key, indices in match_ink_indices(items, spans).items()
+    """``match_ink_indices`` as glyph boxes: one box per matched item.
+
+    The solver over a caller's own item set, for a unit test to drive. A
+    SHEET's text is matched by ``assign_sheet_text`` alone, which adds the
+    section and detail labels that compete for the same spans; the audit and
+    the layout calibration both read that one assignment.
+    """
+    return {key: span_box(spans, indices) for key, indices in match_ink_indices(items, spans).items()}
+
+
+def span_box(spans: Sequence[InkSpan], indices: Iterable[int]) -> Box:
+    """The printed box of the spans one text item matched."""
+    return _union(spans[index].box for index in indices)
+
+
+def assign_sheet_text(
+    dump: Mapping[str, Any], annotations: Sequence[Mapping[str, Any]], spans: Sequence[InkSpan]
+) -> dict[Any, tuple[int, ...]]:
+    """The sheet's ONE text-to-ink assignment, as span indices per key.
+
+    Annotation runs (``(id(annotation), index)``), section-line labels
+    (``("section", view, line, label)``) and detail-circle labels
+    (``("detail", view, circle)``) compete for the same spans, so none may
+    take a span another needed when a different one would have served it
+    (Codex, #902). ``sheet_model`` and the layout calibration both read this,
+    so the match rate and offsets the calibration reports are the audit's.
+    """
+    if not spans:
+        return {}
+    by_key = _spans_by_key(spans)
+    options: dict[Any, list[tuple[tuple[int, ...], float]]] = {
+        (id(annotation), index): ink_options(item, spans, by_key)
+        for annotation in annotations
+        for index, item in enumerate(text_items(annotation.get("display") or {}))
     }
+    for v, view in enumerate(dump.get("views", ())):
+        for s, section in enumerate(view.get("sections", ())):
+            for t, item in enumerate(_section_label_items(section)):
+                options[("section", v, s, t)] = ink_options(item, spans, by_key)
+        for number, (*_arc, text_pt, (height, _)) in enumerate(_detail_circles(view.get("detail_circles_info") or ())):
+            if height > 0.0:
+                options[("detail", v, number)] = _detail_label_options(text_pt, height, spans)
+    return _assign_all({key: found for key, found in options.items() if found})
 
 
 def glyph_count(text: str) -> int:
@@ -1592,19 +1648,7 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
         for annotation in view.get("annotations", ())
     ] + list(dump.get("sheet_annotations", ()))
     advance = calibrate_sheet_advance(every_annotation)
-    # Only what the audit draws takes part in matching: a hidden or template
-    # duplicate must not claim a visible annotation's printed text.
-    audited = [
-        annotation
-        for view in views
-        for annotation in view.get("annotations", ())
-        if int(annotation.get("visible", 1) or 1) not in _HIDDEN_STATES
-    ] + [
-        annotation
-        for annotation in dump.get("sheet_annotations", ())
-        if int(annotation.get("visible", 1) or 1) not in _HIDDEN_STATES
-        and int(annotation.get("owner_type", _OWNER_DRAWING_SHEET)) == _OWNER_DRAWING_SHEET
-    ]
+    audited = audited_annotations(dump)
 
     spans = ink_spans(dump)
     printed_page = "ink" in dump
@@ -1619,22 +1663,7 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
             f"layout audit: sheet {dump.get('sheet')!r} has {len(matchable)} COM text item(s) "
             "but its PDF page has no text"
         )
-    # Every text-to-ink claim on the sheet is ONE assignment: annotation
-    # runs, section-line labels and detail-circle labels compete for the
-    # same spans, so none may take a span another needed when a different
-    # one would have served it (Codex, #902).
-    by_key = _spans_by_key(spans)
-    options: dict[Any, list[tuple[tuple[int, ...], float]]] = {
-        key: ink_options(item, spans, by_key) for key, item in keyed
-    }
-    for v, view in enumerate(views):
-        for s, section in enumerate(view.get("sections", ())):
-            for t, item in enumerate(_section_label_items(section)):
-                options[("section", v, s, t)] = ink_options(item, spans, by_key)
-        for number, (*_arc, text_pt, (height, _)) in enumerate(_detail_circles(view.get("detail_circles_info") or ())):
-            if height > 0.0:
-                options[("detail", v, number)] = _detail_label_options(text_pt, height, spans)
-    chosen_all = _assign_all({key: found for key, found in options.items() if found}) if spans else {}
+    chosen_all = assign_sheet_text(dump, audited, spans)
     indices = {key: chosen for key, chosen in chosen_all.items() if not isinstance(key[0], str)}
     if spans and len(matchable) >= 5 and len(indices) < MIN_MATCH_SHARE * len(matchable):
         raise ValueError(
@@ -1642,7 +1671,7 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
             "strings found their printed text; the PDF page does not line up with the sheet"
         )
     claimed = {index for chosen in chosen_all.values() for index in chosen}
-    printed = {key: _union(spans[index].box for index in chosen) for key, chosen in indices.items()}
+    printed = {key: span_box(spans, chosen) for key, chosen in indices.items()}
 
     def ink_of(annotation: Mapping[str, Any]) -> dict[int, Box] | None:
         if not spans:
