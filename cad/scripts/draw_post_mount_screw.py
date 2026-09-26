@@ -16,8 +16,9 @@ the Front view carries no break dimension.  A 10:1 detail of the tip carries
 it instead as the single limit "0.1 MAX" (the model's CutEndBreak at
 swTolMAX, generated from the spec band).  CutEndBreak is a driving
 dimension of the deburr cutter's profile, and the detail takes it through
-the ENTIRE-MODEL import plus the curate sweep -- the boss hook, spring hook
-and cylinder gear detail form (see ``_curate_tip_detail``).  The only
+the ENTIRE-MODEL import plus the curate sweep, after a read of the detail's
+visible entities (see ``_curate_tip_detail``).  The Front is re-activated
+before the notes so they do not land in the detail.  The only
 note says to deburr the cut end and that the
 undimensioned purchased geometry is reference.  No installation sequence, engagement figure or rule
 number is printed: the sequence is an MHA-A03 assembly step and the
@@ -67,7 +68,7 @@ from post_mount_screw_spec import (
     HEAD_H_MM,
     THREAD_DIA_MM,
 )
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.solidworks.drawing import place_view, view_name
 
 SPEC = DRAWINGS_BY_NAME["post_mount_screw"]
 PART_STEM = SPEC.artifact_stem
@@ -148,22 +149,67 @@ STOCK_ROWS = (
 )
 
 
+# swViewEntityType_e: Edge, Vertex
+_VIEW_ENTITY_EDGE = 1
+_VIEW_ENTITY_VERTEX = 2
+
+
+def read_detail_visible_entities(adapter: Any, detail: Any) -> dict[str, int]:
+    """Read the tip detail's visible edges and vertices BEFORE its import.
+
+    Hypothesis-backed, not a proven cause: this read is the only delta
+    between 3 empty imports (pms857-f543, -56f7, -6099) and 1 success
+    (pms857-diag-9eca, which ran it just before the import); may be seat
+    variance.  Kept as a named step, with its counts on the span, until a
+    second leaf repeats the success.
+    """
+    view = _early_bound(detail, "IView")
+    with _telemetry.span("drawing.tip_detail.visible_entities") as sp:
+        components = list(view.GetVisibleComponents() or ()) or [None]
+        edges = sum(
+            len(view.GetVisibleEntities2(component, _VIEW_ENTITY_EDGE) or ())
+            for component in components
+        )
+        vertices = sum(
+            len(view.GetVisibleEntities2(component, _VIEW_ENTITY_VERTEX) or ())
+            for component in components
+        )
+        counts = {"components": len(components), "edges": edges, "vertices": vertices}
+        for key, value in counts.items():
+            sp.set_attribute(key, value)
+        return counts
+
+
 def _curate_tip_detail(adapter: Any, detail: Any) -> list[Any]:
     """Import the break into the tip detail: entire-model import (source 0)
-    plus the curate sweep, NOT the targeted selected-feature import.
+    plus the curate sweep, after the visible-entity read.
 
-    Targeted (source 1) import into a detail view: dead under {hidden ref
-    sketch, consumed cutter profile}, 10:1 HLR, source 1 -- pms857-f543
-    (f54309af5, owner CutEndBreakReference) and pms857-56f7 (56f732997,
-    owner CutEndDeburrProfile) both raised "tip detail break view is missing
-    model dimensions: ['CutEndBreak']", and neither leaf logged a "targeted
-    model-item import Detail View A" line: InsertModelAnnotations3 returned
-    nothing into the detail.  Source 0 works: the boss hook, spring hook and
-    cylinder gear details import their cutter-sketch dimensions this way.
+    Dead under {hidden ref sketch / source 1, cutter profile / source 1,
+    cutter profile / source 0} on this 10:1 HLR detail: pms857-f543
+    (f54309af5), pms857-56f7 (56f732997) and pms857-6099 (60996965b) each
+    raised "tip detail break view is missing model dimensions:
+    ['CutEndBreak']" with nothing imported.  pms857-diag-9eca (9eca9e227)
+    imported it by source 0 after reading the detail's visible entities;
+    see read_detail_visible_entities.  Source 0 is the boss hook, spring
+    hook and cylinder gear detail form.
     """
+    read_detail_visible_entities(adapter, detail)
     return _drawing_common.curate_view_dimensions(
         adapter, detail, keep=DETAIL_KEEP, view_label="tip detail break"
     )
+
+
+def activate_front_for_notes(adapter: Any, front: Any) -> None:
+    """Make the Front the active view before the property-linked notes.
+
+    A note lands in the ACTIVE view.  The tip detail is active after its
+    curate, so the four notes landed inside it and position_detail_label
+    found 5 notes instead of its one native label (pms857-diag-9eca).
+    """
+    name = view_name(adapter, front)
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate the Front view {name!r} for the notes")
 
 
 def _view_dimension_names(adapter: Any, view: Any) -> list[str]:
@@ -325,6 +371,7 @@ async def build(adapter: Any) -> dict[str, str]:
         assert_imported_precision(adapter, detail_annotations, DETAIL_PRECISION)
         _verify_tip_detail(adapter, front, detail)
 
+    activate_front_for_notes(adapter, front)
     add_property_linked_note(
         adapter, "Manufacturing Notes", *NOTES_XY, char_height=0.003
     )

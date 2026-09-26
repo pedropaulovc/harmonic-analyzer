@@ -619,6 +619,71 @@ def test_tip_detail_takes_the_break_through_the_entire_model_import(monkeypatch)
     """Option A (Main): only the import source changes -- the tip detail uses
     the boss hook's entire-model form, and so receives the break."""
     break_annotation, calls = _fake_detail_seat(monkeypatch)
+    monkeypatch.setattr(
+        drawing,
+        "read_detail_visible_entities",
+        lambda adapter, detail: calls.append("visible") or {},
+    )
     curated = drawing._curate_tip_detail(object(), _FakeDetailView())
     assert curated == [break_annotation]
-    assert calls == ["source0"]
+    # The visible-entity read runs BEFORE the import (pms857-diag-9eca).
+    assert calls == ["visible", "source0"]
+
+
+class _FakeVisibleView:
+    """IView stand-in: 2 edges and 3 vertices on one component."""
+
+    def __init__(self) -> None:
+        self.calls: list[int] = []
+
+    def GetVisibleComponents(self):
+        return ("screw",)
+
+    def GetVisibleEntities2(self, component, entity_type):
+        self.calls.append(entity_type)
+        return {1: ("e1", "e2"), 2: ("v1", "v2", "v3")}[entity_type]
+
+
+def test_visible_entity_read_counts_edges_and_vertices(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    view = _FakeVisibleView()
+    counts = drawing.read_detail_visible_entities(object(), view)
+    assert counts == {"components": 1, "edges": 2, "vertices": 3}
+    assert view.calls == [1, 2]
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source.split("def read_detail_visible_entities", 1)[1].split("\ndef ", 1)[0]
+    body = " ".join(body.split())
+    assert "may be seat variance" in body
+    assert "pms857-f543, -56f7, -6099" in body and "pms857-diag-9eca" in body
+
+
+def test_front_is_active_before_the_notes() -> None:
+    """pms857-diag-9eca: the four property-linked notes landed in the active
+    tip detail ("expected one native detail label, found 5").  The Front is
+    activated after the detail's curate and before the first note."""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source.split("async def build", 1)[1]
+    detail = body.index("_curate_tip_detail(adapter, detail)")
+    activate = body.index("activate_front_for_notes(adapter, front)")
+    first_note = body.index("add_property_linked_note(")
+    label = body.index("trim_drawing.position_detail_label(")
+    assert detail < activate < first_note < label
+
+
+def test_activate_front_for_notes_activates_the_front_by_name(monkeypatch) -> None:
+    activated: list[str] = []
+
+    class _Doc:
+        def ActivateView(self, name):
+            activated.append(name)
+            return name == "Drawing View1"
+
+    class _Adapter:
+        currentModel = _Doc()
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(drawing, "view_name", lambda adapter, view: view)
+    drawing.activate_front_for_notes(_Adapter(), "Drawing View1")
+    assert activated == ["Drawing View1"]
+    with pytest.raises(RuntimeError, match="Front view"):
+        drawing.activate_front_for_notes(_Adapter(), "Detail View A (10 : 1)")
