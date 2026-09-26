@@ -473,6 +473,23 @@ OUTSIDE_ARROW_RUN = 0.0064
 HORIZONTAL_LINE_DROP = 0.0028
 FLANGE_SLOT_W_LINE_DROP = 0.0045
 EXTENSION_GAP = 0.0005
+# Section A-A's chain line runs through the flange slot's centre (the
+# cutting plane is X = 0) and SECTION_LINE_OVERSHOOT past the plan's south
+# end, and FlangeSlotX's slot-centre witness leaves the reference line's end
+# AT that centre (_FLANGE_SLOT_Y in the builder; mha092-r3-8b1b render): the
+# two are collinear.  Main's review of a1b154f69: a witness drawn over a
+# cutting-plane line reads as one ambiguous stroke to a novice, so that
+# witness starts WITNESS_CLEAR_OF_SECTION past the overshoot's end: the
+# sheet's TEXT_CLEARANCE, since a 0.5 mm break (EXTENSION_GAP, 5e8c13351)
+# closes up at print scale.  SetWitnessLineGap measures the gap from the
+# witness's own origin, in sheet metres like the document's
+# swDetailingWitnessLineGap; index 1 is the reference line's end point.
+# Both are proven by the build's read-back of the printed witness.
+SECTION_SOUTH_OVERSHOOT_END_Y = _plan_y(Z_SOUTH) + SECTION_LINE_OVERSHOOT
+WITNESS_CLEAR_OF_SECTION = TEXT_CLEARANCE
+FLANGE_SLOT_X_WITNESS_START_Y = SECTION_SOUTH_OVERSHOOT_END_Y + WITNESS_CLEAR_OF_SECTION
+FLANGE_SLOT_X_CENTRE_WITNESS = 1
+FLANGE_SLOT_X_CENTRE_WITNESS_GAP = FLANGE_SLOT_X_WITNESS_START_Y - _plan_y(FLANGE_SLOT_CENTER_Z)
 EXTENSION_OVERSHOOT = 0.0013
 LINE_PAST_TEXT = 0.0013
 ARROW_HALF_WIDTH = 0.0003
@@ -770,8 +787,9 @@ def sheet_dimension_ink(
             inside,
         ),
         "FlangeSlotW": (h, (tc - slot_w, tc + slot_w), (None, None), drop("FlangeSlotW"), out),
+        # The slot-centre witness starts past A-A's south overshoot.
         "FlangeSlotX": (
-            h, (_PLAN_LEFT, tc), (_plan_y(Z_SOUTH),) * 2, drop("FlangeSlotX"), out
+            h, (_PLAN_LEFT, tc), (_plan_y(Z_SOUTH), FLANGE_SLOT_X_WITNESS_START_Y - EXTENSION_GAP), drop("FlangeSlotX"), out
         ),
         "PinchDepthCenter": (
             h,
@@ -1066,6 +1084,66 @@ def _set_arrow_sides(
             raise RuntimeError(f"{name} did not keep its arrows on side {side}")
     if remaining:
         raise RuntimeError(f"no dimension to set arrow sides: {sorted(remaining)}")
+
+
+def _lift_slot_centre_witness(adapter: Any, annotations: list[Any]) -> None:
+    """Start FlangeSlotX's slot-centre witness past section A-A's south
+    overshoot (SECTION_SOUTH_OVERSHOOT_END_Y), then prove it from the ink
+    the sheet actually prints: a wrong witness index or unit fails here."""
+    displays = [
+        _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        for annotation in (_early_bound(raw, "IAnnotation") for raw in annotations)
+        if dimension_name(adapter, annotation) == "FlangeSlotX"
+    ]
+    if len(displays) != 1:
+        raise RuntimeError(f"expected one FlangeSlotX dimension, found {len(displays)}")
+    if not displays[0].SetWitnessLineGap(
+        FLANGE_SLOT_X_CENTRE_WITNESS, False, FLANGE_SLOT_X_CENTRE_WITNESS_GAP
+    ):
+        raise RuntimeError("FlangeSlotX refused its slot-centre witness gap")
+    rebuild_drawing(adapter, label="FlangeSlotX slot-centre witness gap")
+
+    from diagnostics.drawing_layout_audit import collect_document
+
+    printed = [
+        annotation
+        for sheet in collect_document(adapter)
+        for annotation in sheet.annotations
+        if annotation.label == "FlangeSlotX"
+    ]
+    if len(printed) != 1:
+        raise RuntimeError(f"expected one printed FlangeSlotX, found {len(printed)}")
+    x = TOP_CENTER[0]
+    witness = [
+        segment
+        for segment in printed[0].segments
+        if abs(segment.x0 - x) < 0.0003
+        and abs(segment.x1 - x) < 0.0003
+        and abs(segment.y1 - segment.y0) > 0.001
+    ]
+    starts = [min(segment.y0, segment.y1) for segment in witness]
+    runs = [
+        f"({s.x0 * 1000:.1f},{s.y0 * 1000:.1f})->({s.x1 * 1000:.1f},{s.y1 * 1000:.1f})"
+        for s in printed[0].segments
+    ]
+    # The read-back's own tolerance, not a looser clearance: 0.2 mm under
+    # the commanded start still clears the overshoot by 1.3 mm.
+    floor = FLANGE_SLOT_X_WITNESS_START_Y - 0.0002
+    if not starts or min(starts) < floor:
+        raise RuntimeError(
+            "FlangeSlotX's slot-centre witness does not clear section A-A's south "
+            f"overshoot (ends {SECTION_SOUTH_OVERSHOOT_END_Y * 1000:.1f} mm) after "
+            f"SetWitnessLineGap({FLANGE_SLOT_X_CENTRE_WITNESS}, "
+            f"{FLANGE_SLOT_X_CENTRE_WITNESS_GAP * 1000:.2f} mm): witness starts "
+            f"{[round(y * 1000, 1) for y in starts]} mm; printed runs {runs}"
+        )
+    _telemetry.info(
+        f"FlangeSlotX slot-centre witness starts {min(starts) * 1000:.1f} mm, "
+        f"clear of the A-A overshoot end {SECTION_SOUTH_OVERSHOOT_END_Y * 1000:.1f} mm",
+        witness_start_mm=round(min(starts) * 1000, 2),
+        overshoot_end_mm=round(SECTION_SOUTH_OVERSHOOT_END_Y * 1000, 2),
+    )
+    _telemetry.debug(f"FlangeSlotX printed runs {runs}")
 
 
 def _add_adjuster_axis(adapter: Any, section: Any) -> None:
@@ -1440,7 +1518,7 @@ async def build(adapter: Any) -> dict[str, str]:
     check("open cone-tip-block source", await adapter.open_model(str(SOURCE)))
     source_model = adapter.currentModel
     read_required_properties(
-        adapter.currentModel,
+        source_model,
         (
             "Number",
             "Revision",
@@ -1596,6 +1674,7 @@ async def build(adapter: Any) -> dict[str, str]:
             **{name: _DIM_ARROWS_INSIDE for name in ARROWS_INSIDE},
         },
     )
+    _lift_slot_centre_witness(adapter, annotations)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
     for view, label in (

@@ -457,8 +457,17 @@ FLANGE_SLOT_LEN = FLANGE_SLOT_CTOC + FLANGE_SLOT_W
 # keep NUT_WALL_AIR off the wall.
 NUT_WALL_AIR = 0.5
 # From the south face; the flange's own length is .X like the body's plan.
+# The rule -- the slot's south edge at its printed limits, plus MIN_WEB_MM,
+# plus the length's own .X band, rounded up to .X -- gives 20.6.  The flange
+# end locates nothing, so it takes FLANGE_END_ALLOWANCE_MM more: the end web
+# is then 2.27 at the printed limits, not 2.07, room a first-time machinist
+# can spend on a rough saw cut.  The drive train's clearances read FLANGE_LEN.
 _SLOT_SOUTH_EDGE_MAX = _south_end_limits[1] + FLANGE_SLOT_W_MAX / 2.0
-FLANGE_LEN = 20.8
+_FLANGE_LEN_BY_RULE = (
+    math.ceil((_SLOT_SOUTH_EDGE_MAX + MIN_WEB_MM + _GENERAL_1PL_MM) * 10.0 - 1e-6) / 10.0
+)
+FLANGE_END_ALLOWANCE_MM = 0.2
+FLANGE_LEN = round(_FLANGE_LEN_BY_RULE + FLANGE_END_ALLOWANCE_MM, 1)
 # The slot is on the block's centre plane, located from the -X face (the
 # PassageCenter datum); the flange is the block's full width (.X).  r3 (Main,
 # 2026-09-25): no stack needs the slot's location at .XX, so it prints .X --

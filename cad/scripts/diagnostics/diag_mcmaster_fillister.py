@@ -56,6 +56,11 @@ FILLISTER_SIZES = {
     # 18-8 stainless fillister, the same 0.183 x 0.107 #4-40 head (McMaster
     # 91794A product table, read 2026-09-25).
     "91794A112": (2.8448, 15.875, 2.7178, 4.6482, 0.635),
+    # MSC 40923898 (mfr 1456MSL), 1/4-20 x 3-1/2 slotted fillister, fully
+    # threaded; MSC lists no head sizes, so the head is ASME B18.6.3's 1/4
+    # maximum (A 0.414, O 0.237).  The supplied 3-1/2 in length: MHA-142
+    # (build_post_mount_screw) cuts it to fit, never this row.
+    "40923898": (6.35, 3.5 * 25.4, 0.237 * 25.4, 0.414 * 25.4, 25.4 / 20.0),
 }
 
 

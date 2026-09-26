@@ -411,7 +411,6 @@ def test_plan_values_stand_off_the_part_and_each_other() -> None:
     than the A-A arrow: the slot's location from -X (r3's datum)."""
     keep = drawing.TOP_KEEP
     half_width = drawing.VALUE_TEXT_HALF_WIDTH
-    half_height = drawing.VALUE_TEXT_HALF_HEIGHT
     plan_left = drawing.TOP_CENTER[0] - part.BLOCK_X * drawing._S / 2.0
     plan_right = drawing.TOP_CENTER[0] + part.BLOCK_X * drawing._S / 2.0
     south_face = -part.BLOCK_Z / 2.0
@@ -455,12 +454,45 @@ def test_plan_values_stand_off_the_part_and_each_other() -> None:
     loc_x, loc_y = keep["FlangeSlotX"]
     assert plan_left < loc_x < drawing.TOP_CENTER[0]
     assert loc_y - drawing._plan_y(drawing.Z_SOUTH) >= 0.015
+    location_line_y = loc_y - drawing.HORIZONTAL_LINE_DROP
+    # Higher than the A-A arrow: the location's line (and the value on it)
+    # clears the south cutting-plane arrow's head and its letter by
+    # TEXT_CLEARANCE.
+    south_arrow = drawing.sheet_dimension_ink()["section A south"]
+    arrow_top = max(y for segment in south_arrow.arrows for _x, y in segment)
+    south_letter = drawing.sheet_text_boxes()["section A south"]
+    for top in (arrow_top, south_letter[3]):
+        assert top + drawing.TEXT_CLEARANCE <= location_line_y
     # VIEW C's letter, left of the stem, now stands under the location's
     # value (r3): clear of the value and of its line by TEXT_CLEARANCE.
     letter = drawing.sheet_text_boxes()["view C letter"]
-    location_line_y = loc_y - drawing.HORIZONTAL_LINE_DROP
     assert letter[3] + drawing.TEXT_CLEARANCE <= location_line_y
     assert letter[2] <= drawing.TOP_CENTER[0]
+
+
+def test_slot_location_witness_clears_the_section_line_overshoot() -> None:
+    """Main (a1b154f69 review): FlangeSlotX's witness leaves the slot centre,
+    on section A-A's chain line (the cutting plane is X = 0), so drawn over
+    the chain line's south overshoot the two read as one stroke.  The witness
+    starts WITNESS_CLEAR_OF_SECTION past the overshoot's end -- the sheet's
+    TEXT_CLEARANCE, so the break reads at print scale (Main, 5e8c13351 eye
+    pass: 0.5 mm was too tight) -- and the gap the build sets from the slot
+    centre lands it exactly there."""
+    assert drawing.WITNESS_CLEAR_OF_SECTION == drawing.TEXT_CLEARANCE
+    x = drawing.TOP_CENTER[0]
+    tail = drawing.sheet_section_arrows()["section A south"][0]
+    assert tail[0] == pytest.approx(x)
+    witnesses = [
+        segment
+        for segment in drawing.sheet_dimension_ink()["FlangeSlotX"].lines
+        if all(abs(px - x) < 1e-9 for px, _py in segment)
+    ]
+    assert len(witnesses) == 1
+    start = min(py for _px, py in witnesses[0])
+    assert start >= tail[1] + drawing.WITNESS_CLEAR_OF_SECTION - 1e-12
+    assert drawing._plan_y(
+        drawing.FLANGE_SLOT_CENTER_Z
+    ) + drawing.FLANGE_SLOT_X_CENTRE_WITNESS_GAP == pytest.approx(start)
 
 
 # Ink measured on the I31 farm render (7ab69742b, cone-tip-block_drawing.png,
@@ -564,7 +596,7 @@ _R287_PLACEMENT = {
         'h, (ax, ax + plus_x * half_x), (top, top), drop("PassageCenter"), out'
     ),
     "TOP_CENTER[0] - BLOCK_X * _S / 4.0,": "TOP_CENTER[0] + BLOCK_X * _S / 4.0,",
-    'h, (_PLAN_LEFT, tc), (_plan_y(Z_SOUTH),) * 2, drop("FlangeSlotX"), out': (
+    'h, (_PLAN_LEFT, tc), (_plan_y(Z_SOUTH), FLANGE_SLOT_X_WITNESS_START_Y - EXTENSION_GAP), drop("FlangeSlotX"), out': (
         'h, (tc, _PLAN_RIGHT), (_plan_y(Z_SOUTH),) * 2, drop("FlangeSlotX"), out'
     ),
     "FRONT_CENTER[0] + SLIT_TEXT_OFFSET,": "FRONT_CENTER[0] - SLIT_TEXT_OFFSET,",
@@ -1144,6 +1176,22 @@ def test_flange_webs_and_nut_clear_the_2_0_target_at_the_printed_limits() -> Non
     assert spec.NUT_BEARING_MM >= 1.0
 
 
+def test_flange_length_is_its_rule_plus_a_named_end_allowance() -> None:
+    """The flange length is derived, not typed: the slot's south edge at its
+    printed limits, plus the 2.0 web, plus the length's own .X band, rounded
+    up to .X -- then a named allowance, so the end web sits well clear of
+    the floor for a first-time machinist."""
+    spec = cone_tip_block_spec
+    slot_south_edge_max = 14.9 + 0.8 + (spec.FLANGE_SLOT_W + 0.10) / 2.0
+    by_rule = math.ceil((slot_south_edge_max + 2.0 + 0.8) * 10.0 - 1e-6) / 10.0
+    assert by_rule == pytest.approx(20.6)
+    assert spec.FLANGE_END_ALLOWANCE_MM == 0.2
+    assert spec.FLANGE_LEN == round(by_rule + 0.2, 1) == 20.8
+    assert spec.WORST_FLANGE_END_WEB_MM - spec.MIN_WEB_MM == pytest.approx(
+        0.2 + by_rule - (slot_south_edge_max + 2.0 + 0.8)
+    )
+
+
 def test_holddown_screw_stands_a_pitch_past_the_nut_at_the_thickest_stack() -> None:
     """93075A150 (6-32 x 5/8) into 90631A007: head ledge, shim, flange, nut."""
     spec = cone_tip_block_spec
@@ -1583,8 +1631,12 @@ def test_drive_train_screw_keeps_1_5d_past_the_far_wall() -> None:
 
 
 def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
-    """The hardware follows the ruling: 91794A112 everywhere, 15.875 under
-    the head, and the BOM says stainless over steel is fine here."""
+    """The hardware follows the ruling: 91794A112 everywhere and 15.875 under
+    the head.  The stainless-over-steel (galvanic) choice is design
+    rationale, not a machinist instruction: the material rides the title
+    block and the purchased-part ID, so the installation note no longer
+    restates it.  The sentence was deleted per the codex machinist review
+    of MHA-098 and Main's ruling (a)."""
     import _config
     from _fastener_catalog import fastener
     from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
@@ -1592,9 +1644,10 @@ def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
     config = _config.parts("cone-tip-pinch-screw")
     assert config["supplier_skus"] == ["91794A112"]
     assert "18-8 stainless" in config["material"]
-    assert "STAINLESS OVER\nSTEEL IS FINE FOR THIS #4-40 PINCH SCREW" in (
-        config["installation_notes"]
-    )
+    notes = config["installation_notes"].upper()
+    assert "STAINLESS" not in notes
+    assert "18-8" not in notes
+    assert " STEEL" not in notes
     assert fastener("cone-tip-pinch-screw").skus == ("91794A112",)
     assert fastener("cone-tip-pinch-screw").material == "AISI 304"
     assert FILLISTER_SIZES["91794A112"][1] == cone_tip_block_spec.PINCH_SCREW_LENGTH

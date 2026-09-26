@@ -22,7 +22,9 @@ recipes:
 | 90280A199 | `slotted-screw`, `swing-stop-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A201 | `clamp-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90631A007 | `cone-tip-block-nut` (catalogue-only; no vendor model) | Zinc-Plated Steel Nylon-Insert Locknut |
 | 91247A720 | `knife-hanger-stud` | Medium-Strength Grade 5 Steel Hex Head Screw |
+| 91255A148 | — (diagnostic recipe; `cone-tip-block-screw` until I31) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91410A538 | `gooseneck-set-screw` | Steel Square-Head Cup-Point Set Screw |
 | 91794A112 | `cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 92240A539 | `lag-screw` | 18-8 Stainless Steel Hex Head Screw |
@@ -31,6 +33,7 @@ recipes:
 | 91882A425 | `cone-lock-knob` | Steel Raised Knurled-Head Thumb Screw |
 | 9275K141 | `tube-frame-cap` | Metal Round Cap |
 | 92865A585 | `hex-bolt` | Medium-Strength Grade 5 Steel Hex Head Screw |
+| 93075A150 | `cone-tip-block-screw` (catalogue-only; no vendor model) | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93075A194 | `hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 94025A150 | — (diagnostic recipe; `cone-tip-adjuster` until rule-12 E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
@@ -73,6 +76,41 @@ Catalog specifications checked on September 10, 2026:
   `5bcc08b043bb1e7a8060c75d32db9f30f1528139478ee2a3f35676ab754c05c8`;
   native SLDPRT
   `0e52851776ee9ac5cd03c4d6ad2b1c07715417e4b97b85f032206cd8c2e3fad2`.
+- [91255A148](https://www.mcmaster.com/91255A148/) is the #6-32 x 1/2 in
+  black-oxide alloy steel button head hex drive screw that held the cone tip
+  block until I31 (U30, rule-12 W22). `cone-tip-block-screw` is now
+  93075A150 (below); this entry stays as the replica recipe's provenance and
+  is no longer a machine part. Source: the McMaster product page, supplied by
+  the user on September 24, 2026 (an agent fetch that day was refused, HTTP
+  403): #6-32 UNC-3A, right hand, flat tip, head Ø0.262 in x 0.073 in, 5/64
+  hex drive, 1/2 in under the head, fully threaded, 140 ksi, ASME B18.3 /
+  ASTM F835. The catalog fixes the identity; the geometry is the vendor
+  model's own. `diag_build_91255A148.py` replays the dimensions and solved
+  sketch geometry read from `91255A148.SLDPRT` (the read-only dump
+  `cad/out/reports/mcmaster-91255A148-dump.json`): the 7/64 flat top and
+  R3.941216 dome, the 10 deg edge band and its R0.09271 fillets, the 5/64
+  hex socket 1.01981 deep with its 60 deg countersink, and the thread, tip
+  chamfer and 45 deg neck; its docstring lists each value. The vendor file is
+  local-only (© McMaster, gitignored). The replica gate against it passed on
+  September 25, 2026: volume 130.7034 vs 130.7033 mm^3, area 291.3955 mm^2
+  on both, 26 faces each with the same face-area multiset, and matching
+  centre of mass (`cad/out/reference/91255A148-replica-report.json`).
+  Evidence SHA-256: native SLDPRT
+  `4b8dac17c6b7e77499209a399342aa51780743b657aec0df7175f227b54e59a0`.
+
+- [93075A150](https://www.mcmaster.com/93075A150/) (`cone-tip-block-screw`,
+  MHA-140, from I31) and [90631A007](https://www.mcmaster.com/90631A007/)
+  (`cone-tip-block-nut`, MHA-146) hold the cone tip block down. Both product
+  pages were read through Browserbase on September 25, 2026. 93075A150 is a
+  #6-32 x 5/8 in low-strength zinc-plated steel hex head screw, ASME
+  B18.6.3, head 1/4 in across flats (0.244 min) and 3/32 in high (0.080 to
+  0.093). 90631A007 is a #6-32 zinc-plated steel nylon-insert locknut, 5/16
+  in across flats and 11/64 in high. They are catalogue-only: no vendor
+  model is downloaded or kept here, so neither has a replica gate. The screw
+  is the 93075A* family (`diag_mcmaster_hex_head.py`, whose laws are the
+  replica-gated 93075A194's) at the catalogue sizes. The nut is its
+  catalogue envelope, a sharp hex prism bored at the tap drill. Their
+  standalone diagnostics are catalog-only runs.
 
 Ground rules (mirrored in the diagnostics themselves): the vendor files are
 opened read-only and NEVER saved or modified; everything derived from them
