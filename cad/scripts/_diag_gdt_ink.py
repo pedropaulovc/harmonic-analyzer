@@ -46,6 +46,66 @@ def _indexed(spec: Any, count: str, at: str) -> list[list[float] | None]:
     return [_floats(getattr(spec, at)(i)) for i in range(n)]
 
 
+def _display_data(annotation: Any) -> dict[str, Any]:
+    """IAnnotation.GetDisplayData, every primitive family, sheet space (#902)."""
+    data = _sw_type_info.early_bound_or_flag(
+        annotation.GetDisplayData(), "IDisplayData"
+    )
+    out: dict[str, Any] = {}
+
+    def line(i: int) -> list[float] | None:
+        try:
+            return _floats(data.GetLineAtIndex3(i))
+        except Exception:
+            return _floats(data.GetLineAtIndex2(i))
+
+    _try(out, "lines", lambda: [line(i) for i in range(int(data.GetLineCount() or 0))])
+    _try(
+        out,
+        "arcs",
+        lambda: [
+            _floats(data.GetArcAtIndex2(i)) for i in range(int(data.GetArcCount() or 0))
+        ],
+    )
+    _try(
+        out,
+        "polylines",
+        lambda: [
+            _floats(data.GetPolylineAtIndex2(i))
+            for i in range(int(data.GetPolyLineCount() or 0))
+        ],
+    )
+    _try(
+        out,
+        "triangles",
+        lambda: [
+            _floats(data.GetTriangleAtIndex(i))
+            for i in range(int(data.GetTriangleCount() or 0))
+        ],
+    )
+    _try(
+        out,
+        "ellipses",
+        lambda: [
+            _floats(data.GetEllipseAtIndex2(i))
+            for i in range(int(data.GetEllipseCount() or 0))
+        ],
+    )
+
+    def text(i: int) -> dict[str, Any]:
+        item: dict[str, Any] = {"text": str(data.GetTextAtIndex(i))}
+        _try(item, "position", lambda: _floats(data.GetTextPositionAtIndex(i)))
+        _try(item, "height", lambda: float(data.GetTextHeightAtIndex(i)))
+        _try(item, "angle", lambda: float(data.GetTextAngleAtIndex(i)))
+        _try(item, "ref", lambda: int(data.GetTextRefPositionAtIndex(i)))
+        _try(item, "box_w", lambda: float(data.GetTextInBoxWidthAtIndex(i)))
+        _try(item, "box_h", lambda: float(data.GetTextInBoxHeightAtIndex(i)))
+        return item
+
+    _try(out, "texts", lambda: [text(i) for i in range(int(data.GetTextCount() or 0))])
+    return out
+
+
 def dump_sheet_gdt(adapter: Any, *, label: str) -> None:
     """Log one JSON record per GD&T symbol on every view of the current sheet."""
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
@@ -125,5 +185,19 @@ def dump_sheet_gdt(adapter: Any, *, label: str) -> None:
                     "leader_info",
                     lambda: _floats(spec.GetLeaderInfo()),
                 )
+            _try(record, "display_data", lambda: _display_data(annotation))
+            if kind == _ANNOT_GTOL:
+                sym: dict[str, Any] = {}
+                for index in range(4):
+                    _try(
+                        sym,
+                        f"edge_counts_{index}",
+                        lambda: _floats(spec.GetSymEdgeCounts(index)),
+                    )
+                    _try(
+                        sym, f"lines_{index}", lambda: _floats(spec.GetSymLines(index))
+                    )
+                    _try(sym, f"arcs_{index}", lambda: _floats(spec.GetSymArcs(index)))
+                record["sym"] = sym
             _telemetry.info(f"GDT-DIAG {label} symbol {json.dumps(record)}")
         view = view.GetNextView()
