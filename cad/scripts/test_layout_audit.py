@@ -347,6 +347,28 @@ def test_touching_dimension_texts_fail_the_clearance():
     assert findings[0].extra["gap_mm"] == pytest.approx(0.0, abs=1e-6)
 
 
+@pytest.mark.parametrize(
+    ("note_x", "expected"),
+    [(0.1010, ["text-clearance"]), (0.1150, [])],  # over the "12.0"; clear of it
+)
+def test_a_dimension_text_under_a_note_fails_the_clearance(note_x, expected):
+    """Main's gate-gap sweep (1): the pre-save element gate boxes every
+    dimension as a NONE-scope placeholder (``_dim_element``), so a dimension's
+    text was never compared with a note's (rocker fix3's seat note). The
+    shared audit compares their real boxes: a free note printed over the
+    "12.0" gates, and one a clear word space away does not."""
+    dim = _dim("SeatDepth", "12.0", 0.1000, 0.1500)
+    note = _note("SeatNote", "SEAT", (note_x, 0.1505, note_x + 0.0090, 0.1540))
+    dump = _dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [dim])], sheet_annotations=[note])
+    clearance = [
+        f.kind
+        for f in audit_dump(dump)
+        if f.kind == "text-clearance" and {"SeatDepth", "SeatNote"} <= set((f.a + " " + f.b).split())
+    ]
+    assert clearance == expected
+    assert all(severity(f) is FindingSeverity.GATING for f in audit_dump(dump) if f.kind == "text-clearance")
+
+
 def test_text_crossed_by_a_foreign_view_edge_is_found():
     """MHA-092's ADJUSTER ENTRY: a callout's text crossed by ANOTHER view's
     outline edge. Model edges are the PDF's 0.25 mm solid strokes."""
@@ -2818,6 +2840,55 @@ def test_a_finish_symbols_leader_through_its_own_text_gates():
     assert finding.a == finding.b
     assert "surface-finish" in finding.a
     assert severity(finding) is FindingSeverity.GATING
+
+
+def test_mha116s_crown_finish_leader_through_its_ra_text_gates():
+    """reviewfirst's case packet (layout-blindspots/mha116-crown-ra): at
+    7b21b56c0 the pinion-cam-pin crown's "Ra 1.6" finish leader ran from the
+    shelf end (126.4, 140.0) mm to the crown (152.6, 159.0) mm straight
+    through its own ".6"; the pre-save gate passed the sheet and the
+    machinist review flagged it (fixed in 0007c8d93). Geometry is the
+    packet's, hand-measured on the 300 dpi render (+/-0.2 mm), with the
+    printed "Ra 1.6" as one PDF text object over the measured box. The
+    fix (symbol 10 mm higher, same crown point) is the control."""
+    mm = 0.001
+
+    def strikes(rise):
+        y = 140.0 + rise
+        return _crown_finish_strikes(mm, y)
+
+    [finding] = strikes(0.0)
+    assert "surface-finish" in finding.a and finding.a == finding.b
+    assert severity(finding) is FindingSeverity.GATING
+    # The packet measured 3.2 mm inside the box; the own-row inset trims the ends.
+    assert 2.5 < finding.extra["overlap_mm"] < 3.3
+    assert strikes(10.0) == []
+
+
+def _crown_finish_strikes(mm, y):
+    """leader-through-own-text on MHA-116's crown finish symbol rooted at
+    (120, ``y``) mm, its leader running to the crown point (152.6, 159.0)."""
+    symbol = {
+        "type": 7,
+        "name": "DetailItem crown",
+        "visible": 1,
+        "owner_type": 0,
+        "pos": [120.0 * mm, y * mm, 0.0],
+        "leaders": [[121.0 * mm, y * mm, 0.0, 126.4 * mm, y * mm, 0.0, 152.6 * mm, 159.0 * mm, 0.0]],
+        "display": {
+            "lines": [
+                _line(117.0 * mm, y * mm, 126.4 * mm, y * mm),  # shelf, V's point to leader
+                _line(120.0 * mm, y * mm, 117.5 * mm, (y + 4.3) * mm),  # V, short arm
+                _line(120.0 * mm, y * mm, 124.3 * mm, (y + 7.4) * mm),  # V, long arm to the bar
+                _line(124.3 * mm, (y + 7.4) * mm, 135.0 * mm, (y + 7.4) * mm),  # bar over the Ra text
+            ],
+            "texts": [{"t": "Ra 1.6", "pos": [125.3 * mm, (y + 4.2) * mm, 0.0], "h": 2.5 * mm, "ref": 1, "ang": 0.0}],
+        },
+    }
+    view = _view("Drawing View on RIGHT_CENTER", (0.10, 0.10, 0.30, 0.25), [symbol])
+    spans = [["Ra 1.6", 125.3 * mm, (y + 4.2) * mm, 134.8 * mm, (y + 7.0) * mm]]
+    findings = audit_dump(_dump(views=[view], spans=spans, print_rest=False))
+    return [f for f in findings if f.kind == "leader-through-own-text"]
 
 
 def test_a_hole_callout_over_the_top_border_gates_estimated_or_printed():
