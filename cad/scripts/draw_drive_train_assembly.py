@@ -43,6 +43,7 @@ from _drawing_common import (
 )
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from cone_gear_spec import BACKLASH_ACCEPTANCE_MM
 from cone_post_dowel_spec import POST_DOWEL_RECESS
 from cone_swing_platform_spec import POST_MOUNT_ENGAGEMENT_PRINTED
 from drive_train_assembly_spec import (
@@ -87,7 +88,7 @@ SHEET_NAMES = (
     "ALIGNMENT PINION RIG EXPLODED",
     "ASSEMBLY SEQUENCE",
     "ASSEMBLY SEQUENCE CONT. + FIT",
-    "CHECKS + SETUP",
+    "CONE SET FIT-UP + CHECKS",
 )
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
@@ -353,25 +354,19 @@ CONE_CRANK_STEPS = "\n".join(
         # of cad/docs/drawing-simplicity-policy.md, which records the same
         # 0.90D. (It printed 5.92-6.35 / 0.93-1.0D before #917 S1 counted the
         # tap and cut-end breaks.)
-        # #917 S1 + Codex on #929: the MHA-151 dowel pair is fitted BEFORE the
-        # screws are tightened. The post floats on finger-tight screws for
-        # fit-up (917-fitup-process-budget-20260926.md), is snugged to drill
-        # through the plate into its foot, and each part is reamed to its own
-        # print (the plate press, the post slip). The pins press in from below,
-        # recessed POST_DOWEL_RECESS into the base-slide face, and the post
-        # slips back over them. The install moved here from the MHA-151 sheet
-        # (Main's eye pass: a method, not a part requirement).
-        "2. SET MHA-016 ON MHA-091, 2X MHA-142 FROM THE TOP FINGER-TIGHT;",
-        "   POSITION IT AT FIT-UP AND SNUG. MATCH-DRILL THE DOWEL PAIR FROM",
-        "   BELOW THROUGH MHA-091 INTO MHA-016; LIFT MHA-016 OFF AND REAM",
-        "   EACH PART PER ITS PRINT. PRESS 2X MHA-151 INTO MHA-091 FROM BELOW,",
-        f"   RECESSED {POST_DOWEL_RECESS:.2f} INTO ITS SLIDE FACE, NEVER PROUD. SLIP MHA-016",
-        "   OVER THEM. CUT EACH MHA-142 TO FIT AND CHAMFER THE END: FLUSH TO",
-        "   0.3 SHORT OF THE MHA-091 UNDERSIDE, NEVER PROUD (NOMINAL LENGTH",
+        # #917 D1: on the bench the post only sits on the plate on
+        # finger-tight screws. Its position is set by the mesh on the base
+        # (step 23: T120 by the swing, T006 by the tip block, the post
+        # following) and only then frozen by the MHA-151 dowel pair (step 24);
+        # match-drilling it here froze a position no mesh had set
+        # (917-fitup-process-budget-20260926.md).
         # The sheet states the floor, not our governance (Main, S1): the
         # rule-12 exception it relies on is recorded above and in the policy's
         # Named exceptions table.
-        f"   86.0); TIGHTEN BOTH. ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN.",
+        "2. SET MHA-016 ON MHA-091. CUT EACH MHA-142 TO FIT AND CHAMFER THE",
+        "   END: FLUSH TO 0.3 SHORT OF THE MHA-091 UNDERSIDE, NEVER PROUD",
+        f"   (NOMINAL LENGTH 86.0); ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN. RUN BOTH",
+        "   IN FROM THE TOP FINGER-TIGHT: MHA-016 FLOATS UNTIL STEP 23.",
         # U30 (user, 2026-09-23, option (a)): one #6-32 button-head screw (W22)
         # up through the MHA-091 slot, height and side set by the shim pack at
         # fit-up. Wording from swing (dt-tip-block-attachment-options-20260923.md
@@ -381,7 +376,7 @@ CONE_CRANK_STEPS = "\n".join(
         "   SLOT; MHA-140 UP THROUGH THE SLOT, FINGER-TIGHT. RUN MHA-097 IN",
         "   UNTIL ITS CUP SEATS THE TIP. SLIDE MHA-092 IN THE SLOT AND CHANGE",
         "   SHIMS UNTIL MHA-014 SPINS FREE, NO TIGHT SPOT AT THE MHA-016",
-        "   JOURNAL; SNUG MHA-140 AND RECHECK. RECORD THE SHIM STACK.",
+        "   JOURNAL; MHA-140 STAYS FINGER-TIGHT. RECORD THE SHIM STACK.",
         # U32 (user, 2026-09-23): option 1A turn-set, dt-pending-rulings
         # packet section 1. Worded without the pitch so it survives E11
         # (MHA-097 5/16-18 -> #10-32: 1/8 turn is ~0.18 -> ~0.10).
@@ -528,6 +523,42 @@ RIG_STEPS = "\n".join(
         "    THROUGH ITS FOOT HOLE; DRILL #43 X 11.0, TAP #4-40 X 9.0 (PLUG,",
         "    THEN BOTTOMING), 1 PLACE. FIT {slotted}X MHA-101 AND 1X MHA-103.",
         "21. OTHER BASE MOUNTING: SEE SHEET 8, EXTERNAL INTERFACES.",
+        "    CONE SET ON THE BASE: SHEET 8.",
+    )
+)
+
+# #917 D1: the cone set meets the located bank here, so its mesh is set on the
+# base, not on the bench. The ruled process (917-fitup-process-budget-20260926.md,
+# user R1-R5): the post floats on finger-tight MHA-142; T120's backlash is set
+# by the swing (MHA-093 clamps it), T006's by sliding the tip block in the
+# platform slot, the post following; then the post and tip block are doweled
+# from below and the set is re-set by T120 backlash on the match-reamed pivot.
+# The band is the mesh acceptance the stack-up derives (cone_gear_spec),
+# printed once and read by both the fit-up and check 4.
+# TODO(D1 restack): the pivot match-ream wording and MHA-152 come from S2 and
+# (b); their constants are imported once those land.
+BACKLASH_BAND_TEXT = f"{BACKLASH_ACCEPTANCE_MM[0]:.2f}-{BACKLASH_ACCEPTANCE_MM[1]:.2f}"
+CONE_FITUP_STEPS = "\n".join(
+    (
+        "ASSEMBLY SEQUENCE CONT. - CONE SET ON THE BASE",
+        "22. MATCH-REAM THE MHA-091 PIVOT HOLE TO THE MHA-094 SHOULDER (SEE",
+        "    THE MHA-091 PRINT). SET THE CONE SET ON MHA-035 OVER MHA-094;",
+        "    FIT MHA-093 AND MHA-095. CYLINDER BANK PUSHED BACK.",
+        f"23. MESH: SWING THE SET IN UNTIL T120 READS {BACKLASH_BAND_TEXT} BACKLASH",
+        "    ON ITS MHA-027 (DIAL ON A TOOTH, MHA-027 HELD); TIGHTEN MHA-093.",
+        "    SLIDE MHA-092 IN THE MHA-091 SLOT UNTIL T006 READS THE SAME BAND,",
+        "    MHA-016 FOLLOWING ON ITS MHA-142. RECHECK T120; REPEAT UNTIL BOTH",
+        "    HOLD. SNUG 2X MHA-142 AND MHA-140; MHA-014 STILL SPINS FREE.",
+        "24. DOWELS: BACK MHA-097 OFF AND LIFT MHA-014 OUT. LIFT THE PLATFORM",
+        "    OFF MHA-094; INVERT IT ON PARALLELS. MATCH-DRILL FROM BELOW",
+        "    THROUGH MHA-091 INTO MHA-016 (2 PLACES) AND INTO MHA-092 THROUGH",
+        "    THE SHIMS (1 PLACE). LIFT MHA-016 AND MHA-092 OFF; REAM EACH PART",
+        "    PER ITS PRINT. PRESS 2X MHA-151 AND 1X MHA-152 INTO MHA-091 FROM",
+        f"    BELOW, RECESSED {POST_DOWEL_RECESS:.2f} INTO ITS SLIDE FACE, NEVER PROUD. SLIP",
+        "    MHA-016 AND MHA-092 BACK OVER THEM; TIGHTEN 2X MHA-142, MHA-140.",
+        "25. PLATFORM BACK ON MHA-094, MHA-014 BACK IN; REPEAT STEP 3. RE-SET",
+        f"    T120 TO {BACKLASH_BAND_TEXT} BY THE SWING; TIGHTEN MHA-093. ALL",
+        f"    {{cone_gears}} MESHES {BACKLASH_BAND_TEXT}.",
     )
 )
 
@@ -543,9 +574,12 @@ CHECKS = "\n".join(
         "3. EACH MHA-027 TURNS FREELY ON MHA-028 WITHOUT AXIAL BINDING.",
         "   A CONNECTING-ROD RING MAY OVERHANG ITS CAM UP TO 0.56 (AT LEAST",
         "   81% OF THE RING WIDTH STAYS ON THE CAM).",
-        "4. CONE SWING (P1): LOOSEN MHA-093; THE CONE SET SWINGS ON MHA-094",
-        "   CLEAR OF EVERY MHA-027. RETURN IT TO THE MHA-095 STOP AND",
-        "   TIGHTEN MHA-093; ALL {cone_gears} MESHES RE-ENGAGE.",
+        # MHA-095 is the DISENGAGED stop; the engaged pose has no stop, so
+        # the swing back is re-set by T120 backlash (#917 A6: the match-reamed
+        # pivot keeps T006 within the fit-up residual), never by feel.
+        "4. CONE SWING (P1): LOOSEN MHA-093; SWING THE CONE SET ON MHA-094 TO",
+        "   THE MHA-095 STOP, CLEAR OF EVERY MHA-027. SWING IT BACK AND RE-SET",
+        f"   T120 TO {BACKLASH_BAND_TEXT} BACKLASH (STEP 23); TIGHTEN MHA-093.",
         "5. ZEROING (P2), CONE SET SWUNG CLEAR: TURN EACH MHA-027 BY HAND",
         "   UNTIL ITS NOTCH LINES UP. TURN MHA-059 TO ENGAGE MHA-002; TURN",
         "   MHA-002 BY MHA-058 UNTIL ALL NOTCHES POINT UP (COSINES) OR 90 DEG",
@@ -2066,7 +2100,13 @@ def _place_checks_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     )
     findings = _stack_note_field(
         adapter,
-        (("functional checks", CHECKS.format(cone_gears=facts.count("cone-gear"))),),
+        (
+            (
+                "cone set fit-up",
+                CONE_FITUP_STEPS.format(cone_gears=facts.count("cone-gear")),
+            ),
+            ("functional checks", CHECKS.format(cone_gears=facts.count("cone-gear"))),
+        ),
         NOTE_FIELD_LEFT,
         label=f"sheet {CHECKS_SHEET} left note field",
     )

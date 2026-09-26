@@ -77,18 +77,18 @@ def test_the_pin_seats_by_its_mid_length_plane_and_is_read_back_tight() -> None:
     assert "if abs(seated[1] - dowel_o[1]) > 1e-3:" in source
 
 
-def test_the_cone_crank_sequence_presses_the_pins_recessed_from_the_constant() -> None:
-    """Main's MHA-151 eye pass: the install moved off the part sheet into the
-    step that fits MHA-016 to MHA-091, with the recess read from
-    POST_DOWEL_RECESS, never retyped."""
+def test_the_fitup_presses_the_pins_recessed_from_the_constant() -> None:
+    """Main's MHA-151 eye pass: the install lives on the assembly sheet, not
+    the part sheet, with the recess read from POST_DOWEL_RECESS, never
+    retyped.  #917 D1 moved it from bench step 2 to the base fit-up (step 24),
+    after the mesh sets the post."""
     import draw_drive_train_assembly as drawing
 
-    steps = " ".join(drawing.CONE_CRANK_STEPS.split())
-    assert "PRESS 2X MHA-151 INTO MHA-091" in steps
+    steps = " ".join(drawing.CONE_FITUP_STEPS.split())
+    assert "PRESS 2X MHA-151 AND 1X MHA-152 INTO MHA-091" in steps
     assert f"RECESSED {dowel.POST_DOWEL_RECESS:.2f} INTO ITS SLIDE FACE, NEVER PROUD" in steps
-    assert "MATCH-DRILL THE DOWEL PAIR" in steps
-    # It sits in step 2, before step 3.
-    assert steps.index("2. ") < steps.index("PRESS 2X MHA-151") < steps.index("3. THREAD MHA-097")
+    assert steps.index("24. ") < steps.index("PRESS 2X MHA-151") < steps.index("25. ")
+    assert "MHA-151" not in drawing.CONE_CRANK_STEPS
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "{POST_DOWEL_RECESS:.2f}" in source
     assert "RECESSED 0.25" not in source
@@ -109,31 +109,33 @@ def test_both_ream_callouts_name_the_mating_part_on_their_sheets() -> None:
         assert f"process={name}," in Path(module.__file__).read_text(encoding="utf-8")
 
 
-def test_step_2_dowels_the_post_before_the_screws_are_tightened() -> None:
+def test_the_post_is_doweled_after_the_mesh_sets_it_then_tightened() -> None:
     """Codex on #929 (PRRT_kwDOPHDy386mOPDM): step 2 screwed MHA-016 down and
-    never fitted the dowels.  The order is: MHA-142 finger-tight, the post
-    positioned at fit-up, the pair match-drilled through MHA-091 into
-    MHA-016 and reamed per each print, MHA-151 pressed in from below and
-    recessed, MHA-016 slipped over them, and only then the screws tightened.
-    The printed engagement is the platform spec's floored worst case, not a
-    retyped range."""
+    never fitted the dowels.  #917 D1: the bench leaves MHA-142 finger-tight
+    so the post floats; the base fit-up sets the mesh, snugs the screws to
+    drill, match-drills the pair through MHA-091 into MHA-016, reams each part
+    per its print, presses MHA-151 from below recessed, slips the post back
+    over them, and only then tightens the screws.  The printed engagement is
+    the platform spec's floored worst case, not a retyped range."""
     import cone_swing_platform_spec as platform
     import draw_drive_train_assembly as drawing
 
     steps = " ".join(drawing.CONE_CRANK_STEPS.split())
     step2 = steps[steps.index("2. ") : steps.index("3. THREAD MHA-097")]
+    assert "FINGER-TIGHT: MHA-016 FLOATS UNTIL STEP 23" in step2
+    fitup = " ".join(drawing.CONE_FITUP_STEPS.split())
     order = (
-        "FINGER-TIGHT",
-        "AT FIT-UP",
-        "MATCH-DRILL THE DOWEL PAIR",
+        "23. MESH",
+        "SNUG 2X MHA-142",
+        "MATCH-DRILL FROM BELOW",
         "THROUGH MHA-091 INTO MHA-016",
         "REAM EACH PART PER ITS PRINT",
-        "PRESS 2X MHA-151 INTO MHA-091 FROM BELOW",
+        "PRESS 2X MHA-151 AND 1X MHA-152 INTO MHA-091 FROM BELOW",
         f"RECESSED {dowel.POST_DOWEL_RECESS:.2f} INTO ITS SLIDE FACE, NEVER PROUD",
-        "SLIP MHA-016 OVER THEM",
-        "TIGHTEN BOTH",
+        "SLIP MHA-016 AND MHA-092 BACK OVER THEM",
+        "TIGHTEN 2X MHA-142",
     )
-    positions = [step2.find(phrase) for phrase in order]
+    positions = [fitup.find(phrase) for phrase in order]
     assert -1 not in positions, dict(zip(order, positions))
     assert positions == sorted(positions), dict(zip(order, positions))
     assert "SCREW MHA-016 TO MHA-091" not in step2

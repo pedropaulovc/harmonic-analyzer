@@ -24,7 +24,8 @@ EXTERNAL_NUMBERS = frozenset({"MHA-035"})
 # 2026-09-23: drawing-only rulings commit). The integration commit that adds
 # the rows deletes this set; the test below fails once a row lands anyway.
 PRE_REGISTERED_NUMBERS = frozenset(
-    {"MHA-139", "MHA-140", "MHA-141", "MHA-142"}
+    # MHA-152: the #917 (b) tip-block dowel, whose row arrives with (b).
+    {"MHA-139", "MHA-140", "MHA-141", "MHA-142", "MHA-152"}
 )
 
 
@@ -116,6 +117,7 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
         drawing.CONE_CRANK_STEPS,
         drawing.BANK_STEPS,
         drawing.RIG_STEPS,
+        drawing.CONE_FITUP_STEPS,
         drawing.CHECKS,
         drawing.SETUP_NOTES,
         drawing.INTERFACE_NOTES,
@@ -134,6 +136,7 @@ def test_note_lines_fit_a_half_sheet_field() -> None:
         drawing.CONE_CRANK_STEPS,
         drawing.BANK_STEPS,
         drawing.RIG_STEPS,
+        drawing.CONE_FITUP_STEPS,
         drawing.CHECKS,
         drawing.SETUP_NOTES,
         drawing.INTERFACE_NOTES,
@@ -157,7 +160,7 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     names = drawing.SHEET_NAMES
     assert len(names) == 8
     assert names[drawing.SEQUENCE_SHEET - 1] == "ASSEMBLY SEQUENCE"
-    assert names[drawing.CHECKS_SHEET - 1] == "CHECKS + SETUP"
+    assert names[drawing.CHECKS_SHEET - 1] == "CONE SET FIT-UP + CHECKS"
     assert names[drawing.FIT_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. + FIT"
     assert sorted(drawing.CLUSTER_SHEETS.values()) == [3, 4, 5]
     assert "SHEET 7" in drawing.BOM_REFERENCE_CAPTION
@@ -167,6 +170,77 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
 def test_bom_descriptions_keep_one_line() -> None:
     for stem, text in drawing.BOM_DESCRIPTIONS.items():
         assert len(text) <= drawing.BOM_DESCRIPTION_MAX_CHARS, stem
+
+
+def _collapsed(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _step_heads(text: str) -> list[int]:
+    return [int(n) for n in re.findall(r"^\s*(\d+)\. ", text, re.MULTILINE)]
+
+
+def test_the_cone_set_is_meshed_on_the_base_before_it_is_doweled() -> None:
+    """#917 D1: the post floats on the bench; the mesh on the base sets it
+    (T120 by the swing, T006 by the tip block) and only then does the dowel
+    pair freeze it, before the set is re-set by T120 backlash."""
+    band = (
+        f"{drawing.BACKLASH_ACCEPTANCE_MM[0]:.2f}-{drawing.BACKLASH_ACCEPTANCE_MM[1]:.2f}"
+    )
+    steps = _collapsed(drawing.CONE_FITUP_STEPS)
+    order = [
+        steps.index("MATCH-REAM THE MHA-091 PIVOT HOLE TO THE MHA-094 SHOULDER"),
+        steps.index("SET THE CONE SET ON MHA-035 OVER MHA-094"),
+        steps.index(f"UNTIL T120 READS {band} BACKLASH"),
+        steps.index("TIGHTEN MHA-093"),
+        steps.index("SLIDE MHA-092 IN THE MHA-091 SLOT UNTIL T006 READS THE SAME BAND"),
+        steps.index("SNUG 2X MHA-142 AND MHA-140"),
+        steps.index("LIFT THE PLATFORM OFF MHA-094"),
+        steps.index("MATCH-DRILL FROM BELOW"),
+        steps.index("PRESS 2X MHA-151 AND 1X MHA-152"),
+        steps.index(f"RE-SET T120 TO {band} BY THE SWING"),
+        steps.index(f"MESHES {band}"),
+    ]
+    assert order == sorted(order), steps
+    assert f"RECESSED {drawing.POST_DOWEL_RECESS:.2f} INTO ITS SLIDE FACE, NEVER PROUD" in steps
+    # The bench step no longer drills, dowels or tightens the post.
+    bench = _collapsed(drawing.CONE_CRANK_STEPS.split("\n3. ")[0].split("\n2. ")[1])
+    assert "FINGER-TIGHT: MHA-016 FLOATS UNTIL STEP 23" in bench
+    for gone in ("MATCH-DRILL", "MHA-151", "POSITION IT AT FIT-UP", "TIGHTEN BOTH"):
+        assert gone not in bench, gone
+    assert "MHA-140 STAYS FINGER-TIGHT" in _collapsed(drawing.CONE_CRANK_STEPS)
+    # The fit-up continues the numbered sequence after the rig's last step.
+    rig, fitup = _step_heads(drawing.RIG_STEPS), _step_heads(drawing.CONE_FITUP_STEPS)
+    assert fitup == list(range(rig[-1] + 1, rig[-1] + 1 + len(fitup)))
+    assert "CONE SET ON THE BASE: SHEET 8." in drawing.RIG_STEPS
+
+
+def test_cone_swing_check_resets_t120_backlash_after_the_disengaged_stop() -> None:
+    """MHA-095 bounds the DISENGAGE swing; the engaged pose has no stop, so
+    the swing back is re-set by T120 backlash (#917), never by feel."""
+    band = (
+        f"{drawing.BACKLASH_ACCEPTANCE_MM[0]:.2f}-{drawing.BACKLASH_ACCEPTANCE_MM[1]:.2f}"
+    )
+    check = _collapsed(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0])
+    order = [
+        check.index("TO THE MHA-095 STOP, CLEAR OF EVERY MHA-027"),
+        check.index("SWING IT BACK AND RE-SET"),
+        check.index(f"T120 TO {band} BACKLASH (STEP 23)"),
+        check.index("TIGHTEN MHA-093"),
+    ]
+    assert order == sorted(order), check
+    assert "RETURN IT TO THE MHA-095" not in check
+    assert "RE-ENGAGE" not in check
+
+
+def test_the_last_sheet_fits_the_fitup_above_the_checks() -> None:
+    """Offline estimate (the build's _check_package_layout is authoritative):
+    4.525 mm a line plus the block gap inside the left field's height."""
+    lines = sum(
+        len(text.splitlines()) for text in (drawing.CONE_FITUP_STEPS, drawing.CHECKS)
+    )
+    height_mm = 1000.0 * (drawing.NOTE_FIELD_LEFT[1] - drawing.NOTE_FIELD_LEFT[3])
+    assert lines * 4.525 + 1000.0 * drawing.NOTE_BLOCK_GAP <= height_mm
 
 
 def test_rig_is_located_by_its_parked_tip_gap() -> None:
