@@ -57,7 +57,7 @@ from guide_lock_spec import (
     LOCK_THICK,
     LOCK_WIDTH,
 )
-from build_fillister_screw import SHANK_DIA as FILLISTER_SHANK_DIA
+from fillister_screw_spec import SHANK_DIA as FILLISTER_SHANK_DIA
 
 PART_NAME = "guide-lock"
 MATERIAL = "Plain Carbon Steel"

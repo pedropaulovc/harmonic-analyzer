@@ -50,6 +50,7 @@ from _common import (
     set_sketch_direct_db,
 )
 from _grouped_bom_properties import apply_grouped_bom_properties
+from _visibility import blank_reference_geometry
 # ``set_global`` is imported from _common under a distinct name: the gear-math
 # globals below use involute_gear's stricter 4-arg ``set_global`` (asserts the
 # round-tripped value to test the equation-parser dialect), while the plain
@@ -332,12 +333,12 @@ async def build(adapter) -> dict[str, str]:
     # ------------------------------------------------------------------
     # Pattern about Z; link the instance count to ToothCount.
     # ------------------------------------------------------------------
-    check(
+    pattern_axis = check(
         "create_axis Z (Top x Right)",
         await adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
         ),
-    )
+    ).name
     adapter._zoom_to_fit(adapter.currentModel)
     candidates = [[0.0, 0.0, FACE_WIDTH / 2.0]]
     for angle_deg in (-45.0, -90.0, -135.0, 135.0, 45.0):
@@ -365,6 +366,9 @@ async def build(adapter) -> dict[str, str]:
         _telemetry.debug(f"axis candidate {point} failed: {res.error}")
     if pattern is None:
         raise RuntimeError("circular pattern: no axis candidate selectable")
+    # Hide only now: the pattern picks the axis by screen point, which a
+    # blanked axis would refuse.
+    blank_reference_geometry(adapter, ((pattern_axis, "AXIS"),))
     count_dim = pattern_count_dimension(adapter, pattern.data.name, DEFAULT_TEETH)
     check(
         f"link {count_dim} to ToothCount",

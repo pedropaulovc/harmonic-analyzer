@@ -42,6 +42,7 @@ from _hole_spec import (
     HoleSpec,
     blind_cut_dia_mm,
 )
+from _visibility import blank_sketch_feature
 
 PlacementDimension = tuple[str | None, str | None]
 PlacementDimensions = tuple[PlacementDimension, PlacementDimension]
@@ -532,6 +533,9 @@ def wizard_holes(
         raise RuntimeError(
             f"hole wizard {label}: expected {len(points_mm)} placement points, got {npts}"
         )
+    # Hidden by construction: a shown placement sketch prints its points in
+    # every render of the part and of each assembly that places it.
+    blank_sketch_feature(model, sub, f"hole wizard {label}")
 
     if name:
         try:
@@ -889,6 +893,9 @@ def wizard_hole_on_cylinder(
                 )
     _telemetry.debug(f"hole wizard {label}: point constrained, rebuilding")
     model.EditRebuild3()
+    # Hidden by construction: a shown 3D placement sketch prints its point in
+    # every render of the part and of each assembly that places it.
+    blank_sketch_feature(model, sub, f"hole wizard {label}")
 
     if name:
         try:

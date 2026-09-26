@@ -23,13 +23,15 @@ from pinion_arbor_collar_geometry import (
     COLLAR_OD as COLLAR_OD,
     PIN_HOLE_Z as PIN_HOLE_Z,
 )
+from pinion_arbor_geometry import (
+    PIN_STATION_FROM_HEAD_REAR,
+    SHAFT_DIA,
+)
 from pinion_arbor_spec import (
     DRUM_STATION,
     DRUM_STATION_BAND,
     LINEAR_X_BAND,
     PIN_STATION_BAND,
-    PIN_STATION_FROM_HEAD_REAR,
-    SHAFT_DIA,
     SHAFT_DIA_BAND,
     STRAP_T,
     STRAP_T_BAND,

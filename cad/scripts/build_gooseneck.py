@@ -80,6 +80,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _visibility import blank_reference_geometry
 from gooseneck_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -290,9 +291,11 @@ async def build(adapter) -> dict[str, str]:
             CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=LEG_TOP)
         ),
     )
+    # Both attempts' planes survive a failed first sweep, so hide them all.
+    profile_planes = [getattr(profile_plane, "name", profile_plane)]
     check(
         "create_sketch bend profile",
-        await adapter.create_sketch(getattr(profile_plane, "name", profile_plane)),
+        await adapter.create_sketch(profile_planes[-1]),
     )
     # Annular (OD + bore) like the leg, so the swept bend + arm stay hollow
     # tube -- and driven by the SAME TubeDia/WallT knobs as the leg (each
@@ -337,9 +340,10 @@ async def build(adapter) -> dict[str, str]:
                 )
             ),
         )
+        profile_planes.append(getattr(profile_plane, "name", profile_plane))
         check(
             "create_sketch bend profile (flipped)",
-            await adapter.create_sketch(getattr(profile_plane, "name", profile_plane)),
+            await adapter.create_sketch(profile_planes[-1]),
         )
         bend_prof_flipped = SketchDims()
         await define_circle(
@@ -374,6 +378,7 @@ async def build(adapter) -> dict[str, str]:
             drive_jobs += bend_prof_flipped.apply(adapter, "BendProfileFlipped")
     check("sweep bend + arm", res)
     name_last_feature(adapter, "BendArmSweep")
+    blank_reference_geometry(adapter, tuple((name, "PLANE") for name in profile_planes))
     # Quarter torus with an annular cross-section: V = (arc/2pi) * 2pi*Rc*A
     # = (pi/2) * BendR * ring area; the straight arm is the same ring extruded.
     v_bend = math.pi / 2.0 * BEND_R * _RING_AREA

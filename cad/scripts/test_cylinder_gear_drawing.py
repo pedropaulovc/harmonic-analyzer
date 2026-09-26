@@ -93,19 +93,23 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
 
 
 @pytest.mark.parametrize(
-    "assembly_script",
+    ("assembly_script", "reads_cylinder_spec"),
     (
-        "build_channel_assembly.py",
-        "build_drive_train_assembly.py",
-        "build_paper_drive_assembly.py",
+        ("build_channel_assembly.py", True),
+        ("build_drive_train_assembly.py", True),
+        # paper-drive read the cylinder spec only through the drive-train
+        # script; it now takes the crank axis from cone_line (#880).
+        ("build_paper_drive_assembly.py", False),
     ),
 )
-def test_assembly_recipes_exclude_cylinder_drawing_prose(assembly_script: str) -> None:
+def test_assembly_recipes_exclude_cylinder_drawing_prose(
+    assembly_script: str, reads_cylinder_spec: bool
+) -> None:
     dependencies = {
         Path(path).name
         for path in module_deps_of(Path(__file__).with_name(assembly_script))
     }
-    assert "cylinder_gear_spec.py" in dependencies
+    assert ("cylinder_gear_spec.py" in dependencies) is reads_cylinder_spec
     assert dependencies.isdisjoint({"build_cylinder_gear.py", "cylinder_gear_notes.py"})
 
 

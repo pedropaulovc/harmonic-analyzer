@@ -14,39 +14,26 @@ import sys
 from _common import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
-from diagnostics import diag_build_92240A539, diag_build_92240A540
-from diagnostics.diag_build_92240A539 import (
-    HEX_HEIGHT_MM,
-    HEX_WIDTH_MM,
-    MAJOR_DIAMETER_MM,
-    PITCH_MM,
-    WASHER_DEPTH_MM,
-)
+from diagnostics.diag_build_92240A539 import build_92240A539
+from diagnostics.diag_build_92240A540 import build_92240A540
+from lag_screw_spec import LENGTHS_MM, SPECIFIED_SKU
 
 PART_NAME = "lag-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
-# The 2026-09-25 machinist review specified the 3/4 screw: the 5/8
-# (92240A539) engaged the base 1.456D, under 1.5D. The catalog row keys the
-# replay, so this part, the frame placement and the base seats follow it.
-SPECIFIED_SKU = "92240A540"
-REPLAYS = {
-    "92240A539": (diag_build_92240A539.LENGTH_MM, diag_build_92240A539.build_92240A539),
-    "92240A540": (diag_build_92240A540.LENGTH_MM, diag_build_92240A540.build_92240A540),
-}
 (SKU,) = SPEC.skus
-LENGTH_MM, _REPLAY = REPLAYS[SKU]
-
-HEAD_AF = HEX_WIDTH_MM
-HEAD_H = HEX_HEIGHT_MM
-SHANK_DIA = MAJOR_DIAMETER_MM
-SHANK_LEN = LENGTH_MM
-THREAD_LEN = LENGTH_MM
-THREAD_SIZE = "1/4-20"
-THREAD_CLASS = "2A"
-THREAD_PITCH = PITCH_MM
-BEARING_OFFSET = WASHER_DEPTH_MM
+if SKU != SPECIFIED_SKU:
+    raise ValueError(
+        f"lag-screw catalog row names {SKU}, but lag_screw_spec sizes the frame "
+        f"and base seats for {SPECIFIED_SKU}; change both together"
+    )
+# Each SKU's replay recipe.
+REPLAYS = {
+    "92240A539": (LENGTHS_MM["92240A539"], build_92240A539),
+    "92240A540": (LENGTHS_MM["92240A540"], build_92240A540),
+}
+_REPLAY = REPLAYS[SKU][1]
 
 
 async def build(adapter) -> dict[str, str]:

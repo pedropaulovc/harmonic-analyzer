@@ -79,6 +79,7 @@ from post_mount_screw_spec import (
     MANUFACTURING_NOTES,
     SKU,
     STOCK_LENGTH_MM,
+    THREAD,
     TRIM_REMOVED_MM3,
 )
 
@@ -86,7 +87,6 @@ PART_NAME = "post-mount-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
-THREAD = "1/4-20"
 # The shared row is the supplied screw; the part's shank is its cut length.
 SHANK_DIA, _STOCK_LEN, HEAD_H, HEAD_DIA, THREAD_PITCH = FILLISTER_SIZES[SKU]
 if _STOCK_LEN != STOCK_LENGTH_MM:

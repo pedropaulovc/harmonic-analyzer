@@ -49,6 +49,7 @@ from _fit_limits import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_hole_on_cylinder
 from _part_pmi import author_part_pmi
+from _visibility import blank_reference_geometry
 from crank_hub_geometry import (
     AXIAL_PIN_DIA,
     AXIAL_PIN_LENGTH,
@@ -74,6 +75,15 @@ from crank_hub_spec import (
 
 
 PART_NAME = "crank-hub"
+# Reference sketches this part still saves shown (#880), each with its owner
+# and why.  Delete an entry once the part hides that sketch; the release
+# refuses to start while any part lists one (visibility_debt).
+SHOWN_SKETCH_ALLOWANCES = {
+    "ServicePinStationReference": (
+        "crankhub: carries the drawing's marked dimensions; hide it once "
+        "the sheet imports them from the hidden sketch"
+    ),
+}
 MATERIAL = "Plain Carbon Steel"
 SEAT_R = HUB_SEAT_DIA / 2.0
 BARREL_R = HUB_BARREL_DIA / 2.0
@@ -335,6 +345,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, "BoreProfile", "BoreDia", *deviations(HUB_BORE_BAND)
     )
     await volume_check(adapter, "driven crank hub", final_volume, 0.001 * final_volume)
+    # Both datum planes stay selectable by name for the drive-train mates.
+    blank_reference_geometry(
+        adapter, (("ArmShoulder", "PLANE"), ("ServicePinStationPlane", "PLANE"))
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
@@ -350,7 +364,9 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return await save_part_and_images(
+        adapter, PART_NAME, allowed_shown=SHOWN_SKETCH_ALLOWANCES
+    )
 
 
 if __name__ == "__main__":

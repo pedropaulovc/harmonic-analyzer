@@ -12,12 +12,11 @@ import math
 from collections.abc import Iterable, Mapping
 
 from _hole_spec import blind_cut_dia_mm
-from build_harmonic_base import (
+from harmonic_base_fasteners import (
     HOLD_DOWN_ENGAGEMENT as _HOLD_DOWN_ENGAGEMENT,
     HOLD_DOWN_TAP_DRILL_DIA as _HOLD_DOWN_TAP_DRILL_DIA,
     HOLD_DOWN_THREAD as _HOLD_DOWN_THREAD,
-    PEDESTAL_FLANGE_THICKNESS as _PEDESTAL_FLANGE_THICKNESS,
-    PEDESTAL_SCREW_LEN as _PEDESTAL_SCREW_LEN,
+    PEDESTAL_SCREW_ENGAGEMENT as _PEDESTAL_SCREW_ENGAGEMENT,
 )
 from _hole_spec import THREAD_MAJOR_MM
 from crank_hub_spec import (
@@ -392,7 +391,7 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         range(1, 3),
         "frame-1/harmonic-base",
         _smooth_annulus_limit_mm3(
-            4.1656, 3.454, _PEDESTAL_SCREW_LEN - _PEDESTAL_FLANGE_THICKNESS
+            4.1656, 3.454, _PEDESTAL_SCREW_ENGAGEMENT
         ),
     ),
     **_numbered_pairs(

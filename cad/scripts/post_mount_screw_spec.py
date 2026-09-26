@@ -30,6 +30,7 @@ from _fit_limits import deviations
 from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 
 SKU = "40923898"
+THREAD = "1/4-20"
 THREAD_DIA_MM, STOCK_LENGTH_MM, HEAD_H_MM, _HEAD_DIA, _PITCH = FILLISTER_SIZES[SKU]
 # The cut-to-fit nominal: MHA-142's own length, applied by its trim.  The
 # shared size row stays the supplied screw.

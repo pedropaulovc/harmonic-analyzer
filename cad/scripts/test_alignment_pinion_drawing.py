@@ -9,6 +9,7 @@ import pytest
 
 import _config
 import alignment_pinion_spec as spec
+import pinion_arbor_geometry as arbor_geometry
 import pinion_arbor_spec as arbor
 
 
@@ -42,8 +43,8 @@ def test_bore_has_the_single_machined_finish_contract() -> None:
 
 def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None:
     shaft_limits = (
-        arbor.SHAFT_DIA + arbor.SHAFT_DIA_BAND[1],
-        arbor.SHAFT_DIA + arbor.SHAFT_DIA_BAND[0],
+        arbor_geometry.SHAFT_DIA + arbor.SHAFT_DIA_BAND[1],
+        arbor_geometry.SHAFT_DIA + arbor.SHAFT_DIA_BAND[0],
     )
     bore_limits = (
         spec.BORE_DIA + spec.ARBOR_BORE_BAND[1],
@@ -67,7 +68,7 @@ def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None
     )
     assert maximum_clearance == pytest.approx(0.200)
     assert maximum_clearance < spec.RETAINING_COMPOUND_MAX_GAP_MM
-    assert spec.BORE_DIA == arbor.SHAFT_DIA  # the CAD models line-to-line
+    assert spec.BORE_DIA == arbor_geometry.SHAFT_DIA  # the CAD models line-to-line
 
 
 def test_notes_bond_the_drum_at_the_station_mha102_owns() -> None:

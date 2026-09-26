@@ -15,14 +15,16 @@ spec read the hole from here.
 from __future__ import annotations
 
 import pinion_strap_pin_spec as _pin
+from pinion_arbor_geometry import (
+    NECK_LEN,
+    PIN_STATION_FROM_HEAD_REAR,
+    SHAFT_DIA,
+)
 from pinion_arbor_spec import (
     FRONT_JOURNAL_FROM_HEAD_REAR,
     LAND_FINISH_RUNOUT,
     LINEAR_X_BAND,
-    NECK_LEN,
     PIN_STATION_BAND,
-    PIN_STATION_FROM_HEAD_REAR,
-    SHAFT_DIA,
     SHAFT_DIA_BAND,
 )
 

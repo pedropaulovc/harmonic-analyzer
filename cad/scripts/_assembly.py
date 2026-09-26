@@ -36,6 +36,7 @@ from _common import (
     set_isometric_view,
     whats_wrong,
 )
+from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
 
 
 def assembly_title_properties(assembly_name: str) -> dict[str, str]:
@@ -843,7 +844,11 @@ async def plane_distance_mate(
                 )
             ),
         )
-        target_ref = named_ref(getattr(plane, "name", plane), "PLANE")
+        plane_name = getattr(plane, "name", plane)
+        # Hidden at creation: the mate selects it by name, and a shown plane
+        # prints in the assembly's renders.
+        blank_reference_geometry(adapter, ((plane_name, "PLANE"),))
+        target_ref = named_ref(plane_name, "PLANE")
     return await coincident_mate(
         adapter,
         named_ref(f"{comp_plane}@{comp_name}", "PLANE"),
@@ -2222,6 +2227,9 @@ async def save_assembly_and_images(
     # Every driver is authored by now: prove the contract's flip seeds against
     # the signatures this build actually queried.
     audit_flip_seeds(asm_name)
+    # ... nor one whose own sketches, planes, axes or points render; each
+    # placed part's tree was proved at that part's save.
+    assert_reference_geometry_hidden(adapter, asm_name)
     OUT_SLDASM.mkdir(parents=True, exist_ok=True)
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
     sidecar = _massprops_sidecar(asm_name)

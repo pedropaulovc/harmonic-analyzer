@@ -14,7 +14,8 @@ import _drawing_common
 import draw_rocker_arm_support as drawing
 import build_rocker_arm_support as support
 import build_frame_assembly as frame
-import build_lag_screw as screw
+import build_lag_screw as stock_screw
+import lag_screw_spec as screw
 import rocker_arm_support_spec as placement
 import rocker_arm_support_drawing_spec as drawing_spec
 
@@ -149,9 +150,9 @@ def test_support_has_no_unapproved_gdt_contract() -> None:
 
 
 def test_stock_hold_down_clears_support_and_engages_blind_base_tap() -> None:
-    import build_harmonic_base as base
+    import harmonic_base_fasteners as base
 
-    assert screw.SPEC.skus == ("92240A540",)
+    assert stock_screw.SPEC.skus == ("92240A540",)
     assert screw.THREAD_SIZE == base.HOLD_DOWN_THREAD == "1/4-20"
     assert (screw.THREAD_CLASS, base.HOLD_DOWN_THREAD_CLASS) == ("2A", "2B")
     assert screw.THREAD_LEN == screw.SHANK_LEN
