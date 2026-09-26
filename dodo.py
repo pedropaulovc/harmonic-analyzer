@@ -2849,6 +2849,7 @@ def task_check():
         # no drawing text may add a signed nil band (the burn-down allowlist).
         SCRIPTS_DIR / "test_tolerance_zero_display.py",
         SCRIPTS_DIR / "test_fit_limits.py",
+        SCRIPTS_DIR / "test_drawing_limit_text.py",
         # The [out]-param binding rule is ENFORCED, not just documented: no
         # VT_BYREF on the (uniformly early-bound) build path, late-bound probes
         # declare themselves, and _early_bound never falls back to a raw

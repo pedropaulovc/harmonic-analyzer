@@ -41,6 +41,7 @@ from _drawing_layout_check import (
     format_findings,
 )
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
+from _drawing_limit_text import assert_no_iso_limit_text
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import (
     bool_array,
@@ -6206,6 +6207,9 @@ async def finalize_drawing(
     # so every text extent and view outline is brought current here, before
     # the SLDDRW/PDF that the blind review and the layout audit read.
     rebuild_drawing(adapter, label="finalize_drawing")
+    # #923: no toleranced dimension may print ISO's max./min. The gate forces
+    # its own regen, then reads each dimension's rendered text.
+    assert_no_iso_limit_text(drawing_model, label=pdf_title)
 
     # Persist the native drawing and PDF once from the fully loaded authored
     # document. Reopen/scale/save cycles are deliberately absent from this hot
