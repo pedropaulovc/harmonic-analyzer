@@ -172,3 +172,33 @@ def test_the_step_block_fits_the_field_right_of_the_isometric() -> None:
     assert top - len(lines) * NOTE_LINE_PITCH > bottom_limit
     # The isometric's right edge sat at x ~0.248 on the v36 render.
     assert left > 0.248 + 0.015
+
+
+def test_the_shaft_supplied_long_is_cut_to_fit_before_the_end_play_is_accepted() -> None:
+    """Codex #936 (PRRT_kwDOPHDy386mSteE): MHA-065 is supplied long with its
+    plain end uncut, and its print defers the length to the assembly, but no
+    step cut it. A step between the south bracket's setting and the end-play
+    acceptance must scribe the shaft at the ear, take it out, and cut and dome
+    it to the layout's band."""
+    import pivot_shaft_spec as shaft
+
+    # The part's promise this sheet has to keep.
+    assert "PLAIN END UNCUT" in shaft.DRAWING_NOTES
+    assert shaft.LENGTH_CALLOUT.startswith("CUT TO FIT")
+    cut_steps = [key for key in steps.SEQUENCE if "PLAIN END" in _step_body(key)]
+    assert len(cut_steps) == 1
+    (key,) = cut_steps
+    number = steps.step_number(key)
+    assert steps.step_number("south-bracket-feeler-set") < number
+    assert number < steps.step_number("end-play-accepted")
+    body = _step_body(key)
+    upper, lower = bank.PLAIN_END_CUT_BAND
+    cut = f"{shaft.DOME_HEIGHT + lower:.1f} TO {shaft.DOME_HEIGHT + upper:.1f}"
+    assert f"CUT THE PLAIN END {cut} PAST THE SCRIBE" in body
+    assert f"DOME IT {shaft.DOME_HEIGHT:.1f}" in body
+    assert "SCRIBE" in body.split("CUT")[0] and "SOUTH EAR'S OUTER FACE" in body
+    # It comes out only with the south bracket off, and goes back at the feeler.
+    assert "UNSCREW THE SOUTH" in body
+    assert f"AT THE FEELER AS STEP {steps.step_number('south-bracket-feeler-set')}" in body
+    # Positive control: no other step mentions the cut.
+    assert "SCRIBE" not in _step_body("south-bracket-feeler-set")
