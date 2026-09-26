@@ -763,7 +763,7 @@ sections:
       - confidence
       rows:
       - - Pivot shaft
-        - 'Ø6.35 × 170 along Z at (x, y) = (+72.9, 253.8), centred on the channel stack mid-plane (2026-09: was 203.2 with the south end 19 mm past the support in mid-air)'
+        - 'Ø6.35 along Z at (x, y) = (+72.9, 253.8); #743 PR2 (Reading 1): turned from Ø10 bar with an integral Ø10 × 1.5 shoulder on the north ear''s inner face, the cylinder spanning both ears (cut to fit, nominal 156.6) and each end domed 1.5 proud; the rocker stack closes south on the Ø10 × 1.5 MHA-148 washer, feeler-set 0.45 to the south ear (`rocker_bank_layout.py`). Was 170, centred on the stack mid-plane'
         - 'ball x photo-measured 66…81, ball y 252–255 in both 0°/180° views; y = support apex 228.6 + ball rise 25.2. The fixed support remains at its old world location while the channel bank recenters to z +3.088 and the longer rocker lever reaches drum x −60.394.'
         - med (x, y photo + frame; dia low)
       - - Support casting ×1 (windowed rocker-arm support)
@@ -780,8 +780,8 @@ sections:
         - 'four-hole pattern and foot thickness from `cad/scripts/build_rocker_arm_support.py`; base thread/drill contract from `cad/scripts/build_harmonic_base.py`; purchased identity from `cad/scripts/build_lag_screw.py`; supplied vendor SLDPRT harvested read-only and matched by `cad/scripts/diagnostics/diag_build_92240A540.py`; placed in frame.SLDASM'
         - high (catalog + native vendor model + assembly contract)
       - - Pivot brackets ×2 (replaced the chrome ball mounts 2026-09)
-        - 'black L-bracket (2026-09-02, was a T): foot 16 wide (fits the support''s 16.93 apex) × 6 × 24 running INBOARD from the ear with two Ø4.2 holes on its centreline, ear stub 14 × 6 carrying a Ø16 chrome ball at 25.2 above the foot with the Ø6.5 shaft bore through the ball; north bracket turned Ry180 in channel.SLDASM'
-        - 'ch14 p.27 (2026-09 re-derive): the shaft rides in two black cast brackets bolted to the support rail, not chrome ball pillars; seated on the support at stack-mid z ±78 so the pivot axis stays 228.6 + 25.2 = 253.8 (`build_pivot_bracket.py`)'
+        - 'black L-bracket (2026-09-02, was a T): foot 16 wide (fits the support''s 16.93 apex) × 6 × 24 running INBOARD from the ear with two Ø4.2 holes on its centreline, ear 14 × 6 arched R7 about the Ø6.5 shaft bore at 25.2 above the seat (#743 PR2: the bright dome on the ear is the shaft''s own domed end, so the brazed Ø16 ball is gone); north bracket turned Ry180 in channel.SLDASM'
+        - 'ch14 p.27 (2026-09 re-derive): the shaft rides in two black cast brackets bolted to the support rail, not chrome ball pillars; seated on the support at the rocker_bank_layout ear stations (north ear inner face on the shaft shoulder, south feeler-set) so the pivot axis stays 228.6 + 25.2 = 253.8 (`build_pivot_bracket.py`)'
         - scaled
         - med
       - - Rocker-arm pivot hubs (integral; the ×19 spacer bushings are retired 2026-09-02)
