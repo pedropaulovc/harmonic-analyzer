@@ -55,6 +55,7 @@ from pinion_arbor_spec import (
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     delete_view,
     iter_views,
@@ -75,22 +76,52 @@ ISO_CENTER = (0.365, 0.225)
 DETAIL_CENTER = (0.165, 0.235)
 DETAIL_SCALE = (2, 1)
 DETAIL_RADIUS_MM = 15.0
-# The native "DETAIL A / SCALE 2:1" label sits centred under its own detail
-# circle, this far below it (the label's anchor is its top edge): clear of the
-# HeadLen text that rides the circle's lower edge.
+DETAIL_RATIO = DETAIL_SCALE[0] / DETAIL_SCALE[1]
+# Detail A's crop circle on the sheet: the 15 mm fence round the head centre,
+# enlarged 2:1.
+DETAIL_CROP_RADIUS = DETAIL_RATIO * DETAIL_RADIUS_MM / 1000.0
+# Detail A is a cropped 2:1 MODEL view, not a native detail view.  On this
+# arbor's native detail no dimension could be moved in under any variant
+# tried (drag from the profile or the end-on donor, move or copy, the
+# detail's own feature import, a hidden reference sketch: neckbisect-ecef,
+# neckref-84e5, 20260926T141154Z-1-b0f89771).  A cropped model view is the
+# MHA-142 pattern: a *Top view at 2:1, turned like the profile, moved so the
+# head centre lands on DETAIL_CENTER and cropped by a sketch circle.
+DETAIL_LETTER = "A"
+# A model view has no native label the API can show, so the label is a note
+# the view owns, in the native detail label's words.
+DETAIL_LABEL_TEXT = (
+    f"DETAIL {DETAIL_LETTER}\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
+)
+# The label sits centred under the crop circle, its top edge this far below
+# it: clear of the HeadLen text that rides the circle's lower edge.
 DETAIL_LABEL_DROP = 0.012
 DETAIL_LABEL_XY = (
     DETAIL_CENTER[0],
-    DETAIL_CENTER[1]
-    - DETAIL_RADIUS_MM * DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
-    - DETAIL_LABEL_DROP,
+    DETAIL_CENTER[1] - DETAIL_CROP_RADIUS - DETAIL_LABEL_DROP,
 )
-# The head and neck diameters live in end-on Front-plane profile sketches, so
-# the end-on donor imports them: the head's moves onto the 1:1 profile, the
-# neck's into detail A (DETAIL_DIAMETER_POSITIONS says why).  The Ø8
-# is dimensioned on the profile itself, from the bond zone's flank.
+# The native label measured 32 mm wide (pc-p1 render), and the neighbours'
+# clearances are pinned against this half-width.
+DETAIL_LABEL_HALF_WIDTH = 0.017
+# The letter "A" that names the detail rides the profile's axis just right of
+# the fence circle, where the native detail put it (pc-p1 render: centred at
+# about (334, 170) mm).
+DETAIL_LETTER_OFFSET = (DETAIL_RADIUS_MM / 1000.0 + 0.006, 0.0)
+# swCropViewErrors_e.swCropViewErrors_NoError
+CROP_NO_ERROR = 1
+# The head centre must land within 0.1 mm of DETAIL_CENTER after the move
+# (draw_post_mount_screw's tip-view tolerance).
+DETAIL_POSITION_TOL_M = 1e-4
+# The detail's model axis must run the profile's way on the sheet.
+DETAIL_AXIS_MIN_DOT = 0.999
+# A note that lands more than this off its centring target did not move.
+NOTE_CENTRING_TOL_M = 0.001
+NOTE_CENTRING_PASSES = 2
+# The head diameter lives in an end-on Front-plane profile sketch, so the
+# end-on donor imports it and it moves onto the 1:1 profile.  The Ø8 is
+# dimensioned on the profile itself, from the bond zone's flank.  The neck
+# diameter is imported straight into detail A (see DETAIL_KEEP).
 DONOR_KEEP = {
-    "NeckDia": (0.055, 0.145),
     "HeadDia": (0.030, 0.215),
 }
 # Profile scale is 1:1 with the head to the right, so model z maps to sheet
@@ -230,12 +261,26 @@ PRINCIPAL_KEEP = {
     "PinStationFromHeadRear": (0.288, 0.207),
     "PinHoleDia": (0.250, 0.222),
 }
+# In detail A the neck runs from the fence (x ~0.137 at its edges) to the
+# head rear face (x 0.1545), its Ø10.5 at y 0.2245-0.2455.  Its end-on
+# circle is on the Front plane (model z 0, x 0.152), where the witnesses
+# start, so a line at x 0.140 on the neck's fence side keeps both witnesses
+# on the neck.  The text runs on past the line, away from that circle (the
+# profile rendered it left of its line at a1a694a6), so it rides above-left
+# of the crop circle, clear of it like every other detail-A callout; the line
+# crosses the circle once, square, to reach it.
+NECK_DIA_XY = (0.140, 0.2575)
+# Every dimension detail A carries, imported by feature straight into the
+# cropped view (DRAWING_DIMENSIONS names the owners: Head, FrontCapProfile,
+# CrossHoleProfile, NeckProfile) BEFORE any other view imports, since a
+# model dimension already on the sheet is not imported again.
 DETAIL_KEEP = {
     "HeadLen": (0.165, 0.201),
     "HeadCapR": (0.195, 0.262),
     "HeadCapSagDim": (0.205, 0.210),
     # Above the hole's centre line, so the leader drops onto the hole edge.
     "CrossHoleDia": (0.245, 0.256),
+    "NeckDia": NECK_DIA_XY,
 }
 # The head sits inside detail A's fence at the right end of the profile (the
 # fence spans x 0.298-0.328 on the axis, y 0.170): the Ø15's dimension line
@@ -265,7 +310,6 @@ DIAMETER_POSITIONS = {
 # neck is dimensioned inside detail A, which shows it from the fence to the
 # head rear face (Main's ruling).
 NECK_DIA_TEXT_BOX_FROM_POSITION = (-0.0156, 0.0115, -0.0028, 0.0007)
-DETAIL_RATIO = DETAIL_SCALE[0] / DETAIL_SCALE[1]
 
 
 def _detail_x(model_z: float) -> float:
@@ -275,17 +319,6 @@ def _detail_x(model_z: float) -> float:
     )
 
 
-# In detail A the neck runs from the fence (x ~0.137 at its edges) to the
-# head rear face (x 0.1545), its Ø10.5 at y 0.2245-0.2455.  Its end-on
-# circle is on the Front plane (model z 0, x 0.152), where the witnesses
-# start, so a line at x 0.140 on the neck's fence side keeps both witnesses
-# on the neck.  The text runs on past the line, away from that circle (the
-# profile rendered it left of its line at a1a694a6), so it rides above-left
-# of the fence, clear of the circle like every other detail-A callout; the
-# line crosses the fence once, square, to reach it.
-DETAIL_DIAMETER_POSITIONS = {
-    "NeckDia": (0.140, 0.2575),
-}
 DIMENSION_CALLOUTS = {
     # One name for the axial datum every station runs from (Fable m1): the
     # head end has two shoulders, Ø8-Ø10.5 and Ø10.5-Ø15.
@@ -357,22 +390,33 @@ def _move_dimension(
     return matches[0]
 
 
-def _head_detail(adapter: Any, parent_view: Any) -> Any:
-    """Create an enlarged native detail of the crowded turned head."""
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    parent = _early_bound(parent_view, "IView")
-    if not drawing.ActivateView(view_name(adapter, parent_view)):
-        raise RuntimeError("failed to activate integral-arbor detail parent")
-    draw.ClearSelection2(True)
-    center = model_point_in_view(
-        adapter,
-        parent_view,
-        (0.0, 0.0, HEAD_CENTER_Z / 1000.0),
-        label="integral-arbor head detail centre",
-    )
-    radius = DETAIL_RADIUS_MM / 1000.0
-    sketch = _early_bound(parent.GetSketch(), "ISketch")
+def _activate_view(adapter: Any, view: Any, *, label: str) -> str:
+    """Make ``view`` the active view (sketch entities and notes land in it)."""
+    name = view_name(adapter, view)
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
+        raise RuntimeError(f"failed to activate the {label} {name!r}")
+    adapter.currentModel.ClearSelection2(True)
+    return name
+
+
+def _sketch_circle(
+    adapter: Any,
+    view: Any,
+    center: tuple[float, float],
+    radius: float,
+    *,
+    label: str,
+    add_to_db: bool = False,
+) -> Any:
+    """Sketch a circle in the ACTIVE ``view``'s own sketch from sheet points.
+
+    The sheet points go through the view sketch's ModelToSketchTransform (the
+    recipe the native detail fence and draw_crank_arm's crop already used), so
+    the circle lands where the sheet says whatever the view's scale.  Without
+    ``add_to_db`` the new circle is left SELECTED, which is what Crop2
+    consumes.
+    """
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     points = []
@@ -380,45 +424,276 @@ def _head_detail(adapter: Any, parent_view: Any) -> Any:
         point = _early_bound(
             utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
         )
-        projected = _early_bound(
-            point.MultiplyTransform(transform), "IMathPoint"
-        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
-    manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if manager.CreateCircle(*points[0], *points[1]) is None:
-        raise RuntimeError("failed to create integral-arbor detail fence")
-    detail = drawing.CreateDetailViewAt4(
-        *DETAIL_CENTER,
-        0.0,
-        0,
-        *DETAIL_SCALE,
-        "A",
-        1,
-        True,
-        False,
-        False,
-        5,
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = add_to_db
+    try:
+        circle = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if circle is None:
+        raise RuntimeError(f"failed to sketch the {label} circle")
+    return circle
+
+
+def _mark_detail_on_profile(adapter: Any, principal: Any) -> tuple[float, float]:
+    """Circle detail A's region on the profile: the 15 mm fence round the head.
+
+    It is the circle the native detail was cut from, now a plain view-sketch
+    circle drawn direct to the database (no screen-space inference) in the
+    outline's black.  It is drawn before the turning axis so nothing of the
+    view's own sketch is near it.  Returns its sheet centre.
+    """
+    _activate_view(adapter, principal, label="integral-arbor profile")
+    center = model_point_in_view(
+        adapter,
+        principal,
+        (0.0, 0.0, HEAD_CENTER_Z / 1000.0),
+        label="integral-arbor detail mark centre",
     )
-    if detail is None:
-        raise RuntimeError("failed to create integral-arbor head detail")
-    detail = _early_bound(detail, "IView")
-    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    circle = _sketch_circle(
+        adapter,
+        principal,
+        center,
+        DETAIL_RADIUS_MM / 1000.0,
+        label="detail-A mark",
+        add_to_db=True,
+    )
+    segment = _early_bound(circle, "ISketchSegment")
+    segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
+    if int(segment.Color) != 0:
+        raise RuntimeError("detail-A mark circle colour did not persist")
+    adapter.currentModel.ClearSelection2(True)
+    adapter.currentModel.EditRebuild3()
+    _telemetry.info(
+        f"pinion-arbor: detail-A mark circle R{DETAIL_RADIUS_MM:g} mm at sheet "
+        f"({center[0] * 1000:.1f}, {center[1] * 1000:.1f}) mm on the profile"
+    )
+    return center
+
+
+def _axis_on_sheet(
+    adapter: Any, view: Any, *, label: str
+) -> tuple[tuple[float, float], float]:
+    """The turning axis's unit direction on the sheet in ``view``, and the
+    sheet length one overall part length spans there."""
+    ends = [
+        model_point_in_view(adapter, view, (0.0, 0.0, z / 1000.0), label=label)
+        for z in (HEAD_CENTER_Z, HEAD_CENTER_Z + OVERALL_LEN)
+    ]
+    dx, dy = ends[1][0] - ends[0][0], ends[1][1] - ends[0][1]
+    return _unit(dx, dy), math.hypot(dx, dy)
+
+
+def _cropped_head_view(adapter: Any, principal: Any) -> Any:
+    """Detail A: a standalone 2:1 *Top model view cropped to the head.
+
+    Sequence (the MHA-142 tip view, diag/mha142-bisect b6552f13b, and
+    draw_crank_arm's merged top-view crop): place *Top at 2:1 and turn it like
+    the profile (IView.Angle -90 deg); prove the model axis runs the profile's
+    way at twice its scale; move it so the head centre lands on DETAIL_CENTER
+    (ModelToViewTransform, SetViewPosition); ActivateView; a circle of the
+    fence's 2:1 radius in the view's own sketch; IView.Crop2 straight after
+    it while the circle is still selected (swCropViewErrors_NoError); an
+    IsCropped read-back that raises.
+    """
+    draw = adapter.currentModel
+    view = _early_bound(
+        place_view(adapter, str(SOURCE), "*Top", *DETAIL_CENTER, scale=DETAIL_SCALE),
+        "IView",
+    )
+    ratio = tuple(float(value) for value in view.ScaleRatio)
+    if ratio != tuple(float(value) for value in DETAIL_SCALE):
+        raise RuntimeError(f"detail-A view scale {ratio!r}, expected {DETAIL_SCALE!r}")
+    view.Angle = float(_early_bound(principal, "IView").Angle)
+    draw.EditRebuild3()
+    if abs(math.remainder(float(view.Angle) + math.pi / 2.0, 2.0 * math.pi)) > 1e-9:
+        raise RuntimeError("failed to turn detail A like the integral-arbor profile")
+    profile_axis, profile_span = _axis_on_sheet(
+        adapter, principal, label="profile axis"
+    )
+    detail_axis, detail_span = _axis_on_sheet(adapter, view, label="detail-A axis")
+    dot = profile_axis[0] * detail_axis[0] + profile_axis[1] * detail_axis[1]
+    if (
+        dot < DETAIL_AXIS_MIN_DOT
+        or abs(detail_span / profile_span - DETAIL_RATIO) > 0.01
+    ):
+        raise RuntimeError(
+            f"detail A does not show the profile at {DETAIL_RATIO:g}x: axis "
+            f"{detail_axis!r} vs profile {profile_axis!r} (dot {dot:.4f}), span "
+            f"ratio {detail_span / profile_span:.4f}"
+        )
+    head = (0.0, 0.0, HEAD_CENTER_Z / 1000.0)
+    center = model_point_in_view(adapter, view, head, label="detail-A head centre")
+    position = tuple(float(value) for value in view.Position)
+    target = [position[axis] + DETAIL_CENTER[axis] - center[axis] for axis in range(2)]
+    if not view.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to move detail A onto its sheet position")
+    draw.EditRebuild3()
+    center = model_point_in_view(adapter, view, head, label="detail-A head centre")
+    if math.dist(center, DETAIL_CENTER) > DETAIL_POSITION_TOL_M:
+        raise RuntimeError(
+            f"detail-A head centre sits at {center!r}, not {DETAIL_CENTER!r}"
+        )
+    name = _activate_view(adapter, view, label="detail-A view")
+    _sketch_circle(adapter, view, center, DETAIL_CROP_RADIUS, label="detail-A crop")
+    status = int(view.Crop2(False, False, 5))
     draw.ClearSelection2(True)
     draw.EditRebuild3()
-    outline = tuple(float(value) for value in detail.GetOutline())
-    position = tuple(float(value) for value in detail.Position)
-    if len(outline) != 4 or len(position) != 2:
-        raise RuntimeError("integral-arbor head detail has invalid bounds")
-    target = [
-        position[axis]
-        + DETAIL_CENTER[axis]
-        - (outline[axis] + outline[axis + 2]) / 2.0
-        for axis in range(2)
+    view.UpdateViewDisplayGeometry()
+    cropped = bool(view.IsCropped())
+    outline = tuple(float(value) for value in view.GetOutline())
+    _telemetry.info(
+        f"pinion-arbor: detail A {name!r} {ratio[0]:g}:{ratio[1]:g}, Crop2 status "
+        f"{status}, IsCropped {cropped}, outline "
+        f"{tuple(round(value * 1000, 1) for value in outline)} mm",
+        crop_status=status,
+        cropped=cropped,
+    )
+    if status != CROP_NO_ERROR or not cropped:
+        raise RuntimeError(
+            f"detail A is not cropped: Crop2 status {status}, IsCropped {cropped}"
+        )
+    if len(outline) != 4 or outline[2] - outline[0] > 2.0 * DETAIL_CROP_RADIUS + 0.010:
+        raise RuntimeError(f"detail-A crop did not take: outline {outline!r}")
+    return view
+
+
+def _plain_text(text: str) -> str:
+    """A note's words with its line breaks and spacing folded to single spaces."""
+    return " ".join(str(text).split())
+
+
+def _note_texts(view: Any) -> list[str]:
+    return [
+        _plain_text(_early_bound(note, "INote").GetText() or "")
+        for note in (_early_bound(view, "IView").GetNotes() or ())
     ]
-    if not detail.SetViewPosition(double_array(target), False):
-        raise RuntimeError("failed to position integral-arbor head detail")
-    draw.EditRebuild3()
-    return detail
+
+
+def _note_box(note: Any, *, label: str) -> tuple[float, float, float, float]:
+    """``INote.GetExtent``'s lower-left and upper-right corners, sheet metres."""
+    values = tuple(float(value) for value in (note.GetExtent() or ()))
+    if len(values) != 6 or not all(map(math.isfinite, values)):
+        raise RuntimeError(f"{label}: invalid note extent {values!r}")
+    box = (values[0], values[1], values[3], values[4])
+    if box[0] >= box[2] or box[1] >= box[3]:
+        raise RuntimeError(f"{label}: empty note extent {values!r}")
+    return box
+
+
+def _note_centring_error(
+    box: tuple[float, float, float, float],
+    center_x: float,
+    top: float | None,
+    center_y: float | None,
+) -> tuple[float, float]:
+    """How far a note's extent sits from its target: its horizontal centre
+    against ``center_x``, and its top edge against ``top`` or else its
+    vertical centre against ``center_y``."""
+    error_x = (box[0] + box[2]) / 2.0 - center_x
+    if top is not None:
+        return error_x, box[3] - top
+    if center_y is None:
+        raise ValueError("a centred note needs a top edge or a centre height")
+    return error_x, (box[1] + box[3]) / 2.0 - center_y
+
+
+def _centred_view_note(
+    adapter: Any,
+    view: Any,
+    text: str,
+    *,
+    center_x: float,
+    top: float | None = None,
+    center_y: float | None = None,
+    label: str,
+) -> tuple[float, float, float, float]:
+    """Insert a note owned by ``view``, centred on ``center_x`` by its extent.
+
+    A note lands in the ACTIVE view (pms857-diag-9eca), so the view is
+    activated first.  The note is placed, its rendered extent read
+    (INote.GetExtent) and moved by the centring error (the purchased-part
+    caption recipe); ``top`` pins its top edge, ``center_y`` its middle.
+    Returns the final extent.
+    """
+    _activate_view(adapter, view, label=label)
+    y = top if top is not None else center_y
+    note = add_note(adapter, text, center_x, y)
+    if note is None:
+        raise RuntimeError(f"failed to add the {label} note")
+    note = _early_bound(note, "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    box = _note_box(note, label=label)
+    # A second pass absorbs an anchor that does not move one-for-one with
+    # the extent; the read-back below fails loud if neither pass landed it.
+    for _ in range(NOTE_CENTRING_PASSES):
+        error_x, error_y = _note_centring_error(box, center_x, top, center_y)
+        if max(abs(error_x), abs(error_y)) <= NOTE_CENTRING_TOL_M / 10.0:
+            break
+        position = tuple(
+            float(value) for value in _read_member(annotation, "GetPosition")
+        )
+        if not annotation.SetPosition2(
+            position[0] - error_x, position[1] - error_y, 0.0
+        ):
+            raise RuntimeError(f"failed to centre the {label} note")
+        adapter.currentModel.EditRebuild3()
+        box = _note_box(note, label=label)
+    error_x, error_y = _note_centring_error(box, center_x, top, center_y)
+    _telemetry.info(
+        f"pinion-arbor: {label} note {text!r} extent "
+        f"({box[0] * 1000:.1f}, {box[1] * 1000:.1f})-({box[2] * 1000:.1f}, "
+        f"{box[3] * 1000:.1f}) mm",
+        label=label,
+    )
+    if max(abs(error_x), abs(error_y)) > NOTE_CENTRING_TOL_M:
+        raise RuntimeError(
+            f"{label} note did not centre: off by ({error_x * 1000:.2f}, "
+            f"{error_y * 1000:.2f}) mm"
+        )
+    texts = _note_texts(view)
+    if texts.count(_plain_text(text)) != 1:
+        raise RuntimeError(
+            f"{label} note did not land in its view: its notes are {texts!r}"
+        )
+    return box
+
+
+def _label_detail(
+    adapter: Any, detail: Any, principal: Any, mark: tuple[float, float]
+) -> None:
+    """Label detail A under its crop circle and letter its mark on the profile."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
+    if not sheet.SetScale(*SHEET_SCALE, False, False):
+        raise RuntimeError(
+            "failed to pin sheet scale before placing the detail-A label"
+        )
+    box = _centred_view_note(
+        adapter,
+        detail,
+        DETAIL_LABEL_TEXT,
+        center_x=DETAIL_LABEL_XY[0],
+        top=DETAIL_LABEL_XY[1],
+        label="detail-A label",
+    )
+    if (box[2] - box[0]) / 2.0 > DETAIL_LABEL_HALF_WIDTH:
+        _telemetry.warn(
+            f"pinion-arbor: detail-A label is {(box[2] - box[0]) * 1000:.1f} mm wide, "
+            f"past the {2 * DETAIL_LABEL_HALF_WIDTH * 1000:.0f} mm its neighbours "
+            "were placed against"
+        )
+    _centred_view_note(
+        adapter,
+        principal,
+        DETAIL_LETTER,
+        center_x=mark[0] + DETAIL_LETTER_OFFSET[0],
+        center_y=mark[1] + DETAIL_LETTER_OFFSET[1],
+        label="detail-A letter",
+    )
 
 
 def _add_turning_axis(adapter: Any, view: Any) -> None:
@@ -599,26 +874,6 @@ def _assert_outline_unbroken(
     )
 
 
-def _position_detail_label(adapter: Any, detail: Any) -> None:
-    """Centre the native detail label under its own detail circle."""
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
-    if not sheet.SetScale(*SHEET_SCALE, False, False):
-        raise RuntimeError("failed to pin sheet scale before positioning detail label")
-    notes = tuple(_read_member(detail, "GetNotes") or ())
-    if len(notes) != 1:
-        raise RuntimeError(f"expected one native detail label, found {len(notes)}")
-    note = _early_bound(notes[0], "INote")
-    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
-    target = (*DETAIL_LABEL_XY, 0.0)
-    if not annotation.SetPosition2(*target):
-        raise RuntimeError("failed to position native detail label")
-    adapter.currentModel.EditRebuild3()
-    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
-    if math.dist(actual, target) > 1e-8:
-        raise RuntimeError(f"native detail label position did not persist: {actual}")
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -675,15 +930,28 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (donor, principal, iso):
         set_hidden_lines_removed(adapter, view)
 
-    detail = _head_detail(adapter, principal)
+    mark_center = _mark_detail_on_profile(adapter, principal)
+    detail = _cropped_head_view(adapter, principal)
     set_hidden_lines_removed(adapter, detail)
+    _early_bound(detail, "IView").UpdateViewDisplayGeometry()
+    # Detail A imports FIRST, feature by feature: a model dimension already on
+    # the sheet is not imported again, so the donor's whole-model import below
+    # would otherwise take NeckDia and CrossHoleDia.  A missing dimension
+    # fails here, naming what did arrive (insert_feature_dimensions logs it).
+    detail_annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="integral-arbor head detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     donor_annotations = curate_view_dimensions(
         adapter, donor, keep=DONOR_KEEP, view_label="diameter donor"
     )
     # The profile prints every reference-sketch dimension.  The part saves
     # those sketches hidden (#880), so this projected view shows them per view
     # and imports feature by feature (_drawing_hidden_sketches).  The donor and
-    # detail A dimension none of them and keep the whole-model import.
+    # detail A dimension none of them, so neither needs them shown.
     principal_annotations = curate_hidden_owner_dimensions(
         adapter,
         principal,
@@ -691,13 +959,10 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="integral-arbor profile",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    detail_annotations = curate_view_dimensions(
-        adapter, detail, keep=DETAIL_KEEP, view_label="integral-arbor head detail"
-    )
     for label, kept in (
+        ("detail", detail_annotations),
         ("donor", donor_annotations),
         ("principal", principal_annotations),
-        ("detail", detail_annotations),
     ):
         names = sorted(dimension_name(adapter, annotation) for annotation in kept)
         _telemetry.info(
@@ -706,19 +971,19 @@ async def build(adapter: Any) -> dict[str, str]:
             kept=len(kept),
             names=",".join(names),
         )
-    diameter_targets = {
-        **{name: ("principal", principal, xy) for name, xy in DIAMETER_POSITIONS.items()},
-        **{name: ("detail", detail, xy) for name, xy in DETAIL_DIAMETER_POSITIONS.items()},
-    }
+    # The donor's diameters move onto the 1:1 profile, a model view (the
+    # HeadDia move every build has made); none moves into detail A.
     moved_diameters = []
     moves = []
     for annotation in donor_annotations:
         name = dimension_name(adapter, annotation)
-        label, target, text_xy = diameter_targets[name]
+        text_xy = DIAMETER_POSITIONS[name]
         moved_diameters.append(
-            _move_dimension(adapter, annotation, target, text_xy, source_view=donor)
+            _move_dimension(adapter, annotation, principal, text_xy, source_view=donor)
         )
-        moves.append(f"{name} -> {label} ({text_xy[0] * 1000:.1f}, {text_xy[1] * 1000:.1f}) mm")
+        moves.append(
+            f"{name} -> principal ({text_xy[0] * 1000:.1f}, {text_xy[1] * 1000:.1f}) mm"
+        )
     principal_count = len(_early_bound(principal, "IView").GetAnnotations() or ())
     detail_count = len(_early_bound(detail, "IView").GetAnnotations() or ())
     _telemetry.info(
@@ -778,7 +1043,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.255)
-    _position_detail_label(adapter, detail)
+    _label_detail(adapter, detail, principal, mark_center)
     rebuild_drawing(adapter, label="pinion arbor layout audit")
     sheets = collect_document(adapter)
     _assert_no_text_on_line([f for sheet in sheets for f in audit_sheet(sheet)])
@@ -808,49 +1073,47 @@ async def build(adapter: Any) -> dict[str, str]:
         directions=directions,
     )
     _assert_witnesses_clear_of_detail_fence(
-        [
-            annotation
-            for sheet in sheets
-            for annotation in sheet.annotations
-            if annotation.owner == view_name(adapter, principal)
-            and annotation.kind == "dim"
-        ],
+        _view_dimensions(sheets, view_name(adapter, principal)),
         center=fence_center,
         radius=DETAIL_RADIUS_MM / 1000.0,
         arrows=arrows,
         axis=_unit(far_on_axis[0] - fence_center[0], far_on_axis[1] - fence_center[1]),
     )
-    # The diameters moved INTO detail A answer to its own circle: their
-    # witnesses stay on the part inside it, only the dimension line leaves
-    # for the text.  The detail's other callouts are leaders and axial
-    # stations that leave it by design, so they are not judged here.
+    # Every dimension in detail A answers to its crop circle with the same
+    # classifier: a witness stays on the part inside the circle unless it is
+    # a station witness (HeadLen, the (3.0) crown height, measured along the
+    # axis), and only a dimension line may leave for its text.  NeckDia,
+    # measured across the axis, must keep both witnesses inside.
     detail_name = view_name(adapter, detail)
-    detail_diameters = [
-        annotation
-        for sheet in sheets
-        for annotation in sheet.annotations
-        if annotation.owner == detail_name
-        and annotation.kind == "dim"
-        and annotation.label in DETAIL_DIAMETER_POSITIONS
-    ]
-    for annotation in detail_diameters:
+    detail_dimensions = _view_dimensions(sheets, detail_name)
+    detail_arrows = _dimension_arrows(adapter, detail)
+    for annotation in detail_dimensions:
         boxes = " ".join(box.format_mm() for box in annotation.text_boxes) or "(no text)"
         runs = " ".join(segment.format_mm() for segment in annotation.segments)
+        arrow = detail_arrows.get(annotation.label)
+        tip = (
+            "no readable arrowhead"
+            if arrow is None
+            else f"arrow tip ({arrow[0][0] * 1000:.1f}, {arrow[0][1] * 1000:.1f}) mm "
+            f"dir ({arrow[1][0]:.3f}, {arrow[1][1]:.3f})"
+        )
         _telemetry.info(
-            f"pinion-arbor: detail-A {annotation.label} text {boxes}; runs {runs}",
+            f"pinion-arbor: detail-A {annotation.label} text {boxes}; runs {runs}; {tip}",
             label=annotation.label,
         )
-    if len(detail_diameters) != len(DETAIL_DIAMETER_POSITIONS):
+    audited = sorted(annotation.label for annotation in detail_dimensions)
+    if audited != sorted(DETAIL_KEEP):
         raise RuntimeError(
-            f"pinion-arbor: detail A carries {len(detail_diameters)} of its "
-            f"{len(DETAIL_DIAMETER_POSITIONS)} moved diameters in the layout audit"
+            f"pinion-arbor: the layout audit reads detail A's dimensions as "
+            f"{audited}, expected {sorted(DETAIL_KEEP)}"
         )
+    detail_axis, _span = _axis_on_sheet(adapter, detail, label="detail-A audit axis")
     _assert_witnesses_clear_of_detail_fence(
-        detail_diameters,
+        detail_dimensions,
         center=DETAIL_CENTER,
-        radius=DETAIL_RATIO * DETAIL_RADIUS_MM / 1000.0,
-        arrows=_dimension_arrows(adapter, detail),
-        axis=_unit(far_on_axis[0] - fence_center[0], far_on_axis[1] - fence_center[1]),
+        radius=DETAIL_CROP_RADIUS,
+        arrows=detail_arrows,
+        axis=detail_axis,
     )
 
     sheet = _early_bound(
@@ -1059,6 +1322,16 @@ def _assert_witnesses_clear_of_detail_fence(
             "fence:\n  " + "\n  ".join(offenders)
         )
     _telemetry.success("pinion-arbor: no extension line crosses the detail-A fence")
+
+
+def _view_dimensions(sheets: list[Any], owner: str) -> list[Any]:
+    """The layout audit's dimensions owned by the view named ``owner``."""
+    return [
+        annotation
+        for sheet in sheets
+        for annotation in sheet.annotations
+        if annotation.owner == owner and annotation.kind == "dim"
+    ]
 
 
 def _segment_distance(
