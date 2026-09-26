@@ -1051,8 +1051,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # #906 (USER RULING 2026-09-26): the crank bore's angularity to the cone
     # journal, model PMI (cone_pivot_post_spec.PART_DATUMS /
     # GEOMETRIC_CONTROLS) projected here.  Datum A tags the journal bore in
-    # View B, the only view that shows it true; the frame hangs off the crank
-    # bore rim in the elevation, right of the body and below the bore callout.
+    # View B, the only view that shows it true; datum B tags the foot seat
+    # edge-on in the elevation, left of the body and clear of the foot-seat
+    # finish on the right; the frame hangs off the crank bore rim in the
+    # elevation, right of the body and below the bore callout.
     project_part_pmi(
         adapter,
         placements={
@@ -1060,6 +1062,13 @@ async def build(adapter: Any) -> dict[str, str]:
                 view=journal,
                 position=(0.250, 0.128),
                 edge_entity=_bore_rim_edge(journal, diameter_mm=BORE_DIA),
+            ),
+            "datum:B": PmiDrawingPlacement(
+                view=front,
+                position=(_front_x(-16.0), _front_y(-9.0)),
+                edge_entity=_circular_edge(
+                    front, radius_mm=BLOCK_DIA / 2.0, center_y_mm=0.0
+                ),
             ),
             "crank_bore_angularity": PmiDrawingPlacement(
                 view=front,

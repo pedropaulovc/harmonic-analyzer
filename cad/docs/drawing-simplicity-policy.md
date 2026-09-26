@@ -83,7 +83,8 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
      (rocker arm, channel lever, amplitude bar, connecting rod) where a
      coordinate ± would let the 20 channels scatter;
    - **crank mesh** — MHA-016's crank bore: one diametral angularity frame to
-     the cone-journal bore (datum A), with the plan angle basic. The 16T:64T
+     the cone-journal bore (datum A), clocked by the foot seat (datum B) so the
+     zone holds tilt as well as yaw, with the plan angle basic. The 16T:64T
      crossed mesh loses backlash to yaw and tilt of the crank axis (#906 pose
      study, `dt-logs/crankhub/crank-mesh-angle-20260926.jsonl`; user ruling
      2026-09-26). #906 R1 adds MHA-149's bore: one diametral parallelism frame

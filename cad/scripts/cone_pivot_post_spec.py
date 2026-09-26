@@ -315,12 +315,16 @@ DRAWING_NOTES = "\n".join(
 # direction in two planes at once.  A diametral zone of CRANK_BORE_ANGULARITY_MM
 # over the boss holds both to about 0.08 deg; the basic angle is the plan
 # angle the print already carries.  The running fits stay size limits.
+# Datum A alone leaves the zone free to turn about the journal axis, which
+# bounds the plan angle but not tilt; the foot seat as secondary datum B
+# clocks it, so the same zone holds tilt too.
 CRANK_BORE_ANGULARITY_MM = 0.10
 CRANK_BORE_ANGLE_LIMIT_DEG = math.degrees(
     math.atan(CRANK_BORE_ANGULARITY_MM / CRANK_BOSS_LENGTH)
 )
 PART_DATUMS = (
     PartDatum("A", CylinderFace(BORE_DIA, contains_y_mm=BORE_HEIGHT)),
+    PartDatum("B", PlanarFace((0, -1, 0), 0.0)),
 )
 GEOMETRIC_CONTROLS = (
     GeometricControl(
@@ -328,7 +332,7 @@ GEOMETRIC_CONTROLS = (
         "angularity",
         f"{CRANK_BORE_ANGULARITY_MM:.2f}",
         CylinderFace(CRANK_BORE_DIA, contains_y_mm=CRANK_BORE_HEIGHT),
-        datums=("A",),
+        datums=("A", "B"),
         tolerance_zone="diametral",
     ),
 )

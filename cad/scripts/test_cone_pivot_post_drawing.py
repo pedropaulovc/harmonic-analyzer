@@ -264,19 +264,23 @@ def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
     """#906 (USER RULING 2026-09-26, option ii): rule 3's crank-mesh entry.
 
     One diametral angularity frame on the crank bore to datum A, the cone
-    journal bore; its value is the spec constant, never sheet text, and it
-    bounds yaw and tilt to about 0.08 deg over the boss.
+    journal bore, clocked by datum B, the foot seat; its value is the spec
+    constant, never sheet text, and it bounds yaw and tilt to about 0.08 deg
+    over the boss.  A alone would leave tilt free.
     """
-    from _gtol_spec import CylinderFace
+    from _gtol_spec import CylinderFace, PlanarFace
 
     assert spec.GEOMETRIC_TOLERANCES_MM == {}
-    (datum,) = spec.PART_DATUMS
-    assert datum.letter == "A"
-    assert datum.face == CylinderFace(spec.BORE_DIA, contains_y_mm=spec.BORE_HEIGHT)
+    journal, foot = spec.PART_DATUMS
+    assert journal.letter == "A"
+    assert journal.face == CylinderFace(spec.BORE_DIA, contains_y_mm=spec.BORE_HEIGHT)
+    assert foot.letter == "B"
+    assert foot.face == PlanarFace((0, -1, 0), 0.0)
+    assert foot.face == spec.SURFACE_FINISHES[0].face
     (frame,) = spec.GEOMETRIC_CONTROLS
     assert frame.characteristic == "angularity"
     assert frame.tolerance_zone == "diametral"
-    assert frame.datums == ("A",)
+    assert frame.datums == ("A", "B")
     assert frame.tolerance == f"{spec.CRANK_BORE_ANGULARITY_MM:.2f}" == "0.10"
     assert frame.face == CylinderFace(
         spec.CRANK_BORE_DIA, contains_y_mm=spec.CRANK_BORE_HEIGHT
