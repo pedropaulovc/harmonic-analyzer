@@ -31,6 +31,7 @@ from _common import (
     add_line_chain,
     anchor_point_to_origin,
     apply_color,
+    apply_custom_properties,
     apply_material,
     check,
     drive_dimension,
@@ -63,7 +64,8 @@ from diagnostics.diag_mcmaster_lib import (
 )
 
 PART_NAME = "arbor-set-screw"
-MATERIAL = fastener(PART_NAME).material  # alloy steel, black oxide
+STOCK = fastener(PART_NAME)
+MATERIAL = STOCK.material  # alloy steel, black oxide
 
 MAJOR_R = MAJOR_DIA / 2.0
 CUP_R = CUP_DIA / 2.0
@@ -252,6 +254,15 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
+    # The purchased reference sheet reads these (build_stock_fastener's set).
+    apply_custom_properties(
+        adapter,
+        {
+            "Stock Name": STOCK.stock_name,
+            "Supplier": STOCK.supplier,
+            "Supplier SKUs": ", ".join(STOCK.skus),
+        },
+    )
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

@@ -110,3 +110,36 @@ def test_arbor_set_screw_is_the_verified_black_oxide_cup_point() -> None:
     assert "91375A106" in row["material_specification"]
     for value in row.values():
         assert "TO VERIFY" not in str(value).upper()
+
+
+def test_every_catalog_fastener_has_a_reference_sheet() -> None:
+    """Main on #743: every catalogue fastener ships a purchased reference
+    sheet, MHA-147 included, and a plain set screw's sheet is the shared
+    purchased-fastener builder's."""
+    from pathlib import Path
+
+    from _drawing_registry import DRAWINGS
+
+    sheets = {spec.artifact_stem: spec for spec in DRAWINGS}
+    assert set(FASTENERS) <= set(sheets)
+    spec = sheets["arbor-set-screw"]
+    assert (spec.name, spec.part) == ("arbor_set_screw", "arbor_set_screw")
+    script = Path(__file__).resolve().parent / spec.script_name
+    assert "build_purchased_fastener_drawing" in script.read_text(encoding="utf-8")
+
+
+def test_every_catalog_fastener_stamps_its_supplier_identity() -> None:
+    """build_purchased_fastener_drawing refuses a source part without the
+    Stock Name / Supplier / Supplier SKUs properties; a builder that does not
+    go through build_stock_fastener must stamp them itself."""
+    from pathlib import Path
+
+    scripts = Path(__file__).resolve().parent
+    for stem in FASTENERS:
+        source = (scripts / f"build_{stem.replace('-', '_')}.py").read_text(
+            encoding="utf-8"
+        )
+        if "build_stock_fastener" in source:
+            continue
+        for name in ('"Stock Name"', '"Supplier"', '"Supplier SKUs"'):
+            assert name in source, (stem, name)

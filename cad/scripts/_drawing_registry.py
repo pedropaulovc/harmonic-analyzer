@@ -749,6 +749,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="arbor_set_screw",
+        part="arbor_set_screw",
+        artifact_stem="arbor-set-screw",
+        script_name="draw_arbor_set_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pen_set_screw",
         part="pen_set_screw",
         artifact_stem="pen-set-screw",
