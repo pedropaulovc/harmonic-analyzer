@@ -1005,9 +1005,9 @@ def test_collar_pin_hole_is_a_drilled_spring_pin_hole_clear_of_the_front_land() 
     assert pin_hole.PIN_HOLE_DIA == strap_pin.HOLE_DIA == pytest.approx(25.4 / 16.0)
     assert pin_hole.PIN_HOLE_DIA_BAND == strap_pin.HOLE_BAND == (0.06, 0.0)
     assert pin_hole.PIN_HOLE_CALLOUT == strap_pin.DRILL_THRU_CALLOUT
-    assert spec.PIN_STATION_FROM_HEAD_REAR == 39.0
+    assert spec.PIN_STATION_FROM_HEAD_REAR == 38.0
     assert spec.PIN_STATION_BAND == spec.LINEAR_X_BAND
-    assert spec.PIN_Z == pytest.approx(spec.HEAD_REAR_Z + 39.0)
+    assert spec.PIN_Z == pytest.approx(spec.HEAD_REAR_Z + 38.0)
     assert pin_hole.PIN_HOLE_LAND_CLEARANCE >= 2.0
     assert pin_hole.PIN_HOLE_NECK_CLEARANCE >= 2.0
     assert pin_hole.PIN_HOLE_LIGAMENT_WORST == pytest.approx(3.126, abs=1e-3)
