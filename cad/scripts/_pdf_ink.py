@@ -114,8 +114,10 @@ def _text_runs(page: "pdfium.PdfPage") -> tuple[list[Glyph], list[Span]]:
     return glyphs, spans
 
 
-# Pieces per cubic Bezier: a quarter circle of 30 mm radius strays 0.01 mm.
-BEZIER_PIECES = 8
+# Pieces per cubic Bezier: a chord of a quarter circle of 30 mm radius
+# strays under 0.01 mm from the curve (r * (1 - cos(pi / 4 / pieces))).
+# Eight strayed 0.14 mm, past the audit's 0.1 mm tolerances (Codex, #902).
+BEZIER_PIECES = 32
 
 
 def bezier_points(

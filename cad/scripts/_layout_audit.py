@@ -215,6 +215,12 @@ _HIDDEN_STATES = (2, 3)
 _OWNER_DRAWING_SHEET = 1
 
 
+def is_hidden(annotation: Mapping[str, Any]) -> bool:
+    """A dumped annotation the sheet does not draw (swAnnotationHidden or
+    half-hidden), which the audit leaves out."""
+    return int(annotation.get("visible", 1) or 1) in _HIDDEN_STATES
+
+
 # --------------------------------------------------------------------------
 # display-data primitives -> segments
 # --------------------------------------------------------------------------
