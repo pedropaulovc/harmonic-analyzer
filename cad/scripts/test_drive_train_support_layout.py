@@ -876,7 +876,8 @@ def test_mha145_strap_pins_sit_in_both_strap_cross_holes() -> None:
     from pinion_pivot_shaft_spec import PIN_HOLE_Z
 
     source = inspect.getsource(drive)
-    assert source.count('"pinion-strap-pin"') == 1
+    # The strap-pin loop and R1a's collar pin (MHA-144's cross pin).
+    assert source.count('"pinion-strap-pin"') == 2
     assert 'zip(("front", "back"), STRAP_PIN_Z, strict=True)' in source
     assert 'named_ref(f"Front Plane@{strap_pins[tag]}", "PLANE")' in source
     assert 'label=f"strap pin {tag} locked to its strap"' in source
@@ -933,8 +934,9 @@ def test_mha145_is_mcmaster_98296a027_and_a_purchased_bom_line() -> None:
     row = _config.parts("pinion-strap-pin")
     assert row["number"] == "MHA-145"
     # The BOM line counts the pins the drive train places (Codex #858): one
-    # per strap cross hole.
-    assert int(row["quantity"]) == len(drive.STRAP_PIN_Z) == 2
+    # per strap cross hole, plus the R1a arbor-collar pin at COLLAR_PIN_Z.
+    assert isinstance(drive.COLLAR_PIN_Z, float)
+    assert int(row["quantity"]) == len(drive.STRAP_PIN_Z) + 1 == 3
     assert row["process"] == "purchased"
     assert tuple(row["supplier_skus"]) == ("98296A027",)
     assert row["stock_name"] == part.SPEC.stock_name
