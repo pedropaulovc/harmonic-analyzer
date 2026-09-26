@@ -817,6 +817,22 @@ def test_tip_view_label_is_owned_by_the_tip_view(monkeypatch) -> None:
     ) in seat.log
 
 
+def test_tip_view_label_tolerates_another_note_on_the_view(monkeypatch) -> None:
+    """Whether the template gives a model view a native label of its own is
+    unread on the seat, so only OUR label is counted, never the total."""
+    seat, tip, _front, _placed = _tip_seat(monkeypatch)
+    seat.notes.append(_Note("DRAWING VIEW3", "Drawing View3"))
+    drawing.label_tip_view(seat, tip)
+    texts = [n.text for n in seat.notes if n.owner == "Drawing View3"]
+    assert texts.count("DETAIL A  SCALE 10:1") == 1
+
+
+def test_tip_view_reposition_tolerance_matches_the_notch_detail() -> None:
+    """The move is checked to 0.1 mm on the sheet (draw_cylinder_gear's notch
+    detail tolerance), not a micron the diag never proved."""
+    assert drawing.TIP_VIEW_POSITION_TOLERANCE_M == 1e-4
+
+
 def test_tip_view_label_raises_when_it_lands_elsewhere(monkeypatch) -> None:
     seat, tip, _front, _placed = _tip_seat(monkeypatch)
     monkeypatch.setattr(seat, "ActivateView", lambda name: True)  # stays inactive

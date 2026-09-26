@@ -131,6 +131,9 @@ TIP_VIEW_LABEL = (
     f"DETAIL {TIP_LETTER}  SCALE {DETAIL_SCALE[0]:g}:{DETAIL_SCALE[1]:g}"
 )
 _CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
+# The tip reference must land within 0.1 mm of DETAIL_CENTER after the move:
+# draw_cylinder_gear's notch-detail outline-centre tolerance.
+TIP_VIEW_POSITION_TOLERANCE_M = 1e-4
 
 
 def _detail_point(x_mm: float, y_mm: float) -> tuple[float, float]:
@@ -248,7 +251,7 @@ def cropped_tip_view(adapter: Any) -> Any:
         raise RuntimeError("cannot move the tip view onto its sheet position")
     draw.EditRebuild3()
     center = model_point_in_view(adapter, view, reference, label="tip view reference")
-    if math.dist(center, DETAIL_CENTER) > 1e-6:
+    if math.dist(center, DETAIL_CENTER) > TIP_VIEW_POSITION_TOLERANCE_M:
         raise RuntimeError(
             f"tip view reference sits at {center!r}, not {DETAIL_CENTER!r}"
         )
@@ -290,13 +293,16 @@ def label_tip_view(adapter: Any, view: Any) -> None:
     and auxiliary views carry one; swDetailingOrthoViewLabelsEnableShow is
     documented "Not used"), so the label is a note inserted while the tip
     view is ACTIVE: the view owns it (IView.GetNotes) and it moves with the
-    view.  Read back: the tip view carries exactly that one note.
+    view.  Read back: the tip view carries that label exactly once.  Other
+    notes on the view are logged, not refused: whether the template shows a
+    native label on a model view has not been read on a seat.
     """
     _activate(adapter, view, label="tip view")
     if add_note(adapter, TIP_VIEW_LABEL, *TIP_DETAIL.detail_label_xy) is None:
         raise RuntimeError("failed to add the tip view label")
     texts = _note_texts(view)
-    if texts != [TIP_VIEW_LABEL]:
+    _telemetry.info(f"tip view notes after its label: {texts!r}")
+    if texts.count(TIP_VIEW_LABEL) != 1:
         raise RuntimeError(
             f"tip view label did not land in the tip view: its notes are {texts!r}"
         )
