@@ -896,6 +896,32 @@ def blank_sketch(adapter: Any, sketch_name: str) -> None:
     _telemetry.success(f"blanked sketch {sketch_name}")
 
 
+@_telemetry.traced("appearance.hide_reference_sketches")
+def blank_reference_sketches(adapter: Any, sketches: tuple[str, ...]) -> None:
+    """Blank a part's reference sketches before it is saved, and prove it.
+
+    A dimension-carrying reference sketch stays in the part for the drawing to
+    import (``_drawing_hidden_sketches`` shows it per view), but saved shown it
+    prints grey dots and lines in every assembly render (#880).  Each sketch is
+    read back through ``IPartDoc.FeatureByName`` and must be hidden, so a
+    BlankSketch that silently did nothing fails the build.
+    """
+    part_doc = _early_bound(adapter.currentModel, "IPartDoc")
+    for sketch in sketches:
+        blank_sketch(adapter, sketch)
+        feature = _early_bound(part_doc.FeatureByName(sketch), "IFeature")
+        state = int(feature.Visible)
+        if state != 1:  # swVisibilityState_e: swVisibilityStateHide
+            raise RuntimeError(
+                f"{sketch} still visible after BlankSketch (state {state})"
+            )
+    _telemetry.event(
+        "part.reference_sketches_hidden",
+        sketches=", ".join(sketches),
+        count=len(sketches),
+    )
+
+
 def set_sketch_direct_db(adapter: Any, enabled: bool) -> None:
     """Toggle ``SketchManager.AddToDB`` around non-axis-parallel geometry.
 
