@@ -15,10 +15,10 @@ illegible and its printed +0/-0.1 band read as allowing no break at all, so
 the Front view carries no break dimension.  A 10:1 detail of the tip carries
 it instead as the single limit "0.1 MAX" (the model's CutEndBreak at
 swTolMAX, generated from the spec band).  CutEndBreak is a driving
-dimension of the deburr cutter's profile (the boss hook's detail pattern);
-a part-hidden reference sketch shown via ``part_sketches_shown`` delivered
-nothing to this detail (pms857-f543 -- see post_mount_screw_spec).  The
-only note says to deburr the cut end and that the
+dimension of the deburr cutter's profile, and the detail takes it through
+the ENTIRE-MODEL import plus the curate sweep -- the boss hook, spring hook
+and cylinder gear detail form (see ``_curate_tip_detail``).  The only
+note says to deburr the cut end and that the
 undimensioned purchased geometry is reference.  No installation sequence, engagement figure or rule
 number is printed: the sequence is an MHA-A03 assembly step and the
 engagement a model assert (Main's eye pass of warm-c486, policy rule 6).
@@ -38,6 +38,7 @@ import _drawing_hidden_sketches as hidden_sketches
 import _stock_trim_drawing as trim_drawing
 import _telemetry
 from _common import _early_bound, check, run_build
+import _drawing_common
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -61,7 +62,6 @@ from post_mount_screw_spec import (
     CUT_LENGTH_DIMENSION,
     CUT_LENGTH_MM,
     CUT_TO_FIT_CALLOUT,
-    DETAIL_VIEW_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FRONT_VIEW_DIMENSIONS,
     HEAD_H_MM,
@@ -146,6 +146,24 @@ STOCK_ROWS = (
     ("Supplier SKUs", 0.080, 0.060),
     ("Stock Name", 0.016, 0.049),
 )
+
+
+def _curate_tip_detail(adapter: Any, detail: Any) -> list[Any]:
+    """Import the break into the tip detail: entire-model import (source 0)
+    plus the curate sweep, NOT the targeted selected-feature import.
+
+    Targeted (source 1) import into a detail view: dead under {hidden ref
+    sketch, consumed cutter profile}, 10:1 HLR, source 1 -- pms857-f543
+    (f54309af5, owner CutEndBreakReference) and pms857-56f7 (56f732997,
+    owner CutEndDeburrProfile) both raised "tip detail break view is missing
+    model dimensions: ['CutEndBreak']", and neither leaf logged a "targeted
+    model-item import Detail View A" line: InsertModelAnnotations3 returned
+    nothing into the detail.  Source 0 works: the boss hook, spring hook and
+    cylinder gear details import their cutter-sketch dimensions this way.
+    """
+    return _drawing_common.curate_view_dimensions(
+        adapter, detail, keep=DETAIL_KEEP, view_label="tip detail break"
+    )
 
 
 def _view_dimension_names(adapter: Any, view: Any) -> list[str]:
@@ -297,20 +315,13 @@ async def build(adapter: Any) -> dict[str, str]:
     _reference_cut_length(adapter, annotations)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
 
-    # The break is the deburr cutter's own dimension: a consumed profile
-    # imports into a detail (the boss hook's ChamferWidth), where the
-    # part-hidden reference sketch did not (pms857-f543).
+    # The break is the deburr cutter's own dimension, imported into the
+    # detail by the entire-model form (see _curate_tip_detail).
     with _telemetry.span("drawing.tip_detail", scale=f"{DETAIL_SCALE[0]:g}:1"):
         detail = trim_drawing.end_detail(adapter, front, TIP_DETAIL)
         set_hidden_lines_removed(adapter, detail)
         _early_bound(detail, "IView").UpdateViewDisplayGeometry()
-        detail_annotations = hidden_sketches.curate_view_dimensions(
-            adapter,
-            detail,
-            keep=DETAIL_KEEP,
-            view_label="tip detail break",
-            dimensions_by_feature=DETAIL_VIEW_DIMENSIONS,
-        )
+        detail_annotations = _curate_tip_detail(adapter, detail)
         assert_imported_precision(adapter, detail_annotations, DETAIL_PRECISION)
         _verify_tip_detail(adapter, front, detail)
 

@@ -455,7 +455,8 @@ def test_front_view_carries_no_break_dimension() -> None:
     assert set(drawing.DETAIL_KEEP) == {"CutEndBreak"}
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "dimensions_by_feature=FRONT_VIEW_DIMENSIONS" in source
-    assert "dimensions_by_feature=DETAIL_VIEW_DIMENSIONS" in source
+    # The detail's import is the entire-model form, never the targeted one.
+    assert "dimensions_by_feature=DETAIL_VIEW_DIMENSIONS" not in source
     assert "BREAK_CONTROLS" not in source and "offset_dimension_text" not in source
 
 
@@ -482,7 +483,8 @@ def test_tip_detail_prints_the_band_max_as_a_single_limit() -> None:
     block = source.split('_telemetry.span("drawing.tip_detail"', 1)[1]
     block = block.split("assert_imported_precision(adapter, detail_annotations", 1)[0]
     assert "trim_drawing.end_detail(adapter, front, TIP_DETAIL)" in block
-    assert "hidden_sketches.curate_view_dimensions(" in block
+    assert "_curate_tip_detail(adapter, detail)" in block
+    assert "hidden_sketches.curate_view_dimensions(" not in block
 
 
 def test_tip_detail_geometry_keeps_the_break_inside_its_crop() -> None:
@@ -550,3 +552,73 @@ def test_break_is_owned_by_the_deburr_cutter_not_a_hidden_reference_sketch() -> 
     # radius, and that split point is the one anchored to the origin.
     assert "(radius - CUT_END_BREAK_MM, end),\n                (radius, end)," in cutter
     assert 'f"{lines[1]}.start", radius, end, DEBURR_PROFILE' in cutter
+
+
+class _FakeDetailView:
+    """A derived view as the two MHA-142 leaves saw it: it has a base view."""
+
+    def GetBaseView(self):
+        return object()
+
+
+def _fake_detail_seat(monkeypatch):
+    """Model pms857-f543/56f7: into the detail, the targeted selected-feature
+    import (source 1) returns nothing; the entire-model import (source 0)
+    returns the marked CutEndBreak."""
+    import _drawing_common as dc
+    import _drawing_hidden_sketches as hs
+
+    break_annotation = object()
+    calls: list[str] = []
+
+    def targeted(adapter, view, features):
+        calls.append(f"source1:{list(features)}")
+        return []
+
+    def entire(adapter, view):
+        calls.append("source0")
+        return [break_annotation]
+
+    monkeypatch.setattr(dc, "insert_feature_dimensions", targeted)
+    monkeypatch.setattr(dc, "insert_marked_dimensions", entire)
+    monkeypatch.setattr(dc, "delete_unnamed_imports", lambda adapter, items: list(items))
+    monkeypatch.setattr(
+        dc,
+        "dimension_name",
+        lambda adapter, item: "CutEndBreak" if item is break_annotation else "",
+    )
+    monkeypatch.setattr(
+        dc,
+        "curate_dimensions",
+        lambda adapter, items, delete=(), reposition=None: list(items),
+    )
+    monkeypatch.setattr(hs, "_show_hidden_owners", lambda *a, **k: [])
+    monkeypatch.setattr(hs, "_warn_undetected_owners", lambda *a, **k: [])
+    return break_annotation, calls
+
+
+def test_targeted_import_into_the_tip_detail_raises_as_on_the_seat(monkeypatch) -> None:
+    """The observed failure shape, pinned: the targeted form the two leaves
+    ran returns nothing into the detail and raises "missing model
+    dimensions"."""
+    import _drawing_hidden_sketches as hs
+
+    _, calls = _fake_detail_seat(monkeypatch)
+    with pytest.raises(RuntimeError, match="missing model dimensions: \\['CutEndBreak'\\]"):
+        hs.curate_view_dimensions(
+            object(),
+            _FakeDetailView(),
+            keep=drawing.DETAIL_KEEP,
+            view_label="tip detail break",
+            dimensions_by_feature=spec.DETAIL_VIEW_DIMENSIONS,
+        )
+    assert calls == ["source1:['CutEndDeburrProfile']"]
+
+
+def test_tip_detail_takes_the_break_through_the_entire_model_import(monkeypatch) -> None:
+    """Option A (Main): only the import source changes -- the tip detail uses
+    the boss hook's entire-model form, and so receives the break."""
+    break_annotation, calls = _fake_detail_seat(monkeypatch)
+    curated = drawing._curate_tip_detail(object(), _FakeDetailView())
+    assert curated == [break_annotation]
+    assert calls == ["source0"]
