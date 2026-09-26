@@ -79,9 +79,25 @@ PIVOT_MID_Y = ARM_DEPTH / 2.0  # 8.0
 # ch17 p.40): every arm carries its own round boss on both faces at the
 # pivot; neighbouring hubs touch face to face and SET the 7.0565 station
 # pitch -- there are no loose spacer bushings (the 19 `pivot-bushing` parts
-# are retired). OD kept at the old bushing's O10: at d = 0 the amplitude
-# bar's foot cheeks pass 5.63 above the shaft axis, so OD < ~11.25.
-HUB_DIA = 10.0
+# are retired).
+#
+# The OD's floor is the hub wall: drawing-simplicity policy rule 12's 1.5
+# over the reamed bore at its largest, with the OD at the bottom of the
+# title block's .XX band (machinist review, MHA-071 round 1: O10.00 left
+# 1.48). The MHA-148 thrust washer's own floor is higher, so the two share
+# one O10.20 (rocker_thrust_washer_spec). The ceiling is the amplitude bar's
+# foot cheeks, which pass over the hub at d = 0 (channel_kinematics
+# ``bar_bottom``); test_rocker_bank_layout pins the slack.
+PIVOT_HOLE_BAND = (0.03, 0.0)  # (upper, lower): reamed, note 6
+RULE12_WALL_FLOOR = 1.5  # drawing-simplicity policy rule 12
+LINEAR_2PL = 0.508  # title-block .XX band (pinned to _config by the tests)
+_HUB_FLOOR = PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0] + 2.0 * RULE12_WALL_FLOOR + LINEAR_2PL
+HUB_DIA_MIN = math.ceil(round(_HUB_FLOOR * 100.0, 9)) / 100.0  # 10.04
+HUB_DIA = 10.2
+if HUB_DIA < HUB_DIA_MIN:
+    raise AssertionError(
+        f"hub O{HUB_DIA:.2f} is under its rule-12 wall floor O{HUB_DIA_MIN:.2f}"
+    )
 HUB_LENGTH = 7.0565  # == machine channels.station_pitch_mm (asserted by the build)
 # (upper, lower) on the printed hub length (#743 PR2): a hub may only come out
 # long, and the 20-arm stack's acceptance (rocker_bank_layout.STACK_L20_ACCEPT)

@@ -60,13 +60,8 @@ from _drawing_marks import (
 )
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
-from amplitude_bar_spec import (
-    DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
-    END_VIEW_NOTE,
-    ISOMETRIC_VIEW_NOTE,
-    TOP_PIN_HOLE_SPEC,
-)
+from amplitude_bar_notes import DRAWING_NOTES, END_VIEW_NOTE, ISOMETRIC_VIEW_NOTE
+from amplitude_bar_spec import DRAWING_DIMENSIONS, TOP_PIN_HOLE_SPEC
 
 import _telemetry
 

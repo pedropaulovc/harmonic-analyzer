@@ -225,15 +225,15 @@ def test_relief_keeps_the_thrust_faces_whole_annulus() -> None:
     face. Its flat starts where the grooving corner ends; at the groove's
     high limit that is still inside the hub's and the ear's bores, so each
     seats on the same annulus a plain shoulder gives -- its own bore edge to
-    the O10 -- the annulus MHA-148 gives hub 0 at the other end."""
+    the shoulder's O10 -- as MHA-148 seats hub 0 at the other end."""
     import rocker_thrust_washer_spec as washer
 
     flat_start = spec.RELIEF_DIA + spec.LINEAR_3PL + 2.0 * spec.CORNER_RADIUS_MAX
     mating_bores = (rocker_arm_spec.PIVOT_HOLE_DIA, pivot_bracket_spec.BORE_DIA)
     assert flat_start <= min(mating_bores)
-    # The shoulder face is as wide as the washer's (both the hub's O10), and
-    # the hub seats inside it from its own bore out, as on the washer.
-    assert spec.SHOULDER_DIA == washer.OD == rocker_arm_spec.HUB_DIA
+    # The O10 shoulder sits inside the O10.20 hub face, so hub 19 bears on
+    # the shoulder's whole face; the washer gives hub 0 its own bore out.
+    assert spec.SHOULDER_DIA <= rocker_arm_spec.HUB_DIA == washer.OD
     assert washer.BORE_DIA >= rocker_arm_spec.PIVOT_HOLE_DIA
 
 

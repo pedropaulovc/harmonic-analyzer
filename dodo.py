@@ -2922,6 +2922,12 @@ def task_check():
         # ... and #937: the cylinder-bank layout bands and MHA-147's set screw.
         SCRIPTS_DIR / "test_arbor_set_screw.py",
         SCRIPTS_DIR / "test_cylinder_bank_layout.py",
+        # ... and #936: the rocker-bank stack, the support's bracket seats, the
+        # channel's cross-bank axial budget and the hole-callout process line.
+        SCRIPTS_DIR / "test_channel_axial_budget.py",
+        SCRIPTS_DIR / "test_hole_callout_prefix.py",
+        SCRIPTS_DIR / "test_rocker_bank_layout.py",
+        SCRIPTS_DIR / "test_rocker_bracket_seat_layout.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.

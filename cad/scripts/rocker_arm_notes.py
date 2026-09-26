@@ -20,7 +20,21 @@ from rocker_arm_spec import (
     TIP_FACE,
     TOP_ARC_LEN,
     HUB_DIA,
+    PIVOT_HOLE_BAND,
 )
+
+# The amplitude bar's foot rides the top edge, and at d = 0 its cheeks pass
+# over this arm's hub, so the print controls the edge's height over the pivot
+# axis directly, on the mirror axis, one-sided: the edge may only come out
+# high (user ruling 2026-09-26). The 808.00 centre distance is then REF, and
+# the R800 governs only the curvature. With the amplitude bar's one-sided
+# notch (amplitude_bar_notes.BOTTOM_NOTCH_DEPTH_BAND) a bar can rest at most
+# 1.0 higher than nominal: a steady lever tilt of ~0.45 deg on that channel.
+# Its fundamental moves at most 0.0036 mm (0.04 % of the d = 88 term) across
+# the stations: error_budget.hook_displacement with the edge 0.5 high and the
+# notch 0.5 shallow (test_rocker_bank_layout pins both numbers).
+TOP_EDGE_ABOVE_PIVOT = CENTER_Y - PIVOT_MID_Y - R_TOP  # 8.0
+TOP_EDGE_BAND = (0.50, 0.0)  # (upper, lower)
 
 # True free-text instructions only; geometry / datum structure / roughness live
 # in native dimensions / datum tags / FCFs / surface symbols.  Hole sizes ride
@@ -46,13 +60,16 @@ DRAWING_NOTES = "\n".join(
         "   THE THICKNESS.",
         f"3. TOP EDGE R{R_TOP:.2f}, BOTTOM EDGE R{R_BOTTOM:.2f},",
         "   CONCENTRIC; COMMON CENTRE ON THE",
-        f"   MIRROR AXIS, {CENTER_Y - PIVOT_MID_Y:.2f} FROM THE PIVOT",
+        f"   MIRROR AXIS, {CENTER_Y - PIVOT_MID_Y:.2f} REF FROM THE PIVOT",
         f"   AXIS (STRAP DEPTH {ARM_DEPTH:.2f} REF).",
+        # One-sided: the lower deviation is zero (rocker_arm_spec, tested).
+        f"   TOP EDGE {TOP_EDGE_ABOVE_PIVOT:.2f} +{TOP_EDGE_BAND[0]:.2f}/0 ABOVE THE PIVOT",
+        "   AXIS, ON THE MIRROR AXIS.",
         f"4. ARC LENGTHS {TOP_ARC_LEN:.2f} TOP / {BOT_ARC_LEN:.2f} BOTTOM",
         "   DEFINE THE ARC ENDPOINTS.",
         f"5. EACH END: {TIP_FACE:.2f} RADIAL LAND PERP TO",
         "   TOP EDGE; STRAIGHT TAPER TO BOTTOM ARC.",
-        "6. PIVOT HOLE: REAM +0.03/0, Ra 1.6.",
+        f"6. PIVOT HOLE: REAM +{PIVOT_HOLE_BAND[0]:.2f}/0, Ra 1.6.",
         f"7. INTEGRAL HUB DIA {HUB_DIA:.2f} ON THE PIVOT BORE,",
         "   CENTRED ON THE STRAP: THE HUBS SET THE",
         "   STATION PITCH (NO SPACERS).",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import amplitude_bar_notes
 import amplitude_bar_spec
 import draw_amplitude_bar as drawing
 import build_amplitude_bar as bar
@@ -37,15 +38,15 @@ def test_sheet_runs_at_1_to_4_with_1_to_8_isometric() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 8)" in source  # the isometric override
     assert "scale=(4, 1)" in source  # the top end-view section override
-    assert amplitude_bar_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:8"
-    assert amplitude_bar_spec.END_VIEW_NOTE == "END VIEW SCALE 4:1"
+    assert amplitude_bar_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:8"
+    assert amplitude_bar_notes.END_VIEW_NOTE == "END VIEW SCALE 4:1"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "End View Note"' in source
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
 def test_linked_notes_carry_the_notches_and_hole() -> None:
-    notes = amplitude_bar_spec.DRAWING_NOTES
+    notes = amplitude_bar_notes.DRAWING_NOTES
     assert "BOTTOM NOTCH" in notes
     assert "TOP NOTCH" in notes
     assert drill_process(amplitude_bar_spec.TOP_PIN_HOLE_SPEC) in notes
@@ -56,8 +57,20 @@ def test_linked_notes_carry_the_notches_and_hole() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
+def test_bottom_notch_depth_is_one_sided_shallow() -> None:
+    """User ruling 2026-09-26: a deep notch drops the cheeks onto the rocker
+    hub one for one, so the depth may only come out shallow; the notes print
+    the band from the one constant the cheek-over-hub test reads."""
+    upper, lower = amplitude_bar_notes.BOTTOM_NOTCH_DEPTH_BAND
+    assert upper == 0.0 < lower
+    assert f"2.38 +0/-{lower:.2f} DEEP" in amplitude_bar_notes.DRAWING_NOTES.replace(
+        "\n", " "
+    )
+    assert bar.DRAWING_NOTES is amplitude_bar_notes.DRAWING_NOTES
+
+
 def test_functional_notch_finish_is_feature_specific() -> None:
-    notes = amplitude_bar_spec.DRAWING_NOTES
+    notes = amplitude_bar_notes.DRAWING_NOTES
     assert "BOTTOM NOTCH FLOOR: Ra 0.8" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_datum_feature(" not in source

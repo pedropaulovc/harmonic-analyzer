@@ -13,9 +13,11 @@ from _drawing_common import (
     add_surface_finish,
     assert_imported_precision,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_hidden_lines_removed,
     stamp_drawing_summary,
     visible_view_entities,
@@ -27,6 +29,8 @@ from rocker_thrust_washer_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     OD,
+    STOCK_TEXT_PREFIX,
+    STOCK_TEXT_SUFFIX,
     THICKNESS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -47,7 +51,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A O10 x 1.5 washer: 4:1 keeps both diameters and the thickness legible
+# A O10.2 x 1/16 washer: 4:1 keeps both diameters and the thickness legible
 # without crowding the landscape sheet.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
@@ -108,6 +112,36 @@ def _face_rim_edge(view: Any, z_mm: float, *, label: str) -> Any:
     return matches[0]
 
 
+def _set_stock_text(adapter: Any, annotations: list[Any]) -> None:
+    """Print the thickness as the stock's: "1/16 (1.59) STOCK".
+
+    The washer is cut from 1/16 in stock (user ruling, 2026-09-26), so the
+    mill's tolerance governs the thickness, not the .XX row. Prefix and
+    suffix, not a whole-text override: the value between them stays the
+    model's dimension at its model-owned places, and the parentheses mark it
+    as reference (the cone tip shim's stack text is the same channel).
+    """
+    for annotation in annotations:
+        if dimension_name(adapter, annotation) != "DiscThick":
+            continue
+        annotation = _early_bound(annotation, "IAnnotation")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        if abs(float(dimension.SystemValue) - THICKNESS / 1000.0) > 1e-9:
+            raise RuntimeError(
+                f"washer thickness {float(dimension.SystemValue)!r} m "
+                f"is not the modelled {THICKNESS} mm"
+            )
+        display.SetText(1, STOCK_TEXT_PREFIX)  # swDimensionTextPrefix
+        display.SetText(2, STOCK_TEXT_SUFFIX)  # swDimensionTextSuffix
+        readback = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+        if readback != (STOCK_TEXT_PREFIX, STOCK_TEXT_SUFFIX):
+            raise RuntimeError(f"washer stock text did not persist: {readback!r}")
+        rebuild_drawing(adapter, label="washer stock thickness text")
+        return
+    raise RuntimeError("washer edge view has no DiscThick dimension to label")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -165,6 +199,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Decimal places (and so the general-tolerance row each dimension claims)
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _set_stock_text(adapter, annotations)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the washer face view")
     for key, (symbol_xy, attach_xy) in FINISH_PLACEMENT.items():

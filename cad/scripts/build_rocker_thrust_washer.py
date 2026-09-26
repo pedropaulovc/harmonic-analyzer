@@ -1,9 +1,8 @@
 r"""Reproduction script: rocker-bank south thrust washer (MHA-148; #743 PR2; 1 used).
 
-The turned steel washer on the pivot shaft between rocker 0's hub and the
-south pivot-bracket ear: the mirror of the shaft's integral north shoulder,
-O10 x 1.5 like it, standing the ear off the ch0 amplitude bar
-(``rocker_thrust_washer_spec``). The end-play leaf is set between it and the
+The steel washer on the pivot shaft between rocker 0's hub and the south
+pivot-bracket ear: cut from 1/16 in stock at the rocker hub's O.D., it stands
+the ear off the ch0 amplitude bar (``rocker_thrust_washer_spec``). The end-play leaf is set between it and the
 south ear (``rocker_bank_layout``).
 
 Layout: Front-plane annulus at the origin (OD, bore) extruded +Z by the
@@ -55,7 +54,7 @@ from rocker_thrust_washer_spec import (
 from rocker_thrust_washer_spec import BORE_DIA as BORE_DIA
 
 PART_NAME = "rocker-thrust-washer"
-MATERIAL = "Plain Carbon Steel"  # turned from the pivot shaft's O10 bar
+MATERIAL = "Plain Carbon Steel"  # 1/16 in 1008 cold-rolled sheet
 
 DISC_DIA = OD
 DISC_THICK = THICKNESS

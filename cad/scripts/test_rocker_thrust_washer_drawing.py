@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import ast
+from fractions import Fraction
 from pathlib import Path
+
+import pytest
 
 import _config
 import build_rocker_thrust_washer as part
 import draw_rocker_thrust_washer as drawing
+import rocker_arm_spec
 import rocker_thrust_washer_drawing_spec as drawing_spec
 import rocker_thrust_washer_spec as spec
 from _surface_finish import MACHINED_UM
@@ -41,8 +45,8 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 def test_only_the_bore_is_banded() -> None:
     """The end-play leaf is set against this washer, so its thickness sits in
-    no datum chain: routine .XX, judged at that grade by the bar clearance
-    (test_rocker_bank_layout)."""
+    no datum chain: it is the stock's, judged at the mill's band by the bar
+    clearance (test_rocker_bank_layout)."""
     assert model_toleranced_dimensions(part) == {
         ("RingProfile", "BoreDia"): "*deviations(BORE_BAND)",
     }
@@ -50,11 +54,50 @@ def test_only_the_bore_is_banded() -> None:
     assert spec.BORE_DIA - 6.35 > 0.0
 
 
-def test_registry_row_is_the_turned_mha_148() -> None:
+def test_thickness_is_the_one_sixteenth_stock() -> None:
+    """User ruling 2026-09-26: cut from 1/16 in stock, modelled at 1.59 and
+    printed "1/16 (1.59) STOCK" so the stock's tolerance governs."""
+    assert spec.STOCK_THICKNESS_IN == Fraction(1, 16)
+    assert spec.STOCK_THICKNESS == pytest.approx(1.5875)
+    assert spec.THICKNESS == 1.59
+    assert part.DISC_THICK == spec.THICKNESS
+    places = spec.DRAWING_PRECISION["Disc"]["DiscThick"]
+    printed = (
+        f"{spec.STOCK_TEXT_PREFIX}{spec.THICKNESS:.{places}f}{spec.STOCK_TEXT_SUFFIX}"
+    )
+    assert printed == "1/16 (1.59) STOCK"
+    lo, hi = spec.STOCK_THICKNESS_RANGE
+    assert hi - lo == pytest.approx(2 * 0.005 * 25.4)
+    assert drawing.STOCK_TEXT_PREFIX is spec.STOCK_TEXT_PREFIX
+    assert drawing.STOCK_TEXT_SUFFIX is spec.STOCK_TEXT_SUFFIX
+    build_calls = [
+        node.func.id
+        for node in ast.walk(
+            ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+        )
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    ]
+    assert "_set_stock_text" in build_calls
+
+
+def test_registry_row_is_the_one_sixteenth_stock_mha_148() -> None:
     row = _config.parts("rocker-thrust-washer")
     assert row["number"] == "MHA-148"
     assert int(row["quantity"]) == 1
-    assert "turned" in str(row["process"])
+    assert row["material_specification"] == spec.MATERIAL_SPECIFICATION
+    assert "1/16 in" in str(row["process"])
+
+
+def test_od_is_the_hub_od_over_its_own_wall_floor() -> None:
+    """Main 2026-09-26: one O10.20 for hub and washer, each over its own
+    rule-12 floor (bore max + 2 x 1.5 + the .XX band), computed in its spec."""
+    band = _config.title_block("linear_2pl")["value_in"] * 25.4
+    assert rocker_arm_spec.LINEAR_2PL == pytest.approx(band)
+    assert spec.OD == rocker_arm_spec.HUB_DIA
+    assert spec.OD_MIN == pytest.approx(10.11)
+    assert rocker_arm_spec.HUB_DIA_MIN == pytest.approx(10.04)
+    wall = (spec.OD - band - (spec.BORE_DIA + spec.BORE_BAND[0])) / 2.0
+    assert wall >= rocker_arm_spec.RULE12_WALL_FLOOR
 
 
 def _calls(path: str) -> dict[str, ast.Call]:

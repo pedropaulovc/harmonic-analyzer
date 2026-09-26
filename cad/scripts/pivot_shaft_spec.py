@@ -36,7 +36,10 @@ MM_PER_IN = 25.4
 
 SHAFT_DIA = 0.25 * MM_PER_IN
 SHAFT_DIA_BAND = SHAFT_H
-SHOULDER_DIA = 10.0  # the O10 bar it is turned from; = the rocker hub O.D.
+# The O10 bar it is turned from, left as supplied. It stays no larger than the
+# rocker hub it bears on (O10.20), so it passes under the ch19 bar foot as the
+# hubs do (test_rocker_bank_layout).
+SHOULDER_DIA = 10.0
 SHOULDER_LENGTH = 1.5
 JOURNAL_LENGTH = EAR_T  # shoulder face to the north end: one ear thickness
 DOME_HEIGHT = 1.5  # both ends, like the cylinder arbor's (user, #743 Q4)

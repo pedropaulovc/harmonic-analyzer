@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import math
+from dataclasses import replace
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 import _config
+import amplitude_bar_notes as bar_notes
 import amplitude_bar_spec as bar
+import channel_frame_geom as frame
+import channel_kinematics as ck
+import error_budget
+import rocker_arm_notes as arm_notes
 import cylinder_bank_layout as drum_bank
 import pivot_bracket_spec as bracket
 import pivot_shaft_spec as shaft
@@ -84,7 +92,9 @@ def test_south_bracket_is_feeler_set_off_the_thrust_washer() -> None:
     assert bank.SOUTH_EAR_OUTER_Z == pytest.approx(
         bank.SOUTH_EAR_INNER_Z - bracket.EAR_T
     )
-    assert bank.SOUTH_EAR_INNER_Z == pytest.approx(-68.691, abs=5e-4)
+    # 1/16 stock (1.59, was 1.50) moves the south ear 0.09 out; the end play
+    # is the feeler leaf, set at assembly, so it does not move with it.
+    assert bank.SOUTH_EAR_INNER_Z == pytest.approx(-68.781, abs=5e-4)
 
 
 def test_brackets_sit_on_their_ears_and_move_in_from_78() -> None:
@@ -117,10 +127,25 @@ def test_shaft_spans_both_ears_shoulder_one_ear_from_the_north_end() -> None:
     assert 0.0 < shaft.DOME_HEIGHT <= shaft.SHAFT_DIA / 2
 
 
-def test_shoulder_is_turned_from_the_hub_diameter_bar() -> None:
-    assert shaft.SHOULDER_DIA == arm.HUB_DIA == washer.OD == 10.0
-    assert shaft.SHOULDER_LENGTH == washer.THICKNESS == 1.5
+def test_hub_and_washer_share_one_od_over_each_wall_floor() -> None:
+    """Main 2026-09-26: hub and washer share O10.20; each part's own rule-12
+    floor is derived in its spec (10.04 hub, 10.11 washer), never typed."""
+    assert arm.LINEAR_2PL == pytest.approx(_BAND_2PL)
+    assert washer.OD == arm.HUB_DIA
+    assert arm.HUB_DIA >= arm.HUB_DIA_MIN == pytest.approx(10.04)
+    assert washer.OD >= washer.OD_MIN == pytest.approx(10.11)
     assert washer.BORE_DIA == bracket.BORE_DIA
+
+
+def test_shoulder_stays_on_its_bar_and_under_each_mating_od() -> None:
+    """The shoulder is decoupled from the hub O.D.: it keeps the O10 bar's
+    size (MHA-065 prints STOCK 10 BAR) and stays no larger than the hub it
+    bears on or the washer that closes the stack's other end, so it is never
+    the widest thing under a bar foot."""
+    assert shaft.SHOULDER_DIA == 10.0
+    assert "STOCK 10 BAR" in shaft.DRAWING_NOTES
+    assert shaft.SHOULDER_DIA <= arm.HUB_DIA
+    assert shaft.SHOULDER_DIA <= washer.OD
 
 
 def test_no_keeper_is_needed_at_the_south_extreme() -> None:
@@ -148,18 +173,104 @@ def test_south_apex_stays_on_the_support_at_the_worst_case() -> None:
 def test_amplitude_bars_clear_both_thrust_faces_at_the_worst_case() -> None:
     """The bar straddles its arm plate (z_mid +- BAR_WIDTH/2) while the hub
     face's offset from the plate prints at .XX. A plate-wide thrust face on
-    hub 0 would reach the ch0 bar; the O10 x 1.5 shoulder / washer (under the
-    bar foot, like the hubs) stand the ears off."""
+    hub 0 would reach the ch0 bar; the shoulder and the washer (under the
+    bar foot, like the hubs) stand the ears off. The shoulder is turned at
+    .XX; the washer is 1/16 stock, so the mill's band is its thin side."""
     proud_min = (arm.HUB_LENGTH - arm.ARM_THICKNESS) / 2 - _BAND_2PL
     face_offset_min = arm.ARM_THICKNESS / 2 + proud_min
-    for standoff in (shaft.SHOULDER_LENGTH, washer.THICKNESS):
-        clearance = standoff - _BAND_2PL + face_offset_min - bar.BAR_WIDTH / 2
+    for standoff_min in (
+        shaft.SHOULDER_LENGTH - _BAND_2PL,
+        washer.STOCK_THICKNESS_RANGE[0],
+    ):
+        clearance = standoff_min + face_offset_min - bar.BAR_WIDTH / 2
         assert clearance >= bank.MIN_END_PLAY + bank.MARGIN_SPARE
     # Without a stand-off the bar would reach the ear.
     assert face_offset_min - bar.BAR_WIDTH / 2 < 0.0
     assert bank.BAR_TO_THRUST_EAR == pytest.approx(
         shaft.SHOULDER_LENGTH + arm.HUB_LENGTH / 2 - bar.BAR_WIDTH / 2
     )
+
+
+def _cheek_cap(
+    monkeypatch: pytest.MonkeyPatch, notch_deeper: float, edge_lower: float
+) -> float:
+    """Foot-axis height over the pivot axis at d = 0 (channel_kinematics
+    ``bar_bottom``: the cheeks' underside), with the bar's foot notch cut
+    ``notch_deeper`` deep and the rocker's top edge ``edge_lower`` low. Both
+    move the cheeks one for one; the solver carries the rest of the chain."""
+    with monkeypatch.context() as patch:
+        patch.setattr(ck, "_CONTACT_OFF_Y", ck._CONTACT_OFF_Y + notch_deeper)
+        patch.setitem(ck.ARC, "acy", ck.ARC["acy"] - edge_lower)
+        return ck.solve_state(0.0)["bar_bottom"] - frame.ROCKER_PIVOT_XY[1]
+
+
+def test_bar_foot_cheeks_clear_the_hub_at_the_worst_case(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """At d = 0 each amplitude bar's foot cheeks pass over its rocker's hub.
+    Worst case: the notch at its deepest and the rocker's top edge at its
+    lowest, over the hub, the washer and the shoulder at maximum material.
+    The one-sided bands (user ruling 2026-09-26) make the slack floor 0:
+    neither can move the cheeks toward the pivot."""
+    notch_deeper = bar_notes.BOTTOM_NOTCH_DEPTH_BAND[0]
+    edge_lower = arm_notes.TOP_EDGE_BAND[1]
+    assert notch_deeper == edge_lower == 0.0
+    worst = _cheek_cap(monkeypatch, notch_deeper, edge_lower)
+    nominal = _cheek_cap(monkeypatch, 0.0, 0.0)
+    assert worst == pytest.approx(nominal - notch_deeper - edge_lower, abs=1e-6)
+    max_material_r = max(
+        (arm.HUB_DIA + _BAND_2PL) / 2.0,
+        (washer.OD + _BAND_2PL) / 2.0,
+        shaft.SHOULDER_DIA / 2.0,
+    )
+    assert worst - max_material_r >= 0.0
+    # O10.20 keeps ~0.29 of air at maximum material: the cap (Ø11.29) is
+    # nominal geometry, so the bands above are what hold it.
+    assert worst - max_material_r == pytest.approx(0.291, abs=5e-3)
+    # The bilateral .XX those two features printed before would have put the
+    # cheeks into the hub -- the bands bind.
+    assert _cheek_cap(monkeypatch, _BAND_2PL, 0.0) - max_material_r < 0.0
+    assert _cheek_cap(monkeypatch, 0.0, _BAND_2PL) - max_material_r < 0.0
+
+
+def test_the_one_sided_bands_lift_the_bar_at_most_1_mm_at_rest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The shallow-notch and high-edge limits can only lift a bar: at most
+    1.0 at rest, a steady ~0.45 deg on its channel lever, and at most 0.0036
+    of fundamental at any station (0.04 % of the d = 88 term), from the exact
+    chain in error_budget (rocker_arm_notes states both)."""
+    notch_shallower = bar_notes.BOTTOM_NOTCH_DEPTH_BAND[1]
+    edge_higher = arm_notes.TOP_EDGE_BAND[0]
+    lift = notch_shallower + edge_higher
+    assert lift == pytest.approx(1.0)
+    with monkeypatch.context() as patch:
+        base = ck.solve_state(0.0)
+        patch.setattr(ck, "_CONTACT_OFF_Y", ck._CONTACT_OFF_Y - notch_shallower)
+        patch.setitem(ck.ARC, "acy", ck.ARC["acy"] + edge_higher)
+        up = ck.solve_state(0.0)
+    assert up["bar_bottom"] - base["bar_bottom"] == pytest.approx(lift, abs=1e-3)
+    assert abs(up["lever_tilt"] - base["lever_tilt"]) == pytest.approx(0.45, abs=0.01)
+
+    nom = error_budget.nominal()
+    lifted = replace(
+        nom,
+        arc_cy=nom.arc_cy + edge_higher,
+        contact_dy=nom.contact_dy - notch_shallower,
+    )
+    theta = np.arange(720) * 2.0 * math.pi / 720
+
+    def fundamental(n: error_budget.Nominal, d: float) -> float:
+        u = error_budget.hook_displacement(theta, d, n)
+        return math.hypot(
+            2.0 * float(np.mean(u * np.cos(theta))),
+            2.0 * float(np.mean(u * np.sin(theta))),
+        )
+
+    stations = np.linspace(nom.d_max / 8.0, nom.d_max, 8)
+    deltas = [abs(fundamental(lifted, d) - fundamental(nom, d)) for d in stations]
+    assert max(deltas) < 0.004
+    assert max(deltas) / fundamental(nom, nom.d_max) < 0.0005
 
 
 def test_layout_reads_only_the_channel_stations() -> None:

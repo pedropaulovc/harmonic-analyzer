@@ -83,6 +83,14 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "#47" not in notes
     assert "REAM +0.03/0" in notes
     assert "16.00 REF" in notes
+    # User ruling 2026-09-26: the edge height over the pivot is the control,
+    # one-sided high; the arc centre distance is reference.
+    assert "808.00 REF FROM THE PIVOT" in notes
+    upper, lower = rocker_arm_notes.TOP_EDGE_BAND
+    assert lower == 0.0 < upper
+    assert f"TOP EDGE 8.00 +{upper:.2f}/0 ABOVE THE PIVOT" in notes
+    assert rocker_arm_notes.TOP_EDGE_ABOVE_PIVOT == pytest.approx(8.0)
+    assert f"INTEGRAL HUB DIA {rocker_arm_spec.HUB_DIA:.2f}" in notes
     assert "11.5 IN" not in notes
     assert "0.22 IN" not in notes
     # General tolerances live in the title block ONLY.

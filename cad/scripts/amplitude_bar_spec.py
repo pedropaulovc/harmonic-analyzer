@@ -11,7 +11,7 @@ square section, and carries the two small end notches in the notes.
 """
 
 from __future__ import annotations
-from _hole_spec import HoleSpec, drill_process
+from _hole_spec import HoleSpec
 
 
 MM_PER_IN = 25.4
@@ -41,26 +41,5 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarProfile": {"BarLength"},
 }
 
-# The title-block QTY cell owns the 20-off count; notch orientation and
-# coplanarity are stated because no view resolves them at 1:4 (machinist
-# round 1): both notches live in ONE profile sketch cut thru the full depth,
-# so open-to-opposite-ends / common-plane / centred-on-width IS the model
-# truth, and the pin hole runs thru the top-notch cheeks at mid-depth.
-DRAWING_NOTES = "\n".join(
-    (
-        "1. BAR SECTION 6.35 SQUARE.",
-        "2. BOTTOM NOTCH 3.18 W x 2.38 DEEP;",
-        "   TOP NOTCH 3.18 W x 12.70 DEEP;",
-        "   BOTH THRU THE FULL DEPTH, OPEN TO",
-        "   OPPOSITE ENDS, CENTRED ON THE WIDTH",
-        "   WITHIN 0.10, IN ONE COMMON PLANE;",
-        "   ROOTS R0.40 MAX.",
-        f"3. TOP PIN HOLE {drill_process(TOP_PIN_HOLE_SPEC)} THRU BOTH",
-        "   TOP-NOTCH CHEEKS AT MID-DEPTH,",
-        "   6.35 BELOW THE BAR TOP.",
-        "4. BOTTOM NOTCH FLOOR: Ra 0.8.",
-        "5. DIMS APPLY AFTER PLATING.",
-    )
-)
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:8"
-END_VIEW_NOTE = "END VIEW SCALE 4:1"
+# Drawing prose (DRAWING_NOTES / view notes) and the notch-depth band live in
+# amplitude_bar_notes.py -- see rocker_arm_notes for the rationale.
