@@ -1385,6 +1385,58 @@ def test_cross_tap_drill_keeps_the_bottoming_lead_past_the_deepest_thread() -> N
     assert CASTING_TAP_DRILL_DEPTH - (CASTING_FULL_THREAD_DEPTH + part.SEAT_DEPTH_BAND) >= lead
 
 
+# hb-render-6 sheet 2: the hole table's right edge, the TOP VIEW caption's
+# bottom and the ORIGIN note's top, the neighbours of the socket-fit note.
+HB_RENDER_6_TABLE_RIGHT_X_M = 0.1626
+HB_RENDER_6_TOP_CAPTION_BOTTOM_Y_M = 0.2329
+HB_RENDER_6_ORIGIN_NOTE_TOP_Y_M = 0.1866
+SOCKET_FIT_MIN_MARGIN_M = 0.003
+
+
+def test_socket_fit_note_sits_on_a2_between_the_table_and_the_plan() -> None:
+    import ast
+    from pathlib import Path
+
+    import draw_harmonic_base as sheet
+
+    # Rule 6 (hb-render-6 eye pass): no free-standing A1-A4 fit note remains.
+    source = Path(sheet.__file__).read_text(encoding="utf-8")
+    assert "REFERENCE ONLY" not in source
+    assert "ASSIGNED ACTUAL MHA-083 TUBES" not in source
+    # The note hangs off the A2 rim and keeps the acceptance criterion.
+    assert sheet.SOCKET_FIT_STATION == (-197.0, -112.0)
+    assert "4X" in sheet.SOCKET_FIT_NOTE
+    assert "NO\nPERCEPTIBLE ROCK." in sheet.SOCKET_FIT_NOTE
+    calls = [
+        node for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "_attached_note"
+    ]
+    assert any(ast.unparse(call.args[-1]) == "SOCKET_FIT_NOTE_XY" for call in calls)
+
+    rows = [row.replace("<MOD-DIAM>", "D") for row in sheet.SOCKET_FIT_NOTE.split("\n")]
+    x, y = sheet.SOCKET_FIT_NOTE_XY
+    box = (
+        x,
+        y - len(rows) * sheet.NOTE_ROW_M,
+        x + max(len(row) for row in rows) * sheet.NOTE_CHAR_M,
+        y,
+    )
+    plan_left = sheet._plan_xy(
+        -harmonic_base_spec.BOTTOM_LENGTH / 2.0, 0.0, center=sheet.HOLE_TOP_CENTER
+    )[0]
+    margins = {
+        "hole table": box[0] - HB_RENDER_6_TABLE_RIGHT_X_M,
+        "plan west edge": plan_left - box[2],
+        "TOP VIEW caption": HB_RENDER_6_TOP_CAPTION_BOTTOM_Y_M - box[3],
+        "ORIGIN note": box[1] - HB_RENDER_6_ORIGIN_NOTE_TOP_Y_M,
+    }
+    assert {name: gap for name, gap in margins.items() if gap < SOCKET_FIT_MIN_MARGIN_M} == {}
+    # The A2 rim sits level with the note's top rows, so the leader runs
+    # nearly flat across the gap instead of down through the ORIGIN note.
+    a2 = sheet._plan_xy(*sheet.SOCKET_FIT_STATION, center=sheet.HOLE_TOP_CENTER)
+    assert box[1] < a2[1] < box[3]
+
+
 # hb-render-5's sheet frame: the drawable region starts 12.7 mm in from the
 # sheet's left edge (the frame obstacle the callout check logs).
 SHEET_FRAME_INNER_X_M = 0.0127
