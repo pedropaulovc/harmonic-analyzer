@@ -1,9 +1,9 @@
 pinion-spring:
   title: Pinion Return Leaf Spring
   number: MHA-114
-  material: CDA 260 half-hard, 0.8 mm
-  material_specification: CDA 260 brass sheet, half-hard; 0.8 mm (0.032 in) thick
-  finish: degreased after forming; bare brass, no coating
+  material: 17-7 PH Cond C, 0.381 mm
+  material_specification: 17-7 PH stainless (UNS S17700) strip, Condition C, ASTM A693; 0.015 in (0.381 mm) +/-0.00075 in, sheared 1/4 in wide from McMaster-Carr 2325K19
+  finish: degreased after forming; bare stainless, no coating
   quantity: 1
   tolerance_class: machined_block
-  process: "formed sheet blank (brass)"
+  process: "formed strip blank (17-7 PH stainless, Condition C)"

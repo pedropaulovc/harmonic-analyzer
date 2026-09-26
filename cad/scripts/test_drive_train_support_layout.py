@@ -74,12 +74,133 @@ def test_rederived_cam_and_return_leaf_clearances_are_positive() -> None:
     assert drive._FPIN_TIP_S - drive._S_CAM >= 2.0
 
 
-def test_return_spring_foot_clears_the_fixed_rocker_support() -> None:
+def test_return_spring_foot_is_outboard_east_of_the_strap_and_block() -> None:
+    # 2026-09-24 re-derive: the foot no longer runs west under the lift rod
+    # toward the rocker-arm support; it is screwed down east of the back strap
+    # (machine east = -x), its pad clear of the back pivot block's east end.
+    from pinion_spring_geometry import PAD_LEN
+
+    block_east_face = drive.PIVOT_X - BLOCK_EAST
+    pad_west_edge = drive.SPRING_FOOT_END_X + PAD_LEN
+    assert block_east_face - pad_west_edge >= 0.25
+    assert drive.SPRING_FOOT_TAN_X < drive.PIVOT_X - drive.STRAP_R_END
     rocker_near_face = SUPPORT_WORLD_X - 31.75
-    spring_foot_end = drive.SPRING_X - drive.SPR_FOOT_END_L[0]
-    assert rocker_near_face - spring_foot_end >= 0.25
-    assert (
-        rocker_near_face - (drive.SPRING_HOLE_X + drive.FSCREW_HEAD_DIA / 2.0) >= 0.25
+    assert rocker_near_face - drive.SPRING_FOOT_TAN_X >= 0.25
+
+
+def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
+    # #859 (Codex l4dOj; Main's rulings 1-4): the gates hold at the CORNERS of
+    # the stock and formed bands, not at the nominal.  The leaf is formed to
+    # the nominal inside profile, so a thicker strip shifts the contact face
+    # into the flank by its excess.  Soft corner: thinnest, narrowest strip at
+    # the formed band's low end, against the heavier (brass 8800) gravity.
+    # Stiff corner: thickest strip at the band's high end, engaged.
+    import pinion_spring_geometry as leaf
+    import pinion_spring_section as section
+    from _fit_limits import deviations
+    from _printed_tolerance import printed_deviations
+
+    parked, engaged = drive.SPRING_DEFLECTION
+    assert parked == pytest.approx(leaf.PRESET)
+    assert engaged - parked == pytest.approx(
+        drive._spr_station[-1] * drive._PHI_ENG, rel=0.05
+    )
+    band = leaf.FORMED_BAND_MM
+    t_lo, t_hi = (section.THICK + d for d in deviations(section.THICK_BAND))
+    w_lo = section.WIDTH + printed_deviations(section.WIDTH, section.WIDTH_PLACES)[0]
+    assert t_lo < section.THICK < t_hi and w_lo < section.WIDTH
+    gravity = drive.SWING_GRAVITY_CORNER_NMM
+    assert all(c >= n for c, n in zip(gravity, drive.SWING_GRAVITY_NMM, strict=True))
+    for deflection, station, moment in zip(
+        drive.SPRING_DEFLECTION,
+        (drive._spr_station[0], drive._spr_station[-1]),
+        gravity,
+        strict=True,
+    ):
+        soft = deflection - band + (t_lo - section.THICK)
+        assert leaf.contact_force(soft, t_lo, w_lo) * station >= 1.5 * moment
+    stiff = engaged + band + (t_hi - section.THICK)
+    assert leaf.YIELD_MPA / leaf.root_stress(stiff, t_hi) >= 1.5
+    assert min(drive.SPRING_PRELOAD_RATIO) >= 1.5
+    assert drive.SPRING_STRESS_SF >= 1.5
+
+
+def test_swing_gravity_basis_is_the_current_parts() -> None:
+    # Main (#859 restricted review, change 7): the gravity moments were
+    # computed at SWING_GRAVITY_BASIS.  A part whose volume, governing
+    # dimensions or material moved since fails here, naming the constants to
+    # re-measure.
+    import alignment_pinion_spec as drum_spec
+    import build_alignment_pinion as drum
+    import build_pinion_arbor as arbor
+    import build_pinion_arbor_collar as collar
+    import build_pinion_bracket as strap
+    import build_pinion_cam_pin as cam_pin
+    import build_pinion_handle as handle
+    import build_pinion_pivot_shaft as shaft
+    import pinion_bracket_geometry as strap_geometry
+
+    density = {"Brass": 8500.0, "Plain Carbon Steel": 7800.0}
+    materials = {
+        "alignment-pinion": drum.MATERIAL,
+        "pinion-arbor": arbor.MATERIAL,
+        "pinion-pivot-shaft": shaft.MATERIAL,
+        "pinion-bracket": strap.MATERIAL,
+        "pinion-arbor-collar": collar.MATERIAL,
+        "pinion-handle": handle.MATERIAL,
+        "pinion-cam-pin": cam_pin.MATERIAL,
+    }
+    volumes = {
+        "pinion-arbor": arbor.V_TOTAL,
+        "pinion-pivot-shaft": shaft.V_SHAFT
+        + 2.0 * shaft.V_CAP
+        - 2.0 * shaft._pin_hole_removed(),
+        "pinion-arbor-collar": collar.V_COLLAR - collar.V_PIN_HOLE,
+        "pinion-handle": handle.V_ROD,
+        "pinion-cam-pin": cam_pin.V_PIN + cam_pin.V_CAP,
+    }
+    # The drum's and the strap's c486 mesh volumes stand for these dimensions.
+    dimensions = {
+        "alignment-pinion": (
+            (
+                drum_spec.TEETH,
+                drum_spec.DIAMETRAL_PITCH,
+                drum_spec.FACE_WIDTH,
+                drum_spec.BORE_DIA,
+            ),
+            (32, 49.82, 143.2, 8.0),
+        ),
+        "pinion-bracket": (
+            (
+                strap_geometry.WIDTH,
+                strap_geometry.C2C,
+                strap_geometry.THICKNESS,
+                strap_geometry.PIVOT_BORE,
+                strap_geometry.ARBOR_BORE,
+                strap_geometry.PIN_BORE,
+                strap_geometry.PIN_SEAT,
+            ),
+            (15.0, 28.0, 9.0, 6.35, 8.0, 4.0, 4.0),
+        ),
+    }
+    basis = drive.SWING_GRAVITY_BASIS
+    assert set(basis) == set(materials) == set(volumes) | set(dimensions)
+    stale = [
+        name for name, (_n, _v, rho) in basis.items() if density[materials[name]] != rho
+    ]
+    stale += [
+        name
+        for name, volume in volumes.items()
+        if not math.isclose(basis[name][1], volume, abs_tol=0.01)
+    ]
+    stale += [
+        name
+        for name, (now, then) in dimensions.items()
+        if not all(math.isclose(a, b) for a, b in zip(now, then, strict=True))
+    ]
+    assert not stale, (
+        f"{stale} moved since SWING_GRAVITY_BASIS: re-measure SWING_GRAVITY_NMM "
+        "and SWING_GRAVITY_CORNER_NMM, then update the basis"
     )
 
 
@@ -1028,53 +1149,73 @@ def test_rig_anchors_are_named_not_literal() -> None:
     assert math.isclose(arbor.DRUM_STATION_AS_BUILT, 60.75, abs_tol=1e-12)
 
 
-def test_spring_pad_books_its_printed_width_band() -> None:
-    # Main (restricted review of #858, P2-4): the pad width reads the band its
-    # sheet prints, not a 0.51 literal.
+def test_spring_pad_books_its_printed_bands() -> None:
+    # Main (restricted review of #858, P2-4): the pad reads the bands its sheet
+    # prints, not a 0.51 literal.  Flush with the strip's aft edge (#859 option
+    # (iv)), the pad's width band never reaches the edge the leaf sets.
     import inspect
     import re
 
-    from _printed_tolerance import printed_deviations
-    from pinion_spring_geometry import PAD_WIDTH, PAD_WIDTH_PLACES
-
     assert not re.search(r"\b0\.51\b", inspect.getsource(drive))
-    upper = printed_deviations(PAD_WIDTH, PAD_WIDTH_PLACES)[1]
-    assert math.isclose(drive.SPRING_PAD_WIDTH_WORST, PAD_WIDTH + upper, abs_tol=1e-12)
+    assert not hasattr(drive, "_SPR_PAD_WEST_X")  # z only: the leaf sets z
+    assert math.isclose(
+        drive._SPR_PAD_Z_HI,
+        RIG.SPRING_PAD_AFT_Z + RIG.FEELER_SET_ERROR,
+        abs_tol=1e-12,
+    )
 
 
 def test_spring_is_stationed_from_the_block_on_its_pad_leaf() -> None:
     # Main (restricted review of #858): MHA-114's pad is set SPRING_PAD_LEAF
-    # off the back block's inner face before its seat is transferred.  The
-    # blade then stands on the back strap's flank at exactly its floor plus
-    # RIG_MARGIN_SPARE at the thinnest strap and the leaf's set error: that
-    # row has no spare past the rule, so it is pinned exactly.
-    from _printed_tolerance import printed_deviations
-    from pinion_bracket_geometry import THICKNESS_PLACES
-    from pinion_spring_geometry import PAD_WIDTH, PAD_WIDTH_PLACES, WIDTH
+    # off the back block's inner face before its seat is transferred.  #859
+    # option (iv) (Main, 2026-09-26): the pad is flush with the strip's aft
+    # edge, so the leaf sets the strip's own edge.
+    import pinion_spring_geometry as geometry
+    from pinion_spring_section import PAD_WIDTH, WIDTH
 
-    assert RIG.SPRING_PAD_LEAF == 1.00
-    assert math.isclose(
-        RIG.SPRING_Z,
-        RIG.BACK_BLOCK_Z0 - RIG.SPRING_PAD_LEAF - PAD_WIDTH / 2.0,
-        abs_tol=1e-12,
-    )
+    assert RIG.SPRING_PAD_LEAF == 0.65  # Main's ruling, a stock gage leaf
+    aft = RIG.BACK_BLOCK_Z0 - RIG.SPRING_PAD_LEAF
+    assert math.isclose(RIG.SPRING_PAD_AFT_Z, aft, abs_tol=1e-12)
+    assert math.isclose(RIG.SPRING_Z + WIDTH / 2.0, aft, abs_tol=1e-12)
+    assert math.isclose(RIG.SPRING_PAD_Z + PAD_WIDTH / 2.0, aft, abs_tol=1e-12)
+    # The part's pad sits PAD_Z local +z (machine forward, Ry(180)) of the
+    # strip: the same offset the layout puts between the two mid-planes.
+    assert math.isclose(RIG.SPRING_Z - RIG.SPRING_PAD_Z, geometry.PAD_Z, abs_tol=1e-12)
     assert math.isclose(drive.SPRING_Z, RIG.SPRING_Z, abs_tol=1e-12)
     inset = RIG.SPRING_Z - WIDTH / 2.0 - RIG.STRAP_Z_INNER[1]
     assert math.isclose(inset, RIG.SPRING_BLADE_INSET, abs_tol=1e-12)
-    assert math.isclose(inset, 1.25, abs_tol=1e-9)
-    thin = printed_deviations(drive.STRAP_T, THICKNESS_PLACES)[0]
-    flank = inset + thin - RIG.FEELER_SET_ERROR
-    assert flank == pytest.approx(RIG.SPRING_BLADE_ON_FLANK_WORST, abs=1e-12)
-    assert flank == pytest.approx(
-        RIG.SPRING_BLADE_MIN_ON_FLANK + RIG.RIG_MARGIN_SPARE, abs=1e-9
-    )
-    pad = (
-        RIG.SPRING_PAD_LEAF
-        - RIG.FEELER_SET_ERROR
-        - printed_deviations(PAD_WIDTH, PAD_WIDTH_PLACES)[1] / 2.0
-    )
+    pad = RIG.SPRING_PAD_LEAF - RIG.FEELER_SET_ERROR
     assert pad == pytest.approx(RIG.SPRING_PAD_TO_BLOCK_WORST, abs=1e-12)
-    assert pad == pytest.approx(0.645, abs=1e-9)
+    assert pad >= RIG.SPRING_PAD_MIN_AIR + RIG.RIG_MARGIN_SPARE - 1e-9
+
+
+def test_spring_blade_on_flank_books_every_primitive_term() -> None:
+    # Main (#859 ruling 4): the booked worst case is the sum of named
+    # primitive terms, computed here from their sources and not from the
+    # layout's formula.  The strip's front edge stands leaf + W forward of the
+    # back block; the strap's inner face stands T forward of it.  Worst: the
+    # thinnest strap, the leaf at its thickest setting, the widest strip.
+    # #858's stack left the strip's width band out.
+    from _printed_tolerance import printed_deviations
+    from pinion_bracket_geometry import THICKNESS, THICKNESS_PLACES
+    from pinion_spring_section import WIDTH, WIDTH_PLACES
+
+    terms = {
+        "MHA-056 strap thickness": THICKNESS,
+        "MHA-056 strap thickness .X, thinnest": printed_deviations(
+            THICKNESS, THICKNESS_PLACES
+        )[0],
+        "spring pad leaf": -RIG.SPRING_PAD_LEAF,
+        "spring pad leaf set error": -RIG.FEELER_SET_ERROR,
+        "MHA-114 strip width": -WIDTH,
+        "MHA-114 strip width .XX, widest": -printed_deviations(WIDTH, WIDTH_PLACES)[1],
+    }
+    assert RIG.SPRING_BLADE_ON_FLANK_WORST == pytest.approx(
+        sum(terms.values()), abs=1e-12
+    )
+    assert RIG.SPRING_BLADE_ON_FLANK_WORST >= (
+        RIG.SPRING_BLADE_MIN_ON_FLANK + RIG.RIG_MARGIN_SPARE - 1e-9
+    )
     rows = drive.RIG_MARGINS
     assert rows["spring blade on the back strap flank"] == (
         RIG.SPRING_BLADE_ON_FLANK_WORST,
@@ -1084,6 +1225,91 @@ def test_spring_is_stationed_from_the_block_on_its_pad_leaf() -> None:
         RIG.SPRING_PAD_TO_BLOCK_WORST,
         RIG.SPRING_PAD_MIN_AIR,
     )
+
+
+def _drive_with(monkeypatch, module, name: str, value):
+    """A fresh execution of the drive-train module with one upstream value
+    patched: the gate's own reaction is observed, not re-derived here."""
+    import importlib.util
+
+    monkeypatch.setattr(module, name, value)
+    spec = importlib.util.spec_from_file_location("_drive_perturbed", drive.__file__)
+    fresh = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fresh)
+    return fresh
+
+
+def test_spring_strip_clears_gear_j19_at_the_worst_fit_up() -> None:
+    # Main (#859 restricted review, change 5): the axial gate against the
+    # cylinder drum's last gear read the nominal pose.  The back block is
+    # spotted with the strap between it and the drum, whose back end leaf D
+    # stands off j = 19, and the pad is set its leaf off the block: the
+    # thinnest D, the thinnest strap, the thickest pad leaf and the widest
+    # strip each move the strip's front edge toward the gear.
+    from _printed_tolerance import printed_deviations
+    from pinion_bracket_geometry import THICKNESS, THICKNESS_PLACES
+    from pinion_spring_section import WIDTH, WIDTH_PLACES
+
+    j19_back = drive.Z_DRUM0 + 19 * drive.Z_PITCH + drive.DRUM_FACE / 2.0
+    terms = {
+        "strip front edge, nominal": RIG.SPRING_Z - WIDTH / 2.0 - j19_back,
+        "rig-set leaf D set error": -RIG.FEELER_SET_ERROR,
+        "MHA-056 strap thickness .X, thinnest": printed_deviations(
+            THICKNESS, THICKNESS_PLACES
+        )[0],
+        "spring pad leaf set error": -RIG.FEELER_SET_ERROR,
+        "MHA-114 strip width .XX, widest": -printed_deviations(WIDTH, WIDTH_PLACES)[1],
+    }
+    worst, floor = drive.RIG_MARGINS["spring strip to gear j = 19"]
+    assert worst == pytest.approx(sum(terms.values()), abs=1e-9)
+    assert floor == 0.25
+    assert worst >= floor + RIG.RIG_MARGIN_SPARE
+
+
+def test_spring_leaf_clears_the_lift_rod_envelope(monkeypatch) -> None:
+    # Main (#859 restricted review, change 3): the re-derive deleted the
+    # blade, foot and collar-sweep checks against the lift rod.  One live
+    # gate replaces them: the leaf's westmost point, shifted by the formed
+    # band and the screw's float in the pad hole, keeps 0.25 off the rod's
+    # envelope (the collar's sweep about the rod axis).
+    import pinion_spring_geometry as leaf
+    from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
+
+    west = max(
+        drive.SPRING_FOOT_TAN_X,
+        drive.SPRING_BEND_EXIT[0] + drive.SPRING_T,
+        drive.SPRING_KINK_START[0] + drive.SPRING_T,
+        drive.SPRING_KINK_C[0] + leaf.R_KINK + drive.SPRING_T,
+        drive.SPRING_FLAT_TIP[0] + drive.SPRING_T,
+    )
+    assert west >= drive.SPRING_CREST[0]  # the contact face is inside it
+    shift = (
+        leaf.FORMED_BAND_MM
+        + (blind_cut_dia_mm(leaf.HOLE_SPEC) - THREAD_MAJOR_MM["#4-40"]) / 2.0
+    )
+    envelope = drive.LIFT_X - (drive.CAM_ECC + drive.CAM_OD / 2.0)
+    assert drive.SPRING_TO_LIFT_ROD == pytest.approx(envelope - west - shift)
+    assert drive.SPRING_TO_LIFT_ROD >= 0.25
+    # Fail-first: a formed band wide enough to carry the leaf onto the sweep
+    # trips this gate, ahead of the preload gates that also read the band.
+    reach = drive.SPRING_TO_LIFT_ROD + leaf.FORMED_BAND_MM
+    with pytest.raises(AssertionError, match="lift rod's collar sweep"):
+        _drive_with(monkeypatch, leaf, "FORMED_BAND_MM", reach)
+
+
+def test_foot_screw_bottoming_gate_reads_the_thinnest_strip(monkeypatch) -> None:
+    # Main (#859 restricted review, change 4): the bottoming gate booked the
+    # nominal strip.  A seat sized for the nominal strip passes that booking,
+    # but the thinnest strip the stock band allows runs the screw past its
+    # 0.25 tip reserve, and the gate must see it.
+    import build_harmonic_base as base
+
+    assert drive._SPR_T_LO < drive.SPRING_T
+    seat = drive.FSCREW_SHANK_LEN - drive.SPRING_T + 0.25 + 0.005
+    assert seat - (drive.FSCREW_SHANK_LEN - drive.SPRING_T) >= 0.25
+    assert seat - (drive.FSCREW_SHANK_LEN - drive._SPR_T_LO) < 0.25
+    with pytest.raises(AssertionError, match="bottoms out in the base spring seat"):
+        _drive_with(monkeypatch, base, "FOOT_SCREW_HOLE_DEPTH", seat)
 
 
 def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
@@ -1101,7 +1327,7 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
         "RIG SET, BEFORE SPOTTING THE TRANSFER SEATS:\n"
         "MHA-002 BACK END 1.00 + 0.25 LEAVES OFF\n"
         "NORTH MHA-027 BACK FACE, BANK PUSHED NORTH;\n"
-        "MHA-114 PAD 1.00 LEAF OFF MHA-061."
+        "MHA-114 PAD 0.65 LEAF OFF MHA-061."
     )
     for callout in (base_sheet.TRANSFER_BLOCK_CALLOUT, base_sheet.TRANSFER_SPRING_NOTE):
         assert FITUP.TRANSFER_AFTER_RIG_SET in callout

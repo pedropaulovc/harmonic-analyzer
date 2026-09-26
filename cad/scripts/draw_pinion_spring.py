@@ -1,11 +1,13 @@
 r"""Create the curated machinist drawing for the pinion return leaf spring.
 
-NOT a coil spring: a bent brass leaf.  A 0.8 brass blank -- a 4.0 strip with a
-square screw pad at its free end -- formed as a flat screw-down foot, an R2 bend
-up to a blade following the parked strap lean, then a subtle R1.5 kink (~20 deg
-back) to a short free flat.  The formed profile is baselined from the foot's
-free end in the front view; the projected top view carries the blank's pad,
-strip width and hole; a 5:1 detail carries the kink.
+NOT a coil spring: a bent 17-7 PH stainless leaf.  A 0.381 blank -- a 6.35
+strip with a square screw pad at its free end -- formed as a flat screw-down
+foot, an R3.3 bend up to a blade leaning back over the foot's bend, then an
+R3.3 crest turning 25 deg out to a short free flat.  The solid is the installed shape;
+the front view also shows the part's hidden FreeForm reference sketch as the
+phantom free form, and the free crest and tip are baselined from the foot's
+free end on it.  The projected top view carries the blank's pad, strip width
+and hole; a 5:1 detail carries the crest.
 
 Run with SolidWorks open::
 
@@ -19,6 +21,7 @@ import math
 import sys
 from typing import Any
 
+import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
@@ -39,13 +42,19 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from pinion_spring_geometry import (
+    BEND_CX,
     FLAT_TIP,
     FOOT_END,
+    FOOT_TAN,
+    FREE_FLAT_TIP,
+    FREE_KINK_START,
     HOLE_DIA,
     HOLE_FROM_END,
     KINK_C,
-    KINK_START,
+    PAD_LEN,
     PAD_WIDTH,
+    PAD_Z,
+    R_KINK,
     THICK,
 )
 from pinion_spring_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION_BY_NAME
@@ -71,28 +80,34 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (2.0, 1.0)
 _S = SHEET_SCALE[0] / 1000.0
 
-# Front view (XY): the checkmark profile -- the foot along the bottom, the
-# blade rising to the upper right.  Views centre on their bounding boxes; the
-# profile spans the foot's free end to the blade's east face and the foot's
-# underside to the free tip.
-FRONT_BBOX_CX = (FOOT_END[0] + KINK_START[0] + THICK) / 2.0
+# Front view (XY): the profile -- the foot along the bottom running right to
+# its free end, the blade rising at the left and leaning back over the bend.
+# Views centre on their bounding boxes; the profile spans the crest's outer
+# face to the foot's free end and the foot's underside to the free tip.
+_PROFILE_MIN_X = KINK_C[0] - (R_KINK + THICK)
+FRONT_BBOX_CX = (_PROFILE_MIN_X + FOOT_END[0]) / 2.0
 FRONT_BBOX_CY = (FLAT_TIP[1] + THICK) / 2.0
 FRONT_CENTER = (0.110, 0.118)
 # Third-angle projection: the top view sits ABOVE the front and shares its X
 # station (both views span the same model x range), so the pad and hole read
 # straight up from the profile's free end.
-TOP_CENTER = (FRONT_CENTER[0], 0.205)
+TOP_CENTER = (FRONT_CENTER[0], 0.210)
 ISO_CENTER = (0.350, 0.150)
 DETAIL_CENTER = (0.240, 0.195)
 DETAIL_SCALE = (5, 1)
 # The kink detail's fence: centred between the kink centre and the free tip,
-# large enough to take the whole R1.5 arc and the flat.
+# large enough to take the whole kink arc and the flat (3.06 at R3.3).
 DETAIL_FOCUS = (
     (KINK_C[0] + FLAT_TIP[0]) / 2.0,
     (KINK_C[1] + FLAT_TIP[1]) / 2.0,
 )
 DETAIL_RADIUS_MM = 3.5
 DETAIL_LABEL_XY = (0.222, 0.160)
+# The parent fence's native "A" goes WEST of the fence, level with its centre:
+# SolidWorks sets it above the fence, on the FREE, TO KINK TANGENT row
+# (stacktop-dbe47ae3 and spring-r1 both printed it there).  West of the fence
+# is open sheet; the free-form phantom runs on the fence's west edge.
+PARENT_LETTER_OFFSET = (-(DETAIL_RADIUS_MM * _S + 0.005), 0.0)
 
 
 def _front_x(model_x_mm: float) -> float:
@@ -103,38 +118,47 @@ def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - FRONT_BBOX_CY) * _S
 
 
-_FOOT_MID_X = (FOOT_END[0] + KINK_START[0]) / 2.0
+_FOOT_MID_X = (FOOT_END[0] + FREE_KINK_START[0]) / 2.0
+_PROFILE_TOP = _front_y(max(FLAT_TIP[1], FREE_FLAT_TIP[1]))
 FRONT_KEEP = {
-    "FootLen": (_front_x(_FOOT_MID_X), 0.074),
-    "BendR": (0.172, 0.080),
-    "KinkV": (0.176, 0.120),
-    "KinkH": (_front_x(_FOOT_MID_X), 0.160),
-    # 18 mm above KinkH: 10 put TipH's dimension line through 41.1.
-    "TipH": (_front_x(_FOOT_MID_X), 0.178),
+    "FootLen": (_front_x((FOOT_TAN[0] + FOOT_END[0]) / 2.0), _front_y(0.0) - 0.010),
+    "BendR": (_front_x(BEND_CX) - 0.032, _front_y(0.0) - 0.004),
+    # The free locations, on the FreeForm phantom.
+    "FreeKinkV": (_front_x(FOOT_END[0]) + 0.016, _front_y(FREE_KINK_START[1] / 2.0)),
+    # Clear of the kink fence's native "A" label, which SolidWorks sets just
+    # above the fence (spring-r1 put the 15.0 text on it), with a text gap
+    # between the two and the top view lifted to make room.
+    "FreeKinkH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.020),
+    "FreeTipH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.038),
 }
+_PAD_EAST = _front_x(FOOT_END[0])
 TOP_KEEP = {
-    "PadLen": (_front_x(FOOT_END[0] + 4.75), 0.226),
-    # Outboard of the hole-edge 4.75 (text at x 0.056) so the two stack apart.
-    "PadWidth": (0.028, TOP_CENTER[1]),
-    "StripWidth": (0.172, TOP_CENTER[1]),
+    "PadLen": (_front_x(FOOT_END[0] - PAD_LEN / 2.0), TOP_CENTER[1] + 0.021),
+    # Outboard of the hole-edge 4.75 (HOLE_EDGE_TEXT_XY) so the two stack apart.
+    "PadWidth": (_PAD_EAST + 0.030, TOP_CENTER[1]),
+    "StripWidth": (_front_x(_PROFILE_MIN_X) - 0.018, TOP_CENTER[1]),
 }
 DETAIL_KEEP = {
-    # Upper-left of the fence: right of it the leader crossed the 2.0 flat
-    # dimension's extension lines and its arrowhead met the text.
-    "KinkR": (0.195, 0.232),
-    "FlatLen": (0.278, 0.182),
+    # The flick turns right (east) in this view: the radius leader goes
+    # upper-left of the fence, the flat's length to its right.
+    "KinkR": (0.205, 0.232),
+    "FlatLen": (0.282, 0.200),
 }
 DIMENSION_CALLOUTS = {
     "FootLen": "TO BEND TANGENT",
-    "KinkH": "TO KINK TANGENT",
-    "KinkV": "TO KINK TANGENT",
-    "TipH": "TO FREE TIP",
+    "FreeKinkH": "FREE, TO KINK TANGENT",
+    "FreeKinkV": "FREE, TO KINK TANGENT",
+    "FreeTipH": "FREE, TO TIP",
 }
-HOLE_END_TEXT_XY = (_front_x(FOOT_END[0] + 2.25), 0.236)
-HOLE_EDGE_TEXT_XY = (0.056, TOP_CENTER[1] + 0.004)
-# Below the pad (bottom edge y 0.196): above it the leader crossed the 4.50
-# and 9.50 pad dimensions on its way down to the hole.
-HOLE_CALLOUT_XY = (0.045, 0.188)
+HOLE_END_TEXT_XY = (_front_x(FOOT_END[0] - HOLE_FROM_END / 2.0), TOP_CENTER[1] + 0.031)
+HOLE_EDGE_TEXT_XY = (_PAD_EAST + 0.012, TOP_CENTER[1] + 0.004)
+# Below the pad: above it the leader crossed the 4.50 and 9.50 pad
+# dimensions on its way down to the hole.  The note centres on this point, so
+# it sits east of the pad, clear of the FREE, TO TIP text below the top view.
+HOLE_CALLOUT_XY = (_PAD_EAST + 0.035, TOP_CENTER[1] - 0.019)
+# The #4 normal clearance (3.264 mm = 0.1285 in) is a No. 30 drill; the shop
+# reaches for the number, the native size compartment still prints the diameter.
+HOLE_PROCESS = "#30 DRILL"
 
 
 def _kink_detail(adapter: Any, front: Any) -> Any:
@@ -157,7 +181,9 @@ def _kink_detail(adapter: Any, front: Any) -> Any:
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     points = []
     for x, y in (center, (center[0] + radius, center[1])):
-        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
     manager = _early_bound(draw.SketchManager, "ISketchManager")
@@ -204,6 +230,19 @@ def _kink_detail(adapter: Any, front: Any) -> Any:
     actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
     if math.dist(actual, label_xyz) > 1e-8:
         raise RuntimeError(f"kink detail label position did not persist: {actual}")
+    # _stock_trim_drawing.position_parent_detail_letter's proven form.
+    circles = tuple(_read_member(parent, "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(f"expected one parent detail circle, found {len(circles)}")
+    circle = _early_bound(circles[0], "IDetailCircle")
+    letter = tuple(center[axis] + PARENT_LETTER_OFFSET[axis] for axis in range(2))
+    circle.SetLabelPosition(*letter)
+    draw.EditRebuild3()
+    placed = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(placed) != 2 or math.dist(placed, letter) > 1e-8:
+        raise RuntimeError(
+            f"parent detail-circle label position did not persist: {placed}"
+        )
     return detail
 
 
@@ -214,14 +253,14 @@ def _hole_locations(adapter: Any, top: Any) -> None:
     print dimensions the hole from the blank's own edges with driven sheet
     dimensions picked on both features; they print at the .XX row.
     """
-    hole_x = (FOOT_END[0] + HOLE_FROM_END) / 1000.0
+    hole_x = (FOOT_END[0] - HOLE_FROM_END) / 1000.0
     hole_r = HOLE_DIA / 2000.0
     top_y = THICK / 1000.0
     edge_picks = {
         sign: model_point_in_view(
             adapter,
             top,
-            (hole_x, top_y, sign * PAD_WIDTH / 2000.0),
+            (hole_x, top_y, (PAD_Z + sign * PAD_WIDTH / 2.0) / 1000.0),
             label=f"pad long edge z{sign:+g}",
         )
         for sign in (-1.0, 1.0)
@@ -233,11 +272,18 @@ def _hole_locations(adapter: Any, top: Any) -> None:
             model_point_in_view(
                 adapter,
                 top,
-                (FOOT_END[0] / 1000.0, top_y, -lower * PAD_WIDTH / 4000.0),
+                (
+                    FOOT_END[0] / 1000.0,
+                    top_y,
+                    (PAD_Z - lower * PAD_WIDTH / 4.0) / 1000.0,
+                ),
                 label="pad free end",
             ),
             model_point_in_view(
-                adapter, top, (hole_x - hole_r, top_y, 0.0), label="hole west edge"
+                adapter,
+                top,
+                (hole_x + hole_r, top_y, PAD_Z / 1000.0),
+                label="hole east edge",
             ),
             HOLE_END_TEXT_XY,
             "horizontal",
@@ -249,7 +295,7 @@ def _hole_locations(adapter: Any, top: Any) -> None:
             model_point_in_view(
                 adapter,
                 top,
-                (hole_x, top_y, lower * hole_r),
+                (hole_x, top_y, PAD_Z / 1000.0 + lower * hole_r),
                 label="hole lower edge",
             ),
             HOLE_EDGE_TEXT_XY,
@@ -312,7 +358,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Pinion Return Leaf Spring Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "pinion return spring; bent brass leaf; formed blank",
+            3: "pinion return spring; bent stainless leaf; formed blank",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -324,7 +370,11 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, top, iso):
         set_hidden_lines_removed(adapter, view)
 
-    front_annotations = curate_view_dimensions(
+    # The front view imports the part-hidden FreeForm reference sketch, so it
+    # takes the opt-in curation that shows it (the phantom) in this view only.
+    # The kink detail is derived from it and is created while the part still
+    # hides the sketch, so it shows the installed crest alone.
+    front_annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         front,
         keep=FRONT_KEEP,
@@ -358,7 +408,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         (
-            (FOOT_END[0] + HOLE_FROM_END) / 1000.0,
+            (FOOT_END[0] - HOLE_FROM_END) / 1000.0,
             THICK / 1000.0,
             HOLE_DIA / 2000.0,
         ),
@@ -370,7 +420,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=hole_edge,
         callout_xy=HOLE_CALLOUT_XY,
         label="spring pad clearance hole",
-        process="DRILL",
+        process=HOLE_PROCESS,
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.058)
