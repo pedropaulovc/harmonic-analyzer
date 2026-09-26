@@ -207,30 +207,40 @@ def _cheek_cap(
 def test_bar_foot_cheeks_clear_the_hub_at_the_worst_case(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """At d = 0 each amplitude bar's foot cheeks pass over its rocker's hub.
-    Worst case: the notch at its deepest and the rocker's top edge at its
-    lowest, over the hub, the washer and the shoulder at maximum material.
-    The one-sided bands (user ruling 2026-09-26) make the slack floor 0:
-    neither can move the cheeks toward the pivot."""
+    """At d = 0 each amplitude bar's foot cheeks pass over its own rocker's
+    hub (the washer and the shoulder sit axially outboard of the end bars'
+    cheeks, test_amplitude_bars_clear_both_thrust_faces_at_the_worst_case,
+    and are held no larger than the hub). Worst case: the notch at its
+    deepest, the rocker's top edge at its lowest, and the hub at maximum
+    material and off the bore axis by the printed coaxiality's radius. The
+    one-sided bands (user ruling 2026-09-26) put no term on the notch or the
+    edge; the coaxiality note (Main 2026-09-26) spends 0.25 of the air."""
     notch_deeper = bar_notes.BOTTOM_NOTCH_DEPTH_BAND[0]
     edge_lower = arm_notes.TOP_EDGE_BAND[1]
     assert notch_deeper == edge_lower == 0.0
     worst = _cheek_cap(monkeypatch, notch_deeper, edge_lower)
     nominal = _cheek_cap(monkeypatch, 0.0, 0.0)
     assert worst == pytest.approx(nominal - notch_deeper - edge_lower, abs=1e-6)
-    max_material_r = max(
-        (arm.HUB_DIA + _BAND_2PL) / 2.0,
+    hub_max_material_r = (arm.HUB_DIA + _BAND_2PL) / 2.0
+    # O10.20 keeps ~0.29 of air at maximum material on the bore axis: the cap
+    # (Ø11.29) is nominal geometry, so the bands above are what hold it.
+    assert worst - hub_max_material_r == pytest.approx(0.291, abs=5e-3)
+    eccentricity = arm_notes.HUB_COAXIALITY_DIA / 2.0
+    hub_top = hub_max_material_r + eccentricity
+    assert worst - hub_top >= 0.0
+    assert worst - hub_top == pytest.approx(0.041, abs=5e-3)
+    assert f"WITHIN Ø{arm_notes.HUB_COAXIALITY_DIA:.2f}" in arm_notes.DRAWING_NOTES
+    # A looser coaxiality would put the cheeks into the hub, and so would the
+    # bilateral .XX the notch and the edge printed before -- every band binds.
+    looser = arm_notes.HUB_COAXIALITY_DIA + 0.10
+    assert worst - (hub_max_material_r + looser / 2.0) < 0.0
+    assert _cheek_cap(monkeypatch, _BAND_2PL, 0.0) - hub_top < 0.0
+    assert _cheek_cap(monkeypatch, 0.0, _BAND_2PL) - hub_top < 0.0
+    for other_max_material_r in (
         (washer.OD + _BAND_2PL) / 2.0,
         shaft.SHOULDER_DIA / 2.0,
-    )
-    assert worst - max_material_r >= 0.0
-    # O10.20 keeps ~0.29 of air at maximum material: the cap (Ø11.29) is
-    # nominal geometry, so the bands above are what hold it.
-    assert worst - max_material_r == pytest.approx(0.291, abs=5e-3)
-    # The bilateral .XX those two features printed before would have put the
-    # cheeks into the hub -- the bands bind.
-    assert _cheek_cap(monkeypatch, _BAND_2PL, 0.0) - max_material_r < 0.0
-    assert _cheek_cap(monkeypatch, 0.0, _BAND_2PL) - max_material_r < 0.0
+    ):
+        assert other_max_material_r <= hub_max_material_r
 
 
 def test_the_one_sided_bands_lift_the_bar_at_most_1_mm_at_rest(

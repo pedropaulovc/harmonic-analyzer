@@ -35,6 +35,12 @@ from rocker_arm_spec import (
 # notch 0.5 shallow (test_rocker_bank_layout pins both numbers).
 TOP_EDGE_ABOVE_PIVOT = CENTER_Y - PIVOT_MID_Y - R_TOP  # 8.0
 TOP_EDGE_BAND = (0.50, 0.0)  # (upper, lower)
+# The hub is the other end of that chain: an OD off the bore axis by e lifts
+# its top e toward the cheeks, and nothing else relates the two features. A
+# plain note, not a frame (Main 2026-09-26); turning the hub and reaming the
+# bore in one setup meets it without measuring. Its radius comes off the
+# cheek-over-hub air in test_rocker_bank_layout.
+HUB_COAXIALITY_DIA = 0.50
 
 # True free-text instructions only; geometry / datum structure / roughness live
 # in native dimensions / datum tags / FCFs / surface symbols.  Hole sizes ride
@@ -70,9 +76,11 @@ DRAWING_NOTES = "\n".join(
         f"5. EACH END: {TIP_FACE:.2f} RADIAL LAND PERP TO",
         "   TOP EDGE; STRAIGHT TAPER TO BOTTOM ARC.",
         f"6. PIVOT HOLE: REAM +{PIVOT_HOLE_BAND[0]:.2f}/0, Ra 1.6.",
-        f"7. INTEGRAL HUB DIA {HUB_DIA:.2f} ON THE PIVOT BORE,",
-        "   CENTRED ON THE STRAP: THE HUBS SET THE",
-        "   STATION PITCH (NO SPACERS).",
+        f"7. INTEGRAL HUB DIA {HUB_DIA:.2f}, CENTRED ON THE",
+        "   STRAP: THE HUBS SET THE STATION PITCH",
+        "   (NO SPACERS). HUB OD COAXIAL WITH PIVOT",
+        f"   BORE WITHIN Ø{HUB_COAXIALITY_DIA:.2f} (TURN HUB AND REAM",
+        "   BORE IN ONE SETUP).",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

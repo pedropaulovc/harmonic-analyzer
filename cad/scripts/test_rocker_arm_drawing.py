@@ -91,6 +91,10 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert f"TOP EDGE 8.00 +{upper:.2f}/0 ABOVE THE PIVOT" in notes
     assert rocker_arm_notes.TOP_EDGE_ABOVE_PIVOT == pytest.approx(8.0)
     assert f"INTEGRAL HUB DIA {rocker_arm_spec.HUB_DIA:.2f}" in notes
+    assert (
+        "HUB OD COAXIAL WITH PIVOT BORE WITHIN Ø0.50 (TURN HUB AND REAM BORE IN ONE SETUP)"
+        in " ".join(line.strip() for line in notes.splitlines())
+    )
     assert "11.5 IN" not in notes
     assert "0.22 IN" not in notes
     # General tolerances live in the title block ONLY.
