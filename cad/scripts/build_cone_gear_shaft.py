@@ -312,6 +312,7 @@ def _assert_shoulder_planes_single_owned(adapter: Any) -> None:
             continue
         owner = f'"SecEnd{i}"'
         globals_ = _equations_for(adapter, owner)
+        _telemetry.info(f"shoulder plane ownership SecEnd{i} definition {globals_}")
         if len(globals_) != 1:
             problems.append(f"SecEnd{i}: expected one definition, found {globals_}")
         states = {}

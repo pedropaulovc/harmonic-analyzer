@@ -487,14 +487,18 @@ def _machine(override=None):
 
 
 def test_shoulder_plane_gate_accepts_single_ownership_at_driven_state_1(
-    monkeypatch,
+    monkeypatch, caplog
 ) -> None:
     """Equation-owned dimensions read DrivenState 1 (driven), never 2: the
-    gate compares against the land's equation-owned depth, not a literal."""
+    gate compares against the land's equation-owned depth, not a literal.
+    Each SecEnd definition, with its value, lands in the leaf log as evidence."""
     dims, equations = _machine()
-    part._assert_shoulder_planes_single_owned(
-        _gate_fixture(monkeypatch, dims, equations)
-    )
+    with caplog.at_level("INFO"):
+        part._assert_shoulder_planes_single_owned(
+            _gate_fixture(monkeypatch, dims, equations)
+        )
+    for i in range(1, len(cone_gear_shaft_spec.SECTIONS)):
+        assert equations[f'"SecEnd{i}"'][0] in caplog.text
 
 
 @pytest.mark.parametrize(
