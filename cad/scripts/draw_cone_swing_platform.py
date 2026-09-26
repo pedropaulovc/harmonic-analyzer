@@ -265,8 +265,12 @@ PROFILE_KEEP = {
     # past the plate's west edge -- 8 mm off the R8.0, above the 11.0's witness
     # top (0.1332) and 10 mm under the C-C line.  On the hole-location plan the
     # same line fenced the U on three sides, so no leader could name the
-    # feature without crossing it (MHA-091 round 6, B1).
-    "PivotBearingReliefDia": (0.090, 0.1413),
+    # feature without crossing it (MHA-091 round 6, B1).  SolidWorks centres
+    # the text on this point, so it sits right by half of what the " TOP
+    # RELIEF" suffix adds: leaf swing-s1-34c3 printed the bare 10.50 10.9 mm
+    # wide and the suffixed text 35.6, and at x 0.090 it overprinted the west
+    # edge and the U.  The value keeps the bare 10.50's left edge.
+    "PivotBearingReliefDia": (0.090 + 0.0124, 0.1413),
 }
 # The relief's width names its feature where it prints: the note that
 # identifies the U went to sheet 2 with the hole-location plan (#917 S1), so

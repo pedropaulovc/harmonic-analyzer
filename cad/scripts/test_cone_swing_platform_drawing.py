@@ -1742,12 +1742,17 @@ def test_the_10_50_prints_over_the_profile_u() -> None:
     pivot = drawing.PROFILE_PIVOT_XY
     half = spec.PIVOT_BEARING_RELIEF_DIAMETER / 2.0 * drawing.PLAN_SCALE
     assert y - (pivot[1] + half) == pytest.approx(0.001, abs=2e-4)
-    text = drawing._centred_box((x, y), (len("10.50") * _DIM_CHAR_W, _DIM_GLYPH_H))
+    printed = "10.50" + drawing.RELIEF_WIDTH_SUFFIX["PivotBearingReliefDia"]
+    text = drawing._centred_box((x, y), (len(printed) * _DIM_CHAR_W, _DIM_GLYPH_H))
     assert text[0] - (pivot[0] + half) >= 0.004
     west_edge = drawing.plan_xy(
         drawing.PROFILE_CENTER, drawing.plate_edge_mm(-(y - pivot[1]) / drawing.PLAN_SCALE, 1), 0.0
     )[0]
     assert text[0] - west_edge >= 0.002
+    # Positive control: leaf swing-s1-34c3 printed the suffixed text centred
+    # on x 0.090, 72.4..108.0 mm, across the west edge and over the U.
+    assert (0.0724 - west_edge) < 0 and 0.0724 < pivot[0] + half
+    assert text[2] < 0.216  # the plans sheet's title block starts there
     r8 = drawing._centred_box(drawing.PROFILE_KEEP["CornerNWR"], (0.0151, 0.0035))
     assert _box_gap(text, r8) >= 0.005
     assert text[1] - _D382_NORTH_WEST_X_WITNESS[1][1] >= 0.004
