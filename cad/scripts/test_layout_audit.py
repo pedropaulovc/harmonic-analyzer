@@ -489,7 +489,9 @@ def test_a_shoulder_crossed_by_a_foreign_dimension_line_is_found():
         height=h,
     )
     heel = _dim("HeelReliefHt", "5.56", 0.150, 0.080, lines=[(0.1190, 0.0875, 0.1190, 0.0990)])
-    heel["display"]["lines"].append(_line(0.1190, 0.0990, 0.1190, 0.1010))
+    # Up to 0.1 mm into the text box: under text-on-line's 0.15 mm, so the
+    # crossing is the shoulder's alone.
+    heel["display"]["lines"].append(_line(0.1190, 0.0990, 0.1190, 0.1002))
     findings = audit_dump(_dump(views=[_view("front", (0.05, 0.05, 0.2, 0.2), [callout, heel])]))
     crossed = [f for f in findings if f.kind == "shoulder-crosses-line"]
     assert [(f.a.split()[1], f.b.split()[1]) for f in crossed] == [("Adjuster", "HeelReliefHt")]
@@ -1469,6 +1471,61 @@ def test_the_audit_and_the_placement_checks_share_one_arrow_text_clearance():
     assert ARROW_TEXT_CLEARANCE_M == 0.002
     for finder in (find_arrows_near_text, find_extensions_near_text):
         assert finder.__kwdefaults__["clearance"] is ARROW_TEXT_CLEARANCE_M
+
+
+# knife-mount (95a9e97ca, calibration run 2): the 29.37 runs through the
+# Ø12.00 / THRU parked off the bore, and through the shoulder under it.
+KM_BORE_DIA = _dim_record(
+    "BoreDia",
+    [
+        (0.1044316, 0.134318, 0.0770455, 0.149047),
+        (0.1255684, 0.12295, 0.1044316, 0.134318),
+        (0.0770455, 0.149047, 0.058542, 0.149047),
+    ],
+    [(0.1044316, 0.134318, -0.8807039, 0.4736673)],
+    [("<MOD-DIAM>", 0.058542, 0.1546033), ("12.00", 0.0638205, 0.1546567), ("THRU", 0.0614656, 0.149047)],
+)
+KM_BLOCK_HEIGHT = _dim_record(
+    "BlockHeight",
+    [
+        (0.138, 0.110634, 0.062, 0.110634),
+        (0.138, 0.169366, 0.062, 0.169366),
+        (0.063, 0.110634, 0.063, 0.1372219),
+        (0.063, 0.169366, 0.063, 0.1427781),
+    ],
+    [(0.063, 0.110634, 0.0, 1.0), (0.063, 0.169366, 0.0, -1.0)],
+    [(" 29.37 ", 0.0558882, 0.1372219)],
+)
+KM_SPANS = [
+    ["29.37", 0.0573213, 0.1381558, 0.0686927, 0.1417211],
+    ["12.00", 0.0644833, 0.1555907, 0.0753086, 0.159156],
+    ["THRU", 0.0615403, 0.149981, 0.0721142, 0.1534623],
+]
+
+
+def test_a_dimension_text_shoulder_is_a_shoulder_and_one_crossing_is_one_finding():
+    """The Ø12.00's run under THRU is its text shoulder, not an extension
+    line; the 29.37 through its text and shoulder is one gating defect."""
+    roles = [s.role for s in annotation_geometry(KM_BORE_DIA, owner="v", advance=0.6).segments if s.role != "arrow"]
+    assert roles == ["dim-line", "dim-line", "shoulder"]
+    view = _view("Drawing View1", (0.085412, 0.105046, 0.144588, 0.174954), [KM_BORE_DIA, KM_BLOCK_HEIGHT])
+    block = _box_edges(0.09, 0.11, 0.14, 0.17)
+    findings = audit_dump(_dump(views=[view], spans=KM_SPANS, strokes=block, print_rest=False))
+    gating = [(f.kind, f.a.split()[1], f.b.split()[1]) for f in findings if severity(f) is FindingSeverity.GATING]
+    assert gating == [("text-on-line", "BoreDia", "BlockHeight")]
+
+
+def test_an_extension_line_passing_a_dimension_baseline_stays_an_extension_line():
+    """pinion-bracket's 7.000 (run 2): its lower witness runs along the text
+    baseline, 0.2 mm off it, but does not continue a dimension line."""
+    pin_seat_cy = _dim_record(
+        "PinSeatCy",
+        [(0.07, 0.136, 0.131, 0.136), (0.072, 0.122, 0.131, 0.122), (0.13, 0.136, 0.13, 0.14235), (0.13, 0.122, 0.13, 0.11565)],
+        [(0.13, 0.136, 0.0, 1.0), (0.13, 0.122, 0.0, -1.0)],
+        [(" 7.000 ", 0.1228882, 0.1222219)],
+    )
+    roles = [s.role for s in annotation_geometry(pin_seat_cy, owner="v", advance=0.6).segments if s.role != "arrow"]
+    assert roles == ["ext-line", "ext-line", "dim-line", "dim-line"]
 
 
 def test_two_leaders_converging_on_one_landing_are_advisory():
