@@ -66,6 +66,7 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -77,10 +78,13 @@ from _common import (
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from rocker_arm_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
@@ -89,6 +93,7 @@ from rocker_arm_spec import (
     ARM_THICKNESS as SPEC_ARM_THICKNESS,
     HUB_DIA,
     HUB_LENGTH,
+    HUB_LENGTH_BAND,
     ROD_HOLE_SPEC,
     SURFACE_FINISHES,
 )
@@ -395,7 +400,8 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Hub")
-    drive_jobs.append(("D1@Hub", '"HubLength"'))
+    hub_length_dim = name_dimensions(adapter, "Hub", ["HubLength"])
+    drive_jobs.append((hub_length_dim[0], '"HubLength"'))
     v_hub = math.pi * (HUB_DIA / 2.0) ** 2 * (HUB_LENGTH - ARM_THICKNESS)
     await volume_check(adapter, "strap + hub", v_strap + v_hub, 0.01 * v_strap)
 
@@ -491,6 +497,11 @@ async def build(adapter) -> dict[str, str]:
     # Manufacturing drawing support: mark exactly the print's dimensions (the
     # drawing recipe imports the marked set and must find every one of these),
     # and stamp the make-critical title-block properties.
+    # The hub length only comes out long (#743 PR2): three places hold it.
+    set_dimension_bilateral_tolerance(
+        adapter, "Hub", "HubLength", *deviations(HUB_LENGTH_BAND)
+    )
+    apply_drawing_precision(adapter, {"Hub": {"HubLength": 3}})
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
