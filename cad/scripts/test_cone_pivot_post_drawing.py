@@ -8,7 +8,7 @@ from pathlib import Path
 import build_cone_pivot_post as part
 import cone_pivot_post_spec as spec
 import draw_cone_pivot_post as drawing
-from _assembly import _seed_flip
+from _assembly import _seed_flip, activate_assembly_contract
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED_UM, SEAT_UM, surface_finish_by_key
@@ -215,7 +215,7 @@ def test_the_plan_angle_is_model_geometry_not_sheet_text() -> None:
 def test_machined_faces_are_called_out_on_the_casting() -> None:
     assert part.SURFACE_FINISHES is spec.SURFACE_FINISHES
     keys = {control.key for control in spec.SURFACE_FINISHES}
-    assert keys == {"foot_seat", "crank_bore", "journal_bore"}
+    assert keys == {"foot_seat", "crank_bore", "journal_bore", "cone_boss_north_face"}
     assert (
         surface_finish_by_key(spec.SURFACE_FINISHES, "foot_seat").roughness_um
         == SEAT_UM
@@ -298,6 +298,7 @@ def test_part_exposes_semantic_mating_references() -> None:
 
 
 def test_rotated_post_reverses_the_cone_shaft_axial_mate_side() -> None:
+    activate_assembly_contract("drive-train")
     assert not _seed_flip("cone-shaft axial d=22.01", 22.01)
 
 
@@ -357,6 +358,47 @@ def test_collar_diameter_lives_on_its_plan_circle() -> None:
 
 def test_cone_boss_end_faces_are_located_by_symmetry() -> None:
     assert "CONE BOSS END FACES ARE SYMMETRIC ABOUT THE POST AXIS." in spec.DRAWING_NOTES
+
+
+def test_collar_thrust_face_adds_no_setup_note() -> None:
+    """#914: the collar face gets a finish symbol, not a method note (rule 6).
+
+    Squareness of the north boss end is not functional (the journal locates
+    the shaft), so no note may prescribe facing it or a setup for it; the one
+    SETUP line is the bore-to-bore requirement that predates the collar.
+    """
+    lines = spec.DRAWING_NOTES.splitlines()
+    assert not [line for line in lines if line.startswith("FACE")]
+    assert [line for line in lines if "SETUP" in line] == [
+        line for line in lines if line.startswith("BORE BOTH IN ONE SETUP")
+    ]
+    assert spec.GEOMETRIC_TOLERANCES_MM == {}
+
+
+def test_north_cone_boss_end_carries_the_running_finish() -> None:
+    """#914: the shaft collar runs on the north boss end face (rule 5)."""
+    import math
+
+    from _gtol_spec import PlanarFace
+    from cone_pivot_post_installation import POST_ROTATION_Y_DEG
+
+    control = surface_finish_by_key(spec.SURFACE_FINISHES, "cone_boss_north_face")
+    assert control.roughness_um == MACHINED_UM
+    face = control.face
+    assert isinstance(face, PlanarFace)
+    incline = math.radians(spec.INCLINE_DEG)
+    expected = (-math.sin(incline), 0.0, -math.cos(incline))
+    assert all(abs(a - b) < 1e-12 for a, b in zip(face.normal, expected))
+    assert face.offset_mm == spec.CONE_BOSS_LENGTH / 2.0
+    # North is machine +Z (cone stations grow toward the gears).  The post is
+    # installed Ry(180), which maps part (x, y, z) to machine (-x, y, -z), so
+    # the north face's outward normal must point to machine +Z.
+    assert POST_ROTATION_Y_DEG == 180.0
+    machine_normal = (-face.normal[0], face.normal[1], -face.normal[2])
+    assert machine_normal[2] > 0.9
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "cone_boss_north_face")' in source
+    assert "len(surface_boxes) != len(SURFACE_FINISHES)" in source
 
 
 def test_plan_angle_prints_one_place_under_the_one_degree_band() -> None:

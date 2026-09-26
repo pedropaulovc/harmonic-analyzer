@@ -19,6 +19,7 @@ from _common import (
     run_build,
 )
 from _assembly import (
+    activate_assembly_contract,
     angle_driver,
     coincident_mate,
     component_transform,
@@ -27,6 +28,10 @@ from _assembly import (
     place_component,
     world_point,
 )
+
+# Distance drivers seed their side from summing's flip seeds
+# (cad/config/assemblies/summing.yaml), the assembly this probe mirrors.
+activate_assembly_contract("summing")
 from build_summing_lever import SPIN_REF_X as SL_SPIN_REF_X
 
 KNIFE = (15.0, 990.0)

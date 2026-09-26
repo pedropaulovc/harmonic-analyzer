@@ -496,14 +496,20 @@ async def build_stock_fastener(
                 component=component_count,
                 bodies=len(new_bodies),
             ):
-                _transform_new_bodies(
-                    model,
-                    component_count,
-                    component,
-                    new_bodies,
-                    frozenset(item.name for item in before),
-                )
-                _blank_recipe_references(adapter)
+                # ~27 s per build in one opaque span: split the body move from
+                # the construction-feature walk so the cost can be attributed.
+                with _telemetry.span("fastener.stock.move_features", sku=component.sku):
+                    _transform_new_bodies(
+                        model,
+                        component_count,
+                        component,
+                        new_bodies,
+                        frozenset(item.name for item in before),
+                    )
+                with _telemetry.span(
+                    "fastener.stock.blank_references", sku=component.sku
+                ):
+                    _blank_recipe_references(adapter)
                 model.ClearSelection2(True)
     finally:
         if hasattr(adapter, "_mcm_com_map"):

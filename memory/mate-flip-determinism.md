@@ -17,7 +17,8 @@ to delete + re-add flipped (self-heal) and emit a `flip-seed MISS` **warn**; tha
 inefficient reflip fired every build for any unseeded reference — the exact cost
 the seeding system exists to kill. The recovery is REMOVED: detection stays, but a
 miss now **raises** a `RuntimeError` naming the exact sig to toggle in
-`_FLIP_INVERT`. Zero flips is thus ENFORCED — the build fails loud on the first
+the building assembly's `flip_invert` (`cad/config/assemblies/<stem>.yaml`;
+`_FLIP_INVERT` in `_assembly.py` until 2026-09-25). Zero flips is thus ENFORCED — the build fails loud on the first
 un/mis-seeded mate instead of silently paying for a per-build reflip.
 
 **Winner = distance mate + SIGN-DERIVED flip, NOT signed-offset planes (#185).**
@@ -31,12 +32,13 @@ Frame keeps its 6 `plane_distance_mate` seats (0-flip, 162 s, cheapest there).
 
 **The mechanism (`_assembly.py`, shipped #185).** `distance_driver` takes the
 SIGNED coordinate (call sites pass `coord`, not `abs(coord)`) and seeds
-`flip = (signed < 0) XOR (_flip_sig(label)+_orient_suffix(...) in _FLIP_INVERT)`.
-The sign handles the great majority; `_FLIP_INVERT` is the per-signature learned
+`flip = (signed < 0) XOR (_flip_sig(label)+_orient_suffix(...) in flip_invert)`,
+`flip_invert` being the ACTIVE assembly contract's set (was `_FLIP_INVERT`).
+The sign handles the great majority; `flip_invert` is the per-signature learned
 polarity for references whose default side is inverted. `_mate`'s readback +
 #186's hard-error check stay as the regression alarm, but now FATAL (#195): a
 wrong side **raises** `flip-seed MISS: … landed on the WRONG side … toggle sig
-{sig!r} in _FLIP_INVERT`, naming the exact sig — a flip in a normal build means
+{sig!r} in flip_invert … in cad/config/assemblies/<stem>.yaml`, naming the exact sig — a flip in a normal build means
 the heuristic broke for that mate and the build stops until it is re-seeded.
 
 **Learn from the build's own output.** Post-#195 a miss ERRORS, so a hard-error
@@ -72,18 +74,32 @@ get a semantic name via `_assembly.seat_plane_name(descriptor)` (frame's
 `plane_distance_mate`). Part-build planes use `name_last_feature` (trap: renames
 the SKETCH, not the plane, after `create_sketch`+`exit_sketch`).
 
-**`_FLIP_INVERT` is GLOBAL — do NOT split it per-assembly (tried, reverted PR #193).**
-A seed is keyed by `_flip_sig(label)[+orient]`, and the SAME sig recurs across
-assemblies — e.g. `"lever axial seat"` is exercised by mates in BOTH `channel` and
-`drive_train`. A disjoint per-assembly `cad/config/flip_seeds/<stem>.yaml` split
-under-populated `drive_train` (the sig sat only in `channel.yaml`) → a `flip-seed
-MISS` every build (self-healed, but broke the 0-flip invariant). A CORRECT scheme
-would give every assembly the full set — which is just the module-global
-`_FLIP_INVERT`. Since the table is a universal dep of every assembly either way,
-externalizing it to config buys NO cache-narrowing over keeping it in `_assembly.py`
-next to the `_seed_flip`/`_flip_sig`/`_orient_suffix` logic it keys. Keep it there.
-(Contrast: placement/`mirror_plane` IS genuinely per-part disjoint data — that split,
-`_config_asm.placement` #156, is correct.)
+**Seeds are PER ASSEMBLY, membership per CONSUMER (2026-09-25).** Each
+assembly's `flip_invert` lives in `cad/config/assemblies/<stem>.yaml`
+(`_assembly_contract`); dodo depends each assembly task on its OWN file, so a
+drive-train seed re-keys the drive-train closure (9 of 227 cache keys) instead of
+all eight assemblies (28). The build opens with
+`activate_assembly_contract(ASM_NAME)` and `_seed_flip` reads only that set.
+
+*Why the first split failed (#193, e23ab11cd, reverted a3101bd03):* it was a
+DISJOINT partition — each sig filed under ONE owning assembly. `"lever axial
+seat"` was then queried by both channel and drive-train, sat only in
+`channel.yaml`, and drive-train MISSed it every build. The revert then concluded
+"a correct scheme = the full set in every assembly = no narrowing", which is
+wrong: an assembly only needs the sigs IT QUERIES. A sig queried by N assemblies
+goes in all N files; for every sig an assembly queries, its file's membership then
+equals the old global set's, so behaviour is identical and the narrowing is real.
+
+*How it stays correct:* `_seed_flip` records every queried sig and its polarity;
+the save chokepoint runs `audit_flip_seeds(asm_name)`, which logs the queried set
+(`flip-seed audit (<stem>): …` in the task log, `flip_seeds.audit` span event),
+WARNs + `flip_seeds.dead` event on file entries no mate queried, and raises if
+the active contract is not the assembly being saved. A sig missing from a file
+still fails loud at the mate (`flip-seed MISS`, naming the file). `check:recipe`
+(`test_assembly_contract.py`) forbids stem-keyed tables in `_assembly.py`, pins
+each recipe to its own file only, and pins each build's activation to its own
+stem. (Contrast: placement/`mirror_plane` IS genuinely per-part disjoint data —
+that split, `_config_asm.placement` #156, is correct.)
 
 **History:** frame #138 (5→0, planes, kept). drive #176 + channel #179 = planes,
 CLOSED. **#185 = distance + sign-derived flip + orientation-aware sigs, MERGED**

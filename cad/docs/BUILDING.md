@@ -47,7 +47,7 @@ glance:
 | `verify_soundness:<stem>` / `verify:kinematics` | yes | local seat or farm leaf | DOF/interference/health gates per (sub)assembly · motion-study pen sweep |
 | `verify:soundness` | no (aggregator) | local | fans out to the `verify_soundness:<stem>` leaves; drives no COM itself |
 | `preflight` / `export` / `package:release` | yes | local seat or farm leaf | release preflight (gear ratios) · neutral STEP/STL/glTF + scene-graph export · Pack-and-Go |
-| `check:math` / `check:config` / `check:graph` / `check:nameplate` / `check:numerals` / `check:recipe` / `check:cache` / `check:partiso` / `check:budget` | **no** | local only | Fourier math · config audit · pure-python unit tests |
+| `check:math` / `check:config` / `check:graph` / `check:nameplate` / `check:numerals` / `check:recipe` / `check:cache` / `check:partiso` / `check:inert` / `check:budget` | **no** | local only | Fourier math · config audit · pure-python unit tests |
 | `gallery` | **no** (Blender + GPU) | local only | refresh the photo-vs-CAD comparison gallery; no farm worker has Blender |
 | `release` | meta | local (publishes) | stages, diffs, tags and publishes; its COM half is the separate `package:release` leaf |
 | **`build`** | yes | either executor | **every** part + assembly + **every** gate — the one fully-safe entry |

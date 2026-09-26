@@ -21,8 +21,9 @@ from itertools import combinations
 from pathlib import Path
 from typing import Any, Callable, Literal, Sequence
 
+import _seat_forensics
 import _telemetry
-from _common import OUT_FAILURES, _early_bound, check, run_build
+from _common import _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     _balloon_item_number,
@@ -55,7 +56,6 @@ from drive_train_assembly_spec import (
 )
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
-
 
 SPEC = DRAWINGS_BY_NAME["drive_train_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem
@@ -524,9 +524,12 @@ CHECKS = "\n".join(
         "3. EACH MHA-027 TURNS FREELY ON MHA-028 WITHOUT AXIAL BINDING.",
         "   A CONNECTING-ROD RING MAY OVERHANG ITS CAM UP TO 0.56 (AT LEAST",
         "   81% OF THE RING WIDTH STAYS ON THE CAM).",
-        "4. CONE SWING (P1): LOOSEN MHA-093; THE CONE SET SWINGS ON MHA-094",
-        "   CLEAR OF EVERY MHA-027. RETURN IT TO THE MHA-095 STOP AND",
-        "   TIGHTEN MHA-093; ALL {cone_gears} MESHES RE-ENGAGE.",
+        # MHA-095 is the DISENGAGED stop (build_cone_swing_platform
+        # swing_hardware_geometry): engaged, the plate edge stands >= 2.0 off
+        # it, so the cone set comes back on its meshes, not on the stop.
+        "4. CONE SWING (P1): LOOSEN MHA-093; SWING THE CONE SET ON MHA-094 TO",
+        "   THE MHA-095 STOP, CLEAR OF EVERY MHA-027. SWING IT BACK UNTIL ALL",
+        "   {cone_gears} MESHES RE-ENGAGE; TIGHTEN MHA-093.",
         "5. ZEROING (P2), CONE SET SWUNG CLEAR: TURN EACH MHA-027 BY HAND",
         "   UNTIL ITS NOTCH LINES UP. TURN MHA-059 TO ENGAGE MHA-002; TURN",
         "   MHA-002 BY MHA-058 UNTIL ALL NOTCHES POINT UP (COSINES) OR 90 DEG",
@@ -1486,7 +1489,7 @@ def _export_failure_pdf(adapter: Any, stage: str) -> None:
         _telemetry.warn(f"{stage}-failure PDF skipped: no active drawing")
         return
     path = (
-        OUT_FAILURES
+        _seat_forensics.OUT_FAILURES
         / f"drive-train-package-{stage}"
         / datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
         / f"{ARTIFACT_STEM}.pdf"

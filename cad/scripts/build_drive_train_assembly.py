@@ -201,6 +201,7 @@ from cone_line import (
     cone_station,
 )
 from _assembly import (
+    activate_assembly_contract,
     angle_driver,
     assembly_title_properties,
     apply_component_color,
@@ -2364,6 +2365,8 @@ async def _place_on_shaft(
 
 
 async def build(adapter) -> dict[str, str]:
+    # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
+    activate_assembly_contract(ASM_NAME)
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
     reset_dof_manifest()

@@ -22,12 +22,12 @@ from typing import Any, Callable, Iterable, Literal, Mapping, Sequence
 
 import _config
 import _telemetry
+import _seat_forensics
 from _common import (
     _build_id,
     _early_bound,
     _visible_document_paths,
     apply_custom_properties,
-    capture_com_failure,
 )
 from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
 from _gtol_spec import gtol_frame_xml as _gtol_frame_xml
@@ -1602,7 +1602,7 @@ def add_native_hole_callout(
                     {"before": before, "after": after}, default=str, sort_keys=True
                 )
             )
-        capture_com_failure(
+        _seat_forensics.capture_com_failure(
             adapter,
             f"hole-callout {label}",
             f"failed to insert native hole callout ({label})",

@@ -14,6 +14,7 @@ from typing import Any
 
 import _config
 import _telemetry
+from _assembly_contract import AssemblyContract, assembly_contract
 from _common import (
     DEFAULT_VIEWS,
     FULLY_CONSTRAINED,
@@ -33,6 +34,7 @@ from _common import (
     check,
     log,
     set_isometric_view,
+    whats_wrong,
 )
 from _visibility import (
     assert_reference_geometry_hidden,
@@ -532,92 +534,100 @@ def _mate_hard_error(adapter: Any, name: str) -> int:
 # from one at z=+40 -- so `flip = (signed < 0)` lands the great majority on-
 # target in ONE solve, no delete-and-re-add. A minority of references have their
 # default side inverted relative to the coordinate's + direction (the part
-# plane's normal opposes the datum's); those signatures live in `_FLIP_INVERT`
-# and XOR the rule. The set is DETERMINED ONCE during development: build with it
-# empty, and every mate that still needs a recovery WARNS with its signature
-# (see `_mate`); add those signatures here and rebuild -> zero flips. The
-# readback guard in `_mate` stays as the safety net AND regression alarm: a flip
-# in a normal build means this heuristic broke for that mate -- re-learn its side.
-_FLIP_INVERT: frozenset[str] = frozenset(
-    {
-        # Per-signature flip polarity, learned once from the discovery build (see
-        # `_seed_flip`/`_orient_suffix`): a signature here seats on the side
-        # OPPOSITE the plain sign rule. Rotation/mirror twins carry an ` @<diag>`
-        # orientation suffix so each is seeded independently of its sibling.
-        # Re-derive after a mate/geometry change: build with this empty, read the
-        # `flip-seed MISS` warns, paste their sigs here, rebuild -> zero flips.
-        "alignment pinion axial",
-        "arbor pedestal datum X",
-        "arbor pedestal datum Y",
-        "arbor pedestal datum Y @npn",
-        "arbor pedestal datum Z",
-        "axial seat",
-        "cam follower back seat depth",
-        "cam follower front seat depth",
-        "cone gear axial seat",
-        "cone lock knob datum X",
-        "cone lock knob datum Y",
-        "cone lock knob datum Z",
-        "cone pivot screw datum X",
-        "cone pivot screw datum Y",
-        "cone pivot screw datum Z",
-        "cone platform height",
-        "crank wheel axial",
-        "crankshaft axial (on the plate)",
-        "cylinder gear axial anchor",
-        "cylinder gear axial pitch",
-        "frame side screw datum x",
-        "frame side screw datum y",
-        "frame side screw datum z",
-        "foot screw datum X",
-        "foot screw datum Y",
-        "foot screw datum Z",
-        "fulcrum shaft datum x",
-        "fulcrum shaft datum y",
-        "fulcrum shaft datum z",
-        "hanger screw head plane",
-        "knob wheel axial",
-        "lever axial seat",
-        "lift rod axial",
-        "mag lever depth @npn",
-        "mag lever knife line across @npn",
-        # (was "pen rod travel snapshot" -- the label gained the PARK-driver tag
-        # 2026-07-07; same mate, same learned side)
-        "pen rod travel PARK driver (freed in default build)",
-        "pinch head seat @ppn",
-        "pinion arbor axial",
-        "pinion cam back set pin axial",
-        "pinion cam front set pin axial",
-        "pinion pivot block datum Y @npn",
-        "pinion pivot shaft datum X",
-        "pinion pivot shaft datum Y",
-        "pinion pivot shaft datum Z",
-        "pinion spring datum Y @npn",
-        # (was "pivot ball mount datum x/y/z" -- the rocker pivot stands became
-        # pivot-bracket 2026-09; same datum-locate idiom, same learned sides)
-        "pivot bracket datum x",
-        "pivot bracket datum y",
-        "pivot bracket datum z",
-        "pivot bracket datum y @npn",
-        "platen feed snapshot",
-        # (was "rack pinion disc axial" -- the 120T disc's label became "reducer
-        # disc" in the PR #196 real-train rework; same mate, same learned side.
-        # Latent until 2026-07-07's full paper-drive rebuild re-keyed it.)
-        "reducer disc axial",
-        "slotted screw datum X",
-        "slotted screw datum Y",
-        "slotted screw datum Z",
-        "spring hook datum y @npn",
-        "summing lever axial",
-        "swing stop screw datum X",
-        "swing stop screw datum Y",
-        "swing stop screw datum Z",
-        "tip block axial seat",
-        "tip bushing axial seat",
-        # Option E-a: the pinned torque shaft's axial station (pc-ea run).
-        "torque shaft axial",
-    }
-)
+# plane's normal opposes the datum's); those signatures live in the building
+# assembly's contract (``flip_invert`` in cad/config/assemblies/<stem>.yaml, see
+# ``_assembly_contract``) and XOR the rule. The set is DETERMINED ONCE during
+# development: build with it empty, and every mate that lands on the wrong side
+# fails with its signature (see `_mate`); add those signatures to the file and
+# rebuild -> zero flips. The readback guard in `_mate` stays as the safety net
+# AND regression alarm: a flip in a normal build means this heuristic broke for
+# that mate -- re-learn its side.
+#
+# The seeds are PER ASSEMBLY so a seed edit re-keys only that assembly. A
+# signature two assemblies both query sits in both files (the reverted #193
+# split was a DISJOINT partition and starved drive-train of a shared seed).
+# ``_seed_flip`` records every signature it queries, and the save chokepoint
+# runs ``audit_flip_seeds``: it logs the queried set and warns on contract
+# entries no mate queried, so every full build proves the mapping.
+_ACTIVE_CONTRACT: AssemblyContract | None = None
+# signature (+ orientation suffix) -> whether it was inverted, this build.
+_SEED_QUERIES: dict[str, bool] = {}
+
+
+def activate_assembly_contract(stem: str) -> AssemblyContract:
+    """Select the contract of the DASHED assembly ``stem`` for this process.
+
+    Every ``build_<stem>_assembly.build()`` calls this first, with its own stem
+    (``check:recipe`` pins that), because dodo narrows the assembly's recipe to
+    exactly that contract file. Resets the seed-query record so a multi-build
+    process never leaks one assembly's audit into the next."""
+    global _ACTIVE_CONTRACT
+    _ACTIVE_CONTRACT = assembly_contract(stem)
+    _SEED_QUERIES.clear()
+    return _ACTIVE_CONTRACT
+
+
+def _active_contract() -> AssemblyContract:
+    if _ACTIVE_CONTRACT is None:
+        raise RuntimeError(
+            "no active assembly contract: call activate_assembly_contract("
+            "'<dashed-stem>') at the top of the build before authoring drivers"
+        )
+    return _ACTIVE_CONTRACT
+
+
+def _contract_location() -> str:
+    """Where a seed for the current process lives, for error messages."""
+    if _ACTIVE_CONTRACT is None:
+        return "the building assembly's cad/config/assemblies/<stem>.yaml"
+    return f"cad/config/assemblies/{_ACTIVE_CONTRACT.path.name}"
+
+
+def allowed_free_stems(stem: str) -> tuple[str, ...]:
+    """The exact under-constrained families the DASHED assembly ``stem`` may
+    ship with. Shared by incremental refresh and verify:soundness so neither
+    path can save/approve a stray freedom the other rejects."""
+    return assembly_contract(stem).allowed_free_stems
+
+
+def audit_flip_seeds(asm_name: str) -> None:
+    """End-of-build seed audit: prove this build's contract against the
+    signatures its drivers actually queried.
+
+    Raises if the active contract is not ``asm_name``'s (the recipe would not
+    carry the file the seeds came from). Logs every queried signature with its
+    polarity -- the empirical per-assembly mapping, visible in the task log --
+    and warns (plus a ``flip_seeds.dead`` span event) on contract entries no
+    mate queried, so dead seeds cannot silently accumulate. A queried signature
+    that seeded the wrong side never reaches here: ``_mate`` raises on the miss.
+    """
+    contract = _active_contract()
+    if contract.stem != asm_name:
+        raise RuntimeError(
+            f"{asm_name}: active assembly contract is {contract.stem!r}; the "
+            f"build must activate_assembly_contract({asm_name!r})"
+        )
+    inverted = sorted(sig for sig, inv in _SEED_QUERIES.items() if inv)
+    dead = sorted(contract.flip_invert - _SEED_QUERIES.keys())
+    _telemetry.event(
+        "flip_seeds.audit",
+        assembly=asm_name,
+        queried=sorted(_SEED_QUERIES),
+        inverted=inverted,
+        dead=dead,
+    )
+    _telemetry.success(
+        f"flip-seed audit ({asm_name}): {len(_SEED_QUERIES)} signature(s) queried,"
+        f" {len(inverted)} inverted {inverted}; plain sign rule"
+        f" {sorted(sig for sig, inv in _SEED_QUERIES.items() if not inv)}"
+    )
+    if not dead:
+        return
+    _telemetry.event("flip_seeds.dead", assembly=asm_name, dead=dead)
+    _telemetry.warn(
+        f"flip-seed audit ({asm_name}): {len(dead)} flip_invert entr(y/ies) no"
+        f" mate queried -- dead seed(s), drop from {_contract_location()}: {dead}"
+    )
 
 
 def _flip_sig(label: str) -> str:
@@ -627,9 +637,9 @@ def _flip_sig(label: str) -> str:
     ``d=<dist>`` distance, and every digit-bearing token (channel/tooth indices
     like ``-7``, ``ch16``, ``T120``, ``J4``) -- leaving the structural descriptor
     (``"spring hook datum y"``). Mates that share a signature are the same seat
-    stamped across a pattern, so they share one flip polarity. Keys
-    :data:`_FLIP_INVERT`; generated with the SAME transform over the mined flip
-    logs, so seeds and runtime signatures match by construction."""
+    stamped across a pattern, so they share one flip polarity. Keys the
+    contract's ``flip_invert``; generated with the SAME transform over the mined
+    flip logs, so seeds and runtime signatures match by construction."""
     s = re.sub(r"\s*->.*$", "", label)
     s = re.sub(r"\bd=[+-]?[0-9.]+", "", s)
     s = re.sub(r"\b\w*\d\w*\b", " ", s)
@@ -660,10 +670,15 @@ def _orient_suffix(adapter: Any, comp_name: str) -> str:
 
 def _seed_flip(label: str, signed: float, suffix: str = "") -> bool:
     """The deterministic first-solve side for a distance driver: the sign of the
-    signed target coordinate, XOR the reference's learned polarity. ``suffix`` is
-    the caller's orientation fingerprint (:func:`_orient_suffix`), appended to the
-    signature so a rotation/mirror twin is disambiguated from its sibling."""
-    return (signed < 0.0) ^ ((_flip_sig(label) + suffix) in _FLIP_INVERT)
+    signed target coordinate, XOR the reference's learned polarity in the active
+    assembly contract. ``suffix`` is the caller's orientation fingerprint
+    (:func:`_orient_suffix`), appended to the signature so a rotation/mirror twin
+    is disambiguated from its sibling. Records the query for
+    :func:`audit_flip_seeds`."""
+    sig = _flip_sig(label) + suffix
+    inverted = sig in _active_contract().flip_invert
+    _SEED_QUERIES[sig] = inverted
+    return (signed < 0.0) ^ inverted
 
 
 def witness_from_ledger(comp_name: str, local_mm: list[float]) -> list[float]:
@@ -714,12 +729,12 @@ async def _mate(
     ``verify``.
 
     ``flip`` seeds the solve's side. The correct side is DETERMINISTIC per mate
-    (the sign rule XOR the reference's :data:`_FLIP_INVERT` polarity -- see
+    (the sign rule XOR the reference's contract ``flip_invert`` polarity -- see
     ``_seed_flip``), so a caller that seeds it right lands on-target in ONE solve.
     A wrong seed does NOT self-heal: this used to delete + re-add flipped, but
     that inefficient reflip fired every build for an unseeded reference and is
     exactly what the seeding system exists to kill. Detection stays, but a miss
-    now RAISES, naming the exact signature to toggle in ``_FLIP_INVERT`` so the
+    now RAISES, naming the exact signature to toggle in the contract so the
     fix is a one-line seed change, not a silent per-build reflip.
     """
     if witness is not None and verify is None:
@@ -780,8 +795,8 @@ async def _mate(
             f"flip-seed MISS: {label!r} landed on the WRONG side"
             f" (off by {moved:.2f} mm, error={err}). The correct side is"
             f" DETERMINISTIC -- seed it: toggle sig {_seed_sig!r} in"
-            f" _FLIP_INVERT (add it if absent, remove it if present) in"
-            f" cad/scripts/_assembly.py, then rebuild. It XORs the sign rule for"
+            f" flip_invert (add it if absent, remove it if present) in"
+            f" {_contract_location()}, then rebuild. It XORs the sign rule for"
             f" this reference so the mate lands on-target in ONE solve. Do NOT"
             f" rely on a runtime reflip -- there is none any more."
         )
@@ -1612,84 +1627,6 @@ def write_dof_manifest(name: str) -> Any:
     return path
 
 
-# Exact under-constrained component families allowed for assemblies that ship
-# with operational free DOF. Shared by incremental refresh and verify:soundness
-# so neither path can save/approve a stray freedom the other rejects.
-_ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
-    "channel": ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever"),
-    "summing": ("summing-lever", "boss-hook"),
-    # The carriage riders (v-block, marker, stirrup frame, thumb screw) are
-    # lock-mated to the free rod and read under-constrained with it.
-    "pen": (
-        "pen-rod",
-        "pen-marker",
-        "pen-wire",
-        "pen-v-block",
-        "pen-frame",
-        "pen-set-screw",
-    ),
-    "drive-train": (
-        "alignment-pinion",
-        "cone-gear",
-        "cone-gear-shaft",
-        "cone-pivot-post",
-        "cone-swing-platform",
-        "cone-tip-adjuster",
-        "cone-tip-block",
-        "cone-tip-bushing",
-        "cone-tip-pinch-screw",
-        "crank-arm",
-        "crank-drive-gear",
-        "crank-handle",
-        "crank-pin",
-        "crank-pin-eye",
-        "crank-pin-ring",
-        "crank-pinion",
-        "crank-pinion-pin",
-        "crankshaft",
-        "cylinder-gear",
-        "fillister-screw",
-        "pinion-arbor",
-        "pinion-arbor-collar",
-        "pinion-bracket",
-        "pinion-cam",
-        "pinion-cam-pin",
-        "pinion-handle",
-        "pinion-lever",
-        # MHA-135: locked to the lift rod, it turns with the freed rod spin.
-        "pinion-lever-pin",
-        "pinion-lift-rod",
-        # Option E-a: pinned to both straps, the torque shaft swings with them.
-        "pinion-pivot-shaft",
-    ),
-    "magnifier": (
-        "lever-wire",
-        "magnifying-bracket",
-        "magnifying-clamp",
-        "magnifying-lever",
-        "magnifying-vertical-rod",
-        "magnifying-wheel",
-        "output-fixture",
-        "thumb-screw",
-    ),
-    "paper-drive": (
-        "fillister-screw",
-        "guide-lock",
-        "platen",
-        "platen-clip",
-        "platen-guide",
-        "platen-paper",
-        "platen-rack",
-        "rack-pinion",
-        "transgear-feed-pinion",
-        "transgear-knob-shaft",
-        "transgear-pinion",
-        "transgear-removable",
-        "transgear-thumbnut",  # rides the free knob shaft (lock-mated), 2026-09-02
-    ),
-}
-
-
 def assert_manifest_dof_state(
     adapter: Any,
     asm_name: str,
@@ -1727,7 +1664,7 @@ def assert_manifest_dof_state(
         len(specs),
         resolve=resolve,
         required_instances=tuple(dict.fromkeys(instances)),
-        allowed_stems=_ALLOWED_FREE_STEMS.get(asm_name, ()),
+        allowed_stems=allowed_free_stems(asm_name),
     )
 
 
@@ -2048,40 +1985,6 @@ def check_no_interference(
         _telemetry.success("interference check: none found")
 
 
-def whats_wrong(adapter: Any, model: Any) -> list[tuple[str, int, bool]]:
-    """Return ``[(feature_name, error_code, is_warning), ...]`` for a model.
-
-    Reads the What's Wrong dialog via ``GetWhatsWrong``. Early-bound
-    ``IModelDocExtension::GetWhatsWrong`` collects its three ``out object`` arrays
-    into the return tuple ``(retval, features, codes, warnings)`` -- pass nothing
-    and consume the tuple. The old byref-VARIANT idiom leaves those VARIANTs
-    UNWRITTEN under InvokeTypes, so it silently reported every model clean (a
-    broken assembly would slip the deep-health gate). Empty when the model is
-    clean or the call is unavailable.
-    """
-    ext = _read_member(model, "Extension")
-    if ext is None:
-        return []
-    ext = _early_bound(ext, "IModelDocExtension")
-    res = adapter._attempt(lambda: ext.GetWhatsWrong(), default=None)
-    if not res:
-        return []
-    _retval, feats, codes, warns = res
-    feats = list(feats or [])
-    codes = list(codes or [])
-    warns = list(warns or [])
-    out: list[tuple[str, int, bool]] = []
-    for i, feat in enumerate(feats):
-        name = "?"
-        if feat is not None:
-            feat = _early_bound(feat, "IFeature")
-            name = str(_read_member(feat, "Name"))
-        code = int(codes[i]) if i < len(codes) else -1
-        warn = bool(warns[i]) if i < len(warns) else False
-        out.append((name, code, warn))
-    return out
-
-
 _REBUILD_UNSET: Any = object()
 
 
@@ -2325,6 +2228,9 @@ async def save_assembly_and_images(
     # ... and never save a solver-drifted one: every placed component must
     # still sit at its authored pose after the FINAL solve (see _POSE_LEDGER).
     assert_pose_ledger(adapter)
+    # Every driver is authored by now: prove the contract's flip seeds against
+    # the signatures this build actually queried.
+    audit_flip_seeds(asm_name)
     # ... nor one whose own sketches, planes, axes or points render; each
     # placed part's tree was proved at that part's save.
     hide_reference_geometry(adapter, asm_name)

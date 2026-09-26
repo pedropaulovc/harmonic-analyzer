@@ -879,6 +879,24 @@ def test_event_without_active_span_is_noop():
     _telemetry.event("orphan", foo="bar")  # must not raise
 
 
+def test_annotate_sets_attributes_on_current_span(capture):
+    """``annotate()`` is the per-item alternative to child spans: sub-step
+    timings land as attributes of the span already open, not as new spans."""
+    spans, _ = capture
+    with _telemetry.span("dim.display_precision"):
+        _telemetry.annotate(lookup_ms=12.5, set_ms=3.0, note=("a", 1))
+    (sp,) = [s for s in spans.get_finished_spans() if s.name == "dim.display_precision"]
+    assert sp.attributes["lookup_ms"] == 12.5
+    assert sp.attributes["set_ms"] == 3.0
+    assert sp.attributes["note"] == repr(("a", 1))
+    assert len(spans.get_finished_spans()) == 1
+
+
+def test_annotate_without_active_span_is_noop():
+    """Like ``event()``, a bare ``annotate()`` must never raise."""
+    _telemetry.annotate(orphan=True)
+
+
 def test_sequential_root_spans_do_not_nest(capture):
     """Two spans opened one after the other are SIBLINGS, each timing only its own
     stretch -- the shape dodo relies on to split a COM task's queueing
