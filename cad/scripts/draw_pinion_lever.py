@@ -259,10 +259,17 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     # The grip and pin-hole stations live in reference sketches the part saves
-    # hidden (#880).  A detail takes their visibility from the part when it is
-    # created, so it is created and dimensioned while the part shows them.
+    # hidden (#880).  The detail is created and dimensioned while the part
+    # shows them, and the side view shows them too, because the detail's items
+    # select through it: with only the part showing them, pc-p1r's import
+    # delivered neither station.  The side view prints the same two lines the
+    # detail does, along the hub's silhouette.
     with part_sketches_shown(
-        adapter, source_model, REFERENCE_SKETCHES, label="hub detail stations"
+        adapter,
+        source_model,
+        REFERENCE_SKETCHES,
+        label="hub detail stations",
+        base_view=side,
     ):
         detail = _hub_detail(adapter, side)
         set_hidden_lines_removed(adapter, detail)

@@ -231,6 +231,8 @@ def test_hub_detail_is_created_and_dimensioned_while_the_part_shows_them() -> No
     header, block = _with_block(source, "with part_sketches_shown(")
     assert "source_model" in header
     assert "REFERENCE_SKETCHES" in header
+    # The detail's items select through the side view, so it shows them too.
+    assert "base_view=side" in header
     assert "_hub_detail(adapter, side)" in block
     assert "set_hidden_lines_removed(adapter, detail)" in block
     assert "keep=DETAIL_KEEP" in block
