@@ -1280,6 +1280,46 @@ def test_pdf_arcs_are_the_curve_not_its_control_polygon():
     assert all(abs((x * x + y * y) ** 0.5 - r) < 1e-5 for x, y in points)
 
 
+def test_pdf_arcs_stray_under_a_hundredth_of_a_millimetre_between_points():
+    """Codex P2 on 8697a655c: eight chords left a 30 mm quarter circle's
+    polyline 0.14 mm off the curve between its points."""
+    from _pdf_ink import bezier_points
+
+    k, r = 0.5522847498, 0.030
+    controls = ((r, 0.0), (r, k * r), (k * r, r), (0.0, r))
+    points = bezier_points(*controls)
+
+    def on_curve(t):
+        (x0, y0), (x1, y1), (x2, y2), (x3, y3) = controls
+        u = 1.0 - t
+        weights = (u**3, 3 * u * u * t, 3 * u * t * t, t**3)
+        return (
+            sum(w * x for w, x in zip(weights, (x0, x1, x2, x3))),
+            sum(w * y for w, y in zip(weights, (y0, y1, y2, y3))),
+        )
+
+    def to_polyline(px, py):
+        best = math.inf
+        for (ax, ay), (bx, by) in zip(points, points[1:]):
+            dx, dy = bx - ax, by - ay
+            t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
+            best = min(best, math.hypot(px - ax - t * dx, py - ay - t * dy))
+        return best
+
+    assert max(to_polyline(*on_curve(i / 2000)) for i in range(2001)) < 1e-5
+
+
+def test_the_calibration_matches_only_what_the_audit_draws():
+    """Codex P2 on 8697a655c: a hidden annotation took part in calibration
+    matching, where it could claim a visible annotation's printed text."""
+    from diagnostics.layout_calibration import match_items
+
+    visible = _dim("Visible", "12.0", 0.1000, 0.1500)
+    hidden = {**_dim("Hidden", "12.0", 0.1001, 0.1500), "visible": 3}
+    dump = _dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [hidden, visible])], spans=[["12.0", 0.1002, 0.1509, 0.1060, 0.1542]], print_rest=False)
+    assert [record["label"] for record in match_items(dump)] == ["Visible"]
+
+
 def _fake_drawing(monkeypatch, *, sheet_names, views, pages):
     import _drawing_layout_audit as live
 
