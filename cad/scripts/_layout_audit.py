@@ -1372,6 +1372,17 @@ def _registered_leaders(annotation: Mapping[str, Any]) -> list[Segment]:
     return segments
 
 
+def _leader_ends(annotation: Mapping[str, Any]) -> list[tuple[float, float]]:
+    """The last point of each registered leader: where it lands. COM lists a
+    leader's points from its attachment out (layoutcal2-a DetailItem349)."""
+    ends = []
+    for raw in annotation.get("leaders", ()):
+        values = _floats(raw)
+        if len(values) >= 3:
+            ends.append((values[-3], values[-2]))
+    return ends
+
+
 def classify_segments(
     kind: str,
     annotation: Mapping[str, Any],
@@ -1413,6 +1424,9 @@ class AuditAnnotation(AnnotationGeometry):
 
     text_height: float = 0.0
     arrow_tails: tuple[Segment, ...] = ()
+    # Where each registered leader ends (``_leader_ends``): the landing of a
+    # leader that draws no arrowhead.
+    leader_ends: tuple[tuple[float, float], ...] = ()
 
 
 def _cap_height(item: TextItem, box: Box) -> float:
@@ -1533,6 +1547,7 @@ def annotation_geometry(
         circle=circle,
         text_height=height,
         arrow_tails=tuple(tails),
+        leader_ends=tuple(_leader_ends(annotation)),
     )
 
 
@@ -2408,10 +2423,18 @@ def _leader_paths(annotation: AnnotationGeometry) -> list[tuple[list[tuple[float
     annotation's text (its attachment, or a shoulder under the text), so a
     branch never runs on into a sibling leader. A run past the arrow tip (a
     hole callout's run on to the hole's centre) is not on that path.
+
+    A leader drawing no arrowhead ends where its registered points end, with
+    no head: a cosmetic-thread callout dumps its leader points and no display
+    data (DetailItem357, Codex P2 on b294b7f5f). Arrow style is per leader
+    (IAnnotation::SetArrowHeadStyleAtIndex, swNO_ARROWHEAD), so one
+    annotation can mix both: a registered end farther than an arrowhead's
+    length from every arrow tip is an arrowless leader of its own.
     """
     runs = [s for s in annotation.segments if s.role in ("leader", "shoulder") and s.length > 0.0]
     heads = _arrow_heads(annotation)
-    if not runs or not heads:
+    ends = annotation.leader_ends if isinstance(annotation, AuditAnnotation) else ()
+    if not runs or not (heads or ends):
         return []
     nodes: list[tuple[float, float]] = []
 
@@ -2427,19 +2450,31 @@ def _leader_paths(annotation: AnnotationGeometry) -> list[tuple[list[tuple[float
         a, b = node((segment.x0, segment.y0)), node((segment.x1, segment.y1))
         edges.setdefault(a, []).append((b, segment))
         edges.setdefault(b, []).append((a, segment))
+
+    def node_at(point: tuple[float, float]) -> int | None:
+        return next(
+            (i for i, (x, y) in enumerate(nodes) if math.hypot(point[0] - x, point[1] - y) <= COLLINEAR_TOL_M),
+            None,
+        )
+
     tips = []
     for vertices in heads:
         for k, vertex in enumerate(vertices):
-            hit = next(
-                (i for i, (x, y) in enumerate(nodes) if math.hypot(vertex[0] - x, vertex[1] - y) <= COLLINEAR_TOL_M),
-                None,
-            )
+            hit = node_at(vertex)
             if hit is None:
                 continue
             others = [v for j, v in enumerate(vertices) if j != k]
             base = (sum(v[0] for v in others) / len(others), sum(v[1] for v in others) / len(others))
             tips.append((hit, math.hypot(base[0] - nodes[hit][0], base[1] - nodes[hit][1])))
             break
+    arrowed = list(tips)
+    for end in ends:
+        hit = node_at(end)
+        if hit is None or any(hit == tip for tip, _head in tips):
+            continue
+        if any(math.hypot(end[0] - nodes[tip][0], end[1] - nodes[tip][1]) <= head for tip, head in arrowed):
+            continue
+        tips.append((hit, 0.0))
     paths = []
     tip_nodes = {hit for hit, _length in tips}
     for tip, head in tips:
@@ -2456,15 +2491,15 @@ def _leader_paths(annotation: AnnotationGeometry) -> list[tuple[list[tuple[float
                     distance[to] = there
                     back[to] = (at, segment)
                     heappush(queue, (there, to))
-        ends = [i for i in distance if i not in tip_nodes]
-        if not ends:
+        starts = [i for i in distance if i not in tip_nodes]
+        if not starts:
             continue
         # The walk stops at this leader's own attachment: the node nearest
         # the annotation's text, the nearer along the leader on a tie. The
         # farthest node could be a sibling leader's elbow, reached through a
         # shared attach point (Codex P2 on b49e13940).
         at = min(
-            ends,
+            starts,
             key=lambda i: (
                 round(min((_point_box_distance(nodes[i], box) for box in annotation.text_boxes), default=-distance[i]), 6),
                 distance[i],
@@ -2679,7 +2714,7 @@ def _landings(annotation: Mapping[str, Any]) -> list[tuple[float, float]]:
     tips = [(float(arrow[0]), float(arrow[1])) for arrow in arrows if len(arrow) >= 2]
     if tips:
         return tips
-    return [(float(leader[-3]), float(leader[-2])) for leader in annotation.get("leaders") or () if len(leader) >= 3]
+    return _leader_ends(annotation)
 
 
 def _landed_hole(point: tuple[float, float], holes: Sequence[PrintedHole]) -> int | None:
@@ -2716,6 +2751,11 @@ def find_duplicate_thread_callouts(dump: Mapping[str, Any], sheet: SheetGeometry
     out one group when both land on the same hole, or when the callout's
     "NX" names exactly the holes the view prints at the size both land on.
     A leader landing on no printed ring associates nothing: no finding.
+
+    A sheet annotation's leader may land in any view, so a sheet note is
+    compared with every view's callouts, and a sheet callout with every
+    view's notes (Codex P2 on b294b7f5f, PRRT_kwDOPHDy386mTPiZ); the two
+    must still land in one view.
     """
     owners = [(str(view.get("name", "")), view.get("annotations") or ()) for view in dump.get("views", ())]
     owners.append(
@@ -2750,56 +2790,62 @@ def find_duplicate_thread_callouts(dump: Mapping[str, Any], sheet: SheetGeometry
             if (index := _landed_hole(point, holes(view))) is not None
         }
 
-    def one_group(note: Mapping[str, Any], callout: Mapping[str, Any], owner: str) -> str | None:
-        ours, theirs = landed(note, owner), landed(callout, owner)
-        if ours & theirs:
-            return "same hole"
+    def one_group(
+        note: Mapping[str, Any], note_owner: str, callout: Mapping[str, Any], callout_owner: str
+    ) -> tuple[str, str] | None:
+        """How the two call out one hole group, and the view they meet in."""
+        ours, theirs = landed(note, note_owner), landed(callout, callout_owner)
+        same = min(ours & theirs, default=None)
+        if same is not None:
+            return "same hole", same[0]
         count = _INSTANCES.match(_callout_text(callout))
         if count is None:
             return None
         instances = int(count.group(1))
-        for (view, mine), (their_view, other) in product(ours, theirs):
+        for (view, mine), (their_view, other) in sorted(product(ours, theirs)):
             printed = holes(view)
             if view != their_view or not printed[mine].same_size(printed[other]):
                 continue
             if sum(hole.same_size(printed[other]) for hole in printed) == instances:
-                return f"same {instances}X group"
+                return f"same {instances}X group", view
         return None
 
     def threads(annotation: Mapping[str, Any]) -> list[str]:
         return list(dict.fromkeys(m.group(1).upper() for m in _THREAD.finditer(_callout_text(annotation))))
 
+    shown = [(owner, a) for owner, members in owners for a in members if not is_hidden(a)]
+    callouts = [(owner, a) for owner, a in shown if (a.get("dim") or {}).get("hole_callout")]
+    notes = [
+        (owner, a)
+        for owner, a in shown
+        if ANNOTATION_KINDS.get(int(a.get("type", 0))) == "note"
+        and a.get("leaders")
+        and not (a.get("note") or {}).get("balloon")
+    ]
     findings = []
-    for owner, members in owners:
-        shown = [annotation for annotation in members if not is_hidden(annotation)]
-        callouts = [a for a in shown if (a.get("dim") or {}).get("hole_callout")]
-        notes = [
-            a
-            for a in shown
-            if ANNOTATION_KINDS.get(int(a.get("type", 0))) == "note"
-            and a.get("leaders")
-            and not (a.get("note") or {}).get("balloon")
-        ]
-        for note, callout in product(notes, callouts):
-            shared = [t for t in threads(note) if t in threads(callout)]
-            group = one_group(note, callout, owner) if shared else None
-            if group is None:
-                continue
-            findings.extend(
-                Finding(
-                    kind="duplicate-thread-callout",
-                    sheet=str(dump.get("sheet", "")),
-                    a=f"hole-callout {callout.get('name', '')}",
-                    b=f"note {note.get('name', '')}",
-                    detail=(
-                        f"note {note.get('name', '')!r} in {owner!r} calls out thread {thread} on the "
-                        f"{group} hole callout {callout.get('name', '')!r} already calls out: one feature, "
-                        "called out twice"
-                    ),
-                    extra={"owner": owner, "thread": thread, "association": group},
-                )
-                for thread in shared
+    for (note_owner, note), (callout_owner, callout) in product(notes, callouts):
+        if "sheet" not in (note_owner, callout_owner) and note_owner != callout_owner:
+            continue
+        shared = [t for t in threads(note) if t in threads(callout)]
+        met = one_group(note, note_owner, callout, callout_owner) if shared else None
+        if met is None:
+            continue
+        group, view = met
+        findings.extend(
+            Finding(
+                kind="duplicate-thread-callout",
+                sheet=str(dump.get("sheet", "")),
+                a=f"hole-callout {callout.get('name', '')}",
+                b=f"note {note.get('name', '')}",
+                detail=(
+                    f"note {note.get('name', '')!r} ({note_owner!r}) calls out thread {thread} on the "
+                    f"{group} hole callout {callout.get('name', '')!r} ({callout_owner!r}) already calls "
+                    f"out in {view!r}: one feature, called out twice"
+                ),
+                extra={"owner": view, "thread": thread, "association": group},
             )
+            for thread in shared
+        )
     return findings
 
 
