@@ -4,8 +4,9 @@ validated single-part original).
 
 Replicas use vendor model harvests from ``cad/references/mcmaster/`` and
 the corresponding ``cad/out/reports/mcmaster-<part>-dump.json``.
-90280A837 starts from the supplied catalog dimensions and the existing
-fillister family equations; its native comparison is required before release.
+90280A837 and 91794A112 start from the supplied catalog dimensions and the
+existing fillister family equations; their native comparison is required
+before release.
 Gates run against the vendor's own mass properties and face-area multiset
 (see ``diag_mcmaster_lib.gate_and_save``).
 
@@ -42,6 +43,7 @@ from diagnostics.diag_build_90280A201 import build_90280A201  # noqa: E402
 from diagnostics.diag_build_90280A837 import build_90280A837  # noqa: E402
 from diagnostics.diag_build_91247A720 import build_91247A720  # noqa: E402
 from diagnostics.diag_build_91410A538 import build_91410A538  # noqa: E402
+from diagnostics.diag_build_91794A112 import build_91794A112  # noqa: E402
 from diagnostics.diag_build_92240A539 import build_92240A539  # noqa: E402
 from diagnostics.diag_build_91882A221 import build_91882A221  # noqa: E402
 from diagnostics.diag_build_91882A425 import build_91882A425  # noqa: E402
@@ -49,11 +51,13 @@ from diagnostics.diag_build_9275K141 import build_9275K141  # noqa: E402
 from diagnostics.diag_build_92865A585 import build_92865A585  # noqa: E402
 from diagnostics.diag_build_93075A194 import build_93075A194  # noqa: E402
 from diagnostics.diag_build_94025A150 import build_94025A150  # noqa: E402
+from diagnostics.diag_build_94025A164 import build_94025A164  # noqa: E402
 from diagnostics.diag_build_99607A213 import build_99607A213  # noqa: E402
 
 REGISTRY = {
     "90126A211": build_90126A211,
     "94025A150": build_94025A150,
+    "94025A164": build_94025A164,
     "90114A511": build_90114A511,
     "92240A539": build_92240A539,
     "91410A538": build_91410A538,
@@ -68,6 +72,7 @@ REGISTRY = {
     "90280A199": build_90280A199,
     "90280A201": build_90280A201,
     "90280A837": build_90280A837,
+    "91794A112": build_91794A112,
     "9275K141": build_9275K141,
 }
 
