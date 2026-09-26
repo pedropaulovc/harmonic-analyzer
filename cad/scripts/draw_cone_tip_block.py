@@ -495,6 +495,16 @@ SECTION_LINE_OVERSHOOT = 0.004
 SECTION_ARROW_LENGTH = 0.012
 SECTION_ARROW_HEAD = (0.00635, 0.003175)  # along the shaft, across it
 SECTION_LETTER_BOX = (0.0022, -0.0013, 0.0083, 0.0051)
+# #955: the north letter stood 1.45 mm right of the plan's edge while its
+# top reached 1.1 mm up beside it, under the TEXT_CLEARANCE every letter on
+# the release sheets keeps.  Its x is fixed (the cut is the plan's centre
+# plane), so the north end drops it below the plan's north edge until its
+# corner clears the plan's corner by TEXT_CLEARANCE.  The south letter
+# already stands 2.7 mm past the plan's south edge.
+_NORTH_LETTER_GAP_X = SECTION_ARROW_LENGTH + SECTION_LETTER_BOX[0] - BLOCK_X * _S / 2.0
+SECTION_NORTH_OVERSHOOT = SECTION_LETTER_BOX[3] + math.sqrt(
+    max(0.0, (TEXT_CLEARANCE + ROUND_OUT) ** 2 - _NORTH_LETTER_GAP_X**2)
+)
 # The locating-foot finish symbol: its leader lands midway along the right
 # half of the foot edge; measured on the 287c render, its ink (shoulder,
 # triangle, arm and "Ra 3.2") spans this far round the commanded point and
@@ -885,7 +895,7 @@ def sheet_section_arrows() -> dict[str, tuple[Point, Point]]:
     """Section A-A's two cutting-plane arrows, (tail on the chain line, tip)."""
     tail_x = TOP_CENTER[0]
     ends = (
-        ("north", _plan_y(Z_NORTH) - SECTION_LINE_OVERSHOOT),
+        ("north", _plan_y(Z_NORTH) - SECTION_NORTH_OVERSHOOT),
         ("south", _plan_y(Z_SOUTH) + SECTION_LINE_OVERSHOOT),
     )
     return {
@@ -1615,7 +1625,7 @@ async def build(adapter: Any) -> dict[str, str]:
     section = create_section_view(
         adapter,
         top,
-        line_start=(TOP_CENTER[0], _plan_y(Z_NORTH) - SECTION_LINE_OVERSHOOT),
+        line_start=(TOP_CENTER[0], _plan_y(Z_NORTH) - SECTION_NORTH_OVERSHOOT),
         line_end=(TOP_CENTER[0], _plan_y(Z_SOUTH) + SECTION_LINE_OVERSHOOT),
         view_xy=SECTION_CENTER,
         section_label="A",

@@ -1062,8 +1062,8 @@ def _log_section_profile(
     """Record where a removed section prints its rail centreline.
 
     #955 lengthened B, E and D's cuts through air only.  On b49e1 each
-    view's outline centre sat within 0.35 mm of its profile's centre, not on
-    the cut's midpoint, so the profiles should not move.  This line is what
+    view's outline centre sat no more than 0.35 mm off its profile's
+    centre, not on the cut's midpoint, so the profiles should not move.  This line is what
     confirms it against b49e1's ink: B 356.43, E 296.66, D 331.98 mm.
     """
     x, y = model_point_in_view(

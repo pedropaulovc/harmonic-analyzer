@@ -1868,7 +1868,8 @@ def test_sheet_audit_sees_section_arrows_run1_hid() -> None:
 def test_section_arrows_stand_clear_of_every_value() -> None:
     """Today both cutting-plane arrows keep ARROW_TEXT_CLEARANCE (2 mm) from
     every text: PassageCenter's value moved to the slit's left with its
-    datum, 3.5 mm from the north arrow; VIEW C's letter is 2.65 mm from the
+    datum, 2.1 mm from the north arrow (3.5 until #955 dropped that end to
+    clear its letter off the plan); VIEW C's letter is 2.65 mm from the
     south one.  The build cuts the section where the model draws it."""
     from _drawing_leaders import distance_to_box
 
@@ -1882,12 +1883,44 @@ def test_section_arrows_stand_clear_of_every_value() -> None:
             nearest = min(distance_to_box(s, box) for s in ink[arrow].arrows)
             gaps[(arrow, name)] = nearest - drawing.ARROW_HALF_WIDTH
     assert min(gaps.values()) >= drawing.ARROW_TEXT_CLEARANCE
-    assert gaps[("section A north", "PassageCenter")] == pytest.approx(0.00352, abs=5e-5)
+    assert gaps[("section A north", "PassageCenter")] == pytest.approx(0.00209, abs=5e-5)
     assert gaps[("section A south", "view C letter")] == pytest.approx(0.00265, abs=5e-5)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     body = source[source.index("async def build(") :]
-    assert "_plan_y(Z_NORTH) - SECTION_LINE_OVERSHOOT)" in body
+    assert "_plan_y(Z_NORTH) - SECTION_NORTH_OVERSHOOT)" in body
     assert "_plan_y(Z_SOUTH) + SECTION_LINE_OVERSHOOT)" in body
+
+
+def _north_letter_ink_gap(overshoot: float) -> float:
+    """Nearest ink between section A's north letter and the plan's outline,
+    with the north end ``overshoot`` past the plan (the two boxes stand
+    corner to corner, so this is their corners' distance)."""
+    left, down, right, up = drawing.SECTION_LETTER_BOX
+    tip_x = drawing.TOP_CENTER[0] + drawing.SECTION_ARROW_LENGTH
+    tip_y = drawing._plan_y(drawing.Z_NORTH) - overshoot
+    letter = (tip_x + left, tip_y + down, tip_x + right, tip_y + up)
+    plan = drawing.sheet_view_silhouettes()["plan"]
+    dx = max(plan[0] - letter[2], letter[0] - plan[2], 0.0)
+    dy = max(plan[1] - letter[3], letter[1] - plan[3], 0.0)
+    return math.hypot(dx, dy)
+
+
+def test_section_a_north_letter_clears_the_plan() -> None:
+    """#955: the north letter keeps TEXT_CLEARANCE from the plan's outline,
+    the clearance every cutting-plane letter on the release sheets holds.
+    The model's letter is the one the build prints."""
+    assert drawing.sheet_text_boxes()["section A north"][3] == pytest.approx(
+        drawing._plan_y(drawing.Z_NORTH) - drawing.SECTION_NORTH_OVERSHOOT
+        + drawing.SECTION_LETTER_BOX[3]
+    )
+    assert _north_letter_ink_gap(drawing.SECTION_NORTH_OVERSHOOT) >= drawing.TEXT_CLEARANCE
+
+
+def test_the_4mm_north_end_left_its_letter_beside_the_plan() -> None:
+    """Fail-first: at the 4 mm overshoot both ends had until #955, the
+    letter stood 1.45 mm off the plan's edge, beside it."""
+    assert _north_letter_ink_gap(0.004) == pytest.approx(0.00145, abs=1e-5)
+    assert _north_letter_ink_gap(0.004) < drawing.TEXT_CLEARANCE
 
 
 def test_flange_slot_location_prints_one_place() -> None:
