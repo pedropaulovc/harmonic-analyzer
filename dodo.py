@@ -2905,6 +2905,9 @@ def task_check():
         SCRIPTS_DIR / "test_logo_profile_closure.py",
         SCRIPTS_DIR / "test_sketch_preference_baseline.py",
         SCRIPTS_DIR / "test_diag_mcmaster_lib.py",
+        # Every configuration of a saved part is rebuilt and read back clean
+        # (pc-p1r: MHA-135 INSTALLED saved stale failed saved-rebuild-clean).
+        SCRIPTS_DIR / "test_part_save_rebuild.py",
     ]
     # These are runtime-read rather than imported, so module_deps_of cannot
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun
