@@ -3288,6 +3288,24 @@ def test_an_arrowless_leader_beside_an_arrowed_one_is_measured():
     assert finding.extra["over_part_mm"] == pytest.approx(22.2, abs=0.2)
 
 
+@pytest.mark.parametrize(
+    ("arrows", "arrowless"),
+    [
+        pytest.param([((0.0, 0.0), 0.003556)], [(0.002, 0.0)], id="one-arrow-two-ends"),
+        pytest.param([((0.0, 0.0), 0.003556), ((0.002, 0.0), 0.003556)], [], id="two-arrows-two-ends"),
+    ],
+)
+def test_one_arrowhead_claims_one_leader_end(arrows, arrowless):
+    """Codex P2 on 27173c6ee (PRRT_kwDOPHDy386mUWM-): one arrowhead claimed
+    every registered end within its head's length, so an arrowless sibling
+    ending 2 mm from an arrow tip vanished from both _landings and
+    _leader_paths. Arrowheads match ends one to one, nearest first; two
+    arrows claim both ends."""
+    from _layout_audit import _arrowless_ends
+
+    assert _arrowless_ends([(0.0, 0.0), (0.002, 0.0)], arrows) == arrowless
+
+
 def test_a_textless_branch_is_measured_from_its_own_registered_attachment():
     """Codex P2 on 89a28675e (PRRT_kwDOPHDy386mT5xq): a note with no display
     text (a cosmetic-thread callout, DetailItem357) has no text box to find

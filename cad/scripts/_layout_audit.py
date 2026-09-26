@@ -1428,16 +1428,29 @@ def _leader_ends(annotation: Mapping[str, Any]) -> list[tuple[float, float]]:
 def _arrowless_ends(
     ends: Sequence[tuple[float, float]], arrows: Sequence[tuple[tuple[float, float], float]]
 ) -> list[tuple[float, float]]:
-    """The registered leader ``ends`` no arrowhead lands on: each ``(tip,
-    head length)`` of ``arrows`` claims the ends within its head's length.
-    Arrow style is per leader (IAnnotation::SetArrowHeadStyleAtIndex,
-    swNO_ARROWHEAD), so one annotation can mix arrowed and arrowless
-    leaders; each arrowless one lands where its registered points end."""
-    return [
-        end
-        for end in ends
-        if not any(math.hypot(end[0] - tip[0], end[1] - tip[1]) <= head for tip, head in arrows)
-    ]
+    """The registered leader ``ends`` no arrowhead lands on. Arrow style is
+    per leader (IAnnotation::SetArrowHeadStyleAtIndex, swNO_ARROWHEAD), so
+    one annotation can mix arrowed and arrowless leaders; each arrowless one
+    lands where its registered points end.
+
+    One arrowhead ends one leader: each ``(tip, head length)`` of ``arrows``
+    claims at most one end within its head's length, the nearest pairs
+    first, so an arrowless sibling ending near an arrow tip stays a leader
+    of its own (Codex P2 on 27173c6ee)."""
+    pairs = sorted(
+        (math.hypot(end[0] - tip[0], end[1] - tip[1]), e, a)
+        for e, end in enumerate(ends)
+        for a, (tip, head) in enumerate(arrows)
+        if math.hypot(end[0] - tip[0], end[1] - tip[1]) <= head
+    )
+    claimed_ends: set[int] = set()
+    claimed_arrows: set[int] = set()
+    for _distance, e, a in pairs:
+        if e in claimed_ends or a in claimed_arrows:
+            continue
+        claimed_ends.add(e)
+        claimed_arrows.add(a)
+    return [end for e, end in enumerate(ends) if e not in claimed_ends]
 
 
 def classify_segments(
