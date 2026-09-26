@@ -139,8 +139,8 @@ def test_an_untoleranced_dimension_is_not_scanned():
 
 
 def test_it_reads_only_after_a_forced_regen():
-    """The diag's first pass read the old words straight after the standard
-    changed; the gate must regenerate every view before it reads."""
+    """The gate regenerates every view before it reads, so a read never
+    predates an edit made since the last rebuild."""
     drawing, views = _sheet([("Break", {"text": " 0.1 MAX ", "stale": " 0.1 max. "})])
     assert lt.assert_no_iso_limit_text(drawing, label="x") == 1
     assert drawing.calls == [

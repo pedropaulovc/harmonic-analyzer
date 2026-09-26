@@ -2,16 +2,18 @@
 
 SolidWorks words a MAX/MIN tolerance (swTolMAX / swTolMIN) in the document's
 base dimension standard. Under ISO the post-mount screw's cut-end break reads
-`` 0.1 max. ``; under ANSI it reads `` 0.1 MAX ``, which is ASME Y14.5's form
-(maxmin-diag leaf, 2026-09-26). The project templates are named ANSI but are
-ISO-based (swDetailingDimensionStandard = 2), so every MAX/MIN in the fleet
-printed ``max.``.
+`` 0.1 max. ``, where ASME Y14.5 wants `` 0.1 MAX ``. The project templates are
+named ANSI but are ISO-based (swDetailingDimensionStandard = 2), so every MAX/MIN
+in the fleet printed ``max.``. How the wording flips is still being proven: a
+standard switched ISO -> ANSI printed MAX (maxmin-diag pass 2), while a bare ANSI
+write on the template's ANSI-named standard kept ``max.`` in both the read and
+the PDF (maxblast leaf 20260926T073039391Z, 2026-09-26).
 
 The gate reads what the sheet prints: ``IAnnotation::GetDisplayData``, the one
-rendered-text read-back. It regenerates first, because a read taken straight
-after the standard changed still returned the old words (the diag's first
-pass). A dimension whose display data cannot be read fails the gate: an
-unread string is not a clean one.
+rendered-text read-back; on the maxblast leaf it agreed with the exported PDF.
+It regenerates first, so the read reflects every edit since the last rebuild
+(0.603 s on MHA-142). A dimension whose display data cannot be read fails the
+gate: an unread string is not a clean one.
 """
 
 from __future__ import annotations
