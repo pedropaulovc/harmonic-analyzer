@@ -2916,6 +2916,9 @@ def task_check():
         SCRIPTS_DIR / "test_mcmaster_replica_driver.py",
         # ... and #906: the crank native-acceptance record pins.
         SCRIPTS_DIR / "test_crank_native_acceptance.py",
+        # ... and #937: the cylinder-bank layout bands and MHA-147's set screw.
+        SCRIPTS_DIR / "test_arbor_set_screw.py",
+        SCRIPTS_DIR / "test_cylinder_bank_layout.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.

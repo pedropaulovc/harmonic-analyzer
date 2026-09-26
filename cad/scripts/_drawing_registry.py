@@ -588,6 +588,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="cylinder_end_disc",
+        part="cylinder_end_disc",
+        artifact_stem="cylinder-end-disc",
+        script_name="draw_cylinder_end_disc.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="arbor_pedestal",
         part="arbor_pedestal",
         artifact_stem="arbor-pedestal",
@@ -767,6 +774,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="lag_screw",
         artifact_stem="lag-screw",
         script_name="draw_lag_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="arbor_set_screw",
+        part="arbor_set_screw",
+        artifact_stem="arbor-set-screw",
+        script_name="draw_arbor_set_screw.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

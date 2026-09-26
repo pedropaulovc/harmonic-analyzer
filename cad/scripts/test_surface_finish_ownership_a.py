@@ -199,7 +199,7 @@ CASES = (
                 MACHINED_UM,
                 CylinderFace(
                     cylinder_gear_shaft_spec.SHAFT_DIA,
-                    contains_y_mm=cylinder_gear_shaft_spec.SHAFT_LENGTH / 2.0,
+                    contains_y_mm=cylinder_gear_shaft_spec.ARBOR_BEARING_PROBE_Y_MM,
                 ),
             ),
         ),

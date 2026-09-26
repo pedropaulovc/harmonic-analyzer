@@ -9,6 +9,11 @@ is handled by ``part_sketches_shown`` instead.
 
 from __future__ import annotations
 
+import ast
+import functools
+import importlib
+from pathlib import Path
+
 import pytest
 
 import _drawing_common
@@ -416,3 +421,146 @@ def test_dimensions_that_survive_the_part_reblank_pass(tmp_path, monkeypatch) ->
     assert infos[-1] == (
         "Detail A: after the part re-blank, dimension Visible {'form top:ArcCentreX': 1}"
     )
+
+
+# --- routing guard: which drawings must use this module --------------------
+# #743 canary (r743-canary, drawing:cylinder_gear_shaft): the part blanked its
+# DomeReference sketch and the drawing kept DomeHeight, but it imported
+# curate_view_dimensions from _drawing_common, so DomeHeight never arrived.
+# Run r743-diag-a (fbaf8bb09) swapped only the import and the dimension
+# imported. Nothing stopped the wrong helper, so this guard does.
+_SCRIPTS = Path(hidden_sketches.__file__).resolve().parent
+
+
+@functools.cache
+def _tree(path: Path) -> ast.Module:
+    return ast.parse(path.read_text(encoding="utf-8"))
+
+
+def _called_name(call: ast.Call) -> str | None:
+    if isinstance(call.func, ast.Name):
+        return call.func.id
+    if isinstance(call.func, ast.Attribute):
+        return call.func.attr
+    return None
+
+
+def _reference_sketches(tree: ast.Module) -> set[str]:
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "REFERENCE_SKETCHES"
+            for target in node.targets
+        ):
+            return set(ast.literal_eval(node.value))
+        if isinstance(node, ast.ImportFrom) and any(
+            alias.name == "REFERENCE_SKETCHES" for alias in node.names
+        ):
+            return set(importlib.import_module(node.module).REFERENCE_SKETCHES)
+    raise LookupError("blank_sketch on a computed name, with no REFERENCE_SKETCHES to resolve it")
+
+
+def _blanked_sketches(build: Path) -> set[str]:
+    """Every sketch a part build hides with _common.blank_sketch."""
+    tree = _tree(build)
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and _called_name(node) == "blank_sketch"):
+            continue
+        sketch = node.args[1]
+        if isinstance(sketch, ast.Constant):
+            names.add(sketch.value)
+            continue
+        names |= _reference_sketches(tree)
+    return names
+
+
+def _strings_read_by(draw: Path) -> set[str]:
+    """String constants in a drawing script and the repo modules it imports."""
+    trees = [_tree(draw)]
+    for node in trees[0].body:
+        if isinstance(node, ast.ImportFrom):
+            modules = [node.module]
+        elif isinstance(node, ast.Import):
+            modules = [alias.name for alias in node.names]
+        else:
+            continue
+        trees += [_tree(_SCRIPTS / f"{m}.py") for m in modules if m and (_SCRIPTS / f"{m}.py").exists()]
+    return {
+        node.value
+        for tree in trees
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
+
+
+def _curates_through_hidden_sketches(draw: Path) -> bool:
+    tree = _tree(draw)
+    aliases: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "_drawing_hidden_sketches":
+            if any(alias.name == "curate_view_dimensions" for alias in node.names):
+                return True
+        if isinstance(node, ast.Import):
+            aliases |= {
+                alias.asname or alias.name
+                for alias in node.names
+                if alias.name == "_drawing_hidden_sketches"
+            }
+    return any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "curate_view_dimensions"
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id in aliases
+        for node in ast.walk(tree)
+    )
+
+
+@functools.cache
+def _drawings_reading_blanked_sketches() -> dict[str, frozenset[str]]:
+    from _drawing_registry import DRAWINGS
+
+    found = {}
+    for spec in DRAWINGS:
+        build = _SCRIPTS / f"build_{spec.part}.py"
+        draw = _SCRIPTS / spec.script_name
+        if not (build.exists() and draw.exists()):
+            continue
+        blanked = _blanked_sketches(build)
+        if not blanked:
+            continue
+        read = blanked & _strings_read_by(draw)
+        if read:
+            found[spec.name] = frozenset(read)
+    return found
+
+
+def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
+    """The guard below is only as good as its detection: pin what it finds."""
+    found = _drawings_reading_blanked_sketches()
+    assert {
+        "arbor_pedestal",
+        "cone_tip_block",
+        "cone_tip_shim",
+        "cylinder_gear_shaft",
+        "harmonic_base",
+        "pinion_bracket",
+        "pinion_spring",
+    } <= set(found)
+    assert found["cylinder_gear_shaft"] == {"DomeReference"}
+
+
+def test_a_drawing_of_a_part_hidden_sketch_curates_through_this_module() -> None:
+    """A drawing that reads a sketch its part blanks must curate through
+    _drawing_hidden_sketches: _drawing_common's targeted import delivers
+    nothing from a hidden childless sketch."""
+    from _drawing_registry import DRAWINGS_BY_NAME
+
+    wrong = {
+        name: sorted(sketches)
+        for name, sketches in _drawings_reading_blanked_sketches().items()
+        if not _curates_through_hidden_sketches(
+            _SCRIPTS / DRAWINGS_BY_NAME[name].script_name
+        )
+    }
+    assert wrong == {}
