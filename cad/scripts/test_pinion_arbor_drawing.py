@@ -1059,6 +1059,73 @@ def test_collar_pin_dimensions_stand_above_the_shaft_clear_of_the_front_ra() -> 
     assert min(station_y, dia_y) > axis_y
 
 
+# pc-r10 (37495ac47) layout audit, sheet mm: the three-line collar-pin
+# callout set at (0.250, 0.222) underlined at y 211.9, its leader ran
+# (269.1,170.8) -> (280.1,211.9); the station text set at (0.288, 0.207)
+# boxed [274.5,201.4]..[301.7,204.9].
+PC_R10_PIN_CALLOUT_XY = (0.250, 0.222)
+PC_R10_PIN_LEADER_ELBOW_X = 0.2801
+PIN_CALLOUT_UNDERLINE_FROM_POSITION = -0.0101
+PIN_LEADER_START_Y_FROM_AXIS = 0.0008
+STATION_TEXT_BOX_FROM_POSITION = (-0.0135, 0.0137, -0.0056, -0.0021)
+LEADER_TEXT_CLEARANCE = 0.0015
+
+
+def _pin_leader_elbow(dia_xy: tuple[float, float]) -> tuple[float, float]:
+    """Where the collar-pin callout's underline bends into its leader."""
+    return (
+        dia_xy[0]
+        + drawing.PIN_HOLE_CALLOUT_CENTRE_DX
+        + drawing.PIN_HOLE_CALLOUT_WIDTH / 2.0,
+        dia_xy[1] + PIN_CALLOUT_UNDERLINE_FROM_POSITION,
+    )
+
+
+def _pin_leader_x_at(dia_xy: tuple[float, float], y: float) -> float:
+    """Sheet x of the collar-pin hole's leader at height ``y``."""
+    start = (
+        drawing._sheet_x(spec.PIN_Z) + drawing.PIN_HOLE_LEADER_ARROW_DX,
+        drawing.PRINCIPAL_CENTER[1] + PIN_LEADER_START_Y_FROM_AXIS,
+    )
+    elbow = _pin_leader_elbow(dia_xy)
+    return start[0] + (elbow[0] - start[0]) * (y - start[1]) / (elbow[1] - start[1])
+
+
+def test_pin_callout_width_model_reproduces_the_measured_bend() -> None:
+    """The width estimate the callout's x is derived from puts pc-r10's bend
+    where the audit measured it."""
+    assert _pin_leader_elbow(PC_R10_PIN_CALLOUT_XY)[0] == pytest.approx(
+        PC_R10_PIN_LEADER_ELBOW_X, abs=0.0002
+    )
+    import pinion_arbor_pin_spec as pin_hole
+
+    widest = max(len(line) for line in pin_hole.PIN_HOLE_CALLOUT.split("\n"))
+    assert drawing.PIN_HOLE_CALLOUT_WIDTH == pytest.approx(
+        widest * drawing.PIN_HOLE_CALLOUT_ADVANCE
+    )
+
+
+def test_collar_pin_leader_drops_square_over_the_hole() -> None:
+    """The callout's x follows its width: the bend stands over the hole."""
+    elbow_x, _ = _pin_leader_elbow(drawing.PRINCIPAL_KEEP["PinHoleDia"])
+    arrow_x = drawing._sheet_x(spec.PIN_Z) + drawing.PIN_HOLE_LEADER_ARROW_DX
+    assert elbow_x == pytest.approx(arrow_x, abs=1e-9)
+
+
+def test_collar_pin_leader_drops_clear_of_the_station_text() -> None:
+    """pc-r10's blocking finding: the MHA-145 line widened the callout, its
+    leader's elbow moved right with it, and the leader crossed "COLLAR PIN".
+    The leader must pass left of the station text over the text's height."""
+    station = drawing.PRINCIPAL_KEEP["PinStationFromHeadRear"]
+    left, _right, bottom, top = STATION_TEXT_BOX_FROM_POSITION
+    text_left = station[0] + left
+    for y in (station[1] + bottom, station[1] + top):
+        x = _pin_leader_x_at(drawing.PRINCIPAL_KEEP["PinHoleDia"], y)
+        assert x <= text_left - LEADER_TEXT_CLEARANCE, (y, x, text_left)
+    # Positive control: the pc-r10 position crosses the text, as the audit saw.
+    assert _pin_leader_x_at(PC_R10_PIN_CALLOUT_XY, station[1] + top) > text_left
+
+
 # Measured witness overshoot past a dimension line: c486b6e1's NeckDia line
 # at x 294.5 had its witnesses end at 293.5.
 WITNESS_OVERSHOOT_M = 0.001

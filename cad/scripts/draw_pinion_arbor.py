@@ -49,6 +49,7 @@ from pinion_arbor_spec import (
     HEAD_REAR_Z,
     JOURNAL_LEN,
     OVERALL_LEN,
+    PIN_Z,
     SHAFT_DIA,
     SURFACE_FINISHES,
 )
@@ -240,6 +241,32 @@ OUTLINE_SEARCH_ROWS = 6
 # Rendered width and height of a two-place "Ø8.00 -0.01/-0.0x" callout block,
 # measured on the 63468ee9 sheet.
 DIAMETER_BLOCK_SIZE = (0.027, 0.014)
+# The collar pin hole's callout lines are centred on each other, and its
+# underline runs the widest line to the end nearer the arrow, where the
+# leader bends down to the hole.  The text's x comes from that width, so the
+# bend stands over the hole and the leader drops square to it, left of the
+# "COLLAR PIN" station text.  A wider callout moves left by itself.
+# Measured with the text set at x 0.250:
+# - pc-r9 ("1/16 DRILL THRU" widest) underlined 232.4-269.1 mm, so the text
+#   centres 0.75 mm right of its position;
+# - pc-r10 ("FOR MHA-145 SPRING PIN", 22 characters) bent at 280.1, a 58.7 mm
+#   underline, 2.67 mm per character;
+# - the leader meets the hole 0.4 mm left of its axis (pc-r10, 269.1 mm).
+# The font is proportional, so the per-character advance overstates a line
+# of narrow glyphs.  pc-r9's line reads 3 mm narrower than the estimate,
+# which stands the bend left of the hole, away from the station text.
+PIN_HOLE_CALLOUT_ADVANCE = 0.00267
+PIN_HOLE_CALLOUT_CENTRE_DX = 0.00075
+PIN_HOLE_LEADER_ARROW_DX = -0.0004
+PIN_HOLE_CALLOUT_WIDTH = PIN_HOLE_CALLOUT_ADVANCE * max(
+    len(line) for line in PIN_HOLE_CALLOUT.split("\n")
+)
+PIN_HOLE_CALLOUT_X = (
+    _sheet_x(PIN_Z)
+    + PIN_HOLE_LEADER_ARROW_DX
+    - PIN_HOLE_CALLOUT_WIDTH / 2.0
+    - PIN_HOLE_CALLOUT_CENTRE_DX
+)
 PRINCIPAL_KEEP = {
     "FrontJournalLen": (0.252, 0.188),
     # Below the shaft, under the back Ra symbol and its leader.
@@ -266,7 +293,7 @@ PRINCIPAL_KEEP = {
     # rear face in a row over the Ø15's, and the hole's leader rising left of
     # that row's witness, above the 19.0's right arrow tail.
     "PinStationFromHeadRear": (0.288, 0.207),
-    "PinHoleDia": (0.250, 0.222),
+    "PinHoleDia": (PIN_HOLE_CALLOUT_X, 0.222),
 }
 # In detail A the neck runs from the fence (x ~0.137 at its edges) to the
 # head rear face (x 0.1545), its Ø10.5 at y 0.2245-0.2455.  Its end-on
