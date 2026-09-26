@@ -257,12 +257,92 @@ def test_lengths_are_baseline_from_the_collar_face() -> None:
     assert overall < tiers[-1] and overall > 0.066 + 0.008
     tip_x = big_end - spec.SHAFT_LENGTH / 1000.0
     assert tip_x < drawing.OVERALL_REFERENCE_TEXT_XY[0] < big_end
-    # each station's text stands inside its own span (the web's cannot)
+    # each station's text stands inside its own span, unless the span is too
+    # narrow for it (the web's and the T120's): then left of that span
     for name, span in from_datum.items():
-        if name == "CollarWidth":
+        x = drawing.SIDE_KEEP[name][0]
+        if name in ("CollarWidth", "T120Station"):
+            assert x < datum_x - span / 1000.0, name
             continue
-        assert datum_x - span / 1000.0 < drawing.SIDE_KEEP[name][0] < datum_x, name
+        assert datum_x - span / 1000.0 < x < datum_x, name
     assert drawing.DIMENSION_CALLOUTS["T006Station"] == "20X EQ SP"
+
+
+def _length_texts_crossed(side_keep, overall_xy):
+    """Every (text, line x) pair where an extension line crossing a length
+    text's tier passes within STATION_TEXT_CLEARANCE of that text's box.
+
+    Each length hangs its two extension lines from the shaft down to its own
+    tier, so a line crosses every tier ABOVE its own.  A text is centred on
+    its x; its box is the character count times LENGTH_CHAR_WIDTH (the
+    T006 callout's "20X EQ SP" line is the wider of its two).
+    """
+    spec = cone_gear_shaft_spec
+    big_end = drawing.SIDE_CENTER[0] + spec.SHAFT_LENGTH / 2000.0
+    datum_x = big_end - spec.DATUM_STATION / 1000.0
+    tip_x = big_end - spec.SHAFT_LENGTH / 1000.0
+    from_datum = {
+        "CollarWidth": spec.COLLAR_THICKNESS,
+        "T120Station": spec.SOLDER_T120_STATION,
+        "Sec1End": spec.SECTION_KNOBS[1],
+        "Sec2End": spec.SECTION_KNOBS[2],
+        "Sec3End": spec.SECTION_KNOBS[3],
+        "T006Station": spec.SOLDER_T006_STATION,
+        "Sec4End": spec.SECTION_KNOBS[4],
+    }
+    places = spec.DRAWING_PRECISION_BY_NAME
+    texts = {
+        name: (f"{value:.{places[name]}f}", side_keep[name])
+        for name, value in from_datum.items()
+    }
+    texts["T006Station"] = ("20X EQ SP", side_keep["T006Station"])
+    texts["Sec0End"] = (
+        f"{spec.DATUM_STATION:.{places['Sec0End']}f}",
+        side_keep["Sec0End"],
+    )
+    texts["overall"] = (f"({spec.SHAFT_LENGTH:.1f})", overall_xy)
+    # (line x, the lowest tier it reaches)
+    lines = [(datum_x - value / 1000.0, side_keep[name][1]) for name, value in from_datum.items()]
+    lines.append((datum_x, min(y for _x, y in side_keep.values())))
+    lines += [(big_end, overall_xy[1]), (tip_x, overall_xy[1])]
+    crossed = []
+    for name, (text, (x, y)) in texts.items():
+        half = len(text) * drawing.LENGTH_CHAR_WIDTH / 2.0
+        for line_x, line_bottom in lines:
+            if line_bottom >= y:
+                continue
+            if x - half - drawing.STATION_TEXT_CLEARANCE < line_x < (
+                x + half + drawing.STATION_TEXT_CLEARANCE
+            ):
+                crossed.append((name, round(line_x, 4)))
+    return crossed
+
+
+def test_no_extension_line_strikes_a_length_text() -> None:
+    """The 916a render had the datum line through "10.781" and the web's
+    "1.681" against the collar's witness line (Main's eye-pass); a text
+    keeps 2 mm of ink from every extension line crossing its tier."""
+    assert _length_texts_crossed(drawing.SIDE_KEEP, drawing.OVERALL_REFERENCE_TEXT_XY) == []
+    # Positive control: the 916a positions are caught.
+    before = {
+        **drawing.SIDE_KEEP,
+        "CollarWidth": (0.2020, 0.1355),
+        "T120Station": (0.2042, 0.1275),
+    }
+    crossed = {
+        name for name, _x in _length_texts_crossed(before, drawing.OVERALL_REFERENCE_TEXT_XY)
+    }
+    assert crossed == {"CollarWidth", "T120Station"}
+
+
+def test_the_collar_diameter_draws_nothing_inside_the_ring() -> None:
+    """The 1.7 mm collar cannot hold a dimension line and two arrows (916a
+    eye-pass): its diameter alone takes the near-side single-arrow style."""
+    assert drawing.NEAR_SIDE_DIAMETERS == ("CollarDia",)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "from _drawing_leaders import set_near_side_diameter" in source
+    assert "if name in NEAR_SIDE_DIAMETERS:" in source
+    assert 'set_near_side_diameter(moved, f"{name} near-side diameter")' in source
 
 
 def test_the_pictorial_hides_the_solder_station_witnesses() -> None:
