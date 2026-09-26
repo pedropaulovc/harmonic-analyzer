@@ -332,8 +332,10 @@ def _reference_cut_length(adapter: Any, annotations: list[Any]) -> None:
 # the next view runs, and every line carries prior_deletes.  The positive
 # control (view 1) runs LAST as the canary: if it imports after N deletes,
 # deletion is proven not to poison a re-import.  Execution order:
-#   5 (replay 9eca, first detail after the Front import, label A, the
-#      production position), 3, 4, 2, 1.
+#   6 (10:1 HLV detail imported BEFORE the Front's CutLength import, kept
+#      across it, re-read, then deleted), then after the Front import:
+#   5 (replay 9eca: label A, the production position; now the SECOND detail
+#      on the Front, not the first), 3, 4, 2, 1.
 # Nothing here raises until the end; the build fails only if view 1 did
 # not import (the diag is then invalid).
 # =====================================================================
@@ -371,6 +373,12 @@ class Probe:
     display: str  # hlv | hlr
 
 
+# View 6 runs FIRST, before the Front's CutLength import: the boss hook /
+# spring hook / cylinder gear order ("the detail claims its manufacturing
+# dimensions before the parent import").  Created exactly like view 3.
+PROBE_BEFORE_PARENT = Probe(
+    6, "detail-before-parent", (10.0, 1.0), (0.325, 0.104), "E", "hlv"
+)
 PROBES_IN_ORDER = (
     Probe(5, "replay9eca", DETAIL_SCALE, DETAIL_CENTER, "A", "hlr"),
     Probe(3, "detail", (10.0, 1.0), (0.275, 0.175), "B", "hlv"),
@@ -388,6 +396,7 @@ class ProbeResult:
     imported: bool = False
     available: list[str] = field(default_factory=list)
     error: str = ""
+    prior_deletes: int = 0
 
 
 def _probe_sheet(probe: Probe) -> TrimSheet:
@@ -758,9 +767,17 @@ def _import_into(adapter: Any, front: Any, probe: Probe, view: Any) -> None:
 
 
 def _run_probe(
-    adapter: Any, front: Any, probe: Probe, order: int, prior_deletes: int
+    adapter: Any,
+    front: Any,
+    probe: Probe,
+    order: int,
+    prior_deletes: int,
+    *,
+    delete: bool = True,
 ) -> ProbeResult:
-    result = ProbeResult(probe=probe, order=order)
+    """Create, import, log; delete the import unless ``delete`` is False
+    (view 6 keeps it across the Front's import, see after_front_import)."""
+    result = ProbeResult(probe=probe, order=order, prior_deletes=prior_deletes)
     ratio = probe.scale[0] / probe.scale[1]
     try:
         result.view = _create_probe_view(adapter, front, probe)
@@ -789,18 +806,46 @@ def _run_probe(
         f"sheet_text_h_mm={_diag('text', lambda: _text_height_mm(adapter, result.view))} "
         f"feature_on_sheet_mm={0.1 * ratio:g}"
     )
-    if result.imported:
+    if result.imported and delete:
         deleted = _diag("delete", lambda: _delete_break(adapter, result.view))
         _telemetry.info(f"{DIAG} view={probe.number} deleted={deleted}")
     return result
 
 
-def run_bisect(adapter: Any, front: Any) -> dict[int, ProbeResult]:
+def run_before_parent(adapter: Any, front: Any) -> ProbeResult:
+    """View 6: its import runs BEFORE the Front's CutLength import and is
+    kept across it (deleted by after_front_import).  Never raises."""
+    with _telemetry.span(f"diag.mha142_bisect.view{PROBE_BEFORE_PARENT.number}"):
+        return _run_probe(adapter, front, PROBE_BEFORE_PARENT, 1, 0, delete=False)
+
+
+def after_front_import(adapter: Any, result: ProbeResult) -> int:
+    """Re-read view 6 after the Front's import (does the parent import
+    disturb it?), then delete its CutEndBreak.  Returns the deletes made."""
+    if result.view is None:
+        _telemetry.info(f"{DIAG} view=6 after_front available=na (no view)")
+        return 0
+    names = _diag("names", lambda: _view_dimension_names(adapter, result.view))
+    available = [n for n in names if n] if isinstance(names, list) else [repr(names)]
+    still = CUT_END_BREAK_DIMENSION in available
+    _telemetry.info(
+        f"{DIAG} view=6 after_front available={available} imported={still} "
+        f"imported_before_front={result.imported}"
+    )
+    if not still:
+        return 0
+    deleted = _diag("delete", lambda: _delete_break(adapter, result.view))
+    _telemetry.info(f"{DIAG} view=6 deleted={deleted}")
+    return 1
+
+
+def run_bisect(
+    adapter: Any, front: Any, *, prior_deletes: int = 0, first_order: int = 2
+) -> dict[int, ProbeResult]:
     """Run every probe in PROBES_IN_ORDER; never raises."""
     results: dict[int, ProbeResult] = {}
-    prior_deletes = 0
     with _telemetry.span("diag.mha142_bisect"):
-        for order, probe in enumerate(PROBES_IN_ORDER, start=1):
+        for order, probe in enumerate(PROBES_IN_ORDER, start=first_order):
             with _telemetry.span(f"diag.mha142_bisect.view{probe.number}"):
                 result = _run_probe(adapter, front, probe, order, prior_deletes)
             results[probe.number] = result
@@ -811,7 +856,7 @@ def run_bisect(adapter: Any, front: Any) -> dict[int, ProbeResult]:
 def reimport_survivor(adapter: Any, results: dict[int, ProbeResult]) -> str:
     """Put CutEndBreak back into the first surviving 10:1 view (3, 4, then 5)
     so the published PDF shows it for the legibility eye pass.  Never fatal."""
-    for number in (3, 4, 5):
+    for number in (3, 6, 4, 5):
         result = results.get(number)
         if result is None or not result.imported or result.view is None:
             continue
@@ -841,10 +886,20 @@ def bisect_summary(results: dict[int, ProbeResult], final: str) -> str:
         + ("(err)" if results[number].error else "")
         for number in sorted(results)
     )
-    order = ",".join(str(probe.number) for probe in PROBES_IN_ORDER)
+    order = ",".join(
+        str(probe.number) for probe in (PROBE_BEFORE_PARENT, *PROBES_IN_ORDER)
+    )
+    after = [
+        number
+        for number, result in sorted(results.items(), key=lambda kv: kv[1].order)
+        if result.prior_deletes
+    ]
+    note = (
+        f"views_after_a_delete={after}" if after else "views_after_a_delete=[]"
+    )
     return (
         f"{DIAG} summary host={socket.gethostname()} order={order} {outcomes} "
-        f"final={final}"
+        f"final={final} note={note}"
     )
 
 
@@ -886,26 +941,40 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
 
+    # DIAG: view 6 is created and imported BEFORE the Front's CutLength
+    # import (the hooks' order), and keeps its CutEndBreak across it.
+    before_parent = run_before_parent(adapter, front)
+
     # The cut length lives on a part-hidden reference sketch, so the Front
     # view takes the opt-in curation that shows it in this view only.
-    annotations = hidden_sketches.curate_view_dimensions(
-        adapter,
-        front,
-        keep=FRONT_KEEP,
-        view_label="cut length",
-        dimensions_by_feature=FRONT_VIEW_DIMENSIONS,
-    )
-    assert_imported_precision(adapter, annotations, FRONT_PRECISION)
-    _reference_cut_length(adapter, annotations)
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    # DIAG: wrapped so a Front failure (e.g. disturbed by view 6) is logged
+    # and the probes still run.
+    try:
+        annotations = hidden_sketches.curate_view_dimensions(
+            adapter,
+            front,
+            keep=FRONT_KEEP,
+            view_label="cut length",
+            dimensions_by_feature=FRONT_VIEW_DIMENSIONS,
+        )
+        assert_imported_precision(adapter, annotations, FRONT_PRECISION)
+        _reference_cut_length(adapter, annotations)
+        set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+        _telemetry.info(f"{DIAG} front imported={_view_dimension_names(adapter, front)}")
+    except Exception as exc:  # noqa: BLE001 - every probe must run
+        _telemetry.warn(f"{DIAG} front error={exc!r}")
+    prior_deletes = after_front_import(adapter, before_parent)
 
     # DIAG (diag/mha142-bisect): the production tip detail is replaced by the
-    # five probes (see run_bisect); view 5 is its exact 9eca replay.  The
+    # six probes (see run_before_parent / run_bisect); view 5 is 9eca's replay.  The
     # production detail checks are bypassed on this branch only:
     # assert_imported_precision + _verify_tip_detail (one CutEndBreak in THE
     # detail), position_detail_label (exactly one note per detail) and
     # position_parent_detail_letter (exactly one detail circle on the Front).
-    results = run_bisect(adapter, front)
+    results = {
+        PROBE_BEFORE_PARENT.number: before_parent,
+        **run_bisect(adapter, front, prior_deletes=prior_deletes, first_order=2),
+    }
     final = _diag("final", lambda: reimport_survivor(adapter, results))
     summary = bisect_summary(results, str(final))
     _telemetry.info(summary)
