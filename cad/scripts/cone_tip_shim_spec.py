@@ -24,6 +24,7 @@ from cone_tip_block_spec import (
     FOOT_THREAD,
     SHIM_NOMINAL,
 )
+from drive_train_steps import step_ref
 
 SHIM_X = BLOCK_X
 SHIM_Z = BLOCK_Z
@@ -59,12 +60,18 @@ if END_WEB_MM < 2.0:
 if min(LEAF_STOCK_MM) > STACK_RANGE_MM[0]:
     raise ValueError("the thinnest leaf cannot reach the minimum stack")
 
+# The MHA-A03 step that stacks the pack under the tip block at fit-up.  The
+# sheet cites it through the registry, so a renumbered sequence carries the
+# pointer with it (Codex P2 on #857: the fitting method lives in that step).
+FIT_UP_STEP = "post-and-tip-block"
+
 # Rule 6: at most four short lines.  The leaf stock is the material
 # specification; blackening is the finish.
 MANUFACTURING_NOTES = (
     f"SHIM PACK, STACK TO FIT {STACK_RANGE_MM[0]:.2f}-{STACK_RANGE_MM[1]:.2f}, "
     f"NOMINAL {SHIM_T:.2f}.\n"
-    "HORSESHOE; SLIDE LEAVES IN WITH SCREW BACKED OFF."
+    "HORSESHOE; SLIDE LEAVES IN WITH SCREW BACKED OFF.\n"
+    f"STACK SET AT ASSEMBLY, {step_ref(FIT_UP_STEP)}."
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

@@ -12,6 +12,7 @@ import build_cone_tip_shim as part
 import cone_tip_block_spec as block
 import cone_tip_shim_spec as spec
 import draw_cone_tip_shim as drawing
+import drive_train_steps as steps
 from _drawing_contract import drawing_specification_violations
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
@@ -65,6 +66,7 @@ def test_notes_state_the_stack_range_nominal_and_the_horseshoe() -> None:
     assert len(lines) <= 4
     assert lines[0] == "SHIM PACK, STACK TO FIT 0.05-2.20, NOMINAL 1.10."
     assert lines[1] == "HORSESHOE; SLIDE LEAVES IN WITH SCREW BACKED OFF."
+    assert lines[2] == f"STACK SET AT ASSEMBLY, {steps.step_ref(spec.FIT_UP_STEP)}."
 
 
 def test_registry_row_is_the_bom_shim_pack() -> None:
