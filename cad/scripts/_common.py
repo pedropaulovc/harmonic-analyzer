@@ -1338,7 +1338,7 @@ async def save_part_and_images(
     # summary Title, not its same-named custom property. Keep both identities
     # sourced from part_properties so a registry title override cannot split.
     apply_summary_info(adapter, title=properties["Title"])
-    await rebuild_all_configurations(adapter, part_name)
+    rebuild_stale_configurations(adapter, part_name)
     check(
         f"re-save with properties -> {part_path}",
         await adapter.save_file(str(part_path)),
@@ -1367,60 +1367,107 @@ async def save_part_and_images(
 
 
 @_telemetry.traced("save.rebuild_configs", label_param="part_name")
-async def rebuild_all_configurations(adapter: Any, part_name: str) -> None:
-    """Rebuild every configuration after the caller's last edit, and prove it,
-    right before the part's final save.
+def rebuild_stale_configurations(adapter: Any, part_name: str) -> None:
+    """Leave no configuration stale in the saved part: read first, rebuild only
+    when dirty, and prove it.
 
-    An edit lands in the active configuration and can leave the others stale.
-    Saved that way, an assembly that places a stale configuration opens with
-    NeedsRebuild2=1 and fails verify:soundness's saved-rebuild-clean.  The
+    An edit made after a configuration's last rebuild can leave that
+    configuration stale.  Saved that way, an assembly placing it opens with
+    NeedsRebuild2=1 and fails verify:soundness's saved-rebuild-clean, and the
     #267 reconcile re-saves only the assembly, never the child.  The pc-p1r
     probe (dt-logs/pc-p1r/probe-saved-rebuild.jsonl) read MHA-135's INSTALLED
     configuration stale in the saved part, and cone-gear's unplaced Default.
 
-    Each other configuration is activated and EditRebuild3'd, then the one
-    active on entry, so the saved views stay where the caller left them.  A
-    single-configuration part pays one EditRebuild3, which rebuilds only
-    features that need it, plus one read.
+    Same shape as _assembly.rebuild_if_needed_before_save (1013334c3): every
+    configuration's IConfiguration.NeedsRebuild is read first, and a clean part
+    -- the common case -- gets no rebuild call at all.  A stale one gets ONE
+    IModelDocExtension.EditRebuildAll, which rebuilds what needs it in every
+    configuration without activating any (#271 measured the cost of switching;
+    ForceRebuild3 dirties children, #267).  A refused rebuild, a hard What's
+    Wrong fault, or a configuration still stale after it raises, naming the
+    part.
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     names = [str(name) for name in (model.GetConfigurationNames() or ())]
-    active = active_configuration_name(adapter)
-    if active not in names:
+    stale_before = stale_configurations(model, names)
+    _telemetry.annotate(
+        config_count=len(names),
+        stale_before=len(stale_before),
+        stale_before_names=",".join(stale_before[:8]),
+    )
+    if not stale_before:
+        _telemetry.annotate(rebuild_all="skipped", stale_after=0)
+        _telemetry.success(f"{part_name}: {len(names)} configuration(s) clean before save")
+        return
+    _telemetry.annotate(rebuild_all="ran")
+    extension = _early_bound(_read_member(model, "Extension"), "IModelDocExtension")
+    if not extension.EditRebuildAll():
         raise RuntimeError(
-            f"{part_name}: active configuration {active!r} not among {names}"
+            f"{part_name}: EditRebuildAll refused rebuilding stale configurations "
+            f"{stale_before}"
         )
-    refused = 0
-    for name in [*(name for name in names if name != active), active]:
-        if len(names) > 1:
-            check(
-                f"{part_name}: activate {name} to rebuild it before the save",
-                await adapter.set_active_configuration(name),
-            )
-        refused += not model.EditRebuild3()
-    _telemetry.annotate(config_count=len(names), active=active, rebuild_false=refused)
-    require_configurations_rebuilt(model, part_name, names)
+    faults = [
+        f"{name} ({_FEATURE_ERROR.get(code, code)})"
+        for name, code, warning in whats_wrong(adapter, model)
+        if code > 1 and not warning
+    ]
+    if faults:
+        raise RuntimeError(f"{part_name}: rebuilding {stale_before} left faults {faults}")
+    stale_after = stale_configurations(model, names)
+    _telemetry.annotate(stale_after=len(stale_after))
+    if stale_after:
+        raise RuntimeError(
+            f"{part_name}: configurations {stale_after} still need a rebuild before "
+            "the save; an assembly placing one would open NeedsRebuild2=1"
+        )
+    _telemetry.success(
+        f"{part_name}: rebuilt stale configuration(s) {stale_before} before save"
+    )
 
 
-def require_configurations_rebuilt(
-    model: Any, part_name: str, names: Iterable[str]
-) -> None:
-    """Raise, naming the part and configurations, if any configuration still
-    reads IConfiguration.NeedsRebuild.  The read-back is the proof;
-    EditRebuild3's own bool is only recorded."""
-    stale = [
+def stale_configurations(model: Any, names: Iterable[str]) -> list[str]:
+    """Names of the configurations whose IConfiguration.NeedsRebuild reads true."""
+    return [
         name
         for name in names
         if bool(
             _early_bound(model.GetConfigurationByName(name), "IConfiguration").NeedsRebuild
         )
     ]
-    _telemetry.annotate(stale_count=len(stale))
-    if stale:
-        raise RuntimeError(
-            f"{part_name}: configurations {stale} still need a rebuild before the "
-            "save; an assembly placing one would open NeedsRebuild2=1"
-        )
+
+
+def whats_wrong(adapter: Any, model: Any) -> list[tuple[str, int, bool]]:
+    """Return ``[(feature_name, error_code, is_warning), ...]`` for a model.
+
+    Reads the What's Wrong dialog via ``GetWhatsWrong``. Early-bound
+    ``IModelDocExtension::GetWhatsWrong`` collects its three ``out object`` arrays
+    into the return tuple ``(retval, features, codes, warnings)`` -- pass nothing
+    and consume the tuple. The old byref-VARIANT idiom leaves those VARIANTs
+    UNWRITTEN under InvokeTypes, so it silently reported every model clean (a
+    broken assembly would slip the deep-health gate). Empty when the model is
+    clean or the call is unavailable.
+    """
+    ext = _read_member(model, "Extension")
+    if ext is None:
+        return []
+    ext = _early_bound(ext, "IModelDocExtension")
+    res = adapter._attempt(lambda: ext.GetWhatsWrong(), default=None)
+    if not res:
+        return []
+    _retval, feats, codes, warns = res
+    feats = list(feats or [])
+    codes = list(codes or [])
+    warns = list(warns or [])
+    out: list[tuple[str, int, bool]] = []
+    for i, feat in enumerate(feats):
+        name = "?"
+        if feat is not None:
+            feat = _early_bound(feat, "IFeature")
+            name = str(_read_member(feat, "Name"))
+        code = int(codes[i]) if i < len(codes) else -1
+        warn = bool(warns[i]) if i < len(warns) else False
+        out.append((name, code, warn))
+    return out
 
 
 def _prune_stale_part_views(
