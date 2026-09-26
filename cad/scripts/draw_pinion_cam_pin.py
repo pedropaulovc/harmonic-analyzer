@@ -105,7 +105,13 @@ RIGHT_KEEP = {
     "CapR": (0.105, 0.110),
 }
 OVERALL_TEXT_XY = (RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_DIA + 0.059)
-CROWN_FINISH_SYMBOL_XY = (0.120, 0.140)
+# The crown's roughness leader leaves the symbol's shelf end and rises to the
+# crown, while its "Ra 1.6" text sits above the shelf to the right of that
+# end.  At (0.120, 0.140) the leader climbed 19 mm over 26 mm and ran through
+# the "1.6" (pc-r4-860 render; codex machinist review of 7b21b56c0).  Raised
+# 10 mm, it climbs 9 mm and passes under the text.
+CROWN_FINISH_SYMBOL_XY = (0.120, 0.150)
+CROWN_FINISH_FROM_ROOT_MM = 0.7
 DIMENSION_CALLOUTS = {
     "PinDia": PIN_DIA_CALLOUT,
     "Depth": "SEATED FLAT END\nTO CROWN ROOT",
@@ -229,7 +235,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # Its leader meets the crown's lower flank near the apex from the lower
     # left, above the CapR leader (which lands further round the crown).
     crown_finish_point = model_point_in_view(
-        adapter, right, _crown_point(0.7), label="cam-pin crown finish point"
+        adapter,
+        right,
+        _crown_point(CROWN_FINISH_FROM_ROOT_MM),
+        label="cam-pin crown finish point",
     )
     add_surface_finish(
         adapter,
