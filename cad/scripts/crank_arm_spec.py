@@ -166,22 +166,24 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
 # block stays left of the title block.  The section line is a requirement,
 # not a convenience: the U29 cheek around the hub seat reaches 2 mm only at
 # the mill's width tolerance, not at the .X band.  The third line states the
-# MHA-139 named exception on the sheet that is tapped for it (user ruling
-# 2026-09-25, MHA-020 review B2), with the worst case the screw spec derives
-# from the stock thickness -- the same line and number MHA-139 prints.
+# MHA-139 named exception's shortfall on the sheet that is tapped for it (user
+# ruling 2026-09-25, MHA-020 review B2), with the worst case the screw spec
+# derives from the stock thickness -- the same fact and number MHA-139
+# prints.  It is a plain fact: exception and ruling labels never print (fleet
+# ruling 2026-09-26, after Codex #857 P2).
 STOCK_NOTE = (
     f"{ARM_WIDTH:.1f} x {ARM_THICKNESS:.1f} SECTION: "
     f"{ARM_WIDTH / MM_PER_IN:g} x {ARM_STOCK_THICKNESS_IN} IN CF FLAT BAR AS SUPPLIED."
 )
-PIVOT_ENGAGEMENT_EXCEPTION = (
+PIVOT_ENGAGEMENT_NOTE = (
     f"{HANDLE_PIVOT_HOLE_SPEC.size} THREAD ENGAGEMENT "
-    f"{FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D MIN: NAMED EXCEPTION TO RULE 12."
+    f"{FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D MIN."
 )
 DRAWING_NOTES = "\n".join(
     (
         "PUNCH FIDUCIAL MARK WHERE SHOWN; LOCATE BY EYE.",
         STOCK_NOTE,
-        PIVOT_ENGAGEMENT_EXCEPTION,
+        PIVOT_ENGAGEMENT_NOTE,
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

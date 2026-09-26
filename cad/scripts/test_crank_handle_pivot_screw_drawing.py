@@ -197,8 +197,15 @@ def test_u33b_engagement_exception_is_governed_by_the_stock_arm() -> None:
 
 
 def test_u33b_note_is_the_only_manufacturing_note() -> None:
-    # The sheet states the worst case its named-exception row records.
-    assert "NAMED EXCEPTION TO RULE 12" in spec.DRAWING_NOTES
+    # The sheet states the worst case its named-exception row records, as a
+    # plain fact: exception and ruling labels never print (fleet ruling
+    # 2026-09-26, after Codex #857 P2).
+    assert spec.DRAWING_NOTES == (
+        f"THREAD ENGAGEMENT {spec.FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D MIN."
+    )
+    assert spec.DRAWING_NOTES == "THREAD ENGAGEMENT 1.33D MIN."
+    for internal in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "RULE "):
+        assert internal not in spec.DRAWING_NOTES
     # A MIN is floored, never rounded up: 1.338 prints 1.33.
     assert spec.FULL_THREAD_WORST_DIAMETERS_PRINTED == 1.33
     assert spec.FULL_THREAD_WORST_DIAMETERS_PRINTED <= spec.FULL_THREAD_WORST_DIAMETERS
