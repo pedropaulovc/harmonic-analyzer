@@ -37,6 +37,7 @@ from _common import (
 )
 from _drawing_marks import (
     apply_drawing_precision,
+    apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
@@ -132,6 +133,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 

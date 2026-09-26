@@ -57,6 +57,23 @@ def test_registry_row_is_the_turned_mha_148() -> None:
     assert "turned" in str(row["process"])
 
 
+def test_part_stamps_the_title_block_properties_before_saving() -> None:
+    """r743-p1s-A: the MHA-148 drawing refused its source part, which carried
+    no Material Specification, Finish or Quantity (the build never stamped
+    them)."""
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    calls = {
+        node.func.id: node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    stamp = calls["apply_drawing_properties"]
+    assert [ast.unparse(a) for a in stamp.args] == ["adapter", "PART_NAME"]
+    assert stamp.lineno < calls["save_part_and_images"].lineno
+    row = _config.parts(part.PART_NAME)
+    assert all(row[key] for key in ("material_specification", "finish", "quantity"))
+
+
 def test_both_running_faces_carry_the_machined_finish() -> None:
     """Codex #936 (PRRT_kwDOPHDy386mRSOM): the washer runs on rocker 0's hub
     on one face and on the south ear on the other, so each face owns a
