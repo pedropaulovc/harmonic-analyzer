@@ -2891,6 +2891,146 @@ def _crown_finish_strikes(mm, y):
     return [f for f in findings if f.kind == "leader-through-own-text"]
 
 
+# --------------------------------------------------------------------------
+# Real cases: MHA-089 rocker-arm-support, rocker fix3 (6a5d8dd5c)
+# --------------------------------------------------------------------------
+#
+# reviewfirst's packet (dt-logs/layout-blindspots/mha089-rocker/cases.json):
+# six defects the pre-save gate passed on fix3's sheet, restored from the
+# build cache (key 1bdade086456). Text boxes are pdfium glyph rects and lines
+# the PDF's own path segments, in sheet mm. Each case also carries its
+# control: fix4 (65db4585c, key 52595f0a368e), clean for A-E. F is unchanged
+# on fix4; its control is 60fef5e3b's intent (the text printed above its
+# extension lines), which has not been rendered yet.
+
+_MM = 0.001
+
+
+def _rocker_arrow(x, y, dx, dy):
+    return [x * _MM, y * _MM, 0.0, dx, dy, 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]
+
+
+def _rocker_dim(name, text, box, *, lines=(), arrows=()):
+    (x0, y0), (_x1, y1) = box
+    dim = _dim(name, text, x0 * _MM, y0 * _MM, lines=[tuple(v * _MM for v in line) for line in lines], height=(y1 - y0) * _MM)
+    if arrows:
+        dim["display"]["arrows"] = list(arrows)
+    return dim
+
+
+def _rocker_span(text, box):
+    (x0, y0), (x1, y1) = box
+    return [text, x0 * _MM, y0 * _MM, x1 * _MM, y1 * _MM]
+
+
+def _rocker_seat_note(fixed):
+    """A: the plan's 177.8 left extension line (x 60.54) through the seat
+    note's "TRANSFER FROM MHA-123"; fixed by wrapping the note (widest row
+    ends at x 52.1)."""
+    row = ((16.1, 244.8), (52.1 if fixed else 73.7, 248.4))
+    note = _note("SeatNote", "TRANSFER FROM MHA-123", (row[0][0] * _MM, row[0][1] * _MM, row[1][0] * _MM, row[1][1] * _MM))
+    width = _rocker_dim("Depth", "177.8", ((95.0, 258.0), (105.0, 261.5)), lines=[(60.54, 141.53, 60.54, 256.19)])
+    spans = [_rocker_span("TRANSFER FROM MHA-123", row), _rocker_span("177.8", ((95.0, 258.0), (105.0, 261.5)))]
+    return _dump(views=[_view("plan", (0.010, 0.130, 0.200, 0.265), [width])], sheet_annotations=[note], spans=spans, print_rest=False)
+
+
+def _rocker_chamfer(fixed):
+    """B: RimChamferSize's "X 45 DEG" over the rail's "21.0" by 1.5 x 2.5 mm
+    (the glyphs touch); fixed by moving the chamfer rows to y 192.6-207.3."""
+    chamfer = ((154.0, 203.8), (175.7, 207.3)) if fixed else ((154.0, 223.2), (175.7, 226.7))
+    rail = ((174.2, 222.2), (185.8, 225.7))
+    dims = [_rocker_dim("RimChamferSize", "X 45 DEG", chamfer), _rocker_dim("Rail", "21.0", rail)]
+    spans = [_rocker_span("X 45 DEG", chamfer), _rocker_span("21.0", rail)]
+    return _dump(views=[_view("front", (0.140, 0.180, 0.200, 0.240), dims)], spans=spans, print_rest=False)
+
+
+def _rocker_cavity(fixed):
+    """C: CavWidth's 127.0 dimension line (y 122.41) along the top of
+    WinWidth's "165.1", only 0.09 mm inside its glyph rect but striking the
+    glyph tops; fixed by moving WinWidth to y 110.9-114.5."""
+    pocket = ((99.8, 110.9), (109.8, 114.5)) if fixed else ((99.8, 118.9), (109.8, 122.5))
+    cavity = ((80.0, 123.2), (90.0, 126.7))
+    width = _rocker_dim(
+        "CavWidth",
+        "127.0",
+        cavity,
+        lines=[(73.24, 122.41, 136.74, 122.41)],
+        arrows=[_rocker_arrow(73.24, 122.41, -1.0, 0.0), _rocker_arrow(136.74, 122.41, 1.0, 0.0)],
+    )
+    view = _view("plan", (0.060, 0.100, 0.150, 0.135), [width, _rocker_dim("WinWidth", "165.1", pocket)])
+    return _dump(views=[view], spans=[_rocker_span("165.1", pocket), _rocker_span("127.0", cavity)], print_rest=False)
+
+
+def _rocker_tapped_hole(fixed, *, seen_by_com):
+    """D: the iso's "#8-32 Tapped Hole", which the native save materialized
+    after the pre-save audit, 9.5 mm past the frame's right border. Whether
+    or not COM lists it after the save, the post-save audit sees it: as an
+    annotation over the border, or as printed text nothing claims. Fixed by
+    removing the note."""
+    box = ((386.1, 233.0), (428.6, 237.4))
+    ref = ((350.0, 250.0), (358.4, 253.5))
+    notes = []
+    if seen_by_com and not fixed:
+        notes = [_note("TappedHole", "#8-32 Tapped Hole", (386.1 * _MM, 233.0 * _MM, 428.6 * _MM, 237.4 * _MM))]
+    spans = [_rocker_span("12.0", ref)] + ([] if fixed else [_rocker_span("#8-32 Tapped Hole", box)])
+    view = _view("iso", (0.330, 0.190, 0.415, 0.260), [_rocker_dim("IsoRef", "12.0", ref)])
+    return _dump(views=[view], sheet_annotations=notes, spans=spans, print_rest=False)
+
+
+def _rocker_web(fixed):
+    """E: SECTION A-A's tapered wall (two model edges) through the web's
+    "6.35", across the "6"; fixed by moving the text to x 225.2-236.8."""
+    web = ((225.2, 155.2), (236.8, 158.7)) if fixed else ((215.2, 155.2), (226.8, 158.7))
+    edges = _edges(
+        (219.39 * _MM, 146.90 * _MM, 210.36 * _MM, 215.76 * _MM),
+        (211.00 * _MM, 215.83 * _MM, 220.03 * _MM, 146.97 * _MM),
+    )
+    view = _view("SECTION A-A", (0.200, 0.140, 0.245, 0.220), [_rocker_dim("Web", "6.35", web)])
+    return _dump(views=[view], spans=[_rocker_span("6.35", web)], strokes=edges, print_rest=False)
+
+
+def _rocker_foot(fixed):
+    """F: the foot's "6.35" between its own extension lines, 3.17 mm apart
+    for 3.5 mm text; the lower line 0.35 mm inside the rect over 6.8 mm. The
+    control prints it above both lines, as 60fef5e3b intends."""
+    text = ((174.2, 144.3), (185.8, 147.8)) if fixed else ((174.2, 140.2), (185.8, 143.7))
+    lines = [(188.74, 140.55, 179.00, 140.55), (205.56, 143.72, 179.00, 143.72), (187.5, 135.0, 187.5, 149.0)]
+    arrows = [_rocker_arrow(187.5, 140.55, 0.0, 1.0), _rocker_arrow(187.5, 143.72, 0.0, -1.0)]
+    dim = _rocker_dim("Foot", "6.35", text, lines=lines, arrows=arrows)
+    return _dump(views=[_view("SECTION A-A", (0.165, 0.130, 0.210, 0.160), [dim])], spans=[_rocker_span("6.35", text)], print_rest=False)
+
+
+@pytest.mark.parametrize(
+    ("build", "kind", "a", "b"),
+    [
+        pytest.param(_rocker_seat_note, "text-on-line", "SeatNote", "Depth", id="A-seat-note-on-extension-line"),
+        pytest.param(_rocker_chamfer, "text-clearance", "RimChamferSize", "Rail", id="B-chamfer-text-on-21.0"),
+        pytest.param(_rocker_cavity, "text-on-line", "WinWidth", "CavWidth", id="C-127.0-dim-line-on-165.1"),
+        pytest.param(
+            lambda fixed: _rocker_tapped_hole(fixed, seen_by_com=True),
+            "outside-border", "TappedHole", "right border", id="D-tapped-hole-listed-by-com",
+        ),
+        pytest.param(
+            lambda fixed: _rocker_tapped_hole(fixed, seen_by_com=False),
+            "pdf-text-unclaimed", "TAPPEDHOLE", "", id="D-tapped-hole-print-only",
+        ),
+        pytest.param(_rocker_web, "text-on-line", "Web", "SECTION A-A geometry", id="E-web-6.35-on-section-wall"),
+        pytest.param(_rocker_foot, "extension-through-own-text", "Foot", "Foot", id="F-foot-6.35-on-own-extension"),
+    ],
+)
+def test_rocker_fix3_defects_gate_in_the_shared_audit(build, kind, a, b):
+    """Main's gate-gap sweep: each defect on rocker fix3's sheet that the
+    pre-save gate passed is a gating finding of the shared audit, and its
+    control is clean of it."""
+
+    def hits(dump):
+        return [f for f in audit_dump(dump) if f.kind == kind and a in f.a and b in f.b]
+
+    [finding] = hits(build(False))
+    assert severity(finding) is FindingSeverity.GATING
+    assert hits(build(True)) == []
+
+
 def test_a_hole_callout_over_the_top_border_gates_estimated_or_printed():
     """swing's S1 case (#929 ac4fa6dd0, cone_swing_platform leaf 81d64de9faef):
     RD2, a four-row native hole callout, printed its top row to y 269.9 mm,
