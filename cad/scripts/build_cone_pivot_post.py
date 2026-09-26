@@ -54,6 +54,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _holes import HoleSpec, wizard_holes
@@ -90,6 +91,7 @@ from cone_pivot_post_spec import (
     HEAD_DIA,
     HEAD_HEIGHT,
     INCLINE_DEG,
+    JOURNAL_AXIS_BAND_MM,
     JOURNAL_REFERENCE_LENGTH,
     JOURNAL_REFERENCE_X,
     JOURNAL_REFERENCE_Z,
@@ -847,12 +849,13 @@ async def build(adapter: Any) -> dict[str, str]:
         HARVESTED_VOLUME_MM3,
         0.001 * HARVESTED_VOLUME_MM3,
     )
-    # Three accuracy features on this casting: the two running bores carry the
+    # Four accuracy features on this casting: the two running bores carry the
     # ONE band that closes the `shaft_in_bushing` fit class against their
-    # turned shafts (cad/docs/tolerance-policy.md), and the spacing between
-    # them carries the 16T:64T mesh band.  Everything else -- cast body and
-    # collar diameters, boss diameters, boss extents, mounting-hole stations,
-    # the cone axis above the foot -- runs at the title block's general grade.
+    # turned shafts (cad/docs/tolerance-policy.md), the spacing between them
+    # carries the 16T:64T mesh band, and the cone axis above the foot carries
+    # the tip block's shim-pack band.  Everything else -- cast body and collar
+    # diameters, boss diameters, boss extents, mounting-hole stations -- runs
+    # at the title block's general grade.
     set_dimension_bilateral_tolerance(
         adapter, "CrankBoreProfile", "CrankBoreDia", *deviations(RUNNING_BORE_BAND)
     )
@@ -869,6 +872,11 @@ async def build(adapter: Any) -> dict[str, str]:
         "BoreSpacingReference",
         "CrankAboveCone",
         *deviations(CRANK_ABOVE_CONE_BAND),
+    )
+    # The shim-pack band on the cone-axis height (derivation in
+    # cone_pivot_post_spec.JOURNAL_AXIS_BAND_MM).
+    set_dimension_symmetric_tolerance(
+        adapter, "ConeBossProfile", "JournalAxisY", JOURNAL_AXIS_BAND_MM
     )
 
     # Semantic, name-selected assembly references.  The journal axis is taken
