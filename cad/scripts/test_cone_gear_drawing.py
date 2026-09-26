@@ -9,6 +9,7 @@ import pytest
 import yaml
 
 import _config
+import _drawing_leaders
 import build_cone_gear as part
 import cone_gear_notes as notes
 import cone_gear_shaft_spec
@@ -419,17 +420,60 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
         floor_x, floor_y = front["FloorDia"]
         assert floor_x - _FLOOR_TEXT_HALF_WIDTH > drawing.FRONT_CENTER[0] + half_od
         assert floor_x + _FLOOR_TEXT_HALF_WIDTH < drawing.RIGHT_CENTER[0] - half_face - 0.020
-        assert floor_y - _FLOOR_TEXT_HALF_HEIGHT > drawing.FRONT_CENTER[1] + 0.009
+        # The shelf under "GAP FLOOR" keeps the fleet's arrow-to-text
+        # clearance from the thickness dimension's upper arrow tail: one
+        # template arrow length past the witness, which stands half the arc
+        # thickness above the bore axis at sheet scale (an upper bound on the
+        # chord it witnesses).
+        numerator, denominator = drawing._SCALE_BY_TEETH[teeth]
+        witness_y = (
+            drawing.FRONT_CENTER[1]
+            + spec.tooth_thickness_mm(teeth) * numerator / (denominator * 2000.0)
+        )
+        tail_y = witness_y + drawing.DIMENSION_ARROW_LENGTH
+        shelf_y = floor_y - drawing.FLOOR_STACK_HALF_HEIGHT
+        assert shelf_y - tail_y >= _drawing_leaders.ARROW_TEXT_CLEARANCE - 1e-9, teeth
         assert (
-            floor_y + _FLOOR_TEXT_HALF_HEIGHT
+            floor_y + drawing.FLOOR_STACK_HALF_HEIGHT
             < drawing.GEAR_DATA_POS[1] - drawing.GEAR_DATA_HEIGHT
         )
+        # The shelf rises only where the tail needs it: every other sheet
+        # keeps the stack's usual place.
+        usual = (
+            drawing.FRONT_CENTER[1] + 0.6 * half_od + drawing.FLOOR_DIA_RISE
+        )
+        assert floor_y >= usual - 1e-12
+        if floor_y > usual:
+            assert shelf_y - tail_y == pytest.approx(_drawing_leaders.ARROW_TEXT_CLEARANCE)
+
+
+def test_dimension_arrow_length_is_read_from_the_drawing() -> None:
+    """The layout's arrow length is the drawing's own, not a remembered one."""
+
+    class _Extension:
+        def __init__(self, value: float) -> None:
+            self.value = value
+            self.calls: list[tuple[int, int]] = []
+
+        def GetUserPreferenceDouble(self, pref: int, option: int) -> float:  # noqa: N802
+            self.calls.append((pref, option))
+            return self.value
+
+    class _Drawing:
+        def __init__(self, value: float) -> None:
+            self.Extension = _Extension(value)
+
+    matching = _Drawing(drawing.DIMENSION_ARROW_LENGTH)
+    drawing._assert_dimension_arrow_length(matching)
+    # swDetailingArrowLength, swDetailingNoOptionSpecified
+    assert matching.Extension.calls == [(26, 0)]
+    with pytest.raises(RuntimeError, match="drawing arrow length reads 3.175 mm"):
+        drawing._assert_dimension_arrow_length(_Drawing(0.003175))
 
 
 # The gap-floor stack: "Ø61.050" over "Ø60.485" over "GAP FLOOR" at 3.5 mm
 # text, the widest row 9 characters at ~1.85 mm.
 _FLOOR_TEXT_HALF_WIDTH = 9 * 0.00185 / 2.0
-_FLOOR_TEXT_HALF_HEIGHT = 3 * 0.00351 / 2.0
 
 
 class _FakeFeature:

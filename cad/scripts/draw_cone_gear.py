@@ -29,6 +29,7 @@ from typing import Any
 import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_leaders import ARROW_TEXT_CLEARANCE
 from _drawing_common import (
     _INSERT_DIMS_MARKED,
     DrawingOutputs,
@@ -66,6 +67,7 @@ from cone_gear_spec import (
     bore_dia_mm,
     floor_limits_mm,
     outside_dia_mm,
+    tooth_thickness_mm,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
@@ -163,15 +165,65 @@ BLANK_DIA_LIFT = 0.0145
 # view (left edge >= 0.219 on every sheet).
 FLOOR_DIA_GAP_X = 0.012
 FLOOR_DIA_RISE = 0.006
+# The thickness dimension's arrows stand outside its witnesses, so the upper
+# arrow's tail runs UP the stack's lane: on the 834-fix-6927 T006 sheet (8:1)
+# it crossed the shelf under "GAP FLOOR" by ~1 mm.  The shelf therefore rises
+# per sheet to clear that tail (``floor_dia_y``).
+#
+# swUserPreferenceDoubleValue_e.swDetailingArrowLength (swconst.tlb R2026x),
+# read with swDetailingNoOptionSpecified: how far the dimension line runs past
+# an outside arrow's tip, head and tail together.
+_PREF_ARROW_LENGTH = 26
+_PREF_OPT_NONE = 0
+# The project DRWDOT's value (0.25 in).  The 834-fix-6927 T006 sheet prints
+# the thickness arrow 6.35 mm from tip to tail end; build() reads the live
+# preference and refuses a template that differs.
+DIMENSION_ARROW_LENGTH = 0.00635
+# The limit stack hangs 7.2 mm from its anchor down to the shelf line (three
+# rows at a ~4.9 mm pitch, same sheet), rounded outward; it is centred on the
+# anchor, so the same half-height bounds its top.
+FLOOR_STACK_HALF_HEIGHT = 0.0075
+
+
+def thickness_arrow_reach_y(teeth: int) -> float:
+    """Sheet y where the thickness dimension's upper arrow tail ends.
+
+    The upper witness stands half the tooth thickness above the bore axis at
+    sheet scale (the arc thickness, an upper bound on the pitch chord it
+    witnesses), and one outside arrow runs on past it.
+    """
+    numerator, denominator = _SCALE_BY_TEETH[teeth]
+    half_thickness = tooth_thickness_mm(teeth) * numerator / (denominator * 2000.0)
+    return FRONT_CENTER[1] + half_thickness + DIMENSION_ARROW_LENGTH
+
+
+def floor_dia_y(teeth: int) -> float:
+    """Anchor y of the gap-floor stack: its usual place above the thickness
+    witness, raised where that would put the shelf within the fleet's
+    arrow-to-text clearance of the thickness arrow's tail."""
+    usual = FRONT_CENTER[1] + 0.6 * rendered_half_od(teeth) + FLOOR_DIA_RISE
+    lowest = thickness_arrow_reach_y(teeth) + ARROW_TEXT_CLEARANCE + FLOOR_STACK_HALF_HEIGHT
+    return max(usual, lowest)
+
+
+def _assert_dimension_arrow_length(drawing: Any) -> None:
+    """Refuse a template whose arrow length is not the one the layout assumes."""
+    extension = _early_bound(
+        _early_bound(drawing, "IModelDoc2").Extension, "IModelDocExtension"
+    )
+    live = float(extension.GetUserPreferenceDouble(_PREF_ARROW_LENGTH, _PREF_OPT_NONE))
+    if abs(live - DIMENSION_ARROW_LENGTH) > 1e-6:
+        raise RuntimeError(
+            f"drawing arrow length reads {live * 1000.0:.3f} mm; the gap-floor "
+            f"stack is placed for {DIMENSION_ARROW_LENGTH * 1000.0:.3f} mm"
+        )
+    _telemetry.info(f"drawing arrow length {live * 1000.0:.3f} mm")
 
 
 def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
     half_od = rendered_half_od(teeth)
     return {
-        "FloorDia": (
-            FRONT_CENTER[0] + half_od + FLOOR_DIA_GAP_X,
-            FRONT_CENTER[1] + 0.6 * half_od + FLOOR_DIA_RISE,
-        ),
+        "FloorDia": (FRONT_CENTER[0] + half_od + FLOOR_DIA_GAP_X, floor_dia_y(teeth)),
         "BlankDia": (FRONT_CENTER[0], FRONT_CENTER[1] + half_od + BLANK_DIA_LIFT),
         # One measured exterior lane keeps the full stacked fit callout inside
         # the left border on every scale/configuration.  Do not derive X from
@@ -415,6 +467,7 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    _assert_dimension_arrow_length(drawing_model)
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="cone-gear batch")
     stamp_drawing_summary(
         adapter,
