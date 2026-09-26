@@ -158,10 +158,10 @@ def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates
         assert f"CYLINDER GEAR {notes.CYLINDER_MATE_NUMBER}" in data
         # U40: the floor is a MIN limit; the tooth form and the floor limits
         # state the result, so no row says how to cut it (rule 6).
+        minimum, maximum = spec.floor_limits_mm(teeth)
         assert (
-            f"GAP FLOOR DIAMETER (mm):  {2.0 * spec.floor_radius_mm(teeth):.3f} MIN"
+            f"GAP FLOOR DIAMETER (mm):  {minimum:.3f} MIN / {maximum:.3f} MAX"
         ) in data
-        assert ("MAX" in data) == (teeth in spec.FLOOR_LIMITS_MM)
         for method in ("CUTTING", "CUTTER", "PLUNGE", "INDEXING", "SINKING"):
             assert method not in data
         assert spec.TOOTH_FORM in data
@@ -207,17 +207,18 @@ def test_gap_floor_constructions() -> None:
             thickness_mm=spec.tooth_thickness_mm(teeth),
             tmin=spec.floor_tmin(teeth),
         )
-        if teeth in spec.FLOOR_LIMITS_MM:
-            minimum, maximum = spec.FLOOR_LIMITS_MM[teeth]
+        minimum, maximum = spec.floor_limits_mm(teeth)
+        assert maximum > minimum
+        if teeth in spec.DIPPED_FLOOR_MIN_MM:
             assert spec.floor_radius_mm(teeth) == pytest.approx(minimum / 2.0)
-            assert maximum > minimum
             assert spec.floor_dip_mm(teeth) > 0.0
             assert spec.floor_tmin(teeth) == 0.0
             continue
         assert spec.floor_radius_mm(teeth) == pytest.approx(chord)
         assert spec.floor_dip_mm(teeth) == pytest.approx(0.0)
         assert (spec.floor_tmin(teeth) > 0.0) == (teeth >= 48)
-    assert set(spec.FLOOR_LIMITS_MM) == {6, 12}
+    assert set(spec.DIPPED_FLOOR_MIN_MM) == {6, 12}
+    assert set(spec.FLOOR_MAX_DIA_MM) == set(spec.CONFIGURATION_TEETH)
 
 
 def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> None:
@@ -225,7 +226,12 @@ def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> 
     assert spec.BODY_MATERIAL_SPEC == registry["material_specification"]
     assert spec.TIP_MATERIAL_SPEC == registry["material_tip_specification"]
     assert spec.TIP_MATERIAL_SPEC != spec.BODY_MATERIAL_SPEC
-    assert registry["finish"] == "NONE"
+    # Brass and manganese bronze take no coating; the field says so rather
+    # than reading as a missing value.  "Gear teeth cut; polished" (before
+    # e44791855) was a method, and polishing would round the tooth edges
+    # note 1 forbids breaking.
+    assert registry["finish"] == "AS MACHINED, UNCOATED"
+    assert str(registry["finish"]).strip().upper() not in {"", "NONE", "N/A"}
     for teeth in spec.CONFIGURATION_TEETH:
         assert part.bore_dia_in(teeth) * spec.MM_PER_IN == pytest.approx(
             spec.bore_dia_mm(teeth)
@@ -317,6 +323,20 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
             > drawing.RIGHT_CENTER[1] + half_od + 0.008
         )
         assert right["FaceWidth"][1] < drawing.RIGHT_CENTER[1] - half_od - 0.008
+        # The face-width text never sits on its extension lines (#834
+        # machinist review, sheets 5-20): centred only where the face spans
+        # the text plus a clearance each side, otherwise wholly right of the
+        # right extension line and still clear of the iso view.
+        text_x = right["FaceWidth"][0]
+        text_half = drawing.FACE_WIDTH_TEXT_WIDTH / 2.0
+        clearance = drawing.FACE_WIDTH_TEXT_CLEARANCE
+        if drawing.face_width_text_inside(teeth):
+            assert text_x == pytest.approx(drawing.RIGHT_CENTER[0])
+            assert half_face - text_half >= clearance
+        else:
+            assert text_x - text_half >= drawing.RIGHT_CENTER[0] + half_face + clearance
+            assert text_x + text_half < drawing.ISO_CENTER[0] - half_od - 0.005
+        assert drawing.face_width_text_inside(teeth) == (teeth <= 24)
         # Thickness text (~65 mm callout centred on its x) sits below the gear,
         # left of the side view and its face-width dimension.
         ctt_x, ctt_y = front["ToothThickness"]
@@ -389,7 +409,7 @@ def test_root_to_bore_webs_meet_u27_except_the_named_t006() -> None:
     # T012's MIN floor is its web limit: 2.05, one printed step deeper breaks it.
     t012_bore = (spec.bore_dia_mm(12) + upper) / 2.0
     assert spec.floor_radius_mm(12) - t012_bore >= 2.05
-    assert (spec.FLOOR_LIMITS_MM[12][0] - 0.001) / 2.0 - t012_bore < 2.05
+    assert (spec.DIPPED_FLOOR_MIN_MM[12] - 0.001) / 2.0 - t012_bore < 2.05
     assert set(spec.WEB_EXCEPTIONS_MM) == {6}
     # U40: the user ruled T006's exception at a 0.621 worst-case web; any
     # drift below it needs a new ruling, not a quiet edit.

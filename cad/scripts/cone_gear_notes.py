@@ -15,10 +15,8 @@ import cone_gear_spec as spec
 CYLINDER_MATE_NUMBER = "MHA-027"
 
 
-def _floor_limits(teeth: int, floor_dia: float) -> str:
-    if teeth not in spec.FLOOR_LIMITS_MM:
-        return f"{floor_dia:.3f} MIN"
-    minimum, maximum = spec.FLOOR_LIMITS_MM[teeth]
+def _floor_limits(teeth: int) -> str:
+    minimum, maximum = spec.floor_limits_mm(teeth)
     return f"{minimum:.3f} MIN / {maximum:.3f} MAX"
 
 
@@ -28,7 +26,6 @@ def gear_data(teeth: int) -> str:
         raise ValueError(f"unsupported cone-gear tooth count {teeth}")
     minimum, maximum = spec.BACKLASH_ACCEPTANCE_MM
     pitch_dia = teeth * spec.MODULE_MM
-    floor_dia = 2.0 * spec.floor_radius_mm(teeth)
     rows = (
         ("CONFIGURATION", f"T{teeth:03d}"),
         ("NUMBER OF TEETH", f"{teeth}"),
@@ -37,8 +34,9 @@ def gear_data(teeth: int) -> str:
         ("PRESSURE ANGLE", f"{spec.PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{pitch_dia:.2f}"),
         # U40: the floor is a limit, not a reference -- cutting deeper for a
-        # thinner tooth would thin the root-to-bore web.
-        ("GAP FLOOR DIAMETER (mm)", _floor_limits(teeth, floor_dia)),
+        # thinner tooth would thin the root-to-bore web, and a floor above MAX
+        # would rub the drum tip.
+        ("GAP FLOOR DIAMETER (mm)", _floor_limits(teeth)),
         ("TOOTH FORM", spec.TOOTH_FORM),
         (
             "MATES WITH",
