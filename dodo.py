@@ -2712,9 +2712,9 @@ def task_drawing():
             "verbosity": 2,
         }
     # diag (never merge): the true-ANSI template re-base leaf (#923).
-    script = SCRIPTS_DIR / "diagnostics" / "diag_ansi_template_rebase.py"
-    for layout in ("landscape",):
-        template = CAD_ROOT / "templates" / f"harmonic-analyzer-{layout}.DRWDOT"
+    script = _ANSI_DIAG_SCRIPT
+    for layout in _ANSI_DIAG_LAYOUTS:
+        template = REPO_ROOT / "cad" / "templates" / f"harmonic-analyzer-{layout}.DRWDOT"
         out_dir = CAD_OUT / "templates"
         outputs = [
             out_dir / template.name,
@@ -2722,7 +2722,7 @@ def task_drawing():
             out_dir / "probe-rebased.pdf",
             out_dir / "probe-original.pdf",
         ]
-        deps = sorted({str(template), str(script), *_helper_deps(script)})
+        deps = _ansi_diag_deps(layout)
         label = f"drawing:ansi_template_{layout}"
         yield {
             "name": f"ansi_template_{layout}",
@@ -3571,6 +3571,18 @@ def task_build_bare():
 # or with `all`) the per-dep digests that produced the key, plus a drift flag when
 # this seat's last-published key differs from the current one. That is the ad-hoc
 # script we hand-wrote cutting v0.9.0, kept.
+_ANSI_DIAG_SCRIPT = SCRIPTS_DIR / "diagnostics" / "diag_ansi_template_rebase.py"
+_ANSI_DIAG_LAYOUTS = ("landscape",)
+
+
+def _ansi_diag_deps(layout: str) -> list[str]:
+    """diag (never merge): the ANSI re-base leaf's file_deps (#923)."""
+    template = REPO_ROOT / "cad" / "templates" / f"harmonic-analyzer-{layout}.DRWDOT"
+    return sorted(
+        {str(template), str(_ANSI_DIAG_SCRIPT), *_helper_deps(_ANSI_DIAG_SCRIPT)}
+    )
+
+
 def _cache_rows() -> list[tuple[str, list[str]]]:
     """(label, file_deps) for every cacheable COM task, in build order."""
     rows: list[tuple[str, list[str]]] = []
@@ -3581,6 +3593,8 @@ def _cache_rows() -> list[tuple[str, list[str]]]:
         rows.append((f"assembly:{stem}", _assembly_file_deps(stem)))
     for stem in _drawing_order():
         rows.append((f"drawing:{stem}", _drawing_file_deps(stem)))
+    for layout in _ANSI_DIAG_LAYOUTS:
+        rows.append((f"drawing:ansi_template_{layout}", _ansi_diag_deps(layout)))
     for stem in ASSEMBLY_ORDER:
         rows.append((f"verify_soundness:{stem}", _soundness_file_deps(stem)))
     rows.append(("verify:kinematics", _kinematics_file_deps()))
