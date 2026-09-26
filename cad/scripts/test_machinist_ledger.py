@@ -2500,6 +2500,85 @@ def test_an_untrailered_scripts_family_comes_from_the_rulings_not_the_caller(
     assert (cross.slot, cross.counts) == (ml.CROSS_FAMILY, True)
 
 
+def test_an_outage_fallback_on_record_is_no_half_of_a_both_families_pair(
+    tmp_path: Path, registry: Path
+) -> None:
+    # A fallback recorded before the drawing's both-families ruling existed.
+    pdf = _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+    outages = ml.load_outages(_outages(tmp_path))
+    ml.record_review(
+        _review(pdf, reviewer="claude"),
+        pdf,
+        author_family="claude",
+        provenance={},
+        ledger_path=ledger_path,
+        outage=outages["codex-401-test"],
+    )
+    rulings = ml.load_author_rulings(
+        _author_rulings(tmp_path, family="gpt", both_families=BOTH_REASON)
+    )
+
+    [status] = ml.check(
+        ["crank_arm"], ledger_path=ledger_path, rulings=rulings, outages=outages
+    )
+
+    assert (status.state, status.missing) == (ml.State.UNREVIEWED, ("claude", "gpt"))
+
+
+def test_backfill_withdraws_a_contradicted_outage_fallback(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    pdf = _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+    outages = ml.load_outages(_outages(tmp_path))
+    ml.record_review(
+        _review(
+            pdf, reviewer="claude", reviewed_at=(NOW - timedelta(hours=1)).isoformat()
+        ),
+        pdf,
+        author_family="claude",
+        provenance={},
+        ledger_path=ledger_path,
+        outage=outages["codex-401-test"],
+    )
+    # A newer Fable FIX of the very same sheets.
+    _on_record(
+        records, "wt-fix", reviewer="claude", passed=False, reviewed_at=REVIEWED_AT
+    )
+
+    row = _backfill(tmp_path, records, outages=outages, apply=True)
+
+    assert row.outcome == ml.Backfill.CONTRADICTED, row.detail
+    assert f"recorded {ml.OUTAGE_FALLBACK}" in row.detail
+    assert "crank_arm" not in ml.load_ledger(ledger_path)["drawings"]
+
+
+def test_backfill_fills_both_missing_families_in_one_run(
+    tmp_path: Path, registry: Path, records: Path
+) -> None:
+    rulings = ml.load_author_rulings(
+        _author_rulings(tmp_path, family="gpt", both_families=BOTH_REASON)
+    )
+    _on_record(records, "wt-claude", reviewer="claude")
+    _on_record(records, "wt-codex", reviewer="codex")
+    _sheet(registry)
+
+    dry = _backfill(tmp_path, records, rulings=rulings)
+    assert dry.outcome == ml.Backfill.INGESTED
+    assert "both_families_claude" in dry.detail and "both_families_gpt" in dry.detail
+
+    row = _backfill(tmp_path, records, rulings=rulings, apply=True)
+    assert row.outcome == ml.Backfill.INGESTED, row.detail
+    entry = ml.load_ledger(tmp_path / "ledger.json")["drawings"]["crank_arm"]
+    assert sorted(entry) == ["both_families_claude", "both_families_gpt"]
+    [status] = ml.check(
+        ["crank_arm"], ledger_path=tmp_path / "ledger.json", rulings=rulings
+    )
+    assert status.state == ml.State.OK
+
+
 def test_backfill_adds_only_the_family_a_both_families_drawing_lacks(
     tmp_path: Path, registry: Path, records: Path
 ) -> None:

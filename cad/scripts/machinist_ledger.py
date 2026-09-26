@@ -1627,6 +1627,7 @@ def drawing_status(
             _reviewed(fallback),
             f"{OUTAGE_FALLBACK} {fallback['status']} ({outage_id})",
             last_resort,
+            accepting=(OUTAGE_FALLBACK,),
         )
     if cross_cmp is None and last is not None and not last["counts"]:
         reason = f"last-resort review does not count: {last['not_counted_because']}"
@@ -1664,7 +1665,9 @@ def _both_families_status(
     accepting: list[str] = []
     drifted: list[tuple[dict[str, Any], Comparison]] = []
     for slot, recorded in entry.items():
-        if not recorded.get("counts"):
+        # An outage fallback never stands in for a family (see record_review),
+        # even one recorded before the drawing's both-families ruling.
+        if slot == OUTAGE_FALLBACK or not recorded.get("counts"):
             continue
         comparison = _compare(recorded, current, references)
         if comparison.problem:
@@ -2440,7 +2443,11 @@ def _backfill_drawings(
                 continue
             matcher = _Matcher(pdf, cache)
             tried: list[Tried] = []
+            filed: set[str] = set()  # reviewer families ingested for this drawing
             for index, candidate in enumerate(ships):
+                family = REVIEWER_FAMILIES.get(candidate.review["reviewer"])
+                if family in filed:
+                    continue
                 if candidate.pdf is None:
                     sha = candidate.review["source_sha256"][0]
                     tried.append(
@@ -2464,19 +2471,29 @@ def _backfill_drawings(
                     scratch=Path(tmp) / name / str(index) / "ledger.json",
                 )
                 tried.append(attempt)
-                if attempt.outcome == Backfill.INGESTED:
+                if attempt.outcome != Backfill.INGESTED:
+                    continue
+                # A both-families drawing takes one SHIP per family it lacks.
+                filed.add(family)
+                if not status.missing or filed >= set(status.missing):
                     break
+            ingested = [t for t in tried if t.outcome == Backfill.INGESTED]
             best = min(tried, key=lambda t: _BACKFILL_ORDER.index(t.outcome))
+            shown = ingested or [best]
             rows.append(
                 BackfillRow(
                     name,
                     best.outcome,
-                    f"{best.detail} [{best.candidate.report.resolve().as_posix()}]",
+                    " + ".join(
+                        f"{t.detail} [{t.candidate.report.resolve().as_posix()}]"
+                        for t in shown
+                    ),
                     tried,
                 )
             )
-            if apply and best.outcome == Backfill.INGESTED:
-                _adopt(best, name, ledger, ledger_path)
+            if apply:
+                for attempt in ingested:
+                    _adopt(attempt, name, ledger, ledger_path)
     skipped = [candidate for candidate in found.candidates if candidate.skip]
     return BackfillResult(repo, head, rows, skipped)
 
