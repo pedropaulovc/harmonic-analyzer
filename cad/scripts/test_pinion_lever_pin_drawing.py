@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import _config
 import build_pinion_lever_pin as pin
 import draw_pinion_lever_pin as drawing
@@ -93,11 +95,11 @@ def test_the_pin_sheet_has_no_notes_and_the_mates_carry_the_match_drill() -> Non
     assert "SetPrecision3" not in source
 
 
-def test_the_pin_diameter_is_toleranced_before_the_installed_split() -> None:
-    # pc-lever-pin-diag: tolerancing PinDia after the INSTALLED configuration
-    # was rebuilt left INSTALLED stale in the saved part.  Every model-dimension
-    # edit precedes the configuration split, so both configurations rebuild
-    # after the last one.
+def test_every_model_edit_precedes_the_installed_split() -> None:
+    # pc-lever-pin-diag and -diag2: tolerancing PinDia, then setting the
+    # material, after the INSTALLED configuration was rebuilt left INSTALLED
+    # stale in the saved part.  Every model edit precedes the configuration
+    # split, so both configurations rebuild after the last one.
     import build_pinion_lever_pin as part
 
     source = Path(part.__file__).read_text(encoding="utf-8")
@@ -107,5 +109,39 @@ def test_the_pin_diameter_is_toleranced_before_the_installed_split() -> None:
         "clear_dimensions_for_drawing(adapter)",
         "mark_dimensions_for_drawing(adapter,",
         "apply_drawing_precision(adapter,",
+        "apply_material(adapter,",
+        "apply_color(adapter,",
     ):
+        assert source.count(edit) == 1, edit
         assert source.index(edit) < split, edit
+
+
+class _MaterialPart:
+    """Early-bound IPartDoc: GetMaterialPropertyName2 returns (name, database)."""
+
+    def __init__(self, materials: dict[str, str]) -> None:
+        self.materials = materials
+
+    def GetMaterialPropertyName2(self, config: str):
+        return self.materials[config], "solidworks materials"
+
+
+def test_every_configuration_must_carry_the_pin_material() -> None:
+    # apply_material sets the active configuration only; a configuration
+    # without it gives drive-train the wrong MHA-135 mass.
+    from types import SimpleNamespace
+
+    import build_pinion_lever_pin as part
+
+    configs = ("Default", part.INSTALLED_CONFIG)
+    good = SimpleNamespace(
+        currentModel=_MaterialPart(dict.fromkeys(configs, part.MATERIAL))
+    )
+    part.require_material_in_every_configuration(good, configs)
+    bare = SimpleNamespace(
+        currentModel=_MaterialPart(
+            {"Default": part.MATERIAL, part.INSTALLED_CONFIG: ""}
+        )
+    )
+    with pytest.raises(RuntimeError, match=part.INSTALLED_CONFIG):
+        part.require_material_in_every_configuration(bare, configs)
