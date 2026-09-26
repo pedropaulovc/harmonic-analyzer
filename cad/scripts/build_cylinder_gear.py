@@ -24,10 +24,12 @@ Features, in order:
 3. Integral eccentric cam (book ch. 13, pp. 22-25): one of the 20 cams that
    convert each gear's rotation into the near-sinusoidal reciprocation of its
    connecting rod (displacement = ECCENTRICITY x sin(theta)). Disc OD 30.6 mm,
-   reference thickness 3.5 mm (finished axial fit supports the connecting-rod
-   ring without binding or adjacent-part contact), centre offset +Y by
-   the 8.64 mm eccentricity, boss-extruded z = 3..6.5 from an offset reference
-   plane (cam disc centred on the bore, offset +Y by the eccentricity -- the
+   centre offset +Y by the 8.64 mm eccentricity, boss-extruded from the Front
+   plane through the blank to the OVERALL thickness z = 0..7.0565 (#743: the
+   overall thickness is the station pitch, so the bank stacks cam face on back
+   face and the cam fills the connecting-rod slot; the cam's own thickness,
+   4.0565, is a reference). Cam disc centred on the bore, offset +Y by the
+   eccentricity -- the
    lobe points +Y, the NOTCH side: the ch14 end views prove the rocker tips sit
    at the TOP of their stroke at notch-up/0-cranks, so lobe-up is the cos-mode
    home pose; the pre-ROM-fit build authored it -Y, 180 deg off). The throw is
@@ -59,7 +61,7 @@ tooth-fraction fill).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 13".
 
-Layout: gear axis = Z through the origin, gear z = 0..3 mm, cam z = 3..6.5,
+Layout: gear axis = Z through the origin, gear z = 0..3 mm, cam z = 3..7.0565,
 cam lobe +Y, notch +Y (lobe on the notch side).
 
 Run (SolidWorks already open)::
@@ -110,7 +112,6 @@ from _drawing_marks import (
 from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _part_pmi import author_part_pmi
-from _visibility import blank_reference_geometry
 from involute_gear import DP, gear_facts  # DP = train diametral_pitch (machine.yaml)
 from cylinder_gear_notes import DRAWING_NOTES, GEAR_DATA
 from cylinder_gear_spec import (
@@ -134,6 +135,8 @@ from cylinder_gear_spec import (
     NOTCH_WIDTH,
     NOTCH_WIDTH_BAND,
     OUTSIDE_DIA,
+    OVERALL_THICKNESS,
+    OVERALL_THICKNESS_BAND,
     SURFACE_FINISHES,
     TEETH,
 )
@@ -157,7 +160,7 @@ NOTCH_OUTER = RA_MM + NOTCH_CLEARANCE  # clearance past the OD so the cut always
 # part and the drawing's phase/depth picks cannot drift.
 NOTCH_X = NOTCH_CENTER_X
 
-THROUGH_ALL = FACE_WIDTH + CAM_THICKNESS + 2.0  # bore cut depth
+THROUGH_ALL = OVERALL_THICKNESS + 2.0  # bore cut depth
 
 
 def is_solid(x: float, y: float) -> bool:
@@ -258,10 +261,7 @@ async def _name_lobe_axis(adapter) -> str:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import (
-        CreatePlaneParameters,
-        ExtrusionParameters,
-    )
+    from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -274,7 +274,7 @@ async def build(adapter) -> dict[str, str]:
     # numbers in document units (an unsuffixed 30.6 would be read as 30.6 in).
     await set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
     await set_global(adapter, "CamDiameter", f"{CAM_DIAMETER}mm")
-    await set_global(adapter, "CamThickness", f"{CAM_THICKNESS}mm")
+    await set_global(adapter, "OverallThickness", f"{OVERALL_THICKNESS}mm")
     await set_global(adapter, "Eccentricity", f"{ECCENTRICITY}mm")
     await set_global(adapter, "BoreDiameter", f"{BORE_DIAMETER}mm")
     await set_global(adapter, "NotchDepth", f"{NOTCH_DEPTH}mm")
@@ -299,22 +299,18 @@ async def build(adapter) -> dict[str, str]:
     volume = v_teeth
 
     # ------------------------------------------------------------------
-    # Integral cam on the far gear face (z = 3..6.5), lobe +Y (notch side).
+    # Integral cam on the far gear face (z = 3..OVERALL), lobe +Y (notch side).
+    # It is extruded from the Front plane THROUGH the blank so its one depth
+    # dimension is the overall thickness -- the station pitch the solid bank
+    # stacks on (#743), carrying the print band.  The cam disc (radius <= 23.94)
+    # lies wholly inside the blank's solid web (root radius 30.0), so the part
+    # inside z = 0..FACE_WIDTH merges without changing the blank.
     # ------------------------------------------------------------------
-    plane = check(
-        "create_plane cam (Front + face width)",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset", base_plane="Front Plane", offset=FACE_WIDTH
-            )
-        ),
-    )
-    # Cam disc: ordinary auxiliary circle, centred +Y from the bore.  A sketch
-    # on this custom offset plane emits both centre coordinates even though
-    # x=0, so record all three dimensions and mark only the useful Y offset and
-    # diameter for the drawing.
+    # Cam disc: ordinary auxiliary circle, centred +Y from the bore.  On the
+    # Front plane the on-axis x coordinate drops; record what is emitted and
+    # mark only the Y offset and diameter for the drawing.
     cam = SketchDims()
-    check(f"create_sketch cam on {plane.name}", await adapter.create_sketch(plane.name))
+    check("create_sketch cam on Front", await adapter.create_sketch("Front"))
     await define_circle(
         adapter,
         0.0,
@@ -331,17 +327,17 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += cam.apply(adapter, "CamProfile")
     check(
         "extrude cam",
-        await adapter.create_extrusion(ExtrusionParameters(depth=CAM_THICKNESS)),
+        await adapter.create_extrusion(ExtrusionParameters(depth=OVERALL_THICKNESS)),
     )
     name_last_feature(adapter, "CamBoss")
-    cam_depth = name_dimensions(adapter, "CamBoss", ["CamThickness"])
-    drive_jobs += [(cam_depth[0], '"CamThickness"')]
+    cam_depth = name_dimensions(adapter, "CamBoss", ["OverallThickness"])
+    drive_jobs += [(cam_depth[0], '"OverallThickness"')]
+    # Only the part beyond the blank adds material.
     v_cam = math.pi * (CAM_DIAMETER / 2.0) ** 2 * CAM_THICKNESS
     volume = await volume_check(adapter, "cam boss", volume + v_cam, 0.005 * v_cam)
-    blank_reference_geometry(adapter, ((plane.name, "PLANE"),))
 
-    # The offset plane and the extrude direction both have ambiguous signs:
-    # assert the cam actually landed at z > FACE_WIDTH, on +Y.
+    # The extrude direction has an ambiguous sign: assert the cam actually
+    # landed at z > FACE_WIDTH, on +Y.
     mass = await adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"cam COM check failed: {mass.error}")
@@ -353,7 +349,7 @@ async def build(adapter) -> dict[str, str]:
     if abs(com[2] - com_z) > 0.1 or abs(com[1] - com_y) > 0.1:
         raise RuntimeError(
             f"cam misplaced: COM {com}, expected y {com_y:.3f} z {com_z:.3f} "
-            "-- offset-plane side or extrude direction flipped"
+            "-- extrude direction flipped"
         )
     _telemetry.success(f"cam placement: COM y {com[1]:.3f} z {com[2]:.3f}")
 
@@ -544,7 +540,7 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_cut_extrude(ExtrusionParameters(depth=THROUGH_ALL)),
     )
     name_last_feature(adapter, "Bore")
-    v_bore = math.pi * BORE_RADIUS**2 * (FACE_WIDTH + CAM_THICKNESS)
+    v_bore = math.pi * BORE_RADIUS**2 * OVERALL_THICKNESS
     volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
 
     # Named bore axis (gear axis = Z through the origin) for view-independent
@@ -587,6 +583,9 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "CamProfile", "CamDia", *deviations(CAM_DIA_BAND)
     )
+    set_dimension_bilateral_tolerance(
+        adapter, "CamBoss", "OverallThickness", *deviations(OVERALL_THICKNESS_BAND)
+    )
     set_dimension_symmetric_tolerance(
         adapter,
         "CamProfile",
@@ -616,11 +615,11 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Mark exactly the blank, fitted bore, functional cam and phase-kerf
-    # dimensions and author their decimal places on the part (policy rule 2:
-    # the places are the tolerance, so the sheet reads them back instead of
-    # rewriting them).  The drawing adds only a checked reference overall
-    # thickness.
+    # Mark exactly the blank, fitted bore, functional cam, stacking thickness
+    # and phase-kerf dimensions and author their decimal places on the part
+    # (policy rule 2: the places are the tolerance, so the sheet reads them
+    # back instead of rewriting them).  The drawing adds only a checked
+    # reference cam thickness.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

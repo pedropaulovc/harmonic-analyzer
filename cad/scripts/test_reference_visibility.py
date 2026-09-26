@@ -360,9 +360,10 @@ _SNAPSHOT = {
     "crank-hub": {"ServicePinStationReference"},
     "crank-handle-pivot-screw": {"StationReference"},
     "crankshaft": {"StationReference"},
+    "cone-gear": {"ToothThicknessReference"},
     "cone-pivot-post": {"BoreSpacingReference", "JournalPlanReference"},
 }
-_OWNERS = {"pinioncluster", "crankhub", "pivot"}
+_OWNERS = {"pinioncluster", "crankhub", "pivot", "conegear"}
 
 
 def _allowances() -> dict[str, dict[str, str]]:
@@ -389,7 +390,9 @@ def test_each_listed_part_passes_its_allowance_to_the_save() -> None:
     passing = set()
     for path in SCRIPTS.glob("build_*.py"):
         text = path.read_text(encoding="utf-8")
-        if "allowed_shown=SHOWN_SKETCH_ALLOWANCES" not in text:
+        # save_part_and_images(..., allowed_shown=...) or, for a part that
+        # saves itself, assert_reference_geometry_hidden(..., allowed=...).
+        if not re.search(r"allowed(?:_shown)?=SHOWN_SKETCH_ALLOWANCES", text):
             continue
         match = re.search(r'^PART_NAME = "([^"]+)"', text, re.MULTILINE)
         assert match, path.name

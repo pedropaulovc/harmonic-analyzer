@@ -55,11 +55,12 @@ geometry is casting-shaped, not milling-shaped.
     before it reaches a drawing (gap below).
 
 - `rocker-arm-support` carries four **5/16 through clearance drills**. Four
-  McMaster 92240A539 1/4-20 UNC-2A × 5/8 in hex-head screws install from the
+  McMaster 92240A540 1/4-20 UNC-2A × 3/4 in hex-head screws install from the
   top into blind UNC-2B taps in `harmonic-base`: the exact vendor under-head
-  washer transition seats on the support, leaving 9.247 mm installed engagement
-  (1.456D), 9.497 mm usable full-thread depth (0.25 mm tip clearance), and
-  15.847 mm cylindrical tap-drill depth (full thread + five 1.27 mm pitches).
+  washer transition seats on the support, leaving 12.422 mm installed
+  engagement (1.956D). The seat is sized at its printed .XX worst case:
+  13.20 mm full thread (0.25 mm tip reserve at the low limit) and 20.60 mm
+  cylindrical tap-drill depth (five 1.27 mm pitches past the thread).
   Other receivers are threaded too; the `knife-mount` hanger-stud seat is one
   example. No keyways anywhere — gears are **soldered** to their shafts (the 20
   `cone-gear`s, and the 64T `crank-drive-gear`: plain bore, no keyway,

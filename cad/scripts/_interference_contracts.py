@@ -41,6 +41,8 @@ from frame_cross_screw_spec import THREAD as _FRAME_CROSS_THREAD
 from _hole_spec import TAP_DRILL_MM
 from post_mount_screw_spec import CUT_LENGTH_MM as _POST_SCREW_CUT_LENGTH
 from post_mount_screw_spec import GRIP_MM as _POST_SCREW_GRIP
+from arbor_set_screw_spec import LENGTH as _ARBOR_SET_SCREW_LENGTH
+from arbor_set_screw_spec import THREAD as _ARBOR_SET_SCREW_THREAD
 
 
 def _smooth_annulus_limit_mm3(
@@ -169,6 +171,25 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
         _smooth_annulus_limit_mm3(
             6.35, 5.105, _POST_SCREW_CUT_LENGTH - _POST_SCREW_GRIP
         ),
+    ),
+    # #743 Q3: the MHA-147 #4-40 apex set screw in each pedestal's crown tap,
+    # bounded over its whole length (the crown holds a little less: the cup
+    # point stands in the bore clearance and the socket stands
+    # cylinder_bank_layout.SET_SCREW_SOCKET_PROUD over the apex). Pedestal and
+    # screw are both placed south first, so their suffixes match. #911: this
+    # smooth-annulus bound serves the first build only -- re-pin it to the
+    # measured overlap x 1.10 from the first drive_train leaf, as #838 did for
+    # the tip-block pairs.
+    **_numbered_pairs(
+        "arbor-set-screw",
+        range(1, 3),
+        "arbor-pedestal",
+        _smooth_annulus_limit_mm3(
+            THREAD_MAJOR_MM[_ARBOR_SET_SCREW_THREAD],
+            TAP_DRILL_MM[_ARBOR_SET_SCREW_THREAD],
+            _ARBOR_SET_SCREW_LENGTH,
+        ),
+        second_number=None,
     ),
 }
 
