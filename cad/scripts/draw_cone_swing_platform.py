@@ -390,7 +390,21 @@ DETAIL_ARROWS_INSIDE = ("TipSlotW", "TipCboreW")
 # quadrant to text above; the counterbore note drops from its lower quadrant
 # to text below, its leader crossing pivot-to-slot's dimension line (the only
 # path: below that line's foot sits the relief note).
-_WEST_ARC_CENTER = (DETAIL_CENTER[0] + 2.0 * _DETAIL_S, _SLOT_Y)
+
+
+def detail_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
+    """Sheet point of plate-local (x, z) in detail C (centred on x = 0 at
+    DETAIL_MODEL_Z, the slot's station)."""
+    return (
+        DETAIL_CENTER[0] + x_mm * _DETAIL_S,
+        DETAIL_CENTER[1] - (z_mm - DETAIL_MODEL_Z) * _DETAIL_S,
+    )
+
+
+# The west end arc's centre is the model's: TIP_SCREW_HALF_TRAVEL (a literal
+# 2.0 here outlived b1f7e824b's 2.0 -> 2.5 and put the slot note's tip 1 mm
+# off its arc, S1 leaf 917-s1-5974).
+_WEST_ARC_CENTER = detail_xy(TIP_SCREW_HALF_TRAVEL, TIP_SCREW_LOCAL_Z)
 # The leader roots on the note's FIRST line, on the side toward its tip
 # (d382 leaf log :519: the C'BORE note's text top at 44.5 mm, its leader at
 # 43.1), and a 2.5 mm line pitches 3.35 mm (the same note: two lines,

@@ -1188,7 +1188,8 @@ def test_cutter_note_leaders_reach_their_arcs_without_crossing() -> None:
     assert "SLOT THRU" in by_key["slot"].text
     assert "FROM UNDERSIDE" in by_key["cbore"].text
     assert drawing.LEADER_TIP_BOUND_M == 0.00001
-    centre = (drawing.DETAIL_CENTER[0] + 0.004, drawing._SLOT_Y)
+    # The model's slot end centre (a pinned 0.004 here was the stale 2.0).
+    centre = drawing.detail_xy(spec.TIP_SCREW_HALF_TRAVEL, spec.TIP_SCREW_LOCAL_Z)
     for note in drawing.CUTTER_NOTES:
         tip = drawing.arc_note_tip(note)
         assert math.dist(tip, centre) == pytest.approx(note.radius_mm * 0.002)
@@ -2181,3 +2182,24 @@ def test_tap_callout_reads_each_side_by_its_own_max_flag(
             spec=mixed,
             label="t",
         )
+
+
+def test_detail_c_arc_notes_centre_on_the_model_slot_end() -> None:
+    """S1 leaf 917-s1-5974: "slot note tip projects to (0.09050, 0.048464),
+    layout expects (0.08950, 0.048464) (1.000 mm off)".  The detail's west
+    arc centre was a literal 2.0 mm east of the view centre; b1f7e824b moved
+    the slot end centres to TIP_SCREW_HALF_TRAVEL (2.5), which the model
+    reads.  Each detail-C note's sheet centre is the image of its own model
+    arc centre, and the slot tip is where the seat read it."""
+    s = drawing.DETAIL_SCALE[0] / drawing.DETAIL_SCALE[1] / 1000.0
+    for note in drawing.CUTTER_NOTES:
+        cx, cz = note.arc_center_mm
+        assert note.sheet_center == pytest.approx(
+            (
+                drawing.DETAIL_CENTER[0] + cx * s,
+                drawing.DETAIL_CENTER[1] - (cz - drawing.DETAIL_MODEL_Z) * s,
+            ),
+            abs=1e-9,
+        ), note.key
+    slot = next(note for note in drawing.CUTTER_NOTES if note.key == "slot")
+    assert drawing.arc_note_tip(slot) == pytest.approx((0.0905, 0.04846410161513774), abs=1e-7)
