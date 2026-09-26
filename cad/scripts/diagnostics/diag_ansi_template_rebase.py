@@ -37,6 +37,7 @@ at the end if any check failed.
 from __future__ import annotations
 
 import base64
+import dataclasses
 import gzip
 import hashlib
 import json
@@ -48,6 +49,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import _drawing_common
 import _maxmin_prefs as tables
 import _telemetry
 import ansi_template_manifest as manifest
@@ -302,6 +304,17 @@ def _write_restores(ext: Any, baseline: dict[str, object]) -> None:
                 fmt.CharHeightInPts = int(setting.target[1])
             else:
                 fmt.CharHeight = float(setting.target[0])
+            # A height write reset LineSpacing 1 mm -> 0 on 8 view-label
+            # formats (leaf ansi-rebase-4493): carry every other field from B0.
+            if isinstance(before, dict):
+                for field in _TEXT_FORMAT_FIELDS:
+                    if field in ("CharHeight", "CharHeightInPts", "IsHeightSpecifiedInPts"):
+                        continue
+                    current = getattr(fmt, field)
+                    if callable(current):
+                        continue
+                    if current != before[field]:
+                        setattr(fmt, field, before[field])
             ok = ext.SetUserPreferenceTextFormat(setting.pref, setting.option_id, fmt)
         else:
             raise RuntimeError(
@@ -399,13 +412,18 @@ def _sf_symbol(draw: Any, tag: str, index: int, x: float, y: float) -> dict[str,
         raise RuntimeError(f"{tag}: InsertSurfaceFinishSymbol3 returned None ({index})")
     symbol = _early_bound(raw, "ISFSymbol")
     ok = bool(symbol.SetText(index, _SF_TEXT))
+    annotation = _early_bound(symbol.GetAnnotation(), "IAnnotation")
+    # With no leader the insert ignored X/Y and stacked every symbol at the
+    # sheet corner (leaf ansi-rebase-4493); place it explicitly.
+    placed = bool(annotation.SetPosition2(x, y, 0.0))
     draw.EditRebuild3()
     draw.ForceRebuild3(False)
-    rendered = _rendered(_early_bound(symbol.GetAnnotation(), "IAnnotation"))
+    rendered = _rendered(annotation)
     own = [str(symbol.GetTextAtIndex(i)) for i in range(int(symbol.GetTextCount()))]
     return {
         "index": index,
         "set": ok,
+        "placed": placed,
         "get_text": str(symbol.GetText(index) or ""),
         "display_data": rendered,
         "symbol_texts": own,
@@ -438,16 +456,40 @@ def _sf_standard_sweep(draw: Any, tag: str) -> dict[str, object]:
     return out
 
 
+def _project_drawing(adapter: Any, layout: DrawingLayout, template: Path) -> Any:
+    """A drawing made the build's way (``new_project_drawing``: mm units at 2
+    places, the per-scope 372 pin, annotation ink), from ``template`` instead
+    of the tracked one. The registry entry is swapped only for this call."""
+    spec = DRAWING_TEMPLATES[layout]
+    DRAWING_TEMPLATES[layout] = dataclasses.replace(spec, path=template)
+    try:
+        draw, _sheet = _drawing_common.new_project_drawing(adapter, layout=layout)
+    finally:
+        DRAWING_TEMPLATES[layout] = spec
+    return draw
+
+
 def _probe(
-    adapter: Any, template: Path, tag: str, size: tuple[float, float]
+    adapter: Any,
+    template: Path,
+    tag: str,
+    layout: DrawingLayout,
+    mode: str,  # "plain" (new_drawing) | "project" (new_project_drawing)
 ) -> dict[str, object]:
-    draw = new_drawing(adapter, template=str(template), width=size[0], height=size[1])
+    if mode == "project":
+        draw = _project_drawing(adapter, layout, template)
+    else:
+        spec = DRAWING_TEMPLATES[layout]
+        draw = new_drawing(
+            adapter, template=str(template), width=spec.width_m, height=spec.height_m
+        )
     ext = draw.Extension
-    result: dict[str, object] = {"standard": _standard(ext)}
+    result: dict[str, object] = {"standard": _standard(ext), "mode": mode}
     result["prefs"] = _dump(ext)
     result["limit"] = _limit_probe(adapter, draw, tag)
     result["surface_finish"] = _sf_probe(adapter, draw, tag)
-    result["sf_standard_sweep"] = _sf_standard_sweep(draw, tag)
+    if mode == "plain":
+        result["sf_standard_sweep"] = _sf_standard_sweep(draw, tag)
     pdf = OUT_DIR / f"{template.stem}-probe-{tag}.pdf"
     if pdf.exists():
         pdf.unlink()
@@ -490,9 +532,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
 
 def _rebase(adapter: Any, layout: DrawingLayout) -> Path:
-    template = DRAWING_TEMPLATES[layout]
-    source = template.path
-    size = (template.width_m, template.height_m)
+    source = DRAWING_TEMPLATES[layout].path
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     work = OUT_DIR / f"work-{source.name}"
     result = OUT_DIR / source.name
@@ -550,7 +590,7 @@ def _rebase(adapter: Any, layout: DrawingLayout) -> Path:
     _report["result"] = _stamp(result)
     _log(f"saved {result.name} {_report['result']}")
 
-    rebased = _probe(adapter, result, "rebased", size)
+    rebased = _probe(adapter, result, "rebased", layout, "plain")
     b3 = rebased.pop("prefs")
     _record("b3", b3)
     _report["b3"] = _compare(
@@ -559,10 +599,34 @@ def _rebase(adapter: Any, layout: DrawingLayout) -> Path:
         b3,
         {manifest.key(s): s.target for s in manifest.SETTINGS},
     )
-    control = _probe(adapter, source, "original", size)
+    control = _probe(adapter, source, "original", layout, "plain")
     _record("control", control.pop("prefs"))
     _report["probe_rebased"] = rebased
     _report["probe_original"] = control
+
+    # The sheet the build actually makes: new_project_drawing from each
+    # template. project_delta is every setting a built sheet would change.
+    project_rebased = _probe(adapter, result, "project-rebased", layout, "project")
+    project_original = _probe(adapter, source, "project-original", layout, "project")
+    sheet_rebased = project_rebased.pop("prefs")
+    sheet_original = project_original.pop("prefs")
+    _record("project_rebased", sheet_rebased)
+    _record("project_original", sheet_original)
+    _report["probe_project_rebased"] = project_rebased
+    _report["probe_project_original"] = project_original
+    _report["project_delta"] = {
+        key: [before, sheet_rebased.get(key)]
+        for key, before in sheet_original.items()
+        if before != sheet_rebased.get(key) and not _noise(key, before, sheet_rebased.get(key))
+    }
+    _log(f"project sheet delta: {len(_report['project_delta'])} setting(s)")
+    for key, pair in _report["project_delta"].items():
+        _log(f"project delta {key}: {pair[0]!r} -> {pair[1]!r}")
+    project_gate = project_rebased["limit"]["gate"]
+    if not project_gate["passed"] or project_gate["scanned"] < 2:
+        _finding(f"project sheet: the limit-text gate on the re-based template {project_gate!r}")
+    if project_original["limit"]["gate"]["passed"]:
+        _finding("project sheet: the limit-text gate passed the original template")
 
     for word in ("MAX", "MIN"):
         if (

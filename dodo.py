@@ -2723,6 +2723,8 @@ def task_drawing():
             out_dir / f"{template.stem}-rebase-report.json",
             out_dir / f"{template.stem}-probe-rebased.pdf",
             out_dir / f"{template.stem}-probe-original.pdf",
+            out_dir / f"{template.stem}-probe-project-rebased.pdf",
+            out_dir / f"{template.stem}-probe-project-original.pdf",
         ]
         deps = _ansi_diag_deps(layout)
         label = f"drawing:ansi_template_{layout}"
