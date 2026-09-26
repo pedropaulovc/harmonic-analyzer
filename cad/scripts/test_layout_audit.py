@@ -1771,6 +1771,24 @@ def test_a_run_with_a_symbol_inside_matches_the_text_either_side():
     assert (box.xmin, box.xmax) == pytest.approx((0.1002, 0.1180))
 
 
+def test_split_runs_are_matched_as_a_complete_assignment():
+    """Codex P2 on f7275dfdf: run by run, the flexible run A took the one
+    "2X" (P) and the "3.45" (R) the constrained run B could reach, stranding
+    B although A -> Q+S, B -> P+R matches both."""
+    h = 0.0035
+    flexible = TextItem("2X <MOD-DIAM> 3.45", 0.106, 0.100, h)
+    constrained = TextItem("2X <MOD-DIAM> 3.45", 0.100, 0.100, h)
+    spans = [
+        _ink_span("2X", 0.100, 0.1009, width=0.004),  # P: both runs reach it
+        _ink_span("3.45", 0.109, 0.1009, width=0.009),  # R
+        _ink_span("2X", 0.137, 0.1009, width=0.004),  # Q: past B's run
+        _ink_span("3.45", 0.139, 0.1009, width=0.009),  # S
+    ]
+    matched = match_ink([("A", flexible), ("B", constrained)], spans)
+    assert (matched["B"].xmin, matched["B"].xmax) == pytest.approx((0.100, 0.118))
+    assert (matched["A"].xmin, matched["A"].xmax) == pytest.approx((0.137, 0.148))
+
+
 def test_printed_text_no_annotation_claims_gates_outside_the_title_block_border_and_tables():
     """The reverse of text-unmatched: an annotation whose COM read failed
     still prints, and would be invisible to every other check."""
@@ -1823,6 +1841,18 @@ def test_a_view_that_printed_no_model_edge_is_found():
         ("view shaded", "view-edges-missing", "gating"),
         ("view iso", "view-edges-missing-pictorial", "advisory"),
     }
+
+
+def test_a_view_that_printed_only_hidden_edges_is_not_edgeless():
+    """Codex P2 on f7275dfdf: a Hidden Lines Visible view whose only model
+    strokes are dashed has geometry; only the solid edges were counted."""
+    views = [_view("front", (0.05, 0.05, 0.10, 0.10)), _view("hlv", (0.15, 0.05, 0.20, 0.10))]
+    strokes = [
+        *_edges((0.06, 0.06, 0.09, 0.06)),
+        *_edges((0.16, 0.06, 0.19, 0.06), width=0.00018, dashed=1),
+    ]
+    findings = audit_dump(_dump(views=views, strokes=strokes))
+    assert [f for f in findings if f.kind.startswith("view-edges")] == []
 
 
 def test_a_refused_com_read_is_a_gating_finding():
