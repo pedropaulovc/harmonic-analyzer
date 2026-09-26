@@ -21,6 +21,7 @@ from itertools import combinations
 from pathlib import Path
 from typing import Any, Callable, Literal, Sequence
 
+import _seat_forensics
 import _telemetry
 from _common import _early_bound, check, run_build
 from _drawing_common import (
@@ -43,7 +44,6 @@ from _drawing_common import (
 )
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
-from _seat_forensics import OUT_FAILURES
 from drive_train_assembly_spec import (
     CLUSTERS,
     EXPLODED_VIEW_NAME,
@@ -1489,7 +1489,7 @@ def _export_failure_pdf(adapter: Any, stage: str) -> None:
         _telemetry.warn(f"{stage}-failure PDF skipped: no active drawing")
         return
     path = (
-        OUT_FAILURES
+        _seat_forensics.OUT_FAILURES
         / f"drive-train-package-{stage}"
         / datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
         / f"{ARTIFACT_STEM}.pdf"

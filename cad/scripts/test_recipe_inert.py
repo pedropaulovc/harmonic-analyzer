@@ -48,6 +48,9 @@ CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
     ("_common.py", "save_part_and_images"): frozenset({"record_authoring_context"}),
     # Release packaging's own teardown, after Pack-and-Go.
     ("package_native.py", "_release_seat"): frozenset({"release_seat_working_directory"}),
+    # A failed drive-train package audit: the evidence PDF's directory, read
+    # after the failure, nothing read back into the model.
+    ("draw_drive_train_assembly.py", "_export_failure_pdf"): frozenset({"OUT_FAILURES"}),
 }
 # Allowed anywhere, but only as a statement whose value is the call: it always raises.
 TERMINAL = frozenset({"capture_com_failure"})
