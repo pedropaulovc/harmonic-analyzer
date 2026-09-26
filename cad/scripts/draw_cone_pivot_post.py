@@ -30,6 +30,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from cone_gear_shaft_spec import POST_JOURNAL_RIM_BREAK
 from cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DEPTH,
     ATTACHMENT_CBORE_DIA,
@@ -97,6 +98,14 @@ TOP_KEEP = {
     "MainBodyDia": (TOP_CENTER[0] - 0.040, TOP_CENTER[1]),
     "HeadDia": (TOP_CENTER[0] + 0.045, TOP_CENTER[1]),
 }
+# The journal's rims bound the thrust ring the shaft collar bears on, with the
+# collar's OD edge (cone_gear_shaft_spec: ring - 2 x break >= 1.5), so they
+# print the same break as the collar instead of the title block's 0.25.
+JOURNAL_NOTE = (
+    f"CONE BOSS <MOD-DIAM>{CONE_BOSS_DIA:.3f}; "
+    f"JOURNAL <MOD-DIAM>{BORE_DIA:.4f} THRU\n"
+    f"{POST_JOURNAL_RIM_BREAK}"
+)
 DIMENSION_CALLOUTS = {
     "CrankBoreDia": "THRU",
 }
@@ -381,10 +390,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_attached_note(
         adapter,
         front,
-        text=(
-            f"CONE BOSS <MOD-DIAM>{CONE_BOSS_DIA:.3f}; "
-            f"JOURNAL <MOD-DIAM>{BORE_DIA:.4f} THRU"
-        ),
+        text=JOURNAL_NOTE,
         entity=journal_entity,
         note_xy=(0.155, _front_y(BORE_HEIGHT) + 0.020),
         label="inclined-journal size",

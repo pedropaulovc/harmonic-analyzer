@@ -62,7 +62,11 @@ POST_JOURNAL_BORE_BAND = (0.005, -0.025)
 # with BOTH bounding edges broken at the worst case: the collar's OD edge and
 # the post's bore rim.  The title block's 0.25 break would take the 1.77 ring
 # to 1.27, so both edges print a smaller break, derived from
-# ring - 2 x break >= floor and rounded DOWN to one printable place (0.1).
+# ring - 2 x break >= floor and rounded DOWN to one printable place (0.1):
+# the collar under its stock callout, the post's journal rims in the post
+# sheet's journal note (draw_cone_pivot_post.JOURNAL_NOTE).  Sizing the ring
+# for two 0.25 breaks instead needs ring >= 2.0, an 11/16 bar, which the
+# user's ruling (5/8 bar as supplied) rules out.
 THRUST_RING_FLOOR = 1.5
 THRUST_RING_MIN = (
     (STOCK_DIA + STOCK_DIA_BAND[1]) - (JOURNAL_BORE_DIA + POST_JOURNAL_BORE_BAND[0])
@@ -82,6 +86,9 @@ if THRUST_RING_MIN - 2.0 * THRUST_EDGE_BREAK_MAX < THRUST_RING_FLOOR - 1e-9:
 COLLAR_STOCK_CALLOUT = (
     f"5/8 BAR AS SUPPLIED\nEDGE BREAK {THRUST_EDGE_BREAK_MAX:.1f} MAX"
 )
+# The same break on the post's journal rims, the ring's other bounding edge;
+# the post sheet prints it with the journal size.
+POST_JOURNAL_RIM_BREAK = f"RIMS BREAK {THRUST_EDGE_BREAK_MAX:.1f} MAX"
 
 # T006's north face starts the 4 mm bushing, followed by 2 mm clearance and
 # the 12 mm tip block.  Rule-12 E11 replaced the 5/16-18 94025A150 with the
