@@ -1555,6 +1555,76 @@ def test_a_section_arrow_along_a_dimension_line_gates_but_a_shared_extension_lin
     assert severity(along[0]) is FindingSeverity.GATING
 
 
+# top-frame HUB-SET-SCREW, Drawing View10 (b49e1 leaf dump, verbatim): cutting
+# line D and RD1's 115.1, whose lower extension line runs along D.
+TF_SECTION_D = {
+    "label": "D",
+    "line": [-0.2291, -0.0030876, 0.0, -0.1749, -0.0030876, 0.0],
+    "arrows": [0.0686333, 0.1989708, 0.0, 0.0686333, 0.2109708, 0.0, 0.0867, 0.1989708, 0.0, 0.0867, 0.2109708, 0.0],
+    "texts": [0.0655642, 0.2206166, 0.0, 0.0836309, 0.2206166, 0.0],
+    "text_height": 0.00635,
+}
+TF_RD1 = {
+    "type": 4,
+    "name": "RD1",
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.04, 0.225, 0.0005833],
+    "layer": "",
+    "display": {
+        "lines": [
+            [0.0, 0.0, 0.0, 0.0, 0.0783333, 0.2373333, 0.0005833, 0.039, 0.2373333, 0.0005833],
+            [0.0, 0.0, 0.0, 0.0, 0.0783333, 0.1989708, 0.0005833, 0.039, 0.1989708, 0.0005833],
+            [0.0, 0.0, 0.0, 0.0, 0.04, 0.2373333, 0.0005833, 0.04, 0.2277781, 0.0005833],
+            [0.0, 0.0, 0.0, 0.0, 0.04, 0.1989708, 0.0005833, 0.04, 0.2222219, 0.0005833],
+        ],
+        "arrows": [
+            [0.04, 0.2373333, 0.0005833, -0.0, -1.0, -0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+            [0.04, 0.1989708, 0.0005833, 0.0, 1.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+        ],
+        "texts": [{"t": " 115.1 ", "pos": [0.0328882, 0.2222219, 0.0005833], "h": 0.0035, "ref": 1, "ang": 0.0}],
+    },
+    "dim": {"hole_callout": False},
+}
+
+
+@pytest.mark.parametrize(
+    ("ext_end_x", "found"),
+    [
+        pytest.param(0.0783333, [9.7], id="top-frame-D-on-RD1"),
+        pytest.param(0.0695333, [], id="touching-0.9mm"),
+    ],
+)
+def test_a_section_line_along_an_extension_line_gates(ext_end_x, found):
+    """ansi on #955: top-frame's cutting line D runs 9.7 mm along RD1's
+    115.1 extension line at y 198.97 mm, so the witness disappears into the
+    cutting plane. Gating over 1 mm; an extension line reaching 0.9 mm onto
+    the cutting line is a touch, not a finding."""
+    lines = [list(line) for line in TF_RD1["display"]["lines"]]
+    lines[1][4] = ext_end_x
+    rd1 = {**TF_RD1, "display": {**TF_RD1["display"], "lines": lines}}
+    view = _view("Drawing View10", (0.0650453, 0.1483787, 0.2249547, 0.2516213), [rd1], sections=[TF_SECTION_D])
+    along = [f for f in audit_dump(_dump(views=[view])) if f.kind == "section-line-on-extension-line"]
+    assert [(f.a, f.b) for f in along] == [("section-line D", "dim RD1 '115.1'")] * len(found)
+    assert [round(f.extra["overlap_mm"], 1) for f in along] == found
+    assert all(severity(f) is FindingSeverity.GATING for f in along)
+
+
+def test_a_centre_mark_on_the_cutting_plane_is_no_finding():
+    """A section through a hole's axis runs along that hole's centre mark
+    (top-frame D over DetailItem458); marks are no target."""
+    mark = {
+        "type": 13,
+        "name": "DetailItem458",
+        "visible": 1,
+        "owner_type": 0,
+        "pos": [0.0793333, 0.1989708, 0.0],
+        "display": {"lines": [[0.0, 0.0, 0.0, 0.0, 0.0757, 0.1989708, 0.0, 0.0777, 0.1989708, 0.0]]},
+    }
+    view = _view("Drawing View10", (0.0650453, 0.1483787, 0.2249547, 0.2516213), [mark], sections=[TF_SECTION_D])
+    assert not [f for f in audit_dump(_dump(views=[view])) if f.kind == "section-line-on-extension-line"]
+
+
 def test_a_dimension_line_across_a_foreign_extension_line_gates_only_at_text():
     """Main's ruling b: advisory, unless within 0.5 h of either dimension's text."""
     far = _dim_record("Far", [(0.100, 0.150, 0.140, 0.150)], [(0.100, 0.150, 1.0, 0.0)], [("12.0", 0.150, 0.150)])

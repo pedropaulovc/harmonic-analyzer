@@ -191,6 +191,10 @@ _TEXT_ANCHORS = {0: (0.0, 1.0), 1: (0.0, 0.0), 2: (0.5, 0.5), 3: (1.0, 1.0), 4: 
 # Lines closer than this, over more than this, print as one stroke
 # (crankhub's _drawing_leaders COLLINEAR_TOLERANCE, Main's ruling).
 COLLINEAR_TOL_M = 1e-4
+# A section line may touch an extension line's end, but not run along it for
+# longer than this (ansi's #955 rule: collinear within COLLINEAR_TOL_M, over
+# 1 mm). top-frame's D runs 9.7 mm along RD1's 115.1 extension line.
+SECTION_ON_EXTENSION_MIN_M = 0.001
 # Two leaders landing on one corner may converge within their last 5 mm
 # (Main's ruling on cone-gear-shaft's Ra 1.6 and Sec4Dia): advisory there.
 LANDING_CONVERGE_M = 0.005
@@ -3225,7 +3229,16 @@ def find_lines_on_dimension_lines(sheet: SheetGeometry) -> list[Finding]:
     """A leader, or a section line's arrow, lying ALONG another annotation's
     dimension line: the two print as one stroke (pinion-bracket's section
     arrow B down 28.00's dimension line). Main's ruling: gating, within
-    ``COLLINEAR_TOL_M``. Shared extension lines are normal drafting and exempt.
+    ``COLLINEAR_TOL_M``. Shared extension lines are normal drafting and exempt
+    for a leader.
+
+    A section line lying along another annotation's EXTENSION line for more
+    than ``SECTION_ON_EXTENSION_MIN_M`` is ``section-line-on-extension-line``:
+    the thin witness disappears into the cutting plane, and neither reads
+    (ansi on #955: top-frame's cutting line D on RD1's 115.1 extension
+    line, 9.7 mm). A centre mark or centreline on the cutting plane is how a
+    section through a hole's axis is drawn: its ink is plain ``line``, never
+    a target.
     """
     sources = [
         (annotation, segment)
@@ -3238,28 +3251,37 @@ def find_lines_on_dimension_lines(sheet: SheetGeometry) -> list[Finding]:
         (annotation, segment)
         for annotation in sheet.annotations
         for segment in annotation.segments
-        if segment.role == "dim-line"
+        if segment.role in ("dim-line", "ext-line")
     ]
     findings = []
     seen = set()
     for source, segment in sources:
         for target, line in targets:
-            if source.label == target.label or (source.label, target.label) in seen:
+            if source.label == target.label or (source.label, target.label, line.role) in seen:
+                continue
+            if line.role == "ext-line" and source.kind != "section-line":
                 continue
             overlap = _collinear_overlap(segment, line)
             if overlap is None:
                 continue
-            seen.add((source.label, target.label))
             point, length = overlap
+            if line.role == "ext-line" and length <= SECTION_ON_EXTENSION_MIN_M:
+                continue
+            seen.add((source.label, target.label, line.role))
+            kind, name = (
+                ("line-on-dimension-line", "dimension line")
+                if line.role == "dim-line"
+                else ("section-line-on-extension-line", "extension line")
+            )
             findings.append(
                 Finding(
-                    kind="line-on-dimension-line",
+                    kind=kind,
                     sheet=sheet.name,
                     a=source.label,
                     b=target.label,
                     detail=(
                         f"{segment.role} of {source.label!r} {segment.format_mm()} lies along "
-                        f"{target.label!r}'s dimension line {line.format_mm()} for {length * MM:.2f}mm"
+                        f"{target.label!r}'s {name} {line.format_mm()} for {length * MM:.2f}mm"
                     ),
                     at_mm=(point[0] * MM, point[1] * MM),
                     extra={"overlap_mm": length * MM},
@@ -3480,6 +3502,7 @@ GATING_KINDS = frozenset(
         "leader-crosses-section-line",
         "dim-line-crosses-extension-at-text",
         "line-on-dimension-line",
+        "section-line-on-extension-line",
         "arrow-near-text",
         "merged-blocks",
         "tall-block",
