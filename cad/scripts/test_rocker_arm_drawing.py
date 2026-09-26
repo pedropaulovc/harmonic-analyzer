@@ -291,6 +291,7 @@ def _seat(monkeypatch: pytest.MonkeyPatch, note: _FakeNote) -> tuple[float, ...]
     monkeypatch.setattr(
         drawing, "sheet_drawable_region", lambda *_args, **_kwargs: DRAWABLE
     )
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
     return drawing._seat_notes_on_border(adapter, note, sheet=object())
 
 
@@ -326,6 +327,16 @@ def test_general_notes_too_tall_for_the_band_fail_the_build(
     band = drawing.NOTES_CEILING - DRAWABLE.ymin - drawing.NOTES_BORDER_CLEARANCE
     note = _FakeNote((drawing.NOTES_LEFT, drawing.NOTES_CEILING), band + 0.002)
     with pytest.raises(RuntimeError, match="do not fit"):
+        _seat(monkeypatch, note)
+
+
+def test_an_unresolved_notes_link_fails_instead_of_seating_one_line(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The extent of an unresolved property link is one line of token text;
+    seating that box would put the real block's bottom through the border."""
+    note = _FakeNote((drawing.NOTES_LEFT, drawing.NOTES_CEILING), NOTE_LINE_PITCH)
+    with pytest.raises(RuntimeError, match="has not resolved"):
         _seat(monkeypatch, note)
 
 
