@@ -6,10 +6,14 @@ import hashlib
 import importlib.util
 import inspect
 import json
+import multiprocessing
 import os
 import subprocess
 import sys
+import threading
+import time
 from datetime import timedelta
+from io import BytesIO, StringIO
 from pathlib import Path
 
 import pytest
@@ -78,6 +82,86 @@ _FAILED_LEAF = dict(
     failure_category="task_failed",
     failure_message="SolidWorks connect timed out",
 )
+
+
+_REMOVE_FAILURE_LOG_LOCK_MUTANT_ENV = "HARMONIC_TEST_REMOVE_FARM_LOG_LOCK"
+
+
+def _emit_failed_log_in_process(
+    output_path: str, retrieval_barrier, begin_count, both_begun, name: str
+) -> None:
+    """Fetch in parallel and make unlocked block emission overlap deterministically."""
+
+    def fetch(
+        _pool,
+        *args,
+        interpreter=None,
+        stdout=subprocess.PIPE,
+        stderr=None,
+        timeout_s=None,
+    ):
+        retrieval_barrier.wait(timeout=10)
+        diagnostic = f"retrieval diagnostic for {name}\n"
+        if stderr is None:
+            sys.stderr.write(diagnostic)
+            sys.stderr.flush()
+        else:
+            stderr.write(diagnostic.encode())
+        stdout.write(f"worker log for {name}\n".encode())
+        return subprocess.CompletedProcess(args, 0)
+
+    class CoordinatedOutput:
+        def __init__(self, output):
+            self.output = output
+
+        def write(self, text):
+            written = self.output.write(text)
+            self.output.flush()
+            if text.startswith("--- begin failed farm task log:"):
+                with begin_count.get_lock():
+                    begin_count.value += 1
+                    position = begin_count.value
+                    if position == 2:
+                        both_begun.set()
+                if position == 1:
+                    both_begun.wait(timeout=1)
+            return written
+
+        def flush(self):
+            self.output.flush()
+
+    if os.environ.get(_REMOVE_FAILURE_LOG_LOCK_MUTANT_ENV) == "1":
+
+        class NoOutputLock:
+            def __init__(self, _path):
+                pass
+
+            def acquire(self):
+                pass
+
+            def release(self):
+                pass
+
+        _farm.FileLock = NoOutputLock
+
+    _farm.run_pool_cli = fetch
+    result = _farm.LeafResult(
+        state="failed",
+        exit_code=87,
+        worker_id=f"worker-{name}",
+        attempt=1,
+        cache_present=False,
+        log_blob=f"results/{name}/task.log",
+        failure_category="task_failed",
+        failure_message=f"{name} failed",
+    )
+    with Path(output_path).open("a", encoding="utf-8", buffering=1) as output:
+        previous = sys.stderr
+        sys.stderr = CoordinatedOutput(output)
+        try:
+            _farm._emit_failed_task_log(f"part:{name}", f"leaf:{name}", result)
+        finally:
+            sys.stderr = previous
 
 
 def _refuse_local_build(dodo, monkeypatch, calls):
@@ -432,7 +516,7 @@ def _fixture_namespace(executed):
     return {"task_part": task_part, "task_assembly": task_assembly}
 
 
-def _install_real_doit(monkeypatch, namespace=None):
+def _install_real_doit(monkeypatch, namespace=None, *, reporter_output=None):
     """Use doit's real parser, loader and execution boundary with isolated state."""
     seen = []
     executed = []
@@ -449,6 +533,8 @@ def _install_real_doit(monkeypatch, namespace=None):
 
     monkeypatch.setattr(_doit_cmd_base, "JsonDB", MemoryJsonDB)
     config = {"GLOBAL": {"backend": "json", "dep_file": ":memory:"}}
+    if reporter_output is not None:
+        config["GLOBAL"]["outfile"] = reporter_output
 
     class FixtureFarmDoit(_RealFarmDoitMain):
         def __init__(self):
@@ -551,8 +637,8 @@ _UNREPORTED_BLOCK = _agents_summary(
 )
 
 
-def _preflight_fakes(monkeypatch, *, agents=None, git=None):
-    """Fake a clean local project and the pool's protocol report."""
+def _preflight_fakes(monkeypatch, *, agents=None, logs_help=None, git=None):
+    """Fake a clean local project and the pool's protocol/capability reports."""
     stdout = {
         "status": "",
         "submodule": "",
@@ -561,6 +647,11 @@ def _preflight_fakes(monkeypatch, *, agents=None, git=None):
     stdout.update(git or {})
     if agents is None:
         agents = _agents_summary()
+    if logs_help is None:
+        logs_help = (
+            "usage: farm.py logs [-h] "
+            "[--log-blob results/.../task.log] [workflow_id]\n"
+        )
     launched = []
 
     def fake_run(argv, **kwargs):
@@ -568,8 +659,9 @@ def _preflight_fakes(monkeypatch, *, agents=None, git=None):
         if argv[0] == "git":
             out = stdout[argv[1]]
         else:
-            assert argv[-2:] == ["agents", "--json"]
-            out = agents
+            command = argv[-2:]
+            assert command in (["agents", "--json"], ["logs", "--help"])
+            out = agents if command == ["agents", "--json"] else logs_help
         if isinstance(out, BaseException):
             raise out
         return subprocess.CompletedProcess(argv, 0, out, "")
@@ -601,7 +693,8 @@ def test_successful_preflight_stamps_only_committed_head_without_mutating_refs(
     git_commands = [argv[1] for argv in launched if argv[0] == "git"]
     assert git_commands == ["status", "submodule", "rev-parse"]
     assert [argv[-2:] for argv in launched if argv[0] != "git"] == [
-        ["agents", "--json"]
+        ["agents", "--json"],
+        ["logs", "--help"],
     ]
     assert capsys.readouterr().out.splitlines()[:2] == [
         "farm: protocol 4 on 1 worker(s)",
@@ -633,7 +726,8 @@ def test_an_uninitialized_excluded_submodule_does_not_block_a_dispatch(
 
     assert build.main(["--executor", "farm", "part:x"]) == 0
     assert [argv[-2:] for argv in launched if argv[0] != "git"] == [
-        ["agents", "--json"]
+        ["agents", "--json"],
+        ["logs", "--help"],
     ]
 
 
@@ -811,6 +905,31 @@ def test_preflight_protocol_faults_exit_2(agents, message, monkeypatch, capsys):
     assert capsys.readouterr().err == message + "\n"
     assert executed == []
     assert os.environ["HARMONIC_EXECUTOR"] == "farm"
+    assert os.environ.get("HARMONIC_FARM_COMMIT") is None
+    assert os.environ.get("HARMONIC_SW_AUTOSTART") is None
+
+
+def test_protocol_four_cli_without_exact_log_capability_stops_before_actions(
+    monkeypatch, capsys
+):
+    launched = _preflight_fakes(
+        monkeypatch,
+        logs_help="usage: farm.py logs [-h] [workflow_id]\n",
+    )
+    _seen, executed = _install_real_doit(monkeypatch)
+
+    assert build.main(["--executor", "farm", "assembly:x"]) == 2
+    assert capsys.readouterr().err == (
+        "farm: pool CLI does not support exact failed-task log retrieval "
+        "(--log-blob). Update SOLIDWORKS_POOL_HOME to a solidworks-pool "
+        "checkout whose farm.py supports 'logs <workflow-id> --log-blob "
+        "<results/.../task.log>'.\n"
+    )
+    assert [argv[-2:] for argv in launched if argv[0] != "git"] == [
+        ["agents", "--json"],
+        ["logs", "--help"],
+    ]
+    assert executed == []
     assert os.environ.get("HARMONIC_FARM_COMMIT") is None
     assert os.environ.get("HARMONIC_SW_AUTOSTART") is None
 
@@ -1391,6 +1510,429 @@ def temporal_boundary(tmp_path, monkeypatch):
         outcome["result"] = result
 
     return calls, resolve
+
+
+def test_exact_failed_leaf_log_is_captured_without_replacing_python_action_error(
+    temporal_boundary, monkeypatch, capsys
+):
+    _calls, resolve = temporal_boundary
+    failed = _leaf_result(**_FAILED_LEAF)
+    resolve(failed)
+    _preflight_fakes(monkeypatch)
+    dodo = _load_dodo()
+    expected_wf_id = "leaf:part:x:" + "k" * 64 + ":900s"
+
+    def pool_cli(
+        _pool,
+        *args,
+        interpreter=None,
+        stdout=subprocess.PIPE,
+        stderr=None,
+        timeout_s=None,
+    ):
+        if args == ("agents", "--json"):
+            return subprocess.CompletedProcess(args, 0, _agents_summary(), "")
+        if args == ("logs", "--help"):
+            return subprocess.CompletedProcess(args, 0, "--log-blob\n", "")
+        if args[-2:] == ("--log-blob", failed.log_blob):
+            stdout.write("failed execution log: café\n".encode())
+            stdout.write(b"failed log with damaged UTF-8: \xff\n")
+        else:
+            stdout.write(b"newer execution under the same workflow ID\n")
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setattr(_farm, "run_pool_cli", pool_cli)
+
+    def task_part():
+        yield {
+            "name": "x",
+            "actions": [(dodo._farm_build, ["part:x", "k" * 64, []])],
+            "verbosity": 2,
+        }
+
+    reporter_output = StringIO()
+    _install_real_doit(
+        monkeypatch, {"task_part": task_part}, reporter_output=reporter_output
+    )
+    exit_code = build.main(["--executor", "farm", "part:x"])
+
+    captured = capsys.readouterr()
+    log_output = captured.err
+    report_output = reporter_output.getvalue()
+    line_prefix = "[farm task=part:x] "
+    begin = log_output.index("--- begin failed farm task log:")
+    worker_log = log_output.index(line_prefix + "failed execution log: café")
+    replacement = log_output.index(
+        line_prefix + "failed log with damaged UTF-8: \ufffd"
+    )
+    end = log_output.index("--- end failed farm task log:")
+    assert begin < worker_log < replacement < end
+    assert (
+        f"task=part:x workflow={expected_wf_id} log_blob={failed.log_blob}"
+        in log_output
+    )
+    assert (
+        "part:x failed on sw-01@3 [task_failed] exit 87: "
+        "SolidWorks connect timed out"
+    ) in report_output
+    assert exit_code == 2
+
+
+@pytest.mark.parametrize(
+    ("chunks", "expected_lines"),
+    [
+        (
+            [b"phase1\rphase2\n"],
+            ["phase1", "phase2"],
+        ),
+        (
+            [b"caf\xc3", b"\xa9\r", b"\nnext\r", b"last"],
+            ["café", "next", "last"],
+        ),
+    ],
+)
+def test_spooled_log_normalizes_newlines_across_binary_read_boundaries(
+    monkeypatch, chunks, expected_lines
+):
+    class ChunkedSpool(BytesIO):
+        def __init__(self, parts):
+            super().__init__(b"".join(parts))
+            self.read_sizes = [len(part) for part in parts]
+            self.read1_calls = 0
+
+        def read1(self, size=-1):
+            self.read1_calls += 1
+            if not self.read_sizes:
+                return b""
+            part_size = self.read_sizes.pop(0)
+            if size >= 0:
+                part_size = min(part_size, size)
+            return super().read(part_size)
+
+    prefix = "[farm task=part:pen_rod] "
+    spool = ChunkedSpool(chunks)
+    output = StringIO()
+    monkeypatch.setattr(sys, "stderr", output)
+
+    _farm._write_spooled_utf8(spool, prefix)
+
+    assert output.getvalue() == "".join(
+        prefix + line + "\n" for line in expected_lines
+    )
+    assert spool.read1_calls >= len(chunks)
+    assert not spool.closed
+
+
+def test_retrieved_lines_remain_attributed_when_normal_output_interleaves(
+    tmp_path, monkeypatch
+):
+    task = "part:pen_rod"
+    workflow_id = "leaf:part:pen_rod:key:900s"
+    failed = _leaf_result(**_FAILED_LEAF)
+    line_prefix = f"[farm task={task}] "
+    output = StringIO()
+    retrieved_line_written = threading.Event()
+    normal_line_written = threading.Event()
+
+    class InterleavingOutput:
+        def write(self, text):
+            written = output.write(text)
+            if text == line_prefix + "farm.py diagnostic\n":
+                retrieved_line_written.set()
+                if not normal_line_written.wait(timeout=3):
+                    raise AssertionError("normal build writer did not interleave")
+            return written
+
+        def flush(self):
+            output.flush()
+
+    def normal_writer():
+        if retrieved_line_written.wait(timeout=3):
+            output.write("normal build output\n")
+            normal_line_written.set()
+
+    def retrieve(
+        _pool,
+        *args,
+        interpreter=None,
+        stdout=subprocess.PIPE,
+        stderr=None,
+        timeout_s=None,
+    ):
+        stderr.write(b"farm.py diagnostic\n")
+        stdout.write(b"worker log line\n")
+        stdout.write(b"unterminated worker line")
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setenv(
+        "HARMONIC_FARM_LOG_LOCK", str(tmp_path / "farm-build-output.lock")
+    )
+    monkeypatch.setattr(_farm, "pool_home", lambda: tmp_path / "pool")
+    monkeypatch.setattr(_farm, "run_pool_cli", retrieve)
+    monkeypatch.setattr(sys, "stderr", InterleavingOutput())
+    writer = threading.Thread(target=normal_writer)
+    writer.start()
+    try:
+        _farm._emit_failed_task_log(task, workflow_id, failed)
+    finally:
+        writer.join(timeout=5)
+
+    assert not writer.is_alive()
+    lines = output.getvalue().splitlines()
+    assert lines[0] == (
+        "--- begin failed farm task log: "
+        f"task={task} workflow={workflow_id} log_blob={failed.log_blob} ---"
+    )
+    assert line_prefix + "farm.py diagnostic" in lines
+    assert "normal build output" in lines
+    assert line_prefix + "worker log line" in lines
+    assert line_prefix + "unterminated worker line" in lines
+    assert not {
+        "farm.py diagnostic",
+        "worker log line",
+        "unterminated worker line",
+    }.intersection(lines)
+    assert lines[-1] == (
+        "--- end failed farm task log: "
+        f"task={task} workflow={workflow_id} log_blob={failed.log_blob} ---"
+    )
+    assert lines.index(line_prefix + "farm.py diagnostic") < lines.index(
+        "normal build output"
+    )
+    assert lines.index("normal build output") < lines.index(
+        line_prefix + "worker log line"
+    )
+
+
+def test_parallel_failed_leaf_logs_are_emitted_as_complete_blocks(
+    tmp_path, monkeypatch
+):
+    output_path = tmp_path / "build-stderr.log"
+    output_path.write_text("", encoding="utf-8")
+    monkeypatch.setenv(
+        "HARMONIC_FARM_LOG_LOCK", str(tmp_path / "farm-build-output.lock")
+    )
+    context = multiprocessing.get_context("spawn")
+    retrieval_barrier = context.Barrier(2)
+    begin_count = context.Value("i", 0)
+    both_begun = context.Event()
+    processes = [
+        context.Process(
+            target=_emit_failed_log_in_process,
+            args=(
+                str(output_path),
+                retrieval_barrier,
+                begin_count,
+                both_begun,
+                name,
+            ),
+        )
+        for name in ("a", "b")
+    ]
+    try:
+        for process in processes:
+            process.start()
+        for process in processes:
+            process.join(timeout=15)
+    finally:
+        for process in processes:
+            if process.is_alive():
+                process.terminate()
+                process.join(timeout=5)
+
+    assert [process.exitcode for process in processes] == [0, 0]
+
+    def block(name):
+        task = f"part:{name}"
+        identity = (
+            f"task={task} workflow=leaf:{name} "
+            f"log_blob=results/{name}/task.log"
+        )
+        prefix = f"[farm task={task}] "
+        return (
+            f"--- begin failed farm task log: {identity} ---\n"
+            f"{prefix}retrieval diagnostic for {name}\n"
+            f"{prefix}worker log for {name}\n"
+            "\n"
+            f"--- end failed farm task log: {identity} ---\n"
+        )
+
+    output = output_path.read_text(encoding="utf-8")
+    assert output in (block("a") + block("b"), block("b") + block("a"))
+
+
+@pytest.mark.parametrize(
+    ("diagnostic_outcome", "reason", "warning"),
+    [
+        (
+            subprocess.TimeoutExpired(["python", "farm.py", "logs"], 30),
+            "retrieval_timeout",
+            "task log retrieval timed out after 30s",
+        ),
+        (
+            OSError("operator CLI unavailable"),
+            "retrieval_start_error",
+            "task log retrieval could not start",
+        ),
+        (
+            subprocess.CompletedProcess(["python", "farm.py", "logs"], 19),
+            "retrieval_exit",
+            "task log retrieval exited 19",
+        ),
+    ],
+)
+def test_log_retrieval_faults_preserve_the_failed_leaf_result(
+    temporal_boundary,
+    monkeypatch,
+    capsys,
+    diagnostic_outcome,
+    reason,
+    warning,
+):
+    _calls, resolve = temporal_boundary
+    failed = _leaf_result(**_FAILED_LEAF)
+    resolve(failed)
+    records = []
+
+    def diagnose(*_args, **_kwargs):
+        if isinstance(diagnostic_outcome, BaseException):
+            raise diagnostic_outcome
+        return diagnostic_outcome
+
+    monkeypatch.setattr(_farm, "run_pool_cli", diagnose)
+    monkeypatch.setattr(
+        _farm._telemetry,
+        "warn",
+        lambda message, **fields: records.append((message, fields)),
+    )
+
+    assert _farm.run_leaf("part:pen_rod", "k" * 64) is failed
+    assert len(records) == 1
+    message, fields = records[0]
+    assert warning in message
+    assert fields == {
+        "reason": reason,
+        "task": "part:pen_rod",
+        "workflow_id": "leaf:part:pen_rod:" + "k" * 64 + ":900s",
+        "log_blob": failed.log_blob,
+        "worker_id": "sw-01@3",
+        "attempt": 1,
+    }
+    error = capsys.readouterr().err
+    assert warning not in error
+    assert "--- end failed farm task log:" in error
+
+
+def test_failed_leaf_without_a_log_blob_reports_absence_without_a_cli_call(
+    temporal_boundary, monkeypatch, capsys
+):
+    _calls, resolve = temporal_boundary
+    failed = _leaf_result(**_FAILED_LEAF, log_blob=None)
+    resolve(failed)
+    records = []
+    monkeypatch.setattr(
+        _farm,
+        "run_pool_cli",
+        lambda *_args, **_kwargs: pytest.fail("queried logs without a log blob"),
+    )
+    monkeypatch.setattr(
+        _farm._telemetry,
+        "warn",
+        lambda message, **fields: records.append((message, fields)),
+    )
+
+    assert _farm.run_leaf("part:pen_rod", "k" * 64) is failed
+    assert len(records) == 1
+    message, fields = records[0]
+    assert "no task log was published" in message
+    assert fields["reason"] == "log_blob_absent"
+    assert fields["task"] == "part:pen_rod"
+    assert fields["workflow_id"] == "leaf:part:pen_rod:" + "k" * 64 + ":900s"
+    assert fields["log_blob"] == ""
+    error = capsys.readouterr().err
+    assert "no task log was published" not in error
+    assert "--- end failed farm task log:" in error
+
+
+@pytest.mark.parametrize(
+    ("configured_environment", "environment"),
+    [(None, Path(".venv")), ("pool-python", Path("pool-python"))],
+)
+def test_pool_python_resolves_relative_pool_and_environment_from_repo_root(
+    monkeypatch, configured_environment, environment
+):
+    if configured_environment is None:
+        monkeypatch.delenv("UV_PROJECT_ENVIRONMENT", raising=False)
+    else:
+        monkeypatch.setenv("UV_PROJECT_ENVIRONMENT", configured_environment)
+    executable = (
+        Path("Scripts") / "python.exe"
+        if os.name == "nt"
+        else Path("bin/python")
+    )
+
+    assert _farm._pool_python(Path("relative-pool")) == (
+        (_farm.REPO_ROOT / "relative-pool").resolve() / environment / executable
+    )
+
+
+def test_bounded_log_retrieval_kills_the_direct_pool_process(
+    tmp_path, monkeypatch
+):
+    pool = tmp_path / "pool"
+    pool.mkdir()
+    started = tmp_path / "started.txt"
+    survived = tmp_path / "survived.txt"
+    (pool / "farm.py").write_text(
+        "import time\n"
+        "from pathlib import Path\n"
+        f"Path({str(started)!r}).write_text('started', encoding='utf-8')\n"
+        "time.sleep(1.5)\n"
+        f"Path({str(survived)!r}).write_text('survived', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    environment = Path(sys.executable).parents[1]
+    monkeypatch.setenv("UV_PROJECT_ENVIRONMENT", str(environment))
+    monkeypatch.setenv(
+        "HARMONIC_FARM_LOG_LOCK", str(tmp_path / "farm-build-output.lock")
+    )
+    monkeypatch.setattr(_farm, "pool_home", lambda: pool)
+    monkeypatch.setattr(_farm, "FAILED_LOG_TIMEOUT_S", 0.5)
+    records = []
+    monkeypatch.setattr(
+        _farm._telemetry,
+        "warn",
+        lambda message, **fields: records.append((message, fields)),
+    )
+
+    _farm._emit_failed_task_log(
+        "part:pen_rod",
+        "leaf:part:pen_rod:key:900s",
+        _leaf_result(**_FAILED_LEAF),
+    )
+
+    assert started.read_text(encoding="utf-8") == "started"
+    time.sleep(1.2)
+    assert not survived.exists(), "timed-out farm.py survived to finish its work"
+    assert [fields["reason"] for _message, fields in records] == [
+        "retrieval_timeout"
+    ]
+
+
+def test_successful_leaf_emits_no_task_log_diagnostic(
+    temporal_boundary, monkeypatch, capsys
+):
+    _calls, resolve = temporal_boundary
+    succeeded = _leaf_result()
+    resolve(succeeded)
+    monkeypatch.setattr(
+        _farm,
+        "run_pool_cli",
+        lambda *_args, **_kwargs: pytest.fail("queried logs for a successful leaf"),
+    )
+
+    assert _farm.run_leaf("part:pen_rod", "k" * 64) is succeeded
+    assert capsys.readouterr().err == ""
 
 
 def test_workflow_id_is_logged_before_acceptance_and_attachment_before_wait(
