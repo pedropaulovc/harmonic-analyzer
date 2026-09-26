@@ -42,10 +42,13 @@ _SETTER = "set_dimension_bilateral_tolerance"
 
 # A consumer whose argument is a name local to build() (so it cannot be read off
 # the imported module) must say here which module-level value build() derives it
-# from. "each" means build() loops over the tuple of bands.
+# from. "each" means build() loops over the tuple of bands; "each_last" means
+# it loops over tuples whose last element is the band.
 LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     # for section, band in enumerate(SECTION_DIA_BANDS): ... deviations(band)
     ("build_cone_gear_shaft", "band"): ("SECTION_DIA_BANDS", "each"),
+    # for feature_name, dimension_name, band in BANDED_WIDTHS: ... deviations(band)
+    ("build_cone_swing_platform", "band"): ("BANDED_WIDTHS", "each_last"),
 }
 
 # Consumer modules that cannot be imported without SolidWorks, with the reason.
@@ -165,6 +168,8 @@ def _resolve(use: BandUse) -> list[tuple[str, Any]]:
     if key in LOCAL_BAND_SOURCES:
         source, how = LOCAL_BAND_SOURCES[key]
         value = getattr(module, source)
+        if how == "each_last":
+            return [(f"{source}[{i}][-1]", item[-1]) for i, item in enumerate(value)]
         assert how == "each", f"unknown local-source mode {how!r}"
         return [(f"{source}[{i}]", band) for i, band in enumerate(value)]
     try:

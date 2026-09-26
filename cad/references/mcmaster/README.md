@@ -32,6 +32,7 @@ recipes:
 | 91882A221 | `thumb-screw` | Steel Raised Knurled-Head Thumb Screw |
 | 91882A425 | `cone-lock-knob` | Steel Raised Knurled-Head Thumb Screw |
 | 9275K141 | `tube-frame-cap` | Metal Round Cap |
+| 98381A304 | `cone-post-dowel` | Black-Oxide Alloy Steel Dowel Pin |
 | 92865A585 | `hex-bolt` | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 93075A194 | `hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 94025A150 | — (diagnostic recipe; `cone-tip-adjuster` until rule-12 E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
@@ -101,6 +102,23 @@ Catalog specifications checked on September 10, 2026:
   centre of mass (`cad/out/reference/91255A148-replica-report.json`).
   Evidence SHA-256: native SLDPRT
   `4b8dac17c6b7e77499209a399342aa51780743b657aec0df7175f227b54e59a0`.
+- [98381A304](https://www.mcmaster.com/98381A304/) is the 1/8 x 1/2 in
+  black-oxide alloy steel dowel pin that locates the cone pivot post on the
+  swing platform (MHA-151, #917 S1), ground 0.1251-0.1253 in. The user
+  supplied its SolidWorks model, stored locally as `98381A304.SLDPRT`. On
+  September 25, 2026 its section was read offline from the file's Parasolid
+  partition, without SolidWorks: a 3.175 mm cylinder 12.7 mm long on the Z
+  axis, a 16 deg lead-in cone to a 1.4605 mm end radius at -Z, and an
+  R0.4064 crown blend to a 1.1811 mm end radius at +Z. That is five faces.
+  `diag_build_98381A304.py` replays it at nominal diameter, analytically
+  99.943 mm^3 and 139.476 mm^2. The seat harvest
+  (`cad/out/reports/mcmaster-98381A304-dump.json`) and the replica gate
+  against the vendor file passed on September 26, 2026 with no difference:
+  volume 99.9434 mm^3 and area 139.4763 mm^2 on both, 5 faces each with the
+  same face-area multiset, and matching centre of mass
+  (`cad/out/reference/98381A304-replica-report.json`).
+  Evidence SHA-256: native SLDPRT
+  `35fe64b899c1807f6e88b717a781138962a78c24e92e548b1f0d4b250a27c6cb`.
 
 Ground rules (mirrored in the diagnostics themselves): the vendor files are
 opened read-only and NEVER saved or modified; everything derived from them

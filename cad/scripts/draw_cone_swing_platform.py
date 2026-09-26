@@ -1,8 +1,9 @@
 r"""Create the curated machinist drawing for the cone swing platform.
 
-The SLDPRT remains authoritative.  The plan imports the plate outline,
-post-mount pattern, lock notch and corner radii; the native Hole Wizard callout
-defines the pivot clearance hole; section A-A exposes the shallow pivot-head
+The SLDPRT remains authoritative.  The plan imports the plate outline, lock
+notch and corner radii; native Hole Wizard callouts define the pivot
+clearance hole, the post-mount taps (transferred from MHA-016 at assembly)
+and the post dowel pair (match-reamed with MHA-016, #917 S1); section A-A exposes the shallow pivot-head
 relief and plate thickness in solid lines.  Display precision comes from the
 model.
 
@@ -40,6 +41,7 @@ from _drawing_common import (
     add_leader_note,
     add_native_hole_callout,
     add_property_linked_note,
+    set_hole_callout_precision,
     add_surface_finish,
     assert_imported_precision,
     create_section_view,
@@ -67,8 +69,9 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
     view_name,
 )
-from _hole_spec import blind_cut_dia_mm
+from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _surface_finish import surface_finish_by_key
+from cone_post_dowel_spec import PLATE_DOWEL_CALLOUT, PLATE_DOWEL_REAM_DIA
 from cone_swing_platform_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -165,12 +168,18 @@ PROFILE_KEEP = {
     # feature without crossing it (MHA-091 round 6, B1).
     "PivotBearingReliefDia": (0.090, 0.1413),
 }
-FEATURE_KEEP = {
-    "PostMountWestX": (0.150, 0.185),
-    "PostMountWestZ": (0.225, 0.175),
-    "PostMountEastX": (0.205, 0.185),
-    "PostMountEastZ": (0.130, 0.175),
-}
+# #917 S1: the hole-location plan prints no station.  The post-mount taps
+# transfer from MHA-016 at assembly and the dowel pair is match-drilled
+# through the fitted post, so their native callouts carry everything.
+FEATURE_KEEP: dict[str, tuple[float, float]] = {}
+# The locating instruction ahead of the native tap callout, in the harmonic
+# base's #837 form: the semicolon separates it from "1/4-20 UNC - 2B".
+POST_MOUNT_TRANSFER_CALLOUT = "TRANSFER FROM MHA-016\nAT ASSEMBLY;"
+# The dowel callout, in the band left of the plan's south half, between the
+# profile's west-side dimensions and the plate's east edge (~x 0.165 there);
+# its leader runs right to the north dowel's rim.  Provisional until a seat
+# render: nothing was measured here.
+PLATE_DOWEL_CALLOUT_XY = (0.117, 0.222)
 # The three 1:2 plans centre on the plate's plan box; sheet +x is model +x
 # (west), sheet +y model -z (south).
 PLAN_SCALE = 0.0005
@@ -266,9 +275,10 @@ DETAIL_CENTER = (0.0835, 0.045)
 DETAIL_OUTLINE_PAD = 0.0104
 # DETAIL D: the lock notch's closed end and mouth at 2:1.  The notch is a
 # slot: its width (NotchW, 8.00 +0.10/0, the end mill's band), a full R at
-# the closed end, located at that R's centre on the notch plan (33.00,
-# 205.81), and its run as the angle between the south rail and the plate's
-# west edge at the mouth -- both legs real edges, the vertex the mouth's
+# the closed end, located at that R's centre on the notch plan (32.70,
+# 205.86 since #917 S1 ran the closed end 0.30 past the stud seat), and its
+# run as the angle between the south rail and the plate's west edge at the
+# mouth -- both legs real edges, the vertex the mouth's
 # south corner, a protractor check (MHA-091 round 6; the old 9.11 deg ran
 # from a hidden east-west ray on the notch plan).  The R is a leadered note:
 # the width states the size once (the Ø8.00 restated it).
@@ -291,8 +301,8 @@ CAP_DETAIL_ARC_RADIUS = _part.SLOT_W / 2.0 * _CAP_DETAIL_S
 def cap_detail_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
     """Sheet point of plate-local (x, z) in detail D (centred on the cap)."""
     return (
-        CAP_DETAIL_CENTER[0] + (x_mm - _part.SLOT_E_X) * _CAP_DETAIL_S,
-        CAP_DETAIL_CENTER[1] - (z_mm - _part.SLOT_E_Z) * _CAP_DETAIL_S,
+        CAP_DETAIL_CENTER[0] + (x_mm - _part.NOTCH_CAP_E_XZ[0]) * _CAP_DETAIL_S,
+        CAP_DETAIL_CENTER[1] - (z_mm - _part.NOTCH_CAP_E_XZ[1]) * _CAP_DETAIL_S,
     )
 
 
@@ -311,7 +321,7 @@ CAP_DETAIL_KEEP = {
     # Above the circle, in the material wedge (up-left of the south mouth
     # corner, between the rail running back and the edge running south): an
     # angular dimension prints the sector that holds its text, so here it is
-    # the acute 88, not the 92 supplement.  The arc runs ~10.7 mm out, its
+    # the acute 87, not the 93 supplement.  The arc runs ~10.7 mm out, its
     # top 4.5 mm under the zone frame; the glyphs stand 2 mm off the circle.
     "NotchMouthAngle": (0.3575, 0.2600),
     # Right of the circle, above the width's span: its witnesses extend the
@@ -380,7 +390,21 @@ DETAIL_ARROWS_INSIDE = ("TipSlotW", "TipCboreW")
 # quadrant to text above; the counterbore note drops from its lower quadrant
 # to text below, its leader crossing pivot-to-slot's dimension line (the only
 # path: below that line's foot sits the relief note).
-_WEST_ARC_CENTER = (DETAIL_CENTER[0] + 2.0 * _DETAIL_S, _SLOT_Y)
+
+
+def detail_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
+    """Sheet point of plate-local (x, z) in detail C (centred on x = 0 at
+    DETAIL_MODEL_Z, the slot's station)."""
+    return (
+        DETAIL_CENTER[0] + x_mm * _DETAIL_S,
+        DETAIL_CENTER[1] - (z_mm - DETAIL_MODEL_Z) * _DETAIL_S,
+    )
+
+
+# The west end arc's centre is the model's: TIP_SCREW_HALF_TRAVEL (a literal
+# 2.0 here outlived b1f7e824b's 2.0 -> 2.5 and put the slot note's tip 1 mm
+# off its arc, S1 leaf 917-s1-5974).
+_WEST_ARC_CENTER = detail_xy(TIP_SCREW_HALF_TRAVEL, TIP_SCREW_LOCAL_Z)
 # The leader roots on the note's FIRST line, on the side toward its tip
 # (d382 leaf log :519: the C'BORE note's text top at 44.5 mm, its leader at
 # 43.1), and a 2.5 mm line pitches 3.35 mm (the same note: two lines,
@@ -450,7 +474,7 @@ CAP_R_NOTE = ArcNote(
     _part.SLOT_W / 2.0,
     150.0,
     PLATE_THICKNESS,
-    (_part.SLOT_E_X, _part.SLOT_E_Z),
+    _part.NOTCH_CAP_E_XZ,
     CAP_DETAIL_CENTER,
     _CAP_DETAIL_S,
 )
@@ -517,12 +541,6 @@ DETAIL_LABEL_LOWER_LEFT = (0.016, 0.015)
 # The pivot relief-fit note (2.5 mm text, ~0.095 x 0.018): anchored by its
 # upper-left corner, lower right of the free band, left of the title block.
 RELIEF_NOTE_XY = (0.120, 0.034)
-# The MHA-142 named-exception note and its tap-break override (2.5 mm text,
-# two lines, ~141 x 8.8 mm), anchored upper-left in the empty band above the
-# title block (0.066): right of the plan caption row (x <= 0.2185), under the
-# C-C label (y >= 0.0815) and the A-A label (y >= 0.0853).  A sheet must state
-# a named exception (codex review of 68565ace, blocker B1).
-ENGAGEMENT_NOTE_XY = (0.222, 0.0795)
 # SECTION C-C cuts across the plate along the slot, so the counterbore's
 # depth is an imported model dimension (drawing-simplicity rule 2: a typed
 # "4.20 DEEP" was not).  Its cutting line lives on the 1:2 plate-profile
@@ -792,7 +810,7 @@ def notch_plan_ink(
     ``cap_text_xy`` places the 205.81 and ``iso_note_xy`` the isometric
     caption (the layout's by default).
     """
-    cap = plan_xy(NOTCH_CENTER, _part.SLOT_E_X, _part.SLOT_E_Z)
+    cap = plan_xy(NOTCH_CENTER, *_part.NOTCH_CAP_E_XZ)
     cap_text = NOTCH_KEEP["CapECz"] if cap_text_xy is None else cap_text_xy
     cap_x = cap_text[0]
     witness = (
@@ -1133,10 +1151,10 @@ def _assert_notch_captions_clear(
 def _assert_mouth_angle_in_wedge(
     adapter: Any, view: Any, annotations: list[Any]
 ) -> None:
-    """Prove the mouth angle's text sits in its acute 88 deg sector.
+    """Prove the mouth angle's text sits in its acute 87 deg sector.
 
     An angular dimension draws the sector that holds its text, so a text
-    point beside the wedge prints the 92 supplement or the vertically
+    point beside the wedge prints the 93 supplement or the vertically
     opposite sector's arc.  The sector is re-derived from the model through
     the placed view, not from the layout's own sheet figures.
     """
@@ -1658,17 +1676,73 @@ def _add_arc_note(adapter: Any, view: Any, note: ArcNote) -> Any:
     return created
 
 
-def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
-    """Return the pivot and post-mount rims from the plan view.
+# The Hole Wizard callout's countersink-DIAMETER variables, per side, exactly
+# as the S1 leaf 917-s1-9094 read them on seat (swmaker000005): near-side
+# "hw-nscsdia", far-side "hw-fscsdia".  Named, never matched by pattern: a
+# guessed pattern missed both and reported a proven MAX as absent.
+_CSK_DIA_VARIABLE_BY_SIDE = {"near": "hw-nscsdia", "far": "hw-fscsdia"}
+
+
+def _require_countersink_max(display: Any, *, spec: HoleSpec, label: str) -> None:
+    """Prove the native tap callout carries the part's MAX-banded countersink.
+
+    The break is model-owned (cone_swing_platform_spec.POST_MOUNT_TAP_CSK):
+    the part bands each countersink diameter swTolMAX and this sheet authors
+    nothing.  The callout variable's own ToleranceType is what prints, so read
+    back the diameter variable of every side ``spec`` countersinks and fail
+    loud -- distinctly -- when none is there, when a side's is missing, or
+    when a MAX-limited one does not print MAX.
+    """
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
+
+    seen: dict[str, int] = {}
+    for raw in display.GetHoleCalloutVariables() or ():
+        variable = dynamic_dispatch(raw._oleobj_)
+        seen[str(variable.VariableName)] = int(variable.ToleranceType)
+    wanted = {
+        _CSK_DIA_VARIABLE_BY_SIDE[side]: csk
+        for side, csk in (("near", spec.near_countersink), ("far", spec.far_countersink))
+        if csk is not None
+    }
+    present = sorted(name for name in wanted if name in seen)
+    if not present:
+        raise RuntimeError(
+            f"{label}: no countersink-diameter callout variables found; saw "
+            f"{seen!r} (wanted {sorted(wanted)!r})"
+        )
+    missing = sorted(name for name in wanted if name not in seen)
+    if missing:
+        raise RuntimeError(
+            f"{label}: countersink-diameter callout variable(s) missing "
+            f"{missing!r}; saw {seen!r}"
+        )
+    not_max = {
+        name: seen[name]
+        for name, csk in wanted.items()
+        if csk.max_limit and seen[name] != 6  # swTolType_e.swTolMAX
+    }
+    if not_max:
+        raise RuntimeError(
+            f"{label}: callout countersink diameter(s) {not_max!r} do not print MAX "
+            f"(all variables and tolerance types: {seen!r})"
+        )
+    _telemetry.info(f"{label}: callout countersink diameter(s) {present} print MAX")
+
+
+def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
+    """Return the pivot, post-mount and north post-dowel rims from the plan.
 
     The north-end and long-straight-side edges were dropped with the GD&T that
     referenced them (see ``build``) -- nothing else on this sheet attaches to
-    them.
+    them.  The dowel rim is the one nearest the pivot (the north dowel), so
+    the callout's leader is the shorter of the two.
     """
     expected_radius_m = PIVOT_HOLE_DIA / 2000.0
     expected_mount_radius_m = blind_cut_dia_mm(POST_MOUNT_SPEC) / 2000.0
+    expected_dowel_radius_m = PLATE_DOWEL_REAM_DIA / 2000.0
     pivot_edges: list[Any] = []
     mount_edges: list[Any] = []
+    dowel_edges: list[tuple[float, Any]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
         edges = (
@@ -1687,9 +1761,14 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
                 pivot_edges.append(edge)
             if abs(values[6] - expected_mount_radius_m) <= 1e-6:
                 mount_edges.append(edge)
-    if not pivot_edges or len(mount_edges) < 2:
-        raise RuntimeError("cone-platform plan view is missing pivot/mount controls")
-    return pivot_edges[0], mount_edges[0]
+            if abs(values[6] - expected_dowel_radius_m) <= 1e-6:
+                dowel_edges.append((math.hypot(values[0], values[2]), edge))
+    if not pivot_edges or len(mount_edges) < 2 or len(dowel_edges) < 2:
+        raise RuntimeError(
+            "cone-platform plan view is missing pivot/mount/dowel controls: "
+            f"{len(pivot_edges)} pivot, {len(mount_edges)} mount, {len(dowel_edges)} dowel"
+        )
+    return pivot_edges[0], mount_edges[0], min(dowel_edges, key=lambda item: item[0])[1]
 
 
 def _horizontal_section_edge(
@@ -1941,7 +2020,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Notch View Note",
             "Isometric View Note",
             "Pivot Relief Fit",
-            "Post Mount Engagement",
         ),
         required=(
             "Number",
@@ -1953,7 +2031,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Notch View Note",
             "Isometric View Note",
             "Pivot Relief Fit",
-            "Post Mount Engagement",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -2019,7 +2096,9 @@ async def build(adapter: Any) -> dict[str, str]:
     cap_detail = _create_detail_view(
         adapter,
         feature,
-        model_center_mm=(_part.SLOT_E_X, PLATE_THICKNESS, _part.SLOT_E_Z),
+        model_center_mm=(
+            _part.NOTCH_CAP_E_XZ[0], PLATE_THICKNESS, _part.NOTCH_CAP_E_XZ[1]
+        ),
         radius_mm=CAP_DETAIL_RADIUS_MM,
         view_xy=CAP_DETAIL_CENTER,
         detail_label="D",
@@ -2167,9 +2246,8 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, feature, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to feature plan")
 
-    pivot_edge, mount_edge = _visible_plan_controls(adapter, feature)
-    # Below the section line, between the A arrows: right of the plate the
-    # 189.26 dimension line crosses any callout wider than ~40 mm.
+    pivot_edge, mount_edge, dowel_edge = _visible_plan_controls(adapter, feature)
+    # Below the section line, between the A arrows.
     add_native_hole_callout(
         adapter,
         feature,
@@ -2178,12 +2256,29 @@ async def build(adapter: Any) -> dict[str, str]:
         edge=pivot_edge,
         process="DRILL",
     )
-    add_native_hole_callout(
+    tap_callout = add_native_hole_callout(
         adapter,
         feature,
         callout_xy=(0.200, 0.258),
         label="v2 post-mount tapped holes",
         edge=mount_edge,
+        process=POST_MOUNT_TRANSFER_CALLOUT,
+    )
+    _require_countersink_max(
+        tap_callout, spec=POST_MOUNT_SPEC, label="v2 post-mount tapped holes"
+    )
+    # The dowel pair's size, band and THRU stay native; the prefix names the
+    # mating post and the reamer.  A reamed fit prints three places.
+    dowel_callout = add_native_hole_callout(
+        adapter,
+        feature,
+        callout_xy=PLATE_DOWEL_CALLOUT_XY,
+        label="post dowel reamed holes",
+        edge=dowel_edge,
+        process=PLATE_DOWEL_CALLOUT,
+    )
+    set_hole_callout_precision(
+        dowel_callout, {"hw-diam": 3}, label="post dowel ream diameter"
     )
     # The section shows the top seat at the bottom.  Arrows land mid-face so
     # neither symbol reads as controlling a corner, hole wall or outer edge.
@@ -2220,9 +2315,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         notch_annotations,
         {"Notch View Note": notch_note, "Isometric View Note": iso_note},
-    )
-    add_property_linked_note(
-        adapter, "Post Mount Engagement", *ENGAGEMENT_NOTE_XY, char_height=0.0025
     )
     add_property_linked_note(
         adapter, "Pivot Relief Fit", *RELIEF_NOTE_XY, char_height=0.0025

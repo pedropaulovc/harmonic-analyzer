@@ -330,6 +330,16 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
             # R1: MHA-058 is a bonded slip fit modelled line to line in the
             # MHA-102 cross-hole, so the pair needs no interference allowance.
+            # #917 S1: MHA-151 (Ø.125 nominal) pressed into the plate's Ø.1245
+            # ream, 1/4 in plate less the 0.25 recess.
+            **_expected_numbered_pairs(
+                "cone-post-dowel",
+                range(1, 3),
+                "cone-swing-platform",
+                3.175,
+                0.1245 * 25.4,
+                6.35 - 0.25,
+            ),
         },
         "frame": {
             **_expected_numbered_pairs(

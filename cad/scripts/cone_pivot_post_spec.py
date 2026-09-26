@@ -13,8 +13,12 @@ from __future__ import annotations
 
 import math
 
+from _fit_limits import deviations
 from _gtol_spec import CylinderFace, PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
+
+import cone_post_dowel_spec as _dowel
+from cone_pivot_post_installation import POST_ROTATION_Y_DEG
 
 
 MM_PER_IN = 25.4
@@ -76,6 +80,43 @@ ATTACHMENT_THRU_DIA = 7.14248
 ATTACHMENT_CBORE_DIA = 11.50874
 ATTACHMENT_CBORE_DEPTH = 6.0198
 
+# #917 S1 dowel pair: two blind Ø.1255 slip-fit reams from the foot face,
+# match-drilled through MHA-091 after fit-up.  The pattern is the platform's
+# (cone_post_dowel_spec, plate-local from the pivot), carried into this part's
+# frame the way the assembly installs it: the plate's Ry(+INCLINE) takes it to
+# machine axes about the post axis (the pair's midpoint), and the post's own
+# Ry(POST_ROTATION_Y_DEG) is undone.  It lands on the crank-axis diameter
+# (part Z), at the screws' pitch radius, 90 deg from them.
+POST_DOWEL_CENTRE_PLATE_XZ = tuple(
+    sum(axis) / 2.0 for axis in zip(*_dowel.POST_DOWEL_PLATE_XZ, strict=True)
+)
+
+
+def _ry(x: float, z: float, degrees: float) -> tuple[float, float]:
+    """Ry(degrees) on a plan (x, z), the assembly's convention
+    (build_drive_train_assembly._plate_local_to_machine)."""
+    c, s = math.cos(math.radians(degrees)), math.sin(math.radians(degrees))
+    return (x * c + z * s, -x * s + z * c)
+
+
+def _plate_to_post_xz(x: float, z: float) -> tuple[float, float]:
+    machine = _ry(
+        x - POST_DOWEL_CENTRE_PLATE_XZ[0], z - POST_DOWEL_CENTRE_PLATE_XZ[1], INCLINE_DEG
+    )
+    post = _ry(*machine, -POST_ROTATION_Y_DEG)
+    # The plate literal is three-place; so is the post's station.
+    return tuple(round(value, 3) + 0.0 for value in post)
+
+
+POST_DOWEL_XZ = tuple(_plate_to_post_xz(x, z) for x, z in _dowel.POST_DOWEL_PLATE_XZ)
+POST_DOWEL_RADIUS = math.dist(*POST_DOWEL_XZ) / 2.0
+if any(abs(x) > 1e-9 for x, _z in POST_DOWEL_XZ):
+    raise AssertionError(f"post dowels left the crank-axis diameter: {POST_DOWEL_XZ}")
+if abs(POST_DOWEL_RADIUS - ATTACHMENT_X) > 1e-3:
+    raise AssertionError("post dowels are off the attachment screws' pitch radius")
+POST_DOWEL_REAM_DIA = _dowel.POST_DOWEL_REAM_DIA
+POST_DOWEL_BLIND_DEPTH = _dowel.POST_DOWEL_BLIND_DEPTH
+
 # Final solid volume, the sum of the per-feature analytic terms the build
 # checks natively one feature at a time (build_cone_pivot_post.py asserts
 # the sum at import):
@@ -88,15 +129,16 @@ ATTACHMENT_CBORE_DEPTH = 6.0198
 #   cone pads outside the body cylinder             = +    209.0550
 #   cone bore pi*6.1404^2*42.011                    = -  4 976.2960
 #   2x (thru pi*3.57124^2*79.9802 + cbore pi*5.75437^2*6.0198) = - 7 661.5921
-#                                                   = 114 076.5723
+#   2x dowel ream (pi*1.59385^2*8.5 + 118 deg point, #917 S1)  = -   140.7684
+#                                                   = 113 935.8038
 #
 # The 2026-09-21 farm build of the previous recipe read 121 575.3: it had
 # never bored the crank boss (7 401.7) and had only nicked the 45 mm^3 collar
 # sliver behind the spot-face plane inside the bore disc -- a cut whose
 # default direction (opposite the sketch normal) found the Ø44 collar to bite
 # instead of auto-flipping into the boss.  Mass at gray iron 7.20 g/cc.
-HARVESTED_VOLUME_MM3 = 114_076.5723
-HARVESTED_MASS_KG = 0.821351
+HARVESTED_VOLUME_MM3 = 113_935.8038
+HARVESTED_MASS_KG = 0.820338
 
 # Both bores are running journals, so both carry the SAME size band -- the one
 # the `shaft_in_bushing` fit class needs and no tighter (tolerance-policy.md,
@@ -108,10 +150,63 @@ HARVESTED_MASS_KG = 0.821351
 #   crank:   shaft 11.368..11.388  bore 11.413..11.443  (crankshaft MHA-026)
 #   journal: shaft 12.2108..12.2308 bore 12.2558..12.2858 (cone shaft MHA-014)
 #
-# Apart from the spacing between them (below), nothing else on this casting is
-# an accuracy feature, so nothing else carries a band: the title block's
-# general grades govern.
+# Apart from the spacing between them (below) and #917's dowel reams (their
+# band is the reamer's, carried on the hole feature), nothing else on this
+# casting is an accuracy feature, so nothing else carries a band: the title
+# block's general grades govern.
 RUNNING_BORE_BAND = (0.005, -0.025)
+
+# The title block's general grades, mirrored here (the spec does not read the
+# config; test_cone_pivot_post_drawing cross-checks title_block.yaml): the
+# location bands by decimal places, the flat angular band and the drilled
+# hole's unilateral plus.
+TITLE_BLOCK_BAND_BY_PLACES = {1: 0.8, 2: 0.51}
+TITLE_BLOCK_ANGLE_BAND_DEG = 1.0
+DRILLED_HOLE_PLUS = 0.10
+
+# #917 S1: the mounting holes are transferred from the platform at assembly,
+# so no method note stands guard over the cone journal; the model does.  The
+# vertical through-hole and the inclined journal are skew: their axes stand
+# |MountX| cos(incline) apart, less both radii.  Worst case: the .XX hole
+# station in, the .X incline up a whole degree, the drilled hole at its plus,
+# the journal at its running band's top, and the journal's implied (unprinted)
+# location off the post axis at .XX toward the hole.  The counterbore floor
+# stands some 40 mm above the journal's top, so only the through-hole counts.
+MOUNT_JOURNAL_WALL_TARGET = 2.0
+MOUNT_JOURNAL_WALL_FLOOR = 1.5
+
+
+def _mount_journal_wall(
+    mount_x: float, incline_deg: float, thru_dia: float, bore_dia: float, offset: float
+) -> float:
+    return (
+        mount_x * math.cos(math.radians(incline_deg))
+        - offset
+        - thru_dia / 2.0
+        - bore_dia / 2.0
+    )
+
+
+MOUNT_JOURNAL_WALL_NOMINAL = _mount_journal_wall(
+    ATTACHMENT_X, INCLINE_DEG, ATTACHMENT_THRU_DIA, BORE_DIA, 0.0
+)
+MOUNT_JOURNAL_WALL_WORST = _mount_journal_wall(
+    ATTACHMENT_X - TITLE_BLOCK_BAND_BY_PLACES[2],
+    INCLINE_DEG + TITLE_BLOCK_ANGLE_BAND_DEG,
+    ATTACHMENT_THRU_DIA + DRILLED_HOLE_PLUS,
+    BORE_DIA + deviations(RUNNING_BORE_BAND)[1],
+    TITLE_BLOCK_BAND_BY_PLACES[2],
+)
+if MOUNT_JOURNAL_WALL_WORST < MOUNT_JOURNAL_WALL_FLOOR:
+    raise AssertionError(
+        f"mounting hole breaks toward the cone journal: worst wall "
+        f"{MOUNT_JOURNAL_WALL_WORST:.3f} < floor {MOUNT_JOURNAL_WALL_FLOOR}"
+    )
+if MOUNT_JOURNAL_WALL_WORST < MOUNT_JOURNAL_WALL_TARGET:
+    raise AssertionError(
+        f"mounting hole to cone journal worst wall {MOUNT_JOURNAL_WALL_WORST:.3f} "
+        f"is under the {MOUNT_JOURNAL_WALL_TARGET} target"
+    )
 
 # Crank-above-cone bore spacing (user ruling U31, 2026-09-23, option 3a).  The
 # crank axis is located FROM THE CONE AXIS, not from the foot: the 16T:64T
@@ -238,7 +333,6 @@ DRAWING_NOTES = "\n".join(
         "CRANK BORE CARRIES MHA-026, CONE BORE MHA-014; FOOT ON MHA-091.",
         "CONE BOSS END FACES ARE SYMMETRIC ABOUT THE POST AXIS.",
         "BORE BOTH IN ONE SETUP; INSPECT BORE-TO-BORE BEFORE UNCLAMPING.",
-        "DRILL MOUNTING HOLES FROM TOP FACE; CHECK CONE BORE AT BREAKOUT.",
     )
 )
 

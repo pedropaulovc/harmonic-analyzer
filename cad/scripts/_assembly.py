@@ -1624,6 +1624,7 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
         "cone-gear",
         "cone-gear-shaft",
         "cone-pivot-post",
+        "cone-post-dowel",
         "cone-swing-platform",
         "cone-tip-adjuster",
         "cone-tip-block",

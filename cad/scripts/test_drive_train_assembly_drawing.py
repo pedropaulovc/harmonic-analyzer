@@ -592,3 +592,31 @@ def test_final_uncross_leaves_non_balloon_crossings_to_the_audit() -> None:
         _RebuildAdapter(), "SHEET", annotations, read_segments=crossed_with_a_note
     )
     assert annotations["DetailItem1"].position == (0.0, 1.0)
+
+
+# Printed text cites no internal governance: rule numbers, ruling ids
+# (U41), "policy", "ruling", or a named/accepted exception.  Those are
+# provenance for the comments beside the text (Main, S1 round 5).
+_INTERNAL_REFERENCE = re.compile(
+    r"\bRULE\s*\d+|\bU\d{2,}\b|\bPOLIC(?:Y|IES)\b|\bRULINGS?\b|\b(?:NAMED|ACCEPTED)\s+EXCEPTION",
+    re.IGNORECASE,
+)
+
+
+def test_printed_package_text_cites_no_internal_rule_or_ruling() -> None:
+    blocks = {
+        name: value
+        for name, value in vars(drawing).items()
+        if isinstance(value, str)
+        and name.isupper()
+        and (name.endswith(("_STEPS", "_NOTES", "_HEADING")) or name in ("CHECKS", "FIT_PLACEHOLDER"))
+    }
+    assert {"CONE_CRANK_STEPS", "BANK_STEPS", "RIG_STEPS", "CHECKS", "SETUP_NOTES"} <= set(blocks)
+    hits = {
+        name: _INTERNAL_REFERENCE.findall(" ".join(text.split()))
+        for name, text in blocks.items()
+    }
+    assert not {name: found for name, found in hits.items() if found}
+    # The positive control: the pattern does catch what it forbids.
+    for sample in ("NAMED EXCEPTION TO RULE 12.", "PER U41", "PER POLICY", "SEE RULING"):
+        assert _INTERNAL_REFERENCE.search(sample), sample

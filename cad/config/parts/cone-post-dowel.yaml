@@ -1,0 +1,13 @@
+cone-post-dowel:
+  title: Cone Pivot Post Dowel Pin
+  number: MHA-151
+  stock_name: Black-Oxide Alloy Steel Dowel Pin
+  supplier: McMaster-Carr
+  supplier_skus: [98381A304]
+  material: Alloy Steel
+  material_specification: Alloy steel, McMaster-Carr 98381A304
+  finish: black oxide
+  quantity: 2
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

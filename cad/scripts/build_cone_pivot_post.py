@@ -93,9 +93,14 @@ from cone_pivot_post_spec import (
     JOURNAL_REFERENCE_LENGTH,
     JOURNAL_REFERENCE_X,
     JOURNAL_REFERENCE_Z,
+    POST_DOWEL_BLIND_DEPTH,
+    POST_DOWEL_REAM_DIA,
+    POST_DOWEL_XZ,
     RUNNING_BORE_BAND,
     SURFACE_FINISHES,
 )
+from cone_post_dowel_spec import DOWEL_REAM_TOLERANCE_MM
+from _holes import blind_hole_volume_mm3
 
 PART_NAME = "cone-pivot-post"
 MATERIAL = "Gray Cast Iron"
@@ -108,6 +113,16 @@ ATTACHMENT_HOLE_SPEC = HoleSpec(
         "CounterBoreDiameter": ATTACHMENT_CBORE_DIA,
         "CounterBoreDepth": ATTACHMENT_CBORE_DEPTH,
     },
+)
+
+# #917 S1: the MHA-151 dowel pair's blind slip-fit reams, from the foot face,
+# at the reamer's nominal; the +.0002/0 band rides the hole feature.
+POST_DOWEL_HOLE_SPEC = HoleSpec(
+    "drilled_fractional",
+    "1/8",
+    end="blind",
+    depth_mm=POST_DOWEL_BLIND_DEPTH,
+    overrides_mm={"HoleDiameter": POST_DOWEL_REAM_DIA},
 )
 
 BLOCK_RADIUS = BLOCK_DIA / 2.0
@@ -187,6 +202,9 @@ ATTACHMENT_HOLES_MM3 = 2.0 * (
     math.pi * (ATTACHMENT_THRU_DIA / 2.0) ** 2 * (BLOCK_HEIGHT - ATTACHMENT_CBORE_DEPTH)
     + math.pi * (ATTACHMENT_CBORE_DIA / 2.0) ** 2 * ATTACHMENT_CBORE_DEPTH
 )
+# Dowel reams: two blind holes, each a cylinder to the depth plus its drill
+# point; at the foot, 8.5 deep, they meet no other feature.
+POST_DOWEL_HOLES_MM3 = 2.0 * blind_hole_volume_mm3(POST_DOWEL_REAM_DIA, POST_DOWEL_BLIND_DEPTH)
 _ANALYTIC_FINAL_MM3 = (
     math.pi * BLOCK_RADIUS**2 * BLOCK_HEIGHT
     + math.pi * (HEAD_RADIUS**2 - BLOCK_RADIUS**2) * HEAD_HEIGHT
@@ -196,6 +214,7 @@ _ANALYTIC_FINAL_MM3 = (
     + CONE_PADS_OUTSIDE_BODY_MM3
     - CONE_BORE_MM3
     - ATTACHMENT_HOLES_MM3
+    - POST_DOWEL_HOLES_MM3
 )
 if abs(_ANALYTIC_FINAL_MM3 - HARVESTED_VOLUME_MM3) > 0.01:
     raise AssertionError(
@@ -404,7 +423,9 @@ async def build(adapter: Any) -> dict[str, str]:
     head_volume = (
         body_volume + math.pi * (HEAD_RADIUS**2 - BLOCK_RADIUS**2) * HEAD_HEIGHT
     )
-    await volume_check(adapter, "v2 head collar", head_volume, 0.001 * head_volume)
+    volume = await volume_check(
+        adapter, "v2 head collar", head_volume, 0.001 * head_volume
+    )
 
     # 3. Straight crank boss along +Z from the spot-face station, then the
     # spot face itself, then the bore.  The boss sketch sits ON the station
@@ -449,8 +470,18 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     name_last_feature(adapter, "CrankSprocketBoss")
     name_dimensions(adapter, "CrankSprocketBoss", ["CrankBossLen"])
-    volume = head_volume + CRANK_BOSS_OUTSIDE_COLLAR_MM3
-    await volume_check(adapter, "v2 crank boss", volume, 0.001 * volume)
+    # From here each step checks its feature against the PREVIOUS STEP'S
+    # ACTUAL volume, never the running analytic sum: the boss and the cone
+    # pads read ~2 mm^3 over their analytic (S1 leaf 917-s1-9094), and that
+    # offset carried into every later expected value, where it sank the
+    # post dowel reams' 1.4 mm^3 band although the reams were right.  The
+    # final harvested gate still bounds the sum.
+    volume = await volume_check(
+        adapter,
+        "v2 crank boss",
+        volume + CRANK_BOSS_OUTSIDE_COLLAR_MM3,
+        0.001 * (volume + CRANK_BOSS_OUTSIDE_COLLAR_MM3),
+    )
 
     # The spot face is a MACHINED flat at the station: the Ø44 cast collar
     # stands up to 0.62 mm proud of the station plane over |x| < 5.2 (inside
@@ -484,8 +515,12 @@ async def build(adapter: Any) -> dict[str, str]:
         await adapter.create_cut_extrude(ExtrusionParameters(depth=HEAD_RADIUS)),
     )
     name_last_feature(adapter, "CrankSpotFace")
-    volume -= CRANK_SPOT_FACE_MM3
-    await volume_check(adapter, "v2 crank spot face", volume, 0.1 * CRANK_SPOT_FACE_MM3)
+    volume = await volume_check(
+        adapter,
+        "v2 crank spot face",
+        volume - CRANK_SPOT_FACE_MM3,
+        0.1 * CRANK_SPOT_FACE_MM3,
+    )
 
     # The bore runs INTO the boss (+Z), i.e. against the cut default, so it is
     # reversed explicitly (build_top_frame's SetScrewPocket precedent).  Do
@@ -518,8 +553,9 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "CrankBore")
-    volume -= CRANK_BORE_MM3
-    await volume_check(adapter, "v2 crank bore", volume, 0.001 * volume)
+    volume = await volume_check(
+        adapter, "v2 crank bore", volume - CRANK_BORE_MM3, 0.001 * volume
+    )
 
     # 4. O17.2 flush pads and O12.2808 journal on the inclined v2 axis.  Both
     # are mid-plane extrusions from the harvested ConeShaftNormal reference
@@ -556,8 +592,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     name_last_feature(adapter, "ConeShaftBoss")
     name_dimensions(adapter, "ConeShaftBoss", ["ConeBossLen"])
-    volume += CONE_PADS_OUTSIDE_BODY_MM3
-    await volume_check(adapter, "v2 cone pads", volume, 0.001 * volume)
+    volume = await volume_check(
+        adapter, "v2 cone pads", volume + CONE_PADS_OUTSIDE_BODY_MM3, 0.001 * volume
+    )
 
     journal_bore = SketchDims()
     check(
@@ -585,8 +622,9 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "ConeShaftBore")
-    volume -= CONE_BORE_MM3
-    await volume_check(adapter, "v2 cone bore", volume, 0.001 * volume)
+    volume = await volume_check(
+        adapter, "v2 cone bore", volume - CONE_BORE_MM3, 0.001 * volume
+    )
 
     # 5. Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the
     # top face, ONE native Hole Wizard feature with two driven placement
@@ -615,8 +653,28 @@ async def build(adapter: Any) -> dict[str, str]:
         ],
     )
     drive_jobs += attachment_cut.placement_drive_jobs
-    volume -= ATTACHMENT_HOLES_MM3
-    await volume_check(adapter, "v2 mounting holes", volume, 0.001 * volume)
+    volume = await volume_check(
+        adapter, "v2 mounting holes", volume - ATTACHMENT_HOLES_MM3, 0.001 * volume
+    )
+
+    # 5b. #917 S1: the dowel pair, blind from the foot on the crank-axis
+    # diameter (cone_pivot_post_spec.POST_DOWEL_XZ), match-drilled through
+    # MHA-091 at assembly, so the print carries no station.
+    wizard_holes(
+        adapter,
+        POST_DOWEL_HOLE_SPEC,
+        [[x, 0.0, z] for x, z in POST_DOWEL_XZ],
+        (0.0, -1.0, 0.0),
+        "post dowel pair (Ø.1255 ream, blind)",
+        name="PostDowelHoles",
+        dia_tolerance_mm=DOWEL_REAM_TOLERANCE_MM,
+    )
+    volume = await volume_check(
+        adapter,
+        "post dowel reams",
+        volume - POST_DOWEL_HOLES_MM3,
+        0.01 * POST_DOWEL_HOLES_MM3,
+    )
 
     # 6. Journal-plan reference sketch.  The 12.5182 deg plan angle between the
     # crank axis and the cone-journal axis is the casting's defining

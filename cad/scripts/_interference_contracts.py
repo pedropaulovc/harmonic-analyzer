@@ -38,6 +38,12 @@ from frame_cross_screw_spec import SHANK_DIA as _FRAME_CROSS_DIA
 from frame_cross_screw_spec import SHANK_LEN as _FRAME_CROSS_LENGTH
 from frame_cross_screw_spec import THREAD as _FRAME_CROSS_THREAD
 from _hole_spec import TAP_DRILL_MM
+from cone_post_dowel_spec import (
+    PLATE_DOWEL_REAM_DIA as _PLATE_DOWEL_REAM_DIA,
+    POST_DOWEL_DIA as _POST_DOWEL_DIA,
+    POST_DOWEL_RECESS as _POST_DOWEL_RECESS,
+)
+from cone_swing_platform_spec import PLATE_THICKNESS as _PLATE_THICKNESS
 
 
 def _smooth_annulus_limit_mm3(
@@ -140,6 +146,18 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(
         ("cone-tip-adjuster-1", "cone-gear-shaft-1")
     ): _ADJUSTER_THRUST_GATE_LIMIT_MM3,
+    # #917 S1: each MHA-151 pin is a press fit in the plate's ream: the
+    # nominal pin over the modelled ream, along the plate engagement.
+    **_numbered_pairs(
+        "cone-post-dowel",
+        range(1, 3),
+        "cone-swing-platform",
+        _smooth_annulus_limit_mm3(
+            _POST_DOWEL_DIA,
+            _PLATE_DOWEL_REAM_DIA,
+            _PLATE_THICKNESS - _POST_DOWEL_RECESS,
+        ),
+    ),
 }
 
 # Minimum socket chord across the screw's complete major-diameter envelope.

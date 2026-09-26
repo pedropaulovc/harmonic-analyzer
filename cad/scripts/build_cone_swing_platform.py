@@ -96,6 +96,7 @@ from cone_swing_platform_spec import (
     FEATURE_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
     LOCK_STUD_MAJOR,
+    NOTCH_ENGAGE_OVERTRAVEL,
     NOTCH_MOUTH_ANGLE_DEG,
     NOTCH_VIEW_NOTE,
     NOTCH_W,
@@ -107,7 +108,6 @@ from cone_swing_platform_spec import (
     PIVOT_HOLE_SPEC,
     PIVOT_HEAD_RADIAL_CLEARANCE,  # noqa: F401 -- public verify contract
     PIVOT_RELIEF_FIT_REQUIREMENT,
-    POST_MOUNT_ENGAGEMENT_NOTE,
     PLATE_THICKNESS,
     POST_ATTACHMENT_SPACING,
     POST_BLOCK_DIA,
@@ -130,6 +130,12 @@ from cone_swing_platform_spec import (
     assert_notch_stud_stack,
 )
 from _fit_limits import deviations
+from _hole_spec import HoleSpec, countersink_cone_mm3
+from cone_post_dowel_spec import (
+    DOWEL_REAM_TOLERANCE_MM,
+    PLATE_DOWEL_REAM_DIA,
+    POST_DOWEL_PLATE_XZ,
+)
 
 PART_NAME = "cone-swing-platform"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel plate (p.18 dark wedge)
@@ -254,6 +260,41 @@ POST_MOUNT_DZ = POST_MOUNT_HALF_PITCH * _SIN_I
 POST_MOUNT_WEST_XZ = (POST_MOUNT_X, POST_LOCAL_Z + POST_MOUNT_DZ)
 POST_MOUNT_EAST_XZ = (-POST_MOUNT_X, POST_LOCAL_Z - POST_MOUNT_DZ)
 
+# #917 S1 dowel pair (cone_post_dowel_spec): on the post's crank-axis diameter
+# -- the direction Ry(+INCLINE) maps to machine z -- at the screws' pitch
+# radius, north then south.  The spec carries the ruled three-place literal;
+# it must sit on the post's actual pattern.
+POST_DOWEL_PATTERN_ERROR = max(
+    abs(literal - exact)
+    for (x, z), sign in zip(POST_DOWEL_PLATE_XZ, (1.0, -1.0), strict=True)
+    for literal, exact in (
+        (x, -sign * POST_MOUNT_HALF_PITCH * _SIN_I),
+        (z, POST_LOCAL_Z + sign * POST_MOUNT_HALF_PITCH * _COS_I),
+    )
+)
+if POST_DOWEL_PATTERN_ERROR > 6e-4:
+    raise AssertionError(
+        f"POST_DOWEL_PLATE_XZ is {POST_DOWEL_PATTERN_ERROR:.4f} off the post's pattern"
+    )
+# Both taps' edge-break countersinks, near and far, beyond the tap drill.
+POST_MOUNT_CSK_MM3 = 2.0 * sum(
+    countersink_cone_mm3(csk, POST_MOUNT_TAP_DIA)
+    for csk in (POST_MOUNT_SPEC.near_countersink, POST_MOUNT_SPEC.far_countersink)
+    if csk is not None
+)
+# The named reference axis through each ream, for the drive-train's pin mates.
+POST_DOWEL_AXES = (
+    ("post dowel north", POST_DOWEL_PLATE_XZ[0]),
+    ("post dowel south", POST_DOWEL_PLATE_XZ[1]),
+)
+# Reamed through the plate from underneath, at the reamer's nominal; its
+# +.0002/0 band rides the hole feature.
+PLATE_DOWEL_HOLE_SPEC = HoleSpec(
+    "drilled_fractional",
+    "1/8",
+    overrides_mm={"HoleDiameter": PLATE_DOWEL_REAM_DIA},
+)
+
 # Fail before COM if the v2 foot ever drifts off the tapered plate.  Distance
 # is normal to each straight boundary, not merely an axis-aligned half-width.
 _POST_R = POST_MAIN_DIA / 2.0
@@ -339,7 +380,7 @@ NOTCH_RUN_DEG = math.degrees(math.atan2(_SLOT_TZ, _SLOT_TX))
 # mouth (cone_swing_platform_spec.NOTCH_MOUTH_ANGLE_DEG): both legs are real
 # edges, the vertex the mouth's SOUTH corner, whose material wedge -- the
 # inward rail against the edge running south -- is the acute one.  The stud's
-# chord makes NOTCH_CHORD_MOUTH_DEG (87.53) with it; the spec rounds that to
+# chord makes NOTCH_CHORD_MOUTH_DEG (87.38) with it; the spec rounds that to
 # the whole degree and the notch is CUT along the rounded angle (direction
 # NOTCH_CUT_U), so a protractor on the part reads the printed number.  The
 # stud still runs the chord: the rounding offset is a term of the stud stack.
@@ -379,19 +420,28 @@ WEST_EDGE_ANGLE_ERROR_DEG = math.degrees(
     )
 )
 _MOUTH_OVERSHOOT = 4.0  # rails run past the edge so the mouth opens clean
+# The closed end's full R is centred NOTCH_ENGAGE_OVERTRAVEL deeper than the
+# stud's engaged seat, back along the cut (#917 S1): the fit-up may swing the
+# platform past the seat.  SLOT_E itself -- where the base stud stands -- and
+# the stud's exit travel to the mouth are unchanged.
+NOTCH_CAP_E_XZ = (
+    SLOT_E_X - NOTCH_ENGAGE_OVERTRAVEL * NOTCH_CUT_U[0],
+    SLOT_E_Z - NOTCH_ENGAGE_OVERTRAVEL * NOTCH_CUT_U[1],
+)
 
 
 def notch_cut_points() -> dict[str, tuple[float, float]]:
     """The lock notch's cut outline, local (x, z).
 
-    Closed-end corners either side of the cap centre, the rails' crossings of
-    the west edge (the mouth corners), and the outboard ends
-    _MOUTH_OVERSHOOT past the SOUTH crossing, square to the rails.
+    Closed-end corners either side of the cap centre (NOTCH_CAP_E_XZ), the
+    rails' crossings of the west edge (the mouth corners), and the outboard
+    ends _MOUTH_OVERSHOOT past the SOUTH crossing, square to the rails.
     """
     ux, uz = NOTCH_CUT_U
+    cx, cz = NOTCH_CAP_E_XZ
     px, pz = -uz * SLOT_W / 2.0, ux * SLOT_W / 2.0  # toward the north rail
-    closed_s = (SLOT_E_X - px, SLOT_E_Z - pz)
-    closed_n = (SLOT_E_X + px, SLOT_E_Z + pz)
+    closed_s = (cx - px, cz - pz)
+    closed_n = (cx + px, cz + pz)
     a_s = _exit_travel(*closed_s, ux, uz)
     a_n = _exit_travel(*closed_n, ux, uz)
     out = a_s + _MOUTH_OVERSHOOT
@@ -408,7 +458,7 @@ def notch_cut_points() -> dict[str, tuple[float, float]]:
 NOTCH_CUT_POINTS = notch_cut_points()
 # In-material length of the cut on its centreline: the rails cross a straight
 # edge symmetrically about it, so the in-plate area is exactly width x this.
-NOTCH_CUT_TRAVEL = _exit_travel(SLOT_E_X, SLOT_E_Z, *NOTCH_CUT_U)
+NOTCH_CUT_TRAVEL = _exit_travel(*NOTCH_CAP_E_XZ, *NOTCH_CUT_U)
 if (
     min(
         math.dist(NOTCH_CUT_POINTS["mouth_n"], NOTCH_CUT_POINTS["out_n"]),
@@ -899,6 +949,15 @@ CRANK_SEAT_ANCHOR = (-CRANK_AXIS_OFF * _COS_I, -CRANK_AXIS_OFF * _SIN_I)
 # (part-local plan x, z) = (-49.92, -11.08); machine (-130.82, 103.29)
 
 
+# The widths the print bands (feature, dimension, (upper, lower)); build()
+# sets each through deviations().
+BANDED_WIDTHS = (
+    ("TipScrewSlotProfile", "TipSlotW", TIP_SLOT_W_BAND),
+    ("TipScrewCboreProfile", "TipCboreW", TIP_CBORE_W_BAND),
+    ("LockNotchProfile", "NotchW", NOTCH_W_BAND),
+)
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreateAxisParameters,
@@ -1117,7 +1176,27 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += post_mount_cut.placement_drive_jobs
     v_post_mounts = 2.0 * math.pi * (POST_MOUNT_TAP_DIA / 2.0) ** 2 * PLATE_T
     volume = await volume_check(
-        adapter, "v2 post mount taps", volume - v_post_mounts, 0.01 * v_post_mounts
+        adapter,
+        "v2 post mount taps + edge-break countersinks",
+        volume - v_post_mounts - POST_MOUNT_CSK_MM3,
+        0.01 * (v_post_mounts + POST_MOUNT_CSK_MM3),
+    )
+
+    # #917 S1: the MHA-151 dowel pair, reamed through for a press fit and
+    # match-drilled into the fitted post at assembly (the print carries no
+    # station).  Modelled at nominal from the underside, where the pins go in.
+    wizard_holes(
+        adapter,
+        PLATE_DOWEL_HOLE_SPEC,
+        [[x, 0.0, z] for x, z in POST_DOWEL_PLATE_XZ],
+        (0.0, -1.0, 0.0),
+        "post dowel pair (Ø.1245 ream through)",
+        name="PostDowelHoles",
+        dia_tolerance_mm=DOWEL_REAM_TOLERANCE_MM,
+    )
+    v_dowels = 2.0 * math.pi * (PLATE_DOWEL_REAM_DIA / 2.0) ** 2 * PLATE_T
+    volume = await volume_check(
+        adapter, "post dowel reams", volume - v_dowels, 0.01 * v_dowels
     )
 
     # I31 tip-block hold-down: a through slot for the #6-32 shank, then a
@@ -1278,14 +1357,15 @@ async def build(adapter) -> dict[str, str]:
         adapter, "lock notch", volume - v_slot, max(0.01 * v_slot, 0.5)
     )
 
-    # Closed-end cap at the engaged seat (the mouth end is open -- no W cap).
+    # Closed-end cap, NOTCH_ENGAGE_OVERTRAVEL past the engaged seat (the
+    # mouth end is open -- no W cap).
     v_cap = math.pi * (SLOT_W / 2.0) ** 2 / 2.0 * PLATE_T
     cap = SketchDims()
     check("create_sketch notch cap E", await adapter.create_sketch("Top"))
     await define_circle(
         adapter,
-        SLOT_E_X,
-        -SLOT_E_Z,
+        NOTCH_CAP_E_XZ[0],
+        -NOTCH_CAP_E_XZ[1],
         SLOT_W / 2.0,
         "notch cap E",
         dims=cap,
@@ -1382,6 +1462,11 @@ async def build(adapter) -> dict[str, str]:
             adapter, "Front Plane", mount_z, "Right Plane", mount_x, axis_name
         )
         name_last_feature(adapter, axis_name)
+    for axis_name, (dowel_x, dowel_z) in POST_DOWEL_AXES:
+        await name_bore_axis(
+            adapter, "Front Plane", dowel_z, "Right Plane", dowel_x, axis_name
+        )
+        name_last_feature(adapter, axis_name)
 
     # Rounded plan corners LAST (they consume the sharp corner edges; the
     # notch-mouth edges and the axis construction are already in place).
@@ -1409,11 +1494,7 @@ async def build(adapter) -> dict[str, str]:
     # Decimal places for imported model dimensions live on the PART.  The
     # Hole Wizard owns the pivot-hole precision and native size callout.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    for feature_name, dimension_name, band in (
-        ("TipScrewSlotProfile", "TipSlotW", TIP_SLOT_W_BAND),
-        ("TipScrewCboreProfile", "TipCboreW", TIP_CBORE_W_BAND),
-        ("LockNotchProfile", "NotchW", NOTCH_W_BAND),
-    ):
+    for feature_name, dimension_name, band in BANDED_WIDTHS:
         set_dimension_bilateral_tolerance(
             adapter, feature_name, dimension_name, *deviations(band)
         )
@@ -1448,7 +1529,6 @@ async def build(adapter) -> dict[str, str]:
             "Notch View Note": NOTCH_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Pivot Relief Fit": PIVOT_RELIEF_FIT_REQUIREMENT,
-            "Post Mount Engagement": POST_MOUNT_ENGAGEMENT_NOTE,
         },
     )
     blank_reference_geometry(
@@ -1466,12 +1546,19 @@ async def build(adapter) -> dict[str, str]:
             ("Plane8", "PLANE"),
             ("Plane9", "PLANE"),
             ("Plane10", "PLANE"),
+            # ... and the two post dowel axes'.
+            ("Plane11", "PLANE"),
+            ("Plane12", "PLANE"),
+            ("Plane13", "PLANE"),
+            ("Plane14", "PLANE"),
             ("PlateTop", "PLANE"),
             (swing_axis, "AXIS"),
             (anchor_axis, "AXIS"),
             ("crank axis", "AXIS"),
             ("post mount west", "AXIS"),
             ("post mount east", "AXIS"),
+            ("post dowel north", "AXIS"),
+            ("post dowel south", "AXIS"),
         ),
     )
     return await save_part_and_images(adapter, PART_NAME)

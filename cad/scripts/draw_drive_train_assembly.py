@@ -43,6 +43,8 @@ from _drawing_common import (
 )
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from cone_post_dowel_spec import POST_DOWEL_RECESS
+from cone_swing_platform_spec import POST_MOUNT_ENGAGEMENT_PRINTED
 from drive_train_assembly_spec import (
     CLUSTERS,
     EXPLODED_VIEW_NAME,
@@ -238,6 +240,7 @@ BOM_PART_NUMBERS = {
     "crank-drive-gear": "MHA-021",
     "cone-swing-platform": "MHA-091",
     "cone-pivot-post": "MHA-016",
+    "cone-post-dowel": "MHA-151",
     "cone-tip-block": "MHA-092",
     "cone-tip-bushing": "MHA-096",
     "cone-tip-adjuster": "MHA-097",
@@ -284,6 +287,7 @@ BOM_DESCRIPTIONS = {
     "crank-drive-gear": "CRANK DRIVE GEAR, 64T",
     "cone-swing-platform": "CONE SWING PLATFORM",
     "cone-pivot-post": "CONE PIVOT POST AND CRANK COLUMN",
+    "cone-post-dowel": "1/8 X 1/2 DOWEL PIN, MCMASTER 98381A304",
     "cone-tip-block": "CONE TIP BLOCK",
     "cone-tip-bushing": "CONE TIP BUSHING",
     "cone-tip-adjuster": "CUP-TIP SET SCREW, MCMASTER 94025A164",
@@ -342,17 +346,32 @@ CONE_CRANK_STEPS = "\n".join(
         # slotted fillister, through the unchanged 6.02 counterbore. Its floor
         # sits 78.67-81.29 above the post foot at the printed bands, so a fixed
         # length could end 0.98 proud; each screw is cut to its own hole
-        # (pivot). Engagement is capped by the plate, printed as 1/4 1018 CF
-        # flat bar as supplied (U41, 6.22 min less the 0.3 cut: 5.92 = 0.93D
-        # worst case, swing): a named, user-accepted exception to rule 12, in
-        # the Named exceptions table of cad/docs/drawing-simplicity-policy.md.
-        # Every sheet a row affects states the exception itself, with the
-        # row's recorded range, which the gate matches; the table is the
-        # backstop.
-        "2. SCREW MHA-016 TO MHA-091 WITH 2X MHA-142 FROM THE TOP. CUT EACH TO",
-        "   FIT AND CHAMFER THE END: FLUSH TO 0.3 SHORT OF THE MHA-091",
-        "   UNDERSIDE, NEVER PROUD (NOMINAL LENGTH 86.0). ENGAGEMENT 5.92-6.35",
-        "   (0.93-1.0D): NAMED EXCEPTION TO RULE 12.",
+        # (pivot). Engagement is capped by the plate, 1/4 1018 CF flat bar as
+        # supplied (U41); the printed floor is the platform spec's worst case
+        # with every edge break counted (POST_MOUNT_ENGAGEMENT_PRINTED, 0.90D),
+        # the user-accepted exception to rule 12 in the Named exceptions table
+        # of cad/docs/drawing-simplicity-policy.md, which records the same
+        # 0.90D. (It printed 5.92-6.35 / 0.93-1.0D before #917 S1 counted the
+        # tap and cut-end breaks.)
+        # #917 S1 + Codex on #929: the MHA-151 dowel pair is fitted BEFORE the
+        # screws are tightened. The post floats on finger-tight screws for
+        # fit-up (917-fitup-process-budget-20260926.md), is snugged to drill
+        # through the plate into its foot, and each part is reamed to its own
+        # print (the plate press, the post slip). The pins press in from below,
+        # recessed POST_DOWEL_RECESS into the base-slide face, and the post
+        # slips back over them. The install moved here from the MHA-151 sheet
+        # (Main's eye pass: a method, not a part requirement).
+        "2. SET MHA-016 ON MHA-091, 2X MHA-142 FROM THE TOP FINGER-TIGHT;",
+        "   POSITION IT AT FIT-UP AND SNUG. MATCH-DRILL THE DOWEL PAIR FROM",
+        "   BELOW THROUGH MHA-091 INTO MHA-016; LIFT MHA-016 OFF AND REAM",
+        "   EACH PART PER ITS PRINT. PRESS 2X MHA-151 INTO MHA-091 FROM BELOW,",
+        f"   RECESSED {POST_DOWEL_RECESS:.2f} INTO ITS SLIDE FACE, NEVER PROUD. SLIP MHA-016",
+        "   OVER THEM. CUT EACH MHA-142 TO FIT AND CHAMFER THE END: FLUSH TO",
+        "   0.3 SHORT OF THE MHA-091 UNDERSIDE, NEVER PROUD (NOMINAL LENGTH",
+        # The sheet states the floor, not our governance (Main, S1): the
+        # rule-12 exception it relies on is recorded above and in the policy's
+        # Named exceptions table.
+        f"   86.0); TIGHTEN BOTH. ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN.",
         # U30 (user, 2026-09-23, option (a)): one #6-32 button-head screw (W22)
         # up through the MHA-091 slot, height and side set by the shim pack at
         # fit-up. Wording from swing (dt-tip-block-attachment-options-20260923.md

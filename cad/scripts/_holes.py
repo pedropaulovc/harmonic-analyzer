@@ -26,6 +26,8 @@ still resolves in the table fails loud instead of cutting the wrong drill).
 
 from __future__ import annotations
 
+import math
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -39,6 +41,7 @@ from _hole_spec import (
     NUMBER_DRILL_MM as NUMBER_DRILL_MM,
     TAP_DRILL_MM as TAP_DRILL_MM,
     THREAD_MAJOR_MM as THREAD_MAJOR_MM,
+    Countersink,
     HoleSpec,
     blind_cut_dia_mm,
 )
@@ -198,6 +201,167 @@ def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
     return best
 
 
+def tapped_value_slots(
+    spec: HoleSpec,
+    *,
+    thread_depth_mm: float | None,
+    drill_angle_rad: float | None,
+    thread_end: int,
+) -> list[float]:
+    """HoleWizard5's Value1..Value12 for a straight tap (API remarks): thread
+    depth, near csink diameter/angle, far csink diameter/angle, bottom drill
+    angle, cosmetic thread type (1 = with callout), thread end condition, then
+    unused.  -1 leaves a slot unset.  Countersinks go in HERE: the
+    Near/FarSideCounterSink booleans are get-only after creation (a set plus
+    ModifyDefinition returns success and changes nothing; see the
+    hole-wizard COM recipe)."""
+
+    def _csk(csk: Countersink | None) -> list[float]:
+        if csk is None:
+            return [-1, -1]
+        return [csk.dia_mm / 1000.0, math.radians(csk.angle_deg)]
+
+    return [
+        -1 if thread_depth_mm is None else thread_depth_mm / 1000.0,
+        *_csk(spec.near_countersink),
+        *_csk(spec.far_countersink),
+        -1 if drill_angle_rad is None else drill_angle_rad,
+        1,
+        thread_end,
+        -1,
+        -1,
+        -1,
+        -1,
+    ]
+
+
+_CSK_NAME = re.compile(r"c'?\s*sink|csk|countersink", re.IGNORECASE)
+
+
+def _countersink_sides(spec: HoleSpec) -> dict[str, Countersink]:
+    return {
+        side: csk
+        for side, csk in (("near", spec.near_countersink), ("far", spec.far_countersink))
+        if csk is not None
+    }
+
+
+def _countersink_diameters(names: list[str], spec: HoleSpec, *, label: str) -> list[str]:
+    """Every countersink DIAMETER dimension of the feature: exactly one per
+    side ``spec`` countersinks (the angles are not diameters).
+
+    On seat (S1 leaf 917-s1-9094, part:cone_swing_platform) this pattern
+    found exactly the two diameters of the both-ends countersunk post tap.
+    Those are the FEATURE's dimension FullNames -- a different namespace
+    from the drawing callout's ``hw-nscsdia`` / ``hw-fscsdia`` variables,
+    which match none of these words."""
+    wanted = _countersink_sides(spec)
+    found = [n for n in names if _CSK_NAME.search(n) and "dia" in n.lower()]
+    if not found:
+        raise RuntimeError(
+            f"hole wizard {label}: no countersink diameter dimension among "
+            f"{names!r} (wanted {sorted(wanted)})"
+        )
+    if len(found) != len(wanted):
+        raise RuntimeError(
+            f"hole wizard {label}: {len(found)} countersink diameter(s) for "
+            f"{len(wanted)} countersunk side(s) {sorted(wanted)} among {names!r}"
+        )
+    return found
+
+
+def countersink_diameter_names(
+    names: list[str], spec: HoleSpec, *, label: str
+) -> dict[str, str]:
+    """Each countersunk side's DIAMETER dimension FullName, keyed "near"/"far",
+    by the side word in the name.
+
+    Needed only when the sides' MAX flags differ.  UNVERIFIED on a seat: the
+    S1 leaf did not log the feature's dimension names, so a name that carries
+    no side word is refused (loud, every name listed), never guessed.
+    """
+    wanted = set(_countersink_sides(spec))
+    by_side: dict[str, str] = {}
+    for name in _countersink_diameters(names, spec, label=label):
+        sides = [side for side in ("near", "far") if side in name.lower()]
+        if len(sides) != 1 or sides[0] in by_side:
+            raise RuntimeError(
+                f"hole wizard {label}: countersink diameter {name!r} names no "
+                f"single side among {names!r} -- refusing to guess its side"
+            )
+        by_side[sides[0]] = name
+    missing = sorted(wanted - set(by_side))
+    unexpected = sorted(set(by_side) - wanted)
+    if missing or unexpected:
+        raise RuntimeError(
+            f"hole wizard {label}: countersink diameters missing {missing}, "
+            f"unexpected {unexpected}, among {names!r}"
+        )
+    return {side: by_side[side] for side in ("near", "far") if side in by_side}
+
+
+def countersink_max_names(names: list[str], spec: HoleSpec, *, label: str) -> list[str]:
+    """The countersink diameters to band swTolMAX: each side by its OWN flag.
+
+    When every countersunk side carries the same flag (the post taps: both
+    MAX), the sides need no telling apart -- all of the feature's
+    countersink diameters take that flag, as proven on seat.  Only mixed
+    flags need each diameter's side (countersink_diameter_names)."""
+    sides = _countersink_sides(spec)
+    flags = {csk.max_limit for csk in sides.values()}
+    if len(flags) == 1:
+        found = _countersink_diameters(names, spec, label=label)
+        return found if flags.pop() else []
+    by_side = countersink_diameter_names(names, spec, label=label)
+    return [by_side[side] for side, csk in sides.items() if csk.max_limit]
+
+
+def _tolerance_countersink_max(feat: Any, spec: HoleSpec, *, label: str) -> None:
+    """Band each MAX-flagged countersink diameter swTolMAX ON THE PART, so the
+    native callout prints its nominal as the limit; an unflagged side keeps
+    the wizard default.  Found by name, never by position."""
+    dimensions: dict[str, Any] = {}
+    display = feat.GetFirstDisplayDimension()
+    while display is not None:
+        display = _early_bound(display, "IDisplayDimension")
+        dimension = display.GetDimension()
+        if dimension is not None:
+            dimensions[str(dimension.FullName)] = dimension
+        display = feat.GetNextDisplayDimension(display)
+    # The whole list at info: the next leaf records the wizard's real names.
+    _telemetry.info(f"hole wizard {label}: feature dimensions {sorted(dimensions)}")
+    for name in countersink_max_names(list(dimensions), spec, label=label):
+        tolerance = _early_bound(
+            _early_bound(dimensions[name], "IDimension").Tolerance, "IDimensionTolerance"
+        )
+        tolerance.Type = 6  # swTolType_e.swTolMAX
+        if int(tolerance.Type) != 6:
+            raise RuntimeError(f"hole wizard {label}: {name} refused swTolMAX")
+        _telemetry.info(f"hole wizard {label}: {name} banded MAX")
+
+
+def countersink_readback_problems(defn: Any, spec: HoleSpec) -> list[str]:
+    """Differences between a committed wizard definition and the spec's
+    countersinks (diameters to 1 um, angles to 1e-6 rad)."""
+    problems: list[str] = []
+    for side, csk in (("Near", spec.near_countersink), ("Far", spec.far_countersink)):
+        enabled = bool(getattr(defn, f"{side}SideCounterSink"))
+        if enabled != (csk is not None):
+            problems.append(f"{side}SideCounterSink {enabled} != requested {csk is not None}")
+            continue
+        if csk is None:
+            continue
+        dia = float(getattr(defn, f"{side}CounterSinkDiameter")) * 1000.0
+        ang = float(getattr(defn, f"{side}CounterSinkAngle"))
+        if abs(dia - csk.dia_mm) > 1e-3:
+            problems.append(f"{side}CounterSinkDiameter {dia:.4f} != {csk.dia_mm:.4f} mm")
+        if abs(ang - math.radians(csk.angle_deg)) > 1e-6:
+            problems.append(
+                f"{side}CounterSinkAngle {math.degrees(ang):.4f} != {csk.angle_deg} deg"
+            )
+    return problems
+
+
 def _tolerance_hole_diameter(
     feat: Any, tolerance_mm: tuple[float, float], *, label: str
 ) -> None:
@@ -299,6 +463,14 @@ def wizard_holes(
         )
     hole_type, fastener = _KINDS[spec.kind]
     end = _ENDS[spec.end]
+    countersinks = [c for c in (spec.near_countersink, spec.far_countersink) if c]
+    if countersinks and hole_type != 4:
+        raise ValueError(
+            f"hole wizard {label}: countersinks are supported on straight taps only"
+        )
+    # Blind holes and countersunk taps are created through the positional
+    # HoleWizard5 (see below); everything else through InitializeHole.
+    positional = spec.end == "blind" or bool(countersinks)
 
     model = adapter.currentModel
     model = _early_bound(model, "IModelDoc2")
@@ -317,7 +489,7 @@ def wizard_holes(
     _telemetry.debug(f"hole wizard {label}: face selected, creating feature")
 
     blind_thread_depth_mm: float | None = None
-    if spec.end == "blind":
+    if positional:
         # BLIND holes go through the legacy positional HoleWizard5:
         # InitializeHole(..., blind) is broken on this build -- it cuts a
         # garbage default AND poisons the wizard session so SUBSEQUENT holes
@@ -327,32 +499,29 @@ def wizard_holes(
         # V1=thread depth, V6=bottom drill angle (radians), V7=cosmetic thread
         # type, V8=thread end condition; plain holes take V1=screw fit,
         # V2=bottom drill angle.
+        # A countersunk through tap takes the same path: its near/far
+        # countersinks are Value2..Value5 here, and cannot be switched on after
+        # creation (tapped_value_slots).
         d = spec.depth_mm / 1000.0
         dia = blind_cut_dia_mm(spec) / 1000.0
         ang = 2.0594885  # 118-degree drill point
         if hole_type == 4:
-            blind_thread_depth_mm = spec.overrides_mm.get("ThreadDepth", spec.depth_mm)
-            if not 0.0 < blind_thread_depth_mm <= spec.depth_mm:
-                raise ValueError(
-                    f"hole wizard {label}: blind tap thread depth "
-                    f"{blind_thread_depth_mm} mm must be positive and no deeper "
-                    f"than its {spec.depth_mm} mm hole"
+            if spec.end == "blind":
+                blind_thread_depth_mm = spec.overrides_mm.get(
+                    "ThreadDepth", spec.depth_mm
                 )
-            thread_depth = blind_thread_depth_mm / 1000.0
-            vals = [
-                thread_depth,
-                -1,
-                -1,
-                -1,
-                -1,
-                ang,
-                1,
-                _ENDS["blind"],
-                -1,
-                -1,
-                -1,
-                -1,
-            ]
+                if not 0.0 < blind_thread_depth_mm <= spec.depth_mm:
+                    raise ValueError(
+                        f"hole wizard {label}: blind tap thread depth "
+                        f"{blind_thread_depth_mm} mm must be positive and no deeper "
+                        f"than its {spec.depth_mm} mm hole"
+                    )
+            vals = tapped_value_slots(
+                spec,
+                thread_depth_mm=blind_thread_depth_mm,
+                drill_angle_rad=ang if spec.end == "blind" else None,
+                thread_end=end,
+            )
             tclass = spec.thread_class
         else:
             fit = _FITS[spec.fit] if spec.kind == "clearance" else -1
@@ -363,7 +532,7 @@ def wizard_holes(
             _STD_ANSI_INCH,
             fastener,
             spec.size,
-            _ENDS["blind"],
+            end,
             dia,
             d,
             -1.0,
@@ -378,7 +547,7 @@ def wizard_holes(
         )
         if feat is None:
             raise RuntimeError(
-                f"hole wizard {label}: HoleWizard5 (blind) failed -- size "
+                f"hole wizard {label}: HoleWizard5 ({spec.end}) failed -- size "
                 f"{spec.size!r} may be invalid for kind {spec.kind!r}"
             )
     else:
@@ -400,6 +569,10 @@ def wizard_holes(
     # for a hole that needs TIGHTER than the general row.
     if dia_tolerance_mm is not None:
         _tolerance_hole_diameter(feat, dia_tolerance_mm, label=label)
+    if countersinks:
+        # Every countersunk side is found by name (loud otherwise); only the
+        # sides flagged max_limit are banded MAX.
+        _tolerance_countersink_max(feat, spec, label=label)
 
     # Locate the wizard's 1-point placement sketch.
     place_sk = place_name = None
@@ -544,7 +717,7 @@ def wizard_holes(
     # reads 0.0 for everything it did not set).
     defn = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
     edits: list[tuple[str, object]] = []
-    if hole_type == 4 and spec.end != "blind":
+    if hole_type == 4 and not positional:
         # InitializeHole/CreateFeature discard pre-create thread metadata.
         # Apply it to the populated feature: otherwise a through-wall tap can
         # print a zero blind thread depth and omit its ANSI thread class.
@@ -633,6 +806,10 @@ def wizard_holes(
                 raise RuntimeError(
                     f"hole wizard {label}: {prop} {actual!r} != requested {expected!r}"
                 )
+        if problems := countersink_readback_problems(defn, spec):
+            raise RuntimeError(
+                f"hole wizard {label}: countersinks not committed: " + "; ".join(problems)
+            )
 
     def _dim(prop: str) -> float:
         try:
