@@ -2010,12 +2010,16 @@ def _probe_cache(
     """One remote-cache restore attempt for a phase span; returns its disposition.
 
     ``hit`` (or the caller's ``hit`` wording, e.g. ``hit-after-wait``) / ``miss`` /
-    ``locked`` -- the last when the cached build exists but an output is
-    share-locked by a document SolidWorks still holds
+    ``locked`` / ``auth-failed``. ``locked``: the cached build exists but an
+    output is share-locked by a document SolidWorks still holds
     (:class:`_artifact_cache.RestoreLocked`). A locked probe must NOT fall through
     to a local build (that forks the artefact's identity off the fleet's); the
-    seat-holding caller releases the documents and re-probes instead. Under the
-    farm executor the submitter holds no seat to release, so it fails loud.
+    seat-holding caller releases the documents and re-probes instead.
+    ``auth-failed``: the cache could not authenticate, so the key was never
+    looked up (:class:`_artifact_cache.RestoreAuthFailed`); a local seat builds
+    it, as it would with the cache off, and the span says why. Under the farm
+    executor both are fatal: the submitter holds no seat to release, and a leaf
+    dispatched without a token publishes an artefact this side cannot fetch.
     """
     _tag_cache_key(span, key)
     try:
@@ -2024,6 +2028,10 @@ def _probe_cache(
         if _farm.enabled():
             raise
         outcome = "locked"
+    except _cache.RestoreAuthFailed:
+        if _farm.enabled():
+            raise
+        outcome = "auth-failed"
     span.set_attribute("cache", outcome)
     return outcome
 
@@ -2053,7 +2061,7 @@ def _release_seat_documents(label: str) -> None:
 
 def _reprobe_under_seat(
     key: str, outputs: list[Path], label: str, probed: str
-) -> bool:
+) -> str:
     """The under-seat re-probe every cached COM action runs: a peer may have
     published this exact artefact while we blocked for the seat, so restore it
     rather than rebuild (the fleet cache-split win; fable/codex review). Its OWN
@@ -2063,7 +2071,9 @@ def _reprobe_under_seat(
     reads ``locked`` -- the outside one, or this one after a peer published
     while we queued -- gets ONE release of the seat's documents and one more
     probe; a probe still locked after the release is fatal.
-    Returns True on a hit (the caller skips the build)."""
+    Returns the disposition: ``hit-after-wait`` (the caller skips the build),
+    else ``miss`` or ``auth-failed`` -- which the build's task span carries,
+    so a build the cache could not rule out never reads as a genuine miss."""
     released = False
     if probed == "locked":
         _release_seat_documents(label)
@@ -2076,7 +2086,7 @@ def _reprobe_under_seat(
         ) as reprobe:
             outcome = _probe_cache(key, outputs, label, reprobe, hit="hit-after-wait")
         if outcome != "locked":
-            return outcome == "hit-after-wait"
+            return outcome
         if released:
             raise RuntimeError(
                 f"{label}: cached outputs still share-locked after releasing the "
@@ -2125,7 +2135,8 @@ def _cached_com_action(
         return
 
     with _com_seat(label) as waited:
-        if _reprobe_under_seat(key, outputs, label, probed):
+        reprobed = _reprobe_under_seat(key, outputs, label, probed)
+        if reprobed == "hit-after-wait":
             return
 
         _sw_ensure_once()  # top-level sibling of the task span (once/worker)
@@ -2133,7 +2144,7 @@ def _cached_com_action(
             f"task {label}", label=label, service=_stage_name(label)
         ) as sp:
             _tag_seat_wait(sp, waited)
-            sp.set_attribute("cache", "miss")
+            sp.set_attribute("cache", reprobed)
             _tag_cache_key(sp, key)
             _exec_com(cmd, label, log_stem=log_stem)
             if stamp is not None:
@@ -2209,8 +2220,11 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
     The worker runs the same doit task with the cache in ``rw`` mode and stores
     ``key``; this side never takes the COM seat and never runs ``cache.store``.
     A farm failure is the task's failure (worker, category, exit code, log blob all
-    in the message); a success whose key is still absent is an infrastructure
-    fault and fails just as loud.
+    in the message); a success whose key does not restore is an infrastructure
+    fault and fails just as loud -- naming what the cache said, since a restore
+    that errored, or could not authenticate
+    (:class:`_artifact_cache.RestoreAuthFailed`, raised through), is not an
+    absent key.
     """
     result = _farm.run_leaf(label, key)
     if result.state != "succeeded":
@@ -2229,10 +2243,27 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
     ) as restore:
         _tag_cache_key(restore, key)
         if not _cache.restore(key, outputs, label):
-            raise RuntimeError(
-                f"{label}: farm reported success but cache key {key[:12]} is absent"
-            )
+            raise RuntimeError(_unrestored_leaf(label, key))
         restore.set_attribute("cache", "hit")
+
+
+def _unrestored_leaf(label: str, key: str) -> str:
+    """Why a succeeded leaf's key did not restore, as far as the cache can say.
+
+    ``restore`` answers False for a miss and for an error alike, so ask the
+    store directly (a HEAD, no download) before calling the key absent."""
+    present = _cache.probe(key)
+    if present is False:
+        return f"{label}: farm reported success but cache key {key[:12]} is absent"
+    if present:
+        return (
+            f"{label}: farm reported success and cache key {key[:12]} is present "
+            "but did not restore -- see the [cache] restore error above"
+        )
+    return (
+        f"{label}: farm reported success but cache key {key[:12]} did not "
+        "restore, and its presence could not be checked (cache unreachable)"
+    )
 
 
 def _cached_part_action(stem: str, script: Path) -> None:
@@ -2265,7 +2296,8 @@ def _cached_part_action(stem: str, script: Path) -> None:
         return
 
     with _com_seat(label) as waited:
-        if _reprobe_under_seat(key, outputs, label, probed):
+        reprobed = _reprobe_under_seat(key, outputs, label, probed)
+        if reprobed == "hit-after-wait":
             _stamp_part_execution(stem)
             return
 
@@ -2274,7 +2306,7 @@ def _cached_part_action(stem: str, script: Path) -> None:
             f"task {label}", label=label, service=_stage_name(label)
         ) as sp:
             _tag_seat_wait(sp, waited)
-            sp.set_attribute("cache", "miss")
+            sp.set_attribute("cache", reprobed)
             _tag_cache_key(sp, key)
             _exec_com([sys.executable, str(script)], label, log_stem=f"part-{stem}")
             _stamp_part_execution(stem)
@@ -2534,7 +2566,8 @@ def build_or_refresh(stem, dependencies, changed, targets):
         return
 
     with _com_seat(label) as waited:
-        if _reprobe_under_seat(cache_key, cache_outputs, label, probed):
+        reprobed = _reprobe_under_seat(cache_key, cache_outputs, label, probed)
+        if reprobed == "hit-after-wait":
             _stamp_assembly_execution(stem)
             _record_recipe_digest()
             return
@@ -2546,7 +2579,7 @@ def build_or_refresh(stem, dependencies, changed, targets):
             f"task {label}", label=label, service=_stage_name(label)
         ) as sp:
             _tag_seat_wait(sp, waited)
-            sp.set_attribute("cache", "miss")
+            sp.set_attribute("cache", reprobed)
             _tag_cache_key(sp, cache_key)
 
             target_missing = not Path(targets[0]).exists()
