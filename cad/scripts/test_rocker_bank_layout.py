@@ -215,8 +215,10 @@ def test_bar_foot_cheeks_clear_the_hub_at_the_worst_case(
     material and off the bore axis by the printed coaxiality's radius. The
     one-sided bands (user ruling 2026-09-26) put no term on the notch or the
     edge; the coaxiality note (Main 2026-09-26) spends 0.25 of the air."""
+    # (upper, lower) deviations: the notch deepens by its upper one, the edge
+    # drops by its lower one.
     notch_deeper = bar_notes.BOTTOM_NOTCH_DEPTH_BAND[0]
-    edge_lower = arm_notes.TOP_EDGE_BAND[1]
+    edge_lower = -arm_notes.TOP_EDGE_BAND[1]
     assert notch_deeper == edge_lower == 0.0
     worst = _cheek_cap(monkeypatch, notch_deeper, edge_lower)
     nominal = _cheek_cap(monkeypatch, 0.0, 0.0)
@@ -250,7 +252,7 @@ def test_the_one_sided_bands_lift_the_bar_at_most_1_mm_at_rest(
     1.0 at rest, a steady ~0.45 deg on its channel lever, and at most 0.0036
     of fundamental at any station (0.04 % of the d = 88 term), from the exact
     chain in error_budget (rocker_arm_notes states both)."""
-    notch_shallower = bar_notes.BOTTOM_NOTCH_DEPTH_BAND[1]
+    notch_shallower = -bar_notes.BOTTOM_NOTCH_DEPTH_BAND[1]
     edge_higher = arm_notes.TOP_EDGE_BAND[0]
     lift = notch_shallower + edge_higher
     assert lift == pytest.approx(1.0)

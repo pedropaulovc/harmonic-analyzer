@@ -62,10 +62,9 @@ def test_bottom_notch_depth_is_one_sided_shallow() -> None:
     hub one for one, so the depth may only come out shallow; the notes print
     the band from the one constant the cheek-over-hub test reads."""
     upper, lower = amplitude_bar_notes.BOTTOM_NOTCH_DEPTH_BAND
-    assert upper == 0.0 < lower
-    assert f"2.38 +0/-{lower:.2f} DEEP" in amplitude_bar_notes.DRAWING_NOTES.replace(
-        "\n", " "
-    )
+    assert lower < upper == 0.0
+    assert "2.38 +0/-0.50 DEEP" in amplitude_bar_notes.DRAWING_NOTES.replace("\n", " ")
+    assert f"+0/{lower:.2f} DEEP" in amplitude_bar_notes.DRAWING_NOTES
     assert bar.DRAWING_NOTES is amplitude_bar_notes.DRAWING_NOTES
 
 

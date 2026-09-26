@@ -18,7 +18,7 @@ from amplitude_bar_spec import BOTTOM_NOTCH_HEIGHT, TOP_PIN_HOLE_SPEC
 # for one. So the depth is one-sided, shallow only (user ruling 2026-09-26):
 # a shallow notch just lifts the bar at rest (rocker_arm_notes.TOP_EDGE_BAND
 # states the lift budget and its effect on the channel).
-BOTTOM_NOTCH_DEPTH_BAND = (0.0, 0.50)  # (upper, lower)
+BOTTOM_NOTCH_DEPTH_BAND = (0.0, -0.50)  # (upper, lower) deviations
 
 # The title-block QTY cell owns the 20-off count; notch orientation and
 # coplanarity are stated because no view resolves them at 1:4 (machinist
@@ -30,7 +30,7 @@ DRAWING_NOTES = "\n".join(
         "1. BAR SECTION 6.35 SQUARE.",
         # One-sided: the upper deviation is zero (tested).
         f"2. BOTTOM NOTCH 3.18 W x {BOTTOM_NOTCH_HEIGHT:.2f}"
-        f" +0/-{BOTTOM_NOTCH_DEPTH_BAND[1]:.2f} DEEP;",
+        f" +0/{BOTTOM_NOTCH_DEPTH_BAND[1]:.2f} DEEP;",
         "   TOP NOTCH 3.18 W x 12.70 DEEP;",
         "   BOTH THRU THE FULL DEPTH, OPEN TO",
         "   OPPOSITE ENDS, CENTRED ON THE WIDTH",

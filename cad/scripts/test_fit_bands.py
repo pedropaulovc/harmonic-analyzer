@@ -89,6 +89,10 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "tolerance and the fit-up mic limits"
     ),
     ("pinion_arbor_spec", "DRUM_LEN_BAND"): "indexed into the drum-length limits",
+    ("rocker_arm_spec", "PIVOT_HOLE_BAND"): (
+        "indexed into MHA-071 note 6's ream limits and the hub's wall floor "
+        "(HUB_DIA_MIN)"
+    ),
     ("pinion_handle_geometry", "ROD_DIA_BAND"): (
         "indexed by pinion_arbor_spec for the cross-rod fit limits"
     ),
