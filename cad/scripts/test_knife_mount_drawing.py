@@ -345,7 +345,7 @@ class _DisplayDimension:
         return self._texts.get(index, "")
 
     def GetPrimaryPrecision2(self) -> int:
-        return knife_mount_spec.DRAWING_REFERENCE_PRECISION["BossDia"]
+        return 2
 
 
 def _bind_like_makepy(obj: object, interface: str) -> object:
@@ -367,18 +367,10 @@ def test_sheet_dimension_readbacks_bind_the_annotation_before_calling_it(
     import draw_knife_mount as drawing
 
     monkeypatch.setattr(drawing, "_early_bound", _bind_like_makepy)
-    boss_m = knife_mount_spec.BOSS_DIA / 1000.0
-
-    plain = _DisplayDimension(boss_m, {1: "<MOD-DIAM>"}, ["Ø", "9.5"])
+    probe = _DisplayDimension(0.0, {}, ["x"])
     # Positive control: the unbound handle fails exactly as the farm leaf did.
     with pytest.raises(_MemberNotFound):
-        plain.GetAnnotation().GetSpecificAnnotation()
-    state = drawing._turned_diameter_state(plain.GetAnnotation(), boss_m)
-    assert not state["parenthesized"] and state["is_reference"]
-    assert state["value_m"] == boss_m and state["rendered"] == ["Ø", "9.5"]
-
-    wrapped = _DisplayDimension(boss_m, {1: "<MOD-DIAM>"}, ["(", "Ø9.5", ")"])
-    assert drawing._turned_diameter_state(wrapped.GetAnnotation(), boss_m)["parenthesized"]
+        probe.GetAnnotation().GetSpecificAnnotation()
 
     upper = _DisplayDimension(0.0, {}, ["Ø3.80 ▽ 14.65", "#10-24 UNC ▽ 10.95 MIN"])
     drawing._assert_callout_text_uppercase(upper, "tap")
@@ -455,3 +447,21 @@ def test_knife_mount_prints_the_o1_grade_and_its_hardness() -> None:
     assert "58-60 HRC" in row["finish"]
     assert "O1" in row["material_specification"]
     assert "58-60 HRC" in row["material_specification"]
+
+
+def test_turned_boss_dimensions_are_model_owned_on_the_section() -> None:
+    """Rules 2 and 7 (Main, 2026-09-25): the boss's Ø, height and location are
+    the part's own revolve-profile dimensions, imported onto Section A-A. No
+    sheet-created boss dimension and no drawing-owned boss precision remain."""
+    import draw_knife_mount as drawing
+
+    boss = {"BossFromEnd", "BossDia", "BossHeight"}
+    assert knife_mount_spec.DRAWING_DIMENSIONS["BossProfile"] == boss
+    assert "Boss" not in knife_mount_spec.DRAWING_DIMENSIONS
+    assert set(knife_mount_spec.DRAWING_PRECISION["BossProfile"]) == boss
+    assert "BossDia" not in knife_mount_spec.DRAWING_REFERENCE_PRECISION
+    assert "BossDia" not in knife_mount_spec.REFERENCE_DIMENSION_NOMINALS_MM
+    assert knife_mount_spec.DRAWING_NOMINALS_MM["BossDia"] == knife_mount_spec.BOSS_DIA
+    assert boss <= set(drawing.SECTION_KEEP)
+    assert not drawing.TOP_KEEP
+    assert set(drawing._BOSS_CONTROLLING_DIMENSIONS) == boss

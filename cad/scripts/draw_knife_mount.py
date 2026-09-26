@@ -24,7 +24,7 @@ from typing import Any, NamedTuple
 from win32com.client.dynamic import Dispatch as dynamic_dispatch
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
@@ -55,7 +55,6 @@ from knife_mount_spec import (
     BLK_BOT,
     BLK_TOP,
     BORE_CY,
-    BOSS_DIA,
     SEAT_TOP,
     DRAWING_DIMENSIONS,
     DRAWING_NOMINALS_MM,
@@ -277,29 +276,29 @@ FRONT_KEEP = {
     "BoreFromSide": (FRONT_CENTER[0] - 0.012, _front_y(SEAT_TOP) + 0.021),
 }
 SECTION_KEEP = {
-    # Above the seat boss and its turned diameter, between the block's
-    # end-face witness lines.
+    # The turned seat boss's revolve profile lies in this section's plane, so
+    # its own Ø, height and end-face location import here (policy rules 2 and
+    # 7). Above the boss: the Ø between its flanks, then the block depth.
     "Depth": (SECTION_CENTER[0], _front_y(SEAT_TOP) + 0.020),
+    "BossDia": (SECTION_CENTER[0], _front_y(SEAT_TOP) + 0.009),
     # The boss height beside the section's right outline, where the cut shows
     # the boss and the tap drilled through it.
     "BossHeight": (
         SECTION_CENTER[0] + 0.030,
         (_front_y(BLK_TOP) + _front_y(SEAT_TOP)) / 2.0,
     ),
-}
-TOP_KEEP: dict[str, tuple[float, float]] = {
-    # The boss's (and its concentric tap's) thickness-direction location is the
-    # model's own equation-owned dimension (see _dimension_boss_from_end in
-    # build_knife_mount), measured from the block's near end edge, which the
-    # top view draws as its UPPER outline. Text at the midpoint of that span
-    # (boss centreline -> upper edge), between the witness lines: knife-cc-5
-    # parked the old tap locator at the centre->lower-edge midpoint and the
-    # dimension line ran out past its own witness line to reach the text.
+    # The boss axis from the block's near end face, below the section: the
+    # profile's centerline runs to the block bottom, so both witness lines
+    # leave the part downward, clear of the boss and its Ø above. Text at the
+    # midpoint of that span (axis -> near end face).
     "BossFromEnd": (
-        TOP_CENTER[0] - 0.035,
-        TOP_CENTER[1] + SUPPORT_Z_THICK * SHEET_SCALE[0] / 4000.0,
+        SECTION_CENTER[0] - SUPPORT_Z_THICK * SHEET_SCALE[0] / 4000.0,
+        _front_y(BLK_BOT) - 0.012,
     ),
 }
+# The top view keeps only the tap callout and the (12.0) reference: the boss
+# and tap location is on the section with the rest of the turned boss.
+TOP_KEEP: dict[str, tuple[float, float]] = {}
 # Drawing policy rule 6/7: a process word is allowed where it IS the
 # requirement. The Ø12 knife-bearing bore carries Ra 1.6, which a drill does
 # not leave and a reamer does -- REAM is the requirement (Main, 2026-09-22,
@@ -358,37 +357,48 @@ def _assert_callout_text_uppercase(display: Any, label: str) -> None:
         raise RuntimeError(f"{label} does not print an uppercase MIN: {texts!r}")
 
 
-def _assert_boss_from_end_prints_plain(adapter: Any, annotations: list[Any]) -> None:
-    """The imported 9.0 is a controlling dimension, not a reference read.
+# The turned boss's controlling dimensions, all imported onto Section A-A.
+_BOSS_CONTROLLING_DIMENSIONS = ("BossFromEnd", "BossDia", "BossHeight")
 
-    The model's BossFromEnd reads swDimensionDriven once its equation owns it,
-    exactly like BlockWidth/Depth (knife-cc-5), so DrivenState cannot tell a
-    reference from an equation-owned dimension. What the machinist reads can:
-    no reference flag, no parentheses flag, no "(" / ")" text around the value.
+
+def _assert_boss_dimensions_print_plain(adapter: Any, annotations: list[Any]) -> None:
+    """The imported boss dimensions are controlling, not reference reads.
+
+    Equation-owned model dimensions read swDimensionDriven (BlockWidth/Depth
+    alike, knife-cc-5), so DrivenState cannot tell a reference from a control.
+    What the machinist reads can: no reference flag, no parentheses flag, no
+    "(" / ")" text around the value; and BossDia, a doubled centerline
+    dimension, must still read diametric.
     """
-    matches = [
-        annotation
-        for annotation in annotations
-        if dimension_name(adapter, annotation) == "BossFromEnd"
-    ]
-    if len(matches) != 1:
-        raise RuntimeError(f"top view carries {len(matches)} BossFromEnd dimensions")
-    display = _early_bound(matches[0].GetSpecificAnnotation(), "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    prefix = str(display.GetText(1) or "")  # swDimensionTextPrefix
-    suffix = str(display.GetText(2) or "")  # swDimensionTextSuffix
-    if (
-        bool(dimension.IsReference())
-        or bool(display.ShowParenthesis)
-        or "(" in prefix
-        or ")" in suffix
-    ):
-        raise RuntimeError(
-            "BossFromEnd prints as a reference dimension: "
-            f"is_reference={bool(dimension.IsReference())}, "
-            f"show_parenthesis={bool(display.ShowParenthesis)}, "
-            f"prefix={prefix!r}, suffix={suffix!r}"
-        )
+    for name in _BOSS_CONTROLLING_DIMENSIONS:
+        matches = [
+            annotation
+            for annotation in annotations
+            if dimension_name(adapter, annotation) == name
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(f"section carries {len(matches)} {name} dimensions")
+        display = _early_bound(matches[0].GetSpecificAnnotation(), "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        prefix = str(display.GetText(1) or "")  # swDimensionTextPrefix
+        suffix = str(display.GetText(2) or "")  # swDimensionTextSuffix
+        state = {
+            "is_reference": bool(dimension.IsReference()),
+            "show_parenthesis": bool(display.ShowParenthesis),
+            "prefix": prefix,
+            "suffix": suffix,
+            "diametric": bool(_read_member(display, "Diametric")),
+        }
+        _telemetry.info(f"section {name}: {state!r}")
+        if (
+            state["is_reference"]
+            or state["show_parenthesis"]
+            or "(" in prefix
+            or ")" in suffix
+        ):
+            raise RuntimeError(f"{name} prints as a reference dimension: {state!r}")
+        if name == "BossDia" and not state["diametric"]:
+            raise RuntimeError(f"BossDia lost its diametric display: {state!r}")
 
 
 def _assert_imported_nominals(adapter: Any, annotations: list[Any]) -> None:
@@ -435,134 +445,6 @@ def _finish_tap_reference_dimension(
     return display
 
 @_telemetry.traced("drawing.knife_mount_boss_diameter")
-def _add_boss_turned_diameter(
-    adapter: Any, drawing_model: Any, section: Any, model_boss_dia_m: float
-) -> Any:
-    """Print the lathe-turned seat boss as a diameter on the side view.
-
-    Drawing policy rule 7: a turned diameter is dimensioned on the side view,
-    not leader-piled on the end (circle) view -- the only view the model's
-    circle dimension can import into. Section A-A cuts the boss on its axis,
-    so its two flanks are the diameter's extremes: dimension flank to flank,
-    prefix the diameter symbol, read the measured value back. Plain, not a
-    reference: it is the boss's controlling size at the title-block .X band.
-
-    A dimension created on the sheet is driven (IsReference reads True by
-    construction), so SolidWorks encloses it in parentheses. Precedent: the
-    stud's 45 deg -- parentheses OFF, read back on a fresh handle together with
-    the rendered text, value gated against the model's own BossDia. Its band is
-    the title block's .X, so no tolerance is written. If the per-dimension
-    switch does not clear the parentheses, this drawing's own "Add parentheses
-    by default" document property is cleared and the switch re-applied
-    (knife-cc-15 failed with the parentheses still on).
-    """
-    half = BOSS_DIA * SHEET_SCALE[0] / 2000.0
-    flank_y = (_front_y(BLK_TOP) + _front_y(SEAT_TOP)) / 2.0
-    label = "seat boss turned diameter"
-    display = add_edge_dimension(
-        adapter,
-        section,
-        p0=(SECTION_CENTER[0] - half, flank_y),
-        p1=(SECTION_CENTER[0] + half, flank_y),
-        # Between the boss top and the 18.0 Depth line above it.
-        text_xy=(SECTION_CENTER[0], _front_y(SEAT_TOP) + 0.009),
-        label=label,
-        orientation="horizontal",
-    )
-    display = _sw_type_info.early_bound_or_flag(display, "IDisplayDimension", "SetText")
-    display.SetText(1, "<MOD-DIAM>")  # swDimensionTextPrefix
-    display.SetPrecision3(DRAWING_REFERENCE_PRECISION["BossDia"], -1, -1, -1)
-    # Bound before any call: on a late-bound IAnnotation, pywin32 reads
-    # GetSpecificAnnotation as a property get and then calls the returned
-    # dimension -- 'Member not found' (knife-cc-16).
-    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-    if annotation is None:
-        raise RuntimeError(f"{label}: dimension has no annotation")
-    display.ShowParenthesis = False
-    rebuild_drawing(adapter, label=label)
-    state = _turned_diameter_state(annotation, model_boss_dia_m)
-    _telemetry.info(f"{label} (per-dimension switch): {state!r}")
-    if state["parenthesized"]:
-        _clear_driven_parentheses_default(drawing_model)
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        display.ShowParenthesis = False
-        rebuild_drawing(adapter, label=label)
-        state = _turned_diameter_state(annotation, model_boss_dia_m)
-        _telemetry.info(f"{label} (document default cleared): {state!r}")
-    problems = []
-    if abs(state["value_m"] - model_boss_dia_m) > _MODEL_VALUE_TOLERANCE_M:
-        problems.append(
-            f"measured {state['value_m'] * 1000.0!r} mm, model BossDia "
-            f"{model_boss_dia_m * 1000.0!r} mm"
-        )
-    if state["places"] != DRAWING_REFERENCE_PRECISION["BossDia"]:
-        problems.append(f"precision {state['places']}")
-    if "DIAM" not in state["prefix"]:
-        problems.append(f"prefix {state['prefix']!r}")
-    if state["parenthesized"]:
-        problems.append("still prints in parentheses")
-    if problems:
-        raise RuntimeError(f"{label}: " + "; ".join(problems) + f": {state!r}")
-    return _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-
-
-# A drawn-edge dimension and the model's own parameter measure the same
-# B-rep: agreement to 1e-9 m (the stud's FINISHED_VALUE_TOLERANCE_M).
-_MODEL_VALUE_TOLERANCE_M = 1e-9
-# swUserPreferenceToggle_e.swDetailingDimsShowParenthesisByDefault, read off
-# this install's swconst.tlb (R2026x gen_py) -- the drawing subprocess has no
-# swconst constants loaded (knife-cc-14).
-_SHOW_PARENTHESIS_BY_DEFAULT = 48
-
-
-def _read_model_boss_diameter_m(adapter: Any) -> float:
-    """The source part's BossDia, read before the drawing opens."""
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    parameter = model.Parameter("BossDia@BossProfile")
-    if parameter is None:
-        raise RuntimeError("source part has no BossDia@BossProfile dimension")
-    return abs(float(_early_bound(parameter, "IDimension").SystemValue))
-
-
-def _turned_diameter_state(annotation: Any, model_boss_dia_m: float) -> dict[str, Any]:
-    """Value, places, prefix and rendered text on a fresh handle."""
-    annotation = _early_bound(annotation, "IAnnotation")
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
-    rendered = [
-        str(data.GetTextAtIndex(index) or "")
-        for index in range(int(data.GetTextCount()))
-    ]
-    prefix = str(display.GetText(1) or "")  # swDimensionTextPrefix
-    suffix = str(display.GetText(2) or "")  # swDimensionTextSuffix
-    show_parenthesis = bool(display.ShowParenthesis)
-    return {
-        "value_m": abs(float(dimension.SystemValue)),
-        "model_m": model_boss_dia_m,
-        "places": int(display.GetPrimaryPrecision2()),
-        "prefix": prefix,
-        "suffix": suffix,
-        "rendered": rendered,
-        "show_parenthesis": show_parenthesis,
-        # Logged, not gated: a sheet-created dimension is driven by construction.
-        "is_reference": bool(dimension.IsReference()),
-        "parenthesized": show_parenthesis
-        or any("(" in text or ")" in text for text in (prefix, suffix, *rendered)),
-    }
-
-
-def _clear_driven_parentheses_default(drawing_model: Any) -> None:
-    """Clear 'Add parentheses by default' on THIS drawing only, read back."""
-    name = "swDetailingDimsShowParenthesisByDefault"
-    extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
-    if not extension.SetUserPreferenceToggle(_SHOW_PARENTHESIS_BY_DEFAULT, 0, False):
-        raise RuntimeError(f"failed to clear {name}")
-    if bool(extension.GetUserPreferenceToggle(_SHOW_PARENTHESIS_BY_DEFAULT, 0)):
-        raise RuntimeError(f"{name} did not clear")
-    _telemetry.info(f"{name} cleared on this drawing")
-
-
 def _assert_imported_tolerances(adapter: Any, annotations: list[Any]) -> None:
     # BoreDia keeps its native symmetric band (swTolSYMMETRIC 4); BoreFromTop
     # rides the title block's .XX (swTolNONE 0), so it must import bare.
@@ -1029,7 +911,6 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     source_tap_contracts = _read_source_tap_depth_contracts(adapter)
-    model_boss_dia_m = _read_model_boss_diameter_m(adapter)
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -1090,7 +971,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _assert_imported_nominals(adapter, dimensions)
     _assert_imported_tolerances(adapter, dimensions)
     assert_imported_precision(adapter, dimensions, DRAWING_PRECISION_BY_NAME)
-    _assert_boss_from_end_prints_plain(adapter, top_annotations)
+    _assert_boss_dimensions_print_plain(adapter, section_annotations)
 
     # The Ø12.00 THRU callout is leader-attached, so SOLIDWORKS drew its
     # dimension leader-line pair straight across the bore circle. Suppress the
@@ -1120,8 +1001,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # common-axis/mid-plane construction, derived from the actual finished
     # edges and the actual Hole Wizard circle: a sheet-side location with no
     # second driving acceptance requirement. Its thickness-direction location
-    # is the concentric seat boss's own equation-owned BossFromEnd (kept in
-    # TOP_KEEP above), printed as a controlling 9.0, not a '(9.0)' reference.
+    # is the concentric seat boss's own equation-owned BossFromEnd (on the
+    # section, SECTION_KEEP above), a controlling 9.0, not a '(9.0)' reference.
     tap_radius_sheet = STUD_TAP_DIA * SHEET_SCALE[0] / 2000.0
     tap_from_side = add_edge_dimension(
         adapter,
@@ -1147,7 +1028,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="hanger tap from finished side",
     )
 
-    _add_boss_turned_diameter(adapter, drawing_model, section, model_boss_dia_m)
 
     # Native Hole Wizard callout owns the thread size/class and blind depth.
     tap_callout = add_native_hole_callout(
@@ -1158,6 +1038,9 @@ async def build(adapter: Any) -> dict[str, str]:
         # right outline (sheet x 0.169), which dropping '- 2B' had exposed.
         callout_xy=(0.200, TOP_CENTER[1] + 0.013),
         label="hanger-stud blind tap",
+        # Policy rule 7: a hole callout states its process; the tap drill's
+        # line reads DRILL Ø3.80 ↧ 14.65 (local Codex on #822, Main 2026-09-25).
+        process="DRILL",
     )
     _propagate_source_tap_depth_contracts(
         adapter, tap_callout, source_tap_contracts

@@ -130,8 +130,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "BoreDia",
     },
     "Block": {"Depth"},
-    "BossProfile": {"BossFromEnd"},
-    "Boss": {"BossHeight"},
+    # The turned seat boss's revolve profile lies in Section A-A's plane, so
+    # its Ø, height and end-face location all import onto the section (rule 7).
+    "BossProfile": {"BossFromEnd", "BossDia", "BossHeight"},
 }
 
 # Decimal places carry the ordinary size tolerance and therefore live on the
@@ -143,8 +144,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # BossFromEnd prints one place: it locates the boss (and the tap concentric
 # with it) from ONE end face, and its .X band still leaves both axial walls
 # >= 1.2 mm (test_end_located_hanger_tap_retains_axial_wall_at_limits). The
-# boss height prints one place too: the interface derives the boss height, gap
-# and clearances from the .X band.
+# boss Ø and height print one place too: the interface derives the boss height,
+# gap and clearances from the .X band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {
         "BlockWidth": 1,
@@ -154,8 +155,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BoreDia": 2,
     },
     "Block": {"Depth": 1},
-    "BossProfile": {"BossFromEnd": 1},
-    "Boss": {"BossHeight": 1},
+    "BossProfile": {"BossFromEnd": 1, "BossDia": 1, "BossHeight": 1},
 }
 
 if (
@@ -186,20 +186,16 @@ DRAWING_NOMINALS_MM: dict[str, float] = {
     "BoreFromTop": BORE_FROM_TOP,
     "BoreFromSide": BLK_HALF_X,
     "BossHeight": BOSS_HEIGHT,
+    "BossDia": BOSS_DIA,
     "BossFromEnd": SUPPORT_Z_THICK / 2.0,
 }
 # Sheet-side dimensions: measured on the view, never model-imported.
-# TapFromSide is a parenthesized reference. BossDia is the lathe-turned boss
-# printed as a turned diameter on the side (section) view per drawing policy
-# rule 7; the model's circle dimension only reads on the end view, where rule 7
-# forbids leader-piled diameters. It prints plain, at the interface's .X band.
+# TapFromSide is a parenthesized reference.
 REFERENCE_DIMENSION_NOMINALS_MM = {
     "TapFromSide": BLK_HALF_X,
-    "BossDia": BOSS_DIA,
 }
 DRAWING_REFERENCE_PRECISION = {
     "TapFromSide": 1,  # a read of BoreFromSide's centreline, same precision
-    "BossDia": 1,  # .X: knife_hanger_interface.BOSS_DIA_DEVIATIONS_MM
 }
 # Hole Wizard depth places (policy rule 2's callout exception): SetPrecision3
 # cannot reach a callout's per-variable places, so the part build writes these

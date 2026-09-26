@@ -78,6 +78,7 @@ from summing_lever_spec import HEX_H, HEX_W
 from _holes import blind_hole_volume_mm3, find_planar_face, wizard_holes
 from _drawing_marks import (
     _named_dimension,
+    add_diametric_linear_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -396,7 +397,6 @@ _DIMENSION_DRIVEN = 1
 # the near end edge (DISTANCE 1); a coincident (9) would own the thickness DOF
 # instead. The tap placement point is coincident (9) with the origin, which the
 # BossFromEnd equation keeps at the boss centre.
-_BOSS_CENTRE_RELATIONS = {26, 1}  # VERTPOINTS, DISTANCE
 _COINCIDENT = 9
 _SW_FULLY_CONSTRAINED = 3  # swConstrainedStatus_e
 
@@ -483,77 +483,55 @@ def _assert_boss_from_end(dimension: Any) -> None:
         )
 
 
-def _block_near_end_top_edge(model: Any) -> Any:
-    """The block top face's edge on the near (z = -Depth/2) end face.
+def _block_near_end_face(model: Any) -> Any:
+    """The block's near (z = -Depth/2) end face, by enumeration.
 
-    Picked inside the top face by endpoint midpoint -- never by coordinate
-    SelectByID2, which mis-resolves on end faces (see _holes's header).
+    Never coordinate SelectByID2, which mis-resolves on end faces (see
+    _holes's header).
     """
-    top_face = find_planar_face(model, (0.0, 1.0, 0.0), [[0.0, BLK_TOP, 0.0]])
-    if top_face is None:
-        raise RuntimeError("seat boss: block top face not found")
-    for raw_edge in top_face.GetEdges() or ():
-        edge = _early_bound(raw_edge, "IEdge")
-        ends = [
-            tuple(float(value) for value in _early_bound(v, "IVertex").GetPoint())
-            for v in (edge.GetStartVertex(), edge.GetEndVertex())
-            if v is not None
-        ]
-        if len(ends) != 2:
-            continue
-        mid = [sum(pair) / 2.0 for pair in zip(*ends)]
-        if abs(mid[0]) < 1e-7 and abs(mid[2] + SUPPORT_Z_THICK / 2000.0) < 1e-7:
-            return edge
-    raise RuntimeError("seat boss: block near end edge not found")
+    face = find_planar_face(
+        model,
+        (0.0, 0.0, -1.0),
+        [[0.0, (BLK_TOP + BLK_BOT) / 2.0, -SUPPORT_Z_THICK / 2.0]],
+    )
+    if face is None:
+        raise RuntimeError("seat boss: block near end face not found")
+    return face
 
 
-def _dimension_boss_from_end(adapter: Any, boss: str) -> None:
+def _dimension_boss_from_end(adapter: Any, axis: str) -> None:
     """Author the boss's thickness-direction location as a DRIVING sketch dim.
 
-    Called inside the open boss sketch, which lies in the block top face's
-    plane. The boss centre is held on the bore centreline by one vertical
-    relation; this dimensions it from the block's near END edge -- 9.0 mm,
-    from the outer face the machinist asked for (knife-cc-5), owned by the
-    model like every other marked dim. The tap is concentric with the boss.
+    Called inside the open boss profile sketch on the Right plane. This
+    dimensions the boss's revolve centerline from the block's near END face:
+    9.0 mm, from the outer face the machinist asked for (knife-cc-5), owned by
+    the model like every other marked dim. The tap is concentric with the boss.
+    The text sits below the block so the section prints the 9.0 there, clear
+    of the boss's diameter above it.
     """
-    from solidworks_mcp.adapters.solidworks.sketch import _resolve_entity_ref
+    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
 
     model = adapter.currentModel
-    point = _early_bound(_resolve_entity_ref(adapter, f"{boss}.center"), "ISketchPoint")
-    near_edge = _block_near_end_top_edge(model)
+    near_face = _block_near_end_face(model)
     # SolidWorks resets swInputDimValOnCreate on every sketch entry: the Modify
     # dialog would block the unattended session (the same per-call re-assert
     # the adapter's add_sketch_dimension makes).
     adapter._attempt(lambda: adapter.swApp.SetUserPreferenceToggle(10, False))
     adapter._attempt(lambda: adapter.swApp.SetUserPreferenceToggle(372, False))
     adapter._attempt(lambda: adapter.swApp.SetUserPreferenceToggle(520, False))
-    # Raw COM, narrowly: adapter.add_sketch_dimension cannot dimension a point
-    # against an EDGE -- its distance types hard-require two point refs
-    # (sketch.py:1467-1490) and this 9.0 must measure to the block's near end
-    # edge. Mixed selection is the same shape as that helper's own
-    # _try_create_angular_dimension (sketch.py:1508-1548).
+    # Raw COM, narrowly: adapter.add_sketch_dimension only dimensions sketch
+    # refs, and this 9.0 must measure to the block's near end FACE.
     model.ClearSelection2(True)
-    if not adapter._select_sketch_entity(point, append=False):
-        raise RuntimeError("seat boss: centre point selection failed")
-    if not _early_bound(near_edge, "IEntity").Select2(True, 0):
-        raise RuntimeError("seat boss: near end edge selection failed")
-    text = (0.0, BLK_TOP / 1000.0, -SUPPORT_Z_THICK / 4000.0)
+    _select_sketch_entities(adapter, [axis], 0)
+    if not _early_bound(near_face, "IEntity").Select2(True, 0):
+        raise RuntimeError("seat boss: near end face selection failed")
+    text = (0.0, (BLK_BOT - 5.0) / 1000.0, -SUPPORT_Z_THICK / 4000.0)
     display = adapter._attempt(lambda: model.AddDimension2(*text), default=None)
     if display is None:
-        display = adapter._attempt(
-            lambda: model.Extension.AddDimension(
-                *text, adapter.constants["swSmartDimensionDirectionUp"]
-            ),
-            default=None,
-        )
-    if display is None:
         raise RuntimeError("seat boss: boss-from-end dimension did not insert")
-    dimension = (
-        adapter._attempt(lambda: display.GetDimension2(0), default=None)
-        or adapter._attempt(lambda: display.GetDimension(), default=None)
-        or display
+    dimension = _early_bound(
+        _early_bound(display, "IDisplayDimension").GetDimension2(0), "IDimension"
     )
-    dimension = _early_bound(dimension, "IDimension")
     target_m = SUPPORT_Z_THICK / 2000.0
     if (
         adapter._attempt(
@@ -608,10 +586,10 @@ def _assert_boss_and_tap_contract(adapter: Any) -> None:
     owner and it is not a reference dimension: exactly one equation drives
     ``BossFromEnd``, the dimension reads the same equation-owned state as the
     BlockWidth control (see ``_DIMENSION_DRIVEN``), IsReference() is False, the
-    boss sketch is fully defined with the centre held by the vertical relation
-    plus the 9.0 (no coincident owns the DOF), and the tap's placement point is
-    coincident with the origin station on the boss axis. The drawing proves the
-    sheet prints the 9.0 unparenthesized.
+    boss profile is fully defined (the 9.0 is the only thing locating its
+    centerline, or the sketch would read over-defined), and the tap's placement
+    point is coincident with the origin station on the boss axis. The drawing
+    proves the sheet prints the 9.0 unparenthesized.
     """
     part = _early_bound(adapter.currentModel, "IPartDoc")
     boss_feature = part.FeatureByName("BossProfile")
@@ -648,12 +626,6 @@ def _assert_boss_and_tap_contract(adapter: Any) -> None:
         problems.append("BossFromEnd's state differs from the BlockWidth control")
     if evidence["is_reference"]:
         problems.append("BossFromEnd became a reference dimension")
-    if not _BOSS_CENTRE_RELATIONS <= set(boss_relations):
-        problems.append(
-            f"boss relations {boss_relations} lack {sorted(_BOSS_CENTRE_RELATIONS)}"
-        )
-    if _COINCIDENT in boss_relations:
-        problems.append("a coincident relation owns the boss centre")
     if evidence["boss_constrained_status"] != _SW_FULLY_CONSTRAINED:
         problems.append("boss sketch is not fully defined")
     if _COINCIDENT not in tap_relations:
@@ -672,7 +644,7 @@ def _assert_boss_and_tap_contract(adapter: Any) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
 
@@ -800,47 +772,90 @@ async def build(adapter) -> dict[str, str]:
 
     # 2. Hanger-stud seat boss (knife_hanger_interface option D, user
     # 2026-09-22): a round boss rising from the block top into the casting's
-    # hanger-stud hole; its top is the stud shoulder's seat plane. The sketch
-    # lies in the block top face's plane: the centre is held on the bore
-    # centreline and located 9.0 from the block's near end edge (BossFromEnd,
-    # equation-owned like the old tap locator), and the tap below is concentric.
-    check(
-        "create_plane block top",
-        await adapter.create_plane(
-            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=BLK_TOP)
-        ),
-    )
-    name_last_feature(adapter, "BlockTopPlane")
+    # hanger-stud hole; its top is the stud shoulder's seat plane. It is a
+    # TURNED feature and is modelled as one: its half-profile on the Right
+    # plane -- the plane Section A-A cuts -- revolved about a centerline on the
+    # tap axis. The profile owns the boss's driving Ø (a doubled centerline
+    # dimension), its height and its 9.0 location from the block's near end
+    # face, so the section imports all three verbatim (drawing-simplicity rules
+    # 2 and 7; Main 2026-09-25 replaced the sheet-side Ø). The centerline runs
+    # down to the block bottom so the 9.0's witness line leaves the part below
+    # the section, clear of the boss.
     boss_dims = SketchDims()
-    check("create_sketch seat boss", await adapter.create_sketch("BlockTopPlane"))
+    check("create_sketch seat boss", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     try:
-        boss_result = await adapter.add_circle(0.0, 0.0, BOSS_DIA / 2.0)
+        boss_axis = check(
+            "seat-boss axis",
+            await adapter.add_centerline(0.0, BLK_BOT, 0.0, SEAT_TOP),
+        )
+        boss_pts = [
+            (0.0, BLK_TOP),
+            (BOSS_DIA / 2.0, BLK_TOP),
+            (BOSS_DIA / 2.0, SEAT_TOP),
+            (0.0, SEAT_TOP),
+        ]
+        boss_lines = await add_line_chain(adapter, boss_pts)
     finally:
         set_sketch_direct_db(adapter, False)
-    boss = check("add seat-boss circle", boss_result)
-    check(
-        "seat boss on the bore centreline",
-        await adapter.add_sketch_constraint(f"{boss}.center", "origin", "vertical_points"),
+    boss_base, boss_flank, boss_top, boss_axis_edge = boss_lines
+    for line, direction in (
+        (boss_axis, "vertical"),
+        (boss_base, "horizontal"),
+        (boss_flank, "vertical"),
+        (boss_top, "horizontal"),
+        (boss_axis_edge, "vertical"),
+    ):
+        check(
+            f"seat boss {direction} {line}",
+            await adapter.add_sketch_constraint(line, None, direction),
+        )
+    await dimension_between(
+        adapter,
+        f"{boss_axis}.start",
+        "origin",
+        "vertical_distance",
+        -BLK_BOT,
+        "seat-boss axis foot",
     )
-    check(
-        "dimension seat-boss diameter",
-        await adapter.add_sketch_dimension(boss, None, "diameter", BOSS_DIA),
+    boss_dims.record("BossAxisFoot", '-"BlkBot"')
+    await dimension_between(
+        adapter,
+        f"{boss_base}.start",
+        "origin",
+        "vertical_distance",
+        BLK_TOP,
+        "seat-boss base on the block top",
+    )
+    boss_dims.record("BossBaseY", '"BlkTop"')
+    await dimension_between(
+        adapter,
+        f"{boss_flank}.start",
+        f"{boss_flank}.end",
+        "vertical_distance",
+        BOSS_HEIGHT,
+        "seat-boss height",
+    )
+    boss_dims.record("BossHeight", '"BossHeight"')
+    await add_diametric_linear_dimension(
+        adapter,
+        boss_axis,
+        boss_flank,
+        (BOSS_DIA, (BLK_TOP + SEAT_TOP) / 2.0),
+        "seat-boss diameter",
     )
     boss_dims.record("BossDia", '"BossDia"')
-    _dimension_boss_from_end(adapter, boss)
+    _dimension_boss_from_end(adapter, boss_axis)
     boss_dims.record("BossFromEnd", '"SupportZThick" / 2')
     await ensure_fully_defined(adapter, "seat-boss profile")
     check("exit_sketch seat boss", await adapter.exit_sketch())
     name_last_feature(adapter, "BossProfile")
     drive_jobs += boss_dims.apply(adapter, "BossProfile")
     check(
-        "extrude seat boss",
-        await adapter.create_extrusion(ExtrusionParameters(depth=BOSS_HEIGHT)),
+        "revolve seat boss",
+        await adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
     name_last_feature(adapter, "Boss")
-    boss_height_dim = name_dimensions(adapter, "Boss", ["BossHeight"])
-    drive_jobs += [(boss_height_dim[0], '"BossHeight"')]
     expected += math.pi * (BOSS_DIA / 2.0) ** 2 * BOSS_HEIGHT
     vol = await _volume(adapter)
     _telemetry.info(f"volume after seat boss: {vol:.1f} mm^3 (analytic {expected:.1f})")
@@ -962,13 +977,13 @@ async def build(adapter) -> dict[str, str]:
 
 
 def _hide_reference_geometry(adapter: Any, knife_axis: str) -> None:
-    """Hide the boss sketch plane and the knife axis from renders and assemblies.
+    """Hide the knife axis from renders and assemblies.
 
-    Both stay selectable by name (the summing assembly mates the lever ridge to
+    It stays selectable by name (the summing assembly mates the lever ridge to
     the knife axis); no drawing view dimensions to either. They shipped shown
     and leaked into the isometric and the summing assembly (asm census).
     """
-    references = (("BlockTopPlane", "PLANE"), (knife_axis, "AXIS"))
+    references = ((knife_axis, "AXIS"),)
     blank_reference_geometry(adapter, references)
     model = _early_bound(adapter.currentModel, "IPartDoc")
     shown = {}
