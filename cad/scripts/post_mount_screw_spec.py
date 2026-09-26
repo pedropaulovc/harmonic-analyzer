@@ -12,8 +12,11 @@ so the length prints as a REFERENCE and each screw is cut to its own hole at
 assembly.
 
 The engagement this leaves is the named rule-12 exception in
-``cad/docs/drawing-simplicity-policy.md``; it is held here as a model
-assert, not printed on the part sheet.
+``cad/docs/drawing-simplicity-policy.md``.  The sheet states it as a plain
+fact, "ENGAGEMENT 0.90D MIN", the last line of the cut-length callout
+(CUT_TO_FIT_CALLOUT), formatted from the floored worst case
+POST_MOUNT_ENGAGEMENT_PRINTED; the asserts below still guard that value and
+the nominal chain.
 """
 
 from __future__ import annotations

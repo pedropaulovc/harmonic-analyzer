@@ -24,9 +24,11 @@ label owned by the view, and a circle and letter "A" on the Front at the
 tip.  The Front is re-activated before the notes so they do not land in
 the tip view.  The only
 note says to deburr the cut end and that the
-undimensioned purchased geometry is reference.  No installation sequence, engagement figure or rule
-number is printed: the sequence is an MHA-A03 assembly step and the
-engagement a model assert (Main's eye pass of warm-c486, policy rule 6).
+undimensioned purchased geometry is reference.  No installation sequence or rule number is
+printed: the sequence is an MHA-A03 assembly step (Main's eye pass of
+warm-c486, policy rule 6).  The engagement minimum prints as a plain fact,
+"ENGAGEMENT 0.90D MIN", on the cut-length callout's last line, never in a
+note; the spec's asserts still guard its value.
 
 Run with SolidWorks open::
 

@@ -454,8 +454,9 @@ def test_finish_oils_the_bare_cut_end() -> None:
 def test_sheet_notes_carry_no_dimension_rule_or_sequence() -> None:
     """Main's eye pass of warm-c486 (rule 6): the old INSTALLATION block
     printed "(NOMINAL 86.0)", "0.90D MIN" and "NAMED EXCEPTION TO RULE 12".
-    The cut length is now a reference dimension, engagement a model assert
-    and the sequence an MHA-A03 step, so no part note carries a number."""
+    The cut length is now a reference dimension, the engagement minimum a
+    line of its callout (never a note) and the sequence an MHA-A03 step, so
+    no part note carries a number."""
     row = _config.parts(part.PART_NAME)
     assert "installation_notes" not in row
     notes = spec.MANUFACTURING_NOTES
@@ -467,7 +468,9 @@ def test_sheet_notes_carry_no_dimension_rule_or_sequence() -> None:
 
 
 def test_engagement_exception_is_held_by_the_model() -> None:
-    """The named rule-12 exception (0.90D) is a model assert on the chain."""
+    """The named rule-12 exception (0.90D) is a model assert on the chain;
+    the sheet prints it on the cut-length callout
+    (test_engagement_minimum_prints_on_the_cut_length_callout)."""
     assert spec.MIN_ENGAGEMENT_DIAMETERS == 0.90
     assert spec.ENGAGEMENT_NOMINAL_MM == spec.CUT_LENGTH_MM - GRIP
     assert spec.ENGAGEMENT_NOMINAL_MM / part.SHANK_DIA >= 0.90
