@@ -1,7 +1,7 @@
 r"""Create the cone-gear-shaft manufacturing drawing under the simplicity policy.
 
 The turned shaft is shown horizontally at 1:1 with baseline lengths from the
-large (faced) end below it and every diameter above it on that same side
+collar's thrust face below it and every diameter above it on that same side
 view, each dimension line inside the land it measures.  The two short lands
 ahead of the tip are 6.9 mm long, so the three tip-end diameter texts climb
 in steps: the tip's line rises highest and each text hangs to the RIGHT of
@@ -28,6 +28,7 @@ from _drawing_common import (
     DrawingOutputs,
     _model_item_paths,
     _select_model_feature,
+    add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
@@ -37,6 +38,7 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_reference_dimension,
     stamp_drawing_summary,
     view_name,
     visible_view_entities,
@@ -44,6 +46,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from cone_gear_shaft_spec import (
+    DRAWING_REFERENCE_PRECISION,
     FILLET_CALLOUT,
     JOURNAL_DIA,
     SECTION_DIAS,
@@ -97,22 +100,24 @@ DONOR_CENTER = (0.360, 0.090)
 # 0.2096.  Everything measured from it is baseline below the shaft, one tier
 # per dimension, the shortest nearest the part: the collar web (text outside
 # its 1.68 span, left of the datum), the T120 solder station, the three
-# gear-seat shoulders, then the T006 station with its 20X EQ SP.  The journal
-# runs the other way from the same origin on the first tier, and the overall
-# length hangs lowest, above the title block.  Each station's text is centred
-# in its span.  The one radius rides above the 3/8-to-1/4 in step it attaches
-# to (the fillet's first edge), right of the Ø6.350 line.
+# gear-seat shoulders, the T006 station with its 20X EQ SP, then the tip
+# (#917 R5 (a)).  The journal runs the other way from the same origin on the
+# first tier, and the front-to-tip overall, a reference, hangs lowest, above
+# the title block.  Each station's text is centred in its span.  The one
+# radius rides above the 3/8-to-1/4 in step it attaches to (the fillet's
+# first edge), right of the Ø6.350 line.
 SIDE_KEEP = {
     "CollarWidth": (0.2020, 0.1355),
     "Sec0End": (0.2311, 0.1355),
-    "T120Station": (0.2042, 0.1265),
-    "Sec1End": (0.1492, 0.1175),
-    "Sec2End": (0.1457, 0.1085),
-    "Sec3End": (0.1423, 0.0995),
-    "T006Station": (0.1388, 0.0905),
-    "Sec4End": (0.1515, 0.0815),
+    "T120Station": (0.2042, 0.1275),
+    "Sec1End": (0.1492, 0.1195),
+    "Sec2End": (0.1457, 0.1115),
+    "Sec3End": (0.1423, 0.1035),
+    "T006Station": (0.1388, 0.0955),
+    "Sec4End": (0.1307, 0.0875),
     "ShoulderR": (0.1000, 0.1640),
 }
+OVERALL_REFERENCE_TEXT_XY = (0.1515, 0.0795)
 # Diameters, imported on the donor and dragged onto the side view.  A vertical
 # linear dimension's line sits at its text x and the text hangs to the RIGHT
 # of that line (~32 mm wide with its stacked band), so each x lies INSIDE the
@@ -200,6 +205,82 @@ def _cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
             f"nearest is {radius_mm:.4f} mm"
         )
     return face
+
+
+@_telemetry.traced("drawing.end_face_circle", label_param="label")
+def _end_circle(view: Any, *, station_mm: float, diameter_mm: float, label: str) -> Any:
+    """The one visible end-face circle at ``station_mm`` of ``diameter_mm``.
+
+    The journal's circle also stands at the collar face and the tip land's at
+    its own start, so the pick is by station AND diameter.  The station is
+    matched on |z|: the shaft runs along model Z from the front face, and the
+    sign of that axis is the part's, not an assumption made here.
+    """
+    matches: list[Any] = []
+    for raw in visible_view_entities(view, 1, label=f"{label} edges"):
+        curve = _early_bound(raw, "IEdge").GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) for value in curve.CircleParams)
+        if abs(abs(params[2]) * 1000.0 - station_mm) > 1e-3:
+            continue
+        if abs(params[6] * 2000.0 - diameter_mm) > 1e-3:
+            continue
+        matches.append(raw)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{label}: {len(matches)} end-face circles at z {station_mm:g} "
+            f"of Ø{diameter_mm:g}, expected 1"
+        )
+    return matches[0]
+
+
+def _add_overall_reference(adapter: Any, side: Any) -> Any:
+    """Dimension front stub to tip as a REFERENCE (#917 R5 (a)).
+
+    The tip is a station from the collar face, so the overall is the
+    read-only sum of the journal and the tip station: a sheet-derived
+    dimension between the two end faces, parenthesized, with the places the
+    spec hands over, and its value proved against the part.
+    """
+    front = _end_circle(
+        side, station_mm=0.0, diameter_mm=SECTION_DIAS[0], label="front end face"
+    )
+    tip = _end_circle(
+        side,
+        station_mm=SHAFT_LENGTH,
+        diameter_mm=SECTION_DIAS[-1],
+        label="tip end face",
+    )
+    display = add_edge_dimension(
+        adapter,
+        side,
+        p0=(0.0, 0.0),
+        p1=(0.0, 0.0),
+        text_xy=OVERALL_REFERENCE_TEXT_XY,
+        label="front-to-tip overall",
+        orientation="horizontal",
+        entities=(front, tip),
+    )
+    display = _early_bound(display, "IDisplayDimension")
+    measured = abs(
+        float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue)
+    )
+    if abs(measured * 1000.0 - SHAFT_LENGTH) > 1e-4:
+        raise RuntimeError(
+            f"front-to-tip overall measured {measured * 1000.0:.4f} mm, "
+            f"expected {SHAFT_LENGTH:.4f}"
+        )
+    set_reference_dimension(
+        adapter, display.GetAnnotation(), label="front-to-tip overall reference"
+    )
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
+        raise RuntimeError("front-to-tip overall reference precision did not persist")
+    return display
 
 
 # A centreline runs a short way past the part it marks.
@@ -353,6 +434,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
         raise RuntimeError("failed to delete the empty diameter donor view")
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _add_overall_reference(adapter, side)
 
     # Leader anchors for the two lands that RUN (sheet metres).  The tip
     # symbol stands above the tip with its glyph LEFT of the Ø1.588 dimension

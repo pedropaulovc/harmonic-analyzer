@@ -118,19 +118,23 @@ SHAFT_LENGTH = SECTION_ENDS[-1]
 # One length origin (#914 option A, Main ruling 2026-09-25): the collar's
 # thrust face, the face the post bears on.  Drawing policy rule 8 allows one
 # origin per view, baseline from it.  The journal runs back from it to the
-# front stub, the three gear-seat shoulders and the solder stations run
-# forward from it, and the overall length stays the conspicuous front-to-tip
-# dimension.  Measuring shoulders and gears from the same face keeps the
-# journal's .X length out from between them.  Each land's end plane is offset
-# from SECTION_ORIGINS[i] by SECTION_KNOBS[i], the value its SecEnd{i} global
-# carries; land 0 is the journal, extruded from the front face.
+# front stub, and the three gear-seat shoulders, the solder stations and
+# the tip run forward from it.  Measuring shoulders and gears from the same
+# face keeps the journal's .X length out from between them.  The tip is a
+# station too (#917 R5 (a), Main 2026-09-26): the collar is what the tip
+# cup, the tip block's heel relief and its fit-up slot are set against, and
+# front-to-tip as the controlling length stacked the journal's .X on the
+# overall's, doubling the collar-to-tip band; the front-to-tip overall is a
+# reference.  Each land's end plane is offset from SECTION_ORIGINS[i] by
+# SECTION_KNOBS[i], the value its SecEnd{i} global carries; land 0 is the
+# journal, extruded from the front face.
 DATUM_STATION = COLLAR_START_STATION
 SECTION_ORIGINS = (
     "Front Plane",
     "CollarFace",
     "CollarFace",
     "CollarFace",
-    "Front Plane",
+    "CollarFace",
 )
 SECTION_KNOBS = tuple(
     end if origin == "Front Plane" else end - DATUM_STATION
@@ -265,11 +269,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # could not pass the land to reach its pitch station.  The R0.10 root radius
 # eats a further 0.10 of the outboard margin, which a bore edge break covers.
 #
-# Journal length Sec0End (collar face back to the front stub) and overall
-# length Sec4End: one place, the routine grade the fleet's plain lengths
-# print.  The journal only sets how far the stub stands proud of the post's
-# south face (the collar face bears on its north face), and the tip end meets
-# an adjustable cup-point screw that takes up any length error.  Shoulder
+# Journal length Sec0End (collar face back to the front stub) and tip
+# station Sec4End (collar face to the tip): one place, the routine grade the
+# fleet's plain lengths print.  The journal only sets how far the stub stands
+# proud of the post's south face (the collar face bears on its north face),
+# and the tip end meets an adjustable cup-point screw; the tip block's fit-up
+# chain and heel relief carry this band (cone_tip_block_spec).  Shoulder
 # radius: two places; nothing depends on it beyond clearing the gear faces.
 #
 # Collar (#914): the diameter prints one place (.X leaves a 1.0 mm minimum
@@ -293,6 +298,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Collar": {"CollarWidth": 3},
     "SolderStations": {"T120Station": 3, "T006Station": 3},
 }
+# The front-to-tip overall (#917 R5 (a)) is the sheet's one reference
+# dimension, the read-only sum of the journal and the tip station: one place,
+# the grade of the two lengths it sums.
+DRAWING_REFERENCE_PRECISION = 1
 
 _PRECISION_NAMES = [
     (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
