@@ -24,12 +24,14 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable
+from datetime import UTC, datetime
 import math
 import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, OUT_FAILURES, _early_bound, check, run_build
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _drawing_common import (
@@ -49,6 +51,8 @@ from _drawing_common import (
     offset_dimension_text,
     read_required_properties,
     rebuild_drawing,
+    render_pdf_png,
+    save_drawing,
     set_dimension_callouts,
     set_hole_callout_precision,
     set_hidden_lines_removed,
@@ -780,6 +784,46 @@ def _hole_callout_shelf(annotation: Any, *, label: str) -> Any:
     return shelves[0]
 
 
+def _plan_or_export_sheet(
+    adapter: Any,
+    plan: Callable[[], Any],
+    *,
+    label: str,
+    sizes: dict[str, tuple[float, float]],
+) -> Any:
+    """Run a layout plan; if it finds no fit, record a ``layout.no_fit`` span
+    event naming the group and the sizes (m) that did not fit, and export the
+    sheet under failures/ (which the leaf uploads beside its log) before the
+    plan's error propagates.
+
+    917-s1-568f failed loud on the foot view's no-fit but saved no render, so
+    telling a wide callout from an over-read one took a probe leaf."""
+    try:
+        return plan()
+    except RuntimeError as exc:
+        _telemetry.event(
+            "layout.no_fit",
+            group=label,
+            reason=str(exc)[:500],
+            **{
+                f"{name}_mm": f"{width * 1000.0:.1f} x {height * 1000.0:.1f}"
+                for name, (width, height) in sizes.items()
+            },
+        )
+        out = OUT_FAILURES / "cone-pivot-post-layout" / datetime.now(UTC).strftime(
+            "%Y%m%dT%H%M%SZ"
+        )
+        pdf = out / "cone-pivot-post.pdf"
+        try:
+            out.mkdir(parents=True, exist_ok=True)
+            save_drawing(adapter, "", pdf_path=str(pdf))
+            render_pdf_png(pdf, out / "cone-pivot-post.png", layout=SPEC.layout)
+            _telemetry.warn(f"{label}: no-fit sheet exported to {out}")
+        except Exception as exc:  # noqa: BLE001 - the plan's error is the one to raise
+            _telemetry.warn(f"{label}: no-fit sheet export failed: {type(exc).__name__}: {exc}")
+        raise
+
+
 def _place_foot_group(adapter: Any, foot: Any) -> None:
     """Caption the foot view and call out one dowel ream, all three planned
     together from the sheet's read-back boxes.
@@ -847,20 +891,29 @@ def _place_foot_group(adapter: Any, foot: Any) -> None:
         max(box.ymax for box in boxes),
     )
     scale = FOOT_SCALE[0] / FOOT_SCALE[1]
-    plan = plan_view_group(
-        foot_box,
-        (caption.width, caption.height),
-        obstacles,
-        label="foot view",
-        view_name=foot_name,
-        callout=HoleCallout(
-            label=name,
-            owner=foot_name,
-            text=text,
-            shelf=_hole_callout_shelf(read[0], label="post dowel callout"),
-            rim=(dowel_xy[0], dowel_xy[1], POST_DOWEL_REAM_DIA / 2000.0 * scale),
+    plan = _plan_or_export_sheet(
+        adapter,
+        lambda: plan_view_group(
+            foot_box,
+            (caption.width, caption.height),
+            obstacles,
+            label="foot view",
+            view_name=foot_name,
+            callout=HoleCallout(
+                label=name,
+                owner=foot_name,
+                text=text,
+                shelf=_hole_callout_shelf(read[0], label="post dowel callout"),
+                rim=(dowel_xy[0], dowel_xy[1], POST_DOWEL_REAM_DIA / 2000.0 * scale),
+            ),
+            gap=gap,
         ),
-        gap=gap,
+        label="foot view",
+        sizes={
+            "view": (foot_box.width, foot_box.height),
+            "caption": (caption.width, caption.height),
+            "callout": (text.width, text.height),
+        },
     )
     if plan.view_dx or plan.view_dy:
         bound = _early_bound(foot, "IView")

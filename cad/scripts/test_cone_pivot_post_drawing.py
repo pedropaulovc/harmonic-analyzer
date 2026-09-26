@@ -1011,3 +1011,112 @@ def test_foot_callout_read_back_keys_on_label_and_owning_view(monkeypatch) -> No
     monkeypatch.setattr(audit, "collect_document", lambda adapter: [sheet])
     box = drawing._annotation_text_box(None, "RD1", "Drawing View5")
     assert (box.xmin, box.ymin, box.xmax, box.ymax) == (0.151, 0.214, 0.288, 0.232)
+
+
+def test_hole_callout_prefix_keeps_a_trailing_line_break() -> None:
+    """RD1 probe (917-s1-rd1probe, swmaker000007): the foot's callout read
+    back "...FROM FOOT 2X <MOD-DIAM> 3.188 <HOLE-DEPTH> 8.5" on one 117 mm
+    row.  add_native_hole_callout joined process and format text with
+    process.rstrip() + " ", which ate FOOT_DOWEL_PREFIX's closing line
+    break, so the rewrap never reached the sheet."""
+    import inspect
+
+    import _drawing_common as dc
+
+    native = "2X <MOD-DIAM> 3.188 <HOLE-DEPTH> 8.5"
+    composed = dc.compose_hole_callout_prefix(drawing.FOOT_DOWEL_PREFIX, native)
+    assert composed.splitlines()[-1] == native
+    assert composed.splitlines()[-2] == drawing.FOOT_DOWEL_PREFIX.splitlines()[-1]
+    # A one-line process still joins its format text with one space.
+    assert dc.compose_hole_callout_prefix("DRILL ", " 2X <MOD-DIAM>") == "DRILL 2X <MOD-DIAM>"
+    source = inspect.getsource(dc.add_native_hole_callout)
+    assert "compose_hole_callout_prefix(process, existing)" in source
+
+
+def test_a_foot_plan_no_fit_exports_the_sheet_before_raising(monkeypatch, tmp_path) -> None:
+    """917-s1-568f failed loud on the planner's no-fit but saved no render, so
+    whether the callout was really that wide stayed unknown until a probe
+    leaf.  A failed plan exports the sheet (PDF + PNG) under failures/,
+    which the leaf uploads, then raises the planner's own error."""
+    import inspect
+
+    exported: list[tuple[str, str]] = []
+
+    def save(adapter, path, *, pdf_path):
+        exported.append(("pdf", pdf_path))
+
+    def render(pdf, png, *, layout):
+        exported.append(("png", str(png)))
+
+    events: list[tuple[str, dict]] = []
+    monkeypatch.setattr(drawing, "OUT_FAILURES", tmp_path)
+    monkeypatch.setattr(drawing, "save_drawing", save)
+    monkeypatch.setattr(drawing, "render_pdf_png", render)
+    monkeypatch.setattr(drawing._telemetry, "event", lambda name, **a: events.append((name, a)))
+
+    def no_fit():
+        raise RuntimeError("foot view: no clear place for view")
+
+    sizes = {"view": (0.0332, 0.0476), "callout": (0.1357, 0.0181)}
+    with pytest.raises(RuntimeError, match="no clear place"):
+        drawing._plan_or_export_sheet(object(), no_fit, label="foot view", sizes=sizes)
+    kinds = [kind for kind, _ in exported]
+    assert kinds == ["pdf", "png"]
+    assert all(str(tmp_path) in path for _, path in exported)
+    # The span event names the group and the sizes that did not fit.
+    ((name, attributes),) = events
+    assert name == "layout.no_fit"
+    assert attributes["group"] == "foot view"
+    assert attributes["callout_mm"] == "135.7 x 18.1"
+    assert attributes["view_mm"] == "33.2 x 47.6"
+    # A clear plan exports and records nothing.
+    exported.clear()
+    events.clear()
+    assert (
+        drawing._plan_or_export_sheet(object(), lambda: "plan", label="foot view", sizes=sizes)
+        == "plan"
+    )
+    assert exported == [] and events == []
+    assert "_plan_or_export_sheet(" in inspect.getsource(drawing._place_foot_group)
+
+
+def _hole_callout_processes() -> list[tuple[str, str]]:
+    """Every add_native_hole_callout(process=...) in the draw scripts,
+    resolved to its value: a literal, or a module-level name."""
+    import ast
+    import importlib
+
+    found = []
+    for path in sorted(Path(drawing.__file__).resolve().parent.glob("draw_*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not (
+                isinstance(node, ast.Call)
+                and getattr(node.func, "id", getattr(node.func, "attr", "")) == "add_native_hole_callout"
+            ):
+                continue
+            for keyword in node.keywords:
+                if keyword.arg != "process":
+                    continue
+                if isinstance(keyword.value, ast.Constant) and isinstance(keyword.value.value, str):
+                    found.append((path.stem, keyword.value.value))
+                elif isinstance(keyword.value, ast.Name):
+                    module = importlib.import_module(path.stem)
+                    found.append((path.stem, getattr(module, keyword.value.id)))
+    return found
+
+
+def test_every_line_broken_hole_callout_process_keeps_its_break() -> None:
+    """Main's ruling on the RD1 fix: prove the composed prefix for EVERY
+    caller whose process ends in a line break, not just the constant."""
+    import _drawing_common as dc
+
+    native = "2X <MOD-DIAM> 3.188 <HOLE-DEPTH> 8.5"  # the probe's read-back
+    processes = _hole_callout_processes()
+    assert ("draw_cone_pivot_post", drawing.FOOT_DOWEL_PREFIX) in processes
+    broken = [(stem, text) for stem, text in processes if text.rstrip(" ").endswith("\n")]
+    assert broken, "no caller ends its process in a line break"
+    for stem, text in broken:
+        rows = dc.compose_hole_callout_prefix(text, native).splitlines()
+        assert rows[-1] == native, stem
+        assert rows[:-1] == text.rstrip().splitlines(), stem
