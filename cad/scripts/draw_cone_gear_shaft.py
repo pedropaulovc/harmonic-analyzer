@@ -129,7 +129,8 @@ DONOR_KEEP = {
     name: (DONOR_CENTER[0], DONOR_CENTER[1] - 0.012 * index)
     for index, name in enumerate(SIDE_DIAMETERS)
 }
-# Four identical shoulder roots, one modelled fillet, one radius dimension.
+# Three identical gear-seat shoulder roots, one modelled fillet, one radius
+# dimension (the collar's roots stay sharp, #914).
 DIMENSION_CALLOUTS = {"ShoulderR": FILLET_CALLOUT}
 
 

@@ -7,6 +7,7 @@ from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 from cone_pivot_post_installation import GEAR_AXIS_SHIFT
+from crank_drive_gear_spec import FACE_WIDTH as GEAR64_FACE_WIDTH
 
 
 MM_PER_IN = 25.4
@@ -25,6 +26,23 @@ JOURNAL_END = 43.011
 # 1.0 mm makes the shaft end proud at -61.9068609979.  The part origin is that front end and all
 # stations below are measured from it.
 FRONT_STUB = 61.9068609979
+
+# Axial capture (#914, user ruling 2026-09-25).  The tip adjuster pushes the
+# shaft south, toward the post; nothing reacted it until the 64T met the post
+# boss 1.681 further on.  An integral collar now fills that gap: its south
+# face bears on the post's north boss face (flush with the journal end) and
+# the 64T is soldered against its north face, so no station moves.  The web is
+# the gap, 1.681 -- above the 1.5 floor, accepted by the user rather than
+# moving the 64T.  Ø15.0 bears on the boss annulus outside the Ø12.2808 bore
+# and inside the Ø17.2 boss; it is the largest diameter, so the shaft turns
+# from 5/8 in bar.  The 64T centre is the drive-train's GEAR64_STATION (the
+# shaft tests pin the two equal).
+GEAR64_CENTER_STATION = 19.9 + GEAR_AXIS_SHIFT
+COLLAR_DIA = 15.0
+COLLAR_START_STATION = JOURNAL_END
+COLLAR_END_STATION = FRONT_STUB + GEAR64_CENTER_STATION - GEAR64_FACE_WIDTH / 2.0
+COLLAR_THICKNESS = COLLAR_END_STATION - COLLAR_START_STATION
+STOCK_DIA = 0.625 * MM_PER_IN
 
 # T006's north face starts the 4 mm bushing, followed by 2 mm clearance and
 # the 12 mm tip block.  Rule-12 E11 replaced the 5/16-18 94025A150 with the
@@ -128,8 +146,9 @@ SECTION_DIA_BANDS: tuple[tuple[float, float], ...] = (
 # tool nose radius that clears.  Modelled as geometry and dimensioned once,
 # not written as a process note.
 FILLET_RADIUS = 0.10
-# Four identical shoulder roots, one fillet feature, one radius dimension.
-FILLET_CALLOUT = "4X"
+# Three identical gear-seat shoulder roots (the collar's roots stay sharp,
+# build_cone_gear_shaft), one fillet feature, one radius dimension.
+FILLET_CALLOUT = "3X"
 
 # Surface texture, on the two lands that RUN: the Ø12.2308 journal turns in
 # the pivot post bore and the terminal land turns in the cone tip bushing.

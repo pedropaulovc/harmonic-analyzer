@@ -284,8 +284,9 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     assert "add_fillet(FILLET_RADIUS, fillet_edges, propagate=False)" in source
     assert 'name_last_feature(adapter, "ShoulderFillets")' in source
     assert 'name_dimensions(adapter, "ShoulderFillets", ["ShoulderR"])' in source
-    # One feature, one dimension, one quantity prefix -- not four dimensions.
-    assert drawing.DIMENSION_CALLOUTS == {"ShoulderR": "4X"}
+    # One feature, one dimension, one quantity prefix -- not three dimensions
+    # (the gear-seat steps; the collar's roots stay sharp, #914).
+    assert drawing.DIMENSION_CALLOUTS == {"ShoulderR": "3X"}
     # The old "SHOULDER ROOTS R0.10 MAX" note is gone.  What remains names
     # the mate behind the gear-seat band -- the solder gap (rule 2; codex
     # 375a122c) -- without adding a check of its own (no MUST), and carries
@@ -542,3 +543,208 @@ def test_shoulder_plane_gate_proves_the_depth_owner_too(monkeypatch) -> None:
     assert "Sec3End@Sec3: expected one equation" in message
     assert "SecEnd4: expected one definition" in message
     assert "Sec1" not in message.replace("SecEnd1", "")
+
+
+# #914 (user ruling 2026-09-25): an integral collar captures the shaft.  The
+# tip adjuster pushes the shaft south; the collar's south face bears on the
+# post's north boss face, and the 64T is soldered against its north face.
+def test_collar_fills_the_gap_between_the_post_boss_and_the_64t() -> None:
+    spec = cone_gear_shaft_spec
+    post_north_face = (
+        drive.POST_STATION
+        + drive.POST_CONE_BOSS_LENGTH / 2.0
+        - drive.SHAFT_FRONT_STATION
+    )
+    gear64_south_face = (
+        drive.GEAR64_STATION
+        + drive.GEAR_AXIS_SHIFT
+        - drive.GEAR64_FACE / 2.0
+        - drive.SHAFT_FRONT_STATION
+    )
+    assert spec.COLLAR_START_STATION == pytest.approx(post_north_face, abs=1e-9)
+    assert spec.COLLAR_START_STATION == spec.JOURNAL_END
+    assert spec.COLLAR_END_STATION == pytest.approx(gear64_south_face, abs=1e-9)
+    # user ruling: accept the 1.681 web (novice floor 1.5, no station moves)
+    assert spec.COLLAR_THICKNESS == pytest.approx(1.681, abs=5e-4)
+    assert spec.COLLAR_THICKNESS >= 1.5
+
+
+def test_collar_bears_on_the_boss_annulus_and_turns_from_five_eighths_bar() -> None:
+    import cone_pivot_post_spec as post
+
+    spec = cone_gear_shaft_spec
+    assert spec.COLLAR_DIA == 15.0
+    # a real bearing annulus outside the post bore, inside the Ø17.2 boss
+    assert spec.COLLAR_DIA - post.BORE_DIA >= 2.0
+    assert spec.COLLAR_DIA < post.CONE_BOSS_DIA
+    # the collar is the largest diameter, turned from 5/8 in bar with stock left
+    assert spec.STOCK_DIA == pytest.approx(0.625 * 25.4)
+    assert spec.STOCK_DIA - spec.COLLAR_DIA >= 0.8
+    assert max(spec.SECTION_DIAS) < spec.COLLAR_DIA
+    assert "5/8" in str(_config.parts("cone-gear-shaft")["material"])
+
+
+def _stubbed_build(monkeypatch):
+    """Run the real build() with every imported helper stubbed; return the
+    adapter mock and the stubs so a test can read what it authored."""
+    import asyncio
+    import inspect
+    from unittest.mock import AsyncMock, MagicMock
+
+    stubs = {}
+    for attr, value in list(vars(part).items()):
+        if not callable(value) or attr.startswith("__") or attr == "build":
+            continue
+        if getattr(value, "__module__", "") == part.__name__:
+            continue
+        if not inspect.isfunction(value) and not inspect.isclass(value):
+            continue
+        stub = AsyncMock() if inspect.iscoroutinefunction(value) else MagicMock()
+        stubs[attr] = stub
+        monkeypatch.setattr(part, attr, stub)
+    monkeypatch.setattr(
+        part,
+        "name_dimensions",
+        lambda _a, feature, names: [f"{n}@{feature}" for n in names],
+    )
+    sketch_dims = MagicMock()
+    sketch_dims.return_value.apply.return_value = []
+    monkeypatch.setattr(part, "SketchDims", sketch_dims)
+    monkeypatch.setattr(part, "_assert_shoulder_planes_single_owned", lambda _a: None)
+    adapter = AsyncMock()
+    asyncio.run(part.build(adapter))
+    return adapter, stubs
+
+
+def test_build_turns_the_collar_between_the_journal_and_the_64t(monkeypatch) -> None:
+    """#914: the collar is its own land -- sketched on a plane at its north
+    face, Ø15.0, extruded back one web.  Its roots stay sharp (the post and
+    the 64T bear flat on its faces) and the old journal-to-3/8 step edge is
+    buried under it."""
+    spec = cone_gear_shaft_spec
+    adapter, stubs = _stubbed_build(monkeypatch)
+    offsets = [c.args[0].offset for c in adapter.create_plane.call_args_list]
+    assert spec.COLLAR_END_STATION in offsets
+    radii = [c.args[3] for c in stubs["define_circle"].call_args_list]
+    assert spec.COLLAR_DIA / 2.0 in [pytest.approx(r) for r in radii]
+    extrusions = [c.args[0] for c in adapter.create_extrusion.call_args_list]
+    collar = [e for e in extrusions if e.depth == pytest.approx(spec.COLLAR_THICKNESS)]
+    assert len(collar) == 1 and collar[0].reverse_direction
+    edges = adapter.add_fillet.call_args.args[1]
+    land = 0.375 * spec.MM_PER_IN / 2.0
+    assert [spec.JOURNAL_DIA / 2.0, 0.0, spec.COLLAR_START_STATION] not in edges
+    assert [land, 0.0, spec.COLLAR_END_STATION] not in edges
+    assert [land, 0.0, spec.JOURNAL_END] not in edges
+    assert len(edges) == len(spec.SECTIONS) - 2
+    assert spec.FILLET_CALLOUT == f"{len(edges)}X"
+
+
+def test_build_names_the_collar_thrust_face_for_the_assembly(monkeypatch) -> None:
+    """The drive train mates the collar's south face onto the post boss by a
+    named plane -- a point pick there is ambiguous, the post face lies under
+    it.  SecEnd0 (the journal end) owns the plane, as it owns the journal."""
+    spec = cone_gear_shaft_spec
+    adapter, stubs = _stubbed_build(monkeypatch)
+    offsets = [c.args[0].offset for c in adapter.create_plane.call_args_list]
+    assert spec.COLLAR_START_STATION in offsets
+    named = [c.args[1] for c in stubs["name_last_feature"].call_args_list]
+    assert "CollarFace" in named
+    drives = dict(
+        (c.args[1], c.args[2]) for c in stubs["drive_dimension"].call_args_list
+    )
+    assert drives["CollarFaceStation@CollarFace"] == '"SecEnd0"'
+    assert drives["CollarStation@CollarEndPlane"] == '"CollarEnd"'
+    assert drives["CollarWidth@Collar"] == '"CollarWidth"'
+
+
+def test_drive_train_seats_the_shaft_and_64t_on_the_collar(monkeypatch) -> None:
+    """#914: contacts, not distances -- the collar face ON the post's north
+    boss face (picked on the annulus outside the collar) and the 64T's south
+    face ON the collar's north face."""
+    import asyncio
+    import math
+    from unittest.mock import AsyncMock
+
+    pick = drive._POST_BOSS_NORTH_PICK
+    north = drive.cone_station(drive._POST_NORTH_STATION)
+    axis = (drive.SIN_I, 0.0, drive.COS_I)
+    offset = [pick[k] - north[k] for k in range(3)]
+    assert sum(offset[k] * axis[k] for k in range(3)) == pytest.approx(0.0, abs=1e-9)
+    radius = math.hypot(*offset)
+    assert cone_gear_shaft_spec.COLLAR_DIA / 2.0 < radius
+    assert radius < drive.POST_CONE_BOSS_DIA / 2.0
+    assert offset[1] == 0.0  # horizontal: vertical lies on the body tangent
+
+    source = Path(drive.__file__).read_text(encoding="utf-8")
+    assert 'named_ref(f"CollarFace@{cone_shaft}", "PLANE")' in source
+    assert 'bore_axis_ref(_POST_BOSS_NORTH_PICK, "FACE")' in source
+    assert (
+        'named_ref(f"ConeShaftNormal@{pivot_post}", "PLANE"),\r\n        d_axial'
+        not in source
+    )
+    assert 'seat_plane="CollarEndPlane"' in source
+
+    coincident = AsyncMock()
+    distance = AsyncMock()
+    monkeypatch.setattr(drive, "coincident_mate", coincident)
+    monkeypatch.setattr(drive, "distance_driver", distance)
+    origin = [0.0, 0.0, 0.0]
+    asyncio.run(
+        drive._axial_seat(
+            object(),
+            "g-1",
+            "s-1",
+            origin,
+            [0.0, 0.0, 1.0],
+            origin,
+            "64T",
+            "CollarEndPlane",
+        )
+    )
+    distance.assert_not_awaited()
+    refs = coincident.await_args.args[1:3]
+    assert [r.name for r in refs] == ["Front Plane@g-1", "CollarEndPlane@s-1"]
+    asyncio.run(
+        drive._axial_seat(
+            object(), "g-1", "s-1", origin, [0.0, 0.0, 1.0], [0, 0, 5.0], "T120", ""
+        )
+    )
+    assert distance.await_args.args[3] == pytest.approx(5.0)
+
+
+def test_the_64t_front_plane_is_its_south_face(monkeypatch) -> None:
+    """The 64T's collar seat is Front coincident with CollarEndPlane, which is
+    a contact only because the gear's Front plane IS its south face: its blank
+    is sketched on Front and extruded +z by the face width, and
+    _place_on_shaft puts that origin face/2 south of the gear's centre."""
+    import asyncio
+    import inspect
+
+    import _gear
+    import build_crank_drive_gear
+
+    placed = {}
+
+    async def place_component(_adapter, part_name, origin, *_args, **_kwargs):
+        placed[part_name] = origin
+        return f"{part_name}-1"
+
+    monkeypatch.setattr(drive, "place_component", place_component)
+    asyncio.run(
+        drive._place_on_shaft(
+            object(),
+            "crank-drive-gear",
+            drive.GEAR64_STATION + drive.GEAR_AXIS_SHIFT,
+            drive.GEAR64_FACE,
+        )
+    )
+    south = drive.cone_station(drive._GEAR64_SOUTH_STATION)
+    assert placed["crank-drive-gear"] == pytest.approx(south, abs=1e-9)
+
+    blank = inspect.getsource(_gear.build_fixed_gear)
+    assert 'check("create_sketch blank", await adapter.create_sketch("Front"))' in blank
+    assert "create_extrusion(ExtrusionParameters(depth=face_width))" in blank
+    crank = inspect.getsource(build_crank_drive_gear.build)
+    assert "build_fixed_gear(\n        adapter, TEETH, FACE_WIDTH," in crank.replace(
+        "\r\n", "\n"
+    )

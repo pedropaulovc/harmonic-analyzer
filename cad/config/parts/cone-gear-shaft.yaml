@@ -1,10 +1,10 @@
 cone-gear-shaft:
   title: Cone Gear Shaft
   number: MHA-014
-  material: AISI 1018 cold-finished steel shafting
-  material_specification: AISI 1018 cold-finished steel shafting
+  material: AISI 1018 cold-finished steel shafting, 5/8 in round
+  material_specification: AISI 1018 cold-finished steel shafting, 5/8 in round
   finish: oiled
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "turned stepped shaft with integral bearing journal (steel)"
+  process: "turned stepped shaft with integral bearing journal and thrust collar (steel)"
