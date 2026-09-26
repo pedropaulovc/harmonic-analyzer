@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Iterator, Mapping
 from typing import Any
 
@@ -74,6 +75,7 @@ class FeatureWalk:
     def __init__(self, model: Any) -> None:
         self.model = model
         self.visited = 0
+        self.started = time.perf_counter()
 
     def __iter__(self) -> Iterator[Any]:
         from _common import _early_bound, _read_member
@@ -96,11 +98,24 @@ class FeatureWalk:
         yield from siblings(_read_member(self.model, "FirstFeature"), "GetNextFeature")
 
 
-def _record_walk(walk: FeatureWalk) -> None:
-    trace.get_current_span().set_attribute("features_visited", walk.visited)
+def _record_walk(walk: FeatureWalk, purpose: str, label: str) -> None:
+    """Put the walk's size and cost on its span AND in the console log.
+
+    A farm leaf uploads only its task.log, so this line is the per-save
+    visibility cost that leaves the worker (#880's <= 1 s save bar)."""
+    walk_s = time.perf_counter() - walk.started
+    span = trace.get_current_span()
+    span.set_attribute("features_visited", walk.visited)
+    span.set_attribute("walk_s", walk_s)
+    _telemetry.info(
+        f"{label}: {purpose} walk visited {walk.visited} features in {walk_s:.3f}s",
+        features_visited=walk.visited,
+        walk_s=walk_s,
+        walk_purpose=purpose,
+    )
 
 
-def visible_reference_geometry(model: Any) -> list[tuple[str, str]]:
+def visible_reference_geometry(model: Any, label: str = "") -> list[tuple[str, str]]:
     """``(name, kind)`` of every shown sketch, plane, axis, point or curve."""
     shown: list[tuple[str, str]] = []
     seen: set[str] = set()
@@ -114,7 +129,7 @@ def visible_reference_geometry(model: Any) -> list[tuple[str, str]]:
             continue
         seen.add(name)
         shown.append((name, kind))
-    _record_walk(walk)
+    _record_walk(walk, "check", label)
     return shown
 
 
@@ -150,7 +165,7 @@ def hide_reference_geometry(adapter: Any, label: str) -> list[str]:
         if (kind := str(feature.GetTypeName2())) in _REFERENCE_SELECT_TYPES
         and int(feature.Visible) == _SHOWN
     ]
-    _record_walk(walk)
+    _record_walk(walk, "hide", label)
     # The creating helpers hide what they make, so this backstop should find
     # nothing; the count names what still reaches it and should trend to 0.
     trace.get_current_span().set_attribute("refgeom.hidden_at_save", len(shown))
@@ -216,7 +231,7 @@ def assert_reference_geometry_hidden(
     fails too, so the list can only shrink.
     """
     allowed = dict(allowed or {})
-    shown = visible_reference_geometry(adapter.currentModel)
+    shown = visible_reference_geometry(adapter.currentModel, label)
     names = {name for name, _kind in shown}
     for name, kind in shown:
         if name in allowed:

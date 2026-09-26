@@ -438,6 +438,26 @@ def test_the_save_backstop_counts_what_it_had_to_hide(monkeypatch) -> None:
     assert counts == [1, 0]
 
 
+def test_each_save_walk_logs_its_size_and_cost(monkeypatch) -> None:
+    """A farm leaf uploads only its task.log, so both save walks put
+    features_visited and their elapsed time on an info line (#880's bar)."""
+    lines: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        _visibility._telemetry, "info", lambda msg, **attrs: lines.append((msg, attrs))
+    )
+    model = _part_tree(_Feature("Plane2", "RefPlane"))
+    _visibility.hide_reference_geometry(_adapter(model), "crank-arm")
+    _visibility.assert_reference_geometry_hidden(_adapter(model), "crank-arm")
+    walks = [attrs for _msg, attrs in lines if "walk_purpose" in attrs]
+    assert [attrs["walk_purpose"] for attrs in walks] == ["hide", "check"]
+    for attrs in walks:
+        assert attrs["features_visited"] >= 1
+        assert attrs["walk_s"] >= 0.0
+    assert all(
+        msg.startswith("crank-arm: ") for msg, attrs in lines if "walk_purpose" in attrs
+    )
+
+
 def test_shared_reference_creators_hide_what_they_create() -> None:
     for module in ("_gear.py", "_chain_link.py", "_features.py", "_assembly.py"):
         text = (SCRIPTS / module).read_text(encoding="utf-8")
