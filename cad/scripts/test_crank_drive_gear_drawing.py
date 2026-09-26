@@ -380,17 +380,21 @@ def test_notes_carry_the_part_specific_facts_and_never_the_title_block() -> None
     # the print states the exception.
     assert lines[0] == "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
     # The attachment (rule-11 flag closed 2026-09-21): the bore is the only
-    # attachment feature on the part, so the joint to the shaft land is the
-    # entire torque path -- a machinist who reams the bore and ships it has
-    # made the wrong part. The note must NAME the mate and STATE the joining
-    # methods, which rule 6 allows only because here the process IS the
-    # requirement. Each method is one swappable constant (the user approved a
-    # retaining compound alongside filler metal on 2026-09-21), so this pins
-    # what the sentence has to carry, not the wording of either method.
-    assert "PLAIN BORE, NO KEYWAY" in lines[1]
-    assert notes.ATTACHMENT_PROCESS in lines[1]
-    assert notes.SHAFT_MATE_NUMBER in lines[1]
-    assert notes.ATTACHMENT_ALTERNATIVE in text
+    # attachment feature on the part, so the note names the mate and says the
+    # bore is plain and fixed there. HOW it is fixed is an assembly method
+    # (rule 6; #906, Main 2026-09-26): the solder/braze route and the
+    # retaining-compound permission print on the drive-train sheet's step 1,
+    # from the same two constants.
+    assert lines[1] == (
+        f"PLAIN BORE, NO KEYWAY: FIXED TO THE {notes.SHAFT_MATE_NUMBER} SHAFT SEAT"
+        " AT ASSEMBLY."
+    )
+    assert notes.ATTACHMENT_PROCESS not in text
+    assert notes.ATTACHMENT_ALTERNATIVE not in text
+    import draw_drive_train_assembly as dt
+
+    assert notes.ATTACHMENT_PROCESS in dt.CONE_CRANK_STEPS
+    assert notes.ATTACHMENT_ALTERNATIVE in dt.CONE_CRANK_STEPS
     # Both routes are permitted, so the line that offers the alternative has
     # to read as a permission, not as a second instruction.
     assert "ACCEPTABLE" in notes.ATTACHMENT_ALTERNATIVE
@@ -399,15 +403,12 @@ def test_notes_carry_the_part_specific_facts_and_never_the_title_block() -> None
     assert notes.SHAFT_MATE_NUMBER == _config.parts("cone-gear-shaft")["number"]
     assert notes.SHAFT_MATE_NUMBER != _config.parts("crank-drive-gear")["number"]
     # Rule 6, "never a dimension": the ONLY digits allowed anywhere in the
-    # notes block are the mate's part number and the compound designations. A
-    # size, a limit, a depth or a station typed into a note is what this pins.
-    named = text.replace(notes.SHAFT_MATE_NUMBER, "").replace(
-        notes.ATTACHMENT_ALTERNATIVE, ""
-    )
+    # notes block are the mate's part number.
+    named = text.replace(notes.SHAFT_MATE_NUMBER, "")
     assert not any(ch.isdigit() for ch in named)
     # Rule 6's budget: at most four short lines, each short enough to clear
     # the title-block keep-out from the notes anchor at x = 16 mm.
-    assert len(lines) == 3
+    assert len(lines) == 2
     assert all(len(line) <= 90 for line in lines)
     # The attachment note must not re-print the bore that the face view
     # already dimensions and bands, and must not invent an axial requirement:

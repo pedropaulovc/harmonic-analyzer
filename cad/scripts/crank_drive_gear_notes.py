@@ -97,8 +97,10 @@ GEAR_DATA = gear_data_note(
 
 # How this gear is held to its shaft. The bore is a plain slip fit and the
 # part carries no key, keyway, pin, set screw or hub, so the joint to the
-# shaft land IS the whole torque path -- the case where rule 6 allows a
-# process word on the print. The rule-11 flag closed 2026-09-21
+# shaft land IS the whole torque path.  The joining step is an assembly
+# method, so it lives on the drive-train sheet's step 1 (#906, Main
+# 2026-09-26, the class #814 swept); this sheet keeps only the part fact that
+# the bore is plain.  The rule-11 flag closed 2026-09-21
 # (C:/src/dt-logs/geometry-decisions.md) on ch12 p.20/p.21 evidence: fixed
 # like the 20 cone gears. Each permitted method is ONE constant, so
 # re-deciding the joint is a one-line change; the first carries the verb and
@@ -123,15 +125,16 @@ SHAFT_MATE_NUMBER = "MHA-014"
 # Notes: the part-specific facts a machinist cannot read off the views
 # (drawing-simplicity-policy.md rule 6, budget four short lines). The first is
 # the one thing the title block gets wrong for a fine-pitch gear -- a 0.25
-# break is more than a tenth of this tooth's whole depth. The rest are the
-# attachment. No line carries a dimension: the bore's size and limits print on
-# the face view, and the axial station belongs to the assembly (the model
-# leaves ~1.1 mm of air to T120, so this gear butts nothing).
+# break is more than a tenth of this tooth's whole depth. The second says the
+# bore carries no drive feature and names the land it goes on; how it is
+# joined there is the drive-train sheet's step. No line carries a dimension:
+# the bore's size and limits print on the face view, and the axial station
+# belongs to the assembly (the model leaves ~1.1 mm of air to T120, so this
+# gear butts nothing).
 DRAWING_NOTES = "\n".join(
     (
         "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
-        f"PLAIN BORE, NO KEYWAY: {ATTACHMENT_PROCESS} THE {SHAFT_MATE_NUMBER}"
-        " SHAFT SEAT AT ASSEMBLY;",
-        f"{ATTACHMENT_ALTERNATIVE}.",
+        f"PLAIN BORE, NO KEYWAY: FIXED TO THE {SHAFT_MATE_NUMBER} SHAFT SEAT AT"
+        " ASSEMBLY.",
     )
 )
