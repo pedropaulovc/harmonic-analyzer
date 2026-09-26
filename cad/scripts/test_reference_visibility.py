@@ -525,6 +525,17 @@ def test_elements_answering_another_interface_fail_the_check(monkeypatch) -> Non
         _visibility.assert_reference_geometry_hidden(_adapter(model), "p")
 
 
+@pytest.mark.parametrize("returned", [None, ()])
+def test_an_empty_feature_tree_fails_the_check(monkeypatch, returned) -> None:
+    """Every saved document has at least its origin and default planes, so
+    GetFeatures answering None or nothing is a failed read, not a clean part
+    (Codex on #950)."""
+    model = _part_tree()
+    monkeypatch.setattr(model.FeatureManager, "GetFeatures", lambda _top: returned)
+    with pytest.raises(RuntimeError, match="crank-arm: GetFeatures.* no features"):
+        _visibility.assert_reference_geometry_hidden(_adapter(model), "crank-arm")
+
+
 def test_shared_reference_creators_hide_what_they_create() -> None:
     for module in ("_gear.py", "_chain_link.py", "_features.py", "_assembly.py"):
         text = (SCRIPTS / module).read_text(encoding="utf-8")

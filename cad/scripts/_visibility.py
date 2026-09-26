@@ -166,22 +166,26 @@ def visible_reference_geometry(model: Any, label: str = "") -> list[tuple[str, s
     manager = _dispatch(_early_bound(model, "IModelDoc2")).InvokeTypes(
         *_invocation("IModelDoc2", "FeatureManager")
     )
-    features = tuple(
-        manager.InvokeTypes(*_invocation("IFeatureManager", "GetFeatures", False)) or ()
-    )
+    returned = manager.InvokeTypes(*_invocation("IFeatureManager", "GetFeatures", False))
     fetch_s = time.perf_counter() - started
     com_calls = 2
+    # Every document has at least its origin and default planes, so None or
+    # nothing is a failed read; counting it as a clean part passes blind.
+    if not returned:
+        raise RuntimeError(
+            f"{label}: GetFeatures(False) returned {returned!r}, no features"
+        )
+    features = tuple(returned)
     if len(features) > _MAX_FEATURES:
         raise RuntimeError(f"{label}: {len(features)} features exceed {_MAX_FEATURES}")
     type_name = _invocation("IFeature", "GetTypeName2")
-    if features:
-        answered = features[0].GetIDsOfNames(0, "GetTypeName2")
-        com_calls += 1
-        if answered != type_name[0]:
-            raise RuntimeError(
-                f"{label}: GetFeatures returned a dispatch whose GetTypeName2 is "
-                f"dispid {answered}, not IFeature's {type_name[0]}"
-            )
+    answered = features[0].GetIDsOfNames(0, "GetTypeName2")
+    com_calls += 1
+    if answered != type_name[0]:
+        raise RuntimeError(
+            f"{label}: GetFeatures returned a dispatch whose GetTypeName2 is "
+            f"dispid {answered}, not IFeature's {type_name[0]}"
+        )
     visible = _invocation("IFeature", "Visible")
     feature_name = _invocation("IFeature", "Name")
     shown: list[tuple[str, str]] = []
