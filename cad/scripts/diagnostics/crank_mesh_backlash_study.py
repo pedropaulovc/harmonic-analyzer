@@ -157,8 +157,20 @@ class Pose:
     def __init__(self, extra: float, widen16: float, widen64: float,
                  crank_deg: float, lut: dict, gear16: GearDef = SHIPPED16,
                  gear64: GearDef = SHIPPED64, hand16: float = 1.0,
-                 skew64: bool = False) -> None:
+                 skew64: bool = False, yaw16_deg: float = 0.0,
+                 tilt16_deg: float = 0.0) -> None:
         self.gear16, self.gear64 = gear16, gear64
+        # A misaligned crank bore: the pinion axis turned about the pinion's
+        # mid-face centre -- ``yaw16`` about machine y (the plan angle against
+        # the cone journal), ``tilt16`` about machine x (out of the horizontal)
+        # -- so the centre distance at mid-face is unchanged and only the
+        # angular error is measured.
+        ya, ti = math.radians(yaw16_deg), math.radians(tilt16_deg)
+        ry = np.array([[math.cos(ya), 0.0, math.sin(ya)], [0.0, 1.0, 0.0],
+                       [-math.sin(ya), 0.0, math.cos(ya)]])
+        rx = np.array([[1.0, 0.0, 0.0], [0.0, math.cos(ti), -math.sin(ti)],
+                       [0.0, math.sin(ti), math.cos(ti)]])
+        self.rot16 = ry @ rx
         # The shop's straight skewed slot instead of a true helix: each
         # mid-face point runs along its own tangent (w = s * tan(beta))
         # rather than around the pitch cylinder, so it stands off radially
@@ -172,6 +184,7 @@ class Pose:
         self.twist16 = hand16 * gear16.twist_per_mm
         self.crank = math.radians(crank_deg)
         self.z0 = cms.PINION_TOOTH_Z - cms.PINION_FACE / 2.0
+        self.pivot16 = np.array([cms.X_CRANK, self.y_crank, self.z0 + cms.PINION_FACE / 2.0])
         # The seed the voxel study places at seed_off = 0 (tooth-in-gap
         # formula for this centre distance); a 64T angle is 64/16 pinion
         # angles whatever the pitch radii.
@@ -212,8 +225,9 @@ class Pose:
                 p = (GEAR64_SEAT + s * U)[None, :] + (
                     (rr * np.cos(phi))[:, None] * EX + (rr * np.sin(phi))[:, None] * EY
                 )
-                d = np.hypot(p[:, 0] - cms.X_CRANK, p[:, 1] - self.y_crank)
-                pz = p[:, 2] - self.z0
+                loc = self._to_pinion(p)
+                d = np.hypot(loc[:, 0], loc[:, 1])
+                pz = loc[:, 2]
                 keep = (d <= self.g16.ra + 0.05) & (pz >= -0.05) & (pz <= cms.PINION_FACE + 0.05)
                 if keep.any():
                     pts.append(p[keep])
@@ -234,6 +248,12 @@ class Pose:
             th = th - s * self.twist64
         return (np.abs(s) <= cms.GEAR64_FACE / 2.0) & self.g64.material(th, r)
 
+    def _to_pinion(self, p: np.ndarray) -> np.ndarray:
+        """World points -> pinion frame (x, y about its axis, z from its tooth-row start)."""
+        loc = (p - self.pivot16) @ self.rot16
+        loc[:, 2] += cms.PINION_FACE / 2.0
+        return loc
+
     def _pinion_twist(self, z_local: np.ndarray) -> np.ndarray:
         return (z_local - cms.PINION_FACE / 2.0) * self.twist16
 
@@ -242,18 +262,21 @@ class Pose:
         # Pinion boundary -> world; test in the 64T.
         phi = (self.p_th[:, None] - rot) + self._pinion_twist(self.p_z)[None, :]
         r = np.broadcast_to(self.p_r[:, None], phi.shape)
-        x = cms.X_CRANK + r * np.cos(phi)
-        y = self.y_crank + r * np.sin(phi)
-        z = np.broadcast_to(self.z0 + self.p_z[None, :], phi.shape)
-        # Cull to points within reach of the 64T teeth.
-        near = np.hypot(x - GEAR64_SEAT[0], y - GEAR64_SEAT[1]) <= self.g64.ra + 1.5
-        p = np.stack([x[near], y[near], z[near]], axis=1)
+        lx = r * np.cos(phi)
+        ly = r * np.sin(phi)
+        lz = np.broadcast_to(self.p_z[None, :] - cms.PINION_FACE / 2.0, phi.shape)
+        # Cull to points within reach of the 64T teeth (in the pinion frame,
+        # which a sub-degree misalignment barely moves).
+        near = np.hypot(lx + cms.X_CRANK - GEAR64_SEAT[0], ly + self.y_crank - GEAR64_SEAT[1]) <= (
+            self.g64.ra + 1.5
+        )
+        loc = np.stack([lx[near], ly[near], lz[near]], axis=1)
+        p = self.pivot16 + loc @ self.rot16.T
         if self._in64(p).any():
             return True
         # 64T boundary -> pinion frame; test in the pinion.
-        g = self.gear_pts
-        px, py = g[:, 0] - cms.X_CRANK, g[:, 1] - self.y_crank
-        pz = g[:, 2] - self.z0
+        g = self._to_pinion(self.gear_pts)
+        px, py, pz = g[:, 0], g[:, 1], g[:, 2]
         pth = np.arctan2(py, px) + rot - self._pinion_twist(pz)
         in16 = (pz >= 0) & (pz <= cms.PINION_FACE) & self.g16.material(pth, np.hypot(px, py))
         return bool(in16.any())
@@ -310,11 +333,14 @@ class Case:
     gear64: GearDef = SHIPPED64
     hand16: float = 1.0
     skew64: bool = False
+    yaw16: float = 0.0
+    tilt16: float = 0.0
 
     def record(self) -> dict:
         return {
             "case": self.name, "extra": self.extra, "widen16": self.widen16,
             "widen64": self.widen64, "hand16": self.hand16, "skew64": self.skew64,
+            "yaw16": self.yaw16, "tilt16": self.tilt16,
             **{f"g16_{k}": v for k, v in _gear_record(self.gear16).items()},
             **{f"g64_{k}": v for k, v in _gear_record(self.gear64).items()},
         }
@@ -341,8 +367,9 @@ GEAR_KEYS = {"b16": "beta_deg", "b64": "beta_deg", "def16": "definition",
 def parse_case(spec: str) -> Case:
     """``NAME:key=value,...`` over the shipped case.
 
-    Keys: extra, w16, w64, hand16 (+1/-1), skew64 (1: straight skewed slots), b16, b64 (helix deg), def16,
-    def64 (transverse|normal), dpn16, dpn64 (cutter DP), pan16, pan64 (cutter PA).
+    Keys: extra, w16, w64, hand16 (+1/-1), skew64 (1: straight skewed slots), yaw16, tilt16
+    (crank-axis misalignment, deg), b16, b64 (helix deg), def16, def64 (transverse|normal),
+    dpn16, dpn64 (cutter DP), pan16, pan64 (cutter PA).
     """
     name, _, body = spec.partition(":")
     fields: dict = {}
@@ -350,7 +377,7 @@ def parse_case(spec: str) -> Case:
     g64: dict = {}
     for item in filter(None, body.split(",")):
         key, value = item.split("=")
-        if key in ("extra", "w16", "w64", "hand16"):
+        if key in ("extra", "w16", "w64", "hand16", "yaw16", "tilt16"):
             fields[{"w16": "widen16", "w64": "widen64"}.get(key, key)] = float(value)
             continue
         if key == "skew64":
@@ -391,7 +418,8 @@ def main() -> int:
                 continue
             t0 = time.perf_counter()
             pose = Pose(case.extra, case.widen16, case.widen64, float(ph), lut,
-                        case.gear16, case.gear64, case.hand16, case.skew64)
+                        case.gear16, case.gear64, case.hand16, case.skew64,
+                        case.yaw16, case.tilt16)
             res = window(pose, guess)
             if "centre_deg" in res:
                 guess = res["centre_deg"]
