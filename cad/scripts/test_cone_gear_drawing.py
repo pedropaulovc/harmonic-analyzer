@@ -327,6 +327,19 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
         assert front["ToothThickness"][0] > drawing.FRONT_CENTER[0] + half_od
 
 
+# Measured by the layout audit on the T006 sheet (layoutcal2, cone-gear.json):
+# the vertical centre-mark line reaches y 0.1763, and the BlankDia value's text
+# box hangs 0.0036 below its anchor (anchor 0.1791, box bottom 0.1755).
+_T006_CENTRE_MARK_TOP = 0.1763
+_BLANK_DIA_TEXT_DESCENT = 0.0036
+
+
+def test_t006_blank_dia_value_clears_the_centre_mark_line() -> None:
+    """layoutcheck T006: the value sat 0.82 mm down over the centre-mark line."""
+    text_bottom = drawing.front_keep(6)["BlankDia"][1] - _BLANK_DIA_TEXT_DESCENT
+    assert text_bottom >= _T006_CENTRE_MARK_TOP + 0.001
+
+
 def test_invalid_family_member_is_rejected() -> None:
     with pytest.raises(ValueError):
         spec.bore_dia_mm(7)
