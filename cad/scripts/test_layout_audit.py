@@ -3392,6 +3392,12 @@ def test_a_second_callout_of_one_thread_in_a_view_gates():
         pytest.param("M3 THRU", "M3x0.5 - 6H", True, id="metric-coarse-implied"),
         pytest.param("M3x0.5", "m3 X 0.5", True, id="metric-spaced-and-case"),
         pytest.param("M3 x 6 LG", "M3", True, id="metric-length-is-no-pitch"),
+        # Codex P2s on 069ad9dd7 (PRRT_kwDOPHDy386mUsuF, PRRT_kwDOPHDy386mUsuH).
+        pytest.param("1-8 UNC", "1.000-8 UNC", True, id="whole-inch"),
+        pytest.param("M18", "M18x2.5", True, id="metric-coarse-beyond-m16"),
+        pytest.param("1-8 UNC", "#1-8", False, id="whole-inch-is-not-numbered"),
+        pytest.param("1-64 UNC", "#1-64", True, id="bare-numbered-by-its-pitch"),
+        pytest.param("1-1/2-6 UNC", "1 1/2-6", True, id="mixed-number"),
         pytest.param("M3", "M3x0.35", False, id="metric-fine-is-not-coarse"),
         pytest.param("1/4-20 UNC", "1/4-28 UNF", False, id="unc-is-not-unf"),
         pytest.param("#8-32", "#10-32", False, id="another-size"),
@@ -3406,6 +3412,60 @@ def test_a_thread_keys_by_the_thread_it_names(a, b, same):
 
     ours, theirs = thread_designations(a), thread_designations(b)
     assert bool(set(ours) & set(theirs)) is same
+
+
+def _same_thread(a, b):
+    from _layout_audit import thread_designations
+
+    return set(thread_designations(a)) == set(thread_designations(b)) != set()
+
+
+def test_every_iso_261_coarse_size_keys_with_its_implied_pitch():
+    """Every coarse row: "Md" names "Md x p", and not the same size at half
+    the pitch."""
+    from _layout_audit import _METRIC_COARSE_PITCH
+
+    assert len(_METRIC_COARSE_PITCH) == 39
+    for major, pitch in _METRIC_COARSE_PITCH.items():
+        assert _same_thread(f"M{major:g}", f"M{major:g}x{pitch:g}"), major
+        assert not _same_thread(f"M{major:g}", f"M{major:g}x{pitch / 2:g}"), major
+
+
+def test_every_asme_b1_1_numbered_row_keys_with_and_without_its_number_sign():
+    """Every numbered UNC/UNF/UNEF row: "#N-t", "N-t" and its decimal major
+    diameter name one thread."""
+    from _layout_audit import _NUMBERED_TPI
+
+    for number, pitches in _NUMBERED_TPI.items():
+        for tpi in pitches:
+            decimal = f".{round((0.060 + 0.013 * number) * 1000):03d}"
+            assert _same_thread(f"#{number}-{tpi:g}", f"{number}-{tpi:g} UNC"), (number, tpi)
+            assert _same_thread(f"#{number}-{tpi:g}", f"{decimal}-{tpi:g}"), (number, tpi)
+
+
+@pytest.mark.parametrize(
+    ("size", "decimal", "pitches"),
+    [
+        ("1", "1.000", (8, 12, 20)),
+        ("1-1/4", "1.250", (7, 12, 18)),
+        ("1-1/2", "1.500", (6, 12, 18)),
+        ("1-3/4", "1.750", (5,)),
+        ("2", "2.000", (4.5,)),
+        ("2-1/2", "2.500", (4,)),
+        ("3", "3.000", (4,)),
+        ("4", "4.000", (4,)),
+    ],
+)
+def test_every_asme_b1_1_whole_inch_row_keys_as_inches(size, decimal, pitches):
+    """B1.1 Table 2A whole-inch rows: the bare size, its decimal and (for a
+    mixed number) the spaced form name one thread, and a bare whole number
+    is never read as the numbered size of the same number."""
+    for tpi in pitches:
+        assert _same_thread(f"{size}-{tpi:g} UNC", f"{decimal}-{tpi:g}"), (size, tpi)
+        if "-" in size:
+            assert _same_thread(f"{size}-{tpi:g}", f"{size.replace('-', ' ')}-{tpi:g}"), (size, tpi)
+        else:
+            assert not _same_thread(f"{size}-{tpi:g}", f"#{size}-{tpi:g}"), (size, tpi)
 
 
 def test_a_note_restating_a_callouts_numbered_thread_with_a_number_sign_gates():

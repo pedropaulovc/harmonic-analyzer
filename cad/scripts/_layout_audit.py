@@ -242,56 +242,85 @@ _UNLEADERED_KINDS = frozenset({"dim", "geometry", "section-line", "detail-circle
 # 24cbab237). ``thread_designations`` keys each by the thread it names, not
 # by how it prints.
 #   unified: a size, then threads per inch: "#8-32", "8-32" (numbered),
-#   "1/4-20", '1/4"-20', ".250-20", spaces allowed around the hyphen; the
-#   series ("UNC", "UNF") may follow, joined or not;
+#   "1/4-20", '1/4"-20', ".250-20", "1-8", "1.000-8", "1-1/2-6",
+#   "1 1/2-6", spaces allowed around the hyphen; the series ("UNC", "UNF")
+#   may follow, joined or not;
 #   metric: "M3", "M3x0.5", "M3 x 0.5", "M6x1.0-6H".
 _THREAD = re.compile(
     r"""(?<![\w/.#])
     (?:
-        (?P<size>\#?\d+(?:/\d+)?|\d*\.\d+)"?\s*-\s*(?P<tpi>\d+(?:\.5)?)(?=\s|[,;]|UN|$)
+        (?P<size>\d+[ -]\d+/\d+|\#?\d+(?:/\d+)?|\d*\.\d+)"?\s*-\s*(?P<tpi>\d+(?:\.5)?)(?=\s|[,;]|UN|$)
       | M(?P<major>\d+(?:\.\d+)?)(?:\s*[X×]\s*(?P<pitch>\d+(?:\.\d+)?))?(?=\s|[,;-]|$)
     )""",
     re.IGNORECASE | re.VERBOSE,
 )
-# ISO 261 coarse pitch by major diameter (mm): "M3" means M3x0.5. A size
-# not listed keys by its major diameter alone, matching only another
-# pitchless designation of that size.
+# ISO 261:1998 Table 1, coarse pitch by nominal diameter (mm), first and
+# second choice M1 to M64, plus the two third-choice sizes the coarse column
+# lists (M9, M11): "M18" means M18x2.5. A size not listed keys by its major
+# diameter alone, matching only another pitchless designation of that size.
 _METRIC_COARSE_PITCH = {
-    1.0: 0.25, 1.2: 0.25, 1.4: 0.3, 1.6: 0.35, 2.0: 0.4, 2.5: 0.45, 3.0: 0.5, 3.5: 0.6, 4.0: 0.7,
-    5.0: 0.8, 6.0: 1.0, 8.0: 1.25, 10.0: 1.5, 12.0: 1.75, 14.0: 2.0, 16.0: 2.0, 20.0: 2.5, 24.0: 3.0,
+    1.0: 0.25, 1.1: 0.25, 1.2: 0.25, 1.4: 0.3, 1.6: 0.35, 1.8: 0.35, 2.0: 0.4, 2.2: 0.45,
+    2.5: 0.45, 3.0: 0.5, 3.5: 0.6, 4.0: 0.7, 4.5: 0.75, 5.0: 0.8, 6.0: 1.0, 7.0: 1.0,
+    8.0: 1.25, 9.0: 1.25, 10.0: 1.5, 11.0: 1.5, 12.0: 1.75, 14.0: 2.0, 16.0: 2.0, 18.0: 2.5,
+    20.0: 2.5, 22.0: 2.5, 24.0: 3.0, 27.0: 3.0, 30.0: 3.5, 33.0: 3.5, 36.0: 4.0, 39.0: 4.0,
+    42.0: 4.5, 45.0: 4.5, 48.0: 5.0, 52.0: 5.0, 56.0: 5.5, 60.0: 5.5, 64.0: 6.0,
 }  # fmt: skip
-# ASME B1.1 numbered sizes 0..12: major diameter 0.060 + 0.013 N inch. Its
-# series run 4 (4" UNC) to 80 (#0-80) threads per inch; a "size-count"
-# outside that is not a thread (a tolerance "0.005 - 0.025" can read as one).
+# ASME B1.1-2019 Table 2A (UNC, UNF, UNEF), the numbered sizes: threads per
+# inch by size number, major diameter 0.060 + 0.013 N inch. A bare "N-TPI"
+# is numbered when TPI is one of N's series pitches ("1-64" is #1-64 UNC),
+# otherwise a whole-inch size ("1-8" is 1-8 UNC). B1.1 whole-inch sizes run
+# to 6 in, and no whole-inch row of 1..6 in carries a pitch of the numbered
+# size of that number (#1 64/72 .. #6 32/40), so the (size, TPI) pair is
+# unambiguous. A bare 7..12 off-series stays numbered (UNS): no whole-inch
+# size that large exists.
+_NUMBERED_TPI = {
+    0: (80.0,), 1: (64.0, 72.0), 2: (56.0, 64.0), 3: (48.0, 56.0), 4: (40.0, 48.0), 5: (40.0, 44.0),
+    6: (32.0, 40.0), 8: (32.0, 36.0), 10: (24.0, 32.0), 12: (24.0, 28.0, 32.0),
+}  # fmt: skip
 _NUMBERED_SIZES = 12
+_WHOLE_INCH_MAX = 6
+# B1.1 series run 4 (4-UN) to 80 (#0-80) threads per inch; a "size-count"
+# outside that is not a thread (a tolerance "0.005 - 0.025" can read as one).
 _TPI_RANGE = (4.0, 80.0)
 
 
-def _unified_diameter(size: str) -> float | None:
-    """A unified size's major diameter in inches: "#8" / "8" (numbered),
-    "1/4", ".250". None for what no unified size prints as."""
-    size = size.lstrip("#")
+def _unified_diameter(size: str, tpi: float) -> float | None:
+    """A unified size's major diameter in inches: "#8" / "8" (numbered, by
+    ``_NUMBERED_TPI``), "1" (whole inch), "1/4", "1-1/2" or "1 1/2", ".250"
+    or "1.000". None for what no unified size prints as."""
+    mixed = re.fullmatch(r"(\d+)[ -](\d+)/(\d+)", size)
+    if mixed is not None:
+        whole, numerator, denominator = (int(part) for part in mixed.groups())
+        return whole + numerator / denominator if denominator else None
     if "/" in size:
         numerator, denominator = size.split("/")
         return int(numerator) / int(denominator) if int(denominator) else None
     if "." in size:
-        return float(size) if 0.06 <= float(size) <= 4.0 else None
-    number = int(size)
-    return 0.060 + 0.013 * number if number <= _NUMBERED_SIZES else None
+        return float(size) if 0.06 <= float(size) <= _WHOLE_INCH_MAX else None
+    number = int(size.lstrip("#"))
+    numbered = 0.060 + 0.013 * number
+    if size.startswith("#"):
+        return numbered if number <= _NUMBERED_SIZES else None
+    if tpi in _NUMBERED_TPI.get(number, ()):
+        return numbered
+    if 1 <= number <= _WHOLE_INCH_MAX:
+        return float(number)
+    return numbered if number <= _NUMBERED_SIZES else None
 
 
 def thread_designations(text: str) -> dict[tuple[Any, ...], str]:
     """Each thread ``text`` names, keyed by the thread itself, with the first
     printed form of it. Only forms that name the same thread share a key:
-    "#8-32" and "8-32 UNC"; "1/4-20", '1/4"-20' and ".250-20"; "M3", "M3x0.5"
-    and "m3 x 0.5". "M3x0.35" (fine) keys apart from "M3" (coarse). A
-    metric "x" count over half the major diameter is a length ("M3 x 6"),
+    "#8-32" and "8-32 UNC"; "1/4-20", '1/4"-20' and ".250-20"; "1-8" and
+    "1.000-8" (whole inch) but not "#1-64"; "M18" and "M18x2.5"; "M3",
+    "M3x0.5" and "m3 x 0.5". "M3x0.35" (fine) keys apart from "M3" (coarse).
+    A metric "x" count over half the major diameter is a length ("M3 x 6"),
     not a pitch, and the thread is the coarse one."""
     found: dict[tuple[Any, ...], str] = {}
     for match in _THREAD.finditer(text):
         if match.group("size") is not None:
-            diameter = _unified_diameter(match.group("size"))
             tpi = float(match.group("tpi"))
+            diameter = _unified_diameter(match.group("size"), tpi)
             if diameter is None or not _TPI_RANGE[0] <= tpi <= _TPI_RANGE[1]:
                 continue
             key: tuple[Any, ...] = ("unified", round(diameter, 4), tpi)
