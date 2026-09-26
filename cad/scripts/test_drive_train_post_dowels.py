@@ -75,3 +75,36 @@ def test_the_pin_seats_by_its_mid_length_plane_and_is_read_back_tight() -> None:
     assert 2.0 * bdt._POST_DOWEL_ABOVE_PLATE_TOP >= _MATE_TOL_MM
     source = Path(bdt.__file__).read_text(encoding="utf-8")
     assert "if abs(seated[1] - dowel_o[1]) > 1e-3:" in source
+
+
+def test_the_cone_crank_sequence_presses_the_pins_recessed_from_the_constant() -> None:
+    """Main's MHA-151 eye pass: the install moved off the part sheet into the
+    step that fits MHA-016 to MHA-091, with the recess read from
+    POST_DOWEL_RECESS, never retyped."""
+    import draw_drive_train_assembly as drawing
+
+    steps = " ".join(drawing.CONE_CRANK_STEPS.split())
+    assert "PRESS 2X MHA-151 INTO MHA-091" in steps
+    assert f"RECESSED {dowel.POST_DOWEL_RECESS:.2f} INTO ITS SLIDE FACE, NEVER PROUD" in steps
+    assert "MATCH-DRILL/REAM THE DOWEL PAIR" in steps
+    # It sits in step 2, after the post is screwed down and before step 3.
+    step2 = steps.index("2. SCREW MHA-016 TO MHA-091")
+    assert step2 < steps.index("PRESS 2X MHA-151") < steps.index("3. THREAD MHA-097")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "{POST_DOWEL_RECESS:.2f}" in source
+    assert "RECESSED 0.25" not in source
+
+
+def test_both_ream_callouts_name_the_mating_part_on_their_sheets() -> None:
+    """Guard: each sheet prints its dowel ream with the MATCH-DRILL/REAM
+    prefix naming the mating part (cone_post_dowel_spec)."""
+    import draw_cone_pivot_post
+    import draw_cone_swing_platform
+
+    assert dowel.PLATE_DOWEL_CALLOUT.startswith("MATCH-DRILL/REAM WITH\nMHA-016")
+    assert dowel.POST_DOWEL_CALLOUT.startswith("MATCH-DRILL/REAM WITH\nMHA-091")
+    for module, name in (
+        (draw_cone_swing_platform, "PLATE_DOWEL_CALLOUT"),
+        (draw_cone_pivot_post, "POST_DOWEL_CALLOUT"),
+    ):
+        assert f"process={name}," in Path(module.__file__).read_text(encoding="utf-8")

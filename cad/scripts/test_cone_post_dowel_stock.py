@@ -33,11 +33,10 @@ def test_stock_identity_is_the_dowel_the_post_spec_names() -> None:
     assert row["stock_name"] == spec.stock_name
     assert row["process"] == "purchased"
     assert int(row["quantity"]) == len(dowel.POST_DOWEL_PLATE_XZ) == 2
-    notes = row["installation_notes"]
-    for number in ("MHA-016", "MHA-091"):
-        assert number in notes
-    for token in ("0.", "1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9."):
-        assert token not in notes
+    # Main's MHA-151 eye pass (rule 6): pressing the pins into MHA-091 is an
+    # assembly METHOD, so the part sheet keeps only the standard purchased-part
+    # block; the drive-train assembly sequence carries the install.
+    assert not str(row.get("installation_notes") or "").strip()
 
 
 def test_replay_section_matches_the_catalog_pin() -> None:

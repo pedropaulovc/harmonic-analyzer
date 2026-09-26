@@ -43,6 +43,7 @@ from _drawing_common import (
 )
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from cone_post_dowel_spec import POST_DOWEL_RECESS
 from drive_train_assembly_spec import (
     CLUSTERS,
     EXPLODED_VIEW_NAME,
@@ -355,6 +356,13 @@ CONE_CRANK_STEPS = "\n".join(
         "   FIT AND CHAMFER THE END: FLUSH TO 0.3 SHORT OF THE MHA-091",
         "   UNDERSIDE, NEVER PROUD (NOMINAL LENGTH 86.0). ENGAGEMENT 5.92-6.35",
         "   (0.93-1.0D): NAMED EXCEPTION TO RULE 12.",
+        # #917 S1, Main's MHA-151 eye pass: the pin install is an assembly
+        # method, so it lives here, not on the MHA-151 sheet. Each pin presses
+        # into the MHA-091 ream from below and slips into the MHA-016 ream; the
+        # recess is the model's (cone_post_dowel_spec.POST_DOWEL_RECESS).
+        "   MATCH-DRILL/REAM THE DOWEL PAIR THROUGH MHA-091 INTO MHA-016 PER",
+        f"   BOTH PRINTS. PRESS 2X MHA-151 INTO MHA-091, RECESSED {POST_DOWEL_RECESS:.2f}",
+        "   INTO ITS SLIDE FACE, NEVER PROUD. MHA-016 SLIPS OVER THEM.",
         # U30 (user, 2026-09-23, option (a)): one #6-32 button-head screw (W22)
         # up through the MHA-091 slot, height and side set by the shim pack at
         # fit-up. Wording from swing (dt-tip-block-attachment-options-20260923.md

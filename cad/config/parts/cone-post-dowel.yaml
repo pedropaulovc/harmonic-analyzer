@@ -7,11 +7,6 @@ cone-post-dowel:
   material: Alloy Steel
   material_specification: Alloy steel, McMaster-Carr 98381A304
   finish: black oxide
-  installation_notes: |-
-    INSTALLATION - CONE PIVOT POST DOWELS
-    AFTER MATCH-REAMING WITH MHA-016, PRESS INTO MHA-091,
-    ENDS RECESSED BELOW ITS SLIDE FACE, NEVER PROUD.
-    MHA-016 SLIPS OVER THEM.
   quantity: 2
   tolerance_class: machined_block
   fit_class: fastener_clearance
