@@ -36,7 +36,7 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
         spec.CRANK_BORE_DIA,
         spec.CRANK_BORE_HEIGHT,
         spec.CRANK_BORE_OFFSET,
-    ) == (21.93, 11.438, 72.7, 0.0)
+    ) == (21.93, 15.45, 72.7, 0.0)
     assert spec.CRANK_BOSS_LENGTH_IN == 2.8360
     assert round(spec.CRANK_BOSS_LENGTH, 4) == 72.0344
     # The spot face is stationed from the post axis, NOT from the cast collar.
@@ -61,7 +61,7 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
     # build) fails at import, so only mass coherence is left to pin here.
     assert spec.HARVESTED_VOLUME_MM3 == round(part._ANALYTIC_FINAL_MM3, 4)
     assert round(spec.HARVESTED_VOLUME_MM3 * 7.2e-6, 6) == spec.HARVESTED_MASS_KG
-    assert round(part.CRANK_BORE_MM3, 1) == 7401.7
+    assert round(part.CRANK_BORE_MM3, 1) == 13504.8
     assert round(part.CRANK_SPOT_FACE_MM3, 1) == 93.1
     assert round(part.ATTACHMENT_HOLES_MM3, 1) == 7661.6
 
@@ -137,8 +137,8 @@ def test_part_owns_every_printed_decimal_place() -> None:
         *spec.DRAWING_DIMENSIONS.values()
     )
     assert "draw_cone_pivot_post.py" in PRECISION_MIGRATED_DRAWINGS
-    # Only the two running bores earn a third place, and only because their
-    # size limits are what deliver the shaft_in_bushing clearance band.
+    # Only the two bores earn a third place: the cone journal's limits deliver
+    # the shaft_in_bushing clearance band, the crank bore prints its H7.
     assert {
         name
         for name, places in spec.DRAWING_PRECISION_BY_NAME.items()
@@ -146,29 +146,40 @@ def test_part_owns_every_printed_decimal_place() -> None:
     } == {"CrankBoreDia", "JournalBoreDia"}
 
 
-def test_running_bores_close_the_configured_fit_class() -> None:
+def test_running_bore_closes_the_configured_fit_class() -> None:
     import _config
     import cone_gear_shaft_spec
-    import crankshaft_spec
 
     upper, lower = spec.RUNNING_BORE_BAND
     expected = tuple(_config.fit("shaft_in_bushing", "diametral_clearance_mm"))
-    for bore, shaft_nominal, shaft_band in (
-        (
-            spec.CRANK_BORE_DIA,
-            crankshaft_spec.JOURNAL_DIA,
-            crankshaft_spec.JOURNAL_DIA_BAND,
-        ),
-        (
-            spec.BORE_DIA,
-            cone_gear_shaft_spec.JOURNAL_DIA,
-            cone_gear_shaft_spec.SECTION_DIA_BANDS[0],
-        ),
-    ):
-        shaft_max = shaft_nominal + shaft_band[0]
-        shaft_min = shaft_nominal + shaft_band[1]
-        clearances = (bore + lower - shaft_max, bore + upper - shaft_min)
-        assert tuple(round(value, 3) for value in clearances) == expected
+    shaft_nominal = cone_gear_shaft_spec.JOURNAL_DIA
+    shaft_upper, shaft_lower = cone_gear_shaft_spec.SECTION_DIA_BANDS[0]
+    clearances = (
+        spec.BORE_DIA + lower - (shaft_nominal + shaft_upper),
+        spec.BORE_DIA + upper - (shaft_nominal + shaft_lower),
+    )
+    assert tuple(round(value, 3) for value in clearances) == expected
+
+
+def test_crank_bore_is_an_h7_bushing_seat_with_webs_over_the_floor() -> None:
+    """#906 A2 (user, 2026-09-26): Ø15.45 H7, centred, for MHA-149.
+
+    The web numbers are the ruling's print-worst table; each is an import-time
+    assert in the spec against the 1.5 floor, so this pins the table itself.
+    """
+    assert spec.CRANK_BORE_DIA == 15.45
+    assert spec.CRANK_BORE_OFFSET == 0.0
+    assert spec.CRANK_BORE_BAND == (0.018, 0.0)
+    assert spec.WEB_FLOOR_MM == 1.5
+    assert {
+        name: round(web, 2) for name, web in spec.CRANK_BORE_WEBS_WORST.items()
+    } == {
+        "mounting thru hole": 1.58,
+        "mounting counterbore": 1.51,
+        "top face": 3.89,
+        "crank boss OD": 2.83,
+    }
+    assert "MHA-149" in spec.DRAWING_NOTES.splitlines()[0]
 
 
 def test_nothing_else_on_the_casting_carries_a_band() -> None:
@@ -182,7 +193,8 @@ def test_nothing_else_on_the_casting_carries_a_band() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert source.count("set_dimension_bilateral_tolerance(") == 3
     assert "set_dimension_symmetric_tolerance" not in source
-    assert source.count("deviations(RUNNING_BORE_BAND)") == 2
+    assert source.count("deviations(RUNNING_BORE_BAND)") == 1
+    assert source.count("deviations(CRANK_BORE_BAND)") == 1
     assert source.count("deviations(CRANK_ABOVE_CONE_BAND)") == 1
     assert not hasattr(spec, "TURNED_DIAMETER_TOLERANCE_MM")
     assert not hasattr(spec, "CRANK_BORE_TOLERANCE_MM")
@@ -220,11 +232,15 @@ def test_machined_faces_are_called_out_on_the_casting() -> None:
         surface_finish_by_key(spec.SURFACE_FINISHES, "foot_seat").roughness_um
         == SEAT_UM
     )
-    for key in ("crank_bore", "journal_bore"):
-        assert (
-            surface_finish_by_key(spec.SURFACE_FINISHES, key).roughness_um
-            == MACHINED_UM
-        )
+    # #906 A2: the crank bore seats the bushing; only the cone journal runs.
+    assert (
+        surface_finish_by_key(spec.SURFACE_FINISHES, "crank_bore").roughness_um
+        == SEAT_UM
+    )
+    assert (
+        surface_finish_by_key(spec.SURFACE_FINISHES, "journal_bore").roughness_um
+        == MACHINED_UM
+    )
     seat = surface_finish_by_key(spec.SURFACE_FINISHES, "foot_seat").face
     assert seat.normal == (0, -1, 0) and seat.offset_mm == 0.0
     crank = surface_finish_by_key(spec.SURFACE_FINISHES, "crank_bore").face
