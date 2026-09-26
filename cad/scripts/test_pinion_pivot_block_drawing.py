@@ -215,7 +215,7 @@ def test_rig_layout_sets_the_front_block_by_feeler_off_the_back_stop() -> None:
     assert rig.STRAP_Z_OUTER[1] - rig.STRAP_Z_INNER[1] == THICKNESS
 
 
-def test_rig_layout_shaft_and_rod_stay_flush_with_the_block_faces() -> None:
+def test_rig_layout_shaft_and_rod_are_set_back_flush() -> None:
     import pinion_rig_layout as rig
     from pinion_lift_rod_spec import ROD_LEN
     from pinion_pivot_shaft_spec import SHAFT_LEN
@@ -232,9 +232,9 @@ def test_rig_layout_shaft_and_rod_stay_flush_with_the_block_faces() -> None:
     )
     proud = rig.FRONT_BLOCK_Z0 - rig.LIFT_ROD_Z0
     assert rig.LEVER_SEAT_PROUD - 1e-9 <= proud <= rig.LEVER_SEAT_PROUD + 0.1
-    # The shaft is budgeted on the worst fitted stack (its own test below);
-    # at nominal it stands that allowance proud of the front block.
-    assert (SHAFT_LEN, ROD_LEN) == (185.1, 192.0)
+    # Both are budgeted on the worst fitted stack (their own tests); at
+    # nominal each stands that allowance proud of the front block.
+    assert (SHAFT_LEN, ROD_LEN) == (185.1, 197.0)
 
 
 def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
@@ -290,17 +290,40 @@ def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
     assert ROD_PIN_HOLE_FROM_END + PIN_HOLE_DIA / 2.0 + 0.8 <= BORE_DEPTH
 
 
+def test_worst_stack_bands_are_the_printed_places() -> None:
+    # Codex #837 P1: the worst fitted stack reads each band from the geometry
+    # module that owns it.  Each band is the title-block .X grade, so it holds
+    # only while its dimension prints at one place.
+    import alignment_pinion_spec
+    import pinion_bracket_spec
+    import pinion_lift_rod_spec
+    import pinion_pivot_shaft_spec
+    import pinion_rig_layout as rig
+
+    x_band = 0.8  # title-block .X
+    assert pinion_bracket_spec.DRAWING_PRECISION["Strap"]["Depth"] == 1
+    assert rig.STRAP_T_BAND == pinion_bracket_spec.THICKNESS_BAND == x_band
+    assert alignment_pinion_spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 1
+    assert rig.DRUM_LEN_BAND == x_band
+    assert pinion_lift_rod_spec.DRAWING_PRECISION["Rod"]["Depth"] == 1
+    assert pinion_pivot_shaft_spec.DRAWING_PRECISION["Shaft"]["Depth"] == 1
+    assert rig.LENGTH_BAND == x_band
+    assert not hasattr(rig, "STACK_BAND")  # the stacks name every term
+
+
 def test_front_block_feeler_setting_is_the_ruled_band() -> None:
     # Codex #854 P1: the fit-up setting that makes INNER_SPAN (and
-    # so the 185.1 shaft and 192.0 rod) true is ruling (c)'s 0.25 +/- 0.10
+    # so the 185.1 shaft and 197.0 rod) true is ruling (c)'s 0.25 +/- 0.10
     # feeler between the front strap and the front block.  The band is a
     # named fit-up value so the MHA-A03 step and every worst-case gate read
-    # one source; it never closes the gap or doubles it.  It lives outside
-    # pinion_rig_layout so it stays out of every part's rebuild closure.
+    # one source; it never closes the gap or doubles it.  The layout owns it
+    # (its worst stack sizes the shaft and rod, Codex #837) and pinion_rig_fitup
+    # re-exports it for the print.
     import pinion_rig_fitup as fitup
     import pinion_rig_layout as rig
 
     assert fitup.FRONT_BLOCK_FEELER is rig.FRONT_BLOCK_FEELER
+    assert fitup.FRONT_BLOCK_FEELER_BAND is rig.FRONT_BLOCK_FEELER_BAND
     assert (fitup.FRONT_BLOCK_FEELER, fitup.FRONT_BLOCK_FEELER_BAND) == (0.25, 0.10)
     assert 0.0 < fitup.FRONT_BLOCK_FEELER - fitup.FRONT_BLOCK_FEELER_BAND
     assert fitup.FRONT_BLOCK_FEELER_BAND < fitup.FRONT_BLOCK_FEELER
@@ -389,7 +412,7 @@ def test_spring_blade_stays_on_the_back_strap_flank_at_every_stack() -> None:
     from pinion_bracket_geometry import THICKNESS
     from pinion_bracket_spec import THICKNESS_BAND
 
-    p_max = 0.25 + 0.10
+    p_max = rig.FRONT_BLOCK_FEELER + rig.FRONT_BLOCK_FEELER_BAND
     blade = (rig.SPRING_Z - rig.SPRING_W / 2.0, rig.SPRING_Z + rig.SPRING_W / 2.0)
     for t in (THICKNESS - THICKNESS_BAND, THICKNESS + THICKNESS_BAND):
         for g in (0.0, p_max):
