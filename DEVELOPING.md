@@ -66,18 +66,26 @@ target would leave no selection at all and silently launch the full default
 build. Task names use underscores (`part:pen_rod`), never dashes — a dashed
 name is rejected by `build.py` before the fleet is contacted.
 
-The launcher sets `SOLIDWORKS_POOL_HOME`, `HARMONIC_REMOTE_CACHE_MODE=rw` and
-`PYTHONUNBUFFERED=1`, then runs, from the worktree:
+The launcher sets `SOLIDWORKS_POOL_HOME`, `HARMONIC_REMOTE_CACHE_MODE=rw`,
+`PYTHONUNBUFFERED=1` and `HARMONIC_FARM_PARALLELISM`, then runs, from the
+worktree:
 
 ```
 uv run --frozen python build.py --executor farm --leaf-timeout <minutes> \
-  --verbosity info -n 4 --continue <targets...>
+  --verbosity info --continue <targets...>
 ```
 
-`-n 4` is the submitter's own concurrency, passed explicitly so it wins over the
-`-n 8` (`HARMONIC_FARM_PARALLELISM`) that `build.py` would otherwise insert.
-`--continue` collects later failures instead of stopping at the first; any failed
-task still leaves the run nonzero.
+`build.py` turns `HARMONIC_FARM_PARALLELISM` into `-P thread -n <N>`: that many
+leaves in flight, each waiting on the pool from a thread of one process. The
+launcher resolves N from `-Parallelism`, else an inherited
+`HARMONIC_FARM_PARALLELISM`, else the `_DEFAULT_FARM_PARALLELISM` the worktree's
+own `build.py` declares (16), exports it, and records it as `farm_parallelism`,
+so the run record states the fan-out the build really used. The local
+SolidWorks-free tasks of the same run (`check:*`, `gallery`) do not scale with
+N: they share the machine-wide local slots (`HARMONIC_LOCAL_SLOTS`, 4). Ready
+leaves are submitted slowest-first by the machine's duration ledger
+(`cad/scripts/_farm_order.py`). `--continue` collects later failures instead of
+stopping at the first; any failed task still leaves the run nonzero.
 
 ### Starting one under the supervisor
 
@@ -140,8 +148,9 @@ farm-launch started 20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516 C:\src\
     "HARMONIC_CACHE_SALT": null
   },
   "tag": "smoke",
+  "farm_parallelism": 16,
   "argv": ["uv", "run", "--frozen", "python", "build.py", "--executor", "farm",
-           "--leaf-timeout", "90", "--verbosity", "info", "-n", "4",
+           "--leaf-timeout", "90", "--verbosity", "info",
            "--continue", "part:pen_rod"]
 }
 ```

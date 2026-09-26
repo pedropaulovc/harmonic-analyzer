@@ -4,7 +4,7 @@ import os
 import subprocess
 import tempfile
 import traceback
-from pathlib import PureWindowsPath
+from pathlib import Path, PureWindowsPath
 
 import pytest
 
@@ -191,6 +191,9 @@ def pytest_configure(config):
     Tests therefore never read or write the real store. An explicit setting
     (``off`` or a path) is respected.
 
+    The farm's critical-path duration ledger (``_farm_order``) is redirected
+    the same way, for the same reason.
+
     Refuse every SolidWorks start from this process: ``subprocess`` argv naming
     ``os.startfile``, a ``.lnk`` or a SolidWorks/3DEXPERIENCE launcher image
     (``tasklist`` still reads the process table), in-process ``os.startfile``,
@@ -201,6 +204,12 @@ def pytest_configure(config):
     if "HARMONIC_BUILDGRAPH_CACHE" not in os.environ:
         os.environ["HARMONIC_BUILDGRAPH_CACHE"] = tempfile.mkdtemp(
             prefix="buildgraph-facts-"
+        )
+    # The farm's critical-path ledger is machine-wide too: a test leaf that
+    # "succeeds" in milliseconds must not teach real runs to submit it last.
+    if "HARMONIC_FARM_DURATIONS" not in os.environ:
+        os.environ["HARMONIC_FARM_DURATIONS"] = str(
+            Path(tempfile.mkdtemp(prefix="farm-durations-")) / "farm-durations.json"
         )
     if not _guard_disabled():
         _install_launch_guard()
