@@ -13,7 +13,10 @@ that clears the Ø6.35 pivot bore there.
 
 Layout: axis Z, root (seated) end at the ORIGIN, z 0..15: 4.0 presses
 into the strap's blind edge bore, 13 proud after the v2 linkage closure; domed outer end (sagitta
-0.8, the rod-end crown idiom). Axisymmetric about its local x = 0.
+0.8, the rod-end crown idiom). Axisymmetric about its local x = 0.  Shank and
+crown are both Right-plane half-profiles (sketch u = -z), so the diameter,
+length and crown radius all import into the *Right side view, where the pin
+lies as it is turned (rule 7; machinist review of 7f7fc1717).
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 
@@ -30,15 +33,16 @@ import sys
 from _common import (
     POLISHED_STEEL,
     SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
-    define_circle,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
-    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -48,6 +52,7 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    add_diametric_linear_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -90,7 +95,7 @@ V_PIN = math.pi * PIN_R**2 * PIN_LEN
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
+    from solidworks_mcp.adapters.base import RevolveParameters
 
     check("create_part", await adapter.create_part())
 
@@ -102,79 +107,99 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # On-axis pin (origin centre), extruded root -> +Z.
+    # Shank half-profile on the Right plane (sketch u -> model -Z, v -> model
+    # Y; the crank-pinion-pin idiom): the axis centerline from the seated end
+    # at the origin to the crown root, and the rectangle above it.  Its two
+    # dimensions are the print's two -- the length along the outline, the
+    # diameter as a doubled centerline-to-outline dim -- so both import into
+    # the *Right side view.
     pin = SketchDims()
-    check("create_sketch pin", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch pin", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    axis = check("axis centerline", await adapter.add_centerline(0.0, 0.0, -PIN_LEN, 0.0))
+    profile_pts = [(0.0, 0.0), (0.0, PIN_R), (-PIN_LEN, PIN_R), (-PIN_LEN, 0.0)]
+    profile_lines = await add_line_chain(adapter, profile_pts)
+    set_sketch_direct_db(adapter, False)
+    n = len(profile_lines)
+    for i, line in enumerate(profile_lines):
+        (_, y1), (_, y2) = profile_pts[i], profile_pts[(i + 1) % n]
+        direction = "horizontal" if y1 == y2 else "vertical"
+        check(
+            f"pin {direction} {line}",
+            await adapter.add_sketch_constraint(line, None, direction),
+        )
+    outline = profile_lines[1]
+    await dimension_between(
         adapter,
-        0.0,
-        0.0,
-        PIN_R,
-        "pin",
-        dims=pin,
-        names=("PinCx", "PinCz", "PinDia"),
-        drives=(None, None, '"PinDia"'),
+        f"{outline}.start",
+        f"{outline}.end",
+        "horizontal_distance",
+        PIN_LEN,
+        "pin Depth",
+    )
+    pin.record("Depth", '"PinLen"')
+    await add_diametric_linear_dimension(
+        adapter, axis, outline, (-PIN_LEN / 4.0, PIN_R + 4.0), "PinDia"
+    )
+    pin.record("PinDia", '"PinDia"')
+    await anchor_point_to_origin(
+        adapter, f"{profile_lines[0]}.start", 0.0, 0.0, "pin seated end"
     )
     await ensure_fully_defined(adapter, "pin sketch")
     check("exit_sketch pin", await adapter.exit_sketch())
     name_last_feature(adapter, "PinProfile")
     drive_jobs += pin.apply(adapter, "PinProfile")
-    check(
-        "extrude pin",
-        await adapter.create_extrusion(ExtrusionParameters(depth=PIN_LEN)),
-    )
+    check("revolve pin", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Pin")
-    depth_dim = name_dimensions(adapter, "Pin", ["Depth"])
-    drive_jobs += [(depth_dim[0], '"PinLen"')]
     volume = await volume_check(adapter, "pin", V_PIN, 0.005 * V_PIN)
 
-    # Domed outer end (the arbor back-cap idiom; apex -> rim is the minor CCW
-    # lobe at a +Z end).
-    v_base, v_apex = -PIN_LEN, -(PIN_LEN + CAP_SAG)
-    v_centre = -(PIN_LEN + CAP_SAG - CAP_R)
+    # Domed outer end on the same Right plane (the MHA-060 back-cap idiom;
+    # rim -> apex is the minor CCW lobe at a +Z end, u = -z).
+    u_base, u_apex = -PIN_LEN, -(PIN_LEN + CAP_SAG)
+    u_centre = -(PIN_LEN + CAP_SAG - CAP_R)
     cap = SketchDims()
-    check("create_sketch cap", await adapter.create_sketch("Top"))
+    check("create_sketch cap", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
-    check("cap centerline", await adapter.add_centerline(0.0, v_base, 0.0, v_apex))
-    base = check("cap base", await adapter.add_line(0.0, v_base, PIN_R, v_base))
+    check("cap centerline", await adapter.add_centerline(u_base, 0.0, u_apex, 0.0))
+    base = check("cap base", await adapter.add_line(u_base, 0.0, u_base, PIN_R))
     arc = check(
         "cap arc",
-        await adapter.add_arc(0.0, v_centre, 0.0, v_apex, PIN_R, v_base),
+        await adapter.add_arc(u_centre, 0.0, u_base, PIN_R, u_apex, 0.0),
     )
-    close = check("cap close", await adapter.add_line(0.0, v_apex, 0.0, v_base))
+    close = check("cap close", await adapter.add_line(u_apex, 0.0, u_base, 0.0))
     set_sketch_direct_db(adapter, False)
     check(
-        "cap base horizontal",
-        await adapter.add_sketch_constraint(base, None, "horizontal"),
+        "cap base vertical",
+        await adapter.add_sketch_constraint(base, None, "vertical"),
     )
     check(
-        "cap close vertical",
-        await adapter.add_sketch_constraint(close, None, "vertical"),
+        "cap close horizontal",
+        await adapter.add_sketch_constraint(close, None, "horizontal"),
     )
     check(
         "cap rim reach",
         await adapter.add_sketch_dimension(
-            f"{base}.end", "origin", "horizontal_distance", PIN_R
+            f"{base}.end", "origin", "vertical_distance", PIN_R
         ),
     )
     cap.record("CapRim", '"PinDia" / 2')
     check(
         "cap sagitta",
         await adapter.add_sketch_dimension(
-            f"{close}.start", f"{close}.end", "vertical_distance", CAP_SAG
+            f"{close}.start", f"{close}.end", "horizontal_distance", CAP_SAG
         ),
     )
     cap.record("CapSagDim", '"CapSag"')
     check(
         "cap on axis",
         await adapter.add_sketch_constraint(
-            f"{base}.start", "origin", "vertical_points"
+            f"{base}.start", "origin", "horizontal_points"
         ),
     )
     check(
         "cap station",
         await adapter.add_sketch_dimension(
-            f"{base}.start", "origin", "vertical_distance", PIN_LEN
+            f"{base}.start", "origin", "horizontal_distance", PIN_LEN
         ),
     )
     cap.record("CapZ", '"PinLen"')
@@ -211,7 +236,9 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "PinProfile", "PinDia", *deviations(PIN_DIA_BAND)
     )
-    set_dimension_symmetric_tolerance(adapter, "Pin", "Depth", PIN_LENGTH_TOLERANCE_MM)
+    set_dimension_symmetric_tolerance(
+        adapter, "PinProfile", "Depth", PIN_LENGTH_TOLERANCE_MM
+    )
     set_dimension_symmetric_tolerance(
         adapter, "CapProfile", "CapR", CAP_RADIUS_TOLERANCE_MM
     )

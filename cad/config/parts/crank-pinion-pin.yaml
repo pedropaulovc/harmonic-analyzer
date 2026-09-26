@@ -1,7 +1,7 @@
 crank-pinion-pin:
   number: MHA-134
-  material: AISI 1018 cold-finished steel rod
-  material_specification: AISI 1018 cold-finished steel rod
+  material: AISI 1018 CF or drill rod, 1/8 in
+  material_specification: AISI 1018 cold-finished steel rod or stock 1/8 in drill rod
   finish: bright, oiled
   quantity: 1
   tolerance_class: machined_block

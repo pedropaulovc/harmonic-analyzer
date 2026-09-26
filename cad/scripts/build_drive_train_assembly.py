@@ -1798,7 +1798,7 @@ _GRIP_HEAD_Z = (
 )
 # In-assembly bodies near the grip: everything of the swing rig ends well
 # north of the crossrod band; the crank cluster lives south/east of it.
-for _lo, _hi, _what in (
+_SWING_RIG_BANDS = (
     (
         LEVER_Z - LEVER_HUB_LEN / 2.0 - LEVER_CAP_SAG,
         LEVER_Z + LEVER_HUB_LEN / 2.0,
@@ -1808,11 +1808,21 @@ for _lo, _hi, _what in (
     (LIFT_ROD_Z0, LIFT_ROD_Z0 + RIG.LIFT_ROD_LEN, "lift rod"),
     (PIVOT_SHAFT_Z0, PIVOT_SHAFT_Z0 + RIG.TORQUE_SHAFT_LEN, "pivot shaft"),
     (RIG.STRAP_Z_OUTER[0], RIG.STRAP_Z_INNER[0], "front strap"),
+)
+for _lo, _hi, _what in (
+    *_SWING_RIG_BANDS,
     (REMOVABLE_Z0, REMOVABLE_Z0 + 5.0, "T12 chain wheel"),
     (CRANK_ARM_Z0, CRANK_ARM_Z0 + ARM_THICKNESS, "crank arm hub"),
 ):
     if _GRIP_ROD_Z[1] > _lo - 0.25 and _GRIP_ROD_Z[0] < _hi + 0.25:
         raise AssertionError(f"grip-crossrod sweep band reaches the {_what}")
+# The integral head's own band (front crown apex to neck shoulder) spins with
+# the arbor and is wider than the crossrod's, so it is proved against the same
+# swing-rig bodies directly rather than inferred from the rod band.  The T12
+# wheel and the crank arm keep their own head checks below.
+for _lo, _hi, _what in _SWING_RIG_BANDS:
+    if _GRIP_HEAD_Z[1] > _lo - 0.25 and _GRIP_HEAD_Z[0] < _hi + 0.25:
+        raise AssertionError(f"integral grip-head band reaches the {_what}")
 # The head's wider z band clips the T12 plane, so use radial clearance instead.
 # The crank-arm/handle sweep is axially disjoint from the integral head.
 if (

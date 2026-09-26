@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import pinion_cam_pin_spec
 import draw_pinion_cam_pin as drawing
 import build_pinion_cam_pin as pin
@@ -23,7 +25,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert pin.SURFACE_FINISHES is pinion_cam_pin_spec.SURFACE_FINISHES
     assert drawing.SURFACE_FINISHES is pinion_cam_pin_spec.SURFACE_FINISHES
     marked = set().union(*pinion_cam_pin_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    kept = set(drawing.RIGHT_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
     assert drawing.PIN_DIA == pinion_cam_pin_spec.PIN_DIA
@@ -36,27 +38,44 @@ def test_sheet_runs_at_8_to_1_with_a_4_to_1_pictorial() -> None:
     assert drawing.SHEET_SCALE == (8.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '"*Front", *FRONT_CENTER, scale=(8, 1)' in source
-    assert '"*Top", *RIGHT_CENTER, scale=(8, 1)' in source
+    assert '"*Right", *RIGHT_CENTER, scale=(8, 1)' in source
     assert '"*Isometric", *ISO_CENTER, scale=(4, 1)' in source
-    # The crown radius belongs to a sketch on the Top plane.  The equivalent
-    # axisymmetric side elevation must face that plane to import CapR natively.
-    assert '"*Right", *RIGHT_CENTER' not in source
+    # Every marked dimension belongs to a sketch on the Right plane, so the
+    # side view must face that plane to import them natively.
+    assert '"*Top", *RIGHT_CENTER' not in source
+    build_source = Path(pin.__file__).read_text(encoding="utf-8")
+    assert build_source.count('create_sketch("Right")') == 2
+    assert 'create_sketch("Top")' not in build_source
+    assert 'create_sketch("Front")' not in build_source
     assert pinion_cam_pin_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 4:1"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
     assert "End View Note" not in source
 
 
-def test_elevation_fits_the_sheet_and_clears_the_title_block() -> None:
-    half = drawing.OVERALL / 2.0 * drawing._S
-    top = drawing.RIGHT_CENTER[1] + half
-    bottom = drawing.RIGHT_CENTER[1] - half
-    assert top < 0.262  # inner border ~0.267
-    assert bottom > 0.068  # title block top ~0.065
-    # The two lengths sit left of the elevation, the crown leaders right.
-    left_edge = drawing.RIGHT_CENTER[0] - drawing.PIN_DIA / 2.0 * drawing._S
-    right_edge = drawing.RIGHT_CENTER[0] + drawing.PIN_DIA / 2.0 * drawing._S
-    assert drawing.OVERALL_TEXT_XY[0] < drawing.RIGHT_KEEP["Depth"][0] < left_edge
-    assert drawing.RIGHT_KEEP["CapR"][0] > right_edge
+def test_side_view_lies_as_turned_with_the_end_view_in_projection() -> None:
+    """Machinist review of 7f7fc1717: the end view sat beside a vertical
+    elevation, out of projection, carrying the only diameter.  The side view
+    now lies horizontal (rule 7, turned parts), the end view projects to its
+    left on the same Y station (third angle), and the Ø prints on the side
+    view beside the length."""
+    assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1]
+    crown_apex_x = drawing.side_view_x(drawing.OVERALL)
+    seated_end_x = drawing.side_view_x(0.0)
+    assert seated_end_x - crown_apex_x == pytest.approx(drawing.OVERALL * drawing._S)
+    end_view_right = drawing.FRONT_CENTER[0] + drawing.HALF_DIA
+    assert end_view_right + 0.050 < crown_apex_x
+    assert seated_end_x < 0.325  # clear of the isometric's note column
+    assert drawing.ISO_NOTE_XY[0] > seated_end_x + 0.015
+    top = drawing.RIGHT_CENTER[1] + drawing.HALF_DIA
+    bottom = drawing.RIGHT_CENTER[1] - drawing.HALF_DIA
+    # The two lengths sit above the view (overall outermost), the diameter
+    # below, the crown leaders at the lower left of the crown.
+    assert top < drawing.RIGHT_KEEP["Depth"][1] < drawing.OVERALL_TEXT_XY[1] < 0.255
+    assert 0.080 < drawing.RIGHT_KEEP["PinDia"][1] < bottom
+    assert drawing.RIGHT_KEEP["PinDia"][0] > drawing.RIGHT_CENTER[0]
+    for x, y in (drawing.RIGHT_KEEP["CapR"], drawing.CROWN_FINISH_SYMBOL_XY):
+        assert end_view_right < x < crown_apex_x
+        assert 0.080 < y < drawing.RIGHT_CENTER[1]
 
 
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
@@ -122,7 +141,7 @@ def test_no_gdt_and_the_crown_carries_the_finish() -> None:
     ).read_text(encoding="utf-8")
     assert model_toleranced_dimensions(pin) == {
         ("PinProfile", "PinDia"): "*deviations(PIN_DIA_BAND)",
-        ("Pin", "Depth"): "PIN_LENGTH_TOLERANCE_MM",
+        ("PinProfile", "Depth"): "PIN_LENGTH_TOLERANCE_MM",
         ("CapProfile", "CapR"): "CAP_RADIUS_TOLERANCE_MM",
     }
     assert "FINAL SIZE" not in drawing.DIMENSION_CALLOUTS["PinDia"]
@@ -152,20 +171,32 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert int(spec["quantity"]) == 2
 
 
-def test_pin_diameter_callout_names_the_title_block_stock() -> None:
+def test_pin_diameter_callout_leaves_the_stock_to_the_title_block() -> None:
     """Codex P2 on #814: the PinDia callout said drill rod while the title
-    block said AISI 1018 rod.  Both now read the registry row, and the h9
-    bonded slip fit assumes the drill rod it names."""
+    block said AISI 1018 rod.  Machinist review of 7f7fc1717: naming the stock
+    on the callout at all repeated the Material cell.  The callout now states
+    only the fit, so it cannot disagree with the title block, and the h9
+    bonded slip fit still assumes the drill rod the registry row names."""
     import _config
 
     row = _config.parts("pinion-cam-pin")
     callout = drawing.DIMENSION_CALLOUTS["PinDia"]
     assert callout is pinion_cam_pin_spec.PIN_DIA_CALLOUT
-    stock, fit = callout.split(";\n")
-    assert stock == row["material_specification"].upper()
+    assert callout == f"SLIP FIT IN {pinion_cam_pin_spec.SEAT_NUMBER} FOLLOWER SEAT"
+    assert "DRILL ROD" not in callout.upper()
+    assert row["material_specification"].upper() not in callout.upper()
     assert "drill rod" in row["material_specification"].lower()
-    assert fit == f"SLIP FIT IN {pinion_cam_pin_spec.SEAT_NUMBER} FOLLOWER SEAT"
     assert "drill rod" in row["process"]
+
+
+def test_finish_states_the_condition_not_the_method() -> None:
+    """Machinist review of 7f7fc1717: "crown turned" prescribed a method the
+    crown's radius and roughness already define."""
+    import _config
+
+    finish = _config.parts("pinion-cam-pin")["finish"]
+    assert "turned" not in finish.lower()
+    assert finish == "as-received drill rod; protect with ISO VG 32 machine-oil film"
 
 
 def test_the_part_owns_the_printed_precision() -> None:
