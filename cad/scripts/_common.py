@@ -1383,9 +1383,9 @@ def rebuild_stale_configurations(adapter: Any, part_name: str) -> None:
     -- the common case -- gets no rebuild call at all.  A stale one gets ONE
     IModelDocExtension.EditRebuildAll, which rebuilds what needs it in every
     configuration without activating any (#271 measured the cost of switching;
-    ForceRebuild3 dirties children, #267).  A refused rebuild, a hard What's
-    Wrong fault, or a configuration still stale after it raises, naming the
-    part.
+    ForceRebuild3 dirties children, #267).  A refused rebuild, any non-warning
+    What's Wrong entry (the fleet's fault convention), or a configuration still
+    stale after it raises, naming the part.
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     names = [str(name) for name in (model.GetConfigurationNames() or ())]
@@ -1409,7 +1409,7 @@ def rebuild_stale_configurations(adapter: Any, part_name: str) -> None:
     faults = [
         f"{name} ({_FEATURE_ERROR.get(code, code)})"
         for name, code, warning in whats_wrong(adapter, model)
-        if code > 1 and not warning
+        if not warning
     ]
     if faults:
         raise RuntimeError(f"{part_name}: rebuilding {stale_before} left faults {faults}")
@@ -2422,11 +2422,13 @@ async def name_bore_axis(
     ).name
 
 
-# swFeatureError_e: the codes GetWhatsWrong returns. >1 (warning=False) is a
-# hard rebuild fault; code 1 with the warning flag is informational.
+# swFeatureError_e: the codes GetWhatsWrong returns. Whether an entry is a
+# warning comes from GetWhatsWrong's separate is_warning array, never from
+# the code: every non-warning entry is a fault, code 1 (swFeatureErrorUnknown)
+# included, as verify.py and _assembly's health gates treat them.
 _FEATURE_ERROR = {
     0: "none",
-    1: "warning",
+    1: "unknown-error",
     2: "rebuild-error",
     3: "dangling-no-members",
     4: "dangling-has-members",
