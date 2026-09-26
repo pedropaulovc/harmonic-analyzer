@@ -146,10 +146,17 @@ def rendered_half_face_width(teeth: int) -> float:
     return FACE_WIDTH * numerator / (denominator * 2000.0)
 
 
+# BlankDia's value stands this far above the tip circle.  At 0.012 the T006
+# value (8:1) sat on the vertical centre-mark line, which reaches 26.3 mm
+# above the bore axis on that sheet (layout audit, 0.82 mm overlap); 0.0145
+# clears it, and no other text on any sheet is within 36 mm above the value.
+BLANK_DIA_LIFT = 0.0145
+
+
 def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
     half_od = rendered_half_od(teeth)
     return {
-        "BlankDia": (FRONT_CENTER[0], FRONT_CENTER[1] + half_od + 0.012),
+        "BlankDia": (FRONT_CENTER[0], FRONT_CENTER[1] + half_od + BLANK_DIA_LIFT),
         # One measured exterior lane keeps the full stacked fit callout inside
         # the left border on every scale/configuration.  Do not derive X from
         # gear diameter: that pushed the large-family text through the border.
