@@ -13,7 +13,7 @@ import channel_kinematics
 import connecting_rod_spec
 import cylinder_bank_layout
 import fulcrum_shaft_spec
-import pivot_shaft_spec
+import rocker_bank_layout
 from _assembly import _seed_flip
 from cone_pivot_post_installation import CHANNEL_Z0, DRUM_X, MECHANISM_Z_SHIFT
 
@@ -51,11 +51,13 @@ def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
         + channel.LEVER_THICKNESS / 2.0
     )
 
-    pivot_min = channel.PIVOT_SHAFT_Z - pivot_shaft_spec.SHAFT_LENGTH / 2.0
-    pivot_max = channel.PIVOT_SHAFT_Z + pivot_shaft_spec.SHAFT_LENGTH / 2.0
+    # #743 PR2: the pivot shaft's origin is its north (shouldered) end; its
+    # cylinder spans both bracket ears (rocker_bank_layout).
+    pivot_max = channel.PIVOT_SHAFT_Z
+    pivot_min = pivot_max - rocker_bank_layout.PIVOT_SHAFT_LENGTH
     assert pivot_min < row_min < row_max < pivot_max
     # 481ec429 (2026-09 pivot-bracket re-derive): the asymmetric A-frame/
-    # support mounts became a symmetric pivot-bracket pair on the 170 shaft.
+    # support mounts became a pivot-bracket pair on the shaft.
     bracket_lo, bracket_hi = channel.PIVOT_BRACKET_Z
     assert pivot_min < bracket_lo < row_min < row_max < bracket_hi < pivot_max
 

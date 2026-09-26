@@ -5,13 +5,16 @@ output: connecting rods riding the integral cams, the rocker-arm seesaw
 bank on its pivot shaft, the amplitude bars running UP the spine, and the
 top-lever bank on its fulcrum shaft with the channel springs hanging from
 the lever tips, each retained by a stock eyebolt threaded into the plate.
-128 components:
+129 components:
 
 Coordinates are machine frame (#151: crank at machine -X, output side -Z;
 the M6.8 mirror layer is gone).
 
-* pivot-shaft x1 (rocker bank at (72.9, 253.8), along Z, centred on the
-  20-station stack, 170 long -- 2026-09: ends 4 past each bracket ear)
+* pivot-shaft x1 (rocker bank at (72.9, 253.8), along Z; #743 PR2: an
+  integral shoulder on the north ear's inner face, the cylinder spanning
+  both ears, each end domed -- rocker_bank_layout)
+* rocker-thrust-washer x1 (MHA-148, between rocker 0's hub and the south
+  ear; the end-play leaf is set between it and the ear)
   + fulcrum-shaft x1 (lever bank at (199.9, 1061.4), 182 long - the
   228.6 shaft clipped the west columns at top level, M6.5)
 * pivot-bracket x2 (2026-09 photo re-derive, ch14 page002_img01/img07: the
@@ -237,7 +240,7 @@ if abs(Z0 - CHANNEL_Z0) > 1e-9:
     raise AssertionError(
         f"channels.station_z0_mm {Z0:g} != installation contract {CHANNEL_Z0:g}"
     )
-ARM_MID_DZ = 0.8  # arm/bar/lever mid-planes at z_j + 0.8
+from rocker_bank_layout import ARM_MID_DZ  # noqa: E402  (arm/bar/lever mid-planes at z_j + 0.8)
 # End-for-end cylinder gear: the cam / rod-ring mid-plane sits half the gear's
 # overall (stacking) thickness south of z_j, centred in the closed rod slot
 # between gear j's web and gear j-1's back face (#743 solid stack).
@@ -304,14 +307,40 @@ LEVER_THICKNESS = 3.0
 # --- supports / mounts ------------------------------------------------------
 SUPPORT_APEX_Y = 228.6
 CHANNEL_BANK_REAR_SHIFT = MECHANISM_Z_SHIFT
-# Rocker pivot brackets (pivot-bracket, 2026-09): symmetric about the 20-
-# station arm stack's mid-plane, PIVOT_BRACKET_OFF either side -- ear faces
-# 6.7 clear of the outermost arms, feet inside the rocker-arm-support's
-# +-88.9 top (it is the only stand; the old south "A-frame" is gone).
-_STACK_MID_Z = Z0 + ARM_MID_DZ + 19 * PITCH / 2.0  # 3.83 (the full machine)
-PIVOT_BRACKET_OFF = 78.0
-PIVOT_BRACKET_Z = (_STACK_MID_Z - PIVOT_BRACKET_OFF, _STACK_MID_Z + PIVOT_BRACKET_OFF)
-PIVOT_SHAFT_Z = _STACK_MID_Z  # the 170 shaft spans -81.2..88.8: 4 past each ear
+# Rocker pivot brackets, shaft and south washer (#743 PR2, Reading 1): the
+# rocker bank's retention stack, from rocker_bank_layout. The north ear's
+# inner face is the datum the shaft's shoulder bears on; the south ear is
+# feeler-set off the MHA-148 washer on hub 0. Feet inside the rocker-arm-
+# support's +-88.9 top (it is the only stand; the old south "A-frame" is gone).
+from rocker_bank_layout import (  # noqa: E402
+    PIVOT_BRACKET_Z,
+    PIVOT_SHAFT_NORTH_Z,
+    SHOULDER_Z,
+    SOUTH_WASHER_Z,
+    STACK_MID_Z as _STACK_MID_Z,
+    hub_mid_z,
+)
+from pivot_shaft_spec import JOURNAL_LENGTH as _PIVOT_JOURNAL  # noqa: E402
+
+# The pivot shaft's origin is its NORTH cylinder end (its body runs -Z).
+PIVOT_SHAFT_Z = PIVOT_SHAFT_NORTH_Z
+if abs(_STACK_MID_Z - (Z0 + ARM_MID_DZ + 19 * PITCH / 2.0)) > 1e-9:
+    raise AssertionError("rocker_bank_layout's stack mid-plane is not the channel stations'")
+if any(abs(hub_mid_z(j) - (Z0 + PITCH * j + ARM_MID_DZ)) > 1e-9 for j in (0, 19)):
+    raise AssertionError("rocker_bank_layout's hub stations are not the channel stations")
+# The shaft is the fixed seed, so a wrong origin would fail silently.
+if abs(PIVOT_SHAFT_Z - _PIVOT_JOURNAL - SHOULDER_Z[1]) > 1e-9:
+    raise AssertionError("pivot shaft shoulder is not on the north ear's inner face")
+# Likewise the datum-located south washer: its part runs z 0..THICKNESS from
+# its origin (a Front-plane annulus extruded +Z), so IDENTITY at
+# SOUTH_WASHER_Z[0] must put its north face on hub 0's south face.
+from rocker_arm_spec import HUB_LENGTH as _ROCKER_HUB_LENGTH  # noqa: E402
+from rocker_thrust_washer_spec import THICKNESS as _WASHER_THICK  # noqa: E402
+
+if abs(SOUTH_WASHER_Z[1] - SOUTH_WASHER_Z[0] - _WASHER_THICK) > 1e-9:
+    raise AssertionError("south thrust washer is not rocker_thrust_washer_spec's thickness")
+if abs(SOUTH_WASHER_Z[1] - (hub_mid_z(0) - _ROCKER_HUB_LENGTH / 2.0)) > 1e-9:
+    raise AssertionError("south thrust washer's north face is not on hub 0's south face")
 RAIL_TOP_Y = 1036.2  # new top-frame casting top face (was 1040.7; the rederive
 # dropped the rail top 4.5 -- the ball-mount seats and the whole fulcrum chain
 # follow)
@@ -350,7 +379,7 @@ from stock_anchor_geom import ANCHOR_9489T111  # noqa: E402
 from _hole_spec import blind_cut_dia_mm  # noqa: E402
 from rocker_arm_spec import HUB_DIA as ROCKER_HUB_DIA, HUB_LENGTH as ROCKER_HUB_LENGTH  # noqa: E402
 from channel_lever_spec import HUB_LENGTH as LEVER_HUB_LENGTH  # noqa: E402
-from build_pivot_bracket import FOOT_H as PIVOT_BRACKET_FOOT_H  # noqa: E402
+from pivot_bracket_spec import FOOT_H as PIVOT_BRACKET_FOOT_H  # noqa: E402
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 
@@ -860,6 +889,19 @@ async def build(adapter) -> dict[str, str]:
             label=f"pivot-bracket rocker z{mount_z:+.0f}",
         )
         await _locate_to_datum(adapter, mount)
+    # South thrust washer (MHA-148): on the shaft against rocker 0's hub, the
+    # end-play leaf between it and the south ear. Free-space structure here,
+    # datum-located like the brackets.
+    washer = await place_component(
+        adapter,
+        "rocker-thrust-washer",
+        [PIVOT[0], PIVOT[1], SOUTH_WASHER_Z[0]],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="rocker-thrust-washer south",
+    )
+    await _locate_to_datum(adapter, washer)
     # Fulcrum end keepers (MHA-120): the black shaft-END brackets of the
     # ch17 p.40 closeup -- an upright lug sockets a ball on each shaft end,
     # the foot screwed down to the rail top face. Part +X points outboard
