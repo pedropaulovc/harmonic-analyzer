@@ -80,8 +80,13 @@ if RELIEF_WIDTH_RANGE[0] < FACING_NOSE_RADIUS:
     raise AssertionError("a narrow relief leaves the facing tool's nose radius")
 if (RELIEF_DIA + LINEAR_3PL) / 2.0 + CORNER_RADIUS_MAX > SHAFT_DIA_MIN / 2.0:
     raise AssertionError("a shallow relief leaves its corner radius above the O.D.")
-if JOURNAL_LENGTH - RELIEF_WIDTH_RANGE[1] < JOURNAL_LENGTH / 2.0:
-    raise AssertionError("a wide relief leaves the north journal under half its ear")
+# What a relieved journal must keep: plain bearings are laid out from L/d 0.5
+# up, and shorter ones guide poorly. The north journal bears over the ear's
+# thickness less the groove at its inner face; hub 19 over its length less
+# the groove at the south face (test_pivot_shaft_drawing checks the hub).
+BEARING_LENGTH_MIN = 0.5 * SHAFT_DIA
+if JOURNAL_LENGTH - RELIEF_WIDTH_RANGE[1] < BEARING_LENGTH_MIN:
+    raise AssertionError("a wide relief leaves the north journal under L/d 0.5")
 RELIEF_CALLOUT = "BOTH SHOULDER FACES"
 
 # Probe stations (part z, mm) that name each O6.35 face: the body just past

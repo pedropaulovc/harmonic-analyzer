@@ -194,100 +194,193 @@ def test_hub_length_prints_its_one_sided_band() -> None:
     assert f"{rocker_arm_spec.HUB_LENGTH:.2f}" not in rocker_arm_notes.DRAWING_NOTES
 
 
-def test_datum_a_is_the_pivot_bore_picked_by_its_diameter() -> None:
-    """r743-4D: the rim-coordinate pick put datum A's triangle on the O10 hub
-    circle, which changes what the A-B-C frame controls. Datum A must attach
-    to the edge picked by the pivot bore's diameter."""
-    import ast
-
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    picks = {
-        node.targets[0].id: ast.unparse(node.value.args[2])
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Assign)
-        and isinstance(node.value, ast.Call)
-        and getattr(node.value.func, "id", "") == "visible_circle_edge"
-    }
-    datums = {}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "add_datum_feature":
-            keywords = {k.arg: ast.unparse(k.value) for k in node.keywords}
-            datums[keywords["datum"].strip("'\"")] = keywords
-    edge = datums["A"].get("edge_entity")
-    assert edge is not None and "edge_xy" not in datums["A"]
-    assert picks[edge] == "PIVOT_HOLE_DIA"
-    assert rocker_arm_spec.PIVOT_HOLE_DIA < rocker_arm_spec.HUB_DIA
-
-
-def _datum_readback(radius_m: float, bearing_deg: float) -> tuple[float, float]:
-    centre = drawing._sheet_xy(0.0, rocker_arm_spec.PIVOT_MID_Y)
-    bearing = math.radians(bearing_deg)
-    return (
-        centre[0] + radius_m * math.cos(bearing),
-        centre[1] + radius_m * math.sin(bearing),
-    )
-
-
 _PIVOT_CENTRE = drawing._sheet_xy(0.0, rocker_arm_spec.PIVOT_MID_Y)
-_TRIANGLE_M = 0.00209 - drawing.PIVOT_BORE_SHEET_R  # r743-3C: rim to readback
 
 
-def test_datum_a_on_the_bore_passes() -> None:
-    """r743-3C's readback: 2.09 mm from the pivot at 135.4 deg, the bore rim
-    plus the triangle on the requested ray."""
-    drawing._require_pivot_datum_on_bore(_datum_readback(0.00209, 135.4), _PIVOT_CENTRE)
-    drawing._require_pivot_datum_on_bore(
-        _datum_readback(drawing.PIVOT_BORE_SHEET_R, 135.0), _PIVOT_CENTRE
+class _Tag:
+    def __init__(self, attached: tuple, dangling: bool = False) -> None:
+        self.annotation = SimpleNamespace(
+            GetAttachedEntities3=lambda: attached,
+            IsDangling=lambda: dangling,
+        )
+
+    def GetAnnotation(self) -> SimpleNamespace:
+        return self.annotation
+
+
+_BORE, _HUB = object(), object()
+_APP = SimpleNamespace(IsSame=lambda a, b: 1 if a is b else 0)
+
+
+@pytest.fixture
+def bound(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+
+
+def test_datum_a_attached_to_the_bore_passes(bound: None) -> None:
+    drawing._require_datum_on_bore(_APP, _Tag((_BORE,)), _BORE)
+
+
+@pytest.mark.parametrize(
+    ("attached", "dangling", "match"),
+    [
+        ((_HUB,), False, "other than the O6.5 pivot bore"),
+        ((), False, "has 0"),
+        ((_BORE, _HUB), False, "has 2"),
+        ((_BORE,), True, "dangling"),
+    ],
+)
+def test_datum_a_off_the_bore_fails(
+    bound: None, attached: tuple, dangling: bool, match: str
+) -> None:
+    """r743-4D: the rim pick attached datum A to the concentric O10 hub,
+    which changes what the A-B-C frame controls."""
+    with pytest.raises(RuntimeError, match=match):
+        drawing._require_datum_on_bore(_APP, _Tag(attached, dangling), _BORE)
+
+
+def _picker(monkeypatch: pytest.MonkeyPatch, resolve) -> list:
+    """Route each EDGE pick through ``resolve(fraction of the bore radius)``."""
+    picks: list = []
+
+    def select(_adapter, _view, entity_type, xy, *, label):
+        assert entity_type == "EDGE" and xy is not None
+        fraction = round(math.dist(xy, _PIVOT_CENTRE) / drawing.PIVOT_BORE_SHEET_R, 6)
+        picks.append((fraction, xy))
+        return resolve(fraction)
+
+    monkeypatch.setattr(drawing, "_select_view_entity", select)
+    return picks
+
+
+_ADAPTER = SimpleNamespace(
+    swApp=_APP, currentModel=SimpleNamespace(ClearSelection2=lambda _all: True)
+)
+
+
+def test_pivot_pick_takes_the_bore_rim_on_the_datum_ray(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    picks = _picker(monkeypatch, lambda _fraction: _BORE)
+    xy = drawing._pick_pivot_bore(_ADAPTER, object(), _BORE, _PIVOT_CENTRE)
+    assert [fraction for fraction, _ in picks] == [1.0]
+    bearing = math.atan2(xy[1] - _PIVOT_CENTRE[1], xy[0] - _PIVOT_CENTRE[0])
+    assert bearing == pytest.approx(drawing.PIVOT_DATUM_ANGLE)
+    assert math.dist(xy, _PIVOT_CENTRE) == pytest.approx(drawing.PIVOT_BORE_SHEET_R)
+
+
+def test_pivot_pick_moves_inward_when_the_rim_resolves_to_the_hub(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    picks = _picker(monkeypatch, lambda fraction: _HUB if fraction == 1.0 else _BORE)
+    xy = drawing._pick_pivot_bore(_ADAPTER, object(), _BORE, _PIVOT_CENTRE)
+    assert [fraction for fraction, _ in picks] == list(drawing.PIVOT_PICK_FRACTIONS)
+    assert xy == picks[-1][1]
+    # Inward points stay inside the bore, further from the hub rim.
+    assert all(0.0 < f <= 1.0 for f in drawing.PIVOT_PICK_FRACTIONS)
+
+
+def test_pivot_pick_that_never_finds_the_bore_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def resolve(fraction: float) -> object:
+        if fraction == 1.0:
+            return _HUB
+        raise RuntimeError("failed to select pivot bore datum pick edge")
+
+    _picker(monkeypatch, resolve)
+    with pytest.raises(RuntimeError, match="no pick on datum A's ray"):
+        drawing._pick_pivot_bore(_ADAPTER, object(), _BORE, _PIVOT_CENTRE)
+
+
+class _Window:
+    def __init__(self) -> None:
+        self.calls: list = []
+
+    def ViewZoomTo2(self, *box: float) -> None:
+        self.calls.append(("zoom", box))
+
+    def ViewZoomtofit2(self) -> None:
+        self.calls.append(("fit",))
+
+
+def test_pivot_pick_zoom_frames_the_hub_and_restores_fit() -> None:
+    window = _Window()
+    adapter = SimpleNamespace(currentModel=window)
+    half = drawing.PIVOT_PICK_ZOOM_HALF
+    with pytest.raises(ValueError):
+        with drawing._zoomed_on(adapter, _PIVOT_CENTRE, half):
+            raise ValueError("pick failed")
+    x, y = _PIVOT_CENTRE
+    assert window.calls == [
+        ("zoom", (x - half, y - half, 0.0, x + half, y + half, 0.0)),
+        ("fit",),
+    ]
+    # The window holds the hub with margin, so the pick point is on screen.
+    assert half > drawing.PIVOT_HUB_SHEET_R
+
+
+# Datum A's frame as r743-4D printed it (coordinate pick, request 20 mm out on
+# the 135-degree ray; 5100x3300 px render on 431.8x279.4 mm): the box spans
+# 13.40..6.46 mm left of the requested point and 3.5 mm either side of it.
+DATUM_BOX_LEFT = 0.01340
+DATUM_BOX_RIGHT = 0.00646
+DATUM_BOX_HALF_HEIGHT = 0.0035
+
+
+def _strap_top_sheet_y(sheet_x: float) -> float:
+    scale = drawing._S / 1000.0
+    model_x = (sheet_x - drawing.FRONT_CENTER[0]) / scale
+    return drawing._sheet_xy(
+        model_x,
+        rocker_arm_spec.CENTER_Y - math.sqrt(rocker_arm_spec.R_TOP**2 - model_x**2),
+    )[1]
+
+
+def test_datum_a_frame_box_sits_off_the_part_outline() -> None:
+    """r743-1RC: the entity-attached tag printed its frame on the strap. The
+    coordinate-picked frame sits above the strap's top edge across its whole
+    width, clear of the O6.50 text and above the notes."""
+    rx, ry = drawing._pivot_datum_request(_PIVOT_CENTRE)
+    box = (
+        rx - DATUM_BOX_LEFT,
+        ry - DATUM_BOX_HALF_HEIGHT,
+        rx - DATUM_BOX_RIGHT,
+        ry + DATUM_BOX_HALF_HEIGHT,
     )
+    # r743-4D's measured frame for this same request: the fixture is that print.
+    assert box == pytest.approx((0.15131, 0.18347, 0.15825, 0.19047), abs=2e-4)
+    # The top edge is concave up, so its highest point under the box is at
+    # one of the box's ends.
+    strap_top = max(_strap_top_sheet_y(box[0]), _strap_top_sheet_y(box[2]))
+    assert box[1] > strap_top + DATUM_BOX_HALF_HEIGHT
+    _text_x, text_y = drawing.FRONT_KEEP["PivotDia"]
+    assert box[1] > text_y + 0.010
+    assert box[1] > drawing.NOTES_CEILING
 
 
-def test_datum_a_on_the_hub_fails() -> None:
-    hub_readback = drawing.PIVOT_HUB_SHEET_R + _TRIANGLE_M
-    with pytest.raises(RuntimeError, match="hub rim"):
-        drawing._require_pivot_datum_on_bore(
-            _datum_readback(hub_readback, 135.0), _PIVOT_CENTRE
-        )
-    # Even a bare hub-rim readback, with no triangle, is not the bore.
-    with pytest.raises(RuntimeError, match="hub rim"):
-        drawing._require_pivot_datum_on_bore(
-            _datum_readback(drawing.PIVOT_HUB_SHEET_R, 135.0), _PIVOT_CENTRE
-        )
+def test_pivot_leaders_take_separate_quadrants() -> None:
+    """r743-1RC: datum A, the Ra and the O6.50 converged on the bore. The
+    O6.50 line runs through the centre, so it takes its text's quadrant and
+    the opposite one; datum A and the Ra take the other two."""
 
+    def quadrant(bearing: float) -> int:
+        return int((bearing % math.tau) // (math.pi / 2.0))
 
-def test_datum_a_off_its_ray_fails() -> None:
-    # On the horizontal centre-mark axis: the leader no longer reads oblique.
-    with pytest.raises(RuntimeError, match="swung"):
-        drawing._require_pivot_datum_on_bore(_datum_readback(0.00209, 180.0), _PIVOT_CENTRE)
-    with pytest.raises(RuntimeError, match="swung"):
-        drawing._require_pivot_datum_on_bore(_datum_readback(0.00209, 315.0), _PIVOT_CENTRE)
-
-
-def test_datum_a_read_at_the_tag_or_inside_the_bore_fails() -> None:
-    """A leaderless tag reads at the tag, a stand-off out; neither it nor a
-    point inside the bore is a leader end on the bore."""
-    tag = drawing.PIVOT_BORE_SHEET_R + drawing.PIVOT_DATUM_STANDOFF
-    with pytest.raises(RuntimeError, match="hub rim"):
-        drawing._require_pivot_datum_on_bore(_datum_readback(tag, 135.0), _PIVOT_CENTRE)
-    with pytest.raises(RuntimeError, match="bore rim"):
-        drawing._require_pivot_datum_on_bore(
-            _datum_readback(drawing.PIVOT_BORE_SHEET_R / 2.0, 135.0), _PIVOT_CENTRE
-        )
-
-
-def test_datum_a_gross_bound_is_the_request_to_centre_distance() -> None:
-    """add_datum_feature's own bound only guards against an ignored move: a
-    bore readback anywhere in the checked sector is nearer the request than
-    the pivot centre is, and the default drop (40 mm+) is not."""
-    reach = drawing.PIVOT_BORE_SHEET_R + drawing.PIVOT_DATUM_STANDOFF
-    request = _datum_readback(reach, 135.0)
-    worst = max(
-        math.dist(request, _datum_readback(radius, 135.0 + sign * swing))
-        for radius in (drawing.PIVOT_BORE_SHEET_R, drawing.PIVOT_HUB_SHEET_R)
-        for sign in (-1.0, 1.0)
-        for swing in (math.degrees(drawing.PIVOT_DATUM_BEARING_TOLERANCE),)
-    )
-    assert worst <= drawing.PIVOT_DATUM_POSITION_TOLERANCE
-    assert drawing.PIVOT_DATUM_POSITION_TOLERANCE == pytest.approx(reach)
+    text = drawing.FRONT_KEEP["PivotDia"]
+    dimension = math.atan2(text[1] - _PIVOT_CENTRE[1], text[0] - _PIVOT_CENTRE[0])
+    rim, _symbol = drawing._pivot_finish_placement()
+    finish = math.atan2(rim[1] - _PIVOT_CENTRE[1], rim[0] - _PIVOT_CENTRE[0])
+    used = [
+        quadrant(drawing.PIVOT_DATUM_ANGLE),
+        quadrant(finish),
+        quadrant(dimension),
+        quadrant(dimension + math.pi),
+    ]
+    assert sorted(used) == [0, 1, 2, 3]
+    # Datum A and the Ra land oblique to the centre-mark axes, not on them.
+    for bearing in (drawing.PIVOT_DATUM_ANGLE, finish):
+        assert math.degrees(bearing) % 90.0 == pytest.approx(45.0)
 
 
 def test_pivot_diameter_text_is_clear_of_the_rod_pin_x_dimension() -> None:
@@ -462,26 +555,46 @@ def test_iso_caption_sits_under_the_iso_clear_of_the_frame_and_end_view() -> Non
     assert left < drawing.ISO_CENTER[0] < right
 
 
-def test_pivot_finish_leader_runs_down_left_from_a_symbol_above_the_strap() -> None:
-    """r743-p1s-B2: the default-height Ra 1.6 sat across the strap and the
-    centre mark, its leader running up through the symbol. The body draws
-    up-right of its leader end, so the symbol sits up-right of its rim point,
-    clear of the hub and above the strap's top edge, at note text height."""
-    rim, symbol = drawing._pivot_finish_placement()
-    centre = drawing._sheet_xy(0.0, rocker_arm_spec.PIVOT_MID_Y)
+# The Ra symbol as r743-1RC printed it at note text height: its ink runs
+# 7.2 mm above and 14.7 mm right of its anchor (the leader end).
+FINISH_SYMBOL_HEIGHT = 0.0072
+FINISH_SYMBOL_WIDTH = 0.0147
+
+
+def _strap_bottom_sheet_y(sheet_x: float) -> float:
     scale = drawing._S / 1000.0
-    assert math.dist(rim, centre) == pytest.approx(
+    model_x = (sheet_x - drawing.FRONT_CENTER[0]) / scale
+    return drawing._sheet_xy(
+        model_x,
+        rocker_arm_spec.CENTER_Y
+        - math.sqrt(rocker_arm_spec.R_BOTTOM**2 - model_x**2),
+    )[1]
+
+
+def test_pivot_finish_leader_runs_up_left_from_a_symbol_below_the_strap() -> None:
+    """r743-p1s-B2: from the 7:30 rim the leader ran up through the symbol,
+    whose body draws up-right of its leader end. r743-1RC: at 1:30 it met the
+    O6.50 line. At 4:30 the symbol sits down-right of its rim point, its whole
+    body below the strap's bottom edge, at note text height."""
+    rim, symbol = drawing._pivot_finish_placement()
+    scale = drawing._S / 1000.0
+    assert math.dist(rim, _PIVOT_CENTRE) == pytest.approx(
         rocker_arm_spec.PIVOT_HOLE_DIA / 2.0 * scale
     )
     # Oblique to both centre-mark axes.
-    assert abs(rim[0] - centre[0]) > 0.0005 and abs(rim[1] - centre[1]) > 0.0005
-    assert symbol[0] > rim[0] and symbol[1] > rim[1]
-    assert math.dist(symbol, centre) > rocker_arm_spec.HUB_DIA / 2.0 * scale + 0.005
-    model_x = (symbol[0] - drawing.FRONT_CENTER[0]) / scale
-    strap_top = drawing._sheet_xy(
-        model_x,
-        rocker_arm_spec.CENTER_Y
-        - math.sqrt(rocker_arm_spec.R_TOP**2 - model_x**2),
-    )[1]
-    assert symbol[1] > strap_top + drawing.PIVOT_FINISH_CHAR_HEIGHT
+    assert abs(rim[0] - _PIVOT_CENTRE[0]) > 0.0005
+    assert abs(rim[1] - _PIVOT_CENTRE[1]) > 0.0005
+    assert symbol[0] > rim[0] and symbol[1] < rim[1]
+    assert math.dist(symbol, _PIVOT_CENTRE) > rocker_arm_spec.HUB_DIA / 2.0 * scale + 0.005
+    # The bottom edge is concave up: its lowest point under the body is at
+    # the body's left end.
+    body_top = symbol[1] + FINISH_SYMBOL_HEIGHT
+    assert body_top < _strap_bottom_sheet_y(symbol[0]) - 0.002
+    # Right of the rod-pin X location's extension line through the pivot, and
+    # above that dimension's line and text (y 0.138).
+    assert rim[0] > _PIVOT_CENTRE[0]
+    assert symbol[1] > 0.138 + 0.010
+    assert symbol[0] + FINISH_SYMBOL_WIDTH < drawing._sheet_xy(
+        rocker_arm_spec.ROD_HOLE_X, 0.0
+    )[0]
     assert drawing.PIVOT_FINISH_CHAR_HEIGHT <= 0.0025
