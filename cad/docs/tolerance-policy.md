@@ -419,6 +419,7 @@ operator forms from step 1; the table is the only data the procedure needs beyon
 | station table check | one bar alone at each station, k = 0 amplitude vs a full-scale bar | slide-arc height, contact offset, gain curvature | matches the `READOUT.md` table; idle bar reads ≈ 0.029; subtract the read-vs-set vector (20ℓ at k = 0, −ℓ at odd k) from every trial |
 | broad-input benchmark | Michelson's Gaussian ($e^{-(0.1i)^2}$) and half-range rectangle, corrected readout | everything | MAE ≈ 0.7 %, max ≈ 2 % of the greatest term — historical parity |
 | sparse-input stress | channels 1 and 20 alone | consistency without averaging | expected worst coefficient ≤ 2 % (p99 2.318 reported) |
+| pinion-spring bend coupon (before forming MHA-114) | cut a coupon from the 2325K19 roll along its 50 in length (bend line across the rolling direction, as the part is cut); bend it 90° and 25° over a R3.3 (0.13 in) mandrel; then form one leaf and measure its free preset | whether 17-7 PH Condition C takes R3.3 at 0.015 in — the radius is proxied from NASA SP-5089 Table XXXI (hardened STA sheet, 0.012–0.016 in, R 0.13 in), and Condition C has less elongation; the ±0.5 formed band allows R2.8 | no crack or orange peel on the outside of either bend under a 10× loupe; the free crest preset measures 2.55 ± 0.5 into the flank (the formed band the stock-corner gates in `build_drive_train_assembly` carry); a crack moves both radii up and re-runs the corner gates |
 
 ## Fit classes (interfaces that must carry a rule)
 
