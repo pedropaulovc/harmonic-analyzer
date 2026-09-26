@@ -2235,6 +2235,65 @@ def test_a_required_read_answering_none_is_a_read_error(monkeypatch):
     assert reader.call(lambda: None, "") == "" and reader.take_errors() == {}
 
 
+@pytest.mark.parametrize(
+    ("kind", "errors"),
+    [(1, {}), (15, {}), (6, {"GetPosition": 1}), (5, {"GetPosition": 1})],
+    ids=["cosmetic-thread", "centerline", "note", "gtol"],
+)
+def test_only_a_cosmetic_thread_or_centerline_may_have_no_position(monkeypatch, kind, errors):
+    """On the b49e13940 leaves every cosmetic thread and centerline answered
+    GetPosition None (cone-swing-platform 15, top_frame 98), each a gating
+    com-read-errors count. For those two kinds None is their answer, not a
+    refusal; any other annotation's None position still counts."""
+    import _drawing_layout_audit as collector
+
+    monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
+
+    class Annotation:
+        Visible = 1
+        OwnerType = 0
+        Layer = ""
+
+        def GetType(self):
+            return kind
+
+        def GetName(self):
+            return "Item1"
+
+        def GetPosition(self):
+            return None
+
+        def GetLeaderCount(self):
+            return 0
+
+        def GetDisplayData(self):
+            return Data()
+
+        def GetSpecificAnnotation(self):
+            return Note()
+
+    class Data:
+        def __getattr__(self, name):
+            if name.endswith("Count"):
+                return lambda: 0
+            raise AttributeError(name)
+
+    class Note:
+        def GetText(self):
+            return "1/4-20 Tapped Hole"
+
+        def GetExtent(self):
+            return (0.1, 0.1, 0.0, 0.12, 0.11, 0.0)
+
+        def IsBomBalloon(self):
+            return False
+
+    reader = collector._Reader(adapter=None)
+    record = collector._dump_annotation(reader, Annotation())
+    assert record is not None and record["pos"] == []
+    assert reader.take_errors() == errors
+
+
 def test_a_primitive_count_answering_none_is_a_read_error(monkeypatch):
     """Codex P2 on 7e08a6b17: a count getter answering None read as zero
     primitives, so that ink left the audit while com-read-errors stayed
@@ -3157,6 +3216,42 @@ def test_a_long_leader_by_the_shortest_route_is_advisory():
     assert finding.extra["detour_mm"] == pytest.approx(0.0, abs=0.1)
 
 
+def _arrow_at(tip, toward):
+    """A GetArrowHeadAtIndex2 record at ``tip``, its base toward ``toward``."""
+    dx, dy = toward[0] - tip[0], toward[1] - tip[1]
+    length = math.hypot(dx, dy)
+    return [*tip, 0.0, dx / length, dy / length, 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]
+
+
+def test_each_branch_of_a_two_arrow_leader_is_measured_from_its_own_attachment():
+    """Codex P2 on b49e13940 (PRRT_kwDOPHDy386mTArq): a note's two leaders
+    share their attach point. Walking from one tip to the node farthest from
+    it ran on through the shared attachment into the sibling's elbow, so
+    the sibling's crossing was measured as this branch's route. Here the
+    short branch lands 7.6 mm inside the part's left edge, and the long
+    branch runs 47 mm to a feature 45 mm deep (a direct route, advisory). The
+    old walk measured the short branch from the long one's crossing: a
+    22.8 mm phantom detour, gating."""
+    attach, short_tip, elbow, long_tip = (0.092, 0.150), (0.105, 0.165), (0.140, 0.150), (0.145, 0.155)
+    note = {
+        "type": 6,
+        "name": "Branched",
+        "visible": 1,
+        "owner_type": 0,
+        "leaders": [[*attach, 0.0, *short_tip, 0.0], [*attach, 0.0, *elbow, 0.0, *long_tip, 0.0]],
+        "display": {
+            "arrows": [_arrow_at(short_tip, attach), _arrow_at(long_tip, elbow)],
+            "texts": [{"t": "Ra 3.2", "pos": [0.075, 0.149, 0.0], "h": 0.0025}],
+        },
+        "note": {"text": "Ra 3.2", "balloon": False},
+    }
+    view = _view("Block", (0.095, 0.095, 0.205, 0.205), [note])
+    findings = audit_dump(_dump(views=[view], strokes=_box_edges(0.100, 0.100, 0.200, 0.200)))
+    [finding] = [f for f in findings if f.kind.startswith("leader-over-part")]
+    assert finding.kind == "leader-over-part-direct"
+    assert finding.extra["over_part_mm"] == pytest.approx(47.1, abs=0.2)
+
+
 # DetailItem357, the model's cosmetic-thread callout on View2: COM text and
 # leader verbatim; like its View1 twin (layoutcal2-a DetailItem349) it dumps
 # no display data.
@@ -3188,17 +3283,56 @@ def test_a_second_callout_of_one_thread_in_a_view_gates():
     other hole of RD2's pair. 4dda16fd5 removed it. A general note naming the
     thread, with no leader, calls out no hole and is no duplicate; nor are
     two hole callouts of one thread (harmonic-base's 2X and 4X 8-32 groups,
-    test_gate_mode_passes_a_sheet_with_only_advisories)."""
+    test_gate_mode_passes_a_sheet_with_only_advisories). The two are one
+    group because RD2's "2X" names exactly the view's two holes of the size
+    both leaders land on, so the fixture prints the plate's rings."""
 
     def duplicates(members):
         view = _view("Drawing View2", SWING_VIEW2, members)
-        return [f for f in audit_dump(_dump(views=[view])) if f.kind == "duplicate-thread-callout"]
+        findings = audit_dump(_dump(views=[view], strokes=SWING_PLATE_EDGES))
+        return [f for f in findings if f.kind == "duplicate-thread-callout"]
 
     [finding] = duplicates([_swing_rd2(False), SWING_TAPPED_HOLE, SWING_DEBURR_NOTE])
     assert {finding.a, finding.b} == {"hole-callout RD2", "note DetailItem357"}
     assert finding.extra["thread"] == "1/4-20"
+    assert finding.extra.get("association") == "same 2X group"
     assert severity(finding) is FindingSeverity.GATING
     assert duplicates([_swing_rd2(True), SWING_DEBURR_NOTE]) == []
+
+
+def _tapped_hole_note(tip):
+    """DetailItem357 with its leader's last run ending at ``tip``."""
+    return {**SWING_TAPPED_HOLE, "leaders": [[0.1960, 0.2459, 0.0, 0.1896, 0.2459, 0.0, *tip, 0.0]]}
+
+
+@pytest.mark.parametrize(
+    ("extra_rings", "tip", "association"),
+    [
+        # On RD2's own hole: the same feature, whatever the count.
+        ((), (0.17022 + 0.00164, 0.23520), "same hole"),
+        # Codex P2 on b49e13940 (PRRT_kwDOPHDy386mTAro): the view prints two
+        # more countersunk holes, so RD2's 2X is one pair of four and the
+        # note's hole may be the other pair's.
+        (
+            (*_ring(0.17600, 0.20000, 0.00164), *_ring(0.17600, 0.20000, 0.00127),
+             *_ring(0.17800, 0.17000, 0.00164), *_ring(0.17800, 0.17000, 0.00127)),
+            (0.18334, 0.23229 + 0.00164),
+            None,
+        ),
+        # On the dowel hole: another size, so another group.
+        ((), (0.17533 + 0.00079, 0.22719), None),
+        # On no printed ring: nothing associates the two.
+        ((), (0.18000, 0.21000), None),
+    ],
+    ids=["same-hole", "one-of-two-pairs", "other-size", "no-ring"],
+)
+def test_one_thread_is_one_callout_only_within_one_hole_group(extra_rings, tip, association):
+    """A second callout of RD2's thread duplicates it only on RD2's hole
+    group: one thread can name two groups in one view."""
+    view = _view("Drawing View2", SWING_VIEW2, [_swing_rd2(False), _tapped_hole_note(tip)])
+    findings = audit_dump(_dump(views=[view], strokes=[*SWING_PLATE_EDGES, *_edges(*extra_rings)]))
+    duplicates = [f for f in findings if f.kind == "duplicate-thread-callout"]
+    assert [f.extra.get("association") for f in duplicates] == ([association] if association else [])
 
 
 @pytest.mark.parametrize(
