@@ -65,6 +65,8 @@ from pivot_shaft_spec import (
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     JOURNAL_LENGTH,
+    RELIEF_DIA,
+    RELIEF_WIDTH,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHOULDER_DIA,
@@ -83,6 +85,10 @@ SHAFT_LENGTH = PIVOT_SHAFT_LENGTH  # the cylinder: the span over both ears (REF)
 V_BODY = math.pi * (
     SHAFT_R**2 * (SHAFT_LENGTH - SHOULDER_LENGTH) + SHOULDER_R**2 * SHOULDER_LENGTH
 )
+RELIEF_R = RELIEF_DIA / 2.0
+# Two grooves, each RELIEF_WIDTH long, from the O.D. down to the relief
+# diameter (the cut rises to the shoulder O.D., through air).
+V_RELIEFS = 2.0 * math.pi * (SHAFT_R**2 - RELIEF_R**2) * RELIEF_WIDTH
 if SHAFT_LENGTH <= JOURNAL_LENGTH + SHOULDER_LENGTH:
     raise AssertionError(
         "the pivot shaft's body is shorter than its journal and shoulder"
@@ -173,6 +179,133 @@ async def _shaft_profile(adapter) -> list[tuple[str, str]]:
     drive_jobs = dims.apply(adapter, "ShaftProfile")
     check("revolve shaft", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Shaft")
+    return drive_jobs
+
+
+async def _reliefs(adapter) -> list[tuple[str, str]]:
+    """The two shoulder reliefs: one revolved cut from two rectangles on the
+    Right plane, each flush against a shoulder face. Its own feature, so the
+    sheet imports its dimensions into the enlarged detail alone."""
+    from solidworks_mcp.adapters.base import RevolveParameters
+
+    north_face = JOURNAL_LENGTH
+    south_face = JOURNAL_LENGTH + SHOULDER_LENGTH
+    dims = SketchDims()
+    check("create_sketch relief", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    north_points = [
+        (north_face - RELIEF_WIDTH, RELIEF_R),
+        (north_face, RELIEF_R),
+        (north_face, SHOULDER_R),
+        (north_face - RELIEF_WIDTH, SHOULDER_R),
+    ]
+    south_points = [
+        (south_face, RELIEF_R),
+        (south_face + RELIEF_WIDTH, RELIEF_R),
+        (south_face + RELIEF_WIDTH, SHOULDER_R),
+        (south_face, SHOULDER_R),
+    ]
+    north = await add_line_chain(adapter, north_points)
+    south = await add_line_chain(adapter, south_points)
+    axis = check(
+        "relief axis centerline",
+        await adapter.add_centerline(0.0, 0.0, north_face - RELIEF_WIDTH, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    for tag, lines in (("north", north), ("south", south)):
+        for i, line in enumerate(lines):
+            direction = "horizontal" if i % 2 == 0 else "vertical"
+            check(
+                f"relief {tag} {direction} {line}",
+                await adapter.add_sketch_constraint(line, None, direction),
+            )
+    # The axis: from the origin, level, ending under the north groove's
+    # outer wall (the diameter dimension's reference).
+    check(
+        "relief axis at the origin",
+        await adapter.add_sketch_constraint(f"{axis}.start", "origin", "coincident"),
+    )
+    check(
+        "relief axis level",
+        await adapter.add_sketch_constraint(axis, None, "horizontal"),
+    )
+    check(
+        "relief axis end under the north groove",
+        await adapter.add_sketch_constraint(
+            f"{axis}.end", f"{north[0]}.start", "vertical_points"
+        ),
+    )
+    # One bottom and one top line for both grooves.
+    check(
+        "relief bottoms level",
+        await adapter.add_sketch_constraint(
+            f"{south[0]}.start", f"{north[0]}.start", "horizontal_points"
+        ),
+    )
+    check(
+        "relief tops level",
+        await adapter.add_sketch_constraint(
+            f"{south[2]}.start", f"{north[2]}.start", "horizontal_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{north[0]}.start",
+        f"{north[0]}.end",
+        "horizontal_distance",
+        RELIEF_WIDTH,
+        "relief ReliefWidth",
+    )
+    dims.record("ReliefWidth", '"ReliefWidth"')
+    await dimension_between(
+        adapter,
+        f"{north[0]}.end",
+        "origin",
+        "horizontal_distance",
+        north_face,
+        "relief north station",
+    )
+    dims.record("NorthStation", '"JournalLength"')
+    await dimension_between(
+        adapter,
+        f"{north[1]}.start",
+        f"{north[1]}.end",
+        "vertical_distance",
+        SHOULDER_R - RELIEF_R,
+        "relief rise",
+    )
+    dims.record("Rise", '("ShoulderDia" - "ReliefDia") / 2')
+    await add_diametric_linear_dimension(
+        adapter, axis, north[0], (north_face - RELIEF_WIDTH / 2.0, -5.0), "ReliefDia"
+    )
+    dims.record("ReliefDia", '"ReliefDia"')
+    await dimension_between(
+        adapter,
+        f"{south[0]}.start",
+        f"{south[0]}.end",
+        "horizontal_distance",
+        RELIEF_WIDTH,
+        "relief south width",
+    )
+    dims.record("SouthWidth", '"ReliefWidth"')
+    await dimension_between(
+        adapter,
+        f"{south[0]}.start",
+        "origin",
+        "horizontal_distance",
+        south_face,
+        "relief south station",
+    )
+    dims.record("SouthStation", '"JournalLength" + "ShoulderLength"')
+    await ensure_fully_defined(adapter, "relief sketch")
+    check("exit_sketch relief", await adapter.exit_sketch())
+    name_last_feature(adapter, "ReliefProfile")
+    drive_jobs = dims.apply(adapter, "ReliefProfile")
+    check(
+        "revolve reliefs",
+        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+    )
+    name_last_feature(adapter, "Relief")
     return drive_jobs
 
 
@@ -285,9 +418,15 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ShoulderLength", f"{SHOULDER_LENGTH}mm")
     await set_global(adapter, "JournalLength", f"{JOURNAL_LENGTH}mm")
     await set_global(adapter, "DomeHeight", f"{DOME_HEIGHT}mm")
+    await set_global(adapter, "ReliefWidth", f"{RELIEF_WIDTH}mm")
+    await set_global(adapter, "ReliefDia", f"{RELIEF_DIA}mm")
 
     drive_jobs = await _shaft_profile(adapter)
     volume = await volume_check(adapter, "shaft", V_BODY, 0.005 * V_BODY)
+    drive_jobs += await _reliefs(adapter)
+    volume = await volume_check(
+        adapter, "shoulder reliefs", volume - V_RELIEFS, 0.05 * V_RELIEFS
+    )
     drive_jobs += await _dome(adapter, "North", 0.0, -1.0)
     volume = await volume_check(adapter, "north dome", volume + V_DOME, 0.03 * V_DOME)
     drive_jobs += await _dome(adapter, "South", SHAFT_LENGTH, 1.0)

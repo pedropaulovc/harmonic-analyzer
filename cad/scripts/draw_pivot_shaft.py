@@ -3,11 +3,12 @@ r"""Create the curated machinist drawing for the rocker pivot shaft (MHA-065).""
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -17,12 +18,14 @@ from _drawing_common import (
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_reference_dimension,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
@@ -33,13 +36,18 @@ from pivot_shaft_spec import (
     DRAWING_PRECISION_BY_NAME,
     JOURNAL_LENGTH,
     LENGTH_CALLOUT,
+    RELIEF_CALLOUT,
+    RELIEF_DIA,
+    RELIEF_WIDTH,
     SHAFT_DIA,
     SHOULDER_DIA,
     SHOULDER_LENGTH,
+    SHOULDER_SOUTH_Z_MM,
     SURFACE_FINISHES,
 )
 from rocker_bank_layout import PIVOT_SHAFT_LENGTH
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import place_view, view_name
 
 
 SPEC = DRAWINGS_BY_NAME["pivot_shaft"]
@@ -104,6 +112,140 @@ BEARING_FINISH_SYMBOL = (BEARING_FINISH_EDGE[0], 0.206)
 JOURNAL_FINISH_EDGE = ((NORTH_END_X + SHOULDER_X[0]) / 2.0, SHAFT_UNDER_Y)
 JOURNAL_FINISH_SYMBOL = (JOURNAL_FINISH_EDGE[0] + 0.012, 0.172)
 
+# DETAIL A: the shoulder and its two reliefs (Codex #936 PRRT_kwDOPHDy386mTMXq)
+# are 2 x 0.33 features on a 1:1 sheet, so a native 5:1 detail carries their
+# dimensions and the shoulder's thrust-face Ra (PRRT_kwDOPHDy386mTMXt). The
+# fence centres on the axis mid-shoulder and takes in both grooves and the
+# shoulder O.D.; the detail sits in the open field under the profile, left of
+# the title block (x 0.218) and right of the notes.
+DETAIL_SCALE = (5, 1)
+DETAIL_RADIUS_MM = 6.0
+DETAIL_CENTER = (0.180, 0.105)
+DETAIL_FENCE_Z_MM = -(JOURNAL_LENGTH + SHOULDER_LENGTH / 2.0)
+_DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
+# The label anchors at its top centre, under the fence.
+DETAIL_LABEL_XY = (
+    DETAIL_CENTER[0],
+    DETAIL_CENTER[1] - DETAIL_RADIUS_MM * _DETAIL_MM - 0.004,
+)
+
+
+def _detail_x(z_mm: float) -> float:
+    """Sheet x of part station z in the detail: model -Z runs to the right."""
+    return DETAIL_CENTER[0] - (z_mm - DETAIL_FENCE_Z_MM) * _DETAIL_MM
+
+
+DETAIL_KEEP = {
+    # Over the north groove, above the fence.
+    "ReliefWidth": (
+        _detail_x(-(JOURNAL_LENGTH - RELIEF_WIDTH / 2.0)),
+        DETAIL_CENTER[1] + 0.037,
+    ),
+    # Left of the fence, on the axis: the diameter's line runs through the
+    # north groove.
+    "ReliefDia": (DETAIL_CENTER[0] - 0.042, DETAIL_CENTER[1]),
+}
+# The thrust face's Ra: the leader lands on the face's upper half, between the
+# relief floor and the shoulder O.D., and the symbol stands up-right of it.
+SHOULDER_FACE_X = _detail_x(SHOULDER_SOUTH_Z_MM)
+SHOULDER_FINISH_ATTACH = (
+    SHOULDER_FACE_X,
+    DETAIL_CENTER[1] + (RELIEF_DIA + SHOULDER_DIA) / 4.0 * _DETAIL_MM,
+)
+SHOULDER_FINISH_SYMBOL = (SHOULDER_FACE_X + 0.016, DETAIL_CENTER[1] + 0.035)
+
+
+def _shoulder_detail(adapter: Any, profile: Any) -> Any:
+    """A native 5:1 detail of the shoulder and its reliefs."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(profile, "IView")
+    if not drawing.ActivateView(view_name(adapter, profile)):
+        raise RuntimeError("failed to activate the shoulder detail's parent")
+    draw.ClearSelection2(True)
+    center = model_point_in_view(
+        adapter,
+        profile,
+        (0.0, 0.0, DETAIL_FENCE_Z_MM / 1000.0),
+        label="shoulder detail centre",
+    )
+    radius = DETAIL_RADIUS_MM * SHEET_SCALE[0] / 1000.0
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("failed to create the shoulder detail fence")
+    detail = drawing.CreateDetailViewAt4(
+        *DETAIL_CENTER,
+        0.0,
+        0,  # swDetViewSTANDARD
+        *DETAIL_SCALE,
+        "A",
+        1,  # swDetCircleCIRCLE
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("failed to create the shoulder detail")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("the shoulder detail has invalid bounds")
+    target = [
+        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position the shoulder detail")
+    draw.EditRebuild3()
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native detail label, found {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    label_xyz = (*DETAIL_LABEL_XY, 0.0)
+    if not annotation.SetPosition2(*label_xyz):
+        raise RuntimeError("failed to position the shoulder detail label")
+    draw.EditRebuild3()
+    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
+    if math.dist(actual, label_xyz) > 1e-8:
+        raise RuntimeError(f"the shoulder detail label did not persist: {actual}")
+    return detail
+
+
+def _shoulder_rim_edge(view: Any) -> Any:
+    """The shoulder's O.D. circle at its south face: edge-on it IS that face's
+    line, and its faces include the thrust face the control names."""
+    matches = []
+    for raw in visible_view_entities(view, 1, label="shoulder south rim"):
+        edge = _early_bound(raw, "IEdge")
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        if not curve.IsCircle():
+            continue
+        _cx, _cy, centre_z, *_axis, radius = (
+            float(value) for value in curve.CircleParams
+        )
+        if abs(radius - SHOULDER_DIA / 2000.0) > 1e-7:
+            continue
+        if abs(centre_z - SHOULDER_SOUTH_Z_MM / 1000.0) > 1e-7:
+            continue
+        matches.append(edge)
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one shoulder south rim edge, found {len(matches)}")
+    return matches[0]
+
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -160,7 +302,24 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Decimal places (and so the general-tolerance row each dimension claims)
     # are authored on the part; the sheet only proves the import kept them.
-    assert_imported_precision(adapter, profile_annotations, DRAWING_PRECISION_BY_NAME)
+    detail = _shoulder_detail(adapter, profile)
+    detail_annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="shoulder detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    assert_imported_precision(
+        adapter,
+        [*profile_annotations, *detail_annotations],
+        DRAWING_PRECISION_BY_NAME,
+    )
+    set_dimension_callouts(
+        adapter,
+        detail_annotations,
+        {"ReliefWidth": RELIEF_CALLOUT, "ReliefDia": RELIEF_CALLOUT},
+    )
     # #743 PR2: the plain end is cut to fit the installed brackets, so the
     # modelled length prints as a REFERENCE value and the callout under it is
     # the requirement. Keyed on the parametric name.
@@ -201,6 +360,15 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=JOURNAL_FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_journal"),
         label="pivot journal finish",
+    )
+    add_surface_finish(
+        adapter,
+        detail,
+        edge_entity=_shoulder_rim_edge(detail),
+        symbol_xy=SHOULDER_FINISH_SYMBOL,
+        control=surface_finish_by_key(SURFACE_FINISHES, "shoulder_thrust"),
+        label="shoulder thrust-face finish",
+        leader_attach_xy=SHOULDER_FINISH_ATTACH,
     )
 
     # 0.020: a note is left-aligned on its anchor, so the ink starts here. The
