@@ -79,10 +79,12 @@ V_BODY = (
 V_SOCKET = math.sqrt(3.0) / 2.0 * HEX_AF**2 * SOCKET_DEPTH
 
 
-async def build(adapter) -> dict[str, str]:
+async def author_set_screw(adapter, truth=None) -> float:
+    """Author the screw body into the open, empty part and return its
+    volume (mm^3). The production build and the 91375A106 vendor comparison
+    (diagnostics/diag_build_91375A106) share this geometry; ``truth`` is the
+    replica fleet's builder argument and is unused."""
     from solidworks_mcp.adapters.base import RevolveParameters
-
-    check("create_part", await adapter.create_part())
 
     await set_global(adapter, "MajorDia", f"{MAJOR_DIA}mm")
     await set_global(adapter, "ScrewLength", f"{LENGTH}mm")
@@ -251,7 +253,12 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven set screw (equations neutral)", volume, 0.01 * V_BODY
     )
+    return volume
 
+
+async def build(adapter) -> dict[str, str]:
+    check("create_part", await adapter.create_part())
+    await author_set_screw(adapter)
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
     # The purchased reference sheet reads these (build_stock_fastener's set).
