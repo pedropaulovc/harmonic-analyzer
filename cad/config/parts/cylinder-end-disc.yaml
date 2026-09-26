@@ -1,4 +1,5 @@
 cylinder-end-disc:
+  title: Cylinder Bank End Disc
   number: MHA-121
   material: Brass
   tolerance_class: machined_block

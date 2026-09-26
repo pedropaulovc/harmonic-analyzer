@@ -1,4 +1,5 @@
 nameplate:
+  title: "Maker's Nameplate"
   number: MHA-086
   material: Brass
   tolerance_class: visual_noncritical

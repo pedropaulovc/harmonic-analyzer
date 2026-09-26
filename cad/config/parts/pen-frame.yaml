@@ -1,4 +1,5 @@
 pen-frame:
+  title: Pen Frame
   number: MHA-048
   material: C36000 free-machining brass
   tolerance_class: machined_block

@@ -1,4 +1,5 @@
 transgear-knob-shaft:
+  title: Transgear Knob Shaft
   number: MHA-078
   material: Brass
   tolerance_class: machined_block

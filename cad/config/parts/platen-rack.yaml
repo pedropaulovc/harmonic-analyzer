@@ -1,4 +1,5 @@
 platen-rack:
+  title: Platen Rack
   number: MHA-069
   material: Brass
   tolerance_class: machined_block
