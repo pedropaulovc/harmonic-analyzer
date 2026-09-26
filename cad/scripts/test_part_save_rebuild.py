@@ -149,8 +149,10 @@ def test_a_refused_rebuild_raises_even_when_the_flags_read_clean(seat) -> None:
 
 
 def test_a_hard_fault_after_the_rebuild_raises_but_a_warning_does_not(seat) -> None:
-    adapter, _part = seat({"INSTALLED": True}, faults=(("Pin", 2, False),))
-    with pytest.raises(RuntimeError, match=r"left faults \['Pin \(rebuild-error\)'\]"):
+    adapter, _part = seat({"INSTALLED": True}, faults=(("Pin", 71, False),))
+    with pytest.raises(
+        RuntimeError, match=r"left faults \['Pin \(cut-not-intersect-model\)'\]"
+    ):
         _common.rebuild_stale_configurations(adapter, "pinion-lever-pin")
     adapter, part = seat({"INSTALLED": True}, faults=(("Pin", 1, True),))
     _common.rebuild_stale_configurations(adapter, "pinion-lever-pin")
@@ -168,6 +170,17 @@ def test_code_one_is_a_fault_unless_what_s_wrong_flags_it_a_warning(seat) -> Non
     _common.rebuild_stale_configurations(adapter, "pinion-lever-pin")
     assert part.log == ["EditRebuildAll"]
     assert _common._FEATURE_ERROR[1] == "unknown-error"
+
+
+def test_feature_error_labels_are_the_sw_feature_error_enum() -> None:
+    # GetWhatsWrong's codes are swFeatureError_e: 0, 1, 10-19 and 30-73.  The
+    # old table's 2-7 (rebuild-error, dangling-*, sketch-*) named no member,
+    # so a real code 1 read "warning" and the rest could never match.
+    codes = set(_common._FEATURE_ERROR)
+    assert codes == {0, 1, *range(10, 20), *range(30, 74)}
+    assert _common._FEATURE_ERROR[48] == "mate-broken"
+    assert _common._FEATURE_ERROR[71] == "cut-not-intersect-model"
+    assert "warning" not in _common._FEATURE_ERROR.values()
 
 
 def test_the_save_chokepoint_checks_every_configuration_right_before_its_final_save() -> (
