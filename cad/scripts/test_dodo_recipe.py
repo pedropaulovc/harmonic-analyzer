@@ -2609,3 +2609,153 @@ def test_check_gates_depend_on_everything_they_execute():
         f"check:{name} misses {len(paths)}: {', '.join(paths)}"
         for name, paths in sorted(gaps.items())
     )
+
+
+def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
+    """A catalogued part, its drawing and an assembly that imports a fastener
+    script's constants depend on a per-task digest of only the rows they read,
+    and the build subprocess is told exactly those rows."""
+    dodo = _load_dodo()
+    catalog = str(dodo._FASTENER_CATALOG)
+    part = dodo._part_file_deps(dodo.SCRIPTS_DIR / "build_bracket_screw.py", "bracket_screw")
+    drawing = dodo._drawing_file_deps("bracket_screw")
+    assembly = dodo._recipe_files("channel")
+    for label, deps in (
+        ("part-bracket_screw", part),
+        ("drawing-bracket_screw", drawing),
+        ("assembly-channel", assembly),
+    ):
+        assert catalog not in deps, label
+        assert any(
+            Path(dep).name == f"{label}.digest"
+            and Path(dep).parent.name == ".fastener-catalog"
+            for dep in deps
+        ), label
+    assert dodo._fastener_rows_env("part:bracket_screw") == "bracket-screw"
+    assert dodo._fastener_rows_env("drawing:bracket_screw") == "bracket-screw"
+    # channel's closure imports build_frame_side_screw (through build_fulcrum_keeper)
+    # for its constants; that module's fastener("frame-side-screw") runs on import.
+    assert dodo._fastener_rows_env("assembly:channel") == "frame-side-screw"
+    assert dodo._fastener_rows_env("check:math") is None
+
+
+def test_run_subprocess_hands_the_fastener_rows_to_the_build(monkeypatch):
+    dodo = _load_dodo()
+    seen = {}
+
+    def fake_run(cmd, cwd, env):
+        seen.update(env)
+        return type("Done", (), {"returncode": 0})()
+
+    monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "inherited-must-not-leak")
+    monkeypatch.setattr(dodo.subprocess, "run", fake_run)
+    assert dodo._run_subprocess(["x"], "part:bracket_screw") == 0
+    assert seen["HARMONIC_FASTENER_ROWS"] == "bracket-screw"
+    seen.clear()
+    assert dodo._run_subprocess(["x"], "check:math") == 0
+    assert "HARMONIC_FASTENER_ROWS" not in seen
+
+
+def _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, stem, *, mode):
+    """Drive a local ``build_or_refresh(stem)`` miss through ``mode`` ("full" with
+    one injected post-assembly hook, or "refresh") and return ``(label, env)`` for
+    every subprocess it launched."""
+    launched = []
+
+    class FakePopen:
+        def __init__(self, cmd, cwd, env, **_kw):
+            launched.append((cmd, env))
+            self.stdout = iter(())
+
+        def wait(self):
+            return 0
+
+    @contextlib.contextmanager
+    def free_seat(label):
+        yield 0.0
+
+    target = tmp_path / f"{stem}.SLDASM"
+    sidecar = tmp_path / f".{stem}.recipe.md5"
+    if mode == "refresh":
+        target.write_bytes(b"asm")
+        sidecar.write_text("d" * 32 + "\n", encoding="utf-8")
+    # Prime the task's rows from the real recipe, then stub the recipe so the
+    # injected hook (no such file) is never read.
+    dodo._fastener_rows_env(f"assembly:{stem}")
+    monkeypatch.setattr(dodo, "_recipe_files", lambda _stem: [])
+    monkeypatch.setattr(dodo, "LOGS", tmp_path / "logs")
+    monkeypatch.setattr(dodo, "POST_ASSEMBLY", {stem: ("hook_probe.py",)})
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+    monkeypatch.setattr(dodo._cache, "restore", lambda *_a: False)
+    monkeypatch.setattr(dodo._cache, "store", lambda *_a: "stored")
+    monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
+    monkeypatch.setattr(dodo, "_com_seat", free_seat)
+    monkeypatch.setattr(dodo, "_reprobe_under_seat", lambda *_a: False)
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    monkeypatch.setattr(dodo, "_sw_autostart_enabled", lambda: False)
+    monkeypatch.setattr(dodo, "_recipe_sidecar", lambda _stem: sidecar)
+    monkeypatch.setattr(dodo, "_digest_files", lambda _files: "d" * 32)
+    monkeypatch.setattr(dodo, "_assembly_cache_outputs", lambda _stem: [])
+    monkeypatch.setattr(dodo, "_stamp_assembly_execution", lambda _stem: None)
+    monkeypatch.setattr(dodo.subprocess, "Popen", FakePopen)
+    monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "inherited-must-not-leak")
+
+    dodo.build_or_refresh(stem, [], [], [str(target)])
+
+    return [(Path(cmd[1]).name, env) for cmd, env in launched]
+
+
+@pytest.mark.parametrize("mode", ["full", "refresh"])
+def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path, mode):
+    """Codex on #868: the FULL/REFRESH/hook subprocesses carry display labels, so
+    keying the guard on the label dropped it for every assembly build. The guard
+    is keyed on the doit task instead, whatever the display label says."""
+    dodo = _load_dodo()
+    launched = _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, "channel", mode=mode)
+
+    scripts = [name for name, _env in launched]
+    if mode == "full":
+        assert scripts == ["build_channel_assembly.py", "hook_probe.py"]
+    else:
+        assert scripts == ["refresh_assembly.py"]
+    for name, env in launched:
+        assert env.get("HARMONIC_FASTENER_ROWS") == "frame-side-screw", name
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "FULL build channel (target missing)",
+        "REFRESH channel",
+        "hook hook_probe.py",
+        "check math",
+        "release documents part:bracket_screw",
+        "part:no_such_part",
+        "assembly:no_such_assembly",
+        "drawing:no_such_drawing",
+        "",
+    ],
+)
+def test_fastener_rows_refuse_a_label_that_names_no_task(label):
+    """Silently mapping a display label to "no rows" is what dropped the guard; a
+    label that is not a task (or names a task that does not exist) fails loud."""
+    dodo = _load_dodo()
+    with pytest.raises(ValueError):
+        dodo._fastener_rows_env(label)
+
+
+def test_fastener_rows_leave_unnarrowed_tasks_unguarded():
+    dodo = _load_dodo()
+    assert dodo._fastener_rows_env("check:math") is None
+    assert dodo._fastener_rows_env("release") is None
+    assert dodo._fastener_rows_env("verify:kinematics") is None
+
+
+def test_every_subprocess_launch_names_a_task_the_guard_can_map():
+    """Every task action that launches a subprocess under a display label passes
+    its doit task, so none can reach the guard's refusal at run time."""
+    dodo = _load_dodo()
+    for task in dodo.task_check():
+        for action, args in task["actions"]:
+            if action is dodo._run_stamped:
+                dodo._fastener_rows_env(args[3])  # raises on an unmappable task

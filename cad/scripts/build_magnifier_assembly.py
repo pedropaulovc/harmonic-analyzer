@@ -67,6 +67,7 @@ from _common import (
 )
 from _drawing_marks import DRAWN_BY
 from _assembly import (
+    activate_assembly_contract,
     angle_driver,
     assembly_title_properties,
     assert_component_placed,
@@ -313,6 +314,8 @@ _WIRE_SPIN_ANGLE = math.degrees(math.acos(min(1.0, abs(_HW_ROWS[2][0]))))
 
 
 async def build(adapter) -> dict[str, str]:
+    # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
+    activate_assembly_contract(ASM_NAME)
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
     reset_dof_manifest()

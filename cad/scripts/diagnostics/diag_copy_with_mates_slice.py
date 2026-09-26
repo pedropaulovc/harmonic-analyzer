@@ -52,6 +52,7 @@ from win32com.client import VARIANT  # noqa: E402
 
 from _common import check, log, run_build  # noqa: E402
 from _assembly import (  # noqa: E402
+    activate_assembly_contract,
     _mate_hard_error,
     coincident_mate,
     component_names,
@@ -62,6 +63,10 @@ from _assembly import (  # noqa: E402
     spin_driver,
     world_point,
 )
+
+# Distance drivers seed their side from channel's flip seeds
+# (cad/config/assemblies/channel.yaml), the assembly this probe mirrors.
+activate_assembly_contract("channel")
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rows_from_euler  # noqa: E402
 import _telemetry  # noqa: E402
 import channel_kinematics  # noqa: E402

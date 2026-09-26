@@ -131,6 +131,7 @@ from _common import (
 )
 from _drawing_marks import DRAWN_BY
 from _assembly import (
+    activate_assembly_contract,
     assembly_title_properties,
     assert_component_placed,
     assert_free_dof_necessity,
@@ -754,6 +755,8 @@ async def _prepare_native_spring_specs(adapter, amplitudes: list[float]) -> list
 
 
 async def build(adapter) -> dict[str, str]:
+    # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
+    activate_assembly_contract(ASM_NAME)
     # The amplitude-bar station per channel IS the Fourier coefficient a_j
     # (channels.yaml amplitude_mm, the square-wave preset). solve_state(a_j)
     # repositions that channel's bar + lever; a_j = 0 is the neutral pose. The
