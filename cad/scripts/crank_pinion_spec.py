@@ -401,8 +401,11 @@ GEAR_DATA = gear_data_note(
 # The nonstandard cutter geometry is already explicit in the gear-data block;
 # it needs no duplicate method prohibition.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-# The sheet states the thin boss wall as a plain fact; its acceptance (USER
-# RULING 2026-09-25, option C) lives in the policy's Named exceptions table.
+# The sheet states the thin boss wall as a plain fact, rounded down so it
+# never claims more wall; its acceptance (user, option C, 2026-09-25) lives in
+# the policy's Named exceptions table.
 # Named exception: MHA-025 boss wall (drawing-simplicity-policy.md, "Named exceptions").
-BOSS_WALL_NOTE = f"BOSS WALL {BOSS_WALL_WORST:.2f} MIN AT BORE."
+BOSS_WALL_NOTE = (
+    f"BOSS WALL {math.floor(BOSS_WALL_WORST * 100.0) / 100.0:.2f} MIN AT BORE."
+)
 DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, BOSS_WALL_NOTE))
