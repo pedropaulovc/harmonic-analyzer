@@ -171,9 +171,14 @@ def test_bom_descriptions_keep_one_line() -> None:
 
 def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     """MHA-095 bounds the DISENGAGE swing; engaged, the plate stands off it."""
-    check = drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0]
-    to_stop = check.index("TO\n   THE MHA-095 STOP, CLEAR OF EVERY MHA-027")
-    assert to_stop < check.index("SWING IT BACK") < check.index("RE-ENGAGE")
+    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
+    order = [
+        check.index("TO THE MHA-095 STOP, CLEAR OF EVERY MHA-027"),
+        check.index("SWING IT BACK"),
+        check.index("RE-ENGAGE"),
+        check.index("TIGHTEN MHA-093"),
+    ]
+    assert order == sorted(order), check
     assert "RETURN IT TO THE MHA-095" not in check
 
 
