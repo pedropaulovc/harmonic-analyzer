@@ -40,6 +40,7 @@ from _drawing_common import (
     finalize_drawing,
     import_cosmetic_threads,
     insert_hole_table,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
@@ -287,19 +288,42 @@ def _crop_view_b_to_rail(adapter: Any, view: Any) -> None:
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     native_view = _early_bound(view, "IView")
+    # The positive control (draw_pinion_arbor's cropped 2:1 *Top, 3107bfa95)
+    # rebuilds after placing and locates the fence from the view's own model
+    # transform. r743-p1s-A did neither, and its crop did not take. So: rebuild,
+    # then prove where the part landed (origin on VIEW_B_CENTER, +X running
+    # along the sheet at 1:2) and fence around THAT, not an assumed centre.
+    rebuild_drawing(adapter, label="VIEW B placement")
+    half_len = (BOSS_DEPTH / 2.0 + 2.0) * VIEW_SCALE / 1000.0
+    half_z = VIEW_B_CROP_HALF_Z_MM * VIEW_SCALE / 1000.0
+    origin = model_point_in_view(
+        adapter, native_view, (0.0, 0.0, 0.0), label="VIEW B part origin"
+    )
+    east = model_point_in_view(
+        adapter, native_view, (BOSS_DEPTH / 2000.0, 0.0, 0.0), label="VIEW B east end"
+    )
+    _telemetry.info(f"VIEW B part origin at {origin!r}, east end at {east!r}")
+    end_run = BOSS_DEPTH / 2.0 * VIEW_SCALE / 1000.0
+    if (
+        math.dist(origin, VIEW_B_CENTER) > 0.001
+        or abs(abs(east[0] - origin[0]) - end_run) > 1e-4
+        or abs(east[1] - origin[1]) > 1e-4
+    ):
+        raise RuntimeError(
+            f"VIEW B is not the rail at 1:2 on {VIEW_B_CENTER!r}: part origin "
+            f"{origin!r}, east end {east!r}"
+        )
     if not ddoc.ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate VIEW B for its crop")
     draw.ClearSelection2(True)
-    half_len = (BOSS_DEPTH / 2.0 + 2.0) * VIEW_SCALE / 1000.0
-    half_z = VIEW_B_CROP_HALF_Z_MM * VIEW_SCALE / 1000.0
     before = tuple(float(value) for value in native_view.GetOutline())
     sketch = _early_bound(native_view.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     corners = []
     for x, y in (
-        (VIEW_B_CENTER[0] - half_len, VIEW_B_CENTER[1] + half_z),
-        (VIEW_B_CENTER[0] + half_len, VIEW_B_CENTER[1] - half_z),
+        (origin[0] - half_len, origin[1] + half_z),
+        (origin[0] + half_len, origin[1] - half_z),
     ):
         point = _early_bound(
             math_utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
@@ -313,11 +337,25 @@ def _crop_view_b_to_rail(adapter: Any, view: Any) -> None:
         f"fence corners in view-sketch space={corners!r}"
     )
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if not sketch_manager.CreateCornerRectangle(*corners[0], *corners[1]):
-        raise RuntimeError("failed to sketch the VIEW B crop fence")
+    segments = tuple(
+        sketch_manager.CreateCornerRectangle(*corners[0], *corners[1]) or ()
+    )
+    if len(segments) != 4:
+        raise RuntimeError(f"VIEW B crop fence has {len(segments)} segments, not 4")
+    # Crop2 consumes the selected closed profile. A circle stays selected once
+    # sketched (the positive control); whether all four rectangle lines do is
+    # unproven, so select them all and log what Crop2 is handed.
+    for segment in segments:
+        if not _early_bound(segment, "ISketchSegment").Select4(True, None):
+            raise RuntimeError("failed to select the VIEW B crop fence")
+    selected = int(draw.SelectionManager.GetSelectedObjectCount2(-1))
     # IView.Crop2 returns swCropViewErrors_e, where 1 is NoError.
-    if int(native_view.Crop2(False, True, 0)) != 1:
-        raise RuntimeError("failed to crop VIEW B to the rail strip")
+    status = int(native_view.Crop2(False, True, 0))
+    _telemetry.info(f"VIEW B Crop2 status {status} with {selected} entities selected")
+    if status != 1:
+        raise RuntimeError(
+            f"failed to crop VIEW B to the rail strip: Crop2 status {status}"
+        )
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     native_view.UpdateViewDisplayGeometry()
@@ -325,16 +363,16 @@ def _crop_view_b_to_rail(adapter: Any, view: Any) -> None:
         raise RuntimeError("VIEW B did not retain its crop")
     outline = tuple(float(value) for value in native_view.GetOutline())
     _telemetry.info(f"VIEW B outline after crop: {outline!r}")
-    # r743-p1s-A read 0.116 x 0.035 here, larger than the 0.089 x 0.032 top
-    # view itself, so GetOutline's absolute size cannot prove the fence. The
-    # crop is proved against the same view's outline before it: narrower
-    # across the rail (the fence runs 2 mm past each end, so the length is
-    # not compared) and still centred where the view was placed.
+    # r743-p1s-A read 0.116 x 0.035 here with Crop2 = 1 and IsCropped true:
+    # larger than the 0.089 x 0.032 top view, so neither flag proves a fence
+    # took. The crop is proved against the same view's outline before it:
+    # narrower across the rail (the fence runs 2 mm past each end, so the
+    # length is not compared) and still centred on the part.
     centre = ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
     if (
         len(outline) != 4
         or outline[3] - outline[1] >= before[3] - before[1] - 0.002
-        or math.dist(centre, VIEW_B_CENTER) > 0.001
+        or math.dist(centre, origin) > 0.001
     ):
         raise RuntimeError(
             f"VIEW B crop is not the rail strip: before={before!r}, after={outline!r}"
