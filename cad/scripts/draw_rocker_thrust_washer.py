@@ -11,6 +11,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_surface_finish,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -22,7 +23,12 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from rocker_thrust_washer_drawing_spec import SURFACE_FINISHES
-from rocker_thrust_washer_spec import OD, THICKNESS
+from rocker_thrust_washer_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    OD,
+    THICKNESS,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -48,6 +54,12 @@ VIEW_SCALE = (4, 1)
 FRONT_CENTER = (0.110, 0.180)
 RIGHT_CENTER = (0.200, 0.180)
 ISO_CENTER = (0.320, 0.180)
+
+DRAWING_PRECISION_BY_NAME = {
+    name: digits
+    for names in DRAWING_PRECISION.values()
+    for name, digits in names.items()
+}
 
 FRONT_KEEP = {
     "DiscDia": (0.060, 0.240),
@@ -134,8 +146,25 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-    curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
+    annotations = [
+        *curate_view_dimensions(
+            adapter,
+            front,
+            keep=FRONT_KEEP,
+            view_label="front",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+        *curate_view_dimensions(
+            adapter,
+            right,
+            keep=RIGHT_KEEP,
+            view_label="right",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+    ]
+    # Decimal places (and so the general-tolerance row each dimension claims)
+    # are authored on the part; the sheet only proves the import kept them.
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the washer face view")
     for key, (symbol_xy, attach_xy) in FINISH_PLACEMENT.items():

@@ -11,7 +11,7 @@ import draw_rocker_thrust_washer as drawing
 import rocker_thrust_washer_drawing_spec as drawing_spec
 import rocker_thrust_washer_spec as spec
 from _surface_finish import MACHINED_UM
-from _drawing_contract import model_toleranced_dimensions
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -150,3 +150,17 @@ def test_finish_symbols_sit_off_the_edge_view_and_its_dimension() -> None:
         assert abs(symbol_xy[0] - dim[0]) > 0.010 or abs(symbol_xy[1] - dim[1]) > 0.010
         front_right = drawing.FRONT_CENTER[0] + half_h
         assert symbol_xy[0] > front_right + 0.010
+
+
+def test_imported_places_are_the_part_authored_ones() -> None:
+    """Codex #936 PRRT_kwDOPHDy386mTMXz: the sheet proves each imported
+    dimension kept the places the part authors, and never sets its own."""
+    assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
+    assert drawing.DRAWING_PRECISION_BY_NAME == {
+        name: digits
+        for names in spec.DRAWING_PRECISION.values()
+        for name, digits in names.items()
+    }
+    assert set(drawing.DRAWING_PRECISION_BY_NAME) == set(drawing.FRONT_KEEP) | set(
+        drawing.RIGHT_KEEP
+    )
