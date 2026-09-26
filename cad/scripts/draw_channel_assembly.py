@@ -76,7 +76,7 @@ def _fitup_steps() -> str:
             f"{stack_low:.2f} TO {stack_high:.2f}; RE-FACE A LONG STACK."
         ),
         "north-ear-datum": (
-            f"THE NORTH {bracket} IS SET AT {steps.FITUP_DRAWING_NUMBER} FIT-UP. "
+            f"THE NORTH {bracket} IS SET AT {steps.NORTH_BRACKET_SET_REF}. "
             "ITS EAR IS THE BANK'S AXIAL DATUM: PUSH THE SHAFT SHOULDER "
             "AGAINST IT."
         ),
