@@ -1410,6 +1410,9 @@ class _ArborView:
         self.cropped = kw.get("cropped", True)
         self.turns = kw.get("turns", True)
         self.status = kw.get("status", 1)
+        self.crop_called = False
+        # False: IsCropped claims a crop but the outline never shrinks.
+        self.outline_shrinks = kw.get("outline_shrinks", True)
 
     def __setattr__(self, name, value):
         if name == "Angle" and not getattr(self, "turns", True):
@@ -1434,6 +1437,7 @@ class _ArborView:
 
     def Crop2(self, jagged, no_outline, intensity):  # noqa: N802
         self.seat.log.append(("crop2", self.name, jagged, no_outline, intensity))
+        self.crop_called = True
         return self.status
 
     def IsCropped(self):  # noqa: N802
@@ -1445,9 +1449,11 @@ class _ArborView:
     def GetOutline(self):  # noqa: N802
         cx, cy = drawing.DETAIL_CENTER
         r = drawing.DETAIL_CROP_RADIUS
-        if not self.cropped:
-            return (-0.2, cy - r, 0.5, cy + r)
-        return (cx - r, cy - r, cx + r, cy + r)
+        took = self.crop_called and self.cropped and self.status == 1
+        if not (took and self.outline_shrinks):
+            return (-0.2, cy - r, 0.5, cy + r)  # the whole arbor at 2:1
+        # A crop's outline, with an unmeasured margin round the circle.
+        return (cx - r - 0.004, cy - r - 0.004, cx + r + 0.004, cy + r + 0.004)
 
     def GetNotes(self):  # noqa: N802
         return tuple(note for note in self.seat.notes if note.owner == self.name)
@@ -1601,6 +1607,7 @@ def test_detail_a_is_a_cropped_2_to_1_model_view_turned_like_the_profile(
         ({"cropped": False}, "not cropped"),
         ({"status": 2}, "not cropped"),
         ({"turns": False}, "turn detail A"),
+        ({"outline_shrinks": False}, "crop did not take"),
     ],
 )
 def test_detail_a_fails_loud_when_the_crop_or_the_turn_did_not_take(
@@ -1662,3 +1669,17 @@ def test_detail_a_label_fails_loud_when_it_lands_in_another_view(monkeypatch) ->
     monkeypatch.setattr(seat, "ActivateView", lambda name: True)  # stays inactive
     with pytest.raises(RuntimeError, match="did not land in its view"):
         drawing._label_detail(seat, detail, principal, (0.3132, 0.170))
+
+
+def test_note_read_back_tolerates_how_a_multi_line_note_returns() -> None:
+    """How INote.GetText returns a multi-line note's later lines is unread on
+    a seat, so the two-line label is recognised by its first line; the
+    one-line letter must read back whole."""
+    label = drawing.DETAIL_LABEL_TEXT
+    for found in ("DETAIL A SCALE 2 : 1", "DETAIL A"):
+        assert drawing._is_note_text(found, label)
+    crlf = drawing._plain_text("DETAIL A" + chr(13) + chr(10) + "SCALE 2 : 1")
+    assert drawing._is_note_text(crlf, label)
+    assert not drawing._is_note_text("SCALE 2 : 1", label)
+    assert drawing._is_note_text("A", drawing.DETAIL_LETTER)
+    assert not drawing._is_note_text("A B", drawing.DETAIL_LETTER)
