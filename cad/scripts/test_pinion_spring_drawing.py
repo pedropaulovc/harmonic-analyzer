@@ -4,11 +4,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pinion_spring_spec
-import draw_pinion_spring as drawing
+import pytest
+
+import _config
 import build_pinion_spring as spring
-from _drawing_contract import model_toleranced_dimensions
+import draw_pinion_spring as drawing
+import pinion_spring_geometry as geometry
+import pinion_spring_spec
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+
+_XX_BAND = float(_config.title_block("linear_2pl")["value_in"]) * 25.4
+_HOLE_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
+_WEB_TARGET = 2.0  # U27: machined webs >= 2.0 at the printed worst case
 
 
 def test_required_drawing_paths() -> None:
@@ -16,15 +24,16 @@ def test_required_drawing_paths() -> None:
     assert drawing.PDF.as_posix().endswith("/pdf/pinion-spring.pdf")
     assert drawing.PNG.as_posix().endswith("/png/pinion-spring_drawing.png")
     assert DRAWINGS_BY_NAME["pinion_spring"].script == Path(drawing.__file__).resolve()
+    assert "draw_pinion_spring.py" in PRECISION_MIGRATED_DRAWINGS
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert spring.DRAWING_DIMENSIONS is pinion_spring_spec.DRAWING_DIMENSIONS
     marked = set().union(*pinion_spring_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.DETAIL_KEEP)
     assert kept == marked
+    assert not set(drawing.FRONT_KEEP) & set(drawing.TOP_KEEP)
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
-    # The build re-imports its primitive nominals from the spec.
     assert (spring.FOOT_LEN, spring.THICK, spring.WIDTH) == (
         pinion_spring_spec.FOOT_LEN,
         pinion_spring_spec.THICK,
@@ -32,84 +41,166 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     )
 
 
-def test_it_is_a_formed_leaf_not_a_coil_spring() -> None:
-    # The mission's coil-spring spec sheet does NOT apply: this is a bent strip.
-    notes = pinion_spring_spec.DRAWING_NOTES
-    assert "0.80+/-0.05 THK X 4.00+/-0.05 WIDE STRIP" in notes
-    assert "COIL" not in notes
-    assert "FORM FROM" in notes
-
-
-def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
-    assert drawing.SHEET_SCALE == (2.0, 1.0)
-    assert drawing.TOP_CENTER[0] >= 0.250
-    assert drawing.TOP_CENTER[1] >= 0.090
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 1)" in source  # the isometric override
-    assert pinion_spring_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
-    assert drawing.FRONT_BBOX_CX < 0.0
-
-
-def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
-    notes = pinion_spring_spec.DRAWING_NOTES
-    assert f"TANGENT LENGTH {pinion_spring_spec.BLADE_STRAIGHT_LEN:.2f}" in notes
-    assert "INSIDE-SURFACE PATH" in notes
-    assert "MID-THICKNESS" not in notes
-    assert "FROM EITHER" not in notes
-    assert "FROM R1.50 KINK EXIT TO FREE TIP" in notes
-    assert "0.80 STRIP END FACE" in notes
-    terminal_angle = (
-        90.0 - pinion_spring_spec.BLADE_TILT_DEG + pinion_spring_spec.KINK_DEG
-    )
-    assert f"{terminal_angle:.2f}+/-1 DEG CCW FROM FOOT INSIDE PATH" in (
-        pinion_spring_spec.TERMINAL_CALLOUT
-    )
-    assert "NEAR-VERTICAL" not in pinion_spring_spec.TERMINAL_CALLOUT
-    assert "2.00+/-0.10" not in notes
-    assert "LINEAR +/-" not in notes
-    assert "BA" not in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-
-
-def test_feature_requirements_use_inspectable_datum_controls() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_datum_feature(" not in source
-    assert source.count("add_feature_control_frame(") == 1
-    assert 'characteristic="flatness"' in source
-    assert "parallelism" not in source
-    assert "add_surface_finish(" not in source
-    assert source.count('entity_type="FACE"') == 1
-    assert "FORMED PROFILE - FRONT VIEW SCALE 2:1" in source
-    assert "TOP VIEW - LOOKING AT SCREW-DOWN FOOT BROAD FACE - SCALE 2:1" in source
-    assert "SIZE PER NATIVE CALLOUT" in pinion_spring_spec.DRAWING_NOTES
-    assert source.count("add_native_hole_callout(") == 1
-    assert source.count("add_attached_note(") == 1
-    assert 'label="spring short terminal inside edge"' in source
-    assert "NO TWIST" not in pinion_spring_spec.DRAWING_NOTES
-    assert 'quantity="FOOT BROAD FACE"' in source
-    assert abs(spring._BLADE_LEN - pinion_spring_spec.BLADE_STRAIGHT_LEN) < 1e-9
-    assert "INSIDE RADIUS" in drawing.DIMENSION_CALLOUTS["BendR"]
-    assert "INSIDE RADIUS" in drawing.DIMENSION_CALLOUTS["KinkR"]
+def test_every_formed_feature_carries_the_one_formed_band() -> None:
+    # Main's r6 ruling (c): the hand-formed profile prints one place with a
+    # +/-0.5 band; the blank's cut features ride the title-block .XX row.
+    assert pinion_spring_spec.FORMED_TOLERANCE_MM == 0.5
     assert model_toleranced_dimensions(spring) == {
-        ("SpringProfile", "FootLen"): "FOOT_LENGTH_TOLERANCE_MM",
-        ("SpringProfile", "BendR"): "BEND_RADIUS_TOLERANCE_MM",
-        ("SpringProfile", "KinkR"): "KINK_RADIUS_TOLERANCE_MM",
+        ("feature_name", "name"): "FORMED_TOLERANCE_MM"
     }
+    formed = pinion_spring_spec.FORMED_DIMENSIONS["SpringProfile"]
+    precision = pinion_spring_spec.DRAWING_PRECISION_BY_NAME
+    assert {name: precision[name] for name in formed} == dict.fromkeys(formed, 1)
+    for name in ("StripWidth", "PadWidth", "PadLen"):
+        assert precision[name] == 2
+
+
+def test_profile_is_baselined_from_the_foots_free_end() -> None:
+    # Rule 7: the kink start and the tip locate from the free end, the one
+    # feature the maker can put a rule on, never from the model origin.
+    source = Path(spring.__file__).read_text(encoding="utf-8")
+    assert "KinkStartX" not in source and "FlatTipX" not in source
+    free = pinion_spring_spec.FORMED_DIMENSIONS[pinion_spring_spec.FREE_FORM_SKETCH]
+    assert free == {"FreeKinkH", "FreeKinkV", "FreeTipH"}
+    assert set(drawing.DETAIL_KEEP) == {"KinkR", "FlatLen"}
+    assert drawing.DETAIL_SCALE == (5, 1)
+
+
+def test_pad_webs_clear_two_millimetres_at_the_printed_worst_case() -> None:
+    radius = (geometry.HOLE_DIA + _HOLE_OVERSIZE) / 2.0
+    width_min = geometry.PAD_WIDTH - _XX_BAND
+    across = geometry.PAD_WIDTH / 2.0  # hole from the pad's lower edge
+    side_near = across - _XX_BAND - radius
+    side_far = width_min - (across + _XX_BAND) - radius
+    end_web = geometry.HOLE_FROM_END - _XX_BAND - radius
+    pad_web = (geometry.PAD_LEN - _XX_BAND) - (
+        geometry.HOLE_FROM_END + _XX_BAND
+    ) - radius
+    webs = {"near side": side_near, "far side": side_far, "end": end_web}
+    webs["toward the strip"] = pad_web
+    assert min(webs.values()) >= _WEB_TARGET, webs
+
+
+def test_screw_stands_outboard_east_of_the_back_strap() -> None:
+    # 2026-09-24 re-derive: img01's far-left screw is on the DRUM side (east).
+    # The base's seat is transferred from this hole: it stands 20.0 east of
+    # the pivot bore, the pad and the bend wholly east of the strap flank.
+    assert geometry.HOLE_X - geometry.PIVOT_LX == pytest.approx(20.0)
+    flank = geometry.PIVOT_LX + geometry.STRAP_HALF_WIDTH
+    assert geometry.FOOT_END[0] > geometry.HOLE_X > geometry.FOOT_TAN[0] > flank
+    assert geometry.FOOT_END[0] - geometry.HOLE_X == geometry.HOLE_FROM_END
+    assert geometry.FOOT_LEN == geometry.PAD_LEN + geometry.FOOT_FLAT
+
+
+def test_blade_leans_in_to_its_flank_contact() -> None:
+    # img04: the crest bears on the east flank about 5 below the arbor; img01
+    # reads the blade about 11-13 deg to the flank, leaning in from the foot.
+    assert geometry.CONTACT_T == 23.0
+    assert 9.0 <= geometry.BLADE_TO_FLANK_DEG <= 13.0
+    assert geometry.BLADE_LEAN_DEG > 0.0  # west of vertical, toward the strap
+    assert geometry.KINK_START[0] < geometry.BEND_EXIT[0]
+
+
+def test_free_form_presets_the_crest_into_the_flank() -> None:
+    # O2: the part is the installed shape; the maker forms the free shape,
+    # whose crest stands PRESET into the parked flank.  The band's low end
+    # still leaves a preset.
+    assert geometry.PRESET - geometry.FORMED_BAND_MM > 1.0
+    assert geometry.FREE_KINK_START[0] < geometry.KINK_START[0]
+    assert pinion_spring_spec.FORMED_TOLERANCE_MM == geometry.FORMED_BAND_MM
+
+
+def test_free_form_prints_from_the_hidden_reference_sketch() -> None:
+    # O2 (a): the installed solid plus the FreeForm phantom; the free crest and
+    # tip print from the hidden sketch, which the part blanks and the front
+    # view shows through the opt-in hidden-sketch curation.
+    assert pinion_spring_spec.REFERENCE_SKETCHES == ("FreeForm", "FootHoleReference")
+    build_source = Path(spring.__file__).read_text(encoding="utf-8")
+    assert "for sketch in REFERENCE_SKETCHES:" in build_source
+    assert "blank_sketch(adapter, sketch)" in build_source
+    assert 'prefix="Free", construction=True' in build_source
+    draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "hidden_sketches.curate_view_dimensions(" in draw_source
+    assert {"FreeKinkH", "FreeKinkV", "FreeTipH"} <= set(drawing.FRONT_KEEP)
+    assert "FREE FORM" in pinion_spring_spec.DRAWING_NOTES
+
+
+def test_views_are_projected_and_hidden_lines_removed() -> None:
+    assert drawing.TOP_CENTER[0] == drawing.FRONT_CENTER[0]
+    assert drawing.TOP_CENTER[1] > drawing.FRONT_CENTER[1]
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_hidden_lines_visible" not in source
+    assert "add_feature_control_frame" not in source
+    assert "add_datum_feature" not in source
+    assert "process=HOLE_PROCESS" in source
+    assert drawing.HOLE_PROCESS == "#30 DRILL"
+    assert geometry.HOLE_DIA == pytest.approx(0.1285 * 25.4, abs=1e-3)  # No. 30 drill
+    # The two hole locations are model dimensions now (#843 Codex aB7).
+    assert "add_edge_dimension(" not in source
+
+
+def test_notes_carry_no_dimension_and_stay_short() -> None:
+    notes = pinion_spring_spec.DRAWING_NOTES
+    assert len(notes.splitlines()) <= 4
+    assert "TEMPLATE" in notes and "FORM" in notes
+    assert "COIL" not in notes
+    assert not any(ch.isdigit() for ch in notes)
     assert "+/-" not in "\n".join(drawing.DIMENSION_CALLOUTS.values())
-    assert "R2.00 AND R1.50" not in pinion_spring_spec.DRAWING_NOTES
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
     source = Path(spring.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source
     assert "clear_dimensions_for_drawing" in source
-    import _config
-
+    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
     spec = _config.parts("pinion-spring")
-    assert spec["material"] == spec["material_specification"]
-    assert spec["material_specification"]
+    # The title-block cell holds one line (<= 30 characters); the full
+    # stock callout stays in the material specification.
+    assert len(spec["material"]) <= 30
+    assert "C51000" in spec["material"] and "spring temper" in spec["material"]
+    assert "0.5 mm (0.020 in)" in spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 1
+
+
+def test_hole_locations_are_model_dimensions() -> None:
+    """#843 Codex aB7, policy rule 2: the hole's locations off the foot's free
+    end and the pad's lower edge are .XX manufacturing dimensions, so the part
+    owns them in its hidden FootHoleReference sketch and the top view imports
+    them verbatim -- never picked off view edges."""
+    spec = pinion_spring_spec
+    assert spec.DRAWING_DIMENSIONS["FootHoleReference"] == {"HoleFromEnd", "HoleFromEdge"}
+    assert spec.DRAWING_PRECISION["FootHoleReference"] == {
+        "HoleFromEnd": 2,
+        "HoleFromEdge": 2,
+    }
+    assert {"HoleFromEnd", "HoleFromEdge"} <= set(drawing.TOP_KEEP)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_hole_locations" not in source
+    assert source.count("hidden_sketches.curate_view_dimensions(") == 2
+
+
+def test_foot_hole_reference_lines_restate_the_hole_on_the_pad_outline() -> None:
+    """Each line lies on the pad outline and starts on a pad edge (rule 7);
+    its value is the spec's, and its equation-bound anchors evaluate to the
+    as-built coordinates."""
+    lines = {row[0]: row for row in spring.FOOT_HOLE_LINES}
+    half = geometry.PAD_WIDTH / 2.0
+    end_x = geometry.FOOT_END[0]
+    _, start, stop, orientation, value, drives = lines["HoleFromEnd"]
+    assert orientation == "horizontal" and value == geometry.HOLE_FROM_END
+    assert start == (end_x, half) and stop == (end_x - geometry.HOLE_FROM_END, half)
+    assert end_x - geometry.HOLE_FROM_END == pytest.approx(geometry.HOLE_X)
+    assert drives == ('"HoleFromEnd"', '"FootEndX"', '"PadWidth" / 2')
+    _, start, stop, orientation, value, drives = lines["HoleFromEdge"]
+    assert orientation == "vertical" and value == half
+    assert start == (end_x, -half) and stop == (end_x, 0.0)
+    assert drives == ('"PadWidth" / 2', '"FootEndX"', '"PadWidth" / 2')
+    # Main (#843 aB7 review): the free-end station is not an unguarded
+    # literal. One global carries it into the pad's anchor and both lines,
+    # and the hole the lines restate is cut from the same two values.
+    source = Path(spring.__file__).read_text(encoding="utf-8")
+    assert 'set_global(adapter, "FootEndX", f"{FOOT_END[0]}mm")' in source
+    assert 'set_global(adapter, "HoleFromEnd", f"{HOLE_FROM_END}mm")' in source
+    assert "'\"PadWidth\"', '\"FootEndX\"', '\"PadWidth\" / 2']" in source
+    assert "[[FOOT_END[0] - HOLE_FROM_END, FOOT_Y, 0.0]]" in source

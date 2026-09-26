@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 import _config
 import build_cone_gear as part
@@ -96,15 +97,12 @@ def test_each_configuration_sheet_carries_its_own_drawing_number() -> None:
     assert '"Number": configuration_number(part_number, teeth)' in source
 
 
-def test_bore_band_is_the_explicit_soldered_seat_band() -> None:
-    # Main (2026-09-23): MHA-013 bores print +0.05/0 on their shaft land's
-    # nominal; the soldered seats go to 0/-0.05 (#839), so the pair spans
-    # 0 to 0.10 diametral, the gap the solder or retaining compound fills.
+def test_bore_band_is_the_derived_retained_joint_band() -> None:
+    # Main (2026-09-25): every bonded bore takes the shared retained-joint fit
+    # against its land (retained_joint_fit); the family's one BoreCutDia band
+    # is +0.050/+0.025 (test_cone_gear_seat_fit proves every seat).
     assert part.BORE_DIA_BAND is spec.BORE_DIA_BAND
-    assert spec.BORE_DIA_BAND == (0.05, 0.0)
-    land_upper, land_lower = cone_gear_shaft_spec.SECTION_DIA_BAND
-    assert spec.BORE_DIA_BAND[1] - land_upper == pytest.approx(0.0)
-    assert 0.0 < spec.BORE_DIA_BAND[0] - land_lower <= 0.10
+    assert spec.BORE_DIA_BAND == (0.05, 0.025)
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"BoreProfile", "BoreCutDia", *deviations(BORE_DIA_BAND)' in source
 
@@ -123,7 +121,8 @@ def test_bore_band_is_the_explicit_soldered_seat_band() -> None:
 
 def test_native_tooth_thickness_is_the_modelled_deepened_mesh_tooth() -> None:
     # The band is the configured backlash WINDOW, centred on the modelled
-    # tooth: error_budget.yaml mesh_lag_spread is derived from that window.
+    # tooth: error_budget.yaml's tooth-thickness mesh-lag term is derived
+    # from that window.
     minimum, maximum = _config.fit("gear_mesh", "backlash_mm")
     upper, lower = spec.TOOTH_THICKNESS_BAND
     assert upper == pytest.approx(-lower)
@@ -462,3 +461,36 @@ def test_root_to_bore_webs_meet_u27_except_the_named_t006() -> None:
     assert [spec.bore_dia_mm(t) for t in (6, 12, 18, 24, 30)] == pytest.approx(
         [1.5875, 1.5875, 3.175, 6.35, 9.525]
     )
+
+
+def test_dimensions_record_gear_bores_row_follows_the_spec() -> None:
+    # The narrative record is read by no part, so nothing rebuilds when the
+    # bores move: it kept the pre-S1 map (9.5 on T024-T120) after U40.
+    inch = {0.0625: "1/16", 0.125: "1/8", 0.25: "1/4", 0.375: "3/8"}
+    groups: dict[float, list[int]] = {}
+    for teeth in spec.CONFIGURATION_TEETH:
+        groups.setdefault(spec.bore_dia_mm(teeth), []).append(teeth)
+    cells = []
+    for bore, teeth in sorted(groups.items(), reverse=True):
+        span = f"T{teeth[0]:03d}" if len(teeth) == 1 else f"T{teeth[0]:03d}–T{teeth[-1]:03d}"
+        cells.append(f'{bore + 1e-9:.3f} ({inch[round(bore / spec.MM_PER_IN, 4)]}") {span}')
+    expected = (
+        "snug on the stepped shaft (M6.7 perpendicular seats) AND inside each "
+        "gear's root circle: " + "; ".join(cells) + "; no keyway"
+    )
+    record = yaml.safe_load(
+        (Path(part.__file__).resolve().parents[1] / "config" / "dimensions.yaml")
+        .read_text(encoding="utf-8")
+    )
+    rows = []
+    stack = [record]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            stack.extend(node.values())
+        elif isinstance(node, list):
+            if node and isinstance(node[0], str) and node[0].startswith("Gear bores"):
+                rows.append(node)
+            stack.extend(node)
+    assert len(rows) == 1
+    assert rows[0][1] == expected

@@ -44,11 +44,20 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         "90280A194": RecipeMetadata(
             "diagnostics.diag_build_90280A194", "build_90280A194"
         ),
+        "90280A197": RecipeMetadata(
+            "diagnostics.diag_build_90280A197", "build_90280A197"
+        ),
         "90280A837": RecipeMetadata(
             "diagnostics.diag_build_90280A837", "build_90280A837"
         ),
+        "40923898": RecipeMetadata(
+            "diagnostics.diag_build_40923898", "build_40923898"
+        ),
         "90280A201": RecipeMetadata(
             "diagnostics.diag_build_90280A201", "build_90280A201"
+        ),
+        "91255A148": RecipeMetadata(
+            "diagnostics.diag_build_91255A148", "build_91255A148"
         ),
         "91882A425": RecipeMetadata(
             "diagnostics.diag_build_91882A425", "build_91882A425"
@@ -56,11 +65,14 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         "91829A560": RecipeMetadata(
             "diagnostics.diag_build_91829A560", "build_91829A560"
         ),
-        "94025A150": RecipeMetadata(
-            "diagnostics.diag_build_94025A150", "build_94025A150"
+        "94025A164": RecipeMetadata(
+            "diagnostics.diag_build_94025A164", "build_94025A164"
         ),
         "90280A108": RecipeMetadata(
             "diagnostics.diag_build_90280A108", "build_90280A108"
+        ),
+        "91794A112": RecipeMetadata(
+            "diagnostics.diag_build_91794A112", "build_91794A112"
         ),
         "90114A511": RecipeMetadata(
             "diagnostics.diag_build_90114A511", "build_90114A511"
@@ -68,8 +80,14 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         "91410A538": RecipeMetadata(
             "diagnostics.diag_build_91410A538", "build_91410A538"
         ),
+        "93075A150": RecipeMetadata(
+            "diagnostics.diag_build_93075A150", "build_93075A150"
+        ),
         "93075A194": RecipeMetadata(
             "diagnostics.diag_build_93075A194", "build_93075A194"
+        ),
+        "90631A007": RecipeMetadata(
+            "diagnostics.diag_build_90631A007", "build_90631A007"
         ),
         "92865A585": RecipeMetadata(
             "diagnostics.diag_build_92865A585", "build_92865A585"

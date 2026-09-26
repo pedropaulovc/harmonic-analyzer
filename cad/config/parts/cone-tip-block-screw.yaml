@@ -1,0 +1,13 @@
+cone-tip-block-screw:
+  title: Cone Tip Block Hold-Down Screw
+  number: MHA-140
+  stock_name: Low-Strength Zinc-Plated Steel Hex Head Screw
+  supplier: McMaster-Carr
+  supplier_skus: [93075A150]
+  material: Plain Carbon Steel
+  material_specification: Low-strength steel, McMaster-Carr 93075A150
+  finish: zinc plated
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

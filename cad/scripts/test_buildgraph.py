@@ -103,11 +103,15 @@ _INSERTED_SOURCES = {
     "drive_train": "alignment_pinion arbor_pedestal cone_gear cone_gear_shaft "
     "cone_lock_knob cone_pivot_post cone_pivot_screw cone_swing_platform "
     "cone_tip_adjuster cone_tip_block cone_tip_bushing cone_tip_pinch_screw "
-    "crank_arm crank_drive_gear crank_handle crank_pin crank_pin_eye crank_pin_ring "
-    "crank_pinion crankshaft cylinder_end_disc cylinder_gear cylinder_gear_shaft "
-    "dome_cap_screw fillister_screw foot_screw pinion_arbor pinion_bracket pinion_cam "
-    "pinion_cam_pin pinion_handle pinion_lever pinion_lift_rod pinion_pivot_block "
-    "pinion_pivot_shaft pinion_spring slotted_screw swing_stop_screw",
+    "cone_tip_shim "
+    "crank_arm crank_drive_gear crank_handle crank_handle_pivot_screw crank_hub crank_hub_pin crank_pin "
+    "crank_pin_eye crank_pin_ring "
+    "crank_pinion crank_pinion_pin crankshaft cylinder_end_disc cylinder_gear "
+    "cylinder_gear_shaft "
+    "dome_cap_screw fillister_screw foot_screw pedestal_hold_down_screw pinion_arbor pinion_arbor_collar pinion_bracket pinion_cam "
+    "pinion_cam_pin pinion_handle pinion_lever pinion_lever_pin pinion_lift_rod "
+    "pinion_pivot_block pinion_pivot_shaft pinion_spring post_mount_screw slotted_screw "
+    "swing_stop_screw",
     "channel": "amplitude_bar channel_lever channel_spring_installed connecting_rod "
     "frame_side_screw fulcrum_keeper fulcrum_shaft pivot_bracket pivot_shaft "
     "rocker_arm spring_hook",
@@ -1371,6 +1375,8 @@ def test_assemblies_depend_on_assembly_helpers():
     [
         ("_assembly_patterns", {"drive_train", "frame", "magnifier", "paper_drive"}),
         ("_assembly_couplings", {"drive_train", "paper_drive"}),
+        # paper_drive imports the drive-train builder for X_CRANK/Y_CRANK.
+        ("_drive_train_explode", {"drive_train", "paper_drive"}),
     ],
 )
 def test_specialized_assembly_helpers_have_exact_transitive_consumers(
@@ -2254,3 +2260,12 @@ def test_every_catalog_consumer_in_the_tree_is_classified():
         if bg.table_reads(path.read_text(encoding="utf-8"), *bg.FASTENER_TABLE) is None
     ]
     assert unclassified == []
+
+
+def test_interference_contracts_do_not_depend_on_the_crankshaft_spec() -> None:
+    # Every assembly imports _interference_contracts, so a crankshaft length or
+    # station edit must not re-key them all (W15, Main 2026-09-25): the shaft
+    # diameter comes from its owner, crank_hub_geometry.
+    closure = _helper_names("_interference_contracts.py")
+    assert "crank_hub_geometry" in closure
+    assert "crankshaft_spec" not in closure

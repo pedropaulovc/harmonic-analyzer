@@ -6,6 +6,8 @@ each drum face -- the slice that carries the load -- from the assembly pose and
 the printed bands, and check the design rules the table was sized to:
 
 * tightest case (thickest tooth, runouts closing): backlash >= BL_MIN;
+* loosest case (thinnest tooth, runouts and journal float opening): backlash
+  inside the printed acceptance, whose upper is that limit;
 * thinnest tooth at the largest tip: tip land >= 0.10;
 * largest tip, runouts closing: cone tip >= 0.10 off the drum's chord floor,
   and the drum tip clear of the printed cone floor (0.30 where it is raised);
@@ -47,7 +49,7 @@ BASE_PITCH = math.pi * M * math.cos(PRESSURE_ANGLE)
 # Radial play.  Runouts turn with their gear, so they close the mesh at some
 # angle; float can open it.  The cone runout is sized for the soldered seats
 # #839 prints (0/-0.05), the looser of that and the current shaft land band.
-SEAT_LAND_LOWER = min(cone_gear_shaft_spec.SECTION_DIA_BAND[1], -0.05)
+SEAT_LAND_LOWER = min(cone_gear_shaft_spec.GEAR_SEAT_BAND[1], -0.05)
 CONE_RUNOUT = (spec.BORE_DIA_BAND[0] - SEAT_LAND_LOWER) / 2.0
 DRUM_RUNOUT = drum.BORE_DIAMETRAL_CLEARANCE_MM[1] / 2.0
 _JOURNAL = max(_config.fit("shaft_in_bushing")["diametral_clearance_mm"]) / 2.0
@@ -152,7 +154,7 @@ def _worst(teeth: int, tip_dia: float, thickest: float) -> dict[str, float]:
     closing = nominal - RUNOUT
     return {
         "tight_backlash": _backlash(teeth, thickest, closing),
-        "loose_backlash": _backlash(teeth, thinnest, nominal + RUNOUT),
+        "loose_backlash": _backlash(teeth, thinnest, nominal + FLOAT),
         "tip_land": _tip_land(teeth, thinnest, (tip_dia + od_upper) / 2.0),
         "drum_floor": closing - (tip_dia + od_upper) / 2.0 - DRUM_FLOOR_R,
         "cone_floor": closing
@@ -204,6 +206,17 @@ def test_printed_mesh_meets_its_design_rules(teeth: int) -> None:
     # stack.
     standard = _worst(teeth, (teeth + 2) * M, spec.STANDARD_TOOTH_THICKNESS)
     assert worst["contact_ratio"] > standard["contact_ratio"]
+
+
+def test_backlash_acceptance_upper_is_the_loosest_printed_mesh() -> None:
+    # The separating tooth load takes up both journal clearances while the
+    # mesh is rocked, so the loosest reading includes FLOAT, not only RUNOUT.
+    loosest = max(
+        _worst(teeth, *spec.DEEPENED_MESH_MM[teeth])["loose_backlash"]
+        for teeth in spec.CONFIGURATION_TEETH
+    )
+    high = spec.BACKLASH_ACCEPTANCE_MM[1]
+    assert high == math.ceil(loosest * 100.0) / 100.0, loosest
 
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
@@ -265,6 +278,22 @@ def test_gap_floor_clears_the_drum_and_fits_one_cutter(teeth: int) -> None:
         tmin=spec.floor_tmin(teeth) + 0.0005,
     )
     assert _centre(teeth) - RUNOUT - DRUM_TIP_R - higher < 0.30
+
+
+def test_drive_train_clearance_scans_use_the_printed_cone_tip() -> None:
+    # Codex (#834): the T120/16T scan kept the standard pitch radius +
+    # addendum (Ø62.20) after the long-addendum blank grew the printed tip to
+    # Ø62.93.  Every cone-tip clearance check reads the printed OD at its
+    # upper limit, and the 16T keeps its 0.25 axial air at that tip.
+    assert assembly._TIP120 == pytest.approx(
+        (spec.outside_dia_mm(120) + spec.BLANK_DIA_BAND[0]) / 2.0
+    )
+    for teeth in spec.CONFIGURATION_TEETH:
+        assert assembly._cone_tip_radius_max(teeth) == pytest.approx(
+            (spec.outside_dia_mm(teeth) + spec.BLANK_DIA_BAND[0]) / 2.0
+        )
+    pinion_north = assembly.PINION_TOOTH_Z + assembly.PINION_FACE / 2.0
+    assert assembly._T120_SOUTH - pinion_north >= 0.25
 
 
 # Face-width band (#914 user ruling, 2026-09-25) against the two axial stacks

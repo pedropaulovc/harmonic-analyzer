@@ -2,18 +2,16 @@ r"""Pinion-swing-bracket dimensional contract -- the single source of truth shar
 by the part build (``build_pinion_bracket.py``) and its manufacturing drawing
 (``draw_pinion_bracket.py``).
 
-PURE DATA, no SolidWorks/COM imports: the nominal geometry (the "editable
-knobs"), the derived spans the drawing needs for its view math, and the
-marked-dimension -> kept-dimension NAME map.  Keeping this in ONE module means
-a rename or a nominal change is a single edit that reaches both scripts, so the
-part-side ``mark_dimensions_for_drawing`` set and the drawing-side ``keep``
-maps cannot silently drift apart.
+PURE DATA, no SolidWorks/COM imports: the marked-dimension -> kept-dimension
+NAME map, the decimal places the MODEL authors for each of those dimensions,
+the three fitted-bore bands and the roughness controls.  Keeping this in ONE
+module means a rename or a nominal change is a single edit that reaches both
+scripts, so the part-side ``mark_dimensions_for_drawing`` set and the
+drawing-side ``keep`` maps cannot silently drift apart.
 
 Build-graph consequence (intended): geometry lives in
 ``pinion_bracket_geometry`` so the drive-train assembly can consume it without
-also depending on this module's drawing-only notes and annotation contract.
-The part and drawing import this file, so note edits still rebuild the source
-part whose custom properties carry them and then regenerate the drawing.
+also depending on this module's drawing-only annotation contract.
 
 The offline lockstep test (``test_pinion_bracket_drawing.py``) asserts the part
 marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
@@ -27,7 +25,6 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_bracket_geometry import (
     ARBOR_BORE as ARBOR_BORE,
     C2C as C2C,
-    CAM_RELIEF_RADIUS as CAM_RELIEF_RADIUS,
     HALF_WIDTH as HALF_WIDTH,
     OVERALL_LENGTH as OVERALL_LENGTH,
     PIN_BORE as PIN_BORE,
@@ -38,15 +35,79 @@ from pinion_bracket_geometry import (
     THICKNESS as THICKNESS,
     WIDTH as WIDTH,
 )
+import pinion_strap_pin_spec as _strap_pin
 
-ARBOR_BORE_CZ_TOLERANCE_MM = 0.10
+# --- Tolerance bands.  Only the three fitted bores carry one, and each traces
+# to a NAMED fit class in ``_fit_limits``; every other feature is governed by
+# its decimal places against the title block's general grades.  The strap's
+# former per-part numbers (a +/-0.10 bore centre distance, +/-0.05 on the seat
+# axis and through-thickness station, +/-0.05 on the bar thickness and a
+# +0.10/0 seat depth) traced to no fit class and to no error-budget row: they
+# were habit, not specification, and are gone.  The one non-fit band that
+# survives is PIN_SEAT_STATION_TOL below, and it traces to a web. ---
+# Option E-a: the strap is pinned to the torque shaft, which turns with it in
+# the MHA-061 block bores.  The slide fit stays so the strap goes onto the
+# shaft for fit-up and the cross hole can be match-drilled through both.
 PIVOT_BORE_BAND = REAM_SLIDE
-ARBOR_BORE_BAND = REAM_SLIDE
-PIN_SEAT_AXIS_TOLERANCE_MM = 0.05
-THICKNESS_TOLERANCE_MM = 0.05
+ARBOR_BORE_BAND = REAM_SLIDE  # pinion arbor turns in it
+# The MHA-116 drill-rod stud slips into this seat and is bonded with LOCTITE
+# 638 (U27; pinion_cam_pin_spec proves the 0.000-0.042 bond gap).
 PIN_SEAT_DIA_BAND = REAM_H7
-PIN_SEAT_DEPTH_BAND = (0.10, 0.00)
-PIN_SEAT_CZ_TOLERANCE_MM = 0.05
+
+# Option E-a set-pin cross hole (pinion_strap_pin_spec).  Its location is a
+# functional requirement, not habit: the hole is match-drilled on into the
+# MHA-062 shaft, and every bit it runs off the bore axis comes straight off
+# the shaft wall beside it (SHAFT_LIGAMENT_WORST).  Codex #858 P2, user
+# ruling (a): both locations are model dimensions on the print, never prose.
+# Through the thickness the model's own CrossHoleCz (half the thickness from
+# broad face A) prints at .XX; its far-face web is STRAP_FACE_WEB_WORST.
+# Across the bar the hole sits ON the pivot-bore axis, a relation with no
+# dimension to print, so a hidden construction reference sketch
+# (CrossHoleAxisReference) owns its distance from the pivot-bore wall,
+# CrossHoleFromBoreWall = "PivotBore" / 2, printed at .XX: the
+# SHAFT_LIGAMENT_WORST case.  The diameter carries the spring pin's own
+# functional band (pinion_strap_pin_spec).
+CROSS_HOLE_DIA = _strap_pin.HOLE_DIA
+CROSS_HOLE_BAND = _strap_pin.HOLE_BAND
+CROSS_HOLE_CALLOUT = "\n".join(
+    (
+        "THRU",
+        "SUPPLY 1/16 X 1/2 SLOTTED SPRING",
+        "PIN (ASME B18.8.2) LOOSE",
+    )
+)
+if "SUPPLY " + _strap_pin.PIN_SUPPLY + " LOOSE" != " ".join(
+    CROSS_HOLE_CALLOUT.splitlines()[1:]
+):
+    raise AssertionError("cross-hole callout drifted from the pin spec")
+
+# Rule 12 (#842, U27; audit W23) worst-case web from the blind seat to a broad
+# face.  Codex #858 P2, user ruling (a) (2026-09-25): the seat's station is
+# printed from broad face A as the model's own PinSeatCz, not as "CENTRED ON
+# THICKNESS" prose.  At the general .XX grade that web was 1.18, under the 1.5
+# floor, so the user approved tightening the station alone to +/-0.10: a
+# functional band that traces to this web, not habit.  The far face then sees
+# the thinnest bar (.X minus band) less the station at its upper limit, the
+# seat's upper-limit radius and the 0.05 drilled-hole allowance: 1.54, over
+# the 1.5 floor (the 2.0 target gives way to the printed location).  The near
+# face keeps PIN_SEAT_NEAR_WEB_WORST.
+THICKNESS_BAND = 0.8  # Depth prints .X
+# Symmetric, so the print reads +/- (ASME Y14.5), not an equal bilateral pair.
+PIN_SEAT_STATION_TOL = 0.10
+_PIN_SEAT_MAX = PIN_BORE + PIN_SEAT_DIA_BAND[0]
+PIN_SEAT_WEB_WORST = (
+    (THICKNESS - THICKNESS_BAND)
+    - (THICKNESS / 2.0 + PIN_SEAT_STATION_TOL)
+    - _PIN_SEAT_MAX / 2.0
+    - 0.05
+)
+PIN_SEAT_NEAR_WEB_WORST = (
+    THICKNESS / 2.0 - PIN_SEAT_STATION_TOL - _PIN_SEAT_MAX / 2.0 - 0.05
+)
+if PIN_SEAT_WEB_WORST < 1.5:
+    raise AssertionError(
+        f"follower-seat web {PIN_SEAT_WEB_WORST:.2f} is under the 1.5 floor"
+    )
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_pinion_bracket`` marks exactly these; ``draw_pinion_bracket``
@@ -54,17 +115,79 @@ PIN_SEAT_CZ_TOLERANCE_MM = 0.05
 # enforces ``union(marks) == union(keeps)``. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StrapProfile": {
-        "ArborBoreCz",
         "PivotBoreDia",
         "ArborBoreDia",
+        "ArborBoreCz",
         "BottomCapRadius",
+        "TopCapRadius",
     },
     "Strap": {"Depth"},
-    # PinSeatCz locates the blind pin seat THROUGH the 5 mm thickness (mid-
-    # thickness), so the seat is fully located, not just drawn centred.
+    # Rule 12 (audit W23) and user ruling (a): the seat's station from broad
+    # face A prints as the model's own PinSeatCz at +/-0.10 -- see
+    # PIN_SEAT_WEB_WORST.
     "PinSeatProfile": {"PinSeatDia", "PinSeatCy", "PinSeatCz"},
     "PinSeat": {"PinSeatDepth"},
+    # Option E-a: the set-pin cross hole.  Its size and its station from
+    # broad face A (Codex #858 P2) ...
+    "CrossHoleProfile": {"CrossHoleDia", "CrossHoleCz"},
+    # ... and its height, from the pivot-bore wall (user ruling (a)).
+    "CrossHoleAxisReference": {"CrossHoleFromBoreWall"},
 }
+
+# Decimal places ARE the tolerance statement (drawing-simplicity policy rule
+# 2), so the MODEL owns them: build_pinion_bracket applies this map to the
+# .SLDPRT and draw_pinion_bracket only reads it back.
+#
+# Three places (title-block .XXX, +/-0.13) on PinSeatCy alone: the follower
+# stud's height above the pivot axis sets how far the drum swings for a given
+# cam lift, and the engaged pose is budgeted with 0.25 of air -- half a
+# millimetre there is twice the whole clearance.  Everything else is two
+# places (.XX, +/-0.51): the bore centre distance and the bar thickness are
+# routine link geometry, and the two running bores plus the pressed seat carry
+# their own bands on top.  One place (.X) on the two end radii and the seat
+# depth: the ends are profiled to the bar's own width and the seat bottoms out
+# on a flat-bottom reamer.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "StrapProfile": {
+        "PivotBoreDia": 2,
+        "ArborBoreDia": 2,
+        "ArborBoreCz": 2,
+        "BottomCapRadius": 1,
+        "TopCapRadius": 1,
+    },
+    "Strap": {"Depth": 1},
+    # Two places on PinSeatCz resolve its +/-0.10 band.
+    "PinSeatProfile": {"PinSeatDia": 2, "PinSeatCy": 3, "PinSeatCz": 2},
+    "PinSeat": {"PinSeatDepth": 1},
+    # Two places resolve the spring pin's +0.06/0 hole band; both locations
+    # are routine .XX (their worst cases clear the 1.5 floor at that grade).
+    "CrossHoleProfile": {"CrossHoleDia": 2, "CrossHoleCz": 2},
+    "CrossHoleAxisReference": {"CrossHoleFromBoreWall": 2},
+}
+
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+if any(
+    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
+    for feature, name in _PRECISION_NAMES
+):
+    raise AssertionError("DRAWING_PRECISION names a dimension the part never marks")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
+    raise AssertionError("every marked dimension must state its decimal places")
+
+# The (43.0) overall is a REFERENCE the sheet derives from the outline (C2C
+# plus both end radii), not a model dimension, so no part-side map can hand
+# its decimal places over: the spec owns the digit and the sheet passes it to
+# ``SetPrecision3`` instead of writing a literal (policy rule 2).  One place
+# because the two end radii it sums are one-place dimensions.
+DRAWING_REFERENCE_PRECISION = 1
+
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -79,29 +202,13 @@ SURFACE_FINISHES = (
     ),
 )
 
-# True free-text instructions only. Geometry, datum structure, form/orientation
-# live in native dimensions / datum tags / FCFs / surface symbols. The part
-# build stamps these strings into the SLDPRT; the drawing displays only
-# $PRPSHEET links, so the print cannot silently diverge from its source model.
-DRAWING_NOTES = "\n".join(
-    (
-        f"STRAIGHT SIDES TANGENT TO R{R_END:.2f} END ARCS; R{R_END:.2f} IS BASIC",
-        "  FOR THE END-ARC PROFILE ZONES.",
-        "MACHINE TWO PARTS CLAMPED FACE-TO-FACE IN ONE SETUP; REAM BOTH",
-        "  PIVOT BORES TOGETHER AND BOTH ARBOR BORES TOGETHER.",
-        "PARTS ARE INTERCHANGEABLE; PAIRED MACHINING IS PROCESS",
-        "  GUIDANCE, NOT A MATCHED-PAIR REQUIREMENT.",
-        f"CAM CLEARANCE: 2X OPEN R{CAM_RELIEF_RADIUS:.2f} SCALLOPS PER MODEL;",
-        "  MAINTAIN 2.50 MIN LIGAMENT FROM THE PIVOT BORE.",
-        "PRESS FOLLOWER STUD TO SEAT BOTTOM, THEN SILVER-BRAZE AROUND THE",
-        "  EXPOSED MOUTH; THE SCALLOP OPENS PART OF THE ORIGINAL EDGE SEAT.",
-    )
-)
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+# No manufacturing-note block.  Everything this strap needs is a dimension, a
+# hole callout, a roughness symbol or a title-block field (drawing-simplicity
+# policy rule 6); the retired block restated geometry the native dimensions
+# and outline already define and prescribed an unnecessary fixturing method.
+DRAWING_NOTES = ""
 
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "lower end-arc profile": "0.05",
-    "upper end-arc profile": "0.05",
-}
+# Brackets carry no datums and no feature-control frames (policy rule 3): the
+# end-arc profile frames this sheet used to print were form control on a
+# clearance outline, which no +/- on a dimension was failing to express.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {}

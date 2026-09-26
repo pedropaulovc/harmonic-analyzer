@@ -45,8 +45,8 @@ from build_swing_stop_screw import SHANK_DIA as STOP_SHANK_DIA
             2,
         ),
         (
-            part.FOOT_SEAT_SPEC,
-            part.FOOT_SCREW_LEN - part.PEDESTAL_FLANGE_THICKNESS,
+            part.PEDESTAL_SEAT_SPEC,
+            part.PEDESTAL_SCREW_LEN - part.PEDESTAL_FLANGE_THICKNESS,
             "tapped_bottoming",
             2,
         ),
@@ -257,7 +257,7 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
     edge_norm = math.hypot(edge_x, edge_z)
     edge_x, edge_z = edge_x / edge_norm, edge_z / edge_norm
     disengage_rad = (
-        platform.NOTCH_EXIT_TRAVEL + KNOB_COLLAR_DIA / 2.0 + 2.0
+        platform.NOTCH_EXIT_TRAVEL + KNOB_COLLAR_DIA / 2.0 + platform.DISENGAGE_COLLAR_MARGIN
     ) / platform.SLOT_R
     angle = math.radians(platform.INCLINE_DEG) + disengage_rad
     cos_a, sin_a = math.cos(angle), math.sin(angle)
@@ -298,25 +298,32 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
 
 
 def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
-    # 2026-09 short-strap pinion rig: blocks at machine x -5.863 +/- 13.5,
-    # spring foot screw at 7.486 (build_drive_train_assembly derives both).
-    former_blocks = (
-        (-13.669764612476252, -98.0),
-        (13.33023538752375, -98.0),
-        (-13.669764612476252, 82.0),
-        (13.33023538752375, 82.0),
-    )
-    former_feet = (
-        (13.179270253802283, 70.95),
-        (-54.7, -95.5),
-        (-54.7, 102.5),
-    )
+    # The 32T coherent-placement cutover shifts the block screws and spring
+    # foot with the pinion rig while the arbor-pedestal seats stay on the
+    # unchanged cylinder-drum axis.  U28 (2026-09-23): 2.2425 park-out, screws
+    # +-8.5 about the pivot bore, block mid-depth 5.125 in from each outer face.
+    # Ruling (c) (user, 2026-09-24): the block and spring-foot z stations come
+    # from pinion_rig_layout -- the back block keeps its released seat, the
+    # front block stands one feeler off the front strap, the spring rides with
+    # the back strap.  The spring foot's seat is 20.0 east of the pivot bore
+    # (the 2026-09-24 re-derive: outboard of the back strap, not west of it).
+    import pinion_rig_layout as rig
+
+    former_block_x = (-17.226441649810653, -0.22644164981065273)
+    former_pivot_x = former_block_x[0] + 8.5
+    former_feet = ((former_pivot_x - 20.0, rig.SPRING_Z - MECHANISM_Z_SHIFT),)
     assert part.BLOCK_SCREW_XZ == tuple(
-        (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in former_blocks
+        (x + MECHANISM_X_SHIFT, z) for z in rig.BLOCK_SEAT_Z for x in former_block_x
     )
+    assert rig.BLOCK_SEAT_Z[1] == pytest.approx(82.875 + MECHANISM_Z_SHIFT)
     assert part.FOOT_SCREW_XZ == tuple(
         (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in former_feet
     )
+    # U34c: the arbor pedestals left the #4-40 foot group for their own #8-32
+    # seats, 19.0 outboard of each strap inner face on the unshifted drum axis.
+    expected = ((-54.7 + MECHANISM_X_SHIFT, -91.652), (-54.7 + MECHANISM_X_SHIFT, 94.202))
+    for actual, wanted in zip(part.PEDESTAL_SCREW_XZ, expected, strict=True):
+        assert actual == pytest.approx(wanted)
 
 
 def _socket_bore_geometry(x_mm: float, z_mm: float):
@@ -400,3 +407,46 @@ def test_socket_bore_leader_lands_on_bore_clear_of_the_cross_tap() -> None:
     deck_clearance = part.STACK_HEIGHT - y_mm
     assert min(tap_clearance, deck_clearance) > 4.0
     assert y_mm > part.STACK_HEIGHT - part.COLUMN_SOCKET_DEPTH
+
+
+def test_transferred_pinion_block_seats_print_no_station() -> None:
+    # Codex #855 P1: BLOCK_SEAT_Z is a model-pose station, and the pose's two
+    # STRAP_AIR gaps stand the front block 2 x STRAP_AIR south of its
+    # manufactured station -- more than a #8 floats in its clearance hole.
+    # That is harmless only because the print never carries the station: the
+    # four block seats are spotted THROUGH MHA-061 at assembly (U28 corollary;
+    # MHA-061's note "SPOT BASE SEATS THROUGH BLOCK HOLES AT ASSEMBLY."), so
+    # they leave the hole table and their one callout names the transfer.
+    import draw_harmonic_base as sheet
+    import pinion_rig_layout as rig
+    from pinion_pivot_block_geometry import BLOCK_DEPTH
+
+    block_seats = {(x, z, part.BLOCK_SCREW_HOLE_DIA) for x, z in part.BLOCK_SCREW_XZ}
+    assert set(sheet.TRANSFER_BLOCK_HOLES) == block_seats
+    assert not block_seats & set(sheet.TABLE_HOLES)
+    assert sheet.TRANSFER_BLOCK_CALLOUT.startswith("TRANSFER FROM MHA-061")
+    assert "AT ASSEMBLY" in sheet.TRANSFER_BLOCK_CALLOUT
+    # The front pair's pose-vs-hardware offset the transfer absorbs.
+    physical_front_seat = rig.PHYSICAL_FRONT_BLOCK_OUTER_Z + BLOCK_DEPTH / 2.0
+    assert physical_front_seat - rig.BLOCK_SEAT_Z[0] == pytest.approx(
+        2.0 * rig.STRAP_AIR
+    )
+
+
+def test_transferred_pedestal_and_spring_seats_print_no_station() -> None:
+    # U34c (I27): each arbor pedestal is stood on the base with the arbor in
+    # both straps and its #8-32 seat is spotted through the MHA-004 ledge
+    # hole, so the pair leaves the hole table like the pinion-block seats. The
+    # spring-foot seat, now alone on its #4-40 feature, takes a native callout
+    # instead of a note naming a table row that no longer exists.
+    import draw_harmonic_base as sheet
+
+    pedestal_seats = {
+        (x, z, part.PEDESTAL_SCREW_HOLE_DIA) for x, z in part.PEDESTAL_SCREW_XZ
+    }
+    assert set(sheet.TRANSFER_PEDESTAL_HOLES) == pedestal_seats
+    assert sheet.TRANSFER_SPRING_HOLE[:2] == part.FOOT_SCREW_XZ[0]
+    assert not (pedestal_seats | {sheet.TRANSFER_SPRING_HOLE}) & set(sheet.TABLE_HOLES)
+    assert sheet.TRANSFER_PEDESTAL_CALLOUT == "TRANSFER FROM MHA-004\nAT ASSEMBLY;"
+    assert sheet.TRANSFER_SPRING_CALLOUT == "TRANSFER FROM MHA-114\nAT ASSEMBLY;"
+    assert not any(tag.startswith("G") for tag in sheet.HOLE_TAG_POSITIONS)

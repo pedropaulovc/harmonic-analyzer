@@ -51,6 +51,9 @@ from _drawing_common import (
     view_name,
 )
 
+from _drawing_hidden_sketches import (
+    curate_view_dimensions as curate_hidden_owner_dimensions,
+)
 from _drawing_registry import DRAWINGS_BY_NAME
 from _part_pmi import _resolve_faces
 from _surface_finish import surface_finish_by_key
@@ -68,6 +71,8 @@ from build_harmonic_base import (
     LOCK_SCREW_HOLE_DIA,
     NAMEPLATE_SCREW_HOLE_DIA,
     NAMEPLATE_SCREW_XZ,
+    PEDESTAL_SCREW_HOLE_DIA,
+    PEDESTAL_SCREW_XZ,
     SERIAL_HEIGHT_MM,
     SERIAL_TEXT,
     SERIAL_XZ,
@@ -253,19 +258,16 @@ HOLE_TAG_POSITIONS = {
     "A4": (0.326, 0.215),
     "C1": (0.247, 0.216),
     "D1": (0.247, 0.187),
-    "E1": (0.257, 0.155),
-    "E2": (0.262, 0.226),
-    "E3": (0.287, 0.192),
-    "F1": (0.265, 0.192),
-    "F2": (0.277, 0.224),
-    "F3": (0.287, 0.155),
-    "F4": (0.293, 0.223),
-    "G1": (0.306, 0.187),
-    "G2": (0.289, 0.206),
-    "G3": (0.312, 0.173),
-    "G4": (0.312, 0.214),
-    "H3": (0.343, 0.181),
-    "H4": (0.343, 0.214),
+    # The transferred pinion-rig seats left the table (U28 corollary), and
+    # with U34c the arbor-pedestal seats followed them, taking the last #4-40
+    # rows (the former E) along. The native tags re-letter: the
+    # rocker-support taps are now E and the nameplate seats are now F.
+    "E1": (0.306, 0.187),
+    "E2": (0.289, 0.206),
+    "E3": (0.312, 0.173),
+    "E4": (0.312, 0.214),
+    "F3": (0.343, 0.181),
+    "F4": (0.343, 0.214),
 }
 
 # Hole-table origin is the finished plate's lower-left theoretical sharp
@@ -532,7 +534,7 @@ def _spread_hole_tags(view: Any, table: Any) -> None:
             raise RuntimeError(f"failed to reposition native hole tag {tag}")
         if str(note.GetText()).strip() != tag:
             raise RuntimeError(f"moving native hole tag changed its text: {tag}")
-        if tag in ("D1", "E1", "F1", "E3", "F3", "G1"):
+        if tag in ("D1", "E1", "E3"):
             points = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ())
             if len(points) < 6 or len(points) % 3:
                 raise RuntimeError(f"native hole tag {tag} has no complete leader: {points!r}")
@@ -556,21 +558,44 @@ def _spread_hole_tags(view: Any, table: Any) -> None:
         raise RuntimeError(f"native table/view tag bijection failed: missing={set(table_locations) - found}")
 
 
+# U28 assembly corollary (Main ruling 2026-09-23, from the user's U27/U28):
+# the pinion rig is set on the base by a 2.5 feeler at the parked tip gap,
+# then the pivot-block and spring-foot seats are spotted THROUGH those parts.
+# U34c does the same for the arbor pedestals: each is stood on the base with
+# the arbor running in both straps, and its seat is spotted through the ledge
+# hole. The sheet therefore prints no position for any of them: they leave
+# the hole table and carry their native size on a callout naming their source.
+TRANSFER_BLOCK_HOLES = tuple((x, z, BLOCK_SCREW_HOLE_DIA) for x, z in BLOCK_SCREW_XZ)
+TRANSFER_SPRING_HOLE = (*FOOT_SCREW_XZ[0], FOOT_SCREW_HOLE_DIA)
+TRANSFER_PEDESTAL_HOLES = tuple(
+    (x, z, PEDESTAL_SCREW_HOLE_DIA) for x, z in PEDESTAL_SCREW_XZ
+)
+# The prefix lands before the tap line, so the semicolon separates the
+# locating instruction from "8-32 UNC - 2B" on the rendered line.
+TRANSFER_BLOCK_CALLOUT = "TRANSFER FROM MHA-061\nAT ASSEMBLY;"
+TRANSFER_SPRING_CALLOUT = "TRANSFER FROM MHA-114\nAT ASSEMBLY;"
+TRANSFER_PEDESTAL_CALLOUT = "TRANSFER FROM MHA-004\nAT ASSEMBLY;"
+TRANSFER_HOLES = (*TRANSFER_BLOCK_HOLES, TRANSFER_SPRING_HOLE, *TRANSFER_PEDESTAL_HOLES)
+
 ALL_HOLES = (
     *((x, z, HOLD_DOWN_TAP_DRILL_DIA) for x, z in HOLE_XZ),
     (*PIVOT_SCREW_XZ, PIVOT_SCREW_HOLE_DIA),
     (*STOP_SCREW_XZ, STOP_SCREW_HOLE_DIA),
     *((x, z, BLOCK_SCREW_HOLE_DIA) for x, z in BLOCK_SCREW_XZ),
     *((x, z, FOOT_SCREW_HOLE_DIA) for x, z in FOOT_SCREW_XZ),
+    *TRANSFER_PEDESTAL_HOLES,
     # Keep later seat groups after the earlier mounting-seat groups.
     *((x, z, NAMEPLATE_SCREW_HOLE_DIA) for x, z in NAMEPLATE_SCREW_XZ),
     (*LOCK_KNOB_XZ, LOCK_SCREW_HOLE_DIA),
     *((x, z, COLUMN_SOCKET_DIAMETER) for x, z in COLUMN_SOCKET_XZ),
 )
+TABLE_HOLES = tuple(hole for hole in ALL_HOLES if hole not in TRANSFER_HOLES)
+if len(TABLE_HOLES) != len(ALL_HOLES) - len(TRANSFER_HOLES):
+    raise AssertionError("a transferred seat is not a unique base hole")
 
 
 def _visible_hole_table_entities(
-    adapter: Any, view: Any
+    adapter: Any, view: Any, holes: tuple[tuple[float, float, float], ...]
 ) -> tuple[tuple[Any, ...], Any, Any]:
     """Return hole rims and the two outer edges used as ordinary table axes.
 
@@ -606,7 +631,7 @@ def _visible_hole_table_entities(
 
     selected_edges: list[Any] = []
     used: set[int] = set()
-    for x_mm, z_mm, diameter_mm in ALL_HOLES:
+    for x_mm, z_mm, diameter_mm in holes:
         expected = (
             x_mm / 1000.0,
             z_mm / 1000.0,
@@ -747,14 +772,17 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (top, side, iso):
         set_hidden_lines_removed(adapter, view)
 
-    top_dimensions = curate_view_dimensions(
+    # RimWidth and FlangeToRim are owned by construction sketches the part
+    # saves blanked (build_harmonic_base REFERENCE_SKETCHES); the hidden-owner
+    # curate shows each in the one view that dimensions it.
+    top_dimensions = curate_hidden_owner_dimensions(
         adapter,
         top,
         keep=GEOMETRY_TOP_KEEP,
         view_label="geometry top",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    side_dimensions = curate_view_dimensions(
+    side_dimensions = curate_hidden_owner_dimensions(
         adapter,
         side,
         keep=SIDE_KEEP,
@@ -934,20 +962,33 @@ async def build(adapter: Any) -> dict[str, str]:
         point_xy=(-BOTTOM_LENGTH / 2000.0, -BOTTOM_REAR_Z / 1000.0),
         label="harmonic-base finished-corner table origin",
     )
-    hole_entities, table_x_axis, table_y_axis = _visible_hole_table_entities(
-        adapter, hole_top
+    rim_entities, table_x_axis, table_y_axis = _visible_hole_table_entities(
+        adapter,
+        hole_top,
+        (
+            *TABLE_HOLES,
+            TRANSFER_BLOCK_HOLES[1],
+            TRANSFER_SPRING_HOLE,
+            TRANSFER_PEDESTAL_HOLES[0],
+        ),
     )
+    hole_entities = rim_entities[: len(TABLE_HOLES)]
+    transfer_block_rim, transfer_spring_rim, transfer_pedestal_rim = rim_entities[
+        len(TABLE_HOLES) :
+    ]
     hole_table = insert_hole_table(
         adapter,
         hole_top,
         datum_xy=_TABLE_ORIGIN_XY,
         datum_point=table_origin,
-        hole_points=tuple(_hole_rim(x, z, diameter) for x, z, diameter in ALL_HOLES),
+        hole_points=tuple(
+            _hole_rim(x, z, diameter) for x, z, diameter in TABLE_HOLES
+        ),
         datum_axes=(table_x_axis, table_y_axis),
         hole_entities=hole_entities,
         expected_locations_mm=tuple(
             (x + BOTTOM_LENGTH / 2.0, BOTTOM_WIDTH / 2.0 - z)
-            for x, z, _diameter in ALL_HOLES
+            for x, z, _diameter in TABLE_HOLES
         ),
         anchor_xy=HOLE_TABLE_ANCHOR,
         basic_locations=False,
@@ -959,7 +1000,7 @@ async def build(adapter: Any) -> dict[str, str]:
     hole_feature.CombineSameSize = True
     if not hole_feature.CombineSameSize or hole_feature.CombineTags:
         raise RuntimeError("base hole table did not retain individual coordinate tags")
-    if int(hole_table.RowCount) != len(ALL_HOLES) + 1:
+    if int(hole_table.RowCount) != len(TABLE_HOLES) + 1:
         raise RuntimeError("combining base hole sizes changed individual table rows")
     for row in range(int(hole_table.RowCount)):
         hole_table.SetRowHeight(row, 0.007, 0)
@@ -972,6 +1013,40 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     drawing_model.EditRebuild3()
     _spread_hole_tags(hole_top, hole_table)
+    # The transferred seats: each group is its own native Hole Wizard
+    # feature, so one associative callout per group carries its size and
+    # count -- 4X for the block seats, 2X for the pedestal seats, and the lone
+    # spring-foot seat (U34c moved the pedestals off its #4-40 feature, so it
+    # no longer needs a note pointing at a table row). The block and pedestal
+    # callouts share the clear band above the plan, the pedestal one left of
+    # the block one so their leaders fan apart onto the rear seats. The
+    # spring callout keeps the band between the plan's bottom edge and the
+    # cross-screw callout, left of the section-A arrow (render r4 had it
+    # colliding with the 4X cross-screw callout).
+    add_native_hole_callout(
+        adapter,
+        hole_top,
+        edge=transfer_block_rim,
+        callout_xy=(0.262, 0.252),
+        label="pinion-block transfer seats",
+        process=TRANSFER_BLOCK_CALLOUT,
+    )
+    add_native_hole_callout(
+        adapter,
+        hole_top,
+        edge=transfer_pedestal_rim,
+        callout_xy=(0.200, 0.252),
+        label="arbor-pedestal transfer seats",
+        process=TRANSFER_PEDESTAL_CALLOUT,
+    )
+    add_native_hole_callout(
+        adapter,
+        hole_top,
+        edge=transfer_spring_rim,
+        callout_xy=(0.269, 0.1575),
+        label="pinion-spring transfer seat",
+        process=TRANSFER_SPRING_CALLOUT,
+    )
     tap_callout = add_native_hole_callout(
         adapter,
         hole_side,

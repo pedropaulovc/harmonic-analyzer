@@ -112,7 +112,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import _telemetry  # noqa: E402
-import dodo  # noqa: E402
 from _drawing_common import is_pictorial_orientation  # noqa: E402
 from _drawing_layout_check import DrawableRegion  # noqa: E402
 from _drawing_registry import DRAWING_TEMPLATES  # noqa: E402
@@ -936,6 +935,11 @@ def main(argv: list[str] | None = None) -> int:
     # Hold the seat for the whole open-audit-close: ``_com_seat`` queues behind any
     # running doit COM task (and makes them queue behind us), and sets
     # HARMONIC_COM_SEAT so the adapter's seat guard sees a claimed seat.
+    # dodo is imported here, not at module level: a draw_*.py recipe that calls
+    # audit_document runs inside a doit task that already holds the seat, and
+    # needs none of the task graph.
+    import dodo
+
     with dodo._com_seat(f"audit:layout {path.stem}"):
         return _audit_under_seat(arguments, path)
 

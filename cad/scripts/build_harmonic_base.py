@@ -39,11 +39,13 @@ from _common import (
     PANEL_BLACK,
     SketchDims,
     _early_bound,
+    _read_member,
     add_line_chain,
     anchor_point_to_origin,
     apply_color,
     apply_material,
     bbox_extent_check,
+    blank_sketch,
     check,
     define_circle,
     define_rectilinear_chain,
@@ -124,15 +126,21 @@ from build_swing_stop_screw import (
 )
 from build_slotted_screw import SHANK_LEN as BLOCK_SCREW_LEN
 from build_foot_screw import SHANK_LEN as FOOT_SCREW_LEN
+from build_pedestal_hold_down_screw import SHANK_LEN as PEDESTAL_SCREW_LEN
 from build_fillister_screw import SHANK_LEN as NAMEPLATE_SCREW_LEN
 from build_swing_stop_screw import EMBED_LEN as STOP_ENGAGEMENT
 from build_lag_screw import (
     BEARING_OFFSET as HOLD_DOWN_BEARING_OFFSET,
     SHANK_LEN as HOLD_DOWN_SCREW_LEN,
 )
-from pinion_pivot_block_spec import BLOCK_HEIGHT
-from pinion_spring_geometry import THICK as SPRING_THICKNESS
-from arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS
+from pinion_pivot_block_geometry import BLOCK_HEIGHT
+from pinion_rig_layout import BLOCK_SEAT_Z, SPRING_Z
+from pinion_spring_section import THICK as SPRING_THICKNESS
+from arbor_pedestal_spec import (
+    FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS,
+    SCREW_Z as PEDESTAL_LEDGE_SCREW_Z,
+    STRAP_INNER_Z as PEDESTAL_STRAP_INNER_Z,
+)
 from build_rocker_arm_support import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
 from rocker_arm_support_spec import SUPPORT_HOLD_DOWN_XZ
 from frame_attachment_spec import (
@@ -345,35 +353,69 @@ STOP_SCREW_DRILL_DEPTH = 20.0
 
 # Alignment-pinion rig hold-downs, blind from the TOP face in the same
 # machine-handed convention: four #8-32 seats under the two pivot blocks
-# (2026-09 short-strap rig, the blocks right under the drum) and three #4-40
-# seats under the spring foot and both arbor-pedestal flanges.
-_FORMER_BLOCK_SCREW_XZ = (
-    (-13.669764612476252, -98.0),  # front block, east screw
-    (13.33023538752375, -98.0),  # front block, west screw
-    (-13.669764612476252, 82.0),  # back block, east screw
-    (13.33023538752375, 82.0),  # back block, west screw
-)
+# and one #4-40 seat under the spring foot (the arbor pedestals moved to their
+# own #8-32 group, PEDESTAL_SCREW_XZ, with U34c).
+# The block and spring seats follow the user-authoritative 32T rig's parked
+# tip gap (U28, 2026-09-23: 2.2425, the park-out that seats the 120T tips at
+# the drum's base-circle root) and the U28 block re-layout -- screws +-8.5
+# about the pivot bore, block mid-depth 5.125 in from each outer face; the
+# drum-axis pedestal seats remain unchanged.  Ruling (c) (user, 2026-09-24):
+# the block and spring-foot z stations are pinion_rig_layout's -- the front
+# block stands one feeler off the front strap, the spring rides 0.8 aft.
+_FORMER_BLOCK_SCREW_X = (-17.226441649810653, -0.22644164981065273)  # east, west
 BLOCK_SCREW_XZ = tuple(
-    (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_BLOCK_SCREW_XZ
+    (x + MECHANISM_X_SHIFT, z) for z in BLOCK_SEAT_Z for x in _FORMER_BLOCK_SCREW_X
 )
-# Stock 25.4-mm slotted screws penetrate 6.65 mm below each 18.75-mm block.
-BLOCK_SCREW_HOLE_DEPTH = 6.9  # stock engagement + 0.25 tip reserve
-BLOCK_SCREW_DRILL_DEPTH = 10.0
+# Rule 12 (audit E10): stock 31.75-mm (#8-32 x 1-1/4) slotted screws penetrate
+# 11.25 mm below each 20.5-mm block -- 10.74 = 2.58D at the BlockHeight .XX
+# band.  The full-thread depth keeps the screw off the bottom at the worst
+# case (12.75 - 0.8 .X depth band >= 11.25 + 0.51 block band, 0.19 spare).
+BLOCK_SCREW_HOLE_DEPTH = 12.75
+BLOCK_SCREW_DRILL_DEPTH = 15.0
 # Bottoming tap: 3.1 mm runout exceeds two #8-32 pitches (1.5875 mm).
 _FORMER_FOOT_SCREW_XZ = (
-    (13.179270253802283, 70.95),  # spring foot: 28 reach keeps its screw head
-    # clear of the unchanged rocker-arm-support casting after the rig recenter
-    (-54.7, -95.5),  # south arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
-    (-54.7, 102.5),  # NORTH arbor-pedestal flange (PR8, ch12 img09: the
-    # mirrored base-standing clamp at z 97.5; ry180 flips its flange to +z)
+    # spring foot: 20.0 EAST of the swing pivot bore (the east block screw
+    # is 8.5 east of it), outboard of the back strap (re-derived 2026-09-24;
+    # pinion_spring_geometry.SCREW_EAST_OF_PIVOT, the drive train asserts it;
+    # z: pinion_rig_layout)
+    (_FORMER_BLOCK_SCREW_X[0] + 8.5 - 20.0, SPRING_Z - MECHANISM_Z_SHIFT),
 )
 FOOT_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_FOOT_SCREW_XZ
 )
-# The stock 9.525-mm foot screw penetrates 8.725 mm below the 0.8-mm spring.
-FOOT_SCREW_HOLE_DEPTH = 8.975  # stock engagement + 0.25 tip reserve
-FOOT_SCREW_DRILL_DEPTH = 11.0
+# The stock 9.525-mm foot screw penetrates 9.025 mm below the 0.5-mm spring.
+FOOT_SCREW_HOLE_DEPTH = 9.275  # stock engagement + 0.25 tip reserve
+FOOT_SCREW_DRILL_DEPTH = 11.3
 # Bottoming tap: 2.025 mm runout exceeds two #4-40 pitches (1.27 mm).
+
+# U34c (dt-bank-pedestal-layout-20260923 rev 3, H1): one MHA-143 #8-32 x 3/4
+# fillister holds each arbor pedestal through its ledge hole. Machine frame,
+# like NAMEPLATE_SCREW_XZ (no _FORMER_ twin; the mechanism shift is already in
+# the drive train's stations): the drum axis x, and z = each strap inner face
+# (the drive train's end-disc stations -72.652 / +75.202) -+ the 19.0 from
+# that face to the ledge hole. The seats are TRANSFERRED from the fitted
+# pedestals at assembly, so the print gives no position. These are literals
+# because the base cannot import the drive train (it imports the base); the
+# drive train asserts them against its own derivation within 0.05 and
+# test_drive_train_support_layout pins them within 0.005.
+_DRUM_AXIS_X = -54.7 + MECHANISM_X_SHIFT
+_PEDESTAL_STRAP_FACE_Z = (-72.652, 75.202)
+_PEDESTAL_LEDGE_OFFSET = PEDESTAL_STRAP_INNER_Z - PEDESTAL_LEDGE_SCREW_Z  # 19.0
+PEDESTAL_SCREW_XZ = (
+    (_DRUM_AXIS_X, _PEDESTAL_STRAP_FACE_Z[0] - _PEDESTAL_LEDGE_OFFSET),
+    (_DRUM_AXIS_X, _PEDESTAL_STRAP_FACE_Z[1] + _PEDESTAL_LEDGE_OFFSET),
+)
+# Rule 12 (audit E15), judged at the printed worst case: flange 5.0 +-0.8,
+# screw 19.05 +0/-0.76 (B18.6.3), these depths +-0.8 (.X). The longest screw
+# in the thinnest flange reaches 14.85; 16.0 - 0.8 keeps it 0.35 off the
+# incomplete threads (>= 0.25 tip reserve). The drill keeps two #8-32 pitches
+# of bottoming-tap lead beyond the deepest thread at the worst case too:
+# 19.5 - 0.8 >= 16.0 + 0.8 + 1.5875. Minimum engagement 12.49 = 3.0D.
+PEDESTAL_SCREW_HOLE_DEPTH = 16.0
+PEDESTAL_SCREW_DRILL_DEPTH = 19.5
+# A transferred seat lands where the fitted pedestal stands, within the
+# study's +-2 x / +-5 z fit-up bound of nominal; the wall checks book it.
+PEDESTAL_TRANSFER_ENVELOPE = math.hypot(2.0, 5.0)
 
 # Maker's nameplate seats (2026-09-02 ch26 p.71 re-derive: four brass slotted
 # fillister-head screws hold the plate at its corners), blind from the TOP face
@@ -464,6 +506,27 @@ FOOT_SEAT_SPEC = HoleSpec(
     thread_class="2B",
     overrides_mm={"ThreadDepth": FOOT_SCREW_HOLE_DEPTH},
 )
+PEDESTAL_SEAT_SPEC = HoleSpec(
+    "tapped_bottoming",
+    "#8-32",
+    end="blind",
+    depth_mm=PEDESTAL_SCREW_DRILL_DEPTH,
+    thread_class="2B",
+    overrides_mm={"ThreadDepth": PEDESTAL_SCREW_HOLE_DEPTH},
+)
+# Rule 12 (E15) at the printed worst case, not just the nominal the stock-fit
+# guard checks: the shallowest drill still keeps two pitches of bottoming-tap
+# lead past the deepest thread (the reach side is asserted by the drive train
+# against BASE_PEDESTAL_HOLE_DEPTH).
+_PEDESTAL_DEPTH_BAND = 0.8  # .X
+_PEDESTAL_TAP_LEAD = 2 * 25.4 / float(PEDESTAL_SEAT_SPEC.size.rsplit("-", 1)[1])
+if (
+    PEDESTAL_SCREW_DRILL_DEPTH - _PEDESTAL_DEPTH_BAND
+    < PEDESTAL_SCREW_HOLE_DEPTH + _PEDESTAL_DEPTH_BAND + _PEDESTAL_TAP_LEAD
+):
+    raise AssertionError(
+        "pedestal hold-down drill loses the bottoming-tap lead at the worst case"
+    )
 NAMEPLATE_SEAT_SPEC = HoleSpec(
     "tapped_bottoming",
     "#4-40",
@@ -477,6 +540,7 @@ LOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(LOCK_SEAT_SPEC)
 STOP_SCREW_HOLE_DIA = blind_cut_dia_mm(STOP_SEAT_SPEC)
 BLOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(BLOCK_SEAT_SPEC)
 FOOT_SCREW_HOLE_DIA = blind_cut_dia_mm(FOOT_SEAT_SPEC)
+PEDESTAL_SCREW_HOLE_DIA = blind_cut_dia_mm(PEDESTAL_SEAT_SPEC)
 NAMEPLATE_SCREW_HOLE_DIA = blind_cut_dia_mm(NAMEPLATE_SEAT_SPEC)
 
 # Socket cylinders occupy Y=25.4..50.8, overlapping the deepest vertical-seat
@@ -492,6 +556,7 @@ COLUMN_SOCKET_NEAREST_OCCUPANT_WALL = min(
         ((STOP_SCREW_XZ,), STOP_SCREW_HOLE_DIA),
         (BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
         (FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DIA),
+        (PEDESTAL_SCREW_XZ, PEDESTAL_SCREW_HOLE_DIA),
         (NAMEPLATE_SCREW_XZ, NAMEPLATE_SCREW_HOLE_DIA),
     )
     for occupant in occupants
@@ -555,8 +620,7 @@ def require_blind_seat_fit(
         )
 
 
-# Guard the deepest installed stock insertion in all seven native seat groups.
-# The foot group also serves the thicker pedestal flange, with less insertion.
+# Guard the deepest installed stock insertion in all eight native seat groups.
 for _label, _seat, _engagement in (
     ("rocker support", HOLD_DOWN_SEAT_SPEC, HOLD_DOWN_ENGAGEMENT),
     ("cone pivot", PIVOT_SEAT_SPEC, PIVOT_THREAD_ENGAGEMENT),
@@ -564,7 +628,11 @@ for _label, _seat, _engagement in (
     ("swing stop", STOP_SEAT_SPEC, STOP_ENGAGEMENT),
     ("pinion block", BLOCK_SEAT_SPEC, BLOCK_SCREW_LEN - BLOCK_HEIGHT),
     ("spring foot", FOOT_SEAT_SPEC, FOOT_SCREW_LEN - SPRING_THICKNESS),
-    ("pedestal foot", FOOT_SEAT_SPEC, FOOT_SCREW_LEN - PEDESTAL_FLANGE_THICKNESS),
+    (
+        "pedestal hold-down",
+        PEDESTAL_SEAT_SPEC,
+        PEDESTAL_SCREW_LEN - PEDESTAL_FLANGE_THICKNESS,
+    ),
     (
         "nameplate",
         NAMEPLATE_SEAT_SPEC,
@@ -593,6 +661,7 @@ PIVOT_NEAREST_CAVITY_WALL = min(
         ((STOP_SCREW_XZ,), STOP_SCREW_HOLE_DIA),
         (BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
         (FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DIA),
+        (PEDESTAL_SCREW_XZ, PEDESTAL_SCREW_HOLE_DIA),
         (NAMEPLATE_SCREW_XZ, NAMEPLATE_SCREW_HOLE_DIA),
     )
     for xz in points
@@ -618,6 +687,7 @@ LOCK_NEAREST_CAVITY_WALL = min(
         ((STOP_SCREW_XZ,), STOP_SCREW_HOLE_DIA),
         (BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
         (FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DIA),
+        (PEDESTAL_SCREW_XZ, PEDESTAL_SCREW_HOLE_DIA),
         (NAMEPLATE_SCREW_XZ, NAMEPLATE_SCREW_HOLE_DIA),
     )
     for xz in points
@@ -640,12 +710,52 @@ STOP_NEAREST_CAVITY_WALL = min(
         ((LOCK_KNOB_XZ,), LOCK_SCREW_HOLE_DIA),
         (BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
         (FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DIA),
+        (PEDESTAL_SCREW_XZ, PEDESTAL_SCREW_HOLE_DIA),
         (NAMEPLATE_SCREW_XZ, NAMEPLATE_SCREW_HOLE_DIA),
     )
     for xz in points
 )
 if STOP_NEAREST_CAVITY_WALL < STOP_SCREW_HOLE_DIA:
     raise AssertionError("swing-stop drill crowds another base cavity")
+
+# The transferred pedestal seats: bottom wall, and every neighbouring cavity
+# and the rim's inner face with the seat anywhere in its fit-up envelope.
+PEDESTAL_DRILL_BOTTOM_WALL = (
+    TOP_THICKNESS
+    - PEDESTAL_SCREW_DRILL_DEPTH
+    - PEDESTAL_SCREW_HOLE_DIA / 2.0 * DRILL_POINT_H
+)
+if PEDESTAL_DRILL_BOTTOM_WALL < 1.5 * PEDESTAL_SCREW_HOLE_DIA:
+    raise AssertionError(
+        "pedestal hold-down drill leaves less than 1.5 diameters of upper-pad wall"
+    )
+PEDESTAL_NEAREST_CAVITY_WALL = (
+    min(
+        math.dist(seat, xz) - (PEDESTAL_SCREW_HOLE_DIA + dia) / 2.0
+        for seat in PEDESTAL_SCREW_XZ
+        for points, dia in (
+            (HOLE_XZ, THREAD_MAJOR_MM[HOLD_DOWN_THREAD]),
+            ((PIVOT_SCREW_XZ,), PIVOT_SCREW_HOLE_DIA),
+            ((LOCK_KNOB_XZ,), LOCK_SCREW_HOLE_DIA),
+            ((STOP_SCREW_XZ,), STOP_SCREW_HOLE_DIA),
+            (BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
+            (FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DIA),
+            (NAMEPLATE_SCREW_XZ, NAMEPLATE_SCREW_HOLE_DIA),
+            (COLUMN_SOCKET_XZ, COLUMN_SOCKET_DIAMETER),
+        )
+        for xz in points
+    )
+    - PEDESTAL_TRANSFER_ENVELOPE
+)
+if PEDESTAL_NEAREST_CAVITY_WALL < PEDESTAL_SCREW_HOLE_DIA:
+    raise AssertionError("a transferred pedestal seat can crowd another base cavity")
+PEDESTAL_RIM_LAND = (
+    min(TOP_WIDTH / 2.0 - LIP_W - abs(z) for _x, z in PEDESTAL_SCREW_XZ)
+    - PEDESTAL_SCREW_HOLE_DIA / 2.0
+    - 5.0  # the z half of the fit-up envelope
+)
+if PEDESTAL_RIM_LAND < PEDESTAL_SCREW_HOLE_DIA:
+    raise AssertionError("a transferred pedestal seat can crowd the raised rim")
 
 MM3_PER_IN3 = IN**3
 
@@ -784,10 +894,7 @@ async def _paint_machined_faces_black(adapter) -> None:
     # through it (~1.3% of the cylinder), well inside the 5% band below.
     expected_areas.update(
         {
-            control.key: math.pi
-            * COLUMN_SOCKET_DIAMETER
-            * COLUMN_SOCKET_DEPTH
-            * 1e-6
+            control.key: math.pi * COLUMN_SOCKET_DIAMETER * COLUMN_SOCKET_DEPTH * 1e-6
             for control in SOCKET_BORE_FINISHES
         }
     )
@@ -801,7 +908,9 @@ async def _paint_machined_faces_black(adapter) -> None:
                 f"{expected * 1e6:.0f} (minus openings/edge breaks)"
             )
         if key not in BLACK_FINISH_KEYS:
-            _telemetry.info(f"{key} face qualified ({area * 1e6:.0f} mm^2), body colour")
+            _telemetry.info(
+                f"{key} face qualified ({area * 1e6:.0f} mm^2), body colour"
+            )
             continue
         face.MaterialPropertyValues = values
         back = tuple(float(value) for value in (face.MaterialPropertyValues or ())[:3])
@@ -810,6 +919,30 @@ async def _paint_machined_faces_black(adapter) -> None:
         ):
             raise RuntimeError(f"{key} black face colour did not persist: {back}")
         _telemetry.info(f"{key} face painted black ({area * 1e6:.0f} mm^2)")
+
+
+REFERENCE_SKETCHES = ("RimWidthReference", "HeightReference")
+
+
+@_telemetry.traced("appearance.hide_reference_sketches")
+def _hide_reference_sketches(adapter) -> None:
+    """Blank the drawing-reference sketches and prove each one reads hidden."""
+    for name in REFERENCE_SKETCHES:
+        blank_sketch(adapter, name)
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    shown = {
+        name: visible
+        for name in REFERENCE_SKETCHES
+        # swVisibilityState_e: 1 hidden
+        if (visible := int(_read_member(part.FeatureByName(name), "Visible"))) != 1
+    }
+    if shown:
+        raise RuntimeError(f"reference sketches still visible after blanking: {shown}")
+    _telemetry.event(
+        "part.reference_sketches_hidden",
+        sketches=", ".join(REFERENCE_SKETCHES),
+        count=len(REFERENCE_SKETCHES),
+    )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -980,7 +1113,13 @@ async def build(adapter) -> dict[str, str]:
             "FootScrewHoles",
             FOOT_SEAT_SPEC,
             FOOT_SCREW_XZ,
-            "foot-screw bottoming-tapped seats (#4-40)",
+            "foot-screw bottoming-tapped seat (#4-40)",
+        ),
+        (
+            "PedestalSeats",
+            PEDESTAL_SEAT_SPEC,
+            PEDESTAL_SCREW_XZ,
+            "arbor-pedestal hold-down bottoming-tapped seats (#8-32)",
         ),
         (
             "NameplateSeats",
@@ -1407,10 +1546,14 @@ async def build(adapter) -> dict[str, str]:
     # width is the gap between two loops of one profile, and the 40.6 spans
     # three features. Each therefore gets a hidden one-line sketch whose
     # single driving dimension IS the value, marked for drawing like any
-    # other. Construction, not hidden: a BLANKED sketch's dimensions never reach
-    # InsertModelAnnotations3 (first build failed with "geometry top view is
-    # missing model dimensions: ['RimWidth']"), while construction geometry
-    # imports normally and is never drawn in a view.
+    # other. Both are construction lines, and both are BLANKED once built:
+    # shown, the height line stood as a tick with two endpoint dots on the
+    # base's end face in every assembly render (top iso, asm round d60107b3).
+    # A blanked sketch's dimensions never reach a plain InsertModelAnnotations3
+    # (the first build failed with "geometry top view is missing model
+    # dimensions: ['RimWidth']"), so draw_harmonic_base imports them through
+    # _drawing_hidden_sketches.curate_view_dimensions, which shows each owner
+    # sketch in its own view only.
     check("create_sketch rim-width reference", await adapter.create_sketch("Top"))
     # Direct-to-DB for the geometry: this line lies ON the sketch X axis and
     # runs horizontally, so creation-time inference would snap in exactly the
@@ -1481,6 +1624,7 @@ async def build(adapter) -> dict[str, str]:
     _verify_named_dimension(
         adapter, "FlangeToRim@HeightReference", deck_top - BOTTOM_THICKNESS
     )
+    _hide_reference_sketches(adapter)
     blank_reference_geometry(adapter, tuple((name, "PLANE") for name in ref_planes))
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)

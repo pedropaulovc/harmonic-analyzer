@@ -1,4 +1,4 @@
-"""Cross-sheet offline contracts for the six cone-cluster drawing packages."""
+"""Cross-sheet offline contracts for the seven cone-cluster drawing packages."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import cone_gear_notes
 import cone_gear_shaft_spec
 import cone_pivot_post_spec
 import cone_tip_block_spec
+import cone_swing_platform_spec
 import cone_tip_bushing_spec
 
 
@@ -17,6 +18,7 @@ SHEETS = (
     ("cone-gear-shaft", cone_gear_shaft_spec),
     ("cone-pivot-post", cone_pivot_post_spec),
     ("cone-tip-block", cone_tip_block_spec),
+    ("cone-swing-platform", cone_swing_platform_spec),
     ("cone-tip-bushing", cone_tip_bushing_spec),
 )
 

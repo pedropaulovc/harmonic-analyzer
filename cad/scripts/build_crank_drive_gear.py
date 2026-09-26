@@ -30,8 +30,27 @@ that also absorbs the cos(incline) normal-pitch shrink, and a deepened root floo
 Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
 Appendix C #9.
 
-Layout: gear axis = Z through the origin, disc z = 0..10 mm; the helix
-twist is symmetric about the mid-face plane z = 5 (the assembly's phase
+ATTACHMENT (rule-11 flag closed 2026-09-21, C:/src/dt-logs/geometry-decisions.md):
+the bore is the ONLY attachment feature -- no key, keyway, pin, set screw or
+hub boss -- and that is deliberate, not an omission. Evidence (ch12 p.20
+page003_img03.jpeg; p.21 page003_img02.jpeg's solder blobs on the same shaft's
+small gears; engineerguy v4_t00399/v2_t00069 showing the south face within
+~1 mm of the pivot post, i.e. no room for a boss) says the 64T is fixed like
+the 20 cone gears: soldered or silver-brazed to its 3/8" seat on
+build_cone_gear_shaft's journal, so the brazed joint carries the whole crank
+torque. The bore therefore takes the shared bonded-joint fit
+(retained_joint_fit: 0.025..0.105 diametral clearance on its land, inside both
+the capillary window a silver-braze filler needs and the gap-fill limits of
+the high-strength retaining compounds, so the USER also approved Loctite
+638/648 as an acceptable alternative to filler metal, 2026-09-21);
+the print says so in crank_drive_gear_notes.DRAWING_NOTES. The gear is NOT
+butted against T120: build_drive_train_assembly.GEAR64_STATION holds the
+rederived 19.9 mm centre against a frozen 10.0 mm reference face, so the real
+8.0 mm face leaves ~1.1 mm of axial air each side and the axial station is an
+assembly fact, not a part requirement.
+
+Layout: gear axis = Z through the origin, disc z = 0..8 mm; the helix
+twist is symmetric about the mid-face plane z = 4 (the assembly's phase
 math references the mid-face azimuth).
 
 Run (SolidWorks already open)::
@@ -45,16 +64,22 @@ import math
 import sys
 
 import _config
+import _telemetry
+import cone_shaft_land_bands
 from _common import (
     IN,
     SketchDims,
+    _early_bound,
+    _feature_by_name,
     apply_material,
+    blank_sketch,
     name_bore_axis,
     check,
     define_circle,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -62,6 +87,7 @@ from _common import (
     set_global,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -70,20 +96,58 @@ from _drawing_marks import (
 from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _part_pmi import author_part_pmi
+from crank_drive_gear_notes import DRAWING_NOTES, GEAR_DATA
+from retained_joint_fit import RETAINED_JOINT_CLEARANCE, bonded_bore_band
 from crank_drive_gear_spec import (
-    BORE_DIA_BAND,
+    CUTTER_DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
-    GEAR_DATA,
+    DRAWING_PRECISION,
+    OUTSIDE_DIA,
+    PRESSURE_ANGLE_DEG,
     SURFACE_FINISHES,
 )
+
+
+def _as_construction(adapter, entity_id: str) -> None:
+    """Flag a registered sketch circle as construction geometry.
+
+    ``ConstructionGeometry`` is declared on the base ISketchSegment, not the
+    derived ISketchArc the entity registry binds -- rebind before the set.
+    Construction, not BLANKED: a blanked sketch's dimensions never reach
+    ``InsertModelAnnotations3``, while construction geometry imports its
+    dimensions normally and is never drawn in a view (build_harmonic_base's
+    two reference sketches proved both halves live).
+    """
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+def _verify_named_dimension(adapter, full_name: str, expected_mm: float) -> None:
+    """Prove a renamed dimension is the one the recipe meant.
+
+    ``name_dimensions`` renames by CREATION ORDER, so a feature that emits more
+    than one display dimension can hand the name to the wrong value in silence.
+    Cheap to check, and the failure it catches would otherwise surface as a
+    wrong number on a released sheet.
+    """
+    raw = adapter.currentModel.Parameter(full_name)
+    if raw is None:
+        raise RuntimeError(f"no dimension named {full_name}")
+    actual_mm = float(_early_bound(raw, "IDimension").SystemValue) * 1000.0
+    if abs(actual_mm - expected_mm) > 1e-6:
+        raise RuntimeError(
+            f"{full_name} measures {actual_mm:g} mm, expected {expected_mm:g} mm"
+        )
+
 
 PART_NAME = "crank-drive-gear"
 MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass train
 
 TEETH = 64  # Appendix C #9 estimate, photo-ratified 2026-07-14 (see docstring)
 DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine/gear_train.yaml
-PA_DEG = 14.5
+PA_DEG = PRESSURE_ANGLE_DEG  # transverse, from the normal-plane cutter (spec)
 FACE_WIDTH = 8.0  # mm, p.20 photo-proportioned (low).  Symmetric narrowing
 # retains the rederived centre/mesh axes and clears the fixed v2 post boss.
 # M6.7: seated perpendicular on the cone shaft's 3/8" pivot journal
@@ -99,6 +163,35 @@ BORE_DIAMETER = 0.375 * IN  # snug on the 3/8" journal
 HELIX_DEG = _config.machine("gear_train", "crank_drive_helix_deg")
 BACKLASH_MM = _config.machine("gear_train", "crank_drive_backlash_mm")
 
+# The bore over the cone gear shaft is this part's ONE critical fit: a bonded
+# joint (solder, silver-braze or Loctite 638/648) on MHA-014's Sec1 gear-seat
+# land, the same land the T030-T120 cone gears bond to.  It takes the shared
+# retained-joint fit class (retained_joint_fit, Main ruling 2026-09-25) from
+# that land's own published limits: bore_min = land_max + clearance_min,
+# bore_max = land_min + clearance_max, so moving either input moves the bore.
+# The former shaft_in_bushing running fit, applied to the 0.05-wide land,
+# left a ZERO-width bore band (+0.025/+0.025), which no reamer holds.  It
+# lives in the BUILD script, not the shared spec, so the assemblies that
+# import OUTSIDE_DIA from crank_drive_gear_spec never re-key on a fit edit.
+_LAND_UPPER, _LAND_LOWER = cone_shaft_land_bands.SECTION_DIA_BANDS[1]
+if (_LAND_UPPER, _LAND_LOWER) != cone_shaft_land_bands.GEAR_SEAT_BAND:
+    raise AssertionError("the 64T no longer rides a gear-seat land")
+BORE_DIA_BAND = bonded_bore_band(cone_shaft_land_bands.GEAR_SEAT_BAND)  # (upper, lower)
+# The diametral gap the printed limits actually give, and its three checks:
+# a band a reamer can hold, never over Loctite 648's 0.15 gap-fill limit (with
+# 0.02 margin), and never under the floor that lets the gear start on its land.
+BORE_DIAMETRAL_GAP = (
+    round(BORE_DIA_BAND[1] - _LAND_UPPER, 6),
+    round(BORE_DIA_BAND[0] - _LAND_LOWER, 6),
+)
+LOCTITE_648_GAP_FILL_MAX = 0.15
+if BORE_DIA_BAND[0] - BORE_DIA_BAND[1] < 0.02:
+    raise AssertionError(f"64T bore band {BORE_DIA_BAND} is narrower than 0.02")
+if BORE_DIAMETRAL_GAP[1] > LOCTITE_648_GAP_FILL_MAX - 0.02:
+    raise AssertionError(f"64T bond gap {BORE_DIAMETRAL_GAP} nears the 648 fill limit")
+if BORE_DIAMETRAL_GAP[0] < RETAINED_JOINT_CLEARANCE[0]:
+    raise AssertionError(f"64T bond gap {BORE_DIAMETRAL_GAP} is under the start floor")
+
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
@@ -108,21 +201,39 @@ async def build(adapter) -> dict[str, str]:
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in document
     # units (an unsuffixed 9.525 would be read as 9.525 inches). FaceWidth is the
-    # blank/bore extrude DEPTH (a feature parameter, not a sketch dim), so it is
-    # an editable knob but nothing in drive_jobs drives it; BoreDia drives the
-    # shaft-bore diameter. The toothed-disc geometry (teeth/DP) is authored by the
-    # shared _gear helper with literal-numeric curve expressions, so it has no
-    # sketch dim to drive here.
+    # blank/bore extrude DEPTH and BoreDia the shaft-bore diameter; both are
+    # printed dimensions, so both are knobs AND both are driven below. The
+    # toothed-disc geometry (teeth/DP/helix) is authored by the shared _gear
+    # helper with literal-numeric curve expressions, so it has no sketch dim to
+    # drive here -- which is why the tip circle needs the reference sketch
+    # further down.
     await set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
+    # Normal-defined (#906): the transverse DP/PA place the involute, the
+    # cutter's DP sets the depth.
     volume = await build_fixed_gear(
         adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG,
         helix_deg=HELIX_DEG,
         backlash_mm=BACKLASH_MM, root_relief=True,
+        depth_dp=CUTTER_DIAMETRAL_PITCH,
     )
+
+    # build_fixed_gear is shared by five recipes, so it leaves the blank under
+    # the adapter's default names. Name the boss here: the face width is a size
+    # the turner sets, so it prints as a NATIVE model dimension
+    # (drawing-simplicity-policy.md rules 1-2), which means it must be named,
+    # driven, marked and given its decimal places like any other. Driving it is
+    # also the guard on the default name: a rename that resolved the wrong
+    # feature would move the blank and the equation-neutral volume gate below
+    # would fail loud instead of printing the depth of something else.
+    _feature_by_name(adapter, "Boss-Extrude1").Name = "GearBlank"
+    _telemetry.success("feature 'Boss-Extrude1' -> 'GearBlank'")
+    drive_jobs += [
+        (name_dimensions(adapter, "GearBlank", ["FaceWidth"])[0], '"FaceWidth"')
+    ]
 
     # Shaft bore (on-axis circle at the origin: only the diameter is a dim, so
     # define_circle records just that -- the centre X/Z slots are ignored).
@@ -162,20 +273,45 @@ async def build(adapter) -> dict[str, str]:
     )
     await volume_check(adapter, "driven crank-drive gear (equations neutral)", expected, 0.01 * v_bore)
 
+    # The tip circle, as a REFERENCE sketch. The helix recipe grows the teeth
+    # off a ROOT cylinder blank (_gear.build_fixed_gear), so no solid feature
+    # owns the outside diameter -- yet the OD is the first size the turner sets
+    # and the print must carry it as a model dimension, not as text in the data
+    # block (policy rule 2's "model it, even if that takes a hidden reference
+    # sketch whose one driving dimension IS the value"). Construction geometry:
+    # its dimension imports onto the sheet, the circle itself is never drawn.
+    check("create_sketch tip reference", await adapter.create_sketch("Front"))
+    tip_ref = await define_circle(
+        adapter, 0.0, 0.0, OUTSIDE_DIA / 2.0, "tip circle reference"
+    )
+    _as_construction(adapter, tip_ref)
+    await ensure_fully_defined(adapter, "tip circle reference sketch")
+    check("exit_sketch tip reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "OutsideDiaReference")
+    name_dimensions(adapter, "OutsideDiaReference", ["OutsideDia"])
+    _verify_named_dimension(adapter, "OutsideDia@OutsideDiaReference", OUTSIDE_DIA)
+
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Mark the bore as the single manufacturing model dimension and stamp the
-    # title-block + gear-data properties the curated drawing reads.
+    # Mark this part's three manufacturing dimensions, author the decimal places
+    # they print with (policy rule 2: the model owns both the band and its
+    # spelling -- the drawing only reads them back), and stamp the title-block +
+    # gear-data properties the curated drawing reads.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,
         {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
     )
+    # The reference sketch owns printed dimensions but no geometry: hide it so
+    # no assembly instance renders it (#880).  The drawing shows it per view
+    # through _drawing_hidden_sketches to import those dimensions.
+    blank_sketch(adapter, "OutsideDiaReference")
     return await save_part_and_images(adapter, PART_NAME)
 
 

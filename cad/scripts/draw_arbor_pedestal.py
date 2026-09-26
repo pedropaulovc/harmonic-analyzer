@@ -11,36 +11,37 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_attached_note,
     add_surface_finish,
     add_native_hole_callout,
-    curate_view_dimensions,
+    assert_imported_precision,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_arc_endpoints_to_center,
     set_arc_endpoints_to_max,
     set_dimension_callouts,
-    set_dimension_precision,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     set_reference_dimension,
     stamp_drawing_summary,
     visible_view_entities,
 )
+from _drawing_hidden_sketches import curate_view_dimensions
 from _surface_finish import surface_finish_by_key
 from _drawing_registry import DRAWINGS_BY_NAME
 from arbor_pedestal_spec import (
     BORE_DIA,
     BORE_HEIGHT,
-    FOOT_DEPTH,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     FOOT_HEIGHT,
+    FOOT_MID_Z,
+    FOOT_NEAR_Z,
     FOOT_WIDTH,
     SCREW_HOLE_DIA,
-    STRAP_T,
-    TAPER_ANGLE_DEG,
-    TAPER_TANGENT_X,
-    TAPER_TANGENT_Y,
+    SCREW_Z,
+    STRAP_INNER_Z,
+    STRAP_ROOT_Z,
     SURFACE_FINISHES,
     TOP_RADIUS,
 )
@@ -67,16 +68,20 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (2.0, 1.0)  # 49.718 mm tall; 2:1 keeps the strap and bore legible
 _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 
-# The casting spans model y 0 (foot seat) to 49.718 (dome top); centre the
-# front elevation on that midpoint. Third-angle projection keeps the plan
-# aligned above the elevation; the isometric balances the aligned view group
-# from the right.
+# The part spans model y 0 (foot seat) to 49.718 (dome top); centre the front
+# elevation on that midpoint. Third-angle projection keeps the plan aligned
+# above the elevation; the isometric balances the aligned group from the
+# right. The elevation sits low so the 28-deep plan (56 on the sheet) clears
+# the crown callout and still leaves a dimension lane above itself under the
+# sheet border: lateral-location lane 0.055, elevation 0.065..0.165, crown
+# text ~0.173, plan 0.182..0.238, hole lateral lane 0.246, foot-width lane
+# 0.256.
 _PART_MID_Y = (
     BORE_HEIGHT + TOP_RADIUS
 ) / 2.0  # foot 0 .. dome top (bore + dome radius)
-FRONT_CENTER = (0.135, 0.125)
-TOP_CENTER = (FRONT_CENTER[0], 0.215)
-ISO_CENTER = (0.335, 0.140)
+FRONT_CENTER = (0.115, 0.115)
+TOP_CENTER = (FRONT_CENTER[0], 0.210)
+ISO_CENTER = (0.325, 0.155)
 
 
 def _front_y(model_y: float) -> float:
@@ -84,33 +89,93 @@ def _front_y(model_y: float) -> float:
     return FRONT_CENTER[1] + (model_y - _PART_MID_Y) * _S
 
 
-# Front elevation carries the foot, fitted arbor bore, bore height, and the
-# tangent concentric crown. The plan carries depth and foot-hole placement.
+def _top_y(model_z: float) -> float:
+    """Sheet Y of a model-Z station in the plan view.
+
+    A ``*Top`` view placed above the elevation projects model +Z downward, so
+    the foot's far face (+Z, where the strap is flush) is the plan's BOTTOM
+    edge and the exposed hold-down ledge is at the top. The view is centred on
+    its bounding box, and the foot runs -20..+8 about the part origin, so the
+    sheet centre is the foot's mid-depth, not model z 0.
+    """
+    return TOP_CENTER[1] - (model_z - FOOT_MID_Z) * _S
+
+
+# Lanes for the two lateral locations: below the seat in the elevation (the
+# bore's centreline extends down through the part, crossing no other
+# dimension's extension line), and between the plan and the foot-width lane.
+BORE_LATERAL_XY = (FRONT_CENTER[0] - FOOT_WIDTH / 4.0 * _S, _front_y(0.0) - 0.010)
+HOLE_LATERAL_XY = (TOP_CENTER[0] - FOOT_WIDTH / 4.0 * _S, _top_y(FOOT_NEAR_Z) + 0.008)
+
+# The elevation carries the height chain off the foot seat plus the fitted
+# bore; the plan carries the foot rectangle, the strap band and the hold-down
+# hole. Nested left lanes work outward from the shortest span (foot height,
+# journal axis, overall reference) off the one datum a machinist actually
+# clamps to -- the seat.
 FRONT_KEEP = {
-    "Width": (FRONT_CENTER[0], _front_y(0.0) - 0.006),
-    "FootHt": (FRONT_CENTER[0] - 0.030, _front_y(FOOT_HEIGHT / 2.0)),
-    "BoreDia": (FRONT_CENTER[0] + 0.050, _front_y(BORE_HEIGHT) - 0.004),
+    "FootHt": (FRONT_CENTER[0] - 0.034, _front_y(FOOT_HEIGHT / 2.0)),
+    "BoreHeight": (FRONT_CENTER[0] - 0.046, _front_y(BORE_HEIGHT / 2.0)),
+    "BoreDia": (FRONT_CENTER[0] + 0.043, _front_y(BORE_HEIGHT) - 0.010),
+    "BoreLateral": BORE_LATERAL_XY,
+    # Crown: printed radial (_show_crown_as_radius), up and right of the dome.
+    "DomeDia": (0.178, _front_y(BORE_HEIGHT + TOP_RADIUS) + 0.008),
 }
 TOP_KEEP = {
-    "Depth": (TOP_CENTER[0] - 0.070, TOP_CENTER[1] - 0.010),
+    "Width": (TOP_CENTER[0], _top_y(FOOT_NEAR_Z) + 0.018),
+    # Outer left lane; its text sits above the hold-down lane's text so the
+    # two nested dimensions never read side by side.
+    "Depth": (TOP_CENTER[0] - 0.048, _top_y(FOOT_NEAR_Z) - 0.012),
+    # Both plan depths work off the foot's far face -- the one face the strap
+    # is flush with, so a shop can set the whole Z chain from a single edge.
+    "HoldDownLocation": (
+        TOP_CENTER[0] - 0.036,
+        _top_y((STRAP_INNER_Z + SCREW_Z) / 2.0),
+    ),
+    "StrapDepth": (
+        TOP_CENTER[0] + 0.036,
+        _top_y((STRAP_INNER_Z + STRAP_ROOT_Z) / 2.0),
+    ),
+    "HoleLateral": HOLE_LATERAL_XY,
 }
+# X on this part starts on a FEATURE, never the symmetry axis (policy rule 7):
+# the bore in the elevation and the hold-down hole in the plan are both
+# dimensioned from the foot's west side face, so the two views share one
+# origin the shop can touch off.
 DIMENSION_CALLOUTS = {
-    "BoreDia": "REAM THRU; ON PART C/L",
+    "BoreDia": "REAM THRU",
 }
-DIMENSION_PRECISION = {
-    "Width": 1,
-    "Depth": 1,
-    "FootHt": 1,
-    "BoreDia": 2,
-}
+CROWN_CALLOUT = "SIDES TANGENT FROM FOOT CORNERS"
+
+
+def _set_reference_precision(display: Any, label: str) -> None:
+    """Give a SHEET-derived dimension its PART-authored decimal places.
+
+    Policy rule 2 puts display precision on the model, and every imported
+    dimension here is read back by ``assert_imported_precision``. The strap
+    band, the hold-down station and both lateral locations are owned by the
+    part's hidden reference sketches, and the crown radius is the dome's own
+    diameter printed radial (#810 Codex l4afp). What is left is the
+    parenthesised overall height, a band-free restatement. Its places are
+    still specification, so they come from the spec, never a literal.
+    """
+    places = DRAWING_REFERENCE_PRECISION[label]
+    display = _early_bound(display, "IDisplayDimension")
+    # -1: swDimensionPrecisionSettings_e do-not-change for the dual and both
+    # tolerance places -- the part owns those too. The subscript is written
+    # out again because _drawing_contract only accepts a spec lookup here.
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
+    applied = int(display.GetPrimaryPrecision2())
+    if applied != places:
+        raise RuntimeError(
+            f"{label}: sheet dimension prints {applied} decimal places, not {places}"
+        )
 
 
 @_telemetry.traced("drawing.arbor.front_entity_scan")
-def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
-    """Return the foot-seat, arbor-bore, crown, and taper entities."""
+def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
+    """Return the foot-seat, arbor-bore and crown entities."""
     foot_candidates: list[tuple[float, Any]] = []
     bore_candidates: list[tuple[float, float, Any]] = []
-    taper_candidates: list[tuple[float, Any]] = []
     for raw_edge in visible_view_entities(view, 1, label="pedestal front edges"):
         edge = _early_bound(raw_edge, "IEdge")
         curve = edge.GetCurve()
@@ -129,18 +194,6 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
         p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
         if abs(p0[1]) <= 0.01 and abs(p1[1]) <= 0.01:
             foot_candidates.append((abs(p1[0] - p0[0]), edge))
-        endpoints = sorted(
-            ((abs(p0[0]), p0[1]), (abs(p1[0]), p1[1])), key=lambda p: p[1]
-        )
-        root, tangent = endpoints
-        taper_error = (
-            abs(root[0] - FOOT_WIDTH / 2.0)
-            + abs(root[1] - FOOT_HEIGHT)
-            + abs(tangent[0] - TAPER_TANGENT_X)
-            + abs(tangent[1] - TAPER_TANGENT_Y)
-        )
-        if taper_error <= 0.05:
-            taper_candidates.append((taper_error, edge))
     if not foot_candidates:
         raise RuntimeError("front view has no model edge on the foot-seat plane")
     foot_span, foot_edge = max(foot_candidates, key=lambda item: item[0])
@@ -162,76 +215,55 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
     )
     if abs(dome_radius - TOP_RADIUS) > 0.01 or abs(dome_height - BORE_HEIGHT) > 0.01:
         raise RuntimeError("front view has no circular dome edge")
-    if not taper_candidates:
-        raise RuntimeError("front view has no edge matching the tangent side taper")
-    taper_edge = min(taper_candidates, key=lambda item: item[0])[1]
-    return foot_edge, bore_edge, dome_edge, taper_edge
+    return foot_edge, bore_edge, dome_edge
 
 
-def _top_depth_edge(adapter: Any, view: Any, z_mm: float, *, label: str) -> Any:
-    """Return a plan-view edge at one modeled depth station."""
-    candidates: list[tuple[float, Any]] = []
-    for raw_edge in visible_view_entities(view, 1, label=f"{label} plan edges"):
-        edge = _early_bound(raw_edge, "IEdge")
-        start = edge.GetStartVertex()
-        end = edge.GetEndVertex()
-        if start is None or end is None:
+_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+
+
+@_telemetry.traced("drawing.crown_radius")
+def _show_crown_as_radius(adapter: Any, annotations: list[Any]) -> None:
+    """Print the model's dome diameter as the crown RADIUS it is on the part.
+
+    The dome is a full-circle boss in the model (DomeDia, part-owned places),
+    but only its upper arc survives on the part, and a print gives an arc a
+    radius. ``Diametric = False`` flips the imported diameter to its radial
+    form -- same model dimension, same places, half the value -- so no sheet
+    geometry restates it (#810 Codex l4afp, policy rule 2).
+    """
+    for raw_annotation in annotations:
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if dimension_name(adapter, annotation) != "DomeDia":
             continue
-        start = _early_bound(start, "IVertex")
-        end = _early_bound(end, "IVertex")
-        p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
-        p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
-        if abs(p0[2] - z_mm) <= 0.01 and abs(p1[2] - z_mm) <= 0.01:
-            candidates.append((abs(p1[0] - p0[0]), edge))
-    if not candidates:
-        raise RuntimeError(f"plan view has no {label} edge at z={z_mm:.3f} mm")
-    return max(candidates, key=lambda item: item[0])[1]
-
-
-def _circle_entity(adapter: Any, view: Any, radius_mm: float, *, label: str) -> Any:
-    candidates: list[tuple[float, Any]] = []
-    for raw_edge in visible_view_entities(view, 1, label=f"{label} circles"):
-        edge = _early_bound(raw_edge, "IEdge")
-        curve = edge.GetCurve()
-        if curve is None:
-            continue
-        curve = _early_bound(curve, "ICurve")
-        if not curve.IsCircle():
-            continue
-        radius = float(curve.CircleParams[6]) * 1000.0
-        candidates.append((abs(radius - radius_mm), edge))
-    if not candidates or candidates[0][0] > 0.01:
-        candidates.sort(key=lambda item: item[0])
-    if not candidates or min(candidates, key=lambda item: item[0])[0] > 0.01:
-        raise RuntimeError(f"{label} has no circle of radius {radius_mm:.3f} mm")
-    return min(candidates, key=lambda item: item[0])[1]
-
-
-@_telemetry.traced("drawing.radial_dimension", label_param="label")
-def _add_radial_dimension(
-    adapter: Any,
-    view: Any,
-    entity: Any,
-    *,
-    position: tuple[float, float],
-    label: str,
-) -> Any:
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, view)):
-        raise RuntimeError(f"failed to activate view for {label}")
-    draw.ClearSelection2(True)
-    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    selection_data = selection_manager.CreateSelectData()
-    selection_data.View = view
-    if not _early_bound(entity, "IEntity").Select4(False, selection_data):
-        raise RuntimeError(f"failed to select {label} entity")
-    display = draw.AddRadialDimension2(*position, 0.0)
-    draw.ClearSelection2(True)
-    if display is None:
-        raise RuntimeError(f"failed to create {label} radial dimension")
-    draw.EditRebuild3()
-    return display
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.Diametric = False
+        # The crown is what places the tapered flanks: each side runs from a
+        # 24.0 foot corner up to tangency with this radius, whose centre is
+        # the bore's (the shared centre mark says so). The Fable round-2
+        # review could not tell where the flanks start, so the words name
+        # both ends. Words only -- every digit on this sheet is a dimension.
+        display.SetText(4, CROWN_CALLOUT)
+        # The leader runs from the text toward the crown centre; with the
+        # default "extend to the opposite side" it kept going through the bore
+        # and crossed the Ø9.55 dimension at the centre. Stop it at the arc.
+        display.ArcExtensionLineOrOppositeSide = False
+        # Arrow OUTSIDE the arc (swDimArrowsOutside): the leader runs from the
+        # text to the crown and stops there. Inside, the dimension line ran
+        # from the arc to the centre, straight through the bore (810-l4afp-1
+        # eye pass).
+        display.ArrowSide = _ARROWS_OUTSIDE
+        if (
+            bool(display.Diametric)
+            or str(display.GetText(4) or "") != CROWN_CALLOUT
+            or bool(display.ArcExtensionLineOrOppositeSide)
+            or int(display.ArrowSide) != _ARROWS_OUTSIDE
+        ):
+            raise RuntimeError("crown radius display did not persist")
+        _telemetry.info(
+            f"crown radius: DomeDia shown radial, text {display.GetText(1)!r}"
+        )
+        return
+    raise RuntimeError("front view has no imported DomeDia to show as the crown radius")
 
 
 @_telemetry.traced("drawing.diameter_second_arrow", label_param="label")
@@ -257,37 +289,6 @@ def _disable_diameter_second_arrow(
         adapter.currentModel.GraphicsRedraw2()
         return
     raise RuntimeError(f"dimension {dimension!r} not found for {label}")
-
-
-@_telemetry.traced("drawing.arbor.bore_hidden_lines")
-def _add_bore_hidden_lines(adapter: Any, view: Any) -> None:
-    """Draw the bore's two derived hidden edges in the plan view."""
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, view)):
-        raise RuntimeError("failed to activate plan view for arbor bore hidden lines")
-    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    # Once a drawing view is active, sketch coordinates are view-local model
-    # metres. The Top view's local vertical axis is -model-Z, so reflect the
-    # upright's modeled -2..+8 mm span into view-local -8..+2 mm.
-    bore_radius = BORE_DIA / 2.0 / 1000.0
-    z0 = -(FOOT_DEPTH / 2.0) / 1000.0
-    z1 = -(FOOT_DEPTH / 2.0 - STRAP_T) / 1000.0
-    midpoint = (z0 + z1) / 2.0
-    # Start one hidden segment at each physical face. The dash pattern then
-    # visibly reaches both boundaries instead of leaving an apparent short stop.
-    for x in (-bore_radius, bore_radius):
-        for start_z, end_z in ((z0, midpoint), (z1, midpoint)):
-            draw.ClearSelection2(True)
-            segment = sketch_manager.CreateLine(x, start_z, 0.0, x, end_z, 0.0)
-            if segment is None:
-                raise RuntimeError("failed to create an arbor bore hidden line")
-            segment = _early_bound(segment, "ISketchSegment")
-            segment.Style = 1  # swLineHIDDEN
-            if int(segment.Style) != 1:
-                raise RuntimeError("arbor bore line did not retain hidden line style")
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
 
 
 @_telemetry.traced("drawing.entity_dimension", label_param="label")
@@ -374,29 +375,37 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
-    set_hidden_lines_removed(adapter, iso)
-    # The elevation carries the arbor bore and flange hold-down hole; the plan
-    # carries derived hidden lines for the through-bore plus the screw opening.
-    for view in (front, top):
-        set_hidden_lines_visible(adapter, view)
+    # Neither orthographic view needs hidden lines: the elevation shows the
+    # arbor bore in true circle and the hold-down hole is a native callout on
+    # the plan, so dashed outlines would only add crossings over the strap.
+    for view in (front, top, iso):
+        set_hidden_lines_removed(adapter, view)
 
+    # The strap band, hold-down station and lateral locations are owned by
+    # reference sketches the part saves blanked (arbor_pedestal_spec
+    # REFERENCE_SKETCHES); the hidden-owner curate shows each in the one view
+    # that dimensions it.
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     top_annotations = curate_view_dimensions(
-        adapter, top, keep=TOP_KEEP, view_label="top"
+        adapter,
+        top,
+        keep=TOP_KEEP,
+        view_label="top",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    set_dimension_callouts(
-        adapter, [*front_annotations, *top_annotations], DIMENSION_CALLOUTS
-    )
+    imported_annotations = [*front_annotations, *top_annotations]
+    set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
     for view, label in ((front, "front"), (top, "plan")):
         view.SetDisplayTangentEdges2(0)
         if int(view.GetDisplayTangentEdges2()) != 0:
             raise RuntimeError(f"failed to hide {label}-view tangent edges")
         view.UpdateViewDisplayGeometry()
-    set_dimension_precision(
-        adapter, [*front_annotations, *top_annotations], DIMENSION_PRECISION
-    )
     _disable_diameter_second_arrow(
         adapter,
         front_annotations,
@@ -406,45 +415,37 @@ async def build(adapter: Any) -> dict[str, str]:
     for view, label in ((front, "front"), (top, "plan")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
-    _add_bore_hidden_lines(adapter, top)
 
-    # Bore and foot hole are explicitly placed on the part centreline. This
-    # avoids a long half-width witness line that visually merges with the taper.
-    foot_entity, bore_entity, dome_entity, taper_entity = _front_entities(
-        adapter, front
-    )
+    foot_entity, bore_entity, dome_entity = _front_entities(adapter, front)
+    # Attach on the bore's 3 o'clock point and keep the symbol above that
+    # height: left to itself the leader reached into the circle and crossed
+    # the diameter dimension's line, which leaves the bore at 315 deg.
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(0.095, _front_y(BORE_HEIGHT) + 0.024),
+        symbol_xy=(FRONT_CENTER[0] + 0.037, _front_y(BORE_HEIGHT) + 0.010),
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
         label="arbor bore finish",
         char_height=0.0025,
         entity=bore_entity,
+        leader_attach_xy=(
+            FRONT_CENTER[0] + BORE_DIA / 2.0 * _S,
+            _front_y(BORE_HEIGHT),
+        ),
     )
-    # Right of the 24.0 width dimension (which ends at the foot's right
-    # corner, x ~0.159) and level with it; the leader is pinned to the seat's
-    # right quarter so it leaves the vee's LEFT side and runs up-left, clear
-    # of the "Ra 3.2" text that hangs right of the anchor.
+    # Below and right of the seat. The foot's width is dimensioned in the
+    # plan, so nothing here owns a witness line the leader could cross: it
+    # leaves the vee's left side, runs up-left to the seat's right quarter,
+    # and the "Ra 3.2" text hangs right of the symbol into empty sheet.
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + 0.036, _front_y(0.0) - 0.016),
+        symbol_xy=(FRONT_CENTER[0] + 0.035, _front_y(0.0) - 0.010),
         control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
         label="foot seat finish",
         char_height=0.0025,
         entity=foot_entity,
         leader_attach_xy=(FRONT_CENTER[0] + FOOT_WIDTH * _S / 4.0, _front_y(0.0)),
-    )
-    _add_entity_dimension(
-        adapter,
-        front,
-        foot_entity,
-        bore_entity,
-        orientation="vertical",
-        position=(0.060, FRONT_CENTER[1]),
-        label="bore height from foot seat",
-        arc_endpoint="center",
     )
     overall = _add_entity_dimension(
         adapter,
@@ -452,102 +453,41 @@ async def build(adapter: Any) -> dict[str, str]:
         foot_entity,
         dome_entity,
         orientation="vertical",
-        position=(0.035, FRONT_CENTER[1]),
-        label="overall height reference",
+        position=(FRONT_CENTER[0] - 0.058, FRONT_CENTER[1]),
+        label="overall height",
         arc_endpoint="max",
     )
     set_reference_dimension(
         adapter,
         _early_bound(overall, "IDisplayDimension").GetAnnotation(),
-        label="overall height reference",
+        label="overall height",
     )
-    radius_dimension = _add_radial_dimension(
-        adapter,
-        front,
-        dome_entity,
-        position=(0.195, _front_y(BORE_HEIGHT + TOP_RADIUS) + 0.005),
-        label="crown radius",
-    )
-    radius_display = _early_bound(radius_dimension, "IDisplayDimension")
-    radius_display.SetText(4, "TANGENT; CONC W/ BORE")
-    radius_display.SetPrecision3(1, -1, -1, -1)
-    # The leader runs from the text toward the crown centre; with the default
-    # "extend to the opposite side" it kept going through the bore and crossed
-    # the Ø9.55 dimension at the centre. Stop it at the crown arc.
-    radius_display.ArcExtensionLineOrOppositeSide = False
-    if (
-        str(radius_display.GetText(4) or "") != "TANGENT; CONC W/ BORE"
-        or int(radius_display.GetPrimaryPrecision2()) != 1
-        or bool(radius_display.ArcExtensionLineOrOppositeSide)
-    ):
-        raise RuntimeError("crown radius annotation did not persist")
+    _set_reference_precision(overall, "overall height")
+    _show_crown_as_radius(adapter, front_annotations)
     adapter.currentModel.GraphicsRedraw2()
-    add_attached_note(
-        adapter,
-        front,
-        text=(
-            f"UPRIGHT ROOT = {FOOT_WIDTH:.1f}; "
-            f"TAPER {TAPER_ANGLE_DEG:.2f}<MOD-DEG>/SIDE (REF)"
-        ),
-        entity=taper_entity,
-        note_xy=(0.200, _front_y(23.0)),
-        label="side-taper reference angle",
-    )
-    screw_entity = _circle_entity(
-        adapter,
-        top,
-        SCREW_HOLE_DIA / 2.0,
-        label="flange hold-down hole",
-    )
-    strap_near_entity = _top_depth_edge(
-        adapter,
-        top,
-        FOOT_DEPTH / 2.0 - STRAP_T,
-        label="strap near-face",
-    )
-    far_face_entity = _top_depth_edge(
-        adapter, top, FOOT_DEPTH / 2.0, label="foot and strap far-face"
-    )
-    hold_down_dimension = _add_entity_dimension(
-        adapter,
-        top,
-        far_face_entity,
-        screw_entity,
-        orientation="vertical",
-        position=(TOP_CENTER[0] - 0.045, TOP_CENTER[1]),
-        label="hold-down hole depth location",
-        arc_endpoint="center",
-    )
-    upright_dimension = _add_entity_dimension(
-        adapter,
-        top,
-        strap_near_entity,
-        far_face_entity,
-        orientation="vertical",
-        position=(TOP_CENTER[0] + 0.045, TOP_CENTER[1] + 0.010),
-        label="upright depth",
-    )
-    for raw_dimension, label in (
-        (hold_down_dimension, "hold-down hole depth location"),
-        (upright_dimension, "upright depth"),
-    ):
-        display = _early_bound(raw_dimension, "IDisplayDimension")
-        display.SetPrecision3(1, -1, -1, -1)
-        if int(display.GetPrimaryPrecision2()) != 1:
-            raise RuntimeError(f"{label} precision did not persist")
-        if label == "upright depth":
-            display.SetText(4, "UPRIGHT DEPTH")
-            if str(display.GetText(4) or "") != "UPRIGHT DEPTH":
-                raise RuntimeError("upright-depth callout did not persist")
     _screw_r = SCREW_HOLE_DIA / 2.0 * _S
+    # ``callout_xy`` is the text's CENTRE, and this callout's text is ~114 mm
+    # wide at 2:1, so anchoring it near the view buried its left half in the
+    # plan outline and the foot-width dimension. Centred a view-width to the
+    # right it lands in open sheet between the plan and the isometric, and
+    # its leader leaves the hole below the width witness lines.
     add_native_hole_callout(
         adapter,
         top,
-        edge_xy=(TOP_CENTER[0] + _screw_r, TOP_CENTER[1] + 0.010),
-        callout_xy=(TOP_CENTER[0] + 0.035, TOP_CENTER[1] + 0.035),
+        edge_xy=(TOP_CENTER[0] + _screw_r, _top_y(SCREW_Z)),
+        callout_xy=(TOP_CENTER[0] + 0.120, _top_y(SCREW_Z) + 0.012),
         label="flange hold-down hole",
-        process="FOOT-FLANGE HOLE ON PART C/L: DRILL",
+        process="DRILL",
     )
+    # Re-assert the display mode now the last annotation has landed: an
+    # annotation attached after placement can leave a view's edge set
+    # unregenerated, and only a real mode change rebuilds it.
+    for view in (front, top):
+        set_hidden_lines_removed(adapter, view)
+    # The part authored every imported dimension's decimal places; prove the
+    # import kept them instead of falling back to the sheet's two-place
+    # default (policy rule 2 -- the sheet may not rewrite them).
+    assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
     return await finalize_drawing(
         adapter,
         OUTPUTS,

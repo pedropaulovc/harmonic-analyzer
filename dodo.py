@@ -2888,6 +2888,34 @@ def task_check():
         # attributes the sheet no longer defines, and every check:* gate stayed
         # green (codex #416). Enrolled so the cross-sheet contracts are covered.
         SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
+        # Same failure shape: never enrolled, so the U28 re-lay (997f3534) left
+        # its three drive-train support pins red with every gate green.
+        SCRIPTS_DIR / "test_drive_train_support_layout.py",
+        # The cone tip block's shim, post-fillister and heel-relief contracts
+        # (I20/I22/I24/I31) that build_drive_train_assembly asserts at import.
+        SCRIPTS_DIR / "test_drive_train_cone_tip_holddown.py",
+        # dimensions.yaml is read by no part, so only this test keeps its
+        # alignment-pinion record pinned to the CAD constants (#814).
+        SCRIPTS_DIR / "test_dimensions_alignment_pinion_layout.py",
+        # The mirror-retirement diagnostic's drive-train rows equal the rows the
+        # assembly places with (Codex on #814 and #844).
+        SCRIPTS_DIR / "test_mirror_retirement_expectations.py",
+        # Every cad/scripts/test_*.py runs in some check:* gate or is exempted
+        # with a reason, so a new test cannot ship un-enrolled (Codex on #844).
+        SCRIPTS_DIR / "test_check_gate_enrollment.py",
+        # Integ-branch tests that guard caught un-enrolled at #877 round 4.
+        SCRIPTS_DIR / "test_cone_gear_mesh_design.py",
+        SCRIPTS_DIR / "test_cone_gear_seat_fit.py",
+        SCRIPTS_DIR / "test_drawing_hidden_sketches.py",
+        SCRIPTS_DIR / "test_drive_train_steps.py",
+        SCRIPTS_DIR / "test_drive_train_tip_adjuster_seat.py",
+        SCRIPTS_DIR / "test_fit_bands.py",
+        SCRIPTS_DIR / "test_printed_text_rulings.py",
+        # ... and the #857 re-merge: its leader-geometry and replica-driver pins.
+        SCRIPTS_DIR / "test_drawing_leaders.py",
+        SCRIPTS_DIR / "test_mcmaster_replica_driver.py",
+        # ... and #906: the crank native-acceptance record pins.
+        SCRIPTS_DIR / "test_crank_native_acceptance.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.
@@ -2916,6 +2944,9 @@ def task_check():
         SCRIPTS_DIR / "prompts" / "machinist_review_part.md",
         SCRIPTS_DIR / "prompts" / "machinist_review_assembly.md",
         SCRIPTS_DIR / "prompts" / "machinist_review_schema.json",
+        # test_printed_text_rulings reads the Named exceptions table: a new or
+        # removed row must rerun its tagged-emitter check.
+        SCRIPTS_DIR.parent / "docs" / "drawing-simplicity-policy.md",
     ]
     # test_out_param_binding SCANS sources instead of importing them (it reads
     # every top-level build script and every diagnostics/*.py looking for

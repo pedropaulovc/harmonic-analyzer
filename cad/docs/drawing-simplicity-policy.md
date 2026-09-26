@@ -81,7 +81,13 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    - **cams** — pinion-cam eccentric-axis position (and any future cam);
    - **channel consistency** — at most one control per channel part
      (rocker arm, channel lever, amplitude bar, connecting rod) where a
-     coordinate ± would let the 20 channels scatter.
+     coordinate ± would let the 20 channels scatter;
+   - **crank mesh** — MHA-016's crank bore: one diametral angularity frame to
+     the cone-journal bore (datum A), clocked by the foot seat (datum B) so the
+     zone holds tilt as well as yaw, with the plan angle basic. The 16T:64T
+     crossed mesh loses backlash to yaw and tilt of the crank axis (#906 pose
+     study, `dt-logs/crankhub/crank-mesh-angle-20260926.jsonl`; user ruling
+     2026-09-26).
 
    Everything else — frames, bases, crank parts, handles, knobs, brackets,
    blocks, pedestals, shafts, bushings, gears, screws — carries **no frames
@@ -280,19 +286,27 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
 
 Accepted shortfalls against rule 12. Each is specific to the parts named; it
 is not precedent for anything else. Every sheet a row affects should state
-the exception itself; the table is the backstop. The blind reviewer sees only the sheets,
-so it reports a row's shortfall as a blocker unless the package itself states
-the exception. A blocker that matches a row (same parts, shortfall within the
-recorded range) is recorded against that row by the person running the gate
-rather than fixed; any other finding on those parts still gates. The reviewer
-cannot see this table either, so it files any exception a sheet states under
-minor. The person running the gate checks each such minor entry against the
-table; a stated exception with no matching row gates like a blocker.
+the shortfall itself; the table is the backstop. A sheet states it as a plain
+manufacturing fact, the shortfall and its value (for example "ENGAGEMENT
+5.92-6.35 (0.93-1.0D)"), and never cites a rule number, a ruling id, or the
+words EXCEPTION, ACCEPTED, RULING, POLICY or BOOK FIDELITY
+(test_printed_text_rulings enforces this); this table is where the governance
+lives. The blind reviewer sees only the sheets, so it may still report a row's
+stated shortfall. A finding that matches a row (same parts, shortfall within
+the recorded range) is recorded against that row by the person running the
+gate rather than fixed; any other finding on those parts still gates, and a
+stated shortfall with no matching row gates like a blocker. In code, the emitter
+that prints a row's shortfall carries the comment `# Named exception:
+MHA-nnn <shortfall>`, naming its row; test_printed_text_rulings requires a
+tagged emitter for every row, printing the shortfall it names.
 
 | parts | shortfall | why accepted | ruled |
 |---|---|---|---|
-| MHA-013 cone gear T006 | Root-to-bore web 0.621 mm (printed MIN floor Ø2.880 to the Ø1.6375 maximum bore), under the 1.5 floor. | Book fidelity: the 6-tooth gear's floor sits at r 1.43, and no usable bore meets 1.5 under it. The 1/16 in bore is the shaft's smallest land, and an integral pinion is blocked by the tip-first assembly. T012–T024 meet the 2.0 target on smaller lands. | User, U40, 2026-09-23 |
+| MHA-142 post-to-platform screws, 2X (MSC 40923898, 1/4-20 × 3-1/2 slotted fillister, nominal 86.0, cut to fit at assembly: short of the MHA-091 underside, never proud) into the MHA-091 1/4 plate | 1/4-20 thread engagement 0.90D minimum at the worst case (5.72 of 6.35, edge breaks counted), under the 1.5D rule | the fillister is cut to fit and never stands proud of the plate, which swings over the base; the post counterbore and its webs rule out a longer engagement (U37b's 16.15 counterbore left a 1.20 web to the crank bore) | User, U37c/U41, 2026-09-24 |
+| MHA-013 cone gear T006 | Root-to-bore web 0.621 mm (printed MIN floor Ø2.880 to the Ø1.6375 maximum bore), under the 1.5 floor. | Book fidelity: the 6-tooth gear's floor sits at r 1.44, and no usable bore meets 1.5 under it. The 1/16 in bore is the shaft's smallest land, and an integral pinion is blocked by the tip-first assembly. T012–T024 meet the 2.0 target on smaller lands. | User, U40, 2026-09-23 |
 | MHA-013 cone gears T006–T042, in mesh with MHA-027 | Worst-case transverse contact ratio with the 120T drum below 1.1: 0.18 / 0.43 / 0.61 / 0.75 / 0.86 / 0.97 / 1.06 (T006 → T042), every printed band at its worst case. | Book fidelity: the tooth counts and taper are the book's (ch12 p.16 shows the wear). The mesh is deepened to the limit, where the tooth comes to a point first. Below CR 1 the drive rides on a tooth-tip corner. Rigid transmission error is ≤ 0.023 mm at the drum pitch line on T006 and ≤ 0.004 elsewhere, so the cost is tip-corner wear, not position error. | User, U42, 2026-09-23 |
+| MHA-025 crank pinion boss | Bore-to-OD wall 1.560 at the worst case (printed Ø13.5 at .X −0.8 over the Ø9.580 maximum bore), under the 2.0 target; floor 1.5 | The boss is held at the tooth-root OD so the gear cutter runs out onto it clear, as photographed (ch12 p.19); a boss proud of the root is scalloped by the cutter up to the pin hole | User, option C, 2026-09-25 |
+| MHA-139 crank handle pivot screw (#8-32 slotted, Ø3.0 thread relief) in the tapped 5/16 in steel crank arm MHA-020 (both sheets state it) | full-thread engagement about 1.56D nominal, 1.33D at the printed worst case (the thinnest supplied 5/16 bar: the arm prints its thickness as a stock reference); never under 1D (asserted at import) | the arm is 5/16 flat bar as photographed, and a steel screw in a steel tap reaches full strength at about 1D | User, U33b 2026-09-23; reaffirmed 2026-09-25 (MHA-020 review B2); #10-24 to #8-32 for a 1.25D worst-case margin, User 2026-09-26 |
 
 ## The gate
 

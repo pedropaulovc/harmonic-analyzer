@@ -20,7 +20,8 @@ SCREWS = (
     "slotted-screw-3",
     "slotted-screw-4",
     "foot-screw-1",
-    "foot-screw-2",
+    "pedestal-hold-down-screw-1",
+    "pedestal-hold-down-screw-2",
 )
 
 

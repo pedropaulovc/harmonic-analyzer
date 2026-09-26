@@ -24,15 +24,14 @@ above the 6.35-mm swing plate fixes the drive plane at y = 90.518):
   journal + crank pedestal, ONE casting riding the swing plate), ABOVE the
   64T (ch30 GT:
   the crank axle triangulates to y 144.8 -- a near-vertical 16T:64T mesh):
-  crank arm + handle at the front and the 16T pinion inboard. (The T12
+  crank arm, separate through hub, handle and 16T pinion inboard. (The T12
   removable crank chain wheel -- ch. 23, the roller chain rides its m2 teeth
   -- is NOT placed here: paper-drive now owns the whole crank->paper chain
   drive, so the single crank wheel lives there, avoiding a duplicate at the
-  top level -- codex #189 :605. MHA-024 is not inserted in this as-machined
-  assembly model: MHA-020 and MHA-026 retain their coaxial straight pilot
-  holes here, while the released drawings require their shared 1:48 taper to
-  be match-reamed at assembly.)
-* alignment pinion (ch. 25): the 42T zeroing drum + its swing rig, parked
+  top level -- codex #189 :605.  Removable MHA-024 crosses hub MHA-137 and
+  shaft MHA-026 behind the arm; axial MHA-138 keys only the arm/hub seam at
+  six o'clock.)
+* alignment pinion (ch. 25): the 32T zeroing drum + its swing rig, parked
   DISENGAGED, inboard of the drum and level with the drive axis (GT).
 
 TRUE-CONE MESH GEOMETRY (M6.7; supersedes the M6.6 canted-vertical
@@ -110,15 +109,14 @@ the horizontal mesh; see the derivation at the constant).
 Mated-DOF strategy (M6 operation simulation): the structure -- the
 stationary arbor and the pedestals -- is grounded; the swing platform
 is floated (its riders seat on it and follow the p1 swing); the crank
-chain, the cone cluster and the 20 cylinder
-gears are inserted on their exact machine transforms (so mate
-flip-recovery has a clean reference and the tuned tooth phases are
-preserved) and joined by real kinematic joints. The crankshaft and the
-cone shaft each get a revolute (coincident axis-to-axis + an axial plane
-distance); the crank arm/handle/T12 wheel/16T pinion are keyed to the
-crankshaft and the 64T + 20 cone gears keyed to the cone shaft (lock
-mates); a 16T:64T gear mate drives the cone cluster from the crank, and
-each cylinder gear meshes its cone gear k at ratio [120-6k : 120]. The
+chain, the cone cluster and the 20 cylinder gears are inserted on their
+exact machine transforms, so mate flip-recovery has a clean reference and
+the tuned tooth phases are preserved, then joined by real kinematic joints.
+The crankshaft and cone shaft each get a revolute; the crank hub, arm,
+handle and 16T pinion are keyed to the crankshaft, while the 64T and 20 cone
+gears are keyed to the cone shaft. A 16T:64T gear mate drives the cone cluster
+from the crank, and each cylinder gear meshes its cone gear k at ratio
+[120-6k : 120]. The
 gear mate is each cylinder gear's sole rotational constraint, so it
 holds the cosine-setup phase without nudging the gear. The whole train
 is left with exactly ONE operational DOF -- the crank angle.
@@ -206,6 +204,7 @@ from _assembly_patterns import (
     PatternDirection,
 )
 from _interference_contracts import allowed_interference_pairs
+from _drive_train_explode import create_drive_train_explode
 
 # CopyWithMates2 helpers for the cone-gear ladder (#228). NB importing _cwm
 # folds it into THIS assembly's recipe/cache key -- intended.
@@ -239,6 +238,8 @@ DP_TRAIN = _config.machine(
     "gear_train", "diametral_pitch"
 )  # cad/config/machine.yaml (DIMENSIONS.md ch12)
 DP_CRANK = _config.machine("gear_train", "crank_drive_diametral_pitch")
+# The pair's one cutter (#906): the 16T's DP and both gears' addendum.
+from crank_drive_gear_spec import CUTTER_DIAMETRAL_PITCH as DP_CRANK_CUTTER  # noqa: E402
 ADDENDUM = 25.4 / DP_TRAIN  # 0.510 at DP 49.82
 
 # The four smallest cone gears read "more yellow ... a harder metal" (ch.12 p.21):
@@ -290,7 +291,19 @@ SEC_I = 1.0 / COS_I
 INCLINE_DEG = math.degrees(math.asin(SIN_I))  # 12.5182
 SEAT_PITCH = Z_PITCH * COS_I  # 6.8888: seat pitch along the shaft
 
+from cone_gear_spec import BLANK_DIA_BAND as CONE_GEAR_BLANK_DIA_BAND  # noqa: E402
 from cone_gear_spec import FACE_WIDTH as CONE_GEAR_FACE_WIDTH  # noqa: E402
+from cone_gear_spec import outside_dia_mm as cone_gear_outside_dia_mm  # noqa: E402
+
+
+def _cone_tip_radius_max(teeth: int) -> float:
+    """Largest cone-gear tip radius the print allows (#834 long addendum).
+
+    The deepened mesh cuts each gear from an oversize blank, so the tip is
+    not the standard pitch radius + addendum; clearance checks use the
+    printed outside diameter at its upper limit.
+    """
+    return (cone_gear_outside_dia_mm(teeth) + CONE_GEAR_BLANK_DIA_BAND[0]) / 2.0
 
 # Cone gear face (cone_gear_spec.FACE_WIDTH, 6.0 since the U27 ruling of
 # 2026-09-23).  Every station, the 64T gap and the T006 -> bushing -> tip-block
@@ -306,7 +319,12 @@ GEAR64_FACE = 8.0
 # The 10 mm reference face is placement history, not current part geometry.
 GEAR64_CENTRE_REFERENCE_FACE = 10.0
 DRUM_FACE = 3.0  # cylinder gear face (gear z = 0..3, cam 3..6.5)
-PINION_FACE = 10.8  # re-derived 2026-07-14: fills the casting-face -> T120
+# The 16T south face stays on the 10.8 reference face centred on the 64T row
+# (the crankshaft's SeatPinion datum); option A (Main, 2026-09-23) shortens
+# the teeth from the NORTH to 10.4 so the deepened T120 tip (#834) keeps
+# its 0.25 axial air.  Mirrors CONE_FACE_STATION_REFERENCE.
+PINION_FACE = 10.4
+PINION_FACE_STATION_REFERENCE = 10.8  # re-derived 2026-07-14: fills the casting-face -> T120
 # span (0.32 wall / 0.30 T120 clearance, span-fit assert below); ch12
 # page002_img06 shows the pinion proud of the casting spanning the 64T row
 # (the old 12.0 "slightly wider than the drive gear's 10" was a low-
@@ -394,7 +412,7 @@ GEAR64_STATION = (
 )  # 19.9
 GEAR64_SEAT = cone_station(GEAR64_STATION + GEAR_AXIS_SHIFT)
 R64 = (64.0 / DP_CRANK) * 25.4 / 2.0
-R16 = (16.0 / DP_CRANK) * 25.4 / 2.0
+R16 = (16.0 / DP_CRANK_CUTTER) * 25.4 / 2.0
 
 # Crank: ABOVE the 64T (ch30 GT photogrammetry -- the crank axle triangulates
 # to world (-122.84, 144.78, -189.1) +- 1.4: the pedestal axis of the +122
@@ -418,9 +436,18 @@ R16 = (16.0 / DP_CRANK) * 25.4 / 2.0
 # the radial interleave is ~constant across the face and the real constraint
 # is LATERAL flank misregistration, which no radial backoff fixes and the
 # helix + backlash do).
-ADD16 = 25.4 / DP_CRANK  # crank-pinion addendum
-MESH16_C2C_SLACK = _config.fit("crank_mesh", "c2c_slack_mm")  # 0.25, tolerances.yaml
-MESH16_C2C = R64 + R16 + MESH16_C2C_SLACK
+ADD16 = 25.4 / DP_CRANK_CUTTER  # both gears' addendum: one cutter
+# FRAME-FIXED (#906, Main 2026-09-26): nothing in the frame moves for the
+# single-cutter pair. The v2 casting's crank axis and the 64T station keep the
+# centre distance the fixed-post DP was solved for -- both radii at the
+# transverse DP plus tolerances.yaml's 0.25 slack -- and the smaller 16T
+# inherits the difference as slack: 0.423, still engaged 1.5 deep.
+MESH16_C2C = (
+    R64
+    + (16.0 / DP_CRANK) * 25.4 / 2.0
+    + _config.fit("crank_mesh", "c2c_slack_mm")
+)  # 39.735
+MESH16_C2C_SLACK = MESH16_C2C - R64 - R16  # 0.423
 TIP16_C2C = R64 + R16 + 2.0 * ADD16
 CRANK_MESH_DEPTH = TIP16_C2C - MESH16_C2C
 # Depth band: above ~1.2*ADD (really engaged), below 2*ADD minus the root
@@ -443,19 +470,21 @@ ALPHA16 = math.degrees(math.atan2(_DY16, GEAR64_SEAT[0] - X_CRANK))
 # (both horizontal legs run TOWARD the other axis and read positive -- the
 # chirality-free plane-local convention; the CW spin sense is applied at the
 # rot_z(-PINION_SEED_DEG) callsite)
-# The 10.8-wide pinion stands north of the v2 casting's finite crank boss and
-# is centred on the 64T contact row. The relocated cast-in axis removes the
+# The pinion stands north of the v2 casting's finite crank boss; its 10.8
+# reference face is centred on the 64T contact row and the 10.4 teeth keep
+# that face's south end. The relocated cast-in axis removes the
 # former T120-rim radial overlap; the exact boss/T12/pinion closure below owns
 # the axial clearances.
 _GEAR64_CONTACT_Z = GEAR64_SEAT[2] + R64 * math.cos(math.radians(ALPHA64)) * SIN_I
-PINION_TOOTH_Z = _GEAR64_CONTACT_Z
+PINION_TOOTH_Z = _GEAR64_CONTACT_Z - (PINION_FACE_STATION_REFERENCE - PINION_FACE) / 2.0
 # The pinion follows the recentered cone/64T row while the photo-anchored crank
 # arm and T12 chain plane remain at their existing stations below.
 # Tooth-in-gap phase seed, generalizing the old +11.25 half-pitch: the 64T is
 # keyed at its authored phase (a tooth centred at azimuth 0 -- for the helical
 # teeth that is the MID-FACE azimuth, the twist's symmetry plane), so its
 # nearest tooth leads the contact azimuth by DELTA64; the pinion's gap must
-# sit that same contact arc (scaled by R64/R16) past the contact on ITS side.
+# sit that same contact arc (64/16 pinion degrees per 64T degree -- the tooth
+# ratio, whatever the two pitch radii) past the contact on ITS side.
 # At ALPHA = 0 this is exactly 11.25. The formula is then CENTRED in the
 # zero-collision window: at the full-row band the helical twist biases the
 # window negative of the formula (crossed_mesh_study seed sweep 2026-07-14 at
@@ -467,63 +496,74 @@ PINION_TOOTH_Z = _GEAR64_CONTACT_Z
 _TP64 = 360.0 / 64.0
 DELTA64 = round(ALPHA64 / _TP64) * _TP64 - ALPHA64  # 1.57: 64T tooth lead
 # The v2 post changed the crank-pair DP and therefore the tooth count's phase at
-# the new line of centres.  Re-arbitrated against the exact solid study and the
-# exact-solid phase sweep: -1.50 centres the recentered DP25.742 / 12-degree
-# helix window with +-0.40-degree authoring margin.
-MESH_WINDOW_CENTRE_DEG = -1.50
+# the new line of centres.  Re-arbitrated for the single-cutter pair at the
+# frame's slack (#906; diagnostics/crank_mesh_backlash_study.py, case Bstar0,
+# 9 crank phases): the free window is 2.39..2.45 deg wide and centred at
+# -1.41..-1.44, so -1.42 keeps +-1.2 deg of authoring margin.
+MESH_WINDOW_CENTRE_DEG = -1.42
 PINION_SEED_DEG = (
-    (ALPHA16 + 180.0) - DELTA64 * (R64 / R16) - 22.5 / 2.0
+    (ALPHA16 + 180.0) - DELTA64 * (64.0 / 16.0) - 22.5 / 2.0
 ) % 22.5 + MESH_WINDOW_CENTRE_DEG  # window-centred tooth-in-gap
 
-ARBOR_SOUTH_Z = -90.0 + MECHANISM_Z_SHIFT
-# end stops INSIDE the arbor-pedestal bore, blind-bearing look; was -98, poking
-# 8 clear through the block). = cylinder-gear-shaft origin, placed by its south
-# end.
-ARBOR_LENGTH = 187.0  # north end at z +132.415: 7.5 seated in the NORTH
-# arbor-pedestal's bore band (PR8, ch12 page002_img09 -- the real machine's
-# base-standing north clamp restored as a second, mirrored pedestal with its
-# foot just clear of the rocker-arm-support footprint). Must match
-# cylinder-gear-shaft SHAFT_LENGTH; the pedestal geometry is asserted below.
-CRANKSHAFT_Z0 = -175.0  # outboard (crank) end (was -160: the crank plane moved
-# south with the ch30 GT re-read -- arm hub -175..-167, GT axle bolt -189 +- 2.7)
-CRANKSHAFT_LENGTH = 122.0  # 2026-09 re-derive: -175..-53 ends 6.2 past the
-# 16T pinion's north face (-59.2) -- ch12 page002_img02 shows a short capped
-# end right behind the pinion, not a 34 mm bare stub out the column's back.
-CRANK_ARM_Z0 = CRANKSHAFT_Z0  # arm PLATE south face: the hub band is
-# -175..-167 at the shaft's south end, in FRONT of (south of) the T12 chain
-# wheel (-157.5..-152.5): the arm + the handle (its grip extends -Z, further
-# south) then sweep entirely south of the chain plane (-155) and cannot foul
-# the chain when the crank turns (user, book p005). The placed pose composes a
-# Ry(180) (the plate's local +z extrusion runs machine -z), so the component
-# ORIGIN sits at the north face -- see CRANK_ARM_ORIGIN_Z.
+# ARBOR_SOUTH_Z / ARBOR_LENGTH (the cylinder arbor) follow from the pedestal
+# strap faces and are defined with them below (U34b/U34c).
+from crank_hub_geometry import (  # noqa: E402
+    AXIAL_PIN_LENGTH,
+    AXIAL_PIN_RADIUS_FROM_AXIS,
+    HUB_BARREL_DIA,
+    HUB_LENGTH,
+    HUB_SEAT_LENGTH,
+)
 from crank_arm_spec import (  # noqa: E402
     ANCHOR_HOLE_SPEC,
     ANCHOR_SCREW_X,
     ANCHOR_SCREW_Y,
-    ANCHOR_THREAD_DEPTH,
     ARM_C2C,
     ARM_THICKNESS,
     ARM_WIDTH,
 )
-from crankshaft_spec import PIN_HOLE_HEIGHT  # noqa: E402  # 75: handle pivot from the
+from _fit_limits import deviations  # noqa: E402
+from crankshaft_spec import (  # noqa: E402
+    PIN_HOLE_HEIGHT,
+    SHAFT_LENGTH as CRANKSHAFT_LENGTH,
+    SHAFT_LENGTH_BAND as CRANKSHAFT_LENGTH_BAND,
+)
+from crank_handle_pivot_screw_spec import (  # noqa: E402
+    OVERALL_LENGTH as HANDLE_SCREW_LENGTH,
+    PROUD_INBOARD_MAX as HANDLE_SCREW_PROUD_MAX,
+    SEAT_STATION as HANDLE_SCREW_SEAT_STATION,
+    THREAD_LENGTH_MAX as HANDLE_SCREW_THREAD_MAX,
+    THREAD_MODEL_DIA as HANDLE_SCREW_THREAD_MAJOR,
+)
 
-# shaft axis (2026-09 front-view re-derive, see crank_arm_spec; was 66 from the
-# perspective-magnified side view, 150 before that)
-REMOVABLE_Z0 = -157.5  # mounted T12 (face 5.0): band -157.5..-152.5, mid -155 =
-# the front chain plane (ch30 GT: solved-camera z-ticks bracket the physical
-# chain run at -153 +- 3), between the merged crank column (south flank -98.6,
-# even at the disengaged swing) and the crank arm (-175..-167). The plane
-# clears the paper-drive stub disc
-# (-134.5..-137.5) by 15; the arm sits 9.5 SOUTH of the wheel so the rotating
-# arm/handle never crosses it. The small removable gear is the chain wheel
-# (ch. 23 -- bead chain on its m2 teeth; v2_gears_010).
-ARBOR_PEDESTAL_Z = 90.5 - MECHANISM_Z_SHIFT
-# Its complete footing follows the translated cylinder/arbor family.
-ARBOR_PEDESTAL_NORTH_Z = 97.5 + MECHANISM_Z_SHIFT
-# real machine's base-standing north clamp) -- the SAME casting rotated 180
-# about Y so its strap looks SOUTH at the drum.  After the fixed-post recenter
-# its foot spans z 92.588..108.588, still north of the unchanged rocker support.
-from build_arbor_pedestal import FOOT_DEPTH as ARBOR_PED_DEPTH  # noqa: E402
+CRANK_FACE_Z = -183.0
+CRANKSHAFT_Z0 = CRANK_FACE_Z
+CRANK_ARM_Z0 = CRANK_FACE_Z
+CRANK_HUB_Z0 = CRANK_FACE_Z
+CRANK_ARM_ORIGIN_Z = CRANK_ARM_Z0 + ARM_THICKNESS
+CRANK_HUB_REAR_Z = CRANK_HUB_Z0 + HUB_LENGTH
+CRANK_HUB_PIN_ORIGIN = [
+    X_CRANK,
+    Y_CRANK - AXIAL_PIN_RADIUS_FROM_AXIS,
+    CRANK_FACE_Z,
+]
+# The +8-mm crank-face shift is matched by +8 in the shaft's local stations,
+# preserving the T12, pinion, bearing and far-end world positions.  The arm
+# occupies -183..-175, the hub continues behind it to -163, and the shaft
+# cylinder begins flush at -183; only its integral dome projects outboard.
+if abs(CRANK_ARM_ORIGIN_Z - (CRANK_FACE_Z + HUB_SEAT_LENGTH)) > 1e-9:
+    raise AssertionError("arm inboard face left the hub shoulder station")
+
+# T12 remains on its established world station after the crank-face shift.
+REMOVABLE_Z0 = -157.5  # mounted T12 band -157.5..-152.5, centre -155
+# This is the front chain plane (ch30 GT: solved-camera z-ticks bracket the
+# physical chain run at -153 +- 3), between the merged crank column and the
+# arm/hub cluster.  The separate hub ends at -163, leaving 5.5 axial air.
+if abs(REMOVABLE_Z0 - CRANK_HUB_REAR_Z - 5.5) > 1e-9:
+    raise AssertionError("crank hub rear/T12 air gap drifted")
+# The small removable gear is the chain wheel (ch. 23 -- bead chain on its
+# m2 teeth; v2_gears_010).
+from build_cylinder_end_disc import DISC_DIA as END_DISC_DIA  # noqa: E402
 from build_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E402
 
 # Cylinder END DISCS (2026-09, ch13 page002_img01/img03, ch25 page001_img02):
@@ -536,58 +576,118 @@ from build_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E402
 # instead, the O60 disc fouled the cone-tip block (interference gate).
 from cylinder_gear_spec import CAM_THICKNESS as DRUM_CAM_T  # noqa: E402
 
-END_DISC_AIR = 0.5
-# Dome cap screws (2026-09, ch13 page002_img01/img03, ch25 page002_img03): the
-# bright crown head on each pedestal's OUTER strap face, on the arbor axis --
-# it closes the blind arbor bore (the arbor ends 2.5 inside the strap; the
-# cap's 2.0 spigot stops 0.5 short of it). South strap face = foot centre
-# - 2 (band -2..+8 of the 16 foot); north casting turned 180 -> + 2.
-from build_dome_cap_screw import STUB_LEN as CAP_STUB_LEN  # noqa: E402
-
-CAP_SOUTH_Z = -ARBOR_PEDESTAL_Z - 2.0  # crown base on the south face, +Y -> -Z
-CAP_NORTH_Z = ARBOR_PEDESTAL_NORTH_Z + 2.0  # crown base on the north face, +Y -> +Z
-if (ARBOR_SOUTH_Z - CAP_SOUTH_Z) - CAP_STUB_LEN < 0.25:
-    raise AssertionError("south dome cap spigot reaches the arbor end")
+# U34 (pedestals inboard): each disc floats between its end unit and its
+# pedestal strap. The fitter sets 0.5-0.8 end play per end with a 0.025 in
+# (0.64) feeler, so the model splits that nominal evenly: END_DISC_AIR from the
+# end unit to the disc and the same air from the disc to the strap.
+END_DISC_AIR = 0.32
 END_DISC_SOUTH_Z0 = (
     Z_DRUM0 - DRUM_FACE / 2.0 - DRUM_CAM_T - END_DISC_AIR - END_DISC_THICK
 )
 END_DISC_NORTH_Z0 = Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 + END_DISC_AIR
-if END_DISC_SOUTH_Z0 < -ARBOR_PEDESTAL_Z + ARBOR_PED_DEPTH / 2.0 + 0.25:
-    raise AssertionError("south end disc reaches the south pedestal strap")
-if (
-    END_DISC_NORTH_Z0 + END_DISC_THICK
-    > ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0 - 0.25
-):
-    raise AssertionError("north end disc reaches the north pedestal strap")
-# (also imported with the main block below; repeated here because these
-# asserts run before it)
 
-_ARBOR_NORTH = ARBOR_SOUTH_Z + ARBOR_LENGTH  # +132.415
-if (ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0) - 88.9 < 0.5:
-    raise AssertionError("north pedestal foot reaches the rocker-support foot")
-_N_PED_FACE = ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0
-# south-looking strap face after the Ry180 installation
-if not 6.0 <= _ARBOR_NORTH - _N_PED_FACE <= ARBOR_PED_DEPTH - 4.0:
-    raise AssertionError("arbor north engagement in the north pedestal out of band")
+# Arbor pedestals (U34c, dt-bank-pedestal-layout-20260923 rev 3): the SAME
+# casting twice -- south as built, north rotated 180 about Y so its strap looks
+# south at the drum (PR8, ch12 img09). Each is anchored on its strap INNER face,
+# END_DISC_AIR outboard of its disc; the foot grows 28 outboard of that face and
+# carries one MHA-143 hold-down in a base seat transferred from the pedestal.
+from arbor_pedestal_spec import (  # noqa: E402
+    FOOT_NEAR_Z as ARBOR_PED_FOOT_NEAR_Z,
+    STRAP_INNER_Z as ARBOR_PED_STRAP_INNER_Z,
+    STRAP_ROOT_Z as ARBOR_PED_STRAP_ROOT_Z,
+)
+
+ARBOR_STRAP_SOUTH_Z = END_DISC_SOUTH_Z0 - END_DISC_AIR  # -72.652
+ARBOR_STRAP_NORTH_Z = END_DISC_NORTH_Z0 + END_DISC_THICK + END_DISC_AIR  # +75.202
+# Pedestal ORIGINS: south at -ARBOR_PEDESTAL_Z (as built, local +Z = machine
+# +Z), north at +ARBOR_PEDESTAL_NORTH_Z (Ry180, local +Z = machine -Z).
+ARBOR_PEDESTAL_Z = -(ARBOR_STRAP_SOUTH_Z - ARBOR_PED_STRAP_INNER_Z)  # 80.652
+ARBOR_PEDESTAL_NORTH_Z = ARBOR_STRAP_NORTH_Z + ARBOR_PED_STRAP_INNER_Z  # 83.202
+# Plan z band of each whole foot (strap inner face .. ledge end).
+ARBOR_PED_SOUTH_Z_BAND = (
+    -ARBOR_PEDESTAL_Z + ARBOR_PED_FOOT_NEAR_Z,
+    -ARBOR_PEDESTAL_Z + ARBOR_PED_STRAP_INNER_Z,
+)  # -100.652..-72.652
+ARBOR_PED_NORTH_Z_BAND = (
+    ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_STRAP_INNER_Z,
+    ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_FOOT_NEAR_Z,
+)  # +75.202..+103.202
+# The layout study's stations (rev 3 section 2) -- a derivation drift is loud.
+for _got, _want in (
+    (ARBOR_STRAP_SOUTH_Z, -72.652),
+    (ARBOR_STRAP_NORTH_Z, 75.202),
+):
+    if abs(_got - _want) > 0.005:
+        raise AssertionError(
+            f"arbor strap face {_got:.4f} drifted from the U34 station {_want}"
+        )
+
+# Dome cap screws (2026-09, ch13 page002_img01/img03, ch25 page002_img03): the
+# bright crown head on each pedestal's OUTER strap face, on the arbor axis --
+# it closes the blind arbor bore. Its 2.0 spigot must stop short of the arbor.
+from build_dome_cap_screw import STUB_LEN as CAP_STUB_LEN  # noqa: E402
+
+CAP_SOUTH_Z = -ARBOR_PEDESTAL_Z + ARBOR_PED_STRAP_ROOT_Z  # -82.652, +Y -> -Z
+CAP_NORTH_Z = ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_STRAP_ROOT_Z  # +85.202, +Y -> +Z
+
+# The cylinder arbor (MHA-028) is CUT TO FIT at assembly (U34b): the span over
+# both strap outer faces less 6.0, so it sits centred with ~7.0 in each strap.
+# The model carries the part's REF length and centres it the same way.
+from cylinder_gear_shaft_spec import SHAFT_LENGTH as ARBOR_LENGTH  # noqa: E402
+
+ARBOR_SOUTH_Z = CAP_SOUTH_Z + ((CAP_NORTH_Z - CAP_SOUTH_Z) - ARBOR_LENGTH) / 2.0
+_ARBOR_NORTH = ARBOR_SOUTH_Z + ARBOR_LENGTH
+for _label, _engagement, _spigot_air in (
+    ("south", ARBOR_STRAP_SOUTH_Z - ARBOR_SOUTH_Z, ARBOR_SOUTH_Z - CAP_SOUTH_Z),
+    ("north", _ARBOR_NORTH - ARBOR_STRAP_NORTH_Z, CAP_NORTH_Z - _ARBOR_NORTH),
+):
+    # 6.0..8.0 seated per the cut-to-fit rule; the dome cap's spigot must
+    # still stop 0.25 short of the arbor end in the blind bore.
+    if not 6.0 <= _engagement <= 8.0:
+        raise AssertionError(
+            f"arbor {_label} engagement {_engagement:.3f} in its pedestal out of band"
+        )
+    if _spigot_air - CAP_STUB_LEN < 0.25:
+        raise AssertionError(f"{_label} dome cap spigot reaches the arbor end")
+if END_DISC_SOUTH_Z0 - ARBOR_STRAP_SOUTH_Z < 0.25:
+    raise AssertionError("south end disc reaches the south pedestal strap")
+if ARBOR_STRAP_NORTH_Z - (END_DISC_NORTH_Z0 + END_DISC_THICK) < 0.25:
+    raise AssertionError("north end disc reaches the north pedestal strap")
+# Plan overlap, not z alone, against the rocker-arm-support foot (x 41.15..
+# 104.65 about SUPPORT_WORLD_X, z +-88.9): the north foot shares its z band but
+# stands ~89.5 away in x (study rev 3 section 6; the z-only test fired falsely).
+from build_arbor_pedestal import FOOT_WIDTH as _PED_FOOT_WIDTH  # noqa: E402
+from build_rocker_arm_support import WIDE as _SUPPORT_FOOT_HALF_X  # noqa: E402
+from rocker_arm_support_spec import (  # noqa: E402
+    SUPPORT_HALF_MACHINE_Z as _SUPPORT_FOOT_HALF_Z,
+    SUPPORT_WORLD_X as _SUPPORT_X,
+    SUPPORT_WORLD_Z as _SUPPORT_Z,
+)
+
+for _band in (ARBOR_PED_SOUTH_Z_BAND, ARBOR_PED_NORTH_Z_BAND):
+    _gap_x = (_SUPPORT_X - _SUPPORT_FOOT_HALF_X) - (X_DRUM + _PED_FOOT_WIDTH / 2.0)
+    _gap_z = max(
+        _band[0] - (_SUPPORT_Z + _SUPPORT_FOOT_HALF_Z),
+        (_SUPPORT_Z - _SUPPORT_FOOT_HALF_Z) - _band[1],
+    )
+    if max(_gap_x, _gap_z) < 0.5:
+        raise AssertionError("an arbor pedestal foot reaches the rocker-support foot")
 
 # The pinion must sit fully on the crankshaft.
 if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
     raise AssertionError("crankshaft too short for the M6.7 pinion station")
 # The crankshaft's named seat datums (the flip-free coincident seats for the
 # keyed chain -- see _seat_on_crank) must sit exactly at this module's
-# authored stations.
-from _hole_spec import DRILL_POINT_H, blind_cut_dia_mm  # noqa: E402
+# authored stations.  Hub and arm seat to one another at the shaft origin.
+from _hole_spec import THREAD_MAJOR_MM  # noqa: E402
 from build_crankshaft import (  # noqa: E402
-    SEAT_ARM as CS_SEAT_ARM,
     SEAT_PINION as CS_SEAT_PINION,
     SEAT_T12 as CS_SEAT_T12,
     SHAFT_LENGTH as CS_SHAFT_LENGTH,
 )
 
-CRANK_ARM_ORIGIN_Z = CRANK_ARM_Z0 + ARM_THICKNESS  # the arm origin's world z
 # Crank taper pin + keeper ring (ch11 p.14): pin axis along machine X through
-# the arm hub's mid-thickness (= the crankshaft's PIN_HOLE_HEIGHT above its
-# outboard end), big end PIN_PROUD outside the hub's -X face.
+# MHA-137's rear barrel and the crankshaft at station 12, behind the arm.
 from crank_pin_spec import (  # noqa: E402
     PIN_LENGTH as CRANK_PIN_LENGTH,
     RING_HOLE_DIA as PIN_RING_HOLE_DIA,
@@ -606,17 +706,19 @@ from build_fillister_screw import (  # noqa: E402
 
 CRANK_RING_ARM_CLEARANCE = 0.25
 PIN_PROUD = PIN_RING_HOLE_X + CRANK_RING_WIRE_DIA / 2.0 + CRANK_RING_ARM_CLEARANCE
-CRANK_PIN_Z = CRANK_ARM_Z0 + ARM_THICKNESS / 2.0  # -171: hub mid-thickness
-CRANK_PIN_X0 = X_CRANK - ARM_WIDTH / 2.0 - PIN_PROUD  # big end, -X of the hub
+CRANK_PIN_Z = CRANK_FACE_Z + PIN_HOLE_HEIGHT  # -169.4: behind the 8-mm arm
+CRANK_PIN_X0 = X_CRANK - HUB_BARREL_DIA / 2.0 - PIN_PROUD
 # The ring lies in machine YZ. Its straight local-Z leg is concentric with the
 # pin's machine-Z cross-hole; its bends and return hang toward machine -Y.
 CRANK_RING_Y = Y_CRANK
 if (PIN_RING_HOLE_DIA - CRANK_RING_WIRE_DIA) / 2.0 < 0.1:
     raise AssertionError("keeper-ring wire does not clear the crank-pin cross-hole")
 if abs((CRANKSHAFT_Z0 + PIN_HOLE_HEIGHT) - CRANK_PIN_Z) > 1e-6:
-    raise AssertionError("crankshaft cross-hole is not at the arm hub's mid-thickness")
-if CRANK_PIN_X0 + CRANK_PIN_LENGTH < X_CRANK + ARM_WIDTH / 2.0 + 2.0:
+    raise AssertionError("shaft and hub MHA-024 stations do not coincide")
+if CRANK_PIN_X0 + CRANK_PIN_LENGTH < X_CRANK + HUB_BARREL_DIA / 2.0 + 2.0:
     raise AssertionError("crank pin does not run out the far side of the hub")
+if abs(AXIAL_PIN_LENGTH - ARM_THICKNESS / 2.0) > 1e-9:
+    raise AssertionError("MHA-138 no longer has half-arm-thickness engagement")
 # Keeper-ring anchor (ch11 p.14): the arm's front (south, machine -z) face is
 # CRANK_ARM_Z0; arm local (x, y) -> machine (X_CRANK - y, Y_CRANK - x) (the
 # placed rows: local +x -> -Y, local +y -> -X). The brass eyelet lies flat on
@@ -634,22 +736,17 @@ EYE_CENTER_Y = ANCHOR_SCREW_XY[1] - (
     ANCHOR_SCREW_SHANK_DIA / 2.0 + ANCHOR_AIR + EYE_TAIL_LEN + EYE_LOOP_R
 )
 ANCHOR_THREAD_ENGAGEMENT = ANCHOR_HEAD_Z + ANCHOR_SCREW_SHANK_LEN - CRANK_ARM_Z0
-ANCHOR_BOTTOM_CLEARANCE = ANCHOR_HOLE_SPEC.depth_mm - ANCHOR_THREAD_ENGAGEMENT
-ANCHOR_BACK_WALL = ARM_THICKNESS - (
-    ANCHOR_HOLE_SPEC.depth_mm + blind_cut_dia_mm(ANCHOR_HOLE_SPEC) / 2.0 * DRILL_POINT_H
-)
-if ANCHOR_THREAD_ENGAGEMENT > ANCHOR_THREAD_DEPTH:
-    raise AssertionError("anchor screw bottoms in the crank arm's tap")
+# The #4-40 is tapped THRU the arm (rule 12, W7): nothing to bottom on; the
+# screw tip must stay short of the inboard face.
+ANCHOR_TIP_RESERVE = ARM_THICKNESS - ANCHOR_THREAD_ENGAGEMENT
+if ANCHOR_HOLE_SPEC.end != "through_all":
+    raise AssertionError("crank-arm anchor tap is no longer through the arm")
 if ANCHOR_THREAD_ENGAGEMENT < 2.0:
     raise AssertionError("anchor screw has under 2.0 thread engagement in the arm")
-if ANCHOR_BOTTOM_CLEARANCE < 0.5:
-    raise AssertionError("anchor screw has under 0.5 clearance to the drill shoulder")
-if ANCHOR_BACK_WALL < 0.5:
-    raise AssertionError("anchor tap drill leaves under 0.5 back-face wall")
-# = the plate's NORTH face (-167): the placed rows compose a Ry(180), so the
-# +z-extruded plate fills CRANK_ARM_Z0..here running machine -z from the
-# origin. Both the place_component z and the crankshaft's SeatArm datum
-# station (asserted below) use THIS value.
+if ANCHOR_TIP_RESERVE < 0.5:
+    raise AssertionError("anchor screw tip stands within 0.5 of the arm's inboard face")
+# The plate origin is its inboard face (-175): the Ry(180)-composed pose maps
+# the +z extrusion toward machine -z, filling the arm from -175 to -183.
 
 if abs(CS_SHAFT_LENGTH - CRANKSHAFT_LENGTH) > 1e-9:
     raise AssertionError("crankshaft part length does not cover the moved pinion")
@@ -657,8 +754,68 @@ if abs((CRANKSHAFT_Z0 + CS_SEAT_T12) - REMOVABLE_Z0) > 1e-6:
     raise AssertionError("crankshaft SeatT12 datum off the REMOVABLE_Z0 station")
 if abs((CRANKSHAFT_Z0 + CS_SEAT_PINION) - (PINION_TOOTH_Z - PINION_FACE / 2.0)) > 1e-6:
     raise AssertionError("crankshaft SeatPinion datum off the 16T station")
-if abs((CRANKSHAFT_Z0 + CS_SEAT_ARM) - CRANK_ARM_ORIGIN_Z) > 1e-6:
-    raise AssertionError("crankshaft SeatArm datum off the arm origin station")
+# Pinion retention pin (ch12 p.19): a plain 1/8 in straight pin through the
+# pinion's hub boss and the crankshaft, match-drilled at assembly. The hole is
+# on the pinion's local -X at the boss's mid-length; the crankshaft's hole is
+# turned PIN_CLOCKING_DEG so that, with the pinion seated rot_z(-seed), the two
+# holes are one. The pin lies along machine X through the shaft axis, flush
+# with the boss on both sides. crank_pinion_spec carries the seed as a literal
+# (the part build must not import this module), so it is proven equal HERE.
+from crank_pinion_spec import (  # noqa: E402
+    BOSS_DIA as PINION_BOSS_DIA,
+    FACE_WIDTH as PINION_SPEC_FACE,
+    OVERALL_LENGTH as PINION_OVERALL_LENGTH,
+    PIN_CLOCKING_DEG as PINION_PIN_CLOCKING_DEG,
+    PIN_DIA as PINION_PIN_DIA,
+    PIN_LENGTH as PINION_PIN_LENGTH,
+    FACE_WIDTH_PLACES as PINION_FACE_WIDTH_PLACES,
+    OVERALL_LENGTH_PLACES as PINION_OVERALL_LENGTH_PLACES,
+    SHAFT_LENGTH_PLACES as PINION_SHAFT_LENGTH_PLACES,
+    printed_deviations,
+    PIN_EDGE_MIN_WORST as PINION_PIN_EDGE_MIN_WORST,
+    PIN_EDGE_TO_SHAFT_END_NOMINAL as PINION_PIN_EDGE_NOMINAL,
+    PIN_STATION as PINION_PIN_STATION,
+    PIN_STATION_LAYOUT_ALLOWANCE_MM as PINION_PIN_LAYOUT_ALLOWANCE,
+    SEAT_FEELER_MM as PINION_SEAT_FEELER,
+    SEAT_GAP_MAX_MM as PINION_SEAT_GAP_MAX,
+    SHAFT_END_RECESS_MIN_WORST as PINION_RECESS_MIN_WORST,
+)
+from build_crankshaft import PINION_PIN_STATION_Y as CS_PINION_PIN_STATION  # noqa: E402
+
+PINION_Z0 = PINION_TOOTH_Z - PINION_FACE / 2.0  # pinion origin: toothed south face
+PINION_PIN_Z = PINION_Z0 + PINION_PIN_STATION  # -52.310
+# The pin's axis is the seated pinion's local X: rot_z(-seed) turns local +X to
+# machine (cos s, -sin s, 0). The pin part's +Z runs along that (ROT_Y_POS90
+# lays part +Z on machine +X, then the same rot_z(-seed) as the pinion), so
+# the pin origin sits on the boss's local -X wall, a half boss diameter back.
+PINION_PIN_U = (
+    math.cos(math.radians(PINION_SEED_DEG)),
+    -math.sin(math.radians(PINION_SEED_DEG)),
+    0.0,
+)
+PINION_PIN_ORIGIN = [
+    X_CRANK - PINION_PIN_LENGTH / 2.0 * PINION_PIN_U[0],
+    Y_CRANK - PINION_PIN_LENGTH / 2.0 * PINION_PIN_U[1],
+    PINION_PIN_Z,
+]
+if abs(PINION_SPEC_FACE - PINION_FACE) > 1e-9:
+    raise AssertionError("crank_pinion_spec.FACE_WIDTH disagrees with PINION_FACE")
+if abs(PINION_PIN_CLOCKING_DEG - PINION_SEED_DEG) > 1e-9:
+    raise AssertionError(
+        "crankshaft pin hole is clocked to a stale pinion seed: set "
+        f"crank_pinion_spec.PIN_CLOCKING_DEG = {PINION_SEED_DEG!r}"
+    )
+if abs((CRANKSHAFT_Z0 + CS_PINION_PIN_STATION) - PINION_PIN_Z) > 1e-6:
+    raise AssertionError("crankshaft pin hole station off the pinion's pin station")
+if abs(PINION_PIN_LENGTH - PINION_BOSS_DIA) > 1e-9:
+    raise AssertionError("pinion pin is not flush with the boss")
+_SHAFT_NORTH_END = CRANKSHAFT_Z0 + CS_SHAFT_LENGTH  # -46.2
+# Nominal recess of the shaft end inside the boss and the pin's wall to that
+# end; their worst cases are asserted once the seat gap is known (below).
+PINION_RECESS_NOMINAL = (PINION_Z0 + PINION_OVERALL_LENGTH) - _SHAFT_NORTH_END
+PINION_PIN_EDGE_NOMINAL_ACTUAL = _SHAFT_NORTH_END - (
+    PINION_PIN_Z + PINION_PIN_DIA / 2.0
+)
 
 # The whole cone set rides the SWING PLATFORM (ch.12 p.18: the dark wedge
 # plate labelled "pivot" at its tip end). The green pivot post (big-end
@@ -685,9 +842,9 @@ from build_cone_swing_platform import (  # noqa: E402
     HALF_WIDTH_N as PLAT_EAST_N,  # EAST taper line's north endpoint (12 --
     # the lock-slot side keeps its full seat; feeds the stop-screw/containment
     # east-edge math)
-    WEST_HALF_N as PLAT_WEST_N,  # WEST line's north endpoint (8.0, the
-    # trim; feeds ONLY the west-edge pedestal scan. Aliasing it into the east
-    # math shifted the derived stop point -- Codex catch, 2026-07-05)
+    WEST_HALF_N as PLAT_WEST_N,  # WEST line's north endpoint (the trim;
+    # feeds ONLY the west-edge sweep. Aliasing it into the east math shifted
+    # the derived stop point -- Codex catch, 2026-07-05)
     NORTH_OVERHANG as PLAT_OVERHANG,
     LOCK_HEAD_POST_CLEARANCE as PLAT_LOCK_HEAD_POST_CLEARANCE,
     CRANK_SEAT_ANCHOR as PLAT_SEAT_ANCHOR,
@@ -702,6 +859,23 @@ from build_cone_swing_platform import (  # noqa: E402
     WEST_HALF_S as PLAT_WEST_S,
 )
 from cone_swing_platform_spec import PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA  # noqa: E402
+from cone_swing_platform_spec import (  # noqa: E402
+    POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS,
+    POST_MOUNT_SPEC,
+    POST_MOUNT_TAP_EDGE_BREAK,
+    POST_MOUNT_THREAD_DIA,
+    PLATE_STOCK_BAND as PLAT_STOCK_BAND,
+)
+from cone_tip_shim_spec import (  # noqa: E402
+    SHIM_NORTH_Z as TIP_SHIM_NORTH_Z,
+    SHIM_SOUTH_Z as TIP_SHIM_SOUTH_Z,
+    SHIM_T as TIP_SHIM_T,
+    SHIM_X as TIP_SHIM_X,
+)
+from build_post_mount_screw import (  # noqa: E402
+    SHANK_LEN as POST_SCREW_LEN,
+    THREAD as POST_SCREW_THREAD,
+)
 from build_cone_lock_knob import (  # noqa: E402
     HEAD_DIA as KNOB_HEAD_DIA,
     WASHER_DIA as KNOB_WASHER_DIA,  # noqa: F401 - verify footprint contract
@@ -712,6 +886,7 @@ from build_cone_lock_knob import (  # noqa: E402
 )
 from build_cone_pivot_screw import (  # noqa: E402
     HEAD_DIA as PSCREW_HEAD_DIA,
+    HEAD_H as PSCREW_HEAD_H,
     SHOULDER_DIA as PSCREW_SHOULDER_DIA,
     SHOULDER_LEN as PSCREW_SHOULDER_LEN,
     THREAD as PSCREW_THREAD,
@@ -735,6 +910,9 @@ from build_harmonic_base import (  # noqa: E402
     LOCK_KNOB_XZ as BASE_LOCK_XZ,
     LOCK_SEAT_SPEC as BASE_LOCK_SEAT_SPEC,
     LOCK_STUD_ENGAGEMENT as BASE_LOCK_ENGAGEMENT,
+    PEDESTAL_SCREW_HOLE_DEPTH as BASE_PEDESTAL_HOLE_DEPTH,
+    PEDESTAL_SCREW_XZ as BASE_PEDESTAL_XZ,
+    PEDESTAL_SEAT_SPEC as BASE_PEDESTAL_SEAT_SPEC,
     PIVOT_SEAT_SPEC as BASE_PIVOT_SEAT_SPEC,
     PIVOT_SCREW_XZ as BASE_PIVOT_XZ,
     STOP_SEAT_SPEC as BASE_STOP_SEAT_SPEC,
@@ -742,16 +920,28 @@ from build_harmonic_base import (  # noqa: E402
     SWING_HARDWARE_GEOMETRY as BASE_SWING_HARDWARE,
     require_blind_seat_fit as require_base_seat_fit,
 )
+from build_harmonic_base import (  # noqa: E402
+    HOLE_XZ as BASE_HOLE_XZ,
+    NAMEPLATE_SCREW_XZ as BASE_NAMEPLATE_XZ,
+    SERIAL_HEIGHT_MM as BASE_SERIAL_HEIGHT,
+    SERIAL_XZ as BASE_SERIAL_XZ,
+)
+from frame_column_stations import COLUMN_SOCKET_DIAMETER  # noqa: E402
+from nameplate_spec import (  # noqa: E402
+    PLATE_HEIGHT as NAMEPLATE_HEIGHT,
+    PLATE_WIDTH as NAMEPLATE_WIDTH,
+    mount_point as nameplate_mount_point,
+)
 from harmonic_base_spec import (  # noqa: E402
+    COLUMN_SOCKET_XZ as BASE_COLUMN_SOCKET_XZ,
+    LIP_W as BASE_LIP_W,
     TOP_LENGTH as BASE_TOP_LENGTH,
     TOP_WIDTH as BASE_TOP_WIDTH,
 )
 from build_arbor_pedestal import (  # noqa: E402
-    FOOT_DEPTH as ARBOR_PED_DEPTH,
     FOOT_HEIGHT as ARBOR_PED_FLANGE_T,
     FOOT_WIDTH as ARBOR_PED_WIDTH,
     SCREW_Z as ARBOR_PED_SCREW_Z,
-    STRAP_T as ARBOR_PED_STRAP_T,
 )
 from arbor_pedestal_spec import SCREW_HOLE_SPEC as ARBOR_PED_HOLE_SPEC  # noqa: E402
 
@@ -759,16 +949,27 @@ from arbor_pedestal_spec import SCREW_HOLE_SPEC as ARBOR_PED_HOLE_SPEC  # noqa: 
 from build_alignment_pinion import (  # noqa: E402
     BORE_DIA as DRUM_BORE_DIA,
 )
-from build_pinion_arbor import (  # noqa: E402
+from pinion_arbor_spec import (  # noqa: E402
+    CROSSROD_MAX_CLEARANCE as ARBOR_CROSSROD_MAX_CLEARANCE,
+    CROSSROD_MIN_CLEARANCE as ARBOR_CROSSROD_MIN_CLEARANCE,
+    CROSS_HOLE_DIA as ARBOR_CROSS_HOLE_DIA,
+    RETAINING_COMPOUND_MAX_GAP_MM as ARBOR_BOND_MAX_GAP,
+    HEAD_CAP_SAG as ARBOR_HEAD_CAP_SAG,
+    HEAD_CENTER_Z as ARBOR_HEAD_CENTER_Z,
+    HEAD_DIA as ARBOR_HEAD_DIA,
+    HEAD_FRONT_Z as ARBOR_HEAD_FRONT_Z,
+    NECK_END_Z as ARBOR_NECK_END_Z,
+    PIN_Z as ARBOR_PIN_Z,
     SHAFT_DIA as ARBOR_DIA,
     SHAFT_LEN as ARBOR_LEN,
 )
+from pinion_arbor_collar_geometry import (  # noqa: E402
+    COLLAR_LEN as ARBOR_COLLAR_LEN,
+    COLLAR_OD as ARBOR_COLLAR_OD,
+    PIN_HOLE_Z as ARBOR_COLLAR_PIN_Z,
+)
 from pinion_bracket_geometry import (  # noqa: E402
     ARBOR_BORE as STRAP_ARBOR_BORE,
-    CAM_RELIEF_ENGAGED_CENTER as STRAP_CAM_RELIEF_ENGAGED,
-    CAM_RELIEF_ENVELOPE_RADIUS as STRAP_CAM_RELIEF_ENVELOPE_R,
-    CAM_RELIEF_PARK_CENTER as STRAP_CAM_RELIEF_PARK,
-    CAM_RELIEF_RADIUS as STRAP_CAM_RELIEF_R,
     C2C as STRAP_C2C,
     PIN_BORE as STRAP_PIN_BORE,
     PIN_DROP as FPIN_DROP,
@@ -777,21 +978,20 @@ from pinion_bracket_geometry import (  # noqa: E402
     R_END as STRAP_R_END,
     THICKNESS as STRAP_T,
 )
-from build_pinion_pivot_block import (  # noqa: E402
+from pinion_pivot_block_geometry import (  # noqa: E402
     BLOCK_DEPTH,
+    BLOCK_EAST,
     BLOCK_HEIGHT,
     BLOCK_WIDTH,
-    BORE_HALF_SPACING as BLOCK_BORE_HALF_SPACING,
     BORE_UP as BLOCK_BORE_UP,
     LIFT_BORE_RISE,
+    LIFT_BORE_SPACING,
     SCREW_HALF_SPACING as BLOCK_SCREW_HALF,
 )
-from pinion_pivot_block_spec import SCREW_HOLE_SPEC as BLOCK_SCREW_HOLE_SPEC  # noqa: E402
+from pinion_pivot_block_geometry import SCREW_HOLE_SPEC as BLOCK_SCREW_HOLE_SPEC  # noqa: E402
+import pinion_rig_layout as RIG  # noqa: E402
 from pinion_cam_geometry import (  # noqa: E402
     BORE as CAM_BORE_DIA,
-    BOSS_DIA as CAM_BOSS_DIA,
-    BOSS_PROUD as CAM_BOSS_PROUD,
-    BOSS_Z as CAM_BOSS_Z,
     CAM_LEN,
     CAM_OD,
     ECC as CAM_ECC,
@@ -805,33 +1005,39 @@ from pinion_cam_pin_geometry import (  # noqa: E402
 from pinion_lever_geometry import (  # noqa: E402
     CAP_SAG as LEVER_CAP_SAG,
     HUB_LEN as LEVER_HUB_LEN,
+    ROD_DIA as LEVER_ROD_DIA,
+    ROD_PIN_HOLE_FROM_END as LEVER_PIN_FROM_ROD_END,
     ROD_LEN as LEVER_ROD_LEN,
-    ROD_ROOT_DIA as LEVER_ROD_DIA,
-    ROD_TIP_DIA as LEVER_ROD_TIP_DIA,
     WALL_T as LEVER_WALL_T,
 )
-from pinion_handle_geometry import (  # noqa: E402
-    GRIP_DIA as HANDLE_GRIP_DIA,
-    GRIP_LEN as HANDLE_GRIP_LEN,
-    CAP_SAG as HANDLE_CAP_SAG,
-    ROD_DIA as HANDLE_ROD_DIA,
-    TUBE_ID as HANDLE_TUBE_ID,
-    TUBE_LEN as HANDLE_TUBE_LEN,
-    WALL_T as HANDLE_WALL_T,
-)
+from pinion_handle_geometry import ROD_DIA as HANDLE_ROD_DIA  # noqa: E402
 from pinion_spring_geometry import (  # noqa: E402
-    AXIS_OFFSET as SPRING_AXIS_OFF,
-    BLADE_TILT_DEG as SPR_BLADE_TILT_DEG,
+    BEND_EXIT as SPR_BEND_EXIT_L,
+    CONTACT_T as SPR_CONTACT_T,
+    CREST as SPR_CREST_L,
     FLAT_TIP as SPR_FLAT_TIP_L,
     FOOT_END as SPR_FOOT_END_L,
-    HOLE_FROM_END as SPR_HOLE_FROM_END,
+    FOOT_TAN as SPR_FOOT_TAN_L,
+    FORMED_BAND_MM as SPR_FORMED_BAND,
     HOLE_SPEC as SPR_HOLE_SPEC,
-    KINK_START as SPR_CREST_L,
+    HOLE_X as SPR_HOLE_X_L,
+    KINK_C as SPR_KINK_C_L,
+    KINK_DEG as SPR_KINK_DEG,
+    KINK_START as SPR_KINK_START_L,
+    PAD_LEN as SPR_PAD_LEN,
+    PAD_WIDTH as SPR_PAD_WIDTH,
+    PARKED_AIR as SPR_PARKED_AIR,
     PIVOT_LX as SPR_PIVOT_LX,
     PIVOT_LY as SPR_PIVOT_LY,
-    THICK as SPRING_T,
-    WIDTH as SPRING_W,
+    PRESET as SPR_PRESET,
+    R_KINK as SPR_R_KINK,
+    STRAP_HALF_WIDTH as SPR_STRAP_HALF_WIDTH,
+    STRAP_LEAN_DEG as SPR_STRAP_LEAN_DEG,
+    YIELD_MPA as SPR_YIELD_MPA,
+    contact_force as spr_contact_force,
+    root_stress as spr_root_stress,
 )
+from pinion_spring_section import THICK as SPRING_T, WIDTH as SPRING_W  # noqa: E402
 from build_slotted_screw import (  # noqa: E402
     HEAD_DIA as BSCREW_HEAD_DIA,
     SHANK_LEN as BSCREW_SHANK_LEN,
@@ -843,25 +1049,48 @@ from build_foot_screw import (  # noqa: E402
     SHANK_LEN as FSCREW_SHANK_LEN,
     THREAD as FSCREW_THREAD,
 )
+from build_pedestal_hold_down_screw import (  # noqa: E402
+    HEAD_DIA as HDSCREW_HEAD_DIA,
+    SHANK_DIA as HDSCREW_SHANK_DIA,
+    SHANK_LEN as HDSCREW_SHANK_LEN,
+    THREAD as HDSCREW_THREAD,
+)
 from build_cone_pivot_post import (  # noqa: E402
+    ATTACHMENT_CBORE_DEPTH as POST_CBORE_DEPTH,
+    ATTACHMENT_X as POST_ATTACHMENT_X,
     BLOCK_DIA as POST_BLOCK_DIA,
+    BLOCK_HEIGHT as POST_BLOCK_HEIGHT,
     BORE_HEIGHT as POST_BORE_HEIGHT,
     CONE_BOSS_LENGTH as POST_CONE_BOSS_LENGTH,
     CRANK_BORE_HEIGHT as POST_CRANK_Y,
     CRANK_BOSS_LENGTH as POST_CRANK_BOSS_LENGTH,
     CRANK_BOSS_START_Z as POST_CRANK_BOSS_START_Z,
 )
+from cone_pivot_post_spec import (  # noqa: E402
+    JOURNAL_AXIS_HEIGHT_TOLERANCE_MM as POST_JOURNAL_AXIS_HEIGHT_TOLERANCE_MM,
+)
 from cone_tip_block_spec import (  # noqa: E402
     ADJUSTER_BORE_SPEC as TIP_ADJ_BORE_SPEC,
     ADJUSTER_AXIS_HEIGHT as TIP_ADJUSTER_AXIS_HEIGHT,
-    ADJUSTER_DEPTH as TIP_ADJ_BORE_DEPTH,
+    ADJUSTER_EMBED as TIP_ADJ_EMBED,
+    ADJUSTER_EMBED_WINDOW as TIP_ADJ_EMBED_WINDOW,
     BLOCK_X as TIP_BLOCK_X,
     BLOCK_Z as TIP_BLOCK_Z,
+    FIT_UP_SHIM_MARGIN_MM as TIP_FIT_UP_SHIM_MARGIN_MM,
+    FLANGE_LEN as TIP_FLANGE_LEN,
+    FOOT_SHIM_RANGE_MM as TIP_FOOT_SHIM_RANGE,
+    HEEL_RELIEF_DEPTH as TIP_HEEL_RELIEF_DEPTH,
+    HEEL_RELIEF_HEIGHT as TIP_HEEL_RELIEF_HEIGHT,
+    PASSAGE_CENTER_DATUM as TIP_PASSAGE_CENTER_DATUM,
     PINCH_BORE_SPEC as TIP_PINCH_BORE_SPEC,
     PINCH_CLEARANCE_SPEC as TIP_PINCH_CLEARANCE_SPEC,
     PINCH_HEIGHT as TIP_PINCH_Y,
+    PINCH_SCREW_LENGTH as TIP_PINCH_SCREW_LENGTH,
+    PINCH_SCREW_SKU as TIP_PINCH_SCREW_SKU,
     SHAFT_PASSAGE_DIA as TIP_SHAFT_PASSAGE_DIA,
-    SLIT_W as TIP_SLIT_W,
+    SHIM_NOMINAL as TIP_SHIM_NOMINAL,
+    WORST_PINCH_FAR_WALL_MM as TIP_WORST_PINCH_FAR_WALL_MM,
+    worst_half_widths_mm as tip_worst_half_widths_mm,
 )
 from build_cone_tip_bushing import (  # noqa: E402
     BORE_DIA as BUSH_BORE_DIA,
@@ -875,9 +1104,11 @@ from build_cone_tip_adjuster import (  # noqa: E402
 )
 from build_cone_tip_pinch_screw import (  # noqa: E402
     SHANK_LEN as PINCH_SHANK_LEN,
+    SKU as PINCH_SKU,
     THREAD as PINCH_THREAD,
 )
 from cone_gear_shaft_spec import (  # noqa: E402
+    DRAWING_PRECISION_BY_NAME as SHAFT_DRAWING_PRECISION,
     ADJUSTER_EMBED as ADJ_EMBED,
     FRONT_STUB as SHAFT_FRONT_STUB,
     SECTIONS as SHAFT_SECTIONS,
@@ -913,51 +1144,146 @@ PIVOT_STATION = TIP_BLOCK_STATION + 11.0
 # thickness under each foot + bore height = 54 above the base top.
 if (
     abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + POST_BORE_HEIGHT)) > 1e-9
-    or abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + TIP_ADJUSTER_AXIS_HEIGHT)) > 1e-9
+    or abs(
+        (Y_DRIVE - Y_BASE_TOP) - (PLAT_T + TIP_SHIM_NOMINAL + TIP_ADJUSTER_AXIS_HEIGHT)
+    )
+    > 1e-9
 ):
     raise AssertionError("cone axis height drifted between platform/post/block")
+# r3: the tip block's fit-up shim takes up its printed AxisHeight band plus a
+# margin for this side's terms: the pivot post sets the shaft's height, its
+# cone-axis height held to its named symmetric band.  The plate top is
+# common to both riders and cancels.
+if POST_JOURNAL_AXIS_HEIGHT_TOLERANCE_MM > TIP_FIT_UP_SHIM_MARGIN_MM:
+    raise AssertionError("the tip-block shim margin no longer covers the post's axis-height band")
+# U30 stack (I24): PlateTop | MHA-141 shim pack | block foot. The shim is
+# modelled at the nominal pack and covers the block's foot face exactly -- the
+# full width, from the I31 foot flange's south end to the heel relief's inner
+# face -- so the foot rests on it across the whole face and nothing reaches
+# under the pivot-screw head the relief clears.
+if abs(TIP_SHIM_T - TIP_SHIM_NOMINAL) > 1e-9:
+    raise AssertionError("MHA-141 shim thickness differs from the block's nominal pack")
+if (
+    abs(TIP_SHIM_X - TIP_BLOCK_X) > 1e-9
+    or abs(TIP_SHIM_SOUTH_Z - (-TIP_BLOCK_Z / 2.0 - TIP_FLANGE_LEN)) > 1e-9
+    or abs(TIP_SHIM_NORTH_Z - (TIP_BLOCK_Z / 2.0 - TIP_HEEL_RELIEF_DEPTH)) > 1e-9
+):
+    raise AssertionError("MHA-141 shim footprint differs from the tip block foot face")
+# U30 post mount (I22): each MHA-142 seats on the MHA-016 counterbore floor and
+# is cut to fit into the MHA-091 tap: never proud of the plate underside, and
+# at least 0.90D of thread (U37c/U41's named exception to rule 12) both at the
+# modelled cut length and at the platform spec's printed worst case.
+_require_tapped_thread("cone-post mount", POST_SCREW_THREAD, POST_MOUNT_SPEC)
+POST_SCREW_SEAT = POST_BLOCK_HEIGHT - POST_CBORE_DEPTH  # above PlateTop
+POST_SCREW_INTO_PLATE = POST_SCREW_LEN - POST_SCREW_SEAT
+if POST_SCREW_INTO_PLATE > PLAT_T:
+    raise AssertionError("MHA-142 stands proud of the MHA-091 underside")
+if (
+    POST_SCREW_INTO_PLATE - 2.0 * POST_MOUNT_TAP_EDGE_BREAK
+    < 0.90 * POST_MOUNT_THREAD_DIA
+    or POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS < 0.90
+):
+    raise AssertionError("MHA-142 engages the MHA-091 tap under 0.90D")
 # The shaft is placed by its front stub end; keep the station in lockstep with
 # the part's FRONT_STUB.
 if abs(SHAFT_FRONT_STATION + SHAFT_FRONT_STUB) > 1e-9:
     raise AssertionError("SHAFT_FRONT_STATION out of sync with the shaft FRONT_STUB")
 
 
-def _plat_half_width(s: float) -> float:
-    """Platform MIN half-width at cone station s: the narrower of the east
-    taper and the west flare (the west-tip trim makes the WEST side the
-    narrow one near the north end -- 8 vs 12); negative if s is off the
-    plate. Riders are centred on the shaft plan line (local x 0), so the
-    narrower side at each station bounds their containment."""
+def _plat_side_half_widths(s: float) -> dict[str, float]:
+    """The plate's own east (+X) and west (-X) half-widths at cone station
+    ``s``; both negative if s is off the plate, so a rider run past either
+    end fails its containment check instead of reading extrapolated edges."""
     z_local = s - PIVOT_STATION  # platform local z (+ along increasing station)
     if not (PLAT_OVERHANG - PLAT_LEN - 1e-9 <= z_local <= PLAT_OVERHANG + 1e-9):
-        return -1.0
+        return {"+X": -1.0, "-X": -1.0}
     frac = (PLAT_OVERHANG - z_local) / PLAT_LEN
-    east = PLAT_EAST_N + (PLAT_EAST_S - PLAT_EAST_N) * frac
-    west = PLAT_WEST_N + (PLAT_WEST_S - PLAT_WEST_N) * frac
-    return min(east, west)
+    return {
+        "+X": PLAT_EAST_N + (PLAT_EAST_S - PLAT_EAST_N) * frac,
+        "-X": PLAT_WEST_N + (PLAT_WEST_S - PLAT_WEST_N) * frac,
+    }
+
+
+def _plat_half_width(s: float) -> float:
+    """Platform MIN half-width at cone station s: the narrower of the east
+    taper and the west flare (the WEST side is the narrow one near the north
+    end -- WEST_HALF_N vs HALF_WIDTH_N); negative if s is off the
+    plate. Riders are centred on the shaft plan line (local x 0), so the
+    narrower side at each station bounds their containment."""
+    return min(_plat_side_half_widths(s).values())
 
 
 # Both riders stand fully ON the plate (plan, in the platform's own inclined
 # frame: both are centred on the shaft-axis plan line, so only the along-axis
-# span and the half-width at each end matter).
-for _lbl, _s0, _hx, _hz in (
-    ("pivot post", POST_STATION, POST_BLOCK_DIA / 2.0, POST_BLOCK_DIA / 2.0),
-    ("tip block", TIP_BLOCK_STATION, TIP_BLOCK_X / 2.0, TIP_BLOCK_Z / 2.0),
-):
-    for _end in (_s0 - _hz, _s0 + _hz):
-        if _plat_half_width(_end) < _hx + 0.25:
+# span and the half-width at each end matter), each face at least
+# PLATFORM_CONTAINMENT_FLOOR_MM inside the plate's edge.
+PLATFORM_CONTAINMENT_FLOOR_MM = 0.25
+# Each rider's foot: label -> (south station, north station, half-width).
+PLATFORM_RIDER_SPANS: dict[str, tuple[float, float, float]] = {
+    "pivot post": (
+        POST_STATION - POST_BLOCK_DIA / 2.0,
+        POST_STATION + POST_BLOCK_DIA / 2.0,
+        POST_BLOCK_DIA / 2.0,
+    ),
+    # I31: the block's foot runs FLANGE_LEN further south as its flange.
+    "tip block": (
+        TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0 - TIP_FLANGE_LEN,
+        TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0,
+        TIP_BLOCK_X / 2.0,
+    ),
+}
+for _lbl, (_south, _north, _hx) in PLATFORM_RIDER_SPANS.items():
+    for _end in (_south, _north):
+        if _plat_half_width(_end) < _hx + PLATFORM_CONTAINMENT_FLOOR_MM:
             raise AssertionError(
                 f"{_lbl} overhangs the swing platform at station {_end:g}"
             )
-# The shaft's tip reaches through the block to the adjuster cup (>= 5 inside
-# the block envelope, end short of the north face).
+
+
+# r3 (Main, 2026-09-25): the tip block also stands on the plate at its PRINT's
+# worst case.  Its two side faces sit asymmetrically there -- PassageCenter
+# (.XX) locates the adjuster axis, which the shaft puts on the plan line, from
+# one face and the width's .X band lands on the other -- so each face is held
+# against its own plate edge, the block's +X (pinch-head) face against the
+# east edge and its -X face against the trimmed west one, with the nominal
+# contract's PLATFORM_CONTAINMENT_FLOOR_MM plus TIP_PRINT_WORST_MARGIN_MM,
+# from the body's north face
+# to the foot flange's south end (the flange is the block's full width, and
+# the plate's edges run straight between those stations).
+TIP_PRINT_WORST_MARGIN_MM = 0.25
+
+
+def tip_block_print_worst_containment_mm(half_widths: dict[str, float]) -> float:
+    """Least plate edge left outside the block's side faces, over its whole
+    footprint, given each face's worst distance from the adjuster axis; raise
+    if it is under the floor plus the print-worst margin."""
+    margins = [
+        _plat_side_half_widths(end)[face] - half_widths[face]
+        for end in (
+            TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0 - TIP_FLANGE_LEN,
+            TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0,
+        )
+        for face in ("+X", "-X")
+    ]
+    margin = min(margins)
+    if margin < PLATFORM_CONTAINMENT_FLOOR_MM + TIP_PRINT_WORST_MARGIN_MM - 1e-9:
+        raise AssertionError(
+            f"tip block can overhang the swing platform at its printed limits: "
+            f"{margin:.3f} left (< {PLATFORM_CONTAINMENT_FLOOR_MM} + "
+            f"{TIP_PRINT_WORST_MARGIN_MM})"
+        )
+    return margin
+
+
+TIP_PRINT_WORST_CONTAINMENT_MM = tip_block_print_worst_containment_mm(
+    tip_worst_half_widths_mm(TIP_PASSAGE_CENTER_DATUM)
+)
+# Where the tip ends is owned by the end-play stack below: it sits on the
+# adjuster's cup apex, and the cup rim stays inside the adjuster's working
+# window.  (The former ">= 5 inside the block" floor was the tip-JOURNAL
+# engagement of ada675b1, when the block was the tip bearing; f4462091 moved
+# radial support to the brass bushing and left the number behind.)
 _TIP_END_STATION = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-1][1]
-if not (
-    TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0 + 5.0
-    <= _TIP_END_STATION
-    <= TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 - 0.5
-):
-    raise AssertionError("shaft tip end does not reach the tip-block adjuster")
 # The stub end stands 1.0 mm proud of the post's inclined journal face.
 _STUB_END_Z = cone_station(SHAFT_FRONT_STATION)[2]
 _POST_SOUTH_STATION = POST_STATION - POST_CONE_BOSS_LENGTH / 2.0
@@ -969,31 +1295,51 @@ if SHAFT_FRONT_STATION > _POST_SOUTH_STATION - 1.0 + 1e-9:
     )
 # --- tip end-play stack (item 5, v4_t00471 / 7:49) ---------------------------
 # Along the axis, south to north: T006 gear | brass bushing | block | shaft tip
-# | the 94025A150 adjuster's conical cup. The adjusted 1/16-in shaft terminal
-# meets the vendor cup apex while the full 6 mm of 5/16-18 thread remains in
-# the block; the top slit and 90280A108 pinch screw lock that setting.
+# | the 94025A164 adjuster's conical cup, its #10-32 thread tapped through the
+# block (rule-12 E11/W1). The shaft's flat 1/16-in end cannot reach the cup
+# apex: it seats on the ring where its end edge meets the cone wall,
+# ADJ_SEAT_DEPTH short of the apex (end radius / tan of the vendor cup's
+# half-angle). The adjuster therefore backs out from the nominal ADJ_EMBED by
+# that depth (Main ruling 2026-09-23; burying the apex left 1.05 mm^3 of
+# overlap once the journal grew from 1/32 in). The top slit and 91794A112 pinch
+# screw lock that setting.
 TIP_SOUTH_STATION = TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0
 BUSH_STATION = T006_NORTH_FACE
-ADJ_HEAD_STATION = TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 + (ADJ_LEN - ADJ_EMBED)
+_STUB_DIA = SHAFT_SECTIONS[-1][0] * 25.4
+ADJ_CUP_HALF_ANGLE = math.atan((ADJ_CUP_DIA / 2.0) / ADJ_CUP_DEPTH)
+ADJ_SEAT_DEPTH = (_STUB_DIA / 2.0) / math.tan(ADJ_CUP_HALF_ANGLE)
+ADJ_THREAD_ENGAGEMENT = ADJ_EMBED - ADJ_SEAT_DEPTH
+ADJ_HEAD_STATION = (
+    TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 + (ADJ_LEN - ADJ_THREAD_ENGAGEMENT)
+)
 _ADJ_CUP_RIM = ADJ_HEAD_STATION - ADJ_LEN
 _ADJ_CUP_APEX = _ADJ_CUP_RIM + ADJ_CUP_DEPTH
-_STUB_DIA = SHAFT_SECTIONS[-1][0] * 25.4
 _STUB_START = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-2][1]
-if BUSH_STATION < _STUB_START + 1.0:
-    raise AssertionError("tip bushing rides off the 1/16in tip journal")
+# tip_stub_radially_supported: the brass bushing is the tip's only radial
+# bearing, so its whole length rides the stub section on a matching bore.
+if not (
+    _STUB_START + 1.0 <= BUSH_STATION
+    and BUSH_STATION + BUSH_LEN <= _TIP_END_STATION
+):
+    raise AssertionError("tip stub is not radially supported: bushing rides off the stub")
 if abs(BUSH_BORE_DIA - _STUB_DIA) > 0.05:
     raise AssertionError("tip-bushing bore does not match the tip stub dia")
 _require_tapped_thread("cone-tip adjuster", ADJ_THREAD, TIP_ADJ_BORE_SPEC)
-if ADJ_EMBED > TIP_ADJ_BORE_DEPTH - 0.5:
-    raise AssertionError("adjuster bottoms out in the block tapped hole")
+# adjuster_cup_in_working_window: the fit-up embed is the block spec's.
+if ADJ_EMBED != TIP_ADJ_EMBED or not (
+    TIP_ADJ_EMBED_WINDOW[0] <= ADJ_EMBED <= TIP_ADJ_EMBED_WINDOW[1]
+):
+    raise AssertionError("adjuster cup rim is outside its working window")
 if not 0.0 < ADJ_CUP_DEPTH < ADJ_LEN:
     raise AssertionError("adjuster cup depth is outside the stock body")
 if ADJ_CUP_DIA < _STUB_DIA + 0.25:
     raise AssertionError("adjuster cup rim is too tight around the tip stub")
-if abs(_TIP_END_STATION - _ADJ_CUP_APEX) > 1e-6:
+if not 0.0 < ADJ_SEAT_DEPTH < ADJ_CUP_DEPTH:
+    raise AssertionError("shaft end does not seat on the adjuster cup wall")
+if abs(_TIP_END_STATION + ADJ_SEAT_DEPTH - _ADJ_CUP_APEX) > 1e-6:
     raise AssertionError(
-        f"shaft tip {_TIP_END_STATION:.6f} does not contact vendor cup apex "
-        f"{_ADJ_CUP_APEX:.6f}"
+        f"shaft tip {_TIP_END_STATION:.6f} does not seat on the vendor cup wall "
+        f"{ADJ_SEAT_DEPTH:.6f} short of its apex {_ADJ_CUP_APEX:.6f}"
     )
 if TIP_SHAFT_PASSAGE_DIA < _STUB_DIA + 0.25:
     raise AssertionError("tip-block passage too tight around the shaft tip")
@@ -1002,9 +1348,19 @@ _require_tapped_thread("cone-tip pinch far jaw", PINCH_THREAD, TIP_PINCH_BORE_SP
 _require_clearance_size(
     "cone-tip pinch near jaw", PINCH_THREAD, TIP_PINCH_CLEARANCE_SPEC
 )
-_PINCH_NEAR_JAW = (TIP_BLOCK_X - TIP_SLIT_W) / 2.0
-if PINCH_SHANK_LEN - _PINCH_NEAR_JAW < 1.5:
-    raise AssertionError("pinch screw lacks 1.5 mm far-jaw thread engagement")
+# r3: the screw threads only into the FAR jaw, from the slit's far wall on,
+# and that wall stands at most WORST_PINCH_FAR_WALL_MM from the head's (+X)
+# face at the printed limits; the placed screw must be the one the block's
+# stack was sized for.
+if PINCH_SKU != TIP_PINCH_SCREW_SKU or abs(PINCH_SHANK_LEN - TIP_PINCH_SCREW_LENGTH) > 1e-9:
+    raise AssertionError(
+        f"placed pinch screw {PINCH_SKU} ({PINCH_SHANK_LEN}) is not the tip "
+        f"block's {TIP_PINCH_SCREW_SKU} ({TIP_PINCH_SCREW_LENGTH})"
+    )
+if PINCH_SHANK_LEN - TIP_WORST_PINCH_FAR_WALL_MM < 1.5 * THREAD_MAJOR_MM[PINCH_THREAD]:
+    raise AssertionError(
+        "pinch screw lacks 1.5D of far-jaw thread at the printed worst case"
+    )
 # The crank pedestal is GONE as a separate base-mounted part: the cone pivot
 # post and the crank pedestal are ONE green column riding the swing platform
 # (user-confirmed vs v4_t00411/t00417), so the crank rig swings with the cone
@@ -1057,21 +1413,117 @@ _T12_NORTH = REMOVABLE_Z0 + 5.0
 _PINION_SOUTH = PINION_TOOTH_Z - PINION_FACE / 2.0
 _BOSS_SOUTH_GAP = _POST_BOSS_SOUTH - _T12_NORTH
 _BOSS_NORTH_GAP = _PINION_SOUTH - _POST_BOSS_NORTH
+# The 16T's south face seats against the post boss's north face across this
+# gap (low, high): the pinion is set on the feeler at the floor, and the gap
+# may open to the ceiling before the pinion is re-set.
+PINION_BOSS_NORTH_GAP_RANGE = (PINION_SEAT_FEELER, PINION_SEAT_GAP_MAX)
+_GAP_LO, _GAP_HI = PINION_BOSS_NORTH_GAP_RANGE
 if min(_BOSS_SOUTH_GAP, _BOSS_NORTH_GAP) < 0.25:
     raise AssertionError("v2 crank boss does not clear its axial hardware")
 # Keep both independently derived gaps visible to import-time geometry checks.
 if not 10.0 < _BOSS_SOUTH_GAP < 10.5:
     raise AssertionError("v2 crank boss south/T12 clearance left its derived band")
-if not 0.24 < _BOSS_NORTH_GAP < 1.0:
+if not (
+    _GAP_LO - 1e-6
+    <= _BOSS_NORTH_GAP
+    < _GAP_HI
+):
     raise AssertionError("v2 crank boss north/pinion clearance left its derived band")
-if abs(PINION_TOOTH_Z - _GEAR64_CONTACT_Z) > 0.05:
-    raise AssertionError("16T is no longer centred on the 64T contact row")
+
+
+# Every length term below is what an ACCEPTED part may be: the sheet's printed
+# nominal (the model rounded to its printed places) under the band that sheet
+# prints for it -- the title block's metric row, or the dimension's own band --
+# never the inch grade behind the row (Codex P2 on #892).
+_SHAFT_LENGTH_LIMITS = deviations(CRANKSHAFT_LENGTH_BAND)  # (lower, upper)
+
+
+def pinion_pin_edge_stack(
+    edge_nominal: float, shaft_length: float, pinion_overall_length: float
+) -> dict[str, float]:
+    """W15's worst-case wall from the 16T pin hole to the shaft's north end.
+
+    Each term comes from the source that owns it: the shaft printed at its
+    lower limit (crankshaft_spec), the seat gap opening from its nominal to the
+    range's ceiling (the pinion, and its pin, move north), the boss mid-length
+    the pin is laid out at moving north with a long face and overall length
+    (each at its printed row), the laid-out station's allowance
+    (crank_pinion_spec), and the title block's drilled-hole oversize on the
+    pin's radius.
+    """
+    shaft_lower, _ = printed_deviations(
+        shaft_length, PINION_SHAFT_LENGTH_PLACES, _SHAFT_LENGTH_LIMITS
+    )
+    _, face_upper = printed_deviations(PINION_FACE, PINION_FACE_WIDTH_PLACES)
+    _, overall_upper = printed_deviations(pinion_overall_length, PINION_OVERALL_LENGTH_PLACES)
+    return {
+        "nominal": edge_nominal,
+        "shaft length": shaft_lower,
+        "seat gap": -(_GAP_HI - _BOSS_NORTH_GAP),
+        "boss mid-length": -(face_upper + overall_upper) / 2.0,
+        "pin layout": -PINION_PIN_LAYOUT_ALLOWANCE,
+        "drill oversize": -float(_config.title_block("drilled_hole")["plus_mm"]) / 2.0,
+    }
+
+
+def pinion_recess_stack(
+    recess_nominal: float, shaft_length: float, pinion_overall_length: float
+) -> dict[str, float]:
+    """W15's worst-case recess of the shaft end inside the 16T boss.
+
+    A pinion at its printed lower limit, a seat gap closing from its nominal to
+    the range's floor, and a shaft at its printed upper limit each bring the
+    shaft end out toward the boss face.
+    """
+    overall_lower, _ = printed_deviations(pinion_overall_length, PINION_OVERALL_LENGTH_PLACES)
+    _, shaft_upper = printed_deviations(
+        shaft_length, PINION_SHAFT_LENGTH_PLACES, _SHAFT_LENGTH_LIMITS
+    )
+    return {
+        "nominal": recess_nominal,
+        "pinion overall length": overall_lower,
+        "seat gap": -(_BOSS_NORTH_GAP - _GAP_LO),
+        "shaft length": -shaft_upper,
+    }
+
+
+def _stack_text(stack: dict[str, float]) -> str:
+    terms = ", ".join(f"{name} {value:+.3f}" for name, value in stack.items())
+    return f"{terms} = {sum(stack.values()):.3f}"
+
+
+if PINION_PIN_EDGE_NOMINAL_ACTUAL < PINION_PIN_EDGE_NOMINAL - 1e-6:
+    raise AssertionError(
+        f"16T pin wall to the shaft end {PINION_PIN_EDGE_NOMINAL_ACTUAL:.3f} is under "
+        f"its {PINION_PIN_EDGE_NOMINAL} nominal"
+    )
+PINION_PIN_EDGE_STACK = pinion_pin_edge_stack(
+    PINION_PIN_EDGE_NOMINAL_ACTUAL, CS_SHAFT_LENGTH, PINION_OVERALL_LENGTH
+)
+if sum(PINION_PIN_EDGE_STACK.values()) < PINION_PIN_EDGE_MIN_WORST:
+    raise AssertionError(
+        f"16T pin wall to the shaft end, worst case: "
+        f"{_stack_text(PINION_PIN_EDGE_STACK)} < {PINION_PIN_EDGE_MIN_WORST}"
+    )
+PINION_RECESS_STACK = pinion_recess_stack(
+    PINION_RECESS_NOMINAL, CS_SHAFT_LENGTH, PINION_OVERALL_LENGTH
+)
+if sum(PINION_RECESS_STACK.values()) < PINION_RECESS_MIN_WORST:
+    raise AssertionError(
+        f"crankshaft end recess inside the 16T boss, worst case: "
+        f"{_stack_text(PINION_RECESS_STACK)} < {PINION_RECESS_MIN_WORST}"
+    )
+if abs(
+    (PINION_TOOTH_Z - PINION_FACE / 2.0)
+    - (_GEAR64_CONTACT_Z - PINION_FACE_STATION_REFERENCE / 2.0)
+) > 0.05:
+    raise AssertionError("16T south face left its 64T-row reference station")
 
 # The relocated v2 crank axis also clears the inclined T120 rim radially. Keep
 # the exact arc scan as a tripwire: if a later diameter/station change restores
 # radial overlap, the pinion's north face must retain 0.25 mm axial air.
 _T120_SEAT = cone_station(SHAFT_T120_STATION + GEAR_AXIS_SHIFT)
-_TIP120 = CONE_T120_PITCH_R + ADDENDUM
+_TIP120 = _cone_tip_radius_max(120)
 _T120_SOUTH = math.inf  # no radial overlap -> no T120 bound at all
 for _k in range(7200):
     _c = _TIP120 * math.cos(math.radians(0.05 * _k))
@@ -1126,14 +1578,51 @@ _require_tapped_thread(
     "cone pivot", PSCREW_THREAD, BASE_PIVOT_SEAT_SPEC, kind="tapped_bottoming"
 )
 require_base_seat_fit("cone pivot", BASE_PIVOT_SEAT_SPEC, PSCREW_THREAD_TAIL_LEN)
-# The pivot-screw head sits on the plate top at station PIVOT_STATION; the
-# tip block (also on the plate) ends at station 191.  The stock 3/8-in head
-# retains at least 0.20 mm air to its north face.
-if (
-    PSCREW_HEAD_DIA / 2.0
-    > (PIVOT_STATION - (TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0)) - 0.20
+# I31 heel relief, judged at the worst case: the pivot-screw head stands on
+# its shoulder at station PIVOT_STATION, only HEEL_NOMINAL_GAP off the block's
+# north face.  At fit-up the block's north face follows the shaft tip (the
+# cup seats at a fixed embed from that face), so it can come north by the
+# shaft's overall-length band (Sec4End); the head floats in the plate's pivot
+# hole (drilled band on the hole, stock shoulder).  The relief must clear the
+# head by HEEL_AIR in plan at that extreme, and in height from the lowest foot
+# (thinnest stock plate, thinnest shim stack) to the head top.  The block
+# spec's printed .XX values must cover both, at their own low limits, and be
+# sized from them (no oversize past one .XX band, rounded up).
+_GENERAL_1PL_MM = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
+_GENERAL_2PL_MM = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+_DRILLED_HOLE_PLUS_MM = float(
+    str(_config.title_block("drilled_hole")["display_plus"]).lstrip("+")
+)
+_BAND_BY_PLACES = {1: _GENERAL_1PL_MM, 2: _GENERAL_2PL_MM}
+HEEL_AIR = 0.20
+HEEL_NOMINAL_GAP = (
+    PIVOT_STATION - (TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0)
+) - PSCREW_HEAD_DIA / 2.0
+HEEL_TIP_TRAVEL = _BAND_BY_PLACES[SHAFT_DRAWING_PRECISION["Sec4End"]]
+HEEL_HEAD_FLOAT = (
+    PLAT_PIVOT_HOLE_DIA + _DRILLED_HOLE_PLUS_MM - PSCREW_SHOULDER_DIA
+) / 2.0
+HEEL_DEPTH_REQUIRED = HEEL_TIP_TRAVEL + HEEL_HEAD_FLOAT + HEEL_AIR - HEEL_NOMINAL_GAP
+HEEL_HEIGHT_REQUIRED = (
+    (PSCREW_SHOULDER_LEN + PSCREW_HEAD_H)
+    - (PLAT_T - PLAT_STOCK_BAND + TIP_FOOT_SHIM_RANGE[0])
+    + HEEL_AIR
+)
+for _lbl, _printed, _required in (
+    ("depth", TIP_HEEL_RELIEF_DEPTH, HEEL_DEPTH_REQUIRED),
+    ("height", TIP_HEEL_RELIEF_HEIGHT, HEEL_HEIGHT_REQUIRED),
 ):
-    raise AssertionError("pivot-screw head reaches the tip block's north face")
+    if _printed - _GENERAL_2PL_MM < _required - 1e-9:
+        raise AssertionError(
+            f"tip-block heel relief {_lbl} {_printed:.2f} .XX does not clear the "
+            f"pivot-screw head at the worst case (needs {_required:.3f} at its "
+            "low limit)"
+        )
+    if _printed > math.ceil((_required + _GENERAL_2PL_MM) * 100.0 - 1e-6) / 100.0:
+        raise AssertionError(
+            f"tip-block heel relief {_lbl} {_printed:.2f} is not sized from the "
+            f"worst-case stack ({_required:.3f} + .XX band)"
+        )
 
 
 # --- cone lock knob and swing stop -------------------------------------------
@@ -1162,7 +1651,7 @@ require_lock_seat_fit(BASE_LOCK_SEAT_SPEC, PLAT_T, KNOB_STUD_LEN)
 # the real solids must therefore have clearance at every tooth phase.
 _KNOB_GEAR_CLEARANCE = 0.25
 _KNOB_R = KNOB_HEAD_DIA / 2.0
-_GEAR64_TIP_R = R64 + 25.4 / DP_CRANK
+_GEAR64_TIP_R = R64 + ADD16
 if (
     math.hypot(KNOB_X - GEAR64_SEAT[0], KNOB_Z - GEAR64_SEAT[2])
     - _KNOB_R
@@ -1171,7 +1660,7 @@ if (
 ):
     raise AssertionError("cone-lock knob head crowds the 64T crank-drive gear")
 for _j in range(20):
-    _cone_tip_r = CONE_T120_PITCH_R - RADIUS_STEP * _j + ADDENDUM
+    _cone_tip_r = _cone_tip_radius_max(120 - 6 * _j)
     _cone_x, _cone_z = cone_seat(_j)
     if (
         math.hypot(KNOB_X - _cone_x, KNOB_Z - _cone_z) - _KNOB_R - _cone_tip_r
@@ -1233,74 +1722,188 @@ _ARB_Z_BANDS = (
     # NORTH one runs at the repository's 0.25 mm interference-design floor;
     # ch12 img09 shows the real clamp hugging the plate edge, and the p1 swing
     # moves the plate away from it.
-    (
-        (
-            -ARBOR_PEDESTAL_Z - ARBOR_PED_DEPTH / 2.0,
-            -ARBOR_PEDESTAL_Z + ARBOR_PED_DEPTH / 2.0,
-        ),
-        2.0,
-    ),  # -63.085..-47.085
-    (
-        (
-            ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0,
-            ARBOR_PEDESTAL_NORTH_Z + ARBOR_PED_DEPTH / 2.0,
-        ),
-        0.25,
-    ),
+    (ARBOR_PED_SOUTH_Z_BAND, 2.0),
+    (ARBOR_PED_NORTH_Z_BAND, 0.25),
 )
 _EDGE_X_INTERCEPT = PLAT_WEST_N + _K_W * PLAT_OVERHANG
-_EDGE_WORLD_Z_BASE = _PPIVOT[2] - _EDGE_X_INTERCEPT * SIN_I
-_EDGE_WORLD_Z_SLOPE = COS_I + _K_W * SIN_I
-_EDGE_WORLD_X_BASE = _PPIVOT[0] + _EDGE_X_INTERCEPT * COS_I
-_EDGE_WORLD_X_SLOPE = SIN_I - _K_W * COS_I
 _EDGE_LOCAL_Z_MIN = PLAT_OVERHANG - PLAT_LEN
 _EDGE_LOCAL_Z_MAX = PLAT_OVERHANG
-for _ARB_Z, _min_gap in _ARB_Z_BANDS:
-    _zl0 = max(
-        _EDGE_LOCAL_Z_MIN,
-        (_ARB_Z[0] - _EDGE_WORLD_Z_BASE) / _EDGE_WORLD_Z_SLOPE,
-    )
-    _zl1 = min(
-        _EDGE_LOCAL_Z_MAX,
-        (_ARB_Z[1] - _EDGE_WORLD_Z_BASE) / _EDGE_WORLD_Z_SLOPE,
-    )
-    if _zl1 < _zl0:
-        continue
-    _closest_x = max(
-        _EDGE_WORLD_X_BASE + _EDGE_WORLD_X_SLOPE * _zl0,
-        _EDGE_WORLD_X_BASE + _EDGE_WORLD_X_SLOPE * _zl1,
-    )
-    _gap = _ARB_E_X - _closest_x
-    if _gap < _min_gap:
-        raise AssertionError(
-            f"swing-plate west edge within {_gap:.3f} mm of an arbor-pedestal "
-            f"block over world z {_ARB_Z} (needs >= {_min_gap})"
-        )
+_ARB_BAND_NAMES = ("south arbor pedestal", "north arbor pedestal")
 
+
+def west_edge_arbor_gaps(swing_deg: float) -> tuple[float, ...]:
+    """Plan x-gap from the plate's straight WEST edge to each arbor-pedestal
+    block's plate-facing flank, with the plate swung ``swing_deg`` past the
+    engaged incline (the p1 disengage turns it about the pivot).  The edge
+    and its placement are linear, so the exact local interval crossing each
+    block's z band is solved (a coarse sample once stepped over a 0.93 mm
+    overlap the SolidWorks interference gate found).  A band the edge does
+    not cross reads +inf."""
+    angle = math.radians(INCLINE_DEG + swing_deg)
+    c, s = math.cos(angle), math.sin(angle)
+    world_z_base = _PPIVOT[2] - _EDGE_X_INTERCEPT * s
+    world_z_slope = c + _K_W * s
+    world_x_base = _PPIVOT[0] + _EDGE_X_INTERCEPT * c
+    world_x_slope = s - _K_W * c
+    gaps = []
+    for arb_z, _min_gap in _ARB_Z_BANDS:
+        zl0 = max(_EDGE_LOCAL_Z_MIN, (arb_z[0] - world_z_base) / world_z_slope)
+        zl1 = min(_EDGE_LOCAL_Z_MAX, (arb_z[1] - world_z_base) / world_z_slope)
+        if zl1 < zl0:
+            gaps.append(math.inf)
+            continue
+        closest_x = max(
+            world_x_base + world_x_slope * zl0, world_x_base + world_x_slope * zl1
+        )
+        gaps.append(_ARB_E_X - closest_x)
+    return tuple(gaps)
+
+
+def plate_vertices_machine(swing_deg: float) -> tuple[tuple[float, float], ...]:
+    """The plate's four sharp plan vertices in machine (x, z), swung
+    ``swing_deg`` past the engaged incline about the pivot."""
+    angle = math.radians(INCLINE_DEG + swing_deg)
+    c, s = math.cos(angle), math.sin(angle)
+    return tuple(
+        (_PPIVOT[0] + x * c + z * s, _PPIVOT[2] - x * s + z * c)
+        for x, z in _PLATFORM_VERTICES
+    )
+
+
+Plan = tuple[float, float]
+
+
+def _edges(poly: tuple[Plan, ...]) -> list[tuple[Plan, Plan]]:
+    return list(zip(poly, poly[1:] + poly[:1]))
+
+
+def _point_segment_gap(p: Plan, a: Plan, b: Plan) -> float:
+    dx, dz = b[0] - a[0], b[1] - a[1]
+    t = max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / (dx * dx + dz * dz)))
+    return math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dz))
+
+
+def _segments_cross(p1: Plan, p2: Plan, q1: Plan, q2: Plan) -> bool:
+    def side(a: Plan, b: Plan, c: Plan) -> float:
+        return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
+    return (side(q1, q2, p1) > 0) != (side(q1, q2, p2) > 0) and (
+        side(p1, p2, q1) > 0
+    ) != (side(p1, p2, q2) > 0)
+
+
+def _point_in_polygon(point: Plan, poly: tuple[Plan, ...]) -> bool:
+    px, pz = point
+    inside = False
+    for (ax, az), (bx, bz) in _edges(poly):
+        if (az > pz) != (bz > pz) and px < ax + (pz - az) * (bx - ax) / (bz - az):
+            inside = not inside
+    return inside
+
+
+def _plan_gap_polygons(a: tuple[Plan, ...], b: tuple[Plan, ...]) -> float:
+    """Plan distance between two polygon outlines; negative when they
+    overlap (crossing edges, or one inside the other)."""
+    nearest = math.inf
+    for p1, p2 in _edges(a):
+        for q1, q2 in _edges(b):
+            if _segments_cross(p1, p2, q1, q2):
+                nearest = 0.0
+                continue
+            nearest = min(
+                nearest,
+                _point_segment_gap(p1, q1, q2),
+                _point_segment_gap(p2, q1, q2),
+                _point_segment_gap(q1, p1, p2),
+                _point_segment_gap(q2, p1, p2),
+            )
+    overlap = nearest == 0.0 or _point_in_polygon(a[0], b) or _point_in_polygon(b[0], a)
+    return -nearest if overlap else nearest
+
+
+def _plan_gap_to_plate(point: Plan, swing_deg: float) -> float:
+    """Plan distance from a point to the swung plate outline; negative when
+    the point lies under the plate."""
+    poly = plate_vertices_machine(swing_deg)
+    nearest = min(_point_segment_gap(point, a, b) for a, b in _edges(poly))
+    return -nearest if _point_in_polygon(point, poly) else nearest
+
+
+# I31 (Main, 2026-09-25): the plate's north-west edge is proven over the whole
+# p1 swing, not only engaged -- every sampled angle from 0 to DISENGAGE_DEG:
+# - the straight west edge against both arbor-pedestal blocks (their floors
+#   above: 2.0 south, 0.25 north);
+# - every sharp plate vertex inside the base deck, within the green lip;
+# - every other base-fixed occupant clear of the plate outline: see
+#   SWING_OCCUPANT_CLEARANCE, after the rig and spring layout it reads.
+SWING_SAMPLES = 400
+SWING_ANGLES = tuple(DISENGAGE_DEG * k / SWING_SAMPLES for k in range(SWING_SAMPLES + 1))
+SWING_SWEEP: dict[str, float] = {}
+for _k, _swing in enumerate(SWING_ANGLES):
+    for (_arb_z, _floor), _name, _gap in zip(
+        _ARB_Z_BANDS, _ARB_BAND_NAMES, west_edge_arbor_gaps(_swing), strict=True
+    ):
+        SWING_SWEEP[_name] = min(SWING_SWEEP.get(_name, math.inf), _gap)
+        if _gap < _floor:
+            raise AssertionError(
+                f"swing-plate west edge within {_gap:.3f} mm of the {_name} "
+                f"block at swing {_swing:.3f} deg (needs >= {_floor})"
+            )
+    for _label, (_vx, _vz) in zip(
+        ("NE", "NW", "SW", "SE"), plate_vertices_machine(_swing), strict=True
+    ):
+        _margin = min(
+            _BASE_X_LIMIT - BASE_LIP_W - abs(_vx), _BASE_Z_LIMIT - BASE_LIP_W - abs(_vz)
+        )
+        _key = f"{_label} corner inside the lip"
+        SWING_SWEEP[_key] = min(SWING_SWEEP.get(_key, math.inf), _margin)
+        if _margin < 0.0:
+            raise AssertionError(
+                f"swing-plate {_label} corner crosses the base lip by {-_margin:.3f} "
+                f"at swing {_swing:.3f} deg"
+            )
 # --- alignment pinion (ch. 25): RESTORED 2026-07-02, carried DISENGAGED ------
-# The ch30 GT proves the zeroing rig is on the machine (tee handle triangulates
-# to world (-10.2, 104.2, -144.1), back stub end to (-11.4, 106.7, +91.3)) --
-# INBOARD of the drum and LEVEL with the drive axis, not the old outboard/low
-# placement the OD-62.2 rescale squeezed out (removal note: git c1ebca3).
-# Level + the book's parked tip gap puts the axis at X_DRUM - 44.32 = 10.38
-# authored = world -10.38, 0.2 sigma from GT. Parked DISENGAGED (p.68 "gap");
-# the engage swing is the p2 setup DOF, park-driven and never suppressed in
-# `free` builds (it is a setup motion, not an operational DOF).
-APINION_TEETH = _config.machine("alignment_pinion", "teeth")  # 42 (ch25 plate)
-TIP_APINION = ((APINION_TEETH + 2.0) / DP_TRAIN) * 25.4 / 2.0  # 11.22
-TIP_DRUM120 = (122.0 / DP_TRAIN) * 25.4 / 2.0  # 31.10: cylinder-gear tip radius
-APINION_GAP = _config.machine("alignment_pinion", "disengaged_tip_gap_mm")  # 2.0
-ENGAGED_C2C = (120.0 + APINION_TEETH) / 2.0 * 25.4 / DP_TRAIN  # 41.30 engaged
-APINION_X = X_DRUM + (TIP_DRUM120 + TIP_APINION + APINION_GAP)  # -10.38: INBOARD,
-# tip circles backed off to the parked gap at Delta-y = 0 (axis dead level)
+# The rig stays level-inboard of the cylinder bank. Its user-authoritative 32T
+# drum retains the train's DP 49.82, so the drum, pivot blocks and lift axis move
+# together when tooth count or parked gap changes; no superseded world
+# coordinate is frozen into this placement.  The drum's as-cut gap floor is a
+# chord at its base circle, so the engage stroke ENDS where the 120T tips seat on
+# that floor -- 0.2425 outside the pitch-circle sum (reviewfirst Rule 11).  U28
+# (user, 2026-09-23) keeps those roots and parks the drum 0.2425 further out
+# (config disengaged_tip_gap_mm 2.2425), so the seated stop comes at the same
+# strap swing and lever angle as the pitch-circle design.
+APINION_TEETH = int(_config.machine("alignment_pinion", "teeth"))
+TIP_APINION = ((APINION_TEETH + 2.0) / DP_TRAIN) * 25.4 / 2.0
+TIP_DRUM120 = (122.0 / DP_TRAIN) * 25.4 / 2.0
+APINION_GAP = float(_config.machine("alignment_pinion", "disengaged_tip_gap_mm"))
+_APINION_PA = math.radians(14.5)  # alignment_pinion_spec PRESSURE_ANGLE_DEG
+_APINION_BASE_R = APINION_TEETH / DP_TRAIN * 25.4 * math.cos(_APINION_PA) / 2.0
+_APINION_HALF_GAP = math.pi / APINION_TEETH - (
+    math.pi / (2.0 * APINION_TEETH) + math.tan(_APINION_PA) - _APINION_PA
+)
+APINION_FLOOR_R = _APINION_BASE_R * math.cos(_APINION_HALF_GAP)  # 7.890 chord
+ENGAGED_C2C = TIP_DRUM120 + APINION_FLOOR_R  # 38.990: 120T tips seat on the floor
+_CONFIG_ENGAGED_C2C = float(
+    _config.machine("alignment_pinion", "engaged_center_distance_mm")
+)
+if abs(ENGAGED_C2C - _CONFIG_ENGAGED_C2C) > 1e-6:
+    raise AssertionError(
+        "alignment-pinion configured and derived engaged centre distances disagree: "
+        f"{_CONFIG_ENGAGED_C2C:.6f} vs {ENGAGED_C2C:.6f} mm"
+    )
+APINION_X = X_DRUM + TIP_DRUM120 + TIP_APINION + APINION_GAP
+# Tip circles keep the configured parked gap at Delta-y = 0 (axis level).
 APINION_Y = Y_DRIVE
-APINION_DRUM_LEN = 143.2  # build_alignment_pinion FACE_WIDTH
-APINION_Z_FRONT = -75.0 + MECHANISM_Z_SHIFT
-APINION_Z_BACK = APINION_Z_FRONT + APINION_DRUM_LEN  # +103.615
+# Ruling (c) (user, 2026-09-24): the blocks locate the swing cluster and the
+# drum's bond station moved 0.3 aft -- every rig z station is
+# pinion_rig_layout's, shared with the base's transferred seats.
+APINION_DRUM_LEN = RIG.DRUM_LEN  # build_alignment_pinion FACE_WIDTH
+APINION_Z_FRONT = RIG.DRUM_FRONT_Z
+APINION_Z_BACK = RIG.DRUM_BACK_Z
 PIVOT_Y = Y_BASE_TOP + 12.0  # 62.8: pivot block bore height
 # Bracket thickness, end radius and pivot-to-arbor spacing come from the
 # geometry-only contract imported above.
-STRAP_AIR = 0.25  # axial air each side of each strap
+STRAP_AIR = RIG.STRAP_AIR  # MODEL-pose drum-end air; physical play is the feeler P
 PIVOT_X = APINION_X + math.sqrt(
     STRAP_C2C**2 - (APINION_Y - PIVOT_Y) ** 2
 )  # the far side from the drum, so swinging the strap toward
@@ -1308,10 +1911,10 @@ PIVOT_X = APINION_X + math.sqrt(
 STRAP_LEAN_DEG = math.degrees(
     math.atan2(PIVOT_X - APINION_X, APINION_Y - PIVOT_Y)
 )  # the v2 drive line makes the parked strap lean west of vertical
-LIFT_X = PIVOT_X + 2.0 * BLOCK_BORE_HALF_SPACING  # lift rod in the blocks' WEST bores
+LIFT_X = PIVOT_X + LIFT_BORE_SPACING  # lift rod in the blocks' WEST bores
 # east since the DP40 cram (issue #7 dodged the cone-pivot-post column);
-# the p.68-69 photos put the lever WEST of the tee handle and the cam pins
-# lifting the strap tails' follower pins from the WEST -- an east lift would
+# the p.68-69 photos put the lever WEST of the grip head and the cam pins lift
+# the strap tails' follower pins from the WEST -- an east lift would
 # swing the drum OUT of mesh. The column (x ~-47) is far east of the new spot,
 # and the M6.9 portal south upright that once blocked the west band was
 # replaced by the lone NORTH rocker-arm-support. The recentered p2 rig clears
@@ -1320,13 +1923,14 @@ LIFT_X = PIVOT_X + 2.0 * BLOCK_BORE_HALF_SPACING  # lift rod in the blocks' WEST
 LIFT_Y = PIVOT_Y + LIFT_BORE_RISE  # v2 closure: the steep strap carries its
 # follower contact above the pivot at the WEST cam station.  The eccentric cam
 # collars still meet the pins from below; the pins rest on the collar ODs.
-PIVOT_SHAFT_Z0 = -104.0 + MECHANISM_Z_SHIFT
-# Ø6.35 x 192 remains flush with the translated block outer faces.
-LIFT_ROD_Z0 = -114.0 + MECHANISM_Z_SHIFT
-# front end proud 10 south of the translated front block -- lever hub seat
-BLOCK_X = (PIVOT_X + LIFT_X) / 2.0  # block local origin midway the bores
-BLOCK_FRONT_Z0 = -104.0 + MECHANISM_Z_SHIFT
-BLOCK_BACK_Z0 = 76.0 + MECHANISM_Z_SHIFT
+PIVOT_SHAFT_Z0 = RIG.TORQUE_SHAFT_Z0
+# Ø6.35 torque shaft flush with both block outer faces.
+LIFT_ROD_Z0 = RIG.LIFT_ROD_Z0
+# front end ~10 proud south of the front block -- lever hub seat
+BLOCK_X = PIVOT_X  # block local origin ON the pivot bore (datum B, U28)
+BLOCK_FRONT_Z0 = RIG.FRONT_BLOCK_Z0  # one 0.25 feeler off the front strap
+BLOCK_BACK_Z0 = RIG.BACK_BLOCK_Z0  # outer face fixed at 88; the (c) back stop
+# U28 thinned the blocks (12 -> 10.25) so the 9-thick back strap keeps 0.30 air
 LEVER_TILT_DEG = 10.0  # parked, from vertical toward machine -X
 # ch25 p.68 page002_img08 is explicitly the FRONT side and shows the
 # disengaged lever only about 10 degrees from vertical, with its tip to image
@@ -1338,16 +1942,29 @@ LEVER_TILT_DEG = 10.0  # parked, from vertical toward machine -X
 # pose, and the cam-contact solve proves its full swing to about -72 degrees.
 LEVER_LEN = LEVER_ROD_LEN  # 86: hub centre -> tip (img07 @9.37 px/mm,
 # PR7 -- the PR6 98 was img08's perspective-inflated read)
-LEVER_Z = -111.0 + MECHANISM_Z_SHIFT
+LEVER_Z = LIFT_ROD_Z0 + LEVER_HUB_LEN / 2.0 - LEVER_WALL_T
 # seats on the translated lift-rod front end; north face stays 2 off the block.
-HANDLE_TILT_DEG = 65.0  # cross rod from vertical
-HANDLE_Z = (-135.0 + MECHANISM_Z_SHIFT) - (HANDLE_GRIP_LEN / 2.0 + HANDLE_WALL_T)
-# = ARBOR_Z0 - (hub bore floor station): the blind hub's floor seats on the
-# arbor's flat front tip (asserted below), so the grip station follows the
-# grip length (2026-09: the O23 x 14 drum became a O15 x 9 ball-crowned grip).
-# translated with the p2 arbor. The hub is a blind tubular cap
-# (PR7 item 14): its bore floor at local +9 lands on -99.585, where the
-# steel arbor's flat front tip seats flush (build_pinion_arbor)
+HANDLE_TILT_DEG = 65.0  # grip crossrod from vertical
+ARBOR_Z0 = -135.0 + MECHANISM_Z_SHIFT
+# Preserve the released MHA-058 component origin at the head/cross-hole axis.
+# The head is now integral with MHA-102, whose local head centre is z=-6.5.
+HANDLE_Z = ARBOR_Z0 + ARBOR_HEAD_CENTER_Z
+_HANDLE_C = math.cos(math.radians(HANDLE_TILT_DEG))
+_HANDLE_S = math.sin(math.radians(HANDLE_TILT_DEG))
+HANDLE_ROWS = [
+    [_HANDLE_C, _HANDLE_S, 0.0],
+    [-_HANDLE_S, _HANDLE_C, 0.0],
+    [0.0, 0.0, 1.0],
+]
+# MHA-102's grip bore and MHA-058's rod both run along local +Y.  They share
+# one Rz pose; the circular arbor shaft stays on the same machine-Z journal
+# axis while its cross-hole clocks onto the rod.
+ARBOR_ROWS = HANDLE_ROWS
+# R1a (user, 2026-09-24): the MHA-144 collar is spring-pinned to MHA-102 at its
+# printed pin station.  Both pin holes run along their parts' local +Y, so the
+# collar shares the arbor's pose and its centred hole lands on the arbor's.
+ARBOR_COLLAR_Z0 = ARBOR_Z0 + ARBOR_PIN_Z - ARBOR_COLLAR_PIN_Z
+ARBOR_COLLAR_Z = (ARBOR_COLLAR_Z0, ARBOR_COLLAR_Z0 + ARBOR_COLLAR_LEN)
 
 if abs(math.hypot(PIVOT_X - APINION_X, APINION_Y - PIVOT_Y) - STRAP_C2C) > 0.001:
     raise AssertionError("strap c2c does not span pivot -> pinion axis")
@@ -1363,7 +1980,7 @@ if (
 if math.hypot(PIVOT_X - X_DRUM, Y_DRIVE - PIVOT_Y) > ENGAGED_C2C + STRAP_C2C - 0.25:
     raise AssertionError("engage swing cannot reach the meshed centre distance")
 for _j in range(20):
-    _tip = CONE_T120_PITCH_R - RADIUS_STEP * _j + ADDENDUM
+    _tip = _cone_tip_radius_max(120 - 6 * _j)
     if (
         math.hypot(APINION_X - cone_seat(_j)[0], Y_DRIVE - APINION_Y)
         < _tip + TIP_APINION + 0.25
@@ -1386,10 +2003,9 @@ if abs((LEVER_Z - (LEVER_HUB_LEN / 2.0 - LEVER_WALL_T)) - LIFT_ROD_Z0) > 1e-9:
     raise AssertionError("lever hub bore floor off the lift rod's front end")
 # The parked lever shaft passes clear of the pinion ARBOR (PR7: the Ø8 steel
 # arbor replaced the drum's Ø6.35 stubs; it spans the lever's z band, so the
-# 3D clearance is the 2D distance from the arbor's (x, y) to the Ø6 rod-root
+# 3D clearance is the 2D distance from the arbor's (x, y) to the Ø6 rod's
 # axis line). Perpendicular form when the foot lands on the rod segment,
-# endpoint distance otherwise. Rod ROOT dia books the worst case (the PR7
-# taper only thins toward the tip).
+# endpoint distance otherwise. The rod is a straight Ø6 (ch25 img07).
 _LEV_T = math.radians(LEVER_TILT_DEG)
 _LEV_U = (-math.sin(_LEV_T), math.cos(_LEV_T))  # positive tips machine -X
 _LEV_REL = (APINION_X - LIFT_X, APINION_Y - LIFT_Y)  # root -> arbor axis
@@ -1401,96 +2017,134 @@ else:
     _LEV_STUB_D = math.hypot(
         _LEV_REL[0] - _end * _LEV_U[0], _LEV_REL[1] - _end * _LEV_U[1]
     )
-if _LEV_STUB_D < (ARBOR_DIA + max(LEVER_ROD_DIA, LEVER_ROD_TIP_DIA)) / 2.0 + 0.25:
+# Where the rod plane shares the collar's z band, the Ø15 collar -- not the
+# Ø8 shaft -- is what the lever passes.
+_LEV_ROD_Z = (LEVER_Z - 3.0, LEVER_Z + 3.0)
+_ARBOR_DIA_AT_LEVER = (
+    ARBOR_COLLAR_OD
+    if _LEV_ROD_Z[0] < ARBOR_COLLAR_Z[1] + 0.25 and _LEV_ROD_Z[1] > ARBOR_COLLAR_Z[0] - 0.25
+    else ARBOR_DIA
+)
+if _LEV_STUB_D < (_ARBOR_DIA_AT_LEVER + LEVER_ROD_DIA) / 2.0 + 0.25:
     raise AssertionError("lever shaft crowds the pinion arbor")
 
 # --- pinion return spring (ch. 25, p.68-69): keeps the drum disengaged -------
-# Brass leaf east of the BACK strap only (t00393 shows the front strap clean):
-# foot flat on the base pointing WEST (crossing under the lift rod so its
-# black hold-down screw lands west of the whole moving rig -- img01's
-# far-left dark head), blade rising parallel to the parked strap's east
-# flank; near the top a SUBTLE BEND BACK (PR7 item 10): the kink's convex
-# crest is the parked contact edge, the flat above it the engaged contact
-# face. Engaging the drum swings the strap east INTO the blade -- in the
-# real machine the leaf flexes and pushes the swing back west (the default-
-# disengaged behaviour); in rigid CAD the engaged pose overlaps the unflexed
-# blade, a documented simplification: only the PARKED pose is interference-
-# gated. The cam engage path (PR5, below) defines the engaged pose; flexed
-# spring geometry for it stays deferred -- issue #158 (the channel springs'
-# stretchNN precedent is the eventual shape of the fix).
-# Geometry is imported from pinion_spring_geometry (machine = part local +
-# (SPRING_X, Y_BASE_TOP)). The thin wall is ONE-sided; the part's 1%-tol
-# volume gate pins the probed side (right-of-travel: under the foot, EAST
-# of the blade/flat centreline), but every clearance that can afford it
-# still books the full 0.8 on whichever side hurts. The flat-tip-vs-cap
-# check below is the one exception -- it relies on the gated east side.
-SPRING_X = PIVOT_X + SPR_PIVOT_LX  # machine anchor; the part is placed Ry(180)
-# (its local +x runs machine -x), so every local-x offset below SUBTRACTS.
-SPRING_Z = APINION_Z_BACK + STRAP_AIR + STRAP_T / 2.0  # 106.365: back strap
-_SPR_TH = math.radians(-STRAP_LEAN_DEG)  # blade leans east of vertical
-_SPR_U = (math.sin(_SPR_TH), math.cos(_SPR_TH))  # up the blade
+# Phosphor-bronze leaf EAST of the BACK strap only (t00393 shows the front
+# strap clean).  Re-derived 2026-09-24 (handoff dt-pinion-spring-rederive-
+# 20260924): the foot is screwed to the base OUTBOARD, east of the strap --
+# img01's far-left black head; that side of img01 is the drum side (cylinder
+# gear top-left, lift rod and follower bottom-right), not west as the old
+# block read it.  The blade rises leaning IN toward the strap and its crest
+# bears on the straight east flank CONTACT_T up from the pivot, about 5 below
+# the arbor (img04); a short flick turns back east above the crest.
+# Gravity swings the cluster east into mesh; the leaf pushes the strap top
+# back WEST onto the parked cam collar, and the lever engages against it.
+# In rigid CAD the engaged pose overlaps the unflexed blade, a documented
+# simplification (issue #158): only the PARKED pose is interference-gated;
+# the swing's contact locus, preload and root stress are proven analytically
+# below the cam block (they need _PHI_ENG).
+# Geometry is imported from pinion_spring_geometry: machine = (SPRING_X -
+# local x, Y_BASE_TOP + local y) -- the part is placed Ry(180), its local +x
+# running machine -x (east).  The part's inside-surface path puts the wall
+# west of the blade and under the foot (the build's west-extreme and pad-merge
+# gates prove it), so SPR_CREST_L is already the contact face.
+SPRING_X = PIVOT_X + SPR_PIVOT_LX  # machine anchor
+# The strap's INNER face is what the drum end fixes (STRAP_AIR of axial air);
+# the strap thickness grows OUTBOARD from there, so the blade is referenced to
+# that inner face -- SPRING_BLADE_INSET in from it -- not to the strap
+# mid-plane.
+STRAP_Z_INNER = RIG.STRAP_Z_INNER
+# Blade inner edge, in from the strap's inner face: 1.0 keeps the blade on
+# the flank at every split of the end play (pinion_rig_layout).
+SPRING_BLADE_INSET = RIG.SPRING_BLADE_INSET
+SPRING_Z = RIG.SPRING_Z
+_SPR_TH = math.radians(-STRAP_LEAN_DEG)  # the strap leans east of vertical
+_SPR_U = (math.sin(_SPR_TH), math.cos(_SPR_TH))  # up the strap axis
 _SPR_N = (-math.cos(_SPR_TH), math.sin(_SPR_TH))  # east normal of the axis
 # (east = machine -x)
-_SPR_PIVOT = (SPRING_X - SPR_PIVOT_LX, Y_BASE_TOP + SPR_PIVOT_LY)
-SPRING_CREST = (SPRING_X - SPR_CREST_L[0], Y_BASE_TOP + SPR_CREST_L[1])
-# the parked contact edge (kink start, tangent parallel to the strap axis)
-SPRING_FLAT_TIP = (SPRING_X - SPR_FLAT_TIP_L[0], Y_BASE_TOP + SPR_FLAT_TIP_L[1])
-SPRING_FOOT_TOP = Y_BASE_TOP + SPRING_T  # wall under the foot centreline
-SPRING_HOLE_X = SPRING_X - SPR_FOOT_END_L[0] - SPR_HOLE_FROM_END
+
+
+def _spring_machine(local: tuple[float, float]) -> tuple[float, float]:
+    return (SPRING_X - local[0], Y_BASE_TOP + local[1])
+
+
+def _strap_frame(p: tuple[float, float], phi: float = 0.0) -> tuple[float, float]:
+    """(station up the strap axis, offset east of it) of ``p`` for the strap
+    swung ``phi`` CCW (toward mesh) about the pivot."""
+    c, s = math.cos(phi), math.sin(phi)
+    u = (_SPR_U[0] * c - _SPR_U[1] * s, _SPR_U[0] * s + _SPR_U[1] * c)
+    n = (_SPR_N[0] * c - _SPR_N[1] * s, _SPR_N[0] * s + _SPR_N[1] * c)
+    d = (p[0] - PIVOT_X, p[1] - PIVOT_Y)
+    return (d[0] * u[0] + d[1] * u[1], d[0] * n[0] + d[1] * n[1])
+
+
+_SPR_PIVOT = _spring_machine((SPR_PIVOT_LX, SPR_PIVOT_LY))
+SPRING_CREST = _spring_machine(SPR_CREST_L)  # parked contact, crest west face
+SPRING_KINK_C = _spring_machine(SPR_KINK_C_L)  # crest centre
+SPRING_KINK_START = _spring_machine(SPR_KINK_START_L)  # path = the blade's east face
+SPRING_FLAT_TIP = _spring_machine(SPR_FLAT_TIP_L)  # path = the flick's east face
+SPRING_BEND_EXIT = _spring_machine(SPR_BEND_EXIT_L)  # path = the blade's east face
+SPRING_FOOT_TOP = Y_BASE_TOP + SPRING_T
+SPRING_HOLE_X = SPRING_X - SPR_HOLE_X_L
+SPRING_FOOT_END_X = SPRING_X - SPR_FOOT_END_L[0]  # the free end, east
+SPRING_FOOT_TAN_X = SPRING_X - SPR_FOOT_TAN_L[0]  # the bend tangent
 
 if math.hypot(_SPR_PIVOT[0] - PIVOT_X, _SPR_PIVOT[1] - PIVOT_Y) > 0.01:
     raise AssertionError("spring part frame disagrees with the strap pivot")
-if abs(SPR_BLADE_TILT_DEG - STRAP_LEAN_DEG) > 0.01:
-    raise AssertionError("spring blade is not parallel to the parked strap")
-if SPRING_AXIS_OFF - STRAP_R_END - SPRING_T < 0.25 - 1e-9:
-    raise AssertionError("spring blade touches the parked strap flank")
-if SPRING_W / 2.0 > STRAP_T / 2.0:
+if abs(SPR_STRAP_LEAN_DEG - STRAP_LEAN_DEG) > 0.01:
+    raise AssertionError("spring geometry assumes another parked strap lean")
+if abs(SPR_STRAP_HALF_WIDTH - STRAP_R_END) > 1e-9:
+    raise AssertionError("spring geometry assumes another strap width")
+# Crest station and air, parked: on the straight flank at CONTACT_T, clear of
+# the arbor end cap (the flank is straight from the pivot to STRAP_C2C).
+_CREST_T, _CREST_N = _strap_frame(SPRING_CREST)
+if abs(_CREST_T - SPR_CONTACT_T) > 0.01:
+    raise AssertionError("spring crest is off its contact station")
+if abs(_CREST_N - STRAP_R_END - SPR_PARKED_AIR) > 0.01 or SPR_PARKED_AIR < 0.1:
+    raise AssertionError("spring crest does not hover its parked air off the flank")
+if _CREST_T > STRAP_C2C - 1.0:
+    raise AssertionError("spring crest bears on the arbor end cap, not the flank")
+if SPRING_BLADE_INSET < 0.0 or SPRING_BLADE_INSET + SPRING_W > STRAP_T:
     raise AssertionError("spring blade overhangs the strap flank axially")
-if abs((LIFT_X - PIVOT_X) * _SPR_N[0] - SPRING_AXIS_OFF) - SPRING_T - 3.175 < 0.25:
-    raise AssertionError("spring blade fouls the lift rod")  # perpendicular
-    # foot of the rod axis lands mid-blade, so the segment bound is the line's
-    # (west rod: the blade sits 10.1 EAST of the strap axis, the rod ~14.7 WEST)
-if (
-    math.hypot(X_DRUM - SPRING_CREST[0], Y_DRIVE - SPRING_CREST[1]) - SPRING_T
-    < TIP_DRUM120 + 0.25
-):
-    raise AssertionError("spring contact crest crowds the cylinder-gear tips")
-if (
-    math.hypot(X_DRUM - SPRING_FLAT_TIP[0], Y_DRIVE - SPRING_FLAT_TIP[1]) - SPRING_T
-    < TIP_DRUM120 + 0.25
-):
-    raise AssertionError("spring flat tip crowds the cylinder-gear tips")
-if (
-    math.hypot(SPRING_CREST[0] - APINION_X, SPRING_CREST[1] - APINION_Y)
-    < STRAP_R_END + SPRING_T + 0.25
-):
-    raise AssertionError("spring contact crest reaches the strap's arbor end cap")
-# The flat tips back WEST toward the strap; its wall is on the gated EAST
-# side, so the governing surface is the centreline itself. Two constraints,
-# tip-governed (n falls monotonically along kink + flat): the parked FLANK
-# line (n = R_END, the 6.28 mm^3 interference the first PR7 build hit at
-# FLAT_LEN 6) and the arbor-end cap circle.
-_FLAT_TIP_N = (SPRING_FLAT_TIP[0] - PIVOT_X) * _SPR_N[0] + (
-    SPRING_FLAT_TIP[1] - PIVOT_Y
-) * _SPR_N[1]
-if _FLAT_TIP_N < STRAP_R_END + 0.25:
-    raise AssertionError("spring flat tip re-enters the parked strap flank")
+# The cylinder drum: the leaf rides axially PAST its last (j = 19) gear, so
+# the flexed blade can never meet the 120T tips; only the north end disc
+# (Ø55, END_DISC_AIR outboard of that gear) shares its z band.  Parked, the
+# crest and the flick tip also clear the tip circle itself in 2D; the engaged
+# blade is gated against the disc with the swing gates below.  Each books the
+# strip's full thickness on the east side.
+if (SPRING_Z - SPRING_W / 2.0) - (Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0) < 0.25:
+    raise AssertionError("spring reaches the cylinder drum's last gear axially")
+for _label, _p in (("crest", SPRING_CREST), ("flick tip", SPRING_FLAT_TIP)):
+    if math.hypot(X_DRUM - _p[0], Y_DRIVE - _p[1]) - SPRING_T < TIP_DRUM120 + 0.25:
+        raise AssertionError(f"spring {_label} crowds the cylinder-gear tips")
+# The flick turns back east: its tip stays off the parked flank and the cap.
+if _strap_frame(SPRING_FLAT_TIP)[1] - SPRING_T < STRAP_R_END + 0.25:
+    raise AssertionError("spring flick tip re-enters the parked strap flank")
 if (
     math.hypot(SPRING_FLAT_TIP[0] - APINION_X, SPRING_FLAT_TIP[1] - APINION_Y)
+    - SPRING_T
     < STRAP_R_END + 0.25
 ):
-    raise AssertionError("spring flat tip reaches the strap's arbor end cap")
+    raise AssertionError("spring flick tip reaches the strap's arbor end cap")
 if SPRING_Z + SPRING_W / 2.0 > BLOCK_BACK_Z0 - 0.25:
     raise AssertionError("spring reaches the back pivot block")
-# West foot corridor (PR7 item 11): the strip crosses UNDER the lift rod and
-# the back cam collar; its screw head must clear the rod flank. (The rod now
-# rides at LIFT_Y, PR8; the collar sweep is bounded in the cam block below.)
-if (LIFT_Y - 3.175) - SPRING_FOOT_TOP < 0.25:
-    raise AssertionError("spring foot reaches the lift rod above it")
-if (SPRING_HOLE_X - FSCREW_HEAD_DIA / 2.0) - (LIFT_X + 3.175) < 0.25:
-    raise AssertionError("spring foot screw head crowds the lift rod")
-if SPRING_HOLE_X + FSCREW_HEAD_DIA / 2.0 + 0.25 > SPRING_X - SPR_FOOT_END_L[0]:
+# The foot's screw pad widens the free end symmetrically about the strip.
+# It lies on the base EAST of the back block's east end, so it clears the
+# block in x whatever its z band; where the two share a z band (booked at the
+# printed .XX worst case, +0.51 on the length and the width) the x gap must
+# hold 0.25.
+_SPR_PAD_WEST_X = SPRING_FOOT_END_X + SPR_PAD_LEN + 0.51
+_SPR_PAD_Z_HI = SPRING_Z + (SPR_PAD_WIDTH + 0.51) / 2.0
+if (
+    _SPR_PAD_Z_HI > BLOCK_BACK_Z0 - 0.25
+    and (PIVOT_X - BLOCK_EAST) - _SPR_PAD_WEST_X < 0.25
+):
+    raise AssertionError("spring foot pad reaches the back pivot block")
+# The screw head sits on the pad: clear of the free end and of the bend.
+if (SPRING_HOLE_X - FSCREW_HEAD_DIA / 2.0) - SPRING_FOOT_END_X < 0.25:
     raise AssertionError("spring foot screw head overhangs the foot's free end")
+if SPRING_FOOT_TAN_X - (SPRING_HOLE_X + FSCREW_HEAD_DIA / 2.0) < 0.25:
+    raise AssertionError("spring foot screw head crowds the bend")
 
 # --- cam engage path (ch. 25 + page001_img01; PR8) ---------------------------
 # Each strap carries a Ø4 follower STUD in a blind edge seat FPIN_DROP
@@ -1502,14 +2156,18 @@ if SPRING_HOLE_X + FSCREW_HEAD_DIA / 2.0 + 0.25 > SPRING_X - SPR_FOOT_END_L[0]:
 # authored pose) the collar top hovers a designed ~0.15 under the pin (exact
 # tangency tips the interference gate on FP noise -- the PR5 gap lesson); the
 # return spring holds the strap west on it.
-if not STRAP_PIN_BORE <= FPIN_DIA <= STRAP_PIN_BORE + 0.020:
-    raise AssertionError("follower pin nominal is outside the strap press-fit band")
+# U27: the drill-rod stud slips into the H7 seat line-to-line and is bonded
+# (LOCTITE 638), so the nominal solids touch without overlapping.
+if abs(FPIN_DIA - STRAP_PIN_BORE) > 1e-9:
+    raise AssertionError("follower pin nominal is not line-to-line with its seat")
 if abs(FPIN_SEAT - FPIN_SEAT_LEN) > 1e-9:
     raise AssertionError("pin SEAT_LEN disagrees with the bracket PIN_SEAT")
-if not 6.36 <= CAM_BORE_DIA <= 6.375:
-    raise AssertionError("cam bore nominal is outside its O6.360-O6.375 fit limits")
-if CAM_THIN_SIDE_WALL < 0.5:
-    raise AssertionError("cam thin-side wall is below 0.5 mm")
+# U27 slip fit: the set-screwed cam needs only 0.02-0.10 diametral clearance on
+# the Ø6.35 lift rod (pinion_cam_spec proves it at the printed limits).
+if not 0.02 <= CAM_BORE_DIA - 6.35 <= 0.10:
+    raise AssertionError("cam bore nominal is outside its 0.02-0.10 slip clearance")
+if CAM_THIN_SIDE_WALL < 1.5:
+    raise AssertionError("cam thin-side wall is below the 1.5 mm U27 floor")
 # Blind-seat integrity: nearest approach of the seat cylinder to the pivot
 # bore (perpendicular skew axes; the worst point is the seat bottom).
 _FPIN_S0 = STRAP_R_END - FPIN_SEAT  # 5.0: seat bottom, from the centreline
@@ -1527,36 +2185,28 @@ if _S_CAM - _FPIN_S0 < 2.0:
     raise AssertionError("cam contact lands inside the strap edge, not the pin")
 _FPIN_Y_AT_CAM = _FPIN_C[1] - _S_CAM * _SPR_N[1]  # 64.04
 
-# Cam z stations: the follower pin rides near each collar's BACK face --
-# station CAM_PIN_STATION of the 9-long collar, NOT the middle -- so the
-# set-pin boss (front region, BOSS_Z +- BOSS_R) clears BOTH the pin's z band
-# and (back cam) the spring foot crossing beneath, at EVERY azimuth of the
-# free cam spin (codex review 2026-07-05: a mid-mounted collar put the boss
-# 0.8 into the pin's band on the engaged side, invisible to the parked gate).
-_STRAP_MID_Z = (
-    APINION_Z_FRONT - STRAP_AIR - STRAP_T / 2.0,  # -42.335
-    APINION_Z_BACK + STRAP_AIR + STRAP_T / 2.0,  # +106.365
-)
-CAM_PIN_STATION = 7.0  # pin plane, from the collar front face
-CAM_Z0 = tuple(z - CAM_PIN_STATION for z in _STRAP_MID_Z)
+# Cam z stations: CAM_PIN_STATION of the 9-long collar, from its front face.
+# U28 (2026-09-23) deleted the set-pin boss for a sub-flush M2.5 set screw at
+# SET_SCREW_Z = 4.5, so the collar is a bare cylinder at every azimuth of the
+# free cam spin.  Ruling (c): the FRONT collar is set against the front
+# block's inner face (0.25 feeler) -- flush with the strap's outer face, so
+# the pin rides mid-collar (T/2) and the collar and lever hub capture the lift
+# rod on the block.  The back collar moves from the boss-era 7.5 to 6.0: with
+# the end play, the rod play and a by-eye set it then keeps >= 2 of collar on
+# both sides of the pin, and its back face stays >= 1.1 off the back block at
+# the thinnest strap (test_drive_train_support_layout).
+_STRAP_MID_Z = tuple(
+    z + s * STRAP_T / 2.0 for z, s in zip(STRAP_Z_INNER, (-1.0, 1.0), strict=True)
+)  # -76.362, +76.338 (pinion_rig_layout)
+CAM_PIN_STATION = (STRAP_T / 2.0, 6.0)  # pin plane, from each collar front face
+CAM_Z0 = tuple(z - s for z, s in zip(_STRAP_MID_Z, CAM_PIN_STATION, strict=True))
 for _z0 in CAM_Z0:
-    if _z0 < LIFT_ROD_Z0 + 1.0 or _z0 + CAM_LEN > LIFT_ROD_Z0 + 202.0 - 1.0:
+    if _z0 < LIFT_ROD_Z0 + 1.0 or _z0 + CAM_LEN > LIFT_ROD_Z0 + RIG.LIFT_ROD_LEN - 1.0:
         raise AssertionError("cam collar overhangs the lift rod")
-if not CAM_BOSS_Z + CAM_BOSS_DIA / 2.0 + 0.25 <= CAM_PIN_STATION - FPIN_DIA / 2.0:
-    raise AssertionError("set-pin boss z band reaches the follower pin's band")
-if CAM_PIN_STATION > CAM_LEN - 1.0:
-    raise AssertionError("follower pin rides off the collar's back face")
-# Back cam only: the boss z band must also clear the spring foot's band
-# (the strip crosses under the collar at the same z region).
-_BOSS_Z_BACK = (
-    CAM_Z0[1] + CAM_BOSS_Z - CAM_BOSS_DIA / 2.0,
-    CAM_Z0[1] + CAM_BOSS_Z + CAM_BOSS_DIA / 2.0,
-)
-if (
-    _BOSS_Z_BACK[1] > SPRING_Z - SPRING_W / 2.0 - 0.25
-    and _BOSS_Z_BACK[0] < SPRING_Z + SPRING_W / 2.0 + 0.25
-):
-    raise AssertionError("set-pin boss z band overlaps the spring foot band")
+if max(CAM_PIN_STATION) > CAM_LEN - 1.0 or min(CAM_PIN_STATION) < 1.0:
+    raise AssertionError("follower pin rides off a collar face")
+if CAM_Z0[0] < BLOCK_FRONT_Z0 + BLOCK_DEPTH + RIG.FRONT_BLOCK_FEELER - 1e-9:
+    raise AssertionError("front cam collar crowds the front pivot block")
 
 
 # PARK: collar (ecc down) under the pin, by design 0.10..0.25 of air. The
@@ -1607,7 +2257,7 @@ _N_ENG = (
 )
 _S_CAM_ENG = (_FPIN_C_ENG[0] - LIFT_X) / _N_ENG[0]
 _FPIN_Y_AT_CAM_ENG = _FPIN_C_ENG[1] - _S_CAM_ENG * _N_ENG[1]
-_NEED_LIFT = _FPIN_Y_AT_CAM_ENG - _FPIN_Y_AT_CAM  # ~1.07 up
+_NEED_LIFT = _FPIN_Y_AT_CAM_ENG - _FPIN_Y_AT_CAM  # ~1.57 up for the 32T rig
 if _NEED_LIFT <= 0.2:
     raise AssertionError("engage swing does not RAISE the follower over the cam")
 # Drive authority: with the collar rotated ecc-UP, its surface must reach at
@@ -1656,102 +2306,131 @@ if not -80.0 < LEVER_ENGAGED_TILT_DEG < -65.0:
     raise AssertionError("engaged pinion lever left the photographed +X-side range")
 
 
-# Bracket scallop closure. The lift rod is base-fixed while the bracket swings,
-# so its centre traces an arc in the bracket's local frame. The part carries
-# two R6.90 open scallops at the parked/engaged endpoint centres; their overlap
-# must cover the full collar sweep plus 0.25 air over the intervening arc.
-def _lift_axis_in_strap(lean_rad: float) -> tuple[float, float]:
-    dx, dy = LIFT_X - PIVOT_X, LIFT_Y - PIVOT_Y
-    c, s = math.cos(lean_rad), math.sin(lean_rad)
-    return (-dx * c - dy * s, -dx * s + dy * c)
-
-
-_RELIEF_PARK_ACTUAL = _lift_axis_in_strap(math.radians(STRAP_LEAN_DEG))
-_RELIEF_ENG_ACTUAL = _lift_axis_in_strap(math.radians(STRAP_LEAN_DEG) + _PHI_ENG)
-for _label, _actual, _authored in (
-    ("parked", _RELIEF_PARK_ACTUAL, STRAP_CAM_RELIEF_PARK),
-    ("engaged", _RELIEF_ENG_ACTUAL, STRAP_CAM_RELIEF_ENGAGED),
-):
-    if math.dist(_actual, _authored) > 0.001:
-        raise AssertionError(
-            f"bracket cam relief {_label} centre {_authored} != linkage {_actual}"
-        )
-_RELIEF_CENTRE_CHORD = math.dist(_RELIEF_PARK_ACTUAL, _RELIEF_ENG_ACTUAL)
-_RELIEF_ARC_SAGITTA = math.hypot(LIFT_X - PIVOT_X, LIFT_Y - PIVOT_Y) * (
-    1.0 - math.cos(_PHI_ENG / 2.0)
-)
-_RELIEF_REQUIRED_R = (
-    math.hypot(STRAP_CAM_RELIEF_ENVELOPE_R, _RELIEF_CENTRE_CHORD / 2.0)
-    + _RELIEF_ARC_SAGITTA
-)
-if STRAP_CAM_RELIEF_R < _RELIEF_REQUIRED_R:
+# Follower-seat integrity in the uncut strap. The complete Ø4 mouth must land
+# on the straight -X flank, and the 4-deep blind seat must leave solid stock
+# before the opposite flank.
+_PIN_SEAT_Y = -FPIN_DROP
+_PIN_SEAT_R = FPIN_DIA / 2.0
+if _PIN_SEAT_Y - _PIN_SEAT_R < 0.0 or _PIN_SEAT_Y + _PIN_SEAT_R > STRAP_C2C:
+    raise AssertionError("follower-seat mouth leaves the bracket's straight flank")
+_PIN_SEAT_ENTRY_X = -STRAP_R_END
+_PIN_SEAT_BOTTOM_X = _PIN_SEAT_ENTRY_X + FPIN_SEAT
+_PIN_SEAT_REMAINING_WALL = STRAP_R_END - _PIN_SEAT_BOTTOM_X
+if _PIN_SEAT_REMAINING_WALL < _PIN_SEAT_R:
     raise AssertionError(
-        f"bracket cam relief R{STRAP_CAM_RELIEF_R:.3f} does not cover "
-        f"R{_RELIEF_REQUIRED_R:.3f} moving envelope"
-    )
-# Seat mouth: on the straight flank when the stud sits between the two bores
-# (0 <= -FPIN_DROP <= C2C), else on the end cap arc.
-_PIN_SEAT_SURFACE_X = (
-    -STRAP_R_END
-    if 0.0 <= -FPIN_DROP <= STRAP_C2C
-    else -math.sqrt(STRAP_R_END**2 - FPIN_DROP**2)
-)
-_PIN_SEAT_BOTTOM_X = -(STRAP_R_END - FPIN_SEAT)
-_PIN_SEAT_OPEN_X = _PIN_SEAT_SURFACE_X
-for _cx, _cy in (STRAP_CAM_RELIEF_PARK, STRAP_CAM_RELIEF_ENGAGED):
-    _dy = -FPIN_DROP - _cy
-    if abs(_dy) < STRAP_CAM_RELIEF_R:
-        _PIN_SEAT_OPEN_X = max(
-            _PIN_SEAT_OPEN_X,
-            _cx + math.sqrt(STRAP_CAM_RELIEF_R**2 - _dy**2),
-        )
-_PIN_SEAT_REMAINING = _PIN_SEAT_BOTTOM_X - _PIN_SEAT_OPEN_X
-if _PIN_SEAT_REMAINING < 1.5:
-    raise AssertionError(
-        f"cam scallop leaves only {_PIN_SEAT_REMAINING:.3f} mm follower-stud seat"
+        f"follower seat leaves only {_PIN_SEAT_REMAINING_WALL:.3f} mm "
+        "before the opposite flank"
     )
 
-# Full-rotation sweep of collar + set-pin boss about the rod axis. The boss
-# sweep books its OUTER CORNER -- hypot(axis reach, boss radius), not just
-# the axis tip (codex review 2026-07-05) -- against the base and the pivot
-# shaft; the spring foot shares z only with the bare collar (the boss z band
-# clears it above), so the foot books the collar OD sweep.
-_CAM_SWEEP_R = math.hypot(
-    CAM_ECC + CAM_OD / 2.0 + CAM_BOSS_PROUD, CAM_BOSS_DIA / 2.0
-)  # 6.31 corner
-_COLLAR_SWEEP_R = CAM_ECC + CAM_OD / 2.0  # 5.6 bare collar
+# Full-rotation sweep of the bare collar about the rod axis (U28: no boss, so
+# the eccentric OD's far point is the whole sweep) against the base and the
+# pivot shaft.  (The return spring's foot no longer runs under the rod: it is
+# screwed down east of the strap, 2026-09-24.)
+_CAM_SWEEP_R = CAM_ECC + CAM_OD / 2.0  # 9.3: U28 boss deleted, bare collar
 if LIFT_Y - _CAM_SWEEP_R - Y_BASE_TOP < 0.25:
-    raise AssertionError("cam boss sweep reaches the base top")
-if LIFT_Y - _COLLAR_SWEEP_R - SPRING_FOOT_TOP < 0.25:
-    raise AssertionError("cam collar sweep dips into the spring foot below")
+    raise AssertionError("cam collar sweep reaches the base top")
 if math.hypot(PIVOT_X - LIFT_X, PIVOT_Y - LIFT_Y) - _CAM_SWEEP_R - 3.175 < 0.25:
     raise AssertionError("cam sweep reaches the pivot shaft")
 
+# --- return spring across the engage swing (analytic; issue #158) ------------
+# The strap swings 0 -> _PHI_ENG CCW into the blade.  The leaf deflects by the
+# crest's penetration into the swung flank on top of its PRESET (the free form
+# stands PRESET into the parked flank; the model hovers PARKED_AIR off it).
+# Gravity moments about the pivot (handoff estimate from the part volumes:
+# drum 175 g + arbor 65 g at the arbor axis, straps 80 g at mid-length) --
+# parked, then engaged, N.mm.  Both turn the cluster INTO mesh.
+_SWING_GRAVITY_NMM = (10.9, 19.2)
+_PRELOAD_MARGIN = 1.5  # over gravity, at the formed band's low end
+_STRESS_SF = 1.5  # on yield, at the nominal preset
+_SPR_STEPS = 1 + math.ceil(math.degrees(_PHI_ENG) / 0.25)
+_SPR_BLADE_SAMPLES = 16
+_SPR_CREST_OUTER_R = SPR_R_KINK + SPRING_T  # the crest's contact-face radius
+_spr_blade = (
+    SPRING_KINK_START[0] - SPRING_BEND_EXIT[0],
+    SPRING_KINK_START[1] - SPRING_BEND_EXIT[1],
+)
+_spr_len = math.hypot(*_spr_blade)
+_SPR_WEST = (_spr_blade[1] / _spr_len, -_spr_blade[0] / _spr_len)  # blade normal
+_spr_deflection: list[float] = []
+_spr_station: list[float] = []
+for _i in range(_SPR_STEPS):
+    _phi = _PHI_ENG * _i / (_SPR_STEPS - 1)
+    # The flank touches the crest where the crest's outward normal faces it:
+    # that direction must stay on the crest arc (blade side -> flick side).
+    _t, _n = _strap_frame(SPRING_KINK_C, _phi)
+    _n -= _SPR_CREST_OUTER_R
+    _toward = math.atan2(
+        -(_SPR_N[0] * math.sin(_phi) + _SPR_N[1] * math.cos(_phi)),
+        -(_SPR_N[0] * math.cos(_phi) - _SPR_N[1] * math.sin(_phi)),
+    )
+    _from = math.atan2(_SPR_WEST[1], _SPR_WEST[0])
+    _sweep = (_toward - _from + math.pi) % (2.0 * math.pi) - math.pi
+    if not -1e-9 <= _sweep <= math.radians(SPR_KINK_DEG) + 1e-9:
+        raise AssertionError(f"spring contact runs off the crest arc at {_phi:.4f}")
+    # The contact stays on the STRAIGHT flank, clear of the arbor end cap.
+    if not 1.0 <= _t <= STRAP_C2C - 1.0:
+        raise AssertionError(f"spring contact leaves the straight flank at {_phi:.4f}")
+    # The crest is the first contact: no point of the blade's west face below
+    # it nor the flick tip comes nearer the swung flank.
+    for _k in range(_SPR_BLADE_SAMPLES + 1):
+        _f = _k / _SPR_BLADE_SAMPLES
+        _p = (
+            SPRING_BEND_EXIT[0] + _f * _spr_blade[0] + SPRING_T * _SPR_WEST[0],
+            SPRING_BEND_EXIT[1] + _f * _spr_blade[1] + SPRING_T * _SPR_WEST[1],
+        )
+        if _strap_frame(_p, _phi)[1] < _n - 1e-6:
+            raise AssertionError("spring blade crosses the flank below the crest")
+    if _strap_frame(SPRING_FLAT_TIP, _phi)[1] - SPRING_T < _n - 1e-6:
+        raise AssertionError("spring flick tip crosses the flank above the crest")
+    _spr_deflection.append(SPR_PRESET + SPR_PARKED_AIR - (_n - STRAP_R_END))
+    _spr_station.append(_t)
+SPRING_DEFLECTION = (_spr_deflection[0], _spr_deflection[-1])  # parked, engaged
+for _label, _d, _t, _m in zip(
+    ("parked", "engaged"),
+    SPRING_DEFLECTION,
+    (_spr_station[0], _spr_station[-1]),
+    _SWING_GRAVITY_NMM,
+):
+    if spr_contact_force(_d - SPR_FORMED_BAND) * _t < _PRELOAD_MARGIN * _m:
+        raise AssertionError(
+            f"spring preload loses to gravity {_label} at the formed band's low end"
+        )
+if SPR_YIELD_MPA / spr_root_stress(SPRING_DEFLECTION[1]) < _STRESS_SF:
+    raise AssertionError("spring root stress over yield / SF at the engaged pose")
+# The engaged blade flexes east toward the cylinder drum: the crest and the
+# flick tip, carried east by the extra deflection, keep 0.25 to the north end
+# disc beside them (the gears themselves end axially short of the leaf).
+_spr_push = SPRING_DEFLECTION[1] - SPRING_DEFLECTION[0]
+for _label, _p in (("crest", SPRING_CREST), ("flick tip", SPRING_FLAT_TIP)):
+    _q = (_p[0] + _spr_push * _SPR_N[0], _p[1] + _spr_push * _SPR_N[1])
+    if (
+        math.hypot(X_DRUM - _q[0], Y_DRIVE - _q[1]) - SPRING_T
+        < END_DISC_DIA / 2.0 + 0.25
+    ):
+        raise AssertionError(f"engaged spring {_label} reaches the drum end disc")
+
 # --- full-rotation clearance proofs (PR6) -------------------------------------
-# The interference gate sees only the PARKED pose; the tee handle spins full
+# The interference gate sees only the PARKED pose; the grip crossrod spins full
 # circle during zeroing and the lift rod (pins + lever) sweeps the cam throw.
 # Prove every angle clears the in-assembly neighbours: each sweep is a solid
 # of revolution, so a neighbour is cleared by z-band disjointness or, where
 # bands overlap, by radial clearance from the sweep axis. (Cross-assembly
 # neighbours are parked-gated at the top level; the platen/pen hardware sits
 # at y ~390+, far above both sweeps.)
-# Handle geometry is imported (PR7 img07 re-derivation: arms 42/43, the
-# grip a Ø23 cylinder + domed cap, the hub a blind tube over the arbor).
-# The SWEPT geometry splits in two: the Ø6 cross rod sweeps a R43.5 disc
-# (max(HANDLE_ARM_DOWN, HANDLE_ARM_UP) + 0.5; the long arm's flat-end corner
-# reaches hypot(43, 3) = 43.1)
-# in its own thin band; the grip + cap + tube hub stay ON AXIS (R11.5 worst),
-# only their z reach is wider.
-_TEE_DISC_Z = (
+# The separate Ø6 crossrod sweeps a radius set by its 32/33 mm asymmetric
+# reaches.  Its thin axial band remains centred at the released HANDLE_Z.
+# MHA-102's integral Ø15 head, front crown, and Ø10.5 neck stay on the arbor
+# axis; their wider axial band is the exact former handle-body envelope.
+_GRIP_ROD_Z = (
     HANDLE_Z - HANDLE_ROD_DIA / 2.0,
     HANDLE_Z + HANDLE_ROD_DIA / 2.0,
 )
-_TEE_HUB_Z = (
-    HANDLE_Z - HANDLE_GRIP_LEN / 2.0 - HANDLE_CAP_SAG,
-    HANDLE_Z + HANDLE_GRIP_LEN / 2.0 + HANDLE_WALL_T + HANDLE_TUBE_LEN,
-)  # -153 .. -125: cap, grip, blind wall, tube seat
-# In-assembly bodies near the tee: everything of the swing rig ends well
-# north of the disc band; the crank cluster lives south/east of it.
+_GRIP_HEAD_Z = (
+    ARBOR_Z0 + ARBOR_HEAD_FRONT_Z - ARBOR_HEAD_CAP_SAG,
+    ARBOR_Z0 + ARBOR_NECK_END_Z,
+)
+# In-assembly bodies near the grip: everything of the swing rig ends well
+# north of the crossrod band; the crank cluster lives south/east of it.
 for _lo, _hi, _what in (
     (
         LEVER_Z - LEVER_HUB_LEN / 2.0 - LEVER_CAP_SAG,
@@ -1759,24 +2438,51 @@ for _lo, _hi, _what in (
         "lever hub",
     ),
     (BLOCK_FRONT_Z0, BLOCK_FRONT_Z0 + BLOCK_DEPTH, "front pivot block"),
-    (LIFT_ROD_Z0, LIFT_ROD_Z0 + 202.0, "lift rod"),
-    (PIVOT_SHAFT_Z0, PIVOT_SHAFT_Z0 + 192.0, "pivot shaft"),
+    (LIFT_ROD_Z0, LIFT_ROD_Z0 + RIG.LIFT_ROD_LEN, "lift rod"),
+    (PIVOT_SHAFT_Z0, PIVOT_SHAFT_Z0 + RIG.TORQUE_SHAFT_LEN, "pivot shaft"),
     (APINION_Z_FRONT - STRAP_T - STRAP_AIR, APINION_Z_FRONT, "front strap"),
     (REMOVABLE_Z0, REMOVABLE_Z0 + 5.0, "T12 chain wheel"),
-    (CRANK_ARM_Z0, CRANK_ARM_Z0 + ARM_THICKNESS, "crank arm hub"),
+    (CRANK_ARM_Z0, CRANK_ARM_Z0 + ARM_THICKNESS, "crank arm"),
+    (CRANK_HUB_Z0, CRANK_HUB_REAR_Z, "crank hub"),
 ):
-    if _TEE_DISC_Z[1] > _lo - 0.25 and _TEE_DISC_Z[0] < _hi + 0.25:
-        raise AssertionError(f"tee-handle sweep disc band reaches the {_what}")
-# The hub's wider z band DOES clip the T12 plane: radial clearance instead
-# (the grip is on-axis, the wheel is on the crank axis). The crank arm+handle
-# sweep entirely south of the arm hub (-175..) -- z-disjoint from the grip.
+    if _GRIP_ROD_Z[1] > _lo - 0.25 and _GRIP_ROD_Z[0] < _hi + 0.25:
+        raise AssertionError(f"grip-crossrod sweep band reaches the {_what}")
+# The head's wider z band clips the T12 plane, so use radial clearance instead.
+# The crank arm/hub/handle sweep is axially disjoint from the integral head.
 if (
     math.hypot(X_CRANK - APINION_X, Y_CRANK - APINION_Y)
-    < HANDLE_GRIP_DIA / 2.0 + 16.0 + 0.25
+    < ARBOR_HEAD_DIA / 2.0 + 16.0 + 0.25
 ):  # T12 OD/2 ~14 + margin
-    raise AssertionError("tee-handle grip reaches the T12 chain wheel")
-if _TEE_HUB_Z[0] < CRANK_ARM_Z0 + ARM_THICKNESS + 0.25:
-    raise AssertionError("tee-handle grip band reaches the crank arm sweep")
+    raise AssertionError("integral grip head reaches the T12 chain wheel")
+if _GRIP_HEAD_Z[0] < CRANK_HUB_REAR_Z + 0.25:
+    raise AssertionError("integral grip-head band reaches the crank hub")
+
+# MHA-139 handle pivot screw (U33): the shoulder seats on the arm's outboard
+# face and its thread runs inboard through the arm's tapped hole, so
+# its tip stands proud of the arm's inboard face and sweeps the r = ARM_C2C
+# circle with the crank.  At its longest thread in the thinnest (stock 5/16)
+# arm the tip reaches CRANK_ARM_Z0 + THREAD_LENGTH_MAX; that is the axial
+# band every neighbour on the sweep must clear.
+HANDLE_SCREW_Z0 = CRANK_ARM_Z0 - HANDLE_SCREW_SEAT_STATION  # slotted head face
+HANDLE_SCREW_TIP_Z = HANDLE_SCREW_Z0 + HANDLE_SCREW_LENGTH
+HANDLE_SCREW_TIP_Z_MAX = CRANK_ARM_Z0 + HANDLE_SCREW_THREAD_MAX
+if not 0.0 < HANDLE_SCREW_TIP_Z - CRANK_ARM_ORIGIN_Z <= HANDLE_SCREW_PROUD_MAX:
+    raise AssertionError("MHA-139 tip left its proud band past the arm's inboard face")
+for _lo, _what in (
+    (REMOVABLE_Z0, "T12 chain wheel"),
+    (_GRIP_HEAD_Z[0], "integral grip head"),
+    (_GRIP_ROD_Z[0], "grip crossrod"),
+):
+    if HANDLE_SCREW_TIP_Z_MAX > _lo - 0.25:
+        raise AssertionError(f"MHA-139 tip sweep reaches the {_what}")
+# The base, and the swing platform and posts standing on it, end at the base's
+# south face (-137.25), far north of the tip band: the arm and its sweep
+# hang in front of the base.  The hub barrel is inside the band but radially
+# inside the screw circle.
+if HANDLE_SCREW_TIP_Z_MAX > -_BASE_Z_LIMIT - 0.25:
+    raise AssertionError("MHA-139 tip sweep reaches the harmonic-base south face")
+if ARM_C2C - HANDLE_SCREW_THREAD_MAJOR / 2.0 < HUB_BARREL_DIA / 2.0 + 0.25:
+    raise AssertionError("MHA-139 tip sweep reaches the crank hub barrel")
 
 # Lever full throw: sample the solved cam-contact path from the photographed
 # +10-degree parked pose to about -72 degrees engaged.  Clearance improves
@@ -1796,9 +2502,9 @@ for _step in range(_LEV_SWEEP_STEPS + 1):
             _LEV_REL[0] - _end * _u[0],
             _LEV_REL[1] - _end * _u[1],
         )
-    if _d < (ARBOR_DIA + max(LEVER_ROD_DIA, LEVER_ROD_TIP_DIA)) / 2.0 + 0.25:
+    if _d < (_ARBOR_DIA_AT_LEVER + LEVER_ROD_DIA) / 2.0 + 0.25:
         raise AssertionError("lever shaft crowds the arbor mid-throw")
-_LEV_Z = (LEVER_Z - 3.0, LEVER_Z + 3.0)  # rod plane through the throw
+_LEV_Z = _LEV_ROD_Z  # rod plane through the throw
 if (
     _LEV_Z[0] < BLOCK_FRONT_Z0 + BLOCK_DEPTH + 0.25
     and _LEV_Z[1] > BLOCK_FRONT_Z0 - 0.25
@@ -1806,27 +2512,59 @@ if (
     raise AssertionError("lever throw plane reaches the front pivot block")
 if _LEV_Z[1] > PIVOT_SHAFT_Z0 - 0.25:
     raise AssertionError("lever throw plane reaches the pivot shaft front end")
-if _LEV_Z[0] < _TEE_HUB_Z[1] + 0.25:
-    raise AssertionError("lever throw plane reaches the tee-handle sweep")
+if _LEV_Z[0] < _GRIP_HEAD_Z[1] + 0.25:
+    raise AssertionError("lever throw plane reaches the integral grip head")
 
 # (The PR5 rod-pin throw checks died with the pins; the cam block above
-# bounds the collar + boss sweep against the base, spring foot and shaft.)
+# bounds the collar sweep against the base and shaft.)
+
+# The MHA-144 collar rides the arbor outboard of the front strap.  It must
+# stand clear of the strap's outer face (the printed-band stack lives in
+# pinion_arbor_collar_spec) and of every rig body whose z band it shares:
+# the lift rod and pivot shaft by radial distance between parallel axes (the
+# front pivot block, by height, once BLOCK_TOP_Y is derived below).
+if ARBOR_COLLAR_Z[1] > APINION_Z_FRONT - STRAP_AIR - STRAP_T - 0.25:
+    raise AssertionError("arbor collar reaches the front strap's outer face")
+if ARBOR_COLLAR_Z[0] < _GRIP_HEAD_Z[1] + 0.25:
+    raise AssertionError("arbor collar reaches the integral grip head's neck")
+for _lo, _hi, _axis_xy, _r, _what in (
+    (LIFT_ROD_Z0, LIFT_ROD_Z0 + 202.0, (LIFT_X, LIFT_Y), 3.175, "lift rod"),
+    (PIVOT_SHAFT_Z0, PIVOT_SHAFT_Z0 + 192.0, (PIVOT_X, PIVOT_Y), 3.175, "pivot shaft"),
+):
+    if _hi < ARBOR_COLLAR_Z[0] - 0.25 or _lo > ARBOR_COLLAR_Z[1] + 0.25:
+        continue
+    if (
+        math.hypot(_axis_xy[0] - APINION_X, _axis_xy[1] - APINION_Y)
+        < ARBOR_COLLAR_OD / 2.0 + _r + 0.25
+    ):
+        raise AssertionError(f"arbor collar crowds the {_what}")
 
 # --- pinion arbor + rig fasteners (PR7 items 2/11/12/14) ---------------------
-# The steel Ø8 arbor replaced the drum's integral stubs: it presses through
-# the drum, journals in both straps' top bores, and its flat front tip seats
-# flush on the tee handle's blind-cap bore floor.
-ARBOR_Z0 = -135.0 + MECHANISM_Z_SHIFT
-if abs((HANDLE_Z + HANDLE_GRIP_LEN / 2.0 + HANDLE_WALL_T) - ARBOR_Z0) > 1e-9:
-    raise AssertionError("arbor front tip off the handle cap's bore floor")
+# The steel Ø8 arbor slips through the drum (bonded) and journals in both
+# straps' top bores.  Its turned head/neck are integral; MHA-058 is only the
+# separate crossrod, bonded into the head's reamed hole at the unchanged
+# head/cross-hole station.
+if abs(HANDLE_Z - (ARBOR_Z0 + ARBOR_HEAD_CENTER_Z)) > 1e-9:
+    raise AssertionError("grip crossrod is not centred in the integral head")
 if abs(ARBOR_Z0 + ARBOR_LEN - (91.25 + MECHANISM_Z_SHIFT)) > 0.01:
     raise AssertionError("arbor back end off the translated p2 station")
-if not (ARBOR_DIA == DRUM_BORE_DIA == HANDLE_TUBE_ID == STRAP_ARBOR_BORE):
-    raise AssertionError("arbor dia disagrees with drum bore/handle tube/strap bore")
+if not (ARBOR_DIA == DRUM_BORE_DIA == STRAP_ARBOR_BORE):
+    raise AssertionError("arbor dia disagrees with drum and strap bores")
+# R1: the crossrod is a bonded slip fit, modelled line to line; at the printed
+# limits it must still enter the hole and stay inside the Loctite 638 gap.
+if abs(HANDLE_ROD_DIA - ARBOR_CROSS_HOLE_DIA) > 1e-9:
+    raise AssertionError("grip crossrod and head hole no longer share a nominal")
+if not 0.0 <= ARBOR_CROSSROD_MIN_CLEARANCE <= ARBOR_CROSSROD_MAX_CLEARANCE <= ARBOR_BOND_MAX_GAP:
+    raise AssertionError(
+        "grip crossrod bond clearance "
+        f"{ARBOR_CROSSROD_MIN_CLEARANCE:.3f}-{ARBOR_CROSSROD_MAX_CLEARANCE:.3f} "
+        f"is outside 0-{ARBOR_BOND_MAX_GAP}"
+    )
 if abs(STRAP_PIVOT_BORE - 6.35) > 1e-9:
     raise AssertionError("strap pivot bore no longer rides the O6.35 shaft")
-# Block screws: exact 90280A199 #8-32 x 25.4 stock screws pass through normal
-# #8 clearance holes and engage 6.65 mm in the base's #8-32 UNC-2B seats.
+# Block screws: exact 90280A201 #8-32 x 31.75 stock screws pass through normal
+# #8 clearance holes and engage 11.25 mm (2.7D; 2.58D worst case, rule 12
+# audit E10) in the base's #8-32 UNC-2B seats.
 BLOCK_TOP_Y = PIVOT_Y + (BLOCK_HEIGHT - BLOCK_BORE_UP)
 _require_clearance_size("pinion block", BSCREW_THREAD, BLOCK_SCREW_HOLE_SPEC)
 _require_tapped_thread(
@@ -1840,7 +2578,10 @@ if _BLOCK_SCREW_ENGAGEMENT < 1.0:
     raise AssertionError("block screw barely engages the base")
 if _BLOCK_SCREW_ENGAGEMENT > BASE_BLOCK_HOLE_DEPTH - 0.25:
     raise AssertionError("block screw bottoms out in the base tapped seat")
-if BLOCK_SCREW_HALF + BSCREW_HEAD_DIA / 2.0 > BLOCK_WIDTH / 2.0 - 0.25:
+if (
+    BLOCK_SCREW_HALF + BSCREW_HEAD_DIA / 2.0
+    > min(BLOCK_EAST, BLOCK_WIDTH - BLOCK_EAST) - 0.25
+):
     raise AssertionError("block screw head overhangs the block end")
 _BLOCK_SCREW_XZ = tuple(
     (BLOCK_X + sx, z0 + BLOCK_DEPTH / 2.0)
@@ -1855,40 +2596,230 @@ for _want, _have in zip(_BLOCK_SCREW_XZ, BASE_BLOCK_XZ, strict=True):
             f"harmonic-base block-screw hole {_have} != machine derived "
             f"({_want[0]:.3f}, {_want[1]:.3f})"
         )
-# Exact 90280A108 #4-40 x 9.525 stock screws pass through the spring and
-# pedestal's normal #4 clearances into the base's #4-40 UNC-2B seats.
+# I31 swing sweep, the base-fixed occupants (Main, reviews of 0c1e615c0 and
+# 7240ae0de).  Whatever stands on a base seat keeps
+# SWING_SEAT_RUNNING_CLEARANCE -- the drive train's 2.0 design margin, as the
+# south arbor pedestal and the swing stop keep -- off the swinging plate's
+# plan outline at every SWING_ANGLES sample.  The part standing on a seat,
+# not the screw holding it, is what the plate could hit, so each is checked
+# by its plan footprint; only the column tube, round in its socket, keeps a
+# radius.  Plan-only, so conservative whatever the heights.  The pivot,
+# lock-knob and stop seats meet the plate by design and are proven with their
+# hardware; the arbor pedestals are the blocks proven above.
+SWING_SEAT_RUNNING_CLEARANCE = 2.0
+SWING_COARSE = 10
+# The plate's farthest plan point from its pivot: a vertex of its outline.
+_SWING_REACH = max(math.hypot(x, z) for x, z in _PLATFORM_VERTICES)
+
+
+def _plan_box(x0: float, x1: float, z0: float, z1: float) -> tuple[Plan, ...]:
+    return ((x0, z0), (x1, z0), (x1, z1), (x0, z1))
+
+
+# The spring's formed profile, foot end to flick tip, one strip thickness
+# wider each way; its foot pad is the widest part across z.
+_SPRING_PLAN_X = tuple(
+    SPRING_X - local[0]
+    for local in (
+        SPR_FOOT_END_L,
+        SPR_FOOT_TAN_L,
+        SPR_BEND_EXIT_L,
+        SPR_KINK_START_L,
+        SPR_KINK_C_L,
+        SPR_CREST_L,
+        SPR_FLAT_TIP_L,
+    )
+)
+_SPRING_HALF_Z = max(SPR_PAD_WIDTH, SPRING_W) / 2.0
+_PIVOT_BLOCK_X = (PIVOT_X - BLOCK_EAST, PIVOT_X - BLOCK_EAST + BLOCK_WIDTH)
+SWING_FOOTPRINTS: dict[str, tuple[Plan, ...]] = {
+    # The support's trapezoid is widest at its foot (x +-WIDE, z +-88.9).
+    "rocker-arm support": _plan_box(
+        _SUPPORT_X - _SUPPORT_FOOT_HALF_X,
+        _SUPPORT_X + _SUPPORT_FOOT_HALF_X,
+        _SUPPORT_Z - _SUPPORT_FOOT_HALF_Z,
+        _SUPPORT_Z + _SUPPORT_FOOT_HALF_Z,
+    ),
+    "front pivot block": _plan_box(
+        *_PIVOT_BLOCK_X, BLOCK_FRONT_Z0, BLOCK_FRONT_Z0 + BLOCK_DEPTH
+    ),
+    "back pivot block": _plan_box(*_PIVOT_BLOCK_X, BLOCK_BACK_Z0, BLOCK_BACK_Z0 + BLOCK_DEPTH),
+    "pinion spring": _plan_box(
+        min(_SPRING_PLAN_X) - SPRING_T,
+        max(_SPRING_PLAN_X) + SPRING_T,
+        SPRING_Z - _SPRING_HALF_Z,
+        SPRING_Z + _SPRING_HALF_Z,
+    ),
+    "nameplate": tuple(
+        (corner[0], corner[2])
+        for corner in (
+            nameplate_mount_point((u, v, 0.0))
+            for u, v in (
+                (0.0, 0.0),
+                (NAMEPLATE_WIDTH, 0.0),
+                (NAMEPLATE_WIDTH, NAMEPLATE_HEIGHT),
+                (0.0, NAMEPLATE_HEIGHT),
+            )
+        )
+    ),
+    # The stamp's glyph is narrower than it is tall.
+    "serial stamp": _plan_box(
+        BASE_SERIAL_XZ[0] - BASE_SERIAL_HEIGHT / 2.0,
+        BASE_SERIAL_XZ[0] + BASE_SERIAL_HEIGHT / 2.0,
+        BASE_SERIAL_XZ[1] - BASE_SERIAL_HEIGHT / 2.0,
+        BASE_SERIAL_XZ[1] + BASE_SERIAL_HEIGHT / 2.0,
+    ),
+}
+SWING_ROUND_OCCUPANTS: dict[str, tuple[Plan, float]] = {
+    f"column socket {i}": (xz, COLUMN_SOCKET_DIAMETER / 2.0)
+    for i, xz in enumerate(BASE_COLUMN_SOCKET_XZ)
+}
+# Each footprint must cover the base seats that hold it down: a frame or
+# sign slip would otherwise sweep the wrong rectangle.
+SWING_OCCUPANT_SEATS: dict[str, tuple[Plan, ...]] = {
+    "rocker-arm support": tuple(BASE_HOLE_XZ),
+    "front pivot block": tuple(
+        xz for xz in BASE_BLOCK_XZ if BLOCK_FRONT_Z0 <= xz[1] <= BLOCK_FRONT_Z0 + BLOCK_DEPTH
+    ),
+    "back pivot block": tuple(
+        xz for xz in BASE_BLOCK_XZ if BLOCK_BACK_Z0 <= xz[1] <= BLOCK_BACK_Z0 + BLOCK_DEPTH
+    ),
+    "pinion spring": tuple(BASE_FOOT_XZ),
+    "nameplate": tuple(BASE_NAMEPLATE_XZ),
+    "serial stamp": (BASE_SERIAL_XZ,),
+}
+for _occupant, _seats in SWING_OCCUPANT_SEATS.items():
+    if len(_seats) == 0 or not all(
+        _point_in_polygon(_seat, SWING_FOOTPRINTS[_occupant]) for _seat in _seats
+    ):
+        raise AssertionError(f"the {_occupant} footprint misses its base seats {_seats}")
+if sum(len(_seats) for _seats in SWING_OCCUPANT_SEATS.values()) != (
+    len(BASE_HOLE_XZ) + len(BASE_BLOCK_XZ) + len(BASE_FOOT_XZ) + len(BASE_NAMEPLATE_XZ) + 1
+):
+    raise AssertionError("a base seat is claimed by no swing occupant, or by two")
+
+
+def swing_occupant_clearances(
+    footprints: dict[str, tuple[Plan, ...]],
+    round_occupants: dict[str, tuple[Plan, float]],
+) -> dict[str, tuple[float, float]]:
+    """Each occupant's least plan clearance to the swinging plate over
+    SWING_ANGLES, and the swing angle (deg) where it occurs.
+
+    The plate turns about its pivot, so no plate point moves faster than
+    _SWING_REACH mm per radian and the gap between samples a and b cannot
+    dip below (g(a) + g(b) - reach * (b - a)) / 2.  Every SWING_COARSE-th
+    sample is evaluated first; an interval is filled in only while that
+    bound could still undercut the least gap found -- the same minimum as
+    evaluating every sample, at a fraction of the import time."""
+
+    def gap_at(name: str, k: int) -> float:
+        swing = SWING_ANGLES[k]
+        if name in footprints:
+            return _plan_gap_polygons(plate_vertices_machine(swing), footprints[name])
+        xz, radius = round_occupants[name]
+        return _plan_gap_to_plate(xz, swing) - radius
+
+    reach = _SWING_REACH * math.radians(SWING_ANGLES[1] - SWING_ANGLES[0])
+    coarse = list(range(0, len(SWING_ANGLES), SWING_COARSE))
+    if coarse[-1] != len(SWING_ANGLES) - 1:
+        coarse.append(len(SWING_ANGLES) - 1)
+    worst: dict[str, tuple[float, float]] = {}
+    for name in (*footprints, *round_occupants):
+        gaps = {k: gap_at(name, k) for k in coarse}
+        least = min(gaps.values())
+        for a, b in zip(coarse, coarse[1:]):
+            if (gaps[a] + gaps[b] - reach * (b - a)) / 2.0 >= least:
+                continue
+            for k in range(a + 1, b):
+                gaps[k] = gap_at(name, k)
+                least = min(least, gaps[k])
+        k = min(sorted(gaps), key=gaps.__getitem__)
+        worst[name] = (gaps[k], SWING_ANGLES[k])
+    return worst
+
+
+def require_swing_clearance(
+    footprints: dict[str, tuple[Plan, ...]],
+    round_occupants: dict[str, tuple[Plan, float]],
+) -> dict[str, tuple[float, float]]:
+    """swing_occupant_clearances, failing loud below SWING_SEAT_RUNNING_CLEARANCE."""
+    worst = swing_occupant_clearances(footprints, round_occupants)
+    for name, (gap, swing) in worst.items():
+        if gap < SWING_SEAT_RUNNING_CLEARANCE:
+            raise AssertionError(
+                f"swing plate within {gap:.3f} of the {name} at swing {swing:.3f} "
+                f"deg (needs >= {SWING_SEAT_RUNNING_CLEARANCE})"
+            )
+    return worst
+
+
+SWING_OCCUPANT_CLEARANCE = require_swing_clearance(SWING_FOOTPRINTS, SWING_ROUND_OCCUPANTS)
+SWING_NEAREST_OCCUPANT: tuple[float, str] = min(
+    (gap, name) for name, (gap, _swing) in SWING_OCCUPANT_CLEARANCE.items()
+)
+# The MHA-144 collar can share the front pivot block's z band; its underside
+# must then clear the block's flat top.
+if (
+    BLOCK_FRONT_Z0 < ARBOR_COLLAR_Z[1] + 0.25
+    and BLOCK_FRONT_Z0 + BLOCK_DEPTH > ARBOR_COLLAR_Z[0] - 0.25
+    and APINION_Y - ARBOR_COLLAR_OD / 2.0 < BLOCK_TOP_Y + 0.25
+):
+    raise AssertionError("arbor collar sits on the front pivot block")
+# The exact 90280A108 #4-40 x 9.525 stock screw passes through the spring's
+# normal #4 clearance into the base's #4-40 UNC-2B seat.
 _require_clearance_size("pinion spring foot", FSCREW_THREAD, SPR_HOLE_SPEC)
-_require_clearance_size("arbor pedestal foot", FSCREW_THREAD, ARBOR_PED_HOLE_SPEC)
 _require_tapped_thread(
     "foot-screw base seat", FSCREW_THREAD, BASE_FOOT_SEAT_SPEC, kind="tapped_bottoming"
 )
-if FSCREW_SHANK_LEN - ARBOR_PED_FLANGE_T < 2.0:
-    raise AssertionError("foot screw barely engages the base at the pedestal")
 if FSCREW_SHANK_LEN - SPRING_T > BASE_FOOT_HOLE_DEPTH - 0.25:
     raise AssertionError("foot screw bottoms out in the base spring seat")
-# Head fits the pedestal's exposed flange strip (local z -8..-2, centre -5).
-if FSCREW_HEAD_DIA / 2.0 > min(
-    abs(ARBOR_PED_SCREW_Z + ARBOR_PED_DEPTH / 2.0),
-    abs(ARBOR_PED_DEPTH / 2.0 - ARBOR_PED_STRAP_T - ARBOR_PED_SCREW_Z),
+_FOOT_SCREW_XZ = ((SPRING_HOLE_X, SPRING_Z),)
+# U34c: one MHA-143 (90280A197 #8-32 x 3/4) per pedestal, through the ledge's
+# #8 close clearance into a base seat transferred from the fitted pedestal.
+_require_clearance_size("arbor pedestal ledge", HDSCREW_THREAD, ARBOR_PED_HOLE_SPEC)
+_require_tapped_thread(
+    "pedestal hold-down base seat",
+    HDSCREW_THREAD,
+    BASE_PEDESTAL_SEAT_SPEC,
+    kind="tapped_bottoming",
+)
+# Rule 12 (audit E15): at the printed worst case (flange 5.0 +-0.8, screw
+# 19.05 +0/-0.76, seat depths +-0.8) the screw keeps >= 1.5D of thread and
+# never reaches the incomplete threads at the bottom of the seat.
+_HDSCREW_MIN_ENGAGEMENT = (HDSCREW_SHANK_LEN - 0.76) - (ARBOR_PED_FLANGE_T + 0.8)
+_HDSCREW_MAX_REACH = HDSCREW_SHANK_LEN - (ARBOR_PED_FLANGE_T - 0.8)
+if _HDSCREW_MIN_ENGAGEMENT < 1.5 * HDSCREW_SHANK_DIA:
+    raise AssertionError("pedestal hold-down keeps under 1.5D of thread at worst case")
+if _HDSCREW_MAX_REACH + 0.25 > BASE_PEDESTAL_HOLE_DEPTH - 0.8:
+    raise AssertionError("pedestal hold-down reaches the seat's incomplete threads")
+# The head sits on the 18 ledge, clear of the strap root and the ledge end.
+if HDSCREW_HEAD_DIA / 2.0 > min(
+    ARBOR_PED_SCREW_Z - ARBOR_PED_FOOT_NEAR_Z,
+    ARBOR_PED_STRAP_ROOT_Z - ARBOR_PED_SCREW_Z,
 ):
-    raise AssertionError("foot screw head overhangs the pedestal flange")
-_FOOT_SCREW_XZ = (
-    (SPRING_HOLE_X, SPRING_Z),
-    (X_DRUM, -ARBOR_PEDESTAL_Z + ARBOR_PED_SCREW_Z),
-    # North pedestal (ry180 flips its flange to +z): z_c - SCREW_Z = 102.5.
-    (X_DRUM, ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_SCREW_Z),
+    raise AssertionError("pedestal hold-down head overhangs the ledge")
+_PEDESTAL_SCREW_XZ = (
+    (X_DRUM, -ARBOR_PEDESTAL_Z + ARBOR_PED_SCREW_Z),  # -91.652
+    # North pedestal (Ry180 flips its ledge to +z): origin - SCREW_Z.
+    (X_DRUM, ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_SCREW_Z),  # +94.202
 )
 
 # Both machine-handed: the base holes agree directly.
-for _want, _have in zip(_FOOT_SCREW_XZ, BASE_FOOT_XZ, strict=True):
-    if abs(_want[0] - _have[0]) > 0.05 or abs(_want[1] - _have[1]) > 0.05:
-        raise AssertionError(
-            f"harmonic-base foot-screw hole {_have} != machine derived "
-            f"({_want[0]:.3f}, {_want[1]:.3f})"
-        )
+for _label, _derived, _base in (
+    ("foot-screw", _FOOT_SCREW_XZ, BASE_FOOT_XZ),
+    ("pedestal hold-down", _PEDESTAL_SCREW_XZ, BASE_PEDESTAL_XZ),
+):
+    for _want, _have in zip(_derived, _base, strict=True):
+        if abs(_want[0] - _have[0]) > 0.05 or abs(_want[1] - _have[1]) > 0.05:
+            raise AssertionError(
+                f"harmonic-base {_label} hole {_have} != machine derived "
+                f"({_want[0]:.3f}, {_want[1]:.3f})"
+            )
 
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+CRANK_HUB_PIN_ROWS = IDENTITY
 ROT_X_POS90 = [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]]
 ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
 # Cam-follower pin pose (PR8): part +Z (root -> dome) -> WEST along -N,
@@ -1930,6 +2861,27 @@ PINCH_WEST_EULER = euler_from_rows(ROT_PINCH_WEST)  # [180-INCLINE, 0, -90]
 def rot_z_rows(deg: float) -> list[list[float]]:
     c, s = math.cos(math.radians(deg)), math.sin(math.radians(deg))
     return [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]]
+
+
+# MHA-135 is match-drilled through the lever hub and the lift rod at assembly,
+# so both pin holes share one axis.  Each part cuts its hole along its own
+# local X; the lever is photographed at LEVER_TILT_DEG, so the ROD is phased to
+# the lever (the rod is round: its phase is free and never printed) and the
+# lever clamps parallel to it.  The cams keep their world phase (ecc straight
+# down) through an angle tie of the same LEVER_TILT_DEG back off the rod.
+LIFT_ROD_ROWS = rot_z_rows(LEVER_TILT_DEG)
+# Option E-a: the torque shaft's pin holes run along its local X, which must
+# lie along the straps' cross holes (their local X after Ry(180) . Rz(lean)).
+TORQUE_SHAFT_ROWS = rot_z_rows(STRAP_LEAN_DEG)
+LEVER_ROWS = rot_z_rows(LEVER_TILT_DEG)
+PINION_CAM_ROWS = IDENTITY
+# Rod Top-plane normal (local +Y) against the assembly Right normal (+X): the
+# freed pinion_cam spin's rest dihedral -- 90 + LEVER_TILT_DEG.
+LIFT_ROD_PARK_DEG = math.degrees(math.acos(LIFT_ROD_ROWS[1][0]))
+# Cam Right-plane normal against the rod's: the set-pin phase.
+CAM_ROD_PHASE_DEG = math.degrees(
+    math.acos(sum(a * b for a, b in zip(PINION_CAM_ROWS[0], LIFT_ROD_ROWS[0])))
+)
 
 
 def _org(adapter, name: str) -> list[float]:
@@ -1992,7 +2944,7 @@ async def _key_to_shaft(
         adapter,
         named_ref(f"Right Plane@{part}", "PLANE"),
         named_ref(f"Right Plane@{shaft}", "PLANE"),
-        label=f"{label} anti-spin (keyed phase)",
+        label=f"{label} anti-spin",
         verify=(part, p_o),
     )
 
@@ -2006,17 +2958,18 @@ async def _seat_on_crank(
     seat_plane,
     alignment: str = "closest",
 ) -> list[float]:
-    """Journal a crank-chain part on the crankshaft via SEMANTIC mates: coaxial
-    on the crank axis + an axial seat -- the part's Z-normal Front plane
-    COINCIDENT to the crankshaft's named seat datum ('SeatT12'/'SeatPinion'/
-    'SeatArm'). Coincident replaces the old
-    UNSIGNED plane-plane distance, whose two solution branches let the free-
-    spinning crank family reflect about the shaft origin on a re-solve: the
-    16T rendered floating ~200 south of its seat with every gate green
-    (render-gate catch, 2026-07-04). The seat must reference the crankshaft,
-    NOT a world datum (a world plane pins the crank axis to machine z and
-    through it the whole p1 swing). Leaves ONLY spin -- the caller pins it
-    with a per-part anti-spin. Returns the part's live origin."""
+    """Journal a keyed crank part with semantic mates.
+
+    The part is coaxial on the crank axis and its Z-normal Front plane seats
+    coincident to a named crankshaft datum (SeatT12 or SeatPinion).  Coincident
+    replaces the old UNSIGNED plane-plane distance, whose two solution branches
+    let the free-spinning crank family reflect about the shaft origin on a
+    re-solve: the 16T rendered floating ~200 south of its seat with every gate
+    green (render-gate catch, 2026-07-04).  The seat must reference the
+    crankshaft, NOT a world datum (a world plane pins the crank axis to machine
+    z and through it the whole p1 swing).  The caller supplies the anti-spin,
+    leaving only the shared crank rotation.  Returns the part's live origin.
+    """
     o = _org(adapter, part)
     await coincident_mate(
         adapter,
@@ -2073,6 +3026,16 @@ async def build(adapter) -> dict[str, str]:
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
     reset_dof_manifest()
+    # #893: the W15 stacks are import-time asserts, so a passing build would
+    # otherwise leave no record of their sums or margins in the leaf log.
+    _telemetry.info(
+        "16T pin wall to the shaft end, worst case: "
+        f"{_stack_text(PINION_PIN_EDGE_STACK)} >= {PINION_PIN_EDGE_MIN_WORST}"
+    )
+    _telemetry.info(
+        "crankshaft end recess inside the 16T boss, worst case: "
+        f"{_stack_text(PINION_RECESS_STACK)} >= {PINION_RECESS_MIN_WORST}"
+    )
     check("create_assembly", await adapter.create_assembly())
 
     # =================== structure (static lock + moving joints) ===========
@@ -2111,8 +3074,9 @@ async def build(adapter) -> dict[str, str]:
     )
     await _lock_static(adapter, arbor_pedestal, arbor)
     # NORTH pedestal (PR8, ch12 img09): the same casting rotated 180 about Y
-    # so its strap face looks south at the drum's north end; the arbor's +97
-    # end seats 7.5 into its bore band. Base-bolted static like the south one.
+    # so its strap face looks south at the drum's north end; the arbor's north
+    # end seats ~7.0 into its strap bore (U34c). Base-bolted static like the
+    # south one.
     north_pedestal = await place_component(
         adapter,
         "arbor-pedestal",
@@ -2183,15 +3147,50 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="cone-pivot-post (v2 Ry180, big-end journal, on the plate)",
     )
+    # I22: the two MHA-142 fillisters, head up on the post's counterbore
+    # floors. The post is turned Ry180, so its local +X "mount west" axis
+    # lands at machine -X of the post origin.
+    post_screws: list[str] = []
+    for tag, dx in (("west", -POST_ATTACHMENT_X), ("east", POST_ATTACHMENT_X)):
+        post_screws.append(
+            await place_component(
+                adapter,
+                "post-mount-screw",
+                [ppost[0] + dx, Y_BASE_TOP + PLAT_T + POST_SCREW_SEAT, ppost[2]],
+                [0.0, 0.0, 0.0],
+                IDENTITY,
+                ground=False,
+                label=f"post-mount-screw {tag} (MHA-142 on the post counterbore)",
+            )
+        )
     ptip = cone_station(TIP_BLOCK_STATION)
+    # U30: the block stands on the nominal MHA-141 fit-up shim pack, so its
+    # foot sits TIP_SHIM_NOMINAL above PlateTop (the axis-height assert above
+    # already counts it); the shim is placed under it below.
+    tip_foot_y = Y_BASE_TOP + PLAT_T + TIP_SHIM_NOMINAL
     tip_block = await place_component(
         adapter,
         "cone-tip-block",
-        [ptip[0], Y_BASE_TOP + PLAT_T, ptip[2]],
+        [ptip[0], tip_foot_y, ptip[2]],
         [0.0, INCLINE_DEG, 0.0],
         ROT_Y_INCLINE,
         ground=False,
         label="cone-tip-block (end-play adjuster support, on the plate)",
+    )
+    # I20: the MHA-141 shim pack on PlateTop under the block's foot, in the
+    # block's own frame (it runs under the I31 foot flange, its horseshoe slot
+    # open south along the flange slot).  The I31 hold-down (MHA-140 through
+    # the flange slot into the MHA-146 locknut) is not placed on this base:
+    # its plate slot still sits under the block centre (U30) until #925's I31
+    # plate lands (test_i31_hold_down_is_placed, strict xfail).
+    tip_shim = await place_component(
+        adapter,
+        "cone-tip-shim",
+        [ptip[0], Y_BASE_TOP + PLAT_T, ptip[2]],
+        [0.0, INCLINE_DEG, 0.0],
+        ROT_Y_INCLINE,
+        ground=False,
+        label="cone-tip-shim (MHA-141 fit-up pack under the tip block)",
     )
     # Tip end-play stack (item 5, v4_t00471): the brass spacer bushing on the
     # tip stub, the axial adjuster screw in the block's counterbore, and the
@@ -2222,7 +3221,7 @@ async def build(adapter) -> dict[str, str]:
         "cone-tip-pinch-screw",
         [
             ptip[0] - (TIP_BLOCK_X / 2.0) * COS_I,
-            Y_BASE_TOP + PLAT_T + TIP_PINCH_Y,
+            tip_foot_y + TIP_PINCH_Y,
             ptip[2] + (TIP_BLOCK_X / 2.0) * SIN_I,
         ],
         PINCH_WEST_EULER,
@@ -2278,10 +3277,9 @@ async def build(adapter) -> dict[str, str]:
     # (locked to the fixed seed arbor below); the lift rod is a REVOLUTE in
     # the blocks' raised west bores carrying the two eccentric cams and the
     # lever (PR8 -- all semantically mated, spinning as one family on the
-    # freed pinion_cam DOF). The tee handle is LOCKED to the arbor in
-    # the joints section (cross-pinned in the real machine) so the freed p2
-    # swing carries it with the rig -- it was base-FIXED while the swing was
-    # pinned, which PR8's freed swing would have left hanging in space
+    # freed pinion_cam DOF). The separate MHA-058 grip crossrod is LOCKED to
+    # MHA-102's integral head in the joints section, so the freed p2 swing
+    # carries it with the rig instead of leaving it base-fixed in space
     # (Codex catch, 2026-07-05).
     align_pinion = await place_component(
         adapter,
@@ -2324,20 +3322,24 @@ async def build(adapter) -> dict[str, str]:
             label=f"pinion-pivot-block {tag}",
         )
         pinion_blocks.append(blk)
+    # Option E-a: the shaft is pinned to both straps through their cross
+    # holes, so it is inserted phased to them -- its local X (the pin-hole
+    # axis) lies along the straps' local X at the park lean.
     pivot_shaft = await place_component(
         adapter,
         "pinion-pivot-shaft",
         [PIVOT_X, PIVOT_Y, PIVOT_SHAFT_Z0],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
+        [0.0, 0.0, STRAP_LEAN_DEG],
+        TORQUE_SHAFT_ROWS,
         ground=False,
+        label="pinion-pivot-shaft (pinned to the straps, E-a)",
     )
     lift_rod = await place_component(
         adapter,
         "pinion-lift-rod",
         [LIFT_X, LIFT_Y, LIFT_ROD_Z0],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
+        [0.0, 0.0, LEVER_TILT_DEG],
+        LIFT_ROD_ROWS,  # phased to the lever: coaxial MHA-135 pin holes
         ground=False,
         label="pinion-lift-rod (in the blocks' raised west bores)",
     )
@@ -2362,7 +3364,7 @@ async def build(adapter) -> dict[str, str]:
             label=f"pinion-cam-pin {tag} (edge-seat follower)",
         )
     # Eccentric cam collars (PR8 items 8b/9): one per strap station, pinned to
-    # the lift rod in the authored PARK pose (ecc + boss straight down).
+    # the lift rod in the authored PARK pose (ecc straight down).
     pinion_cams: dict[str, str] = {}
     for tag, z0 in (("front", CAM_Z0[0]), ("back", CAM_Z0[1])):
         pinion_cams[tag] = await place_component(
@@ -2370,7 +3372,7 @@ async def build(adapter) -> dict[str, str]:
             "pinion-cam",
             [LIFT_X, LIFT_Y, z0],
             [0.0, 0.0, 0.0],
-            IDENTITY,
+            PINION_CAM_ROWS,
             ground=False,
             label=f"pinion-cam {tag} (parked ecc down)",
         )
@@ -2379,30 +3381,53 @@ async def build(adapter) -> dict[str, str]:
         "pinion-lever",
         [LIFT_X, LIFT_Y, LEVER_Z],
         [0.0, 0.0, LEVER_TILT_DEG],
-        rot_z_rows(LEVER_TILT_DEG),  # positive rest angle tips machine -X
+        LEVER_ROWS,  # positive rest angle tips machine -X
         ground=False,
         label="pinion-lever (clamp hub on the lift rod front end)",
     )
-    tee_handle = await place_component(
+    # MHA-135: the 1/16 pin driven through the match-drilled hub and rod holes.
+    # Its axis is its local X, so it takes the rod's phase and sits centred on
+    # the rod's "lever pin" station.
+    lever_pin = await place_component(
+        adapter,
+        "pinion-lever-pin",
+        [LIFT_X, LIFT_Y, LIFT_ROD_Z0 + LEVER_PIN_FROM_ROD_END],
+        [0.0, 0.0, LEVER_TILT_DEG],
+        LIFT_ROD_ROWS,
+        ground=False,
+        label="pinion-lever-pin (MHA-135 through hub and rod)",
+    )
+    grip_crossrod = await place_component(
         adapter,
         "pinion-handle",
         [APINION_X, APINION_Y, HANDLE_Z],
         [0.0, 0.0, HANDLE_TILT_DEG],
-        rot_z_rows(HANDLE_TILT_DEG),  # +z spin tips east (-x)
+        HANDLE_ROWS,  # unchanged +z spin tips the local +Y rod toward machine -X
         ground=False,
-        label="pinion-handle (blind cap over the arbor front end)",
+        label="pinion-handle (separate grip crossrod through integral head)",
     )
-    # The steel arbor (PR7 item 14): pressed through the brass drum, journaled
-    # in both straps' Ø8 top bores -- it RIDES the swing group (mated in the
-    # joints section, not located: the engage swing carries it).
+    # MHA-102 is pressed through the brass drum and journaled in both straps'
+    # Ø8 top bores.  Its turned grip head and neck are part of this same solid.
+    # Rotate only about the circular shaft axis so its local-Y cross-hole is
+    # coaxial with MHA-058's local-Y rod; every world centre and Z station stays
+    # unchanged.
     pinion_arbor = await place_component(
         adapter,
         "pinion-arbor",
         [APINION_X, APINION_Y, ARBOR_Z0],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
+        [0.0, 0.0, HANDLE_TILT_DEG],
+        ARBOR_ROWS,
         ground=False,
-        label="pinion-arbor (steel, through the drum)",
+        label="pinion-arbor (integral steel arbor and grip head)",
+    )
+    arbor_collar = await place_component(
+        adapter,
+        "pinion-arbor-collar",
+        [APINION_X, APINION_Y, ARBOR_COLLAR_Z0],
+        [0.0, 0.0, HANDLE_TILT_DEG],
+        ARBOR_ROWS,
+        ground=False,
+        label="pinion-arbor-collar (spring-pinned walk-out backstop)",
     )
     # Rig hold-downs (PR7 items 2/11/12): physically located seeds are patterned
     # across the repeated block/pedestal stations in the joints section below.
@@ -2416,21 +3441,28 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="slotted-screw block hold-down seed",
     )
-    foot_screws: list[str] = []
-    for tag, (sx, sz), seat_y in (
-        ("spring foot", _FOOT_SCREW_XZ[0], Y_BASE_TOP + SPRING_T),
-        ("pedestal flange", _FOOT_SCREW_XZ[1], Y_BASE_TOP + ARBOR_PED_FLANGE_T),
-    ):
-        scr = await place_component(
-            adapter,
-            "foot-screw",
-            [sx, seat_y, sz],
-            [0.0, 0.0, 0.0],
-            IDENTITY,
-            ground=False,
-            label=f"foot-screw ({tag})",
-        )
-        foot_screws.append(scr)
+    sx, sz = _FOOT_SCREW_XZ[0]
+    spring_foot_screw = await place_component(
+        adapter,
+        "foot-screw",
+        [sx, Y_BASE_TOP + SPRING_T, sz],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="foot-screw (spring foot)",
+    )
+    # U34c: the south pedestal's MHA-143 is the seed; the north one is its
+    # linear pattern instance below (pedestal-hold-down-screw-1 / -2).
+    sx, sz = _PEDESTAL_SCREW_XZ[0]
+    pedestal_screw = await place_component(
+        adapter,
+        "pedestal-hold-down-screw",
+        [sx, Y_BASE_TOP + ARBOR_PED_FLANGE_T, sz],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="pedestal-hold-down-screw (south ledge)",
+    )
 
     # =================== cone cluster (driven, on-solution) ====================
     cone_shaft = await place_component(
@@ -2516,20 +3548,36 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="crank-pinion (centred on the 64T contact tooth)",
     )
+    hub = await place_component(
+        adapter,
+        "crank-hub",
+        [X_CRANK, Y_CRANK, CRANK_HUB_Z0],
+        [90.0, 0.0, 0.0],
+        ROT_X_POS90,
+        ground=False,
+        label="MHA-137 through hub",
+    )
+    seam_pin = await place_component(
+        adapter,
+        "crank-hub-pin",
+        CRANK_HUB_PIN_ORIGIN,
+        [0.0, 0.0, 0.0],
+        CRANK_HUB_PIN_ROWS,
+        ground=False,
+        label="MHA-138 six-o'clock axial seam pin",
+    )
     # The crank-end T12 chain wheel is NOT placed here: paper-drive now OWNS the
     # whole crank->paper chain drive (both sprockets + roller chain + belt), so the
     # single crank chain wheel lives in paper-drive (codex #189 :605). Placing it
     # here too made two coincident T12 wheels at the crank centre once both
-    # subassemblies are inserted at the top level -> interference. drive-train keeps
-    # only the crankshaft, arm, handle and 16T pinion; the crank spin DOF is
-    # unchanged (crankshaft/arm, free_dof_key="crank_angle").
+    # subassemblies are inserted at the top level -> interference. Drive-train
+    # keeps the shaft, hub, arm, handle, both crank pins and 16T pinion; the
+    # crank spin DOF remains keyed through the arm.
     # Crank rest pose: the arm hangs straight DOWN (ch30 eight-views -- the
     # handle reads "down" in all eight roll angles, which only a -Y arm does,
     # since a downward vector lies on the views' vertical rotation axis). The
-    # arm part extrudes along its local +X; rot_z(-90) maps that to assembly
-    # -Y, and the composed Ry(180) flips the plate's local +z extrusion to run
-    # machine -z: the origin sits at the plate's NORTH face
-    # (CRANK_ARM_ORIGIN_Z, -167) with the plate band filling -175..-167.
+    # arm's local +x maps to machine -Y, while local +z maps toward machine -Z;
+    # its origin is the inboard face at -175 and the plate fills -183..-175.
     arm = await place_component(
         adapter,
         "crank-arm",
@@ -2538,14 +3586,12 @@ async def build(adapter) -> dict[str, str]:
         compose_rows(rot_z_rows(-90.0), ROT_Y_180),
         ground=False,
     )
-    # Taper pin (2026-09-02, ch11 p.14): through the arm hub + the crankshaft
-    # cross-hole along machine X at the arm's mid-thickness, big end PIN_PROUD
-    # proud of the hub's outer (-X) face, the small end running out the far
-    # side; the brass keeper ring hangs from the head's cross-hole (0.25 air
-    # under the hole's bottom edge). Both lock to the arm so they spin with the
-    # crank. The pin's nominal taper is larger than the arm's #14 / shaft's #9
-    # pilot holes (they are taper-reamed together at assembly), so the two
-    # overlaps are volume-bounded allowed pairs in _interference_contracts.
+    # Taper pin MHA-024 crosses the separate hub's rear barrel and crankshaft
+    # at station -169.4, behind the arm.  Its big end stands PIN_PROUD outside
+    # the hub's -X face; the brass keeper ring hangs from the head cross-hole.
+    # The hub #14 and shaft #9 pilots are match-reamed together to the pin's
+    # 1:48 taper, so those two overlaps alone are volume-bounded allowed pairs
+    # in _interference_contracts.
     pin = await place_component(
         adapter,
         "crank-pin",
@@ -2558,8 +3604,8 @@ async def build(adapter) -> dict[str, str]:
     await lock_mate(
         adapter,
         named_ref(f"Front Plane@{pin}", "PLANE"),
-        named_ref(f"Front Plane@{arm}", "PLANE"),
-        label="crank pin locked to the arm",
+        named_ref(f"Front Plane@{hub}", "PLANE"),
+        label="MHA-024 locked to the crank hub",
     )
     ring = await place_component(
         adapter,
@@ -2575,6 +3621,26 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{ring}", "PLANE"),
         named_ref(f"Front Plane@{pin}", "PLANE"),
         label="keeper ring locked to the pin",
+    )
+    # Pinion retention pin (ch12 p.19): through the boss and the shaft at the
+    # pin station along the seated pinion's local X (PINION_PIN_U), flush with
+    # the boss both sides. Locked to the pinion so it turns with the crank; a
+    # light drive fit in its own match-drilled hole is line contact at the
+    # nominal, so no allowed-pair volume is needed.
+    pinion_pin = await place_component(
+        adapter,
+        "crank-pinion-pin",
+        PINION_PIN_ORIGIN,
+        [0.0, 90.0, -PINION_SEED_DEG],
+        compose_rows(ROT_Y_POS90, rot_z_rows(-PINION_SEED_DEG)),
+        ground=False,
+        label="crank pinion retention pin",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{pinion_pin}", "PLANE"),
+        named_ref(f"Front Plane@{pinion}", "PLANE"),
+        label="pinion retention pin locked to the pinion",
     )
     # Keeper-ring anchor screw + brass eyelet on the arm's front face (ch11
     # p.14); both lock to the arm so they turn with the crank.
@@ -2618,6 +3684,16 @@ async def build(adapter) -> dict[str, str]:
         ROT_Y_POS90,
         ground=False,
     )
+    # MHA-139 carries the handle: head outboard, local +Z (head -> tip) along
+    # machine +z, so the shoulder's ArmSeat lands on the arm's outboard face.
+    handle_screw = await place_component(
+        adapter,
+        "crank-handle-pivot-screw",
+        [X_CRANK, Y_CRANK - ARM_C2C, HANDLE_SCREW_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+    )
 
     # =================== joints ================================================
     # Crankshaft revolute on the PLATFORM's "crank axis" (the machine-z crank
@@ -2649,12 +3725,11 @@ async def build(adapter) -> dict[str, str]:
         label=f"crankshaft axial d={_cs_axial:.2f} (on the plate)",
         verify=(crankshaft, cs_o),
     )
-    # Keyed crank rig: the 16T pinion and the arm turn rigidly WITH the crankshaft;
-    # the handle rides the arm's pivot pin. Each lock is replaced by a SEMANTIC
-    # keyed joint -- coaxial + axial seat + an anti-spin -- so they share the
-    # crankshaft's single spin DOF with no lock/fix. The suppressible crank ANGLE
-    # DRIVER below pins that spin (via the arm). (The T12 chain wheel that used to
-    # be keyed here now lives in paper-drive -- codex #189 :605.)
+    # Keyed crank rig: the 16T pinion, separate hub and matched arm rotate with
+    # the crankshaft; the handle rides the arm pivot.  Semantic coaxial, axial
+    # seat and anti-spin mates retain the single crankshaft spin DOF without
+    # grounding the swing rig.  The suppressible crank angle driver below pins
+    # that spin via the arm.  The T12 chain wheel lives in paper-drive.
     crank_axis = named_ref(f"Axis1@{crankshaft}", "AXIS")
     cs_right = named_ref(f"Right Plane@{crankshaft}", "PLANE")
 
@@ -2680,27 +3755,85 @@ async def build(adapter) -> dict[str, str]:
         verify=(pinion, pn_o),
     )
 
-    # Crank arm (rest pose -Y, rot_z -90): its Top plane is parallel to the
-    # crankshaft's Right at the keyed phase. The crank angle driver below pins the
-    # arm -- hence the whole keyed chain -- to the assembly.
-    # The arm's Ry(180)-composed pose turns its Front normal to machine -z
-    # against SeatArm's +z: the seat holds at the as-built pose only
-    # ANTI-aligned. Pin it explicitly rather than trust CLOSEST.
-    arm_o = await _seat_on_crank(
+    # MHA-137 seats directly on the shaft's common outboard plane.  The
+    # through bore leaves the service pair removable after MHA-024 is tapped
+    # out; the Right-plane anti-spin represents that installed taper pin.
+    hub_o = _org(adapter, hub)
+    hub_axis = named_ref(f"Axis1@{hub}", "AXIS")
+    await coincident_mate(
         adapter,
-        arm,
-        "Axis1",
+        hub_axis,
         crank_axis,
-        crankshaft,
-        "SeatArm",
-        alignment="anti_aligned",
+        label="MHA-137 coaxial on crankshaft",
+        verify=(hub, hub_o),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"Top Plane@{hub}", "PLANE"),
+        named_ref(f"Top Plane@{crankshaft}", "PLANE"),
+        label="MHA-137 flush on shaft cylinder face",
+        alignment="aligned",
+        verify=(hub, hub_o),
     )
     await parallel_mate(
         adapter,
-        named_ref(f"Top Plane@{arm}", "PLANE"),
+        named_ref(f"Right Plane@{hub}", "PLANE"),
         cs_right,
-        label="crank-arm anti-spin (keyed phase)",
+        label="MHA-137 anti-spin (MHA-024)",
+        verify=(hub, hub_o),
+    )
+
+    # MHA-020 is a matched light press fit onto the 15-mm hub seat and butts
+    # against ArmShoulder at local station 8.  Its local +x hangs machine -Y,
+    # putting the seam at six o'clock.
+    arm_o = _org(adapter, arm)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{arm}", "AXIS"),
+        hub_axis,
+        label="crank arm matched on MHA-137 seat",
         verify=(arm, arm_o),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"Front Plane@{arm}", "PLANE"),
+        named_ref(f"ArmShoulder@{hub}", "PLANE"),
+        label="crank arm inboard face on hub shoulder",
+        alignment="anti_aligned",
+        verify=(arm, arm_o),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{arm}", "PLANE"),
+        named_ref(f"Front Plane@{hub}", "PLANE"),
+        label="crank arm six-o'clock phase on hub",
+        verify=(arm, arm_o),
+    )
+
+    # MHA-138 runs axially from the common outboard face for 4 mm and keys only
+    # the arm/hub seam; it never crosses the shaft bore.
+    seam_o = _org(adapter, seam_pin)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{seam_pin}", "AXIS"),
+        named_ref(f"Axis2@{hub}", "AXIS"),
+        label="MHA-138 coaxial with six-o'clock seam",
+        verify=(seam_pin, seam_o),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"Front Plane@{seam_pin}", "PLANE"),
+        named_ref(f"Top Plane@{hub}", "PLANE"),
+        label="MHA-138 seated at outboard face",
+        alignment="aligned",
+        verify=(seam_pin, seam_o),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{seam_pin}", "PLANE"),
+        named_ref(f"Right Plane@{hub}", "PLANE"),
+        label="MHA-138 rotational closure",
+        verify=(seam_pin, seam_o),
     )
 
     # Crank handle: rides the arm's PIVOT pin (Axis2@arm), NOT the crankshaft --
@@ -2729,8 +3862,8 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Right Plane@{handle}", "PLANE"),
         named_ref(f"HandleSeat@{arm}", "PLANE"),
         label="handle axial seat on arm south face (coincident, flip-free)",
-        # Both normals read machine -z (Ry(180)-composed poses): pin the
-        # alignment rather than trust CLOSEST (see the SeatArm note above).
+        # Both normals read machine -z in the composed handle/arm poses; pin
+        # the alignment rather than trusting the closest-solution heuristic.
         alignment="aligned",
         verify=(handle, hd_o),
     )
@@ -2740,6 +3873,34 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Right Plane@{arm}", "PLANE"),
         label="handle anti-spin (grip rest)",
         verify=(handle, hd_o),
+    )
+    # MHA-139 mirrors the handle's pin joint on the same arm datums: coaxial
+    # on the arm pivot, shoulder seated on HandleSeat (ArmSeat's normal is
+    # machine +z, HandleSeat's reads -z), and a parallel holding the slot's
+    # clocking (immaterial, like the handle's grip spin).  The arm's Right
+    # Plane is machine XZ, the identity-placed screw's Top Plane.
+    hs_o = _org(adapter, handle_screw)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{handle_screw}", "AXIS"),
+        named_ref(f"Axis2@{arm}", "AXIS"),
+        label="MHA-139 coaxial on arm pivot",
+        verify=(handle_screw, hs_o),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"ArmSeat@{handle_screw}", "PLANE"),
+        named_ref(f"HandleSeat@{arm}", "PLANE"),
+        label="MHA-139 shoulder seated on arm outboard face",
+        alignment="anti_aligned",
+        verify=(handle_screw, hs_o),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Top Plane@{handle_screw}", "PLANE"),
+        named_ref(f"Right Plane@{arm}", "PLANE"),
+        label="MHA-139 slot clocking",
+        verify=(handle_screw, hs_o),
     )
 
     # =============== cone platform swing (p1 disengage DOF) ==============
@@ -2819,6 +3980,14 @@ async def build(adapter) -> dict[str, str]:
         label="cone-post local-west to platform-east mounting axis",
         verify=(pivot_post, post_o),
     )
+    # I22: each MHA-142 clamps the post to the plate.
+    for screw in post_screws:
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{screw}", "PLANE"),
+            named_ref(f"Front Plane@{pivot_post}", "PLANE"),
+            label=f"{screw} clamped in the post counterbore",
+        )
 
     # Cone shaft revolute in the black pivot post: coincident + an axial plane
     # distance along the inclined axis (the shaft's local Z, read live). Its
@@ -2849,9 +4018,10 @@ async def build(adapter) -> dict[str, str]:
     # Tip block: aligned to the shaft/adjuster axis (which the post + platform
     # already carry) + an axial seat + a
     # parallel anti-spin against the PLATFORM (not the spinning shaft). Its
-    # height falls out of the coaxial (bore height + plate = drive height,
-    # asserted at import), so its foot lands ON PlateTop with no seat mate --
-    # contact, not constraint. It follows the p1 swing through the shaft.
+    # height falls out of the coaxial (plate + shim + axis height = drive
+    # height, asserted at import), so its foot sits the nominal shim pack
+    # above PlateTop with no seat mate; the shim (MHA-141) is the
+    # integrator's. It follows the p1 swing through the shaft.
     tb_o = _org(adapter, tip_block)
     tb_axial = sum((tb_o[k] - cone_o[k]) * cone_axis_dir[k] for k in range(3))
     await coincident_mate(
@@ -2876,6 +4046,33 @@ async def build(adapter) -> dict[str, str]:
         label="tip-block anti-spin (rides the plate)",
         verify=(tip_block, tb_o),
     )
+    # I24: the shim pack is seated face-to-face on PlateTop and squared under
+    # the block's foot (its Front/Right planes are the foot's). The block's
+    # height already comes from the coaxial, so its foot resting on the shim
+    # is contact, proven below and by the interference gate, not a mate.
+    shim_o = _org(adapter, tip_shim)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Top Plane@{tip_shim}", "PLANE"),
+        named_ref(f"PlateTop@{platform}", "PLANE"),
+        label="tip shim seats on the plate (bottom <-> PlateTop)",
+        verify=(tip_shim, shim_o),
+    )
+    for plane in ("Front Plane", "Right Plane"):
+        await coincident_mate(
+            adapter,
+            named_ref(f"{plane}@{tip_shim}", "PLANE"),
+            named_ref(f"{plane}@{tip_block}", "PLANE"),
+            label=f"tip shim squared under the block foot ({plane})",
+            verify=(tip_shim, shim_o),
+        )
+    _shim_y = _org(adapter, tip_shim)[1]
+    _stack = _org(adapter, tip_block)[1] - _shim_y
+    if abs(_stack - TIP_SHIM_T) > 1e-4 or abs(_shim_y - (Y_BASE_TOP + PLAT_T)) > 1e-4:
+        raise AssertionError(
+            f"tip block foot is {_stack:.4f} above the shim's underside, not on its "
+            f"{TIP_SHIM_T:.2f} top"
+        )
     # --- tip end-play stack (item 5): bushing | adjuster | pinch screw --------
     # The bushing spaces the T006 gear off the block's south face: coaxial on
     # the tip stub + an axial seat off the shaft. Free-spinning in reality; its
@@ -3508,17 +4705,46 @@ async def build(adapter) -> dict[str, str]:
         reledger_to_solved(adapter, cyl)
 
     # =============== alignment-pinion swing group (p2 engage DOF) ==============
-    # The two straps + the pinion drum swing as ONE group on the torque shaft to
-    # mesh the cylinder train (ch.25, p.66); parked DISENGAGED (p.68 "gap").
-    # Statics first: the pivot blocks and torque shaft are base-bolted mounts at
-    # their authored transforms -> locked once to the fixed seed arbor. The
-    # lift rod is NOT static any more (PR8): it journals in the blocks' raised
-    # west bores as a revolute below, carrying the cams + lever.
+    # The two straps + the pinion drum swing as ONE group to mesh the cylinder
+    # train (ch.25, p.66); parked DISENGAGED (p.68 "gap").  Option E-a pins
+    # both straps to the torque shaft, so the shaft swings with them in the
+    # blocks' pivot bores.  Statics first: the pivot blocks are base-bolted
+    # mounts at their authored transforms -> locked once to the fixed seed
+    # arbor. The lift rod is NOT static any more (PR8): it journals in the
+    # blocks' raised west bores as a revolute below, carrying the cams + lever.
     for blk in pinion_blocks:
         await _lock_static(adapter, blk, arbor)
-    await _lock_static(adapter, pivot_shaft, arbor)
+    # The shaft's axis sits on the blocks' pivot bores and its station is the
+    # authored one (the cone-platform pivot idiom: an axis held off two
+    # assembly planes); only its spin is left, and the pin tie to the front
+    # strap below takes that.
+    ps_o = _org(adapter, pivot_shaft)
+    await distance_driver(
+        adapter,
+        named_ref(f"Axis1@{pivot_shaft}", "AXIS"),
+        named_ref("Right Plane", "PLANE"),
+        ps_o[0],
+        label=f"torque shaft axis X d={abs(ps_o[0]):.2f}",
+        verify=(pivot_shaft, ps_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Axis1@{pivot_shaft}", "AXIS"),
+        named_ref("Top Plane", "PLANE"),
+        ps_o[1],
+        label=f"torque shaft axis Y d={abs(ps_o[1]):.2f}",
+        verify=(pivot_shaft, ps_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Front Plane@{pivot_shaft}", "PLANE"),
+        named_ref("Front Plane", "PLANE"),
+        ps_o[2],
+        label=f"torque shaft axial d={abs(ps_o[2]):.2f}",
+        verify=(pivot_shaft, ps_o),
+    )
     await _lock_static(adapter, spring, arbor)
-    for scr in [block_screw, *foot_screws]:
+    for scr in (block_screw, spring_foot_screw, pedestal_screw):
         await _lock_static(adapter, scr, arbor)
     block_instances = await grid_component_pattern(
         adapter,
@@ -3541,24 +4767,24 @@ async def build(adapter) -> dict[str, str]:
         "pinion block-screw grid",
     )
     pedestal_target = [
-        _FOOT_SCREW_XZ[2][0],
+        _PEDESTAL_SCREW_XZ[1][0],
         Y_BASE_TOP + ARBOR_PED_FLANGE_T,
-        _FOOT_SCREW_XZ[2][1],
+        _PEDESTAL_SCREW_XZ[1][1],
     ]
     pedestal_instances = await linear_component_pattern(
         adapter,
-        [foot_screws[1]],
+        [pedestal_screw],
         axis="z",
-        spacing_mm=_FOOT_SCREW_XZ[2][1] - _FOOT_SCREW_XZ[1][1],
+        spacing_mm=_PEDESTAL_SCREW_XZ[1][1] - _PEDESTAL_SCREW_XZ[0][1],
         instances=2,
-        label="arbor pedestal foot-screw pattern",
+        label="arbor pedestal hold-down pattern",
     )
     assert_pattern_targets(
         adapter,
         pedestal_instances,
         [pedestal_target],
         IDENTITY,
-        "arbor pedestal foot-screw pattern",
+        "arbor pedestal hold-down pattern",
     )
     # Front strap: revolute on the torque shaft (coincident pivot bore + axial
     # seat) -- the swing DOF. The parked-lean ANGLE driver is a FREED
@@ -3632,6 +4858,27 @@ async def build(adapter) -> dict[str, str]:
         # satisfied at either lean, so witness the arbor bore at the strap top.
         witness_local=[0.0, STRAP_C2C, 0.0],
     )
+    # Option E-a set pins: the shaft's pin holes and the straps' cross holes
+    # share an axis (their local X), so the pin tie is the back strap's own
+    # rigid-group idiom -- the shaft's Right plane parallel to the front
+    # strap's.  The front strap's swing is the freed DOF, so the shaft now
+    # turns with the group in the block bores.  Its origin is on the swing
+    # axis (#154 blindness), so a point on the pin-hole axis at the shaft's
+    # surface witnesses the phase.
+    shaft_x = component_transform(adapter, pivot_shaft)[0:3]
+    strap_x = component_transform(adapter, fb)[0:3]
+    if abs(abs(sum(a * b for a, b in zip(shaft_x, strap_x))) - 1.0) > 1e-6:
+        raise AssertionError(
+            "torque-shaft pin holes are not phased to the straps' cross holes"
+        )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{pivot_shaft}", "PLANE"),
+        named_ref(f"Right Plane@{fb}", "PLANE"),
+        label="torque shaft pinned to the front strap (E-a set pin)",
+        verify=(pivot_shaft, ps_o),
+        witness_local=[STRAP_PIVOT_BORE / 2.0, 0.0, 0.0],
+    )
     # Cam-follower pins (PR8): pressed in each strap's blind WEST-EDGE seat
     # (Axis3), so they RIDE the swing group -- coaxial + the seat-bottom axial
     # split off the strap's Right plane (which contains the seat bottom's
@@ -3704,14 +4951,21 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Top Plane@{lift_rod}", "PLANE"),
         named_ref("Right Plane", "PLANE"),
-        90.0,
-        label="lift rod spin PARK driver (cams parked ecc-down, a=90.00)",
+        LIFT_ROD_PARK_DEG,
+        label=(
+            "lift rod spin PARK driver (cams parked ecc-down, "
+            f"a={LIFT_ROD_PARK_DEG:.2f})"
+        ),
         verify=(lift_rod, lr_o),
         free_dof_key="pinion_cam",
+        # The rod origin sits on the spin axis: an off-axis witness pins the
+        # branch (a +/-LEVER_TILT_DEG mirror would re-phase the cams).
+        witness_local=[0.0, 5.0, 0.0],
     )
     # Eccentric cams: pinned to the rod (set pin) -- coaxial on the rod's axis
-    # + an axial seat + a parallel anti-spin to the rod (both at IDENTITY, so
-    # their Right planes are parallel; the pair spins as one with the rod).
+    # + an axial seat + an angle anti-spin at CAM_ROD_PHASE_DEG to the rod (the
+    # rod is phased to the lever's pin hole, the cams stay ecc-down in the
+    # world), so the set spins as one with the rod.
     for tag in ("front", "back"):
         cam = pinion_cams[tag]
         cam_o = _org(adapter, cam)
@@ -3731,16 +4985,19 @@ async def build(adapter) -> dict[str, str]:
             label=f"pinion cam {tag} set-pin axial d={_cam_ax:.2f}",
             verify=(cam, cam_o),
         )
-        await parallel_mate(
+        await angle_driver(
             adapter,
             named_ref(f"Right Plane@{cam}", "PLANE"),
             named_ref(f"Right Plane@{lift_rod}", "PLANE"),
-            label=f"pinion cam {tag} set-pin anti-spin",
+            CAM_ROD_PHASE_DEG,
+            label=(f"pinion cam {tag} set-pin anti-spin (a={CAM_ROD_PHASE_DEG:.2f})"),
             verify=(cam, cam_o),
+            witness_local=[0.0, 5.0, 0.0],
         )
-    # Lever: clamped on the rod's front end -- coaxial + axial + an angle tie
-    # to the ROD at the photographed 10-degree parked dihedral, so it spins
-    # WITH the rod: dragging the lever in the saved free model turns the cams.
+    # Lever: clamped on the rod's front end -- coaxial + axial + a parallel
+    # tie to the ROD (the rod carries the photographed 10-degree parked phase,
+    # so the match-drilled MHA-135 holes stay coaxial) -- so it spins WITH the
+    # rod: dragging the lever in the saved free model turns the cams.
     lev_o = _org(adapter, lever)
     await coincident_mate(
         adapter,
@@ -3757,14 +5014,40 @@ async def build(adapter) -> dict[str, str]:
         label=f"lever axial seat d={abs(lev_o[2] - lr_o[2]):.2f}",
         verify=(lever, lev_o),
     )
-    await angle_driver(
+    await parallel_mate(
         adapter,
         named_ref(f"Right Plane@{lever}", "PLANE"),
         named_ref(f"Right Plane@{lift_rod}", "PLANE"),
-        abs(LEVER_TILT_DEG),
-        label=f"lever clamp phase (a={abs(LEVER_TILT_DEG):.2f})",
+        label="lever clamp phase (parallel to the rod: coaxial pin holes)",
         verify=(lever, lev_o),
         witness_local=[0.0, LEVER_LEN, 0.0],
+    )
+    # MHA-135 locked to the rod: on the rod's pin-hole axis (Axis2), centred
+    # across it (Right planes coincident -- both contain the rod axis), and
+    # anti-spun about its own axis by a Top-plane parallel.  Rigid with the
+    # rod, it turns with the freed lift-rod spin.
+    lp_o = _org(adapter, lever_pin)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{lever_pin}", "AXIS"),
+        named_ref(f"Axis2@{lift_rod}", "AXIS"),
+        label="MHA-135 on the lift rod's pin-hole axis",
+        verify=(lever_pin, lp_o),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"Right Plane@{lever_pin}", "PLANE"),
+        named_ref(f"Right Plane@{lift_rod}", "PLANE"),
+        label="MHA-135 centred across the lift rod",
+        verify=(lever_pin, lp_o),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Top Plane@{lever_pin}", "PLANE"),
+        named_ref(f"Top Plane@{lift_rod}", "PLANE"),
+        label="MHA-135 anti-spin (parallel to the rod)",
+        verify=(lever_pin, lp_o),
+        witness_local=[0.0, 0.0, 1.0],
     )
     # Pinion drum: journaled in the straps' top bores -- coaxial on the front
     # strap's Axis2 + an axial seat. Its free spin (real: the zeroing input) is
@@ -3802,9 +5085,9 @@ async def build(adapter) -> dict[str, str]:
     )
     # Steel arbor (PR7 item 14): pressed through the drum on the same strap
     # bore axis -- coaxial + an axial seat (Front-plane distance, invariant
-    # under the z-parallel engage swing) + a parallel anti-spin to the drum
-    # it is pressed into (both inserted at IDENTITY, so their Right planes
-    # are parallel; riding the same swing group keeps the pair parallel).
+    # under the z-parallel engage swing) + a fixed 65-degree anti-spin phase
+    # to the drum.  The phase clocks its local-Y cross-hole onto the grip rod;
+    # an off-axis head witness distinguishes the two angle-mate branches.
     arb_o = _org(adapter, pinion_arbor)
     await coincident_mate(
         adapter,
@@ -3821,22 +5104,31 @@ async def build(adapter) -> dict[str, str]:
         label=f"pinion arbor axial d={abs(arb_o[2]):.2f}",
         verify=(pinion_arbor, arb_o),
     )
-    await parallel_mate(
+    await angle_driver(
         adapter,
         named_ref(f"Right Plane@{pinion_arbor}", "PLANE"),
         named_ref(f"Right Plane@{align_pinion}", "PLANE"),
-        label="pinion arbor anti-spin (pressed in the drum)",
+        HANDLE_TILT_DEG,
+        label=f"pinion arbor anti-spin (pressed phase={HANDLE_TILT_DEG:.2f})",
         verify=(pinion_arbor, arb_o),
+        witness_local=[0.0, ARBOR_HEAD_DIA / 2.0, ARBOR_HEAD_CENTER_Z],
     )
-    # Tee handle: cross-pinned on the arbor front end (the zeroing crank), so
-    # it is RIGID to the arbor -- a LOCK records the authored relative pose
-    # with no branches and no DOF change, and the freed p2 swing carries the
-    # handle with the rig instead of leaving it base-fixed in space.
+    # The separate grip crossrod is bonded in MHA-102's reamed integral head
+    # (R1).  A LOCK records that authored relative pose with no
+    # branches or added DOF, so the engage swing carries the complete crank.
     await lock_mate(
         adapter,
-        named_ref(f"Front Plane@{tee_handle}", "PLANE"),
+        named_ref(f"Front Plane@{grip_crossrod}", "PLANE"),
         named_ref(f"Front Plane@{pinion_arbor}", "PLANE"),
-        label="tee handle cross-pinned on the arbor",
+        label="grip crossrod bonded in the integral arbor head",
+    )
+    # R1a: the collar is spring-pinned to the arbor, so it LOCKs to it and
+    # rides the engage swing with no added DOF.
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{arbor_collar}", "PLANE"),
+        named_ref(f"Front Plane@{pinion_arbor}", "PLANE"),
+        label="arbor collar spring-pinned to the arbor",
     )
 
     # DRIVER #1 (the single machine input): the crank angle. The arm hangs at
@@ -3914,6 +5206,7 @@ async def build(adapter) -> dict[str, str]:
     # The PART cell resolves the document summary Title; "drive-train assembly"
     # (not the bare stem) so the sheet identifies itself as an assembly drawing.
     apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
+    create_drive_train_explode(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 
