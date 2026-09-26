@@ -99,7 +99,7 @@ ATTACHMENT_CBORE_DEPTH = 6.0198
 #   cone pads outside the body cylinder             = +    209.0550
 #   cone bore pi*6.1404^2*42.011                    = -  4 976.2960
 #   2x (thru pi*3.57124^2*79.9802 + cbore pi*5.75437^2*6.0198) = - 7 661.5921
-#                                                   = 109 418.5740
+#                                                   = 109 418.5741
 #
 # (#906 R1 bored the crank bore out from Ø11.438 to Ø14.6: 114 076.5723
 # before.  Lowering the crank boss by CRANK_BORE_DROP changes no term: the
@@ -108,7 +108,7 @@ ATTACHMENT_CBORE_DEPTH = 6.0198
 # sliver behind the spot-face plane inside the bore disc -- a cut whose
 # default direction (opposite the sketch normal) found the Ø44 collar to bite
 # instead of auto-flipping into the boss.  Mass at gray iron 7.20 g/cc.
-HARVESTED_VOLUME_MM3 = 109_418.5740
+HARVESTED_VOLUME_MM3 = 109_418.5741
 HARVESTED_MASS_KG = 0.787814
 
 # The cone journal bore is a running journal, so it carries the band the
@@ -155,9 +155,11 @@ CRANK_BORE_BAND = (0.018, 0.0)  # (upper, lower): H7
 # 0.28 - 0.517 * (0.002 + 0.078 + 0.043) = 0.216, and at +0.368 it is
 # 0.28 + 0.517 * (0.364 + 0.078 + 0.048) = 0.533: the drive-train sheet's
 # 0.20-0.55 acceptance.  Printed 39.33 +0.37/0 (aim 39.51) is the post's one
-# tight band; how the shop holds it is theirs (policy rule 6); a
-# post bored outside it is rescued by opening the crank bore for an eccentric
-# bushing, not scrapped.
+# tight band; how the shop holds it is theirs (policy rule 6).
+#
+# #906 R1: the MHA-149 eccentric bushing now takes up the mesh at fit-up, and
+# crank_mesh_stack carries this printed band as one of its terms, with the
+# bore CRANK_BORE_DROP below the frame; the band itself is U31's, unchanged.
 CRANK_ABOVE_CONE = CRANK_BORE_HEIGHT - BORE_HEIGHT
 CRANK_ABOVE_CONE_BAND = (0.37, 0.0)
 

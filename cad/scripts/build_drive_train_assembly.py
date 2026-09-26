@@ -1025,10 +1025,12 @@ from build_cone_pivot_post import (  # noqa: E402
     BLOCK_DIA as POST_BLOCK_DIA,
     BORE_HEIGHT as POST_BORE_HEIGHT,
     CONE_BOSS_LENGTH as POST_CONE_BOSS_LENGTH,
-    CRANK_BORE_HEIGHT as POST_CRANK_Y,
     CRANK_BOSS_LENGTH as POST_CRANK_BOSS_LENGTH,
     CRANK_BOSS_START_Z as POST_CRANK_BOSS_START_Z,
 )
+# #906 R1: the frame's crank axis; the post's crank bore sits CRANK_BORE_DROP
+# below it and the MHA-149 bushing's throw carries the crank back up.
+from cone_pivot_post_spec import CRANK_AXIS_HEIGHT as POST_CRANK_Y  # noqa: E402
 from cone_tip_block_spec import (  # noqa: E402
     ADJUSTER_BORE_SPEC as TIP_ADJ_BORE_SPEC,
     ADJUSTER_AXIS_HEIGHT as TIP_ADJUSTER_AXIS_HEIGHT,

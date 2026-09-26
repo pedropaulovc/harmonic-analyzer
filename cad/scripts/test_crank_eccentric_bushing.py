@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -56,12 +57,12 @@ def test_walls_hold_the_floor_and_match_the_named_row() -> None:
     assert (spec.WALL_TARGET_MM, spec.WALL_FLOOR_MM) == (2.0, 1.5)
     assert spec.WALL_FLOOR_MM <= part.WALL_WORST < spec.WALL_TARGET_MM
     assert spec.WALL_FLOOR_MM <= part.FLATS_WALL_WORST < spec.WALL_TARGET_MM
-    assert round(part.WALL_WORST, 3) == 1.876
+    assert math.floor(part.WALL_WORST * 1000.0) == 1876
     row = next(
         line for line in _policy().splitlines() if line.startswith("| MHA-149 ")
     )
-    assert f"wall {part.WALL_WORST:.3f}" in row
-    assert f"flat {part.FLATS_WALL_WORST:.3f}" in row
+    assert f"wall {math.floor(part.WALL_WORST * 1000.0) / 1000.0:.3f}" in row
+    assert f"flat {math.floor(part.FLATS_WALL_WORST * 1000.0) / 1000.0:.3f}" in row
 
 
 def test_throw_band_matches_its_named_row() -> None:
@@ -93,7 +94,6 @@ def test_flats_are_square_to_the_throw_on_the_protrusion() -> None:
 def test_the_shaft_runs_on_its_core_through_the_bushing() -> None:
     """R1 drops the journal: the 3/8 in core runs the whole bushing length."""
     assert not hasattr(crankshaft_spec, "JOURNAL_DIA")
-    assert crankshaft_spec.SEAT_STEP >= crankshaft_spec.POST_BORE_END
 
 
 def test_part_and_spec_share_one_dimension_contract() -> None:

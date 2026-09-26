@@ -53,19 +53,10 @@ if not (
 # +/-0.8 the wall is 1.873 < 2.0 and the recess -0.461.
 SHAFT_LENGTH_BAND = (0.00, -0.40)  # (upper, lower) deviations
 
-# The installed v2 pivot post remains fixed.  Its Ø11.438 bore spans world
-# z -142.244894428..-70.210494428.  Moving the common crank face from -175 to
-# -183 and adding the same 8 mm to local stations leaves that journal, the T12
-# and the pinion in their established world positions.
-# The 0.05-mm journal clearance is intentional; the surrounding shaft remains
-# the existing 3/8-in OD for the T12, pinion and through-hub fits.
-JOURNAL_BORE_DIA = 11.438
-JOURNAL_CLEARANCE = 0.05
-JOURNAL_DIA = JOURNAL_BORE_DIA - JOURNAL_CLEARANCE
-JOURNAL_DIA_BAND = (0.00, -0.02)  # (upper, lower) deviations
-JOURNAL_START = 32.755105572 + CRANK_FACE_SHIFT
-# The MHA-149 bushing lines the post's crank bore end to end, so the journal
-# runs in the bushing from the bore's outboard end to its inboard end here.
+# #906 R1: the shaft runs in the MHA-149 eccentric bushing on its plain 3/8 in
+# core; the integral journal and its relief are gone.  The bushing's north
+# end sits flush with the post boss's spot face here (the old journal
+# bore's inboard end), which the Ø9.0 seat step stays at.
 POST_BORE_END = 104.789505572 + CRANK_FACE_SHIFT  # 112.79
 
 # Every axial station prints from the FAR END at one place (policy rule 7), and
@@ -103,67 +94,13 @@ if SEAT_STEP_STANDOFF_WORST > SEAT_GAP_NORTH_RANGE + 1e-9:
         f"at print-worst, past the seat gap's {SEAT_GAP_NORTH_RANGE:.2f} north range"
     )
 
-# The journal's inboard land ends one turnable land short of the step: the
-# Ø9.525 web between the journal shoulder and the seat step keeps the 2.0 web
-# target with both stations at their printed rows (policy rule 12).
-WEB_TARGET_MM = 2.0
-JOURNAL_INBOARD_STATION = 27.7
-JOURNAL_END = local_station(JOURNAL_INBOARD_STATION)  # 109.1
-JOURNAL_LENGTH = JOURNAL_END - JOURNAL_START
-STEP_WEB_WORST = (SEAT_STEP - STATION_ROW) - (JOURNAL_END + STATION_ROW)
-if STEP_WEB_WORST < WEB_TARGET_MM - 1e-9:
-    raise AssertionError(
-        f"web between the journal shoulder and the Ø{PINION_SEAT_DIA} seat step is "
-        f"{STEP_WEB_WORST:.3f} at print-worst, under the {WEB_TARGET_MM} target"
-    )
-if JOURNAL_END + STATION_ROW > POST_BORE_END:
-    raise AssertionError("the journal's inboard land can leave the bushing bore")
-
-# Journal relief (Main 2026-09-26, #906): the bushing is reamed plain through,
-# so the shaft carries the relief.  Two lands at the bushing's ends bear; the
-# middle is turned under them.  The relief prints at .X like any free
-# diameter: at the top of its row it still clears the land's lower limit, and
-# at the bottom it never cuts into the 3/8 in core.  Each land keeps at least
-# one journal diameter of length (L/D >= 1) with both of its stations at their
-# printed rows.
-RELIEF_DIA = 10.4
-RELIEF_DIA_PLACES = 1
-RELIEF_OUTBOARD_STATION = 81.0
-RELIEF_INBOARD_STATION = 42.7
-RELIEF_START = local_station(RELIEF_OUTBOARD_STATION)  # 55.8
-RELIEF_END = local_station(RELIEF_INBOARD_STATION)  # 94.1
-RELIEF_LENGTH = RELIEF_END - RELIEF_START
-_RELIEF_ROW = crank_pinion_spec.printed_band_mm(RELIEF_DIA_PLACES)
-if RELIEF_DIA + _RELIEF_ROW >= JOURNAL_DIA + JOURNAL_DIA_BAND[1]:
-    raise AssertionError("the journal relief can print as large as the lands it relieves")
-if RELIEF_DIA - _RELIEF_ROW < SHAFT_DIA + SHAFT_DIA_BAND[0]:
-    raise AssertionError("the journal relief can print into the 3/8 in core")
-_OUTBOARD_START_LOWER, _OUTBOARD_START_UPPER = crank_pinion_spec.printed_deviations(
-    SHAFT_LENGTH - JOURNAL_START, STATION_PLACES
-)
-JOURNAL_LAND_L_OVER_D_MIN = 1.0
-JOURNAL_LANDS_WORST = (
-    # far-end stations: a land is short when its inboard station prints long
-    # and its outboard one prints short
-    (SHAFT_LENGTH - JOURNAL_START + _OUTBOARD_START_LOWER)
-    - (RELIEF_OUTBOARD_STATION + STATION_ROW),
-    (RELIEF_INBOARD_STATION - STATION_ROW) - (JOURNAL_INBOARD_STATION + STATION_ROW),
-)
-for _land in JOURNAL_LANDS_WORST:
-    if _land < JOURNAL_LAND_L_OVER_D_MIN * JOURNAL_DIA:
-        raise AssertionError(
-            f"journal land {_land:.3f} at print-worst is under L/D "
-            f"{JOURNAL_LAND_L_OVER_D_MIN} of the Ø{JOURNAL_DIA} journal"
-        )
-
+# The core runs in the bushing (rule 5); the finish rides its middle.
+BEARING_MID_STATION = POST_BORE_END - 38.5
 SURFACE_FINISHES = (
     SurfaceFinishControl(
-        "bearing_journal",
+        "bearing_core",
         MACHINED_UM,
-        CylinderFace(
-            JOURNAL_DIA,
-            contains_y_mm=(RELIEF_END + JOURNAL_END) / 2.0,
-        ),
+        CylinderFace(SHAFT_DIA, contains_y_mm=BEARING_MID_STATION),
     ),
 )
 # MHA-024 hub-to-shaft cross-hole behind the crank arm.
@@ -180,37 +117,25 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDiaDim"},
     "Shaft": {"Depth"},
     "ShaftDomeProfile": {"DomeHeight"},
-    "JournalProfile": {"JournalDiaDim"},
-    "ReliefProfile": {"ReliefDiaDim"},
     "PinionSeatProfile": {"PinionSeatDiaDim"},
     "StationReference": {
         "OverallLength",
         "PinionSeatStation",
-        "JournalInboardStation",
-        "ReliefInboardStation",
-        "ReliefOutboardStation",
-        "JournalOutboardStation",
         "PinHoleStation",
         "DomeSphereRadius",
     },
 }
-# Decimal places ARE the tolerance (policy rule 2).  The three running/seat
-# diameters are functional fits and keep their three-place size bands; the
-# relief and every length on this hand-cranked shaft are routine (.X).
+# Decimal places ARE the tolerance (policy rule 2).  The two running/seat
+# diameters are functional fits and keep their three-place size bands; every
+# length on this hand-cranked shaft is routine (.X).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftProfile": {"ShaftDiaDim": 3},
     "Shaft": {"Depth": crank_pinion_spec.SHAFT_LENGTH_PLACES},
     "ShaftDomeProfile": {"DomeHeight": 1},
-    "JournalProfile": {"JournalDiaDim": 3},
-    "ReliefProfile": {"ReliefDiaDim": RELIEF_DIA_PLACES},
     "PinionSeatProfile": {"PinionSeatDiaDim": 3},
     "StationReference": {
         "OverallLength": 1,
         "PinionSeatStation": STATION_PLACES,
-        "JournalInboardStation": STATION_PLACES,
-        "ReliefInboardStation": STATION_PLACES,
-        "ReliefOutboardStation": STATION_PLACES,
-        "JournalOutboardStation": STATION_PLACES,
         "PinHoleStation": STATION_PLACES,
         "DomeSphereRadius": 1,
     },
