@@ -188,7 +188,7 @@ def test_printed_mesh_meets_its_design_rules(teeth: int) -> None:
     assert worst["tip_land"] >= LAND_MIN, worst
     assert worst["drum_floor"] >= DRUM_FLOOR_MIN, worst
     # The drum tip still clears the (risen) chord floor with every runout
-    # closing; +0.030 at T006 is the tightest running clearance.
+    # closing; +0.045 at T006 is the tightest running clearance.
     assert worst["cone_floor"] > 0.0, worst
     low, high = spec.BACKLASH_ACCEPTANCE_MM
     assert low == spec.MESH_BACKLASH_MIN_MM

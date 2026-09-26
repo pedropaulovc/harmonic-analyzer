@@ -334,21 +334,21 @@ PINION_FACE_STATION_REFERENCE = 10.8  # re-derived 2026-07-14: fills the casting
 # = build_crank_pinion FACE_WIDTH.
 
 # Mesh anchor: X_PITCH is every cone gear's pitch-section x at the
-# contact azimuth. The oblique crossing dives (DRUM_FACE/2)*tan(i) past
-# the mid-face penetration, so the mid value is capped at working depth
-# minus the dive minus the edge slack -> tip interleave 0.00..1.14.
-# Slack 0.55 is checker-arbitrated: the oblique crossing distorts the
-# flank match beyond plain backlash math, worst at the smallest gears
-# (their engagement arc spans a large azimuth, where the off-centre
-# teeth barely drift out of the drum band) -- 0.15 left <=0.06 mm^3
-# flank slivers at the five smallest stations, 0.35 still skinned the
-# last four.
-DRUM_TIP_X = X_DRUM - (122.0 / DP_TRAIN) * 25.4 / 2.0  # -85.80 at DP 49.82
+# contact azimuth. The oblique crossing dives (DRUM_FACE/2)*tan(i) = 0.333
+# past the mid-face penetration, so the mid value is capped at working
+# depth minus the dive minus the edge slack: standard-tip interleave
+# -0.196..+0.470 across each drum face (test_cone_gear_mesh_design pins
+# the 0.470).  The slack 0.55 was checker-arbitrated on the retired
+# standard-tip pose -- 0.15 left <=0.06 mm^3 flank slivers at the five
+# smallest stations, 0.35 still skinned the last four.  Since U42 the
+# printed (deepened) teeth are budgeted by test_cone_gear_mesh_design
+# against this pose; the lateral fit-up that sets it is #917.
+DRUM_TIP_X = X_DRUM - (122.0 / DP_TRAIN) * 25.4 / 2.0
 PEN_EDGE_SLACK = _config.fit(
     "cone_drum_oblique_mesh", "edge_slack_mm"
 )  # cad/config/tolerances.yaml
-PEN_MID = WORKING_DEPTH - PEN_EDGE_SLACK - (DRUM_FACE / 2.0) * TAN_I  # 0.565
-X_PITCH = DRUM_TIP_X - ADDENDUM * SEC_I + PEN_MID  # -85.76 at DP 49.82
+PEN_MID = WORKING_DEPTH - PEN_EDGE_SLACK - (DRUM_FACE / 2.0) * TAN_I  # 0.137
+X_PITCH = DRUM_TIP_X - ADDENDUM * SEC_I + PEN_MID
 
 
 def cone_seat(j: int) -> tuple[float, float]:
