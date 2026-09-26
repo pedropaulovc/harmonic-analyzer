@@ -508,20 +508,18 @@ def test_note_says_deburr_not_chamfer() -> None:
 
 def test_front_view_carries_no_break_dimension() -> None:
     """The 1:1 Front claims only the cut length; the break is claimed only by
-    the tip detail."""
+    the 10:1 tip view, and both import by feature (never the entire model)."""
     assert "CutEndBreak" not in drawing.FRONT_KEEP
     assert spec.FRONT_VIEW_DIMENSIONS == {"CutLengthReference": {"CutLength"}}
-    assert spec.DETAIL_VIEW_DIMENSIONS == {"CutEndDeburrProfile": {"CutEndBreak"}}
     assert set(drawing.DETAIL_KEEP) == {"CutEndBreak"}
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "dimensions_by_feature=FRONT_VIEW_DIMENSIONS" in source
-    # The detail's import is the entire-model form, never the targeted one.
-    assert "dimensions_by_feature=DETAIL_VIEW_DIMENSIONS" not in source
+    assert "dimensions_by_feature=DRAWING_DIMENSIONS" in source
     assert "BREAK_CONTROLS" not in source and "offset_dimension_text" not in source
 
 
-def test_tip_detail_prints_the_band_max_as_a_single_limit() -> None:
-    """The detail's dimension reads the spec band's max at its places, as a
+def test_tip_view_prints_the_band_max_as_a_single_limit() -> None:
+    """The tip view's dimension reads the spec band's max at its places, as a
     swTolMAX single limit; the seat read-back composes the same text."""
     lower, upper = deviations(spec.CUT_END_BREAK_BAND)
     places = spec.DRAWING_PRECISION_BY_NAME["CutEndBreak"]
@@ -539,11 +537,12 @@ def test_tip_detail_prints_the_band_max_as_a_single_limit() -> None:
     assert drawing.break_text(spec.CUT_END_BREAK_MAX_MM, places, 2, "", "") != expected
     assert drawing.break_text(spec.CUT_END_BREAK_MAX_MM, places, 6, "(", ")") != expected
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("_verify_tip_detail(adapter, front, detail)") == 2
-    block = source.split('_telemetry.span("drawing.tip_detail"', 1)[1]
-    block = block.split("assert_imported_precision(adapter, detail_annotations", 1)[0]
-    assert "trim_drawing.end_detail(adapter, front, TIP_DETAIL)" in block
-    assert "_curate_tip_detail(adapter, detail)" in block
+    assert source.count("_verify_tip_view(adapter, front, tip)") == 2
+    block = source.split('_telemetry.span("drawing.tip_view"', 1)[1]
+    block = block.split("_verify_tip_view(adapter, front, tip)", 1)[0]
+    assert "cropped_tip_view(adapter)" in block
+    assert "_curate_tip_view(adapter, tip)" in block
+    assert "assert_imported_precision(adapter, tip_annotations, DETAIL_PRECISION)" in block
     assert "hidden_sketches.curate_view_dimensions(" not in block
 
 
@@ -614,34 +613,182 @@ def test_break_is_owned_by_the_deburr_cutter_not_a_hidden_reference_sketch() -> 
     assert 'f"{lines[1]}.start", radius, end, DEBURR_PROFILE' in cutter
 
 
-class _FakeDetailView:
-    """A derived view as the two MHA-142 leaves saw it: it has a base view."""
+# --- The tip view is a CROPPED 10:1 MODEL VIEW, not a detail ----------------
+# b6552f13b (diag/mha142-bisect, farm worker swmaker000008): no detail child
+# of the Front offered CutEndBreak to the import, under 10:1 HLR, 10:1 HLV,
+# 5:1 and 2:1, imported before or after the Front's own import; a standalone
+# 10:1 *Front model view, moved to the tip and cropped, imported it twice.
 
-    def GetBaseView(self):
+
+class _Point:
+    def __init__(self, xyz) -> None:
+        self.ArrayData = tuple(xyz)
+
+    def MultiplyTransform(self, transform):
+        return _Point(transform(self.ArrayData))
+
+
+class _Utility:
+    def CreatePoint(self, xyz):
+        return _Point(xyz)
+
+
+class _Sketch:
+    # A sheet point maps to its view-sketch point x1000 (any affine map works).
+    ModelToSketchTransform = staticmethod(lambda xyz: tuple(v * 1000.0 for v in xyz))
+
+
+class _Note:
+    def __init__(self, text: str, owner: str) -> None:
+        self.text = text
+        self.owner = owner
+
+    def GetText(self):
+        return self.text
+
+
+class _SeatView:
+    """IView stand-in whose tip reference sits 0.4 m below its Position."""
+
+    def __init__(self, name: str, seat: "_Seat", *, cropped: bool = True) -> None:
+        self.name = name
+        self.seat = seat
+        self.cropped = cropped
+        self.ScaleRatio = (10.0, 1.0)
+        self.Position = (0.2, 0.6)
+
+    def SetViewPosition(self, position, move_children):
+        self.seat.log.append(("move", self.name, tuple(position), move_children))
+        self.Position = tuple(position)
+        return True
+
+    def GetSketch(self):
+        return _Sketch()
+
+    def Crop2(self, jagged, no_outline, intensity):
+        self.seat.log.append(("crop2", self.name, jagged, no_outline, intensity))
+        return 1  # swCropViewErrors_NoError
+
+    def IsCropped(self):
+        return self.cropped
+
+    def GetOutline(self):
+        return (0.15, 0.13, 0.23, 0.22)
+
+    def GetNotes(self):
+        return tuple(note for note in self.seat.notes if note.owner == self.name)
+
+
+class _Seat:
+    """IModelDoc2 + IDrawingDoc + ISketchManager + adapter, recorded."""
+
+    def __init__(self) -> None:
+        self.log: list[tuple] = []
+        self.notes: list[_Note] = []
+        self.active = ""
+        self.currentModel = self
+        self.SketchManager = self
+        self.swApp = self
+
+    def GetMathUtility(self):
+        return _Utility()
+
+    def ActivateView(self, name):
+        self.log.append(("activate", name))
+        self.active = name
+        return True
+
+    def ClearSelection2(self, _all):
+        return True
+
+    def EditRebuild3(self):
+        return True
+
+    def CreateCircle(self, *xyz):
+        self.log.append(("circle", self.active, tuple(round(v, 9) for v in xyz)))
         return object()
 
+    def CreateDetailViewAt4(self, *args):
+        raise AssertionError("the tip must not be a detail view")
 
-def _fake_detail_seat(monkeypatch):
-    """Model pms857-f543/56f7: into the detail, the targeted selected-feature
-    import (source 1) returns nothing; the entire-model import (source 0)
-    returns the marked CutEndBreak."""
+
+def _tip_seat(monkeypatch, *, cropped: bool = True):
+    seat = _Seat()
+    tip = _SeatView("Drawing View3", seat, cropped=cropped)
+    front = _SeatView("Drawing View1", seat)
+    placed: list[tuple] = []
+
+    def place(adapter, source, orientation, x, y, *, scale=None):
+        placed.append((orientation, x, y, scale))
+        return tip
+
+    def point_in_view(adapter, view, xyz, *, label):
+        assert xyz == tuple(v / 1000 for v in drawing.TIP_DETAIL.detail_reference_mm)
+        return (view.Position[0], view.Position[1] - 0.4)
+
+    def note(adapter, text, x, y, **_kwargs):
+        made = _Note(text, seat.active)
+        seat.notes.append(made)
+        seat.log.append(("note", seat.active, text, round(x, 9), round(y, 9)))
+        return made
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(drawing, "double_array", lambda values: list(values))
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "model_point_in_view", point_in_view)
+    monkeypatch.setattr(drawing, "view_name", lambda adapter, view: view.name)
+    monkeypatch.setattr(drawing, "add_note", note)
+    return seat, tip, front, placed
+
+
+def test_tip_view_is_a_cropped_10_to_1_model_view_not_a_detail(monkeypatch) -> None:
+    seat, tip, _front, placed = _tip_seat(monkeypatch)
+    view = drawing.cropped_tip_view(seat)
+    assert view is tip
+    assert placed == [("*Front", *drawing.DETAIL_CENTER, drawing.DETAIL_SCALE)]
+    # Moved so the tip reference lands where the detail sat.
+    moves = [entry for entry in seat.log if entry[0] == "move"]
+    assert len(moves) == 1
+    assert moves[0][2] == pytest.approx(
+        (drawing.DETAIL_CENTER[0], drawing.DETAIL_CENTER[1] + 0.4)
+    )
+    # The crop circle is sketched in the tip view itself, centred on the tip,
+    # at the fence's sheet radius, and Crop2 runs straight after it (the new
+    # circle must still be the selection).
+    kinds = [entry[0] for entry in seat.log]
+    assert kinds[-3:] == ["activate", "circle", "crop2"]
+    assert seat.log[-3] == ("activate", "Drawing View3")
+    _, owner, xyz = seat.log[-2]
+    assert owner == "Drawing View3"
+    cx, cy, _, px, py, _ = (v / 1000.0 for v in xyz)
+    assert (cx, cy) == pytest.approx(drawing.DETAIL_CENTER)
+    assert math.dist((cx, cy), (px, py)) == pytest.approx(drawing.DETAIL_RADIUS)
+    assert seat.log[-1] == ("crop2", "Drawing View3", False, False, 5)
+
+
+def test_tip_view_raises_when_the_crop_did_not_take(monkeypatch) -> None:
+    seat, _tip, _front, _placed = _tip_seat(monkeypatch, cropped=False)
+    with pytest.raises(RuntimeError, match="not cropped"):
+        drawing.cropped_tip_view(seat)
+
+
+def test_tip_view_imports_the_break_by_feature(monkeypatch) -> None:
+    """Targeted import: only the deburr cutter's profile is selected; the
+    entire-model import is never called."""
     import _drawing_common as dc
-    import _drawing_hidden_sketches as hs
 
     break_annotation = object()
     calls: list[str] = []
 
     def targeted(adapter, view, features):
-        calls.append(f"source1:{list(features)}")
-        return []
+        calls.append(f"features:{list(features)}")
+        return [("CutEndBreak", break_annotation)]
 
     def entire(adapter, view):
-        calls.append("source0")
-        return [break_annotation]
+        raise AssertionError("the tip view must not import the entire model")
 
     monkeypatch.setattr(dc, "insert_feature_dimensions", targeted)
     monkeypatch.setattr(dc, "insert_marked_dimensions", entire)
-    monkeypatch.setattr(dc, "delete_unnamed_imports", lambda adapter, items: list(items))
     monkeypatch.setattr(
         dc,
         "dimension_name",
@@ -652,82 +799,91 @@ def _fake_detail_seat(monkeypatch):
         "curate_dimensions",
         lambda adapter, items, delete=(), reposition=None: list(items),
     )
-    monkeypatch.setattr(hs, "_show_hidden_owners", lambda *a, **k: [])
-    monkeypatch.setattr(hs, "_warn_undetected_owners", lambda *a, **k: [])
-    return break_annotation, calls
-
-
-def test_targeted_import_into_the_tip_detail_raises_as_on_the_seat(monkeypatch) -> None:
-    """The observed failure shape, pinned: the targeted form the two leaves
-    ran returns nothing into the detail and raises "missing model
-    dimensions"."""
-    import _drawing_hidden_sketches as hs
-
-    _, calls = _fake_detail_seat(monkeypatch)
-    with pytest.raises(RuntimeError, match="missing model dimensions: \\['CutEndBreak'\\]"):
-        hs.curate_view_dimensions(
-            object(),
-            _FakeDetailView(),
-            keep=drawing.DETAIL_KEEP,
-            view_label="tip detail break",
-            dimensions_by_feature=spec.DETAIL_VIEW_DIMENSIONS,
-        )
-    assert calls == ["source1:['CutEndDeburrProfile']"]
-
-
-def test_tip_detail_takes_the_break_through_the_entire_model_import(monkeypatch) -> None:
-    """Option A (Main): only the import source changes -- the tip detail uses
-    the boss hook's entire-model form, and so receives the break."""
-    break_annotation, calls = _fake_detail_seat(monkeypatch)
-    monkeypatch.setattr(
-        drawing,
-        "read_detail_visible_entities",
-        lambda adapter, detail: calls.append("visible") or {},
-    )
-    curated = drawing._curate_tip_detail(object(), _FakeDetailView())
+    curated = drawing._curate_tip_view(object(), object())
     assert curated == [break_annotation]
-    # The visible-entity read runs BEFORE the import (pms857-diag-9eca).
-    assert calls == ["visible", "source0"]
+    assert calls == ["features:['CutEndDeburrProfile']"]
 
 
-class _FakeVisibleView:
-    """IView stand-in: 2 edges and 3 vertices on one component."""
+def test_tip_view_label_is_owned_by_the_tip_view(monkeypatch) -> None:
+    seat, tip, _front, _placed = _tip_seat(monkeypatch)
+    assert drawing.TIP_VIEW_LABEL == "DETAIL A  SCALE 10:1"
+    drawing.label_tip_view(seat, tip)
+    assert [(n.owner, n.text) for n in seat.notes] == [
+        ("Drawing View3", "DETAIL A  SCALE 10:1")
+    ]
+    x, y = drawing.TIP_DETAIL.detail_label_xy
+    assert (
+        "note", "Drawing View3", "DETAIL A  SCALE 10:1", round(x, 9), round(y, 9)
+    ) in seat.log
 
-    def __init__(self) -> None:
-        self.calls: list[int] = []
 
-    def GetVisibleComponents(self):
-        return ("screw",)
-
-    def GetVisibleEntities2(self, component, entity_type):
-        self.calls.append(entity_type)
-        return {1: ("e1", "e2"), 2: ("v1", "v2", "v3")}[entity_type]
+def test_tip_view_label_raises_when_it_lands_elsewhere(monkeypatch) -> None:
+    seat, tip, _front, _placed = _tip_seat(monkeypatch)
+    monkeypatch.setattr(seat, "ActivateView", lambda name: True)  # stays inactive
+    with pytest.raises(RuntimeError, match="label"):
+        drawing.label_tip_view(seat, tip)
 
 
-def test_visible_entity_read_counts_edges_and_vertices(monkeypatch) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
-    view = _FakeVisibleView()
-    counts = drawing.read_detail_visible_entities(object(), view)
-    assert counts == {"components": 1, "edges": 2, "vertices": 3}
-    assert view.calls == [1, 2]
+def test_front_marks_the_tip_with_a_circle_and_letter(monkeypatch) -> None:
+    seat, _tip, front, _placed = _tip_seat(monkeypatch)
+    drawing.mark_tip_on_front(seat, front)
+    circles = [entry for entry in seat.log if entry[0] == "circle"]
+    assert len(circles) == 1 and circles[0][1] == "Drawing View1"
+    cx, cy, _, px, py, _ = (v / 1000.0 for v in circles[0][2])
+    tip = (front.Position[0], front.Position[1] - 0.4)
+    assert (cx, cy) == pytest.approx(tip)
+    # The fence's 1:1 radius: the circle bounds exactly what the tip view shows.
+    assert math.dist((cx, cy), (px, py)) == pytest.approx(drawing.DETAIL_FENCE_MM / 1000.0)
+    assert [(n.owner, n.text) for n in seat.notes] == [("Drawing View1", "A")]
+    note = next(entry for entry in seat.log if entry[0] == "note")
+    offset = drawing.TIP_DETAIL.parent_letter_offset
+    assert note[3:] == (round(tip[0] + offset[0], 9), round(tip[1] + offset[1], 9))
+
+
+def test_tip_label_and_letter_agree() -> None:
+    assert drawing.TIP_LETTER == "A"
+    assert drawing.TIP_VIEW_LABEL.startswith(f"DETAIL {drawing.TIP_LETTER} ")
+    num, den = drawing.DETAIL_SCALE
+    assert drawing.TIP_VIEW_LABEL.endswith(f"SCALE {num:g}:{den:g}")
+
+
+def test_bisect_scaffolding_is_gone() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source.split("def read_detail_visible_entities", 1)[1].split("\ndef ", 1)[0]
+    for token in (
+        "read_detail_visible_entities",
+        "GetVisibleEntities2",
+        "_detail_facts",
+        "mha142-bisect view=",
+        "run_bisect",
+        "end_detail(",
+        "CreateDetailViewAt4",
+        "position_detail_label",
+        "position_parent_detail_letter",
+    ):
+        assert token not in source, token
+
+
+def test_measured_behaviour_is_recorded_on_the_tip_view() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source.split("def cropped_tip_view", 1)[1].split("\ndef ", 1)[0]
     body = " ".join(body.split())
-    assert "may be seat variance" in body
-    assert "pms857-f543, -56f7, -6099" in body and "pms857-diag-9eca" in body
+    for evidence in ("b6552f13b", "10:1 HLR", "10:1 HLV", "5:1", "2:1", "before or after"):
+        assert evidence in body, evidence
 
 
 def test_front_is_active_before_the_notes() -> None:
-    """pms857-diag-9eca: the four property-linked notes landed in the active
-    tip detail ("expected one native detail label, found 5").  The Front is
-    activated after the detail's curate and before the first note."""
+    """pms857-diag-9eca: property-linked notes land in the ACTIVE view.  The
+    tip view is labelled while active, the Front is marked, then the Front
+    is re-activated before the first sheet note."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     body = source.split("async def build", 1)[1]
-    detail = body.index("_curate_tip_detail(adapter, detail)")
+    curate = body.index("_curate_tip_view(adapter, tip)")
+    label = body.index("label_tip_view(adapter, tip)")
+    mark = body.index("mark_tip_on_front(adapter, front)")
     activate = body.index("activate_front_for_notes(adapter, front)")
     first_note = body.index("add_property_linked_note(")
-    label = body.index("trim_drawing.position_detail_label(")
-    assert detail < activate < first_note < label
+    assert curate < label < mark < activate < first_note
+
 
 
 def test_activate_front_for_notes_activates_the_front_by_name(monkeypatch) -> None:
