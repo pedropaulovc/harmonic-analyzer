@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from pathlib import Path
 
 import pinion_pivot_shaft_spec
@@ -133,3 +134,102 @@ def test_set_pin_holes_print_only_size_and_the_match_drill() -> None:
     assert "2 PL" in callout
     assert pinion_pivot_shaft_spec.PIN_HOLE_DIA == 25.4 / 16.0
     assert pinion_pivot_shaft_spec.PIN_HOLE_BAND == (0.06, 0.0)
+
+
+# pc-r7 eye pass: the cylindricity frame and datum A sat on the match-drill
+# callout's text and the Ra bar on its shoulder.  The callout is placed from
+# the symbols' read-back boxes (_drawing_annotation_extent), and these pin the
+# arithmetic and the wiring offline.
+def test_callout_text_box_is_the_shoulder_span_mirrored_about_the_text_centre() -> None:
+    import _drawing_annotation_extent as extent
+
+    lines = [
+        (0.068, 0.2227, 0.1156, 0.205),  # sloped leader down to the hole
+        (0.066, 0.2227, 0.193, 0.2227),  # the shoulder under the text
+        (0.100, 0.259, 0.104, 0.259),  # a short stacked-tolerance rule
+    ]
+    assert extent.callout_text_box(lines, (0.125, 0.241)) == pytest.approx(
+        (0.066, 0.2227, 0.193, 0.2593)
+    )
+    with pytest.raises(RuntimeError, match="no shoulder"):
+        extent.callout_text_box([lines[0]], (0.125, 0.241))
+
+
+def test_the_callout_moves_above_the_ra_lane_and_right_of_the_end_view_frames(
+    monkeypatch,
+) -> None:
+    import _drawing_annotation_extent as extent
+    from _drawing_layout_check import DrawableRegion
+
+    offset = [0.0, 0.0]
+    text = (0.066, 0.2227, 0.193, 0.2593)
+
+    def ink(_adapter, _annotation, *, label):
+        dx, dy = offset
+        box = (text[0] + dx, text[1] + dy, text[2] + dx, text[3] + dy)
+        return extent.CalloutInk(label, box, ())
+
+    def move(_adapter, _annotation, dx, dy, *, label):
+        offset[0] += dx
+        offset[1] += dy
+
+    monkeypatch.setattr(extent, "callout_ink", ink)
+    monkeypatch.setattr(extent, "move_annotation", move)
+    monkeypatch.setattr(extent, "rebuild_drawing", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        extent, "sheet_region", lambda _a: DrawableRegion(0.0127, 0.0127, 0.419, 0.2667)
+    )
+    ra = (0.147, 0.205, 0.194, 0.223)
+    frame = (0.063, 0.215, 0.085, 0.232)
+    crown = (0.2455, 0.214, 0.262, 0.229)
+    placed = extent.place_callout_clear(
+        None,
+        None,
+        label="MHA-062 match-drill callout",
+        below={"Ra 1.6": ra},
+        beside={"cylindricity frame": frame, "crown profile frame": crown},
+    )
+    assert placed.text[1] == pytest.approx(ra[3] + extent.CLEAR_GAP_M)
+    assert placed.text[0] == pytest.approx(frame[2] + extent.CLEAR_GAP_M)
+    for box in (ra, frame, crown):
+        assert extent.boxes_clear(placed.text, box)
+
+
+def test_a_callout_too_long_to_fit_fails_loud_instead_of_re_colliding(
+    monkeypatch,
+) -> None:
+    import _drawing_annotation_extent as extent
+    from _drawing_layout_check import DrawableRegion
+
+    monkeypatch.setattr(
+        extent,
+        "callout_ink",
+        lambda _a, _n, *, label: extent.CalloutInk(
+            label, (0.066, 0.23, 0.25, 0.26), ()
+        ),
+    )
+    monkeypatch.setattr(extent, "move_annotation", lambda *_a, **_k: None)
+    monkeypatch.setattr(extent, "rebuild_drawing", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        extent, "sheet_region", lambda _a: DrawableRegion(0.0127, 0.0127, 0.419, 0.2667)
+    )
+    with pytest.raises(RuntimeError, match="crowds"):
+        extent.place_callout_clear(
+            None,
+            None,
+            label="MHA-062 match-drill callout",
+            below={},
+            beside={"crown profile frame": (0.2455, 0.214, 0.262, 0.265)},
+        )
+
+
+def test_the_match_drill_callout_is_placed_from_every_neighbours_read_back_box() -> (
+    None
+):
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    call = source[source.index("place_callout_clear(") :]
+    call = call[: call.index("add_property_linked_note")]
+    assert '== "PinHoleDia"' in call
+    for handle in ("bearing_finish", "cylindricity", "datum_a", "crown_profile"):
+        assert f"{handle}.GetAnnotation()" in call
+    assert call.index("below=") < call.index("bearing_finish") < call.index("beside=")

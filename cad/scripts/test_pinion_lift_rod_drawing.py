@@ -83,3 +83,14 @@ def test_view_scales_are_explicit() -> None:
     assert "scale=(1, 1)" in source  # side view true scale
     assert pinion_lift_rod_spec.END_VIEW_NOTE == "END VIEW SCALE 2:1"
     assert pinion_lift_rod_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
+
+
+def test_the_end_view_diameter_is_placed_inside_the_zone_frame_from_its_read_back() -> (
+    None
+):
+    # pc-r7 machinist review: its shoulder ran past the inner border.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    call = source[source.index("place_callout_clear(") :]
+    call = call[: call.index("add_property_linked_note")]
+    assert '== "RodDia"' in call
+    assert "front_annotations" in call
