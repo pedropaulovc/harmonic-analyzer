@@ -739,6 +739,10 @@ def _pack_group(
     split options or none, exhaustively, and every other item then takes a
     whole match from what is left, bipartitely."""
     split_keys = [key for key in group if any(len(indices) > 1 for indices, _ in options[key])]
+    # A split item left without a split option still competes in ``whole``
+    # when it has a one-span option, so the bound keeps counting it (Codex).
+    whole_capable = {key for key in split_keys if any(len(indices) == 1 for indices, _ in options[key])}
+    others = len(group) - len(split_keys)
 
     def whole(taken: frozenset[int], skip: Mapping[Any, Any]) -> tuple[list[tuple[Any, int]], float]:
         costs = {
@@ -754,8 +758,11 @@ def _pack_group(
     best: dict[str, Any] = {"count": -1, "cost": 0.0, "pick": {}}
     pick: dict[Any, tuple[int, ...]] = {}
 
-    def search(position: int, taken: frozenset[int], cost: float) -> None:
-        if len(pick) + len(group) - position < best["count"]:
+    def search(position: int, taken: frozenset[int], cost: float, skipped: int) -> None:
+        # Most items this branch can still match: those picked, the split
+        # items not yet decided, the whole-only items, and each skipped split
+        # item that can still match whole.
+        if len(pick) + len(split_keys) - position + others + skipped < best["count"]:
             return
         if position == len(split_keys):
             pairs, whole_cost = whole(taken, pick)
@@ -768,11 +775,11 @@ def _pack_group(
             if len(indices) < 2 or not taken.isdisjoint(indices):
                 continue
             pick[key] = indices
-            search(position + 1, taken | frozenset(indices), cost + step)
+            search(position + 1, taken | frozenset(indices), cost + step, skipped)
             del pick[key]
-        search(position + 1, taken, cost)
+        search(position + 1, taken, cost, skipped + (key in whole_capable))
 
-    search(0, frozenset(), 0.0)
+    search(0, frozenset(), 0.0, 0)
     return best["pick"]
 
 

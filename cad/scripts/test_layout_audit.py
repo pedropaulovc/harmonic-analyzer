@@ -1869,6 +1869,67 @@ def test_whole_and_split_matches_are_assigned_together():
     assert matched["plain"].xmin == pytest.approx(0.1060)
 
 
+def test_a_skipped_split_item_still_counts_toward_the_bound():
+    """Codex P2 on 7e067cacb, its exact counterexample: once the split
+    branches had matched one item, the bound subtracted every visited split
+    key and pruned the branch where both items take their one-span option
+    (A on 5, B on 6), although a skipped split item can still match whole.
+    B then read as a false gating text-unmatched."""
+    from _layout_audit import _assign_all
+
+    options = {"A": [((0, 6, 7), 0.1), ((5,), 0.2)], "B": [((0, 5), 0.1), ((6,), 0.2)]}
+    assert _assign_all(options) == {"A": (5,), "B": (6,)}
+
+
+def _brute_force(options):
+    """Most items matched with no span shared, then the least total cost: every
+    choice of one option or none per item, tried exhaustively."""
+    keys = list(options)
+    best = (0, 0.0)
+
+    def walk(position, taken, count, cost):
+        nonlocal best
+        if position == len(keys):
+            if count > best[0] or (count == best[0] and cost < best[1]):
+                best = (count, cost)
+            return
+        walk(position + 1, taken, count, cost)
+        for indices, step in options[keys[position]]:
+            if taken.isdisjoint(indices):
+                walk(position + 1, taken | set(indices), count + 1, cost + step)
+
+    walk(0, frozenset(), 0, 0.0)
+    return best
+
+
+@pytest.mark.parametrize("seed", range(8))
+def test_the_joint_assignment_matches_brute_force(seed):
+    """The pruning in ``_pack_group`` is an optimisation: on small random
+    instances with whole and split options competing for spans, the joint
+    assignment matches as many items as exhaustive search, at its least
+    cost, and never shares a span."""
+    import random
+
+    from _layout_audit import _assign_all, _pack_group
+
+    rng = random.Random(seed)
+    for _ in range(150):
+        options = {}
+        for key in range(rng.randint(1, 5)):
+            found = {}
+            for _option in range(rng.randint(1, 3)):
+                size = 1 if rng.random() < 0.6 else rng.randint(2, 3)
+                found.setdefault(tuple(rng.sample(range(7), size)), round(rng.uniform(0.0, 1.0), 3))
+            options[key] = list(found.items())
+        expected = _brute_force(options)
+        for chosen in (_assign_all(options), _pack_group(list(options), options)):
+            spans = [index for indices in chosen.values() for index in indices]
+            assert len(spans) == len(set(spans)), options
+            assert all(indices in [o for o, _ in options[key]] for key, indices in chosen.items()), options
+            cost = sum(dict(options[key])[indices] for key, indices in chosen.items())
+            assert (len(chosen), cost) == (expected[0], pytest.approx(expected[1])), options
+
+
 def test_section_labels_join_the_sheets_one_text_assignment():
     """Codex P2 on de9d742ab: annotation text was matched first, so a
     dimension reading "A" took the only "A" (P) section label A could reach
