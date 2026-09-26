@@ -2163,6 +2163,115 @@ def test_part_properties_use_release_revision():
     assert part_properties("platen-guide")["Revision"] == _config.release_revision()
 
 
+# The title block's PART cell prints the part's slug, never a registry title
+# (user ruling 2026-09-26, via Main): one convention on every part sheet.  The
+# cell resolves the linked model's summary Title, which save_part_and_images
+# stamps from part_properties()["Title"]; a registry ``title:`` stays in the
+# registry for its other readers but must not reach that cell.
+def _drawing_stems(source_kind: str) -> list[str]:
+    from _drawing_registry import DRAWINGS
+
+    return sorted(
+        {d.part.replace("_", "-") for d in DRAWINGS if d.source_kind == source_kind}
+    )
+
+
+def _registry_title(stem: str) -> str | None:
+    import _config
+
+    try:
+        return _config.parts(stem).get("title")
+    except KeyError:
+        return None
+
+
+_PART_DRAWING_STEMS = _drawing_stems("part")
+_TITLED_PART_STEMS = [
+    stem for stem in _PART_DRAWING_STEMS if _registry_title(stem) not in (None, stem)
+]
+
+
+def test_titled_part_sheets_are_under_test():
+    # 49 part sheets carried a registry title at the ruling; an empty list
+    # would let the parametrized checks below pass vacuously.
+    assert len(_TITLED_PART_STEMS) >= 40
+
+
+@pytest.mark.parametrize("stem", _PART_DRAWING_STEMS)
+def test_part_cell_prints_the_slug(stem):
+    assert part_properties(stem)["Title"] == stem
+
+
+@pytest.mark.parametrize("stem", _TITLED_PART_STEMS)
+def test_no_registry_title_reaches_the_part_cell(stem):
+    assert _registry_title(stem) not in part_properties(stem).values()
+
+
+def test_the_saved_summary_title_is_the_stamped_title():
+    import inspect
+
+    import _common
+
+    source = inspect.getsource(_common.save_part_and_images)
+    assert "properties = part_properties(part_name)" in source
+    assert 'apply_summary_info(adapter, title=properties["Title"])' in source
+
+
+# Assembly sheets follow the same ruling: the PART cell prints the assembly's
+# slug ("drive-train"), not "drive-train assembly".  The one stamp is the
+# shared save path; no builder stamps its own.
+_ASSEMBLY_DRAWING_STEMS = _drawing_stems("assembly")
+
+
+def test_every_assembly_sheet_is_under_test():
+    assert len(_ASSEMBLY_DRAWING_STEMS) >= 8
+
+
+@pytest.mark.parametrize("stem", _ASSEMBLY_DRAWING_STEMS)
+def test_assembly_part_cell_prints_the_slug(stem):
+    import re
+
+    scripts = Path(__file__).resolve().parent
+    script = scripts / f"build_{stem.replace('-', '_')}_assembly.py"
+    source = script.read_text(encoding="utf-8")
+    assert re.search(rf'^ASM_NAME = "{re.escape(stem)}"$', source, re.MULTILINE)
+    assert "save_assembly_and_images(" in source
+    assert "apply_summary_info" not in source, "the shared save path stamps it"
+    assert assembly_title_properties(stem)["Title"] == stem
+
+
+def test_both_assembly_save_chokepoints_stamp_the_slug():
+    # The full build (SaveAs3 copy) and the refresh / auto-repair (in-place
+    # Save3) each restamp the title; test_assembly_save proves the behaviour.
+    import inspect
+
+    import _assembly
+
+    full = inspect.getsource(_assembly._save_new_assembly_as_copy)
+    in_place = inspect.getsource(_assembly.save_assembly_in_place)
+    assert "_ensure_assembly_title(adapter, asm_path.stem)" in full
+    assert "title_changed = _ensure_assembly_title(adapter, asm_name, asm)" in in_place
+    assert "or title_changed" in in_place
+
+
+def test_both_chokepoints_stamp_the_same_slug():
+    # The full build stamps asm_path.stem, the refresh stamps asm_name: the
+    # two agree only because every caller derives the path from the name.
+    import inspect
+
+    import _assembly
+
+    derived = 'OUT_SLDASM / f"{asm_name}.SLDASM"'
+    for caller in (
+        _assembly.save_assembly_and_images,
+        _assembly.save_assembly_in_place,
+        _assembly.refresh_assembly,
+    ):
+        assert derived in inspect.getsource(caller), caller.__name__
+    for stem in _ASSEMBLY_DRAWING_STEMS:
+        assert Path(f"{stem}.SLDASM").stem == stem
+
+
 def test_config_syntax_is_reused_by_content_not_source_path():
     bg._config_references_in_text.cache_clear()
     first = "import _config as cfg\nx = cfg.machine('gear_train')\n"
