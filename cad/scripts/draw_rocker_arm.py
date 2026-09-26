@@ -53,6 +53,7 @@ from _surface_finish import surface_finish_by_key
 from rocker_arm_notes import DRAWING_DIMENSIONS, DRAWING_NOTES
 from rocker_arm_spec import (
     ARM_THICKNESS,
+    HUB_DIA,
     PIVOT_HOLE_DIA,
     R_TOP,
     ROD_HOLE_X,
@@ -127,6 +128,55 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
         FRONT_CENTER[0] + mx * _S / 1000.0,
         FRONT_CENTER[1] + (my - _BBOX_CY) * _S / 1000.0,
     )
+
+
+# Datum A on the pivot bore, attached to the diameter-picked edge. An
+# entity-attached tag has no pick point, so its leader end re-solves along the
+# circle toward the tag and IAnnotation::GetPosition reads that re-solved
+# point, not the tag: r743-3C read 2.09 mm from the pivot centre on the
+# requested 135-degree ray (the 1.625 mm bore rim plus the triangle), 19.5 mm
+# from the request. add_datum_feature's docstring records the same on
+# pinion_cam's OD-attached datum C (17.3 mm off, printing at the request).
+# Distance to the request cannot tell the bore from the concentric O10 hub
+# (2.5 mm), so _require_pivot_datum_on_bore checks what the readback proves:
+# it lies inside the hub circle and outside the bore -- only a bore
+# attachment reads there -- and on the requested ray.
+PIVOT_DATUM_STANDOFF = 0.020
+PIVOT_DATUM_ANGLE = math.radians(135.0)
+PIVOT_BORE_SHEET_R = PIVOT_HOLE_DIA / 2.0 * _S / 1000.0
+PIVOT_HUB_SHEET_R = HUB_DIA / 2.0 * _S / 1000.0
+# The leader is set oblique to both centre-mark axes (45 degrees from each);
+# a bearing that swung half-way to either axis no longer shows that.
+PIVOT_DATUM_BEARING_TOLERANCE = math.radians(45.0) / 2.0
+# add_datum_feature's own readback bound, kept only as the gross guard: any
+# readback nearer the request than the pivot centre is. An ignored
+# SetPosition2 leaves the tag at its default drop, 40 mm+ off.
+PIVOT_DATUM_POSITION_TOLERANCE = PIVOT_DATUM_STANDOFF + PIVOT_BORE_SHEET_R
+
+
+def _require_pivot_datum_on_bore(
+    readback_xy: tuple[float, float], centre_xy: tuple[float, float]
+) -> None:
+    """Raise unless datum A's readback is a leader end on the pivot bore."""
+    dx = readback_xy[0] - centre_xy[0]
+    dy = readback_xy[1] - centre_xy[1]
+    radius = math.hypot(dx, dy)
+    swing = abs(math.remainder(math.atan2(dy, dx) - PIVOT_DATUM_ANGLE, math.tau))
+    inside_bore = radius < PIVOT_BORE_SHEET_R and not math.isclose(
+        radius, PIVOT_BORE_SHEET_R, abs_tol=1e-9
+    )
+    if inside_bore or radius >= PIVOT_HUB_SHEET_R:
+        raise RuntimeError(
+            f"datum A reads {radius * 1000.0:.3f} mm from the pivot centre: a bore"
+            f" attachment reads from the bore rim ({PIVOT_BORE_SHEET_R * 1000.0:.3f})"
+            f" to inside the hub rim ({PIVOT_HUB_SHEET_R * 1000.0:.3f})"
+        )
+    if swing > PIVOT_DATUM_BEARING_TOLERANCE:
+        raise RuntimeError(
+            f"datum A's leader swung {math.degrees(swing):.1f} deg off its"
+            f" {math.degrees(PIVOT_DATUM_ANGLE):.0f}-degree ray"
+            f" (limit {math.degrees(PIVOT_DATUM_BEARING_TOLERANCE):.1f})"
+        )
 
 
 # Pivot-bore Ra. The symbol's body always draws up-right of its leader end.
@@ -353,29 +403,33 @@ async def build(adapter: Any) -> dict[str, str]:
     # The bore is picked by DIAMETER, like every other bore annotation here: the
     # rim-coordinate pick landed the triangle on the concentric O10 hub circle
     # (r743-4D render), which would make the hub, not the bore, datum A.
-    pivot_datum_angle = math.radians(135.0)
-    pivot_radius = PIVOT_HOLE_DIA / 2.0
-    pivot_datum_rim = _sheet_xy(
-        pivot_radius * math.cos(pivot_datum_angle),
-        _PIVOT_MID_Y + pivot_radius * math.sin(pivot_datum_angle),
-    )
-    pivot_datum_standoff = 0.020
-    add_datum_feature(
+    pivot_centre = _sheet_xy(0.0, _PIVOT_MID_Y)
+    pivot_datum_reach = PIVOT_BORE_SHEET_R + PIVOT_DATUM_STANDOFF
+    datum_a = add_datum_feature(
         adapter,
         front,
         edge_entity=pivot_bore_edge,
         symbol_xy=(
-            pivot_datum_rim[0] + pivot_datum_standoff * math.cos(pivot_datum_angle),
-            pivot_datum_rim[1] + pivot_datum_standoff * math.sin(pivot_datum_angle),
+            pivot_centre[0] + pivot_datum_reach * math.cos(PIVOT_DATUM_ANGLE),
+            pivot_centre[1] + pivot_datum_reach * math.sin(PIVOT_DATUM_ANGLE),
         ),
         datum="A",
         label="pivot bore cylindrical datum feature",
         shoulder=True,
-        # The tag stands only 20 mm off the rim, so a snap-back onto the
-        # attachment would sit at the default bound; the live readback is
-        # 0.0109 mm from the request.
-        position_tolerance_m=0.010,
+        position_tolerance_m=PIVOT_DATUM_POSITION_TOLERANCE,
     )
+    datum_a_readback = _early_bound(datum_a.GetAnnotation(), "IAnnotation").GetPosition()
+    if not datum_a_readback:
+        raise RuntimeError("datum A reports no position after the rebuild")
+    datum_a_xy = (float(datum_a_readback[0]), float(datum_a_readback[1]))
+    _telemetry.event(
+        "datum.bore_attachment",
+        reported_x=datum_a_xy[0],
+        reported_y=datum_a_xy[1],
+        centre_x=pivot_centre[0],
+        centre_y=pivot_centre[1],
+    )
+    _require_pivot_datum_on_bore(datum_a_xy, pivot_centre)
     # The bore circle picked by DIAMETER above (the visible-entity walk the
     # cone-gear drawing uses): a coordinate pick on the concentric O6.5 / O10
     # rims resolves to the hub's outer circle within SolidWorks' tolerance.
