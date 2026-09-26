@@ -1789,6 +1789,50 @@ def test_split_runs_are_matched_as_a_complete_assignment():
     assert (matched["A"].xmin, matched["A"].xmax) == pytest.approx((0.137, 0.148))
 
 
+@pytest.mark.parametrize(
+    ("angle", "pieces", "expected"),
+    [
+        (
+            math.pi / 2,  # reads up the page, glyphs left of the baseline
+            [("2X", (0.0969, 0.1002, 0.0991, 0.1042)), ("3.45", (0.0969, 0.1090, 0.0991, 0.1180))],
+            (0.0969, 0.1002, 0.0991, 0.1180),
+        ),
+        (
+            -math.pi / 2,  # reads down the page, glyphs right of the baseline
+            [("2X", (0.1009, 0.0958, 0.1031, 0.0998)), ("3.45", (0.1009, 0.0820, 0.1031, 0.0910))],
+            (0.1009, 0.0820, 0.1031, 0.0998),
+        ),
+    ],
+)
+def test_a_rotated_split_run_matches_its_pieces_along_its_baseline(angle, pieces, expected):
+    """Codex P2 on e49f535b8: split pieces were ordered by x and held to the
+    run's y, so a vertical "2X Ø 3.45" (pieces stacked at one x) went
+    unmatched and gated as text-unmatched."""
+    from _layout_audit import InkSpan, ink_key
+
+    item = TextItem("2X <MOD-DIAM> 3.45", 0.100, 0.100, 0.0035, angle=angle)
+    spans = [InkSpan(ink_key(text), Box(*box)) for text, box in pieces]
+    box = match_ink([("S", item)], spans)["S"]
+    assert (box.xmin, box.ymin, box.xmax, box.ymax) == pytest.approx(expected)
+
+
+def test_a_rotated_runs_symbols_extend_its_box_along_its_baseline():
+    """Codex P2 on e49f535b8: a vertical "Ø12.00" reached back to its start
+    in x, not down the page where its Ø prints; a trailing symbol likewise."""
+    leading = _dim("Bore", "<MOD-DIAM>12.00", 0.100, 0.100)
+    leading["display"]["texts"][0]["ang"] = math.pi / 2
+    printed = Box(0.0969, 0.1060, 0.0991, 0.1168)
+    [row] = annotation_geometry(leading, owner="v", advance=0.6, ink={0: printed}).text_boxes
+    assert (row.xmin, row.ymin, row.xmax, row.ymax) == pytest.approx((0.0969, 0.1000, 0.0991, 0.1168))
+    trailing = _dim("Depth", "6.9<HOLE-DEPTH>", 0.100, 0.100)
+    trailing["display"]["texts"][0]["ang"] = math.pi / 2
+    printed = Box(0.0969, 0.1005, 0.0991, 0.1060)
+    [row] = annotation_geometry(trailing, owner="v", advance=0.6, ink={0: printed}).text_boxes
+    assert (row.xmin, row.ymin, row.xmax, row.ymax) == pytest.approx(
+        (0.0969, 0.1005, 0.0991, 0.1060 + 0.6 * 0.0035)
+    )
+
+
 def test_printed_text_no_annotation_claims_gates_outside_the_title_block_border_and_tables():
     """The reverse of text-unmatched: an annotation whose COM read failed
     still prints, and would be invisible to every other check."""
