@@ -440,14 +440,16 @@ expect(
     DT,
     "pinion-pivot-shaft-1",
     [d.PIVOT_X, d.PIVOT_Y, d.PIVOT_SHAFT_Z0],
-    IDENTITY,
+    # E-a (1c4bea6ac): the torque shaft turns with the strap lean so its
+    # cross holes line up with the strap pins.
+    d.TORQUE_SHAFT_ROWS,
     "pinion-pivot-shaft",
 )
 expect(
     DT,
     "pinion-lift-rod-1",
     [d.LIFT_X, d.LIFT_Y, d.LIFT_ROD_Z0],
-    IDENTITY,
+    d.LIFT_ROD_ROWS,
     "pinion-lift-rod",
 )
 expect(
@@ -472,23 +474,23 @@ expect(
     "pinion-cam-pin back",
 )
 expect(
-    DT, "pinion-cam-1", [d.LIFT_X, d.LIFT_Y, d.CAM_Z0[0]], IDENTITY, "pinion-cam front"
+    DT, "pinion-cam-1", [d.LIFT_X, d.LIFT_Y, d.CAM_Z0[0]], d.PINION_CAM_ROWS, "pinion-cam front"
 )
 expect(
-    DT, "pinion-cam-2", [d.LIFT_X, d.LIFT_Y, d.CAM_Z0[1]], IDENTITY, "pinion-cam back"
+    DT, "pinion-cam-2", [d.LIFT_X, d.LIFT_Y, d.CAM_Z0[1]], d.PINION_CAM_ROWS, "pinion-cam back"
 )
 expect(
     DT,
     "pinion-lever-1",
     [d.LIFT_X, d.LIFT_Y, d.LEVER_Z],
-    d.rot_z_rows(d.LEVER_TILT_DEG),
+    d.LEVER_ROWS,
     "pinion-lever",
 )
 expect(
     DT,
     "pinion-handle-1",
     [d.APINION_X, d.APINION_Y, d.HANDLE_Z],
-    d.rot_z_rows(d.HANDLE_TILT_DEG),
+    d.HANDLE_ROWS,
     "pinion-handle",
 )
 expect(

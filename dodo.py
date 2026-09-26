@@ -2894,6 +2894,20 @@ def task_check():
         # dimensions.yaml is read by no part, so only this test keeps its
         # alignment-pinion record pinned to the CAD constants (#814).
         SCRIPTS_DIR / "test_dimensions_alignment_pinion_layout.py",
+        # The mirror-retirement diagnostic's drive-train rows equal the rows the
+        # assembly places with (Codex on #814 and #844).
+        SCRIPTS_DIR / "test_mirror_retirement_expectations.py",
+        # Every cad/scripts/test_*.py runs in some check:* gate or is exempted
+        # with a reason, so a new test cannot ship un-enrolled (Codex on #844).
+        SCRIPTS_DIR / "test_check_gate_enrollment.py",
+        # Integ-branch tests that guard caught un-enrolled at #877 round 4.
+        SCRIPTS_DIR / "test_cone_gear_mesh_design.py",
+        SCRIPTS_DIR / "test_cone_gear_seat_fit.py",
+        SCRIPTS_DIR / "test_drawing_hidden_sketches.py",
+        SCRIPTS_DIR / "test_drive_train_steps.py",
+        SCRIPTS_DIR / "test_drive_train_tip_adjuster_seat.py",
+        SCRIPTS_DIR / "test_fit_bands.py",
+        SCRIPTS_DIR / "test_printed_text_rulings.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.

@@ -346,13 +346,12 @@ CONE_CRANK_STEPS = "\n".join(
         # flat bar as supplied (U41, 6.22 min less the 0.3 cut: 5.92 = 0.93D
         # worst case, swing): a named, user-accepted exception to rule 12, in
         # the Named exceptions table of cad/docs/drawing-simplicity-policy.md.
-        # Every sheet a row affects states the exception itself, with the
-        # row's recorded range, which the gate matches; the table is the
-        # backstop.
+        # The sheet states the range, never the governance label (fleet
+        # ruling 2026-09-26, test_printed_text_rulings).
         "2. SCREW MHA-016 TO MHA-091 WITH 2X MHA-142 FROM THE TOP. CUT EACH TO",
         "   FIT AND CHAMFER THE END: FLUSH TO 0.3 SHORT OF THE MHA-091",
         "   UNDERSIDE, NEVER PROUD (NOMINAL LENGTH 86.0). ENGAGEMENT 5.92-6.35",
-        "   (0.93-1.0D): NAMED EXCEPTION TO RULE 12.",
+        "   (0.93-1.0D).",
         # U30 (user, 2026-09-23, option (a)): one #6-32 button-head screw (W22)
         # up through the MHA-091 slot, height and side set by the shim pack at
         # fit-up. Wording from swing (dt-tip-block-attachment-options-20260923.md
