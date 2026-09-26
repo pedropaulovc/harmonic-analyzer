@@ -26,6 +26,8 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    _model_item_paths,
+    _select_model_feature,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
@@ -91,19 +93,25 @@ NOTES_XY = (0.058, 0.060)
 # belongs to, and this view is then deleted.
 DONOR_CENTER = (0.360, 0.090)
 
-# Axial step stations (extrude depths Sec{i}End), all measured from the
-# large-end datum face: baseline dimensioning below the shaft, shortest
-# nearest the part, each text centred between the big end and its shoulder.
-# The one radius rides above the journal shoulder it
-# attaches to (the fillet feature's first edge), its leader dropping straight
-# to that corner, right of the Ø9.525 text and left of the pivot finish.
+# Lengths (option A, #914): ONE origin, the collar's thrust face at sheet x
+# 0.2096.  Everything measured from it is baseline below the shaft, one tier
+# per dimension, the shortest nearest the part: the collar web (text outside
+# its 1.68 span, left of the datum), the T120 solder station, the three
+# gear-seat shoulders, then the T006 station with its 20X EQ SP.  The journal
+# runs the other way from the same origin on the first tier, and the overall
+# length hangs lowest, above the title block.  Each station's text is centred
+# in its span.  The one radius rides above the 3/8-to-1/4 in step it attaches
+# to (the fillet's first edge), right of the Ø6.350 line.
 SIDE_KEEP = {
+    "CollarWidth": (0.2020, 0.1355),
     "Sec0End": (0.2311, 0.1355),
-    "Sec1End": (0.1707, 0.1265),
-    "Sec2End": (0.1672, 0.1175),
-    "Sec3End": (0.1638, 0.1085),
-    "Sec4End": (0.1499, 0.0995),
-    "ShoulderR": (0.2000, 0.1920),
+    "T120Station": (0.2042, 0.1265),
+    "Sec1End": (0.1492, 0.1175),
+    "Sec2End": (0.1457, 0.1085),
+    "Sec3End": (0.1423, 0.0995),
+    "T006Station": (0.1388, 0.0905),
+    "Sec4End": (0.1515, 0.0815),
+    "ShoulderR": (0.1000, 0.1640),
 }
 # Diameters, imported on the donor and dragged onto the side view.  A vertical
 # linear dimension's line sits at its text x and the text hangs to the RIGHT
@@ -122,16 +130,50 @@ SIDE_DIAMETERS = {
     "Sec2Dia": (0.0853, 0.1760),
     "Sec3Dia": (0.0785, 0.1880),
     "Sec4Dia": (0.0520, 0.2000),
+    # #914: the collar ring is 1.681 wide; its line stands mid-ring.
+    "CollarDia": (0.2088, 0.1760),
 }
 # Sheet width of one diameter text with its stacked band, for the layout test.
 DIAMETER_TEXT_WIDTH = 0.032
+# The collar's diameter prints one place with no band: a single short line.
+COLLAR_DIA_TEXT_WIDTH = 0.014
 DONOR_KEEP = {
     name: (DONOR_CENTER[0], DONOR_CENTER[1] - 0.012 * index)
     for index, name in enumerate(SIDE_DIAMETERS)
 }
 # Three identical gear-seat shoulder roots, one modelled fillet, one radius
 # dimension (the collar's roots stay sharp, #914).
-DIMENSION_CALLOUTS = {"ShoulderR": FILLET_CALLOUT}
+DIMENSION_CALLOUTS = {"ShoulderR": FILLET_CALLOUT, "T006Station": "20X EQ SP"}
+# The pivot-journal finish symbol, left of which the collar diameter's text
+# must end.
+PIVOT_FINISH_XY = (0.2400, 0.1800)
+# The part's solder-station witness sketch (#914): shown in the side view,
+# whose station dimensions it owns; hidden in the pictorial.
+SOLDER_STATION_SKETCH = "SolderStations"
+
+
+def _hide_reference_sketch(adapter: Any, view: Any, label: str) -> None:
+    """Hide the part's solder-station witness sketch in one drawing view.
+
+    ``IModelDoc2::BlankSketch`` on a sketch selected through a view hides it
+    in that view only, as the cone gear hides its thickness witness; blanking
+    it in the part would also drop the side view's station dimensions.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"{label}: failed to activate {name!r}")
+    draw.ClearSelection2(True)
+    selected = _select_model_feature(
+        adapter, SOLDER_STATION_SKETCH, paths=_model_item_paths(adapter, view)
+    )
+    if not selected.startswith("SKETCH"):
+        draw.ClearSelection2(True)
+        raise RuntimeError(f"{label}: witness resolved as {selected!r}, not a sketch")
+    draw.BlankSketch()
+    draw.ClearSelection2(True)
+    _telemetry.debug(f"{label}: hid {SOLDER_STATION_SKETCH} ({selected})")
 
 
 @_telemetry.traced("drawing.cylindrical_face_scan")
@@ -279,9 +321,10 @@ async def build(adapter: Any) -> dict[str, str]:
 
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=SIDE_SCALE)
     donor = place_view(adapter, str(SOURCE), "*Front", *DONOR_CENTER, scale=SIDE_SCALE)
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (side, donor):
         set_hidden_lines_removed(adapter, view)
+    _hide_reference_sketch(adapter, iso, "isometric")
 
     pivot_face = _cylindrical_face(adapter, side, JOURNAL_DIA)
     tip_face = _cylindrical_face(adapter, side, SECTION_DIAS[-1])
@@ -327,7 +370,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         side,
-        symbol_xy=(0.2400, 0.1800),
+        symbol_xy=PIVOT_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_journal"),
         label="pivot journal finish",
         char_height=0.0025,
