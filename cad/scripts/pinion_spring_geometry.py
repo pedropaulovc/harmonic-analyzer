@@ -18,6 +18,7 @@ west face is the contact face.
 
 from __future__ import annotations
 
+import itertools
 import math
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
@@ -189,16 +190,75 @@ RATE_N_PER_MM = MODULUS_MPA * WIDTH * THICK**3 / (4.0 * BLADE_ARM**3)
 
 
 def contact_force(
-    deflection_mm: float, thick: float = THICK, width: float = WIDTH
+    deflection_mm: float,
+    thick: float = THICK,
+    width: float = WIDTH,
+    arm: float = BLADE_ARM,
 ) -> float:
     """Normal force (N) at the crest for a crest deflection (mm), for a strip
-    of ``thick`` x ``width`` (the nominal section by default)."""
-    return MODULUS_MPA * width * thick**3 / (4.0 * BLADE_ARM**3) * deflection_mm
+    of ``thick`` x ``width`` on a cantilever ``arm`` long (the nominal part by
+    default)."""
+    return MODULUS_MPA * width * thick**3 / (4.0 * arm**3) * deflection_mm
 
 
-def root_stress(deflection_mm: float, thick: float = THICK) -> float:
+def root_stress(
+    deflection_mm: float, thick: float = THICK, arm: float = BLADE_ARM
+) -> float:
     """Bending stress (MPa) at the blade root for a crest deflection (mm)."""
-    return 1.5 * MODULUS_MPA * thick * deflection_mm / BLADE_ARM**2
+    return 1.5 * MODULUS_MPA * thick * deflection_mm / arm**2
+
+
+# The formed profile as the print holds it (Codex #859, PRRT_kwDOPHDy386mTao2):
+# FootLen, BendR, the free kink start's FreeKinkH / FreeKinkV from the foot's
+# free end, and KinkR each carry FORMED_BAND_MM on their own.  FlatLen and
+# FreeTipH shape the flick past the crest's contact point, so they move
+# neither the contact nor the arm.  A corner is one sign per band.
+FREE_KINK_H = FOOT_END[0] - FREE_KINK_START[0]
+FREE_KINK_V = FREE_KINK_START[1] - FOOT_END[1]
+FORMED_CONTACT_BANDS = ("FootLen", "BendR", "FreeKinkH", "FreeKinkV", "KinkR")
+
+
+def formed_contact(
+    deviations: dict[str, float] | None = None, thick: float = THICK
+) -> tuple[float, float, float]:
+    """(penetration, arm, station) of a formed FREE profile, mm.
+
+    ``deviations`` moves each named FORMED_CONTACT_BANDS dimension off its
+    nominal.  The foot's free end is fixed (the pad screw); the bend starts
+    FootLen west of it; the blade is the tangent from the free kink start to
+    the bend circle; the crest's outer face is KinkR + ``thick`` round its
+    centre.  Penetration is how far that face stands into the parked flank,
+    arm runs from the bend exit to the contact along the blade, and station
+    is the contact's distance up the strap from the pivot.
+    """
+    dev = {name: 0.0 for name in FORMED_CONTACT_BANDS}
+    dev.update(deviations or {})
+    r_bend = R_BEND + dev["BendR"]
+    r_kink = R_KINK + dev["KinkR"]
+    bend_c = (FOOT_END[0] - (FOOT_LEN + dev["FootLen"]), FOOT_Y + r_bend)
+    kink_start = (
+        FOOT_END[0] - (FREE_KINK_H + dev["FreeKinkH"]),
+        FOOT_END[1] + FREE_KINK_V + dev["FreeKinkV"],
+    )
+    dx, dy = bend_c[0] - kink_start[0], bend_c[1] - kink_start[1]
+    lean = math.atan2(dy, dx) + math.acos(r_bend / math.hypot(dx, dy))
+    up = (-math.sin(lean), math.cos(lean))
+    west = (-math.cos(lean), -math.sin(lean))
+    bend_exit = _add(bend_c, west, r_bend)
+    kink_c = _add(kink_start, west, -r_kink)
+    outer = r_kink + thick
+    contact = _add(kink_c, STRAP_N, -outer)
+    rel = (kink_c[0] - _PIVOT[0], kink_c[1] - _PIVOT[1])
+    penetration = STRAP_HALF_WIDTH - (rel[0] * STRAP_N[0] + rel[1] * STRAP_N[1] - outer)
+    arm = (contact[0] - bend_exit[0]) * up[0] + (contact[1] - bend_exit[1]) * up[1]
+    station = (contact[0] - _PIVOT[0]) * STRAP_U[0] + (contact[1] - _PIVOT[1]) * STRAP_U[1]
+    return penetration, arm, station
+
+
+FORMED_CORNERS = tuple(
+    dict(zip(FORMED_CONTACT_BANDS, (s * FORMED_BAND_MM for s in signs), strict=True))
+    for signs in itertools.product((-1.0, 1.0), repeat=len(FORMED_CONTACT_BANDS))
+)
 
 
 # The contact normal (-N) must fall on the crest arc, between the blade's west

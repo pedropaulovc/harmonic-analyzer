@@ -98,6 +98,7 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
     # the formed band's low end, against the heavier (brass 8800) gravity.
     # Stiff corner: thickest strip at the band's high end, engaged.
     import pinion_spring_geometry as leaf
+    import pinion_spring_spec as spring_spec
     import pinion_spring_section as section
     from _fit_limits import deviations
     from _printed_tolerance import printed_deviations
@@ -113,18 +114,46 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
     assert t_lo < section.THICK < t_hi and w_lo < section.WIDTH
     gravity = drive.SWING_GRAVITY_CORNER_NMM
     assert all(c >= n for c, n in zip(gravity, drive.SWING_GRAVITY_NMM, strict=True))
-    for deflection, station, moment in zip(
+    # Codex #859 (PRRT_kwDOPHDy386mTao2): every formed band the print holds
+    # independently is a corner of its own, recomputing the arm and station.
+    # The flick's two (FlatLen, FreeTipH) lie past the contact.
+    assert set(leaf.FORMED_CONTACT_BANDS) | {"FlatLen", "FreeTipH"} == set().union(
+        *spring_spec.FORMED_DIMENSIONS.values()
+    )
+    assert len(leaf.FORMED_CORNERS) == 2 ** len(leaf.FORMED_CONTACT_BANDS)
+    nominal = leaf.formed_contact()
+    assert nominal[0] == pytest.approx(leaf.PRESET, abs=0.02)
+    assert nominal[1] == pytest.approx(leaf.BLADE_ARM, abs=0.5)
+    assert nominal[2] == pytest.approx(leaf.CONTACT_T, abs=1.0)
+    # A shorter free kink height shortens the arm by about as much.
+    short = leaf.formed_contact({"FreeKinkV": -band})
+    assert short[1] == pytest.approx(nominal[1] - band, abs=0.1)
+    # The corners ride the installed nominal: no deviation at the nominal
+    # strip is the swing's own deflection, arm and stations (Main, #859 T_ao2
+    # restricted review).
+    zero = {name: 0.0 for name in leaf.FORMED_CONTACT_BANDS}
+    deflection0, arm0, stations0 = drive._spring_corner(zero, drive.SPRING_T)
+    assert deflection0 == pytest.approx(drive.SPRING_DEFLECTION, abs=1e-12)
+    assert arm0 == pytest.approx(leaf.BLADE_ARM, abs=1e-12)
+    assert stations0 == pytest.approx(
+        (drive._spr_station[0], drive._spr_station[-1]), abs=1e-12
+    )
+    assert drive.SPRING_PRELOAD_RATIO == pytest.approx((1.575, 2.118), abs=5e-4)
+    assert drive.SPRING_STRESS_SF == pytest.approx(1.525, abs=5e-4)
+    assert min(drive.SPRING_PRELOAD_RATIO) >= 1.5
+    assert drive.SPRING_STRESS_SF >= 1.5
+    # Positive control: the one-band gate this replaced read higher on both.
+    for deflection, station, moment, walked in zip(
         drive.SPRING_DEFLECTION,
         (drive._spr_station[0], drive._spr_station[-1]),
         gravity,
+        drive.SPRING_PRELOAD_RATIO,
         strict=True,
     ):
         soft = deflection - band + (t_lo - section.THICK)
-        assert leaf.contact_force(soft, t_lo, w_lo) * station >= 1.5 * moment
+        assert leaf.contact_force(soft, t_lo, w_lo) * station / moment > walked
     stiff = engaged + band + (t_hi - section.THICK)
-    assert leaf.YIELD_MPA / leaf.root_stress(stiff, t_hi) >= 1.5
-    assert min(drive.SPRING_PRELOAD_RATIO) >= 1.5
-    assert drive.SPRING_STRESS_SF >= 1.5
+    assert leaf.YIELD_MPA / leaf.root_stress(stiff, t_hi) > drive.SPRING_STRESS_SF
 
 
 def test_swing_gravity_basis_is_the_current_parts() -> None:
