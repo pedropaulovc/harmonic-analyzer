@@ -1016,7 +1016,14 @@ def test_collar_pin_hole_is_a_drilled_spring_pin_hole_clear_of_the_front_land() 
     # One pin family and one drill for the whole rig (pinioncluster's E-a).
     assert pin_hole.PIN_HOLE_DIA == strap_pin.HOLE_DIA == pytest.approx(25.4 / 16.0)
     assert pin_hole.PIN_HOLE_DIA_BAND == strap_pin.HOLE_BAND == (0.06, 0.0)
-    assert pin_hole.PIN_HOLE_CALLOUT == strap_pin.DRILL_THRU_CALLOUT
+    # The hole names the pin it takes, which is why its band beats the
+    # title block's drilled-hole row (codex machinist pass on pc-r8).
+    import _config
+
+    assert pin_hole.PIN_NUMBER == _config.parts("pinion-strap-pin")["number"]
+    assert pin_hole.PIN_HOLE_CALLOUT == (
+        f"{strap_pin.DRILL_THRU_CALLOUT}\nFOR {pin_hole.PIN_NUMBER} SPRING PIN"
+    )
     assert spec.PIN_STATION_FROM_HEAD_REAR == 38.0
     assert spec.PIN_STATION_BAND == spec.LINEAR_X_BAND
     assert spec.PIN_Z == pytest.approx(spec.HEAD_REAR_Z + 38.0)
@@ -1028,7 +1035,7 @@ def test_collar_pin_hole_is_a_drilled_spring_pin_hole_clear_of_the_front_land() 
     assert spec.DRAWING_DIMENSIONS["PinStationReference"] == {"PinStationFromHeadRear"}
     assert spec.DRAWING_PRECISION_BY_NAME["PinHoleDia"] == 2
     assert spec.DRAWING_PRECISION_BY_NAME["PinStationFromHeadRear"] == 1
-    assert drawing.DIMENSION_CALLOUTS["PinHoleDia"] == "1/16 DRILL THRU"
+    assert drawing.DIMENSION_CALLOUTS["PinHoleDia"] == pin_hole.PIN_HOLE_CALLOUT
     assert drawing.DIMENSION_CALLOUTS["PinStationFromHeadRear"] == "COLLAR PIN"
     assert part.V_PIN_HOLE > 0.0
 
