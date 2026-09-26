@@ -939,6 +939,15 @@ CRANK_SEAT_ANCHOR = (-CRANK_AXIS_OFF * _COS_I, -CRANK_AXIS_OFF * _SIN_I)
 # (part-local plan x, z) = (-49.92, -11.08); machine (-130.82, 103.29)
 
 
+# The widths the print bands (feature, dimension, (upper, lower)); build()
+# sets each through deviations().
+BANDED_WIDTHS = (
+    ("TipScrewSlotProfile", "TipSlotW", TIP_SLOT_W_BAND),
+    ("TipScrewCboreProfile", "TipCboreW", TIP_CBORE_W_BAND),
+    ("LockNotchProfile", "NotchW", NOTCH_W_BAND),
+)
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreateAxisParameters,
@@ -1467,11 +1476,7 @@ async def build(adapter) -> dict[str, str]:
     # Decimal places for imported model dimensions live on the PART.  The
     # Hole Wizard owns the pivot-hole precision and native size callout.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    for feature_name, dimension_name, band in (
-        ("TipScrewSlotProfile", "TipSlotW", TIP_SLOT_W_BAND),
-        ("TipScrewCboreProfile", "TipCboreW", TIP_CBORE_W_BAND),
-        ("LockNotchProfile", "NotchW", NOTCH_W_BAND),
-    ):
+    for feature_name, dimension_name, band in BANDED_WIDTHS:
         set_dimension_bilateral_tolerance(
             adapter, feature_name, dimension_name, *deviations(band)
         )
