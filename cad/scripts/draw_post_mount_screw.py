@@ -84,6 +84,13 @@ PART_STEM = SPEC.artifact_stem
 SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
 TITLE = "Cone Pivot Post Mount Screw — Modified Stock Drawing"
+DRAWING_SUMMARY = {
+    0: TITLE,
+    1: "Manufacturing controls for modified purchased stock",
+    2: "Harmonic Analyzer Project",
+    3: "MHA-142; MSC Industrial Supply 40923898",
+    4: "Native dimension-driven cut length",
+}
 
 SHEET_SCALE = (1.0, 1.0)
 # The screw stands head up in the Front view: under-head face at model y 0,
@@ -92,7 +99,7 @@ FRONT_CENTER = (0.100, 0.165)
 ISO_CENTER = (0.270, 0.185)
 # The cut length reads on the left, where its reference line runs along the
 # shank's silhouette, midway along the span, far enough out that its
-# four-line acceptance callout (22 capitals at its widest) clears the head
+# five-line acceptance callout (22 capitals at its widest) clears the head
 # and stays inside the border.
 # The cut end's break is not dimensioned in this 1:1 view (see the module
 # docstring).  (The view is placed by its outline's centre: the end face is
@@ -703,17 +710,7 @@ async def build(adapter: Any) -> dict[str, str]:
     draw, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
-    stamp_drawing_summary(
-        adapter,
-        draw,
-        {
-            0: TITLE,
-            1: "Manufacturing controls for modified purchased stock",
-            2: "Harmonic Analyzer Project",
-            3: "MHA-142; MSC Industrial Supply 40923898",
-            4: "Native dimension-driven cut length",
-        },
-    )
+    stamp_drawing_summary(adapter, draw, DRAWING_SUMMARY)
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=SHEET_SCALE)
     for view in (front, iso):

@@ -7,6 +7,7 @@ import difflib
 import hashlib
 import subprocess
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -137,6 +138,81 @@ def test_cut_to_fit_acceptance_prints_on_the_delegating_callout() -> None:
     assert spec.POST_MOUNT_ENGAGEMENT_WORST / spec.THREAD_DIA_MM >= spec.MIN_ENGAGEMENT_DIAMETERS
     # No other sheet text restates it: the part notes stay digit-free.
     assert not any(ch.isdigit() for ch in spec.MANUFACTURING_NOTES)
+
+
+def test_engagement_minimum_prints_on_the_cut_length_callout() -> None:
+    """Codex P2 on #857 (PRRT_kwDOPHDy386mOxdw): MHA-142 stated its 0.90D
+    engagement shortfall nowhere, yet the policy's named-exceptions section
+    wants every affected sheet to state it.  The callout that delegates the
+    cut carries the worst-case minimum as a plain fact, floored from the
+    spec's worst case -- never a literal."""
+    callout = drawing.DIMENSION_CALLOUTS["CutLength"]
+    printed = spec.POST_MOUNT_ENGAGEMENT_PRINTED
+    assert printed == math.floor(
+        spec.POST_MOUNT_ENGAGEMENT_WORST / spec.THREAD_DIA_MM * 100.0
+    ) / 100.0
+    assert printed >= spec.MIN_ENGAGEMENT_DIAMETERS
+    fact = f"ENGAGEMENT {printed:.2f}D MIN"
+    assert fact in callout.splitlines()
+    # It closes the acceptance the cut delegates to assembly.
+    assert callout.splitlines()[-1] == fact
+
+
+# Words that cite the exception's LABEL rather than state its fact (Main's
+# fleet ruling on the Codex P2): no rule, ruling, policy or exception words,
+# and no user-ruling ids such as "U37c".
+_BANNED_ON_SHEET = re.compile(
+    r"\b(EXCEPTIONS?|ACCEPTED|RULES?|RULINGS?|POLICY|U\d+[A-Z]?)\b", re.IGNORECASE
+)
+
+
+def _mha142_printed_strings() -> dict[str, str]:
+    config = _config.parts("post-mount-screw")
+    printed = {
+        "CutLength callout": drawing.DIMENSION_CALLOUTS["CutLength"],
+        "manufacturing notes": spec.MANUFACTURING_NOTES,
+        "tip view label": drawing.TIP_VIEW_LABEL,
+        "tip letter": drawing.TIP_LETTER,
+    }
+    for index, text in drawing.DRAWING_SUMMARY.items():
+        printed[f"summary {index}"] = text
+    for field in (
+        "title",
+        "number",
+        "stock_name",
+        "supplier",
+        "material",
+        "material_specification",
+        "finish",
+        "installation_notes",
+    ):
+        if field in config:
+            printed[f"yaml {field}"] = str(config[field])
+    return printed
+
+
+def test_banned_word_scan_catches_a_cited_exception() -> None:
+    """Positive control: the scan flags the label forms it exists to keep off."""
+    for text in (
+        "ENGAGEMENT 0.90D MIN (ACCEPTED EXCEPTION)",
+        "PER RULE 12",
+        "SEE RULING U37c",
+        "POLICY: CUT TO FIT",
+    ):
+        assert _BANNED_ON_SHEET.search(text), text
+    assert not _BANNED_ON_SHEET.search("ENGAGEMENT 0.90D MIN")
+    assert not _BANNED_ON_SHEET.search("OF MHA-091 UNDERSIDE, NEVER PROUD")
+
+
+def test_mha142_prints_no_exception_label() -> None:
+    printed = _mha142_printed_strings()
+    assert "CutLength callout" in printed and "yaml finish" in printed
+    hits = {
+        name: match.group(0)
+        for name, text in printed.items()
+        if (match := _BANNED_ON_SHEET.search(text))
+    }
+    assert hits == {}
 
 
 def test_cut_to_fit_allowance_is_exported_once() -> None:

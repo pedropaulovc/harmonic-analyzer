@@ -181,12 +181,6 @@ POST_SCREW_CUT_TO_FIT_SHORT = -_fit_lower
 _FIT_PLACES = DRAWING_PRECISION[CUT_LENGTH_SKETCH][CUT_LENGTH_DIMENSION]
 if round(POST_SCREW_CUT_TO_FIT_SHORT, _FIT_PLACES) != POST_SCREW_CUT_TO_FIT_SHORT:
     raise ValueError("the cut-to-fit allowance does not print at the cut length's places")
-CUT_TO_FIT_CALLOUT = (
-    "CUT TO FIT AT ASSEMBLY\n"
-    f"END FLUSH TO {POST_SCREW_CUT_TO_FIT_SHORT:.{_FIT_PLACES}f} SHORT\n"
-    "OF MHA-091 UNDERSIDE,\n"
-    "NEVER PROUD"
-)
 
 # The named exception's worst case, cut to fit: unlike the fixed-length
 # corner above, the floor drops out (each screw is cut to its own hole), so
@@ -212,6 +206,22 @@ if POST_MOUNT_ENGAGEMENT_PRINTED < MIN_ENGAGEMENT_DIAMETERS:
         f"({POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS:.3f}D) is under "
         f"{MIN_ENGAGEMENT_DIAMETERS:.2f}D"
     )
+
+# The callout states the acceptance AND the shortfall it leaves: the
+# policy's named-exceptions section wants every affected sheet to state the
+# exception (Codex P2 on #857, PRRT_kwDOPHDy386mOxdw).  Main's fleet ruling:
+# the sheet states the FACT -- the worst-case engagement, floored above --
+# never its label (no rule number, ruling id, EXCEPTION or ACCEPTED).
+# Provenance stays here: the User's U37c/U41 ruling admits 0.90D under the
+# 1.5D rule.  The wording follows S1's drive-train step ("ENGAGEMENT 0.90D
+# MIN.").
+CUT_TO_FIT_CALLOUT = (
+    "CUT TO FIT AT ASSEMBLY\n"
+    f"END FLUSH TO {POST_SCREW_CUT_TO_FIT_SHORT:.{_FIT_PLACES}f} SHORT\n"
+    "OF MHA-091 UNDERSIDE,\n"
+    "NEVER PROUD,\n"
+    f"ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN"
+)
 
 # The model as built, on the nominal chain: the reference length never
 # stands proud, and still holds the exception's minimum.
