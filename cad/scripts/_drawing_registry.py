@@ -32,6 +32,13 @@ class DrawingTemplateSpec:
     pixel_size: tuple[int, int]
     title_block_left_m: float
     title_block_top_m: float
+    # The title block's MATERIAL / FINISH cells between their rules, sheet
+    # metres (xmin, ymin, xmax, ymax): what finalize_drawing holds each
+    # printed value inside. Measured on MHA-102's landscape render (7f7fc1717,
+    # 300 dpi, rule centres); the portrait block is the same block moved left
+    # by the 6 in width difference (same right margin).
+    material_cell_m: tuple[float, float, float, float]
+    finish_cell_m: tuple[float, float, float, float]
 
 
 # Hand-made in SolidWorks (title block, tolerance block, embedded ASME B sheet
@@ -46,6 +53,8 @@ DRAWING_TEMPLATES = {
         pixel_size=(5100, 3300),
         title_block_left_m=0.216,
         title_block_top_m=0.066,
+        material_cell_m=(0.2181, 0.0260, 0.3105, 0.0336),
+        finish_cell_m=(0.2181, 0.0336, 0.3105, 0.0445),
     ),
     DrawingLayout.PORTRAIT: DrawingTemplateSpec(
         path=TEMPLATES_DIR / "harmonic-analyzer-portrait.DRWDOT",
@@ -55,6 +64,8 @@ DRAWING_TEMPLATES = {
         pixel_size=(3300, 5100),
         title_block_left_m=0.0636,
         title_block_top_m=0.066,
+        material_cell_m=(0.0657, 0.0260, 0.1581, 0.0336),
+        finish_cell_m=(0.0657, 0.0336, 0.1581, 0.0445),
     ),
 }
 

@@ -117,7 +117,7 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
         {
             "Number": "42",
             "Title": "Test Fastener",
-            "Material": "Steel",
+            "Material Specification": "Steel, McMaster-Carr 12345A678",
             "Stock Name": "Test stock",
             "Supplier": "Test supplier",
             "Supplier SKUs": "SKU-1",
@@ -132,7 +132,7 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
     registry = {
         "number": properties["Number"],
         "title": properties["Title"],
-        "material": properties["Material"],
+        "material_specification": properties["Material Specification"],
         "finish": "As purchased",
     }
     draw = _Drawing()

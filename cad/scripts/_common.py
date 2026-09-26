@@ -1641,6 +1641,9 @@ def part_properties(part_name: str) -> dict[str, str]:
     field_map = {
         "Number": "number",
         "Material": "material",
+        # The title block's MATERIAL cell (finalize_drawing retargets it here);
+        # stamped on every registered part so a purchased part carries it too.
+        "Material Specification": "material_specification",
         "Tolerance Class": "tolerance_class",
         "Fit Class": "fit_class",
         "Process": "process",

@@ -12,6 +12,7 @@ import contextlib
 import json
 import math
 import os
+import re
 import sys
 from collections import Counter
 from dataclasses import dataclass, replace
@@ -1730,6 +1731,183 @@ def read_required_properties(
                 f"source model Revision {revision!r} != current release {expected!r}"
             )
     return properties
+
+
+def native_box(
+    values: Any, *, label: str, kind: Literal["view", "note"] = "view"
+) -> tuple[float, float, float, float]:
+    """Decode documented IView.GetOutline / INote.GetExtent sheet coordinates."""
+    coordinates = tuple(float(value) for value in (values or ()))
+    expected = 6 if kind == "note" else 4
+    if len(coordinates) != expected or not all(map(math.isfinite, coordinates)):
+        raise RuntimeError(f"{label}: invalid native extent {coordinates!r}")
+    if kind == "note":
+        coordinates = (coordinates[0], coordinates[1], coordinates[3], coordinates[4])
+    if coordinates[0] >= coordinates[2] or coordinates[1] >= coordinates[3]:
+        raise RuntimeError(f"{label}: empty or inverted native extent {coordinates!r}")
+    return coordinates
+
+
+def box_inside(box: Sequence[float], container: Sequence[float], *, slack: float = 0.0) -> bool:
+    """Whether ``box`` lies within ``container`` grown by ``slack`` on every side."""
+    return (
+        box[0] >= container[0] - slack
+        and box[1] >= container[1] - slack
+        and box[2] <= container[2] + slack
+        and box[3] <= container[3] + slack
+    )
+
+
+# The template's MATERIAL cell links the registry's short ``material`` (the
+# family name, "Brass"); a machinist needs the alloy (#923 fleet, conegear
+# 834b: T006-T024 printed "Brass" against C67500). finalize_drawing retargets
+# every sheet's cell to the part's Material Specification -- the saved
+# template, hand-edited in SolidWorks, is never touched -- and reads both
+# make-critical cells back against the linked model.
+TITLE_BLOCK_MATERIAL_PROPERTY = "Material Specification"
+TITLE_BLOCK_FINISH_PROPERTY = "Finish"
+_TEMPLATE_MATERIAL_LINK = property_link("Material")
+_PROPERTY_LINK = re.compile(r'\$(PRPSHEET|PRP):"([^"]+)"')
+_NOTE_FORMAT_CODE = re.compile(r"<[^<>]+>")
+# A value that says nothing is as bad as a blank one (cone-gear's "NONE").
+TITLE_BLOCK_PLACEHOLDER = re.compile(r"^\s*(?:none|n/?a|tbd|-+)?\s*$", re.IGNORECASE)
+_SW_NOTE = 6  # swAnnotationType_e.swNote
+# A value may reach, not cross, its cell's rule (the cells are rule centres).
+TITLE_BLOCK_CELL_SLACK_M = 0.0003
+
+
+def _sheet_format_notes(draw: Any) -> list[Any]:
+    """The active sheet's own notes (its format's title block among them)."""
+    sheet_view = _early_bound(draw, "IDrawingDoc").GetFirstView()
+    if sheet_view is None:
+        raise RuntimeError("active drawing sheet has no sheet view")
+    notes = []
+    for annotation in _early_bound(sheet_view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(annotation, "IAnnotation")
+        if annotation.GetType() != _SW_NOTE:
+            continue
+        specific = annotation.GetSpecificAnnotation()
+        if specific is None:
+            raise RuntimeError("sheet-format note has no INote")
+        notes.append(_early_bound(specific, "INote"))
+    return notes
+
+
+def retarget_title_block_links(draw: Any, links: Mapping[str, str], *, label: str) -> list[tuple[Any, str]]:
+    """Point the active sheet's title-block property links at other sources.
+
+    Each ``links`` key is an exact link token (``$PRPSHEET:"Material"``) that
+    must appear exactly once on the sheet; its note keeps every other
+    character -- label text, formatting -- and only the token changes. Returns
+    each rewritten note with its new linked text.
+    """
+    matched = dict.fromkeys(links, 0)
+    rewritten = []
+    for note in _sheet_format_notes(draw):
+        raw = str(note.PropertyLinkedText)
+        linked = raw
+        for token, replacement in links.items():
+            matched[token] += raw.count(token)
+            linked = linked.replace(token, replacement)
+        if linked == raw:
+            continue
+        note.PropertyLinkedText = linked
+        if note.PropertyLinkedText != linked:
+            raise RuntimeError(f"{label}: title-block link did not persist: {raw!r} -> {linked!r}")
+        rewritten.append((note, linked))
+    if any(count != 1 for count in matched.values()):
+        raise RuntimeError(f"{label}: the title block must carry each retargeted link exactly once: {matched!r}")
+    return rewritten
+
+
+def _note_text(text: str) -> str:
+    """Note text as printed: no format codes, any whitespace run one space
+    (INote.GetText ends lines CRLF where PropertyLinkedText keeps LF)."""
+    return " ".join(_NOTE_FORMAT_CODE.sub("", text).split())
+
+
+def assert_title_block_resolves(
+    draw: Any,
+    linked_model: Any,
+    configuration: str,
+    *,
+    drawing: str,
+    sheet: str,
+    cells: Mapping[str, tuple[float, float, float, float]],
+) -> dict[str, int]:
+    """Read the active sheet's linked title-block notes back against their sources.
+
+    ``$PRPSHEET`` resolves as SolidWorks does -- the view configuration's own
+    property first, then the file's (conegear's per-config DWG. NO. relies on
+    it) -- and ``$PRP`` on the drawing document; ``SW-`` built-ins are not
+    custom properties and are skipped. MATERIAL (the Material Specification)
+    and FINISH must print exactly once each, match, and stay inside their
+    ``cells`` (``INote.GetExtent``): blank, a placeholder (NONE, N/A, TBD,
+    -), missing, different or overflowing raises -- a long specification is reworded at its source, never shrunk
+    here. Any other linked cell that prints something other than its source
+    warns and records a ``drawing.title_block_drift`` event.
+    """
+    def source(kind: str, name: str) -> str:
+        if kind == "PRP":
+            return str(draw.GetCustomInfoValue("", name) or "")
+        value = str(linked_model.GetCustomInfoValue(configuration, name) or "")
+        return value or str(linked_model.GetCustomInfoValue("", name) or "")
+
+    where = f"{drawing} sheet {sheet!r} (config {configuration!r})"
+    hard = {TITLE_BLOCK_MATERIAL_PROPERTY: 0, TITLE_BLOCK_FINISH_PROPERTY: 0}
+    counts = {"notes": 0, "drift": 0}
+    for note in _sheet_format_notes(draw):
+        linked = str(note.PropertyLinkedText)
+        tokens = _PROPERTY_LINK.findall(linked)
+        if not tokens or any(name.startswith("SW-") for _kind, name in tokens):
+            continue
+        counts["notes"] += 1
+        values = {(kind, name): source(kind, name) for kind, name in tokens}
+        critical = sorted({name for _kind, name in tokens if name in hard})
+        for name in critical:
+            hard[name] += 1
+        blank = [
+            f"{name}={value!r}"
+            for (_kind, name), value in values.items()
+            if name in hard and TITLE_BLOCK_PLACEHOLDER.match(value)
+        ]
+        if blank:
+            raise RuntimeError(f"{where}: title-block {blank} is blank or a placeholder on the linked model")
+        expected = _note_text(_PROPERTY_LINK.sub(lambda m: values[(m.group(1), m.group(2))], linked))
+        printed = _note_text(str(note.GetText()))
+        for name in critical:
+            box = native_box(note.GetExtent(), label=f"{where} {name}", kind="note")
+            if not box_inside(box, cells[name], slack=TITLE_BLOCK_CELL_SLACK_M):
+                raise RuntimeError(
+                    f"{where}: title-block {name} {printed!r} overflows its cell: "
+                    f"extent {tuple(round(v, 4) for v in box)} m, cell {cells[name]} m"
+                )
+        if printed == expected:
+            continue
+        if critical:
+            raise RuntimeError(
+                f"{where}: title-block {critical} prints {printed!r}, the linked model says "
+                f"{expected!r} (link {linked!r})"
+            )
+        counts["drift"] += 1
+        _telemetry.warn(
+            f"{where}: title-block link {linked!r} prints {printed!r}, its source says {expected!r}",
+            drawing=drawing,
+            sheet=sheet,
+        )
+        _telemetry.event(
+            "drawing.title_block_drift",
+            drawing=drawing,
+            sheet=sheet,
+            configuration=configuration,
+            link=linked,
+            expected=expected,
+            printed=printed,
+        )
+    wrong = {name: count for name, count in hard.items() if count != 1}
+    if wrong:
+        raise RuntimeError(f"{where}: MATERIAL/FINISH must each print exactly once: {wrong!r}")
+    return counts
 
 
 @_telemetry.traced("drawing.cosmetic_threads")
@@ -6052,6 +6230,7 @@ async def finalize_drawing(
             f"missing={missing!r}, unknown={unknown!r}"
         )
 
+    title_block_sources: dict[str, tuple[Any, str, dict[str, tuple[float, float, float, float]]]] = {}
     # Every sheet owns its own $PRPSHEET link. Point each at that sheet's first
     # real view after all views exist, validate the linked model's tolerance and
     # current-release Revision properties, and hold every sheet to the same ASME B
@@ -6160,6 +6339,40 @@ async def finalize_drawing(
                 TITLE_BLOCK_COPYRIGHT_PROPERTY,
             ),
         )
+        retarget_title_block_links(
+            drawing_model,
+            {_TEMPLATE_MATERIAL_LINK: property_link(TITLE_BLOCK_MATERIAL_PROPERTY)},
+            label=f"sheet {sheet_name!r}",
+        )
+        template = DRAWING_TEMPLATES[resolved_layouts[sheet_name]]
+        title_block_sources[sheet_name] = (
+            linked_model,
+            str(adapter._get_attr_or_call(first_view, "ReferencedConfiguration") or ""),
+            {
+                TITLE_BLOCK_MATERIAL_PROPERTY: template.material_cell_m,
+                TITLE_BLOCK_FINISH_PROPERTY: template.finish_cell_m,
+            },
+        )
+
+    # One rebuild re-resolves every retargeted link; then each sheet's title
+    # block is read back against the model its views show.
+    if not drawing_model.EditRebuild3():
+        raise RuntimeError("drawing rebuild after the title-block retarget failed")
+    drawing_label = str(drawing_model.GetTitle() or "drawing")
+    with _telemetry.span("drawing.title_block_readback", sheets=len(sheet_names)) as span:
+        drift = 0
+        for sheet_name, (linked_model, configuration, cells) in title_block_sources.items():
+            if not ddoc.ActivateSheet(sheet_name):
+                raise RuntimeError(f"failed to activate drawing sheet {sheet_name!r} for its title block")
+            drift += assert_title_block_resolves(
+                drawing_model,
+                linked_model,
+                configuration,
+                drawing=drawing_label,
+                sheet=sheet_name,
+                cells=cells,
+            )["drift"]
+        span.set_attribute("drift", drift)
 
     # Explicit recipe-requested cleanup remains sheet-scoped. When a standard
     # Isometric view is present, the finalizer owns its high-quality Shaded With
@@ -6201,6 +6414,13 @@ async def finalize_drawing(
 
     if not ddoc.ActivateSheet(sheet_names[0]):
         raise RuntimeError("failed to restore first drawing sheet before export")
+    # The per-sheet passes above leave whichever sheet they touched last
+    # active, and the SLDDRW opens on the sheet it was saved on: sheet 1.
+    active = str(
+        adapter._get_attr_or_call(adapter._get_attr_or_call(ddoc, "GetCurrentSheet"), "GetName") or ""
+    )
+    if active != sheet_names[0]:
+        raise RuntimeError(f"drawing would save on sheet {active!r}, not {sheet_names[0]!r}")
     # The ONE settling rebuild for the whole print: per-dimension and
     # per-callout helpers no longer rebuild (their readbacks never needed it),
     # so every text extent and view outline is brought current here, before
