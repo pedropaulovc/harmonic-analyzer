@@ -27,7 +27,9 @@ checkout rendered at the release head:
   reviewer that is down goes straight to the fallback reviewer and model the
   user directed, and a pass is recorded as ``outage_fallback`` with that
   outage.  A both-families drawing never takes it: the family that is down is
-  left ``reviewer-down`` (retried on resume) once the other has run.
+  left ``reviewer-down`` (retried on resume) once the other has run.  For
+  a Mimo author, whom both families review cross-family, the directed
+  alternative is recorded as an ordinary ``cross_family`` review.
 * **Ingest** -- a passing review is recorded in the ledger through
   ``record_review``, so the family rule and the last-resort evidence are the
   ones every other entry meets.  A FIX is left for the author, with its counts.
@@ -37,7 +39,8 @@ checkout rendered at the release head:
   reviewed again; anything else (pending, interrupted, refused, errored, or
   re-rendered since) is.  An ingested drawing is only ever routed again when
   the gate blocks it again -- its outage closed, or its entry was withdrawn --
-  and then it gets a fresh review, not its old report.  A review that broke
+  and then it gets a fresh review, not its old report (whose digest the
+  manifest keeps as stale, so a crash cannot bring it back).  A review that broke
   the blind-review rules, or whose pass could not be written to the ledger,
   is an error, retried on resume (the second from its report, at no cost; a
   last-resort pass is recovered together with the kept refusal that licensed
@@ -298,8 +301,13 @@ def manifest_problem(data: Any) -> str | None:
                 return f"{name}: an attempt's tokens is not an object"
             if not isinstance(attempt.get("findings") or {}, dict):
                 return f"{name}: an attempt's findings is not an object"
+            if not isinstance(attempt.get("report_sha256") or "", str):
+                return f"{name}: an attempt's report_sha256 is not a sha256"
         if not isinstance(entry.get("pdf_sha256", ""), str):
             return f"{name}: pdf_sha256 is not a sha256"
+        stale = entry.get("stale_reports", [])
+        if not isinstance(stale, list) or not all(isinstance(x, str) for x in stale):
+            return f"{name}: stale_reports is not a list of sha256"
         if entry.get("name") != name:
             return f"{name}: its entry names {entry.get('name')!r}"
     return None
@@ -376,7 +384,6 @@ class Wave:
     backoff: timedelta = QUOTA_BACKOFF
     rulings: ml.AuthorRulings = field(default_factory=ml.load_author_rulings)
     outage: dict[str, Any] | None = None  # open; the user directed its fallback
-    lapsed: set[str] = field(default_factory=set)  # ingested, then blocked again
     ledger_lock: threading.Lock = field(default_factory=threading.Lock)
 
     def run_one(self, route: Route) -> State:
@@ -420,9 +427,18 @@ class Wave:
     def _run_one(self, route: Route) -> State:
         pdf_sha = ml.sha256_file(route.pdf)
         entry = self.manifest.drawings.get(route.name) or {}
+        stale = set(entry.get("stale_reports") or [])
         if entry.get("state") == State.INGESTED and entry.get("pdf_sha256") == pdf_sha:
-            self.lapsed.add(route.name)  # its old report no longer counts
-        self.manifest.update(route.name, state=State.RUNNING, pdf_sha256=pdf_sha)
+            # Ingested, then blocked again: its reports no longer count.  Kept
+            # by digest in the same save that marks it running, so a crash
+            # before the fresh review cannot bring the old report back.
+            stale |= self._report_digests(route.name)
+        self.manifest.update(
+            route.name,
+            state=State.RUNNING,
+            pdf_sha256=pdf_sha,
+            stale_reports=sorted(stale),
+        )
         if self._down(route.reviewer):
             return self._run_fallback(route)
         recovered = self._recovered_last_resort(route, pdf_sha)
@@ -451,14 +467,19 @@ class Wave:
         """The same-family review the user directed while the cross reviewer is down."""
         outage = self.outage
         reviewer = outage["fallback_reviewer"]
+        # A Mimo author has two cross-family reviewers: the alternative to the
+        # one that is down is an ordinary cross-family review, not a fallback.
+        if ml.review_slot(reviewer, route.author_family or "") == ml.CROSS_FAMILY:
+            outage = None
+        slot = ml.OUTAGE_FALLBACK if outage is not None else ml.CROSS_FAMILY
         review = self._attempt(
-            route, reviewer, slot=ml.OUTAGE_FALLBACK, model=outage["fallback_model"]
+            route, reviewer, slot=slot, model=self.outage["fallback_model"]
         )
         if self._quota_refused(review):
             return self._refused(
                 route,
-                f"{outage['reviewer']} is down (outage {outage['id']}) and its "
-                f"fallback {reviewer} refused on quota",
+                f"{self.outage['reviewer']} is down (outage {self.outage['id']}) "
+                f"and its fallback {reviewer} refused on quota",
             )
         return self._settle(route, review, None, outage=outage)
 
@@ -522,7 +543,7 @@ class Wave:
             # A reused report was paid for by the attempt that produced it --
             # if that attempt reached the checkpoint; a crash before it did
             # leaves the spend recorded nowhere else.
-            already_charged = reused and self._checkpointed(route.name, review)
+            already_charged = reused and self._checkpointed(route.name, reviewer)
             cost = {} if already_charged else review_cost(review.events_file)
             # The checkpoint first: nothing after the reviewer returns may lose it.
             self.manifest.add_attempt(
@@ -539,6 +560,7 @@ class Wave:
                     "findings": _findings(review),
                     "error": review.error,
                     "report": self._report(reviewer, route.name).as_posix(),
+                    "report_sha256": self._report_digest(reviewer, route.name),
                     "reused_report": reused,
                     **cost,
                 },
@@ -558,16 +580,22 @@ class Wave:
                 )
         return review
 
-    def _checkpointed(self, name: str, review: mr.Review) -> bool:
-        """Whether an attempt already in the manifest recorded this report."""
+    def _report_digest(self, reviewer: str, name: str) -> str | None:
+        report = self._report(reviewer, name)
+        return ml.sha256_file(report) if report.is_file() else None
+
+    def _report_digests(self, name: str) -> set[str]:
+        """The digest of every reviewer's report on disk for ``name``."""
+        digests = (self._report_digest(r, name) for r in mr.DEFAULT_MODELS)
+        return {digest for digest in digests if digest}
+
+    def _checkpointed(self, name: str, reviewer: str) -> bool:
+        """Whether an attempt in the manifest already recorded this exact report."""
+        digest = self._report_digest(reviewer, name)
         entry = self.manifest.drawings.get(name) or {}
-        verdict = (review.verdict or {}).get("verdict")
-        return any(
-            (a.get("reviewer"), a.get("model"), a.get("effort"))
-            == (review.reviewer, review.model, review.effort)
-            and a.get("duration_s") == review.duration_s
-            and a.get("verdict") == verdict
-            for a in entry.get("attempts") or []
+        return digest is not None and any(
+            attempt.get("report_sha256") == digest
+            for attempt in entry.get("attempts") or []
         )
 
     def _finished(
@@ -580,8 +608,11 @@ class Wave:
         instead of spending the review again.
         """
         report = self._report(reviewer, route.name)
-        if route.name in self.lapsed or not report.is_file():
+        if not report.is_file():
             return None
+        entry = self.manifest.drawings.get(route.name) or {}
+        if ml.sha256_file(report) in (entry.get("stale_reports") or []):
+            return None  # an acceptance that lapsed: it needs a fresh review
         try:
             data = json.loads(report.read_text(encoding="utf-8"))
             if not isinstance(data, dict) or ml.review_record_problem(data):

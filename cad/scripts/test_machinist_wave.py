@@ -425,7 +425,11 @@ def test_refused_drawings_are_retried_after_the_backoff(
     ruling = {"drawing": "crank_arm", "family": "gpt", "commit": "c" * 40}
     outcomes = {("crank_arm", "claude"): "quota"}
     fake = FakeReviewer(outcomes)
-    wave = _wave(tmp_path, checkout, fake)
+    # Routed and recorded under the same ruling: with none, the author of an
+    # untrailered commit rests on nobody's authority and nothing counts.
+    wave = _wave(
+        tmp_path, checkout, fake, rulings=ml.AuthorRulings({"crank_arm": ruling})
+    )
     [crank] = [
         r
         for r in _routes(checkout, tmp_path, {"crank_arm": ruling})
@@ -639,6 +643,89 @@ def test_a_checkout_with_other_review_metadata_is_refused(
     assert "run that checkout's own" in capsys.readouterr().err
     assert mw.main([*argv, "plan"]) == 2
     assert not (mw.WAVE_ROOT / "w").exists()
+
+
+class Crash(BaseException):
+    """The process dying mid-run: nothing the wave catches."""
+
+
+def test_a_lapsed_report_stays_lapsed_across_a_crash(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    fake = FakeReviewer({("crank_arm", "codex"): "ship"})
+    [crank] = [r for r in _routes(checkout, tmp_path) if r.name == "crank_arm"]
+    assert mw.run_wave([crank], _wave(tmp_path, checkout, fake)) == {
+        "crank_arm": mw.State.INGESTED
+    }
+    (tmp_path / "ledger.json").unlink()  # its acceptance is withdrawn
+
+    def dies(*args, **kwargs):
+        raise Crash()
+
+    with pytest.raises(Crash):  # marked for a fresh review, then the process dies
+        mw.run_wave([crank], _wave(tmp_path, checkout, dies))
+    fake.calls.clear()
+
+    assert mw.run_wave([crank], _wave(tmp_path, checkout, fake)) == {
+        "crank_arm": mw.State.INGESTED
+    }
+    assert len(fake.calls) == 1  # reviewed afresh, not the withdrawn report
+
+
+def test_a_mimo_drawings_outage_alternative_is_an_ordinary_cross_family_review(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A Mimo author: Claude reviews it, and Codex is cross-family to it too.
+    _authors(monkeypatch, crank_arm="mimo-v2.6-pro", pen_rod="gpt-6-sol")
+    path = _outages(
+        tmp_path,
+        id="claude-down-test",
+        reviewer="claude",
+        fallback_reviewer="codex",
+        fallback_model=mr.DEFAULT_MODELS["codex"],
+    )
+    outage = ml.load_outages(path)["claude-down-test"]
+    fake = FakeReviewer({("crank_arm", "codex"): "ship"})
+    [crank] = [r for r in _routes(checkout, tmp_path) if r.name == "crank_arm"]
+    assert crank.reviewer == "claude"
+
+    outcome = mw.run_wave([crank], _wave(tmp_path, checkout, fake, outage=outage))
+
+    assert outcome == {"crank_arm": mw.State.INGESTED}
+    ledger = ml.load_ledger(tmp_path / "ledger.json")["drawings"]
+    assert list(ledger["crank_arm"]) == [ml.CROSS_FAMILY]
+
+
+def test_a_later_uncheckpointed_report_is_charged_though_it_looks_like_an_old_one(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    fake = FakeReviewer({("pen_rod", "claude"): "fix"})
+    [pen] = [r for r in _routes(checkout, tmp_path) if r.name == "pen_rod"]
+    wave = _wave(tmp_path, checkout, fake)
+    mw.run_wave([pen], wave)  # one paid FIX, checkpointed
+    # A second paid run of the same drawing wrote its report, then the process
+    # died before the checkpoint: same reviewer, model, effort, verdict.
+    later = mr.ReviewPackage("pen_rod", "part", (pen.pdf,))
+    fake(
+        later,
+        reviewer="claude",
+        model=mr.DEFAULT_MODELS["claude"],
+        effort=mr.DEFAULT_EFFORTS["claude"],
+        report_dir=mw.WAVE_ROOT / "w1" / "reviews" / "claude",
+    )
+    report = mw.WAVE_ROOT / "w1" / "reviews" / "claude" / "pen_rod.json"
+    data = json.loads(report.read_text(encoding="utf-8"))
+    later_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+    data["reviewed_at"] = later_at.isoformat(timespec="seconds")
+    report.write_text(json.dumps(data), encoding="utf-8")
+    wave.manifest.update("pen_rod", state=mw.State.RUNNING)
+
+    resumed = _wave(tmp_path, checkout, fake)
+    mw.run_wave([pen], resumed)
+
+    assert "claude: 2 runs, $0.50 total" in mw.table(resumed.manifest.data)
 
 
 def test_a_reused_report_is_not_charged_again(
