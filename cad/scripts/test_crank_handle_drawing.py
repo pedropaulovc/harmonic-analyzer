@@ -90,7 +90,7 @@ def test_pivot_interface_is_fully_released_for_manufacture() -> None:
     assert "STRAIGHT GRAIN PARALLEL TO TURNING AXIS" in notes
     assert f"X{crank_handle_spec.HANDLE_LENGTH:.2f}" in notes
     assert (
-        f"ACTUAL BUTT FACE AT {crank_handle_spec.HANDLE_LENGTH:.2f}+0.00/-0.25 TRIMS"
+        f"ACTUAL BUTT FACE AT {crank_handle_spec.HANDLE_LENGTH:.2f} 0/-0.25 TRIMS"
         in notes
     )
     assert "ACTUAL BUTT TRIM FACE" in notes

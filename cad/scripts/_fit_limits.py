@@ -22,7 +22,7 @@ SHAFT_H = (0.000, -0.020)
 REAM_H7 = (0.012, 0.000)
 
 
-def band_text(band: tuple[float, float]) -> str:
+def band_text(band: tuple[float, float], *, decimals: int = 2) -> str:
     """Render an ``(upper, lower)`` band the way a shop note quotes it.
 
     Upper deviation first (ASME Y14.5 §2.3.2).  A note that quotes a band beside
@@ -30,18 +30,24 @@ def band_text(band: tuple[float, float]) -> str:
     toleranced with, or the two drift — the half-migrated pattern where the
     nominal is f-stringed and the band beside it is typed.
 
-    A nil deviation keeps its band's SIGN (``-0.00`` on the low side of a
-    unilateral band), because that is what the released sheets print today and
-    this helper exists to make a relocation a pure refactor.  Y14.5 §2.3.2
-    actually prefers a bare ``0`` for a nil limit; switching to it changes ink on
-    every affected sheet, so it is a deliberate drawing change to make on its
-    own, not a side effect of moving a constant.
+    A nil deviation prints as a single ``0`` with no sign: ASME Y14.5-2018
+    §2.3 says so for metric unilateral tolerancing, and the dimension stacks on
+    the same sheets print it that way (#923).  The old signed ``-0.00`` (#851)
+    left a sheet quoting ``0`` in the stack and ``-0.00`` in the note.  The
+    caller supplies the space between the nominal and the band, so a bare
+    ``0`` never runs into the nominal's digits.  ``decimals`` matches the
+    band to its nominal's places (a gear span quotes ``0/-0.020``).
     """
     upper, lower = band
     if upper <= lower:
         raise ValueError(f"fit band is inverted: {band!r}")
-    low = f"{lower:+.2f}" if lower else "-0.00"
-    return f"{upper:+.2f}/{low}"
+    if decimals < 0:
+        raise ValueError(f"band decimals must be >= 0, got {decimals!r}")
+    return f"{_deviation_text(upper, decimals)}/{_deviation_text(lower, decimals)}"
+
+
+def _deviation_text(deviation: float, decimals: int) -> str:
+    return f"{deviation:+.{decimals}f}" if deviation else "0"
 
 
 def deviations(band: tuple[float, float]) -> tuple[float, float]:
