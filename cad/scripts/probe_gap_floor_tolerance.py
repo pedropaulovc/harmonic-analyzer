@@ -24,6 +24,16 @@ variant back in session, then saves, closes, reopens and reads back again per
 configuration, then renders the T006 and T120 front views with the imported
 dimensions to PDF/PNG under ``failures/gapfloor-probe/<stamp>/``, and finally
 raises through ``capture_com_failure`` so the leaf stores no cache entry.
+
+Stage 2 (the #834 fix's import path, same leaf): the part saves the probe
+sketch BLANKED, as the fix will save ``ToothThicknessReference`` and the gap
+floor.  Each of the two sheets then imports it twice:
+
+* view A: ``_drawing_hidden_sketches.curate_view_dimensions`` (targeted
+  import, ``DuplicateDims`` true) -- does sheet 2 still receive dims that
+  sheet 1 already carries?
+* view B: per-view ``UnblankSketch`` + the package's whole-model import
+  (``DuplicateDims`` false, as ``draw_cone_gear`` does for its 20 sheets).
 """
 
 from __future__ import annotations
@@ -38,6 +48,8 @@ import _telemetry
 from _common import (
     SketchDims,
     _early_bound,
+    _read_member,
+    blank_sketch,
     check,
     define_circle,
     name_last_feature,
@@ -47,6 +59,11 @@ from _seat_forensics import OUT_FAILURES, capture_com_failure
 from cone_gear_spec import floor_limits_mm
 
 PROBE_SKETCH = "GapFloorProbe"
+# Stage-2 sheet positions (m): view B right of the real front view, view A's
+# kept dims stacked above it.
+VIEW_B_CENTER = (0.300, 0.150)
+KEEP_Y0 = 0.205
+KEEP_DY = 0.008
 PROBE_CONFIGS = (("T006", 6), ("T012", 12), ("T060", 60), ("T120", 120))
 # name -> (circle radius mm, tolerance type, form)
 VARIANTS = {
@@ -130,7 +147,7 @@ def _set_variants(adapter: Any) -> dict[str, Any]:
         if form == "all_setvalues2":
             calls[name] = _call(
                 f"{name} SetValues2 all",
-                lambda t=tol: t.SetValues2(0.0, widest, 2, None),
+                lambda t=tol: t.SetValues2(0.0, widest, 2, ""),
             )
             continue
         for configuration, teeth in PROBE_CONFIGS:
@@ -154,10 +171,11 @@ def _set_variants(adapter: Any) -> dict[str, Any]:
                 )
                 calls[f"{key}.select"] = selected
                 model.EditSketch()
-            tol = _tolerance(adapter, name)
             calls[key] = _call(
                 f"{key} SetValues2 this",
-                lambda t=tol, w=window: t.SetValues2(0.0, w, 1, ""),
+                lambda w=window, n=name: _tolerance(adapter, n).SetValues2(
+                    0.0, w, 1, ""
+                ),
             )
             if form == "this_config_edit":
                 model.SketchManager.InsertSketch(True)
@@ -184,16 +202,20 @@ async def _author_probe_sketch(adapter: Any) -> None:
 
 
 def _drawing_reads(imported: list[Any]) -> list[dict[str, Any]]:
-    """Name, printed text and tolerance of each imported display dimension."""
+    """Name, visibility and tolerance of each imported dimension."""
     reads: list[dict[str, Any]] = []
     for item in imported:
         try:
-            display = _early_bound(item, "IDisplayDimension")
+            # InsertModelAnnotations3 hands back IAnnotation objects.
+            annotation = _early_bound(item, "IAnnotation")
+            display = _early_bound(
+                annotation.GetSpecificAnnotation(), "IDisplayDimension"
+            )
             dimension = _early_bound(display.GetDimension2(0), "IDimension")
             tol = _early_bound(dimension.Tolerance, "IDimensionTolerance")
             reads.append({
                 "name": str(dimension.Name),
-                "text": [str(display.GetText(k)) for k in range(1, 6)],
+                "visible": int(annotation.Visible),
                 "type": int(tol.Type),
                 "min_mm": round(float(tol.GetMinValue()) * 1000.0, 6),
                 "max_mm": round(float(tol.GetMaxValue()) * 1000.0, 6),
@@ -204,9 +226,11 @@ def _drawing_reads(imported: list[Any]) -> list[dict[str, Any]]:
 
 
 def _render(adapter: Any, copy: Path, out_dir: Path) -> list[str]:
+    import _drawing_hidden_sketches as hidden_sketches
     import draw_cone_gear as sheet
     from _drawing_common import (
         _INSERT_DIMS_MARKED,
+        _model_item_paths,
         create_blank_drawing_sheets,
         new_project_drawing,
         render_pdf_png,
@@ -227,28 +251,52 @@ def _render(adapter: Any, copy: Path, out_dir: Path) -> list[str]:
             adapter, str(copy), "*Front", *sheet.FRONT_CENTER,
             scale=sheet.SHEET_SCALES[configuration],
         )
-        sheet._configure_views(adapter, configuration, (front,))
-        name = sheet.view_name(adapter, front)
-        activated = bool(ddoc.ActivateView(name))
-        drawing_model.ClearSelection2(True)
-        selected = bool(
-            drawing_model.Extension.SelectByID2(
-                name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
-            )
+        view_b = place_view(
+            adapter, str(copy), "*Front", *VIEW_B_CENTER,
+            scale=sheet.SHEET_SCALES[configuration],
         )
+        sheet._configure_views(adapter, configuration, (front, view_b))
+        keep = {
+            name: (sheet.FRONT_CENTER[0], KEEP_Y0 + KEEP_DY * index)
+            for index, name in enumerate(VARIANTS)
+        }
         try:
+            curated = hidden_sketches.curate_view_dimensions(
+                adapter,
+                front,
+                keep=keep,
+                view_label=f"{configuration} probe A",
+                dimensions_by_feature={PROBE_SKETCH: set(VARIANTS)},
+            )
+            rendered.append(f"{configuration} A targeted: {_drawing_reads(curated)}")
+        except Exception as exc:  # noqa: BLE001
+            rendered.append(f"{configuration} A targeted raised {type(exc).__name__}: {exc}")
+        name = sheet.view_name(adapter, view_b)
+        try:
+            ddoc.ActivateView(name)
+            hidden_sketches._show_view_sketches(
+                drawing_model,
+                [PROBE_SKETCH],
+                paths=_model_item_paths(adapter, view_b),
+                label=f"{configuration} probe B",
+            )
+            drawing_model.ClearSelection2(True)
+            selected = bool(
+                drawing_model.Extension.SelectByID2(
+                    name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+                )
+            )
             result = ddoc.InsertModelAnnotations3(
                 0, _INSERT_DIMS_MARKED, False, False, True, False
             )
+            drawing_model.ClearSelection2(True)
+            imported = [] if not result or isinstance(result, str) else list(result)
+            rendered.append(
+                f"{configuration} B whole-model (selected={selected}): "
+                f"{_drawing_reads(imported)}"
+            )
         except Exception as exc:  # noqa: BLE001
-            result = None
-            rendered.append(f"{configuration}: import raised {type(exc).__name__}: {exc}")
-        drawing_model.ClearSelection2(True)
-        imported = [] if not result or isinstance(result, str) else list(result)
-        rendered.append(
-            f"{configuration}: view {name} activated={activated} selected={selected}"
-        )
-        rendered.append(f"{configuration}: imported {_drawing_reads(imported)}")
+            rendered.append(f"{configuration} B raised {type(exc).__name__}: {exc}")
     drawing_model.ClearSelection2(True)
     pdf = out_dir / "gapfloor-probe.pdf"
     png = out_dir / "gapfloor-probe.png"
@@ -275,19 +323,27 @@ async def probe(adapter: Any, source: Path) -> None:
         await _author_probe_sketch(adapter)
         report["calls"] = _set_variants(adapter)
         report["in_session"] = _read_all(adapter, "in-session")
+        blank_sketch(adapter, PROBE_SKETCH)
         model = adapter.currentModel
         report["save"] = _call("Save3", lambda: model.Save3(1, 0, 0))
         title = str(model.GetTitle())
         report["close"] = _call("CloseDoc", lambda: adapter.swApp.CloseDoc(title))
         check("reopen probe copy", await adapter.open_model(str(copy)))
         report["reopened"] = _read_all(adapter, "reopened")
+        feature = _early_bound(
+            _early_bound(adapter.currentModel, "IPartDoc").FeatureByName(PROBE_SKETCH),
+            "IFeature",
+        )
+        report["reopened_sketch_visible"] = int(_read_member(feature, "Visible"))
         report["expected_window_mm"] = {
             c: round(_window_m(t) * 1000.0, 6) for c, t in PROBE_CONFIGS
         }
         try:
             report["render"] = _render(adapter, copy, out_dir)
         except Exception as exc:  # noqa: BLE001
-            report["render"] = f"failed {type(exc).__name__}: {exc}"
+            report["render"] = [f"failed {type(exc).__name__}: {exc}"]
+        for line in report["render"]:
+            _telemetry.warn(f"gapfloor probe stage 2: {line}")
     (out_dir / "gapfloor-probe.json").write_text(
         json.dumps(report, indent=2, default=repr), encoding="utf-8"
     )
@@ -302,7 +358,9 @@ async def probe(adapter: Any, source: Path) -> None:
         "gapfloor-probe",
         "gapfloor probe finished (deliberate raise, no cache store): "
         f"expected windows {report['expected_window_mm']}; reopened max per "
-        f"variant {'; '.join(verdicts)}; report {out_dir / 'gapfloor-probe.json'}",
+        f"variant {'; '.join(verdicts)}; sketch Visible after reopen "
+        f"{report['reopened_sketch_visible']}; stage 2 {report['render']}; "
+        f"report {out_dir / 'gapfloor-probe.json'}",
         api="IDimensionTolerance.SetValues2",
         sketch=PROBE_SKETCH,
     )
