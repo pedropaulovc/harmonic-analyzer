@@ -120,6 +120,7 @@ from _assembly_patterns import (
     PatternDirection,
 )
 from _interference_contracts import allowed_interference_pairs
+from _visibility import blank_reference_geometry
 from _holes import CLEARANCE_MM
 from _transforms import (  # noqa: E402
     IDENTITY,
@@ -977,6 +978,7 @@ async def _insert_roller_chain(adapter) -> None:
     # Hide the path spline: it is construction scaffolding for the pattern, not a
     # rendered feature.
     check("blank chain path sketch", await adapter.blank_sketch("chain-path"))
+    blank_reference_geometry(adapter, ((plane_name, "PLANE"),))
 
     # 4. Gates: enough links, on the chain plane, on the loop centreline.
     links = [

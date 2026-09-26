@@ -110,6 +110,7 @@ from _drawing_marks import (
 from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _part_pmi import author_part_pmi
+from _visibility import blank_reference_geometry
 from involute_gear import DP, gear_facts  # DP = train diametral_pitch (machine.yaml)
 from cylinder_gear_notes import DRAWING_NOTES, GEAR_DATA
 from cylinder_gear_spec import (
@@ -337,6 +338,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += [(cam_depth[0], '"CamThickness"')]
     v_cam = math.pi * (CAM_DIAMETER / 2.0) ** 2 * CAM_THICKNESS
     volume = await volume_check(adapter, "cam boss", volume + v_cam, 0.005 * v_cam)
+    blank_reference_geometry(adapter, ((plane.name, "PLANE"),))
 
     # The offset plane and the extrude direction both have ambiguous signs:
     # assert the cam actually landed at z > FACE_WIDTH, on +Y.

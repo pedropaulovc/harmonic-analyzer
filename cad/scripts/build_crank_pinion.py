@@ -65,6 +65,7 @@ from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _part_pmi import author_part_pmi
+from _visibility import blank_reference_geometry
 from crank_pinion_spec import (
     BORE_DIA_BAND,
     BOSS_CHAMFER,
@@ -373,6 +374,7 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(
         adapter, "retention-pin cross-hole", volume - v_pin_hole, 0.02 * v_pin_hole
     )
+    blank_reference_geometry(adapter, (("PinStationPlane", "PLANE"),))
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).

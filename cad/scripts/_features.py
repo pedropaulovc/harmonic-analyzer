@@ -69,6 +69,8 @@ def insert_helix(
     name = feature_name_by_type(adapter, "Helix")
     if not name:
         raise RuntimeError("InsertHelix did not create a helix feature")
+    # Hidden at creation; the sweep still selects its path by name.
+    blank_reference_geometry(adapter, ((name, "REFERENCECURVES"),))
     _telemetry.success(f"insert_helix -> {name}")
     return name
 
@@ -214,6 +216,7 @@ async def add_spring_end_hooks(
                 ),
             )
             profile_plane = getattr(plane, "name", plane)
+            hook_planes = [profile_plane]
         else:
             profile_plane = "Top Plane"
         await _profile(profile_plane, label)
@@ -232,12 +235,14 @@ async def add_spring_end_hooks(
                     )
                 ),
             )
-            await _profile(getattr(plane, "name", plane), f"{label} (flipped)")
+            hook_planes.append(getattr(plane, "name", plane))
+            await _profile(hook_planes[-1], f"{label} (flipped)")
             res = await adapter.create_sweep(SweepParameters(path=path_name))
         check(f"sweep {label} hook", res)
         if d > 0:
-            # The profile plane has served the sweep; hide it from renders.
-            blank_reference_geometry(adapter, ((getattr(plane, "name", plane), "PLANE"),))
+            # The profile planes have served the sweep; a failed first attempt
+            # leaves its plane behind too, so hide every one from renders.
+            blank_reference_geometry(adapter, tuple((name, "PLANE") for name in hook_planes))
 
         added = await _volume() - before
         # Upper bound 1%: planar-path Pappus is exact analytically, but the

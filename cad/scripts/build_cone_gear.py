@@ -139,7 +139,7 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
-from _visibility import assert_reference_geometry_hidden
+from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
 
 # NOTE: the validating ``set_global`` comes from ``involute_gear`` -- it
 # round-trips every gear-math global through the SW equation parser to assert
@@ -1042,12 +1042,12 @@ async def build(adapter) -> dict[str, str]:
     # ------------------------------------------------------------------
     from solidworks_mcp.adapters.base import CreateAxisParameters
 
-    check(
+    pattern_axis = check(
         "create_axis Z (Top x Right)",
         await adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
         ),
-    )
+    ).name
     adapter._zoom_to_fit(adapter.currentModel)
     ra_default_mm = facts["Ra"] * 25.4
     candidates = [[0.0, 0.0, FACE_WIDTH / 2.0]]  # on the reference axis
@@ -1076,6 +1076,9 @@ async def build(adapter) -> dict[str, str]:
         _telemetry.debug(f"axis candidate {point} failed: {res.error}")
     if pattern is None:
         raise RuntimeError("circular pattern: no axis candidate selectable")
+    # Hide only now: the pattern picks the axis by screen point, which a
+    # blanked axis would refuse.
+    blank_reference_geometry(adapter, ((pattern_axis, "AXIS"),))
     pattern_name = name_last_feature(adapter, TOOTH_PATTERN_FEATURE)
     count_dim = pattern_count_dimension(adapter, pattern_name, DEFAULT_TEETH)
     check(

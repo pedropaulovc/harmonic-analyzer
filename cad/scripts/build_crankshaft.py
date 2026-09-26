@@ -60,6 +60,7 @@ from _fit_limits import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _part_pmi import author_part_pmi
+from _visibility import blank_reference_geometry
 from crank_pinion_spec import (
     CRANKSHAFT_PIN_HOLE_PROCESS,
     PIN_CLOCKING_DEG as PINION_PIN_CLOCKING_DEG,
@@ -435,6 +436,23 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         name_last_feature(adapter, seat_name)
+    # Every surviving plane (the rejected clocking attempt was deleted); the
+    # seat datums stay selectable by name for the drive-train mates.
+    blank_reference_geometry(
+        adapter,
+        tuple(
+            (name, "PLANE")
+            for name in (
+                "JournalStartPlane",
+                "PinHoleStationPlane",
+                "PinionPinStationPlane",
+                "PinionPinClockingPlane",
+                "SeatT12",
+                "SeatPinion",
+                "SeatArm",
+            )
+        ),
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

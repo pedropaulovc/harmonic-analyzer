@@ -474,6 +474,69 @@ def test_shared_reference_creators_hide_what_they_create() -> None:
         assert creates and "blank_reference_geometry(" in text, module
 
 
+_REFERENCE_CREATE = re.compile(
+    r"\b(?:create_plane|create_axis|create_reference_point|InsertRefPlane"
+    r"|InsertAxis2?|InsertReferencePoint|InsertHelix|InsertCompositeCurve)\("
+)
+_REFERENCE_HIDES = (
+    "blank_reference_geometry(",
+    ".BlankRefGeom(",
+    "_blank_recipe_references(",
+)
+# Modules that create reference geometry but never save a document: the
+# motion studies author transient points/planes on an open model and discard it.
+_NON_SAVING_CREATORS = frozenset(
+    {"build_motion_study.py", "build_motion_study_springs.py"}
+)
+
+
+def _creates_without_hiding(text: str) -> bool:
+    """A module that authors reference geometry must hide some of it itself."""
+    code = [line for line in text.splitlines() if not line.lstrip().startswith("#")]
+    if not any(_REFERENCE_CREATE.search(line) for line in code):
+        return False
+    return not any(hide in line for line in code for hide in _REFERENCE_HIDES)
+
+
+def test_the_creator_sweep_flags_a_create_without_a_hide() -> None:
+    assert _creates_without_hiding(
+        "plane = check('p', await adapter.create_plane(params)).name\n"
+    )
+    assert _creates_without_hiding(
+        "model.FeatureManager.InsertReferencePoint(7, 0, 0.0, 1)\n"
+    )
+    assert not _creates_without_hiding(
+        "name = check('p', await adapter.create_plane(params)).name\n"
+        "blank_reference_geometry(adapter, ((name, 'PLANE'),))\n"
+    )
+    assert not _creates_without_hiding("# await adapter.create_axis(params)\n")
+    assert not _creates_without_hiding("CreateAxisParameters(mode='two_planes')\n")
+
+
+def test_every_reference_creator_hides_what_it_creates() -> None:
+    """Nothing hides at save any more, so each builder hides its own planes,
+    axes, points and curves.  ``diagnostics/`` is out of scope: its purchased-part
+    recipes are blanked by their caller (``_stock_fastener._blank_recipe_references``)
+    and the rest are hand-run probes that never ship an artefact."""
+    offenders = sorted(
+        path.name
+        for path in SCRIPTS.rglob("*.py")
+        if "diagnostics" not in path.relative_to(SCRIPTS).parts
+        and not path.name.startswith("test_")
+        and path.name not in _NON_SAVING_CREATORS
+        and _creates_without_hiding(path.read_text(encoding="utf-8"))
+    )
+    assert offenders == []
+
+
+def test_the_non_saving_allowance_stays_honest() -> None:
+    for module in _NON_SAVING_CREATORS:
+        text = (SCRIPTS / module).read_text(encoding="utf-8")
+        assert _creates_without_hiding(text), module
+        assert "save_part_and_images" not in text, module
+        assert "save_assembly_and_images" not in text, module
+
+
 def test_one_error_names_both_unexpected_and_stale_entries() -> None:
     model = _part_tree(_Feature("Plane7", "RefPlane", SHOWN))
     with pytest.raises(RuntimeError) as raised:

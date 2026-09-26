@@ -92,6 +92,7 @@ from _drawing_marks import (
 from _fit_limits import deviations
 from _gear import volume_check
 from _part_pmi import author_part_pmi
+from _visibility import blank_reference_geometry
 from cone_gear_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -208,6 +209,9 @@ async def build(adapter) -> dict[str, str]:
         # check as well as the size check.
         await volume_check(adapter, label, volume, 0.005 * volume)
         prev_end = end_z
+    blank_reference_geometry(
+        adapter, tuple((f"Sec{i}EndPlane", "PLANE") for i in range(1, len(SECTIONS)))
+    )
 
     # Shoulder roots.  ONE constant-radius fillet over all four internal step
     # edges, each picked by a point on the SMALLER land's circle at that
