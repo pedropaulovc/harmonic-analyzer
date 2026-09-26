@@ -174,7 +174,12 @@ SIDE_KEEP = {
 _DIAMETER_ROW_Y = (0.212, 0.228)
 DIAMETER_POSITIONS = {
     "ShaftDiaDim": (JOURNAL_START_X - 0.022, _DIAMETER_ROW_Y[0]),
-    "JournalDiaDim": (JOURNAL_START_X + 0.012, _DIAMETER_ROW_Y[1]),
+    # 22 mm in, not 12: its 2X sits over the text, and at 12 the cross-hole
+    # callout's leader shoulder ran into the 2X (run
+    # 20260926T203148919Z-b7caf9a2: the shoulder ends at sheet x ~0.182,
+    # where the 2X began).  At 22 the 2X starts ~10 mm right of it, and the
+    # Ø11.388 text still ends ~8 mm short of the Ø10.4's.
+    "JournalDiaDim": (JOURNAL_START_X + 0.022, _DIAMETER_ROW_Y[1]),
     "ReliefDiaDim": (RELIEF_START_X + 0.030, _DIAMETER_ROW_Y[0]),
     "PinionSeatDiaDim": (SEAT_STEP_X + 0.010, _DIAMETER_ROW_Y[0]),
 }
