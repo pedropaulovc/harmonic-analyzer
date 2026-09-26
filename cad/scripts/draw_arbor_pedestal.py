@@ -25,6 +25,7 @@ from _drawing_common import (
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     set_reference_dimension,
+    sketch_view_line,
     stamp_drawing_summary,
     visible_view_entities,
 )
@@ -266,7 +267,6 @@ def _add_bore_hidden_lines(adapter: Any, view: Any) -> None:
     drawing = _early_bound(draw, "IDrawingDoc")
     if not drawing.ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate plan view for arbor bore hidden lines")
-    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
     # Once a drawing view is active, sketch coordinates are view-local model
     # metres. The Top view's local vertical axis is -model-Z, so reflect the
     # upright's modeled -2..+8 mm span into view-local -8..+2 mm.
@@ -279,9 +279,17 @@ def _add_bore_hidden_lines(adapter: Any, view: Any) -> None:
     for x in (-bore_radius, bore_radius):
         for start_z, end_z in ((z0, midpoint), (z1, midpoint)):
             draw.ClearSelection2(True)
-            segment = sketch_manager.CreateLine(x, start_z, 0.0, x, end_z, 0.0)
-            if segment is None:
-                raise RuntimeError("failed to create an arbor bore hidden line")
+            segment = sketch_view_line(
+                adapter,
+                view,
+                (x, start_z),
+                (x, end_z),
+                coords="view",
+                label=(
+                    f"arbor bore hidden line x={x * 1000.0:+.2f} "
+                    f"from z={start_z * 1000.0:+.2f}"
+                ),
+            )
             segment = _early_bound(segment, "ISketchSegment")
             segment.Style = 1  # swLineHIDDEN
             if int(segment.Style) != 1:

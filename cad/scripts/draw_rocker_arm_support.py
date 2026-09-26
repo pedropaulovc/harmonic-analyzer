@@ -39,6 +39,7 @@ from _drawing_common import (
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    sketch_view_line,
     stamp_drawing_summary,
     view_name,
 )
@@ -225,27 +226,17 @@ def _create_view_centerline(
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate centerline view {name!r}")
-    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    previous_add_to_db = bool(sketch_manager.AddToDB)
-    previous_display = bool(sketch_manager.DisplayWhenAdded)
-    sketch_manager.AddToDB = True
-    sketch_manager.DisplayWhenAdded = True
-    try:
-        centerline = sketch_manager.CreateCenterLine(
-            start_xy[0],
-            start_xy[1],
-            0.0,
-            end_xy[0],
-            end_xy[1],
-            0.0,
-        )
-    finally:
-        sketch_manager.AddToDB = previous_add_to_db
-        sketch_manager.DisplayWhenAdded = previous_display
+    centerline = sketch_view_line(
+        adapter,
+        view,
+        start_xy,
+        end_xy,
+        kind="centerline",
+        coords="view",
+        label=f"{label} centerline",
+    )
     draw.ClearSelection2(True)
     draw.EditRebuild3()
-    if centerline is None:
-        raise RuntimeError(f"failed to create {label} centerline")
     return centerline
 
 

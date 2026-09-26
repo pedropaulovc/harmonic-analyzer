@@ -59,6 +59,8 @@ from _drawing_common import (
     ViewEdges,
     rebuild_drawing,
     scan_view_edges,
+    sketch_view_circle,
+    sketch_view_line,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -410,23 +412,19 @@ def _add_view_centerlines(
     if not drawing.ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate drawing centreline view")
     draw.ClearSelection2(True)
-    sketch = _early_bound(view.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    manager = _early_bound(draw.SketchManager, "ISketchManager")
     segments = []
-    for start, end in axes:
-        points = []
-        for xyz in (start, end):
-            x, y = model_point_in_view(
+    for index, (start, end) in enumerate(axes):
+        start_xy, end_xy = (
+            model_point_in_view(
                 adapter, view, tuple(value/1000.0 for value in xyz),
                 label="drawing centreline endpoint",
             )
-            point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
-            points.append(tuple(_early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData))
-        segment = manager.CreateCenterLine(*points[0], *points[1])
-        if segment is None:
-            raise RuntimeError("failed to create owned drawing centreline")
+            for xyz in (start, end)
+        )
+        segment = sketch_view_line(
+            adapter, view, start_xy, end_xy, kind="centerline", coords="sheet",
+            label=f"owned drawing centreline {index}",
+        )
         segment = _early_bound(segment, "ISketchSegment")
         segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
         if int(segment.Color) != 0:
@@ -835,7 +833,6 @@ def _hub_underside_detail(adapter: Any, parent_view: Any) -> Any:
     """Enlarge the native underside; the circular fence is presentation only."""
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
-    parent = _early_bound(parent_view, "IView")
     if not drawing.ActivateView(view_name(adapter, parent_view)):
         raise RuntimeError("failed to activate underside detail parent")
     draw.ClearSelection2(True)
@@ -845,16 +842,10 @@ def _hub_underside_detail(adapter: Any, parent_view: Any) -> Any:
         label="underside detail centre",
     )
     radius = (HUB_GUSSET_HALF_OUT+HUB_BOSS_DROP)*HUB_BOTTOM_SCALE[0]/HUB_BOTTOM_SCALE[1]/1000.0
-    sketch = _early_bound(parent.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = []
-    for x, y in (center, (center[0]+radius, center[1])):
-        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
-        points.append(tuple(_early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData))
-    manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if manager.CreateCircle(*points[0], *points[1]) is None:
-        raise RuntimeError("failed to create native underside detail fence")
+    sketch_view_circle(
+        adapter, parent_view, center, radius, coords="sheet",
+        label="native underside detail fence",
+    )
     detail = drawing.CreateDetailViewAt4(
         *HUB_DETAIL_CENTER, 0.0, 0, *HUB_DETAIL_SCALE, "C", 1, True, False, False, 5,
     )
