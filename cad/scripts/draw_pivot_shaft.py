@@ -107,6 +107,10 @@ PROFILE_KEEP = {
 # edge, so the pick names that entity type; straight leaders keep off the
 # geometry. The body's rides its top flank, the journal's its underside
 # (the lengths stand over the journal).
+# Note text height, as on the other part sheets: at the template default the
+# symbols printed ~18 mm tall, the journal's over the profile and DETAIL A's
+# over the length dimension (r743-2R render).
+FINISH_CHAR_HEIGHT = 0.0025
 BEARING_FINISH_EDGE = (PROFILE_CENTER[0] + 0.030, SHAFT_FLANK_Y)
 BEARING_FINISH_SYMBOL = (BEARING_FINISH_EDGE[0], 0.206)
 JOURNAL_FINISH_EDGE = ((NORTH_END_X + SHOULDER_X[0]) / 2.0, SHAFT_UNDER_Y)
@@ -142,17 +146,22 @@ DETAIL_KEEP = {
         DETAIL_CENTER[1] + 0.037,
     ),
     # Left of the fence, on the axis: the diameter's line runs through the
-    # north groove.
-    "ReliefDia": (DETAIL_CENTER[0] - 0.042, DETAIL_CENTER[1]),
+    # north groove. At 42 mm out its callout ran across the fence (r743-2R).
+    "ReliefDia": (DETAIL_CENTER[0] - 0.061, DETAIL_CENTER[1]),
 }
 # The thrust face's Ra: the leader lands on the face's upper half, between the
-# relief floor and the shoulder O.D., and the symbol stands up-right of it.
+# relief floor and the shoulder O.D., and runs right, through the air over the
+# south groove and the body, to a symbol outside the fence. Up-right of the
+# face it crossed the ReliefWidth callout and the length dimension (r743-2R).
 SHOULDER_FACE_X = _detail_x(SHOULDER_SOUTH_Z_MM)
 SHOULDER_FINISH_ATTACH = (
     SHOULDER_FACE_X,
     DETAIL_CENTER[1] + (RELIEF_DIA + SHOULDER_DIA) / 4.0 * _DETAIL_MM,
 )
-SHOULDER_FINISH_SYMBOL = (SHOULDER_FACE_X + 0.016, DETAIL_CENTER[1] + 0.035)
+SHOULDER_FINISH_SYMBOL = (
+    DETAIL_CENTER[0] + DETAIL_RADIUS_MM * _DETAIL_MM + 0.002,
+    SHOULDER_FINISH_ATTACH[1] + 0.003,
+)
 
 
 def _shoulder_detail(adapter: Any, profile: Any) -> Any:
@@ -351,6 +360,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=BEARING_FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bearing"),
         label="pivot bearing finish",
+        char_height=FINISH_CHAR_HEIGHT,
     )
     add_surface_finish(
         adapter,
@@ -360,6 +370,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=JOURNAL_FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_journal"),
         label="pivot journal finish",
+        char_height=FINISH_CHAR_HEIGHT,
     )
     add_surface_finish(
         adapter,
@@ -369,6 +380,7 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "shoulder_thrust"),
         label="shoulder thrust-face finish",
         leader_attach_xy=SHOULDER_FINISH_ATTACH,
+        char_height=FINISH_CHAR_HEIGHT,
     )
 
     # 0.020: a note is left-aligned on its anchor, so the ink starts here. The

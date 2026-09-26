@@ -257,3 +257,51 @@ def test_detail_sits_in_the_open_field() -> None:
     reach = spec.SHOULDER_LENGTH / 2.0 + spec.RELIEF_WIDTH
     assert reach < fence
     assert spec.SHOULDER_DIA / 2.0 < fence
+
+
+# Measured on the r743-2R render (5100x3300 px on 431.8x279.4 mm): an Ra
+# symbol at note text height runs 14.7 mm right of and 7.2 mm above its
+# leader end; the relief callouts' "BOTH SHOULDER FACES" line runs ~52 mm,
+# centred on its dimension text.
+FINISH_SYMBOL_WIDTH = 0.0147
+FINISH_SYMBOL_HEIGHT = 0.0072
+RELIEF_CALLOUT_HALF_WIDTH = 0.026
+TITLE_BLOCK_TOP = 0.065
+
+
+def test_finishes_print_at_note_height() -> None:
+    """r743-2R: at the template's default height the three Ra symbols printed
+    ~18 mm tall, the journal's over the profile and DETAIL A's across the
+    length dimension."""
+    assert drawing.FINISH_CHAR_HEIGHT == 0.0025
+    source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
+    assert source.count("char_height=FINISH_CHAR_HEIGHT") == len(spec.SURFACE_FINISHES)
+
+
+def test_detail_annotations_keep_off_the_fence_and_each_other() -> None:
+    """r743-2R: the O5.700 callout ran across the fence, and the thrust-face
+    Ra's leader crossed the ReliefWidth callout. The Ra now leads right, over
+    the south groove, to a symbol outside the fence and above the title
+    block; the O5.700 callout ends left of the fence."""
+    radius = drawing.DETAIL_RADIUS_MM * drawing.DETAIL_SCALE[0] / 1000.0
+    cx, cy = drawing.DETAIL_CENTER
+    symbol = drawing.SHOULDER_FINISH_SYMBOL
+    attach = drawing.SHOULDER_FINISH_ATTACH
+    # The body sits wholly outside the fence, right of it.
+    assert symbol[0] > cx + radius
+    assert symbol[1] > TITLE_BLOCK_TOP
+    assert symbol[1] + FINISH_SYMBOL_HEIGHT < drawing.PROFILE_KEEP["ShaftLength"][1]
+    # The leader runs through air: above the body flank and under the shoulder
+    # O.D. where it leaves the face.
+    scale = drawing.DETAIL_SCALE[0] / 1000.0
+    flank = cy + spec.SHAFT_DIA / 2.0 * scale
+    shoulder_top = cy + spec.SHOULDER_DIA / 2.0 * scale
+    assert flank < attach[1] < shoulder_top
+    assert flank < symbol[1]
+    # The ReliefWidth callout sits above everything the Ra draws.
+    width_text = drawing.DETAIL_KEEP["ReliefWidth"]
+    assert width_text[1] > symbol[1] + FINISH_SYMBOL_HEIGHT
+    # The O5.700 callout ends left of the fence.
+    dia_x, dia_y = drawing.DETAIL_KEEP["ReliefDia"]
+    fence_left = cx - math.sqrt(radius**2 - (dia_y - cy) ** 2)
+    assert dia_x + RELIEF_CALLOUT_HALF_WIDTH < fence_left
