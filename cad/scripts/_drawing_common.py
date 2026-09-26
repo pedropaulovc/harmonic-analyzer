@@ -1857,6 +1857,50 @@ def _pin_dimension_text_and_leader_style(draw: Any) -> None:
     )
 
 
+# swUserPreferenceIntegerValue_e / swDetailingDimTrailingZero_e, read off
+# swconst.tlb R2026x (the docs print no integers for these members).
+_PREF_DIM_TRAILING_ZERO = 15
+_PREF_TOL_TRAILING_ZERO = 582
+_DETAILING_NO_OPTION = 0
+_TRAILING_ZERO_SMART = 0
+_TRAILING_ZERO_REMOVE_ONLY_ON_ZERO = 4
+
+
+def _pin_tolerance_zero_display(draw: Any) -> None:
+    """Print a nil tolerance deviation as a bare ``0`` (#923, #851).
+
+    ASME Y14.5-2018 §2.3: in metric unilateral tolerancing a nil deviation is
+    "a single zero ... without a plus or minus sign"; the template printed
+    ``0.00`` over ``-0.03``. swDimRemoveOnlyOnZero strips the trailing zeros
+    of an exactly-zero deviation only, so ``-0.10`` keeps its places.
+
+    A DRAWING document preference, and it reaches the part's imported model
+    dimensions: tolstack-diag (3df0bcc44) printed MHA-102's ``0.00`` as ``0``
+    with every other string on the sheet byte-identical. The dimension's own
+    trailing-zero style (15) is read and never written -- changing it would
+    reformat every nominal -- and a Smart style fails loud first, because
+    SolidWorks refuses 582 under it.
+    """
+    ext = draw.Extension
+    dimension_style = int(ext.GetUserPreferenceInteger(_PREF_DIM_TRAILING_ZERO, _DETAILING_NO_OPTION))
+    if dimension_style == _TRAILING_ZERO_SMART:
+        raise RuntimeError(
+            "drawing template's dimension trailing zeros are Smart "
+            f"(swDetailingDimTrailingZero={dimension_style}); SolidWorks refuses the "
+            "tolerance zero style under it, and 15 is not ours to rewrite"
+        )
+    ok = ext.SetUserPreferenceInteger(
+        _PREF_TOL_TRAILING_ZERO, _DETAILING_NO_OPTION, _TRAILING_ZERO_REMOVE_ONLY_ON_ZERO
+    )
+    applied = int(ext.GetUserPreferenceInteger(_PREF_TOL_TRAILING_ZERO, _DETAILING_NO_OPTION))
+    if not ok or applied != _TRAILING_ZERO_REMOVE_ONLY_ON_ZERO:
+        raise RuntimeError(
+            "failed to pin tolerance trailing zeros to remove-only-on-zero "
+            f"(set returned {ok!r}, document reads {applied})"
+        )
+    _telemetry.event("drawing.tolerance_zero_display", style=applied, dimension_style=dimension_style)
+
+
 @_telemetry.traced("drawing.new_from_template")
 def new_project_drawing(
     adapter: Any,
@@ -1904,6 +1948,7 @@ def new_project_drawing(
     # display (an exact inch conversion like 9.525) can pass decimals=3.
     set_units_mm(adapter, decimals=decimals)
     _pin_dimension_text_and_leader_style(draw)
+    _pin_tolerance_zero_display(draw)
     _pin_annotation_ink(adapter)
     if not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
         raise RuntimeError(
