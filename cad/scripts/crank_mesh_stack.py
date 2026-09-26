@@ -13,21 +13,20 @@ corners of the stack:
 The bushing's reach is its throw at the bottom of its band, about the post
 bore; the post bore's own place (``cone_pivot_post_spec.CRANK_BORE_DROP`` below
 the frame's crank axis, plus its printed spacing band) is the first term, so
-the reach is measured from the frame.  Import fails if either end runs out.
+the reach is measured from the frame.  Import fails if either end runs out, if
+the printed drop is not the one that centres the reach, or if a worst-case tip
+can touch the mating root at the loose fit-up.
 
-Where the numbers come from:
+Where the numbers come from (``diagnostics/crank_mesh_backlash_study.py``,
+exact tooth solids, min backlash over nine crank phases):
 
-* ``diagnostics/crank_mesh_backlash_study.py`` -- exact tooth solids, min
-  backlash over nine crank phases.  Its slopes (the ``B-*`` cases,
-  dt-logs/crank-mesh-C-B-20260925.jsonl) give backlash per mm of centre
-  distance and of tooth thinning; its ``Bstar*`` cases
-  (crank-mesh-C-Bstar-20260925.jsonl) give the frame's nominal and the two
-  measured corners; the pose cases (crankhub/crank-mesh-angle-20260926.jsonl)
-  give the crank axis's yaw and tilt.
-* KC was fitted over -0.150..+0.150 of centre distance.  The fit-up asks it to
-  hold out to about -0.77 (the bushing fully closed at the loose corner).  The
-  loose corner at +0.49 already reads +0.019 above the linear model, so that
-  measured excess is carried as a term; nothing was measured past -0.15.
+* the B-star cutter's centre-distance cases at -/+0.150 give KC (verifier's
+  fit controls, 2026-09-26); the older B cases give the tooth-thinning slopes;
+* the R1 cases (dt-logs/crankhub/crank-mesh-R1-fitup-20260926.jsonl) put the
+  linear model within LINEAR_RESIDUAL_MM of the solids from -0.35 to +0.15 of
+  centre distance, and within 0.002 at both R1 fit-up states;
+* the pose cases (crankhub/crank-mesh-angle-20260926.jsonl) give the crank
+  axis's yaw and tilt.
 """
 
 from __future__ import annotations
@@ -53,33 +52,33 @@ FITUP_BACKLASH_BAND_MM = 0.03
 # build_drive_train_assembly's MESH16_C2C: both radii at the transverse DP plus
 # the crank_mesh slack (39.735), with the crank axis CRANK_AXIS_HEIGHT above
 # the post foot and the cone axis BORE_HEIGHT above it.
-FRAME_C2C = (
-    gear64.PITCH_DIA / 2.0
-    + (16.0 / gear64.DIAMETRAL_PITCH) * gear64.MM_PER_IN / 2.0
-    + _config.fit("crank_mesh", "c2c_slack_mm")
-)
+R64 = gear64.PITCH_DIA / 2.0
+R16 = (16.0 / gear64.DIAMETRAL_PITCH) * gear64.MM_PER_IN / 2.0
+FRAME_C2C = R64 + R16 + _config.fit("crank_mesh", "c2c_slack_mm")
 FRAME_DY = post.CRANK_AXIS_HEIGHT - post.BORE_HEIGHT  # 39.332
 FRAME_DX = math.sqrt(FRAME_C2C**2 - FRAME_DY**2)
 DC_PER_DY = FRAME_DY / FRAME_C2C  # 0.990
 DC_PER_DX = FRAME_DX / FRAME_C2C  # 0.142
 
 # --- The study -------------------------------------------------------------
-# Min backlash over nine crank phases (mm).  Slopes from the B cases:
-_B_CD = {-0.150: 0.23172, +0.150: 0.40616}  # centre distance -/+0.150
+_EXTRA_NOMINAL = 0.4225696498924991  # FRAME_C2C - R64 - R16
+NOMINAL_TIGHT_BACKLASH_MM = 0.32269  # Bstar0
+_BSTAR_CD = {-0.150: 0.23685, +0.150: 0.41222}  # B-star, centre distance -/+0.150
 _B_THIN64 = {0.05: 0.22079, 0.25: 0.41722}  # 64T thinned 0.05 / 0.25
 _B_THIN16 = {0.00: 0.31888, 0.05: 0.36930}  # 16T thinned 0 / 0.05
-KC = (_B_CD[0.150] - _B_CD[-0.150]) / 0.300  # per mm of centre distance
+KC = (_BSTAR_CD[0.150] - _BSTAR_CD[-0.150]) / 0.300  # per mm of centre distance
 K64 = (_B_THIN64[0.25] - _B_THIN64[0.05]) / 0.20  # per mm of 64T thinning
 K16 = (_B_THIN16[0.05] - _B_THIN16[0.00]) / 0.05  # per mm of 16T thinning
-# The B-star cutter at the frame: nominal, and the two corners as measured.
-# Each corner is (centre-distance offset, 64T thinning, 16T thinning, backlash);
-# the model's own 64T thinning is gear_train.yaml's 0.15.
-_EXTRA_NOMINAL = 0.4225696498924991
-NOMINAL_TIGHT_BACKLASH_MM = 0.32269
-STUDY_CORNERS = {
-    "tight": (0.2095696498924991 - _EXTRA_NOMINAL, 0.05, 0.00, 0.10230),
-    "loose": (0.9125696498924991 - _EXTRA_NOMINAL, 0.20, 0.02, 0.69568),
+# (centre-distance offset from the frame, 64T thinning, 16T thinning, backlash)
+STUDY_CHECKS = {
+    "Bstar-cd-0.35": (-0.35, 0.15, 0.00, 0.11570),
+    "Bstar-cd-0.25": (-0.25, 0.15, 0.00, 0.17760),
+    "Bstar-cd-0.15": (-0.15, 0.15, 0.00, 0.23685),
+    "Bstar-cd+0.15": (+0.15, 0.15, 0.00, 0.41222),
+    "R1-tight-fitup": (0.4664672651183648 - _EXTRA_NOMINAL, 0.05, 0.00, 0.25110),
+    "R1-loose-fitup": (0.17841893904636286 - _EXTRA_NOMINAL, 0.20, 0.02, 0.24830),
 }
+LINEAR_RESIDUAL_MM = 0.0035
 # Pose cases, min backlash with the crank axis turned 1 deg about each axis.
 _YAW = {+1.0: 0.29715, -1.0: 0.22040}
 _TILT = {+1.0: 0.34323, -1.0: 0.28188}
@@ -92,6 +91,11 @@ def _linear_backlash(dc: float, thin64: float, thin16: float) -> float:
         + K64 * (thin64 - gear64.BACKLASH_MM)
         + K16 * thin16
     )
+
+
+for _case, (_dc, _w64, _w16, _measured) in STUDY_CHECKS.items():
+    if abs(_measured - _linear_backlash(_dc, _w64, _w16)) > LINEAR_RESIDUAL_MM + 1e-4:
+        raise AssertionError(f"{_case}: the linear mesh model left its measured residual")
 
 
 def _pose_range(cases: dict[float, float], limit_deg: float) -> tuple[float, float]:
@@ -110,6 +114,7 @@ _RUNNING = tuple(
     float(v) for v in _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
 )
 _ROW_1 = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
+_ROW_2 = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
 # The cone bore's plan angle turns the 64T, 26.69 out along the cone shaft
 # from the post axis, sideways by this much per degree (U31 table,
 # cone_pivot_post_spec).
@@ -120,6 +125,36 @@ STATION_64T_DC = 0.015
 # Mesh mid-face overhangs past each bearing's inboard end (U31 table).
 CRANK_OVERHANG = 5.65
 CONE_OVERHANG = 5.68
+# The 16T's mid-face stands this far north of the boss's spot face (the widest
+# seat gap + half the face), where the bushing's north end sits flush.  The
+# crank bore's spacing is inspected at the post axis, so a post angle error
+# moves the mesh by MESH_LEVER.
+PINION_BEYOND_BUSHING = pinion.SEAT_GAP_MAX_MM + pinion.FACE_WIDTH / 2.0
+MESH_LEVER = post.CRANK_BOSS_NORTH_FACE + PINION_BEYOND_BUSHING
+
+# The crank axis's angle budget: the post's angularity frame, the bushing
+# bore's parallelism to its OD, and the bushing cocking in its g6/H7 seat
+# before the compound cures.
+POST_ANGLE_DEG = post.CRANK_BORE_ANGLE_LIMIT_DEG
+BUSHING_ANGLE_DEG = math.degrees(math.atan(bushing.BORE_PARALLELISM_MM / bushing.LENGTH))
+SEAT_CLEARANCE_MAX = post.CRANK_BORE_BAND[0] - bushing.OD_BAND[1]
+SEAT_COCK_DEG = math.degrees(math.atan(SEAT_CLEARANCE_MAX / bushing.POST_BORE_LENGTH))
+CRANK_ANGLE_DEG = POST_ANGLE_DEG + BUSHING_ANGLE_DEG + SEAT_COCK_DEG
+# What each of them moves the 16T's mid-face by, in any direction (so, at
+# worst, along the line of centres): the post's frame about the inspection
+# point, the bushing's two about the bushing's own length.
+POST_ANGLE_AT_MESH = MESH_LEVER * math.tan(math.radians(POST_ANGLE_DEG))
+BUSHING_BORE_AT_MESH = bushing.BORE_PARALLELISM_MM / 2.0 + (
+    bushing.BORE_PARALLELISM_MM / bushing.LENGTH * PINION_BEYOND_BUSHING
+)
+SEAT_AT_MESH = SEAT_CLEARANCE_MAX / 2.0 + (
+    SEAT_CLEARANCE_MAX / bushing.POST_BORE_LENGTH * PINION_BEYOND_BUSHING
+)
+
+# Cutting runout of each gear's teeth to its own bore: not on either sheet
+# today.  Proposed at this TIR on both gear-data blocks; carried here as a
+# reach term so the throw covers it.
+TOOTH_RUNOUT_TIR_MM = 0.05
 
 
 def _float_at_rest(clearance: float, bearing_length: float, overhang: float) -> float:
@@ -139,17 +174,24 @@ def stack_terms(
     *,
     spacing_printed: float,
     plan_limit_deg: float,
+    crank_angle_deg: float,
     crank_bearing_length: float,
-    residual: bool = True,
 ) -> tuple[Term, ...]:
     """Every contributor but the bushing, relative to the frame's nominal."""
     band_high = post.CRANK_ABOVE_CONE_BAND[0]
     band_low = post.CRANK_ABOVE_CONE_BAND[1]
     plan_dc = PLAN_DX_PER_DEG * plan_limit_deg * DC_PER_DX
+    post_at_mesh = MESH_LEVER * math.tan(math.radians(plan_limit_deg))
     thick64_high, thin64_low = crank_drive_gear_notes.TOOTH_THICKNESS_DEVIATIONS
-    yaw = _pose_range(_YAW, plan_limit_deg)
-    tilt = _pose_range(_TILT, plan_limit_deg)
-    terms = [
+    yaw = _pose_range(_YAW, crank_angle_deg)
+    tilt = _pose_range(_TILT, crank_angle_deg)
+    crank_float = [
+        _float_at_rest(c, crank_bearing_length, CRANK_OVERHANG) for c in _RUNNING
+    ]
+    cone_float = [
+        _float_at_rest(c, post.CONE_BOSS_LENGTH, CONE_OVERHANG) for c in _RUNNING
+    ]
+    return (
         # The printed crank-above-cone spacing, placed against the frame: R1's
         # bore sits CRANK_BORE_DROP low, so its whole band is below the frame.
         Term(
@@ -159,51 +201,42 @@ def stack_terms(
         ),
         Term("cone bore plan angle", -KC * plan_dc, KC * plan_dc),
         Term("64T axial station", -KC * STATION_64T_DC, KC * STATION_64T_DC),
-        # At rest gravity drops the crank toward the 64T and the cone shaft
-        # away from the crank; each is zero at the other corner.
+        # At rest both shafts sag: the crank toward the 64T, the cone shaft
+        # away from the crank.  Each corner takes one at its largest clearance
+        # and the other at its smallest.
         Term(
             "crank float at rest",
-            -KC * _float_at_rest(_RUNNING[1], crank_bearing_length, CRANK_OVERHANG),
-            0.0,
+            -KC * crank_float[1] * DC_PER_DY,
+            -KC * crank_float[0] * DC_PER_DY,
         ),
         Term(
             "cone float at rest",
-            0.0,
-            KC * _float_at_rest(_RUNNING[1], post.CONE_BOSS_LENGTH, CONE_OVERHANG),
+            KC * cone_float[0] * DC_PER_DY,
+            KC * cone_float[1] * DC_PER_DY,
         ),
-        # A gear offset on its bore puts its runout's closing side at the tight
-        # spot, so it only ever closes there.
+        # A gear offset on its bore, or cut out of true to it, puts the
+        # closing side at the tight spot, so each only ever closes there.
         Term(
             "gear bore runout (16T slip, 64T bonded)",
             -KC * (pinion.BORE_DIAMETRAL_CLEARANCE[1] + RETAINED_JOINT_CLEARANCE[1]) / 2.0,
             0.0,
         ),
+        Term("tooth-to-bore cutting runout (proposed)", -KC * TOOTH_RUNOUT_TIR_MM, 0.0),
         Term("64T tooth thickness", -K64 * thick64_high, -K64 * thin64_low),
         Term(
             "16T tooth thickness",
             -K16 * pinion.TOOTH_THICKNESS_UPPER_DEVIATION,
             -K16 * pinion.TOOTH_THICKNESS_LOWER_DEVIATION,
         ),
-        # Yaw and tilt each at the full limit: a diametral zone bounds their
+        # Yaw and tilt each at the full budget: a diametral zone bounds their
         # vector sum, so this is up to sqrt(2) conservative.
         Term("crank axis yaw", yaw[0], yaw[1]),
         Term("crank axis tilt", tilt[0], tilt[1]),
-    ]
-    if residual:
-        # What the exact solids read over the linear model at each measured
-        # corner, taken only where it hurts.
-        excess = {
-            corner: backlash - _linear_backlash(dc, thin64, thin16)
-            for corner, (dc, thin64, thin16, backlash) in STUDY_CORNERS.items()
-        }
-        terms.append(
-            Term(
-                "study excess over the linear model",
-                min(excess["tight"], 0.0),
-                max(excess["loose"], 0.0),
-            )
-        )
-    return tuple(terms)
+        Term("post frame angle at the mesh", -KC * post_at_mesh, KC * post_at_mesh),
+        Term("bushing bore parallelism at the mesh", -KC * BUSHING_BORE_AT_MESH, KC * BUSHING_BORE_AT_MESH),
+        Term("bushing seated in its clearance, at the mesh", -KC * SEAT_AT_MESH, KC * SEAT_AT_MESH),
+        Term("linear-model residual", -LINEAR_RESIDUAL_MM, LINEAR_RESIDUAL_MM),
+    )
 
 
 def _corner_backlash(terms: tuple[Term, ...]) -> tuple[float, float]:
@@ -216,10 +249,12 @@ def _corner_backlash(terms: tuple[Term, ...]) -> tuple[float, float]:
 # --- R1 as printed -----------------------------------------------------------
 _SPACING_PLACES = post.DRAWING_PRECISION_BY_NAME["CrankAboveCone"]
 SPACING_PRINTED = round(post.CRANK_ABOVE_CONE, _SPACING_PLACES)
+CRANK_BEARING_LENGTH = bushing.LENGTH - _ROW_1
 TERMS = stack_terms(
     spacing_printed=SPACING_PRINTED,
-    plan_limit_deg=post.CRANK_BORE_ANGLE_LIMIT_DEG,
-    crank_bearing_length=bushing.LENGTH - _ROW_1,
+    plan_limit_deg=POST_ANGLE_DEG,
+    crank_angle_deg=CRANK_ANGLE_DEG,
+    crank_bearing_length=CRANK_BEARING_LENGTH,
 )
 TIGHT_BACKLASH_MM, LOOSE_BACKLASH_MM = _corner_backlash(TERMS)
 # Centre distance the bushing must supply, from the post bore's place.
@@ -228,11 +263,50 @@ CLOSE_NEEDED = (LOOSE_BACKLASH_MM - FITUP_BACKLASH_MM) / KC
 THROW_REACH = bushing.ECCENTRICITY + bushing.ECCENTRICITY_BAND[1]
 OPEN_MARGIN = THROW_REACH - OPEN_NEEDED
 CLOSE_MARGIN = THROW_REACH - CLOSE_NEEDED
+# The drop that centres the reach on the window, at the spacing's printed
+# places: raising the bore by d opens both corners by KC * d * DC_PER_DY.
+IDEAL_DROP = post.CRANK_BORE_DROP + (OPEN_MARGIN - CLOSE_MARGIN) / (2.0 * DC_PER_DY)
+if round(IDEAL_DROP, _SPACING_PLACES) != post.CRANK_BORE_DROP:
+    raise AssertionError(
+        f"cone_pivot_post_spec.CRANK_BORE_DROP {post.CRANK_BORE_DROP} is not the "
+        f"drop that centres the MHA-149 reach ({IDEAL_DROP:.4f})"
+    )
+
+# --- Tips against roots at the loose fit-up ----------------------------------
+# The closest the pair ever runs: the loose corner with the bushing closed to
+# the target.  Each gear's tip can print a whole .XX row over nominal
+# (crank_pinion_spec / crank_drive_gear_spec OD notes) and sit on its cutting
+# runout; the other gear's root is cut to depth.
+_POSE_LOOSE = sum(
+    t.loose for t in TERMS
+    if t.name in ("crank axis yaw", "crank axis tilt", "linear-model residual")
+)
+_LOOSE_NET_DC = (
+    FITUP_BACKLASH_MM
+    - _POSE_LOOSE
+    - _linear_backlash(
+        0.0,
+        gear64.BACKLASH_MM - crank_drive_gear_notes.TOOTH_THICKNESS_DEVIATIONS[1],
+        -pinion.TOOTH_THICKNESS_LOWER_DEVIATION,
+    )
+) / KC
+TIP_ROOT_AIR_WORST = (
+    _EXTRA_NOMINAL
+    + _LOOSE_NET_DC
+    + pinion.TIP_CLEARANCE_MM
+    - _ROW_2 / 2.0
+    - TOOTH_RUNOUT_TIR_MM / 2.0
+)
+if TIP_ROOT_AIR_WORST <= 0.0:
+    raise AssertionError(
+        f"a worst-case tip can reach the mating root at the loose fit-up "
+        f"({TIP_ROOT_AIR_WORST:.3f})"
+    )
 
 # --- The acceptance budget after bonding ------------------------------------
 # The g6 OD can settle anywhere in the H7 bore while the compound cures; that
 # moves the set centre distance by up to half the seat clearance.
-RESEAT_DC = (post.CRANK_BORE_BAND[0] - bushing.OD_BAND[1]) / 2.0
+RESEAT_DC = SEAT_AT_MESH
 RESEAT_BACKLASH = KC * RESEAT_DC
 READING_ALLOWANCE = FITUP_BACKLASH_BAND_MM - RESEAT_BACKLASH
 
@@ -243,6 +317,10 @@ def stack_text() -> str:
         f"+/-{FITUP_BACKLASH_BAND_MM:.2f} at the tight spot; KC {KC:.4f}, "
         f"K64 {K64:.3f}, K16 {K16:.3f}; frame C {FRAME_C2C:.3f}, "
         f"DY/C {DC_PER_DY:.4f}, DX/C {DC_PER_DX:.4f}",
+        f"  crank angle budget {CRANK_ANGLE_DEG:.4f} deg (post {POST_ANGLE_DEG:.4f} + "
+        f"bushing {BUSHING_ANGLE_DEG:.4f} + seat {SEAT_COCK_DEG:.4f}); mesh lever "
+        f"{MESH_LEVER:.3f}; at the mesh: post {POST_ANGLE_AT_MESH:.4f}, bushing bore "
+        f"{BUSHING_BORE_AT_MESH:.4f}, seat {SEAT_AT_MESH:.4f}",
         f"  {'term':52s} {'tight':>8s} {'loose':>8s}  (backlash mm)",
     ]
     lines += [f"  {t.name:52s} {t.tight:+8.4f} {t.loose:+8.4f}" for t in TERMS]
@@ -251,8 +329,9 @@ def stack_text() -> str:
         f"loose {LOOSE_BACKLASH_MM:.4f}",
         f"  bushing must open {OPEN_NEEDED:.4f} and close {CLOSE_NEEDED:.4f}; "
         f"throw reach {THROW_REACH:.3f}",
-        f"  margin: open {OPEN_MARGIN:+.4f}, close {CLOSE_MARGIN:+.4f} "
-        "(linear KC, fitted over +/-0.150 of centre distance)",
+        f"  margin: open {OPEN_MARGIN:+.4f}, close {CLOSE_MARGIN:+.4f}; drop "
+        f"{post.CRANK_BORE_DROP} (ideal {IDEAL_DROP:.4f})",
+        f"  tip-root air at the loose fit-up, worst: {TIP_ROOT_AIR_WORST:.4f}",
         f"  bonding re-seat {RESEAT_DC:.4f} dC = {RESEAT_BACKLASH:.4f} backlash; "
         f"{READING_ALLOWANCE:.4f} of the +/-{FITUP_BACKLASH_BAND_MM:.2f} left for the reading",
     ]

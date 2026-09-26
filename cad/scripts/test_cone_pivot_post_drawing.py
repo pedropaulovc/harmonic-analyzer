@@ -34,10 +34,10 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
     assert (
         spec.CRANK_BOSS_DIA,
         spec.CRANK_BORE_DIA,
-        spec.CRANK_BORE_HEIGHT,
+        round(spec.CRANK_BORE_HEIGHT, 6),
         spec.CRANK_BORE_OFFSET,
-    ) == (21.93, 14.6, 72.44, 0.0)
-    assert (spec.CRANK_AXIS_HEIGHT, spec.CRANK_BORE_DROP) == (72.7, 0.26)
+    ) == (21.93, 14.6, 72.49, 0.0)
+    assert (spec.CRANK_AXIS_HEIGHT, spec.CRANK_BORE_DROP) == (72.7, 0.21)
     assert spec.CRANK_BOSS_LENGTH_IN == 2.8360
     assert round(spec.CRANK_BOSS_LENGTH, 4) == 72.0344
     # The spot face is stationed from the post axis, NOT from the cast collar.
@@ -179,8 +179,8 @@ def test_crank_bore_is_an_h7_bushing_seat_with_webs_over_the_floor() -> None:
         name: round(web, 2) for name, web in spec.CRANK_BORE_WEBS_WORST.items()
     } == {
         "mounting thru hole": 2.0,
-        "mounting counterbore": 2.11,
-        "top face": 4.57,
+        "mounting counterbore": 2.07,
+        "top face": 4.52,
         "crank boss OD": 3.26,
     }
     assert min(spec.CRANK_BORE_WEBS_WORST.values()) >= 2.0
@@ -470,7 +470,7 @@ def test_crank_bore_is_located_from_the_cone_bore_inside_the_mesh_window() -> No
     """
     import crank_mesh_stack
 
-    assert round(spec.CRANK_ABOVE_CONE, 3) == 39.072
+    assert round(spec.CRANK_ABOVE_CONE, 3) == 39.122
     assert spec.CRANK_ABOVE_CONE_BAND == (0.37, 0.0)
     assert crank_mesh_stack.SPACING_PRINTED == round(spec.CRANK_ABOVE_CONE, 2)
     assert abs(crank_mesh_stack.FRAME_DY - spec.CRANK_ABOVE_CONE - spec.CRANK_BORE_DROP) < 1e-9

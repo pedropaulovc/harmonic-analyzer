@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import math
 
-from _gtol_spec import CylinderFace
+from _gtol_spec import CylinderFace, GeometricControl, PartDatum
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
@@ -57,6 +57,23 @@ WALL_FLOOR_MM = 1.5
 # block's angular grade; at that limit the throw leans this far toward a flat.
 FLATS_CLOCKING_TOLERANCE_DEG = 1.0
 FLATS_THROW_LEAN = math.sin(math.radians(FLATS_CLOCKING_TOLERANCE_DEG))
+
+# The bore's direction to the OD is part of the crank axis's angle budget
+# (crank_mesh_stack): the bore is bored in a second, offset chucking, so its
+# parallelism to the OD is held by one diametral frame to the OD (rule 3's
+# crank-mesh allowlist entry).  Over the 77 length it is 0.037 deg.
+BORE_PARALLELISM_MM = 0.05
+PART_DATUMS = (PartDatum("A", CylinderFace(OUTER_DIA, contains_y_mm=LENGTH / 2.0)),)
+GEOMETRIC_CONTROLS = (
+    GeometricControl(
+        "bore_parallelism",
+        "parallelism",
+        f"{BORE_PARALLELISM_MM:.2f}",
+        CylinderFace(BORE_DIA, contains_y_mm=LENGTH / 2.0),
+        datums=("A",),
+        tolerance_zone="diametral",
+    ),
+)
 
 # Rule 5: the bore runs on the shaft, so it carries the finish.  The OD is a
 # bonded seat on a turned part and carries nothing.

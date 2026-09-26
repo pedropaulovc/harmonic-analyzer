@@ -49,7 +49,7 @@ CRANK_BOSS_DIA = 21.93
 # shape and every harvested volume below holds.
 CRANK_BORE_DIA = 14.6
 CRANK_AXIS_HEIGHT = 72.7
-CRANK_BORE_DROP = 0.26
+CRANK_BORE_DROP = 0.21
 CRANK_BORE_HEIGHT = CRANK_AXIS_HEIGHT - CRANK_BORE_DROP
 CRANK_BORE_OFFSET = 0.0
 # The boss's near face is a MACHINED SPOT FACE, not the rim of the cast

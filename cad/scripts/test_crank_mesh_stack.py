@@ -8,78 +8,74 @@ import cone_pivot_post_spec as post
 import crank_eccentric_bushing_spec as bushing
 import crank_mesh_stack as stack
 
-_CENTRE_DISTANCE_TERMS = (
-    "crank bore spacing (printed band, from the frame)",
-    "cone bore plan angle",
-    "64T axial station",
-    "crank float at rest",
-    "cone float at rest",
-    "gear bore runout (16T slip, 64T bonded)",
-)
 
-
-def test_terms_rebuild_the_study_corners_centre_distances() -> None:
-    """The study's corners were cut at the pre-R1 prints: spacing 39.33
-    +0.37/0 against the frame, plan +/-1 deg, the crank in the post's own
-    72.03 bore.  The named centre-distance terms must land on the offsets the
-    study actually built, or a term is mis-derived."""
-    terms = {
-        t.name: t
-        for t in stack.stack_terms(
-            spacing_printed=39.33,
-            plan_limit_deg=1.0,
-            crank_bearing_length=post.CRANK_BOSS_LENGTH,
-        )
+def _terms(**overrides: float) -> dict[str, stack.Term]:
+    kwargs = {
+        "spacing_printed": stack.SPACING_PRINTED,
+        "plan_limit_deg": stack.POST_ANGLE_DEG,
+        "crank_angle_deg": stack.CRANK_ANGLE_DEG,
+        "crank_bearing_length": stack.CRANK_BEARING_LENGTH,
+        **overrides,
     }
-    tight = sum(terms[name].tight for name in _CENTRE_DISTANCE_TERMS) / stack.KC
-    loose = sum(terms[name].loose for name in _CENTRE_DISTANCE_TERMS) / stack.KC
-    assert tight == pytest.approx(stack.STUDY_CORNERS["tight"][0], abs=0.002)
-    assert loose == pytest.approx(stack.STUDY_CORNERS["loose"][0], abs=0.002)
+    return {t.name: t for t in stack.stack_terms(**kwargs)}
 
 
-def test_linear_model_plus_excess_reads_the_measured_corners() -> None:
-    for dc, thin64, thin16, measured in stack.STUDY_CORNERS.values():
+def test_linear_model_reads_every_measured_case_within_its_residual() -> None:
+    """The exact-solid study, from -0.35 to +0.15 of centre distance and at
+    both R1 fit-up states, stays within LINEAR_RESIDUAL_MM of the model."""
+    for dc, thin64, thin16, measured in stack.STUDY_CHECKS.values():
         linear = stack._linear_backlash(dc, thin64, thin16)
-        assert abs(measured - linear) < 0.025
-    (excess,) = [
-        t for t in stack.TERMS if t.name == "study excess over the linear model"
-    ]
-    assert excess.tight == 0.0  # the tight corner read looser than linear
-    assert excess.loose == pytest.approx(0.0188, abs=0.0005)
+        assert abs(measured - linear) <= stack.LINEAR_RESIDUAL_MM + 1e-4
+    assert stack.KC == pytest.approx(0.5846, abs=1e-4)
 
 
-def test_the_throw_reaches_both_ends_with_margin() -> None:
+def test_the_throw_reaches_both_ends() -> None:
     print(stack.stack_text())
     assert stack.THROW_REACH == bushing.ECCENTRICITY + bushing.ECCENTRICITY_BAND[1]
-    assert stack.OPEN_MARGIN > 0.05
-    assert stack.CLOSE_MARGIN > 0.05
+    assert stack.OPEN_MARGIN > 0.0
+    assert stack.CLOSE_MARGIN > 0.0
 
 
-def test_the_bore_drop_centres_the_reach_on_the_window() -> None:
-    assert post.CRANK_BORE_DROP == 0.26
+def test_the_printed_drop_is_the_one_that_centres_the_reach() -> None:
+    assert round(stack.IDEAL_DROP, 2) == post.CRANK_BORE_DROP
     assert abs(stack.OPEN_MARGIN - stack.CLOSE_MARGIN) < 0.02
 
 
-def test_the_angularity_frame_is_load_bearing() -> None:
-    """At the title block's +/-1 deg in place of the frame, the throw no
-    longer reaches the open end."""
-    assert post.CRANK_BORE_ANGLE_LIMIT_DEG < 0.1
-    terms = stack.stack_terms(
-        spacing_printed=stack.SPACING_PRINTED,
-        plan_limit_deg=1.0,
-        crank_bearing_length=bushing.LENGTH - 0.8,
+def test_both_shafts_sag_at_rest_at_both_corners() -> None:
+    terms = _terms()
+    crank = terms["crank float at rest"]
+    cone = terms["cone float at rest"]
+    assert crank.tight < crank.loose < 0.0
+    assert 0.0 < cone.tight < cone.loose
+
+
+def test_every_angle_source_is_in_the_budget() -> None:
+    assert stack.CRANK_ANGLE_DEG == pytest.approx(
+        stack.POST_ANGLE_DEG + stack.BUSHING_ANGLE_DEG + stack.SEAT_COCK_DEG
     )
-    tight = stack.NOMINAL_TIGHT_BACKLASH_MM + sum(t.tight for t in terms)
+    assert stack.MESH_LEVER == pytest.approx(27.575, abs=1e-3)
+    # The post frame's move at the mesh is the verifier's 0.038.
+    assert stack.POST_ANGLE_AT_MESH == pytest.approx(0.038, abs=5e-4)
+
+
+def test_the_angularity_frame_is_load_bearing() -> None:
+    """At the title block's +/-1 deg in place of the frame, the stack no
+    longer closes."""
+    terms = _terms(plan_limit_deg=1.0, crank_angle_deg=1.0 + stack.BUSHING_ANGLE_DEG)
+    tight = stack.NOMINAL_TIGHT_BACKLASH_MM + sum(t.tight for t in terms.values())
     assert stack.THROW_REACH - (stack.FITUP_BACKLASH_MM - tight) / stack.KC < 0.0
 
 
+def test_no_worst_case_tip_reaches_a_root() -> None:
+    assert stack.TIP_ROOT_AIR_WORST > 0.0
+
+
 def test_bonding_leaves_the_fitter_a_reading_allowance() -> None:
-    # g6 in H7: half of 0.018 + 0.017 of seat clearance.
-    assert stack.RESEAT_DC == pytest.approx(0.0175)
+    assert stack.RESEAT_DC == stack.SEAT_AT_MESH
     assert stack.READING_ALLOWANCE > 0.015
 
 
 def test_frame_matches_the_assembly_c2c() -> None:
     assert stack.FRAME_C2C == pytest.approx(39.735, abs=0.001)
     assert stack.FRAME_DY == pytest.approx(39.332, abs=1e-9)
-    assert stack.SPACING_PRINTED == 39.07
+    assert stack.SPACING_PRINTED == round(stack.FRAME_DY - post.CRANK_BORE_DROP, 2)

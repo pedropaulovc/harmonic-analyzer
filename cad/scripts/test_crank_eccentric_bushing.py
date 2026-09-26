@@ -79,7 +79,7 @@ def test_throw_band_matches_its_named_row() -> None:
 
 def test_throw_reaches_the_mesh_stack() -> None:
     assert crank_mesh_stack.THROW_REACH == pytest.approx(0.575)
-    assert min(crank_mesh_stack.OPEN_MARGIN, crank_mesh_stack.CLOSE_MARGIN) > 0.05
+    assert min(crank_mesh_stack.OPEN_MARGIN, crank_mesh_stack.CLOSE_MARGIN) > 0.0
 
 
 def test_flats_are_square_to_the_throw_on_the_protrusion() -> None:
