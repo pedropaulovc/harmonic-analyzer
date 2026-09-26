@@ -3380,6 +3380,47 @@ def test_a_second_callout_of_one_thread_in_a_view_gates():
     assert duplicates([_swing_rd2(True), SWING_DEBURR_NOTE]) == []
 
 
+@pytest.mark.parametrize(
+    ("a", "b", "same"),
+    [
+        # Codex P2 on b9674fa86 (PRRT_kwDOPHDy386mUhqD): the number sign is optional.
+        pytest.param("8-32 UNC - 2B", "#8-32 Tapped Hole", True, id="number-sign"),
+        pytest.param("10-24UNC-2B", "#10 - 24 UNC", True, id="series-joined-and-spaced"),
+        pytest.param("1/4-20 UNC - 2B", '1/4"-20 TAPPED', True, id="inch-mark"),
+        pytest.param("1/4-20 UNC", ".250-20 UNC", True, id="decimal-size"),
+        pytest.param("#8-32", ".164-32", True, id="numbered-is-its-diameter"),
+        pytest.param("M3 THRU", "M3x0.5 - 6H", True, id="metric-coarse-implied"),
+        pytest.param("M3x0.5", "m3 X 0.5", True, id="metric-spaced-and-case"),
+        pytest.param("M3 x 6 LG", "M3", True, id="metric-length-is-no-pitch"),
+        pytest.param("M3", "M3x0.35", False, id="metric-fine-is-not-coarse"),
+        pytest.param("1/4-20 UNC", "1/4-28 UNF", False, id="unc-is-not-unf"),
+        pytest.param("#8-32", "#10-32", False, id="another-size"),
+        pytest.param("12.281 +0.005 -0.025", "+0.005 -0.025", False, id="a-tolerance-is-no-thread"),
+    ],
+)
+def test_a_thread_keys_by_the_thread_it_names(a, b, same):
+    """Two designations share a key only when they name one thread: the
+    number sign, spacing, the series suffix, an inch mark, a decimal size,
+    case and an implied coarse pitch are print, not thread."""
+    from _layout_audit import thread_designations
+
+    ours, theirs = thread_designations(a), thread_designations(b)
+    assert bool(set(ours) & set(theirs)) is same
+
+
+def test_a_note_restating_a_callouts_numbered_thread_with_a_number_sign_gates():
+    """Codex P2 on b9674fa86: a hole callout printing "8-32 UNC - 2B" and a
+    note printing "#8-32 Tapped Hole" on its hole name one thread."""
+    rows = [*SWING_RD2_ROWS[:3], ("AT ASSEMBLY; 8-32 UNC - 2B THRU ALL", 0.2060, 0.2148)]
+    rd2 = _swing_rd2(False)
+    rd2["display"]["texts"] = [{"t": t, "pos": [x, y, 0.0], "h": 0.0035} for t, x, y in rows]
+    note = {**SWING_TAPPED_HOLE, "note": {**SWING_TAPPED_HOLE["note"], "text": "#8-32 Tapped Hole"}}
+    view = _view("Drawing View2", SWING_VIEW2, [rd2, note])
+    findings = audit_dump(_dump(views=[view], strokes=SWING_PLATE_EDGES))
+    [finding] = [f for f in findings if f.kind == "duplicate-thread-callout"]
+    assert finding.extra["thread"] == "#8-32"
+
+
 def _tapped_hole_note(tip):
     """DetailItem357 with its leader's last run ending at ``tip``."""
     return {**SWING_TAPPED_HOLE, "leaders": [[0.1960, 0.2459, 0.0, 0.1896, 0.2459, 0.0, *tip, 0.0]]}
@@ -3629,16 +3670,16 @@ def test_a_sheet_note_restating_a_view_callouts_thread_gates():
     [
         ("AT ASSEMBLY; 1/4-20 UNC - 2B THRU ALL", ["1/4-20"]),
         ("#8-32 Tapped Hole", ["#8-32"]),
-        ("4X M6x1.0 - 6H", ["M6"]),
+        ("4X M6x1.0 - 6H", ["M6X1.0"]),
         ("1018 CF FLAT 1/4 x 2-1/2 in", []),
         ("TRANSFER FROM MHA-016", []),
         ("DIMENSIONING AND TOLERANCING PER ASME Y14.5-2018", []),
     ],
 )
 def test_thread_designations_are_read_from_callout_text(text, threads):
-    from _layout_audit import _THREAD
+    from _layout_audit import thread_designations
 
-    assert [m.group(1).upper() for m in _THREAD.finditer(text)] == [t.upper() for t in threads]
+    assert list(thread_designations(text).values()) == threads
 
 
 # layoutcal2-a cone-swing-platform DetailItem349, verbatim: the profile view's

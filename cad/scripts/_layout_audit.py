@@ -236,12 +236,73 @@ LEADER_OVER_PART_M = 0.025
 # Leader ink that never runs to a feature over a view: dimensions draw their
 # own lines, and the rest are construction or view ink.
 _UNLEADERED_KINDS = frozenset({"dim", "geometry", "section-line", "detail-circle", "table", *_MARK_KINDS})
-# A thread designation in callout text, keyed as printed: unified
-# ("1/4-20", "#8-32", "10-24") or metric by its major diameter ("M6" of
-# "M6x1.0"). Two leadered callouts in one view naming one thread call the
-# same holes out twice (cone-swing-platform's "1/4-20 Tapped Hole" beside
-# RD2's "2X ... 1/4-20 UNC - 2B THRU ALL", 24cbab237).
-_THREAD = re.compile(r"(?<![\w/.#])(#?\d+(?:/\d+)?-\d+|M\d+(?:\.\d+)?)(?=[\s,;xX×]|$)")
+# A thread designation in callout text. Two leadered callouts in one view
+# naming one thread call the same holes out twice (cone-swing-platform's
+# "1/4-20 Tapped Hole" beside RD2's "2X ... 1/4-20 UNC - 2B THRU ALL",
+# 24cbab237). ``thread_designations`` keys each by the thread it names, not
+# by how it prints.
+#   unified: a size, then threads per inch: "#8-32", "8-32" (numbered),
+#   "1/4-20", '1/4"-20', ".250-20", spaces allowed around the hyphen; the
+#   series ("UNC", "UNF") may follow, joined or not;
+#   metric: "M3", "M3x0.5", "M3 x 0.5", "M6x1.0-6H".
+_THREAD = re.compile(
+    r"""(?<![\w/.#])
+    (?:
+        (?P<size>\#?\d+(?:/\d+)?|\d*\.\d+)"?\s*-\s*(?P<tpi>\d+(?:\.5)?)(?=\s|[,;]|UN|$)
+      | M(?P<major>\d+(?:\.\d+)?)(?:\s*[X×]\s*(?P<pitch>\d+(?:\.\d+)?))?(?=\s|[,;-]|$)
+    )""",
+    re.IGNORECASE | re.VERBOSE,
+)
+# ISO 261 coarse pitch by major diameter (mm): "M3" means M3x0.5. A size
+# not listed keys by its major diameter alone, matching only another
+# pitchless designation of that size.
+_METRIC_COARSE_PITCH = {
+    1.0: 0.25, 1.2: 0.25, 1.4: 0.3, 1.6: 0.35, 2.0: 0.4, 2.5: 0.45, 3.0: 0.5, 3.5: 0.6, 4.0: 0.7,
+    5.0: 0.8, 6.0: 1.0, 8.0: 1.25, 10.0: 1.5, 12.0: 1.75, 14.0: 2.0, 16.0: 2.0, 20.0: 2.5, 24.0: 3.0,
+}  # fmt: skip
+# ASME B1.1 numbered sizes 0..12: major diameter 0.060 + 0.013 N inch. Its
+# series run 4 (4" UNC) to 80 (#0-80) threads per inch; a "size-count"
+# outside that is not a thread (a tolerance "0.005 - 0.025" can read as one).
+_NUMBERED_SIZES = 12
+_TPI_RANGE = (4.0, 80.0)
+
+
+def _unified_diameter(size: str) -> float | None:
+    """A unified size's major diameter in inches: "#8" / "8" (numbered),
+    "1/4", ".250". None for what no unified size prints as."""
+    size = size.lstrip("#")
+    if "/" in size:
+        numerator, denominator = size.split("/")
+        return int(numerator) / int(denominator) if int(denominator) else None
+    if "." in size:
+        return float(size) if 0.06 <= float(size) <= 4.0 else None
+    number = int(size)
+    return 0.060 + 0.013 * number if number <= _NUMBERED_SIZES else None
+
+
+def thread_designations(text: str) -> dict[tuple[Any, ...], str]:
+    """Each thread ``text`` names, keyed by the thread itself, with the first
+    printed form of it. Only forms that name the same thread share a key:
+    "#8-32" and "8-32 UNC"; "1/4-20", '1/4"-20' and ".250-20"; "M3", "M3x0.5"
+    and "m3 x 0.5". "M3x0.35" (fine) keys apart from "M3" (coarse). A
+    metric "x" count over half the major diameter is a length ("M3 x 6"),
+    not a pitch, and the thread is the coarse one."""
+    found: dict[tuple[Any, ...], str] = {}
+    for match in _THREAD.finditer(text):
+        if match.group("size") is not None:
+            diameter = _unified_diameter(match.group("size"))
+            tpi = float(match.group("tpi"))
+            if diameter is None or not _TPI_RANGE[0] <= tpi <= _TPI_RANGE[1]:
+                continue
+            key: tuple[Any, ...] = ("unified", round(diameter, 4), tpi)
+        else:
+            major = float(match.group("major"))
+            pitch = float(match.group("pitch")) if match.group("pitch") is not None else None
+            if pitch is None or pitch > major / 2.0:
+                pitch = _METRIC_COARSE_PITCH.get(major)
+            key = ("metric", major, pitch)
+        found.setdefault(key, " ".join(match.group(0).upper().split()))
+    return found
 # A hole callout's leading instance count: "2X " of RD2's first row.
 _INSTANCES = re.compile(r"^\s*(\d+)\s*X(?![A-Za-z])")
 # Printed edge pieces meeting here are one stroke chain. A PDF path's pieces
@@ -2902,8 +2963,8 @@ def find_duplicate_thread_callouts(dump: Mapping[str, Any], sheet: SheetGeometry
                 return f"same {instances}X group", view
         return None
 
-    def threads(annotation: Mapping[str, Any]) -> list[str]:
-        return list(dict.fromkeys(m.group(1).upper() for m in _THREAD.finditer(_callout_text(annotation))))
+    def threads(annotation: Mapping[str, Any]) -> dict[tuple[Any, ...], str]:
+        return thread_designations(_callout_text(annotation))
 
     shown = [(owner, a) for owner, members in owners for a in members if not is_hidden(a)]
     callouts = [(owner, a) for owner, a in shown if (a.get("dim") or {}).get("hole_callout")]
@@ -2918,7 +2979,8 @@ def find_duplicate_thread_callouts(dump: Mapping[str, Any], sheet: SheetGeometry
     for (note_owner, note), (callout_owner, callout) in product(notes, callouts):
         if "sheet" not in (note_owner, callout_owner) and note_owner != callout_owner:
             continue
-        shared = [t for t in threads(note) if t in threads(callout)]
+        theirs = threads(callout)
+        shared = [printed for key, printed in threads(note).items() if key in theirs]
         met = one_group(note, note_owner, callout, callout_owner) if shared else None
         if met is None:
             continue
