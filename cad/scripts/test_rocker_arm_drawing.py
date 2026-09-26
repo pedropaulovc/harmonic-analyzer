@@ -6,11 +6,15 @@ import ast
 import math
 import re
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 import rocker_arm_notes
 import rocker_arm_spec
 import draw_rocker_arm as drawing
 import build_rocker_arm as arm
+from _drawing_layout_check import DrawableRegion
 from _drawing_registry import DRAWINGS_BY_NAME
 from cone_pivot_post_installation import MECHANISM_X_SHIFT
 from _hole_spec import blind_cut_dia_mm
@@ -240,22 +244,89 @@ BORDER_BOTTOM = 0.0127
 NOTE_LINE_PITCH = 0.0042
 CAPTION_CHAR_WIDTH = 0.0026
 RIGHT_BORDER = 0.415
+DRAWABLE = DrawableRegion(0.0127, BORDER_BOTTOM, 0.4191, 0.2667)
 
 
-def test_general_notes_are_seated_on_the_border_under_the_front_view() -> None:
+class _FakeAnnotation:
+    def __init__(self, position: tuple[float, float]) -> None:
+        self.position = position
+
+    def GetPosition(self) -> tuple[float, float, float]:
+        return (*self.position, 0.0)
+
+    def SetPosition(self, x: float, y: float, _z: float) -> bool:
+        self.position = (x, y)
+        return True
+
+
+class _FakeNote:
+    """A top-left-anchored text block whose box sits off its insertion point
+    and follows a move only ``tracking`` of the way, as SolidWorks' does."""
+
+    def __init__(
+        self, anchor: tuple[float, float], height: float, tracking: float = 1.0
+    ) -> None:
+        self.annotation = _FakeAnnotation(anchor)
+        self.anchor = anchor
+        self.height = height
+        self.tracking = tracking
+
+    def GetAnnotation(self) -> _FakeAnnotation:
+        return self.annotation
+
+    def GetExtent(self) -> tuple[float, ...]:
+        x, y = (
+            a + (p - a) * self.tracking
+            for a, p in zip(self.anchor, self.annotation.position)
+        )
+        x0, y1 = x + 0.0008, y - 0.0011
+        return (x0, y1 - self.height, 0.0, x0 + 0.180, y1, 0.0)
+
+
+def _seat(monkeypatch: pytest.MonkeyPatch, note: _FakeNote) -> tuple[float, ...]:
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None)
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(
+        drawing, "sheet_drawable_region", lambda *_args, **_kwargs: DRAWABLE
+    )
+    return drawing._seat_notes_on_border(adapter, note, sheet=object())
+
+
+@pytest.mark.parametrize("tracking", [1.0, 0.8])
+def test_general_notes_bottom_is_seated_inside_the_frame(
+    monkeypatch: pytest.MonkeyPatch, tracking: float
+) -> None:
     """r743-p1s-B2: anchored by its top at 0.082, the 18-line block ran two
-    lines past the bottom border. The build now seats its MEASURED bottom on
-    the drawable region and fails if it then reaches the front view's
-    annotations; this pins that the block fits that band at all."""
-    lines = rocker_arm_notes.DRAWING_NOTES.splitlines()
-    bottom = BORDER_BOTTOM + drawing.NOTES_BORDER_CLEARANCE
-    assert bottom + len(lines) * NOTE_LINE_PITCH < drawing.NOTES_CEILING - 0.010
+    lines past the bottom border. Seated from its measured extent, its bottom
+    lands on the drawable region's clearance line and its left on NOTES_LEFT,
+    whatever the insertion point's offset from the rendered box."""
+    lines = len(rocker_arm_notes.DRAWING_NOTES.splitlines())
+    note = _FakeNote(
+        (drawing.NOTES_LEFT, drawing.NOTES_CEILING),
+        lines * NOTE_LINE_PITCH,
+        tracking,
+    )
+    x0, y0, _x1, y1 = _seat(monkeypatch, note)
+    assert y0 >= DRAWABLE.ymin
+    assert y0 == pytest.approx(
+        DRAWABLE.ymin + drawing.NOTES_BORDER_CLEARANCE,
+        abs=0.0005,
+    )
+    assert x0 == pytest.approx(drawing.NOTES_LEFT, abs=0.0005)
+    assert y1 < drawing.NOTES_CEILING
     # The old top anchor: the same block reached below the border.
-    assert 0.082 - len(lines) * NOTE_LINE_PITCH < BORDER_BOTTOM
-    assert drawing.NOTES_CEILING < 0.117  # the front view's O6.50 text
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_seat_notes_on_border(adapter, notes, sheet)" in source
-    assert "check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)" in source
+    assert 0.082 - lines * NOTE_LINE_PITCH < BORDER_BOTTOM
+
+
+def test_general_notes_too_tall_for_the_band_fail_the_build(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    band = drawing.NOTES_CEILING - DRAWABLE.ymin - drawing.NOTES_BORDER_CLEARANCE
+    note = _FakeNote((drawing.NOTES_LEFT, drawing.NOTES_CEILING), band + 0.002)
+    with pytest.raises(RuntimeError, match="do not fit"):
+        _seat(monkeypatch, note)
 
 
 def test_iso_caption_sits_under_the_iso_clear_of_the_frame_and_end_view() -> None:
@@ -270,22 +341,26 @@ def test_iso_caption_sits_under_the_iso_clear_of_the_frame_and_end_view() -> Non
     assert left < drawing.ISO_CENTER[0] < right
 
 
-def test_pivot_finish_is_note_height_with_its_leader_running_down_left() -> None:
+def test_pivot_finish_leader_runs_down_left_from_a_symbol_above_the_strap() -> None:
     """r743-p1s-B2: the default-height Ra 1.6 sat across the strap and the
     centre mark, its leader running up through the symbol. The body draws
-    up-right of its leader end, so the symbol sits up-right of its rim point."""
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    (call,) = (
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and getattr(node.func, "id", "") == "add_surface_finish"
+    up-right of its leader end, so the symbol sits up-right of its rim point,
+    clear of the hub and above the strap's top edge, at note text height."""
+    rim, symbol = drawing._pivot_finish_placement()
+    centre = drawing._sheet_xy(0.0, rocker_arm_spec.PIVOT_MID_Y)
+    scale = drawing._S / 1000.0
+    assert math.dist(rim, centre) == pytest.approx(
+        rocker_arm_spec.PIVOT_HOLE_DIA / 2.0 * scale
     )
-    keywords = {k.arg: ast.unparse(k.value) for k in call.keywords}
-    assert keywords["char_height"] == "0.0025"
-    assert keywords["leader_attach_xy"] == "pivot_finish_rim"
-    assert keywords["symbol_xy"] == (
-        "(pivot_finish_rim[0] + 0.012, pivot_finish_rim[1] + 0.011)"
-    )
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "pivot_finish_angle = math.radians(45.0)" in source
+    # Oblique to both centre-mark axes.
+    assert abs(rim[0] - centre[0]) > 0.0005 and abs(rim[1] - centre[1]) > 0.0005
+    assert symbol[0] > rim[0] and symbol[1] > rim[1]
+    assert math.dist(symbol, centre) > rocker_arm_spec.HUB_DIA / 2.0 * scale + 0.005
+    model_x = (symbol[0] - drawing.FRONT_CENTER[0]) / scale
+    strap_top = drawing._sheet_xy(
+        model_x,
+        rocker_arm_spec.CENTER_Y
+        - math.sqrt(rocker_arm_spec.R_TOP**2 - model_x**2),
+    )[1]
+    assert symbol[1] > strap_top + drawing.PIVOT_FINISH_CHAR_HEIGHT
+    assert drawing.PIVOT_FINISH_CHAR_HEIGHT <= 0.0025
