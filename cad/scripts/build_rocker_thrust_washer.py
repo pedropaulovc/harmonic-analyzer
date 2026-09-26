@@ -116,7 +116,9 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven disc (equations neutral)", V_DISC, 0.005 * V_DISC)
+    await volume_check(
+        adapter, "driven disc (equations neutral)", V_DISC, 0.005 * V_DISC
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

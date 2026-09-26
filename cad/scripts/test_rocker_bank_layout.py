@@ -27,7 +27,9 @@ def test_hub_length_is_the_station_pitch_and_only_comes_out_long() -> None:
     upper, lower = arm.HUB_LENGTH_BAND
     assert lower == 0.0 < upper == pytest.approx(0.05)
     assert bank.STACK_L20 == pytest.approx(bank.COUNT * arm.HUB_LENGTH)
-    assert bank.STACK_L20_ACCEPT == pytest.approx((bank.STACK_L20, bank.STACK_L20 + 0.20))
+    assert bank.STACK_L20_ACCEPT == pytest.approx(
+        (bank.STACK_L20, bank.STACK_L20 + 0.20)
+    )
 
 
 def test_end_play_rule_is_the_cylinder_bank_rule() -> None:
@@ -48,30 +50,40 @@ def test_hub_mid_planes_are_the_channel_arm_planes() -> None:
     assert bank.ARM_MID_DZ == 0.8
     for j in (0, 7, 19):
         assert bank.hub_mid_z(j) == pytest.approx(z0 + pitch * j + 0.8)
-    assert bank.STACK_MID_Z == pytest.approx((bank.hub_mid_z(0) + bank.hub_mid_z(19)) / 2)
+    assert bank.STACK_MID_Z == pytest.approx(
+        (bank.hub_mid_z(0) + bank.hub_mid_z(19)) / 2
+    )
 
 
 def test_stack_closes_north_on_the_shoulder_against_the_north_ear() -> None:
     """Reading 1 (user, #743 Q4): the integral shoulder bears on the north
     ear's inner face and hub 19 bears on the shoulder; no north washer."""
-    assert bank.HUB19_NORTH_FACE_Z == pytest.approx(bank.hub_mid_z(19) + arm.HUB_LENGTH / 2)
+    assert bank.HUB19_NORTH_FACE_Z == pytest.approx(
+        bank.hub_mid_z(19) + arm.HUB_LENGTH / 2
+    )
     assert bank.SHOULDER_Z == pytest.approx(
         (bank.HUB19_NORTH_FACE_Z, bank.HUB19_NORTH_FACE_Z + shaft.SHOULDER_LENGTH)
     )
     assert bank.NORTH_EAR_INNER_Z == pytest.approx(bank.SHOULDER_Z[1])
-    assert bank.NORTH_EAR_OUTER_Z == pytest.approx(bank.NORTH_EAR_INNER_Z + bracket.EAR_T)
+    assert bank.NORTH_EAR_OUTER_Z == pytest.approx(
+        bank.NORTH_EAR_INNER_Z + bracket.EAR_T
+    )
     assert bank.NORTH_EAR_INNER_Z == pytest.approx(75.889, abs=5e-4)
 
 
 def test_south_bracket_is_feeler_set_off_the_thrust_washer() -> None:
-    assert bank.HUB0_SOUTH_FACE_Z == pytest.approx(bank.hub_mid_z(0) - arm.HUB_LENGTH / 2)
+    assert bank.HUB0_SOUTH_FACE_Z == pytest.approx(
+        bank.hub_mid_z(0) - arm.HUB_LENGTH / 2
+    )
     assert bank.SOUTH_WASHER_Z == pytest.approx(
         (bank.HUB0_SOUTH_FACE_Z - washer.THICKNESS, bank.HUB0_SOUTH_FACE_Z)
     )
     assert bank.SOUTH_WASHER_Z[0] - bank.SOUTH_EAR_INNER_Z == pytest.approx(
         bank.ROCKER_END_FEELER
     )
-    assert bank.SOUTH_EAR_OUTER_Z == pytest.approx(bank.SOUTH_EAR_INNER_Z - bracket.EAR_T)
+    assert bank.SOUTH_EAR_OUTER_Z == pytest.approx(
+        bank.SOUTH_EAR_INNER_Z - bracket.EAR_T
+    )
     assert bank.SOUTH_EAR_INNER_Z == pytest.approx(-68.691, abs=5e-4)
 
 
@@ -92,8 +104,9 @@ def test_shaft_spans_both_ears_shoulder_one_ear_from_the_north_end() -> None:
         bank.NORTH_EAR_OUTER_Z - bank.SOUTH_EAR_OUTER_Z
     )
     assert bank.NORTH_JOURNAL_LENGTH == pytest.approx(bracket.EAR_T)
-    assert bank.PIVOT_SHAFT_SOUTH_Z + bank.PIVOT_SHAFT_LENGTH - bank.NORTH_JOURNAL_LENGTH == (
-        pytest.approx(bank.SHOULDER_Z[1])
+    assert (
+        bank.PIVOT_SHAFT_SOUTH_Z + bank.PIVOT_SHAFT_LENGTH - bank.NORTH_JOURNAL_LENGTH
+        == (pytest.approx(bank.SHOULDER_Z[1]))
     )
     assert bank.PIVOT_SHAFT_OVERALL_LENGTH == pytest.approx(
         bank.PIVOT_SHAFT_LENGTH + 2 * shaft.DOME_HEIGHT
@@ -165,8 +178,14 @@ def test_layout_reads_only_the_channel_stations() -> None:
 def test_pivot_parts_read_no_gear_train_config() -> None:
     shaft_cfg = config_files_of(SCRIPTS / "build_pivot_shaft.py")
     assert "machine/channels.yaml" in shaft_cfg
-    assert {"machine/gear_train.yaml", "machine/cone_incline.yaml"}.isdisjoint(shaft_cfg)
-    assert not any(t.startswith("machine/") for t in config_files_of(SCRIPTS / "build_pivot_bracket.py"))
+    assert {"machine/gear_train.yaml", "machine/cone_incline.yaml"}.isdisjoint(
+        shaft_cfg
+    )
     assert not any(
-        t.startswith("machine/") for t in config_files_of(SCRIPTS / "build_rocker_thrust_washer.py")
+        t.startswith("machine/")
+        for t in config_files_of(SCRIPTS / "build_pivot_bracket.py")
+    )
+    assert not any(
+        t.startswith("machine/")
+        for t in config_files_of(SCRIPTS / "build_rocker_thrust_washer.py")
     )

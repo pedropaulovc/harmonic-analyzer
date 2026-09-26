@@ -107,7 +107,9 @@ if any(
     name not in DRAWING_DIMENSIONS.get(feature, frozenset())
     for feature, name in _PRECISION_NAMES
 ) or len(_PRECISION_NAMES) != sum(len(names) for names in DRAWING_DIMENSIONS.values()):
-    raise AssertionError("DRAWING_PRECISION and DRAWING_DIMENSIONS must name the same dims")
+    raise AssertionError(
+        "DRAWING_PRECISION and DRAWING_DIMENSIONS must name the same dims"
+    )
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
 }

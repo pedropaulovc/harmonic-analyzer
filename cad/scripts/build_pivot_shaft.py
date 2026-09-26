@@ -80,9 +80,13 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 SHAFT_R = SHAFT_DIA / 2.0
 SHOULDER_R = SHOULDER_DIA / 2.0
 SHAFT_LENGTH = PIVOT_SHAFT_LENGTH  # the cylinder: the span over both ears (REF)
-V_BODY = math.pi * (SHAFT_R**2 * (SHAFT_LENGTH - SHOULDER_LENGTH) + SHOULDER_R**2 * SHOULDER_LENGTH)
+V_BODY = math.pi * (
+    SHAFT_R**2 * (SHAFT_LENGTH - SHOULDER_LENGTH) + SHOULDER_R**2 * SHOULDER_LENGTH
+)
 if SHAFT_LENGTH <= JOURNAL_LENGTH + SHOULDER_LENGTH:
-    raise AssertionError("the pivot shaft's body is shorter than its journal and shoulder")
+    raise AssertionError(
+        "the pivot shaft's body is shorter than its journal and shoulder"
+    )
 
 
 async def _shaft_profile(adapter) -> list[tuple[str, str]]:
@@ -128,18 +132,30 @@ async def _shaft_profile(adapter) -> list[tuple[str, str]]:
         ),
     )
     await dimension_between(
-        adapter, f"{journal}.start", f"{body}.end", "horizontal_distance",
-        SHAFT_LENGTH, "shaft ShaftLength",
+        adapter,
+        f"{journal}.start",
+        f"{body}.end",
+        "horizontal_distance",
+        SHAFT_LENGTH,
+        "shaft ShaftLength",
     )
     dims.record("ShaftLength", '"ShaftLength"')
     await dimension_between(
-        adapter, f"{journal}.start", f"{journal}.end", "horizontal_distance",
-        JOURNAL_LENGTH, "shaft JournalLength",
+        adapter,
+        f"{journal}.start",
+        f"{journal}.end",
+        "horizontal_distance",
+        JOURNAL_LENGTH,
+        "shaft JournalLength",
     )
     dims.record("JournalLength", '"JournalLength"')
     await dimension_between(
-        adapter, f"{shoulder}.start", f"{shoulder}.end", "horizontal_distance",
-        SHOULDER_LENGTH, "shaft ShoulderLength",
+        adapter,
+        f"{shoulder}.start",
+        f"{shoulder}.end",
+        "horizontal_distance",
+        SHOULDER_LENGTH,
+        "shaft ShoulderLength",
     )
     dims.record("ShoulderLength", '"ShoulderLength"')
     await add_diametric_linear_dimension(
@@ -193,7 +209,10 @@ async def _dome(adapter, tag: str, u_end: float, sign: float) -> list[tuple[str,
     )
     close = check(f"{name} close", await adapter.add_line(u_apex, 0.0, u_end, 0.0))
     set_sketch_direct_db(adapter, False)
-    check(f"{name} base vertical", await adapter.add_sketch_constraint(base, None, "vertical"))
+    check(
+        f"{name} base vertical",
+        await adapter.add_sketch_constraint(base, None, "vertical"),
+    )
     check(
         f"{name} close horizontal",
         await adapter.add_sketch_constraint(close, None, "horizontal"),
@@ -203,23 +222,36 @@ async def _dome(adapter, tag: str, u_end: float, sign: float) -> list[tuple[str,
     )
     dims.record("Rim", '"ShaftDia" / 2')
     await dimension_between(
-        adapter, f"{close}.start", f"{close}.end", "horizontal_distance",
-        DOME_HEIGHT, f"{name} height",
+        adapter,
+        f"{close}.start",
+        f"{close}.end",
+        "horizontal_distance",
+        DOME_HEIGHT,
+        f"{name} height",
     )
     dims.record("DomeHeight" if sign < 0 else "SouthDomeHeight", '"DomeHeight"')
     if u_end:
         check(
             f"{name} on axis",
-            await adapter.add_sketch_constraint(f"{base}.start", "origin", "horizontal_points"),
+            await adapter.add_sketch_constraint(
+                f"{base}.start", "origin", "horizontal_points"
+            ),
         )
         await dimension_between(
-            adapter, f"{base}.start", "origin", "horizontal_distance", u_end, f"{name} station"
+            adapter,
+            f"{base}.start",
+            "origin",
+            "horizontal_distance",
+            u_end,
+            f"{name} station",
         )
         dims.record("Station", '"ShaftLength"')
     else:
         check(
             f"{name} station",
-            await adapter.add_sketch_constraint(f"{base}.start", "origin", "coincident"),
+            await adapter.add_sketch_constraint(
+                f"{base}.start", "origin", "coincident"
+            ),
         )
     check(
         f"{name} radius",
@@ -233,7 +265,10 @@ async def _dome(adapter, tag: str, u_end: float, sign: float) -> list[tuple[str,
     check(f"exit_sketch {name}", await adapter.exit_sketch())
     name_last_feature(adapter, name)
     drive_jobs = dims.apply(adapter, name)
-    check(f"revolve {tag} cap", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check(
+        f"revolve {tag} cap",
+        await adapter.create_revolve(RevolveParameters(angle=360.0)),
+    )
     name_last_feature(adapter, f"{tag}Cap")
     return drive_jobs
 
@@ -264,7 +299,9 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven shaft (equations neutral)", volume, 0.005 * volume)
+    await volume_check(
+        adapter, "driven shaft (equations neutral)", volume, 0.005 * volume
+    )
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
