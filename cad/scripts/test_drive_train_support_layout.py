@@ -1166,12 +1166,16 @@ def test_the_rig_assembly_sequence_carries_each_part_step_verbatim() -> None:
     # #814 moved the rule-6 assembly notes off MHA-116, MHA-058, MHA-102,
     # MHA-002 and MHA-135 into ASSEMBLY_STEP constants. The sequence imports
     # them (identity, not a retyped copy), bonds before RIG SET, pin last.
+    # MHA-144 and the front strap go on first: neither passes the Ø15 head
+    # or a bonded drum (Codex #860, PRRT_kwDOPHDy386mTbe7).
+    import pinion_arbor_collar_spec
     import pinion_arbor_spec
     import pinion_cam_pin_spec
     import pinion_handle_spec
     import pinion_lever_pin_spec
 
     assert FITUP.ASSEMBLY_SEQUENCE == (
+        pinion_arbor_collar_spec.ASSEMBLY_STEP,
         pinion_arbor_spec.ASSEMBLY_STEP,
         pinion_handle_spec.ASSEMBLY_STEP,
         pinion_cam_pin_spec.ASSEMBLY_STEP,
@@ -1180,14 +1184,21 @@ def test_the_rig_assembly_sequence_carries_each_part_step_verbatim() -> None:
         FITUP.COLLAR_SET_STEP,
         pinion_lever_pin_spec.ASSEMBLY_STEP,
     )
-    assert FITUP.ASSEMBLY_SEQUENCE[0] is pinion_arbor_spec.ASSEMBLY_STEP
+    collar = FITUP.ASSEMBLY_SEQUENCE[0]
+    assert collar is pinion_arbor_collar_spec.ASSEMBLY_STEP
+    words = collar.replace(";", " ").replace(",", " ").split()
+    assert {"MHA-144", "MHA-102", "MHA-145", "MHA-056"} <= set(words)
+    assert collar.startswith("BEFORE THE DRUM BOND:")
+    assert FITUP.ASSEMBLY_SEQUENCE.index(collar) < FITUP.ASSEMBLY_SEQUENCE.index(
+        pinion_arbor_spec.ASSEMBLY_STEP
+    )
     assert FITUP.ASSEMBLY_SEQUENCE[-1] is pinion_lever_pin_spec.ASSEMBLY_STEP
-    bonds = FITUP.ASSEMBLY_SEQUENCE[:3]
+    bonds = FITUP.ASSEMBLY_SEQUENCE[1:4]
     assert all("LOCTITE 638" in step for step in bonds)
     assert {"MHA-102", "MHA-002", "MHA-058", "MHA-116"} <= {
         word for step in bonds for word in step.replace(";", " ").split()
     }
-    assert FITUP.ASSEMBLY_SEQUENCE.index(FITUP.RIG_SET_STEP) > 2
+    assert FITUP.ASSEMBLY_SEQUENCE.index(FITUP.RIG_SET_STEP) > 3
     # The pins freeze the strap spacing RIG SET measures the drum from.
     assert FITUP.ASSEMBLY_SEQUENCE.index(
         FITUP.SHAFT_DRILL_STEP

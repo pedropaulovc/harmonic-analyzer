@@ -182,3 +182,17 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 BORE_CALLOUT = f"DRILL THRU\nSLIDES ON {ARBOR_NUMBER}"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
+# The rig's first assembly step (Codex #860, PRRT_kwDOPHDy386mTbe7).  The
+# collar reaches the pin station only from the arbor's back crown end: its
+# Ø8 bore passes neither the Ø15 head nor a drum already bonded at the drum
+# station.  The front strap, journaled between the collar and the drum, is
+# trapped the same way, so it follows the collar on before the bond.
+COLLAR_NUMBER = "MHA-144"
+ASSEMBLY_STEP = "\n".join(
+    (
+        f"BEFORE THE DRUM BOND: SLIDE {COLLAR_NUMBER} ONTO {ARBOR_NUMBER} FROM ITS",
+        f"BACK CROWN END TO THE PIN STATION; DRIVE {PIN_NUMBER} THRU BOTH, SUB-FLUSH;",
+        f"THEN SLIDE THE FRONT {STRAP_NUMBER} ON BEHIND IT.",
+    )
+)
+
