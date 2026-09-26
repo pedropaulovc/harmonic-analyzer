@@ -71,8 +71,13 @@ Catalog specifications checked on September 10, 2026:
   volume 25.8601 mm^3, area 95.038 mm^2, 28 faces
   (`cad/out/reports/mcmaster-91375A106-dump.json`). The ASME B18.3 nominal
   model then shipped failed the replica gate against it (plain body, no
-  thread); `diag_build_91375A106.py` is now a true replica of the vendor
-  recipe and must pass the gate before release.
+  thread). `diag_build_91375A106.py`, a true replica of the vendor recipe,
+  passed the gate on September 26, 2026: volume 25.8601 vs 25.8601 mm^3,
+  area 95.0373 vs 95.038 mm^2, 28 faces each with the same face-area
+  multiset (largest per-face delta 0.0008 mm^2), and centre of mass within
+  0.003 mm (`cad/out/reference/91375A106-replica-report.json`). The replica
+  starts its thread helix a quarter turn from the vendor's, which only
+  rotates the thread about its axis.
   Evidence SHA-256: native SLDPRT
   `7f4cfb6c5bdd3053372667ac29a37b319392bff40cdc908f924424c8d8ebecd8`.
 - [91882A425](https://www.mcmaster.com/91882A425/) is black-oxide steel,
