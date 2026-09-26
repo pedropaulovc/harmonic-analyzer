@@ -77,8 +77,10 @@ Catalog specifications checked on September 10, 2026:
   native SLDPRT
   `0e52851776ee9ac5cd03c4d6ad2b1c07715417e4b97b85f032206cd8c2e3fad2`.
 - [91255A148](https://www.mcmaster.com/91255A148/) is the #6-32 x 1/2 in
-  black-oxide alloy steel button head hex drive screw that holds the cone tip
-  block (U30, rule-12 W22). Source: the McMaster product page, supplied by
+  black-oxide alloy steel button head hex drive screw that held the cone tip
+  block until I31 (U30, rule-12 W22). `cone-tip-block-screw` is now
+  93075A150 (below); this entry stays as the replica recipe's provenance and
+  is no longer a machine part. Source: the McMaster product page, supplied by
   the user on September 24, 2026 (an agent fetch that day was refused, HTTP
   403): #6-32 UNC-3A, right hand, flat tip, head Ø0.262 in x 0.073 in, 5/64
   hex drive, 1/2 in under the head, fully threaded, 140 ksi, ASME B18.3 /
