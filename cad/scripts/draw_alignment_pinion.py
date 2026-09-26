@@ -22,10 +22,10 @@ from _drawing_common import (
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
-    find_edge_near,
     new_project_drawing,
     property_link,
     read_required_properties,
+    scan_view_edges,
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -326,29 +326,41 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # Both end faces are thrust faces against the MHA-056 straps: each takes
-    # its own machined-grade symbol on its edge-on line in the profile.
-    back_end_face = find_edge_near(
-        adapter, right, BACK_END_FACE_XY, axis="x", label="drum back end face"
-    )
+    # its own machined-grade symbol on its edge-on line in the profile.  Every
+    # longitudinal tooth edge ends on that line too, so a coordinate pick there
+    # can take a tooth edge instead of the face (leaf 20260926T113807Z-1-194b1994
+    # took a tip-land edge for the back face).  Each symbol attaches to a
+    # tooth-tip arc lying IN its end face, picked from the profile's edge scan,
+    # and its leader lands on the edge-on line at the nominal point.
+    profile_edges = scan_view_edges(right, label="drum profile end-face arcs")
     add_surface_finish(
         adapter,
         right,
-        edge_xy=back_end_face,
+        edge_entity=profile_edges.circle_at(
+            (0.0, 0.0, FACE_WIDTH),
+            OUTSIDE_DIA / 2.0,
+            axis=(0.0, 0.0, 1.0),
+            label="drum back end face tip arc",
+        ).edge,
         symbol_xy=BACK_END_FINISH_SYMBOL_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "back_end_face"),
         label="drum back end face finish",
+        leader_attach_xy=BACK_END_FACE_XY,
         char_height=0.0025,
-    )
-    front_end_face = find_edge_near(
-        adapter, right, FRONT_END_FACE_XY, axis="x", label="drum front end face"
     )
     add_surface_finish(
         adapter,
         right,
-        edge_xy=front_end_face,
+        edge_entity=profile_edges.circle_at(
+            (0.0, 0.0, 0.0),
+            OUTSIDE_DIA / 2.0,
+            axis=(0.0, 0.0, 1.0),
+            label="drum front end face tip arc",
+        ).edge,
         symbol_xy=FRONT_END_FINISH_SYMBOL_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "front_end_face"),
         label="drum front end face finish",
+        leader_attach_xy=FRONT_END_FACE_XY,
         char_height=0.0025,
     )
 
