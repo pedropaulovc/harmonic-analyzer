@@ -68,15 +68,24 @@ TOOTH_THICKNESS_LOWER_DEVIATION = -0.020
 MESH_C2C_SLACK_MM = _config.fit("crank_mesh")["c2c_slack_mm"]
 TIP_CLEARANCE_MM = 0.157 / DIAMETRAL_PITCH * MM_PER_IN
 
-# The bore over the crankshaft is the part's one critical fit, and the only
-# reason anything here prints a third decimal: a slip fit exists only if the
-# size limits on BOTH mating features are narrower than the clearance band it
-# claims (tolerance-policy.md step 6b). The feature callout names the mate and
-# publishes the required diametral-clearance range; the dimensional band is
+# RULING (b), Main 2026-09-26 (#906): the crankshaft steps down to SEAT_DIA
+# under this pinion, and the pinion is bored to match. A smaller 16T cut by
+# the pair's one cutter would leave the boss wall under its 1.5 floor over
+# the 3/8 in shaft; the step gives the wall back without tightening a band.
+# The seat is turned to the through shaft's own size band
+# (crankshaft_spec.PINION_SEAT_DIA_BAND), so the fit below is the class it
+# always was.
+SEAT_DIA = 9.0
+
+# The bore over the crankshaft's seat is the part's one critical fit, and the
+# only reason anything here prints a third decimal: a slip fit exists only if
+# the size limits on BOTH mating features are narrower than the clearance band
+# it claims (tolerance-policy.md step 6b). The feature callout names the mate
+# and publishes the required diametral-clearance range; the dimensional band is
 # DERIVED -- never a per-part number -- from that named fit class and the
-# shaft's own published limits: bore_min = shaft_max + clearance_min,
-# bore_max = shaft_min + clearance_max. Move either input and this moves with it.
-BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8" crankshaft)
+# seat's own published limits: bore_min = seat_max + clearance_min,
+# bore_max = seat_min + clearance_max. Move either input and this moves with it.
+BORE_DIA = SEAT_DIA
 BORE_DIAMETRAL_CLEARANCE = tuple(
     _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
 )
@@ -160,7 +169,7 @@ BOSS_DIA_PLACES = 1
 BOSS_WALL_FLOOR_MM = 1.5
 _BORE_LOWER, _BORE_UPPER = deviations(BORE_DIA_BAND)
 _BOSS_DIA_LOWER, _BOSS_DIA_UPPER = printed_deviations(BOSS_DIA, BOSS_DIA_PLACES)
-BOSS_WALL_WORST = (BOSS_DIA + _BOSS_DIA_LOWER - (BORE_DIA + _BORE_UPPER)) / 2.0  # 1.560
+BOSS_WALL_WORST = (BOSS_DIA + _BOSS_DIA_LOWER - (BORE_DIA + _BORE_UPPER)) / 2.0  # 1.8225
 if BOSS_WALL_WORST < BOSS_WALL_FLOOR_MM:
     raise AssertionError(
         f"16T boss worst wall {BOSS_WALL_WORST:.3f} is under the {BOSS_WALL_FLOOR_MM} "
@@ -196,8 +205,11 @@ PIN_EDGE_MIN_WORST = 2.0
 PIN_STATION_LAYOUT_ALLOWANCE_MM = 0.25
 # The pinion is set on its seat with this feeler between its toothed south
 # face and the v2 post boss's spot face (MHA-A03 step 4); the assembly's
-# seat-gap range starts here.
+# seat-gap range starts here, and it may open to SEAT_GAP_MAX_MM before the
+# pinion is re-set: the W15 pin-wall and recess stacks carry the pinion that
+# far north of its nominal seat on the shaft.
 SEAT_FEELER_MM = 0.25
+SEAT_GAP_MAX_MM = 1.0
 # The shaft end stays recessed inside the boss in the worst case too.  The
 # overall length prints at OVERALL_LENGTH_PLACES, so an accepted pinion is as
 # short as the printed row allows (.X +/-0.8).  Nothing else can shallow the
@@ -252,7 +264,7 @@ BORE_FIT_CALLOUT = "\n".join(
     (
         "BORE LIMITS GOVERN",
         f"MATE SHAFT {CRANKSHAFT_NUMBER}",
-        f"(\N{DIAMETER SIGN}{crank_hub_geometry.SHAFT_DIA:.3f} "
+        f"(\N{DIAMETER SIGN}{SEAT_DIA:.3f} "
         f"+{_SHAFT_UPPER:.3f}/{_SHAFT_LOWER:.3f})",
         f"(DIA CLR {_CLEARANCE_MIN:.3f}-{_CLEARANCE_MAX:.3f} mm)",
     )

@@ -762,6 +762,7 @@ from crank_pinion_spec import (  # noqa: E402
     PIN_STATION as PINION_PIN_STATION,
     PIN_STATION_LAYOUT_ALLOWANCE_MM as PINION_PIN_LAYOUT_ALLOWANCE,
     SEAT_FEELER_MM as PINION_SEAT_FEELER,
+    SEAT_GAP_MAX_MM as PINION_SEAT_GAP_MAX,
     SHAFT_END_RECESS_MIN_WORST as PINION_RECESS_MIN_WORST,
 )
 from build_crankshaft import PINION_PIN_STATION_Y as CS_PINION_PIN_STATION  # noqa: E402
@@ -1246,7 +1247,7 @@ _BOSS_NORTH_GAP = _PINION_SOUTH - _POST_BOSS_NORTH
 # The 16T's south face seats against the post boss's north face across this
 # gap (low, high): the pinion is set on the feeler at the floor, and the gap
 # may open to the ceiling before the pinion is re-set.
-PINION_BOSS_NORTH_GAP_RANGE = (PINION_SEAT_FEELER, 1.0)
+PINION_BOSS_NORTH_GAP_RANGE = (PINION_SEAT_FEELER, PINION_SEAT_GAP_MAX)
 _GAP_LO, _GAP_HI = PINION_BOSS_NORTH_GAP_RANGE
 if min(_BOSS_SOUTH_GAP, _BOSS_NORTH_GAP) < 0.25:
     raise AssertionError("v2 crank boss does not clear its axial hardware")

@@ -314,8 +314,8 @@ def test_bore_band_is_derived_from_its_fit_class_not_written_by_hand() -> None:
     # pins, not the literal pair of numbers.
     low, high = _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
     assert spec.BORE_DIAMETRAL_CLEARANCE == pytest.approx((low, high))
-    shaft_upper, shaft_lower = crankshaft_spec.SHAFT_DIA_BAND
-    assert spec.BORE_DIA == crankshaft_spec.SHAFT_DIA
+    shaft_upper, shaft_lower = crankshaft_spec.PINION_SEAT_DIA_BAND
+    assert spec.BORE_DIA == crankshaft_spec.PINION_SEAT_DIA
     assert spec.BORE_DIA_BAND == (
         pytest.approx(shaft_lower + high),
         pytest.approx(shaft_upper + low),
@@ -350,7 +350,7 @@ def test_callouts_add_only_what_the_number_cannot_carry() -> None:
     # publishes its shaft limits and states the resulting clearance, so the
     # shop can verify that both statements are the same acceptance criterion.
     low, high = spec.BORE_DIAMETRAL_CLEARANCE
-    shaft_upper, shaft_lower = crankshaft_spec.SHAFT_DIA_BAND
+    shaft_upper, shaft_lower = crankshaft_spec.PINION_SEAT_DIA_BAND
     assert drawing.DIMENSION_CALLOUTS == {
         "BoreDia": spec.BORE_PROCESS_CALLOUT,
     }
@@ -359,7 +359,7 @@ def test_callouts_add_only_what_the_number_cannot_carry() -> None:
         (
             "BORE LIMITS GOVERN",
             f"MATE SHAFT {spec.CRANKSHAFT_NUMBER}",
-            f"(\N{DIAMETER SIGN}{crankshaft_spec.SHAFT_DIA:.3f} "
+            f"(\N{DIAMETER SIGN}{crankshaft_spec.PINION_SEAT_DIA:.3f} "
             f"+{shaft_upper:.3f}/{shaft_lower:.3f})",
             f"(DIA CLR {low:.3f}-{high:.3f} mm)",
         )
@@ -432,7 +432,7 @@ def test_notes_carry_only_the_tooth_edge_and_boss_wall_exceptions() -> None:
         f"BOSS WALL {spec.BOSS_WALL_WORST:.2f} MIN AT BORE: "
         "ACCEPTED EXCEPTION (GEAR CUTTER RUNOUT).",
     ]
-    assert lines[1] == "BOSS WALL 1.56 MIN AT BORE: ACCEPTED EXCEPTION (GEAR CUTTER RUNOUT)."
+    assert lines[1] == "BOSS WALL 1.82 MIN AT BORE: ACCEPTED EXCEPTION (GEAR CUTTER RUNOUT)."
     assert len(lines) <= 4
     policy = (
         Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"
@@ -634,7 +634,7 @@ def test_boss_wall_is_the_ruled_option_c_exception() -> None:
     printed_boss = round(spec.BOSS_DIA, spec.BOSS_DIA_PLACES)
     worst = (printed_boss - 0.8 - (spec.BORE_DIA + bore_upper)) / 2.0
     assert spec.BOSS_DIA == pytest.approx(spec.ROOT_DIA)
-    assert spec.BOSS_WALL_WORST == pytest.approx(worst) == pytest.approx(1.56, abs=1e-3)
+    assert spec.BOSS_WALL_WORST == pytest.approx(worst) == pytest.approx(1.8225, abs=1e-3)
     assert spec.BOSS_WALL_FLOOR_MM <= spec.BOSS_WALL_WORST < 2.0
     assert spec.DRAWING_PRECISION["BossProfile"]["BossDia"] == spec.BOSS_DIA_PLACES
     assert "USER RULING 2026-09-25, MHA-025 boss option C" in Path(spec.__file__).read_text(

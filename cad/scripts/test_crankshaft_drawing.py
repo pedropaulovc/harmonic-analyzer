@@ -33,8 +33,13 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "Depth",
         "DomeHeight",
         "JournalDiaDim",
+        "ReliefDiaDim",
+        "PinionSeatDiaDim",
         "OverallLength",
+        "PinionSeatStation",
         "JournalInboardStation",
+        "ReliefInboardStation",
+        "ReliefOutboardStation",
         "JournalOutboardStation",
         "PinHoleStation",
         "DomeSphereRadius",
@@ -59,7 +64,7 @@ def test_policy_migrated_sheet_carries_no_gdt_and_model_owned_places() -> None:
     assert "draw_crankshaft.py" in PRECISION_MIGRATED_DRAWINGS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    functional_fits = {"ShaftDiaDim", "JournalDiaDim"}
+    functional_fits = {"ShaftDiaDim", "JournalDiaDim", "PinionSeatDiaDim"}
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
         assert places == (3 if name in functional_fits else 1), name
     assert spec.REFERENCE_DIMENSIONS <= marked
@@ -70,8 +75,21 @@ def test_far_end_stations_restate_the_modelled_geometry() -> None:
     # The StationReference sketch drives each printed station from the same
     # globals as the features; these are the values the equations evaluate to.
     far = spec.SHAFT_LENGTH
-    assert far - (spec.JOURNAL_START + spec.JOURNAL_LENGTH) == pytest.approx(26.6)
+    assert far - spec.SEAT_STEP == pytest.approx(24.1)
+    assert far - (spec.JOURNAL_START + spec.JOURNAL_LENGTH) == pytest.approx(27.7)
+    assert far - spec.RELIEF_END == pytest.approx(42.7)
+    assert far - spec.RELIEF_START == pytest.approx(81.0)
     assert far - spec.JOURNAL_START == pytest.approx(96.0449, abs=1e-3)
+    # Each station the spec chose prints exactly at its places.
+    for station in (
+        spec.PINION_SEAT_STATION,
+        spec.JOURNAL_INBOARD_STATION,
+        spec.RELIEF_INBOARD_STATION,
+        spec.RELIEF_OUTBOARD_STATION,
+    ):
+        assert station == round(station, spec.STATION_PLACES)
+    assert set(part._STATIONS) == set(part._STATION_DRIVES)
+    assert set(part._STATIONS) <= spec.DRAWING_DIMENSIONS["StationReference"]
     assert far - spec.PIN_HOLE_HEIGHT == pytest.approx(123.2)
     assert far + spec.SHAFT_DOME_HEIGHT == pytest.approx(138.8)
     assert part.DOME_SPHERE_R == pytest.approx(6.6710, abs=1e-3)
@@ -100,10 +118,10 @@ def test_face_shift_preserves_every_inboard_world_station() -> None:
     assert pinion.SHAFT_END_RECESS_MIN <= spec.SHAFT_END_RECESS <= pinion.SHAFT_END_RECESS_MAX
     assert part.SEAT_PINION == spec.SEAT_PINION
     assert spec.JOURNAL_START == pytest.approx(40.755105572)
-    assert spec.JOURNAL_END == pytest.approx(110.2)
-    assert spec.JOURNAL_LENGTH == pytest.approx(69.4449, abs=1e-4)
+    assert spec.JOURNAL_END == pytest.approx(109.1)
+    assert spec.JOURNAL_LENGTH == pytest.approx(68.3449, abs=1e-4)
     assert -183.0 + spec.JOURNAL_START == pytest.approx(-142.244894428)
-    assert -183.0 + spec.JOURNAL_END == pytest.approx(-72.8)
+    assert -183.0 + spec.JOURNAL_END == pytest.approx(-73.9)
     assert part.SEAT_T12 == pytest.approx(25.5)
     assert part.SEAT_PINION == pytest.approx(113.039505572)
     assert not hasattr(part, "SEAT_ARM")
@@ -197,13 +215,23 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     # Ø9.525 on the dome-side seat, Ø11.388 on the journal.
     shaft_x = drawing.DIAMETER_POSITIONS["ShaftDiaDim"][0]
     journal_x = drawing.DIAMETER_POSITIONS["JournalDiaDim"][0]
+    relief_x = drawing.DIAMETER_POSITIONS["ReliefDiaDim"][0]
+    seat_x = drawing.DIAMETER_POSITIONS["PinionSeatDiaDim"][0]
     hole_radius = drawing._PIN_HOLE_DIA * drawing.SHEET_SCALE[0] / 2000.0
     assert drawing.PIN_X + hole_radius < shaft_x < drawing.JOURNAL_START_X
-    assert drawing.JOURNAL_START_X < journal_x < drawing.JOURNAL_END_X
+    # The journal's own sketch starts on the outboard land, the relief's and
+    # the seat's on their own sections.
+    assert drawing.JOURNAL_START_X < journal_x < drawing.RELIEF_START_X
+    assert drawing.RELIEF_START_X < relief_x < drawing.RELIEF_END_X
+    pinion_hole_left = drawing.PINION_PIN_HOLE_WINDOW[0]
+    assert drawing.SEAT_STEP_X < seat_x < pinion_hole_left
     # The cross-hole callout sits right of the hole so its leader cannot run
     # near-parallel to the station extension line through the hole.
     assert drawing.HOLE_CALLOUT_XY[0] > drawing.PIN_X
-    assert drawing.JOURNAL_START_X < drawing.FINISH_PICK[0] < drawing.JOURNAL_END_X
+    # The finish sits on the inboard land its control names.
+    assert drawing.RELIEF_END_X < drawing.FINISH_PICK[0] < drawing.JOURNAL_END_X
+    finish_y = spec.SURFACE_FINISHES[0].face.contains_y_mm
+    assert spec.RELIEF_END < finish_y < spec.JOURNAL_END
 
 
 def test_journal_fit_and_surface_finish_remain_unchanged() -> None:
@@ -234,15 +262,57 @@ def test_part_registry_retains_make_critical_properties() -> None:
     assert int(config["quantity"]) == 1
 
 
-def test_pinion_land_is_turnable_at_the_printed_band() -> None:
+def test_web_between_journal_and_seat_step_is_turnable_at_the_printed_band() -> None:
     # U27: the 0.25 land left by a journal running the full post bore was
-    # unturnable.  The journal stops short; the land between its shoulder
-    # and the pinion seat keeps 2 mm at the .X band on the printed station.
-    land = part.SEAT_PINION - spec.JOURNAL_END
-    assert land == pytest.approx(2.8395, abs=1e-4)
-    assert land - geometry.GENERAL_1PL_TOL_MM >= 2.0
-    post_bore = 104.789505572 - 32.755105572
-    assert spec.JOURNAL_LENGTH / post_bore > 0.96
+    # unturnable.  #906 puts the Ø9.0 seat step inboard of the journal, so the
+    # Ø9.525 web between the journal shoulder and the step keeps the 2.0 web
+    # target with BOTH stations at their printed .X rows.
+    row = geometry.GENERAL_1PL_TOL_MM
+    assert spec.STATION_ROW == pytest.approx(0.8)
+    web = spec.SEAT_STEP - spec.JOURNAL_END
+    assert web == pytest.approx(3.6)
+    assert web - 2.0 * spec.STATION_ROW >= spec.WEB_TARGET_MM - 1e-9
+    assert spec.WEB_TARGET_MM == 2.0
+    assert row <= spec.STATION_ROW
+    # The inboard land stays inside the bushing at its printed row.
+    assert spec.JOURNAL_END + spec.STATION_ROW < spec.POST_BORE_END
+
+
+def test_seat_step_never_pushes_the_pinion_past_its_seat_gap() -> None:
+    # The pinion is set on its feeler and pinned; the step never locates it.
+    # A step printed at its north limit plus a corner up to the title block's
+    # R0.25 stands the bore edge off, which the seat gap's north range (the
+    # range the W15 pin-wall and recess stacks carry) must hold.
+    import _config
+
+    pinion = spec.crank_pinion_spec
+    assert spec.STEP_CORNER_RADIUS_MAX == _config.title_block("edge_break")["radius_mm"]
+    standoff = spec.SEAT_STEP + spec.STATION_ROW + spec.STEP_CORNER_RADIUS_MAX - part.SEAT_PINION
+    assert standoff == pytest.approx(spec.SEAT_STEP_STANDOFF_WORST)
+    assert standoff <= pinion.SEAT_GAP_MAX_MM - pinion.SEAT_FEELER_MM
+    # At the pinion's own seat the step would stand it off 1.05: too far.
+    at_seat = part.SEAT_PINION + spec.STATION_ROW + spec.STEP_CORNER_RADIUS_MAX
+    assert at_seat - part.SEAT_PINION > pinion.SEAT_GAP_MAX_MM - pinion.SEAT_FEELER_MM
+    # The seat is the pinion's bore mate, at the through shaft's size band.
+    assert spec.PINION_SEAT_DIA == pinion.BORE_DIA == 9.0
+    assert spec.PINION_SEAT_DIA_BAND == spec.SHAFT_DIA_BAND
+    build = Path(part.__file__).read_text(encoding="utf-8")
+    assert '"PinionSeatProfile",\n        "PinionSeatDiaDim",' in build
+
+
+def test_journal_relief_leaves_two_bearing_lands() -> None:
+    # #906: the MHA-149 bushing is reamed plain through, so the shaft carries
+    # the relief.  At .X the relief never reaches the lands' lower limit nor
+    # the 3/8 in core, and each land keeps L/D >= 1 at print-worst.
+    row = spec.STATION_ROW
+    assert spec.RELIEF_DIA + row < spec.JOURNAL_DIA + spec.JOURNAL_DIA_BAND[1]
+    assert spec.RELIEF_DIA - row >= spec.SHAFT_DIA + spec.SHAFT_DIA_BAND[0]
+    assert spec.DRAWING_PRECISION["ReliefProfile"]["ReliefDiaDim"] == 1
+    assert spec.RELIEF_START - spec.JOURNAL_START == pytest.approx(15.045, abs=1e-3)
+    assert spec.JOURNAL_END - spec.RELIEF_END == pytest.approx(15.0)
+    for land in spec.JOURNAL_LANDS_WORST:
+        assert land == pytest.approx(13.4, abs=1e-3)
+        assert land >= spec.JOURNAL_LAND_L_OVER_D_MIN * spec.JOURNAL_DIA
 
 
 def test_pinion_pin_hole_prints_the_shared_matched_fit_note() -> None:
@@ -263,8 +333,8 @@ def test_pinion_pin_hole_prints_the_shared_matched_fit_note() -> None:
     assert "PINION_PIN_PROCESS" not in source
     # No station: neither a marked model dimension nor a sheet placement.
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert all("Pinion" not in name for name in marked)
-    assert all("Pinion" not in name for name in drawing.SIDE_KEEP)
+    assert all("PinionPin" not in name for name in marked)
+    assert all("PinionPin" not in name for name in drawing.SIDE_KEEP)
     build = Path(part.__file__).read_text(encoding="utf-8")
     assert '"ShaftLength" - "PinionPinStation"' not in build
     # The build stores the same text on the part; the sheet refuses a part
@@ -290,7 +360,10 @@ def test_pinion_pin_hole_prints_the_shared_matched_fit_note() -> None:
     assert field_y1 < 0.2667
     assert field_x0 < x0 and right < field_x1
     assert y0 <= field_y1
-    assert bottom > drawing.DIAMETER_POSITIONS["JournalDiaDim"][1] + 0.010
+    # Every diameter under the note's span keeps its text below the note.
+    for name, (dx, dy) in drawing.DIAMETER_POSITIONS.items():
+        if dx > x0 - 0.030:
+            assert bottom > dy + 0.010, name
 
 
 def test_note_text_is_shifted_into_its_field_from_the_measured_box() -> None:
@@ -317,9 +390,10 @@ def test_leader_tip_is_the_point_nearest_the_hole_and_must_land_on_it() -> None:
     assert centre[0] == pytest.approx(drawing.PINION_PIN_X)
     assert centre[1] == pytest.approx(drawing.SIDE_CENTER[1])
     # run1b's measured tip, 3.0 mm below the axis on the 2:1 sheet, is on it.
-    leader = (0.3004, 0.2472, 0.0, drawing.PINION_PIN_X - 0.001, 0.16699, 0.0)
+    tip_y = drawing.SIDE_CENTER[1] - 0.00301
+    leader = (0.3004, 0.2472, 0.0, drawing.PINION_PIN_X - 0.001, tip_y, 0.0)
     tip = drawing._leader_tip(leader, centre)
-    assert tip == (drawing.PINION_PIN_X - 0.001, 0.16699)
+    assert tip == (drawing.PINION_PIN_X - 0.001, tip_y)
     assert drawing._inside(tip, window)
     assert not drawing._inside((drawing.PINION_PIN_X, 0.20), window)
     with pytest.raises(RuntimeError, match="no leader points"):

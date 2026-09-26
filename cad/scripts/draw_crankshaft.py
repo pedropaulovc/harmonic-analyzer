@@ -58,8 +58,11 @@ from crankshaft_spec import (
     JOURNAL_START,
     PIN_HOLE_HEIGHT,
     PIN_HOLE_SPEC,
+    PINION_SEAT_DIA,
     REFERENCE_DIMENSIONS,
-    SHAFT_DIA,
+    RELIEF_END,
+    RELIEF_START,
+    SEAT_STEP,
     SHAFT_DOME_HEIGHT,
     SHAFT_LENGTH,
     SPHERICAL_DIMENSIONS,
@@ -92,7 +95,7 @@ _PIN_HOLE_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
-SIDE_CENTER = (0.210, 0.170)
+SIDE_CENTER = (0.210, 0.180)
 # Third-angle left view of the dome end, on the profile's axis.
 END_CENTER = (0.036, SIDE_CENTER[1])
 ISO_CENTER = (0.390, SIDE_CENTER[1])
@@ -120,30 +123,40 @@ DOME_ROOT_X = _sheet_x(0.0)
 PIN_X = _sheet_x(PIN_HOLE_HEIGHT)
 JOURNAL_START_X = _sheet_x(JOURNAL_START)
 JOURNAL_END_X = _sheet_x(JOURNAL_START + JOURNAL_LENGTH)
+RELIEF_START_X = _sheet_x(RELIEF_START)
+RELIEF_END_X = _sheet_x(RELIEF_END)
+SEAT_STEP_X = _sheet_x(SEAT_STEP)
 FAR_END_X = _sheet_x(SHAFT_LENGTH)
 JOURNAL_FLANK_Y = _sheet_y(JOURNAL_DIA / 2.0)
 
 # Baseline rows below the profile, all from the FAR END and stacked
-# shortest-first so no extension line crosses a dimension line; rows are 13
+# shortest-first so no extension line crosses a dimension line; rows are 12
 # mm apart because the text sits ~3 mm above its requested point and the
 # dimension line ~5 mm below it.  The 2.0 dome height shares the first row at
-# the far left, where no baseline reaches.
-_ROW_Y = (0.150, 0.137, 0.124, 0.111, 0.096)
+# the far left, where no baseline reaches.  Eight baselines since the #906
+# seat step and journal relief: the side view rides 10 mm higher so the last
+# row's dimension line still clears the title block's top edge.
+_ROW_Y = (0.160, 0.148, 0.136, 0.124, 0.112, 0.100, 0.088, 0.076)
 # The two diameters are authored in end-profile sketches; the end view
 # receives them first and they are then dragged onto the profile (rule 7:
 # diameters on the side view).  Their temporary end-view spots are clear of
 # everything else on the sheet.
 END_KEEP = {
     "ShaftDiaDim": (0.036, 0.215),
-    "JournalDiaDim": (0.036, 0.230),
+    "JournalDiaDim": (0.036, 0.228),
+    "ReliefDiaDim": (0.036, 0.241),
+    "PinionSeatDiaDim": (0.036, 0.254),
 }
 SIDE_KEEP = {
     "DomeHeight": (DOME_TIP_X - 0.016, _ROW_Y[0]),
-    "JournalInboardStation": ((JOURNAL_END_X + FAR_END_X) / 2.0 + 0.004, _ROW_Y[0]),
-    "JournalOutboardStation": ((JOURNAL_START_X + FAR_END_X) / 2.0 - 0.020, _ROW_Y[1]),
-    "PinHoleStation": ((PIN_X + FAR_END_X) / 2.0, _ROW_Y[2]),
-    "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0, _ROW_Y[3]),
-    "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0, _ROW_Y[4]),
+    "PinionSeatStation": ((SEAT_STEP_X + FAR_END_X) / 2.0, _ROW_Y[0]),
+    "JournalInboardStation": ((JOURNAL_END_X + FAR_END_X) / 2.0, _ROW_Y[1]),
+    "ReliefInboardStation": ((RELIEF_END_X + FAR_END_X) / 2.0, _ROW_Y[2]),
+    "ReliefOutboardStation": ((RELIEF_START_X + FAR_END_X) / 2.0, _ROW_Y[3]),
+    "JournalOutboardStation": ((JOURNAL_START_X + FAR_END_X) / 2.0 - 0.020, _ROW_Y[4]),
+    "PinHoleStation": ((PIN_X + FAR_END_X) / 2.0, _ROW_Y[5]),
+    "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0, _ROW_Y[6]),
+    "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0, _ROW_Y[7]),
     # Above-left of the dome, where no extension line rises: the radial
     # leader runs down-right to the dome silhouette.
     "DomeSphereRadius": (DOME_TIP_X - 0.022, 0.205),
@@ -155,16 +168,22 @@ SIDE_KEEP = {
 # lies at the dome root, and placed on the far-end seat its extension lines
 # drew solid through the journal (run 20260923T031747843Z-94724e44).
 # Ø9.525 on the dome-side seat right of the cross-hole; Ø11.388 on the
-# journal right of its finish symbol.
+# outboard land (its sketch starts there), a row higher so its text clears
+# the Ø9.525's; the relief's on the relief; the Ø9.0 seat's on the seat, left
+# of the pinion pin hole.
+_DIAMETER_ROW_Y = (0.212, 0.228)
 DIAMETER_POSITIONS = {
-    "ShaftDiaDim": (JOURNAL_START_X - 0.022, 0.200),
-    "JournalDiaDim": (JOURNAL_END_X - 0.052, 0.200),
+    "ShaftDiaDim": (JOURNAL_START_X - 0.022, _DIAMETER_ROW_Y[0]),
+    "JournalDiaDim": (JOURNAL_START_X + 0.012, _DIAMETER_ROW_Y[1]),
+    "ReliefDiaDim": (RELIEF_START_X + 0.030, _DIAMETER_ROW_Y[0]),
+    "PinionSeatDiaDim": (SEAT_STEP_X + 0.010, _DIAMETER_ROW_Y[0]),
 }
 # One Ø9.525 dimension governs both 3/8-in seats.
 CALLOUTS_ABOVE = {"ShaftDiaDim": "2X"}
 CALLOUTS_BELOW = {"OverallLength": "OVERALL"}
-FINISH_PICK = (JOURNAL_START_X + 0.040, JOURNAL_FLANK_Y)
-FINISH_SYMBOL = (JOURNAL_START_X + 0.050, 0.203)
+# The finish rides the inboard land (crankshaft_spec.SURFACE_FINISHES).
+FINISH_PICK = (RELIEF_END_X + 0.015, JOURNAL_FLANK_Y)
+FINISH_SYMBOL = (RELIEF_END_X + 0.012, 0.200)
 # Text centred up-right of the cross-hole, above the Ø9.525 dimension: the
 # callout's leader leaves the text's left end and runs down-left at ~64 deg
 # through the hole centre, a clean crossing of the 118.0 station's extension
@@ -198,9 +217,9 @@ PINION_PIN_NOTE_FIELD = (
 # pick slack) of its station and inside the shaft's silhouette.
 PINION_PIN_HOLE_WINDOW = (
     PINION_PIN_X - (PINION_PIN_DIA / 2.0 + 0.5) * _S / 1000.0,
-    _sheet_y(-SHAFT_DIA / 2.0),
+    _sheet_y(-PINION_SEAT_DIA / 2.0),
     PINION_PIN_X + (PINION_PIN_DIA / 2.0 + 0.5) * _S / 1000.0,
-    _sheet_y(SHAFT_DIA / 2.0),
+    _sheet_y(PINION_SEAT_DIA / 2.0),
 )
 NOTE_FIELD_MARGIN = 0.001
 NOTES_XY = (0.016, 0.062)

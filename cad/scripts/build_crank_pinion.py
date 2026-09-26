@@ -66,6 +66,7 @@ from _gear import build_fixed_gear, volume_check
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _part_pmi import author_part_pmi
 from crank_pinion_spec import (
+    BORE_DIA,
     BORE_DIA_BAND,
     BOSS_DIA,
     BOSS_LENGTH,
@@ -93,7 +94,7 @@ PA_DEG = 14.5
 # PINION_FACE asserts equality. (The old 12.0 "slightly wider than the drive
 # gear's 10" was a low-confidence read; 11.0 fit the line-of-centres overhang
 # model but grazed the true rim minimum at the tight 2026-07-14 fit.)
-BORE_DIAMETER = 0.375 * IN  # 9.525 -- crankshaft dia (med)
+BORE_DIAMETER = BORE_DIA  # the crankshaft's Ø9.0 pinion seat (crank_pinion_spec)
 
 
 async def build(adapter) -> dict[str, str]:
