@@ -22,6 +22,7 @@ from _drawing_common import (
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
+    find_edge_near,
     new_project_drawing,
     property_link,
     read_required_properties,
@@ -36,6 +37,8 @@ from alignment_pinion_spec import (
     ARBOR_BORE_CALLOUT,
     BORE_DIA,
     DRAWING_PRECISION_BY_NAME,
+    FACE_WIDTH,
+    OUTSIDE_DIA,
     SURFACE_FINISHES,
     TEETH,
 )
@@ -77,6 +80,25 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "FaceWidth": (RIGHT_CENTER[0], 0.125),
 }
+# The *Right profile lays model +Z to the left, so the z = 0 (front) end face
+# is its right end and the z = FACE_WIDTH (back) end face its left.  Each end
+# face's roughness leader meets the face's edge-on line above the axis, inside
+# the tooth outline, from outside the drum: the back face's from the upper
+# left, clear of the end view's OD leader; the front face's from the lower
+# right, below the isometric and clear of the FaceWidth extension line, which
+# runs down from the face's lower corner.
+_PROFILE_HALF_LEN = FACE_WIDTH / 2000.0 * PROFILE_SCALE[0] / PROFILE_SCALE[1]
+END_FACE_PICK_RISE = OUTSIDE_DIA / 4000.0 * PROFILE_SCALE[0] / PROFILE_SCALE[1]
+BACK_END_FACE_XY = (
+    RIGHT_CENTER[0] - _PROFILE_HALF_LEN,
+    RIGHT_CENTER[1] + END_FACE_PICK_RISE,
+)
+FRONT_END_FACE_XY = (
+    RIGHT_CENTER[0] + _PROFILE_HALF_LEN,
+    RIGHT_CENTER[1] + END_FACE_PICK_RISE,
+)
+BACK_END_FINISH_SYMBOL_XY = (BACK_END_FACE_XY[0] - 0.015, RIGHT_CENTER[1] + 0.030)
+FRONT_END_FINISH_SYMBOL_XY = (FRONT_END_FACE_XY[0] + 0.022, RIGHT_CENTER[1] - 0.028)
 DIMENSION_CALLOUTS = {
     "ArborBoreDia": ARBOR_BORE_CALLOUT,
     "FaceWidth": "OVERALL; TEETH FULL LENGTH",
@@ -300,6 +322,33 @@ async def build(adapter: Any) -> dict[str, str]:
             FRONT_CENTER[0],
             FRONT_CENTER[1] - BORE_DIA * FRONT_SCALE[0] / FRONT_SCALE[1] / 2000.0,
         ),
+        char_height=0.0025,
+    )
+
+    # Both end faces are thrust faces against the MHA-056 straps: each takes
+    # its own machined-grade symbol on its edge-on line in the profile.
+    back_end_face = find_edge_near(
+        adapter, right, BACK_END_FACE_XY, axis="x", label="drum back end face"
+    )
+    add_surface_finish(
+        adapter,
+        right,
+        edge_xy=back_end_face,
+        symbol_xy=BACK_END_FINISH_SYMBOL_XY,
+        control=surface_finish_by_key(SURFACE_FINISHES, "back_end_face"),
+        label="drum back end face finish",
+        char_height=0.0025,
+    )
+    front_end_face = find_edge_near(
+        adapter, right, FRONT_END_FACE_XY, axis="x", label="drum front end face"
+    )
+    add_surface_finish(
+        adapter,
+        right,
+        edge_xy=front_end_face,
+        symbol_xy=FRONT_END_FINISH_SYMBOL_XY,
+        control=surface_finish_by_key(SURFACE_FINISHES, "front_end_face"),
+        label="drum front end face finish",
         char_height=0.0025,
     )
 

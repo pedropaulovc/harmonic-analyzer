@@ -34,16 +34,17 @@ RETAINING_COMPOUND_MAX_GAP_MM = 0.25
 PIN_LENGTH_TOLERANCE_MM = 0.05
 CAP_RADIUS_TOLERANCE_MM = 0.05
 
+# Rule 7 (turned parts): the shank is a Right-plane half-profile, so its
+# diameter prints on the side view beside the length, not on the end view
+# (machinist review of 7f7fc1717).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "PinProfile": {"PinDia"},
-    "Pin": {"Depth"},
+    "PinProfile": {"PinDia", "Depth"},
     "CapProfile": {"CapR"},
 }
 # Decimal places ARE the tolerance statement (policy rule 2): the h9 stock
 # band and the two +/-0.05 bands are all hundredths.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "PinProfile": {"PinDia": 2},
-    "Pin": {"Depth": 2},
+    "PinProfile": {"PinDia": 2, "Depth": 2},
     "CapProfile": {"CapR": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -54,13 +55,14 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
-# The stock is the registry row's material (the title block's Material cell),
-# so the diameter callout can never name a different bar than the title block
-# (Codex P2 on #814).  The h9 slip fit above assumes that drill rod.
+# The stock is stated once, in the title block's Material cell (the registry
+# row): repeating it on the diameter callout was over-specification (machinist
+# review of 7f7fc1717), and a callout that names no bar cannot disagree with
+# the title block (Codex P2 on #814).  The h9 slip fit above assumes drill rod.
 STOCK = _config.parts("pinion-cam-pin")["material"]
 if "drill rod" not in STOCK.lower():
     raise AssertionError(f"the h9 bonded slip fit assumes drill rod, not {STOCK!r}")
-PIN_DIA_CALLOUT = f"{STOCK.upper()};\nSLIP FIT IN {SEAT_NUMBER} FOLLOWER SEAT"
+PIN_DIA_CALLOUT = f"SLIP FIT IN {SEAT_NUMBER} FOLLOWER SEAT"
 
 # Rule 5: the crown is the surface that runs (it rides the cam OD); the
 # bonded shank is a static seat and carries no symbol.
