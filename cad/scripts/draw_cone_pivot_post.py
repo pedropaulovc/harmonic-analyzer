@@ -736,20 +736,26 @@ def _collect_sheet(adapter: Any, *, label: str) -> Any:
     return sheets[0]
 
 
-def _annotation_text_box(adapter: Any, name: str) -> Any:
-    """The union of a named annotation's rendered text boxes, as the layout
-    audit reads them."""
+def _owned_annotations(sheet: Any, name: str, owner: str) -> list[Any]:
+    """The annotations called ``name`` in view ``owner``.  A name alone is not
+    an identity: SolidWorks names hole callouts per view, so the plan's RD1
+    and the foot's dowel callout were both 'RD1' (leaf 917-s1-b5d9)."""
+    return [a for a in sheet.annotations if a.label == name and a.owner == owner]
+
+
+def _annotation_text_box(adapter: Any, name: str, owner: str) -> Any:
+    """The union of the rendered text boxes of annotation ``name`` in view
+    ``owner``, as the layout audit reads them."""
     from _layout_geometry import Box
     from diagnostics.drawing_layout_audit import collect_document
 
     boxes = [
         box
-        for annotation in collect_document(adapter)[0].annotations
-        if annotation.label == name
+        for annotation in _owned_annotations(collect_document(adapter)[0], name, owner)
         for box in annotation.text_boxes
     ]
     if not boxes:
-        raise RuntimeError(f"no rendered text read back for annotation {name!r}")
+        raise RuntimeError(f"no rendered text read back for {owner}'s annotation {name!r}")
     return Box(
         min(box.xmin for box in boxes),
         min(box.ymin for box in boxes),
@@ -828,11 +834,9 @@ def _place_foot_group(adapter: Any, foot: Any) -> None:
     rebuild_drawing(adapter, label="post dowel callout text")
     annotation = _early_bound(dowel_callout.GetAnnotation(), "IAnnotation")
     name = str(annotation.GetName())
-    read = [
-        item
-        for item in _collect_sheet(adapter, label="post dowel callout read-back").annotations
-        if item.label == name
-    ]
+    read = _owned_annotations(
+        _collect_sheet(adapter, label="post dowel callout read-back"), name, foot_name
+    )
     if len(read) != 1 or not read[0].text_boxes:
         raise RuntimeError(f"post dowel callout {name!r} was not read back: {read!r}")
     boxes = read[0].text_boxes
@@ -877,7 +881,7 @@ def _place_foot_group(adapter: Any, foot: Any) -> None:
     )
     # The callout belongs to the foot view and may have ridden with it: move
     # it from wherever it reads now to the planned text box.
-    current = _annotation_text_box(adapter, name)
+    current = _annotation_text_box(adapter, name, foot_name)
     _move_annotation(
         annotation,
         (plan.callout_text.xmin - current.xmin, plan.callout_text.ymax - current.ymax),
@@ -885,7 +889,7 @@ def _place_foot_group(adapter: Any, foot: Any) -> None:
     )
     rebuild_drawing(adapter, label="foot view group placed")
     caption = _note_box(note)
-    placed = _annotation_text_box(adapter, name)
+    placed = _annotation_text_box(adapter, name, foot_name)
     for what, got, want in (
         ("foot caption", caption, plan.caption),
         ("post dowel callout", placed, plan.callout_text),

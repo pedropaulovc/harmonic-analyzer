@@ -978,3 +978,36 @@ def test_post_plans_its_foot_group_last() -> None:
         assert call in group
     assert "_collect_sheet(" in inspect.getsource(drawing._assert_native_layout)
     assert "describe_sheet(" in inspect.getsource(drawing._collect_sheet)
+
+
+def _two_rd1_sheet():
+    """Leaf 917-s1-b5d9 (swmaker000006): SolidWorks names hole callouts per
+    view, so the plan's RD1 (Drawing View2) and the foot's new dowel callout
+    (Drawing View5) are both 'RD1'."""
+    from types import SimpleNamespace
+
+    from _layout_geometry import AnnotationGeometry, Box
+
+    return SimpleNamespace(
+        annotations=[
+            AnnotationGeometry(
+                "RD1", "dim", "Drawing View2", text_boxes=(Box(0.138, 0.244, 0.200, 0.2535),)
+            ),
+            AnnotationGeometry(
+                "RD1", "dim", "Drawing View5", text_boxes=(Box(0.151, 0.214, 0.288, 0.232),)
+            ),
+        ]
+    )
+
+
+def test_foot_callout_read_back_keys_on_label_and_owning_view(monkeypatch) -> None:
+    """917-s1-b5d9 died with "post dowel callout 'RD1' was not read back": the
+    read-back matched the name alone and found the plan's RD1 too."""
+    import diagnostics.drawing_layout_audit as audit
+
+    sheet = _two_rd1_sheet()
+    (read,) = drawing._owned_annotations(sheet, "RD1", "Drawing View5")
+    assert read.owner == "Drawing View5"
+    monkeypatch.setattr(audit, "collect_document", lambda adapter: [sheet])
+    box = drawing._annotation_text_box(None, "RD1", "Drawing View5")
+    assert (box.xmin, box.ymin, box.xmax, box.ymax) == (0.151, 0.214, 0.288, 0.232)
