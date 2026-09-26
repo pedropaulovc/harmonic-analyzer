@@ -82,12 +82,18 @@ FOLLOWER_SEAT_LIGAMENT = abs(PIN_DROP) - HOLE_MAX / 2.0 - PIN_BORE / 2.0
 # Shaft wall beside the match-drilled hole.  The hole must cross the shaft
 # axis: an offset e from it thins one side by e.  MHA-056 prints the strap
 # hole's height as its distance from the pivot-bore wall (the model's own
-# "PivotBore" / 2 reference, Codex #858 P2 user ruling (a)) at .XX, so the
-# offset is read against the full general .XX grade -- the worst case below,
-# which still clears the 1.5 floor, so no tighter band (and no position
-# frame, which rule 3 bars on a bracket) is needed.  A V-block set-up holding
-# 0.25 leaves SHAFT_LIGAMENT_QUARTER.
+# "PivotBore" / 2 reference, Codex #858 P2 user ruling (a)) at .XX, so e is
+# the full general .XX grade plus the rounding of its 3.175 nominal, 0.515,
+# and the worst wall is 2.341 - 0.515 = 1.826.  That misses the 2.0 web
+# target (Codex #858, PRRT_kwDOPHDy386mTvki), and no geometry can move to
+# meet it: the MHA-062 shaft is the ruled 1/4 in, the pin is the smallest
+# B18.8.2 size (1/16), and the hole band is already B18.8.2's recommended
+# window.  With no lever, the loosest band that clears the 1.5 floor governs:
+# no print tolerance tighter than the title block, and no position frame,
+# which rule 3 bars on a bracket.  A V-block set-up holding 0.25 leaves
+# SHAFT_LIGAMENT_QUARTER.
 # The MHA-062 shaft is the pivot bore's own nominal (a lockstep test pins it).
+SHAFT_LIGAMENT_FLOOR = 1.5
 _SHAFT_MIN = PIVOT_BORE + SHAFT_H[1]
 SHAFT_LIGAMENT_CENTRED = (_SHAFT_MIN - HOLE_MAX) / 2.0
 SHAFT_LIGAMENT_QUARTER = SHAFT_LIGAMENT_CENTRED - 0.25
@@ -108,7 +114,10 @@ if FOLLOWER_SEAT_LIGAMENT < 2.0:
     raise AssertionError(
         f"follower-seat ligament {FOLLOWER_SEAT_LIGAMENT:.2f} is under 2.0"
     )
-if SHAFT_LIGAMENT_WORST < 1.5:
-    raise AssertionError(f"shaft ligament {SHAFT_LIGAMENT_WORST:.2f} is under 1.5")
+if SHAFT_LIGAMENT_WORST < SHAFT_LIGAMENT_FLOOR:
+    raise AssertionError(
+        f"shaft ligament {SHAFT_LIGAMENT_WORST:.3f} is under the"
+        f" {SHAFT_LIGAMENT_FLOOR} floor"
+    )
 if PIN_BURIED_MARGIN < 0.0:
     raise AssertionError("the longest pin stands proud of the narrowest strap foot")

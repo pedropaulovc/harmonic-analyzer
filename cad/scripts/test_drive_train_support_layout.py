@@ -6,9 +6,11 @@ import math
 
 import pytest
 
+import _fit_limits
 import build_drive_train_assembly as drive
 import pinion_rig_fitup as FITUP
 import pinion_rig_layout as RIG
+from _printed_tolerance import printed_band_mm
 from pinion_pivot_block_geometry import BLOCK_EAST
 from rocker_arm_support_spec import SUPPORT_WORLD_X
 
@@ -854,8 +856,28 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     assert pin.STRAP_FACE_WEB_WORST >= 2.0
     assert pin.FOLLOWER_SEAT_LIGAMENT >= 2.0
     assert math.isclose(pin.SHAFT_LIGAMENT_WORST, 1.826, abs_tol=5e-4)
-    assert pin.SHAFT_LIGAMENT_WORST >= 1.5
+    assert pin.SHAFT_LIGAMENT_WORST >= pin.SHAFT_LIGAMENT_FLOOR == 1.5
     assert math.isclose(pin.SHAFT_LIGAMENT_QUARTER, 2.091, abs_tol=5e-4)
+    # Where the 1.826 comes from (Codex #858, PRRT_kwDOPHDy386mTvki).  The
+    # centred wall is (min shaft 6.33 - max hole 1.6475) / 2 = 2.341.  The hole
+    # can run off the shaft axis by MHA-056's general .XX grade on
+    # CrossHoleFromBoreWall (0.51) plus the 0.005 rounding of its 3.175 nominal
+    # at two places.  2.0 is a target met with geometry where a lever exists; none
+    # does here (the 1/4 shaft is ruled, the 1/16 pin is the smallest B18.8.2
+    # size, the hole band is B18.8.2's window), so the loosest band that clears
+    # the 1.5 floor governs.
+    shaft_min = pin.PIVOT_BORE + _fit_limits.SHAFT_H[1]
+    assert math.isclose(shaft_min, 6.33, abs_tol=1e-9)
+    assert math.isclose(pin.SHAFT_LIGAMENT_CENTRED, (6.33 - 1.6475) / 2.0)
+    places = pin.CROSS_HOLE_FROM_BORE_WALL_PLACES
+    assert places == 2
+    rounding = abs(round(pin.PIVOT_BORE / 2.0, places) - pin.PIVOT_BORE / 2.0)
+    assert math.isclose(rounding, 0.005, abs_tol=1e-9)
+    offset = printed_band_mm(places) + rounding
+    assert math.isclose(offset, 0.515, abs_tol=1e-9)
+    assert math.isclose(
+        pin.SHAFT_LIGAMENT_WORST, pin.SHAFT_LIGAMENT_CENTRED - offset, abs_tol=1e-9
+    )
 
 
 def test_mha145_strap_pins_sit_in_both_strap_cross_holes() -> None:
