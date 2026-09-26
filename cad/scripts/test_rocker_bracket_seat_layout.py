@@ -10,6 +10,7 @@ import pytest
 import _interference_contracts
 import build_channel_assembly as channel
 import build_pedestal_hold_down_screw as hold_down
+import arbor_pedestal_spec as pedestal
 import pivot_bracket_spec as bracket
 import rocker_bracket_seat_layout as seats
 from _hole_spec import DRILL_POINT_H
@@ -110,3 +111,46 @@ def test_bracket_hole_clears_the_screw_junction_fillet() -> None:
     assert radial > fillet
     assert channel.BRACKET_HOLE_FILLET_CLEARANCE == pytest.approx(radial - fillet)
     assert bracket.HOLE_DIA < hold_down.HEAD_DIA
+
+
+def test_bracket_hole_is_mha_004s_hole_for_the_same_screw() -> None:
+    """Both carry the MHA-143 hold-down; their holes must not drift apart."""
+    assert bracket.HOLD_DOWN_HOLE_SPEC == pedestal.SCREW_HOLE_SPEC
+
+
+def test_bracket_hole_ligaments_keep_the_floor_at_worst_case() -> None:
+    assert min(bracket.HOLE_LIGAMENTS_MIN.values()) >= bracket.LIGAMENT_FLOOR
+    # Centred on the free run: neither foot end is the weak one.
+    assert bracket.HOLE_LIGAMENTS_MIN["ear face"] == pytest.approx(
+        bracket.HOLE_LIGAMENTS_MIN["foot end"]
+    )
+    assert bracket.HOLE_LIGAMENTS_MIN["ear face"] + 2.5 * bracket.LIGAMENT_BAND >= (
+        bracket.LIGAMENT_TARGET
+    )
+    # The band is the one the seat stack carries this foot at.
+    assert bracket.LIGAMENT_BAND == seats.LINEAR_2PL
+    # The stations print at .X.
+    assert all(round(z, 1) == z for z in bracket.HOLE_Z)
+
+
+def test_old_stations_fail_the_ligament_floor_with_the_close_hole() -> None:
+    """Fail-first: the #19 stations (9, 17) with the 4.572 hole leave 0.44
+    to the foot end at worst case."""
+    old = bracket.hole_ligaments_min((9.0, 17.0))
+    assert old["foot end"] < bracket.LIGAMENT_FLOOR
+
+
+def test_derived_stations_are_the_best_print_step_rounding() -> None:
+    """No .X station pair centred on the run keeps a larger least ligament."""
+    mid = sum(bracket.FREE_RUN) / 2.0
+    best = min(bracket.HOLE_LIGAMENTS_MIN.values())
+    for tenths in range(20, 90):
+        half = tenths / 10.0
+        candidate = bracket.hole_ligaments_min((mid - half, mid + half))
+        assert min(candidate.values()) <= best + 1e-9
+
+
+def test_screw_heads_keep_air_to_the_ear_and_the_foot_end() -> None:
+    head_r = hold_down.HEAD_DIA / 2.0
+    assert min(bracket.HOLE_Z) - head_r > bracket.FREE_RUN[0]
+    assert max(bracket.HOLE_Z) + head_r < bracket.FREE_RUN[1]
