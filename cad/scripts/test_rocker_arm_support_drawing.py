@@ -872,9 +872,11 @@ def test_view_b_is_a_cropped_rail_strip_in_the_band_below_the_section() -> None:
     x, y = drawing.VIEW_B_CENTER
     half_len = support.BOSS_DEPTH / 2 * scale
     half_crop = drawing.VIEW_B_CROP_HALF_Z_MM * scale
-    # The crop keeps the whole rail top (its half-width) and stays inside the
-    # foot, so only rail-strip ink survives.
-    assert support.NARROW < drawing.VIEW_B_CROP_HALF_Z_MM < support.WIDE
+    # The crop keeps the whole rail top (its half-width) and stays clear of
+    # the foot holes seen through the cavity: a fence through them left half
+    # hole symbols on its edges (r743-p1s-B2 render, Main's eye-pass ruling).
+    foot_hole_inner_z = min(abs(z) for _, z in support.HOLES) - support.HOLE_DIA / 2
+    assert support.NARROW < drawing.VIEW_B_CROP_HALF_Z_MM < foot_hole_inner_z
     assert x - half_len > bottom_right + 0.010
     assert x + half_len < drawing.HOLE_TABLE_ANCHOR[0] - 0.010
     assert y + half_crop < SECTION_CAPTION_BOTTOM - 0.003

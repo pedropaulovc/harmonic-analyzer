@@ -65,6 +65,7 @@ from build_rocker_arm_support import (
     HALF_Y,
     HOLES,
     HOLE_DIA,
+    NARROW,
     WEB,
     WIDE,
 )
@@ -174,11 +175,18 @@ SEAT_CALLOUT_X_MM = max(SEAT_LOCAL_X)
 # they get VIEW B (Main's ruling): a partial top view of the rail strip,
 # relocated to the band below Section A-A and right of the bottom view, named
 # by a letter arrow looking down on the front view's top edge. The crop keeps
-# the rail top (half-width NARROW) inside the foot (WIDE). The callout text sits
-# right of VIEW B, between the hole table and the title block; its rows
-# centre on its y.
+# the rail top (half-width NARROW) and stops short of the foot holes the view
+# sees through the cavity: at 16 mm it cut them, leaving half hole symbols on
+# its edges (r743-p1s-B2 render). The callout text sits right of VIEW B,
+# between the hole table and the title block; its rows centre on its y.
 VIEW_B_CENTER = (0.210, 0.108)
-VIEW_B_CROP_HALF_Z_MM = 16.0
+VIEW_B_CROP_HALF_Z_MM = 12.0
+FOOT_HOLE_INNER_Z = min(abs(z) for _, z in HOLES) - HOLE_DIA / 2.0
+if not NARROW < VIEW_B_CROP_HALF_Z_MM < FOOT_HOLE_INNER_Z:
+    raise AssertionError(
+        f"VIEW B fence half-width {VIEW_B_CROP_HALF_Z_MM} must keep the rail top "
+        f"({NARROW}) and clear the foot holes ({FOOT_HOLE_INNER_Z:.2f})"
+    )
 VIEW_B_CAPTION = f"VIEW B\nSCALE {SHEET_SCALE[0]:g}:{SHEET_SCALE[1]:g}"
 VIEW_B_CAPTION_XY = (
     VIEW_B_CENTER[0] - BOSS_DEPTH / 2.0 * VIEW_SCALE / 1000.0,
