@@ -108,9 +108,9 @@ HARVESTED_MASS_KG = 0.821351
 #   crank:   shaft 11.368..11.388  bore 11.413..11.443  (crankshaft MHA-026)
 #   journal: shaft 12.2108..12.2308 bore 12.2558..12.2858 (cone shaft MHA-014)
 #
-# Apart from the spacing between them (below), nothing else on this casting is
-# an accuracy feature, so nothing else carries a band: the title block's
-# general grades govern.
+# Apart from the spacing between them and the cone-axis height (both below),
+# nothing else on this casting is an accuracy feature, so nothing else
+# carries a band: the title block's general grades govern.
 RUNNING_BORE_BAND = (0.005, -0.025)
 
 # Crank-above-cone bore spacing (user ruling U31, 2026-09-23, option 3a).  The
@@ -142,6 +142,16 @@ RUNNING_BORE_BAND = (0.005, -0.025)
 # bushing, not scrapped.
 CRANK_ABOVE_CONE = CRANK_BORE_HEIGHT - BORE_HEIGHT
 CRANK_ABOVE_CONE_BAND = (0.37, 0.0)
+
+# Cone-axis height above the foot.  The post's journal sets the cone shaft's
+# height; at the shaft's tip MHA-092 is set on MHA-141's shim pack, whose
+# range holds 0.25 beyond the block's own AxisHeight band for this side's
+# terms (cone_tip_block_spec.FIT_UP_SHIM_MARGIN_MM; the plate top is common
+# to both and cancels).  The .XX grade (+/-0.51) overruns that, so the height
+# carries its own symmetric band: the loosest the pack allows, so the
+# machinist gets every hundredth the fit-up can absorb.  The drive train's
+# shim check reads this name.
+JOURNAL_AXIS_HEIGHT_TOLERANCE_MM = 0.25
 
 # Journal-plan reference sketch (Top plane, all construction).  The 12.5182 deg
 # plan angle between the crank axis and the cone-journal axis is REAL model
@@ -207,8 +217,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # band (.X +/-0.8, .XX +/-0.51, .XXX +/-0.13), so the PART owns them and the
 # sheet only proves they survived the import (drawing-simplicity-policy rule 2).
 # The as-cast collar diameter and the cast body/boss sizes take one place --
-# nothing mates on them.  The cone-axis height, the crank-above-cone spacing
-# (which carries its own explicit band), the crank-axis height the print
+# nothing mates on them.  The cone-axis height and the crank-above-cone
+# spacing (each carries its own explicit band), the crank-axis height the print
 # repeats only as a reference, the two mounting-hole stations and the machined
 # spot-face station take two.  The plan angle takes
 # one: the title block holds angles to +/-1 deg, so a second place would only
