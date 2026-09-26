@@ -283,7 +283,10 @@ NECK_DIA_XY = (0.140, 0.2575)
 # model dimension already on the sheet is not imported again.
 DETAIL_KEEP = {
     "HeadLen": (0.165, 0.201),
-    "HeadCapR": (0.195, 0.262),
+    # Right of and below its pc-r8 spot (0.195, 0.262), whose leader met the
+    # crown at its top corner: aimed lower, the arrow lands on the arc
+    # itself, still left of the cross-hole callout and above its leader.
+    "HeadCapR": (0.205, 0.257),
     "HeadCapSagDim": (0.205, 0.210),
     # Above the hole's centre line, so the leader drops onto the hole edge.
     "CrossHoleDia": (0.245, 0.256),
@@ -590,11 +593,13 @@ def _cropped_head_view(adapter: Any, principal: Any) -> Any:
 
 
 def _radius_leader_outside(adapter: Any, annotations: list[Any], name: str) -> None:
-    """Put a radius's arrow outside its arc (swDimArrowsOutside).
+    """Put a radius's arrow outside its arc, with no line on to its centre.
 
     Drawn from the arc's centre, the SR10.9 leader ran through the Ø6 cross
-    hole and its centre mark (Main's F2 on pc-r6).  With the arrow outside,
-    the leader reaches the crown from its text and never enters the part.
+    hole and its centre mark (Main's F2 on pc-r6).  The arrow outside alone
+    (swDimArrowsOutside) kept that line: pc-r8 drew it solid from the arrow
+    to the centre, through the hole.  With the solid leader off as well, the
+    leader reaches the crown from its text and stops there.
     """
     matches = [
         annotation
@@ -608,6 +613,9 @@ def _radius_leader_outside(adapter: Any, annotations: list[Any], name: str) -> N
     display.ArrowSide = 1  # swDimArrowsOutside
     if int(display.ArrowSide) != 1:
         raise RuntimeError(f"{name} did not keep its arrow outside the arc")
+    display.SolidLeader = False
+    if bool(display.SolidLeader):
+        raise RuntimeError(f"{name} still draws its solid leader to the centre")
 
 
 def _plain_text(text: str) -> str:
