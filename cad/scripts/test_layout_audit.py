@@ -556,6 +556,28 @@ def test_a_leader_crossing_another_dimension_line_is_found():
     assert "leader-crosses-line" in _kinds(findings)
 
 
+def test_a_hole_callouts_attach_run_is_leader_even_where_it_misses_its_text():
+    """swing, #902 case 2: collect_document tags only the run touching the
+    text as leader, so MHA-091 RD1's rim-to-shelf diagonal read "line" and a
+    leader crossing it passed audit_sheet. The shared audit takes every
+    display line of a hole callout as leader. RD1's lines are the S1 @
+    ac4fa6dd0 dump's; RD3 is moved so its diagonal crosses RD1's."""
+    rd1 = _hole_callout(
+        "RD1",
+        [(0.1773, 0.1361, 0.1884, 0.1042), (0.1762, 0.1393, 0.1773, 0.1361), (0.1884, 0.1042, 0.2400, 0.1042)],
+        [("<MOD-DIAM>6.6 THRU", 0.1900, 0.1042)],
+    )
+    rd3 = _hole_callout(
+        "RD3",
+        [(0.1950, 0.1400, 0.1700, 0.1200), (0.1700, 0.1200, 0.1200, 0.1200)],
+        [("<MOD-DIAM>4.0 THRU", 0.1250, 0.1205)],
+    )
+    findings = audit_dump(_dump(views=[_view("v", (0.05, 0.05, 0.26, 0.26), [rd1, rd3])]))
+    crossings = [f for f in findings if f.kind == "leader-crosses-leader"]
+    assert [{f.a.split()[1], f.b.split()[1]} for f in crossings] == [{"RD1", "RD3"}]
+    assert severity(crossings[0]) is FindingSeverity.GATING
+
+
 def test_dimension_text_over_the_title_block_or_off_the_sheet_is_found():
     """Main's rider: the deleted ``_dim_element`` gave every dimension and hole
     callout the border check and the title-block keep-out (Codex #269 thread
