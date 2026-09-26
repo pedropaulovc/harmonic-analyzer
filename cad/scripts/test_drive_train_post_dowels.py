@@ -137,10 +137,9 @@ def test_step_2_dowels_the_post_before_the_screws_are_tightened() -> None:
     assert -1 not in positions, dict(zip(order, positions))
     assert positions == sorted(positions), dict(zip(order, positions))
     assert "SCREW MHA-016 TO MHA-091" not in step2
-    assert (
-        f"ENGAGEMENT {platform.POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN: NAMED "
-        "EXCEPTION TO RULE 12." in step2
-    )
+    # The floor, and nothing of our governance (Main, S1 round 5).
+    assert f"ENGAGEMENT {platform.POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN." in step2
+    assert "RULE" not in step2 and "EXCEPTION" not in step2
     assert "5.92" not in step2
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "{POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN" in source

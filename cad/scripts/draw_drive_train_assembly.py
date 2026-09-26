@@ -368,8 +368,10 @@ CONE_CRANK_STEPS = "\n".join(
         f"   RECESSED {POST_DOWEL_RECESS:.2f} INTO ITS SLIDE FACE, NEVER PROUD. SLIP MHA-016",
         "   OVER THEM. CUT EACH MHA-142 TO FIT AND CHAMFER THE END: FLUSH TO",
         "   0.3 SHORT OF THE MHA-091 UNDERSIDE, NEVER PROUD (NOMINAL LENGTH",
-        f"   86.0); TIGHTEN BOTH. ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN: NAMED EXCEPTION TO",
-        "   RULE 12.",
+        # The sheet states the floor, not our governance (Main, S1): the
+        # rule-12 exception it relies on is recorded above and in the policy's
+        # Named exceptions table.
+        f"   86.0); TIGHTEN BOTH. ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN.",
         # U30 (user, 2026-09-23, option (a)): one #6-32 button-head screw (W22)
         # up through the MHA-091 slot, height and side set by the shim pack at
         # fit-up. Wording from swing (dt-tip-block-attachment-options-20260923.md
