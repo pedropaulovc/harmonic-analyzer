@@ -5,7 +5,7 @@ output: connecting rods riding the integral cams, the rocker-arm seesaw
 bank on its pivot shaft, the amplitude bars running UP the spine, and the
 top-lever bank on its fulcrum shaft with the channel springs hanging from
 the lever tips, each retained by a stock eyebolt threaded into the plate.
-129 components:
+133 components:
 
 Coordinates are machine frame (#151: crank at machine -X, output side -Z;
 the M6.8 mirror layer is gone).
@@ -21,7 +21,9 @@ the M6.8 mirror layer is gone).
   black foot-and-ear brackets on the rocker-arm-support's top, 78 either
   side of the stack centre so both feet sit ON the support (the old chrome
   pivot-ball-mount pair is retired -- photo-refuted, and its south pillar
-  stood 19 mm past the support's end in mid-air))
+  stood 19 mm past the support's end in mid-air)) + pedestal-hold-down-screw
+  x4 (MHA-143, two down through each foot into the support rail's
+  transferred #8-32 seats -- rocker_bracket_seat_layout)
 * fulcrum-keeper x2 + frame-side-screw x2 (the black shaft-END brackets on
   the top-frame west rail top face -- ch17 p.40 bottom-left / ch30 p008;
   ball centres (199.9, 1061.4, 3.088 +- 88.75), foot screws down into the
@@ -350,6 +352,46 @@ if abs(SOUTH_WASHER_Z[1] - (hub_mid_z(0) - _ROCKER_HUB_LENGTH / 2.0)) > 1e-9:
     raise AssertionError(
         "south thrust washer's north face is not on hub 0's south face"
     )
+# Bracket hold-downs (#743 PR2): two MHA-143 (#8-32 x 3/4 fillister) per
+# bracket, through its #19 foot holes into the support rail's transferred
+# seats. rocker_bracket_seat_layout owns the seats and their worst-case stack;
+# here the screw it assumed must be the part placed, the brackets must stand
+# on the support's centreline, and each head must sit on its foot.
+from build_pedestal_hold_down_screw import (  # noqa: E402
+    HEAD_DIA as _HDSCREW_HEAD_DIA,
+    SHANK_LEN as _HDSCREW_LEN,
+    THREAD as _HDSCREW_THREAD,
+)
+from pivot_bracket_spec import (  # noqa: E402
+    EAR_T as _BRACKET_EAR_T,
+    FOOT_Z1 as _BRACKET_FOOT_Z1,
+    HOLD_DOWN_HOLE_SPEC as _BRACKET_HOLE_SPEC,
+    HOLE_DIA as _BRACKET_HOLE_DIA,
+    HOLE_Z as _BRACKET_HOLE_Z,
+)
+from rocker_arm_support_spec import SUPPORT_WORLD_X as _SUPPORT_WORLD_X  # noqa: E402
+from rocker_bracket_seat_layout import (  # noqa: E402
+    SCREW_LENGTH as _SEAT_SCREW_LENGTH,
+    SCREW_MAJOR_DIA as _SEAT_SCREW_MAJOR_DIA,
+    SCREW_THREAD as _SEAT_SCREW_THREAD,
+    SEAT_MACHINE_XZ as BRACKET_SCREW_XZ,
+)
+
+if (
+    _HDSCREW_THREAD != _SEAT_SCREW_THREAD
+    or abs(_HDSCREW_LEN - _SEAT_SCREW_LENGTH) > 1e-9
+):
+    raise AssertionError("rocker_bracket_seat_layout's screw is not the MHA-143 placed")
+if abs(PIVOT[0] - _SUPPORT_WORLD_X) > 1e-9:
+    raise AssertionError("pivot brackets are off the rocker-arm-support's centreline")
+if _BRACKET_HOLE_SPEC.kind != "drilled_number" or not (
+    _SEAT_SCREW_MAJOR_DIA < _BRACKET_HOLE_DIA < _HDSCREW_HEAD_DIA
+):
+    raise AssertionError("bracket foot hole does not pass the #8 screw under its head")
+if min(_BRACKET_HOLE_Z) - _HDSCREW_HEAD_DIA / 2.0 < _BRACKET_EAR_T / 2.0 or (
+    max(_BRACKET_HOLE_Z) + _HDSCREW_HEAD_DIA / 2.0 > _BRACKET_FOOT_Z1
+):
+    raise AssertionError("a bracket hold-down head overhangs its foot")
 RAIL_TOP_Y = 1036.2  # new top-frame casting top face (was 1040.7; the rederive
 # dropped the rail top 4.5 -- the ball-mount seats and the whole fulcrum chain
 # follow)
@@ -911,6 +953,20 @@ async def build(adapter) -> dict[str, str]:
         label="rocker-thrust-washer south",
     )
     await _locate_to_datum(adapter, washer)
+    # Bracket hold-downs (MHA-143): head down on each bracket foot's top,
+    # over the rail seat rocker_bracket_seat_layout derived from its hole.
+    # Free-space here (the support is the frame's), datum-located likewise.
+    for screw_x, screw_z in BRACKET_SCREW_XZ:
+        hold_down = await place_component(
+            adapter,
+            "pedestal-hold-down-screw",
+            [screw_x, SUPPORT_APEX_Y + PIVOT_BRACKET_FOOT_H, screw_z],
+            [0.0, 0.0, 0.0],
+            IDENTITY,
+            ground=False,
+            label=f"pivot-bracket hold-down z{screw_z:+.1f}",
+        )
+        await _locate_to_datum(adapter, hold_down)
     # Fulcrum end keepers (MHA-120): the black shaft-END brackets of the
     # ch17 p.40 closeup -- an upright lug sockets a ball on each shaft end,
     # the foot screwed down to the rail top face. Part +X points outboard

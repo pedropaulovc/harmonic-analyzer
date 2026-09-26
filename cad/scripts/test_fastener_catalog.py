@@ -26,7 +26,7 @@ _EXPECTED = {
     "hex-bolt": (("92865A585",), "MHA-036", None),
     "knife-hanger-stud": (("91247A720",), "MHA-119", 2),
     "lag-screw": (("92240A540",), "MHA-039", 4),
-    "pedestal-hold-down-screw": (("90280A197",), "MHA-143", 2),
+    "pedestal-hold-down-screw": (("90280A197",), "MHA-143", 6),
     "pen-set-screw": (("99607A213",), "MHA-052", 1),
     "post-mount-screw": (("40923898",), "MHA-142", 2),
     "slotted-screw": (("90280A201",), "MHA-101", 4),
