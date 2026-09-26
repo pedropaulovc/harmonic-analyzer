@@ -1979,3 +1979,14 @@ def test_the_r8_0_stands_near_its_corner() -> None:
         assert not _drawing_leaders.segments_cross(segment, _D382_NORTH_WEST_X_WITNESS)
     box = drawing._centred_box(text, (0.0151, 0.0035))
     assert _box_gap(box, _D382_NORTH_WEST_X_TEXT) >= 0.005
+
+
+def test_feature_plan_caption_names_what_the_view_carries() -> None:
+    """#917 S1: the post taps are transferred and the dowels match-reamed, so
+    the feature plan keeps no location dimension; it carries the pivot, tap
+    and dowel hole callouts.  Its caption says so instead of promising
+    locations."""
+    assert drawing.FEATURE_KEEP == {}
+    assert "LOCATION" not in spec.FEATURE_VIEW_NOTE
+    assert spec.FEATURE_VIEW_NOTE == "HOLES — SCALE 1:2"
+    assert not any(ch.isdigit() for ch in spec.FEATURE_VIEW_NOTE.split("SCALE")[0])

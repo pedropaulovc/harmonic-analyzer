@@ -498,6 +498,6 @@ def assert_notch_stud_stack(
 # labels.  The split plans are named so each dimension set has an unambiguous
 # owner; these are view captions, not manufacturing notes.
 PROFILE_VIEW_NOTE = "PLATE PROFILE — SCALE 1:2"
-FEATURE_VIEW_NOTE = "HOLE LOCATIONS — SCALE 1:2"
+FEATURE_VIEW_NOTE = "HOLES — SCALE 1:2"
 NOTCH_VIEW_NOTE = "LOCK NOTCH — SCALE 1:2"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
