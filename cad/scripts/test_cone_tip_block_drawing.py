@@ -411,7 +411,6 @@ def test_plan_values_stand_off_the_part_and_each_other() -> None:
     than the A-A arrow: the slot's location from -X (r3's datum)."""
     keep = drawing.TOP_KEEP
     half_width = drawing.VALUE_TEXT_HALF_WIDTH
-    half_height = drawing.VALUE_TEXT_HALF_HEIGHT
     plan_left = drawing.TOP_CENTER[0] - part.BLOCK_X * drawing._S / 2.0
     plan_right = drawing.TOP_CENTER[0] + part.BLOCK_X * drawing._S / 2.0
     south_face = -part.BLOCK_Z / 2.0
@@ -455,10 +454,18 @@ def test_plan_values_stand_off_the_part_and_each_other() -> None:
     loc_x, loc_y = keep["FlangeSlotX"]
     assert plan_left < loc_x < drawing.TOP_CENTER[0]
     assert loc_y - drawing._plan_y(drawing.Z_SOUTH) >= 0.015
+    location_line_y = loc_y - drawing.HORIZONTAL_LINE_DROP
+    # Higher than the A-A arrow: the location's line (and the value on it)
+    # clears the south cutting-plane arrow's head and its letter by
+    # TEXT_CLEARANCE.
+    south_arrow = drawing.sheet_dimension_ink()["section A south"]
+    arrow_top = max(y for segment in south_arrow.arrows for _x, y in segment)
+    south_letter = drawing.sheet_text_boxes()["section A south"]
+    for top in (arrow_top, south_letter[3]):
+        assert top + drawing.TEXT_CLEARANCE <= location_line_y
     # VIEW C's letter, left of the stem, now stands under the location's
     # value (r3): clear of the value and of its line by TEXT_CLEARANCE.
     letter = drawing.sheet_text_boxes()["view C letter"]
-    location_line_y = loc_y - drawing.HORIZONTAL_LINE_DROP
     assert letter[3] + drawing.TEXT_CLEARANCE <= location_line_y
     assert letter[2] <= drawing.TOP_CENTER[0]
 
