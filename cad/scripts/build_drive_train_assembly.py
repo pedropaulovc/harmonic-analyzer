@@ -827,6 +827,7 @@ from cone_swing_platform_spec import (  # noqa: E402
     POST_MOUNT_SPEC,
     POST_MOUNT_TAP_EDGE_BREAK,
     POST_MOUNT_THREAD_DIA,
+    PLATE_STOCK_BAND as PLAT_STOCK_BAND,
 )
 from cone_tip_shim_spec import (  # noqa: E402
     SHIM_NORTH_Z as TIP_SHIM_NORTH_Z,
@@ -848,6 +849,7 @@ from build_cone_lock_knob import (  # noqa: E402
 )
 from build_cone_pivot_screw import (  # noqa: E402
     HEAD_DIA as PSCREW_HEAD_DIA,
+    HEAD_H as PSCREW_HEAD_H,
     SHOULDER_DIA as PSCREW_SHOULDER_DIA,
     SHOULDER_LEN as PSCREW_SHOULDER_LEN,
     THREAD as PSCREW_THREAD,
@@ -1025,7 +1027,9 @@ from cone_tip_block_spec import (  # noqa: E402
     BLOCK_Z as TIP_BLOCK_Z,
     FIT_UP_SHIM_MARGIN_MM as TIP_FIT_UP_SHIM_MARGIN_MM,
     FLANGE_LEN as TIP_FLANGE_LEN,
+    FOOT_SHIM_RANGE_MM as TIP_FOOT_SHIM_RANGE,
     HEEL_RELIEF_DEPTH as TIP_HEEL_RELIEF_DEPTH,
+    HEEL_RELIEF_HEIGHT as TIP_HEEL_RELIEF_HEIGHT,
     PASSAGE_CENTER_DATUM as TIP_PASSAGE_CENTER_DATUM,
     PINCH_BORE_SPEC as TIP_PINCH_BORE_SPEC,
     PINCH_CLEARANCE_SPEC as TIP_PINCH_CLEARANCE_SPEC,
@@ -1053,6 +1057,7 @@ from build_cone_tip_pinch_screw import (  # noqa: E402
     THREAD as PINCH_THREAD,
 )
 from cone_gear_shaft_spec import (  # noqa: E402
+    DRAWING_PRECISION_BY_NAME as SHAFT_DRAWING_PRECISION,
     ADJUSTER_EMBED as ADJ_EMBED,
     FRONT_STUB as SHAFT_FRONT_STUB,
     SECTIONS as SHAFT_SECTIONS,
@@ -1418,14 +1423,51 @@ _require_tapped_thread(
     "cone pivot", PSCREW_THREAD, BASE_PIVOT_SEAT_SPEC, kind="tapped_bottoming"
 )
 require_base_seat_fit("cone pivot", BASE_PIVOT_SEAT_SPEC, PSCREW_THREAD_TAIL_LEN)
-# The pivot-screw head sits on the plate top at station PIVOT_STATION; the
-# tip block (also on the plate) ends at station 191.  The stock 3/8-in head
-# retains at least 0.20 mm air to its north face.
-if (
-    PSCREW_HEAD_DIA / 2.0
-    > (PIVOT_STATION - (TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0)) - 0.20
+# I31 heel relief, judged at the worst case: the pivot-screw head stands on
+# its shoulder at station PIVOT_STATION, only HEEL_NOMINAL_GAP off the block's
+# north face.  At fit-up the block's north face follows the shaft tip (the
+# cup seats at a fixed embed from that face), so it can come north by the
+# shaft's overall-length band (Sec4End); the head floats in the plate's pivot
+# hole (drilled band on the hole, stock shoulder).  The relief must clear the
+# head by HEEL_AIR in plan at that extreme, and in height from the lowest foot
+# (thinnest stock plate, thinnest shim stack) to the head top.  The block
+# spec's printed .XX values must cover both, at their own low limits, and be
+# sized from them (no oversize past one .XX band, rounded up).
+_GENERAL_1PL_MM = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
+_GENERAL_2PL_MM = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+_DRILLED_HOLE_PLUS_MM = float(
+    str(_config.title_block("drilled_hole")["display_plus"]).lstrip("+")
+)
+_BAND_BY_PLACES = {1: _GENERAL_1PL_MM, 2: _GENERAL_2PL_MM}
+HEEL_AIR = 0.20
+HEEL_NOMINAL_GAP = (
+    PIVOT_STATION - (TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0)
+) - PSCREW_HEAD_DIA / 2.0
+HEEL_TIP_TRAVEL = _BAND_BY_PLACES[SHAFT_DRAWING_PRECISION["Sec4End"]]
+HEEL_HEAD_FLOAT = (
+    PLAT_PIVOT_HOLE_DIA + _DRILLED_HOLE_PLUS_MM - PSCREW_SHOULDER_DIA
+) / 2.0
+HEEL_DEPTH_REQUIRED = HEEL_TIP_TRAVEL + HEEL_HEAD_FLOAT + HEEL_AIR - HEEL_NOMINAL_GAP
+HEEL_HEIGHT_REQUIRED = (
+    (PSCREW_SHOULDER_LEN + PSCREW_HEAD_H)
+    - (PLAT_T - PLAT_STOCK_BAND + TIP_FOOT_SHIM_RANGE[0])
+    + HEEL_AIR
+)
+for _lbl, _printed, _required in (
+    ("depth", TIP_HEEL_RELIEF_DEPTH, HEEL_DEPTH_REQUIRED),
+    ("height", TIP_HEEL_RELIEF_HEIGHT, HEEL_HEIGHT_REQUIRED),
 ):
-    raise AssertionError("pivot-screw head reaches the tip block's north face")
+    if _printed - _GENERAL_2PL_MM < _required - 1e-9:
+        raise AssertionError(
+            f"tip-block heel relief {_lbl} {_printed:.2f} .XX does not clear the "
+            f"pivot-screw head at the worst case (needs {_required:.3f} at its "
+            "low limit)"
+        )
+    if _printed > math.ceil((_required + _GENERAL_2PL_MM) * 100.0 - 1e-6) / 100.0:
+        raise AssertionError(
+            f"tip-block heel relief {_lbl} {_printed:.2f} is not sized from the "
+            f"worst-case stack ({_required:.3f} + .XX band)"
+        )
 
 
 # --- cone lock knob and swing stop -------------------------------------------
