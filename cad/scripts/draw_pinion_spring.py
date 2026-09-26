@@ -370,10 +370,27 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, top, iso):
         set_hidden_lines_removed(adapter, view)
 
+    # The kink detail is created and dimensioned FIRST, while nothing is on
+    # the sheet: KinkR and FlatLen live in SpringProfile with the profile's
+    # FootLen and BendR, so the profile's targeted import delivers them too.
+    # pc-r10 (37495ac47) ran the profile first and deleted the pair; the
+    # detail's import then brought KinkR back but not FlatLen.  A dimension
+    # already on the sheet is never imported again (the arbor's detail A
+    # imports first for the same reason), so the profile's import now skips
+    # the pair the detail holds.  The detail is derived from the front view
+    # while the part still hides FreeForm, so it shows the installed crest
+    # alone.
+    detail = _kink_detail(adapter, front)
+    set_hidden_lines_removed(adapter, detail)
+    detail_annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="kink detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     # The front view imports the part-hidden FreeForm reference sketch, so it
     # takes the opt-in curation that shows it (the phantom) in this view only.
-    # The kink detail is derived from it and is created while the part still
-    # hides the sketch, so it shows the installed crest alone.
     front_annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         front,
@@ -386,15 +403,6 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         keep=TOP_KEEP,
         view_label="blank top",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    detail = _kink_detail(adapter, front)
-    set_hidden_lines_removed(adapter, detail)
-    detail_annotations = curate_view_dimensions(
-        adapter,
-        detail,
-        keep=DETAIL_KEEP,
-        view_label="kink detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = [*front_annotations, *top_annotations, *detail_annotations]
