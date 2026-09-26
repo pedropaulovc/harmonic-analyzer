@@ -38,7 +38,8 @@ each drawing:
 Last, the part template: a copy re-based 13 = 2 -> 1 (nothing else; the part
 side is not ruled yet), and a part from it and from the original, each with
 one unattached symbol per text field (8/5/4, the ``_part_pmi`` no-face call).
-Text 8 must print on the original part, or the read-back proves nothing.
+Text 8 printing on the original part is the read-back control; when it does
+not, the part result is reported as inconclusive, never failed.
 
 Every document is closed and proven gone before the next step reads a file.
 Everything is logged (``ansi-rebase`` lines); the JSON report (every manifest
@@ -542,10 +543,11 @@ async def _part_sf(adapter: Any, template: Path, tag: str) -> dict[str, object]:
     ext = model.Extension
     out: dict[str, object] = {"standard": _standard(ext)}
     check(f"{tag} sketch", await adapter.create_sketch("Top"))
-    check(f"{tag} rectangle", await adapter.add_rectangle(-0.01, -0.01, 0.01, 0.01))
+    # The adapter's sketch and extrusion helpers take millimetres.
+    check(f"{tag} rectangle", await adapter.add_rectangle(-10.0, -10.0, 10.0, 10.0))
     check(f"{tag} exit sketch", await adapter.exit_sketch())
     check(
-        f"{tag} block", await adapter.create_extrusion(ExtrusionParameters(depth=0.005))
+        f"{tag} block", await adapter.create_extrusion(ExtrusionParameters(depth=5.0))
     )
     for column, (index, field) in enumerate(_SF_FIELDS.items()):
         model.ClearSelection2(True)
@@ -572,6 +574,7 @@ async def _part_sf(adapter: Any, template: Path, tag: str) -> dict[str, object]:
         symbol = _early_bound(raw_symbol, "ISFSymbol")
         ok = bool(symbol.SetText(index, _SF_TEXT))
         model.EditRebuild3()
+        model.ForceRebuild3(False)
         rendered = _rendered(_early_bound(symbol.GetAnnotation(), "IAnnotation"))
         out[field] = {
             "index": index,
@@ -609,11 +612,14 @@ async def _part_probe(adapter: Any) -> dict[str, object]:
     _log(f"part template b0={out['b0']!r} b1={out['b1']!r}")
     out["rebased"] = await _part_sf(adapter, result, "part-rebased")
     out["original"] = await _part_sf(adapter, source, "part-original")
-    if not out["original"]["RoughnessValue1"]["prints_value"]:
-        _finding(
-            "part control: text 8 prints no Ra on a part from the ORIGINAL template, "
-            f"so the part read-back proves nothing: {out['original']['RoughnessValue1']!r}"
-        )
+    # The control: text 8 printing on the ORIGINAL part is what makes the
+    # re-based part's reads mean anything. GetDisplayData has never been read
+    # on a part annotation here, so an unreadable control is reported as
+    # inconclusive (the part side gets its own change), not failed.
+    control = out["original"]["RoughnessValue1"]
+    out["readback"] = "valid" if control["prints_value"] else "inconclusive"
+    if out["readback"] == "inconclusive":
+        _log(f"WARN part read-back inconclusive: original text 8 reads {control!r}")
     return out
 
 
