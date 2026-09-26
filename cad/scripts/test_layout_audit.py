@@ -2099,6 +2099,32 @@ def test_a_split_circle_balloons_separator_moves_with_its_ring():
     )
 
 
+def test_a_short_leaders_arrowhead_keeps_its_registered_geometry():
+    """Codex P2 on the ring move: a short leader can put its arrowhead's base
+    inside the COM circle; the arrow is not balloon body, so none of it moves
+    (a moved base would detach it from its own sides and tip)."""
+    cx, cy, radius = balloon_circle(DTA_BALLOON_17["display"])
+    tip = (cx + radius + 0.0003, cy)
+    arrow = [*tip, 0.0, -1.0, 0.0, 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]
+    short = {
+        **DTA_BALLOON_17,
+        "leaders": [[cx + radius, cy, 0.0, *tip, 0.0]],
+        "display": {
+            **DTA_BALLOON_17["display"],
+            "lines": [[0.0, 0.0, 0.0, 0.0, cx + radius, cy, 0.0, *tip, 0.0]],
+            "arrows": [arrow],
+        },
+    }
+    base = arrowhead_segments(arrow)
+    assert any(
+        all(math.hypot(x - cx, y - cy) < radius for x, y in ((s.x0, s.y0), (s.x1, s.y1))) for s in base
+    ), "fixture: the arrowhead's base must lie inside the COM circle"
+    [balloon] = [a for a in sheet_model(_balloon_17_dump(short)).geometry.annotations if a.kind == "balloon"]
+    assert balloon.circle != (cx, cy, radius)
+    arrows = [s for s in balloon.segments if s.role == "arrow"]
+    assert arrows == base
+
+
 def test_a_balloon_leader_leaving_its_ring_and_an_edge_past_its_corner_are_not_findings():
     """28 leader-through-own-text on drive-train-assembly: the balloon's text
     box was the COM circle's bounding square, so every leader leaving the rim
