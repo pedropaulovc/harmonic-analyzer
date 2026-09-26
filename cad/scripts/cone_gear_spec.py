@@ -314,7 +314,7 @@ def _bonded_fit_band() -> tuple[float, float]:
 
 def _t006_web_upper() -> float:
     """Largest bore deviation that leaves T006 its named web, to print places."""
-    web_cap = FLOOR_LIMITS_MM[6][0] - 2.0 * WEB_EXCEPTIONS_MM[6] - bore_dia_mm(6)
+    web_cap = floor_limits_mm(6)[0] - 2.0 * WEB_EXCEPTIONS_MM[6] - bore_dia_mm(6)
     scale = 10**BORE_BAND_PLACES
     return math.floor(web_cap * scale + 1e-9) / scale
 

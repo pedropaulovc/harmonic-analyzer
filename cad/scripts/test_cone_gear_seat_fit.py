@@ -104,7 +104,7 @@ def test_the_band_upper_is_the_lower_of_its_two_named_limits() -> None:
         )
     )
     web_cap = (
-        spec.FLOOR_LIMITS_MM[6][0]
+        spec.floor_limits_mm(6)[0]
         - 2.0 * spec.WEB_EXCEPTIONS_MM[6]
         - spec.bore_dia_mm(6)
     )
@@ -118,6 +118,6 @@ def test_the_band_upper_is_the_lower_of_its_two_named_limits() -> None:
 
 def test_the_t006_web_caps_the_bore_band() -> None:
     # The largest T006 bore under its printed MIN floor keeps the named web.
-    floor_min = spec.FLOOR_LIMITS_MM[6][0]
+    floor_min = spec.floor_limits_mm(6)[0]
     largest_bore = spec.bore_dia_mm(6) + spec.BORE_DIA_BAND[0]
     assert (floor_min - largest_bore) / 2.0 >= spec.WEB_EXCEPTIONS_MM[6] - 1e-9
