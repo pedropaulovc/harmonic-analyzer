@@ -1411,6 +1411,8 @@ class _ArborView:
         self.turns = kw.get("turns", True)
         self.status = kw.get("status", 1)
         self.crop_called = False
+        # What the seat reports back for the crop's outline style.
+        self.boundary = kw.get("boundary")
         # False: IsCropped claims a crop but the outline never shrinks.
         self.outline_shrinks = kw.get("outline_shrinks", True)
 
@@ -1438,7 +1440,21 @@ class _ArborView:
     def Crop2(self, jagged, no_outline, intensity):  # noqa: N802
         self.seat.log.append(("crop2", self.name, jagged, no_outline, intensity))
         self.crop_called = True
+        if self.boundary is None:
+            self.boundary = (jagged, no_outline, intensity)
         return self.status
+
+    @property
+    def CropViewJaggedOutline(self):  # noqa: N802
+        return self.boundary[0]
+
+    @property
+    def CropViewNoOutline(self):  # noqa: N802
+        return self.boundary[1]
+
+    @property
+    def CropViewJaggedShapeIntensity(self):  # noqa: N802
+        return self.boundary[2]
 
     def IsCropped(self):  # noqa: N802
         return self.cropped
@@ -1597,7 +1613,16 @@ def test_detail_a_is_a_cropped_2_to_1_model_view_turned_like_the_profile(
     cx, cy, _, px, py, _ = xyz
     assert (cx, cy) == pytest.approx(drawing.DETAIL_CENTER)
     assert math.dist((cx, cy), (px, py)) == pytest.approx(drawing.DETAIL_CROP_RADIUS)
-    assert seat.log[-1] == ("crop2", "Drawing View4", False, False, 5)
+    # F1: the boundary where the crop cuts the neck is a freehand break (the
+    # jagged outline), not a smooth arc reading as a domed end.
+    assert seat.log[-1] == (
+        "crop2",
+        "Drawing View4",
+        True,
+        False,
+        drawing.DETAIL_BREAK_INTENSITY,
+    )
+    assert 1 <= drawing.DETAIL_BREAK_INTENSITY <= 5
     assert seat.AddToDB is False
 
 
@@ -1608,6 +1633,8 @@ def test_detail_a_is_a_cropped_2_to_1_model_view_turned_like_the_profile(
         ({"status": 2}, "not cropped"),
         ({"turns": False}, "turn detail A"),
         ({"outline_shrinks": False}, "crop did not take"),
+        ({"boundary": (False, False, 5)}, "not the freehand break"),
+        ({"boundary": (True, True, 3)}, "not the freehand break"),
     ],
 )
 def test_detail_a_fails_loud_when_the_crop_or_the_turn_did_not_take(
@@ -1683,3 +1710,46 @@ def test_note_read_back_tolerates_how_a_multi_line_note_returns() -> None:
     assert not drawing._is_note_text("SCALE 2 : 1", label)
     assert drawing._is_note_text("A", drawing.DETAIL_LETTER)
     assert not drawing._is_note_text("A B", drawing.DETAIL_LETTER)
+
+
+class _RadiusDisplay:
+    def __init__(self, keeps: bool) -> None:
+        self.keeps = keeps
+        self._side = 0  # swDimArrowsSmart
+
+    @property
+    def ArrowSide(self):  # noqa: N802 - the COM member name
+        return self._side
+
+    @ArrowSide.setter
+    def ArrowSide(self, value):  # noqa: N802 - the COM member name
+        if self.keeps:
+            self._side = value
+
+
+class _RadiusAnnotation:
+    def __init__(self, name: str, keeps: bool = True) -> None:
+        self.name = name
+        self.display = _RadiusDisplay(keeps)
+
+    def GetSpecificAnnotation(self):  # noqa: N802 - the COM member name
+        return self.display
+
+
+def test_sr_leader_reaches_the_crown_from_outside(monkeypatch) -> None:
+    """F2 (Main, pc-r6): the SR10.9 leader ran from the crown's centre through
+    the cross hole; its arrow now sits outside the arc, and a seat that drops
+    the setting fails loud."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(drawing, "dimension_name", lambda adapter, a: a.name)
+    annotations = [_RadiusAnnotation("HeadLen"), _RadiusAnnotation("HeadCapR")]
+    drawing._radius_leader_outside(None, annotations, "HeadCapR")
+    assert annotations[1].display.ArrowSide == 1  # swDimArrowsOutside
+    assert annotations[0].display.ArrowSide == 0
+    stuck = [_RadiusAnnotation("HeadCapR", keeps=False)]
+    with pytest.raises(RuntimeError, match="arrow outside the arc"):
+        drawing._radius_leader_outside(None, stuck, "HeadCapR")
+    with pytest.raises(RuntimeError, match="expected one HeadCapR"):
+        drawing._radius_leader_outside(None, annotations[:1], "HeadCapR")
+    source = inspect.getsource(drawing.build)
+    assert '_radius_leader_outside(adapter, detail_annotations, "HeadCapR")' in source
