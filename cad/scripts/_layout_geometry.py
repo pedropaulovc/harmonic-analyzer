@@ -300,6 +300,11 @@ def segment_box_distance(segment: Segment, box: Box) -> float:
     )
 
 
+def point_segment_distance(point: tuple[float, float], segment: Segment) -> float:
+    """Shortest distance from ``point`` to ``segment``."""
+    return _point_segment_distance(point, segment)
+
+
 def segment_circle_distance(segment: Segment, circle: tuple[float, float, float]) -> float:
     """Shortest distance from ``segment`` to the disc ``(cx, cy, radius)``;
     0 when it touches or enters it."""

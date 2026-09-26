@@ -65,6 +65,7 @@ from _layout_geometry import (
     find_border_breaches,
     find_leader_crossings,
     find_text_on_line,
+    point_segment_distance,
     segment_box_distance,
     segment_circle_distance,
     text_overlap,
@@ -146,6 +147,9 @@ INK_MATCH_WINDOW_M = 0.003
 # Model edges print as 0.25 mm solid black strokes (annotation ink 0.18 mm,
 # section lines 0.35 mm, the frame and title block grey).
 MODEL_EDGE_WIDTH_M = (0.00022, 0.00030)
+# A dashed stroke whose ends both lie within this of an annotation's segment
+# is that annotation's ink, not a hidden model edge.
+HIDDEN_EDGE_ON_ANNOTATION_M = 0.0001
 
 # Symbol tokens IDisplayData returns unresolved; each renders as ONE glyph.
 _TOKEN = re.compile(r"<[^<>]+>")
@@ -502,6 +506,45 @@ def ink_edges(dump: Mapping[str, Any]) -> list[Segment]:
     ]
 
 
+def ink_dashed_strokes(dump: Mapping[str, Any]) -> list[Segment]:
+    """The page's dashed strokes no wider than a model edge: hidden edges
+    (Hidden Lines Visible prints them at 0.18 mm) among centre marks,
+    cosmetic threads and other annotations' dashes, which
+    ``_hidden_model_edges`` separates."""
+    return [
+        Segment(*_floats(raw)[:4], "hidden")
+        for raw in (dump.get("ink") or {}).get("strokes", ())
+        if float(raw[4]) <= MODEL_EDGE_WIDTH_M[1] and raw[5]
+    ]
+
+
+def _hidden_model_edges(
+    dashed: Sequence[Segment], annotations: Sequence[AnnotationGeometry], tol: float = HIDDEN_EDGE_ON_ANNOTATION_M
+) -> list[Segment]:
+    """The dashed strokes that are NOT an annotation's own ink: the pieces
+    whose both ends lie on some annotation segment (a centre mark, a thread,
+    a dimension's dashed extension) belong to that annotation."""
+    own = [
+        segment
+        for annotation in annotations
+        if annotation.kind != "geometry"
+        for segment in annotation.segments
+    ]
+    grid = SegmentGrid(list(enumerate(own)))
+
+    def on_annotation(dash: Segment) -> bool:
+        reach = Box(
+            min(dash.x0, dash.x1) - tol, min(dash.y0, dash.y1) - tol, max(dash.x0, dash.x1) + tol, max(dash.y0, dash.y1) + tol
+        )
+        return any(
+            point_segment_distance((dash.x0, dash.y0), segment) <= tol
+            and point_segment_distance((dash.x1, dash.y1), segment) <= tol
+            for _index, segment in grid.near(reach)
+        )
+
+    return [dash for dash in dashed if not on_annotation(dash)]
+
+
 def _anchor(box: Box, reference: int) -> tuple[float, float]:
     fx, fy = _TEXT_ANCHORS.get(reference, (0.0, 0.0))
     return box.xmin + fx * box.width, box.ymin + fy * box.height
@@ -519,8 +562,11 @@ def match_ink_indices(
     Candidates share the item's ink string and sit within ``INK_MATCH_WINDOW_M``
     plus one text height of its reference point, compared to the same point of
     the span's box (``GetTextRefPositionAtIndex``: lower-left, centre, ...).
-    The closest pairs are taken first and each span serves one item, so six
-    "13.12"s on one sheet cannot claim the same run. Symbol-only items
+    Each span serves one item, so six "13.12"s on one sheet cannot claim the
+    same run, and the assignment is complete before it is short: as many
+    items as possible are matched, then at the least total distance
+    (``_assign``) -- nearest-first could hand a flexible item the one span a
+    constrained item needed. Symbol-only items
     (``<MOD-DIAM>``) print as paths, not text, and never match. A run with a
     symbol INSIDE it may print as one text object per side of the symbol's
     path; it then matches those pieces left to right along its baseline.
@@ -529,7 +575,7 @@ def match_ink_indices(
     by_key: dict[str, list[int]] = {}
     for index, span in enumerate(spans):
         by_key.setdefault(span.key, []).append(index)
-    pairs = []
+    costs: dict[str, dict[tuple[Any, int], float]] = {}
     for key, item in items:
         wanted = ink_key(item.text)
         if not wanted:
@@ -541,13 +587,12 @@ def match_ink_indices(
             ax, ay = _anchor(spans[index].box, item.reference)
             dx, dy = abs(ax - item.x), abs(ay - item.y)
             if dx < window and dy < window:
-                pairs.append((dx + dy, key, index))
+                costs.setdefault(wanted, {})[(key, index)] = dx + dy
     matched: dict[Any, tuple[int, ...]] = {}
-    for _cost, key, index in sorted(pairs, key=lambda pair: pair[0]):
-        if key in matched or index in used:
-            continue
-        matched[key] = (index,)
-        used.add(index)
+    for group in costs.values():
+        for key, index in _assign(group):
+            matched[key] = (index,)
+            used.add(index)
     for key, item in items:
         if key in matched:
             continue
@@ -575,6 +620,53 @@ def match_ink_indices(
             matched[key] = tuple(chosen)
             used.update(chosen)
     return matched
+
+
+def _assign(costs: Mapping[tuple[Any, int], float]) -> list[tuple[Any, int]]:
+    """The most (row, column) pairs of ``costs`` sharing no row or column, at
+    the least total cost among those: the Hungarian method on a square
+    matrix where a missing pair costs more than any complete assignment."""
+    rows = sorted({row for row, _ in costs}, key=repr)
+    cols = sorted({col for _, col in costs})
+    size = max(len(rows), len(cols))
+    forbidden = 1.0 + sum(costs.values())
+    grid = [
+        [costs.get((rows[i], cols[j]), forbidden) if i < len(rows) and j < len(cols) else forbidden
+         for j in range(size)]
+        for i in range(size)
+    ]
+    # e-maxx formulation, 1-based: u/v potentials, owner[j] = row on column j.
+    u, v, owner, way = [0.0] * (size + 1), [0.0] * (size + 1), [0] * (size + 1), [0] * (size + 1)
+    for i in range(1, size + 1):
+        owner[0], j0 = i, 0
+        low, done = [math.inf] * (size + 1), [False] * (size + 1)
+        while owner[j0]:
+            done[j0] = True
+            i0, delta, j1 = owner[j0], math.inf, 0
+            for j in range(1, size + 1):
+                if done[j]:
+                    continue
+                reduced = grid[i0 - 1][j - 1] - u[i0] - v[j]
+                if reduced < low[j]:
+                    low[j], way[j] = reduced, j0
+                if low[j] < delta:
+                    delta, j1 = low[j], j
+            for j in range(size + 1):
+                if done[j]:
+                    u[owner[j]] += delta
+                    v[j] -= delta
+                else:
+                    low[j] -= delta
+            j0 = j1
+        while j0:
+            j1 = way[j0]
+            owner[j0] = owner[j1]
+            j0 = j1
+    return [
+        (rows[owner[j] - 1], cols[j - 1])
+        for j in range(1, size + 1)
+        if owner[j] - 1 < len(rows) and j - 1 < len(cols) and (rows[owner[j] - 1], cols[j - 1]) in costs
+    ]
 
 
 def _union(boxes: Iterable[Box]) -> Box:
@@ -1457,6 +1549,20 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
                     exact=True,
                 )
             )
+    # Hidden Lines Visible edges print dashed: they are view geometry too, so
+    # text over one is text on a line. Attributed like the solid edges, once
+    # every annotation's own dashes are known.
+    hidden = view_edges(_hidden_model_edges(ink_dashed_strokes(dump), annotations), outlines)
+    for name, dashes in hidden.items():
+        index = next(
+            (i for i, a in enumerate(annotations) if a.kind == "geometry" and a.owner == name), None
+        )
+        if index is None:
+            annotations.append(
+                AnnotationGeometry(label=f"view {name} geometry", kind="geometry", owner=name, segments=tuple(dashes))
+            )
+            continue
+        annotations[index] = replace(annotations[index], segments=(*annotations[index].segments, *dashes))
     geometry = SheetGeometry(
         name=str(dump.get("sheet", "")),
         width=width,
