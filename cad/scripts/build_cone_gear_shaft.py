@@ -16,8 +16,9 @@ yellow metal soldered on.
 
 Sections, FRONT STUB end at z = 0.  The v2 post puts that end at cone
 station -61.9068609979, 1.0 mm proud of the post front face.  An integral
-Ø12.2308 journal runs to z = 43.011 in the post's Ø12.2808 bore, then
-steps to the existing 3/8 in gear-seat shaft. M6.7
+Ø12.2308 journal runs to z = 43.011 in the post's Ø12.2808 bore, where an
+integral Ø15.0 thrust collar (#914) fills the 1.681 to the 64T and bears on
+the post's north boss face, then steps to the existing 3/8 in gear-seat shaft. M6.7
 (true-cone mesh, see the assembly docstring): gear seats at the
 exact-tracking stack pitch 6.8889 mm (= drum z-pitch 7.0565 x
 cos 12.52 deg), seat centres at FRONT_STUB + 28.25 + 6.8889 j, gear
@@ -94,6 +95,10 @@ from _fit_limits import deviations
 from _gear import volume_check
 from _part_pmi import author_part_pmi
 from cone_gear_shaft_spec import (
+    COLLAR_DIA,
+    COLLAR_END_STATION,
+    COLLAR_START_STATION,
+    COLLAR_THICKNESS,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -144,6 +149,9 @@ async def build(adapter) -> dict[str, str]:
     for i, (dia_in, end_z) in enumerate(SECTIONS):
         await set_global(adapter, f"SecDia{i}", f"{dia_in * IN}mm")
         await set_global(adapter, f"SecEnd{i}", f"{end_z}mm")
+    await set_global(adapter, "CollarDia", f"{COLLAR_DIA}mm")
+    await set_global(adapter, "CollarEnd", f"{COLLAR_END_STATION}mm")
+    await set_global(adapter, "CollarWidth", f"{COLLAR_THICKNESS}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -213,14 +221,78 @@ async def build(adapter) -> dict[str, str]:
         await volume_check(adapter, label, volume, 0.005 * volume)
         prev_end = end_z
 
-    # Shoulder roots.  ONE constant-radius fillet over all four internal step
-    # edges, each picked by a point on the SMALLER land's circle at that
+    # Thrust collar (#914): the ring from the journal end to the 64T, the one
+    # land that is not contained in its neighbour, so it is sketched on a
+    # plane at its north face and extruded back one web onto the 3/8 in land.
+    # CollarEnd drives the plane and CollarWidth the web, so the knobs move
+    # the collar rather than only a depth.
+    label = f"collar d{COLLAR_DIA:g}mm to z={COLLAR_END_STATION:g}"
+    check(
+        f"create_plane end of {label}",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Front Plane", offset=COLLAR_END_STATION
+            )
+        ),
+    )
+    name_last_feature(adapter, "CollarEndPlane")
+    plane_dim = name_dimensions(adapter, "CollarEndPlane", ["CollarStation"])
+    drive_jobs += [(plane_dim[0], '"CollarEnd"')]
+    collar = SketchDims()
+    check(f"create_sketch {label}", await adapter.create_sketch("CollarEndPlane"))
+    await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        COLLAR_DIA / 2.0,
+        label,
+        dims=collar,
+        names=("CollarCx", "CollarCz", "CollarDia"),
+        drives=(None, None, '"CollarDia"'),
+    )
+    await ensure_fully_defined(adapter, f"{label} sketch")
+    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    name_last_feature(adapter, "CollarProfile")
+    drive_jobs += collar.apply(adapter, "CollarProfile")
+    check(
+        f"extrude {label}",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=COLLAR_THICKNESS, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, "Collar")
+    width_dim = name_dimensions(adapter, "Collar", ["CollarWidth"])
+    drive_jobs += [(width_dim[0], '"CollarWidth"')]
+    land_dia = SECTIONS[1][0] * IN
+    volume += math.pi / 4.0 * (COLLAR_DIA**2 - land_dia**2) * COLLAR_THICKNESS
+    await volume_check(adapter, label, volume, 0.005 * volume)
+    # The collar's south face is the thrust face the drive train seats on the
+    # post boss.  A point pick there is ambiguous (the post face lies under
+    # it), so it gets a named plane, owned like the journal by SecEnd0.
+    check(
+        "create_plane CollarFace",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Front Plane", offset=COLLAR_START_STATION
+            )
+        ),
+    )
+    name_last_feature(adapter, "CollarFace")
+    face_dim = name_dimensions(adapter, "CollarFace", ["CollarFaceStation"])
+    drive_jobs += [(face_dim[0], '"SecEnd0"')]
+
+    # Shoulder roots.  ONE constant-radius fillet over the three gear-seat
+    # step edges, each picked by a point on the SMALLER land's circle at that
     # station; the nearest other edge is 0.79 mm away radially and 6.9 mm
     # axially.  Tangent propagation is off: every seed is already a complete
-    # closed circle.
+    # closed circle.  The collar's two roots stay sharp: the post boss and the
+    # 64T bear flat against its faces, and a root radius would stand on the
+    # post bore's and the 64T bore's edges -- the title block's edge break on
+    # those parts is what clears the tool's nose radius.  (The old journal
+    # step edge is buried under the collar.)
     fillet_edges = [
         [SECTIONS[i + 1][0] * IN / 2.0, 0.0, end_z]
-        for i, (_dia_in, end_z) in enumerate(SECTIONS[:-1])
+        for i, (_dia_in, end_z) in enumerate(SECTIONS[1:-1], start=1)
     ]
     check(
         "fillet shoulder roots",
@@ -228,7 +300,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "ShoulderFillets")
     name_dimensions(adapter, "ShoulderFillets", ["ShoulderR"])
-    # Four R0.10 rounds add ~0.15 mm^3 to a ~13000 mm^3 shaft: this checks
+    # Three R0.10 rounds add ~0.1 mm^3 to a ~13000 mm^3 shaft: this checks
     # that the fillet did not eat a land, not that it moved the number.
     await volume_check(adapter, "shoulder fillets", volume, 0.005 * volume)
 
