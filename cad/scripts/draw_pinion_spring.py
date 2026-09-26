@@ -159,6 +159,14 @@ HOLE_CALLOUT_XY = (_PAD_EAST + 0.035, TOP_CENTER[1] - 0.019)
 # The #4 normal clearance (3.264 mm = 0.1285 in) is a No. 30 drill; the shop
 # reaches for the number, the native size compartment still prints the diameter.
 HOLE_PROCESS = "#30 DRILL"
+# The pad hole where build_pinion_spring's Hole Wizard puts it (model mm): on
+# the foot's top face, centred across the pad, which stands PAD_Z off the
+# strip's centre plane.  The callout picks its rim at the +z quadrant.  pc-r11
+# (0c5636eab) picked z HOLE_DIA/2, the rim while the pad was centred on the
+# strip; once 6c9d4f476 moved the pad, that point sat 0.06 mm from the hole's
+# centre, and SelectByID2 found no edge there.
+HOLE_CENTER = (FOOT_END[0] - HOLE_FROM_END, THICK, PAD_Z)
+HOLE_EDGE_PICK = (HOLE_CENTER[0], HOLE_CENTER[1], HOLE_CENTER[2] + HOLE_DIA / 2.0)
 
 
 def _kink_detail(adapter: Any, front: Any) -> Any:
@@ -416,9 +424,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         (
-            (FOOT_END[0] - HOLE_FROM_END) / 1000.0,
-            THICK / 1000.0,
-            HOLE_DIA / 2000.0,
+            HOLE_EDGE_PICK[0] / 1000.0,
+            HOLE_EDGE_PICK[1] / 1000.0,
+            HOLE_EDGE_PICK[2] / 1000.0,
         ),
         label="pad hole edge",
     )
