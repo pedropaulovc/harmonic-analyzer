@@ -2,10 +2,10 @@ r"""Pure-data dimensional contract shared by the pinion return leaf spring and
 its manufacturing drawing.
 
 PURE DATA, no SolidWorks/COM imports.  The pinion return spring is NOT a coil
-spring: it is a bent PHOSPHOR-BRONZE LEAF -- a 0.5 thick strip formed as a flat
-screw-down foot with a square screw pad at its free end, an R2 bend up to a
-blade leaning BLADE_LEAN_DEG west of vertical (in toward the strap), then an
-R1.5 crest turning 25 deg back east to a short free flat.  The nominals drive the part's named equation globals AND the
+spring: it is a bent 17-7 PH STAINLESS LEAF -- a 0.015 in (0.381) strip formed
+as a flat screw-down foot with a square screw pad at its free end, an R3.3 bend
+up to a blade leaning BLADE_LEAN_DEG west of vertical (in toward the strap),
+then an R3.3 crest turning 25 deg back east to a short free flat.  The nominals drive the part's named equation globals AND the
 drawing's coordinate math; the marked-dimension map keeps the part marks and
 drawing keeps in lockstep (``test_pinion_spring_drawing.py``).
 
