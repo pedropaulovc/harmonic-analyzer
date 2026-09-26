@@ -160,11 +160,11 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked collar dimension needs authored places")
 
-PIN_CALLOUT = _pin.PIN_SUPPLY
-PIN_HOLE_CALLOUT = _pin.DRILL_THRU_CALLOUT
+# The pin is the stock MHA-145 (McMaster 98296A027): its own BOM line and a
+# modelled drive-train component.  So the collar sheet carries no supply note
+# (the MHA-056 strap precedent); the hole callout names the pin it takes.
+PIN_NUMBER = "MHA-145"
+PIN_HOLE_CALLOUT = f"{_pin.DRILL_THRU_CALLOUT}\nFOR {PIN_NUMBER} SPRING PIN"
 BORE_CALLOUT = f"DRILL THRU\nSLIDES ON {ARBOR_NUMBER}"
-# The sole linked note supplies the loose purchased pin (the MHA-104 cam
-# precedent); the fit-up order lives in the drive-train assembly steps.
-DRAWING_NOTES = f"SUPPLY 1X {PIN_CALLOUT} LOOSE."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 

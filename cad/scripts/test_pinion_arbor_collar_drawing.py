@@ -45,14 +45,46 @@ def test_user_ruling_r1a_geometry() -> None:
 
 def test_spring_pin_is_the_rig_family_and_never_proud() -> None:
     assert strap_pin.PIN_STANDARD == "ASME B18.8.2"
-    assert spec.PIN_CALLOUT == strap_pin.PIN_SUPPLY
-    assert spec.PIN_CALLOUT == "1/16 X 1/2 SLOTTED SPRING PIN (ASME B18.8.2)"
     assert spec.PIN_LEN == pytest.approx(12.7)
     # 1.15 sub-flush each side at nominal, still sub-flush at the worst case.
     assert (geometry.COLLAR_OD - spec.PIN_LEN) / 2.0 == pytest.approx(1.15)
     assert spec.PIN_SUB_FLUSH_WORST > 0.0
     assert spec.PIN_WALL_ENGAGEMENT_WORST >= 1.5
-    assert spec.DRAWING_NOTES == f"SUPPLY 1X {spec.PIN_CALLOUT} LOOSE."
+
+
+def test_collar_pin_is_the_stock_mha145_named_on_the_hole_not_a_note() -> None:
+    """#858 made the rig's spring pin the stock MHA-145 (McMaster 98296A027),
+    its own BOM line.  The collar takes a third one, so the sheet names it on
+    the pin-hole callout and carries no supply note (the MHA-056 precedent)."""
+    row = _config.parts("pinion-strap-pin")
+    assert spec.PIN_NUMBER == row["number"]
+    assert int(row["quantity"]) == 3  # two strap pins and the collar pin
+    assert spec.PIN_HOLE_CALLOUT == (
+        f"{strap_pin.DRILL_THRU_CALLOUT}\nFOR {row['number']} SPRING PIN"
+    )
+    assert drawing.DIMENSION_CALLOUTS["PinHoleDia"] == spec.PIN_HOLE_CALLOUT
+    assert not hasattr(spec, "DRAWING_NOTES")
+    for script in (collar, drawing):
+        assert "Manufacturing Notes" not in Path(script.__file__).read_text(
+            encoding="utf-8"
+        )
+
+
+def test_drive_train_pins_the_collar_with_a_locked_mha145() -> None:
+    """The collar pin is a modelled component on the collar's and arbor's
+    common pin-hole axis, locked to the collar so it rides the p2 swing."""
+    import inspect
+
+    import build_drive_train_assembly as assembly
+
+    rows = assembly.COLLAR_PIN_ROWS
+    # The stock pin's axis (local X) is the arbor's pin-hole axis (local Y).
+    assert rows[0] == pytest.approx(assembly.ARBOR_ROWS[1])
+    assert assembly.COLLAR_PIN_Z == pytest.approx(assembly.ARBOR_Z0 + arbor.PIN_Z)
+    source = inspect.getsource(assembly)
+    assert "[APINION_X, APINION_Y, COLLAR_PIN_Z]" in source
+    assert 'named_ref(f"Front Plane@{collar_pin}", "PLANE")' in source
+    assert 'label="collar spring pin locked in the collar"' in source
 
 
 def test_webs_meet_the_u27_target_at_the_printed_worst_case() -> None:
@@ -120,7 +152,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     kept = set(drawing.END_KEEP) | set(drawing.PROFILE_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
-    assert drawing.DIMENSION_CALLOUTS["PinHoleDia"] == "1/16 DRILL THRU"
+    assert drawing.DIMENSION_CALLOUTS["PinHoleDia"].startswith("1/16 DRILL THRU\n")
     assert "MHA-102" in drawing.DIMENSION_CALLOUTS["BoreDia"]
 
 

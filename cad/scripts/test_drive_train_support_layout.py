@@ -873,7 +873,8 @@ def test_mha145_strap_pins_sit_in_both_strap_cross_holes() -> None:
     from pinion_pivot_shaft_spec import PIN_HOLE_Z
 
     source = inspect.getsource(drive)
-    assert source.count('"pinion-strap-pin"') == 1
+    # The strap-pin loop and R1a's collar pin (MHA-144's cross pin).
+    assert source.count('"pinion-strap-pin"') == 2
     assert 'zip(("front", "back"), STRAP_PIN_Z, strict=True)' in source
     assert 'named_ref(f"Front Plane@{strap_pins[tag]}", "PLANE")' in source
     assert 'label=f"strap pin {tag} locked to its strap"' in source
