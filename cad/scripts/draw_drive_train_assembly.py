@@ -1,4 +1,4 @@
-r"""Create the native eight-sheet drive-train assembly drawing package (MHA-A03).
+r"""Create the native nine-sheet drive-train assembly drawing package (MHA-A03).
 
 The released ``drive-train.SLDASM`` stays authoritative and byte-for-byte
 unchanged. This recipe consumes the builder-owned ``DRIVE_TRAIN_EXPLODED``
@@ -7,7 +7,8 @@ position it prints from the opened model; nothing pending on a sibling branch
 (crank hub, lever pin, pinion tooth count, bracket placement) is typed here.
 
 Sheet numbers are fixed: cross-references on the sheets cite them, so a sheet
-whose content is still pending keeps its slot with a placeholder.
+whose content is still pending keeps its slot with a placeholder. Every cited
+number is generated from the ``*_SHEET`` constants, never typed.
 """
 
 from __future__ import annotations
@@ -22,6 +23,8 @@ from pathlib import Path
 from typing import Any, Callable, Literal, Sequence
 
 import _telemetry
+import connecting_rod_spec as rod
+import cylinder_bank_layout as bank
 from _common import OUT_FAILURES, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
@@ -84,6 +87,7 @@ SHEET_NAMES = (
     "CONE SET + CRANK EXPLODED",
     "ALIGNMENT PINION RIG EXPLODED",
     "ASSEMBLY SEQUENCE",
+    "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK",
     "ASSEMBLY SEQUENCE CONT. + FIT",
     "CHECKS + SETUP",
 )
@@ -101,9 +105,12 @@ CLUSTER_TITLES: dict[Cluster, str] = {
     "cone-crank": "CONE SET, SWING PLATFORM AND CRANK",
     "pinion-rig": "ALIGNMENT PINION RIG",
 }
+# #743 grew steps 8-9 past sheet 6's right field, so the bank sequence has its
+# own sheet (Main, B1 re-ruling 2026-09-26).
 SEQUENCE_SHEET = 6
-FIT_SHEET = 7
-CHECKS_SHEET = 8
+BANK_SHEET = 7
+FIT_SHEET = 8
+CHECKS_SHEET = 9
 
 ASSEMBLED_SCALE = (1.0, 3.0)
 ASSEMBLED_ISO_SCALE = (1.0, 3.0)
@@ -118,13 +125,12 @@ CLUSTER_SCALES: dict[Cluster, tuple[float, float]] = {
     "cone-crank": (1.0, 3.0),
     "pinion-rig": (1.0, 2.0),
 }
+# Sheets without a cluster or the assembled views carry only the 1:8
+# reference isometric.
 SHEET_SCALES = {
+    **{name: REFERENCE_ISO_SCALE for name in SHEET_NAMES},
     SHEET_NAMES[0]: ASSEMBLED_SCALE,
-    SHEET_NAMES[1]: REFERENCE_ISO_SCALE,
     **{SHEET_NAMES[number - 1]: CLUSTER_SCALES[c] for c, number in CLUSTER_SHEETS.items()},
-    SHEET_NAMES[5]: REFERENCE_ISO_SCALE,
-    SHEET_NAMES[6]: REFERENCE_ISO_SCALE,
-    SHEET_NAMES[7]: REFERENCE_ISO_SCALE,
 }
 
 # --- sheet 1: projected front/top/right group + isometric ---------------------
@@ -167,8 +173,9 @@ BOM_REFERENCE_ISO_CENTER = (0.110, 0.068)
 # 20-configuration row SolidWorks kept a written description only up to its
 # second comma (farm leaf 20260923T040258Z-1-0726d474, swmaker000005).
 BOM_REFERENCE_CAPTION = (
-    "REFERENCE 1:8 - BALLOONS ON SHEETS 3-5\n"
-    "MHA-013 CONE GEAR STATIONS: SHEET 7"
+    f"REFERENCE 1:8 - BALLOONS ON SHEETS {min(CLUSTER_SHEETS.values())}-"
+    f"{max(CLUSTER_SHEETS.values())}\n"
+    f"MHA-013 CONE GEAR STATIONS: SHEET {FIT_SHEET}"
 )
 
 # --- sheets 3-5: exploded cluster views --------------------------------------
@@ -213,10 +220,10 @@ REFERENCE_ISO_CENTER = (0.380, 0.110)
 # Notes pitch 4.525 mm a line (summing-assembly.pdf): ~47 lines fit the full
 # left column, ~24 the right one above the 1:8 reference view that every sheet
 # needs for its title-block property links (finalize_drawing refuses a sheet
-# without a view: r8, leaf 20260923T214354Z-1-4126331f). With every ruling in,
-# sheet 6 carries steps 1-7 and the general notes on the left and steps 8-9 on
-# the right; steps 10-17 continue on sheet 7 beside the station table (Main,
-# layout A).
+# without a view: r8, leaf 20260923T214354Z-1-4126331f). Sheet 6 carries steps
+# 1-7 and the general notes on the left, its right field kept free for D1; the
+# bank's steps 8-9F fill sheet 7's left field; steps 10-21 continue on sheet 8
+# beside the station table (Main, B1 re-ruling 2026-09-26).
 ISO_RIGHT_FIELD = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
 
@@ -330,14 +337,14 @@ BOM_NORMALIZED_ALIASES = {
 # every quoted fit/process is the wording already printed on that part's sheet.
 # "[PENDING ...]" marks a joint whose hardware or ruling has not landed; the
 # package is not released while any remains.
-ASSEMBLED_HEADING = "SAVED WORKING POSE AND FREE MOTIONS: SEE SHEET 8 FOR SETUP."
+ASSEMBLED_HEADING = f"SAVED WORKING POSE AND FREE MOTIONS: SEE SHEET {CHECKS_SHEET} FOR SETUP."
 
 CONE_CRANK_STEPS = "\n".join(
     (
         "ASSEMBLY SEQUENCE - CONE SET AND CRANK",
         "1. BOND {cone_gears}X MHA-013 TO THEIR MHA-014 SEATS PER THE MHA-013",
         "   PRINT, TIP FIRST: T006 AT THE BACK THROUGH T120 AT THE FRONT",
-        "   (STATION TABLE, SHEET 7). BOND MHA-021 FRONT OF T120 PER ITS PRINT.",
+        f"   (STATION TABLE, SHEET {FIT_SHEET}). BOND MHA-021 FRONT OF T120 PER ITS PRINT.",
         # U37c (user, 2026-09-23): MHA-142 is MSC 40923898, 1/4-20 x 3-1/2
         # slotted fillister, through the unchanged 6.02 counterbore. Its floor
         # sits 78.67-81.29 above the post foot at the printed bands, so a fixed
@@ -395,6 +402,7 @@ CONE_CRANK_STEPS = "\n".join(
         "7. SLIDE MHA-022 ONTO MHA-139. THREAD MHA-139 INTO THE MHA-020",
         "   PIVOT TAP WITH LOCTITE 222 (REMOVABLE); SEAT THE SHOULDER TIGHT",
         "   ON THE ARM FACE. HANDLE TURNS FREELY; END PLAY 0.25-1.0.",
+        f"   CYLINDER BANK: SHEET {BANK_SHEET}.",
     )
 )
 
@@ -442,21 +450,33 @@ BANK_STEPS = "\n".join(
         "   LIFT OFF. DRILL #29 X 19.5, TAP #8-32 X 16.0 (PLUG, THEN",
         "   BOTTOMING); BLOW OUT CHIPS. REFIT, RE-SET Y AND X, TIGHTEN",
         "   MHA-143 AND RECHECK.",
+        # dtrefactor's #937 review: the loaded mandrel hangs from the back
+        # strap alone until the front one goes on (F2), and its front end sits
+        # over the front foot hole, where no chuck or tap wrench reaches (F1).
+        # So the loaded mandrel leaves the base for the drill and tap.
         "9B. FROM THE FRONT, LOAD ONE MHA-121, THE STACK IN ORDER, THEN THE",
         "   OTHER MHA-121. PUSH THE BANK BACK, CLOSED UP ON THE BACK MHA-121.",
+        "   PROP THE MANDREL FRONT END AT BORE HEIGHT (V-BLOCK ON PARALLELS);",
+        "   TAKE THE PROP AWAY ONLY TO SLIDE THE FRONT MHA-004 ON.",
         "9C. SLIDE THE FRONT MHA-004 ON UNTIL A 0.45 LEAF BETWEEN ITS STRAP",
-        "   AND THE FRONT MHA-121 IS LIGHTLY PINCHED. SET X 168.11-168.31,",
-        "   SPOT, LIFT OFF, DRILL AND TAP AS 9A. REFIT; RE-SET THE LEAF AND X,",
-        "   TIGHTEN MHA-143 AND RECHECK.",
+        "   AND THE FRONT MHA-121 IS LIGHTLY PINCHED. SET X 168.11-168.31 AND",
+        "   SPOT AS 9A. SLIDE THE FRONT MHA-004 OFF; DRAW THE LOADED MANDREL",
+        "   OUT OF THE BACK MHA-004, HOLDING BOTH MHA-121, AND LAY IT IN",
+        "   V-BLOCKS ON PARALLELS OFF THE BASE, RODS HANGING FREE. DRILL AND",
+        "   TAP AS 9A. PASS THE MANDREL BACK THROUGH THE BACK MHA-004, PUSH",
+        "   THE BANK BACK AND PROP IT AS 9B. REFIT THE FRONT MHA-004; RE-SET",
+        "   THE LEAF AND X, TIGHTEN MHA-143 AND RECHECK.",
         "9D. MEASURE MHA-004 OUTER FACE TO OUTER FACE. TURN MHA-028: ITS",
         "   CYLINDER IS THAT SPAN, PLUS A 1.5 DOME EACH END (SEE ITS PRINT).",
         "9E. PUSH MHA-028 IN FROM THE BACK, END TO END WITH THE MANDREL, UNTIL",
         "   THE MANDREL IS OUT AND EACH DOME STANDS 1.5 PROUD (DEPTH GAUGE).",
         "   SPOT MHA-028 THROUGH EACH CROWN TAP WITH A #43 DRILL, 0.5 DEEP;",
         "   BLOW OUT CHIPS. RUN THE BACK MHA-147 IN TIGHT, THEN THE FRONT ONE.",
-        "9F. THE BANK TURNS FREE BY HAND; A 0.35 LEAF ENTERS AT THE FRONT",
-        "   MHA-121, A 0.55 LEAF DOES NOT.",
-        "   PINION RIG: SHEET 7.",
+        # F3: the leaf reads the end play only with the bank closed up on
+        # the back washer; pulled forward it reads nothing.
+        "9F. THE BANK TURNS FREE BY HAND. BANK PUSHED BACK:",
+        "   A 0.35 LEAF ENTERS AT THE FRONT MHA-121, A 0.55 LEAF DOES NOT.",
+        f"   PINION RIG: CONT. ON SHEET {FIT_SHEET}.",
     )
 )
 
@@ -529,8 +549,15 @@ RIG_STEPS = "\n".join(
         "    MHA-114 WITH ITS TERMINAL FLAT ON THE PARKED BACK MHA-056; SPOT",
         "    THROUGH ITS FOOT HOLE; DRILL #43 X 11.0, TAP #4-40 X 9.0 (PLUG,",
         "    THEN BOTTOMING), 1 PLACE. FIT {slotted}X MHA-101 AND 1X MHA-103.",
-        "21. OTHER BASE MOUNTING: SEE SHEET 8, EXTERNAL INTERFACES.",
+        f"21. OTHER BASE MOUNTING: SEE SHEET {CHECKS_SHEET}, EXTERNAL INTERFACES.",
     )
+)
+
+# Check 3 prints the bank's ring-overhang bound (#743 user ruling Q1) and the
+# share of the ring width that bound leaves on the cam, rounded down.
+RING_OVERHANG_TEXT = f"{bank.RING_OVERHANG_MAX:.2f}"
+RING_ON_CAM_PERCENT = math.floor(
+    100.0 * (rod.RING_THICKNESS - bank.RING_OVERHANG_MAX) / rod.RING_THICKNESS
 )
 
 CHECKS = "\n".join(
@@ -543,8 +570,9 @@ CHECKS = "\n".join(
         "   AT REST, NO TIGHT SPOT THROUGH ONE FULL MHA-021 TURN; EACH CONE",
         "   GEAR MESHES ITS MHA-027 PER THE MHA-013 PRINT.",
         "3. EACH MHA-027 TURNS FREELY ON MHA-028 WITHOUT AXIAL BINDING.",
-        "   A CONNECTING-ROD RING MAY OVERHANG ITS CAM UP TO 0.56 (AT LEAST",
-        "   81% OF THE RING WIDTH STAYS ON THE CAM).",
+        # The same bound the MHA-027 print states (cylinder_gear_notes).
+        f"   A CONNECTING-ROD RING MAY OVERHANG ITS CAM UP TO {RING_OVERHANG_TEXT} (AT LEAST",
+        f"   {RING_ON_CAM_PERCENT}% OF THE RING WIDTH STAYS ON THE CAM).",
         "4. CONE SWING (P1): LOOSEN MHA-093; THE CONE SET SWINGS ON MHA-094",
         "   CLEAR OF EVERY MHA-027. RETURN IT TO THE MHA-095 STOP AND",
         "   TIGHTEN MHA-093; ALL {cone_gears} MESHES RE-ENGAGE.",
@@ -554,7 +582,7 @@ CHECKS = "\n".join(
         "   (SINES). RETURN MHA-059 TO PARK; RE-ENGAGE THE CONE SET.",
         "6. PARKED, MHA-114 HOLDS MHA-002 CLEAR OF EVERY MHA-027.",
         "7. PARKED, PINS ON THE CAMS: A 2.5 FEELER IS SNUG TIP TO TIP AT THE",
-        "   FRONT AND BACK STATIONS; ACCEPT 2.3-2.7 (SHEET 7, STEP 19).",
+        f"   FRONT AND BACK STATIONS; ACCEPT 2.3-2.7 (SHEET {FIT_SHEET}, STEP 19).",
     )
 )
 
@@ -2014,7 +2042,15 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
         NOTE_FIELD_LEFT,
         label=f"sheet {SEQUENCE_SHEET} left note field",
     )
-    findings += _stack_note_field(
+    # The right field stays empty: it is reserved for D1.
+    return findings
+
+
+def _place_bank_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
+    _activate_sheet(adapter, SHEET_NAMES[BANK_SHEET - 1])
+    _heading(adapter, BANK_SHEET)
+    _reference_iso(adapter, caption="FINISHED ASSEMBLY 1:8", label="bank reference isometric")
+    return _stack_note_field(
         adapter,
         (
             (
@@ -2022,10 +2058,9 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
                 BANK_STEPS.format(cylinder_gears=facts.count("cylinder-gear")),
             ),
         ),
-        ISO_RIGHT_FIELD,
-        label=f"sheet {SEQUENCE_SHEET} right note field",
+        NOTE_FIELD_LEFT,
+        label=f"sheet {BANK_SHEET} left note field",
     )
-    return findings
 
 
 def _place_fit_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
@@ -2101,6 +2136,7 @@ def _place_package(adapter: Any, facts: SourceFacts) -> None:
             adapter, cluster, facts, bom_name=bom_name, items=items
         )
     findings += _place_sequence_sheet(adapter, facts)
+    findings += _place_bank_sheet(adapter, facts)
     findings += _place_fit_sheet(adapter, facts)
     findings += _place_checks_sheet(adapter, facts)
     for sheet_name, sheet_balloons in cluster_balloons.items():
