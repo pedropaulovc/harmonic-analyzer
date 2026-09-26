@@ -579,6 +579,13 @@ _FLIP_INVERT: frozenset[str] = frozenset(
         # (was "pen rod travel snapshot" -- the label gained the PARK-driver tag
         # 2026-07-07; same mate, same learned side)
         "pen rod travel PARK driver (freed in default build)",
+        # #743 PR2: the channel's datum-located MHA-143 bracket hold-downs,
+        # inserted IDENTITY like the brackets whose x/y/z seeds they share
+        # (r743-4D: the channel build's first MISS was the washer's x; the
+        # hold-downs follow it in the same datum-locate loop).
+        "pedestal hold down screw datum x",
+        "pedestal hold down screw datum y",
+        "pedestal hold down screw datum z",
         "pinch head seat @ppn",
         "pinion arbor axial",
         "pinion cam back set pin axial",
@@ -599,6 +606,11 @@ _FLIP_INVERT: frozenset[str] = frozenset(
         # disc" in the PR #196 real-train rework; same mate, same learned side.
         # Latent until 2026-07-07's full paper-drive rebuild re-keyed it.)
         "reducer disc axial",
+        # #743 PR2: the MHA-148 south thrust washer, datum-located IDENTITY
+        # like the pivot brackets (r743-4D flip-seed MISS on its x).
+        "rocker thrust washer datum x",
+        "rocker thrust washer datum y",
+        "rocker thrust washer datum z",
         "slotted screw datum X",
         "slotted screw datum Y",
         "slotted screw datum Z",
