@@ -544,3 +544,30 @@ def test_seat_note_names_the_transfer_and_both_depths() -> None:
             drawing.FRONT_CENTER[1] + support.HALF_Y * drawing.VIEW_SCALE / 1000,
         )
     )
+
+
+def test_rim_chamfer_is_placed_on_the_section_by_a_targeted_import() -> None:
+    """#743: the front view only ever got RimChamferSize from the entire-model
+    import, and the rail took it away (r743-diag-a/b). A targeted RimChamfer
+    import into the section delivers it (r743-diag-c), so the section owns it
+    and its curate imports only the features that own its kept dimensions."""
+    import ast
+
+    assert "RimChamferSize" in drawing.RIGHT_KEEP
+    assert "RimChamferSize" not in drawing.FRONT_KEEP
+    owned = set().union(*support.DRAWING_DIMENSIONS.values())
+    assert set(drawing.RIGHT_KEEP) <= owned
+
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    curates = {
+        call.args[1].id: {kw.arg: kw.value for kw in call.keywords}
+        for call in ast.walk(tree)
+        if isinstance(call, ast.Call)
+        and isinstance(call.func, ast.Name)
+        and call.func.id == "curate_view_dimensions"
+    }
+    section = curates["right"]
+    assert isinstance(section["keep"], ast.Name) and section["keep"].id == "RIGHT_KEEP"
+    by_feature = section.get("dimensions_by_feature")
+    assert isinstance(by_feature, ast.Name) and by_feature.id == "DRAWING_DIMENSIONS"
+    assert drawing.DRAWING_DIMENSIONS is support.DRAWING_DIMENSIONS
