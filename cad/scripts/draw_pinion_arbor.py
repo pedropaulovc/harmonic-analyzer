@@ -102,6 +102,11 @@ _CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 # The head centre must land within 0.1 mm of DETAIL_CENTER after the move
 # (the MHA-142 tip view's tolerance).
 DETAIL_POSITION_TOL_M = 1e-4
+# A moved note's read-back extent settles to within this of its target:
+# SolidWorks re-lays the text on each move, so the box does not follow the
+# anchor exactly (rf-arbor-crop, swmaker000005: the "A" read 0.07 mm off
+# after two moves).  0.2 mm is below any layout gate's clearance.
+NOTE_EXTENT_TOL_M = 2e-4
 # The head and neck diameters live in end-on Front-plane profile sketches, so
 # the end-on donor imports them: the head's moves onto the 1:1 profile, the
 # neck's into detail A (DETAIL_DIAMETER_POSITIONS says why).  The Ø8
@@ -686,7 +691,7 @@ def _view_note(
     if not annotation.SetTextFormat(0, False, text_format):
         raise RuntimeError(f"failed to size the {label}")
     adapter.currentModel.EditRebuild3()
-    for _attempt in range(2):
+    for _attempt in range(3):
         x0, y0, _z0, x1, y1, _z1 = (float(value) for value in note.GetExtent())
         actual = (
             ((x0 + x1) / 2.0, max(y0, y1))
@@ -694,7 +699,7 @@ def _view_note(
             else (min(x0, x1), (y0 + y1) / 2.0)
         )
         error = (xy[0] - actual[0], xy[1] - actual[1])
-        if math.hypot(*error) <= 1e-5:
+        if math.hypot(*error) <= NOTE_EXTENT_TOL_M:
             break
         position = tuple(float(value) for value in annotation.GetPosition())
         moved = (position[0] + error[0], position[1] + error[1], 0.0)

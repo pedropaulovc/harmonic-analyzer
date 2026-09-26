@@ -1146,6 +1146,8 @@ def test_neck_diameter_text_rides_clear_of_detail_a_and_its_callouts() -> None:
         assert drawing.DETAIL_KEEP[name][0] > right + 0.030
     for name in ("HeadLen", "HeadCapSagDim"):
         assert drawing.DETAIL_KEEP[name][1] < bottom - 0.030
+
+
 # --- Detail A is a CROPPED 2:1 MODEL VIEW, not a native detail ---------------
 # A native detail refused every DragModelDimension into it: neckbisect-ecef
 # (from the profile: move, copy, centre drop) and pc-r5-860 (straight from
@@ -1428,3 +1430,46 @@ def test_a_note_that_lands_in_another_view_fails_loud(monkeypatch) -> None:
     monkeypatch.setattr(drawing, "add_note", stray)
     with pytest.raises(RuntimeError, match="did not land in its view"):
         drawing._position_detail_label(seat, crop)
+
+
+class _JitterNote(_CropNote):
+    """Re-lays its text on every move: the box lands 0.07 mm right of where
+    the anchor alone puts it (rf-arbor-crop's "A" on swmaker000005)."""
+
+    def GetExtent(self):
+        x0, y0, z0, x1, y1, z1 = super().GetExtent()
+        return (x0 + 0.00007, y0, z0, x1 + 0.00007, y1, z1)
+
+
+class _StuckNote(_CropNote):
+    """Accepts every move and never goes anywhere."""
+
+    def GetAnnotation(self):
+        annotation = _NoteAnnotation(self)
+        annotation.SetPosition2 = lambda x, y, z: True
+        return annotation
+
+
+@pytest.mark.parametrize(
+    ("note_type", "lands"), [(_JitterNote, True), (_StuckNote, False)]
+)
+def test_a_view_note_lands_within_the_extent_tolerance_or_fails_loud(
+    monkeypatch, note_type, lands
+) -> None:
+    seat, crop, _profile, _placed = _crop_seat(monkeypatch)
+
+    def note(adapter, text, x, y, **_kwargs):
+        made = note_type(text, seat.active, (x, y))
+        seat.notes.append(made)
+        return made
+
+    monkeypatch.setattr(drawing, "add_note", note)
+    if not lands:
+        with pytest.raises(RuntimeError, match="extent sits at"):
+            drawing._position_detail_label(seat, crop)
+        return
+    drawing._position_detail_label(seat, crop)
+    (label,) = crop.GetNotes()
+    x0, _y0, _z0, x1, y1, _z1 = label.GetExtent()
+    error = math.dist(((x0 + x1) / 2, y1), drawing.DETAIL_LABEL_XY)
+    assert 0.0 < error <= drawing.NOTE_EXTENT_TOL_M
