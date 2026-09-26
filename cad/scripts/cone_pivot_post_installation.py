@@ -13,9 +13,11 @@ POST_ROTATION_Y_DEG = 180.0
 POST_X_SHIFT = 1.484
 POST_Z_SHIFT = 35.415
 
-# Move the working gear stack toward the fixed post until the 64T retains
-# 0.10 mm axial air to the post's cone boss.  The world projections follow the
-# unchanged 12.5182-degree journal and recenter the channel/cylinder bank.
+# Move the working gear stack toward the fixed post.  Axially the stack now
+# stands on the cone shaft's integral thrust collar (#914): the collar's south
+# face bears on the post's north cone-boss end face, and the 64T abuts the
+# collar's north face.  The world projections follow the unchanged
+# 12.5182-degree journal and recenter the channel/cylinder bank.
 GEAR_AXIS_SHIFT = -33.114642580298394
 MECHANISM_X_SHIFT = -5.69360213488344
 MECHANISM_Z_SHIFT = 3.0875877804265315
