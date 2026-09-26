@@ -91,3 +91,21 @@ def test_the_pin_sheet_has_no_notes_and_the_mates_carry_the_match_drill() -> Non
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_feature_control_frame" not in source
     assert "SetPrecision3" not in source
+
+
+def test_the_pin_diameter_is_toleranced_before_the_installed_split() -> None:
+    # pc-lever-pin-diag: tolerancing PinDia after the INSTALLED configuration
+    # was rebuilt left INSTALLED stale in the saved part.  Every model-dimension
+    # edit precedes the configuration split, so both configurations rebuild
+    # after the last one.
+    import build_pinion_lever_pin as part
+
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    split = source.index("create_configuration {INSTALLED_CONFIG}")
+    for edit in (
+        "set_dimension_bilateral_tolerance(",
+        "clear_dimensions_for_drawing(adapter)",
+        "mark_dimensions_for_drawing(adapter,",
+        "apply_drawing_precision(adapter,",
+    ):
+        assert source.index(edit) < split, edit

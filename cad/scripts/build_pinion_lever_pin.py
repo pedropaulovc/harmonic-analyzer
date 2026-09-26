@@ -139,6 +139,21 @@ async def build(adapter) -> dict[str, str]:
     # overlength cut the drawing prints, and both carry one MHA-135 BOM
     # identity.  PinLen is set per configuration in each, so neither inherits
     # the other's length.
+    # Manufacturing drawing support: the stock band, the marked set and the
+    # model-owned decimal places.  Set BEFORE the INSTALLED split: tolerancing
+    # PinDia after it left INSTALLED stale (IConfiguration.NeedsRebuild) in the
+    # saved part, so drive-train opened NeedsRebuild2=1 (pc-lever-pin-diag,
+    # dt-logs/pc-lever-pin-diag/task.log: clean after the BOM properties,
+    # stale from set_dimension_bilateral_tolerance on).  #928's save guard
+    # still rebuilds any stale configuration; this keeps its happy path clean.
+    set_dimension_bilateral_tolerance(
+        adapter, "PinProfile", "PinDia", *deviations(PIN_DIA_BAND)
+    )
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+
     default_config = active_configuration_name(adapter)
     check(
         f"create_configuration {INSTALLED_CONFIG}",
@@ -176,16 +191,6 @@ async def build(adapter) -> dict[str, str]:
         part_number=str(grouped_spec["number"]),
         description=str(grouped_spec["title"]),
     )
-
-    # Manufacturing drawing support: the stock band, the marked set and the
-    # model-owned decimal places.
-    set_dimension_bilateral_tolerance(
-        adapter, "PinProfile", "PinDia", *deviations(PIN_DIA_BAND)
-    )
-    clear_dimensions_for_drawing(adapter)
-    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
-        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    apply_drawing_precision(adapter, DRAWING_PRECISION)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
