@@ -288,6 +288,33 @@ def test_book_fidelity_exceptions_are_recorded_in_the_spec_not_on_a_sheet() -> N
         assert not hasattr(notes, retired)
 
 
+@pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
+def test_named_shortfalls_print_as_facts_on_their_sheets(teeth: int) -> None:
+    # The blind reviewer sees only the sheets, so every sheet a named
+    # exception row affects states the shortfall itself, as a plain fact with
+    # its value (drawing-simplicity policy, named exceptions); the ruling
+    # never prints (test_no_sheet_prints_a_review_record).
+    data = notes.gear_data(teeth)
+    web_row = "WALL, GAP FLOOR TO HOLE (mm, REF):  "
+    if teeth in spec.WEB_EXCEPTIONS_MM:
+        web = notes.root_to_bore_web_min_mm(teeth)
+        # the printed limits give exactly the web the user accepted
+        assert web == pytest.approx(spec.WEB_EXCEPTIONS_MM[teeth], abs=0.0005)
+        # stated rounded DOWN: never more wall than the limits give
+        stated = float(data.split(web_row)[1].split()[0])
+        assert 0.0 <= web - stated < 0.01
+        assert f"{web_row}{stated:.2f} MIN" in data
+    else:
+        assert web_row not in data
+        assert notes.root_to_bore_web_min_mm(teeth) >= spec.MACHINED_WEB_FLOOR_MM
+    ratio_row = f"CONTACT RATIO WITH {notes.CYLINDER_MATE_NUMBER}, WORST CASE (REF):  "
+    assert set(notes.WORST_CONTACT_RATIO) == set(spec.CONTACT_RATIO_EXCEPTION_TEETH)
+    if teeth in spec.CONTACT_RATIO_EXCEPTION_TEETH:
+        assert f"{ratio_row}{notes.WORST_CONTACT_RATIO[teeth]:.2f}" in data
+    else:
+        assert ratio_row not in data
+
+
 _REVIEW_RECORD_TEXT = re.compile(
     r"RULE \d|U\d\d|EXCEPTION|BOOK FIDELITY|POLICY|RULING"
 )

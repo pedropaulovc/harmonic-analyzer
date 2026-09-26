@@ -29,6 +29,7 @@ import pytest
 
 import _config
 import build_drive_train_assembly as assembly
+import cone_gear_notes
 import cone_gear_shaft_spec
 import cone_gear_spec as spec
 import cylinder_gear_notes
@@ -195,6 +196,10 @@ def test_printed_mesh_meets_its_design_rules(teeth: int) -> None:
     assert worst["loose_backlash"] <= high, worst
     if teeth in spec.CONTACT_RATIO_EXCEPTION_TEETH:
         assert worst["contact_ratio"] < CR_EXCEPTION, worst
+        # The sheet states this worst case (policy, named exceptions),
+        # rounded DOWN to two places: never more than the part has.
+        printed = cone_gear_notes.WORST_CONTACT_RATIO[teeth]
+        assert 0.0 <= worst["contact_ratio"] - printed < 0.01, (printed, worst)
     else:
         assert worst["contact_ratio"] >= CR_EXCEPTION, worst
     # Deeper than today everywhere: a standard tip and tooth at the same
