@@ -527,7 +527,11 @@ def _blast_radius(adapter: Any, pdf_path: str) -> None:
             f"maxmin-blast set 13=1 -> {ok!r}; reads {ext.GetUserPreferenceInteger(13, 0)!r} "
             f"name {ext.GetUserPreferenceString(65, 0)!r}"
         )
+        import time
+
+        started = time.perf_counter()
         _blast_regen(draw, ddoc)
+        _telemetry.info(f"maxmin-blast regen recipe {time.perf_counter() - started:.3f} s")
         ansi = _blast_dump(ext)
         ansi_texts = _blast_texts(ddoc)
         ansi_pdf = _BLAST_DIR / "ansi.pdf"
@@ -557,11 +561,21 @@ def _blast_radius(adapter: Any, pdf_path: str) -> None:
         _telemetry.warn(f"maxmin-blast failed: {exc!r}")
 
 
+def _blast_file_stamp(path: Any) -> str:
+    import hashlib
+
+    file = Path(path)
+    stat = file.stat()
+    digest = hashlib.sha256(file.read_bytes()).hexdigest()
+    return f"size={stat.st_size} mtime_ns={stat.st_mtime_ns} sha256={digest}"
+
+
 _ORIGINAL_SAVE_DRAWING = _drawing_common.save_drawing
 
 
 def _blast_save_drawing(adapter: Any, slddrw_path: str, **kwargs: Any) -> dict[str, str]:
     artifacts = _ORIGINAL_SAVE_DRAWING(adapter, slddrw_path, **kwargs)
+    _telemetry.info(f"maxmin-blast slddrw pre-diag {_blast_file_stamp(artifacts['drawing'])}")
     _blast_radius(adapter, artifacts["pdf"])
     return artifacts
 
@@ -666,13 +680,15 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, front)
     # Re-read after the last rebuilds, before the save.
     _verify_tip_view(adapter, front, tip)
-    return await finalize_drawing(
+    artifacts = await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title=TITLE,
         scale=SHEET_SCALE,
         layout=SPEC.layout,
     )
+    _telemetry.info(f"maxmin-blast slddrw post-close {_blast_file_stamp(OUTPUTS.slddrw)}")
+    return artifacts
 
 
 def _parse_args() -> argparse.Namespace:
