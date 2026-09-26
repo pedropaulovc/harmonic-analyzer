@@ -39,7 +39,7 @@ FLUSH_LENGTH_MM = GRIP_MM + platform.PLATE_THICKNESS
 # sketch with ONE driving dimension (under-head face to cut end).  The cut
 # end's break is a driving dimension of the deburr CUTTER's own profile,
 # CutEndDeburrProfile -- the boss hook's StockDeburrProfile pattern -- not a
-# hidden reference sketch: the tip detail could not import it from one.
+# hidden reference sketch: no view could import it from one.
 # Dead under: a childless part-hidden CutEndBreakReference, shown in the
 # part in memory (part_sketches_shown) around creating and curating the 10:1
 # detail, targeted feature import (pms857-f543, f54309af5, drawing leaf log
@@ -49,6 +49,10 @@ FLUSH_LENGTH_MM = GRIP_MM + platform.PLATE_THICKNESS
 # the cause: the detail's hidden-sketch check read the sketch Visible=2
 # (shown), children=0, and showed nothing further.  Untested: the per-view
 # override on a detail, an entire-model import, other detail types.
+# Later (b6552f13b, swmaker000008): no DETAIL view offers CutEndBreak at
+# all -- 10:1 HLR, 10:1 HLV, 5:1, 2:1, before or after the Front's import
+# all returned available=[] -- while a cropped 10:1 MODEL view imported
+# it.  So the break prints in a cropped 10:1 model view of the tip.
 CUT_LENGTH_SKETCH = "CutLengthReference"
 CUT_LENGTH_DIMENSION = "CutLength"
 CUT_END_BREAK_SKETCH = "CutEndDeburrProfile"
@@ -68,9 +72,9 @@ DRAWING_PRECISION_BY_NAME = {
 }
 REFERENCE_SKETCHES = (CUT_LENGTH_SKETCH,)
 # Which view claims which marked dimension: the 1:1 Front view carries only
-# the cut length; the break is claimed only by the 10:1 tip detail.
+# the cut length; the break is claimed only by the cropped 10:1 tip view.
 FRONT_VIEW_DIMENSIONS = {CUT_LENGTH_SKETCH: {CUT_LENGTH_DIMENSION}}
-DETAIL_VIEW_DIMENSIONS = {CUT_END_BREAK_SKETCH: {CUT_END_BREAK_DIMENSION}}
+TIP_VIEW_DIMENSIONS = {CUT_END_BREAK_SKETCH: {CUT_END_BREAK_DIMENSION}}
 
 # --- U27: can one fixed cut length serve every in-band post and plate? ---
 # The printed bands, as the shop reads them off the title block: the post's
@@ -90,7 +94,7 @@ PLATE_STOCK_BAND_MM = 0.13
 #   override); this branch predates it, and integ dedupes it to one copy.
 # - the screw's cut end: a deburr (the shop hacksaws and files the burr),
 #   0.1 max.  The model holds 0.1 as the nominal of its band; the sheet
-#   prints the single limit "0.1 MAX" in a 10:1 detail of the tip, because
+#   prints the single limit "0.1 MAX" in a cropped 10:1 view of the tip, because
 #   a 0.1 dimension at 1:1 is illegible and a printed +0/-0.1 band reads as
 #   permitting no break at all (Main's MHA-142 eye pass on #857).
 POST_MOUNT_TAP_EDGE_BREAK = 0.1
@@ -120,7 +124,7 @@ if CUT_END_BREAK_MM != CUT_END_BREAK_MAX_MM:
 _BREAK_PLACES = DRAWING_PRECISION[CUT_END_BREAK_SKETCH][CUT_END_BREAK_DIMENSION]
 if round(CUT_END_BREAK_MAX_MM, _BREAK_PLACES) != CUT_END_BREAK_MAX_MM:
     raise ValueError("the cut-end break max does not print at its places")
-# What the detail's dimension must read: the band's max at its places.
+# What the tip view's dimension must read: the band's max at its places.
 CUT_END_BREAK_TEXT = f"{CUT_END_BREAK_MAX_MM:.{_BREAK_PLACES}f} MAX"
 
 # Counterbore floor above PlateTop (the post foot seats on it), both ends.
