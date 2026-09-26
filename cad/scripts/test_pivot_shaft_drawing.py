@@ -196,14 +196,45 @@ def test_shoulder_reliefs_clear_the_tool_and_keep_the_seats_flat() -> None:
     assert (spec.RELIEF_DIA + spec.LINEAR_3PL) / 2.0 + spec.CORNER_RADIUS_MAX <= (
         spec.SHAFT_DIA_MIN / 2.0
     )
-    # The widest groove leaves the north journal and hub 19 most of their
-    # bearing.
-    assert spec.JOURNAL_LENGTH - width_high >= spec.JOURNAL_LENGTH / 2.0
-    hub = rocker_arm_spec.HUB_LENGTH
-    assert hub - width_high >= hub / 2.0
     # The reliefs print at the places their sizing assumes.
     assert spec.DRAWING_PRECISION["ReliefProfile"] == {"ReliefWidth": 1, "ReliefDia": 3}
     assert round(spec.RELIEF_DIA, 2) == spec.RELIEF_DIA
+
+
+def test_widest_relief_leaves_each_journal_its_bearing_length() -> None:
+    """Codex #936 PRRT_kwDOPHDy386mTMXq: the groove sits under the first
+    RELIEF_WIDTH of the north ear's bore and of hub 19's. What is left must
+    still bear at L/d 0.5 or more on the O6.35."""
+    width_high = spec.RELIEF_WIDTH_RANGE[1]
+    assert spec.BEARING_LENGTH_MIN == 0.5 * spec.SHAFT_DIA
+    # North journal: the ear's thickness, which the journal length matches.
+    assert spec.JOURNAL_LENGTH == pivot_bracket_spec.EAR_T
+    north = pivot_bracket_spec.EAR_T - width_high
+    # Hub 19: bears on the shoulder's south face, so the south groove is
+    # under its bore. The hub may only come out long (HUB_LENGTH_BAND).
+    hub_19 = rocker_arm_spec.HUB_LENGTH - rocker_arm_spec.HUB_LENGTH_BAND[1] - width_high
+    for remaining in (north, hub_19):
+        assert remaining >= spec.BEARING_LENGTH_MIN
+    # A groove 0.1 mm wider than the .X band allows breaks the north journal:
+    # the requirement binds, it is not decoration.
+    assert pivot_bracket_spec.EAR_T - (width_high + 0.1) < spec.BEARING_LENGTH_MIN
+
+
+def test_relief_keeps_the_thrust_faces_whole_annulus() -> None:
+    """Codex #936 PRRT_kwDOPHDy386mTMXq: the groove must not eat the thrust
+    face. Its flat starts where the grooving corner ends; at the groove's
+    high limit that is still inside the hub's and the ear's bores, so each
+    seats on the same annulus a plain shoulder gives -- its own bore edge to
+    the O10 -- the annulus MHA-148 gives hub 0 at the other end."""
+    import rocker_thrust_washer_spec as washer
+
+    flat_start = spec.RELIEF_DIA + spec.LINEAR_3PL + 2.0 * spec.CORNER_RADIUS_MAX
+    mating_bores = (rocker_arm_spec.PIVOT_HOLE_DIA, pivot_bracket_spec.BORE_DIA)
+    assert flat_start <= min(mating_bores)
+    # The shoulder face is as wide as the washer's (both the hub's O10), and
+    # the hub seats inside it from its own bore out, as on the washer.
+    assert spec.SHOULDER_DIA == washer.OD == rocker_arm_spec.HUB_DIA
+    assert washer.BORE_DIA >= rocker_arm_spec.PIVOT_HOLE_DIA
 
 
 def test_relief_volume_is_two_annular_grooves() -> None:
