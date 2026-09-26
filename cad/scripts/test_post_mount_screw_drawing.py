@@ -628,8 +628,19 @@ class _Point:
         return _Point(transform(self.ArrayData))
 
 
+class _DoubleArray(tuple):
+    """What the fake double_array hands COM: a bare list must never reach
+    CreatePoint or SetViewPosition (a real seat reads it as zeros)."""
+
+
+def _require_double_array(values, what: str) -> None:
+    if not isinstance(values, _DoubleArray):
+        raise TypeError(f"{what} got {type(values).__name__}, not a double_array")
+
+
 class _Utility:
     def CreatePoint(self, xyz):
+        _require_double_array(xyz, "CreatePoint")
         return _Point(xyz)
 
 
@@ -658,6 +669,7 @@ class _SeatView:
         self.Position = (0.2, 0.6)
 
     def SetViewPosition(self, position, move_children):
+        _require_double_array(position, "SetViewPosition")
         self.seat.log.append(("move", self.name, tuple(position), move_children))
         self.Position = tuple(position)
         return True
@@ -733,7 +745,7 @@ def _tip_seat(monkeypatch, *, cropped: bool = True):
         return made
 
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
-    monkeypatch.setattr(drawing, "double_array", lambda values: list(values))
+    monkeypatch.setattr(drawing, "double_array", lambda values: _DoubleArray(values))
     monkeypatch.setattr(drawing, "place_view", place)
     monkeypatch.setattr(drawing, "model_point_in_view", point_in_view)
     monkeypatch.setattr(drawing, "view_name", lambda adapter, view: view.name)
