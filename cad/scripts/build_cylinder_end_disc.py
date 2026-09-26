@@ -42,6 +42,7 @@ from _common import (
 )
 from _drawing_marks import (
     apply_drawing_precision,
+    apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
@@ -138,6 +139,9 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # MHA-121's title block reads Material Specification / Finish / Quantity
+    # from its registry row (test_source_properties_drawing).
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 
