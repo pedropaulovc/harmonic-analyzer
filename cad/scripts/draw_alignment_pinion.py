@@ -16,7 +16,6 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    ViewEdges,
     add_property_linked_note,
     add_surface_finish,
     assert_imported_precision,
@@ -26,7 +25,6 @@ from _drawing_common import (
     new_project_drawing,
     property_link,
     read_required_properties,
-    scan_view_edges,
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -38,8 +36,6 @@ from alignment_pinion_spec import (
     ARBOR_BORE_CALLOUT,
     BORE_DIA,
     DRAWING_PRECISION_BY_NAME,
-    FACE_WIDTH,
-    OUTSIDE_DIA,
     SURFACE_FINISHES,
     TEETH,
 )
@@ -81,46 +77,10 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "FaceWidth": (RIGHT_CENTER[0], 0.125),
 }
-# The *Right profile lays model +Z to the left, so the z = 0 (front) end face
-# is its right end and the z = FACE_WIDTH (back) end face its left.  Each end
-# face's roughness leader meets the face's edge-on line above the axis, inside
-# the tooth outline, from outside the drum: the back face's from the upper
-# left, clear of the end view's OD leader; the front face's from the lower
-# right, below the isometric and clear of the FaceWidth extension line, which
-# runs down from the face's lower corner.
-_PROFILE_HALF_LEN = FACE_WIDTH / 2000.0 * PROFILE_SCALE[0] / PROFILE_SCALE[1]
-END_FACE_PICK_RISE = OUTSIDE_DIA / 4000.0 * PROFILE_SCALE[0] / PROFILE_SCALE[1]
-BACK_END_FACE_XY = (
-    RIGHT_CENTER[0] - _PROFILE_HALF_LEN,
-    RIGHT_CENTER[1] + END_FACE_PICK_RISE,
-)
-FRONT_END_FACE_XY = (
-    RIGHT_CENTER[0] + _PROFILE_HALF_LEN,
-    RIGHT_CENTER[1] + END_FACE_PICK_RISE,
-)
-BACK_END_FINISH_SYMBOL_XY = (BACK_END_FACE_XY[0] - 0.015, RIGHT_CENTER[1] + 0.030)
-FRONT_END_FINISH_SYMBOL_XY = (FRONT_END_FACE_XY[0] + 0.022, RIGHT_CENTER[1] - 0.028)
 DIMENSION_CALLOUTS = {
     "ArborBoreDia": ARBOR_BORE_CALLOUT,
     "FaceWidth": "OVERALL; TEETH FULL LENGTH",
 }
-
-
-def _end_face_tip_arc(profile_edges: ViewEdges, face_z_mm: float, *, label: str) -> Any:
-    """A tooth-tip arc lying IN the end face at ``face_z_mm``, picked from the
-    profile's edge scan by its circle, never by a sheet point.
-
-    On the profile the end face is an edge-on line, and every longitudinal
-    tooth edge ends on it, so a point pick there took a tip-land edge for the
-    back face (leaf 20260926T113807Z-1-194b1994).  Every tip arc bounds its
-    own end face, so any of them carries that face's finish.
-    """
-    return profile_edges.circle_at(
-        (0.0, 0.0, face_z_mm),
-        OUTSIDE_DIA / 2.0,
-        axis=(0.0, 0.0, 1.0),
-        label=label,
-    ).edge
 
 
 def _bind_title_material_specification(
@@ -340,39 +300,6 @@ async def build(adapter: Any) -> dict[str, str]:
             FRONT_CENTER[0],
             FRONT_CENTER[1] - BORE_DIA * FRONT_SCALE[0] / FRONT_SCALE[1] / 2000.0,
         ),
-        char_height=0.0025,
-    )
-
-    # Both end faces are thrust faces against the MHA-056 straps: each takes
-    # its own machined-grade symbol on its edge-on line in the profile.  Every
-    # longitudinal tooth edge ends on that line too, so a coordinate pick there
-    # can take a tooth edge instead of the face (leaf 20260926T113807Z-1-194b1994
-    # took a tip-land edge for the back face).  Each symbol attaches to a
-    # tooth-tip arc lying IN its end face, picked from the profile's edge scan,
-    # and its leader lands on the edge-on line at the nominal point.
-    profile_edges = scan_view_edges(right, label="drum profile end-face arcs")
-    add_surface_finish(
-        adapter,
-        right,
-        edge_entity=_end_face_tip_arc(
-            profile_edges, FACE_WIDTH, label="drum back end face tip arc"
-        ),
-        symbol_xy=BACK_END_FINISH_SYMBOL_XY,
-        control=surface_finish_by_key(SURFACE_FINISHES, "back_end_face"),
-        label="drum back end face finish",
-        leader_attach_xy=BACK_END_FACE_XY,
-        char_height=0.0025,
-    )
-    add_surface_finish(
-        adapter,
-        right,
-        edge_entity=_end_face_tip_arc(
-            profile_edges, 0.0, label="drum front end face tip arc"
-        ),
-        symbol_xy=FRONT_END_FINISH_SYMBOL_XY,
-        control=surface_finish_by_key(SURFACE_FINISHES, "front_end_face"),
-        label="drum front end face finish",
-        leader_attach_xy=FRONT_END_FACE_XY,
         char_height=0.0025,
     )
 
