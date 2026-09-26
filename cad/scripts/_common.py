@@ -2349,8 +2349,13 @@ async def force_rebuild(adapter: Any) -> None:
     makes the new names resolvable as equation targets and refreshes the tree
     labels. Delegates to the adapter's ``rebuild_model`` (``ForceRebuild3``) so
     the COM call runs on the adapter's executor thread and a failed rebuild
-    raises through :func:`check` rather than passing silently."""
-    check("rebuild", await adapter.rebuild_model())
+    raises through :func:`check` rather than passing silently.  A refused
+    rebuild first names its What's Wrong features and captures the seat
+    (:func:`_seat_forensics.capture_rebuild_failure`), raising the same message."""
+    result = await adapter.rebuild_model()
+    if not result.is_success:
+        _seat_forensics.capture_rebuild_failure(adapter, f"rebuild failed: {result.error}")
+    check("rebuild", result)
 
 
 # ---------------------------------------------------------------------------

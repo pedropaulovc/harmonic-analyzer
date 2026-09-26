@@ -53,7 +53,7 @@ CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
     ("draw_drive_train_assembly.py", "_export_failure_pdf"): frozenset({"OUT_FAILURES"}),
 }
 # Allowed anywhere, but only as a statement whose value is the call: it always raises.
-TERMINAL = frozenset({"capture_com_failure"})
+TERMINAL = frozenset({"capture_com_failure", "capture_rebuild_failure"})
 
 # Rule 3: the COM mutators an inert module may call, and the function that calls each.
 MUTATOR = re.compile(
@@ -266,11 +266,20 @@ def test_rule3_inert_module_runs_no_com_mutator_before_a_save(name):
         stray = callers - roots
         if stray:
             violations.append(f"{holder} (a pinned mutator) is reached from {sorted(stray)}")
-    capture = functions.get("capture_com_failure")
-    if capture is not None:
+    # A terminal call is allowed anywhere only because it always raises: each
+    # ends in a raise, or in a call to another terminal that does.
+    for terminal in TERMINAL & set(functions):
+        capture = functions[terminal]
         returns = ast.unparse(capture.returns) if capture.returns is not None else ""
-        if returns != "NoReturn" or not isinstance(capture.body[-1], ast.Raise):
-            violations.append("capture_com_failure must be NoReturn and end in raise")
+        last = capture.body[-1]
+        ends_terminal = (
+            isinstance(last, ast.Expr)
+            and isinstance(last.value, ast.Call)
+            and isinstance(last.value.func, ast.Name)
+            and last.value.func.id in TERMINAL - {terminal}
+        )
+        if returns != "NoReturn" or not (isinstance(last, ast.Raise) or ends_terminal):
+            violations.append(f"{terminal} must be NoReturn and end in raise")
     for entry in PRE_SAVE & set(functions):
         reached = _reachable(tree, {entry}) & set(MUTATOR_ROOTS)
         if reached:

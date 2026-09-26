@@ -1681,5 +1681,105 @@ def test_selection_description_never_raises_for_an_unreadable_entity():
     assert all(isinstance(v, (str, bool, int, float)) for v in bag.values())
 
 
+# --- force_rebuild: a refused rebuild names its features (#906) --------------
+
+
+class _Named:
+    def __init__(self, name: str) -> None:
+        self.Name = name
+
+
+class _RebuildExtension:
+    """What's Wrong as the crank pinion's refused rebuild left it: the pin hole
+    and two tooth cuts, early-bound (the outs ride the return tuple)."""
+
+    FAULTS = (("PinHole", 1), ("ToothGap12", 2), ("ToothGap13", 2))
+
+    def GetWhatsWrongCount(self) -> int:
+        return len(self.FAULTS)
+
+    def GetWhatsWrong(self):
+        names, codes = zip(*self.FAULTS)
+        return True, [_Named(name) for name in names], list(codes), [False] * len(codes)
+
+
+class _MessagingSeat(_Seat):
+    def GetErrorMessages(self):
+        return 1, ["PinHole: could not be inserted due to geometry conditions"], [0]
+
+
+class _RebuildResult:
+    def __init__(self, error: str | None) -> None:
+        self.is_success = error is None
+        self.error = error
+        self.data = None
+
+
+class _RebuildAdapter(_Adapter):
+    def __init__(self, tmp_path: Path, error: str | None) -> None:
+        model = _Model(tmp_path)
+        model.Extension = _RebuildExtension()
+        super().__init__(sw=_MessagingSeat(), model=model)
+        self._result = _RebuildResult(error)
+
+    async def rebuild_model(self) -> _RebuildResult:
+        return self._result
+
+
+def test_a_refused_rebuild_names_its_features_captures_and_raises(
+    tmp_path, monkeypatch, capture_telemetry
+):
+    """part:crank_pinion failed five times with only "Failed to rebuild model".
+    The refusal now carries What's Wrong on the rebuild span, and the full
+    capture (session messages included) lands before the unchanged raise."""
+    import asyncio
+
+    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    spans, logs = capture_telemetry
+    adapter = _RebuildAdapter(tmp_path, "Error in rebuild_model: Failed to rebuild model")
+
+    with pytest.raises(
+        RuntimeError, match=r"^rebuild failed: Error in rebuild_model: Failed to rebuild model$"
+    ):
+        asyncio.run(_common.force_rebuild(adapter))
+
+    (rebuild,) = [s for s in spans.get_finished_spans() if s.name == "feature.rebuild"]
+    (event,) = [e for e in rebuild.events if e.name == "rebuild.failed"]
+    assert event.attributes["failing_features"] == (
+        "PinHole (unknown-error, code 1); "
+        "ToothGap12 (rebuild-error, code 2); "
+        "ToothGap13 (rebuild-error, code 2)"
+    )
+    assert event.attributes["fault_count"] == 3
+
+    (captured,) = sorted((tmp_path / "failures").glob("*/*/capture.json"))
+    report = json.loads(captured.read_text())
+    assert report["api"] == "IModelDoc2.ForceRebuild3"
+    assert report["label"] == "rebuild 91247A720"
+    assert [row["feature"] for row in report["error_state"]["whats_wrong"]] == [
+        "PinHole",
+        "ToothGap12",
+        "ToothGap13",
+    ]
+    assert report["error_state"]["error_messages"] == [
+        "PinHole: could not be inserted due to geometry conditions"
+    ]
+    assert report["context"]["failing_features"] == event.attributes["failing_features"]
+    bodies = [str(r.log_record.body) for r in logs.get_finished_logs()]
+    assert any(body.startswith("[forensics] rebuild 91247A720:") for body in bodies)
+
+
+def test_a_clean_rebuild_captures_nothing(tmp_path, monkeypatch, capture_telemetry):
+    import asyncio
+
+    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    spans, _logs = capture_telemetry
+    asyncio.run(_common.force_rebuild(_RebuildAdapter(tmp_path, None)))
+
+    (rebuild,) = [s for s in spans.get_finished_spans() if s.name == "feature.rebuild"]
+    assert not [e for e in rebuild.events if e.name == "rebuild.failed"]
+    assert not (tmp_path / "failures").exists()
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))
