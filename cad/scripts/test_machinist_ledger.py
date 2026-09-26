@@ -143,6 +143,14 @@ def _review(
     )
 
 
+@pytest.fixture(autouse=True)
+def finding_rulings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Each test's own finding-rulings file, never the tracked one."""
+    path = tmp_path / "finding-rulings.md"
+    monkeypatch.setattr(ml, "FINDING_RULINGS_PATH", path)
+    return path
+
+
 @pytest.fixture
 def registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Point the crank_arm registry row at a temp PDF path; return that path.
@@ -918,26 +926,39 @@ def test_cross_family_drift_is_covered_by_a_counting_last_resort(
 # --- rulings -------------------------------------------------------------------------
 
 
-def _rulings_log(tmp_path: Path) -> Path:
-    log = tmp_path / "handoff.md"
-    filler = "".join(f"- 14:{minute:02d}Z build notes\n" for minute in range(10))
-    log.write_text(
-        f"# handoff\n{filler}- ~15:50Z USER RULINGS (via Main):\n"
-        "- U31: the note band stays on the sheet\n"
-        "- U37: datum A stays for the fixture\n",
-        encoding="utf-8",
+RULING_HEADER = (
+    "# Machinist-review finding rulings\n\n"
+    "| id | drawing | finding | decision | evidence | ruled_by | date |\n"
+    "|---|---|---|---|---|---|---|\n"
+)
+U31_ROW = (
+    "| U31 | crank_arm | note band repeats the title block | KEPT: the note band "
+    "stays on the sheet | handoff 15:50Z | user | 2026-09-25 |"
+)
+
+
+def _rulings_log(tmp_path: Path, *rows: str) -> Path:
+    """The test's finding-rulings file (see the autouse fixture) with ``rows``."""
+    log = ml.FINDING_RULINGS_PATH
+    rows = rows or (
+        U31_ROW,
+        "| U37 | crank_arm | datum A | KEPT: datum A stays for the fixture | "
+        "Main's adjudication, PR #1 | Main | 2026-09-25 |",
+        "| U40 | pen_rod | a pen_rod finding | KEPT | handoff | user | 2026-09-25 |",
     )
+    log.write_text(RULING_HEADER + "\n".join(rows) + "\n", encoding="utf-8")
     return log
 
 
 def _rebuttals(log: Path) -> list[dict]:
+    line = 1 + log.read_text(encoding="utf-8").splitlines().index(U31_ROW)
     return [
         {
             "category": "over_specification",
             "index": 0,
             "where": "note 2",
             "ruling": "U31",
-            "citation": f"{log.as_posix()}:13",
+            "citation": f"{log.as_posix()}:{line}",
             "rebuttal": "the user ruled the band onto the sheet",
         },
         {
@@ -970,10 +991,11 @@ def test_a_fix_whose_every_finding_cites_a_ruling_is_accepted_with_rulings(
     entry = ml.load_ledger(ledger_path)["drawings"]["crank_arm"][ml.CROSS_FAMILY]
     status = ml.check(["crank_arm"], ledger_path=ledger_path)[0]
     assert recorded.status == entry["status"] == ml.ACCEPTED_WITH_RULINGS
-    assert [(r["where"], r["ruling"], r["cited"]) for r in entry["rebuttals"]] == [
-        ("note 2", "U31", "- U31: the note band stays on the sheet"),
-        ("datum A", "U37", "- U37: datum A stays for the fixture"),
+    assert [(r["where"], r["ruling"], r["ruled_by"]) for r in entry["rebuttals"]] == [
+        ("note 2", "U31", "user"),
+        ("datum A", "U37", "Main"),
     ]
+    assert entry["rebuttals"][0]["cited"] == U31_ROW
     assert entry["rebuttals"][0]["issue"] == "band repeats the title block"
     assert (status.state, status.via) == (
         ml.State.OK,
@@ -988,12 +1010,19 @@ def test_a_fix_whose_every_finding_cites_a_ruling_is_accepted_with_rulings(
             lambda r: r[:1],
             r"findings with no cited ruling: \['over_specification\[1\] datum A'\]",
         ),
-        (lambda r: [{**r[0], "ruling": "U99"}, r[1]], "does not mention U99"),
+        (lambda r: [{**r[0], "ruling": "U99"}, r[1]], "U99 is not a ruling recorded"),
         (
-            lambda r: [{**r[0], "citation": r[0]["citation"][:-3] + ":2"}, r[1]],
-            "near that line",
+            lambda r: [{**r[0], "ruling": "U40"}, r[1]],
+            "U40 is on pen_rod, not crank_arm",
         ),
-        (lambda r: [{**r[0], "citation": "missing.md:3"}, r[1]], "no such file"),
+        (
+            lambda r: [
+                {**r[0], "citation": r[0]["citation"].rsplit(":", 1)[0] + ":2"},
+                r[1],
+            ],
+            "U31 is recorded on line",
+        ),
+        (lambda r: [{**r[0], "citation": "missing.md:3"}, r[1]], "must point at"),
         (lambda r: [{**r[0], "where": "note 3"}, r[1]], "where 'note 3'"),
         (lambda r: [r[0], r[0], r[1]], "rebutted twice"),
         (lambda r: [*r, {**r[0], "index": 5}], "names no finding"),
@@ -1021,18 +1050,17 @@ def test_an_uncited_finding_keeps_the_drawing_failing(
     assert not ledger_path.exists()
 
 
-@pytest.mark.parametrize("line", ["- U31A: a different ruling", "- see U31B, U310"])
-def test_a_ruling_id_matches_only_as_a_whole_token(
-    tmp_path: Path, registry: Path, line: str
+def test_a_rebuttal_must_cite_the_drawings_row_in_the_finding_rulings(
+    tmp_path: Path, registry: Path
 ) -> None:
-    log = tmp_path / "handoff.md"
-    log.write_text(f"# handoff\n{line}\n- U37: datum A stays\n", encoding="utf-8")
-    rebuttals = _rebuttals(log)
-    rebuttals[0]["citation"] = f"{log.as_posix()}:2"
+    # An id that merely appears in some other file is no recorded ruling.
+    handoff = tmp_path / "handoff.md"
+    handoff.write_text("- U31: the note band stays on the sheet\n", encoding="utf-8")
+    rebuttals = _rebuttals(_rulings_log(tmp_path))
     pdf = _sheet(registry)
 
-    with pytest.raises(ValueError, match="does not mention U31"):
-        ml.record_review(
+    def record(rebuttals: list[dict]):
+        return ml.record_review(
             _review(pdf, passed=False),
             pdf,
             author_family="claude",
@@ -1041,16 +1069,36 @@ def test_a_ruling_id_matches_only_as_a_whole_token(
             ledger_path=tmp_path / "ledger.json",
         )
 
-    log.write_text("# handoff\n- (U31) the band stays\n- U37.\n", encoding="utf-8")
-    recorded = ml.record_review(
-        _review(pdf, passed=False),
-        pdf,
-        author_family="claude",
-        rebuttals=rebuttals,
-        provenance={},
-        ledger_path=tmp_path / "ledger.json",
-    )
-    assert recorded.status == ml.ACCEPTED_WITH_RULINGS
+    with pytest.raises(ValueError, match="must point at finding-rulings.md"):
+        record([{**rebuttals[0], "citation": f"{handoff.as_posix()}:1"}, rebuttals[1]])
+    # Nor does a row that only resembles the id.
+    _rulings_log(tmp_path, U31_ROW.replace("| U31 |", "| U31A |"))
+    with pytest.raises(ValueError, match="U31 is not a ruling recorded"):
+        record(rebuttals)
+    _rulings_log(tmp_path)
+    assert record(rebuttals).status == ml.ACCEPTED_WITH_RULINGS
+
+
+@pytest.mark.parametrize(
+    ("row", "error"),
+    [
+        (U31_ROW.replace("| user |", "| codex |"), "ruled_by 'codex' is not one of"),
+        (
+            U31_ROW.replace("| crank_arm |", "| retired_part |"),
+            "not a registry drawing",
+        ),
+        (U31_ROW.replace("| handoff 15:50Z |", "|  |"), r"lacks \['evidence'\]"),
+        (U31_ROW.replace("| 2026-09-25 |", "| yesterday |"), "is not ISO"),
+        (U31_ROW.replace(" | user", ""), "a ruling row has 7 cells"),
+    ],
+)
+def test_a_finding_ruling_row_needs_its_drawing_evidence_and_ruler(
+    tmp_path: Path, registry: Path, row: str, error: str
+) -> None:
+    with pytest.raises(ValueError, match=error):
+        ml.load_finding_rulings(_rulings_log(tmp_path, row))
+    with pytest.raises(ValueError, match="recorded twice"):
+        ml.load_finding_rulings(_rulings_log(tmp_path, U31_ROW, U31_ROW))
 
 
 @pytest.mark.parametrize(
@@ -2618,25 +2666,10 @@ def test_an_author_ruling_needs_its_family_commit_and_evidence(
         ml.load_author_rulings(_author_rulings(tmp_path, **change))
 
 
-def test_every_tracked_finding_ruling_is_citable() -> None:
-    path = ml.CAD_ROOT / "reviews" / "finding-rulings.md"
-    lines = path.read_text(encoding="utf-8").splitlines()
-    rows = [
-        (number, [cell.strip() for cell in line.strip("|").split("|")])
-        for number, line in enumerate(lines, 1)
-        if line.startswith("| MR-")
-    ]
-    assert rows, "finding-rulings.md records no ruling"
-    ids = [cells[0] for _, cells in rows]
-    assert len(ids) == len(set(ids))
-    for number, cells in rows:
-        ruling, drawing, finding, decision, evidence, ruled_by, date = cells
-        assert drawing.split()[0] in ml.DRAWINGS_BY_NAME
-        assert finding and decision and evidence
-        assert ruled_by in ("user", "Main")  # Main adjudicates by delegation
-        datetime.fromisoformat(date)
-        citation = f"{path.relative_to(ml.REPO_ROOT).as_posix()}:{number}"
-        assert ruling in ml._cited_excerpt(ruling, citation)
+def test_the_tracked_finding_rulings_load() -> None:
+    rulings = ml.load_finding_rulings(ml.CAD_ROOT / "reviews" / "finding-rulings.md")
+    assert rulings["MR-037-1"]["drawing"] == "knife_mount"
+    assert rulings["MR-037-1"]["ruled_by"] == "Main"
 
 
 def test_the_tracked_author_rulings_load() -> None:
@@ -2699,6 +2732,50 @@ def test_a_newer_failing_verdict_can_overrule_a_ship(
     assert row.outcome == outcome
     if outcome == ml.Backfill.CONTRADICTED:
         assert "newer codex/gpt-6-astra" in row.detail and "wt-fix" in row.detail
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"blind": False},
+        {"kind": "assembly"},
+        {"prompt_text": "a custom rubric: be terse"},
+        {"passed_flag_only": True},  # a SHIP verdict whose passed flag says false
+    ],
+    ids=["sighted", "wrong-kind", "custom-rubric", "flag-contradicts-verdict"],
+)
+def test_only_a_gating_review_can_overrule_a_ship(
+    tmp_path: Path,
+    registry: Path,
+    records: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    change: dict,
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    _on_record(records, "wt-ship", reviewed_at=EARLIER)
+    options = dict(change)
+    flag_only = options.pop("passed_flag_only", False)
+    edits = {key: options.pop(key) for key in ("blind", "kind") if key in options}
+    _on_record(
+        records,
+        "wt-other",
+        passed=flag_only,
+        reviewed_at=REVIEWED_AT,
+        **options,
+    )
+    report = records / "wt-other" / "cad" / "out" / "reports" / "machinist-review"
+    report = report / "crank_arm.json"
+    data = json.loads(report.read_text(encoding="utf-8"))
+    data.update(edits)
+    if flag_only:
+        data["passed"] = False
+    report.write_text(json.dumps(data), encoding="utf-8")
+    _sheet(registry)
+
+    row = _backfill(tmp_path, records)
+
+    assert row.outcome == ml.Backfill.INGESTED, row.detail
+    assert "wt-ship" in row.detail
 
 
 def test_backfill_skips_what_cannot_be_ingested_and_honours_exclusions(

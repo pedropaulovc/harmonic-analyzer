@@ -20,9 +20,10 @@ sheet a reviewer passed.  This module is that link.
   script's last commit trailer.  Anything else is recorded with ``counts:
   false`` and the reason, and is never accepted.
 * **Accepted** -- a ``SHIP``, or ``accepted_with_rulings``: a verdict whose
-  every blocker, over-specification and clarity finding is rebutted by a cited
-  recorded ruling (ruling id plus the file and line recording it).  The rebuttal
-  and the cited line are kept in the entry.  An unrebutted finding keeps the
+  every blocker, over-specification and clarity finding is rebutted by a
+  ruling recorded for that drawing in ``cad/reviews/finding-rulings.md``, cited
+  by id and that file (and its line).  The rebuttal and the ruling's row are
+  kept in the entry.  An unrebutted finding keeps the
   drawing failing.
 * **Sheet content** -- each PDF page rendered at the review's 300 dpi,
   grayscale, thresholded to 1-bit ink, plus the page's text layer as spans
@@ -166,7 +167,17 @@ _TRAILER = re.compile(
     r"^co-authored-by:\s*([^<\n]+?)\s*(?:<[^>\n]*>)?\s*$", re.I | re.M
 )
 _CITATION = re.compile(r"^(?P<path>.+?)(?::(?P<line>\d+))?$")
-_CITATION_WINDOW = 3  # lines either side of a cited line that may hold the ruling id
+FINDING_RULINGS_PATH = CAD_ROOT / "reviews" / "finding-rulings.md"
+RULED_BY = ("user", "Main")  # Main adjudicates under the user's standing delegation
+_RULING_COLUMNS = (
+    "id",
+    "drawing",
+    "finding",
+    "decision",
+    "evidence",
+    "ruled_by",
+    "date",
+)
 
 # PDFium's native API is process-global and not thread-safe.
 _PDFIUM_LOCK = threading.Lock()
@@ -1160,36 +1171,98 @@ def load_rebuttals(path: Path, *, name: str) -> list[dict[str, Any]]:
     return rebuttals
 
 
-def _cited_excerpt(ruling: str, citation: str) -> str:
-    """The cited line(s) holding ``ruling``; raises when the citation does not."""
-    match = _CITATION.match(citation.strip())
-    path = Path(match["path"])
-    path = path if path.is_absolute() else REPO_ROOT / path
+def load_finding_rulings(path: Path | None = None) -> dict[str, dict[str, Any]]:
+    """The recorded rulings that answer gating findings, by id.
+
+    One table row per ruling: id, drawing, finding, decision, evidence,
+    ruled_by (``user``, or ``Main`` adjudicating under the user's standing
+    delegation) and date.  Each row keeps its line number and text.
+    """
+    path = FINDING_RULINGS_PATH if path is None else path
     if not path.is_file():
-        raise ValueError(f"citation {citation!r}: no such file")
-    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    # The whole id: "U31" must not match inside "U31A" or "U310".
-    pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(ruling)}(?![A-Za-z0-9])")
-    if match["line"] is None:
-        found = [line for line in lines if pattern.search(line)]
-        if not found:
-            raise ValueError(f"citation {citation!r} does not mention {ruling}")
-        return found[0].strip()[:300]
-    number = int(match["line"])
-    if not 1 <= number <= len(lines):
-        raise ValueError(f"citation {citation!r}: the file has {len(lines)} lines")
-    window = lines[max(0, number - 1 - _CITATION_WINDOW) : number + _CITATION_WINDOW]
-    if not any(pattern.search(line) for line in window):
+        return {}
+    rulings: dict[str, dict[str, Any]] = {}
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if cells[0] == "id" or not cells[0].strip("-: "):
+            continue  # the header and the separator row
+        where = f"{path.name}:{number}"
+        if len(cells) != len(_RULING_COLUMNS):
+            raise ValueError(
+                f"{where}: a ruling row has {len(_RULING_COLUMNS)} cells "
+                f"({', '.join(_RULING_COLUMNS)}), not {len(cells)}"
+            )
+        row = dict(zip(_RULING_COLUMNS, cells, strict=True))
+        missing = [key for key, value in row.items() if not value]
+        if missing:
+            raise ValueError(f"{where}: ruling {row['id']} lacks {missing}")
+        drawing = row["drawing"].split()[0]
+        if drawing not in DRAWINGS_BY_NAME:
+            raise ValueError(f"{where}: {drawing!r} is not a registry drawing")
+        if row["ruled_by"] not in RULED_BY:
+            raise ValueError(
+                f"{where}: ruled_by {row['ruled_by']!r} is not one of {RULED_BY}"
+            )
+        try:
+            datetime.fromisoformat(row["date"])
+        except ValueError:
+            raise ValueError(f"{where}: date {row['date']!r} is not ISO") from None
+        if row["id"] in rulings:
+            raise ValueError(f"{where}: ruling {row['id']} is recorded twice")
+        rulings[row["id"]] = {
+            **row,
+            "drawing": drawing,
+            "line": number,
+            "text": line.strip(),
+        }
+    return rulings
+
+
+def _ruling_row(
+    ruling: str,
+    citation: str,
+    *,
+    name: str,
+    rulings: dict[str, dict[str, Any]],
+    path: Path,
+) -> dict[str, Any]:
+    """The finding-rulings row a rebuttal cites; raises unless it is ``name``'s."""
+    row = rulings.get(ruling)
+    if row is None:
+        raise ValueError(f"{ruling} is not a ruling recorded in {path.name}")
+    if row["drawing"] != name:
+        raise ValueError(f"ruling {ruling} is on {row['drawing']}, not {name}")
+    match = _CITATION.match(citation.strip())
+    cited = Path(match["path"])
+    cited = cited if cited.is_absolute() else REPO_ROOT / cited
+    if cited.resolve() != path.resolve():
         raise ValueError(
-            f"citation {citation!r} does not mention {ruling} near that line"
+            f"citation {citation!r} must point at {path.name}, where {ruling} is "
+            "recorded"
         )
-    return lines[number - 1].strip()[:300]
+    if match["line"] is not None and int(match["line"]) != row["line"]:
+        raise ValueError(
+            f"citation {citation!r}: {ruling} is recorded on line {row['line']}"
+        )
+    return row
 
 
 def apply_rebuttals(
-    verdict: dict[str, Any], rebuttals: Sequence[dict[str, Any]]
+    verdict: dict[str, Any],
+    rebuttals: Sequence[dict[str, Any]],
+    *,
+    name: str,
+    rulings_path: Path | None = None,
 ) -> list[dict[str, Any]]:
-    """Pair every gating finding with its cited ruling; raises on any gap."""
+    """Pair every gating finding with its recorded ruling; raises on any gap.
+
+    Each rebuttal cites a row of the finding rulings (``rulings_path``,
+    default ``cad/reviews/finding-rulings.md``) recorded for drawing ``name``.
+    """
+    rulings_path = FINDING_RULINGS_PATH if rulings_path is None else rulings_path
+    rulings = load_finding_rulings(rulings_path)
     findings = {
         (key, index): finding
         for key in GATING_KEYS
@@ -1218,6 +1291,12 @@ def apply_rebuttals(
             raise ValueError(
                 f"rebuttal {ref} needs a ruling id, a citation and its text"
             )
+        try:
+            row = _ruling_row(
+                ruling, citation, name=name, rulings=rulings, path=rulings_path
+            )
+        except ValueError as exc:
+            raise ValueError(f"rebuttal {ref}: {exc}") from None
         records[ref] = {
             "category": ref[0],
             "index": ref[1],
@@ -1225,7 +1304,8 @@ def apply_rebuttals(
             "issue": finding["issue"],
             "ruling": ruling,
             "citation": citation,
-            "cited": _cited_excerpt(ruling, citation),
+            "cited": row["text"][:300],
+            "ruled_by": row["ruled_by"],
             "rebuttal": text,
         }
     missing = [
@@ -1301,7 +1381,7 @@ def record_review(
     if rebuttals:
         if passed:
             raise ValueError(f"{name}: a passing review has nothing to rebut")
-        rebutted = apply_rebuttals(review["verdict"], rebuttals)
+        rebutted = apply_rebuttals(review["verdict"], rebuttals, name=name)
         status = ACCEPTED_WITH_RULINGS
     elif not passed:
         raise ValueError(
@@ -2003,6 +2083,28 @@ def _skip_reason(review: dict[str, Any], drawing: str) -> str:
     return ""
 
 
+def _objection_problem(review: dict[str, Any], drawing: str) -> str:
+    """Why a failing record may not withdraw a SHIP; "" when it is gating evidence.
+
+    Only what the gate itself would weigh objects: a blind review of the
+    registry drawing under its kind's committed rubric, whose verdict is valid
+    and fails.  A custom-rubric, sighted or wrong-kind run is not a verdict on
+    these sheets, whatever it says.
+    """
+    if not drawing:
+        return f"{review.get('name')!r} is not a registry drawing"
+    if not review.get("blind"):
+        return "not a blind review"
+    if review.get("kind") != DRAWINGS_BY_NAME[drawing].source_kind:
+        return f"a {review.get('kind')} review of a {DRAWINGS_BY_NAME[drawing].source_kind}"
+    try:
+        if verdict_passes({**review, "name": drawing}):
+            return "its verdict passes"
+        return prompt_problem(review) or ""
+    except (KeyError, TypeError, ValueError) as exc:
+        return f"not a valid review: {exc}"
+
+
 def find_reviews(roots: Sequence[Path], cache: BackfillCache | None = None) -> Found:
     """Every machinist_review record under ``roots``: verdicts and quota refusals."""
     by_pdf = {spec.outputs["pdf"].name: name for name, spec in DRAWINGS_BY_NAME.items()}
@@ -2038,7 +2140,11 @@ def find_reviews(roots: Sequence[Path], cache: BackfillCache | None = None) -> F
             continue
         drawing = _registry_name(review, by_pdf)
         skip = _skip_reason(review, drawing)
-        if not review.get("passed") and not skip.startswith("reviewed"):
+        if (
+            not review.get("passed")
+            and not skip.startswith("reviewed")
+            and not _objection_problem(review, drawing)
+        ):
             objections.append(Candidate(path, review, drawing))
         if verdict.get("verdict") == "SHIP":
             candidates.append(Candidate(path, review, drawing, skip=skip))

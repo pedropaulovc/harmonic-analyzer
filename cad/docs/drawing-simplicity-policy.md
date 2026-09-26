@@ -340,11 +340,13 @@ Every accepted registry-drawing review is recorded in the tracked ledger
 `cad/reviews/machinist-ledger.json`, together with the exact PDF it saw
 (`cad/reviews/sheets/<sha256>.pdf`). Accepted means `SHIP`, or
 `accepted_with_rulings`: a verdict whose every gating finding is answered, via
-`--rebuttals <file>`, by a ruling id plus the file and line that record it.
-A ruling is the user's, or Main's adjudication under the user's standing
-delegation; an adjudication counts only when it is recorded with its evidence,
-one row per ruling, in `cad/reviews/finding-rulings.md` (`ruled_by` is `user`
-or `Main`). A finding with no cited ruling keeps the drawing failing.
+`--rebuttals <file>`, by a ruling recorded for that drawing in
+`cad/reviews/finding-rulings.md`, cited by its id and that file (and line). A
+ruling is the user's, or Main's adjudication under the user's standing
+delegation; an adjudication counts only when it is recorded there with its
+evidence, one row per ruling (`ruled_by` is `user` or `Main`). A ruling on
+another drawing, or an id that merely appears in some other file, answers
+nothing. A finding with no recorded ruling keeps the drawing failing.
 `uv run cad/scripts/machinist_ledger.py check [<name>...]` exits nonzero for any
 drawing whose current PDF matches no accepted, counting review. Sheets match on
 identical masked ink, or on an identical text layer (every string, positions
@@ -361,7 +363,10 @@ under the roots. It finds the exact PDF each one reviewed by sha256 wherever it
 now lives, and ingests the newest `SHIP` whose sheets match the current render
 under the same rule and that counts under the family rule. A newer failing
 verdict that reviewed the same sheets, or whose reviewed PDF is lost, blocks
-the older `SHIP`, and `--apply` drops a recorded entry it contradicts. A draw
+the older `SHIP`, and `--apply` drops a recorded entry it contradicts. Only a
+verdict the gate would weigh objects: a blind review of the registry drawing
+under its kind's committed rubric with a valid, failing verdict. A sighted,
+custom-rubric or wrong-kind run does not. A draw
 script whose last commit names no model takes its family from
 `cad/reviews/author-rulings.json`. A per-drawing ruling names the family, the
 exact commit it judged, who ruled and the evidence; a later commit to the
