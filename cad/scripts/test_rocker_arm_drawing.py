@@ -134,3 +134,18 @@ def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
         in sheet_source
     )
     assert "roughness_ra=" not in sheet_source
+
+
+def test_hub_length_prints_its_one_sided_band() -> None:
+    """#743 PR2: the hubs are a solid stack whose north end is the rocker
+    bank's datum, so each hub may only come out long and the print says so
+    natively; rocker_bank_layout's L20 acceptance caps the sum."""
+    from _drawing_contract import model_toleranced_dimensions
+
+    assert rocker_arm_notes.DRAWING_DIMENSIONS["Hub"] == {"HubLength"}
+    assert "HubLength" in drawing.RIGHT_KEEP
+    assert model_toleranced_dimensions(arm)[("Hub", "HubLength")] == (
+        "*deviations(HUB_LENGTH_BAND)"
+    )
+    assert rocker_arm_spec.HUB_LENGTH_BAND == (0.05, 0.0)
+    assert f"{rocker_arm_spec.HUB_LENGTH:.2f}" not in rocker_arm_notes.DRAWING_NOTES

@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from rocker_arm_spec import (
     ARM_DEPTH,
-    ARM_THICKNESS,
     BOT_ARC_LEN,
     CENTER_Y,
     PIVOT_MID_Y,
@@ -21,7 +20,6 @@ from rocker_arm_spec import (
     TIP_FACE,
     TOP_ARC_LEN,
     HUB_DIA,
-    HUB_LENGTH,
 )
 
 # True free-text instructions only; geometry / datum structure / roughness live
@@ -34,6 +32,9 @@ from rocker_arm_spec import (
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StrapProfile": {"TopRadius", "BottomRadius"},
     "PivotHoleProfile": {"PivotDia"},
+    # #743 PR2: the hub length carries its +0.05/0 band natively; the 20-arm
+    # stack acceptance (rocker_bank_layout) caps the sum.
+    "Hub": {"HubLength"},
 }
 
 DRAWING_NOTES = "\n".join(
@@ -52,9 +53,9 @@ DRAWING_NOTES = "\n".join(
         f"5. EACH END: {TIP_FACE:.2f} RADIAL LAND PERP TO",
         "   TOP EDGE; STRAIGHT TAPER TO BOTTOM ARC.",
         "6. PIVOT HOLE: REAM +0.03/0, Ra 1.6.",
-        f"7. INTEGRAL HUB DIA {HUB_DIA:.2f} X {HUB_LENGTH:.2f} ON THE PIVOT",
-        f"   BORE, PROUD {(HUB_LENGTH - ARM_THICKNESS) / 2.0:.2f} EACH FACE: THE HUBS",
-        "   SET THE STATION PITCH (NO SPACERS).",
+        f"7. INTEGRAL HUB DIA {HUB_DIA:.2f} ON THE PIVOT BORE,",
+        "   CENTRED ON THE STRAP: THE HUBS SET THE",
+        "   STATION PITCH (NO SPACERS).",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

@@ -112,7 +112,11 @@ FRONT_KEEP = {
     "PivotDia": (0.180, 0.120),
 }
 NOTE_ONLY_DIMENSIONS = {"TopRadius", "BottomRadius"}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+# The hub length (+0.05/0, #743 PR2) under the end view, where the hub shows
+# its full length (the end view is 1:1, centred on the pivot mid-depth).
+RIGHT_KEEP: dict[str, tuple[float, float]] = {
+    "HubLength": (RIGHT_CENTER[0], RIGHT_CENTER[1] - (_PIVOT_MID_Y + 12.0) / 1000.0),
+}
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 
 
