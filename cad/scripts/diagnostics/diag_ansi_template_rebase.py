@@ -12,11 +12,17 @@ B1  write swDetailingDimensionStandard 2 then 1 (the ISO -> ANSI sequence that
     nothing else may move;
 B2  write the manifest's ``restore`` rows, dump, and require manifest rows ==
     ``target`` and every other preference == B0;
-B3  SaveAs the re-based template, close it, create a drawing from the SAVED
-    file, dump, and require B3 == B2 (the settings persist through the file).
+B2R SaveAs the re-based template, close it, reopen the SAVED file, dump, and
+    require B2R == B2 (every write, the precision 2 included, survives);
+B3  create a drawing from the SAVED file, dump, and require B3 == B2.
 
-Then two probes on that new drawing and on one made from the ORIGINAL
-template (the negative control):
+Then probes on drawings from the re-based and the ORIGINAL template (the
+negative control), each made two ways: plainly (``new_drawing``) and the way
+the build makes a sheet (``new_project_drawing``: units, the 372 pin, ink).
+``project_delta`` is every setting that differs between the two built sheets;
+it may hold only the manifest's unpinned ANSI rows, and the four generic
+leader-style rows must read 2 on the re-based built sheet (user ruling). On
+each drawing:
 * limit text: a sheet-sketch line dimensioned twice, one swTolMAX and one
   swTolMIN, read through ``IAnnotation::GetDisplayData`` (the limit-text gate's
   reader; it agreed with the PDF in the blast leaf), then the limit-text gate
@@ -24,8 +30,15 @@ template (the negative control):
   (positive control, >= 2 scanned) and fail on the original (negative control);
 * surface finish: three machining-required symbols carrying "Ra 3.2" in text
   index 8 (RoughnessValue1, today's ISO field), 5 (MaximumRoughness) and 4
-  (OtherRoughnessValue), each read back as rendered text; then, on the probe
-  drawing only, one text-8 symbol per swDetailingSFSymbolStandard value.
+  (OtherRoughnessValue), each placed and read back as rendered text; text 5
+  must print on both re-based sheets (user ruling: every drawing Ra moves
+  there); on the plain drawings, one text-8 symbol per
+  swDetailingSFSymbolStandard value.
+
+Last, the part template: a copy re-based 13 = 2 -> 1 (nothing else; the part
+side is not ruled yet), and a part from it and from the original, each with
+one unattached symbol per text field (8/5/4, the ``_part_pmi`` no-face call).
+Text 8 must print on the original part, or the read-back proves nothing.
 
 Every document is closed and proven gone before the next step reads a file.
 Everything is logged (``ansi-rebase`` lines); the JSON report (every manifest
@@ -53,13 +66,13 @@ import _drawing_common
 import _maxmin_prefs as tables
 import _telemetry
 import ansi_template_manifest as manifest
-from _common import _early_bound, run_build
+from _common import PART_TEMPLATE, _early_bound, check, run_build
 from _drawing_limit_text import ISO_LIMIT_WORD, assert_no_iso_limit_text
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 from solidworks_mcp.adapters.solidworks.drawing import new_drawing
 
 OUT_DIR = Path(__file__).resolve().parents[2] / "out" / "templates"
-_DOC_DRAWING = 3  # swDocumentTypes_e.swDocDRAWING
+_DOC_PART, _DOC_DRAWING = 1, 3  # swDocumentTypes_e
 _OPEN_SILENT = 1  # swOpenDocOptions_e.swOpenDocOptions_Silent
 _TOL_MIN, _TOL_MAX = 5, 6  # swTolType_e
 _SF_MACHINING_REQUIRED = 1  # swSFSymType_e.swSFMachining_Req (installed R2026x)
@@ -250,8 +263,8 @@ def _standard(ext: Any) -> dict[str, object]:
     }
 
 
-def _open(adapter: Any, path: Path) -> Any:
-    result = adapter.swApp.OpenDoc6(str(path), _DOC_DRAWING, _OPEN_SILENT, "", 0, 0)
+def _open(adapter: Any, path: Path, doc_type: int = _DOC_DRAWING) -> Any:
+    result = adapter.swApp.OpenDoc6(str(path), doc_type, _OPEN_SILENT, "", 0, 0)
     model = result[0] if isinstance(result, tuple) else result
     if not model:
         raise RuntimeError(f"OpenDoc6 failed for {path}: {result!r}")
@@ -294,6 +307,10 @@ def _write_restores(ext: Any, baseline: dict[str, object]) -> None:
             ok = ext.SetUserPreferenceDouble(
                 setting.pref, setting.option_id, float(setting.target)
             )
+        elif setting.kind == "integer":
+            ok = ext.SetUserPreferenceInteger(
+                setting.pref, setting.option_id, int(setting.target)
+            )
         elif setting.kind == "text_format":
             fmt = _early_bound(
                 ext.GetUserPreferenceTextFormat(setting.pref, setting.option_id),
@@ -308,7 +325,11 @@ def _write_restores(ext: Any, baseline: dict[str, object]) -> None:
             # formats (leaf ansi-rebase-4493): carry every other field from B0.
             if isinstance(before, dict):
                 for field in _TEXT_FORMAT_FIELDS:
-                    if field in ("CharHeight", "CharHeightInPts", "IsHeightSpecifiedInPts"):
+                    if field in (
+                        "CharHeight",
+                        "CharHeightInPts",
+                        "IsHeightSpecifiedInPts",
+                    ):
                         continue
                     current = getattr(fmt, field)
                     if callable(current):
@@ -401,7 +422,9 @@ def _limit_probe(adapter: Any, draw: Any, tag: str) -> dict[str, object]:
     return out
 
 
-def _sf_symbol(draw: Any, tag: str, index: int, x: float, y: float) -> dict[str, object]:
+def _sf_symbol(
+    draw: Any, tag: str, index: int, x: float, y: float
+) -> dict[str, object]:
     """Insert one machining-required symbol, write ``Ra 3.2`` to text
     ``index``, regenerate, and read back what it prints."""
     draw.ClearSelection2(True)
@@ -502,6 +525,98 @@ def _probe(
     return result
 
 
+# --- the part template (_part_pmi writes Ra into text 8 on every part) -----------
+
+
+async def _part_sf(adapter: Any, template: Path, tag: str) -> dict[str, object]:
+    """A part from ``template`` with one small block, then one unattached
+    machining-required symbol per text field (the ``_part_pmi`` no-face path),
+    each read back as printed text."""
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
+    raw = adapter.swApp.NewDocument(str(template), 0, 0, 0)
+    if not raw:
+        raise RuntimeError(f"{tag}: NewDocument failed for {template}")
+    model = _early_bound(raw, "IModelDoc2")
+    adapter.currentModel = model
+    ext = model.Extension
+    out: dict[str, object] = {"standard": _standard(ext)}
+    check(f"{tag} sketch", await adapter.create_sketch("Top"))
+    check(f"{tag} rectangle", await adapter.add_rectangle(-0.01, -0.01, 0.01, 0.01))
+    check(f"{tag} exit sketch", await adapter.exit_sketch())
+    check(
+        f"{tag} block", await adapter.create_extrusion(ExtrusionParameters(depth=0.005))
+    )
+    for column, (index, field) in enumerate(_SF_FIELDS.items()):
+        model.ClearSelection2(True)
+        raw_symbol = ext.InsertSurfaceFinishSymbol3(
+            _SF_MACHINING_REQUIRED,
+            0,
+            0.02 + 0.01 * column,
+            0.02,
+            0.005,
+            0,
+            1,
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+        )  # no leader, no lay, closed arrowhead (the _part_pmi no-face call)
+        if raw_symbol is None:
+            raise RuntimeError(
+                f"{tag}: InsertSurfaceFinishSymbol3 returned None ({field})"
+            )
+        symbol = _early_bound(raw_symbol, "ISFSymbol")
+        ok = bool(symbol.SetText(index, _SF_TEXT))
+        model.EditRebuild3()
+        rendered = _rendered(_early_bound(symbol.GetAnnotation(), "IAnnotation"))
+        out[field] = {
+            "index": index,
+            "set": ok,
+            "get_text": str(symbol.GetText(index) or ""),
+            "display_data": rendered,
+            "prints_value": any("3.2" in text for text in rendered or []),
+        }
+        _log(f"{tag}: sf {field} {out[field]!r}")
+    _close(adapter, model)
+    return out
+
+
+async def _part_probe(adapter: Any) -> dict[str, object]:
+    """Re-base a copy of the part template (13 = 2 -> 1, nothing else: the
+    part side is not ruled yet) and read Ra from text 8/5/4 on a part made
+    from it and on one made from the original (the read-back control)."""
+    source = PART_TEMPLATE
+    work = OUT_DIR / f"work-{source.name}"
+    result = OUT_DIR / f"rebased-{source.name}"
+    for path in (work, result):
+        if path.exists():
+            path.unlink()
+    shutil.copyfile(source, work)
+    model = _open(adapter, work, _DOC_PART)
+    ext = model.Extension
+    out: dict[str, object] = {"source": _stamp(source), "b0": _standard(ext)}
+    for value in manifest.REBASE_SEQUENCE:
+        ext.SetUserPreferenceInteger(manifest.STANDARD_PREF, 0, value)
+    model.EditRebuild3()
+    out["b1"] = _standard(ext)
+    model.SaveAs3(str(result), 0, 1)
+    _close(adapter, model)
+    work.unlink()
+    _log(f"part template b0={out['b0']!r} b1={out['b1']!r}")
+    out["rebased"] = await _part_sf(adapter, result, "part-rebased")
+    out["original"] = await _part_sf(adapter, source, "part-original")
+    if not out["original"]["RoughnessValue1"]["prints_value"]:
+        _finding(
+            "part control: text 8 prints no Ra on a part from the ORIGINAL template, "
+            f"so the part read-back proves nothing: {out['original']['RoughnessValue1']!r}"
+        )
+    return out
+
+
 # --- the leaf ----------------------------------------------------------------------
 
 
@@ -511,7 +626,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     report = OUT_DIR / f"{DRAWING_TEMPLATES[layout].path.stem}-rebase-report.json"
     try:
-        result = _rebase(adapter, layout)
+        result = await _rebase(adapter, layout)
     except Exception as exc:
         _finding(f"aborted: {type(exc).__name__}: {exc}")
         raise
@@ -531,7 +646,7 @@ async def build(adapter: Any) -> dict[str, str]:
     return {"template": str(result), "report": str(report)}
 
 
-def _rebase(adapter: Any, layout: DrawingLayout) -> Path:
+async def _rebase(adapter: Any, layout: DrawingLayout) -> Path:
     source = DRAWING_TEMPLATES[layout].path
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     work = OUT_DIR / f"work-{source.name}"
@@ -590,6 +705,15 @@ def _rebase(adapter: Any, layout: DrawingLayout) -> Path:
     _report["result"] = _stamp(result)
     _log(f"saved {result.name} {_report['result']}")
 
+    # B2R: reopen the SAVED template itself; every write (the precision 2
+    # included) must survive the file round trip.
+    reopened = _open(adapter, result)
+    b2r = _dump(reopened.Extension)
+    _record("b2_reopen", b2r)
+    _report["standard_b2_reopen"] = _standard(reopened.Extension)
+    _report["b2_reopen"] = _compare("B2R saved template reopened", b2, b2r, targets)
+    _close(adapter, reopened)
+
     rebased = _probe(adapter, result, "rebased", layout, "plain")
     b3 = rebased.pop("prefs")
     _record("b3", b3)
@@ -617,16 +741,70 @@ def _rebase(adapter: Any, layout: DrawingLayout) -> Path:
     _report["project_delta"] = {
         key: [before, sheet_rebased.get(key)]
         for key, before in sheet_original.items()
-        if before != sheet_rebased.get(key) and not _noise(key, before, sheet_rebased.get(key))
+        if before != sheet_rebased.get(key)
+        and not _noise(key, before, sheet_rebased.get(key))
     }
     _log(f"project sheet delta: {len(_report['project_delta'])} setting(s)")
     for key, pair in _report["project_delta"].items():
         _log(f"project delta {key}: {pair[0]!r} -> {pair[1]!r}")
     project_gate = project_rebased["limit"]["gate"]
     if not project_gate["passed"] or project_gate["scanned"] < 2:
-        _finding(f"project sheet: the limit-text gate on the re-based template {project_gate!r}")
+        _finding(
+            f"project sheet: the limit-text gate on the re-based template {project_gate!r}"
+        )
     if project_original["limit"]["gate"]["passed"]:
         _finding("project sheet: the limit-text gate passed the original template")
+
+    # A built sheet may change ONLY the ANSI rows the build does not pin; a
+    # restore row, or anything outside the manifest, moving on a sheet is a
+    # finding. An ANSI row the build overwrites is reported, not failed.
+    ansi_rows = {
+        manifest.key(s): s
+        for s in manifest.SETTINGS
+        if s.decision == "ansi" and (s.pref, s.option_id) not in manifest.CODE_PINNED
+    }
+    for key, (before, after) in _report["project_delta"].items():
+        if key not in ansi_rows:
+            _finding(
+                f"project sheet: {key} moved outside the ANSI rows: {before!r} -> {after!r}"
+            )
+    _report["project_overridden"] = {
+        key: [sheet_rebased.get(key), s.target]
+        for key, s in ansi_rows.items()
+        if not _matches(s, sheet_rebased.get(key), s.target)
+    }
+    _log(
+        f"project sheet: ANSI rows the build overrides {_report['project_overridden']!r}"
+    )
+    # User ruling 2026-09-26: the generic leader-style rows count as proven only
+    # if a BUILT sheet from the re-based template reads 2.
+    generic = {
+        f"integer|{name}|-": sheet_rebased.get(f"integer|{name}|-")
+        for name in (
+            "swDetailingAngularDimLeaderStyle",
+            "swDetailingDimensionTextAndLeaderStyle",
+            "swDetailingLinearDimLeaderStyle",
+            "swDetailingRadialDimLeaderStyle",
+        )
+    }
+    _report["generic_leader_rows_on_sheet"] = {
+        "rebased": generic,
+        "original": {key: sheet_original.get(key) for key in generic},
+    }
+    _log(
+        f"generic leader rows on a built sheet {_report['generic_leader_rows_on_sheet']!r}"
+    )
+    for key, value in generic.items():
+        if value != 2:
+            _finding(
+                f"STOP: built sheet from the re-based template reads {key} = {value!r}, not 2"
+            )
+    # User ruling 2026-09-26: every drawing Ra moves to text 5.
+    for tag, probe in (("plain", rebased), ("project", project_rebased)):
+        if not probe["surface_finish"]["MaximumRoughness"]["prints_value"]:
+            _finding(f"{tag} re-based sheet: text 5 (MaximumRoughness) prints no Ra")
+
+    _report["part"] = await _part_probe(adapter)
 
     for word in ("MAX", "MIN"):
         if (
@@ -642,7 +820,9 @@ def _rebase(adapter: Any, layout: DrawingLayout) -> Path:
             )
     gate = rebased["limit"]["gate"]
     if not gate["passed"] or gate["scanned"] < 2:
-        _finding(f"positive control: the limit-text gate on the re-based probe {gate!r}")
+        _finding(
+            f"positive control: the limit-text gate on the re-based probe {gate!r}"
+        )
     if control["limit"]["gate"]["passed"]:
         _finding(
             f"negative control: the limit-text gate passed the original template "
