@@ -32,33 +32,20 @@ def test_gear_data_block_preserves_the_actual_base_chord_profile() -> None:
     assert "X.XX" not in data
 
 
-def test_bore_and_both_thrust_end_faces_carry_the_machined_finish() -> None:
-    """Machinist review of 7f7fc1717: "end faces polished" had no stated
-    function.  The drum's ends are thrust faces -- MHA-102's float model stops
-    the drum hard forward and hard aft against the MHA-056 straps -- so each
-    carries the machined grade on its own face, and the finish field drops
-    the polish."""
+def test_only_the_bore_carries_a_finish_symbol() -> None:
+    """Machinist review of the pc-r7 sheet: Ra 1.6 on both end faces was
+    over-specified.  The ends bear on the MHA-056 straps at the float's two
+    stops, but no friction or end-play budget asks for a grade, so they take
+    the title-block finish.  "End faces polished" stays retired too."""
     import draw_alignment_pinion as drawing
-    from _gtol_spec import PlanarFace
 
-    bore, front, back = spec.SURFACE_FINISHES
+    (bore,) = spec.SURFACE_FINISHES
     assert bore.key == "drum_bore"
-    assert bore.face.diameter_mm == 8.0
-    assert front.key == "front_end_face"
-    assert front.face == PlanarFace((0, 0, -1), 0.0)
-    assert back.key == "back_end_face"
-    assert back.face == PlanarFace((0, 0, 1), spec.FACE_WIDTH)
-    assert {control.roughness_um for control in spec.SURFACE_FINISHES} == {1.6}
-    # The float model the thrust claim rests on.
-    assert arbor.STRAP_AXIAL_LOCATION == "block-stop-slot-set"
-    assert arbor.drum_total_air()[0] == 0.0  # a drum end can touch a strap
+    assert bore.face.diameter_mm == spec.BORE_DIA
+    assert bore.roughness_um == 1.6
     assert "polish" not in _config.parts("alignment-pinion")["finish"].lower()
-    # Each symbol's leader starts outside the drum and lands on its own end.
-    assert drawing.BACK_END_FINISH_SYMBOL_XY[0] < drawing.BACK_END_FACE_XY[0]
-    assert drawing.FRONT_END_FINISH_SYMBOL_XY[0] > drawing.FRONT_END_FACE_XY[0]
-    assert drawing.FRONT_END_FACE_XY[0] - drawing.BACK_END_FACE_XY[0] == pytest.approx(
-        spec.FACE_WIDTH / 1000.0
-    )
+    for retired in ("_end_face_tip_arc", "BACK_END_FACE_XY", "FRONT_END_FACE_XY"):
+        assert not hasattr(drawing, retired), retired
 
 
 def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None:
@@ -244,114 +231,3 @@ def test_no_note_line_carries_a_dimension() -> None:
     for line in spec.DRAWING_NOTES.splitlines():
         text = re.sub(r"MHA-\d+", "", line).replace(spec.RETAINING_COMPOUND, "")
         assert not re.search(r"\d", text), line
-
-
-# --- The end-face finishes attach to an edge OF the face ----------------------
-# Leaf 20260926T113807Z-1-194b1994 (7b21b56c0): a point pick on the back face's
-# edge-on line took a longitudinal tooth edge ending there, and the control
-# check refused it.  These fakes stand in for the profile's edge scan and the
-# faces each edge bounds.
-
-
-class _Surface:
-    def __init__(self, identity: int, **params) -> None:
-        self.Identity = identity
-        for name, value in params.items():
-            setattr(self, name, value)
-
-
-class _Face:
-    def __init__(
-        self, surface: _Surface, box: tuple[float, ...], *, reversed_sense=False
-    ):
-        self.surface = surface
-        self.box = box
-        self.reversed_sense = reversed_sense
-
-    def GetSurface(self):
-        return self.surface
-
-    def GetBox(self):
-        return self.box
-
-    def FaceInSurfaceSense(self):
-        return self.reversed_sense
-
-
-class _Edge:
-    def __init__(self, *faces: _Face) -> None:
-        self.faces = faces
-
-    def GetTwoAdjacentFaces2(self):
-        return self.faces
-
-
-def _profile_faces() -> dict[str, _Face]:
-    from _part_pmi import _SURFACE_CYLINDER, _SURFACE_PLANE
-
-    tip_r = spec.OUTSIDE_DIA / 2000.0
-    length = spec.FACE_WIDTH / 1000.0
-    return {
-        "tip": _Face(
-            _Surface(_SURFACE_CYLINDER, CylinderParams=(0, 0, length, 0, 0, -1, tip_r)),
-            (-tip_r, -tip_r, 0.0, tip_r, tip_r, length),
-        ),
-        # A tooth flank: neither the tip cylinder nor an end plane.
-        "flank": _Face(_Surface(4009), (0.0, 0.0, 0.0, tip_r, tip_r, length)),
-        "back": _Face(
-            _Surface(_SURFACE_PLANE, PlaneParams=(0, 0, 1, 0, 0, length)),
-            (-tip_r, -tip_r, length, tip_r, tip_r, length),
-        ),
-        "front": _Face(
-            _Surface(_SURFACE_PLANE, PlaneParams=(0, 0, -1, 0, 0, 0)),
-            (-tip_r, -tip_r, 0.0, tip_r, tip_r, 0.0),
-        ),
-    }
-
-
-def _profile_scan(faces: dict[str, _Face]):
-    from _drawing_common import ViewEdge, ViewEdges
-
-    tip_r = spec.OUTSIDE_DIA / 2.0
-    rise = spec.OUTSIDE_DIA / 4.0  # the leader lands this high on the edge-on line
-    flank = ViewEdge(
-        edge=_Edge(faces["tip"], faces["flank"]),
-        line=((0.0, rise, 0.0), (0.0, rise, spec.FACE_WIDTH)),
-        circle=None,
-        vertices=None,
-    )
-    arcs = {
-        name: ViewEdge(
-            edge=_Edge(faces["tip"], faces[name]),
-            line=None,
-            circle=(0.0, 0.0, z, 0.0, 0.0, 1.0, tip_r),
-            vertices=None,
-        )
-        for name, z in (("back", spec.FACE_WIDTH), ("front", 0.0))
-    }
-    return ViewEdges("drum profile", (flank, arcs["back"], arcs["front"])), flank, arcs
-
-
-@pytest.mark.parametrize(("face", "z_mm"), [("back", spec.FACE_WIDTH), ("front", 0.0)])
-def test_end_face_finish_attaches_to_an_edge_of_its_own_face(face, z_mm) -> None:
-    import _drawing_common as dc
-    import draw_alignment_pinion as drawing
-    from _surface_finish import surface_finish_by_key
-
-    faces = _profile_faces()
-    scan, flank, arcs = _profile_scan(faces)
-    control = surface_finish_by_key(spec.SURFACE_FINISHES, f"{face}_end_face")
-    # A point pick at the leader's landing on the edge-on line meets the
-    # flank edge, which ENDS there -- and the control check refuses it.
-    leader = (0.0, spec.OUTSIDE_DIA / 4.0, z_mm)
-    assert leader in flank.line
-    with pytest.raises(RuntimeError, match="does not touch controlled"):
-        dc._validate_surface_finish_control_face(
-            flank.edge, entity_type="EDGE", control=control, label="point pick"
-        )
-    # The drawing's pick is the tip arc in that face, which the check accepts.
-    picked = drawing._end_face_tip_arc(scan, z_mm, label=f"{face} end face tip arc")
-    assert picked is arcs[face].edge
-    dc._validate_surface_finish_control_face(
-        picked, entity_type="EDGE", control=control, label="tip arc"
-    )
