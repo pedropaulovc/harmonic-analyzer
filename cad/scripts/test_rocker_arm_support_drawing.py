@@ -571,3 +571,27 @@ def test_rim_chamfer_is_placed_on_the_section_by_a_targeted_import() -> None:
     by_feature = section.get("dimensions_by_feature")
     assert isinstance(by_feature, ast.Name) and by_feature.id == "DRAWING_DIMENSIONS"
     assert drawing.DRAWING_DIMENSIONS is support.DRAWING_DIMENSIONS
+
+
+def test_precision_reaches_every_dimension_exactly_once() -> None:
+    """r743-rocker-fix (53cb9ad5b) failed "dimension precision not applied:
+    ['RailDepth']": the bulk call covers only imported dimensions, and the
+    sheet-made ones (web, foot, rail depth) set their own after the import.
+    Every DIMENSION_PRECISION name goes through exactly one of the two."""
+    import ast
+
+    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    bulk = drawing.imported_precision()
+    assert set(bulk) == kept & set(drawing.DIMENSION_PRECISION)
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    own = {
+        node.slice.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Subscript)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "DIMENSION_PRECISION"
+        and isinstance(node.slice, ast.Constant)
+    }
+    assert own == {"WebThickness", "FootThickness", "RailDepth"}
+    assert not own & set(bulk)
+    assert own | set(bulk) == set(drawing.DIMENSION_PRECISION)
