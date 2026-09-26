@@ -382,6 +382,63 @@ async def _volume(adapter) -> float:
     return res.data.volume if res.is_success else float("nan")
 
 
+# (volume mm^3, surface area mm^2, centre of mass (x, y, z) mm)
+MassState = tuple[float, float, tuple[float, float, float]]
+
+
+async def _mass_state(adapter: Any) -> MassState:
+    res = await adapter.get_mass_properties()
+    if not res.is_success:
+        raise RuntimeError(f"mass properties unreadable: {res.error}")
+    data = res.data
+    return (
+        float(data.volume),
+        float(data.surface_area),
+        tuple(float(value) for value in data.center_of_mass),
+    )
+
+
+# The boss-step parity band. The deltas are small against the whole body
+# (the boss is ~4 % of the volume), so the bands are relative to the DELTA
+# but loose enough for SolidWorks' mass-property accuracy on the full body;
+# a wrong revolve (angle, radius, height or station) misses by far more.
+_BOSS_PARITY_RELATIVE = 1e-3
+_BOSS_PARITY_STATION_MM = 0.02
+
+
+def boss_parity_problems(before: MassState, after: MassState) -> list[str]:
+    """Judge the seat-boss step: the revolve must add exactly the old boss.
+
+    The boss was an extruded Ø BOSS_DIA x BOSS_HEIGHT cylinder on the block
+    top; it is now a revolve (Main 2026-09-25: same solid, different
+    feature). Adding that cylinder adds pi r^2 h of volume and its lateral
+    2 pi r h of area (its top disc replaces the block-top disc it covers),
+    and moves the first moment by its volume times its centroid
+    (0, BLK_TOP + h/2, 0). Volume and area prove the size, the moment proves
+    the station; any other solid fails one of the three.
+    """
+    radius = BOSS_DIA / 2.0
+    volume = math.pi * radius**2 * BOSS_HEIGHT
+    lateral = 2.0 * math.pi * radius * BOSS_HEIGHT
+    centroid = (0.0, BLK_TOP + BOSS_HEIGHT / 2.0, 0.0)
+    (volume_0, area_0, com_0), (volume_1, area_1, com_1) = before, after
+    problems = []
+    added_volume = volume_1 - volume_0
+    if abs(added_volume - volume) > _BOSS_PARITY_RELATIVE * volume:
+        problems.append(f"boss adds {added_volume:.4f} mm^3, cylinder {volume:.4f}")
+    added_area = area_1 - area_0
+    if abs(added_area - lateral) > _BOSS_PARITY_RELATIVE * lateral:
+        problems.append(f"boss adds {added_area:.4f} mm^2, lateral {lateral:.4f}")
+    for axis, (c_0, c_1, want) in enumerate(zip(com_0, com_1, centroid, strict=True)):
+        moment = volume_1 * c_1 - volume_0 * c_0
+        if abs(moment - volume * want) > _BOSS_PARITY_STATION_MM * volume:
+            problems.append(
+                f"boss centroid {'xyz'[axis]} {moment / volume:.4f} mm, "
+                f"cylinder {want:.4f}"
+            )
+    return problems
+
+
 # swDimensionDrivenState_e. A sketch dimension reads DRIVING (2) as authored
 # and DRIVEN (1) once an equation owns its value -- the equation, not the
 # sketch, is then its single driver. Measured on the farm (knife-cc-5,
@@ -641,6 +698,30 @@ def _assert_boss_and_tap_contract(adapter: Any) -> None:
             + f" -- {json.dumps(evidence, sort_keys=True)}"
         )
     _assert_tap_station(adapter, tap_sketch)
+    _assert_tap_on_boss_top(adapter)
+
+
+def _assert_tap_on_boss_top(adapter: Any) -> None:
+    """The seat plane at the tap is the Boss revolve's own top face.
+
+    ``_assert_tap_station`` proves the placement point sits at (0, SEAT_TOP,
+    0); this proves the +Y face there belongs to the Boss feature, i.e. the
+    Hole Wizard tap still starts on the turned boss after its move from an
+    extrude to a revolve. The probe point is between the tap drill and the
+    boss flank, so the tap's own cut cannot own it.
+    """
+    probe_x = (STUD_TAP_DIA / 2.0 + BOSS_DIA / 2.0) / 2.0
+    face = find_planar_face(
+        adapter.currentModel, (0.0, 1.0, 0.0), [[probe_x, SEAT_TOP, 0.0]], tol_mm=1e-3
+    )
+    if face is None:
+        raise RuntimeError(f"hanger-stud tap: no +Y face at the seat plane y={SEAT_TOP}")
+    owner = _early_bound(face, "IFace2").GetFeature()
+    owner_name = "" if owner is None else str(_early_bound(owner, "IFeature").Name)
+    if owner_name != "Boss":
+        raise RuntimeError(
+            f"hanger-stud tap: the seat face is owned by {owner_name!r}, not Boss"
+        )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -781,6 +862,7 @@ async def build(adapter) -> dict[str, str]:
     # 2 and 7; Main 2026-09-25 replaced the sheet-side Ø). The centerline runs
     # down to the block bottom so the 9.0's witness line leaves the part below
     # the section, clear of the boss.
+    before_boss = await _mass_state(adapter)
     boss_dims = SketchDims()
     check("create_sketch seat boss", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
@@ -857,10 +939,18 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Boss")
     expected += math.pi * (BOSS_DIA / 2.0) ** 2 * BOSS_HEIGHT
-    vol = await _volume(adapter)
-    _telemetry.info(f"volume after seat boss: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 0.01 * expected:
-        raise RuntimeError(f"seat boss volume {vol:.1f} != {expected:.1f}")
+    after_boss = await _mass_state(adapter)
+    _telemetry.info(
+        json.dumps(
+            {"event": "boss_parity", "before": before_boss, "after": after_boss},
+            sort_keys=True,
+        )
+    )
+    problems = boss_parity_problems(before_boss, after_boss)
+    if problems:
+        raise RuntimeError("seat boss is not the extruded boss: " + "; ".join(problems))
+    if abs(after_boss[0] - expected) > 0.01 * expected:
+        raise RuntimeError(f"seat boss volume {after_boss[0]:.1f} != {expected:.1f}")
 
     # 3. Hanger-stud tap: native #10-24 blind bottoming tap down the boss axis.
     # HoleWizard5 reads depth as the cylindrical drill shoulder below the seat;
@@ -951,6 +1041,12 @@ async def build(adapter) -> dict[str, str]:
     # database steel's bright render nor the frame's green.
     await apply_color(adapter, HARDENED_STEEL)
     await report_mass_properties(adapter)
+    _telemetry.info(
+        json.dumps(
+            {"event": "knife_mount_mass_state", "state": await _mass_state(adapter)},
+            sort_keys=True,
+        )
+    )
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
