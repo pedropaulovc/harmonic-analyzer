@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import math
 
+from _fit_limits import deviations
 from _gtol_spec import CylinderFace, PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
@@ -155,6 +156,58 @@ HARVESTED_MASS_KG = 0.820338
 # block's general grades govern.
 RUNNING_BORE_BAND = (0.005, -0.025)
 
+# The title block's general grades, mirrored here (the spec does not read the
+# config; test_cone_pivot_post_drawing cross-checks title_block.yaml): the
+# location bands by decimal places, the flat angular band and the drilled
+# hole's unilateral plus.
+TITLE_BLOCK_BAND_BY_PLACES = {1: 0.8, 2: 0.51}
+TITLE_BLOCK_ANGLE_BAND_DEG = 1.0
+DRILLED_HOLE_PLUS = 0.10
+
+# #917 S1: the mounting holes are transferred from the platform at assembly,
+# so no method note stands guard over the cone journal; the model does.  The
+# vertical through-hole and the inclined journal are skew: their axes stand
+# |MountX| cos(incline) apart, less both radii.  Worst case: the .XX hole
+# station in, the .X incline up a whole degree, the drilled hole at its plus,
+# the journal at its running band's top, and the journal's implied (unprinted)
+# location off the post axis at .XX toward the hole.  The counterbore floor
+# stands some 40 mm above the journal's top, so only the through-hole counts.
+MOUNT_JOURNAL_WALL_TARGET = 2.0
+MOUNT_JOURNAL_WALL_FLOOR = 1.5
+
+
+def _mount_journal_wall(
+    mount_x: float, incline_deg: float, thru_dia: float, bore_dia: float, offset: float
+) -> float:
+    return (
+        mount_x * math.cos(math.radians(incline_deg))
+        - offset
+        - thru_dia / 2.0
+        - bore_dia / 2.0
+    )
+
+
+MOUNT_JOURNAL_WALL_NOMINAL = _mount_journal_wall(
+    ATTACHMENT_X, INCLINE_DEG, ATTACHMENT_THRU_DIA, BORE_DIA, 0.0
+)
+MOUNT_JOURNAL_WALL_WORST = _mount_journal_wall(
+    ATTACHMENT_X - TITLE_BLOCK_BAND_BY_PLACES[2],
+    INCLINE_DEG + TITLE_BLOCK_ANGLE_BAND_DEG,
+    ATTACHMENT_THRU_DIA + DRILLED_HOLE_PLUS,
+    BORE_DIA + deviations(RUNNING_BORE_BAND)[1],
+    TITLE_BLOCK_BAND_BY_PLACES[2],
+)
+if MOUNT_JOURNAL_WALL_WORST < MOUNT_JOURNAL_WALL_FLOOR:
+    raise AssertionError(
+        f"mounting hole breaks toward the cone journal: worst wall "
+        f"{MOUNT_JOURNAL_WALL_WORST:.3f} < floor {MOUNT_JOURNAL_WALL_FLOOR}"
+    )
+if MOUNT_JOURNAL_WALL_WORST < MOUNT_JOURNAL_WALL_TARGET:
+    raise AssertionError(
+        f"mounting hole to cone journal worst wall {MOUNT_JOURNAL_WALL_WORST:.3f} "
+        f"is under the {MOUNT_JOURNAL_WALL_TARGET} target"
+    )
+
 # Crank-above-cone bore spacing (user ruling U31, 2026-09-23, option 3a).  The
 # crank axis is located FROM THE CONE AXIS, not from the foot: the 16T:64T
 # crank mesh closes on that spacing alone, and two foot-referenced .XX heights
@@ -280,7 +333,6 @@ DRAWING_NOTES = "\n".join(
         "CRANK BORE CARRIES MHA-026, CONE BORE MHA-014; FOOT ON MHA-091.",
         "CONE BOSS END FACES ARE SYMMETRIC ABOUT THE POST AXIS.",
         "BORE BOTH IN ONE SETUP; INSPECT BORE-TO-BORE BEFORE UNCLAMPING.",
-        "DRILL MOUNTING HOLES FROM TOP FACE; CHECK CONE BORE AT BREAKOUT.",
     )
 )
 

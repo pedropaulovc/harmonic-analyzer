@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+
+import pytest
 from pathlib import Path
 
 import build_cone_pivot_post as part
@@ -334,8 +336,10 @@ def test_dowel_pair_prints_on_a_foot_view_with_its_match_ream_callout() -> None:
     assert '{"hw-diam": 3, "hw-depth": 1}' in source
     assert 'label="post dowel reamed holes"' in source
     assert drawing.FOOT_VIEW_NOTE == "VIEW C - FOOT\nSCALE 1:2"
-    # The foot view is not a note: the manufacturing block stays at four lines.
-    assert len(spec.DRAWING_NOTES.splitlines()) == 4
+    # The foot view is not a note: its caption stays out of the manufacturing
+    # block, which keeps within rule 6's four lines.
+    assert "VIEW C" not in spec.DRAWING_NOTES
+    assert len(spec.DRAWING_NOTES.splitlines()) <= 4
 
 
 
@@ -471,10 +475,17 @@ def test_crank_bore_is_located_from_the_cone_bore_inside_the_mesh_window() -> No
     assert "BORE-TO-BORE" in spec.DRAWING_NOTES
 
 
-def test_deep_mounting_holes_carry_a_drilling_note() -> None:
-    """U37: the 2X mounting holes run the full post height in cast iron."""
-    assert "DRILL MOUNTING HOLES FROM TOP FACE" in spec.DRAWING_NOTES
-    assert "CONE BORE AT BREAKOUT" in spec.DRAWING_NOTES
+def test_deep_mounting_holes_keep_their_wall_to_the_cone_journal() -> None:
+    """U37: the 2X mounting holes run the full post height in cast iron, past
+    the cone journal.  Until #917 S1 a method note ("... CHECK CONE BORE AT
+    BREAKOUT") guarded that; the holes are now transferred from the platform
+    and the model asserts the wall instead (rule 6, Main)."""
+    assert "CONE BORE AT BREAKOUT" not in spec.DRAWING_NOTES
+    assert spec.MOUNT_JOURNAL_WALL_WORST >= spec.MOUNT_JOURNAL_WALL_TARGET == 2.0
+    assert spec.MOUNT_JOURNAL_WALL_FLOOR == 1.5
+    # The holes still run the full height: through below a top counterbore.
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'HoleSpec(\n    "counterbore_fillister",\n    "1/4"' in source
 
 
 def test_point_relations_use_the_point_relation_types() -> None:
@@ -535,3 +546,49 @@ def test_dimension_catalog_row_matches_the_spec() -> None:
     assert f"Ø{spec.BLOCK_DIA:g} × {spec.BLOCK_HEIGHT:.1f} tall" in dims
     assert f"bore on the body centreline at y {spec.CRANK_BORE_HEIGHT:g}" in dims
     assert "42.7506" not in " ".join(rows[0])
+
+
+def test_mount_holes_clear_the_journal_bore_at_print_worst() -> None:
+    """#917 S1 (Main): the mounting holes are transferred, so the method note
+    "DRILL MOUNTING HOLES FROM TOP FACE; CHECK CONE BORE AT BREAKOUT." goes
+    (rule 6).  Its requirement -- the holes clear the cone journal bore --
+    becomes a model assert: the vertical Ø7.142 through-hole and the
+    inclined Ø12.2808 journal are skew, so the wall is the axis distance
+    |x| cos(incline) less both radii, at the title block's worst case."""
+    import math
+
+    import _config
+    from _fit_limits import deviations
+
+    assert "DRILL" not in spec.DRAWING_NOTES
+    assert "BREAKOUT" not in spec.DRAWING_NOTES
+    # crankhub removes this one in #906; S1 leaves it.
+    assert "BORE BOTH IN ONE SETUP" in spec.DRAWING_NOTES
+    # The spec mirrors the title block's grades (it may not read the config).
+    xx = _config.title_block("linear_2pl")["value_in"] * 25.4
+    assert spec.TITLE_BLOCK_BAND_BY_PLACES[2] == pytest.approx(xx, abs=0.005)
+    assert spec.TITLE_BLOCK_ANGLE_BAND_DEG == _config.title_block("angular")["value_deg"]
+    assert spec.DRILLED_HOLE_PLUS == _config.title_block("drilled_hole")["plus_mm"]
+    assert spec.DRAWING_PRECISION_BY_NAME["MountWestX"] == 2
+    assert spec.DRAWING_PRECISION_BY_NAME["InclineAngle"] == 1
+
+    def wall(x: float, incline: float, hole: float, bore: float, offset: float) -> float:
+        return x * math.cos(math.radians(incline)) - offset - hole / 2.0 - bore / 2.0
+
+    nominal = wall(spec.ATTACHMENT_X, spec.INCLINE_DEG, 7.14248, 12.2808, 0.0)
+    worst = wall(
+        spec.ATTACHMENT_X - 0.51,
+        spec.INCLINE_DEG + 1.0,
+        7.14248 + 0.10,
+        12.2808 + deviations(spec.RUNNING_BORE_BAND)[1],
+        0.51,  # the journal's implied (unprinted) location off the post axis
+    )
+    assert spec.MOUNT_JOURNAL_WALL_NOMINAL == pytest.approx(nominal)
+    assert spec.MOUNT_JOURNAL_WALL_WORST == pytest.approx(worst)
+    assert round(nominal, 3) == 3.412
+    assert round(worst, 3) == 2.301
+    assert worst >= 2.0
+    # The counterbore never reaches the journal: its floor stands far above
+    # the bore's top.
+    cbore_floor = spec.BLOCK_HEIGHT - spec.ATTACHMENT_CBORE_DEPTH
+    assert cbore_floor - (spec.BORE_HEIGHT + 12.2858 / 2.0) > 40.0
