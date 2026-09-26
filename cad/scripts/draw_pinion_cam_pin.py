@@ -178,7 +178,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         drawing_model,
         {
-            0: "Pinion Cam-Follower Pin Manufacturing Drawing",
+            0: "Pinion Cam Follower Pin Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
             3: "pinion cam-follower pin; drill-rod stud; steel",
@@ -236,7 +236,7 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        pdf_title="Pinion Cam-Follower Pin Manufacturing Drawing",
+        pdf_title="Pinion Cam Follower Pin Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
     )

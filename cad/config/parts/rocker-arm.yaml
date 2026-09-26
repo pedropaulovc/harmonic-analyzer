@@ -1,4 +1,5 @@
 rocker-arm:
+  title: Rocker Arm
   number: MHA-071
   material_family: ferrous_noncritical
   finish: matte black oxide

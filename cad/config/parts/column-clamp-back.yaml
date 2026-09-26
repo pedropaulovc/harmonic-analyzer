@@ -1,4 +1,5 @@
 column-clamp-back:
+  title: Column Clamp Back Arc
   number: MHA-106
   material_family: ferrous_noncritical
   tolerance_class: machined_block

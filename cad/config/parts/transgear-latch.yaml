@@ -1,4 +1,5 @@
 transgear-latch:
+  title: Transgear Latch
   number: MHA-079
   material_family: ferrous_noncritical
   tolerance_class: machined_block

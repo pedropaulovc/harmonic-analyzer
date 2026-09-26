@@ -1,4 +1,5 @@
 platen:
+  title: Platen
   number: MHA-066
   material: Brass
   tolerance_class: plate_profile

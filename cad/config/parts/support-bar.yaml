@@ -1,4 +1,5 @@
 support-bar:
+  title: Support Bar
   number: MHA-074
   material: Plain Carbon Steel
   tolerance_class: machined_block

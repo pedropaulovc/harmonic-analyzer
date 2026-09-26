@@ -724,7 +724,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         drawing_model,
         {
-            0: "Harmonic Base Manufacturing Drawing",
+            0: "Two-Plate Frame Base Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
             3: "harmonic base; stepped; gray-iron frame",
@@ -1207,7 +1207,7 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        pdf_title="Harmonic Base Manufacturing Drawing",
+        pdf_title="Two-Plate Frame Base Manufacturing Drawing",
         scale=SHEET_SCALE,
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=14,
