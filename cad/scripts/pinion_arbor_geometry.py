@@ -298,3 +298,16 @@ if not (
     raise AssertionError(
         "the bond-zone diameter must sit on the drum, clear of both lands"
     )
+
+# R1a (user, 2026-09-24): the station of the cross hole for the MHA-144
+# collar's spring pin, at the general .X band from the head rear face (U27:
+# the collar-to-strap gap grows to absorb it, pinion_arbor_collar_spec).  The
+# drive-train assembly reads the station; the hole itself and its clearance
+# proofs live in pinion_arbor_pin_spec.  38.0, not R1a's 39.0: on #858's
+# pinned straps the drum's front air runs to the whole 0.55 of end play and
+# the 11.5 head moved the drum station to 61.05, which closed the worst-case
+# collar-to-strap gap to 0.00; one millimetre forward restores it to 1.00,
+# over the 0.25 the novice-margin rule asks (pinion_arbor_collar_spec).
+PIN_STATION_FROM_HEAD_REAR = 38.0
+PIN_STATION_BAND = LINEAR_X_BAND
+PIN_Z = HEAD_REAR_Z + PIN_STATION_FROM_HEAD_REAR
