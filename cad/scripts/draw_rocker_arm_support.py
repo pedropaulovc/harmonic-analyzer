@@ -35,6 +35,7 @@ from _drawing_common import (
     create_view_theoretical_datum,
     curate_view_dimensions,
     finalize_drawing,
+    import_cosmetic_threads,
     insert_hole_table,
     new_project_drawing,
     read_required_properties,
@@ -139,22 +140,27 @@ def imported_precision() -> dict[str, int]:
     import; set_dimension_precision fails on a name it cannot find, which
     is how the #743 rail's RailDepth entry broke r743-rocker-fix."""
     kept = set(FRONT_KEEP) | set(RIGHT_KEEP)
-    return {name: digits for name, digits in DIMENSION_PRECISION.items() if name in kept}
+    return {
+        name: digits for name, digits in DIMENSION_PRECISION.items() if name in kept
+    }
 
 
 # The bracket seats: located by transfer, so the print gives their thread,
 # depths and process only. A view-owned pointer to the rail's top edge over
 # the outermost seat, left of the front view and clear of the Depth callout.
-# Wrapped to 21 characters: at ~0.75 x height per character a 26-character
-# first line ran to x ~0.065, into the Depth extension line at 0.0605.
+# add_note leaves text at the sheet's default height (its height argument is
+# not applied), which r743-rocker-fix3's render measured at ~2.76 mm per
+# character and a 4.5 mm line pitch. The 21-character wrap still crossed the
+# Depth extension line at x 0.0605, so no line exceeds 15 characters: the
+# note fills the column left of the front view, above the R12.7 callout.
 SEAT_NOTE = (
     f"{len(SEAT_LOCAL_X)}X {SCREW_THREAD} UNC-2B\n"
     f"{SEAT_THREAD_DEPTH:.1f} DEEP\n"
-    f"{SEAT_DRILL_NAME} DRILL {SEAT_DRILL_DEPTH:.1f} DEEP\n"
-    "TRANSFER FROM MHA-123\nAT ASSEMBLY"
+    f"{SEAT_DRILL_NAME} DRILL\n"
+    f"{SEAT_DRILL_DEPTH:.1f} DEEP\n"
+    "TRANSFER FROM\nMHA-123 AT\nASSEMBLY"
 )
 SEAT_NOTE_XY = (0.016, 0.262)
-SEAT_NOTE_HEIGHT = 0.0025
 SEAT_NOTE_ATTACH = (
     FRONT_CENTER[0] + min(SEAT_LOCAL_X) * VIEW_SCALE / 1000.0,
     FRONT_CENTER[1] + HALF_Y * VIEW_SCALE / 1000.0,
@@ -163,6 +169,11 @@ SEAT_NOTE_ATTACH = (
 # top face (half-width NARROW less the rim chamfer) and the pocket's top face
 # (WEB out to the wall).
 RAIL_PICK_Z = 5.0
+# The web thickness text sits right of the section, clear of the slanted
+# wall (x ~0.2187 at y 0.157) and of the 177.8 dimension line at x 0.240;
+# at x 0.221 it printed across the wall line (fix3 render).
+WEB_TEXT_XY = (RIGHT_CENTER[0] + 0.026, RIGHT_CENTER[1] - 0.028)
+RAIL_TEXT_XY = (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] + 0.039)
 # The section cuts the window rim in profile, and it is the one view where a
 # targeted import of RimChamfer delivers RimChamferSize (r743-diag-c, leaf
 # 20260926T100550Z-1-829fb125). The front view only ever got it as a side
@@ -172,7 +183,9 @@ RIGHT_KEEP = {
     "WallHeight": (0.240, 0.185),
     "FootSpan": (0.205, 0.133),
     "TopSpan": (0.205, 0.238),
-    "RimChamferSize": (0.165, 0.225),
+    # Below the rail-depth dimension, whose 21.0 sits at y 0.224 in the same
+    # lane: at 0.225 the two ran together ("X 45 DEG21.0", fix3 render).
+    "RimChamferSize": (0.165, 0.200),
 }
 
 # Top-left anchor; the native four-row table grows down and right while
@@ -433,7 +446,7 @@ async def build(adapter: Any) -> dict[str, str]:
             right,
             p0=(RIGHT_CENTER[0] - half_web, web_y),
             p1=(RIGHT_CENTER[0] + half_web, web_y),
-            text_xy=(RIGHT_CENTER[0] + 0.016, RIGHT_CENTER[1] - 0.028),
+            text_xy=WEB_TEXT_XY,
             orientation="horizontal",
             label="section web thickness",
         ),
@@ -483,7 +496,7 @@ async def build(adapter: Any) -> dict[str, str]:
             right,
             p0=(rail_pick_x, RIGHT_CENTER[1] + HALF_Y * VIEW_SCALE / 1000.0),
             p1=(rail_pick_x, RIGHT_CENTER[1] + WINDOW_TOP_Y * VIEW_SCALE / 1000.0),
-            text_xy=(RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] + 0.039),
+            text_xy=RAIL_TEXT_XY,
             orientation="vertical",
             label="section rail depth",
             entities=_right_rail_edges(adapter, right),
@@ -507,7 +520,6 @@ async def build(adapter: Any) -> dict[str, str]:
         attach_xy=SEAT_NOTE_ATTACH,
         label="rocker-bracket seats",
         view=front,
-        height=SEAT_NOTE_HEIGHT,
     )
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to bottom view")
@@ -560,12 +572,22 @@ async def build(adapter: Any) -> dict[str, str]:
     # set stale, so restore its complete projected edge set before export.
     set_hidden_lines_visible(adapter, bottom)
 
+    # Materialize the iso's cosmetic threads before the strict final note
+    # cleanup, so BracketSeats' descriptive label exists when it is counted
+    # rather than first appearing during the native drawing save.
+    import_cosmetic_threads(adapter, iso)
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Rocker-Arm Support Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # BracketSeats' descriptive label on the isometric ran past the
+        # right border (fix3 render); the seat note already states it. One
+        # label per tapped Hole Wizard feature per view that shows it.
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=1,
     )
 
 
