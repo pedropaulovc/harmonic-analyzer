@@ -50,7 +50,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
-from rocker_arm_notes import DRAWING_DIMENSIONS
+from rocker_arm_notes import DRAWING_DIMENSIONS, DRAWING_NOTES
 from rocker_arm_spec import (
     ARM_THICKNESS,
     PIVOT_HOLE_DIA,
@@ -112,6 +112,8 @@ NOTES_BORDER_CLEARANCE = 0.003
 NOTES_CEILING = 0.110
 NOTES_SEAT_PASSES = 3
 NOTES_SEAT_SETTLE = 0.00005
+# Below any note text height this sheet prints (the linked block pitches ~4.1).
+NOTES_MIN_LINE_PITCH = 0.0025
 
 # Tip-face midpoint (model mm): the top-arc endpoint pushed half the tip face
 # outward along the end radius -- where datum C (clocking) attaches.
@@ -189,7 +191,17 @@ def _seat_notes_on_border(
     annotation = _early_bound(
         _early_bound(note, "INote").GetAnnotation(), "IAnnotation"
     )
+    # A property-linked note shows its resolved text only after a rebuild; an
+    # extent read before it would seat the one-line link token, not the block.
+    rebuild_drawing(adapter, label="manufacturing notes link resolve")
     extent = _note_extent(adapter, note)
+    lines = len(DRAWING_NOTES.splitlines())
+    if extent[3] - extent[1] < lines * NOTES_MIN_LINE_PITCH:
+        raise RuntimeError(
+            f"manufacturing notes render {(extent[3] - extent[1]) * 1000.0:.1f} mm "
+            f"tall, under {lines} lines at {NOTES_MIN_LINE_PITCH * 1000.0:.1f} mm: "
+            "the property link has not resolved"
+        )
     for _pass in range(NOTES_SEAT_PASSES):
         shift = (target[0] - extent[0], target[1] - extent[1])
         if max(abs(shift[0]), abs(shift[1])) <= NOTES_SEAT_SETTLE:
