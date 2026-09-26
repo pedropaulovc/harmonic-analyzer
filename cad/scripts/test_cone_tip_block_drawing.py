@@ -533,11 +533,37 @@ _R287_PINCH_HOLE_MM = ((155.40, 155.56), 2.45)  # the 6.0's hole: centre, radius
 # measured ink above stays as the record of those renders, but no placement
 # of today's module prints them, so every model comparison skips them.
 _R3_RETIRED = frozenset({"FlangeSlotZ", "FlangeSlotCtoC"})
+# Where the adjuster callout, its ADJUSTER ENTRY name and the right-hand view
+# row stood from I31's round 1 (287c) to 9a0f50b1c, before #946 derived them
+# from the hole: the callout below-right of the hole, its name over it, the
+# right view at 0.171 and section A-A at 0.190.
+_RD1_ENTRY_DX = """ADJUSTER_ENTRY_DX = _ADJUSTER_SHOULDER_DX + (
+    ADJUSTER_CALLOUT_EXTENT[0] + ADJUSTER_CALLOUT_EXTENT[2] - ADJUSTER_ENTRY_EXTENT[2]
+) / 2.0"""
+_RD1_ENTRY_Y = (
+    "ADJUSTER_ENTRY_Y = _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH, FRONT_CENTER) - ADJUSTER_FLOOR_GAP"
+)
+_RD1_PLACEMENT = {
+    "RIGHT_CENTER = (_RIGHT_NORTH_FACE_X + (Z_NORTH - Z_MID) * _S,": "RIGHT_CENTER = (0.171,",
+    "LEFT_CENTER = (RIGHT_CENTER[0] + VIEW_ROW_PITCH,": "LEFT_CENTER = (0.243,",
+    "BACK_CENTER = (RIGHT_CENTER[0] + 2.0 * VIEW_ROW_PITCH,": "BACK_CENTER = (0.315,",
+    "ADJUSTER_CALLOUT_DX = _ADJUSTER_SHOULDER_DX + ADJUSTER_CALLOUT_EXTENT[0]": (
+        "ADJUSTER_CALLOUT_DX = 0.043"
+    ),
+    "ADJUSTER_CALLOUT_Y = ADJUSTER_SHOULDER_Y + ADJUSTER_CALLOUT_EXTENT[1]": (
+        "ADJUSTER_CALLOUT_Y = 0.121"
+    ),
+    _RD1_ENTRY_DX: "ADJUSTER_ENTRY_DX = 0.023",
+    # The name stood 13.5 mm over the callout's point.
+    _RD1_ENTRY_Y: "ADJUSTER_ENTRY_Y = 0.121 + 0.0135",
+    "SECTION_CENTER = (RIGHT_CENTER[0] + 0.019,": "SECTION_CENTER = (0.190,",
+}
 # What the 287c sheet commanded at 287c5cf6a, expressed against today's
 # module: the r3 lines that replaced a 287c placement map back to it, the
 # DRILL TO SLOT growth back to the blind depth's text, and r3's own new
 # dimensions keep r3's arrow sides.
 _R287_PLACEMENT = {
+    **_RD1_PLACEMENT,
     "FLANGE_SLOT_W_Z = FLANGE_SLOT_CENTER_Z - 3.0": (
         "FLANGE_SLOT_W_Z = FLANGE_SLOT_CENTER_Z - 8.42 * 0.4"
     ),
@@ -577,10 +603,13 @@ _I31_PLACEMENT = {
     "PLAN_CHAIN_X = _PLAN_LEFT - 3.0 * PLAN_BASELINE_STEP": (
         "PLAN_CHAIN_X = TOP_CENTER[0] - 0.030"
     ),
-    "RIGHT_CENTER = (0.171,": "RIGHT_CENTER = (0.166,",
-    "LEFT_CENTER = (0.243,": "LEFT_CENTER = (0.238,",
-    "BACK_CENTER = (0.315,": "BACK_CENTER = (0.310,",
-    "ADJUSTER_CALLOUT_Y = 0.121": "ADJUSTER_CALLOUT_Y = 0.115",
+    "RIGHT_CENTER = (_RIGHT_NORTH_FACE_X + (Z_NORTH - Z_MID) * _S,": "RIGHT_CENTER = (0.166,",
+    "LEFT_CENTER = (RIGHT_CENTER[0] + VIEW_ROW_PITCH,": "LEFT_CENTER = (0.238,",
+    "BACK_CENTER = (RIGHT_CENTER[0] + 2.0 * VIEW_ROW_PITCH,": "BACK_CENTER = (0.310,",
+    "ADJUSTER_CALLOUT_Y = ADJUSTER_SHOULDER_Y + ADJUSTER_CALLOUT_EXTENT[1]": (
+        "ADJUSTER_CALLOUT_Y = 0.115"
+    ),
+    _RD1_ENTRY_Y: "ADJUSTER_ENTRY_Y = 0.115 + 0.0135",
 }
 # The whole-sheet audit of the 287c placement.  287c also reported three
 # findings on the 10.7 (retired by r3): its line through "3.97", its witness
@@ -695,7 +724,8 @@ def test_sheet_ink_audit_flags_the_i31_render_and_clears_the_moved_ink() -> None
         # it again for DRILL TO SLOT.
         "pinch clearance callout": (callout_x - (0.166 - 0.033), callout_y - 0.1735),
         "PinchDepthCenter": (right_dx, 0.0),
-        "adjuster callout": (0.0, drawing.ADJUSTER_CALLOUT_Y - 0.115),
+        # #946 moved it again, under SLOT DEPTH's floor line.
+        "adjuster callout": (drawing.ADJUSTER_CALLOUT_DX - 0.043, drawing.ADJUSTER_CALLOUT_Y - 0.115),
     }
     grow = drawing._PINCH_CLEARANCE_TEXT_GROWTH / 2.0
 
@@ -768,11 +798,15 @@ def test_sheet_ink_model_reproduces_the_i31_render() -> None:
         # wider pinch callout rides with it; with PassageCenter now on the
         # slit's left and SlitW's value raised, nothing else meets it.)
         (
-            ("RIGHT_CENTER = (0.171,", "LEFT_CENTER = (0.243,", "BACK_CENTER = (0.315,"),
+            (
+                "RIGHT_CENTER = (_RIGHT_NORTH_FACE_X + (Z_NORTH - Z_MID) * _S,",
+                "LEFT_CENTER = (RIGHT_CENTER[0] + VIEW_ROW_PITCH,",
+                "BACK_CENTER = (RIGHT_CENTER[0] + 2.0 * VIEW_ROW_PITCH,",
+            ),
             [_I31_FINDINGS[2]],
         ),
         (
-            ("ADJUSTER_CALLOUT_Y = 0.121",),
+            ("ADJUSTER_CALLOUT_Y = ADJUSTER_SHOULDER_Y + ADJUSTER_CALLOUT_EXTENT[1]",),
             [
                 _I31_FINDINGS[3],
                 "arrow-near-text: HeelReliefHt's arrow ... 'adjuster callout'",
@@ -782,7 +816,8 @@ def test_sheet_ink_model_reproduces_the_i31_render() -> None:
     ids=["a-plan-chain", "b-pinch-callout", "c-right-view", "c-adjuster-callout"],
 )
 def test_each_i31_move_is_what_clears_its_collision(reverted, expected) -> None:
-    mutant = _drawing_at({line: _I31_PLACEMENT[line] for line in reverted})
+    # Each move is reverted from where round 1 left the sheet, before #946.
+    mutant = _drawing_at({**_RD1_PLACEMENT, **{line: _I31_PLACEMENT[line] for line in reverted}})
     findings = _sheet_findings(mutant)
     assert _findings_match(findings, expected), findings
 
@@ -835,10 +870,15 @@ def _moved_r287_fixture(names: tuple[str, ...]):
     dimensions = {
         name: ink for name, ink in dimensions.items() if name not in _R3_RETIRED
     }
+    # #946 slid the right view's whole row, the pinch callout with it; the
+    # 287c ink (the 6.0 and its hole) is planted where 287c printed it, so the
+    # callout's move is taken in the right view's frame.
+    row = drawing.RIGHT_CENTER[0] - old.RIGHT_CENTER[0]
+    pinch_dx, pinch_dy = _delta(
+        drawing.PINCH_CLEARANCE_CALLOUT_XY, old.PINCH_CLEARANCE_CALLOUT_XY
+    )
     moves = {
-        "pinch clearance callout": _delta(
-            drawing.PINCH_CLEARANCE_CALLOUT_XY, old.PINCH_CLEARANCE_CALLOUT_XY
-        ),
+        "pinch clearance callout": (pinch_dx - row, pinch_dy),
         "foot finish": _delta(
             drawing._foot_finish_placement()[0], old._foot_finish_placement()[0]
         ),
@@ -1018,7 +1058,8 @@ def test_sheet_ink_model_reproduces_the_287c_render() -> None:
     ],
 )
 def test_each_287c_move_is_what_clears_its_collision(reverted, expected) -> None:
-    mutant = _drawing_at({line: _R287_PLACEMENT[line] for line in reverted})
+    # Each move is reverted from where round 2 left the sheet, before #946.
+    mutant = _drawing_at({**_RD1_PLACEMENT, **{line: _R287_PLACEMENT[line] for line in reverted}})
     findings = _sheet_findings(mutant)
     assert _findings_match(findings, expected), findings
 
@@ -1063,6 +1104,148 @@ def test_sheet_audit_uses_the_shared_leader_geometry() -> None:
     assert drawing.ARROW_TEXT_CLEARANCE == _drawing_leaders.ARROW_TEXT_CLEARANCE == 0.002
     for local in ("def _segments_cross", "def _point_segment_distance"):
         assert local not in source, local
+
+
+# #946's leader-over-part rule, on this sheet's own model: the run over the
+# part from the leader's entry to its tip, minus the tip's shortest approach
+# from outside (its distance to the nearest side of the view's outline).
+# Swing's RD2 fix (4dda16fd5) left 3.8 mm; Main's brief for RD1 is ~4 mm.
+LEADER_DETOUR_TARGET = 0.004
+
+
+def _run_inside(segment, box) -> float:
+    """Length of ``segment`` inside ``box`` (Liang-Barsky clip)."""
+    (x0, y0), (x1, y1) = segment
+    dx, dy = x1 - x0, y1 - y0
+    low, high = 0.0, 1.0
+    for p, q in ((-dx, x0 - box[0]), (dx, box[2] - x0), (-dy, y0 - box[1]), (dy, box[3] - y0)):
+        if p == 0.0:
+            if q < 0.0:
+                return 0.0
+            continue
+        t = q / p
+        if p < 0.0:
+            low = max(low, t)
+        else:
+            high = min(high, t)
+    return max(0.0, high - low) * math.hypot(dx, dy)
+
+
+def _leader_detours(module) -> dict[str, tuple[float, float, float]]:
+    """(over the part, shortest approach, detour) of every leader whose tip
+    lands in a view outline, in sheet metres."""
+    silhouettes = module.sheet_view_silhouettes()
+    detours = {}
+    for name, leader in module.sheet_leaders().items():
+        tx, ty = leader.tip
+        holding = sorted(
+            (box for box in silhouettes.values() if box[0] <= tx <= box[2] and box[1] <= ty <= box[3]),
+            key=lambda box: (box[2] - box[0]) * (box[3] - box[1]),
+        )
+        if not holding:
+            continue
+        box = holding[0]
+        over = _run_inside(leader.segment(), box)
+        approach = min(tx - box[0], box[2] - tx, ty - box[1], box[3] - ty)
+        detours[name] = (over, approach, over - approach)
+    return detours
+
+
+def test_adjuster_callout_leader_takes_the_short_way_to_its_hole() -> None:
+    """#946 / MHA-092: RD1's callout stood below-right of the adjuster hole and
+    its leader climbed ~28 mm over the front view to the rim, ~16 mm further
+    than the hole's 11.5 mm approach from the right face, reading as an edge
+    of the part.  The leader now enters by the hole's shortest approach."""
+    detours = _leader_detours(drawing)
+    over, approach, detour = detours["adjuster callout"]
+    assert detour <= LEADER_DETOUR_TARGET, (over, approach, detour)
+    # The shoulder stays off the part, so the leader is the only ink over it.
+    start = drawing.sheet_leaders()["adjuster callout"].start
+    front = drawing.sheet_view_silhouettes()["front"]
+    assert start[0] > front[2]
+
+
+# The ASME B landscape sheet's frame and title block, as the layout audit's
+# dump reads them (ISheet::GetZoneMargin 12.7 mm each side; the title block's
+# box, layoutcal2-a cone-tip-block.json).
+SHEET_INNER_BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
+TITLE_BLOCK = (0.216, 0.0, 0.4318, 0.066)
+
+
+def _isometric_box(module) -> tuple[float, float, float, float]:
+    """The isometric view's outer bound: the part's bounding box seen along
+    (1, 1, 1), centred on the view's placement.  Across, (X + Z) / sqrt(2);
+    up, Y * sqrt(2/3) + (X + Z) / sqrt(6)."""
+    across = module.BLOCK_X + (module.Z_NORTH - module.Z_SOUTH)
+    width = across / math.sqrt(2.0) * module._S
+    height = (module.BLOCK_HEIGHT * math.sqrt(2.0 / 3.0) + across / math.sqrt(6.0)) * module._S
+    x, y = module.ISO_CENTER
+    return (x - width / 2.0, y - height / 2.0, x + width / 2.0, y + height / 2.0)
+
+
+def test_the_slid_view_row_fits_the_sheet() -> None:
+    """#946 slid the right view and the removed views B and C right to make
+    room for the adjuster callout's short leader.  Every view outline, text
+    block and dimension line stays inside the frame and off the title block,
+    and no two views' outlines meet."""
+    views = {**drawing.sheet_view_silhouettes(), "isometric": _isometric_box(drawing)}
+    ink = {
+        **{f"view {name}": box for name, box in views.items()},
+        **{f"text {name}": box for name, box in drawing.sheet_text_boxes().items()},
+    }
+    for owner, dimension in drawing.sheet_dimension_ink().items():
+        for index, ((x0, y0), (x1, y1)) in enumerate(dimension.segments()):
+            ink[f"{owner} line {index}"] = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
+    left, bottom, right, top = SHEET_INNER_BORDER
+    outside = [
+        name
+        for name, box in ink.items()
+        if box[0] < left or box[1] < bottom or box[2] > right or box[3] > top
+    ]
+    assert outside == []
+    on_title = [
+        name
+        for name, box in ink.items()
+        if box[0] < TITLE_BLOCK[2]
+        and box[2] > TITLE_BLOCK[0]
+        and box[1] < TITLE_BLOCK[3]
+        and box[3] > TITLE_BLOCK[1]
+    ]
+    assert on_title == []
+    # A view's body and its flange share an edge; different views may not.
+    owner = {name: name.split(" ")[0] if name.startswith(("right", "view B")) else name for name in views}
+    owner["view B body"] = owner["view B flange"] = "view B"
+    names = sorted(views)
+    touching = [
+        (first, second)
+        for index, first in enumerate(names)
+        for second in names[index + 1 :]
+        if owner[first] != owner[second]
+        and drawing._box_gap(views[first], views[second]) < drawing.TEXT_CLEARANCE
+    ]
+    assert touching == []
+    # The slide is what the callout needs: the right view's north face stands
+    # one text clearance past the callout's right end.
+    callout = drawing.sheet_text_boxes()["adjuster callout"]
+    assert views["right body"][0] - callout[2] == pytest.approx(
+        drawing.TEXT_CLEARANCE + drawing.ROUND_OUT, abs=1e-9
+    )
+
+
+def test_the_9a0f_placement_is_what_ran_the_leader_over_the_part() -> None:
+    """Reverting #946's placement brings back the gating detour (the audit's
+    provisional limit is 10 mm) and nothing else."""
+    old = _drawing_at(_RD1_PLACEMENT)
+    over, approach, detour = _leader_detours(old)["adjuster callout"]
+    assert detour > 0.010, (over, approach, detour)
+    assert _sheet_findings(old) == []
+
+
+def test_no_leader_on_the_sheet_detours_over_the_part() -> None:
+    detours = _leader_detours(drawing)
+    assert {"adjuster callout", "pinch clearance callout", "pinch thread callout"} <= set(detours)
+    long_way = {name: d for name, d in detours.items() if d[2] > LEADER_DETOUR_TARGET}
+    assert long_way == {}
 
 
 def test_flange_slot_travel_is_built_from_the_fit_up_chain() -> None:

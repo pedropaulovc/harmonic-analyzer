@@ -237,7 +237,36 @@ DETAIL_FRONT_CENTER = (0.145, 0.228)
 DETAIL_SECTION_SCALE = (1, 2)
 DETAIL_SECTION_CENTER = (0.290, 0.135)
 DETAIL_SECTION_CAPTION_XY = (0.240, 0.088)
-CAP_SEAT_FINISH_SYMBOL_XY = (0.175, 0.114)
+
+# #946 leader-over-part (layoutcheck's b2 leaf on b49e13940): two leaders ran
+# far over the part to reach their feature, reading as edges of it.
+# - RD4, the 2X keeper tap callout, stood above the upper-right boss and its
+#   leader crossed the boss and bore rings to the front keeper tap: 29.6 mm
+#   over the part, 18.3 mm more than the tap's shortest approach.
+# - The cap seat Ra 3.2 stood below-left of A-A and its leader climbed 24.7
+#   mm through the hatching to the far ledge: 16.6 mm more than the approach.
+# Each now enters by its feature's short side (Main: detour <= ~4 mm; swing's
+# RD2 fix, 4dda16fd5, left 3.8).  Placement is computed from the feature's
+# projected model points at build time; the pure placement functions below
+# are what the offline tests pin.
+#
+# The sheet's frame: ISheet::GetZoneMargin's 12.7 mm inside the ASME B sheet.
+SHEET_FRAME = (0.0127, 0.0127, 0.4191, 0.2667)
+# Ink that must read apart stands this far off (_drawing_leaders keeps 2 mm
+# between an arrow and foreign text); clearances round outward by 0.1 mm.
+INK_CLEARANCE = 0.002
+ROUND_OUT = 0.0001
+# The native arrowhead is 0.762 mm across (b49e1 dump, IDisplayData arrows).
+ARROW_HALF_WIDTH = 0.000381
+# RD4's ink about its commanded point, (left, down, right, up), measured on
+# the b49e1 render: the shoulder under "KEEPER TAP 8-32 UNC - 2B v 10.0" runs
+# 38.4 mm left and 36.8 mm right of it, 5.6 mm down; "2X 3.45 v 16.0" tops out
+# 4.6 mm up.  The leader leaves the shoulder's end nearer the hole.
+KEEPER_CALLOUT_EXTENT = (0.0384, 0.0056, 0.0368, 0.0046)
+# The cap seat symbol's ink right of its leader's bend: "CAP SEAT FLOORS, 4X"
+# and the rule over it end 4.64 mm past the bend (b49e1: bend at x 210.00,
+# text to 214.57, rule to 214.64), rounded outward.
+CAP_SEAT_FINISH_INK_PAST_BEND = 0.0047
 BOSS_ABOVE_RAIL_LINE_XY = (0.3665, 0.1423)
 # Above the dimension's own upper arrow, not 51 mm below it -- see the
 # boss-height comment in the A-A recipe for what the long leader crossed.
@@ -901,6 +930,68 @@ def _finish_leader_tail(symbol: Any, *, label: str) -> None:
         raise RuntimeError(f"{label} finish leader did not clear its roughness text")
 
 
+Point = tuple[float, float]
+
+
+def keeper_callout_placement(
+    hole: Point, hole_r: float, boss: Point, boss_r: float
+) -> tuple[Point, Point]:
+    """(callout point, leader tip) of RD4, on the rear keeper tap, in sheet m.
+
+    The tap's short way in is from the rail's outer face, right of it.  Its
+    REAR KEEPER Z extension line runs right from the tap's centre and ends
+    on that dimension's arrow, so the callout stands under it, its top an
+    arrow clearance clear.  Below the tap the rear boss rounds out toward
+    the rail, so the leader drops away from the tap as steeply as the boss
+    allows: it passes the boss an ink clearance off.  The tip is where that
+    leader meets the tap's rim.
+    """
+    left, down, right, up = KEEPER_CALLOUT_EXTENT
+    shoulder_y = hole[1] - (INK_CLEARANCE + ARROW_HALF_WIDTH + ROUND_OUT) - up - down
+    # The leader leaves the hole along (cos t, -sin t); its distance to the
+    # boss centre is rho cos(t - phi), shrinking as t steepens past phi.
+    bx, by = boss[0] - hole[0], boss[1] - hole[1]
+    rho, phi = math.hypot(bx, by), math.atan2(-bx, -by)
+    reach = boss_r + INK_CLEARANCE + ROUND_OUT
+    if reach >= rho:
+        raise ValueError(f"keeper tap stands inside its boss clearance ({rho=}, {reach=})")
+    steepest = phi + math.acos(reach / rho)
+    shoulder_x = hole[0] + (hole[1] - shoulder_y) / math.tan(steepest)
+    if shoulder_x + left + right + INK_CLEARANCE > SHEET_FRAME[2]:
+        raise ValueError(f"keeper callout runs past the frame at x {shoulder_x + left + right:.4f}")
+    tip = (hole[0] + hole_r * math.cos(steepest), hole[1] - hole_r * math.sin(steepest))
+    return (shoulder_x + left, shoulder_y + down), tip
+
+
+def cap_seat_finish_placement(tip: Point, entry: Point) -> Point:
+    """The cap seat symbol's point, its leader running from ``tip`` (the near
+    ledge of the cap seat) back out through ``entry`` (where it crosses the
+    boss's outer face), bent to its tail an ink clearance off that face."""
+    bend_x = entry[0] - CAP_SEAT_FINISH_INK_PAST_BEND - INK_CLEARANCE - ROUND_OUT
+    slope = (entry[1] - tip[1]) / (entry[0] - tip[0])
+    return (bend_x - FINISH_LEADER_TAIL, tip[1] + (bend_x - tip[0]) * slope)
+
+
+def _model_offset_in_view(
+    adapter: Any, view: Any, origin: tuple[float, float, float], along: Point, *, label: str
+) -> tuple[float, float, float]:
+    """The plan-model point (X, origin Y, Z) that projects ``along`` (sheet m)
+    from ``origin``'s projection, read from the view's own X and Z axes."""
+    base = model_point_in_view(adapter, view, tuple(v / 1000.0 for v in origin), label=label)
+    axes = []
+    for dx, dz in ((1.0, 0.0), (0.0, 1.0)):
+        moved = (origin[0] + dx, origin[1], origin[2] + dz)
+        point = model_point_in_view(adapter, view, tuple(v / 1000.0 for v in moved), label=label)
+        axes.append((point[0] - base[0], point[1] - base[1]))
+    (xa, ya), (xb, yb) = axes
+    det = xa * yb - xb * ya
+    if abs(det) < 1e-12:
+        raise RuntimeError(f"{label}: the view does not show model X and Z")
+    u = (along[0] * yb - along[1] * xb) / det
+    w = (xa * along[1] - ya * along[0]) / det
+    return (origin[0] + u, origin[1], origin[2] + w)
+
+
 def _machined_faces(view: Any) -> dict[str, Any]:
     """Resolve every part-owned surface-finish face through ``view``'s model.
 
@@ -1454,22 +1545,50 @@ async def build(adapter: Any) -> dict[str, str]:
         label="2X hanger-stud clearance holes",
         process="HANGER DRILL",
     )
-    keeper_edge = model_point_in_view(
-        adapter,
-        detail_top,
+    # #946: RD4 reads off the rear keeper tap, from the rail's outer side.
+    rear_keeper = (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_REAR)
+    keeper_hole = model_point_in_view(
+        adapter, detail_top, tuple(v / 1000.0 for v in rear_keeper),
+        label="top-frame rear keeper tap centre",
+    )
+    keeper_rim = model_point_in_view(
+        adapter, detail_top,
         (
-            KEEPER_TAP_X / 1000.0,
+            (KEEPER_TAP_X + TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0) / 1000.0,
             HALF_H / 1000.0,
-            (KEEPER_TAP_Z_FRONT + TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0)
-            / 1000.0,
+            KEEPER_TAP_Z_REAR / 1000.0,
         ),
+        label="top-frame rear keeper tap rim",
+    )
+    rear_boss = model_point_in_view(
+        adapter, detail_top,
+        (COLUMN_X / 1000.0, (HALF_H + BOSS_ABOVE) / 1000.0, REAR_COLUMN_Z / 1000.0),
+        label="top-frame rear right boss centre",
+    )
+    keeper_callout_xy, keeper_tip = keeper_callout_placement(
+        keeper_hole,
+        math.dist(keeper_hole, keeper_rim),
+        rear_boss,
+        BOSS_DIA / 2.0 * DETAIL_VIEW_SCALE / 1000.0,
+    )
+    keeper_edge_model = _model_offset_in_view(
+        adapter, detail_top, rear_keeper,
+        (keeper_tip[0] - keeper_hole[0], keeper_tip[1] - keeper_hole[1]),
+        label="top-frame rear keeper tap leader rim",
+    )
+    keeper_edge = model_point_in_view(
+        adapter, detail_top, tuple(v / 1000.0 for v in keeper_edge_model),
         label="top-frame fulcrum-keeper tap edge",
     )
+    if math.dist(keeper_edge, keeper_tip) > 1e-6:
+        raise RuntimeError(
+            f"rear keeper rim point projects to {keeper_edge}, not the leader's {keeper_tip}"
+        )
     keeper_callout = add_native_hole_callout(
         adapter,
         detail_top,
         edge_xy=keeper_edge,
-        callout_xy=(0.3660, 0.247),
+        callout_xy=keeper_callout_xy,
         label="2X fulcrum-keeper blind taps",
         process="KEEPER TAP",
     )
@@ -1760,24 +1879,38 @@ async def build(adapter: Any) -> dict[str, str]:
         suffix="TAP AXIS BELOW BOSS TOP",
         entities=(upper_boss_edge, front_tap_edge), offset_text=(0.300, 0.229),
     )
+    # #946: the leader lands on the cap seat's near (outboard) ledge and
+    # leaves through the boss's outer face midway between the cross tap's
+    # spotface and the boss top, as far from both as that face allows.
+    cap_seat_tip = model_point_in_view(
+        adapter,
+        detail_section,
+        (
+            COLUMN_X/1000.0,
+            CAP_RECESS_FLOOR_Y/1000.0,
+            (FRONT_COLUMN_Z-(BORE_DIA+CAP_RECESS_DIAMETER)/4)/1000.0,
+        ),
+        label="cap seat finish leader",
+    )
+    cap_seat_entry = model_point_in_view(
+        adapter,
+        detail_section,
+        (
+            COLUMN_X/1000.0,
+            (SPOTFACE_DIA/2 + HALF_H + BOSS_ABOVE)/2/1000.0,
+            (FRONT_COLUMN_Z-BOSS_DIA/2)/1000.0,
+        ),
+        label="cap seat finish leader entry",
+    )
     cap_seat_finish = add_surface_finish(
         adapter,
         detail_section,
-        symbol_xy=CAP_SEAT_FINISH_SYMBOL_XY,
+        symbol_xy=cap_seat_finish_placement(cap_seat_tip, cap_seat_entry),
         control=surface_finish_by_key(SURFACE_FINISHES, "cap_seat_west_front"),
         label="cap seat floor finish",
         entity_type="FACE",
         entity=machined_faces["cap_seat_west_front"],
-        leader_attach_xy=model_point_in_view(
-            adapter,
-            detail_section,
-            (
-                COLUMN_X/1000.0,
-                CAP_RECESS_FLOOR_Y/1000.0,
-                (FRONT_COLUMN_Z+(BORE_DIA+CAP_RECESS_DIAMETER)/4)/1000.0,
-            ),
-            label="cap seat finish leader",
-        ),
+        leader_attach_xy=cap_seat_tip,
         char_height=0.0025,
     )
     _finish_leader_tail(cap_seat_finish, label="cap seat floor")

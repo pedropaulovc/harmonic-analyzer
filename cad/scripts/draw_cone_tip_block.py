@@ -88,16 +88,9 @@ SHEET_SCALE = (3.0, 2.0)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
 FRONT_CENTER = (0.072, 0.129)
 TOP_CENTER = (FRONT_CENTER[0], 0.222)
-# Main eye-pass of the I31 render (7ab69742b): at x 0.166 the adjuster
-# callout's longest line (54.5 mm, shoulder 57.1) ran over the right view's
-# north face -- the gap between the front and right views was 58.2 mm.  The
-# right view slides 5 mm along its projection row (ASME alignment is the
-# shared y), and the removed views B and C slide with it so the gaps to
-# their right keep their measured air.
-RIGHT_CENTER = (0.171, FRONT_CENTER[1])
-LEFT_CENTER = (0.243, FRONT_CENTER[1])
-BACK_CENTER = (0.315, FRONT_CENTER[1])
-SECTION_CENTER = (0.190, 0.225)
+# The right view and the removed views B and C stand on the front view's
+# projection row; their x follows from the adjuster callout between the front
+# and right views (RIGHT_CENTER, below), and section A-A rides above them.
 ISO_CENTER = (0.350, 0.215)
 # A view centres on the part's box.  Along the cone axis that box runs from
 # the north face to the flange's south end, so the block's own centre (the
@@ -133,7 +126,68 @@ def _right_x(model_z: float) -> float:
 VALUE_TEXT_HALF_WIDTH = 0.0046
 VALUE_TEXT_HALF_HEIGHT = 0.0019
 ARROW_LENGTH = 0.0034
+# An inside arrowhead is about 0.6 mm across (287c).
+ARROW_HALF_WIDTH = 0.0003
 TEXT_CLEARANCE = 0.0015
+# Clearances are rounded outward by this much, so a placement derived to one
+# does not stand exactly on the audit's limit.
+ROUND_OUT = 0.0001
+
+# The adjuster's hole callout stands between the adjuster elevation and the
+# right view.  #946 / MHA-092: at 9a0f50b1c it stood below-right of the hole
+# and its leader climbed ~28 mm over the front view to the rim, ~16 mm
+# further than the hole's approach from the right face, reading as an edge of
+# the part.  The short way in, from the right face, is SLOT DEPTH's: its
+# lower extension line leaves the slit floor 0.97 mm under the hole centre
+# and runs out to its value, so the callout stands under that line with its
+# ADJUSTER ENTRY name over it (review: named above the thread callout it
+# describes): the name's top an arrow clearance (plus half an arrowhead)
+# under the line, clear of the 15.2's lower arrow, and the callout a text
+# clearance under the name.  Its leader leaves the shoulder's left end at
+# ADJUSTER_LEADER_ANGLE: at 45 deg the run over the part is 4.4 mm longer
+# than the hole's approach, past Main's ~4 mm brief (swing's RD2 fix,
+# 4dda16fd5, left 3.8); at 40 deg it is 3.2.  Every degree shallower slides
+# the right-hand views ~0.6 mm further right.  Hole callouts' extents (every
+# line plus the shoulder) are measured on the I31 render like the rest of the
+# sheet's ink (see "Sheet ink audit").
+ADJUSTER_CALLOUT_EXTENT = (0.0295, 0.0086, 0.0278, 0.0078)
+# The name's ink from its upper-left corner (287c: 36.3 x 3.4 mm).
+ADJUSTER_ENTRY_EXTENT = (0.0, 0.0036, 0.0365, 0.0)
+ADJUSTER_LEADER_ANGLE = math.radians(40.0)
+ADJUSTER_FLOOR_GAP = _drawing_leaders.ARROW_TEXT_CLEARANCE + ARROW_HALF_WIDTH + ROUND_OUT
+ADJUSTER_ENTRY_Y = _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH, FRONT_CENTER) - ADJUSTER_FLOOR_GAP
+ADJUSTER_SHOULDER_Y = (
+    ADJUSTER_ENTRY_Y
+    - ADJUSTER_ENTRY_EXTENT[1]
+    - TEXT_CLEARANCE
+    - ROUND_OUT
+    - ADJUSTER_CALLOUT_EXTENT[3]
+    - ADJUSTER_CALLOUT_EXTENT[1]
+)
+_ADJUSTER_SHOULDER_DX = (
+    _elevation_y(ADJUSTER_AXIS_HEIGHT, FRONT_CENTER) - ADJUSTER_SHOULDER_Y
+) / math.tan(ADJUSTER_LEADER_ANGLE)
+ADJUSTER_CALLOUT_DX = _ADJUSTER_SHOULDER_DX + ADJUSTER_CALLOUT_EXTENT[0]
+ADJUSTER_CALLOUT_Y = ADJUSTER_SHOULDER_Y + ADJUSTER_CALLOUT_EXTENT[1]
+# The name stands centred over the callout.
+ADJUSTER_ENTRY_DX = _ADJUSTER_SHOULDER_DX + (
+    ADJUSTER_CALLOUT_EXTENT[0] + ADJUSTER_CALLOUT_EXTENT[2] - ADJUSTER_ENTRY_EXTENT[2]
+) / 2.0
+# The right view's north face stands a text clearance past the callout's right
+# end.  (I31, 7ab69742b: at x 0.166 the callout's longest line ran over that
+# face; the right view slid 5 mm then, the removed views with it.)  The
+# removed views B and C keep the row's 72 mm pitch, so the gaps to their
+# right keep their measured air.
+_RIGHT_NORTH_FACE_X = (
+    FRONT_CENTER[0] + ADJUSTER_CALLOUT_DX + ADJUSTER_CALLOUT_EXTENT[2] + TEXT_CLEARANCE + ROUND_OUT
+)
+VIEW_ROW_PITCH = 0.072
+RIGHT_CENTER = (_RIGHT_NORTH_FACE_X + (Z_NORTH - Z_MID) * _S, FRONT_CENTER[1])
+LEFT_CENTER = (RIGHT_CENTER[0] + VIEW_ROW_PITCH, FRONT_CENTER[1])
+BACK_CENTER = (RIGHT_CENTER[0] + 2.0 * VIEW_ROW_PITCH, FRONT_CENTER[1])
+# Section A-A stands 19 mm right of the right view, above it, so the pinch
+# depth's value over that view keeps its air to the section's label.
+SECTION_CENTER = (RIGHT_CENTER[0] + 0.019, 0.225)
 # The 1.2 slot prints 1.8 mm wide, narrower than its value, so the arrows
 # stand outside the slot walls and the text sits right of the right arrow's
 # tail on the extended dimension line.  Right, because on the adjuster
@@ -287,14 +341,8 @@ DIMENSION_CALLOUTS = {
     "SlitDepth": "SLOT DEPTH",
 }
 
-# The adjuster's hole callout stands between the adjuster elevation and the
-# right view, named by the ADJUSTER ENTRY note above it.  At y 0.115 (I31
-# render) its shoulder sat at 106.6 mm, where the 5.56 heel height's outside
-# arrow runs up to 108.5 mm: the callout rises 6 mm, still 7 mm under the
-# SLOT DEPTH witness line at 141.3 mm.
-ADJUSTER_CALLOUT_DX = 0.043
-ADJUSTER_CALLOUT_Y = 0.121
-ADJUSTER_ENTRY_RISE = 0.0135
+# The adjuster's hole callout is placed with the view row (ADJUSTER_CALLOUT_*,
+# above).
 # The pinch clearance callout stands above and left of the right view.  At
 # (x - 0.033, 0.1735) its text printed over the 6.0 (I31); raised to 0.178
 # (287c) its leader still dropped almost straight down beside the 6.0's
@@ -361,8 +409,8 @@ def _sheet_notes(
         # Review: named above the thread callout it describes.
         (
             "ADJUSTER ENTRY",
-            adjuster_center[0] + 0.023,
-            ADJUSTER_CALLOUT_Y + ADJUSTER_ENTRY_RISE,
+            adjuster_center[0] + ADJUSTER_ENTRY_DX,
+            ADJUSTER_ENTRY_Y,
         ),
         ("ROTATED 90°", *ROTATED_NOTE_XY),
     )
@@ -408,8 +456,8 @@ _VALUE_EXTENTS = {
     # "15.2" over its SLOT DEPTH callout line.
     "SlitDepth": (0.0129, 0.0046, 0.0124, 0.0045),
 }
-# Hole callouts: every line plus the shoulder the leader leaves from.
-ADJUSTER_CALLOUT_EXTENT = (0.0295, 0.0086, 0.0278, 0.0078)
+# Hole callouts: every line plus the shoulder the leader leaves from
+# (ADJUSTER_CALLOUT_EXTENT is with the adjuster callout's placement).
 # r3: "Ø 3.26 ↓ 6.9" measured 28.5 mm of text (I31); "Ø 2.26 TO SLOT" on
 # the same sheet 33.7 mm.  "Ø 3.26 DRILL TO SLOT" adds "DRILL " (six glyphs at
 # the 2.4 mm that line averages) to the latter: 19.6 mm over the old text,
@@ -425,7 +473,7 @@ PINCH_CLEARANCE_CALLOUT_EXTENT = (
 PINCH_THREAD_CALLOUT_EXTENT = (0.0322, 0.0085, 0.0310, 0.0078)
 # Free notes are placed by their upper-left corner.
 _NOTE_EXTENTS = {
-    "ADJUSTER ENTRY": (0.0, 0.0036, 0.0365, 0.0),
+    "ADJUSTER ENTRY": ADJUSTER_ENTRY_EXTENT,
     "ROTATED 90°": (0.0, 0.0036, 0.0257, 0.0),
     "RIGHT VIEW\nPINCH CLEARANCE ENTRY": (0.0, 0.0081, 0.0581, 0.0),
     "VIEW B\nPINCH THREAD ENTRY": (0.0, 0.0081, 0.0476, 0.0),
@@ -475,7 +523,6 @@ FLANGE_SLOT_W_LINE_DROP = 0.0045
 EXTENSION_GAP = 0.0005
 EXTENSION_OVERSHOOT = 0.0013
 LINE_PAST_TEXT = 0.0013
-ARROW_HALF_WIDTH = 0.0003
 # A text block may not come nearer a view's model outline than this.
 OUTLINE_CLEARANCE = 0.0005
 # Main's eye-pass of 287c: an arrowhead or its tail within 0.2-0.4 mm of
