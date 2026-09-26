@@ -940,9 +940,11 @@ def test_post_screw_engagement_exception_is_stated_where_the_screw_is() -> None:
     assert printed <= diameters and printed >= spec.POST_MOUNT_ENGAGEMENT_MIN_DIAMETERS
     assert f"{printed:.2f}" == "0.90"
     # #917 S1 (a): the platform no longer prints it as a note (rule 6: no
-    # numbers in notes; the tap break is now the model's countersink).  The
-    # screw's own BOM installation note states the exception at the printed
-    # value.
+    # numbers in notes; the tap break is now the model's countersink).  It
+    # states it as its tap callout's last row instead (Codex review of
+    # 4dda16fd5, B1), and the screw's own BOM installation note states the
+    # exception at the printed value.
+    assert drawing.POST_MOUNT_ENGAGEMENT_ROW == f"ENGAGEMENT {printed:.2f}D MIN"
     notes = _config.parts("post-mount-screw")["installation_notes"]
     assert f"ENGAGEMENT {printed:.2f}D MIN: NAMED EXCEPTION TO RULE 12." in notes
     # The break the derivation counts is the break the model's countersink
@@ -963,26 +965,30 @@ def test_post_screw_engagement_exception_is_stated_where_the_screw_is() -> None:
 # 2.5 mm text anchored upper-left, ~1.894 mm a character and 3.52 mm a line
 # (the relief note, 0.0947 x 0.0176 for 50 characters on five lines).
 _NOTE_CHAR_W, _NOTE_LINE_H = 0.001894, 0.00352
-_DETAIL_SPANS = {  # each width's extension-line span, sheet y
-    name: (
-        drawing._SLOT_Y - width * drawing._DETAIL_S / 2.0,
-        drawing._SLOT_Y + width * drawing._DETAIL_S / 2.0,
+_DETAIL_SPANS = {  # the through slot width's extension-line span, sheet y
+    "TipSlotW": (
+        drawing._SLOT_Y - spec.TIP_SLOT_W * drawing._DETAIL_S / 2.0,
+        drawing._SLOT_Y + spec.TIP_SLOT_W * drawing._DETAIL_S / 2.0,
     )
-    for name, width in (("TipSlotW", spec.TIP_SLOT_W), ("TipCboreW", spec.TIP_CBORE_W))
 }
 
 
 def _detail_text_boxes(keep: dict[str, tuple[float, float]]) -> dict[str, tuple]:
     slot_x, slot_y = keep["TipSlotW"]
-    cbore_x, cbore_y = keep["TipCboreW"]
     east_x, east_y = keep["TipSlotEastCx"]
     west_x, west_y = keep["TipSlotWestCx"]
     return {
         "TipSlotW": (slot_x - 0.018, slot_y - 0.0045, slot_x, slot_y + 0.0045),
-        "TipCboreW": (cbore_x - 0.022, cbore_y - 0.0045, cbore_x, cbore_y + 0.0045),
         "TipSlotEastCx": (east_x - 0.006, east_y - 0.0025, east_x + 0.006, east_y + 0.0025),
         "TipSlotWestCx": (west_x - 0.006, west_y - 0.0025, west_x + 0.006, west_y + 0.0025),
     }
+
+
+# The counterbore's width text, as detail B's 4dda read it: "6.50 +0.1/0.0"
+# about 23 x 8 mm, hanging left of its keep x, centred on its keep y.
+def _underside_text_box(keep: dict[str, tuple[float, float]]) -> tuple:
+    x, y = keep["TipCboreW"]
+    return (x - 0.023, y - 0.004, x, y + 0.004)
 
 
 def _note_box(note: drawing.ArcNote) -> tuple[float, float, float, float]:
@@ -1058,17 +1064,10 @@ def test_detail_band_clears_border_title_block_and_captions() -> None:
     assert outline[1] > 0.0097
     notes = {f"{note.key} note": _note_box(note) for note in drawing.CUTTER_NOTES}
     # The audit boxes each leadered note from leader tip to text (ec70186e):
-    # those extents stay apart by 3 mm, and clear of the label and relief.
-    extents = [_note_extent(note) for note in drawing.CUTTER_NOTES]
-    low, high = sorted(extents, key=lambda box: box[1])
-    assert high[1] - low[3] >= 0.003
-    for extent in extents:
+    # clear of the label and relief.
+    for note in drawing.CUTTER_NOTES:
+        extent = _note_extent(note)
         assert not _boxes_overlap(extent, label) and not _boxes_overlap(extent, relief)
-    # Positive control: ec70186e's cbore note (text above its upper-quadrant
-    # tip) nested inside the slot note's extent.
-    by_key = {note.key: note for note in drawing.CUTTER_NOTES}
-    old_cbore = dataclasses.replace(by_key["cbore"], text_xy=(0.121, 0.0715), tip_deg=35.0)
-    assert _boxes_overlap(_note_extent(old_cbore), _note_extent(by_key["slot"]))
     for other in (label, relief, *notes.values()):
         assert not _boxes_overlap(outline, other)
     for caption in captions:
@@ -1112,9 +1111,8 @@ def test_detail_dimension_text_sits_outside_its_own_lines() -> None:
     boxes = _detail_text_boxes(keep)
     east_arc_x = drawing.DETAIL_CENTER[0] - 0.004  # where the width lines start
     extension_runs = {
-        # The widths run left from the slot's straight edges to their lines.
+        # The width runs left from the slot's straight edges to its line.
         "TipSlotW": [((keep["TipSlotW"][0], y), (east_arc_x, y)) for y in _DETAIL_SPANS["TipSlotW"]],
-        "TipCboreW": [((keep["TipCboreW"][0], y), (east_arc_x, y)) for y in _DETAIL_SPANS["TipCboreW"]],
     }
     for name, (low, high) in _DETAIL_SPANS.items():
         x, _y = keep[name]
@@ -1124,42 +1122,43 @@ def test_detail_dimension_text_sits_outside_its_own_lines() -> None:
         for other, runs in extension_runs.items():
             for run in runs:
                 assert not _segment_hits_box(run, box), (name, other, run)
-    slot_x, cbore_x = keep["TipSlotW"][0], keep["TipCboreW"][0]
-    assert cbore_x < slot_x < east_arc_x  # counterbore outboard of the slot
-    assert set(drawing.DETAIL_ARROWS_INSIDE) == {"TipSlotW", "TipCboreW"}
+    assert keep["TipSlotW"][0] < east_arc_x
+    assert set(drawing.DETAIL_ARROWS_INSIDE) == {"TipSlotW"}
     # I31: the slot's station from the pivot left the detail for the notch
     # plan (the circle is centred on the slot, 27.7 south of the pivot).
     assert "TipSlotZ" not in keep
     assert drawing.DETAIL_MODEL_Z == spec.TIP_SCREW_LOCAL_Z
-    # Positive control: 81788ce9's keeps put both widths inside their spans
-    # (there centred on the slot), where the text is centred on its own line.
-    old = {"TipSlotW": drawing._SLOT_Y, "TipCboreW": drawing._SLOT_Y}
-    for name, y in old.items():
-        low, high = _DETAIL_SPANS[name]
-        assert low < y < high
+    # Positive control: 81788ce9's keep put the width inside its span (there
+    # centred on the slot), where the text is centred on its own line.
+    low, high = _DETAIL_SPANS["TipSlotW"]
+    assert low < drawing._SLOT_Y < high
 
 
 def test_cutter_note_leaders_reach_their_arcs_without_crossing() -> None:
-    """Each cutter note's leader tip is on its slot's west end arc.
+    """Each slot note's leader tip is on its slot's west end arc.
 
-    The build proves the tip against the physical edge (``_add_cutter_note``,
-    0.01 mm); here the tip's sheet image, the arc radius and the leader paths
-    are pinned: both leaders rise to the right and cross neither each other,
-    the other note, pivot-to-slot's text or the 2.00s.
+    The build proves the tip against the physical edge (``_add_arc_note``,
+    0.01 mm); here the tip's sheet image, the arc radius and the leader path
+    are pinned: detail B's through-slot note rises to the right clear of the
+    2.00s, and the counterbore is named on the underside view, where it
+    prints solid (C1).
     """
     by_key = {note.key: note for note in drawing.CUTTER_NOTES}
-    assert set(by_key) == {"slot", "cbore"}
-    assert by_key["slot"].feature == "TipScrewSlot"
-    assert by_key["cbore"].feature == "TipScrewCbore"
-    assert by_key["slot"].radius_mm == spec.TIP_SLOT_W / 2.0
-    assert by_key["cbore"].radius_mm == spec.TIP_CBORE_W / 2.0
-    assert by_key["slot"].model_y_mm == spec.PLATE_THICKNESS  # the visible arc
-    assert "SLOT THRU" in by_key["slot"].text
-    assert "FROM UNDERSIDE" in by_key["cbore"].text
+    assert set(by_key) == {"slot"}
+    slot, cbore = by_key["slot"], drawing.UNDERSIDE_CBORE_NOTE
+    assert slot.feature == "TipScrewSlot" and cbore.feature == "TipScrewCbore"
+    assert slot.radius_mm == spec.TIP_SLOT_W / 2.0
+    assert cbore.radius_mm == spec.TIP_CBORE_W / 2.0
+    assert slot.model_y_mm == spec.PLATE_THICKNESS  # the top face's arc
+    assert cbore.model_y_mm == 0.0  # the underside face's arc
+    assert (slot.facing, cbore.facing) == ("top", "bottom")
+    assert "SLOT THRU" in slot.text
     assert drawing.LEADER_TIP_BOUND_M == 0.00001
     # The model's slot end centre (a pinned 0.004 here was the stale 2.0).
-    centre = drawing.detail_xy(spec.TIP_SCREW_HALF_TRAVEL, spec.TIP_SCREW_LOCAL_Z)
-    for note in drawing.CUTTER_NOTES:
+    for note, centre in (
+        (slot, drawing.detail_xy(spec.TIP_SCREW_HALF_TRAVEL, spec.TIP_SCREW_LOCAL_Z)),
+        (cbore, drawing.underside_xy(spec.TIP_SCREW_HALF_TRAVEL, spec.TIP_SCREW_LOCAL_Z)),
+    ):
         tip = drawing.arc_note_tip(note)
         assert math.dist(tip, centre) == pytest.approx(note.radius_mm * 0.002)
         assert -90.0 < note.tip_deg < 90.0  # the west (sheet-right) end arc
@@ -1168,31 +1167,107 @@ def test_cutter_note_leaders_reach_their_arcs_without_crossing() -> None:
             model[0] - spec.TIP_SCREW_HALF_TRAVEL / 1000.0,
             model[2] - spec.TIP_SCREW_LOCAL_Z / 1000.0,
         ) == pytest.approx(note.radius_mm / 1000.0)
-    # The slot note rises from the upper quadrant, the counterbore note drops
-    # from the lower one (their audit extents must not nest, ec70186e).
-    assert by_key["slot"].tip_deg > 0.0 > by_key["cbore"].tip_deg
-    assert drawing.arc_note_tip(by_key["slot"])[1] > drawing._SLOT_Y
+    # Both tips sit on their arc's sheet-upper quadrant, which is model south
+    # looking down and model north looking up.
+    assert slot.tip_deg > 0.0 and cbore.tip_deg > 0.0
+    assert drawing.arc_note_model_tip(slot)[2] * 1000.0 < spec.TIP_SCREW_LOCAL_Z
+    assert drawing.arc_note_model_tip(cbore)[2] * 1000.0 > spec.TIP_SCREW_LOCAL_Z
+    assert drawing.arc_note_tip(slot)[1] > drawing._SLOT_Y
     boxes = _detail_text_boxes(drawing.DETAIL_KEEP)
-    obstacles = {name: boxes[name] for name in ("TipSlotEastCx", "TipSlotWestCx")}
-    fans = {note.key: _leader_fan(note) for note in drawing.CUTTER_NOTES}
-    for key, fan in fans.items():
-        other = "cbore" if key == "slot" else "slot"
-        for segment in fan:
-            for name, box in obstacles.items():
-                assert not _segment_hits_box(segment, box), (key, name)
-            assert not _segment_hits_box(segment, _note_box(by_key[other])), key
-            for other_segment in fans[other]:
-                assert not _segments_cross(segment, other_segment)
-    # Positive control: with the texts swapped, the two leaders cross.
-    swapped = [
-        dataclasses.replace(by_key["slot"], text_xy=by_key["cbore"].text_xy),
-        dataclasses.replace(by_key["cbore"], text_xy=by_key["slot"].text_xy),
-    ]
-    assert any(
-        _segments_cross(a, b)
-        for a in _leader_fan(swapped[0])
-        for b in _leader_fan(swapped[1])
-    )
+    for segment in _leader_fan(slot):
+        for name in ("TipSlotEastCx", "TipSlotWestCx"):
+            assert not _segment_hits_box(segment, boxes[name]), name
+    for segment in _leader_fan(cbore):
+        assert not _segment_hits_box(segment, _underside_text_box(drawing.UNDERSIDE_KEEP))
+
+
+# --- the underside view (MHA-091 Codex review of 4dda16fd5, C1) ------------------
+
+# The features sheet as leaf 917-s1-sheet2-4dda read it (leaf-4dda.log), sheet
+# metres: the hole-location plan, section A-A with its stock text, the pivot
+# and tap callouts (RD2 one row deeper for the engagement row, B1), the relief
+# note, and the zone border.
+_FEATURES_OBSTACLES = {
+    "hole-location plan": (0.1594, 0.1286, 0.2006, 0.2514),
+    "section A-A": (0.3311, 0.1081, 0.3989, 0.1319),
+    "A-A stock text": (0.3016, 0.1207, 0.3345, 0.1353),
+    "pivot callout RD1": (0.1900, 0.1042, 0.2467, 0.1077),
+    "tap callout RD2": (0.2059, 0.2030 - 0.0056, 0.3074, 0.2289),
+    "relief note": (0.1326, 0.1397, 0.1747, 0.1546),
+}
+
+
+def _underside_boxes() -> dict[str, tuple[float, float, float, float]]:
+    cx, cy = drawing.UNDERSIDE_CENTER
+    r = drawing.UNDERSIDE_SHEET_RADIUS
+    x, y = drawing.UNDERSIDE_CAPTION_UPPER_LEFT
+    # The plan captions' glyphs: "HOLES — SCALE 1:2" read 43.4 x 4.8 mm.
+    caption_w = len(drawing.UNDERSIDE_CAPTION) * 0.0434 / len("HOLES — SCALE 1:2")
+    return {
+        "crop": (cx - r, cy - r, cx + r, cy + r),
+        "width text": _underside_text_box(drawing.UNDERSIDE_KEEP),
+        "cbore note": _note_extent(drawing.UNDERSIDE_CBORE_NOTE),
+        "caption": (x, y - 0.0048, x + caption_w, y),
+    }
+
+
+def test_the_underside_view_prints_the_counterbore_width_on_solid_lines() -> None:
+    """C1: detail B dimensioned the counterbore's 6.50 to dashed edges, and
+    section C-C cuts along the slot, so it cannot show the width.  The width
+    moves to a *Bottom view cropped about the slot; detail B keeps the
+    through slot, hidden lines removed."""
+    assert drawing.DIMENSION_OWNER["TipCboreW"] == "tip counterbore underside"
+    assert "TipCboreW" not in drawing.DETAIL_KEEP
+    assert drawing.UNDERSIDE_SCALE == drawing.DETAIL_SCALE == (2, 1)
+    # The crop holds the whole counterbore, ends and all.
+    reach = spec.TIP_SCREW_HALF_TRAVEL + spec.TIP_CBORE_W / 2.0
+    assert reach + 1.0 < drawing.UNDERSIDE_CROP_RADIUS_MM
+    # The width's text sits outside its extension-line span, left of the crop.
+    x, y = drawing.UNDERSIDE_KEEP["TipCboreW"]
+    half_span = spec.TIP_CBORE_W * drawing._UNDERSIDE_S / 2.0
+    text = _underside_text_box(drawing.UNDERSIDE_KEEP)
+    assert text[1] >= drawing.UNDERSIDE_CENTER[1] + half_span
+    assert x < drawing.UNDERSIDE_CENTER[0] - drawing.UNDERSIDE_SHEET_RADIUS
+    source = inspect.getsource(drawing.build)
+    assert "set_hidden_lines_visible" not in source
+
+
+def test_the_underside_view_sits_clear_on_the_features_sheet() -> None:
+    boxes = _underside_boxes()
+    border = (0.0127, 0.0127, 0.4191, 0.2667)
+    title_block = (0.216, 0.0, 0.4318, 0.066)
+    for name, box in boxes.items():
+        assert border[0] < box[0] and box[2] < border[2], name
+        assert border[1] < box[1] and box[3] < border[3], name
+        assert not _boxes_overlap(box, title_block), name
+        for other, obstacle in _FEATURES_OBSTACLES.items():
+            assert not _boxes_overlap(box, obstacle), (name, other)
+    names = list(boxes)
+    for i, first in enumerate(names):
+        for second in names[i + 1 :]:
+            if {first, second} == {"crop", "cbore note"}:
+                continue  # its leader tip is inside the crop by design
+            assert not _boxes_overlap(boxes[first], boxes[second]), (first, second)
+    # The caption sits under the crop, centred on it.
+    caption = boxes["caption"]
+    assert caption[3] < boxes["crop"][1]
+    assert (caption[0] + caption[2]) / 2.0 == pytest.approx(drawing.UNDERSIDE_CENTER[0], abs=0.002)
+    # Positive control: the view at the tap callout's height collides.
+    cx, cy, r = drawing.UNDERSIDE_CENTER[0], 0.215, drawing.UNDERSIDE_SHEET_RADIUS
+    assert _boxes_overlap((cx - r, cy - r, cx + r, cy + r), _FEATURES_OBSTACLES["tap callout RD2"])
+
+
+def test_a_projection_off_the_layout_basis_is_named() -> None:
+    """The recipe reads the *Bottom view's basis at the slot; anything but
+    +x -> sheet +x and +z -> sheet +y at 2:1 fails loud with what it read."""
+    s = drawing._UNDERSIDE_S
+    centre = drawing.UNDERSIDE_CENTER
+    assert drawing.underside_basis_errors(centre, (s, 0.0), (0.0, s)) == []
+    # Looking down (a *Top view) flips z.
+    (error,) = drawing.underside_basis_errors(centre, (s, 0.0), (0.0, -s))
+    assert "model z" in error
+    # Mirrored x, and a view that did not land on its slot.
+    assert len(drawing.underside_basis_errors((0.25, 0.16), (-s, 0.0), (0.0, s))) == 2
 
 
 _TIP_SLOT_WIDTHS = {"TipSlot": spec.TIP_SLOT_W, "TipCbore": spec.TIP_CBORE_W}
@@ -1220,21 +1295,26 @@ def test_detail_b_dimension_references_lie_inside_its_crop() -> None:
     dimensioned to the sketch origin, 27.7 from the slot-centred R12 circle,
     detail B came up with only the two widths ("missing model dimensions:
     ['TipSlotEastCx', 'TipSlotWestCx']")."""
-    assert set(drawing.DETAIL_KEEP) == {
-        "TipSlotEastCx",
-        "TipSlotWestCx",
-        "TipSlotW",
-        "TipCboreW",
-    }
-    for name in drawing.DETAIL_KEEP:
-        width, key = _tip_slot_dimension(name)
-        points = part.tip_slot_sketch_points(width)
-        for ref in part.TIP_SLOT_DIMENSION_REFERENCES[key]:
-            distance = _crop_distance(points[ref])
-            assert distance < drawing.DETAIL_RADIUS_MM - 1.0, (name, ref, distance)
+    assert set(drawing.DETAIL_KEEP) == {"TipSlotEastCx", "TipSlotWestCx", "TipSlotW"}
+    # The underside crop is centred on the same slot, so the same test holds
+    # for the counterbore's width at its own radius.
+    for keep, radius in (
+        (drawing.DETAIL_KEEP, drawing.DETAIL_RADIUS_MM),
+        (drawing.UNDERSIDE_KEEP, drawing.UNDERSIDE_CROP_RADIUS_MM),
+    ):
+        for name in keep:
+            width, key = _tip_slot_dimension(name)
+            points = part.tip_slot_sketch_points(width)
+            for ref in part.TIP_SLOT_DIMENSION_REFERENCES[key]:
+                distance = _crop_distance(points[ref])
+                assert distance < radius - 1.0, (name, ref, distance)
     # Positive control: the origin, the Cx dimensions' old reference, lies
     # outside the crop -- and before I31 (slot at z -11, circle centred at
     # z -6) it lay inside, which is why the same dimensions imported then.
+    # (It lies outside the underside crop too.)
+    assert _crop_distance(part.tip_slot_sketch_points(spec.TIP_CBORE_W)["origin"]) > (
+        drawing.UNDERSIDE_CROP_RADIUS_MM
+    )
     origin = part.tip_slot_sketch_points(spec.TIP_SLOT_W)["origin"]
     assert _crop_distance(origin) > drawing.DETAIL_RADIUS_MM
     assert math.hypot(0.0, 0.0 - (-6.0)) < drawing.DETAIL_RADIUS_MM
@@ -1454,8 +1534,9 @@ def test_every_kept_dimension_prints_once_on_its_owning_view() -> None:
     curation fails the build if a deletion did not hold."""
     owner = drawing.DIMENSION_OWNER
     assert owner["TipSlotZ"] == "notch plan"
-    for name in ("TipSlotEastCx", "TipSlotWestCx", "TipSlotW", "TipCboreW"):
+    for name in ("TipSlotEastCx", "TipSlotWestCx", "TipSlotW"):
         assert owner[name] == "tip screw slot detail", name
+    assert owner["TipCboreW"] == "tip counterbore underside"
     assert owner["TipCboreDepth"] == "tip screw slot section"
     assert owner["NotchW"] == owner["NotchMouthAngle"] == "lock notch cap detail"
     assert owner["PivotBearingReliefDia"] == "profile plan"
@@ -1474,7 +1555,7 @@ def test_every_kept_dimension_prints_once_on_its_owning_view() -> None:
     assert len(errors) == 3 and all("found on ['notch plan'" in e for e in errors)
     # Detail B came up without its end centres (7ab69742b).
     missing = {view: list(names) for view, names in clean.items()}
-    missing["tip screw slot detail"] = ["TipCboreW", "TipSlotW"]
+    missing["tip screw slot detail"] = ["TipSlotW"]
     assert len(drawing.dimension_placement_errors(missing)) == 2
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     call = source.split("_assert_each_kept_dimension_once(\n        adapter,")[1]
@@ -1899,8 +1980,10 @@ def test_detail_b_callouts_identify_features_without_size_or_cutter() -> None:
     note only names its feature."""
     by_key = {note.key: note for note in drawing.CUTTER_NOTES}
     assert by_key["slot"].text == "SLOT THRU"
-    assert by_key["cbore"].text == "C'BORE SLOT\nFROM UNDERSIDE"
-    for note in drawing.CUTTER_NOTES:
+    # The underside view's caption says where it is seen from (C1).
+    assert drawing.UNDERSIDE_CBORE_NOTE.text == "C'BORE SLOT"
+    assert drawing.UNDERSIDE_CAPTION.startswith("UNDERSIDE")
+    for note in (*drawing.CUTTER_NOTES, drawing.UNDERSIDE_CBORE_NOTE):
         assert "END MILL" not in note.text
         assert "<MOD-DIAM>" not in note.text
         assert not any(ch.isdigit() for ch in note.text)

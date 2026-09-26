@@ -59,7 +59,6 @@ from _drawing_common import (
     model_point_in_view,
     read_required_properties,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     set_dimension_callouts,
     set_reference_dimension,
     stamp_drawing_summary,
@@ -86,6 +85,7 @@ from cone_swing_platform_spec import (
     PIVOT_HOLE_DIA,
     PLATE_STOCK_CALLOUT,
     PLATE_THICKNESS,
+    POST_MOUNT_ENGAGEMENT_PRINTED,
     POST_MOUNT_SPEC,
     SURFACE_FINISHES,
     TIP_CBORE_W,
@@ -148,6 +148,7 @@ VIEW_SHEETS = {
     "pivot section": FEATURES_SHEET,
     "tip screw slot detail": FEATURES_SHEET,
     "lock notch cap detail": FEATURES_SHEET,
+    "tip counterbore underside": FEATURES_SHEET,
 }
 # Each derived view and the view it is cut or detailed from.
 VIEW_PARENTS = {
@@ -267,6 +268,11 @@ PROFILE_KEEP = {
     # feature without crossing it (MHA-091 round 6, B1).
     "PivotBearingReliefDia": (0.090, 0.1413),
 }
+# The relief's width names its feature where it prints: the note that
+# identifies the U went to sheet 2 with the hole-location plan (#917 S1), so
+# on sheet 1 a bare 10.50 read as an undesignated size (MHA-091 Codex review
+# of 4dda16fd5, B3).  A suffix, so the value stays the native dimension.
+RELIEF_WIDTH_SUFFIX = {"PivotBearingReliefDia": " TOP RELIEF"}
 # #917 S1: the hole-location plan prints no station.  The post-mount taps
 # transfer from MHA-016 at assembly and the dowel pair is match-drilled
 # through the fitted post, so their native callouts carry everything.
@@ -274,6 +280,13 @@ FEATURE_KEEP: dict[str, tuple[float, float]] = {}
 # The locating instruction ahead of the native tap callout, in the harmonic
 # base's #837 form: the semicolon separates it from "1/4-20 UNC - 2B".
 POST_MOUNT_TRANSFER_CALLOUT = "TRANSFER FROM MHA-016\nAT ASSEMBLY;"
+# The tapped pair's worst-case engagement, stated on the feature it limits
+# (rule 6: a fact on the callout, not a note).  The number is the platform
+# spec's floored worst case, the one the drive-train step prints; the MHA-091
+# Codex review of 4dda16fd5 (B1) read the bare 1/4-20 THRU as an unstated
+# shortfall.  It is the tap callout's last prefix row, under the thread.
+# Named exception: MHA-142 engagement (drawing-simplicity-policy.md, "Named exceptions")
+POST_MOUNT_ENGAGEMENT_ROW = f"ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN"
 # Nominal callout anchors on the features sheet.  Each is read back and moved
 # to the nearest clear spot (``plan_shift``), so these only seed the search;
 # the offline dump test proves the seed is already clear.  The pivot callout
@@ -483,28 +496,23 @@ DETAIL_KEEP = {
         DETAIL_CENTER[0] + 0.0135,
         DETAIL_CENTER[1] + DETAIL_SHEET_RADIUS + 0.005,
     ),
-    # Left, nearest the circle: the through slot, text above both spans
-    # (over the counterbore's upper extension line).
+    # Left, nearest the circle: the through slot, its text above its span.
+    # The counterbore's width left for the underside view (C1).
     "TipSlotW": (DETAIL_CENTER[0] - 0.0275, _SLOT_Y + 0.0125),
-    # Left, outboard: the counterbored slot, text above the slot's.
-    "TipCboreW": (DETAIL_CENTER[0] - 0.0465, _SLOT_Y + 0.0225),
 }
-# Arrowheads inside the extension lines: outside, the slot's 8 mm span put
-# an arrow tail across the counterbore's upper extension line (81788ce9).
-DETAIL_ARROWS_INSIDE = ("TipSlotW", "TipCboreW")
+# Arrowheads inside the extension lines (81788ce9: outside, the 8 mm span's
+# arrow tail crossed the counterbore's extension line; kept for the tail's
+# run over the slot's own witness).
+DETAIL_ARROWS_INSIDE = ("TipSlotW",)
 # Each slot named by a leadered note (2.5 mm text, anchored upper-left) in
-# the open field right of the circle.  Feature identification only: the
+# the open field right of its view.  Feature identification only: the
 # banded 4.0 and 6.50 +0.1/0 dimensions own the widths, and a cutter is a
 # method (MHA-091 Fable review, 63fb3bd2d: "Ø4 END MILL" restated the 4.0 in
 # another spelling and band).
 # Each leader tip lands on the WEST (sheet-right) end arc of its slot, at a
 # sheet angle from that arc's centre.  A leadered note's INote.GetExtent --
-# what the layout audit boxes -- runs from its leader tip to its text, so two
-# notes whose texts sit on the same side of their tips nest (ec70186e: 65.5
-# x 12.1 mm overlap).  The slot note therefore rises from the arc's upper
-# quadrant to text above; the counterbore note drops from its lower quadrant
-# to text below, its leader crossing pivot-to-slot's dimension line (the only
-# path: below that line's foot sits the relief note).
+# what the layout audit boxes -- runs from its leader tip to its text; the
+# slot note rises from the arc's upper quadrant to text above.
 
 
 def detail_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
@@ -535,7 +543,8 @@ class ArcNote:
     The edge is ``feature``'s circle of ``radius_mm`` about the plate-local
     ``arc_center_mm`` (x, z), drawn in a plan-oriented view whose image of
     that centre is ``sheet_center`` at ``sheet_scale`` sheet metres per model
-    mm (sheet +x = +x, sheet +y = -z)."""
+    mm.  Sheet +x is +x either way; sheet +y is -z looking down on the
+    ``"top"`` and +z looking up at the ``"bottom"``."""
 
     key: str
     text: str
@@ -547,6 +556,7 @@ class ArcNote:
     arc_center_mm: tuple[float, float]
     sheet_center: tuple[float, float]
     sheet_scale: float
+    facing: Literal["top", "bottom"] = "top"
 
 
 CUTTER_NOTES = (
@@ -562,20 +572,66 @@ CUTTER_NOTES = (
         _WEST_ARC_CENTER,
         _DETAIL_S,
     ),
-    ArcNote(
-        "cbore",
-        "C'BORE SLOT\nFROM UNDERSIDE",
-        # I31: 2.5 mm lower than 0.047, so its extent stays 3 mm under the
-        # slot note's, whose tip came down 10 mm with the re-centred slot.
-        (0.121, 0.0445),
-        "TipScrewCbore",
-        TIP_CBORE_W / 2.0,
-        -35.0,
-        None,  # the dashed arc: underside outline and floor edge project as one
-        (TIP_SCREW_HALF_TRAVEL, TIP_SCREW_LOCAL_Z),
-        _WEST_ARC_CENTER,
-        _DETAIL_S,
+)
+# The counterbore, seen from below in solid lines (MHA-091 Codex review of
+# 4dda16fd5, C1).  Detail B dimensioned its 6.50 width to the dashed edges it
+# showed through the plate, and section C-C cuts ALONG the slot, so neither
+# can carry the width on solid lines.  A *Bottom model view at 2:1, cropped to
+# a circle about the slot, can: a cropped MODEL view takes the targeted
+# import, where a detail refuses moved dimensions.  Detail B keeps the
+# through slot alone, hidden lines removed.  Looking up, sheet +x is still
+# model +x (west) and sheet +y is model +z (north); the recipe measures that
+# basis and fails loud if SolidWorks maps it otherwise.  The slot centre lands
+# in the open field right of the hole-location plan: over the pivot callout
+# (y <= 0.108), under the tap callout (y >= 0.203), and left of section A-A's
+# stock text (x >= 0.30).
+UNDERSIDE_SCALE = (2, 1)
+_UNDERSIDE_S = UNDERSIDE_SCALE[0] / UNDERSIDE_SCALE[1] / 1000.0
+UNDERSIDE_CENTER = (0.262, 0.160)
+# The crop takes in the whole counterbore, whose ends stand
+# TIP_SCREW_HALF_TRAVEL + TIP_CBORE_W / 2 from the slot centre, with 3 to spare.
+UNDERSIDE_CROP_RADIUS_MM = TIP_SCREW_HALF_TRAVEL + TIP_CBORE_W / 2.0 + 3.0
+UNDERSIDE_SHEET_RADIUS = UNDERSIDE_CROP_RADIUS_MM * _UNDERSIDE_S
+
+
+def underside_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
+    """Sheet point of plate-local (x, z) in the underside view."""
+    return (
+        UNDERSIDE_CENTER[0] + x_mm * _UNDERSIDE_S,
+        UNDERSIDE_CENTER[1] + (z_mm - TIP_SCREW_LOCAL_Z) * _UNDERSIDE_S,
+    )
+
+
+# The width left of the crop, its text outside and above its extension-line
+# span (detail B's form: inside the span the text centres on its own line).
+UNDERSIDE_KEEP = {
+    "TipCboreW": (
+        UNDERSIDE_CENTER[0] - UNDERSIDE_SHEET_RADIUS - 0.006,
+        UNDERSIDE_CENTER[1] + TIP_CBORE_W * _UNDERSIDE_S / 2.0 + 0.007,
     ),
+}
+UNDERSIDE_ARROWS_INSIDE = ("TipCboreW",)
+# The counterbore's outline on the underside face, named from the west
+# (sheet-right) end arc's upper quadrant, the text up and right of the crop.
+UNDERSIDE_CBORE_NOTE = ArcNote(
+    "cbore",
+    "C'BORE SLOT",
+    (UNDERSIDE_CENTER[0] + UNDERSIDE_SHEET_RADIUS + 0.004, UNDERSIDE_CENTER[1] + 0.016),
+    "TipScrewCbore",
+    TIP_CBORE_W / 2.0,
+    35.0,
+    0.0,  # the underside face's arc, not the counterbore floor's
+    (TIP_SCREW_HALF_TRAVEL, TIP_SCREW_LOCAL_Z),
+    underside_xy(TIP_SCREW_HALF_TRAVEL, TIP_SCREW_LOCAL_Z),
+    _UNDERSIDE_S,
+    facing="bottom",
+)
+# A model view has no native label: the caption states the direction and
+# scale in the plan captions' form, centred under the crop.
+UNDERSIDE_CAPTION = "UNDERSIDE — SCALE 2:1"
+UNDERSIDE_CAPTION_UPPER_LEFT = (
+    UNDERSIDE_CENTER[0] - 0.0265,
+    UNDERSIDE_CENTER[1] - UNDERSIDE_SHEET_RADIUS - 0.004,
 )
 # Detail D's full R: "R" alone (ASME: a full radius is stated, its size is
 # the width's), in the mouth right of the circle between the width's
@@ -631,13 +687,15 @@ def arc_note_tip(note: ArcNote) -> tuple[float, float]:
 
 
 def arc_note_model_tip(note: ArcNote) -> tuple[float, float, float]:
-    """``arc_note_tip`` in part metres (sheet +x = +x, sheet +y = -z)."""
+    """``arc_note_tip`` in part metres (sheet +y is -z from the top, +z from
+    the bottom)."""
     angle = math.radians(note.tip_deg)
     cx, cz = note.arc_center_mm
+    z_per_sheet_y = -1.0 if note.facing == "top" else 1.0
     return (
         (cx + note.radius_mm * math.cos(angle)) / 1000.0,
         (note.model_y_mm if note.model_y_mm is not None else PLATE_THICKNESS) / 1000.0,
-        (cz - note.radius_mm * math.sin(angle)) / 1000.0,
+        (cz + z_per_sheet_y * note.radius_mm * math.sin(angle)) / 1000.0,
     )
 
 
@@ -703,6 +761,7 @@ VIEW_KEEPS: dict[str, dict[str, tuple[float, float]]] = {
     "tip screw slot detail": DETAIL_KEEP,
     "lock notch cap detail": CAP_DETAIL_KEEP,
     "tip screw slot section": SLOT_SECTION_KEEP,
+    "tip counterbore underside": UNDERSIDE_KEEP,
 }
 DIMENSION_OWNER: dict[str, str] = {
     name: view for view, keep in VIEW_KEEPS.items() for name in keep
@@ -1880,6 +1939,96 @@ def _create_detail_view(
     return detail
 
 
+def underside_basis_errors(
+    centre: tuple[float, float],
+    x_step: tuple[float, float],
+    z_step: tuple[float, float],
+) -> list[str]:
+    """Why a measured underside projection is not the layout's, or nothing.
+
+    ``centre`` is the slot centre's sheet image; ``x_step``/``z_step`` the
+    sheet displacement of +1 mm model x / z there.  The layout wants the slot
+    on UNDERSIDE_CENTER, +x to sheet +x and +z to sheet +y, at 2:1."""
+    errors = []
+    if math.dist(centre, UNDERSIDE_CENTER) > 0.0002:
+        errors.append(f"slot centre at {centre}, layout wants {UNDERSIDE_CENTER}")
+    step = _UNDERSIDE_S
+    for axis, got, want in (("x", x_step, (step, 0.0)), ("z", z_step, (0.0, step))):
+        if math.dist(got, want) > 1e-6:
+            errors.append(f"+1 mm model {axis} moves {got} on the sheet, layout wants {want}")
+    return errors
+
+
+def _place_underside_view(adapter: Any) -> Any:
+    """The *Bottom model view at 2:1, its slot centre on UNDERSIDE_CENTER,
+    cropped to UNDERSIDE_SHEET_RADIUS about it (crank arm's top-view crop)."""
+    view = place_view(adapter, str(SOURCE), "*Bottom", *UNDERSIDE_CENTER, scale=UNDERSIDE_SCALE)
+    native = _early_bound(view, "IView")
+    slot_m = (0.0, 0.0, TIP_SCREW_LOCAL_Z / 1000.0)
+    # A model view's Position is its whole outline's centre, not the slot's.
+    for attempt in range(2):
+        landed = model_point_in_view(
+            adapter, view, slot_m, label=f"underside slot centre, pass {attempt}"
+        )
+        if math.dist(landed[:2], UNDERSIDE_CENTER) < 0.0001:
+            break
+        anchor = tuple(float(value) for value in native.Position)
+        moved = [anchor[axis] + UNDERSIDE_CENTER[axis] - landed[axis] for axis in range(2)]
+        if not native.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to position the underside view")
+        rebuild_drawing(adapter, label="place underside view")
+    centre = model_point_in_view(adapter, view, slot_m, label="underside slot centre")[:2]
+    steps = []
+    for offset in ((0.001, 0.0, 0.0), (0.0, 0.0, 0.001)):
+        point = tuple(slot_m[i] + offset[i] for i in range(3))
+        moved_xy = model_point_in_view(adapter, view, point, label="underside basis")
+        steps.append((moved_xy[0] - centre[0], moved_xy[1] - centre[1]))
+    print(f"underside view: slot_centre={centre} x_step={steps[0]} z_step={steps[1]}")
+    errors = underside_basis_errors(centre, steps[0], steps[1])
+    if errors:
+        raise RuntimeError("underside view projection: " + "; ".join(errors))
+
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the underside view to crop it")
+    draw.ClearSelection2(True)
+    sketch = _early_bound(native.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (UNDERSIDE_CENTER, (UNDERSIDE_CENTER[0] + UNDERSIDE_SHEET_RADIUS, UNDERSIDE_CENTER[1])):
+        point = _early_bound(math_utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if sketch_manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("failed to sketch the underside crop circle")
+    # IView.Crop2 crops to the selected closed profile; it returns
+    # swCropViewErrors_e, where 1 is NoError.
+    cropped = int(native.Crop2(False, True, 0))
+    draw.ClearSelection2(True)
+    if cropped != 1:
+        raise RuntimeError(f"failed to crop the underside view: swCropViewErrors_e {cropped}")
+    rebuild_drawing(adapter, label="crop underside view")
+    native.UpdateViewDisplayGeometry()
+    if not bool(native.IsCropped()):
+        raise RuntimeError("the underside view did not retain its crop")
+    outline = tuple(float(value) for value in native.GetOutline())
+    print(f"underside view: cropped outline={outline}")
+    r = UNDERSIDE_SHEET_RADIUS
+    circle = (UNDERSIDE_CENTER[0] - r, UNDERSIDE_CENTER[1] - r, UNDERSIDE_CENTER[0] + r, UNDERSIDE_CENTER[1] + r)
+    # The outline holds the crop circle and not much more: uncropped, the
+    # 2:1 plate runs ~450 mm.
+    slack = [circle[0] - outline[0], circle[1] - outline[1], outline[2] - circle[2], outline[3] - circle[3]]
+    if len(outline) != 4 or not all(-0.0005 <= side <= 0.012 for side in slack):
+        raise RuntimeError(f"the underside crop outline {outline} does not hug its circle {circle}")
+    centre = model_point_in_view(adapter, view, slot_m, label="cropped underside slot centre")[:2]
+    if math.dist(centre, UNDERSIDE_CENTER) > 0.0002:
+        raise RuntimeError(f"the crop moved the underside slot centre to {centre}")
+    return view
+
+
 def _look_slot_section_south(
     adapter: Any, parent: Any, section: Any, cut: Any
 ) -> None:
@@ -2182,6 +2331,52 @@ def _require_countersink_max(display: Any, *, spec: HoleSpec, label: str) -> Non
             f"(all variables and tolerance types: {seen!r})"
         )
     _telemetry.info(f"{label}: callout countersink diameter(s) {present} print MAX")
+
+
+def _append_callout_row(display: Any, row: str, *, label: str) -> None:
+    """Add ``row`` as the hole callout's last prefix row, under the thread.
+
+    The prefix DEFINITION is edited, as ``add_native_hole_callout`` writes it,
+    so the Hole Wizard variables stay associative; its read-back is the
+    persistence check (IDisplayDimension.SetText is void).
+    """
+    native = _early_bound(display, "IDisplayDimension")
+    definition = str(native.GetText(5) or "")  # swDimensionTextPrefixDefinition
+    if "<hw-threaddesc>" not in definition:
+        raise RuntimeError(f"{label}: callout prefix carries no thread row: {definition!r}")
+    if row in definition:
+        raise RuntimeError(f"{label}: callout already carries {row!r}: {definition!r}")
+    with_row = f"{definition.rstrip()}\n{row}"
+    native.SetText(1, with_row)  # swDimensionTextPrefix
+    if str(native.GetText(5) or "") != with_row:
+        raise RuntimeError(
+            f"{label}: callout row {row!r} did not persist: {native.GetText(5)!r}"
+        )
+    _telemetry.info(f"{label}: callout prefix {with_row!r}")
+
+
+def _suffix_dimensions(
+    adapter: Any, annotations: Sequence[Any], suffixes: dict[str, str]
+) -> None:
+    """Write each named dimension's suffix and read it back; fail on a miss."""
+    remaining = dict(suffixes)
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        suffix = remaining.pop(name, None)
+        if suffix is None:
+            continue
+        display = _early_bound(
+            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        display.SetText(2, suffix)  # swDimensionTextSuffix
+        if str(display.GetText(2) or "") != suffix:
+            raise RuntimeError(
+                f"{name}: suffix {suffix!r} did not persist: {display.GetText(2)!r}"
+            )
+        _telemetry.info(f"{name}: suffix {suffix!r}")
+    if remaining:
+        raise RuntimeError(f"dimension suffixes not applied: {sorted(remaining)}")
 
 
 def post_mount_callout_xz() -> tuple[float, float]:
@@ -2592,8 +2787,8 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=DETAIL_SCALE,
         label="tip screw slot detail",
     )
-    # Hidden edges dashed, so the underside counterbored slot reads.
-    set_hidden_lines_visible(adapter, detail)
+    # The through slot alone: the counterbore prints solid on the underside view.
+    set_hidden_lines_removed(adapter, detail)
     cap_detail = _create_detail_view(
         adapter,
         feature,
@@ -2607,6 +2802,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="lock notch cap detail",
     )
     set_hidden_lines_removed(adapter, cap_detail)
+    _on_sheet_of(adapter, "tip counterbore underside")
+    underside = _place_underside_view(adapter)
+    set_hidden_lines_removed(adapter, underside)
     _on_sheet_of(adapter, "tip screw slot section")
     profile_pivot = model_point_in_view(
         adapter, profile, (0.0, PLATE_THICKNESS / 1000.0, 0.0), label="profile pivot"
@@ -2646,6 +2844,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="profile plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    _suffix_dimensions(adapter, profile_annotations, RELIEF_WIDTH_SUFFIX)
     _hide_profile_cosmetic_threads(adapter, profile)
     _delete_thread_callouts(adapter, profile, label="profile plan")
     _on_sheet_of(adapter, "feature plan")
@@ -2702,6 +2901,15 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _set_arrows_inside(adapter, detail_annotations, DETAIL_ARROWS_INSIDE)
+    _on_sheet_of(adapter, "tip counterbore underside")
+    underside_annotations = curate_view_dimensions(
+        adapter,
+        underside,
+        keep=UNDERSIDE_KEEP,
+        view_label="tip counterbore underside",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    _set_arrows_inside(adapter, underside_annotations, UNDERSIDE_ARROWS_INSIDE)
     # Detail D alone imports the notch sketch (NotchW and the mouth angle);
     # the notch plan keeps only the cap sketch's centre.
     cap_detail_annotations = curate_view_dimensions(
@@ -2752,6 +2960,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *detail_annotations,
         *cap_detail_annotations,
         *slot_section_annotations,
+        *underside_annotations,
     ]
     if not auto_center_marks(adapter, feature, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to feature plan")
@@ -2777,6 +2986,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _require_countersink_max(
         tap_callout, spec=POST_MOUNT_SPEC, label="v2 post-mount tapped holes"
+    )
+    _append_callout_row(
+        tap_callout, POST_MOUNT_ENGAGEMENT_ROW, label="v2 post-mount tapped holes"
     )
     # The dowel pair's size, band and THRU stay native; the prefix names the
     # mating post and the reamer.  A reamed fit prints three places.
@@ -2841,6 +3053,10 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     cap_r_note = _add_arc_note(adapter, cap_detail, CAP_R_NOTE)
     _add_arc_note(adapter, feature, RELIEF_ID_NOTE)
+    _on_sheet_of(adapter, "tip counterbore underside")
+    _add_arc_note(adapter, underside, UNDERSIDE_CBORE_NOTE)
+    if add_note(adapter, UNDERSIDE_CAPTION, *UNDERSIDE_CAPTION_UPPER_LEFT) is None:
+        raise RuntimeError("failed to caption the underside view")
 
     # Annotation insertion can invalidate the exported display geometry.
     for key, view in (
@@ -2850,14 +3066,12 @@ async def build(adapter: Any) -> dict[str, str]:
         ("pivot section", section),
         ("tip screw slot section", slot_section),
         ("isometric", iso),
+        ("tip screw slot detail", detail),
         ("lock notch cap detail", cap_detail),
+        ("tip counterbore underside", underside),
     ):
         _on_sheet_of(adapter, key)
         set_hidden_lines_removed(adapter, view)
-    # Re-assert after the dimensions attach: the shared helper passes through
-    # HLR, so the dashed edge set is regenerated, not a same-mode no-op.
-    _on_sheet_of(adapter, "tip screw slot detail")
-    set_hidden_lines_visible(adapter, detail)
     # Last, after every annotation and display-mode regen could re-lay it.
     _position_view_label(
         adapter,
@@ -2919,6 +3133,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "tip screw slot detail": detail,
             "lock notch cap detail": cap_detail,
             "tip screw slot section": slot_section,
+            "tip counterbore underside": underside,
         },
     )
     if cut.GetDisplayOnlySurfaceCut() is not True:

@@ -18,6 +18,7 @@ import _drawing_common
 import _drawing_leaders
 import build_cone_swing_platform as part
 import cone_swing_platform_ac4f_dump as ac4f
+import cone_swing_platform_spec as spec
 import draw_cone_swing_platform as drawing
 import pytest
 from _drawing_layout_check import CollisionScope, DrawableRegion, LayoutElement
@@ -233,7 +234,8 @@ def test_the_package_is_two_named_sheets_at_the_plan_scale() -> None:
 
 def test_the_feature_plan_takes_its_callouts_caption_and_derived_views() -> None:
     """Sheet 1 keeps the profile and notch plans, the isometric and C-C; the
-    feature plan goes to sheet 2 with A-A, B and D, which are cut from it."""
+    feature plan goes to sheet 2 with A-A, B and D, which are cut from it,
+    and the underside view that dimensions the counterbore (C1)."""
     on = {
         name: {view for view, sheet in drawing.VIEW_SHEETS.items() if sheet == name}
         for name in drawing.SHEET_NAMES
@@ -244,7 +246,10 @@ def test_the_feature_plan_takes_its_callouts_caption_and_derived_views() -> None
         "pivot section",
         "tip screw slot detail",
         "lock notch cap detail",
+        "tip counterbore underside",
     }
+    # A model view, so it has no parent to share a sheet with.
+    assert "tip counterbore underside" not in drawing.VIEW_PARENTS
     assert drawing.caption_sheet("Feature View Note") == "FEATURES"
     assert drawing.caption_sheet("Pivot Relief Fit") == "FEATURES"
     assert {drawing.caption_sheet(c) for c in ("Profile View Note", "Notch View Note", "Isometric View Note")} == {"PLANS"}
@@ -265,7 +270,8 @@ def test_the_ac4f_views_and_captions_map_onto_the_declared_sheets() -> None:
     """Every ac4f view has a recipe key, every caption was found at its anchor,
     and no annotation is left without a sheet."""
     assert set(_AC4F_VIEWS) == {view.name for view in AC4F.views}
-    assert set(_AC4F_VIEWS.values()) == set(drawing.VIEW_SHEETS)
+    # ac4f predates the underside view (C1, after 4dda16fd5).
+    assert set(_AC4F_VIEWS.values()) == set(drawing.VIEW_SHEETS) - {"tip counterbore underside"}
     found = {_caption_of(item) for item in AC4F.annotations} - {None}
     assert found == set(_CAPTION_ANCHORS) == set(drawing.CAPTION_VIEWS)
     split = _split(AC4F)
@@ -694,6 +700,90 @@ def test_both_plans_lose_their_thread_callout_and_finalize_trips_on_a_survivor()
     assert "expected_redundant_notes=0" in source
     hide = inspect.getsource(drawing._hide_profile_cosmetic_threads)
     assert "ThreadCallout" not in hide
+
+
+# --- MHA-091 Codex review of 4dda16fd5: B1 engagement, B3 relief width ---------
+
+# The tap callout's prefix definition as the 4dda leaf logged it.
+_TAP_PREFIX = "TRANSFER FROM MHA-016\nAT ASSEMBLY; <hw-threaddesc> <hw-threadclass> <hw-thru>"
+
+
+class _DisplayDimension:
+    """IDisplayDimension text parts: 1 writes the prefix that 5 reads back as its
+    definition, 2 is the suffix.  ``drop`` loses every write (a void SetText
+    SolidWorks ignores)."""
+
+    def __init__(self, texts: dict[int, str], *, drop: bool = False) -> None:
+        self.texts, self.drop = dict(texts), drop
+
+    def GetText(self, part: int) -> str:  # noqa: N802 - COM name
+        return self.texts.get(part, "")
+
+    def SetText(self, part: int, text: str) -> None:  # noqa: N802 - COM name
+        if not self.drop:
+            self.texts[5 if part == 1 else part] = text
+
+
+def test_the_tap_callout_states_the_engagement_it_limits_under_its_thread() -> None:
+    """B1: the sheet states MHA-142's shortfall at the drive-train step's value."""
+    display = _DisplayDimension({5: _TAP_PREFIX})
+    drawing._append_callout_row(display, drawing.POST_MOUNT_ENGAGEMENT_ROW, label="tap")
+    rows = display.GetText(5).splitlines()
+    assert rows[-2].endswith("<hw-threaddesc> <hw-threadclass> <hw-thru>")
+    assert rows[-1] == f"ENGAGEMENT {spec.POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN"
+    # The printed MIN is the floored worst case and never under the ruled floor.
+    worst_d = spec.POST_MOUNT_ENGAGEMENT_WORST / spec.POST_MOUNT_THREAD_DIA
+    assert spec.POST_MOUNT_ENGAGEMENT_MIN_DIAMETERS <= spec.POST_MOUNT_ENGAGEMENT_PRINTED
+    assert spec.POST_MOUNT_ENGAGEMENT_PRINTED <= worst_d
+    source = inspect.getsource(drawing.build)
+    assert source.index("add_native_hole_callout(") < source.index(
+        "_append_callout_row(\n        tap_callout, POST_MOUNT_ENGAGEMENT_ROW"
+    )
+
+
+@pytest.mark.parametrize(
+    ("texts", "drop", "match"),
+    [
+        ({5: "TRANSFER FROM MHA-016\nAT ASSEMBLY;"}, False, "carries no thread row"),
+        ({5: f"{_TAP_PREFIX}\nENGAGEMENT 0.90D MIN"}, False, "already carries"),
+        ({5: _TAP_PREFIX}, True, "did not persist"),
+    ],
+)
+def test_the_engagement_row_fails_loud_off_its_callout(texts, drop, match) -> None:
+    display = _DisplayDimension(texts, drop=drop)
+    with pytest.raises(RuntimeError, match=match):
+        drawing._append_callout_row(display, "ENGAGEMENT 0.90D MIN", label="tap")
+
+
+class _Dimension:
+    def __init__(self, name: str, display: _DisplayDimension) -> None:
+        self.name, self.display = name, display
+
+    def GetSpecificAnnotation(self) -> _DisplayDimension:  # noqa: N802 - COM name
+        return self.display
+
+
+def test_the_relief_width_names_its_feature_on_the_profile_sheet(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """B3: the relief's identifying note left for sheet 2 with the hole plan,
+    so the width on sheet 1 carries the feature's name itself."""
+    assert set(drawing.RELIEF_WIDTH_SUFFIX) <= set(drawing.PROFILE_KEEP)
+    assert drawing.VIEW_SHEETS["profile plan"] != drawing.VIEW_SHEETS["feature plan"]
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
+    width = _Dimension("PivotBearingReliefDia", _DisplayDimension({}))
+    other = _Dimension("PlateLenDim", _DisplayDimension({}))
+    drawing._suffix_dimensions(None, [other, width], drawing.RELIEF_WIDTH_SUFFIX)
+    assert width.display.GetText(2) == " TOP RELIEF"
+    assert other.display.GetText(2) == ""
+    with pytest.raises(RuntimeError, match="did not persist"):
+        drawing._suffix_dimensions(
+            None,
+            [_Dimension("PivotBearingReliefDia", _DisplayDimension({}, drop=True))],
+            drawing.RELIEF_WIDTH_SUFFIX,
+        )
+    with pytest.raises(RuntimeError, match="not applied"):
+        drawing._suffix_dimensions(None, [other], drawing.RELIEF_WIDTH_SUFFIX)
 
 
 # --- the sheet numbers ----------------------------------------------------------
