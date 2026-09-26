@@ -2,10 +2,11 @@ r"""Create the complete cone-gear batch drawing package (MHA-013).
 
 Every configured family member T006..T120 by six receives a standalone sheet.
 Each sheet selects its own part configuration, imports the native model-owned
-blank diameter, bore, face width, and driving circular-tooth-thickness
-requirement, and carries its own gear data and title-block alloy.  The bore and
-tooth-thickness bands are authored by ``build_cone_gear`` from the named shaft
-and gear-mesh fits; this drawing only arranges and verifies them.
+blank diameter, bore, face width, driving circular-tooth-thickness requirement
+and gap-floor limits, and carries its own gear data and title-block alloy.  The
+bands are authored by ``build_cone_gear`` from the named shaft and gear-mesh
+fits (the gap floor as one LIMIT band per configuration); this drawing only
+arranges and verifies them.
 
 There are no datums or feature-control frames.  Hidden lines communicate no
 additional manufacturing fact on these plain through-bored spur gears, so all
@@ -13,8 +14,9 @@ three views remain hidden-lines-removed.  The one finish symbol belongs to the
 fitted bore.  The side view stays in projection with the front view's bore
 axis; its face width hangs below it, clear of the Gear Data block.  The
 circular tooth thickness is dimensioned on the +X tooth's pitch chord (a tooth
-on every configuration), and the part's construction witness sketch is hidden
-in the side and isometric views, where it carries no dimension.  The approved attachment note permits solder/silver-braze or
+on every configuration), and the gap floor on a phantom circle at the modelled
+floor.  The part saves both construction sketches hidden; only the front view,
+which dimensions them, shows them.  The approved attachment note permits solder/silver-braze or
 Loctite 638/648 and adds no key, pin, set screw, or hub.
 """
 
@@ -24,12 +26,12 @@ import argparse
 import sys
 from typing import Any
 
+import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_leaders import ARROW_TEXT_CLEARANCE
 from _drawing_common import (
     _INSERT_DIMS_MARKED,
-    _model_item_paths,
-    _select_model_feature,
     DrawingOutputs,
     add_note,
     add_property_linked_note,
@@ -52,7 +54,10 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
-from build_cone_gear import assert_saved_configuration_topology
+from build_cone_gear import (
+    assert_saved_configuration_topology,
+    gap_floor_deviations_mm,
+)
 from cone_gear_spec import (
     BORE_SURFACE_FINISHES,
     CONFIGURATION_TEETH,
@@ -60,7 +65,9 @@ from cone_gear_spec import (
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     bore_dia_mm,
+    floor_limits_mm,
     outside_dia_mm,
+    tooth_thickness_mm,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
@@ -124,7 +131,6 @@ GEAR_DATA_POS = (0.215, 0.263)
 # Rendered height/width budget of the Gear Data block, for the layout test.
 GEAR_DATA_HEIGHT = 0.056
 GEAR_DATA_MAX_LINE_CHARS = 66
-TOOTH_REFERENCE_SKETCH = "ToothThicknessReference"
 MANUFACTURING_NOTES_POS = (0.015, 0.263)
 SHEET_COUNT_POS = (0.350, 0.263)
 
@@ -133,6 +139,8 @@ DIMENSION_CALLOUTS = {
     # Pitch diameter, backlash and mate already live in the Gear Data block.
     # Repeating them here made the long suffix collide with the bore callout.
     "ToothThickness": "CIRCULAR TOOTH THICKNESS",
+    # The limit pair points at a phantom circle; name what it bounds.
+    "FloorDia": "GAP FLOOR",
 }
 
 
@@ -146,10 +154,77 @@ def rendered_half_face_width(teeth: int) -> float:
     return FACE_WIDTH * numerator / (denominator * 2000.0)
 
 
+# BlankDia's value stands this far above the tip circle.  At 0.012 the T006
+# value (8:1) sat on the vertical centre-mark line, which reaches 26.3 mm
+# above the bore axis on that sheet (layout audit, 0.82 mm overlap); 0.0145
+# clears it, and no other text on any sheet is within 36 mm above the value.
+BLANK_DIA_LIFT = 0.0145
+# The gap-floor limit stack (value pair plus "GAP FLOOR") stands right of the
+# tip circle, above the thickness witness: in the same lane as the thickness
+# dimension line, which runs DOWN from the +X tooth, and clear of the side
+# view (left edge >= 0.219 on every sheet).
+FLOOR_DIA_GAP_X = 0.012
+FLOOR_DIA_RISE = 0.006
+# The thickness dimension's arrows stand outside its witnesses, so the upper
+# arrow's tail runs UP the stack's lane: on the 834-fix-6927 T006 sheet (8:1)
+# it crossed the shelf under "GAP FLOOR" by ~1 mm.  The shelf therefore rises
+# per sheet to clear that tail (``floor_dia_y``).
+#
+# swUserPreferenceDoubleValue_e.swDetailingArrowLength (swconst.tlb R2026x),
+# read with swDetailingNoOptionSpecified: how far the dimension line runs past
+# an outside arrow's tip, head and tail together.
+_PREF_ARROW_LENGTH = 26
+_PREF_OPT_NONE = 0
+# The project DRWDOT's value (0.25 in).  The 834-fix-6927 T006 sheet prints
+# the thickness arrow 6.35 mm from tip to tail end; build() reads the live
+# preference and refuses a template that differs.
+DIMENSION_ARROW_LENGTH = 0.00635
+# The limit stack hangs 7.2 mm from its anchor down to the shelf line (three
+# rows at a ~4.9 mm pitch, same sheet), rounded outward; it is centred on the
+# anchor, so the same half-height bounds its top.
+FLOOR_STACK_HALF_HEIGHT = 0.0075
+
+
+def thickness_arrow_reach_y(teeth: int) -> float:
+    """Sheet y where the thickness dimension's upper arrow tail ends.
+
+    The upper witness stands half the tooth thickness above the bore axis at
+    sheet scale (the arc thickness, an upper bound on the pitch chord it
+    witnesses), and one outside arrow runs on past it.
+    """
+    numerator, denominator = _SCALE_BY_TEETH[teeth]
+    half_thickness = tooth_thickness_mm(teeth) * numerator / (denominator * 2000.0)
+    return FRONT_CENTER[1] + half_thickness + DIMENSION_ARROW_LENGTH
+
+
+def floor_dia_y(teeth: int) -> float:
+    """Anchor y of the gap-floor stack: its usual place above the thickness
+    witness, raised where that would put the shelf within the fleet's
+    arrow-to-text clearance of the thickness arrow's tail."""
+    usual = FRONT_CENTER[1] + 0.6 * rendered_half_od(teeth) + FLOOR_DIA_RISE
+    lowest = thickness_arrow_reach_y(teeth) + ARROW_TEXT_CLEARANCE + FLOOR_STACK_HALF_HEIGHT
+    return max(usual, lowest)
+
+
+def _assert_dimension_arrow_length(drawing: Any) -> None:
+    """Refuse a template whose arrow length is not the one the layout assumes."""
+    extension = _early_bound(
+        _early_bound(drawing, "IModelDoc2").Extension, "IModelDocExtension"
+    )
+    live = float(extension.GetUserPreferenceDouble(_PREF_ARROW_LENGTH, _PREF_OPT_NONE))
+    if abs(live - DIMENSION_ARROW_LENGTH) > 1e-6:
+        raise RuntimeError(
+            f"drawing arrow length reads {live * 1000.0:.3f} mm; the gap-floor "
+            f"stack is placed for {DIMENSION_ARROW_LENGTH * 1000.0:.3f} mm"
+        )
+    _telemetry.info(f"drawing arrow length {live * 1000.0:.3f} mm")
+
+
 def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
     half_od = rendered_half_od(teeth)
     return {
-        "BlankDia": (FRONT_CENTER[0], FRONT_CENTER[1] + half_od + 0.012),
+        "FloorDia": (FRONT_CENTER[0] + half_od + FLOOR_DIA_GAP_X, floor_dia_y(teeth)),
+        "BlankDia": (FRONT_CENTER[0], FRONT_CENTER[1] + half_od + BLANK_DIA_LIFT),
         # One measured exterior lane keeps the full stacked fit callout inside
         # the left border on every scale/configuration.  Do not derive X from
         # gear diameter: that pushed the large-family text through the border.
@@ -189,39 +264,75 @@ def bore_finish_xy(teeth: int) -> tuple[tuple[float, float], tuple[float, float]
     return edge, symbol
 
 
-def right_keep(teeth: int) -> dict[str, tuple[float, float]]:
-    return {
-        "FaceWidth": (
-            RIGHT_CENTER[0],
-            RIGHT_CENTER[1] - rendered_half_od(teeth) - 0.012,
-        )
-    }
+# Sheet width of the face-width text with its stacked band ("6.00" plus
+# "+0.1/-0.1"), measured ~19.4 mm on the conegear-834b render.  Where the face
+# spans less than the text plus a clearance each side, the #834 machinist
+# review found the text crowding its extension lines (sheets 5-20, 3:1 and
+# below): the text then stands outside, right of the view, on the extended
+# dimension line.
+FACE_WIDTH_TEXT_WIDTH = 0.020
+FACE_WIDTH_TEXT_CLEARANCE = 0.002
 
 
-def _hide_reference_sketch(adapter: Any, view: Any, label: str) -> None:
-    """Hide the part's thickness-witness sketch in one drawing view only.
-
-    ``IModelDoc2::BlankSketch`` on a sketch selected through a view
-    (``"<sketch>@<component>@<view>"``) hides it in that view -- the SOLIDWORKS
-    "Reset Visibility of Sketches in Drawing View" example.  Blanking it in the
-    part instead would also hide it in the front view, whose thickness
-    dimension it owns.
-    """
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    name = view_name(adapter, view)
-    if not ddoc.ActivateView(name):
-        raise RuntimeError(f"{label}: failed to activate {name!r}")
-    draw.ClearSelection2(True)
-    selected = _select_model_feature(
-        adapter, TOOTH_REFERENCE_SKETCH, paths=_model_item_paths(adapter, view)
+def face_width_text_inside(teeth: int) -> bool:
+    return (
+        2.0 * rendered_half_face_width(teeth)
+        >= FACE_WIDTH_TEXT_WIDTH + 2.0 * FACE_WIDTH_TEXT_CLEARANCE
     )
-    if not selected.startswith("SKETCH"):
-        draw.ClearSelection2(True)
-        raise RuntimeError(f"{label}: witness resolved as {selected!r}, not a sketch")
-    draw.BlankSketch()
-    draw.ClearSelection2(True)
-    _telemetry.debug(f"{label}: hid {TOOTH_REFERENCE_SKETCH} ({selected})")
+
+
+def right_keep(teeth: int) -> dict[str, tuple[float, float]]:
+    y = RIGHT_CENTER[1] - rendered_half_od(teeth) - 0.012
+    if face_width_text_inside(teeth):
+        return {"FaceWidth": (RIGHT_CENTER[0], y)}
+    x = (
+        RIGHT_CENTER[0]
+        + rendered_half_face_width(teeth)
+        + FACE_WIDTH_TEXT_CLEARANCE
+        + FACE_WIDTH_TEXT_WIDTH / 2.0
+    )
+    return {"FaceWidth": (x, y)}
+
+
+_TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
+
+
+def _assert_sheet_floor_limits(
+    adapter: Any, annotations: list[Any], configuration: str, teeth: int
+) -> None:
+    """Prove the sheet's gap-floor dimension carries THIS configuration's limits.
+
+    One model dimension holds twenty LIMIT bands; the imported display
+    dimension reads the band of its view's referenced configuration from the
+    saved part, so this is the per-configuration readback after save and
+    reopen.
+    """
+    floor = [a for a in annotations if dimension_name(adapter, a) == "FloorDia"]
+    if len(floor) != 1:
+        raise RuntimeError(
+            f"{configuration}: expected one FloorDia on the sheet, found {len(floor)}"
+        )
+    display = _early_bound(
+        _early_bound(floor[0], "IAnnotation").GetSpecificAnnotation(),
+        "IDisplayDimension",
+    )
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    kind = int(tolerance.Type)
+    observed = (
+        float(tolerance.GetMinValue()) * 1000.0,
+        float(tolerance.GetMaxValue()) * 1000.0,
+    )
+    expected = gap_floor_deviations_mm(teeth)
+    drifted = any(abs(o - e) > 1e-6 for o, e in zip(observed, expected))
+    if kind != _TOL_LIMIT or drifted:
+        raise RuntimeError(
+            f"{configuration}: sheet FloorDia reads type {kind} {observed} mm, "
+            f"expected LIMIT {expected} mm ({floor_limits_mm(teeth)})"
+        )
+    _telemetry.success(
+        f"{configuration}: sheet gap-floor limits {floor_limits_mm(teeth)} mm"
+    )
 
 
 def _configure_views(
@@ -356,6 +467,7 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    _assert_dimension_arrow_length(drawing_model)
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="cone-gear batch")
     stamp_drawing_summary(
         adapter,
@@ -390,15 +502,19 @@ async def build(adapter: Any) -> dict[str, str]:
         for view in views:
             set_hidden_lines_removed(adapter, view)
         _assert_tooth_geometry(front, configuration, teeth)
-        _hide_reference_sketch(adapter, right, f"{configuration} side witness")
-        _hide_reference_sketch(adapter, iso, f"{configuration} iso witness")
 
-        front_annotations = _curate_repeated_dimensions(
+        # The part saves both authoring sketches hidden; the front view shows
+        # them again for their dimensions (the side and iso views show the
+        # part as saved).  The targeted import still delivers the dimensions
+        # on every sheet after the first (probe 834-gapfloor-c301).
+        front_annotations = hidden_sketches.curate_view_dimensions(
             adapter,
             front,
             keep=front_keep(teeth),
             view_label=f"{configuration} front",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
         )
+        _assert_sheet_floor_limits(adapter, front_annotations, configuration, teeth)
         right_annotations = _curate_repeated_dimensions(
             adapter,
             right,

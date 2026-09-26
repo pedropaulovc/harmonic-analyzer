@@ -360,10 +360,9 @@ _SNAPSHOT = {
     "crank-hub": {"ServicePinStationReference"},
     "crank-handle-pivot-screw": {"StationReference"},
     "crankshaft": {"StationReference"},
-    "cone-gear": {"ToothThicknessReference"},
     "cone-pivot-post": {"BoreSpacingReference", "JournalPlanReference"},
 }
-_OWNERS = {"pinioncluster", "crankhub", "pivot", "conegear"}
+_OWNERS = {"pinioncluster", "crankhub", "pivot"}
 
 
 def _allowances() -> dict[str, dict[str, str]]:
