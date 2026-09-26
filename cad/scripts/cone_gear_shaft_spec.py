@@ -7,6 +7,7 @@ from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 from cone_pivot_post_installation import GEAR_AXIS_SHIFT
+from cone_gear_spec import FACE_WIDTH as CONE_GEAR_FACE_WIDTH
 from crank_drive_gear_spec import FACE_WIDTH as GEAR64_FACE_WIDTH
 
 
@@ -114,6 +115,53 @@ SECTION_DIAS = tuple(dia_in * MM_PER_IN for dia_in, _end in SECTIONS)
 SECTION_ENDS = tuple(end for _dia_in, end in SECTIONS)
 SHAFT_LENGTH = SECTION_ENDS[-1]
 
+# One length origin (#914 option A, Main ruling 2026-09-25): the collar's
+# thrust face, the face the post bears on.  Drawing policy rule 8 allows one
+# origin per view, baseline from it.  The journal runs back from it to the
+# front stub, the three gear-seat shoulders and the solder stations run
+# forward from it, and the overall length stays the conspicuous front-to-tip
+# dimension.  Measuring shoulders and gears from the same face keeps the
+# journal's .X length out from between them.  Each land's end plane is offset
+# from SECTION_ORIGINS[i] by SECTION_KNOBS[i], the value its SecEnd{i} global
+# carries; land 0 is the journal, extruded from the front face.
+DATUM_STATION = COLLAR_START_STATION
+SECTION_ORIGINS = (
+    "Front Plane",
+    "CollarFace",
+    "CollarFace",
+    "CollarFace",
+    "Front Plane",
+)
+SECTION_KNOBS = tuple(
+    end if origin == "Front Plane" else end - DATUM_STATION
+    for end, origin in zip(SECTION_ENDS, SECTION_ORIGINS)
+)
+
+# Solder stations (#914 user ruling: +-0.13 from the collar face).  #834
+# narrows each cone gear from its SOUTH face only, so the north faces stay on
+# the 6.5 reference face and a station is the gear's south face, the face a
+# spacer set on the collar meets.  The twenty seats are equally spaced at the
+# exact-tracking seat pitch, so the print gives the first and the last with
+# "20X EQ SP".  T120's reference centre is the drive train's
+# SHAFT_T120_STATION (the shaft tests pin the two equal).
+CONE_FACE_REFERENCE = T006_FACE_WIDTH
+T120_CENTER_STATION = 28.25 + GEAR_AXIS_SHIFT
+SOLDER_STATION_COUNT = 20
+SOLDER_T120_STATION = (
+    FRONT_STUB
+    + T120_CENTER_STATION
+    + CONE_FACE_REFERENCE / 2.0
+    - CONE_GEAR_FACE_WIDTH
+    - DATUM_STATION
+)
+SOLDER_T006_STATION = (
+    FRONT_STUB
+    + T006_CENTER_STATION
+    + CONE_FACE_REFERENCE / 2.0
+    - CONE_GEAR_FACE_WIDTH
+    - DATUM_STATION
+)
+
 # Diameter bands, one NAMED class per land, applied to the model dimension
 # by build_cone_gear_shaft -- never "+0.00/-0.02" typed as sheet callout text.
 #
@@ -194,6 +242,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Sec3": {"Sec3End"},
     "Sec4": {"Sec4End"},
     "ShoulderFillets": {"ShoulderR"},
+    "CollarProfile": {"CollarDia"},
+    "Collar": {"CollarWidth"},
+    "SolderStations": {"T120Station", "T006Station"},
 }
 
 # Display precision is a MODEL property (drawing-simplicity policy rule 2):
@@ -214,13 +265,18 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # could not pass the land to reach its pitch station.  The R0.10 root radius
 # eats a further 0.10 of the outboard margin, which a bore edge break covers.
 #
-# Journal length Sec0End and overall length Sec4End: one place, the routine
-# grade the fleet's plain lengths print.  The journal is 1.0 mm proud of the
-# post front face, the post bore ends flush with its shoulder, and the 64T
-# crank-drive gear beside that shoulder is soldered with ~1.7 mm of air to the
-# step, so +-0.8 on the length touches nothing; the tip end meets an
-# adjustable cup-point screw that takes up any length error.  Shoulder
+# Journal length Sec0End (collar face back to the front stub) and overall
+# length Sec4End: one place, the routine grade the fleet's plain lengths
+# print.  The journal only sets how far the stub stands proud of the post's
+# south face (the collar face bears on its north face), and the tip end meets
+# an adjustable cup-point screw that takes up any length error.  Shoulder
 # radius: two places; nothing depends on it beyond clearing the gear faces.
+#
+# Collar (#914): the diameter prints one place (.X leaves a 1.0 mm minimum
+# bearing ring outside the post bore, and the 5/8 bar caps the top); the web
+# prints three places, because at .XX the 1.681 web could fall to 1.17, under
+# the 1.5 floor the user accepted it against.  Solder stations: three places,
+# the +-0.13 the user ruled.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Sec0Profile": {"Sec0Dia": 3},
     "Sec1Profile": {"Sec1Dia": 3},
@@ -233,6 +289,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Sec3": {"Sec3End": 3},
     "Sec4": {"Sec4End": 1},
     "ShoulderFillets": {"ShoulderR": 2},
+    "CollarProfile": {"CollarDia": 1},
+    "Collar": {"CollarWidth": 3},
+    "SolderStations": {"T120Station": 3, "T006Station": 3},
 }
 
 _PRECISION_NAMES = [
