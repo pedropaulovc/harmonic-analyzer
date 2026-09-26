@@ -365,8 +365,9 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     # (the gear-seat steps; the collar's roots stay sharp, #914).
     assert drawing.DIMENSION_CALLOUTS["ShoulderR"] == "3X"
     # The old "SHOULDER ROOTS R0.10 MAX" note is gone.  What remains names
-    # the mate behind the gear-seat band -- the solder gap (rule 2; codex
-    # 375a122c) -- without adding a check of its own (no MUST), and carries
+    # the gear seats' mate (rule 2; codex 375a122c) without the joint method
+    # (rule 6, Main 2026-09-26: soldering is the drive-train assembly step's)
+    # or a check of its own (no MUST), and carries
     # no number but the mate's part number, no tolerance, datum or method
     # word -- except the tailstock line, a user-ruled process requirement
     # (U40, 2026-09-23: the 23.293 mm Ø1.588 tip land at L/D 14.7 is only
@@ -393,11 +394,14 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
         "BASIC",
         "FINISH",
         "GRIND",
+        "SOLDER",
+        "BRAZE",
+        "LOCTITE",
     ):
         assert forbidden not in notes.upper()
     # U40: "TURN" appears only in the ruled tailstock line.
     assert "TURN" not in notes.upper().replace(tailstock[0].upper(), "")
-    assert "SOLDER GAP" in notes and f"CONE GEAR BORES, {mate_number}" in notes
+    assert notes.splitlines()[0] == f"GEAR SEATS MATE {mate_number} BORES."
     assert "THREE-PLACE" not in notes
     assert (
         'apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})'

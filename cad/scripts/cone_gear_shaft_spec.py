@@ -216,20 +216,19 @@ SURFACE_FINISHES = (
 )
 
 # What the native dimensions cannot say (drawing-simplicity policy rule 2: a
-# fit requirement names its mate).  The gear-seat limits are what leaves the
-# solder gap in the cone gears' bores; the printed limits govern, so the note
-# is a reason, not a fitting instruction (review 2026-09-23).  The old lines
-# explaining the three-place stations went: the places already say it.  No
-# check the shop cannot make (codex, 375a122c), no digits but the mate's
-# number, no method words but one.  Lines stay short: the note block starts
-# 58 mm in and the title block begins at 216 mm.  The tailstock line is that
-# one process word, by user ruling (U40, 2026-09-23): the 23.293 mm
-# Ø1.588 terminal land (L/D 14.7) cannot be turned unsupported, so the
-# support IS the requirement (rule 6's exception), not a method preference.
+# fit requirement names its mate).  The gear seats name the bores they fit;
+# why their band sits below nominal (the joint gap) is GEAR_SEAT_BAND's
+# comment, and the joint method lives only at the drive-train assembly step
+# (cone_gear_notes.ATTACHMENT) -- rule 6 keeps both off the sheet (Main,
+# 2026-09-26).  No check the shop cannot make (codex, 375a122c), no digits but
+# the mate's number, no method words but one.  Lines stay short: the note
+# block starts 58 mm in and the title block begins at 216 mm.  The tailstock
+# line is that one process word, by user ruling (U40, 2026-09-23): the
+# 23.293 mm Ø1.588 terminal land (L/D 14.7) cannot be turned unsupported, so
+# the support IS the requirement (rule 6's exception), not a method preference.
 DRAWING_NOTES = "\n".join(
     (
-        "GEAR SEAT LIMITS LEAVE A SOLDER GAP",
-        "IN THE CONE GEAR BORES, MHA-013.",
+        "GEAR SEATS MATE MHA-013 BORES.",
         "TURN THE TIP JOURNAL WITH TAILSTOCK SUPPORT.",
     )
 )
