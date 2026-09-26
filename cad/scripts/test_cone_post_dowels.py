@@ -12,6 +12,7 @@ bent into the test.
 
 from __future__ import annotations
 
+import ast
 import math
 from pathlib import Path
 
@@ -277,9 +278,7 @@ def test_plate_names_each_dowel_axis_for_the_assembly() -> None:
         assert f'("{plane}", "PLANE"),' in source
 
 
-def _volume_check_calls(tree: "ast.AST") -> dict[str, "ast.Call"]:
-    import ast
-
+def _volume_check_calls(tree: ast.AST) -> dict[str, ast.Call]:
     calls: dict[str, ast.Call] = {}
     for node in ast.walk(tree):
         if (
@@ -304,7 +303,6 @@ def test_post_feature_volume_checks_chain_from_the_previous_actual() -> None:
     ACTUAL volume volume_check returns and build its expected value as
     ``volume +/- <feature>``, so a step's band measures only its own feature.
     """
-    import ast
     import inspect
     import textwrap
 
