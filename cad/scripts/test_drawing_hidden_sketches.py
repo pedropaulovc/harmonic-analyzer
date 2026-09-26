@@ -540,6 +540,7 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
     found = _drawings_reading_blanked_sketches()
     assert {
         "arbor_pedestal",
+        "cone_gear",
         "cone_tip_block",
         "cone_tip_shim",
         "cylinder_gear_shaft",

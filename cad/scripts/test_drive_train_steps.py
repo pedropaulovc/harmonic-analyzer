@@ -53,6 +53,29 @@ def test_each_typed_step_cite_names_the_step_that_does_it(
     assert phrase in _step_body(key)
 
 
+def test_the_cone_gear_joint_prints_in_the_step_that_bonds_the_gears() -> None:
+    """#834 (rule 6) took the MHA-013 joining method off every cone gear sheet,
+    so the step that bonds the gears states it, and the adhesive note sends
+    the fitter to that step, not to a print that no longer carries it."""
+    import cone_gear_notes
+    import cone_gear_spec
+
+    joint = cone_gear_notes.ATTACHMENT
+    for teeth in cone_gear_spec.CONFIGURATION_TEETH:
+        assert joint not in cone_gear_notes.drawing_notes(teeth)
+        assert joint not in cone_gear_notes.gear_data(teeth)
+    body = _step_body("cone-gears-bonded")
+    assert "MHA-013" in body and joint in body
+    adhesive = next(
+        line
+        for line in drawing.CONSUMABLES_NOTES.splitlines()
+        if line.startswith("ADHESIVE:")
+    )
+    assert "MHA-013" in adhesive
+    assert f"STEP {steps.step_number('cone-gears-bonded')}" in adhesive
+    assert "PRINT" not in adhesive
+
+
 def test_a_cite_to_the_wrong_step_is_caught() -> None:
     """Positive control: step 18 locates the rig but does not set the gap."""
     assert "2.5 FEELER" not in _step_body("rig-located")
