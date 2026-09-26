@@ -36,6 +36,7 @@ from _common import (
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
+    bbox_extent_check,
     name_bore_axis,
     check,
     define_circle,
@@ -62,7 +63,8 @@ from _drawing_marks import (
 from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
-from _part_pmi import author_part_pmi
+from _gtol_spec import CylinderFace
+from _part_pmi import _resolve_faces, author_part_pmi
 from crank_pinion_spec import (
     BORE_DIA,
     BORE_DIA_BAND,
@@ -95,6 +97,32 @@ PA_DEG = PRESSURE_ANGLE_DEG
 # gear's 10" was a low-confidence read; 11.0 fit the line-of-centres overhang
 # model but grazed the true rim minimum at the tight 2026-07-14 fit.)
 BORE_DIAMETER = BORE_DIA  # the crankshaft's Ø9.0 pinion seat (crank_pinion_spec)
+
+# The hub boss as the runtime gate reads it (#906 diag v3, d6ca08eb7): a boss
+# revolve coincident with the gap floors' root arcs vanished on a
+# regeneration with the rebuild reporting success and What's Wrong empty, so
+# the gate reads the solid itself.  The station sits in the outboard stub,
+# clear of the teeth, so only the boss can reach it; the relieved gap floors
+# share its radius over the toothed length alone.  Tolerances are 1 um: the
+# gate must see a dropped boss, not re-prove the dimensions.
+BOSS_GATE_TOL_MM = 1e-3
+BOSS_GATE_FACE = CylinderFace(
+    BOSS_DIA,
+    contains_z_mm=(FACE_WIDTH + OVERALL_LENGTH) / 2.0,
+    tolerance_mm=BOSS_GATE_TOL_MM,
+)
+
+
+async def assert_boss_present(adapter, label: str) -> None:
+    """Fail loud unless the solid still reaches OVERALL_LENGTH along the axis
+    and carries exactly one boss-radius cylinder outboard of the teeth."""
+    with _telemetry.span("pinion.boss_gate", label=label):
+        await bbox_extent_check(
+            adapter, f"{label} overall length", "z", OVERALL_LENGTH,
+            tol=BOSS_GATE_TOL_MM,
+        )
+        _resolve_faces(adapter.currentModel, {f"{label} hub boss": BOSS_GATE_FACE})
+        _telemetry.success(f"{label}: hub boss present")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -156,28 +184,32 @@ async def build(adapter) -> dict[str, str]:
         )
     ]
 
-    # Hub boss (ch12 p.19): the root-circle cylinder from the SAME faced end
-    # as the teeth, through the toothed length and BOSS_LENGTH past it, so its
-    # length IS the part's overall length -- one conspicuous native dimension
-    # from one faced end (policy rule 7). Inside the toothed length the
-    # cylinder lies within the blank's solid core (its surface is the relieved
-    # gap floors' own root arc), so the merge adds exactly the outboard stub,
-    # which the volume gate proves. It is a REVOLVE of a half-profile on the
-    # Right plane (local x -> model -Z, local y -> model Y) rather than an
-    # extruded circle: a turned part prints its diameter beside its length on
-    # the side view (rule 7), and only a dimension whose sketch plane is
-    # parallel to that view imports there natively -- the boss diameter as a
-    # doubled centerline-to-outline dim, the overall length along the outline.
+    # Hub boss (ch12 p.19): the root-circle cylinder BOSS_LENGTH past the
+    # teeth. Its outboard end is dimensioned from the SAME faced end as the
+    # teeth, so the overall length stays one conspicuous native dimension from
+    # one faced end (policy rule 7). The half-profile starts AT the tooth face,
+    # not at the faced end: a profile run through the toothed length sits
+    # exactly on every relieved gap floor's root arc, and SolidWorks drops
+    # that revolve without a feature error on the next regeneration after the
+    # first (#906 diag v3, d6ca08eb7: the stub vanished on a plain
+    # ForceRebuild3, and PinHole lost its face). Starting at the tooth face
+    # adds the same stub, which the volume gate proves. It is a REVOLVE of a
+    # half-profile on the Right plane (local x -> model -Z, local y -> model Y)
+    # rather than an extruded circle: a turned part prints its diameter beside
+    # its length on the side view (rule 7), and only a dimension whose sketch
+    # plane is parallel to that view imports there natively -- the boss
+    # diameter as a doubled centerline-to-outline dim, the overall length
+    # along the outline.
     boss = SketchDims()
     check("create_sketch boss", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     boss_axis = check(
         "boss axis centerline",
-        await adapter.add_centerline(0.0, 0.0, -OVERALL_LENGTH, 0.0),
+        await adapter.add_centerline(-FACE_WIDTH, 0.0, -OVERALL_LENGTH, 0.0),
     )
     boss_pts = [
-        (0.0, 0.0),
-        (0.0, BOSS_DIA / 2.0),
+        (-FACE_WIDTH, 0.0),
+        (-FACE_WIDTH, BOSS_DIA / 2.0),
         (-OVERALL_LENGTH, BOSS_DIA / 2.0),
         (-OVERALL_LENGTH, 0.0),
     ]
@@ -221,7 +253,7 @@ async def build(adapter) -> dict[str, str]:
         check(
             f"{label} starts at faced end",
             await adapter.add_sketch_constraint(
-                f"{line}.start", f"{boss_lines[0]}.start", "vertical_points"
+                f"{line}.start", "origin", "vertical_points"
             ),
         )
     check(
@@ -233,8 +265,8 @@ async def build(adapter) -> dict[str, str]:
     boss_outline = boss_lines[1]
     await dimension_between(
         adapter,
-        f"{boss_outline}.start",
         f"{boss_outline}.end",
+        "origin",
         "horizontal_distance",
         OVERALL_LENGTH,
         "boss OverallLength",
@@ -276,9 +308,12 @@ async def build(adapter) -> dict[str, str]:
         "BoreDia",
     )
     boss.record("BoreDia", '"BoreDia"')
+    # The profile's start sits on the axis at the tooth face: one alignment
+    # relation plus one distance, driven by FaceWidth.
     await anchor_point_to_origin(
-        adapter, f"{boss_lines[0]}.start", 0.0, 0.0, "boss anchor"
+        adapter, f"{boss_lines[0]}.start", -FACE_WIDTH, 0.0, "boss anchor"
     )
+    boss.record("BossStart", '"FaceWidth"')
     await ensure_fully_defined(adapter, "boss sketch")
     check("exit_sketch boss", await adapter.exit_sketch())
     name_last_feature(adapter, "BossProfile")
@@ -362,6 +397,10 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
+    # A second regeneration is where the old boss profile vanished; take one
+    # and prove the solid kept its boss (the rebuild's own verdict did not).
+    await force_rebuild(adapter)
+    await assert_boss_present(adapter, "driven crank pinion")
     set_dimension_bilateral_tolerance(
         adapter, "BossProfile", "BoreDia", *deviations(BORE_DIA_BAND)
     )
@@ -389,6 +428,7 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
     )
+    await assert_boss_present(adapter, "crank pinion before save")
     return await save_part_and_images(adapter, PART_NAME)
 
 
