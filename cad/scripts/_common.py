@@ -1339,6 +1339,7 @@ async def save_part_and_images(
     # sourced from part_properties so a registry title override cannot split.
     apply_summary_info(adapter, title=properties["Title"])
     require_one_material(adapter, part_name)
+    require_one_colour(adapter, part_name)
     rebuild_stale_configurations(adapter, part_name)
     check(
         f"re-save with properties -> {part_path}",
@@ -1940,29 +1941,113 @@ async def apply_color(adapter: Any, rgb: tuple[float, float, float]) -> None:
     (Oak's wood image kept rendering over PAPER_WHITE). Body appearances
     sit above part appearances in the display hierarchy, so the body-level
     colour wins over the texture.
-    """
-    from solidworks_mcp.adapters.com_variant import double_array
 
-    values = double_array([*rgb, 1.0, 1.0, 0.3, 0.31, 0.0, 0.0])
-    doc = adapter.currentModel
+    Both levels are per configuration. The doc level is set on all of them at
+    once (IModelDocExtension::SetMaterialPropertyValues, swAllConfiguration).
+    IBody2::MaterialPropertyValues2 is documented for the active configuration
+    only and IBody2 has no configuration-option setter, so each configuration
+    is activated in turn, written and read back at both levels, and the
+    original active configuration is restored. The configurations walked are
+    recorded on the adapter: one created afterwards would take its body colour
+    from undocumented inheritance, which require_one_colour refuses.
+    """
+    from solidworks_mcp.adapters.com_variant import double_array, null_variant
+
     # [R,G,B, ambient, diffuse, specular, shininess, transparency, emission]
-    doc.MaterialPropertyValues = values
-    back = tuple(float(v) for v in (doc.MaterialPropertyValues or ())[:3])
-    # SolidWorks quantises to 8 bits per channel
-    if len(back) != 3 or any(abs(b - w) > 1 / 255 for b, w in zip(back, rgb)):
-        raise RuntimeError(f"colour readback mismatch: set {rgb}, got {back}")
+    values = double_array([*rgb, 1.0, 1.0, 0.3, 0.31, 0.0, 0.0])
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    extension = _early_bound(_read_member(model, "Extension"), "IModelDocExtension")
+    extension.SetMaterialPropertyValues(values, _SW_ALL_CONFIGURATIONS, null_variant())
+    active = active_configuration_name(adapter, model)
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    shown = active
+    wrong: dict[str, str] = {}
     n_bodies = 0
-    try:
-        part_h = _early_bound(
-            doc, "IPartDoc"
-        )  # IPartDoc for GetBodies2; keep `doc` for MaterialPropertyValues
-        bodies = part_h.GetBodies2(0, True) or []  # solid bodies
-        for body in bodies:
+    activations = 0
+    for name in [active, *(name for name in names if name != active)]:
+        if name != shown:
+            activations += 1
+            if not model.ShowConfiguration2(name):
+                raise RuntimeError(f"apply_color: cannot activate configuration {name!r}")
+        shown = name
+        if not _rgb_matches(model.MaterialPropertyValues, rgb):
+            wrong[f"{name} (part)"] = _rgb_text(model.MaterialPropertyValues)
+        bodies = part.GetBodies2(0, True) or []  # swSolidBody, visible
+        if not bodies:
+            raise RuntimeError(f"apply_color: configuration {name!r} has no solid body")
+        for index, body in enumerate(bodies):
             body.MaterialPropertyValues2 = values
-            n_bodies += 1
-    except Exception as exc:
-        log(f"body colour skipped ({exc})")
-    log(f"colour override {tuple(round(v, 3) for v in back)} ({n_bodies} bodies)")
+            if not _rgb_matches(body.MaterialPropertyValues2, rgb):
+                wrong[f"{name} (body {index})"] = _rgb_text(body.MaterialPropertyValues2)
+        n_bodies += len(bodies)
+    if shown != active:
+        activations += 1
+        if not model.ShowConfiguration2(active):
+            raise RuntimeError(f"apply_color: cannot restore configuration {active!r}")
+    _telemetry.annotate(config_count=len(names), activations=activations)
+    if wrong:
+        raise RuntimeError(f"apply_color {rgb}: read back {wrong}")
+    adapter.colour_configurations = frozenset(names)
+    log(f"colour override {rgb} ({len(names)} configuration(s), {n_bodies} bodies)")
+
+
+_SW_ALL_CONFIGURATIONS = 2  # swInConfigurationOpts_e.swAllConfiguration
+_SW_SPECIFY_CONFIGURATION = 3  # swInConfigurationOpts_e.swSpecifyConfiguration
+
+
+def _rgb_matches(values: Any, rgb: tuple[float, float, float]) -> bool:
+    back = [float(value) for value in (values or ())[:3]]
+    # SolidWorks quantises to 8 bits per channel
+    return len(back) == 3 and all(abs(b - w) <= 1 / 255 for b, w in zip(back, rgb))
+
+
+def _rgb_text(values: Any) -> str:
+    return str(tuple(round(float(value), 3) for value in (values or ())[:3]))
+
+
+def configuration_colours(model: Any, names: Iterable[str]) -> dict[str, str]:
+    """Part-level appearance RGB per configuration, without activating any.
+
+    IModelDocExtension::GetMaterialPropertyValues reads all -1 where no
+    appearance is assigned.
+    """
+    from solidworks_mcp.adapters.com_variant import bstr_array
+
+    extension = _early_bound(_read_member(model, "Extension"), "IModelDocExtension")
+    return {
+        name: _rgb_text(
+            extension.GetMaterialPropertyValues(_SW_SPECIFY_CONFIGURATION, bstr_array([name]))
+        )
+        for name in names
+    }
+
+
+@_telemetry.traced("save.colour_gate", label_param="part_name")
+def require_one_colour(adapter: Any, part_name: str) -> None:
+    """Fail the save unless every configuration carries the same part colour.
+
+    Body-level colour is readable only in the active configuration, so this
+    gate reads the part level; apply_color reads both back per configuration,
+    and a configuration it never walked has an unproven body colour.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    walked = getattr(adapter, "colour_configurations", None)
+    unwalked = [name for name in names if walked is not None and name not in walked]
+    if unwalked:
+        raise RuntimeError(
+            f"{part_name}: configuration(s) {unwalked} created after apply_color; "
+            "body colour unproven (call apply_color after every configuration exists)"
+        )
+    colours = configuration_colours(model, names)
+    found = set(colours.values())
+    _telemetry.annotate(config_count=len(names), colours=";".join(sorted(found)))
+    if len(found) > 1:
+        raise RuntimeError(
+            f"{part_name}: every configuration must carry one colour, read {colours}"
+        )
+    _telemetry.success(f"{part_name}: one colour in {len(names)} configuration(s)")
 
 
 @_telemetry.traced("check.measure", label_param="label")
