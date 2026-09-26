@@ -22,8 +22,10 @@ import math
 import sys
 
 import _config
+import _telemetry
 from _common import (
     POLISHED_STEEL,
+    _early_bound,
     SketchDims,
     active_configuration_name,
     apply_color,
@@ -202,6 +204,7 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, POLISHED_STEEL)
     diag_stale_probe(adapter, "apply_color")
     await report_mass_properties(adapter)
+    require_material_in_every_configuration(adapter, (default_config, INSTALLED_CONFIG))
     diag_stale_probe(adapter, "report_mass_properties")
     apply_drawing_properties(
         adapter,
@@ -214,6 +217,32 @@ async def build(adapter) -> dict[str, str]:
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
+
+
+def require_material_in_every_configuration(
+    adapter, configurations: tuple[str, ...]
+) -> None:
+    """Read each configuration's material back; raise unless all are MATERIAL.
+
+    ``apply_material`` sets the ACTIVE configuration's material only
+    (``IPartDoc::SetMaterialPropertyName2``), so a configuration split before
+    it could carry no material, and drive-train would take MHA-135's mass
+    from the wrong density.  Every configuration is logged before any
+    raise, so a failing leaf still shows what each one reads.
+    """
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    readings: dict[str, str] = {}
+    for name in configurations:
+        # Early-bound: the retval, then the [out] database.
+        material, database = part.GetMaterialPropertyName2(name)
+        readings[name] = str(material or "")
+        _telemetry.info(f"material in {name}: {material!r} (database {database!r})")
+    wrong = {name: got for name, got in readings.items() if got != MATERIAL}
+    if wrong:
+        raise RuntimeError(
+            f"{PART_NAME}: configurations {wrong} do not carry {MATERIAL!r}"
+        )
+    _telemetry.success(f"{MATERIAL} in every configuration {list(readings)}")
 
 
 if __name__ == "__main__":
