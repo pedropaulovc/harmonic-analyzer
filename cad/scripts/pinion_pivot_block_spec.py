@@ -55,14 +55,23 @@ from pinion_pivot_block_geometry import (
 # bore that must turn or slide by hand.
 BORE_DIA_BAND = REAM_SLIDE
 
-# The two reamed bores share a diameter.  The harvested pivot-bore cylinder
+# Both reamed bores are running faces (rule 5): MHA-062 turns in the pivot
+# bore and MHA-060 in the lift bore (Main, MHA-061 eye pass: the lift bore
+# had none).  They share a diameter.  The harvested pivot-bore cylinder
 # spans y=-BORE_DIA/2..+BORE_DIA/2, while the raised lift bore does not reach
-# the pivot bore's lower generator; that point makes this selector exact.
+# the pivot bore's lower generator; that point makes the pivot selector
+# exact.  The lift bore sits LIFT_BORE_SPACING west, beyond the pivot
+# bore's x-span, which makes its selector exact.
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "pivot_bore",
         MACHINED_UM,
         CylinderFace(BORE_DIA, contains_y_mm=-BORE_DIA / 2.0),
+    ),
+    SurfaceFinishControl(
+        "lift_bore",
+        MACHINED_UM,
+        CylinderFace(BORE_DIA, contains_x_mm=-LIFT_BORE_SPACING),
     ),
 )
 
@@ -98,7 +107,7 @@ PIVOT_SHAFT_NAME = _registry_name("pinion-pivot-shaft")
 LIFT_ROD_NAME = _registry_name("pinion-lift-rod")
 
 # True free-text instructions only. Geometry lives in native dimensions and
-# the one running-bore surface symbol (policy rule 3: a block carries no
+# the two running-bore surface symbols (policy rule 3: a block carries no
 # frames or datums). The part
 # build stamps these strings into the SLDPRT; the drawing displays only
 # $PRPSHEET links, so the print cannot silently diverge from its source model.

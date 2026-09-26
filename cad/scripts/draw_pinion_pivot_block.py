@@ -44,6 +44,7 @@ from pinion_pivot_block_spec import (
     BORE_DIA,
     FRONT_BBOX_CX,
     FRONT_BBOX_CY,
+    LIFT_BORE_RISE,
     LIFT_BORE_SPACING,
     SCREW_HALF_SPACING,
     SCREW_HOLE_DIA,
@@ -261,6 +262,24 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.208, 0.170),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
+        char_height=0.0025,
+    )
+    # The lift bore runs MHA-060 (rule 5).  Its REAM callout leaves the rim
+    # upper-left and crosses to the lower-right, its centre lines leave at
+    # 180 and 270 deg, so 225 deg is the clear sector; the symbol sits in
+    # the empty band left of the block, under the lift REAM callout and
+    # above the length dimensions.
+    lift_lower_left_edge = (
+        _front_x(-LIFT_BORE_SPACING) - BORE_R_SHEET * 0.7071,
+        _front_y(LIFT_BORE_RISE) - BORE_R_SHEET * 0.7071,
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=lift_lower_left_edge,
+        symbol_xy=(0.045, 0.115),
+        control=surface_finish_by_key(SURFACE_FINISHES, "lift_bore"),
+        label="lift bore finish",
         char_height=0.0025,
     )
 

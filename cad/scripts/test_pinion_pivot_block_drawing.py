@@ -21,15 +21,23 @@ from _hole_spec import blind_cut_dia_mm
 
 
 def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
-    (control,) = pinion_pivot_block_spec.SURFACE_FINISHES
-    assert control.key == "pivot_bore"
-    assert control.roughness_um == 1.6
-    assert control.face.diameter_mm == pinion_pivot_block_spec.BORE_DIA
-    assert control.face.contains_y_mm == -pinion_pivot_block_spec.BORE_DIA / 2.0
+    # Both bores run a shaft (rule 5): MHA-062 in the pivot bore, MHA-060
+    # in the lift bore.
+    pivot, lift = pinion_pivot_block_spec.SURFACE_FINISHES
+    assert (pivot.key, lift.key) == ("pivot_bore", "lift_bore")
+    for control in (pivot, lift):
+        assert control.roughness_um == 1.6
+        assert control.face.diameter_mm == pinion_pivot_block_spec.BORE_DIA
+    assert pivot.face.contains_y_mm == -pinion_pivot_block_spec.BORE_DIA / 2.0
+    # The lift selector's station lies outside the pivot bore's x-span.
+    lift_x = lift.face.contains_x_mm
+    assert lift_x == -pinion_pivot_block_spec.LIFT_BORE_SPACING
+    assert abs(lift_x) > pinion_pivot_block_spec.BORE_DIA / 2.0
     part_source = Path(block.__file__).read_text(encoding="utf-8")
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "surface_finishes=SURFACE_FINISHES" in part_source
     assert 'surface_finish_by_key(SURFACE_FINISHES, "pivot_bore")' in drawing_source
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "lift_bore")' in drawing_source
     assert "roughness_ra=" not in drawing_source
 
 
