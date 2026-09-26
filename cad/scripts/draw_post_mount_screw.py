@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from dataclasses import dataclass
 from typing import Any
 
 import _drawing_hidden_sketches as hidden_sketches
@@ -59,6 +60,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _layout_geometry import Box, estimate_text_box
 from _stock_trim_drawing import TrimSheet
 from post_mount_screw_spec import (
     CUT_END_BREAK_DIMENSION,
@@ -286,6 +288,242 @@ def _curate_tip_view(adapter: Any, view: Any) -> list[Any]:
     )
 
 
+# swDimensionArrowsSide_e.swDimArrowsOutside: the arrows sit outside the
+# extension lines and point in.
+ARROWS_OUTSIDE = 1
+# Clear sheet space between the break text's right edge and the tail of the
+# left arrowhead.
+BREAK_TEXT_GAP_M = 0.002
+# GetArrowHeadAtIndex2 has no read on this project's seats yet: a width past
+# this is not an arrowhead in sheet metres, and a move past the shift bound
+# (text width + arrow + gap is ~10-25 mm) means a convention was misread.
+# Either raises rather than parking the text somewhere nobody wants it.
+_ARROW_WIDTH_MAX_M = 0.01
+_BREAK_TEXT_SHIFT_MAX_M = 0.03
+# A vertical run: its ends share x to within this.
+_VERTICAL_TOLERANCE_M = 1e-6
+# The display data's text must sit within this of the annotation's own
+# position, or its frame is not the sheet and no clearance can be read.
+_TEXT_FRAME_TOLERANCE_M = 0.05
+
+
+@dataclass(frozen=True)
+class BreakInk:
+    """The break dimension's rendered ink on the sheet, metres.
+
+    No API returns a dimension's rendered text width (INote::GetExtent is
+    for notes only), so the text box is the display data's text anchor,
+    reference corner and cap height, widened by the template's estimated
+    glyph advance (_layout_geometry.estimate_text_box).
+    """
+
+    extension_x: tuple[float, float]
+    arrow_left_x: float
+    text: str
+    height: float
+    text_box: Box
+    position: tuple[float, float]
+
+    @property
+    def left_limit(self) -> float:
+        """The leftmost ink the text must clear: left line or arrow tail."""
+        return min(self.extension_x[0], self.arrow_left_x)
+
+
+def _floats(raw: Any) -> tuple[float, ...]:
+    return tuple(float(value) for value in (raw or ()))
+
+
+def _break_annotation(adapter: Any, annotations: list[Any]) -> Any:
+    for item in annotations:
+        annotation = _early_bound(item, "IAnnotation")
+        if dimension_name(adapter, annotation) == CUT_END_BREAK_DIMENSION:
+            return annotation
+    raise RuntimeError(f"tip view has no {CUT_END_BREAK_DIMENSION} to place")
+
+
+def _extension_x(data: Any) -> tuple[float, float]:
+    """The x of the two vertical extension lines, from GetLineAtIndex2 (the
+    read draw_frame_assembly already makes on the seat).  Each line ends with
+    start[3], end[3] whichever overload's leading scalars precede them, so the
+    points are read from the array's end, as drawing_layout_audit does."""
+    xs: list[float] = []
+    for index in range(int(data.GetLineCount())):
+        values = _floats(data.GetLineAtIndex2(index))
+        if len(values) < 10:
+            raise RuntimeError(f"break dimension line {index} is incomplete: {values!r}")
+        start = len(values) - 6
+        x0, y0 = values[start], values[start + 1]
+        x1, y1 = values[start + 3], values[start + 4]
+        if abs(x0 - x1) > _VERTICAL_TOLERANCE_M or abs(y0 - y1) <= _VERTICAL_TOLERANCE_M:
+            continue
+        if all(abs(x0 - seen) > _VERTICAL_TOLERANCE_M for seen in xs):
+            xs.append(x0)
+    if len(xs) != 2:
+        raise RuntimeError(
+            f"break dimension must draw two extension lines, read x={sorted(xs)!r}"
+        )
+    left, right = sorted(xs)
+    return (left, right)
+
+
+def _arrow_left_x(data: Any, fallback: float) -> float:
+    """The leftmost arrowhead ink.  GetArrowHeadAtIndex2 returns [tip[3],
+    dir[3], width, ...]; the body is taken on BOTH sides of the tip, so the
+    result does not rest on which way dir points."""
+    lefts = [fallback]
+    for index in range(int(data.GetArrowHeadCount())):
+        values = _floats(data.GetArrowHeadAtIndex2(index))
+        if len(values) < 7:
+            raise RuntimeError(f"break arrowhead {index} is incomplete: {values!r}")
+        dx, dy, dz = values[3:6]
+        length = math.sqrt(dx * dx + dy * dy + dz * dz) or 1.0
+        width = values[6]
+        if not 0.0 <= width <= _ARROW_WIDTH_MAX_M:
+            raise RuntimeError(
+                f"break arrowhead {index} width {width!r} is not an arrowhead's"
+            )
+        lefts.append(values[0] - abs(dx / length) * width)
+    return min(lefts)
+
+
+def read_break_ink(annotation: Any) -> BreakInk:
+    """Read the break's extension lines, arrowheads and text box back."""
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    extension = _extension_x(data)
+    arrow_left = _arrow_left_x(data, extension[0])
+    count = int(data.GetTextCount())
+    if count < 1:
+        raise RuntimeError("break dimension draws no text")
+    texts: list[str] = []
+    boxes: list[Box] = []
+    height = 0.0
+    for index in range(count):
+        text = str(data.GetTextAtIndex(index) or "")
+        anchor = _floats(data.GetTextPositionAtIndex(index))
+        size = float(data.GetTextHeightAtIndex(index))
+        reference = int(data.GetTextRefPositionAtIndex(index))
+        box = estimate_text_box(
+            text,
+            anchor=(anchor[0], anchor[1]),
+            height=size,
+            reference=reference if 0 <= reference <= 5 else 0,
+            angle=float(data.GetTextAngleAtIndex(index)),
+        )
+        if box is None:
+            continue
+        texts.append(text)
+        boxes.append(box)
+        height = max(height, size)
+    if not boxes:
+        raise RuntimeError("break dimension text has no extent to read")
+    text_box = Box(
+        min(box.xmin for box in boxes),
+        min(box.ymin for box in boxes),
+        max(box.xmax for box in boxes),
+        max(box.ymax for box in boxes),
+    )
+    position = _floats(annotation.GetPosition())[:2]
+    centre = (
+        (text_box.xmin + text_box.xmax) / 2.0,
+        (text_box.ymin + text_box.ymax) / 2.0,
+    )
+    if math.dist(centre, position) > _TEXT_FRAME_TOLERANCE_M:
+        raise RuntimeError(
+            f"break text at {centre!r} is not in the sheet frame of its "
+            f"annotation at {position!r}"
+        )
+    return BreakInk(
+        extension_x=extension,
+        arrow_left_x=arrow_left,
+        text=" ".join(texts),
+        height=height,
+        text_box=text_box,
+        position=(position[0], position[1]),
+    )
+
+
+def _log_break_ink(ink: BreakInk, *, stage: str) -> None:
+    clearance = ink.left_limit - ink.text_box.xmax
+    _telemetry.info(
+        f"tip view break text {stage}: {ink.text!r} box x "
+        f"{ink.text_box.xmin:.5f}..{ink.text_box.xmax:.5f} (width "
+        f"{ink.text_box.width:.5f}, height {ink.height:.5f}), extension lines x "
+        f"{ink.extension_x[0]:.5f}/{ink.extension_x[1]:.5f}, left arrow tail x "
+        f"{ink.arrow_left_x:.5f}, anchor {ink.position[0]:.5f}, "
+        f"clearance {clearance:.5f} m"
+    )
+    _telemetry.event(
+        "drawing.tip_break_text",
+        stage=stage,
+        text=ink.text,
+        text_box=(
+            ink.text_box.xmin,
+            ink.text_box.ymin,
+            ink.text_box.xmax,
+            ink.text_box.ymax,
+        ),
+        extension_x=ink.extension_x,
+        arrow_left_x=ink.arrow_left_x,
+        position=ink.position,
+        clearance_m=clearance,
+    )
+
+
+def assert_break_text_outside(ink: BreakInk) -> None:
+    """The text must sit wholly left of both extension lines and of the left
+    arrow's tail: none of it between or across the lines."""
+    if ink.text_box.xmax > ink.extension_x[0]:
+        raise RuntimeError(
+            f"break text box ends at x {ink.text_box.xmax:.5f}, across the left "
+            f"extension line at {ink.extension_x[0]:.5f}"
+        )
+    if ink.text_box.xmax > ink.arrow_left_x:
+        raise RuntimeError(
+            f"break text box ends at x {ink.text_box.xmax:.5f}, over the left "
+            f"arrow's tail at {ink.arrow_left_x:.5f}"
+        )
+
+
+def place_break_text_outside(adapter: Any, annotations: list[Any]) -> BreakInk:
+    """Put the break's text LEFT of the leader, arrows outside pointing in.
+
+    857-b835: the text sat centred almost on the 1 mm gap and overprinted
+    both extension lines and the inner arrowheads.  Arrows go outside
+    (ArrowSide), auto-centring is off (CenterText), and the text moves along
+    the dimension line only, so its right edge sits BREAK_TEXT_GAP_M left of
+    the left arrow's tail, measured from the display data's own read-back.
+    """
+    annotation = _break_annotation(adapter, annotations)
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.CenterText = False
+    display.ArrowSide = ARROWS_OUTSIDE
+    if int(display.ArrowSide) != ARROWS_OUTSIDE or bool(display.CenterText):
+        raise RuntimeError(
+            f"break arrows/centring did not take: ArrowSide {display.ArrowSide}, "
+            f"CenterText {display.CenterText}"
+        )
+    adapter.currentModel.EditRebuild3()
+    before = read_break_ink(annotation)
+    _log_break_ink(before, stage="imported")
+    shift = before.left_limit - BREAK_TEXT_GAP_M - before.text_box.xmax
+    if abs(shift) > _BREAK_TEXT_SHIFT_MAX_M:
+        raise RuntimeError(
+            f"break text would move {shift:.5f} m, past {_BREAK_TEXT_SHIFT_MAX_M} m: "
+            "an arrowhead or text read-back convention is off"
+        )
+    x, y = before.position
+    if not annotation.SetPosition2(x + shift, y, 0.0):
+        raise RuntimeError("cannot move the break text left of its leader")
+    adapter.currentModel.EditRebuild3()
+    after = read_break_ink(annotation)
+    _log_break_ink(after, stage="placed")
+    assert_break_text_outside(after)
+    return after
+
+
 def label_tip_view(adapter: Any, view: Any) -> None:
     """Label the tip view "DETAIL A  SCALE 10:1".
 
@@ -359,8 +597,8 @@ def break_text(value_mm: float, places: int, tol_type: int, prefix: str, suffix:
 
 def _verify_tip_view(adapter: Any, front: Any, tip: Any) -> None:
     """Seat read-back: the tip view is cropped at its scale, carries the one
-    break dimension as a MAX limit reading the spec's text, and the Front
-    does not."""
+    break dimension as a MAX limit reading the spec's text, with that text
+    left of both extension lines, and the Front does not."""
     view = _early_bound(tip, "IView")
     ratio = tuple(float(value) for value in view.ScaleRatio)
     if ratio != DETAIL_SCALE:
@@ -414,6 +652,9 @@ def _verify_tip_view(adapter: Any, front: Any, tip: Any) -> None:
             f"tip view break reads {text!r} (type {tol_type}, parenthesis "
             f"{parenthesis}), expected {CUT_END_BREAK_TEXT!r}"
         )
+    ink = read_break_ink(annotation)
+    _log_break_ink(ink, stage="verified")
+    assert_break_text_outside(ink)
     _telemetry.success(f"tip view {ratio[0]:g}:{ratio[1]:g} reads {text}")
 
 
@@ -500,6 +741,7 @@ async def build(adapter: Any) -> dict[str, str]:
         _early_bound(tip, "IView").UpdateViewDisplayGeometry()
         tip_annotations = _curate_tip_view(adapter, tip)
         assert_imported_precision(adapter, tip_annotations, DETAIL_PRECISION)
+        place_break_text_outside(adapter, tip_annotations)
         _verify_tip_view(adapter, front, tip)
     label_tip_view(adapter, tip)
     mark_tip_on_front(adapter, front)

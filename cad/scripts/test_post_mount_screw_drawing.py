@@ -816,6 +816,209 @@ def test_tip_view_imports_the_break_by_feature(monkeypatch) -> None:
     assert calls == ["features:['CutEndDeburrProfile']"]
 
 
+# The 857-b835 render of detail A: the 1 mm (0.1 at 10:1) break between two
+# vertical extension lines, arrows outside pointing in, and "0.1 max." centred
+# almost on the lines, so it overprints both and the inner arrowheads.
+_B835_EXTENSION_X = (0.2000, 0.2010)
+_B835_ARROW_WIDTH = 0.003
+_B835_TEXT = "0.1 max."
+_B835_TEXT_HEIGHT = 0.0035
+_B835_TEXT_XY = (0.1995, 0.155)
+
+
+class _BreakData:
+    """IDisplayData of the break: lines, arrowheads, one centred text run."""
+
+    def __init__(self, annotation: "_BreakAnnotation") -> None:
+        self._annotation = annotation
+        left, right = _B835_EXTENSION_X
+        self._lines = [
+            (0, 0, 0, 0, left, 0.150, 0.0, left, 0.160, 0.0),
+            (0, 0, 0, 0, right, 0.150, 0.0, right, 0.160, 0.0),
+            (0, 0, 0, 0, 0.190, 0.152, 0.0, 0.215, 0.152, 0.0),
+        ]
+        self._arrows = [
+            (left, 0.152, 0.0, 1.0, 0.0, 0.0, _B835_ARROW_WIDTH, 0.001, 1, 0, 0, 1),
+            (right, 0.152, 0.0, -1.0, 0.0, 0.0, _B835_ARROW_WIDTH, 0.001, 1, 0, 0, 1),
+        ]
+
+    def GetLineCount(self):
+        return len(self._lines)
+
+    def GetLineAtIndex2(self, index):
+        return self._lines[index]
+
+    def GetArrowHeadCount(self):
+        return len(self._arrows)
+
+    def GetArrowHeadAtIndex2(self, index):
+        return self._arrows[index]
+
+    def GetTextCount(self):
+        return 1
+
+    def GetTextAtIndex(self, index):
+        return _B835_TEXT
+
+    def GetTextPositionAtIndex(self, index):
+        x, y = self._annotation.text_xy
+        return (x, y, 0.0)
+
+    def GetTextHeightAtIndex(self, index):
+        return _B835_TEXT_HEIGHT
+
+    def GetTextRefPositionAtIndex(self, index):
+        return 2  # swTextPosition_e.swCENTER
+
+    def GetTextAngleAtIndex(self, index):
+        return 0.0
+
+
+class _BreakDisplay:
+    def __init__(self, annotation: "_BreakAnnotation") -> None:
+        self._annotation = annotation
+        self.ArrowSide = 2  # swDimArrowsSmart
+        self.CenterText = True
+
+    def GetDisplayData(self):
+        return _BreakData(self._annotation)
+
+
+class _BreakAnnotation:
+    def __init__(self, *, text_offset=(0.0, 0.0)) -> None:
+        self.position = _B835_TEXT_XY
+        self.text_offset = text_offset
+        self.display = _BreakDisplay(self)
+        self.moves: list[tuple[float, float]] = []
+
+    @property
+    def text_xy(self):
+        return (
+            self.position[0] + self.text_offset[0],
+            self.position[1] + self.text_offset[1],
+        )
+
+    def GetSpecificAnnotation(self):
+        return self.display
+
+    def GetPosition(self):
+        return (*self.position, 0.0)
+
+    def SetPosition2(self, x, y, z):
+        self.position = (x, y)
+        self.moves.append((x, y))
+        return True
+
+
+class _RebuildSeat:
+    def __init__(self) -> None:
+        self.rebuilds = 0
+        self.currentModel = self
+
+    def EditRebuild3(self):
+        self.rebuilds += 1
+        return True
+
+
+def _break_seat(monkeypatch, **kwargs):
+    annotation = _BreakAnnotation(**kwargs)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(
+        drawing,
+        "dimension_name",
+        lambda adapter, item: "CutEndBreak" if item is annotation else "",
+    )
+    return _RebuildSeat(), annotation
+
+
+def test_b835_break_text_overprints_both_extension_lines(monkeypatch) -> None:
+    """Planted from the 857-b835 render: the read-back sees the text box
+    across both extension lines, and the check refuses it."""
+    _seat, annotation = _break_seat(monkeypatch)
+    ink = drawing.read_break_ink(annotation)
+    assert ink.extension_x == _B835_EXTENSION_X
+    assert ink.text == _B835_TEXT
+    assert ink.text_box.xmin < _B835_EXTENSION_X[0]
+    assert ink.text_box.xmax > _B835_EXTENSION_X[1]
+    with pytest.raises(RuntimeError, match="extension line"):
+        drawing.assert_break_text_outside(ink)
+
+
+def test_break_text_moves_left_of_both_extension_lines(monkeypatch) -> None:
+    """Arrows outside pointing in, text not centred, and the text's right
+    edge a gap clear of the left arrow's tail -- so left of both lines."""
+    seat, annotation = _break_seat(monkeypatch)
+    ink = drawing.place_break_text_outside(seat, [object(), annotation])
+    assert annotation.display.ArrowSide == drawing.ARROWS_OUTSIDE == 1
+    assert annotation.display.CenterText is False
+    assert len(annotation.moves) == 1
+    # The text moves along the dimension line only.
+    assert annotation.moves[0][1] == pytest.approx(_B835_TEXT_XY[1])
+    arrow_tail = _B835_EXTENSION_X[0] - _B835_ARROW_WIDTH
+    assert ink.arrow_left_x == pytest.approx(arrow_tail)
+    assert ink.text_box.xmax == pytest.approx(arrow_tail - drawing.BREAK_TEXT_GAP_M)
+    assert ink.text_box.xmax < _B835_EXTENSION_X[0]
+    # The minimum form: the centred anchor sits left of the left extension
+    # line by at least half the text's width.
+    half = ink.text_box.width / 2.0
+    assert annotation.text_xy[0] <= _B835_EXTENSION_X[0] - half
+    drawing.assert_break_text_outside(ink)
+    assert seat.rebuilds >= 2
+
+
+def test_break_ink_refuses_text_off_the_sheet_frame(monkeypatch) -> None:
+    """GetTextPositionAtIndex is an offset from the display data's origin; if
+    that is not the sheet, no clearance can be read from it."""
+    _seat, annotation = _break_seat(monkeypatch, text_offset=(0.2, 0.0))
+    with pytest.raises(RuntimeError, match="sheet"):
+        drawing.read_break_ink(annotation)
+
+
+def test_break_ink_needs_exactly_two_extension_lines(monkeypatch) -> None:
+    _seat, annotation = _break_seat(monkeypatch)
+    data = _BreakData(annotation)
+    data._lines = data._lines[1:]
+    annotation.display.GetDisplayData = lambda: data
+    with pytest.raises(RuntimeError, match="two extension lines"):
+        drawing.read_break_ink(annotation)
+
+
+def test_break_ink_refuses_an_arrowhead_wider_than_one(monkeypatch) -> None:
+    """GetArrowHeadAtIndex2 is unread on the seat: a width in another unit
+    must fail loud, not park the text far left."""
+    _seat, annotation = _break_seat(monkeypatch)
+    data = _BreakData(annotation)
+    tip = list(data._arrows[0])
+    tip[6] = 3.0  # millimetres, not metres
+    data._arrows[0] = tuple(tip)
+    annotation.display.GetDisplayData = lambda: data
+    with pytest.raises(RuntimeError, match="arrowhead"):
+        drawing.read_break_ink(annotation)
+
+
+def test_break_text_move_is_bounded(monkeypatch) -> None:
+    seat, annotation = _break_seat(monkeypatch)
+    annotation.position = (_B835_TEXT_XY[0] + 0.05, _B835_TEXT_XY[1])
+    monkeypatch.setattr(drawing, "_TEXT_FRAME_TOLERANCE_M", 1.0)
+    with pytest.raises(RuntimeError, match="would move"):
+        drawing.place_break_text_outside(seat, [annotation])
+    assert annotation.moves == []
+
+
+def test_break_text_is_placed_and_checked_on_the_seat() -> None:
+    """The build places the text right after the tip view's import, and both
+    tip-view read-backs re-prove it."""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    block = source.split('_telemetry.span("drawing.tip_view"', 1)[1]
+    block = block.split("_verify_tip_view(adapter, front, tip)", 1)[0]
+    curate = block.index("_curate_tip_view(adapter, tip)")
+    place = block.index("place_break_text_outside(adapter, tip_annotations)")
+    assert curate < place
+    verify = source.split("def _verify_tip_view", 1)[1].split("\ndef ", 1)[0]
+    assert "assert_break_text_outside(" in verify
+    assert "read_break_ink(" in verify
+
+
 def test_tip_view_label_is_owned_by_the_tip_view(monkeypatch) -> None:
     seat, tip, _front, _placed = _tip_seat(monkeypatch)
     assert drawing.TIP_VIEW_LABEL == "DETAIL A  SCALE 10:1"
