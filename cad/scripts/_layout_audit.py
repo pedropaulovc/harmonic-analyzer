@@ -1978,6 +1978,44 @@ def find_leader_through_text(
     return findings
 
 
+def find_extension_through_own_text(
+    sheet: SheetGeometry, *, tol: float = DEFAULT_TEXT_TOUCH_TOL_M, inset: float = OWN_ROW_INSET_M
+) -> list[Finding]:
+    """A dimension's own extension line struck through its own text.
+
+    ``text-on-line`` skips an annotation's own ink, so text parked across its
+    own witness line went unreported: MHA-014's "10.781", pushed outside its
+    extension lines, printed with the collar-face witness through "0" and "7"
+    (conegear, #916 388d1e3fb). The rows are shrunk by ``inset`` so a witness
+    line that only touches a row's corner is not reported.
+    """
+    findings = []
+    for annotation in sheet.annotations:
+        extensions = [s for s in annotation.segments if s.role == "ext-line"]
+        for box in annotation.text_boxes if extensions else ():
+            for segment in extensions:
+                length, span = text_overlap(segment, annotation, box, inset=inset)
+                if length <= tol:
+                    continue
+                mid = segment.point_at(sum(span) / 2.0) if span else box.center()
+                findings.append(
+                    Finding(
+                        kind="extension-through-own-text",
+                        sheet=sheet.name,
+                        a=annotation.label,
+                        b=annotation.label,
+                        detail=(
+                            f"extension line of {annotation.label!r} {segment.format_mm()} runs "
+                            f"{length * MM:.2f}mm through its own text {box.format_mm()}"
+                        ),
+                        at_mm=(mid[0] * MM, mid[1] * MM),
+                        extra={"overlap_mm": length * MM},
+                    )
+                )
+                break
+    return findings
+
+
 def _past_arrow_zones(annotation: AnnotationGeometry) -> list[tuple[tuple[float, float], float]]:
     """``(end, radius)`` for each leader run that continues past its arrowhead.
 
@@ -2513,6 +2551,7 @@ GATING_KINDS = frozenset(
         "text-on-line",
         "leader-through-text",
         "leader-through-own-text",
+        "extension-through-own-text",
         "leader-crosses-line",
         "shoulder-crosses-line",
         "leader-crosses-view",
@@ -2568,6 +2607,7 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
         *on_line,
         *find_text_on_view(sheet),
         *find_leader_through_text(sheet),
+        *find_extension_through_own_text(sheet),
         # A line through a callout's text crosses the shoulder under it too:
         # one defect, reported as text-on-line. Only the SAME line: another
         # line of that annotation crossing the shoulder is its own defect.

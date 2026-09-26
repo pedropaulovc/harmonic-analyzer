@@ -2356,3 +2356,34 @@ def test_reciprocal_dimension_crossings_are_one_finding_the_worse():
     sheet = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (far_a, near_b), 0.6)
     [finding] = find_dimension_line_crossings(sheet)
     assert (finding.kind, finding.a, finding.b) == ("dim-line-crosses-extension-at-text", "A", "B")
+
+
+def test_a_dimensions_own_extension_line_through_its_text_gates():
+    """conegear's MHA-014 (#916 388d1e3fb): "10.781", parked outside its
+    extension lines, printed with its own collar-face witness line through
+    "0" and "7". text-on-line skips an annotation's own ink, so nothing saw
+    it. A witness line that only touches a row's corner is not a strike."""
+    from _layout_audit import find_extension_through_own_text
+    from _layout_geometry import AnnotationGeometry, SheetGeometry
+
+    text = Box(0.1000, 0.1000, 0.1150, 0.1035)
+
+    def dim(extension_x):
+        return AnnotationGeometry(
+            "dim CollarToPin '10.781'",
+            "dim",
+            "v",
+            (text,),
+            (
+                Segment(0.0950, 0.0995, 0.1200, 0.0995, "dim-line"),
+                Segment(extension_x, 0.0950, extension_x, 0.1300, "ext-line"),
+            ),
+        )
+
+    struck = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (dim(0.1080),), 0.6)
+    [finding] = find_extension_through_own_text(struck)
+    assert finding.kind == "extension-through-own-text"
+    assert severity(finding) is FindingSeverity.GATING
+    assert finding.extra["overlap_mm"] == pytest.approx(3.5 - 0.4, abs=0.01)
+    touching = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (dim(0.1150),), 0.6)
+    assert find_extension_through_own_text(touching) == []
