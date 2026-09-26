@@ -370,6 +370,17 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         "frame-1/top-frame",
         _smooth_annulus_limit_mm3(4.1656, 3.454, 8.6624),
     ),
+    # #743 PR2: the four #8-32 x 3/4 (19.05) MHA-143 rocker-bracket hold-downs
+    # pass the 6.0 bracket foot and engage 13.05 of the support rail's
+    # transferred seats. Literals, like the rows above, so every assembly does
+    # not re-key on the rocker bank's layout; test_rocker_bracket_seat_layout
+    # pins them to rocker_bracket_seat_layout.
+    **_numbered_pairs(
+        "channel-1/pedestal-hold-down-screw",
+        range(1, 5),
+        "frame-1/rocker-arm-support",
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 19.05 - 6.0),
+    ),
 }
 
 _BY_ASSEMBLY: dict[str, Mapping[frozenset[str], float]] = {
