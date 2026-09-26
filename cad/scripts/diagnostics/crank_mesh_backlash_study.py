@@ -313,14 +313,15 @@ CASES: list[Case] = [
 ]
 
 GEAR_KEYS = {"b16": "beta_deg", "b64": "beta_deg", "def16": "definition",
-             "def64": "definition", "dpn16": "dp_n", "dpn64": "dp_n"}
+             "def64": "definition", "dpn16": "dp_n", "dpn64": "dp_n",
+             "pan16": "pa_n", "pan64": "pa_n"}
 
 
 def parse_case(spec: str) -> Case:
     """``NAME:key=value,...`` over the shipped case.
 
     Keys: extra, w16, w64, hand16 (+1/-1), b16, b64 (helix deg), def16,
-    def64 (transverse|normal), dpn16, dpn64 (cutter DP).
+    def64 (transverse|normal), dpn16, dpn64 (cutter DP), pan16, pan64 (cutter PA).
     """
     name, _, body = spec.partition(":")
     fields: dict = {}
