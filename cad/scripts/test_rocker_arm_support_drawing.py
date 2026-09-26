@@ -676,16 +676,18 @@ def _boxes_clear(a: tuple[float, ...], b: tuple[float, ...], gap: float) -> bool
 def test_seat_note_stays_in_the_column_left_of_the_front_view() -> None:
     """r743-rocker-fix3 printed the 21-character wrap across the Depth
     extension line at the front view's left edge. At the measured text size the
-    note must end 2 mm short of that edge, and sit above the R12.7 callout that
-    shares the column."""
+    note must end 2 mm short of that edge, and sit above every front-view
+    callout that shares the column."""
     lines = drawing.SEAT_NOTE.splitlines()
     left, top = drawing.SEAT_NOTE_XY
     right = left + max(map(len, lines)) * NOTE_CHAR_WIDTH
     bottom = top - len(lines) * NOTE_LINE_PITCH
     front_left = drawing.FRONT_CENTER[0] - support.HALF_Y * drawing.VIEW_SCALE / 1000
     assert right < front_left - 0.002
-    cavity_label = _text_box("R12.7\n4X", drawing.FRONT_KEEP["CavityRadius"])
-    assert bottom > cavity_label[3] + 0.005
+    column = [xy for xy in drawing.FRONT_KEEP.values() if xy[0] < front_left]
+    assert column  # the radius callouts
+    for xy in column:
+        assert bottom > _text_box("R00.00\n0X", xy)[3] + 0.005
     assert top <= 0.263
 
 
@@ -739,3 +741,114 @@ def test_iso_tapped_hole_label_is_materialized_then_removed() -> None:
     (threads,) = [c for c in calls if c.func.id == "import_cosmetic_threads"]
     assert [ast.unparse(a) for a in threads.args] == ["adapter", "iso"]
     assert threads.lineno < finalize.lineno
+
+
+def test_stacked_pocket_widths_keep_separate_bands() -> None:
+    """Each stacked width prints its text just above its own dimension line.
+    At WinWidth y 0.118 the 127.0 line ran through "165.1" (Main's fix3 eye
+    pass), so the lower text clears the upper dimension by a full line pitch,
+    and its own line still stays above the bottom view."""
+    cavity = _text_box("127.0\nSQ CAVITY THRU", drawing.FRONT_KEEP["CavWidth"])
+    pocket = _text_box("165.1\nPOCKET", drawing.FRONT_KEEP["WinWidth"])
+    assert pocket[3] + NOTE_LINE_PITCH <= cavity[1]
+    bottom_top = drawing.BOTTOM_CENTER[1] + support.WIDE * drawing.VIEW_SCALE / 1000
+    assert pocket[1] - NOTE_LINE_PITCH > bottom_top + 0.005
+
+
+def test_cavity_radius_callout_sits_on_its_corner_bisector_outside_the_view() -> None:
+    """CornerFillet's R12.7 is bound to one cavity corner. From the left
+    column its leader crossed the whole cavity and landed on the far side of
+    the fillet's circle (fix3 render). On the arc's bisector the arrow lands on
+    the arc itself; the text stays outside the view and clear of the section's
+    callouts."""
+    scale = drawing.VIEW_SCALE / 1000
+    sign_x, sign_y = drawing.CAVITY_RADIUS_CORNER
+    inset = (support.CAV - support.FILLET_R) * scale
+    centre = (
+        drawing.FRONT_CENTER[0] + sign_x * inset,
+        drawing.FRONT_CENTER[1] + sign_y * inset,
+    )
+    text_xy = drawing.FRONT_KEEP["CavityRadius"]
+    angle = math.degrees(
+        math.atan2(sign_y * (text_xy[1] - centre[1]), sign_x * (text_xy[0] - centre[0]))
+    )
+    assert 25.0 < angle < 65.0
+    label = _text_box("R12.7\n4X", text_xy)
+    front_right = drawing.FRONT_CENTER[0] + support.BOSS_DEPTH / 2 * scale
+    assert label[0] > front_right + 0.003
+    for other in (
+        _text_box("16.9", drawing.RIGHT_KEEP["TopSpan"]),
+        _text_box(f"{support.RAIL_DEPTH:.1f}", drawing.RAIL_TEXT_XY),
+        _text_box("1.27\nX 45 DEG\n2 FACES", drawing.RIGHT_KEEP["RimChamferSize"]),
+        _text_box("177.8", drawing.FRONT_KEEP["Depth"]),
+    ):
+        assert _boxes_clear(label, other, 0.003)
+
+
+def _fake_note_annotation(text: str, x: float, y: float, *, kind: int = 6):
+    state = {"position": (x, y, 0.0)}
+    note = SimpleNamespace(GetText=lambda: text)
+
+    def set_position(new_x, new_y, new_z):
+        state["position"] = (new_x, new_y, new_z)
+        return True
+
+    return SimpleNamespace(
+        GetType=lambda: kind,
+        GetSpecificAnnotation=lambda: note,
+        GetPosition=lambda: state["position"],
+        SetPosition2=set_position,
+    )
+
+
+def test_right_end_hole_tags_move_left_of_their_holes(monkeypatch) -> None:
+    """A3 and A4 printed across the pocket's hidden end lines (fix3 render).
+    They take the mirror spot left of their holes; A1 and A2 stay put."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    tags = {
+        name: _fake_note_annotation(name, x, y)
+        for name, x, y in (
+            ("A1", 0.0796, 0.0661),
+            ("A2", 0.0796, 0.0878),
+            ("A3", 0.1397, 0.0661),
+            ("A4", 0.1397, 0.0878),
+        )
+    }
+    dimension = _fake_note_annotation("A4", 0.2, 0.1, kind=1)
+    view = SimpleNamespace(GetAnnotations=lambda: (*tags.values(), dimension))
+    moved = drawing._mirror_right_end_hole_tags(view)
+    assert set(moved) == {"A3", "A4"}
+    for name in ("A3", "A4"):
+        assert tags[name].GetPosition()[0] == pytest.approx(
+            0.1397 + drawing.HOLE_TAG_MIRROR_SHIFT
+        )
+    assert tags["A1"].GetPosition()[0] == 0.0796
+    assert dimension.GetPosition()[0] == 0.2
+
+    # Measured on A4 in the fix3 render: the tag's left edge 4.6 mm right of
+    # its hole centre, 5.8 mm wide. The shift mirrors it about the hole.
+    scale = drawing.VIEW_SCALE / 1000
+    hole_x = (
+        drawing.BOTTOM_CENTER[0]
+        + (
+            drawing.HOLE_TABLE_DATUM_XZ_MM[0]
+            + drawing.EXPECTED_HOLE_TABLE_LOCATIONS_MM[0][0]
+        )
+        * scale
+    )
+    moved_right = hole_x + 0.0046 + 0.0058 + drawing.HOLE_TAG_MIRROR_SHIFT
+    assert hole_x - moved_right == pytest.approx(0.0046, abs=0.0005)
+
+
+def test_right_end_hole_tag_mover_fails_loud(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    only_a3 = SimpleNamespace(
+        GetAnnotations=lambda: (_fake_note_annotation("A3", 0.1397, 0.0661),)
+    )
+    with pytest.raises(RuntimeError, match="A4"):
+        drawing._mirror_right_end_hole_tags(only_a3)
+    left_a4 = SimpleNamespace(
+        GetAnnotations=lambda: (_fake_note_annotation("A4", 0.0796, 0.0878),)
+    )
+    with pytest.raises(RuntimeError, match="not at the right end"):
+        drawing._mirror_right_end_hole_tags(left_a4)
