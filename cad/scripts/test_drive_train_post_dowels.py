@@ -86,10 +86,9 @@ def test_the_cone_crank_sequence_presses_the_pins_recessed_from_the_constant() -
     steps = " ".join(drawing.CONE_CRANK_STEPS.split())
     assert "PRESS 2X MHA-151 INTO MHA-091" in steps
     assert f"RECESSED {dowel.POST_DOWEL_RECESS:.2f} INTO ITS SLIDE FACE, NEVER PROUD" in steps
-    assert "MATCH-DRILL/REAM THE DOWEL PAIR" in steps
-    # It sits in step 2, after the post is screwed down and before step 3.
-    step2 = steps.index("2. SCREW MHA-016 TO MHA-091")
-    assert step2 < steps.index("PRESS 2X MHA-151") < steps.index("3. THREAD MHA-097")
+    assert "MATCH-DRILL THE DOWEL PAIR" in steps
+    # It sits in step 2, before step 3.
+    assert steps.index("2. ") < steps.index("PRESS 2X MHA-151") < steps.index("3. THREAD MHA-097")
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "{POST_DOWEL_RECESS:.2f}" in source
     assert "RECESSED 0.25" not in source
@@ -108,3 +107,40 @@ def test_both_ream_callouts_name_the_mating_part_on_their_sheets() -> None:
         (draw_cone_pivot_post, "POST_DOWEL_CALLOUT"),
     ):
         assert f"process={name}," in Path(module.__file__).read_text(encoding="utf-8")
+
+
+def test_step_2_dowels_the_post_before_the_screws_are_tightened() -> None:
+    """Codex on #929 (PRRT_kwDOPHDy386mOPDM): step 2 screwed MHA-016 down and
+    never fitted the dowels.  The order is: MHA-142 finger-tight, the post
+    positioned at fit-up, the pair match-drilled through MHA-091 into
+    MHA-016 and reamed per each print, MHA-151 pressed in from below and
+    recessed, MHA-016 slipped over them, and only then the screws tightened.
+    The printed engagement is the platform spec's floored worst case, not a
+    retyped range."""
+    import cone_swing_platform_spec as platform
+    import draw_drive_train_assembly as drawing
+
+    steps = " ".join(drawing.CONE_CRANK_STEPS.split())
+    step2 = steps[steps.index("2. ") : steps.index("3. THREAD MHA-097")]
+    order = (
+        "FINGER-TIGHT",
+        "AT FIT-UP",
+        "MATCH-DRILL THE DOWEL PAIR",
+        "THROUGH MHA-091 INTO MHA-016",
+        "REAM EACH PART PER ITS PRINT",
+        "PRESS 2X MHA-151 INTO MHA-091 FROM BELOW",
+        f"RECESSED {dowel.POST_DOWEL_RECESS:.2f} INTO ITS SLIDE FACE, NEVER PROUD",
+        "SLIP MHA-016 OVER THEM",
+        "TIGHTEN BOTH",
+    )
+    positions = [step2.find(phrase) for phrase in order]
+    assert -1 not in positions, dict(zip(order, positions))
+    assert positions == sorted(positions), dict(zip(order, positions))
+    assert "SCREW MHA-016 TO MHA-091" not in step2
+    assert (
+        f"ENGAGEMENT {platform.POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN: NAMED "
+        "EXCEPTION TO RULE 12." in step2
+    )
+    assert "5.92" not in step2
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "{POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN" in source
