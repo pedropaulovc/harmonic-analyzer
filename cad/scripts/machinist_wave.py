@@ -58,7 +58,9 @@ Usage (SolidWorks-free; the checkout's ``cad/out/pdf`` must be rendered)::
     uv run cad/scripts/machinist_wave.py table --wave <id>
 
 (``--checkout``, ``--ledger``, ``--author-rulings``, ``--outage`` and
-``--outages`` go before the subcommand.)
+``--outages`` go before the subcommand.)  A ``--checkout`` whose drawing
+registry, prompt builder, prompts or rubric history differ from this
+worktree's is refused: run that checkout's own copy of this driver.
 
 ``run`` reviews only the drawings it is given, or every blocked one with
 ``--all-blocked``: there is no default that spends reviewer quota.
@@ -255,7 +257,11 @@ class Manifest:
 
     def update(self, name: str, **fields: Any) -> dict[str, Any]:
         with self.lock:
-            entry = self.drawings.setdefault(name, {"name": name, "attempts": []})
+            # Every entry is born pending: a checkpoint saved while it waits
+            # in the queue is still one manifest_problem accepts.
+            entry = self.drawings.setdefault(
+                name, {"name": name, "state": State.PENDING, "attempts": []}
+            )
             entry.update(fields)
             entry["updated_at"] = _now()
             self.save()
@@ -513,8 +519,11 @@ class Wave:
                     timeout_s=self.timeout_s,
                 )
             verdict = (review.verdict or {}).get("verdict")
-            # A reused report was paid for by the attempt that produced it.
-            cost = {} if reused else review_cost(review.events_file)
+            # A reused report was paid for by the attempt that produced it --
+            # if that attempt reached the checkpoint; a crash before it did
+            # leaves the spend recorded nowhere else.
+            already_charged = reused and self._checkpointed(route.name, review)
+            cost = {} if already_charged else review_cost(review.events_file)
             # The checkpoint first: nothing after the reviewer returns may lose it.
             self.manifest.add_attempt(
                 route.name,
@@ -548,6 +557,18 @@ class Wave:
                     {k: v for k, v in measured.items() if v is not None}
                 )
         return review
+
+    def _checkpointed(self, name: str, review: mr.Review) -> bool:
+        """Whether an attempt already in the manifest recorded this report."""
+        entry = self.manifest.drawings.get(name) or {}
+        verdict = (review.verdict or {}).get("verdict")
+        return any(
+            (a.get("reviewer"), a.get("model"), a.get("effort"))
+            == (review.reviewer, review.model, review.effort)
+            and a.get("duration_s") == review.duration_s
+            and a.get("verdict") == verdict
+            for a in entry.get("attempts") or []
+        )
 
     def _finished(
         self, route: Route, reviewer: str, model: str, effort: str
@@ -931,6 +952,12 @@ def _run(args: argparse.Namespace) -> int:
     if args.command == "run" and bool(args.names) == args.all_blocked:
         raise ValueError(
             "name the drawings to review, or pass --all-blocked (not both)"
+        )
+    problem = ml.checkout_metadata_problem(args.checkout)
+    if problem:
+        raise ValueError(
+            f"--checkout {args.checkout}: {problem}; run that checkout's own "
+            "machinist_wave.py instead"
         )
     rulings = ml.load_author_rulings(args.author_rulings)
     outage = _open_outage(args.outage, args.outages) if args.outage else None

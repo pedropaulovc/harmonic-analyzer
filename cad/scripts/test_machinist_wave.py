@@ -36,6 +36,9 @@ def checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         )
         monkeypatch.setitem(mw.DRAWINGS_BY_NAME, name, row)
     monkeypatch.setattr(mw, "WAVE_ROOT", tmp_path / "waves")
+    # A stand-in render with no registry or git history of its own; the
+    # checkout rule has its own test below.
+    monkeypatch.setattr(ml, "checkout_metadata_problem", lambda checkout: None)
     return root
 
 
@@ -49,6 +52,9 @@ def _authors(monkeypatch: pytest.MonkeyPatch, **models: str | None) -> None:
         ml, "draw_script_authors", lambda names, **_: {n: authors[n] for n in names}
     )
     monkeypatch.setattr(ml, "draw_script_author", lambda name, **_: authors[name])
+
+
+REAL_CHECKOUT_PROBLEM = ml.checkout_metadata_problem
 
 
 class FakeReviewer:
@@ -555,6 +561,84 @@ def test_a_requested_drawing_that_is_not_rendered_fails_the_run(
     saved = json.loads((mw.WAVE_ROOT / "w" / "manifest.json").read_text("utf-8"))
     assert saved["drawings"]["crank_arm"]["state"] == "unrendered"
     assert "no rendered PDF" in saved["drawings"]["crank_arm"]["detail"]
+
+
+def test_a_checkpoint_taken_while_drawings_are_queued_can_be_resumed(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    fake = FakeReviewer({("crank_arm", "codex"): "ship", ("pen_rod", "claude"): "ship"})
+    on_disk: list[str | None] = []
+
+    def reviewing(package, **kwargs):
+        # One job at a time: the other drawing is queued while this one runs.
+        saved = mw.WAVE_ROOT / "w1" / "manifest.json"
+        on_disk.append(mw.manifest_problem(json.loads(saved.read_text("utf-8"))))
+        return fake(package, **kwargs)
+
+    mw.run_wave(
+        _routes(checkout, tmp_path), _wave(tmp_path, checkout, reviewing), jobs=1
+    )
+
+    assert on_disk == [None, None]
+
+
+def test_a_report_never_checkpointed_is_charged_when_it_is_recovered(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    fake = FakeReviewer({("pen_rod", "claude"): "fix"})
+    [pen] = [r for r in _routes(checkout, tmp_path) if r.name == "pen_rod"]
+    wave = _wave(tmp_path, checkout, fake)
+    mw.run_wave([pen], wave)
+    # The process died after the report was written, before its checkpoint.
+    wave.manifest.update("pen_rod", state=mw.State.RUNNING, attempts=[])
+    fake.calls.clear()
+
+    resumed = _wave(tmp_path, checkout, fake)
+    mw.run_wave([pen], resumed)
+
+    assert fake.calls == []  # recovered, not reviewed again
+    [attempt] = resumed.manifest.drawings["pen_rod"]["attempts"]
+    assert attempt["reused_report"] and attempt["cost_usd"] == 0.25
+    assert "claude: 1 runs, $0.25 total" in mw.table(resumed.manifest.data)
+
+
+def test_a_report_whose_flag_contradicts_its_verdict_is_not_adopted(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    fake = FakeReviewer({("crank_arm", "codex"): "ship"})
+    [crank] = [r for r in _routes(checkout, tmp_path) if r.name == "crank_arm"]
+    real = ml.record_review
+
+    def locked(*args, **kwargs):
+        raise PermissionError("the ledger is locked by another process")
+
+    monkeypatch.setattr(ml, "record_review", locked)
+    mw.run_wave([crank], _wave(tmp_path, checkout, fake))
+    monkeypatch.setattr(ml, "record_review", real)
+    report = mw.WAVE_ROOT / "w1" / "reviews" / "codex" / "crank_arm.json"
+    data = json.loads(report.read_text(encoding="utf-8"))
+    report.write_text(json.dumps({**data, "passed": False}), encoding="utf-8")
+    fake.calls.clear()
+
+    assert mw.run_wave([crank], _wave(tmp_path, checkout, fake)) == {
+        "crank_arm": mw.State.INGESTED
+    }
+    assert len(fake.calls) == 1  # reviewed again, never settled as a FIX
+
+
+def test_a_checkout_with_other_review_metadata_is_refused(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    monkeypatch.setattr(ml, "checkout_metadata_problem", REAL_CHECKOUT_PROBLEM)
+    argv = ["--checkout", str(checkout), "--ledger", str(tmp_path / "l.json")]
+
+    assert mw.main([*argv, "run", "--wave", "w", "crank_arm"]) == 2
+    assert "run that checkout's own" in capsys.readouterr().err
+    assert mw.main([*argv, "plan"]) == 2
+    assert not (mw.WAVE_ROOT / "w").exists()
 
 
 def test_a_reused_report_is_not_charged_again(
