@@ -620,3 +620,33 @@ def test_dimension_catalog_row_matches_the_spec() -> None:
     assert f"Ø{spec.BLOCK_DIA:g} × {spec.BLOCK_HEIGHT:.1f} tall" in dims
     assert f"bore on the body centreline at y {spec.CRANK_BORE_HEIGHT:g}" in dims
     assert "42.7506" not in " ".join(rows[0])
+
+
+def _datum_b_frame_clears_the_notes(tag_y: float) -> bool:
+    frame_bottom = tag_y - drawing._DATUM_TAG_FRAME_HEIGHT
+    return frame_bottom >= drawing.NOTES_ANCHOR[1] + drawing._DATUM_NOTES_CLEARANCE - 1e-12
+
+
+def _journal_axis_text_clears_the_spacing_line(text_x: float) -> bool:
+    right = text_x + drawing._JOURNAL_AXIS_TEXT_RIGHT
+    line_x = drawing.JOURNAL_KEEP["CrankAboveCone"][0]
+    return right <= line_x - drawing._TEXT_LINE_CLEARANCE + 1e-12
+
+
+def test_datum_b_and_the_33_37_text_clear_what_crossed_them() -> None:
+    """Leaf w3-1026 (layout check with #1026's degenerate-line fix): datum B's
+    frame sat on the manufacturing notes, and the crank spacing's extension
+    line at x 208.0 crossed the 33.37 text.  Both placements now derive from
+    the measured extents; the old ones are the positive control."""
+    assert not _datum_b_frame_clears_the_notes(drawing._front_y(-9.0))
+    assert _datum_b_frame_clears_the_notes(drawing.DATUM_B_TAG_XY[1])
+    # Still below the foot seat it tags.
+    assert drawing.DATUM_B_TAG_XY[1] < drawing._front_y(0.0)
+    assert not _journal_axis_text_clears_the_spacing_line(0.190)
+    assert _journal_axis_text_clears_the_spacing_line(
+        drawing.JOURNAL_TEXT_OFFSETS["JournalAxisY"][0]
+    )
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "JOURNAL_TEXT_OFFSETS,\n" in source
+    assert "position=DATUM_B_TAG_XY," in source
+    assert '"Manufacturing Notes", *NOTES_ANCHOR)' in source
