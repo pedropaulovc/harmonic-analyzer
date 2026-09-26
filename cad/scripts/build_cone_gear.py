@@ -139,7 +139,7 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
-from _visibility import assert_reference_geometry_hidden, hide_reference_geometry
+from _visibility import assert_reference_geometry_hidden
 
 # NOTE: the validating ``set_global`` comes from ``involute_gear`` -- it
 # round-trips every gear-math global through the SW equation parser to assert
@@ -1185,8 +1185,7 @@ async def build(adapter) -> dict[str, str]:
     # deliberately adds AvoidRebuildOnSave, which live probes proved does not
     # persist rebuilt inactive-configuration bodies.
     # This part saves itself rather than through save_part_and_images, so it
-    # runs that helper's construction-geometry hide and check here.
-    hide_reference_geometry(adapter, PART_NAME)
+    # runs that helper's construction-geometry check here.
     assert_reference_geometry_hidden(adapter, PART_NAME)
     OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
     part_path = (OUT_SLDPRT / f"{PART_NAME}.SLDPRT").resolve()

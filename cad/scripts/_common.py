@@ -1320,10 +1320,10 @@ async def save_part_and_images(
     assembly build reads it for mirror placement), and PNG views to
     ``cad/out/png``.
 
-    Planes, axes, points and reference curves are hidden first; the save then
-    fails if anything still shows, including any sketch not listed in
+    The creating helpers hide the planes, axes, points and curves they make;
+    the save fails if anything still shows, including any sketch not listed in
     ``allowed_shown`` (``reference_visibility_allowances``)."""
-    from _visibility import assert_reference_geometry_hidden, hide_reference_geometry
+    from _visibility import assert_reference_geometry_hidden
 
     # Recorded BEFORE anything touches the camera: this runs at the end of
     # authoring, and set_isometric_view below (like export_image further down) is
@@ -1332,7 +1332,6 @@ async def save_part_and_images(
     # under can still be read. A SUCCESS has to record it too -- otherwise a good
     # run and a bad one cannot be compared (see _seat_forensics.record_authoring_context).
     _seat_forensics.record_authoring_context(adapter, part_name)
-    hide_reference_geometry(adapter, part_name)
     assert_reference_geometry_hidden(adapter, part_name, allowed_shown)
     OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
     part_path = (OUT_SLDPRT / f"{part_name}.SLDPRT").resolve()

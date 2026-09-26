@@ -77,6 +77,27 @@ _SELECT_TYPES = {
 _SKETCHES = {"ProfileFeature", "3DProfileFeature"}
 
 
+class _FeatureManager:
+    def __init__(self, model: _Model) -> None:
+        self.model = model
+        self.get_features_calls = 0
+
+    def GetFeatures(self, top_level_only: bool):
+        assert top_level_only is False
+        self.get_features_calls += 1
+        found: list[_Feature] = []
+
+        def add(feature: _Feature) -> None:
+            found.append(feature)
+            if feature.kind != "Reference":  # a component's own tree
+                for child in feature.subs:
+                    add(child)
+
+        for feature in self.model.features:
+            add(feature)
+        return tuple(found)
+
+
 class _Model:
     def __init__(self, *features: _Feature, blank_works: bool = True) -> None:
         self.features = list(features)
@@ -91,6 +112,7 @@ class _Model:
         self.selected: list[_Feature] = []
         self.blank_works = blank_works
         self.Extension = _Extension(self)
+        self.FeatureManager = _FeatureManager(self)
 
     def FirstFeature(self):
         return self.features[0] if self.features else None
@@ -222,37 +244,14 @@ def test_part_save_checks_before_the_first_save() -> None:
     assert saves == []
 
 
-def test_the_save_hides_planes_axes_points_and_curves_but_not_sketches() -> None:
-    model = _part_tree(
-        _Feature("HandleSeat", "RefPlane", SHOWN),
-        _Feature("Axis1", "RefAxis", SHOWN),
-        _Feature("Point1", "RefPoint", SHOWN),
-        _Feature("Helix1", "Helix", SHOWN),
-        _Feature("StationReference", "ProfileFeature", SHOWN),
-    )
-    hidden = _visibility.hide_reference_geometry(_adapter(model), "crank-arm")
-    assert hidden == ["HandleSeat", "Axis1", "Point1", "Helix1"]
-    assert model.by_name["StationReference"].Visible == SHOWN
-    with pytest.raises(RuntimeError, match="StationReference") as raised:
-        _visibility.assert_reference_geometry_hidden(_adapter(model), "crank-arm")
-    assert "Axis1" not in str(raised.value)
-
-
-def test_the_hide_fails_when_blank_ref_geom_does_not_take() -> None:
-    model = _part_tree(_Feature("Axis1", "RefAxis", SHOWN), blank_works=False)
-    with pytest.raises(RuntimeError, match=r"left \['Axis1'\] shown"):
-        _visibility.hide_reference_geometry(_adapter(model), "p")
-
-
-def test_part_save_hides_reference_geometry_then_checks() -> None:
+def test_a_shown_plane_reaching_the_save_fails_it() -> None:
+    """The creating helpers own hiding; nothing hides at save, so the check is
+    the fail-loud backstop for a plane, axis, point or curve left shown."""
     saves: list[str] = []
-    model = _part_tree(
-        _Feature("Axis1", "RefAxis", SHOWN),
-        _Feature("StationReference", "ProfileFeature", SHOWN),
-    )
-    with pytest.raises(RuntimeError, match="StationReference"):
+    model = _part_tree(_Feature("Axis1", "RefAxis", SHOWN))
+    with pytest.raises(RuntimeError, match="axis 'Axis1'"):
         asyncio.run(_common.save_part_and_images(_adapter(model, saves), "crank-arm"))
-    assert model.by_name["Axis1"].Visible == HIDE
+    assert model.by_name["Axis1"].Visible == SHOWN
     assert saves == []
 
 
@@ -295,9 +294,6 @@ def test_every_standalone_save_path_runs_the_check() -> None:
         assert "assert_reference_geometry_hidden(adapter" in text
     assembly = (SCRIPTS / "_assembly.py").read_text(encoding="utf-8")
     assert "assert_reference_geometry_hidden(adapter, asm_name)" in assembly
-    assert "hide_reference_geometry(adapter, asm_name)" in assembly
-    cone_gear = (SCRIPTS / "build_cone_gear.py").read_text(encoding="utf-8")
-    assert "hide_reference_geometry(adapter, PART_NAME)" in cone_gear
 
 
 # The debt at the time the check landed.  Owners delete entries as they convert
@@ -422,40 +418,51 @@ def test_name_bore_axis_hides_the_planes_and_axis_it_creates() -> None:
     assert _visibility.visible_reference_geometry(model) == []
 
 
-def test_the_save_backstop_counts_what_it_had_to_hide(monkeypatch) -> None:
-    events: list[tuple[str, dict]] = []
-    monkeypatch.setattr(
-        _visibility._telemetry,
-        "event",
-        lambda name, **attrs: events.append((name, attrs)),
-    )
-    model = _part_tree(_Feature("Plane2", "RefPlane", SHOWN))
-    _visibility.hide_reference_geometry(_adapter(model), "crank-arm")
-    _visibility.hide_reference_geometry(_adapter(model), "crank-arm")
-    counts = [
-        attrs["count"] for name, attrs in events if name == "refgeom.hidden_at_save"
-    ]
-    assert counts == [1, 0]
+class _CountingFeature(_Feature):
+    """Counts the COM reads the save check makes on it."""
+
+    reads: dict[str, int] = {}
+
+    def __getattribute__(self, name: str):
+        if name in ("Name", "Visible", "GetTypeName2"):
+            reads = _CountingFeature.reads
+            reads[name] = reads.get(name, 0) + 1
+        return super().__getattribute__(name)
 
 
-def test_each_save_walk_logs_its_size_and_cost(monkeypatch) -> None:
-    """A farm leaf uploads only its task.log, so both save walks put
-    features_visited and their elapsed time on an info line (#880's bar)."""
+def test_the_check_reads_one_member_per_feature_and_logs_its_cost(monkeypatch) -> None:
+    """#880's save bar: one GetFeatures call, then GetTypeName2 per feature,
+    Visible only on reference types and Name only on a shown one; the size
+    and cost reach the task.log, the only telemetry a farm leaf uploads."""
     lines: list[tuple[str, dict]] = []
     monkeypatch.setattr(
         _visibility._telemetry, "info", lambda msg, **attrs: lines.append((msg, attrs))
     )
-    model = _part_tree(_Feature("Plane2", "RefPlane"))
-    _visibility.hide_reference_geometry(_adapter(model), "crank-arm")
-    _visibility.assert_reference_geometry_hidden(_adapter(model), "crank-arm")
-    walks = [attrs for _msg, attrs in lines if "walk_purpose" in attrs]
-    assert [attrs["walk_purpose"] for attrs in walks] == ["hide", "check"]
-    for attrs in walks:
-        assert attrs["features_visited"] >= 1
-        assert attrs["walk_s"] >= 0.0
-    assert all(
-        msg.startswith("crank-arm: ") for msg, attrs in lines if "walk_purpose" in attrs
-    )
+    features = [
+        _CountingFeature("Front Plane", "RefPlane"),
+        _CountingFeature(
+            "Boss",
+            "Extrusion",
+            SHOWN,
+            subs=[_CountingFeature("Sketch1", "ProfileFeature")],
+        ),
+        _CountingFeature("Fillet1", "Fillet", SHOWN),
+        _CountingFeature("StationReference", "ProfileFeature", SHOWN),
+    ]
+    model = _Model(*features)
+    _CountingFeature.reads = {}  # the fake's own setup read every Name
+    allowed = {"StationReference": "crankhub: reason"}
+    _visibility.assert_reference_geometry_hidden(_adapter(model), "crank-arm", allowed)
+    assert model.FeatureManager.get_features_calls == 1
+    assert _CountingFeature.reads == {"GetTypeName2": 5, "Visible": 3, "Name": 1}
+    scans = [
+        (msg, attrs) for msg, attrs in lines if attrs.get("walk_purpose") == "check"
+    ]
+    assert len(scans) == 1
+    msg, attrs = scans[0]
+    assert msg.startswith("crank-arm: check scanned 5 features with 11 COM calls")
+    assert attrs["features_visited"] == 5 and attrs["com_calls"] == 11
+    assert 0.0 <= attrs["fetch_s"] <= attrs["walk_s"]
 
 
 def test_shared_reference_creators_hide_what_they_create() -> None:
@@ -524,11 +531,10 @@ def test_the_shared_walk_counts_every_feature_but_skips_components() -> None:
     assert walk.visited == 4
 
 
-def test_creation_hides_and_the_save_backstop_are_distinct_spans() -> None:
+def test_creation_hides_and_the_save_check_are_distinct_spans() -> None:
     text = (SCRIPTS / "_visibility.py").read_text(encoding="utf-8")
     for span in (
         "appearance.blank_reference_geometry",
-        "appearance.hide_reference_geometry",
         "appearance.blank_sketch_feature",
         "appearance.assert_reference_geometry_hidden",
     ):

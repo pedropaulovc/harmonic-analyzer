@@ -36,11 +36,7 @@ from _common import (
     set_isometric_view,
     whats_wrong,
 )
-from _visibility import (
-    assert_reference_geometry_hidden,
-    blank_reference_geometry,
-    hide_reference_geometry,
-)
+from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
 
 
 def assembly_title_properties(assembly_name: str) -> dict[str, str]:
@@ -2233,7 +2229,6 @@ async def save_assembly_and_images(
     audit_flip_seeds(asm_name)
     # ... nor one whose own sketches, planes, axes or points render; each
     # placed part's tree was proved at that part's save.
-    hide_reference_geometry(adapter, asm_name)
     assert_reference_geometry_hidden(adapter, asm_name)
     OUT_SLDASM.mkdir(parents=True, exist_ok=True)
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()

@@ -64,18 +64,18 @@ _MAX_FEATURES = 20000
 
 
 class FeatureWalk:
-    """Every feature of a model and, recursively, its sub-features.
+    """Every feature of a model and, recursively, its sub-features, in tree order.
 
-    The one tree walk the save check, the save backstop and the stock-fastener
-    cleanup share.  It does not descend into an assembly's components (each
-    part's own save proved its tree), counts what it visits in ``visited``
-    for the span that owns the walk, and refuses a runaway traversal.
+    The stock-fastener cleanup's walk.  It does not descend into an assembly's
+    components (each part's own save proved its tree), counts what it visits in
+    ``visited`` for the span that owns the walk, and refuses a runaway
+    traversal.  The save check does not use it: it costs three COM calls per
+    feature just to move (``visible_reference_geometry``).
     """
 
     def __init__(self, model: Any) -> None:
         self.model = model
         self.visited = 0
-        self.started = time.perf_counter()
 
     def __iter__(self) -> Iterator[Any]:
         from _common import _early_bound, _read_member
@@ -98,103 +98,76 @@ class FeatureWalk:
         yield from siblings(_read_member(self.model, "FirstFeature"), "GetNextFeature")
 
 
-def _record_walk(walk: FeatureWalk, purpose: str, label: str) -> None:
-    """Put the walk's size and cost on its span AND in the console log.
-
-    A farm leaf uploads only its task.log, so this line is the per-save
-    visibility cost that leaves the worker (#880's <= 1 s save bar)."""
-    walk_s = time.perf_counter() - walk.started
-    span = trace.get_current_span()
-    span.set_attribute("features_visited", walk.visited)
-    span.set_attribute("walk_s", walk_s)
-    _telemetry.info(
-        f"{label}: {purpose} walk visited {walk.visited} features in {walk_s:.3f}s",
-        features_visited=walk.visited,
-        walk_s=walk_s,
-        walk_purpose=purpose,
-    )
-
-
 def visible_reference_geometry(model: Any, label: str = "") -> list[tuple[str, str]]:
-    """``(name, kind)`` of every shown sketch, plane, axis, point or curve."""
+    """``(name, kind)`` of every shown sketch, plane, axis, point or curve.
+
+    One ``IFeatureManager.GetFeatures(False)`` call returns every feature and
+    child feature, and none inside an assembly's components (the SolidWorks
+    API reference), so nothing is walked.  Each feature then costs ONE COM
+    call, ``GetTypeName2``; ``Visible`` is read only on the reference types and
+    ``Name`` only on a shown one.  ``_early_bound`` is local (it wraps the raw
+    dispatch in the generated class, no round trip) and keeps each read a
+    single by-dispid Invoke instead of a name lookup plus the call.  #880's
+    save bar is <= 1 s, and the tree walk it replaces cost 49 ms per feature
+    on a farm seat (harmonic_base: 107 features, 5.6 s)."""
+    from _common import _early_bound, _read_member
+
+    started = time.perf_counter()
+    manager = _early_bound(
+        _read_member(_early_bound(model, "IModelDoc2"), "FeatureManager"),
+        "IFeatureManager",
+    )
+    features = tuple(manager.GetFeatures(False) or ())
+    # pywin32 wraps each returned dispatch on the way out (its type info is
+    # read per element), so the fetch is timed apart from the per-feature reads.
+    fetch_s = time.perf_counter() - started
+    com_calls = 2
+    if len(features) > _MAX_FEATURES:
+        raise RuntimeError(f"{label}: {len(features)} features exceed {_MAX_FEATURES}")
     shown: list[tuple[str, str]] = []
     seen: set[str] = set()
-    walk = FeatureWalk(model)
-    for feature in walk:
+    for raw in features:
+        feature = _early_bound(raw, "IFeature")
         kind = REFERENCE_FEATURE_KINDS.get(str(feature.GetTypeName2()))
+        com_calls += 1
         if kind is None:
             continue
+        com_calls += 1
+        if int(feature.Visible) != _SHOWN:
+            continue
         name = str(feature.Name)
-        if name in seen or int(feature.Visible) != _SHOWN:
+        com_calls += 1
+        if name in seen:
             continue
         seen.add(name)
         shown.append((name, kind))
-    _record_walk(walk, "check", label)
+    _record_scan(
+        label, len(features), com_calls, fetch_s, time.perf_counter() - started
+    )
     return shown
 
 
-# SelectByID2 types for the reference entities BlankRefGeom hides.  Sketches
-# are not here: hiding one changes which dimensions its drawing imports
-# (``_drawing_hidden_sketches``), so a shown sketch fails the check instead.
-_REFERENCE_SELECT_TYPES = {
-    "RefPlane": "PLANE",
-    "RefAxis": "AXIS",
-    "RefPoint": "DATUMPOINT",
-    "Helix": "REFERENCECURVES",
-    "CompositeCurve": "REFERENCECURVES",
-}
+def _record_scan(
+    label: str, features: int, com_calls: int, fetch_s: float, scan_s: float
+) -> None:
+    """Put the check's size and cost on its span AND in the console log.
 
-
-@_telemetry.traced("appearance.hide_reference_geometry", label_param="label")
-def hide_reference_geometry(adapter: Any, label: str) -> list[str]:
-    """Hide every shown plane, axis, point and reference curve before a save.
-
-    Parts and assemblies create them for sketch placement and as named mate
-    targets, and a shown one prints its outline and label in every render
-    (crank-arm's HandleSeat, Plane2, Axis1 and Axis2).  Blanked entities stay
-    selectable by name, so mates and later features still find them.  Returns
-    the names it hid.
-    """
-    from solidworks_mcp.adapters.pywin32_adapter import null_callout
-
-    model = adapter.currentModel
-    walk = FeatureWalk(model)
-    shown = [
-        (feature, str(feature.Name), _REFERENCE_SELECT_TYPES[kind])
-        for feature in walk
-        if (kind := str(feature.GetTypeName2())) in _REFERENCE_SELECT_TYPES
-        and int(feature.Visible) == _SHOWN
-    ]
-    _record_walk(walk, "hide", label)
-    # The creating helpers hide what they make, so this backstop should find
-    # nothing; the count names what still reaches it and should trend to 0.
-    trace.get_current_span().set_attribute("refgeom.hidden_at_save", len(shown))
-    _telemetry.event(
-        "refgeom.hidden_at_save",
-        label=label,
-        count=len(shown),
-        names=",".join(name for _feature, name, _type in shown),
-    )
-    if not shown:
-        return []
-    model.ClearSelection2(True)
-    for index, (_feature, name, select_type) in enumerate(shown):
-        if not model.Extension.SelectByID2(
-            name, select_type, 0, 0, 0, index > 0, 0, null_callout(), 0
-        ):
-            raise RuntimeError(
-                f"{label}: cannot select {select_type} {name!r} to hide it"
-            )
-    model.BlankRefGeom()
-    model.ClearSelection2(True)
-    names = [name for _feature, name, _type in shown]
-    still = [name for feature, name, _type in shown if int(feature.Visible) == _SHOWN]
-    if still:
-        raise RuntimeError(f"{label}: BlankRefGeom left {still} shown")
+    A farm leaf uploads only its task.log, so this line is the per-save
+    visibility cost that leaves the worker (#880's <= 1 s save bar)."""
+    span = trace.get_current_span()
+    span.set_attribute("features_visited", features)
+    span.set_attribute("com_calls", com_calls)
+    span.set_attribute("fetch_s", fetch_s)
+    span.set_attribute("walk_s", scan_s)
     _telemetry.info(
-        f"{label}: refgeom.hidden_at_save={len(names)} ({', '.join(names)})"
+        f"{label}: check scanned {features} features with {com_calls} COM calls "
+        f"in {scan_s:.3f}s (GetFeatures {fetch_s:.3f}s)",
+        features_visited=features,
+        com_calls=com_calls,
+        fetch_s=fetch_s,
+        walk_s=scan_s,
+        walk_purpose="check",
     )
-    return names
 
 
 @_telemetry.traced("appearance.blank_sketch_feature", label_param="label")
