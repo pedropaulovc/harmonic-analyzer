@@ -359,8 +359,21 @@ async def build(adapter) -> dict[str, str]:
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
     await force_rebuild(adapter)
+    # DIAG (#906, not for merge): rebuild after each equation and dump
+    # SolidWorks' What's Wrong table on the first failure.
+    from _common import _seat_error_state
+    import _telemetry
+
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
+        ok = await adapter.rebuild_model()
+        if not getattr(ok, "is_success", bool(ok)):
+            _telemetry.error(
+                f"DIAG rebuild failed after {dim_name} = {expr}: "
+                f"{_seat_error_state(adapter)!r}"
+            )
+            raise RuntimeError(f"DIAG rebuild failed after {dim_name}")
+        _telemetry.info(f"DIAG rebuild OK after {dim_name} = {expr}")
     await force_rebuild(adapter)
     set_dimension_bilateral_tolerance(
         adapter, "BossProfile", "BoreDia", *deviations(BORE_DIA_BAND)
