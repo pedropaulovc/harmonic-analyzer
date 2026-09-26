@@ -1,8 +1,23 @@
 gooseneck:
+  title: Gooseneck
   number: MHA-032
-  material: AISI 1010 seamless steel tube
-  material_specification: AISI 1010 seamless steel tube
-  finish: ASTM B456 SC2 Ni-Cr plate after braze; Ra 0.8 max; dims pre-plate
+  # The tube is purchased stock, printed as reference (gooseneck_spec
+  # TUBE_STOCK_WALL_TOL cites the A519 wall band). The title-block note wraps
+  # at about 56 mm of text into the row below (farm r23: 35 characters
+  # wrapped), so material names the tube only as CDS (cold-drawn seamless: the
+  # A519 Table 9 wall band depends on it); the stock size and wall band ride
+  # section B-B (TUBE_STOCK_CALLOUT) and material_specification spells it out.
+  material: A519 1010 CDS; 1018 PLUG/SCREW
+  material_specification: ASTM A519 1010 COLD-DRAWN SEAMLESS TUBE 16 OD X 2 WALL; AISI 1018 PLUG/SCREW
+  # Plating builds about 4x its thickness onto a 60-degree thread's pitch
+  # diameter, past the 2A/2B bands, so the screw comes out before plating and
+  # is black-oxided instead, and the builder chases the tapped plug afterwards
+  # rather than relying on the plater's masking (CodeRabbit review of
+  # 022c54f1; Main ruling). Both finishes live here, in the Finish field
+  # (Codex machinist r24). The cell holds two lines of about 80 mm (r24's
+  # first line fit at 632 px at 200 dpi), so "DIMS PRE-PLATE" and "THREAD"
+  # gave way.
+  finish: "ASTM B456 SC2 NI-CR AFTER BRAZE, SCREW REMOVED; CHASE #6-32 AFTER PLATING. SCREW: BLACK OXIDE"
   quantity: 1
   tolerance_class: machined_block
-  process: "machined (steel)"
+  process: "formed and silver-brazed steel fabrication"
