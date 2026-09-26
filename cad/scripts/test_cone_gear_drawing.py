@@ -46,7 +46,13 @@ def test_every_configuration_has_one_complete_sheet_and_native_scale() -> None:
 def test_part_and_drawing_share_the_complete_native_dimension_contract() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert marked == {"BlankDia", "FaceWidth", "BoreCutDia", "ToothThickness"}
+    assert marked == {
+        "BlankDia",
+        "FaceWidth",
+        "BoreCutDia",
+        "ToothThickness",
+        "FloorDia",
+    }
     for teeth in spec.CONFIGURATION_TEETH:
         kept = set(drawing.front_keep(teeth)) | set(drawing.right_keep(teeth))
         assert kept == marked
@@ -58,6 +64,9 @@ def test_model_owns_precision_for_both_fit_dimensions() -> None:
         "FaceWidth": 2,
         "BoreCutDia": 3,
         "ToothThickness": 3,
+        # The T006 floor window is 0.049 wide: two places would print the
+        # upper limit rounded up (probe 834-gapfloor-c301 showed .049 as .05).
+        "FloorDia": 3,
     }
     assert "draw_cone_gear.py" in PRECISION_MIGRATED_DRAWINGS
 
@@ -157,12 +166,8 @@ def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates
         assert "PRESSURE ANGLE" in data
         assert "INVOLUTE FLANKS" in data
         assert f"CYLINDER GEAR {notes.CYLINDER_MATE_NUMBER}" in data
-        # U40: the floor is a MIN limit; the tooth form and the floor limits
-        # state the result, so no row says how to cut it (rule 6).
-        minimum, maximum = spec.floor_limits_mm(teeth)
-        assert (
-            f"GAP FLOOR DIAMETER (mm):  {minimum:.3f} MIN / {maximum:.3f} MAX"
-        ) in data
+        # The tooth form and the floor's native limit dimension state the
+        # result, so no row says how to cut it (rule 6).
         for method in ("CUTTING", "CUTTER", "PLUNGE", "INDEXING", "SINKING"):
             assert method not in data
         assert spec.TOOTH_FORM in data
@@ -194,6 +199,7 @@ def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates
             "FACE WIDTH",
             "BORE",
             "CIRCULAR TOOTH THICKNESS",
+            "GAP FLOOR DIAMETER",
             "FAMILY T",
         ):
             assert duplicate not in data
@@ -210,6 +216,11 @@ def test_gap_floor_constructions() -> None:
         )
         minimum, maximum = spec.floor_limits_mm(teeth)
         assert maximum > minimum
+        # Bands round outward: the printed MIN is the modelled floor floored
+        # to three places, never above it.
+        modelled = 2.0 * spec.floor_radius_mm(teeth)
+        assert modelled - 0.001 < minimum <= modelled
+        assert minimum == pytest.approx(round(minimum, 3), abs=1e-12)
         if teeth in spec.DIPPED_FLOOR_MIN_MM:
             assert spec.floor_radius_mm(teeth) == pytest.approx(minimum / 2.0)
             assert spec.floor_dip_mm(teeth) > 0.0
@@ -402,6 +413,144 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
             >= 0.008
         )
         assert front["ToothThickness"][0] > drawing.FRONT_CENTER[0] + half_od
+        # The gap-floor limit stack (two 3-place values plus "GAP FLOOR",
+        # ~17 x 11 mm) stands right of the tip circle, above the thickness
+        # witness, left of the side view and below the Gear Data block.
+        floor_x, floor_y = front["FloorDia"]
+        assert floor_x - _FLOOR_TEXT_HALF_WIDTH > drawing.FRONT_CENTER[0] + half_od
+        assert floor_x + _FLOOR_TEXT_HALF_WIDTH < drawing.RIGHT_CENTER[0] - half_face - 0.020
+        assert floor_y - _FLOOR_TEXT_HALF_HEIGHT > drawing.FRONT_CENTER[1] + 0.009
+        assert (
+            floor_y + _FLOOR_TEXT_HALF_HEIGHT
+            < drawing.GEAR_DATA_POS[1] - drawing.GEAR_DATA_HEIGHT
+        )
+
+
+# The gap-floor stack: "Ø61.050" over "Ø60.485" over "GAP FLOOR" at 3.5 mm
+# text, the widest row 9 characters at ~1.85 mm.
+_FLOOR_TEXT_HALF_WIDTH = 9 * 0.00185 / 2.0
+_FLOOR_TEXT_HALF_HEIGHT = 3 * 0.00351 / 2.0
+
+
+class _FakeFeature:
+    def __init__(self, visible: int) -> None:
+        self.Visible = visible
+
+
+class _FakePart:
+    """A part document that records sketch blanks and reports visibility."""
+
+    def __init__(self, *, hides: bool) -> None:
+        self.hides = hides
+        self.selected: list[tuple[str, str]] = []
+        self.blanked: list[str] = []
+        self.Extension = self
+
+    def ClearSelection2(self, _all: bool) -> None:
+        pass
+
+    def SelectByID2(self, name: str, kind: str, *_args: object) -> bool:
+        self.selected.append((name, kind))
+        return True
+
+    def BlankSketch(self) -> None:
+        self.blanked.append(self.selected[-1][0])
+
+    def FeatureByName(self, name: str) -> _FakeFeature:
+        # swVisibilityState_e: 1 hidden, 2 shown
+        return _FakeFeature(1 if self.hides and name in self.blanked else 2)
+
+
+class _FakeAdapter:
+    def __init__(self, model: object) -> None:
+        self.currentModel = model
+
+
+def test_the_part_saves_both_authoring_sketches_hidden() -> None:
+    """#950's save gate: a shown construction sketch renders in the part images
+    and in every assembly that places a gear, so the part blanks both before
+    its first save and reads the blank back."""
+    model = _FakePart(hides=True)
+    part._blank_reference_sketches(_FakeAdapter(model))
+    sketches = [spec.TOOTH_REFERENCE_SKETCH, spec.GAP_FLOOR_SKETCH]
+    assert model.selected == [(sketch, "SKETCH") for sketch in sketches]
+    assert model.blanked == sketches
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build(") :]
+    assert body.index("_blank_reference_sketches(adapter)") < body.index(
+        "await adapter.save_file("
+    )
+
+
+def test_a_blank_that_does_not_take_fails_the_part_build() -> None:
+    with pytest.raises(RuntimeError, match="still visible after BlankSketch"):
+        part._blank_reference_sketches(_FakeAdapter(_FakePart(hides=False)))
+
+
+class _FakeTolerance:
+    def __init__(self, accept: bool = True) -> None:
+        self.Type = 0
+        self.accept = accept
+        self.calls: list[tuple[float, float, int, list[str]]] = []
+
+    def SetValues2(self, lower: float, upper: float, which: int, names: object) -> bool:
+        self.calls.append((lower, upper, which, list(names.value)))
+        return self.accept
+
+
+def _patch_floor_dimension(monkeypatch: pytest.MonkeyPatch, tolerance: object) -> None:
+    dimension = type("Dimension", (), {"Tolerance": tolerance})()
+
+    def named(_adapter: object, feature: str, name: str) -> tuple[object, object]:
+        assert (feature, name) == (spec.GAP_FLOOR_SKETCH, "FloorDia")
+        return object(), dimension
+
+    monkeypatch.setattr(part, "_named_dimension", named)
+
+
+def test_each_configuration_stores_its_own_gap_floor_limits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#834 Codex P1: the floor band is a native per-configuration LIMIT, one
+    SetValues2 per configuration naming only that configuration."""
+    tolerance = _FakeTolerance()
+    _patch_floor_dimension(monkeypatch, tolerance)
+    part._set_gap_floor_limits(object())
+    assert tolerance.Type == 3  # swTolLIMIT
+    assert [call[3] for call in tolerance.calls] == [[name] for name, _ in part.CONFIGS]
+    for (lower, upper, which, _names), (_name, teeth) in zip(
+        tolerance.calls, part.CONFIGS, strict=True
+    ):
+        assert which == 3  # swSetValue_InSpecificConfigurations
+        nominal = 2.0 * spec.floor_radius_mm(teeth)
+        minimum, maximum = spec.floor_limits_mm(teeth)
+        assert nominal + lower * 1000.0 == pytest.approx(minimum, abs=1e-9)
+        assert nominal + upper * 1000.0 == pytest.approx(maximum, abs=1e-9)
+        assert lower <= 0.0 < upper
+
+
+def test_a_rejected_configuration_limit_fails_the_part_build(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_floor_dimension(monkeypatch, _FakeTolerance(accept=False))
+    with pytest.raises(RuntimeError, match="FloorDia@T006: SetValues2 rejected"):
+        part._set_gap_floor_limits(object())
+
+
+def test_only_the_front_view_shows_the_authoring_sketches() -> None:
+    """Both sketches' dimensions live on the front view, which takes the
+    opt-in import; the side and iso views show the part as saved."""
+    for sketch in (spec.TOOTH_REFERENCE_SKETCH, spec.GAP_FLOOR_SKETCH):
+        owned = spec.DRAWING_DIMENSIONS[sketch]
+        for teeth in spec.CONFIGURATION_TEETH:
+            assert owned <= set(drawing.front_keep(teeth))
+            assert not owned & set(drawing.right_keep(teeth))
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build(") :]
+    assert body.count("hidden_sketches.curate_view_dimensions(") == 1
+    call = body[body.index("hidden_sketches.curate_view_dimensions(") :]
+    assert call.index("front,") < call.index(")")
+    assert "BlankSketch" not in source
 
 
 # Measured by the layout audit on the T006 sheet (layoutcal2, cone-gear.json):

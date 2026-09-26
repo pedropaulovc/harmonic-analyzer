@@ -255,7 +255,8 @@ def test_gap_floor_clears_the_drum_and_fits_one_cutter(teeth: int) -> None:
     # Every floor is two-sided (Main, 2026-09-26: the #834 machinist review
     # found sheets 3-20 printed MIN only).  MAX is the shallowest floor keeping
     # 0.02 of drum-tip clearance with every runout closing (a shallow plunge
-    # would rub), floored to three places; MIN is the modelled floor.
+    # would rub), floored to three places; MIN is the modelled floor, floored
+    # to three places too (bands round outward).
     minimum, maximum = spec.floor_limits_mm(teeth)
     drum_path = _centre(teeth) - RUNOUT - DRUM_TIP_R
     assert drum_path - maximum / 2.0 >= 0.02
@@ -263,7 +264,8 @@ def test_gap_floor_clears_the_drum_and_fits_one_cutter(teeth: int) -> None:
     # Main: T006's window must be at least 0.04 on diameter; every other
     # gear's is wider.
     assert maximum - minimum >= 0.04
-    assert minimum == pytest.approx(2.0 * spec.floor_radius_mm(teeth), abs=0.0005)
+    modelled = 2.0 * spec.floor_radius_mm(teeth)
+    assert modelled - 0.001 < minimum <= modelled
     if teeth in spec.DIPPED_FLOOR_MIN_MM:
         assert clearance > 0.04  # +0.045 at T006, +0.076 at T012
         return

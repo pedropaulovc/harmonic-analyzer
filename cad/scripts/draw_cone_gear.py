@@ -2,10 +2,11 @@ r"""Create the complete cone-gear batch drawing package (MHA-013).
 
 Every configured family member T006..T120 by six receives a standalone sheet.
 Each sheet selects its own part configuration, imports the native model-owned
-blank diameter, bore, face width, and driving circular-tooth-thickness
-requirement, and carries its own gear data and title-block alloy.  The bore and
-tooth-thickness bands are authored by ``build_cone_gear`` from the named shaft
-and gear-mesh fits; this drawing only arranges and verifies them.
+blank diameter, bore, face width, driving circular-tooth-thickness requirement
+and gap-floor limits, and carries its own gear data and title-block alloy.  The
+bands are authored by ``build_cone_gear`` from the named shaft and gear-mesh
+fits (the gap floor as one LIMIT band per configuration); this drawing only
+arranges and verifies them.
 
 There are no datums or feature-control frames.  Hidden lines communicate no
 additional manufacturing fact on these plain through-bored spur gears, so all
@@ -13,8 +14,9 @@ three views remain hidden-lines-removed.  The one finish symbol belongs to the
 fitted bore.  The side view stays in projection with the front view's bore
 axis; its face width hangs below it, clear of the Gear Data block.  The
 circular tooth thickness is dimensioned on the +X tooth's pitch chord (a tooth
-on every configuration), and the part's construction witness sketch is hidden
-in the side and isometric views, where it carries no dimension.  The approved attachment note permits solder/silver-braze or
+on every configuration), and the gap floor on a phantom circle at the modelled
+floor.  The part saves both construction sketches hidden; only the front view,
+which dimensions them, shows them.  The approved attachment note permits solder/silver-braze or
 Loctite 638/648 and adds no key, pin, set screw, or hub.
 """
 
@@ -24,12 +26,11 @@ import argparse
 import sys
 from typing import Any
 
+import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     _INSERT_DIMS_MARKED,
-    _model_item_paths,
-    _select_model_feature,
     DrawingOutputs,
     add_note,
     add_property_linked_note,
@@ -52,7 +53,10 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
-from build_cone_gear import assert_saved_configuration_topology
+from build_cone_gear import (
+    assert_saved_configuration_topology,
+    gap_floor_deviations_mm,
+)
 from cone_gear_spec import (
     BORE_SURFACE_FINISHES,
     CONFIGURATION_TEETH,
@@ -60,6 +64,7 @@ from cone_gear_spec import (
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     bore_dia_mm,
+    floor_limits_mm,
     outside_dia_mm,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -124,7 +129,6 @@ GEAR_DATA_POS = (0.215, 0.263)
 # Rendered height/width budget of the Gear Data block, for the layout test.
 GEAR_DATA_HEIGHT = 0.056
 GEAR_DATA_MAX_LINE_CHARS = 66
-TOOTH_REFERENCE_SKETCH = "ToothThicknessReference"
 MANUFACTURING_NOTES_POS = (0.015, 0.263)
 SHEET_COUNT_POS = (0.350, 0.263)
 
@@ -133,6 +137,8 @@ DIMENSION_CALLOUTS = {
     # Pitch diameter, backlash and mate already live in the Gear Data block.
     # Repeating them here made the long suffix collide with the bore callout.
     "ToothThickness": "CIRCULAR TOOTH THICKNESS",
+    # The limit pair points at a phantom circle; name what it bounds.
+    "FloorDia": "GAP FLOOR",
 }
 
 
@@ -151,11 +157,21 @@ def rendered_half_face_width(teeth: int) -> float:
 # above the bore axis on that sheet (layout audit, 0.82 mm overlap); 0.0145
 # clears it, and no other text on any sheet is within 36 mm above the value.
 BLANK_DIA_LIFT = 0.0145
+# The gap-floor limit stack (value pair plus "GAP FLOOR") stands right of the
+# tip circle, above the thickness witness: in the same lane as the thickness
+# dimension line, which runs DOWN from the +X tooth, and clear of the side
+# view (left edge >= 0.219 on every sheet).
+FLOOR_DIA_GAP_X = 0.012
+FLOOR_DIA_RISE = 0.006
 
 
 def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
     half_od = rendered_half_od(teeth)
     return {
+        "FloorDia": (
+            FRONT_CENTER[0] + half_od + FLOOR_DIA_GAP_X,
+            FRONT_CENTER[1] + 0.6 * half_od + FLOOR_DIA_RISE,
+        ),
         "BlankDia": (FRONT_CENTER[0], FRONT_CENTER[1] + half_od + BLANK_DIA_LIFT),
         # One measured exterior lane keeps the full stacked fit callout inside
         # the left border on every scale/configuration.  Do not derive X from
@@ -226,30 +242,45 @@ def right_keep(teeth: int) -> dict[str, tuple[float, float]]:
     return {"FaceWidth": (x, y)}
 
 
-def _hide_reference_sketch(adapter: Any, view: Any, label: str) -> None:
-    """Hide the part's thickness-witness sketch in one drawing view only.
+_TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 
-    ``IModelDoc2::BlankSketch`` on a sketch selected through a view
-    (``"<sketch>@<component>@<view>"``) hides it in that view -- the SOLIDWORKS
-    "Reset Visibility of Sketches in Drawing View" example.  Blanking it in the
-    part instead would also hide it in the front view, whose thickness
-    dimension it owns.
+
+def _assert_sheet_floor_limits(
+    adapter: Any, annotations: list[Any], configuration: str, teeth: int
+) -> None:
+    """Prove the sheet's gap-floor dimension carries THIS configuration's limits.
+
+    One model dimension holds twenty LIMIT bands; the imported display
+    dimension reads the band of its view's referenced configuration from the
+    saved part, so this is the per-configuration readback after save and
+    reopen.
     """
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    name = view_name(adapter, view)
-    if not ddoc.ActivateView(name):
-        raise RuntimeError(f"{label}: failed to activate {name!r}")
-    draw.ClearSelection2(True)
-    selected = _select_model_feature(
-        adapter, TOOTH_REFERENCE_SKETCH, paths=_model_item_paths(adapter, view)
+    floor = [a for a in annotations if dimension_name(adapter, a) == "FloorDia"]
+    if len(floor) != 1:
+        raise RuntimeError(
+            f"{configuration}: expected one FloorDia on the sheet, found {len(floor)}"
+        )
+    display = _early_bound(
+        _early_bound(floor[0], "IAnnotation").GetSpecificAnnotation(),
+        "IDisplayDimension",
     )
-    if not selected.startswith("SKETCH"):
-        draw.ClearSelection2(True)
-        raise RuntimeError(f"{label}: witness resolved as {selected!r}, not a sketch")
-    draw.BlankSketch()
-    draw.ClearSelection2(True)
-    _telemetry.debug(f"{label}: hid {TOOTH_REFERENCE_SKETCH} ({selected})")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    kind = int(tolerance.Type)
+    observed = (
+        float(tolerance.GetMinValue()) * 1000.0,
+        float(tolerance.GetMaxValue()) * 1000.0,
+    )
+    expected = gap_floor_deviations_mm(teeth)
+    drifted = any(abs(o - e) > 1e-6 for o, e in zip(observed, expected))
+    if kind != _TOL_LIMIT or drifted:
+        raise RuntimeError(
+            f"{configuration}: sheet FloorDia reads type {kind} {observed} mm, "
+            f"expected LIMIT {expected} mm ({floor_limits_mm(teeth)})"
+        )
+    _telemetry.success(
+        f"{configuration}: sheet gap-floor limits {floor_limits_mm(teeth)} mm"
+    )
 
 
 def _configure_views(
@@ -418,15 +449,19 @@ async def build(adapter: Any) -> dict[str, str]:
         for view in views:
             set_hidden_lines_removed(adapter, view)
         _assert_tooth_geometry(front, configuration, teeth)
-        _hide_reference_sketch(adapter, right, f"{configuration} side witness")
-        _hide_reference_sketch(adapter, iso, f"{configuration} iso witness")
 
-        front_annotations = _curate_repeated_dimensions(
+        # The part saves both authoring sketches hidden; the front view shows
+        # them again for their dimensions (the side and iso views show the
+        # part as saved).  The targeted import still delivers the dimensions
+        # on every sheet after the first (probe 834-gapfloor-c301).
+        front_annotations = hidden_sketches.curate_view_dimensions(
             adapter,
             front,
             keep=front_keep(teeth),
             view_label=f"{configuration} front",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
         )
+        _assert_sheet_floor_limits(adapter, front_annotations, configuration, teeth)
         right_annotations = _curate_repeated_dimensions(
             adapter,
             right,

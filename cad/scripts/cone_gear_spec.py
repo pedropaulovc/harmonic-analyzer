@@ -245,9 +245,15 @@ def floor_radius_mm(teeth: int) -> float:
 
 
 def floor_limits_mm(teeth: int) -> tuple[float, float]:
-    """Return the printed (MIN, MAX) gap-floor diameters."""
+    """Return the printed (MIN, MAX) gap-floor diameters.
+
+    The MIN is the modelled floor floored to the printed three places: a band
+    rounds outward, so the sheet never demands a floor above the model's
+    (rounding to nearest raised nine of the twenty MINs by up to 0.0005).
+    """
     _require_member(teeth)
-    return round(2.0 * floor_radius_mm(teeth), 3), FLOOR_MAX_DIA_MM[teeth]
+    minimum = math.floor(2.0 * floor_radius_mm(teeth) * 1000.0 + 1e-6) / 1000.0
+    return minimum, FLOOR_MAX_DIA_MM[teeth]
 
 
 def floor_dip_mm(teeth: int) -> float:
@@ -353,16 +359,27 @@ BORE_SURFACE_FINISHES: dict[int, tuple[SurfaceFinishControl, ...]] = {
     teeth: (bore_surface_finish(teeth),) for teeth in CONFIGURATION_TEETH
 }
 
-# The three blank sizes and the tooth-system acceptance size.  ToothThickness
-# is a DRIVING dimension in a construction-only authoring sketch: policy rule 2
-# permits that pattern when the printed value is not itself a solid feature
-# dimension.  It is not a reference-status drawing dimension, so its native
-# asymmetric tolerance remains meaningful.
+# The part's two construction-only authoring sketches.  The part saves both
+# hidden (they would otherwise render in every assembly that places a gear);
+# the sheet's front view shows them again to import their dimensions.
+TOOTH_REFERENCE_SKETCH = "ToothThicknessReference"
+GAP_FLOOR_SKETCH = "GapFloorReference"
+REFERENCE_SKETCHES = (TOOTH_REFERENCE_SKETCH, GAP_FLOOR_SKETCH)
+
+# The three blank sizes, the tooth-system acceptance size and the gap-floor
+# limits.  ToothThickness and FloorDia are DRIVING dimensions in
+# construction-only authoring sketches: policy rule 2 permits that pattern
+# when the printed value is not itself a solid feature dimension (the gap
+# floor is an involute-profile chord bowed by FloorDip, with no diameter of
+# its own).  Neither is a reference-status drawing dimension, so their native
+# tolerances remain meaningful: ToothThickness a bilateral band, FloorDia the
+# per-configuration floor_limits_mm pair as LIMIT tolerance.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlankProfile": {"BlankDia"},
     "Blank": {"FaceWidth"},
     "BoreProfile": {"BoreCutDia"},
-    "ToothThicknessReference": {"ToothThickness"},
+    TOOTH_REFERENCE_SKETCH: {"ToothThickness"},
+    GAP_FLOOR_SKETCH: {"FloorDia"},
 }
 
 # Tip-diameter band, (upper, lower) deviations.  The tip sets how deep the
@@ -390,14 +407,16 @@ def configuration_number(part_number: str, teeth: int) -> str:
 # --- Decimal places, authored ON THE PART ------------------------------------
 #
 # Policy rule 2: places and bands are model properties.  Three places belong
-# on the two fit dimensions: the bore and circular tooth thickness.  Tip
-# diameter prints two places with its own BLANK_DIA_BAND (below); face
-# width prints two places with its FACE_WIDTH_BAND (#914).
+# on the two fit dimensions (the bore and circular tooth thickness) and on
+# the gap-floor limits, whose T006 window is 0.049 wide.  Tip diameter prints
+# two places with its own BLANK_DIA_BAND (below); face width prints two
+# places with its FACE_WIDTH_BAND (#914).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlankProfile": {"BlankDia": 2},
     "Blank": {"FaceWidth": 2},
     "BoreProfile": {"BoreCutDia": 3},
-    "ToothThicknessReference": {"ToothThickness": 3},
+    TOOTH_REFERENCE_SKETCH: {"ToothThickness": 3},
+    GAP_FLOOR_SKETCH: {"FloorDia": 3},
 }
 
 # The drawing reads this flat view back off the sheet: a dimension name is

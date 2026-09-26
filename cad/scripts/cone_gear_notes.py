@@ -17,11 +17,6 @@ import cone_gear_spec as spec
 CYLINDER_MATE_NUMBER = "MHA-027"
 
 
-def _floor_limits(teeth: int) -> str:
-    minimum, maximum = spec.floor_limits_mm(teeth)
-    return f"{minimum:.3f} MIN / {maximum:.3f} MAX"
-
-
 # The U42 gears' worst-case transverse contact ratio with MHA-027, rounded
 # DOWN to two places so no sheet claims more than the part has.  Sheet text, so it lives here and not in
 # cone_gear_spec (which the drive-train imports);
@@ -79,10 +74,8 @@ def gear_data(teeth: int) -> str:
         ("MODULE (mm, REF)", f"{spec.MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{spec.PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{pitch_dia:.2f}"),
-        # U40: the floor is a limit, not a reference -- cutting deeper for a
-        # thinner tooth would thin the root-to-bore web, and a floor above MAX
-        # would rub the drum tip.
-        ("GAP FLOOR DIAMETER (mm)", _floor_limits(teeth)),
+        # The gap floor's MIN/MAX prints on the front view as the native
+        # FloorDia limit dimension (#834), not as a row here.
         ("TOOTH FORM", spec.TOOTH_FORM),
         (
             "MATES WITH",
