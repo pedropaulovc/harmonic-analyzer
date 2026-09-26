@@ -479,15 +479,17 @@ EXTENSION_GAP = 0.0005
 # AT that centre (_FLANGE_SLOT_Y in the builder; mha092-r3-8b1b render): the
 # two are collinear.  Main's review of a1b154f69: a witness drawn over a
 # cutting-plane line reads as one ambiguous stroke to a novice, so that
-# witness starts EXTENSION_GAP past the overshoot's end.  SetWitnessLineGap
-# measures the gap from the witness's own origin, in sheet metres like the
-# document's swDetailingWitnessLineGap; index 1 is the reference line's end
-# point.  Both are proven by the build's read-back of the printed witness.
+# witness starts WITNESS_CLEAR_OF_SECTION past the overshoot's end: the
+# sheet's TEXT_CLEARANCE, since a 0.5 mm break (EXTENSION_GAP, 5e8c13351)
+# closes up at print scale.  SetWitnessLineGap measures the gap from the
+# witness's own origin, in sheet metres like the document's
+# swDetailingWitnessLineGap; index 1 is the reference line's end point.
+# Both are proven by the build's read-back of the printed witness.
 SECTION_SOUTH_OVERSHOOT_END_Y = _plan_y(Z_SOUTH) + SECTION_LINE_OVERSHOOT
+WITNESS_CLEAR_OF_SECTION = TEXT_CLEARANCE
+FLANGE_SLOT_X_WITNESS_START_Y = SECTION_SOUTH_OVERSHOOT_END_Y + WITNESS_CLEAR_OF_SECTION
 FLANGE_SLOT_X_CENTRE_WITNESS = 1
-FLANGE_SLOT_X_CENTRE_WITNESS_GAP = (
-    SECTION_SOUTH_OVERSHOOT_END_Y + EXTENSION_GAP - _plan_y(FLANGE_SLOT_CENTER_Z)
-)
+FLANGE_SLOT_X_CENTRE_WITNESS_GAP = FLANGE_SLOT_X_WITNESS_START_Y - _plan_y(FLANGE_SLOT_CENTER_Z)
 EXTENSION_OVERSHOOT = 0.0013
 LINE_PAST_TEXT = 0.0013
 ARROW_HALF_WIDTH = 0.0003
@@ -787,7 +789,7 @@ def sheet_dimension_ink(
         "FlangeSlotW": (h, (tc - slot_w, tc + slot_w), (None, None), drop("FlangeSlotW"), out),
         # The slot-centre witness starts past A-A's south overshoot.
         "FlangeSlotX": (
-            h, (_PLAN_LEFT, tc), (_plan_y(Z_SOUTH), SECTION_SOUTH_OVERSHOOT_END_Y), drop("FlangeSlotX"), out
+            h, (_PLAN_LEFT, tc), (_plan_y(Z_SOUTH), FLANGE_SLOT_X_WITNESS_START_Y - EXTENSION_GAP), drop("FlangeSlotX"), out
         ),
         "PinchDepthCenter": (
             h,
@@ -1120,12 +1122,14 @@ def _lift_slot_centre_witness(adapter: Any, annotations: list[Any]) -> None:
         and abs(segment.y1 - segment.y0) > 0.001
     ]
     starts = [min(segment.y0, segment.y1) for segment in witness]
-    floor = SECTION_SOUTH_OVERSHOOT_END_Y + EXTENSION_GAP / 2.0
+    runs = [
+        f"({s.x0 * 1000:.1f},{s.y0 * 1000:.1f})->({s.x1 * 1000:.1f},{s.y1 * 1000:.1f})"
+        for s in printed[0].segments
+    ]
+    # The read-back's own tolerance, not a looser clearance: 0.2 mm under
+    # the commanded start still clears the overshoot by 1.3 mm.
+    floor = FLANGE_SLOT_X_WITNESS_START_Y - 0.0002
     if not starts or min(starts) < floor:
-        runs = [
-            f"({s.x0 * 1000:.1f},{s.y0 * 1000:.1f})->({s.x1 * 1000:.1f},{s.y1 * 1000:.1f})"
-            for s in printed[0].segments
-        ]
         raise RuntimeError(
             "FlangeSlotX's slot-centre witness does not clear section A-A's south "
             f"overshoot (ends {SECTION_SOUTH_OVERSHOOT_END_Y * 1000:.1f} mm) after "
@@ -1139,6 +1143,7 @@ def _lift_slot_centre_witness(adapter: Any, annotations: list[Any]) -> None:
         witness_start_mm=round(min(starts) * 1000, 2),
         overshoot_end_mm=round(SECTION_SOUTH_OVERSHOOT_END_Y * 1000, 2),
     )
+    _telemetry.debug(f"FlangeSlotX printed runs {runs}")
 
 
 def _add_adjuster_axis(adapter: Any, section: Any) -> None:
