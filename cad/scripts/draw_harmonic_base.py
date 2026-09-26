@@ -189,9 +189,16 @@ SOCKET_FIT_NOTE = (
 )
 SOCKET_FIT_NOTE_XY = (0.1665, 0.2262)
 SOCKET_FIT_STATION = min(COLUMN_SOCKET_XZ)
-# hb-render-6's sheet-2 notes at the default note height: 2.49 mm per
-# character and 4.6 mm per row, the text hanging from its top-left anchor.
-NOTE_CHAR_M = 0.00249
+# Sheet-2 notes at the default note height, text hanging from its top-left
+# anchor: 4.6 mm per row (hb-render-6), and 2.69 mm per character, measured
+# on hb-render-7's widest socket-fit row "RETAIN MATCH MARKS." (19
+# characters from x 0.1665 to ~0.2176). hb-render-6's 2.49, read off a note
+# with more narrow glyphs and spaces, under-predicted this note by 3.8 mm.
+NOTE_CHAR_M = 0.00269
+# SolidWorks does not seat a note exactly on its anchor: hb-render-7 put the
+# socket-fit note's box at x 0.1662 for an anchor of 0.1665. Layout
+# predictions grow the text box by this much on every side.
+NOTE_PLACEMENT_SLOP_M = 0.0003
 NOTE_ROW_M = 0.0046
 # Sheet-2 hole callout text anchors. _check_hole_sheet_callouts proves each
 # clears the others, the notes, the table, the table's datum origin and every

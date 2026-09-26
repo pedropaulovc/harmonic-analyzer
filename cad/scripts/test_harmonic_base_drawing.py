@@ -1387,7 +1387,8 @@ def test_cross_tap_drill_keeps_the_bottoming_lead_past_the_deepest_thread() -> N
 
 # hb-render-6 sheet 2: the hole table's right edge, the TOP VIEW caption's
 # bottom and the ORIGIN note's top, the neighbours of the socket-fit note.
-HB_RENDER_6_TABLE_RIGHT_X_M = 0.1626
+# The table edge is hb-render-7's callout-check obstacle box (0.16276).
+HB_RENDER_6_TABLE_RIGHT_X_M = 0.16276
 HB_RENDER_6_TOP_CAPTION_BOTTOM_Y_M = 0.2329
 HB_RENDER_6_ORIGIN_NOTE_TOP_Y_M = 0.1866
 SOCKET_FIT_MIN_MARGIN_M = 0.003
@@ -1415,11 +1416,12 @@ def test_socket_fit_note_sits_on_a2_between_the_table_and_the_plan() -> None:
 
     rows = [row.replace("<MOD-DIAM>", "D") for row in sheet.SOCKET_FIT_NOTE.split("\n")]
     x, y = sheet.SOCKET_FIT_NOTE_XY
+    slop = sheet.NOTE_PLACEMENT_SLOP_M
     box = (
-        x,
-        y - len(rows) * sheet.NOTE_ROW_M,
-        x + max(len(row) for row in rows) * sheet.NOTE_CHAR_M,
-        y,
+        x - slop,
+        y - len(rows) * sheet.NOTE_ROW_M - slop,
+        x + max(len(row) for row in rows) * sheet.NOTE_CHAR_M + slop,
+        y + slop,
     )
     plan_left = sheet._plan_xy(
         -harmonic_base_spec.BOTTOM_LENGTH / 2.0, 0.0, center=sheet.HOLE_TOP_CENTER
