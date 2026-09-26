@@ -581,6 +581,145 @@ def test_a_reused_report_is_not_charged_again(
     assert "reused" in table
 
 
+def test_a_recovered_last_resort_pass_keeps_the_refusal_that_licensed_it(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # crank_arm: an Opus author, so codex reviews it and Fable is its last resort.
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    fake = FakeReviewer(
+        {("crank_arm", "codex"): "quota", ("crank_arm", "claude"): "ship"}
+    )
+    [crank] = [r for r in _routes(checkout, tmp_path) if r.name == "crank_arm"]
+    real = ml.record_review
+
+    def locked(*args, **kwargs):
+        raise PermissionError("the ledger is locked by another process")
+
+    monkeypatch.setattr(ml, "record_review", locked)
+    assert mw.run_wave([crank], _wave(tmp_path, checkout, fake)) == {
+        "crank_arm": mw.State.ERROR
+    }
+
+    # Codex is still out of quota: the pass and its refusal are recovered as
+    # a pair, with no reviewer call and no newer refusal replacing the old one.
+    monkeypatch.setattr(ml, "record_review", real)
+    fake.calls.clear()
+    resumed = _wave(tmp_path, checkout, fake)
+    assert mw.run_wave([crank], resumed) == {"crank_arm": mw.State.INGESTED}
+    assert fake.calls == []
+    entry = ml.load_ledger(tmp_path / "ledger.json")["drawings"]["crank_arm"]
+    assert entry[ml.LAST_RESORT]["counts"]
+
+
+def test_the_run_result_is_what_the_gate_blocks_now_not_the_waves_history(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    fake = FakeReviewer({("crank_arm", "codex"): "fix", ("pen_rod", "claude"): "ship"})
+    wave = _wave(tmp_path, checkout, fake)
+    assert mw.run_wave(_routes(checkout, tmp_path), wave, jobs=1) == {
+        "crank_arm": mw.State.FIX,
+        "pen_rod": mw.State.INGESTED,
+    }
+    # crank_arm is then accepted outside the wave, its PDF unchanged.
+    pdf = ml._current_pdf("crank_arm", checkout)
+    ship = FakeReviewer({("crank_arm", "codex"): "ship"})(
+        mr.ReviewPackage("crank_arm", "part", (pdf,)),
+        reviewer="codex",
+        model="gpt-6-astra",
+        effort="low",
+        report_dir=tmp_path / "elsewhere",
+    )
+    ml.record_review(
+        asdict(ship),
+        pdf,
+        author_family="claude",
+        provenance={},
+        ledger_path=tmp_path / "ledger.json",
+        rulings=ml.AuthorRulings(),
+    )
+    argv = ["--checkout", str(checkout), "--ledger", str(tmp_path / "ledger.json")]
+    argv += ["--author-rulings", str(tmp_path / "none.json")]
+
+    # Named: nothing it names is blocked now, so the run succeeds.
+    assert mw.main([*argv, "run", "--wave", "w1", "crank_arm", "pen_rod"]) == 0
+    saved = json.loads((mw.WAVE_ROOT / "w1" / "manifest.json").read_text("utf-8"))
+    assert saved["drawings"]["crank_arm"]["state"] == "fix"  # history is kept
+
+
+@pytest.mark.parametrize(
+    ("manifest", "error"),
+    [
+        ([], "is not an object"),
+        ({"wave": "w", "drawings": []}, "drawings is not an object"),
+        ({"wave": "w", "drawings": {"crank_arm": {"state": "bogus"}}}, "state 'bogus'"),
+        (
+            {"wave": "w", "drawings": {"crank_arm": {"state": "fix", "attempts": {}}}},
+            "attempts is not a list",
+        ),
+    ],
+)
+def test_a_corrupt_manifest_is_refused_before_it_is_used(
+    tmp_path: Path, checkout: Path, capsys, manifest, error: str
+) -> None:
+    path = mw.WAVE_ROOT / "w" / "manifest.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    argv = ["--checkout", str(checkout), "--ledger", str(tmp_path / "l.json")]
+
+    assert mw.main([*argv, "run", "--wave", "w", "crank_arm"]) == 2
+    assert error in capsys.readouterr().err
+    assert mw.main(["table", "--wave", "w"]) == 2
+    assert error in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"reviewed_at": "2026-09-25T10:00:00"},  # naive: cannot be ordered
+        {"verdict": "FIX"},
+        {"blind": "yes"},
+    ],
+    ids=["naive-time", "verdict-not-object", "blind-not-bool"],
+)
+def test_a_malformed_report_is_not_adopted_on_resume(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch, broken: dict
+) -> None:
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    fake = FakeReviewer({("crank_arm", "codex"): "fix"})
+    [crank] = [r for r in _routes(checkout, tmp_path) if r.name == "crank_arm"]
+    wave = _wave(tmp_path, checkout, fake)
+    mw.run_wave([crank], wave)
+    report = mw.WAVE_ROOT / "w1" / "reviews" / "codex" / "crank_arm.json"
+    data = json.loads(report.read_text(encoding="utf-8"))
+    report.write_text(json.dumps({**data, **broken}), encoding="utf-8")
+    wave.manifest.update("crank_arm", state=mw.State.RUNNING)  # a crash
+    fake.calls.clear()
+
+    mw.run_wave([crank], _wave(tmp_path, checkout, fake))
+
+    assert len(fake.calls) == 1  # reviewed again, not adopted
+
+
+def test_a_report_of_another_kind_is_not_adopted_on_resume(
+    tmp_path: Path, checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _authors(monkeypatch, crank_arm="claude-opus-5-5", pen_rod="gpt-6-sol")
+    fake = FakeReviewer({("crank_arm", "codex"): "fix"})
+    [crank] = [r for r in _routes(checkout, tmp_path) if r.name == "crank_arm"]
+    wave = _wave(tmp_path, checkout, fake)
+    mw.run_wave([crank], wave)
+    report = mw.WAVE_ROOT / "w1" / "reviews" / "codex" / "crank_arm.json"
+    data = json.loads(report.read_text(encoding="utf-8"))
+    report.write_text(json.dumps({**data, "kind": "assembly"}), encoding="utf-8")
+    wave.manifest.update("crank_arm", state=mw.State.RUNNING)  # a crash
+    fake.calls.clear()
+
+    mw.run_wave([crank], _wave(tmp_path, checkout, fake))
+
+    assert len(fake.calls) == 1  # reviewed again, not adopted
+
+
 def test_the_usage_examples_parse() -> None:
     usage = mw.__doc__.split("Usage")[1]
     lines = [

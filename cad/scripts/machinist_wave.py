@@ -39,7 +39,13 @@ checkout rendered at the release head:
   the gate blocks it again -- its outage closed, or its entry was withdrawn --
   and then it gets a fresh review, not its old report.  A review that broke
   the blind-review rules, or whose pass could not be written to the ledger,
-  is an error, retried on resume (the second from its report, at no cost).
+  is an error, retried on resume (the second from its report, at no cost; a
+  last-resort pass is recovered together with the kept refusal that licensed
+  it, without asking the cross-family reviewer again).  A manifest or report
+  on disk that is not one this driver wrote is refused (the manifest) or
+  reviewed again (a report), never used.  The run succeeds only when every
+  drawing the gate blocks now is ingested: entries it no longer blocks stay
+  in the manifest for the table but do not decide the result.
 * **Telemetry** -- one ``machinist.review`` span per reviewer run, carrying the
   drawing, reviewer, model, tier, effort, slot, verdict, duration and cost
   (Claude's reported USD; Codex's token counts).
@@ -228,7 +234,7 @@ class Manifest:
     @classmethod
     def open(cls, path: Path, header: dict[str, Any]) -> Manifest:
         if path.is_file():  # resume: same wave, possibly a newer render
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = read_manifest(path)
             data.update({k: v for k, v in header.items() if k != "created_at"})
         else:
             data = {**header, "drawings": {}}
@@ -259,6 +265,47 @@ class Manifest:
         with self.lock:
             self.drawings[name]["attempts"].append(attempt)
             self.save()
+
+
+def manifest_problem(data: Any) -> str | None:
+    """Why a manifest on disk is not one this driver wrote; None when it is."""
+    if not isinstance(data, dict):
+        return "the manifest is not an object"
+    drawings = data.get("drawings")
+    if not isinstance(drawings, dict):
+        return "drawings is not an object"
+    states = {str(state) for state in State}
+    for name, entry in drawings.items():
+        if not isinstance(entry, dict):
+            return f"{name} is not an object"
+        if entry.get("state") not in states:
+            return f"{name}: state {entry.get('state')!r} is not a wave state"
+        attempts = entry.get("attempts", [])
+        if not isinstance(attempts, list) or not all(
+            isinstance(attempt, dict) for attempt in attempts
+        ):
+            return f"{name}: attempts is not a list of attempts"
+        for attempt in attempts:
+            if not isinstance(attempt.get("cost_usd", 0.0), (int, float)):
+                return f"{name}: an attempt's cost_usd is not a number"
+            if not isinstance(attempt.get("tokens", {}), dict):
+                return f"{name}: an attempt's tokens is not an object"
+            if not isinstance(attempt.get("findings") or {}, dict):
+                return f"{name}: an attempt's findings is not an object"
+        if not isinstance(entry.get("pdf_sha256", ""), str):
+            return f"{name}: pdf_sha256 is not a sha256"
+        if entry.get("name") != name:
+            return f"{name}: its entry names {entry.get('name')!r}"
+    return None
+
+
+def read_manifest(path: Path) -> dict[str, Any]:
+    """A wave's manifest, refused loud when it is not one this driver wrote."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    problem = manifest_problem(data)
+    if problem:
+        raise ValueError(f"{path}: {problem}")
+    return data
 
 
 def _now() -> str:
@@ -372,6 +419,9 @@ class Wave:
         self.manifest.update(route.name, state=State.RUNNING, pdf_sha256=pdf_sha)
         if self._down(route.reviewer):
             return self._run_fallback(route)
+        recovered = self._recovered_last_resort(route, pdf_sha)
+        if recovered is not None:  # a pass the ledger could not take last time
+            return self._settle(route, *recovered)
         review = self._attempt(route, route.reviewer, slot=ml.CROSS_FAMILY)
         if not self._quota_refused(review):
             return self._settle(route, review, None)
@@ -512,11 +562,16 @@ class Wave:
         if route.name in self.lapsed or not report.is_file():
             return None
         try:
-            review = mr.Review(**json.loads(report.read_text(encoding="utf-8")))
+            data = json.loads(report.read_text(encoding="utf-8"))
+            if not isinstance(data, dict) or ml.review_record_problem(data):
+                return None  # not a record this driver wrote: review again
+            review = mr.Review(**data)
         except (OSError, ValueError, TypeError):
             return None
         same = (
-            review.source_sha256 == [ml.sha256_file(route.pdf)]
+            review.name == route.name
+            and review.kind == DRAWINGS_BY_NAME[route.name].source_kind
+            and review.source_sha256 == [ml.sha256_file(route.pdf)]
             and (review.model, review.effort) == (model, effort)
             and review.verdict is not None
             and review.blind
@@ -535,10 +590,47 @@ class Wave:
         except ValueError:
             return None
 
-    def _last_resort(
-        self, route: Route, refusal: dict[str, Any], pdf_sha: str
+    def _recovered_last_resort(
+        self, route: Route, pdf_sha: str
+    ) -> tuple[mr.Review, dict[str, Any]] | None:
+        """A finished last-resort review and the kept refusal that licensed it.
+
+        Recovered as a pair, with no reviewer call: re-asking the cross-family
+        reviewer first would replace the kept refusal with a newer one that the
+        finished review predates, and the pair would no longer count.  The
+        pair is re-proved as the ledger will: the refusal's age is judged at
+        the review's own time, and the tier rule against the author on record.
+        """
+        if route.families or route.reviewer is None:
+            return None
+        report_dir = self.directory / "reviews" / route.reviewer
+        kept = mr.quota_refused_path(report_dir, route.name, route.reviewer)
+        if not kept.is_file():
+            return None
+        try:
+            refusal = ml.quota_refusal(
+                kept, name=route.name, author_family=route.author_family or ""
+            )
+        except (KeyError, TypeError, ValueError):
+            return None
+        choice, _ = self._last_resort_choice(route)
+        if choice is None:
+            return None
+        reviewer, model, effort = choice
+        finished = self._finished(route, reviewer, model, effort)
+        if finished is None or ml.refusal_problem(
+            refusal, pdf_sha256=pdf_sha, reviewed_at=finished.reviewed_at
+        ):
+            return None
+        review = self._attempt(
+            route, reviewer, slot=ml.LAST_RESORT, model=model, effort=effort
+        )
+        return review, refusal
+
+    def _last_resort_choice(
+        self, route: Route
     ) -> tuple[tuple[str, str, str] | None, str]:
-        """The same-family reviewer the last-resort rule allows here, or why none."""
+        """The same-family reviewer, model and effort the tier rule allows, or why none."""
         if route.author_source != "trailer" or route.author_model is None:
             return None, "no last resort: the author model is not in a trailer"
         reviewer = LAST_RESORT_REVIEWER.get(route.author_family or "")
@@ -550,12 +642,22 @@ class Wave:
             if ml.model_tier(route.author_model) == "top"
             else mr.DEFAULT_EFFORTS[reviewer]
         )
-        problem = ml.last_resort_tier_problem(
-            route.author_model, model, effort
-        ) or ml.refusal_problem(refusal, pdf_sha256=pdf_sha, reviewed_at=_now())
+        problem = ml.last_resort_tier_problem(route.author_model, model, effort)
         if problem:
             return None, f"no last resort: {problem}"
         return (reviewer, model, effort), ""
+
+    def _last_resort(
+        self, route: Route, refusal: dict[str, Any], pdf_sha: str
+    ) -> tuple[tuple[str, str, str] | None, str]:
+        """The same-family reviewer the last-resort rule allows now, or why none."""
+        choice, why = self._last_resort_choice(route)
+        if choice is None:
+            return None, why
+        problem = ml.refusal_problem(refusal, pdf_sha256=pdf_sha, reviewed_at=_now())
+        if problem:
+            return None, f"no last resort: {problem}"
+        return choice, ""
 
     def _settle(
         self,
@@ -701,8 +803,12 @@ def run_wave(
         )
         sleep(wave.backoff.total_seconds())
         pending = [route for route in pending if route.name in refused]
-    for name, entry in wave.manifest.drawings.items():
-        outcome.setdefault(name, State(entry["state"]))
+    # The run's result is what the gate blocks now: the routes it was given.
+    # Other manifest entries stay for the table, but never decide the result.
+    for route in routes:
+        entry = wave.manifest.drawings.get(route.name)
+        if entry is not None:
+            outcome.setdefault(route.name, State(entry["state"]))
     return outcome
 
 
@@ -817,8 +923,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _run(args: argparse.Namespace) -> int:
     _telemetry.set_service("machinist-wave")
     if args.command == "table":
-        manifest = WAVE_ROOT / args.wave / "manifest.json"
-        print(table(json.loads(manifest.read_text(encoding="utf-8"))))
+        print(table(read_manifest(WAVE_ROOT / args.wave / "manifest.json")))
         return 0
     unknown = [n for n in args.names if n not in DRAWINGS_BY_NAME]
     if unknown:
@@ -885,7 +990,8 @@ def _run(args: argparse.Namespace) -> int:
             routes, wave, jobs=args.jobs, quota_retries=args.quota_retries
         )
     print(table(manifest.data))
-    return 0 if all(state == State.INGESTED for state in outcome.values()) else 1
+    ingested = all(state == State.INGESTED for state in outcome.values())
+    return 0 if ingested and not unrendered else 1
 
 
 def _open_outage(outage_id: str, path: Path) -> dict[str, Any]:
