@@ -63,8 +63,10 @@ Prototype scope notes:
   true root circle + trochoid fillet.  ``Tmin`` starts the flanks above the
   base circle to raise the floor (T048+), and ``FloorDip`` bows it down to
   the standard tooth's base chord (T006, T012); see
-  ``cone_gear_spec.floor_radius_mm``.  The sheet prints that floor as a MIN
-  diameter.
+  ``cone_gear_spec.floor_radius_mm``.  The floor has no diameter of its own,
+  so a construction circle at it (``GapFloorReference``, driven by the
+  configuration-scoped ``FloorDia`` global) carries the printed MIN/MAX as a
+  per-configuration LIMIT tolerance.  Both authoring sketches save hidden.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 12" -- DP 49.82 / PA 14.5 deg, face
 width 6.5 mm (M6.7 mesh packing; annotated 7 is inconsistent with the drum
@@ -87,6 +89,7 @@ from typing import Any
 
 import _config
 from _drawing_marks import (
+    _named_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -99,19 +102,24 @@ from _part_pmi import author_part_pmi
 from cone_gear_notes import drawing_notes, gear_data
 from cone_gear_spec import (
     BLANK_DIA_BAND,
+    FACE_WIDTH_BAND,
     BORE_DIA_BAND,
     CONFIGURATION_TEETH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FACE_WIDTH,
+    GAP_FLOOR_SKETCH,
     MM_PER_IN,
+    REFERENCE_SKETCHES,
     STANDARD_TOOTH_THICKNESS,
     SURFACE_FINISHES,
+    TOOTH_REFERENCE_SKETCH,
     TOOTH_THICKNESS,
     TOOTH_THICKNESS_BAND,
     bore_dia_mm,
     configuration_number,
     floor_dip_mm,
+    floor_limits_mm,
     floor_radius_mm,
     floor_tmin,
     material_specification,
@@ -126,7 +134,9 @@ from _common import (
     _read_member,
     apply_custom_properties,
     apply_material,
+    blank_sketch,
     check,
+    define_circle,
     dimension_between,
     drive_dimension,
     ensure_fully_defined,
@@ -164,15 +174,6 @@ from involute_gear import (
 )
 
 PART_NAME = "cone-gear"
-# Reference sketches this part still saves shown (#880), each with its owner
-# and why.  Delete an entry once the part hides that sketch; the release
-# refuses to start while any part lists one (visibility_debt).
-SHOWN_SKETCH_ALLOWANCES = {
-    "ToothThicknessReference": (
-        "conegear: carries the print's driving tooth-thickness dimension; "
-        "#834 hides it once the sheet imports it from the hidden sketch"
-    ),
-}
 MATERIAL = "Brass"  # ch. 13 text: polished brass gear stock; cone set matches
 # The four smallest tip gears read "more yellow ... a harder metal" (ch.12 p.21)
 # -- a high-zinc yellow metal (Muntz/manganese bronze). That muntz_yellow tint is
@@ -201,10 +202,29 @@ DEFAULT_TEETH = CONFIGURATION_TEETH[-1]
 TOOTH_GAP_PROFILE = "ToothGapProfile"
 TOOTH_GAP_CUT = "ToothGapCut"
 TOOTH_PATTERN_FEATURE = "ToothGapPattern"
+_TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
+_SET_IN_SPECIFIC_CONFIGURATIONS = 3  # swSetValueInConfiguration_e
+_VISIBILITY_HIDDEN = 1  # swVisibilityState_e
 
 def bore_dia_in(teeth: int) -> float:
     """Configured bore diameter in inches, matching the stepped-shaft seat."""
     return bore_dia_mm(teeth) / MM_PER_IN
+
+
+def floor_dia_in(teeth: int) -> float:
+    """Modelled gap-floor diameter in inches (the FloorDia global)."""
+    return 2.0 * floor_radius_mm(teeth) / MM_PER_IN
+
+
+def gap_floor_deviations_mm(teeth: int) -> tuple[float, float]:
+    """FloorDia's (lower, upper) LIMIT deviations from the modelled floor.
+
+    The printed limits are ``floor_limits_mm``; the dimension's nominal is the
+    modelled floor, so each limit is stored as its offset from it.
+    """
+    minimum, maximum = floor_limits_mm(teeth)
+    nominal = 2.0 * floor_radius_mm(teeth)
+    return minimum - nominal, maximum - nominal
 
 
 def thicken_in(teeth: int) -> float:
@@ -311,6 +331,107 @@ async def _author_tooth_thickness_reference(adapter: Any) -> SketchDims:
         await adapter.exit_sketch(),
     )
     return tooth_reference
+
+
+async def _author_gap_floor_reference(adapter: Any) -> SketchDims:
+    """Author the model-owned gap-floor dimension: a construction circle at the
+    modelled floor, its diameter driven by the configuration-scoped FloorDia.
+
+    The floor itself is the gap profile's feet chord bowed by FloorDip, with
+    no diameter of its own to import, so policy rule 2's authoring-reference
+    sketch pattern carries the printed limits.
+    """
+    floor = SketchDims()
+    check("create_sketch gap-floor reference", await adapter.create_sketch("Front"))
+    circle = await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        floor_radius_mm(DEFAULT_TEETH),
+        "gap-floor reference",
+        dims=floor,
+        names=(None, None, "FloorDia"),
+        drives=(None, None, '"FloorDia"'),
+    )
+    _as_construction(adapter, circle)
+    await ensure_fully_defined(adapter, "gap-floor reference sketch")
+    check("exit_sketch gap-floor reference", await adapter.exit_sketch())
+    return floor
+
+
+def _gap_floor_tolerance(adapter: Any) -> Any:
+    _display, dimension = _named_dimension(adapter, GAP_FLOOR_SKETCH, "FloorDia")
+    return _early_bound(dimension.Tolerance, "IDimensionTolerance")
+
+
+def _set_gap_floor_limits(adapter: Any) -> None:
+    """Store each configuration's printed floor limits on FloorDia (LIMIT).
+
+    One dimension, twenty bands: ``SetValues2`` with
+    swSetValue_InSpecificConfigurations and a one-name BSTR array writes a
+    single configuration without activating it.  Probe leaf 834-gapfloor-c301
+    read this form back per configuration after save and reopen, and on two
+    drawing sheets; the configuration sweep reads all twenty back.
+    """
+    import pythoncom
+    from win32com.client import VARIANT
+
+    tolerance = _gap_floor_tolerance(adapter)
+    tolerance.Type = _TOL_LIMIT
+    if int(tolerance.Type) != _TOL_LIMIT:
+        raise RuntimeError("FloorDia: LIMIT tolerance type did not persist")
+    for name, teeth in CONFIGS:
+        lower, upper = gap_floor_deviations_mm(teeth)
+        names = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BSTR, [name])
+        accepted = tolerance.SetValues2(
+            lower / 1000.0, upper / 1000.0, _SET_IN_SPECIFIC_CONFIGURATIONS, names
+        )
+        if not bool(accepted):
+            raise RuntimeError(
+                f"FloorDia@{name}: SetValues2 rejected the limits "
+                f"{floor_limits_mm(teeth)} mm"
+            )
+    _telemetry.success(f"FloorDia: LIMIT set in {len(CONFIGS)} configurations")
+
+
+def _assert_gap_floor_limits(adapter: Any, configuration: str, teeth: int) -> None:
+    """Read FloorDia's LIMIT back in the active configuration."""
+    tolerance = _gap_floor_tolerance(adapter)
+    kind = int(tolerance.Type)
+    observed = (
+        float(tolerance.GetMinValue()) * 1000.0,
+        float(tolerance.GetMaxValue()) * 1000.0,
+    )
+    expected = gap_floor_deviations_mm(teeth)
+    drifted = any(abs(o - e) > 1e-6 for o, e in zip(observed, expected))
+    if kind != _TOL_LIMIT or drifted:
+        raise RuntimeError(
+            f"{configuration}: FloorDia tolerance reads type {kind} {observed} mm, "
+            f"expected LIMIT {expected} mm"
+        )
+    _telemetry.success(
+        f"{configuration}: gap-floor limits {floor_limits_mm(teeth)} mm"
+    )
+
+
+def _blank_reference_sketches(adapter: Any) -> None:
+    """Save the two authoring sketches hidden, and prove it.
+
+    Shown, they render in the part's images and in every assembly that places
+    a gear; the sheet's front view shows them again for their dimensions
+    (``_drawing_hidden_sketches``).
+    """
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    for sketch in REFERENCE_SKETCHES:
+        blank_sketch(adapter, sketch)
+        feature = part.FeatureByName(sketch)
+        if feature is None:
+            raise RuntimeError(f"{sketch}: sketch missing after BlankSketch")
+        visible = int(_read_member(_early_bound(feature, "IFeature"), "Visible"))
+        if visible != _VISIBILITY_HIDDEN:
+            raise RuntimeError(
+                f"{sketch}: still visible after BlankSketch (Visible={visible})"
+            )
 
 
 def _active_configuration(model: Any) -> Any:
@@ -1116,12 +1237,23 @@ async def build(adapter) -> dict[str, str]:
     # print one DRIVING model dimension.  The vertical witness is the +X
     # tooth's pitch chord, a tooth for every even count: the imported
     # extension lines start on that tooth's flanks.  The construction chord is
-    # volume-neutral; the drawing hides the sketch in its side and isometric
-    # views (blanking it in the part would also suppress the dimension).
+    # volume-neutral; the part saves the sketch hidden and the sheet's front
+    # view shows it again for the dimension.
     tooth_reference = await _author_tooth_thickness_reference(adapter)
-    tooth_sketch = name_last_feature(adapter, "ToothThicknessReference")
+    tooth_sketch = name_last_feature(adapter, TOOTH_REFERENCE_SKETCH)
     thickness_dim = f"ToothThickness@{tooth_sketch}"
     drive_jobs += tooth_reference.apply(adapter, tooth_sketch)
+
+    # Gap-floor limits (#834): a construction circle at the modelled floor,
+    # driven by the configuration-scoped FloorDia (set per configuration below,
+    # like BoreDia) and toleranced per configuration, prints the MIN/MAX pair
+    # as one native dimension.
+    floor_default_in = floor_dia_in(DEFAULT_TEETH)
+    await set_global(adapter, "FloorDia", f"{floor_default_in:.12g}", floor_default_in)
+    floor_reference = await _author_gap_floor_reference(adapter)
+    floor_sketch = name_last_feature(adapter, GAP_FLOOR_SKETCH)
+    floor_dim = f"FloorDia@{floor_sketch}"
+    drive_jobs += floor_reference.apply(adapter, floor_sketch)
 
     # Apply every deferred drive equation after all targets exist: blank and
     # bore circle dimensions plus the construction sketch's native circular
@@ -1186,6 +1318,16 @@ async def build(adapter) -> dict[str, str]:
                     )
                 ),
             )
+        floor_value = f"{floor_dia_in(teeth):.12g}"
+        check(
+            f"FloorDia = {floor_value} in {name}",
+            await adapter.set_global_variable(
+                SetGlobalVariableParameters(
+                    name="FloorDia", expression=floor_value, configuration=name
+                )
+            ),
+        )
+    _set_gap_floor_limits(adapter)
 
     # Author before the existing 20-configuration regeneration sweep.  This is
     # the live regression gate for the model-owned symbol: a face-attached
@@ -1195,10 +1337,12 @@ async def build(adapter) -> dict[str, str]:
     # Establish the final path once while T120 is active. The per-configuration
     # sweep can then use IModelDoc2.Save3 directly; the adapter's in-place save
     # deliberately adds AvoidRebuildOnSave, which live probes proved does not
-    # persist rebuilt inactive-configuration bodies.
-    # This part saves itself rather than through save_part_and_images, so it
-    # runs that helper's construction-geometry check here.
-    assert_reference_geometry_hidden(adapter, PART_NAME, allowed=SHOWN_SKETCH_ALLOWANCES)
+    # persist rebuilt inactive-configuration bodies.  The two authoring
+    # sketches go hidden first, so no saved image or placing assembly draws
+    # them.  This part saves itself rather than through save_part_and_images,
+    # so it runs that helper's construction-geometry check here.
+    _blank_reference_sketches(adapter)
+    assert_reference_geometry_hidden(adapter, PART_NAME)
     OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
     part_path = (OUT_SLDPRT / f"{PART_NAME}.SLDPRT").resolve()
     check(
@@ -1266,6 +1410,16 @@ async def build(adapter) -> dict[str, str]:
                 f"{expected_thickness:g} -- ToothThickness did not regenerate"
             )
         _telemetry.success(f"{name}: tooth thickness dim = {thickness:g}")
+        # The gap-floor dimension: its nominal follows FloorDia and its LIMIT
+        # band is this configuration's own.
+        floor = read_dimension(adapter, floor_dim)
+        expected_floor = floor_dia_in(teeth) * dim_unit
+        if abs(floor - expected_floor) > 1e-6 * expected_floor:
+            raise RuntimeError(
+                f"{name}: {floor_dim} reads {floor:g}, expected "
+                f"{expected_floor:g} -- FloorDia did not regenerate"
+            )
+        _assert_gap_floor_limits(adapter, name, teeth)
 
         img = (png_dir / f"{PART_NAME}_{name}_isometric.png").resolve()
         check(
@@ -1315,9 +1469,10 @@ async def build(adapter) -> dict[str, str]:
     apply_custom_properties(adapter, {"Description": description})
     await report_mass_properties(adapter)
 
-    # Mark the four manufacturing model dimensions.  Both fitted sizes carry
-    # bands derived above; their decimal places live on the model and each
-    # configuration sheet only imports and arranges them.
+    # Mark the five manufacturing model dimensions.  Each carries a band
+    # derived above (FloorDia's per-configuration LIMIT was set before the
+    # sweep); their decimal places live on the model and each configuration
+    # sheet only imports and arranges them.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -1325,11 +1480,14 @@ async def build(adapter) -> dict[str, str]:
         adapter, "BlankProfile", "BlankDia", *deviations(BLANK_DIA_BAND)
     )
     set_dimension_bilateral_tolerance(
+        adapter, "Blank", "FaceWidth", *deviations(FACE_WIDTH_BAND)
+    )
+    set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreCutDia", *deviations(BORE_DIA_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter,
-        "ToothThicknessReference",
+        TOOTH_REFERENCE_SKETCH,
         "ToothThickness",
         *deviations(TOOTH_THICKNESS_BAND),
     )

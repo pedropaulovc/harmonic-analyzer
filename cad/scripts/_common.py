@@ -1347,7 +1347,7 @@ async def save_part_and_images(
     apply_custom_properties(adapter, properties)
     # The drawing template's PART cell resolves the linked model's document
     # summary Title, not its same-named custom property. Keep both identities
-    # sourced from part_properties so a registry title override cannot split.
+    # sourced from part_properties (the slug) so the two cannot split.
     apply_summary_info(adapter, title=properties["Title"])
     rebuild_stale_configurations(adapter, part_name)
     check(
@@ -1607,7 +1607,10 @@ def part_properties(part_name: str) -> dict[str, str]:
 
     ``Revision`` is the next compact release number from ``release.yaml``;
     per-part registry revisions are retained only as historical source data and
-    never override the release identity stamped into shipped CAD.
+    never override the release identity stamped into shipped CAD.  ``Title`` is
+    always the part's slug: it is what the title block's PART cell prints, one
+    convention on every sheet (user ruling 2026-09-26), so a registry
+    ``title:`` never reaches it (``test_buildgraph.test_part_cell_prints_the_slug``).
     """
     import _config
 
@@ -1648,7 +1651,6 @@ def part_properties(part_name: str) -> dict[str, str]:
         reg = _config.parts(registry_name)
     except KeyError:
         return props
-    props["Title"] = str(reg.get("title") or part_name)
     field_map = {
         "Number": "number",
         "Material": "material",
@@ -1835,14 +1837,15 @@ PROJECT_AUTHOR = "Pedro Paulo Vezza Campos"
 
 
 @_telemetry.traced("part.summary_info")
-def apply_summary_info(adapter: Any, *, title: str) -> None:
+def apply_summary_info(adapter: Any, *, title: str, model: Any = None) -> None:
     """Write and read-verify the document summary Title + Author.
 
     Same early-bound split as the drawing summary stamper: SummaryInfo is a
     property, so early binding exposes the getter as ``SummaryInfo(field)`` and
-    the setter as ``SetSummaryInfo(field, value)``.
+    the setter as ``SetSummaryInfo(field, value)``.  ``model`` defaults to the
+    active document, like ``apply_custom_properties``.
     """
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    model = _early_bound(adapter.currentModel if model is None else model, "IModelDoc2")
     for summary_field, value in ((_SUMMARY_TITLE, title), (_SUMMARY_AUTHOR, PROJECT_AUTHOR)):
         model.SetSummaryInfo(summary_field, value)
         if model.SummaryInfo(summary_field) != value:
@@ -2349,8 +2352,13 @@ async def force_rebuild(adapter: Any) -> None:
     makes the new names resolvable as equation targets and refreshes the tree
     labels. Delegates to the adapter's ``rebuild_model`` (``ForceRebuild3``) so
     the COM call runs on the adapter's executor thread and a failed rebuild
-    raises through :func:`check` rather than passing silently."""
-    check("rebuild", await adapter.rebuild_model())
+    raises through :func:`check` rather than passing silently.  A refused
+    rebuild first names its What's Wrong features and captures the seat
+    (:func:`_seat_forensics.capture_rebuild_failure`), raising the same message."""
+    result = await adapter.rebuild_model()
+    if not result.is_success:
+        _seat_forensics.capture_rebuild_failure(adapter, f"rebuild failed: {result.error}")
+    check("rebuild", result)
 
 
 # ---------------------------------------------------------------------------

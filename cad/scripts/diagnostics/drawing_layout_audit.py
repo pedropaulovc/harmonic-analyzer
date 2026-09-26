@@ -249,7 +249,7 @@ def _display_data(adapter: Any, annotation: Any) -> Any:
     )
 
 
-def _display_lines(adapter: Any, data: Any) -> list[Segment]:
+def _display_lines(adapter: Any, data: Any, dropped: list[int] | None = None) -> list[Segment]:
     """Every straight run of the annotation's ink, in sheet metres.
 
     ``GetLineAtIndex3`` -> ``[color, lineType, lineStyle, lineWeight,
@@ -257,6 +257,15 @@ def _display_lines(adapter: Any, data: Any) -> list[Segment]:
     older ``GetLineAtIndex2`` drops lineStyle/lineWeight, shifting the points
     two slots left, so the index of the start point is read from the array
     LENGTH rather than assumed.
+
+    A record whose ends coincide on the sheet draws no ink and is dropped,
+    wherever it lies, and counted into ``dropped`` (``collect_sheet`` puts
+    the sheet's total on its span). Since #906 every linear dimension on
+    cone_pivot_post reads back 15 such records, ``[0, swLF_VISIBLE,
+    swLineHIDDEN, swLW_THIN, (0,0,0), (0,0,0)]``, between its extension and
+    dimension lines (diag/cone-pivot-origin-probe fc2212cd6, leaf run
+    20260926T205141966Z); boxed as ink, each dimension's box ran from the
+    sheet origin.
     """
     count = int(_get(adapter, data, "GetLineCount", 0) or 0)
     segments: list[Segment] = []
@@ -268,15 +277,18 @@ def _display_lines(adapter: Any, data: Any) -> list[Segment]:
         if len(values) < 10:
             continue
         start = len(values) - 6
-        segments.append(
-            Segment(
-                values[start],
-                values[start + 1],
-                values[start + 3],
-                values[start + 4],
-                _LINE_ROLE,
-            )
+        segment = Segment(
+            values[start],
+            values[start + 1],
+            values[start + 3],
+            values[start + 4],
+            _LINE_ROLE,
         )
+        if segment.length == 0.0:
+            if dropped is not None:
+                dropped.append(index)
+            continue
+        segments.append(segment)
     return segments
 
 
@@ -509,8 +521,10 @@ def _annotation_geometry(
     *,
     owner: str,
     advance_ratio: float,
+    dropped: list[int] | None = None,
 ) -> tuple[AnnotationGeometry | None, list[tuple[str, float, Box]]]:
-    """One annotation's text boxes and ink, plus any exact-box calibration sample."""
+    """One annotation's text boxes and ink, plus any exact-box calibration
+    sample. Zero-length display lines go to ``dropped`` (``_display_lines``)."""
     annotation = _bind(annotation, "IAnnotation")
     kind_code = int(_get(adapter, annotation, "GetType", 0) or 0)
     kind = _TEXT_ANNOTATIONS.get(kind_code)
@@ -536,7 +550,7 @@ def _annotation_geometry(
     data = _display_data(adapter, annotation)
     estimated: list[tuple[str, float, tuple[float, float], int, float]] = []
     if data is not None:
-        segments.extend(_display_lines(adapter, data))
+        segments.extend(_display_lines(adapter, data, dropped))
         segments.extend(_display_arcs(adapter, data))
         boxes, estimated = _display_text_boxes(
             adapter, data, advance_ratio=advance_ratio
@@ -641,6 +655,7 @@ def _keep_outs(width: float, height: float) -> tuple[tuple[str, Box], ...]:
     return ()
 
 
+@_telemetry.traced("layout.collect_sheet")
 def collect_sheet(
     adapter: Any, drawing: Any, sheet_view: Any, views: list[Any]
 ) -> SheetGeometry:
@@ -694,6 +709,7 @@ def collect_sheet(
 
     annotations: list[AnnotationGeometry] = []
     seen_tables: dict[str, AnnotationGeometry] = {}
+    dropped: list[int] = []
     for view, geometry in [
         *zip(views, view_geometry),
         (sheet_view, None),
@@ -707,7 +723,11 @@ def collect_sheet(
                 if owner_type != _OWNER_DRAWING_SHEET:
                     continue
             item, _samples = _annotation_geometry(
-                adapter, annotation, owner=owner, advance_ratio=advance_ratio
+                adapter,
+                annotation,
+                owner=owner,
+                advance_ratio=advance_ratio,
+                dropped=dropped,
             )
             if item is not None:
                 annotations.append(item)
@@ -716,6 +736,10 @@ def collect_sheet(
             if item is not None:
                 seen_tables[item.label] = item
     annotations.extend(seen_tables.values())
+    # The zero-length display lines _display_lines dropped stay visible.
+    _telemetry.annotate(sheet=name, degenerate_lines=len(dropped))
+    if dropped:
+        _telemetry.debug(f"layout {name}: {len(dropped)} zero-length display line(s) dropped, no ink")
 
     return SheetGeometry(
         name=name,

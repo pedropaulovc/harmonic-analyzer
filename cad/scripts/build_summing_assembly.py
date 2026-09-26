@@ -47,7 +47,6 @@ import sys
 
 from _common import (
     apply_custom_properties,
-    apply_summary_info,
     check,
     log,
     run_build,
@@ -506,9 +505,6 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    # The PART cell resolves the document summary Title; "summing assembly" (not
-    # the bare stem) so the sheet identifies itself as an assembly drawing.
-    apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
     return await save_assembly_and_images(
         adapter,
         ASM_NAME,

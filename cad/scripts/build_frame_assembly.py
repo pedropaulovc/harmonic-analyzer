@@ -100,7 +100,6 @@ from _common import (
     OUT_SLDPRT,
     _early_bound,
     apply_custom_properties,
-    apply_summary_info,
     check,
     run_build,
 )
@@ -895,9 +894,6 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    # The PART cell resolves the document summary Title; "frame assembly" (not
-    # the bare stem) so the sheet identifies itself as an assembly drawing.
-    apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
     _create_frame_explode(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
 
