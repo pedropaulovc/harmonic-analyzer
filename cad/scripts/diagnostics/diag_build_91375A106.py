@@ -28,7 +28,8 @@ vendor's own dimension or solved sketch geometry, in mm:
   The replica revolves both cones as cuts (the 91255A148 idiom).
 - thread (their Sketch7 + Helix/Spiral1 + Sketch8 + Cut-Sweep1): helix
   seeded on the cup-end face, L + 1.01P high (11.01 revs, start 0 deg),
-  running out past the socket face; the symmetric UN cutter centred 7P/16
+  running out past the socket face (the replica starts at 90 deg: see the
+  helix step); the symmetric UN cutter centred 7P/16
   past the cup end (root flat P/8 at the root radius 1.009955, top 15P/16 at
   major + H/16) -- the 91255A148 cutter.
 
@@ -322,6 +323,14 @@ async def build_91375A106(adapter, truth=None):
     # --- helix: seeded on the cup end, L + 1.01P toward the socket -----------
     # Their seed plane faces -z with clockwise=True, reverse=True; ours faces
     # +y, so both flags invert (the 91255A148 / 93075A194 handedness proof).
+    # Their start is 0 deg because their cutter (Sketch8) sits on their Right
+    # plane at vendor +y (replica +z). Ours sits on Front at +x, where every
+    # replica's pi/2 start lands; the sweep path must start on the profile's
+    # plane, and a 0 start (copied verbatim) put it at +-z, off the Front plane:
+    # CreateFeature returned None (amet gate, 2026-09-26 08:29Z). The pi/2
+    # start turns the thread 90 deg about the axis -- volume, area and faces
+    # are unchanged, and the COM's ~0.002 radial offset only rotates, inside
+    # the gate's +-0.02.
     offset_plane(adapter, "CupEndPlane", -HALF)
     check("create_sketch helix seed", await adapter.create_sketch("CupEndPlane"))
     with no_sketch_inference(adapter):
@@ -338,7 +347,7 @@ async def build_91375A106(adapter, truth=None):
         HELIX_REVS,
         clockwise=False,
         reversed_dir=False,
-        start_angle_rad=0.0,
+        start_angle_rad=math.pi / 2.0,
         feature_name="ThreadHelix",
     )
 

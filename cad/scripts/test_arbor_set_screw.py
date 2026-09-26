@@ -127,6 +127,17 @@ def test_com_map_is_a_proper_rotation() -> None:
     assert "adapter._mcm_com_map = lambda c: [c[0], c[2], -c[1]]" in source
 
 
+def test_helix_starts_on_the_front_plane_cutter() -> None:
+    # The sweep path must start on the cutter's plane. The cutter sits on
+    # Front at +x, where a pi/2 start lands (every replica's idiom); the
+    # vendor's verbatim 0 put the start off that plane and the sweep failed on
+    # the 2026-09-26 amet gate.
+    source = Path(recipe.__file__).read_text(encoding="utf-8")
+    assert 'await adapter.create_sketch("Front")' in source
+    assert "start_angle_rad=math.pi / 2.0," in source
+    assert "start_angle_rad=0.0" not in source
+
+
 def test_drawing_is_the_purchased_reference_sheet() -> None:
     sheet = DRAWINGS_BY_NAME["arbor_set_screw"]
     assert drawing.SPEC is sheet
