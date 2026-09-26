@@ -47,6 +47,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
+from rocker_arm_notes import DRAWING_DIMENSIONS
 from rocker_arm_spec import (
     ARM_THICKNESS,
     PIVOT_HOLE_DIA,
@@ -173,6 +174,18 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_visible(adapter, front)
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    # The hub length only shows its length in the end view; the front looks
+    # down the hub's axis. Codex #936 (PRRT_kwDOPHDy386mRk__): RIGHT_KEEP was
+    # declared but never curated, so the +0.05/0 band that sets all 20
+    # channel stations never printed. Targeted by feature, so only Hub's
+    # dimensions arrive.
+    curate_view_dimensions(
+        adapter,
+        right,
+        keep=RIGHT_KEEP,
+        view_label="right",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

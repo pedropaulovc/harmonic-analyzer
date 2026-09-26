@@ -130,10 +130,41 @@ def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
     assert "surface_finishes=SURFACE_FINISHES" in part_source
     sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
     assert (
-        'control=surface_finish_by_key(SURFACE_FINISHES,"pivot_bore")'
-        in sheet_source
+        'control=surface_finish_by_key(SURFACE_FINISHES,"pivot_bore")' in sheet_source
     )
     assert "roughness_ra=" not in sheet_source
+
+
+def test_every_view_keep_map_is_curated_on_its_own_view() -> None:
+    """Codex #936 (PRRT_kwDOPHDy386mRk__): RIGHT_KEEP promised HubLength but
+    build() curated only the front view, so the hub length never printed. Each
+    non-empty <VIEW>_KEEP must be curated on that view, and curation fails
+    loud on a missing kept dimension, so the print carries every one."""
+    import ast
+
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    curated = {}
+    for node in ast.walk(tree):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "curate_view_dimensions"
+        ):
+            continue
+        keywords = {k.arg: ast.unparse(k.value) for k in node.keywords}
+        curated[keywords["keep"]] = (ast.unparse(node.args[1]), keywords)
+    for keep_name, view in (
+        ("FRONT_KEEP", "front"),
+        ("RIGHT_KEEP", "right"),
+        ("TOP_KEEP", "top"),
+    ):
+        if not getattr(drawing, keep_name):
+            continue
+        assert keep_name in curated, keep_name
+        assert curated[keep_name][0] == view
+    # The end view imports by feature: only Hub's dimensions arrive there.
+    assert curated["RIGHT_KEEP"][1]["dimensions_by_feature"] == "DRAWING_DIMENSIONS"
+    assert drawing.DRAWING_DIMENSIONS is rocker_arm_notes.DRAWING_DIMENSIONS
 
 
 def test_hub_length_prints_its_one_sided_band() -> None:
