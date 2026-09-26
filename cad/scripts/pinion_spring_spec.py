@@ -84,10 +84,14 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
+# The bend coupon qualifies a blank cut along the roll's length, its bends
+# across the rolling direction (cad/docs/tolerance-policy.md); the blank also
+# fits across the roll, so the print names the direction (Codex #859,
+# PRRT_kwDOPHDy386mTtoA).
 DRAWING_NOTES = "\n".join(
     (
-        "CUT BLANK TO TEMPLATE OF TOP-VIEW PAD, DRILL, LEAVE STRIP LONG;",
-        "  FORM, THEN TRIM FREE TIP.",
+        "CUT BLANK ALONG ROLL LENGTH (BENDS ACROSS ROLLING DIRECTION)",
+        "  TO TOP-VIEW PAD TEMPLATE, DRILL, LEAVE LONG; FORM, TRIM TIP.",
         "RADII AND FORMED-PROFILE DIMENSIONS ARE TO THE INSIDE SURFACE.",
         "PHANTOM PROFILE IS THE FREE FORM; SOLID IS AS INSTALLED.",
     )
