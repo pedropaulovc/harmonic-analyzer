@@ -43,6 +43,7 @@ from _layout_audit import (  # noqa: E402
     ANNOTATION_KINDS,
     audit_dump,
     ink_edges,
+    is_hidden,
     ink_key,
     ink_spans,
     match_ink,
@@ -56,10 +57,12 @@ MM = 1000.0
 
 
 def _annotations(dump: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
-    """(kind, annotation) for every audited annotation on the sheet."""
+    """(kind, annotation) for every audited annotation on the sheet: like
+    the audit, a hidden one is left out, so it cannot claim a visible
+    annotation's printed text or count as unmatched."""
     owned = [a for view in dump.get("views", ()) for a in view.get("annotations", ())]
     owned += [a for a in dump.get("sheet_annotations", ()) if int(a.get("owner_type", 1)) == 1]
-    return [(ANNOTATION_KINDS.get(int(a.get("type", 0)), "other"), a) for a in owned]
+    return [(ANNOTATION_KINDS.get(int(a.get("type", 0)), "other"), a) for a in owned if not is_hidden(a)]
 
 
 def match_items(dump: dict[str, Any]) -> list[dict[str, Any]]:
