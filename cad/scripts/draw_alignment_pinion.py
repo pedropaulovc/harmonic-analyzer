@@ -16,6 +16,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    ViewEdges,
     add_property_linked_note,
     add_surface_finish,
     assert_imported_precision,
@@ -103,6 +104,23 @@ DIMENSION_CALLOUTS = {
     "ArborBoreDia": ARBOR_BORE_CALLOUT,
     "FaceWidth": "OVERALL; TEETH FULL LENGTH",
 }
+
+
+def _end_face_tip_arc(profile_edges: ViewEdges, face_z_mm: float, *, label: str) -> Any:
+    """A tooth-tip arc lying IN the end face at ``face_z_mm``, picked from the
+    profile's edge scan by its circle, never by a sheet point.
+
+    On the profile the end face is an edge-on line, and every longitudinal
+    tooth edge ends on it, so a point pick there took a tip-land edge for the
+    back face (leaf 20260926T113807Z-1-194b1994).  Every tip arc bounds its
+    own end face, so any of them carries that face's finish.
+    """
+    return profile_edges.circle_at(
+        (0.0, 0.0, face_z_mm),
+        OUTSIDE_DIA / 2.0,
+        axis=(0.0, 0.0, 1.0),
+        label=label,
+    ).edge
 
 
 def _bind_title_material_specification(
@@ -336,12 +354,9 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         right,
-        edge_entity=profile_edges.circle_at(
-            (0.0, 0.0, FACE_WIDTH),
-            OUTSIDE_DIA / 2.0,
-            axis=(0.0, 0.0, 1.0),
-            label="drum back end face tip arc",
-        ).edge,
+        edge_entity=_end_face_tip_arc(
+            profile_edges, FACE_WIDTH, label="drum back end face tip arc"
+        ),
         symbol_xy=BACK_END_FINISH_SYMBOL_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "back_end_face"),
         label="drum back end face finish",
@@ -351,12 +366,9 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         right,
-        edge_entity=profile_edges.circle_at(
-            (0.0, 0.0, 0.0),
-            OUTSIDE_DIA / 2.0,
-            axis=(0.0, 0.0, 1.0),
-            label="drum front end face tip arc",
-        ).edge,
+        edge_entity=_end_face_tip_arc(
+            profile_edges, 0.0, label="drum front end face tip arc"
+        ),
         symbol_xy=FRONT_END_FINISH_SYMBOL_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "front_end_face"),
         label="drum front end face finish",
