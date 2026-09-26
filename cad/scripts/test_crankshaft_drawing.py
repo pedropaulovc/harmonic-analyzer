@@ -70,10 +70,10 @@ def test_far_end_stations_restate_the_modelled_geometry() -> None:
     # The StationReference sketch drives each printed station from the same
     # globals as the features; these are the values the equations evaluate to.
     far = spec.SHAFT_LENGTH
-    assert far - (spec.JOURNAL_START + spec.JOURNAL_LENGTH) == pytest.approx(19.8)
-    assert far - spec.JOURNAL_START == pytest.approx(89.2449, abs=1e-3)
-    assert far - spec.PIN_HOLE_HEIGHT == pytest.approx(116.4)
-    assert far + spec.SHAFT_DOME_HEIGHT == pytest.approx(132.0)
+    assert far - (spec.JOURNAL_START + spec.JOURNAL_LENGTH) == pytest.approx(26.6)
+    assert far - spec.JOURNAL_START == pytest.approx(96.0449, abs=1e-3)
+    assert far - spec.PIN_HOLE_HEIGHT == pytest.approx(123.2)
+    assert far + spec.SHAFT_DOME_HEIGHT == pytest.approx(138.8)
     assert part.DOME_SPHERE_R == pytest.approx(6.6710, abs=1e-3)
 
 
@@ -84,7 +84,21 @@ def test_notes_stay_within_rule_six() -> None:
 
 
 def test_face_shift_preserves_every_inboard_world_station() -> None:
-    assert spec.SHAFT_LENGTH == 130.0
+    # W15: the far end sits recessed inside the 16T's boss, so the length
+    # follows the pinion (crank_pinion_spec), not a literal -- floored to the
+    # places it prints, so the sheet's nominal is the model's (Codex P2, #892).
+    pinion = spec.crank_pinion_spec
+    assert spec.SHAFT_LENGTH == pytest.approx(
+        pinion.floor_to_places(
+            spec.SEAT_PINION + pinion.OVERALL_LENGTH - pinion.SHAFT_END_RECESS_MIN,
+            pinion.SHAFT_LENGTH_PLACES,
+        )
+    )
+    assert spec.SHAFT_LENGTH == round(spec.SHAFT_LENGTH, pinion.SHAFT_LENGTH_PLACES)
+    assert spec.DRAWING_PRECISION["Shaft"]["Depth"] == pinion.SHAFT_LENGTH_PLACES
+    assert spec.SHAFT_LENGTH == pytest.approx(136.8)
+    assert pinion.SHAFT_END_RECESS_MIN <= spec.SHAFT_END_RECESS <= pinion.SHAFT_END_RECESS_MAX
+    assert part.SEAT_PINION == spec.SEAT_PINION
     assert spec.JOURNAL_START == pytest.approx(40.755105572)
     assert spec.JOURNAL_END == pytest.approx(110.2)
     assert spec.JOURNAL_LENGTH == pytest.approx(69.4449, abs=1e-4)
@@ -95,7 +109,7 @@ def test_face_shift_preserves_every_inboard_world_station() -> None:
     assert not hasattr(part, "SEAT_ARM")
     assert -183.0 + part.SEAT_T12 == pytest.approx(-157.5)
     assert -183.0 + part.SEAT_PINION == pytest.approx(-69.960494428)
-    assert -183.0 + spec.SHAFT_LENGTH == pytest.approx(-53.0)
+    assert -183.0 + spec.SHAFT_LENGTH == pytest.approx(-46.2)
 
 
 def test_integral_dome_is_the_only_outboard_shaft_projection() -> None:
@@ -231,17 +245,18 @@ def test_pinion_land_is_turnable_at_the_printed_band() -> None:
     assert spec.JOURNAL_LENGTH / post_bore > 0.96
 
 
-def test_pinion_pin_hole_is_shown_as_a_transfer_from_the_pinion() -> None:
+def test_pinion_pin_hole_prints_the_shared_matched_fit_note() -> None:
     """Codex #813 (PRRT_kwDOPHDy386l4ZrZ): MHA-026 cut the PinionPinHole but
     the sheet did not show it.  The hole is match-drilled through the seated
-    pinion's boss at assembly (crank_pinion_spec), so -- like MHA-061's
-    transfer seats on the base (U28) -- the sheet names its source and prints
-    no size and no station (Main, 2026-09-25).  run1-61671871a proved a native
-    Hole Wizard callout cannot bind to the saddle rim of a radial hole in a
-    round shaft."""
+    pinion's boss at assembly, so the sheet prints no size and no station;
+    since the machinist review of 4d4e038e3 it prints the pinion sheet's own
+    four-fact note with the mates swapped, because a bare transfer gave the
+    shaft's machinist no process or fit (test_crank_pinion_drawing pins the
+    facts).  run1-61671871a proved a native Hole Wizard callout cannot bind
+    to the saddle rim of a radial hole in a round shaft."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_attached_note(" in source
-    assert "text=PINION_PIN_TRANSFER_NOTE," in source
+    assert "text=CRANKSHAFT_PIN_HOLE_PROCESS," in source
     assert "entity=_visible_cross_hole_edge(adapter, side, PINION_PIN_DIA)," in source
     # One native callout on the sheet, the MHA-024 cross-hole's; none here.
     assert source.count("add_native_hole_callout(\n") == 1
@@ -252,14 +267,9 @@ def test_pinion_pin_hole_is_shown_as_a_transfer_from_the_pinion() -> None:
     assert all("Pinion" not in name for name in drawing.SIDE_KEEP)
     build = Path(part.__file__).read_text(encoding="utf-8")
     assert '"ShaftLength" - "PinionPinStation"' not in build
-    # The text is the transfer, from the spec's own part number; the assembly
-    # procedure stays in CRANKSHAFT_PIN_HOLE_PROCESS for MHA-A03 (rule 6).
-    pinion_number = notes.PINION_NUMBER
-    assert notes.PINION_PIN_TRANSFER_NOTE == f"TRANSFER FROM {pinion_number}\nAT ASSEMBLY"
-    lines = notes.PINION_PIN_TRANSFER_NOTE.split("\n")
-    assert len(lines) <= 4
-    assert not any(ch.isdigit() for ch in notes.PINION_PIN_TRANSFER_NOTE.replace(pinion_number, ""))
-    # The build still stores the full process on the part for the assembly.
+    # The build stores the same text on the part; the sheet refuses a part
+    # built from any other.
+    assert not hasattr(notes, "PINION_PIN_TRANSFER_NOTE")
     assert '"Pinion Pin Hole Process"' in source
     assert drawing.PINION_PIN_X == pytest.approx(
         drawing.DOME_ROOT_X + part.PINION_PIN_STATION_Y * drawing.SHEET_SCALE[0] / 1000.0
@@ -268,6 +278,7 @@ def test_pinion_pin_hole_is_shown_as_a_transfer_from_the_pinion() -> None:
     # The note block (top-left anchored; sized for up to 3.5 mm note text)
     # stays inside its field: right of the Ø11.388 text, above its row,
     # left of the isometric and inside the border.
+    lines = drawing.CRANKSHAFT_PIN_HOLE_PROCESS.split("\n")
     height = 0.0035
     char_w, line_h = 0.8 * height, 1.7 * height
     x0, y0 = drawing.PINION_PIN_NOTE_XY
@@ -313,3 +324,93 @@ def test_leader_tip_is_the_point_nearest_the_hole_and_must_land_on_it() -> None:
     assert not drawing._inside((drawing.PINION_PIN_X, 0.20), window)
     with pytest.raises(RuntimeError, match="no leader points"):
         drawing._leader_tip((), centre)
+
+
+def test_shaft_length_is_unilateral_and_printed_from_the_model() -> None:
+    # W15 band (a): a long shaft would stand proud of the 16T boss, so the
+    # length only comes out short, and the model's Depth carries the band.
+    assert spec.SHAFT_LENGTH_BAND == (0.00, -0.40)
+    build = Path(part.__file__).read_text(encoding="utf-8")
+    assert '"Shaft", "Depth", *deviations(SHAFT_LENGTH_BAND)' in build
+    assert "Depth" in spec.DRAWING_DIMENSIONS["Shaft"]
+    assert "Depth" not in spec.REFERENCE_DIMENSIONS
+
+
+def test_shaft_band_ruling_holds_because_the_general_tolerance_fails_both_stacks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # RULING W15-SHAFT-BAND (machinist review of f0c105531 flagged the band as
+    # over-specified): the unilateral +0/-0.4 is functional. With the shaft at
+    # the title block's .X +/-0.8 instead, both W15 stacks fail.
+    import build_drive_train_assembly as bdt
+
+    source = Path(spec.__file__).read_text(encoding="utf-8")
+    assert "# RULING W15-SHAFT-BAND (Main 2026-09-25)" in source
+    shaft, pinion = spec.SHAFT_LENGTH, bdt.PINION_OVERALL_LENGTH
+    edge_nominal, recess_nominal = bdt.PINION_PIN_EDGE_NOMINAL_ACTUAL, bdt.PINION_RECESS_NOMINAL
+    assert sum(bdt.pinion_pin_edge_stack(edge_nominal, shaft, pinion).values()) >= (
+        bdt.PINION_PIN_EDGE_MIN_WORST
+    )
+    assert sum(bdt.pinion_recess_stack(recess_nominal, shaft, pinion).values()) >= (
+        bdt.PINION_RECESS_MIN_WORST
+    )
+    monkeypatch.setattr(bdt, "_SHAFT_LENGTH_LIMITS", (-0.8, 0.8))
+    edge = sum(bdt.pinion_pin_edge_stack(edge_nominal, shaft, pinion).values())
+    recess = sum(bdt.pinion_recess_stack(recess_nominal, shaft, pinion).values())
+    assert edge == pytest.approx(1.873, abs=1e-3)
+    assert edge < bdt.PINION_PIN_EDGE_MIN_WORST
+    assert recess == pytest.approx(-0.461, abs=1e-3)
+    assert recess < bdt.PINION_RECESS_MIN_WORST
+
+
+def _dimension_record_rows() -> dict[str, list[str]]:
+    import yaml
+
+    record = yaml.safe_load(
+        (Path(spec.__file__).resolve().parents[1] / "config" / "dimensions.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    rows: dict[str, list[str]] = {}
+    stack = [record]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            stack.extend(node.values())
+            continue
+        if not isinstance(node, list):
+            continue
+        if node and isinstance(node[0], str) and node[0].startswith("Crankshaft"):
+            rows[node[0]] = [str(cell) for cell in node]
+            continue
+        stack.extend(node)
+    return rows
+
+
+def test_dimension_record_rows_follow_the_spec() -> None:
+    # Codex #892 (PRRT_kwDOPHDy386mNCXx): W15 lengthened the cylinder to 136.8
+    # (inboard end z -46.2), but the structured dimensions record still said
+    # 130 ending at -53.  Every crankshaft length and station it states comes
+    # from the spec and the placed shaft origin.
+    import build_drive_train_assembly as bdt
+
+    z0 = bdt.CRANKSHAFT_Z0
+    end = z0 + spec.SHAFT_LENGTH
+    rows = _dimension_record_rows()
+    length = rows["Crankshaft length"]
+    assert length[1] == (
+        f"{spec.SHAFT_LENGTH:g} mm cylindrical length plus "
+        f"{spec.SHAFT_DOME_HEIGHT:g}-mm integral outboard dome"
+    )
+    assert length[2] == f"{spec.SHAFT_LENGTH / 25.4:.2f} + dome"
+    assert f"inboard end sits at z −{-end:g}" in length[3]
+    assert f"{spec.SHAFT_END_RECESS:.2f} inside the 16T pinion's boss" in length[3]
+    placed = rows["Crankshaft"][1]
+    assert f"The {spec.SHAFT_LENGTH:g}-mm cylinder spans z −{-z0:g}..−{-end:g}" in placed
+    assert f"stops at z −{-(z0 + spec.JOURNAL_END):g} (local {spec.JOURNAL_END:g})" in placed
+    journal = rows["Crankshaft bearing journal"][1]
+    assert journal == (
+        f"Ø{spec.JOURNAL_DIA:g} × {spec.JOURNAL_LENGTH:.4f} mm; local stations "
+        f"{spec.JOURNAL_START:.9f}..{spec.JOURNAL_END:g} "
+        f"(world z −{-(z0 + spec.JOURNAL_START):.9f}..−{-(z0 + spec.JOURNAL_END):g})"
+    )

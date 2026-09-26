@@ -25,6 +25,7 @@ from _common import (
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
+    blank_sketch,
     name_bore_axis,
     check,
     define_circle,
@@ -562,6 +563,10 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+    # The reference sketch owns printed dimensions but no geometry: hide it so
+    # no assembly instance renders it (#880).  The drawing shows it per view
+    # through _drawing_hidden_sketches to import those dimensions.
+    blank_sketch(adapter, "StationReference")
     return await save_part_and_images(adapter, PART_NAME)
 
 

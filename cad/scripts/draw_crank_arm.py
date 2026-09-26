@@ -1,6 +1,7 @@
 r"""Create the curated machinist drawing for crank arm MHA-020.
 
-The arm is match-fitted to separate through hub MHA-137.  Its outboard face
+Separate through hub MHA-137 is a light press in the arm's seat bore, turned
+to suit it.  Its outboard face
 shows the simple punched alignment witness and the axial seam for MHA-138,
 match-drilled with the hub; the seam's callout gives its nominal size and
 depth.  The handle pivot is tapped for the MHA-139 shoulder screw.
@@ -33,16 +34,24 @@ from _drawing_common import (
     add_native_hole_callout,
     add_property_linked_note,
     assert_imported_precision,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_arc_endpoints_to_max,
     set_reference_dimension,
     stamp_drawing_summary,
     view_name,
+)
+from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_leaders import (
+    assert_leaders_clear,
+    dimension_segments,
+    dimension_text_points,
+    points_inside,
+    set_near_side_diameter,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from crank_arm_spec import (
@@ -56,12 +65,18 @@ from crank_arm_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
+    REFERENCE_DIMENSIONS,
     HALF_WIDTH,
     HANDLE_PIVOT_HOLE_SPEC,
+    HUB_SEAT_DIA,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from crank_arm_notes import HUB_SEAT_CALLOUT, SEAM_CALLOUT
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
 
 
 SPEC = DRAWINGS_BY_NAME["crank_arm"]
@@ -175,12 +190,32 @@ FRONT_KEEP = {
     "ArmEndX": (0.190, 0.085),
     "PivotStation": (_sheet_x(ARM_C2C / 2.0), 0.095),
     "AnchorStation": (_sheet_x(ANCHOR_SCREW_X / 2.0), 0.104),
-    "AnchorOffset": (0.106, FRONT_CENTER[1] + 0.017),
+    "AnchorOffset": (0.108, FRONT_CENTER[1] + HALF_WIDTH * SHEET_SCALE[0] / 1000.0 + 0.008),
     "AxisOffset": (0.252, FRONT_CENTER[1] + 0.013),
     "Width": (0.279, FRONT_CENTER[1]),
     "BossRadius": (0.030, FRONT_CENTER[1]),
-    "HubSeatDia": (0.054, 0.225),
+    "HubSeatDia": (0.048, 0.225),
 }
+# The hub seat's leader lands on the near rim, upper left of the bore: at
+# 0.054 with both arrows it ran down through the bore centre to the far
+# rim and crossed R12.7's leader there (eye pass of w15-301f4bf4e; the
+# 2026-09-23 review had flagged the far-side landing). Nothing but R12.7
+# itself may come within half the seat radius of the centre.
+BORE_CENTER = (_sheet_x(0.0), FRONT_CENTER[1])
+HUB_SEAT_KEEP_OUT = HUB_SEAT_DIA * SHEET_SCALE[0] / 4000.0
+# Where each leader must END, from the bore centre (sheet metres): the hub
+# seat on its rim, R12.7 at the centre or on its arc. A reading outside the
+# band means the segments are not sheet metres, and the clear check fails.
+HUB_SEAT_LANDING = (HUB_SEAT_KEEP_OUT, 3.0 * HUB_SEAT_KEEP_OUT)
+BOSS_RADIUS_LANDING = (0.0, 1.2 * HALF_WIDTH * SHEET_SCALE[0] / 1000.0)
+# Every front-view dimension text stands outside the arm's silhouette
+# (2026-09-23 review: 8.2 sat on the part, between the top edge and the tap).
+ARM_SILHOUETTE = (
+    _sheet_x(-HALF_WIDTH),
+    FRONT_CENTER[1] - HALF_WIDTH * SHEET_SCALE[0] / 1000.0,
+    _sheet_x(ARM_END_X),
+    FRONT_CENTER[1] + HALF_WIDTH * SHEET_SCALE[0] / 1000.0,
+)
 # The arm's half of the MHA-138 seam is the arc bulging from the seat edge
 # toward the arm end; the callout attaches 45 degrees up its flank.
 SEAM_EDGE_PICK = (
@@ -192,6 +227,48 @@ SEAM_CALLOUT_XY = (0.104, 0.250)
 ANCHOR_CALLOUT_XY = (0.195, 0.205)
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 DIMENSION_CALLOUTS = {"HubSeatDia": HUB_SEAT_CALLOUT}
+
+
+def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
+    matches = [a for a in annotations if dimension_name(adapter, a) == name]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
+    return matches[0]
+
+
+def _hub_seat_leader_clear(adapter: Any, annotations: list[Any]) -> None:
+    """Mark the hub seat reference and land it on its near rim, clear of R12.7.
+
+    MHA-137 is turned to suit this bore for a light press, so the note under
+    it governs and the bore's nominal prints as a reference, (Ø19.5), not a title-block
+    tolerance (2026-09-23 review).
+    """
+    hub_seat = _named(adapter, annotations, "HubSeatDia")
+    set_reference_dimension(adapter, hub_seat, label="hub seat nominal", diameter=True)
+    set_near_side_diameter(hub_seat, "hub seat diameter")
+    rebuild_drawing(adapter, label="hub seat near-side leader")
+    assert_leaders_clear(
+        {
+            "HubSeatDia": dimension_segments(hub_seat),
+            "BossRadius": dimension_segments(_named(adapter, annotations, "BossRadius")),
+        },
+        centre=BORE_CENTER,
+        keep_out={"HubSeatDia": HUB_SEAT_KEEP_OUT},
+        lands_within={"HubSeatDia": HUB_SEAT_LANDING, "BossRadius": BOSS_RADIUS_LANDING},
+        label="crank arm hub seat",
+    )
+
+
+def _texts_off_the_part(adapter: Any, annotations: list[Any]) -> None:
+    """Fail when a front-view dimension's text sits inside the arm's silhouette."""
+    inside = {
+        dimension_name(adapter, annotation): points
+        for annotation in annotations
+        if (points := points_inside(dimension_text_points(annotation), ARM_SILHOUETTE))
+    }
+    _telemetry.event("drawing.texts_off_part", inside=str(inside))
+    if inside:
+        raise RuntimeError(f"dimension text inside the arm silhouette {ARM_SILHOUETTE}: {inside}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -259,9 +336,16 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     imported_annotations = [*front_annotations, *right_annotations]
     set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
-    # The part authored every displayed decimal place.  The match-fit hub seat
-    # remains a one-place nominal because the assigned actual hub governs size.
+    # The part authored every displayed decimal place.  The hub seat bore
+    # remains a one-place reference nominal: MHA-137 is turned to suit it.
     assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
+    # The thickness is the supplied stock's (the stock note governs it).
+    for name in sorted(REFERENCE_DIMENSIONS):
+        set_reference_dimension(
+            adapter, _named(adapter, right_annotations, name), label="arm stock thickness"
+        )
+    _hub_seat_leader_clear(adapter, front_annotations)
+    _texts_off_the_part(adapter, front_annotations)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

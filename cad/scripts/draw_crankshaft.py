@@ -68,7 +68,7 @@ from crankshaft_spec import (
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from build_crankshaft import PINION_PIN_DIA, PINION_PIN_STATION_Y
 from crank_pinion_spec import CRANKSHAFT_PIN_HOLE_PROCESS
-from crankshaft_notes import CROSS_HOLE_CALLOUT, PINION_PIN_TRANSFER_NOTE
+from crankshaft_notes import CROSS_HOLE_CALLOUT
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -171,11 +171,13 @@ FINISH_SYMBOL = (JOURNAL_START_X + 0.050, 0.203)
 # line rather than a near parallel one (run 20260923T030252135Z-49e46990),
 # left of the Ø9.525 text and clear of the SR on the left.
 HOLE_CALLOUT_XY = (PIN_X + 0.054, 0.247)
-# The 16T retention-pin hole, 2.9 from the far end, is match-drilled through
-# the seated pinion's boss at assembly (crank_pinion_spec), so the sheet
-# shows the modelled hole and names where it comes from -- no size, no
-# station -- exactly as MHA-061's transfer seats on the base (U28).  The
-# note is attached to the hole's own visible rim edge: a radial hole in a
+# The 16T retention-pin hole is match-drilled through the seated pinion's
+# boss at assembly, so the sheet prints the pinion sheet's own matched-fit
+# note with the mates swapped (crank_pinion_spec.CRANKSHAFT_PIN_HOLE_PROCESS,
+# also the part property checked below): the operation, where it runs, the
+# pin it is reamed to, the fit's acceptance and flush -- no size, no station.
+# A bare transfer note gave the shaft's machinist none of these (machinist
+# review of 4d4e038e3).  The note is attached to the hole's own visible rim edge: a radial hole in a
 # round shaft has a saddle rim, not a circle, so a native Hole Wizard
 # callout cannot bind to it (run1-61671871a).  Its TEXT sits, anchored
 # upper-left, in the free field above the far-end seat, right of the Ø11.388
@@ -185,7 +187,7 @@ HOLE_CALLOUT_XY = (PIN_X + 0.054, 0.247)
 # window instead (run1b-e7fd1a2ec: the leader tip, not the text, read 0.3 mm
 # under the floor).
 PINION_PIN_X = _sheet_x(PINION_PIN_STATION_Y)
-PINION_PIN_NOTE_XY = (0.300, 0.250)
+PINION_PIN_NOTE_XY = (0.258, 0.250)
 PINION_PIN_NOTE_FIELD = (
     DIAMETER_POSITIONS["JournalDiaDim"][0] + 0.010,
     SIDE_CENTER[1],
@@ -558,7 +560,7 @@ async def build(adapter: Any) -> dict[str, str]:
     pinion_note = add_attached_note(
         adapter,
         side,
-        text=PINION_PIN_TRANSFER_NOTE,
+        text=CRANKSHAFT_PIN_HOLE_PROCESS,
         entity=_visible_cross_hole_edge(adapter, side, PINION_PIN_DIA),
         note_xy=PINION_PIN_NOTE_XY,
         label="16T retention-pin transfer",

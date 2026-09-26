@@ -167,14 +167,16 @@ def test_u33b_engagement_exception_is_governed_by_the_stock_arm() -> None:
     # Nominal: min(9.0 - 0.5, arm 8.0) - 1.5 = 6.5 of full thread, 1.35 D.
     assert spec.FULL_THREAD_NOMINAL == pytest.approx(6.5)
     assert spec.FULL_THREAD_NOMINAL_DIAMETERS == pytest.approx(6.5 / 4.826)
-    # Stock 5/16-in arm: min(8.0, 7.9375 - the 0.25 exit break) - (1.5 + the
-    # .XX band 0.51) = 5.68, 1.18 D.  The arm governs.
+    # Thinnest stock 5/16-in arm (mill -0.004 in on a 1-in flat): min(8.0,
+    # 7.8359 - the 0.25 exit break) - (1.5 + the .XX band 0.51) = 5.58,
+    # 1.155 D.  The arm governs.
     assert geometry.GENERAL_2PL_TOL_MM == pytest.approx(0.51)
     assert spec.TAP_EXIT_BREAK == pytest.approx(0.25)
     assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
     assert spec.RELIEF_WIDTH_MAX == pytest.approx(2.01)
-    assert spec.FULL_THREAD_WORST == pytest.approx(5.6775)
-    assert spec.FULL_THREAD_WORST_DIAMETERS == pytest.approx(1.176, abs=1e-3)
+    assert spec.ARM_STOCK_THICKNESS_MIN == pytest.approx(7.8359)
+    assert spec.FULL_THREAD_WORST == pytest.approx(5.5759)
+    assert spec.FULL_THREAD_WORST_DIAMETERS == pytest.approx(1.1554, abs=1e-4)
     assert spec.ENGAGEMENT_GOVERNED_BY == "arm"
     # Arm at its printed maximum 8.8: min(8.0, 8.8 - 0.25) - 2.01 = 5.99,
     # 1.24 D; the screw governs there.
@@ -192,8 +194,8 @@ def test_u33b_engagement_exception_is_governed_by_the_stock_arm() -> None:
 def test_u33b_note_is_the_only_manufacturing_note() -> None:
     # The sheet states the worst case its named-exception row records.
     assert "NAMED EXCEPTION TO RULE 12" in spec.DRAWING_NOTES
-    # A MIN is floored, never rounded up: 1.176 prints 1.17.
-    assert spec.FULL_THREAD_WORST_DIAMETERS_PRINTED == 1.17
+    # A MIN is floored, never rounded up: 1.155 prints 1.15.
+    assert spec.FULL_THREAD_WORST_DIAMETERS_PRINTED == 1.15
     assert spec.FULL_THREAD_WORST_DIAMETERS_PRINTED <= spec.FULL_THREAD_WORST_DIAMETERS
     worst = f"{spec.FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D"
     assert spec.DRAWING_NOTES.startswith(f"THREAD ENGAGEMENT {worst} MIN")
@@ -396,3 +398,25 @@ def test_assembly_seats_the_shoulder_on_the_arm_and_bounds_the_tip() -> None:
     assert assembly.HANDLE_SCREW_TIP_Z_MAX - stock_inboard_face == pytest.approx(
         spec.PROUD_INBOARD_MAX
     )
+
+
+def test_quarter_inch_arm_stock_fails_the_full_strength_floor(monkeypatch) -> None:
+    # User ruling 2026-09-25: the exception holds only while a steel screw in
+    # the steel arm keeps >= 1D of full thread.  1/4-in bar would leave
+    # min(8.0, 6.35 - 0.25) - 2.01 = 4.09, 0.85D.
+    # Executed as a separate, unregistered module: reloading the real one
+    # would swap its band tuples for new objects under every importer
+    # (test_fit_bands tracks them by identity).
+    import importlib.util
+    from fractions import Fraction
+
+    assert spec.FULL_STRENGTH_ENGAGEMENT_D == 1.0
+    monkeypatch.setattr(geometry, "ARM_STOCK_THICKNESS_IN", Fraction(1, 4))
+    monkeypatch.setattr(geometry, "ARM_STOCK_THICKNESS", 0.25 * 25.4)
+    monkeypatch.setattr(geometry, "ARM_STOCK_THICKNESS_MIN", 0.246 * 25.4)
+    probe_spec = importlib.util.spec_from_file_location("_quarter_inch_probe", spec.__file__)
+    probe = importlib.util.module_from_spec(probe_spec)
+    with pytest.raises(AssertionError, match="under 1D"):
+        probe_spec.loader.exec_module(probe)
+    assert probe.ARM_STOCK_THICKNESS == pytest.approx(6.35)
+    assert probe.FULL_THREAD_WORST < probe.THREAD_MODEL_DIA

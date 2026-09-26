@@ -60,8 +60,9 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 ):
     raise AssertionError("every marked crank-hub dimension needs authored places")
 
-# The arm bore is made first and carries the band; this seat is turned to fit
-# it, so its nominal prints as a reference under the match-fit callout
+# The arm bore is made first to its reference nominal; this seat is turned to
+# suit it for a light press, so its nominal prints as a reference under the
+# press-fit callout
 # (crank_hub_notes owns the callout prose).
 REFERENCE_DIMENSIONS = frozenset({"SeatDia"})
 # No general notes (policy rule 6): the seat fit, the seam and the cross-hole

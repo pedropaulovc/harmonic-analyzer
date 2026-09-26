@@ -31,6 +31,8 @@ from crank_handle_spec import (
     PIVOT_BORE_DIA,
 )
 from crank_hub_geometry import (
+    ARM_STOCK_THICKNESS,
+    ARM_STOCK_THICKNESS_MIN,
     ARM_THICKNESS,
     EDGE_BREAK_MAX_MM,
     GENERAL_1PL_TOL_MM,
@@ -144,9 +146,12 @@ DIAMETRAL_CLEARANCE_MAX = round(HANDLE_BORE_MAX - SHOULDER_DIA_MIN, 6)
 # MHA-020 arm; exception to the 1.5D rule.
 ENGAGEMENT_EXCEPTION_FLOOR_D = 1.15
 ENGAGEMENT_FLOOR = ENGAGEMENT_EXCEPTION_FLOOR_D * THREAD_MODEL_DIA
-# The arm is 5/16-in cold-finished flat bar left at stock thickness; its
-# printed 8.0 carries the .X title-block band.
-ARM_STOCK_THICKNESS = 0.3125 * MM_PER_IN
+# The arm is 5/16-in cold-finished flat bar left at stock thickness
+# (crank_hub_geometry.ARM_STOCK_THICKNESS).  Its sheet prints the 8.0 as a
+# reference to that stock (Codex #892: a toleranced 8.0 took the .X band and
+# accepted a 7.2 arm, 1.02D), so the thinnest accepted arm is the mill's
+# ARM_STOCK_THICKNESS_MIN.  The thick side keeps the .X band as a bound on
+# what the model allows.
 ARM_PRINTED_THICKNESS_MAX = ARM_THICKNESS + GENERAL_1PL_TOL_MM
 # The relief width prints at .XX (Main, on the rule-12 audit note): at .X its
 # +0.8 alone took the stock-arm case under the U33b floor once the tapped
@@ -164,16 +169,16 @@ FULL_THREAD_REACH_MIN = round(THREAD_LENGTH_MIN - TIP_CHAMFER, 6)
 FULL_THREAD_NOMINAL = round(
     min(FULL_THREAD_REACH_NOMINAL, ARM_THICKNESS) - RELIEF_WIDTH, 6
 )
-# Worst case in the stock arm: min(full-thread reach, arm 7.94 less the exit
-# break) - relief 2.01.
+# Worst case in the thinnest stock arm: min(full-thread reach, arm 7.84 less
+# the exit break) - relief 2.01.
 FULL_THREAD_WORST = round(
-    min(FULL_THREAD_REACH_MIN, ARM_STOCK_THICKNESS - TAP_EXIT_BREAK)
+    min(FULL_THREAD_REACH_MIN, ARM_STOCK_THICKNESS_MIN - TAP_EXIT_BREAK)
     - RELIEF_WIDTH_MAX,
     6,
 )
 ENGAGEMENT_GOVERNED_BY = (
     "arm"
-    if ARM_STOCK_THICKNESS - TAP_EXIT_BREAK <= FULL_THREAD_REACH_MIN
+    if ARM_STOCK_THICKNESS_MIN - TAP_EXIT_BREAK <= FULL_THREAD_REACH_MIN
     else "screw"
 )
 # Worst case in an arm at its printed maximum 8.8: the screw always governs.
@@ -193,7 +198,7 @@ PROUD_INBOARD_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS, 6)
 # engagement its policy row records (the stock arm, after the exit break) and
 # worded like the other sheets' rule-12 statements.  The ruling ID (U33b)
 # stays here; it means nothing to the book's reader.
-# A MIN never rounds up: 1.176 prints 1.17, floored to two places.
+# A MIN never rounds up: 1.155 prints 1.15, floored to two places.
 FULL_THREAD_WORST_DIAMETERS_PRINTED = math.floor(FULL_THREAD_WORST_DIAMETERS * 100.0) / 100.0
 DRAWING_NOTES = (
     f"THREAD ENGAGEMENT {FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D MIN: "
@@ -216,7 +221,17 @@ NECK_AREA = math.pi / 4.0 * RELIEF_DIA**2
 TENSILE_STRESS_AREA = 0.0175 * MM_PER_IN**2
 NECK_TO_STRESS_AREA = NECK_AREA / TENSILE_STRESS_AREA
 
+# User ruling 2026-09-25 (MHA-020 review B2): the exception stands because a
+# steel screw in a steel tap develops full strength at about 1D of full
+# thread.  Below 1D that reason is gone, whatever the U33b floor says.
+FULL_STRENGTH_ENGAGEMENT_D = 1.0
 for _ok, _what in (
+    (
+        min(FULL_THREAD_WORST, FULL_THREAD_WORST_PRINTED_ARM)
+        >= FULL_STRENGTH_ENGAGEMENT_D * THREAD_MODEL_DIA,
+        "worst-case engagement is under 1D: the steel-in-steel full-strength "
+        "reason for the named exception no longer holds",
+    ),
     (END_PLAY_MIN > 0.0, "handle is clamped: no end play at worst case"),
     (END_PLAY_MAX <= 1.0, "handle end play exceeds 1.0 at worst case"),
     (DIAMETRAL_CLEARANCE_MIN > 0.0, "shoulder can bind in the oak bore"),

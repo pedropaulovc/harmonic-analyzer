@@ -5,6 +5,7 @@ from __future__ import annotations
 from _hole_spec import HoleSpec, drill_process
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+import crank_pinion_spec
 from crank_hub_geometry import (
     CRANK_FACE_SHIFT,
     FIDUCIAL_MODEL_DEPTH,
@@ -17,10 +18,40 @@ from crank_hub_geometry import (
 )
 
 
-SHAFT_LENGTH = 122.0 + CRANK_FACE_SHIFT
 # The common arm/hub/shaft cylinder face moved 8 mm outboard.  Adding the same
 # shift to all inboard stations preserves every established bearing, T12 and
-# pinion world interface and keeps the far end at its prior world coordinate.
+# pinion world interface.  The 16T pinion's toothed south face seats here.
+SEAT_PINION = 105.039505572 + CRANK_FACE_SHIFT  # 113.039505572
+# W15 (Main, 2026-09-25): the far end sits recessed inside the pinion's boss,
+# and crank_pinion_spec sizes that boss so the retention pin keeps its wall to
+# this end.  The length is floored to the places it prints (Codex P2 on #892),
+# so the sheet's nominal IS the model's and an accepted shaft is never longer
+# than the model; the recess that leaves lies between the pinion's
+# SHAFT_END_RECESS_MIN and _MAX, the range its boss was sized for.
+SHAFT_LENGTH = crank_pinion_spec.floor_to_places(
+    SEAT_PINION
+    + crank_pinion_spec.OVERALL_LENGTH
+    - crank_pinion_spec.SHAFT_END_RECESS_MIN,
+    crank_pinion_spec.SHAFT_LENGTH_PLACES,
+)  # 136.8
+SHAFT_END_RECESS = SEAT_PINION + crank_pinion_spec.OVERALL_LENGTH - SHAFT_LENGTH  # 1.1395
+if not (
+    crank_pinion_spec.SHAFT_END_RECESS_MIN - 1e-9
+    <= SHAFT_END_RECESS
+    <= crank_pinion_spec.SHAFT_END_RECESS_MAX + 1e-9
+):
+    raise AssertionError(
+        f"crankshaft end recess {SHAFT_END_RECESS:.4f} left the range the 16T boss "
+        "was sized for"
+    )
+# Unilateral: a long shaft would stand proud of the boss, and a short one only
+# deepens the recess and shortens the pin's wall, which build_drive_train_
+# assembly's worst-case stacks carry.  Printed on Depth from the model.
+# RULING W15-SHAFT-BAND (Main 2026-09-25): unilateral +0/-0.4 is required by
+# the W15 pin-wall and recess stacks (pinion_pin_edge_stack /
+# pinion_recess_stack in build_drive_train_assembly); at the title-block .X
+# +/-0.8 the wall is 1.873 < 2.0 and the recess -0.461.
+SHAFT_LENGTH_BAND = (0.00, -0.40)  # (upper, lower) deviations
 
 # The installed v2 pivot post remains fixed.  Its Ø11.438 bore spans world
 # z -142.244894428..-70.210494428.  Moving the common crank face from -175 to
@@ -78,7 +109,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # hand-cranked shaft is routine (.X).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftProfile": {"ShaftDiaDim": 3},
-    "Shaft": {"Depth": 1},
+    "Shaft": {"Depth": crank_pinion_spec.SHAFT_LENGTH_PLACES},
     "ShaftDomeProfile": {"DomeHeight": 1},
     "JournalProfile": {"JournalDiaDim": 3},
     "StationReference": {
