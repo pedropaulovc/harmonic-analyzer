@@ -1763,6 +1763,9 @@ def _fastener_rows_env(task: str) -> str | None:
             f"{task!r} is not a doit task name; pass the task the subprocess works "
             "for, or its fastener-row guard is lost"
         )
+    # diag (never merge, #923): a sample sheet reads its real drawing's rows.
+    if task.startswith("drawing:ansi_sample_"):
+        task = "drawing:" + task.removeprefix("drawing:ansi_sample_")
     family, _, stem = task.partition(":")
     if task not in _FASTENER_ROWS:
         if family == "part" and stem in part_stems():
@@ -1774,7 +1777,9 @@ def _fastener_rows_env(task: str) -> str | None:
         elif task in {f"drawing:ansi_template_{lay}" for lay in _ANSI_DIAG_LAYOUTS}:
             pass  # diag (never merge, #923): reads no fastener row
         elif family in ("part", "assembly", "drawing"):
-            raise ValueError(f"{task!r} names no {family} task; its fastener rows are unknown")
+            raise ValueError(
+                f"{task!r} names no {family} task; its fastener rows are unknown"
+            )
     rows = _FASTENER_ROWS.get(task)
     return None if rows is None else ",".join(sorted(rows))
 
@@ -2053,9 +2058,7 @@ def _release_seat_documents(label: str) -> None:
         )
 
 
-def _reprobe_under_seat(
-    key: str, outputs: list[Path], label: str, probed: str
-) -> bool:
+def _reprobe_under_seat(key: str, outputs: list[Path], label: str, probed: str) -> bool:
     """The under-seat re-probe every cached COM action runs: a peer may have
     published this exact artefact while we blocked for the seat, so restore it
     rather than rebuild (the fleet cache-split win; fable/codex review). Its OWN
@@ -2716,7 +2719,9 @@ def task_drawing():
     # diag (never merge): the true-ANSI template re-base leaf (#923).
     script = _ANSI_DIAG_SCRIPT
     for layout in _ANSI_DIAG_LAYOUTS:
-        template = REPO_ROOT / "cad" / "templates" / f"harmonic-analyzer-{layout}.DRWDOT"
+        template = (
+            REPO_ROOT / "cad" / "templates" / f"harmonic-analyzer-{layout}.DRWDOT"
+        )
         out_dir = CAD_OUT / "templates"
         outputs = [
             out_dir / template.name,
@@ -2741,6 +2746,32 @@ def task_drawing():
                         deps,
                         outputs,
                         f"drawing-ansi-template-{layout}",
+                    ],
+                )
+            ],
+            "verbosity": 2,
+        }
+    # diag (never merge): real sheets on the re-based template (#923).
+    for stem in _ANSI_SAMPLES:
+        deps = _ansi_sample_deps(stem)
+        outputs = [
+            CAD_OUT / "ansi-sample" / f"{DRAWINGS_BY_NAME[stem].artifact_stem}{suffix}"
+            for suffix in (".SLDDRW", ".pdf", ".png")
+        ]
+        label = f"drawing:ansi_sample_{stem}"
+        yield {
+            "name": f"ansi_sample_{stem}",
+            "file_dep": deps,
+            "targets": [str(path) for path in outputs],
+            "actions": [
+                (
+                    _cached_com_action,
+                    [
+                        label,
+                        [sys.executable, str(_ANSI_SAMPLE_SCRIPT), stem],
+                        deps,
+                        outputs,
+                        f"drawing-ansi-sample-{stem}",
                     ],
                 )
             ],
@@ -3552,6 +3583,7 @@ def task_build():
             # diag (never merge): the worker admits only tasks in the exported
             # build/release closure (#923).
             + [f"drawing:ansi_template_{layout}" for layout in _ANSI_DIAG_LAYOUTS]
+            + [f"drawing:ansi_sample_{stem}" for stem in _ANSI_SAMPLES]
             + [f"verify:{s}" for s in _VERIFY_NAMES]
         ),
     }
@@ -3590,6 +3622,22 @@ def _ansi_diag_deps(layout: str) -> list[str]:
     )
 
 
+_ANSI_SAMPLE_SCRIPT = SCRIPTS_DIR / "diagnostics" / "diag_ansi_sample_drawing.py"
+_ANSI_SAMPLES = ("post_mount_screw", "cone_tip_block")
+
+
+def _ansi_sample_deps(stem: str) -> list[str]:
+    """diag (never merge): the real drawing's inputs plus the sample wrapper's."""
+    return sorted(
+        {
+            *_drawing_file_deps(stem),
+            str(_ANSI_SAMPLE_SCRIPT),
+            *_helper_deps(_ANSI_SAMPLE_SCRIPT),
+            *_ansi_diag_deps("landscape"),  # the re-base it reuses, stated outright
+        }
+    )
+
+
 def _cache_rows() -> list[tuple[str, list[str]]]:
     """(label, file_deps) for every cacheable COM task, in build order."""
     rows: list[tuple[str, list[str]]] = []
@@ -3602,6 +3650,8 @@ def _cache_rows() -> list[tuple[str, list[str]]]:
         rows.append((f"drawing:{stem}", _drawing_file_deps(stem)))
     for layout in _ANSI_DIAG_LAYOUTS:
         rows.append((f"drawing:ansi_template_{layout}", _ansi_diag_deps(layout)))
+    for stem in _ANSI_SAMPLES:
+        rows.append((f"drawing:ansi_sample_{stem}", _ansi_sample_deps(stem)))
     for stem in ASSEMBLY_ORDER:
         rows.append((f"verify_soundness:{stem}", _soundness_file_deps(stem)))
     rows.append(("verify:kinematics", _kinematics_file_deps()))
