@@ -191,11 +191,18 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to front view")
 
     # Rod-pin hole native callout (the #47 wizard hole near the +X tip).
+    # Both bores are picked by DIAMETER (the visible-entity walk), never by a
+    # rim coordinate: r743-p1s-B's coordinate pick on the #47 rim resolved to
+    # the strap's tapered end-face line 1.6 mm (sheet) away, so AddHoleCallout2
+    # had no hole to call out; the pivot bore's rim pick already had the same
+    # fate against the concentric hub (see its finish below).
     rod_rim = _sheet_xy(ROD_HOLE_X, ROD_HOLE_Y - _ROD_HOLE_DIA / 2.0)
+    rod_hole_edge = visible_circle_edge(adapter, front, _ROD_HOLE_DIA)
+    pivot_bore_edge = visible_circle_edge(adapter, front, PIVOT_HOLE_DIA)
     add_native_hole_callout(
         adapter,
         front,
-        edge_xy=rod_rim,
+        edge=rod_hole_edge,
         callout_xy=(0.300, 0.128),
         label="rod-pin hole",
     )
@@ -214,6 +221,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(0.180, 0.138),
         label="rod-pin X location",
         orientation="horizontal",
+        entities=(pivot_bore_edge, rod_hole_edge),
     )
     set_basic_dimension(adapter, rod_location_x, label="rod-pin X location")
     rod_location_y = add_edge_dimension(
@@ -224,6 +232,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(0.267, 0.162),
         label="rod-pin Y location",
         orientation="vertical",
+        entities=(pivot_bore_edge, rod_hole_edge),
     )
     set_basic_dimension(adapter, rod_location_y, label="rod-pin Y location")
 
@@ -263,10 +272,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pivot_radius * math.cos(pivot_finish_angle),
         _PIVOT_MID_Y + pivot_radius * math.sin(pivot_finish_angle),
     )
-    # Pick the bore circle by DIAMETER (the visible-entity walk the cone-gear
-    # drawing uses): a coordinate pick on the concentric O6.5 / O10 rims
-    # resolves to the hub's outer circle within SolidWorks' tolerance.
-    pivot_bore_edge = visible_circle_edge(adapter, front, PIVOT_HOLE_DIA)
+    # The bore circle picked by DIAMETER above (the visible-entity walk the
+    # cone-gear drawing uses): a coordinate pick on the concentric O6.5 / O10
+    # rims resolves to the hub's outer circle within SolidWorks' tolerance.
     add_surface_finish(
         adapter,
         front,
@@ -306,7 +314,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=rod_rim,
+        edge_entity=rod_hole_edge,
         frame_xy=(0.300, 0.195),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["rod-pin hole position"],
