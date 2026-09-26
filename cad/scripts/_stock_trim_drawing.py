@@ -16,7 +16,7 @@ import math
 from typing import Any
 
 from _common import _early_bound, _read_member
-from _drawing_common import dimension_name, model_point_in_view
+from _drawing_common import dimension_name, model_point_in_view, sketch_view_circle
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import view_name
 
@@ -44,7 +44,6 @@ def end_detail(adapter: Any, front: Any, sheet: TrimSheet) -> Any:
     """Crop the real cut end; transform the fence as in the cylinder-gear recipe."""
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
-    parent = _early_bound(front, "IView")
     if not ddoc.ActivateView(view_name(adapter, front)):
         raise RuntimeError("cannot activate cut-end detail parent")
     draw.ClearSelection2(True)
@@ -55,19 +54,9 @@ def end_detail(adapter: Any, front: Any, sheet: TrimSheet) -> Any:
         label="cut end detail center",
     )
     radius = sheet.fence_radius_mm * sheet.sheet_scale[0] / sheet.sheet_scale[1] / 1000
-    sketch = _early_bound(parent.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = []
-    for x, y in (center, (center[0] + radius, center[1])):
-        point = _early_bound(
-            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
-        )
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        points.append(tuple(float(value) for value in projected.ArrayData))
-    manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if manager.CreateCircle(*points[0], *points[1]) is None:
-        raise RuntimeError("cannot create native cut-end detail fence")
+    sketch_view_circle(
+        adapter, front, center, radius, coords="sheet", label="cut-end detail fence"
+    )
     detail = ddoc.CreateDetailViewAt4(
         *sheet.detail_center, 0.0, 0, *sheet.detail_scale, "A", 1, True, False, False, 5
     )

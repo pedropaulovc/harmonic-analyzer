@@ -215,6 +215,7 @@ class _FakeSketchManager:
         raises: Exception | None = None,
     ) -> None:
         self.AddToDB = add_to_db
+        self.DisplayWhenAdded = add_to_db
         self.add_to_db_when_created: bool | None = None
         self.calls: list[tuple[float, ...]] = []
         self._snap = snap
@@ -345,7 +346,8 @@ def test_section_cut_uses_parent_sketch_coordinates(
         label="centre cut regression",
     )
     assert result is doubles.section
-    assert doubles.points == [(*doubles.start, 0.0), (*doubles.end, 0.0)]
+    # The two asks come first; the helper then probes the transform's scale.
+    assert doubles.points[:2] == [(*doubles.start, 0.0), (*doubles.end, 0.0)]
     assert doubles.sketch_manager.calls[0] == pytest.approx(
         (0.0, -0.050 / scale, 0.0, 0.0, 0.050 / scale, 0.0)
     )
