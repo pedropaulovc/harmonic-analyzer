@@ -89,3 +89,47 @@ def test_layout_stays_geometry_only() -> None:
     )
     source = Path(bank.__file__).read_text(encoding="utf-8")
     assert "title_block" not in source.split('"""', 2)[2]
+
+
+def test_arbor_spans_both_straps_and_domes_proud_of_each() -> None:
+    """#743 supersedes U34b's "span less 6.0": the arbor fills both strap
+    bores, where the apex set screws bear on it, and each end is domed
+    ARBOR_DOME_HEIGHT proud of its strap's outer face."""
+    import arbor_pedestal_spec as ped
+
+    assert bank.STRAP_OUTER_SPAN == pytest.approx(bank.STRAP_INNER_SPAN + 2 * ped.STRAP_T)
+    assert bank.ARBOR_LENGTH == pytest.approx(bank.STRAP_OUTER_SPAN)
+    assert bank.ARBOR_SOUTH_Z == pytest.approx(bank.FRONT_STRAP_INNER_Z - ped.STRAP_T)
+    assert bank.ARBOR_SOUTH_Z + bank.ARBOR_LENGTH == pytest.approx(
+        bank.BACK_STRAP_INNER_Z + ped.STRAP_T
+    )
+    assert bank.ARBOR_OVERALL_LENGTH == pytest.approx(
+        bank.ARBOR_LENGTH + 2 * bank.ARBOR_DOME_HEIGHT
+    )
+    # A true dome over the whole end (SR about 8.3 on the 3/8 rod), never
+    # more than a hemisphere.
+    import cylinder_gear_shaft_spec as arbor
+
+    assert 0.0 < bank.ARBOR_DOME_HEIGHT <= arbor.SHAFT_DIA / 2.0
+
+
+def test_pedestals_anchor_on_the_bank_strap_faces() -> None:
+    """The drive train stands each MHA-004 on its strap inner face (U34 row 5),
+    and the #743 stack is what fixes those faces."""
+    import arbor_pedestal_spec as ped
+
+    assert bank.FRONT_PEDESTAL_ORIGIN_Z == pytest.approx(
+        bank.FRONT_STRAP_INNER_Z - ped.STRAP_INNER_Z
+    )
+    assert bank.BACK_PEDESTAL_ORIGIN_Z == pytest.approx(
+        bank.BACK_STRAP_INNER_Z + ped.STRAP_INNER_Z
+    )
+    assert bank.FRONT_STRAP_INNER_Z == pytest.approx(-71.519, abs=5e-4)
+    assert bank.BACK_STRAP_INNER_Z == pytest.approx(73.062, abs=5e-4)
+    # The apex set screws sit at each strap's mid-depth.
+    assert bank.FRONT_SET_SCREW_Z == pytest.approx(
+        bank.FRONT_PEDESTAL_ORIGIN_Z + ped.SET_SCREW_Z
+    )
+    assert bank.BACK_SET_SCREW_Z == pytest.approx(
+        bank.BACK_PEDESTAL_ORIGIN_Z - ped.SET_SCREW_Z
+    )

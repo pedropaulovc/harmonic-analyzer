@@ -15,6 +15,9 @@ strap.
 * The BACK (north) strap is the bank's axial datum. Its inner face is
   DRO-located at fit-up, and the bank is pushed back against it: g19's back
   face bears on the back washer, which bears on the back strap.
+* The arbor fills both strap bores and domes proud of each strap; a set
+  screw in each pedestal's crown apex bears on it (MHA-147): the back one
+  fixes the arbor, the front one is tightened once the end-play leaf is set.
 * The FRONT (south) strap is feeler-set: one BANK_END_FEELER leaf between the
   front washer and the strap. That gap is the bank's assembled end play, E_b.
   The feeler is chosen by the rule ``pinion_rig_layout`` uses for its drum
@@ -39,6 +42,7 @@ from __future__ import annotations
 import math
 
 import _config
+import arbor_pedestal_spec as _pedestal
 from cylinder_end_disc_spec import (
     WASHER_THICK,
     WASHER_THICK_TOLERANCE_MM,
@@ -121,6 +125,25 @@ STRAP_INNER_SPAN = BACK_STRAP_INNER_Z - FRONT_STRAP_INNER_Z
 # spans FACE_WIDTH/2 .. FACE_WIDTH/2 + CAM_THICKNESS south of it.
 CAM_MID_DZ = -(FACE_WIDTH + CAM_THICKNESS) / 2.0
 
+# --- pedestals, arbor and set screws (nominal, bank pushed back) ------------
+# Each MHA-004 stands on its strap INNER face (U34 row 5): the front one as
+# built (local +z = machine +z), the back one turned 180 about y (local +z =
+# machine -z). Their origins follow from those faces.
+FRONT_PEDESTAL_ORIGIN_Z = FRONT_STRAP_INNER_Z - _pedestal.STRAP_INNER_Z
+BACK_PEDESTAL_ORIGIN_Z = BACK_STRAP_INNER_Z + _pedestal.STRAP_INNER_Z
+STRAP_OUTER_SPAN = STRAP_INNER_SPAN + 2.0 * _pedestal.STRAP_T
+# The arbor fills both strap bores end to end, so the MHA-147 apex set screws
+# (each at its strap's mid-depth) bear on it, and each end is domed
+# ARBOR_DOME_HEIGHT proud of its strap's outer face. Its cylinder IS the span
+# over both straps, the length the fitter measures and cuts to (#743,
+# superseding U34b's "span less 6.0").
+ARBOR_DOME_HEIGHT = 1.5
+ARBOR_LENGTH = STRAP_OUTER_SPAN
+ARBOR_SOUTH_Z = FRONT_STRAP_INNER_Z - _pedestal.STRAP_T
+ARBOR_OVERALL_LENGTH = ARBOR_LENGTH + 2.0 * ARBOR_DOME_HEIGHT
+FRONT_SET_SCREW_Z = FRONT_PEDESTAL_ORIGIN_Z + _pedestal.SET_SCREW_Z
+BACK_SET_SCREW_Z = BACK_PEDESTAL_ORIGIN_Z - _pedestal.SET_SCREW_Z
+
 # --- g0 -> g19 pitch-stack band ---------------------------------------------
 # g0's tooth-front face sits at g19's back face - L20 + (T0 - FW0).
 G0_FRONT_FROM_G19_BACK = G0_TOOTH_FRONT_Z - G19_BACK_FACE_Z
@@ -165,6 +188,15 @@ DATUM_CHAIN_STACK = {
 }
 
 __all__ = [
+    "ARBOR_DOME_HEIGHT",
+    "ARBOR_LENGTH",
+    "ARBOR_OVERALL_LENGTH",
+    "ARBOR_SOUTH_Z",
+    "BACK_PEDESTAL_ORIGIN_Z",
+    "BACK_SET_SCREW_Z",
+    "FRONT_PEDESTAL_ORIGIN_Z",
+    "FRONT_SET_SCREW_Z",
+    "STRAP_OUTER_SPAN",
     "BACK_STRAP_INNER_Z",
     "BACK_WASHER_Z",
     "BANK_END_FEELER",

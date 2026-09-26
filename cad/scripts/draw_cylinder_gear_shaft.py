@@ -28,12 +28,13 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
+from cylinder_bank_layout import ARBOR_DOME_HEIGHT, ARBOR_LENGTH
 from cylinder_gear_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DOME_CALLOUT,
     LENGTH_CALLOUT,
     SHAFT_DIA,
-    SHAFT_LENGTH,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -66,8 +67,11 @@ SHEET_SCALE = (1.0, 1.0)
 PROFILE_CENTER = (0.140, 0.190)
 PROFILE_ROTATION = -math.pi / 2.0  # model +Y (arbor axis) -> sheet +x
 SHAFT_FLANK_Y = PROFILE_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 2000.0
-SHAFT_LEFT_X = PROFILE_CENTER[0] - SHAFT_LENGTH * SHEET_SCALE[0] / 2000.0
-# The 162 shaft's isometric silhouette is a mostly-VERTICAL slender bar (~0.153
+# The view centres on the bar's bounding box, domes included, so the cylinder
+# (ARBOR_LENGTH, the span over both straps) is centred too.
+SHAFT_LEFT_X = PROFILE_CENTER[0] - ARBOR_LENGTH * SHEET_SCALE[0] / 2000.0
+SHAFT_RIGHT_X = PROFILE_CENTER[0] + ARBOR_LENGTH * SHEET_SCALE[0] / 2000.0
+# The 168 shaft's isometric silhouette is a mostly-VERTICAL slender bar (~0.153
 # m long at 1:1 -- taller than the drawable band), so the pictorial renders at
 # 1:2 and says so in its own note.
 ISO_CENTER = (0.330, 0.175)
@@ -81,7 +85,15 @@ ISO_SCALE = (1, 2)
 DONOR_CENTER = (0.355, 0.248)
 DONOR_KEEP = {"ShaftDia": (0.392, DONOR_CENTER[1])}
 PROFILE_DIAMETERS = {"ShaftDia": (0.196, 0.222)}
-PROFILE_KEEP = {"Depth": (PROFILE_CENTER[0], 0.158)}
+PROFILE_KEEP = {
+    "Depth": (PROFILE_CENTER[0], 0.158),
+    # Over the north (right-hand) dome, above the bar: a short .X height the
+    # "BOTH ENDS" callout makes a 2X statement.
+    "DomeHeight": (
+        SHAFT_RIGHT_X + ARBOR_DOME_HEIGHT * SHEET_SCALE[0] / 2000.0,
+        0.206,
+    ),
+}
 # Ra on the one running surface: the O.D. the 20 cylinder gears turn on and
 # both pedestals journal.  A revolved/extruded flank is a drawing SILHOUETTE,
 # not a model edge, so the pick names that entity type.
@@ -238,6 +250,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("profile view does not carry exactly one arbor length")
     set_reference_dimension(adapter, length_annotations[0], label="arbor length")
     set_dimension_callouts(adapter, length_annotations, {"Depth": LENGTH_CALLOUT})
+    set_dimension_callouts(adapter, profile_annotations, {"DomeHeight": DOME_CALLOUT})
 
     # A bare rectangle does not say which pair of lines is the O.D.; the axis
     # does, and it is what the shop indicates the bar on.  The face pick sits
