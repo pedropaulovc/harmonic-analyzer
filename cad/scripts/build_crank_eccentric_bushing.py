@@ -59,9 +59,11 @@ from crank_eccentric_bushing_spec import (
     FLATS_ACROSS,
     FLATS_LENGTH,
     FLATS_THROW_LEAN,
+    GEOMETRIC_CONTROLS,
     LENGTH,
     OD_BAND,
     OUTER_DIA,
+    PART_DATUMS,
     SURFACE_FINISHES,
     WALL_FLOOR_MM,
 )
@@ -229,7 +231,12 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    author_part_pmi(
+        adapter,
+        datums=PART_DATUMS,
+        controls=GEOMETRIC_CONTROLS,
+        surface_finishes=SURFACE_FINISHES,
+    )
     apply_drawing_properties(
         adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
     )

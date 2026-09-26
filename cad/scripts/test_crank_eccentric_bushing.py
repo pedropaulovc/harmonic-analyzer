@@ -119,3 +119,27 @@ def test_notes_identify_both_mates_and_state_the_exception_without_a_size() -> N
         spec.POST_MATE_NUMBER, ""
     )
     assert not any(character.isdigit() for character in stripped)
+
+
+def test_the_bore_holds_its_share_of_the_crank_angle_budget() -> None:
+    """Rule 3's crank-mesh entry: one diametral parallelism frame, bore to OD,
+    authored as model PMI; the stack takes its angle from the same constant."""
+    from _gtol_spec import CylinderFace
+
+    (datum,) = spec.PART_DATUMS
+    assert datum.letter == "A"
+    assert datum.face == CylinderFace(spec.OUTER_DIA, contains_y_mm=spec.LENGTH / 2.0)
+    (frame,) = spec.GEOMETRIC_CONTROLS
+    assert frame.characteristic == "parallelism"
+    assert frame.tolerance_zone == "diametral"
+    assert frame.datums == ("A",)
+    assert frame.tolerance == f"{spec.BORE_PARALLELISM_MM:.2f}" == "0.05"
+    assert frame.face == CylinderFace(spec.BORE_DIA, contains_y_mm=spec.LENGTH / 2.0)
+    assert crank_mesh_stack.BUSHING_ANGLE_DEG == pytest.approx(
+        math.degrees(math.atan(spec.BORE_PARALLELISM_MM / spec.LENGTH))
+    )
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "datums=PART_DATUMS" in source
+    assert "controls=GEOMETRIC_CONTROLS" in source
+    policy = _policy()
+    assert "MHA-149's bore: one diametral parallelism frame" in policy
