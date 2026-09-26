@@ -8,7 +8,8 @@ each run of ink is. The two only agree when every COM text item finds the PDF
 text object that printed it. This tool replays drawing layout reports and
 reports, per annotation kind:
 
-* how often a COM text item matched a PDF text object (``match_ink``);
+* how often a COM text item matched a PDF text object, in the audit's own
+  assignment (``assign_sheet_text``, view labels included);
 * the COM-vs-ink offsets of the matched items (left edge, baseline, ink
   height over COM height), in millimetres;
 * the unmatched items (the audit reports each as ``text-unmatched``);
@@ -41,12 +42,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from _layout_audit import (  # noqa: E402
     ANNOTATION_KINDS,
+    assign_sheet_text,
     audit_dump,
+    audited_annotations,
     ink_edges,
-    is_hidden,
     ink_key,
     ink_spans,
-    match_ink,
+    span_box,
     text_items,
     view_edges,
 )
@@ -57,26 +59,29 @@ MM = 1000.0
 
 
 def _annotations(dump: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
-    """(kind, annotation) for every audited annotation on the sheet: like
-    the audit, a hidden one is left out, so it cannot claim a visible
-    annotation's printed text or count as unmatched."""
-    owned = [a for view in dump.get("views", ()) for a in view.get("annotations", ())]
-    owned += [a for a in dump.get("sheet_annotations", ()) if int(a.get("owner_type", 1)) == 1]
-    return [(ANNOTATION_KINDS.get(int(a.get("type", 0)), "other"), a) for a in owned if not is_hidden(a)]
+    """(kind, annotation) for every annotation the audit matches
+    (``audited_annotations``): a hidden one is left out, so it cannot claim a
+    visible annotation's printed text or count as unmatched."""
+    return [(ANNOTATION_KINDS.get(int(a.get("type", 0)), "other"), a) for a in audited_annotations(dump)]
 
 
 def match_items(dump: dict[str, Any]) -> list[dict[str, Any]]:
-    """Every keyed COM text item against the PDF text object the audit matched."""
+    """Every keyed COM text item against the PDF text object the audit
+    matched: the sheet's one assignment (``assign_sheet_text``), in which the
+    section and detail labels compete for the same spans. Only annotation
+    runs are reported."""
+    annotations = _annotations(dump)
+    spans = ink_spans(dump)
+    chosen = assign_sheet_text(dump, [annotation for _kind, annotation in annotations], spans)
     keyed = [
         ((id(annotation), index), (kind, annotation, item))
-        for kind, annotation in _annotations(dump)
+        for kind, annotation in annotations
         for index, item in enumerate(text_items(annotation.get("display") or {}))
         if ink_key(item.text)
     ]
-    printed = match_ink([(key, item) for key, (_k, _a, item) in keyed], ink_spans(dump))
     records = []
     for key, (kind, annotation, item) in keyed:
-        box = printed.get(key)
+        box = span_box(spans, chosen[key]) if key in chosen else None
         record = {
             "kind": kind,
             "label": str(annotation.get("name", "")),

@@ -1885,6 +1885,26 @@ def test_section_labels_join_the_sheets_one_text_assignment():
     assert label.text_boxes[0].xmin == pytest.approx(0.1002)
 
 
+def test_calibration_matches_text_in_the_audits_one_assignment():
+    """Codex P2 on 727ea8f56: the calibration matched annotation runs alone,
+    so where a section label and a dimension compete for one "A" it put the
+    dimension on the span the audit gives the label, and its offsets and
+    match rate disagreed with the audit's."""
+    from diagnostics.layout_calibration import match_items
+
+    h = 0.0035
+    dim = _dim("DimA", "A", 0.1010, 0.100)
+    section = {"label": "A", "line": [], "arrows": [], "texts": [0.0960, 0.100 + h, 0.0], "text_height": h}
+    view = _view("v", (0.05, 0.05, 0.25, 0.25), [dim], sections=[section])
+    spans = [["A", 0.1002, 0.1009, 0.1017, 0.1042], ["A", 0.1060, 0.1009, 0.1075, 0.1042]]  # P, Q
+    dump = _dump(views=[view], spans=spans, print_rest=False)
+    [audited] = [a for a in sheet_model(dump).geometry.annotations if a.kind == "dim"]
+    assert audited.text_boxes[0].xmin == pytest.approx(0.1060)  # the audit: Q, the label keeps P
+    [record] = match_items(dump)
+    assert record["label"] == "DimA"
+    assert record["pdf_box_mm"][0] == pytest.approx(audited.text_boxes[0].xmin * 1000.0)
+
+
 def test_detail_labels_join_the_sheets_one_text_assignment():
     """The sweep's other label path: a detail circle's label (any short
     all-letter run in its window) must not lose its only span to annotation
