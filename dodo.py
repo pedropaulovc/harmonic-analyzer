@@ -1771,6 +1771,8 @@ def _fastener_rows_env(task: str) -> str | None:
             _recipe_files(stem)
         elif family == "drawing" and stem in DRAWINGS_BY_NAME:
             _drawing_file_deps(stem)
+        elif task in {f"drawing:ansi_template_{lay}" for lay in _ANSI_DIAG_LAYOUTS}:
+            pass  # diag (never merge, #923): reads no fastener row
         elif family in ("part", "assembly", "drawing"):
             raise ValueError(f"{task!r} names no {family} task; its fastener rows are unknown")
     rows = _FASTENER_ROWS.get(task)
