@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
+import _equation_units
 import build_cone_pivot_post as part
+import cone_incline
 import cone_pivot_post_spec as spec
 import draw_cone_pivot_post as drawing
 from _assembly import _seed_flip, activate_assembly_contract
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED_UM, SEAT_UM, surface_finish_by_key
 
 
 def test_required_drawing_paths() -> None:
@@ -24,7 +29,7 @@ def test_required_drawing_paths() -> None:
 def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
     assert (spec.BLOCK_DIA, spec.BLOCK_HEIGHT) == (42.011, 86.0)
     assert (spec.HEAD_DIA, spec.HEAD_HEIGHT, spec.HEAD_BASE_Y) == (
-        42.7506,
+        44.0,
         26.6,
         59.4,
     )
@@ -36,82 +41,232 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
     ) == (21.93, 11.438, 72.7, 0.0)
     assert spec.CRANK_BOSS_LENGTH_IN == 2.8360
     assert round(spec.CRANK_BOSS_LENGTH, 4) == 72.0344
+    # The spot face is stationed from the post axis, NOT from the cast collar.
+    assert spec.CRANK_BOSS_NORTH_FACE == 21.3753
     assert round(spec.CRANK_BOSS_START_Z, 4) == -21.3753
+    assert spec.CRANK_BOSS_START_Z != -spec.HEAD_DIA / 2.0
     assert round(spec.CRANK_BOSS_END_Z, 4) == 50.6591
     assert (spec.CONE_BOSS_DIA, spec.BORE_DIA, spec.BORE_HEIGHT) == (
         17.2,
         12.2808,
         33.368,
     )
-    assert spec.INCLINE_DEG == 12.5182
+    # The incline is the drive train's derived one, not a rounded literal.
+    assert spec.INCLINE_DEG is cone_incline.INCLINE_DEG
+    assert f"{spec.INCLINE_DEG:.4f}" == "12.5182"
     assert (
         spec.ATTACHMENT_SPACING,
         spec.ATTACHMENT_THRU_DIA,
         spec.ATTACHMENT_CBORE_DIA,
         spec.ATTACHMENT_CBORE_DEPTH,
     ) == (26.88704, 7.14248, 11.50874, 6.0198)
-    assert spec.HARVESTED_VOLUME_MM3 == 112_302.9406
-    assert spec.HARVESTED_MASS_KG == 0.808581173
+    # The final volume is the per-feature sum the build checks natively; a
+    # constant that drifts from the features (the 2026-09-21 unbored-boss
+    # build) fails at import, so only mass coherence is left to pin here.
+    assert spec.HARVESTED_VOLUME_MM3 == round(part._ANALYTIC_FINAL_MM3, 4)
+    assert round(spec.HARVESTED_VOLUME_MM3 * 7.2e-6, 6) == spec.HARVESTED_MASS_KG
+    assert round(part.CRANK_BORE_MM3, 1) == 7401.7
+    assert round(part.CRANK_SPOT_FACE_MM3, 1) == 93.1
+    assert round(part.ATTACHMENT_HOLES_MM3, 1) == 7661.6
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
+    kept = (
+        set(drawing.FRONT_KEEP)
+        | set(drawing.TOP_KEEP)
+        | set(drawing.SECTION_KEEP)
+        | set(drawing.JOURNAL_KEEP)
+    )
     assert kept == marked
     assert marked == {
         "MainBodyDia",
         "MainBodyHt",
         "HeadDia",
         "HeadHt",
+        "MountWestX",
+        "MountEastX",
         "CrankAxisY",
+        "CrankAboveCone",
         "CrankBossDia",
+        "CrankBossLen",
+        "ConeBossLen",
         "CrankBoreDia",
+        "JournalAxisY",
+        "ConeBossDia",
+        "JournalBoreDia",
+        "CrankBossStartZ",
+        "InclineAngle",
     }
-    assert drawing.FRONT_KEEP["CrankBossDia"][1] == (
-        drawing._front_y(drawing.CRANK_BORE_HEIGHT) + 0.018
-    )
-    assert drawing.FRONT_KEEP["CrankBoreDia"][1] == (
-        drawing._front_y(drawing.CRANK_BORE_HEIGHT) - 0.012
+    # No dimension may be placed twice: two views that both carry a value are
+    # two chances for the sheet to contradict itself.
+    assert (
+        len(drawing.FRONT_KEEP)
+        + len(drawing.TOP_KEEP)
+        + len(drawing.SECTION_KEEP)
+        + len(drawing.JOURNAL_KEEP)
+        == len(kept)
     )
 
 
-def test_journal_axis_table_matches_the_inclined_v2_bore() -> None:
-    assert spec.JOURNAL_AXIS_ORIENTATION_NOTE == (
-        "O = A/B INTERSECTION; +Y ALONG B AWAY FROM A\n"
-        "+X RIGHT; +Z DOWN IN UPPER PLAN"
+def test_inclined_journal_sizes_live_in_the_true_shape_view() -> None:
+    """The cone-axis view alone exposes the boss OD and bore in true shape.
+
+    It is also the one view showing both bores, so the crank-above-cone
+    spacing chains off the cone-axis height there.
+    """
+    cone_owned = (
+        spec.DRAWING_DIMENSIONS["ConeBossProfile"]
+        | spec.DRAWING_DIMENSIONS["JournalBoreProfile"]
+        | spec.DRAWING_DIMENSIONS["BoreSpacingReference"]
     )
-    assert tuple(
-        (point, *(round(value, 3) for value in coordinates))
-        for point, *coordinates in spec.JOURNAL_AXIS_POINTS
-    ) == (
-        ("P", 0.0, 33.368, 0.0),
-        ("Q", 21.675, 33.368, 97.623),
+    assert set(drawing.JOURNAL_KEEP) == cone_owned
+    assert drawing.CONE_AXIS_VIEW == part.CONE_AXIS_VIEW == "CONE JOURNAL"
+
+
+def test_cone_boss_length_lives_in_the_bore_plane_section() -> None:
+    """The raised boss's axial extent is dimensioned where its profile is visible."""
+    assert drawing.SECTION_SCALE == (1, 1)
+    assert set(drawing.SECTION_KEEP) == {"ConeBossLen"}
+    assert "ConeBossLen" not in drawing.TOP_KEEP
+    start, end = drawing.CONE_SECTION_LINE
+    assert start[1] == end[1] == drawing._front_y(spec.BORE_HEIGHT)
+    assert start[0] < drawing.FRONT_CENTER[0] < end[0]
+
+
+def test_part_owns_every_printed_decimal_place() -> None:
+    assert part.DRAWING_PRECISION is spec.DRAWING_PRECISION
+    assert set(spec.DRAWING_PRECISION_BY_NAME) == set().union(
+        *spec.DRAWING_DIMENSIONS.values()
     )
+    assert "draw_cone_pivot_post.py" in PRECISION_MIGRATED_DRAWINGS
+    # Only the two running bores earn a third place, and only because their
+    # size limits are what deliver the shaft_in_bushing clearance band.
+    assert {
+        name
+        for name, places in spec.DRAWING_PRECISION_BY_NAME.items()
+        if places >= 3
+    } == {"CrankBoreDia", "JournalBoreDia"}
+
+
+def test_running_bores_close_the_configured_fit_class() -> None:
+    import _config
+    import cone_gear_shaft_spec
+    import crankshaft_spec
+
+    upper, lower = spec.RUNNING_BORE_BAND
+    expected = tuple(_config.fit("shaft_in_bushing", "diametral_clearance_mm"))
+    for bore, shaft_nominal, shaft_band in (
+        (
+            spec.CRANK_BORE_DIA,
+            crankshaft_spec.JOURNAL_DIA,
+            crankshaft_spec.JOURNAL_DIA_BAND,
+        ),
+        (
+            spec.BORE_DIA,
+            cone_gear_shaft_spec.JOURNAL_DIA,
+            cone_gear_shaft_spec.SECTION_DIA_BAND,
+        ),
+    ):
+        shaft_max = shaft_nominal + shaft_band[0]
+        shaft_min = shaft_nominal + shaft_band[1]
+        clearances = (bore + lower - shaft_max, bore + upper - shaft_min)
+        assert tuple(round(value, 3) for value in clearances) == expected
+
+
+def test_nothing_else_on_the_casting_carries_a_band() -> None:
+    """One band, named once, applied to the two features the fit class names.
+
+    The cast body, collar and boss diameters and the mounting-hole stations
+    are not accuracy features (cad/docs/tolerance-policy.md, "Result"), so the
+    part must not author a tolerance on them at all: the title block's general
+    grade is the whole specification.
+    """
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert source.count("set_dimension_bilateral_tolerance(") == 3
+    assert "set_dimension_symmetric_tolerance" not in source
+    assert source.count("deviations(RUNNING_BORE_BAND)") == 2
+    assert source.count("deviations(CRANK_ABOVE_CONE_BAND)") == 1
+    assert not hasattr(spec, "TURNED_DIAMETER_TOLERANCE_MM")
+    assert not hasattr(spec, "CRANK_BORE_TOLERANCE_MM")
+
+
+def test_the_plan_angle_is_model_geometry_not_sheet_text() -> None:
+    """The 12.5182 deg plan incline is a DRIVING model dimension.
+
+    A driven reference angle cannot express it: SOLIDWORKS returns the
+    obtuse member of a line pair whatever the ray directions, the selection
+    order or the text position.  A driving dimension fixes the quadrant when
+    the sketch is authored, and driving it from the same ``ConeIncline``
+    global that builds ConeShaftNormal is what stops the printed value and
+    the built geometry from drifting apart.
+    """
+    assert "InclineAngle" in spec.DRAWING_DIMENSIONS["JournalPlanReference"]
+    assert "CrankBossStartZ" in spec.DRAWING_DIMENSIONS["JournalPlanReference"]
+    assert round(spec.CRANK_BOSS_NEAR_Z, 4) == 21.3753
+    assert round(spec.JOURNAL_REFERENCE_X, 6) == 8.670004
+    assert round(spec.JOURNAL_REFERENCE_Z, 6) == 39.049085
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'plan.record("InclineAngle", \'"ConeIncline"\')' in source
+    assert "add_angular_reference_dimension" not in source
+    # A blanked sketch's dimensions never reach InsertModelAnnotations3.
+    blanked = source.split("_blank_reference_geometry(\n        adapter,")[1]
+    assert "JournalPlanReference" not in blanked.split("\n    )\n")[0]
+
+
+def test_machined_faces_are_called_out_on_the_casting() -> None:
+    assert part.SURFACE_FINISHES is spec.SURFACE_FINISHES
+    keys = {control.key for control in spec.SURFACE_FINISHES}
+    assert keys == {"foot_seat", "crank_bore", "journal_bore"}
+    assert (
+        surface_finish_by_key(spec.SURFACE_FINISHES, "foot_seat").roughness_um
+        == SEAT_UM
+    )
+    for key in ("crank_bore", "journal_bore"):
+        assert (
+            surface_finish_by_key(spec.SURFACE_FINISHES, key).roughness_um
+            == MACHINED_UM
+        )
+    seat = surface_finish_by_key(spec.SURFACE_FINISHES, "foot_seat").face
+    assert seat.normal == (0, -1, 0) and seat.offset_mm == 0.0
+    crank = surface_finish_by_key(spec.SURFACE_FINISHES, "crank_bore").face
+    assert (crank.diameter_mm, crank.contains_y_mm) == (
+        spec.CRANK_BORE_DIA,
+        spec.CRANK_BORE_HEIGHT,
+    )
+    journal = surface_finish_by_key(spec.SURFACE_FINISHES, "journal_bore").face
+    assert (journal.diameter_mm, journal.contains_y_mm) == (
+        spec.BORE_DIA,
+        spec.BORE_HEIGHT,
+    )
+
+
+def test_sheet_carries_no_datums_or_feature_control_frames() -> None:
+    assert spec.GEOMETRIC_TOLERANCES_MM == {}
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "JOURNAL AXIS COORDINATES (mm)" in source
-    assert "AXIS = LINE THROUGH P AND Q" in source
-    assert "JOURNAL_AXIS_POINTS" in source
-    assert '("POINT", "X", "Y", "Z")' in source
-    assert "note.SetBalloon(4, 0)" in source
+    for banned in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "set_basic_dimension(",
+        "set_dimension_precision(",
+        "SetBalloon(",
+    ):
+        assert banned not in source
 
 
-def test_manufacturing_notes_describe_the_bossed_casting() -> None:
-    notes = spec.DRAWING_NOTES
-    assert "A48" not in notes
-    assert "MACHINE FOOT, BOSSES, BORES AND MOUNTING HOLES" in notes
-    assert "MAIN-BODY OD" in notes
-    assert "INCLINED JOURNAL AXIS" in notes
-    assert "12.2808" in notes
-    assert "11.438" in notes
-    assert "11.50874" in notes
-    assert "26.88704" in notes
-    assert "CONTINUOUS-CAST ROUND STOCK" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert "ATTACHMENT_CBORE_DIA" in source
-    assert "ATTACHMENT_THRU_DIA" in source
-    assert "ATTACHMENT_SPACING" in source
+def test_manufacturing_notes_do_not_restate_dimensions() -> None:
+    # A note may state the axis relationship, but it may not restate a size, a
+    # band or a finish: those remain dimensions and native symbols under
+    # drawing-simplicity-policy.md rules 1 and 6.
+    # drawing-simplicity-policy.md rule 6: at most four short lines.
+    lines = spec.DRAWING_NOTES.splitlines()
+    assert len(lines) <= 4
+    assert max(len(line) for line in lines) <= 64
+    stripped = re.sub(r"MHA-\d+", "", spec.DRAWING_NOTES)
+    assert not any(character.isdigit() for character in stripped)
+    for banned in ("DIA", "THRU", "DEEP", "C-C", "DATUM", "MACHINE", "Ra"):
+        assert banned not in spec.DRAWING_NOTES
 
 
 def test_source_records_exact_manual_photo_provenance() -> None:
@@ -137,7 +292,7 @@ def test_part_exposes_semantic_mating_references() -> None:
         "mount west",
     ):
         assert f'"{name}"' in source
-    assert '_create_feature_cylinder_axis(' in source
+    assert "_create_feature_cylinder_axis(" in source
     assert '"ConeShaftBoss",\n        CONE_BOSS_DIA / 2.0' in source
     assert '(("mount west", ATTACHMENT_X), ("mount east", -ATTACHMENT_X))' in source
     assert not hasattr(part, "CRANK_BORE_DX")
@@ -162,7 +317,7 @@ def test_v2_feature_topology_uses_midplane_extrusions_and_hole_wizard() -> None:
     assert "_revolved_cylinder" not in source
     assert "create_revolve" not in source
     assert source.count("both_directions=True") == 2
-    assert source.count('create_sketch("ConeShaftNormal")') == 2
+    assert source.count('create_sketch("ConeShaftNormal")') == 3
     assert "angle=-INCLINE_DEG" in source
     assert 'HoleSpec(\n    "counterbore_fillister",\n    "1/4"' in source
     assert source.count("wizard_holes(") == 1
@@ -170,43 +325,11 @@ def test_v2_feature_topology_uses_midplane_extrusions_and_hole_wizard() -> None:
     assert 'name="AttachmentScrewHoles"' in source
 
 
-def test_native_datums_and_controls_are_present() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 4
-    assert 'datums=("A", "B")' in source
-    assert 'datums=("A", "B", "C")' in source
-    assert 'characteristic="flatness"' in source
-    assert 'characteristic="cylindricity"' in source
-    assert 'characteristic="position"' in source
-    assert "add_surface_finish(" not in source
-
-
-def test_view_scales_are_explicit() -> None:
-    assert drawing.SHEET_SCALE == (1.0, 1.0)
-    assert drawing.TOP_CENTER == (0.105, 0.235)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(1, 1)") == 1
-    assert source.count("scale=(1, 2)") == 2
 
 
 def test_bore_rim_com_scan_is_traced() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert (
-        '@_telemetry.traced("drawing.bore_rim_scan")\n'
-        "def _bore_rim_edge"
-    ) in source
-
-
-def test_inclined_journal_datum_uses_projected_axis_center() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "journal_center = model_point_in_view(" in source
-    assert "symbol_xy=(journal_center[0], journal_center[1] - 0.018)" in source
-    assert "frame_xy=(0.185, journal_center[1] - 0.023)" in source
-    assert (
-        '"UPPER PLAN SCALE 1:2 (+X RIGHT, +Z DOWN)",\n'
-        "        0.070,\n        0.263,"
-    ) in source
+    assert ('@_telemetry.traced("drawing.bore_rim_scan")\n' "def _bore_rim_edge") in source
 
 
 def test_part_config_is_a_machined_casting() -> None:
@@ -218,9 +341,532 @@ def test_part_config_is_a_machined_casting() -> None:
     config = _config.parts("cone-pivot-post")
     assert config["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
     assert config["material"] == "LOW-CARBON STEEL OR GRAY IRON"
-    assert "RAL 6005" in str(config["finish"])
-    assert "SSPC-SP 3" in str(config["finish"])
-    assert "50-75 um DFT" in str(config["finish"])
-    assert "boss" in str(config["finish"]).lower()
+    finish = str(config["finish"])
+    assert "RAL 6005" in finish
+    assert "SSPC-SP 3" in finish
+    assert "50-75 um DFT" in finish
+    assert "MASK MACHINED FACES" in finish
+    assert "OIL BARE FACES ISO VG 32" in finish
     assert config["process"] == "machined from solid stock or casting"
     assert int(config["quantity"]) == 1
+
+
+def test_collar_diameter_lives_on_its_plan_circle() -> None:
+    """The front-view crank-bore leaders must not cross a collar dimension line."""
+    assert "HeadDia" in drawing.TOP_KEEP
+    assert "HeadDia" not in drawing.FRONT_KEEP
+    # Names the feature, not a process: the part may be turned from bar stock.
+    assert drawing.DIMENSION_CALLOUTS["HeadDia"] == "COLLAR"
+
+
+def test_cone_boss_end_faces_are_located_by_symmetry() -> None:
+    assert "CONE BOSS END FACES ARE SYMMETRIC ABOUT THE POST AXIS." in spec.DRAWING_NOTES
+
+
+def test_plan_angle_prints_one_place_under_the_one_degree_band() -> None:
+    assert spec.DRAWING_PRECISION_BY_NAME["InclineAngle"] == 1
+
+
+def test_section_reads_by_its_bore_axis_not_by_a_note() -> None:
+    assert "SECTION A-A" not in spec.DRAWING_NOTES
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_add_cone_section_centerline(adapter, section, cone_axis)" in source
+
+
+def test_spotface_station_prints_its_value_on_its_own_dimension_line() -> None:
+    """The 21.38 station is a plain dimension: no label, no offset shelf."""
+    assert "CrankBossStartZ" not in drawing.DIMENSION_CALLOUTS
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '{"CrankBossStartZ":' not in source
+    # Left of the Ø44 circle and right of the crank-boss length's line.
+    x, _y = drawing.TOP_KEEP["CrankBossStartZ"]
+    assert drawing.TOP_KEEP["CrankBossLen"][0] < x < drawing._top_x(-spec.HEAD_DIA / 2.0)
+
+
+def test_section_centerline_is_forced_to_print_black_in_center_font() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert drawing._SW_LINE_CENTER == 4
+    assert "segment.Color = 0" in source
+    assert "segment.Style = _SW_LINE_CENTER" in source
+    assert "int(segment.Color) != 0 or int(segment.Style) != _SW_LINE_CENTER" in source
+
+
+def test_crank_boss_od_is_labelled_as_the_boss() -> None:
+    """The elevation sees the boss's far end: its Ø is the boss, not a spotface."""
+    assert drawing.DIMENSION_CALLOUTS["CrankBossDia"] == "CRANK BOSS"
+    assert "SPOTFACE" not in drawing.DIMENSION_CALLOUTS.values()
+
+
+def test_section_caption_states_no_scale_at_sheet_scale() -> None:
+    assert drawing.SECTION_SCALE == drawing.SHEET_SCALE
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'expected = "<VLNAME> <VLLABEL>"\n' in source
+
+
+def test_spotface_station_has_one_driving_global() -> None:
+    """The printed station and the plane the boss grows from cannot drift apart."""
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '"CrankBossNearZ": CRANK_BOSS_NEAR_Z,' in source
+    assert 'drive_jobs.append(("D1@CrankInterfacePlane", \'"CrankBossNearZ"\'))' in source
+    assert 'plan.record("CrankBossStartZ", \'"CrankBossNearZ"\')' in source
+
+
+def test_crank_bore_is_located_from_the_cone_bore_inside_the_mesh_window() -> None:
+    """U31: the 16T:64T mesh closes on the bore spacing, so the print states it.
+
+    Re-adds the spec's stated worst-case contributors and proves the printed
+    band, read against the model nominal, stays inside what the centre-distance
+    contract leaves for the spacing.
+    """
+    assert round(spec.CRANK_ABOVE_CONE, 3) == 39.332
+    assert spec.CRANK_ABOVE_CONE_BAND == (0.37, 0.0)
+    window_lo, window_hi = -0.150, 0.540
+    crank_float = 0.0375 + 0.075 / 72.03 * 5.65
+    cone_float = 0.0375 + 0.075 / 42.01 * 5.68
+    float_open = crank_float + cone_float
+    plan_angle = 0.063
+    station = 0.015
+    dc_ddy = 39.332 / 39.735
+    lo = (window_lo + plan_angle + station) / dc_ddy
+    hi = (window_hi - float_open - plan_angle - station) / dc_ddy
+    printed = round(spec.CRANK_ABOVE_CONE, 2)
+    upper, lower = spec.CRANK_ABOVE_CONE_BAND
+    assert lo < printed + lower - spec.CRANK_ABOVE_CONE
+    assert printed + upper - spec.CRANK_ABOVE_CONE < hi
+    # The assembly check reads backlash at rest (crank dropped by gravity):
+    # every in-print post must land inside the drive-train sheet's 0.20-0.55.
+    backlash_lo = 0.28 + 0.517 * (
+        dc_ddy * (printed + lower - spec.CRANK_ABOVE_CONE)
+        - plan_angle
+        - station
+        - crank_float
+    )
+    backlash_hi = 0.28 + 0.517 * (
+        dc_ddy * (printed + upper - spec.CRANK_ABOVE_CONE)
+        + plan_angle
+        + station
+        + cone_float
+    )
+    assert 0.20 <= backlash_lo < backlash_hi <= 0.55
+    # The foot-to-crank height stays on the front view only as a reference.
+    assert "CrankAxisY" in drawing.FRONT_KEEP
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'label="crank axis height reference"' in drawing_source
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert """set_global(adapter, "CrankAxisY", '"JournalAxisY" + "CrankAboveCone"')""" in source
+    assert "ONE SETUP" in spec.DRAWING_NOTES
+    assert "BORE-TO-BORE" in spec.DRAWING_NOTES
+
+
+def test_deep_mounting_holes_carry_a_drilling_note() -> None:
+    """U37: the 2X mounting holes run the full post height in cast iron."""
+    assert "DRILL MOUNTING HOLES FROM TOP FACE" in spec.DRAWING_NOTES
+    assert "CONE BORE AT BREAKOUT" in spec.DRAWING_NOTES
+
+
+def test_point_relations_use_the_point_relation_types() -> None:
+    """swConstraintType_HORIZONTAL/VERTICAL apply only to lines.
+
+    r6 (farm, 2026-09-23) related BoreSpacingReference's start point to the
+    origin with plain "horizontal": SOLIDWORKS returned a relation, but the
+    sketch stayed under-defined.  A point pair must use the *_points type.
+    """
+    import re as _re
+
+    from solidworks_mcp.adapters.solidworks.sketch import RELATION_NAME_MAP
+
+    assert RELATION_NAME_MAP["horizontal_points"] == 25  # swConstraintType_HORIZPOINTS
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    calls = _re.findall(
+        r"add_sketch_constraint\(\s*([^,]+),\s*([^,]+),\s*\"(\w+)\"", source
+    )
+    assert calls, "no sketch relations found"
+    for entity1, entity2, relation in calls:
+        is_point_pair = entity2.strip() != "None" and (
+            ".start" in entity1 or ".end" in entity1 or ".center" in entity1
+        )
+        if is_point_pair and relation in {"horizontal", "vertical"}:
+            raise AssertionError(
+                f"line-only relation {relation!r} on points {entity1} / {entity2}"
+            )
+    assert '"origin", "horizontal_points"' in source
+
+
+def _catalog_rows(node):
+    if isinstance(node, dict):
+        for value in node.values():
+            yield from _catalog_rows(value)
+    if isinstance(node, list):
+        if node and all(isinstance(cell, str) for cell in node):
+            yield node
+        for item in node:
+            yield from _catalog_rows(item)
+
+
+def test_dimension_catalog_row_matches_the_spec() -> None:
+    # dimensions.yaml is the narrative geometry catalog; its cone-pivot-post
+    # row must state the collar the part is built with, not the retired
+    # v2-harvest O42.7506 (Codex PRRT_kwDOPHDy386l4aOa).
+    import yaml
+
+    catalog = Path(spec.__file__).resolve().parents[1] / "config" / "dimensions.yaml"
+    rows = [
+        row
+        for row in _catalog_rows(yaml.safe_load(catalog.read_text(encoding="utf-8")))
+        if row[0].startswith("`cone-pivot-post`")
+    ]
+    assert len(rows) == 1
+    dims = rows[0][1]
+    assert f"Ø{spec.HEAD_DIA:.1f} ± 0.4 × {spec.HEAD_HEIGHT:g} upper collar" in dims
+    assert f"y {spec.HEAD_BASE_Y:g}..{spec.BLOCK_HEIGHT:g}" in dims
+    assert f"Ø{spec.BLOCK_DIA:g} × {spec.BLOCK_HEIGHT:.1f} tall" in dims
+    assert f"bore on the body centreline at y {spec.CRANK_BORE_HEIGHT:g}" in dims
+    assert "42.7506" not in " ".join(rows[0])
+
+
+def test_cone_incline_drives_the_plane_the_inclined_features_are_built_on() -> None:
+    # Codex PRRT_kwDOPHDy386l5WL2: ConeShaftNormal was created from the literal
+    # -INCLINE_DEG and never bound, so a GUI edit of ConeIncline turned the
+    # printed plan angle but not the cone boss, bore, journal axis or view.
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '("D1@ConeShaftNormal", \'"ConeIncline"\')' in source
+    assert "_assert_journal_axis_direction(adapter)" in source
+
+
+def test_journal_axis_check_rejects_the_mirrored_plane_solution() -> None:
+    import math
+
+    incline = math.radians(spec.INCLINE_DEG)
+    designed = (math.sin(incline), 0.0, math.cos(incline))
+    assert part._journal_axis_misalignment(designed) < 1e-12
+    assert part._journal_axis_misalignment(tuple(-v for v in designed)) < 1e-12
+    assert part._journal_axis_misalignment(tuple(40.0 * v for v in designed)) < 1e-12
+    mirrored = (-math.sin(incline), 0.0, math.cos(incline))
+    assert math.isclose(
+        part._journal_axis_misalignment(mirrored), math.sin(2.0 * incline)
+    )
+    assert part._journal_axis_misalignment((0.0, 0.0, 1.0)) > 1e-6
+    assert part._journal_axis_misalignment((0.0, 0.0, 0.0)) == 1.0
+
+
+def test_registry_titles_the_part_for_the_title_block() -> None:
+    import _config
+
+    assert _config.parts("cone-pivot-post")["title"] == "Cone Pivot Post"
+
+
+class _Dim:
+    def __init__(self, state: int, radians: float, reference: bool = False) -> None:
+        self.DrivenState = state
+        self.SystemValue = radians
+        self._reference = reference
+
+    def IsReference(self) -> bool:
+        return self._reference
+
+
+class _Model:
+    def __init__(self, dims: dict[str, _Dim]) -> None:
+        self._dims = dims
+
+    def Parameter(self, name: str) -> _Dim | None:
+        return self._dims.get(name)
+
+
+def _ownership_fixture(monkeypatch, dims, equations):
+    import math
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(
+        part,
+        "_equations_for",
+        lambda _adapter, lhs: [e for e in equations if e.startswith(lhs + " ")],
+    )
+    return SimpleNamespace(currentModel=_Model(dims)), math.radians(spec.INCLINE_DEG)
+
+
+def _owned_dims(incline: float) -> dict[str, _Dim]:
+    return {
+        "D1@ConeShaftNormal": _Dim(1, incline),
+        "D1@CrankInterfacePlane": _Dim(1, 0.0213753),
+        "InclineAngle@JournalPlanReference": _Dim(1, incline),
+        "CrankBossStartZ@JournalPlanReference": _Dim(1, 0.0213753),
+    }
+
+
+_OWNED_EQUATIONS = [
+    '"D1@ConeShaftNormal" = "ConeIncline"',
+    '"InclineAngle@JournalPlanReference" = "ConeIncline"',
+]
+
+
+def test_cone_incline_single_ownership_gate_passes_on_one_equation_owner(
+    monkeypatch,
+) -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "    _assert_cone_incline_single_owner(adapter)\n" in source.replace(
+        "\r\n", "\n"
+    )
+    adapter, incline = _ownership_fixture(monkeypatch, {}, _OWNED_EQUATIONS)
+    adapter.currentModel = _Model(_owned_dims(incline))
+    part._assert_cone_incline_single_owner(adapter)
+
+
+def test_cone_incline_single_ownership_gate_rejects_each_failure(monkeypatch) -> None:
+    import pytest
+
+    adapter, incline = _ownership_fixture(monkeypatch, {}, _OWNED_EQUATIONS)
+    # A second owner, a missing owner, a reference demotion, a state unlike the
+    # control, and a non-neutral drive must each fail loud.
+    cases = []
+    doubled = _OWNED_EQUATIONS + ['"D1@ConeShaftNormal" = 12.5182deg']
+    cases.append((_owned_dims(incline), doubled, "expected one equation"))
+    cases.append((_owned_dims(incline), _OWNED_EQUATIONS[1:], "expected one equation"))
+    demoted = _owned_dims(incline)
+    demoted["D1@ConeShaftNormal"] = _Dim(1, incline, reference=True)
+    cases.append((demoted, _OWNED_EQUATIONS, "reference dimension"))
+    unlike = _owned_dims(incline)
+    unlike["InclineAngle@JournalPlanReference"] = _Dim(2, incline)
+    cases.append((unlike, _OWNED_EQUATIONS, "differs from the equation-owned control"))
+    moved = _owned_dims(incline)
+    moved["D1@ConeShaftNormal"] = _Dim(1, incline + 1e-6)
+    cases.append((moved, _OWNED_EQUATIONS, "reads"))
+    for dims, equations, message in cases:
+        monkeypatch.setattr(
+            part,
+            "_equations_for",
+            lambda _adapter, lhs, eqs=equations: [
+                e for e in eqs if e.startswith(lhs + " ")
+            ],
+        )
+        adapter.currentModel = _Model(dims)
+        with pytest.raises(RuntimeError, match=message):
+            part._assert_cone_incline_single_owner(adapter)
+
+
+def test_cone_incline_global_is_stored_at_full_precision() -> None:
+    # r10 (a5df755e) leaf: "global ConeIncline = 12.5182deg -> 12.52". The
+    # equation manager rounds a global to the document's angular decimal places
+    # (the template's 2), so both ConeIncline-owned angles read 12.52 against
+    # the built geometry.  The angular global goes through _equation_units,
+    # which widens the places and proves the stored value (r11: -> 12.5182).
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'await set_angular_global(adapter, "ConeIncline", INCLINE_DEG)' in source
+    assert 'set_global(adapter, "ConeIncline"' not in source
+    assert _equation_units.SW_UNITS_ANGULAR_DECIMAL_PLACES == 52
+    assert _equation_units.EQUATION_ANGULAR_DECIMALS == 8
+    assert _equation_units.ANGULAR_GLOBAL_TOLERANCE_DEG == 1e-8
+
+
+class _Extension:
+    def __init__(self, sticks: bool) -> None:
+        self.values = {_equation_units.SW_UNITS_ANGULAR_DECIMAL_PLACES: 2}
+        self.sticks = sticks
+
+    def GetUserPreferenceInteger(self, pref: int, option: int) -> int:
+        assert option == 0
+        return self.values[pref]
+
+    def SetUserPreferenceInteger(self, pref: int, option: int, value: int) -> bool:
+        assert option == 0
+        if self.sticks:
+            self.values[pref] = value
+        return True
+
+
+def _units_adapter(monkeypatch, sticks: bool):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(_equation_units, "_early_bound", lambda obj, _iface: obj)
+    extension = _Extension(sticks)
+    return SimpleNamespace(currentModel=SimpleNamespace(Extension=extension)), extension
+
+
+def test_equation_angular_decimals_are_set_and_read_back(monkeypatch) -> None:
+    import pytest
+
+    adapter, extension = _units_adapter(monkeypatch, sticks=True)
+    _equation_units.keep_equation_angles_exact(adapter)
+    assert extension.values[_equation_units.SW_UNITS_ANGULAR_DECIMAL_PLACES] == 8
+    adapter, _extension = _units_adapter(monkeypatch, sticks=False)
+    with pytest.raises(RuntimeError, match="angular decimal places read 2"):
+        _equation_units.keep_equation_angles_exact(adapter)
+
+
+def test_angular_global_is_written_exactly_and_rounding_fails_loud(monkeypatch) -> None:
+    import asyncio
+
+    import pytest
+
+    written: list[tuple[str, str]] = []
+
+    def fake_set_global(stored: float):
+        async def _set_global(_adapter, name, expr):
+            written.append((name, expr))
+            return stored
+
+        return _set_global
+
+    adapter, extension = _units_adapter(monkeypatch, sticks=True)
+    monkeypatch.setattr(
+        _equation_units, "set_global", fake_set_global(round(spec.INCLINE_DEG, 8))
+    )
+    stored = asyncio.run(
+        _equation_units.set_angular_global(adapter, "ConeIncline", spec.INCLINE_DEG)
+    )
+    assert abs(stored - spec.INCLINE_DEG) < 1e-8
+    assert written == [("ConeIncline", f"{spec.INCLINE_DEG!r}deg")]
+    assert float(written[0][1].removesuffix("deg")) == spec.INCLINE_DEG
+    assert extension.values[_equation_units.SW_UNITS_ANGULAR_DECIMAL_PLACES] == 8
+    # The r10 failure: the template's two places store 12.52.
+    monkeypatch.setattr(_equation_units, "set_global", fake_set_global(12.52))
+    with pytest.raises(RuntimeError, match="global ConeIncline stored 12.52"):
+        asyncio.run(
+            _equation_units.set_angular_global(adapter, "ConeIncline", spec.INCLINE_DEG)
+        )
+
+
+# The incline's consumers this PR owns.  TODO(swing): add
+# build_cone_swing_platform.py (and its INCLINE_DEG = literal, line 124) when
+# that branch rebases onto #833 and switches to cone_incline.INCLINE_DEG.
+_CONE_INCLINE_CONSUMERS = (
+    "cone_incline.py",
+    "_equation_units.py",
+    "build_cone_pivot_post.py",
+    "cone_pivot_post_spec.py",
+    "cone_pivot_post_installation.py",
+    "draw_cone_pivot_post.py",
+    "build_drive_train_assembly.py",
+    "test_cone_pivot_post_drawing.py",
+)
+
+
+def test_no_script_carries_the_rounded_cone_incline_literal() -> None:
+    # One source for the cone incline (cone_incline.INCLINE_DEG): the post
+    # hard-coded 12.5182 against the drive train's derived 12.518222...  No
+    # numeric literal of it may come back in a consumer.
+    import io
+    import tokenize
+
+    scripts = Path(part.__file__).resolve().parent
+    offenders = []
+    for path in (scripts / name for name in _CONE_INCLINE_CONSUMERS):
+        source = path.read_text(encoding="utf-8")
+        for token in tokenize.generate_tokens(io.StringIO(source).readline):
+            if token.type == tokenize.NUMBER and token.string.startswith("12.518"):
+                offenders.append(f"{path.relative_to(scripts)}:{token.start[0]}")
+    assert offenders == []
+
+
+def test_journal_axis_readback_runs_before_the_ownership_gate() -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    axis = source.index("    _assert_journal_axis_direction(adapter)\n")
+    owner = source.index("    _assert_cone_incline_single_owner(adapter)\n")
+    assert axis < owner
+
+
+def _function_source(module, name: str) -> str:
+    import inspect
+
+    return inspect.getsource(getattr(module, name))
+
+
+def test_cone_axis_view_is_derived_from_the_rebuilt_axis() -> None:
+    # Codex PRRT_kwDOPHDy386mFsEs: the named view was a matrix frozen to the
+    # Python-time INCLINE_DEG, so a GUI edit of ConeIncline left View B skewed.
+    import math
+
+    incline = math.radians(spec.INCLINE_DEG)
+    designed = (math.sin(incline), 0.0, math.cos(incline))
+    expected = (
+        math.cos(incline), 0.0, -math.sin(incline),
+        0.0, 1.0, 0.0,
+        math.sin(incline), 0.0, math.cos(incline),
+    )
+    # r12's readback runs the other sense; either sense gives the same view.
+    readback = (-0.0009728067983417014, 0.0, -0.004381452997468928)
+    for axis in (designed, tuple(-v for v in designed), readback):
+        rotation = part.cone_axis_view_rotation(axis)
+        assert max(abs(a - b) for a, b in zip(rotation, expected)) < 1e-9
+    # A different rebuilt incline yields a different view: nothing is frozen.
+    edited = math.radians(20.0)
+    rotation = part.cone_axis_view_rotation((math.sin(edited), 0.0, math.cos(edited)))
+    assert abs(rotation[6] - math.sin(edited)) < 1e-12
+    assert abs(rotation[0] - math.cos(edited)) < 1e-12
+    for body in (
+        _function_source(part, "cone_axis_view_rotation"),
+        _function_source(part, "sync_cone_axis_view"),
+        _function_source(drawing, "_assert_view_geometry"),
+        _function_source(drawing, "_add_cone_section_centerline"),
+    ):
+        assert "math.radians(INCLINE_DEG)" not in body
+        assert "INCLINE_DEG)" not in body
+    assert "journal_axis_vector(adapter)" in _function_source(part, "sync_cone_axis_view")
+    assert not hasattr(part, "_name_cone_axis_view")
+
+
+def test_drawing_regenerates_view_b_from_the_live_axis_before_placing_it() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    sync = source.index("    cone_axis = sync_cone_axis_view(adapter)\n")
+    place = source.index("        CONE_AXIS_VIEW,\n")
+    assert sync < place
+    assert "        cone_axis=cone_axis,\n" in source
+
+
+class _ViewModel:
+    def __init__(self, stored) -> None:
+        from _named_views import octant_rotation
+
+        self._standard = octant_rotation(1, 1, 1)
+        self.stored = stored
+        self.named: list[str] = []
+        self.Extension = self
+        self.ActiveView = type("View", (), {"Orientation3": None})()
+
+    def GetStandardViewRotation(self, _view: int):
+        return self._standard
+
+    def GetNamedViewRotation(self, _name: str):
+        return self.stored
+
+    def NameView(self, name: str) -> None:
+        self.named.append(name)
+        self.stored = self.pending
+
+    def ShowNamedView2(self, _name: str, _view: int) -> None:
+        pass
+
+
+def test_sync_regenerates_only_a_stale_named_view(monkeypatch) -> None:
+    import math
+    from types import SimpleNamespace
+
+    edited = math.radians(20.0)
+    axis = (math.sin(edited), 0.0, math.cos(edited))
+    fresh = part.cone_axis_view_rotation(axis)
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(part, "journal_axis_vector", lambda _adapter: axis)
+    monkeypatch.setattr(part, "double_array", lambda values: tuple(values))
+
+    class _Utility:
+        def CreateTransform(self, values):
+            model.pending = tuple(values[:9])
+            return values
+
+    # A view saved at the old incline is regenerated from the rebuilt axis.
+    stale = part.cone_axis_view_rotation(
+        (math.sin(math.radians(spec.INCLINE_DEG)), 0.0, math.cos(math.radians(spec.INCLINE_DEG)))
+    )
+    model = _ViewModel(stale)
+    adapter = SimpleNamespace(
+        currentModel=model, swApp=SimpleNamespace(GetMathUtility=lambda: _Utility())
+    )
+    assert part.sync_cone_axis_view(adapter) == axis
+    assert model.named == [spec.CONE_AXIS_VIEW]
+    assert model.stored == fresh
+    # An up-to-date view is left alone (a normal drawing build never dirties it).
+    model = _ViewModel(fresh)
+    adapter.currentModel = model
+    part.sync_cone_axis_view(adapter)
+    assert model.named == []
