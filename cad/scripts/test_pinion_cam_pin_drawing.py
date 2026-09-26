@@ -225,3 +225,42 @@ def test_the_part_owns_the_printed_precision() -> None:
     )
     assert "draw_pinion_cam_pin.py" in PRECISION_MIGRATED_DRAWINGS
     assert not drawing_specification_violations(draw_source, filename=drawing.__file__)
+
+
+# The crown symbol's ink relative to CROWN_FINISH_SYMBOL_XY (the V's root) at
+# its 2.5 mm character height, measured on the pc-r4-860 render: the leader
+# leaves the shelf's right end, and the "Ra 1.6" text sits above the shelf
+# with its lower-right corner up and to the right of that end.
+_SHELF_END_DX = 0.0064
+_TEXT_RIGHT_DX = 0.0148
+_TEXT_BOTTOM_DY = 0.0042
+_LEADER_TEXT_CLEARANCE = 0.0005
+
+
+def _crown_leader_rise_at_text_right(symbol_xy: tuple[float, float]) -> float:
+    """Height of the straight roughness leader, above the shelf, where it
+    passes the text's right edge."""
+    _x, y_model, z_model = drawing._crown_point(drawing.CROWN_FINISH_FROM_ROOT_MM)
+    crown = (
+        drawing.side_view_x(z_model * 1000.0),
+        drawing.RIGHT_CENTER[1] + y_model * drawing.SHEET_SCALE[0],
+    )
+    shelf_end = (symbol_xy[0] + _SHELF_END_DX, symbol_xy[1])
+    slope = (crown[1] - shelf_end[1]) / (crown[0] - shelf_end[0])
+    return slope * (_TEXT_RIGHT_DX - _SHELF_END_DX)
+
+
+def test_crown_finish_leader_passes_under_its_own_text() -> None:
+    """Machinist review of 7b21b56c0 (codex): the crown's Ra 1.6 leader crossed
+    its own text.  The leader rises from the shelf end to the crown point, so
+    it must still be below the text's baseline where the text ends."""
+    limit = _TEXT_BOTTOM_DY - _LEADER_TEXT_CLEARANCE
+    assert _crown_leader_rise_at_text_right(drawing.CROWN_FINISH_SYMBOL_XY) < limit
+    # Positive control: the reviewed position ran through the "1.6".
+    assert _crown_leader_rise_at_text_right((0.120, 0.140)) > _TEXT_BOTTOM_DY
+    # The leader still rises onto the crown's lower flank, from the lower left.
+    _x, y_model, _z = drawing._crown_point(drawing.CROWN_FINISH_FROM_ROOT_MM)
+    crown_y = drawing.RIGHT_CENTER[1] + y_model * drawing.SHEET_SCALE[0]
+    assert drawing.CROWN_FINISH_SYMBOL_XY[1] < crown_y
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_crown_point(CROWN_FINISH_FROM_ROOT_MM)" in source
