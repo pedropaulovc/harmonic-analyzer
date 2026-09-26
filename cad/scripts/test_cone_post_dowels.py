@@ -275,3 +275,114 @@ def test_plate_names_each_dowel_axis_for_the_assembly() -> None:
         assert f'("{name}", "AXIS"),' in source
     for plane in ("Plane11", "Plane12", "Plane13", "Plane14"):
         assert f'("{plane}", "PLANE"),' in source
+
+
+def _volume_check_calls(tree: "ast.AST") -> dict[str, "ast.Call"]:
+    import ast
+
+    calls: dict[str, ast.Call] = {}
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "volume_check"
+            and len(node.args) >= 2
+            and isinstance(node.args[1], ast.Constant)
+        ):
+            calls[node.args[1].value] = node
+    assert calls, "no volume_check calls found"
+    return calls
+
+
+def test_post_feature_volume_checks_chain_from_the_previous_actual() -> None:
+    """S1 leaf 917-s1-9094: part:cone_pivot_post failed "post dowel reams:
+    volume 113938.0 mm^3, expected 113935.8 (+/- 1.4)".  The reams removed
+    140.7 against an analytic 140.8; the 2.2 miss was the boss and cone pads
+    reading ~2 mm^3 over their analytic, carried in the running analytic sum.
+
+    Every per-feature step after the head collar must rebind ``volume`` to the
+    ACTUAL volume volume_check returns and build its expected value as
+    ``volume +/- <feature>``, so a step's band measures only its own feature.
+    """
+    import ast
+    import inspect
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(post_part.build)))
+    calls = _volume_check_calls(tree)
+    rebinds = {
+        node.value.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and [getattr(t, "id", None) for t in node.targets] == ["volume"]
+        and isinstance(node.value, ast.Await)
+    }
+    chained = (
+        "v2 crank boss",
+        "v2 crank spot face",
+        "v2 crank bore",
+        "v2 cone pads",
+        "v2 cone bore",
+        "v2 mounting holes",
+        "post dowel reams",
+    )
+    for label in ("v2 head collar", *chained):
+        assert calls[label] in rebinds, f"{label}: volume not rebound to the actual"
+    for label in chained:
+        expected = calls[label].args[2]
+        assert (
+            isinstance(expected, ast.BinOp)
+            and isinstance(expected.op, (ast.Add, ast.Sub))
+            and isinstance(expected.left, ast.Name)
+            and expected.left.id == "volume"
+        ), f"{label}: expected is {ast.unparse(expected)}, not volume +/- feature"
+
+
+class _FakeMass:
+    def __init__(self, volume: float) -> None:
+        self.is_success = True
+        self.error = None
+        self.data = type("D", (), {"volume": volume})()
+
+
+class _FakeAdapter:
+    def __init__(self, volume: float) -> None:
+        self._volume = volume
+
+    async def get_mass_properties(self) -> _FakeMass:
+        return _FakeMass(self._volume)
+
+
+def _ream_check(before_actual: float, after_actual: float, expected: float) -> None:
+    import asyncio
+
+    from _common import volume_check
+
+    asyncio.run(
+        volume_check(
+            _FakeAdapter(after_actual),
+            "post dowel reams",
+            expected,
+            0.01 * post_part.POST_DOWEL_HOLES_MM3,
+        )
+    )
+
+
+def test_post_dowel_ream_band_accepts_the_leaf_and_rejects_a_wrong_reamer() -> None:
+    """Replays the leaf's actual volumes (mounting holes 114078.7, reams
+    113938.0; running analytic 113935.8)."""
+    before, after, running_analytic = 114078.7, 113938.0, 113935.8
+    removed = post_part.POST_DOWEL_HOLES_MM3
+    assert removed == pytest.approx(140.8, abs=0.05)
+    # Positive control: the old expected value -- the running analytic sum,
+    # +2.2 behind the actual -- rejects the right reams.
+    with pytest.raises(RuntimeError, match="post dowel reams: volume 113938.0"):
+        _ream_check(before, after, running_analytic)
+    # Chained from the previous step's actual, the same reams pass.
+    _ream_check(before, after, before - removed)
+    # A 1/64 in oversize reamer still fails the chained band.
+    wrong = 2.0 * post_part.blind_hole_volume_mm3(
+        post_part.POST_DOWEL_REAM_DIA + 0.4, post_part.POST_DOWEL_BLIND_DEPTH
+    )
+    with pytest.raises(RuntimeError, match="post dowel reams"):
+        _ream_check(before, before - wrong, before - removed)
