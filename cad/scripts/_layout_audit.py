@@ -756,6 +756,49 @@ def _arrow_tails(segments: Sequence[Segment], arrows: Sequence[Any]) -> list[Seg
     return tails
 
 
+def _dimension_shoulders(segments: Sequence[Segment], items: Sequence[TextItem]) -> list[Segment]:
+    """A dimension's text shoulder as ``shoulder``, not ``ext-line``.
+
+    A diameter or radius dimension with its text parked off the feature
+    draws a horizontal run on the baseline of its lowest text row, on from
+    the free end of its dimension line, the way a callout does (knife-mount's
+    Ø12.00 / THRU). It carries no arrow, so ``_split_dimension_lines`` calls
+    it extension line. An extension line that merely passes the text's
+    baseline (pinion-bracket's 7.000 witness at y 136) does not start where
+    a dimension line ends, and stays ``ext-line``.
+    """
+    if not items:
+        return list(segments)
+    baseline = min(item.y for item in items)
+    left = min(item.x for item in items)
+    right = max(item.x + item.height for item in items)
+    ends = [
+        point
+        for segment in segments
+        if segment.role == "dim-line"
+        for point in ((segment.x0, segment.y0), (segment.x1, segment.y1))
+    ]
+
+    def continues(segment: Segment) -> bool:
+        return any(
+            math.hypot(x - ex, y - ey) <= COLLINEAR_TOL_M
+            for x, y in ((segment.x0, segment.y0), (segment.x1, segment.y1))
+            for ex, ey in ends
+        )
+
+    return [
+        replace(segment, role="shoulder")
+        if segment.role == "ext-line"
+        and _is_horizontal(segment)
+        and abs(segment.y0 - baseline) < SHOULDER_Y_TOL_M
+        and min(segment.x0, segment.x1) < right
+        and max(segment.x0, segment.x1) > left
+        and continues(segment)
+        else segment
+        for segment in segments
+    ]
+
+
 def _is_horizontal(segment: Segment) -> bool:
     return abs(segment.y1 - segment.y0) < 1e-7 and segment.length > 0.0
 
@@ -909,6 +952,7 @@ def annotation_geometry(
     tails: list[Segment] = []
     if kind == "dim":
         segments = _split_dimension_lines(segments, display.get("arrows", ()))
+        segments = _dimension_shoulders(segments, items)
         tails = _arrow_tails(segments, display.get("arrows", ()))
     registered = _registered_leaders(annotation)
     segments = [s for s in segments if not any(_same_run(s, leader) for leader in registered)]
@@ -2114,7 +2158,13 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
         *on_line,
         *find_text_on_view(sheet),
         *find_leader_through_text(sheet),
-        *find_leader_across_lines(sheet),
+        # A line through a callout's text crosses the shoulder under it too:
+        # one defect, reported as text-on-line.
+        *(
+            f
+            for f in find_leader_across_lines(sheet)
+            if f.kind != "shoulder-crosses-line" or frozenset((f.a, f.b)) not in through
+        ),
         *find_dimension_line_crossings(sheet),
         *find_lines_on_dimension_lines(sheet),
         *(f for f in find_arrows_near_text(sheet) if frozenset((f.a, f.b)) not in through),
