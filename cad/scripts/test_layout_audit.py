@@ -696,6 +696,59 @@ def test_a_collector_fault_fails_loud_in_every_mode(monkeypatch, tmp_path):
     assert not list(tmp_path.iterdir())
 
 
+@pytest.mark.parametrize("fault", ["collect", "audit"])
+def test_a_failed_audit_leaves_no_stale_report(monkeypatch, tmp_path, fault):
+    """Codex P2 on 72c147a19: a rebuild whose collector or audit_report()
+    raised left the PREVIOUS build's report beside the new PDF and SLDDRW,
+    and calibration or review read its findings as current. The old report
+    goes before collection starts; the fault still propagates."""
+    report = tmp_path / "fixture.json"
+    report.write_text('{"stale": true}', encoding="utf-8")
+    if fault == "collect":
+        live = _patch_collect(monkeypatch, RuntimeError("COM went away"))
+    else:
+        live = _patch_collect(monkeypatch, [_holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)])
+
+        def broken(*_args, **_kwargs):
+            raise RuntimeError("COM went away")
+
+        monkeypatch.setattr(live, "audit_report", broken)
+    with pytest.raises(RuntimeError, match="COM went away"):
+        _run(live, LayoutAuditMode.REPORT, report)
+    assert not report.exists()
+
+
+def test_a_crash_while_writing_leaves_no_torn_report(monkeypatch, tmp_path):
+    """The report reaches its path whole or not at all: it is written beside
+    it and renamed over it, so a crash mid-write leaves neither a torn file
+    nor the stale one it was replacing, and no temporary behind."""
+    import _layout_audit
+
+    live = _patch_collect(monkeypatch, [_holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)])
+    report = tmp_path / "fixture.json"
+    report.write_text('{"stale": true}', encoding="utf-8")
+
+    def crash(*_args, **_kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(_layout_audit.os, "replace", crash)
+    with pytest.raises(OSError, match="disk full"):
+        _run(live, LayoutAuditMode.REPORT, report)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_failed_calibration_leaves_no_stale_json(tmp_path):
+    """The same class in the calibration tool: a run that raises must not
+    leave the previous run's --json to be read as this one's."""
+    from diagnostics.layout_calibration import main
+
+    out = tmp_path / "calib.json"
+    out.write_text('{"stale": true}', encoding="utf-8")
+    with pytest.raises(FileNotFoundError):
+        main(["--report", str(tmp_path / "missing.json"), "--json", str(out)])
+    assert not out.exists()
+
+
 def test_report_mode_writes_every_finding_and_dump_and_gate_mode_raises(monkeypatch, tmp_path):
     import json
 

@@ -48,6 +48,7 @@ from _layout_audit import (  # noqa: E402
     ink_edges,
     ink_key,
     ink_spans,
+    replace_text,
     span_box,
     text_items,
     view_edges,
@@ -180,9 +181,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pdf-dir", type=Path)
     parser.add_argument("--json", type=Path)
     args = parser.parse_args(argv)
+    if args.json:
+        # A run that fails must not leave the previous run's output behind.
+        args.json.unlink(missing_ok=True)
     report = calibrate(args.report, args.pdf_dir)
     if args.json:
-        args.json.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
+        replace_text(args.json, json.dumps(report, indent=2, default=str))
     for sheet in report["sheets"]:
         print(
             f"{sheet['stem']} / {sheet['sheet']} (page {sheet['page']}): findings={sheet['findings']} "
