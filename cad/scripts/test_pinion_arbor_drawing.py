@@ -1473,3 +1473,41 @@ def test_a_view_note_lands_within_the_extent_tolerance_or_fails_loud(
     x0, _y0, _z0, x1, y1, _z1 = label.GetExtent()
     error = math.dist(((x0 + x1) / 2, y1), drawing.DETAIL_LABEL_XY)
     assert 0.0 < error <= drawing.NOTE_EXTENT_TOL_M
+
+
+class _CrlfNote(_CropNote):
+    """Reads its text back the way the seat does: CRLF line breaks
+    (rf-arbor-crop-r2 read 'DETAIL A\r\nSCALE 2 : 1')."""
+
+    def GetText(self):
+        return self.text.replace("\n", "\r\n")
+
+
+class _WrongTextNote(_CropNote):
+    """Lands in the right view but reads back another label."""
+
+    def GetText(self):
+        return self.text.replace("DETAIL A", "DETAIL B").replace("\n", "\r\n")
+
+
+@pytest.mark.parametrize(
+    ("note_type", "lands"), [(_CrlfNote, True), (_WrongTextNote, False)]
+)
+def test_a_view_note_reads_back_across_line_break_styles(
+    monkeypatch, note_type, lands
+) -> None:
+    seat, crop, _profile, _placed = _crop_seat(monkeypatch)
+
+    def note(adapter, text, x, y, **_kwargs):
+        made = note_type(text, seat.active, (x, y))
+        seat.notes.append(made)
+        return made
+
+    monkeypatch.setattr(drawing, "add_note", note)
+    if not lands:
+        with pytest.raises(RuntimeError, match="did not land in its view"):
+            drawing._position_detail_label(seat, crop)
+        return
+    drawing._position_detail_label(seat, crop)
+    (label,) = crop.GetNotes()
+    assert "\r\n" in label.GetText()

@@ -708,8 +708,10 @@ def _view_note(
         adapter.currentModel.EditRebuild3()
     else:
         raise RuntimeError(f"the {label} extent sits at {actual!r}, not {xy!r}")
+    # SolidWorks reads a multi-line note back with CRLF breaks (rf-arbor-crop-r2
+    # read 'DETAIL A\r\nSCALE 2 : 1' for the label it had just placed).
     texts = [
-        str(_early_bound(item, "INote").GetText())
+        str(_early_bound(item, "INote").GetText()).replace("\r\n", "\n")
         for item in (_early_bound(view, "IView").GetNotes() or ())
     ]
     if texts.count(text) != 1:
