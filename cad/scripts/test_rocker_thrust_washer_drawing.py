@@ -15,7 +15,10 @@ from _drawing_registry import DRAWINGS_BY_NAME
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/rocker-thrust-washer.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/rocker-thrust-washer.pdf")
-    assert DRAWINGS_BY_NAME["rocker_thrust_washer"].script == Path(drawing.__file__).resolve()
+    assert (
+        DRAWINGS_BY_NAME["rocker_thrust_washer"].script
+        == Path(drawing.__file__).resolve()
+    )
 
 
 def test_every_marked_dimension_has_one_view_and_model_places() -> None:
@@ -23,8 +26,14 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) == marked
     assert not set(drawing.FRONT_KEEP) & set(drawing.RIGHT_KEEP)
     assert {
-        (feature, name) for feature, names in spec.DRAWING_PRECISION.items() for name in names
-    } == {(feature, name) for feature, names in spec.DRAWING_DIMENSIONS.items() for name in names}
+        (feature, name)
+        for feature, names in spec.DRAWING_PRECISION.items()
+        for name in names
+    } == {
+        (feature, name)
+        for feature, names in spec.DRAWING_DIMENSIONS.items()
+        for name in names
+    }
 
 
 def test_only_the_bore_is_banded() -> None:

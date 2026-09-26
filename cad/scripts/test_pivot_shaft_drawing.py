@@ -144,10 +144,16 @@ def test_surface_finishes_name_the_body_and_the_journal() -> None:
     body_z = by_key["pivot_bearing"].face.contains_z_mm
     journal_z = by_key["pivot_journal"].face.contains_z_mm
     assert -spec.JOURNAL_LENGTH < journal_z < 0.0
-    assert -bank.PIVOT_SHAFT_LENGTH < body_z < -(spec.JOURNAL_LENGTH + spec.SHOULDER_LENGTH)
+    assert (
+        -bank.PIVOT_SHAFT_LENGTH
+        < body_z
+        < -(spec.JOURNAL_LENGTH + spec.SHOULDER_LENGTH)
+    )
     part_source = "".join(Path(part.__file__).read_text(encoding="utf-8").split())
     assert "surface_finishes=SURFACE_FINISHES" in part_source
     sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
     for key in by_key:
-        assert f'control=surface_finish_by_key(SURFACE_FINISHES,"{key}")' in sheet_source
+        assert (
+            f'control=surface_finish_by_key(SURFACE_FINISHES,"{key}")' in sheet_source
+        )
     assert "roughness_ra=" not in sheet_source
