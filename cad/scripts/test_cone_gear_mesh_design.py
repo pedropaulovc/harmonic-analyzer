@@ -29,6 +29,7 @@ import pytest
 
 import _config
 import build_drive_train_assembly as assembly
+import cone_gear_notes
 import cone_gear_shaft_spec
 import cone_gear_spec as spec
 import cylinder_gear_notes
@@ -195,6 +196,10 @@ def test_printed_mesh_meets_its_design_rules(teeth: int) -> None:
     assert worst["loose_backlash"] <= high, worst
     if teeth in spec.CONTACT_RATIO_EXCEPTION_TEETH:
         assert worst["contact_ratio"] < CR_EXCEPTION, worst
+        # The sheet states this worst case (policy, named exceptions),
+        # rounded DOWN to two places: never more than the part has.
+        printed = cone_gear_notes.WORST_CONTACT_RATIO[teeth]
+        assert 0.0 <= worst["contact_ratio"] - printed < 0.01, (printed, worst)
     else:
         assert worst["contact_ratio"] >= CR_EXCEPTION, worst
     # Deeper than today everywhere: a standard tip and tooth at the same
@@ -247,17 +252,20 @@ def test_gap_floor_clears_the_drum_and_fits_one_cutter(teeth: int) -> None:
     clearance = _worst(teeth, tip_dia, thickest)["cone_floor"]
     # Main: one fly cutter at least 0.43 wide fits every gap.
     assert _floor_width(teeth, thickest) >= 0.43
-    if teeth in spec.FLOOR_LIMITS_MM:
-        # Two-sided floor: MAX is the shallowest floor keeping 0.02 of
-        # drum-tip clearance with every runout closing (a shallow plunge would
-        # rub); MIN is the web limit.
-        minimum, maximum = spec.FLOOR_LIMITS_MM[teeth]
-        drum_path = _centre(teeth) - RUNOUT - DRUM_TIP_R
+    # Every floor is two-sided (Main, 2026-09-26: the #834 machinist review
+    # found sheets 3-20 printed MIN only).  MAX is the shallowest floor keeping
+    # 0.02 of drum-tip clearance with every runout closing (a shallow plunge
+    # would rub), floored to three places; MIN is the modelled floor.
+    minimum, maximum = spec.floor_limits_mm(teeth)
+    drum_path = _centre(teeth) - RUNOUT - DRUM_TIP_R
+    assert drum_path - maximum / 2.0 >= 0.02
+    assert drum_path - (maximum + 0.001) / 2.0 < 0.02
+    # Main: T006's window must be at least 0.04 on diameter; every other
+    # gear's is wider.
+    assert maximum - minimum >= 0.04
+    assert minimum == pytest.approx(2.0 * spec.floor_radius_mm(teeth), abs=0.0005)
+    if teeth in spec.DIPPED_FLOOR_MIN_MM:
         assert clearance > 0.04  # +0.045 at T006, +0.076 at T012
-        assert drum_path - maximum / 2.0 >= 0.02
-        assert drum_path - (maximum + 0.001) / 2.0 < 0.02
-        # Main: T006's window must be at least 0.04 on diameter.
-        assert maximum - minimum >= 0.04
         return
     if spec.floor_tmin(teeth) == 0.0:
         assert clearance >= 0.10
@@ -286,3 +294,30 @@ def test_drive_train_clearance_scans_use_the_printed_cone_tip() -> None:
         )
     pinion_north = assembly.PINION_TOOTH_Z + assembly.PINION_FACE / 2.0
     assert assembly._T120_SOUTH - pinion_north >= 0.25
+
+
+# Face-width band (#914 user ruling, 2026-09-25) against the two axial stacks
+# it sits in.  The #834 machinist review asked what needs +/-0.10.
+# * Upper limit -- neighbour air.  Adjacent gears sit one seat pitch apart and
+#   each is soldered to its station within +/-0.13 (#914 user ruling), so two
+#   gears at the upper limit, stations closing, keep
+#   SEAT_PITCH - upper - 2 x 0.13.  At the .X band (6.8) that is -0.17: the
+#   gears would collide, so the face needs a band tighter than .X.
+# * Lower limit -- the drum's engaged zone, [-0.75, +1.35] about the narrowed
+#   gear's centre (cone_gear_spec), against the in-service cone/drum stack
+#   retention743 re-derived for R1 on 2026-09-26 with the fit-up centring:
+#   +0.55 north, -1.10 south (dt-logs/handoffs/retention743-routing-notes.md).
+SOLDER_STATION_TOL = 0.13
+ENGAGED_ZONE = (-0.75, 1.35)
+CONE_DRUM_Z_STACK = (-1.10, 0.55)
+
+
+def test_face_width_band_holds_both_axial_stacks() -> None:
+    upper = spec.FACE_WIDTH + spec.FACE_WIDTH_BAND[0]
+    lower = spec.FACE_WIDTH + spec.FACE_WIDTH_BAND[1]
+    air = assembly.SEAT_PITCH - upper - 2.0 * SOLDER_STATION_TOL
+    assert air == pytest.approx(0.529, abs=0.001)
+    assert assembly.SEAT_PITCH - (spec.FACE_WIDTH + 0.8) - 2.0 * SOLDER_STATION_TOL < 0.0
+    north = lower / 2.0 - ENGAGED_ZONE[1] - CONE_DRUM_Z_STACK[1]
+    south = lower / 2.0 + ENGAGED_ZONE[0] + CONE_DRUM_Z_STACK[0]
+    assert (round(north, 2), round(south, 2)) == (1.05, 1.10)

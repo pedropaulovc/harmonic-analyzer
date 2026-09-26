@@ -127,8 +127,18 @@ BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
 # U27 face width (Main ruling, 2026-09-23): 6.0 at the .X band keeps the
 # widest gear (6.8) inside the 6.889 seat pitch; 6.5 +/-0.51 could reach
 # 7.01 and overlap a neighbour.  The drum's engaged zone spans
-# [-0.75, +1.35] mm about the narrowed gear's centre, inside the 5.2 minimum.
+# [-0.75, +1.35] mm about the narrowed gear's centre.
 FACE_WIDTH = 6.0
+# #914 (user ruling, 2026-09-25): the face is the cone set's axial margin
+# against the drum.  At the .X minimum (5.2) the north side keeps only 1.25,
+# which the cylinder bank's 1.175 all but consumes; +/-0.10 (5.9 minimum)
+# keeps 1.60, leaving ~0.425 for the cone set's own Z.  Facing both sides to
+# a micrometer is a novice-holdable step.  The stacks that bound it today:
+# the upper limit keeps 0.53 of neighbour air with the +/-0.13 solder
+# stations (6.8, the .X maximum, would collide), and the lower limit keeps
+# 1.05 north / 1.10 south of the re-derived R1 cone/drum stack --
+# test_cone_gear_mesh_design.test_face_width_band_holds_both_axial_stacks.
+FACE_WIDTH_BAND = (0.10, -0.10)
 
 
 def chord_floor_radius_mm(
@@ -164,20 +174,43 @@ def chord_floor_radius_mm(
 #
 # * T006, T012: the thicker tooth's chord would sit in the drum tip's path
 #   (+0.030 at T006), so the floor bows below the feet chord to the printed
-#   MIN.  These two also print a MAX (Main, 2026-09-23): the drum tip clears
-#   them by as little as 0.05, so a shallow plunge would rub.  MAX is the
-#   shallowest floor that keeps 0.02 of drum-tip clearance with every runout
-#   closing.  MIN is the web limit: T006 keeps the 0.621 web the user ruled
-#   on as its named exception (U40); T012 trades its web from 2.12 down to
-#   2.05, still over the 2.0 target, for a 0.25 window instead of 0.11.
+#   MIN.  MIN is the web limit: T006 keeps the 0.621 web the user ruled on as
+#   its named exception (U40); T012 trades its web from 2.12 down to 2.05,
+#   still over the 2.0 target, for a 0.25 window instead of 0.11.
 # * T018-T042: the chord between the flank feet on the base circle.
 # * T048-T120: the flanks start at ``GAP_FLOOR_TMIN`` above the base circle,
 #   which raises the floor until the drum tip clears it by 0.30 at the worst
 #   case.  The gap is then shallower and wider at the floor, so one fly
 #   cutter at least 0.43 wide fits every gear.
-FLOOR_LIMITS_MM: dict[int, tuple[float, float]] = {
-    6: (2.880, 2.929),
-    12: (5.738, 5.988),
+#
+# Every gear also prints a MAX (Main, 2026-09-23 for T006/T012; 2026-09-26
+# for the rest, after the #834 machinist review found sheets 3-20 left the
+# gap depth open): the shallowest floor that keeps 0.02 of drum-tip clearance
+# with every runout closing, floored to the printed three places.  A floor
+# above it would rub the drum tip; test_cone_gear_mesh_design re-derives each
+# value from the assembly pose.
+DIPPED_FLOOR_MIN_MM: dict[int, float] = {6: 2.880, 12: 5.738}
+FLOOR_MAX_DIA_MM: dict[int, float] = {
+    6: 2.929,
+    12: 5.988,
+    18: 9.047,
+    24: 12.106,
+    30: 15.165,
+    36: 18.224,
+    42: 21.283,
+    48: 24.342,
+    54: 27.401,
+    60: 30.460,
+    66: 33.519,
+    72: 36.578,
+    78: 39.637,
+    84: 42.696,
+    90: 45.755,
+    96: 48.814,
+    102: 51.873,
+    108: 54.932,
+    114: 57.991,
+    120: 61.050,
 }
 GAP_FLOOR_TMIN: dict[int, float] = {
     48: 0.0900,
@@ -204,11 +237,17 @@ def floor_tmin(teeth: int) -> float:
 
 def floor_radius_mm(teeth: int) -> float:
     """Return the modelled gap-floor radius, printed as the MIN diameter."""
-    if teeth in FLOOR_LIMITS_MM:
-        return FLOOR_LIMITS_MM[teeth][0] / 2.0
+    if teeth in DIPPED_FLOOR_MIN_MM:
+        return DIPPED_FLOOR_MIN_MM[teeth] / 2.0
     return chord_floor_radius_mm(
         teeth, thickness_mm=tooth_thickness_mm(teeth), tmin=floor_tmin(teeth)
     )
+
+
+def floor_limits_mm(teeth: int) -> tuple[float, float]:
+    """Return the printed (MIN, MAX) gap-floor diameters."""
+    _require_member(teeth)
+    return round(2.0 * floor_radius_mm(teeth), 3), FLOOR_MAX_DIA_MM[teeth]
 
 
 def floor_dip_mm(teeth: int) -> float:
@@ -275,7 +314,7 @@ def _bonded_fit_band() -> tuple[float, float]:
 
 def _t006_web_upper() -> float:
     """Largest bore deviation that leaves T006 its named web, to print places."""
-    web_cap = FLOOR_LIMITS_MM[6][0] - 2.0 * WEB_EXCEPTIONS_MM[6] - bore_dia_mm(6)
+    web_cap = floor_limits_mm(6)[0] - 2.0 * WEB_EXCEPTIONS_MM[6] - bore_dia_mm(6)
     scale = 10**BORE_BAND_PLACES
     return math.floor(web_cap * scale + 1e-9) / scale
 
@@ -353,11 +392,10 @@ def configuration_number(part_number: str, teeth: int) -> str:
 # Policy rule 2: places and bands are model properties.  Three places belong
 # on the two fit dimensions: the bore and circular tooth thickness.  Tip
 # diameter prints two places with its own BLANK_DIA_BAND (below); face
-# width takes one place, the loosest title-block band (.X +/-0.8), which the
-# 6.0 nominal clears against the 6.889 seat pitch.
+# width prints two places with its FACE_WIDTH_BAND (#914).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlankProfile": {"BlankDia": 2},
-    "Blank": {"FaceWidth": 1},
+    "Blank": {"FaceWidth": 2},
     "BoreProfile": {"BoreCutDia": 3},
     "ToothThicknessReference": {"ToothThickness": 3},
 }

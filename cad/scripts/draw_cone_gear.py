@@ -146,10 +146,17 @@ def rendered_half_face_width(teeth: int) -> float:
     return FACE_WIDTH * numerator / (denominator * 2000.0)
 
 
+# BlankDia's value stands this far above the tip circle.  At 0.012 the T006
+# value (8:1) sat on the vertical centre-mark line, which reaches 26.3 mm
+# above the bore axis on that sheet (layout audit, 0.82 mm overlap); 0.0145
+# clears it, and no other text on any sheet is within 36 mm above the value.
+BLANK_DIA_LIFT = 0.0145
+
+
 def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
     half_od = rendered_half_od(teeth)
     return {
-        "BlankDia": (FRONT_CENTER[0], FRONT_CENTER[1] + half_od + 0.012),
+        "BlankDia": (FRONT_CENTER[0], FRONT_CENTER[1] + half_od + BLANK_DIA_LIFT),
         # One measured exterior lane keeps the full stacked fit callout inside
         # the left border on every scale/configuration.  Do not derive X from
         # gear diameter: that pushed the large-family text through the border.
@@ -189,13 +196,34 @@ def bore_finish_xy(teeth: int) -> tuple[tuple[float, float], tuple[float, float]
     return edge, symbol
 
 
+# Sheet width of the face-width text with its stacked band ("6.00" plus
+# "+0.1/-0.1"), measured ~19.4 mm on the conegear-834b render.  Where the face
+# spans less than the text plus a clearance each side, the #834 machinist
+# review found the text crowding its extension lines (sheets 5-20, 3:1 and
+# below): the text then stands outside, right of the view, on the extended
+# dimension line.
+FACE_WIDTH_TEXT_WIDTH = 0.020
+FACE_WIDTH_TEXT_CLEARANCE = 0.002
+
+
+def face_width_text_inside(teeth: int) -> bool:
+    return (
+        2.0 * rendered_half_face_width(teeth)
+        >= FACE_WIDTH_TEXT_WIDTH + 2.0 * FACE_WIDTH_TEXT_CLEARANCE
+    )
+
+
 def right_keep(teeth: int) -> dict[str, tuple[float, float]]:
-    return {
-        "FaceWidth": (
-            RIGHT_CENTER[0],
-            RIGHT_CENTER[1] - rendered_half_od(teeth) - 0.012,
-        )
-    }
+    y = RIGHT_CENTER[1] - rendered_half_od(teeth) - 0.012
+    if face_width_text_inside(teeth):
+        return {"FaceWidth": (RIGHT_CENTER[0], y)}
+    x = (
+        RIGHT_CENTER[0]
+        + rendered_half_face_width(teeth)
+        + FACE_WIDTH_TEXT_CLEARANCE
+        + FACE_WIDTH_TEXT_WIDTH / 2.0
+    )
+    return {"FaceWidth": (x, y)}
 
 
 def _hide_reference_sketch(adapter: Any, view: Any, label: str) -> None:

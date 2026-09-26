@@ -47,6 +47,7 @@ from _drawing_common import (
 )
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from cone_gear_notes import ATTACHMENT as CONE_GEAR_JOINT
 from crank_drive_gear_notes import ATTACHMENT_ALTERNATIVE as CRANK_GEAR_ALTERNATIVE
 from crank_drive_gear_notes import ATTACHMENT_PROCESS as CRANK_GEAR_JOINT
 from drive_train_assembly_spec import (
@@ -350,9 +351,11 @@ ASSEMBLED_HEADING = f"SAVED WORKING POSE AND FREE MOTIONS: SEE SHEET {CHECKS_SHE
 CONE_CRANK_STEPS = "\n".join(
     (
         "ASSEMBLY SEQUENCE - CONE SET AND CRANK",
-        "1. BOND {cone_gears}X MHA-013 TO THEIR MHA-014 SEATS PER THE MHA-013",
-        "   PRINT, TIP FIRST: T006 AT THE BACK THROUGH T120 AT THE FRONT",
-        f"   (STATION TABLE, SHEET {FIT_SHEET}).",
+        # #834 (rule 6): the cone gears' joining method left the MHA-013
+        # sheets for this step; the wording is the gear's own constant.
+        "1. BOND {cone_gears}X MHA-013 TO THEIR MHA-014 SEATS, TIP FIRST, WITH",
+        f"   {CONE_GEAR_JOINT}: T006 AT THE BACK THROUGH",
+        f"   T120 AT THE FRONT (STATION TABLE, SHEET {FIT_SHEET}).",
         # #906 (Main 2026-09-26): MHA-021's joining method moved here from its
         # print (rule 6); the wording is the gear's own constants.
         f"   MHA-021 FRONT OF T120: {CRANK_GEAR_JOINT} ITS MHA-014 SEAT;",
@@ -626,7 +629,7 @@ INTERFACE_NOTES = "\n".join(
 CONSUMABLES_NOTES = "\n".join(
     (
         "GENERAL ASSEMBLY NOTES",
-        "ADHESIVE: PER THE MHA-013 PRINT; MHA-021 PER STEP 1.",
+        "ADHESIVE: MHA-013 AND MHA-021 PER STEP 1.",
         "OIL THE MHA-027/MHA-028 JOURNALS AND ALL PIVOTS WITH ISO VG 32",
         "MACHINE OIL. NO THREADLOCKER UNLESS A STEP OR PRINT CALLS FOR IT",
         "(LOCTITE 222 ON MHA-139, STEP 7). #4-40, #6-32, #8-32 SCREWS: SNUG.",
