@@ -46,6 +46,11 @@ _SETTER = "set_dimension_bilateral_tolerance"
 LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     # for section, band in enumerate(SECTION_DIA_BANDS): ... deviations(band)
     ("build_cone_gear_shaft", "band"): ("SECTION_DIA_BANDS", "each"),
+    # def _printed_limits(nominal, places): ... GENERAL_BAND_BY_PLACES[places]
+    ("cone_tip_block_spec", "GENERAL_BAND_BY_PLACES[places]"): (
+        "GENERAL_BAND_BY_PLACES",
+        "values",
+    ),
 }
 
 # Consumer modules that cannot be imported without SolidWorks, with the reason.
@@ -82,20 +87,7 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ),
 }
 
-# The crank-drive gear's derived bore band collapses to zero width on this
-# integration head. crankhub's 64T bore fix (integ/64t-bore-resolve) resolves
-# it and removes this mark.
-_XFAIL_64T_BORE = pytest.mark.xfail(
-    strict=True,
-    raises=ValueError,
-    reason=(
-        "BORE_DIA_BAND derives to (0.025, 0.025): zero width. Fixed by crankhub's "
-        "64T bore resolve (integ/64t-bore-resolve), which removes this xfail."
-    ),
-)
-KNOWN_BAD: dict[str, pytest.MarkDecorator] = {
-    "build_crank_drive_gear:BORE_DIA_BAND": _XFAIL_64T_BORE,
-}
+KNOWN_BAD: dict[str, pytest.MarkDecorator] = {}
 
 
 @dataclass(frozen=True)
@@ -165,6 +157,8 @@ def _resolve(use: BandUse) -> list[tuple[str, Any]]:
     if key in LOCAL_BAND_SOURCES:
         source, how = LOCAL_BAND_SOURCES[key]
         value = getattr(module, source)
+        if how == "values":
+            return [(f"{source}[{places!r}]", band) for places, band in value.items()]
         assert how == "each", f"unknown local-source mode {how!r}"
         return [(f"{source}[{i}]", band) for i, band in enumerate(value)]
     try:

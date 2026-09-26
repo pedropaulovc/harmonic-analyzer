@@ -1,17 +1,12 @@
 cone-tip-block-screw:
   title: Cone Tip Block Hold-Down Screw
   number: MHA-140
-  stock_name: Black-Oxide Alloy Steel Button Head Hex Drive Screw
+  stock_name: Low-Strength Zinc-Plated Steel Hex Head Screw
   supplier: McMaster-Carr
-  supplier_skus: [91255A148]
-  material: Alloy Steel
-  material_specification: Alloy steel, McMaster-Carr 91255A148
-  finish: black oxide
-  installation_notes: |-
-    INSTALLATION - CONE TIP BLOCK HOLD-DOWN
-    FROM UNDER SWING PLATFORM MHA-091, HEAD ON THE
-    COUNTERBORE LEDGE, THROUGH SHIM PACK MHA-141
-    INTO THE MHA-092 FOOT TAP. ENGAGEMENT 1.80D MIN.
+  supplier_skus: [93075A150]
+  material: Plain Carbon Steel
+  material_specification: Low-strength steel, McMaster-Carr 93075A150
+  finish: zinc plated
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance

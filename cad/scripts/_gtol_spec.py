@@ -22,6 +22,7 @@ from xml.etree import ElementTree
 
 # SOLIDWORKS 2022+ frame-XML symbol names per geometric characteristic.
 GTOL_SYMBOLS = {
+    "angularity": "GTOL-ANGULAR",
     "circular_runout": "GTOL-SRUN",
     "cylindricity": "GTOL-CYL",
     "flatness": "GTOL-FLAT",

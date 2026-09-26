@@ -137,13 +137,13 @@ def test_part_owns_every_printed_decimal_place() -> None:
         *spec.DRAWING_DIMENSIONS.values()
     )
     assert "draw_cone_pivot_post.py" in PRECISION_MIGRATED_DRAWINGS
-    # Only the two running bores earn a third place, and only because their
-    # size limits are what deliver the shaft_in_bushing clearance band.
+    # Only the two bores earn a third place, for their limits; the basic plan
+    # angle prints the model's exact value (#906, it feeds the frame).
     assert {
         name
         for name, places in spec.DRAWING_PRECISION_BY_NAME.items()
         if places >= 3
-    } == {"CrankBoreDia", "JournalBoreDia"}
+    } == {"CrankBoreDia", "JournalBoreDia", "InclineAngle"}
 
 
 def test_running_bores_close_the_configured_fit_class() -> None:
@@ -172,7 +172,7 @@ def test_running_bores_close_the_configured_fit_class() -> None:
 
 
 def test_nothing_else_on_the_casting_carries_a_band() -> None:
-    """One band, named once, applied to the two features the fit class names.
+    """Each band named once, applied to the features whose fit needs it.
 
     The cast body, collar and boss diameters and the mounting-hole stations
     are not accuracy features (cad/docs/tolerance-policy.md, "Result"), so the
@@ -181,11 +181,32 @@ def test_nothing_else_on_the_casting_carries_a_band() -> None:
     """
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert source.count("set_dimension_bilateral_tolerance(") == 3
-    assert "set_dimension_symmetric_tolerance" not in source
+    assert source.count("set_dimension_symmetric_tolerance(") == 1
     assert source.count("deviations(RUNNING_BORE_BAND)") == 2
     assert source.count("deviations(CRANK_ABOVE_CONE_BAND)") == 1
     assert not hasattr(spec, "TURNED_DIAMETER_TOLERANCE_MM")
     assert not hasattr(spec, "CRANK_BORE_TOLERANCE_MM")
+
+
+def test_the_cone_axis_height_carries_the_shim_packs_band() -> None:
+    """The post sets the cone shaft's height and MHA-141's shim pack takes up
+    what it leaves; the pack's range holds 0.25 for the post.  The .XX grade
+    (+/-0.51) overruns that, so the height carries its own band -- the
+    loosest the pack allows -- on the model dimension, where the sheet
+    imports it, and nowhere as a literal or a frame."""
+    assert spec.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM == 0.25
+    # The title block's general grades by places: .X, .XX, .XXX.
+    general = {1: 0.8, 2: 0.51, 3: 0.13}
+    assert spec.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM < general[
+        spec.DRAWING_PRECISION_BY_NAME["JournalAxisY"]
+    ]
+    assert spec.GEOMETRIC_TOLERANCES_MM == {}
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert re.search(
+        r'set_dimension_symmetric_tolerance\(\s*adapter,\s*"ConeBossProfile",'
+        r'\s*"JournalAxisY",\s*JOURNAL_AXIS_HEIGHT_TOLERANCE_MM,?\s*\)',
+        source,
+    )
 
 
 def test_the_plan_angle_is_model_geometry_not_sheet_text() -> None:
@@ -239,13 +260,45 @@ def test_machined_faces_are_called_out_on_the_casting() -> None:
     )
 
 
-def test_sheet_carries_no_datums_or_feature_control_frames() -> None:
+def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
+    """#906 (USER RULING 2026-09-26, option ii): rule 3's crank-mesh entry.
+
+    One diametral angularity frame on the crank bore to datum A, the cone
+    journal bore, clocked by datum B, the foot seat; its value is the spec
+    constant, never sheet text, and it bounds yaw and tilt to about 0.08 deg
+    over the boss.  A alone would leave tilt free.
+    """
+    from _gtol_spec import CylinderFace, PlanarFace
+
     assert spec.GEOMETRIC_TOLERANCES_MM == {}
+    journal, foot = spec.PART_DATUMS
+    assert journal.letter == "A"
+    assert journal.face == CylinderFace(spec.BORE_DIA, contains_y_mm=spec.BORE_HEIGHT)
+    assert foot.letter == "B"
+    assert foot.face == PlanarFace((0, -1, 0), 0.0)
+    assert foot.face == spec.SURFACE_FINISHES[0].face
+    (frame,) = spec.GEOMETRIC_CONTROLS
+    assert frame.characteristic == "angularity"
+    assert frame.tolerance_zone == "diametral"
+    assert frame.datums == ("A", "B")
+    assert frame.tolerance == f"{spec.CRANK_BORE_ANGULARITY_MM:.2f}" == "0.10"
+    assert frame.face == CylinderFace(
+        spec.CRANK_BORE_DIA, contains_y_mm=spec.CRANK_BORE_HEIGHT
+    )
+    assert round(spec.CRANK_BORE_ANGLE_LIMIT_DEG, 4) == 0.0795
+    assert part.PART_DATUMS is spec.PART_DATUMS
+    assert part.GEOMETRIC_CONTROLS is spec.GEOMETRIC_CONTROLS
+    policy = (
+        Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"
+    ).read_text(encoding="utf-8")
+    assert "**crank mesh** — MHA-016's crank bore" in policy
     source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "datums=PART_DATUMS" in source
+    assert "controls=GEOMETRIC_CONTROLS" in source
+    assert "set_basic_dimensions(adapter, annotations, BASIC_DIMENSIONS)" in source
     for banned in (
         "add_datum_feature(",
         "add_feature_control_frame(",
-        "set_basic_dimension(",
         "set_dimension_precision(",
         "SetBalloon(",
     ):
@@ -401,8 +454,12 @@ def test_north_cone_boss_end_carries_the_running_finish() -> None:
     assert "len(surface_boxes) != len(SURFACE_FINISHES)" in source
 
 
-def test_plan_angle_prints_one_place_under_the_one_degree_band() -> None:
-    assert spec.DRAWING_PRECISION_BY_NAME["InclineAngle"] == 1
+def test_plan_angle_is_basic_and_prints_the_model_angle() -> None:
+    """#906: the plan angle feeds the crank bore's angularity frame (rule 4),
+    so it is boxed BASIC and prints the model's 12.5182 exactly."""
+    assert spec.BASIC_DIMENSIONS == frozenset({"InclineAngle"})
+    assert spec.DRAWING_PRECISION_BY_NAME["InclineAngle"] == 4
+    assert round(spec.INCLINE_DEG, 4) == spec.INCLINE_DEG
 
 
 def test_section_reads_by_its_bore_axis_not_by_a_note() -> None:
@@ -492,8 +549,9 @@ def test_crank_bore_is_located_from_the_cone_bore_inside_the_mesh_window() -> No
     assert 'label="crank axis height reference"' in drawing_source
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert """set_global(adapter, "CrankAxisY", '"JournalAxisY" + "CrankAboveCone"')""" in source
-    assert "ONE SETUP" in spec.DRAWING_NOTES
-    assert "BORE-TO-BORE" in spec.DRAWING_NOTES
+    # Rule 6: the spacing band is a dimension, never a setup method.
+    assert "ONE SETUP" not in spec.DRAWING_NOTES
+    assert "BORE-TO-BORE" not in spec.DRAWING_NOTES
 
 
 def test_deep_mounting_holes_carry_a_drilling_note() -> None:

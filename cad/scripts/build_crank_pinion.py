@@ -16,7 +16,7 @@ Appendix C #9. Face slightly wider than the drive gear's (meshing-pair
 practice, axial alignment slack).
 
 Layout: gear axis = Z through the origin, teeth z = 0..10.4 mm, boss
-z = 10.4..17.28 mm, pin cross-hole along X at z = 13.84.
+z = 10.4..24.9 mm, pin cross-hole along X at z = 17.65 (W15).
 
 Run (SolidWorks already open)::
 
@@ -28,10 +28,8 @@ from __future__ import annotations
 import math
 import sys
 
-import _config
 import _telemetry
 from _common import (
-    IN,
     SketchDims,
     _feature_by_name,
     _early_bound,
@@ -67,10 +65,11 @@ from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from crank_pinion_spec import (
+    BORE_DIA,
     BORE_DIA_BAND,
-    BOSS_CHAMFER,
     BOSS_DIA,
     BOSS_LENGTH,
+    DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -81,6 +80,7 @@ from crank_pinion_spec import (
     PIN_DIA,
     PIN_HOLE_SPEC,
     PIN_STATION,
+    PRESSURE_ANGLE_DEG,
     SURFACE_FINISHES,
 )
 
@@ -88,14 +88,14 @@ PART_NAME = "crank-pinion"
 MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
 
 TEETH = 16  # DIMENSIONS.md ch12 / Appendix C #9 estimate (low)
-DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine.yaml (low)
-PA_DEG = 14.5
+DP = DIAMETRAL_PITCH  # the 64T's normal-plane cutter, cut square (crank_pinion_spec)
+PA_DEG = PRESSURE_ANGLE_DEG
 # FACE_WIDTH (10.4: spans the 64T row north of the v2 crank boss) lives in
 # crank_pinion_spec with the boss and pin it sizes; build_drive_train_assembly's
 # PINION_FACE asserts equality. (The old 12.0 "slightly wider than the drive
 # gear's 10" was a low-confidence read; 11.0 fit the line-of-centres overhang
 # model but grazed the true rim minimum at the tight 2026-07-14 fit.)
-BORE_DIAMETER = 0.375 * IN  # 9.525 -- crankshaft dia (med)
+BORE_DIAMETER = BORE_DIA  # the crankshaft's Ø9.0 pinion seat (crank_pinion_spec)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -119,7 +119,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
     await set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
     await set_global(adapter, "BossLength", f"{BOSS_LENGTH}mm")
-    await set_global(adapter, "BossChamfer", f"{BOSS_CHAMFER}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -315,23 +314,6 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Bore")
     v_bore = math.pi * (BORE_DIAMETER / 2.0) ** 2 * OVERALL_LENGTH
     volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
-
-    # Boss end break: the photographed rounding as the sized 45-degree chamfer
-    # rule 7 prefers, on the boss's outer end edge. A cone of this size on the
-    # bore's edge instead would remove a different volume, so the gate below
-    # is also the guard on the coordinate edge pick.
-    check(
-        "chamfer boss end",
-        await adapter.add_chamfer(BOSS_CHAMFER, [[BOSS_DIA / 2.0, 0.0, OVERALL_LENGTH]]),
-    )
-    name_last_feature(adapter, "BossBreak")
-    drive_jobs += [
-        (name_dimensions(adapter, "BossBreak", ["BossChamfer"])[0], '"BossChamfer"')
-    ]
-    v_chamfer = math.pi * BOSS_CHAMFER**2 * (BOSS_DIA / 2.0 - BOSS_CHAMFER / 3.0)
-    volume = await volume_check(
-        adapter, "boss end break", volume - v_chamfer, 0.2 * v_chamfer
-    )
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train). Stays Axis2: the cross-hole comes

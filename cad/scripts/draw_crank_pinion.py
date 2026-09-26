@@ -15,8 +15,9 @@ mating crankshaft and required diametral clearance. The decimal places are the
 PART's (``crank_pinion_spec.DRAWING_PRECISION``, applied natively by
 ``build_crank_pinion``); this script only reads them back off the sheet.
 
-Drawn 4:1 -- the boss makes the part 17.28 long, and at the disc's 5:1 the
-isometric ran off the B sheet's right border.
+Drawn 3:1 -- W15's boss makes the part 24.9 long: at 4:1 the section's
+boss-end dimensions ran into the isometric, and at 5:1 the isometric had
+already run off the B sheet's right border.
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-from typing import Any
+from typing import Any, Sequence
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
@@ -46,6 +47,11 @@ from _drawing_common import (
     stamp_drawing_summary,
     view_name,
 )
+from _drawing_leaders import (
+    assert_leaders_clear,
+    leader_segments,
+    section_line_segments,
+)
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
@@ -66,6 +72,7 @@ from crank_pinion_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -82,17 +89,22 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (4.0, 1.0)
-VIEW_SCALE = (4, 1)
+SHEET_SCALE = (3.0, 1.0)
+VIEW_SCALE = (3, 1)
 FRONT_CENTER = (0.110, 0.150)
 RIGHT_CENTER = (0.215, 0.150)
-ISO_CENTER = (0.345, 0.150)
+# At 0.345 the isometric's outline began under the boss diameter's text
+# (eye pass of f0c105531); ``_isometric_clears_boss_dia`` now holds it clear.
+# The guard reads the view's bounding box, +-0.0509 about its centre at 3:1
+# (w15-301f4bf4e read-back), wider than the drawn silhouette: 0.360 failed it
+# by 2.7 mm, and 0.365 clears the text by 2.3 mm and the border by 3.2 mm.
+ISO_CENTER = (0.365, 0.150)
 
 # Half the printed tooth-tip circle, in sheet metres: the face-view silhouette
 # radius and the section's half-height, which every dimension is placed clear
 # of; and half the printed boss, the section's height past the teeth.
-HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0  # 0.0356
-HALF_BOSS = BOSS_DIA * VIEW_SCALE[0] / 2000.0  # 0.0270
+HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0  # 0.0267
+HALF_BOSS = BOSS_DIA * VIEW_SCALE[0] / 2000.0  # 0.0203
 
 
 def _side_x(z_mm: float) -> float:
@@ -180,34 +192,108 @@ FRONT_KEEP: dict[str, tuple[float, float]] = {}
 # bore diameter sits just right of the silhouette, still clear of the
 # isometric. The two lengths stay baseline-stacked below the view from the
 # toothed south face (rule 7: one origin per view, baseline not chained). The
-# boss diameter sits above-right on a vertical dimension line beyond the boss
-# end, while the end break stays separately above the chamfer.
+# boss diameter reads on a vertical dimension line beyond the boss end, its
+# text on the axis between the extension lines: at +0.020 it sat on the upper
+# extension line (machinist review of 4d4e038e3), which
+# ``_boss_dia_text_crossings`` now rejects on the sheet.
 _SIDE_BOTTOM = RIGHT_CENTER[1] - HALF_OD
+BOSS_DIA_TEXT_X = _side_x(OVERALL_LENGTH) + 0.049
 RIGHT_KEEP = {
     "OutsideDia": (
         (_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0,
         RIGHT_CENTER[1] + HALF_OD + 0.012,
     ),
-    "BossDia": (
-        _side_x(OVERALL_LENGTH) + 0.049,
-        RIGHT_CENTER[1] + 0.020,
-    ),
+    "BossDia": (BOSS_DIA_TEXT_X, RIGHT_CENTER[1]),
     "BoreDia": (_side_x(OVERALL_LENGTH) + 0.020, RIGHT_CENTER[1]),
     "FaceWidth": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.014),
     "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.026),
-    "BossChamfer": (
-        _side_x(OVERALL_LENGTH) + 0.025,
-        RIGHT_CENTER[1] + HALF_BOSS + 0.010,
-    ),
 }
+DIMENSION_TEXT_LINE_GAP = 0.0005
+# The boss diameter's text is centred on its dimension line; it read 13.1 mm
+# wide on the f0c105531 render. Its right edge plus a clearance bounds where
+# the isometric's outline may begin.
+BOSS_DIA_TEXT_HALF_WIDTH = 0.0075
+ISO_TEXT_CLEARANCE = 0.003
 
 DIMENSION_CALLOUTS = {
     # The native value/limits define the bore; this short feature callout adds
     # the process and extent without tangling its native diameter leaders.
     "BoreDia": BORE_PROCESS_CALLOUT,
-    # The chamfer feature imports its one distance; the angle is the caption.
-    "BossChamfer": "X 45 DEG",
 }
+
+
+Point = tuple[float, float]
+
+
+def _text_line_crossings(
+    texts: Sequence[tuple[float, float, float]],
+    lines: Sequence[tuple[Point, Point]],
+    gap: float,
+) -> list[tuple[Point, Point]]:
+    """The horizontal ink lines that run through a dimension's text.
+
+    ``texts`` are the display data's (x, y, height) text origins. The origin
+    may be the text's base or its middle, so a text claims y - height ..
+    y + height, widened by ``gap``; a horizontal line crosses it when its y is
+    in that band and its x-span reaches the origin.
+    """
+    crossings = []
+    for (x0, y0), (x1, y1) in lines:
+        if abs(y1 - y0) > 1e-6:
+            continue
+        for x, y, height in texts:
+            if abs(y0 - y) <= height + gap and min(x0, x1) <= x <= max(x0, x1):
+                crossings.append(((x0, y0), (x1, y1)))
+                break
+    return crossings
+
+
+def _boss_dia_text_crossings(adapter: Any, annotations: Sequence[Any]) -> None:
+    """Fail when the boss diameter's text sits on one of its own lines."""
+    for annotation in annotations:
+        annotation = _early_bound(annotation, "IAnnotation")
+        if dimension_name(adapter, annotation) != "BossDia":
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        data = _early_bound(display.GetDisplayData(), "IDisplayData")
+        lines = []
+        for index in range(int(data.GetLineCount())):
+            line = tuple(float(value) for value in data.GetLineAtIndex2(index))
+            if len(line) < 10:
+                raise RuntimeError("BossDia: incomplete native dimension line")
+            lines.append(((line[4], line[5]), (line[7], line[8])))
+        texts = [
+            (
+                *(float(v) for v in tuple(data.GetTextPositionAtIndex(index))[:2]),
+                float(data.GetTextHeightAtIndex(index)),
+            )
+            for index in range(int(data.GetTextCount()))
+        ]
+        crossings = _text_line_crossings(texts, lines, DIMENSION_TEXT_LINE_GAP)
+        _telemetry.event(
+            "drawing.boss_dia_text", texts=str(texts), lines=len(lines), crossings=len(crossings)
+        )
+        if not texts or crossings:
+            raise RuntimeError(f"BossDia text {texts} sits on its lines {crossings}")
+        return
+    raise RuntimeError("BossDia never reached the longitudinal section")
+
+
+def _isometric_clears_boss_dia(iso: Any) -> None:
+    """Fail when the isometric starts under the boss diameter's text or leaves the border."""
+    outline = tuple(float(value) for value in iso.GetOutline())
+    if len(outline) != 4:
+        raise RuntimeError(f"isometric has invalid bounds {outline}")
+    _telemetry.event("drawing.isometric_outline", outline=str(outline))
+    text_right = BOSS_DIA_TEXT_X + BOSS_DIA_TEXT_HALF_WIDTH + ISO_TEXT_CLEARANCE
+    if outline[0] < text_right:
+        raise RuntimeError(
+            f"isometric outline {outline} starts left of the boss diameter text's {text_right:.4f}"
+        )
+    if outline[2] > SHEET_INNER_BORDER[2]:
+        raise RuntimeError(
+            f"isometric outline {outline} left the inner border {SHEET_INNER_BORDER}"
+        )
 
 # The retention-pin cross-hole is cut in section at the boss mid-length. Keep
 # its matched-fit callout above-right of the section so its leader leaves the
@@ -217,6 +303,15 @@ PIN_HOLE_EDGE = (
     RIGHT_CENTER[1] + PIN_DIA * VIEW_SCALE[0] / 2000.0,
 )
 PIN_HOLE_CALLOUT = (0.260, RIGHT_CENTER[1] + HALF_OD + 0.056)
+# The shared matched-fit note (crank_pinion_spec.pin_hole_note): match drill
+# with the shaft at the boss mid-length, ream to fit the named pin (the fit to
+# the actual pin governs the hole, not a drill size), the fit's acceptance and
+# flush both sides.
+PIN_HOLE_NOTE = PIN_HOLE_PROCESS
+# 2.5 mm text, anchored upper-left; the read-back extent, leader included,
+# must stay inside the B sheet's inner border.
+PIN_HOLE_NOTE_HEIGHT = 0.0025
+SHEET_INNER_BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
 _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
 _BORE_GAP_ANGLE_RAD = math.radians(168.75)
 BORE_FIT_NOTE = (0.016, 0.174)
@@ -224,6 +319,43 @@ BORE_FIT_ATTACH = (
     FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(_BORE_GAP_ANGLE_RAD),
     FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(_BORE_GAP_ANGLE_RAD),
 )
+# The bore finish lands at -45 degrees, lower right: dropped straight to the
+# bore's bottom, its leader started on the A-A cutting-plane line (eye pass of
+# w15-3d3a9d762). The symbol stands right of the end view, clear of the teeth
+# and of the lower A arrow; ``_bore_leaders_clear_section_line`` reads the
+# cutting line back and fails on any crossing or overlap with it.
+FINISH_ATTACH = (
+    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(-45.0)),
+    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(-45.0)),
+)
+FINISH_SYMBOL = (FRONT_CENTER[0] + HALF_OD + 0.010, FRONT_CENTER[1] - 0.015)
+# Where each stroke must END, from the bore centre (sheet metres): both bore
+# leaders on the rim; the cutting line at its ends past the tooth tips. A
+# reading outside the band means the strokes are not sheet metres.
+BORE_LANDING = (0.5 * _BORE_SHEET_RADIUS, 1.5 * _BORE_SHEET_RADIUS)
+SECTION_LINE_LANDING = (0.0, HALF_OD + 0.010)
+
+
+def _bore_leaders_clear_section_line(
+    adapter: Any, front: Any, bore_fit: Any, finish: Any
+) -> None:
+    """Fail when either bore leader crosses or runs along the A-A cutting line."""
+    rebuild_drawing(adapter, label="bore leaders vs section line")
+    assert_leaders_clear(
+        {
+            "BoreFit": leader_segments(_early_bound(bore_fit, "INote").GetAnnotation()),
+            "BoreFinish": leader_segments(finish.GetAnnotation()),
+            "SectionLine": section_line_segments(adapter, front),
+        },
+        centre=FRONT_CENTER,
+        keep_out={},
+        lands_within={
+            "BoreFit": BORE_LANDING,
+            "BoreFinish": BORE_LANDING,
+            "SectionLine": SECTION_LINE_LANDING,
+        },
+        label="crank pinion end view",
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -282,6 +414,7 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
+    _isometric_clears_boss_dia(iso)
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -303,6 +436,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(
         adapter, front_annotations + right_annotations, DRAWING_PRECISION_BY_NAME
     )
+    _boss_dia_text_crossings(adapter, right_annotations)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pinion bore")
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
@@ -317,24 +451,35 @@ async def build(adapter: Any) -> dict[str, str]:
         label="crank pinion axis",
     )
     # The cross-hole is governed by a matched fit, not the model's nominal
-    # drill diameter. Attach the operation and acceptance directly to its rim:
-    # drill both seated parts together, ream to the named pin and finish flush.
+    # drill diameter. The pinion's boss guides the drill, so its rim carries
+    # the operation, where it runs, the mating part, the pin it is reamed to,
+    # the fit's acceptance and the flush condition.
     # A longitudinal section presents the radial through-hole as cut edges, not
     # a selectable model circle, so this view-owned pointer names its cut
     # location without dimensioning that hole.
-    add_leader_note(
+    pin_note = add_leader_note(
         adapter,
-        PIN_HOLE_PROCESS,
+        PIN_HOLE_NOTE,
         text_xy=PIN_HOLE_CALLOUT,
         attach_xy=PIN_HOLE_EDGE,
         label="retention-pin matched cross-hole",
         view=right,
-        height=0.0025,
+        height=PIN_HOLE_NOTE_HEIGHT,
     )
+    adapter.currentModel.GraphicsRedraw2()
+    extent = tuple(float(v) for v in (_early_bound(pin_note, "INote").GetExtent() or ()))
+    _telemetry.info(f"retention-pin note extent {extent}")
+    x0, y0, x1, y1 = SHEET_INNER_BORDER
+    if len(extent) < 5 or not (
+        x0 <= extent[0] and y0 <= extent[1] and extent[3] <= x1 and extent[4] <= y1
+    ):
+        raise RuntimeError(
+            f"retention-pin note extent {extent} left the inner border {SHEET_INNER_BORDER}"
+        )
     # Put the fit note immediately left of the end view and send its short
     # leader radially through the upper-left tooth gap to the visible bore.
     # The native section-view diameter remains beside its axial extent (rule 7).
-    add_leader_note(
+    bore_fit = add_leader_note(
         adapter,
         BORE_FIT_CALLOUT,
         text_xy=BORE_FIT_NOTE,
@@ -350,21 +495,19 @@ async def build(adapter: Any) -> dict[str, str]:
     # leaves. The roughness is the project's general machined grade, authored
     # on the PART and read back here (policy rule 5's "a surface that has to
     # work" case). A surface symbol's native anchor is its lower-left corner,
-    # and its text grows rightward; place it below the face view, clear of the
-    # boss-chamfer witness.
-    add_surface_finish(
+    # and its text grows rightward; place it right of the face view, clear of
+    # the A-A cutting-plane line.
+    finish = add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + HALF_OD - 0.006, FRONT_CENTER[1] - 0.055),
+        symbol_xy=FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "crank_pinion_bore"),
         label="crank pinion bore finish",
         entity=visible_circle_edge(adapter, front, BORE_DIA),
-        leader_attach_xy=(
-            FRONT_CENTER[0],
-            FRONT_CENTER[1] - BORE_DIA * VIEW_SCALE[0] / 2000.0,
-        ),
+        leader_attach_xy=FINISH_ATTACH,
         char_height=0.0025,
     )
+    _bore_leaders_clear_section_line(adapter, front, bore_fit, finish)
 
     add_property_linked_note(adapter, "Gear Data", 0.016, 0.258, char_height=0.0025)
     add_property_linked_note(

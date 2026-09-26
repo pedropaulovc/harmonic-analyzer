@@ -44,6 +44,8 @@ from _drawing_common import (
 )
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from crank_drive_gear_notes import ATTACHMENT_ALTERNATIVE as CRANK_GEAR_ALTERNATIVE
+from crank_drive_gear_notes import ATTACHMENT_PROCESS as CRANK_GEAR_JOINT
 from drive_train_assembly_spec import (
     CLUSTERS,
     EXPLODED_VIEW_NAME,
@@ -254,6 +256,7 @@ BOM_PART_NUMBERS = {
     "crank-pin-eye": "MHA-130",
     "fillister-screw": "MHA-030",
     "crank-handle": "MHA-022",
+    "crank-handle-pivot-screw": "MHA-139",
     "crank-hub": "MHA-137",
     "crank-hub-pin": "MHA-138",
     "alignment-pinion": "MHA-002",
@@ -287,7 +290,7 @@ BOM_DESCRIPTIONS = {
     "cone-tip-block": "CONE TIP BLOCK",
     "cone-tip-bushing": "CONE TIP BUSHING",
     "cone-tip-adjuster": "CUP-TIP SET SCREW, MCMASTER 94025A164",
-    "cone-tip-pinch-screw": "#4-40 FILLISTER SCREW, MCMASTER 90280A110",
+    "cone-tip-pinch-screw": "#4-40 FILLISTER SCREW, MCMASTER 91794A112",
     "cone-lock-knob": "KNURLED THUMB SCREW, MCMASTER 91882A425",
     "cone-pivot-screw": "SHOULDER SCREW, MCMASTER 91829A560",
     "swing-stop-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A199",
@@ -300,6 +303,7 @@ BOM_DESCRIPTIONS = {
     "crank-pin-eye": "KEEPER RING ANCHOR EYE",
     "fillister-screw": "#4-40 BRASS FILLISTER, MCMASTER 90114A511",
     "crank-handle": "CRANK HANDLE",
+    "crank-handle-pivot-screw": "CRANK HANDLE PIVOT SCREW",
     "crank-hub": "CRANK HUB",
     "crank-hub-pin": "CRANK HUB AXIAL PIN",
     "alignment-pinion": "ALIGNMENT PINION",
@@ -337,7 +341,11 @@ CONE_CRANK_STEPS = "\n".join(
         "ASSEMBLY SEQUENCE - CONE SET AND CRANK",
         "1. BOND {cone_gears}X MHA-013 TO THEIR MHA-014 SEATS PER THE MHA-013",
         "   PRINT, TIP FIRST: T006 AT THE BACK THROUGH T120 AT THE FRONT",
-        "   (STATION TABLE, SHEET 7). BOND MHA-021 FRONT OF T120 PER ITS PRINT.",
+        "   (STATION TABLE, SHEET 7).",
+        # #906 (Main 2026-09-26): MHA-021's joining method moved here from its
+        # print (rule 6); the wording is the gear's own constants.
+        f"   MHA-021 FRONT OF T120: {CRANK_GEAR_JOINT} ITS MHA-014 SEAT;",
+        f"   {CRANK_GEAR_ALTERNATIVE}.",
         # U37c (user, 2026-09-23): MHA-142 is MSC 40923898, 1/4-20 x 3-1/2
         # slotted fillister, through the unchanged 6.02 counterbore. Its floor
         # sits 78.67-81.29 above the post foot at the printed bands, so a fixed
@@ -346,13 +354,12 @@ CONE_CRANK_STEPS = "\n".join(
         # flat bar as supplied (U41, 6.22 min less the 0.3 cut: 5.92 = 0.93D
         # worst case, swing): a named, user-accepted exception to rule 12, in
         # the Named exceptions table of cad/docs/drawing-simplicity-policy.md.
-        # Every sheet a row affects states the exception itself, with the
-        # row's recorded range, which the gate matches; the table is the
-        # backstop.
+        # The sheet states the range, never the governance label (fleet
+        # ruling 2026-09-26, test_printed_text_rulings).
         "2. SCREW MHA-016 TO MHA-091 WITH 2X MHA-142 FROM THE TOP. CUT EACH TO",
         "   FIT AND CHAMFER THE END: FLUSH TO 0.3 SHORT OF THE MHA-091",
         "   UNDERSIDE, NEVER PROUD (NOMINAL LENGTH 86.0). ENGAGEMENT 5.92-6.35",
-        "   (0.93-1.0D): NAMED EXCEPTION TO RULE 12.",
+        "   (0.93-1.0D).",
         # U30 (user, 2026-09-23, option (a)): one #6-32 button-head screw (W22)
         # up through the MHA-091 slot, height and side set by the shim pack at
         # fit-up. Wording from swing (dt-tip-block-attachment-options-20260923.md
@@ -565,7 +572,7 @@ INTERFACE_NOTES = "\n".join(
 CONSUMABLES_NOTES = "\n".join(
     (
         "GENERAL ASSEMBLY NOTES",
-        "ADHESIVE: PER THE MHA-013 AND MHA-021 PRINTS.",
+        "ADHESIVE: PER THE MHA-013 PRINT; MHA-021 PER STEP 1.",
         "OIL THE MHA-027/MHA-028 JOURNALS AND ALL PIVOTS WITH ISO VG 32",
         "MACHINE OIL. NO THREADLOCKER UNLESS A STEP OR PRINT CALLS FOR IT",
         "(LOCTITE 222 ON MHA-139, STEP 7). #4-40, #6-32, #8-32 SCREWS: SNUG.",

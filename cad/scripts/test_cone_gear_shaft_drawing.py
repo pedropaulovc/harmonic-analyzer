@@ -446,3 +446,169 @@ def test_prose_quotes_the_printed_tip_gear_diameters() -> None:
     spec_source = Path(cone_gear_shaft_spec.__file__).read_text(encoding="utf-8")
     for teeth in (6, 12, 18, 24):
         assert f"{cone_gear_spec.DEEPENED_MESH_MM[teeth][0]:.2f}" in spec_source
+
+
+def test_every_section_knob_drives_its_shoulder_plane_and_depth(monkeypatch) -> None:
+    """SecEnd{i} is a documented knob (Tools > Equations): editing it must move
+    the shoulder, not only the extrude depth back to the large end. Run the
+    real build() against recording stubs and read the drive equations it
+    authors: every land on an offset plane has that plane's offset AND its
+    depth owned by the same SecEnd{i} (Codex #839 PRRT_kwDOPHDy386mKNTW)."""
+    import asyncio
+    import inspect
+    from unittest.mock import AsyncMock, MagicMock
+
+    drives: list[tuple[str, str]] = []
+
+    def name_dimensions(_adapter, feature, names):
+        return [f"{name}@{feature}" for name in names]
+
+    async def drive_dimension(_adapter, dim_name, expr):
+        drives.append((dim_name, expr))
+
+    for attr, value in list(vars(part).items()):
+        if not callable(value) or attr.startswith("__") or attr == "build":
+            continue
+        if getattr(value, "__module__", "") == part.__name__:
+            continue
+        if not inspect.isfunction(value) and not inspect.isclass(value):
+            continue
+        stub = AsyncMock() if inspect.iscoroutinefunction(value) else MagicMock()
+        monkeypatch.setattr(part, attr, stub)
+    monkeypatch.setattr(part, "name_dimensions", name_dimensions)
+    monkeypatch.setattr(part, "drive_dimension", drive_dimension)
+    # the diameter drives ride SketchDims.apply; this test reads the stations
+    sketch_dims = MagicMock()
+    sketch_dims.return_value.apply.return_value = []
+    monkeypatch.setattr(part, "SketchDims", sketch_dims)
+    gated_after: list[int] = []
+    monkeypatch.setattr(
+        part,
+        "_assert_shoulder_planes_single_owned",
+        lambda _adapter: gated_after.append(len(drives)),
+    )
+
+    asyncio.run(part.build(AsyncMock()))
+    # the seat-side ownership gate runs once, after every drive is authored
+    assert gated_after == [len(drives)]
+
+    owners = dict(drives)
+    for i in range(1, len(cone_gear_shaft_spec.SECTIONS)):
+        assert owners[f"Sec{i}Station@Sec{i}EndPlane"] == f'"SecEnd{i}"', i
+        assert owners[f"Sec{i}End@Sec{i}"] == f'"SecEnd{i}"', i
+    assert owners["Sec0End@Sec0"] == '"SecEnd0"'
+
+
+class _Dim:
+    def __init__(self, mm: float, driven_state: int = 1, reference: bool = False):
+        self.SystemValue = mm / 1000.0
+        self.DrivenState = driven_state
+        self._reference = reference
+
+    def IsReference(self) -> bool:
+        return self._reference
+
+
+def _gate_fixture(monkeypatch, dims, equations):
+    from unittest.mock import MagicMock
+
+    model = MagicMock()
+    model.Parameter.side_effect = dims.get
+    adapter = MagicMock()
+    adapter.currentModel = model
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(
+        part, "_equations_for", lambda _adapter, lhs: equations.get(lhs, [])
+    )
+    return adapter
+
+
+def _as_built(
+    i: int,
+    *,
+    owner: str | None = None,
+    depth_owner: str | None = None,
+    state: int = 1,
+):
+    end = cone_gear_shaft_spec.SECTIONS[i][1]
+    own = f'"SecEnd{i}"'
+    return (
+        {
+            f"Sec{i}Station@Sec{i}EndPlane": _Dim(end, state),
+            f"Sec{i}End@Sec{i}": _Dim(end),
+        },
+        {
+            f'"Sec{i}Station@Sec{i}EndPlane"': [
+                f'"Sec{i}Station@Sec{i}EndPlane" = {owner or own}'
+            ],
+            f'"Sec{i}End@Sec{i}"': [f'"Sec{i}End@Sec{i}" = {depth_owner or own}'],
+            own: [f"{own} = {end}mm"],
+        },
+    )
+
+
+def _machine(override=None):
+    dims, equations = {}, {}
+    for i in range(1, len(cone_gear_shaft_spec.SECTIONS)):
+        d, e = _as_built(i, **(override or {}).get(i, {}))
+        dims.update(d)
+        equations.update(e)
+    return dims, equations
+
+
+def test_shoulder_plane_gate_accepts_single_ownership_at_driven_state_1(
+    monkeypatch, caplog
+) -> None:
+    """Equation-owned dimensions read DrivenState 1 (driven), never 2: the
+    gate compares against the land's equation-owned depth, not a literal.
+    Each SecEnd definition, with its value, lands in the leaf log as evidence."""
+    dims, equations = _machine()
+    with caplog.at_level("INFO"):
+        part._assert_shoulder_planes_single_owned(
+            _gate_fixture(monkeypatch, dims, equations)
+        )
+    for i in range(1, len(cone_gear_shaft_spec.SECTIONS)):
+        assert equations[f'"SecEnd{i}"'][0] in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("override", "message"),
+    [
+        ({2: {"owner": '"SecEnd1"'}}, 'not "SecEnd2"'),
+        ({3: {"state": 2}}, "plane and depth DrivenState differ"),
+    ],
+)
+def test_shoulder_plane_gate_rejects_a_wrong_owner_or_state(
+    monkeypatch, override, message
+) -> None:
+    dims, equations = _machine(override)
+    adapter = _gate_fixture(monkeypatch, dims, equations)
+    with pytest.raises(RuntimeError, match=message):
+        part._assert_shoulder_planes_single_owned(adapter)
+
+
+def test_shoulder_plane_gate_rejects_a_missing_or_moved_plane(monkeypatch) -> None:
+    dims, equations = _machine()
+    del equations['"Sec1Station@Sec1EndPlane"']
+    dims["Sec4Station@Sec4EndPlane"] = _Dim(cone_gear_shaft_spec.SECTIONS[4][1] + 1e-3)
+    adapter = _gate_fixture(monkeypatch, dims, equations)
+    with pytest.raises(RuntimeError, match="expected one equation") as raised:
+        part._assert_shoulder_planes_single_owned(adapter)
+    assert "Sec4Station@Sec4EndPlane: reads" in str(raised.value)
+
+
+def test_shoulder_plane_gate_proves_the_depth_owner_too(monkeypatch) -> None:
+    """Codex #839 P2: a depth that keeps its as-built value and DrivenState
+    but is driven by the wrong global, or has lost its equation, must fail --
+    as must a SecEnd global defined twice."""
+    dims, equations = _machine({2: {"depth_owner": '"SecEnd1"'}})
+    del equations['"Sec3End@Sec3"']
+    equations['"SecEnd4"'] *= 2
+    adapter = _gate_fixture(monkeypatch, dims, equations)
+    with pytest.raises(RuntimeError) as raised:
+        part._assert_shoulder_planes_single_owned(adapter)
+    message = str(raised.value)
+    assert "Sec2End@Sec2: owned by" in message
+    assert "Sec3End@Sec3: expected one equation" in message
+    assert "SecEnd4: expected one definition" in message
+    assert "Sec1" not in message.replace("SecEnd1", "")

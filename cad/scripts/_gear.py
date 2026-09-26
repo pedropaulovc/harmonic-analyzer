@@ -223,6 +223,8 @@ def gap_area_in_disc_ext(
     widen_rad: float = 0.0,
     root_r_in: float | None = None,
     samples: int = 2000,
+    *,
+    addendum_extra_in: float = 0.0,
 ) -> float:
     """In-blank area of one tooth gap (in^2) with the widen/root extensions.
 
@@ -233,9 +235,10 @@ def gap_area_in_disc_ext(
     flank reversed (rotated +widen), then the floor -- base chord, or radial
     extensions + root arc when ``root_r_in`` is set. A whole-gap rotation
     never changes the area, so the sliced-helix twist reuses this expectation
-    per slice.
+    per slice. ``addendum_extra_in`` moves the rim arc exactly as it moves
+    ``gear_facts``' tip radius.
     """
-    f = gear_facts(teeth, dp, pa_deg)
+    f = gear_facts(teeth, dp, pa_deg, addendum_extra_in=addendum_extra_in)
     rb, ra = f["Rb"], f["Ra"]
     tmax, delta, gamma = f["Tmax"], f["Delta"], f["Gamma"]
     eps = widen_rad
@@ -442,6 +445,7 @@ async def build_fixed_gear(
     helix_deg: float = 0.0,
     backlash_mm: float = 0.0,
     root_relief: bool = False,
+    depth_dp: float | None = None,
 ) -> float:
     """Build a toothed disc on the active new part.
 
@@ -463,12 +467,19 @@ async def build_fixed_gear(
     REQUIRED on any gear meshing a small pinion (and by the helix path,
     whose additive area algebra needs the arc floor): the stock base-circle
     floor leaves a 16T's mate 0.7 mm shy of working depth.
+    ``depth_dp`` is the DP whose standard addendum (1/depth_dp) and dedendum
+    (1.157/depth_dp) set the tooth depth; it defaults to ``dp``. A helical
+    gear cut by a normal-plane cutter passes its TRANSVERSE ``dp`` and
+    ``pa_deg`` (they place the involute) and the cutter's DP here: the cutter
+    cuts its own depth whichever plane the profile is read in.
     """
-    facts = gear_facts(teeth, dp, pa_deg)
+    depth_dp = dp if depth_dp is None else depth_dp
+    addendum_extra_in = 1.0 / depth_dp - 1.0 / dp
+    facts = gear_facts(teeth, dp, pa_deg, addendum_extra_in=addendum_extra_in)
     ra_mm = facts["Ra"] * IN
     pitch_r_in = teeth / dp / 2.0
     widen_rad = (backlash_mm / 2.0) / (pitch_r_in * IN)
-    root_r_in = (pitch_r_in - 1.157 / dp) if root_relief else None
+    root_r_in = (pitch_r_in - 1.157 / depth_dp) if root_relief else None
     if helix_deg and root_r_in is None:
         raise ValueError("helix_deg requires root_relief=True (additive tooth "
                          "area algebra assumes the root-arc floor)")
@@ -488,7 +499,8 @@ async def build_fixed_gear(
     await volume_check(adapter, "blank", v_blank, 0.005 * v_blank)
 
     gap_area = gap_area_in_disc_ext(
-        teeth, dp=dp, pa_deg=pa_deg, widen_rad=widen_rad, root_r_in=root_r_in
+        teeth, dp=dp, pa_deg=pa_deg, widen_rad=widen_rad, root_r_in=root_r_in,
+        addendum_extra_in=addendum_extra_in,
     )
     if not helix_deg:
         gap_cut = await cut_tooth_gap(

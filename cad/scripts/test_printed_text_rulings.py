@@ -52,7 +52,9 @@ def _docstrings(tree: ast.Module) -> set[int]:
     return {
         id(node.body[0].value)
         for node in ast.walk(tree)
-        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        if isinstance(
+            node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+        )
         and node.body
         and isinstance(node.body[0], ast.Expr)
         and isinstance(node.body[0].value, ast.Constant)
@@ -140,15 +142,12 @@ def test_the_scan_reaches_known_printed_text() -> None:
 @pytest.mark.xfail(
     strict=True,
     reason="#929 (S1) states the post-mount floor plainly on the platform note and "
-    "step 2; #857 deletes post-mount-screw installation_notes (b8355fcde); "
-    "#834 drops cone_gear_notes' ACCEPTED EXCEPTION lines (b8406ef77); "
-    "knife_mount_spec's 'ACCEPTED BY DESIGN' still needs rewording (Main to route)",
+    "step 2; #834 drops cone_gear_notes' ACCEPTED EXCEPTION lines (b8406ef77)",
 )
 def test_no_printed_text_cites_an_internal_rule_or_ruling() -> None:
     assert not _internal_hits({**printed_constants(), **printed_registry_fields()})
 
 
-@pytest.mark.xfail(strict=True, reason="#857 deletes it (b8355fcde)")
 def test_post_mount_screw_prints_no_installation_notes() -> None:
     row = yaml.safe_load((PARTS / "post-mount-screw.yaml").read_text(encoding="utf-8"))
     assert "installation_notes" not in row["post-mount-screw"]

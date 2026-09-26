@@ -357,8 +357,9 @@ _SNAPSHOT = {
         "PinStationReference",
     },
     "pinion-lever": {"GripStationReference", "PinHoleStationReference"},
-    "crank-arm": {"PinStationReference", "StationReference"},
-    "crank-drive-gear": {"OutsideDiaReference"},
+    "crank-hub": {"ServicePinStationReference"},
+    "crank-handle-pivot-screw": {"StationReference"},
+    "crankshaft": {"StationReference"},
     "cone-pivot-post": {"BoreSpacingReference", "JournalPlanReference"},
 }
 _OWNERS = {"pinioncluster", "crankhub", "pivot"}
