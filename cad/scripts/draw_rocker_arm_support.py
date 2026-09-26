@@ -344,6 +344,15 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, right)
     set_hidden_lines_removed(adapter, iso)
 
+    # DIAG743 (throwaway): RimChamferSize's state and imports, then stop.
+    from diagnostics import diag_743_dims as d743
+
+    d743.log_view_mode(front, tag="R0")
+    d743.log_feature_dims(adapter, front, "RimChamfer", tag="R0")
+    d743.import_variant(adapter, front, [], tag="R1-entire", option=d743.FROM_ENTIRE_MODEL)
+    d743.import_variant(adapter, front, ["RimChamfer"], tag="R3-targeted")
+    d743.finish()
+
     front_dimensions = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
