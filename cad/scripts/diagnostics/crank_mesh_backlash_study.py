@@ -156,8 +156,15 @@ class Pose:
 
     def __init__(self, extra: float, widen16: float, widen64: float,
                  crank_deg: float, lut: dict, gear16: GearDef = SHIPPED16,
-                 gear64: GearDef = SHIPPED64, hand16: float = 1.0) -> None:
+                 gear64: GearDef = SHIPPED64, hand16: float = 1.0,
+                 skew64: bool = False) -> None:
         self.gear16, self.gear64 = gear16, gear64
+        # The shop's straight skewed slot instead of a true helix: each
+        # mid-face point runs along its own tangent (w = s * tan(beta))
+        # rather than around the pitch cylinder, so it stands off radially
+        # by ~w^2 / 2r at the face ends -- the flank-line sag.
+        self.skew64 = skew64
+        self.tan64 = math.tan(math.radians(gear64.beta_deg))
         self.y_crank = y_for_extra(extra, gear16, gear64)
         self.g16 = gear16.lookup(widen16, lut)
         self.g64 = gear64.lookup(widen64, lut)
@@ -195,9 +202,15 @@ class Pose:
         pts = []
         for s in np.arange(-cms.GEAR64_FACE / 2.0, cms.GEAR64_FACE / 2.0 + 1e-9, SLICE_MM):
             for k in range(64):
-                phi = th + k * gamma - self.crank / 4.0 + s * self.twist64
+                if self.skew64:
+                    w = s * self.tan64
+                    phi = th + k * gamma - self.crank / 4.0 + np.arctan2(w, r)
+                    rr = np.hypot(r, w)
+                else:
+                    phi = th + k * gamma - self.crank / 4.0 + s * self.twist64
+                    rr = r
                 p = (GEAR64_SEAT + s * U)[None, :] + (
-                    (r * np.cos(phi))[:, None] * EX + (r * np.sin(phi))[:, None] * EY
+                    (rr * np.cos(phi))[:, None] * EX + (rr * np.sin(phi))[:, None] * EY
                 )
                 d = np.hypot(p[:, 0] - cms.X_CRANK, p[:, 1] - self.y_crank)
                 pz = p[:, 2] - self.z0
@@ -211,7 +224,14 @@ class Pose:
         s = rel @ U
         radial = rel - np.outer(s, U)
         r = np.linalg.norm(radial, axis=1)
-        th = np.arctan2(radial @ EY, radial @ EX) + self.crank / 4.0 - s * self.twist64
+        th = np.arctan2(radial @ EY, radial @ EX) + self.crank / 4.0
+        if self.skew64:
+            w = s * self.tan64
+            r0 = np.sqrt(np.maximum(r * r - w * w, 0.0))
+            th = th - np.arctan2(w, r0)
+            r = r0
+        else:
+            th = th - s * self.twist64
         return (np.abs(s) <= cms.GEAR64_FACE / 2.0) & self.g64.material(th, r)
 
     def _pinion_twist(self, z_local: np.ndarray) -> np.ndarray:
@@ -289,11 +309,12 @@ class Case:
     gear16: GearDef = SHIPPED16
     gear64: GearDef = SHIPPED64
     hand16: float = 1.0
+    skew64: bool = False
 
     def record(self) -> dict:
         return {
             "case": self.name, "extra": self.extra, "widen16": self.widen16,
-            "widen64": self.widen64, "hand16": self.hand16,
+            "widen64": self.widen64, "hand16": self.hand16, "skew64": self.skew64,
             **{f"g16_{k}": v for k, v in _gear_record(self.gear16).items()},
             **{f"g64_{k}": v for k, v in _gear_record(self.gear64).items()},
         }
@@ -320,7 +341,7 @@ GEAR_KEYS = {"b16": "beta_deg", "b64": "beta_deg", "def16": "definition",
 def parse_case(spec: str) -> Case:
     """``NAME:key=value,...`` over the shipped case.
 
-    Keys: extra, w16, w64, hand16 (+1/-1), b16, b64 (helix deg), def16,
+    Keys: extra, w16, w64, hand16 (+1/-1), skew64 (1: straight skewed slots), b16, b64 (helix deg), def16,
     def64 (transverse|normal), dpn16, dpn64 (cutter DP), pan16, pan64 (cutter PA).
     """
     name, _, body = spec.partition(":")
@@ -331,6 +352,9 @@ def parse_case(spec: str) -> Case:
         key, value = item.split("=")
         if key in ("extra", "w16", "w64", "hand16"):
             fields[{"w16": "widen16", "w64": "widen64"}.get(key, key)] = float(value)
+            continue
+        if key == "skew64":
+            fields["skew64"] = value == "1"
             continue
         target = g16 if key.endswith("16") else g64
         attr = GEAR_KEYS[key]
@@ -367,7 +391,7 @@ def main() -> int:
                 continue
             t0 = time.perf_counter()
             pose = Pose(case.extra, case.widen16, case.widen64, float(ph), lut,
-                        case.gear16, case.gear64, case.hand16)
+                        case.gear16, case.gear64, case.hand16, case.skew64)
             res = window(pose, guess)
             if "centre_deg" in res:
                 guess = res["centre_deg"]
