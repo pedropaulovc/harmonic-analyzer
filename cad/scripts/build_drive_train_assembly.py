@@ -2121,8 +2121,14 @@ if ARBOR_COLLAR_Z[1] > RIG.STRAP_Z_OUTER[0] - 0.25:
 if ARBOR_COLLAR_Z[0] < _GRIP_HEAD_Z[1] + 0.25:
     raise AssertionError("arbor collar reaches the integral grip head's neck")
 for _lo, _hi, _axis_xy, _r, _what in (
-    (LIFT_ROD_Z0, LIFT_ROD_Z0 + 202.0, (LIFT_X, LIFT_Y), 3.175, "lift rod"),
-    (PIVOT_SHAFT_Z0, PIVOT_SHAFT_Z0 + 192.0, (PIVOT_X, PIVOT_Y), 3.175, "pivot shaft"),
+    (LIFT_ROD_Z0, LIFT_ROD_Z0 + RIG.LIFT_ROD_LEN, (LIFT_X, LIFT_Y), 3.175, "lift rod"),
+    (
+        PIVOT_SHAFT_Z0,
+        PIVOT_SHAFT_Z0 + RIG.TORQUE_SHAFT_LEN,
+        (PIVOT_X, PIVOT_Y),
+        3.175,
+        "pivot shaft",
+    ),
 ):
     if _hi < ARBOR_COLLAR_Z[0] - 0.25 or _lo > ARBOR_COLLAR_Z[1] + 0.25:
         continue
