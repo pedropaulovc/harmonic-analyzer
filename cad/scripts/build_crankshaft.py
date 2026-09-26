@@ -748,7 +748,7 @@ async def build(adapter) -> dict[str, str]:
             (name, "PLANE")
             for name in (
                 "ShaftFiducialPlane",
-                "JournalStartPlane",
+                "PinionSeatStartPlane",
                 "PinHoleStationPlane",
                 "PinionPinStationPlane",
                 "PinionPinClockingPlane",
