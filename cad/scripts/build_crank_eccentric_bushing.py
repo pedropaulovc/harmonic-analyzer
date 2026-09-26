@@ -1,12 +1,13 @@
-r"""Reproduction script: crank eccentric bushing, MHA-149 (#906 A2).
+r"""Reproduction script: crank eccentric bushing, MHA-149 (#906 R1).
 
 Bronze sleeve lining MHA-016's crank bore, with the crankshaft running in it.
 Its bore is offset from its OD by the throw (``crank_eccentric_bushing_spec``),
 so turning it in the post sets the 16T:64T centre distance at fit-up.
 
 Plain sleeve: OD and bore extruded from the Top plane along +Y (the assembly
-lays it along the crank axis).  Both axes lie in the Front plane, which is the
-clocking reference the assembly turns the throw by.
+lays it along the crank axis, the Top-plane end south).  Both axes lie in the
+Front plane, which is the clocking reference the assembly turns the throw by.
+Two wrench flats on the south end, square to the throw, turn it.
 
 Run (SolidWorks already open)::
 
@@ -22,6 +23,7 @@ from _common import (
     SketchDims,
     apply_material,
     check,
+    define_centered_rectangle,
     define_circle,
     drive_dimension,
     ensure_fully_defined,
@@ -36,7 +38,7 @@ from _common import (
     volume_check,
 )
 import _config
-import crankshaft_spec
+import crank_hub_geometry
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -54,7 +56,11 @@ from crank_eccentric_bushing_spec import (
     DRAWING_PRECISION,
     ECCENTRICITY,
     ECCENTRICITY_BAND,
+    FLATS_ACROSS,
+    FLATS_LENGTH,
+    FLATS_THROW_LEAN,
     LENGTH,
+    OD_BAND,
     OUTER_DIA,
     SURFACE_FINISHES,
     WALL_FLOOR_MM,
@@ -65,44 +71,46 @@ MATERIAL = "Brass"  # nearest SolidWorks entry; the yaml names the bronze
 
 # The bore is this part's running fit, so its band is DERIVED, as on
 # cone-tip-bushing: from the named fit class (crank-eccentric-bushing.yaml:
-# shaft_in_bushing) and the journal's own limits.  bore_min = journal_max +
-# clearance_min, bore_max = journal_min + clearance_max.
+# shaft_in_bushing) and the 3/8 in core's own limits.  bore_min = shaft_max +
+# clearance_min, bore_max = shaft_min + clearance_max.
 _CLEARANCE_MIN, _CLEARANCE_MAX = (
     float(value)
     for value in _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
 )
-_JOURNAL_UPPER, _JOURNAL_LOWER = crankshaft_spec.JOURNAL_DIA_BAND
+_SHAFT_UPPER, _SHAFT_LOWER = crank_hub_geometry.SHAFT_DIA_BAND
 BORE_DIA_BAND = (  # (upper, lower) deviations from BORE_DIA
-    crankshaft_spec.JOURNAL_DIA + _JOURNAL_LOWER + _CLEARANCE_MAX - BORE_DIA,
-    crankshaft_spec.JOURNAL_DIA + _JOURNAL_UPPER + _CLEARANCE_MIN - BORE_DIA,
+    crank_hub_geometry.SHAFT_DIA + _SHAFT_LOWER + _CLEARANCE_MAX - BORE_DIA,
+    crank_hub_geometry.SHAFT_DIA + _SHAFT_UPPER + _CLEARANCE_MIN - BORE_DIA,
 )
 
-# The OD is a slip fit in the post's H7 bore on the same fit class (Main,
-# 2026-09-26): the bushing turns in the bore at fit-up and is then bonded, so
-# OD_max = post_bore_min - clearance_min and OD_min = post_bore_max -
-# clearance_max.  Its lower limit is what the thin side of the wall is taken at.
-_POST_UPPER, _POST_LOWER = POST_BORE_BAND
-OD_BAND = (  # (upper, lower) deviations from OUTER_DIA
-    _POST_LOWER - _CLEARANCE_MIN,
-    _POST_UPPER - _CLEARANCE_MAX,
+# The g6 OD in the post's H7 bore (crank_eccentric_bushing_spec.OD_BAND).
+OD_SEAT_CLEARANCE = (
+    POST_BORE_BAND[1] - OD_BAND[0],
+    POST_BORE_BAND[0] - OD_BAND[1],
 )
+if OD_SEAT_CLEARANCE[0] <= 0.0:
+    raise AssertionError("the bushing's g6 OD can bind in the post's H7 bore")
 
-# Rule 12, the named exception (drawing-simplicity-policy.md): the thin side
-# of the wall at print-worst -- OD at its minimum, the throw at its maximum,
-# the bore at its maximum -- sits ON the floor.  The throw's band is what holds
-# it there; loosen it and this fails.
-WALL_WORST = (
-    (OUTER_DIA + OD_BAND[1]) / 2.0
-    - (ECCENTRICITY + ECCENTRICITY_BAND[0])
-    - (BORE_DIA + BORE_DIA_BAND[0]) / 2.0
+# Rule 12 (drawing-simplicity-policy.md): the thin side of the wall at
+# print-worst -- OD at its minimum, the throw at its maximum, the bore at its
+# maximum -- and the wall under a flat, with the flats' clocking at its angular
+# limit.  Both sit under the 2.0 target and over the 1.5 floor, and both are
+# the policy's named MHA-149 row; the test holds the row to these numbers.
+_BORE_MAX = BORE_DIA + BORE_DIA_BAND[0]
+_THROW_MAX = ECCENTRICITY + ECCENTRICITY_BAND[0]
+WALL_WORST = (OUTER_DIA + OD_BAND[1]) / 2.0 - _THROW_MAX - _BORE_MAX / 2.0
+_FLATS_ROW = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+FLATS_WALL_WORST = (
+    (FLATS_ACROSS - _FLATS_ROW) / 2.0 - _THROW_MAX * FLATS_THROW_LEAN - _BORE_MAX / 2.0
 )
-if WALL_WORST < WALL_FLOOR_MM - 1e-9:
-    raise AssertionError(
-        f"the bushing's thin wall is {WALL_WORST:.4f} at print-worst (OD "
-        f"{OUTER_DIA + OD_BAND[1]:.3f} min, throw "
-        f"{ECCENTRICITY + ECCENTRICITY_BAND[0]:.3f} max, bore "
-        f"{BORE_DIA + BORE_DIA_BAND[0]:.3f} max), under the {WALL_FLOOR_MM} floor"
-    )
+for _name, _wall in (("thin side", WALL_WORST), ("under a flat", FLATS_WALL_WORST)):
+    if _wall < WALL_FLOOR_MM - 1e-9:
+        raise AssertionError(
+            f"the bushing's wall {_name} is {_wall:.4f} at print-worst, under the "
+            f"{WALL_FLOOR_MM} floor"
+        )
+if FLATS_ACROSS + _FLATS_ROW >= OUTER_DIA + OD_BAND[1]:
+    raise AssertionError("the wrench flats can print as wide as the OD they cut")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -157,6 +165,41 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven bushing (equations neutral)", volume,
                        0.005 * v_bore)
+
+    # Wrench flats, square to the throw (the throw lies along model X, so the
+    # flats face +/-Z): the ring between an oversize circle and a rectangle
+    # FlatsAcross deep in Z is cut from the south (Top-plane) end, into the
+    # body, so it is reversed explicitly.
+    await set_global(adapter, "FlatsAcross", f"{FLATS_ACROSS}mm")
+    await set_global(adapter, "FlatsLength", f"{FLATS_LENGTH}mm")
+    flats = SketchDims()
+    check("create_sketch flats", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, 0.0, 0.0, OUTER_DIA, "flats outer", dims=flats,
+        names=("FlatsCx", "FlatsCz", "FlatsClear"), drives=(None, None, None),
+    )
+    await define_centered_rectangle(
+        adapter, OUTER_DIA / 2.0 + 0.5, FLATS_ACROSS / 2.0, "flats", dims=flats,
+        name_width="FlatsSpan", name_depth="FlatsAcross",
+        drive_depth='"FlatsAcross"',
+    )
+    await ensure_fully_defined(adapter, "flats sketch")
+    check("exit_sketch flats", await adapter.exit_sketch())
+    name_last_feature(adapter, "FlatsProfile")
+    drive_jobs += flats.apply(adapter, "FlatsProfile")
+    check("cut flats", await adapter.create_cut_extrude(
+        ExtrusionParameters(depth=FLATS_LENGTH, reverse_direction=True)))
+    name_last_feature(adapter, "Flats")
+    flats_depth = name_dimensions(adapter, "Flats", ["FlatsDepth"])
+    drive_jobs += [(flats_depth[0], '"FlatsLength"')]
+    _r, _h = OUTER_DIA / 2.0, FLATS_ACROSS / 2.0
+    v_flats = 2.0 * FLATS_LENGTH * (
+        _r * _r * math.acos(_h / _r) - _h * math.sqrt(_r * _r - _h * _h)
+    )
+    volume = await volume_check(adapter, "flats", volume - v_flats, 0.02 * v_flats)
+    for dim_name, expr in drive_jobs[-2:]:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
     set_dimension_bilateral_tolerance(
         adapter, "BodyProfile", "ODDim", *deviations(OD_BAND)
     )

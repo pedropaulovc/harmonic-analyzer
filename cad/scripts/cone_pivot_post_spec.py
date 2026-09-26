@@ -39,11 +39,18 @@ HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
 # corrected source dimension in inches: 2.8360 in replaces the 2.85086614 in
 # initial derivation.
 CRANK_BOSS_DIA = 21.93
-# #906 A2 (user, 2026-09-26): the crank bore is bored out to an H7 seat for the
-# MHA-149 eccentric bushing, centred on the boss; the crankshaft runs in the
-# bushing, whose 0.45 throw takes up the 16T:64T centre distance at fit-up.
-CRANK_BORE_DIA = 15.45
-CRANK_BORE_HEIGHT = 72.7
+# #906 R1: the crank bore is bored out to an H7 seat for the MHA-149 eccentric
+# bushing; the crankshaft runs in the bushing, whose throw takes up the 16T:64T
+# centre distance at fit-up.  The whole crank boss sits CRANK_BORE_DROP below
+# the frame's crank axis (CRANK_AXIS_HEIGHT, where build_drive_train_assembly
+# lays the crank train out), because the mesh stack's fit-up window is not
+# centred on the frame: crank_mesh_stack sizes both and asserts the throw
+# reaches each end.  The boss moves with the bore, so the casting keeps its
+# shape and every harvested volume below holds.
+CRANK_BORE_DIA = 14.6
+CRANK_AXIS_HEIGHT = 72.7
+CRANK_BORE_DROP = 0.26
+CRANK_BORE_HEIGHT = CRANK_AXIS_HEIGHT - CRANK_BORE_DROP
 CRANK_BORE_OFFSET = 0.0
 # The boss's near face is a MACHINED SPOT FACE, not the rim of the cast
 # collar: it is stationed from the post axis and the print dimensions it that
@@ -88,20 +95,21 @@ ATTACHMENT_CBORE_DEPTH = 6.0198
 #   collar    pi*(22^2 - 21.0055^2)*26.6            = +  3 574.0470
 #   crank boss outside the collar cylinder          = + 11 215.7157
 #   spot face (collar proud of z=-21.3753 in disc)  = -     93.1451
-#   crank bore pi*7.725^2*72.0344                   = - 13 504.7576
+#   crank bore pi*7.3^2*72.0344                     = - 12 059.6731
 #   cone pads outside the body cylinder             = +    209.0550
 #   cone bore pi*6.1404^2*42.011                    = -  4 976.2960
 #   2x (thru pi*3.57124^2*79.9802 + cbore pi*5.75437^2*6.0198) = - 7 661.5921
-#                                                   = 107 973.4896
+#                                                   = 109 418.5740
 #
-# (#906 A2 bored the crank bore out from Ø11.438 to Ø15.45: 114 076.5723
-# before.)  The 2026-09-21 farm build of the previous recipe read 121 575.3: it had
+# (#906 R1 bored the crank bore out from Ø11.438 to Ø14.6: 114 076.5723
+# before.  Lowering the crank boss by CRANK_BORE_DROP changes no term: the
+# boss stays inside the collar's 59.4..86 height band.)  The 2026-09-21 farm build of the previous recipe read 121 575.3: it had
 # never bored the crank boss (7 401.7) and had only nicked the 45 mm^3 collar
 # sliver behind the spot-face plane inside the bore disc -- a cut whose
 # default direction (opposite the sketch normal) found the Ø44 collar to bite
 # instead of auto-flipping into the boss.  Mass at gray iron 7.20 g/cc.
-HARVESTED_VOLUME_MM3 = 107_973.4896
-HARVESTED_MASS_KG = 0.777409
+HARVESTED_VOLUME_MM3 = 109_418.5740
+HARVESTED_MASS_KG = 0.787814
 
 # The cone journal bore is a running journal, so it carries the band the
 # `shaft_in_bushing` fit class needs and no tighter (tolerance-policy.md,
@@ -113,7 +121,7 @@ HARVESTED_MASS_KG = 0.777409
 #   journal: shaft 12.2108..12.2308 bore 12.2558..12.2858 (cone shaft MHA-014)
 #
 # The crank bore no longer runs anything: it seats the MHA-149 bushing, bored
-# H7 (ISO 286, 10-18 mm: +0.018/0), the fit the user ruled for A2.  The
+# H7 (ISO 286, 10-18 mm: +0.018/0), the fit the user ruled for the bushing.  The
 # bushing's OD band is derived from it (build_crank_eccentric_bushing), and
 # every web around it below is taken at its H7 maximum.
 #
@@ -153,8 +161,8 @@ CRANK_BORE_BAND = (0.018, 0.0)  # (upper, lower): H7
 CRANK_ABOVE_CONE = CRANK_BORE_HEIGHT - BORE_HEIGHT
 CRANK_ABOVE_CONE_BAND = (0.37, 0.0)
 
-# #906 A2: webs around the Ø15.45 H7 crank bore, at print-worst (policy rule
-# 12: 2.0 target, 1.5 floor).  The bore is centred on the post's symmetry
+# #906 R1: webs around the Ø14.6 H7 crank bore, at print-worst (policy rule
+# 12: 2.0 target, 1.5 floor; R1 holds the target).  The bore is centred on the post's symmetry
 # plane, which is what keeps the two mounting holes beside it workable; its
 # worst case is the H7 maximum with the crank axis at its highest (the cone
 # axis .XX high plus the whole +0.37 spacing band).  Holes are drilled
