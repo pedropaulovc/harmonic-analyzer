@@ -1888,7 +1888,7 @@ def configuration_materials(part: Any, names: Iterable[str]) -> dict[str, str]:
     for name in names:
         material, database = part.GetMaterialPropertyName2(name)
         materials[name] = str(material or "")
-        _telemetry.debug(f"material in {name}: {material!r} (database {database!r})")
+        _telemetry.info(f"material in {name}: {material!r} (database {database!r})")
     return materials
 
 
