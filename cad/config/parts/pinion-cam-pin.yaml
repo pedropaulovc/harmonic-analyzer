@@ -3,7 +3,7 @@ pinion-cam-pin:
   number: MHA-116
   material: AISI O1 drill rod
   material_specification: AISI O1 drill rod
-  finish: as-received drill rod; crown turned; protect with ISO VG 32 machine-oil film
+  finish: as-received drill rod; protect with ISO VG 32 machine-oil film
   quantity: 2
   tolerance_class: machined_block
   process: "cut from drill rod; crown turned"

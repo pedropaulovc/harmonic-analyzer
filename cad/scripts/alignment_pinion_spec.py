@@ -11,7 +11,7 @@ import math
 
 import _config
 
-from _gtol_spec import CylinderFace
+from _gtol_spec import CylinderFace, PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
@@ -68,8 +68,23 @@ FACE_WIDTH = 143.2  # general .X; located from the back end (drawing note)
 # +/-0.51, the drum tip keeps >= 0.21 mm to the 120T gap floor and the mesh
 # keeps a contact ratio >= 1.13 (test_alignment_pinion_drawing).
 
+# The two end faces are running thrust faces, so each carries the machined
+# grade on its own face instead of the title block's retired "end faces
+# polished" (machinist review of 7f7fc1717: polishing had no stated
+# function).  MHA-102's float model (pinion_arbor_spec) is the evidence: the
+# drum is trapped between the two MHA-056 straps, the fit-up end play is shared
+# by four axial gaps each >= 0, and "the drum hard forward and hard aft are the
+# two stops" -- a drum end face meets a strap's inner face.  The drum turns
+# against the strap while it does: it rides the crossrod-driven arbor round
+# during zeroing and is driven by the cylinder train while engaged.  The blank
+# is extruded from the Front plane toward +Z, so the ends sit at z = 0 and
+# z = FACE_WIDTH.
 SURFACE_FINISHES = (
     SurfaceFinishControl("drum_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
+    SurfaceFinishControl("front_end_face", MACHINED_UM, PlanarFace((0, 0, -1), 0.0)),
+    SurfaceFinishControl(
+        "back_end_face", MACHINED_UM, PlanarFace((0, 0, 1), FACE_WIDTH)
+    ),
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

@@ -32,12 +32,33 @@ def test_gear_data_block_preserves_the_actual_base_chord_profile() -> None:
     assert "X.XX" not in data
 
 
-def test_bore_has_the_single_machined_finish_contract() -> None:
-    assert len(spec.SURFACE_FINISHES) == 1
-    (finish,) = spec.SURFACE_FINISHES
-    assert finish.key == "drum_bore"
-    assert finish.roughness_um == 1.6
-    assert finish.face.diameter_mm == 8.0
+def test_bore_and_both_thrust_end_faces_carry_the_machined_finish() -> None:
+    """Machinist review of 7f7fc1717: "end faces polished" had no stated
+    function.  The drum's ends are thrust faces -- MHA-102's float model stops
+    the drum hard forward and hard aft against the MHA-056 straps -- so each
+    carries the machined grade on its own face, and the finish field drops
+    the polish."""
+    import draw_alignment_pinion as drawing
+    from _gtol_spec import PlanarFace
+
+    bore, front, back = spec.SURFACE_FINISHES
+    assert bore.key == "drum_bore"
+    assert bore.face.diameter_mm == 8.0
+    assert front.key == "front_end_face"
+    assert front.face == PlanarFace((0, 0, -1), 0.0)
+    assert back.key == "back_end_face"
+    assert back.face == PlanarFace((0, 0, 1), spec.FACE_WIDTH)
+    assert {control.roughness_um for control in spec.SURFACE_FINISHES} == {1.6}
+    # The float model the thrust claim rests on.
+    assert arbor.STRAP_AXIAL_LOCATION == "block-stop-slot-set"
+    assert arbor.drum_total_air()[0] == 0.0  # a drum end can touch a strap
+    assert "polish" not in _config.parts("alignment-pinion")["finish"].lower()
+    # Each symbol's leader starts outside the drum and lands on its own end.
+    assert drawing.BACK_END_FINISH_SYMBOL_XY[0] < drawing.BACK_END_FACE_XY[0]
+    assert drawing.FRONT_END_FINISH_SYMBOL_XY[0] > drawing.FRONT_END_FACE_XY[0]
+    assert drawing.FRONT_END_FACE_XY[0] - drawing.BACK_END_FACE_XY[0] == pytest.approx(
+        spec.FACE_WIDTH / 1000.0
+    )
 
 
 def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None:
@@ -94,7 +115,7 @@ def test_the_drum_bond_is_the_fitup_step_not_a_note() -> None:
 def test_part_metadata_preserves_material_finish_quantity() -> None:
     config = _config.parts("alignment-pinion")
     assert config["material_specification"] == "C36000 free-machining brass"
-    assert config["finish"] == "end faces polished; bore as reamed; teeth as cut"
+    assert config["finish"] == "bore as reamed; teeth as cut"
     assert int(config["quantity"]) == 1
 
 

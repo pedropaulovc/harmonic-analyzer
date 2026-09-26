@@ -62,10 +62,18 @@ FRONT_CENTER = (0.110, 0.175)
 RIGHT_CENTER = (0.235, FRONT_CENTER[1])
 ISO_CENTER = (0.345, 0.195)
 
-FRONT_KEEP = {"Depth": (FRONT_CENTER[0], 0.140)}
-RIGHT_KEEP = {"PinDia": (0.265, 0.205)}
+# Printed half-diameter in sheet metres, which the diameter is placed clear of.
+HALF_DIA = PIN_DIA * SHEET_SCALE[0] / 2000.0
+# Rule 7 (turned parts): both dimensions sit on the side view, the diameter
+# above it -- its dimension line left of centre so the axis-centerline pick at
+# the view's middle lands on bare face -- and the cut length below.  The end
+# view is a bare circle with its center mark (machinist review of 7f7fc1717).
+FRONT_KEEP = {
+    "PinDia": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1] + HALF_DIA + 0.016),
+    "PinLen": (FRONT_CENTER[0], 0.140),
+}
 DIMENSION_CALLOUTS = {
-    "Depth": "CUT LENGTH",
+    "PinLen": "CUT LENGTH",
     "PinDia": "1/16 DRILL ROD",
 }
 
@@ -115,21 +123,13 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    front_annotations = curate_view_dimensions(
+    annotations = curate_view_dimensions(
         adapter,
         front,
         keep=FRONT_KEEP,
         view_label="pin side",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    right_annotations = curate_view_dimensions(
-        adapter,
-        right,
-        keep=RIGHT_KEEP,
-        view_label="pin end",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    annotations = [*front_annotations, *right_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):

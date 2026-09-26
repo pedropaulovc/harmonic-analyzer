@@ -41,7 +41,7 @@ def test_pin_fills_the_match_drilled_hole_and_spans_the_hub() -> None:
     shortest_pin = spec.PIN_LEN - 0.8
     largest_hub = lever.HUB_OD + 0.8
     assert pinion_lever_spec.DRAWING_PRECISION_BY_NAME["HubOd"] == 1
-    assert spec.DRAWING_PRECISION_BY_NAME["Depth"] == 1
+    assert spec.DRAWING_PRECISION_BY_NAME["PinLen"] == 1
     assert (shortest_pin - largest_hub) / 2.0 >= PEEN_ALLOWANCE >= 0.5
     assert "TRIM AND PEEN" in spec.ASSEMBLY_STEP
 
@@ -59,12 +59,26 @@ def test_cross_hole_webs_clear_two_millimetres_at_the_worst_case() -> None:
 
 def test_marked_set_bands_and_places_come_from_the_spec() -> None:
     assert pin.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
-    assert kept == set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert set(drawing.FRONT_KEEP) == set().union(*spec.DRAWING_DIMENSIONS.values())
     assert model_toleranced_dimensions(pin) == {
         ("PinProfile", "PinDia"): "*deviations(PIN_DIA_BAND)"
     }
-    assert spec.DRAWING_PRECISION_BY_NAME == {"PinDia": 3, "Depth": 1}
+    assert spec.DRAWING_PRECISION_BY_NAME == {"PinDia": 3, "PinLen": 1}
+
+
+def test_the_diameter_prints_on_the_side_view_beside_the_length() -> None:
+    """Machinist review of 7f7fc1717 (rule 7, turned parts): the Ø sat alone
+    on the end view.  Both dimensions now come from the one revolved
+    half-profile the *Front side view shows, and the end view keeps nothing."""
+    assert spec.DRAWING_DIMENSIONS == {"PinProfile": {"PinDia", "PinLen"}}
+    assert not hasattr(drawing, "RIGHT_KEEP")
+    source = Path(pin.__file__).read_text(encoding="utf-8")
+    assert 'create_sketch("Front")' in source
+    assert "add_diametric_linear_dimension" in source
+    assert "create_revolve" in source and "create_extrusion" not in source
+    # The diameter's text sits above the side view, clear of the pin outline.
+    assert drawing.FRONT_KEEP["PinDia"][1] > drawing.FRONT_CENTER[1] + drawing.HALF_DIA
+    assert drawing.FRONT_KEEP["PinLen"][1] < drawing.FRONT_CENTER[1] - drawing.HALF_DIA
 
 
 def test_the_pin_sheet_has_no_notes_and_the_mates_carry_the_match_drill() -> None:
