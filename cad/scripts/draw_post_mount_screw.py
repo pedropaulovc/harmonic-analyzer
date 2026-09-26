@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from pathlib import Path
 from typing import Any
 
 import _drawing_hidden_sketches as hidden_sketches
@@ -415,75 +416,157 @@ def _verify_tip_view(adapter: Any, front: Any, tip: Any) -> None:
             f"{parenthesis}), expected {CUT_END_BREAK_TEXT!r}"
         )
     _telemetry.success(f"tip view {ratio[0]:g}:{ratio[1]:g} reads {text}")
-    _probe_max_text(adapter, annotation, view)
 
 
-# diag (#923 MAX/MIN, never merge): what prints the break's "max." text.
-_PREF_INTS = {"swDetailingDimensionStandard": 13}
-_PREF_STRINGS = {"swDetailingDimensionStandardName": 65, "swFileLocationsDraftingStandard": 64}
-_PREF_TOGGLES = {
-    "swDetailingAllUpperCase": 538,
-    "swDraftingStandardUppercase": 552,
-    "swDraftingStandardAllUppercaseForDimensionsAndHoleCallouts": 754,
-}
+# diag (#923 MAX/MIN blast radius, never merge): every document preference and
+# every annotation's rendered text, as saved and after swDetailingDimensionStandard
+# = ANSI plus a forced regen; both sheets exported as PDF into the task log.
+_BLAST_DIR = Path(__file__).resolve().parents[1] / "out" / "reports" / "maxmin-blast"
+_TEXT_FORMAT_FIELDS = (
+    "TypeFaceName", "CharHeight", "CharHeightInPts", "IsHeightSpecifiedInPts",
+    "Bold", "Italic", "Underline", "Strikeout", "WidthFactor", "CharSpacingFactor",
+    "LineSpacing", "LineLength", "ObliqueAngle", "Escapement", "Vertical",
+    "BackWards", "UpsideDown",
+)
 
 
-def _probe_max_text(adapter: Any, annotation: Any, view: Any) -> None:
-    """Log the drafting-standard prefs and the break's rendered strings under
-    each variant; restores every pref it touched. Never raises."""
-    draw = adapter.currentModel
-    ext = draw.Extension
+def _blast_value(ext: Any, kind: str, pref: int, option: int) -> object:
+    if kind == "integer":
+        return int(ext.GetUserPreferenceInteger(pref, option))
+    if kind == "toggle":
+        return bool(ext.GetUserPreferenceToggle(pref, option))
+    if kind == "double":
+        return float(ext.GetUserPreferenceDouble(pref, option))
+    if kind == "string":
+        return str(ext.GetUserPreferenceString(pref, option))
+    raw = ext.GetUserPreferenceTextFormat(pref, option)
+    if raw is None:
+        return None
+    fmt = _early_bound(raw, "ITextFormat")
+    return {field: getattr(fmt, field) for field in _TEXT_FORMAT_FIELDS}
 
-    def rendered() -> list[str]:
-        data = _early_bound(annotation, "IAnnotation").GetDisplayData()
-        if data is None:
-            return ["<no display data>"]
-        data = _early_bound(data, "IDisplayData")
-        return [str(data.GetTextAtIndex(i)) for i in range(int(data.GetTextCount()))]
 
-    def prefs() -> dict[str, object]:
-        out: dict[str, object] = {}
-        for name, pref in _PREF_INTS.items():
-            out[name] = int(ext.GetUserPreferenceInteger(pref, 0))
-        for name, pref in _PREF_STRINGS.items():
-            out[name] = str(ext.GetUserPreferenceString(pref, 0))
-        for name, pref in _PREF_TOGGLES.items():
-            out[name] = bool(ext.GetUserPreferenceToggle(pref, 0))
-        return out
+def _blast_dump(ext: Any) -> dict[str, object]:
+    import _maxmin_prefs as tables
 
-    def log(variant: str) -> None:
-        draw.EditRebuild3()
-        _telemetry.info(f"maxmin-diag {variant}: texts={rendered()!r} prefs={prefs()!r}")
+    reads: list[tuple[str, str, str]] = [
+        (kind, name, "-")
+        for kind in ("integer", "toggle", "double", "string", "text_format")
+        for name in getattr(tables, kind.upper())
+    ]
+    reads += list(tables.PAIRS)
+    out: dict[str, object] = {}
+    for index, (kind, name, option) in enumerate(reads):
+        if index % 500 == 0:
+            _telemetry.info(f"maxmin-blast dump {index}/{len(reads)}")
+        pref = getattr(tables, kind.upper())[name]
+        opt = 0 if option == "-" else tables.OPTION[option]
+        try:
+            value = _blast_value(ext, kind, pref, opt)
+        except Exception as exc:  # noqa: BLE001 - diagnostic
+            value = f"ERR {type(exc).__name__}"
+        out[f"{kind}|{name}|{option}"] = value
+    return out
+
+
+def _blast_texts(ddoc: Any) -> dict[str, list[str]]:
+    out: dict[str, list[str]] = {}
+    for sheet_name in ddoc.GetSheetNames() or ():
+        sheet = _early_bound(ddoc.Sheet(str(sheet_name)), "ISheet")
+        for raw_view in sheet.GetViews() or ():
+            view = _early_bound(raw_view, "IView")
+            for raw in view.GetAnnotations() or ():
+                annotation = _early_bound(raw, "IAnnotation")
+                key = f"{sheet_name}/{view.GetName2()}/{annotation.GetName()}"
+                data = annotation.GetDisplayData()
+                if data is None:
+                    out[key] = ["<no display data>"]
+                    continue
+                data = _early_bound(data, "IDisplayData")
+                out[key] = [str(data.GetTextAtIndex(i)) for i in range(int(data.GetTextCount()))]
+    return out
+
+
+def _blast_regen(draw: Any, ddoc: Any) -> None:
+    draw.EditRebuild3()
+    draw.ForceRebuild3(False)
+    for sheet_name in ddoc.GetSheetNames() or ():
+        sheet = _early_bound(ddoc.Sheet(str(sheet_name)), "ISheet")
+        for raw_view in sheet.GetViews() or ():
+            _early_bound(raw_view, "IView").UpdateViewDisplayGeometry()
+    draw.EditRebuild3()
+
+
+def _blast_emit_pdf(state: str, path: Path) -> None:
+    import base64
+
+    blob = base64.b64encode(path.read_bytes()).decode("ascii")
+    chunks = [blob[i : i + 8000] for i in range(0, len(blob), 8000)]
+    for index, chunk in enumerate(chunks):
+        _telemetry.info(f"maxmin-blast pdf {state} {index + 1}/{len(chunks)} {chunk}")
+
+
+def _blast_radius(adapter: Any, pdf_path: str) -> None:
+    """Dump, switch to ANSI, force a regen, dump again; never raises."""
+    import json
+    import shutil
+    import socket
 
     try:
-        import socket
-
-        _telemetry.info(f"maxmin-diag host={socket.gethostname()}")
-        try:
-            part = _early_bound(view.ReferencedDocument, "IModelDoc2")
-            part_ext = part.Extension
-            _telemetry.info(
-                f"maxmin-diag part {part.GetTitle()!r}: "
-                f"swDetailingDimensionStandard={int(part_ext.GetUserPreferenceInteger(13, 0))} "
-                f"swDetailingDimensionStandardName={str(part_ext.GetUserPreferenceString(65, 0))!r} "
-                f"swDetailingAllUpperCase={bool(part_ext.GetUserPreferenceToggle(538, 0))}"
-            )
-        except Exception as exc:  # noqa: BLE001 - diagnostic
-            _telemetry.warn(f"maxmin-diag part prefs unreadable: {exc!r}")
-        base = prefs()
-        log("baseline")
-        for name in ("swDraftingStandardAllUppercaseForDimensionsAndHoleCallouts", "swDetailingAllUpperCase"):
-            pref = _PREF_TOGGLES[name]
-            ok = ext.SetUserPreferenceToggle(pref, 0, True)
-            log(f"{name}=True (set {ok!r})")
-            ext.SetUserPreferenceToggle(pref, 0, bool(base[name]))
-        for standard in (1, 2):  # swDetailingStandardANSI, swDetailingStandardISO
-            ok = ext.SetUserPreferenceInteger(13, 0, standard)
-            log(f"swDetailingDimensionStandard={standard} (set {ok!r})")
-        ext.SetUserPreferenceInteger(13, 0, int(base["swDetailingDimensionStandard"]))
-        log("restored")
+        draw = adapter.currentModel
+        ddoc = _early_bound(draw, "IDrawingDoc")
+        ext = draw.Extension
+        _BLAST_DIR.mkdir(parents=True, exist_ok=True)
+        _telemetry.info(f"maxmin-blast host={socket.gethostname()}")
+        baseline_pdf = _BLAST_DIR / "baseline.pdf"
+        shutil.copyfile(pdf_path, baseline_pdf)
+        baseline = _blast_dump(ext)
+        baseline_texts = _blast_texts(ddoc)
+        ok = ext.SetUserPreferenceInteger(13, 0, 1)  # swDetailingStandardANSI
+        _telemetry.info(
+            f"maxmin-blast set 13=1 -> {ok!r}; reads {ext.GetUserPreferenceInteger(13, 0)!r} "
+            f"name {ext.GetUserPreferenceString(65, 0)!r}"
+        )
+        _blast_regen(draw, ddoc)
+        ansi = _blast_dump(ext)
+        ansi_texts = _blast_texts(ddoc)
+        ansi_pdf = _BLAST_DIR / "ansi.pdf"
+        if ansi_pdf.exists():
+            ansi_pdf.unlink()
+        draw.SaveAs3(str(ansi_pdf), 0, 0)
+        rows = [
+            [key, baseline[key], ansi.get(key)]
+            for key in baseline
+            if baseline[key] != ansi.get(key)
+        ]
+        _telemetry.info(f"maxmin-blast prefs read {len(baseline)}; differ {len(rows)}")
+        for row in rows:
+            _telemetry.info(f"maxmin-blast diff {json.dumps(row, default=str)}")
+        errors = sum(1 for value in baseline.values() if str(value).startswith("ERR "))
+        _telemetry.info(f"maxmin-blast read errors {errors}")
+        for key in sorted(set(baseline_texts) | set(ansi_texts)):
+            before, after = baseline_texts.get(key), ansi_texts.get(key)
+            tag = "same" if before == after else "DIFF"
+            _telemetry.info(f"maxmin-blast text {tag} {json.dumps([key, before, after])}")
+        (_BLAST_DIR / "dump.json").write_text(
+            json.dumps({"baseline": baseline, "ansi": ansi}, default=str), encoding="utf-8"
+        )
+        _blast_emit_pdf("baseline", baseline_pdf)
+        _blast_emit_pdf("ansi", ansi_pdf)
     except Exception as exc:  # noqa: BLE001 - diagnostic must never fail the leaf
-        _telemetry.warn(f"maxmin-diag failed: {exc!r}")
+        _telemetry.warn(f"maxmin-blast failed: {exc!r}")
+
+
+_ORIGINAL_SAVE_DRAWING = _drawing_common.save_drawing
+
+
+def _blast_save_drawing(adapter: Any, slddrw_path: str, **kwargs: Any) -> dict[str, str]:
+    artifacts = _ORIGINAL_SAVE_DRAWING(adapter, slddrw_path, **kwargs)
+    _blast_radius(adapter, artifacts["pdf"])
+    return artifacts
+
+
+_drawing_common.save_drawing = _blast_save_drawing
 
 
 def _reference_cut_length(adapter: Any, annotations: list[Any]) -> None:
