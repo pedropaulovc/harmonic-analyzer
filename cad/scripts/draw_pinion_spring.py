@@ -120,18 +120,43 @@ def _front_y(model_y_mm: float) -> float:
 
 _FOOT_MID_X = (FOOT_END[0] + FREE_KINK_START[0]) / 2.0
 _PROFILE_TOP = _front_y(max(FLAT_TIP[1], FREE_FLAT_TIP[1]))
+_PAD_EAST = _front_x(FOOT_END[0])
+# Half the printed width of each qualified dimension's widest text line, as
+# pc-r12's render measured it (sheet metres, 11.8 px/mm).  A text wider than
+# its own dimension goes east of the foot end's extension line, which the
+# FootLen, FreeKinkH and FreeTipH rows share: centred between the extension
+# lines, pc-r12 printed those lines through FREE, BEND and TANGENT.
+QUALIFIER_HALF_WIDTH = {
+    "FREE, TO KINK TANGENT": 0.026,
+    "TO BEND TANGENT": 0.021,
+    "FREE, TO TIP": 0.013,
+}
+TEXT_TO_EXTENSION_GAP = 0.003
+_KINK_TEXT_X = _PAD_EAST + TEXT_TO_EXTENSION_GAP + QUALIFIER_HALF_WIDTH["FREE, TO KINK TANGENT"]
 FRONT_KEEP = {
-    "FootLen": (_front_x((FOOT_TAN[0] + FOOT_END[0]) / 2.0), _front_y(0.0) - 0.010),
+    "FootLen": (
+        _PAD_EAST + TEXT_TO_EXTENSION_GAP + QUALIFIER_HALF_WIDTH["TO BEND TANGENT"],
+        _front_y(0.0) - 0.010,
+    ),
     "BendR": (_front_x(BEND_CX) - 0.032, _front_y(0.0) - 0.004),
-    # The free locations, on the FreeForm phantom.
-    "FreeKinkV": (_front_x(FOOT_END[0]) + 0.016, _front_y(FREE_KINK_START[1] / 2.0)),
+    # The free locations, on the FreeForm phantom.  FreeKinkV's dimension
+    # line runs where its text sits, east of the foot end.
+    "FreeKinkV": (_KINK_TEXT_X, _front_y(FREE_KINK_START[1] / 2.0)),
     # Clear of the kink fence's native "A" label, which SolidWorks sets just
     # above the fence (spring-r1 put the 15.0 text on it), with a text gap
-    # between the two and the top view lifted to make room.
-    "FreeKinkH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.020),
+    # between the two and the top view lifted to make room.  FREE, TO TIP
+    # fits between its extension lines; the kink row's text does not.
+    "FreeKinkH": (_KINK_TEXT_X, _PROFILE_TOP + 0.020),
     "FreeTipH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.038),
 }
-_PAD_EAST = _front_x(FOOT_END[0])
+# The vertical extension lines each qualified row's text sits among: its own
+# two, and the foot end's, which runs past every row.
+FRONT_ROW_EXTENSION_X = {
+    "FootLen": (_front_x(FOOT_TAN[0]), _PAD_EAST),
+    "FreeKinkV": (_PAD_EAST,),
+    "FreeKinkH": (_front_x(FREE_KINK_START[0]), _PAD_EAST),
+    "FreeTipH": (_front_x(FREE_FLAT_TIP[0]), _PAD_EAST),
+}
 TOP_KEEP = {
     "PadLen": (_front_x(FOOT_END[0] - PAD_LEN / 2.0), TOP_CENTER[1] + 0.021),
     # Outboard of the hole-edge 4.75 (HOLE_EDGE_TEXT_XY) so the two stack apart.
