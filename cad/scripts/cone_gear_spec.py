@@ -329,7 +329,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Tip-diameter band, (upper, lower) deviations.  The tip sets how deep the
 # cone teeth reach into the 120T drum on the backed-off oblique mesh, so the
 # title-block .XX +/-0.51 (a whole addendum) is too loose: at -0.51 the
-# nominal 0.459 mm interleave halves (Fable review, 2026-09-23).  Main ruled
+# nominal 0.470 mm interleave halves (Fable review, 2026-09-23).  Main ruled
 # the band by contact ratio (U27: the looser +/-0.25 only if it keeps CR >= 1.1
 # at the worst case).  Worst case of every printed band -- this band, drum OD
 # +0/-0.10, bore-on-land, journal, drum-bore and arbor float -- leaves CR
