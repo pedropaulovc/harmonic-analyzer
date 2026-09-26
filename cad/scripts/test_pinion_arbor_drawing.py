@@ -1146,3 +1146,285 @@ def test_neck_diameter_text_rides_clear_of_detail_a_and_its_callouts() -> None:
         assert drawing.DETAIL_KEEP[name][0] > right + 0.030
     for name in ("HeadLen", "HeadCapSagDim"):
         assert drawing.DETAIL_KEEP[name][1] < bottom - 0.030
+# --- Detail A is a CROPPED 2:1 MODEL VIEW, not a native detail ---------------
+# A native detail refused every DragModelDimension into it: neckbisect-ecef
+# (from the profile: move, copy, centre drop) and pc-r5-860 (straight from
+# the donor, f0faedc51).  A model view takes one on every build (HeadDia,
+# donor -> profile), and a cropped model view took an import (MHA-142,
+# b6552f13b).  These fakes stand in for the seat.
+
+
+class _CropPoint:
+    def __init__(self, xyz) -> None:
+        self.ArrayData = tuple(xyz)
+
+    def MultiplyTransform(self, transform):
+        return _CropPoint(transform(self.ArrayData))
+
+
+class _CropDoubles(tuple):
+    """What the fake double_array hands COM: a bare list must never reach
+    CreatePoint or SetViewPosition (a real seat reads it as zeros)."""
+
+
+def _require_doubles(values, what: str) -> None:
+    if not isinstance(values, _CropDoubles):
+        raise TypeError(f"{what} got {type(values).__name__}, not a double_array")
+
+
+class _CropUtility:
+    def CreatePoint(self, xyz):
+        _require_doubles(xyz, "CreatePoint")
+        return _CropPoint(xyz)
+
+
+class _CropSketch:
+    # A sheet point maps to its view-sketch point x1000 (any affine map works).
+    ModelToSketchTransform = staticmethod(lambda xyz: tuple(v * 1000.0 for v in xyz))
+
+
+class _TextFormat:
+    CharHeight = 0.0035
+
+
+class _NoteAnnotation:
+    def __init__(self, note: "_CropNote") -> None:
+        self.note = note
+
+    def GetTextFormat(self, _index):
+        return _TextFormat()
+
+    def SetTextFormat(self, _index, _defaults, text_format):
+        self.note.height = text_format.CharHeight
+        return True
+
+    def GetPosition(self):
+        return (*self.note.position, 0.0)
+
+    def SetPosition2(self, x, y, _z):
+        self.note.position = (x, y)
+        return True
+
+
+class _CropNote:
+    """A free note whose position is NOT its extent: the box starts 1 mm
+    right of and 0.5 mm below the anchor, sized from the text and height."""
+
+    def __init__(self, text: str, owner: str, position: tuple[float, float]) -> None:
+        self.text = text
+        self.owner = owner
+        self.position = position
+        self.height = 0.0035
+
+    def GetText(self):
+        return self.text
+
+    def GetAnnotation(self):
+        return _NoteAnnotation(self)
+
+    def GetExtent(self):
+        lines = self.text.split("\n")
+        width = 0.6 * self.height * max(len(line) for line in lines)
+        depth = 1.5 * self.height * len(lines)
+        left = self.position[0] + 0.001
+        top = self.position[1] - 0.0005
+        return (left, top - depth, 0.0, left + width, top, 0.0)
+
+
+class _CropView:
+    """IView stand-in whose head centre sits 0.4 m below its Position."""
+
+    def __init__(self, name: str, seat: "_CropSeat", *, cropped: bool = True) -> None:
+        self.name = name
+        self.seat = seat
+        self.cropped = cropped
+        self.ScaleRatio = (2.0, 1.0)
+        self.Position = (0.2, 0.6)
+        self._angle = 0.0
+
+    @property
+    def Angle(self):
+        return self._angle
+
+    @Angle.setter
+    def Angle(self, value):
+        self.seat.log.append(("angle", self.name, value))
+        self._angle = value
+
+    def SetViewPosition(self, position, move_children):
+        _require_doubles(position, "SetViewPosition")
+        self.seat.log.append(("move", self.name, tuple(position), move_children))
+        self.Position = tuple(position)
+        return True
+
+    def GetSketch(self):
+        return _CropSketch()
+
+    def Crop2(self, jagged, no_outline, intensity):
+        self.seat.log.append(("crop2", self.name, jagged, no_outline, intensity))
+        return 1  # swCropViewErrors_NoError
+
+    def IsCropped(self):
+        return self.cropped
+
+    def GetNotes(self):
+        return tuple(note for note in self.seat.notes if note.owner == self.name)
+
+
+_FENCE_ON_PROFILE = (0.3132, 0.170)
+
+
+class _CropSeat:
+    """IModelDoc2 + IDrawingDoc + ISketchManager + adapter, recorded."""
+
+    def __init__(self) -> None:
+        self.log: list[tuple] = []
+        self.notes: list[_CropNote] = []
+        self.active = ""
+        self.currentModel = self
+        self.SketchManager = self
+        self.swApp = self
+
+    def GetMathUtility(self):
+        return _CropUtility()
+
+    def ActivateView(self, name):
+        self.log.append(("activate", name))
+        self.active = name
+        return True
+
+    def ClearSelection2(self, _all):
+        return True
+
+    def EditRebuild3(self):
+        return True
+
+    def CreateCircle(self, *xyz):
+        self.log.append(("circle", self.active, tuple(v / 1000.0 for v in xyz)))
+        return object()
+
+    def CreateDetailViewAt4(self, *args):
+        raise AssertionError("detail A must not be a native detail view")
+
+
+def _crop_seat(monkeypatch, *, cropped: bool = True):
+    seat = _CropSeat()
+    crop = _CropView("Drawing View4", seat, cropped=cropped)
+    profile = _CropView("Drawing View2", seat)
+    profile._angle = -math.pi / 2.0
+    placed: list[tuple] = []
+
+    def place(adapter, source, orientation, x, y, *, scale=None):
+        placed.append((orientation, x, y, scale))
+        return crop
+
+    def point_in_view(adapter, view, xyz, *, label):
+        assert xyz == (0.0, 0.0, spec.HEAD_CENTER_Z / 1000.0)
+        if view is profile:
+            return _FENCE_ON_PROFILE
+        return (view.Position[0], view.Position[1] - 0.4)
+
+    def note(adapter, text, x, y, **_kwargs):
+        made = _CropNote(text, seat.active, (x, y))
+        seat.notes.append(made)
+        return made
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(drawing, "double_array", lambda values: _CropDoubles(values))
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "model_point_in_view", point_in_view)
+    monkeypatch.setattr(drawing, "view_name", lambda adapter, view: view.name)
+    monkeypatch.setattr(drawing, "add_note", note)
+    return seat, crop, profile, placed
+
+
+def _circle(entry: tuple) -> tuple[tuple[float, float], float]:
+    cx, cy, _cz, px, py, _pz = entry[2]
+    return (cx, cy), math.dist((cx, cy), (px, py))
+
+
+def test_detail_a_is_a_cropped_2_to_1_model_view_turned_like_the_profile(
+    monkeypatch,
+) -> None:
+    seat, crop, profile, placed = _crop_seat(monkeypatch)
+    assert drawing._head_detail(seat, profile) is crop
+    assert placed == [("*Top", *drawing.DETAIL_CENTER, drawing.DETAIL_SCALE)]
+    # Turned before it is measured: the move follows the angle.
+    kinds = [entry[0] for entry in seat.log]
+    assert kinds.index("angle") < kinds.index("move")
+    assert crop.Angle == profile.Angle
+    # Moved so the head centre lands where the detail sat.
+    (move,) = [entry for entry in seat.log if entry[0] == "move"]
+    assert move[2] == pytest.approx(
+        (drawing.DETAIL_CENTER[0], drawing.DETAIL_CENTER[1] + 0.4)
+    )
+    # The crop circle is sketched in the crop view itself, centred on the
+    # head at the fence's 2:1 radius, and Crop2 runs straight after it while
+    # the new circle is still the selection.
+    crop_at = kinds.index("crop2")
+    assert kinds[crop_at - 2 : crop_at + 1] == ["activate", "circle", "crop2"]
+    assert seat.log[crop_at - 2] == ("activate", crop.name)
+    center, radius = _circle(seat.log[crop_at - 1])
+    assert seat.log[crop_at - 1][1] == crop.name
+    assert center == pytest.approx(drawing.DETAIL_CENTER)
+    assert radius == pytest.approx(
+        drawing.DETAIL_RATIO * drawing.DETAIL_RADIUS_MM / 1000
+    )
+    assert seat.log[crop_at] == ("crop2", crop.name, False, False, 5)
+
+
+def test_the_profile_marks_detail_a_with_its_fence_and_letter(monkeypatch) -> None:
+    seat, crop, profile, _placed = _crop_seat(monkeypatch)
+    drawing._head_detail(seat, profile)
+    (fence,) = [
+        entry for entry in seat.log if entry[0] == "circle" and entry[1] == profile.name
+    ]
+    center, radius = _circle(fence)
+    assert center == pytest.approx(_FENCE_ON_PROFILE)
+    assert radius == pytest.approx(drawing.DETAIL_RADIUS_MM / 1000)
+    (letter,) = profile.GetNotes()
+    assert letter.text == drawing.DETAIL_LETTER
+    assert not crop.GetNotes()
+    x0, y0, _z0, _x1, y1, _z1 = letter.GetExtent()
+    assert x0 == pytest.approx(
+        _FENCE_ON_PROFILE[0] + radius + drawing.DETAIL_LETTER_GAP
+    )
+    assert (y0 + y1) / 2 == pytest.approx(_FENCE_ON_PROFILE[1])
+    assert letter.height == drawing.DETAIL_LETTER_HEIGHT
+
+
+def test_detail_a_raises_when_the_crop_did_not_take(monkeypatch) -> None:
+    seat, _crop, profile, _placed = _crop_seat(monkeypatch, cropped=False)
+    with pytest.raises(RuntimeError, match="not cropped"):
+        drawing._head_detail(seat, profile)
+
+
+def test_detail_a_label_is_a_note_the_view_owns_centred_under_its_circle(
+    monkeypatch,
+) -> None:
+    seat, crop, _profile, _placed = _crop_seat(monkeypatch)
+    drawing._position_detail_label(seat, crop)
+    (label,) = crop.GetNotes()
+    assert label.text == "DETAIL A\nSCALE 2 : 1"
+    x0, _y0, _z0, x1, y1, _z1 = label.GetExtent()
+    # The anchor was moved by the extent's error, so the box, not the
+    # anchor, is centred under the circle at DETAIL_LABEL_XY.
+    assert ((x0 + x1) / 2, y1) == pytest.approx(drawing.DETAIL_LABEL_XY)
+    assert label.height == drawing.DETAIL_LABEL_HEIGHT
+    circle_bottom = drawing.DETAIL_CENTER[1] - (
+        drawing.DETAIL_RATIO * drawing.DETAIL_RADIUS_MM / 1000
+    )
+    assert circle_bottom - y1 == pytest.approx(drawing.DETAIL_LABEL_DROP)
+
+
+def test_a_note_that_lands_in_another_view_fails_loud(monkeypatch) -> None:
+    seat, crop, profile, _placed = _crop_seat(monkeypatch)
+
+    def stray(adapter, text, x, y, **_kwargs):
+        made = _CropNote(text, profile.name, (x, y))
+        seat.notes.append(made)
+        return made
+
+    monkeypatch.setattr(drawing, "add_note", stray)
+    with pytest.raises(RuntimeError, match="did not land in its view"):
+        drawing._position_detail_label(seat, crop)

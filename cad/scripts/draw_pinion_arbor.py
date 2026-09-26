@@ -8,7 +8,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -55,6 +55,7 @@ from pinion_arbor_spec import (
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     delete_view,
     iter_views,
@@ -75,9 +76,18 @@ ISO_CENTER = (0.365, 0.225)
 DETAIL_CENTER = (0.165, 0.235)
 DETAIL_SCALE = (2, 1)
 DETAIL_RADIUS_MM = 15.0
-# The native "DETAIL A / SCALE 2:1" label sits centred under its own detail
-# circle, this far below it (the label's anchor is its top edge): clear of the
-# HeadLen text that rides the circle's lower edge.
+# Detail A is a cropped 2:1 *model* view, not a native detail: a native
+# detail refused every DragModelDimension into it (neckbisect-ecef: from the
+# profile by move, copy and centre drop; pc-r5-860: straight from the donor),
+# while a model view takes one every build (HeadDia, donor -> profile).  A
+# model view has no native label, so "DETAIL A / SCALE 2 : 1" is a note the
+# view owns, centred under its crop circle this far below it (the extent's top
+# edge): clear of the HeadLen text that rides the circle's lower edge.  The
+# profile keeps the crop's 1:1 circle and an "A" note it owns.
+DETAIL_LETTER = "A"
+DETAIL_LABEL = f"DETAIL {DETAIL_LETTER}\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
+DETAIL_LABEL_HEIGHT = 0.005
+DETAIL_LETTER_HEIGHT = 0.007
 DETAIL_LABEL_DROP = 0.012
 DETAIL_LABEL_XY = (
     DETAIL_CENTER[0],
@@ -85,6 +95,13 @@ DETAIL_LABEL_XY = (
     - DETAIL_RADIUS_MM * DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
     - DETAIL_LABEL_DROP,
 )
+# The profile's "A" stands right of its 1:1 circle on the axis, where the
+# native detail letter printed (a1a694a6: 5.4 mm clear of the circle).
+DETAIL_LETTER_GAP = 0.0054
+_CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
+# The head centre must land within 0.1 mm of DETAIL_CENTER after the move
+# (the MHA-142 tip view's tolerance).
+DETAIL_POSITION_TOL_M = 1e-4
 # The head and neck diameters live in end-on Front-plane profile sketches, so
 # the end-on donor imports them: the head's moves onto the 1:1 profile, the
 # neck's into detail A (DETAIL_DIAMETER_POSITIONS says why).  The Ø8
@@ -357,22 +374,12 @@ def _move_dimension(
     return matches[0]
 
 
-def _head_detail(adapter: Any, parent_view: Any) -> Any:
-    """Create an enlarged native detail of the crowded turned head."""
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    parent = _early_bound(parent_view, "IView")
-    if not drawing.ActivateView(view_name(adapter, parent_view)):
-        raise RuntimeError("failed to activate integral-arbor detail parent")
-    draw.ClearSelection2(True)
-    center = model_point_in_view(
-        adapter,
-        parent_view,
-        (0.0, 0.0, HEAD_CENTER_Z / 1000.0),
-        label="integral-arbor head detail centre",
-    )
-    radius = DETAIL_RADIUS_MM / 1000.0
-    sketch = _early_bound(parent.GetSketch(), "ISketch")
+def _sketch_circle_in_view(
+    adapter: Any, view: Any, center: tuple[float, float], radius: float, *, label: str
+) -> None:
+    """Sketch a circle in ``view``'s own sketch from SHEET coordinates and
+    leave it selected (what Crop2 consumes).  The caller activates the view."""
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     points = []
@@ -380,45 +387,94 @@ def _head_detail(adapter: Any, parent_view: Any) -> Any:
         point = _early_bound(
             utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
         )
-        projected = _early_bound(
-            point.MultiplyTransform(transform), "IMathPoint"
-        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
-    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
     if manager.CreateCircle(*points[0], *points[1]) is None:
-        raise RuntimeError("failed to create integral-arbor detail fence")
-    detail = drawing.CreateDetailViewAt4(
-        *DETAIL_CENTER,
-        0.0,
-        0,
-        *DETAIL_SCALE,
-        "A",
-        1,
-        True,
-        False,
-        False,
-        5,
+        raise RuntimeError(f"failed to sketch the {label} circle")
+
+
+def _activate(adapter: Any, view: Any, *, label: str) -> None:
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate the {label}")
+    adapter.currentModel.ClearSelection2(True)
+
+
+def _head_detail(adapter: Any, parent_view: Any) -> Any:
+    """Detail A: the profile's *Top at 2:1, turned like it, moved so the head
+    centre lands on DETAIL_CENTER and cropped by the fence circle.
+
+    Sequence (the MHA-142 tip view's, b6552f13b): place; set the profile's
+    angle and rebuild BEFORE measuring, or the head lands sideways; move by
+    the head centre's sheet error; activate; sketch the fence in the view's
+    own sketch; Crop2 while the circle is still selected; read back
+    IsCropped.  The profile gets the fence at 1:1 and an "A" of its own.
+    """
+    draw = adapter.currentModel
+    parent = _early_bound(parent_view, "IView")
+    view = _early_bound(
+        place_view(adapter, str(SOURCE), "*Top", *DETAIL_CENTER, scale=DETAIL_SCALE),
+        "IView",
     )
-    if detail is None:
-        raise RuntimeError("failed to create integral-arbor head detail")
-    detail = _early_bound(detail, "IView")
-    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    view.Angle = float(parent.Angle)
+    draw.EditRebuild3()
+    ratio = tuple(float(value) for value in view.ScaleRatio)
+    if ratio != tuple(float(value) for value in DETAIL_SCALE):
+        raise RuntimeError(f"detail A scale {ratio!r}, expected {DETAIL_SCALE!r}")
+    head_center = (0.0, 0.0, HEAD_CENTER_Z / 1000.0)
+    center = model_point_in_view(
+        adapter, view, head_center, label="detail A head centre"
+    )
+    position = tuple(float(value) for value in view.Position)
+    target = [position[axis] + DETAIL_CENTER[axis] - center[axis] for axis in range(2)]
+    if not view.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position detail A")
+    draw.EditRebuild3()
+    center = model_point_in_view(
+        adapter, view, head_center, label="detail A head centre"
+    )
+    if math.dist(center, DETAIL_CENTER) > DETAIL_POSITION_TOL_M:
+        raise RuntimeError(
+            f"detail A head centre sits at {center!r}, not {DETAIL_CENTER!r}"
+        )
+    _activate(adapter, view, label="detail A")
+    crop_radius = DETAIL_RATIO * DETAIL_RADIUS_MM / 1000.0
+    _sketch_circle_in_view(adapter, view, center, crop_radius, label="detail A crop")
+    status = int(view.Crop2(False, False, 5))
     draw.ClearSelection2(True)
     draw.EditRebuild3()
-    outline = tuple(float(value) for value in detail.GetOutline())
-    position = tuple(float(value) for value in detail.Position)
-    if len(outline) != 4 or len(position) != 2:
-        raise RuntimeError("integral-arbor head detail has invalid bounds")
-    target = [
-        position[axis]
-        + DETAIL_CENTER[axis]
-        - (outline[axis] + outline[axis + 2]) / 2.0
-        for axis in range(2)
-    ]
-    if not detail.SetViewPosition(double_array(target), False):
-        raise RuntimeError("failed to position integral-arbor head detail")
-    draw.EditRebuild3()
-    return detail
+    cropped = bool(view.IsCropped())
+    _telemetry.info(
+        f"detail A {view_name(adapter, view)!r}: {ratio[0]:g}:{ratio[1]:g}, "
+        f"Crop2 status {status}, IsCropped {cropped}",
+        crop_status=status,
+        cropped=cropped,
+    )
+    if status != _CROP_NO_ERROR or not cropped:
+        raise RuntimeError(
+            f"detail A is not cropped: Crop2 status {status}, IsCropped {cropped}"
+        )
+
+    _activate(adapter, parent_view, label="integral-arbor detail parent")
+    fence = model_point_in_view(
+        adapter, parent_view, head_center, label="integral-arbor head detail centre"
+    )
+    radius = DETAIL_RADIUS_MM / 1000.0
+    _sketch_circle_in_view(
+        adapter, parent_view, fence, radius, label="profile detail fence"
+    )
+    draw.ClearSelection2(True)
+    _view_note(
+        adapter,
+        parent_view,
+        DETAIL_LETTER,
+        (fence[0] + radius + DETAIL_LETTER_GAP, fence[1]),
+        height=DETAIL_LETTER_HEIGHT,
+        anchor="left-middle",
+        label="profile detail letter",
+    )
+    return view
 
 
 def _add_turning_axis(adapter: Any, view: Any) -> None:
@@ -599,24 +655,76 @@ def _assert_outline_unbroken(
     )
 
 
-def _position_detail_label(adapter: Any, detail: Any) -> None:
-    """Centre the native detail label under its own detail circle."""
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
-    if not sheet.SetScale(*SHEET_SCALE, False, False):
-        raise RuntimeError("failed to pin sheet scale before positioning detail label")
-    notes = tuple(_read_member(detail, "GetNotes") or ())
-    if len(notes) != 1:
-        raise RuntimeError(f"expected one native detail label, found {len(notes)}")
-    note = _early_bound(notes[0], "INote")
-    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
-    target = (*DETAIL_LABEL_XY, 0.0)
-    if not annotation.SetPosition2(*target):
-        raise RuntimeError("failed to position native detail label")
+def _view_note(
+    adapter: Any,
+    view: Any,
+    text: str,
+    xy: tuple[float, float],
+    *,
+    height: float,
+    anchor: str,
+    label: str,
+) -> Any:
+    """A note owned by ``view`` (inserted while it is active), sized, then
+    moved so its extent's ``anchor`` point sits on ``xy``.
+
+    A free note's position is not its extent (the anchor is the text's top
+    left), so the move reads INote.GetExtent back and shifts by the error.
+    ``anchor`` is "centre-top" (a label under its circle) or "left-middle"
+    (a letter beside it).  Read back: the view owns the note exactly once.
+    """
+    _activate(adapter, view, label=label)
+    note = add_note(adapter, text, *xy)
+    if note is None:
+        raise RuntimeError(f"failed to add the {label}")
+    note = _early_bound(note, "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f"the {label} has no text format")
+    text_format.CharHeight = float(height)
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError(f"failed to size the {label}")
     adapter.currentModel.EditRebuild3()
-    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
-    if math.dist(actual, target) > 1e-8:
-        raise RuntimeError(f"native detail label position did not persist: {actual}")
+    for _attempt in range(2):
+        x0, y0, _z0, x1, y1, _z1 = (float(value) for value in note.GetExtent())
+        actual = (
+            ((x0 + x1) / 2.0, max(y0, y1))
+            if anchor == "centre-top"
+            else (min(x0, x1), (y0 + y1) / 2.0)
+        )
+        error = (xy[0] - actual[0], xy[1] - actual[1])
+        if math.hypot(*error) <= 1e-5:
+            break
+        position = tuple(float(value) for value in annotation.GetPosition())
+        moved = (position[0] + error[0], position[1] + error[1], 0.0)
+        if not annotation.SetPosition2(*moved):
+            raise RuntimeError(f"failed to move the {label}")
+        adapter.currentModel.EditRebuild3()
+    else:
+        raise RuntimeError(f"the {label} extent sits at {actual!r}, not {xy!r}")
+    texts = [
+        str(_early_bound(item, "INote").GetText())
+        for item in (_early_bound(view, "IView").GetNotes() or ())
+    ]
+    if texts.count(text) != 1:
+        raise RuntimeError(
+            f"the {label} did not land in its view: its notes are {texts!r}"
+        )
+    return note
+
+
+def _position_detail_label(adapter: Any, detail: Any) -> None:
+    """Label detail A under its crop circle (a model view has no native one)."""
+    _view_note(
+        adapter,
+        detail,
+        DETAIL_LABEL,
+        DETAIL_LABEL_XY,
+        height=DETAIL_LABEL_HEIGHT,
+        anchor="centre-top",
+        label="detail A label",
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -682,8 +790,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The profile prints every reference-sketch dimension.  The part saves
     # those sketches hidden (#880), so this projected view shows them per view
-    # and imports feature by feature (_drawing_hidden_sketches).  The donor and
-    # detail A dimension none of them and keep the whole-model import.
+    # and imports feature by feature (_drawing_hidden_sketches).  Detail A, a
+    # model view too, imports its head features the same way; the donor keeps
+    # the whole-model import for the end-on diameters.
     principal_annotations = curate_hidden_owner_dimensions(
         adapter,
         principal,
@@ -691,8 +800,12 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="integral-arbor profile",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    detail_annotations = curate_view_dimensions(
-        adapter, detail, keep=DETAIL_KEEP, view_label="integral-arbor head detail"
+    detail_annotations = curate_hidden_owner_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="integral-arbor head detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     for label, kept in (
         ("donor", donor_annotations),
