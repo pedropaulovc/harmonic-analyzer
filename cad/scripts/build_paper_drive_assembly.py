@@ -82,6 +82,7 @@ from _chain import (
 )
 from _common import (
     IN,
+    _early_bound,
     apply_custom_properties,
     check,
     log,
@@ -119,7 +120,7 @@ from _assembly_patterns import (
     PatternDirection,
 )
 from _interference_contracts import allowed_interference_pairs
-from _visibility import blank_reference_geometry
+from _visibility import blank_reference_geometry, visible_reference_geometry
 from _holes import CLEARANCE_MM
 from _transforms import (  # noqa: E402
     IDENTITY,
@@ -1014,6 +1015,50 @@ async def _insert_roller_chain(adapter) -> None:
     )
 
 
+def _shown_planes(adapter) -> set[str]:
+    """The assembly's reference planes that would render if saved now."""
+    return {
+        name
+        for name, kind in visible_reference_geometry(adapter.currentModel, ASM_NAME)
+        if kind == "plane"
+    }
+
+
+def hide_generated_planes(adapter, shown_before: set[str], step: str) -> list[str]:
+    """Hide the reference planes ``step`` generated and prove each one hidden.
+
+    SolidWorks' chain pattern and Belt/Chain features author their own
+    construction in the assembly tree.  The adapter hides the sketches it
+    knows about; a plane either feature generates is named by SolidWorks
+    (the #950 save check caught 'PLANE2' on integ e12b78a2a), so it is found
+    as a plane shown after ``step`` that was not shown before it.
+    """
+    generated = sorted(_shown_planes(adapter) - shown_before)
+    if not generated:
+        log(f"{step}: generated no shown reference plane")
+        return []
+    def owner_of(name: str) -> str:
+        assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+        feature = _early_bound(assembly.FeatureByName(name), "IFeature")
+        return str(_early_bound(feature.GetOwnerFeature(), "IFeature").Name)
+
+    # Which feature owns each plane names it in the log (diagnostic only).
+    owners = [
+        adapter._attempt(lambda n=name: owner_of(n), default="?") for name in generated
+    ]
+    blank_reference_geometry(adapter, tuple((name, "PLANE") for name in generated))
+    still = sorted(_shown_planes(adapter) & set(generated))
+    if still:
+        raise RuntimeError(
+            f"{step}: generated plane(s) {still} still shown after BlankRefGeom"
+        )
+    log(
+        f"{step}: hid generated plane(s) "
+        + ", ".join(f"{name} (owner {owner})" for name, owner in zip(generated, owners))
+    )
+    return generated
+
+
 async def _sprocket_revolute(adapter, name: str, label: str) -> None:
     """Constrain a free-spinning wheel to a fixed Z spin-axis, leaving the
     spin free (the operational/coupled DOF).
@@ -1635,7 +1680,9 @@ async def build(adapter) -> dict[str, str]:
     await _sprocket_revolute(adapter, t12, "T12 crank wheel")
     # The roller chain looping both removables (_assert_chain_layout pins the
     # _chain.py anchors to KNOB_SHAFT_XY / the drive-train crank).
+    shown = _shown_planes(adapter)
     await _insert_roller_chain(adapter)
+    hide_generated_planes(adapter, shown, "roller chain pattern")
 
     # --- operational coupling (every stage a real mate) ------------------------
     # (1) The native Belt/Chain assembly feature couples the crank T12 <-> knob
@@ -1657,6 +1704,7 @@ async def build(adapter) -> dict[str, str]:
     # relative rotation -- 0 net free DOF added.
     from solidworks_mcp.adapters.base import BeltChainParameters
 
+    shown = _shown_planes(adapter)
     check(
         "chain coupling T12<->T24 (belt/chain feature, pitch 24:48)",
         await adapter.insert_belt_chain(
@@ -1671,6 +1719,7 @@ async def build(adapter) -> dict[str, str]:
             )
         ),
     )
+    hide_generated_planes(adapter, shown, "belt/chain coupling")
     # (2) GEAR mate 12:120: the third gear (in the knob cluster) drives the
     # reducer disc -- the permanent DP38 mesh the latch arm exists to hold.
     await gear_mate(
