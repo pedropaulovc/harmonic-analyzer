@@ -1010,3 +1010,37 @@ def test_both_reviewers_receive_one_complete_package_invocation(
     assert claude_review.extra["images_read"] == ["sheet-1.png", "sheet-2.png"]
     assert len(commands) == 2
     assert sum(value == "-i" for value in commands[1]) == 2
+
+
+def test_the_index_skips_kept_quota_refusals(tmp_path: Path) -> None:
+    verdict = {
+        "verdict": "SHIP",
+        "summary": "ok",
+        "blockers": [],
+        "over_specification": [],
+        "clarity": [],
+        "minor": [],
+    }
+    review = mr.Review(
+        name="crank_arm",
+        kind="part",
+        sources=["x.png"],
+        source_sha256=["b" * 64],
+        verdict=verdict,
+        passed=True,
+        blind=True,
+        tool_events=0,
+        reviewer="codex",
+        model="gpt-6-astra",
+        effort="low",
+        prompt_sha256="a" * 64,
+        sheet_count=1,
+        duration_s=1.0,
+        reviewed_at="now",
+    )
+    mr.write_review(review, tmp_path)
+    kept = mr.quota_refused_path(tmp_path, "crank_arm", "codex")
+    kept.write_text((tmp_path / "crank_arm.json").read_text("utf-8"), "utf-8")
+
+    assert mr.load_reviews(tmp_path) == [review]
+    assert mr.render_index(mr.load_reviews(tmp_path)).count("[crank_arm]") == 1

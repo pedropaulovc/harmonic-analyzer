@@ -67,6 +67,7 @@ A rebuttals file::
 from __future__ import annotations
 
 import argparse
+import functools
 import hashlib
 import json
 import re
@@ -89,7 +90,9 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 from _drawing_registry import CAD_ROOT, DRAWINGS, DRAWINGS_BY_NAME  # noqa: E402
 
 REPO_ROOT = CAD_ROOT.parent
+PROMPTS_DIR = SCRIPTS_DIR / "prompts"
 LEDGER_PATH = CAD_ROOT / "reviews" / "machinist-ledger.json"
+OUTAGES_PATH = CAD_ROOT / "reviews" / "outages.json"
 REPORT_DIR = CAD_ROOT / "out" / "reports" / "machinist-ledger"
 LEDGER_VERSION = 1
 
@@ -120,6 +123,7 @@ GATING_KEYS = ("blockers", "over_specification", "clarity")
 
 CROSS_FAMILY = "cross_family"
 LAST_RESORT = "last_resort"
+OUTAGE_FALLBACK = "outage_fallback"  # same family, by user direction, during an outage
 SHIP = "ship"
 ACCEPTED_WITH_RULINGS = "accepted_with_rulings"
 
@@ -803,6 +807,184 @@ def refusal_problem(
     return None
 
 
+# --- outage ------------------------------------------------------------------------
+
+_OUTAGE_KEYS = (
+    "id",
+    "reviewer",
+    "fallback_reviewer",
+    "fallback_model",
+    "directed_by",
+    "quote",
+    "directed_at",
+    "started_at",
+)
+
+
+def load_outages(path: Path = OUTAGES_PATH) -> dict[str, dict[str, Any]]:
+    """Named reviewer outages the user directed a same-family fallback for, by id.
+
+    Each carries the user's words, when they were given, the window (open
+    while ``ended_at`` is null) and an excerpt of the failing reviewer's
+    output.  A fallback review counts only inside its outage's window, and
+    stops counting once the outage is closed: that is the re-review list.
+    """
+    if not path.is_file():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    outages: dict[str, dict[str, Any]] = {}
+    for outage in data.get("outages", []):
+        missing = [key for key in _OUTAGE_KEYS if not outage.get(key)]
+        if missing:
+            raise ValueError(f"{path}: outage {outage.get('id')} lacks {missing}")
+        name = outage["id"]
+        evidence = outage.get("evidence") or {}
+        if not evidence.get("path") or not evidence.get("excerpt"):
+            raise ValueError(f"{path}: {name}: evidence needs its path and an excerpt")
+        for key in ("reviewer", "fallback_reviewer"):
+            if outage[key] not in REVIEWER_FAMILIES:
+                raise ValueError(f"{path}: {name}: unknown {key} {outage[key]!r}")
+        if reviewer_family(outage["reviewer"]) == reviewer_family(
+            outage["fallback_reviewer"]
+        ):
+            raise ValueError(
+                f"{path}: {name}: the fallback is the same family as the reviewer "
+                "that is down"
+            )
+        # Reviews are stamped in UTC; a naive window time cannot be compared.
+        window = {
+            key: datetime.fromisoformat(outage[key])
+            for key in ("started_at", "ended_at")
+            if outage.get(key) is not None
+        }
+        naive = [key for key, when in window.items() if when.tzinfo is None]
+        if naive:
+            raise ValueError(f"{path}: {name}: {naive[0]} needs a UTC offset")
+        if "ended_at" in window and window["ended_at"] < window["started_at"]:
+            raise ValueError(f"{path}: {name}: it ended before it started")
+        if name in outages:
+            raise ValueError(f"{path}: two outages named {name}")
+        outages[name] = outage
+    return outages
+
+
+def outage_problem(
+    review: dict[str, Any], author_family: str, outage: dict[str, Any]
+) -> str | None:
+    """Why ``review`` is not the fallback its outage directed; None when it is."""
+    if reviewer_family(review["reviewer"]) != author_family:
+        return "a cross-family review needs no outage"
+    if reviewer_family(outage["reviewer"]) == author_family:
+        return (
+            f"outage {outage['id']} is of {outage['reviewer']}, not the cross-family "
+            f"reviewer of a {author_family} author"
+        )
+    directed = (outage["fallback_reviewer"], outage["fallback_model"])
+    if (review["reviewer"], review["model"]) != directed:
+        return (
+            f"{review['reviewer']}/{review['model']} is not the directed fallback "
+            f"{'/'.join(directed)}"
+        )
+    reviewed = datetime.fromisoformat(review["reviewed_at"])
+    started = datetime.fromisoformat(outage["started_at"])
+    ended = outage.get("ended_at")
+    if reviewed < started or (ended and reviewed > datetime.fromisoformat(ended)):
+        return (
+            f"reviewed at {review['reviewed_at']}, outside outage {outage['id']} "
+            f"({outage['started_at']} to {ended or 'now'})"
+        )
+    return None
+
+
+# --- prompt ------------------------------------------------------------------------
+
+
+@functools.cache
+def standard_rubrics(kind: str) -> tuple[str, ...]:
+    """Every committed version of the standard rubric for a ``kind`` package."""
+    rel = (PROMPTS_DIR / f"machinist_review_{kind}.md").relative_to(REPO_ROOT)
+    commits = (_git("log", "--format=%H", "--", rel.as_posix()) or "").split()
+    if not commits:
+        return ()
+    # One process for every version: a git spawn costs ~70 ms on Windows.
+    proc = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "cat-file", "--batch"],
+        input="".join(f"{commit}:{rel.as_posix()}\n" for commit in commits).encode(),
+        capture_output=True,
+        check=False,
+    )
+    rubrics, out = [], proc.stdout
+    while out:
+        header, _, out = out.partition(b"\n")
+        fields = header.split()
+        if len(fields) != 3:  # "<object> missing"
+            continue
+        size = int(fields[2])
+        blob, out = out[:size], out[size + 1 :]
+        rubrics.append(blob.decode("utf-8").replace("\r\n", "\n"))
+    return tuple(rubrics)
+
+
+def verdict_passes(review: dict[str, Any]) -> bool:
+    """Pass or fail from the verdict itself: a SHIP with no gating finding.
+
+    The record's ``passed`` flag must agree; an edited or malformed report is
+    refused rather than trusted or silently corrected.
+    """
+    import machinist_review  # imports this module; a top-level import would cycle
+
+    name = review["name"]
+    try:
+        verdict = machinist_review.validate_verdict(review["verdict"])
+    except ValueError as exc:
+        raise ValueError(f"{name}: its verdict is malformed: {exc}") from None
+    passed = machinist_review.is_pass(verdict)
+    if bool(review.get("passed")) != passed:
+        raise ValueError(
+            f"{name}: its passed flag ({review.get('passed')}) contradicts its "
+            f"{verdict['verdict']} verdict"
+        )
+    return passed
+
+
+def prompt_problem(review: dict[str, Any]) -> str | None:
+    """Why a review's prompt is not the gate's; None under a committed rubric.
+
+    A ``--prompt-file`` override (or any hand-edited prompt) is a different
+    review, whatever its verdict, so it fails closed: the record must carry
+    the exact prompt the reviewer saw, hashing to its ``prompt_sha256``, and
+    that prompt must be exactly what machinist_review builds around a
+    committed version of the standard rubric -- no text added or removed.
+    """
+    import machinist_review  # imports this module; a top-level import would cycle
+
+    evidence = (review.get("extra") or {}).get("evidence") or {}
+    prompt = evidence.get("effective_prompt")
+    if not prompt:
+        return "the record does not carry the prompt the reviewer saw"
+    if hashlib.sha256(prompt.encode("utf-8")).hexdigest() != review.get(
+        "prompt_sha256"
+    ):
+        return "the recorded prompt does not hash to its prompt_sha256"
+    package = machinist_review.ReviewPackage(review["name"], review["kind"], ())
+    text = prompt.replace("\r\n", "\n")
+    standard = (
+        machinist_review._review_prompt(
+            package,
+            review["sheet_count"],
+            reviewer=review["reviewer"],
+            prompt_text=rubric,
+        )
+        for rubric in standard_rubrics(review["kind"])
+    )
+    if text not in standard:
+        return (
+            f"its prompt is not the standard prompt around a committed rubric for a "
+            f"{review['kind']} package (a --prompt-file override is not the gate)"
+        )
+    return None
+
+
 # --- rulings -----------------------------------------------------------------------
 
 
@@ -826,7 +1008,8 @@ def _cited_excerpt(ruling: str, citation: str) -> str:
     if not path.is_file():
         raise ValueError(f"citation {citation!r}: no such file")
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(ruling)}(?![0-9])")
+    # The whole id: "U31" must not match inside "U31A" or "U310".
+    pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(ruling)}(?![A-Za-z0-9])")
     if match["line"] is None:
         found = [line for line in lines if pattern.search(line)]
         if not found:
@@ -918,6 +1101,7 @@ def record_review(
     refusal: dict[str, Any] | None = None,
     rebuttals: Sequence[dict[str, Any]] | None = None,
     ledger_path: Path = LEDGER_PATH,
+    outage: dict[str, Any] | None = None,
 ) -> Recorded:
     """Enter one accepted review in its slot, replacing that slot's previous entry.
 
@@ -927,7 +1111,9 @@ def record_review(
     to the reviewed ``source_sha256`` -- a re-rendered file is not the sheet the
     reviewer saw -- and is stored beside the ledger.  A same-family review
     lands in ``last_resort`` and counts only with a recent quota ``refusal``, a
-    trailer-verified author model and the tier rule met.
+    trailer-verified author model and the tier rule met.  A same-family review
+    the user directed during a named ``outage`` of the cross-family reviewer
+    lands in ``outage_fallback`` instead: it counts while that outage is open.
     """
     name = review["name"]
     if name not in DRAWINGS_BY_NAME:
@@ -936,14 +1122,21 @@ def record_review(
         )
     if not review.get("blind") or review.get("verdict") is None:
         raise ValueError(f"{name}: only a blind review with a verdict is recorded")
+    kind = DRAWINGS_BY_NAME[name].source_kind
+    if review.get("kind") != kind:
+        raise ValueError(
+            f"{name}: its review kind is {review.get('kind')!r}, the registry's is "
+            f"{kind!r}; only the {kind} rubric reviews it"
+        )
+    passed = verdict_passes(review)
     status = SHIP
     rebutted: list[dict[str, Any]] = []
     if rebuttals:
-        if review.get("passed"):
+        if passed:
             raise ValueError(f"{name}: a passing review has nothing to rebut")
         rebutted = apply_rebuttals(review["verdict"], rebuttals)
         status = ACCEPTED_WITH_RULINGS
-    elif not review.get("passed"):
+    elif not passed:
         raise ValueError(
             f"{name}: only a passing review, or one with rebuttals, is recorded"
         )
@@ -957,6 +1150,11 @@ def record_review(
             f"{pdf}: sha256 {actual[:12]} is not the reviewed {review['source_sha256'][0][:12]}"
         )
     slot = review_slot(review["reviewer"], author_family)
+    if outage is not None:
+        why = outage_problem(review, author_family, outage)
+        if why:
+            raise ValueError(f"{name}: not an outage fallback: {why}")
+        slot = OUTAGE_FALLBACK
     author = resolve_author(name, author_family, author_model)
     problem = None
     if slot == LAST_RESORT:
@@ -967,6 +1165,9 @@ def record_review(
             f"{name}: {pdf} has {len(sheets)} sheets, the review saw {review['sheet_count']}"
         )
     digests = [sheet_digest(sheet.ink) for sheet in sheets]
+    prompt = prompt_problem(review)
+    if prompt:
+        raise ValueError(f"{name}: not recorded: {prompt}")
     stored = sheets_dir(ledger_path) / f"{actual}.pdf"
     if not stored.is_file():
         stored.parent.mkdir(parents=True, exist_ok=True)
@@ -995,6 +1196,8 @@ def record_review(
     }
     if rebutted:
         entry["rebuttals"] = rebutted
+    if outage is not None:
+        entry["outage"] = outage
     if slot == LAST_RESORT:
         entry["quota_refusal"] = refusal
         entry["quota_refusal_window_hours"] = QUOTA_REFUSAL_MAX_AGE / timedelta(hours=1)
@@ -1031,6 +1234,8 @@ def ingest(
     rebuttals_path: Path | None = None,
     pdf: Path | None = None,
     ledger_path: Path = LEDGER_PATH,
+    outage_id: str | None = None,
+    outages_path: Path = OUTAGES_PATH,
 ) -> Recorded:
     """Record an EXISTING verdict JSON against the exact PDF it reviewed."""
     review = json.loads(report.read_text(encoding="utf-8"))
@@ -1045,6 +1250,11 @@ def ingest(
     rebuttals = None
     if rebuttals_path is not None:
         rebuttals = load_rebuttals(rebuttals_path, name=review["name"])
+    outage = None
+    if outage_id is not None:
+        outage = load_outages(outages_path).get(outage_id)
+        if outage is None:
+            raise ValueError(f"no outage {outage_id!r} in {outages_path}")
     return record_review(
         review,
         pdf or Path(sources[0]),
@@ -1054,6 +1264,7 @@ def ingest(
         rebuttals=rebuttals,
         provenance={"ingested_from": Path(report).resolve().as_posix()},
         ledger_path=ledger_path,
+        outage=outage,
     )
 
 
@@ -1153,8 +1364,14 @@ def drawing_status(
     references: _References,
     pdf: Path | None = None,
     report_dir: Path | None = None,
+    outages: dict[str, dict[str, Any]] | None = None,
 ) -> Status:
-    """Where ``name``'s current sheets stand against its recorded reviews."""
+    """Where ``name``'s current sheets stand against its recorded reviews.
+
+    An ``outage_fallback`` entry of the current sheets is accepted only while
+    its outage (``outages``, default: the tracked file) is open; once it is
+    closed the drawing needs a cross-family re-review.
+    """
     pdf = pdf or DRAWINGS_BY_NAME[name].outputs["pdf"]
     if not pdf.is_file():
         return Status(name, State.UNRENDERED, f"no rendered PDF at {pdf}", "", "-")
@@ -1182,6 +1399,26 @@ def drawing_status(
             State.OK,
             _reviewed(last),
             f"{LAST_RESORT} {last['status']}",
+            last_resort,
+        )
+    fallback = entry.get(OUTAGE_FALLBACK)
+    if fallback is not None and not _compare(fallback, current, references).problem:
+        outage_id = fallback["outage"]["id"]
+        outage = (load_outages() if outages is None else outages).get(outage_id)
+        if outage is None:
+            reason = f"shipped on outage fallback {outage_id}, which is not on record"
+            return Status(name, State.UNREVIEWED, reason, "", last_resort)
+        if outage.get("ended_at"):
+            reason = (
+                f"shipped on outage fallback: outage {outage_id} ended at "
+                f"{outage['ended_at']}, so it needs a cross-family re-review"
+            )
+            return Status(name, State.UNREVIEWED, reason, "", last_resort)
+        return Status(
+            name,
+            State.OK,
+            _reviewed(fallback),
+            f"{OUTAGE_FALLBACK} {fallback['status']} ({outage_id})",
             last_resort,
         )
     if cross_cmp is None and last is not None and not last["counts"]:
@@ -1212,7 +1449,9 @@ def check(
     *,
     ledger_path: Path = LEDGER_PATH,
     report_dir: Path | None = None,
+    outages: dict[str, dict[str, Any]] | None = None,
 ) -> list[Status]:
+    outages = load_outages() if outages is None else outages
     ledger = load_ledger(ledger_path)
     selected = list(names) or [spec.name for spec in DRAWINGS]
     unknown = [name for name in selected if name not in DRAWINGS_BY_NAME]
@@ -1220,7 +1459,9 @@ def check(
         raise ValueError(f"unknown drawing names: {unknown}")
     references = _References(sheets_dir(ledger_path))
     return [
-        drawing_status(name, ledger, references=references, report_dir=report_dir)
+        drawing_status(
+            name, ledger, references=references, report_dir=report_dir, outages=outages
+        )
         for name in selected
     ]
 
@@ -1283,6 +1524,7 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         default=REPORT_DIR,
         help="where changed sheets' diffs go",
     )
+    check_cmd.add_argument("--outages", type=Path, default=OUTAGES_PATH)
 
     ingest_cmd = commands.add_parser("ingest", help="record an existing verdict JSON")
     ingest_cmd.add_argument("report", type=Path, help="machinist_review verdict JSON")
@@ -1291,11 +1533,18 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "--author-model",
         help="cross-check for the model in the draw script's commit trailer",
     )
-    ingest_cmd.add_argument(
+    evidence = ingest_cmd.add_mutually_exclusive_group()
+    evidence.add_argument(
         "--quota-refusal",
         type=Path,
         help="the cross-family reviewer's quota-refused report",
     )
+    evidence.add_argument(
+        "--outage",
+        metavar="ID",
+        help="a named outage in --outages that directed this same-family review",
+    )
+    ingest_cmd.add_argument("--outages", type=Path, default=OUTAGES_PATH)
     ingest_cmd.add_argument(
         "--rebuttals",
         type=Path,
@@ -1335,6 +1584,8 @@ def _run(args: argparse.Namespace) -> int:
             rebuttals_path=args.rebuttals,
             pdf=args.pdf,
             ledger_path=args.ledger,
+            outage_id=args.outage,
+            outages_path=args.outages,
         )
         counted = "" if recorded.counts else f", does NOT count: {recorded.problem}"
         print(
@@ -1344,7 +1595,12 @@ def _run(args: argparse.Namespace) -> int:
         # Recorded is not accepted: a row that does not count must not read as success.
         return 0 if recorded.counts else 1
 
-    statuses = check(args.names, ledger_path=args.ledger, report_dir=args.report_dir)
+    statuses = check(
+        args.names,
+        ledger_path=args.ledger,
+        report_dir=args.report_dir,
+        outages=load_outages(args.outages),
+    )
     if args.json:
         authors = draw_script_authors(
             [status.name for status in statuses if status.state != State.OK]
@@ -1372,12 +1628,25 @@ def _run(args: argparse.Namespace) -> int:
     failing = [status for status in statuses if status.state not in accepted]
     via = Counter(status.via for status in statuses if status.state == State.OK)
     last_resort = sum(n for key, n in via.items() if key.startswith(LAST_RESORT))
-    rulings = sum(n for key, n in via.items() if key.endswith(ACCEPTED_WITH_RULINGS))
+    rulings = sum(n for key, n in via.items() if ACCEPTED_WITH_RULINGS in key)
+    fallback = [s for s in statuses if s.via.startswith(OUTAGE_FALLBACK)]
     print(
         f"{len(statuses) - len(failing)}/{len(statuses)} drawings match an accepted review "
-        f"({last_resort} via last resort, {rulings} accepted with rulings)",
+        f"({last_resort} via last resort, {rulings} accepted with rulings, "
+        f"{len(fallback)} via outage fallback)",
         file=sys.stderr,
     )
+    by_outage: dict[str, list[str]] = {}
+    for status in fallback:
+        outage_id = status.via.rsplit("(", 1)[1].rstrip(")")
+        by_outage.setdefault(outage_id, []).append(status.name)
+    outages = load_outages(args.outages)
+    for outage_id, names in by_outage.items():
+        print(
+            f"on outage fallback, re-review cross-family when "
+            f"{outages[outage_id]['reviewer']} recovers: {', '.join(names)}",
+            file=sys.stderr,
+        )
     if failing:
         print(
             f"{len(failing)} drawings have no counting machinist review of the sheet "
