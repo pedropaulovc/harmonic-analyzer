@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import ast
+import difflib
 import hashlib
+import subprocess
 import math
 from pathlib import Path
 
@@ -194,12 +197,17 @@ def test_worst_case_engagement_holds_the_named_minimum() -> None:
     assert spec.POST_MOUNT_ENGAGEMENT_PRINTED >= 0.90
 
 
-# The shared fillister recipe's git blobs (LF-normalised) at 695af67a0.  The
-# cut end is MHA-142's own modification: it must never leak into the family.
-_RECIPE_BLOBS = {
-    "diagnostics/diag_mcmaster_fillister.py": "01b1860f31fd5ffd179bbe1e1fd73de590425383",
+# MHA-142's own stock recipe (added by #857, touched by nobody else), pinned
+# as its git blob (LF-normalised).  The cut end is MHA-142's modification:
+# it must never leak into it.
+_OWN_RECIPE_BLOBS = {
     "diagnostics/diag_build_40923898.py": "fed1a2b1c89e1cdf7ddc01baa01980b2aed39470",
 }
+# The SHARED fillister family recipe moves with the base (#839 added
+# 91794A112 and dropped 90280A110 under it), so it is checked against the
+# base, not pinned: #857's only change to it is this one size row.
+_SHARED_RECIPE = "cad/scripts/diagnostics/diag_mcmaster_fillister.py"
+_ROW_MARKER = '"40923898": '
 
 
 def _git_blob_sha(path: Path) -> str:
@@ -207,13 +215,65 @@ def _git_blob_sha(path: Path) -> str:
     return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
 
 
+def _git(*args: str) -> str:
+    root = Path(part.__file__).resolve().parents[2]
+    return subprocess.run(
+        ["git", "-C", str(root), *args],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    ).stdout
+
+
+def _row_introducing_commit() -> str:
+    """The one commit on HEAD's history that added the 40923898 size row to
+    the shared recipe.  Its parent's copy of the file is #857's base (the
+    merge base with #839) for this file: no later #857 commit touches it."""
+    commits = _git(
+        "log", "--format=%H", f"-S{_ROW_MARKER}", "HEAD", "--", _SHARED_RECIPE
+    ).split()
+    assert len(commits) == 1, f"expected one commit adding the row, got {commits}"
+    return commits[0]
+
+
+def _functions(source: str) -> dict[str, str]:
+    tree = ast.parse(source)
+    return {
+        node.name: ast.dump(node)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+
+
 def test_shared_fillister_recipe_is_untouched() -> None:
     """Main's ruling on the cut end: the modification lives in MHA-142's
     builder, never in the family recipe (which would re-key every
-    fillister screw for one part's fact)."""
+    fillister screw for one part's fact).  Against the base (Main's option
+    (b) after the restack onto #839): #857's only change to the shared
+    recipe is its one FILLISTER_SIZES row, and every function in the
+    recipe is identical to the base's."""
     scripts = Path(part.__file__).resolve().parent
-    for relative, blob in _RECIPE_BLOBS.items():
+    for relative, blob in _OWN_RECIPE_BLOBS.items():
         assert _git_blob_sha(scripts / relative) == blob, relative
+    base = _git("show", f"{_row_introducing_commit()}^:{_SHARED_RECIPE}")
+    head = (Path(part.__file__).resolve().parents[2] / _SHARED_RECIPE).read_text(
+        encoding="utf-8"
+    ).replace("\r\n", "\n")
+    diff = [
+        line
+        for line in difflib.unified_diff(
+            base.splitlines(), head.splitlines(), lineterm="", n=0
+        )
+        if line[:1] in "+-" and not line.startswith(("+++", "---"))
+    ]
+    removed = [line for line in diff if line.startswith("-")]
+    added = [line[1:] for line in diff if line.startswith("+")]
+    assert removed == [], removed
+    rows = [line for line in added if _ROW_MARKER in line]
+    assert len(rows) == 1, added
+    assert all(line.strip().startswith("#") for line in added if line not in rows), added
+    assert _functions(base) == _functions(head)
     assert FILLISTER_SIZES["40923898"][1] == 86.0
 
 
