@@ -50,6 +50,7 @@ from _drawing_common import (
     read_required_properties,
     rebuild_drawing,
     set_dimension_callouts,
+    set_hole_callout_precision,
     set_hidden_lines_removed,
     set_reference_dimension,
     set_high_quality_shaded_with_edges,
@@ -75,8 +76,10 @@ from cone_pivot_post_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     INCLINE_DEG,
+    POST_DOWEL_REAM_DIA,
     SURFACE_FINISHES,
 )
+from cone_post_dowel_spec import POST_DOWEL_CALLOUT
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -108,6 +111,15 @@ SECTION_CENTER = (0.295, 0.230)
 SECTION_CAPTION = (0.295, 0.201)
 SECTION_LABEL_SCALE_TEXT = "SCALE"
 SECTION_SCALE = (1, 1)
+# #917 S1: the dowel pair opens only on the foot, so a foot view (looking up
+# at it, 1:2) carries its callout, in the open field between the plan's
+# counterbore callout and section A-A.  Provisional until a seat render:
+# nothing here was measured.
+FOOT_CENTER = (0.228, 0.238)
+FOOT_SCALE = (1, 2)
+FOOT_VIEW_NOTE = "VIEW C - FOOT\nSCALE 1:2"
+FOOT_NOTE_XY = (0.212, 0.268)
+FOOT_DOWEL_CALLOUT_XY = (0.176, 0.222)
 
 # The checked-in landscape template's FINISH value cell, measured between its
 # authored sheet-format rules.  Its linked INote extent is checked natively
@@ -851,6 +863,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _configure_section_caption(drawing_model)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
+    foot = place_view(adapter, str(SOURCE), "*Bottom", *FOOT_CENTER, scale=FOOT_SCALE)
     section = create_section_view(
         adapter,
         front,
@@ -865,7 +878,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The named journal view looks exactly down the inclined model axis.  Unlike
     # the bore-plane section, it retains the uncut boss end face, so its Ø17.2
     # OD and Ø12.281 bore are two visible concentric circles with clear leaders.
-    for view in (front, top, journal, section):
+    for view in (front, top, journal, section, foot):
         set_hidden_lines_removed(adapter, view)
     _assert_view_geometry(
         adapter,
@@ -981,6 +994,28 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=(0.160, 0.250),
         label="mounting counterbores",
     )
+    # #917 S1: the blind dowel reams.  Size, band and depth stay native (the
+    # depth at the part's .X); the prefix names the mating platform and the
+    # reamer.  Either dowel's rim: both sit on the foot at x = 0.
+    dowel_callout = add_native_hole_callout(
+        adapter,
+        foot,
+        edge=_circular_edge(
+            foot,
+            radius_mm=POST_DOWEL_REAM_DIA / 2.0,
+            center_y_mm=0.0,
+            center_x_mm=0.0,
+        ),
+        callout_xy=FOOT_DOWEL_CALLOUT_XY,
+        label="post dowel reamed holes",
+        process=POST_DOWEL_CALLOUT,
+    )
+    set_hole_callout_precision(
+        dowel_callout, {"hw-diam": 3, "hw-depth": 1}, label="post dowel ream"
+    )
+    if not auto_center_marks(adapter, foot, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center marks to the foot view")
+    add_note(adapter, FOOT_VIEW_NOTE, *FOOT_NOTE_XY)
 
     # The seat is the elevation's bottom line: the O42.011 foot rim seen
     # edge-on.  A coordinate pick on that line failed on the farm (the two
@@ -1056,6 +1091,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, top)
     set_hidden_lines_removed(adapter, journal)
     set_hidden_lines_removed(adapter, section)
+    set_hidden_lines_removed(adapter, foot)
     rebuild_drawing(adapter, label="final cone pivot post native layout")
     _show_section_scale_in_caption(adapter, section)
     _assert_native_layout(

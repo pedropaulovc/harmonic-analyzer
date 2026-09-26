@@ -177,7 +177,8 @@ def test_nothing_else_on_the_casting_carries_a_band() -> None:
     The cast body, collar and boss diameters and the mounting-hole stations
     are not accuracy features (cad/docs/tolerance-policy.md, "Result"), so the
     part must not author a tolerance on them at all: the title block's general
-    grade is the whole specification.
+    grade is the whole specification.  The one other band is the #917 dowel
+    ream's, carried on its Hole Wizard feature (test_cone_post_dowels).
     """
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert source.count("set_dimension_bilateral_tolerance(") == 3
@@ -316,9 +317,25 @@ def test_v2_feature_topology_uses_midplane_extrusions_and_hole_wizard() -> None:
     assert source.count('create_sketch("ConeShaftNormal")') == 3
     assert "angle=-INCLINE_DEG" in source
     assert 'HoleSpec(\n    "counterbore_fillister",\n    "1/4"' in source
-    assert source.count("wizard_holes(") == 1
+    # The mounting pair plus #917 S1's blind dowel pair.
+    assert source.count("wizard_holes(") == 2
     assert "attachment_cut.placement_drive_jobs" in source
     assert 'name="AttachmentScrewHoles"' in source
+    assert 'name="PostDowelHoles"' in source
+
+
+def test_dowel_pair_prints_on_a_foot_view_with_its_match_ream_callout() -> None:
+    """#917 S1: the blind Ø.1255 slip-fit pair opens only on the foot, so a
+    foot view carries it; the native callout states size, band and depth,
+    and its prefix names the mating platform and the reamer."""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"*Bottom"' in source
+    assert "process=POST_DOWEL_CALLOUT" in source
+    assert '{"hw-diam": 3, "hw-depth": 1}' in source
+    assert 'label="post dowel reamed holes"' in source
+    assert drawing.FOOT_VIEW_NOTE == "VIEW C - FOOT\nSCALE 1:2"
+    # The foot view is not a note: the manufacturing block stays at four lines.
+    assert len(spec.DRAWING_NOTES.splitlines()) == 4
 
 
 

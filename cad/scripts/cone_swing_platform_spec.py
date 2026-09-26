@@ -143,8 +143,11 @@ TIP_BLOCK_NORTH_TRAVEL = 0.8
 # The lateral slot sits under the flange slot's centre.
 TIP_SCREW_LOCAL_Z = TIP_BLOCK_LOCAL_Z - (TIP_BLOCK_HALF_DEPTH + TIP_FLANGE_SLOT_Z)
 # Both slots share two end centres TIP_SCREW_HALF_TRAVEL either side of the
-# cone axis.
-TIP_SCREW_HALF_TRAVEL = 2.0
+# cone axis.  #917 S1 (plan A1, Main/user ruling 2026-09-26): +/-2.0 -> +/-2.5,
+# so the fit-up (tip block sets T006 with the post screws finger-tight) has
+# +/-0.906 of worst-case lateral reach after the slot ends' and the block's
+# location bands; at +/-2.0 it had 0.427.
+TIP_SCREW_HALF_TRAVEL = 2.5
 TIP_SCREW_MAJOR = 3.505  # #6-32 basic major
 # McMaster 93075A150 (product page read 2026-09-25): head 1/4 wide x 3/32
 # high.  ASME B18.6.3 bounds the #6 hex head at 0.244-0.250 across the flats
@@ -190,12 +193,12 @@ TIP_LEDGE_RANGE = (
     PLATE_THICKNESS + PLATE_STOCK_BAND - TIP_CBORE_DEPTH + _XX,
 )
 # Lateral fit-up travel either side of the cone axis: the end centres plus
-# the screw's float in the narrowest slot, which is the nominal 4.0 (+/-2.25),
-# and with the .XX centres at their short limit (+/-1.74).
+# the screw's float in the narrowest slot, which is the nominal 4.0 (+/-2.75),
+# and with the .XX centres at their short limit (+/-2.24).
 TIP_LATERAL_TRAVEL = TIP_SCREW_HALF_TRAVEL + TIP_SLOT_SCREW_CLEARANCE / 2.0
 TIP_LATERAL_TRAVEL_WORST = TIP_LATERAL_TRAVEL - _XX
-if (round(TIP_LATERAL_TRAVEL, 2), round(TIP_LATERAL_TRAVEL_WORST, 2)) != (2.25, 1.74):
-    raise AssertionError("tip-block lateral travel no longer reads +/-2.25 (1.74 worst)")
+if (round(TIP_LATERAL_TRAVEL, 2), round(TIP_LATERAL_TRAVEL_WORST, 2)) != (2.75, 2.24):
+    raise AssertionError("tip-block lateral travel no longer reads +/-2.75 (2.24 worst)")
 if TIP_SLOT_SCREW_CLEARANCE < 0.25:
     raise AssertionError("tip-block screw slot does not clear the #6-32 major")
 if TIP_SLOT_HEAD_BEARING < 0.5:
@@ -230,6 +233,18 @@ TIP_BLOCK_NORTH_REACH_Z = TIP_BLOCK_LOCAL_Z + TIP_BLOCK_HALF_DEPTH + TIP_BLOCK_N
 TIP_BLOCK_EDGE_MARGIN = 0.25
 
 
+# #917 S1: the post dowel pair, match-drilled through the plate into the post
+# foot after fit-up.  Owned by the leaf cone_post_dowel_spec (the post reads it
+# too, and this module already imports the post's spec); re-exported here under
+# the names conegear's fit-up budget imports.
+from cone_post_dowel_spec import (  # noqa: E402
+    POST_DOWEL_BLIND_DEPTH as POST_DOWEL_BLIND_DEPTH,
+    POST_DOWEL_DIA as POST_DOWEL_DIA,
+    POST_DOWEL_PLATE_XZ as POST_DOWEL_PLATE_XZ,
+    POST_DOWEL_RECESS as POST_DOWEL_RECESS,
+)
+
+
 # Only functional sliding/locating surfaces carry roughness.  The existing
 # close-clearance pivot hole needs no bearing-finish control; the top locates
 # the post and tip block, and the underside slides on the harmonic-base deck.
@@ -243,10 +258,13 @@ SURFACE_FINISHES = (
 )
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  The pivot-hole centre is the layout origin: every plan corner,
-# both post-mount taps and the lock notch are located from it in the plate's own
-# axes (station along the cone axis, offset across it), so a shop lays the whole
-# plate out from one scribed centre.  Corner radii come off their fillets. ---
+# print shows.  The pivot-hole centre is the layout origin: every plan corner
+# and the lock notch are located from it in the plate's own axes (station along
+# the cone axis, offset across it), so a shop lays the whole plate out from one
+# scribed centre.  Corner radii come off their fillets.  The two post-mount taps
+# and the dowel pair print no station: #917 (user ruling via Main, 2026-09-26)
+# transfers the taps from MHA-016 at assembly, as #837 does on the base, and
+# match-drills the dowels through the fitted post. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {
         "NorthEastX",
@@ -259,12 +277,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Plate": {"PlateThk"},
     "PivotBearingReliefProfile": {"PivotBearingReliefDia"},
     "PivotBearingRelief": {"PivotBearingReliefDepth"},
-    "PostMountHoles": {
-        "PostMountWestX",
-        "PostMountWestZ",
-        "PostMountEastX",
-        "PostMountEastZ",
-    },
     # The closed-end cap locates the notch; the run angle gives its rails a
     # direction (the chord the lock stud follows).  Without it the sheet
     # defines where the notch starts but not which way it runs.
@@ -289,18 +301,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # outline prints one place (+/-0.8): the east edge at the swing stop and the
 # west edge at the notch mouth spend the disengaged lock-collar margin, which
 # build_cone_swing_platform.DISENGAGE_COLLAR_MARGIN sizes to keep >= 2.0 mm
-# at this band.  Relief diameter, tapped-hole pattern and notch stay at the
-# .XX grade. Relief
-# depth is a reference nominal governed by the matched fit above. The Hole
+# at this band.  Relief diameter and notch stay at the .XX grade.  Relief
+# depth is a reference nominal governed by the matched fit above.  The Hole
 # Wizard owns the pivot-hole size/callout.
 #
-# The tapped pair's per-axis .XX is NOT what closes it against the post: the
-# pitch that mates is cone_post_mount_interface's (#833, e93b658da), one
-# direct tap-to-tap dimension at +/-0.25 (PLATFORM_PITCH_BAND) against 0.79
-# of screw clearance.  Per-axis stations give about +/-1.22 of pitch at .XX
-# and more at .X, so neither grade closes it; the direct pitch lands with
-# #830's rebase onto #833 (merge rider).  Until then the stations keep .XX,
-# the tighter of the two (MHA-091 Fable review asked for .X).
+# The tapped pair prints no station: neither .XX (+/-1.22 of pitch) nor .X
+# closed it against the post's 0.79 of screw clearance, and the #833 direct
+# pitch never landed.  #917 transfers the pair from MHA-016 at assembly
+# instead, so it always fits whatever the post's own pitch.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {
         "NorthEastX": 1,
@@ -313,19 +321,13 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Plate": {"PlateThk": 2},
     "PivotBearingReliefProfile": {"PivotBearingReliefDia": 2},
     "PivotBearingRelief": {"PivotBearingReliefDepth": 2},
-    "PostMountHoles": {
-        "PostMountWestX": 2,
-        "PostMountWestZ": 2,
-        "PostMountEastX": 2,
-        "PostMountEastZ": 2,
-    },
     # The mouth angle is authored at a whole degree and prints as one (the
     # title block's flat +/-1 deg); NotchW carries its end-mill band natively
     # (NOTCH_W_BAND); the cap centre stays .XX -- at .X the stud-in-cap stack
     # fails (below).
     "LockNotchProfile": {"NotchMouthAngle": 0, "NotchW": 2},
     "LockNotchCapEProfile": {"CapECx": 2, "CapECz": 2},
-    # The slot ends are .XX so the +/-2.25 fit-up travel keeps >= +/-1.74
+    # The slot ends are .XX so the +/-2.75 fit-up travel keeps >= +/-2.24
     # (TIP_LATERAL_TRAVEL, TIP_LATERAL_TRAVEL_WORST).
     "TipScrewSlotProfile": {
         "TipSlotEastCx": 2,
@@ -371,6 +373,12 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # printed until 63fb3bd2d (Main, MHA-091 round 6).
 NOTCH_W = 8.0
 NOTCH_W_BAND = (0.10, 0.0)
+# #917 S1 (plan A2): the closed end runs on this far past the engaged stud
+# seat, along the cut.  The fit-up sets the engaged swing by T120 backlash,
+# not against the cap, and may need the platform up to 1.11 deeper than the
+# seat -- more than the stud's 0.825 of radial room in the full R alone.  The
+# seat (build_cone_swing_platform.SLOT_E_X/Z) and the base stud do not move.
+NOTCH_ENGAGE_OVERTRAVEL = 0.30
 _NOTCH_W_LOWER, _NOTCH_W_UPPER = deviations(NOTCH_W_BAND)
 NOTCH_W_MIN = NOTCH_W + _NOTCH_W_LOWER
 # McMaster 91882A425 (the cone lock knob): a 1/4-20 stud, basic major 6.35;
@@ -384,13 +392,15 @@ TITLE_BLOCK_ANGLE_BAND_DEG = 1.0
 # at the mouth -- both legs drawn, the vertex the real mouth corner, a
 # protractor check (Main, MHA-091 round 6; the old angle ran from a hidden
 # east-west construction ray).  The stud's own path is the chord tangent to
-# its swing arc, 87.53 deg off that edge (the edge leans 6.64 deg off the
+# its swing arc, 87.40 deg off that edge (the edge leans 6.51 deg off the
 # plate axis, the chord 9.11 deg off east-west); build_cone_swing_platform
 # derives it.  The angle is not critical (the channel keeps ~0.2 of slack,
-# some 4.6 deg over the 2.76 exit travel), so the notch is authored at the
-# whole degree and cut along it: the 0.47 deg offset joins the title block's
-# band in the stud stack below.
-NOTCH_MOUTH_ANGLE_DEG = 88.0
+# some 4.6 deg over the 2.78 exit travel), so the notch is authored at the
+# whole degree and cut along it: the 0.40 deg offset joins the title block's
+# band in the stud stack below.  #917 S1's wider north-west (WEST_HALF_N
+# 11.0 -> 11.5, for the +/-2.5 tip slot) tilted the edge 0.13 deg, taking the
+# chord from 87.53 to 87.40 deg: the whole degree went 88 -> 87.
+NOTCH_MOUTH_ANGLE_DEG = 87.0
 
 
 def notch_stud_stack(

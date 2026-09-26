@@ -93,9 +93,14 @@ from cone_pivot_post_spec import (
     JOURNAL_REFERENCE_LENGTH,
     JOURNAL_REFERENCE_X,
     JOURNAL_REFERENCE_Z,
+    POST_DOWEL_BLIND_DEPTH,
+    POST_DOWEL_REAM_DIA,
+    POST_DOWEL_XZ,
     RUNNING_BORE_BAND,
     SURFACE_FINISHES,
 )
+from cone_post_dowel_spec import DOWEL_REAM_TOLERANCE_MM
+from _holes import blind_hole_volume_mm3
 
 PART_NAME = "cone-pivot-post"
 MATERIAL = "Gray Cast Iron"
@@ -108,6 +113,16 @@ ATTACHMENT_HOLE_SPEC = HoleSpec(
         "CounterBoreDiameter": ATTACHMENT_CBORE_DIA,
         "CounterBoreDepth": ATTACHMENT_CBORE_DEPTH,
     },
+)
+
+# #917 S1: the MHA-151 dowel pair's blind slip-fit reams, from the foot face,
+# at the reamer's nominal; the +.0002/0 band rides the hole feature.
+POST_DOWEL_HOLE_SPEC = HoleSpec(
+    "drilled_fractional",
+    "1/8",
+    end="blind",
+    depth_mm=POST_DOWEL_BLIND_DEPTH,
+    overrides_mm={"HoleDiameter": POST_DOWEL_REAM_DIA},
 )
 
 BLOCK_RADIUS = BLOCK_DIA / 2.0
@@ -187,6 +202,9 @@ ATTACHMENT_HOLES_MM3 = 2.0 * (
     math.pi * (ATTACHMENT_THRU_DIA / 2.0) ** 2 * (BLOCK_HEIGHT - ATTACHMENT_CBORE_DEPTH)
     + math.pi * (ATTACHMENT_CBORE_DIA / 2.0) ** 2 * ATTACHMENT_CBORE_DEPTH
 )
+# Dowel reams: two blind holes, each a cylinder to the depth plus its drill
+# point; at the foot, 8.5 deep, they meet no other feature.
+POST_DOWEL_HOLES_MM3 = 2.0 * blind_hole_volume_mm3(POST_DOWEL_REAM_DIA, POST_DOWEL_BLIND_DEPTH)
 _ANALYTIC_FINAL_MM3 = (
     math.pi * BLOCK_RADIUS**2 * BLOCK_HEIGHT
     + math.pi * (HEAD_RADIUS**2 - BLOCK_RADIUS**2) * HEAD_HEIGHT
@@ -196,6 +214,7 @@ _ANALYTIC_FINAL_MM3 = (
     + CONE_PADS_OUTSIDE_BODY_MM3
     - CONE_BORE_MM3
     - ATTACHMENT_HOLES_MM3
+    - POST_DOWEL_HOLES_MM3
 )
 if abs(_ANALYTIC_FINAL_MM3 - HARVESTED_VOLUME_MM3) > 0.01:
     raise AssertionError(
@@ -617,6 +636,23 @@ async def build(adapter: Any) -> dict[str, str]:
     drive_jobs += attachment_cut.placement_drive_jobs
     volume -= ATTACHMENT_HOLES_MM3
     await volume_check(adapter, "v2 mounting holes", volume, 0.001 * volume)
+
+    # 5b. #917 S1: the dowel pair, blind from the foot on the crank-axis
+    # diameter (cone_pivot_post_spec.POST_DOWEL_XZ), match-drilled through
+    # MHA-091 at assembly, so the print carries no station.
+    wizard_holes(
+        adapter,
+        POST_DOWEL_HOLE_SPEC,
+        [[x, 0.0, z] for x, z in POST_DOWEL_XZ],
+        (0.0, -1.0, 0.0),
+        "post dowel pair (Ø.1255 ream, blind)",
+        name="PostDowelHoles",
+        dia_tolerance_mm=DOWEL_REAM_TOLERANCE_MM,
+    )
+    volume -= POST_DOWEL_HOLES_MM3
+    await volume_check(
+        adapter, "post dowel reams", volume, 0.01 * POST_DOWEL_HOLES_MM3
+    )
 
     # 6. Journal-plan reference sketch.  The 12.5182 deg plan angle between the
     # crank axis and the cone-journal axis is the casting's defining

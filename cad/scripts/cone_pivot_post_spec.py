@@ -16,6 +16,9 @@ import math
 from _gtol_spec import CylinderFace, PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
+import cone_post_dowel_spec as _dowel
+from cone_pivot_post_installation import POST_ROTATION_Y_DEG
+
 
 MM_PER_IN = 25.4
 
@@ -76,6 +79,43 @@ ATTACHMENT_THRU_DIA = 7.14248
 ATTACHMENT_CBORE_DIA = 11.50874
 ATTACHMENT_CBORE_DEPTH = 6.0198
 
+# #917 S1 dowel pair: two blind Ø.1255 slip-fit reams from the foot face,
+# match-drilled through MHA-091 after fit-up.  The pattern is the platform's
+# (cone_post_dowel_spec, plate-local from the pivot), carried into this part's
+# frame the way the assembly installs it: the plate's Ry(+INCLINE) takes it to
+# machine axes about the post axis (the pair's midpoint), and the post's own
+# Ry(POST_ROTATION_Y_DEG) is undone.  It lands on the crank-axis diameter
+# (part Z), at the screws' pitch radius, 90 deg from them.
+POST_DOWEL_CENTRE_PLATE_XZ = tuple(
+    sum(axis) / 2.0 for axis in zip(*_dowel.POST_DOWEL_PLATE_XZ, strict=True)
+)
+
+
+def _ry(x: float, z: float, degrees: float) -> tuple[float, float]:
+    """Ry(degrees) on a plan (x, z), the assembly's convention
+    (build_drive_train_assembly._plate_local_to_machine)."""
+    c, s = math.cos(math.radians(degrees)), math.sin(math.radians(degrees))
+    return (x * c + z * s, -x * s + z * c)
+
+
+def _plate_to_post_xz(x: float, z: float) -> tuple[float, float]:
+    machine = _ry(
+        x - POST_DOWEL_CENTRE_PLATE_XZ[0], z - POST_DOWEL_CENTRE_PLATE_XZ[1], INCLINE_DEG
+    )
+    post = _ry(*machine, -POST_ROTATION_Y_DEG)
+    # The plate literal is three-place; so is the post's station.
+    return tuple(round(value, 3) + 0.0 for value in post)
+
+
+POST_DOWEL_XZ = tuple(_plate_to_post_xz(x, z) for x, z in _dowel.POST_DOWEL_PLATE_XZ)
+POST_DOWEL_RADIUS = math.dist(*POST_DOWEL_XZ) / 2.0
+if any(abs(x) > 1e-9 for x, _z in POST_DOWEL_XZ):
+    raise AssertionError(f"post dowels left the crank-axis diameter: {POST_DOWEL_XZ}")
+if abs(POST_DOWEL_RADIUS - ATTACHMENT_X) > 1e-3:
+    raise AssertionError("post dowels are off the attachment screws' pitch radius")
+POST_DOWEL_REAM_DIA = _dowel.POST_DOWEL_REAM_DIA
+POST_DOWEL_BLIND_DEPTH = _dowel.POST_DOWEL_BLIND_DEPTH
+
 # Final solid volume, the sum of the per-feature analytic terms the build
 # checks natively one feature at a time (build_cone_pivot_post.py asserts
 # the sum at import):
@@ -88,15 +128,16 @@ ATTACHMENT_CBORE_DEPTH = 6.0198
 #   cone pads outside the body cylinder             = +    209.0550
 #   cone bore pi*6.1404^2*42.011                    = -  4 976.2960
 #   2x (thru pi*3.57124^2*79.9802 + cbore pi*5.75437^2*6.0198) = - 7 661.5921
-#                                                   = 114 076.5723
+#   2x dowel ream (pi*1.59385^2*8.5 + 118 deg point, #917 S1)  = -   140.7684
+#                                                   = 113 935.8038
 #
 # The 2026-09-21 farm build of the previous recipe read 121 575.3: it had
 # never bored the crank boss (7 401.7) and had only nicked the 45 mm^3 collar
 # sliver behind the spot-face plane inside the bore disc -- a cut whose
 # default direction (opposite the sketch normal) found the Ø44 collar to bite
 # instead of auto-flipping into the boss.  Mass at gray iron 7.20 g/cc.
-HARVESTED_VOLUME_MM3 = 114_076.5723
-HARVESTED_MASS_KG = 0.821351
+HARVESTED_VOLUME_MM3 = 113_935.8038
+HARVESTED_MASS_KG = 0.820338
 
 # Both bores are running journals, so both carry the SAME size band -- the one
 # the `shaft_in_bushing` fit class needs and no tighter (tolerance-policy.md,
@@ -108,9 +149,10 @@ HARVESTED_MASS_KG = 0.821351
 #   crank:   shaft 11.368..11.388  bore 11.413..11.443  (crankshaft MHA-026)
 #   journal: shaft 12.2108..12.2308 bore 12.2558..12.2858 (cone shaft MHA-014)
 #
-# Apart from the spacing between them (below), nothing else on this casting is
-# an accuracy feature, so nothing else carries a band: the title block's
-# general grades govern.
+# Apart from the spacing between them (below) and #917's dowel reams (their
+# band is the reamer's, carried on the hole feature), nothing else on this
+# casting is an accuracy feature, so nothing else carries a band: the title
+# block's general grades govern.
 RUNNING_BORE_BAND = (0.005, -0.025)
 
 # Crank-above-cone bore spacing (user ruling U31, 2026-09-23, option 3a).  The
