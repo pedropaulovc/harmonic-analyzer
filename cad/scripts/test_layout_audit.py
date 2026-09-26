@@ -3288,6 +3288,32 @@ def test_an_arrowless_leader_beside_an_arrowed_one_is_measured():
     assert finding.extra["over_part_mm"] == pytest.approx(22.2, abs=0.2)
 
 
+def test_a_textless_branch_is_measured_from_its_own_registered_attachment():
+    """Codex P2 on 89a28675e (PRRT_kwDOPHDy386mT5xq): a note with no display
+    text (a cosmetic-thread callout, DetailItem357) has no text box to find
+    each leader's attachment by, and the walk ran to the node farthest from
+    the tip. Two arrowless leaders share their attach point 8 mm left of the
+    part: one runs 25 mm in to an elbow and 3 mm on to its feature, a direct
+    route 28 mm over the part (advisory); the other stops outside the part.
+    The old walk measured the short one from the sibling's elbow: 25 mm over
+    the part to a tip outside it, a phantom gating detour."""
+    attach, elbow, deep_tip, short_tip = (0.092, 0.150), (0.125, 0.150), (0.125, 0.147), (0.095, 0.160)
+    note = {
+        "type": 6,
+        "name": "Textless",
+        "visible": 1,
+        "owner_type": 0,
+        "leaders": [[*attach, 0.0, *elbow, 0.0, *deep_tip, 0.0], [*attach, 0.0, *short_tip, 0.0]],
+        "display": {},
+        "note": {"text": "", "balloon": False},
+    }
+    view = _view("Block", (0.095, 0.095, 0.205, 0.205), [note])
+    findings = audit_dump(_dump(views=[view], strokes=_box_edges(0.100, 0.100, 0.200, 0.200)))
+    [finding] = [f for f in findings if f.kind.startswith("leader-over-part")]
+    assert finding.kind == "leader-over-part-direct"
+    assert finding.extra["over_part_mm"] == pytest.approx(28.0, abs=0.2)
+
+
 # DetailItem357, the model's cosmetic-thread callout on View2: COM text and
 # leader verbatim; like its View1 twin (layoutcal2-a DetailItem349) it dumps
 # no display data.
@@ -3596,6 +3622,23 @@ def test_an_annotation_on_a_non_printing_layer_is_counted_not_audited(state, aud
     assert any("DetailItem349" in label for label in labels) is audited
     report, _gating = audit_report("cone-swing-platform", LayoutAuditMode.REPORT, [dump])
     assert report["summary"]["hidden_layer"] == ({} if audited else {"Sheet2": 1})
+
+
+def test_a_view_owned_annotation_on_a_hidden_layer_counts_once():
+    """Codex P2 on 89a28675e (PRRT_kwDOPHDy386mT5xs): the sheet view's
+    GetAnnotations also returns the annotations a drawing view owns, so the
+    collector records DetailItem349 under its view and again under the sheet
+    (OwnerType 0, not swDrawingSheet 1). One non-printing annotation is one
+    hidden item, as ``audited_annotations`` already treats it."""
+    from _layout_audit import audit_report
+
+    view = _view("Drawing View1", (0.0544, 0.1286, 0.0956, 0.2514), [SWING_HIDDEN_TAPPED_HOLE])
+    dump = {
+        **_dump(views=[view], sheet_annotations=[SWING_HIDDEN_TAPPED_HOLE]),
+        "layers": {"COSMETIC-THREADS-HIDDEN": {"visible": True, "printable": False}},
+    }
+    report, _gating = audit_report("cone-swing-platform", LayoutAuditMode.REPORT, [dump])
+    assert report["summary"]["hidden_layer"] == {"Sheet2": 1}
 
 
 def test_the_collector_records_each_annotation_layers_print_state(monkeypatch):

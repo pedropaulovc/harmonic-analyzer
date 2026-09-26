@@ -298,14 +298,24 @@ def printed_dump(dump: Mapping[str, Any]) -> Mapping[str, Any]:
     }
 
 
+def sheet_owned(annotation: Mapping[str, Any]) -> bool:
+    """Whether a ``sheet_annotations`` entry belongs to the sheet itself. The
+    sheet view's GetAnnotations also returns annotations a drawing view owns
+    (already in that view's list) and the template's (the title block's), so
+    every reader of the sheet's own annotations filters on this."""
+    return int(annotation.get("owner_type", _OWNER_DRAWING_SHEET)) == _OWNER_DRAWING_SHEET
+
+
 def layered_items(dump: Mapping[str, Any]) -> Iterator[Mapping[str, Any]]:
-    """Every dumped item that sits on a layer: each view's annotations, the
-    sheet's, and the tables, which ``GetTableAnnotations`` collects apart
-    (Codex P2 on b2b4f8e66). The collector reads the layers of exactly
-    these, and ``printed_dump`` filters exactly these."""
+    """Every dumped item that sits on a layer, once: each view's
+    annotations, the sheet's own (``sheet_owned``; a view-owned one would
+    count twice, Codex P2 on 89a28675e), and the tables, which
+    ``GetTableAnnotations`` collects apart (Codex P2 on b2b4f8e66). The
+    collector reads the layers of these, and ``hidden_layer_count`` counts
+    them."""
     for view in dump.get("views", ()):
         yield from view.get("annotations") or ()
-    yield from dump.get("sheet_annotations") or ()
+    yield from (a for a in dump.get("sheet_annotations") or () if sheet_owned(a))
     yield from dump.get("tables") or ()
 
 
@@ -329,8 +339,7 @@ def audited_annotations(dump: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     ] + [
         annotation
         for annotation in dump.get("sheet_annotations", ())
-        if not is_hidden(annotation)
-        and int(annotation.get("owner_type", _OWNER_DRAWING_SHEET)) == _OWNER_DRAWING_SHEET
+        if not is_hidden(annotation) and sheet_owned(annotation)
     ]
 
 
@@ -1380,15 +1389,21 @@ def _registered_leaders(annotation: Mapping[str, Any]) -> list[Segment]:
     return segments
 
 
-def _leader_ends(annotation: Mapping[str, Any]) -> list[tuple[float, float]]:
-    """The last point of each registered leader: where it lands. COM lists a
-    leader's points from its attachment out (layoutcal2-a DetailItem349)."""
-    ends = []
+def _leader_spans(annotation: Mapping[str, Any]) -> list[tuple[tuple[float, float], tuple[float, float]]]:
+    """Each registered leader's ``(attachment, landing)``: its first and last
+    points. COM lists a leader's points from its attachment out
+    (layoutcal2-a DetailItem349)."""
+    spans = []
     for raw in annotation.get("leaders", ()):
         values = _floats(raw)
         if len(values) >= 3:
-            ends.append((values[-3], values[-2]))
-    return ends
+            spans.append(((values[0], values[1]), (values[-3], values[-2])))
+    return spans
+
+
+def _leader_ends(annotation: Mapping[str, Any]) -> list[tuple[float, float]]:
+    """The last point of each registered leader: where it lands."""
+    return [end for _start, end in _leader_spans(annotation)]
 
 
 def _arrowless_ends(
@@ -1462,9 +1477,10 @@ class AuditAnnotation(AnnotationGeometry):
 
     text_height: float = 0.0
     arrow_tails: tuple[Segment, ...] = ()
-    # Where each registered leader ends (``_leader_ends``): the landing of a
-    # leader that draws no arrowhead.
-    leader_ends: tuple[tuple[float, float], ...] = ()
+    # Each registered leader's (attachment, landing) (``_leader_spans``): the
+    # landing of a leader that draws no arrowhead, and where a leader with no
+    # text box to walk to starts.
+    leader_spans: tuple[tuple[tuple[float, float], tuple[float, float]], ...] = ()
 
 
 def _cap_height(item: TextItem, box: Box) -> float:
@@ -1585,7 +1601,7 @@ def annotation_geometry(
         circle=circle,
         text_height=height,
         arrow_tails=tuple(tails),
-        leader_ends=tuple(_leader_ends(annotation)),
+        leader_spans=tuple(_leader_spans(annotation)),
     )
 
 
@@ -1890,7 +1906,7 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
                 )
             )
     for annotation in dump.get("sheet_annotations", ()):
-        if int(annotation.get("owner_type", _OWNER_DRAWING_SHEET)) != _OWNER_DRAWING_SHEET:
+        if not sheet_owned(annotation):
             continue
         item = annotation_geometry(
             annotation, owner="sheet", advance=advance, ink=ink_of(annotation), strokes=annotation_strokes
@@ -2174,7 +2190,7 @@ def find_tall_blocks(dump: Mapping[str, Any], *, limit: int = TEXT_ROW_LIMIT) ->
     ] + [
         ("sheet", annotation)
         for annotation in dump.get("sheet_annotations", ())
-        if int(annotation.get("owner_type", _OWNER_DRAWING_SHEET)) == _OWNER_DRAWING_SHEET
+        if sheet_owned(annotation)
     ]
     findings = []
     for owner, annotation in owned:
@@ -2469,7 +2485,8 @@ def _leader_paths(annotation: AnnotationGeometry) -> list[tuple[list[tuple[float
     """
     runs = [s for s in annotation.segments if s.role in ("leader", "shoulder") and s.length > 0.0]
     heads = _arrow_heads(annotation)
-    ends = annotation.leader_ends if isinstance(annotation, AuditAnnotation) else ()
+    spans = annotation.leader_spans if isinstance(annotation, AuditAnnotation) else ()
+    ends = [end for _start, end in spans]
     if not runs or not (heads or ends):
         return []
     nodes: list[tuple[float, float]] = []
@@ -2530,14 +2547,25 @@ def _leader_paths(annotation: AnnotationGeometry) -> list[tuple[list[tuple[float
         # The walk stops at this leader's own attachment: the node nearest
         # the annotation's text, the nearer along the leader on a tie. The
         # farthest node could be a sibling leader's elbow, reached through a
-        # shared attach point (Codex P2 on b49e13940).
-        at = min(
-            starts,
-            key=lambda i: (
-                round(min((_point_box_distance(nodes[i], box) for box in annotation.text_boxes), default=-distance[i]), 6),
-                distance[i],
-            ),
-        )
+        # shared attach point (Codex P2 on b49e13940). With no text box (a
+        # cosmetic-thread callout, DetailItem357) it is the node nearest the
+        # first point of the registered leader landing here, else nearest
+        # the annotation's position (Codex P2 on 89a28675e). Only with none
+        # of the three does the walk run to the farthest node. A registered
+        # leader is tied to this tip when its last point lies within the
+        # arrowhead's length of it; one ending farther off its drawn tip
+        # falls through to the position.
+        reach = max(head, COLLINEAR_TOL_M)
+        anchors = [start for start, end in spans if math.dist(end, nodes[tip]) <= reach]
+        if not anchors and annotation.position is not None:
+            anchors = [annotation.position]
+        if annotation.text_boxes:
+            gap = {i: min(_point_box_distance(nodes[i], box) for box in annotation.text_boxes) for i in starts}
+        elif anchors:
+            gap = {i: min(math.dist(nodes[i], anchor) for anchor in anchors) for i in starts}
+        else:
+            gap = {i: -distance[i] for i in starts}
+        at = min(starts, key=lambda i: (round(gap[i], 6), distance[i]))
         points = [nodes[at]]
         while at != tip:
             at, _segment = back[at]
@@ -2797,11 +2825,7 @@ def find_duplicate_thread_callouts(dump: Mapping[str, Any], sheet: SheetGeometry
     owners.append(
         (
             "sheet",
-            [
-                annotation
-                for annotation in dump.get("sheet_annotations") or ()
-                if int(annotation.get("owner_type", _OWNER_DRAWING_SHEET)) == _OWNER_DRAWING_SHEET
-            ],
+            [annotation for annotation in dump.get("sheet_annotations") or () if sheet_owned(annotation)],
         )
     )
     edges_of: dict[str, list[Segment]] = {}
@@ -3234,11 +3258,7 @@ def find_duplicate_annotations(
     owners.append(
         (
             "sheet",
-            [
-                annotation
-                for annotation in dump.get("sheet_annotations") or ()
-                if int(annotation.get("owner_type", _OWNER_DRAWING_SHEET)) == _OWNER_DRAWING_SHEET
-            ],
+            [annotation for annotation in dump.get("sheet_annotations") or () if sheet_owned(annotation)],
         )
     )
     findings = []
