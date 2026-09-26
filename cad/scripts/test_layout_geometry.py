@@ -364,3 +364,106 @@ def test_leader_clipping_a_pictorial_view_is_not_a_crossing():
     )
     findings = audit_sheet(_sheet([crossing], views=views))
     assert not any(finding.kind == "leader-crosses-view" for finding in findings)
+
+
+def test_a_hole_callouts_attach_run_is_leader_even_where_it_misses_its_text():
+    """swing, #902 case 2: collect_document promoted only the run touching the
+    text, so MHA-091 RD1's rim-to-shelf diagonal (S1 @ ac4fa6dd0 dump) stayed
+    "line" and a leader crossing it passed audit_sheet. A hole callout's
+    display lines are all leader."""
+    from diagnostics.drawing_layout_audit import _classify_segments
+
+    lines = [
+        Segment(0.1773, 0.1361, 0.1884, 0.1042, "line"),  # rim to shelf
+        Segment(0.1762, 0.1393, 0.1773, 0.1361, "line"),
+        Segment(0.1884, 0.1042, 0.2400, 0.1042, "line"),  # shelf under the text
+    ]
+    text = [Box(0.1900, 0.1042, 0.2436, 0.1077)]
+    assert [s.role for s in _classify_segments(lines, text)] == ["line", "line", "leader"]
+    rd1 = AnnotationGeometry(
+        label="RD1",
+        kind="dim",
+        owner="v",
+        text_boxes=tuple(text),
+        segments=tuple(_classify_segments(lines, text, hole_callout=True)),
+    )
+    assert {s.role for s in rd1.segments} == {"leader"}
+    rd3 = AnnotationGeometry(  # moved so its diagonal crosses RD1's
+        label="RD3",
+        kind="dim",
+        owner="v",
+        text_boxes=(Box(0.1250, 0.1205, 0.1650, 0.1240),),
+        segments=(
+            Segment(0.1950, 0.1400, 0.1700, 0.1200, "leader"),
+            Segment(0.1700, 0.1200, 0.1200, 0.1200, "leader"),
+        ),
+    )
+    views = (ViewGeometry("v", Box(0.050, 0.050, 0.260, 0.260)),)
+
+    def crossings(callout):
+        findings = audit_sheet(_sheet([callout, rd3], views=views))
+        return [(f.a, f.b) for f in findings if f.kind == "leader-crosses-leader"]
+
+    assert crossings(rd1)
+    by_topology = AnnotationGeometry(
+        label="RD1", kind="dim", owner="v", text_boxes=tuple(text),
+        segments=tuple(_classify_segments(lines, text)),
+    )
+    assert not crossings(by_topology)  # the miss swing reported
+
+
+# MHA-091 RD1-RD3 as the S1 @ ac4fa6dd0 dump read them (swing, #902 case 2):
+# display lines, then the lower-left of each estimated text row, in mm.
+_S1_CALLOUTS = {
+    "RD1": (
+        [(177.3, 136.1, 188.4, 104.2), (176.2, 139.3, 177.3, 136.1), (188.4, 104.2, 240.0, 104.2)],
+        [(190.0, 104.2)],
+    ),
+    "RD2": (
+        [(169.1, 235.8, 154.3, 244.0), (171.3, 234.6, 169.1, 235.8), (154.3, 244.0, 244.1, 244.0)],
+        [(178.1, 266.4), (171.0, 260.8), (155.9, 255.2), (162.3, 249.6), (164.1, 244.0)],
+    ),
+    "RD3": (
+        [(174.9, 226.5, 166.6, 211.9), (175.7, 227.9, 174.9, 226.5), (166.6, 211.9, 69.0, 211.9)],
+        [(88.5, 226.5), (91.0, 221.0), (69.0, 212.0)],
+    ),
+}
+
+
+@pytest.mark.parametrize("label", sorted(_S1_CALLOUTS))
+def test_both_audits_classify_a_hole_callouts_lines_alike(label):
+    """Main, #902: two classifiers drifted (collect_document tagged RD1's and
+    RD2's diagonals "line", RD3's "leader"). collect_document now delegates a
+    hole callout to the shared ``classify_segments``; this fails loud if the
+    two paths ever disagree on the S1 fixture. The legacy audit has no
+    shoulder role, so the shared audit's shoulder reads as leader there."""
+    from diagnostics.drawing_layout_audit import _classify_segments
+    from _layout_audit import annotation_geometry
+
+    mm = 0.001
+    lines, rows = _S1_CALLOUTS[label]
+    dump = {
+        "type": 4,
+        "name": label,
+        "visible": 1,
+        "display": {
+            "lines": [[0, 0, 0, 0, x0 * mm, y0 * mm, 0.0, x1 * mm, y1 * mm, 0.0] for x0, y0, x1, y1 in lines],
+            "texts": [{"t": "<MOD-DIAM>6.6 THRU", "pos": [x * mm, y * mm, 0.0], "h": 0.0035} for x, y in rows],
+        },
+        "dim": {"hole_callout": True},
+    }
+    shared = annotation_geometry(dump, owner="v", advance=0.6)
+    legacy = _classify_segments(
+        [Segment(x0 * mm, y0 * mm, x1 * mm, y1 * mm, "line") for x0, y0, x1, y1 in lines],
+        [Box(x * mm, y * mm, x * mm + 0.030, y * mm + 0.0035) for x, y in rows],
+        hole_callout=True,
+    )
+
+    def roles(segments, *, shoulder_as):
+        return {
+            (round(s.x0, 6), round(s.y0, 6), round(s.x1, 6), round(s.y1, 6)): shoulder_as.get(s.role, s.role)
+            for s in segments
+        }
+
+    assert roles(legacy, shoulder_as={}) == roles(shared.segments, shoulder_as={"shoulder": "leader"})
+    assert set(roles(legacy, shoulder_as={}).values()) == {"leader"}
