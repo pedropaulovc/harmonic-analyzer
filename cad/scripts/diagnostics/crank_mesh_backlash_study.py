@@ -113,8 +113,10 @@ class GearDef:
         return lut[key]
 
 
-SHIPPED16 = GearDef(16)
-SHIPPED64 = GearDef(64, cms.HELIX_DEG)
+# #906: one cutter, the 64T normal-defined, at the frame's centre distance.
+SHIPPED16 = GearDef(16, dp_n=cms.DP_CRANK_CUTTER)
+SHIPPED64 = GearDef(64, cms.HELIX_DEG, dp_n=cms.DP_CRANK_CUTTER, definition="normal")
+SHIPPED_EXTRA = cms.SLACK
 assert math.isclose(SHIPPED16.rp, cms.R16) and math.isclose(SHIPPED64.rp, cms.R64)
 assert math.isclose(SHIPPED16.root, cms.ROOT16) and math.isclose(SHIPPED64.root, cms.ROOT64)
 
@@ -326,7 +328,7 @@ def window(pose: Pose, guess: float) -> dict:
 @dataclass(frozen=True)
 class Case:
     name: str
-    extra: float = 0.25
+    extra: float = SHIPPED_EXTRA
     widen16: float = 0.0
     widen64: float = 0.15
     gear16: GearDef = SHIPPED16
@@ -353,10 +355,10 @@ def _gear_record(g: GearDef) -> dict:
 
 CASES: list[Case] = [
     Case("nominal"),
-    *[Case(f"cd{e:+.3f}", extra=0.25 + e) for e in (-0.15, -0.075, 0.075, 0.15, 0.30)],
+    *[Case(f"cd{e:+.3f}", extra=SHIPPED_EXTRA + e) for e in (-0.15, -0.075, 0.075, 0.15, 0.30)],
     *[Case(f"thin64={w:.2f}", widen64=w) for w in (0.05, 0.10, 0.20, 0.25)],
     *[Case(f"thin16={w:.3f}", widen16=w) for w in (0.02, 0.05)],
-    Case("cd-0.15,thin64=0.05", extra=0.10, widen64=0.05),
+    Case("cd-0.15,thin64=0.05", extra=SHIPPED_EXTRA - 0.15, widen64=0.05),
 ]
 
 GEAR_KEYS = {"b16": "beta_deg", "b64": "beta_deg", "def16": "definition",

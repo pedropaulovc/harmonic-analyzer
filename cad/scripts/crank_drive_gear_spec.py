@@ -29,16 +29,6 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 MM_PER_IN = 25.4
 
 TEETH = 64
-DIAMETRAL_PITCH = _config.machine("gear_train", "crank_drive_diametral_pitch")
-PRESSURE_ANGLE_DEG = 14.5  # transverse
-MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
-PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
-OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
-WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
-# The gap floor is a root arc one standard dedendum below the pitch circle
-# (``_gear.build_fixed_gear(root_relief=True)``, required by the helix path):
-# the cutter's depth of cut produces it, so it is REF on the print.
-ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN
 
 # The crossed-axis accommodation: the 64T rides the cone shaft, inclined in
 # plan against a crank pinion that spins about machine z, so the gear is cut as
@@ -49,6 +39,32 @@ HELIX_ANGLE_DEG = _config.machine("gear_train", "crank_drive_helix_deg")
 BACKLASH_MM = _config.machine("gear_train", "crank_drive_backlash_mm")
 FACE_WIDTH = 8.0
 
+# ONE cutter cuts both gears of the pair (#906, Main 2026-09-26). A crossed
+# helical pair meshes in the NORMAL plane, so this gear is cut normal-defined:
+# the cutter, set over at the helix angle, cuts its own DP, pressure angle and
+# depth in the normal section, and the straight 16T takes the same cutter
+# square. The TRANSVERSE DP stays the frame's (gear_train.yaml): it places the
+# pitch circle the fixed post was laid out for, and the transverse pressure
+# angle follows from the normal one.
+DIAMETRAL_PITCH = _config.machine("gear_train", "crank_drive_diametral_pitch")  # transverse
+_COS_HELIX = math.cos(math.radians(HELIX_ANGLE_DEG))
+CUTTER_DIAMETRAL_PITCH = DIAMETRAL_PITCH / _COS_HELIX  # normal: 26.306
+CUTTER_PRESSURE_ANGLE_DEG = 14.5  # normal
+PRESSURE_ANGLE_DEG = math.degrees(  # transverse: 14.81
+    math.atan(math.tan(math.radians(CUTTER_PRESSURE_ANGLE_DEG)) / _COS_HELIX)
+)
+MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH  # transverse
+NORMAL_MODULE_MM = MM_PER_IN / CUTTER_DIAMETRAL_PITCH
+PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
+# The cutter's addendum and depth: a standard full-depth tooth of the NORMAL
+# module, whatever plane the profile is read in.
+OUTSIDE_DIA = PITCH_DIA + 2.0 * NORMAL_MODULE_MM
+WHOLE_DEPTH = 2.157 * NORMAL_MODULE_MM
+# The gap floor is a root arc one standard dedendum below the pitch circle
+# (``_gear.build_fixed_gear(root_relief=True)``, required by the helix path):
+# the cutter's depth of cut produces it, so it is REF on the print.
+ROOT_DIA = PITCH_DIA - 2.0 * 1.157 * NORMAL_MODULE_MM
+
 # Hand: the tooth azimuth advances counter-clockwise about +z as z increases
 # (``_gear._TWIST_CCW``), which is a RIGHT-hand helix. It is the one tooth-system
 # fact a mirrored part would get wrong and no view can settle, so the data block
@@ -58,17 +74,20 @@ TOTAL_TWIST_DEG = math.degrees(
     FACE_WIDTH * math.tan(math.radians(HELIX_ANGLE_DEG)) / (PITCH_DIA / 2.0)
 )
 TRANSVERSE_CIRCULAR_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0 - BACKLASH_MM
+# What a gear-tooth caliper set square to the helix reads.
+NORMAL_CIRCULAR_TOOTH_THICKNESS = TRANSVERSE_CIRCULAR_TOOTH_THICKNESS * _COS_HELIX
 
 # The blank's outside diameter is the one tooth-system number the turner sets
 # before a cutter touches the part, so it prints as a NATIVE dimension instead
 # of as text in the data block -- but at the title block's general .XX grade,
-# with no band of its own. The crossed 16T:64T mesh is built with
-# ``fits.crank_mesh.c2c_slack_mm`` 0.25 mm of centre-distance slack on top of
-# the tooth system's own tip clearance below, so the tip circle has 0.405 mm of
-# radial room: the general +/-0.51 diametral is +/-0.255 radial, inside it. A
-# tighter band here would be a habit, not a requirement
-# (cad/docs/tolerance-policy.md, "Fit classes" and the one-sided-load bullets).
-TIP_CLEARANCE_MM = 0.157 / DIAMETRAL_PITCH * MM_PER_IN
+# with no band of its own. The crossed 16T:64T mesh keeps at least
+# ``fits.crank_mesh.c2c_slack_mm`` 0.25 mm of centre-distance slack (the frame
+# leaves the single-cutter pair more) on top of the tooth system's own tip
+# clearance below, so the tip circle has over 0.40 mm of radial room: the
+# general +/-0.51 diametral is +/-0.255 radial, inside it. A tighter band here
+# would be a habit, not a requirement (cad/docs/tolerance-policy.md, "Fit
+# classes" and the one-sided-load bullets).
+TIP_CLEARANCE_MM = 0.157 * NORMAL_MODULE_MM
 
 # The cone shaft's 3/8" gear land. The bore over it is the part's one critical
 # fit and the only reason anything on the print carries a third decimal -- but

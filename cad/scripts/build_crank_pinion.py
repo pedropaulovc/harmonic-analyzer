@@ -28,10 +28,8 @@ from __future__ import annotations
 import math
 import sys
 
-import _config
 import _telemetry
 from _common import (
-    IN,
     SketchDims,
     _feature_by_name,
     _early_bound,
@@ -70,6 +68,7 @@ from crank_pinion_spec import (
     BORE_DIA_BAND,
     BOSS_DIA,
     BOSS_LENGTH,
+    DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -80,6 +79,7 @@ from crank_pinion_spec import (
     PIN_DIA,
     PIN_HOLE_SPEC,
     PIN_STATION,
+    PRESSURE_ANGLE_DEG,
     SURFACE_FINISHES,
 )
 
@@ -87,8 +87,8 @@ PART_NAME = "crank-pinion"
 MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
 
 TEETH = 16  # DIMENSIONS.md ch12 / Appendix C #9 estimate (low)
-DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine.yaml (low)
-PA_DEG = 14.5
+DP = DIAMETRAL_PITCH  # the 64T's normal-plane cutter, cut square (crank_pinion_spec)
+PA_DEG = PRESSURE_ANGLE_DEG
 # FACE_WIDTH (10.4: spans the 64T row north of the v2 crank boss) lives in
 # crank_pinion_spec with the boss and pin it sizes; build_drive_train_assembly's
 # PINION_FACE asserts equality. (The old 12.0 "slightly wider than the drive

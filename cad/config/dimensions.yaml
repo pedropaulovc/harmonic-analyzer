@@ -362,7 +362,7 @@ sections:
         - derived
         - low
       - - Crank-drive gear (dark steel gear at the large end, "This gear engages the crank" p.20)
-        - '64T at DP 25.7311: PD 63.176 mm, OD 65.151 mm; mates a 16T pinion (4:1, PD 15.794, OD 17.768). The fixed v2 post keeps both bore axes; the 64T/cone stack moves 33.115 mm toward it along the inclined shaft and the pair is reclosed at 39.735 mm c2c with 0.25 mm slack. Cut as a true 12.00° helix with 0.15 transverse tooth thinning + root-relieved floors. Held like the 20 cone gears: plain Ø9.525 bore, NO keyway/pin/set screw/hub, soldered or silver-brazed to the shaft''s 3/8" seat (Loctite 638/648 retaining compound an approved alternative, 2026-09-21) — the joint is the gear''s only torque path, so the print states it. Not butted to T120: the 8.0 face against the frozen 10.0 reference face leaves ~1.1 mm of axial air, so the station is an assembly fact.'
+        - '64T at transverse DP 25.7311 (normal DP 26.306, one cutter for the pair, #906): PD 63.176 mm, OD 65.108 mm; mates a 16T pinion cut straight by the same cutter (4:1, PD 15.449, OD 17.380, frame-fixed slack 0.423). The fixed v2 post keeps both bore axes; the 64T/cone stack moves 33.115 mm toward it along the inclined shaft and the pair is reclosed at 39.735 mm c2c with 0.25 mm slack. Cut as a true 12.00° helix with 0.15 transverse tooth thinning + root-relieved floors. Held like the 20 cone gears: plain Ø9.525 bore, NO keyway/pin/set screw/hub, soldered or silver-brazed to the shaft''s 3/8" seat (Loctite 638/648 retaining compound an approved alternative, 2026-09-21) — the joint is the gear''s only torque path, so the print states it. Not butted to T120: the 8.0 face against the frozen 10.0 reference face leaves ~1.1 mm of axial air, so the station is an assembly fact.'
         - —
         - 'p.20 supplies the 4:1 reduction and the visibly coarser pair; the manually rederived v2 post supplies the harder geometric constraint. With its world placement and both bores fixed, the recentered 64T station closes the axes at c2c 39.735, so DP = 25.7311 at the retained 0.25 mm slack. The exact-solid phase sweep rederives the tooth inclination to 12.00°. Attachment (rule-11 flag closed 2026-09-21, dt-logs/geometry-decisions.md): p.20 `page003_img03.jpeg` shows the 64T face-on to T120 with no hub, fillet or pin head, p.21 `page003_img02.jpeg` shows solder at the same shaft''s small gears, and engineerguy `v4_t00399`/`v2_t00069` leave ~1 mm between the far face and the pivot post — no room for a boss either side. Confidence high on no-hub/no-pin; geometry unchanged.'
         - scaled
@@ -586,7 +586,7 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - 'along Z at (x, y) = (−129.336, 129.850), the Ry180-installed v2 casting''s unchanged straight crank bore; 16T:64T c2c 39.735 = radii + 0.25 slack at DP25.7311. The 136.8-mm cylinder spans z −183..−46.2 with a 2-mm integral dome outboard; +8-shifted local seats preserve T12 at z −155 and the pinion centre at z −64.560. The 2.8360-in boss remains z −142.245..−70.210, leaving 10.255 mm to T12 and 0.250 mm to the pinion. The Ø11.388 journal stops at z −73.9 (local 109.1), 3.7 inside the boss, bearing on two 15-mm lands with a Ø10.4 relief between; the Ø9.525 web to the Ø9.0 pinion seat step (local 112.7) is 3.6, 2.0 with both stations at their .X rows (U27, #906).'
+        - 'along Z at (x, y) = (−129.336, 129.850), the Ry180-installed v2 casting''s unchanged straight crank bore; 16T:64T c2c 39.735 = radii + 0.25 slack at DP25.7311. The single-cutter pair (#906) keeps that frame c2c with 0.423 slack. The 136.8-mm cylinder spans z −183..−46.2 with a 2-mm integral dome outboard; +8-shifted local seats preserve T12 at z −155 and the pinion centre at z −64.560. The 2.8360-in boss remains z −142.245..−70.210, leaving 10.255 mm to T12 and 0.250 mm to the pinion. The Ø11.388 journal stops at z −73.9 (local 109.1), 3.7 inside the boss, bearing on two 15-mm lands with a Ø10.4 relief between; the Ø9.525 web to the Ø9.0 pinion seat step (local 112.7) is 3.6, 2.0 with both stations at their .X rows (U27, #906).'
         - 'cone-pivot-post-v2 is the physical authority for x/y. The ch30 GT crank_sprocket result (−122.84, 144.78) remains independent image evidence, while the primary crank construction photo governs the separate through hub and flush outboard face. The crossed-helical accommodation and 0.25 mm mesh slack remain.'
         - high (GT + mesh)
       - - Chain run
@@ -2132,7 +2132,9 @@ sections:
          backlash + root relief on both. **V2 casting override (2026-07-24):**
          the exact rederived bores keep the drive line at y 90.518 and crank
          axis at (−129.336, 129.850), closing the DP25.7311 pair at c2c 39.735
-         (0.25 slack; zero collision must be rechecked over
+         (0.25 slack; #906 then cut both gears with one DP 26.306 normal
+         cutter at that same frame c2c, leaving 0.423 slack and a 2.4-deg free
+         window centred at −1.42; zero collision must be rechecked over
          a full crank-pitch phase sweep with ±0.4° seed margin —
          `diagnostics/crossed_mesh_study.py`; the fit re-arbitrated
          2026-07-14 from the interim K=12-slice cut stack's 0.40/0.60 after

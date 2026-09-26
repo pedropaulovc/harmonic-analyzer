@@ -26,6 +26,9 @@ BACKLASH_MM = _config.fit("gear_mesh", "backlash_mm")
 
 # Standard full-depth thickness at the pitch circle, before any thinning.
 STANDARD_TOOTH_THICKNESS = math.pi * spec.MODULE_MM / 2.0
+# The gear is cut and measured square to its helix (#906): every transverse
+# thickness reads cos(helix) thinner there.
+_COS_HELIX = math.cos(math.radians(spec.HELIX_ANGLE_DEG))
 
 # Tooth thickness is this part's ONE tooth-system acceptance size, so it is a
 # toleranced requirement, not a REF consequence of the cutter: the pinion it
@@ -38,6 +41,10 @@ TOOTH_THICKNESS_DEVIATIONS = (
     round(spec.BACKLASH_MM - BACKLASH_MM[0], 3),
     round(-(BACKLASH_MM[1] - spec.BACKLASH_MM), 3),
 )
+# ... and the same band where the caliper reads it, square to the helix.
+NORMAL_TOOTH_THICKNESS_DEVIATIONS = tuple(
+    round(deviation * _COS_HELIX, 3) for deviation in TOOTH_THICKNESS_DEVIATIONS
+)
 
 
 def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
@@ -46,9 +53,11 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
 
 
 # Rule 6's gear-data block: the tooth system a cut-gear drawing cannot express
-# as dimensions. Every GENERATING number is REF -- the cutter, its depth of cut
-# and the helix setting produce them, and the acceptance sizes are the three
-# native dimensions on the views. The two rows that are NOT REF are the pair's
+# as dimensions. The cutter is named first, in the NORMAL plane it cuts in
+# (#906: one cutter for the pair, set over at the helix angle); every number
+# that follows from it is REF -- the cutter, its depth of cut and the helix
+# setting produce them, and the acceptance sizes are the three native
+# dimensions on the views. The two rows that are NOT REF are the pair's
 # requirement, and each names WHERE it is accepted: the tooth thickness is
 # checked on this part, the backlash it exists to produce is checked when the
 # pair is assembled (the operating centre distance and shaft angle live on the
@@ -57,9 +66,13 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{spec.TEETH}"),
-        ("DIAMETRAL PITCH, TRANSVERSE", f"{spec.DIAMETRAL_PITCH:.2f} (NONSTANDARD)"),
-        ("MODULE, TRANSVERSE (mm, REF)", f"{spec.MODULE_MM:.3f}"),
-        ("PRESSURE ANGLE, TRANSVERSE", f"{spec.PRESSURE_ANGLE_DEG:.1f} DEG"),
+        (
+            "DIAMETRAL PITCH, NORMAL (CUTTER)",
+            f"{spec.CUTTER_DIAMETRAL_PITCH:.2f} (NONSTANDARD; SAME CUTTER AS MHA-025)",
+        ),
+        ("PRESSURE ANGLE, NORMAL (CUTTER)", f"{spec.CUTTER_PRESSURE_ANGLE_DEG:.1f} DEG"),
+        ("DIAMETRAL PITCH, TRANSVERSE (REF)", f"{spec.DIAMETRAL_PITCH:.2f}"),
+        ("PRESSURE ANGLE, TRANSVERSE (REF)", f"{spec.PRESSURE_ANGLE_DEG:.2f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{spec.PITCH_DIA:.2f}"),
         ("ROOT DIAMETER (mm, REF)", f"{spec.ROOT_DIA:.2f}"),
         ("WHOLE DEPTH (mm, REF)", f"{spec.WHOLE_DEPTH:.2f}"),
@@ -68,9 +81,10 @@ GEAR_DATA = gear_data_note(
             f"{spec.HELIX_ANGLE_DEG:.1f} DEG {spec.HELIX_HAND}",
         ),
         (
-            "CIRCULAR TOOTH THICKNESS AT PITCH DIA, TRANSVERSE (mm), ACCEPT ON THIS PART",
-            f"{spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS:.3f} "
-            f"+{TOOTH_THICKNESS_DEVIATIONS[0]:.3f} / {TOOTH_THICKNESS_DEVIATIONS[1]:.3f}",
+            "CIRCULAR TOOTH THICKNESS AT PITCH DIA, NORMAL (mm), ACCEPT ON THIS PART",
+            f"{spec.NORMAL_CIRCULAR_TOOTH_THICKNESS:.3f} "
+            f"+{NORMAL_TOOTH_THICKNESS_DEVIATIONS[0]:.3f} / "
+            f"{NORMAL_TOOTH_THICKNESS_DEVIATIONS[1]:.3f}",
         ),
         (
             "TRANSVERSE BACKLASH WITH MHA-025, ACCEPT AT ASSEMBLY (mm)",

@@ -48,9 +48,13 @@ import build_drive_train_assembly as dta
 from _gear import gap_area_in_disc_ext  # noqa: F401  (re-exported for callers)
 from involute_gear import PA_DEG, gear_facts
 from build_crank_drive_gear import BACKLASH_MM, HELIX_DEG
+from crank_drive_gear_spec import PRESSURE_ANGLE_DEG as PA64_T  # transverse
 
 IN = 25.4
 DP_CRANK = dta.DP_CRANK
+# #906: one cutter for the pair -- the 16T's DP, and the 64T's normal DP.
+DP_CRANK_CUTTER = dta.DP_CRANK_CUTTER
+ADDENDUM64_EXTRA_IN = 1.0 / DP_CRANK_CUTTER - 1.0 / DP_CRANK
 GEAR64_SEAT = dta.GEAR64_SEAT
 GEAR64_FACE = dta.GEAR64_FACE
 PINION_FACE = dta.PINION_FACE
@@ -174,7 +178,7 @@ def study(y_crank: float, skew_deg: float = 0.0, widen16: float = 0.0,
     alpha16 = math.degrees(math.atan2(dy16, GEAR64_SEAT[0] - X_CRANK))
     tp64 = 360.0 / 64.0
     delta64 = round(alpha64 / tp64) * tp64 - alpha64
-    seed = ((alpha16 + 180.0) - delta64 * (R64 / R16) - 22.5 / 2.0
+    seed = ((alpha16 + 180.0) - delta64 * (64.0 / 16.0) - 22.5 / 2.0
             ) % 22.5 + seed_off
     # Axial placement: the shipped station. It is anchored to the STATIC
     # casting-to-T120 span (see the assembly's span-fit assert), not to the
@@ -184,9 +188,10 @@ def study(y_crank: float, skew_deg: float = 0.0, widen16: float = 0.0,
     k16 = (16, widen16, root16)
     k64 = (64, widen64, root64)
     if k16 not in lut:
-        lut[k16] = GapLookup(16, DP_CRANK, widen16, root16)
+        lut[k16] = GapLookup(16, DP_CRANK_CUTTER, widen16, root16)
     if k64 not in lut:
-        lut[k64] = GapLookup(64, DP_CRANK, widen64, root64)
+        lut[k64] = GapLookup(64, DP_CRANK, widen64, root64, pa_deg=PA64_T,
+                             addendum_extra_in=ADDENDUM64_EXTRA_IN)
     g16, g64 = lut[k16], lut[k64]
 
     xs = np.arange(X_CRANK - g16.ra - 0.3, X_CRANK + g16.ra + 0.3, vox)

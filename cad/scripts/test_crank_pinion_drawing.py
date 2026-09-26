@@ -156,7 +156,7 @@ def test_pin_hole_is_match_drilled_to_the_named_pin() -> None:
     assert not hasattr(spec, "PIN_DIA_BAND")
     assert "fit_class" not in _config.parts("crank-pinion-pin")
     # The pinion's hole clocking is the assembly's mesh seed, asserted there.
-    assert spec.PIN_CLOCKING_DEG == pytest.approx(13.703608450714796)
+    assert spec.PIN_CLOCKING_DEG == pytest.approx(13.783608450714796)
 
 
 def _assert_four_fact_note(note: str, mate_number: str) -> None:
@@ -336,7 +336,7 @@ def test_outside_diameter_stays_at_the_general_grade() -> None:
     assert not hasattr(spec, "OUTSIDE_DIA_BAND")
     assert spec.DRAWING_PRECISION_BY_NAME["OutsideDia"] == 2
     assert spec.MESH_C2C_SLACK_MM == _config.fit("crank_mesh")["c2c_slack_mm"]
-    assert spec.TIP_CLEARANCE_MM == pytest.approx(0.155, abs=0.001)
+    assert spec.TIP_CLEARANCE_MM == pytest.approx(0.152, abs=0.001)
     radial_room = spec.MESH_C2C_SLACK_MM + spec.TIP_CLEARANCE_MM
     general_radial = _config.title_block("linear_2pl")["value_in"] * 25.4 / 2.0
     assert general_radial < radial_room
@@ -400,10 +400,11 @@ def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
     # margin: it checks nominal 0.150 mm tooth thinning and samples 0.100 mm
     # only at the nominal c2c/helix/shaft/offset/bore stack. Keep the maximum
     # pinion tooth nominal and reuse MHA-021's established 0.020 mm one-sided
-    # tooth-control capability. MHA-021 now publishes only its authoritative
-    # transverse pressure angle and helix angle; derive the corresponding
-    # normal angle here before converting its normal-span lower limit.
-    normal_pressure_angle_rad = math.atan(
+    # tooth-control capability. MHA-021 is cut normal-defined by this gear's
+    # own cutter (#906), so its normal pressure angle IS the cutter's; convert
+    # its normal-span lower limit with it.
+    normal_pressure_angle_rad = math.radians(mate.CUTTER_PRESSURE_ANGLE_DEG)
+    assert math.tan(normal_pressure_angle_rad) == pytest.approx(
         math.tan(math.radians(mate.PRESSURE_ANGLE_DEG))
         * math.cos(math.radians(mate.HELIX_ANGLE_DEG))
     )
@@ -418,7 +419,7 @@ def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
         + mate_extra_thinning
     )
     assert pair_minimum == pytest.approx(0.150)
-    assert pair_maximum == pytest.approx(0.191091, abs=1e-6)
+    assert pair_maximum == pytest.approx(0.191120, abs=1e-6)
 
 
 def test_notes_carry_only_the_tooth_edge_and_boss_wall_exceptions() -> None:
@@ -432,7 +433,7 @@ def test_notes_carry_only_the_tooth_edge_and_boss_wall_exceptions() -> None:
         f"BOSS WALL {spec.BOSS_WALL_WORST:.2f} MIN AT BORE: "
         "ACCEPTED EXCEPTION (GEAR CUTTER RUNOUT).",
     ]
-    assert lines[1] == "BOSS WALL 1.82 MIN AT BORE: ACCEPTED EXCEPTION (GEAR CUTTER RUNOUT)."
+    assert lines[1] == "BOSS WALL 1.67 MIN AT BORE: ACCEPTED EXCEPTION (GEAR CUTTER RUNOUT)."
     assert len(lines) <= 4
     policy = (
         Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"
@@ -634,7 +635,7 @@ def test_boss_wall_is_the_ruled_option_c_exception() -> None:
     printed_boss = round(spec.BOSS_DIA, spec.BOSS_DIA_PLACES)
     worst = (printed_boss - 0.8 - (spec.BORE_DIA + bore_upper)) / 2.0
     assert spec.BOSS_DIA == pytest.approx(spec.ROOT_DIA)
-    assert spec.BOSS_WALL_WORST == pytest.approx(worst) == pytest.approx(1.8225, abs=1e-3)
+    assert spec.BOSS_WALL_WORST == pytest.approx(worst) == pytest.approx(1.6725, abs=1e-3)
     assert spec.BOSS_WALL_FLOOR_MM <= spec.BOSS_WALL_WORST < 2.0
     assert spec.DRAWING_PRECISION["BossProfile"]["BossDia"] == spec.BOSS_DIA_PLACES
     assert "USER RULING 2026-09-25, MHA-025 boss option C" in Path(spec.__file__).read_text(

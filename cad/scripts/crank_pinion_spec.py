@@ -27,6 +27,7 @@ from __future__ import annotations
 import math
 
 import _config
+import crank_drive_gear_spec
 import crank_hub_geometry
 from _fit_limits import deviations
 from _gtol_spec import CylinderFace
@@ -37,8 +38,11 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 MM_PER_IN = 25.4
 
 TEETH = 16
-DIAMETRAL_PITCH = 25.73110354953376  # fixed-post recentered mesh
-PRESSURE_ANGLE_DEG = 14.5
+# Cut straight by the 64T's own cutter (#906): a straight gear's transverse
+# section IS its normal section, so the cutter's DP and pressure angle are this
+# gear's, and the pair's normal pitches match.
+DIAMETRAL_PITCH = crank_drive_gear_spec.CUTTER_DIAMETRAL_PITCH  # 26.306
+PRESSURE_ANGLE_DEG = crank_drive_gear_spec.CUTTER_PRESSURE_ANGLE_DEG
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
@@ -59,10 +63,11 @@ TOOTH_THICKNESS_LOWER_DEVIATION = -0.020
 # The blank's outside diameter is the one tooth-system number the turner sets
 # before a cutter touches the part, so it prints as a NATIVE dimension instead
 # of as text in the data block -- but at the title block's general .XX grade,
-# with no band of its own. The crossed 16T:64T mesh is built with
-# ``fits.crank_mesh.c2c_slack_mm`` 0.25 mm of centre-distance slack on top of
-# the tooth system's own 0.157/DP tip clearance (0.155 mm), so the tip circle
-# has 0.405 mm of radial room: +/-0.51 diametral is +/-0.255 radial, inside it.
+# with no band of its own. The crossed 16T:64T mesh keeps at least
+# ``fits.crank_mesh.c2c_slack_mm`` 0.25 mm of centre-distance slack (the frame
+# leaves the single-cutter pair more) on top of the tooth system's own 0.157/DP
+# tip clearance (0.152 mm), so the tip circle has over 0.40 mm of radial room:
+# +/-0.51 diametral is +/-0.255 radial, inside it.
 # A tighter band here would be a habit, not a requirement
 # (cad/docs/tolerance-policy.md, "Fit classes" and the one-sided-load bullets).
 MESH_C2C_SLACK_MM = _config.fit("crank_mesh")["c2c_slack_mm"]
@@ -117,7 +122,7 @@ FACE_WIDTH = 10.4  # spans the 64T row north of the v2 crank boss
 # extruded from the SAME faced end as the teeth, so the print carries one
 # overall length from that end (rule 7: lengths from one faced end, the overall
 # length real and conspicuous), and the toothed length is FaceWidth.
-ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN  # 13.51
+ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN  # 13.21
 BOSS_DIA = ROOT_DIA
 # The boss's outer end edge takes the title block's edge break: the sized
 # chamfer that once imitated the photo's rounding had no function, and at its
@@ -169,7 +174,7 @@ BOSS_DIA_PLACES = 1
 BOSS_WALL_FLOOR_MM = 1.5
 _BORE_LOWER, _BORE_UPPER = deviations(BORE_DIA_BAND)
 _BOSS_DIA_LOWER, _BOSS_DIA_UPPER = printed_deviations(BOSS_DIA, BOSS_DIA_PLACES)
-BOSS_WALL_WORST = (BOSS_DIA + _BOSS_DIA_LOWER - (BORE_DIA + _BORE_UPPER)) / 2.0  # 1.8225
+BOSS_WALL_WORST = (BOSS_DIA + _BOSS_DIA_LOWER - (BORE_DIA + _BORE_UPPER)) / 2.0  # 1.6725
 if BOSS_WALL_WORST < BOSS_WALL_FLOOR_MM:
     raise AssertionError(
         f"16T boss worst wall {BOSS_WALL_WORST:.3f} is under the {BOSS_WALL_FLOOR_MM} "
@@ -247,7 +252,7 @@ for _name, _value, _places in (
 # wall alone needed 12.815 (1.23 faces) at the old 0.32 recess; the recess
 # that survives the printed row and an exactly printed shaft adds the rest.
 PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0  # 17.65 from the toothed (south) face
-PIN_CLOCKING_DEG = 13.703608450714796  # = build_drive_train_assembly.PINION_SEED_DEG
+PIN_CLOCKING_DEG = 13.783608450714796  # = build_drive_train_assembly.PINION_SEED_DEG
 if PIN_STATION - PIN_DIA / 2.0 < FACE_WIDTH + 0.5:
     raise AssertionError("retention pin hole breaks into the pinion's tooth face")
 if PIN_STATION + PIN_DIA / 2.0 > OVERALL_LENGTH - 0.5:
@@ -372,7 +377,10 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
-        ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f} (NONSTANDARD)"),
+        (
+            "DIAMETRAL PITCH",
+            f"{DIAMETRAL_PITCH:.2f} (NONSTANDARD; MHA-021'S CUTTER)",
+        ),
         ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
