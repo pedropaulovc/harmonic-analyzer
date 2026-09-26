@@ -164,7 +164,6 @@ def test_every_view_keep_map_is_curated_on_its_own_view() -> None:
     build() curated only the front view, so the hub length never printed. Each
     non-empty <VIEW>_KEEP must be curated on that view, and curation fails
     loud on a missing kept dimension, so the print carries every one."""
-    import ast
 
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     curated = {}
@@ -412,7 +411,6 @@ def test_both_bores_are_picked_by_diameter_not_by_a_rim_coordinate() -> None:
     """r743-p1s-B: a coordinate pick on the #47 rod-hole rim resolved to the
     strap's tapered end-face line, so AddHoleCallout2 returned None. Every
     annotation on the rod-pin hole takes the diameter-picked edge."""
-    import ast
 
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     picks = {}
