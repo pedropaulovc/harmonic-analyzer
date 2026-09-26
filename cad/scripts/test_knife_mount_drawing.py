@@ -465,3 +465,45 @@ def test_turned_boss_dimensions_are_model_owned_on_the_section() -> None:
     assert boss <= set(drawing.SECTION_KEEP)
     assert not drawing.TOP_KEEP
     assert set(drawing._BOSS_CONTROLLING_DIMENSIONS) == boss
+
+
+def test_revolved_boss_parity_judges_size_and_station() -> None:
+    """Main 2026-09-25: the revolve must add exactly the old extruded boss."""
+    import math
+
+    import build_knife_mount as build
+
+    radius = knife_mount_spec.BOSS_DIA / 2.0
+    height = knife_mount_spec.BOSS_HEIGHT
+    boss_volume = math.pi * radius**2 * height
+    lateral = 2.0 * math.pi * radius * height
+    block_volume, block_area = 10412.8, 3000.0
+    block_com = (0.0, 3.2, 0.0)
+    centroid_y = build.BLK_TOP + height / 2.0
+
+    def after(volume: float, area: float, station: tuple[float, float, float]):
+        total = block_volume + volume
+        com = tuple(
+            (block_volume * c + volume * s) / total
+            for c, s in zip(block_com, station, strict=True)
+        )
+        return (total, block_area + area, com)
+
+    before = (block_volume, block_area, block_com)
+    # Positive control: the old extruded cylinder at its station passes.
+    assert build.boss_parity_problems(
+        before, after(boss_volume, lateral, (0.0, centroid_y, 0.0))
+    ) == []
+    # A half revolve, a wrong radius and a boss off its station all fail.
+    half = build.boss_parity_problems(
+        before, after(boss_volume / 2.0, lateral / 2.0, (0.0, centroid_y, 0.0))
+    )
+    assert any("mm^3" in problem for problem in half)
+    wide = (radius + 0.05) / radius
+    assert build.boss_parity_problems(
+        before, after(boss_volume * wide**2, lateral * wide, (0.0, centroid_y, 0.0))
+    )
+    shifted = build.boss_parity_problems(
+        before, after(boss_volume, lateral, (0.0, centroid_y, 0.1))
+    )
+    assert shifted and all("centroid z" in problem for problem in shifted)
