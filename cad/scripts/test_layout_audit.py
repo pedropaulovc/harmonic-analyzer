@@ -1528,6 +1528,59 @@ def test_an_extension_line_passing_a_dimension_baseline_stays_an_extension_line(
     assert roles == ["ext-line", "ext-line", "dim-line", "dim-line"]
 
 
+def test_a_line_through_a_callouts_text_and_shoulder_is_one_text_on_line():
+    """The same geometry as the shoulder test, but the line runs on 0.9 mm
+    into the text: one defect, reported as text-on-line only."""
+    h = 0.0035
+    callout = _hole_callout(
+        "Adjuster",
+        [(0.080, 0.090, 0.100, 0.1000), (0.100, 0.1000, 0.140, 0.1000)],
+        [("THRU ALL", 0.100, 0.1001)],
+        height=h,
+    )
+    heel = _dim("HeelReliefHt", "5.56", 0.150, 0.080, lines=[(0.1190, 0.0875, 0.1190, 0.0990)])
+    heel["display"]["lines"].append(_line(0.1190, 0.0990, 0.1190, 0.1010))
+    findings = audit_dump(_dump(views=[_view("front", (0.05, 0.05, 0.2, 0.2), [callout, heel])]))
+    pair = [f.kind for f in findings if {f.a.split()[1], f.b.split()[1]} == {"Adjuster", "HeelReliefHt"}]
+    assert pair == ["text-on-line"]
+
+
+# cone-gear T006 (95a9e97ca, calibration run 2): the view's centre mark,
+# dumped twice (#913). Every cone-gear sheet and four other drawings did so.
+CG_T006_CENTER_MARK = {
+    "type": 13,
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.1013585, 0.1447979, 0.024],
+    "display": {
+        "lines": [
+            [-1.0, 0.0, 0.0, 0.0, 0.105, 0.15, 0.0, 0.105, 0.17, 0.0],
+            [-1.0, 0.0, 0.0, 0.0, 0.105, 0.15, 0.0, 0.085, 0.15, 0.0],
+            [-1.0, 0.0, 0.0, 0.0, 0.105, 0.15, 0.0, 0.105, 0.13, 0.0],
+            [-1.0, 0.0, 0.0, 0.0, 0.105, 0.15, 0.0, 0.125, 0.15, 0.0],
+            [-1.0, 0.0, -1.0, 0.0, 0.105, 0.17, 0.0, 0.105, 0.17635, 0.0],
+            [-1.0, 0.0, -1.0, 0.0, 0.085, 0.15, 0.0, 0.07865, 0.15, 0.0],
+            [-1.0, 0.0, -1.0, 0.0, 0.105, 0.13, 0.0, 0.105, 0.12365, 0.0],
+            [-1.0, 0.0, -1.0, 0.0, 0.125, 0.15, 0.0, 0.13135, 0.15, 0.0],
+        ]
+    },
+}
+
+
+def test_a_centre_mark_dumped_twice_is_a_gating_duplicate():
+    """#913: DetailItem346 and DetailItem347 on cone-gear T006 are one centre
+    mark inserted twice; each other kind of pair, or a moved copy, is not."""
+    first = {**CG_T006_CENTER_MARK, "name": "DetailItem346"}
+    second = {**CG_T006_CENTER_MARK, "name": "DetailItem347"}
+    moved = {**CG_T006_CENTER_MARK, "name": "DetailItem348", "pos": [0.1113585, 0.1447979, 0.024]}
+    other_type = {**CG_T006_CENTER_MARK, "name": "DetailItem349", "type": 6}
+    view = _view("Drawing View1", (0.082292, 0.1289996, 0.127708, 0.1710004), [first, second, moved, other_type])
+    findings = [f for f in audit_dump(_dump(views=[view])) if f.kind == "duplicate-annotation"]
+    assert [(f.a, f.b) for f in findings] == [("center-mark DetailItem346", "center-mark DetailItem347")]
+    assert severity(findings[0]) is FindingSeverity.GATING
+    assert findings[0].extra == {"owner": "Drawing View1", "identical": True}
+
+
 def test_two_leaders_converging_on_one_landing_are_advisory():
     """cone-gear-shaft (d09c2b9eb): Ra 1.6's leader meets Sec4Dia's dimension
     line 3.7 mm before both arrows land on the shaft's corner. Main's ruling:

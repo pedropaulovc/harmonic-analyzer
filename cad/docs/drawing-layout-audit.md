@@ -133,6 +133,7 @@ only for a dump with no PDF text, i.e. the offline fixtures.
 | `text-unmatched` | gating | a COM text item with no printed PDF text object: the audit cannot place it |
 | `pdf-text-unclaimed` | gating | printed text in the drawable region no COM item claims (not the title block or a table) |
 | `view-edges-missing` / `-pictorial` | gating / advisory | a view with an outline but no printed model edge (a shaded or draft view, another edge weight): text over it is unchecked |
+| `duplicate-annotation` | gating | two visible annotations of one type, owned by the same view or the sheet, anchored within 0.01 mm: the second prints over the first (#913: every cone-gear sheet and four other drawings carried each centre mark twice; all 30 run-2 pairs were exact, with identical display data) |
 | `com-read-errors` | gating | the collector was refused a COM read on the sheet; the counts per accessor are in the finding |
 | `text-separation` | advisory | distinct annotation blocks clear of each other but closer than one text height; they read as one callout |
 
