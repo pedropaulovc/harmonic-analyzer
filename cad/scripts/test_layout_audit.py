@@ -3252,6 +3252,42 @@ def test_each_branch_of_a_two_arrow_leader_is_measured_from_its_own_attachment()
     assert finding.extra["over_part_mm"] == pytest.approx(47.1, abs=0.2)
 
 
+def test_an_arrowless_leader_running_over_the_part_gates():
+    """Codex P2 on b294b7f5f (PRRT_kwDOPHDy386mTPic): a cosmetic-thread
+    callout dumps its registered leader and no display data (DetailItem357),
+    so it has no arrowhead to walk to and was never measured. It ends where
+    its registered points end. Here it enters the plate across its right
+    edge and runs 22.2 mm to hole A's outer ring, 6.9 mm from the plate's
+    left side: a 15.3 mm detour."""
+    tip = (0.17022 + 0.00164, 0.23520)
+    note = {**SWING_TAPPED_HOLE, "leaders": [[0.2000, 0.2352, 0.0, *tip, 0.0]]}
+    view = _view("Drawing View2", SWING_VIEW2, [note])
+    findings = audit_dump(_dump(views=[view], strokes=SWING_PLATE_EDGES))
+    [finding] = [f for f in findings if f.kind.startswith("leader-over-part")]
+    assert finding.kind == "leader-over-part"
+    assert finding.extra["over_part_mm"] == pytest.approx(22.2, abs=0.2)
+    assert finding.extra["detour_mm"] == pytest.approx(15.3, abs=0.2)
+
+
+def test_an_arrowless_leader_beside_an_arrowed_one_is_measured():
+    """Arrow style is per leader (IAnnotation::SetArrowHeadStyleAtIndex), so
+    one note can carry an arrowed leader and an arrowless one (Main on the
+    TPic fix). The arrowed branch stops outside the plate; the arrowless one
+    runs the 22.2 mm to hole A and gates."""
+    attach, arrowed_tip = (0.2000, 0.2352), (0.1960, 0.2300)
+    tip = (0.17022 + 0.00164, 0.23520)
+    note = {
+        **SWING_TAPPED_HOLE,
+        "leaders": [[*attach, 0.0, *arrowed_tip, 0.0], [*attach, 0.0, *tip, 0.0]],
+        "display": {"arrows": [_arrow_at(arrowed_tip, attach)]},
+    }
+    view = _view("Drawing View2", SWING_VIEW2, [note])
+    findings = audit_dump(_dump(views=[view], strokes=SWING_PLATE_EDGES))
+    [finding] = [f for f in findings if f.kind.startswith("leader-over-part")]
+    assert finding.kind == "leader-over-part"
+    assert finding.extra["over_part_mm"] == pytest.approx(22.2, abs=0.2)
+
+
 # DetailItem357, the model's cosmetic-thread callout on View2: COM text and
 # leader verbatim; like its View1 twin (layoutcal2-a DetailItem349) it dumps
 # no display data.
@@ -3333,6 +3369,20 @@ def test_one_thread_is_one_callout_only_within_one_hole_group(extra_rings, tip, 
     findings = audit_dump(_dump(views=[view], strokes=[*SWING_PLATE_EDGES, *_edges(*extra_rings)]))
     duplicates = [f for f in findings if f.kind == "duplicate-thread-callout"]
     assert [f.extra.get("association") for f in duplicates] == ([association] if association else [])
+
+
+def test_a_sheet_note_restating_a_view_callouts_thread_gates():
+    """Codex P2 on b294b7f5f (PRRT_kwDOPHDy386mTPiZ): the 24cb duplicate
+    with DetailItem357 owned by the sheet instead of View2. The sheet note
+    and the view's callout sat in separate owner groups and were never
+    compared, though the note's leader lands on View2's hole B."""
+    view = _view("Drawing View2", SWING_VIEW2, [_swing_rd2(False)])
+    note = {**SWING_TAPPED_HOLE, "owner_type": 1}
+    findings = audit_dump(_dump(views=[view], sheet_annotations=[note], strokes=SWING_PLATE_EDGES))
+    [finding] = [f for f in findings if f.kind == "duplicate-thread-callout"]
+    assert {finding.a, finding.b} == {"hole-callout RD2", "note DetailItem357"}
+    assert finding.extra.get("association") == "same 2X group"
+    assert finding.extra.get("owner") == "Drawing View2"
 
 
 @pytest.mark.parametrize(
