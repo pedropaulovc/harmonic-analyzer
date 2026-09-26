@@ -82,20 +82,7 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ),
 }
 
-# The crank-drive gear's derived bore band collapses to zero width on this
-# integration head. crankhub's 64T bore fix (integ/64t-bore-resolve) resolves
-# it and removes this mark.
-_XFAIL_64T_BORE = pytest.mark.xfail(
-    strict=True,
-    raises=ValueError,
-    reason=(
-        "BORE_DIA_BAND derives to (0.025, 0.025): zero width. Fixed by crankhub's "
-        "64T bore resolve (integ/64t-bore-resolve), which removes this xfail."
-    ),
-)
-KNOWN_BAD: dict[str, pytest.MarkDecorator] = {
-    "build_crank_drive_gear:BORE_DIA_BAND": _XFAIL_64T_BORE,
-}
+KNOWN_BAD: dict[str, pytest.MarkDecorator] = {}
 
 
 @dataclass(frozen=True)
