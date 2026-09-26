@@ -28,11 +28,10 @@ from cone_tip_block_spec import (
     BLOCK_Z,
     DRAWING_PRECISION as BLOCK_DRAWING_PRECISION,
     FLANGE_LEN,
-    FLANGE_SLOT_CTOC,
+    FLANGE_SLOT_END_PLACES,
     FLANGE_SLOT_FLOAT,
+    FLANGE_SLOT_NORTH_Z,
     FLANGE_SLOT_W_MAX,
-    FLANGE_SLOT_Z,
-    FLANGE_SLOT_Z_PLACES,
     FOOT_SHIM_RANGE_MM,
     FOOT_THREAD,
     HEEL_RELIEF_DEPTH,
@@ -68,21 +67,29 @@ _SCREW_R = THREAD_MAJOR_MM[FOOT_THREAD] / 2.0
 # The closed end's radius centre, located (.X) from the pack's north edge.
 # The fitter squares the north edge on the block's heel-relief face, so the
 # screw's farthest reach north of that edge runs through the block's prints
-# (heel relief .XX, Depth .X, FlangeSlotZ .X, half the slot spacing .XX)
-# plus the screw's float in the flange slot.  The radius end must pass it
+# (heel relief .XX, Depth .X, and the flange slot's north arc centre
+# FlangeSlotNorthZ, baselined from the body's south face at .X since #838
+# r3) plus the screw's float in the flange slot.  The old chain went through
+# the slot midpoint FlangeSlotZ (.X) and half the .XX spacing; the block no
+# longer prints either.  The radius end must pass it
 # with the narrowest slot (the screw can sit that slot's slack past the
 # radius centre) and the location at its long limit.
 _HEEL_DEPTH_PLACES = BLOCK_DRAWING_PRECISION["HeelReliefProfile"]["HeelReliefDepth"]
-_CTOC_PLACES = BLOCK_DRAWING_PRECISION["FlangeSlotProfile"]["FlangeSlotCtoC"]
+_NORTH_END_PLACES = BLOCK_DRAWING_PRECISION["FlangeSlotNorthReference"][
+    "FlangeSlotNorthZ"
+]
+if _NORTH_END_PLACES != FLANGE_SLOT_END_PLACES:
+    raise ValueError("the block's FlangeSlotNorthZ places moved off its spec")
 FLANGE_SLOT_NORTH_CENTRE_FROM_NORTH = (
-    SHIM_NORTH_Z + BLOCK_Z / 2.0 + FLANGE_SLOT_Z - FLANGE_SLOT_CTOC / 2.0
+    SHIM_NORTH_Z + BLOCK_Z / 2.0 + FLANGE_SLOT_NORTH_Z
 )
-SCREW_NORTH_REACH_FROM_NORTH = FLANGE_SLOT_NORTH_CENTRE_FROM_NORTH - (
+SCREW_NORTH_REACH_BANDS_MM = (
     _BAND_BY_PLACES[_HEEL_DEPTH_PLACES]
     + _BAND_BY_PLACES[BLOCK_DEPTH_PLACES]
-    + _BAND_BY_PLACES[FLANGE_SLOT_Z_PLACES]
-    + _BAND_BY_PLACES[_CTOC_PLACES] / 2.0
-    + FLANGE_SLOT_FLOAT
+    + _BAND_BY_PLACES[_NORTH_END_PLACES]
+)
+SCREW_NORTH_REACH_FROM_NORTH = FLANGE_SLOT_NORTH_CENTRE_FROM_NORTH - (
+    SCREW_NORTH_REACH_BANDS_MM + FLANGE_SLOT_FLOAT
 )
 SLOT_CENTRE_FROM_NORTH = (
     math.floor(
