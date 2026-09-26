@@ -238,24 +238,88 @@ def tapped_value_slots(
 _CSK_NAME = re.compile(r"c'?\s*sink|csk|countersink", re.IGNORECASE)
 
 
-def countersink_diameter_names(
-    names: list[str], *, expected: int, label: str
-) -> list[str]:
-    """The wizard feature's countersink DIAMETER dimension names, exactly
-    ``expected`` of them, or a loud failure listing every name seen."""
+def _countersink_sides(spec: HoleSpec) -> dict[str, Countersink]:
+    return {
+        side: csk
+        for side, csk in (("near", spec.near_countersink), ("far", spec.far_countersink))
+        if csk is not None
+    }
+
+
+def _countersink_diameters(names: list[str], spec: HoleSpec, *, label: str) -> list[str]:
+    """Every countersink DIAMETER dimension of the feature: exactly one per
+    side ``spec`` countersinks (the angles are not diameters).
+
+    On seat (S1 leaf 917-s1-9094, part:cone_swing_platform) this pattern
+    found exactly the two diameters of the both-ends countersunk post tap.
+    Those are the FEATURE's dimension FullNames -- a different namespace
+    from the drawing callout's ``hw-nscsdia`` / ``hw-fscsdia`` variables,
+    which match none of these words."""
+    wanted = _countersink_sides(spec)
     found = [n for n in names if _CSK_NAME.search(n) and "dia" in n.lower()]
-    if len(found) != expected:
+    if not found:
         raise RuntimeError(
-            f"hole wizard {label}: expected exactly {expected} countersink "
-            f"diameter dimension(s), found {len(found)} among {names!r} -- "
-            "refusing to guess which carries the MAX band"
+            f"hole wizard {label}: no countersink diameter dimension among "
+            f"{names!r} (wanted {sorted(wanted)})"
+        )
+    if len(found) != len(wanted):
+        raise RuntimeError(
+            f"hole wizard {label}: {len(found)} countersink diameter(s) for "
+            f"{len(wanted)} countersunk side(s) {sorted(wanted)} among {names!r}"
         )
     return found
 
 
-def _tolerance_countersink_max(feat: Any, expected: int, *, label: str) -> None:
-    """Band each countersink diameter swTolMAX ON THE PART, so the native
-    callout prints its nominal as the limit.  Found by name, never by position."""
+def countersink_diameter_names(
+    names: list[str], spec: HoleSpec, *, label: str
+) -> dict[str, str]:
+    """Each countersunk side's DIAMETER dimension FullName, keyed "near"/"far",
+    by the side word in the name.
+
+    Needed only when the sides' MAX flags differ.  UNVERIFIED on a seat: the
+    S1 leaf did not log the feature's dimension names, so a name that carries
+    no side word is refused (loud, every name listed), never guessed.
+    """
+    wanted = set(_countersink_sides(spec))
+    by_side: dict[str, str] = {}
+    for name in _countersink_diameters(names, spec, label=label):
+        sides = [side for side in ("near", "far") if side in name.lower()]
+        if len(sides) != 1 or sides[0] in by_side:
+            raise RuntimeError(
+                f"hole wizard {label}: countersink diameter {name!r} names no "
+                f"single side among {names!r} -- refusing to guess its side"
+            )
+        by_side[sides[0]] = name
+    missing = sorted(wanted - set(by_side))
+    unexpected = sorted(set(by_side) - wanted)
+    if missing or unexpected:
+        raise RuntimeError(
+            f"hole wizard {label}: countersink diameters missing {missing}, "
+            f"unexpected {unexpected}, among {names!r}"
+        )
+    return {side: by_side[side] for side in ("near", "far") if side in by_side}
+
+
+def countersink_max_names(names: list[str], spec: HoleSpec, *, label: str) -> list[str]:
+    """The countersink diameters to band swTolMAX: each side by its OWN flag.
+
+    When every countersunk side carries the same flag (the post taps: both
+    MAX), the sides need no telling apart -- all of the feature's
+    countersink diameters take that flag, as proven on seat.  Only mixed
+    flags need each diameter's side (countersink_diameter_names)."""
+    sides = _countersink_sides(spec)
+    flags = {csk.max_limit for csk in sides.values()}
+    if len(flags) == 1:
+        found = _countersink_diameters(names, spec, label=label)
+        return found if flags.pop() else []
+    by_side = countersink_diameter_names(names, spec, label=label)
+    return [by_side[side] for side, csk in sides.items() if csk.max_limit]
+
+
+def _tolerance_countersink_max(feat: Any, spec: HoleSpec, *, label: str) -> None:
+    """Band each MAX-flagged countersink diameter swTolMAX ON THE PART, so the
+    native callout prints its nominal as the limit; an unflagged side keeps
+    the wizard default.  Found by name, never by position."""
     dimensions: dict[str, Any] = {}
     display = feat.GetFirstDisplayDimension()
     while display is not None:
@@ -264,14 +328,16 @@ def _tolerance_countersink_max(feat: Any, expected: int, *, label: str) -> None:
         if dimension is not None:
             dimensions[str(dimension.FullName)] = dimension
         display = feat.GetNextDisplayDimension(display)
-    for name in countersink_diameter_names(list(dimensions), expected=expected, label=label):
+    # The whole list at info: the next leaf records the wizard's real names.
+    _telemetry.info(f"hole wizard {label}: feature dimensions {sorted(dimensions)}")
+    for name in countersink_max_names(list(dimensions), spec, label=label):
         tolerance = _early_bound(
             _early_bound(dimensions[name], "IDimension").Tolerance, "IDimensionTolerance"
         )
         tolerance.Type = 6  # swTolType_e.swTolMAX
         if int(tolerance.Type) != 6:
             raise RuntimeError(f"hole wizard {label}: {name} refused swTolMAX")
-        _telemetry.debug(f"hole wizard {label}: {name} banded MAX")
+        _telemetry.info(f"hole wizard {label}: {name} banded MAX")
 
 
 def countersink_readback_problems(defn: Any, spec: HoleSpec) -> list[str]:
@@ -503,9 +569,10 @@ def wizard_holes(
     # for a hole that needs TIGHTER than the general row.
     if dia_tolerance_mm is not None:
         _tolerance_hole_diameter(feat, dia_tolerance_mm, label=label)
-    max_banded = sum(1 for c in countersinks if c.max_limit)
-    if max_banded:
-        _tolerance_countersink_max(feat, max_banded, label=label)
+    if countersinks:
+        # Every countersunk side is found by name (loud otherwise); only the
+        # sides flagged max_limit are banded MAX.
+        _tolerance_countersink_max(feat, spec, label=label)
 
     # Locate the wizard's 1-point placement sketch.
     place_sk = place_name = None

@@ -2146,3 +2146,38 @@ def test_tap_callout_without_countersink_variables_says_so(
     nominal = {**_LEAF_TAP_CALLOUT_VARIABLES, "hw-nscsdia": 0}
     with pytest.raises(RuntimeError, match=r"hw-nscsdia.*do not print MAX"):
         _require_max(monkeypatch, nominal)
+
+
+@pytest.mark.parametrize(("near_max", "far_max"), [(True, False), (False, True)])
+def test_tap_callout_reads_each_side_by_its_own_max_flag(
+    monkeypatch: pytest.MonkeyPatch, near_max: bool, far_max: bool
+) -> None:
+    """Codex on #929 (PRRT_kwDOPHDy386mOPDP): a MAX-flagged side must print
+    MAX, an unflagged side is not forced, and both must be present."""
+    import win32com.client.dynamic
+    from _hole_spec import Countersink
+
+    monkeypatch.setattr(win32com.client.dynamic, "Dispatch", lambda raw: raw)
+    mixed = dataclasses.replace(
+        spec.POST_MOUNT_SPEC,
+        near_countersink=Countersink(6.55, 90.0, max_limit=near_max),
+        far_countersink=Countersink(6.55, 90.0, max_limit=far_max),
+    )
+    printed = {
+        **_LEAF_TAP_CALLOUT_VARIABLES,
+        "hw-nscsdia": 6 if near_max else 0,
+        "hw-fscsdia": 6 if far_max else 0,
+    }
+    drawing._require_countersink_max(_FakeHoleCallout(printed), spec=mixed, label="t")
+    flagged = "hw-nscsdia" if near_max else "hw-fscsdia"
+    with pytest.raises(RuntimeError, match=f"{flagged}.*do not print MAX"):
+        drawing._require_countersink_max(
+            _FakeHoleCallout({**printed, flagged: 0}), spec=mixed, label="t"
+        )
+    unflagged = "hw-fscsdia" if near_max else "hw-nscsdia"
+    with pytest.raises(RuntimeError, match=f"missing .*{unflagged}"):
+        drawing._require_countersink_max(
+            _FakeHoleCallout({k: v for k, v in printed.items() if k != unflagged}),
+            spec=mixed,
+            label="t",
+        )
