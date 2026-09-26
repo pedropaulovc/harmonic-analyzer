@@ -36,7 +36,7 @@ import math
 import sys
 from dataclasses import dataclass, replace
 from collections.abc import Callable, Collection, Sequence
-from typing import Any
+from typing import Any, Literal
 
 import _drawing_leaders
 import _telemetry
@@ -284,6 +284,16 @@ POST_MOUNT_TRANSFER_CALLOUT = "TRANSFER FROM MHA-016\nAT ASSEMBLY;"
 # its right end 2 mm clear of the view.
 PIVOT_CALLOUT_XY = (0.215, 0.107)
 POST_MOUNT_CALLOUT_XY = (0.250, 0.217)
+# The 2X tap callout's leader lands on the tap nearest its text: the WEST one,
+# sheet-right on these plans (sheet +x is model +x, west).  The Hole Wizard
+# feature names its two stations; the leaf picks the rim by that name, never by
+# the order SolidWorks happens to list visible edges in (24cb's leader ran
+# 45 mm across the plate to the east tap, mount_edges[0]).
+POST_MOUNT_TAPS = {
+    "west": _part.POST_MOUNT_WEST_XZ,
+    "east": _part.POST_MOUNT_EAST_XZ,
+}
+POST_MOUNT_CALLOUT_TAP = "west"
 PLATE_DOWEL_CALLOUT_XY = (0.1075, 0.222)
 # The three 1:2 plans centre on the plate's plan box; sheet +x is model +x
 # (west), sheet +y model -z (south).
@@ -825,6 +835,14 @@ def slot_section_line_model_points() -> tuple[tuple[float, float, float], ...]:
 
 
 _COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
+# SolidWorks gives each sheet's first plan of the tapped Hole Wizard feature a
+# descriptive thread callout ("1/4-20 Tapped Hole") when the view is created.
+# One sheet had one (DetailItem351 on the profile plan, layered out of sight);
+# the split gave the features sheet its own (24cb's DetailItem357 on the
+# hole-location plan, printed, duplicating the 2X callout and touching detail
+# D's letter).  The 2X native hole callout states the thread, so each one is
+# deleted, not hidden: one per plan view, counted.
+THREAD_CALLOUT_TEXT = "Tapped Hole"
 
 
 # --- the notch plan's ink, predicted -----------------------------------------
@@ -1427,7 +1445,11 @@ def _assert_mouth_angle_in_wedge(
 
 
 def _hide_profile_cosmetic_threads(adapter: Any, view: Any) -> None:
-    """Hide the redundant model cosmetic-thread callout in the profile view."""
+    """Hide the profile view's redundant cosmetic-thread ink.
+
+    The thread's descriptive callout note is not hidden with it: it is deleted
+    by ``_delete_thread_callouts``, so no invisible note stays on the sheet.
+    """
     draw = adapter.currentModel
     manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
     layer = manager.GetLayer(_COSMETIC_THREAD_LAYER)
@@ -1452,7 +1474,6 @@ def _hide_profile_cosmetic_threads(adapter: Any, view: Any) -> None:
         raise RuntimeError("cosmetic-thread layer did not remain hidden")
 
     hidden = 0
-    hidden_callouts = 0
     for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
         annotation = _early_bound(raw_annotation, "IAnnotation")
         if int(annotation.GetType()) != 1:  # swCosmeticThread
@@ -1460,23 +1481,86 @@ def _hide_profile_cosmetic_threads(adapter: Any, view: Any) -> None:
         annotation.Layer = _COSMETIC_THREAD_LAYER
         if str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
             raise RuntimeError("profile cosmetic thread refused the hidden layer")
-        thread = _early_bound(annotation.GetSpecificAnnotation(), "ICThread")
-        raw_callout = _read_member(thread, "ThreadCallout")
-        if raw_callout is not None:
-            callout = _early_bound(raw_callout, "INote")
-            callout_annotation = _early_bound(
-                _read_member(callout, "GetAnnotation"), "IAnnotation"
-            )
-            callout_annotation.Layer = _COSMETIC_THREAD_LAYER
-            if str(callout_annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
-                raise RuntimeError("profile thread callout refused the hidden layer")
-            hidden_callouts += 1
         hidden += 1
     if not hidden:
         raise RuntimeError("profile view has no cosmetic thread to hide")
-    if not hidden_callouts:
-        raise RuntimeError("profile cosmetic threads have no callout note to hide")
     rebuild_drawing(adapter, label="hide profile cosmetic threads")
+
+
+def _thread_callout_notes(
+    view: Any, *, reach: Literal["thread_or_text", "on_view"] = "thread_or_text"
+) -> list[tuple[str, Any]]:
+    """Each descriptive thread-callout note on one view: its text and annotation.
+
+    Two routes to the same note, so neither can miss one: the callout each
+    cosmetic thread names (``ICThread.ThreadCallout``), and any note on the
+    view whose text carries ``THREAD_CALLOUT_TEXT``.  ``reach="on_view"``
+    reads the second alone: what is still ON the view -- the notes the layout
+    audit and finalize's sweep read -- so a thread property that has not let
+    go of its deleted callout yet cannot fail the read-back.
+    """
+    found: list[tuple[str, Any]] = []
+    for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        kind = int(annotation.GetType())
+        if kind == 1 and reach == "thread_or_text":  # swCThread: its callout
+            thread = _early_bound(annotation.GetSpecificAnnotation(), "ICThread")
+            raw_callout = _read_member(thread, "ThreadCallout")
+            if raw_callout is None:
+                continue
+            note = _early_bound(raw_callout, "INote")
+            owner = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+        elif kind == 6:  # swNote
+            note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
+            owner = annotation
+        else:
+            continue
+        text = str(_read_member(note, "GetText") or "")
+        if kind == 6 and THREAD_CALLOUT_TEXT.lower() not in text.lower():
+            continue
+        # The same note, reached both ways, counts once: by its drawing-unique
+        # name (DetailItem357), or by identity where no name reads back.
+        name = _read_member(owner, "GetName")
+        if any(
+            (name is not None and _read_member(seen, "GetName") == name) or seen == owner
+            for _text, seen in found
+        ):
+            continue
+        found.append((text, owner))
+    return found
+
+
+@_telemetry.traced("drawing.thread_callouts", label_param="label")
+def _delete_thread_callouts(adapter: Any, view: Any, *, label: str) -> None:
+    """Delete the view's one descriptive thread callout, and prove it gone.
+
+    Exactly one before (one tapped Hole Wizard feature, one label per plan
+    that shows it) and none after: a count off either way fails loud with the
+    texts read.  Deleted, not layered out of sight -- a hidden note is still
+    ink the audit and the next reader have to explain.
+    """
+    draw = adapter.currentModel
+    found = _thread_callout_notes(view)
+    if len(found) != 1:
+        raise RuntimeError(
+            f"{label}: expected 1 {THREAD_CALLOUT_TEXT!r} thread callout, read "
+            f"{len(found)}: {[text for text, _annotation in found]!r}"
+        )
+    text, annotation = found[0]
+    draw.ClearSelection2(True)
+    if annotation.Select2(False, 0) is not True:
+        raise RuntimeError(f"{label}: thread callout {text!r} refused selection")
+    draw.EditDelete()
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label=f"{label} thread callout deleted")
+    left = _thread_callout_notes(view, reach="on_view")
+    if left:
+        raise RuntimeError(
+            f"{label}: {len(left)} thread callout(s) survived deletion: "
+            f"{[kept for kept, _annotation in left]!r}"
+        )
+    _telemetry.info(f"{label}: deleted thread callout {text!r}")
+    _telemetry.event("drawing.thread_callout_deleted", view=label, text=text)
 
 
 def _position_section_label(adapter: Any, section: Any) -> None:
@@ -2100,19 +2184,44 @@ def _require_countersink_max(display: Any, *, spec: HoleSpec, label: str) -> Non
     _telemetry.info(f"{label}: callout countersink diameter(s) {present} print MAX")
 
 
+def post_mount_callout_xz() -> tuple[float, float]:
+    """Plate-local (x, z) mm of the tap the 2X callout's leader lands on."""
+    return POST_MOUNT_TAPS[POST_MOUNT_CALLOUT_TAP]
+
+
+def _named_tap_edge(mount_edges: Sequence[tuple[tuple[float, float], Any]]) -> Any:
+    """The visible post-mount rim at the callout's named tap, or fail loud.
+
+    Each entry is a rim's circle centre (plate-local x, z mm) and its edge.
+    Every rim at one station projects to the same plan circle, so any of them
+    carries the leader to the same place.
+    """
+    target = post_mount_callout_xz()
+    named = [edge for xz, edge in mount_edges if math.dist(xz, target) <= 0.01]
+    if not named:
+        seen = [tuple(round(value, 3) for value in xz) for xz, _edge in mount_edges]
+        raise RuntimeError(
+            f"cone-platform plan shows {len(named)} rim(s) at the "
+            f"{POST_MOUNT_CALLOUT_TAP} post-mount tap {target}; post-mount rims "
+            f"seen at {seen}"
+        )
+    return named[0]
+
+
 def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
     """Return the pivot, post-mount and north post-dowel rims from the plan.
 
     The north-end and long-straight-side edges were dropped with the GD&T that
     referenced them (see ``build``) -- nothing else on this sheet attaches to
     them.  The dowel rim is the one nearest the pivot (the north dowel), so
-    the callout's leader is the shorter of the two.
+    the callout's leader is the shorter of the two.  The post-mount rim is the
+    named tap nearest the callout's text (``POST_MOUNT_CALLOUT_TAP``).
     """
     expected_radius_m = PIVOT_HOLE_DIA / 2000.0
     expected_mount_radius_m = blind_cut_dia_mm(POST_MOUNT_SPEC) / 2000.0
     expected_dowel_radius_m = PLATE_DOWEL_REAM_DIA / 2000.0
     pivot_edges: list[Any] = []
-    mount_edges: list[Any] = []
+    mount_edges: list[tuple[tuple[float, float], Any]] = []
     dowel_edges: list[tuple[float, Any]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
@@ -2131,7 +2240,7 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
             if abs(values[6] - expected_radius_m) <= 1e-6:
                 pivot_edges.append(edge)
             if abs(values[6] - expected_mount_radius_m) <= 1e-6:
-                mount_edges.append(edge)
+                mount_edges.append(((values[0] * 1000.0, values[2] * 1000.0), edge))
             if abs(values[6] - expected_dowel_radius_m) <= 1e-6:
                 dowel_edges.append((math.hypot(values[0], values[2]), edge))
     if not pivot_edges or len(mount_edges) < 2 or len(dowel_edges) < 2:
@@ -2139,7 +2248,11 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
             "cone-platform plan view is missing pivot/mount/dowel controls: "
             f"{len(pivot_edges)} pivot, {len(mount_edges)} mount, {len(dowel_edges)} dowel"
         )
-    return pivot_edges[0], mount_edges[0], min(dowel_edges, key=lambda item: item[0])[1]
+    return (
+        pivot_edges[0],
+        _named_tap_edge(mount_edges),
+        min(dowel_edges, key=lambda item: item[0])[1],
+    )
 
 
 def _horizontal_section_edge(
@@ -2534,6 +2647,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _hide_profile_cosmetic_threads(adapter, profile)
+    _delete_thread_callouts(adapter, profile, label="profile plan")
     _on_sheet_of(adapter, "feature plan")
     feature_annotations = curate_view_dimensions(
         adapter,
@@ -2542,6 +2656,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="feature plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    _delete_thread_callouts(adapter, feature, label="feature plan")
     _on_sheet_of(adapter, "notch plan")
     notch_annotations = curate_view_dimensions(
         adapter,
@@ -2897,6 +3012,11 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts=SHEET_LAYOUTS,
         sheet_scales=SHEET_SCALES,
+        # A tripwire, not the cleanup: each plan's thread callout was deleted
+        # and read back at its source (_delete_thread_callouts).  One that
+        # reappears by the save fails here, on every sheet.
+        redundant_note_substrings=(THREAD_CALLOUT_TEXT,),
+        expected_redundant_notes=0,
     )
 
 

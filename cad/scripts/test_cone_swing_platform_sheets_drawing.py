@@ -184,7 +184,7 @@ def _rims() -> dict[str, tuple[float, float, float]]:
     return {
         "RD1": (*drawing.plan_xy(center, 0.0, 0.0), PIVOT_HOLE_DIA / 2 * drawing.PLAN_SCALE),
         "RD2": (
-            *drawing.plan_xy(center, *part.POST_MOUNT_EAST_XZ),
+            *drawing.plan_xy(center, *drawing.post_mount_callout_xz()),
             blind_cut_dia_mm(POST_MOUNT_SPEC) / 2 * drawing.PLAN_SCALE,
         ),
         "RD3": (
@@ -312,11 +312,21 @@ def test_each_callout_seed_is_already_clear_on_the_features_sheet() -> None:
         assert drawing.plan_shift(label, callout.text, conflict, obstacles) == (0.0, 0.0)
 
 
+def _tap_rim(name: str) -> tuple[float, float, float]:
+    return (
+        *drawing.plan_xy(drawing.FEATURE_CENTER, *drawing.POST_MOUNT_TAPS[name]),
+        blind_cut_dia_mm(POST_MOUNT_SPEC) / 2 * drawing.PLAN_SCALE,
+    )
+
+
 def test_the_callout_rims_are_where_ac4f_drew_the_leaders() -> None:
     """The rims the offline tests use are the ones the seat's leaders cross:
     the arrow runs across the hole, so two of each leader's ends lie on its
-    rim, 0.15 mm either way (the dump prints 0.1 mm)."""
-    for label, (cx, cy, radius) in _rims().items():
+    rim, 0.15 mm either way (the dump prints 0.1 mm).  RD2 is the exception
+    that F2 fixes: ac4f (and 24cb) drew it to the EAST tap, mount_edges[0];
+    the recipe now names the west one."""
+    rims = {**_rims(), "RD2": _tap_rim("east")}
+    for label, (cx, cy, radius) in rims.items():
         item = next(a for a in AC4F.annotations if a.label == label)
         ends = {
             end
@@ -382,6 +392,308 @@ def test_a_callout_with_no_clear_spot_fails_naming_every_box() -> None:
     for view in sheet.views:
         assert view.name in message
     assert "keep-out title-block" in message
+
+
+# --- the 2X tap callout's hole (24cb eye pass, F2) -------------------------------
+
+
+def test_the_named_callout_tap_is_the_one_nearest_the_callout() -> None:
+    """The tap the leader lands on is named, and it is the nearer of the two
+    to both the callout's anchor and its seeded text: no leader crosses the
+    plate to the far tap."""
+    assert drawing.POST_MOUNT_CALLOUT_TAP == "west"
+    assert set(drawing.POST_MOUNT_TAPS) == {"west", "east"}
+    assert drawing.post_mount_callout_xz() == part.POST_MOUNT_WEST_XZ
+    text = drawing._text_union(
+        next(a for a in _seeded_features_sheet().annotations if a.label == "RD2")
+    )
+    text_centre = ((text.xmin + text.xmax) / 2, (text.ymin + text.ymax) / 2)
+    for target in (drawing.POST_MOUNT_CALLOUT_XY, text_centre):
+        nearest = min(
+            drawing.POST_MOUNT_TAPS,
+            key=lambda name: math.dist(
+                drawing.plan_xy(drawing.FEATURE_CENTER, *drawing.POST_MOUNT_TAPS[name]),
+                target,
+            ),
+        )
+        assert nearest == drawing.POST_MOUNT_CALLOUT_TAP, target
+
+
+def test_the_tap_callout_leader_stays_on_its_own_side_of_the_plate() -> None:
+    """24cb's leader ran ~45 mm diagonally across the plate.  From the named
+    tap the rim-to-shelf run is the shorter: under the east tap's, and under
+    40 mm (the shelf under the text is the same either way)."""
+    item = next(a for a in _seeded_features_sheet().annotations if a.label == "RD2")
+    lengths = {}
+    for name in drawing.POST_MOUNT_TAPS:
+        run, _shelf = drawing.hole_callout(item, rim=_tap_rim(name)).leader(0.0, 0.0, (0.0, 0.0))
+        lengths[name] = math.dist((run.x0, run.y0), (run.x1, run.y1))
+    assert lengths["west"] < lengths["east"], lengths
+    assert lengths["west"] < 0.040, lengths
+
+
+class _Curve:
+    def __init__(self, centre_mm: tuple[float, float], radius_m: float) -> None:
+        self.params = (centre_mm[0] / 1000, 0.00635, centre_mm[1] / 1000, 0.0, 1.0, 0.0, radius_m)
+
+    def IsCircle(self) -> bool:  # noqa: N802 - COM name
+        return True
+
+    @property
+    def CircleParams(self) -> tuple[float, ...]:  # noqa: N802 - COM name
+        return self.params
+
+
+class _Edge:
+    def __init__(self, name: str, centre_mm: tuple[float, float], radius_m: float) -> None:
+        self.name = name
+        self.curve = _Curve(centre_mm, radius_m)
+
+    def GetCurve(self) -> _Curve:  # noqa: N802 - COM name
+        return self.curve
+
+
+class _PlanView:
+    def __init__(self, edges: list[_Edge]) -> None:
+        self.edges = edges
+
+    def GetVisibleComponents(self) -> tuple[str, ...]:  # noqa: N802 - COM name
+        return ("plate",)
+
+    def GetVisibleEntities2(self, _component: str, _kind: int) -> list[_Edge]:  # noqa: N802 - COM name
+        return self.edges
+
+
+class _Attempting:
+    @staticmethod
+    def _attempt(call, default=None):
+        return call()
+
+
+def _plan_edges(*mount_names: str) -> list[_Edge]:
+    """The plan's visible rims, the post-mount taps in the given order (their
+    stations straight from the part, not from the recipe under test)."""
+    taps = {"west": part.POST_MOUNT_WEST_XZ, "east": part.POST_MOUNT_EAST_XZ}
+    mount_radius = blind_cut_dia_mm(POST_MOUNT_SPEC) / 2000
+    north_dowel = min(POST_DOWEL_PLATE_XZ, key=lambda xz: math.hypot(*xz))
+    south_dowel = max(POST_DOWEL_PLATE_XZ, key=lambda xz: math.hypot(*xz))
+    return [
+        _Edge("pivot", (0.0, 0.0), PIVOT_HOLE_DIA / 2000),
+        *(_Edge(name, taps[name], mount_radius) for name in mount_names),
+        _Edge("north dowel", north_dowel, PLATE_DOWEL_REAM_DIA / 2000),
+        _Edge("south dowel", south_dowel, PLATE_DOWEL_REAM_DIA / 2000),
+    ]
+
+
+@pytest.mark.parametrize("order", [("east", "west"), ("west", "east")])
+def test_the_tap_rim_is_picked_by_name_not_by_edge_order(order: tuple[str, str]) -> None:
+    """SolidWorks listed the east rim first on 24cb; whatever the order, the
+    callout gets the named (west) tap."""
+    pivot, mount, dowel = drawing._visible_plan_controls(_Attempting(), _PlanView(_plan_edges(*order)))
+    assert (pivot.name, mount.name, dowel.name) == ("pivot", "west", "north dowel")
+
+
+def test_a_plan_without_the_named_tap_fails_naming_the_rims_it_saw() -> None:
+    edges = _plan_edges("east", "east")
+    with pytest.raises(RuntimeError, match=r"0 rim\(s\) at the west post-mount tap") as failure:
+        drawing._visible_plan_controls(_Attempting(), _PlanView(edges))
+    assert str(round(part.POST_MOUNT_EAST_XZ[0], 3)) in str(failure.value)
+
+
+# --- the descriptive thread callouts (24cb eye pass, F1) --------------------------
+
+
+class _CalloutNote:
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.annotation: _ThreadAnnotation | None = None
+
+    def GetText(self) -> str:  # noqa: N802 - COM name
+        return self.text
+
+    def GetAnnotation(self) -> "_ThreadAnnotation | None":  # noqa: N802 - COM name
+        return self.annotation
+
+
+class _Thread:
+    def __init__(self, callout: _CalloutNote | None) -> None:
+        self.callout = callout
+
+    @property
+    def ThreadCallout(self) -> _CalloutNote | None:  # noqa: N802 - COM name
+        return self.callout
+
+
+class _ThreadAnnotation:
+    """An IAnnotation: a cosmetic thread (1), a note (6) or a dimension (4)."""
+
+    def __init__(
+        self, drawing_model: "_ThreadDrawing", kind: int, specific, name: str = ""
+    ) -> None:
+        self.model, self.kind, self.specific, self.name = drawing_model, kind, specific, name
+        self.Layer = ""
+
+    def GetName(self) -> str:  # noqa: N802 - COM name
+        return self.name
+
+    def GetType(self) -> int:  # noqa: N802 - COM name
+        return self.kind
+
+    def GetSpecificAnnotation(self):  # noqa: N802 - COM name
+        return self.specific
+
+    def Select2(self, append: bool, mark: int) -> bool:  # noqa: N802 - COM name
+        self.model.selected.append(self)
+        return True
+
+
+class _ThreadView:
+    def __init__(self) -> None:
+        self.annotations: list[_ThreadAnnotation] = []
+
+    def GetAnnotations(self) -> list[_ThreadAnnotation]:  # noqa: N802 - COM name
+        return list(self.annotations)
+
+
+class _ThreadDrawing:
+    """EditDelete removes the selection from the view; ``refuse`` keeps it
+    (a delete SolidWorks silently ignores); ``stale`` leaves the thread still
+    naming its deleted callout."""
+
+    def __init__(self, view: _ThreadView, *, refuse: bool = False, stale: bool = False) -> None:
+        self.view, self.refuse, self.stale = view, refuse, stale
+        self.selected: list[_ThreadAnnotation] = []
+        self.deleted: list[_ThreadAnnotation] = []
+        self.rebuilds = 0
+
+    def ClearSelection2(self, _all: bool) -> bool:  # noqa: N802 - COM name
+        self.selected.clear()
+        return True
+
+    def EditDelete(self) -> None:  # noqa: N802 - COM name
+        if self.refuse:
+            return
+        for annotation in self.selected:
+            self.view.annotations = [
+                kept for kept in self.view.annotations if kept.name != annotation.name
+            ]
+            self.deleted.append(annotation)
+            if annotation.kind == 6 and not self.stale:
+                for other in self.view.annotations:
+                    if other.kind == 1 and other.specific.callout is annotation.specific:
+                        other.specific.callout = None
+
+    def EditRebuild3(self) -> bool:  # noqa: N802 - COM name
+        self.rebuilds += 1
+        return True
+
+
+class _ThreadAdapter:
+    def __init__(self, model: _ThreadDrawing) -> None:
+        self.currentModel = model
+
+
+def _plan_with_thread(
+    *, callouts: int = 1, refuse: bool = False, twin_wrappers: bool = False, stale: bool = False
+) -> tuple[_ThreadAdapter, _ThreadView]:
+    """A plan whose cosmetic thread carries its descriptive callout, as 24cb's
+    DetailItem357 (and the profile's DetailItem351) read.  ``twin_wrappers``
+    hands the thread's route a second wrapper of the same note, as COM may."""
+    view = _ThreadView()
+    model = _ThreadDrawing(view, refuse=refuse, stale=stale)
+    for index in range(callouts):
+        name = f"DetailItem{357 + index}"
+        note = _CalloutNote("1/4-20 Tapped Hole")
+        note_annotation = _ThreadAnnotation(model, 6, note, name)
+        note.annotation = (
+            _ThreadAnnotation(model, 6, note, name) if twin_wrappers else note_annotation
+        )
+        view.annotations += [
+            _ThreadAnnotation(model, 1, _Thread(note), f"CThread{index}"),
+            note_annotation,
+        ]
+    view.annotations.append(
+        _ThreadAnnotation(model, 6, _CalloutNote("DRILL THRU"), "DetailItem400")
+    )
+    return _ThreadAdapter(model), view
+
+
+def test_the_plan_thread_callout_is_deleted_and_read_back_gone() -> None:
+    adapter, view = _plan_with_thread()
+    drawing._delete_thread_callouts(adapter, view, label="feature plan")
+    assert [a.specific.text for a in adapter.currentModel.deleted] == ["1/4-20 Tapped Hole"]
+    assert drawing._thread_callout_notes(view) == []
+    # The thread's ink and every other note stay.
+    assert [a.kind for a in view.annotations] == [1, 6]
+    assert view.annotations[1].specific.text == "DRILL THRU"
+
+
+def test_one_note_reached_by_its_thread_and_by_its_text_counts_once() -> None:
+    adapter, view = _plan_with_thread(twin_wrappers=True)
+    assert [text for text, _annotation in drawing._thread_callout_notes(view)] == [
+        "1/4-20 Tapped Hole"
+    ]
+    drawing._delete_thread_callouts(adapter, view, label="feature plan")
+    assert drawing._thread_callout_notes(view) == []
+
+
+def test_a_thread_still_naming_its_deleted_callout_does_not_fail_the_read_back() -> None:
+    """Gone means gone from the view (what the audit and finalize read), not
+    a thread property that has yet to let go."""
+    adapter, view = _plan_with_thread(stale=True)
+    drawing._delete_thread_callouts(adapter, view, label="feature plan")
+    assert drawing._thread_callout_notes(view, reach="on_view") == []
+
+
+def test_a_thread_callout_that_survives_its_delete_fails_loud() -> None:
+    adapter, view = _plan_with_thread(refuse=True)
+    with pytest.raises(RuntimeError, match=r"feature plan: 1 thread callout\(s\) survived deletion"):
+        drawing._delete_thread_callouts(adapter, view, label="feature plan")
+
+
+@pytest.mark.parametrize("callouts", [0, 2])
+def test_a_plan_without_exactly_one_thread_callout_fails_with_the_count(callouts: int) -> None:
+    adapter, view = _plan_with_thread(callouts=callouts)
+    with pytest.raises(RuntimeError, match=f"expected 1 'Tapped Hole' thread callout, read {callouts}"):
+        drawing._delete_thread_callouts(adapter, view, label="profile plan")
+    assert adapter.currentModel.deleted == []
+
+
+def test_the_profile_hides_only_the_thread_ink_and_leaves_no_hidden_note(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """DetailItem351 was layered out of sight; it is deleted now, so the
+    hidden layer carries the thread ink alone."""
+
+    class _Layer:
+        Visible = True
+        Printable = False
+
+    class _Layers:
+        def GetLayer(self, _name: str) -> _Layer:  # noqa: N802 - COM name
+            return _Layer()
+
+    adapter, view = _plan_with_thread()
+    adapter.currentModel.GetLayerManager = lambda: _Layers()  # noqa: N802 - COM name
+    drawing._hide_profile_cosmetic_threads(adapter, view)
+    layered = {a.kind: a.Layer for a in view.annotations if a.Layer}
+    assert layered == {1: drawing._COSMETIC_THREAD_LAYER}
+    drawing._delete_thread_callouts(adapter, view, label="profile plan")
+    assert not [a for a in view.annotations if a.Layer and a.kind != 1]
+
+
+def test_both_plans_lose_their_thread_callout_and_finalize_trips_on_a_survivor() -> None:
+    source = inspect.getsource(drawing.build)
+    assert '_delete_thread_callouts(adapter, profile, label="profile plan")' in source
+    assert '_delete_thread_callouts(adapter, feature, label="feature plan")' in source
+    # Before the callouts are seeded and the sheets are read for placement.
+    assert source.index("_delete_thread_callouts(adapter, feature") < source.index(
+        "add_native_hole_callout("
+    )
+    assert "redundant_note_substrings=(THREAD_CALLOUT_TEXT,)" in source
+    assert "expected_redundant_notes=0" in source
+    hide = inspect.getsource(drawing._hide_profile_cosmetic_threads)
+    assert "ThreadCallout" not in hide
 
 
 # --- the sheet numbers ----------------------------------------------------------
