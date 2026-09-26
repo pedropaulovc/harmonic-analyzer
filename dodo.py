@@ -2908,6 +2908,9 @@ def task_check():
         SCRIPTS_DIR / "test_drive_train_tip_adjuster_seat.py",
         SCRIPTS_DIR / "test_fit_bands.py",
         SCRIPTS_DIR / "test_printed_text_rulings.py",
+        # ... and the #857 re-merge: its leader-geometry and replica-driver pins.
+        SCRIPTS_DIR / "test_drawing_leaders.py",
+        SCRIPTS_DIR / "test_mcmaster_replica_driver.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.

@@ -46,6 +46,11 @@ _SETTER = "set_dimension_bilateral_tolerance"
 LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     # for section, band in enumerate(SECTION_DIA_BANDS): ... deviations(band)
     ("build_cone_gear_shaft", "band"): ("SECTION_DIA_BANDS", "each"),
+    # def _printed_limits(nominal, places): ... GENERAL_BAND_BY_PLACES[places]
+    ("cone_tip_block_spec", "GENERAL_BAND_BY_PLACES[places]"): (
+        "GENERAL_BAND_BY_PLACES",
+        "values",
+    ),
 }
 
 # Consumer modules that cannot be imported without SolidWorks, with the reason.
@@ -165,6 +170,8 @@ def _resolve(use: BandUse) -> list[tuple[str, Any]]:
     if key in LOCAL_BAND_SOURCES:
         source, how = LOCAL_BAND_SOURCES[key]
         value = getattr(module, source)
+        if how == "values":
+            return [(f"{source}[{places!r}]", band) for places, band in value.items()]
         assert how == "each", f"unknown local-source mode {how!r}"
         return [(f"{source}[{i}]", band) for i, band in enumerate(value)]
     try:
