@@ -36,8 +36,8 @@ Z = wall thickness):
 * **CavityCut** -- 127 mm cavity square (``±63.5``), Through-All-Both -> the
   central cavity, leaving 6.35 mm shell walls (whole ``CavityProfile``).
 * **WindowCut1 / WindowCut2** -- ONE shared window, 165.1 mm wide
-  (``WindowProfile``, ``X ±82.55``, ``Y -82.55..+67.9``: the source's square
-  with its top edge lowered so the top rail is 21.0 deep, #743). Each cut is a
+  (``WindowProfile``, ``X ±82.55``, ``Y -82.55..+66.2``: the source's square
+  with its top edge lowered so the top rail is 22.7 deep, #743). Each cut is a
   Through-All that STARTS ``WEB``
   (3.175) off the sketch plane in the opposite direction (forward / reverse, the
   second re-selecting ``WindowProfile`` -> a shared-sketch reference), so the
@@ -146,7 +146,7 @@ CAV = 63.5  # 127 mm square half (Cut-Extrude2)
 BIG = round(HALF_Y - FOOT_THICKNESS, 6)  # 82.55: the window's side and bottom half
 WEB = 3.175  # window-cut start-offset; the 2*WEB band left as the web
 # The cavity's top rim (chamfered on both web faces) must stay a web edge
-# under the rail, not run into the pocket's top face: the 4.4 band keeps it.
+# under the rail, not run into the pocket's top face: the 2.7 band keeps it.
 if WINDOW_TOP_Y - CAV < 2.0:
     raise AssertionError("the deeper rail's underside reaches the cavity's top rim")
 

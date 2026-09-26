@@ -29,7 +29,10 @@ BORE_DIA = 6.5  # O6.35 shaft, 0.15 diametral clearance
 EAR_ARCH_R = EAR_W / 2.0  # the ear's top is a half-round about the bore
 EAR_TOP_Y = BORE_H + EAR_ARCH_R
 BORE_LIGAMENT = EAR_ARCH_R - BORE_DIA / 2.0  # 3.75: rule 12 web over the bore
-HOLD_DOWN_HOLE_SPEC = HoleSpec("drilled_number", "#19")
+# The MHA-143 hold-downs pass here: #8 close clearance, the hole MHA-004
+# gives the same screw. The old #19 (0.025 radial over the thread major)
+# caught the screw's under-head junction fillet on its mouth (r743-3C).
+HOLD_DOWN_HOLE_SPEC = HoleSpec("clearance", "#8", fit="close")
 HOLE_DIA = blind_cut_dia_mm(HOLD_DOWN_HOLE_SPEC)
 HOLE_Z = (9.0, 17.0)  # hold-down holes on x = 0, inside the foot's free run
 

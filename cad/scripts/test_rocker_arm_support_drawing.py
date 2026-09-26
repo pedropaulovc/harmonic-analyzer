@@ -438,15 +438,15 @@ def test_section_constants_live_in_the_pure_data_spec() -> None:
 
 
 def test_deeper_rail_lowers_only_the_window_top() -> None:
-    assert seats.RAIL_DEPTH == 21.0
-    assert seats.WINDOW_TOP_Y == pytest.approx(67.9)
+    assert seats.RAIL_DEPTH == 22.7
+    assert seats.WINDOW_TOP_Y == pytest.approx(66.2)
     assert seats.WINDOW_BOTTOM_Y == pytest.approx(-support.BIG)
-    assert seats.WINDOW_HEIGHT == pytest.approx(150.45)
-    # 165.1 wide by 150.45 tall: the print no longer calls it square.
+    assert seats.WINDOW_HEIGHT == pytest.approx(148.75)
+    # 165.1 wide by 148.75 tall: the print no longer calls it square.
     assert 2.0 * support.BIG - seats.WINDOW_HEIGHT > 10.0
     assert "SQ" not in drawing.DIMENSION_CALLOUTS["WinWidth"]
     # The cavity's chamfered top rim stays a web edge under the rail.
-    assert seats.WINDOW_TOP_Y - support.CAV == pytest.approx(4.4)
+    assert seats.WINDOW_TOP_Y - support.CAV == pytest.approx(2.7)
 
 
 def test_rail_volume_deltas_are_the_closed_forms() -> None:
