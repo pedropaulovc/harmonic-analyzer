@@ -635,7 +635,7 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
 @pytest.mark.parametrize(
     ("helper", "consumers"),
     [
-        ("_assembly_patterns", {"drive_train", "frame", "magnifier", "paper_drive"}),
+        ("_assembly_patterns", {"drive_train", "frame", "magnifier", "paper_drive", "summing"}),
         ("_assembly_couplings", {"drive_train", "paper_drive"}),
         ("_assembly", None),
     ],

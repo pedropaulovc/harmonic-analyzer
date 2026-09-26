@@ -33,11 +33,12 @@ class TrimSheet:
     detail_offset_mm: float
     detail_label_xy: tuple[float, float]
     parent_letter_offset: tuple[float, float]
+    detail_center_x_mm: float = 0.0
 
     @property
     def detail_reference_mm(self) -> tuple[float, float, float]:
         """Model point the detail fence and the parent letter both key on."""
-        return (0.0, self.cut_end_y_mm + self.detail_offset_mm, 0.0)
+        return (self.detail_center_x_mm, self.cut_end_y_mm + self.detail_offset_mm, 0.0)
 
 
 def end_detail(adapter: Any, front: Any, sheet: TrimSheet) -> Any:

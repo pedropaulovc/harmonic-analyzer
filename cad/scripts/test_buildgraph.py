@@ -1369,7 +1369,7 @@ def test_assemblies_depend_on_assembly_helpers():
 @pytest.mark.parametrize(
     ("helper", "consumers"),
     [
-        ("_assembly_patterns", {"drive_train", "frame", "magnifier", "paper_drive"}),
+        ("_assembly_patterns", {"drive_train", "frame", "magnifier", "paper_drive", "summing"}),
         ("_assembly_couplings", {"drive_train", "paper_drive"}),
     ],
 )

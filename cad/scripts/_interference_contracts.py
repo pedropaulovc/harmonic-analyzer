@@ -8,6 +8,7 @@ and maximum-volume contract.
 
 from __future__ import annotations
 
+import importlib
 import math
 from collections.abc import Iterable, Mapping
 
@@ -32,7 +33,7 @@ from crankshaft_spec import SHAFT_DIA as _CS_DIA
 from pinion_bracket_geometry import PIN_BORE, PIN_SEAT
 from pinion_cam_pin_geometry import PIN_DIA
 import summing_lever_spec
-from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
+from stock_anchor_geom import ANCHOR_9489T111
 from frame_attachment_spec import COLUMN_SOCKET_DIAMETER
 from frame_cross_screw_spec import SHANK_DIA as _FRAME_CROSS_DIA
 from frame_cross_screw_spec import SHANK_LEN as _FRAME_CROSS_LENGTH
@@ -194,27 +195,11 @@ _MAGNIFIER_ALLOWED_PAIRS = {
     ),
 }
 
-_COUNTER_ANCHOR_THREAD_LIMIT = _smooth_annulus_limit_mm3(
-    ANCHOR_9490T1.thread_major_dia_mm,
-    blind_cut_dia_mm(summing_lever_spec.COUNTER_HOLE_SPEC),
-    summing_lever_spec.ANCHOR_H,
-)
 _CHANNEL_ANCHOR_THREAD_LIMIT = _smooth_annulus_limit_mm3(
     ANCHOR_9489T111.thread_major_dia_mm,
     blind_cut_dia_mm(summing_lever_spec.HOLE_SPEC),
     summing_lever_spec.PLATE_T,
 )
-_SUMMING_ALLOWED_PAIRS = {
-    **_numbered_pairs(
-        "knife-hanger-stud",
-        range(1, 3),
-        "knife-mount",
-        _smooth_annulus_limit_mm3(12.7, 10.716, 11.3735),
-        second_number=None,
-    ),
-    frozenset(("boss-hook-1", "summing-lever-1")): _COUNTER_ANCHOR_THREAD_LIMIT,
-}
-
 _PEN_ALLOWED_PAIRS = {
     frozenset(("pen-set-screw-1", "pen-frame-1")): _smooth_annulus_limit_mm3(
         2.8448, 2.261, 5.0
@@ -342,13 +327,23 @@ _BY_ASSEMBLY: dict[str, Mapping[frozenset[str], float]] = {
     "drive-train": _DRIVE_TRAIN_ALLOWED_PAIRS,
     "frame": _FRAME_ALLOWED_PAIRS,
     "magnifier": _MAGNIFIER_ALLOWED_PAIRS,
-    "summing": _SUMMING_ALLOWED_PAIRS,
     "pen": _PEN_ALLOWED_PAIRS,
     "paper-drive": _PAPER_DRIVE_ALLOWED_PAIRS,
     "harmonic-analyzer": _HARMONIC_ANALYZER_ALLOWED_PAIRS,
 }
 
 
+# Assemblies that own their contract module, loaded BY NAME: a static import
+# here would put the owner's inputs in every assembly's recipe closure (every
+# assembly script imports this module), so one knife-hanger joint tweak would
+# re-key the fleet. The owner's build script imports its module directly, so
+# its own recipe still tracks it (see summing_interference_contract).
+_OWNED_CONTRACTS = {"summing": "summing_interference_contract"}
+
+
 def allowed_interference_pairs(name: str) -> Mapping[frozenset[str], float]:
     """Return exact intended-fit pairs and maximum overlap volumes for *name*."""
+    owner = _OWNED_CONTRACTS.get(name)
+    if owner is not None:
+        return importlib.import_module(owner).ALLOWED_PAIRS
     return _BY_ASSEMBLY.get(name, {})

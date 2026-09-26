@@ -6,8 +6,7 @@ importing ``build_gooseneck`` for them would fold the whole part build --
 including ``gooseneck_spec``'s DRAWING_NOTES prose -- into the summing assembly
 recipe (codex #361): a text-only note edit would escalate to a full COM
 re-insert of the assembly. Assemblies import this module; ``build_gooseneck``
-re-imports the
-same constants so the two can never drift.
+re-imports the same constants so the two can never drift.
 
 Part origin is the vertical leg's mid-height. The arm runs toward negative
 part X; the summing assembly places it Ry(180), so machine X = COLUMN_X -
@@ -16,25 +15,57 @@ part X. Sliding the post sets spring tension, not the part's dimensions.
 
 from __future__ import annotations
 
+from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
+
 TUBE_DIA = 16.0  # DIMENSIONS.md ch19: scaled vs frame anchors (med)
 WALL_T = 2.0  # tube wall: O16 x 2.0 WALL tube stock (codex review #361)
 ARM_Y = 163.3  # arm/screw axis above the part origin
 BEND_R = 51.0  # 90-degree bend centreline radius (med)
 ARM_END_X = -101.8  # flat arm-end face; exposed screw runs toward negative X
-# The arm END is what makes the counter spring hang plumb in the saved neutral
-# pose: the spring's top eye rides the exposed shank's midpoint, so
-# spring_mount_geom puts that eye at COLUMN_X - ARM_END_X + SCREW_SHANK_LEN/2 =
-# -197 + 101.8 + 4 = -91.2 -- exactly the summing-lever counter anchor's machine
-# X (COUNTER_ANCHOR_XY).  Was -95.25, which hung the eye at -97.75 and leaned
-# the 351 mm spring 6.55 mm off plumb.  Sliding the post sets tension, never
-# this face.
+# The saved/default assembly pose clamps the MHA-019 end band between the screw
+# head and arm end.  The open 8 mm gap is installation access, not the spring's
+# calibrated running position.  Assembly placement consumes the canonical
+# derived eye centre below so its spring axis follows this clamped default.
 ARM_RUN = -ARM_END_X - BEND_R  # 50.8 (2"): straight run after the bend exit
-SCREW_SHANK_DIA = 3.6  # axial #6-32 spring screw envelope
-SCREW_SHANK_LEN = 8.0  # exposed shank: end face to head underside
+SCREW_SHANK_DIA = 3.6  # conservative external envelope used by assembly checks
+SCREW_THREAD_MAJOR_DIA = THREAD_MAJOR_MM["#6-32"]
+SPRING_SCREW_OPEN_GAP_MM = 8.0
+# Native clamp calibration (verify:calibrate_summing_clamp, run
+# 20260923T001401277Z-691cdb38; neutral/square mean, spread 4e-5 mm). The
+# 1330K524 end loop is widest outside the tube OD, so it seats on the tube end's
+# OD corner, 0.231 mm past the full-band position, and the head closes onto it.
+SPRING_SCREW_CLAMPED_GAP_MM = 4.616832947108421
+SPRING_SCREW_TRAVEL_MM = SPRING_SCREW_OPEN_GAP_MM - SPRING_SCREW_CLAMPED_GAP_MM
+SPRING_EYE_CENTRE_FROM_ARM_END_MM = 2.2090440562497236
 SCREW_HEAD_DIA = 12.0  # approved retention for the 1330K524 double-loop eye
 # The former Ø10 head left only 0.2502 mm nominal radial overlap. Ø12 gives
 # 1.2502 mm; the summing assembly also checks the loop's axial band and coil
 # clearance against this head and the arm end.
-SCREW_HEAD_T = 2.0  # head thickness (low)
-PLUG_T = 6.0  # end plug capping the bore behind the screw: 6.0 gives the
-# #6-32 tap ~7 full threads (a 2.0 cap would hold ~2.5) (derived)
+# User ruling: machined webs 2 mm target, 1.5 floor, judged at the WORST case
+# of the printed bands, fixed by geometry so bands can be LOOSE. The head prints
+# at .X (+/-0.8) and the 0.8 slot at .XX (+/-0.51), so the web under the slot is
+# 4.2 - 0.8 - (0.8 + 0.51) = 2.09 mm at worst (the 2.8 head at .XX gave 0.98).
+# The underside (HEAD_X, the clamp face) is unchanged; only the slotted end face
+# moves outboard. It stays 1.66 mm from the counter spring's raised half-turn,
+# which plateaus from T = 3.2 (1.92 at the old 2.0), and 3.72 mm from its coil.
+SCREW_HEAD_T = 4.2
+# Ø11.85 is the nominal model insert in the nominal Ø12.00 tube bore (0.075 mm
+# radial gap). The drawing does not assume stock-ID accuracy: it match-turns
+# this identified plug to the actual assigned bore for the filler supplier's
+# 0.051-0.127 mm gap BETWEEN FACING SURFACES and holds it concentric. The
+# supplier range is at brazing temperature; the AISI 1010 tube and AISI 1018
+# plug are similar-expansion steels, so their centered cold-fit gap is retained
+# to first order through brazing rather than translated into a diametral band.
+PLUG_DIA = 11.85
+# Policy rule 12 (U27): full-thread engagement >= 1.5D at the printed worst
+# case. The plug prints at .X (+/-0.8), so 7.0 leaves 6.2 = 1.77D of #6-32
+# (the former 6.0 gave 5.2 = 1.48D). The under-head length grows with it.
+PLUG_T = 7.0
+PLUG_BRAZE_RADIAL_CLEARANCE = 0.075
+SPRING_SCREW_PLUG_ENGAGEMENT_MM = PLUG_T
+SPRING_SCREW_UNDERHEAD_LENGTH_MM = (
+    SPRING_SCREW_PLUG_ENGAGEMENT_MM + SPRING_SCREW_OPEN_GAP_MM
+)
+SCREW_TAP_MINOR_DIA = TAP_DRILL_MM["#6-32"]
+SCREW_SLOT_W = 0.80
+SCREW_SLOT_DEPTH = 0.80

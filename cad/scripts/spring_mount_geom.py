@@ -40,7 +40,9 @@ COUNTER_ANCHOR_XY = (
     KNIFE[1] + summing_lever_spec.ANCHOR_H / 2.0 - ANCHOR_9490T1.thread_start_y_mm,
 )
 GOOSENECK_END_X = COLUMN_X - gooseneck_geom.ARM_END_X
-COUNTER_UPPER_EYE_X = GOOSENECK_END_X + gooseneck_geom.SCREW_SHANK_LEN / 2.0
+COUNTER_UPPER_EYE_X = (
+    GOOSENECK_END_X + gooseneck_geom.SPRING_EYE_CENTRE_FROM_ARM_END_MM
+)
 
 _channel = _config.parts("channel-spring-installed")
 _counter = _config.parts("counter-spring")
@@ -247,9 +249,10 @@ def counter_pose(length_mm: float) -> SpringPose:
     lower = (ax + ux * _COUNTER_LOWER_OFFSET, ay + uy * _COUNTER_LOWER_OFFSET)
     upper = (lower[0] + ux * span, lower[1] + uy * span)
     # The +X end has an extra half-turn and an asymmetric transition. Put
-    # that raised wire on the OPEN side of the arm end, not inside the tube.
-    # The opposite clocking penetrates the tube; the clearance regression
-    # exercises this geometry rather than asserting an arbitrary angle.
+    # that raised wire on the outboard side of the clamped arm end, not inside
+    # the tube. The opposite clocking penetrates the tube; the clearance
+    # regression exercises this geometry rather than asserting an arbitrary
+    # angle.
     return _pose(length, lower, upper, (ux, uy), clocking="half_turn")
 
 
@@ -389,7 +392,7 @@ def counter_half_turn_clearances(
     eye_x = counter_stock.end_centers_mm(pose.length_mm)[1][0]
     start_x = counter_stock.coil_end_x_mm(pose.length_mm) + wire
     rows = pose.rotation_rows
-    head_x = GOOSENECK_END_X + gooseneck_geom.SCREW_SHANK_LEN
+    head_x = GOOSENECK_END_X + gooseneck_geom.SPRING_SCREW_CLAMPED_GAP_MM
     tube_gap = head_gap = math.inf
     steps = 1024
     for index in range(steps + 1):
