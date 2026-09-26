@@ -389,7 +389,9 @@ CONE_CRANK_STEPS = "\n".join(
         # MHA-024 cross-hole runs behind the arm through the hub barrel. The
         # handle rides the MHA-139 shoulder screw. Wording from crankhub.
         "6. PRESS MHA-137 INTO MHA-020 TO THE SHOULDER, FACES FLUSH.",
-        "   MATCH-DRILL/REAM THE SEAM Ø4 X 4.0 DEEP; DRIVE MHA-138 FLUSH.",
+        # #921 follow-up (rule 6): MHA-138's drilling and driving direction
+        # moved here from its print.
+        "   MATCH-DRILL/REAM SEAM Ø4 X 4.0 FROM OUTBOARD; DRIVE MHA-138 FLUSH.",
         "   SLIDE ONTO MHA-026, SHAFT END FLUSH, PUNCH MARKS ALIGNED.",
         "   TAPER-REAM 1:48 THROUGH HUB AND SHAFT; LIGHT-DRIVE MHA-024,",
         "   REMOVABLE BY TAP ON SMALL END. HANG MHA-128 FROM THE PIN HEAD;",
