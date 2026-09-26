@@ -533,8 +533,8 @@ def test_section_picks_land_on_the_rail_and_the_lower_web() -> None:
 
 def test_seat_note_names_the_transfer_and_both_depths() -> None:
     assert drawing.SEAT_NOTE == (
-        "4X #8-32 UNC-2B\n14.7 DEEP\n#29 DRILL 18.0 DEEP\n"
-        "TRANSFER FROM MHA-123\nAT ASSEMBLY"
+        "4X #8-32 UNC-2B\n14.7 DEEP\n#29 DRILL\n18.0 DEEP\n"
+        "TRANSFER FROM\nMHA-123 AT\nASSEMBLY"
     )
     # The leader lands on the rail's top edge over the outermost seat.
     assert drawing.SEAT_NOTE_ATTACH == pytest.approx(
@@ -598,10 +598,11 @@ def test_precision_reaches_every_dimension_exactly_once() -> None:
 
 
 def _z_line(y_mm: float, z0_mm: float, z1_mm: float, *, direction=(0.0, 0.0, 1.0)):
-    points = [(0.0, y_mm / 1000.0, z0_mm / 1000.0), (0.0, y_mm / 1000.0, z1_mm / 1000.0)]
-    curve = SimpleNamespace(
-        IsLine=lambda: True, LineParams=(*points[0], *direction)
-    )
+    points = [
+        (0.0, y_mm / 1000.0, z0_mm / 1000.0),
+        (0.0, y_mm / 1000.0, z1_mm / 1000.0),
+    ]
+    curve = SimpleNamespace(IsLine=lambda: True, LineParams=(*points[0], *direction))
     return SimpleNamespace(
         GetCurve=lambda: curve,
         GetStartVertex=lambda: SimpleNamespace(GetPoint=lambda: points[0]),
@@ -642,18 +643,99 @@ def test_rail_depth_is_dimensioned_between_exact_section_edges(monkeypatch) -> N
     assert "entities=_right_rail_edges(adapter, right)" in source
 
 
-def test_seat_note_stays_left_of_the_depth_callout_and_above_the_view() -> None:
-    """Offline extent check after r743-rocker-fix2: at ~0.75 x height per
-    character (the drive-train package's measured 2.63 mm at 3.5 mm) and
-    ~1.3 x height per line (its 4.525 mm pitch), the note ends left of the
-    front view's left edge, where the Depth extension line runs, and above the
-    view's top edge, under the top zone border."""
-    height = drawing.SEAT_NOTE_HEIGHT
+# Sheet-default note text as rendered by r743-rocker-fix3 (leaf
+# 20260926T112244Z-1-a884759d): "TRANSFER FROM MHA-123" spanned 57.6 mm for 21
+# characters and five lines stepped 4.45 mm. add_note does not apply a height,
+# so every note on this sheet renders at this size.
+NOTE_CHAR_WIDTH = 0.00276
+NOTE_LINE_PITCH = 0.0045
+
+
+def _text_box(text: str, center: tuple[float, float]) -> tuple[float, ...]:
+    """(left, bottom, right, top) of a note or dimension text centred on ``center``."""
+    lines = text.splitlines()
+    half_w = max(map(len, lines)) * NOTE_CHAR_WIDTH / 2.0
+    half_h = len(lines) * NOTE_LINE_PITCH / 2.0
+    return (
+        center[0] - half_w,
+        center[1] - half_h,
+        center[0] + half_w,
+        center[1] + half_h,
+    )
+
+
+def _boxes_clear(a: tuple[float, ...], b: tuple[float, ...], gap: float) -> bool:
+    return (
+        a[2] + gap <= b[0]
+        or b[2] + gap <= a[0]
+        or a[3] + gap <= b[1]
+        or b[3] + gap <= a[1]
+    )
+
+
+def test_seat_note_stays_in_the_column_left_of_the_front_view() -> None:
+    """r743-rocker-fix3 printed the 21-character wrap across the Depth
+    extension line at the front view's left edge. At the measured text size the
+    note must end 2 mm short of that edge, and sit above the R12.7 callout that
+    shares the column."""
     lines = drawing.SEAT_NOTE.splitlines()
-    right = drawing.SEAT_NOTE_XY[0] + max(map(len, lines)) * 0.75 * height
-    bottom = drawing.SEAT_NOTE_XY[1] - len(lines) * 1.3 * height
+    left, top = drawing.SEAT_NOTE_XY
+    right = left + max(map(len, lines)) * NOTE_CHAR_WIDTH
+    bottom = top - len(lines) * NOTE_LINE_PITCH
     front_left = drawing.FRONT_CENTER[0] - support.HALF_Y * drawing.VIEW_SCALE / 1000
-    front_top = drawing.FRONT_CENTER[1] + support.HALF_Y * drawing.VIEW_SCALE / 1000
     assert right < front_left - 0.002
-    assert bottom > front_top + 0.002
-    assert drawing.SEAT_NOTE_XY[1] <= 0.263
+    cavity_label = _text_box("R12.7\n4X", drawing.FRONT_KEEP["CavityRadius"])
+    assert bottom > cavity_label[3] + 0.005
+    assert top <= 0.263
+
+
+def test_rim_chamfer_callout_clears_the_rail_depth_text() -> None:
+    """r743-rocker-fix3 ran "X 45 DEG" into the section's 21.0: both sat in the
+    lane between the front view and the section at y ~0.224."""
+    # Rendered as three lines: the value, then the callout's two.
+    assert drawing.DIMENSION_CALLOUTS["RimChamferSize"] == " X 45 DEG\n2 FACES"
+    chamfer = _text_box("1.27\nX 45 DEG\n2 FACES", drawing.RIGHT_KEEP["RimChamferSize"])
+    rail = _text_box(f"{support.RAIL_DEPTH:.1f}", drawing.RAIL_TEXT_XY)
+    assert _boxes_clear(chamfer, rail, 0.003)
+    # ...and stays right of the front view.
+    front_right = drawing.FRONT_CENTER[0] + support.HALF_Y * drawing.VIEW_SCALE / 1000
+    assert chamfer[0] > front_right + 0.003
+
+
+def test_web_thickness_text_clears_the_wall_and_the_height_dimension() -> None:
+    """r743-rocker-fix3 printed the section's 6.35 across the slanted wall
+    line; the text must sit between that wall and the 177.8 dimension line."""
+    web = _text_box(f"{2 * support.WEB:.2f}", drawing.WEB_TEXT_XY)
+    scale = drawing.VIEW_SCALE / 1000
+    lowest_local_y = (web[1] - drawing.RIGHT_CENTER[1]) / scale
+    wall_x = drawing.RIGHT_CENTER[0] + support._wall_half_z_at(lowest_local_y) * scale
+    assert web[0] > wall_x + 0.002
+    assert web[2] < drawing.RIGHT_KEEP["WallHeight"][0] - 0.002
+
+
+def test_iso_tapped_hole_label_is_materialized_then_removed() -> None:
+    """r743-rocker-fix3's isometric carried SolidWorks' own "#8-32 Tapped
+    Hole" label past the right border. The seat note already states the thread,
+    so the cosmetic threads are imported before finalize (the pen-hanger
+    pattern) and finalize removes exactly that one label."""
+    import ast
+
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    ]
+    (finalize,) = [c for c in calls if c.func.id == "finalize_drawing"]
+    kwargs = {
+        k.arg: ast.literal_eval(k.value)
+        for k in finalize.keywords
+        if k.arg in {"redundant_note_substrings", "expected_redundant_notes"}
+    }
+    assert kwargs == {
+        "redundant_note_substrings": ("Tapped Hole",),
+        "expected_redundant_notes": 1,
+    }
+    (threads,) = [c for c in calls if c.func.id == "import_cosmetic_threads"]
+    assert [ast.unparse(a) for a in threads.args] == ["adapter", "iso"]
+    assert threads.lineno < finalize.lineno
