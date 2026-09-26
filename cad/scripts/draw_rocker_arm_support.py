@@ -131,6 +131,17 @@ DIMENSION_PRECISION = {
     "FootThickness": 2,
     "RailDepth": 1,  # the seats' drill point needs the .X band (seat layout)
 }
+
+
+def imported_precision() -> dict[str, int]:
+    """Precision for the imported model dimensions only. The sheet-made ones
+    (web, foot, rail depth) set their own when they are created, after the
+    import; set_dimension_precision fails on a name it cannot find, which
+    is how the #743 rail's RailDepth entry broke r743-rocker-fix."""
+    kept = set(FRONT_KEEP) | set(RIGHT_KEEP)
+    return {name: digits for name, digits in DIMENSION_PRECISION.items() if name in kept}
+
+
 # The bracket seats: located by transfer, so the print gives their thread,
 # depths and process only. A view-owned pointer to the rail's top edge over
 # the outermost seat, left of the front view and clear of the Depth callout.
@@ -362,15 +373,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     dimensions = [*front_dimensions, *right_dimensions]
     set_dimension_callouts(adapter, dimensions, DIMENSION_CALLOUTS)
-    set_dimension_precision(
-        adapter,
-        dimensions,
-        {
-            name: digits
-            for name, digits in DIMENSION_PRECISION.items()
-            if name not in {"WebThickness", "FootThickness"}
-        },
-    )
+    set_dimension_precision(adapter, dimensions, imported_precision())
     _create_view_centerline(
         adapter,
         front,
