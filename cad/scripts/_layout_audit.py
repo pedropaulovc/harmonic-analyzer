@@ -43,7 +43,7 @@ import tempfile
 from dataclasses import dataclass, replace
 from enum import Enum
 from heapq import heappop, heappush
-from itertools import combinations
+from itertools import combinations, product
 from pathlib import Path
 from statistics import median
 from typing import Any, Iterable, Mapping, Sequence
@@ -241,6 +241,26 @@ _UNLEADERED_KINDS = frozenset({"dim", "geometry", "section-line", "detail-circle
 # same holes out twice (cone-swing-platform's "1/4-20 Tapped Hole" beside
 # RD2's "2X ... 1/4-20 UNC - 2B THRU ALL", 24cbab237).
 _THREAD = re.compile(r"(?<![\w/.#])(#?\d+(?:/\d+)?-\d+|M\d+(?:\.\d+)?)(?=[\s,;xX×]|$)")
+# A hole callout's leading instance count: "2X " of RD2's first row.
+_INSTANCES = re.compile(r"^\s*(\d+)\s*X(?![A-Za-z])")
+# Printed edge pieces meeting here are one stroke chain. A PDF path's pieces
+# share their end points exactly (_pdf_ink flattens each curve in place);
+# this only absorbs float noise where two paths meet.
+RING_JOIN_M = 1e-6
+# HOLE_*: PROVISIONAL, from the printed rings of 24cbab237's
+# cone-swing-platform View2 (the restored PDF, swing-24cb-raw). One hole's
+# concentric rings fit centres this close: the two countersinks' rings fit
+# 6 and 9 um apart.
+HOLE_CENTER_TOL_M = 0.00005
+# Two holes are one size when every ring's radius agrees this closely: the
+# countersinks' outer rings fit 1.639 and 1.634 mm, the dowels 0.796 and
+# 0.792 mm.
+HOLE_RADIUS_TOL_M = 0.00002
+# A leader lands on a ring when its end lies within a model-edge stroke
+# width of it: RD2's arrow tip sits 0.009 mm off hole A's inner ring and
+# DetailItem357's leader end 0.004 mm off hole B's outer one, while a
+# countersink's two rings print 0.36 mm apart.
+HOLE_LANDING_TOL_M = MODEL_EDGE_WIDTH_M[1]
 
 
 def is_hidden(annotation: Mapping[str, Any]) -> bool:
@@ -2384,9 +2404,10 @@ def _leader_paths(annotation: AnnotationGeometry) -> list[tuple[list[tuple[float
     ``(points from the text end to the tip, arrowhead length)``.
 
     The leader and shoulder pieces form a small graph. A tip is a node an
-    arrowhead's vertex sits on; the text end is the node farthest along the
-    graph from it that is not another tip. A run past the arrow tip (a hole
-    callout's run on to the hole's centre) is not on that path.
+    arrowhead's vertex sits on; the text end is the node nearest the
+    annotation's text (its attachment, or a shoulder under the text), so a
+    branch never runs on into a sibling leader. A run past the arrow tip (a
+    hole callout's run on to the hole's centre) is not on that path.
     """
     runs = [s for s in annotation.segments if s.role in ("leader", "shoulder") and s.length > 0.0]
     heads = _arrow_heads(annotation)
@@ -2438,7 +2459,17 @@ def _leader_paths(annotation: AnnotationGeometry) -> list[tuple[list[tuple[float
         ends = [i for i in distance if i not in tip_nodes]
         if not ends:
             continue
-        at = max(ends, key=lambda i: distance[i])
+        # The walk stops at this leader's own attachment: the node nearest
+        # the annotation's text, the nearer along the leader on a tie. The
+        # farthest node could be a sibling leader's elbow, reached through a
+        # shared attach point (Codex P2 on b49e13940).
+        at = min(
+            ends,
+            key=lambda i: (
+                round(min((_point_box_distance(nodes[i], box) for box in annotation.text_boxes), default=-distance[i]), 6),
+                distance[i],
+            ),
+        )
         points = [nodes[at]]
         while at != tip:
             at, _segment = back[at]
@@ -2509,7 +2540,8 @@ def find_leaders_over_part(
         grid = every if annotation.owner == "sheet" else grids.get(annotation.owner)
         if grid is None:
             continue
-        worst: tuple[float, float, int, tuple[float, float]] | None = None
+        # The most severe branch: a gating detour first, then a long direct run.
+        worst: tuple[tuple[int, float], float, float, int, tuple[float, float]] | None = None
         for points, head in _leader_paths(annotation):
             pieces = [Segment(*a, *b, "leader") for a, b in zip(points, points[1:])]
             remaining = sum(piece.length for piece in pieces)
@@ -2528,18 +2560,15 @@ def find_leaders_over_part(
             merged = [c for i, c in enumerate(crossings) if i == 0 or crossings[i - 1][0] - c[0] > MODEL_EDGE_WIDTH_M[1]]
             if not merged:
                 continue
-            detour = merged[0][0] - approach(points[-1], annotation.owner)
-            if worst is None or detour > worst[1]:
-                worst = (merged[0][0], detour, len(merged), merged[0][1])
-        if worst is None:
+            over = merged[0][0]
+            detour = over - approach(points[-1], annotation.owner)
+            rank = (2 if detour > detour_limit else 1 if over > limit else 0, detour)
+            if worst is None or rank > worst[0]:
+                worst = (rank, over, detour, len(merged), merged[0][1])
+        if worst is None or worst[0][0] == 0:
             continue
-        over, detour, count, point = worst
-        if detour > detour_limit:
-            kind = "leader-over-part"
-        elif over > limit:
-            kind = "leader-over-part-direct"
-        else:
-            continue
+        (level, _detour), over, detour, count, point = worst
+        kind = "leader-over-part" if level == 2 else "leader-over-part-direct"
         findings.append(
             Finding(
                 kind=kind,
@@ -2567,16 +2596,126 @@ def _callout_text(annotation: Mapping[str, Any]) -> str:
     return _TOKEN.sub(" ", text)
 
 
-def find_duplicate_thread_callouts(dump: Mapping[str, Any]) -> list[Finding]:
-    """A leadered note restating the thread a hole callout in its view
-    already calls out.
+@dataclass(frozen=True)
+class PrintedHole:
+    """A circle printed in a view: its centre and its concentric rings' radii
+    (a countersink prints two), smallest first."""
+
+    center: tuple[float, float]
+    radii: tuple[float, ...]
+
+    def same_size(self, other: PrintedHole) -> bool:
+        return len(self.radii) == len(other.radii) and all(
+            abs(a - b) <= HOLE_RADIUS_TOL_M for a, b in zip(self.radii, other.radii)
+        )
+
+
+def printed_holes(edges: Sequence[Segment]) -> list[PrintedHole]:
+    """The circles a view's printed model ``edges`` draw, concentric rings
+    grouped into one hole.
+
+    Pieces sharing an end point form a chain; a chain whose vertices all lie
+    within ``BALLOON_RING_FIT_TOL_M`` of one circle is an arc of it. Arcs of
+    one circle (a circle printed as two paths) pool; a circle is kept once
+    its arcs reach every side of the centre. A slot or a filleted corner
+    chains its arcs to straight edges, fits no circle and is not a hole.
+    """
+    parent = list(range(len(edges)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    first: dict[tuple[int, int], int] = {}
+    for index, edge in enumerate(edges):
+        for x, y in ((edge.x0, edge.y0), (edge.x1, edge.y1)):
+            other = first.setdefault((round(x / RING_JOIN_M), round(y / RING_JOIN_M)), index)
+            parent[find(index)] = find(other)
+    chains: dict[int, set[tuple[float, float]]] = {}
+    for index, edge in enumerate(edges):
+        chains.setdefault(find(index), set()).update(((edge.x0, edge.y0), (edge.x1, edge.y1)))
+    arcs: list[tuple[float, float, float, set[tuple[bool, bool]]]] = []
+    for points in chains.values():
+        if len(points) < 6:
+            continue
+        fit = _fit_circle(list(points))
+        if fit is None:
+            continue
+        fx, fy, fr = fit
+        if max(abs(math.hypot(x - fx, y - fy) - fr) for x, y in points) > BALLOON_RING_FIT_TOL_M:
+            continue
+        sides = {(x >= fx, y >= fy) for x, y in points}
+        same = next(
+            (
+                arc
+                for arc in arcs
+                if math.hypot(arc[0] - fx, arc[1] - fy) <= HOLE_CENTER_TOL_M and abs(arc[2] - fr) <= HOLE_RADIUS_TOL_M
+            ),
+            None,
+        )
+        if same is None:
+            arcs.append((fx, fy, fr, sides))
+            continue
+        same[3].update(sides)
+    holes: list[tuple[tuple[float, float], list[float]]] = []
+    for cx, cy, radius, sides in arcs:
+        if len(sides) < 4:
+            continue
+        hole = next((h for h in holes if math.hypot(h[0][0] - cx, h[0][1] - cy) <= HOLE_CENTER_TOL_M), None)
+        if hole is None:
+            holes.append(((cx, cy), [radius]))
+            continue
+        hole[1].append(radius)
+    return [PrintedHole(center, tuple(sorted(radii))) for center, radii in holes]
+
+
+def _landings(annotation: Mapping[str, Any]) -> list[tuple[float, float]]:
+    """Where an annotation's leaders end: its arrow tips, else the last
+    point of each COM leader (a cosmetic-thread callout dumps no display
+    data, DetailItem357)."""
+    arrows = (annotation.get("display") or {}).get("arrows") or ()
+    tips = [(float(arrow[0]), float(arrow[1])) for arrow in arrows if len(arrow) >= 2]
+    if tips:
+        return tips
+    return [(float(leader[-3]), float(leader[-2])) for leader in annotation.get("leaders") or () if len(leader) >= 3]
+
+
+def _landed_hole(point: tuple[float, float], holes: Sequence[PrintedHole]) -> int | None:
+    """The hole whose ring ``point`` lies on, the nearest ring's; None off
+    every ring."""
+    best = min(
+        (
+            (abs(math.hypot(point[0] - hole.center[0], point[1] - hole.center[1]) - radius), index)
+            for index, hole in enumerate(holes)
+            for radius in hole.radii
+        ),
+        default=None,
+    )
+    if best is None or best[0] > HOLE_LANDING_TOL_M:
+        return None
+    return best[1]
+
+
+def find_duplicate_thread_callouts(dump: Mapping[str, Any], sheet: SheetGeometry) -> list[Finding]:
+    """A leadered note restating the thread of the hole group a hole callout
+    in its view already calls out.
 
     swing's 917-s1 sheet 2 eye pass: the model's cosmetic-thread callout
     "1/4-20 Tapped Hole" printed beside RD2's "2X <MOD-DIAM> 5.11 THRU ALL /
     1/4-20 UNC - 2B THRU ALL", its leader on the other hole of RD2's pair.
-    Two hole callouts naming one thread are two hole groups, not a duplicate
-    (harmonic-base's "2X ... 19.50" and "4X ... 15.00", both 8-32). A note
-    without a leader ("1/4-20 TAPPED HOLES: DEBURR ONLY") calls out no hole.
+    A note without a leader ("1/4-20 TAPPED HOLES: DEBURR ONLY") calls out
+    no hole, and two hole callouts naming one thread are two hole groups
+    (harmonic-base's "2X ... 19.50" and "4X ... 15.00", both 8-32).
+
+    One thread is not one group: a view can hold two groups of one thread
+    (Codex P2 on b49e13940, PRRT_kwDOPHDy386mTAro). The dump records no
+    leader's attached entity, so the two are associated by where their
+    leaders land on the view's printed holes (``printed_holes``). They call
+    out one group when both land on the same hole, or when the callout's
+    "NX" names exactly the holes the view prints at the size both land on.
+    A leader landing on no printed ring associates nothing: no finding.
     """
     owners = [(str(view.get("name", "")), view.get("annotations") or ()) for view in dump.get("views", ())]
     owners.append(
@@ -2589,6 +2728,44 @@ def find_duplicate_thread_callouts(dump: Mapping[str, Any]) -> list[Finding]:
             ],
         )
     )
+    edges_of: dict[str, list[Segment]] = {}
+    for annotation in sheet.annotations:
+        if annotation.kind == "geometry":
+            edges_of.setdefault(annotation.owner, []).extend(s for s in annotation.segments if s.role == "geometry")
+    holes_of: dict[str, list[PrintedHole]] = {}
+
+    def holes(view: str) -> list[PrintedHole]:
+        if view not in holes_of:
+            holes_of[view] = printed_holes(edges_of.get(view, ()))
+        return holes_of[view]
+
+    def landed(annotation: Mapping[str, Any], owner: str) -> set[tuple[str, int]]:
+        """The (view, hole) pairs an annotation's leaders land on; a sheet
+        annotation's may be in any view."""
+        views = sorted(edges_of) if owner == "sheet" else [owner]
+        return {
+            (view, index)
+            for point in _landings(annotation)
+            for view in views
+            if (index := _landed_hole(point, holes(view))) is not None
+        }
+
+    def one_group(note: Mapping[str, Any], callout: Mapping[str, Any], owner: str) -> str | None:
+        ours, theirs = landed(note, owner), landed(callout, owner)
+        if ours & theirs:
+            return "same hole"
+        count = _INSTANCES.match(_callout_text(callout))
+        if count is None:
+            return None
+        instances = int(count.group(1))
+        for (view, mine), (their_view, other) in product(ours, theirs):
+            printed = holes(view)
+            if view != their_view or not printed[mine].same_size(printed[other]):
+                continue
+            if sum(hole.same_size(printed[other]) for hole in printed) == instances:
+                return f"same {instances}X group"
+        return None
+
     def threads(annotation: Mapping[str, Any]) -> list[str]:
         return list(dict.fromkeys(m.group(1).upper() for m in _THREAD.finditer(_callout_text(annotation))))
 
@@ -2603,22 +2780,26 @@ def find_duplicate_thread_callouts(dump: Mapping[str, Any]) -> list[Finding]:
             and a.get("leaders")
             and not (a.get("note") or {}).get("balloon")
         ]
-        for note in notes:
-            for callout in callouts:
-                for thread in (t for t in threads(note) if t in threads(callout)):
-                    findings.append(
-                        Finding(
-                            kind="duplicate-thread-callout",
-                            sheet=str(dump.get("sheet", "")),
-                            a=f"hole-callout {callout.get('name', '')}",
-                            b=f"note {note.get('name', '')}",
-                            detail=(
-                                f"note {note.get('name', '')!r} in {owner!r} calls out thread {thread}, which "
-                                f"hole callout {callout.get('name', '')!r} already calls out: one feature, called out twice"
-                            ),
-                            extra={"owner": owner, "thread": thread},
-                        )
-                    )
+        for note, callout in product(notes, callouts):
+            shared = [t for t in threads(note) if t in threads(callout)]
+            group = one_group(note, callout, owner) if shared else None
+            if group is None:
+                continue
+            findings.extend(
+                Finding(
+                    kind="duplicate-thread-callout",
+                    sheet=str(dump.get("sheet", "")),
+                    a=f"hole-callout {callout.get('name', '')}",
+                    b=f"note {note.get('name', '')}",
+                    detail=(
+                        f"note {note.get('name', '')!r} in {owner!r} calls out thread {thread} on the "
+                        f"{group} hole callout {callout.get('name', '')!r} already calls out: one feature, "
+                        "called out twice"
+                    ),
+                    extra={"owner": owner, "thread": thread, "association": group},
+                )
+                for thread in shared
+            )
     return findings
 
 
@@ -3117,7 +3298,7 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
         *find_edgeless_views(model),
         *find_read_errors(dump),
         *find_duplicate_annotations(dump),
-        *find_duplicate_thread_callouts(dump),
+        *find_duplicate_thread_callouts(dump, sheet),
         *(f for f in find_text_separation(sheet) if frozenset((f.a, f.b)) not in reported),
     ])
 

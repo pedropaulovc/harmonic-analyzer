@@ -52,6 +52,12 @@ from _layout_audit import (
 _ANNOT_DIM = 4
 _ANNOT_NOTE = 6
 _ANNOT_DATUM_ORIGIN = 16
+# swCThread, swCenterLine: GetPosition answered None for every one of them
+# on the b49e13940 leaves (cone-swing-platform 14 + 1, top_frame's six
+# sheets 98 cosmetic threads). The audit reads their ink from display data;
+# only the same-spot duplicate check reads a position, and it skips an
+# annotation without one. So a None position is no refusal for these two.
+_ANCHORLESS = frozenset({1, 15})
 # How far a PDF page may differ from its sheet's GetProperties2 size.
 PAGE_SIZE_TOL_M = 0.0005
 # swZoneMargin_e
@@ -84,7 +90,9 @@ class _Reader:
     consumed by the audit (font, line spacing, scale, display mode,
     datum-origin axes and labels), where the default is the conservative
     answer (an annotation's layer name, or a layer ``GetLayer`` cannot
-    resolve: its annotations are audited as printed), or where a fallback
+    resolve: its annotations are audited as printed), where SolidWorks
+    answers None for a whole kind (``GetPosition`` of a cosmetic thread or
+    a centerline, ``_ANCHORLESS``), or where a fallback
     read follows (``GetName2`` before ``Name``).
 
     Every refusal is counted per sheet under the accessor's name. A refused
@@ -202,7 +210,7 @@ def _dump_annotation(reader: _Reader, raw: Any) -> dict[str, Any] | None:
         "name": str(reader.need(lambda: annotation.GetName(), "")),
         "visible": int(reader.need(lambda: annotation.Visible, 1)),
         "owner_type": int(reader.need(lambda: annotation.OwnerType, -1)),
-        "pos": _round(reader.need(lambda: annotation.GetPosition(), ())),
+        "pos": _round((reader.call if kind in _ANCHORLESS else reader.need)(lambda: annotation.GetPosition(), ())),
         "layer": str(reader.call(lambda: annotation.Layer, "")),
     }
     leaders = []
