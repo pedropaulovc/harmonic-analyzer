@@ -737,3 +737,83 @@ def test_creation_hides_and_the_save_check_are_distinct_spans() -> None:
         assert text.count(f'"{span}"') == 1, span
     stock = (SCRIPTS / "_stock_fastener.py").read_text(encoding="utf-8")
     assert "FeatureWalk(model)" in stock and "walk_siblings" not in stock
+
+
+# paper-drive's chain pattern and Belt/Chain feature author their own
+# construction; a plane either generates carries a SolidWorks name ('PLANE2' on
+# integ e12b78a2a), so the builder hides what each step newly shows.
+
+
+class _PaperDriveAdapter:
+    currentModel = object()
+
+    @staticmethod
+    def _attempt(operation, default=None):
+        try:
+            return operation()
+        except Exception:
+            return default
+
+
+def _paper_drive_scans(monkeypatch, shown: list[set[str]], blanked: list[tuple]):
+    """Each visibility scan reads the next set; the blank records its request."""
+    import build_paper_drive_assembly as paper_drive
+
+    scans = iter(shown)
+
+    def visible(model, label=""):
+        assert label == paper_drive.ASM_NAME
+        return [(name, "plane") for name in next(scans)] + [("Sketch9", "sketch")]
+
+    monkeypatch.setattr(paper_drive, "visible_reference_geometry", visible)
+    monkeypatch.setattr(
+        paper_drive, "blank_reference_geometry", lambda adapter, refs: blanked.append(refs)
+    )
+    return paper_drive
+
+
+def test_paper_drive_hides_only_the_planes_a_step_generated(monkeypatch) -> None:
+    blanked: list[tuple] = []
+    paper_drive = _paper_drive_scans(
+        monkeypatch, [{"Front Plane", "PLANE2"}, {"Front Plane"}], blanked
+    )
+
+    hidden = paper_drive.hide_generated_planes(
+        _PaperDriveAdapter(), {"Front Plane"}, "belt/chain coupling"
+    )
+
+    assert hidden == ["PLANE2"]
+    # A plane shown before the step is not the step's to hide.
+    assert blanked == [(("PLANE2", "PLANE"),)]
+
+
+def test_paper_drive_step_that_generates_no_plane_blanks_nothing(monkeypatch) -> None:
+    blanked: list[tuple] = []
+    paper_drive = _paper_drive_scans(monkeypatch, [{"Front Plane"}], blanked)
+
+    assert (
+        paper_drive.hide_generated_planes(
+            _PaperDriveAdapter(), {"Front Plane"}, "roller chain pattern"
+        )
+        == []
+    )
+    assert blanked == []
+
+
+def test_paper_drive_plane_that_stays_shown_fails_loud(monkeypatch) -> None:
+    blanked: list[tuple] = []
+    paper_drive = _paper_drive_scans(monkeypatch, [{"PLANE2"}, {"PLANE2"}], blanked)
+
+    with pytest.raises(RuntimeError, match=r"\['PLANE2'\] still shown after BlankRefGeom"):
+        paper_drive.hide_generated_planes(
+            _PaperDriveAdapter(), set(), "belt/chain coupling"
+        )
+
+
+def test_paper_drive_wraps_both_feature_steps() -> None:
+    source = (SCRIPTS / "build_paper_drive_assembly.py").read_text(encoding="utf-8")
+    assert 'hide_generated_planes(adapter, shown, "roller chain pattern")' in source
+    assert 'hide_generated_planes(adapter, shown, "belt/chain coupling")' in source
+    for step in ("await _insert_roller_chain(adapter)", "await adapter.insert_belt_chain("):
+        at = source.index(step)
+        assert source.rindex("shown = _shown_planes(adapter)", 0, at) < at, step
