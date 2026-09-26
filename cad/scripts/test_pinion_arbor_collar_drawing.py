@@ -106,16 +106,20 @@ def test_collar_never_touches_the_front_strap_at_any_band_corner() -> None:
     (PinHoleCz), each at its printed band, with the collar either way round.
     Codex P2 on #860: the length and the station vary independently, so the
     pin-to-inboard-face distance is not simply half the length."""
-    assert spec.GAP_MIN == pytest.approx(0.70)
-    assert spec.GAP_NOMINAL == pytest.approx(4.875)
-    assert spec.GAP_MAX == pytest.approx(9.05)
+    # On #858 pinned straps with the 11.5 head and the 38.0 pin station.
+    assert spec.GAP_MIN == pytest.approx(1.00)
+    assert spec.GAP_MIN >= spec.GAP_REQUIRED == pytest.approx(0.25)
+    assert spec.GAP_NOMINAL == pytest.approx(5.10)
+    assert spec.GAP_MAX == pytest.approx(9.55)
     gaps = [
         (station - air - strap) - (pin + to_face)
         for station, air, strap, pin, length, cz in product(
             (arbor.DRUM_STATION - 0.8, arbor.DRUM_STATION + 0.8),
-            arbor.drum_total_air(),
-            (arbor.STRAP_T - 0.8, arbor.STRAP_T + 0.8),
-            (38.2, 39.8),
+            # Pinned straps (#858): the drum's front air runs from nothing
+            # to its whole end play.
+            (0.0, arbor.drum_total_air()[1]),
+            (spec.STRAP_T - 0.8, spec.STRAP_T + 0.8),
+            (37.2, 38.8),
             (geometry.COLLAR_LEN - 0.8, geometry.COLLAR_LEN + 0.8),
             (geometry.PIN_HOLE_Z - 0.8, geometry.PIN_HOLE_Z + 0.8),
         )
@@ -208,7 +212,7 @@ def test_drive_train_places_the_collar_on_the_arbor_pin_station() -> None:
     assert assembly.ARBOR_COLLAR_Z0 + geometry.PIN_HOLE_Z == pytest.approx(
         assembly.ARBOR_Z0 + arbor.PIN_Z
     )
-    strap_outer = assembly.APINION_Z_FRONT - assembly.STRAP_AIR - assembly.STRAP_T
+    strap_outer = assembly.RIG.STRAP_Z_OUTER[0]
     assert 0.0 < strap_outer - assembly.ARBOR_COLLAR_Z[1] < spec.GAP_MAX
 
 

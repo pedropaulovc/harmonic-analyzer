@@ -26,6 +26,7 @@ from pinion_arbor_collar_geometry import (
 from pinion_arbor_spec import (
     DRUM_STATION,
     DRUM_STATION_BAND,
+    END_PLAY,
     LINEAR_X_BAND,
     PIN_STATION_BAND,
     PIN_STATION_FROM_HEAD_REAR,
@@ -35,6 +36,7 @@ from pinion_arbor_spec import (
 )
 from pinion_bracket_geometry import THICKNESS as STRAP_T
 from pinion_bracket_geometry import THICKNESS_BAND as STRAP_T_BAND
+from pinion_rig_layout import RIG_MARGIN_SPARE
 
 # The rig's one pin family (pinion_strap_pin_spec): a 1/16 x 1/2 slotted
 # spring pin in a 1/16 drilled hole carrying its own functional band.
@@ -80,6 +82,9 @@ if SLIDE_CLEARANCE_MIN <= 0.0:
     raise AssertionError("the collar no longer slides over the arbor")
 
 MIN_GAP = 0.0  # the collar never touches the strap at rest
+# The novice-margin rule (Main, restricted review of #858): the gap keeps
+# RIG_MARGIN_SPARE over its floor at the worst corner, like every rig margin.
+GAP_REQUIRED = MIN_GAP + RIG_MARGIN_SPARE
 
 
 def collar_strap_gaps() -> tuple[float, float]:
@@ -90,12 +95,15 @@ def collar_strap_gaps() -> tuple[float, float]:
     outer face sits DRUM_STATION less the drum's front air and the strap
     thickness; the collar's inboard face sits one pin-to-face distance past
     the pin, and that distance runs over the length AND pin-station bands
-    (pin_to_face_distances), not just half the length.
+    (pin_to_face_distances), not just half the length.  The straps are
+    pinned at the drum plus the drilling shim (#858), so the drum's front
+    air runs from nothing (drum hard forward) to the whole of its end play
+    (drum hard aft, the drilling pose).
     """
     gaps = []
     for station, air, strap, pin, to_face in product(
         (DRUM_STATION - DRUM_STATION_BAND, DRUM_STATION + DRUM_STATION_BAND),
-        drum_total_air(),
+        (0.0, drum_total_air()[1]),
         (STRAP_T - STRAP_T_BAND, STRAP_T + STRAP_T_BAND),
         (
             PIN_STATION_FROM_HEAD_REAR - PIN_STATION_BAND,
@@ -110,11 +118,15 @@ def collar_strap_gaps() -> tuple[float, float]:
 
 
 GAP_MIN, GAP_MAX = collar_strap_gaps()
-GAP_NOMINAL = (
-    DRUM_STATION - sum(drum_total_air()) / 2.0 - STRAP_T
-) - (PIN_STATION_FROM_HEAD_REAR + COLLAR_LEN / 2.0)
-if GAP_MIN <= MIN_GAP:
-    raise AssertionError(f"collar can touch the front strap: gap {GAP_MIN:.3f}")
+# In the assembly's pose: the drum hard on the back strap, its front end one
+# drilling shim (END_PLAY) off the front strap.
+GAP_NOMINAL = (DRUM_STATION - END_PLAY - STRAP_T) - (
+    PIN_STATION_FROM_HEAD_REAR + COLLAR_LEN / 2.0
+)
+if GAP_MIN < GAP_REQUIRED - 1e-9:
+    raise AssertionError(
+        f"collar gap to the front strap {GAP_MIN:.3f} under {GAP_REQUIRED}"
+    )
 
 # Rule 12 webs at the printed worst case (U27 target 2.0, floor 1.5).
 COLLAR_WALL_WORST = (COLLAR_OD - OD_BAND - (BORE + BORE_BAND[0])) / 2.0
