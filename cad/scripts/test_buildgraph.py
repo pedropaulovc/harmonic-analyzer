@@ -2663,3 +2663,20 @@ def test_interference_contracts_do_not_depend_on_the_crankshaft_spec() -> None:
     closure = _helper_names("_interference_contracts.py")
     assert "crank_hub_geometry" in closure
     assert "crankshaft_spec" not in closure
+
+
+@pytest.mark.parametrize(
+    ("script", "expected"),
+    [
+        # Listed themselves: the root script is not in its own import closure
+        # (Codex #1035, PRRT_kwDOPHDy386mV11b).
+        ("build_wheel_bar.py", True),
+        ("build_swing_stop_screw.py", True),
+        # Reads through an imported listed module.
+        ("build_boss_hook.py", True),
+        ("build_spring_hook.py", True),
+        ("build_platen_guide.py", False),
+    ],
+)
+def test_reads_title_block_geometry_covers_root_and_closure(script, expected):
+    assert bg.reads_title_block_geometry(SCRIPTS_DIR / script) is expected
