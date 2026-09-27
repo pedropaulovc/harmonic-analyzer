@@ -6,7 +6,7 @@ reference sheet: a Front view carrying the cut length -- the part's hidden
 reference-sketch dimension, imported at its model-owned places -- and an
 isometric, both 1:1.  No single length suits every in-band post and plate
 (post_mount_screw_spec's U27 check), so the length prints as a REFERENCE,
-"(86.0)", with no band and the cut-to-fit acceptance beneath it: cut at
+"(86.2)", with no band and the cut-to-fit acceptance beneath it: cut at
 assembly, end flush to the spec band's allowance short of the MHA-091
 underside, never proud (post_mount_screw_spec.CUT_TO_FIT_CALLOUT -- no MHA-A03
 procedure sheet exists to carry it, Codex P1 on #857).  The cut end's break

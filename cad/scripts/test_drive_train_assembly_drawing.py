@@ -360,6 +360,68 @@ def test_note_fields_and_ring_fit() -> None:
     assert shift == pytest.approx((0.1, 0.1)) and overflows == []
 
 
+def _title_block_keep_out() -> tuple[float, float, float, float]:
+    template = drawing.DRAWING_TEMPLATES[drawing.SPEC.layout]
+    clearance = drawing.CLUSTER_TITLE_BLOCK_CLEARANCE
+    return (
+        template.title_block_left_m - clearance,
+        0.0,
+        template.width_m,
+        template.title_block_top_m + clearance,
+    )
+
+
+def _ring_slide(outline_mm: tuple[float, ...]) -> tuple[float, tuple[float, float]]:
+    outline = tuple(value / 1000.0 for value in outline_mm)
+    shift, _overflows = drawing.ring_fit_shift(
+        outline,
+        drawing.CLUSTER_RING_REGION,
+        grow=drawing.CLUSTER_BALLOON_MARGIN + drawing.BALLOON_DIAMETER,
+    )
+    x = drawing.ring_keep_out_shift_x(
+        outline,
+        shift,
+        margin=drawing.CLUSTER_BALLOON_MARGIN,
+        balloon_radius=drawing.BALLOON_DIAMETER / 2.0,
+        keep_out=_title_block_keep_out(),
+    )
+    return x - shift[0], (x, shift[1])
+
+
+def test_the_cone_crank_ring_slides_off_the_title_block() -> None:
+    """rim-124f's cone-crank outline (leaf telemetry, drawing.cluster_ring_fit):
+    centred, the ring's low arc put items 5 and 33 on the title block.  After
+    the slide no balloon on the ellipse reaches it, and the ring stays on the
+    sheet's left side of its region."""
+    outline_mm = (126.422, 110.834, 286.493, 268.479)
+    slide, shift = _ring_slide(outline_mm)
+    assert slide < 0.0
+    outline = tuple(value / 1000.0 for value in outline_mm)
+    margin, r = drawing.CLUSTER_BALLOON_MARGIN, drawing.BALLOON_DIAMETER / 2.0
+    cx = (outline[0] + outline[2]) / 2.0 + shift[0]
+    cy = (outline[1] + outline[3]) / 2.0 + shift[1]
+    rx = (outline[2] - outline[0]) / 2.0 + margin
+    ry = (outline[3] - outline[1]) / 2.0 + margin
+    left, _bottom, _right, top = _title_block_keep_out()
+    for k in range(3600):
+        a = 2.0 * math.pi * k / 3600
+        x, y = cx + rx * math.cos(a), cy + ry * math.sin(a)
+        assert not (x + r > left + 1e-9 and y - r < top - 1e-9), (x, y)
+    assert cx - rx - r >= drawing.CLUSTER_RING_REGION[0]
+
+
+@pytest.mark.parametrize(
+    "outline_mm",
+    [
+        (88.871, 68.887, 257.678, 210.050),  # cylinder bank, rim-124f
+        (145.842, 92.169, 280.976, 215.724),  # pinion rig, rim-124f
+    ],
+)
+def test_a_ring_clear_of_the_title_block_stays_centred(outline_mm: tuple[float, ...]) -> None:
+    slide, _shift = _ring_slide(outline_mm)
+    assert slide == 0.0
+
+
 class _Adapter:
     def _attempt(self, fn, default=None):
         try:

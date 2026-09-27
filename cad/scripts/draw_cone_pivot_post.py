@@ -2,7 +2,8 @@ r"""Create the curated machinist drawing for the v2 cone pivot post.
 
 The SLDPRT remains authoritative.  This recipe places the plan, the front
 elevation, a true-shape cone-journal view, a native section through the cone
-bore plane and a pictorial isometric, and imports exactly the model dimensions
+bore plane and a pictorial isometric on sheet 1, the crank boss's spot face
+and run-out flat at 2:1 on sheet 2, and imports exactly the model dimensions
 ``cone_pivot_post_spec.DRAWING_DIMENSIONS`` marks; shared sheet/template,
 import, curation and export behaviour lives in ``_drawing_common``.
 
@@ -26,13 +27,18 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from typing import Any
 
+import _seat_forensics
 import _telemetry
+from _layout_geometry import DEFAULT_MOVE_CLEARANCE_M
 from _common import CAD_ROOT, _early_bound, check, run_build
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _drawing_common import (
+    _select_view_entity,
     DrawingOutputs,
     PmiDrawingPlacement,
     add_attached_note,
@@ -41,6 +47,7 @@ from _drawing_common import (
     add_surface_finish,
     add_view_centerline,
     assert_imported_precision,
+    create_blank_drawing_sheets,
     curate_view_dimensions,
     create_section_view,
     dimension_name,
@@ -60,7 +67,10 @@ from _drawing_common import (
     visible_view_entities,
     view_name,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_hidden_sketches import (
+    curate_view_dimensions as curate_hidden_owner_dimensions,
+)
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DIA,
@@ -71,13 +81,16 @@ from cone_pivot_post_spec import (
     BORE_DIA,
     BORE_HEIGHT,
     CONE_AXIS_VIEW,
+    CONE_BOSS_DIA,
     CONE_BOSS_LENGTH,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
     CRANK_BOSS_END_Z,
     CRANK_BOSS_START_Z,
+    CRANK_SPOT_FACE_RUN_OUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    HEAD_DIA,
     GEOMETRIC_CONTROLS,
     INCLINE_DEG,
     PART_DATUMS,
@@ -188,6 +201,123 @@ FRONT_KEEP = {
     # x=0.155 the two sat 4.15 mm apart, under one text height (r7 audit).
     "CrankBoreDia": (0.149, 0.172),
 }
+# The spot face and its run-out flat are on the post's NORTH face, behind the
+# elevation (which looks at the crank boss's far end).  Sheet 1 has no room to
+# show them at a size a novice can read, so they get a sheet of their own at
+# the largest preferred scale that fits: a rear view shows the D face-on (the
+# flat's width over the top, its run-out from the crank axis down to the
+# milled step on the right), and a plan locates the face from the post axis,
+# the station sheet 1's plan chains the crank boss length from.  Sheet 1
+# points here at the crank boss.
+SHEET_NAMES = ("MAIN", "SPOT-FACE")
+SPOT_FACE_SHEET = SHEET_NAMES[1]
+_TEMPLATE = DRAWING_TEMPLATES[SPEC.layout]
+# The template's zone margin, 12.7 mm on every side (what ISheet::GetZoneMargin
+# reports and the layout audit's drawable region is built from; the tests
+# hold it to test_drawing_layout_check.ZONE_MARGINS).
+_ZONE_MARGIN = 0.0127
+DRAWABLE = (
+    _ZONE_MARGIN,
+    _ZONE_MARGIN,
+    _TEMPLATE.width_m - _ZONE_MARGIN,
+    _TEMPLATE.height_m - _ZONE_MARGIN,
+)
+# ASME Y14.1's and ISO 5455's preferred enlargements.
+PREFERRED_SCALES = ((1.0, 1.0), (2.0, 1.0), (4.0, 1.0), (5.0, 1.0), (10.0, 1.0))
+# Sheet-2 lanes (sheet metres).  Over and under the rear view stand the width
+# dimension with its label and the view label: 27.4 mm together, measured on
+# leaf crankhub-rim-29eb (run 20260927T060632040Z-47d7306d; 15.2 above, 12.2
+# below).  Between the views run the run-out's text and the station's; under
+# the plan, its label, above the title block.
+_REAR_TEXT_BANDS = 0.0274
+_REAR_LEFT_LANE = 0.028
+_BETWEEN_VIEWS_LANE = 0.117
+_PLAN_LABEL_LANE = 0.026
+
+
+def spot_plan_depth_mm() -> float:
+    """The plan's projected depth along the crank axis: from the cone boss's
+    far corner (beyond the body; the collar's own rim is trimmed at the spot
+    face) to the crank boss's far end."""
+    incline = math.radians(INCLINE_DEG)
+    corner = (CONE_BOSS_LENGTH / 2.0) * math.cos(incline) + (
+        CONE_BOSS_DIA / 2.0
+    ) * math.sin(incline)
+    return CRANK_BOSS_END_Z + max(corner, BLOCK_DIA / 2.0)
+
+
+def spot_face_fits(scale: tuple[float, float]) -> bool:
+    """Both sheet-2 views, with their text lanes, inside the drawable region
+    and the plan above the title block."""
+    f = scale[0] / scale[1] / 1000.0
+    rear_height = BLOCK_HEIGHT * f + _REAR_TEXT_BANDS
+    plan_top = _TEMPLATE.title_block_top_m + _PLAN_LABEL_LANE + spot_plan_depth_mm() * f
+    right = DRAWABLE[0] + _REAR_LEFT_LANE + 2.0 * HEAD_DIA * f + _BETWEEN_VIEWS_LANE
+    return (
+        rear_height <= DRAWABLE[3] - DRAWABLE[1]
+        and plan_top <= DRAWABLE[3]
+        and right <= DRAWABLE[2]
+    )
+
+
+SPOT_FACE_SCALE = max(
+    (scale for scale in PREFERRED_SCALES if spot_face_fits(scale)),
+    key=lambda scale: scale[0] / scale[1],
+)
+SHEET_SCALES = {SHEET_NAMES[0]: SHEET_SCALE, SPOT_FACE_SHEET: SPOT_FACE_SCALE}
+_F = SPOT_FACE_SCALE[0] / SPOT_FACE_SCALE[1] / 1000.0
+# ``place_view`` centres a view on its projected bounding box: the rear view's
+# runs the collar's width and the post's height, centred in the drawable
+# height left of the title block; the plan stands right of it, over the
+# title block.
+REAR_CENTER = (
+    DRAWABLE[0] + _REAR_LEFT_LANE + HEAD_DIA / 2.0 * _F,
+    (DRAWABLE[1] + DRAWABLE[3]) / 2.0,
+)
+SPOT_PLAN_CENTER = (
+    REAR_CENTER[0] + HEAD_DIA * _F + _BETWEEN_VIEWS_LANE,
+    _TEMPLATE.title_block_top_m + _PLAN_LABEL_LANE + spot_plan_depth_mm() * _F / 2.0,
+)
+
+
+def _rear_x(model_x: float) -> float:
+    # *Back looks along +Z, so model +X runs LEFT on the sheet.
+    return REAR_CENTER[0] - model_x * _F
+
+
+def _rear_y(model_y: float) -> float:
+    return REAR_CENTER[1] + (model_y - BLOCK_HEIGHT / 2.0) * _F
+
+
+# The width stands over the head with its label above the value, off the view;
+# the run-out stands right of the collar, half-way down the flat.
+REAR_KEEP = {
+    "SpotFaceWidth": (REAR_CENTER[0], _rear_y(BLOCK_HEIGHT) + 0.010),
+    "SpotFaceRunOut": (
+        _rear_x(-HEAD_DIA / 2.0) + 0.028,
+        _rear_y(CRANK_BORE_HEIGHT - CRANK_SPOT_FACE_RUN_OUT / 2.0),
+    ),
+}
+# The plan keeps one dimension, the spot face's station from the post axis.
+# Its text stands left of the view, level with the half-way point between the
+# axis and the face; both ends are read off the placed view.
+SPOT_PLAN_DIMENSION = "CrankBossStartZ"
+SPOT_PLAN_TEXT_LEFT_OF_VIEW = 0.030
+# The two views are not in projection with each other, so each is named,
+# centred under its live outline.  Every view on the sheet is at the sheet
+# scale, which the title block states.
+REAR_LABEL_TEXT = "REAR VIEW"
+SPOT_PLAN_LABEL_TEXT = "TOP VIEW"
+VIEW_LABEL_GAP = DEFAULT_MOVE_CLEARANCE_M
+SPOT_FACE_NOTE = f"SPOT FACE CLEARS <MOD-DIAM>{HEAD_DIA:.0f} COLLAR"
+SPOT_FACE_NOTE_XY = (0.135, 0.258)
+# Sheet 1's pointer stands in the free field left of the plan, level with the
+# spot face that the crank boss length is taken from.
+SEE_SPOT_FACE_SHEET = f"SPOT FACE:\nSEE SHEET {SHEET_NAMES.index(SPOT_FACE_SHEET) + 1}"
+SEE_SPOT_FACE_SHEET_XY = (0.018, 0.250)
+# Each sheet states its place in the package, clear of section A-A's
+# face-to-face dimension on sheet 1 (pinion_bracket's position).
+SHEET_COUNT_XY = (0.380, 0.260)
 # The Ø44 collar is dimensioned on its true-shape plan circle, not across the
 # elevation: there its dimension line sat directly under the crank-bore size
 # and finish leaders, which both had to cross it to reach the bore.  The text
@@ -195,12 +325,6 @@ FRONT_KEEP = {
 TOP_KEEP = {
     "HeadDia": (0.071, 0.188),
     "CrankBossLen": (0.056, TOP_CENTER[1]),
-    # The spot-face station stands between the crank-boss length and the
-    # circle, its value on its own dimension line.  On the right its upper
-    # witness line ran level with the counterbore callout's shelf and that
-    # callout's leader crossed its dimension line, so its text had to be
-    # offset to a distant shelf, where a blind reader took it for a note.
-    "CrankBossStartZ": (0.0655, 0.2338),
     "MountEastX": (0.075, 0.2525),
     "MountWestX": (0.110, 0.2525),
     "InclineAngle": (0.142, _top_y(28.0)),
@@ -237,8 +361,8 @@ JOURNAL_TEXT_OFFSETS = {
 # The non-preferred bore limits tell the shop what to inspect without imposing
 # a particular cutting method.  Ø21.93 is the crank boss OD -- the elevation
 # looks at the boss's far end, so it is labelled as the boss, not as the
-# spot-faced near face -- and the 21.3753 mm station locates that near face
-# from the post axis without inventing a depth against the curved collar.
+# spot-faced near face -- and sheet 2's station locates that near face from
+# the post axis without inventing a depth against the curved collar.
 DIMENSION_CALLOUTS = {
     "HeadDia": "COLLAR",
     "CrankBossDia": "CRANK BOSS",
@@ -248,6 +372,15 @@ DIMENSION_CALLOUTS = {
     "ConeBossDia": "CONE JOURNAL BOSS OD",
     "ConeBossLen": "CONE BOSS FACE-TO-FACE",
     "InclineAngle": "CONE/CRANK BORE AXES",
+}
+# Sheet 2's labels.  The width's stands above its value: below, it would print
+# on the head the dimension spans.  The station is labelled below its value on
+# its own dimension line, not on an offset shelf (Main's rim-8339 ruling: a
+# bare 18.88 was not found as the spot face's station).
+SPOT_FACE_WIDTH_CALLOUT = {"SpotFaceWidth": "SPOT FACE WIDTH"}
+SPOT_FACE_CALLOUTS = {
+    "SpotFaceRunOut": "RUN-OUT TO STEP",
+    "CrankBossStartZ": "SPOT FACE STATION",
 }
 
 
@@ -391,6 +524,7 @@ def _model_face_evidence(
     for name in (
         "CrankSprocketBoss",
         "CrankSpotFace",
+        "CrankSpotFaceRunOut",
         "CrankBore",
         "ConeShaftBoss",
         "ConeShaftBore",
@@ -456,6 +590,51 @@ def _hide_witness_sketch(adapter: Any, view: Any, sketch_name: str) -> None:
     rebuild_drawing(adapter, label=f"hide {sketch_name} in {name}")
     draw.ClearSelection2(True)
     _telemetry.info(f"drawing witness sketch blanked in view: {qualified}")
+
+
+def _plane_centres(
+    face_evidence: dict[str, list[tuple[str, tuple[float, ...]]]],
+    feature_name: str,
+    count: int,
+    *,
+    besides: tuple[tuple[float, float, float], ...] = (),
+) -> list[tuple[float, float, float]]:
+    """A feature's plane root points (model metres), all but ``besides``."""
+    centres = [
+        (values[3], values[4], values[5])
+        for kind, values in face_evidence[feature_name]
+        if kind == "plane" and (values[3], values[4], values[5]) not in besides
+    ]
+    if len(centres) != count:
+        raise RuntimeError(
+            f"{feature_name} has {len(centres)} BREP face centres, expected {count}"
+        )
+    return centres
+
+
+def _crank_face_centres(
+    face_evidence: dict[str, list[tuple[str, tuple[float, ...]]]],
+) -> list[tuple[float, float, float]]:
+    """The crank boss's spot face and far face, in that order.
+
+    The spot face is CrankSpotFace's one plane.  Without a run-out,
+    CrankSprocketBoss lists it too; the run-out flat's floor is coplanar with
+    it and merges into it, after which the boss lists only its far face.
+    Either way the boss has exactly one plane besides the spot face, and each
+    stands at its printed station.
+    """
+    (spot,) = _plane_centres(face_evidence, "CrankSpotFace", 1)
+    (far,) = _plane_centres(face_evidence, "CrankSprocketBoss", 1, besides=(spot,))
+    for label, centre, station in (
+        ("spot", spot, CRANK_BOSS_START_Z),
+        ("far", far, CRANK_BOSS_END_Z),
+    ):
+        if abs(centre[2] * 1000.0 - station) > 1e-3:
+            raise RuntimeError(
+                f"crank boss {label} face at z={centre[2] * 1000.0:.4f} mm, "
+                f"expected {station:.4f}"
+            )
+    return [spot, far]
 
 
 def _assert_view_geometry(
@@ -550,24 +729,9 @@ def _assert_view_geometry(
         f"ConeShaftBoss/ConeShaftBore at model Y={BORE_HEIGHT:.3f}mm; "
         f"top acute axis angle={acute:.6f} deg"
     )
-    def plane_centres(feature_name: str) -> list[tuple[float, float, float]]:
-        centres = [
-            (values[3], values[4], values[5])
-            for kind, values in face_evidence[feature_name]
-            if kind == "plane"
-        ]
-        if len(centres) != 2:
-            raise RuntimeError(
-                f"{feature_name} has {len(centres)} BREP face centres, expected two"
-            )
-        return centres
-
-    crank_face_centres = sorted(
-        plane_centres("CrankSprocketBoss"),
-        key=lambda point: point[2],
-    )
+    crank_face_centres = _crank_face_centres(face_evidence)
     cone_face_centres = sorted(
-        plane_centres("ConeShaftBoss"),
+        _plane_centres(face_evidence, "ConeShaftBoss", 2),
         key=lambda point: sum(point[i] * cone_axis[i] for i in range(3)),
     )
     iso_face_centres = {
@@ -763,10 +927,264 @@ def _show_section_scale_in_caption(adapter: Any, view: Any) -> None:
         raise RuntimeError("native cone-section scale caption did not persist")
 
 
+def _place_note_under(
+    adapter: Any,
+    note: Any,
+    outline: tuple[float, ...],
+    *,
+    gap: float,
+    label: str,
+) -> None:
+    """Stand a free note's rendered box ``gap`` under a view outline,
+    centred on it.
+
+    A note's text box neither sits on nor tracks its insertion point 1:1, so
+    this reads the rendered extent and moves by the difference until it
+    settles (the drive-train package's note anchoring, for one note).
+    """
+    if note is None:
+        raise RuntimeError(f"failed to add {label}")
+    note = _early_bound(note, "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    target = ((outline[0] + outline[2]) / 2.0, outline[1] - gap)
+    extent: tuple[float, ...] = ()
+    for _pass in range(3):
+        adapter.currentModel.GraphicsRedraw2()
+        extent = tuple(float(value) for value in (note.GetExtent() or ()))
+        if len(extent) != 6 or extent[3] <= extent[0]:
+            raise RuntimeError(f"{label}: note has no rendered extent: {extent!r}")
+        shift = (target[0] - (extent[0] + extent[3]) / 2.0, target[1] - extent[4])
+        if max(abs(shift[0]), abs(shift[1])) <= 1e-4:
+            break
+        position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+        if len(position) != 3:
+            raise RuntimeError(f"{label}: note position is unreadable: {position!r}")
+        if not annotation.SetPosition(position[0] + shift[0], position[1] + shift[1], position[2]):
+            raise RuntimeError(f"{label}: note SetPosition failed")
+    _telemetry.info(
+        f"{label} placed under its view: text "
+        f"[{extent[0] * 1000:.1f}..{extent[3] * 1000:.1f}]x"
+        f"[{extent[1] * 1000:.1f}..{extent[4] * 1000:.1f}] mm, view "
+        f"[{outline[0] * 1000:.1f}..{outline[2] * 1000:.1f}]x"
+        f"[{outline[1] * 1000:.1f}..{outline[3] * 1000:.1f}] mm"
+    )
+
+
+def _view_outline(view: Any) -> tuple[float, float, float, float]:
+    outline = tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
+    if len(outline) != 4:
+        raise RuntimeError(f"view has an invalid outline: {outline!r}")
+    return outline
+
+
+def _pin_sheet_scales(adapter: Any) -> None:
+    """Re-pin every sheet's scale before the native gate reads (or its
+    failure PDF prints) the title block.
+
+    Inserting a model view drifts the sheet scale; ``finalize_drawing``
+    re-pins it before export, but the native gate and its evidence PDF come
+    first, and rim-8339's evidence printed "SCALE: 1:2" on a 1:1 sheet.
+    """
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    for name in SHEET_NAMES:
+        if not ddoc.ActivateSheet(name):
+            raise RuntimeError(f"failed to activate sheet {name!r} to pin its scale")
+        numerator, denominator = SHEET_SCALES[name]
+        sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
+        if not sheet.SetScale(float(numerator), float(denominator), False, False):
+            raise RuntimeError(f"failed to pin sheet {name!r} at {numerator:g}:{denominator:g}")
+    if not ddoc.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to return to the main sheet")
+
+
+def _spot_plan_keep(adapter: Any, plan: Any) -> dict[str, tuple[float, float]]:
+    """Where the spot-face station's text stands on the sheet-2 plan: left of
+    the view, half-way between the post axis and the face it locates."""
+    top = BLOCK_HEIGHT / 1000.0
+    axis = model_point_in_view(adapter, plan, (0.0, top, 0.0), label="plan post axis")
+    face = model_point_in_view(
+        adapter, plan, (0.0, top, CRANK_BOSS_START_Z / 1000.0), label="plan spot face"
+    )
+    outline = _view_outline(plan)
+    return {
+        SPOT_PLAN_DIMENSION: (
+            outline[0] - SPOT_PLAN_TEXT_LEFT_OF_VIEW,
+            (axis[1] + face[1]) / 2.0,
+        )
+    }
+
+
+_SW_CENTER_MARK_SINGLE = 2  # swCenterMarkStyle_e.swCenterMark_Single
+
+
+def _mark_post_axis(adapter: Any, plan: Any) -> None:
+    """Centre-mark the collar's top rim: in the plan the post axis is a point,
+    and the station is measured from it."""
+    edge = _circular_edge(plan, radius_mm=HEAD_DIA / 2.0, center_y_mm=BLOCK_HEIGHT)
+    _select_view_entity(adapter, plan, "EDGE", None, label="collar rim", entity=edge)
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    center_mark = drawing.InsertCenterMark3(_SW_CENTER_MARK_SINGLE, False, False)
+    adapter.currentModel.ClearSelection2(True)
+    if center_mark is None:
+        raise RuntimeError("failed to centre-mark the post axis on the spot-face plan")
+
+
+def _draw_spot_face_sheet(adapter: Any) -> tuple[Any, Any, list[Any]]:
+    """Sheet 2: the spot face and its run-out flat at 2:1.
+
+    The station comes from SpotFaceStationReference, which the part saves
+    hidden: the hidden-owner import shows that one ray in this plan only.
+    """
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not ddoc.ActivateSheet(SPOT_FACE_SHEET):
+        raise RuntimeError("failed to activate the spot-face sheet")
+    rear = place_view(adapter, str(SOURCE), "*Back", *REAR_CENTER, scale=SPOT_FACE_SCALE)
+    plan = place_view(
+        adapter, str(SOURCE), "*Top", *SPOT_PLAN_CENTER, scale=SPOT_FACE_SCALE
+    )
+    for view in (rear, plan):
+        set_hidden_lines_removed(adapter, view)
+    plan_annotations = curate_hidden_owner_dimensions(
+        adapter,
+        plan,
+        keep=_spot_plan_keep(adapter, plan),
+        view_label="spot-face plan",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    rear_annotations = curate_view_dimensions(
+        adapter,
+        rear,
+        keep=REAR_KEEP,
+        view_label="rear",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    annotations = [*plan_annotations, *rear_annotations]
+    set_dimension_callouts(
+        adapter, annotations, SPOT_FACE_WIDTH_CALLOUT, location="above"
+    )
+    set_dimension_callouts(adapter, annotations, SPOT_FACE_CALLOUTS)
+    # No 12.52 deg dimension stands on this sheet, so the plan-angle rays
+    # would print as undimensioned edges (Main's rim-29eb eye pass).  Hiding
+    # a sketch in a view hides what was imported from it, which is why the
+    # station has its own sketch; the native gate proves it still prints.
+    for view in (rear, plan):
+        _hide_witness_sketch(adapter, view, "JournalPlanReference")
+        _hide_witness_sketch(adapter, view, "BoreSpacingReference")
+    _mark_post_axis(adapter, plan)
+    # The same crank-boss pick as sheet 1's plan (model z 35).
+    add_view_centerline(
+        adapter,
+        plan,
+        face_xy=model_point_in_view(
+            adapter, plan, (0.0, BLOCK_HEIGHT / 1000.0, 0.035), label="plan crank boss"
+        ),
+        label="spot-face plan crank boss axis",
+    )
+    for view, text, label in (
+        (rear, REAR_LABEL_TEXT, "rear view label"),
+        (plan, SPOT_PLAN_LABEL_TEXT, "spot-face plan label"),
+    ):
+        outline = _view_outline(view)
+        _place_note_under(
+            adapter,
+            add_note(adapter, text, outline[0], outline[1]),
+            outline,
+            gap=VIEW_LABEL_GAP,
+            label=label,
+        )
+    if add_note(adapter, SPOT_FACE_NOTE, *SPOT_FACE_NOTE_XY) is None:
+        raise RuntimeError("failed to add the spot-face collar note")
+    for view in (rear, plan):
+        set_hidden_lines_removed(adapter, view)
+    if not ddoc.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to return to the main sheet")
+    return rear, plan, annotations
+
+
+def _assert_native_layout_with_evidence(
+    adapter: Any,
+    journal: Any,
+    *,
+    spot_face_views: Mapping[str, Any],
+    expected_finish: str,
+) -> None:
+    """The native layout gate, leaving the failing sheets as PDFs.  The
+    evidence never masks the failure: the gate's own error is re-raised
+    whatever the export does."""
+    try:
+        _assert_native_layout(
+            adapter,
+            journal,
+            spot_face_views=spot_face_views,
+            expected_finish=expected_finish,
+        )
+    except RuntimeError:
+        try:
+            _export_failure_pdf(adapter, "native-layout")
+        except Exception as exc:  # noqa: BLE001 - evidence must not mask the failure
+            _telemetry.warn(f"native-layout failure PDF raised: {exc!r}")
+        raise
+
+
+def _export_failure_pdf(adapter: Any, stage: str) -> None:
+    """Export each failing sheet under the forensic tree the farm uploads."""
+    try:
+        folder = (
+            _seat_forensics.OUT_FAILURES
+            / f"cone-pivot-post-{stage}"
+            / datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        )
+        folder.mkdir(parents=True, exist_ok=True)
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+        paths = []
+        for name in SHEET_NAMES:
+            if not drawing.ActivateSheet(name):
+                _telemetry.warn(f"{stage}-failure PDF: cannot activate sheet {name!r}")
+                continue
+            path = folder / f"cone-pivot-post-{name.lower()}.pdf"
+            model.SaveAs3(str(path), 0, 0)
+            paths.append(path)
+    except Exception as exc:  # noqa: BLE001 - evidence must not mask the failure
+        _telemetry.warn(f"{stage}-failure PDF export failed: {exc!r}")
+        return
+    for path in paths:
+        if not path.is_file():
+            _telemetry.warn(f"{stage}-failure PDF export produced no file: {path}")
+            continue
+        _telemetry.event("drawing.failure_pdf", stage=stage, path=str(path))
+        _telemetry.info(f"{stage}-failure evidence PDF: {path}")
+
+
+def view_placement_problems(
+    outlines: Mapping[str, tuple[float, float, float, float]],
+    region: Any,
+    keep_outs: tuple[tuple[str, Any], ...],
+) -> list[str]:
+    """Views that leave the inner border or reach into a keep-out (the
+    title block).  The text audit reads annotations, not view outlines."""
+    from _layout_geometry import DEFAULT_TEXT_TOUCH_TOL_M, Box
+
+    problems = []
+    for label, outline in outlines.items():
+        box = Box(*outline)
+        escape = box.escape(region)
+        if escape is not None:
+            problems.append(f"{label} leaves the inner border: {box.format_mm()}, {escape=}")
+        for keep_out_name, keep_out in keep_outs:
+            if box.overlaps(keep_out, tol=DEFAULT_TEXT_TOUCH_TOL_M) is not None:
+                problems.append(
+                    f"{label} reaches into the {keep_out_name}: "
+                    f"{box.format_mm()} vs {keep_out.format_mm()}"
+                )
+    return problems
+
+
 def _assert_native_layout(
     adapter: Any,
     journal: Any,
     *,
+    spot_face_views: Mapping[str, Any],
     expected_finish: str,
 ) -> None:
     """Prove the final live sheet geometry before spending an export."""
@@ -779,20 +1197,38 @@ def _assert_native_layout(
     )
     from diagnostics.drawing_layout_audit import collect_document
 
-    sheets = collect_document(adapter)
-    if len(sheets) != 1:
-        raise RuntimeError(f"cone pivot post must have one drawing sheet: {len(sheets)}")
-    sheet = sheets[0]
+    # collect_document's sheet order is undetermined: match by name.
+    sheets = {sheet.name: sheet for sheet in collect_document(adapter)}
+    if tuple(sorted(sheets)) != tuple(sorted(SHEET_NAMES)):
+        raise RuntimeError(f"cone pivot post sheets {sorted(sheets)} != {sorted(SHEET_NAMES)}")
+    sheet = sheets[SHEET_NAMES[0]]
+    spot_face_sheet = sheets[SPOT_FACE_SHEET]
 
-    journal_values = tuple(float(value) for value in journal.GetOutline())
-    if len(journal_values) != 4:
-        raise RuntimeError("cone journal view has invalid final outline")
-    journal_box = Box(*journal_values)
-    journal_escape = journal_box.escape(sheet.region)
-    if journal_escape is not None:
+    journal_box = Box(*_view_outline(journal))
+    placement = [
+        *view_placement_problems(
+            {"cone journal view": _view_outline(journal)}, sheet.region, ()
+        ),
+        *view_placement_problems(
+            {label: _view_outline(view) for label, view in spot_face_views.items()},
+            spot_face_sheet.region,
+            spot_face_sheet.keep_outs,
+        ),
+    ]
+    if placement:
+        raise RuntimeError("cone pivot post view placement failed:\n" + "\n".join(placement))
+    # Hiding a sketch in a view hides the dimensions imported from it
+    # (rim-aba9 lost the station that way), so sheet 2's three must each
+    # still print, once.
+    spot_face_labels = [annotation.label for annotation in spot_face_sheet.annotations]
+    missing = [
+        name
+        for name in (SPOT_PLAN_DIMENSION, *REAR_KEEP)
+        if spot_face_labels.count(name) != 1
+    ]
+    if missing:
         raise RuntimeError(
-            "cone journal view leaves the inner border: "
-            f"{journal_box.format_mm()}, {journal_escape=}"
+            f"{SPOT_FACE_SHEET} must print each of {missing} once: {sorted(spot_face_labels)}"
         )
 
     finish_notes = []
@@ -884,15 +1320,19 @@ def _assert_native_layout(
                 f"{own_overlap * 1000.0:.3f} mm"
             )
         own_overlaps[label] = round(own_overlap * 1000.0, 3)
-    findings = audit_sheet(sheet)
+    findings = [finding for name in SHEET_NAMES for finding in audit_sheet(sheets[name])]
     if findings:
         raise RuntimeError(
             "cone pivot post native annotation layout failed:\n"
             f"{format_findings(findings)}"
         )
+    spot_face_boxes = {
+        label: Box(*_view_outline(view)).format_mm()
+        for label, view in spot_face_views.items()
+    }
     _telemetry.info(
         "cone pivot post native layout: "
-        f"journal={journal_box.format_mm()}; "
+        f"journal={journal_box.format_mm()}; {SPOT_FACE_SHEET}={spot_face_boxes}; "
         f"finish={finish_box.format_mm()} in {finish_cell.format_mm()}; "
         f"Ra={[box.format_mm() for box in surface_boxes]}; "
         f"self-overlap mm={own_overlaps}"
@@ -927,6 +1367,7 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="cone pivot post drawing package")
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -938,6 +1379,7 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
+    rear, spot_plan, spot_face_annotations = _draw_spot_face_sheet(adapter)
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
@@ -1010,6 +1452,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *section_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    annotations.extend(spot_face_annotations)
     crank_height = [
         annotation
         for annotation in front_annotations
@@ -1196,6 +1639,8 @@ async def build(adapter: Any) -> dict[str, str]:
         0.202,
         0.104,
     )
+    if add_note(adapter, SEE_SPOT_FACE_SHEET, *SEE_SPOT_FACE_SHEET_XY) is None:
+        raise RuntimeError("failed to add the spot-face sheet reference")
     # Rule 6 caps the block at four lines (about 18 mm); the anchor keeps the
     # r7 clearance to the bottom inner border.
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_ANCHOR)
@@ -1206,11 +1651,19 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, top)
     set_hidden_lines_removed(adapter, journal)
     set_hidden_lines_removed(adapter, section)
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
+    for index, sheet_name in enumerate(SHEET_NAMES, start=1):
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(f"failed to activate sheet {sheet_name!r} to number it")
+        if add_note(adapter, f"SHEET {index} OF {len(SHEET_NAMES)}", *SHEET_COUNT_XY) is None:
+            raise RuntimeError(f"failed to stamp the sheet count on {sheet_name!r}")
+    _pin_sheet_scales(adapter)
     rebuild_drawing(adapter, label="final cone pivot post native layout")
     _show_section_scale_in_caption(adapter, section)
-    _assert_native_layout(
+    _assert_native_layout_with_evidence(
         adapter,
         journal,
+        spot_face_views={"rear view": rear, "spot-face plan": spot_plan},
         expected_finish=source_properties["Finish"],
     )
 
@@ -1222,6 +1675,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Cone Pivot Post Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        expected_sheet_names=SHEET_NAMES,
+        sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
+        sheet_scales=SHEET_SCALES,
     )
 
 

@@ -55,9 +55,13 @@ SHAFT_LENGTH_BAND = (0.00, -0.40)  # (upper, lower) deviations
 
 # #906 R1: the shaft runs in the MHA-149 eccentric bushing on its plain 3/8 in
 # core; the integral journal and its relief are gone.  The bushing's north
-# end sits flush with the post boss's spot face here (the old journal
-# bore's inboard end), which the Ø9.0 seat step stays at.
-POST_BORE_END = 104.789505572 + CRANK_FACE_SHIFT  # 112.79
+# end sits flush with the post boss's spot face here: the old journal bore's
+# inboard end, less the 2.5 the spot face retreated from the 64T
+# (cone_pivot_post_spec CRANK_SPOT_FACE_RETREAT; hard-coded so the post's spec
+# is not a rebuild input of this shaft, and the offline test pins it).  The
+# Ø9.0 seat step stays where it was, north of it, so the core runs the
+# bushing's full length.
+POST_BORE_END = 104.789505572 + CRANK_FACE_SHIFT - 2.5  # 110.29
 
 # Every axial station prints from the FAR END at one place (policy rule 7), and
 # each one below is chosen to print EXACTLY, so its printed row IS its limit

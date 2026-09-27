@@ -535,16 +535,24 @@ def _imported_name(tree: ast.Module, name: str) -> str | None:
 
 def _blanked_sketches(build: Path) -> set[str]:
     """Every sketch a part build hides with _common.blank_sketch, or with
-    _common.blank_reference_sketches over its REFERENCE_SKETCHES."""
+    _common.blank_reference_sketches (which calls it per sketch) over a
+    literal tuple or the build's REFERENCE_SKETCHES."""
     tree = _tree(build)
     names: set[str] = set()
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
-        if _called_name(node) == "blank_reference_sketches":
+        called = _called_name(node)
+        if called == "blank_reference_sketches":
+            sketches = node.args[1]
+            if isinstance(sketches, (ast.Tuple, ast.List)) and all(
+                isinstance(item, ast.Constant) for item in sketches.elts
+            ):
+                names |= {item.value for item in sketches.elts}
+                continue
             names |= _reference_sketches(tree)
             continue
-        if _called_name(node) != "blank_sketch":
+        if called != "blank_sketch":
             continue
         sketch = node.args[1]
         if isinstance(sketch, ast.Constant):
@@ -624,6 +632,7 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
     assert {
         "arbor_pedestal",
         "cone_gear",
+        "cone_pivot_post",
         "cone_tip_block",
         "cone_tip_shim",
         "cylinder_gear_shaft",
@@ -632,6 +641,8 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
         "pinion_spring",
     } <= set(found)
     assert found["cylinder_gear_shaft"] == {"DomeReference"}
+    # Blanked with _common.blank_reference_sketches, not blank_sketch.
+    assert found["cone_pivot_post"] == {"SpotFaceStationReference"}
 
 
 def test_a_drawing_of_a_part_hidden_sketch_curates_through_this_module() -> None:
