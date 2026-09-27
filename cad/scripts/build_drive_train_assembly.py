@@ -247,19 +247,21 @@ ADDENDUM = 25.4 / DP_TRAIN  # 0.510 at DP 49.82
 MUNTZ_YELLOW = _config.palette("muntz_yellow")
 TIP_TEETH = {int(c[1:]) for c in _config.materials().get("cone_tip_gear_configs", [])}
 WORKING_DEPTH = 2.0 * ADDENDUM  # 1.020: full tooth interleave depth
-RADIUS_STEP = 3.0 * 25.4 / DP_TRAIN  # 1.5295: pitch-radius step per 6 teeth
 CONE_T120_PITCH_R = (
     (120.0 / DP_TRAIN) * 25.4 / 2.0
 )  # 30.59: largest cone gear pitch radius
 
 # Shared machine grid: the working train is recentered independently of the
-# fixed post/carrier, along the post's unchanged inclined journal.
-_DRUM_SEAT_NOMINAL = _config.machine(
-    "cone_incline", "drum_seat_nominal_mm"
-)  # 7.2204 (OD 62.2)
-Z_PITCH = _DRUM_SEAT_NOMINAL * math.cos(
-    math.asin(RADIUS_STEP / _DRUM_SEAT_NOMINAL)
-)  # 7.0566: drum z-pitch
+# fixed post/carrier, along the post's unchanged inclined journal.  The drum
+# z-pitch, the per-6-teeth radius step and the cone incline they fix are derived
+# ONCE in cone_incline, which the post and the swing platform read too.
+from cone_incline import (  # noqa: E402
+    COS_I,
+    INCLINE_DEG,
+    RADIUS_STEP,
+    SIN_I,
+    Z_PITCH,
+)
 X_DRUM = DRUM_X
 if POST_ROTATION_Y_DEG != 180.0:
     raise AssertionError(
@@ -281,13 +283,11 @@ Z_DRUM0 = _config.machine("channels", "station_z0_mm")
 if abs(Z_DRUM0 - CHANNEL_Z0) > 1e-9:
     raise AssertionError("channel station_z0 does not carry the fixed-post recenter")
 
-# True-cone incline (M6.7, exact tracking -- see module docstring). Values are
-# at the OD-62.2 / DP 49.82 re-anchor (was 21.10 deg at the retired DP 30).
-SIN_I = RADIUS_STEP / Z_PITCH  # 0.21675
-COS_I = math.sqrt(1.0 - SIN_I * SIN_I)  # 0.97623
+# True-cone incline (M6.7, exact tracking -- see module docstring): SIN_I,
+# COS_I and INCLINE_DEG come from cone_incline above, at the OD-62.2 /
+# DP 49.82 re-anchor (was 21.10 deg at the retired DP 30).
 TAN_I = SIN_I / COS_I
 SEC_I = 1.0 / COS_I
-INCLINE_DEG = math.degrees(math.asin(SIN_I))  # 12.5182
 SEAT_PITCH = Z_PITCH * COS_I  # 6.8888: seat pitch along the shaft
 
 CONE_FACE = 6.5  # M6.7 mesh packing (annotated 7 -- build_cone_gear.py)
