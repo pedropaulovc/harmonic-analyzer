@@ -5974,6 +5974,183 @@ def check_drawing_layout(
         )
 
 
+@_telemetry.traced("drawing.pin_sheet_property_view", label_param="sheet_name")
+def pin_sheet_property_view(adapter: Any, ddoc: Any, sheet_name: str) -> tuple[Any, ...]:
+    """Point the ACTIVE sheet's ``$PRPSHEET`` links at its first view.
+
+    Returns the sheet's views, the property source first. ``finalize_drawing``
+    pins every sheet this way before save; a recipe that must read a resolved
+    title-block link back per sheet (a configured package whose sheets each
+    show another configuration) pins its sheet here first, or every pasted
+    sheet resolves against the sheet Document Properties names. The pin is
+    idempotent, so ``finalize_drawing`` re-pinning the same view is a no-op.
+    """
+    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+    if sheet is None:
+        raise RuntimeError(f"drawing sheet {sheet_name!r} has no ISheet")
+    properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
+    if len(properties) < 8:
+        raise RuntimeError(
+            f"sheet {sheet_name!r} has incomplete properties: {properties!r}"
+        )
+    if bool(properties[7]):
+        # PasteSheet preserves the source sheet's "same as sheet specified
+        # in Document Properties" flag. In that mode SolidWorks silently
+        # ignores a per-sheet CustomPropertyView assignment and returns the
+        # literal UI label instead of a view name. Clear the mode through
+        # the current ISheet API while preserving every other property.
+        sheet.SetProperties2(
+            int(properties[0]),
+            int(properties[1]),
+            float(properties[2]),
+            float(properties[3]),
+            bool(properties[4]),
+            float(properties[5]),
+            float(properties[6]),
+            False,
+        )
+        sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+        properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
+        if len(properties) < 8 or bool(properties[7]):
+            raise RuntimeError(
+                f"failed to enable explicit property source on {sheet_name!r}"
+            )
+    views = tuple(iter_views(adapter))
+    if not views:
+        raise RuntimeError(
+            f"drawing sheet {sheet_name!r} has no view for property links"
+        )
+    first_name = view_name(adapter, views[0])
+    sheet.CustomPropertyView = first_name
+    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+    linked = str(adapter._get_attr_or_call(sheet, "CustomPropertyView") or "")
+    if linked != first_name:
+        raise RuntimeError(
+            f"sheet {sheet_name!r} CustomPropertyView did not take: "
+            f"{linked!r} != {first_name!r}"
+        )
+    return views
+
+
+# The title block's MATERIAL cell.  The project templates link the generic
+# SolidWorks material ($PRPSHEET:"Material": "Brass", "Plain Carbon Steel"),
+# which named the wrong alloy on 2 drawings and no grade on 18 more (swing's
+# 877-final material audit, 58 of 111 drawings).  finalize_drawing retargets
+# the cell on every sheet to the part's own stock specification and reads the
+# resolved text back, so a configured package prints each configuration's own.
+TITLE_MATERIAL_PROPERTY = "Material Specification"
+_GENERIC_MATERIAL_LINK = property_link("Material")
+_TITLE_MATERIAL_LINK = property_link(TITLE_MATERIAL_PROPERTY)
+_SW_NOTE = 6  # swAnnotationType_e.swNote
+
+
+@dataclass(frozen=True)
+class TitleMaterialBinding:
+    """One sheet's retargeted MATERIAL note and what it must print."""
+
+    sheet_name: str
+    note: Any
+    linked_text: str
+    material: str
+
+
+def linked_title_material(model: Any, configuration: str, *, label: str) -> str:
+    """The Material Specification a sheet showing ``configuration`` prints.
+
+    ``$PRPSHEET`` resolves a configuration-specific property first and the
+    file property otherwise (build_cone_gear stamps one per configuration).
+    Blank fails: the cell never falls back to the generic Material.
+    """
+    value = ""
+    if configuration:
+        value = str(model.GetCustomInfoValue(configuration, TITLE_MATERIAL_PROPERTY) or "")
+    value = value or str(model.GetCustomInfoValue("", TITLE_MATERIAL_PROPERTY) or "")
+    if not value.strip():
+        raise RuntimeError(
+            f"{label}: source model has no {TITLE_MATERIAL_PROPERTY!r} "
+            f"(configuration {configuration!r}) for the title-block MATERIAL"
+        )
+    return value
+
+
+@_telemetry.traced("drawing.title_material_bind", label_param="sheet_name")
+def bind_title_material(
+    drawing_model: Any, *, sheet_name: str, material: str
+) -> TitleMaterialBinding:
+    """Point the ACTIVE sheet's one MATERIAL cell at Material Specification.
+
+    Postcondition, not precondition: the sheet ends with exactly one material
+    link and it names Material Specification, so a sheet pasted from a bound
+    one is accepted as it arrives; none, or two, fails with the count.
+    """
+    sheet_view = _early_bound(drawing_model, "IDrawingDoc").GetFirstView()
+    if sheet_view is None:
+        raise RuntimeError(f"sheet {sheet_name!r} has no sheet view")
+    cells = 0
+    generic = 0
+    binding: TitleMaterialBinding | None = None
+    for raw_annotation in _early_bound(sheet_view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if annotation.GetType() != _SW_NOTE:
+            continue
+        raw_note = annotation.GetSpecificAnnotation()
+        if raw_note is None:
+            raise RuntimeError(f"sheet {sheet_name!r}: title-block note has no INote")
+        note = _early_bound(raw_note, "INote")
+        raw = str(note.PropertyLinkedText)
+        generic_here = raw.count(_GENERIC_MATERIAL_LINK)
+        cells_here = generic_here + raw.count(_TITLE_MATERIAL_LINK)
+        if not cells_here:
+            continue
+        cells += cells_here
+        generic += generic_here
+        linked_text = raw.replace(_GENERIC_MATERIAL_LINK, _TITLE_MATERIAL_LINK)
+        if linked_text != raw:
+            note.PropertyLinkedText = linked_text
+            if str(note.PropertyLinkedText) != linked_text:
+                raise RuntimeError(
+                    f"sheet {sheet_name!r}: MATERIAL link did not persist: {raw!r}"
+                )
+        binding = TitleMaterialBinding(sheet_name, note, linked_text, material)
+    if cells != 1 or binding is None:
+        raise RuntimeError(
+            f"sheet {sheet_name!r} must carry exactly one MATERIAL property "
+            f"link, found {cells} ({generic} generic)"
+        )
+    return binding
+
+
+@_telemetry.traced("drawing.title_material_verify")
+def verify_title_materials(
+    adapter: Any, ddoc: Any, bindings: Sequence[TitleMaterialBinding]
+) -> None:
+    """Read every bound MATERIAL cell back, each with its own sheet active.
+
+    Runs after finalize_drawing's settling rebuild: the purchased-part sheets
+    read this same retargeted link back after an EditRebuild3, and
+    ``$PRPSHEET`` resolves through the sheet's pinned property view.
+    """
+    for binding in bindings:
+        if len(bindings) > 1 and not ddoc.ActivateSheet(binding.sheet_name):
+            raise RuntimeError(f"failed to activate sheet {binding.sheet_name!r}")
+        expected = binding.linked_text.replace(_TITLE_MATERIAL_LINK, binding.material)
+        actual_link = str(binding.note.PropertyLinkedText)
+        actual_text = str(binding.note.GetText()).replace("\r\n", "\n")
+        if actual_link == binding.linked_text and actual_text == expected:
+            continue
+        sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+        source = str(adapter._get_attr_or_call(sheet, "CustomPropertyView") or "")
+        raise RuntimeError(
+            f"sheet {binding.sheet_name!r} MATERIAL did not resolve: expected "
+            f"{expected!r}, got {actual_text!r} from {actual_link!r} "
+            f"(property view {source!r})"
+        )
+    _telemetry.debug(
+        "title MATERIAL read back: "
+        + ", ".join(f"{b.sheet_name}={b.material!r}" for b in bindings)
+    )
+
+
 @_telemetry.traced("drawing.finalize")
 async def finalize_drawing(
     adapter: Any,
@@ -5987,8 +6164,14 @@ async def finalize_drawing(
     expected_sheet_names: tuple[str, ...] | None = None,
     sheet_layouts: Mapping[str, DrawingLayout] | None = None,
     sheet_scales: Mapping[str, tuple[float, float]] | None = None,
+    expected_materials: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
-    """Enforce the sheet/view contract and export SLDDRW, PDF, and rendered PNG."""
+    """Enforce the sheet/view contract and export SLDDRW, PDF, and rendered PNG.
+
+    ``expected_materials`` (sheet name -> Material Specification) holds each
+    sheet's title-block MATERIAL to the recipe's own value on top of the
+    linked model's property, which every sheet is always read back against.
+    """
     drawing_model = adapter.currentModel
     ddoc = _early_bound(
         drawing_model, "IDrawingDoc"
@@ -6036,6 +6219,12 @@ async def finalize_drawing(
     # real view after all views exist, validate the linked model's tolerance and
     # current-release Revision properties, and hold every sheet to the same ASME B
     # contract.
+    if expected_materials is not None and set(expected_materials) != set(sheet_names):
+        raise ValueError(
+            f"expected materials must cover every sheet exactly: "
+            f"{sorted(expected_materials)!r} != {sorted(sheet_names)!r}"
+        )
+    material_bindings: list[TitleMaterialBinding] = []
     for sheet_name in sheet_names:
         if not ddoc.ActivateSheet(sheet_name):
             raise RuntimeError(f"failed to activate drawing sheet {sheet_name!r}")
@@ -6059,46 +6248,15 @@ async def finalize_drawing(
             phase=f"before save {sheet_name}",
             scale=sheet_scale,
         )
-        properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
-        if len(properties) < 8:
-            raise RuntimeError(
-                f"sheet {sheet_name!r} has incomplete properties: {properties!r}"
-            )
-        if bool(properties[7]):
-            # PasteSheet preserves the source sheet's "same as sheet specified
-            # in Document Properties" flag. In that mode SolidWorks silently
-            # ignores a per-sheet CustomPropertyView assignment and returns the
-            # literal UI label instead of a view name. Clear the mode through
-            # the current ISheet API while preserving every other property.
-            sheet.SetProperties2(
-                int(properties[0]),
-                int(properties[1]),
-                float(properties[2]),
-                float(properties[3]),
-                bool(properties[4]),
-                float(properties[5]),
-                float(properties[6]),
-                False,
-            )
-            sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
-            properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
-            if len(properties) < 8 or bool(properties[7]):
-                raise RuntimeError(
-                    f"failed to enable explicit property source on {sheet_name!r}"
-                )
-            assert_asme_b_sheet(
-                adapter,
-                sheet,
-                layout=resolved_layouts[sheet_name],
-                phase=f"explicit property source {sheet_name}",
-                scale=sheet_scale,
-            )
-        views = tuple(iter_views(adapter))
-        first_view = views[0] if views else None
-        if first_view is None:
-            raise RuntimeError(
-                f"drawing sheet {sheet_name!r} has no view for property links"
-            )
+        views = pin_sheet_property_view(adapter, ddoc, sheet_name)
+        first_view = views[0]
+        assert_asme_b_sheet(
+            adapter,
+            adapter._get_attr_or_call(ddoc, "GetCurrentSheet"),
+            layout=resolved_layouts[sheet_name],
+            phase=f"explicit property source {sheet_name}",
+            scale=sheet_scale,
+        )
         for view in views:
             orientation = str(
                 adapter._get_attr_or_call(view, "GetOrientationName") or ""
@@ -6111,14 +6269,6 @@ async def finalize_drawing(
                 label=f"{sheet_name} {view_name(adapter, view)!r}",
             )
         first_name = view_name(adapter, first_view)
-        sheet.CustomPropertyView = first_name
-        sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
-        linked = str(adapter._get_attr_or_call(sheet, "CustomPropertyView") or "")
-        if linked != first_name:
-            raise RuntimeError(
-                f"sheet {sheet_name!r} CustomPropertyView did not take: "
-                f"{linked!r} != {first_name!r}"
-            )
         linked_model = adapter._get_attr_or_call(first_view, "ReferencedDocument")
         if linked_model is None:
             raise RuntimeError(
@@ -6139,6 +6289,20 @@ async def finalize_drawing(
                 TITLE_BLOCK_REVISION_PROPERTY,
                 TITLE_BLOCK_COPYRIGHT_PROPERTY,
             ),
+        )
+        configuration = str(
+            adapter._get_attr_or_call(first_view, "ReferencedConfiguration") or ""
+        )
+        material = linked_title_material(
+            linked_model, configuration, label=f"sheet {sheet_name!r}"
+        )
+        if expected_materials is not None and material != expected_materials[sheet_name]:
+            raise RuntimeError(
+                f"sheet {sheet_name!r} ({configuration!r}) source Material "
+                f"Specification {material!r} != {expected_materials[sheet_name]!r}"
+            )
+        material_bindings.append(
+            bind_title_material(drawing_model, sheet_name=sheet_name, material=material)
         )
 
     # Explicit recipe-requested cleanup remains sheet-scoped. When a standard
@@ -6186,6 +6350,9 @@ async def finalize_drawing(
     # so every text extent and view outline is brought current here, before
     # the SLDDRW/PDF that the blind review and the layout audit read.
     rebuild_drawing(adapter, label="finalize_drawing")
+    verify_title_materials(adapter, ddoc, material_bindings)
+    if len(sheet_names) > 1 and not ddoc.ActivateSheet(sheet_names[0]):
+        raise RuntimeError("failed to restore first drawing sheet before export")
 
     # Persist the native drawing and PDF once from the fully loaded authored
     # document. Reopen/scale/save cycles are deliberately absent from this hot

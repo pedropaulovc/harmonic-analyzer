@@ -66,6 +66,7 @@ from cone_gear_spec import (
     FACE_WIDTH,
     bore_dia_mm,
     floor_limits_mm,
+    material_specification,
     outside_dia_mm,
     tooth_thickness_mm,
 )
@@ -570,6 +571,12 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
         sheet_scales=SHEET_SCALES,
+        # Each sheet's MATERIAL is its configuration's alloy (C67500 for the
+        # tip gears; build_cone_gear stamps it per configuration).
+        expected_materials={
+            f"T{teeth:03d}": material_specification(teeth)
+            for teeth in CONFIGURATION_TEETH
+        },
     )
 
 

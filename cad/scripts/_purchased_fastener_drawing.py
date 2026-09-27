@@ -55,6 +55,7 @@ _PROPERTIES = (
     "Revision",
     "Title",
     "Material",
+    "Material Specification",
     "Stock Name",
     "Supplier",
     "Supplier SKUs",
@@ -182,21 +183,20 @@ def _purchased_title_block(
     adapter: Any,
     draw: Any,
     *,
-    material: str,
     finish: str,
-    material_property: str = "Material",
 ) -> list[tuple[Any, str, str]]:
-    """Retarget this drawing's material/finish cells, never the saved template."""
+    """Retarget this drawing's finish cell, never the saved template.
+
+    The MATERIAL cell is finalize_drawing's, as on every drawing
+    (``_drawing_common.bind_title_material``).
+    """
     apply_custom_properties(adapter, {"Finish": finish}, model=draw)
     ddoc = _early_bound(draw, "IDrawingDoc")
     sheet_view = ddoc.GetFirstView()
     if sheet_view is None:
         raise RuntimeError("purchased drawing template has no sheet view")
     sheet_view = _early_bound(sheet_view, "IView")
-    replacements = {
-        property_link("Material"): (property_link(material_property), material),
-        property_link("Finish"): ('$PRP:"Finish"', finish),
-    }
+    replacements = {property_link("Finish"): ('$PRP:"Finish"', finish)}
     matched = {token: 0 for token in replacements}
     notes = []
     for annotation in sheet_view.GetAnnotations() or ():
@@ -227,8 +227,7 @@ def _purchased_title_block(
         notes.append((note, linked_text, resolved_text))
     if any(count != 1 for count in matched.values()):
         raise RuntimeError(
-            "purchased template must contain exactly one Material "
-            f"and one Finish property link: {matched!r}"
+            f"purchased template must contain exactly one Finish property link: {matched!r}"
         )
     return notes
 
@@ -294,14 +293,13 @@ async def build_purchased_spring_drawing(
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     if Path(model.GetPathName()).resolve() != source.resolve():
         raise RuntimeError(f"opened purchased spring is not {source}")
-    names = (*_PROPERTIES, "Material Specification", "Finish", "Manufacturing Notes")
+    names = (*_PROPERTIES, "Finish", "Manufacturing Notes")
     properties = read_required_properties(model, names, required=names)
     return await _build_reference_sheet(
         adapter,
         spec,
         properties=properties,
         finish=properties["Finish"],
-        material_property="Material Specification",
         reference_notes=properties["Manufacturing Notes"],
     )
 
@@ -312,7 +310,6 @@ async def _build_reference_sheet(
     *,
     properties: dict[str, str],
     finish: str,
-    material_property: str = "Material",
     installation_notes: str = "",
     reference_notes: str = "",
     document_title: str | None = None,
@@ -321,13 +318,7 @@ async def _build_reference_sheet(
     template = DRAWING_TEMPLATES[spec.layout]
     cells = _SPRING_VIEW_CELLS if reference_notes else _VIEW_CELLS
     draw, sheet = new_project_drawing(adapter, layout=spec.layout)
-    title_block_notes = _purchased_title_block(
-        adapter,
-        draw,
-        material=properties[material_property],
-        finish=finish,
-        material_property=material_property,
-    )
+    title_block_notes = _purchased_title_block(adapter, draw, finish=finish)
     # The registry title still names the drawing document and PDF; only the
     # sheet's PART cell moved to the slug.
     title = f"{document_title or properties['Title']} — Purchased Part Reference Drawing"

@@ -1791,6 +1791,10 @@ def part_properties(part_name: str) -> dict[str, str]:
     field_map = {
         "Number": "number",
         "Material": "material",
+        # The title block's MATERIAL cell prints this, never the generic
+        # Material (_drawing_common.TITLE_MATERIAL_PROPERTY), so every
+        # registered part carries it -- purchased stock included.
+        "Material Specification": "material_specification",
         "Tolerance Class": "tolerance_class",
         "Fit Class": "fit_class",
         "Process": "process",

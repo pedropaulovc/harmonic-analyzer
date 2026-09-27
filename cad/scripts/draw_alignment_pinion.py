@@ -23,7 +23,6 @@ from _drawing_common import (
     dimension_name,
     finalize_drawing,
     new_project_drawing,
-    property_link,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
@@ -81,71 +80,6 @@ DIMENSION_CALLOUTS = {
     "ArborBoreDia": ARBOR_BORE_CALLOUT,
     "FaceWidth": "OVERALL; TEETH FULL LENGTH",
 }
-
-
-def _bind_title_material_specification(
-    drawing_model: Any, material_specification: str
-) -> tuple[Any, str, str]:
-    """Retarget this sheet's material cell to the make-critical stock grade."""
-    if not material_specification.strip():
-        raise RuntimeError("alignment-pinion material specification is blank")
-    drawing = _early_bound(drawing_model, "IDrawingDoc")
-    sheet_view = drawing.GetFirstView()
-    if sheet_view is None:
-        raise RuntimeError("alignment-pinion drawing template has no sheet view")
-    sheet_view = _early_bound(sheet_view, "IView")
-    generic_link = property_link("Material")
-    specification_link = property_link("Material Specification")
-    matched = 0
-    binding: tuple[Any, str, str] | None = None
-    for raw_annotation in sheet_view.GetAnnotations() or ():
-        annotation = _early_bound(raw_annotation, "IAnnotation")
-        if annotation.GetType() != 6:  # swAnnotationType_e.swNote
-            continue
-        raw_note = annotation.GetSpecificAnnotation()
-        if raw_note is None:
-            raise RuntimeError("alignment-pinion title-block note has no INote")
-        note = _early_bound(raw_note, "INote")
-        raw = str(note.PropertyLinkedText)
-        occurrences = raw.count(generic_link)
-        if not occurrences:
-            continue
-        matched += occurrences
-        linked_text = raw.replace(generic_link, specification_link)
-        resolved_text = raw.replace(generic_link, material_specification)
-        note.PropertyLinkedText = linked_text
-        if str(note.PropertyLinkedText) != linked_text:
-            raise RuntimeError("alignment-pinion material title link did not persist")
-        binding = (note, linked_text, resolved_text)
-    if matched != 1 or binding is None:
-        raise RuntimeError(
-            "alignment-pinion template must contain exactly one Material "
-            f"property link, found {matched}"
-        )
-    return binding
-
-
-def _verify_title_material_specification(
-    drawing_model: Any, binding: tuple[Any, str, str]
-) -> None:
-    """Read the retargeted cell back once a model view can resolve it.
-
-    ``$PRPSHEET`` resolves against the sheet's property view, which only
-    exists after the first model view is placed (run 6da5050a failed reading
-    it back on the bare template).  The explicit CustomPropertyView pin stays
-    in ``finalize_drawing``'s guarded path; until then SolidWorks' default
-    source is the first view, which is the front view here.
-    """
-    drawing_model.ForceRebuild3(False)
-    note, linked_text, resolved_text = binding
-    actual_link = str(note.PropertyLinkedText)
-    actual_text = str(note.GetText())
-    if actual_link != linked_text or actual_text != resolved_text:
-        raise RuntimeError(
-            "alignment-pinion material title link did not resolve: "
-            f"expected {resolved_text!r}, got {actual_text!r} "
-            f"from {actual_link!r}"
-        )
 
 
 def _match_bore_tolerance_places(adapter: Any, annotations: list[Any]) -> None:
@@ -220,7 +154,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open alignment-pinion source", await adapter.open_model(str(SOURCE)))
-    properties = read_required_properties(
+    read_required_properties(
         adapter.currentModel,
         (
             "Number",
@@ -246,9 +180,6 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
-    material_binding = _bind_title_material_specification(
-        drawing_model, properties["Material Specification"]
-    )
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -272,7 +203,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
-    _verify_title_material_specification(drawing_model, material_binding)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="toothed end"
