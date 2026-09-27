@@ -74,6 +74,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -127,6 +128,7 @@ from _buildgraph import (  # noqa: E402
 
 import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
 import _farm  # noqa: E402  (farm executor: cache-missing leaves run on the pool)
+import _local_slot  # noqa: E402  (machine-wide slots for SolidWorks-free subprocesses)
 import _sw_lifecycle  # noqa: E402  (SolidWorks autostart/recover; lazy-imports sw_recovery)
 import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
 from _drawing_registry import (  # noqa: E402
@@ -247,7 +249,21 @@ def _com_seat(label: str):
     Callers get the wait handed back so the task span can still carry it as a
     ``seat_wait_s`` attribute, and release logs the seat's TOTAL elapsed time.
 
-    Yields the seconds spent blocked (0.0 when the seat was free)."""
+    Yields the seconds spent blocked (0.0 when the seat was free).
+
+    Main thread only. The seat sets ``HARMONIC_COM_SEAT`` in this PROCESS's
+    environment, which a sibling thread would inherit mid-task, and the farm's
+    ``-P thread`` runner never needs the seat (``_cached_com_action`` dispatches a
+    leaf instead) -- so a seat request from a worker thread is a wiring fault and
+    fails loud with the task's name rather than racing the environment."""
+    if threading.current_thread() is not threading.main_thread():
+        raise RuntimeError(
+            f"{label}: the SolidWorks seat was requested from doit worker thread "
+            f"{threading.current_thread().name!r}; the COM seat is process-global "
+            "and only the process runner (-P process, the local default) may take "
+            "it. Under --executor farm this task should have been dispatched to "
+            "the farm."
+        )
     _COM_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
     holder = f"{label} pid={os.getpid()}"
     entered = time.monotonic()
@@ -674,6 +690,8 @@ def _run_subprocess(
     # The MCP adapter uses Loguru directly. Keep its console sink aligned with
     # the build's warning-by-default policy while preserving an explicit override.
     env.setdefault("LOGURU_LEVEL", _external_console_level())
+    # A nested ``_run`` in this subprocess reuses the local slot held here.
+    env.update(_local_slot.held_env())
     if log_stem is None:
         return subprocess.run(cmd, cwd=str(REPO_ROOT), env=env).returncode
     LOGS.mkdir(parents=True, exist_ok=True)
@@ -952,15 +970,23 @@ def _run(
     CONTINUES this span (via the injected TRACEPARENT) instead of adding a
     duplicate root layer under it.
 
-    SolidWorks-FREE tasks ONLY -- it never takes the COM seat, so these fan out
-    under ``-n N``. Every COM-touching task goes through
-    :func:`_cached_com_action`, which owns the seat lock, the remote-cache
-    probe/store and the farm dispatch; there is therefore no code path that can
-    reach SolidWorks while bypassing the cache or the farm."""
-    with _telemetry.span(
-        f"task {label}", label=label, cmd=" ".join(cmd), service=_stage_name(label)
-    ):
-        _exec(cmd, label, log_stem, task=task)
+    SolidWorks-FREE tasks ONLY -- it never takes the COM seat. Every COM-touching
+    task goes through :func:`_cached_com_action`, which owns the seat lock, the
+    remote-cache probe/store and the farm dispatch; there is therefore no code
+    path that can reach SolidWorks while bypassing the cache or the farm.
+
+    The subprocess runs inside one of the machine-wide local slots
+    (:mod:`_local_slot`, ``HARMONIC_LOCAL_SLOTS``, default 4): under the farm
+    executor doit's ``-n`` is sized for farm leaves, which only wait on the pool,
+    so it cannot be what bounds local CPU work. The slot wait is its own
+    ``local.slot.wait`` span and rides the task span as ``slot_wait_s``."""
+    with _local_slot.local_slot(label) as waited:
+        with _telemetry.span(
+            f"task {label}", label=label, cmd=" ".join(cmd), service=_stage_name(label)
+        ) as sp:
+            if waited is not None:
+                sp.set_attribute("slot_wait_s", round(waited, 2))
+            _exec(cmd, label, log_stem, task=task)
 
 
 # --- Per-script helper dependencies, computed from each build script's REAL

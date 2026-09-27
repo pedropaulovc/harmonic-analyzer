@@ -106,9 +106,16 @@ so it also serializes COM across worktrees on the seat. Outputs land in
 The same lock is what bounds a farm worker: it serializes that worker's own COM
 session, not the fleet. Different workers hold different seats and run different
 leaves at the same time, which is why a farm submitter keeps several leaves in
-flight. Run `build.py --executor farm` yourself and it adds `-n 8`
-(`HARMONIC_FARM_PARALLELISM`) unless you pass `-n`/`--process`; the supervised
-launcher passes `-n 4` explicitly, so a supervised run keeps four in flight.
+flight. Run `build.py --executor farm` yourself and it adds `-P thread -n 16`
+(`HARMONIC_FARM_PARALLELISM`) unless you pass `-n`/`--process` or
+`-P`/`--parallel-type`; the supervised launcher exports the same variable and
+records the value in its run record. A farm leaf only waits on the pool, so its
+doit worker is a thread, and ready leaves are offered slowest-first
+(`cad/scripts/_farm_order.py`, a machine-wide duration ledger that never feeds a
+cache key). The SolidWorks-free local tasks of any build (`check:*`, `gallery`,
+the publishing half of `release`) run inside the machine-wide local slots
+(`cad/scripts/_local_slot.py`: `HARMONIC_LOCAL_SLOTS`, default 4, under
+`%PROGRAMDATA%/harmonic-analyzer/local-slots`), whatever `-n` is.
 
 ## Forcing a full rebuild of one assembly
 

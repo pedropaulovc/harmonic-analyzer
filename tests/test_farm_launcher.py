@@ -44,7 +44,9 @@ def _git(repo: Path, *args: str) -> None:
 def _launcher_fixture(tmp_path: Path) -> dict[str, object]:
     worktree = tmp_path / "source worktree"
     worktree.mkdir()
-    (worktree / "build.py").write_text("# launcher fixture\n", encoding="utf-8")
+    (worktree / "build.py").write_text(
+        '# launcher fixture\n_DEFAULT_FARM_PARALLELISM = "16"\n', encoding="utf-8"
+    )
     _git(worktree, "init", "-q")
     _git(worktree, "add", "build.py")
     _git(worktree, "commit", "-q", "-m", "launcher fixture")
@@ -74,6 +76,7 @@ Path(os.environ["UV_STUB_INVOCATION"]).write_text(
                 "SOLIDWORKS_POOL_HOME": os.environ.get("SOLIDWORKS_POOL_HOME"),
                 "HARMONIC_REMOTE_CACHE_MODE": os.environ.get("HARMONIC_REMOTE_CACHE_MODE"),
                 "PYTHONUNBUFFERED": os.environ.get("PYTHONUNBUFFERED"),
+                "HARMONIC_FARM_PARALLELISM": os.environ.get("HARMONIC_FARM_PARALLELISM"),
             },
         }
     ),
@@ -107,6 +110,7 @@ raise SystemExit(int(os.environ.get("UV_STUB_EXIT", "0")))
     environment["HARMONIC_CACHE_ACCOUNT"] = "fixture-account"
     environment.pop("HARMONIC_CACHE_CONTAINER", None)
     environment["HARMONIC_CACHE_SALT"] = "fixture-salt"
+    environment.pop("HARMONIC_FARM_PARALLELISM", None)
 
     return {
         "pwsh": pwsh,
@@ -120,7 +124,11 @@ raise SystemExit(int(os.environ.get("UV_STUB_EXIT", "0")))
 
 
 def _command(
-    fixture: dict[str, object], targets: str, *, tag: str = "test"
+    fixture: dict[str, object],
+    targets: str,
+    *,
+    tag: str = "test",
+    extra: tuple[str, ...] = (),
 ) -> list[str]:
     return [
         str(fixture["pwsh"]),
@@ -140,6 +148,7 @@ def _command(
         "90",
         "-Tag",
         tag,
+        *extra,
     ]
 
 
@@ -312,6 +321,7 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
     assert finished["targets"] == ["part:pen_rod", "drawing:pen"]
     assert finished["tag"] == "spaces-ok"
     assert finished["leaf_timeout_minutes"] == 90
+    assert finished["farm_parallelism"] == 16
     assert Path(finished["worktree"]) == Path(fixture["worktree"]).resolve()
     assert Path(finished["pool_home"]) == Path(fixture["pool"]).resolve()
     assert Path(finished["log"]).is_absolute()
@@ -334,8 +344,6 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
         "90",
         "--verbosity",
         "info",
-        "-n",
-        "4",
         "--continue",
         "part:pen_rod",
         "drawing:pen",
@@ -347,6 +355,7 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
         "SOLIDWORKS_POOL_HOME": str(Path(fixture["pool"]).resolve()),
         "HARMONIC_REMOTE_CACHE_MODE": "rw",
         "PYTHONUNBUFFERED": "1",
+        "HARMONIC_FARM_PARALLELISM": "16",
     }
     launch_log = Path(finished["log"]).read_text(encoding="utf-8")
     assert "uv-stdout" in launch_log
@@ -533,3 +542,43 @@ def test_log_directory_must_be_outside_the_worktree(tmp_path: Path) -> None:
     assert "LogDirectory must be outside the target worktree" in result.stderr
     assert not Path(fixture["invocation"]).exists()
     assert not Path(fixture["log_directory"]).exists()
+
+
+@pytest.mark.parametrize(
+    ("extra", "inherited", "expected"),
+    [
+        (("-Parallelism", "48"), "7", 48),
+        ((), "7", 7),
+    ],
+    ids=["parameter-wins", "inherited-environment"],
+)
+def test_the_recorded_fan_out_is_the_one_build_py_reads(
+    tmp_path: Path, extra: tuple[str, ...], inherited: str, expected: int
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    environment = dict(fixture["environment"])
+    environment["HARMONIC_FARM_PARALLELISM"] = inherited
+
+    completed = _run_launcher(
+        fixture, _command(fixture, "part:pen_rod", extra=extra), environment
+    )
+
+    assert completed.returncode == 0, (completed.stdout, completed.stderr)
+    finished = _record(_only(Path(fixture["log_directory"]), "*.done"))
+    assert finished["farm_parallelism"] == expected
+    assert "-n" not in finished["argv"]
+    invocation = json.loads(Path(fixture["invocation"]).read_text(encoding="utf-8"))
+    assert invocation["environment"]["HARMONIC_FARM_PARALLELISM"] == str(expected)
+
+
+def test_an_unreadable_fan_out_never_starts_the_build(tmp_path: Path) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    environment = dict(fixture["environment"])
+    environment["HARMONIC_FARM_PARALLELISM"] = "lots"
+
+    completed = _run_launcher(fixture, _command(fixture, "part:pen_rod"), environment)
+
+    assert completed.returncode == 1
+    assert "HARMONIC_FARM_PARALLELISM is not a positive integer" in completed.stderr
+    assert not Path(fixture["invocation"]).exists()
+    assert not list(Path(fixture["log_directory"]).glob("*.run.json"))

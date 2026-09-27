@@ -19,7 +19,10 @@ param(
     [int]$LeafTimeout,
 
     [ValidatePattern('\A[A-Za-z0-9_-]+\z')]
-    [string]$Tag = 'run'
+    [string]$Tag = 'run',
+
+    [ValidateRange(1, 512)]
+    [int]$Parallelism = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -38,6 +41,39 @@ function Resolve-ExistingDirectory {
         throw "$ParameterName is not an existing directory: $Path"
     }
     return Resolve-PhysicalDirectory -Path (Resolve-Path -LiteralPath $Path).Path
+}
+
+function Resolve-FarmParallelism {
+    <#
+    .SYNOPSIS
+    The farm fan-out this run will use: -Parallelism, else an inherited
+    HARMONIC_FARM_PARALLELISM, else the default the worktree's own build.py
+    declares. The launcher exports the value it resolves, so the number in the
+    run record is the number build.py reads, not a guess at its default.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Worktree,
+        [Parameter(Mandatory)][int]$Requested
+    )
+
+    if ($Requested -gt 0) {
+        return $Requested
+    }
+    $inherited = [System.Environment]::GetEnvironmentVariable('HARMONIC_FARM_PARALLELISM', 'Process')
+    if (-not [string]::IsNullOrWhiteSpace($inherited)) {
+        $parsed = 0
+        if (-not [int]::TryParse($inherited.Trim(), [ref]$parsed) -or $parsed -lt 1) {
+            throw "HARMONIC_FARM_PARALLELISM is not a positive integer: $inherited"
+        }
+        return $parsed
+    }
+    $buildScript = Join-Path $Worktree 'build.py'
+    $declared = Select-String -LiteralPath $buildScript -Pattern '^_DEFAULT_FARM_PARALLELISM = "(\d+)"' |
+        Select-Object -First 1
+    if ($null -eq $declared) {
+        throw "cannot read _DEFAULT_FARM_PARALLELISM from $buildScript; pass -Parallelism"
+    }
+    return [int]$declared.Matches[0].Groups[1].Value
 }
 
 function Resolve-PhysicalDirectory {
@@ -255,9 +291,9 @@ try {
         '--executor', 'farm',
         '--leaf-timeout', [string]$LeafTimeout,
         '--verbosity', 'info',
-        '-n', '4',
         '--continue'
     ) + $normalizedTargets
+    $farmParallelism = Resolve-FarmParallelism -Worktree $resolvedWorktree -Requested $Parallelism
     [string[]]$nativeArgv = @('uv') + $buildArgs
 
     do {
@@ -289,6 +325,7 @@ try {
         commit = $commit
         targets = @($normalizedTargets)
         leaf_timeout_minutes = $LeafTimeout
+        farm_parallelism = $farmParallelism
         started_at = $startedAt.ToString('o', [System.Globalization.CultureInfo]::InvariantCulture)
         pid = $PID
         log = [System.IO.Path]::GetFullPath($logPath)
@@ -324,6 +361,7 @@ try {
     $env:SOLIDWORKS_POOL_HOME = $resolvedPoolHome
     $env:HARMONIC_REMOTE_CACHE_MODE = 'rw'
     $env:PYTHONUNBUFFERED = '1'
+    $env:HARMONIC_FARM_PARALLELISM = [string]$farmParallelism
     Push-Location -LiteralPath $resolvedWorktree
     try {
         & uv @buildArgs *>&1 | Tee-Object -LiteralPath $logPath
