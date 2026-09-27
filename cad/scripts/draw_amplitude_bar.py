@@ -6,8 +6,9 @@ import, curation, and export behavior lives in ``_drawing_common``.
 
 The bar is ~808 mm long but only 6.35 mm square, so the print shows a 1:4
 full-length front view (overall length only), a 4:1 top end view for the square
-section, and a small 1:8 isometric; the two tiny end notches and the top pin
-hole are dimensioned in the notes.  The sheet runs at 1:4.
+section, a small 1:8 isometric, and a 4:1 native detail of each end notch that
+carries its centring ledge, width and depth (and, at the foot, the floor's Ra
+symbol); the top pin hole is dimensioned in the notes.  The sheet runs at 1:4.
 
 Run with SolidWorks open::
 
@@ -27,6 +28,7 @@ from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
+    add_surface_finish,
     assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
@@ -35,14 +37,20 @@ from _drawing_common import (
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import surface_finish_by_key
+from amplitude_bar_drawing_spec import SURFACE_FINISHES
 from amplitude_bar_spec import (
+    BAR_DEPTH,
     BAR_LENGTH,
     BAR_WIDTH,
     BOTTOM_NOTCH_HEIGHT,
+    BOTTOM_NOTCH_WIDTH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    NOTCH_OFFSET,
     TOP_NOTCH_HEIGHT,
 )
 from solidworks_mcp.adapters.com_variant import double_array
@@ -113,39 +121,71 @@ class NotchDetail:
         return (self.centre[0], self.centre[1] - self.radius_mm * self.mm - 0.004)
 
 
-# At 1:4 an end notch is under a millimetre on the sheet, so each end's width
-# and depth -- the foot notch's with its one-sided band (Codex #936
-# PRRT_kwDOPHDy386mWF0L) -- print in a native detail. DETAIL A (the foot, 4:1)
-# sits under the end view, left of the title block; DETAIL B (the 12.7-deep top
-# notch, 2:1) over the isometric, right of the notes.
-DETAIL_A = NotchDetail("A", (4, 1), (BAR_WIDTH / 2.0, 2.0), 5.5, (0.165, 0.095))
+# At 1:4 an end notch is under a millimetre on the sheet, so each end's
+# centring ledge, width and depth -- the foot notch's depth with its one-sided
+# band (Codex #936 PRRT_kwDOPHDy386mWF0L) -- print in a native 4:1 detail
+# (Main ruling 2026-09-27). DETAIL A (the foot) sits under the end view, left
+# of the title block, its fence centred on the bar's end, right of the notch,
+# to take the width row and the floor's Ra symbol; DETAIL B (the 12.7-deep top notch) right of
+# the notes, left of and above the isometric. A detail drops any dimension
+# whose reference lies outside its fence, so every printed edge's ends stay
+# inside it (test_notch_details_frame_their_ends...).
+DETAIL_A = NotchDetail("A", (4, 1), (BAR_WIDTH / 2.0 + 2.0, 0.0), 7.5, (0.170, 0.100))
 DETAIL_B = NotchDetail(
-    "B", (2, 1), (BAR_WIDTH / 2.0, BAR_LENGTH - 6.0), 8.0, (0.300, 0.222)
+    "B", (4, 1), (BAR_WIDTH / 2.0, BAR_LENGTH - 6.0), 8.0, (0.300, 0.205)
 )
-# A callout's text stands this far outside the bar's edge or end.
+# A callout's text stands this far outside the bar's edge, or outside
+# DETAIL A's fence; a width/ledge row this far outside the bar's end.
 DETAIL_TEXT_GAP = 0.010
+DETAIL_A_FENCE_TEXT_GAP = 0.014
+DETAIL_ROW_GAP = 0.012
+_DETAIL_A_TEXT_X = (
+    DETAIL_A.centre[0] - DETAIL_A.radius_mm * DETAIL_A.mm - DETAIL_A_FENCE_TEXT_GAP
+)
+_DETAIL_A_ROW_Y = DETAIL_A.sheet_xy(0.0, 0.0)[1] - DETAIL_ROW_GAP
 DETAIL_A_KEEP = {
-    # Left of the bar, level with the notch: the depth and its band.
+    # Left of the fence, level with the notch: the depth and its band.
     "BottomNotchHeight": (
-        DETAIL_A.sheet_xy(0.0, 0.0)[0] - DETAIL_TEXT_GAP,
+        _DETAIL_A_TEXT_X,
         DETAIL_A.sheet_xy(0.0, BOTTOM_NOTCH_HEIGHT / 2.0)[1],
     ),
-    # Under the open end: its witnesses run down through the notch's air.
+    # One row under the open end, chained on the ledge's inner witness: the
+    # centring ledge's text left of the fence, the width's under the mouth
+    # (its witnesses run down the walls, through the notch's air).
+    "BottomLeftLedge": (_DETAIL_A_TEXT_X, _DETAIL_A_ROW_Y),
     "BottomNotchWidth": (
-        DETAIL_A.centre[0],
-        DETAIL_A.sheet_xy(0.0, 0.0)[1] - 0.008,
+        DETAIL_A.sheet_xy(BAR_WIDTH / 2.0, 0.0)[0],
+        _DETAIL_A_ROW_Y,
     ),
 }
+_DETAIL_B_TEXT_X = DETAIL_B.sheet_xy(BAR_WIDTH, 0.0)[0] + DETAIL_TEXT_GAP
+_DETAIL_B_ROW_Y = DETAIL_B.sheet_xy(0.0, BAR_LENGTH)[1] + DETAIL_ROW_GAP
 DETAIL_B_KEEP = {
     "TopNotchHeight": (
-        DETAIL_B.sheet_xy(BAR_WIDTH, 0.0)[0] + DETAIL_TEXT_GAP,
+        _DETAIL_B_TEXT_X,
         DETAIL_B.sheet_xy(0.0, BAR_LENGTH - TOP_NOTCH_HEIGHT / 2.0)[1],
     ),
-    "TopNotchWidth": (
-        DETAIL_B.centre[0],
-        DETAIL_B.sheet_xy(0.0, BAR_LENGTH)[1] + 0.008,
-    ),
+    # One row over the open end, chained on the ledge's inner witness.
+    "TopNotchWidth": (DETAIL_B.sheet_xy(BAR_WIDTH / 2.0, 0.0)[0], _DETAIL_B_ROW_Y),
+    "TopRightLedge": (_DETAIL_B_TEXT_X, _DETAIL_B_ROW_Y),
 }
+
+# The foot notch floor's Ra (Main ruling B, 2026-09-27). The symbol is ~17 mm
+# wide at the fleet's 2.5 mm height, wider than the 12.7 mm mouth, so it
+# stands under the right cheek, inside the fence, and its bent leader climbs
+# through the mouth to the floor. With the width row hanging under the mouth,
+# a leader out of it must cross a witness or the dimension line; it crosses
+# only the right witness, between the bar's end and the row (an extension
+# line may be crossed; a dimension line should not be).
+FLOOR_FINISH_ATTACH = DETAIL_A.sheet_xy(BAR_WIDTH / 2.0 + 0.5, BOTTOM_NOTCH_HEIGHT)
+FLOOR_FINISH_SYMBOL = (
+    DETAIL_A.sheet_xy(BAR_WIDTH / 2.0, 0.0)[0] + 0.0163,
+    DETAIL_A.sheet_xy(0.0, 0.0)[1] - 0.017,
+)
+FINISH_CHAR_HEIGHT = 0.0025
+# The bent leader's shoulder runs this far from the symbol's vertex toward the
+# attach point before it turns (measured on the pivot-shaft sheet, r743-5).
+FINISH_SHOULDER = 0.0063
 
 
 def _notch_detail(adapter: Any, front: Any, detail: NotchDetail) -> Any:
@@ -222,6 +262,36 @@ def _notch_detail(adapter: Any, front: Any, detail: NotchDetail) -> Any:
     return view
 
 
+def _notch_floor_edge(view: Any) -> Any:
+    """The foot notch floor's near edge in DETAIL A: edge-on it IS the floor's
+    line, and its faces include the floor the control names."""
+    span = sorted((NOTCH_OFFSET, NOTCH_OFFSET + BOTTOM_NOTCH_WIDTH))
+    matches = []
+    for raw in visible_view_entities(view, 1, label="bottom notch floor"):
+        edge = _early_bound(raw, "IEdge")
+        start, end = edge.GetStartVertex(), edge.GetEndVertex()
+        if start is None or end is None:
+            continue
+        points = [
+            tuple(float(v) * 1000.0 for v in _early_bound(vertex, "IVertex").GetPoint())
+            for vertex in (start, end)
+        ]
+        if any(abs(p[1] - BOTTOM_NOTCH_HEIGHT) > 0.01 for p in points):
+            continue
+        if not all(
+            math.isclose(a, b, abs_tol=0.01)
+            for a, b in zip(sorted(p[0] for p in points), span)
+        ):
+            continue
+        matches.append((points[0][2], edge))
+    # The near (z = BarDepth) and far (z = 0) edges project onto one line and
+    # both bound the floor; take the near one when both are listed.
+    depths = sorted(round(z, 2) for z, _edge in matches)
+    if depths not in ([0.0], [round(BAR_DEPTH, 2)], [0.0, round(BAR_DEPTH, 2)]):
+        raise RuntimeError(f"unexpected bottom notch floor edges at z={depths} mm")
+    return max(matches, key=lambda item: item[0])[1]
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -287,6 +357,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="top",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    details = {}
     for detail, keep in ((DETAIL_A, DETAIL_A_KEEP), (DETAIL_B, DETAIL_B_KEEP)):
         view = _notch_detail(adapter, front, detail)
         annotations += curate_view_dimensions(
@@ -296,9 +367,21 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=f"detail {detail.label}",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
+        details[detail.label] = view
     # Decimal places (and so the band each dimension claims) are authored on
     # the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+
+    add_surface_finish(
+        adapter,
+        details[DETAIL_A.label],
+        edge_entity=_notch_floor_edge(details[DETAIL_A.label]),
+        symbol_xy=FLOOR_FINISH_SYMBOL,
+        control=surface_finish_by_key(SURFACE_FINISHES, "bottom_notch_floor"),
+        label="bottom notch floor finish",
+        leader_attach_xy=FLOOR_FINISH_ATTACH,
+        char_height=FINISH_CHAR_HEIGHT,
+    )
 
     # The projected end outline is not a selectable topological EDGE after the
     # end notches are overlaid. The manufacturing note owns the explicit 6.35

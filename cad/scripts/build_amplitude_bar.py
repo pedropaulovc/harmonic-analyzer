@@ -59,15 +59,19 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
+from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
+from amplitude_bar_drawing_spec import SURFACE_FINISHES
 from amplitude_bar_notes import DRAWING_NOTES, END_VIEW_NOTE, ISOMETRIC_VIEW_NOTE
 from amplitude_bar_spec import (
     BOTTOM_NOTCH_DEPTH_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    NOTCH_OFFSET_TOLERANCE_MM,
     TOP_PIN_HOLE_SPEC,
 )
 
@@ -322,7 +326,8 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
 
     # Manufacturing drawing support: the foot notch may only come out shallow
-    # (amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND), natively on its depth;
+    # (amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND), natively on its depth, and
+    # each notch is centred by the band on the ledge its detail prints;
     # author every printed dimension's places, mark exactly the print's
     # dimensions and stamp the make-critical title-block properties.
     set_dimension_bilateral_tolerance(
@@ -331,10 +336,18 @@ async def build(adapter) -> dict[str, str]:
         "BottomNotchHeight",
         *deviations(BOTTOM_NOTCH_DEPTH_BAND),
     )
+    set_dimension_symmetric_tolerance(
+        adapter, "BarProfile", "BottomLeftLedge", NOTCH_OFFSET_TOLERANCE_MM
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "BarProfile", "TopRightLedge", NOTCH_OFFSET_TOLERANCE_MM
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # The foot notch floor's roughness lives on the MODEL as a plain annotation.
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

@@ -90,50 +90,180 @@ def test_bottom_notch_depth_band_is_native_on_its_dimension() -> None:
     assert bar.DRAWING_NOTES is amplitude_bar_notes.DRAWING_NOTES
 
 
+# Each printed profile dimension's two sketch endpoints (part x, y mm): a
+# detail drops any dimension whose reference lies outside its fence.
+_W = amplitude_bar_spec.BAR_WIDTH
+_O = (_W - amplitude_bar_spec.BOTTOM_NOTCH_WIDTH) / 2.0
+_L = amplitude_bar_spec.BAR_LENGTH
+_DETAIL_DIMENSION_ENDS = {
+    "BottomLeftLedge": ((0.0, 0.0), (_O, 0.0)),
+    "BottomNotchHeight": ((_O, 0.0), (_O, amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT)),
+    "BottomNotchWidth": (
+        (_O, amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT),
+        (_W - _O, amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT),
+    ),
+    "TopRightLedge": ((_W, _L), (_W - _O, _L)),
+    "TopNotchHeight": (
+        (_W - _O, _L),
+        (_W - _O, _L - amplitude_bar_spec.TOP_NOTCH_HEIGHT),
+    ),
+    "TopNotchWidth": (
+        (_W - _O, _L - amplitude_bar_spec.TOP_NOTCH_HEIGHT),
+        (_O, _L - amplitude_bar_spec.TOP_NOTCH_HEIGHT),
+    ),
+}
+
+
 def test_notch_details_frame_their_ends_and_place_text_outside_the_bar() -> None:
-    """DETAIL A takes in the foot notch and the open end; DETAIL B the 12.7
-    top notch. Each depth's text stands outside the bar's side and each
-    width's outside its open end, where the witnesses run through air."""
+    """Both details run 4:1 (Main ruling 2026-09-27). DETAIL A takes in the
+    foot notch and the open end; DETAIL B the 12.7 top notch. Every printed
+    dimension's ends lie inside its fence; each depth's text stands outside
+    the bar's side and each ledge/width row outside its open end, where the
+    witnesses run through air."""
     spec = amplitude_bar_spec
-    for detail, low, high in (
-        (drawing.DETAIL_A, 0.0, spec.BOTTOM_NOTCH_HEIGHT),
-        (drawing.DETAIL_B, spec.BAR_LENGTH - spec.TOP_NOTCH_HEIGHT, spec.BAR_LENGTH),
-    ):
+    a, b = drawing.DETAIL_A, drawing.DETAIL_B
+    assert a.scale == b.scale == (4, 1)
+    for detail, keep in ((a, drawing.DETAIL_A_KEEP), (b, drawing.DETAIL_B_KEEP)):
         fx, fy = detail.fence_mm
-        for x in (0.0, spec.BAR_WIDTH):
-            for y in (low, high):
-                assert math.hypot(x - fx, y - fy) < detail.radius_mm
-    a = drawing.DETAIL_A
+        for name in keep:
+            for x, y in _DETAIL_DIMENSION_ENDS[name]:
+                assert math.hypot(x - fx, y - fy) < detail.radius_mm - 0.5, name
     depth_x, depth_y = drawing.DETAIL_A_KEEP["BottomNotchHeight"]
-    assert depth_x < a.sheet_xy(0.0, 0.0)[0]
+    assert depth_x < a.centre[0] - a.radius_mm * a.mm  # left of the fence
     assert (
         a.sheet_xy(0.0, 0.0)[1] < depth_y < a.sheet_xy(0.0, spec.BOTTOM_NOTCH_HEIGHT)[1]
     )
-    assert drawing.DETAIL_A_KEEP["BottomNotchWidth"][1] < a.sheet_xy(0.0, 0.0)[1]
-    b = drawing.DETAIL_B
+    bottom_row = {
+        drawing.DETAIL_A_KEEP[n][1] for n in ("BottomLeftLedge", "BottomNotchWidth")
+    }
+    (row_y,) = bottom_row
+    assert row_y < a.sheet_xy(0.0, 0.0)[1]
+    assert drawing.DETAIL_A_KEEP["BottomLeftLedge"][0] < a.sheet_xy(0.0, 0.0)[0]
     assert (
         drawing.DETAIL_B_KEEP["TopNotchHeight"][0] > b.sheet_xy(spec.BAR_WIDTH, 0.0)[0]
     )
+    top_row = {drawing.DETAIL_B_KEEP[n][1] for n in ("TopRightLedge", "TopNotchWidth")}
+    (row_y,) = top_row
+    assert row_y > b.sheet_xy(0.0, spec.BAR_LENGTH)[1]
     assert (
-        drawing.DETAIL_B_KEEP["TopNotchWidth"][1] > b.sheet_xy(0.0, spec.BAR_LENGTH)[1]
+        drawing.DETAIL_B_KEEP["TopRightLedge"][0] > b.sheet_xy(spec.BAR_WIDTH, 0.0)[0]
     )
     # Both details and their labels stay on the sheet, clear of the title
-    # block (x >= 0.218 below y 0.065) and of each other.
+    # block (x >= 0.218 below y 0.065), the notes block (right edge ~0.237),
+    # the end-view note (from x 0.205) and the isometric (x 0.330, top 0.181).
     for detail in (a, b):
         radius = detail.radius_mm * detail.mm
         assert detail.label_xy[1] - 0.010 > 0.0127
         assert detail.centre[1] + radius < 0.2667
-    assert a.centre[0] + a.radius_mm * a.mm < 0.218
-    assert b.label_xy[1] - 0.010 > 0.181  # over the isometric's top
+    assert drawing._DETAIL_B_ROW_Y + 0.004 < 0.2667
+    assert a.centre[0] + a.radius_mm * a.mm < 0.205
+    assert b.centre[0] - b.radius_mm * b.mm > 0.240
+    assert b.label_xy[0] + 0.022 < drawing.ISO_CENTER[0] - 0.002
 
 
-def test_functional_notch_finish_is_feature_specific() -> None:
-    notes = amplitude_bar_notes.DRAWING_NOTES
-    assert "BOTTOM NOTCH FLOOR: Ra 0.8" in notes
+def test_notch_centring_bands_ride_each_details_ledge_not_a_note() -> None:
+    """Main ruling A(a) 2026-09-27 (Codex #936 PRRT_kwDOPHDy386mWF0L): the
+    'CENTRED ON THE WIDTH WITHIN 0.10' note becomes a native +/-0.05 on the
+    NotchOffset ledge each detail prints."""
+    from _drawing_contract import model_toleranced_dimensions
+
+    assert amplitude_bar_spec.NOTCH_OFFSET_TOLERANCE_MM == 0.05
+    assert amplitude_bar_spec.NOTCH_OFFSET == _O == bar.NOTCH_OFFSET
+    bands = model_toleranced_dimensions(bar)
+    for name, keep in (
+        ("BottomLeftLedge", drawing.DETAIL_A_KEEP),
+        ("TopRightLedge", drawing.DETAIL_B_KEEP),
+    ):
+        assert bands[("BarProfile", name)] == "NOTCH_OFFSET_TOLERANCE_MM"
+        assert name in keep
+        assert amplitude_bar_spec.DRAWING_PRECISION["BarProfile"][name] == 2
+    notes = " ".join(
+        line.strip() for line in amplitude_bar_notes.DRAWING_NOTES.splitlines()
+    )
+    assert "CENTRED" not in notes and "WITHIN" not in notes
+
+
+def test_notes_keep_only_the_ruled_prose() -> None:
+    """Note 2 keeps its orientation prose and the Main-ruled R0.40 MAX
+    exception word for word; the Ra note is gone and PLATING renumbers."""
+    assert amplitude_bar_notes.DRAWING_NOTES.splitlines() == [
+        "1. BAR SECTION 6.35 SQUARE.",
+        "2. END NOTCHES (DETAILS A, B):",
+        "   BOTH THRU THE FULL DEPTH, OPEN TO",
+        "   OPPOSITE ENDS, IN ONE COMMON PLANE;",
+        "   ROOTS R0.40 MAX.",
+        f"3. TOP PIN HOLE {drill_process(amplitude_bar_spec.TOP_PIN_HOLE_SPEC)} THRU BOTH",
+        "   TOP-NOTCH CHEEKS AT MID-DEPTH,",
+        "   6.35 BELOW THE BAR TOP.",
+        "4. DIMS APPLY AFTER PLATING.",
+    ]
+
+
+def test_functional_notch_finish_is_a_native_symbol_on_the_floor() -> None:
+    """Main ruling B 2026-09-27: the foot notch floor's Ra 0.8 is a native
+    finish symbol on the floor in DETAIL A, authored on the part, not a note."""
+    import amplitude_bar_drawing_spec as finish_spec
+    from _gtol_spec import PlanarFace
+    from _surface_finish import GROUND, surface_finish_by_key
+
+    control = surface_finish_by_key(finish_spec.SURFACE_FINISHES, "bottom_notch_floor")
+    assert control.roughness_ra == GROUND == "0.8"
+    assert control.face == PlanarFace(
+        (0, -1, 0), -amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT
+    )
+    assert len(finish_spec.SURFACE_FINISHES) == 1
+    assert "Ra" not in amplitude_bar_notes.DRAWING_NOTES
+    part_source = Path(bar.__file__).read_text(encoding="utf-8")
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "bottom_notch_floor")' in source
     assert "add_datum_feature(" not in source
     assert "add_feature_control_frame(" not in source
-    assert "add_surface_finish(" not in source
+    assert drawing.FINISH_CHAR_HEIGHT == 0.0025
+    # The channel/magnifier/summing closure imports amplitude_bar_spec; the
+    # finish controls stay out of it.
+    spec_source = Path(amplitude_bar_spec.__file__).read_text(encoding="utf-8")
+    assert "SurfaceFinishControl" not in spec_source
+
+
+def test_floor_finish_leader_runs_through_the_mouth_crossing_only_a_witness() -> None:
+    """The symbol (~17 mm wide) cannot stand in the 12.7 mm mouth; its bent
+    leader climbs from under the right cheek through the mouth to the floor,
+    crossing the right witness between the bar's end and the width row, never
+    the row's dimension line or the cheek."""
+    a = drawing.DETAIL_A
+    spec = amplitude_bar_spec
+    ax, ay = drawing.FLOOR_FINISH_ATTACH
+    vx, vy = drawing.FLOOR_FINISH_SYMBOL
+    kx = vx - drawing.FINISH_SHOULDER  # the shoulder runs toward the attach
+    end_y = a.sheet_xy(0.0, 0.0)[1]
+    left_wall = a.sheet_xy(_O, 0.0)[0]
+    right_wall = a.sheet_xy(_O + spec.BOTTOM_NOTCH_WIDTH, 0.0)[0]
+    bar_right = a.sheet_xy(_W, 0.0)[0]
+    row_y = drawing.DETAIL_A_KEEP["BottomNotchWidth"][1]
+
+    assert ay == a.sheet_xy(0.0, spec.BOTTOM_NOTCH_HEIGHT)[1]  # on the floor
+    assert left_wall < ax < right_wall
+
+    def x_at(y: float) -> float:
+        return kx + (ax - kx) * (y - vy) / (ay - vy)
+
+    # Leaves the mouth clear of the cheek's corner.
+    assert left_wall + 0.001 < x_at(end_y) < right_wall - 0.001
+    # Crosses the right witness between the bar's end and the row...
+    t = (kx - right_wall) / (kx - ax)
+    witness_y = vy + t * (ay - vy)
+    assert row_y + 0.002 < witness_y < end_y - 0.002
+    # ...and passes the row outside the dimension line, arrows included.
+    assert vy < row_y - 0.002
+    assert x_at(row_y) > right_wall + 0.001
+    # The symbol body (~2.5 mm left of the vertex to ~15 mm right, 5.4 mm up)
+    # stands under the right cheek, clear of the bar, inside the fence.
+    assert vx - 0.0025 > right_wall + 0.004
+    assert vy + 0.0054 < end_y - 0.004
+    for x, y in ((vx + 0.015, vy), (vx + 0.015, vy + 0.0054)):
+        assert math.dist((x, y), a.centre) < a.radius_mm * a.mm
+    assert vy + 0.0054 < end_y and vx + 0.015 > bar_right  # under, past the cheek
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

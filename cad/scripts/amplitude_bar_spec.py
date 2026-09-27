@@ -32,6 +32,7 @@ TOP_PIN_HOLE_SPEC = HoleSpec("drilled_number", "#47")
 
 # --- Derived. ---
 TOP_PIN_Y = BAR_LENGTH - TOP_PIN_DROP  # 801.95
+NOTCH_OFFSET = (BAR_WIDTH - BOTTOM_NOTCH_WIDTH) / 2.0  # 1.5875 ledge: notches centred
 
 
 # The foot notch's roof rides the rocker's top edge, and at d = 0 the cheeks
@@ -43,26 +44,36 @@ TOP_PIN_Y = BAR_LENGTH - TOP_PIN_DROP  # 801.95
 # BottomNotchHeight, never note text.
 BOTTOM_NOTCH_DEPTH_BAND = (0.0, -0.50)  # (upper, lower) deviations
 
+# Each notch is centred on the bar's width by its NotchOffset ledge, so the
+# centring requirement rides natively on the ledge each detail prints (Main
+# ruling A(a) 2026-09-27, Codex #936 PRRT_kwDOPHDy386mWF0L): the bottom-left
+# ledge in DETAIL A, the top-right one in DETAIL B.
+NOTCH_OFFSET_TOLERANCE_MM = 0.05  # symmetric
+
 # --- Marked-dimension contract.  The bar is far too long to dimension the tiny
 # end notches on the 1:4 view, so the overall length prints there and each
-# notch's width and depth print in a native detail of its end. ---
+# notch's centring ledge, width and depth print in a native detail of its end. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarProfile": {
         "BarLength",
+        "BottomLeftLedge",
         "BottomNotchHeight",
         "BottomNotchWidth",
         "TopNotchHeight",
         "TopNotchWidth",
+        "TopRightLedge",
     },
 }
 # Places the part authors on each printed dimension (policy rule 2).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BarProfile": {
         "BarLength": 2,
+        "BottomLeftLedge": 2,
         "BottomNotchHeight": 2,
         "BottomNotchWidth": 2,
         "TopNotchHeight": 2,
         "TopNotchWidth": 2,
+        "TopRightLedge": 2,
     },
 }
 
