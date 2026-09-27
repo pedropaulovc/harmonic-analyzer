@@ -412,19 +412,8 @@ def _title_block_keep_out() -> tuple[float, float, float, float]:
 
 def _ring_slide(outline_mm: tuple[float, ...]) -> tuple[float, tuple[float, float]]:
     outline = tuple(value / 1000.0 for value in outline_mm)
-    shift, _overflows = drawing.ring_fit_shift(
-        outline,
-        drawing.CLUSTER_RING_REGION,
-        grow=drawing.CLUSTER_BALLOON_MARGIN + drawing.BALLOON_DIAMETER,
-    )
-    x = drawing.ring_keep_out_shift_x(
-        outline,
-        shift,
-        margin=drawing.CLUSTER_BALLOON_MARGIN,
-        balloon_radius=drawing.BALLOON_DIAMETER / 2.0,
-        keep_out=_title_block_keep_out(),
-    )
-    return x - shift[0], (x, shift[1])
+    shift, _overflows, slide = drawing.cluster_ring_fit(outline)
+    return slide, shift
 
 
 def test_the_cone_crank_ring_slides_off_the_title_block() -> None:
@@ -459,6 +448,79 @@ def test_the_cone_crank_ring_slides_off_the_title_block() -> None:
 def test_a_ring_clear_of_the_title_block_stays_centred(outline_mm: tuple[float, ...]) -> None:
     slide, _shift = _ring_slide(outline_mm)
     assert slide == 0.0
+
+
+# cascade-3's cone-crank outline at 1:3 (the same one rim-124f read): its ring
+# put balloons '42' and '43' on sheet 4's two-line heading (leaf log, layout
+# audit of 4e7ab7ca0; heading box bottom 254.3 mm).
+CONE_CRANK_OUTLINE_1_3 = (0.126422, 0.110834, 0.286493, 0.268479)
+CYLINDER_BANK_OUTLINE_2_3 = (0.088871, 0.068887, 0.257678, 0.210050)
+PINION_RIG_OUTLINE_1_2 = (0.145842, 0.092169, 0.280976, 0.215724)
+
+
+def test_the_ring_reach_is_where_the_balloon_ink_lands() -> None:
+    """``_spread_balloons`` puts each circle CENTRE on the ellipse ``margin``
+    outside the outline, so the ink reaches margin + radius.  cascade-3's
+    audit read balloon '42' at y [246.1, 255.5] mm, centred at the ellipse's
+    top vertex; the estimate must land there, not a radius higher."""
+    outline = CONE_CRANK_OUTLINE_1_3
+    shift, _overflows, _slide = drawing.cluster_ring_fit(outline)
+    ink_top = outline[3] + shift[1] + drawing.CLUSTER_RING_REACH
+    assert ink_top * 1000.0 == pytest.approx(255.5, abs=0.5)
+
+
+def test_every_cluster_prefers_a_scale_on_the_ladder() -> None:
+    ladder = drawing.CLUSTER_SCALE_LADDER
+    ratios = [n / d for n, d in ladder]
+    assert ratios == sorted(ratios, reverse=True) and len(set(ratios)) == len(ratios)
+    assert set(drawing.CLUSTER_SCALES.values()) <= set(ladder)
+
+
+def test_an_overflowing_cone_crank_ring_steps_down_to_the_first_fitting_scale() -> None:
+    """At 1:3 the ring is 191.6 mm tall against a 176 mm region; at 1:4 it fits
+    centred, clear of the heading and the title block."""
+    _shift, overflows, _slide = drawing.cluster_ring_fit(CONE_CRANK_OUTLINE_1_3)
+    assert any(finding.startswith("height") for finding in overflows)
+    scale = drawing.cluster_ring_scale(CONE_CRANK_OUTLINE_1_3, (1.0, 3.0), label="cone-crank")
+    assert scale == (1.0, 4.0)
+    k = (1.0 / 4.0) / (1.0 / 3.0)
+    x0, y0, x1, y1 = CONE_CRANK_OUTLINE_1_3
+    cx, cy, hw, hh = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2 * k, (y1 - y0) / 2 * k
+    _shift, overflows, slide = drawing.cluster_ring_fit((cx - hw, cy - hh, cx + hw, cy + hh))
+    assert overflows == [] and slide == 0.0
+
+
+@pytest.mark.parametrize(
+    ("outline", "preferred"),
+    [(CYLINDER_BANK_OUTLINE_2_3, (2.0, 3.0)), (PINION_RIG_OUTLINE_1_2, (1.0, 2.0))],
+)
+def test_a_ring_that_fits_keeps_its_preferred_scale(outline, preferred) -> None:
+    assert drawing.cluster_ring_scale(outline, preferred, label="fits") == preferred
+
+
+def test_the_fit_does_not_depend_on_where_the_view_landed() -> None:
+    moved = tuple(value + 0.050 for value in CONE_CRANK_OUTLINE_1_3)
+    assert drawing.cluster_ring_scale(moved, (1.0, 3.0), label="moved") == (1.0, 4.0)
+
+
+def test_a_ring_no_ladder_scale_fits_raises_naming_the_cluster_and_overflow() -> None:
+    # 1.1 m tall at 1:3 is still 367 mm at 1:5.
+    outline = (0.100, 0.0, 0.200, 1.100)
+    with pytest.raises(ValueError, match=r"cone-crank.*1:5: height"):
+        drawing.cluster_ring_scale(outline, (1.0, 3.0), label="cone-crank")
+
+
+def test_a_preferred_scale_off_the_ladder_is_refused() -> None:
+    with pytest.raises(ValueError, match="not on the ladder"):
+        drawing.cluster_ring_scale(CONE_CRANK_OUTLINE_1_3, (3.0, 7.0), label="odd")
+
+
+def test_the_sheet_scales_follow_the_chosen_cluster_scales() -> None:
+    chosen = {**drawing.CLUSTER_SCALES, "cone-crank": (1.0, 4.0)}
+    scales = drawing.package_sheet_scales(chosen)
+    assert set(scales) == set(drawing.SHEET_NAMES)
+    assert scales[drawing.SHEET_NAMES[drawing.CLUSTER_SHEETS["cone-crank"] - 1]] == (1.0, 4.0)
+    assert drawing.package_sheet_scales(drawing.CLUSTER_SCALES) == drawing.SHEET_SCALES
 
 
 class _Adapter:
