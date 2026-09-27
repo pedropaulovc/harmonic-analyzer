@@ -17,6 +17,7 @@ import argparse
 import hashlib
 import math
 import sys
+import textwrap
 from datetime import UTC, datetime
 from itertools import combinations
 from pathlib import Path
@@ -28,6 +29,8 @@ import _telemetry
 import connecting_rod_spec as rod
 import cylinder_bank_layout as bank
 import drive_train_steps as steps
+import pinion_rig_fitup as FITUP
+import pinion_rig_tip_gap as TIP_GAP
 from channel_assembly_steps import NORTH_BRACKET_SET_KEY
 from _common import _early_bound, check, run_build
 from _drawing_common import (
@@ -65,6 +68,7 @@ from drive_train_assembly_spec import (
     cluster_members,
     unclassified_stems,
 )
+from pinion_spring_section import SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST_OF_PIVOT
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
 
@@ -260,7 +264,7 @@ REFERENCE_ISO_CENTER = (0.380, 0.110)
 # needs for its title-block property links (finalize_drawing refuses a sheet
 # without a view: r8, leaf 20260923T214354Z-1-4126331f). Sheet 6 carries steps
 # 1-7 and the general notes on the left, its right field kept free for D1; the
-# bank's steps 8-10 fill sheet 7's left field; steps 11-22 continue on sheet 8
+# bank's steps 8-10 fill sheet 7's left field; the rig's steps continue on sheet 8
 # beside the station table (Main, B1 re-ruling 2026-09-26).
 ISO_RIGHT_FIELD = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
@@ -561,78 +565,135 @@ BANK_STEPS = "\n".join(
     )
 )
 
-RIG_STEPS = "\n".join(
-    (
-        "ASSEMBLY SEQUENCE CONT. - PINION RIG",
-        # The front MHA-056 top bore is a closed 8 mm hole: once MHA-002 is
-        # bonded, the drum blocks MHA-102 from the north and its 15 mm head
-        # from the south. So the arbor passes the front strap bare, back end
-        # first, and the drum is bonded after (reviewfirst, Main 2026-09-24).
-        "11. PRESS {cam_pins}X MHA-116 INTO THE MHA-056 SEATS PER ITS PRINT.",
-        "12. MATCH-REAM THE MHA-102 HEAD TO MHA-058; PRESS MHA-058 (NO TURN OR",
-        "    SLIDE BY HAND).",
-        # R1a (user): pinned retention collar MHA-144 (#860). It goes on
-        # before the arbor is journalled (pinion_arbor_collar_spec); the pin
-        # is the rig's 1/16 x 1/2 slotted spring pin, never proud of the Ø15.
-        "13. SLIDE MHA-144 ON FROM THE MHA-102 BACK END, PAST BOTH JOURNALS,",
-        "    TO THE MHA-102 PIN HOLE; DRIVE ONE 1/16 X 1/2 SPRING PIN THROUGH",
-        "    BOTH, SUB-FLUSH.",
-        "14. PASS MHA-102, BACK END FIRST, THROUGH THE FRONT MHA-056 TOP BORE",
-        "    FROM THE HEAD SIDE.",
-        "15. FIT MHA-002 ON MHA-102 PER THE MHA-102 PRINT.",
-        "16. JOURNAL THE MHA-102 BACK END IN THE BACK MHA-056 TOP BORE; HANG",
-        "    BOTH MHA-056 ON MHA-062 THROUGH {pivot_blocks}X MHA-061.",
-        # E-a (user): the strap feet are pinned to the torque shaft. Right
-        # after the hang: MHA-062 is drilled off the machine (the cams sit
-        # ~18.5 west of the foot), and once the cams are on, the pin's west
-        # edge has 0.38 of air to the MHA-104 collar. Wording from
-        # pinioncluster (dt-torque-shaft-pin-fitup-steps-20260924.md), #858.
-        "17. PUSH THE HUNG CLUSTER HARD ON THE BACK MHA-061; SET",
-        "    MHA-062 FLUSH WITH ITS OUTER FACE. TRANSFER-PUNCH MHA-062 THROUGH",
-        "    EACH MHA-056 CROSS HOLE; WITHDRAW IT AND DRILL 1/16 THRU AT EACH",
-        "    MARK (V-BLOCK). REFIT MHA-062 FLUSH END BACK; DRIVE ONE 1/16 X 1/2",
-        "    SPRING PIN PER STRAP, SUB-FLUSH BOTH EDGES. THE CLUSTER SWINGS",
-        "    FREELY AND MHA-062 TURNS WITH IT IN BOTH MHA-061.",
-        "18. FIT {cams}X MHA-104 AND MHA-059 ON MHA-060 IN THE MHA-061 LIFT",
-        "    BORES. PARK EACH CAM ECCENTRIC DOWN; LOCK IT WITH THE M2.5 SET",
-        "    SCREW SUPPLIED WITH MHA-104. SEAT MHA-059 ON MHA-060 TO THE BORE",
-        "    FLOOR, GRIP AT ITS PARK ANGLE; AT 3 O'CLOCK MATCH-DRILL 1/16",
-        "    THROUGH HUB AND ROD AT MID-ENGAGEMENT (4.0 FROM THE BORE FLOOR);",
-        "    DRIVE MHA-135; PEEN BOTH ENDS FLUSH.",
-        # Main ruling 2026-09-23 (U28 corollary): the rig is located by its
-        # parked tip gap, and MHA-035 carries its hold-down and spring seats as
-        # TRANSFER FROM MHA-061. The level line of centres makes block travel
-        # equal gap change; 2.5 is the physical rest gap, not the CAD gap
-        # (pinioncluster, PR #837).
-        "19. LOCATE THE RIG ON BASE MHA-035 (FRAME ASSEMBLY MHA-A04); ITS",
-        "    SEATS ARE TRANSFERRED, NOT PRE-DRILLED. SET BOTH MHA-061 LOOSE",
-        "    ON THE BASE WITH MHA-114 FITTED.",
-        "    PARK MHA-059: THE MHA-116 PINS REST ON THE CAMS UNDER THE SPRING.",
-        "20. FACE A MHA-002 TOOTH TIP TO A MHA-027 TOOTH TIP ON THE LEVEL",
-        "    LINE OF CENTRES. SLIDE THE RIG IN UNTIL A 2.5 FEELER (E.G. 2.00",
-        "    + 0.50 LEAVES) IS SNUG; ACCEPT 2.3-2.7. SET IT AT THE FRONT AND",
-        "    BACK STATIONS TO SQUARE BOTH MHA-061 TO THE DRUM.",
-        # #854 Codex P1: the front-block end-play feeler is set here, before
-        # the clamp and before step 21 spots the seats. Wording from
-        # pinioncluster; the band is pinion_rig_layout FRONT_BLOCK_FEELER
-        # 0.25 with FRONT_BLOCK_FEELER_BAND 0.10, printed as limits (the purity
-        # gate keeps bilateral bands in the spec). PENDING until #854 lands,
-        # when the limits are generated from those two constants.
-        "    [PENDING: WITH THE CLUSTER HARD ON THE BACK MHA-061, STAND THE",
-        "    FRONT MHA-061 0.15-0.35 OFF THE FRONT MHA-056 OUTER FACE",
-        "    (FEELER).] CLAMP.",
-        # Seat depths from the base's own seat specs (build_harmonic_base
-        # BLOCK_/FOOT_SCREW_DRILL_DEPTH and _HOLE_DEPTH; the #8-32 pair is the
-        # rule-12 E10 re-derive on dt-pinion-lever-pin #844). FOOT_HOLE_DEPTH
-        # 8.975 prints as 9.0: .X +/-0.8 is the honest band for a tap depth.
-        "21. SPOT MHA-035 THROUGH THE MHA-061 HOLES; DRILL #29 X 15.0, TAP",
-        "    #8-32 X 12.75 (PLUG, THEN BOTTOMING), {slotted} PLACES. SET",
-        "    MHA-114 WITH ITS TERMINAL FLAT ON THE PARKED BACK MHA-056; SPOT",
-        "    THROUGH ITS FOOT HOLE; DRILL #43 X 11.0, TAP #4-40 X 9.0 (PLUG,",
-        "    THEN BOTTOMING), 1 PLACE. FIT {slotted}X MHA-101 AND 1X MHA-103.",
-        f"22. OTHER BASE MOUNTING: SEE SHEET {CHECKS_SHEET}, EXTERNAL INTERFACES.",
-    )
+RIG_SEQUENCE_HEADING = "ASSEMBLY SEQUENCE CONT. - PINION RIG"
+# A printed step line, at the 70 characters a half-sheet field holds.
+_STEP_LINE_WIDTH = 70
+
+# The rig's own assembly steps are pinion_rig_fitup's (Codex #858,
+# PRRT_kwDOPHDy386mTbPB): each part step, SHAFT DRILL SET, RIG SET and
+# COLLAR SET print here word for word, re-wrapped to the field, and every
+# other sheet cites them by registry key.  Unpacking fails loud if the
+# fit-up sequence gains or loses a step.
+(
+    _ARBOR_COLLAR_STEP,
+    _DRUM_BOND_STEP,
+    _HANDLE_BOND_STEP,
+    _CAM_PIN_BOND_STEP,
+    _SHAFT_DRILL_STEP,
+    _RIG_SET_STEP,
+    _COLLAR_SET_STEP,
+    _LEVER_PIN_STEP,
+) = FITUP.ASSEMBLY_SEQUENCE
+
+# MHA-114's east-west station, in the strap's swing plane (Main's TbPB
+# ruling Q2(2) A): the foot hole where the preload gates put it
+# (pinion_spring_section), the crest then bearing on the parked flank.  RIG
+# SET's pad leaf sets the other axis, along the bank.  The window a fitter
+# must hold it in is known issue #1037, which ships this as the interim.
+SPRING_EAST_WEST = (
+    f"MHA-114 FOOT HOLE CENTRE {SPRING_SCREW_EAST_OF_PIVOT:.1f} EAST OF THE "
+    "MHA-062 AXIS, CREST BEARING ON THE PARKED BACK MHA-056 FLANK"
 )
+
+
+def _numbered_step(key: str, text: str) -> str:
+    """``text`` headed by ``key``'s registry number, re-wrapped to the field
+    and hung under the head.  A line after a colon, and an indented line,
+    keep their own break and indent; every other break is a soft wrap."""
+    head = f"{steps.step_number(key)}. "
+    hang = " " * len(head)
+    paragraphs: list[tuple[str, str]] = []
+    for source in text.split("\n"):
+        body = source.lstrip()
+        indent = source[: len(source) - len(body)]
+        if paragraphs and not indent and not paragraphs[-1][0]:
+            if not paragraphs[-1][1].endswith(":"):
+                paragraphs[-1] = ("", f"{paragraphs[-1][1]} {body}")
+                continue
+        paragraphs.append((indent, body))
+    lines: list[str] = []
+    for indent, body in paragraphs:
+        lead = hang + indent
+        lines += textwrap.wrap(
+            body,
+            width=_STEP_LINE_WIDTH,
+            initial_indent=lead if lines else head,
+            subsequent_indent=lead,
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+    return "\n".join(lines)
+
+
+def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
+    """The pinion rig's steps, counted from the built assembly."""
+    numbered = (
+        # MHA-144 and the front strap go on first: neither passes the Ø15
+        # head or a bonded drum (Codex #860, PRRT_kwDOPHDy386mTbe7).
+        ("arbor-collar-pinned", _ARBOR_COLLAR_STEP),
+        ("drum-bonded", _DRUM_BOND_STEP),
+        ("handle-bonded", _HANDLE_BOND_STEP),
+        ("cam-pins-bonded", _CAM_PIN_BOND_STEP),
+        (
+            "cluster-hung",
+            "JOURNAL THE MHA-102 BACK END IN THE BACK MHA-056 TOP BORE; HANG "
+            f"BOTH MHA-056 ON MHA-062 THROUGH {pivot_blocks}X MHA-061.",
+        ),
+        # E-a (user): the straps are pinned to the torque shaft before the
+        # cams go on, which leave the pin's west edge 0.38 of air.
+        (
+            "straps-pinned-to-torque-shaft",
+            f"{_SHAFT_DRILL_STEP}\n"
+            "THE CLUSTER SWINGS FREELY; MHA-062 TURNS WITH IT IN BOTH MHA-061.",
+        ),
+        # Main's TbPB ruling (1), 2026-09-27: the set screws stay loose here;
+        # COLLAR SET locks them once the collars are set.
+        (
+            "cams-and-lever-fitted",
+            f"FIT {cams}X MHA-104 AND MHA-059 ON MHA-060 IN THE MHA-061 LIFT "
+            "BORES, EACH CAM ECCENTRIC DOWN, ITS M2.5 SET SCREW (SUPPLIED WITH "
+            "MHA-104) LOOSE. SEAT MHA-059 ON MHA-060 TO THE BORE FLOOR.",
+        ),
+        # U28 corollary (Main 2026-09-23): the rig's east-west locate is its
+        # parked tip gap, on the level line of centres, where block travel
+        # equals gap change; the feeler is the bench rest gap, the pins on
+        # the cams (pinion_rig_tip_gap).  RIG SET, next, sets it along the
+        # bank.
+        (
+            "rig-located",
+            "LOCATE THE RIG ON BASE MHA-035 (FRAME ASSEMBLY MHA-A04); ITS SEATS "
+            "ARE TRANSFERRED, NOT PRE-DRILLED. SET BOTH MHA-061 LOOSE ON THE "
+            f"BASE WITH MHA-114 FITTED: {SPRING_EAST_WEST}. PARK MHA-059: THE "
+            "MHA-116 PINS REST ON THE CAMS UNDER THE SPRING. FACE A MHA-002 "
+            "TOOTH TIP TO A MHA-027 TOOTH TIP ON THE LEVEL LINE OF CENTRES. "
+            f"SLIDE THE RIG IN UNTIL A {TIP_GAP.TIP_GAP_FEELER_TEXT} IS SNUG; "
+            f"{TIP_GAP.TIP_GAP_ACCEPT_TEXT}. SET IT AT THE FRONT AND BACK "
+            "STATIONS TO SQUARE BOTH MHA-061 TO THE DRUM.",
+        ),
+        ("rig-set", f"{_RIG_SET_STEP}\nCLAMP BOTH MHA-061."),
+        # The seats' drill, tap and depth are the MHA-035 transfer callouts'
+        # (build_harmonic_base), so the sheet names the print, never a copy.
+        (
+            "rig-seats-transferred",
+            f"SPOT MHA-035 THROUGH THE {slotted} MHA-061 HOLES AND THE MHA-114 "
+            "FOOT HOLE; DRILL AND TAP EACH PER ITS MHA-035 TRANSFER CALLOUT. "
+            f"FIT {slotted}X MHA-101 AND 1X MHA-103.",
+        ),
+        # The cams' phase is set with the lever parked; COLLAR SET then sets
+        # each collar along the rod and locks it.
+        (
+            "cam-collars-set",
+            f"MHA-059 AT PARK, EACH CAM ECCENTRIC DOWN;\n{_COLLAR_SET_STEP}",
+        ),
+        ("lever-pin-set", _LEVER_PIN_STEP),
+        (
+            "other-base-mounting",
+            f"OTHER BASE MOUNTING: SEE SHEET {CHECKS_SHEET}, EXTERNAL INTERFACES.",
+        ),
+    )
+    return "\n".join(
+        (RIG_SEQUENCE_HEADING, *(_numbered_step(key, text) for key, text in numbered))
+    )
 
 # Check 3 prints the bank's ring-overhang bound (#743 user ruling Q1) and the
 # share of the ring width that bound leaves on the cam, rounded down.
@@ -665,8 +726,9 @@ CHECKS = "\n".join(
         "   MHA-002 BY MHA-058 UNTIL ALL NOTCHES POINT UP (COSINES) OR 90 DEG",
         "   (SINES). RETURN MHA-059 TO PARK; RE-ENGAGE THE CONE SET.",
         "6. PARKED, MHA-114 HOLDS MHA-002 CLEAR OF EVERY MHA-027.",
-        "7. PARKED, PINS ON THE CAMS: A 2.5 FEELER IS SNUG TIP TO TIP AT THE",
-        f"   FRONT AND BACK STATIONS; ACCEPT 2.3-2.7 (SHEET {FIT_SHEET}, STEP 20).",
+        f"7. PARKED, PINS ON THE CAMS: A {TIP_GAP.TIP_GAP_FEELER:.2f} FEELER IS SNUG TIP TO TIP",
+        f"   AT THE FRONT AND BACK STATIONS; {TIP_GAP.TIP_GAP_ACCEPT_TEXT}",
+        f"   (SHEET {FIT_SHEET}, STEP {steps.step_number('rig-located')}).",
     )
 )
 
@@ -707,7 +769,7 @@ FIT_PLACEHOLDER = "\n".join(
         # U31 (pivot): the bored spacing fixes the mesh; check 2 proves it.
         # The rest of the old placeholder is owned elsewhere now: each cone
         # gear's mesh by the MHA-013 print (check 2), the pinion engagement
-        # by steps 18-19 and check 7, the taper pin by step 6.
+        # by the rig-located step and check 7, the taper pin by step 6.
         "16T:64T CENTRE DISTANCE FIXED BY MHA-016 BORE SPACING; VERIFY BY",
         "BACKLASH (CHECK 2).",
     )
@@ -2283,8 +2345,7 @@ def _place_fit_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
         (
             (
                 "pinion rig sequence",
-                RIG_STEPS.format(
-                    cam_pins=facts.count("pinion-cam-pin"),
+                rig_steps(
                     pivot_blocks=facts.count("pinion-pivot-block"),
                     cams=facts.count("pinion-cam"),
                     slotted=facts.count("slotted-screw"),

@@ -7,9 +7,15 @@ import re
 import cone_tip_shim_spec as shim
 import draw_drive_train_assembly as drawing
 import drive_train_steps as steps
+import pinion_rig_tip_gap as tip_gap
 import pytest
 
-SEQUENCE_BLOCKS = (drawing.CONE_CRANK_STEPS, drawing.BANK_STEPS, drawing.RIG_STEPS)
+SEQUENCE_BLOCKS = (
+    drawing.CONE_CRANK_STEPS,
+    drawing.BANK_STEPS,
+    drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4),
+)
+TIP_GAP_FEELER = f"{tip_gap.TIP_GAP_FEELER:.2f} FEELER"
 STEP_HEAD = re.compile(r"^\s*(\d+)\. ", re.MULTILINE)
 POINTER = re.compile(rf"{re.escape(steps.DRAWING_NUMBER)} STEP (\d+)\b")
 
@@ -32,7 +38,7 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
 def test_a_key_resolves_to_its_position_and_prints_a_pointer() -> None:
     for index, key in enumerate(steps.SEQUENCE, start=1):
         assert steps.step_number(key) == index
-    assert steps.step_ref("rig-tip-gap-set") == "MHA-A03 STEP 20"
+        assert steps.step_ref(key) == f"MHA-A03 STEP {index}"
     with pytest.raises(KeyError):
         steps.step_number("no-such-step")
 
@@ -40,7 +46,7 @@ def test_a_key_resolves_to_its_position_and_prints_a_pointer() -> None:
 @pytest.mark.parametrize(
     ("text", "key", "phrase"),
     (
-        (drawing.CHECKS, "rig-tip-gap-set", "2.5 FEELER"),
+        (drawing.CHECKS, "rig-located", TIP_GAP_FEELER),
         (drawing.CONSUMABLES_NOTES, "crank-handle-fitted", "LOCTITE 222"),
     ),
 )
@@ -77,8 +83,8 @@ def test_the_cone_gear_joint_prints_in_the_step_that_bonds_the_gears() -> None:
 
 
 def test_a_cite_to_the_wrong_step_is_caught() -> None:
-    """Positive control: step 18 locates the rig but does not set the gap."""
-    assert "2.5 FEELER" not in _step_body("rig-located")
+    """Positive control: RIG SET sets the rig along the bank, not its tip gap."""
+    assert TIP_GAP_FEELER not in _step_body("rig-set")
 
 
 def _cited_keys(notes: str) -> list[str]:

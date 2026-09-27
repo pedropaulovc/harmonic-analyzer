@@ -103,7 +103,11 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
         steps.DRAWING_NUMBER: _sequence_steps(drawing.FITUP_STEPS),
         FITUP_DRAWING_NUMBER: _sequence_steps(
             "\n".join(
-                (drive_train.CONE_CRANK_STEPS, drive_train.BANK_STEPS, drive_train.RIG_STEPS)
+                (
+                    drive_train.CONE_CRANK_STEPS,
+                    drive_train.BANK_STEPS,
+                    drive_train.rig_steps(pivot_blocks=2, cams=2, slotted=4),
+                )
             )
         ),
         _literal_number("build_frame_assembly.py", "Number"): _sequence_steps(
