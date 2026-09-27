@@ -39,6 +39,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -441,6 +442,12 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven shaft (equations neutral)", volume, 0.005 * volume
     )
+
+    # The rockers ride this axis by name.  A point on the O.D. is a
+    # view-dependent pick that grazes the silhouette in the standard views,
+    # where the rocker and ear bores' edges sit 0.075 mm off it (#916).
+    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "shaft axis")
+    name_last_feature(adapter, "shaft axis")
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)

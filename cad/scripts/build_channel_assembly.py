@@ -140,13 +140,11 @@ from _assembly import (
     assembly_title_properties,
     assert_component_placed,
     assert_free_dof_necessity,
-    bore_axis_ref,
     check_no_interference,
     coincident_mate,
     collected_dof_specs,
     component_named_ref,
     component_transform,
-    concentric_mate,
     delete_assembly_feature,
     distance_driver,
     named_ref,
@@ -455,8 +453,6 @@ def z_station(j: int) -> float:
 
 
 # --- mate scheme (validated single-channel probe) ---------------------------
-# Both rocker-pivot and lever-fulcrum shafts ride O6.35 bores.
-SHAFT_R = 6.35 / 2.0
 # Off-pivot bore locals (mm, part frame) used by the spin drivers + world_point.
 ROCKER_ROD_BORE_LOCAL = [
     ARM_ROD_HOLE_X,
@@ -632,7 +628,6 @@ async def _revolute(
     axis_a,
     axis_b,
     *,
-    concentric: bool,
     off_axis_name: str,
     off_axis_local: list[float],
     pivot_xy: tuple[float, float],
@@ -643,10 +638,10 @@ async def _revolute(
 ) -> Any:
     """Build one revolute joint pinned to its on-solution pose.
 
-    ``concentric`` selects the radial mate kind: a cylindrical-face ↔ named-axis
-    pair is *concentric* (shaft OD vs bore), two named axes are *coincident*
-    (collinear lines = coaxial; AddMate5 rejects concentric on two axes). Then
-    the axial (Z) seat, and a ``spin_driver`` on an off-pivot bore pins the
+    The radial mate is the shaft's named axis *coincident* with the part's bore
+    axis (collinear lines = coaxial; AddMate5 rejects concentric on two axes,
+    and a point on the shaft's O.D. is a view-dependent pick, #916). Then the
+    axial (Z) seat, and a ``spin_driver`` on an off-pivot bore pins the
     residual spin -> fully defined, on-target.
 
     ``axial`` chooses the Z seat (the #110 "chain off a physical neighbor, not the
@@ -673,8 +668,9 @@ async def _revolute(
     # pose the mate solve drifted to. Each part is inserted on its exact mirrored
     # transform, so the design pose IS the on-solution target.
     off_design = world_point(adapter, comp, off_axis_local)
-    radial = concentric_mate if concentric else coincident_mate
-    await radial(adapter, axis_a, axis_b, label=f"{label} radial", verify=(comp, tgt))
+    await coincident_mate(
+        adapter, axis_a, axis_b, label=f"{label} radial", verify=(comp, tgt)
+    )
     part_plane = named_ref(f"Front Plane@{comp}", "PLANE")
     kind = axial[0]
     if kind == "datum":
@@ -907,7 +903,7 @@ async def build(adapter) -> dict[str, str]:
     # partner, so it is datum-located (three orthogonal plane distances), not
     # fixed. The shaft axes (machine frame, crank at -X) anchor the
     # rocker/lever concentrics.
-    await place_component(
+    pivot_shaft = await place_component(
         adapter,
         "pivot-shaft",
         [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z],
@@ -928,8 +924,12 @@ async def build(adapter) -> dict[str, str]:
     await _locate_to_datum(adapter, fulcrum)
     pivot_w = (PIVOT[0], PIVOT[1])  # (72.9, 253.8) machine world
     fulc_w = (FULCRUM[0], FULCRUM[1])  # (199.9, 1061.4) machine world
-    pivot_od = [pivot_w[0] + SHAFT_R, pivot_w[1], 0.0]
-    fulc_od = [fulc_w[0] + SHAFT_R, fulc_w[1], 0.0]
+    # The rockers and levers ride the shafts' named axes.  A point on a shaft's
+    # O.D. is a view-dependent pick (#916): in the standard views it grazes the
+    # silhouette, 0.075 mm from the bores' edges, and a hub at z = 0 (channel 9)
+    # would cover it outright.
+    pivot_axis = named_ref(f"shaft axis@{pivot_shaft}", "AXIS")
+    fulcrum_axis = named_ref(f"shaft axis@{fulcrum}", "AXIS")
 
     # Pivot brackets. Free-space structure with no contact partner inside
     # this subassembly, so each is datum-located (three orthogonal plane
@@ -1137,9 +1137,8 @@ async def build(adapter) -> dict[str, str]:
         await _revolute(
             adapter,
             rocker,
-            bore_axis_ref(pivot_od),
+            pivot_axis,
             named_ref(f"Axis1@{rocker}", "AXIS"),
-            concentric=True,
             off_axis_name="Axis2",
             off_axis_local=ROCKER_ROD_BORE_LOCAL,
             pivot_xy=pivot_w,
@@ -1197,9 +1196,8 @@ async def build(adapter) -> dict[str, str]:
         await _revolute(
             adapter,
             lever,
-            bore_axis_ref(fulc_od),
+            fulcrum_axis,
             named_ref(f"Axis1@{lever}", "AXIS"),
-            concentric=True,
             off_axis_name="Axis2",
             off_axis_local=LEVER_BAR_PIN_BORE_LOCAL,
             pivot_xy=fulc_w,

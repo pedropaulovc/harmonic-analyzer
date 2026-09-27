@@ -762,14 +762,67 @@ def test_part_exposes_semantic_mating_references() -> None:
         "swing pivot",
         "mount east",
         "mount west",
+        "BossNorth",
     ):
         assert f'"{name}"' in source
+    assert '("BossNorth", "PLANE")' in source  # hidden, not removed (#950)
     assert "_create_feature_cylinder_axis(" in source
     assert '"ConeShaftBoss",\n        CONE_BOSS_DIA / 2.0' in source
     assert '(("mount west", ATTACHMENT_X), ("mount east", -ATTACHMENT_X))' in source
     assert not hasattr(part, "CRANK_BORE_DX")
     assert not hasattr(part, "CRANK_BORE_Y")
     assert "HARVESTED_VOLUME_MM3" in source
+
+
+def test_boss_north_is_the_whole_north_annulus_on_the_journal() -> None:
+    """#916: BossNorth sits half a pad length north of ConeShaftNormal on the
+    journal axis, faces away from the pads, and its face is the whole annulus
+    between the pad and the journal bore."""
+    import math
+
+    incline = math.radians(spec.INCLINE_DEG)
+    axis = (math.sin(incline), 0.0, math.cos(incline))
+    assert part.BOSS_NORTH_NORMAL == pytest.approx([-c for c in axis], abs=1e-12)
+    offset = [c - b for c, b in zip(part.BOSS_NORTH_CENTRE, (0.0, spec.BORE_HEIGHT, 0.0))]
+    assert offset == pytest.approx(
+        [-spec.CONE_BOSS_LENGTH / 2.0 * c for c in axis], abs=1e-12
+    )
+    assert part.BOSS_NORTH_AREA == pytest.approx(
+        math.pi / 4.0 * (spec.CONE_BOSS_DIA**2 - spec.BORE_DIA**2)
+    )
+
+
+class _FakeSurface:
+    def __init__(self, root_m: tuple[float, float, float]) -> None:
+        self.PlaneParams = (0.0, 0.0, 0.0, *root_m)
+
+
+class _FakeFace:
+    def __init__(self, normal: tuple[float, ...], root_mm: tuple[float, ...]) -> None:
+        self.Normal = normal
+        self._surface = _FakeSurface(tuple(c / 1000.0 for c in root_mm))
+
+    def GetSurface(self) -> _FakeSurface:
+        return self._surface
+
+
+def test_face_finder_keeps_only_the_square_face_through_the_station() -> None:
+    """The finder matches by geometry, never by a view-dependent pick: a
+    non-planar face (zero Normal), the opposite end, a face 12.5 deg off
+    square and a parallel face off the station all fall out."""
+    normal = part.BOSS_NORTH_NORMAL
+    centre = part.BOSS_NORTH_CENTRE
+    # any root point in the face plane: the centre moved across the axis
+    in_plane = (centre[0] + 5.0 * normal[2], centre[1] + 3.0, centre[2] - 5.0 * normal[0])
+    target = _FakeFace(normal, in_plane)
+    faces = [
+        _FakeFace((0.0, 0.0, 0.0), centre),  # the collar OD #916 picked
+        _FakeFace(tuple(-c for c in normal), centre),  # the south end
+        _FakeFace((0.0, 0.0, -1.0), centre),  # the milled step
+        _FakeFace(normal, tuple(c + 0.01 * n for c, n in zip(centre, normal))),
+        target,
+    ]
+    assert part._planar_faces_on(faces, normal, centre) == [target]
 
 
 def test_rotated_post_reverses_the_cone_shaft_axial_mate_side() -> None:

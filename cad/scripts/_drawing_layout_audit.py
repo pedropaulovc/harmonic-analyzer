@@ -11,6 +11,9 @@ by the sheet's own view):
   and per type: a note's text/extent/balloon flag, a display dimension's
   hole-callout flag and its own ``IDisplayDimension::GetDisplayData``, a datum
   origin's ``GetAxisPoints2`` and labels;
+* the Visible/Printable state of each layer those annotations sit on: an
+  annotation on a layer that does not print is left out of the audit and
+  counted per sheet in the report's summary (``hidden_layer``);
 * every view's outline and orientation;
 * section lines (``IDrSection`` line, arrows, label origins, text height) and
   detail circles (``IView::GetDetailCircleInfo2``);
@@ -43,12 +46,20 @@ from _layout_audit import (
     LAYOUT_AUDIT_MODE,
     LayoutAuditMode,
     audit_report,
+    enforced,
+    layered_items,
     replace_text,
 )
 
 _ANNOT_DIM = 4
 _ANNOT_NOTE = 6
 _ANNOT_DATUM_ORIGIN = 16
+# swCThread, swCenterLine: GetPosition answered None for every one of them
+# on the b49e13940 leaves (cone-swing-platform 14 + 1, top_frame's six
+# sheets 98 cosmetic threads). The audit reads their ink from display data;
+# only the same-spot duplicate check reads a position, and it skips an
+# annotation without one. So a None position is no refusal for these two.
+_ANCHORLESS = frozenset({1, 15})
 # How far a PDF page may differ from its sheet's GetProperties2 size.
 PAGE_SIZE_TOL_M = 0.0005
 # swZoneMargin_e
@@ -78,9 +89,13 @@ class _Reader:
     None is the documented empty answer (``GetAnnotations``,
     ``GetSectionLines``, ``GetTableAnnotations``, ``GetDetailCircleInfo2``,
     ``GetSplitInformation`` on an unsplit table), where the value is not
-    consumed by the audit (font, line spacing, layer, scale, display mode,
-    datum-origin axes and labels), or where a fallback read follows
-    (``GetName2`` before ``Name``).
+    consumed by the audit (font, line spacing, scale, display mode,
+    datum-origin axes and labels), where the default is the conservative
+    answer (an annotation's layer name, or a layer ``GetLayer`` cannot
+    resolve: its annotations are audited as printed), where SolidWorks
+    answers None for a whole kind (``GetPosition`` of a cosmetic thread or
+    a centerline, ``_ANCHORLESS``), or where a fallback
+    read follows (``GetName2`` before ``Name``).
 
     Every refusal is counted per sheet under the accessor's name. A refused
     read can drop an annotation's ink or text from the audit, so any count is
@@ -150,6 +165,15 @@ def _accessor(fn: Callable[[], Any]) -> str:
     return fn.__code__.co_names[-1] if fn.__code__.co_names else "?"
 
 
+def _optional(fn: Callable[[], Any]) -> Any:
+    """A read whose refusal loses nothing (the audit falls back), so it is
+    never counted as a ``com-read-errors`` refusal."""
+    try:
+        return fn()
+    except Exception:
+        return None
+
+
 def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
     data = reader.bind(data, "IDisplayData")
     if data is None:
@@ -182,9 +206,26 @@ def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
                 "ls": round(float(reader.call(lambda i=index: data.GetTextLineSpacingAtIndex(i), 0.0)), 7),
             }
         )
+        # The run's own width (MHA-062, gdtdiag2: "BOTH CROWNS" 34.1 mm, as
+        # printed). Its GetTextInBoxHeightAtIndex twin read 0.0 there, so the
+        # height stays GetTextHeightAtIndex.
+        width = _optional(lambda i=index: data.GetTextInBoxWidthAtIndex(i))
+        if width:
+            texts[-1]["w"] = round(float(width), 7)
     if texts:
         out["texts"] = texts
     return out
+
+
+def annotation_display(adapter: Any, annotation: Any) -> tuple[dict[str, Any], dict[str, int]]:
+    """One annotation's ``IAnnotation::GetDisplayData`` in the dump shape the
+    audit reads, with every read SolidWorks refused (accessor -> count)."""
+    reader = _Reader(adapter)
+    bound = reader.bind(annotation, "IAnnotation")
+    if bound is None:
+        return {}, reader.take_errors()
+    display = _dump_display(reader, reader.need(lambda: bound.GetDisplayData()))
+    return display, reader.take_errors()
 
 
 def _dump_annotation(reader: _Reader, raw: Any) -> dict[str, Any] | None:
@@ -197,7 +238,7 @@ def _dump_annotation(reader: _Reader, raw: Any) -> dict[str, Any] | None:
         "name": str(reader.need(lambda: annotation.GetName(), "")),
         "visible": int(reader.need(lambda: annotation.Visible, 1)),
         "owner_type": int(reader.need(lambda: annotation.OwnerType, -1)),
-        "pos": _round(reader.need(lambda: annotation.GetPosition(), ())),
+        "pos": _round((reader.call if kind in _ANCHORLESS else reader.need)(lambda: annotation.GetPosition(), ())),
         "layer": str(reader.call(lambda: annotation.Layer, "")),
     }
     leaders = []
@@ -238,6 +279,32 @@ def _dump_annotation(reader: _Reader, raw: Any) -> dict[str, Any] | None:
     return record
 
 
+def _layer_states(reader: _Reader, dump: Mapping[str, Any]) -> dict[str, dict[str, bool]]:
+    """``ILayer`` Visible/Printable of each named layer the sheet's
+    annotations and tables sit on (``layered_items``, so a dumped item's
+    layer can't go unread). An annotation on a hidden or non-printing layer
+    reads ``Visible`` 1 through COM but prints nothing (cone-swing-platform's
+    profile thread callout on COSMETIC-THREADS-HIDDEN, 24cbab237), so the
+    audit needs the layer to know what printed. A name ``GetLayer`` does not
+    resolve is left out, and its annotations are audited as printed."""
+    names = sorted({str(item.get("layer") or "") for item in layered_items(dump)} - {""})
+    if not names:
+        return {}
+    manager = reader.bind(reader.need(lambda: reader.adapter.currentModel.GetLayerManager()), "ILayerMgr")
+    if manager is None:
+        return {}
+    states = {}
+    for name in names:
+        layer = reader.bind(reader.call(lambda n=name: manager.GetLayer(n)), "ILayer")
+        if layer is None:
+            continue
+        states[name] = {
+            "visible": bool(reader.need(lambda: layer.Visible, True)),
+            "printable": bool(reader.need(lambda: layer.Printable, True)),
+        }
+    return states
+
+
 def _table_record(reader: _Reader, raw: Any) -> dict[str, Any] | None:
     """A table's box: top-left anchor, then visible rows down and columns right."""
     table = reader.bind(raw, "ITableAnnotation")
@@ -265,6 +332,7 @@ def _table_record(reader: _Reader, raw: Any) -> dict[str, Any] | None:
     return {
         "name": str(reader.need(lambda: inner.GetName(), "table")),
         "box": _round((x, y - height, x + width, y)),
+        "layer": str(reader.call(lambda: inner.Layer, "")),
     }
 
 
@@ -445,6 +513,7 @@ def _dump_sheet(
             if record is not None:
                 tables[record["name"]] = record
     dump["tables"] = list(tables.values())
+    dump["layers"] = _layer_states(reader, dump)
     page = dump["page"]
     if not 0 <= page < len(pages):
         raise RuntimeError(
@@ -474,7 +543,9 @@ def run_layout_audit(
     is_pictorial: Callable[[str], bool],
     mode: LayoutAuditMode = LAYOUT_AUDIT_MODE,
 ) -> None:
-    """Dump and audit every sheet, write ``report``; under GATE, raise on a gating finding.
+    """Dump and audit every sheet, write ``report``; raise on a finding
+    ``enforced`` under ``mode`` (every gating one under GATE, the
+    ``ENFORCED_KINDS`` under REPORT).
 
     A collector or audit fault fails the drawing in every mode: a report that
     silently skipped a sheet would under-count the fleet calibration. The
@@ -503,6 +574,14 @@ def run_layout_audit(
         span.set_attribute("sheets", summary["sheets"])
         span.set_attribute("gating", summary["gating"])
         span.set_attribute("collect_s", summary["collect_s"])
+        hidden = sum(summary["hidden_layer"].values())
+        span.set_attribute("hidden_layer", hidden)
+        if hidden:
+            _telemetry.info(f"layout audit {stem}: annotations on non-printing layers, not audited: {summary['hidden_layer']}")
+        degenerate = sum(summary["degenerate_lines"].values())
+        span.set_attribute("degenerate_lines", degenerate)
+        if degenerate:
+            _telemetry.info(f"layout audit {stem}: zero-length display lines, no ink: {summary['degenerate_lines']}")
         read_errors = sum(sum(d["read_errors"].values()) for d in dumps)
         span.set_attribute("read_errors", read_errors)
         if read_errors:
@@ -516,8 +595,9 @@ def run_layout_audit(
             f"layout audit {stem}: {summary['sheets']} sheet(s), {summary['gating']} gating, "
             f"{summary['findings']} -> {report}"
         )
-        if gating and mode is LayoutAuditMode.GATE:
+        failing = enforced(mode, gating)
+        if failing:
             raise RuntimeError(
-                f"drawing layout audit failed for {stem}: {len(gating)} gating finding(s):\n"
-                + "\n".join(f"  - {finding.format()}" for finding in gating)
+                f"drawing layout audit failed for {stem} ({mode.value} mode): {len(failing)} "
+                f"enforced finding(s):\n" + "\n".join(f"  - {finding.format()}" for finding in failing)
             )
