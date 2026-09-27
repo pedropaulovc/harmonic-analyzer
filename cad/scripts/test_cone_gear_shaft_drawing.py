@@ -310,7 +310,9 @@ def test_the_collar_callout_moves_clear_of_the_pivot_finish() -> None:
     assert dx < 0.0
     assert boxes_clear(moved, finish)
     assert all(distance_to_box(segment, moved) >= CLEAR_GAP_M for segment in leader)
-    assert moved[0] >= drawing._collar_callout_floor()
+    # nominal room; the build proves it against the Ø9.525 text's measured ink
+    sec1_x, _y = drawing.SIDE_DIAMETERS["Sec1Dia"]
+    assert moved[0] >= sec1_x + drawing.DIAMETER_TEXT_WIDTH + CLEAR_GAP_M
     # a block already clear stays put
     assert drawing._collar_callout_dx(moved, finish, leader) == 0.0
 
@@ -328,17 +330,28 @@ def test_the_collar_callout_read_guard_takes_the_whole_block() -> None:
     assert value_line_only < drawing.COLLAR_CALLOUT_MIN_READ
 
 
-def _clear_collar_with(monkeypatch, texts):
-    """Run _clear_collar_callout against fakes: each read returns the next
-    text box; returns the recorded moves."""
+# The Ø9.525 text as it hangs right of its line at SIDE_DIAMETERS["Sec1Dia"]:
+# the value over its stacked band, and its vertical dimension line.
+_SEC1_TEXT = (0.1410, 0.1690, 0.1640, 0.1790)
+_SEC1_LINES = [((0.1400, 0.1452), (0.1400, 0.1548))]
+
+
+def _clear_collar_with(monkeypatch, texts, dimensions=None):
+    """Run _clear_collar_callout against fakes: each collar read returns the
+    next text box, each neighbour dimension its (text box, lines); returns the
+    recorded moves."""
     from types import SimpleNamespace
 
+    if dimensions is None:
+        dimensions = {"Sec1Dia": (_SEC1_TEXT, _SEC1_LINES)}
     finish, leader = _pivot_finish_ink()
     reads = iter(texts)
     moves = []
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
     monkeypatch.setattr(drawing, "gdt_box", lambda *_a, **_k: finish)
     monkeypatch.setattr(drawing, "leader_segments", lambda _a: leader)
+    monkeypatch.setattr(drawing, "_dimension_text_box", lambda name, _l: dimensions[name][0])
+    monkeypatch.setattr(drawing, "dimension_segments", lambda name: dimensions[name][1])
     monkeypatch.setattr(
         drawing,
         "callout_ink",
@@ -356,7 +369,10 @@ def _clear_collar_with(monkeypatch, texts):
         lambda _a: SimpleNamespace(xmin=0.01, ymin=0.01, xmax=0.42, ymax=0.27),
     )
     finish_symbol = SimpleNamespace(GetAnnotation=lambda: object())
-    drawing._clear_collar_callout(object(), object(), finish_symbol)
+    # each neighbour's fake annotation is its own name
+    drawing._clear_collar_callout(
+        object(), object(), finish_symbol, {name: name for name in dimensions}
+    )
     return moves
 
 
@@ -373,6 +389,69 @@ def test_the_build_moves_and_proves_the_collar_callout(monkeypatch) -> None:
     value_only = (0.2094, 0.1783, 0.2094 + 0.019, 0.1834)
     with pytest.raises(RuntimeError, match="misread"):
         _clear_collar_with(monkeypatch, [value_only])
+
+
+def test_the_collar_proof_measures_the_dimensions_it_moves_towards(monkeypatch) -> None:
+    """The block moves left, towards the Ø9.525 text and over land 1, so the
+    proof reads those neighbours' ink rather than trusting a nominal width:
+    a Ø9.525 text measured wider than DIAMETER_TEXT_WIDTH, or a land-1
+    dimension line rising into the block, fails the build."""
+    text = _FINAL877_COLLAR_TEXT
+    finish, leader = _pivot_finish_ink()
+    dx = drawing._collar_callout_dx(text, finish, leader)
+    moved = (text[0] + dx, text[1], text[2] + dx, text[3])
+    land1_line = [((0.2000, 0.1452), (0.2000, 0.1350))]
+    clear = {
+        "Sec1Dia": (_SEC1_TEXT, _SEC1_LINES),
+        "Sec1End": ((0.1400, 0.1170, 0.1600, 0.1210), land1_line),
+    }
+    assert _clear_collar_with(monkeypatch, [text, moved], clear) == [(dx, 0.0)]
+    wide_sec1 = (_SEC1_TEXT[0], _SEC1_TEXT[1], moved[0] - 0.001, _SEC1_TEXT[3])
+    with pytest.raises(RuntimeError, match=r"crowds \['Sec1Dia'\]"):
+        _clear_collar_with(
+            monkeypatch, [text, moved], {**clear, "Sec1Dia": (wide_sec1, _SEC1_LINES)}
+        )
+    rising = [((0.2000, 0.1452), (0.2000, moved[1] + 0.004))]
+    with pytest.raises(RuntimeError, match=r"\['Sec1End'\] lines run by"):
+        _clear_collar_with(
+            monkeypatch, [text, moved], {**clear, "Sec1End": (clear["Sec1End"][0], rising)}
+        )
+
+
+def test_a_dimension_text_box_spans_every_text_item() -> None:
+    """The value and its stacked band are separate text items; the box a
+    neighbour is proved against spans both."""
+    from types import SimpleNamespace
+
+    from _layout_geometry import estimate_text_box
+
+    items = [("Ø9.525", (0.1410, 0.1760), 0.0025), ("+0.000", (0.1560, 0.1730), 0.0018)]
+    data = SimpleNamespace(
+        GetTextCount=lambda: len(items),
+        GetTextAtIndex=lambda i: items[i][0],
+        GetTextPositionAtIndex=lambda i: (*items[i][1], 0.0),
+        GetTextHeightAtIndex=lambda i: items[i][2],
+        GetTextRefPositionAtIndex=lambda _i: 1,
+        GetTextAngleAtIndex=lambda _i: 0.0,
+    )
+    display = SimpleNamespace(GetDisplayData=lambda: data)
+    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
+    boxes = [
+        estimate_text_box(text, anchor=anchor, height=height, reference=1)
+        for text, anchor, height in items
+    ]
+    assert drawing._dimension_text_box(annotation, "Sec1Dia") == (
+        min(box.xmin for box in boxes),
+        min(box.ymin for box in boxes),
+        max(box.xmax for box in boxes),
+        max(box.ymax for box in boxes),
+    )
+    no_text = SimpleNamespace(GetTextCount=lambda: 0)
+    empty = SimpleNamespace(
+        GetSpecificAnnotation=lambda: SimpleNamespace(GetDisplayData=lambda: no_text)
+    )
+    with pytest.raises(RuntimeError, match="draws no text"):
+        drawing._dimension_text_box(empty, "Sec1Dia")
 
 
 def test_lengths_are_baseline_from_the_collar_face() -> None:

@@ -23,7 +23,7 @@ import argparse
 import sys
 from typing import Any
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
@@ -60,12 +60,14 @@ from _drawing_common import (
 )
 from _drawing_leaders import (
     Segment,
+    dimension_segments,
     dimension_text_points,
     distance_to_box,
     leader_segments,
     set_near_side_diameter,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _layout_geometry import estimate_text_box
 from _surface_finish import surface_finish_by_key
 from cone_gear_shaft_spec import (
     COLLAR_DIA,
@@ -399,10 +401,34 @@ def _collar_callout_dx(text: Box, finish: Box, finish_leader: Sequence[Segment])
     return min(0.0, leftmost - CLEAR_GAP_M - PLACE_SETTLE_M - text[2])
 
 
-def _collar_callout_floor() -> float:
-    """The collar text's left bound: clear of the Ø9.525 text, whose block
-    hangs right of its line (DIAMETER_TEXT_WIDTH)."""
-    return SIDE_DIAMETERS["Sec1Dia"][0] + DIAMETER_TEXT_WIDTH + CLEAR_GAP_M
+def _dimension_text_box(annotation: Any, label: str) -> Box:
+    """A dimension's rendered text block: every text item it draws (value,
+    stacked band, callout lines), boxed by the layout audit's estimator, since
+    no API returns a text's width."""
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    boxes = []
+    for index in range(int(data.GetTextCount())):
+        anchor = [float(value) for value in data.GetTextPositionAtIndex(index)]
+        reference = int(data.GetTextRefPositionAtIndex(index))
+        box = estimate_text_box(
+            str(data.GetTextAtIndex(index) or ""),
+            anchor=(anchor[0], anchor[1]),
+            height=float(data.GetTextHeightAtIndex(index)),
+            reference=reference if 0 <= reference <= 5 else 0,
+            angle=float(data.GetTextAngleAtIndex(index)),
+        )
+        if box is not None:
+            boxes.append(box)
+    if not boxes:
+        raise RuntimeError(f"{label} draws no text to measure")
+    return (
+        min(box.xmin for box in boxes),
+        min(box.ymin for box in boxes),
+        max(box.xmax for box in boxes),
+        max(box.ymax for box in boxes),
+    )
 
 
 def _collar_text(adapter: Any, collar: Any, label: str) -> tuple[Any, Box]:
@@ -425,10 +451,14 @@ def _collar_text(adapter: Any, collar: Any, label: str) -> tuple[Any, Box]:
 
 
 @_telemetry.traced("drawing.collar_callout_clear")
-def _clear_collar_callout(adapter: Any, collar: Any, finish: Any) -> None:
+def _clear_collar_callout(
+    adapter: Any, collar: Any, finish: Any, dimensions: Mapping[str, Any]
+) -> None:
     """Move the collar's stock callout left of the pivot-journal finish, then
-    prove it: clear of the symbol, its leader clear of the symbol, the finish
-    leader clear of its text, right of the Ø9.525 text, inside the frame."""
+    prove it from measured ink: its text clear of the symbol and of every
+    other dimension's text (the Ø9.525 and land-1 texts it moves towards),
+    its leader through none of them, no finish leader or dimension line by
+    its text, and inside the frame."""
     label = "collar stock callout"
     rebuild_drawing(adapter, label=f"measure {label}")
     finish_annotation = finish.GetAnnotation()
@@ -440,20 +470,24 @@ def _clear_collar_callout(adapter: Any, collar: Any, finish: Any) -> None:
         move_annotation(adapter, collar, dx, 0.0, label=label)
     ink, text = _collar_text(adapter, collar, label)
     neighbours = {"pivot journal finish": finish_box}
+    lines = {"pivot journal finish": finish_leader}
+    for name, dimension in dimensions.items():
+        neighbours[name] = _dimension_text_box(dimension, name)
+        lines[name] = dimension_segments(dimension)
     require_clear(label, text, neighbours)
     require_leader_clear(ink, neighbours)
     near = [
-        segment for segment in finish_leader if distance_to_box(segment, text) < CLEAR_GAP_M
+        name
+        for name, segments in lines.items()
+        if any(distance_to_box(segment, text) < CLEAR_GAP_M for segment in segments)
     ]
     if near:
-        raise RuntimeError(f"pivot journal finish leader {near} runs by the {label}")
-    if text[0] < _collar_callout_floor():
-        raise RuntimeError(
-            f"{label} starts at x {text[0]:.4f}, on the Ø9.525 text "
-            f"(ends {_collar_callout_floor():.4f})"
-        )
+        raise RuntimeError(f"{near} lines run by the {label} {text}")
     require_inside(label, text, sheet_region(adapter))
-    _telemetry.success(f"{label} moved {dx:.4f} m, clear of the pivot journal finish")
+    _telemetry.success(
+        f"{label} moved {dx:.4f} m, clear of the pivot journal finish and "
+        f"{len(dimensions)} dimensions"
+    )
 
 
 def _set_t006_station_suffix(adapter: Any, annotations: Sequence[Any]) -> None:
@@ -561,7 +595,20 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("the donor view gave no CollarDia dimension")
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _set_t006_station_suffix(adapter, annotations)
-    _add_overall_reference(adapter, side)
+    overall = _add_overall_reference(adapter, side)
+    # Every other dimension on the side view, which the collar callout's
+    # proof measures it against.
+    collar_neighbours = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in annotations
+        if annotation is not collar
+    }
+    collar_neighbours["front-to-tip overall"] = overall.GetAnnotation()
+    if len(collar_neighbours) != len(annotations):
+        raise RuntimeError(
+            f"side view dimensions {sorted(collar_neighbours)} do not name "
+            f"the {len(annotations) - 1} beside the collar uniquely"
+        )
 
     # Leader anchors for the two lands that RUN (sheet metres).  The tip
     # symbol stands above the tip with its glyph LEFT of the Ø1.588 dimension
@@ -598,7 +645,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=tip_face,
         leader_attach_xy=tip_top,
     )
-    _clear_collar_callout(adapter, collar, pivot_finish)
+    _clear_collar_callout(adapter, collar, pivot_finish, collar_neighbours)
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(
