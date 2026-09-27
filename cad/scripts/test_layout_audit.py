@@ -4009,3 +4009,66 @@ def test_a_leadered_notes_zero_length_attach_stub_is_no_finding():
     stub = _edges((0.1202019, 0.0776806, 0.1202019, 0.0776806), width=0.00018)
     findings = audit_dump(_dump(views=[view], strokes=stub))
     assert [f for f in findings if "DetailItem374" in f.a or "DetailItem374" in f.b] == []
+
+
+def test_every_auto_center_marks_call_records_its_counts(monkeypatch):
+    """#913 (2): _drawing_common registers the submodule's observer, and each
+    call lands as a center_marks.auto_insert span event."""
+    import _drawing_common
+    import _telemetry
+    from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
+    from solidworks_mcp.adapters.solidworks import drawing as sw_drawing
+
+    assert sw_drawing.CENTER_MARK_OBSERVER is _drawing_common._record_center_marks
+    events = []
+    monkeypatch.setattr(_telemetry, "event", lambda name, **attrs: events.append((name, attrs)))
+    marks = ["template-mark"]
+
+    class View:
+        def AutoInsertCenterMarks2(self, *_args):  # noqa: N802 - COM name
+            marks.append("explicit-mark")
+            return True
+
+        def GetAnnotationsByType(self, kind):  # noqa: N802 - COM name
+            return tuple(marks) if kind == 13 else ()
+
+        def GetName2(self):  # noqa: N802 - COM name
+            return "Drawing View1"
+
+    class Adapter:
+        # The real pure helpers, without an adapter or COM session.
+        _attempt = PyWin32Adapter._attempt
+        _get_attr_or_call = PyWin32Adapter._get_attr_or_call
+
+    assert sw_drawing.auto_center_marks(Adapter(), View(), holes=True) is True
+    assert events == [
+        (
+            "center_marks.auto_insert",
+            {"view": "Drawing View1", "before": 1, "after": 2, "holes": True, "slots": False, "ok": True},
+        )
+    ]
+
+
+def test_a_refused_center_mark_count_is_sent_as_a_primitive(monkeypatch):
+    """OTel drops None attribute values: a count whose read raised goes out as
+    -1 and is named in read_failed; the view is its name string."""
+    import _drawing_common
+    import _telemetry
+
+    events = []
+    monkeypatch.setattr(_telemetry, "event", lambda name, **attrs: events.append((name, attrs)))
+    _drawing_common._record_center_marks(
+        {"view": "Drawing View2", "before": None, "after": 3, "holes": True, "slots": False, "ok": True}
+    )
+    [(name, attrs)] = events
+    assert name == "center_marks.auto_insert"
+    assert attrs == {
+        "view": "Drawing View2",
+        "before": -1,
+        "after": 3,
+        "holes": True,
+        "slots": False,
+        "ok": True,
+        "read_failed": ["before"],
+    }
+    assert all(isinstance(value, (str, bool, int, float, list)) for value in attrs.values())
