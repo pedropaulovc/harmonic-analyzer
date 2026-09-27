@@ -45,6 +45,7 @@ from _drawing_common import (
     set_reference_dimension,
     stamp_drawing_summary,
     view_name,
+    visible_component_entities,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -316,8 +317,8 @@ def _visible_cross_hole_edge(adapter: Any, view: Any, diameter_mm: float) -> Any
     for component in components:
         edges = (
             adapter._attempt(
-                lambda c=component: view.GetVisibleEntities2(
-                    c, 1
+                lambda c=component: visible_component_entities(
+                    view, c, 1
                 ),  # swViewEntityType_Edge
                 default=(),
             )
@@ -354,8 +355,8 @@ def _visible_cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> An
     for component in components:
         faces = (
             adapter._attempt(
-                lambda c=component: view.GetVisibleEntities2(
-                    c, 3
+                lambda c=component: visible_component_entities(
+                    view, c, 3
                 ),  # swViewEntityType_Face
                 default=(),
             )

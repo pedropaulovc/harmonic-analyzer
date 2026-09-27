@@ -19,7 +19,6 @@ from itertools import combinations
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Mapping, Sequence
 
-
 import _config
 import _telemetry
 import _seat_forensics
@@ -55,15 +54,18 @@ from solidworks_mcp.adapters.solidworks import drawing as _sw_drawing
 from solidworks_mcp.adapters.solidworks.drawing import (
     TOL_BASIC,
     add_note,
+    bind_view_entity,
     curate_dimensions,
     dimension_name,
     iter_views,
     new_drawing,
     place_view,
+    raw_visible_entities,
     remove_notes_matching as remove_notes_matching,
     save_drawing,
     set_units_mm,
     view_name,
+    visible_component_entities as visible_component_entities,
 )
 
 
@@ -3463,7 +3465,7 @@ def visible_view_entities(view: Any, entity_kind: int, *, label: str) -> list[An
     entities: list[Any] = []
     components = drawing_view.GetVisibleComponents() or []
     for component in components:
-        entities.extend(drawing_view.GetVisibleEntities2(component, entity_kind) or [])
+        entities.extend(visible_component_entities(drawing_view, component, entity_kind))
     # The scan's SIZE, on the span itself. Duration alone cannot separate "this
     # view is huge" from "this seat is slow", and the callers that classify each
     # returned entity scale directly with this count.
@@ -4781,10 +4783,17 @@ def _drawing_component_children(drawing_component: Any) -> tuple[Any, ...]:
     return tuple(children or ())
 
 
-def _drawing_component_stems(
-    adapter: Any, drawing_component: Any, stems: frozenset[str]
-) -> set[str]:
-    """Return requested file stems represented by one leaf drawing component."""
+@dataclass(frozen=True)
+class _ComponentLeaf:
+    """One leaf drawing component and the file identities it answers to."""
+
+    name: str
+    component: Any
+    identities: frozenset[str]
+
+
+def _component_leaf(adapter: Any, drawing_component: Any) -> _ComponentLeaf:
+    """Read one leaf drawing component's model component and identities."""
     component = adapter._attempt(
         lambda dc=drawing_component: dc.Component, default=None
     )
@@ -4793,10 +4802,17 @@ def _drawing_component_stems(
         path = adapter._attempt(lambda c=component: c.GetPathName(), default="") or ""
     name = str(drawing_component.Name or "")
     drawing_name = name.split("@", 1)[0].replace("\\", "/")
-    identities = {
-        Path(str(path)).stem.casefold(),
-        drawing_name.rsplit("/", 1)[-1].casefold(),
-    }
+    identities = frozenset(
+        {
+            Path(str(path)).stem.casefold(),
+            drawing_name.rsplit("/", 1)[-1].casefold(),
+        }
+    )
+    return _ComponentLeaf(name=name, component=component, identities=identities)
+
+
+def _stems_matching(identities: frozenset[str], stems: frozenset[str]) -> set[str]:
+    """Return the requested file stems ``identities`` represent."""
     return {
         stem
         for stem in stems
@@ -4809,6 +4825,40 @@ def _drawing_component_stems(
             for identity in identities
         )
     }
+
+
+def _drawing_component_stems(
+    adapter: Any, drawing_component: Any, stems: frozenset[str]
+) -> set[str]:
+    """Return requested file stems represented by one leaf drawing component."""
+    return _stems_matching(_component_leaf(adapter, drawing_component).identities, stems)
+
+
+@_telemetry.traced("drawing.component_leaves", label_param="label")
+def _view_component_leaves(
+    adapter: Any, view: Any, *, label: str
+) -> tuple[_ComponentLeaf, ...]:
+    """Every leaf drawing component of ``view``, in depth-first walk order.
+
+    Balloon anchoring used to repeat this walk once PER BALLOON -- ~3 s of
+    fixed cost on every ``drawing.pick_balloon_anchor`` span across the farm
+    (fit intercept 3.08 s, n=1302). Inserting balloons changes no component
+    visibility, so one walk serves a whole balloon set.
+    """
+    root = adapter._attempt(lambda: view.RootDrawingComponent2(False), default=None)
+    if root is None:
+        raise RuntimeError(f"{label}: drawing view has no root component")
+    leaves: list[_ComponentLeaf] = []
+    pending = list(_drawing_component_children(root))
+    while pending:
+        drawing_component = pending.pop()
+        children = _drawing_component_children(drawing_component)
+        pending.extend(children)
+        if children:
+            continue
+        leaves.append(_component_leaf(adapter, drawing_component))
+    _span_scan_attrs(leaves=len(leaves))
+    return tuple(leaves)
 
 
 @_telemetry.traced("drawing.isolate_components", label_param="label")
@@ -4852,7 +4902,12 @@ def isolate_drawing_view_components(
 
 @_telemetry.traced("drawing.pick_balloon_anchor", label_param="stem")
 def _pick_component_anchor_edge(
-    adapter: Any, view: Any, *, stem: str, label: str
+    adapter: Any,
+    view: Any,
+    *,
+    leaves: Sequence[_ComponentLeaf],
+    stem: str,
+    label: str,
 ) -> Any:
     """Return the one visible edge a ``stem``'s balloon leader attaches to.
 
@@ -4883,40 +4938,36 @@ def _pick_component_anchor_edge(
     The traversal order is deterministic given the tree, and the ring sort in
     :func:`_spread_balloons` no longer breaks ties on arrival order, so those
     two sources are closed regardless of what the measurement says.
+
+    ``leaves`` is the view's walk from :func:`_view_component_leaves`, taken
+    once per balloon set. Only the chosen edge is bound
+    (``raw_visible_entities``). The frame nameplate returns 22,486 visible
+    edges: wrapping them all cost 674 s; the raw fetch costs 2-4 s, but
+    releasing the tuple's proxies when this returns still costs 117-206 s,
+    which lands inside this span.
     """
-    root = adapter._attempt(lambda: view.RootDrawingComponent2(False), default=None)
-    if root is None:
-        raise RuntimeError(f"{label}: drawing view has no root component")
     selected_edge: Any | None = None
     chosen_name = ""
     edge_count = 0
     enumerated: list[str] = []
     visited = 0
-    pending = list(_drawing_component_children(root))
-    while pending:
-        drawing_component = pending.pop()
-        children = _drawing_component_children(drawing_component)
-        pending.extend(children)
-        if children:
-            continue
+    wanted = frozenset({stem})
+    for leaf in leaves:
         visited += 1
-        if stem not in _drawing_component_stems(
-            adapter, drawing_component, frozenset({stem})
-        ):
+        if not _stems_matching(leaf.identities, wanted):
             continue
-        chosen_name = str(drawing_component.Name or "")
+        chosen_name = leaf.name
         enumerated.append(chosen_name)
-        component = adapter._attempt(
-            lambda dc=drawing_component: dc.Component, default=None
-        )
         edges = (
-            adapter._attempt(lambda: view.GetVisibleEntities2(component, 1), default=())
+            adapter._attempt(
+                lambda c=leaf.component: raw_visible_entities(view, c, 1), default=()
+            )
             or ()
         )
         if not edges:
             continue
         edge_count = len(edges)
-        selected_edge = edges[0]
+        selected_edge = bind_view_entity(edges[0], 1)
         break
     if selected_edge is None:
         raise RuntimeError(
@@ -4952,12 +5003,15 @@ def _create_component_bom_balloon(
     adapter: Any,
     view: Any,
     *,
+    leaves: Sequence[_ComponentLeaf],
     stem: str,
     expected_item: str,
     label: str,
 ) -> Any:
     """Attach one BOM balloon to a visible edge of a requested component."""
-    selected_edge = _pick_component_anchor_edge(adapter, view, stem=stem, label=label)
+    selected_edge = _pick_component_anchor_edge(
+        adapter, view, leaves=leaves, stem=stem, label=label
+    )
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     if not ddoc.ActivateView(view_name(adapter, view)):
@@ -5005,10 +5059,12 @@ def add_component_bom_balloons(
     numbers = [item for _stem, item in items]
     if len(stems) != len(set(stems)) or len(numbers) != len(set(numbers)):
         raise ValueError(f"{label}: duplicate component or item number")
+    leaves = _view_component_leaves(adapter, view, label=label)
     balloons = [
         _create_component_bom_balloon(
             adapter,
             view,
+            leaves=leaves,
             stem=stem,
             expected_item=item,
             label=label,

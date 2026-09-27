@@ -2142,11 +2142,16 @@ def _anchor_view(edges_by_component):
     )
 
 
-def _anchor(edges_by_component, stem="cone-gear"):
-    view = _anchor_view(edges_by_component)
+def _pick(view, stem, label):
+    adapter = _FakeAdapter(None)
+    leaves = drawing_common._view_component_leaves(adapter, view, label=label)
     return drawing_common._pick_component_anchor_edge(
-        _FakeAdapter(None), view, stem=stem, label="drive-train"
+        adapter, view, leaves=leaves, stem=stem, label=label
     )
+
+
+def _anchor(edges_by_component, stem="cone-gear"):
+    return _pick(_anchor_view(edges_by_component), stem, "drive-train")
 
 
 def _edge(x):
@@ -2226,9 +2231,7 @@ def test_anchor_span_counts_every_leaf_it_walked_not_just_the_match():
         edges = {"C:/x/cone-gear.SLDPRT": [_edge(0.01)]}
         view.RootDrawingComponent2 = lambda _r: root
         view.GetVisibleEntities2 = lambda c, _k: edges.get(c.GetPathName(), [])
-        drawing_common._pick_component_anchor_edge(
-            _FakeAdapter(None), view, stem="cone-gear", label="dt"
-        )
+        _pick(view, "cone-gear", "dt")
     finally:
         drawing_common._span_scan_attrs = original
     assert recorded["visited"] == 4, recorded

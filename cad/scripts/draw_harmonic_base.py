@@ -48,6 +48,7 @@ from _drawing_common import (
     stamp_drawing_summary,
     visible_view_entities,
     view_name,
+    visible_component_entities,
 )
 
 from _drawing_common import _iter_tables, _iter_view_annotations, sheet_drawable_region
@@ -1269,8 +1270,8 @@ def _visible_hole_table_entities(
     for component in components:
         visible_edges = (
             adapter._attempt(
-                lambda c=component: view.GetVisibleEntities2(
-                    c, 1
+                lambda c=component: visible_component_entities(
+                    view, c, 1
                 ),  # swViewEntityType_Edge
                 default=(),
             )

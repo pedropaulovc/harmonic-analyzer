@@ -50,6 +50,7 @@ from _drawing_common import (
     rebuild_drawing,
     set_hidden_lines_removed,
     set_high_quality_shaded_with_edges,
+    visible_component_entities,
 )
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
@@ -1544,7 +1545,7 @@ def _head_edge(adapter: Any, view: Any, instance: str, *, label: str) -> Any | N
         raise RuntimeError(f"{label}: {instance} is not in the view")
     edges = tuple(
         adapter._attempt(
-            lambda: view.GetVisibleEntities2(component, SW_VIEW_ENTITY_EDGE), default=()
+            lambda: visible_component_entities(view, component, SW_VIEW_ENTITY_EDGE), default=()
         )
         or ()
     )
