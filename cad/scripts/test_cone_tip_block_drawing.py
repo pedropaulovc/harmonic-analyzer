@@ -411,7 +411,6 @@ def test_plan_values_stand_off_the_part_and_each_other() -> None:
     than the A-A arrow: the slot's location from -X (r3's datum)."""
     keep = drawing.TOP_KEEP
     half_width = drawing.VALUE_TEXT_HALF_WIDTH
-    half_height = drawing.VALUE_TEXT_HALF_HEIGHT
     plan_left = drawing.TOP_CENTER[0] - part.BLOCK_X * drawing._S / 2.0
     plan_right = drawing.TOP_CENTER[0] + part.BLOCK_X * drawing._S / 2.0
     south_face = -part.BLOCK_Z / 2.0
@@ -455,12 +454,45 @@ def test_plan_values_stand_off_the_part_and_each_other() -> None:
     loc_x, loc_y = keep["FlangeSlotX"]
     assert plan_left < loc_x < drawing.TOP_CENTER[0]
     assert loc_y - drawing._plan_y(drawing.Z_SOUTH) >= 0.015
+    location_line_y = loc_y - drawing.HORIZONTAL_LINE_DROP
+    # Higher than the A-A arrow: the location's line (and the value on it)
+    # clears the south cutting-plane arrow's head and its letter by
+    # TEXT_CLEARANCE.
+    south_arrow = drawing.sheet_dimension_ink()["section A south"]
+    arrow_top = max(y for segment in south_arrow.arrows for _x, y in segment)
+    south_letter = drawing.sheet_text_boxes()["section A south"]
+    for top in (arrow_top, south_letter[3]):
+        assert top + drawing.TEXT_CLEARANCE <= location_line_y
     # VIEW C's letter, left of the stem, now stands under the location's
     # value (r3): clear of the value and of its line by TEXT_CLEARANCE.
     letter = drawing.sheet_text_boxes()["view C letter"]
-    location_line_y = loc_y - drawing.HORIZONTAL_LINE_DROP
     assert letter[3] + drawing.TEXT_CLEARANCE <= location_line_y
     assert letter[2] <= drawing.TOP_CENTER[0]
+
+
+def test_slot_location_witness_clears_the_section_line_overshoot() -> None:
+    """Main (a1b154f69 review): FlangeSlotX's witness leaves the slot centre,
+    on section A-A's chain line (the cutting plane is X = 0), so drawn over
+    the chain line's south overshoot the two read as one stroke.  The witness
+    starts WITNESS_CLEAR_OF_SECTION past the overshoot's end -- the sheet's
+    TEXT_CLEARANCE, so the break reads at print scale (Main, 5e8c13351 eye
+    pass: 0.5 mm was too tight) -- and the gap the build sets from the slot
+    centre lands it exactly there."""
+    assert drawing.WITNESS_CLEAR_OF_SECTION == drawing.TEXT_CLEARANCE
+    x = drawing.TOP_CENTER[0]
+    tail = drawing.sheet_section_arrows()["section A south"][0]
+    assert tail[0] == pytest.approx(x)
+    witnesses = [
+        segment
+        for segment in drawing.sheet_dimension_ink()["FlangeSlotX"].lines
+        if all(abs(px - x) < 1e-9 for px, _py in segment)
+    ]
+    assert len(witnesses) == 1
+    start = min(py for _px, py in witnesses[0])
+    assert start >= tail[1] + drawing.WITNESS_CLEAR_OF_SECTION - 1e-12
+    assert drawing._plan_y(
+        drawing.FLANGE_SLOT_CENTER_Z
+    ) + drawing.FLANGE_SLOT_X_CENTRE_WITNESS_GAP == pytest.approx(start)
 
 
 # Ink measured on the I31 farm render (7ab69742b, cone-tip-block_drawing.png,
@@ -564,7 +596,7 @@ _R287_PLACEMENT = {
         'h, (ax, ax + plus_x * half_x), (top, top), drop("PassageCenter"), out'
     ),
     "TOP_CENTER[0] - BLOCK_X * _S / 4.0,": "TOP_CENTER[0] + BLOCK_X * _S / 4.0,",
-    'h, (_PLAN_LEFT, tc), (_plan_y(Z_SOUTH),) * 2, drop("FlangeSlotX"), out': (
+    'h, (_PLAN_LEFT, tc), (_plan_y(Z_SOUTH), FLANGE_SLOT_X_WITNESS_START_Y - EXTENSION_GAP), drop("FlangeSlotX"), out': (
         'h, (tc, _PLAN_RIGHT), (_plan_y(Z_SOUTH),) * 2, drop("FlangeSlotX"), out'
     ),
     "FRONT_CENTER[0] + SLIT_TEXT_OFFSET,": "FRONT_CENTER[0] - SLIT_TEXT_OFFSET,",
