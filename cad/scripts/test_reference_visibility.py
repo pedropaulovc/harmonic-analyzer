@@ -346,11 +346,9 @@ def test_every_standalone_save_path_runs_the_check() -> None:
     assert "assert_reference_geometry_hidden(adapter, asm_name)" in assembly
 
 
-# The debt at the time the check landed.  Owners delete entries as they convert
-# their parts; nobody adds one.  Shrink this snapshot along with the list.
-_SNAPSHOT = {
-    "cone-pivot-post": {"BoreSpacingReference", "JournalPlanReference"},
-}
+# The debt at the time the check landed, shrunk as owners converted their
+# parts; cone-pivot-post's two were the last (v37).  Nobody adds one.
+_SNAPSHOT: dict[str, set[str]] = {}
 _OWNERS = {"pinioncluster", "crankhub", "pivot"}
 
 
@@ -409,18 +407,39 @@ def test_only_a_command_that_executes_release_is_refused(monkeypatch) -> None:
         assert refusal(*argv) is None, argv
 
 
-def test_release_refuses_to_start_while_any_allowance_remains(tmp_path) -> None:
-    assert _allowances(), "no debt left; keep only the clean half of this test"
+def test_no_part_saves_a_reference_sketch_shown() -> None:
+    """The debt is paid: no builder lists an allowance, so the release starts."""
+    assert _allowances() == {}
+    assert build._visibility_debt() is None
+    visibility_debt.assert_no_visibility_debt()
+
+
+def test_release_refuses_to_start_while_any_allowance_remains(
+    tmp_path, monkeypatch
+) -> None:
     assert build._selects_release(["release", "--", "v22"])
     assert build._selects_release(["run", "release"])
     assert not build._selects_release(["build", "--", "release"])
-    assert "release blocked" in (build._visibility_debt() or "")
-    assert build.main(["release"]) == 2
-    clean = tmp_path / "build_clean_part.py"
-    clean.write_text(
+    clean = tmp_path / "clean"
+    clean.mkdir()
+    (clean / "build_clean_part.py").write_text(
         'PART_NAME = "clean-part"\nSHOWN_SKETCH_ALLOWANCES = {}\n', encoding="utf-8"
     )
-    visibility_debt.assert_no_visibility_debt(tmp_path)
+    visibility_debt.assert_no_visibility_debt(clean)
+    dirty = tmp_path / "dirty"
+    dirty.mkdir()
+    (dirty / "build_dirty_part.py").write_text(
+        'PART_NAME = "dirty-part"\n'
+        'SHOWN_SKETCH_ALLOWANCES = {"StationReference": "pivot: reason"}\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(RuntimeError, match="release blocked.*dirty-part"):
+        visibility_debt.assert_no_visibility_debt(dirty)
+    # A part with debt stops `release` before anything is dispatched.
+    gate = visibility_debt.assert_no_visibility_debt
+    monkeypatch.setattr(visibility_debt, "assert_no_visibility_debt", lambda: gate(dirty))
+    assert "release blocked" in (build._visibility_debt() or "")
+    assert build.main(["release"]) == 2
 
 
 def test_name_bore_axis_hides_the_planes_and_axis_it_creates() -> None:
