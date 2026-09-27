@@ -3051,6 +3051,111 @@ async def _place_on_shaft(
     )
 
 
+def _cone_copy_fault_forensics(adapter, model, faulted: list[str]) -> None:
+    """Best-effort: name what fails inside each faulted cone-gear copy.
+
+    What's Wrong reports a faulted copy as the component with code 1
+    (swFeatureErrorUnknown), which says nothing about the part.  This walks
+    each copy's features in its referenced configuration, reads the shared
+    part document's state for that configuration, then activates each
+    swapped configuration in the part and reads What's Wrong as loaded,
+    after EditRebuild3 and after ForceRebuild3, and finally rebuilds the
+    assembly again, so the log separates a bad saved cache from a
+    configuration that cannot regenerate.  Never raises: the caller raises
+    the rebuild failure itself.
+    """
+
+    def probe(label, fn):
+        try:
+            return fn()
+        except Exception as exc:  # noqa: BLE001 - forensics must not mask the fault
+            _telemetry.warn(f"cone forensics: {label} raised {exc!r}")
+            return None
+
+    asm = _early_bound(model, "IAssemblyDoc")
+    part_doc = None
+    by_config: dict[str, str] = {}
+    for name in faulted:
+        comp = probe(f"{name} lookup", lambda n=name: asm.GetComponentByName(n))
+        if comp is None:
+            _telemetry.warn(f"cone forensics: {name} not found")
+            continue
+        comp = _early_bound(comp, "IComponent2")
+        cfg = str(probe(f"{name} config", lambda c=comp: c.ReferencedConfiguration))
+        by_config[name] = cfg
+        errored = []
+        walked = 0
+        feat = probe(f"{name} FirstFeature", lambda c=comp: c.FirstFeature())
+        while feat is not None and walked < 500:
+            feat = _early_bound(feat, "IFeature")
+            walked += 1
+            code = probe(f"{name} GetErrorCode2", lambda f=feat: f.GetErrorCode2())
+            if isinstance(code, (list, tuple)) and code and int(code[0]):
+                errored.append(
+                    f"{probe('name', lambda f=feat: f.Name)}"
+                    f"<{probe('type', lambda f=feat: f.GetTypeName2())}>"
+                    f"={int(code[0])}{'w' if len(code) > 1 and code[1] else ''}"
+                )
+            feat = probe(f"{name} GetNextFeature", lambda f=feat: f.GetNextFeature())
+        bodies = probe(f"{name} bodies", lambda c=comp: c.GetBodies2(0))
+        _telemetry.warn(
+            f"cone forensics: {name} cfg={cfg} features={walked} "
+            f"bodies={len(bodies) if bodies else 0} errored={errored or 'none'}"
+        )
+        if part_doc is None:
+            part_doc = probe(f"{name} GetModelDoc2", lambda c=comp: c.GetModelDoc2())
+    if part_doc is None:
+        return
+    part_doc = _early_bound(part_doc, "IModelDoc2")
+    active = probe(
+        "part active config",
+        lambda: _early_bound(part_doc.GetActiveConfiguration(), "IConfiguration").Name,
+    )
+    stale = [
+        cfg
+        for cfg in sorted(set(by_config.values()))
+        if probe(
+            f"{cfg} NeedsRebuild",
+            lambda c=cfg: bool(
+                _early_bound(part_doc.GetConfigurationByName(c), "IConfiguration")
+                .NeedsRebuild
+            ),
+        )
+    ]
+    _telemetry.warn(
+        f"cone forensics: part {probe('title', part_doc.GetTitle)} active={active} "
+        f"stale={stale or 'none'} whats_wrong={whats_wrong(adapter, part_doc) or 'clean'}"
+    )
+    # Each swapped configuration in the part itself: What's Wrong as loaded,
+    # after a plain EditRebuild3, and after ForceRebuild3.  A fault only in
+    # the first read is a bad saved cache; one that survives the forced
+    # rebuild is a configuration that cannot regenerate.
+    for cfg in sorted(set(by_config.values())):
+        shown = probe(f"ShowConfiguration2({cfg})", lambda c=cfg: part_doc.ShowConfiguration2(c))
+        loaded = whats_wrong(adapter, part_doc)
+        edited = probe(f"{cfg} EditRebuild3", part_doc.EditRebuild3)
+        after_edit = whats_wrong(adapter, part_doc)
+        forced = probe(f"{cfg} ForceRebuild3", lambda: part_doc.ForceRebuild3(False))
+        after_force = whats_wrong(adapter, part_doc)
+        _telemetry.warn(
+            f"cone forensics: part in {cfg}: shown={shown!r} "
+            f"loaded={loaded or 'clean'} edit={edited!r}->{after_edit or 'clean'} "
+            f"force={forced!r}->{after_force or 'clean'}"
+        )
+    if active:
+        probe(f"restore {active}", lambda: part_doc.ShowConfiguration2(active))
+    again = probe("assembly EditRebuild3 retry", lambda: model.EditRebuild3())
+    still = [
+        f"{name} [code={code}]"
+        for name, code, warning in whats_wrong(adapter, model)
+        if not warning
+    ]
+    _telemetry.warn(
+        f"cone forensics: assembly retry after rebuilding each configuration in "
+        f"the part: rebuilt={again!r} hard faults={still or 'none'}"
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
@@ -4339,6 +4444,9 @@ async def build(adapter) -> dict[str, str]:
             warnings = [
                 f"{name} [code={code}]" for name, code, warning in faults if warning
             ]
+            _cone_copy_fault_forensics(
+                adapter, model, [name for name, _code, warning in faults if not warning]
+            )
             _telemetry.error(
                 "cone-gear replication rebuild rejected",
                 rebuild_result=repr(rebuilt),
