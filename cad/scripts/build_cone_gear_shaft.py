@@ -111,6 +111,7 @@ from cone_gear_shaft_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FILLET_RADIUS,
+    REFERENCE_SKETCHES,
     SECTION_DIA_BANDS,
     SECTION_KNOBS,
     SECTION_ORIGINS,
@@ -415,14 +416,13 @@ def _blank_solder_stations(adapter: Any) -> None:
     """Save the solder-station witness sketch hidden, so no part image or
     assembly instance renders it; the drawing's side view shows it back
     through _drawing_hidden_sketches to import the station dimensions."""
-    blank_sketch(adapter, SOLDER_STATION_SKETCH)
     part_doc = _early_bound(adapter.currentModel, "IPartDoc")
-    feature = _early_bound(part_doc.FeatureByName(SOLDER_STATION_SKETCH), "IFeature")
-    state = int(feature.Visible)
-    if state != 1:  # swVisibilityStateHide
-        raise RuntimeError(
-            f"{SOLDER_STATION_SKETCH} still visible after BlankSketch ({state})"
-        )
+    for sketch in REFERENCE_SKETCHES:
+        blank_sketch(adapter, sketch)
+        feature = _early_bound(part_doc.FeatureByName(sketch), "IFeature")
+        state = int(feature.Visible)
+        if state != 1:  # swVisibilityStateHide
+            raise RuntimeError(f"{sketch} still visible after BlankSketch ({state})")
 
 
 def _as_construction(adapter: Any, entity_id: str) -> None:

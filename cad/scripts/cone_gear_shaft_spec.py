@@ -254,6 +254,10 @@ SOLDER_T006_STATION = (
 # saves it hidden (no render shows it); the drawing's side view shows it
 # back to import them (_drawing_hidden_sketches).
 SOLDER_STATION_SKETCH = "SolderStations"
+# Every sketch the part saves hidden, by the name the drawing reads it back
+# by (test_drawing_hidden_sketches resolves the build's blank_sketch calls
+# through this).
+REFERENCE_SKETCHES = (SOLDER_STATION_SKETCH,)
 
 # Diameter bands, one NAMED class per land, live in cone_shaft_land_bands so
 # the cone gears derive their bonded bores from them without importing
