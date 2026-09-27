@@ -12,6 +12,7 @@ from __future__ import annotations
 import ast
 import functools
 import importlib
+import inspect
 from pathlib import Path
 
 import pytest
@@ -563,5 +564,76 @@ def test_a_drawing_of_a_part_hidden_sketch_curates_through_this_module() -> None
         if not _curates_through_hidden_sketches(
             _SCRIPTS / DRAWINGS_BY_NAME[name].script_name
         )
+    }
+    assert wrong == {}
+
+
+# cd50a8425 made dimensions_by_feature a required keyword; draw_crankshaft
+# kept calling this helper without it, and nothing offline noticed until the
+# seat raised TypeError (#960 leaf cr-r1c, drawing:crankshaft).
+_REQUIRED_KEYWORDS = frozenset(
+    name
+    for name, parameter in inspect.signature(
+        hidden_sketches.curate_view_dimensions
+    ).parameters.items()
+    if parameter.kind is inspect.Parameter.KEYWORD_ONLY
+    and parameter.default is inspect.Parameter.empty
+)
+
+
+def _hidden_curate_calls_missing_keywords(tree: ast.Module) -> list[tuple[int, list[str]]]:
+    """Calls resolved to this module's curate_view_dimensions (a bare name
+    imported from it, or an attribute of its module alias) that omit a
+    required keyword."""
+    names: set[str] = set()
+    aliases: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "_drawing_hidden_sketches":
+            names |= {
+                alias.asname or alias.name
+                for alias in node.names
+                if alias.name == "curate_view_dimensions"
+            }
+        if isinstance(node, ast.Import):
+            aliases |= {
+                alias.asname or alias.name
+                for alias in node.names
+                if alias.name == "_drawing_hidden_sketches"
+            }
+    missing = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        routed = (isinstance(func, ast.Name) and func.id in names) or (
+            isinstance(func, ast.Attribute)
+            and func.attr == "curate_view_dimensions"
+            and isinstance(func.value, ast.Name)
+            and func.value.id in aliases
+        )
+        if not routed or any(keyword.arg is None for keyword in node.keywords):
+            continue
+        absent = sorted(_REQUIRED_KEYWORDS - {keyword.arg for keyword in node.keywords})
+        if absent:
+            missing.append((node.lineno, absent))
+    return missing
+
+
+def test_the_keyword_guard_flags_a_call_without_dimensions_by_feature() -> None:
+    # Positive control: the draw_crankshaft call shape the seat rejected.
+    tree = ast.parse(
+        "from _drawing_hidden_sketches import curate_view_dimensions\n"
+        "curate_view_dimensions(adapter, end, keep=KEEP, view_label='end')\n"
+    )
+    assert _hidden_curate_calls_missing_keywords(tree) == [
+        (2, ["dimensions_by_feature"])
+    ]
+
+
+def test_every_hidden_sketch_curate_call_passes_its_required_keywords() -> None:
+    wrong = {
+        path.name: missing
+        for path in sorted(_SCRIPTS.glob("*.py"))
+        if (missing := _hidden_curate_calls_missing_keywords(_tree(path)))
     }
     assert wrong == {}

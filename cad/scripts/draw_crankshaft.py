@@ -52,6 +52,7 @@ from _hole_spec import blind_cut_dia_mm
 from _surface_finish import surface_finish_by_key
 from crankshaft_spec import (
     CROSS_HOLE_PROCESS,
+    DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIN_HOLE_HEIGHT,
     PIN_HOLE_SPEC,
@@ -504,10 +505,18 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     end_annotations = curate_view_dimensions(
-        adapter, end, keep=END_KEEP, view_label="crank-end"
+        adapter,
+        end,
+        keep=END_KEEP,
+        view_label="crank-end",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     side_annotations = curate_view_dimensions(
-        adapter, side, keep=SIDE_KEEP, view_label="side"
+        adapter,
+        side,
+        keep=SIDE_KEEP,
+        view_label="side",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     moved = [
         _move_dimension(
