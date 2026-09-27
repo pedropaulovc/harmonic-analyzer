@@ -168,18 +168,33 @@ def test_collar_never_touches_the_front_strap_at_any_band_corner() -> None:
 
 def test_gap_max_is_only_a_bond_failure_walk_the_rig_tolerates() -> None:
     """GAP_MAX is how far MHA-102 can walk north through the drum if its
-    Loctite 638 bond lets go before the collar stops it.  The drum stays
-    trapped between the straps, so the mesh never moves; the arbor's back end
-    walks alongside the north arbor pedestal, which stands well clear of the
-    pinion-arbor axis radially."""
+    Loctite 638 bond lets go before the collar stops it on the front strap.
+    The drum stays trapped between the straps, so the mesh never moves.  The
+    only new volume the walk sweeps is the arbor's back crown, north of where
+    it already overhangs the back MHA-061 pivot block at rest; nothing stands
+    on the pinion-arbor axis there.  Its neighbours are the block below it
+    and the north arbor pedestal and its dome cap on the cylinder axis beside
+    it; the base's deck ends past the walk.  (A pedestal-foot z bound stood
+    in for this until #743 moved the pedestals; it guarded no part.)"""
     import build_arbor_pedestal as pedestal
     import build_drive_train_assembly as assembly
+    import pinion_rig_layout as rig
 
+    back_end = assembly.ARBOR_Z0 + arbor.SHAFT_LEN
+    walked_end = back_end + spec.GAP_MAX
+    crown_underside = assembly.APINION_Y - arbor.SHAFT_DIA / 2.0
+    # At rest the back crown already runs past the back block, so the walk
+    # sweeps only open air north of it, and the block stays below the crown.
+    assert back_end > rig.BACK_BLOCK_OUTER_Z
+    assert crown_underside - assembly.BLOCK_TOP_Y > rig.RIG_MARGIN_SPARE
+    # The pedestal and its dome cap stand on the cylinder axis, well clear of
+    # the pinion-arbor axis radially at every z.
     pedestal_reach_x = assembly.X_DRUM + pedestal.FOOT_WIDTH / 2.0
     arbor_near_x = assembly.APINION_X - arbor.SHAFT_DIA / 2.0
     assert arbor_near_x - pedestal_reach_x > 20.0
-    back_end = assembly.ARBOR_Z0 + arbor.SHAFT_LEN
-    assert back_end + spec.GAP_MAX < assembly.ARBOR_PEDESTAL_NORTH_Z + pedestal.FOOT_DEPTH / 2.0
+    # The walked crown never overhangs the base deck, beyond which the frame
+    # and the other subassemblies stand.
+    assert walked_end < assembly.BASE_TOP_WIDTH / 2.0 - rig.RIG_MARGIN_SPARE
 
 
 def test_the_pin_never_enters_the_front_land() -> None:
