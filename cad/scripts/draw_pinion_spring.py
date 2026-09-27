@@ -31,6 +31,7 @@ from _drawing_common import (
     add_property_linked_note,
     assert_imported_precision,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
@@ -297,15 +298,14 @@ def _mark_kink_on_front(adapter: Any, front: Any) -> tuple[float, float]:
     return center
 
 
-def _cropped_kink_view(adapter: Any) -> Any:
-    """Detail A: a standalone 5:1 *Front model view cropped to the kink.
+def _placed_kink_view(adapter: Any) -> Any:
+    """Detail A, uncropped: a standalone 5:1 *Front model view, moved so the
+    kink focus lands on DETAIL_CENTER (checked to DETAIL_POSITION_TOL_M).
 
-    Place *Front at 5:1; move it so the kink focus lands on DETAIL_CENTER
-    (checked to DETAIL_POSITION_TOL_M); activate it; sketch the fence's 5:1
-    circle in its own sketch and Crop2 while the circle is still selected,
-    with the circle as its outline, as the native detail printed it.  Crop
-    status, IsCropped and the outline style are read back and raise.  The
-    part hides FreeForm, so the view shows the installed crest alone.
+    The part hides FreeForm, so the view shows the installed crest alone.
+    It is dimensioned before _crop_kink_view crops it: pc-r14 (6aebefd18,
+    leaf 20260927T005429Z-1-555a9662) imported into the cropped view and got
+    FlatLen but not KinkR, where the uncropped *Front imports both.
     """
     draw = adapter.currentModel
     view = _early_bound(
@@ -325,9 +325,25 @@ def _cropped_kink_view(adapter: Any) -> Any:
     center = model_point_in_view(adapter, view, focus, label="kink detail focus")
     if math.dist(center, DETAIL_CENTER) > DETAIL_POSITION_TOL_M:
         raise RuntimeError(f"kink focus sits at {center!r}, not {DETAIL_CENTER!r}")
+    return view
+
+
+def _crop_kink_view(adapter: Any, view: Any) -> None:
+    """Crop detail A to the fence's 5:1 circle round DETAIL_CENTER.
+
+    Activate the view, sketch the circle in its own sketch and Crop2 while
+    the circle is still selected, with the circle as its outline, as the
+    native detail printed it.  Crop status, IsCropped, the outline and its
+    style are read back and raise.
+    """
+    draw = adapter.currentModel
+    view = _early_bound(view, "IView")
+    ratio = tuple(float(value) for value in view.ScaleRatio)
     uncropped = tuple(float(value) for value in view.GetOutline())
     name = _activate_view(adapter, view, label="kink detail")
-    _sketch_circle(adapter, view, center, DETAIL_CROP_RADIUS, label="kink-detail crop")
+    _sketch_circle(
+        adapter, view, DETAIL_CENTER, DETAIL_CROP_RADIUS, label="kink-detail crop"
+    )
     status = int(view.Crop2(False, False, 1))
     draw.ClearSelection2(True)
     draw.EditRebuild3()
@@ -361,7 +377,6 @@ def _cropped_kink_view(adapter: Any) -> Any:
             f"kink detail's crop boundary is not its plain circle: jagged, "
             f"no-outline {boundary!r}"
         )
-    return view
 
 
 def _plain_text(text: str) -> str:
@@ -616,8 +631,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # detail's import then brought KinkR back but not FlatLen.  A dimension
     # already on the sheet is never imported again (the arbor's detail A
     # imports first for the same reason), so the profile's import now skips
-    # the pair the detail holds.
-    detail = _cropped_kink_view(adapter)
+    # the pair the detail holds.  The detail is dimensioned uncropped and
+    # cropped after (_placed_kink_view says why).
+    detail = _placed_kink_view(adapter)
     set_hidden_lines_removed(adapter, detail)
     detail_annotations = curate_view_dimensions(
         adapter,
@@ -626,6 +642,17 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="kink detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    _crop_kink_view(adapter, detail)
+    # The crop must not have taken the pair with it.
+    kept = {
+        dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
+        for annotation in (_early_bound(detail, "IView").GetAnnotations() or ())
+    }
+    if not set(DETAIL_KEEP) <= kept:
+        raise RuntimeError(
+            f"kink detail lost {sorted(set(DETAIL_KEEP) - kept)} to its crop; "
+            f"it holds {sorted(name for name in kept if name)}"
+        )
     # The front view imports the part-hidden FreeForm reference sketch, so it
     # takes the opt-in curation that shows it (the phantom) in this view only.
     front_annotations = hidden_sketches.curate_view_dimensions(
