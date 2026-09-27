@@ -130,10 +130,17 @@ def test_set_pin_holes_print_only_size_and_the_match_drill() -> None:
     callout = drawing.DIMENSION_CALLOUTS["PinHoleDia"]
     assert callout is pinion_pivot_shaft_spec.PIN_HOLE_CALLOUT
     # The hole specification only (Main's re-ruling, 2026-09-26): the
-    # drilling pose is MHA-A03's SHAFT DRILL SET.
+    # drilling pose is MHA-A03's SHAFT DRILL SET, and the callout points at
+    # that step through the registry, so a renumbered sequence carries it
+    # (Codex #858, PRRT_kwDOPHDy386mTbPB).
+    import drive_train_steps
+
+    key = pinion_pivot_shaft_spec.SHAFT_DRILL_STEP_KEY
+    assert key == "straps-pinned-to-torque-shaft"
     assert callout.split("\n") == [
         "MATCH-DRILL THRU AT ASSEMBLY",
-        "IN MHA-056 CROSS HOLES, 2 PL",
+        "IN MHA-056 CROSS HOLES, 2 PL,",
+        f"PER {drive_train_steps.step_ref(key)}",
     ]
     assert pinion_pivot_shaft_spec.PIN_HOLE_DIA == 25.4 / 16.0
     assert pinion_pivot_shaft_spec.PIN_HOLE_BAND == (0.06, 0.0)
