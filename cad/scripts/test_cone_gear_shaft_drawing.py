@@ -274,7 +274,105 @@ def test_collar_diameter_stands_on_the_collar() -> None:
     x, y = drawing.SIDE_DIAMETERS["CollarDia"]
     assert ring[0] < x < ring[1]
     assert y > drawing.SIDE_CENTER[1] + spec.COLLAR_DIA / 2000.0 + 0.010
-    assert x + drawing.COLLAR_DIA_TEXT_WIDTH < drawing.PIVOT_FINISH_XY[0] - 0.010
+
+
+# final877 (04b825fca) read-off of MHA-014: the collar's three-line callout
+# hung right from its rim arrow over sheet x 0.2094..0.2565, y 0.1683..0.1834,
+# the pivot-journal Ra 1.6 sat on "15.88)" and its leader crossed the block.
+_FINAL877_COLLAR_TEXT = (0.2094, 0.1683, 0.2565, 0.1834)
+
+
+def _pivot_finish_ink() -> tuple[tuple[float, float, float, float], list]:
+    """The pivot finish as the build places it: the symbol at PIVOT_FINISH_XY
+    and its leader down onto the journal land's top flank."""
+    spec = cone_gear_shaft_spec
+    big_end = drawing.SIDE_CENTER[0] + spec.SHAFT_LENGTH / 2000.0
+    x, y = drawing.PIVOT_FINISH_XY
+    box = (x - 0.002, y - 0.002, x + 0.016, y + 0.006)
+    top = (big_end - 0.020, drawing.SIDE_CENTER[1] + spec.SECTION_DIAS[0] / 2000.0)
+    return box, [((x, y), top)]
+
+
+def test_the_collar_callout_moves_clear_of_the_pivot_finish() -> None:
+    """final877: the collar's stock callout is wider than the whole journal
+    land, so the pivot finish's leader, which lands on that journal, crossed it
+    wherever the symbol stood.  The planner moves the block left until it ends
+    clear of the symbol and of that leader, and the room it moves into, right
+    of the Ø9.525 text, holds the block."""
+    from _drawing_annotation_extent import CLEAR_GAP_M, boxes_clear
+    from _drawing_leaders import distance_to_box
+
+    finish, leader = _pivot_finish_ink()
+    text = _FINAL877_COLLAR_TEXT
+    assert not boxes_clear(text, finish)  # positive control: the render's clash
+    dx = drawing._collar_callout_dx(text, finish, leader)
+    moved = (text[0] + dx, text[1], text[2] + dx, text[3])
+    assert dx < 0.0
+    assert boxes_clear(moved, finish)
+    assert all(distance_to_box(segment, moved) >= CLEAR_GAP_M for segment in leader)
+    assert moved[0] >= drawing._collar_callout_floor()
+    # a block already clear stays put
+    assert drawing._collar_callout_dx(moved, finish, leader) == 0.0
+
+
+def test_the_collar_callout_read_guard_takes_the_whole_block() -> None:
+    """The measured block must be the three lines, not the value line alone:
+    the render's width passes the guard, a "(Ø15.88)"-only box does not."""
+    assert drawing.COLLAR_CALLOUT_LINES == (
+        "(Ø15.88)",
+        *cone_gear_shaft_spec.COLLAR_STOCK_CALLOUT.split("\n"),
+    )
+    measured = _FINAL877_COLLAR_TEXT[2] - _FINAL877_COLLAR_TEXT[0]
+    assert measured >= drawing.COLLAR_CALLOUT_MIN_READ
+    value_line_only = len("(Ø15.88)") * drawing.LENGTH_CHAR_WIDTH
+    assert value_line_only < drawing.COLLAR_CALLOUT_MIN_READ
+
+
+def _clear_collar_with(monkeypatch, texts):
+    """Run _clear_collar_callout against fakes: each read returns the next
+    text box; returns the recorded moves."""
+    from types import SimpleNamespace
+
+    finish, leader = _pivot_finish_ink()
+    reads = iter(texts)
+    moves = []
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing, "gdt_box", lambda *_a, **_k: finish)
+    monkeypatch.setattr(drawing, "leader_segments", lambda _a: leader)
+    monkeypatch.setattr(
+        drawing,
+        "callout_ink",
+        lambda *_a, **_k: SimpleNamespace(label="collar", text=next(reads), leader=()),
+    )
+    monkeypatch.setattr(drawing, "dimension_text_points", lambda _a: [])
+    monkeypatch.setattr(
+        drawing,
+        "move_annotation",
+        lambda _ad, _an, dx, dy, **_k: moves.append((dx, dy)),
+    )
+    monkeypatch.setattr(
+        drawing,
+        "sheet_region",
+        lambda _a: SimpleNamespace(xmin=0.01, ymin=0.01, xmax=0.42, ymax=0.27),
+    )
+    finish_symbol = SimpleNamespace(GetAnnotation=lambda: object())
+    drawing._clear_collar_callout(object(), object(), finish_symbol)
+    return moves
+
+
+def test_the_build_moves_and_proves_the_collar_callout(monkeypatch) -> None:
+    text = _FINAL877_COLLAR_TEXT
+    finish, leader = _pivot_finish_ink()
+    dx = drawing._collar_callout_dx(text, finish, leader)
+    moved = (text[0] + dx, text[1], text[2] + dx, text[3])
+    assert _clear_collar_with(monkeypatch, [text, moved]) == [(dx, 0.0)]
+    # a move that does not land (the text reads back where it was) fails
+    with pytest.raises(RuntimeError, match="crowds"):
+        _clear_collar_with(monkeypatch, [text, text])
+    # a box around the value line alone is refused, never "cleared"
+    value_only = (0.2094, 0.1783, 0.2094 + 0.019, 0.1834)
+    with pytest.raises(RuntimeError, match="misread"):
+        _clear_collar_with(monkeypatch, [value_only])
 
 
 def test_lengths_are_baseline_from_the_collar_face() -> None:
@@ -321,7 +419,32 @@ def test_lengths_are_baseline_from_the_collar_face() -> None:
             assert x < datum_x - span / 1000.0, name
             continue
         assert datum_x - span / 1000.0 < x < datum_x, name
-    assert drawing.DIMENSION_CALLOUTS["T006Station"] == "20X EQ SP"
+
+
+def test_every_length_tier_is_one_line(monkeypatch) -> None:
+    """final877: "20X EQ SP" as a callout below 142.168 hung between it and
+    157.9 and read as either's.  No length below the shaft carries a callout
+    line; the T006 station's pattern note is a suffix on its own value line."""
+    assert not set(drawing.DIMENSION_CALLOUTS) & set(drawing.SIDE_KEEP) - {"ShoulderR"}
+    assert drawing.T006_STATION_SUFFIX == " 20X EQ SP"
+
+    from types import SimpleNamespace
+
+    texts: dict[int, str] = {}
+
+    def set_text(part, value):
+        texts[part] = value
+
+    display = SimpleNamespace(SetText=set_text, GetText=lambda part: texts.get(part))
+    station = SimpleNamespace(GetSpecificAnnotation=lambda: display)
+    other = SimpleNamespace(GetSpecificAnnotation=lambda: None)
+    names = {id(station): "T006Station", id(other): "Sec4End"}
+    monkeypatch.setattr(drawing, "dimension_name", lambda _a, ann: names[id(ann)])
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    drawing._set_t006_station_suffix(object(), [other, station])
+    assert texts == {2: " 20X EQ SP"}  # swDimensionTextSuffix only
+    with pytest.raises(RuntimeError, match="no T006Station"):
+        drawing._set_t006_station_suffix(object(), [other])
 
 
 def _length_texts_crossed(side_keep, overall_xy):
@@ -331,7 +454,7 @@ def _length_texts_crossed(side_keep, overall_xy):
     Each length hangs its two extension lines from the shaft down to its own
     tier, so a line crosses every tier ABOVE its own.  A text is centred on
     its x; its box is the character count times LENGTH_CHAR_WIDTH (the
-    T006 callout's "20X EQ SP" line is the wider of its two).
+    T006 station's line carries its " 20X EQ SP" suffix).
     """
     spec = cone_gear_shaft_spec
     big_end = drawing.SIDE_CENTER[0] + spec.SHAFT_LENGTH / 2000.0
@@ -351,7 +474,8 @@ def _length_texts_crossed(side_keep, overall_xy):
         name: (f"{value:.{places[name]}f}", side_keep[name])
         for name, value in from_datum.items()
     }
-    texts["T006Station"] = ("20X EQ SP", side_keep["T006Station"])
+    value, xy = texts["T006Station"]
+    texts["T006Station"] = (value + drawing.T006_STATION_SUFFIX, xy)
     texts["Sec0End"] = (
         f"{spec.DATUM_STATION:.{places['Sec0End']}f}",
         side_keep["Sec0End"],
@@ -395,8 +519,10 @@ def test_the_collar_diameter_draws_nothing_inside_the_ring() -> None:
     """The 1.7 mm collar cannot hold a dimension line and two arrows (916a
     eye-pass): its diameter alone takes the near-side single-arrow style."""
     assert drawing.NEAR_SIDE_DIAMETERS == ("CollarDia",)
+    import _drawing_leaders
+
+    assert drawing.set_near_side_diameter is _drawing_leaders.set_near_side_diameter
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "from _drawing_leaders import set_near_side_diameter" in source
     assert "if name in NEAR_SIDE_DIAMETERS:" in source
     assert 'set_near_side_diameter(moved, f"{name} near-side diameter")' in source
 

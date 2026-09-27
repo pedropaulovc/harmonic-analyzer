@@ -23,9 +23,23 @@ import argparse
 import sys
 from typing import Any
 
+from collections.abc import Sequence
+
 import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import (
+    CLEAR_GAP_M,
+    PLACE_SETTLE_M,
+    Box,
+    callout_ink,
+    gdt_box,
+    move_annotation,
+    require_clear,
+    require_inside,
+    require_leader_clear,
+    sheet_region,
+)
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
@@ -36,6 +50,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_reference_dimension,
@@ -43,10 +58,17 @@ from _drawing_common import (
     view_name,
     visible_view_entities,
 )
-from _drawing_leaders import set_near_side_diameter
+from _drawing_leaders import (
+    Segment,
+    dimension_text_points,
+    distance_to_box,
+    leader_segments,
+    set_near_side_diameter,
+)
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from cone_gear_shaft_spec import (
+    COLLAR_DIA,
     COLLAR_STOCK_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_REFERENCE_PRECISION,
@@ -103,7 +125,10 @@ DONOR_CENTER = (0.360, 0.090)
 # 0.2096.  Everything measured from it is baseline below the shaft, one tier
 # per dimension, the shortest nearest the part: the collar web, the T120
 # solder station, the three gear-seat shoulders, the T006 station with its
-# 20X EQ SP, then the tip (#917 R5 (a)).  The journal runs the other way from
+# 20X EQ SP on the value's own line, then the tip (#917 R5 (a)).  Every tier
+# is therefore one line of text: as a callout below, "20X EQ SP" hung
+# between 142.168 and 157.9 and read as either's (final877 eye pass).  The
+# journal runs the other way from
 # the same origin on the first tier, and the front-to-tip overall, a
 # reference, hangs lowest, above the title block.  A station's text is
 # centred in its span when it fits there with STATION_TEXT_CLEARANCE to spare;
@@ -159,8 +184,17 @@ NEAR_SIDE_DIAMETERS = ("CollarDia",)
 REFERENCE_DIAMETERS = ("CollarDia",)
 # Sheet width of one diameter text with its stacked band, for the layout test.
 DIAMETER_TEXT_WIDTH = 0.032
-# The collar's reference diameter, "(Ø15.88)": eight characters on one line.
-COLLAR_DIA_TEXT_WIDTH = 0.019
+# The collar prints its reference diameter over the stock statement, three
+# lines whose widest is "5/8 BAR AS SUPPLIED".  At LENGTH_CHAR_WIDTH a line
+# that long is wider than the whole journal land, so hanging right from its
+# rim arrow the block ran under the pivot-journal finish and that finish's
+# leader crossed it (final877 eye pass).  The build moves the block left, over
+# land 1, from its measured ink (_clear_collar_callout).
+COLLAR_CALLOUT_LINES = (f"(Ø{COLLAR_DIA:.2f})", *COLLAR_STOCK_CALLOUT.split("\n"))
+COLLAR_CALLOUT_WIDTH = max(len(line) for line in COLLAR_CALLOUT_LINES) * LENGTH_CHAR_WIDTH
+# A measured block narrower than this is a misread (a box around the value
+# line alone), not a layout: the proof refuses it rather than clearing it.
+COLLAR_CALLOUT_MIN_READ = 0.9 * COLLAR_CALLOUT_WIDTH
 DONOR_KEEP = {
     name: (DONOR_CENTER[0], DONOR_CENTER[1] - 0.012 * index)
     for index, name in enumerate(SIDE_DIAMETERS)
@@ -169,11 +203,11 @@ DONOR_KEEP = {
 # dimension (the collar's roots stay sharp, #914).
 DIMENSION_CALLOUTS = {
     "ShoulderR": FILLET_CALLOUT,
-    "T006Station": "20X EQ SP",
     "CollarDia": COLLAR_STOCK_CALLOUT,
 }
-# The pivot-journal finish symbol, left of which the collar diameter's text
-# must end.
+# The T006 station's pattern note, on the value's own line.
+T006_STATION_SUFFIX = " 20X EQ SP"
+# The pivot-journal finish symbol, left of whose ink the collar's text must end.
 PIVOT_FINISH_XY = (0.2400, 0.1800)
 
 
@@ -357,6 +391,86 @@ def _move_dimension(
     return matches[0]
 
 
+def _collar_callout_dx(text: Box, finish: Box, finish_leader: Sequence[Segment]) -> float:
+    """How far to move the collar callout (negative: left) so its text ends
+    clear of the pivot-journal finish: of the symbol and of its leader, which
+    drops onto the journal land under the callout's old place."""
+    leftmost = min([finish[0]] + [x for segment in finish_leader for x, _y in segment])
+    return min(0.0, leftmost - CLEAR_GAP_M - PLACE_SETTLE_M - text[2])
+
+
+def _collar_callout_floor() -> float:
+    """The collar text's left bound: clear of the Ø9.525 text, whose block
+    hangs right of its line (DIAMETER_TEXT_WIDTH)."""
+    return SIDE_DIAMETERS["Sec1Dia"][0] + DIAMETER_TEXT_WIDTH + CLEAR_GAP_M
+
+
+def _collar_text(adapter: Any, collar: Any, label: str) -> tuple[Any, Box]:
+    """The collar callout's ink and its whole text block, refusing a misread.
+
+    ``callout_ink`` boxes the text from its shoulder; the text positions widen
+    that box to every line, so a stock line hung below the shoulder counts.
+    """
+    ink = callout_ink(adapter, collar, label=label)
+    points = dimension_text_points(collar)
+    xs = [ink.text[0], ink.text[2], *(x for x, _y in points)]
+    ys = [ink.text[1], ink.text[3], *(y for _x, y in points)]
+    text = (min(xs), min(ys), max(xs), max(ys))
+    if text[2] - text[0] < COLLAR_CALLOUT_MIN_READ:
+        raise RuntimeError(
+            f"{label} read {text[2] - text[0]:.4f} m wide, under the "
+            f"{COLLAR_CALLOUT_MIN_READ:.4f} its widest line needs: a misread"
+        )
+    return ink, text
+
+
+@_telemetry.traced("drawing.collar_callout_clear")
+def _clear_collar_callout(adapter: Any, collar: Any, finish: Any) -> None:
+    """Move the collar's stock callout left of the pivot-journal finish, then
+    prove it: clear of the symbol, its leader clear of the symbol, the finish
+    leader clear of its text, right of the Ø9.525 text, inside the frame."""
+    label = "collar stock callout"
+    rebuild_drawing(adapter, label=f"measure {label}")
+    finish_annotation = finish.GetAnnotation()
+    finish_box = gdt_box(adapter, finish_annotation, label="pivot journal finish")
+    finish_leader = leader_segments(finish_annotation)
+    _ink, text = _collar_text(adapter, collar, label)
+    dx = _collar_callout_dx(text, finish_box, finish_leader)
+    if dx:
+        move_annotation(adapter, collar, dx, 0.0, label=label)
+    ink, text = _collar_text(adapter, collar, label)
+    neighbours = {"pivot journal finish": finish_box}
+    require_clear(label, text, neighbours)
+    require_leader_clear(ink, neighbours)
+    near = [
+        segment for segment in finish_leader if distance_to_box(segment, text) < CLEAR_GAP_M
+    ]
+    if near:
+        raise RuntimeError(f"pivot journal finish leader {near} runs by the {label}")
+    if text[0] < _collar_callout_floor():
+        raise RuntimeError(
+            f"{label} starts at x {text[0]:.4f}, on the Ø9.525 text "
+            f"(ends {_collar_callout_floor():.4f})"
+        )
+    require_inside(label, text, sheet_region(adapter))
+    _telemetry.success(f"{label} moved {dx:.4f} m, clear of the pivot journal finish")
+
+
+def _set_t006_station_suffix(adapter: Any, annotations: Sequence[Any]) -> None:
+    """Print the T006 station's pattern note on the value's own line."""
+    for annotation in annotations:
+        if dimension_name(adapter, annotation) != "T006Station":
+            continue
+        annotation = _early_bound(annotation, "IAnnotation")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.SetText(2, T006_STATION_SUFFIX)  # swDimensionTextSuffix
+        readback = str(display.GetText(2) or "")
+        if readback != T006_STATION_SUFFIX:
+            raise RuntimeError(f"T006 station suffix did not persist: {readback!r}")
+        return
+    raise RuntimeError("side view has no T006Station dimension to label")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -422,11 +536,14 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = list(side_annotations)
+    collar = None
     for annotation in donor_annotations:
         name = dimension_name(adapter, annotation)
         moved = _move_dimension(
             adapter, annotation, side, SIDE_DIAMETERS[name], source_view=donor
         )
+        if name == "CollarDia":
+            collar = moved
         if name in NEAR_SIDE_DIAMETERS:
             set_near_side_diameter(moved, f"{name} near-side diameter")
         if name in REFERENCE_DIAMETERS:
@@ -440,7 +557,10 @@ async def build(adapter: Any) -> dict[str, str]:
     delete_view(adapter, donor)
     if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
         raise RuntimeError("failed to delete the empty diameter donor view")
+    if collar is None:
+        raise RuntimeError("the donor view gave no CollarDia dimension")
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _set_t006_station_suffix(adapter, annotations)
     _add_overall_reference(adapter, side)
 
     # Leader anchors for the two lands that RUN (sheet metres).  The tip
@@ -456,7 +576,7 @@ async def build(adapter: Any) -> dict[str, str]:
         big_end_x - SHAFT_LENGTH / 1000.0 + 0.002,
         SIDE_CENTER[1] + SECTION_DIAS[-1] / 2000.0,
     )
-    add_surface_finish(
+    pivot_finish = add_surface_finish(
         adapter,
         side,
         symbol_xy=PIVOT_FINISH_XY,
@@ -478,6 +598,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=tip_face,
         leader_attach_xy=tip_top,
     )
+    _clear_collar_callout(adapter, collar, pivot_finish)
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(
