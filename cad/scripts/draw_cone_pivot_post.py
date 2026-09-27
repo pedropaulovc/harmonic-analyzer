@@ -31,6 +31,7 @@ from typing import Any
 
 import _seat_forensics
 import _telemetry
+from _layout_geometry import DEFAULT_MOVE_CLEARANCE_M
 from _common import CAD_ROOT, _early_bound, check, run_build
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -201,17 +202,19 @@ REAR_SCALE = (1, 2)
 _R = REAR_SCALE[0] / REAR_SCALE[1] / 1000.0
 # x: the rear view's SpotFaceWidth text must stand one text height clear of
 # the plan's RD1 hole callout (_layout_geometry's view-crowding rule: the
-# smaller box's height), plus a margin.  Measured boxes, leaf crankhub-rim-091e
-# (x=0.2245, where the two stood 4.16 mm apart): RD1 ends at 198.1 mm; the
-# width text is 41.8 mm wide, centred 1.3 mm left of the view; the audit's
-# text height is 9.06 mm.
+# smaller box's height), plus the audit's own move clearance.  The boxes are
+# MEASURED, on leaf crankhub-rim-091e (run 20260927T051203752Z-64abb83d,
+# x=0.2245, where the two stood 4.16 mm apart): RD1 ends at 198.1 mm; the
+# width text is 41.8 mm wide, centred 1.3 mm left of the view; the text
+# height the rule used is 9.06 mm (the audit has no constant for it -- it
+# reads each box's height).  If RD1 or either text moves, these go stale, and
+# the native layout audit (_assert_native_layout) is the backstop that fails
+# the build.
 _PLAN_RD1_RIGHT = 0.1981
 _REAR_WIDTH_TEXT_HALF = 0.0418 / 2.0
 _REAR_WIDTH_TEXT_LEFT_OF_VIEW = 0.0013
 _SHEET_TEXT_HEIGHT = 0.00906
-# Beyond the rule itself, so a note's re-layout jitter (~0.2 mm) and a
-# slightly longer callout cannot bring the pair back under it.
-_VIEW_CROWDING_MARGIN = 0.0015
+_VIEW_CROWDING_MARGIN = DEFAULT_MOVE_CLEARANCE_M
 REAR_CENTER = (
     _PLAN_RD1_RIGHT
     + _SHEET_TEXT_HEIGHT

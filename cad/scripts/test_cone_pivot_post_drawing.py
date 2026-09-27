@@ -10,6 +10,7 @@ import pytest
 
 import build_cone_pivot_post as part
 import cone_pivot_post_spec as spec
+import _layout_geometry as layout
 import draw_cone_pivot_post as drawing
 from _assembly import _seed_flip, activate_assembly_contract
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
@@ -241,8 +242,8 @@ def test_the_rear_width_text_clears_the_plan_callout_by_a_text_height() -> None:
         - drawing._REAR_WIDTH_TEXT_HALF
     )
     gap = text_left - drawing._PLAN_RD1_RIGHT
-    assert gap == pytest.approx(drawing._SHEET_TEXT_HEIGHT + drawing._VIEW_CROWDING_MARGIN)
-    assert gap > drawing._SHEET_TEXT_HEIGHT
+    assert gap >= drawing._SHEET_TEXT_HEIGHT + drawing._VIEW_CROWDING_MARGIN - 1e-12
+    assert drawing._VIEW_CROWDING_MARGIN is layout.DEFAULT_MOVE_CLEARANCE_M
 
 
 def _failing_layout(monkeypatch: pytest.MonkeyPatch) -> None:
