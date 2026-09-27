@@ -117,6 +117,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         | set(drawing.SECTION_KEEP)
         | set(drawing.JOURNAL_KEEP)
         | set(drawing.REAR_KEEP)
+        | {drawing.SPOT_PLAN_DIMENSION}
     )
     assert kept == marked
     assert marked == {
@@ -148,6 +149,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         + len(drawing.SECTION_KEEP)
         + len(drawing.JOURNAL_KEEP)
         + len(drawing.REAR_KEEP)
+        + 1
         == len(kept)
     )
 
@@ -157,6 +159,168 @@ def test_the_spot_face_run_out_is_dimensioned_face_on() -> None:
     at the crank boss's far end), so only the rear view shows it face-on."""
     assert set(drawing.REAR_KEEP) == spec.DRAWING_DIMENSIONS["CrankSpotFaceRunOutProfile"]
     assert "*Back" in Path(drawing.__file__).read_text(encoding="utf-8")
+
+
+def test_the_spot_face_has_its_own_sheet_at_two_to_one() -> None:
+    """Sheet 1 had no room to show the D at a size a novice reads (the
+    rim-8339 eye pass), so it is sheet 2, at 2:1, which the title block states;
+    sheet 1 keeps 1:1 and points there by the derived sheet number."""
+    assert drawing.SHEET_NAMES == ("MAIN", "SPOT-FACE")
+    assert drawing.SHEET_SCALES == {"MAIN": (1.0, 1.0), "SPOT-FACE": (2.0, 1.0)}
+    assert drawing.SPOT_FACE_SCALE == drawing.SHEET_SCALES[drawing.SPOT_FACE_SHEET]
+    assert drawing.SEE_SPOT_FACE_SHEET == "SPOT FACE:\nSEE SHEET 2"
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "sheet_scales=SHEET_SCALES" in source
+    assert "expected_sheet_names=SHEET_NAMES" in source
+    # Every sheet-2 view is placed at the sheet's own scale.
+    assert source.count("scale=SPOT_FACE_SCALE") == 2
+
+
+def test_the_spot_face_dimensions_are_labelled_for_what_they_locate() -> None:
+    assert drawing.SPOT_FACE_WIDTH_CALLOUT == {"SpotFaceWidth": "SPOT FACE WIDTH"}
+    assert drawing.SPOT_FACE_CALLOUTS == {"SpotFaceRunOut": "RUN-OUT TO STEP"}
+    assert not set(drawing.DIMENSION_CALLOUTS) & (
+        set(drawing.SPOT_FACE_WIDTH_CALLOUT) | set(drawing.SPOT_FACE_CALLOUTS)
+    )
+    # The collar the flat clears is the part's, not a typed 44.
+    assert drawing.SPOT_FACE_NOTE == (
+        f"SPOT FACE CLEARS <MOD-DIAM>{spec.HEAD_DIA:.0f} COLLAR"
+    )
+    assert spec.HEAD_DIA == 44.0
+
+
+def _spot_face_outlines() -> dict[str, tuple[float, float, float, float]]:
+    """Sheet-2 view outlines predicted from the part: ``place_view`` centres
+    each on its projected bounding box.  The plan's box runs from the cone
+    boss's corner (beyond the collar, whose flat trims it at the spot face) to
+    the crank boss's far end."""
+    f = drawing.SPOT_FACE_SCALE[0] / drawing.SPOT_FACE_SCALE[1] / 1000.0
+    incline = math.radians(spec.INCLINE_DEG)
+    corner = (spec.CONE_BOSS_LENGTH / 2.0) * math.cos(incline) + (
+        spec.CONE_BOSS_DIA / 2.0
+    ) * math.sin(incline)
+    plan_depth = spec.CRANK_BOSS_END_Z + max(corner, spec.BLOCK_DIA / 2.0)
+    half = spec.HEAD_DIA / 2.0 * f
+    rear_x, rear_y = drawing.REAR_CENTER
+    plan_x, plan_y = drawing.SPOT_PLAN_CENTER
+    return {
+        "rear view": (
+            rear_x - half,
+            rear_y - spec.BLOCK_HEIGHT / 2.0 * f,
+            rear_x + half,
+            rear_y + spec.BLOCK_HEIGHT / 2.0 * f,
+        ),
+        "spot-face plan": (
+            plan_x - half,
+            plan_y - plan_depth / 2.0 * f,
+            plan_x + half,
+            plan_y + plan_depth / 2.0 * f,
+        ),
+    }
+
+
+def _landscape_sheet() -> tuple[object, tuple]:
+    from _drawing_layout_check import DrawableRegion
+    from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
+    from diagnostics.drawing_layout_audit import _keep_outs
+    from test_drawing_layout_check import ZONE_MARGINS
+
+    template = DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE]
+    region = DrawableRegion.from_margins(template.width_m, template.height_m, **ZONE_MARGINS)
+    return region, _keep_outs(template.width_m, template.height_m)
+
+
+def test_the_spot_face_views_fit_the_sheet_clear_of_the_title_block() -> None:
+    region, keep_outs = _landscape_sheet()
+    outlines = _spot_face_outlines()
+    assert drawing.view_placement_problems(outlines, region, keep_outs) == []
+    rear, plan = outlines["rear view"], outlines["spot-face plan"]
+    # The run-out text stands between the two views, the station text left of
+    # the plan and right of the run-out text.
+    run_out_x = drawing.REAR_KEEP["SpotFaceRunOut"][0]
+    station_x = plan[0] - drawing.SPOT_PLAN_TEXT_LEFT_OF_VIEW
+    assert rear[2] < run_out_x < station_x < plan[0]
+
+
+def test_view_placement_flags_the_border_and_the_title_block() -> None:
+    region, keep_outs = _landscape_sheet()
+    outlines = {
+        "over the block": (0.300, 0.050, 0.350, 0.120),
+        "off the left": (0.005, 0.100, 0.060, 0.150),
+        "clear": (0.100, 0.100, 0.150, 0.150),
+    }
+    problems = drawing.view_placement_problems(outlines, region, keep_outs)
+    assert len(problems) == 2
+    assert "over the block reaches into the title-block" in problems[0]
+    assert "off the left leaves the inner border" in problems[1]
+
+
+def test_the_station_text_stands_left_of_the_plan_half_way_to_the_face(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both ends of the station are projected from the model onto the placed
+    plan, so the text follows the view, not a measured coordinate."""
+    projected = {
+        "plan post axis": (0.290, 0.1933),
+        "plan spot face": (0.290, 0.2311),
+    }
+    monkeypatch.setattr(
+        drawing,
+        "model_point_in_view",
+        lambda _adapter, _view, _xyz, *, label: projected[label],
+    )
+    monkeypatch.setattr(drawing, "_view_outline", lambda _view: (0.246, 0.092, 0.334, 0.238))
+    keep = drawing._spot_plan_keep(object(), object())
+    assert keep == {
+        "CrankBossStartZ": (
+            pytest.approx(0.246 - drawing.SPOT_PLAN_TEXT_LEFT_OF_VIEW),
+            pytest.approx((0.1933 + 0.2311) / 2.0),
+        )
+    }
+
+
+def test_a_view_label_centres_under_its_view(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The text box does not sit on its insertion point, so the label is
+    steered by its rendered extent until its top stands the gap under the view
+    outline, centred on it."""
+
+    class Annotation:
+        def __init__(self) -> None:
+            self.position = (0.041, 0.054, 0.0)
+
+        def GetPosition(self):
+            return self.position
+
+        def SetPosition(self, x, y, z):
+            self.position = (x, y, z)
+            return True
+
+    class Note:
+        def __init__(self) -> None:
+            self.annotation = Annotation()
+
+        def GetAnnotation(self):
+            return self.annotation
+
+        def GetExtent(self):
+            # 22 x 4.5 mm, offset from the anchor the way SolidWorks offsets it
+            x, y, _z = self.annotation.position
+            return (x + 0.0003, y - 0.0050, 0.0, x + 0.0223, y - 0.0005, 0.0)
+
+    class Model:
+        def GraphicsRedraw2(self) -> None:
+            pass
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, iface: obj)
+    note = Note()
+    outline = (0.041, 0.054, 0.129, 0.226)
+    adapter = type("Adapter", (), {"currentModel": Model()})()
+    gap = drawing.VIEW_LABEL_GAP
+    drawing._place_note_under(adapter, note, outline, gap=gap, label="rear view label")
+    x0, _y0, _z0, x1, y1, _z1 = note.GetExtent()
+    assert (x0 + x1) / 2.0 == pytest.approx((outline[0] + outline[2]) / 2.0, abs=1e-4)
+    assert y1 == pytest.approx(outline[1] - gap, abs=1e-4)
+    assert gap is layout.DEFAULT_MOVE_CLEARANCE_M
 
 
 def _crank_evidence(boss_lists_spot_face: bool) -> dict:
@@ -193,82 +357,6 @@ def test_the_crank_boss_face_set_is_asserted_not_guessed() -> None:
         drawing._crank_face_centres(evidence)
 
 
-def test_the_rear_label_stands_left_of_its_view(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The text box does not sit on its insertion point, so the label is
-    steered by its rendered extent until it stands the gap left of the view
-    outline, centred on it (below the view is View B)."""
-
-    class Annotation:
-        def __init__(self) -> None:
-            self.position = (0.2245, 0.20, 0.0)
-
-        def GetPosition(self):
-            return self.position
-
-        def SetPosition(self, x, y, z):
-            self.position = (x, y, z)
-            return True
-
-    class Note:
-        def __init__(self) -> None:
-            self.annotation = Annotation()
-
-        def GetAnnotation(self):
-            return self.annotation
-
-        def GetExtent(self):
-            # 22 x 9 mm (two lines), offset from the anchor the way SolidWorks
-            # offsets it
-            x, y, _z = self.annotation.position
-            return (x + 0.0003, y - 0.0095, 0.0, x + 0.0223, y - 0.0005, 0.0)
-
-    class Model:
-        def GraphicsRedraw2(self) -> None:
-            pass
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, iface: obj)
-    note = Note()
-    outline = (0.2148, 0.2079, 0.2479, 0.2509)
-    adapter = type("Adapter", (), {"currentModel": Model()})()
-    gap = drawing.REAR_LABEL_GAP
-    drawing._place_note_left_of(adapter, note, outline, gap=gap, label="rear view label")
-    x0, y0, _z0, x1, y1, _z1 = note.GetExtent()
-    assert x1 == pytest.approx(outline[0] - gap, abs=1e-4)
-    assert (y0 + y1) / 2.0 == pytest.approx((outline[1] + outline[3]) / 2.0, abs=1e-4)
-
-
-def test_the_rear_view_stands_clear_of_view_b() -> None:
-    """At its station the rear view's outline bottom stands REAR_VIEW_GAP
-    above View B's measured top; the build re-checks the live outlines."""
-    bottom = drawing.REAR_CENTER[1] - (spec.BLOCK_HEIGHT / 2.0) * drawing._R
-    assert bottom - drawing._VIEW_B_TOP == pytest.approx(drawing.REAR_VIEW_GAP)
-
-
-def test_a_fused_rear_view_fails_the_build(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, iface: obj)
-    view_b = SimpleNamespace(GetOutline=lambda: (0.213, 0.117, 0.257, 0.2034))
-    fused = SimpleNamespace(GetOutline=lambda: (0.2148, 0.2039, 0.2479, 0.2469))
-    clear = SimpleNamespace(
-        GetOutline=lambda: (0.2148, 0.2034 + drawing.REAR_VIEW_GAP, 0.2479, 0.25)
-    )
-    with pytest.raises(RuntimeError, match="above View B"):
-        drawing._assert_rear_view_clear(fused, view_b)
-    drawing._assert_rear_view_clear(clear, view_b)
-
-
-def test_the_rear_width_text_clears_the_plan_callout_by_a_text_height() -> None:
-    """The view-crowding rule demands one text height between two views'
-    text; the rear view stands that plus the named margin off RD1."""
-    text_left = (
-        drawing.REAR_CENTER[0]
-        - drawing._REAR_WIDTH_TEXT_LEFT_OF_VIEW
-        - drawing._REAR_WIDTH_TEXT_HALF
-    )
-    gap = text_left - drawing._PLAN_RD1_RIGHT
-    assert gap >= drawing._SHEET_TEXT_HEIGHT + drawing._VIEW_CROWDING_MARGIN - 1e-12
-    assert drawing._VIEW_CROWDING_MARGIN is layout.DEFAULT_MOVE_CLEARANCE_M
-
-
 def _failing_layout(monkeypatch: pytest.MonkeyPatch) -> None:
     def fail(*_args, **_kwargs):
         raise RuntimeError("cone pivot post native annotation layout failed: probe")
@@ -298,7 +386,36 @@ def test_the_failure_pdf_never_masks_the_layout_error(
         monkeypatch.setattr(drawing, "_export_failure_pdf", boom)
     adapter = type("Adapter", (), {"currentModel": object()})()
     with pytest.raises(RuntimeError, match="native annotation layout failed: probe"):
-        drawing._assert_native_layout_with_evidence(adapter, object(), expected_finish="x")
+        drawing._assert_native_layout_with_evidence(
+            adapter, object(), spot_face_views={}, expected_finish="x"
+        )
+
+
+def test_the_failure_evidence_has_a_pdf_per_sheet(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A PDF save prints the active sheet, so each sheet is activated and
+    saved in turn; Main's eye pass needs sheet 2 as much as sheet 1."""
+    saved = []
+
+    class Drawing:
+        active = ""
+
+        def ActivateSheet(self, name):
+            Drawing.active = name
+            return True
+
+        def SaveAs3(self, path, _version, _options):
+            saved.append(Drawing.active)
+            Path(path).write_bytes(b"%PDF")
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, iface: obj)
+    monkeypatch.setattr(drawing._seat_forensics, "OUT_FAILURES", tmp_path)
+    adapter = SimpleNamespace(currentModel=Drawing())
+    drawing._export_failure_pdf(adapter, "native-layout")
+    assert saved == list(drawing.SHEET_NAMES)
+    pdfs = sorted(path.name for path in tmp_path.rglob("*.pdf"))
+    assert pdfs == ["cone-pivot-post-main.pdf", "cone-pivot-post-spot-face.pdf"]
 
 
 def test_inclined_journal_sizes_live_in_the_true_shape_view() -> None:
@@ -689,13 +806,16 @@ def test_section_reads_by_its_bore_axis_not_by_a_note() -> None:
 
 
 def test_spotface_station_prints_its_value_on_its_own_dimension_line() -> None:
-    """The 21.38 station is a plain dimension: no label, no offset shelf."""
+    """The spot-face station is a plain dimension: no label, no offset shelf.
+    It stands once, on sheet 2's plan (where it is the only dimension), not on
+    sheet 1's."""
     assert "CrankBossStartZ" not in drawing.DIMENSION_CALLOUTS
+    assert "CrankBossStartZ" not in drawing.SPOT_FACE_CALLOUTS
+    assert "CrankBossStartZ" not in drawing.TOP_KEEP
+    assert drawing.SPOT_PLAN_DIMENSION == "CrankBossStartZ"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '{"CrankBossStartZ":' not in source
-    # Left of the Ø44 circle and right of the crank-boss length's line.
-    x, _y = drawing.TOP_KEEP["CrankBossStartZ"]
-    assert drawing.TOP_KEEP["CrankBossLen"][0] < x < drawing._top_x(-spec.HEAD_DIA / 2.0)
+    assert "offset_dimension_text(adapter, plan_annotations" not in source
 
 
 def test_section_centerline_is_forced_to_print_black_in_center_font() -> None:
