@@ -868,6 +868,31 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     assert math.isclose(pin.STRAP_FOOT_MIN_WIDTH, 2.0 * (drive.STRAP_R_END - 0.8))
     assert pin.PIN_LEN + pin.PIN_LEN_BAND <= pin.STRAP_FOOT_MIN_WIDTH
     assert pin.PIN_BURIED_MARGIN >= 0.4
+    # The drive's printed acceptance (Codex #858, PRRT_kwDOPHDy386mV2GL):
+    # each end 0 to PIN_SUB_FLUSH_MAX below its strap edge.  The 0 is what
+    # PIN_BURIED_MARGIN relies on; every foot/pin pair fits the window (the
+    # longest pin in the narrowest foot shares PIN_BURIED_MARGIN, the
+    # shortest in the widest PIN_DRIVE_SHARE_MAX); at the limit the far wall
+    # still grips a pin diameter.
+    step_line = FITUP.SHAFT_DRILL_STEP.split("\n")[-1]
+    assert step_line == (
+        f"BOTH ENDS 0 TO {pin.PIN_SUB_FLUSH_MAX:.1f} BELOW THE MHA-056 EDGES."
+    )
+    assert pin.PIN_SUB_FLUSH_MAX == pytest.approx(2.8)
+    assert 0.0 <= pin.PIN_BURIED_MARGIN <= 2.0 * pin.PIN_SUB_FLUSH_MAX
+    assert pin.PIN_DRIVE_SHARE_MAX <= 2.0 * pin.PIN_SUB_FLUSH_MAX
+    assert pin.PIN_WALL_ENGAGEMENT_WORST >= pin.PIN_DIA
+    # One 0.1 step deeper would leave the far wall under a pin diameter.
+    deeper = pin.PIN_SUB_FLUSH_MAX + 0.1
+    assert (
+        pin.PIN_LEN - pin.PIN_LEN_BAND - deeper - pin.PIVOT_BORE_MAX
+    ) / 2.0 < pin.PIN_DIA
+    # The bore allowance is MHA-056's own printed band.
+    import pinion_bracket_spec
+
+    assert pin.PIVOT_BORE_MAX == pytest.approx(
+        pinion_bracket_spec.PIVOT_BORE + pinion_bracket_spec.PIVOT_BORE_BAND[0]
+    )
     # Engagement in each strap wall past the pivot bore.
     assert pin.PIN_LEN / 2.0 - drive.STRAP_PIVOT_BORE / 2.0 >= 3.0
     # U27 webs: strap faces and follower seat at the 2.0 target (the far

@@ -49,6 +49,7 @@ from pinion_rig_layout import (
     RIG_SET_LEAVES,
     SPRING_PAD_LEAF,
 )
+from pinion_strap_pin_spec import PIN_SUB_FLUSH_MAX
 
 # One purchased set, pinned like any other bought part: Starrett 66MA metric
 # thickness gage, 20 straight tempered-steel leaves 0.05-1.00 mm in 0.05 steps
@@ -133,7 +134,11 @@ COLLAR_SET_STEP = (
 # "SEE MHA-A03 STEP n" pointer lands at integration, generated from the
 # assembly step registry, never a hand-typed step name or number.  The pose
 # is what fixes the pin-hole stations -- the shaft prints none -- and its two
-# set errors ride the bearing stacks by name (pinion_rig_layout).
+# set errors ride the bearing stacks by name (pinion_rig_layout).  The drive
+# carries its own acceptance (Codex #858, PRRT_kwDOPHDy386mV2GL): neither end
+# proud, since the west end faces the MHA-104 collar across 0.38 of air, and
+# neither end deeper than pinion_strap_pin_spec.PIN_SUB_FLUSH_MAX, which keeps
+# a pin diameter of grip in each strap wall.
 SHAFT_DRILL_NAME = "SHAFT DRILL SET"
 STRAP_PIN_NUMBER = "MHA-145"
 SHAFT_DRILL_STEP = "\n".join(
@@ -141,7 +146,8 @@ SHAFT_DRILL_STEP = "\n".join(
         f"{SHAFT_DRILL_NAME}: MATCH-DRILL MHA-062 THRU MHA-056 CROSS HOLES, 2 PL,",
         f"MHA-062 REAR END FLUSH WITH MHA-061 REAR FACE +/-{FLUSH_SET_ERROR:.2f},",
         "STRAPS ON BACK STOP, MHA-002 ON BACK STRAP,",
-        f"{DRUM_END_SHIM:.2f} FEELER AT MHA-002 FRONT END; DRIVE {STRAP_PIN_NUMBER} PINS.",
+        f"{DRUM_END_SHIM:.2f} FEELER AT MHA-002 FRONT END; DRIVE {STRAP_PIN_NUMBER} PINS,",
+        f"BOTH ENDS 0 TO {PIN_SUB_FLUSH_MAX:.1f} BELOW THE MHA-056 EDGES.",
     )
 )
 

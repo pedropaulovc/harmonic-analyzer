@@ -14,7 +14,9 @@ and shaft specs read it, the drive-train assembly never does.
 
 from __future__ import annotations
 
-from _fit_limits import SHAFT_H
+import math
+
+from _fit_limits import REAM_SLIDE, SHAFT_H
 from _printed_tolerance import printed_deviations
 from pinion_bracket_geometry import (
     CROSS_HOLE_CZ_PLACES,
@@ -108,6 +110,30 @@ STRAP_FOOT_MIN_WIDTH = 2.0 * (R_END + _R_END_LOWER)
 PIN_BURIED_MARGIN = STRAP_FOOT_MIN_WIDTH - (PIN_LEN + PIN_LEN_BAND)
 PIN_CENTRED_SUB_FLUSH = (STRAP_FOOT_MIN_WIDTH - PIN_LEN) / 2.0
 
+# The drive's acceptance (Codex #858, PRRT_kwDOPHDy386mV2GL): each pin end
+# 0 to PIN_SUB_FLUSH_MAX below its strap edge.  The 0 keeps the pin out of
+# the 0.38 of air to the MHA-104 collar.  The upper limit keeps each strap
+# wall gripping PIN_WALL_ENGAGEMENT_FLOOR of pin past the pivot bore: with
+# one end PIN_SUB_FLUSH_MAX down, the shortest pin reaches
+# (L - S - bore) / 2 into the far wall at the widest foot it can still sit
+# inside, so S is the loosest 0.1 step that keeps that over the floor.  One
+# pin diameter per wall is the least grip this rig accepts.  The window
+# holds every pin in every foot: the most the two ends must share, widest
+# foot less shortest pin, is under 2 S.
+_R_END_UPPER = printed_deviations(R_END, END_RADIUS_PLACES)[1]
+STRAP_FOOT_MAX_WIDTH = 2.0 * (R_END + _R_END_UPPER)
+PIVOT_BORE_MAX = PIVOT_BORE + REAM_SLIDE[0]  # MHA-056 PIVOT_BORE_BAND
+PIN_WALL_ENGAGEMENT_FLOOR = PIN_DIA
+_PIN_LEN_MIN = PIN_LEN - PIN_LEN_BAND
+PIN_SUB_FLUSH_MAX = (
+    math.floor(
+        round((_PIN_LEN_MIN - PIVOT_BORE_MAX - 2.0 * PIN_WALL_ENGAGEMENT_FLOOR) * 10.0, 9)
+    )
+    / 10.0
+)
+PIN_WALL_ENGAGEMENT_WORST = (_PIN_LEN_MIN - PIN_SUB_FLUSH_MAX - PIVOT_BORE_MAX) / 2.0
+PIN_DRIVE_SHARE_MAX = STRAP_FOOT_MAX_WIDTH - _PIN_LEN_MIN
+
 if STRAP_FACE_WEB_WORST < 2.0:
     raise AssertionError(f"strap face web {STRAP_FACE_WEB_WORST:.2f} is under 2.0")
 if FOLLOWER_SEAT_LIGAMENT < 2.0:
@@ -121,3 +147,7 @@ if SHAFT_LIGAMENT_WORST < SHAFT_LIGAMENT_FLOOR:
     )
 if PIN_BURIED_MARGIN < 0.0:
     raise AssertionError("the longest pin stands proud of the narrowest strap foot")
+if PIN_WALL_ENGAGEMENT_WORST < PIN_WALL_ENGAGEMENT_FLOOR:
+    raise AssertionError("a pin at the sub-flush limit barely grips the far strap wall")
+if PIN_DRIVE_SHARE_MAX > 2.0 * PIN_SUB_FLUSH_MAX:
+    raise AssertionError("the widest foot cannot hold the shortest pin in the window")

@@ -855,7 +855,8 @@ def test_drum_runs_in_the_shim_the_straps_were_drilled_on() -> None:
         "SHAFT DRILL SET: MATCH-DRILL MHA-062 THRU MHA-056 CROSS HOLES, 2 PL,",
         "MHA-062 REAR END FLUSH WITH MHA-061 REAR FACE +/-0.10,",
         "STRAPS ON BACK STOP, MHA-002 ON BACK STRAP,",
-        "0.45 FEELER AT MHA-002 FRONT END; DRIVE MHA-145 PINS.",
+        "0.45 FEELER AT MHA-002 FRONT END; DRIVE MHA-145 PINS,",
+        "BOTH ENDS 0 TO 2.8 BELOW THE MHA-056 EDGES.",
     ]
     # Both bearing stacks carry the flush setting, and the front one the
     # shim's set error, by name.
