@@ -1249,6 +1249,63 @@ def test_rig_anchors_are_named_not_literal() -> None:
     assert math.isclose(arbor.DRUM_STATION_AS_BUILT, 60.75, abs_tol=1e-12)
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason=(
+        "#1037: MHA-114's pad has no east-west locate that fits the preload "
+        "and stress window (user ruling 2026-09-27: ships in v37 as a known "
+        "issue, redesigned after the release)"
+    ),
+)
+def test_spring_pad_east_west_placement_fits_the_preload_and_stress_window() -> None:
+    # Codex #859 (review body, P1): the base seat is spotted through the pad,
+    # so the pad's east-west station is where the fitter holds it.  An east
+    # shift s cuts the crest's penetration by s cos(lean), a west one adds it.
+    # The window is what the worst formed corners leave: east until the soft
+    # corner reaches the 1.5x preload floor, west until the stiff corner
+    # reaches the 1.5 stress floor.
+    from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
+    from _printed_tolerance import printed_deviations
+
+    cos_lean = math.cos(math.radians(drive.STRAP_LEAN_DEG))
+    east_room = []
+    for dev in drive.SPR_FORMED_CORNERS:
+        deflection, arm, stations = drive._spring_corner(dev, drive._SPR_T_LO)
+        for pose in range(2):
+            ratio = (
+                drive.spr_contact_force(
+                    deflection[pose], drive._SPR_T_LO, drive._SPR_W_LO, arm
+                )
+                * stations[pose]
+                / drive.SWING_GRAVITY_CORNER_NMM[pose]
+            )
+            east_room.append(deflection[pose] * (1.0 - 1.5 / ratio) / cos_lean)
+    west_room = []
+    for dev in drive.SPR_FORMED_CORNERS:
+        deflection, arm, _ = drive._spring_corner(dev, drive._SPR_T_HI)
+        sf = drive.SPR_YIELD_MPA / drive.spr_root_stress(
+            deflection[1], drive._SPR_T_HI, arm
+        )
+        west_room.append(deflection[1] * (sf / 1.5 - 1.0) / cos_lean)
+    window = min(min(east_room), min(west_room))
+    assert window == pytest.approx(0.092, abs=0.002)  # #1037's number
+    # The best named-datum stop #1037 found: a gage leaf on edge against the
+    # back block's east end, the pad screwed through its clearance hole.
+    placement = {
+        "gage leaf set error": RIG.FEELER_SET_ERROR,
+        "MHA-061 east end from its pivot bore, .X": printed_deviations(
+            BLOCK_EAST, 1
+        )[1],
+        "#4 screw float in the pad's clearance hole": (
+            blind_cut_dia_mm(drive.SPR_HOLE_SPEC)
+            - THREAD_MAJOR_MM[drive.FSCREW_THREAD]
+        )
+        / 2.0,
+    }
+    assert sum(placement.values()) <= window
+
+
 def test_spring_pad_books_its_printed_bands() -> None:
     # Main (restricted review of #858, P2-4): the pad reads the bands its sheet
     # prints, not a 0.51 literal.  Flush with the strip's aft edge (#859 option
