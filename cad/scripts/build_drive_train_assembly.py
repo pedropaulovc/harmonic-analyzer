@@ -230,6 +230,7 @@ from _assembly_patterns import (
 )
 from _interference_contracts import allowed_interference_pairs
 from _drive_train_explode import create_drive_train_explode
+from drive_train_assembly_spec import COLLAR_PIN_ROLE
 
 # CopyWithMates2 helpers for the cone-gear ladder (#228). NB importing _cwm
 # folds it into THIS assembly's recipe/cache key -- intended.
@@ -3466,6 +3467,27 @@ async def _place_on_shaft(
     )
 
 
+def _require_collar_pin_in_collar_hole(adapter, pin: str, collar: str) -> None:
+    """The MHA-145 tagged as the collar pin for the explode must be the one in
+    the MHA-144 collar's pin hole: its axis (local X) along the hole's (the
+    collar's local +Y) and its centre on that axis.  A mislabelled instance
+    fails here instead of leaving a strap pin with the arbor."""
+    pin_t = component_transform(adapter, pin)
+    collar_t = component_transform(adapter, collar)
+    hole_axis = collar_t[3:6]
+    if abs(abs(sum(a * b for a, b in zip(pin_t[0:3], hole_axis))) - 1.0) > 1e-6:
+        raise AssertionError(f"{pin} does not lie along {collar}'s pin hole")
+    hole_centre = [
+        o + ARBOR_COLLAR_PIN_Z / 1000.0 * z
+        for o, z in zip(collar_t[9:12], collar_t[6:9], strict=True)
+    ]
+    offset = [p - h for p, h in zip(pin_t[9:12], hole_centre, strict=True)]
+    along = sum(d * a for d, a in zip(offset, hole_axis))
+    off_axis = math.sqrt(max(sum(d * d for d in offset) - along * along, 0.0))
+    if off_axis * 1000.0 > 1e-3:
+        raise AssertionError(f"{pin} stands {off_axis * 1000.0:.4f} mm off {collar}'s pin hole")
+
+
 async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
@@ -5693,7 +5715,9 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    create_drive_train_explode(adapter)
+    # The collar's MHA-145 leaves with the arbor it pins; the strap pins stay.
+    _require_collar_pin_in_collar_hole(adapter, collar_pin, arbor_collar)
+    create_drive_train_explode(adapter, {collar_pin: COLLAR_PIN_ROLE})
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 

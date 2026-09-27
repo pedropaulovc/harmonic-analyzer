@@ -64,12 +64,16 @@ def _instances(**overrides) -> list[spec.Instance]:
         "pinion-pivot-block": [(-5.9, 62.8, -95.0), (-5.9, 62.8, 85.0)],
         "pinion-cam-pin": [(-8.0, 70.0, -72.0), (-8.0, 70.0, 71.0)],
         "pinion-cam": [(0.4, 64.7, -72.0), (0.4, 64.7, 71.0)],
+        # Two strap set pins, then the collar pin (the builder's insertion order).
+        "pinion-strap-pin": [(-12.1, 62.8, -74.0), (-12.1, 62.8, 81.0), (-18.4, 90.5, -127.0)],
     }
     layout.update(overrides)
+    roles = {"pinion-strap-pin-3": spec.COLLAR_PIN_ROLE}
     instances = []
     for stem in sorted(_builder_stems() | set(layout)):
         for index, origin in enumerate(layout.get(stem, [(0.0, 100.0, 0.0)]), start=1):
-            instances.append(spec.Instance(f"{stem}-{index}", stem, origin))
+            name = f"{stem}-{index}"
+            instances.append(spec.Instance(name, stem, origin, roles.get(name)))
     return instances
 
 
@@ -738,3 +742,71 @@ def test_ring_overhang_check_matches_the_cylinder_gear_print() -> None:
     on_cam = 100.0 * (rod.RING_THICKNESS - bank.RING_OVERHANG_MAX) / rod.RING_THICKNESS
     assert f"AT LEAST {math.floor(on_cam)}% OF THE RING WIDTH" in checks
     assert "0.56" not in checks
+
+
+def test_the_collar_pin_explodes_with_the_arbor_and_the_strap_pins_stay() -> None:
+    """Main's MHA-145 ruling: one family serves as the two strap set pins and
+    the MHA-144 collar pin.  The builder tags the collar pin by what it pins,
+    and only that instance leaves, with the arbor; the strap pins stay with
+    the stationary strap group."""
+    assert drawing.BOM_PART_NUMBERS["pinion-strap-pin"] == "MHA-145"
+    moved = {step.label: names for step, names in spec.plan_explode(_instances())}
+    assert moved["arbor collar pin"] == ("pinion-strap-pin-3",)
+    steps = {step.label: step for step in spec.EXPLODE_STEPS}
+    arbor, pin = steps["pinion arbor"], steps["arbor collar pin"]
+    assert (pin.axis, pin.distance_mm) == (arbor.axis, arbor.distance_mm)
+    every_moved = {name for names in moved.values() for name in names}
+    assert not {"pinion-strap-pin-1", "pinion-strap-pin-2"} & every_moved
+
+
+def test_the_collar_pin_role_is_carried_by_exactly_one_pin() -> None:
+    untagged = [
+        spec.Instance(i.name, i.stem, i.origin_mm) for i in _instances()
+    ]
+    with pytest.raises(ValueError, match="must tag one"):
+        spec.plan_explode(untagged)
+    twice = [
+        spec.Instance(i.name, i.stem, i.origin_mm, spec.COLLAR_PIN_ROLE)
+        if i.stem == "pinion-strap-pin"
+        else i
+        for i in _instances()
+    ]
+    with pytest.raises(ValueError, match="must tag one"):
+        spec.plan_explode(twice)
+    wrong_family = [
+        spec.Instance(i.name, i.stem, i.origin_mm, spec.COLLAR_PIN_ROLE)
+        if i.name == "pinion-lever-pin-1"
+        else spec.Instance(i.name, i.stem, i.origin_mm)
+        for i in _instances()
+    ]
+    with pytest.raises(ValueError, match="must tag one"):
+        spec.plan_explode(wrong_family)
+
+
+def test_the_builder_refuses_a_mislabelled_collar_pin(monkeypatch) -> None:
+    """The builder proves the tagged MHA-145 sits in the collar's pin hole
+    before authoring the explode; a strap pin tagged by mistake fails loud."""
+    import build_drive_train_assembly as assembly
+
+    def rows(rows3, origin_mm):
+        flat = [value for row in rows3 for value in row]
+        return [*flat, *(value / 1000.0 for value in origin_mm), 1.0, 0.0, 0.0, 0.0]
+
+    collar = rows(
+        assembly.ARBOR_ROWS, (assembly.APINION_X, assembly.APINION_Y, assembly.ARBOR_COLLAR_Z0)
+    )
+    transforms = {
+        "collar": collar,
+        "collar-pin": rows(
+            assembly.COLLAR_PIN_ROWS,
+            (assembly.APINION_X, assembly.APINION_Y, assembly.COLLAR_PIN_Z),
+        ),
+        "strap-pin": rows(
+            assembly.TORQUE_SHAFT_ROWS,
+            (assembly.PIVOT_X, assembly.PIVOT_Y, assembly.STRAP_PIN_Z[0]),
+        ),
+    }
+    monkeypatch.setattr(assembly, "component_transform", lambda _a, name: transforms[name])
+    assembly._require_collar_pin_in_collar_hole(None, "collar-pin", "collar")
+    with pytest.raises(AssertionError):
+        assembly._require_collar_pin_in_collar_hole(None, "strap-pin", "collar")

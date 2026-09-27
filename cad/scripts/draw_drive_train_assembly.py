@@ -282,6 +282,7 @@ BOM_PART_NUMBERS = {
     "pinion-handle": "MHA-058",
     "pinion-arbor": "MHA-102",
     "pinion-arbor-collar": "MHA-144",
+    "pinion-strap-pin": "MHA-145",
     "slotted-screw": "MHA-101",
 }
 BOM_DESCRIPTIONS = {
@@ -331,6 +332,7 @@ BOM_DESCRIPTIONS = {
     "pinion-handle": "PINION GRIP CROSSROD",
     "pinion-arbor": "INTEGRAL PINION ARBOR AND GRIP HEAD",
     "pinion-arbor-collar": "PINION ARBOR RETENTION COLLAR",
+    "pinion-strap-pin": "1/16 X 1/2 SPRING PIN, MCMASTER 98296A027",
     "slotted-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A201",
 }
 if set(BOM_DESCRIPTIONS) != set(BOM_PART_NUMBERS):
