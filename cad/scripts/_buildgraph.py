@@ -2214,6 +2214,7 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "cone_pivot_post_spec",
         "cone_tip_block_spec",
         "cone_tip_shim_spec",
+        "crank_boss_rim",
         "crank_hub_geometry",
         "crank_mesh_stack",
         "crank_pinion_spec",
