@@ -190,8 +190,9 @@ DIAMETER_TEXT_WIDTH = 0.032
 # lines whose widest is "5/8 BAR AS SUPPLIED".  At LENGTH_CHAR_WIDTH a line
 # that long is wider than the whole journal land, so hanging right from its
 # rim arrow the block ran under the pivot-journal finish and that finish's
-# leader crossed it (final877 eye pass).  The build moves the block left, over
-# land 1, from its measured ink (_clear_collar_callout).
+# leader crossed it (final877 eye pass).  The build lifts the block above the
+# finish symbol, from its measured ink (_clear_collar_callout); the dimension
+# line stays on the ring and simply runs longer.
 COLLAR_CALLOUT_LINES = (f"(Ø{COLLAR_DIA:.2f})", *COLLAR_STOCK_CALLOUT.split("\n"))
 COLLAR_CALLOUT_WIDTH = max(len(line) for line in COLLAR_CALLOUT_LINES) * LENGTH_CHAR_WIDTH
 # A measured block narrower than this is a misread (a box around the value
@@ -209,7 +210,7 @@ DIMENSION_CALLOUTS = {
 }
 # The T006 station's pattern note, on the value's own line.
 T006_STATION_SUFFIX = " 20X EQ SP"
-# The pivot-journal finish symbol, left of whose ink the collar's text must end.
+# The pivot-journal finish symbol, above whose ink the collar's text must stand.
 PIVOT_FINISH_XY = (0.2400, 0.1800)
 
 
@@ -393,12 +394,22 @@ def _move_dimension(
     return matches[0]
 
 
-def _collar_callout_dx(text: Box, finish: Box, finish_leader: Sequence[Segment]) -> float:
-    """How far to move the collar callout (negative: left) so its text ends
-    clear of the pivot-journal finish: of the symbol and of its leader, which
-    drops onto the journal land under the callout's old place."""
-    leftmost = min([finish[0]] + [x for segment in finish_leader for x, _y in segment])
-    return min(0.0, leftmost - CLEAR_GAP_M - PLACE_SETTLE_M - text[2])
+def _collar_callout_dy(text: Box, finish: Box, finish_leader: Sequence[Segment]) -> float:
+    """How far to lift the collar callout so its text clears the pivot-journal
+    finish from above: the symbol and every leader run under the text's span.
+
+    Only up: the collar diameter's dimension line stands at its text's left
+    edge, so a sideways move drags that line off the ring and its extension
+    lines along the rim (mha014-1 moved it 74 mm left, onto land 1's
+    Ø9.525 text)."""
+    left, right = text[0] - CLEAR_GAP_M, text[2] + CLEAR_GAP_M
+    under = [finish[3]] if finish[0] < right and left < finish[2] else []
+    under += [
+        max(a[1], b[1])
+        for a, b in finish_leader
+        if min(a[0], b[0]) < right and left < max(a[0], b[0])
+    ]
+    return max([0.0] + [top + CLEAR_GAP_M + PLACE_SETTLE_M - text[1] for top in under])
 
 
 def _dimension_text_box(annotation: Any, label: str) -> Box:
@@ -454,21 +465,27 @@ def _collar_text(adapter: Any, collar: Any, label: str) -> tuple[Any, Box]:
 def _clear_collar_callout(
     adapter: Any, collar: Any, finish: Any, dimensions: Mapping[str, Any]
 ) -> None:
-    """Move the collar's stock callout left of the pivot-journal finish, then
-    prove it from measured ink: its text clear of the symbol and of every
-    other dimension's text (the Ø9.525 and land-1 texts it moves towards),
-    its leader through none of them, no finish leader or dimension line by
-    its text, and inside the frame."""
+    """Lift the collar's stock callout above the pivot-journal finish, then
+    prove it from measured ink: its dimension line still on the ring, its
+    text clear of the symbol and of every other dimension's text, its leader
+    through none of them, no finish leader or dimension line by its text,
+    and inside the frame."""
     label = "collar stock callout"
     rebuild_drawing(adapter, label=f"measure {label}")
     finish_annotation = finish.GetAnnotation()
     finish_box = gdt_box(adapter, finish_annotation, label="pivot journal finish")
     finish_leader = leader_segments(finish_annotation)
-    _ink, text = _collar_text(adapter, collar, label)
-    dx = _collar_callout_dx(text, finish_box, finish_leader)
-    if dx:
-        move_annotation(adapter, collar, dx, 0.0, label=label)
+    _telemetry.info(f"pivot journal finish leader: {finish_leader}")
+    _ink, placed = _collar_text(adapter, collar, label)
+    dy = _collar_callout_dy(placed, finish_box, finish_leader)
+    if dy:
+        move_annotation(adapter, collar, 0.0, dy, label=label)
     ink, text = _collar_text(adapter, collar, label)
+    if abs(text[0] - placed[0]) > PLACE_SETTLE_M:
+        raise RuntimeError(
+            f"{label} moved sideways ({placed[0]:.4f} -> {text[0]:.4f}): its "
+            "dimension line left the collar ring"
+        )
     neighbours = {"pivot journal finish": finish_box}
     lines = {"pivot journal finish": finish_leader}
     for name, dimension in dimensions.items():
@@ -485,7 +502,7 @@ def _clear_collar_callout(
         raise RuntimeError(f"{near} lines run by the {label} {text}")
     require_inside(label, text, sheet_region(adapter))
     _telemetry.success(
-        f"{label} moved {dx:.4f} m, clear of the pivot journal finish and "
+        f"{label} lifted {dy:.4f} m, clear of the pivot journal finish and "
         f"{len(dimensions)} dimensions"
     )
 

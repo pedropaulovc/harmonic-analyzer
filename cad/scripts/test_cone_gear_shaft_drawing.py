@@ -276,45 +276,56 @@ def test_collar_diameter_stands_on_the_collar() -> None:
     assert y > drawing.SIDE_CENTER[1] + spec.COLLAR_DIA / 2000.0 + 0.010
 
 
-# final877 (04b825fca) read-off of MHA-014: the collar's three-line callout
-# hung right from its rim arrow over sheet x 0.2094..0.2565, y 0.1683..0.1834,
-# the pivot-journal Ra 1.6 sat on "15.88)" and its leader crossed the block.
-_FINAL877_COLLAR_TEXT = (0.2094, 0.1683, 0.2565, 0.1834)
+# The mha014-1 leaf's read-off of MHA-014 (9ec43110c, before any move): the
+# collar's three-line callout hangs right from its dimension line at the ring,
+# the pivot-journal Ra 1.6 box, and the Ø9.525 text on land 1.  final877 had
+# the same block (0.2094, 0.1683, 0.2565, 0.1834): the Ra sat on "15.88)" and
+# its leader crossed the block.
+_COLLAR_TEXT = (0.2088, 0.1676, 0.2565, 0.1844)
+_PIVOT_FINISH_BOX = (0.2320, 0.1800, 0.2790, 0.1980)
+_SEC1_TEXT = (0.1400, 0.1685, 0.1723, 0.1765)
+_SEC1_LINES = [((0.1400, 0.1452), (0.1400, 0.1548))]
 
 
 def _pivot_finish_ink() -> tuple[tuple[float, float, float, float], list]:
-    """The pivot finish as the build places it: the symbol at PIVOT_FINISH_XY
-    and its leader down onto the journal land's top flank."""
+    """The pivot finish as the build places it: the measured symbol box and
+    its leader from PIVOT_FINISH_XY down onto the journal land's top flank."""
     spec = cone_gear_shaft_spec
     big_end = drawing.SIDE_CENTER[0] + spec.SHAFT_LENGTH / 2000.0
-    x, y = drawing.PIVOT_FINISH_XY
-    box = (x - 0.002, y - 0.002, x + 0.016, y + 0.006)
     top = (big_end - 0.020, drawing.SIDE_CENTER[1] + spec.SECTION_DIAS[0] / 2000.0)
-    return box, [((x, y), top)]
+    return _PIVOT_FINISH_BOX, [(drawing.PIVOT_FINISH_XY, top)]
 
 
-def test_the_collar_callout_moves_clear_of_the_pivot_finish() -> None:
+def _lifted(text, dy):
+    return (text[0], text[1] + dy, text[2], text[3] + dy)
+
+
+def test_the_collar_callout_lifts_clear_of_the_pivot_finish() -> None:
     """final877: the collar's stock callout is wider than the whole journal
     land, so the pivot finish's leader, which lands on that journal, crossed it
-    wherever the symbol stood.  The planner moves the block left until it ends
-    clear of the symbol and of that leader, and the room it moves into, right
-    of the Ø9.525 text, holds the block."""
+    wherever the symbol stood.  The planner lifts the block above the symbol
+    and its leader, never sideways: mha014-1 moved it left and it landed on
+    the Ø9.525 text, dragging the dimension line off the ring."""
     from _drawing_annotation_extent import CLEAR_GAP_M, boxes_clear
     from _drawing_leaders import distance_to_box
 
     finish, leader = _pivot_finish_ink()
-    text = _FINAL877_COLLAR_TEXT
+    text = _COLLAR_TEXT
     assert not boxes_clear(text, finish)  # positive control: the render's clash
-    dx = drawing._collar_callout_dx(text, finish, leader)
-    moved = (text[0] + dx, text[1], text[2] + dx, text[3])
-    assert dx < 0.0
-    assert boxes_clear(moved, finish)
-    assert all(distance_to_box(segment, moved) >= CLEAR_GAP_M for segment in leader)
-    # nominal room; the build proves it against the Ø9.525 text's measured ink
-    sec1_x, _y = drawing.SIDE_DIAMETERS["Sec1Dia"]
-    assert moved[0] >= sec1_x + drawing.DIAMETER_TEXT_WIDTH + CLEAR_GAP_M
+    dy = drawing._collar_callout_dy(text, finish, leader)
+    lifted = _lifted(text, dy)
+    assert dy > 0.0
+    assert boxes_clear(lifted, finish)
+    assert all(distance_to_box(segment, lifted) >= CLEAR_GAP_M for segment in leader)
+    assert boxes_clear(lifted, _SEC1_TEXT)
     # a block already clear stays put
-    assert drawing._collar_callout_dx(moved, finish, leader) == 0.0
+    assert drawing._collar_callout_dy(lifted, finish, leader) == 0.0
+    # a leader running above the symbol under the block's span lifts it further
+    high = [((0.2300, finish[3] + 0.003), (0.2326, 0.1564))]
+    assert drawing._collar_callout_dy(text, finish, high) == pytest.approx(dy + 0.003)
+    # ink outside the block's span does not
+    aside = [((0.3000, 0.2500), (0.3100, 0.2400))]
+    assert drawing._collar_callout_dy(text, finish, aside) == pytest.approx(dy)
 
 
 def test_the_collar_callout_read_guard_takes_the_whole_block() -> None:
@@ -324,16 +335,10 @@ def test_the_collar_callout_read_guard_takes_the_whole_block() -> None:
         "(Ø15.88)",
         *cone_gear_shaft_spec.COLLAR_STOCK_CALLOUT.split("\n"),
     )
-    measured = _FINAL877_COLLAR_TEXT[2] - _FINAL877_COLLAR_TEXT[0]
+    measured = _COLLAR_TEXT[2] - _COLLAR_TEXT[0]
     assert measured >= drawing.COLLAR_CALLOUT_MIN_READ
     value_line_only = len("(Ø15.88)") * drawing.LENGTH_CHAR_WIDTH
     assert value_line_only < drawing.COLLAR_CALLOUT_MIN_READ
-
-
-# The Ø9.525 text as it hangs right of its line at SIDE_DIAMETERS["Sec1Dia"]:
-# the value over its stacked band, and its vertical dimension line.
-_SEC1_TEXT = (0.1410, 0.1690, 0.1640, 0.1790)
-_SEC1_LINES = [((0.1400, 0.1452), (0.1400, 0.1548))]
 
 
 def _clear_collar_with(monkeypatch, texts, dimensions=None):
@@ -376,45 +381,55 @@ def _clear_collar_with(monkeypatch, texts, dimensions=None):
     return moves
 
 
-def test_the_build_moves_and_proves_the_collar_callout(monkeypatch) -> None:
-    text = _FINAL877_COLLAR_TEXT
+def test_the_build_lifts_and_proves_the_collar_callout(monkeypatch) -> None:
+    text = _COLLAR_TEXT
     finish, leader = _pivot_finish_ink()
-    dx = drawing._collar_callout_dx(text, finish, leader)
-    moved = (text[0] + dx, text[1], text[2] + dx, text[3])
-    assert _clear_collar_with(monkeypatch, [text, moved]) == [(dx, 0.0)]
+    dy = drawing._collar_callout_dy(text, finish, leader)
+    lifted = _lifted(text, dy)
+    assert _clear_collar_with(monkeypatch, [text, lifted]) == [(0.0, dy)]
     # a move that does not land (the text reads back where it was) fails
     with pytest.raises(RuntimeError, match="crowds"):
         _clear_collar_with(monkeypatch, [text, text])
+    # a block that reads back moved sideways took its dimension line off the ring
+    drifted = (lifted[0] - 0.005, lifted[1], lifted[2] - 0.005, lifted[3])
+    with pytest.raises(RuntimeError, match="left the collar ring"):
+        _clear_collar_with(monkeypatch, [text, drifted])
     # a box around the value line alone is refused, never "cleared"
-    value_only = (0.2094, 0.1783, 0.2094 + 0.019, 0.1834)
+    value_only = (0.2088, 0.1783, 0.2088 + 0.019, 0.1844)
     with pytest.raises(RuntimeError, match="misread"):
         _clear_collar_with(monkeypatch, [value_only])
 
 
-def test_the_collar_proof_measures_the_dimensions_it_moves_towards(monkeypatch) -> None:
-    """The block moves left, towards the Ø9.525 text and over land 1, so the
-    proof reads those neighbours' ink rather than trusting a nominal width:
-    a Ø9.525 text measured wider than DIAMETER_TEXT_WIDTH, or a land-1
-    dimension line rising into the block, fails the build."""
-    text = _FINAL877_COLLAR_TEXT
+def test_the_collar_proof_measures_every_dimension_beside_it(monkeypatch) -> None:
+    """The proof reads the other dimensions' ink rather than trusting nominal
+    widths: a text measured where the lifted block lands, or a dimension line
+    rising into it, fails the build.  mha014-1 is the positive control: its
+    leftward move landed on the measured Ø9.525 text and the proof refused
+    it."""
+    text = _COLLAR_TEXT
     finish, leader = _pivot_finish_ink()
-    dx = drawing._collar_callout_dx(text, finish, leader)
-    moved = (text[0] + dx, text[1], text[2] + dx, text[3])
+    dy = drawing._collar_callout_dy(text, finish, leader)
+    lifted = _lifted(text, dy)
     land1_line = [((0.2000, 0.1452), (0.2000, 0.1350))]
     clear = {
         "Sec1Dia": (_SEC1_TEXT, _SEC1_LINES),
         "Sec1End": ((0.1400, 0.1170, 0.1600, 0.1210), land1_line),
     }
-    assert _clear_collar_with(monkeypatch, [text, moved], clear) == [(dx, 0.0)]
-    wide_sec1 = (_SEC1_TEXT[0], _SEC1_TEXT[1], moved[0] - 0.001, _SEC1_TEXT[3])
+    assert _clear_collar_with(monkeypatch, [text, lifted], clear) == [(0.0, dy)]
+    from _drawing_annotation_extent import require_clear
+
+    mha014_1 = (0.1344, 0.1676, 0.1821, 0.1844)
     with pytest.raises(RuntimeError, match=r"crowds \['Sec1Dia'\]"):
+        require_clear("collar stock callout", mha014_1, {"Sec1Dia": _SEC1_TEXT})
+    above = (lifted[2] - 0.004, lifted[1] + 0.002, lifted[2] + 0.020, lifted[3])
+    with pytest.raises(RuntimeError, match=r"crowds \['Sec0Dia'\]"):
         _clear_collar_with(
-            monkeypatch, [text, moved], {**clear, "Sec1Dia": (wide_sec1, _SEC1_LINES)}
+            monkeypatch, [text, lifted], {**clear, "Sec0Dia": (above, [])}
         )
-    rising = [((0.2000, 0.1452), (0.2000, moved[1] + 0.004))]
+    rising = [((0.2200, 0.1579), (0.2200, lifted[1] + 0.004))]
     with pytest.raises(RuntimeError, match=r"\['Sec1End'\] lines run by"):
         _clear_collar_with(
-            monkeypatch, [text, moved], {**clear, "Sec1End": (clear["Sec1End"][0], rising)}
+            monkeypatch, [text, lifted], {**clear, "Sec1End": (clear["Sec1End"][0], rising)}
         )
 
 
