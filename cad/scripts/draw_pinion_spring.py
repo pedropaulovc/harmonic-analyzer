@@ -379,6 +379,53 @@ def _crop_kink_view(adapter: Any, view: Any) -> None:
         )
 
 
+def _view_dimension_names(adapter: Any, view: Any) -> list[str]:
+    """The model-dimension names ``view`` holds, sorted."""
+    return sorted(
+        name
+        for name in (
+            dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
+            for annotation in (_early_bound(view, "IView").GetAnnotations() or ())
+        )
+        if name
+    )
+
+
+def _dimension_then_crop_kink_view(adapter: Any, detail: Any) -> list[Any]:
+    """Import and curate detail A's pair while it is uncropped, then crop it.
+
+    The dimension names are read back before and after the crop and recorded
+    as one ``kink_detail.crop`` event, so the log shows whether a crop keeps
+    dimensions already attached; either of the pair missing afterwards raises.
+    Returns the curated annotations.
+    """
+    annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="kink detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    before = _view_dimension_names(adapter, detail)
+    _crop_kink_view(adapter, detail)
+    after = _view_dimension_names(adapter, detail)
+    lost = sorted(set(DETAIL_KEEP) - set(after))
+    _telemetry.event(
+        "kink_detail.crop",
+        dimensions_before=",".join(before),
+        dimensions_after=",".join(after),
+        lost=",".join(lost),
+    )
+    _telemetry.info(
+        f"pinion-spring: kink detail dimensions before crop {before}, after {after}"
+    )
+    if lost:
+        raise RuntimeError(
+            f"kink detail lost {lost} to its crop; before {before}, after {after}"
+        )
+    return annotations
+
+
 def _plain_text(text: str) -> str:
     """A note's words with its line breaks and spacing folded to single spaces."""
     return " ".join(str(text).split())
@@ -635,24 +682,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # cropped after (_placed_kink_view says why).
     detail = _placed_kink_view(adapter)
     set_hidden_lines_removed(adapter, detail)
-    detail_annotations = curate_view_dimensions(
-        adapter,
-        detail,
-        keep=DETAIL_KEEP,
-        view_label="kink detail",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    _crop_kink_view(adapter, detail)
-    # The crop must not have taken the pair with it.
-    kept = {
-        dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
-        for annotation in (_early_bound(detail, "IView").GetAnnotations() or ())
-    }
-    if not set(DETAIL_KEEP) <= kept:
-        raise RuntimeError(
-            f"kink detail lost {sorted(set(DETAIL_KEEP) - kept)} to its crop; "
-            f"it holds {sorted(name for name in kept if name)}"
-        )
+    detail_annotations = _dimension_then_crop_kink_view(adapter, detail)
     # The front view imports the part-hidden FreeForm reference sketch, so it
     # takes the opt-in curation that shows it (the phantom) in this view only.
     front_annotations = hidden_sketches.curate_view_dimensions(

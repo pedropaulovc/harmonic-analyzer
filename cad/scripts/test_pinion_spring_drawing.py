@@ -266,19 +266,79 @@ def test_kink_detail_is_a_cropped_front_model_view(monkeypatch) -> None:
     assert "CreateDetailViewAt4" not in Path(drawing.__file__).read_text(encoding="utf-8")
 
 
-def test_kink_detail_is_dimensioned_before_it_is_cropped() -> None:
+class _Annotation:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+class _DimensionedView:
+    def __init__(self) -> None:
+        self.names: list[str] = []
+
+    def GetAnnotations(self):  # noqa: N802
+        return [_Annotation(name) for name in self.names]
+
+
+def _order_seat(monkeypatch, view: _DimensionedView, *, crop_drops: tuple[str, ...]):
+    """Record import, read-back and crop order on ``view``; the crop drops
+    ``crop_drops`` from it.  Returns the call log and the recorded events."""
+    calls: list[str] = []
+    events: list[tuple[str, dict]] = []
+
+    def curate(_adapter, _view, *, keep, view_label, dimensions_by_feature):
+        calls.append("import")
+        view.names = sorted(keep)
+        return ["curated"]
+
+    def crop(_adapter, _view):
+        calls.append("crop")
+        view.names = [name for name in view.names if name not in crop_drops]
+
+    def names(_adapter, _view):
+        calls.append("read")
+        return sorted(view.names)
+
+    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
+    monkeypatch.setattr(drawing, "_crop_kink_view", crop)
+    monkeypatch.setattr(drawing, "_view_dimension_names", names)
+    monkeypatch.setattr(
+        drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs))
+    )
+    return calls, events
+
+
+def test_kink_detail_is_dimensioned_before_it_is_cropped(monkeypatch) -> None:
     # pc-r14 (6aebefd18, leaf 20260927T005429Z-1-555a9662): imported into the
     # cropped view, SpringProfile brought FlatLen but not KinkR; the uncropped
-    # *Front imports both.  The detail is placed, curated, then cropped, and
-    # the build checks the pair survived the crop.
+    # *Front imports both.  The detail imports while uncropped, then crops,
+    # and the pair is read back on both sides of the crop.
+    view = _DimensionedView()
+    calls, events = _order_seat(monkeypatch, view, crop_drops=())
+    assert drawing._dimension_then_crop_kink_view(object(), view) == ["curated"]
+    assert calls == ["import", "read", "crop", "read"]
+    assert events == [
+        (
+            "kink_detail.crop",
+            {
+                "dimensions_before": "FlatLen,KinkR",
+                "dimensions_after": "FlatLen,KinkR",
+                "lost": "",
+            },
+        )
+    ]
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     body = source[source.index("async def build(") :]
-    placed = body.index("_placed_kink_view(adapter)")
-    curated = body.index("keep=DETAIL_KEEP")
-    cropped = body.index("_crop_kink_view(adapter, detail)")
-    front = body.index("keep=FRONT_KEEP")
-    assert placed < curated < cropped < front
-    assert "to its crop" in body[cropped:front]
+    assert body.index("_placed_kink_view(adapter)") < body.index(
+        "_dimension_then_crop_kink_view(adapter, detail)"
+    ) < body.index("keep=FRONT_KEEP")
+
+
+def test_kink_detail_fails_loud_when_the_crop_takes_a_dimension(monkeypatch) -> None:
+    view = _DimensionedView()
+    calls, events = _order_seat(monkeypatch, view, crop_drops=("KinkR",))
+    with pytest.raises(RuntimeError, match=r"lost \['KinkR'\] to its crop"):
+        drawing._dimension_then_crop_kink_view(object(), view)
+    assert events[0][1]["lost"] == "KinkR"
 
 
 @pytest.mark.parametrize(
