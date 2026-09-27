@@ -191,6 +191,47 @@ def test_the_crank_boss_face_set_is_asserted_not_guessed() -> None:
         drawing._crank_face_centres(evidence)
 
 
+def test_the_rear_label_centres_under_its_view(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The text box does not sit on its insertion point, so the label is
+    steered by its rendered extent until centred under the view outline."""
+
+    class Annotation:
+        def __init__(self) -> None:
+            self.position = (0.2245, 0.20, 0.0)
+
+        def GetPosition(self):
+            return self.position
+
+        def SetPosition(self, x, y, z):
+            self.position = (x, y, z)
+            return True
+
+    class Note:
+        def __init__(self) -> None:
+            self.annotation = Annotation()
+
+        def GetAnnotation(self):
+            return self.annotation
+
+        def GetExtent(self):
+            # 48.5 x 4.2 mm, offset from the anchor the way SolidWorks offsets it
+            x, y, _z = self.annotation.position
+            return (x + 0.0003, y - 0.0050, 0.0, x + 0.0488, y - 0.0008, 0.0)
+
+    class Model:
+        def GraphicsRedraw2(self) -> None:
+            pass
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, iface: obj)
+    note = Note()
+    outline = (0.2205, 0.2039, 0.2425, 0.2469)
+    adapter = type("Adapter", (), {"currentModel": Model()})()
+    drawing._centre_note_under(adapter, note, outline, gap=0.004, label="rear view label")
+    x0, y0, _z0, x1, y1, _z1 = note.GetExtent()
+    assert (x0 + x1) / 2.0 == pytest.approx((outline[0] + outline[2]) / 2.0, abs=1e-4)
+    assert y1 == pytest.approx(outline[1] - 0.004, abs=1e-4)
+
+
 def test_inclined_journal_sizes_live_in_the_true_shape_view() -> None:
     """The cone-axis view alone exposes the boss OD and bore in true shape.
 

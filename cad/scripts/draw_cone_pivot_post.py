@@ -26,8 +26,10 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from datetime import UTC, datetime
 from typing import Any
 
+import _seat_forensics
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from solidworks_mcp.adapters.com_variant import double_array
@@ -197,8 +199,13 @@ FRONT_KEEP = {
 # from the crank axis on the right.
 REAR_SCALE = (1, 2)
 _R = REAR_SCALE[0] / REAR_SCALE[1] / 1000.0
-REAR_CENTER = (0.2245, 0.2254)
-REAR_LABEL_XY = (REAR_CENTER[0], REAR_CENTER[1] - (BLOCK_HEIGHT / 2.0) * _R - 0.006)
+# x: leaf crankhub-rim-091e measured the plan's RD1 hole callout ending at
+# 198.1 mm and SpotFaceWidth's text box 41.8 mm wide, centred 1.3 mm left of
+# the view; at x=0.2245 the two stood 4.16 mm apart, under one text height
+# (9.06 mm).  0.2315 opens that to 11.2 mm.
+REAR_CENTER = (0.2315, 0.2254)
+# The label is centred under the view's live outline, this far below it.
+REAR_LABEL_GAP = 0.004
 
 
 def _rear_y(model_y: float) -> float:
@@ -819,6 +826,68 @@ def _show_section_scale_in_caption(adapter: Any, view: Any) -> None:
         raise RuntimeError("native cone-section scale caption did not persist")
 
 
+def _centre_note_under(
+    adapter: Any,
+    note: Any,
+    outline: tuple[float, ...],
+    *,
+    gap: float,
+    label: str,
+) -> None:
+    """Centre a free note's rendered box under a view outline, ``gap`` below.
+
+    A note's text box neither sits on nor tracks its insertion point 1:1, so
+    this reads the rendered extent and moves by the difference until it
+    settles (the drive-train package's note anchoring, for one note).
+    """
+    if note is None:
+        raise RuntimeError(f"failed to add {label}")
+    note = _early_bound(note, "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    target = ((outline[0] + outline[2]) / 2.0, outline[1] - gap)
+    extent: tuple[float, ...] = ()
+    for _pass in range(3):
+        adapter.currentModel.GraphicsRedraw2()
+        extent = tuple(float(value) for value in (note.GetExtent() or ()))
+        if len(extent) != 6 or extent[3] <= extent[0]:
+            raise RuntimeError(f"{label}: note has no rendered extent: {extent!r}")
+        shift = (target[0] - (extent[0] + extent[3]) / 2.0, target[1] - extent[4])
+        if max(abs(shift[0]), abs(shift[1])) <= 1e-4:
+            break
+        position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+        if len(position) != 3:
+            raise RuntimeError(f"{label}: note position is unreadable: {position!r}")
+        if not annotation.SetPosition(position[0] + shift[0], position[1] + shift[1], position[2]):
+            raise RuntimeError(f"{label}: note SetPosition failed")
+    _telemetry.info(
+        f"{label} centred under its view: text "
+        f"[{extent[0] * 1000:.1f}..{extent[3] * 1000:.1f}]x"
+        f"[{extent[1] * 1000:.1f}..{extent[4] * 1000:.1f}] mm, view "
+        f"[{outline[0] * 1000:.1f}..{outline[2] * 1000:.1f}] mm"
+    )
+
+
+def _export_failure_pdf(adapter: Any, stage: str) -> None:
+    """Export the failing sheet under the forensic tree the farm uploads."""
+    path = (
+        _seat_forensics.OUT_FAILURES
+        / f"cone-pivot-post-{stage}"
+        / datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        / "cone-pivot-post.pdf"
+    )
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _early_bound(adapter.currentModel, "IModelDoc2").SaveAs3(str(path), 0, 0)
+    except Exception as exc:  # noqa: BLE001 - evidence must not mask the failure
+        _telemetry.warn(f"{stage}-failure PDF export failed: {exc!r}")
+        return
+    if not path.is_file():
+        _telemetry.warn(f"{stage}-failure PDF export produced no file: {path}")
+        return
+    _telemetry.event("drawing.failure_pdf", stage=stage, path=str(path))
+    _telemetry.info(f"{stage}-failure evidence PDF: {path}")
+
+
 def _assert_native_layout(
     adapter: Any,
     journal: Any,
@@ -1261,7 +1330,14 @@ async def build(adapter: Any) -> dict[str, str]:
         0.202,
         0.104,
     )
-    add_note(adapter, "REAR VIEW, SCALE 1:2", *REAR_LABEL_XY)
+    rear_outline = tuple(float(value) for value in _early_bound(rear, "IView").GetOutline())
+    _centre_note_under(
+        adapter,
+        add_note(adapter, "REAR VIEW, SCALE 1:2", rear_outline[0], rear_outline[1]),
+        rear_outline,
+        gap=REAR_LABEL_GAP,
+        label="rear view label",
+    )
     # Rule 6 caps the block at four lines (about 18 mm); the anchor keeps the
     # r7 clearance to the bottom inner border.
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_ANCHOR)
@@ -1275,11 +1351,15 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, rear)
     rebuild_drawing(adapter, label="final cone pivot post native layout")
     _show_section_scale_in_caption(adapter, section)
-    _assert_native_layout(
-        adapter,
-        journal,
-        expected_finish=source_properties["Finish"],
-    )
+    try:
+        _assert_native_layout(
+            adapter,
+            journal,
+            expected_finish=source_properties["Finish"],
+        )
+    except RuntimeError:
+        _export_failure_pdf(adapter, "native-layout")
+        raise
 
     set_high_quality_shaded_with_edges(adapter, iso, label="pictorial isometric")
 
