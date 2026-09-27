@@ -1521,7 +1521,9 @@ def test_the_rig_assembly_sequence_carries_each_part_step_verbatim() -> None:
     bonds = FITUP.ASSEMBLY_SEQUENCE[1:4]
     assert all("LOCTITE 638" in step for step in bonds)
     assert {"MHA-102", "MHA-002", "MHA-058", "MHA-116"} <= {
-        word for step in bonds for word in step.replace(";", " ").split()
+        word
+        for step in bonds
+        for word in step.replace(";", " ").replace(",", " ").split()
     }
     assert FITUP.ASSEMBLY_SEQUENCE.index(FITUP.RIG_SET_STEP) > 3
     # The pins freeze the strap spacing RIG SET measures the drum from.

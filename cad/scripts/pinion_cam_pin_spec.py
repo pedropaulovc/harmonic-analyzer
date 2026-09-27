@@ -92,8 +92,10 @@ DRAWING_NOTES = "\n".join(
         "  EXEMPT FROM TITLE-BLOCK EDGE-BREAK REQUIREMENT.",
     )
 )
+# One pin per strap: the count prints, or a fitter bonds one and stops.
+_PIN = _config.parts("pinion-cam-pin")
 ASSEMBLY_STEP = (
-    f"BOND {_config.parts('pinion-cam-pin')['number']} INTO {SEAT_NUMBER} "
+    f"BOND {_PIN['quantity']}X {_PIN['number']}, ONE INTO EACH {SEAT_NUMBER} "
     f"FOLLOWER SEAT WITH {RETAINING_COMPOUND}."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"

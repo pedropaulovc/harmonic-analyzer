@@ -113,13 +113,27 @@ def test_bonded_slip_fit_replaces_the_press() -> None:
     assert "LOCTITE" not in notes and "ON ASSEMBLY" not in notes
     assert len(notes.splitlines()) == 2
     assert pinion_cam_pin_spec.ASSEMBLY_STEP == (
-        "BOND MHA-116 INTO MHA-056 FOLLOWER SEAT WITH LOCTITE 638."
+        "BOND 2X MHA-116, ONE INTO EACH MHA-056 FOLLOWER SEAT WITH LOCTITE 638."
     )
     assert "MHA-056" in drawing.DIMENSION_CALLOUTS["PinDia"]
     assert "SLIP FIT" in drawing.DIMENSION_CALLOUTS["PinDia"]
     import draw_pinion_bracket
 
     assert "MHA-116" in draw_pinion_bracket.DIMENSION_CALLOUTS["PinSeatDia"]
+
+
+def test_the_bond_step_counts_one_pin_per_strap() -> None:
+    """final877 eye pass (A03 sheet 8, step 14): the step named no count, so a
+    fitter could bond one follower pin and stop.  It prints the BOM quantity,
+    and that quantity is one per strap."""
+    import _config
+
+    pins = _config.parts("pinion-cam-pin")["quantity"]
+    straps = _config.parts("pinion-bracket")
+    assert straps["number"] == pinion_cam_pin_spec.SEAT_NUMBER
+    assert pins == straps["quantity"] == 2
+    step = pinion_cam_pin_spec.ASSEMBLY_STEP
+    assert step.startswith(f"BOND {pins}X MHA-116, ONE INTO EACH MHA-056 ")
 
 
 def test_no_gdt_and_the_crown_carries_the_finish() -> None:
