@@ -1,0 +1,183 @@
+{
+ "option": "S1_boss17_c2c38990",
+ "overrides": {
+  "pinion_cam_geometry": {
+   "BOSS_Z": "1.7"
+  },
+  "build_drive_train_assembly": {
+   "ENGAGED_C2C": "38.990"
+  }
+ },
+ "assert_failures": [
+  "alignment-pinion configured and derived engaged centre distances disagree: 38.747491 vs 38.990000 mm"
+ ],
+ "import_error": null,
+ "anchors": {
+  "APINION_X": -18.626440352466744,
+  "APINION_Y": 90.518,
+  "PIVOT_X": -14.662543784694092,
+  "PIVOT_Y": 62.8,
+  "LIFT_X": -2.1625437846940923,
+  "LIFT_Y": 64.65619117891471,
+  "STRAP_LEAN_DEG": 8.138574451932667,
+  "BLOCK_X": -8.412543784694092,
+  "BLOCK_BACK_Z0": 79.08758778042653,
+  "BLOCK_FRONT_Z0": -100.91241221957347,
+  "SPRING_X": -22.542543784694093,
+  "SPRING_HOLE_X": 4.936491081584441,
+  "SPRING_Z": 74.03758778042652
+ },
+ "linkage": {
+  "park_gap": 0.15000000000000124,
+  "need_lift": 1.4358407208549835,
+  "cam_reach_past_touch": 1.3172206857740925,
+  "cam_engage_rotation_deg": -77.76197081129595,
+  "lever_engaged_tilt_deg": -67.76197081129595,
+  "engage_swing_deg": 5.800316530633322,
+  "pin_tip_reserve_engaged": 6.131574489708486,
+  "s_cam_park": 13.48522185607316,
+  "lever_arbor_stub_clear": 4.722917011781583
+ },
+ "strap_vs_collar": {
+  "park_air": -0.15167835432268717,
+  "engaged_air": -1.4194880531850842,
+  "path_min_air": -1.4194880531850842,
+  "path_min_at_cam_deg": -77.76197081129595,
+  "rect_min_air_any_cam_any_swing": -1.4194880531850842,
+  "collar_strap_axial_overlap": [
+   5.5,
+   5.5
+  ],
+  "boss_to_strap_axial_air": [
+   0.20000000000000284,
+   0.20000000000000284
+  ],
+  "boss_tip_path_min_air_if_z_overlaps": -1.8880277407239108
+ },
+ "sweeps": {
+  "boss_sweep_vs_base": 6.617158094310113,
+  "collar_sweep_vs_spring_foot": 6.496191178914714,
+  "sweep_vs_pivot_shaft": 2.2230332558353654,
+  "lever_hub_bottom_vs_base": 7.356191178914713,
+  "spring_screw_head_vs_lift_rod": 1.599934866278533
+ },
+ "axial": {
+  "rear_block_air": -0.44999999999998863,
+  "front_block_air": 8.75,
+  "strap_z": [
+   [
+    -80.16241221957347,
+    -72.16241221957347
+   ],
+   [
+    71.53758778042652,
+    79.53758778042652
+   ]
+  ],
+  "cam_z": [
+   [
+    -83.66241221957347,
+    -74.66241221957347
+   ],
+   [
+    68.03758778042652,
+    77.03758778042652
+   ]
+  ]
+ },
+ "pivot_block": {
+  "bore_to_bore_web": 6.287066340439967,
+  "pivot_bore_to_screw_web": 1.5860000000000003,
+  "lift_bore_to_screw_web": 1.8198456486408645,
+  "screw_hole_to_end_web": 2.011,
+  "screw_head_rim": 1.0710000000000002,
+  "lift_bore_top_web": 1.718808821085287,
+  "lift_bore_bottom_web": 10.681191178914712,
+  "pivot_bore_top_web": 3.575,
+  "screw_hole_dia": 4.978,
+  "head_dia": 6.858
+ },
+ "cam": {
+  "wall_nom": 0.5750000000000002,
+  "wall_worst_pm05": 0.49749999999999983,
+  "wall_worst_pm10": 0.4225000000000003,
+  "od": 10.32,
+  "ecc": 1.4,
+  "lift_bore_rise": 1.8561911789147132,
+  "bore_half_spacing": 6.25
+ },
+ "strap": {
+  "arbor_bore_end_wall": 3.5,
+  "pivot_bore_end_wall": 4.325,
+  "pin_seat_face_web": 2.0,
+  "pin_seat_to_pivot_bore_true_web": 2.140072906367325,
+  "pin_seat_to_pivot_bore_module_metric": 1.7712219947249022
+ },
+ "base_required": {
+  "block_screw_xz": [
+   [
+    -21.912543784694094,
+    -94.91241221957347
+   ],
+   [
+    5.087456215305908,
+    -94.91241221957347
+   ],
+   [
+    -21.912543784694094,
+    85.08758778042653
+   ],
+   [
+    5.087456215305908,
+    85.08758778042653
+   ]
+  ],
+  "block_screw_xz_base_has": [
+   [
+    -21.912543784694094,
+    -94.91241221957347
+   ],
+   [
+    5.087456215305906,
+    -94.91241221957347
+   ],
+   [
+    -21.912543784694094,
+    85.08758778042653
+   ],
+   [
+    5.087456215305906,
+    85.08758778042653
+   ]
+  ],
+  "foot_screw_xz": [
+   [
+    4.936491081584441,
+    74.03758778042652
+   ],
+   [
+    -60.393602134883444,
+    -92.41241221957347
+   ],
+   [
+    -60.393602134883444,
+    105.58758778042653
+   ]
+  ],
+  "foot_screw_xz_base_has": [
+   [
+    4.936491081584439,
+    74.03758778042653
+   ],
+   [
+    -60.393602134883444,
+    -92.41241221957347
+   ],
+   [
+    -60.393602134883444,
+    105.58758778042653
+   ]
+  ],
+  "mechanism_z_shift": 3.0875877804265315
+ }
+}

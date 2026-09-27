@@ -1,0 +1,210 @@
+{
+ "option": "C_floor_c2c38990",
+ "overrides": {
+  "pinion_bracket_geometry": {
+   "THICKNESS": "9.0"
+  },
+  "pinion_cam_pin_geometry": {
+   "PIN_LEN": "20.0"
+  },
+  "pinion_cam_geometry": {
+   "CAM_OD": "13.4",
+   "ECC": "1.9",
+   "BOSS_DIA": "0.0",
+   "BOSS_PROUD": "0.0",
+   "BOSS_Z": "1.7"
+  },
+  "pinion_pivot_block_spec": {
+   "BORE_HALF_SPACING": "8.75",
+   "LIFT_BORE_RISE": "1.52",
+   "BLOCK_DEPTH": "10.25",
+   "SCREW_HALF_SPACING": "16.55",
+   "BLOCK_WIDTH": "42.5",
+   "BLOCK_HEIGHT": "19.25"
+  },
+  "pinion_spring_geometry": {
+   "FOOT_LEN": "33.0"
+  },
+  "build_drive_train_assembly": {
+   "BLOCK_BACK_Z0": "77.75 + MECHANISM_Z_SHIFT",
+   "ENGAGED_C2C": "38.990"
+  }
+ },
+ "assert_failures": [
+  "alignment-pinion configured and derived engaged centre distances disagree: 38.747491 vs 38.990000 mm",
+  "harmonic-base block-screw hole (-21.912543784694094, -94.91241221957347) != machine derived (-22.463, -95.787)",
+  "harmonic-base block-screw hole (5.087456215305906, -94.91241221957347) != machine derived (10.637, -95.787)",
+  "harmonic-base block-screw hole (-21.912543784694094, 85.08758778042653) != machine derived (-22.463, 85.963)",
+  "harmonic-base block-screw hole (5.087456215305906, 85.08758778042653) != machine derived (10.637, 85.963)",
+  "harmonic-base foot-screw hole (4.936491081584439, 74.03758778042653) != machine derived (9.936, 74.038)"
+ ],
+ "import_error": null,
+ "anchors": {
+  "APINION_X": -18.626440352466744,
+  "APINION_Y": 90.518,
+  "PIVOT_X": -14.662543784694092,
+  "PIVOT_Y": 62.8,
+  "LIFT_X": 2.8374562153059077,
+  "LIFT_Y": 64.32,
+  "STRAP_LEAN_DEG": 8.138574451932667,
+  "BLOCK_X": -5.912543784694092,
+  "BLOCK_BACK_Z0": 80.83758778042653,
+  "BLOCK_FRONT_Z0": -100.91241221957347,
+  "SPRING_X": -22.542543784694093,
+  "SPRING_HOLE_X": 9.93649108158444,
+  "SPRING_Z": 74.03758778042652
+ },
+ "linkage": {
+  "park_gap": 0.14560821200076468,
+  "need_lift": 1.9617778138020725,
+  "cam_reach_past_touch": 1.8117714315756626,
+  "cam_engage_rotation_deg": -77.03457021561246,
+  "lever_engaged_tilt_deg": -67.03457021561246,
+  "engage_swing_deg": 5.800316530633322,
+  "pin_tip_reserve_engaged": 3.9798733615339295,
+  "s_cam_park": 18.53609132717497,
+  "lever_arbor_stub_clear": 9.588576791276388
+ },
+ "strap_vs_collar": {
+  "park_air": 3.3041252280712383,
+  "engaged_air": 1.486613888015948,
+  "path_min_air": 1.486613888015948,
+  "path_min_at_cam_deg": -77.03457021561246,
+  "rect_min_air_any_cam_any_swing": 1.486613888015948,
+  "collar_strap_axial_overlap": [
+   6.0,
+   6.0
+  ],
+  "boss_to_strap_axial_air": [
+   1.2999999999999972,
+   1.2999999999999972
+  ],
+  "boss_tip_path_min_air_if_z_overlaps": 1.6284424029218023
+ },
+ "sweeps": {
+  "boss_sweep_vs_base": 4.919999999999995,
+  "collar_sweep_vs_spring_foot": 4.119999999999997,
+  "sweep_vs_pivot_shaft": 5.790887395745197,
+  "lever_hub_bottom_vs_base": 7.019999999999996,
+  "spring_screw_head_vs_lift_rod": 1.5999348662785335
+ },
+ "axial": {
+  "rear_block_air": 0.30000000000001137,
+  "front_block_air": 9.5,
+  "strap_z": [
+   [
+    -81.16241221957347,
+    -72.16241221957347
+   ],
+   [
+    71.53758778042652,
+    80.53758778042652
+   ]
+  ],
+  "cam_z": [
+   [
+    -84.16241221957347,
+    -75.16241221957347
+   ],
+   [
+    68.53758778042652,
+    77.53758778042652
+   ]
+  ]
+ },
+ "pivot_block": {
+  "bore_to_bore_web": 11.215887395745197,
+  "pivot_bore_to_screw_web": 2.136000000000001,
+  "lift_bore_to_screw_web": 2.2827225948814913,
+  "screw_hole_to_end_web": 2.2109999999999994,
+  "screw_head_rim": 1.2709999999999995,
+  "lift_bore_top_web": 2.5550000000000006,
+  "lift_bore_bottom_web": 10.344999999999999,
+  "pivot_bore_top_web": 4.075,
+  "screw_hole_dia": 4.978,
+  "head_dia": 6.858
+ },
+ "cam": {
+  "wall_nom": 1.6150000000000002,
+  "wall_worst_pm05": 1.5374999999999999,
+  "wall_worst_pm10": 1.4625000000000004,
+  "od": 13.4,
+  "ecc": 1.9,
+  "lift_bore_rise": 1.52,
+  "bore_half_spacing": 8.75
+ },
+ "strap": {
+  "arbor_bore_end_wall": 3.5,
+  "pivot_bore_end_wall": 4.325,
+  "pin_seat_face_web": 2.5,
+  "pin_seat_to_pivot_bore_true_web": 2.140072906367325,
+  "pin_seat_to_pivot_bore_module_metric": 1.7712219947249022
+ },
+ "base_required": {
+  "block_screw_xz": [
+   [
+    -22.46254378469409,
+    -95.78741221957347
+   ],
+   [
+    10.637456215305908,
+    -95.78741221957347
+   ],
+   [
+    -22.46254378469409,
+    85.96258778042653
+   ],
+   [
+    10.637456215305908,
+    85.96258778042653
+   ]
+  ],
+  "block_screw_xz_base_has": [
+   [
+    -21.912543784694094,
+    -94.91241221957347
+   ],
+   [
+    5.087456215305906,
+    -94.91241221957347
+   ],
+   [
+    -21.912543784694094,
+    85.08758778042653
+   ],
+   [
+    5.087456215305906,
+    85.08758778042653
+   ]
+  ],
+  "foot_screw_xz": [
+   [
+    9.93649108158444,
+    74.03758778042652
+   ],
+   [
+    -60.393602134883444,
+    -92.41241221957347
+   ],
+   [
+    -60.393602134883444,
+    105.58758778042653
+   ]
+  ],
+  "foot_screw_xz_base_has": [
+   [
+    4.936491081584439,
+    74.03758778042653
+   ],
+   [
+    -60.393602134883444,
+    -92.41241221957347
+   ],
+   [
+    -60.393602134883444,
+    105.58758778042653
+   ]
+  ],
+  "mechanism_z_shift": 3.0875877804265315
+ }
+}

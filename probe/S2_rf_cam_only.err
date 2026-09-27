@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "C:\src\wt-pinion-scratch\probe\pinion_cluster_probe.py", line 233, in <module>
+    print(json.dumps(main(opt, spec), indent=1, default=str))
+                     ~~~~^^^^^^^^^^^
+  File "C:\src\wt-pinion-scratch\probe\pinion_cluster_probe.py", line 180, in main
+    out.update(
+    ^^^
+UnboundLocalError: cannot access local variable 'out' where it is not associated with a value
