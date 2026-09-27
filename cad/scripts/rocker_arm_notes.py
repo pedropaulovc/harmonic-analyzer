@@ -20,7 +20,6 @@ from rocker_arm_spec import (
     TIP_FACE,
     TOP_ARC_LEN,
     HUB_DIA,
-    PIVOT_HOLE_BAND,
 )
 
 # The top edge's one-sided height over the pivot is a model dimension with
@@ -67,7 +66,9 @@ DRAWING_NOTES = "\n".join(
         "   DEFINE THE ARC ENDPOINTS.",
         f"5. EACH END: {TIP_FACE:.2f} RADIAL LAND PERP TO",
         "   TOP EDGE; STRAIGHT TAPER TO BOTTOM ARC.",
-        f"6. PIVOT HOLE: REAM +{PIVOT_HOLE_BAND[0]:.2f}/0, Ra 1.6.",
+        # REAM is the fit bore's process requirement (policy rule 6); its
+        # +0.03/0 band rides the O6.50 natively and its Ra the bore's symbol.
+        "6. PIVOT HOLE: REAM.",
         f"7. INTEGRAL HUB DIA {HUB_DIA:.2f}, CENTRED ON THE",
         "   STRAP: THE HUBS SET THE STATION PITCH",
         "   (NO SPACERS). HUB OD COAXIAL WITH PIVOT",

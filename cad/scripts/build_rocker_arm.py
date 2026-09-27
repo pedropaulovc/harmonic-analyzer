@@ -97,6 +97,7 @@ from rocker_arm_spec import (
     HUB_DIA,
     HUB_LENGTH,
     HUB_LENGTH_BAND,
+    PIVOT_HOLE_BAND,
     PIVOT_MID_Y,
     ROD_HOLE_SPEC,
     SURFACE_FINISHES,
@@ -573,6 +574,11 @@ async def build(adapter) -> dict[str, str]:
     # The top edge may only come out high (rocker_arm_spec.TOP_EDGE_BAND).
     set_dimension_bilateral_tolerance(
         adapter, "TopEdgeReference", "TopAbovePivot", *deviations(TOP_EDGE_BAND)
+    )
+    # The reamed pivot bore's band rides its O6.50 natively (policy rule 2);
+    # note 6 keeps only the REAM process word.
+    set_dimension_bilateral_tolerance(
+        adapter, "PivotHoleProfile", "PivotDia", *deviations(PIVOT_HOLE_BAND)
     )
     apply_drawing_precision(
         adapter,

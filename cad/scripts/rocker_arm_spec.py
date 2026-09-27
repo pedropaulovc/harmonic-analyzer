@@ -76,7 +76,7 @@ PIVOT_MID_Y = ARM_DEPTH / 2.0  # 8.0
 # axis directly, on the mirror axis, one-sided: the edge may only come out
 # high (user ruling 2026-09-26). The 808.00 centre distance is then REF, and
 # the R800 governs only the curvature. With the amplitude bar's one-sided
-# notch (amplitude_bar_notes.BOTTOM_NOTCH_DEPTH_BAND) a bar can rest at most
+# notch (amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND) a bar can rest at most
 # 1.0 higher than nominal: a steady lever tilt of ~0.45 deg on that channel.
 # Its fundamental moves at most 0.0036 mm (0.04 % of the d = 88 term) across
 # the stations: error_budget.hook_displacement with the edge 0.5 high and the
@@ -104,7 +104,7 @@ TOP_EDGE_BAND = (0.50, 0.0)  # (upper, lower)
 # one O10.20 (rocker_thrust_washer_spec). The ceiling is the amplitude bar's
 # foot cheeks, which pass over the hub at d = 0 (channel_kinematics
 # ``bar_bottom``); test_rocker_bank_layout pins the slack.
-PIVOT_HOLE_BAND = (0.03, 0.0)  # (upper, lower): reamed, note 6
+PIVOT_HOLE_BAND = (0.03, 0.0)  # (upper, lower): reamed; native on PivotDia
 RULE12_WALL_FLOOR = 1.5  # drawing-simplicity policy rule 12
 LINEAR_2PL = 0.508  # title-block .XX band (pinned to _config by the tests)
 _HUB_FLOOR = PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0] + 2.0 * RULE12_WALL_FLOOR + LINEAR_2PL

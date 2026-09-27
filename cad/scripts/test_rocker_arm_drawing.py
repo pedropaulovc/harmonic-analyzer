@@ -81,7 +81,7 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     # count and process only, never a second copy of a sheet dimension.
     assert "(1X)" in notes
     assert "#47" not in notes
-    assert "REAM +0.03/0" in notes
+    assert "6. PIVOT HOLE: REAM." in notes
     assert "16.00 REF" in notes
     # User ruling 2026-09-26: the edge height over the pivot is the control
     # (a model dimension, test_top_edge_height_is_a_banded_model_dimension);
@@ -231,6 +231,36 @@ def test_top_edge_height_is_a_banded_model_dimension() -> None:
     # hold one value while the sheet prints another.
     assert '"ArmDepth" / 2 + "TopAbovePivot" + "CurveRadius"' in build
     assert '"TopEdgeReference": {"TopAbovePivot": 2}' in build
+
+
+def test_pivot_bore_ream_band_rides_its_diameter_not_a_note() -> None:
+    """Codex #936 sweep (policy rule 2): note 6 printed "REAM +0.03/0, Ra
+    1.6" while the O6.50 printed bare. The band is now native on PivotDia and
+    the Ra is the bore's own symbol; the note keeps only REAM."""
+    from _drawing_contract import model_toleranced_dimensions
+
+    assert model_toleranced_dimensions(arm)[("PivotHoleProfile", "PivotDia")] == (
+        "*deviations(PIVOT_HOLE_BAND)"
+    )
+    assert "PivotDia" in drawing.FRONT_KEEP
+    joined = " ".join(
+        line.strip() for line in rocker_arm_notes.DRAWING_NOTES.splitlines()
+    )
+    assert "+0.03" not in joined
+    assert "Ra 1.6" not in joined
+    assert any(
+        control.key == "pivot_bore" for control in rocker_arm_spec.SURFACE_FINISHES
+    )
+
+
+def test_no_rocker_note_carries_a_tolerance_band() -> None:
+    """Policy rule 2 / 6: every band on MHA-071 is a model tolerance. The one
+    exception is the hub coaxiality, a plain note by Main's ruling
+    (2026-09-26)."""
+    for line in rocker_arm_notes.DRAWING_NOTES.splitlines():
+        if "COAXIAL" in line or "WITHIN" in line:
+            continue
+        assert not re.search(r"\+\d|[-+]0\.\d+/|±|\+/-", line), line
 
 
 def test_top_edge_reference_is_saved_hidden_and_imported_per_view() -> None:
