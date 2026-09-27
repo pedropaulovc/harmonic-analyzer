@@ -2414,10 +2414,17 @@ def find_lines_through_own_text(
     no finder either (Main's gate-gap sweep). The rows are shrunk by
     ``inset`` so a line that only touches a row's corner, or runs along the
     baseline the text sits on, is not reported.
+
+    A dimension with no readable arrowhead (suppressed arrows, an ordinate
+    dimension) keeps its lines unsplit as ``line`` (``_split_dimension_lines``
+    splits every nonzero line once it has a tip), so a dimension's ``line``
+    runs are checked too (Codex P2 on fa1c58be4). Other annotations' ``line``
+    ink (a frame round a datum letter) is not.
     """
     findings = []
     for annotation in sheet.annotations:
-        for role, (kind, what) in _OWN_LINE_KINDS.items():
+        roles = _DIM_OWN_LINE_KINDS if annotation.kind == "dim" else _OWN_LINE_KINDS
+        for role, (kind, what) in roles.items():
             lines = [s for s in annotation.segments if s.role == role]
             for box in annotation.text_boxes if lines else ():
                 for segment in lines:
@@ -2448,6 +2455,8 @@ _OWN_LINE_KINDS = {
     "ext-line": ("extension-through-own-text", "extension line"),
     "dim-line": ("dim-line-through-own-text", "dimension line"),
 }
+# Plus an arrowless dimension's lines, which the split leaves unsplit.
+_DIM_OWN_LINE_KINDS = {**_OWN_LINE_KINDS, "line": ("line-through-own-text", "line")}
 
 
 def _past_arrow_zones(annotation: AnnotationGeometry) -> list[tuple[tuple[float, float], float]]:
@@ -3454,6 +3463,7 @@ GATING_KINDS = frozenset(
         "leader-through-own-text",
         "extension-through-own-text",
         "dim-line-through-own-text",
+        "line-through-own-text",
         "leader-crosses-line",
         "shoulder-crosses-line",
         "leader-crosses-view",

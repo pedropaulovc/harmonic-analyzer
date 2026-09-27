@@ -2849,6 +2849,32 @@ def test_a_dimensions_own_dimension_line_through_its_text_gates():
         assert find_lines_through_own_text(sheet) == []
 
 
+@pytest.mark.parametrize(
+    ("arrows", "kind"),
+    [
+        pytest.param([], "line-through-own-text", id="suppressed-arrows"),
+        pytest.param(
+            [[0.0950, 0.1517, 0.0, -1.0, 0.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, -1.0]],
+            "dim-line-through-own-text",
+            id="arrowed-control",
+        ),
+    ],
+)
+def test_an_arrowless_dimensions_line_through_its_own_text_gates(arrows, kind):
+    """Codex P2 on fa1c58be4 (PRRT_kwDOPHDy386mVU8Y): a dimension with no
+    arrowhead (suppressed arrows, an ordinate dimension) keeps its lines as
+    plain ``line``, and the own-text finder read only ``ext-line`` and
+    ``dim-line``, so its line struck through its own text passed. The same
+    dimension with an arrowhead at the line's end still reports as a
+    dimension line, once."""
+    dim = _dim("Suppressed", "12.0", 0.1000, 0.1500, lines=[(0.0950, 0.1517, 0.1150, 0.1517)])
+    dim["display"]["arrows"] = arrows
+    findings = audit_dump(_dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [dim])]))
+    own = [f for f in findings if f.kind.endswith("-through-own-text")]
+    assert [f.kind for f in own] == [kind]
+    assert severity(own[0]) is FindingSeverity.GATING
+
+
 # cone-gear-shaft Sheet1's "Ra 1.6" finish symbol (DetailItem351) as the
 # layoutcal2 leaf dumped it (95a9e97ca): its registered leader, the display
 # copy of that leader's two runs (first two lines), the symbol's own strokes.
