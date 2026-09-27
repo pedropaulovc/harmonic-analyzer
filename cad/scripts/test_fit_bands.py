@@ -109,6 +109,10 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("pinion_handle_geometry", "ROD_DIA_BAND"): (
         "indexed by pinion_arbor_spec for the cross-rod fit limits"
     ),
+    ("rocker_arm_spec", "PIVOT_HOLE_BAND"): (
+        "indexed into the hub's wall floor (HUB_DIA_MIN); the build also "
+        "sets it natively on PivotDia"
+    ),
 }
 
 KNOWN_BAD: dict[str, pytest.MarkDecorator] = {}

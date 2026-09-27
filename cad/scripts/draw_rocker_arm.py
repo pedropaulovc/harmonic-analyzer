@@ -20,35 +20,45 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Iterator
 
 from _gear_drawing_entities import visible_circle_edge
 from rocker_arm_spec import ARM_DEPTH, GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _hole_spec import blind_cut_dia_mm
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    _select_view_entity,
     add_datum_feature,
     add_edge_dimension,
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
-    curate_view_dimensions,
+    check_drawing_layout,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_basic_dimension,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    sheet_drawable_region,
     stamp_drawing_summary,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
+
+# The part saves TopEdgeReference hidden (#880): this form shows it in the
+# view that imports its dimension.
+from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
+from rocker_arm_notes import DRAWING_DIMENSIONS, DRAWING_NOTES
 from rocker_arm_spec import (
     ARM_THICKNESS,
+    HUB_DIA,
     PIVOT_HOLE_DIA,
     R_TOP,
     ROD_HOLE_X,
@@ -57,6 +67,7 @@ from rocker_arm_spec import (
     SURFACE_FINISHES,
     TIP_FACE,
     TOP_ARC_LEN,
+    TOP_EDGE_ABOVE_PIVOT,
     TOP_END_X,
     TOP_END_Y,
 )
@@ -90,6 +101,26 @@ _BBOX_CY = TOP_END_Y / 2.0
 FRONT_CENTER = (0.180, 0.175)
 RIGHT_CENTER = (0.300, 0.165)
 ISO_CENTER = (0.345, 0.205)
+# The rod-pin position frame's top-left corner; it draws 7 mm tall.
+FCF_XY = (0.300, 0.195)
+# The iso caption's top-left, under the iso's right half: below the FCF and
+# right of the end view. Beside the end view (0.315, 0.150) it read as that
+# view's label, 0.4 mm from HubLength's "+0.05" (r743-p1s-B2 render).
+ISO_CAPTION_XY = (0.325, 0.183)
+
+# General notes. The linked block renders ~4.1 mm a line, so its 18 lines run
+# ~75 mm. Anchored by its top at y 0.082, the last two ran past the bottom
+# border into the zone band (r743-p1s-B2 render). The block is now seated from
+# its MEASURED extent: rendered bottom NOTES_BORDER_CLEARANCE above the
+# sheet's drawable region, left edge on NOTES_LEFT. A block that then reaches
+# NOTES_CEILING, under the front view's O6.50 text (y ~0.117), fails the build.
+NOTES_LEFT = 0.020
+NOTES_BORDER_CLEARANCE = 0.003
+NOTES_CEILING = 0.110
+NOTES_SEAT_PASSES = 3
+NOTES_SEAT_SETTLE = 0.00005
+# Below any note text height this sheet prints (the linked block pitches ~4.1).
+NOTES_MIN_LINE_PITCH = 0.0025
 
 # Tip-face midpoint (model mm): the top-arc endpoint pushed half the tip face
 # outward along the end radius -- where datum C (clocking) attaches.
@@ -105,15 +136,227 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
     )
 
 
+# Datum A on the pivot bore. Three leaders land on that 3.25 mm circle, one
+# per quadrant (r743-1RC eye pass: they converged): datum A from the upper
+# left, the O6.50 dimension from the lower left (its line runs on through the
+# centre to the upper-right rim), the Ra from the lower right.
+#
+# The tag is COORDINATE-picked, because only a coordinate-picked tag puts its
+# frame box where it is asked: r743-4D printed it up-left of the pivot, clear
+# above the strap, and channel_lever's datum B reads 0.002 mm off its request.
+# An entity-attached tag drops its box at SolidWorks' default instead: r743-1RC
+# printed it on the strap beside the bore, and the vm2 datum probe measured
+# the same behaviour 34.7 mm off its request.
+#
+# A coordinate pick hit-tests with a PIXEL aperture mapped through the current
+# zoom (see new_project_drawing), and at fit-to-sheet that aperture spans the
+# 0.875 mm (sheet) between the O6.5 bore and the concentric O10 hub rims:
+# r743-4D's pick, exactly on the bore rim, put the triangle on the hub. Its
+# render has the pivot centre within 0.05 mm of _sheet_xy, so the mapping is
+# not the cause. The pick is therefore made zoomed in on the pivot, checked
+# against the diameter-picked bore edge before the tag goes in, and the tag's
+# attachment is checked again after it does. The triangle then re-attaches at
+# the bore point nearest the box, on the 135-degree ray (see
+# draw_platen_guide's datum C note).
+PIVOT_DATUM_STANDOFF = 0.020
+PIVOT_DATUM_ANGLE = math.radians(135.0)
+PIVOT_BORE_SHEET_R = PIVOT_HOLE_DIA / 2.0 * _S / 1000.0
+PIVOT_HUB_SHEET_R = HUB_DIA / 2.0 * _S / 1000.0
+# The zoomed pick window's half-span: the hub and a hub radius of margin. That
+# is ~40x the fit-to-sheet scale (432 mm across), so an aperture that reached
+# the hub 0.875 mm off now covers about 0.02 mm.
+PIVOT_PICK_ZOOM_HALF = 2.0 * PIVOT_HUB_SHEET_R
+# Pick candidates on the 135-degree ray as fractions of the bore radius: the
+# rim first, then a point further from the hub rim. Each result is recorded,
+# and a pick that never resolves to the bore fails the build.
+PIVOT_PICK_FRACTIONS = (1.0, 0.6)
+
+
+def _pivot_datum_request(centre: tuple[float, float]) -> tuple[float, float]:
+    """The sheet point datum A's leader meets its frame, on the 135-degree ray."""
+    reach = PIVOT_BORE_SHEET_R + PIVOT_DATUM_STANDOFF
+    return (
+        centre[0] + reach * math.cos(PIVOT_DATUM_ANGLE),
+        centre[1] + reach * math.sin(PIVOT_DATUM_ANGLE),
+    )
+
+
+@contextmanager
+def _zoomed_on(adapter: Any, centre: tuple[float, float], half: float) -> Iterator[None]:
+    """Zoom the drawing window onto a sheet square, then back to fit.
+
+    new_project_drawing fits the sheet so every other coordinate pick sees the
+    zoom it was placed under; this restores that zoom on the way out.
+    """
+    draw = adapter.currentModel
+    draw.ViewZoomTo2(
+        centre[0] - half, centre[1] - half, 0.0, centre[0] + half, centre[1] + half, 0.0
+    )
+    try:
+        yield
+    finally:
+        draw.ViewZoomtofit2()
+
+
+def _pick_pivot_bore(
+    adapter: Any, view: Any, bore_edge: Any, centre: tuple[float, float]
+) -> tuple[float, float]:
+    """Return a sheet point whose EDGE pick resolves to the pivot bore."""
+    results = []
+    for fraction in PIVOT_PICK_FRACTIONS:
+        radius = PIVOT_BORE_SHEET_R * fraction
+        xy = (
+            centre[0] + radius * math.cos(PIVOT_DATUM_ANGLE),
+            centre[1] + radius * math.sin(PIVOT_DATUM_ANGLE),
+        )
+        try:
+            picked = _select_view_entity(
+                adapter, view, "EDGE", xy, label="pivot bore datum pick"
+            )
+        except RuntimeError as error:
+            results.append((fraction, str(error)))
+            _telemetry.event("datum.bore_pick", fraction=fraction, same=-2)
+            continue
+        same = int(adapter.swApp.IsSame(picked, bore_edge))
+        results.append((fraction, same))
+        _telemetry.event("datum.bore_pick", fraction=fraction, same=same)
+        adapter.currentModel.ClearSelection2(True)
+        if same == 1:
+            return xy
+    raise RuntimeError(
+        "no pick on datum A's ray resolves to the O6.5 pivot bore "
+        f"(fraction of bore radius, IsSame or error): {results!r}"
+    )
+
+
+def _require_datum_on_bore(app: Any, tag: Any, bore_edge: Any) -> None:
+    """Raise unless datum A is attached to the pivot bore edge alone."""
+    annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    if len(attached) != 1 or attached[0] is None:
+        raise RuntimeError(
+            f"datum A needs one attached edge, has {len(attached)}: {attached!r}"
+        )
+    # swObjectSame = 1; different (0) and unknown (-1) both fail.
+    if int(app.IsSame(attached[0], bore_edge)) != 1:
+        raise RuntimeError(
+            "datum A is attached to an edge other than the O6.5 pivot bore "
+            "(r743-4D: the concentric O10 hub)"
+        )
+    if annotation.IsDangling():
+        raise RuntimeError("datum A is dangling")
+
+
+# Pivot-bore Ra. The symbol's body always draws up-right of its leader end
+# (r743-p1s-B2: from the 7:30 rim the leader ran up through the body). It
+# lands on the rim at 4:30 -- oblique to both centre-mark axes, in the one
+# quadrant no other pivot leader uses -- from a symbol down-right of it, below
+# the strap. At 1:30 it met the O6.50 dimension line where that runs on past
+# the centre (r743-1RC). Note text height, as on the other part sheets.
+PIVOT_FINISH_ANGLE = math.radians(-45.0)
+PIVOT_FINISH_OFFSET = (0.012, -0.013)
+PIVOT_FINISH_CHAR_HEIGHT = 0.0025
+
+
+def _pivot_finish_placement() -> tuple[tuple[float, float], tuple[float, float]]:
+    """Sheet (rim, symbol) points of the pivot-bore finish leader."""
+    radius = PIVOT_HOLE_DIA / 2.0
+    rim = _sheet_xy(
+        radius * math.cos(PIVOT_FINISH_ANGLE),
+        _PIVOT_MID_Y + radius * math.sin(PIVOT_FINISH_ANGLE),
+    )
+    return rim, (rim[0] + PIVOT_FINISH_OFFSET[0], rim[1] + PIVOT_FINISH_OFFSET[1])
+
+
 # The large concentric radii are carried in the manufacturing note: imported
 # radius dimensions retain off-sheet centre witnesses even in shortened-radius
 # mode.  Keeping them as notes avoids clipped geometry without losing values.
+# The O6.50 text sits down-left of the pivot, left of the rod-pin X location
+# dimension (pivot to rod-pin hole, its line at y 0.138): from (0.180, 0.120),
+# straight below the bore, its leader crossed that dimension's line and ran up
+# its extension line (r743-4D render).
+# The top edge's +0.50/0 height over the pivot axis (Codex #936
+# PRRT_kwDOPHDy386mV3AO) runs up the mirror axis from the pivot centre, its
+# text straight above the strap: right of datum A's box (up-left of the
+# pivot, x < 0.160), left of the rod-pin frame and datum C.
+TOP_ABOVE_PIVOT_TEXT_RISE = 0.010
 FRONT_KEEP = {
-    "PivotDia": (0.180, 0.120),
+    "PivotDia": (0.130, 0.148),
+    "TopAbovePivot": (
+        _sheet_xy(0.0, _PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT)[0],
+        _sheet_xy(0.0, _PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT)[1]
+        + TOP_ABOVE_PIVOT_TEXT_RISE,
+    ),
 }
 NOTE_ONLY_DIMENSIONS = {"TopRadius", "BottomRadius"}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+# The hub length (+0.05/0, #743 PR2) under the end view, where the hub shows
+# its full length (the end view is 1:1, centred on the pivot mid-depth).
+RIGHT_KEEP: dict[str, tuple[float, float]] = {
+    "HubLength": (RIGHT_CENTER[0], RIGHT_CENTER[1] - (_PIVOT_MID_Y + 12.0) / 1000.0),
+}
 TOP_KEEP: dict[str, tuple[float, float]] = {}
+
+
+def _note_extent(adapter: Any, note: Any) -> tuple[float, float, float, float]:
+    """The rendered sheet-space box (x0, y0, x1, y1) of a free note."""
+    adapter.currentModel.GraphicsRedraw2()
+    extent = tuple(
+        float(value) for value in (_early_bound(note, "INote").GetExtent() or ())
+    )
+    if len(extent) != 6 or extent[3] <= extent[0] or extent[4] <= extent[1]:
+        raise RuntimeError(f"manufacturing notes have no rendered extent: {extent!r}")
+    return (extent[0], extent[1], extent[3], extent[4])
+
+
+def _seat_notes_on_border(
+    adapter: Any, note: Any, sheet: Any
+) -> tuple[float, float, float, float]:
+    """Steer the notes' RENDERED bottom-left corner onto NOTES_LEFT,
+    NOTES_BORDER_CLEARANCE above the sheet's drawable region (the insertion
+    point is neither the text box's corner nor tracked by it 1:1)."""
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    region = sheet_drawable_region(
+        adapter, sheet, width=template.width_m, height=template.height_m
+    )
+    target = (NOTES_LEFT, region.ymin + NOTES_BORDER_CLEARANCE)
+    annotation = _early_bound(
+        _early_bound(note, "INote").GetAnnotation(), "IAnnotation"
+    )
+    # A property-linked note shows its resolved text only after a rebuild; an
+    # extent read before it would seat the one-line link token, not the block.
+    rebuild_drawing(adapter, label="manufacturing notes link resolve")
+    extent = _note_extent(adapter, note)
+    lines = len(DRAWING_NOTES.splitlines())
+    if extent[3] - extent[1] < lines * NOTES_MIN_LINE_PITCH:
+        raise RuntimeError(
+            f"manufacturing notes render {(extent[3] - extent[1]) * 1000.0:.1f} mm "
+            f"tall, under {lines} lines at {NOTES_MIN_LINE_PITCH * 1000.0:.1f} mm: "
+            "the property link has not resolved"
+        )
+    for _pass in range(NOTES_SEAT_PASSES):
+        shift = (target[0] - extent[0], target[1] - extent[1])
+        if max(abs(shift[0]), abs(shift[1])) <= NOTES_SEAT_SETTLE:
+            break
+        position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+        if len(position) != 3:
+            raise RuntimeError(f"manufacturing notes position unreadable: {position!r}")
+        if not annotation.SetPosition(
+            position[0] + shift[0], position[1] + shift[1], position[2]
+        ):
+            raise RuntimeError("manufacturing notes SetPosition failed")
+        extent = _note_extent(adapter, note)
+    extent_mm = tuple(round(value * 1000.0, 2) for value in extent)
+    _telemetry.info(
+        f"manufacturing notes seated: extent_mm={extent_mm!r}, "
+        f"drawable bottom {region.ymin * 1000.0:.2f} mm"
+    )
+    if extent[1] < region.ymin or extent[3] > NOTES_CEILING:
+        raise RuntimeError(
+            "manufacturing notes do not fit between the border "
+            f"({region.ymin * 1000.0:.2f} mm) and the front view's annotations "
+            f"({NOTES_CEILING * 1000.0:.1f} mm): rendered extent {extent_mm!r}"
+        )
+    return extent
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -142,7 +385,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
         ),
     )
-    drawing_model, _sheet = new_project_drawing(
+    drawing_model, sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
@@ -168,17 +411,45 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    # By feature, like the end view: only PivotHoleProfile's O6.50 and
+    # TopEdgeReference's height arrive, so the note-only radii are never
+    # imported to be deleted again.
+    curate_view_dimensions(
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    # The hub length only shows its length in the end view; the front looks
+    # down the hub's axis. Codex #936 (PRRT_kwDOPHDy386mRk__): RIGHT_KEEP was
+    # declared but never curated, so the +0.05/0 band that sets all 20
+    # channel stations never printed. Targeted by feature, so only Hub's
+    # dimensions arrive.
+    curate_view_dimensions(
+        adapter,
+        right,
+        keep=RIGHT_KEEP,
+        view_label="right",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
     # Rod-pin hole native callout (the #47 wizard hole near the +X tip).
+    # Both bores are picked by DIAMETER (the visible-entity walk), never by a
+    # rim coordinate: r743-p1s-B's coordinate pick on the #47 rim resolved to
+    # the strap's tapered end-face line 1.6 mm (sheet) away, so AddHoleCallout2
+    # had no hole to call out; the pivot bore's rim pick already had the same
+    # fate against the concentric hub (see its finish below).
     rod_rim = _sheet_xy(ROD_HOLE_X, ROD_HOLE_Y - _ROD_HOLE_DIA / 2.0)
+    rod_hole_edge = visible_circle_edge(adapter, front, _ROD_HOLE_DIA)
+    pivot_bore_edge = visible_circle_edge(adapter, front, PIVOT_HOLE_DIA)
     add_native_hole_callout(
         adapter,
         front,
-        edge_xy=rod_rim,
+        edge=rod_hole_edge,
         callout_xy=(0.300, 0.128),
         label="rod-pin hole",
     )
@@ -197,6 +468,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(0.180, 0.138),
         label="rod-pin X location",
         orientation="horizontal",
+        entities=(pivot_bore_edge, rod_hole_edge),
     )
     set_basic_dimension(adapter, rod_location_x, label="rod-pin X location")
     rod_location_y = add_edge_dimension(
@@ -207,57 +479,45 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(0.267, 0.162),
         label="rod-pin Y location",
         orientation="vertical",
+        entities=(pivot_bore_edge, rod_hole_edge),
     )
     set_basic_dimension(adapter, rod_location_y, label="rod-pin Y location")
 
     # Datum A identifies the pivot bore's cylindrical surface.  Keep its leader
     # oblique to both centre-mark axes so the triangle unmistakably terminates
     # on the circumference rather than appearing to identify the bore centre.
-    pivot_datum_angle = math.radians(135.0)
-    pivot_radius = PIVOT_HOLE_DIA / 2.0
-    pivot_datum_rim = _sheet_xy(
-        pivot_radius * math.cos(pivot_datum_angle),
-        _PIVOT_MID_Y + pivot_radius * math.sin(pivot_datum_angle),
-    )
-    pivot_datum_standoff = 0.020
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=pivot_datum_rim,
-        symbol_xy=(
-            pivot_datum_rim[0] + pivot_datum_standoff * math.cos(pivot_datum_angle),
-            pivot_datum_rim[1] + pivot_datum_standoff * math.sin(pivot_datum_angle),
-        ),
-        datum="A",
-        label="pivot bore cylindrical datum feature",
-        shoulder=True,
-        # The tag stands only 20 mm off the rim, so a snap-back onto the
-        # attachment would sit at the default bound; the live readback is
-        # 0.0109 mm from the request.
-        position_tolerance_m=0.010,
-    )
-    # Ra on the bore rim at 7:30 -- oblique to both centre-mark axes like the
-    # datum above: since the integral hub (2026-09-02) the 6 o'clock point on
-    # the bore lies on the centre mark's vertical extension and the coordinate
-    # pick resolved to the hub's O10 rim instead of the O6.5 bore edge. Then a
-    # position FCF tying the rod-pin hole to the complete A-B-C frame.
-    pivot_finish_angle = math.radians(225.0)
-    pivot_bottom = _sheet_xy(
-        pivot_radius * math.cos(pivot_finish_angle),
-        _PIVOT_MID_Y + pivot_radius * math.sin(pivot_finish_angle),
-    )
-    # Pick the bore circle by DIAMETER (the visible-entity walk the cone-gear
-    # drawing uses): a coordinate pick on the concentric O6.5 / O10 rims
-    # resolves to the hub's outer circle within SolidWorks' tolerance.
-    pivot_bore_edge = visible_circle_edge(adapter, front, PIVOT_HOLE_DIA)
+    # Picked by coordinate under a zoom and proven against the bore edge picked
+    # by DIAMETER (see PIVOT_DATUM_STANDOFF's note).
+    pivot_centre = _sheet_xy(0.0, _PIVOT_MID_Y)
+    with _zoomed_on(adapter, pivot_centre, PIVOT_PICK_ZOOM_HALF):
+        pivot_datum_pick = _pick_pivot_bore(
+            adapter, front, pivot_bore_edge, pivot_centre
+        )
+        datum_a = add_datum_feature(
+            adapter,
+            front,
+            edge_xy=pivot_datum_pick,
+            symbol_xy=_pivot_datum_request(pivot_centre),
+            datum="A",
+            label="pivot bore cylindrical datum feature",
+            shoulder=True,
+        )
+    _require_datum_on_bore(adapter.swApp, datum_a, pivot_bore_edge)
+    # The bore circle picked by DIAMETER above (the visible-entity walk the
+    # cone-gear drawing uses): a coordinate pick on the concentric O6.5 / O10
+    # rims resolves to the hub's outer circle within SolidWorks' tolerance.
+    pivot_finish_rim, pivot_finish_symbol = _pivot_finish_placement()
     add_surface_finish(
         adapter,
         front,
         edge_entity=pivot_bore_edge,
-        symbol_xy=(pivot_bottom[0] - 0.012, pivot_bottom[1] - 0.020),
+        symbol_xy=pivot_finish_symbol,
+        leader_attach_xy=pivot_finish_rim,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
+        char_height=PIVOT_FINISH_CHAR_HEIGHT,
     )
+    # Then a position FCF tying the rod-pin hole to the complete A-B-C frame.
     # Datum B (broad face, on the end view) orients the hole axes; datum C
     # (the +X tip face) clocks rotation about the pivot axis, so the X/Y BASIC
     # coordinates above have an inspectable direction.
@@ -289,8 +549,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=rod_rim,
-        frame_xy=(0.300, 0.195),
+        edge_entity=rod_hole_edge,
+        frame_xy=FCF_XY,
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["rod-pin hole position"],
         datums=("A", "B", "C"),
@@ -298,8 +558,14 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rod-pin hole position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.082)
-    add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.150)
+    notes = add_property_linked_note(
+        adapter, "Manufacturing Notes", NOTES_LEFT, NOTES_CEILING
+    )
+    _seat_notes_on_border(adapter, notes, sheet)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_CAPTION_XY)
+    # The shared gate: no overlaps, border crossings or leader crossings.
+    rebuild_drawing(adapter, label="rocker-arm layout audit")
+    check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
 
     return await finalize_drawing(
         adapter,
