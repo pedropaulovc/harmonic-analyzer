@@ -3421,18 +3421,21 @@ def task_gallery():
         # Always run: the gallery's own --stale-only pass is the cheap freshness
         # check, and a pair whose render was deleted must be regenerated.
         "uptodate": [False],
-        "actions": [
-            (
-                _run,
-                [
-                    [sys.executable, str(EXPORT_PY), "--comparisons"],
-                    "gallery",
-                    "gallery",
-                ],
-            )
-        ],
+        "actions": [(_refresh_gallery, [])],
         "verbosity": 2,
     }
+
+
+def _refresh_gallery() -> None:
+    """``gallery``'s action. doit refuses a callable that declares ``task`` with a
+    default, so ``_run`` (whose ``task`` is keyword-only, default ``None``) cannot
+    be the action itself; this wrapper names the task explicitly instead."""
+    _run(
+        [sys.executable, str(EXPORT_PY), "--comparisons"],
+        "gallery",
+        "gallery",
+        task="gallery",
+    )
 
 
 def task_preflight():
