@@ -36,8 +36,10 @@ from _common import (
     IN,
     OUT_PNG,
     SketchDims,
+    _early_bound,
     add_line_chain,
     apply_material,
+    assert_saved_configurations_regenerate,
     check,
     define_circle,
     drive_dimension,
@@ -556,6 +558,15 @@ async def build(adapter) -> dict[str, str]:
     check("activate T24 for saved views", await adapter.set_active_configuration("T24"))
     await report_mass_properties(adapter)
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
+    # paper-drive places T12 and T18 while the part saves on T24, so their
+    # saved caches are what it rebuilds.  Reopen and prove them the way it
+    # loads them (cg-fx1: the same equation-driven recipe saved cone-gear's
+    # inactive caches faulted).
+    part_title = str(_early_bound(adapter.currentModel, "IModelDoc2").GetTitle())
+    adapter.swApp.CloseDoc(part_title)
+    adapter.currentModel = None
+    check("reopen saved transgear-removable", await adapter.open_model(artefacts["part"]))
+    assert_saved_configurations_regenerate(adapter, PART_NAME)
     return artefacts
 
 
