@@ -7,7 +7,7 @@ The nominal geometry MUST match the constants in build_amplitude_bar.py.
 
 The bar is ~808 mm long but only 6.35 mm square, so the print shows a 1:4
 full-length front view (overall length + top pin hole), a right end view for the
-square section, and carries the two small end notches in the notes.
+square section, and a native detail of each small end notch.
 """
 
 from __future__ import annotations
@@ -34,12 +34,37 @@ TOP_PIN_HOLE_SPEC = HoleSpec("drilled_number", "#47")
 TOP_PIN_Y = BAR_LENGTH - TOP_PIN_DROP  # 801.95
 
 
+# The foot notch's roof rides the rocker's top edge, and at d = 0 the cheeks
+# either side pass over the rocker hub; a deep notch drops them onto it one
+# for one. So the depth is one-sided, shallow only (user ruling 2026-09-26):
+# a shallow notch just lifts the bar at rest (rocker_arm_spec.TOP_EDGE_BAND
+# states the lift budget and its effect on the channel). Policy rule 2
+# (Codex #936 PRRT_kwDOPHDy386mWF0L): the band is the part's, native on
+# BottomNotchHeight, never note text.
+BOTTOM_NOTCH_DEPTH_BAND = (0.0, -0.50)  # (upper, lower) deviations
+
 # --- Marked-dimension contract.  The bar is far too long to dimension the tiny
-# end notches on the 1:4 view, so only the overall length is a graphical marked
-# dim; the notch sizes are dimensioned in the notes. ---
+# end notches on the 1:4 view, so the overall length prints there and each
+# notch's width and depth print in a native detail of its end. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "BarProfile": {"BarLength"},
+    "BarProfile": {
+        "BarLength",
+        "BottomNotchHeight",
+        "BottomNotchWidth",
+        "TopNotchHeight",
+        "TopNotchWidth",
+    },
+}
+# Places the part authors on each printed dimension (policy rule 2).
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "BarProfile": {
+        "BarLength": 2,
+        "BottomNotchHeight": 2,
+        "BottomNotchWidth": 2,
+        "TopNotchHeight": 2,
+        "TopNotchWidth": 2,
+    },
 }
 
-# Drawing prose (DRAWING_NOTES / view notes) and the notch-depth band live in
-# amplitude_bar_notes.py -- see rocker_arm_notes for the rationale.
+# Drawing prose (DRAWING_NOTES / view notes) lives in amplitude_bar_notes.py
+# -- see rocker_arm_notes for the rationale.

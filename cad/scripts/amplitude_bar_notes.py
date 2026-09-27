@@ -1,5 +1,5 @@
 r"""Amplitude-bar drawing prose -- the manufacturing notes the part build stamps
-into the SLDPRT, the view labels, and the notch-depth band the notes print.
+into the SLDPRT and the view labels.
 
 Split OUT of ``amplitude_bar_spec`` (the ``rocker_arm_notes`` treatment, codex
 #354): the channel kinematics, the rocker-bank layout and the spring specs
@@ -11,27 +11,21 @@ ONLY by ``build_amplitude_bar`` and the offline tests.
 from __future__ import annotations
 
 from _hole_spec import drill_process
-from amplitude_bar_spec import BOTTOM_NOTCH_HEIGHT, TOP_PIN_HOLE_SPEC
-
-# The foot notch's roof rides the rocker's top edge, and at d = 0 the cheeks
-# either side pass over the rocker hub; a deep notch drops them onto it one
-# for one. So the depth is one-sided, shallow only (user ruling 2026-09-26):
-# a shallow notch just lifts the bar at rest (rocker_arm_spec.TOP_EDGE_BAND
-# states the lift budget and its effect on the channel).
-BOTTOM_NOTCH_DEPTH_BAND = (0.0, -0.50)  # (upper, lower) deviations
+from amplitude_bar_spec import TOP_PIN_HOLE_SPEC
 
 # The title-block QTY cell owns the 20-off count; notch orientation and
 # coplanarity are stated because no view resolves them at 1:4 (machinist
 # round 1): both notches live in ONE profile sketch cut thru the full depth,
 # so open-to-opposite-ends / common-plane / centred-on-width IS the model
-# truth, and the pin hole runs thru the top-notch cheeks at mid-depth.
+# truth, and the pin hole runs thru the top-notch cheeks at mid-depth. Each
+# notch's width and depth -- the bottom depth with its one-sided band
+# (amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND) -- print as model dimensions
+# in its end's detail, never here (policy rule 2, Codex #936
+# PRRT_kwDOPHDy386mWF0L).
 DRAWING_NOTES = "\n".join(
     (
         "1. BAR SECTION 6.35 SQUARE.",
-        # One-sided: the upper deviation is zero (tested).
-        f"2. BOTTOM NOTCH 3.18 W x {BOTTOM_NOTCH_HEIGHT:.2f}"
-        f" +0/{BOTTOM_NOTCH_DEPTH_BAND[1]:.2f} DEEP;",
-        "   TOP NOTCH 3.18 W x 12.70 DEEP;",
+        "2. END NOTCHES (DETAILS A, B):",
         "   BOTH THRU THE FULL DEPTH, OPEN TO",
         "   OPPOSITE ENDS, CENTRED ON THE WIDTH",
         "   WITHIN 0.10, IN ONE COMMON PLANE;",

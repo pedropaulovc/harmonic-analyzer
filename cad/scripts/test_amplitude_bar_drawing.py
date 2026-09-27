@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import amplitude_bar_notes
@@ -22,8 +23,17 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert bar.DRAWING_DIMENSIONS is amplitude_bar_spec.DRAWING_DIMENSIONS
     marked = set().union(*amplitude_bar_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
+    keeps = (
+        drawing.FRONT_KEEP,
+        drawing.RIGHT_KEEP,
+        drawing.TOP_KEEP,
+        drawing.DETAIL_A_KEEP,
+        drawing.DETAIL_B_KEEP,
+    )
+    kept = set().union(*keeps)
     assert kept == marked
+    assert sum(len(keep) for keep in keeps) == len(marked)  # one view each
+    assert set(drawing.DRAWING_PRECISION_BY_NAME) == marked
 
 
 def test_part_geometry_matches_the_spec() -> None:
@@ -47,8 +57,7 @@ def test_sheet_runs_at_1_to_4_with_1_to_8_isometric() -> None:
 
 def test_linked_notes_carry_the_notches_and_hole() -> None:
     notes = amplitude_bar_notes.DRAWING_NOTES
-    assert "BOTTOM NOTCH" in notes
-    assert "TOP NOTCH" in notes
+    assert "END NOTCHES (DETAILS A, B)" in notes
     assert drill_process(amplitude_bar_spec.TOP_PIN_HOLE_SPEC) in notes
     assert "LINEAR +/-" not in notes
     assert "STEEL" not in notes
@@ -57,15 +66,65 @@ def test_linked_notes_carry_the_notches_and_hole() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_bottom_notch_depth_is_one_sided_shallow() -> None:
+def test_bottom_notch_depth_band_is_native_on_its_dimension() -> None:
     """User ruling 2026-09-26: a deep notch drops the cheeks onto the rocker
-    hub one for one, so the depth may only come out shallow; the notes print
-    the band from the one constant the cheek-over-hub test reads."""
-    upper, lower = amplitude_bar_notes.BOTTOM_NOTCH_DEPTH_BAND
-    assert lower < upper == 0.0
-    assert "2.38 +0/-0.50 DEEP" in amplitude_bar_notes.DRAWING_NOTES.replace("\n", " ")
-    assert f"+0/{lower:.2f} DEEP" in amplitude_bar_notes.DRAWING_NOTES
+    hub one for one, so the depth may only come out shallow. Codex #936
+    PRRT_kwDOPHDy386mWF0L, policy rule 2: that band is the part's, native on
+    BottomNotchHeight from the one constant the cheek-over-hub test reads,
+    printed in DETAIL A -- and no note carries it or any notch size."""
+    from _drawing_contract import model_toleranced_dimensions
+
+    upper, lower = amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND
+    assert lower == -0.50 < upper == 0.0
+    assert not hasattr(amplitude_bar_notes, "BOTTOM_NOTCH_DEPTH_BAND")
+    assert model_toleranced_dimensions(bar)[("BarProfile", "BottomNotchHeight")] == (
+        "*deviations(BOTTOM_NOTCH_DEPTH_BAND)"
+    )
+    assert "BottomNotchHeight" in drawing.DETAIL_A_KEEP
+    notes = " ".join(
+        line.strip() for line in amplitude_bar_notes.DRAWING_NOTES.splitlines()
+    )
+    assert "DEEP" not in notes
+    assert "+0/" not in notes
+    assert "3.18" not in notes and "2.38" not in notes and "12.70" not in notes
     assert bar.DRAWING_NOTES is amplitude_bar_notes.DRAWING_NOTES
+
+
+def test_notch_details_frame_their_ends_and_place_text_outside_the_bar() -> None:
+    """DETAIL A takes in the foot notch and the open end; DETAIL B the 12.7
+    top notch. Each depth's text stands outside the bar's side and each
+    width's outside its open end, where the witnesses run through air."""
+    spec = amplitude_bar_spec
+    for detail, low, high in (
+        (drawing.DETAIL_A, 0.0, spec.BOTTOM_NOTCH_HEIGHT),
+        (drawing.DETAIL_B, spec.BAR_LENGTH - spec.TOP_NOTCH_HEIGHT, spec.BAR_LENGTH),
+    ):
+        fx, fy = detail.fence_mm
+        for x in (0.0, spec.BAR_WIDTH):
+            for y in (low, high):
+                assert math.hypot(x - fx, y - fy) < detail.radius_mm
+    a = drawing.DETAIL_A
+    depth_x, depth_y = drawing.DETAIL_A_KEEP["BottomNotchHeight"]
+    assert depth_x < a.sheet_xy(0.0, 0.0)[0]
+    assert (
+        a.sheet_xy(0.0, 0.0)[1] < depth_y < a.sheet_xy(0.0, spec.BOTTOM_NOTCH_HEIGHT)[1]
+    )
+    assert drawing.DETAIL_A_KEEP["BottomNotchWidth"][1] < a.sheet_xy(0.0, 0.0)[1]
+    b = drawing.DETAIL_B
+    assert (
+        drawing.DETAIL_B_KEEP["TopNotchHeight"][0] > b.sheet_xy(spec.BAR_WIDTH, 0.0)[0]
+    )
+    assert (
+        drawing.DETAIL_B_KEEP["TopNotchWidth"][1] > b.sheet_xy(0.0, spec.BAR_LENGTH)[1]
+    )
+    # Both details and their labels stay on the sheet, clear of the title
+    # block (x >= 0.218 below y 0.065) and of each other.
+    for detail in (a, b):
+        radius = detail.radius_mm * detail.mm
+        assert detail.label_xy[1] - 0.010 > 0.0127
+        assert detail.centre[1] + radius < 0.2667
+    assert a.centre[0] + a.radius_mm * a.mm < 0.218
+    assert b.label_xy[1] - 0.010 > 0.181  # over the isometric's top
 
 
 def test_functional_notch_finish_is_feature_specific() -> None:

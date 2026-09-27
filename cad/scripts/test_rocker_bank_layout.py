@@ -10,7 +10,6 @@ import numpy as np
 import pytest
 
 import _config
-import amplitude_bar_notes as bar_notes
 import amplitude_bar_spec as bar
 import channel_frame_geom as frame
 import channel_kinematics as ck
@@ -217,7 +216,7 @@ def test_bar_foot_cheeks_clear_the_hub_at_the_worst_case(
     edge; the coaxiality note (Main 2026-09-26) spends 0.25 of the air."""
     # (upper, lower) deviations: the notch deepens by its upper one, the edge
     # drops by its lower one.
-    notch_deeper = bar_notes.BOTTOM_NOTCH_DEPTH_BAND[0]
+    notch_deeper = bar.BOTTOM_NOTCH_DEPTH_BAND[0]
     edge_lower = -arm.TOP_EDGE_BAND[1]
     assert notch_deeper == edge_lower == 0.0
     worst = _cheek_cap(monkeypatch, notch_deeper, edge_lower)
@@ -253,7 +252,7 @@ def test_the_one_sided_bands_lift_the_bar_at_most_1_mm_at_rest(
     1.0 at rest, a steady ~0.45 deg on its channel lever, and at most 0.0036
     of fundamental at any station (0.04 % of the d = 88 term), from the exact
     chain in error_budget (rocker_arm_spec states both)."""
-    notch_shallower = -bar_notes.BOTTOM_NOTCH_DEPTH_BAND[1]
+    notch_shallower = -bar.BOTTOM_NOTCH_DEPTH_BAND[1]
     edge_higher = arm.TOP_EDGE_BAND[0]
     lift = notch_shallower + edge_higher
     assert lift == pytest.approx(1.0)

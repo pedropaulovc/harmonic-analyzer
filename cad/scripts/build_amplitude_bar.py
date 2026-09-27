@@ -54,14 +54,22 @@ from _common import (
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from amplitude_bar_notes import DRAWING_NOTES, END_VIEW_NOTE, ISOMETRIC_VIEW_NOTE
-from amplitude_bar_spec import DRAWING_DIMENSIONS, TOP_PIN_HOLE_SPEC
+from amplitude_bar_spec import (
+    BOTTOM_NOTCH_DEPTH_BAND,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    TOP_PIN_HOLE_SPEC,
+)
 
 import _telemetry
 
@@ -313,8 +321,17 @@ async def build(adapter) -> dict[str, str]:
 
     await report_mass_properties(adapter)
 
-    # Manufacturing drawing support: mark exactly the print's dimensions and
-    # stamp the make-critical title-block properties.
+    # Manufacturing drawing support: the foot notch may only come out shallow
+    # (amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND), natively on its depth;
+    # author every printed dimension's places, mark exactly the print's
+    # dimensions and stamp the make-critical title-block properties.
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "BarProfile",
+        "BottomNotchHeight",
+        *deviations(BOTTOM_NOTCH_DEPTH_BAND),
+    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
