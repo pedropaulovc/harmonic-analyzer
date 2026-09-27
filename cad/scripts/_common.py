@@ -896,6 +896,32 @@ def blank_sketch(adapter: Any, sketch_name: str) -> None:
     _telemetry.success(f"blanked sketch {sketch_name}")
 
 
+@_telemetry.traced("appearance.hide_reference_sketches")
+def blank_reference_sketches(adapter: Any, sketches: tuple[str, ...]) -> None:
+    """Blank a part's reference sketches before it is saved, and prove it.
+
+    A dimension-carrying reference sketch stays in the part for the drawing to
+    import (``_drawing_hidden_sketches`` shows it per view), but saved shown it
+    prints grey dots and lines in every assembly render (#880).  Each sketch is
+    read back through ``IPartDoc.FeatureByName`` and must be hidden, so a
+    BlankSketch that silently did nothing fails the build.
+    """
+    part_doc = _early_bound(adapter.currentModel, "IPartDoc")
+    for sketch in sketches:
+        blank_sketch(adapter, sketch)
+        feature = _early_bound(part_doc.FeatureByName(sketch), "IFeature")
+        state = int(feature.Visible)
+        if state != 1:  # swVisibilityState_e: swVisibilityStateHide
+            raise RuntimeError(
+                f"{sketch} still visible after BlankSketch (state {state})"
+            )
+    _telemetry.event(
+        "part.reference_sketches_hidden",
+        sketches=", ".join(sketches),
+        count=len(sketches),
+    )
+
+
 def set_sketch_direct_db(adapter: Any, enabled: bool) -> None:
     """Toggle ``SketchManager.AddToDB`` around non-axis-parallel geometry.
 
@@ -1391,12 +1417,28 @@ def rebuild_stale_configurations(adapter: Any, part_name: str) -> None:
 
     Same shape as _assembly.rebuild_if_needed_before_save (1013334c3): every
     configuration's IConfiguration.NeedsRebuild is read first, and a clean part
-    -- the common case -- gets no rebuild call at all.  A stale one gets ONE
-    IModelDocExtension.EditRebuildAll, which rebuilds what needs it in every
-    configuration without activating any (#271 measured the cost of switching;
-    ForceRebuild3 dirties children, #267).  A refused rebuild, any non-warning
-    What's Wrong entry (the fleet's fault convention), or a configuration still
-    stale after it raises, naming the part.
+    -- the common case -- gets no rebuild call and no switch at all.
+
+    A stale INACTIVE configuration is activated and force-rebuilt
+    (ShowConfiguration2 + ForceRebuild3), must then read What's Wrong clean,
+    and the original active configuration is shown again.  efae8d795 rebuilt
+    those with one EditRebuildAll and no switch (#271 measured the cost of
+    switching), but cg-fx1 (9459428ec,
+    dt-logs/farm-runs/leaf-logs/cg-fx1-task.log:305-345) found that it left
+    every cone-gear T00x configuration saved with ToothGapCut and
+    ToothGapPattern at error 1 and NeedsRebuild false: the drive train's
+    configuration swap failed its EditRebuild3, and only an activated
+    ForceRebuild3 cleared the faults.  What's Wrong reads the active
+    configuration only, so the no-switch path could not see them.  The user
+    ruled (2026-09-27, option (a)) that the fix lives here: one switch per
+    stale inactive configuration, none otherwise.  #267's objection to
+    ForceRebuild3 is about an assembly's children; a part has none.
+
+    A stale ACTIVE configuration keeps ONE IModelDocExtension.EditRebuildAll.
+    A refused rebuild, any non-warning What's Wrong entry (the fleet's fault
+    convention), or a configuration still stale afterwards raises, naming the
+    part.  :func:`assert_saved_configurations_regenerate` proves the saved
+    result the way a placing assembly loads it.
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     names = [str(name) for name in (model.GetConfigurationNames() or ())]
@@ -1410,18 +1452,22 @@ def rebuild_stale_configurations(adapter: Any, part_name: str) -> None:
         _telemetry.annotate(rebuild_all="skipped", stale_after=0)
         _telemetry.success(f"{part_name}: {len(names)} configuration(s) clean before save")
         return
-    _telemetry.annotate(rebuild_all="ran")
-    extension = _early_bound(_read_member(model, "Extension"), "IModelDocExtension")
-    if not extension.EditRebuildAll():
-        raise RuntimeError(
-            f"{part_name}: EditRebuildAll refused rebuilding stale configurations "
-            f"{stale_before}"
-        )
-    faults = [
-        f"{name} ({_FEATURE_ERROR.get(code, code)})"
-        for name, code, warning in whats_wrong(adapter, model)
-        if not warning
-    ]
+    active = active_configuration_name(adapter, model)
+    if not active:
+        raise RuntimeError(f"{part_name}: the active configuration cannot be read")
+    inactive = [name for name in stale_before if name != active]
+    _telemetry.annotate(stale_inactive=len(inactive))
+    if inactive:
+        _rebuild_inactive_while_active(adapter, model, part_name, inactive, active)
+    if active in stale_before:
+        _telemetry.annotate(rebuild_all="ran")
+        extension = _early_bound(_read_member(model, "Extension"), "IModelDocExtension")
+        if not extension.EditRebuildAll():
+            raise RuntimeError(
+                f"{part_name}: EditRebuildAll refused rebuilding stale configurations "
+                f"{stale_before}"
+            )
+    faults = _hard_fault_names(adapter, model)
     if faults:
         raise RuntimeError(f"{part_name}: rebuilding {stale_before} left faults {faults}")
     stale_after = stale_configurations(model, names)
@@ -1445,6 +1491,97 @@ def stale_configurations(model: Any, names: Iterable[str]) -> list[str]:
             _early_bound(model.GetConfigurationByName(name), "IConfiguration").NeedsRebuild
         )
     ]
+
+
+def _hard_fault_names(adapter: Any, model: Any) -> list[str]:
+    """Non-warning What's Wrong entries of the ACTIVE configuration, named."""
+    return [
+        f"{name} ({_FEATURE_ERROR.get(code, code)})"
+        for name, code, warning in whats_wrong(adapter, model)
+        if not warning
+    ]
+
+
+def _rebuild_inactive_while_active(
+    adapter: Any, model: Any, part_name: str, inactive: list[str], active: str
+) -> None:
+    """Activate and force-rebuild each stale inactive configuration, then show
+    ``active`` again (see :func:`rebuild_stale_configurations`)."""
+    failures: list[str] = []
+    for name in inactive:
+        if not bool(model.ShowConfiguration2(name)):
+            failures.append(f"{name}: ShowConfiguration2 refused")
+            continue
+        if not bool(model.ForceRebuild3(False)):
+            failures.append(f"{name}: ForceRebuild3 returned False")
+            continue
+        faults = _hard_fault_names(adapter, model)
+        if faults:
+            failures.append(f"{name}: {faults}")
+    if not bool(model.ShowConfiguration2(active)):
+        failures.append(f"restoring {active}: ShowConfiguration2 refused")
+    if failures:
+        raise RuntimeError(
+            f"{part_name}: stale inactive configurations did not rebuild clean "
+            "while active: " + "; ".join(failures)
+        )
+
+
+@_telemetry.traced("save.saved_configs_regenerate", label_param="part_name")
+def assert_saved_configurations_regenerate(adapter: Any, part_name: str) -> None:
+    """Load each configuration of a reopened part the way a placing assembly
+    does, and prove it regenerates.
+
+    An assembly that places a configuration other than the part's saved
+    active one reads that configuration's saved cache and runs a plain
+    ``EditRebuild3`` (the drive train's cone-gear ladder swaps 19 copies).
+    cg-fx1 (9459428ec, dt-logs/farm-runs/leaf-logs/cg-fx1-task.log:305-345)
+    found cone-gear's T00x caches faulted as loaded, ``EditRebuild3``
+    returning False over them, and NeedsRebuild false throughout, so no
+    NeedsRebuild read or forced-rebuild check can stand in for this one.
+
+    Call it on the reopened part, before anything force-rebuilds it: each
+    configuration (the saved active one last, so the part ends on it) is
+    shown, What's Wrong is read as loaded, and ``EditRebuild3`` must return
+    True with What's Wrong still clean.  Nothing may save afterwards.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    active = active_configuration_name(adapter, model)
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    if active not in names:
+        raise RuntimeError(
+            f"{part_name}: active configuration {active!r} is not among {names}"
+        )
+    failures: list[str] = []
+    for name in [name for name in names if name != active] + [active]:
+        shown = active_configuration_name(adapter, model) == name or bool(
+            model.ShowConfiguration2(name)
+        )
+        if not shown:
+            failures.append(f"{name}: ShowConfiguration2 refused")
+            continue
+        loaded = _hard_fault_names(adapter, model)
+        rebuilt = bool(model.EditRebuild3())
+        after = _hard_fault_names(adapter, model)
+        _telemetry.info(
+            f"{part_name} saved {name}: loaded={loaded or 'clean'}, "
+            f"EditRebuild3={rebuilt}, after={after or 'clean'}"
+        )
+        if loaded or not rebuilt or after:
+            failures.append(
+                f"{name}: loaded {loaded or 'clean'}, EditRebuild3={rebuilt}, "
+                f"after {after or 'clean'}"
+            )
+    if failures:
+        raise RuntimeError(
+            f"saved {part_name} configurations do not regenerate the way a "
+            "placing assembly loads them (activate, then a plain EditRebuild3): "
+            + "; ".join(failures)
+        )
+    _telemetry.success(
+        f"{part_name}: {len(names)} saved configuration(s) regenerate clean as "
+        "an assembly loads them"
+    )
 
 
 def whats_wrong(adapter: Any, model: Any) -> list[tuple[str, int, bool]]:

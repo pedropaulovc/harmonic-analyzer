@@ -23,20 +23,22 @@ from pinion_arbor_collar_geometry import (
     COLLAR_OD as COLLAR_OD,
     PIN_HOLE_Z as PIN_HOLE_Z,
 )
-from pinion_arbor_geometry import (
-    PIN_STATION_FROM_HEAD_REAR,
-    SHAFT_DIA,
-)
+from pinion_arbor_pin_spec import PIN_HOLE_CALLOUT as PIN_HOLE_CALLOUT
+from pinion_arbor_pin_spec import PIN_NUMBER as PIN_NUMBER
 from pinion_arbor_spec import (
     DRUM_STATION,
     DRUM_STATION_BAND,
+    END_PLAY,
     LINEAR_X_BAND,
     PIN_STATION_BAND,
+    PIN_STATION_FROM_HEAD_REAR,
+    SHAFT_DIA,
     SHAFT_DIA_BAND,
-    STRAP_T,
-    STRAP_T_BAND,
     drum_total_air,
 )
+from pinion_bracket_geometry import THICKNESS as STRAP_T
+from pinion_bracket_geometry import THICKNESS_BAND as STRAP_T_BAND
+from pinion_rig_layout import RIG_MARGIN_SPARE
 
 # The rig's one pin family (pinion_strap_pin_spec): a 1/16 x 1/2 slotted
 # spring pin in a 1/16 drilled hole carrying its own functional band.
@@ -48,16 +50,43 @@ PIN_LEN_TOL = _pin.PIN_LEN_BAND
 
 ARBOR_NUMBER = "MHA-102"
 STRAP_NUMBER = "MHA-056"
-# Drilled Ø8 slide fit over the arbor (Ø8 -0.01/-0.10, lands -0.01/-0.03):
-# the title block's DRILLED HOLES band, printed on the dimension.
+# Drilled Ø8 slide fit over the arbor (Ø8 -0.01/-0.10, lands -0.01/-0.03).
+# The title block's DRILLED HOLES row (+0.10/0) governs it and is NOT printed
+# on the dimension (policy rule 1); the band is restated here only for the
+# stacks below, and a test pins it to title_block.yaml's drilled_hole row.
 BORE_BAND = (0.10, 0.0)  # (upper, lower) deviations
 OD_BAND = LINEAR_X_BAND
 LEN_BAND = LINEAR_X_BAND
+# PinHoleCz prints at one place from one end face, independently of Depth.
+PIN_HOLE_Z_BAND = LINEAR_X_BAND
+
+
+def pin_to_face_distances() -> tuple[float, float]:
+    """Least and greatest distance from the pin hole's axis to either end
+    face, over every corner of the printed length and pin-station bands.
+
+    The station is printed from one face (PinHoleCz), the other face sits the
+    length away, and the collar goes on either way round, so both faces can
+    end up inboard.
+    """
+    distances = []
+    for length, station in product(
+        (COLLAR_LEN - LEN_BAND, COLLAR_LEN + LEN_BAND),
+        (PIN_HOLE_Z - PIN_HOLE_Z_BAND, PIN_HOLE_Z + PIN_HOLE_Z_BAND),
+    ):
+        distances.extend((station, length - station))
+    return min(distances), max(distances)
+
+
+PIN_TO_FACE_MIN, PIN_TO_FACE_MAX = pin_to_face_distances()
 SLIDE_CLEARANCE_MIN = round(BORE + BORE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]), 6)
 if SLIDE_CLEARANCE_MIN <= 0.0:
     raise AssertionError("the collar no longer slides over the arbor")
 
 MIN_GAP = 0.0  # the collar never touches the strap at rest
+# The novice-margin rule (Main, restricted review of #858): the gap keeps
+# RIG_MARGIN_SPARE over its floor at the worst corner, like every rig margin.
+GAP_REQUIRED = MIN_GAP + RIG_MARGIN_SPARE
 
 
 def collar_strap_gaps() -> tuple[float, float]:
@@ -66,35 +95,44 @@ def collar_strap_gaps() -> tuple[float, float]:
 
     Stations run from MHA-102's head rear face toward the back.  The strap's
     outer face sits DRUM_STATION less the drum's front air and the strap
-    thickness; the collar's inboard face sits half its length past the pin.
+    thickness; the collar's inboard face sits one pin-to-face distance past
+    the pin, and that distance runs over the length AND pin-station bands
+    (pin_to_face_distances), not just half the length.  The straps are
+    pinned at the drum plus the drilling shim (#858), so the drum's front
+    air runs from nothing (drum hard forward) to the whole of its end play
+    (drum hard aft, the drilling pose).
     """
     gaps = []
-    for station, air, strap, pin, length in product(
+    for station, air, strap, pin, to_face in product(
         (DRUM_STATION - DRUM_STATION_BAND, DRUM_STATION + DRUM_STATION_BAND),
-        drum_total_air(),
+        (0.0, drum_total_air()[1]),
         (STRAP_T - STRAP_T_BAND, STRAP_T + STRAP_T_BAND),
         (
             PIN_STATION_FROM_HEAD_REAR - PIN_STATION_BAND,
             PIN_STATION_FROM_HEAD_REAR + PIN_STATION_BAND,
         ),
-        (COLLAR_LEN - LEN_BAND, COLLAR_LEN + LEN_BAND),
+        (PIN_TO_FACE_MIN, PIN_TO_FACE_MAX),
     ):
         strap_outer = station - air - strap
-        collar_inboard = pin + length / 2.0
+        collar_inboard = pin + to_face
         gaps.append(strap_outer - collar_inboard)
     return min(gaps), max(gaps)
 
 
 GAP_MIN, GAP_MAX = collar_strap_gaps()
-GAP_NOMINAL = (
-    DRUM_STATION - sum(drum_total_air()) / 2.0 - STRAP_T
-) - (PIN_STATION_FROM_HEAD_REAR + COLLAR_LEN / 2.0)
-if GAP_MIN <= MIN_GAP:
-    raise AssertionError(f"collar can touch the front strap: gap {GAP_MIN:.3f}")
+# In the assembly's pose: the drum hard on the back strap, its front end one
+# drilling shim (END_PLAY) off the front strap.
+GAP_NOMINAL = (DRUM_STATION - END_PLAY - STRAP_T) - (
+    PIN_STATION_FROM_HEAD_REAR + COLLAR_LEN / 2.0
+)
+if GAP_MIN < GAP_REQUIRED - 1e-9:
+    raise AssertionError(
+        f"collar gap to the front strap {GAP_MIN:.3f} under {GAP_REQUIRED}"
+    )
 
 # Rule 12 webs at the printed worst case (U27 target 2.0, floor 1.5).
 COLLAR_WALL_WORST = (COLLAR_OD - OD_BAND - (BORE + BORE_BAND[0])) / 2.0
-PIN_TO_END_WEB_WORST = (COLLAR_LEN - LEN_BAND) / 2.0 - PIN_HOLE_MAX / 2.0
+PIN_TO_END_WEB_WORST = PIN_TO_FACE_MIN - PIN_HOLE_MAX / 2.0
 for _name, _web in (
     ("collar wall", COLLAR_WALL_WORST),
     ("pin hole to collar end face", PIN_TO_END_WEB_WORST),
@@ -105,10 +143,30 @@ for _name, _web in (
 # The pin is never proud of the smallest OD, and still crosses the largest
 # bore into both walls.
 PIN_SUB_FLUSH_WORST = (COLLAR_OD - OD_BAND - (PIN_LEN + PIN_LEN_TOL)) / 2.0
-PIN_WALL_ENGAGEMENT_WORST = (PIN_LEN - PIN_LEN_TOL) / 2.0 - (BORE + BORE_BAND[0]) / 2.0
+# The drive's acceptance (Codex #860, PRRT_kwDOPHDy386mWhrK).  SUB-FLUSH alone
+# lets the largest collar hold the shortest pin nearly flush at one end and
+# OD - L = 3.354 down at the other, 0.496 past the bore.  A one-sided "0 TO x
+# BELOW" window cannot fit the .X OD band: x must reach half the largest
+# OD - L to hold every pin, yet the smallest OD with an end x down leaves
+# under the floor.  So the acceptance bounds the difference between the two
+# end depths: with it under D, the deeper end sits at most D / 2 past centred,
+# and the far wall keeps (L - D - bore) / 2 at any OD.  D is the loosest 0.1
+# step that holds the rig's one-pin-diameter grip (pinion_strap_pin_spec).
+PIN_WALL_ENGAGEMENT_FLOOR = _pin.PIN_WALL_ENGAGEMENT_FLOOR
+_PIN_LEN_MIN = PIN_LEN - PIN_LEN_TOL
+_BORE_MAX = BORE + BORE_BAND[0]
+PIN_END_DEPTH_SPREAD_MAX = (
+    math.floor(
+        round((_PIN_LEN_MIN - _BORE_MAX - 2.0 * PIN_WALL_ENGAGEMENT_FLOOR) * 10.0, 9)
+    )
+    / 10.0
+)
+PIN_WALL_ENGAGEMENT_WORST = (_PIN_LEN_MIN - PIN_END_DEPTH_SPREAD_MAX - _BORE_MAX) / 2.0
 if PIN_SUB_FLUSH_WORST <= 0.0:
     raise AssertionError("the spring pin can stand proud of the collar")
-if PIN_WALL_ENGAGEMENT_WORST < 1.5:
+if PIN_END_DEPTH_SPREAD_MAX <= 0.0:
+    raise AssertionError("no pin-end depth spread keeps both collar walls gripped")
+if PIN_WALL_ENGAGEMENT_WORST < PIN_WALL_ENGAGEMENT_FLOOR:
     raise AssertionError("the spring pin barely reaches the collar wall")
 if not math.isclose(PIN_HOLE_Z, COLLAR_LEN / 2.0):
     raise AssertionError("the pin hole must stay centred on the collar length")
@@ -136,11 +194,27 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked collar dimension needs authored places")
 
-PIN_CALLOUT = _pin.PIN_SUPPLY
-PIN_HOLE_CALLOUT = _pin.DRILL_THRU_CALLOUT
+# The pin is the stock MHA-145 (McMaster 98296A027): its own BOM line and a
+# modelled drive-train component.  So the collar sheet carries no supply note
+# (the MHA-056 strap precedent); the hole callout names the pin it takes,
+# the same callout MHA-102 prints for the same pin (PIN_NUMBER and
+# PIN_HOLE_CALLOUT come from pinion_arbor_pin_spec).
 BORE_CALLOUT = f"DRILL THRU\nSLIDES ON {ARBOR_NUMBER}"
-# The sole linked note supplies the loose purchased pin (the MHA-104 cam
-# precedent); the fit-up order lives in the drive-train assembly steps.
-DRAWING_NOTES = f"SUPPLY 1X {PIN_CALLOUT} LOOSE."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
+
+# The rig's first assembly step (Codex #860, PRRT_kwDOPHDy386mTbe7).  The
+# collar reaches the pin station only from the arbor's back crown end: its
+# Ø8 bore passes neither the Ø15 head nor a drum already bonded at the drum
+# station.  The front strap, journaled between the collar and the drum, is
+# trapped the same way, so it follows the collar on before the bond.
+COLLAR_NUMBER = "MHA-144"
+ASSEMBLY_STEP = "\n".join(
+    (
+        f"BEFORE THE DRUM BOND: SLIDE {COLLAR_NUMBER} ONTO {ARBOR_NUMBER} FROM ITS",
+        f"BACK CROWN END TO THE PIN STATION; DRIVE {PIN_NUMBER} THRU BOTH, BOTH ENDS",
+        "SUB-FLUSH AND THEIR DEPTHS BELOW THE OD WITHIN "
+        f"{PIN_END_DEPTH_SPREAD_MAX:.1f} OF EACH OTHER;",
+        f"THEN SLIDE THE FRONT {STRAP_NUMBER} ON BEHIND IT.",
+    )
+)
 

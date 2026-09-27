@@ -12,6 +12,7 @@ from __future__ import annotations
 import ast
 import functools
 import importlib
+import inspect
 from pathlib import Path
 
 import pytest
@@ -339,6 +340,67 @@ def test_a_real_curate_inside_the_block_marks_its_owner_dimensioned(
         assert hidden_sketches._PART_SHOWN[-1].dimensioned == {"ArcReference"}
 
 
+class RebuildingHiddenSketchDrawing(HiddenSketchDrawing):
+    """The drawing the block rebuilds, logging onto the part's event log."""
+
+    def __init__(self, part: TogglePart) -> None:
+        super().__init__(part, "Drawing View2", "summing-lever-2")
+        self.events = part.log
+
+    def UnblankSketch(self) -> None:
+        self.events.append("view unblank")
+        super().UnblankSketch()
+
+    def BlankSketch(self) -> None:
+        self.events.append("view blank")
+        super().BlankSketch()
+
+    def EditRebuild3(self) -> bool:
+        self.events.append("rebuild")
+        return True
+
+
+def _base_view_block(tmp_path, orientation: str):
+    part = TogglePart(tmp_path / "lever.SLDPRT", "ArcReference")
+    drawing = RebuildingHiddenSketchDrawing(part)
+    base = ReferencingView("Drawing View2", "summing-lever-2", part, orientation)
+    block = hidden_sketches.part_sketches_shown(
+        FakeAdapter(drawing), part, ["ArcReference"], label="Detail A", base_view=base
+    )
+    return part, drawing, block
+
+
+def test_the_base_view_shows_the_sketches_first_and_keeps_them(tmp_path) -> None:
+    """pc-p1r: a detail's items select through its base view, and with only
+    the part showing the sketches the import delivered nothing.  The base view
+    shows them per view before the part does and is never blanked again."""
+    part, drawing, block = _base_view_block(tmp_path, "*Right")
+    with block:
+        hidden_sketches._PART_SHOWN[-1].dimensioned.add("ArcReference")
+        part.log.append("create + curate")
+    assert part.log == [
+        "view unblank",
+        "part unblank",
+        "rebuild",
+        "create + curate",
+        "part blank",
+        "rebuild",
+    ]
+    sketch = ("ArcReference@summing-lever-2@Drawing View2",)
+    assert drawing.log == [("unblank", sketch)]
+    assert drawing.view_shows_sketch
+
+
+def test_a_pictorial_base_view_never_shows_a_reference_sketch(tmp_path) -> None:
+    part, drawing, block = _base_view_block(tmp_path, "*Isometric")
+    with pytest.raises(RuntimeError, match="pictorial base view"):
+        with block:
+            pass
+    assert part.log == []
+    assert drawing.log == []
+    assert hidden_sketches._PART_SHOWN == []
+
+
 def test_part_sketches_are_blanked_again_when_the_block_fails(tmp_path) -> None:
     part = TogglePart(tmp_path / "lever.SLDPRT")
     adapter = FakeAdapter(RebuildingDrawing(part.log))
@@ -459,16 +521,45 @@ def _reference_sketches(tree: ast.Module) -> set[str]:
     raise LookupError("blank_sketch on a computed name, with no REFERENCE_SKETCHES to resolve it")
 
 
+def _imported_name(tree: ast.Module, name: str) -> str | None:
+    """A sketch name the build imports as a module constant (build_pinion_spring's
+    ``FREE_FORM_SKETCH`` from its spec), or None when it imports no such name."""
+    for node in tree.body:
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        for alias in node.names:
+            if (alias.asname or alias.name) == name:
+                return getattr(importlib.import_module(node.module), alias.name)
+    return None
+
+
 def _blanked_sketches(build: Path) -> set[str]:
-    """Every sketch a part build hides with _common.blank_sketch."""
+    """Every sketch a part build hides with _common.blank_sketch, or with
+    _common.blank_reference_sketches (which calls it per sketch) over a
+    literal tuple or the build's REFERENCE_SKETCHES."""
     tree = _tree(build)
     names: set[str] = set()
     for node in ast.walk(tree):
-        if not (isinstance(node, ast.Call) and _called_name(node) == "blank_sketch"):
+        if not isinstance(node, ast.Call):
+            continue
+        called = _called_name(node)
+        if called == "blank_reference_sketches":
+            sketches = node.args[1]
+            if isinstance(sketches, (ast.Tuple, ast.List)) and all(
+                isinstance(item, ast.Constant) for item in sketches.elts
+            ):
+                names |= {item.value for item in sketches.elts}
+                continue
+            names |= _reference_sketches(tree)
+            continue
+        if called != "blank_sketch":
             continue
         sketch = node.args[1]
         if isinstance(sketch, ast.Constant):
             names.add(sketch.value)
+            continue
+        if isinstance(sketch, ast.Name) and (imported := _imported_name(tree, sketch.id)):
+            names.add(imported)
             continue
         names |= _reference_sketches(tree)
     return names
@@ -541,6 +632,7 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
     assert {
         "arbor_pedestal",
         "cone_gear",
+        "cone_pivot_post",
         "cone_tip_block",
         "cone_tip_shim",
         "cylinder_gear_shaft",
@@ -549,6 +641,8 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
         "pinion_spring",
     } <= set(found)
     assert found["cylinder_gear_shaft"] == {"DomeReference"}
+    # Blanked with _common.blank_reference_sketches, not blank_sketch.
+    assert found["cone_pivot_post"] == {"SpotFaceStationReference"}
 
 
 def test_a_drawing_of_a_part_hidden_sketch_curates_through_this_module() -> None:
@@ -563,5 +657,76 @@ def test_a_drawing_of_a_part_hidden_sketch_curates_through_this_module() -> None
         if not _curates_through_hidden_sketches(
             _SCRIPTS / DRAWINGS_BY_NAME[name].script_name
         )
+    }
+    assert wrong == {}
+
+
+# cd50a8425 made dimensions_by_feature a required keyword; draw_crankshaft
+# kept calling this helper without it, and nothing offline noticed until the
+# seat raised TypeError (#960 leaf cr-r1c, drawing:crankshaft).
+_REQUIRED_KEYWORDS = frozenset(
+    name
+    for name, parameter in inspect.signature(
+        hidden_sketches.curate_view_dimensions
+    ).parameters.items()
+    if parameter.kind is inspect.Parameter.KEYWORD_ONLY
+    and parameter.default is inspect.Parameter.empty
+)
+
+
+def _hidden_curate_calls_missing_keywords(tree: ast.Module) -> list[tuple[int, list[str]]]:
+    """Calls resolved to this module's curate_view_dimensions (a bare name
+    imported from it, or an attribute of its module alias) that omit a
+    required keyword."""
+    names: set[str] = set()
+    aliases: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "_drawing_hidden_sketches":
+            names |= {
+                alias.asname or alias.name
+                for alias in node.names
+                if alias.name == "curate_view_dimensions"
+            }
+        if isinstance(node, ast.Import):
+            aliases |= {
+                alias.asname or alias.name
+                for alias in node.names
+                if alias.name == "_drawing_hidden_sketches"
+            }
+    missing = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        routed = (isinstance(func, ast.Name) and func.id in names) or (
+            isinstance(func, ast.Attribute)
+            and func.attr == "curate_view_dimensions"
+            and isinstance(func.value, ast.Name)
+            and func.value.id in aliases
+        )
+        if not routed or any(keyword.arg is None for keyword in node.keywords):
+            continue
+        absent = sorted(_REQUIRED_KEYWORDS - {keyword.arg for keyword in node.keywords})
+        if absent:
+            missing.append((node.lineno, absent))
+    return missing
+
+
+def test_the_keyword_guard_flags_a_call_without_dimensions_by_feature() -> None:
+    # Positive control: the draw_crankshaft call shape the seat rejected.
+    tree = ast.parse(
+        "from _drawing_hidden_sketches import curate_view_dimensions\n"
+        "curate_view_dimensions(adapter, end, keep=KEEP, view_label='end')\n"
+    )
+    assert _hidden_curate_calls_missing_keywords(tree) == [
+        (2, ["dimensions_by_feature"])
+    ]
+
+
+def test_every_hidden_sketch_curate_call_passes_its_required_keywords() -> None:
+    wrong = {
+        path.name: missing
+        for path in sorted(_SCRIPTS.glob("*.py"))
+        if (missing := _hidden_curate_calls_missing_keywords(_tree(path)))
     }
     assert wrong == {}

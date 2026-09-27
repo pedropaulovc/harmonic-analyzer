@@ -76,23 +76,33 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "pinion-handle",
         "pinion-arbor",
         "pinion-arbor-collar",
+        "pinion-strap-pin",
         "slotted-screw",
         "foot-screw",
     ),
 }
 Pick = Literal["south", "north"]
+# A role singles out the one instance of a family that explodes apart from its
+# siblings.  The builder tags it at insertion by what it is pinned to, never by
+# where it stands, so a layout move cannot re-pick it.  MHA-145 serves both as
+# the two strap set pins (stationary with the straps) and as the MHA-144 collar
+# pin, which leaves with the arbor it pins.
+Role = Literal["arbor-collar-pin"]
+COLLAR_PIN_ROLE: Role = "arbor-collar-pin"
 
 
 @dataclass(frozen=True)
 class ExplodeStep:
     """One native explode step: every instance of ``stems`` meeting ALL
-    ``picks`` moves ``distance_mm`` along the world ``axis`` (sign = direction)."""
+    ``picks`` -- and, when ``roles`` is set, carrying one of them -- moves
+    ``distance_mm`` along the world ``axis`` (sign = direction)."""
 
     label: str
     stems: tuple[str, ...]
     axis: Literal["x", "y", "z"]
     distance_mm: float
     picks: tuple[Pick, ...] = ()
+    roles: tuple[Role, ...] = ()
 
 
 # Machine frame: +Y up, -Z front (south), the drum arbor along Z. Every family
@@ -163,6 +173,11 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         "z",
         -50.0,
     ),
+    # ...and so is the collar's MHA-145 spring pin.  The other two MHA-145
+    # instances pin the straps to the torque shaft and stay with them.
+    ExplodeStep(
+        "arbor collar pin", ("pinion-strap-pin",), "z", -50.0, roles=(COLLAR_PIN_ROLE,)
+    ),
     ExplodeStep("grip crossrod", ("pinion-handle",), "y", 25.0),
 )
 
@@ -196,6 +211,7 @@ class Instance:
     name: str
     stem: str
     origin_mm: tuple[float, float, float]
+    role: Role | None = None
 
 
 def classified_stems() -> frozenset[str]:
@@ -211,6 +227,8 @@ def unclassified_stems(stems: Sequence[str]) -> list[str]:
 
 
 def _picked(step: ExplodeStep, instance: Instance) -> bool:
+    if step.roles and instance.role not in step.roles:
+        return False
     z = instance.origin_mm[2]
     tests = {"south": z < 0.0, "north": z > 0.0}
     return all(tests[pick] for pick in step.picks)
@@ -224,12 +242,30 @@ def plan_explode(
     Refuses an unknown or retired family, a moving family no step moves, a
     step that selects nothing, and a non-pending family a step names but the
     model lacks. The south/north picks split each paired family by world z
-    (the machine is laid out about z = 0).
+    (the machine is laid out about z = 0). A role step moves only the
+    instances the builder tagged with its role; each role must be carried by
+    exactly one instance, of a family that role's step names.
     """
     stems = {instance.stem for instance in instances}
     unknown = unclassified_stems(sorted(stems))
     if unknown:
         raise ValueError(f"explode plan does not classify {unknown!r}")
+    role_stems: dict[Role, set[str]] = {}
+    for step in EXPLODE_STEPS:
+        for role in step.roles:
+            role_stems.setdefault(role, set()).update(step.stems)
+    for role, owners in role_stems.items():
+        tagged = [instance for instance in instances if instance.role == role]
+        if len(tagged) != 1 or tagged[0].stem not in owners:
+            found = [(instance.name, instance.stem) for instance in tagged]
+            raise ValueError(f"role {role!r} must tag one {sorted(owners)!r}, found {found!r}")
+    stray = sorted(
+        instance.name
+        for instance in instances
+        if instance.role is not None and instance.role not in role_stems
+    )
+    if stray:
+        raise ValueError(f"instances carry roles no step moves: {stray!r}")
 
     moved_stems = {stem for step in EXPLODE_STEPS for stem in step.stems}
     unplanned = sorted(stems - moved_stems - STATIONARY_STEMS)

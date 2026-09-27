@@ -1434,6 +1434,8 @@ def _drawing_registry_reads(text: str) -> frozenset[str] | None:
         "DrawingSpec",
         "DRAWING_TEMPLATES",
         "DRAWINGS_BY_NAME",
+        # Row-independent: a path from the artefact stem the caller already has.
+        "layout_report_path",
     }
     for node in nodes:
         if (
@@ -1766,12 +1768,14 @@ _FIXED_ACCESSOR_TOKENS: dict[str, frozenset[str]] = {
     "active_channels": frozenset({"channels.yaml", "machine/channels.yaml"}),
     "fit": frozenset({"tolerances.yaml"}),
     "release_revision": frozenset({"release.yaml"}),
-    # title_block is read only by _common.part_properties (the TOL_* stamping),
-    # so it emits a DYNAMIC token dodo narrows per task exactly like "parts/*":
-    # parts (and stamping assemblies) -> title_block.yaml; a non-stamping
-    # assembly drops it (a title-block edit re-stamps the parts, whose new
-    # digests REFRESH the assembly — folding it into the assembly recipe would
-    # escalate to a spurious ~500 s FULL rebuild).
+    # title_block is read by the TOL_* stamping (_common.part_properties,
+    # _assembly.assembly_title_properties) and, for geometry, by the modules in
+    # TITLE_BLOCK_GEOMETRY_MODULES (worst-case stacks sized from the printed
+    # rows).  It emits a DYNAMIC token dodo narrows per task exactly like
+    # "parts/*": parts, stamping assemblies and geometry readers ->
+    # title_block.yaml; any other assembly drops it (a title-block edit
+    # re-stamps the parts, whose new digests REFRESH the assembly — folding it
+    # into the assembly recipe would escalate to a spurious ~500 s FULL rebuild).
     "title_block": frozenset({"title_block"}),
     "materials": frozenset({"materials.yaml"}),
     "palette": frozenset({"materials.yaml"}),
@@ -2191,6 +2195,46 @@ def stamps_part_properties(script: Path) -> bool:
 def stamps_title_block_properties(script: Path) -> bool:
     """True when this script stamps the general-tolerance title-block fields."""
     return script.stem in _stamping_modules(_TITLE_BLOCK_STAMP_PRIMITIVES)
+
+
+# Modules that read title_block.yaml for GEOMETRY -- a worst-case stack that
+# sizes or places a part from the printed rows, or a part dimension set to a
+# printed band -- rather than for the TOL_* stamping.  A title-block edit moves
+# those, so a build importing one keeps title_block.yaml even when it stamps
+# nothing (Codex #854 review).  Every module that calls the accessor and is not
+# a stamper or a drawing script is listed here (test_dodo_recipe pins it).
+TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
+    {
+        "_printed_tolerance",
+        "boss_hook_spec",
+        "build_crank_eccentric_bushing",
+        "build_drive_train_assembly",
+        "build_harmonic_base",
+        "build_wheel_bar",
+        "cone_pivot_post_spec",
+        "cone_tip_block_spec",
+        "cone_tip_shim_spec",
+        "crank_boss_rim",
+        "crank_hub_geometry",
+        "crank_mesh_stack",
+        "crank_pinion_spec",
+        "harmonic_base_fasteners",
+        "post_mount_screw_spec",
+        "spring_hook_spec",
+        "swing_stop_screw_spec",
+    }
+)
+
+
+def reads_title_block_geometry(script: Path) -> bool:
+    """True when this script, or its import closure, sizes geometry from the
+    title block.  ``module_deps_of`` lists imports only, so the root script is
+    checked by its own stem (Codex #1035, PRRT_kwDOPHDy386mV11b)."""
+    if Path(script).stem in TITLE_BLOCK_GEOMETRY_MODULES:
+        return True
+    return any(
+        Path(dep).stem in TITLE_BLOCK_GEOMETRY_MODULES for dep in module_deps_of(script)
+    )
 
 
 def dependents_of(stem: str) -> list[str]:

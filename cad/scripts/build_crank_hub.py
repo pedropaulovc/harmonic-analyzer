@@ -20,6 +20,7 @@ from _common import (
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
+    blank_sketch,
     check,
     define_circle,
     dimension_between,
@@ -75,15 +76,6 @@ from crank_hub_spec import (
 
 
 PART_NAME = "crank-hub"
-# Reference sketches this part still saves shown (#880), each with its owner
-# and why.  Delete an entry once the part hides that sketch; the release
-# refuses to start while any part lists one (visibility_debt).
-SHOWN_SKETCH_ALLOWANCES = {
-    "ServicePinStationReference": (
-        "crankhub: carries the drawing's marked dimensions; hide it once "
-        "the sheet imports them from the hidden sketch"
-    ),
-}
 MATERIAL = "Plain Carbon Steel"
 SEAT_R = HUB_SEAT_DIA / 2.0
 BARREL_R = HUB_BARREL_DIA / 2.0
@@ -364,9 +356,11 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(
-        adapter, PART_NAME, allowed_shown=SHOWN_SKETCH_ALLOWANCES
-    )
+    # The reference sketch owns printed dimensions but no geometry: hide it so
+    # no assembly instance renders it (#880).  The drawing shows it per view
+    # through _drawing_hidden_sketches to import those dimensions.
+    blank_sketch(adapter, "ServicePinStationReference")
+    return await save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

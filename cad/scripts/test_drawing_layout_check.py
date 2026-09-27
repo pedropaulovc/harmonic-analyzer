@@ -334,7 +334,6 @@ def test_live_collector_never_flags_transient_dispatches(monkeypatch):
     assert [(element.label, element.kind) for element in elements] == [
         ("Front", "view"),
         ("general-note", "note"),
-        ("dimension", "dim"),
         ("hole-table", "table"),
         ("title-block", "titleblock"),
     ]
@@ -938,6 +937,47 @@ def test_hole_callout_leader_reads_the_true_bent_geometry():
     # The shoulder reaches x=0.12252, PAST the text at 0.104 -- ground a straight
     # attachment->text chord never covered, so the chord could miss a crossing.
     assert max(s.x1 for s in segs) == pytest.approx(0.12252)
+
+
+def test_collector_boxes_no_dimension_but_keeps_hole_callout_leaders(monkeypatch):
+    """A display dimension used to become an 8 mm nominal square with NONE
+    scope, which nothing ever overlap-checked: MHA-092's "20.8"/"8.42" and its
+    callouts over the right view all passed. The shared layout audit boxes
+    dimension text from display data now, so the element audit carries NO
+    dimension box -- only the hole callout's leader ink for crossing checks."""
+    monkeypatch.setattr(
+        drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_a, **_k: obj
+    )
+    lines = [
+        ((0.0707, 0.20571), (0.08389, 0.2192)),
+        ((0.0693, 0.20429), (0.0707, 0.20571)),
+        ((0.08389, 0.2192), (0.12252, 0.2192)),
+    ]
+    callout = _hole_callout(lines)
+    callout.GetPosition = lambda: [0.104, 0.2192, 0.0]
+    view = SimpleNamespace(
+        GetName2="Front",
+        GetOrientationName=lambda: "*Front",
+        GetOutline=[0.05, 0.15, 0.15, 0.25],
+        GetAnnotations=lambda: [callout],
+        GetTableAnnotations=[],
+        GetNextView=None,
+    )
+    sheet_view = SimpleNamespace(
+        GetNextView=lambda: view, GetTableAnnotations=[], GetAnnotations=lambda: []
+    )
+    sheet = SimpleNamespace(
+        GetProperties=lambda: [0.0, 0.0, 1.0, 1.0, 0.0, SHEET_W, SHEET_H],
+        GetZoneMargin=lambda _code: 0.0127,
+    )
+    model = SimpleNamespace(GetCurrentSheet=sheet, GetFirstView=lambda: sheet_view)
+
+    elements, leaders, _region = drawing_common.collect_layout_elements(
+        _FakeAdapter(model), layout=DrawingLayout.LANDSCAPE
+    )
+
+    assert not [element for element in elements if element.kind == "dim"]
+    assert [(s.label, s.owner) for s in leaders] == [("RD3", "Front")] * 3
 
 
 def test_plain_dimension_contributes_no_leader():
@@ -1577,6 +1617,15 @@ def test_edge_key_is_none_when_the_geometry_cannot_be_read():
 
 
 class _FakeNote:
+    """A BOM balloon whose anchor sits a constant offset off its circle.
+
+    ``placed`` is the rendered CIRCLE centre. ``GetPosition``/``SetPosition``
+    read and move the ANCHOR, which native balloons keep ~(+4.0, -1.7) mm off
+    the centre (#866, MHA-A03 integ3 leaf, 40 balloons).
+    """
+
+    ANCHOR_OFFSET = (0.0040, -0.0017)
+
     def __init__(self, attach_x, attach_y, radius=0.0047, item="1"):
         self._attach = (attach_x, attach_y)
         self._radius = radius
@@ -1609,8 +1658,12 @@ class _FakeNote:
         # Flat x,y,z stream: balloon end first, attachment LAST.
         return (0.0, 0.0, 0.0, self._attach[0], self._attach[1], 0.0)
 
+    def GetPosition(self):
+        cx, cy = self.placed or (0.0, 0.0)
+        return (cx + self.ANCHOR_OFFSET[0], cy + self.ANCHOR_OFFSET[1], 0.0)
+
     def SetPosition(self, x, y, _z):
-        self.placed = (x, y)
+        self.placed = (x - self.ANCHOR_OFFSET[0], y - self.ANCHOR_OFFSET[1])
         return True
 
 
@@ -1738,6 +1791,19 @@ def test_balloons_attached_at_one_angle_ring_in_a_fixed_order():
     reversed_ = dict(zip(("far", "near"), _ring_positions([far2, near2])))
     assert forward == reversed_
     assert forward["near"] != forward["far"]
+
+
+def test_spread_balloons_land_their_circles_on_the_ring_not_their_anchors():
+    """#866: the ring slot is a CIRCLE centre, and SetPosition moves the anchor.
+
+    Placing the anchor on the slot left every circle ~(+4.0, -1.7) mm off the
+    ring (MHA-A03 integ3). The spread must carry each balloon's anchor offset.
+    """
+    notes = [_FakeNote(0.12, 0.13), _FakeNote(0.18, 0.17), _FakeNote(0.15, 0.19)]
+    margin = 0.014
+    rx = ry = 0.05 + margin
+    for x, y in _ring_positions(notes):
+        assert ((x - 0.15) / rx) ** 2 + ((y - 0.15) / ry) ** 2 == pytest.approx(1.0)
 
 
 def test_ring_order_survives_any_arrival_order():

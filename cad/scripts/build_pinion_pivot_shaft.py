@@ -256,7 +256,8 @@ async def build(adapter) -> dict[str, str]:
         volume = await volume_check(adapter, f"cap {tag}", volume + V_CAP, 0.03 * V_CAP)
 
     # Option E-a set-pin holes: one diametral cross hole along X under each
-    # strap's mid-plane (pinion_pivot_shaft_spec.PIN_HOLE_Z), sketched on the
+    # strap's mid-plane in the physical back-stop stack, where the match-drill
+    # puts it (pinion_pivot_shaft_spec.PIN_HOLE_Z), sketched on the
     # Right Plane (normal X; sketch u = -z) and cut mid-plane twice the shaft
     # diameter deep -- the MHA-060 pin-hole idiom.  The origin sits on the
     # front end face, so each circle's axial anchor is its station from that

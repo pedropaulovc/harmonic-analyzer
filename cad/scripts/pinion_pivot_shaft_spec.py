@@ -15,30 +15,32 @@ from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 import pinion_strap_pin_spec as _strap_pin
 from pinion_rig_layout import (
-    STRAP_Z_INNER,
-    STRAP_Z_OUTER,
     TORQUE_SHAFT_LEN,
-    TORQUE_SHAFT_Z0,
+    TORQUE_SHAFT_PIN_HOLE_Z,
 )
 
 SHAFT_DIA = 6.35  # 1/4 in: rides both pivot blocks' east bores and the straps
-# Ends flush with the pivot blocks' outer faces; ruling (c) moved the front
-# block inboard to the front strap (pinion_rig_layout), 192 -> 182.0
-# (the physical stack, never the model pose's air: Codex #854).
+# Set back-flush with the back block's outer face; ruling (c) moved the front
+# block inboard to the front strap (pinion_rig_layout), 192 -> 182.0, then
+# the worst fitted stack (Codex #854 P1) made it long enough that the
+# shortest shaft still bears 9.5 of the front block
+# (pinion_rig_layout.torque_shaft_bearing_stack).
 SHAFT_LEN = TORQUE_SHAFT_LEN
 CAP_SAG = 1.2  # shallow spherical crown height at each end
 CAP_RADIUS = ((SHAFT_DIA / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
 SHAFT_DIA_BAND = SHAFT_H
 # U27 (Main, 2026-09-24): the length carries the title-block .X band (+/-0.8),
 # not a tight one.  Pinned to the straps (option E-a) the shaft rides the
-# cluster's end play (0.25 +/- 0.10): drilled back-flush at the back stop, at
-# the front stop its front end stands at worst 1.20 proud of the front block,
-# the SR crown apex 2.40, and its back end sits 0.35 inside the back block.
+# cluster's end play (0.25 +/- 0.10): drilled back-flush at the back stop,
+# the longest shaft in the shortest stack stands at worst 7.52 proud of the
+# front block, 7.87 at the front stop with the SR crown apex at 9.07, and its
+# back end then sits 0.35 inside the back block, still bearing 10.04 of the
+# shallowest one past its flush setting
+# (pinion_rig_layout.torque_shaft_back_bearing_stack).
 # Nothing stands on the shaft's axis past either block: the nearest body, the
-# MHA-059 lever, rides the lift rod 18.63 off it -- hub 8.95 radial clear, arm
-# >= 12.42 clear over the -82 degree throw (test_drive_train_support_layout::
-# test_torque_shaft_length_band_clears_both_ends).  Each block still bears
-# >= 9.5 of its 10.25.
+# MHA-059 lever, rides the lift rod 18.63 off it -- hub 8.95 radial clear,
+# arm >= 12.42 clear over the -82 degree throw (test_drive_train_support_layout::
+# test_torque_shaft_length_band_clears_both_ends).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Shaft": {"Depth": 1},
     # Two places resolve the spring pin's +0.06/0 hole band.
@@ -47,18 +49,20 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 
 # Option E-a set pins (pinion_strap_pin_spec): one cross hole under each
 # MHA-056 strap, match-drilled through the strap's own cross hole with the
-# shaft back-flush and the cluster at the back stop.  The model holds them at
-# the strap mid-planes of the POSE (from the front end, local z 0), which
-# carries 2 x STRAP_AIR more than the hardware between the straps; the
-# physical stations are pinned by test_drive_train_support_layout.  The print
+# shaft back-flush and the cluster at the back stop -- the fit-up stack the
+# assembly shows (pinion_rig_layout) -- so they sit at its strap mid-planes,
+# from the front end (local z 0).  The print
 # carries no station: the strap sets it at assembly, so a printed one would be
 # a second, conflicting specification on a shaft whose length floats +/-0.8.
 PIN_HOLE_DIA = _strap_pin.HOLE_DIA
 PIN_HOLE_BAND = _strap_pin.HOLE_BAND  # the spring pin's functional band
-PIN_HOLE_Z = tuple(
-    (outer + inner) / 2.0 - TORQUE_SHAFT_Z0
-    for outer, inner in zip(STRAP_Z_OUTER, STRAP_Z_INNER)
-)  # (front, back)
+PIN_HOLE_Z = TORQUE_SHAFT_PIN_HOLE_Z  # (front, back), pinion_rig_layout
+# The hole specification only.  The drilling set-up the pin-hole stations
+# and both bearing stacks assume is an assembly step: Main's re-ruling
+# (2026-09-26) moved it from this callout to MHA-A03's SHAFT DRILL SET
+# (pinion_rig_fitup.SHAFT_DRILL_STEP), where the fitter drills, superseding
+# the #858 restricted review's rulings 2 and 3.  The pointer to that step
+# lands at integration, from the assembly step registry.
 PIN_HOLE_CALLOUT = "\n".join(
     (
         "MATCH-DRILL THRU AT ASSEMBLY",

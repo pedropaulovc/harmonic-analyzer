@@ -110,7 +110,7 @@ _INSERTED_SOURCES = {
     "cylinder_gear_shaft "
     "fillister_screw foot_screw pedestal_hold_down_screw pinion_arbor pinion_arbor_collar pinion_bracket pinion_cam "
     "pinion_cam_pin pinion_handle pinion_lever pinion_lever_pin pinion_lift_rod "
-    "pinion_pivot_block pinion_pivot_shaft pinion_spring post_mount_screw slotted_screw "
+    "pinion_pivot_block pinion_pivot_shaft pinion_spring pinion_strap_pin post_mount_screw slotted_screw "
     "swing_stop_screw",
     "channel": "amplitude_bar channel_lever channel_spring_installed connecting_rod "
     "frame_side_screw fulcrum_keeper fulcrum_shaft pedestal_hold_down_screw pivot_bracket "
@@ -1375,7 +1375,7 @@ def test_assemblies_depend_on_assembly_helpers():
     [
         ("_assembly_patterns", {"drive_train", "frame", "magnifier", "paper_drive"}),
         ("_assembly_couplings", {"drive_train", "paper_drive"}),
-        # paper_drive reads X_CRANK/Y_CRANK from cone_line, not the builder.
+        # paper_drive reads its crank axis from crank_fitup_axis, not the builder.
         ("_drive_train_explode", {"drive_train"}),
     ],
 )
@@ -1416,6 +1416,23 @@ def test_swing_platform_consumers_read_geometry_not_the_builder():
         assert "cone_swing_platform_geometry" in deps, script
         assert "build_cone_swing_platform" not in deps, script
         assert "cone_swing_platform_drawing_spec" not in deps, script
+
+
+def test_harmonic_base_never_reads_the_crank_mesh_stack():
+    """The plate's crank axis sits on the crank's fit-up line, which the crank
+    mesh stack derives from fit classes.  That axis lives in its own module so
+    the base, which reads the plate geometry for its seats, keeps the stack
+    (and the parts rows and fit classes it reads) off the frame's cache key
+    (R1 ruling, 2026-09-26).  test_dodo_recipe's
+    test_config_deps_are_fine_grained holds the frame recipe itself."""
+    deps = _helper_names("build_harmonic_base.py")
+    assert "cone_swing_platform_geometry" in deps
+    assert "cone_swing_platform_crank_axis" not in deps
+    assert "crank_mesh_stack" not in deps
+    # The consumers that place the crank train do read it.
+    for script in ("build_cone_swing_platform.py", "build_drive_train_assembly.py"):
+        deps = _helper_names(script)
+        assert {"cone_swing_platform_crank_axis", "crank_mesh_stack"} <= deps, script
 
 
 # Direct imports of one build script by another, grandfathered at #880 and
@@ -2637,3 +2654,20 @@ def test_interference_contracts_do_not_depend_on_the_crankshaft_spec() -> None:
     closure = _helper_names("_interference_contracts.py")
     assert "crank_hub_geometry" in closure
     assert "crankshaft_spec" not in closure
+
+
+@pytest.mark.parametrize(
+    ("script", "expected"),
+    [
+        # Listed themselves: the root script is not in its own import closure
+        # (Codex #1035, PRRT_kwDOPHDy386mV11b).
+        ("build_wheel_bar.py", True),
+        ("build_swing_stop_screw.py", True),
+        # Reads through an imported listed module.
+        ("build_boss_hook.py", True),
+        ("build_spring_hook.py", True),
+        ("build_platen_guide.py", False),
+    ],
+)
+def test_reads_title_block_geometry_covers_root_and_closure(script, expected):
+    assert bg.reads_title_block_geometry(SCRIPTS_DIR / script) is expected

@@ -119,6 +119,7 @@ from _buildgraph import (  # noqa: E402
     part_scripts,
     part_stems,
     parts_registry_files,
+    reads_title_block_geometry,
     references_of,
     script_for,
     stamps_part_properties,
@@ -1035,10 +1036,16 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
 def _expand_title_block_token(kind: str | None, script: Path) -> list[str]:
     """Per-task expansion of the ``"title_block"`` token (the TOL_* stamping in
     ``_common.part_properties`` or ``_assembly.assembly_title_properties``):
-    every part and every drawing-owning assembly stamps these values. Assemblies
-    without either path drop the token. Any other caller keeps the dependency
+    every part and every drawing-owning assembly stamps these values. An
+    assembly whose closure sizes geometry from the printed rows
+    (``reads_title_block_geometry``) keeps it too, stamping or not. Other
+    assemblies drop the token. Any other caller keeps the dependency
     conservatively."""
-    if kind == "assembly" and not stamps_title_block_properties(script):
+    if (
+        kind == "assembly"
+        and not stamps_title_block_properties(script)
+        and not reads_title_block_geometry(script)
+    ):
         return []
     return [str((CONFIG_DIR / "title_block.yaml").resolve())]
 
@@ -1833,8 +1840,11 @@ def _drawing_file_deps(stem: str) -> list[str]:
 
 
 def _drawing_cache_outputs(stem: str) -> list[Path]:
-    """Native drawing plus every derived manufacturing output it emits."""
-    return [path.resolve() for path in DRAWINGS_BY_NAME[stem].outputs.values()]
+    """Native drawing, every derived manufacturing output it emits, and its
+    layout-audit report -- which rides the remote cache with the sheet, so a
+    restored leaf still carries its findings and sheet dumps."""
+    spec = DRAWINGS_BY_NAME[stem]
+    return [path.resolve() for path in (*spec.outputs.values(), spec.layout_report)]
 
 
 # --- Inputs of the whole-machine COM stages (verify gates, preflight, neutral
@@ -2701,8 +2711,8 @@ def task_assembly():
 
 
 def _clean_drawing(stem: str) -> None:
-    for target in DRAWINGS_BY_NAME[stem].outputs.values():
-        _force_remove(Path(target))
+    for target in _drawing_cache_outputs(stem):
+        _force_remove(target)
 
 
 def task_drawing():
@@ -2714,11 +2724,10 @@ def task_drawing():
     ``drawing:<stem>`` and deliberately excluded from ``build_bare``.
     """
     for stem in _drawing_order():
-        spec = DRAWINGS_BY_NAME[stem]
         yield {
             "name": stem,
             "file_dep": _drawing_file_deps(stem),
-            "targets": [str(path.resolve()) for path in spec.outputs.values()],
+            "targets": [str(path) for path in _drawing_cache_outputs(stem)],
             "actions": [(_cached_drawing_action, [stem])],
             "clean": [(_clean_drawing, [stem])],
             "verbosity": 2,
@@ -2871,6 +2880,8 @@ def task_check():
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
         SCRIPTS_DIR / "test_drawing_layout_check.py",
+        # The shared layout audit's own contract (_layout_audit.py finders + ink model).
+        SCRIPTS_DIR / "test_layout_audit.py",
         # Drawing infrastructure and cross-sheet contracts do not follow the
         # per-sheet test_*_drawing.py suffix, so enroll them explicitly.
         SCRIPTS_DIR / "test_drawing_marks.py",
@@ -2912,12 +2923,19 @@ def task_check():
         # dimensions.yaml is read by no part, so only this test keeps its
         # alignment-pinion record pinned to the CAD constants (#814).
         SCRIPTS_DIR / "test_dimensions_alignment_pinion_layout.py",
+        # Every cad/config YAML parses: prose-only records move no cache key,
+        # so a row that breaks the file is otherwise invisible (caf03f2b7).
+        SCRIPTS_DIR / "test_config_yaml_parses.py",
         # The mirror-retirement diagnostic's drive-train rows equal the rows the
         # assembly places with (Codex on #814 and #844).
         SCRIPTS_DIR / "test_mirror_retirement_expectations.py",
         # Every cad/scripts/test_*.py runs in some check:* gate or is exempted
         # with a reason, so a new test cannot ship un-enrolled (Codex on #844).
         SCRIPTS_DIR / "test_check_gate_enrollment.py",
+        # No module assigns an UPPERCASE name twice at top level: a merge that
+        # kept both sides of a rewritten block shadowed seven BDT constants
+        # (cascade -> integ merge, Main's restricted review).
+        SCRIPTS_DIR / "test_module_constants_assigned_once.py",
         # Integ-branch tests that guard caught un-enrolled at #877 round 4.
         SCRIPTS_DIR / "test_cone_gear_mesh_design.py",
         SCRIPTS_DIR / "test_cone_gear_seat_fit.py",
@@ -2931,6 +2949,10 @@ def task_check():
         SCRIPTS_DIR / "test_mcmaster_replica_driver.py",
         # ... and #906: the crank native-acceptance record pins.
         SCRIPTS_DIR / "test_crank_native_acceptance.py",
+        # ... and #906 R1: the crank mesh stack (the fit-up axis the drive
+        # train places the crank train on) and MHA-149's wall and throw.
+        SCRIPTS_DIR / "test_crank_mesh_stack.py",
+        SCRIPTS_DIR / "test_crank_eccentric_bushing.py",
         # ... and #937: the cylinder-bank layout bands and MHA-147's set screw.
         SCRIPTS_DIR / "test_arbor_set_screw.py",
         SCRIPTS_DIR / "test_cylinder_bank_layout.py",

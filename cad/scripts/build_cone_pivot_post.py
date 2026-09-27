@@ -31,10 +31,13 @@ from _common import (
     CASTING_GREEN,
     SketchDims,
     _early_bound,
+    add_line_chain,
     apply_color,
+    blank_reference_sketches,
     apply_material,
     check,
     define_circle,
+    define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -76,13 +79,17 @@ from cone_pivot_post_spec import (
     CONE_BOSS_LENGTH,
     CRANK_ABOVE_CONE,
     CRANK_ABOVE_CONE_BAND,
+    CRANK_BORE_BAND,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
     CRANK_BOSS_DIA,
     CRANK_BOSS_END_Z,
     CRANK_BOSS_LENGTH,
     CRANK_BOSS_NEAR_Z,
+    CRANK_BOSS_NORTH_FACE,
     CRANK_BOSS_START_Z,
+    CRANK_SPOT_FACE_RUN_OUT,
+    CRANK_SPOT_FACE_WIDTH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -167,9 +174,10 @@ def _collar_surface_z(x: float) -> float:
 # as an unexplained final gap.  Their sum is HARVESTED_VOLUME_MM3 (asserted at
 # import below).
 #
-# Crank boss: a Ø21.93 cylinder from z=-21.3753 to +50.6591 minus the part of
-# it already inside the collar -- at each x the collar spans |z| <= s(x), and
-# the boss starts at the station, so the overlap column is s + min(21.3753, s).
+# Crank boss: a Ø21.93 cylinder from the station (z = -CRANK_BOSS_NORTH_FACE)
+# to +50.6591 minus the part of it already inside the collar -- at each x the
+# collar spans |z| <= s(x), and the boss starts at the station, so the overlap
+# column is s + min(station, s).
 CRANK_BOSS_OUTSIDE_COLLAR_MM3 = (
     math.pi * CRANK_BOSS_RADIUS** 2 * CRANK_BOSS_LENGTH
     - _disc_column_integral(
@@ -178,12 +186,52 @@ CRANK_BOSS_OUTSIDE_COLLAR_MM3 = (
     )
 )
 # Spot face: the collar material standing proud of the station plane inside
-# the boss disc (s(x) - 21.3753 where positive, i.e. |x| < 5.21).
+# the boss disc (s(x) - station where positive: the whole disc since the
+# 2.5 retreat).
 CRANK_SPOT_FACE_MM3 = _disc_column_integral(
     CRANK_BOSS_RADIUS,
     lambda x: max(_collar_surface_z(x) + CRANK_BOSS_START_Z, 0.0),
 )
-# Crank bore: the full Ø11.438 cylinder from the station through the boss end;
+# Spot-face run-out: the flat carried |x| <= W/2 from the crank axis down
+# CRANK_SPOT_FACE_RUN_OUT, outside the boss disc the spot face already cut.
+# Over the collar band the collar stands s(x) - station proud of it, below the
+# collar the turned body; the disc's lower half is the only part of the band
+# already gone.
+def _spot_face_run_out_column(x: float) -> float:
+    station = -CRANK_BOSS_START_Z
+    collar_band = CRANK_BORE_HEIGHT - HEAD_BASE_Y
+    collar_len = collar_band - (
+        math.sqrt(CRANK_BOSS_RADIUS**2 - x * x) if abs(x) < CRANK_BOSS_RADIUS else 0.0
+    )
+    body_len = CRANK_SPOT_FACE_RUN_OUT - collar_band
+    return max(_collar_surface_z(x) - station, 0.0) * collar_len + max(
+        math.sqrt(max(BLOCK_RADIUS**2 - x * x, 0.0)) - station, 0.0
+    ) * body_len
+
+
+def _piecewise_simpson(f: Any, breaks: list[float]) -> float:
+    return sum(_simpson(f, a, b) for a, b in zip(breaks, breaks[1:]) if b > a)
+
+
+_RUN_OUT_HALF = CRANK_SPOT_FACE_WIDTH / 2.0
+_RUN_OUT_KINKS = sorted(
+    {
+        -_RUN_OUT_HALF,
+        _RUN_OUT_HALF,
+        *(
+            k * edge
+            for k in (-1.0, 1.0)
+            for edge in (
+                CRANK_BOSS_RADIUS,
+                math.sqrt(HEAD_RADIUS**2 - CRANK_BOSS_NORTH_FACE**2),
+                math.sqrt(BLOCK_RADIUS**2 - CRANK_BOSS_NORTH_FACE**2),
+            )
+            if edge < _RUN_OUT_HALF
+        ),
+    }
+)
+CRANK_SPOT_FACE_RUN_OUT_MM3 = _piecewise_simpson(_spot_face_run_out_column, _RUN_OUT_KINKS)
+# Crank bore: the full Ø15.45 cylinder from the station through the boss end;
 # after the spot face everything on that path is solid.
 CRANK_BORE_MM3 = math.pi * CRANK_BORE_RADIUS**2 * CRANK_BOSS_LENGTH
 # Cone pads: a Ø17.2 mid-plane cylinder of total length 42.011 whose axis is
@@ -198,7 +246,7 @@ CONE_PADS_OUTSIDE_BODY_MM3 = (
 )
 CONE_BORE_MM3 = math.pi * BORE_RADIUS**2 * CONE_BOSS_LENGTH
 # Mounting holes: two through drills plus two counterbores; they clear the
-# crank bore (|x| <= 5.72 against a hole edge at 9.87) and, drilled last, are
+# crank bore (|x| <= 7.73 against a hole edge at 9.87) and, drilled last, are
 # not re-filled by any boss.
 ATTACHMENT_HOLES_MM3 = 2.0 * (
     math.pi * (ATTACHMENT_THRU_DIA / 2.0) ** 2 * (BLOCK_HEIGHT - ATTACHMENT_CBORE_DEPTH)
@@ -209,6 +257,7 @@ _ANALYTIC_FINAL_MM3 = (
     + math.pi * (HEAD_RADIUS**2 - BLOCK_RADIUS**2) * HEAD_HEIGHT
     + CRANK_BOSS_OUTSIDE_COLLAR_MM3
     - CRANK_SPOT_FACE_MM3
+    - CRANK_SPOT_FACE_RUN_OUT_MM3
     - CRANK_BORE_MM3
     + CONE_PADS_OUTSIDE_BODY_MM3
     - CONE_BORE_MM3
@@ -345,6 +394,8 @@ async def build(adapter: Any) -> dict[str, str]:
         # The spot-face station: one global drives both the interface plane
         # the boss grows from and the plan ray the print dimensions it on.
         "CrankBossNearZ": CRANK_BOSS_NEAR_Z,
+        "CrankSpotFaceWidth": CRANK_SPOT_FACE_WIDTH,
+        "CrankSpotFaceRunOut": CRANK_SPOT_FACE_RUN_OUT,
     }
     for name, value in globals_mm.items():
         await set_global(adapter, name, f"{value}mm")
@@ -470,9 +521,9 @@ async def build(adapter: Any) -> dict[str, str]:
     await volume_check(adapter, "v2 crank boss", volume, 0.001 * volume)
 
     # The spot face is a MACHINED flat at the station: the Ø44 cast collar
-    # stands up to 0.62 mm proud of the station plane over |x| < 5.2 (inside
-    # the boss disc, around the bore mouth) and has to be faced off, or the
-    # 16T pinion that sits 0.25 mm from this face rides on a cast ridge.  A
+    # stands up to 3.12 mm proud of the station plane across the boss disc and
+    # has to be faced off -- the station is where the 64T clears the post
+    # (crank_boss_rim), and MHA-149's north end sits flush with it.  A
     # blind cut's default direction is OPPOSITE the sketch normal (-Z, behind
     # the plane), so with no direction flag it faces the collar and never
     # touches the boss; only the collar bulge lies behind the plane inside the
@@ -503,6 +554,53 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "CrankSpotFace")
     volume -= CRANK_SPOT_FACE_MM3
     await volume_check(adapter, "v2 crank spot face", volume, 0.1 * CRANK_SPOT_FACE_MM3)
+
+    # The spot face runs out as one flat, milled in the same setup, from the
+    # crank axis down past the collar's lower edge into the turned body, where
+    # the 64T's south face comes nearest (crank_boss_rim).  Same sketch plane
+    # and cut direction as the spot face, so it only bites what stands north
+    # of the station.
+    run_out = SketchDims()
+    check(
+        "create sketch CrankSpotFaceRunOutProfile",
+        await adapter.create_sketch("CrankInterfacePlane"),
+    )
+    half_width = CRANK_SPOT_FACE_WIDTH / 2.0
+    run_out_bottom = CRANK_BORE_HEIGHT - CRANK_SPOT_FACE_RUN_OUT
+    run_out_points = [
+        (-half_width, run_out_bottom),
+        (half_width, run_out_bottom),
+        (half_width, CRANK_BORE_HEIGHT),
+        (-half_width, CRANK_BORE_HEIGHT),
+    ]
+    run_out_lines = await add_line_chain(adapter, run_out_points)
+    await define_rectilinear_chain(
+        adapter,
+        run_out_lines,
+        run_out_points,
+        label="crank spot face run-out",
+        dims=run_out,
+        names=["SpotFaceWidth", "SpotFaceRunOut", "SpotFaceWest", "SpotFaceBottom"],
+        drives=[
+            '"CrankSpotFaceWidth"',
+            '"CrankSpotFaceRunOut"',
+            '"CrankSpotFaceWidth" / 2',
+            '"CrankAxisY" - "CrankSpotFaceRunOut"',
+        ],
+    )
+    await ensure_fully_defined(adapter, "CrankSpotFaceRunOutProfile")
+    check("exit sketch CrankSpotFaceRunOutProfile", await adapter.exit_sketch())
+    name_last_feature(adapter, "CrankSpotFaceRunOutProfile")
+    drive_jobs += run_out.apply(adapter, "CrankSpotFaceRunOutProfile")
+    check(
+        "cut CrankSpotFaceRunOut",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=HEAD_RADIUS)),
+    )
+    name_last_feature(adapter, "CrankSpotFaceRunOut")
+    volume -= CRANK_SPOT_FACE_RUN_OUT_MM3
+    await volume_check(
+        adapter, "v2 crank spot face run-out", volume, 0.01 * CRANK_SPOT_FACE_RUN_OUT_MM3
+    )
 
     # The bore runs INTO the boss (+Z), i.e. against the cut default, so it is
     # reversed explicitly (build_top_frame's SetScrewPocket precedent).  Do
@@ -639,10 +737,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # crank axis and the cone-journal axis is the casting's defining
     # relationship, but it lives in ConeShaftNormal's plane angle and no FACE
     # projects it into a view.  Two Top-plane construction centrelines carry
-    # the two axis directions, a driven angular reference dimension reports the
-    # angle, and the crank line's near end states where the boss face starts --
-    # so both plan values the shop needs are model-owned, not sheet text
-    # (drawing-simplicity-policy.md rule 2).  All geometry is construction and
+    # the two axis directions and a driving angular dimension reports the
+    # angle, so the plan value the shop needs is model-owned, not sheet text
+    # (drawing-simplicity-policy.md rule 2); the spot face's station has its
+    # own sketch (6b).  All geometry is construction and
     # the sketch stays unblanked: a blanked sketch's dimensions never reach
     # InsertModelAnnotations3.
     plan = SketchDims()
@@ -672,23 +770,14 @@ async def build(adapter: Any) -> dict[str, str]:
             0.0, 0.0, JOURNAL_REFERENCE_X, -JOURNAL_REFERENCE_Z
         ),
     )
-    spot_face_line = check(
-        "crank boss spot face reference ray",
-        await adapter.add_centerline(0.0, 0.0, 0.0, CRANK_BOSS_NEAR_Z),
-    )
     set_sketch_direct_db(adapter, False)
-    for line, label in (
-        (crank_axis_line, "crank axis ray"),
-        (spot_face_line, "spot face ray"),
-    ):
-        check(
-            f"{label} vertical",
-            await adapter.add_sketch_constraint(line, None, "vertical"),
-        )
+    check(
+        "crank axis ray vertical",
+        await adapter.add_sketch_constraint(crank_axis_line, None, "vertical"),
+    )
     for line, label in (
         (crank_axis_line, "crank axis ray"),
         (journal_axis_line, "journal axis ray"),
-        (spot_face_line, "spot face ray"),
     ):
         check(
             f"{label} rooted on the post axis",
@@ -696,16 +785,6 @@ async def build(adapter: Any) -> dict[str, str]:
                 f"{line}.start", "origin", "coincident"
             ),
         )
-    check(
-        "crank boss near face station",
-        await adapter.add_sketch_dimension(
-            f"{spot_face_line}.end",
-            "origin",
-            "vertical_distance",
-            CRANK_BOSS_NEAR_Z,
-        ),
-    )
-    plan.record("CrankBossStartZ", '"CrankBossNearZ"')
     check(
         "crank boss far face station",
         await adapter.add_sketch_dimension(
@@ -744,6 +823,51 @@ async def build(adapter: Any) -> dict[str, str]:
     check("exit sketch JournalPlanReference", await adapter.exit_sketch())
     name_last_feature(adapter, "JournalPlanReference")
     drive_jobs += plan.apply(adapter, "JournalPlanReference")
+
+    # 6b. Spot-face station reference sketch: one Top-plane ray from the post
+    # axis to the crank boss's near (spot) face, carrying the station the
+    # print locates that face by.  It is its own sketch because a drawing view
+    # that dimensions only the station must not print the plan-angle rays
+    # beside it undimensioned (MHA-016 sheet 2), and hiding a sketch in a view
+    # hides the dimensions imported from it (_drawing_hidden_sketches, r21).
+    # The part saves it hidden; the drawing shows it per view.
+    station = SketchDims()
+    check(
+        "create sketch SpotFaceStationReference",
+        await adapter.create_sketch("Top"),
+    )
+    # Authored without inference, as the plan rays are, so the explicit
+    # relations below are the only ones.
+    set_sketch_direct_db(adapter, True)
+    spot_face_line = check(
+        "crank boss spot face reference ray",
+        await adapter.add_centerline(0.0, 0.0, 0.0, CRANK_BOSS_NEAR_Z),
+    )
+    set_sketch_direct_db(adapter, False)
+    check(
+        "spot face ray vertical",
+        await adapter.add_sketch_constraint(spot_face_line, None, "vertical"),
+    )
+    check(
+        "spot face ray rooted on the post axis",
+        await adapter.add_sketch_constraint(
+            f"{spot_face_line}.start", "origin", "coincident"
+        ),
+    )
+    check(
+        "crank boss near face station",
+        await adapter.add_sketch_dimension(
+            f"{spot_face_line}.end",
+            "origin",
+            "vertical_distance",
+            CRANK_BOSS_NEAR_Z,
+        ),
+    )
+    station.record("CrankBossStartZ", '"CrankBossNearZ"')
+    await ensure_fully_defined(adapter, "SpotFaceStationReference")
+    check("exit sketch SpotFaceStationReference", await adapter.exit_sketch())
+    name_last_feature(adapter, "SpotFaceStationReference")
+    drive_jobs += station.apply(adapter, "SpotFaceStationReference")
 
     # 7. Bore-spacing reference sketch.  Both bore axes cross the post axis,
     # which is ConeShaftNormal's local X axis (pointing down model -Y), so one
@@ -806,15 +930,15 @@ async def build(adapter: Any) -> dict[str, str]:
         HARVESTED_VOLUME_MM3,
         0.001 * HARVESTED_VOLUME_MM3,
     )
-    # Four accuracy features on this casting: the two running bores carry the
-    # ONE band that closes the `shaft_in_bushing` fit class against their
-    # turned shafts (cad/docs/tolerance-policy.md), the spacing between them
-    # carries the 16T:64T mesh band, and the cone axis above the foot carries
-    # the tip block's shim-pack band.  Everything else -- cast body and collar
-    # diameters, boss diameters, boss extents, mounting-hole stations -- runs
-    # at the title block's general grade.
+    # Four accuracy features on this casting: the cone journal bore carries
+    # the band that closes the `shaft_in_bushing` fit class against its turned
+    # shaft (cad/docs/tolerance-policy.md), the crank bore its H7 seat for the
+    # MHA-149 bushing, the spacing between them the 16T:64T mesh band, and the
+    # cone axis above the foot the tip block's shim-pack band.  Everything
+    # else -- cast body and collar diameters, boss diameters, boss extents,
+    # mounting-hole stations -- runs at the title block's general grade.
     set_dimension_bilateral_tolerance(
-        adapter, "CrankBoreProfile", "CrankBoreDia", *deviations(RUNNING_BORE_BAND)
+        adapter, "CrankBoreProfile", "CrankBoreDia", *deviations(CRANK_BORE_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter,
@@ -889,6 +1013,7 @@ async def build(adapter: Any) -> dict[str, str]:
             ("mount east", "AXIS"),
         ),
     )
+    blank_reference_sketches(adapter, ("SpotFaceStationReference",))
     return await save_part_and_images(
         adapter, PART_NAME, allowed_shown=SHOWN_SKETCH_ALLOWANCES
     )
