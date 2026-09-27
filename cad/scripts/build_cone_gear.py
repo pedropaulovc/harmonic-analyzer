@@ -90,6 +90,7 @@ from cone_gear_spec import (
     CONFIGURATION_TEETH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    FACE_WIDTH,
     SURFACE_FINISHES,
     TOOTH_THICKNESS,
     base_chord_root_radius_mm,
@@ -142,10 +143,10 @@ DP = _config.machine("gear_train", "diametral_pitch")  # cad/config/machine.yaml
 PA_DEG = 14.5  # pressure angle, period-typical assumption (low)
 # M6.7: the exact-tracking mesh (assembly docstring) fixes the seat
 # pitch along the shaft at Z_PITCH*cos(12.52 deg) = 6.889 mm (the finer
-# DP 49.82 module gives a shallower incline); face 6.5 leaves 0.39 air,
-# and the photo's 7 mm callout still cannot hold -- the annotated cone
-# figures stay inconsistent with the drum grid, see DIMENSIONS.md ch. 12.
-FACE_WIDTH = 6.5  # mm, derived (photo callout 7, see above)
+# DP 49.82 module gives a shallower incline); face 6.0 (cone_gear_spec,
+# U27: .X band, max 6.8 still clears the pitch) leaves 0.89 air, and the
+# photo's 7 mm callout still cannot hold -- the annotated cone figures stay
+# inconsistent with the drum grid, see DIMENSIONS.md ch. 12.
 
 # Cut clearance radius (inches -- document units, see module docstring)
 # beyond the largest tip radius (120T OD/2 = 2.033") so the gap profile
