@@ -2767,6 +2767,7 @@ def test_every_auto_center_marks_call_records_its_counts(monkeypatch):
     call lands as a center_marks.auto_insert span event."""
     import _drawing_common
     import _telemetry
+    from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
     from solidworks_mcp.adapters.solidworks import drawing as sw_drawing
 
     assert sw_drawing.CENTER_MARK_OBSERVER is _drawing_common._record_center_marks
@@ -2786,12 +2787,9 @@ def test_every_auto_center_marks_call_records_its_counts(monkeypatch):
             return "Drawing View1"
 
     class Adapter:
-        @staticmethod
-        def _attempt(fn, default=None):
-            try:
-                return fn()
-            except Exception:
-                return default
+        # The real pure helpers, without an adapter or COM session.
+        _attempt = PyWin32Adapter._attempt
+        _get_attr_or_call = PyWin32Adapter._get_attr_or_call
 
     assert sw_drawing.auto_center_marks(Adapter(), View(), holes=True) is True
     assert events == [
