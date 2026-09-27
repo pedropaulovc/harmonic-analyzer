@@ -240,7 +240,8 @@ def test_bar_foot_cheeks_clear_the_hub_at_the_worst_case(
     assert _cheek_cap(monkeypatch, 0.0, _BAND_2PL) - hub_top < 0.0
     for other_max_material_r in (
         (washer.OD + _BAND_2PL) / 2.0,
-        shaft.SHOULDER_DIA / 2.0,
+        # MHA-065 prints the shoulder Ø10.00 at .XX, as supplied bar or not.
+        (shaft.SHOULDER_DIA + _BAND_2PL) / 2.0,
     ):
         assert other_max_material_r <= hub_max_material_r
 

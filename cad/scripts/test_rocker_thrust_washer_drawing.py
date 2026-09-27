@@ -12,9 +12,7 @@ import _config
 import build_rocker_thrust_washer as part
 import draw_rocker_thrust_washer as drawing
 import rocker_arm_spec
-import rocker_thrust_washer_drawing_spec as drawing_spec
 import rocker_thrust_washer_spec as spec
-from _surface_finish import MACHINED_UM
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
@@ -144,55 +142,29 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     assert missing == []
 
 
-def test_both_running_faces_carry_the_machined_finish() -> None:
-    """Codex #936 (PRRT_kwDOPHDy386mRSOM): the washer runs on rocker 0's hub
-    on one face and on the south ear on the other, so each face owns a
-    MACHINED finish. The controls live in the drawing spec, never in the
-    placement spec the channel assembly reads."""
-    by_key = {control.key: control for control in drawing_spec.SURFACE_FINISHES}
-    assert set(by_key) == {"hub_face", "ear_face"}
-    assert {control.roughness_um for control in by_key.values()} == {MACHINED_UM}
-    assert by_key["hub_face"].face.normal == (0, 0, 1)
-    assert by_key["hub_face"].face.offset_mm == spec.THICKNESS
-    assert by_key["ear_face"].face.normal == (0, 0, -1)
-    assert by_key["ear_face"].face.offset_mm == 0.0
-    assert not hasattr(spec, "SURFACE_FINISHES")
-
-
-def test_the_part_authors_and_the_drawing_projects_every_finish() -> None:
-    build_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in build_source
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "control = surface_finish_by_key(SURFACE_FINISHES, key)" in drawing_source
-    calls = [
-        node
-        for node in ast.walk(ast.parse(drawing_source))
+def _called_names(path: str) -> set[str]:
+    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
+    return {
+        node.func.id if isinstance(node.func, ast.Name) else node.func.attr
+        for node in ast.walk(tree)
         if isinstance(node, ast.Call)
-        and getattr(node.func, "id", "") == "add_surface_finish"
-    ]
-    assert len(calls) == 1
-    (control,) = [k.value for k in calls[0].keywords if k.arg == "control"]
-    assert ast.unparse(control) == "control"
-    assert set(drawing.FINISH_PLACEMENT) == {
-        c.key for c in drawing_spec.SURFACE_FINISHES
+        and isinstance(node.func, (ast.Name, ast.Attribute))
     }
 
 
-def test_finish_symbols_sit_off_the_edge_view_and_its_dimension() -> None:
-    scale = drawing.VIEW_SCALE[0] / drawing.VIEW_SCALE[1] / 1000.0
-    half_w = spec.THICKNESS * scale / 2.0
-    half_h = spec.OD * scale / 2.0
-    for key, (symbol_xy, attach_xy) in drawing.FINISH_PLACEMENT.items():
-        # The leader lands on its own face's line in the edge-on right view:
-        # +Z (the hub face) draws on the left, -Z on the right.
-        side = -1.0 if key == "hub_face" else 1.0
-        assert attach_xy[0] == drawing.RIGHT_CENTER[0] + side * half_w
-        assert abs(attach_xy[1] - drawing.RIGHT_CENTER[1]) < half_h
-        assert abs(symbol_xy[0] - drawing.RIGHT_CENTER[0]) > half_w + 0.010
-        dim = drawing.RIGHT_KEEP["DiscThick"]
-        assert abs(symbol_xy[0] - dim[0]) > 0.010 or abs(symbol_xy[1] - dim[1]) > 0.010
-        front_right = drawing.FRONT_CENTER[0] + half_h
-        assert symbol_xy[0] > front_right + 0.010
+def test_faces_carry_no_roughness_callout() -> None:
+    """Main 2026-09-26 (r743-3 eye pass): the faces are the 1/16 sheet's as
+    supplied. A face Ra could only force the facing the stock ruling avoids,
+    and a hand-cranked thrust washer does not need one. This supersedes the
+    two MACHINED face finishes Codex #936 (PRRT_kwDOPHDy386mRSOM) asked for.
+    The part authors no finish PMI and the sheet places no finish symbol; the
+    title block's surface row is a process statement, not a number."""
+    assert "author_part_pmi" not in _called_names(part.__file__)
+    assert "add_surface_finish" not in _called_names(drawing.__file__)
+    assert not (
+        Path(spec.__file__).parent / "rocker_thrust_washer_drawing_spec.py"
+    ).exists()
+    assert not hasattr(spec, "SURFACE_FINISHES")
 
 
 def test_imported_places_are_the_part_authored_ones() -> None:

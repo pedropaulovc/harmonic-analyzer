@@ -42,8 +42,6 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
 )
 from _fit_limits import deviations
-from _part_pmi import author_part_pmi
-from rocker_thrust_washer_drawing_spec import SURFACE_FINISHES
 from rocker_thrust_washer_spec import (
     BORE_BAND,
     DRAWING_DIMENSIONS,
@@ -131,7 +129,9 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    # No face finish (Main 2026-09-26): the faces are the 1/16 sheet's as
+    # supplied, so a roughness callout could only force the facing the stock
+    # ruling avoids.
     apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
