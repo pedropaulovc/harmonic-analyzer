@@ -3553,14 +3553,16 @@ GATING_KINDS = frozenset(
 )
 
 
-# Gating kinds that fail the leaf in every mode, REPORT included. a5563c7a0
-# retired check_drawing_layout's nominal dimension box, whose border and
-# title-block checks failed the build; this audit took them over, so they
-# must not drop to a log line while it reports (Codex P2 on #901,
-# PRRT_kwDOPHDy386mTiwV). None fired on the layoutcal2 / c2 / b49e1 replay
-# (9 drawings). A kind joins once its fleet count is zero; GATE is this set
-# grown to GATING_KINDS.
-ENFORCED_KINDS = frozenset({"outside-border", "keep-out"})
+# Gating kinds that fail the leaf in every mode, REPORT included. GATE is this
+# set grown to GATING_KINDS. A kind joins once its fleet count is zero.
+# a5563c7a0 retired check_drawing_layout's nominal dimension box, whose border
+# and title-block checks failed the build; this audit took them over (Codex
+# P2 on #901, PRRT_kwDOPHDy386mTiwV). "outside-border" and "keep-out" are
+# held out until a full-fleet count reads zero: the pre-merge replay of #946
+# covered 32 of 111 drawings (79 have no layout dump), and there they fired
+# on three drawings until 2930b3f0d fixed the detail-circle read. The #877
+# cold build's reports are the first full-fleet count (#1052).
+ENFORCED_KINDS: frozenset[str] = frozenset()
 
 
 def severity(finding: Finding) -> FindingSeverity:

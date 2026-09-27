@@ -1190,6 +1190,8 @@ def test_every_labelled_detail_circle_of_a_view_is_parsed():
 # View5, whose ring the PDF prints at 0.18 mm) and on rocker-arm-support's
 # Drawing View5 (whose ring the PDF does not print).
 CROP_LABEL_AT_ORIGIN = [-0.0005696, 0.0002378, -0.0, 0.00635, 0.0]
+# The border and title-block kinds 7f5948f3c enforced (#1052 re-enables them).
+SHEET_EDGE_KINDS = ("outside-border", "keep-out")
 AMPLITUDE_BAR_CROP_B = [1.0, -1.0, 0.3, 0.205, 0.0, 0.3, 0.237, 0.0, 0.3, 0.237, 0.0, 3.0, *CROP_LABEL_AT_ORIGIN]
 ROCKER_SUPPORT_CROP = [
     1.0, -1.0, 0.21, 0.1079955, 0.0, 0.253815, 0.1079955, 0.0, 0.253815, 0.1079955, 0.0, 3.0,
@@ -1211,12 +1213,10 @@ def test_a_crop_profiles_label_at_the_sheet_origin_prints_nothing():
     finding (amplitude-bar x3, pinion-arbor, rocker-arm-support x2) was a crop
     profile's label boxed at the origin, 18.81 mm past the bottom border and in
     the title block. No label prints there; the printed ring stays ink."""
-    from _layout_audit import ENFORCED_KINDS
-
     view = _view("Drawing View5", (0.279172, 0.161812, 0.320828, 0.240188), [],
                  detail_circles_info=AMPLITUDE_BAR_CROP_B)
     dump = _dump(views=[view], strokes=_printed_ring(0.3, 0.205, 0.032))
-    assert [f for f in audit_dump(dump) if f.kind in ENFORCED_KINDS] == []
+    assert [f for f in audit_dump(dump) if f.kind in SHEET_EDGE_KINDS] == []
     [circle] = _circles(dump)
     assert circle.text_boxes == ()
     assert circle.box().ymin == pytest.approx(0.205 - 0.032, abs=1e-4)
@@ -1226,17 +1226,17 @@ def test_a_detail_circle_the_page_does_not_print_is_no_ink():
     """rocker-arm-support's crop ring (r 43.8 mm) prints nothing, yet its box
     corner read as keep-out in the title block. Printed, the same ring would
     dip into the title block, and that still gates."""
-    from _layout_audit import ENFORCED_KINDS
-
     view = _view("Drawing View5", (0.151834, 0.0952075, 0.268166, 0.1207835), [],
                  detail_circles_info=ROCKER_SUPPORT_CROP)
     # Ink elsewhere, and a line crossing the ring: near it at one point only.
     elsewhere = _edges((0.05, 0.2, 0.08, 0.2), (0.15, 0.1079955, 0.27, 0.1079955), width=0.00018)
     unprinted = _dump(views=[view], strokes=elsewhere)
     assert _circles(unprinted) == []
-    assert [f for f in audit_dump(unprinted) if f.kind in ENFORCED_KINDS] == []
+    assert [f for f in audit_dump(unprinted) if f.kind in SHEET_EDGE_KINDS] == []
     printed = _dump(views=[view], strokes=[*elsewhere, *_printed_ring(0.21, 0.1079955, 0.043815)])
-    assert [(f.kind, f.b) for f in audit_dump(printed) if f.kind in ENFORCED_KINDS] == [("keep-out", "title-block")]
+    edge = [f for f in audit_dump(printed) if f.kind in SHEET_EDGE_KINDS]
+    assert [(f.kind, f.b) for f in edge] == [("keep-out", "title-block")]
+    assert severity(edge[0]) is FindingSeverity.GATING
 
 
 def test_a_crop_profile_is_ink_only_where_the_page_prints_it():
@@ -3644,22 +3644,33 @@ def test_one_thread_is_one_callout_only_within_one_hole_group(extra_rings, tip, 
     [(0.418, 0.200, "outside-border"), (0.300, 0.040, "keep-out")],
     ids=["past-the-border", "on-the-title-block"],
 )
-def test_a_dimension_past_the_border_or_on_the_title_block_fails_in_report_mode(x, y, kind):
+def test_a_dimension_past_the_border_or_on_the_title_block_gates(x, y, kind):
     """Codex P2 on #901 (PRRT_kwDOPHDy386mTiwV): a5563c7a0 retired the
     nominal dimension box whose border and title-block checks failed the
-    build, and under REPORT this audit only logged them. They are
-    ENFORCED_KINDS now: they fail the leaf in every mode, while any other
-    gating kind still only reports."""
-    from _layout_audit import enforced
+    build. This audit finds both as gating kinds; GATE fails the leaf on
+    them. REPORT fails on them only once they join ENFORCED_KINDS after a
+    zero full-fleet count (#1052)."""
+    from _layout_audit import ENFORCED_KINDS, enforced
     from _layout_geometry import Finding
 
     dump = _dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [_dim("Stray", "20.0", x, y)])])
     findings = [f for f in audit_dump(dump) if "Stray" in f.a or "Stray" in f.b]
     assert kind in _kinds(findings)
-    assert [f.kind for f in enforced(LayoutAuditMode.REPORT, findings)] == [kind]
+    [found] = [f for f in findings if f.kind == kind]
+    assert severity(found) is FindingSeverity.GATING
+    assert found in enforced(LayoutAuditMode.GATE, findings)
+    assert [f.kind for f in enforced(LayoutAuditMode.REPORT, findings)] == ([kind] if kind in ENFORCED_KINDS else [])
     clearance = Finding(kind="text-clearance", sheet="Sheet2", a="dim A", b="dim B", detail="")
     assert enforced(LayoutAuditMode.REPORT, [clearance]) == []
     assert enforced(LayoutAuditMode.GATE, [clearance]) == [clearance]
+
+
+def test_report_mode_enforces_nothing_until_the_full_fleet_count_is_zero():
+    """#946's replay covered 32 of 111 drawings; the border and title-block
+    kinds wait for the #877 cold build's full-fleet count (#1052)."""
+    from _layout_audit import ENFORCED_KINDS
+
+    assert ENFORCED_KINDS == frozenset()
 
 
 _ZERO_LINE = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
