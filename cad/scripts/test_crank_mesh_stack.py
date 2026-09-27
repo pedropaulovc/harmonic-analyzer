@@ -16,6 +16,7 @@ import crank_drive_gear_spec as gear64
 import crank_eccentric_bushing_spec as bushing
 import crank_mesh_stack as stack
 import crank_pinion_spec as pinion
+from diagnostics import crossed_mesh_study as crossed
 from diagnostics import probe_crank_post_phase, probe_live_crank_mesh
 
 
@@ -268,3 +269,35 @@ def test_the_frame_crank_axis_is_not_the_fit_up_axis(monkeypatch):
     ]
     expected = _assembly_placements(monkeypatch)["crank-pinion"]
     assert _max_delta(stale, expected) > 1e-3
+
+
+# ---- the crossed-mesh study checks the pose the assembly ships ---------------
+# Codex on #960 (WjI8): diagnostics/crossed_mesh_study.py asserted the
+# assembly's fit-up-derived PINION_SEED_DEG while still studying the pair on
+# the frame crank axis.  Its axis is now explicit: SHIPPED_AXIS for the
+# shipped pose, frame_axis(extra) for the frame-axis rederivation.
+
+
+def test_the_crossed_mesh_study_ships_the_fit_up_pose() -> None:
+    assert crossed.SHIPPED_AXIS == (drive.X_CRANK_FIT, drive.Y_CRANK_FIT)
+    shipped = crossed.pose(crossed.SHIPPED_AXIS, drive.MESH_WINDOW_CENTRE_DEG)
+    assert shipped["seed"] == pytest.approx(drive.PINION_SEED_DEG, abs=1e-9)
+    assert shipped["c2c"] == pytest.approx(drive.CRANK_FIT_C2C, abs=1e-9)
+
+
+def test_the_crossed_mesh_study_keeps_the_frame_axis_rederivation() -> None:
+    # Lifting the frame axis to the frame slack lands on the casting's crank
+    # axis at the engaged centre distance the assembly asserts.
+    x_frame, y_frame = crossed.frame_axis(drive.MESH16_C2C_SLACK)
+    assert x_frame == drive.X_CRANK
+    assert y_frame == pytest.approx(drive.Y_CRANK, abs=0.05)
+    assert crossed.pose((x_frame, y_frame))["c2c"] == pytest.approx(
+        drive.MESH16_C2C, abs=1e-9
+    )
+
+
+def test_the_frame_axis_seed_is_not_the_shipped_seed() -> None:
+    # Positive control: the pre-R1 study pose, the frame crank axis, reads a
+    # seed the assembly no longer ships.
+    frame = crossed.pose((drive.X_CRANK, drive.Y_CRANK), drive.MESH_WINDOW_CENTRE_DEG)
+    assert abs(frame["seed"] - drive.PINION_SEED_DEG) > 1e-3
