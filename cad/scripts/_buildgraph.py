@@ -2213,7 +2213,11 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
 
 
 def reads_title_block_geometry(script: Path) -> bool:
-    """True when this script's import closure sizes geometry from the title block."""
+    """True when this script, or its import closure, sizes geometry from the
+    title block.  ``module_deps_of`` lists imports only, so the root script is
+    checked by its own stem (Codex #1035, PRRT_kwDOPHDy386mV11b)."""
+    if Path(script).stem in TITLE_BLOCK_GEOMETRY_MODULES:
+        return True
     return any(
         Path(dep).stem in TITLE_BLOCK_GEOMETRY_MODULES for dep in module_deps_of(script)
     )
