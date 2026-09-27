@@ -174,11 +174,30 @@ def test_no_part_imports_main_assembly_helper():
         f"part scripts transitively import an assembly-level helper: {offenders}")
 
 
+def test_no_part_reads_the_assembly_step_registry():
+    """No part's recipe depends on MHA-A03's step numbering.
+
+    A step pointer is sheet text, so renumbering the sequence re-keys the
+    drawings that print it, never a part (Main's TbPB ruling 2, 2026-09-27:
+    the cone tip shim's spec imported ``drive_train_steps`` for its note, so
+    every sequence edit re-keyed the part and the assemblies above it).
+    """
+    offenders = sorted(
+        script.name
+        for script in part_scripts()
+        if any(Path(p).stem == "drive_train_steps" for p in module_deps_of(script))
+    )
+    assert not offenders, (
+        "part scripts transitively import the MHA-A03 step registry "
+        f"(drive_train_steps): {offenders}. Print the pointer from the drawing.")
+
+
 def _main() -> int:
     test_forbidden_set_is_nonempty()
     test_no_part_imports_assembly_level_submodule()
     test_no_assembly_imports_drawing_submodule()
     test_no_part_imports_main_assembly_helper()
+    test_no_part_reads_the_assembly_step_registry()
     n, m = len(part_scripts()), len(_assembly_scripts())
     print(f"OK  part-isolation: {n} part scripts import no assembly/motion/drawing "
           f"module; {m} assembly scripts import no drawing module")

@@ -1,0 +1,4074 @@
+"""SolidWorks-free contract for the unified drawing layout audit (``_layout_audit``).
+
+The audit's input is a per-sheet JSON dump the live collector
+(``_drawing_layout_audit.collect_sheet_dumps``) records on every drawing leaf,
+so every test here builds or replays a dump. The replayed values are REAL
+SolidWorks display data from harmonic-base farm leaves (dt-logs/hb-render-2 and
+hb-render-4 drawing-task.log, supports' "callout ... display data" lines and
+``INote::GetExtent`` obstacle boxes), not hand-drawn boxes.
+"""
+
+from __future__ import annotations
+
+import math
+
+import pytest
+
+from _layout_audit import (
+    LAYOUT_AUDIT_MODE,
+    FindingSeverity,
+    LayoutAuditMode,
+    TextItem,
+    annotation_geometry,
+    arrowhead_segments,
+    audit_dump,
+    balloon_circle,
+    find_merged_blocks,
+    glyph_count,
+    ink_edges,
+    match_ink,
+    row_boxes,
+    severity,
+    sheet_model,
+    view_edges,
+)
+from _layout_geometry import DEFAULT_TEXT_TOUCH_TOL_M, Box, Segment
+
+SHEET_W = 0.4318
+SHEET_H = 0.2794
+ZONE = {"left": 0.0127, "right": 0.0127, "bottom": 0.0127, "top": 0.0127}
+TITLE_BLOCK = [0.216, 0.0, SHEET_W, 0.066]
+
+
+def _line(x0, y0, x1, y1):
+    """A GetLineAtIndex3-shaped record: [color, type, style, weight, s3, e3]."""
+    return [0, 0, 0, 0, x0, y0, 0.0, x1, y1, 0.0]
+
+
+def _hole_callout(name, lines, texts, *, height=0.0035):
+    return {
+        "type": 4,
+        "name": name,
+        "visible": 1,
+        "display": {
+            "lines": [_line(*line) for line in lines],
+            "texts": [{"t": t, "pos": [x, y, 0.0], "h": height} for t, x, y in texts],
+        },
+        "dim": {"hole_callout": True},
+    }
+
+
+def _dim(name, text, x, y, *, lines=(), height=0.0035):
+    return {
+        "type": 4,
+        "name": name,
+        "display": {
+            "lines": [_line(*line) for line in lines],
+            "texts": [{"t": text, "pos": [x, y, 0.0], "h": height}],
+        },
+    }
+
+
+def _note(name, text, extent, *, owner_type=1):
+    x0, y0, x1, y1 = extent
+    return {
+        "type": 6,
+        "name": name,
+        "owner_type": owner_type,
+        "display": {},
+        "note": {"text": text, "extent": [x0, y0, 0.0, x1, y1, 0.0], "balloon": False},
+    }
+
+
+def _edges(*segments, width=0.00025, dashed=0):
+    """PDF strokes as the collector dumps them: [x0, y0, x1, y1, width, dashed]."""
+    return [[*segment, width, dashed] for segment in segments]
+
+
+def _box_edges(x0, y0, x1, y1):
+    return _edges((x0, y0, x1, y0), (x1, y0, x1, y1), (x1, y1, x0, y1), (x0, y1, x0, y0))
+
+
+def _printed(annotations, advance=0.6):
+    """An ideal PDF of fixture COM text: one text object per item, its glyphs
+    from the item's lower-left, symbols printing as paths (no object)."""
+    from _layout_audit import ink_key, text_items
+
+    spans = []
+    for annotation in annotations:
+        for item in text_items(annotation.get("display") or {}):
+            if not ink_key(item.text) or "<" in item.text:
+                continue
+            width = advance * item.height * len(item.text.strip())
+            spans.append([item.text.strip(), item.x, item.y, item.x + width, item.y + item.height])
+    return spans
+
+
+def _dump(*, views=(), sheet_annotations=(), tables=(), spans=(), strokes=(), print_rest=True):
+    """A sheet dump; with ``strokes`` or ``spans`` it is a printed page. Text
+    ``spans`` does not give prints where the fixture's COM items say, unless
+    ``print_rest`` is off."""
+    ink = {}
+    if strokes or spans:
+        from _layout_audit import ink_key
+
+        annotations = [a for view in views for a in view.get("annotations", ())] + list(sheet_annotations)
+        given = {ink_key(str(span[0])) for span in spans}
+        rest = [span for span in _printed(annotations) if ink_key(span[0]) not in given] if print_rest else []
+        printed = [*spans, *rest]
+        ink = {"ink": {"spans": [list(span) for span in printed], "strokes": [list(stroke) for stroke in strokes]}}
+    return {**ink, **{
+        "schema": 1,
+        "stem": "fixture",
+        "sheet": "Sheet2",
+        "width": SHEET_W,
+        "height": SHEET_H,
+        "zone": ZONE,
+        "title_block": TITLE_BLOCK,
+        "views": list(views),
+        "sheet_annotations": list(sheet_annotations),
+        "tables": list(tables),
+        "read_errors": {},
+    }}
+
+
+def _view(name, outline, annotations=(), **extra):
+    return {"name": name, "outline": list(outline), "annotations": list(annotations), **extra}
+
+
+def _kinds(findings):
+    return sorted({f.kind for f in findings})
+
+
+# --------------------------------------------------------------------------
+# Real display data: MHA-035 harmonic base, sheet 2
+# --------------------------------------------------------------------------
+
+# hb-render-2 (e533ef6fd's layout): the MHA-004 transfer callout, as the leaf
+# logged its IDisplayDimension display data.
+HB2_PEDESTAL = (
+    "MHA-004",
+    [
+        (0.264542, 0.218153, 0.23054, 0.240834),
+        (0.265261, 0.217673, 0.264542, 0.218153),
+        (0.23054, 0.240834, 0.171047, 0.240834),
+    ],
+    [
+        ("2X ", 0.179215, 0.25761),
+        ("<MOD-DIAM>", 0.185938, 0.257556),
+        (" 3.45 ", 0.191216, 0.25761),
+        ("<HOLE-DEPTH>", 0.202854, 0.257556),
+        (" 19.50", 0.207854, 0.25761),
+        ("TRANSFER FROM MHA-004", 0.171047, 0.252),
+        ("AT ASSEMBLY;", 0.184746, 0.246444),
+        (" 8-32 UNC - 2B ", 0.174589, 0.240888),
+        ("<HOLE-DEPTH>", 0.20748, 0.240834),
+        (" 16.00", 0.21248, 0.240888),
+    ],
+)
+HB2_BLOCK = (
+    "MHA-061",
+    [
+        (0.278736, 0.216933, 0.29254, 0.240834),
+        (0.278304, 0.216185, 0.278736, 0.216933),
+        (0.29254, 0.240834, 0.233047, 0.240834),
+    ],
+    [
+        ("4X ", 0.241215, 0.25761),
+        ("<MOD-DIAM>", 0.247938, 0.257556),
+        (" 3.45 ", 0.253216, 0.25761),
+        ("<HOLE-DEPTH>", 0.264854, 0.257556),
+        (" 15.00", 0.269854, 0.25761),
+        ("TRANSFER FROM MHA-061", 0.233047, 0.252),
+        ("AT ASSEMBLY;", 0.246746, 0.246444),
+        (" 8-32 UNC - 2B ", 0.236589, 0.240888),
+        ("<HOLE-DEPTH>", 0.26948, 0.240834),
+        (" 12.75", 0.27448, 0.240888),
+    ],
+)
+# INote::GetExtent of "TOP VIEW SCALE 1:4": centred over the plan in
+# hb-render-2, moved beside the plan's top-left corner in hb-render-4.
+HB2_TOP_LABEL = (0.23475, 0.23265, 0.27947, 0.23703)
+HB4_TOP_LABEL = (0.169863, 0.23265, 0.214585, 0.237034)
+# The plan's casting box as supports' check logged it (hb-render-5 obstacles,
+# 'view holes top'); the label and every callout sit outside it.
+HOLES_TOP_OUTLINE = (0.22285, 0.1591, 0.33715, 0.2309)
+
+# hb-render-4: the MHA-114 spring callout and the MHA-132 cross-tap callout
+# whose top row sits 1.7 mm under the spring callout's underline.
+HB4_SPRING = (
+    "MHA-114",
+    [
+        (0.271414, 0.175759, 0.274041, 0.136412),
+        (0.271376, 0.176323, 0.271414, 0.175759),
+        (0.274041, 0.136412, 0.354372, 0.136412),
+    ],
+    [
+        ("<MOD-DIAM>", 0.297576, 0.147578),
+        (" 2.26 ", 0.302855, 0.147632),
+        ("<HOLE-DEPTH>", 0.314492, 0.147578),
+        (" 11.30", 0.319493, 0.147632),
+        ("TRANSFER FROM MHA-114", 0.286047, 0.142022),
+        ("AT ASSEMBLY; 4-40 UNC - 2B ", 0.275628, 0.136466),
+        ("<HOLE-DEPTH>", 0.339027, 0.136412),
+        (" 9.28", 0.344027, 0.136466),
+    ],
+)
+HB4_CROSS_TAP = (
+    "MHA-132",
+    [
+        (0.329717, 0.098055, 0.342356, 0.103278),
+        (0.328783, 0.09767, 0.329717, 0.098055),
+        (0.342356, 0.103278, 0.229232, 0.103278),
+    ],
+    [
+        ("4X ", 0.262404, 0.131166),
+        ("<MOD-DIAM>", 0.269127, 0.131113),
+        (" 4.04 ", 0.274406, 0.131166),
+        ("<HOLE-DEPTH>", 0.286043, 0.131113),
+        (" 48 MIN", 0.291044, 0.131166),
+        ("MHA-132 TUBE CROSS-SCREWS", 0.250907, 0.125556),
+        ("THRU BOTH WALLS, SINGLE CONTINUOUS THREAD", 0.230711, 0.12),
+        ("DEPTHS FROM SPOTFACE FLOOR", 0.248979, 0.114444),
+        ("ON A1-A4 X CENTRES", 0.261375, 0.108888),
+        ("2 EACH FRONT/REAR FACE 10-32 UNF - 2B ", 0.229232, 0.103331),
+        ("<HOLE-DEPTH>", 0.322837, 0.103278),
+        (" 46.00", 0.327838, 0.103331),
+    ],
+)
+
+
+def _holes_sheet(top_label, *callouts):
+    return _dump(
+        views=[_view("holes top", HOLES_TOP_OUTLINE, [_hole_callout(*c) for c in callouts])],
+        sheet_annotations=[_note("DetailItem467", "TOP VIEW SCALE 1:4", top_label)],
+    )
+
+
+def test_e533ef6fd_leader_through_the_top_view_label_is_found():
+    """Positive control: hb-render-2's MHA-004 leader struck "TOP VIEW SCALE 1:4"."""
+    findings = audit_dump(_holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK))
+    hits = [
+        f
+        for f in findings
+        if f.kind == "leader-through-text" and "MHA-004" in f.a and "TOP VIEW" in f.b
+    ]
+    assert len(hits) == 1
+    assert severity(hits[0]) is FindingSeverity.GATING
+
+
+def test_the_moved_top_view_label_clears_every_leader():
+    """hb-render-4 moved the label beside the plan; the same leaders miss it."""
+    findings = audit_dump(_holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK))
+    assert not [f for f in findings if f.kind.startswith("leader") and "TOP VIEW" in f.b]
+
+
+def test_the_two_transfer_callouts_side_by_side_keep_their_air():
+    findings = audit_dump(_holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK))
+    assert not [f for f in findings if f.kind == "text-clearance"]
+
+
+def test_hb_render_4_cross_tap_under_the_spring_underline_reads_as_one_callout():
+    """1.75 mm under the spring callout's underline: clear of it, but tighter
+    than the 2.06 mm gap between rows INSIDE one callout, so the pair reads as
+    one. It sits on the provisional 0.5 h clearance line (1.746 vs 1.75 mm);
+    whichever class the calibrated thresholds put it in, it is reported."""
+    findings = audit_dump(_holes_sheet(HB4_TOP_LABEL, HB4_SPRING, HB4_CROSS_TAP))
+    pair = [
+        f
+        for f in findings
+        if f.kind in ("text-clearance", "merged-blocks", "text-separation")
+        and {f.a.split()[1], f.b.split()[1]} == {"MHA-114", "MHA-132"}
+    ]
+    assert pair
+    assert min(f.extra["gap_mm"] for f in pair) == pytest.approx(1.75, abs=0.05)
+
+
+def test_stacked_callouts_under_a_row_pitch_apart_read_as_one_block():
+    """Port of supports' find_merged_blocks: Main's hb-render-4 eye pass read
+    the spring block 1.7 mm over the cross-tap block as its fourth row. The
+    side-by-side transfer pair (x spans disjoint, 2.5 mm apart) is not one
+    column, and the plan's view label is not a callout."""
+    sheet = sheet_model(
+        _holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK, HB4_SPRING, HB4_CROSS_TAP)
+    ).geometry
+    merged = find_merged_blocks(sheet)
+    assert [(f.a.split()[1], f.b.split()[1]) for f in merged] == [("MHA-114", "MHA-132")]
+    assert merged[0].extra["gap_mm"] == pytest.approx(1.75, abs=0.05)
+    assert merged[0].extra["limit_mm"] == pytest.approx(5.556, abs=0.01)
+    assert severity(merged[0]) is FindingSeverity.GATING
+
+
+def test_a_callout_over_four_rows_is_a_tall_block():
+    """Port of supports' find_tall_callouts: hb-render-4's cross-tap ran six
+    rows (Main's 4-row ruling). The 3-row spring and 4-row transfer pass."""
+    findings = audit_dump(_holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB4_SPRING, HB4_CROSS_TAP))
+    tall = [f for f in findings if f.kind == "tall-block"]
+    assert [(f.a, f.extra["rows"]) for f in tall] == [("hole-callout MHA-132", 6)]
+    assert severity(tall[0]) is FindingSeverity.GATING
+
+
+def test_callout_rows_centre_on_the_shoulder_and_tokens_are_one_glyph():
+    items = [TextItem(t, x, y, 0.0035) for t, x, y in HB2_PEDESTAL[2]]
+    shoulder = Segment(*HB2_PEDESTAL[1][2])
+    rows = dict(row_boxes(items, advance=0.6, shoulders=[shoulder]))
+    # The shoulder spans the widest row; the centred rows mirror about it.
+    centre = (0.23054 + 0.171047) / 2.0
+    top = rows["2X <MOD-DIAM> 3.45 <HOLE-DEPTH> 19.50"]
+    assert top.xmin == pytest.approx(0.179215)
+    assert top.xmax == pytest.approx(2 * centre - 0.179215)
+    assert top.ymin == pytest.approx(0.257556)
+    assert top.ymax == pytest.approx(0.25761 + 0.0035)
+    assert glyph_count("<MOD-DIAM> 3.45 ") == 7
+
+
+# --------------------------------------------------------------------------
+# the classes the older audits could not see
+# --------------------------------------------------------------------------
+
+
+def test_touching_dimension_texts_fail_the_clearance():
+    """MHA-092's "20.8" and "8.42" printed as "20.88.42": zero gap, no overlap.
+    A penetration test passes that; a clearance test does not."""
+    advance = 0.6
+    h = 0.0035
+    left = _dim("D1", "20.8", 0.040, 0.200)
+    # "8.42" starts exactly where "20.8" ends.
+    right = _dim("D2", "8.42", 0.040 + 4 * advance * h, 0.200)
+    # An exact-width item on the sheet pins the advance at 0.6.
+    ruler = _dim("D3", "", 0, 0)
+    ruler["display"]["texts"] = [
+        {"t": "12", "pos": [0.300, 0.100, 0.0], "h": h},
+        {"t": "34", "pos": [0.300 + 2 * advance * h, 0.100, 0.0], "h": h},
+    ]
+    dump = _dump(views=[_view("plan", (0.02, 0.15, 0.1, 0.25), [left, right, ruler])])
+    findings = [f for f in audit_dump(dump) if f.kind == "text-clearance"]
+    assert len(findings) == 1
+    assert findings[0].extra["gap_mm"] == pytest.approx(0.0, abs=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("note_x", "expected"),
+    [(0.1010, ["text-clearance"]), (0.1150, [])],  # over the "12.0"; clear of it
+)
+def test_a_dimension_text_under_a_note_fails_the_clearance(note_x, expected):
+    """Main's gate-gap sweep (1): the pre-save element gate boxes every
+    dimension as a NONE-scope placeholder (``_dim_element``), so a dimension's
+    text was never compared with a note's (rocker fix3's seat note). The
+    shared audit compares their real boxes: a free note printed over the
+    "12.0" gates, and one a clear word space away does not."""
+    dim = _dim("SeatDepth", "12.0", 0.1000, 0.1500)
+    note = _note("SeatNote", "SEAT", (note_x, 0.1505, note_x + 0.0090, 0.1540))
+    dump = _dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [dim])], sheet_annotations=[note])
+    clearance = [
+        f.kind
+        for f in audit_dump(dump)
+        if f.kind == "text-clearance" and {"SeatDepth", "SeatNote"} <= set((f.a + " " + f.b).split())
+    ]
+    assert clearance == expected
+    assert all(severity(f) is FindingSeverity.GATING for f in audit_dump(dump) if f.kind == "text-clearance")
+
+
+def test_text_crossed_by_a_foreign_view_edge_is_found():
+    """MHA-092's ADJUSTER ENTRY: a callout's text crossed by ANOTHER view's
+    outline edge. Model edges are the PDF's 0.25 mm solid strokes."""
+    # A single vertical model edge of the right view at x = 0.130.
+    right_view = _view("right", (0.128, 0.078, 0.170, 0.162))
+    callout = _hole_callout(
+        "ADJ",
+        [(0.080, 0.100, 0.100, 0.118), (0.100, 0.118, 0.140, 0.118)],
+        [("ADJUSTER ENTRY", 0.100, 0.118)],
+    )
+    front = _view("front", (0.060, 0.080, 0.100, 0.160), [callout])
+    printed = [["ADJUSTER ENTRY", 0.1002, 0.1189, 0.1400, 0.1222]]  # runs the width of its shoulder
+    findings = audit_dump(
+        _dump(views=[front, right_view], strokes=_edges((0.130, 0.080, 0.130, 0.160)), spans=printed)
+    )
+    hits = [f for f in findings if f.kind == "text-on-line" and "view right geometry" in f.b]
+    assert len(hits) == 1
+
+
+def test_text_crossed_by_a_hidden_edge_is_found_but_not_by_its_own_centre_mark():
+    """Codex P2 on d9c5fbb88: Hidden Lines Visible edges print as 0.18 mm
+    DASHED strokes, and the solid-only model-edge filter dropped them, so text
+    over a hidden edge never gated. A dashed stroke lying on an annotation's
+    own segment (a centre mark here) is that annotation's ink, not an edge."""
+    right_view = _view("right", (0.128, 0.078, 0.170, 0.162))
+    callout = _hole_callout(
+        "ADJ",
+        [(0.080, 0.100, 0.100, 0.118), (0.100, 0.118, 0.140, 0.118)],
+        [("ADJUSTER ENTRY", 0.100, 0.118)],
+    )
+    front = _view("front", (0.060, 0.080, 0.100, 0.160), [callout])
+    printed = [["ADJUSTER ENTRY", 0.1002, 0.1189, 0.1400, 0.1222]]
+    hidden = _edges((0.130, 0.080, 0.130, 0.160), width=0.00018, dashed=1)
+
+    def hits(dump):
+        return [f for f in audit_dump(dump) if f.kind == "text-on-line" and "view right geometry" in f.b]
+
+    assert len(hits(_dump(views=[front, right_view], strokes=hidden, spans=printed))) == 1
+    mark = {
+        "type": 13,
+        "name": "CM1",
+        "visible": 1,
+        "display": {"lines": [_line(0.130, 0.080, 0.130, 0.160)], "texts": []},
+    }
+    marked = _view("right", (0.128, 0.078, 0.170, 0.162), [mark])
+    assert hits(_dump(views=[front, marked], strokes=hidden, spans=printed)) == []
+
+
+def _mha_092_pre_287c_sheet():
+    """MHA-092's three collisions as Main's I31 eye pass measured them, rebuilt
+    as display data (the calibration run's own dump replaces this once logged):
+
+    * plan "20.8" 0.68 mm left of "8.42" -- same view, no overlap;
+    * the pinch-clearance callout (front view) over the right view's "6.0",
+      overlapping it 1.3 x 4.8 mm;
+    * the ADJUSTER callout (front view) printed INSIDE the right view's face,
+      between its edges, touching none of them.
+    """
+    h = 0.0035
+    advance = 0.6
+    ruler = _dim("ruler", "", 0, 0)
+    ruler["display"]["texts"] = [
+        {"t": "12", "pos": [0.300, 0.230, 0.0], "h": h},
+        {"t": "34", "pos": [0.300 + 2 * advance * h, 0.230, 0.0], "h": h},
+    ]
+    plan_left = _dim("PlanWidth", "20.8", 0.040, 0.200)
+    plan_right = _dim("PlanPitch", "8.42", 0.040 + 4 * advance * h + 0.00068, 0.200)
+    plan = _view("plan", (0.020, 0.170, 0.110, 0.240), [plan_left, plan_right, ruler])
+    # The right view: a 30 x 60 mm face whose only model edges are its border.
+    x0, y0, x1, y1 = 0.160, 0.080, 0.190, 0.140
+    six = _dim("RightDepth", "6.0", 0.165, 0.120)
+    right = _view("right", (x0 - 0.001, y0 - 0.001, x1 + 0.001, y1 + 0.001), [six])
+    # "6.0" spans x 165.0-171.3, y 120.0-123.5 mm. "<MOD-DIAM> 3.26" ends
+    # 4.8 mm into it and sits 1.3 mm down over its top.
+    pinch = _hole_callout(
+        "PinchClearance",
+        [(0.120, 0.100, 0.1572, 0.1222), (0.1572, 0.1222, 0.1698, 0.1222)],
+        [("<MOD-DIAM>", 0.1572, 0.1222), (" 3.26", 0.1572 + advance * h, 0.1222)],
+    )
+    adjuster = _hole_callout(
+        "Adjuster",
+        [(0.140, 0.090, 0.1650, 0.0950), (0.1650, 0.0950, 0.1850, 0.0950)],
+        [("THRU ALL", 0.1660, 0.0952)],
+    )
+    front = _view("front", (0.100, 0.080, 0.150, 0.140), [pinch, adjuster])
+    return _dump(views=[plan, right, front], strokes=_box_edges(x0, y0, x1, y1))
+
+
+def test_mha_092_collisions_fail_the_shared_audit_and_passed_the_old_one():
+    """Fail-first: the annotation audit of the time (``_layout_geometry``)
+    passes the 0.68 mm "20.88.42" pair and the ADJUSTER text inside the right
+    view; the element audit boxed every dimension as a NONE-scope placeholder
+    and compared none of the three. The shared audit gates all three."""
+    from _layout_geometry import audit_sheet
+
+    dump = _mha_092_pre_287c_sheet()
+    old = audit_sheet(sheet_model(dump).geometry)
+    assert not [f for f in old if {"PlanWidth", "PlanPitch"} <= set((f.a + " " + f.b).split())]
+    assert not [f for f in old if "Adjuster" in f.a and f.kind.startswith("text")]
+
+    findings = audit_dump(dump)
+    gating = [f for f in findings if severity(f) is FindingSeverity.GATING]
+
+    def pair(kind, a, b):
+        return [f for f in gating if f.kind == kind and a in f.a + f.b and b in f.a + f.b]
+
+    near = pair("text-clearance", "PlanWidth", "PlanPitch")
+    assert len(near) == 1 and near[0].extra["gap_mm"] == pytest.approx(0.68, abs=0.01)
+    assert pair("text-clearance", "PinchClearance", "RightDepth")
+    assert pair("text-on-view", "Adjuster", "view right")
+    assert not pair("text-on-line", "Adjuster", "view right geometry")
+
+
+# Ink measured on the I31 farm render (7ab69742b, cone-tip-block_drawing.png,
+# 5100 x 3300 px, 11.81 px/mm) by swing: dark-pixel component boxes in sheet
+# mm (test_cone_tip_block_drawing @ 287c5cf6a, _I31_TEXT_MM and friends).
+I31_TEXT_MM = {
+    "FlangeLen": ("plan", "20.8", (37.68, 229.19, 46.31, 232.66)),
+    "FlangeSlotCtoC": ("plan", "8.42", (46.99, 229.70, 55.63, 233.09)),
+    "PinchClearance": ("front", "<MOD-DIAM>3.26 <HOLE-DEPTH>6.9", (118.11, 170.60, 149.52, 175.68)),
+    "PinchDepthCenter": ("right", "6.0", (143.00, 169.42, 148.84, 172.72)),
+    "Adjuster": ("front", "ADJUSTER\nENTRY\nTHRU ALL", (85.60, 106.51, 142.66, 122.68)),
+}
+I31_RIGHT_BODY_MM = (141.31, 93.81, 159.43, 164.17)
+I31_HEEL_HEIGHT_LINE_MM = ((119.25, 87.55), (119.25, 108.46))
+
+
+def test_mha_092_i31_ink_fails_on_every_collision_the_eye_pass_found():
+    """Positive control on the I31 render's own ink: all four of Main's
+    collisions gate -- "20.8"/"8.42" 0.68 mm apart, the pinch callout on the
+    6.0, the adjuster callout over the right view's body, and the 5.56
+    heel-height line through the adjuster callout."""
+    by_view = {"plan": [], "front": [], "right": []}
+    for name, (view, text, box) in I31_TEXT_MM.items():
+        by_view[view].append(_note(name, text, tuple(v / 1000.0 for v in box)))
+    (hx0, hy0), (hx1, hy1) = I31_HEEL_HEIGHT_LINE_MM
+    by_view["front"].append(
+        _dim("HeelReliefHt", "5.56", 0.1100, 0.0950, lines=[(hx0 / 1000, hy0 / 1000, hx1 / 1000, hy1 / 1000)])
+    )
+    x0, y0, x1, y1 = (v / 1000.0 for v in I31_RIGHT_BODY_MM)
+    pad = 0.003  # GetOutline pads the body with whitespace
+    dump = _dump(
+        views=[
+            _view("plan", (0.020, 0.190, 0.120, 0.250), by_view["plan"]),
+            _view("front", (0.060, 0.090, 0.118, 0.170), by_view["front"]),
+            _view("right", (x0 - pad, y0 - pad, x1 + pad, y1 + pad), by_view["right"]),
+        ],
+        strokes=_box_edges(x0, y0, x1, y1),
+    )
+    gating = [f for f in audit_dump(dump) if severity(f) is FindingSeverity.GATING]
+
+    def hits(kind, a, b):
+        return [f for f in gating if f.kind == kind and a in f.a + f.b and b in f.a + f.b]
+
+    near = hits("text-clearance", "FlangeLen", "FlangeSlotCtoC")
+    assert len(near) == 1 and near[0].extra["gap_mm"] == pytest.approx(0.68, abs=0.01)
+    assert hits("text-clearance", "PinchClearance", "PinchDepthCenter")
+    assert hits("text-on-view", "Adjuster", "view right")
+    assert hits("text-on-line", "HeelReliefHt", "Adjuster")
+
+
+def test_a_shoulder_crossed_by_a_foreign_dimension_line_is_found():
+    """Swing's class d: a dimension line crossing a callout's shoulder, the
+    run under its text, below the text box itself."""
+    h = 0.0035
+    callout = _hole_callout(
+        "Adjuster",
+        [(0.080, 0.090, 0.100, 0.1000), (0.100, 0.1000, 0.140, 0.1000)],
+        [("THRU ALL", 0.100, 0.1001)],
+        height=h,
+    )
+    heel = _dim("HeelReliefHt", "5.56", 0.150, 0.080, lines=[(0.1190, 0.0875, 0.1190, 0.0990)])
+    # Up to 0.1 mm into the text box: under text-on-line's 0.15 mm, so the
+    # crossing is the shoulder's alone.
+    heel["display"]["lines"].append(_line(0.1190, 0.0990, 0.1190, 0.1002))
+    findings = audit_dump(_dump(views=[_view("front", (0.05, 0.05, 0.2, 0.2), [callout, heel])]))
+    crossed = [f for f in findings if f.kind == "shoulder-crosses-line"]
+    assert [(f.a.split()[1], f.b.split()[1]) for f in crossed] == [("Adjuster", "HeelReliefHt")]
+    assert severity(crossed[0]) is FindingSeverity.GATING
+
+
+def test_a_leader_through_its_own_rows_is_found_but_its_shoulder_joint_is_not():
+    h = 0.0035
+    rows = [("TOP ROW TEXT", 0.100, 0.110), ("BOTTOM ROW", 0.100, 0.1044)]
+    # Leader rises from the shoulder's right end, straight up through the rows.
+    through = _hole_callout(
+        "UP", [(0.125, 0.1044, 0.125, 0.140), (0.100, 0.1044, 0.1245, 0.1044)], rows, height=h
+    )
+    findings = audit_dump(_dump(views=[_view("v", (0.05, 0.05, 0.2, 0.2), [through])]))
+    assert [f.kind for f in findings if f.kind.startswith("leader-through")] == [
+        "leader-through-own-text"
+    ]
+    # Same leader leaving DOWNWARD from the shoulder end: only the joint touches.
+    down = _hole_callout(
+        "DOWN", [(0.1245, 0.1044, 0.140, 0.080), (0.100, 0.1044, 0.1245, 0.1044)], rows, height=h
+    )
+    findings = audit_dump(_dump(views=[_view("v", (0.05, 0.05, 0.2, 0.2), [down])]))
+    assert not [f for f in findings if f.kind.startswith("leader-through")]
+
+
+def test_a_leader_crossing_another_dimension_line_is_found():
+    callout = _hole_callout(
+        "C", [(0.100, 0.100, 0.140, 0.140), (0.140, 0.140, 0.170, 0.140)], [("Ø4.0", 0.140, 0.1402)]
+    )
+    dim = _dim("D", "25.0", 0.200, 0.200, lines=[(0.100, 0.130, 0.140, 0.110)])
+    findings = audit_dump(_dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [callout, dim])]))
+    assert "leader-crosses-line" in _kinds(findings)
+
+
+def test_a_hole_callouts_attach_run_is_leader_even_where_it_misses_its_text():
+    """swing, #902 case 2: collect_document tags only the run touching the
+    text as leader, so MHA-091 RD1's rim-to-shelf diagonal read "line" and a
+    leader crossing it passed audit_sheet. The shared audit takes every
+    display line of a hole callout as leader. RD1's lines are the S1 @
+    ac4fa6dd0 dump's; RD3 is moved so its diagonal crosses RD1's."""
+    rd1 = _hole_callout(
+        "RD1",
+        [(0.1773, 0.1361, 0.1884, 0.1042), (0.1762, 0.1393, 0.1773, 0.1361), (0.1884, 0.1042, 0.2400, 0.1042)],
+        [("<MOD-DIAM>6.6 THRU", 0.1900, 0.1042)],
+    )
+    rd3 = _hole_callout(
+        "RD3",
+        [(0.1950, 0.1400, 0.1700, 0.1200), (0.1700, 0.1200, 0.1200, 0.1200)],
+        [("<MOD-DIAM>4.0 THRU", 0.1250, 0.1205)],
+    )
+    findings = audit_dump(_dump(views=[_view("v", (0.05, 0.05, 0.26, 0.26), [rd1, rd3])]))
+    crossings = [f for f in findings if f.kind == "leader-crosses-leader"]
+    assert [{f.a.split()[1], f.b.split()[1]} for f in crossings] == [{"RD1", "RD3"}]
+    assert severity(crossings[0]) is FindingSeverity.GATING
+
+
+def test_dimension_text_over_the_title_block_or_off_the_sheet_is_found():
+    """Main's rider: the deleted ``_dim_element`` gave every dimension and hole
+    callout the border check and the title-block keep-out (Codex #269 thread
+    1). The shared audit boxes their measured text against both."""
+    over_block = _dim("OverBlock", "12.0", 0.300, 0.030)  # title block: x > 216, y < 66 mm
+    off_sheet = _dim("OffSheet", "12.0", SHEET_W + 0.010, 0.150)
+    in_border_band = _dim("InBand", "12.0", 0.005, 0.150)  # inside the 12.7 mm zone band
+    callout = _hole_callout(
+        "CalloutOverBlock", [(0.200, 0.100, 0.260, 0.050), (0.260, 0.050, 0.300, 0.050)], [("<MOD-DIAM>4.0 THRU", 0.262, 0.0502)]
+    )
+    clear = _dim("Clear", "12.0", 0.100, 0.150)
+    findings = audit_dump(
+        _dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [over_block, off_sheet, in_border_band, callout, clear])])
+    )
+
+    def named(kind, name):
+        return [f for f in findings if f.kind == kind and f" {name} " in f" {f.a} "]
+
+    assert named("keep-out", "OverBlock")
+    assert named("keep-out", "CalloutOverBlock")
+    assert named("outside-border", "OffSheet")
+    assert named("outside-border", "InBand")
+    assert not [f for f in findings if " Clear " in f" {f.a} "]
+    assert all(
+        severity(f) is FindingSeverity.GATING
+        for f in findings
+        if f.kind in ("keep-out", "outside-border")
+    )
+
+
+def test_hidden_annotations_and_template_notes_are_not_audited():
+    hidden = _dim("H", "99", 0.005, 0.005)
+    hidden["visible"] = 3
+    template = _note("Z", "A", (0.003, 0.03, 0.009, 0.038), owner_type=2)
+    findings = audit_dump(
+        _dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [hidden])], sheet_annotations=[template])
+    )
+    assert findings == []
+
+
+# --------------------------------------------------------------------------
+# primitives
+# --------------------------------------------------------------------------
+
+
+def test_a_balloon_is_its_single_rendered_circle():
+    arc = [0, 0, 0, 0, 0.105, 0.2, 0.0, 0.105, 0.2, 0.0, 0.1, 0.2, 0.0, 0.0, 0.0, 1.0, 1.0]
+    assert balloon_circle({"arcs": [arc]}) == pytest.approx((0.1, 0.2, 0.005))
+    assert balloon_circle({"arcs": [arc, arc]}) is None
+
+
+def test_the_audit_ships_in_report_mode_until_the_fleet_report_is_triaged():
+    """Main's gating decision (a), 2026-09-25: REPORT first, then GATE."""
+    assert LAYOUT_AUDIT_MODE is LayoutAuditMode.REPORT
+
+
+def test_sheet_model_measures_the_glyph_advance_from_exact_item_widths():
+    model = sheet_model(_holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK))
+    # '2X ' / '4X ' span 6.72 mm, ' 3.45 ' 11.64 mm, ' 8-32 UNC - 2B ' 32.9 mm,
+    # all at 3.5 mm height; token items are excluded.
+    assert model.advance == pytest.approx(median_ratio(), rel=1e-3)
+
+
+def median_ratio():
+    from statistics import median
+
+    widths = [
+        (0.185938 - 0.179215) / 3,
+        (0.202854 - 0.191216) / 6,
+        (0.247938 - 0.241215) / 3,
+        (0.264854 - 0.253216) / 6,
+        (0.20748 - 0.174589) / 15,
+        (0.26948 - 0.236589) / 15,
+    ]
+    return median(w / 0.0035 for w in widths)
+
+
+# --------------------------------------------------------------------------
+# run_layout_audit: the cached report, fail-loud faults, GATE on gating findings
+# --------------------------------------------------------------------------
+
+
+def _patch_collect(monkeypatch, result):
+    import _drawing_layout_audit as live
+
+    def collect(*_args, **_kwargs):
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr(live, "collect_sheet_dumps", collect)
+    return live
+
+
+def _run(live, mode, report):
+    from pathlib import Path
+
+    live.run_layout_audit(
+        object(),
+        stem="fixture",
+        pdf=Path("fixture.pdf"),
+        report=report,
+        sheet_layouts={},
+        is_pictorial=lambda _o: False,
+        mode=mode,
+    )
+
+
+def test_a_collector_fault_fails_loud_in_every_mode(monkeypatch, tmp_path):
+    """Main's rider: a fault that skipped a sheet would silently under-count
+    the fleet report, so REPORT fails the drawing too, and writes no report."""
+    live = _patch_collect(monkeypatch, RuntimeError("COM went away"))
+    for mode in LayoutAuditMode:
+        with pytest.raises(RuntimeError, match="COM went away"):
+            _run(live, mode, tmp_path / f"{mode.value}.json")
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("fault", ["collect", "audit"])
+def test_a_failed_audit_leaves_no_stale_report(monkeypatch, tmp_path, fault):
+    """Codex P2 on 72c147a19: a rebuild whose collector or audit_report()
+    raised left the PREVIOUS build's report beside the new PDF and SLDDRW,
+    and calibration or review read its findings as current. The old report
+    goes before collection starts; the fault still propagates."""
+    report = tmp_path / "fixture.json"
+    report.write_text('{"stale": true}', encoding="utf-8")
+    if fault == "collect":
+        live = _patch_collect(monkeypatch, RuntimeError("COM went away"))
+    else:
+        live = _patch_collect(monkeypatch, [_holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)])
+
+        def broken(*_args, **_kwargs):
+            raise RuntimeError("COM went away")
+
+        monkeypatch.setattr(live, "audit_report", broken)
+    with pytest.raises(RuntimeError, match="COM went away"):
+        _run(live, LayoutAuditMode.REPORT, report)
+    assert not report.exists()
+
+
+def test_a_crash_while_writing_leaves_no_torn_report(monkeypatch, tmp_path):
+    """The report reaches its path whole or not at all: it is written beside
+    it and renamed over it, so a crash mid-write leaves neither a torn file
+    nor the stale one it was replacing, and no temporary behind."""
+    import _layout_audit
+
+    live = _patch_collect(monkeypatch, [_holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)])
+    report = tmp_path / "fixture.json"
+    report.write_text('{"stale": true}', encoding="utf-8")
+
+    def crash(*_args, **_kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(_layout_audit.os, "replace", crash)
+    with pytest.raises(OSError, match="disk full"):
+        _run(live, LayoutAuditMode.REPORT, report)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_failed_calibration_leaves_no_stale_json(tmp_path):
+    """The same class in the calibration tool: a run that raises must not
+    leave the previous run's --json to be read as this one's."""
+    from diagnostics.layout_calibration import main
+
+    out = tmp_path / "calib.json"
+    out.write_text('{"stale": true}', encoding="utf-8")
+    with pytest.raises(FileNotFoundError):
+        main(["--report", str(tmp_path / "missing.json"), "--json", str(out)])
+    assert not out.exists()
+
+
+def test_report_mode_writes_every_finding_and_dump_and_gate_mode_raises(monkeypatch, tmp_path):
+    import json
+
+    sheet = _holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)
+    live = _patch_collect(monkeypatch, [sheet])
+    report = tmp_path / "reports" / "fixture.json"
+    _run(live, LayoutAuditMode.REPORT, report)
+    content = json.loads(report.read_text(encoding="utf-8"))
+    assert content["mode"] == "report"
+    assert content["sheets"] == [sheet]
+    assert content["summary"]["findings"]["leader-through-text"] == 1
+    assert content["summary"]["gating"] >= 1
+    assert {f["kind"] for f in content["findings"]} >= {"leader-through-text"}
+    # The cached report replays to the same findings the seat saw.
+    assert [f.kind for f in audit_dump(content["sheets"][0])] == [
+        f["kind"] for f in content["findings"]
+    ]
+    with pytest.raises(RuntimeError, match="leader-through-text"):
+        _run(live, LayoutAuditMode.GATE, tmp_path / "gate.json")
+    assert (tmp_path / "gate.json").is_file()  # written before the gate fails
+
+
+def test_gate_mode_passes_a_sheet_with_only_advisories(monkeypatch, tmp_path):
+    live = _patch_collect(monkeypatch, [_holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)])
+    findings = audit_dump(_holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK))
+    assert all(severity(f) is FindingSeverity.ADVISORY for f in findings)
+    _run(live, LayoutAuditMode.GATE, tmp_path / "fixture.json")
+
+
+def test_the_audit_span_carries_per_class_counts(monkeypatch, tmp_path):
+    import _telemetry
+
+    spans = []
+    real_span = _telemetry.span
+
+    def recording_span(name, **attrs):
+        context = real_span(name, **attrs)
+
+        class Recorder:
+            def __enter__(self):
+                self.span = context.__enter__()
+                spans.append((name, self))
+                self.attributes = {}
+                original = self.span.set_attribute
+
+                def set_attribute(key, value):
+                    self.attributes[key] = value
+                    return original(key, value)
+
+                self.span.set_attribute = set_attribute
+                return self.span
+
+            def __exit__(self, *exc):
+                return context.__exit__(*exc)
+
+        return Recorder()
+
+    live = _patch_collect(monkeypatch, [_holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)])
+    monkeypatch.setattr(live._telemetry, "span", recording_span)
+    _run(live, LayoutAuditMode.REPORT, tmp_path / "fixture.json")
+    recorded = dict(spans)
+    assert list(recorded) == ["layout.audit fixture", "layout.findings"]
+    assert recorded["layout.audit fixture"].attributes["findings.leader-through-text"] == 1
+    assert recorded["layout.audit fixture"].attributes["sheets"] == 1
+    assert recorded["layout.findings"].attributes["findings.leader-through-text"] == 1
+    assert recorded["layout.findings"].attributes["findings_s"] >= 0.0
+
+
+# hb-render-5 (375bf2aad, supports' fix): the cross-tap cut to three rows and
+# lowered 10 mm clear of the spring block (dt-logs/hb-render-5 line 54).
+HB5_CROSS_TAP = (
+    "MHA-132",
+    [
+        (0.3295759581969177, 0.09824798610154864, 0.3408763902127743, 0.11161215219646692),
+        (0.3289240418030824, 0.09747701389845134, 0.3295759581969177, 0.09824798610154864),
+        (0.3408763902127743, 0.11161215219646692, 0.23071110978722575, 0.11161215219646692),
+    ],
+    [
+        ("4X ", 0.2624042181670666, 0.12283159763785084),
+        ("<MOD-DIAM>", 0.26912713501602414, 0.12277812546119099),
+        (" 4.04 ", 0.2744055724143982, 0.12283159763785084),
+        ("<HOLE-DEPTH>", 0.2860430719703436, 0.12277812546119099),
+        (" 48 MIN", 0.2910436967760325, 0.12283159763785084),
+        ("THRU BOTH WALLS, SINGLE CONTINUOUS THREAD", 0.23071110978722575, 0.1172218752955087),
+        (" 10-32 UNF - 2B ", 0.2590618392825127, 0.1116656253044494),
+        ("<HOLE-DEPTH>", 0.29300697878003124, 0.11161215312778955),
+        (" 46.00", 0.2980076035857201, 0.1116656253044494),
+    ],
+)
+
+
+def test_hb_render_5_fixed_cross_tap_passes_the_block_rules():
+    """Negative control: supports' fix keeps three rows, 10 mm under the
+    spring block, so neither block rule nor the clearance rule fires."""
+    findings = audit_dump(
+        _holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK, HB4_SPRING, HB5_CROSS_TAP)
+    )
+    assert not [
+        f
+        for f in findings
+        if f.kind in ("merged-blocks", "tall-block", "text-clearance", "text-separation")
+        and "MHA-132" in f.a + f.b
+    ]
+
+
+def test_every_drawing_task_targets_and_caches_its_layout_report():
+    """Main's rider: the report rides the remote cache, so a leaf restored
+    from cache still carries its findings -- it is a declared target of every
+    drawing task and one of the outputs the cache stores and restores. It is
+    not a release output (cut_release stages ``spec.outputs`` only)."""
+    import importlib.util
+    from pathlib import Path
+
+    from _drawing_registry import DRAWINGS, LAYOUT_REPORT_DIR
+
+    root = Path(__file__).resolve().parents[2]
+    spec = importlib.util.spec_from_file_location("dodo", root / "dodo.py")
+    dodo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dodo)
+    tasks = {task["name"]: task for task in dodo.task_drawing()}
+    assert LAYOUT_REPORT_DIR == root / "cad" / "out" / "reports" / "layout-audit"
+    for drawing in DRAWINGS:
+        report = drawing.layout_report.resolve()
+        assert report.parent == LAYOUT_REPORT_DIR.resolve()
+        assert str(report) in tasks[drawing.name]["targets"]
+        assert report in dodo._drawing_cache_outputs(drawing.name)
+        assert report not in drawing.outputs.values()
+
+
+# --------------------------------------------------------------------------
+# PDF ink: where text and model edges printed
+# --------------------------------------------------------------------------
+#
+# Real records from the d09c2b9eb calibration leaves (integ 06b840e49): each
+# drawing's layout dump replayed against its own exported PDF page.
+
+
+def test_an_arrowhead_base_lies_along_its_direction_from_the_tip():
+    """``GetArrowHeadAtIndex2``'s direction points from the tip back along the
+    shaft. pinion-bracket's 28.00 (ArborBoreCz) prints its lower arrowhead's
+    base at y 125.55 mm, above the tip at 122.00: drawn the other way, the
+    triangle landed inside the section label "B" beneath it."""
+    lower = [0.24, 0.122, -0.0088, 0.0, 1.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0]
+    upper = [0.24, 0.178, -0.0088, -0.0, -1.0, -0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0]
+    tip, *base = ((s.x0, s.y0) for s in arrowhead_segments(lower))
+    assert tip == pytest.approx((0.24, 0.122))
+    assert [v for point in sorted(base) for v in point] == pytest.approx([0.239619, 0.125556, 0.240381, 0.125556])
+    assert {round(s.y0, 6) for s in arrowhead_segments(upper)} == {0.178, 0.174444}
+
+
+def test_ink_matching_is_one_to_one_nearest_first_and_same_string_only():
+    """Six "13.12"s on one sheet must not all claim one printed run."""
+    h = 0.0035
+    near_left = TextItem("13.12", 0.1000, 0.1000, h)
+    near_right = TextItem("13.12", 0.1015, 0.1000, h)
+    stranded = TextItem("13.12", 0.3000, 0.1000, h)
+    other_string = TextItem("8.42", 0.1000, 0.1000, h)
+    spans = [
+        _ink_span("13.12", 0.1012, 0.0991),
+        _ink_span("13.12", 0.1003, 0.0991),
+        _ink_span("13.12", 0.3100, 0.0991),  # 10 mm off: outside the window
+    ]
+    matched = match_ink(
+        [("L", near_left), ("R", near_right), ("S", stranded), ("O", other_string)], spans
+    )
+    assert matched["L"].xmin == pytest.approx(0.1003)
+    assert matched["R"].xmin == pytest.approx(0.1012)
+    assert "S" not in matched and "O" not in matched
+
+
+def test_ink_matching_completes_before_it_is_short():
+    """Codex P2 on d9c5fbb88: nearest-first gave the flexible item A the one
+    span (X) the constrained item B could reach, stranding B as unmatched
+    and Y as unclaimed although A->Y, B->X matches both."""
+    h = 0.0035
+    flexible = TextItem("0.50", 0.1015, 0.1000, h)
+    constrained = TextItem("0.50", 0.1000, 0.1000, h)
+    spans = [_ink_span("0.50", 0.1010, 0.0991), _ink_span("0.50", 0.1070, 0.0991)]
+    matched = match_ink([("A", flexible), ("B", constrained)], spans)
+    assert matched["B"].xmin == pytest.approx(0.1010)
+    assert matched["A"].xmin == pytest.approx(0.1070)
+
+
+def _ink_span(text, x, y, width=0.008, height=0.0033):
+    from _layout_audit import InkSpan, ink_key
+
+    return InkSpan(ink_key(text), Box(x, y, x + width, y + height))
+
+
+def test_printed_glyph_boxes_replace_com_boxes_and_a_symbol_follows_its_row():
+    """The row box is the printed glyphs', not COM's row estimate (which ran
+    up to 21 mm wide on a dimension). ``<MOD-DIAM>`` prints as a path, so it
+    is boxed from COM and shifted by the offset its printed neighbour shows."""
+    h = 0.0035
+    dim = _dim("Bore", "", 0, 0)
+    dim["display"]["texts"] = [
+        {"t": "<MOD-DIAM>", "pos": [0.1000, 0.1500, 0.0], "h": h},
+        {"t": " 3.26", "pos": [0.1027, 0.1500, 0.0], "h": h},
+    ]
+    printed = Box(0.1035, 0.1491, 0.1120, 0.1524)
+    geometry = annotation_geometry(dim, owner="v", advance=0.6, ink={1: printed})
+    [row] = geometry.text_boxes
+    assert (row.xmin, row.ymin, row.xmax, row.ymax) == pytest.approx((0.1000, 0.1491, 0.1120, 0.1524))
+    assert geometry.exact
+
+
+def test_com_text_the_pdf_never_printed_gates_but_symbols_do_not():
+    """The audit is blind wherever COM and the PDF disagree, so an unmatched
+    string is a gating finding. A symbol-only item (``<MOD-DIAM>``) prints as
+    a path and is exempt."""
+    printed = _dim("Printed", "12.0", 0.100, 0.150)
+    lost = _dim("Lost", "7.5", 0.150, 0.150)
+    symbol = _dim("Symbol", "<MOD-DIAM>", 0.180, 0.150)
+    dump = _dump(
+        views=[_view("v", (0.05, 0.05, 0.25, 0.25), [printed, lost, symbol])],
+        spans=[["12.0", 0.1002, 0.1491, 0.1060, 0.1524]],
+        print_rest=False,
+    )
+    unmatched = [f for f in audit_dump(dump) if f.kind == "text-unmatched"]
+    assert [(f.a, f.b) for f in unmatched] == [("Lost", "7.5")]
+    assert severity(unmatched[0]) is FindingSeverity.GATING
+
+
+def test_model_edges_are_solid_quarter_millimetre_strokes_owned_by_the_smallest_view():
+    """Model edges print 0.25 mm solid black; annotation ink is 0.18 mm and
+    hidden lines are dashed. An edge belongs to the innermost outline holding
+    it (a detail drawn inside its parent's box), and none outside every view."""
+    dump = {
+        "ink": {
+            "strokes": [
+                [0.12, 0.12, 0.13, 0.12, 0.00025, 0],  # parent edge
+                [0.15, 0.15, 0.16, 0.15, 0.00025, 0],  # inside the detail
+                [0.12, 0.13, 0.13, 0.13, 0.00018, 0],  # annotation line
+                [0.12, 0.14, 0.13, 0.14, 0.00025, 1],  # hidden line
+                [0.30, 0.30, 0.31, 0.30, 0.00025, 0],  # in no view
+            ]
+        }
+    }
+    edges = ink_edges(dump)
+    assert len(edges) == 3
+    owned = view_edges(edges, [("parent", Box(0.10, 0.10, 0.20, 0.20)), ("detail", Box(0.14, 0.14, 0.17, 0.17))])
+    assert [(e.x0, e.y0) for e in owned["parent"]] == [(0.12, 0.12)]
+    assert [(e.x0, e.y0) for e in owned["detail"]] == [(0.15, 0.15)]
+
+
+# cone-tip-block section A-A: GetLineInfo answers (0, -8)..(0, 8) mm -- the
+# view's model space -- for a cutting line printed at x 72 mm.
+CTB_SECTION_A = {
+    "label": "A",
+    "line": [0.0, -0.008, 0.0, 0.0, 0.008, 0.0],
+    "arrows": [0.072, 0.209, 0.0, 0.084, 0.209, 0.0, 0.072, 0.241, 0.0, 0.084, 0.241, 0.0],
+    "texts": [0.0855346, 0.2138229, 0.0, 0.0855346, 0.2458229, 0.0],
+    "text_height": 0.00635,
+}
+CTB_SECTION_A_SPANS = [
+    ["A", 0.0862235, 0.2077981, 0.0920824, 0.2139703],
+    ["A", 0.0862235, 0.2397982, 0.0920824, 0.2459704],
+]
+
+
+def test_a_section_line_runs_between_its_arrow_tails_with_its_printed_labels():
+    view = _view("Drawing View2", (0.051412, 0.207412, 0.092588, 0.242588), sections=[CTB_SECTION_A])
+    model = sheet_model(_dump(views=[view], spans=CTB_SECTION_A_SPANS))
+    [section] = [a for a in model.geometry.annotations if a.kind == "section-line"]
+    [line] = [s for s in section.segments if s.role == "line"]
+    assert (line.x0, line.y0, line.x1, line.y1) == pytest.approx((0.072, 0.209, 0.072, 0.241))
+    assert [(b.xmin, b.ymin, b.xmax, b.ymax) for b in section.text_boxes] == [
+        tuple(span[1:]) for span in CTB_SECTION_A_SPANS
+    ]
+    assert model.unmatched == ()
+    lost = sheet_model(_dump(views=[view], spans=CTB_SECTION_A_SPANS[:1]))
+    assert lost.unmatched == (("section-line A", "A"),)
+
+
+# cone-swing-platform, Drawing View2: the 6.76 hole callout's leader runs
+# past its arrow tip on the hole's edge to the hole's centre, where 195.09's
+# extension line and section line A both pass.
+CSP_VIEW2 = (0.1594442, 0.1285735, 0.2005558, 0.2514265)
+CSP_DRILL = {
+    "type": 4,
+    "name": "RD1",
+    "visible": 1,
+    "display": {
+        "lines": [
+            _line(0.1773666, 0.1360656, 0.1884146, 0.1041951),
+            _line(0.1762602, 0.1392573, 0.1773666, 0.1360656),
+            _line(0.1884146, 0.1041951, 0.2399979, 0.1041951),
+        ],
+        "arrows": [[0.1773666, 0.1360656, -0.0015875, 0.3275313, -0.9448403, 0.0, 0.003556, 0.000762, 0.0, 0.0, -0.0, -1.0]],
+        "texts": [
+            {"t": "DRILL ", "pos": [0.1900021, 0.1042486, 0.0], "h": 0.0035},
+            {"t": "<MOD-DIAM>", "pos": [0.2029618, 0.1041951, 0.0], "h": 0.0035},
+            {"t": " 6.76 THRU ALL", "pos": [0.2082403, 0.1042486, 0.0], "h": 0.0035},
+        ],
+    },
+    "dim": {"hole_callout": True},
+}
+CSP_POST_MOUNT = _dim(
+    "PostMountEastZ",
+    " 195.09 ",
+    0.1215951,
+    0.1722219,
+    lines=[
+        (0.1737778, 0.2352052, 0.129, 0.2352052),
+        (0.1807524, 0.1376615, 0.129, 0.1376615),
+        (0.13, 0.2352052, 0.13, 0.1777781),
+        (0.13, 0.1376615, 0.13, 0.1722219),
+    ],
+)
+CSP_SECTION_A = {
+    "label": "A",
+    "arrows": [0.1574442, 0.1376615, 0.0, 0.1574442, 0.1256615, 0.0, 0.2025558, 0.1376615, 0.0, 0.2025558, 0.1256615, 0.0],
+    "texts": [0.1547156, 0.1235998, 0.0, 0.1998272, 0.1235998, 0.0],
+    "text_height": 0.00635,
+}
+CSP_DETAIL_B = [1.0, -1.0, 0.1768134, 0.1406615, 0.0, 0.1828134, 0.1406615, 0.0, 0.1828134, 0.1406615, 0.0,
+                3.0, 0.1849758, 0.1445509, -0.0, 0.00635, 0.0]
+CSP_DETAIL_B_SPAN = ["B", 0.1860114, 0.1383209, 0.1896602, 0.1444931]
+# Detail View B: the C'BORE SLOT note's leader crosses 11.00's dimension line
+# mid-span -- the one true leader crossing on the sheet.
+CSP_SLOT_NOTE = {
+    "type": 6,
+    "name": "DetailItem375",
+    "visible": 1,
+    "leaders": [[0.1204851, 0.0455793, -0.0, 0.0940041, 0.0504458, 0.0]],
+    "display": {
+        "lines": [_line(0.1202019, 0.04615, 0.0940041, 0.0504458)],
+        "arrows": [[0.0940041, 0.0504458, 0.0, 0.9868211, -0.1618151, -0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]],
+        "texts": [
+            {"t": "<MOD-DIAM>", "pos": [0.121, 0.0435, 0.0], "h": 0.0025},
+            {"t": "7.94 END MILL C'BORE SLOT", "pos": [0.1247703, 0.0435, 0.0], "h": 0.0025},
+            {"t": "FROM UNDERSIDE", "pos": [0.121, 0.04, 0.0], "h": 0.0025},
+        ],
+    },
+    "note": {"text": "<MOD-DIAM>7.94 END MILL C'BORE SLOT\r\nFROM UNDERSIDE", "balloon": False},
+}
+CSP_TIP_SLOT = _dim(
+    "TipSlotZ",
+    " 11.00 ",
+    0.1135,
+    0.0567219,
+    lines=[
+        (0.0805, 0.055, 0.1145, 0.055),
+        (0.096256, 0.033, 0.1145, 0.033),
+        (0.1277236, 0.0567219, 0.1135, 0.0567219),
+        (0.1135, 0.0567219, 0.1135, 0.055),
+        (0.1135, 0.055, 0.1135, 0.033),
+    ],
+)
+
+
+def _cone_swing_platform():
+    view2 = _view(
+        "Drawing View2",
+        CSP_VIEW2,
+        [CSP_DRILL, CSP_POST_MOUNT],
+        sections=[CSP_SECTION_A],
+        detail_circles_info=CSP_DETAIL_B,
+    )
+    detail = _view("Detail View B (2 : 1)", (0.049112, 0.0106121, 0.117888, 0.079388), [CSP_SLOT_NOTE, CSP_TIP_SLOT])
+    return _dump(views=[view2, detail], spans=[CSP_DETAIL_B_SPAN])
+
+
+def test_a_leader_running_past_its_arrow_into_the_hole_crosses_nothing():
+    """The crossings on the stretch past the arrow tip are the hole's own
+    centre and extension lines; the slot note's leader across 11.00's
+    dimension line, 20 mm from its tip, still gates."""
+    crossings = [f for f in audit_dump(_cone_swing_platform()) if "crosses" in f.kind]
+    assert [(f.kind, f.a.split()[1], f.b.split()[1]) for f in crossings] == [
+        ("leader-crosses-line", "DetailItem375", "TipSlotZ")
+    ]
+    assert severity(crossings[0]) is FindingSeverity.GATING
+
+
+def test_a_detail_circle_is_no_leader_target_and_its_label_is_the_printed_one():
+    """A leader to a feature inside a detail circle must cross the circle.
+    The circle's label is boxed from its printed "B" (x 186.0 mm), which
+    10.50's dimension line (ending x 185.8) stops short of; the COM estimate
+    started at 185.0 and read the line as crossing it."""
+    detail = {"type": 4, "name": "Reach", "visible": 1, "display": {
+        "lines": [_line(0.1700, 0.1300, 0.1840, 0.1420)], "texts": []}, "dim": {"hole_callout": True}}
+    relief = _dim("PivotBearingReliefDia", "10.50", 0.1650, 0.1500, lines=[(0.1794, 0.1411, 0.1858, 0.1411)])
+    view = _view("Drawing View2", CSP_VIEW2, [detail, relief], detail_circles_info=CSP_DETAIL_B)
+    findings = audit_dump(_dump(views=[view], spans=[CSP_DETAIL_B_SPAN]))
+    assert not [f for f in findings if "detail-circle" in f.a + f.b]
+    estimated = audit_dump(_dump(views=[view]))
+    assert [f.kind for f in estimated if "detail-circle" in f.a + f.b] == ["text-on-line"]
+
+
+def test_every_labelled_detail_circle_of_a_view_is_parsed():
+    """Codex P1 on f81d7ff3a: the label's span index overwrote the cursor into
+    GetDetailCircleInfo2, so a view's second labelled circle parsed from the
+    wrong offset (or raised when the first label had no printed span)."""
+    record = CSP_DETAIL_B[1:]
+    shift = [0.030 if k in (1, 4, 7, 11) else 0.0 for k in range(len(record))]
+    second = [value + delta for value, delta in zip(record, shift)]
+    info = [2.0, *record, *second]
+    span_c = ["C", CSP_DETAIL_B_SPAN[1] + 0.030, *CSP_DETAIL_B_SPAN[2:3], CSP_DETAIL_B_SPAN[3] + 0.030,
+              CSP_DETAIL_B_SPAN[4]]
+    view = _view("Drawing View2", (0.15, 0.12, 0.25, 0.26), [], detail_circles_info=info)
+    for spans in ([["10.50", 0.1650, 0.1500, 0.1700, 0.1530], CSP_DETAIL_B_SPAN, span_c], []):
+        circles = [
+            a for a in sheet_model(_dump(views=[view], spans=spans)).geometry.annotations
+            if a.kind == "detail-circle"
+        ]
+        assert [a.label for a in circles] == [
+            "detail-circle Drawing View2 #1",
+            "detail-circle Drawing View2 #2",
+        ]
+        centres = [round(min(s.x0 for s in a.segments) * 1000, 1) for a in circles]
+        assert centres[1] - centres[0] == pytest.approx(30.0, abs=0.2)
+
+
+# IView::GetDetailCircleInfo2 of a view cropped by a circle: its crop profile,
+# the label point at the sheet origin with a 6.35 mm height. Read by the
+# r743-8 leaf (C:/src/_wt/r743-integ) on amplitude-bar's DETAIL B (Drawing
+# View5, whose ring the PDF prints at 0.18 mm) and on rocker-arm-support's
+# Drawing View5 (whose ring the PDF does not print).
+CROP_LABEL_AT_ORIGIN = [-0.0005696, 0.0002378, -0.0, 0.00635, 0.0]
+# The border and title-block kinds 7f5948f3c enforced (#1052 re-enables them).
+SHEET_EDGE_KINDS = ("outside-border", "keep-out")
+AMPLITUDE_BAR_CROP_B = [1.0, -1.0, 0.3, 0.205, 0.0, 0.3, 0.237, 0.0, 0.3, 0.237, 0.0, 3.0, *CROP_LABEL_AT_ORIGIN]
+ROCKER_SUPPORT_CROP = [
+    1.0, -1.0, 0.21, 0.1079955, 0.0, 0.253815, 0.1079955, 0.0, 0.253815, 0.1079955, 0.0, 3.0,
+    *CROP_LABEL_AT_ORIGIN,
+]
+
+
+def _printed_ring(cx, cy, radius):
+    """A printed detail circle: the PDF's polyline at annotation weight."""
+    return _edges(*_ring(cx, cy, radius, sides=96), width=0.00018)
+
+
+def _circles(dump):
+    return [a for a in sheet_model(dump).geometry.annotations if a.kind == "detail-circle"]
+
+
+def test_a_crop_profiles_label_at_the_sheet_origin_prints_nothing():
+    """The 446acf694 replay over the r743-8 and cascade dumps: every enforced
+    finding (amplitude-bar x3, pinion-arbor, rocker-arm-support x2) was a crop
+    profile's label boxed at the origin, 18.81 mm past the bottom border and in
+    the title block. No label prints there; the printed ring stays ink."""
+    view = _view("Drawing View5", (0.279172, 0.161812, 0.320828, 0.240188), [],
+                 detail_circles_info=AMPLITUDE_BAR_CROP_B)
+    dump = _dump(views=[view], strokes=_printed_ring(0.3, 0.205, 0.032))
+    assert [f for f in audit_dump(dump) if f.kind in SHEET_EDGE_KINDS] == []
+    [circle] = _circles(dump)
+    assert circle.text_boxes == ()
+    assert circle.box().ymin == pytest.approx(0.205 - 0.032, abs=1e-4)
+
+
+def test_a_detail_circle_the_page_does_not_print_is_no_ink():
+    """rocker-arm-support's crop ring (r 43.8 mm) prints nothing, yet its box
+    corner read as keep-out in the title block. Printed, the same ring would
+    dip into the title block, and that still gates."""
+    view = _view("Drawing View5", (0.151834, 0.0952075, 0.268166, 0.1207835), [],
+                 detail_circles_info=ROCKER_SUPPORT_CROP)
+    # Ink elsewhere, and a line crossing the ring: near it at one point only.
+    elsewhere = _edges((0.05, 0.2, 0.08, 0.2), (0.15, 0.1079955, 0.27, 0.1079955), width=0.00018)
+    unprinted = _dump(views=[view], strokes=elsewhere)
+    assert _circles(unprinted) == []
+    assert [f for f in audit_dump(unprinted) if f.kind in SHEET_EDGE_KINDS] == []
+    printed = _dump(views=[view], strokes=[*elsewhere, *_printed_ring(0.21, 0.1079955, 0.043815)])
+    edge = [f for f in audit_dump(printed) if f.kind in SHEET_EDGE_KINDS]
+    assert [(f.kind, f.b) for f in edge] == [("keep-out", "title-block")]
+    assert severity(edge[0]) is FindingSeverity.GATING
+
+
+def test_a_crop_profile_is_ink_only_where_the_page_prints_it():
+    """amplitude-bar's DETAIL A (r743-8): the page prints the crop ring's arc
+    inside the view, 60-150 degrees, and none of its lower half, which the
+    whole COM circle ran through BottomNotchWidth's "+0.3" (text-on-line)."""
+    cx, cy, radius = 0.16822, 0.1, 0.03178
+    info = [1.0, -1.0, cx, cy, 0.0, cx, cy + radius, 0.0, cx, cy + radius, 0.0, 3.0, *CROP_LABEL_AT_ORIGIN]
+    view = _view("Drawing View4", (0.141172, 0.091234, 0.182828, 0.140546), [], detail_circles_info=info)
+    arc = [
+        (cx + radius * math.cos(math.radians(a)), cy + radius * math.sin(math.radians(a)))
+        for a in range(60, 151, 2)
+    ]
+    dump = _dump(views=[view], strokes=_edges(*[(*a, *b) for a, b in zip(arc, arc[1:])], width=0.00018))
+    [circle] = _circles(dump)
+    box = circle.box()
+    # The printed arc's lower end is its 150-degree end, well above the centre.
+    assert box.ymin >= cy + radius * math.sin(math.radians(150)) - 0.0005
+    assert box.xmin >= cx + radius * math.cos(math.radians(150)) - 0.002
+    assert box.xmax <= cx + radius * math.cos(math.radians(60)) + 0.002
+
+
+def test_arrow_clearance_to_a_balloon_is_measured_to_its_ring():
+    """Codex P2 on f81d7ff3a: a 5 mm balloon's bounding square put an arrow
+    7.5 mm out along the diagonal 0.4 mm from "text" -- 2.5 mm from the ring,
+    past the 2 mm rule. Square-side arrows keep gating as before."""
+    from _layout_audit import find_arrows_near_text, find_extensions_near_text
+    from _layout_geometry import AnnotationGeometry, SheetGeometry
+
+    cx, cy, radius = 0.200, 0.150, 0.005
+    balloon = AnnotationGeometry(
+        "balloon 17", "balloon", "v", (Box(cx - radius, cy - radius, cx + radius, cy + radius),),
+        circle=(cx, cy, radius),
+    )
+
+    def sheet(point, role):
+        x, y = point
+        segment = Segment(x, y, x + 0.002, y + 0.002, role)
+        return SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (balloon, AnnotationGeometry(
+            "dim 10.5", "dim", "v", (), (segment,))), 0.6)
+
+    diagonal = (cx + 0.0075 / math.sqrt(2), cy + 0.0075 / math.sqrt(2))
+    assert find_arrows_near_text(sheet(diagonal, "arrow")) == []
+    assert find_extensions_near_text(sheet(diagonal, "ext-line")) == []
+    [near] = find_arrows_near_text(sheet((cx + radius + 0.0015, cy), "arrow"))
+    assert near.extra["gap_mm"] == pytest.approx(1.5)
+
+
+def test_a_leader_across_a_section_cutting_line_gates():
+    """Main's ruling: gating -- the MHA-025 finish leader was moved off its
+    A-A line for exactly this."""
+    callout = _hole_callout(
+        "C", [(0.160, 0.120, 0.190, 0.150), (0.190, 0.150, 0.230, 0.150)], [("THRU", 0.190, 0.1502)]
+    )
+    view = _view("v", CSP_VIEW2, [callout], sections=[CSP_SECTION_A])
+    [finding] = [f for f in audit_dump(_dump(views=[view])) if "crosses" in f.kind]
+    assert finding.kind == "leader-crosses-section-line"
+    assert severity(finding) is FindingSeverity.GATING
+
+
+def test_text_beside_a_view_is_measured_against_its_printed_edges_not_its_padded_outline():
+    """knife-mount's Ra 0.8 (owned by View1) ends 2 mm inside View2's
+    GetOutline but 1.5 mm clear of its first printed edge."""
+    outline = (0.200412, 0.105046, 0.239588, 0.174954)
+    beside = _note("Ra", "Ra 0.8", (0.1805, 0.1194, 0.2044, 0.1259))
+    over = _note("Over", "Ra 0.8", (0.1845, 0.1394, 0.2084, 0.1459))
+    views = [_view("View1", (0.085, 0.105, 0.145, 0.175), [beside, over]), _view("View2", outline)]
+    findings = audit_dump(_dump(views=views, strokes=_box_edges(0.2059, 0.1070, 0.2380, 0.1730)))
+    assert [f.a for f in findings if f.kind == "text-on-view"] == ["note Over 'Ra 0.8'"]
+    padded = audit_dump(_dump(views=views))
+    assert sorted(f.a for f in padded if f.kind == "text-on-view") == ["note Over 'Ra 0.8'", "note Ra 'Ra 0.8'"]
+
+
+def test_a_general_note_is_no_tall_callout_but_a_leadered_one_is():
+    """knife-mount's 11-row process note is a text block by design; the
+    same rows at the end of a leader stop reading as one label."""
+    h = 0.0035
+    rows = [{"t": f"ROW {i}", "pos": [0.020, 0.070 - i * 0.0045, 0.0], "h": h} for i in range(11)]
+    general = {"type": 6, "name": "Process", "visible": 1, "display": {"texts": rows}, "note": {"balloon": False}}
+    leadered = {**general, "name": "Callout", "leaders": [[0.020, 0.075, 0.0, 0.050, 0.090, 0.0]]}
+    findings = audit_dump(_dump(views=[_view("v", (0.1, 0.1, 0.2, 0.2), [general, leadered])]))
+    assert [f.a for f in findings if f.kind == "tall-block"] == ["note Callout"]
+
+
+def test_one_line_through_a_two_row_dimension_is_one_finding():
+    """knife-mount's Ø12.00 / THRU, both rows crossed by 29.37's dimension line."""
+    bore = _dim("BoreDia", "", 0, 0)
+    bore["display"]["texts"] = [
+        {"t": "<MOD-DIAM>12.00", "pos": [0.0585, 0.1555, 0.0], "h": 0.0035},
+        {"t": "THRU", "pos": [0.0615, 0.1500, 0.0], "h": 0.0035},
+    ]
+    height = _dim("BlockHeight", "29.37", 0.0590, 0.1380, lines=[(0.063, 0.1694, 0.063, 0.1428)])
+    findings = audit_dump(_dump(views=[_view("v", (0.04, 0.13, 0.09, 0.18), [bore, height])]))
+    assert [(f.a.split()[1], f.b.split()[1]) for f in findings if f.kind == "text-on-line"] == [
+        ("BoreDia", "BlockHeight")
+    ]
+
+
+def test_a_pdf_page_dumps_its_text_and_only_its_black_stroked_lines():
+    """The frame and title block print grey and arrowheads/section arrows are
+    filled: neither is a line the audit measures."""
+    from _pdf_ink import page_ink
+    from _pdf_ink import PageInk, Span, Stroke
+
+    def stroke(y, *, rgb=(0, 0, 0), filled=False, stroked=True, dashed=False):
+        return Stroke(0.1, y, 0.2, y, 0.00025, rgb, dashed, filled, stroked)
+
+    page = PageInk(
+        width=SHEET_W,
+        height=SHEET_H,
+        glyphs=(),
+        spans=(Span("6.0", 0.1, 0.1, 0.106, 0.1033, ()),),
+        strokes=(
+            stroke(0.10),
+            stroke(0.11, dashed=True),
+            stroke(0.12, rgb=(128, 128, 128)),
+            stroke(0.13, filled=True),
+            stroke(0.14, stroked=False, filled=True),
+        ),
+    )
+    ink = page_ink(page)
+    assert ink["spans"] == [["6.0", 0.1, 0.1, 0.106, 0.1033]]
+    assert ink["strokes"] == [[0.1, 0.1, 0.2, 0.1, 0.00025, 0], [0.1, 0.11, 0.2, 0.11, 0.00025, 1]]
+
+
+# --------------------------------------------------------------------------
+# codex review of 6bab30da9
+# --------------------------------------------------------------------------
+
+
+def test_a_run_mixing_a_symbol_and_text_keeps_the_symbol_in_its_box():
+    """``<MOD-DIAM>12.00`` prints "12.00" as text and "Ø" as a path: the box
+    reaches back to the run's COM start, where the symbol is."""
+    dim = _dim("Bore", "<MOD-DIAM>12.00", 0.0585, 0.1545)
+    printed = Box(0.0645, 0.1556, 0.0753, 0.1592)
+    geometry = annotation_geometry(dim, owner="v", advance=0.6, ink={0: printed})
+    [row] = geometry.text_boxes
+    assert (row.xmin, row.xmax) == pytest.approx((0.0585, 0.0753))
+    trailing = _dim("Depth", "6.9<HOLE-DEPTH>", 0.100, 0.100)
+    [row] = annotation_geometry(
+        trailing, owner="v", advance=0.6, ink={0: Box(0.1005, 0.1009, 0.1060, 0.1042)}
+    ).text_boxes
+    assert row.xmax == pytest.approx(0.1060 + 0.6 * 0.0035)
+
+
+def test_hidden_and_template_text_neither_claims_printed_text_nor_goes_unmatched():
+    visible = _dim("Visible", "12.0", 0.1000, 0.1500)
+    hidden = _dim("Hidden", "12.0", 0.1001, 0.1500)
+    hidden["visible"] = 3
+    template = _note("Template", "", (0.003, 0.03, 0.009, 0.038), owner_type=2)
+    template["display"] = {"texts": [{"t": "REV", "pos": [0.005, 0.030, 0.0], "h": 0.0035}]}
+    dump = _dump(
+        views=[_view("v", (0.05, 0.05, 0.25, 0.25), [hidden, visible])],
+        sheet_annotations=[template],
+        spans=[["12.0", 0.10012, 0.15093, 0.1060, 0.1542]],
+    )
+    model = sheet_model(dump)
+    assert model.unmatched == ()
+    [box] = [a.text_boxes[0] for a in model.geometry.annotations if "Visible" in a.label]
+    assert box.xmin == pytest.approx(0.10012)
+
+
+def test_two_printed_leadered_notes_stacked_tight_merge():
+    """A note matched to its PDF text is exact, and still a callout."""
+    h = 0.0035
+
+    def leadered(name, y):
+        note = {
+            "type": 6,
+            "name": name,
+            "visible": 1,
+            "leaders": [[0.100, y, 0.0, 0.080, y - 0.010, 0.0]],
+            "display": {"texts": [{"t": name, "pos": [0.100, y, 0.0], "h": h}]},
+            "note": {"balloon": False},
+        }
+        return note, [name, 0.1002, y + 0.0009, 0.1300, y + 0.0042]
+
+    upper, upper_ink = leadered("UPPER", 0.1500)
+    lower, lower_ink = leadered("LOWER", 0.1450)
+    dump = _dump(views=[_view("v", (0.02, 0.02, 0.07, 0.07), [upper, lower])], spans=[upper_ink, lower_ink])
+    assert [f.kind for f in audit_dump(dump) if f.kind == "merged-blocks"] == ["merged-blocks"]
+
+
+def test_pdf_arcs_are_the_curve_not_its_control_polygon():
+    from _pdf_ink import bezier_points
+
+    k = 0.5522847498  # quarter-circle cubic, 30 mm radius
+    r = 0.030
+    points = bezier_points((r, 0.0), (r, k * r), (k * r, r), (0.0, r))
+    assert points[0] == (r, 0.0) and points[-1] == pytest.approx((0.0, r))
+    assert all(abs((x * x + y * y) ** 0.5 - r) < 1e-5 for x, y in points)
+
+
+def test_pdf_arcs_stray_under_a_hundredth_of_a_millimetre_between_points():
+    """Codex P2 on 8697a655c: eight chords left a 30 mm quarter circle's
+    polyline 0.14 mm off the curve between its points."""
+    from _pdf_ink import bezier_points
+
+    k, r = 0.5522847498, 0.030
+    controls = ((r, 0.0), (r, k * r), (k * r, r), (0.0, r))
+    points = bezier_points(*controls)
+
+    def on_curve(t):
+        (x0, y0), (x1, y1), (x2, y2), (x3, y3) = controls
+        u = 1.0 - t
+        weights = (u**3, 3 * u * u * t, 3 * u * t * t, t**3)
+        return (
+            sum(w * x for w, x in zip(weights, (x0, x1, x2, x3))),
+            sum(w * y for w, y in zip(weights, (y0, y1, y2, y3))),
+        )
+
+    def to_polyline(px, py):
+        best = math.inf
+        for (ax, ay), (bx, by) in zip(points, points[1:]):
+            dx, dy = bx - ax, by - ay
+            t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
+            best = min(best, math.hypot(px - ax - t * dx, py - ay - t * dy))
+        return best
+
+    assert max(to_polyline(*on_curve(i / 2000)) for i in range(2001)) < 1e-5
+
+
+def test_the_calibration_matches_only_what_the_audit_draws():
+    """Codex P2 on 8697a655c: a hidden annotation took part in calibration
+    matching, where it could claim a visible annotation's printed text."""
+    from diagnostics.layout_calibration import match_items
+
+    visible = _dim("Visible", "12.0", 0.1000, 0.1500)
+    hidden = {**_dim("Hidden", "12.0", 0.1001, 0.1500), "visible": 3}
+    dump = _dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [hidden, visible])], spans=[["12.0", 0.1002, 0.1509, 0.1060, 0.1542]], print_rest=False)
+    assert [record["label"] for record in match_items(dump)] == ["Visible"]
+
+
+def _fake_drawing(monkeypatch, *, sheet_names, views, pages):
+    import _drawing_layout_audit as live
+
+    class Doc:
+        def GetSheetNames(self):  # noqa: N802 - COM name
+            if isinstance(sheet_names, Exception):
+                raise sheet_names
+            return sheet_names
+
+        def GetViews(self):  # noqa: N802 - COM name
+            return views
+
+    monkeypatch.setattr(live, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(live, "read_pdf_ink", lambda _pdf: pages)
+    adapter = type("Adapter", (), {"currentModel": Doc()})()
+    return live, adapter
+
+
+def test_the_collector_fails_loud_rather_than_audit_no_sheet(monkeypatch, tmp_path):
+    """A refused GetSheetNames/GetViews used to read as an empty drawing and
+    cache a clean zero-sheet report."""
+    from pathlib import Path
+
+    kwargs = {"stem": "x", "pdf": Path("x.pdf"), "sheet_layouts": {}, "is_pictorial": lambda _o: False}
+    live, adapter = _fake_drawing(monkeypatch, sheet_names=RuntimeError("RPC"), views=(), pages=[object()])
+    with pytest.raises(RuntimeError, match="RPC"):
+        live.collect_sheet_dumps(adapter, **kwargs)
+    live, adapter = _fake_drawing(monkeypatch, sheet_names=("Sheet1",), views=(), pages=[object()])
+    with pytest.raises(RuntimeError, match=r"dumped sheets \[\], drawing has \['Sheet1'\]"):
+        live.collect_sheet_dumps(adapter, **kwargs)
+    live, adapter = _fake_drawing(monkeypatch, sheet_names=("Sheet1", "Sheet2"), views=(), pages=[object()])
+    with pytest.raises(RuntimeError, match="2 sheet"):
+        live.collect_sheet_dumps(adapter, **kwargs)
+
+
+def test_stacked_leadered_balloons_are_not_merged_callouts():
+    """Codex on 9aaa829d6: admitting exact (PDF-matched) leadered notes as
+    callouts must not admit BOM balloons, which are leadered note circles."""
+
+    def balloon(name, cy):
+        arc = [0, 0, 0, 0, 0.105, cy, 0.0, 0.105, cy, 0.0, 0.1, cy, 0.0, 0.0, 0.0, 1.0, 1.0]
+        return {
+            "type": 6,
+            "name": name,
+            "visible": 1,
+            "leaders": [[0.095, cy, 0.0, 0.080, cy - 0.010, 0.0]],
+            "display": {"arcs": [arc], "texts": [{"t": name, "pos": [0.099, cy - 0.001, 0.0], "h": 0.0035}]},
+            "note": {"balloon": True, "text": name},
+        }
+
+    dump = _dump(
+        views=[_view("v", (0.02, 0.02, 0.07, 0.07), [balloon("1", 0.150), balloon("2", 0.1385)])],
+        spans=[["1", 0.0992, 0.1491, 0.1010, 0.1524], ["2", 0.0992, 0.1376, 0.1010, 0.1409]],
+    )
+    findings = audit_dump(dump)
+    assert not [f for f in findings if f.kind == "merged-blocks"]
+    assert {a.kind for a in sheet_model(dump).geometry.annotations} == {"balloon"}
+
+
+# --------------------------------------------------------------------------
+# Main's C2 review (CHANGES) and rulings, 2026-09-25
+# --------------------------------------------------------------------------
+
+
+def _dim_record(name, lines, arrows, texts):
+    """A dimension as the collector dumps it (real d09c2b9eb records below)."""
+    return {
+        "type": 4,
+        "name": name,
+        "visible": 1,
+        "display": {
+            "lines": [[0.0, 0.0, 0.0, 0.0, x0, y0, 0.0, x1, y1, 0.0] for x0, y0, x1, y1 in lines],
+            "arrows": [[x, y, 0.0, dx, dy, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0] for x, y, dx, dy in arrows],
+            "texts": [{"t": t, "pos": [x, y, 0.0], "h": 0.0035, "ref": 1} for t, x, y in texts],
+        },
+        "dim": {"hole_callout": False},
+    }
+
+
+# pinion-bracket (d09c2b9eb): in Drawing View2, 4.50 +/-0.10 and 9.0 share
+# the x = 71 extension line; in View1, 28.00 runs its dimension line down
+# x = 240, the line section arrow B is drawn along.
+PB_PIN_SEAT_CZ = _dim_record(
+    "PinSeatCz",
+    [
+        (0.08, 0.126, 0.08, 0.2007219),
+        (0.071, 0.123, 0.071, 0.2007219),
+        (0.08, 0.1997219, 0.071, 0.1997219),
+        (0.071, 0.1997219, 0.0457281, 0.1997219),
+    ],
+    [(0.08, 0.1997219, -1.0, 0.0), (0.071, 0.1997219, 1.0, 0.0)],
+    [(" 4.50 ±0.10 ", 0.0457281, 0.1997219)],
+)
+PB_DEPTH = _dim_record(
+    "Depth",
+    [
+        (0.071, 0.123, 0.071, 0.2102219),
+        (0.089, 0.123, 0.089, 0.2102219),
+        (0.071, 0.2092219, 0.06465, 0.2092219),
+        (0.071, 0.2092219, 0.089, 0.2092219),
+        (0.089, 0.2092219, 0.09535, 0.2092219),
+    ],
+    [(0.071, 0.2092219, -1.0, 0.0), (0.089, 0.2092219, 1.0, 0.0)],
+    [(" 9.0 ", 0.0754743, 0.2092219)],
+)
+PB_ARBOR_BORE_CZ = _dim_record(
+    "ArborBoreCz",
+    [
+        (0.224, 0.178, 0.241, 0.178),
+        (0.22235, 0.122, 0.241, 0.122),
+        (0.24, 0.178, 0.24, 0.1537781),
+        (0.24, 0.122, 0.24, 0.1482219),
+    ],
+    [(0.24, 0.178, 0.0, -1.0), (0.24, 0.122, 0.0, 1.0)],
+    [(" 28.00 ", 0.2328882, 0.1482219)],
+)
+PB_SECTION_B = {
+    "label": "B",
+    "line": [-0.015, -0.007, 0.0, 0.015, -0.007, 0.0],
+    "arrows": [0.18, 0.136, 0.0, 0.18, 0.124, 0.0, 0.24, 0.136, 0.0, 0.24, 0.124, 0.0],
+    "texts": [0.1778777, 0.1219384, 0.0, 0.2378777, 0.1219384, 0.0],
+    "text_height": 0.00635,
+}
+PB_SPANS = [
+    ["28.00", 0.2343213, 0.1491558, 0.2456694, 0.1527211],
+    ["B", 0.1783162, 0.11566, 0.1819653, 0.1218322],
+    ["B", 0.2383162, 0.11566, 0.2419653, 0.1218322],
+    ["9.0", 0.0769961, 0.2101558, 0.0830833, 0.2137211],
+    ["4.50±0.10", 0.0471378, 0.2006558, 0.0688295, 0.2042211],
+]
+
+
+def test_a_dimension_splits_into_its_dimension_line_and_extension_lines():
+    geometry = annotation_geometry(PB_PIN_SEAT_CZ, owner="v", advance=0.6)
+    roles = [
+        (s.role, round(s.x0 * 1000, 1), round(s.x1 * 1000, 1)) for s in geometry.segments if s.role != "arrow"
+    ]
+    assert roles == [
+        ("ext-line", 80.0, 80.0),
+        ("ext-line", 71.0, 71.0),
+        ("dim-line", 80.0, 71.0),
+        ("dim-line", 71.0, 45.7),  # the run out to the text parked left
+    ]
+
+
+def test_a_section_arrow_along_a_dimension_line_gates_but_a_shared_extension_line_does_not():
+    """Main's collinear ruling: pinion-bracket's section arrow B runs 12 mm
+    down 28.00's dimension line. 4.50 +/-0.10 and 9.0 share x = 71 as
+    extension line, which is normal drafting."""
+    view1 = _view(
+        "Drawing View1", (0.189412, 0.101412, 0.230588, 0.198588), [PB_ARBOR_BORE_CZ], sections=[PB_SECTION_B]
+    )
+    view2 = _view("Drawing View2", (0.04, 0.12, 0.1, 0.215), [PB_PIN_SEAT_CZ, PB_DEPTH])
+    findings = audit_dump(_dump(views=[view1, view2], spans=PB_SPANS, print_rest=False))
+    along = [f for f in findings if f.kind == "line-on-dimension-line"]
+    assert [(f.a, f.b.split()[1]) for f in along] == [("section-line B", "ArborBoreCz")]
+    assert along[0].extra["overlap_mm"] == pytest.approx(12.0, abs=0.01)
+    assert severity(along[0]) is FindingSeverity.GATING
+
+
+def test_a_dimension_line_across_a_foreign_extension_line_gates_only_at_text():
+    """Main's ruling b: advisory, unless within 0.5 h of either dimension's text."""
+    far = _dim_record("Far", [(0.100, 0.150, 0.140, 0.150)], [(0.100, 0.150, 1.0, 0.0)], [("12.0", 0.150, 0.150)])
+    near = _dim_record("Near", [(0.100, 0.130, 0.140, 0.130)], [(0.100, 0.130, 1.0, 0.0)], [("8.0", 0.121, 0.1305)])
+    crossed = _dim_record(
+        "Crossed",
+        [(0.120, 0.100, 0.120, 0.170), (0.120, 0.160, 0.180, 0.160)],
+        [(0.180, 0.160, -1.0, 0.0)],
+        [("30.0", 0.185, 0.160)],
+    )
+    findings = audit_dump(_dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [far, near, crossed])]))
+    crossings = {(f.a.split()[1], f.kind, severity(f).value) for f in findings if f.kind.startswith("dim-line")}
+    assert crossings == {
+        ("Far", "dim-line-crosses-extension", "advisory"),
+        ("Near", "dim-line-crosses-extension-at-text", "gating"),
+    }
+
+
+# --------------------------------------------------------------------------
+# Arrow and extension line near foreign text (Main's ruling on swing's MHA-092
+# round-2 rule). Ink measured off the 287c5cf6a cone-tip-block render, sheet
+# mm (C:/src/dt-logs/handoffs/mha092-r2-fixtures.md).
+# --------------------------------------------------------------------------
+
+
+def _mm(*values):
+    return tuple(value / 1000.0 for value in values)
+
+
+def _vertical_dim(name, text, x, low, high, text_box, *, outside=True):
+    """A vertical dimension between tips (x, low) and (x, high), its text
+    printed in ``text_box`` (mm). Outside arrows point in and carry 6.35 mm
+    tails; inside arrows point out."""
+    sign = 1.0 if outside else -1.0
+    lines = [_mm(x, low, x, high)]
+    if outside:
+        lines += [_mm(x, low, x, low - 6.35), _mm(x, high, x, high + 6.35)]
+    arrows = [(*_mm(x, low), 0.0, -sign), (*_mm(x, high), 0.0, sign)]
+    record = _dim_record(name, lines, arrows, [(f" {text} ", *_mm(text_box[0], text_box[1]))])
+    return record, [text, *_mm(*text_box)]
+
+
+def _text_note(name, text, box):
+    x0, y0 = _mm(box[0], box[1])
+    note = {
+        "type": 6,
+        "name": name,
+        "visible": 1,
+        "display": {"texts": [{"t": text, "pos": [x0, y0, 0.0], "h": 0.0035, "ref": 1}]},
+        "note": {"text": text, "balloon": False},
+    }
+    return note, [text, *_mm(*box)]
+
+
+def _near_text(annotations_and_spans):
+    annotations = [a for a, _span in annotations_and_spans]
+    spans = [span for _a, span in annotations_and_spans]
+    view = _view("v", _mm(20.0, 20.0, 300.0, 270.0), annotations)
+    findings = audit_dump(_dump(views=[view], spans=spans, print_rest=False))
+    return {
+        (f.kind, f.a.split()[1], f.b.split()[1], severity(f).value)
+        for f in findings
+        if f.kind in ("arrow-near-text", "extension-near-text", "text-on-line")
+    }
+
+
+def test_an_arrow_tail_near_foreign_text_gates():
+    """287c: the 15.2's lower outside arrow's tail stood 0.2 mm over the
+    ADJUSTER ENTRY note; its head, 3.5 mm off, does not reach. Arrows set
+    inside (the fix) carry no tail and clear the note."""
+    note = _text_note("adjuster", "ADJUSTER ENTRY", (95.17, 130.98, 131.49, 134.37))
+    slit = _vertical_dim("SlitDepth", "15.2", 114.93, 141.39, 164.19, (116.5, 150.0, 122.5, 153.5))
+    assert _near_text([note, slit]) == {("arrow-near-text", "SlitDepth", "adjuster", "gating")}
+    inside = _vertical_dim("SlitDepth", "15.2", 114.93, 141.39, 164.19, (116.5, 150.0, 122.5, 153.5), outside=False)
+    assert _near_text([note, inside]) == set()
+
+
+def test_an_arrowhead_near_foreign_text_gates():
+    """287c: the 5.56's lower arrow ran 0.4 mm from the foot finish's Ra 3.2
+    (fixture 2), and the 7.50's left arrow sat on VIEW C's letter. Moving the
+    note clears it."""
+    heel = _vertical_dim("HeelReliefHt", "5.56", 124.25, 93.90, 102.11, (125.5, 96.2, 131.5, 99.7))
+    finish = _text_note("foot", "Ra 3.2", (112.35, 85.94, 123.70, 89.49))
+    assert _near_text([heel, finish]) == {("arrow-near-text", "HeelReliefHt", "foot", "gating")}
+    moved = _text_note("foot", "Ra 3.2", (62.35, 85.94, 73.70, 89.49))  # 50 mm left, clear of every arrow
+    assert _near_text([heel, moved]) == set()
+
+    letter = _text_note("viewC", "C", (64.60, 254.51, 69.17, 259.50))
+    slot_x = _dim_record(
+        "FlangeSlotX",
+        [_mm(72.0, 259.88, 79.5, 259.88), _mm(72.0, 259.88, 65.65, 259.88), _mm(79.5, 259.88, 85.85, 259.88)],
+        [(*_mm(72.0, 259.88), -1.0, 0.0), (*_mm(79.5, 259.88), 1.0, 0.0)],
+        [(" 7.50 ", *_mm(73.0, 262.0))],
+    )
+    assert _near_text([letter, (slot_x, ["7.50", *_mm(73.0, 262.0, 79.0, 265.5)])]) == {
+        ("arrow-near-text", "FlangeSlotX", "viewC", "gating")
+    }
+
+
+def test_an_arrow_inside_foreign_text_is_one_gating_finding():
+    """287c fixture 3: the 10.7's upper arrow landed inside the 3.97's
+    tolerance stack. It is ink through text (text-on-line), reported once."""
+    stack = _text_note("FlangeSlotW", "3.97", (83.48, 232.58, 102.36, 240.96))
+    slot_z = _vertical_dim("FlangeSlotZ", "10.7", 93.90, 215.48, 231.39, (90.17, 221.66, 98.30, 225.04))
+    found = _near_text([stack, slot_z])
+    assert {(kind, a, b) for kind, a, b, _severity in found} == {("text-on-line", "FlangeSlotW", "FlangeSlotZ")}
+
+
+def test_an_extension_line_near_foreign_text_is_advisory():
+    """Main's ruling: an extension line within 2 mm of another annotation's
+    text, not touching it, is advisory; through it is text-on-line."""
+    witness = _dim_record(
+        "Witness",
+        [_mm(150.0, 100.0, 150.0, 140.0), _mm(170.0, 100.0, 170.0, 140.0), _mm(150.0, 138.0, 170.0, 138.0)],
+        [(*_mm(150.0, 138.0), 1.0, 0.0), (*_mm(170.0, 138.0), -1.0, 0.0)],
+        [(" 20.0 ", *_mm(155.0, 139.0))],
+    )
+    beside = _text_note("beside", "SIDE", (130.0, 120.0, 148.8, 123.5))
+    through = _text_note("through", "CROSS", (165.0, 125.0, 175.0, 128.5))
+    found = _near_text(
+        [(witness, ["20.0", *_mm(155.0, 139.0, 163.0, 142.5)]), beside, through]
+    )
+    assert found == {
+        ("extension-near-text", "Witness", "beside", "advisory"),
+        ("text-on-line", "through", "Witness", "gating"),
+    }
+
+
+def test_only_an_outside_arrow_has_a_tail():
+    """Real pinion-bracket records: 9.0's outside arrows carry 6.35 mm tails;
+    4.50's inside arrows, whose line runs on to text parked left, carry none."""
+    depth = annotation_geometry(PB_DEPTH, owner="v", advance=0.6)
+    assert sorted((round(t.x0 * 1000, 2), round(t.x1 * 1000, 2)) for t in depth.arrow_tails) == [
+        (71.0, 64.65),
+        (89.0, 95.35),
+    ]
+    assert annotation_geometry(PB_PIN_SEAT_CZ, owner="v", advance=0.6).arrow_tails == ()
+
+
+def test_the_audit_and_the_placement_checks_share_one_arrow_text_clearance():
+    from _layout_audit import find_arrows_near_text, find_extensions_near_text
+    from _layout_geometry import ARROW_TEXT_CLEARANCE_M
+
+    assert ARROW_TEXT_CLEARANCE_M == 0.002
+    for finder in (find_arrows_near_text, find_extensions_near_text):
+        assert finder.__kwdefaults__["clearance"] is ARROW_TEXT_CLEARANCE_M
+
+
+# knife-mount (95a9e97ca, calibration run 2): the 29.37 runs through the
+# Ø12.00 / THRU parked off the bore, and through the shoulder under it.
+KM_BORE_DIA = _dim_record(
+    "BoreDia",
+    [
+        (0.1044316, 0.134318, 0.0770455, 0.149047),
+        (0.1255684, 0.12295, 0.1044316, 0.134318),
+        (0.0770455, 0.149047, 0.058542, 0.149047),
+    ],
+    [(0.1044316, 0.134318, -0.8807039, 0.4736673)],
+    [("<MOD-DIAM>", 0.058542, 0.1546033), ("12.00", 0.0638205, 0.1546567), ("THRU", 0.0614656, 0.149047)],
+)
+KM_BLOCK_HEIGHT = _dim_record(
+    "BlockHeight",
+    [
+        (0.138, 0.110634, 0.062, 0.110634),
+        (0.138, 0.169366, 0.062, 0.169366),
+        (0.063, 0.110634, 0.063, 0.1372219),
+        (0.063, 0.169366, 0.063, 0.1427781),
+    ],
+    [(0.063, 0.110634, 0.0, 1.0), (0.063, 0.169366, 0.0, -1.0)],
+    [(" 29.37 ", 0.0558882, 0.1372219)],
+)
+KM_SPANS = [
+    ["29.37", 0.0573213, 0.1381558, 0.0686927, 0.1417211],
+    ["12.00", 0.0644833, 0.1555907, 0.0753086, 0.159156],
+    ["THRU", 0.0615403, 0.149981, 0.0721142, 0.1534623],
+]
+
+
+def test_a_dimension_text_shoulder_is_a_shoulder_and_one_crossing_is_one_finding():
+    """The Ø12.00's run under THRU is its text shoulder, not an extension
+    line; the 29.37 through its text and shoulder is one gating defect."""
+    roles = [s.role for s in annotation_geometry(KM_BORE_DIA, owner="v", advance=0.6).segments if s.role != "arrow"]
+    assert roles == ["dim-line", "dim-line", "shoulder"]
+    view = _view("Drawing View1", (0.085412, 0.105046, 0.144588, 0.174954), [KM_BORE_DIA, KM_BLOCK_HEIGHT])
+    block = _box_edges(0.09, 0.11, 0.14, 0.17)
+    findings = audit_dump(_dump(views=[view], spans=KM_SPANS, strokes=block, print_rest=False))
+    gating = [(f.kind, f.a.split()[1], f.b.split()[1]) for f in findings if severity(f) is FindingSeverity.GATING]
+    assert gating == [("text-on-line", "BoreDia", "BlockHeight")]
+
+
+def test_an_extension_line_passing_a_dimension_baseline_stays_an_extension_line():
+    """pinion-bracket's 7.000 (run 2): its lower witness runs along the text
+    baseline, 0.2 mm off it, but does not continue a dimension line."""
+    pin_seat_cy = _dim_record(
+        "PinSeatCy",
+        [(0.07, 0.136, 0.131, 0.136), (0.072, 0.122, 0.131, 0.122), (0.13, 0.136, 0.13, 0.14235), (0.13, 0.122, 0.13, 0.11565)],
+        [(0.13, 0.136, 0.0, 1.0), (0.13, 0.122, 0.0, -1.0)],
+        [(" 7.000 ", 0.1228882, 0.1222219)],
+    )
+    roles = [s.role for s in annotation_geometry(pin_seat_cy, owner="v", advance=0.6).segments if s.role != "arrow"]
+    assert roles == ["ext-line", "ext-line", "dim-line", "dim-line"]
+
+
+def test_a_line_through_a_callouts_text_and_shoulder_is_one_text_on_line():
+    """The same geometry as the shoulder test, but the line runs on 0.9 mm
+    into the text: one defect, reported as text-on-line only."""
+    h = 0.0035
+    callout = _hole_callout(
+        "Adjuster",
+        [(0.080, 0.090, 0.100, 0.1000), (0.100, 0.1000, 0.140, 0.1000)],
+        [("THRU ALL", 0.100, 0.1001)],
+        height=h,
+    )
+    heel = _dim("HeelReliefHt", "5.56", 0.150, 0.080, lines=[(0.1190, 0.0875, 0.1190, 0.0990)])
+    heel["display"]["lines"].append(_line(0.1190, 0.0990, 0.1190, 0.1010))
+    findings = audit_dump(_dump(views=[_view("front", (0.05, 0.05, 0.2, 0.2), [callout, heel])]))
+    pair = [f.kind for f in findings if {f.a.split()[1], f.b.split()[1]} == {"Adjuster", "HeelReliefHt"}]
+    assert pair == ["text-on-line"]
+
+
+# cone-gear T006 (95a9e97ca, calibration run 2): the view's centre mark,
+# dumped twice (#913). Every cone-gear sheet and four other drawings did so.
+CG_T006_CENTER_MARK = {
+    "type": 13,
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.1013585, 0.1447979, 0.024],
+    "display": {
+        "lines": [
+            [-1.0, 0.0, 0.0, 0.0, 0.105, 0.15, 0.0, 0.105, 0.17, 0.0],
+            [-1.0, 0.0, 0.0, 0.0, 0.105, 0.15, 0.0, 0.085, 0.15, 0.0],
+            [-1.0, 0.0, 0.0, 0.0, 0.105, 0.15, 0.0, 0.105, 0.13, 0.0],
+            [-1.0, 0.0, 0.0, 0.0, 0.105, 0.15, 0.0, 0.125, 0.15, 0.0],
+            [-1.0, 0.0, -1.0, 0.0, 0.105, 0.17, 0.0, 0.105, 0.17635, 0.0],
+            [-1.0, 0.0, -1.0, 0.0, 0.085, 0.15, 0.0, 0.07865, 0.15, 0.0],
+            [-1.0, 0.0, -1.0, 0.0, 0.105, 0.13, 0.0, 0.105, 0.12365, 0.0],
+            [-1.0, 0.0, -1.0, 0.0, 0.125, 0.15, 0.0, 0.13135, 0.15, 0.0],
+        ]
+    },
+}
+
+
+def test_a_centre_mark_dumped_twice_is_a_gating_duplicate():
+    """#913: DetailItem346 and DetailItem347 on cone-gear T006 are one centre
+    mark inserted twice; each other kind of pair, or a moved copy, is not."""
+    first = {**CG_T006_CENTER_MARK, "name": "DetailItem346"}
+    second = {**CG_T006_CENTER_MARK, "name": "DetailItem347"}
+    moved = {**CG_T006_CENTER_MARK, "name": "DetailItem348", "pos": [0.1113585, 0.1447979, 0.024]}
+    other_type = {**CG_T006_CENTER_MARK, "name": "DetailItem349", "type": 6}
+    view = _view("Drawing View1", (0.082292, 0.1289996, 0.127708, 0.1710004), [first, second, moved, other_type])
+    findings = [f for f in audit_dump(_dump(views=[view])) if f.kind == "duplicate-annotation"]
+    assert [(f.a, f.b) for f in findings] == [("center-mark DetailItem346", "center-mark DetailItem347")]
+    assert severity(findings[0]) is FindingSeverity.GATING
+    assert findings[0].extra == {"owner": "Drawing View1", "identical": True}
+
+
+def test_another_line_crossing_the_shoulder_is_still_reported():
+    """codex on a0f26c3c1: the dedupe drops a shoulder crossing only when the
+    SAME line runs through the text; a second line of that annotation
+    crossing the shoulder alone is its own defect."""
+    h = 0.0035
+    callout = _hole_callout(
+        "Adjuster",
+        [(0.080, 0.090, 0.100, 0.1000), (0.100, 0.1000, 0.140, 0.1000)],
+        [("THRU ALL", 0.100, 0.1001)],
+        height=h,
+    )
+    heel = _dim("HeelReliefHt", "5.56", 0.150, 0.080, lines=[(0.1190, 0.0875, 0.1190, 0.0990)])
+    heel["display"]["lines"].append(_line(0.1190, 0.0990, 0.1190, 0.1010))  # through the text
+    heel["display"]["lines"].append(_line(0.1350, 0.0990, 0.1350, 0.1002))  # the shoulder only, past the text
+    findings = audit_dump(_dump(views=[_view("front", (0.05, 0.05, 0.2, 0.2), [callout, heel])]))
+    pair = sorted(f.kind for f in findings if {f.a.split()[1], f.b.split()[1]} == {"Adjuster", "HeelReliefHt"})
+    assert pair == ["shoulder-crosses-line", "text-on-line"]
+
+
+def test_a_template_note_is_no_duplicate_of_a_sheet_note():
+    """codex on a0f26c3c1: template annotations (owner_type 2) are the title
+    block's; only drawing-sheet ones are paired."""
+    note = {"type": 6, "visible": 1, "pos": [0.30, 0.02, 0.0], "display": {}}
+    sheet_note = {**note, "name": "DetailItem1", "owner_type": 1}
+    template_note = {**note, "name": "DetailItem2", "owner_type": 2}
+    findings = audit_dump(_dump(sheet_annotations=[sheet_note, template_note]))
+    assert [f for f in findings if f.kind == "duplicate-annotation"] == []
+    twice = audit_dump(_dump(sheet_annotations=[sheet_note, {**sheet_note, "name": "DetailItem3"}]))
+    assert [f.kind for f in twice if f.kind == "duplicate-annotation"] == ["duplicate-annotation"]
+
+
+def test_two_leaders_converging_on_one_landing_are_advisory():
+    """cone-gear-shaft (d09c2b9eb): Ra 1.6's leader meets Sec4Dia's dimension
+    line 3.7 mm before both arrows land on the shaft's corner. Main's ruling:
+    advisory within the last 5 mm."""
+    finish = {
+        "type": 7,
+        "name": "DetailItem352",
+        "visible": 1,
+        "leaders": [[0.02275, 0.196, 0.0, 0.03035, 0.196, 0.0, 0.0537143, 0.1507938, 0.0]],
+        "display": {
+            "lines": [_line(0.02275, 0.196, 0.03035, 0.196), _line(0.03035, 0.196, 0.0537143, 0.1507938)],
+            "arrows": [
+                [0.0537143, 0.1507938, 0.0, -0.4591403, 0.8883638, -0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]
+            ],
+            "texts": [{"t": "Ra 1.6", "pos": [0.029, 0.1995713, 0.0], "h": 0.0025, "ref": 1}],
+        },
+    }
+    sec4 = _dim_record(
+        "Sec4Dia",
+        [(0.0833972, 0.1954743, 0.052, 0.1954743), (0.052, 0.1954743, 0.052, 0.1507938)],
+        [(0.052, 0.1507938, 0.0, 1.0)],
+        [("1.588 ", 0.0585715, 0.1955278)],
+    )
+    findings = audit_dump(_dump(views=[_view("v", (0.02, 0.14, 0.09, 0.21), [finish, sec4])]))
+    crossing = [f for f in findings if "leader" in f.kind and "Sec4Dia" in f.b]
+    assert [(f.kind, severity(f).value) for f in crossing] == [("leader-converges-at-landing", "advisory")]
+
+
+def test_a_clockwise_arc_is_its_own_sweep_not_the_complement():
+    """``rotationDir`` CW = 0. Read as CCW, a 30 degree CW arc became its
+    330 degree complement: phantom ink across the sheet."""
+    import math
+
+    from _layout_audit import arc_segments
+
+    r = 0.010
+    start = (r, 0.0)
+    end = (r * math.cos(math.radians(-30)), r * math.sin(math.radians(-30)))
+    raw = [0, 0, 0, 0, *start, 0.0, *end, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+    angles = [math.degrees(math.atan2(s.y0, s.x0)) for s in arc_segments(raw)]
+    assert all(-30.0 - 1e-6 <= a <= 1e-6 for a in angles)
+    ccw = arc_segments([*raw[:16], 1.0])
+    assert max(math.degrees(math.atan2(s.y0, s.x0)) for s in ccw) > 90.0
+    variant_true = arc_segments([*raw[:16], -1.0])  # a COM VARIANT_BOOL true
+    assert [(s.x0, s.y0) for s in variant_true] == [(s.x0, s.y0) for s in ccw]
+
+
+def test_a_wide_centred_string_matches_on_its_centre():
+    """``GetTextRefPositionAtIndex`` swCENTER (2): the item's point is the
+    box centre. Compared as a lower-left corner, a 60 mm string's centre sits
+    30 mm off its printed left edge and matched nothing."""
+    item = TextItem("GENERAL TOLERANCES UNLESS NOTED", 0.200, 0.100, 0.0035, reference=2)
+    span = _ink_span("GENERAL TOLERANCES UNLESS NOTED", 0.170, 0.0983, width=0.060, height=0.0033)
+    assert match_ink([("C", item)], [span])["C"].xmin == pytest.approx(0.170)
+    as_lower_left = TextItem(item.text, item.x, item.y, item.height, reference=1)
+    assert match_ink([("C", as_lower_left)], [span]) == {}
+
+
+def test_a_run_with_a_symbol_inside_matches_the_text_either_side():
+    """A symbol inside a run prints as a path, splitting the text around it."""
+    item = TextItem("2X <MOD-DIAM> 3.45", 0.100, 0.100, 0.0035)
+    spans = [_ink_span("2X", 0.1002, 0.1009, width=0.004), _ink_span("3.45", 0.1090, 0.1009, width=0.009)]
+    box = match_ink([("S", item)], spans)["S"]
+    assert (box.xmin, box.xmax) == pytest.approx((0.1002, 0.1180))
+
+
+def test_split_runs_are_matched_as_a_complete_assignment():
+    """Codex P2 on f7275dfdf: run by run, the flexible run A took the one
+    "2X" (P) and the "3.45" (R) the constrained run B could reach, stranding
+    B although A -> Q+S, B -> P+R matches both."""
+    h = 0.0035
+    flexible = TextItem("2X <MOD-DIAM> 3.45", 0.106, 0.100, h)
+    constrained = TextItem("2X <MOD-DIAM> 3.45", 0.100, 0.100, h)
+    spans = [
+        _ink_span("2X", 0.100, 0.1009, width=0.004),  # P: both runs reach it
+        _ink_span("3.45", 0.109, 0.1009, width=0.009),  # R
+        _ink_span("2X", 0.137, 0.1009, width=0.004),  # Q: past B's run
+        _ink_span("3.45", 0.139, 0.1009, width=0.009),  # S
+    ]
+    matched = match_ink([("A", flexible), ("B", constrained)], spans)
+    assert (matched["B"].xmin, matched["B"].xmax) == pytest.approx((0.100, 0.118))
+    assert (matched["A"].xmin, matched["A"].xmax) == pytest.approx((0.137, 0.148))
+
+
+
+def test_whole_and_split_matches_are_assigned_together():
+    """Codex P2 on 7e08a6b17: the plain "A" took its nearest "A" (P) before
+    split runs were considered, and "A <MOD-DIAM> B" -- whose "B" only P
+    can precede -- went text-unmatched although the plain "A" had another
+    "A" (Q) in reach."""
+    plain = TextItem("A", 0.1020, 0.100, 0.0035)
+    split = TextItem("A <MOD-DIAM> B", 0.1000, 0.100, 0.0035)
+    spans = [
+        _ink_span("A", 0.1002, 0.1009, width=0.0015),  # P
+        _ink_span("B", 0.1030, 0.1009, width=0.0015),
+        _ink_span("A", 0.1060, 0.1009, width=0.0015),  # Q: past the "B"
+    ]
+    matched = match_ink([("plain", plain), ("split", split)], spans)
+    assert (matched["split"].xmin, matched["split"].xmax) == pytest.approx((0.1002, 0.1045))
+    assert matched["plain"].xmin == pytest.approx(0.1060)
+
+
+def test_a_skipped_split_item_still_counts_toward_the_bound():
+    """Codex P2 on 7e067cacb, its exact counterexample: once the split
+    branches had matched one item, the bound subtracted every visited split
+    key and pruned the branch where both items take their one-span option
+    (A on 5, B on 6), although a skipped split item can still match whole.
+    B then read as a false gating text-unmatched."""
+    from _layout_audit import _assign_all
+
+    options = {"A": [((0, 6, 7), 0.1), ((5,), 0.2)], "B": [((0, 5), 0.1), ((6,), 0.2)]}
+    assert _assign_all(options) == {"A": (5,), "B": (6,)}
+
+
+def _brute_force(options):
+    """Most items matched with no span shared, then the least total cost: every
+    choice of one option or none per item, tried exhaustively."""
+    keys = list(options)
+    best = (0, 0.0)
+
+    def walk(position, taken, count, cost):
+        nonlocal best
+        if position == len(keys):
+            if count > best[0] or (count == best[0] and cost < best[1]):
+                best = (count, cost)
+            return
+        walk(position + 1, taken, count, cost)
+        for indices, step in options[keys[position]]:
+            if taken.isdisjoint(indices):
+                walk(position + 1, taken | set(indices), count + 1, cost + step)
+
+    walk(0, frozenset(), 0, 0.0)
+    return best
+
+
+@pytest.mark.parametrize("seed", range(8))
+def test_the_joint_assignment_matches_brute_force(seed):
+    """The pruning in ``_pack_group`` is an optimisation: on small random
+    instances with whole and split options competing for spans, the joint
+    assignment matches as many items as exhaustive search, at its least
+    cost, and never shares a span."""
+    import random
+
+    from _layout_audit import _assign_all, _pack_group
+
+    rng = random.Random(seed)
+    for _ in range(150):
+        options = {}
+        for key in range(rng.randint(1, 5)):
+            found = {}
+            for _option in range(rng.randint(1, 3)):
+                size = 1 if rng.random() < 0.6 else rng.randint(2, 3)
+                found.setdefault(tuple(rng.sample(range(7), size)), round(rng.uniform(0.0, 1.0), 3))
+            options[key] = list(found.items())
+        expected = _brute_force(options)
+        for chosen in (_assign_all(options), _pack_group(list(options), options)):
+            spans = [index for indices in chosen.values() for index in indices]
+            assert len(spans) == len(set(spans)), options
+            assert all(indices in [o for o, _ in options[key]] for key, indices in chosen.items()), options
+            cost = sum(dict(options[key])[indices] for key, indices in chosen.items())
+            assert (len(chosen), cost) == (expected[0], pytest.approx(expected[1])), options
+
+
+def test_section_labels_join_the_sheets_one_text_assignment():
+    """Codex P2 on de9d742ab: annotation text was matched first, so a
+    dimension reading "A" took the only "A" (P) section label A could reach
+    although it had another "A" (Q) in its own window; the label then read
+    text-unmatched."""
+    h = 0.0035
+    dim = _dim("DimA", "A", 0.1010, 0.100)
+    section = {"label": "A", "line": [], "arrows": [], "texts": [0.0960, 0.100 + h, 0.0], "text_height": h}
+    view = _view("v", (0.05, 0.05, 0.25, 0.25), [dim], sections=[section])
+    spans = [["A", 0.1002, 0.1009, 0.1017, 0.1042], ["A", 0.1060, 0.1009, 0.1075, 0.1042]]  # P, Q
+    model = sheet_model(_dump(views=[view], spans=spans, print_rest=False))
+    assert model.unmatched == ()
+    [label] = [a for a in model.geometry.annotations if a.kind == "section-line"]
+    assert label.text_boxes[0].xmin == pytest.approx(0.1002)
+
+
+def test_calibration_matches_text_in_the_audits_one_assignment():
+    """Codex P2 on 727ea8f56: the calibration matched annotation runs alone,
+    so where a section label and a dimension compete for one "A" it put the
+    dimension on the span the audit gives the label, and its offsets and
+    match rate disagreed with the audit's."""
+    from diagnostics.layout_calibration import match_items
+
+    h = 0.0035
+    dim = _dim("DimA", "A", 0.1010, 0.100)
+    section = {"label": "A", "line": [], "arrows": [], "texts": [0.0960, 0.100 + h, 0.0], "text_height": h}
+    view = _view("v", (0.05, 0.05, 0.25, 0.25), [dim], sections=[section])
+    spans = [["A", 0.1002, 0.1009, 0.1017, 0.1042], ["A", 0.1060, 0.1009, 0.1075, 0.1042]]  # P, Q
+    dump = _dump(views=[view], spans=spans, print_rest=False)
+    [audited] = [a for a in sheet_model(dump).geometry.annotations if a.kind == "dim"]
+    assert audited.text_boxes[0].xmin == pytest.approx(0.1060)  # the audit: Q, the label keeps P
+    [record] = match_items(dump)
+    assert record["label"] == "DimA"
+    assert record["pdf_box_mm"][0] == pytest.approx(audited.text_boxes[0].xmin * 1000.0)
+
+
+def test_detail_labels_join_the_sheets_one_text_assignment():
+    """The sweep's other label path: a detail circle's label (any short
+    all-letter run in its window) must not lose its only span to annotation
+    text that had another."""
+    h = 0.0035
+    dim = _dim("DimB", "B", 0.1010, 0.100)
+    # One circle: layer, centre, start, end, lineType, label point (upper-left), height, no arrows.
+    info = [1, 0, 0.09, 0.08, 0.0, 0.10, 0.08, 0.0, 0.10, 0.08, 0.0, 0, 0.0960, 0.100 + h, 0.0, h, 0]
+    view = _view("v", (0.05, 0.05, 0.25, 0.25), [dim], detail_circles_info=info)
+    spans = [["B", 0.1002, 0.1009, 0.1017, 0.1042], ["B", 0.1060, 0.1009, 0.1075, 0.1042]]
+    model = sheet_model(_dump(views=[view], spans=spans, print_rest=False))
+    assert model.unmatched == ()
+    [circle] = [a for a in model.geometry.annotations if a.kind == "detail-circle"]
+    assert circle.text_boxes[0].xmin == pytest.approx(0.1002)
+
+@pytest.mark.parametrize(
+    ("angle", "pieces", "expected"),
+    [
+        (
+            math.pi / 2,  # reads up the page, glyphs left of the baseline
+            [("2X", (0.0969, 0.1002, 0.0991, 0.1042)), ("3.45", (0.0969, 0.1090, 0.0991, 0.1180))],
+            (0.0969, 0.1002, 0.0991, 0.1180),
+        ),
+        (
+            -math.pi / 2,  # reads down the page, glyphs right of the baseline
+            [("2X", (0.1009, 0.0958, 0.1031, 0.0998)), ("3.45", (0.1009, 0.0820, 0.1031, 0.0910))],
+            (0.1009, 0.0820, 0.1031, 0.0998),
+        ),
+    ],
+)
+def test_a_rotated_split_run_matches_its_pieces_along_its_baseline(angle, pieces, expected):
+    """Codex P2 on e49f535b8: split pieces were ordered by x and held to the
+    run's y, so a vertical "2X Ø 3.45" (pieces stacked at one x) went
+    unmatched and gated as text-unmatched."""
+    from _layout_audit import InkSpan, ink_key
+
+    item = TextItem("2X <MOD-DIAM> 3.45", 0.100, 0.100, 0.0035, angle=angle)
+    spans = [InkSpan(ink_key(text), Box(*box)) for text, box in pieces]
+    box = match_ink([("S", item)], spans)["S"]
+    assert (box.xmin, box.ymin, box.xmax, box.ymax) == pytest.approx(expected)
+
+
+def test_a_rotated_runs_symbols_extend_its_box_along_its_baseline():
+    """Codex P2 on e49f535b8: a vertical "Ø12.00" reached back to its start
+    in x, not down the page where its Ø prints; a trailing symbol likewise."""
+    leading = _dim("Bore", "<MOD-DIAM>12.00", 0.100, 0.100)
+    leading["display"]["texts"][0]["ang"] = math.pi / 2
+    printed = Box(0.0969, 0.1060, 0.0991, 0.1168)
+    [row] = annotation_geometry(leading, owner="v", advance=0.6, ink={0: printed}).text_boxes
+    assert (row.xmin, row.ymin, row.xmax, row.ymax) == pytest.approx((0.0969, 0.1000, 0.0991, 0.1168))
+    trailing = _dim("Depth", "6.9<HOLE-DEPTH>", 0.100, 0.100)
+    trailing["display"]["texts"][0]["ang"] = math.pi / 2
+    printed = Box(0.0969, 0.1005, 0.0991, 0.1060)
+    [row] = annotation_geometry(trailing, owner="v", advance=0.6, ink={0: printed}).text_boxes
+    assert (row.xmin, row.ymin, row.xmax, row.ymax) == pytest.approx(
+        (0.0969, 0.1005, 0.0991, 0.1060 + 0.6 * 0.0035)
+    )
+
+
+def test_printed_text_no_annotation_claims_gates_outside_the_title_block_border_and_tables():
+    """The reverse of text-unmatched: an annotation whose COM read failed
+    still prints, and would be invisible to every other check."""
+    owned = _dim("Owned", "12.0", 0.100, 0.150)
+    dump = _dump(
+        views=[_view("v", (0.05, 0.05, 0.25, 0.25), [owned])],
+        tables=[{"name": "BOM", "box": [0.300, 0.200, 0.400, 0.250]}],
+        spans=[
+            ["12.0", 0.1002, 0.1509, 0.1060, 0.1542],
+            ["7.5", 0.1500, 0.1509, 0.1550, 0.1542],  # printed, no COM owner
+            ["REV", 0.3000, 0.0300, 0.3100, 0.0335],  # title block
+            ["A", 0.0035, 0.1000, 0.0090, 0.1060],  # zone label in the border band
+            ["QTY", 0.3100, 0.2300, 0.3200, 0.2335],  # inside the BOM table
+        ],
+        print_rest=False,
+    )
+    unclaimed = [f for f in audit_dump(dump) if f.kind == "pdf-text-unclaimed"]
+    assert [f.a for f in unclaimed] == ["pdf '7.5'"]
+    assert severity(unclaimed[0]) is FindingSeverity.GATING
+
+
+def test_a_printed_page_that_cannot_hold_the_sheet_fails_loud():
+    """No silent fall-back to COM boxes: COM text on a page with no PDF text,
+    or a page where most strings find no printed match (origin, scale or page
+    mapping wrong), stops the audit."""
+    dims = [_dim(f"D{i}", f"{i}.5", 0.100, 0.100 + 0.01 * i) for i in range(6)]
+    view = _view("v", (0.05, 0.05, 0.25, 0.25), dims)
+    blank = _dump(views=[view], strokes=_edges((0.06, 0.06, 0.07, 0.06)))
+    blank["ink"]["spans"] = []
+    with pytest.raises(ValueError, match="no text"):
+        audit_dump(blank)
+    shifted = _dump(
+        views=[view], spans=[[f"{i}.5", 0.200, 0.100 + 0.01 * i, 0.206, 0.1033 + 0.01 * i] for i in range(6)]
+    )
+    with pytest.raises(ValueError, match="does not line up"):
+        audit_dump(shifted)
+
+
+def test_a_view_that_printed_no_model_edge_is_found():
+    """A shaded or draft view, or a template with another edge weight, prints
+    no 0.25 mm stroke: text over it is unchecked. Pictorial: advisory."""
+    views = [
+        _view("front", (0.05, 0.05, 0.10, 0.10)),
+        _view("shaded", (0.15, 0.05, 0.20, 0.10)),
+        _view("iso", (0.25, 0.05, 0.30, 0.10), pictorial=True),
+    ]
+    findings = audit_dump(_dump(views=views, strokes=_edges((0.06, 0.06, 0.09, 0.06))))
+    missing = {(f.a, f.kind, severity(f).value) for f in findings if f.kind.startswith("view-edges")}
+    assert missing == {
+        ("view shaded", "view-edges-missing", "gating"),
+        ("view iso", "view-edges-missing-pictorial", "advisory"),
+    }
+
+
+def test_a_view_that_printed_only_hidden_edges_is_not_edgeless():
+    """Codex P2 on f7275dfdf: a Hidden Lines Visible view whose only model
+    strokes are dashed has geometry; only the solid edges were counted."""
+    views = [_view("front", (0.05, 0.05, 0.10, 0.10)), _view("hlv", (0.15, 0.05, 0.20, 0.10))]
+    strokes = [
+        *_edges((0.06, 0.06, 0.09, 0.06)),
+        *_edges((0.16, 0.06, 0.19, 0.06), width=0.00018, dashed=1),
+    ]
+    findings = audit_dump(_dump(views=views, strokes=strokes))
+    assert [f for f in findings if f.kind.startswith("view-edges")] == []
+
+
+def test_a_refused_com_read_is_a_gating_finding():
+    dump = _dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25))])
+    dump["read_errors"] = {"GetDisplayData": 2}
+    [finding] = [f for f in audit_dump(dump) if f.kind == "com-read-errors"]
+    assert finding.extra["read_errors"] == {"GetDisplayData": 2}
+    assert severity(finding) is FindingSeverity.GATING
+
+
+def test_an_overload_fallback_is_not_a_read_error():
+    """GetLineAtIndex3 refusing before GetLineAtIndex2 answers is the
+    expected path; only a primitive every overload refuses counts."""
+    from _drawing_layout_audit import _Reader
+
+    reader = _Reader(adapter=None)
+
+    def refuse():
+        raise RuntimeError("E_NOTIMPL")
+
+    assert reader.first([refuse, lambda: (1.0, 2.0)], name="GetLineAtIndex3/GetLineAtIndex2") == (1.0, 2.0)
+    assert reader.take_errors() == {}
+    assert reader.first([refuse, refuse], name="GetLineAtIndex3/GetLineAtIndex2") is None
+    assert reader.take_errors() == {"GetLineAtIndex3/GetLineAtIndex2": 1}
+
+
+def test_a_required_read_answering_none_is_a_read_error(monkeypatch):
+    """SolidWorks often fails a getter by answering None rather than raising:
+    an annotation whose display data is None loses all its ink, so it counts."""
+    import _drawing_layout_audit as collector
+
+    monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
+
+    class Annotation:
+        Visible = 1
+        OwnerType = 1
+        Layer = ""
+
+        def GetType(self):
+            return 6  # swNote
+
+        def GetName(self):
+            return "Note1"
+
+        def GetPosition(self):
+            return (0.1, 0.1, 0.0)
+
+        def GetLeaderCount(self):
+            return 1
+
+        def GetLeaderPointsAtIndex(self, _index):
+            return None
+
+        def GetDisplayData(self):
+            return None
+
+        def GetSpecificAnnotation(self):
+            return None
+
+    reader = collector._Reader(adapter=None)
+    record = collector._dump_annotation(reader, Annotation())
+    assert record is not None and record["display"] == {}
+    assert reader.take_errors() == {
+        "GetDisplayData": 1,
+        "GetLeaderPointsAtIndex": 1,
+        "GetSpecificAnnotation": 1,
+    }
+    # An optional read answering None is not a refusal.
+    assert reader.call(lambda: None, "") == "" and reader.take_errors() == {}
+
+
+@pytest.mark.parametrize(
+    ("kind", "errors"),
+    [(1, {}), (15, {}), (6, {"GetPosition": 1}), (5, {"GetPosition": 1})],
+    ids=["cosmetic-thread", "centerline", "note", "gtol"],
+)
+def test_only_a_cosmetic_thread_or_centerline_may_have_no_position(monkeypatch, kind, errors):
+    """On the b49e13940 leaves every cosmetic thread and centerline answered
+    GetPosition None (cone-swing-platform 15, top_frame 98), each a gating
+    com-read-errors count. For those two kinds None is their answer, not a
+    refusal; any other annotation's None position still counts."""
+    import _drawing_layout_audit as collector
+
+    monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
+
+    class Annotation:
+        Visible = 1
+        OwnerType = 0
+        Layer = ""
+
+        def GetType(self):
+            return kind
+
+        def GetName(self):
+            return "Item1"
+
+        def GetPosition(self):
+            return None
+
+        def GetLeaderCount(self):
+            return 0
+
+        def GetDisplayData(self):
+            return Data()
+
+        def GetSpecificAnnotation(self):
+            return Note()
+
+    class Data:
+        def __getattr__(self, name):
+            if name.endswith("Count"):
+                return lambda: 0
+            raise AttributeError(name)
+
+    class Note:
+        def GetText(self):
+            return "1/4-20 Tapped Hole"
+
+        def GetExtent(self):
+            return (0.1, 0.1, 0.0, 0.12, 0.11, 0.0)
+
+        def IsBomBalloon(self):
+            return False
+
+    reader = collector._Reader(adapter=None)
+    record = collector._dump_annotation(reader, Annotation())
+    assert record is not None and record["pos"] == []
+    assert reader.take_errors() == errors
+
+
+def test_a_primitive_count_answering_none_is_a_read_error(monkeypatch):
+    """Codex P2 on 7e08a6b17: a count getter answering None read as zero
+    primitives, so that ink left the audit while com-read-errors stayed
+    clean. A count is required like the rows it guards; zero still is not a
+    refusal."""
+    import _drawing_layout_audit as collector
+
+    monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
+
+    class Data:
+        def __getattr__(self, name):
+            if name == "GetLineCount":
+                return lambda: None
+            if name.endswith("Count"):
+                return lambda: 0
+            raise AttributeError(name)
+
+    reader = collector._Reader(adapter=None)
+    assert collector._dump_display(reader, Data()) == {}
+    assert reader.take_errors() == {"GetLineCount": 1}
+
+
+@pytest.mark.parametrize("getter", ["GetTextHeightAtIndex", "GetTextRefPositionAtIndex", "GetTextAngleAtIndex"])
+def test_a_text_run_read_answering_none_is_a_read_error(monkeypatch, getter):
+    """Codex P2 on de9d742ab: a None height read as 0.0, so text_items dropped
+    the run with com-read-errors clean. Every text read the audit consumes is
+    required (the reader sweep); font and line spacing, which it does not
+    consume, stay optional."""
+    import _drawing_layout_audit as collector
+
+    monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
+    answers = {
+        "GetTextCount": 1,
+        "GetTextAtIndex": "12.0",
+        "GetTextPositionAtIndex": (0.1, 0.1, 0.0),
+        "GetTextHeightAtIndex": 0.0035,
+        "GetTextRefPositionAtIndex": 1,
+        "GetTextAngleAtIndex": 0.0,
+        "GetTextFontAtIndex": "Century Gothic",
+        "GetTextLineSpacingAtIndex": 0.0,
+        getter: None,
+    }
+
+    class Data:
+        def __getattr__(self, name):
+            if name in answers:
+                value = answers[name]
+                return lambda *_args: value
+            if name.endswith("Count"):
+                return lambda: 0
+            raise AttributeError(name)
+
+    reader = collector._Reader(adapter=None)
+    collector._dump_display(reader, Data())
+    assert reader.take_errors() == {getter: 1}
+
+
+def test_a_run_meeting_a_leader_end_to_end_is_not_its_copy():
+    """A shoulder running on from a leader's landing shares an end and a
+    direction with it but is real ink; only a run overlapping it is a copy."""
+    from _layout_audit import _same_run
+
+    leader = Segment(0.10, 0.10, 0.12, 0.10)
+    assert _same_run(Segment(0.10, 0.10, 0.12, 0.10), leader)
+    assert _same_run(Segment(0.1005, 0.10, 0.12, 0.10), leader)  # starts 0.5 mm off the attach point
+    assert not _same_run(Segment(0.12, 0.10, 0.13, 0.10), leader)
+    assert not _same_run(Segment(0.10, 0.10, 0.09, 0.10), leader)
+
+
+def test_the_report_keeps_a_stroke_count_not_every_stroke():
+    from _layout_audit import audit_report
+
+    dump = _dump(
+        views=[_view("v", (0.05, 0.05, 0.25, 0.25))], strokes=_edges((0.06, 0.06, 0.07, 0.06), (0.1, 0.1, 0.2, 0.1))
+    )
+    report, _gating = audit_report("x", LayoutAuditMode.REPORT, [dump])
+    [sheet] = report["sheets"]
+    assert sheet["ink"]["stroke_count"] == 2 and "strokes" not in sheet["ink"]
+    assert "strokes" in dump["ink"]  # the audited dump is untouched
+
+
+def test_a_page_the_size_of_another_sheet_fails_loud(monkeypatch):
+    from pathlib import Path
+
+    from _pdf_ink import PageInk
+
+    letter = PageInk(0.2794, 0.2159, (), (), ())
+    live, adapter = _fake_drawing(monkeypatch, sheet_names=("Sheet1",), views=(), pages=[letter])
+
+    class View:
+        def GetName2(self):  # noqa: N802 - COM name
+            return "Sheet1"
+
+        def GetAnnotations(self):  # noqa: N802 - COM name
+            return ()
+
+        def GetTableAnnotations(self):  # noqa: N802 - COM name
+            return ()
+
+    class Sheet:
+        def GetProperties2(self):  # noqa: N802 - COM name
+            return (0, 0, 0, 0, 0, SHEET_W, SHEET_H)
+
+        def GetZoneMargin(self, _code):  # noqa: N802 - COM name
+            return 0.0
+
+    adapter.currentModel.GetViews = lambda: ((View(),),)
+    adapter.currentModel.Sheet = lambda _name: Sheet()
+    with pytest.raises(RuntimeError, match=r"431\.8 x 279\.4 mm but page 0 of x\.pdf is 279\.4 x 215\.9 mm"):
+        live.collect_sheet_dumps(
+            adapter, stem="x", pdf=Path("x.pdf"), sheet_layouts={}, is_pictorial=lambda _o: False
+        )
+
+
+def test_a_collector_fault_carries_what_was_collected(monkeypatch):
+    """Main's ruling: fail loud, no report on a fault, but the error and a
+    warn say how far the collector got -- the sheets dumped with their
+    refused reads, and the refusals on the sheet it died in."""
+    from pathlib import Path
+
+    import _telemetry
+    from _pdf_ink import PageInk
+
+    pages = [PageInk(SHEET_W, SHEET_H, (), (), ()), PageInk(0.2794, 0.2159, (), (), ())]
+    live, adapter = _fake_drawing(monkeypatch, sheet_names=("A", "B"), views=(), pages=pages)
+
+    class View:
+        def __init__(self, name):
+            self.name = name
+
+        def GetName2(self):  # noqa: N802 - COM name
+            return self.name
+
+        def GetAnnotations(self):  # noqa: N802 - COM name
+            if self.name == "B":
+                raise RuntimeError("E_FAIL")
+            return ()
+
+        def GetTableAnnotations(self):  # noqa: N802 - COM name
+            return ()
+
+    class Sheet:
+        def GetProperties2(self):  # noqa: N802 - COM name
+            return (0, 0, 0, 0, 0, SHEET_W, SHEET_H)
+
+        def GetZoneMargin(self, _code):  # noqa: N802 - COM name
+            return 0.0
+
+    warnings = []
+    monkeypatch.setattr(_telemetry, "warn", lambda message, **_kw: warnings.append(message))
+    adapter.currentModel.GetViews = lambda: ((View("A"),), (View("B"),))
+    adapter.currentModel.Sheet = lambda _name: Sheet()
+    with pytest.raises(RuntimeError) as raised:
+        live.collect_sheet_dumps(
+            adapter, stem="x", pdf=Path("x.pdf"), sheet_layouts={}, is_pictorial=lambda _o: False
+        )
+    message = str(raised.value)
+    assert "1 sheet(s) dumped {'A': {}}" in message
+    assert "refused reads on the failing sheet {'GetAnnotations': 1}" in message
+    assert "page 1 of x.pdf is 279.4 x 215.9 mm" in message
+    assert message in warnings
+
+
+def test_an_empty_answer_is_not_a_refused_read():
+    """Main's rider: an overload answering an empty value (no points, ())
+    answered; only raising or None from every overload is a refusal."""
+    from _drawing_layout_audit import _Reader
+
+    reader = _Reader(adapter=None)
+
+    def refuse():
+        raise RuntimeError("E_NOTIMPL")
+
+    assert reader.first([refuse, lambda: ()], name="GetPolylineAtIndex2") == ()
+    assert reader.take_errors() == {}
+    assert reader.first([refuse, lambda: None], name="GetPolylineAtIndex2") is None
+    assert reader.take_errors() == {"GetPolylineAtIndex2": 1}
+
+
+def test_an_empty_answer_falls_through_to_the_next_overload():
+    """GetLineAtIndex3 answering () must not hide the primitive
+    GetLineAtIndex2 holds: that ink is what the overload chain is for."""
+    from _drawing_layout_audit import _Reader
+
+    reader = _Reader(adapter=None)
+    line = (0.0, 0.0, 0.0, 0.0, 0.1, 0.1, 0.0, 0.2, 0.1, 0.0)
+    assert reader.first([lambda: (), lambda: line], name="GetLineAtIndex3/GetLineAtIndex2") == line
+    assert reader.take_errors() == {}
+
+
+def test_a_path_inside_a_form_xobject_fails_rather_than_misplace_ink():
+    import pypdfium2.raw as pdfium_raw
+    from _pdf_ink import _strokes
+
+    class FormPath:
+        type = pdfium_raw.FPDF_PAGEOBJ_PATH
+        level = 1
+
+    class Page:
+        def get_objects(self, max_depth):
+            return [FormPath()]
+
+    with pytest.raises(ValueError, match="form XObject"):
+        _strokes(Page())
+
+
+def test_the_segment_grid_finds_exactly_what_a_full_scan_finds():
+    """find_text_on_line buckets ink in a grid (thousands of PDF edge pieces
+    per sheet, checked while the build holds the COM seat); its findings must
+    equal the every-box-against-every-segment scan it replaced."""
+    import random
+
+    from _layout_geometry import AnnotationGeometry, SheetGeometry, find_text_on_line, segment_box_overlap_length
+
+    random.seed(7)
+    annotations = []
+    for i in range(40):
+        x, y = random.uniform(0.02, 0.4), random.uniform(0.02, 0.26)
+        starts = [(random.uniform(0.0, 0.43), random.uniform(0.0, 0.28)) for _ in range(30)]
+        segments = tuple(
+            Segment(a, b, a + random.uniform(-0.05, 0.05), b + random.uniform(-0.05, 0.05)) for a, b in starts
+        )
+        annotations.append(AnnotationGeometry(f"a{i}", "dim", "v", (Box(x, y, x + 0.01, y + 0.0035),), segments))
+    sheet = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), tuple(annotations), 0.6)
+    found = [(f.a, f.b) for f in find_text_on_line(sheet)]
+    expected = [
+        (target.label, source.label)
+        for target in annotations
+        for box in target.text_boxes
+        for source in annotations
+        if source.label != target.label
+        for segment in source.segments
+        if segment_box_overlap_length(segment, box) > DEFAULT_TEXT_TOUCH_TOL_M
+    ]
+    assert found == expected
+    assert len(found) > 20
+
+
+def test_a_note_leader_is_one_leader_not_also_a_line():
+    """cone-swing-platform's C'BORE note (d09c2b9eb): its display data draws
+    the leader from 0.5 mm off the attach point GetLeaderPointsAtIndex (and
+    the printed stroke) starts at. Kept both, the leader read as line AND
+    leader, and a crossing was reported twice under two kinds."""
+    note = {
+        "type": 6,
+        "name": "DetailItem375",
+        "visible": 1,
+        "leaders": [[0.1204851, 0.0455793, -0.0, 0.0940041, 0.0504458, 0.0]],
+        "display": {
+            "lines": [_line(0.1202019, 0.04615, 0.1202019, 0.04615), _line(0.1202019, 0.04615, 0.0940041, 0.0504458)],
+            "texts": [{"t": "7.94 END MILL C'BORE SLOT", "pos": [0.1247703, 0.0435, 0.0], "h": 0.0025}],
+        },
+        "note": {"balloon": False},
+    }
+    geometry = annotation_geometry(note, owner="v", advance=0.6)
+    long_runs = [(s.role, round(s.x0 * 1000, 2)) for s in geometry.segments if s.length > 0.001]
+    assert long_runs == [("leader", 120.49)]
+
+
+# --------------------------------------------------------------------------
+# layoutcal2-c (f31db84eb) drive-train-assembly: balloons are circles, a table
+# is one owner. All 36 of its findings were these two false-positive classes.
+# --------------------------------------------------------------------------
+
+# drive-train-assembly "ALIGNMENT PINION RIG EXPLODED", balloon 17, verbatim.
+DTA_BALLOON_17 = {
+    "type": 6,
+    "name": "DetailItem394",
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.1597687, 0.1070215, 0.051225],
+    "leaders": [[0.1659001, 0.1095358, 0.051225, 0.1676521, 0.1137831, 0.051225]],
+    "display": {
+        "lines": [[0.0, 0.0, 0.0, 0.0, 0.1658344, 0.1099698, 0.051225, 0.1676521, 0.1137831, 0.051225]],
+        "arcs": [[0.0, 0.0, -1.0, -1.0, 0.1593408, 0.1033526, -0.0, 0.1593408, 0.1033526, -0.0,
+                  0.1637253, 0.1055448, -0.0, 0.0, 0.0, 1.0, 1.0]],
+        "arrows": [[0.1676521, 0.1137831, 0.051225, -0.4302722, -0.9026992, -0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]],
+        "texts": [{"t": "17", "pos": [0.1611392, 0.1027295, -0.0], "h": 0.0035, "ref": 1, "ang": 0.0}],
+    },
+    "note": {"text": "17", "extent": [0.1593408, 0.1015555, -0.0, 0.1681097, 0.1138319, -0.0], "balloon": True},
+}
+# Where the PDF printed its ring: 0.57 mm off the GetDisplayData circle
+# (163.73, 105.54) r 4.90, while the leader starts ON the printed ring.
+DTA_BALLOON_17_RING = (0.16404, 0.10506, 0.00484)
+# Its printed leader + arrowhead (0.18 mm) and the view edge that passes it
+# (0.25 mm), verbatim from the PDF.
+DTA_BALLOON_17_LEADER_INK = [
+    (0.16764, 0.113771, 0.166617, 0.110349),
+    (0.165911, 0.110631, 0.16764, 0.113771),
+    (0.165876, 0.109502, 0.16764, 0.113771),
+]
+DTA_BALLOON_17_EDGES = [(0.177553, 0.10414, 0.163407, 0.112324), (0.163407, 0.112324, 0.163407, 0.120685)]
+
+
+def _ring(cx, cy, radius, sides=48):
+    points = [
+        (cx + radius * math.cos(2 * math.pi * k / sides), cy + radius * math.sin(2 * math.pi * k / sides))
+        for k in range(sides + 1)
+    ]
+    return [(*a, *b) for a, b in zip(points, points[1:])]
+
+
+def _balloon_17_dump(balloon=DTA_BALLOON_17):
+    return _dump(
+        views=[_view("Drawing View8", (0.12, 0.08, 0.30, 0.20), [balloon])],
+        spans=[["17", 0.1618, 0.1034, 0.1662, 0.1069]],
+        strokes=[
+            *_edges(*_ring(*DTA_BALLOON_17_RING), *DTA_BALLOON_17_LEADER_INK, width=0.00018),
+            *_edges(*DTA_BALLOON_17_EDGES),
+        ],
+    )
+
+
+def test_a_balloon_takes_the_ring_it_printed():
+    """Codex P2 on 1fdd5c833: the ring's own ink moves too, so the balloon as
+    an OBSTACLE (a foreign line past it) reads the printed ring."""
+    [balloon] = [a for a in sheet_model(_balloon_17_dump()).geometry.annotations if a.kind == "balloon"]
+    assert balloon.circle == pytest.approx(DTA_BALLOON_17_RING, abs=2e-5)
+    def on(circle):
+        cx, cy, radius = circle
+        return [
+            s for s in balloon.segments
+            if all(abs(math.hypot(x - cx, y - cy) - radius) < 1e-7 for x, y in ((s.x0, s.y0), (s.x1, s.y1)))
+        ]
+
+    com = balloon_circle(DTA_BALLOON_17["display"])
+    assert len(on(balloon.circle)) >= 32
+    assert on(com) == []
+
+
+def test_a_split_circle_balloons_separator_moves_with_its_ring():
+    """Codex P2 on the ring move: a swBS_SplitCirc balloon's rim-to-rim
+    separator is the balloon's own ink too; it moves, it is not dropped."""
+    cx, cy, radius = balloon_circle(DTA_BALLOON_17["display"])
+    split = {
+        **DTA_BALLOON_17,
+        "display": {
+            **DTA_BALLOON_17["display"],
+            "lines": [
+                *DTA_BALLOON_17["display"]["lines"],
+                [0.0, 0.0, 0.0, 0.0, cx - radius, cy, 0.0, cx + radius, cy, 0.0],
+            ],
+        },
+    }
+    [balloon] = [a for a in sheet_model(_balloon_17_dump(split)).geometry.annotations if a.kind == "balloon"]
+    px, py, pr = balloon.circle
+    separators = [s for s in balloon.segments if s.length > 0.9 * 2 * pr]
+    assert len(separators) == 1
+    [separator] = separators
+    assert (separator.x0, separator.y0, separator.x1, separator.y1) == pytest.approx(
+        (px - pr, py, px + pr, py), abs=1e-7
+    )
+
+
+def test_a_short_leaders_arrowhead_keeps_its_registered_geometry():
+    """Codex P2 on the ring move: a short leader can put its arrowhead's base
+    inside the COM circle; the arrow is not balloon body, so none of it moves
+    (a moved base would detach it from its own sides and tip)."""
+    cx, cy, radius = balloon_circle(DTA_BALLOON_17["display"])
+    tip = (cx + radius + 0.0003, cy)
+    arrow = [*tip, 0.0, -1.0, 0.0, 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]
+    short = {
+        **DTA_BALLOON_17,
+        "leaders": [[cx + radius, cy, 0.0, *tip, 0.0]],
+        "display": {
+            **DTA_BALLOON_17["display"],
+            "lines": [[0.0, 0.0, 0.0, 0.0, cx + radius, cy, 0.0, *tip, 0.0]],
+            "arrows": [arrow],
+        },
+    }
+    base = arrowhead_segments(arrow)
+    assert any(
+        all(math.hypot(x - cx, y - cy) < radius for x, y in ((s.x0, s.y0), (s.x1, s.y1))) for s in base
+    ), "fixture: the arrowhead's base must lie inside the COM circle"
+    [balloon] = [a for a in sheet_model(_balloon_17_dump(short)).geometry.annotations if a.kind == "balloon"]
+    assert balloon.circle != (cx, cy, radius)
+    arrows = [s for s in balloon.segments if s.role == "arrow"]
+    assert arrows == base
+
+
+def test_a_balloon_leader_leaving_its_ring_and_an_edge_past_its_corner_are_not_findings():
+    """28 leader-through-own-text on drive-train-assembly: the balloon's text
+    box was the COM circle's bounding square, so every leader leaving the rim
+    clipped a corner (or the COM circle's 0.5 mm offset). The view edge
+    through that square's corner misses the printed ring by 1.1 mm."""
+    findings = audit_dump(_balloon_17_dump())
+    assert not [f for f in findings if "DetailItem394" in f.a or "DetailItem394" in f.b]
+
+
+def test_a_leader_through_its_own_balloon_is_still_found():
+    """Positive control: a leader that starts on the far rim and crosses the
+    digits is ink through the balloon's own text."""
+    cx, cy, radius = DTA_BALLOON_17_RING
+    through = {
+        **DTA_BALLOON_17,
+        "leaders": [[cx - radius, cy, 0.051225, 0.1676521, 0.1137831, 0.051225]],
+        "display": {
+            **DTA_BALLOON_17["display"],
+            "lines": [[0.0, 0.0, 0.0, 0.0, cx - radius, cy, 0.051225, 0.1676521, 0.1137831, 0.051225]],
+        },
+    }
+    findings = audit_dump(_balloon_17_dump(through))
+    assert [f.kind for f in findings if f.kind == "leader-through-own-text"] == ["leader-through-own-text"]
+
+
+def test_diagonal_balloons_are_separated_by_their_circles():
+    """6 text-separation on drive-train-assembly: balloons set diagonally have
+    bounding-square corners 2 mm apart and circles 7 mm apart. At 0.5 mm the
+    squares would fail text-clearance; the circles are still 4.9 mm apart."""
+
+    def balloon(name, cx, cy):
+        arc = [0, 0, 0, 0, cx + 0.005, cy, 0.0, cx + 0.005, cy, 0.0, cx, cy, 0.0, 0.0, 0.0, 1.0, 1.0]
+        return {
+            "type": 6,
+            "name": name,
+            "visible": 1,
+            "display": {"arcs": [arc], "texts": [{"t": name, "pos": [cx - 0.001, cy - 0.00175, 0.0], "h": 0.0035}]},
+            "note": {"balloon": True, "text": name},
+        }
+
+    for corner_gap in (0.00207, 0.0005):
+        other = 0.150 + 0.010 + corner_gap
+        dump = _dump(views=[_view("v", (0.02, 0.02, 0.07, 0.07), [balloon("1", 0.150, 0.150), balloon("2", other, other)])])
+        findings = audit_dump(dump)
+        assert not [f for f in findings if f.kind in ("text-separation", "text-clearance")], corner_gap
+
+
+def test_a_tables_own_grid_line_is_not_a_line_through_its_text():
+    """drive-train-assembly's BOM: the table came back as a sheet annotation
+    labelled with its first row AND as ``tables`` ``table <name>``, so its own
+    column rule read as a foreign line through the table."""
+    table = {
+        "type": 14,
+        "name": "DetailItem359",
+        "visible": 1,
+        "owner_type": 1,
+        "pos": [0.19, 0.252, 0.0],
+        "display": {
+            "lines": [_line(0.202, 0.252, 0.202, 0.2418)],
+            "texts": [{"t": "ITEM", "pos": [0.192, 0.244, 0.0], "h": 0.0035}],
+        },
+    }
+    dump = _dump(
+        sheet_annotations=[table],
+        tables=[{"name": "DetailItem359", "box": [0.190, 0.1158, 0.354, 0.252]}],
+    )
+    findings = audit_dump(dump)
+    assert not [f for f in findings if f.kind == "text-on-line"]
+
+
+def test_a_rotated_runs_height_is_its_cap_height_not_its_length():
+    """Codex P2 on 7f8ad69fc: a vertical dimension's printed glyph box is the
+    string's length tall; the run's cap height stays the COM height."""
+    from _layout_audit import text_height
+
+    dim = _dim("Height", "12.50", 0.100, 0.100)
+    dim["display"]["texts"][0]["ang"] = math.pi / 2
+    printed = Box(0.0985, 0.1000, 0.1020, 0.1150)
+    geometry = annotation_geometry(dim, owner="v", advance=0.6, ink={0: printed})
+    assert text_height(geometry) == pytest.approx(0.0035)
+
+
+def test_reciprocal_dimension_crossings_are_one_finding_the_worse():
+    """Codex P2 on 7f8ad69fc: A's line over B's extension line and B's line
+    over A's were two findings for one pair; the gating one must win."""
+    from _layout_audit import find_dimension_line_crossings
+    from _layout_geometry import AnnotationGeometry, SheetGeometry
+
+    def dim(label, line_y, ext_x, text):
+        return AnnotationGeometry(
+            label,
+            "dim",
+            "v",
+            (text,),
+            (
+                Segment(0.100, line_y, 0.140, line_y, "dim-line"),
+                Segment(ext_x, 0.090, ext_x, 0.130, "ext-line"),
+            ),
+        )
+
+    far_a = dim("A", 0.100, 0.105, Box(0.300, 0.200, 0.310, 0.2035))
+    far_b = dim("B", 0.120, 0.135, Box(0.300, 0.220, 0.310, 0.2235))
+    sheet = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (far_a, far_b), 0.6)
+    assert [f.kind for f in find_dimension_line_crossings(sheet)] == ["dim-line-crosses-extension"]
+    # B's text sits at A's line crossing B's extension line (0.135, 0.100).
+    near_b = dim("B", 0.120, 0.135, Box(0.136, 0.101, 0.146, 0.1045))
+    sheet = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (far_a, near_b), 0.6)
+    [finding] = find_dimension_line_crossings(sheet)
+    assert (finding.kind, finding.a, finding.b) == ("dim-line-crosses-extension-at-text", "A", "B")
+
+
+def test_a_dimensions_own_extension_line_through_its_text_gates():
+    """conegear's MHA-014 (#916 388d1e3fb): "10.781", parked outside its
+    extension lines, printed with its own collar-face witness line through
+    "0" and "7". text-on-line skips an annotation's own ink, so nothing saw
+    it. A witness line that only touches a row's corner is not a strike."""
+    from _layout_audit import find_lines_through_own_text
+    from _layout_geometry import AnnotationGeometry, SheetGeometry
+
+    text = Box(0.1000, 0.1000, 0.1150, 0.1035)
+
+    def dim(extension_x):
+        return AnnotationGeometry(
+            "dim CollarToPin '10.781'",
+            "dim",
+            "v",
+            (text,),
+            (
+                Segment(0.0950, 0.0995, 0.1200, 0.0995, "dim-line"),
+                Segment(extension_x, 0.0950, extension_x, 0.1300, "ext-line"),
+            ),
+        )
+
+    struck = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (dim(0.1080),), 0.6)
+    [finding] = find_lines_through_own_text(struck)
+    assert finding.kind == "extension-through-own-text"
+    assert severity(finding) is FindingSeverity.GATING
+    assert finding.extra["overlap_mm"] == pytest.approx(3.5 - 0.4, abs=0.01)
+    touching = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (dim(0.1150),), 0.6)
+    assert find_lines_through_own_text(touching) == []
+
+
+def test_a_dimensions_own_dimension_line_through_its_text_gates():
+    """Main's gate-gap sweep (2): a dimension line struck through its own
+    text had no finder -- text-on-line skips an annotation's own ink and the
+    own-text finders covered only witness lines and leaders. The line the
+    text sits on (along the row's baseline) is not a strike, and nor is a
+    line clear of the row."""
+    from _layout_audit import find_lines_through_own_text
+    from _layout_geometry import AnnotationGeometry, SheetGeometry
+
+    text = Box(0.1000, 0.1000, 0.1150, 0.1035)
+
+    def dim(line_y):
+        return AnnotationGeometry(
+            "dim Chamfer '21.0'",
+            "dim",
+            "v",
+            (text,),
+            (
+                Segment(0.0950, line_y, 0.1200, line_y, "dim-line"),
+                Segment(0.0950, 0.0900, 0.0950, 0.1100, "ext-line"),
+            ),
+        )
+
+    struck = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (dim(0.1017),), 0.6)
+    [finding] = find_lines_through_own_text(struck)
+    assert finding.kind == "dim-line-through-own-text"
+    assert severity(finding) is FindingSeverity.GATING
+    assert finding.extra["overlap_mm"] == pytest.approx(15.0 - 0.4, abs=0.01)
+    for clear in (0.1000, 0.0995):  # on the baseline, below the row
+        sheet = SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (dim(clear),), 0.6)
+        assert find_lines_through_own_text(sheet) == []
+
+
+@pytest.mark.parametrize(
+    ("arrows", "kind"),
+    [
+        pytest.param([], "line-through-own-text", id="suppressed-arrows"),
+        pytest.param(
+            [[0.0950, 0.1517, 0.0, -1.0, 0.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, -1.0]],
+            "dim-line-through-own-text",
+            id="arrowed-control",
+        ),
+    ],
+)
+def test_an_arrowless_dimensions_line_through_its_own_text_gates(arrows, kind):
+    """Codex P2 on fa1c58be4 (PRRT_kwDOPHDy386mVU8Y): a dimension with no
+    arrowhead (suppressed arrows, an ordinate dimension) keeps its lines as
+    plain ``line``, and the own-text finder read only ``ext-line`` and
+    ``dim-line``, so its line struck through its own text passed. The same
+    dimension with an arrowhead at the line's end still reports as a
+    dimension line, once."""
+    dim = _dim("Suppressed", "12.0", 0.1000, 0.1500, lines=[(0.0950, 0.1517, 0.1150, 0.1517)])
+    dim["display"]["arrows"] = arrows
+    findings = audit_dump(_dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [dim])]))
+    own = [f for f in findings if f.kind.endswith("-through-own-text")]
+    assert [f.kind for f in own] == [kind]
+    assert severity(own[0]) is FindingSeverity.GATING
+
+
+# cone-gear-shaft Sheet1's "Ra 1.6" finish symbol (DetailItem351) as the
+# layoutcal2 leaf dumped it (95a9e97ca): its registered leader, the display
+# copy of that leader's two runs (first two lines), the symbol's own strokes.
+FINISH_LEADER = [0.24125, 0.18, 0.0, 0.23365, 0.18, 0.0, 0.2326, 0.1561154, 0.0]
+FINISH_SYMBOL_LINES = [
+    (0.24, 0.18, 0.237835, 0.18375),
+    (0.242165, 0.18375, 0.237835, 0.18375),
+    (0.24, 0.18, 0.2442135, 0.1871425),
+    (0.2415305, 0.1856117, 0.2384695, 0.1856117),
+    (0.2442135, 0.1871425, 0.2546457, 0.1871425),
+]
+
+
+def _finish_symbol(leader):
+    runs = [(leader[i], leader[i + 1], leader[i + 3], leader[i + 4]) for i in range(0, len(leader) - 3, 3)]
+    return {
+        "type": 7,
+        "name": "DetailItem351",
+        "visible": 1,
+        "owner_type": 0,
+        "pos": [0.24, 0.18, 0.0],
+        "leaders": [list(leader)],
+        "display": {
+            "lines": [_line(*line) for line in (*runs, *FINISH_SYMBOL_LINES)],
+            "arrows": [[0.2326, 0.1561154, 0.0, 0.043919, 0.9990351, -0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]],
+            "texts": [{"t": "Ra 1.6", "pos": [0.245, 0.1835713, 0.0], "h": 0.0025, "ref": 1, "ang": 0.0}],
+        },
+    }
+
+
+def test_a_finish_symbols_leader_through_its_own_text_gates():
+    """Main's gate-gap sweep (3), MHA-116's crown Ra: a finish symbol's leader
+    reaches the audit as ``leader`` (its registered GetLeaderPointsAtIndex
+    runs; the display copy is dropped), so a leader struck back through its
+    own "Ra" text is leader-through-own-text. The real symbol, leader clear
+    of its text, is the positive control."""
+    view = (0.15, 0.10, 0.30, 0.25)
+
+    def own_strikes(annotation):
+        dump = _dump(views=[_view("v", view, [annotation])])
+        return [f for f in audit_dump(dump) if f.kind == "leader-through-own-text"]
+
+    assert own_strikes(_finish_symbol(FINISH_LEADER)) == []
+    # Attached right of the text, the leader runs back left along the row
+    # at mid-height before it drops to the face.
+    struck = [0.2570, 0.1855, 0.0, 0.2430, 0.1855, 0.0, 0.2326, 0.1561154, 0.0]
+    [finding] = own_strikes(_finish_symbol(struck))
+    assert finding.a == finding.b
+    assert "surface-finish" in finding.a
+    assert severity(finding) is FindingSeverity.GATING
+
+
+def test_mha116s_crown_finish_leader_through_its_ra_text_gates():
+    """reviewfirst's case packet (layout-blindspots/mha116-crown-ra): at
+    7b21b56c0 the pinion-cam-pin crown's "Ra 1.6" finish leader ran from the
+    shelf end (126.4, 140.0) mm to the crown (152.6, 159.0) mm straight
+    through its own ".6"; the pre-save gate passed the sheet and the
+    machinist review flagged it (fixed in 0007c8d93). Geometry is the
+    packet's, hand-measured on the 300 dpi render (+/-0.2 mm), with the
+    printed "Ra 1.6" as one PDF text object over the measured box. The
+    fix (symbol 10 mm higher, same crown point) is the control."""
+    mm = 0.001
+
+    def strikes(rise):
+        y = 140.0 + rise
+        return _crown_finish_strikes(mm, y)
+
+    [finding] = strikes(0.0)
+    assert "surface-finish" in finding.a and finding.a == finding.b
+    assert severity(finding) is FindingSeverity.GATING
+    # The packet measured 3.2 mm inside the box; the own-row inset trims the ends.
+    assert 2.5 < finding.extra["overlap_mm"] < 3.3
+    assert strikes(10.0) == []
+
+
+def _crown_finish_strikes(mm, y):
+    """leader-through-own-text on MHA-116's crown finish symbol rooted at
+    (120, ``y``) mm, its leader running to the crown point (152.6, 159.0)."""
+    symbol = {
+        "type": 7,
+        "name": "DetailItem crown",
+        "visible": 1,
+        "owner_type": 0,
+        "pos": [120.0 * mm, y * mm, 0.0],
+        "leaders": [[121.0 * mm, y * mm, 0.0, 126.4 * mm, y * mm, 0.0, 152.6 * mm, 159.0 * mm, 0.0]],
+        "display": {
+            "lines": [
+                _line(117.0 * mm, y * mm, 126.4 * mm, y * mm),  # shelf, V's point to leader
+                _line(120.0 * mm, y * mm, 117.5 * mm, (y + 4.3) * mm),  # V, short arm
+                _line(120.0 * mm, y * mm, 124.3 * mm, (y + 7.4) * mm),  # V, long arm to the bar
+                _line(124.3 * mm, (y + 7.4) * mm, 135.0 * mm, (y + 7.4) * mm),  # bar over the Ra text
+            ],
+            "texts": [{"t": "Ra 1.6", "pos": [125.3 * mm, (y + 4.2) * mm, 0.0], "h": 2.5 * mm, "ref": 1, "ang": 0.0}],
+        },
+    }
+    view = _view("Drawing View on RIGHT_CENTER", (0.10, 0.10, 0.30, 0.25), [symbol])
+    spans = [["Ra 1.6", 125.3 * mm, (y + 4.2) * mm, 134.8 * mm, (y + 7.0) * mm]]
+    findings = audit_dump(_dump(views=[view], spans=spans, print_rest=False))
+    return [f for f in findings if f.kind == "leader-through-own-text"]
+
+
+# --------------------------------------------------------------------------
+# Real cases: MHA-089 rocker-arm-support, rocker fix3 (6a5d8dd5c)
+# --------------------------------------------------------------------------
+#
+# reviewfirst's packet (dt-logs/layout-blindspots/mha089-rocker/cases.json):
+# six defects the pre-save gate passed on fix3's sheet, restored from the
+# build cache (key 1bdade086456). Text boxes are pdfium glyph rects and lines
+# the PDF's own path segments, in sheet mm. Each case also carries its
+# control: fix4 (65db4585c, key 52595f0a368e), clean for A-E. F is unchanged
+# on fix4; its control is 60fef5e3b's intent (the text printed above its
+# extension lines), which has not been rendered yet.
+
+_MM = 0.001
+
+
+def _rocker_arrow(x, y, dx, dy):
+    return [x * _MM, y * _MM, 0.0, dx, dy, 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]
+
+
+def _rocker_dim(name, text, box, *, lines=(), arrows=()):
+    (x0, y0), (_x1, y1) = box
+    dim = _dim(name, text, x0 * _MM, y0 * _MM, lines=[tuple(v * _MM for v in line) for line in lines], height=(y1 - y0) * _MM)
+    if arrows:
+        dim["display"]["arrows"] = list(arrows)
+    return dim
+
+
+def _rocker_span(text, box):
+    (x0, y0), (x1, y1) = box
+    return [text, x0 * _MM, y0 * _MM, x1 * _MM, y1 * _MM]
+
+
+def _rocker_seat_note(fixed):
+    """A: the plan's 177.8 left extension line (x 60.54) through the seat
+    note's "TRANSFER FROM MHA-123"; fixed by wrapping the note (widest row
+    ends at x 52.1)."""
+    row = ((16.1, 244.8), (52.1 if fixed else 73.7, 248.4))
+    note = _note("SeatNote", "TRANSFER FROM MHA-123", (row[0][0] * _MM, row[0][1] * _MM, row[1][0] * _MM, row[1][1] * _MM))
+    width = _rocker_dim("Depth", "177.8", ((95.0, 258.0), (105.0, 261.5)), lines=[(60.54, 141.53, 60.54, 256.19)])
+    spans = [_rocker_span("TRANSFER FROM MHA-123", row), _rocker_span("177.8", ((95.0, 258.0), (105.0, 261.5)))]
+    return _dump(views=[_view("plan", (0.010, 0.130, 0.200, 0.265), [width])], sheet_annotations=[note], spans=spans, print_rest=False)
+
+
+def _rocker_chamfer(fixed):
+    """B: RimChamferSize's "X 45 DEG" over the rail's "21.0" by 1.5 x 2.5 mm
+    (the glyphs touch); fixed by moving the chamfer rows to y 192.6-207.3."""
+    chamfer = ((154.0, 203.8), (175.7, 207.3)) if fixed else ((154.0, 223.2), (175.7, 226.7))
+    rail = ((174.2, 222.2), (185.8, 225.7))
+    dims = [_rocker_dim("RimChamferSize", "X 45 DEG", chamfer), _rocker_dim("Rail", "21.0", rail)]
+    spans = [_rocker_span("X 45 DEG", chamfer), _rocker_span("21.0", rail)]
+    return _dump(views=[_view("front", (0.140, 0.180, 0.200, 0.240), dims)], spans=spans, print_rest=False)
+
+
+def _rocker_cavity(fixed):
+    """C: CavWidth's 127.0 dimension line (y 122.41) along the top of
+    WinWidth's "165.1", only 0.09 mm inside its glyph rect but striking the
+    glyph tops; fixed by moving WinWidth to y 110.9-114.5."""
+    pocket = ((99.8, 110.9), (109.8, 114.5)) if fixed else ((99.8, 118.9), (109.8, 122.5))
+    cavity = ((80.0, 123.2), (90.0, 126.7))
+    width = _rocker_dim(
+        "CavWidth",
+        "127.0",
+        cavity,
+        lines=[(73.24, 122.41, 136.74, 122.41)],
+        arrows=[_rocker_arrow(73.24, 122.41, -1.0, 0.0), _rocker_arrow(136.74, 122.41, 1.0, 0.0)],
+    )
+    view = _view("plan", (0.060, 0.100, 0.150, 0.135), [width, _rocker_dim("WinWidth", "165.1", pocket)])
+    return _dump(views=[view], spans=[_rocker_span("165.1", pocket), _rocker_span("127.0", cavity)], print_rest=False)
+
+
+def _rocker_tapped_hole(fixed, *, seen_by_com):
+    """D: the iso's "#8-32 Tapped Hole", which the native save materialized
+    after the pre-save audit, 9.5 mm past the frame's right border. Whether
+    or not COM lists it after the save, the post-save audit sees it: as an
+    annotation over the border, or as printed text nothing claims. Fixed by
+    removing the note."""
+    box = ((386.1, 233.0), (428.6, 237.4))
+    ref = ((350.0, 250.0), (358.4, 253.5))
+    notes = []
+    if seen_by_com and not fixed:
+        notes = [_note("TappedHole", "#8-32 Tapped Hole", (386.1 * _MM, 233.0 * _MM, 428.6 * _MM, 237.4 * _MM))]
+    spans = [_rocker_span("12.0", ref)] + ([] if fixed else [_rocker_span("#8-32 Tapped Hole", box)])
+    view = _view("iso", (0.330, 0.190, 0.415, 0.260), [_rocker_dim("IsoRef", "12.0", ref)])
+    return _dump(views=[view], sheet_annotations=notes, spans=spans, print_rest=False)
+
+
+def _rocker_web(fixed):
+    """E: SECTION A-A's tapered wall (two model edges) through the web's
+    "6.35", across the "6"; fixed by moving the text to x 225.2-236.8."""
+    web = ((225.2, 155.2), (236.8, 158.7)) if fixed else ((215.2, 155.2), (226.8, 158.7))
+    edges = _edges(
+        (219.39 * _MM, 146.90 * _MM, 210.36 * _MM, 215.76 * _MM),
+        (211.00 * _MM, 215.83 * _MM, 220.03 * _MM, 146.97 * _MM),
+    )
+    view = _view("SECTION A-A", (0.200, 0.140, 0.245, 0.220), [_rocker_dim("Web", "6.35", web)])
+    return _dump(views=[view], spans=[_rocker_span("6.35", web)], strokes=edges, print_rest=False)
+
+
+def _rocker_foot(fixed):
+    """F: the foot's "6.35" between its own extension lines, 3.17 mm apart
+    for 3.5 mm text; the lower line 0.35 mm inside the rect over 6.8 mm. The
+    control prints it above both lines, as 60fef5e3b intends."""
+    text = ((174.2, 144.3), (185.8, 147.8)) if fixed else ((174.2, 140.2), (185.8, 143.7))
+    lines = [(188.74, 140.55, 179.00, 140.55), (205.56, 143.72, 179.00, 143.72), (187.5, 135.0, 187.5, 149.0)]
+    arrows = [_rocker_arrow(187.5, 140.55, 0.0, 1.0), _rocker_arrow(187.5, 143.72, 0.0, -1.0)]
+    dim = _rocker_dim("Foot", "6.35", text, lines=lines, arrows=arrows)
+    return _dump(views=[_view("SECTION A-A", (0.165, 0.130, 0.210, 0.160), [dim])], spans=[_rocker_span("6.35", text)], print_rest=False)
+
+
+@pytest.mark.parametrize(
+    ("build", "kind", "a", "b"),
+    [
+        pytest.param(_rocker_seat_note, "text-on-line", "SeatNote", "Depth", id="A-seat-note-on-extension-line"),
+        pytest.param(_rocker_chamfer, "text-clearance", "RimChamferSize", "Rail", id="B-chamfer-text-on-21.0"),
+        pytest.param(_rocker_cavity, "text-on-line", "WinWidth", "CavWidth", id="C-127.0-dim-line-on-165.1"),
+        pytest.param(
+            lambda fixed: _rocker_tapped_hole(fixed, seen_by_com=True),
+            "outside-border", "TappedHole", "right border", id="D-tapped-hole-listed-by-com",
+        ),
+        pytest.param(
+            lambda fixed: _rocker_tapped_hole(fixed, seen_by_com=False),
+            "pdf-text-unclaimed", "TAPPEDHOLE", "", id="D-tapped-hole-print-only",
+        ),
+        pytest.param(_rocker_web, "text-on-line", "Web", "SECTION A-A geometry", id="E-web-6.35-on-section-wall"),
+        pytest.param(_rocker_foot, "extension-through-own-text", "Foot", "Foot", id="F-foot-6.35-on-own-extension"),
+    ],
+)
+def test_rocker_fix3_defects_gate_in_the_shared_audit(build, kind, a, b):
+    """Main's gate-gap sweep: each defect on rocker fix3's sheet that the
+    pre-save gate passed is a gating finding of the shared audit, and its
+    control is clean of it."""
+
+    def hits(dump):
+        return [f for f in audit_dump(dump) if f.kind == kind and a in f.a and b in f.b]
+
+    [finding] = hits(build(False))
+    assert severity(finding) is FindingSeverity.GATING
+    assert hits(build(True)) == []
+
+
+def test_a_hole_callout_over_the_top_border_gates_estimated_or_printed():
+    """swing's S1 case (#929 ac4fa6dd0, cone_swing_platform leaf 81d64de9faef):
+    RD2, a four-row native hole callout, printed its top row to y 269.9 mm,
+    3.2 mm past the 266.7 inner border, and main's element audit read "0
+    border crossing(s)": it gives dimensions no box. The shared audit boxes
+    the rows and gates the breach whether they are estimated from COM
+    positions or measured from the printed glyphs."""
+    rows = [
+        ("C'BORE TRANSFER", 0.1781, 0.2664),
+        ("2X <MOD-DIAM>6.76 THRU", 0.1710, 0.2608),
+        ("5/16-18 UNC - 2B THRU", 0.1559, 0.2552),
+        ("90° CSK <MOD-DIAM>9.0", 0.1623, 0.2496),
+    ]
+    callout = _hole_callout("RD2", [(0.180, 0.230, 0.200, 0.248), (0.155, 0.248, 0.250, 0.248)], rows)
+    view = _view("Drawing View2", (0.1594, 0.1286, 0.2006, 0.2514), [callout])
+
+    def breaches(dump):
+        return [f for f in audit_dump(dump) if f.kind == "outside-border" and " RD2 " in f" {f.a} "]
+
+    [estimated] = breaches(_dump(views=[view]))
+    assert estimated.b == "top border"
+    assert estimated.extra["breach_mm"] > 3.0
+    assert severity(estimated) is FindingSeverity.GATING
+    [printed] = breaches(_dump(views=[view], strokes=_edges((0.06, 0.06, 0.09, 0.06))))
+    assert printed.b == "top border"
+
+
+# --------------------------------------------------------------------------
+# swing's 917-s1 sheet 2 eye pass (cone_swing_platform leaf 917-s1-sheet2-24cb,
+# key f1615b4b73f0 at 24cbab237; fix 4dda16fd5). Lines, arrows and edges are
+# the leaf's own PDF strokes in sheet mm (restored from the build cache,
+# dt-logs/layout-blindspots/swing-24cb-raw); leaders and note text are the
+# leaf's COM inventory (dt-logs/917-s1-sheet2/leaf-24cb.log).
+# --------------------------------------------------------------------------
+
+SWING_VIEW2 = (0.1594, 0.1286, 0.2006, 0.2514)
+# The plate's tapered sides and top edge, and the printed rings of the two
+# countersunk 1/4-20 holes (outer 1.64, inner 1.27 mm radius) and the dowel
+# hole between them (0.79 mm).
+SWING_PLATE_EDGES = _edges(
+    (0.18299, 0.13769, 0.19442, 0.23834),
+    (0.16499, 0.23961, 0.16859, 0.13896),
+    (0.19248, 0.24582, 0.17099, 0.24582),
+    *_ring(0.17022, 0.23520, 0.00164),
+    *_ring(0.17022, 0.23520, 0.00127),
+    *_ring(0.18334, 0.23229, 0.00164),
+    *_ring(0.18334, 0.23229, 0.00127),
+    *_ring(0.17533, 0.22719, 0.00079),
+)
+SWING_RD2_ROWS = [
+    ("2X ", 0.2283, 0.2264),
+    ("<MOD-DIAM>", 0.2350, 0.2264),
+    (" 5.11 THRU ALL", 0.2416, 0.2264),
+    ("AT ASSEMBLY; 1/4-20 UNC - 2B THRU ALL", 0.2060, 0.2148),
+]
+
+
+def _swing_rd2(fixed):
+    """RD2's leader, shoulder and arrow as printed: at 24cbab237 to the left
+    1/4-20 hole across 28 mm of plate; at 4dda16fd5 to the right one."""
+    tip, end, base = ((0.18408, 0.23125), (0.18260, 0.23333), (0.18616, 0.22835)) if fixed else (
+        (0.17113, 0.23431), (0.16930, 0.23608), (0.173725, 0.23188)
+    )
+    callout = _hole_callout(
+        "RD2",
+        [(*tip, 0.20433, 0.20302), (*end, *tip), (0.20433, 0.20302, 0.29404, 0.20302)],
+        SWING_RD2_ROWS,
+    )
+    callout["display"]["arrows"] = [
+        [*tip, 0.0, base[0] - tip[0], base[1] - tip[1], 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]
+    ]
+    return callout
+
+
+def test_a_leader_running_over_the_part_gates():
+    """(a) RD2's leader crossed the plate's right edge at 24cbab237 and ran
+    28.2 mm over the plate to a hole 6.1 mm from the plate's side: a 22 mm
+    detour, reading as an edge of the part. The fix at 4dda16fd5 lands on the
+    nearer hole, 14.1 mm over the plate for a 10.3 mm approach, and is clear.
+    Both land on a countersink's inner ring, 0.37 mm inside the outer one:
+    that crossing is under the arrowhead, so each counts one edge."""
+
+    def over(fixed):
+        view = _view("Drawing View2", SWING_VIEW2, [_swing_rd2(fixed)])
+        findings = audit_dump(_dump(views=[view], strokes=SWING_PLATE_EDGES))
+        return [f for f in findings if f.kind.startswith("leader-over-part") and "RD2" in f.a]
+
+    [finding] = over(False)
+    assert finding.kind == "leader-over-part"
+    assert severity(finding) is FindingSeverity.GATING
+    assert 27.5 < finding.extra["over_part_mm"] < 29.0
+    assert 21.0 < finding.extra["detour_mm"] < 23.5
+    assert finding.extra["edge_crossings"] == 1
+    assert over(True) == []
+
+
+def test_a_long_leader_by_the_shortest_route_is_advisory():
+    """cone-gear's Ra 1.6 leaders run 27-39 mm over the gear to its bore, the
+    shortest route there is (layoutcal2-a T072..T120, detour -5..-2 mm): no
+    placement shortens them, so they are reported but do not gate. Here an
+    80 mm square part with a 5 mm bore at its centre, the leader in from the
+    left edge: 35 mm over the part, 35 mm approach."""
+    ring = _ring(0.200, 0.150, 0.005)
+    part = _box_edges(0.160, 0.110, 0.240, 0.190)
+    tip = (0.195, 0.150)
+    note = {
+        "type": 6,
+        "name": "Finish",
+        "visible": 1,
+        "owner_type": 0,
+        "leaders": [[0.140, 0.150, 0.0, *tip, 0.0]],
+        "display": {
+            "arrows": [[*tip, 0.0, -1.0, 0.0, 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]],
+            "texts": [{"t": "Ra 1.6", "pos": [0.125, 0.151, 0.0], "h": 0.0025}],
+        },
+        "note": {"text": "Ra 1.6", "balloon": False},
+    }
+    view = _view("Gear", (0.155, 0.105, 0.245, 0.195), [note])
+    findings = audit_dump(_dump(views=[view], strokes=[*part, *_edges(*ring)]))
+    [finding] = [f for f in findings if f.kind.startswith("leader-over-part")]
+    assert finding.kind == "leader-over-part-direct"
+    assert severity(finding) is FindingSeverity.ADVISORY
+    assert finding.extra["over_part_mm"] == pytest.approx(35.0, abs=0.1)
+    assert finding.extra["detour_mm"] == pytest.approx(0.0, abs=0.1)
+
+
+def _arrow_at(tip, toward):
+    """A GetArrowHeadAtIndex2 record at ``tip``, its base toward ``toward``."""
+    dx, dy = toward[0] - tip[0], toward[1] - tip[1]
+    length = math.hypot(dx, dy)
+    return [*tip, 0.0, dx / length, dy / length, 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]
+
+
+def test_each_branch_of_a_two_arrow_leader_is_measured_from_its_own_attachment():
+    """Codex P2 on b49e13940 (PRRT_kwDOPHDy386mTArq): a note's two leaders
+    share their attach point. Walking from one tip to the node farthest from
+    it ran on through the shared attachment into the sibling's elbow, so
+    the sibling's crossing was measured as this branch's route. Here the
+    short branch lands 7.6 mm inside the part's left edge, and the long
+    branch runs 47 mm to a feature 45 mm deep (a direct route, advisory). The
+    old walk measured the short branch from the long one's crossing: a
+    22.8 mm phantom detour, gating."""
+    attach, short_tip, elbow, long_tip = (0.092, 0.150), (0.105, 0.165), (0.140, 0.150), (0.145, 0.155)
+    note = {
+        "type": 6,
+        "name": "Branched",
+        "visible": 1,
+        "owner_type": 0,
+        "leaders": [[*attach, 0.0, *short_tip, 0.0], [*attach, 0.0, *elbow, 0.0, *long_tip, 0.0]],
+        "display": {
+            "arrows": [_arrow_at(short_tip, attach), _arrow_at(long_tip, elbow)],
+            "texts": [{"t": "Ra 3.2", "pos": [0.075, 0.149, 0.0], "h": 0.0025}],
+        },
+        "note": {"text": "Ra 3.2", "balloon": False},
+    }
+    view = _view("Block", (0.095, 0.095, 0.205, 0.205), [note])
+    findings = audit_dump(_dump(views=[view], strokes=_box_edges(0.100, 0.100, 0.200, 0.200)))
+    [finding] = [f for f in findings if f.kind.startswith("leader-over-part")]
+    assert finding.kind == "leader-over-part-direct"
+    assert finding.extra["over_part_mm"] == pytest.approx(47.1, abs=0.2)
+
+
+def test_an_arrowless_leader_running_over_the_part_gates():
+    """Codex P2 on b294b7f5f (PRRT_kwDOPHDy386mTPic): a cosmetic-thread
+    callout dumps its registered leader and no display data (DetailItem357),
+    so it has no arrowhead to walk to and was never measured. It ends where
+    its registered points end. Here it enters the plate across its right
+    edge and runs 22.2 mm to hole A's outer ring, 6.9 mm from the plate's
+    left side: a 15.3 mm detour."""
+    tip = (0.17022 + 0.00164, 0.23520)
+    note = {**SWING_TAPPED_HOLE, "leaders": [[0.2000, 0.2352, 0.0, *tip, 0.0]]}
+    view = _view("Drawing View2", SWING_VIEW2, [note])
+    findings = audit_dump(_dump(views=[view], strokes=SWING_PLATE_EDGES))
+    [finding] = [f for f in findings if f.kind.startswith("leader-over-part")]
+    assert finding.kind == "leader-over-part"
+    assert finding.extra["over_part_mm"] == pytest.approx(22.2, abs=0.2)
+    assert finding.extra["detour_mm"] == pytest.approx(15.3, abs=0.2)
+
+
+def test_an_arrowless_leader_beside_an_arrowed_one_is_measured():
+    """Arrow style is per leader (IAnnotation::SetArrowHeadStyleAtIndex), so
+    one note can carry an arrowed leader and an arrowless one (Main on the
+    TPic fix). The arrowed branch stops outside the plate; the arrowless one
+    runs the 22.2 mm to hole A and gates."""
+    attach, arrowed_tip = (0.2000, 0.2352), (0.1960, 0.2300)
+    tip = (0.17022 + 0.00164, 0.23520)
+    note = {
+        **SWING_TAPPED_HOLE,
+        "leaders": [[*attach, 0.0, *arrowed_tip, 0.0], [*attach, 0.0, *tip, 0.0]],
+        "display": {"arrows": [_arrow_at(arrowed_tip, attach)]},
+    }
+    view = _view("Drawing View2", SWING_VIEW2, [note])
+    findings = audit_dump(_dump(views=[view], strokes=SWING_PLATE_EDGES))
+    [finding] = [f for f in findings if f.kind.startswith("leader-over-part")]
+    assert finding.kind == "leader-over-part"
+    assert finding.extra["over_part_mm"] == pytest.approx(22.2, abs=0.2)
+
+
+@pytest.mark.parametrize(
+    ("ends", "arrows", "arrowless"),
+    [
+        pytest.param(
+            [(0.0, 0.0), (0.002, 0.0)], [((0.0, 0.0), 0.003556)], [(0.002, 0.0)], id="one-arrow-two-ends"
+        ),
+        pytest.param(
+            [(0.0, 0.0), (0.002, 0.0)],
+            [((0.0, 0.0), 0.003556), ((0.002, 0.0), 0.003556)],
+            [],
+            id="two-arrows-two-ends",
+        ),
+        # Codex P2 on 3b7ef9d3b (PRRT_kwDOPHDy386mU9Pg): nearest-first gives
+        # the 1 mm head the 0 mm end, and the -2 mm head reaches nothing else.
+        pytest.param(
+            [(0.0, 0.0), (0.003, 0.0)],
+            [((0.001, 0.0), 0.003556), ((-0.002, 0.0), 0.003556)],
+            [],
+            id="greedy-strands-an-end",
+        ),
+        # Where every arrow has its own end, the least total distance wins.
+        pytest.param(
+            [(0.0, 0.0), (0.003, 0.0), (0.009, 0.0)],
+            [((0.0005, 0.0), 0.003556), ((0.0028, 0.0), 0.003556)],
+            [(0.009, 0.0)],
+            id="greedy-and-optimal-agree",
+        ),
+    ],
+)
+def test_one_arrowhead_claims_one_leader_end(ends, arrows, arrowless):
+    """Codex P2 on 27173c6ee (PRRT_kwDOPHDy386mUWM-): one arrowhead claimed
+    every registered end within its head's length, so an arrowless sibling
+    ending 2 mm from an arrow tip vanished from both _landings and
+    _leader_paths. Arrowheads match ends one to one: the most matches, then
+    the least total distance."""
+    from _layout_audit import _arrowless_ends
+
+    assert _arrowless_ends(ends, arrows) == arrowless
+
+
+def test_a_textless_branch_is_measured_from_its_own_registered_attachment():
+    """Codex P2 on 89a28675e (PRRT_kwDOPHDy386mT5xq): a note with no display
+    text (a cosmetic-thread callout, DetailItem357) has no text box to find
+    each leader's attachment by, and the walk ran to the node farthest from
+    the tip. Two arrowless leaders share their attach point 8 mm left of the
+    part: one runs 25 mm in to an elbow and 3 mm on to its feature, a direct
+    route 28 mm over the part (advisory); the other stops outside the part.
+    The old walk measured the short one from the sibling's elbow: 25 mm over
+    the part to a tip outside it, a phantom gating detour."""
+    attach, elbow, deep_tip, short_tip = (0.092, 0.150), (0.125, 0.150), (0.125, 0.147), (0.095, 0.160)
+    note = {
+        "type": 6,
+        "name": "Textless",
+        "visible": 1,
+        "owner_type": 0,
+        "leaders": [[*attach, 0.0, *elbow, 0.0, *deep_tip, 0.0], [*attach, 0.0, *short_tip, 0.0]],
+        "display": {},
+        "note": {"text": "", "balloon": False},
+    }
+    view = _view("Block", (0.095, 0.095, 0.205, 0.205), [note])
+    findings = audit_dump(_dump(views=[view], strokes=_box_edges(0.100, 0.100, 0.200, 0.200)))
+    [finding] = [f for f in findings if f.kind.startswith("leader-over-part")]
+    assert finding.kind == "leader-over-part-direct"
+    assert finding.extra["over_part_mm"] == pytest.approx(28.0, abs=0.2)
+
+
+# DetailItem357, the model's cosmetic-thread callout on View2: COM text and
+# leader verbatim; like its View1 twin (layoutcal2-a DetailItem349) it dumps
+# no display data.
+SWING_TAPPED_HOLE = {
+    "type": 6,
+    "name": "DetailItem357",
+    "visible": 1,
+    "owner_type": 0,
+    "layer": "",
+    "leaders": [[0.1960, 0.2459, 0.0, 0.1896, 0.2459, 0.0, 0.1834, 0.2339, 0.0]],
+    "display": {},
+    "note": {"text": "1/4-20 Tapped Hole", "balloon": False},
+}
+# A general note naming the same thread, with no leader (layoutcal2-a
+# DetailItem372's second row).
+SWING_DEBURR_NOTE = {
+    "type": 6,
+    "name": "DetailItem372",
+    "visible": 1,
+    "owner_type": 0,
+    "display": {"texts": [{"t": "1/4-20 TAPPED HOLES: DEBURR ONLY, 0.1 MAX BREAK EACH END.", "pos": [0.2225, 0.0729, 0.0], "h": 0.0025}]},
+    "note": {"text": "1/4-20 TAPPED HOLES: DEBURR ONLY, 0.1 MAX BREAK EACH END.", "balloon": False},
+}
+
+
+def test_a_second_callout_of_one_thread_in_a_view_gates():
+    """(b) At 24cbab237 the cosmetic-thread callout "1/4-20 Tapped Hole"
+    printed beside RD2's "2X ... 1/4-20 UNC - 2B THRU ALL", its leader on the
+    other hole of RD2's pair. 4dda16fd5 removed it. A general note naming the
+    thread, with no leader, calls out no hole and is no duplicate; nor are
+    two hole callouts of one thread (harmonic-base's 2X and 4X 8-32 groups,
+    test_gate_mode_passes_a_sheet_with_only_advisories). The two are one
+    group because RD2's "2X" names exactly the view's two holes of the size
+    both leaders land on, so the fixture prints the plate's rings."""
+
+    def duplicates(members):
+        view = _view("Drawing View2", SWING_VIEW2, members)
+        findings = audit_dump(_dump(views=[view], strokes=SWING_PLATE_EDGES))
+        return [f for f in findings if f.kind == "duplicate-thread-callout"]
+
+    [finding] = duplicates([_swing_rd2(False), SWING_TAPPED_HOLE, SWING_DEBURR_NOTE])
+    assert {finding.a, finding.b} == {"hole-callout RD2", "note DetailItem357"}
+    assert finding.extra["thread"] == "1/4-20"
+    assert finding.extra.get("association") == "same 2X group"
+    assert severity(finding) is FindingSeverity.GATING
+    assert duplicates([_swing_rd2(True), SWING_DEBURR_NOTE]) == []
+
+
+@pytest.mark.parametrize(
+    ("a", "b", "same"),
+    [
+        # Codex P2 on b9674fa86 (PRRT_kwDOPHDy386mUhqD): the number sign is optional.
+        pytest.param("8-32 UNC - 2B", "#8-32 Tapped Hole", True, id="number-sign"),
+        pytest.param("10-24UNC-2B", "#10 - 24 UNC", True, id="series-joined-and-spaced"),
+        pytest.param("1/4-20 UNC - 2B", '1/4"-20 TAPPED', True, id="inch-mark"),
+        pytest.param("1/4-20 UNC", ".250-20 UNC", True, id="decimal-size"),
+        pytest.param("#8-32", ".164-32", True, id="numbered-is-its-diameter"),
+        pytest.param("M3 THRU", "M3x0.5 - 6H", True, id="metric-coarse-implied"),
+        pytest.param("M3x0.5", "m3 X 0.5", True, id="metric-spaced-and-case"),
+        pytest.param("M3 x 6 LG", "M3", True, id="metric-length-is-no-pitch"),
+        # Codex P2s on 069ad9dd7 (PRRT_kwDOPHDy386mUsuF, PRRT_kwDOPHDy386mUsuH).
+        pytest.param("1-8 UNC", "1.000-8 UNC", True, id="whole-inch"),
+        pytest.param("M18", "M18x2.5", True, id="metric-coarse-beyond-m16"),
+        pytest.param("1-8 UNC", "#1-8", False, id="whole-inch-is-not-numbered"),
+        pytest.param("1-64 UNC", "#1-64", True, id="bare-numbered-by-its-pitch"),
+        pytest.param("1-1/2-6 UNC", "1 1/2-6", True, id="mixed-number"),
+        pytest.param("M3", "M3x0.35", False, id="metric-fine-is-not-coarse"),
+        pytest.param("1/4-20 UNC", "1/4-28 UNF", False, id="unc-is-not-unf"),
+        pytest.param("#8-32", "#10-32", False, id="another-size"),
+        pytest.param("12.281 +0.005 -0.025", "+0.005 -0.025", False, id="a-tolerance-is-no-thread"),
+    ],
+)
+def test_a_thread_keys_by_the_thread_it_names(a, b, same):
+    """Two designations share a key only when they name one thread: the
+    number sign, spacing, the series suffix, an inch mark, a decimal size,
+    case and an implied coarse pitch are print, not thread."""
+    from _layout_audit import thread_designations
+
+    ours, theirs = thread_designations(a), thread_designations(b)
+    assert bool(set(ours) & set(theirs)) is same
+
+
+def _same_thread(a, b):
+    from _layout_audit import thread_designations
+
+    return set(thread_designations(a)) == set(thread_designations(b)) != set()
+
+
+def test_every_iso_261_coarse_size_keys_with_its_implied_pitch():
+    """Every coarse row: "Md" names "Md x p", and not the same size at half
+    the pitch."""
+    from _layout_audit import _METRIC_COARSE_PITCH
+
+    assert len(_METRIC_COARSE_PITCH) == 39
+    for major, pitch in _METRIC_COARSE_PITCH.items():
+        assert _same_thread(f"M{major:g}", f"M{major:g}x{pitch:g}"), major
+        assert not _same_thread(f"M{major:g}", f"M{major:g}x{pitch / 2:g}"), major
+
+
+def test_every_asme_b1_1_numbered_row_keys_with_and_without_its_number_sign():
+    """Every numbered UNC/UNF/UNEF row: "#N-t", "N-t" and its decimal major
+    diameter name one thread."""
+    from _layout_audit import _NUMBERED_TPI
+
+    for number, pitches in _NUMBERED_TPI.items():
+        for tpi in pitches:
+            decimal = f".{round((0.060 + 0.013 * number) * 1000):03d}"
+            assert _same_thread(f"#{number}-{tpi:g}", f"{number}-{tpi:g} UNC"), (number, tpi)
+            assert _same_thread(f"#{number}-{tpi:g}", f"{decimal}-{tpi:g}"), (number, tpi)
+
+
+@pytest.mark.parametrize(
+    ("size", "decimal", "pitches"),
+    [
+        ("1", "1.000", (8, 12, 20)),
+        ("1-1/4", "1.250", (7, 12, 18)),
+        ("1-1/2", "1.500", (6, 12, 18)),
+        ("1-3/4", "1.750", (5,)),
+        ("2", "2.000", (4.5,)),
+        ("2-1/2", "2.500", (4,)),
+        ("3", "3.000", (4,)),
+        ("4", "4.000", (4,)),
+    ],
+)
+def test_every_asme_b1_1_whole_inch_row_keys_as_inches(size, decimal, pitches):
+    """B1.1 Table 2A whole-inch rows: the bare size, its decimal and (for a
+    mixed number) the spaced form name one thread, and a bare whole number
+    is never read as the numbered size of the same number."""
+    for tpi in pitches:
+        assert _same_thread(f"{size}-{tpi:g} UNC", f"{decimal}-{tpi:g}"), (size, tpi)
+        if "-" in size:
+            assert _same_thread(f"{size}-{tpi:g}", f"{size.replace('-', ' ')}-{tpi:g}"), (size, tpi)
+        else:
+            assert not _same_thread(f"{size}-{tpi:g}", f"#{size}-{tpi:g}"), (size, tpi)
+
+
+def test_a_note_restating_a_callouts_numbered_thread_with_a_number_sign_gates():
+    """Codex P2 on b9674fa86: a hole callout printing "8-32 UNC - 2B" and a
+    note printing "#8-32 Tapped Hole" on its hole name one thread."""
+    rows = [*SWING_RD2_ROWS[:3], ("AT ASSEMBLY; 8-32 UNC - 2B THRU ALL", 0.2060, 0.2148)]
+    rd2 = _swing_rd2(False)
+    rd2["display"]["texts"] = [{"t": t, "pos": [x, y, 0.0], "h": 0.0035} for t, x, y in rows]
+    note = {**SWING_TAPPED_HOLE, "note": {**SWING_TAPPED_HOLE["note"], "text": "#8-32 Tapped Hole"}}
+    view = _view("Drawing View2", SWING_VIEW2, [rd2, note])
+    findings = audit_dump(_dump(views=[view], strokes=SWING_PLATE_EDGES))
+    [finding] = [f for f in findings if f.kind == "duplicate-thread-callout"]
+    assert finding.extra["thread"] == "#8-32"
+
+
+def _tapped_hole_note(tip):
+    """DetailItem357 with its leader's last run ending at ``tip``."""
+    return {**SWING_TAPPED_HOLE, "leaders": [[0.1960, 0.2459, 0.0, 0.1896, 0.2459, 0.0, *tip, 0.0]]}
+
+
+@pytest.mark.parametrize(
+    ("extra_rings", "tip", "association"),
+    [
+        # On RD2's own hole: the same feature, whatever the count.
+        ((), (0.17022 + 0.00164, 0.23520), "same hole"),
+        # Codex P2 on b49e13940 (PRRT_kwDOPHDy386mTAro): the view prints two
+        # more countersunk holes, so RD2's 2X is one pair of four and the
+        # note's hole may be the other pair's.
+        (
+            (*_ring(0.17600, 0.20000, 0.00164), *_ring(0.17600, 0.20000, 0.00127),
+             *_ring(0.17800, 0.17000, 0.00164), *_ring(0.17800, 0.17000, 0.00127)),
+            (0.18334, 0.23229 + 0.00164),
+            None,
+        ),
+        # On the dowel hole: another size, so another group.
+        ((), (0.17533 + 0.00079, 0.22719), None),
+        # On no printed ring: nothing associates the two.
+        ((), (0.18000, 0.21000), None),
+    ],
+    ids=["same-hole", "one-of-two-pairs", "other-size", "no-ring"],
+)
+def test_one_thread_is_one_callout_only_within_one_hole_group(extra_rings, tip, association):
+    """A second callout of RD2's thread duplicates it only on RD2's hole
+    group: one thread can name two groups in one view."""
+    view = _view("Drawing View2", SWING_VIEW2, [_swing_rd2(False), _tapped_hole_note(tip)])
+    findings = audit_dump(_dump(views=[view], strokes=[*SWING_PLATE_EDGES, *_edges(*extra_rings)]))
+    duplicates = [f for f in findings if f.kind == "duplicate-thread-callout"]
+    assert [f.extra.get("association") for f in duplicates] == ([association] if association else [])
+
+
+@pytest.mark.parametrize(
+    ("x", "y", "kind"),
+    [(0.418, 0.200, "outside-border"), (0.300, 0.040, "keep-out")],
+    ids=["past-the-border", "on-the-title-block"],
+)
+def test_a_dimension_past_the_border_or_on_the_title_block_gates(x, y, kind):
+    """Codex P2 on #901 (PRRT_kwDOPHDy386mTiwV): a5563c7a0 retired the
+    nominal dimension box whose border and title-block checks failed the
+    build. This audit finds both as gating kinds; GATE fails the leaf on
+    them. REPORT fails on them only once they join ENFORCED_KINDS after a
+    zero full-fleet count (#1052)."""
+    from _layout_audit import ENFORCED_KINDS, enforced
+    from _layout_geometry import Finding
+
+    dump = _dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [_dim("Stray", "20.0", x, y)])])
+    findings = [f for f in audit_dump(dump) if "Stray" in f.a or "Stray" in f.b]
+    assert kind in _kinds(findings)
+    [found] = [f for f in findings if f.kind == kind]
+    assert severity(found) is FindingSeverity.GATING
+    assert found in enforced(LayoutAuditMode.GATE, findings)
+    assert [f.kind for f in enforced(LayoutAuditMode.REPORT, findings)] == ([kind] if kind in ENFORCED_KINDS else [])
+    clearance = Finding(kind="text-clearance", sheet="Sheet2", a="dim A", b="dim B", detail="")
+    assert enforced(LayoutAuditMode.REPORT, [clearance]) == []
+    assert enforced(LayoutAuditMode.GATE, [clearance]) == [clearance]
+
+
+def test_report_mode_enforces_nothing_until_the_full_fleet_count_is_zero():
+    """#946's replay covered 32 of 111 drawings; the border and title-block
+    kinds wait for the #877 cold build's full-fleet count (#1052)."""
+    from _layout_audit import ENFORCED_KINDS
+
+    assert ENFORCED_KINDS == frozenset()
+
+
+_ZERO_LINE = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+# cone_pivot_post's MainBodyHt, display data verbatim from the probe leaf
+# (diag/cone-pivot-origin-probe fc2212cd6, leaf run 20260926T205141966Z): two
+# extension lines, the 15 zero-length records #906 brought, two dimension-line pieces.
+CPP_MAIN_BODY_HT = {
+    "type": 4,
+    "name": "MainBodyHt",
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.04, 0.112, -0.0140445],
+    "layer": "",
+    "display": {
+        "lines": [
+            [0.0, 0.0, 0.0, 0.0, 0.1180055, 0.069, -0.0140445, 0.039, 0.069, -0.0140445],
+            [0.0, 0.0, 0.0, 0.0, 0.1180055, 0.155, -0.0140445, 0.039, 0.155, -0.0140445],
+            *([_ZERO_LINE] * 15),
+            [0.0, 0.0, 0.0, 0.0, 0.04, 0.069, -0.0140445, 0.04, 0.1092219, -0.0140445],
+            [0.0, 0.0, 0.0, 0.0, 0.04, 0.155, -0.0140445, 0.04, 0.1147781, -0.0140445],
+        ],
+        "arrows": [
+            [0.04, 0.069, -0.0140445, 0.0, 1.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+            [0.04, 0.155, -0.0140445, -0.0, -1.0, -0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+        ],
+        "texts": [{"t": " 86.0 ", "pos": [0.0341812, 0.1092219, -0.0140445], "h": 0.0035, "ref": 1.0}],
+    },
+}
+
+
+def test_a_zero_length_display_line_is_no_ink_and_is_counted():
+    """The cone_pivot_post integ blocker (probe fc2212cd6): since #906 every
+    linear dimension there reads back 15 line records with both ends at
+    (0,0,0). Taken as ink they put the dimension's box at the sheet origin,
+    an ENFORCED outside-border and keep-out. A zero-length record draws
+    nothing, wherever it lies; the report counts the drop per sheet."""
+    from _layout_audit import audit_report
+
+    dump = _dump(views=[_view("Drawing View1", (0.030, 0.060, 0.125, 0.165), [CPP_MAIN_BODY_HT])])
+    findings = [f for f in audit_dump(dump) if "MainBodyHt" in f.a or "MainBodyHt" in f.b]
+    assert not {"outside-border", "keep-out"} & set(_kinds(findings))
+    report, _gating = audit_report("cone-pivot-post", LayoutAuditMode.REPORT, [dump])
+    assert report["summary"]["degenerate_lines"] == {"Sheet2": 15}
+
+
+# knife-mount's datum tag A (d09c2b9eb c2 dump, DetailItem350, verbatim): COM
+# registers no leader, and its display data runs one line from the tag's
+# frame down to its datum triangle.
+KM_DATUM_A = {
+    "type": 2,
+    "name": "DetailItem350",
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.115, 0.18737, 0.014],
+    "layer": "",
+    "display": {
+        "lines": [
+            [0.0, 0.0, 0.0, 0.0, 0.115, 0.169366, 0.014, 0.115, 0.18737, 0.014],
+            [0.0, 0.0, 0.0, 0.0, 0.1185, 0.18737, 0.014, 0.1115, 0.18737, 0.014],
+            [0.0, 0.0, 0.0, 0.0, 0.1115, 0.18737, 0.014, 0.1115, 0.19437, 0.014],
+            [0.0, 0.0, 0.0, 0.0, 0.1115, 0.19437, 0.014, 0.1185, 0.19437, 0.014],
+            [0.0, 0.0, 0.0, 0.0, 0.1185, 0.19437, 0.014, 0.1185, 0.18737, 0.014],
+        ],
+        "triangles": [[0.1164, 0.169366, 0.014, 0.1136, 0.169366, 0.014, 0.115, 0.171816, 0.014, 1.0, 0.0]],
+        "texts": [{"t": "A", "pos": [0.1132743, 0.1880919, 0.014], "h": 0.0035, "ref": 1, "ang": 0.0}],
+    },
+}
+
+
+def test_a_datum_tags_display_only_leader_is_a_leader():
+    """Codex P2 on #901 (PRRT_kwDOPHDy386mTiwX): a leader that exists only in
+    display data kept the ``line`` role, so no leader check saw it. Datum
+    tag A's line to its triangle is its leader: a foreign dimension's
+    extension line across it is a leader crossing a line. Its frame is not."""
+    foreign = _dim("Width", "20.0", 0.140, 0.200, lines=[(0.105, 0.178, 0.125, 0.178)])
+    view = _view("Drawing View1", (0.085412, 0.105046, 0.144588, 0.174954), [KM_DATUM_A, foreign])
+    geometry = sheet_model(_dump(views=[view])).geometry
+    [datum] = [a for a in geometry.annotations if "DetailItem350" in a.label]
+    assert [s.format_mm() for s in datum.segments if s.role == "leader"] == ["(115.0,169.4)->(115.0,187.4)mm"]
+    crossings = [f for f in audit_dump(_dump(views=[view])) if f.kind == "leader-crosses-line"]
+    assert [(f.a, f.b) for f in crossings] == [(datum.label, "dim Width '20.0'")]
+
+
+def test_a_mixed_notes_arrowless_branch_restating_a_callouts_thread_gates():
+    """Codex P2 on b2b4f8e66 (PRRT_kwDOPHDy386mTebe): DetailItem357 with a
+    second, arrowed leader off the plate. Its arrowless branch still lands on
+    hole B, RD2's pair; the landings kept only the arrow tips once any arrow
+    existed, so the duplicate went unpaired."""
+    attach, arrowed_tip = (0.1960, 0.2459), (0.1990, 0.2400)
+    note = {
+        **SWING_TAPPED_HOLE,
+        "leaders": [[*attach, 0.0, *arrowed_tip, 0.0], *SWING_TAPPED_HOLE["leaders"]],
+        "display": {"arrows": [_arrow_at(arrowed_tip, attach)]},
+    }
+    view = _view("Drawing View2", SWING_VIEW2, [_swing_rd2(False), note])
+    findings = audit_dump(_dump(views=[view], strokes=SWING_PLATE_EDGES))
+    [finding] = [f for f in findings if f.kind == "duplicate-thread-callout"]
+    assert finding.extra.get("association") == "same 2X group"
+
+
+@pytest.mark.parametrize(
+    ("state", "audited"),
+    [
+        pytest.param({"visible": False, "printable": True}, False, id="hidden-layer"),
+        pytest.param({"visible": True, "printable": True}, True, id="printing-layer"),
+    ],
+)
+def test_a_table_on_a_non_printing_layer_is_counted_not_audited(state, audited):
+    """Codex P2 on b2b4f8e66 (PRRT_kwDOPHDy386mTebd): tables come from
+    GetTableAnnotations, apart from the views' annotations, and were audited
+    whatever their layer. A BOM run past the sheet's right edge gates only
+    when its layer prints; on a hidden layer it is counted instead."""
+    from _layout_audit import audit_report
+
+    table = {"name": "BOM", "box": [0.400, 0.200, 0.440, 0.250], "layer": "BOM-HIDDEN"}
+    dump = {**_dump(tables=[table]), "layers": {"BOM-HIDDEN": state}}
+    named = [f for f in audit_dump(dump) if "table BOM" in (f.a, f.b)]
+    assert bool(named) is audited
+    report, _gating = audit_report("fixture", LayoutAuditMode.REPORT, [dump])
+    assert report["summary"]["hidden_layer"] == ({} if audited else {"Sheet2": 1})
+
+
+def test_the_collector_records_a_tables_layer(monkeypatch):
+    """A table's layer is its IAnnotation's, read like an annotation's
+    (optional: an unread layer is audited as printed)."""
+    import _drawing_layout_audit as collector
+
+    monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
+
+    class Inner:
+        Layer = "BOM-HIDDEN"
+
+        def GetPosition(self):
+            return (0.30, 0.25, 0.0)
+
+        def GetName(self):
+            return "BOM"
+
+    class Table:
+        RowCount = 2
+        ColumnCount = 1
+
+        def GetAnnotation(self):
+            return Inner()
+
+        def GetSplitInformation(self, *_args):
+            return None
+
+        def GetColumnWidth(self, _index):
+            return 0.10
+
+        def GetRowHeight(self, _index):
+            return 0.025
+
+    reader = collector._Reader(adapter=None)
+    record = collector._table_record(reader, Table())
+    assert record == {"name": "BOM", "box": [0.3, 0.2, 0.4, 0.25], "layer": "BOM-HIDDEN"}
+    assert reader.take_errors() == {}
+
+    # A refused layer read (the wrong interface raises) is a com-read-error,
+    # not a silent "" that audits the table as printed.
+    class Refusing(Inner):
+        @property
+        def Layer(self):
+            raise AttributeError("Layer")
+
+    class RefusingTable(Table):
+        def GetAnnotation(self):
+            return Refusing()
+
+    assert collector._table_record(reader, RefusingTable())["layer"] == ""
+    assert reader.take_errors() == {"Layer": 1}
+
+
+def test_a_sheet_note_restating_a_view_callouts_thread_gates():
+    """Codex P2 on b294b7f5f (PRRT_kwDOPHDy386mTPiZ): the 24cb duplicate
+    with DetailItem357 owned by the sheet instead of View2. The sheet note
+    and the view's callout sat in separate owner groups and were never
+    compared, though the note's leader lands on View2's hole B."""
+    view = _view("Drawing View2", SWING_VIEW2, [_swing_rd2(False)])
+    note = {**SWING_TAPPED_HOLE, "owner_type": 1}
+    findings = audit_dump(_dump(views=[view], sheet_annotations=[note], strokes=SWING_PLATE_EDGES))
+    [finding] = [f for f in findings if f.kind == "duplicate-thread-callout"]
+    assert {finding.a, finding.b} == {"hole-callout RD2", "note DetailItem357"}
+    assert finding.extra.get("association") == "same 2X group"
+    assert finding.extra.get("owner") == "Drawing View2"
+
+
+@pytest.mark.parametrize(
+    ("text", "threads"),
+    [
+        ("AT ASSEMBLY; 1/4-20 UNC - 2B THRU ALL", ["1/4-20"]),
+        ("#8-32 Tapped Hole", ["#8-32"]),
+        ("4X M6x1.0 - 6H", ["M6X1.0"]),
+        ("1018 CF FLAT 1/4 x 2-1/2 in", []),
+        ("TRANSFER FROM MHA-016", []),
+        ("DIMENSIONING AND TOLERANCING PER ASME Y14.5-2018", []),
+    ],
+)
+def test_thread_designations_are_read_from_callout_text(text, threads):
+    from _layout_audit import thread_designations
+
+    assert list(thread_designations(text).values()) == threads
+
+
+# layoutcal2-a cone-swing-platform DetailItem349, verbatim: the profile view's
+# cosmetic-thread callout, which draw_cone_swing_platform put on the hidden
+# COSMETIC-THREADS-HIDDEN layer. COM reads it Visible 1 with a registered
+# leader and no display data; the PDF prints none of it (24cbab237's
+# DetailItem351, swing's 917-s1 sheet 1 eye pass).
+SWING_HIDDEN_TAPPED_HOLE = {
+    "type": 6,
+    "name": "DetailItem349",
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.0918458, 0.2473492, -0.0015875],
+    "layer": "COSMETIC-THREADS-HIDDEN",
+    "leaders": [[0.0913007, 0.2455784, -0.0015875, 0.0849507, 0.2455784, -0.0015875, 0.0783754, 0.2338789, -0.0015875]],
+    "display": {},
+    "note": {
+        "text": "1/4-20 Tapped Hole",
+        "extent": [0.0782569, 0.2342918, -0.0, 0.1358608, 0.2476316, -0.0],
+        "balloon": False,
+    },
+}
+
+
+@pytest.mark.parametrize(
+    ("state", "audited"),
+    [
+        pytest.param({"visible": False, "printable": False}, False, id="hidden-layer"),
+        pytest.param({"visible": True, "printable": False}, False, id="non-printing-layer"),
+        pytest.param({"visible": True, "printable": True}, True, id="printing-layer"),
+    ],
+)
+def test_an_annotation_on_a_non_printing_layer_is_counted_not_audited(state, audited):
+    """Main's ruling (Option A): the audit judges what prints. An annotation
+    on a layer that does not print leaves no ink, so its leader is no obstacle
+    and no finding names it; the report counts it per sheet instead."""
+    from _layout_audit import audit_report
+
+    view = _view("Drawing View1", (0.0544, 0.1286, 0.0956, 0.2514), [SWING_HIDDEN_TAPPED_HOLE])
+    dump = {**_dump(views=[view]), "layers": {"COSMETIC-THREADS-HIDDEN": state}}
+    labels = {a.label for a in sheet_model(dump).geometry.annotations}
+    assert any("DetailItem349" in label for label in labels) is audited
+    report, _gating = audit_report("cone-swing-platform", LayoutAuditMode.REPORT, [dump])
+    assert report["summary"]["hidden_layer"] == ({} if audited else {"Sheet2": 1})
+
+
+def test_a_view_owned_annotation_on_a_hidden_layer_counts_once():
+    """Codex P2 on 89a28675e (PRRT_kwDOPHDy386mT5xs): the sheet view's
+    GetAnnotations also returns the annotations a drawing view owns, so the
+    collector records DetailItem349 under its view and again under the sheet
+    (OwnerType 0, not swDrawingSheet 1). One non-printing annotation is one
+    hidden item, as ``audited_annotations`` already treats it."""
+    from _layout_audit import audit_report
+
+    view = _view("Drawing View1", (0.0544, 0.1286, 0.0956, 0.2514), [SWING_HIDDEN_TAPPED_HOLE])
+    dump = {
+        **_dump(views=[view], sheet_annotations=[SWING_HIDDEN_TAPPED_HOLE]),
+        "layers": {"COSMETIC-THREADS-HIDDEN": {"visible": True, "printable": False}},
+    }
+    report, _gating = audit_report("cone-swing-platform", LayoutAuditMode.REPORT, [dump])
+    assert report["summary"]["hidden_layer"] == {"Sheet2": 1}
+
+
+def test_the_collector_records_each_annotation_layers_print_state(monkeypatch):
+    """Option A's collector half: each named layer the sheet's annotations sit
+    on, read once through ILayerMgr::GetLayer, Visible then Printable. A name
+    GetLayer cannot resolve is left out (audited as printed), not a refusal."""
+    import _drawing_layout_audit as collector
+
+    monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
+    asked = []
+
+    class Layer:
+        Visible = False
+        Printable = False
+
+    class Manager:
+        def GetLayer(self, name):
+            asked.append(name)
+            return Layer() if name == "COSMETIC-THREADS-HIDDEN" else None
+
+    class Model:
+        def GetLayerManager(self):
+            return Manager()
+
+    class Adapter:
+        currentModel = Model()
+
+    dump = _dump(
+        views=[_view("Drawing View1", (0.05, 0.12, 0.10, 0.25), [SWING_HIDDEN_TAPPED_HOLE, {"type": 6, "name": "Gone", "layer": "FORMAT"}])],
+        sheet_annotations=[{"type": 6, "name": "Plain", "layer": ""}],
+        # A table's layer is read too (Codex P2 on b2b4f8e66).
+        tables=[{"name": "BOM", "box": [0.3, 0.2, 0.4, 0.25], "layer": "BOM-LAYER"}],
+    )
+    reader = collector._Reader(adapter=Adapter())
+    assert collector._layer_states(reader, dump) == {"COSMETIC-THREADS-HIDDEN": {"visible": False, "printable": False}}
+    assert asked == ["BOM-LAYER", "COSMETIC-THREADS-HIDDEN", "FORMAT"]
+    assert reader.take_errors() == {}
+
+
+# layoutcal2-a cone-swing-platform DetailItem374, verbatim: like every
+# leadered note, its display data opens with a zero-length line at the attach
+# point, and the PDF prints it as a zero-length 0.18 mm stroke (five such on
+# 24cbab237's FEATURES sheet and five on the fixed 4dda16fd5's).
+SWING_SLOT_NOTE = {
+    "type": 6,
+    "name": "DetailItem374",
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.121, 0.0785, 0.0],
+    "layer": "",
+    "leaders": [[0.1204851, 0.0770861, -0.0, 0.0895, 0.0584641, 0.0]],
+    "display": {
+        "lines": [
+            [0.0, 0.0, 0.0, 0.0, 0.1202019, 0.0776806, -0.0, 0.1202019, 0.0776806, -0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.1202019, 0.0776806, -0.0, 0.0895, 0.0584641, 0.0],
+        ],
+        "arrows": [[0.0895, 0.0584641, 0.0, 0.8476532, 0.5305507, -0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]],
+        "texts": [
+            {"t": "<MOD-DIAM>", "pos": [0.121, 0.075, 0.0], "h": 0.0025, "ref": 1, "ang": 0.0},
+            {"t": "4 END MILL SLOT THRU", "pos": [0.1247703, 0.075, 0.0], "h": 0.0025, "ref": 1, "ang": 0.0},
+        ],
+    },
+    "note": {"text": "<MOD-DIAM>4 END MILL SLOT THRU", "extent": [0.0891713, 0.0590545, -0.0, 0.1589024, 0.0790643, -0.0], "balloon": False},
+}
+
+
+def test_a_leadered_notes_zero_length_attach_stub_is_no_finding():
+    """Main's ruling on swing's third case (b3): the zero-length leader
+    segment is SolidWorks' attach stub, printed for every leadered note, so
+    it is a contract, not a defect: the note audits clean."""
+    view = _view("Detail View B (2 : 1)", (0.0491, 0.0106, 0.1179, 0.0794), [SWING_SLOT_NOTE])
+    stub = _edges((0.1202019, 0.0776806, 0.1202019, 0.0776806), width=0.00018)
+    findings = audit_dump(_dump(views=[view], strokes=stub))
+    assert [f for f in findings if "DetailItem374" in f.a or "DetailItem374" in f.b] == []
+
+
+def test_every_auto_center_marks_call_records_its_counts(monkeypatch):
+    """#913 (2): _drawing_common registers the submodule's observer, and each
+    call lands as a center_marks.auto_insert span event."""
+    import _drawing_common
+    import _telemetry
+    from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
+    from solidworks_mcp.adapters.solidworks import drawing as sw_drawing
+
+    assert sw_drawing.CENTER_MARK_OBSERVER is _drawing_common._record_center_marks
+    events = []
+    monkeypatch.setattr(_telemetry, "event", lambda name, **attrs: events.append((name, attrs)))
+    marks = ["template-mark"]
+
+    class View:
+        def AutoInsertCenterMarks2(self, *_args):  # noqa: N802 - COM name
+            marks.append("explicit-mark")
+            return True
+
+        def GetAnnotationsByType(self, kind):  # noqa: N802 - COM name
+            return tuple(marks) if kind == 13 else ()
+
+        def GetName2(self):  # noqa: N802 - COM name
+            return "Drawing View1"
+
+    class Adapter:
+        # The real pure helpers, without an adapter or COM session.
+        _attempt = PyWin32Adapter._attempt
+        _get_attr_or_call = PyWin32Adapter._get_attr_or_call
+
+    assert sw_drawing.auto_center_marks(Adapter(), View(), holes=True) is True
+    assert events == [
+        (
+            "center_marks.auto_insert",
+            {"view": "Drawing View1", "before": 1, "after": 2, "holes": True, "slots": False, "ok": True},
+        )
+    ]
+
+
+def test_a_refused_center_mark_count_is_sent_as_a_primitive(monkeypatch):
+    """OTel drops None attribute values: a count whose read raised goes out as
+    -1 and is named in read_failed; the view is its name string."""
+    import _drawing_common
+    import _telemetry
+
+    events = []
+    monkeypatch.setattr(_telemetry, "event", lambda name, **attrs: events.append((name, attrs)))
+    _drawing_common._record_center_marks(
+        {"view": "Drawing View2", "before": None, "after": 3, "holes": True, "slots": False, "ok": True}
+    )
+    [(name, attrs)] = events
+    assert name == "center_marks.auto_insert"
+    assert attrs == {
+        "view": "Drawing View2",
+        "before": -1,
+        "after": 3,
+        "holes": True,
+        "slots": False,
+        "ok": True,
+        "read_failed": ["before"],
+    }
+    assert all(isinstance(value, (str, bool, int, float, list)) for value in attrs.values())

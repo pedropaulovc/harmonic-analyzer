@@ -119,6 +119,7 @@ from _buildgraph import (  # noqa: E402
     part_scripts,
     part_stems,
     parts_registry_files,
+    reads_title_block_geometry,
     references_of,
     script_for,
     stamps_part_properties,
@@ -1007,9 +1008,17 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
         superset of the rows it stamps -- conservative); a non-stamping assembly
         needs NO parts row (a referenced part's row edit rebuilds that PART, whose
         new .SLDPRT triggers the assembly REFRESH);
+      * a DRAWING reads its OWN part's row -> parts/<dashed-part>.yaml +
+        _defaults (none for an assembly-sourced sheet, which has no row).
+        Every dynamic registry read a drawing closure reaches is its own part
+        (``_common.part_properties``, ``_purchased_fastener_drawing``,
+        ``_drawing_marks.apply_drawing_properties``);
+        test_dodo_recipe.test_drawing_closures_read_no_foreign_dynamic_part_row
+        fails loud on any new one.  A literal read of ANOTHER part's row
+        (``_config.parts("pivot-bracket")``) is its own concrete token;
       * any other caller (e.g. an offline check) -> the whole registry.
     """
-    if kind == "part" and stem is not None:
+    if kind in ("part", "drawing") and stem is not None:
         return part_row_files(stem.replace("_", "-"))
     if kind == "assembly" and stem is not None:
         if not stamps_part_properties(script):
@@ -1027,10 +1036,16 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
 def _expand_title_block_token(kind: str | None, script: Path) -> list[str]:
     """Per-task expansion of the ``"title_block"`` token (the TOL_* stamping in
     ``_common.part_properties`` or ``_assembly.assembly_title_properties``):
-    every part and every drawing-owning assembly stamps these values. Assemblies
-    without either path drop the token. Any other caller keeps the dependency
+    every part and every drawing-owning assembly stamps these values. An
+    assembly whose closure sizes geometry from the printed rows
+    (``reads_title_block_geometry``) keeps it too, stamping or not. Other
+    assemblies drop the token. Any other caller keeps the dependency
     conservatively."""
-    if kind == "assembly" and not stamps_title_block_properties(script):
+    if (
+        kind == "assembly"
+        and not stamps_title_block_properties(script)
+        and not reads_title_block_geometry(script)
+    ):
         return []
     return [str((CONFIG_DIR / "title_block.yaml").resolve())]
 
@@ -1814,6 +1829,10 @@ def _drawing_file_deps(stem: str) -> list[str]:
             str(RELEASE_VERSION_FILE),
             *source_deps,
             *runtime,
+            # The cad/config rows the draw closure reads (Codex #936 T_oyK): a
+            # sheet that prints another part's registry number must re-run, and
+            # miss the cache, when that row changes without any geometry change.
+            *_config_deps(script, spec.part, "drawing"),
             *(str(path.resolve()) for path in spec.assets),
         }
     )
@@ -1821,8 +1840,11 @@ def _drawing_file_deps(stem: str) -> list[str]:
 
 
 def _drawing_cache_outputs(stem: str) -> list[Path]:
-    """Native drawing plus every derived manufacturing output it emits."""
-    return [path.resolve() for path in DRAWINGS_BY_NAME[stem].outputs.values()]
+    """Native drawing, every derived manufacturing output it emits, and its
+    layout-audit report -- which rides the remote cache with the sheet, so a
+    restored leaf still carries its findings and sheet dumps."""
+    spec = DRAWINGS_BY_NAME[stem]
+    return [path.resolve() for path in (*spec.outputs.values(), spec.layout_report)]
 
 
 # --- Inputs of the whole-machine COM stages (verify gates, preflight, neutral
@@ -2689,8 +2711,8 @@ def task_assembly():
 
 
 def _clean_drawing(stem: str) -> None:
-    for target in DRAWINGS_BY_NAME[stem].outputs.values():
-        _force_remove(Path(target))
+    for target in _drawing_cache_outputs(stem):
+        _force_remove(target)
 
 
 def task_drawing():
@@ -2702,11 +2724,10 @@ def task_drawing():
     ``drawing:<stem>`` and deliberately excluded from ``build_bare``.
     """
     for stem in _drawing_order():
-        spec = DRAWINGS_BY_NAME[stem]
         yield {
             "name": stem,
             "file_dep": _drawing_file_deps(stem),
-            "targets": [str(path.resolve()) for path in spec.outputs.values()],
+            "targets": [str(path) for path in _drawing_cache_outputs(stem)],
             "actions": [(_cached_drawing_action, [stem])],
             "clean": [(_clean_drawing, [stem])],
             "verbosity": 2,
@@ -2859,11 +2880,16 @@ def task_check():
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
         SCRIPTS_DIR / "test_drawing_layout_check.py",
+        # The shared layout audit's own contract (_layout_audit.py finders + ink model).
+        SCRIPTS_DIR / "test_layout_audit.py",
         # Drawing infrastructure and cross-sheet contracts do not follow the
         # per-sheet test_*_drawing.py suffix, so enroll them explicitly.
         SCRIPTS_DIR / "test_drawing_marks.py",
         SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
         SCRIPTS_DIR / "test_fastener_catalog.py",
+        # No part or assembly saves construction geometry shown, and the
+        # per-part sketch allowances only shrink (#880).
+        SCRIPTS_DIR / "test_reference_visibility.py",
         # Fleet-wide manufacturing ownership/validation contracts are standalone
         # tests rather than one-file-per-drawing tests, so the glob below cannot
         # discover them.  They must execute under the required recipe gate: these
@@ -2888,6 +2914,58 @@ def task_check():
         # attributes the sheet no longer defines, and every check:* gate stayed
         # green (codex #416). Enrolled so the cross-sheet contracts are covered.
         SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
+        # Same failure shape: never enrolled, so the U28 re-lay (997f3534) left
+        # its three drive-train support pins red with every gate green.
+        SCRIPTS_DIR / "test_drive_train_support_layout.py",
+        # The cone tip block's shim, post-fillister and heel-relief contracts
+        # (I20/I22/I24/I31) that build_drive_train_assembly asserts at import.
+        SCRIPTS_DIR / "test_drive_train_cone_tip_holddown.py",
+        # dimensions.yaml is read by no part, so only this test keeps its
+        # alignment-pinion record pinned to the CAD constants (#814).
+        SCRIPTS_DIR / "test_dimensions_alignment_pinion_layout.py",
+        # Every cad/config YAML parses: prose-only records move no cache key,
+        # so a row that breaks the file is otherwise invisible (caf03f2b7).
+        SCRIPTS_DIR / "test_config_yaml_parses.py",
+        # The mirror-retirement diagnostic's drive-train rows equal the rows the
+        # assembly places with (Codex on #814 and #844).
+        SCRIPTS_DIR / "test_mirror_retirement_expectations.py",
+        # Every cad/scripts/test_*.py runs in some check:* gate or is exempted
+        # with a reason, so a new test cannot ship un-enrolled (Codex on #844).
+        SCRIPTS_DIR / "test_check_gate_enrollment.py",
+        # No module assigns an UPPERCASE name twice at top level: a merge that
+        # kept both sides of a rewritten block shadowed seven BDT constants
+        # (cascade -> integ merge, Main's restricted review).
+        SCRIPTS_DIR / "test_module_constants_assigned_once.py",
+        # Integ-branch tests that guard caught un-enrolled at #877 round 4.
+        SCRIPTS_DIR / "test_cone_gear_mesh_design.py",
+        SCRIPTS_DIR / "test_cone_gear_seat_fit.py",
+        SCRIPTS_DIR / "test_drawing_hidden_sketches.py",
+        SCRIPTS_DIR / "test_drive_train_steps.py",
+        SCRIPTS_DIR / "test_drive_train_tip_adjuster_seat.py",
+        SCRIPTS_DIR / "test_fit_bands.py",
+        SCRIPTS_DIR / "test_printed_text_rulings.py",
+        # ... and the #857 re-merge: its leader-geometry and replica-driver pins.
+        SCRIPTS_DIR / "test_drawing_leaders.py",
+        SCRIPTS_DIR / "test_mcmaster_replica_driver.py",
+        # ... and #906: the crank native-acceptance record pins.
+        SCRIPTS_DIR / "test_crank_native_acceptance.py",
+        # ... and #906 R1: the crank mesh stack (the fit-up axis the drive
+        # train places the crank train on) and MHA-149's wall and throw.
+        SCRIPTS_DIR / "test_crank_mesh_stack.py",
+        SCRIPTS_DIR / "test_crank_eccentric_bushing.py",
+        # ... and #937: the cylinder-bank layout bands and MHA-147's set screw.
+        SCRIPTS_DIR / "test_arbor_set_screw.py",
+        SCRIPTS_DIR / "test_cylinder_bank_layout.py",
+        # ... and #936: the rocker-bank stack, the support's bracket seats, the
+        # channel's cross-bank axial budget and the hole-callout process line.
+        SCRIPTS_DIR / "test_channel_axial_budget.py",
+        SCRIPTS_DIR / "test_hole_callout_prefix.py",
+        # ... and #1075: a radial wizard tap commits its thread class and
+        # termination, and define_circle can dimension a circle by its radius.
+        SCRIPTS_DIR / "test_holes_thread_metadata.py",
+        SCRIPTS_DIR / "test_define_circle.py",
+        SCRIPTS_DIR / "test_rocker_bank_layout.py",
+        SCRIPTS_DIR / "test_rocker_bracket_seat_layout.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.
@@ -2908,6 +2986,9 @@ def task_check():
         # Every configuration of a saved part is rebuilt and read back clean
         # (pc-p1r: MHA-135 INSTALLED saved stale failed saved-rebuild-clean).
         SCRIPTS_DIR / "test_part_save_rebuild.py",
+        # Assembly mates select by name, never by a view-dependent point pick
+        # (#916: the collar pick selected the shaft collar's OD on one seat).
+        SCRIPTS_DIR / "test_assembly_named_selection.py",
     ]
     # These are runtime-read rather than imported, so module_deps_of cannot
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun
@@ -2916,6 +2997,9 @@ def task_check():
         SCRIPTS_DIR / "prompts" / "machinist_review_part.md",
         SCRIPTS_DIR / "prompts" / "machinist_review_assembly.md",
         SCRIPTS_DIR / "prompts" / "machinist_review_schema.json",
+        # test_printed_text_rulings reads the Named exceptions table: a new or
+        # removed row must rerun its tagged-emitter check.
+        SCRIPTS_DIR.parent / "docs" / "drawing-simplicity-policy.md",
     ]
     # test_out_param_binding SCANS sources instead of importing them (it reads
     # every top-level build script and every diagnostics/*.py looking for
@@ -3430,7 +3514,13 @@ def _run_release(relargs):
     the renders and the gallery, then tags and uploads. It takes NO COM seat, so it
     neither blocks another worktree's build nor needs SolidWorks on this machine --
     which is the whole point: a release can be cut from a seatless box, with every
-    COM stage dispatched to the farm."""
+    COM stage dispatched to the farm.
+
+    ``build.py`` refuses a release with visibility debt before dispatching any
+    leaf; a bare ``doit release`` reaches this check only after its gates."""
+    import visibility_debt
+
+    visibility_debt.assert_no_visibility_debt()
     _run([sys.executable, str(RELEASE_PY), *relargs], "cut release", task="release")
 
 

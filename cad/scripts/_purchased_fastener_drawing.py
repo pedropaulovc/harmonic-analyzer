@@ -260,7 +260,8 @@ async def build_purchased_fastener_drawing(
             )
         expected = {
             "Number": str(registry["number"]),
-            "Title": str(registry["title"]),
+            # The PART cell prints the slug (_common.part_properties).
+            "Title": stock.part_name,
             "Material": str(registry["material"]),
             "Stock Name": stock.stock_name,
             "Supplier": stock.supplier,
@@ -278,6 +279,7 @@ async def build_purchased_fastener_drawing(
         properties=properties,
         finish=finish,
         installation_notes=installation_notes,
+        document_title=str(registry["title"]),
     )
 
 
@@ -313,6 +315,7 @@ async def _build_reference_sheet(
     material_property: str = "Material",
     installation_notes: str = "",
     reference_notes: str = "",
+    document_title: str | None = None,
 ) -> dict[str, str]:
     source = spec.source
     template = DRAWING_TEMPLATES[spec.layout]
@@ -325,7 +328,9 @@ async def _build_reference_sheet(
         finish=finish,
         material_property=material_property,
     )
-    title = f"{properties['Title']} — Purchased Part Reference Drawing"
+    # The registry title still names the drawing document and PDF; only the
+    # sheet's PART cell moved to the slug.
+    title = f"{document_title or properties['Title']} — Purchased Part Reference Drawing"
     with _telemetry.span("drawing.purchased_summary"):
         stamp_drawing_summary(
             adapter,

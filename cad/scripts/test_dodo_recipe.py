@@ -176,6 +176,136 @@ def test_drawing_tasks_depend_on_all_selected_layout_templates():
         assert template_deps == selected, stem
 
 
+@pytest.mark.parametrize(
+    ("stem", "rows"),
+    [
+        # cone_gear_shaft and the drive-train sheet read the cone gear's
+        # grouped spec. (R1 hard-codes the crank numbers crank_pinion_spec
+        # prints, test_crank_pinion_drawing pins them to the registry, so the
+        # pin sheet no longer reads a foreign row.)
+        ("cone_gear_shaft", ("cone-gear",)),
+        ("drive_train_assembly", ("cone-gear",)),
+    ],
+)
+def test_drawing_depends_on_the_config_rows_its_closure_reads(stem, rows):
+    """Codex #936 T_oyK: a sheet that prints another part's registry row must
+    go stale, and miss the cache, when only that row changes."""
+    dodo = _load_dodo()
+    spec = dodo.DRAWINGS_BY_NAME[stem]
+    deps = set(dodo._drawing_file_deps(stem))
+    for row in rows:
+        assert str((dodo.CONFIG_DIR / "parts" / f"{row}.yaml").resolve()) in deps
+    assert set(dodo._config_deps(spec.script, spec.part, "drawing")) <= deps
+    drawing = next(task for task in dodo.task_drawing() if task["name"] == stem)
+    assert deps <= set(drawing["file_dep"])
+
+
+def test_every_drawing_carries_its_config_read_set():
+    dodo = _load_dodo()
+    for stem, spec in dodo.DRAWINGS_BY_NAME.items():
+        config = set(dodo._config_deps(spec.script, spec.part, "drawing"))
+        assert config <= set(dodo._drawing_file_deps(stem)), stem
+
+
+def test_drawing_reading_a_foreign_part_row_carries_that_row(tmp_path):
+    """The Codex example itself: a draw script that prints pivot-bracket's
+    number from the registry depends on parts/pivot-bracket.yaml."""
+    dodo = _load_dodo()
+    script = tmp_path / "draw_foreign_row_probe.py"
+    script.write_text(
+        'import _config\nPIVOT_NUMBER = _config.parts("pivot-bracket")["number"]\n',
+        encoding="utf-8",
+    )
+    deps = dodo._config_deps(script, "rocker_arm_support", "drawing")
+    parts = dodo.CONFIG_DIR / "parts"
+    assert str((parts / "pivot-bracket.yaml").resolve()) in deps
+    # A literal read names its row; it does not also pull the sheet's own row.
+    assert str((parts / "rocker-arm-support.yaml").resolve()) not in deps
+
+
+# Every source that reads the registry through a NON-literal part name
+# (config_files_of's "parts/*" token) inside a drawing closure, and why that
+# name is the drawing's OWN part.  dodo._expand_parts_token narrows "parts/*"
+# to the own row for a drawing on exactly this premise; a new dynamic reader
+# must be reviewed here, or the narrowing would hide a foreign row edit.
+_DRAWING_OWN_ROW_READERS = {
+    # part_properties(name) / save_part_and_images(adapter, name): the name
+    # arrives from a caller, pinned below to build_<own part>.py's PART_NAME.
+    "_common.py",
+    # apply_drawing_properties(adapter, name): same callers, same pin.
+    "_drawing_marks.py",
+    # _config.parts(stock.part_name) after the source identity check
+    # (spec.source.stem == stock.part_name).
+    "_purchased_fastener_drawing.py",
+}
+# Registry-reading helper -> index of its part-name argument.
+_OWN_ROW_HELPERS = {
+    "part_properties": 0,
+    "save_part_and_images": 1,
+    "apply_drawing_properties": 1,
+}
+
+
+def _module_part_name(source: Path) -> str | None:
+    import ast
+
+    for node in ast.parse(source.read_text(encoding="utf-8")).body:
+        if (
+            isinstance(node, ast.Assign)
+            and any(
+                isinstance(t, ast.Name) and t.id == "PART_NAME" for t in node.targets
+            )
+            and isinstance(node.value, ast.Constant)
+        ):
+            return node.value.value
+    return None
+
+
+def _helper_name_arguments(source: Path) -> list[tuple[str, str]]:
+    import ast
+
+    found = []
+    for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+        if name not in _OWN_ROW_HELPERS:
+            continue
+        index = _OWN_ROW_HELPERS[name]
+        args = [*node.args[index : index + 1]]
+        args += [kw.value for kw in node.keywords if kw.arg == "part_name"]
+        found.extend((name, ast.unparse(arg)) for arg in args)
+    return found
+
+
+def test_drawing_closures_read_no_foreign_dynamic_part_row():
+    import _buildgraph as bg
+
+    dodo = _load_dodo()
+    for stem, spec in dodo.DRAWINGS_BY_NAME.items():
+        script = spec.script.resolve()
+        own_build = f"build_{spec.part}.py"
+        for source in (script, *(Path(path) for path in bg.module_deps_of(script))):
+            try:
+                tokens = bg._config_tokens_in_source(source)
+            except bg._UnknownConfigUse:
+                continue  # the whole-config fallback narrows nothing
+            if "parts/*" in tokens:
+                assert source.name in {*_DRAWING_OWN_ROW_READERS, own_build}, (
+                    f"drawing:{stem} reaches a new dynamic registry read in "
+                    f"{source.name}; review it against _expand_parts_token"
+                )
+            if source.name in _DRAWING_OWN_ROW_READERS:
+                continue  # forwards its caller's name
+            calls = _helper_name_arguments(source)
+            if not calls:
+                continue
+            assert source.name == own_build, (stem, source.name, calls)
+            assert {arg for _name, arg in calls} == {"PART_NAME"}, (stem, calls)
+            assert _module_part_name(source) == spec.part.replace("_", "-"), stem
+
+
 @pytest.fixture
 def isolated_drawing_keys(tmp_path, monkeypatch):
     """Copy real drawing closures; keep all native inputs and writes isolated."""
@@ -184,7 +314,10 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
     dodo = _load_dodo()
     stems = ("platen_guide", "bracket_screw", "pen_assembly")
     release_relative = dodo.RELEASE_VERSION_FILE.relative_to(REPO_ROOT)
-    sources = {dodo.RELEASE_VERSION_FILE}
+    config_relative = dodo.CONFIG_DIR.relative_to(REPO_ROOT)
+    # The drawing recipe folds the config rows its closure reads (Codex #936
+    # T_oyK), so the checkout carries the config tree its keys hash.
+    sources = {dodo.RELEASE_VERSION_FILE, *dodo.CONFIG_DIR.rglob("*.yaml")}
     for stem in stems:
         spec = dodo.DRAWINGS_BY_NAME[stem]
         sources.update((spec.script, *spec.assets))
@@ -195,6 +328,7 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
 
     def clear_closure():
         bg.clear_import_caches()
+        bg.config_files_of.cache_clear()
 
     def checkout(name="repo", *, crlf=False):
         root = tmp_path / name
@@ -209,6 +343,9 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
         monkeypatch.setattr(dodo._cache, "REPO_ROOT", root)
         monkeypatch.setattr(dodo, "SCRIPTS_DIR", scripts)
         monkeypatch.setattr(bg, "SCRIPTS_DIR", scripts)
+        monkeypatch.setattr(dodo, "CONFIG_DIR", root / config_relative)
+        monkeypatch.setattr(bg, "CONFIG_DIR", dodo.CONFIG_DIR)
+        monkeypatch.setattr(bg, "ASSEMBLY_CONTRACT_DIR", dodo.CONFIG_DIR / "assemblies")
         monkeypatch.setattr(dodo, "CAD_OUT", root / "cad" / "out")
         monkeypatch.setattr(bg, "CAD_OUT", dodo.CAD_OUT)
         monkeypatch.setattr(
@@ -359,6 +496,23 @@ def test_selected_drawing_row_changes_only_its_freshness_and_cache_key(
     assert all(a != b for a, b in zip(before["platen_guide"], after["platen_guide"]))
     for stem in ("bracket_screw", "pen_assembly"):
         assert after[stem] == before[stem]
+
+
+def test_config_row_change_moves_only_its_readers_freshness_and_cache_key(
+    isolated_drawing_keys,
+):
+    dodo, _root, snapshot = isolated_drawing_keys()
+    before = snapshot()
+    # A renumbering: no geometry input moves, only the printed registry value.
+    row = dodo.CONFIG_DIR / "parts" / "platen-guide.yaml"
+    text = row.read_text(encoding="utf-8")
+    renumbered = re.sub(r"(?m)^(\s+number:\s*)\S+$", r"\g<1>MHA-999", text, count=1)
+    assert renumbered != text
+    row.write_text(renumbered, encoding="utf-8")
+    after = snapshot()
+    assert all(a != b for a, b in zip(before["platen_guide"], after["platen_guide"]))
+    for stem in ("bracket_screw", "pen_assembly"):
+        assert after[stem] == before[stem], stem
 
 
 @pytest.mark.parametrize(
@@ -1822,11 +1976,10 @@ def test_config_deps_are_fine_grained():
     cfg = (REPO_ROOT / "cad" / "config").resolve()
     whole = set(dodo._CONFIG_YAMLS)
 
-    # A gear part reads machine("gear_train", ...) -> machine/gear_train.yaml ONLY
-    # (NOT machine/channels.yaml, where active_count lives) + its own registry row
-    # + title_block.yaml (every part stamps the title-block tolerance properties
-    # from _common.part_properties -> _config.title_block) + release.yaml for the
-    # global CAD Revision.
+    # The cone-gear part reads gear_train (through ``involute_gear``), its own
+    # registry row, title-block properties and the global release.  Its bore
+    # and tooth-thickness bands are cone-specific constants in
+    # ``cone_gear_spec`` (U38/U42), so ``tolerances.yaml`` is not an input.
     cone = dodo._config_deps(scripts / "build_cone_gear.py", "cone_gear", "part")
     assert _rel(cone, cfg) == {
         "machine/gear_train.yaml",
@@ -1835,6 +1988,10 @@ def test_config_deps_are_fine_grained():
         "title_block.yaml",
         "release.yaml",
     }, _rel(cone, cfg)
+    cylinder = dodo._config_deps(
+        scripts / "build_cylinder_gear.py", "cylinder_gear", "part"
+    )
+    assert "machine/gear_train.yaml" in _rel(cylinder, cfg)
     assert set(cone) <= whole
 
     # Editing ONE part's registry row rebuilds only that part: a leaf screw depends
@@ -2562,6 +2719,28 @@ def test_export_cache_ships_every_file_it_certifies():
     )
 
 
+def test_title_block_geometry_readers_keep_the_title_block_without_stamping(
+    monkeypatch,
+) -> None:
+    # Codex #854 review (Main): pinion_rig_layout sizes the torque shaft and the
+    # lift rod from the title block's printed rows (_printed_tolerance), so a
+    # row edit moves drive-train placements.  The title_block token must
+    # survive for such an assembly even if it stopped stamping; only a
+    # stamp-free assembly that reads no geometry from it drops the token.
+    import _buildgraph
+
+    dodo = _load_dodo()
+    drive_train = dodo.script_for("drive_train")
+    channel = dodo.script_for("channel")
+    assert _buildgraph.reads_title_block_geometry(drive_train)
+    monkeypatch.setattr(dodo, "stamps_title_block_properties", lambda _script: False)
+    assert dodo._expand_title_block_token("assembly", drive_train)
+    # Every assembly reaches a geometry reader today, so a stamp-free, geometry-
+    # free one is simulated to prove the drop branch.
+    monkeypatch.setattr(dodo, "reads_title_block_geometry", lambda _script: False)
+    assert dodo._expand_title_block_token("assembly", channel) == []
+
+
 def test_check_gates_depend_on_everything_they_execute():
     """Every ``check:*`` stamp must go stale when code or config it EXECUTES
     changes, or the gate reports green without running.
@@ -2616,11 +2795,11 @@ def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
     catalog = str(dodo._FASTENER_CATALOG)
     part = dodo._part_file_deps(dodo.SCRIPTS_DIR / "build_bracket_screw.py", "bracket_screw")
     drawing = dodo._drawing_file_deps("bracket_screw")
-    assembly = dodo._recipe_files("channel")
+    assembly = dodo._recipe_files("pen")
     for label, deps in (
         ("part-bracket_screw", part),
         ("drawing-bracket_screw", drawing),
-        ("assembly-channel", assembly),
+        ("assembly-pen", assembly),
     ):
         assert catalog not in deps, label
         assert any(
@@ -2630,9 +2809,9 @@ def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
         ), label
     assert dodo._fastener_rows_env("part:bracket_screw") == "bracket-screw"
     assert dodo._fastener_rows_env("drawing:bracket_screw") == "bracket-screw"
-    # channel's closure imports build_frame_side_screw (through build_fulcrum_keeper)
-    # for its constants; that module's fastener("frame-side-screw") runs on import.
-    assert dodo._fastener_rows_env("assembly:channel") == "frame-side-screw"
+    # pen's closure imports build_pen_set_screw for its constants; that module's
+    # fastener("pen-set-screw") runs on import.
+    assert dodo._fastener_rows_env("assembly:pen") == "pen-set-screw"
     assert dodo._fastener_rows_env("check:math") is None
 
 
@@ -2708,15 +2887,15 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
     keying the guard on the label dropped it for every assembly build. The guard
     is keyed on the doit task instead, whatever the display label says."""
     dodo = _load_dodo()
-    launched = _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, "channel", mode=mode)
+    launched = _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, "pen", mode=mode)
 
     scripts = [name for name, _env in launched]
     if mode == "full":
-        assert scripts == ["build_channel_assembly.py", "hook_probe.py"]
+        assert scripts == ["build_pen_assembly.py", "hook_probe.py"]
     else:
         assert scripts == ["refresh_assembly.py"]
     for name, env in launched:
-        assert env.get("HARMONIC_FASTENER_ROWS") == "frame-side-screw", name
+        assert env.get("HARMONIC_FASTENER_ROWS") == "pen-set-screw", name
 
 
 @pytest.mark.parametrize(
@@ -2756,3 +2935,28 @@ def test_every_subprocess_launch_names_a_task_the_guard_can_map():
         for action, args in task["actions"]:
             if action is dodo._run_stamped:
                 dodo._fastener_rows_env(args[3])  # raises on an unmappable task
+
+
+def test_every_title_block_reader_is_classified() -> None:
+    # Main (restricted review of #854): the title_block token survives for a
+    # stamp-free assembly only through TITLE_BLOCK_GEOMETRY_MODULES, so a module
+    # that reads the printed rows for geometry and is missing from it would
+    # silently drop title_block.yaml from an assembly recipe.  Every module that
+    # calls the accessor is either one of the TOL_* stampers, a drawing script
+    # (drawing tasks always keep the token), or a geometry reader in the set.
+    import _buildgraph
+
+    stampers = {"_config", "_common", "_assembly"}  # the accessor and TOL_* stamping
+    readers = {
+        path.stem
+        for path in (REPO_ROOT / "cad" / "scripts").glob("*.py")
+        if not path.stem.startswith(("test_", "draw_"))
+        and re.search(r"\btitle_block\(", path.read_text(encoding="utf-8"))
+    }
+    unclassified = sorted(readers - stampers - _buildgraph.TITLE_BLOCK_GEOMETRY_MODULES)
+    assert not unclassified, (
+        "modules read _config.title_block but are not in "
+        f"TITLE_BLOCK_GEOMETRY_MODULES: {unclassified}"
+    )
+    stale = sorted(_buildgraph.TITLE_BLOCK_GEOMETRY_MODULES - readers)
+    assert not stale, f"TITLE_BLOCK_GEOMETRY_MODULES names non-readers: {stale}"

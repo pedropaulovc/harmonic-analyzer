@@ -11,8 +11,9 @@ import _cwm
 import build_channel_assembly as channel
 import channel_kinematics
 import connecting_rod_spec
+import cylinder_bank_layout
 import fulcrum_shaft_spec
-import pivot_shaft_spec
+import rocker_bank_layout
 from _assembly import _seed_flip, activate_assembly_contract
 from cone_pivot_post_installation import CHANNEL_Z0, DRUM_X, MECHANISM_Z_SHIFT
 
@@ -23,7 +24,9 @@ def test_machine_config_and_channel_interface_share_one_installation_contract() 
     )
     assert math.isclose(channel.Z0, CHANNEL_Z0, abs_tol=1e-12)
     assert channel.X_DRUM == DRUM_X
-    assert channel.CAM_DZ == -3.25
+    # #743 solid stack: the ring rides the middle of its closed cam slot.
+    assert channel.CAM_DZ == pytest.approx(cylinder_bank_layout.CAM_MID_DZ)
+    assert channel.CAM_DZ == pytest.approx(-7.0565 / 2.0)
 
     phase = math.radians(channel.GEAR_PHASE_DEG)
     assert channel.RING_CENTER == (
@@ -48,11 +51,13 @@ def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
         + channel.LEVER_THICKNESS / 2.0
     )
 
-    pivot_min = channel.PIVOT_SHAFT_Z - pivot_shaft_spec.SHAFT_LENGTH / 2.0
-    pivot_max = channel.PIVOT_SHAFT_Z + pivot_shaft_spec.SHAFT_LENGTH / 2.0
+    # #743 PR2: the pivot shaft's origin is its north (shouldered) end; its
+    # cylinder spans both bracket ears (rocker_bank_layout).
+    pivot_max = channel.PIVOT_SHAFT_Z
+    pivot_min = pivot_max - rocker_bank_layout.PIVOT_SHAFT_LENGTH
     assert pivot_min < row_min < row_max < pivot_max
     # 481ec429 (2026-09 pivot-bracket re-derive): the asymmetric A-frame/
-    # support mounts became a symmetric pivot-bracket pair on the 170 shaft.
+    # support mounts became a pivot-bracket pair on the shaft.
     bracket_lo, bracket_hi = channel.PIVOT_BRACKET_Z
     assert pivot_min < bracket_lo < row_min < row_max < bracket_hi < pivot_max
 

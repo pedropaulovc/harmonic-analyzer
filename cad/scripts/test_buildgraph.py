@@ -100,17 +100,21 @@ def _helper_names(stem_script: str) -> set[str]:
 _INSERTED_SOURCES = {
     "frame": "fillister_screw frame_cross_screw gooseneck_set_screw harmonic_base "
     "lag_screw nameplate rocker_arm_support top_frame tube_frame tube_frame_cap",
-    "drive_train": "alignment_pinion arbor_pedestal cone_gear cone_gear_shaft "
+    "drive_train": "alignment_pinion arbor_pedestal arbor_set_screw cone_gear cone_gear_shaft "
     "cone_lock_knob cone_pivot_post cone_pivot_screw cone_swing_platform "
     "cone_tip_adjuster cone_tip_block cone_tip_bushing cone_tip_pinch_screw "
-    "crank_arm crank_drive_gear crank_handle crank_pin crank_pin_eye crank_pin_ring "
-    "crank_pinion crankshaft cylinder_end_disc cylinder_gear cylinder_gear_shaft "
-    "dome_cap_screw fillister_screw foot_screw pinion_arbor pinion_bracket pinion_cam "
-    "pinion_cam_pin pinion_handle pinion_lever pinion_lift_rod pinion_pivot_block "
-    "pinion_pivot_shaft pinion_spring slotted_screw swing_stop_screw",
+    "cone_tip_shim "
+    "crank_arm crank_drive_gear crank_handle crank_handle_pivot_screw crank_hub crank_hub_pin crank_pin "
+    "crank_pin_eye crank_pin_ring "
+    "crank_pinion crank_pinion_pin crankshaft cylinder_end_disc cylinder_gear "
+    "cylinder_gear_shaft "
+    "fillister_screw foot_screw pedestal_hold_down_screw pinion_arbor pinion_arbor_collar pinion_bracket pinion_cam "
+    "pinion_cam_pin pinion_handle pinion_lever pinion_lever_pin pinion_lift_rod "
+    "pinion_pivot_block pinion_pivot_shaft pinion_spring pinion_strap_pin post_mount_screw slotted_screw "
+    "swing_stop_screw",
     "channel": "amplitude_bar channel_lever channel_spring_installed connecting_rod "
-    "frame_side_screw fulcrum_keeper fulcrum_shaft pivot_bracket pivot_shaft "
-    "rocker_arm spring_hook",
+    "frame_side_screw fulcrum_keeper fulcrum_shaft pedestal_hold_down_screw pivot_bracket "
+    "pivot_shaft rocker_arm rocker_thrust_washer spring_hook",
     "summing": "boss_hook counter_spring gooseneck knife_hanger_stud knife_hanger_washer knife_mount summing_lever",
     "magnifier": "clamp_screw column_clamp_back column_clamp_front lever_wire "
     "magnifying_bracket magnifying_clamp magnifying_lever magnifying_vertical_rod "
@@ -1371,6 +1375,8 @@ def test_assemblies_depend_on_assembly_helpers():
     [
         ("_assembly_patterns", {"drive_train", "frame", "magnifier", "paper_drive"}),
         ("_assembly_couplings", {"drive_train", "paper_drive"}),
+        # paper_drive reads its crank axis from crank_fitup_axis, not the builder.
+        ("_drive_train_explode", {"drive_train"}),
     ],
 )
 def test_specialized_assembly_helpers_have_exact_transitive_consumers(
@@ -1388,6 +1394,282 @@ def test_specialized_assembly_helpers_have_exact_transitive_consumers(
     for stem in part_stems():
         assert helper not in _helper_names(f"build_{stem}.py"), stem
 
+
+def test_cone_line_consumers_do_not_import_the_drive_train_script():
+    """The base's pivot seat and the paper-drive crank sprocket read the pure
+    cone_line module; importing build_drive_train_assembly instead would put the
+    whole drive-train recipe on their cache keys (#880)."""
+    for script in ("build_harmonic_base.py", "build_paper_drive_assembly.py"):
+        deps = _helper_names(script)
+        assert "cone_line" in deps, script
+        assert "build_drive_train_assembly" not in deps, script
+
+
+def test_swing_platform_consumers_read_geometry_not_the_builder():
+    """The base and the drive train read the platform's plan geometry, not its
+    builder or its print data: a sketch, precision or caption edit on MHA-091
+    re-keys the platform and its sheet only (#880)."""
+    builder = _helper_names("build_cone_swing_platform.py")
+    assert {"cone_swing_platform_geometry", "cone_swing_platform_drawing_spec"} <= builder
+    for script in ("build_harmonic_base.py", "build_drive_train_assembly.py"):
+        deps = _helper_names(script)
+        assert "cone_swing_platform_geometry" in deps, script
+        assert "build_cone_swing_platform" not in deps, script
+        assert "cone_swing_platform_drawing_spec" not in deps, script
+
+
+def test_harmonic_base_never_reads_the_crank_mesh_stack():
+    """The plate's crank axis sits on the crank's fit-up line, which the crank
+    mesh stack derives from fit classes.  That axis lives in its own module so
+    the base, which reads the plate geometry for its seats, keeps the stack
+    (and the parts rows and fit classes it reads) off the frame's cache key
+    (R1 ruling, 2026-09-26).  test_dodo_recipe's
+    test_config_deps_are_fine_grained holds the frame recipe itself."""
+    deps = _helper_names("build_harmonic_base.py")
+    assert "cone_swing_platform_geometry" in deps
+    assert "cone_swing_platform_crank_axis" not in deps
+    assert "crank_mesh_stack" not in deps
+    # The consumers that place the crank train do read it.
+    for script in ("build_cone_swing_platform.py", "build_drive_train_assembly.py"):
+        deps = _helper_names(script)
+        assert {"cone_swing_platform_crank_axis", "crank_mesh_stack"} <= deps, script
+
+
+# Direct imports of one build script by another, grandfathered at #880 and
+# owned by the follow-up that burns them down.  Importing a BUILDER puts its
+# whole recipe (sketch code, drawing marks, the config it reads) on the
+# importer's cache key; the numbers belong in the part's pure spec.  The list
+# only shrinks: an unlisted edge fails, and so does a listed edge that no longer
+# exists.  Each entry is "<owner>: <what it reads>".
+_GRANDFATHERED_BUILDER_EDGES = {
+    ("build_channel_assembly.py", "build_fulcrum_keeper"): (
+        "dtrefactor: reads CBORE_DEPTH_MM, FOOT_H"
+    ),
+    ("build_drive_train_assembly.py", "build_alignment_pinion"): (
+        "dtrefactor: reads BORE_DIA"
+    ),
+    ("build_drive_train_assembly.py", "build_arbor_pedestal"): (
+        "dtrefactor: reads FOOT_HEIGHT, FOOT_WIDTH, SCREW_Z"
+    ),
+    ("build_drive_train_assembly.py", "build_cone_pivot_post"): (
+        "dtrefactor: reads BLOCK_DIA, BORE_HEIGHT, CONE_BOSS_LENGTH, CRANK_BORE_HEIGHT, CRANK_BOSS_LENGTH, CRANK_BOSS_START_Z"
+    ),
+    ("build_drive_train_assembly.py", "build_cone_tip_adjuster"): (
+        "dtrefactor: reads BODY_LEN, CUP_DEPTH, CUP_DIA, THREAD"
+    ),
+    ("build_drive_train_assembly.py", "build_cone_tip_bushing"): (
+        "dtrefactor: reads BORE_DIA, LENGTH"
+    ),
+    ("build_drive_train_assembly.py", "build_cone_tip_pinch_screw"): (
+        "dtrefactor: reads SHANK_LEN, THREAD"
+    ),
+    ("build_drive_train_assembly.py", "build_crank_pin_eye"): (
+        "dtrefactor: reads LOOP_R, TAIL_LEN, WIRE_DIA"
+    ),
+    ("build_drive_train_assembly.py", "build_crank_pin_ring"): (
+        "dtrefactor: reads WIRE_DIA"
+    ),
+    ("build_drive_train_assembly.py", "build_crankshaft"): (
+        "dtrefactor: reads PINION_PIN_STATION_Y, SEAT_ARM, SEAT_PINION, SEAT_T12, SHAFT_LENGTH"
+    ),
+    ("build_drive_train_assembly.py", "build_cylinder_end_disc"): (
+        "dtrefactor: reads DISC_DIA, DISC_THICK"
+    ),
+    ("build_drive_train_assembly.py", "build_harmonic_base"): (
+        "dtrefactor: reads BLOCK_SCREW_HOLE_DEPTH, BLOCK_SCREW_XZ, BLOCK_SEAT_SPEC, FOOT_SCREW_HOLE_DEPTH, FOOT_SCREW_XZ, FOOT_SEAT_SPEC, LOCK_KNOB_XZ, LOCK_SEAT_SPEC, LOCK_STUD_ENGAGEMENT, PEDESTAL_SCREW_HOLE_DEPTH, PEDESTAL_SCREW_XZ, PEDESTAL_SEAT_SPEC, PIVOT_SCREW_XZ, PIVOT_SEAT_SPEC, STOP_SCREW_XZ, STOP_SEAT_SPEC, SWING_HARDWARE_GEOMETRY, require_blind_seat_fit"
+    ),
+    ("build_frame_assembly.py", "build_gooseneck_set_screw"): (
+        "dtrefactor: reads SHANK_LEN"
+    ),
+    ("build_frame_assembly.py", "build_top_frame"): (
+        "dtrefactor: reads SIDE_TAP_SPEC"
+    ),
+    ("build_harmonic_analyzer_assembly.py", "build_measuring_stick"): (
+        "dtrefactor: reads BODY_THICKNESS, BODY_WIDTH, DIVISION_SPACING, SCALE_START_X"
+    ),
+    ("build_harmonic_analyzer_assembly.py", "build_measuring_stick_stop"): (
+        "dtrefactor: reads HEAD_H, SLOT_FLOOR, SLOT_H, SLOT_W"
+    ),
+    ("build_kinematic_probe.py", "build_paper_drive_assembly"): (
+        "dtrefactor: reads CHAIN_CRANK_CENTRE, DISC_TEETH, FEED_PD, KNOB_SHAFT_XY, NET_RACK_TRAVEL_PER_CRANK_REV, SPARE_GEAR_POS, THIRD_TEETH"
+    ),
+    ("build_magnifier_assembly.py", "build_thumb_screw"): (
+        "dtrefactor: reads HEAD_STACK_LEN, SHANK_LEN"
+    ),
+    ("build_mobility_probe.py", "build_motion_study"): (
+        "dtrefactor: reads ANGLE, DISTANCE, _family, _iter_mates, _real_parts"
+    ),
+    ("build_motion_setup_drives.py", "build_motion_study"): (
+        "dtrefactor: reads ANGLE, DISTANCE, _comp_xform, _entity_ref, _family, _find_one, _iter_mates, _real_parts, _reset_to_assembled, _rot_angle, assert_motion_progressed"
+    ),
+    ("build_motion_study.py", "build_motion_study_springs"): (
+        "dtrefactor: reads add_springs, add_wires_gravity"
+    ),
+    ("build_motion_study_springs.py", "build_motion_study"): (
+        "dtrefactor: reads ANGLE, DISTANCE, SPRING_KCH, SPRING_KCT, STOCK_KCH, STOCK_KCT, _by_z_rank, _components, _entity_ref, _family, _find_one, _iter_mates, _lone_real, _read_member, _sub_model, _suppress_named"
+    ),
+    ("build_paper_drive_assembly.py", "build_bracket_screw"): (
+        "dtrefactor: reads SHANK_DIA, SHANK_LEN"
+    ),
+    ("build_paper_drive_assembly.py", "build_column_clamp_back"): (
+        "dtrefactor: reads DEPTH, HOLE_SPEC"
+    ),
+    ("build_paper_drive_assembly.py", "build_guide_lock"): (
+        "dtrefactor: reads HOLE_DIA, LOCK_THICK, LOCK_WIDTH"
+    ),
+    ("build_paper_drive_assembly.py", "build_latch_hook"): (
+        "dtrefactor: reads STRIP_T, X_MAX, X_MIN, Y_MIN"
+    ),
+    ("build_paper_drive_assembly.py", "build_platen_clip"): (
+        "dtrefactor: reads CLIP_LENGTH, CLIP_THICKNESS, HOLE_DIA, HOLE_INSET, HOLE_Y, SCREW_SEAT_BOSS_H, SCREW_SEAT_DIA, SCREW_SEAT_STACK"
+    ),
+    ("build_paper_drive_assembly.py", "build_platen_guide"): (
+        "dtrefactor: reads GUIDE_DEPTH, GUIDE_HEIGHT, GUIDE_LENGTH, GUIDE_SCREW_BOTTOM_CLEARANCE, GUIDE_SCREW_PASSAGE, GUIDE_SCREW_THREAD_ENGAGEMENT, HOLE_X, LOCK_SCREW_BOTTOM_CLEARANCE, LOCK_SCREW_PASSAGE, LOCK_SCREW_THREAD_ENGAGEMENT, LOCK_STATION_X, SCREW_STATION_X"
+    ),
+    ("build_paper_drive_assembly.py", "build_platen_paper"): (
+        "dtrefactor: reads PAPER_HEIGHT, PAPER_WIDTH"
+    ),
+    ("build_paper_drive_assembly.py", "build_platen_rack"): (
+        "dtrefactor: reads ADDENDUM, BAR_HEIGHT, FIRST_GAP_X, PITCH"
+    ),
+    ("build_paper_drive_assembly.py", "build_rack_pinion"): (
+        "dtrefactor: reads DP, FACE_WIDTH, TEETH"
+    ),
+    ("build_paper_drive_assembly.py", "build_support_bar"): (
+        "dtrefactor: reads BAR_DEPTH, BAR_HEIGHT, BRACKET_HOLE_SPEC, BRACKET_HOLE_X, BRACKET_STUD_X, CLAMP_CBORE_DEPTH, CLAMP_CBORE_DIA, CLAMP_HEAD_RECESS, CLAMP_HOLE_DIA, CLAMP_HOLE_X, LATCH_HOLE_X"
+    ),
+    ("build_paper_drive_assembly.py", "build_transgear_bracket"): (
+        "dtrefactor: reads PLATE_THICK, SCREW_HOLE_DX, SCREW_HOLE_SPEC"
+    ),
+    ("build_paper_drive_assembly.py", "build_transgear_feed_pinion"): (
+        "dtrefactor: reads DP, FACE_WIDTH, TEETH"
+    ),
+    ("build_paper_drive_assembly.py", "build_transgear_knob_shaft"): (
+        "dtrefactor: reads FRONT_STUB, SHAFT_DIA"
+    ),
+    ("build_paper_drive_assembly.py", "build_transgear_latch"): (
+        "dtrefactor: reads C2C, THICKNESS"
+    ),
+    ("build_paper_drive_assembly.py", "build_transgear_pinion"): (
+        "dtrefactor: reads DP, FACE_WIDTH, TEETH"
+    ),
+    ("build_paper_drive_assembly.py", "build_transgear_removable"): (
+        "dtrefactor: reads BORE_DIAMETER, FACE_WIDTH, PIN_CIRCLE_RADIUS, PIN_HOLE_DIAMETER"
+    ),
+    ("build_paper_drive_assembly.py", "build_transgear_thumbnut"): (
+        "dtrefactor: reads BORE_DIA, DISC_DIA, DISC_LEN, NECK_DIA, NECK_LEN, TOTAL_LEN"
+    ),
+    ("build_pen_assembly.py", "build_pen_frame"): (
+        "dtrefactor: reads FRAME_DEPTH, OUTER_HEIGHT, OUTER_WIDTH, RAIL_END, RAIL_SIDE"
+    ),
+    ("build_pen_assembly.py", "build_pen_hanger"): (
+        "dtrefactor: reads SCREW_HOLE_XY, STRAP_Z"
+    ),
+    ("build_pen_assembly.py", "build_pen_set_screw"): (
+        "dtrefactor: reads HEAD_STACK_LEN, SHANK_DIA, SHANK_LEN, TIP_CHAMFER"
+    ),
+    ("build_summing_assembly.py", "build_knife_hanger_stud"): (
+        "dtrefactor: reads SHANK_DIA, UNDERHEAD_LEN"
+    ),
+    ("build_summing_assembly.py", "build_knife_hanger_washer"): (
+        "dtrefactor: reads INNER_DIA, OUTER_DIA, THICKNESS"
+    ),
+    ("build_summing_assembly.py", "build_knife_mount"): (
+        "dtrefactor: reads CASTING_UNDERSIDE_Y, MOUNT_GAP, STUD_TAP_DEPTH"
+    ),
+    ("build_summing_assembly.py", "build_top_frame"): (
+        "dtrefactor: reads RING_HEIGHT, STUD_HOLE_DIA"
+    ),
+}
+# Entry tools that open built models and therefore import their builders; they
+# are run, never imported by a build recipe's pure helpers.
+_ENTRY_TOOLS = frozenset({"verify.py", "preflight_release.py"})
+
+
+def _direct_builder_edges() -> set[tuple[str, str]]:
+    """(importer, imported) for every build script importing another, anywhere
+    in the file (top level or lazily)."""
+    edges: set[tuple[str, str]] = set()
+    for path in sorted(SCRIPTS_DIR.glob("build_*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                names = [node.module]
+            else:
+                continue
+            edges.update((path.name, n) for n in names if n.startswith("build_"))
+    return edges
+
+
+def _library_modules() -> list[Path]:
+    """Every module a build or drawing recipe imports that is not itself an
+    entry script: specs, geometry, layouts, helpers, interference contracts."""
+    entries = sorted([*SCRIPTS_DIR.glob("build_*.py"), *SCRIPTS_DIR.glob("draw_*.py")])
+    library = {
+        Path(dep)
+        for entry in entries
+        for dep in module_deps_of(entry)
+        if not Path(dep).name.startswith(("build_", "draw_", "test_"))
+        and Path(dep).name not in _ENTRY_TOOLS
+    }
+    return sorted(library)
+
+
+def _reached_builders(path: Path) -> list[str]:
+    """``build_*`` modules in ``path``'s transitive import closure, itself excluded."""
+    return sorted(
+        Path(dep).stem
+        for dep in module_deps_of(path)
+        if Path(dep).name.startswith("build_") and Path(dep).stem != path.stem
+    )
+
+
+def test_library_modules_reach_no_builder():
+    """#880: a spec, geometry, layout, helper or interference-contract module
+    reaches no build script, however indirectly.  There is no allowance: the
+    numbers a sibling needs move into the part's pure spec."""
+    library = _library_modules()
+    names = {path.name for path in library}
+    assert {"harmonic_base_fasteners.py", "_interference_contracts.py"} <= names
+    assert {"cone_swing_platform_geometry.py", "fillister_screw_spec.py"} <= names
+    reached = {
+        path.name: builders for path in library if (builders := _reached_builders(path))
+    }
+    assert not reached, f"read the part's spec, not its builder: {reached}"
+
+
+def test_a_builder_import_in_a_pure_module_goes_red(tmp_path):
+    """Fail-first for the guard above: a synthetic spec that imports a builder
+    is caught through the same closure the build graph uses."""
+    planted = tmp_path / "planted_spec.py"
+    planted.write_text("from build_foot_screw import THREAD\n", encoding="utf-8")
+    assert _reached_builders(planted) == ["build_foot_screw"]
+    clean = tmp_path / "clean_spec.py"
+    clean.write_text("from foot_screw_spec import THREAD\n", encoding="utf-8")
+    assert _reached_builders(clean) == []
+
+
+def test_builder_to_builder_edges_only_shrink():
+    """Every direct build-script edge is listed with its owner and reason; a new
+    one fails, and a listed one that is gone must be deleted."""
+    found = _direct_builder_edges()
+    listed = set(_GRANDFATHERED_BUILDER_EDGES)
+    assert not found - listed, f"new builder imports; read a spec: {sorted(found - listed)}"
+    assert not listed - found, f"edges gone; delete them: {sorted(listed - found)}"
+    for edge, note in _GRANDFATHERED_BUILDER_EDGES.items():
+        owner, _, reason = note.partition(": ")
+        assert owner and reason.strip(), edge
+
+
+def test_part_builders_reach_no_other_part_builder():
+    """#880: the part-to-part edges on the assembly re-key path are burned down;
+    a part builder reads a sibling's numbers from its spec."""
+    parts = [path for path in bg.part_scripts() if not path.name.endswith("_assembly.py")]
+    reached = {
+        path.name: builders for path in parts if (builders := _reached_builders(path))
+    }
+    assert not reached, reached
 
 def test_module_deps_are_transitive():
     """The closure follows imports through helper chains: a chain-link part pulls
@@ -1889,6 +2171,115 @@ def test_part_properties_use_release_revision():
     assert part_properties("platen-guide")["Revision"] == _config.release_revision()
 
 
+# The title block's PART cell prints the part's slug, never a registry title
+# (user ruling 2026-09-26, via Main): one convention on every part sheet.  The
+# cell resolves the linked model's summary Title, which save_part_and_images
+# stamps from part_properties()["Title"]; a registry ``title:`` stays in the
+# registry for its other readers but must not reach that cell.
+def _drawing_stems(source_kind: str) -> list[str]:
+    from _drawing_registry import DRAWINGS
+
+    return sorted(
+        {d.part.replace("_", "-") for d in DRAWINGS if d.source_kind == source_kind}
+    )
+
+
+def _registry_title(stem: str) -> str | None:
+    import _config
+
+    try:
+        return _config.parts(stem).get("title")
+    except KeyError:
+        return None
+
+
+_PART_DRAWING_STEMS = _drawing_stems("part")
+_TITLED_PART_STEMS = [
+    stem for stem in _PART_DRAWING_STEMS if _registry_title(stem) not in (None, stem)
+]
+
+
+def test_titled_part_sheets_are_under_test():
+    # 49 part sheets carried a registry title at the ruling; an empty list
+    # would let the parametrized checks below pass vacuously.
+    assert len(_TITLED_PART_STEMS) >= 40
+
+
+@pytest.mark.parametrize("stem", _PART_DRAWING_STEMS)
+def test_part_cell_prints_the_slug(stem):
+    assert part_properties(stem)["Title"] == stem
+
+
+@pytest.mark.parametrize("stem", _TITLED_PART_STEMS)
+def test_no_registry_title_reaches_the_part_cell(stem):
+    assert _registry_title(stem) not in part_properties(stem).values()
+
+
+def test_the_saved_summary_title_is_the_stamped_title():
+    import inspect
+
+    import _common
+
+    source = inspect.getsource(_common.save_part_and_images)
+    assert "properties = part_properties(part_name)" in source
+    assert 'apply_summary_info(adapter, title=properties["Title"])' in source
+
+
+# Assembly sheets follow the same ruling: the PART cell prints the assembly's
+# slug ("drive-train"), not "drive-train assembly".  The one stamp is the
+# shared save path; no builder stamps its own.
+_ASSEMBLY_DRAWING_STEMS = _drawing_stems("assembly")
+
+
+def test_every_assembly_sheet_is_under_test():
+    assert len(_ASSEMBLY_DRAWING_STEMS) >= 8
+
+
+@pytest.mark.parametrize("stem", _ASSEMBLY_DRAWING_STEMS)
+def test_assembly_part_cell_prints_the_slug(stem):
+    import re
+
+    scripts = Path(__file__).resolve().parent
+    script = scripts / f"build_{stem.replace('-', '_')}_assembly.py"
+    source = script.read_text(encoding="utf-8")
+    assert re.search(rf'^ASM_NAME = "{re.escape(stem)}"$', source, re.MULTILINE)
+    assert "save_assembly_and_images(" in source
+    assert "apply_summary_info" not in source, "the shared save path stamps it"
+    assert assembly_title_properties(stem)["Title"] == stem
+
+
+def test_both_assembly_save_chokepoints_stamp_the_slug():
+    # The full build (SaveAs3 copy) and the refresh / auto-repair (in-place
+    # Save3) each restamp the title; test_assembly_save proves the behaviour.
+    import inspect
+
+    import _assembly
+
+    full = inspect.getsource(_assembly._save_new_assembly_as_copy)
+    in_place = inspect.getsource(_assembly.save_assembly_in_place)
+    assert "_ensure_assembly_title(adapter, asm_path.stem)" in full
+    assert "title_changed = _ensure_assembly_title(adapter, asm_name, asm)" in in_place
+    assert "or title_changed" in in_place
+
+
+def test_both_chokepoints_stamp_the_same_slug():
+    # The full build stamps asm_path.stem, the refresh stamps asm_name: the
+    # two agree only because every caller derives the path from the name.
+    import inspect
+
+    import _assembly
+
+    derived = 'OUT_SLDASM / f"{asm_name}.SLDASM"'
+    for caller in (
+        _assembly.save_assembly_and_images,
+        _assembly.save_assembly_in_place,
+        _assembly.refresh_assembly,
+    ):
+        assert derived in inspect.getsource(caller), caller.__name__
+    for stem in _ASSEMBLY_DRAWING_STEMS:
+        assert Path(f"{stem}.SLDASM").stem == stem
+
+
 def test_config_syntax_is_reused_by_content_not_source_path():
     bg._config_references_in_text.cache_clear()
     first = "import _config as cfg\nx = cfg.machine('gear_train')\n"
@@ -2254,3 +2645,29 @@ def test_every_catalog_consumer_in_the_tree_is_classified():
         if bg.table_reads(path.read_text(encoding="utf-8"), *bg.FASTENER_TABLE) is None
     ]
     assert unclassified == []
+
+
+def test_interference_contracts_do_not_depend_on_the_crankshaft_spec() -> None:
+    # Every assembly imports _interference_contracts, so a crankshaft length or
+    # station edit must not re-key them all (W15, Main 2026-09-25): the shaft
+    # diameter comes from its owner, crank_hub_geometry.
+    closure = _helper_names("_interference_contracts.py")
+    assert "crank_hub_geometry" in closure
+    assert "crankshaft_spec" not in closure
+
+
+@pytest.mark.parametrize(
+    ("script", "expected"),
+    [
+        # Listed themselves: the root script is not in its own import closure
+        # (Codex #1035, PRRT_kwDOPHDy386mV11b).
+        ("build_wheel_bar.py", True),
+        ("build_swing_stop_screw.py", True),
+        # Reads through an imported listed module.
+        ("build_boss_hook.py", True),
+        ("build_spring_hook.py", True),
+        ("build_platen_guide.py", False),
+    ],
+)
+def test_reads_title_block_geometry_covers_root_and_closure(script, expected):
+    assert bg.reads_title_block_geometry(SCRIPTS_DIR / script) is expected

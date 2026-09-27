@@ -57,7 +57,7 @@ from _common import (
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 import _config
-from build_hanger_screw import SHANK_DIA as HANGER_SCREW_DIA
+from hanger_screw_spec import SHANK_DIA as HANGER_SCREW_DIA
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,

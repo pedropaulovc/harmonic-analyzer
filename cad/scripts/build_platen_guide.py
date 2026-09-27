@@ -51,9 +51,9 @@ from _drawing_marks import (
 )
 from _hole_spec import DRILL_POINT_H, blind_cut_dia_mm
 from _holes import blind_hole_volume_mm3, wizard_holes
-from build_fillister_screw import SHANK_LEN as FILLISTER_SHANK_LEN
-from build_platen import CBORE_DEPTH as PLATEN_CBORE_DEPTH, PLATE_THICKNESS
-from build_guide_lock import LOCK_THICK
+from fillister_screw_spec import SHANK_LEN as FILLISTER_SHANK_LEN
+from platen_spec import CBORE_DEPTH as PLATEN_CBORE_DEPTH, PLATE_THICKNESS
+from guide_lock_spec import LOCK_THICK
 from platen_guide_spec import TAPPED_HOLE_SPEC
 
 PART_NAME = "platen-guide"

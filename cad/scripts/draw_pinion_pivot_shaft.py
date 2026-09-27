@@ -21,6 +21,7 @@ from pinion_pivot_shaft_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, check, run_build
+from _drawing_annotation_extent import gdt_box, place_callout_clear
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -37,15 +38,18 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
+from drive_train_steps import step_ref
 from pinion_pivot_shaft_spec import (
     CAP_RADIUS,
     CAP_SAG,
+    PIN_HOLE_CALLOUT,
     SHAFT_DIA as SHAFT_DIA,
     SHAFT_LEN,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -70,20 +74,33 @@ RIGHT_CENTER = (
     FRONT_CENTER[1],
 )
 ISO_CENTER = (0.355, 0.205)
-# 1:2, like fulcrum-shaft's identical long turned shaft: at 1:1 a 192 mm
+# 1:2, like fulcrum-shaft's identical long turned shaft: at 1:1 the ~180 mm
 # isometric bar runs over the right zone border, so the pictorial is halved and
 # a scale callout keeps the title block honest.
 ISO_SCALE = (1, 2)
 
 FRONT_KEEP = {
-    "ShaftDia": (0.055, 0.167),
+    # Left of the end view, so the leader rises right from the underline and
+    # never crosses the stacked tolerance (Main eye pass on pc-ea2: under the
+    # view its leader ran back through "-0.02").
+    "ShaftDia": (0.030, 0.167),
 }
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
+    # Option E-a: the set-pin holes read as solid circles in the side view.
+    # Only the size is printed; the match-drill callout carries the location.
+    # pc-ea eye pass: below the view its text ran into the 182.0 body
+    # dimension's callout, so it sits above the view between the datum frame
+    # and the Ra flag, its leader dropping to the left-hand hole.
+    "PinHoleDia": (0.125, 0.241),
 }
+# The holes are drilled at MHA-A03's SHAFT DRILL SET, so the callout points
+# at that step through the registry (Codex #858, PRRT_kwDOPHDy386mTbPB).
+SHAFT_DRILL_STEP_KEY = "straps-pinned-to-torque-shaft"
 DIMENSION_CALLOUTS = {
     "ShaftDia": "FINAL SIZE",
     "Depth": "CYLINDRICAL BODY\nBETWEEN CROWN ROOT CIRCLES",
+    "PinHoleDia": f"{PIN_HOLE_CALLOUT},\nPER {step_ref(SHAFT_DRILL_STEP_KEY)}",
 }
 
 
@@ -157,7 +174,7 @@ async def build(adapter: Any) -> dict[str, str]:
         FRONT_CENTER[0] + end_radius * math.cos(math.radians(50.0)),
         FRONT_CENTER[1] + end_radius * math.sin(math.radians(50.0)),
     )
-    add_feature_control_frame(
+    cylindricity = add_feature_control_frame(
         adapter,
         front,
         edge_xy=end_upper,
@@ -166,7 +183,7 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance=GEOMETRIC_TOLERANCES_MM["pinion pivot cylindrical body"],
         label="pinion pivot cylindrical body",
     )
-    add_datum_feature(
+    datum_a = add_datum_feature(
         adapter,
         front,
         edge_xy=end_top,
@@ -184,7 +201,7 @@ async def build(adapter: Any) -> dict[str, str]:
         RIGHT_CENTER[0],
         RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 4000.0,
     )
-    add_feature_control_frame(
+    crown_profile = add_feature_control_frame(
         adapter,
         right,
         edge_xy=right_crown_face,
@@ -196,7 +213,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pinion pivot crown profile",
         entity_type="FACE",
     )
-    add_surface_finish(
+    bearing_finish = add_surface_finish(
         adapter,
         right,
         edge_xy=body_face,
@@ -204,6 +221,35 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="pinion pivot bearing finish",
         entity_type="FACE",
+    )
+
+    # pc-r7 eye pass: the cylindricity frame and datum A sat on the
+    # match-drill callout's text, and the Ra bar on its shoulder.  The callout
+    # is moved from the symbols' read-back boxes, not by a hand-tuned
+    # coordinate, and the placement is asserted, so a longer callout moves
+    # further instead of re-colliding.
+    place_callout_clear(
+        adapter,
+        next(
+            annotation
+            for annotation in right_annotations
+            if dimension_name(adapter, annotation) == "PinHoleDia"
+        ),
+        label="MHA-062 match-drill callout",
+        below={
+            "bearing finish": gdt_box(
+                adapter, bearing_finish.GetAnnotation(), label="bearing Ra"
+            ),
+        },
+        beside={
+            "cylindricity frame": gdt_box(
+                adapter, cylindricity.GetAnnotation(), label="cylindricity frame"
+            ),
+            "datum A": gdt_box(adapter, datum_a.GetAnnotation(), label="datum A"),
+            "crown profile frame": gdt_box(
+                adapter, crown_profile.GetAnnotation(), label="crown profile frame"
+            ),
+        },
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)

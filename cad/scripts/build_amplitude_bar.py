@@ -54,16 +54,29 @@ from _common import (
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
+from _fit_limits import deviations
+from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
+from _visibility import blank_reference_geometry
+from amplitude_bar_drawing_spec import SURFACE_FINISHES
+from amplitude_bar_notes import DRAWING_NOTES, END_VIEW_NOTE, ISOMETRIC_VIEW_NOTE
 from amplitude_bar_spec import (
+    BOTTOM_NOTCH_DEPTH_BAND,
+    BOTTOM_NOTCH_OFFSET,
+    BOTTOM_NOTCH_WIDTH,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
-    END_VIEW_NOTE,
-    ISOMETRIC_VIEW_NOTE,
+    DRAWING_PRECISION,
+    NOTCH_OFFSET_TOLERANCE_MM,
+    NOTCH_WIDTH_BAND,
+    TOP_NOTCH_OFFSET,
+    TOP_NOTCH_WIDTH,
     TOP_PIN_HOLE_SPEC,
 )
 
@@ -77,14 +90,12 @@ BAR_LENGTH = 32.0 * IN - 4.5  # 808.3: legacy 32" minus the 4.5 top-frame-rederi
 # amplitude_bar_spec.BAR_LENGTH.
 BAR_WIDTH = 0.25 * IN  # 6.35   DIMENSIONS.md ch15: annotated (high)
 BAR_DEPTH = 0.25 * IN  # 6.35   DIMENSIONS.md ch15: legacy, square section (med)
-BOTTOM_NOTCH_WIDTH = 0.125 * IN  # 3.175  DIMENSIONS.md ch15: legacy (med)
+# Notch widths: amplitude_bar_spec derives each from the plate it straddles
+# (was the legacy 1/8" = 3.175; user ruling 2026-09-27, #1038).
 BOTTOM_NOTCH_HEIGHT = 0.09375 * IN  # 2.381  DIMENSIONS.md ch15: legacy 3/32" (med)
-TOP_NOTCH_WIDTH = 0.125 * IN  # 3.175  DIMENSIONS.md ch15: legacy (med)
 TOP_NOTCH_HEIGHT = 0.5 * IN  # 12.7   DIMENSIONS.md ch15: legacy (med)
 # top pin hole: was Ø2.0 drill, now #47 (Ø1.994) native Hole Wizard feature
 TOP_PIN_DROP = 0.25 * IN  # 6.35  DIMENSIONS.md ch15: hole centre below bar top (derived)
-
-NOTCH_OFFSET = (BAR_WIDTH - BOTTOM_NOTCH_WIDTH) / 2.0  # notches centred on width
 
 
 async def build(adapter) -> dict[str, str]:
@@ -96,8 +107,8 @@ async def build(adapter) -> dict[str, str]:
     # the top pin hole, and its drop below the bar top. The mm suffix is
     # load-bearing -- this is an INCH document and the equation manager reads
     # BARE numbers in document units (an unsuffixed 812.8 = 812.8 in, 25.4x
-    # too big). NotchOffset is derived (the notches are centred on the width),
-    # so it tracks BarWidth/BottomNotchWidth edits.
+    # too big). Each end's NotchOffset is derived (the notches are centred on
+    # the width), so it tracks BarWidth and its own notch width.
     await set_global(adapter, "BarLength", f"{BAR_LENGTH}mm")
     await set_global(adapter, "BarWidth", f"{BAR_WIDTH}mm")
     await set_global(adapter, "BarDepth", f"{BAR_DEPTH}mm")
@@ -110,8 +121,9 @@ async def build(adapter) -> dict[str, str]:
     # standard (Hole Wizard), so the old TopPinHoleDia knob is gone.
     await set_global(adapter, "TopPinDrop", f"{TOP_PIN_DROP}mm")
     await set_global(
-        adapter, "NotchOffset", '("BarWidth" - "BottomNotchWidth") / 2'
+        adapter, "BottomNotchOffset", '("BarWidth" - "BottomNotchWidth") / 2'
     )
+    await set_global(adapter, "TopNotchOffset", '("BarWidth" - "TopNotchWidth") / 2')
 
     # Each sketch's dim names + drive equations are recorded inline as the dims
     # are created (a per-sketch SketchDims), then renamed immediately; the drive
@@ -125,16 +137,16 @@ async def build(adapter) -> dict[str, str]:
     # Clockwise from the origin at the bottom-left corner.
     points = [
         (0.0, 0.0),
-        (NOTCH_OFFSET, 0.0),
-        (NOTCH_OFFSET, BOTTOM_NOTCH_HEIGHT),
-        (NOTCH_OFFSET + BOTTOM_NOTCH_WIDTH, BOTTOM_NOTCH_HEIGHT),
-        (NOTCH_OFFSET + BOTTOM_NOTCH_WIDTH, 0.0),
+        (BOTTOM_NOTCH_OFFSET, 0.0),
+        (BOTTOM_NOTCH_OFFSET, BOTTOM_NOTCH_HEIGHT),
+        (BOTTOM_NOTCH_OFFSET + BOTTOM_NOTCH_WIDTH, BOTTOM_NOTCH_HEIGHT),
+        (BOTTOM_NOTCH_OFFSET + BOTTOM_NOTCH_WIDTH, 0.0),
         (BAR_WIDTH, 0.0),
         (BAR_WIDTH, BAR_LENGTH),
-        (BAR_WIDTH - NOTCH_OFFSET, BAR_LENGTH),
-        (BAR_WIDTH - NOTCH_OFFSET, BAR_LENGTH - TOP_NOTCH_HEIGHT),
-        (BAR_WIDTH - NOTCH_OFFSET - TOP_NOTCH_WIDTH, BAR_LENGTH - TOP_NOTCH_HEIGHT),
-        (BAR_WIDTH - NOTCH_OFFSET - TOP_NOTCH_WIDTH, BAR_LENGTH),
+        (BAR_WIDTH - TOP_NOTCH_OFFSET, BAR_LENGTH),
+        (BAR_WIDTH - TOP_NOTCH_OFFSET, BAR_LENGTH - TOP_NOTCH_HEIGHT),
+        (BAR_WIDTH - TOP_NOTCH_OFFSET - TOP_NOTCH_WIDTH, BAR_LENGTH - TOP_NOTCH_HEIGHT),
+        (BAR_WIDTH - TOP_NOTCH_OFFSET - TOP_NOTCH_WIDTH, BAR_LENGTH),
         (0.0, BAR_LENGTH),
     ]
     lines = await add_line_chain(adapter, points)
@@ -151,17 +163,17 @@ async def build(adapter) -> dict[str, str]:
     # creation order (= emission order) with its friendly name + drive equation;
     # all ten are positive segment lengths, so the drives evaluate positive (no
     # unsigned-distance negation needed). The notch ledges/widths/heights all
-    # reference their globals; the two repeated spans (notch returns, the three
-    # NotchOffset ledges) reuse the same global, so a single edit moves both
-    # sides together.
+    # reference their globals; the repeated spans (notch returns, the two
+    # BottomNotchOffset ledges) reuse the same global, so a single edit moves
+    # both sides together.
     dims = [
-        (lines[0], NOTCH_OFFSET, "bottom-left ledge", "BottomLeftLedge", '"NotchOffset"'),
+        (lines[0], BOTTOM_NOTCH_OFFSET, "bottom-left ledge", "BottomLeftLedge", '"BottomNotchOffset"'),
         (lines[1], BOTTOM_NOTCH_HEIGHT, "bottom notch height", "BottomNotchHeight", '"BottomNotchHeight"'),
         (lines[2], BOTTOM_NOTCH_WIDTH, "bottom notch width", "BottomNotchWidth", '"BottomNotchWidth"'),
         (lines[3], BOTTOM_NOTCH_HEIGHT, "bottom notch return", "BottomNotchReturn", '"BottomNotchHeight"'),
-        (lines[4], NOTCH_OFFSET, "bottom-right ledge", "BottomRightLedge", '"NotchOffset"'),
+        (lines[4], BOTTOM_NOTCH_OFFSET, "bottom-right ledge", "BottomRightLedge", '"BottomNotchOffset"'),
         (lines[5], BAR_LENGTH, "bar length", "BarLength", '"BarLength"'),
-        (lines[6], NOTCH_OFFSET, "top-right ledge", "TopRightLedge", '"NotchOffset"'),
+        (lines[6], TOP_NOTCH_OFFSET, "top-right ledge", "TopRightLedge", '"TopNotchOffset"'),
         (lines[7], TOP_NOTCH_HEIGHT, "top notch height", "TopNotchHeight", '"TopNotchHeight"'),
         (lines[8], TOP_NOTCH_WIDTH, "top notch width", "TopNotchWidth", '"TopNotchWidth"'),
         (lines[9], TOP_NOTCH_HEIGHT, "top notch return", "TopNotchReturn", '"TopNotchHeight"'),
@@ -284,6 +296,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     drive_jobs.append(('D1@MidWidth', '"BarWidth" / 2'))
+    blank_reference_geometry(adapter, (("MidWidth", "PLANE"),))
 
     # Apply the deferred drive equations now -- after the whole model + a
     # rebuild exists, so every target (BarProfile + TopPinProfile) resolves.
@@ -316,11 +329,36 @@ async def build(adapter) -> dict[str, str]:
 
     await report_mass_properties(adapter)
 
-    # Manufacturing drawing support: mark exactly the print's dimensions and
-    # stamp the make-critical title-block properties.
+    # Manufacturing drawing support: the foot notch may only come out shallow
+    # (amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND), natively on its depth;
+    # each notch may only come out wider than the plate it straddles
+    # (NOTCH_WIDTH_BAND, #1038) and is centred by the band on the ledge its
+    # detail prints; author every printed dimension's places, mark exactly
+    # the print's dimensions and stamp the make-critical title-block properties.
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "BarProfile",
+        "BottomNotchHeight",
+        *deviations(BOTTOM_NOTCH_DEPTH_BAND),
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "BarProfile", "BottomNotchWidth", *deviations(NOTCH_WIDTH_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "BarProfile", "TopNotchWidth", *deviations(NOTCH_WIDTH_BAND)
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "BarProfile", "BottomLeftLedge", NOTCH_OFFSET_TOLERANCE_MM
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "BarProfile", "TopRightLedge", NOTCH_OFFSET_TOLERANCE_MM
+    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # The foot notch floor's roughness lives on the MODEL as a plain annotation.
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

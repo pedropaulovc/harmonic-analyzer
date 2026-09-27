@@ -1,7 +1,7 @@
 r"""Pure-data dimensional contract shared by the pinion cam-follower pin and its
 manufacturing drawing.
 
-PURE DATA, no SolidWorks/COM imports.  A short bright-steel stud pressed into the
+PURE DATA, no SolidWorks/COM imports.  A short drill-rod stud bonded into the
 swing strap's west edge, riding on the eccentric cam collar.  The nominals drive
 the part's named equation globals AND the drawing's coordinate math; the
 marked-dimension map keeps the part marks and drawing keeps in lockstep
@@ -10,8 +10,10 @@ marked-dimension map keeps the part marks and drawing keeps in lockstep
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace
-from _surface_finish import GROUND_UM, SurfaceFinishControl
+import _config
+from _fit_limits import REAM_H7
+from _gtol_spec import SphereFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_cam_pin_geometry import (
     CAP_RADIUS as CAP_RADIUS,
     CAP_SAG as CAP_SAG,
@@ -20,40 +22,83 @@ from pinion_cam_pin_geometry import (
     SEAT_LEN as SEAT_LEN,
 )
 
-# Symmetric final-size band about the PIN_DIA mid nominal (4.020 MAX /
-# 4.012 MIN press band); the drawing callout derives its limits from these
-# two constants so a retuned press fit can never ship stale limit text.
-PIN_DIA_TOL = 0.004
-PIN_DIA_BAND = (PIN_DIA_TOL, -PIN_DIA_TOL)
+# U27 (Main, 2026-09-23): no press.  The stud is stock 4 mm drill rod (h9,
+# 4.000-3.970) slipped into the MHA-056 strap's reamed H7 follower seat
+# (4.000-4.012) and bonded with LOCTITE 638: 0.000-0.042 diametral clearance,
+# inside the 0.25 mm bond gap the 638 data sheet allows (the U6 drum-to-arbor
+# precedent).  A novice cannot hold the old +/-0.004 press band.
+PIN_DIA_BAND = (0.0, -0.03)  # (upper, lower): h9 drill rod
+SEAT_NUMBER = "MHA-056"
+RETAINING_COMPOUND = "LOCTITE 638"
+RETAINING_COMPOUND_MAX_GAP_MM = 0.25
 PIN_LENGTH_TOLERANCE_MM = 0.05
 CAP_RADIUS_TOLERANCE_MM = 0.05
 
+# Rule 7 (turned parts): the shank is a Right-plane half-profile, so its
+# diameter prints on the side view beside the length, not on the end view
+# (machinist review of 7f7fc1717).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "PinProfile": {"PinDia"},
-    "Pin": {"Depth"},
+    "PinProfile": {"PinDia", "Depth"},
     "CapProfile": {"CapR"},
 }
+# Decimal places ARE the tolerance statement (policy rule 2): the h9 stock
+# band and the two +/-0.05 bands are all hundredths.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "PinProfile": {"PinDia": 2, "Depth": 2},
+    "CapProfile": {"CapR": 2},
+}
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
+}
+if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
+    raise AssertionError("every marked dimension must state its decimal places")
 
+# The stock is stated once, in the title block's Material cell (the registry
+# row): repeating it on the diameter callout was over-specification (machinist
+# review of 7f7fc1717), and a callout that names no bar cannot disagree with
+# the title block (Codex P2 on #814).  The h9 slip fit above assumes drill rod.
+STOCK = _config.parts("pinion-cam-pin")["material"]
+if "drill rod" not in STOCK.lower():
+    raise AssertionError(f"the h9 bonded slip fit assumes drill rod, not {STOCK!r}")
+PIN_DIA_CALLOUT = f"SLIP FIT IN {SEAT_NUMBER} FOLLOWER SEAT"
+
+# Rule 5: the crown is the surface that runs (it rides the cam OD); the
+# bonded shank is a static seat and carries no symbol.
 SURFACE_FINISHES = (
     SurfaceFinishControl(
-        key="finished_shank",
-        roughness_um=GROUND_UM,
-        face=CylinderFace(diameter_mm=PIN_DIA),
+        key="crown",
+        roughness_um=MACHINED_UM,
+        face=SphereFace(diameter_mm=2.0 * CAP_RADIUS),
     ),
 )
 
+SEAT_BAND = REAM_H7
+BOND_CLEARANCE_MIN = round(SEAT_BAND[1] - PIN_DIA_BAND[0], 6)
+BOND_CLEARANCE_MAX = round(SEAT_BAND[0] - PIN_DIA_BAND[1], 6)
+if BOND_CLEARANCE_MIN < 0.0 or BOND_CLEARANCE_MAX > RETAINING_COMPOUND_MAX_GAP_MM:
+    raise AssertionError(
+        f"bonded pin gap {BOND_CLEARANCE_MIN}-{BOND_CLEARANCE_MAX} is outside the"
+        f" 0-{RETAINING_COMPOUND_MAX_GAP_MM} {RETAINING_COMPOUND} window"
+    )
+
+# Rule 6: assembly requirements belong on the feature callout or the
+# assembly step, never in a part's general notes.  ASSEMBLY_STEP is the
+# pinion fit-up step text (pinion_rig_fitup) that owns this joint.
 DRAWING_NOTES = "\n".join(
     (
-        "SEATED END IS FLAT; OPPOSITE END HAS ONE SPHERICAL CROWN.",
-        "CROWN ROOT CIRCLE IS A SHARP PROFILE BREAK, R0.10 MAX; NO CHAMFER;",
+        "LEAVE THE CROWN ROOT CIRCLE SHARP, NO CHAMFER;",
         "  EXEMPT FROM TITLE-BLOCK EDGE-BREAK REQUIREMENT.",
     )
 )
-END_VIEW_NOTE = "END VIEW SCALE 8:1"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "cam-pin seated-end flatness": "0.05",
-    "pinion cam-pin crown profile": "0.05",
-}
+# One pin per strap: the count prints, or a fitter bonds one and stops.
+_PIN = _config.parts("pinion-cam-pin")
+ASSEMBLY_STEP = (
+    f"BOND {_PIN['quantity']}X {_PIN['number']}, ONE INTO EACH {SEAT_NUMBER} "
+    f"FOLLOWER SEAT WITH {RETAINING_COMPOUND}."
+)
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"
+# The overall (seated end to crown apex) is a pure reference restatement;
+# its places are specification (policy rule 2).
+DRAWING_REFERENCE_PRECISION = 2

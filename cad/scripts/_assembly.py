@@ -25,17 +25,20 @@ from _common import (
     _CHAIN_LINK_PREFIXES,
     _FEATURE_ERROR,
     _MATE_TOL_MM,
+    _SUMMARY_TITLE,
     _git_commit_year,
     _git_sha,
     _early_bound,
     _read_member,
     apply_custom_properties,
+    apply_summary_info,
     active_configuration_name,
     check,
     log,
     set_isometric_view,
     whats_wrong,
 )
+from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
 
 
 def assembly_title_properties(assembly_name: str) -> dict[str, str]:
@@ -82,6 +85,27 @@ def _ensure_assembly_revision(adapter: Any, model: Any = None) -> bool:
         revision=expected,
     )
     log(f"assembly Revision {current!r} -> {expected}")
+    return True
+
+
+@_telemetry.traced("assembly.ensure_title")
+def _ensure_assembly_title(adapter: Any, asm_name: str, model: Any = None) -> bool:
+    """Restamp an assembly's document summary Title with its slug if stale.
+
+    The drawing template's PART cell resolves the summary Title, and every
+    sheet prints the slug (user ruling 2026-09-26).  Both save chokepoints call
+    this beside ``_ensure_assembly_revision``, so a refresh restamps a file
+    saved under an older title as surely as a full build stamps a new one.
+    """
+    target = _early_bound(adapter.currentModel if model is None else model, "IModelDoc2")
+    current = str(
+        adapter._attempt(lambda: target.SummaryInfo(_SUMMARY_TITLE), default="") or ""
+    )
+    if current == asm_name:
+        return False
+    apply_summary_info(adapter, title=asm_name, model=target)
+    _telemetry.event("assembly.title_restamped", previous=current, title=asm_name)
+    log(f"assembly summary Title {current!r} -> {asm_name!r}")
     return True
 
 
@@ -843,7 +867,11 @@ async def plane_distance_mate(
                 )
             ),
         )
-        target_ref = named_ref(getattr(plane, "name", plane), "PLANE")
+        plane_name = getattr(plane, "name", plane)
+        # Hidden at creation: the mate selects it by name, and a shown plane
+        # prints in the assembly's renders.
+        blank_reference_geometry(adapter, ((plane_name, "PLANE"),))
+        target_ref = named_ref(plane_name, "PLANE")
     return await coincident_mate(
         adapter,
         named_ref(f"{comp_plane}@{comp_name}", "PLANE"),
@@ -1852,7 +1880,10 @@ def check_no_interference(
     intentional overlap volume permitted in mm^3.  This is for modeled
     interference fits whose nominal CAD solids genuinely overlap: both the
     pair identity and the measured volume must match, so a neighbouring clash
-    or an unexpectedly deep overlap remains a hard fault.
+    or an unexpectedly deep overlap remains a hard fault.  The volume is the
+    pair's TOTAL over every interference body SolidWorks reports for it: a
+    thread annulus comes back as a dozen slivers, each far under a limit the
+    sum can exceed (#853).
 
     Chain-internal contact (a pair of roller-chain links touching each other)
     is allowed and reported separately, not raised: a chain is an articulating
@@ -1873,6 +1904,8 @@ def check_no_interference(
             )
         details = []
         bounded_contacts = []
+        # frozenset(names) -> (names as first reported, [body volumes])
+        allowed_bodies: dict[frozenset[str], tuple[list[str], list[float]]] = {}
         chain_contacts = []
         chain_mesh_contacts = []
         for interference in list(interferences or []):
@@ -1885,13 +1918,8 @@ def check_no_interference(
                 configs.append(str(_read_member(comp, "ReferencedConfiguration") or ""))
             volume_mm3 = float(_read_member(interference, "Volume") or 0.0) * 1e9
             pair = frozenset(names)
-            allowed_volume = (allowed_pairs or {}).get(pair)
-            if (
-                len(names) == 2
-                and allowed_volume is not None
-                and volume_mm3 <= allowed_volume
-            ):
-                bounded_contacts.append((names, volume_mm3, allowed_volume))
+            if len(names) == 2 and pair in (allowed_pairs or {}):
+                allowed_bodies.setdefault(pair, (names, []))[1].append(volume_mm3)
                 continue
             if (
                 all(n.startswith(_CHAIN_LINK_PREFIXES) for n in names)
@@ -1923,6 +1951,23 @@ def check_no_interference(
             )
             details.append(f"{' & '.join(names)}: {volume_mm3:.9g} mm^3")
         adapter._attempt(lambda: mgr.Done(), default=None)
+        for pair, (names, bodies) in allowed_bodies.items():
+            total_mm3 = sum(bodies)
+            allowed_volume = allowed_pairs[pair]
+            if total_mm3 <= allowed_volume:
+                bounded_contacts.append((names, total_mm3, len(bodies), allowed_volume))
+                continue
+            _telemetry.event(
+                "interference.unexpected",
+                components=names,
+                volume_mm3=total_mm3,
+                body_count=len(bodies),
+                limit_mm3=allowed_volume,
+            )
+            details.append(
+                f"{' & '.join(names)}: {total_mm3:.9g} mm^3 over {len(bodies)} "
+                f"bodies (limit {allowed_volume:.9g} mm^3)"
+            )
         isp.set_attribute("hits", len(details))
         isp.set_attribute("bounded_contacts", len(bounded_contacts))
         isp.set_attribute("chain_contacts", len(chain_contacts))
@@ -1938,10 +1983,21 @@ def check_no_interference(
                 f" (<= {max(chain_mesh_contacts):.2f} mm^3) allowed -- chain seated"
                 f" on the pitch circle"
             )
-        for names, volume_mm3, allowed_volume in bounded_contacts:
-            _telemetry.debug(
+        # Info, not debug, and a span event: a farm leaf keeps only its
+        # info-level task.log, and a bounded limit is calibrated from these
+        # readings.
+        for names, volume_mm3, body_count, allowed_volume in bounded_contacts:
+            _telemetry.event(
+                "interference.bounded_pair",
+                pair=names,
+                overlap_mm3=volume_mm3,
+                body_count=body_count,
+                limit_mm3=allowed_volume,
+            )
+            _telemetry.info(
                 f"{' <-> '.join(names)} intentional fit overlap "
-                f"{volume_mm3:.2f} mm^3 allowed (limit {allowed_volume:.2f} mm^3)"
+                f"{volume_mm3:.4f} mm^3 over {body_count} bodies allowed "
+                f"(limit {allowed_volume:.4f} mm^3)"
             )
         if details:
             raise RuntimeError(f"{len(details)} interference(s): " + "; ".join(details))
@@ -2194,6 +2250,9 @@ async def save_assembly_and_images(
     # Every driver is authored by now: prove the contract's flip seeds against
     # the signatures this build actually queried.
     audit_flip_seeds(asm_name)
+    # ... nor one whose own sketches, planes, axes or points render; each
+    # placed part's tree was proved at that part's save.
+    assert_reference_geometry_hidden(adapter, asm_name)
     OUT_SLDASM.mkdir(parents=True, exist_ok=True)
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
     sidecar = _massprops_sidecar(asm_name)
@@ -2249,6 +2308,9 @@ def _save_new_assembly_as_copy(adapter: Any, asm_path: Any) -> None:
     is gated on this call producing a new, non-empty target file.
     """
     _ensure_assembly_revision(adapter)
+    # The PART cell prints the bare slug, the same convention as every part
+    # sheet (user ruling 2026-09-26); the MHA-A## number marks an assembly.
+    _ensure_assembly_title(adapter, asm_path.stem)
     options = 1 | 2 | 8
     model = adapter.currentModel
     if asm_path.exists():
@@ -2669,7 +2731,8 @@ def save_assembly_in_place(
     ``repro_inplace_save.py`` (ret=True, err=0, warn=0, the active config persists
     on reopen).
 
-    ``geometry_changed`` or a stale Revision gates the bump. Every in-place
+    ``geometry_changed``, a stale Revision or a stale summary Title gates the
+    bump. Every in-place
     ``Save3`` rewrites fresh save metadata -> a new md5, and the parent's doit dep
     is this file's md5. When neither changed, the save is skipped so a no-op
     refresh leaves the ``.SLDASM`` byte-identical. When either changed, we force
@@ -2678,13 +2741,14 @@ def save_assembly_in_place(
     """
     asm = _early_bound(adapter.currentModel if model is None else model, "IModelDoc2")
     revision_changed = _ensure_assembly_revision(adapter, asm)
-    must_save = geometry_changed or revision_changed
+    title_changed = _ensure_assembly_title(adapter, asm_name, asm)
+    must_save = geometry_changed or revision_changed or title_changed
     sldasm = OUT_SLDASM / f"{asm_name}.SLDASM"
     if not must_save:
-        # No-op refresh: resolved geometry and Revision are identical to the last
-        # save. Do NOT rewrite -- a fresh md5 here would invalidate the parent.
+        # No-op refresh: resolved geometry, Revision and Title are identical to
+        # the last save. Do NOT rewrite -- a fresh md5 would invalidate the parent.
         log(
-            f"{sldasm.name}: geometry and Revision unchanged -- .SLDASM left "
+            f"{sldasm.name}: geometry, Revision and Title unchanged -- .SLDASM left "
             "intact (no md5 bump)"
         )
         return False

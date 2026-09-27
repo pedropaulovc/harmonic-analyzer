@@ -40,7 +40,9 @@ from _drawing_layout_check import (
     audit_layout,
     format_findings,
 )
-from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
+from _drawing_layout_audit import annotation_display, run_layout_audit
+from _layout_audit import display_box, estimated_text_runs, line_segment
+from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, layout_report_path
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import (
     bool_array,
@@ -49,6 +51,7 @@ from solidworks_mcp.adapters.com_variant import (
     double_array,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.solidworks import drawing as _sw_drawing
 from solidworks_mcp.adapters.solidworks.drawing import (
     TOL_BASIC,
     add_note,
@@ -62,6 +65,34 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     set_units_mm,
     view_name,
 )
+
+
+def _record_center_marks(counts: dict[str, Any]) -> None:
+    """Every auto_center_marks call's centre-mark count, before and after
+    AutoInsertCenterMarks2, as a span event (#913: each mark printed twice on
+    30 views). after == 2 x before would point at a template auto-insert the
+    explicit call repeats; before == 0 at duplicates made some other way.
+
+    The observer is process-global and set when this module is imported, so
+    a script that never imports _drawing_common records nothing (every
+    auto_center_marks caller does). OTel attributes must be primitives: a
+    count whose read raised arrives as None and is sent as -1, named in
+    ``read_failed``.
+    """
+    attributes = {key: value for key, value in counts.items() if value is not None}
+    failed = sorted(key for key, value in counts.items() if value is None)
+    for key in failed:
+        attributes[key] = -1
+    if failed:
+        attributes["read_failed"] = failed
+    _telemetry.event("center_marks.auto_insert", **attributes)
+    _telemetry.debug(
+        f"center marks {counts.get('view')!r}: {counts.get('before')} -> {counts.get('after')}"
+        f" (holes={counts.get('holes')}, slots={counts.get('slots')}, ok={counts.get('ok')})"
+    )
+
+
+_sw_drawing.CENTER_MARK_OBSERVER = _record_center_marks
 
 
 # swAnnotationType_e.swNote -- the view-owned annotation TYPE that becomes a
@@ -90,13 +121,6 @@ _ANNOT_GTOL = 5
 _ANNOT_SFSYM = 7
 _SEL_DIMENSION = 14  # swSelectType_e.swSelDIMENSIONS
 _GDT_TYPES = frozenset({_ANNOT_DATUM, _ANNOT_GTOL, _ANNOT_SFSYM})
-# The interface each GD&T kind's geometry actually lives on -- reached via
-# IAnnotation::GetSpecificAnnotation, never off IAnnotation itself.
-_GDT_IFACE = {
-    _ANNOT_DATUM: "IDatumTag",
-    _ANNOT_GTOL: "IGtol",
-    _ANNOT_SFSYM: "ISFSymbol",
-}
 # Fallback only, for an annotation whose geometry cannot be read. Every GD&T
 # symbol that CAN be measured is (see _measured_gdt_box) -- a fixed square is
 # wrong for an FCF by construction, since its width tracks its compartments.
@@ -124,16 +148,12 @@ _SF_BOX_UP_M = 0.018
 _SF_BOX_DOWN_M = 0.0
 
 # swAnnotationType_e.swDisplayDimension -- every linear/diameter dimension AND
-# the native hole callouts (a diameter dim carrying "/ THRU" text). Like GD&T
-# they expose only a text-anchor GetPosition (no clean box) and by design sit
-# ON/ACROSS the view geometry they measure, so they get a small nominal box and
-# ``NONE`` scope: overflow-checked + title-block keep-out (a callout dragged off
-# the sheet or over the title block is caught) but NOT overlap-checked against
-# views. Half-span is smaller than GD&T's -- dimension text is compact, and a
-# tight box keeps the zero-slack overflow check false-positive-free on interior
-# dims (Codex #269 thread 1).
+# the native hole callouts. The element audit gives them NO box: the shared
+# layout audit (``_drawing_layout_audit``) boxes their text from its display
+# data and checks it against text, lines and model edges on every sheet. The
+# 8 mm nominal square they used to get here was never overlap-checked, so
+# MHA-092's "20.8"/"8.42" and its callouts over the right view passed.
 _ANNOT_DIM = 4
-_NOMINAL_DIM_HALF_M = 0.004
 
 
 # swLeaderStyle_e.swBENT / swLeaderSide_e.swLS_SMART. Every leadered annotation
@@ -178,10 +198,6 @@ _DIM_DETAILING_SCOPES = {
     "swDetailingAngularRunningDimension": 209,
 }
 
-# A circular 2-character BOM balloon renders ~10-12 mm across at the template
-# font; its GetExtent is leader-polluted (see _note_element), so it gets this
-# nominal half-span box around its IAnnotation.GetPosition anchor instead.
-_NOMINAL_BALLOON_HALF_M = 0.006
 # Ink gap left between two balloon circles pushed apart on the ring. Their radius
 # is measured from its rendered full-circle arc (4.72 mm on pen-assembly), so
 # this is only the clearance between them, not a stand-in for the circle itself.
@@ -1526,6 +1542,16 @@ def add_attached_note(
     return note
 
 
+def compose_hole_callout_prefix(process: str, existing: str) -> str:
+    """The hole callout's prefix definition: ``process`` ahead of the native
+    format text.  A process ending in a line break puts the native size on
+    its own row; otherwise the two join with one space.  (Stripping the
+    break put the post's whole size row on one 117 mm line: RD1 probe,
+    917-s1-rd1probe.)"""
+    separator = "\n" if process.rstrip(" ").endswith("\n") else " "
+    return process.rstrip() + separator + existing.lstrip()
+
+
 @_telemetry.traced("drawing.hole_callout", label_param="label")
 def add_native_hole_callout(
     adapter: Any,
@@ -1636,7 +1662,7 @@ def add_native_hole_callout(
         existing = str(display.GetText(5) or "")  # swDimensionTextPrefixDefinition
         if not existing.strip():
             raise RuntimeError(f"hole callout has no format text to prefix ({label})")
-        prefix = process.rstrip() + " " + existing.lstrip()
+        prefix = compose_hole_callout_prefix(process, existing)
         display.SetText(1, prefix)
         if str(display.GetText(5) or "") != prefix:
             raise RuntimeError(
@@ -4532,10 +4558,11 @@ def _spread_balloons(
 
     ``AutoBalloon5`` stacks balloons whose attachment points cluster, and on a
     pictorial view its square layout can even drop balloons INSIDE the outline
-    box. Deterministic fix: place every balloon's box center on an ellipse
-    ``margin`` outside the view outline, evenly spaced, and assign the ring slots
-    in the angular order of the balloons' ATTACHMENT POINTS. Leaders stay
-    attached; only the balloon anchor moves (``IAnnotation.SetPosition``).
+    box. Deterministic fix: place every balloon's rendered CIRCLE centre on an
+    ellipse ``margin`` outside the view outline, evenly spaced, and assign the
+    ring slots in the angular order of the balloons' ATTACHMENT POINTS. Leaders
+    stay attached; only the balloon anchor moves (``IAnnotation.SetPosition``),
+    carrying the anchor's constant offset from the circle centre (#866).
 
     **Sort on the ATTACHMENT, not on where the balloon landed.** For straight
     leaders from points on a convex ring to points inside it, the non-crossing
@@ -4570,7 +4597,10 @@ def _spread_balloons(
         note = _sw_type_info.early_bound_or_flag(
             note, "INote", "GetAnnotation", "GetBomBalloonText"
         )
-        radii.append(rendered_balloon_circle(note, label="balloon spread")[2])
+        circle_x, circle_y, radius = rendered_balloon_circle(
+            note, label="balloon spread"
+        )
+        radii.append(radius)
         annotation = adapter._attempt(lambda n=note: n.GetAnnotation())
         if annotation is None:
             raise RuntimeError("balloon spread: balloon without an annotation")
@@ -4581,6 +4611,13 @@ def _spread_balloons(
             "SetPosition",
             "GetLeaderPointsAtIndex",
         )
+        # SetPosition moves the ANCHOR, which is not the circle centre: it sits
+        # a constant ~(+4.0, -1.7) mm off it (#866, 40 balloons on MHA-A03).
+        # Carry that offset so the CIRCLE lands on its ring slot.
+        anchor = annotation.GetPosition()
+        if anchor is None or len(anchor) < 2:
+            raise RuntimeError("balloon spread: balloon without a position")
+        offset = (float(anchor[0]) - circle_x, float(anchor[1]) - circle_y)
         # Never GetExtent: a balloon note's extent box includes its LEADER, so it
         # spans to the pointed-at component and is useless for placing the
         # balloon circle itself.
@@ -4595,7 +4632,13 @@ def _spread_balloons(
         attach_x, attach_y = float(raw[-3]), float(raw[-2])
         theta = math.atan2(attach_y - center_y, attach_x - center_x)
         items.append(
-            (theta, attach_x, attach_y, _balloon_item_key(adapter, note), annotation)
+            (
+                theta,
+                attach_x,
+                attach_y,
+                _balloon_item_key(adapter, note),
+                (annotation, offset),
+            )
         )
     # Sort on (theta, attach x, attach y, BOM item), never on theta alone. Two
     # balloons attached at the same angle from the view centre -- coaxial parts
@@ -4646,9 +4689,9 @@ def _spread_balloons(
     angles = _push_apart_on_ring(
         [theta for theta, _x, _y, _i, _a in items], min_gap=gap
     )
-    for angle, (_theta, _x, _y, _item, annotation) in zip(angles, items):
-        target_x = center_x + radius_x * math.cos(angle)
-        target_y = center_y + radius_y * math.sin(angle)
+    for angle, (_theta, _x, _y, _item, (annotation, offset)) in zip(angles, items):
+        target_x = center_x + radius_x * math.cos(angle) + offset[0]
+        target_y = center_y + radius_y * math.sin(angle) + offset[1]
         if not annotation.SetPosition(target_x, target_y, 0.0):
             raise RuntimeError("failed to re-ring a BOM balloon")
 
@@ -5326,63 +5369,62 @@ def _datum_is_dimension_attached(adapter: Any, annotation: Any) -> bool:
     return _SEL_DIMENSION in (int(value) for value in attachment_types)
 
 
-def _measured_gdt_box(
-    adapter: Any, annotation: Any, kind: int
-) -> tuple[float, float, float, float] | None:
-    """Box a GD&T symbol from the geometry SolidWorks actually renders.
+def _gdt_display(
+    adapter: Any, annotation: Any, kind: int, *, name: str
+) -> dict[str, Any] | None:
+    """A datum tag's or feature-control frame's rendered ink, in sheet space.
 
-    ``IDatumTag`` / ``IGtol`` / ``ISFSymbol`` all expose the symbol's real
-    primitives -- ``GetLineAtIndex(i)`` -> ``[lineType, startPt[3], endPt[3]]``,
-    ``GetTriangleAtIndex(i)`` -> ``[vtx1[3], vtx2[3], vtx3[3], isFilled,
-    lineType]``, ``GetArcAtIndex(i)`` -> ``[lineType, startPt[3], endPt[3],
-    centerPt[3], rotationDir]``. Their union is the symbol's ink, leader
-    included, which is exactly the question an OVERFLOW check asks.
+    ``IAnnotation::GetDisplayData``, read by the shared layout audit's reader
+    (``annotation_display``): lines, arcs, triangles and text runs where
+    SolidWorks draws them. NOT the ``IGtol`` / ``IDatumTag`` primitives
+    (``GetLineAtIndex`` and kin) this used to read -- on MHA-062 at 4:1
+    (pc-gdt-ink-diag, a89a13a7a) a leadered FCF's primitives are a crossed
+    2h x 2h placeholder square at the leader's far end plus the leader's last
+    run, never the frame, and a datum tag's box lies about (-9.9, -5.0) mm off
+    its ink. The display data is where the PDF prints: knife-mount's datum A
+    and its leadered three-compartment FCF match their PDF glyphs within
+    0.15 mm (layoutcal d09c2b9eb).
 
-    They are NOT on ``IAnnotation``: go through ``GetSpecificAnnotation()``
-    first, or every call raises. (``GetExtent`` is not the route -- the type
-    library declares it on ``IBomTable`` and ``INote`` only, verified against a
-    working ``INote.GetExtent()`` in the same probe run.)
+    ``None``, with a ``gdt_box.fallback`` event naming the symbol and the
+    reason, when there is nothing to read; the caller then falls back.
+    A DATUM attached to a display dimension is one such case: its IDatumTag
+    primitives were in the dimension's local frame, and whether its display
+    data is sheet space is unmeasured, so it keeps the nominal box. A frame
+    attached to a dimension reads its display data like any other: a nominal
+    square is wrong for an FCF by construction.
     """
-    if kind == _ANNOT_DATUM:
-        if _datum_is_dimension_attached(adapter, annotation):
-            # A datum attached to a display dimension reports IDatumTag primitive
-            # coordinates in that dimension's local frame, unlike the sheet-space
-            # primitives of an edge-attached tag. Its IAnnotation.GetPosition is
-            # still the documented sheet-space symbol origin, so the nominal datum
-            # box below is the truthful overflow check for this attachment type.
-            return None
+    if kind == _ANNOT_DATUM and _datum_is_dimension_attached(adapter, annotation):
+        reason = "dimension-attached datum"
+    else:
+        display, refused = annotation_display(adapter, annotation)
+        if display:
+            return display
+        reason = f"no display data (refused {refused})" if refused else "no display data"
+    _telemetry.event("gdt_box.fallback", symbol=name, reason=reason)
+    _telemetry.debug(f"{name}: GD&T box falls back to the nominal square: {reason}")
+    return None
 
-    spec = adapter._attempt(
-        lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
-    )
-    if spec is None:
-        return None
-    spec = _sw_type_info.early_bound_or_flag(spec, _GDT_IFACE[kind])
 
-    points: list[tuple[float, float]] = []
-    for count_name, at_name, offsets in (
-        ("GetLineCount", "GetLineAtIndex", ((1, 2), (4, 5))),
-        ("GetArcCount", "GetArcAtIndex", ((1, 2), (4, 5))),
-        ("GetTriangleCount", "GetTriangleAtIndex", ((0, 1), (3, 4), (6, 7))),
-    ):
-        n = (
-            adapter._attempt(
-                lambda c=count_name: int(adapter._get_attr_or_call(spec, c) or 0)
-            )
-            or 0
-        )
-        for i in range(n):
-            raw = adapter._attempt(lambda a=at_name, j=i: getattr(spec, a)(j))
-            if not raw:
-                continue
-            v = [float(t) for t in raw]
-            points.extend((v[ix], v[iy]) for ix, iy in offsets if iy < len(v))
-    if not points:
-        return None
+def _measured_gdt_box(
+    adapter: Any, annotation: Any, kind: int, *, name: str
+) -> tuple[float, float, float, float] | None:
+    """Box a datum tag or feature-control frame from the ink it renders.
 
-    xs = [p[0] for p in points]
-    ys = [p[1] for p in points]
-    return min(xs), min(ys), max(xs), max(ys)
+    ``_gdt_display``'s display data, every primitive and text run
+    (``display_box``). Leader included: that is ink too, and it can cross a
+    border on its own. Text below a frame ("BOTH CROWNS") is inside no frame
+    line, so its run is boxed at the width SolidWorks reports; a run with
+    none is estimated from its glyph count, with a ``gdt_box.text_estimated``
+    event.
+    """
+    display = _gdt_display(adapter, annotation, kind, name=name)
+    box = display_box(display) if display else None
+    if display and box is None:
+        _telemetry.event("gdt_box.fallback", symbol=name, reason="display data draws nothing")
+    estimated = estimated_text_runs(display) if display else 0
+    if estimated:
+        _telemetry.event("gdt_box.text_estimated", symbol=name, runs=estimated)
+    return None if box is None else (box.xmin, box.ymin, box.xmax, box.ymax)
 
 
 def _gdt_element(
@@ -5426,7 +5468,7 @@ def _gdt_element(
             y + _SF_BOX_UP_M,
             scope=CollisionScope.NONE,
         )
-    measured = _measured_gdt_box(adapter, annotation, kind)
+    measured = _measured_gdt_box(adapter, annotation, kind, name=name)
     if measured is not None:
         x0, y0, x1, y1 = measured
         return LayoutElement(name, "gdt", x0, y0, x1, y1, scope=CollisionScope.NONE)
@@ -5440,25 +5482,6 @@ def _gdt_element(
     )
 
 
-def _dim_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | None:
-    """Box a display dimension / hole callout as a small nominal square (NONE scope).
-
-    Like GD&T, a dimension exposes only a text-anchor ``GetPosition`` and sits on
-    the geometry it measures, so it is overflow-checked and title-block-keep-out
-    checked only -- never overlap-checked against a view (Codex #269 thread 1).
-    """
-    position = adapter._attempt(
-        lambda: adapter._get_attr_or_call(annotation, "GetPosition")
-    )
-    if not position:
-        return None
-    x, y = float(position[0]), float(position[1])
-    half = _NOMINAL_DIM_HALF_M
-    return LayoutElement(
-        name, "dim", x - half, y - half, x + half, y + half, scope=CollisionScope.NONE
-    )
-
-
 def _iter_view_annotations(adapter: Any, view: Any):
     """Yield ``(LayoutElement, annotation)`` for each note / GD&T symbol / dimension.
 
@@ -5469,7 +5492,9 @@ def _iter_view_annotations(adapter: Any, view: Any):
     ``GetTableAnnotations`` instead.
 
     The live annotation rides along so the caller can pull its leader geometry
-    (see :func:`_leader_segments_of`) without a second COM walk.
+    (see :func:`_leader_segments_of`) without a second COM walk. A DISPLAY
+    DIMENSION yields ``None`` for its element: it gets no box here (see
+    ``_ANNOT_DIM``), only its leaders.
     """
     annotations = (
         adapter._attempt(lambda: adapter._get_attr_or_call(view, "GetAnnotations"))
@@ -5492,7 +5517,8 @@ def _iter_view_annotations(adapter: Any, view: Any):
         elif kind in _GDT_TYPES:
             element = _gdt_element(adapter, annotation, name, kind)
         elif kind == _ANNOT_DIM:
-            element = _dim_element(adapter, annotation, name)
+            yield None, annotation
+            continue
         else:
             continue
         if element is not None:
@@ -5602,8 +5628,11 @@ def _datum_leader_segments(
     ``GetLeaderCount()`` returns 0 for every ``swDatumTag`` (measured: 3 tags on
     rocker-arm-support report 0, while a ``swGtol`` on the same sheet reports 1).
 
-    But the leader IS DRAWN, and it IS readable -- as ordinary geometry via
-    ``IDatumTag::GetLineAtIndex``. Without this, a datum tag routed straight
+    But the leader IS DRAWN, and it IS readable -- as the tag's display data
+    (``IAnnotation::GetDisplayData`` lines, sheet space). NOT
+    ``IDatumTag::GetLineAtIndex``: at 4:1 on MHA-062 those primitives drew the
+    box (-9.9, -5.0) mm off its ink and a jog to it the sheet never printed
+    (pc-gdt-ink-diag, a89a13a7a), a phantom leader run. Without this, a datum tag routed straight
     across a neighbouring view is invisible to BOTH audits: its box is
     ``CollisionScope.NONE`` so it is never overlap-checked, and it contributes no
     leader segments so it is never crossing-checked (codex #334). That is not
@@ -5614,22 +5643,12 @@ def _datum_leader_segments(
     if _datum_is_dimension_attached(adapter, annotation):
         return []
 
-    spec = adapter._attempt(
-        lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
-    )
-    if spec is None:
-        return []
-    spec = _sw_type_info.early_bound_or_flag(spec, "IDatumTag")
-    count = int(
-        adapter._attempt(lambda: adapter._get_attr_or_call(spec, "GetLineCount")) or 0
-    )
-    lines: list[tuple[tuple[float, float], tuple[float, float]]] = []
-    for index in range(count):
-        raw = adapter._attempt(lambda i=index: spec.GetLineAtIndex(i))
-        if not raw:
-            continue
-        v = [float(t) for t in raw]  # [lineType, startPt[3], endPt[3]]
-        lines.append(((v[1], v[2]), (v[4], v[5])))
+    display, _refused = annotation_display(adapter, annotation)
+    lines: list[tuple[tuple[float, float], tuple[float, float]]] = [
+        ((segment.x0, segment.y0), (segment.x1, segment.y1))
+        for segment in (line_segment(raw) for raw in display.get("lines", ()))
+        if segment is not None
+    ]
     # Drop the tag's own BOX -- it is not a leader, and a box legitimately abuts
     # its own view. Everything else (the leader run, and the shoulder some tags
     # draw along the attached edge) is a straight run that can cross a view.
@@ -5748,9 +5767,10 @@ def collect_layout_elements(
       SMALL note centered inside its own view is a hole tag / balloon sitting on
       the geometry and is scoped ``NON_VIEW`` (does not collide with its view);
     * every native GD&T symbol (datum tag / feature-control frame /
-      surface-finish) and DISPLAY DIMENSION / hole callout, boxed nominally and
-      scoped ``NONE`` (no real bbox API, and they sit on the geometry they
+      surface-finish), boxed and scoped ``NONE`` (they sit on the geometry they
       annotate) -- overflow- and title-block-keep-out-checked only;
+    * NO display dimension or hole callout: only their leaders. The shared
+      layout audit boxes their text from display data (``_ANNOT_DIM``);
     * every TABLE (hole tables land on the SHEET view, so it is scanned too);
     * two reserved KEEP-OUT boxes -- the checked-in title block and its
       projection symbol -- so no content may land on either.
@@ -5802,6 +5822,25 @@ def collect_layout_elements(
                 )
             )
         for element, annotation in _iter_view_annotations(adapter, view):
+            if element is None:
+                # A display dimension: no box, but its leaders still cross-check.
+                label = str(adapter._get_attr_or_call(annotation, "GetName") or "")
+                leaders.extend(
+                    _leader_segments_of(
+                        adapter, annotation, label=label, kind="dim", owner=name
+                    )
+                )
+                # A native hole callout is an IDisplayDimension whose leader is
+                # NOT a SetLeader3 leader, so GetLeaderCount()==0 and the call
+                # above returns nothing -- yet its offset text can drive a leader
+                # across a neighbouring view. Read it from the display data
+                # (codex #3605215320); a no-op for non-callout dimensions.
+                leaders.extend(
+                    _display_dimension_leader_segments(
+                        adapter, annotation, label=label, owner=name
+                    )
+                )
+                continue
             # Record the owning view: a NON_VIEW annotation is exempt from
             # colliding with THIS view only, not other drawing views (Codex #269
             # thread 3).
@@ -5835,20 +5874,6 @@ def collect_layout_elements(
                         adapter, annotation, label=element.label, owner=name
                     )
                 )
-            # A native hole callout is an IDisplayDimension whose leader is NOT a
-            # SetLeader3 leader, so GetLeaderCount()==0 and the call above returns
-            # nothing -- yet its offset text can drive a leader across a
-            # neighbouring view. Reconstruct it from the text + the projected
-            # attachment (codex #3605215320); a no-op for non-callout dimensions.
-            if element.kind == "dim":
-                leaders.extend(
-                    _display_dimension_leader_segments(
-                        adapter,
-                        annotation,
-                        label=element.label,
-                        owner=name,
-                    )
-                )
             # A SMALL note centered inside its owning view is a hole tag / balloon
             # sitting on the geometry -- give it NON_VIEW scope so it does not
             # collide with the view it sits on (but still collides with a free
@@ -5876,7 +5901,7 @@ def collect_layout_elements(
         for table in _iter_tables(adapter, sheet_view):
             tables[table.label] = table
         for element, annotation in _iter_view_annotations(adapter, sheet_view):
-            if element.kind != "note":
+            if element is None or element.kind != "note":
                 continue
             owner_type = int(
                 adapter._attempt(
@@ -6184,6 +6209,17 @@ async def finalize_drawing(
     artifacts["png"] = str(outputs.png.resolve())
     if set(artifacts) != {"drawing", "pdf", "png"}:
         raise RuntimeError(f"drawing export incomplete: {artifacts!r}")
+    # Every sheet of every drawing is audited on the finished, still-open
+    # document, next to the PDF it printed (``_drawing_layout_audit``). Under
+    # GATE a finding fails the leaf, so no artefact is stored.
+    run_layout_audit(
+        adapter,
+        stem=outputs.slddrw.stem,
+        pdf=outputs.pdf,
+        report=layout_report_path(outputs.slddrw.stem),
+        sheet_layouts=resolved_layouts,
+        is_pictorial=is_pictorial_orientation,
+    )
     # Release the file: SolidWorks keeps the saved SLDDRW open past the COM
     # session, and the next run (or a from-scratch rebuild deleting the
     # target) then hits "in use by another process".

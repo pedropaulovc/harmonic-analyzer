@@ -20,6 +20,11 @@ RING_BORE_DIA = 30.8  # strap bore riding the eccentric cam
 RING_BORE_DIA_BAND = (0.10, 0.00)  # running bore; (upper, lower) deviations
 RING_WALL = 5.0  # radial strap wall
 RING_THICKNESS = 3.0
+# The rod print leaves the ring thickness to the title block's 2-place class,
+# +/-.02 in (title_block.yaml linear_2pl, pinned by test_cylinder_bank_layout):
+# the loosest routine class a shop would read into it. The cylinder bank's
+# closed cam slot must hold the thickest such ring (cylinder_bank_layout).
+RING_THICKNESS_BAND = (0.508, -0.508)  # (upper, lower) deviations
 SHANK_WIDTH = 8.0
 SHANK_THICKNESS = 2.5
 HEAD_WIDTH = 10.0  # across the tombstone cheeks

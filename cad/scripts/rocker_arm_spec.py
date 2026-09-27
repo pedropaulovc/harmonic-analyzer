@@ -71,6 +71,22 @@ ROD_HOLE_Y = (
 # stay out of assembly rebuild closures -- codex #354).
 PIVOT_MID_Y = ARM_DEPTH / 2.0  # 8.0
 
+# The amplitude bar's foot rides the top edge, and at d = 0 its cheeks pass
+# over this arm's hub, so the print controls the edge's height over the pivot
+# axis directly, on the mirror axis, one-sided: the edge may only come out
+# high (user ruling 2026-09-26). The 808.00 centre distance is then REF, and
+# the R800 governs only the curvature. With the amplitude bar's one-sided
+# notch (amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND) a bar can rest at most
+# 1.0 higher than nominal: a steady lever tilt of ~0.45 deg on that channel.
+# Its fundamental moves at most 0.0036 mm (0.04 % of the d = 88 term) across
+# the stations: error_budget.hook_displacement with the edge 0.5 high and the
+# notch 0.5 shallow (test_rocker_bank_layout pins both numbers).
+# Policy rule 2 (Codex #936 PRRT_kwDOPHDy386mV3AO): the band is the part's,
+# on a model dimension -- build_rocker_arm's hidden TopEdgeReference sketch,
+# whose one printed dimension IS this height and drives the arcs' centre.
+TOP_EDGE_ABOVE_PIVOT = CENTER_Y - PIVOT_MID_Y - R_TOP  # 8.0
+TOP_EDGE_BAND = (0.50, 0.0)  # (upper, lower)
+
 # Drawing prose (DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) lives in
 # rocker_arm_notes.py -- see connecting_rod_notes for the rationale.
 
@@ -79,10 +95,30 @@ PIVOT_MID_Y = ARM_DEPTH / 2.0  # 8.0
 # ch17 p.40): every arm carries its own round boss on both faces at the
 # pivot; neighbouring hubs touch face to face and SET the 7.0565 station
 # pitch -- there are no loose spacer bushings (the 19 `pivot-bushing` parts
-# are retired). OD kept at the old bushing's O10: at d = 0 the amplitude
-# bar's foot cheeks pass 5.63 above the shaft axis, so OD < ~11.25.
-HUB_DIA = 10.0
+# are retired).
+#
+# The OD's floor is the hub wall: drawing-simplicity policy rule 12's 1.5
+# over the reamed bore at its largest, with the OD at the bottom of the
+# title block's .XX band (machinist review, MHA-071 round 1: O10.00 left
+# 1.48). The MHA-148 thrust washer's own floor is higher, so the two share
+# one O10.20 (rocker_thrust_washer_spec). The ceiling is the amplitude bar's
+# foot cheeks, which pass over the hub at d = 0 (channel_kinematics
+# ``bar_bottom``); test_rocker_bank_layout pins the slack.
+PIVOT_HOLE_BAND = (0.03, 0.0)  # (upper, lower): reamed; native on PivotDia
+RULE12_WALL_FLOOR = 1.5  # drawing-simplicity policy rule 12
+LINEAR_2PL = 0.508  # title-block .XX band (pinned to _config by the tests)
+_HUB_FLOOR = PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0] + 2.0 * RULE12_WALL_FLOOR + LINEAR_2PL
+HUB_DIA_MIN = math.ceil(round(_HUB_FLOOR * 100.0, 9)) / 100.0  # 10.04
+HUB_DIA = 10.2
+if HUB_DIA < HUB_DIA_MIN:
+    raise AssertionError(
+        f"hub O{HUB_DIA:.2f} is under its rule-12 wall floor O{HUB_DIA_MIN:.2f}"
+    )
 HUB_LENGTH = 7.0565  # == machine channels.station_pitch_mm (asserted by the build)
+# (upper, lower) on the printed hub length (#743 PR2): a hub may only come out
+# long, and the 20-arm stack's acceptance (rocker_bank_layout.STACK_L20_ACCEPT)
+# caps the sum, as the cylinder gears' overall thickness does.
+HUB_LENGTH_BAND = (0.05, 0.0)
 
 # Manufacturing GD&T limits consumed by the part's drawing projection.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {

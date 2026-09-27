@@ -2,8 +2,8 @@ crankshaft:
   number: MHA-026
   material: AISI 1018 cold-finished steel shafting
   material_specification: AISI 1018 cold-finished steel shafting
-  finish: precision turned or ground, oiled
+  finish: oiled
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "turned stepped shaft with integral bearing journal (steel)"
+  process: "turned stepped shaft: plain 3/8 in core, Ø9.0 pinion seat step (steel)"
