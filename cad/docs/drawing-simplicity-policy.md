@@ -210,8 +210,9 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    would make the same content materially larger or easier to read. Each
    `DrawingSpec` records the choice explicitly. The layout audit
    (`_drawing_layout_check`) checks the selected template's border and
-   title-block keep-out; the eye pass and machinist review judge every visible
-   element's containment, balance, and fit.
+   title-block keep-out; the machinist review judges every visible
+   element's containment, balance, and fit (an eye pass stands in only where
+   no machinist review covers the sheet's version).
 9. **Assembly drawings are judged as complete assembly packages.** Every PDF
    sheet is rendered at full resolution and attached to one blind-review
    invocation. Acceptance cross-checks BOM rows, balloons, setup and assembly
