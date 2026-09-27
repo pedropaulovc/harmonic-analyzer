@@ -158,7 +158,7 @@ critical_features:
     nominal: summing_lever_spec.HOLE_X
     quantity: gain
     class: channel
-    holds: "half of the 0.30 spring-hole pattern position zone (summing_lever_spec.GEOMETRIC_TOLERANCES_MM), normal to the knife line"
+    holds: "the +/-0.15 on HoleSeedX (summing_lever_spec.HOOK_ARM_TOLERANCE_MM): the one-row spring-hole field's distance normal to the knife line, shared by all 20 holes"
   spring_rate:
     tolerance: 1.25
     unit: pct

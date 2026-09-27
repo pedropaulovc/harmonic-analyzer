@@ -1202,9 +1202,13 @@ def test_drawing_limits_agree_with_the_budget(budget):
     assert cylinder_gear_spec.CAM_PHASE_TOLERANCE_DEG == pytest.approx(
         feats["cam_phase"]["tolerance"]
     ), "cylinder-gear drawing carries a different cam-phase tolerance"
-    # every +/- arm tolerance is held by a diametral position zone of twice it
+    # The summing hook arm is one straight row of holes along the knife, so its
+    # +/- band sits directly on the row's distance from the knife line.
+    assert summing_lever_spec.HOOK_ARM_TOLERANCE_MM == pytest.approx(
+        feats["summing_hook_arm"]["tolerance"]
+    ), "summing-lever drawing carries a different hook-arm tolerance"
+    # every other +/- arm tolerance is held by a diametral position zone of twice it
     for feature, spec_module, key in (
-        ("summing_hook_arm", summing_lever_spec, "spring-hole pattern position"),
         ("rocker_rod_pin_radius", rocker_arm_spec, "rod-pin hole position"),
         ("lever_bar_pin_arm", channel_lever_spec, "bar-pin hole position"),
         ("lever_spring_hook_arm", channel_lever_spec, "spring-eye hole position"),
