@@ -22,6 +22,7 @@ from itertools import combinations
 from pathlib import Path
 from typing import Any, Callable, Literal, Sequence
 
+import _config
 import _seat_forensics
 import _telemetry
 import connecting_rod_spec as rod
@@ -332,7 +333,9 @@ BOM_DESCRIPTIONS = {
     "pinion-cam-pin": "PINION CAM FOLLOWER PIN",
     "pinion-cam": "PINION ECCENTRIC CAM, WITH M2.5 SET SCREW",
     "pinion-lever": "PINION LEVER",
-    "pinion-lever-pin": "PINION LEVER PIN, 1/16 X 13 STEEL",
+    # Grouped: its configurations' BOM description wins over a written cell,
+    # so the row prints the registry description the builder stamps.
+    "pinion-lever-pin": str(_config.parts("pinion-lever-pin")["description"]),
     "pinion-handle": "PINION GRIP CROSSROD",
     "pinion-arbor": "INTEGRAL PINION ARBOR AND GRIP HEAD",
     "pinion-arbor-collar": "PINION ARBOR RETENTION COLLAR",
