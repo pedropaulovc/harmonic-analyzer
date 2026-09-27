@@ -13,8 +13,11 @@ drive train swapped 19 cone-gear copies to T006..T114 and its EditRebuild3
 failed, every copy on ToothGapCut + ToothGapPattern at error 1.  In the part,
 each of those configurations faulted as loaded, a plain EditRebuild3 returned
 False and left it faulted, and only an activated ForceRebuild3 cleared it --
-all while NeedsRebuild read false.  The reopen tripwire reads exactly that;
-the double below reproduces the cg-fx1 seat behaviour.
+all while NeedsRebuild read false.  efae8d795 had rebuilt stale inactive
+configurations with one no-switch EditRebuildAll; the user's ruling
+(2026-09-27, option (a)) moved the fix into the shared helper: exactly one
+switch per stale INACTIVE configuration, and none when nothing inactive is
+stale.  The double below reproduces the cg-fx1 seat behaviour.
 """
 
 from __future__ import annotations
@@ -27,6 +30,7 @@ from pathlib import Path
 import pytest
 
 import _common
+import build_cone_gear
 
 CONE_FAULTS = (("ToothGapCut", 1, False), ("ToothGapPattern", 1, False))
 
@@ -153,6 +157,10 @@ CONE_GEAR = ("Default", *(f"T{teeth:03d}" for teeth in range(6, 121, 6)))
 SWAPPED = CONE_GEAR[1:-1]  # T006..T114, the configurations the copies take
 
 
+def _switches(part: _Part) -> list[str]:
+    return [entry for entry in part.log if entry.startswith("show")]
+
+
 # --- rebuild_stale_configurations ---------------------------------------------
 
 
@@ -162,38 +170,73 @@ def test_a_clean_part_gets_no_rebuild_call_at_all(seat) -> None:
     assert part.log == []
 
 
-def test_a_stale_configuration_gets_one_edit_rebuild_all_and_no_switch(seat) -> None:
-    adapter, part = seat({"Default": False, "INSTALLED": True})
+def test_a_stale_active_configuration_gets_one_edit_rebuild_all_and_no_switch(
+    seat,
+) -> None:
+    """efae8d795's perf intent, kept by the 2026-09-27 ruling: nothing inactive
+    is stale, so nothing switches."""
+    adapter, part = seat({"Default": True})
     _common.rebuild_stale_configurations(adapter, "pinion-lever-pin")
     assert part.log == ["EditRebuildAll"]
+    adapter, part = seat({"Default": True, "INSTALLED": False})
+    _common.rebuild_stale_configurations(adapter, "pinion-lever-pin")
+    assert part.log == ["EditRebuildAll"]
+
+
+def test_a_stale_inactive_configuration_gets_one_switch_and_a_forced_rebuild(
+    seat,
+) -> None:
+    """The 2026-09-27 ruling (replacing efae8d795's no-switch EditRebuildAll):
+    one switch per stale inactive configuration, then the active one is shown
+    again."""
+    adapter, part = seat({"Default": False, "INSTALLED": True})
+    _common.rebuild_stale_configurations(adapter, "pinion-lever-pin")
+    assert part.log == ["show INSTALLED", "force INSTALLED", "show Default"]
+    assert part.active == "Default"
     assert not any(config.NeedsRebuild for config in part.configs.values())
 
 
-def test_many_stale_configurations_still_get_exactly_one_rebuild(seat) -> None:
+def test_many_stale_configurations_switch_once_each_and_end_on_the_active_one(
+    seat,
+) -> None:
+    """Cone gear, every configuration stale, T120 active: 20 switches for the
+    20 stale inactive ones, one back to T120, and T120 itself keeps the single
+    EditRebuildAll (efae8d795's no-switch rebuild for the active one)."""
     adapter, part = seat({name: True for name in CONE_GEAR}, active="T120")
     _common.rebuild_stale_configurations(adapter, "cone-gear")
-    assert part.log == ["EditRebuildAll"]
+    inactive = [name for name in CONE_GEAR if name != "T120"]
+    assert _switches(part) == [f"show {name}" for name in (*inactive, "T120")]
+    assert [entry for entry in part.log if entry.startswith("force")] == [
+        f"force {name}" for name in inactive
+    ]
+    assert part.log[-1] == "EditRebuildAll"
+    assert part.active == "T120"
 
 
 def test_configurations_still_stale_after_the_rebuild_raise_naming_part_and_all(
     seat,
 ) -> None:
-    adapter, part = seat(
+    adapter, _part = seat(
         {name: True for name in CONE_GEAR[:5]}, active="Default", stuck=("T006", "T018")
     )
     with pytest.raises(
         RuntimeError, match=r"cone-gear: configurations \['T006', 'T018'\]"
     ):
         _common.rebuild_stale_configurations(adapter, "cone-gear")
-    assert part.log == ["EditRebuildAll"]
 
 
 def test_a_refused_rebuild_raises_even_when_the_flags_read_clean(seat) -> None:
     # Codex P1 on #928: a feature that fails to rebuild can leave NeedsRebuild
     # false, so the rebuild's own verdict is enforced, not just recorded.
-    adapter, _part = seat({"Default": False, "INSTALLED": True}, rebuild_result=False)
+    adapter, _part = seat({"Default": True, "INSTALLED": False}, rebuild_result=False)
     with pytest.raises(RuntimeError, match=r"pinion-lever-pin: EditRebuildAll refused"):
         _common.rebuild_stale_configurations(adapter, "pinion-lever-pin")
+    adapter, part = seat({"Default": False, "INSTALLED": True}, force_result=False)
+    with pytest.raises(
+        RuntimeError, match=r"INSTALLED: ForceRebuild3 returned False"
+    ):
+        _common.rebuild_stale_configurations(adapter, "pinion-lever-pin")
+    assert part.active == "Default"
 
 
 def test_a_hard_fault_after_the_rebuild_raises_but_a_warning_does_not(seat) -> None:
@@ -216,6 +259,25 @@ def test_code_one_is_a_fault_unless_what_s_wrong_flags_it_a_warning(seat) -> Non
     _common.rebuild_stale_configurations(adapter, "pinion-lever-pin")
     assert part.log == ["EditRebuildAll"]
     assert _common._FEATURE_ERROR[1] == "unknown-error"
+
+
+def test_an_inactive_configuration_still_faulted_while_active_stops_the_save(
+    seat,
+) -> None:
+    adapter, part = seat(
+        {name: True for name in CONE_GEAR},
+        active="T120",
+        bad=("T006", "T060"),
+        stuck=("T060",),
+    )
+    with pytest.raises(
+        RuntimeError,
+        match=r"cone-gear: stale inactive configurations did not rebuild clean while "
+        r"active: T060: \['ToothGapCut \(unknown-error\)', "
+        r"'ToothGapPattern \(unknown-error\)'\]$",
+    ):
+        _common.rebuild_stale_configurations(adapter, "cone-gear")
+    assert part.active == "T120"
 
 
 def test_the_save_chokepoint_checks_every_configuration_right_before_its_final_save() -> (
@@ -270,6 +332,20 @@ def test_edit_rebuild_all_alone_leaves_the_cg_fx1_caches_that_fail_the_reopen(
     assert not any(entry.startswith("force") for entry in part.log)
 
 
+def test_the_chokepoint_heals_the_cg_fx1_caches_so_the_reopen_passes(seat) -> None:
+    adapter, part = seat(
+        {name: name != "T120" for name in CONE_GEAR}, active="T120", bad=SWAPPED
+    )
+    _common.rebuild_stale_configurations(adapter, "cone-gear")
+    part.log.clear()
+    _common.assert_saved_configurations_regenerate(adapter, "cone-gear")
+    assert [entry for entry in part.log if entry.startswith("edit")] == [
+        f"edit {name}" for name in (*CONE_GEAR[:-1], "T120")
+    ]
+    assert part.active == "T120"
+    assert not any(entry.startswith("force") for entry in part.log)
+
+
 def test_clean_saved_caches_pass_with_one_plain_rebuild_each_ending_on_active(
     seat,
 ) -> None:
@@ -318,3 +394,14 @@ def test_every_configuration_builder_proves_its_saved_caches_on_reopen(stem) -> 
     between = source[reopened:tripwire]
     assert not [call for call in FORCED_REBUILDS if call in between]
     assert source.rindex("save_part_and_images(adapter, PART_NAME)") < reopened
+
+
+def test_the_cone_gear_save_tail_no_longer_force_rebuilds_all() -> None:
+    # cg-fx2a: ForceRebuildAll, then Save3, left every T00x cache faulted; the
+    # tail now asserts nothing is stale instead.
+    source = inspect.getsource(build_cone_gear.build)
+    assert "ForceRebuildAll" not in source
+    marks = source.index("AddRebuildSaveMark(2")
+    stale = source.index("stale_configurations(", marks)
+    save = source.index('label="rebuild and persist all marked configurations"')
+    assert marks < stale < save
