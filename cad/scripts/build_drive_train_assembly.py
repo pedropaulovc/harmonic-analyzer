@@ -1008,8 +1008,6 @@ from pinion_pivot_block_geometry import (  # noqa: E402
     BLOCK_HEIGHT,
     BLOCK_WIDTH,
     BORE_UP as BLOCK_BORE_UP,
-    LIFT_BORE_RISE,
-    LIFT_BORE_SPACING,
     SCREW_HALF_SPACING as BLOCK_SCREW_HALF,
 )
 from pinion_pivot_block_geometry import SCREW_HOLE_SPEC as BLOCK_SCREW_HOLE_SPEC  # noqa: E402
@@ -2026,11 +2024,27 @@ for _k, _swing in enumerate(SWING_ANGLES):
 # that floor -- 0.2425 outside the pitch-circle sum (reviewfirst Rule 11).  U28
 # (user, 2026-09-23) keeps those roots and parks the drum 0.2425 further out
 # (config disengaged_tip_gap_mm 2.2425), so the seated stop comes at the same
-# strap swing and lever angle as the pitch-circle design.
-APINION_TEETH = int(_config.machine("alignment_pinion", "teeth"))
-TIP_APINION = ((APINION_TEETH + 2.0) / DP_TRAIN) * 25.4 / 2.0
-TIP_DRUM120 = (122.0 / DP_TRAIN) * 25.4 / 2.0
-APINION_GAP = float(_config.machine("alignment_pinion", "disengaged_tip_gap_mm"))
+# strap swing and lever angle as the pitch-circle design.  The parked
+# placement -- drum, strap pivot, lean, lift axis and follower-pin line -- is
+# the pure pinion_rig_park_geometry, which the A03 fit-up text reads too (#880).
+from pinion_rig_park_geometry import (  # noqa: E402
+    APINION_GAP,  # noqa: F401 -- the placement's input, read as drive.APINION_GAP
+    APINION_TEETH,
+    APINION_X,
+    APINION_Y,
+    FPIN_C as _FPIN_C,
+    LIFT_X,
+    LIFT_Y,
+    PIVOT_X,
+    PIVOT_Y,
+    SPR_N as _SPR_N,
+    SPR_U as _SPR_U,
+    STRAP_LEAN_DEG,
+    TIP_APINION,
+    TIP_DRUM120,
+)
+from pinion_rig_park_geometry import pin_line_dist as _pin_line_dist  # noqa: E402
+
 _APINION_PA = math.radians(14.5)  # alignment_pinion_spec PRESSURE_ANGLE_DEG
 _APINION_BASE_R = APINION_TEETH / DP_TRAIN * 25.4 * math.cos(_APINION_PA) / 2.0
 _APINION_HALF_GAP = math.pi / APINION_TEETH - (
@@ -2046,9 +2060,6 @@ if abs(ENGAGED_C2C - _CONFIG_ENGAGED_C2C) > 1e-6:
         "alignment-pinion configured and derived engaged centre distances disagree: "
         f"{_CONFIG_ENGAGED_C2C:.6f} vs {ENGAGED_C2C:.6f} mm"
     )
-APINION_X = X_DRUM + TIP_DRUM120 + TIP_APINION + APINION_GAP
-# Tip circles keep the configured parked gap at Delta-y = 0 (axis level).
-APINION_Y = Y_DRIVE
 # Ruling (c) (user, 2026-09-24): the blocks locate the swing cluster -- every
 # rig z station is pinion_rig_layout's fit-up stack (the cluster hard on the
 # back block, the drum hard on the back strap and one shim off the front one:
@@ -2056,17 +2067,8 @@ APINION_Y = Y_DRIVE
 APINION_DRUM_LEN = RIG.DRUM_LEN  # build_alignment_pinion FACE_WIDTH
 APINION_Z_FRONT = RIG.DRUM_FRONT_Z
 APINION_Z_BACK = RIG.DRUM_BACK_Z
-PIVOT_Y = Y_BASE_TOP + 12.0  # 62.8: pivot block bore height
-# Bracket thickness, end radius and pivot-to-arbor spacing come from the
-# geometry-only contract imported above.
-PIVOT_X = APINION_X + math.sqrt(
-    STRAP_C2C**2 - (APINION_Y - PIVOT_Y) ** 2
-)  # the far side from the drum, so swinging the strap toward
-# vertical advances the pinion into mesh
-STRAP_LEAN_DEG = math.degrees(
-    math.atan2(PIVOT_X - APINION_X, APINION_Y - PIVOT_Y)
-)  # the v2 drive line makes the parked strap lean west of vertical
-LIFT_X = PIVOT_X + LIFT_BORE_SPACING  # lift rod in the blocks' WEST bores
+# PIVOT_X/Y, STRAP_LEAN_DEG and LIFT_X/Y are pinion_rig_park_geometry's.  The
+# lift rod sits in the blocks' WEST bores: it moved there from the
 # east since the DP40 cram (issue #7 dodged the cone-pivot-post column);
 # the p.68-69 photos put the lever WEST of the grip head and the cam pins lift
 # the strap tails' follower pins from the WEST -- an east lift would
@@ -2074,10 +2076,10 @@ LIFT_X = PIVOT_X + LIFT_BORE_SPACING  # lift rod in the blocks' WEST bores
 # and the M6.9 portal south upright that once blocked the west band was
 # replaced by the lone NORTH rocker-arm-support. The recentered p2 rig clears
 # the unmodified casting; the complete-machine interference gate proves that
-# cross-subassembly relationship from the built solids.
-LIFT_Y = PIVOT_Y + LIFT_BORE_RISE  # v2 closure: the steep strap carries its
-# follower contact above the pivot at the WEST cam station.  The eccentric cam
-# collars still meet the pins from below; the pins rest on the collar ODs.
+# cross-subassembly relationship from the built solids.  The v2 closure: the
+# steep strap carries its follower contact above the pivot at the WEST cam
+# station.  The eccentric cam collars still meet the pins from below; the pins
+# rest on the collar ODs.
 PIVOT_SHAFT_Z0 = RIG.TORQUE_SHAFT_Z0
 # Ø6.35 torque shaft, set back-flush; its front end stands the worst-stack
 # allowance proud of the front block (pinion_rig_layout).
@@ -2259,10 +2261,8 @@ STRAP_Z_INNER = RIG.STRAP_Z_INNER
 # floor (pinion_rig_layout).
 SPRING_BLADE_INSET = RIG.SPRING_BLADE_INSET
 SPRING_Z = RIG.SPRING_Z
-_SPR_TH = math.radians(-STRAP_LEAN_DEG)  # the strap leans east of vertical
-_SPR_U = (math.sin(_SPR_TH), math.cos(_SPR_TH))  # up the strap axis
-_SPR_N = (-math.cos(_SPR_TH), math.sin(_SPR_TH))  # east normal of the axis
-# (east = machine -x)
+# _SPR_U (up the strap axis) and _SPR_N (its east normal, east = machine -x)
+# are pinion_rig_park_geometry's parked strap frame.
 
 
 def _spring_machine(local: tuple[float, float]) -> tuple[float, float]:
@@ -2368,9 +2368,9 @@ if CAM_THIN_SIDE_WALL < 1.5:
 _FPIN_S0 = STRAP_R_END - FPIN_SEAT  # 5.0: seat bottom, from the centreline
 if math.hypot(_FPIN_S0, FPIN_DROP) - FPIN_DIA / 2.0 - STRAP_PIVOT_BORE / 2.0 < 0.15:
     raise AssertionError("blind pin seat cuts too close to the pivot bore")
-# Pin axis, machine frame: through the strap axis FPIN_DROP below the pivot,
-# running WEST along -N (the axis RISES going west, N[1] < 0).
-_FPIN_C = (PIVOT_X - FPIN_DROP * _SPR_U[0], PIVOT_Y - FPIN_DROP * _SPR_U[1])
+# Pin axis, machine frame: _FPIN_C (pinion_rig_park_geometry), through the
+# strap axis FPIN_DROP below the pivot, running WEST along -N (the axis RISES
+# going west, N[1] < 0).
 _FPIN_TIP_S = _FPIN_S0 + FPIN_LEN  # 20: dome end station, from the centreline
 _S_CAM = (_FPIN_C[0] - LIFT_X) / _SPR_N[0]  # 14.9: where the pin crosses the
 # rod/cam plane x = LIFT_X
@@ -2410,15 +2410,8 @@ if CAM_Z0[0] < BLOCK_FRONT_Z0 + BLOCK_DEPTH + RIG.FRONT_BLOCK_FEELER - 1e-9:
 # vertical gap at the crossing x (that mistake put the first build 0.009
 # into the collar: the pin's closest approach is downhill-west of the
 # crossing). The collar axis pierces the pin's z-plane at (LIFT_X, LIFT_Y -
-# ECC) parked; the pin line runs from _FPIN_C along -N.
-def _pin_line_dist(centre_y: float, c=None, n=None) -> float:
-    """Perpendicular distance from (LIFT_X, centre_y) to the pin axis line."""
-    c = c if c is not None else _FPIN_C
-    n = n if n is not None else _SPR_N
-    dx, dy = LIFT_X - c[0], centre_y - c[1]
-    return abs(dx * (-n[1]) - dy * (-n[0]))
-
-
+# ECC) parked; the pin line runs from _FPIN_C along -N (_pin_line_dist,
+# pinion_rig_park_geometry).
 _PARK_GAP = _pin_line_dist(LIFT_Y - CAM_ECC) - (FPIN_DIA + CAM_OD) / 2.0
 if not 0.10 <= _PARK_GAP <= 0.25:
     raise AssertionError(f"park gap {_PARK_GAP:.3f} outside the 0.10..0.25 design band")

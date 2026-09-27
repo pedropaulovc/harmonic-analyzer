@@ -9,18 +9,23 @@ than the model's.  Main's U28 corollary: the rig is slid in until a feeler set
 to that rest gap is snug tooth tip to tooth tip at the front and back
 stations, then clamped, and the base seats are spotted through the blocks.
 
-This module derives that rest gap from the drive-train model, rounds it to
-the feeler gage's leaf step and makes it up from the same STARRETT 66MA the
-rig's other settings use.  It is not a fit-up setting (pinion_rig_fitup
-allows those one or two leaves); the tip gap takes three.  Only drawing
-steps and tests import it.
+This module derives that rest gap from the rig's parked geometry (the pure
+pinion_rig_park_geometry the assembly places the rig from), rounds it to the
+feeler gage's leaf step and makes it up from the same STARRETT 66MA the rig's
+other settings use.  It is not a fit-up setting (pinion_rig_fitup allows
+those one or two leaves); the tip gap takes three.  Only drawing steps and
+tests import it.
 """
 
 from __future__ import annotations
 
 import math
 
-import build_drive_train_assembly as drive
+import pinion_rig_park_geometry as park
+from cone_line import X_DRUM, Y_DRIVE
+from pinion_cam_geometry import CAM_OD
+from pinion_cam_geometry import ECC as CAM_ECC
+from pinion_cam_pin_geometry import PIN_DIA as FPIN_DIA
 from pinion_rig_fitup import FEELER_GAGE_LEAVES_MM, FEELER_GAGE_NAME
 from pinion_rig_layout import FEELER_LEAF_STEP
 
@@ -28,28 +33,26 @@ from pinion_rig_layout import FEELER_LEAF_STEP
 def _swung(point: tuple[float, float], psi: float) -> tuple[float, float]:
     """``point`` swung ``psi`` (CCW, toward mesh) about the strap pivot."""
     c, s = math.cos(psi), math.sin(psi)
-    dx, dy = point[0] - drive.PIVOT_X, point[1] - drive.PIVOT_Y
-    return (drive.PIVOT_X + dx * c - dy * s, drive.PIVOT_Y + dx * s + dy * c)
+    dx, dy = point[0] - park.PIVOT_X, point[1] - park.PIVOT_Y
+    return (park.PIVOT_X + dx * c - dy * s, park.PIVOT_Y + dx * s + dy * c)
 
 
 def _pin_air(psi: float) -> float:
     """Follower pin to eccentric-down cam air with the cluster swung ``psi``,
     on the same skew-perpendicular metric the model's park gap uses."""
     c, s = math.cos(psi), math.sin(psi)
-    axis = drive._SPR_N  # the pin's axis, parked
+    axis = park.SPR_N  # the pin's axis, parked
     n = (axis[0] * c - axis[1] * s, axis[0] * s + axis[1] * c)
-    centre_y = drive.LIFT_Y - drive.CAM_ECC  # the cam axis, eccentric down
-    return drive._pin_line_dist(centre_y, c=_swung(drive._FPIN_C, psi), n=n) - (
-        drive.FPIN_DIA + drive.CAM_OD
+    centre_y = park.LIFT_Y - CAM_ECC  # the cam axis, eccentric down
+    return park.pin_line_dist(centre_y, c=_swung(park.FPIN_C, psi), n=n) - (
+        FPIN_DIA + CAM_OD
     ) / 2.0
 
 
 def _tip_gap(psi: float) -> float:
     """Pinion tip to cylinder-gear tip on the line of centres, swung ``psi``."""
-    x, y = _swung((drive.APINION_X, drive.APINION_Y), psi)
-    return math.hypot(x - drive.X_DRUM, y - drive.Y_DRIVE) - (
-        drive.TIP_DRUM120 + drive.TIP_APINION
-    )
+    x, y = _swung((park.APINION_X, park.APINION_Y), psi)
+    return math.hypot(x - X_DRUM, y - Y_DRIVE) - (park.TIP_DRUM120 + park.TIP_APINION)
 
 
 def _rest_swing() -> float:
@@ -69,7 +72,7 @@ def _rest_swing() -> float:
 
 MODEL_TIP_GAP = _tip_gap(0.0)
 REST_TIP_GAP = _tip_gap(_rest_swing())
-if not math.isclose(MODEL_TIP_GAP, drive.APINION_GAP, abs_tol=1e-9):
+if not math.isclose(MODEL_TIP_GAP, park.APINION_GAP, abs_tol=1e-9):
     raise AssertionError("the parked pinion is off the level line of centres")
 # The gage sets whole leaf steps, so the printed nominal is the rest gap to
 # the nearest step.
