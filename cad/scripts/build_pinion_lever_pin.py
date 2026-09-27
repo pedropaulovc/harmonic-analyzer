@@ -221,12 +221,14 @@ async def build(adapter) -> dict[str, str]:
     )
     await force_rebuild(adapter)
     await volume_check(adapter, "manufactured pin (default)", volume, 0.005 * V_PIN)
+    # The configuration description wins over the drive-train BOM's written
+    # cell, so it is the text that BOM prints (cascade-2, 2026-09-27).
     grouped_spec = _config.parts(PART_NAME)
     apply_grouped_bom_properties(
         adapter,
         [default_config, INSTALLED_CONFIG],
         part_number=str(grouped_spec["number"]),
-        description=str(grouped_spec["title"]),
+        description=str(grouped_spec["description"]),
     )
     await report_mass_properties(adapter)
     require_material_in_every_configuration(adapter, (default_config, INSTALLED_CONFIG))

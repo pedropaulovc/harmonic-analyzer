@@ -176,6 +176,45 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     assert all(text.count(",") <= 1 for text in drawing.BOM_DESCRIPTIONS.values())
 
 
+def test_grouped_parts_stamp_the_description_the_bom_prints() -> None:
+    """A grouped part's configurations carry UseDescriptionInBOM, and that
+    wins over the drawing's written cell: cascade-2 (2026-09-27) read back
+    MHA-135's 'Pinion Lever Cross Pin' after SetText2 wrote its BOM text.  So
+    the builder stamps the registry description, and it must already be the
+    text the BOM prints (cone-gear's always was)."""
+    grouped = [
+        build
+        for build in sorted(SCRIPTS.glob("build_*.py"))
+        if "apply_grouped_bom_properties(" in build.read_text(encoding="utf-8")
+    ]
+    assert grouped, "no grouped-BOM builders found"
+    printed = []
+    for build in grouped:
+        stem = build.stem.removeprefix("build_").replace("_", "-")
+        source = build.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        stamped = [
+            ast.get_source_segment(source, keyword.value)
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and getattr(node.func, "id", None) == "apply_grouped_bom_properties"
+            for keyword in node.keywords
+            if keyword.arg == "description"
+        ]
+        # The builder passes a local it read from the row, or the row read inline.
+        assert stamped, build.name
+        assert all("title" not in text for text in stamped), (build.name, stamped)
+        assert re.search(r"""\(["']description["']""", source) or re.search(
+            r"""\[["']description["']\]""", source
+        ), build.name
+        if stem not in drawing.BOM_DESCRIPTIONS:
+            continue
+        row = yaml.safe_load((PARTS / f"{stem}.yaml").read_text(encoding="utf-8"))[stem]
+        assert row.get("description") == drawing.BOM_DESCRIPTIONS[stem], stem
+        printed.append(stem)
+    assert {"cone-gear", "pinion-lever-pin"} <= set(printed)
+
+
 def test_bom_descriptions_keep_one_line() -> None:
     for stem, text in drawing.BOM_DESCRIPTIONS.items():
         assert len(text) <= drawing.BOM_DESCRIPTION_MAX_CHARS, stem
