@@ -237,6 +237,16 @@ def test_part_registry_retains_make_critical_properties() -> None:
     assert "1018" in str(config["material_specification"])
     assert config["finish"]
     assert int(config["quantity"]) == 1
+    # Codex on #960 (WjJD): the audit's process column describes the shaft R1
+    # ships -- the plain core in MHA-149 and the pinion seat step -- not the
+    # retired integral journal.
+    from fractions import Fraction
+
+    process = str(config["process"])
+    core_in = Fraction(geometry.SHAFT_DIA / 25.4).limit_denominator(64)
+    assert f"plain {core_in} in core" in process
+    assert f"Ø{spec.PINION_SEAT_DIA:.1f} pinion seat step" in process
+    assert "journal" not in process
 
 
 def test_seat_step_never_pushes_the_pinion_past_its_seat_gap() -> None:
@@ -435,6 +445,18 @@ def test_dimension_record_rows_follow_the_spec() -> None:
         f"{south:.9f}..{spec.POST_BORE_END:.9f} "
         f"(world z −{-(z0 + south):.9f}..−{-(z0 + spec.POST_BORE_END):.9f})"
     )
+    # Codex on #960 (WjJA): the bushing's south end stands its length past the
+    # boss it is flush with at the north, not the grip head's centre plane.
+    import cone_pivot_post_spec as post
+
+    proud = bushing.LENGTH - post.CRANK_BOSS_LENGTH
+    head_start = proud - bushing.HEAD_LENGTH
+    rationale = rows["Crankshaft bearing"][3]
+    assert f"its south end stands {proud:.3f} proud of the boss" in rationale
+    assert (
+        f"the {bushing.HEAD_LENGTH:.1f} grip head starting {head_start:.3f} off "
+        "the boss's south face"
+    ) in rationale
 
 
 def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
