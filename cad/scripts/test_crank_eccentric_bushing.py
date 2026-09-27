@@ -84,7 +84,9 @@ def test_throw_reaches_the_mesh_stack() -> None:
 
 def test_the_grip_head_stands_off_the_boss_at_its_rows() -> None:
     assert spec.SOUTH_PROTRUSION == spec.HEAD_STANDOFF + spec.HEAD_LENGTH
-    assert spec.LENGTH == spec.POST_BORE_LENGTH + spec.SOUTH_PROTRUSION == 80.0
+    # 80.0 before MHA-016's spot face retreated 2.5 with the south face fixed:
+    # the bushing, flush with the face, shortens with the boss.
+    assert spec.LENGTH == spec.POST_BORE_LENGTH + spec.SOUTH_PROTRUSION == 77.5
     assert spec.FLATS_LENGTH == spec.HEAD_LENGTH
     row_1 = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
     row_2 = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
@@ -183,15 +185,17 @@ def test_the_bore_cut_runs_the_full_length() -> None:
     pi * 4.7875^2 * 42.0 exactly.  The old depth is the positive control."""
     assert not _mid_plane_cut_spans_the_body(spec.LENGTH + 4.0)
     assert _mid_plane_cut_spans_the_body(part.BORE_CUT_DEPTH)
-    removed = math.pi * (spec.BORE_DIA / 2.0) ** 2 * ((spec.LENGTH + 4.0) / 2.0)
+    # The leaf's bushing was 80.0 long (before MHA-016's spot face retreated).
+    leaf_length = 80.0
+    removed = math.pi * (spec.BORE_DIA / 2.0) ** 2 * ((leaf_length + 4.0) / 2.0)
     assert removed == pytest.approx(13915.6 - 10891.3, abs=0.2)
     # The build's expected volume after the bore, from the spec's own sizes:
-    # body pi*7.3^2*80 + head annulus pi*(9^2 - 7.3^2)*6 - bore pi*4.7875^2*80.
+    # body pi*7.3^2*77.5 + head annulus pi*(9^2 - 7.3^2)*6 - bore pi*4.7875^2*77.5.
     body = math.pi * (spec.OUTER_DIA / 2.0) ** 2 * spec.LENGTH
     head = math.pi * ((spec.HEAD_DIA / 2.0) ** 2 - (spec.OUTER_DIA / 2.0) ** 2) * spec.HEAD_LENGTH
     bore = math.pi * (spec.BORE_DIA / 2.0) ** 2 * spec.LENGTH
     assert (body, body + head, body + head - bore) == pytest.approx(
-        (13393.2, 13915.6, 8155.1), abs=0.05
+        (12974.7, 13497.0, 7916.6), abs=0.05
     )
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "depth=BORE_CUT_DEPTH, both_directions=True" in source

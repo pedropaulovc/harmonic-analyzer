@@ -76,8 +76,10 @@ from cone_pivot_post_spec import (
     CRANK_BORE_HEIGHT,
     CRANK_BOSS_END_Z,
     CRANK_BOSS_START_Z,
+    CRANK_SPOT_FACE_RUN_OUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    HEAD_DIA,
     GEOMETRIC_CONTROLS,
     INCLINE_DEG,
     PART_DATUMS,
@@ -188,6 +190,28 @@ FRONT_KEEP = {
     # x=0.155 the two sat 4.15 mm apart, under one text height (r7 audit).
     "CrankBoreDia": (0.149, 0.172),
 }
+# The spot face and its run-out flat are on the post's NORTH face, behind the
+# elevation (which looks at the crank boss's far end).  A half-scale rear view
+# shows them face-on in the free band between the plan's hole callout and
+# section A-A, above View B: the flat's width over the top face, its length
+# from the crank axis on the right.
+REAR_SCALE = (1, 2)
+_R = REAR_SCALE[0] / REAR_SCALE[1] / 1000.0
+REAR_CENTER = (0.2245, 0.2254)
+REAR_LABEL_XY = (REAR_CENTER[0], REAR_CENTER[1] - (BLOCK_HEIGHT / 2.0) * _R - 0.006)
+
+
+def _rear_y(model_y: float) -> float:
+    return REAR_CENTER[1] + (model_y - BLOCK_HEIGHT / 2.0) * _R
+
+
+REAR_KEEP = {
+    "SpotFaceWidth": (REAR_CENTER[0], _rear_y(BLOCK_HEIGHT) + 0.007),
+    "SpotFaceRunOut": (
+        REAR_CENTER[0] + (HEAD_DIA / 2.0) * _R + 0.009,
+        _rear_y(CRANK_BORE_HEIGHT - CRANK_SPOT_FACE_RUN_OUT / 2.0),
+    ),
+}
 # The Ø44 collar is dimensioned on its true-shape plan circle, not across the
 # elevation: there its dimension line sat directly under the crank-bore size
 # and finish leaders, which both had to cross it to reach the bore.  The text
@@ -242,6 +266,7 @@ JOURNAL_TEXT_OFFSETS = {
 DIMENSION_CALLOUTS = {
     "HeadDia": "COLLAR",
     "CrankBossDia": "CRANK BOSS",
+    "SpotFaceWidth": "SPOTFACE RUN-OUT",
     "CrankBossLen": "CRANK BOSS LENGTH",
     "CrankBoreDia": "CRANK BORE THRU",
     "JournalBoreDia": "CONE BORE THRU",
@@ -950,6 +975,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _configure_section_caption(drawing_model)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
+    rear = place_view(adapter, str(SOURCE), "*Back", *REAR_CENTER, scale=REAR_SCALE)
     section = create_section_view(
         adapter,
         front,
@@ -964,7 +990,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The named journal view looks exactly down the inclined model axis.  Unlike
     # the bore-plane section, it retains the uncut boss end face, so its Ø17.2
     # OD and Ø12.281 bore are two visible concentric circles with clear leaders.
-    for view in (front, top, journal, section):
+    for view in (front, top, journal, section, rear):
         set_hidden_lines_removed(adapter, view)
     _assert_view_geometry(
         adapter,
@@ -1003,11 +1029,19 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="cone boss bore-plane section",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    rear_annotations = curate_view_dimensions(
+        adapter,
+        rear,
+        keep=REAR_KEEP,
+        view_label="rear",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     annotations = [
         *front_annotations,
         *top_annotations,
         *journal_annotations,
         *section_annotations,
+        *rear_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     crank_height = [
@@ -1038,12 +1072,12 @@ async def build(adapter: Any) -> dict[str, str]:
     # The plan must retain JournalPlanReference: its two native centreline rays
     # and imported dimensions carry the spotface station and 12.52-degree bore
     # azimuth.  Other projections have no use for that witness geometry.
-    for view in (front, journal, iso):
+    for view in (front, journal, iso, rear):
         _hide_witness_sketch(adapter, view, "JournalPlanReference")
     # The cone-axis view keeps BoreSpacingReference: its centreline joins the
     # two bore centres and carries the spacing.  Elsewhere it only doubles the
     # post axis.
-    for view in (front, top, iso):
+    for view in (front, top, iso, rear):
         _hide_witness_sketch(adapter, view, "BoreSpacingReference")
     for view, label in ((front, "front"), (top, "top"), (journal, "cone journal")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
@@ -1196,6 +1230,7 @@ async def build(adapter: Any) -> dict[str, str]:
         0.202,
         0.104,
     )
+    add_note(adapter, "REAR VIEW, SCALE 1:2", *REAR_LABEL_XY)
     # Rule 6 caps the block at four lines (about 18 mm); the anchor keeps the
     # r7 clearance to the bottom inner border.
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_ANCHOR)
@@ -1206,6 +1241,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, top)
     set_hidden_lines_removed(adapter, journal)
     set_hidden_lines_removed(adapter, section)
+    set_hidden_lines_removed(adapter, rear)
     rebuild_drawing(adapter, label="final cone pivot post native layout")
     _show_section_scale_in_caption(adapter, section)
     _assert_native_layout(

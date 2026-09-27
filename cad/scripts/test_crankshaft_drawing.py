@@ -102,7 +102,13 @@ def test_face_shift_preserves_every_inboard_world_station() -> None:
     assert spec.SHAFT_LENGTH == pytest.approx(136.8)
     assert pinion.SHAFT_END_RECESS_MIN <= spec.SHAFT_END_RECESS <= pinion.SHAFT_END_RECESS_MAX
     assert part.SEAT_PINION == spec.SEAT_PINION
-    assert -183.0 + spec.POST_BORE_END == pytest.approx(-70.210494428)
+    # The bushing's north end is flush with MHA-016's spot face, which stands
+    # its retreat south of the harvested station (world z -70.210494428).
+    import cone_pivot_post_spec as post
+
+    assert -183.0 + spec.POST_BORE_END == pytest.approx(
+        -70.210494428 - post.CRANK_SPOT_FACE_RETREAT
+    )
     assert part.SEAT_T12 == pytest.approx(25.5)
     assert part.SEAT_PINION == pytest.approx(113.039505572)
     assert not hasattr(part, "SEAT_ARM")
@@ -217,9 +223,10 @@ def test_the_core_runs_in_the_bushing_with_one_finish() -> None:
     assert len(spec.SURFACE_FINISHES) == 1
     assert spec.SURFACE_FINISHES[0].key == "bearing_core"
     assert spec.SURFACE_FINISHES[0].face.diameter_mm == spec.SHAFT_DIA
-    # The seat step stays at the bushing's north end, never south of the
-    # bushing's last 1 mm.
-    assert spec.POST_BORE_END - 1.0 < spec.SEAT_STEP <= spec.POST_BORE_END
+    # The seat step is never south of the bushing's last 1 mm, so the core runs
+    # the bushing's length; since the spot face's retreat it stands north of
+    # the bushing, still south of the 16T's seat.
+    assert spec.POST_BORE_END - 1.0 < spec.SEAT_STEP < part.SEAT_PINION
 
 
 def test_view_scales_and_linked_notes_are_explicit() -> None:

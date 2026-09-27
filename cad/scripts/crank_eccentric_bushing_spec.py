@@ -45,12 +45,15 @@ ECCENTRICITY_BAND = (0.025, -0.025)  # (upper, lower)
 # grip, not a stop, so the bore's direction never depends on how square that
 # face is.  The overall and head lengths print at .XX so the stand-off holds
 # with the boss length at its .X row (the offline test takes that worst case).
-POST_BORE_LENGTH = 72.0  # MHA-016's crank boss, CRANK_BOSS_LENGTH at .X
+# The boss is 2.5 shorter than it was harvested (its spot face retreated from
+# the 64T, cone_pivot_post_spec CRANK_SPOT_FACE_RETREAT); its south face did
+# not move, so neither does the head: the bushing is 2.5 shorter with it.
+POST_BORE_LENGTH = 69.5  # MHA-016's crank boss, CRANK_BOSS_LENGTH at .X
 HEAD_STANDOFF = 2.0
 HEAD_LENGTH = 6.0
 HEAD_DIA = 18.0
 SOUTH_PROTRUSION = HEAD_STANDOFF + HEAD_LENGTH
-LENGTH = POST_BORE_LENGTH + SOUTH_PROTRUSION  # 80.0
+LENGTH = POST_BORE_LENGTH + SOUTH_PROTRUSION  # 77.5
 # Two wrench flats on the head, square to the throw so the throw never thins
 # the wall under a flat; 16 across flats takes a stock open-end wrench.
 # Across-flats prints at .XX: the wrench only needs the flats parallel.  The

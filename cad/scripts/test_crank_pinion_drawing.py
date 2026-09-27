@@ -617,7 +617,10 @@ def test_w15_boss_hides_the_shaft_end_and_walls_the_pin_at_every_limit() -> None
     # #906 moved the 1.0 upper end into the spec; the value is unchanged, so
     # sourcing it there left the BDT stacks value-neutral.
     assert spec.SEAT_GAP_MAX_MM == 1.0
-    assert bdt.PINION_BOSS_NORTH_GAP_RANGE == (spec.SEAT_FEELER_MM, 1.0)
+    # ... measured past the spot face's retreat from the 64T, which the
+    # fitter's feeler stack adds (MHA-A03 step 4).
+    retreat = bdt.POST_SPOT_FACE_RETREAT
+    assert bdt.PINION_BOSS_NORTH_GAP_RANGE == (retreat + spec.SEAT_FEELER_MM, retreat + 1.0)
     assert not hasattr(bdt, "PINION_BOSS_NORTH_GAP_BAND")
     recess = bdt.PINION_RECESS_STACK
     assert recess == {
