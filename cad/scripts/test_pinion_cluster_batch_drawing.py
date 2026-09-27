@@ -317,16 +317,28 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
 def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     threaded_by_assembly = {
         "drive-train": {
-            # Rule-12 E11: 94025A164 #10-32 in the #21 tap drill, 9.5 deep.
-            frozenset(("cone-tip-adjuster-1", "cone-tip-block-1")): _annulus_limit(
-                4.826, 4.0386, 9.5
-            ),
-            # Rule-12 E1: 90280A110 (12.7), 6.47 scaled by far-jaw engagement.
-            frozenset(("cone-tip-pinch-screw-1", "cone-tip-block-1")): 15.73,
+            # mha092-r3-8b1b drive-train leaf: 16.4412 and 7.8008 observed,
+            # plus ten percent.
+            frozenset(("cone-tip-adjuster-1", "cone-tip-block-1")): 18.08532,
+            frozenset(("cone-tip-pinch-screw-1", "cone-tip-block-1")): 8.58088,
             # 1/16 in tip land: 0.13 observed at Ø0.79, scaled by r^3 (x8).
             frozenset(("cone-tip-adjuster-1", "cone-gear-shaft-1")): 1.144,
             frozenset(("fillister-screw-1", "crank-arm-1")): _annulus_limit(
                 2.8448, 2.261, 5.33
+            ),
+            # I31: MHA-140 #6-32 through the MHA-146 locknut's #36 bore,
+            # 11/64 high (the first build's observation replaces this bound).
+            frozenset(("cone-tip-block-screw-1", "cone-tip-block-nut-1")): _annulus_limit(
+                3.505, 2.705, 11.0 / 64.0 * 25.4
+            ),
+            # U30 I22: each MHA-142 1/4-20 in its #7 MHA-091 tap, 6.0198 deep.
+            **_expected_numbered_pairs(
+                "post-mount-screw",
+                (1, 2),
+                "cone-swing-platform",
+                6.35,
+                5.105,
+                6.0198,
             ),
             # R1: MHA-058 is a bonded slip fit modelled line to line in the
             # MHA-102 cross-hole, so the pair needs no interference allowance.

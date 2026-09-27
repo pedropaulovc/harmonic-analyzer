@@ -651,6 +651,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="cone_tip_block_nut",
+        part="cone_tip_block_nut",
+        artifact_stem="cone-tip-block-nut",
+        script_name="draw_cone_tip_block_nut.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="cone_tip_block_screw",
         part="cone_tip_block_screw",
         artifact_stem="cone-tip-block-screw",

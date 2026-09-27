@@ -604,7 +604,7 @@ sections:
         - 'manual height rederivation from ch30 Eight Views station 2 (references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png); proportions from ch11 references/albert-michelsons-harmonic-analyzer/ch11_images/page002_img05.jpeg and page002_img06.jpeg; collar Ø44.0 measured from the cast/turned seam in ch11 page002_img04/05/06 and ch30 page003_img01 (`cad/scripts/cone_pivot_post_spec.py` HEAD_DIA); other feature dimensions harvested from cone-pivot-post-v2.SLDPRT'
         - 'med (86 mm height, proportions and Ø44.0 as-cast collar photo-derived; other v2 feature dimensions exact)'
       - - '`cone-tip-block` (adjuster carrier + end-play lock, on the plate — GT cone_back realized)'
-        - 'black steel block 15 × 12 × 46.83 tall on a 1.10 nominal fit-up shim pack; #10-32 UNF-2B thread tapped THROUGH on the cone axis 32.27 above the foot, with a 90° countersink to Ø5.0 at both ends (rule-12 E11/W1), carrying the cup-ended cone-tip-adjuster from the north face while the shaft tip enters from the south; 1.2-wide top slit with its floor 0.65 below the axis, crossed by a #4-40 pinch joint 8.85 above the axis (McMaster 90280A110, Ø3.264 normal-clearance near jaw). Every web keeps 2.0 at the printed title-block and hole bands.'
+        - 'black steel block 17 × 12 × 46.83 tall on a 1.10 nominal fit-up shim pack; #10-32 UNF-2B thread tapped THROUGH on the cone axis 32.27 above the foot, with a 90° countersink to Ø5.0 at both ends (rule-12 E11/W1), carrying the cup-ended cone-tip-adjuster from the north face while the shaft tip enters from the south; 1.2-wide top slit with its floor 0.65 below the axis, crossed by a #4-40 pinch joint 41.12 above the foot, 8.85 over the axis (McMaster 91794A112; its Ø3.264 normal-clearance near jaw is drilled to the slot, the far jaw tapped through to it; the axis and the flange slot print from the -X face, the pinch screw''s far side). A south foot flange (20.8 × 3.50) carries the hold-down slot, its arc centres 6.5 and 14.9 from the body''s south face. Every web keeps 2.0 at the printed title-block and hole bands.'
         - 'centre (−90.067, +85.281) = cone shaft station 141.272, standing ON the swing platform beside T006; at the 9.5 mm fit-up adjuster engagement (working window 7.72..10.72), the shaft tip contacts the McMaster 94025A164 conical cup apex at station 138.9788259477.'
         - 'ch30 GT (cone_back); p.18 tip clamp + v4_t00471 (7:49 full tip-stack geometry); 2026-09-21 user-approved DFM correction grows only the block top and controls the pinch axis relative to the unchanged adjuster axis'
         - med (GT-anchored)
@@ -634,9 +634,9 @@ sections:
         - v4_t00471 / 7:49 (t00147: hollow slotted screw the cone shaft rests in)
         - med (role high, dims low)
       - - '`cone-tip-pinch-screw` (locks the adjuster)'
-        - 'McMaster-Carr 90280A110 steel narrow fillister-head slotted screw: head Ø4.6482 × 2.7178, #4-40 shank Ø2.8448 × 12.7 (rule-12 E1: 1.77D far-jaw engagement at the printed worst case).'
+        - 'McMaster-Carr 91794A112 18-8 stainless fillister-head slotted screw: head Ø4.6482 × 2.7178, #4-40 shank Ø2.8448 × 15.875 (rule-12 E1: 5.21 = 1.83D of far-jaw thread, from the slit''s far wall, at the printed worst case; tip 0.325 inside the -X face at the width minimum).'
         - 'across the tip block''s top slit (head on the east face, y 110.35): the near jaw is normal-clearance and the far jaw is native #4-40 UNC-2B; tightening pinches the slit closed around the #10-32 adjuster so its end-play setting cannot back off.'
-        - McMaster-Carr 90280A110 recipe + v4_t00471 / 7:49 (small perpendicular screw at the block top)
+        - McMaster-Carr 91794A112 recipe + v4_t00471 / 7:49 (small perpendicular screw at the block top)
         - high (stock dimensions exact; function photo-derived)
   - prose: |2
 
