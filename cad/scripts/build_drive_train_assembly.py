@@ -3072,6 +3072,13 @@ def _cone_copy_fault_forensics(adapter, model, faulted: list[str]) -> None:
             _telemetry.warn(f"cone forensics: {label} raised {exc!r}")
             return None
 
+    def wrong(label, doc):
+        """What's Wrong of ``doc`` as a log fragment; 'unreadable' if it raised."""
+        faults = probe(f"whats_wrong {label}", lambda: whats_wrong(adapter, doc))
+        if faults is None:
+            return "unreadable"
+        return faults or "clean"
+
     asm = _early_bound(model, "IAssemblyDoc")
     part_doc = None
     by_config: dict[str, str] = {}
@@ -3124,7 +3131,7 @@ def _cone_copy_fault_forensics(adapter, model, faulted: list[str]) -> None:
     ]
     _telemetry.warn(
         f"cone forensics: part {probe('title', part_doc.GetTitle)} active={active} "
-        f"stale={stale or 'none'} whats_wrong={whats_wrong(adapter, part_doc) or 'clean'}"
+        f"stale={stale or 'none'} whats_wrong={wrong('part', part_doc)}"
     )
     # Each swapped configuration in the part itself: What's Wrong as loaded,
     # after a plain EditRebuild3, and after ForceRebuild3.  A fault only in
@@ -3132,27 +3139,28 @@ def _cone_copy_fault_forensics(adapter, model, faulted: list[str]) -> None:
     # rebuild is a configuration that cannot regenerate.
     for cfg in sorted(set(by_config.values())):
         shown = probe(f"ShowConfiguration2({cfg})", lambda c=cfg: part_doc.ShowConfiguration2(c))
-        loaded = whats_wrong(adapter, part_doc)
+        loaded = wrong(f"{cfg} loaded", part_doc)
         edited = probe(f"{cfg} EditRebuild3", part_doc.EditRebuild3)
-        after_edit = whats_wrong(adapter, part_doc)
+        after_edit = wrong(f"{cfg} after EditRebuild3", part_doc)
         forced = probe(f"{cfg} ForceRebuild3", lambda: part_doc.ForceRebuild3(False))
-        after_force = whats_wrong(adapter, part_doc)
+        after_force = wrong(f"{cfg} after ForceRebuild3", part_doc)
         _telemetry.warn(
-            f"cone forensics: part in {cfg}: shown={shown!r} "
-            f"loaded={loaded or 'clean'} edit={edited!r}->{after_edit or 'clean'} "
-            f"force={forced!r}->{after_force or 'clean'}"
+            f"cone forensics: part in {cfg}: shown={shown!r} loaded={loaded} "
+            f"edit={edited!r}->{after_edit} force={forced!r}->{after_force}"
         )
     if active:
         probe(f"restore {active}", lambda: part_doc.ShowConfiguration2(active))
     again = probe("assembly EditRebuild3 retry", lambda: model.EditRebuild3())
-    still = [
-        f"{name} [code={code}]"
-        for name, code, warning in whats_wrong(adapter, model)
-        if not warning
-    ]
+    retry = probe("whats_wrong assembly retry", lambda: whats_wrong(adapter, model))
+    still = (
+        "unreadable"
+        if retry is None
+        else [f"{name} [code={code}]" for name, code, warning in retry if not warning]
+        or "none"
+    )
     _telemetry.warn(
         f"cone forensics: assembly retry after rebuilding each configuration in "
-        f"the part: rebuilt={again!r} hard faults={still or 'none'}"
+        f"the part: rebuilt={again!r} hard faults={still}"
     )
 
 
@@ -4444,9 +4452,14 @@ async def build(adapter) -> dict[str, str]:
             warnings = [
                 f"{name} [code={code}]" for name, code, warning in faults if warning
             ]
-            _cone_copy_fault_forensics(
-                adapter, model, [name for name, _code, warning in faults if not warning]
-            )
+            try:
+                _cone_copy_fault_forensics(
+                    adapter,
+                    model,
+                    [name for name, _code, warning in faults if not warning],
+                )
+            except Exception as exc:  # noqa: BLE001 - never mask the rebuild fault
+                _telemetry.warn(f"cone forensics aborted: {exc!r}")
             _telemetry.error(
                 "cone-gear replication rebuild rejected",
                 rebuild_result=repr(rebuilt),
