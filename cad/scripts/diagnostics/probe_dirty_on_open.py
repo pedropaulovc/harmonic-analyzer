@@ -27,14 +27,10 @@ import _telemetry  # noqa: E402
 
 import win32com.client  # noqa: E402
 
-from _common import _early_bound  # noqa: E402
+# The one swFeatureError_e table: a private copy here is how code 1 came to
+# read "warning".
+from _common import _FEATURE_ERROR, _early_bound  # noqa: E402
 from solidworks_mcp.adapters import sw_type_info  # noqa: E402
-
-_FEATURE_ERROR = {
-    0: "none", 1: "warning", 2: "rebuild-error", 3: "dangling-no-members",
-    4: "dangling-has-members", 5: "sketch-overdefined", 6: "sketch-nosolution",
-    7: "sketch-overdefined-dangling",
-}
 
 
 def whats_wrong(model):
