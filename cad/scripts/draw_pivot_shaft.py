@@ -87,6 +87,21 @@ SHOULDER_TOP_Y = PROFILE_CENTER[1] + SHOULDER_DIA * _MM / 2.0
 ISO_CENTER = (0.330, 0.175)
 ISO_SCALE = (1, 2)
 
+# A short dimension's callout is far wider than the span it measures, so its
+# text stands OUTSIDE the witness pair, clear of both lines, and the dimension
+# line runs out under it: centred between them, both witnesses crossed "1.5
+# BOTH ENDS" and "2.0 BOTH SHOULDER FACES" (r743-3 eye pass). Callout text
+# runs ~2.75 mm a character at the template's dimension height (r743-3 render:
+# "BOTH ENDS" 24.5 mm, "BOTH SHOULDER FACES" 52 mm).
+CALLOUT_CHAR_WIDTH = 0.00275
+CALLOUT_WITNESS_GAP = 0.003
+
+
+def _left_of_witness(witness_x: float, callout: str) -> float:
+    """Text centre x that ends a callout CALLOUT_WITNESS_GAP left of a witness."""
+    return witness_x - CALLOUT_WITNESS_GAP - len(callout) * CALLOUT_CHAR_WIDTH / 2.0
+
+
 PROFILE_KEEP = {
     # Under the bar, centred: the REF span the cut-to-fit callout governs.
     "ShaftLength": (PROFILE_CENTER[0], 0.158),
@@ -98,9 +113,13 @@ PROFILE_KEEP = {
     # shoulder, each over the feature it spans.
     "JournalLength": ((NORTH_END_X + SHOULDER_X[0]) / 2.0, 0.210),
     "ShoulderLength": ((SHOULDER_X[0] + SHOULDER_X[1]) / 2.0, 0.226),
-    # Under the north dome: a short .X height the "BOTH ENDS" callout makes
-    # a 2X statement.
-    "DomeHeight": (NORTH_END_X - DOME_HEIGHT * _MM / 2.0, 0.172),
+    # Under the north dome, left of the dome tip's witness: a short .X height
+    # the "BOTH ENDS" callout makes a 2X statement. Its top stays under the
+    # O10.00 dimension's lower arrow.
+    "DomeHeight": (
+        _left_of_witness(NORTH_END_X - DOME_HEIGHT * _MM, DOME_CALLOUT),
+        0.172,
+    ),
 }
 # Ra on the two running faces: the body the 20 hubs rock on, and the north
 # journal in its ear. A revolved flank is a drawing SILHOUETTE, not a model
@@ -140,9 +159,10 @@ def _detail_x(z_mm: float) -> float:
 
 
 DETAIL_KEEP = {
-    # Over the north groove, above the fence.
+    # Above the fence, left of the north groove's outer witness; the Ra
+    # symbol takes the air on the right.
     "ReliefWidth": (
-        _detail_x(-(JOURNAL_LENGTH - RELIEF_WIDTH / 2.0)),
+        _left_of_witness(_detail_x(-(JOURNAL_LENGTH - RELIEF_WIDTH)), RELIEF_CALLOUT),
         DETAIL_CENTER[1] + 0.037,
     ),
     # Left of the fence, on the axis: the diameter's line runs through the

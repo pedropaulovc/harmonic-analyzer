@@ -6,6 +6,8 @@ import math
 import re
 from pathlib import Path
 
+import pytest
+
 import _config
 import _fit_limits
 import build_pivot_shaft as part
@@ -305,3 +307,50 @@ def test_detail_annotations_keep_off_the_fence_and_each_other() -> None:
     dia_x, dia_y = drawing.DETAIL_KEEP["ReliefDia"]
     fence_left = cx - math.sqrt(radius**2 - (dia_y - cy) ** 2)
     assert dia_x + RELIEF_CALLOUT_HALF_WIDTH < fence_left
+
+
+# Measured on the r743-3 render: "BOTH ENDS" runs 24.5 mm, centred on its
+# dimension text like the relief callouts; the values above them are shorter.
+DOME_CALLOUT_HALF_WIDTH = 0.01225
+# Witness lines are hairlines; the text must clear them by a visible gap.
+CALLOUT_WITNESS_CLEARANCE = 0.002
+
+
+def _stands_outside(text_x: float, half_width: float, witnesses: tuple) -> bool:
+    left, right = text_x - half_width, text_x + half_width
+    return (
+        right + CALLOUT_WITNESS_CLEARANCE <= min(witnesses)
+        or left - CALLOUT_WITNESS_CLEARANCE >= max(witnesses)
+    )
+
+
+def test_dome_height_callout_stands_outside_its_witness_pair() -> None:
+    """r743-3 eye pass: centred on its 1.5 mm span, "1.5 BOTH ENDS" was
+    crossed by both witness lines. It now ends left of the dome tip, clear
+    of the shaft-length witness there too."""
+    witnesses = (
+        drawing.NORTH_END_X - spec.DOME_HEIGHT * drawing._MM,  # dome tip
+        drawing.NORTH_END_X,  # shaft end
+    )
+    text_x, _ = drawing.PROFILE_KEEP["DomeHeight"]
+    assert _stands_outside(text_x, DOME_CALLOUT_HALF_WIDTH, witnesses)
+    assert text_x < min(witnesses)
+    # Still inside the sheet's left border.
+    assert text_x - DOME_CALLOUT_HALF_WIDTH > 0.02
+
+
+def test_relief_width_callout_stands_outside_its_witness_pair() -> None:
+    """r743-3 eye pass: centred on the 2.0 groove, "2.0 BOTH SHOULDER FACES"
+    was crossed by both witness lines. It now ends left of the groove's
+    outer witness, and stays above the detail fence."""
+    scale = drawing.DETAIL_SCALE[0] / 1000.0
+    witnesses = (
+        drawing._detail_x(-(spec.JOURNAL_LENGTH - spec.RELIEF_WIDTH)),
+        drawing._detail_x(-spec.JOURNAL_LENGTH),
+    )
+    assert witnesses[1] - witnesses[0] == pytest.approx(spec.RELIEF_WIDTH * scale)
+    text_x, text_y = drawing.DETAIL_KEEP["ReliefWidth"]
+    assert _stands_outside(text_x, RELIEF_CALLOUT_HALF_WIDTH, witnesses)
+    assert text_x < min(witnesses)
+    fence_top = drawing.DETAIL_CENTER[1] + drawing.DETAIL_RADIUS_MM * scale
+    assert text_y > fence_top
