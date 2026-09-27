@@ -241,14 +241,20 @@ def _kink_adapter():
     return type("Adapter", (), {"currentModel": _KinkModel()})()
 
 
+def _crop_kink(adapter, monkeypatch, view: _KinkView) -> list[tuple]:
+    log = _kink_seat(monkeypatch, view)
+    assert drawing._placed_kink_view(adapter) is view
+    drawing._crop_kink_view(adapter, view)
+    return log
+
+
 def test_kink_detail_is_a_cropped_front_model_view(monkeypatch) -> None:
     # pc-r13 (leaf 20260927T001822Z-1-ba1f4546): the native detail's
     # targeted import brought KinkR but not FlatLen.  Detail A is now a *Front
     # model view at 5:1, its kink focus moved onto DETAIL_CENTER, cropped by
     # the fence's 5:1 circle with a plain circular outline.
     view = _KinkView()
-    log = _kink_seat(monkeypatch, view)
-    assert drawing._cropped_kink_view(_kink_adapter()) is view
+    log = _crop_kink(_kink_adapter(), monkeypatch, view)
     assert log[0] == ("place", "*Front", drawing.DETAIL_CENTER, drawing.DETAIL_SCALE)
     kind, center, radius, add_to_db = log[1]
     assert kind == "circle" and not add_to_db
@@ -258,6 +264,21 @@ def test_kink_detail_is_a_cropped_front_model_view(monkeypatch) -> None:
     assert "Crop2(False, False, 1)" in view.calls
     assert not hasattr(drawing, "_kink_detail")
     assert "CreateDetailViewAt4" not in Path(drawing.__file__).read_text(encoding="utf-8")
+
+
+def test_kink_detail_is_dimensioned_before_it_is_cropped() -> None:
+    # pc-r14 (6aebefd18, leaf 20260927T005429Z-1-555a9662): imported into the
+    # cropped view, SpringProfile brought FlatLen but not KinkR; the uncropped
+    # *Front imports both.  The detail is placed, curated, then cropped, and
+    # the build checks the pair survived the crop.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build(") :]
+    placed = body.index("_placed_kink_view(adapter)")
+    curated = body.index("keep=DETAIL_KEEP")
+    cropped = body.index("_crop_kink_view(adapter, detail)")
+    front = body.index("keep=FRONT_KEEP")
+    assert placed < curated < cropped < front
+    assert "to its crop" in body[cropped:front]
 
 
 @pytest.mark.parametrize(
@@ -272,9 +293,8 @@ def test_kink_detail_fails_loud_when_the_seat_does_not_obey(
     monkeypatch, kwargs, message
 ) -> None:
     view = _KinkView(**kwargs)
-    _kink_seat(monkeypatch, view)
     with pytest.raises(RuntimeError, match=message):
-        drawing._cropped_kink_view(_kink_adapter())
+        _crop_kink(_kink_adapter(), monkeypatch, view)
 
 
 def test_kink_crop_holds_its_dimensions_and_labels_clear_of_them() -> None:
