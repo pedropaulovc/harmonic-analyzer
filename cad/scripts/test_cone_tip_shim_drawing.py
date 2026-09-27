@@ -141,9 +141,15 @@ def test_the_only_general_note_is_the_fit_up_pointer() -> None:
     """Stock is the material spec, blackening the finish, and the stack
     range rides the thickness dimension (rule 1); the one note line points
     at the MHA-A03 step that fits the pack (Codex P2 on #857)."""
-    pointer = steps.step_ref(spec.FIT_UP_STEP)
-    assert spec.MANUFACTURING_NOTES == f"STACK SET AT ASSEMBLY, {pointer}."
-    assert not re.search(r"\d", spec.MANUFACTURING_NOTES.replace(pointer, ""))
+    pointer = steps.step_ref(drawing.FIT_UP_STEP)
+    assert drawing.PRINTED_MANUFACTURING_NOTE == f"STACK SET AT ASSEMBLY, {pointer}."
+    assert not re.search(r"\d", drawing.PRINTED_MANUFACTURING_NOTE.replace(pointer, ""))
+    # The part carries the note without the pointer; the sheet links it and
+    # appends the pointer, so the part never reads the step registry.
+    assert spec.MANUFACTURING_NOTES == "STACK SET AT ASSEMBLY"
+    assert drawing.MANUFACTURING_NOTE == (
+        f'$PRPSHEET:"Manufacturing Notes", {pointer}.'
+    )
     # The note clears the stack text below it.
     assert drawing.THICKNESS_TEXT[1] + 0.006 < drawing.NOTES_XY[1] - 0.008
 

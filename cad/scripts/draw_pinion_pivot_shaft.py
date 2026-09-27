@@ -38,6 +38,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
+from drive_train_steps import step_ref
 from pinion_pivot_shaft_spec import (
     CAP_RADIUS,
     CAP_SAG,
@@ -93,10 +94,13 @@ RIGHT_KEEP = {
     # and the Ra flag, its leader dropping to the left-hand hole.
     "PinHoleDia": (0.125, 0.241),
 }
+# The holes are drilled at MHA-A03's SHAFT DRILL SET, so the callout points
+# at that step through the registry (Codex #858, PRRT_kwDOPHDy386mTbPB).
+SHAFT_DRILL_STEP_KEY = "straps-pinned-to-torque-shaft"
 DIMENSION_CALLOUTS = {
     "ShaftDia": "FINAL SIZE",
     "Depth": "CYLINDRICAL BODY\nBETWEEN CROWN ROOT CIRCLES",
-    "PinHoleDia": PIN_HOLE_CALLOUT,
+    "PinHoleDia": f"{PIN_HOLE_CALLOUT},\nPER {step_ref(SHAFT_DRILL_STEP_KEY)}",
 }
 
 

@@ -13,7 +13,6 @@ from __future__ import annotations
 from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
-from drive_train_steps import step_ref
 import pinion_strap_pin_spec as _strap_pin
 from pinion_rig_layout import (
     TORQUE_SHAFT_LEN,
@@ -62,15 +61,13 @@ PIN_HOLE_Z = TORQUE_SHAFT_PIN_HOLE_Z  # (front, back), pinion_rig_layout
 # and both bearing stacks assume is an assembly step: Main's re-ruling
 # (2026-09-26) moved it from this callout to MHA-A03's SHAFT DRILL SET
 # (pinion_rig_fitup.SHAFT_DRILL_STEP), where the fitter drills, superseding
-# the #858 restricted review's rulings 2 and 3.  The callout points at that
-# step through the assembly step registry, so a renumbered sequence carries
-# the pointer with it (Codex #858, PRRT_kwDOPHDy386mTbPB).
-SHAFT_DRILL_STEP_KEY = "straps-pinned-to-torque-shaft"
+# the #858 restricted review's rulings 2 and 3.  The drawing adds the
+# pointer to that step (draw_pinion_pivot_shaft): it is sheet text, so the
+# part never reads the assembly step registry.
 PIN_HOLE_CALLOUT = "\n".join(
     (
         "MATCH-DRILL THRU AT ASSEMBLY",
-        "IN MHA-056 CROSS HOLES, 2 PL,",
-        f"PER {step_ref(SHAFT_DRILL_STEP_KEY)}",
+        "IN MHA-056 CROSS HOLES, 2 PL",
     )
 )
 

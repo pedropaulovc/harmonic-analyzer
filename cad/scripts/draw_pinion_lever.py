@@ -36,6 +36,7 @@ from _drawing_common import (
 )
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_registry import DRAWINGS_BY_NAME
+from drive_train_steps import step_ref
 from pinion_lever_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -118,13 +119,15 @@ DETAIL_KEEP = {
     "BoreDepth": (DETAIL_CENTER[0] + 0.037, DETAIL_CENTER[1] - 0.048),
     "PinHoleDia": (DETAIL_CENTER[0] + 0.085, DETAIL_CENTER[1] + 0.008),
 }
+LEVER_PIN_SET_STEP_KEY = "lever-pin-set"
 DIMENSION_CALLOUTS = {
     "HubBore": f"BORE OR REAM\nSLIP ON {LIFT_ROD_NUMBER}",
     "BoreDepth": "FLAT BOTTOM",
     "EndWall": "TO CROWN ROOT",
     "RodTipY": "FROM HUB AXIS",
     "GripFromB": "GRIP AXIS",
-    "PinHoleDia": PIN_HOLE_CALLOUT,
+    # Drilled at MHA-A03's LEVER PIN SET; the pointer comes from the registry.
+    "PinHoleDia": f"{PIN_HOLE_CALLOUT},\nPER {step_ref(LEVER_PIN_SET_STEP_KEY)}",
 }
 
 

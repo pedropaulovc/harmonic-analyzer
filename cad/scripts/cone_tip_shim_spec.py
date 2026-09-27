@@ -37,7 +37,6 @@ from cone_tip_block_spec import (
     HEEL_RELIEF_DEPTH,
     SHIM_NOMINAL,
 )
-from drive_train_steps import step_ref
 
 SHIM_X = BLOCK_X
 # I31 (Main, 2026-09-25): the block's north-bottom heel is relieved for the
@@ -162,8 +161,8 @@ THICKNESS_TEXT_PREFIX = (
 )
 THICKNESS_TEXT_SUFFIX = " NOM)"
 
-# The MHA-A03 step that stacks the pack under the tip block at fit-up.  The
-# sheet cites it through the registry, so a renumbered sequence carries the
-# pointer with it.
-FIT_UP_STEP = "post-and-tip-block"
-MANUFACTURING_NOTES = f"STACK SET AT ASSEMBLY, {step_ref(FIT_UP_STEP)}."
+# The part's note property.  The sheet appends the pointer to the MHA-A03
+# step that stacks the pack (draw_cone_tip_shim), from the step registry: a
+# pointer is sheet text, so renumbering the sequence never re-keys the part
+# (Main's TbPB ruling 2, 2026-09-27; test_part_isolation).
+MANUFACTURING_NOTES = "STACK SET AT ASSEMBLY"

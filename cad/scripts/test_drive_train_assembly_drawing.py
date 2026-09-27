@@ -319,12 +319,18 @@ def test_the_rig_steps_print_the_fitup_sequence_once_in_order() -> None:
     first = steps.SEQUENCE.index("arbor-collar-pinned") + 1
     assert printed == list(range(first, len(steps.SEQUENCE) + 1))
     assert "PENDING" not in RIG_STEPS
-    # MHA-062's callout points at the step that drills it.
-    import pinion_pivot_shaft_spec as shaft
+    # Each match-drilled pin hole's callout points at the step that drills it.
+    import draw_pinion_lever as lever
+    import draw_pinion_lift_rod as lift_rod
+    import draw_pinion_pivot_shaft as shaft
 
-    pointer = steps.step_ref(shaft.SHAFT_DRILL_STEP_KEY)
-    assert pointer in _flat(shaft.PIN_HOLE_CALLOUT)
-    assert fitup.SHAFT_DRILL_NAME in _rig_step_body(shaft.SHAFT_DRILL_STEP_KEY)
+    for sheet, key, name in (
+        (shaft, shaft.SHAFT_DRILL_STEP_KEY, fitup.SHAFT_DRILL_NAME),
+        (lever, lever.LEVER_PIN_SET_STEP_KEY, "LEVER PIN SET"),
+        (lift_rod, lift_rod.LEVER_PIN_SET_STEP_KEY, "LEVER PIN SET"),
+    ):
+        assert steps.step_ref(key) in _flat(sheet.DIMENSION_CALLOUTS["PinHoleDia"])
+        assert name in _rig_step_body(key)
 
 
 def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:

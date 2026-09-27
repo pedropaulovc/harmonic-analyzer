@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-import cone_tip_shim_spec as shim
+import draw_cone_tip_shim as shim
 import draw_drive_train_assembly as drawing
 import drive_train_steps as steps
 import pinion_rig_tip_gap as tip_gap
@@ -95,7 +95,7 @@ def _cited_keys(notes: str) -> list[str]:
 def test_the_shim_sheet_points_at_the_step_that_fits_the_shim_pack() -> None:
     """Codex P2 on #857: MHA-141 dropped its leaf-fitting note for MHA-A03's
     fit-up step, so its sheet must carry a generated pointer to that step."""
-    cited = _cited_keys(shim.MANUFACTURING_NOTES)
+    cited = _cited_keys(shim.PRINTED_MANUFACTURING_NOTE)
     assert cited == [key for key in steps.SEQUENCE if "MHA-141" in _step_body(key)]
     assert len(cited) == 1
     assert "SHIM" in _step_body(cited[0])
