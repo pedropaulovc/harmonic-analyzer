@@ -416,6 +416,7 @@ def _model_face_evidence(
     for name in (
         "CrankSprocketBoss",
         "CrankSpotFace",
+        "CrankSpotFaceRunOut",
         "CrankBore",
         "ConeShaftBoss",
         "ConeShaftBore",
@@ -481,6 +482,51 @@ def _hide_witness_sketch(adapter: Any, view: Any, sketch_name: str) -> None:
     rebuild_drawing(adapter, label=f"hide {sketch_name} in {name}")
     draw.ClearSelection2(True)
     _telemetry.info(f"drawing witness sketch blanked in view: {qualified}")
+
+
+def _plane_centres(
+    face_evidence: dict[str, list[tuple[str, tuple[float, ...]]]],
+    feature_name: str,
+    count: int,
+    *,
+    besides: tuple[tuple[float, float, float], ...] = (),
+) -> list[tuple[float, float, float]]:
+    """A feature's plane root points (model metres), all but ``besides``."""
+    centres = [
+        (values[3], values[4], values[5])
+        for kind, values in face_evidence[feature_name]
+        if kind == "plane" and (values[3], values[4], values[5]) not in besides
+    ]
+    if len(centres) != count:
+        raise RuntimeError(
+            f"{feature_name} has {len(centres)} BREP face centres, expected {count}"
+        )
+    return centres
+
+
+def _crank_face_centres(
+    face_evidence: dict[str, list[tuple[str, tuple[float, ...]]]],
+) -> list[tuple[float, float, float]]:
+    """The crank boss's spot face and far face, in that order.
+
+    The spot face is CrankSpotFace's one plane.  Without a run-out,
+    CrankSprocketBoss lists it too; the run-out flat's floor is coplanar with
+    it and merges into it, after which the boss lists only its far face.
+    Either way the boss has exactly one plane besides the spot face, and each
+    stands at its printed station.
+    """
+    (spot,) = _plane_centres(face_evidence, "CrankSpotFace", 1)
+    (far,) = _plane_centres(face_evidence, "CrankSprocketBoss", 1, besides=(spot,))
+    for label, centre, station in (
+        ("spot", spot, CRANK_BOSS_START_Z),
+        ("far", far, CRANK_BOSS_END_Z),
+    ):
+        if abs(centre[2] * 1000.0 - station) > 1e-3:
+            raise RuntimeError(
+                f"crank boss {label} face at z={centre[2] * 1000.0:.4f} mm, "
+                f"expected {station:.4f}"
+            )
+    return [spot, far]
 
 
 def _assert_view_geometry(
@@ -575,24 +621,9 @@ def _assert_view_geometry(
         f"ConeShaftBoss/ConeShaftBore at model Y={BORE_HEIGHT:.3f}mm; "
         f"top acute axis angle={acute:.6f} deg"
     )
-    def plane_centres(feature_name: str) -> list[tuple[float, float, float]]:
-        centres = [
-            (values[3], values[4], values[5])
-            for kind, values in face_evidence[feature_name]
-            if kind == "plane"
-        ]
-        if len(centres) != 2:
-            raise RuntimeError(
-                f"{feature_name} has {len(centres)} BREP face centres, expected two"
-            )
-        return centres
-
-    crank_face_centres = sorted(
-        plane_centres("CrankSprocketBoss"),
-        key=lambda point: point[2],
-    )
+    crank_face_centres = _crank_face_centres(face_evidence)
     cone_face_centres = sorted(
-        plane_centres("ConeShaftBoss"),
+        _plane_centres(face_evidence, "ConeShaftBoss", 2),
         key=lambda point: sum(point[i] * cone_axis[i] for i in range(3)),
     )
     iso_face_centres = {
