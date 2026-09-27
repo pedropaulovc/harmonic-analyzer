@@ -2,7 +2,8 @@ r"""Modified purchased cone pivot post mount screw: MSC 40923898, cut to length.
 
 Head up, under-head junction at the origin: the head seats on the MHA-016
 counterbore floor and the shank runs down through the post into the
-MHA-091 tap.  Modelled at the 86.0 cut-to-fit nominal (U37c).
+MHA-091 tap.  Modelled at the cut-to-fit nominal (U37c;
+post_mount_screw_spec.CUT_LENGTH_MM, 86.2: flush less half the allowance).
 
 The cut is the one modification, so the part owns its length: a hidden
 construction sketch whose single driving dimension is the cut length

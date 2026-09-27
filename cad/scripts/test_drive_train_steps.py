@@ -32,7 +32,7 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
 def test_a_key_resolves_to_its_position_and_prints_a_pointer() -> None:
     for index, key in enumerate(steps.SEQUENCE, start=1):
         assert steps.step_number(key) == index
-    assert steps.step_ref("rig-tip-gap-set") == "MHA-A03 STEP 19"
+    assert steps.step_ref("rig-tip-gap-set") == "MHA-A03 STEP 20"
     with pytest.raises(KeyError):
         steps.step_number("no-such-step")
 

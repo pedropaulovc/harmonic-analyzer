@@ -230,7 +230,7 @@ sections:
         - legacy
         - med
       - - Crankshaft bearing
-        - 'plain Ø9.525 core in the MHA-149 bushing; local stations 32.789505572..112.789505572 (world z −150.210494428..−70.210494428)'
+        - 'plain Ø9.525 core in the MHA-149 bushing; local stations 32.789505572..110.289505572 (world z −150.210494428..−72.710494428)'
         - —
         - '#906 R1: the integral Ø11.388 journal and its relief are gone; the core runs in the eccentric bushing''s Ø9.575 bore at the shaft_in_bushing clearance. The bushing''s north end is flush with the boss spot face; its south end stands 7.966 proud of the boss, the 6.0 grip head starting 1.966 off the boss''s south face.'
         - derived
@@ -350,7 +350,7 @@ sections:
         - derived
         - high
       - - Cone shaft diameter
-        - 'stepped from the front end: Ø12.2308 journal z 0–43.011; Ø9.525 (3/8") to 164.0684295852; Ø6.35 (1/4") to 170.9572174024; Ø3.175 (1/8") to 177.8460052197; Ø1.5875 (1/16") to 200.8856869456 (U40 S1: each small land one gear station toward the big end; each step centred in its air gap, 0.444 to both 6.0 gear faces)'
+        - 'stepped from the front end: Ø12.2308 journal z 0–43.011; Ø15.875 integral thrust collar (the 5/8 bar''s OD as supplied, #916) z 43.011–44.6922184176 (#914: bears on the post''s north boss face, the 64T soldered against it; the collar face is the print''s length origin); Ø9.525 (3/8") to 164.0684295852; Ø6.35 (1/4") to 170.9572174024; Ø3.175 (1/8") to 177.8460052197; Ø1.5875 (1/16") to 200.8856869456 (U40 S1: each small land one gear station toward the big end; each step centred in its air gap, 0.444 to both 6.0 gear faces)'
         - 12.2308/9.525/6.35/3.175/1.5875
         - 'The integral front journal is derived from the manually rederived `cone-pivot-post-v2` Ø12.2808 cone bore with 0.05 mm diametral running clearance. It spans the 42.011 post body plus 1.0 mm proud. Gear seats and world stations are unchanged; the terminal 1/16" endpoint is shortened 7.29350 mm to machine station 138.9788259477, the McMaster 94025A164 conical cup apex at 9.5 mm thread engagement (rule-12 E11). The 23.0396817259 mm tip land carries the T012 and T006 seats and the bushing (U40), turned with tailstock support at L/D 14.5; it was 1/32" until the T006 rim was recomputed against the as-cut (base-chord) root, which allows 1/16" — `build_cone_gear_shaft.py`.'
         - legacy + derived
@@ -586,7 +586,7 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - 'along Z at the R1 nominal fit-up (x, y) = (−128.733, 129.805): the MHA-149 throw (0.625 at 15.27°) about the v2 casting''s straight crank bore, which sits 0.21 below the frame axis (−129.336, 129.850); fit-up 16T:64T c2c 39.611. The frame c2c 39.735 = radii + 0.25 slack at DP25.7311. The single-cutter pair (#906) keeps that frame c2c with 0.423 slack. The 136.8-mm cylinder spans z −183..−46.2 with a 2-mm integral dome outboard; +8-shifted local seats preserve T12 at z −155 and the pinion centre at z −64.560. The 2.8360-in boss remains z −142.245..−70.210, leaving 10.255 mm to T12 and 0.250 mm to the pinion. The Ø9.525 core runs in the MHA-149 eccentric bushing, whose north end is flush with the spot face at z −70.210 (local 112.79); the Ø9.0 pinion seat step is at local 112.7 (#906 R1).'
+        - 'along Z at the R1 nominal fit-up (x, y) = (−128.733, 129.805): the MHA-149 throw (0.625 at 15.27°) about the v2 casting''s straight crank bore, which sits 0.21 below the frame axis (−129.336, 129.850); fit-up 16T:64T c2c 39.611. The frame c2c 39.735 = radii + 0.25 slack at DP25.7311. The single-cutter pair (#906) keeps that frame c2c with 0.423 slack. The 136.8-mm cylinder spans z −183..−46.2 with a 2-mm integral dome outboard; +8-shifted local seats preserve T12 at z −155 and the pinion centre at z −64.560. The boss runs z −142.245..−72.710 (2.8360 in harvested, its spot face retreated 2.5 from the 64T), leaving 10.255 mm to T12 and 2.750 mm to the pinion. The Ø9.525 core runs in the MHA-149 eccentric bushing, whose north end is flush with the spot face at z −72.710 (local 110.29); the Ø9.0 pinion seat step is at local 112.7 (#906 R1).'
         - 'cone-pivot-post-v2 is the physical authority for x/y. The ch30 GT crank_sprocket result (−122.84, 144.78) remains independent image evidence, while the primary crank construction photo governs the separate through hub and flush outboard face. The crossed-helical accommodation and 0.25 mm mesh slack remain.'
         - high (GT + mesh)
       - - Chain run
@@ -619,7 +619,7 @@ sections:
         - p.18 top-down (the "pivot" label at the TIP; dark wedge under the whole cone set) + v4 stills; v2 envelope/mount cascade from cone-pivot-post-v2.SLDPRT, whose height was manually rederived from ch30 Eight Views image 2 (page003_img01.png) and whose proportions follow ch11 page002_img05.jpeg / page002_img06.jpeg
         - med (role high, dims low)
       - - '`cone-pivot-post` (ONE green column: big-end journal + crank pedestal, on the plate)'
-        - 'v2 green cast body: Ø42.011 × 86.0 tall, with an as-cast Ø44.0 ± 0.4 × 26.6 upper collar (y 59.4..86, a real 0.8-1.27 radial step at the cast/turned seam; one-place reference size); straight crank/sprocket boss Ø21.93 with Ø14.6 H7 bore on the body centreline at y 72.49 (#906 R1: boss and bore 0.21 below the frame''s crank axis at 72.7; the bore seats the MHA-149 eccentric bushing, e 0.625 ±0.025, whose Ø9.575 bore runs on the 3/8 in crankshaft core), length 2.8360 in (72.0344 mm); inclined cone-shaft boss Ø17.2 with Ø12.2808 journal at y 33.368, its axis yawed 12.5182° about the vertical body axis; 2× vertical ANSI-inch 1/4 fillister counterbores on 26.88704 centres (Ø7.14248 thru, Ø11.50874 × 6.0198 deep).'
+        - 'v2 green cast body: Ø42.011 × 86.0 tall, with an as-cast Ø44.0 ± 0.4 × 26.6 upper collar (y 59.4..86, a real 0.8-1.27 radial step at the cast/turned seam; one-place reference size); straight crank/sprocket boss Ø21.93 with Ø14.6 H7 bore on the body centreline at y 72.49 (#906 R1: boss and bore 0.21 below the frame''s crank axis at 72.7; the bore seats the MHA-149 eccentric bushing, e 0.625 ±0.025, whose Ø9.575 bore runs on the 3/8 in crankshaft core), harvested length 2.8360 in (72.0344 mm), its north spot face retreated 2.5 from the 64T (boss 69.5344) and run out as a 23.0-wide flat to 17.0 below the crank axis; inclined cone-shaft boss Ø17.2 with Ø12.2808 journal at y 33.368, its axis yawed 12.5182° about the vertical body axis; 2× vertical ANSI-inch 1/4 fillister counterbores on 26.88704 centres (Ø7.14248 thru, Ø11.50874 × 6.0198 deep).'
         - 'stands on the cone swing platform at exact Ry180, cross-pairing the two mounting-hole axes and putting the crank boss outside the machine. The post and carrier retain the ch30-fitted +1.484 X / +35.415 Z world placement. The working cone/cylinder/channel family is independently recentered 33.115 mm toward the post along its unchanged inclined bore; the post fit is not a machine-wide translation.'
         - 'manual height rederivation from ch30 Eight Views station 2 (references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png); proportions from ch11 references/albert-michelsons-harmonic-analyzer/ch11_images/page002_img05.jpeg and page002_img06.jpeg; collar Ø44.0 measured from the cast/turned seam in ch11 page002_img04/05/06 and ch30 page003_img01 (`cad/scripts/cone_pivot_post_spec.py` HEAD_DIA); other feature dimensions harvested from cone-pivot-post-v2.SLDPRT'
         - 'med (86 mm height, proportions and Ø44.0 as-cast collar photo-derived; other v2 feature dimensions exact)'
@@ -783,7 +783,7 @@ sections:
       - confidence
       rows:
       - - Pivot shaft
-        - 'Ø6.35 × 170 along Z at (x, y) = (+72.9, 253.8), centred on the channel stack mid-plane (2026-09: was 203.2 with the south end 19 mm past the support in mid-air)'
+        - 'Ø6.35 along Z at (x, y) = (+72.9, 253.8); #743 PR2 (Reading 1): turned from Ø10 bar with an integral Ø10 × 1.5 shoulder on the north ear''s inner face, the cylinder spanning both ears (cut to fit, nominal 156.6) and each end domed 1.5 proud; the rocker stack closes south on the Ø10 × 1.5 MHA-148 washer, feeler-set 0.45 to the south ear (`rocker_bank_layout.py`). Was 170, centred on the stack mid-plane'
         - 'ball x photo-measured 66…81, ball y 252–255 in both 0°/180° views; y = support apex 228.6 + ball rise 25.2. The fixed support remains at its old world location while the channel bank recenters to z +3.088 and the longer rocker lever reaches drum x −60.394.'
         - med (x, y photo + frame; dia low)
       - - Support casting ×1 (windowed rocker-arm support)
@@ -800,8 +800,8 @@ sections:
         - 'four-hole pattern and foot thickness from `cad/scripts/build_rocker_arm_support.py`; base thread/drill contract from `cad/scripts/build_harmonic_base.py`; purchased identity from `cad/scripts/build_lag_screw.py`; supplied vendor SLDPRT harvested read-only and matched by `cad/scripts/diagnostics/diag_build_92240A540.py`; placed in frame.SLDASM'
         - high (catalog + native vendor model + assembly contract)
       - - Pivot brackets ×2 (replaced the chrome ball mounts 2026-09)
-        - 'black L-bracket (2026-09-02, was a T): foot 16 wide (fits the support''s 16.93 apex) × 6 × 24 running INBOARD from the ear with two Ø4.2 holes on its centreline, ear stub 14 × 6 carrying a Ø16 chrome ball at 25.2 above the foot with the Ø6.5 shaft bore through the ball; north bracket turned Ry180 in channel.SLDASM'
-        - 'ch14 p.27 (2026-09 re-derive): the shaft rides in two black cast brackets bolted to the support rail, not chrome ball pillars; seated on the support at stack-mid z ±78 so the pivot axis stays 228.6 + 25.2 = 253.8 (`build_pivot_bracket.py`)'
+        - 'black L-bracket (2026-09-02, was a T): foot 16 wide (fits the support''s 16.93 apex) × 6 × 24 running INBOARD from the ear with two Ø4.2 holes on its centreline, ear 14 × 6 arched R7 about the Ø6.5 shaft bore at 25.2 above the seat (#743 PR2: the bright dome on the ear is the shaft''s own domed end, so the brazed Ø16 ball is gone); north bracket turned Ry180 in channel.SLDASM'
+        - 'ch14 p.27 (2026-09 re-derive): the shaft rides in two black cast brackets bolted to the support rail, not chrome ball pillars; seated on the support at the rocker_bank_layout ear stations (north ear inner face on the shaft shoulder, south feeler-set) so the pivot axis stays 228.6 + 25.2 = 253.8 (`build_pivot_bracket.py`)'
         - scaled
         - med
       - - Rocker-arm pivot hubs (integral; the ×19 spacer bushings are retired 2026-09-02)
@@ -1845,9 +1845,9 @@ sections:
         - stated
         - high
       - - Return spring (leaf)
-        - 0.5 × 6.0 C51000 phosphor-bronze strip (spring temper; O1-b, user 2026-09-24, supersedes 0.5 × 5.0); 10.0 foot (a 9.5 square screw pad plus the 0.5 flat to the bend tangent) screwed down 20.0 EAST of the pivot bore, outboard of the back strap; R2 bend; straight blade leaning ~2.2° west of vertical (~10.3° in to the parked flank); crest R1.5 bearing on the east flank 23.0 up the strap, 5 below the arbor; 25° flick back east, 2.0 flat. Modelled installed (0.15 parked air); formed free with the crest preset ~1.6 into the flank (3.4° more bend) (re-derived 2026-09-24, handoff dt-pinion-spring-rederive-20260924; `pinion_spring_geometry.py`)
+        - 0.381 × 6.35 17-7 PH stainless strip, Condition C (0.015 in, McMaster-Carr 2325K19 sheared 1/4 in wide; PR 859 ruling 4, 2026-09-25, supersedes the 0.5 × 6.0 C51000 of O1-b — stainless departs from the p.68 brass look for stress margin and corrosion resistance); foot screwed down 20.0 EAST of the pivot bore, outboard of the back strap, on a 9.5 square pad flush with the strip's aft edge (widening forward only, PR 859 option (iv)); R3.3 bend straight off the pad; straight blade leaning ~1.0° west of vertical (~9.2° in to the parked flank); crest R3.3 bearing on the east flank 23.0 up the strap, 5 below the arbor; 25° flick back east, 2.0 flat. Modelled installed (0.15 parked air); formed free with the crest preset ~2.6 into the flank (5.4° more bend) (`pinion_spring_geometry.py`, `pinion_spring_section.py`)
         - —
-        - 'p.68–69 + v4_pinion_013/018/019: a brass-coloured leaf bears on the BACK strap''s east flank in both poses, more flexed engaged — it holds the drum disengaged by default; front strap clean (t00393). img01''s far-left black screw is on the DRUM side (east): the foot is outboard, not under the strap (the pre-2026-09-24 model read it as west). img04 puts the crest 5 below the arbor. The blade rides 1.0 in from the strap''s inner face (`SPRING_BLADE_INSET`) (build_pinion_spring / build_drive_train SPRING_*)'
+        - 'p.68–69 + v4_pinion_013/018/019: a brass-coloured leaf bears on the BACK strap''s east flank in both poses, more flexed engaged — it holds the drum disengaged by default; front strap clean (t00393). img01''s far-left black screw is on the DRUM side (east): the foot is outboard, not under the strap (the pre-2026-09-24 model read it as west). img04 puts the crest 5 below the arbor. The pad''s aft edge, flush with the strip''s, is set a 0.65 gage leaf off the back block (`SPRING_PAD_LEAF`), which stations the blade in from the strap''s inner face (`SPRING_BLADE_INSET`) (build_pinion_spring / build_drive_train SPRING_*)'
         - scaled
         - med
       - - Swing straps ×2 (2026-09 re-derive)
@@ -1857,7 +1857,7 @@ sections:
         - scaled
         - med
       - - Pinion grip head and crossrod (2026-09 re-derive)
-        - Integral MHA-102 turned head Ø15 × 10.5 (SR10.9 crown; rule 12 W6, was × 9), neck Ø10.5 × 11.25, reamed Ø6.00 +0.10/0 for the separate MHA-058 Ø6 crossrod, bonded with Loctite 638, 65 overall (32 down / 33 up)
+        - Integral MHA-102 turned head Ø15 × 11.5 (SR10.9 crown; rule 12 W6 was × 9 → 10.5, machinist review of 7f7fc1717 → 11.5 for a 2.30 worst-case crossrod web), neck Ø10.5 × 10.5 (shoulder 0.25 forward so every turned length prints .X), reamed Ø6.00 +0.10/0 for the separate MHA-058 Ø6 crossrod, bonded with Loctite 638, 65 overall (32 down / 33 up)
         - —
         - 'ch25 p.68: a ~Ø15 ball on a ~65 rod. The one-piece arbor/head and separate crossrod are an approved photo-derived reconstruction choice, not proof of the historical joint detail. SUPERSEDES the Ø23 × 14 drum on an 85 rod and the unsupported socket / radial-retention-pin reconstruction.'
         - scaled
@@ -1897,9 +1897,9 @@ sections:
       user-authoritative 32T count and the U28 2.2425 mm parked tip gap now own
       the derived rig location. Modeled layout (`APINION_*` constants): axis at
       machine (−18.384, 90.518) = X_DRUM + (drum tip 31.100 + pinion tip 8.667 +
-      2.2425 disengaged gap); drum z −71.612..+71.588 (face 143.2, spanning all 20
-      stations), integral steel arbor/head root z −131.912..+94.338,
-      head/crossrod axis z −138.412, and separate MHA-058 crossrod at +65°.
+      2.2425 disengaged gap); drum z −70.388..+72.812 (face 143.2, spanning all 20
+      stations), integral steel arbor/head root z −130.688..+95.562,
+      head/crossrod axis z −137.188, and separate MHA-058 crossrod at +65°.
       Straps: 15 wide × 9 thick with R7.5 ends, plain (no cam relief), pivot
       (−14.420, 62.8), bore-to-bore c2c 28.0, parked at an 8.139° lean; the swing
       rides the setup DOF (a freed operational DOF, its angle drive spec recorded
@@ -2143,9 +2143,10 @@ sections:
          pinion (face 10.8) stands PROUD of
          the green column's casting face — ch12 page002_img06 shows no
          relief pocket — centred in the TRUE casting-to-T120 span
-         (z −31.025, centred on the shifted 64T row). The 2.8360-in v2 boss occupies
-         z −142.245..−70.210, leaving 10.255 mm to the fixed T12 wheel and
-         0.250 mm to the pinion south face. The 130-mm shaft cylinder moves only
+         (z −31.025, centred on the shifted 64T row). The v2 boss occupies
+         z −142.245..−72.710 (its spot face retreated 2.5 from the 64T),
+         leaving 10.255 mm to the fixed T12 wheel and 2.750 mm to the pinion
+         south face. The 130-mm shaft cylinder moves only
          its common crank face outboard to z −183; all inboard world stations remain fixed.
       10. **Alignment-pinion mechanism removed (2026-06-18) — RESTORED
          2026-07-02** (ch. 25). The removal-era impossibility used the now-

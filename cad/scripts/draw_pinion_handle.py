@@ -38,11 +38,17 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (2.0, 1.0)
-PRINCIPAL_CENTER = (0.180, 0.160)
-ISO_CENTER = (0.340, 0.125)
+# Machinist review of 7f7fc1717: the group sat low and right, leaving a large
+# empty field above and to the left.  The profile, its two dimensions and the
+# isometric now centre on the field between the inner border's top and the
+# title block's (FIELD_Y), and span it left to right.
+FIELD_Y = (0.065, 0.266)  # title-block top, inner-border top
+PRINCIPAL_CENTER = (0.160, 0.172)
+ISO_CENTER = (0.330, 0.165)
+ISO_NOTE_XY = (0.295, 0.222)
 DONOR_KEEP = {"RodDia": (0.035, 0.205)}
-PRINCIPAL_KEEP = {"RodSpan": (PRINCIPAL_CENTER[0], 0.105)}
-ROD_DIAMETER_XY = (0.255, 0.195)
+PRINCIPAL_KEEP = {"RodSpan": (PRINCIPAL_CENTER[0], 0.117)}
+ROD_DIAMETER_XY = (0.235, 0.207)
 DIMENSION_CALLOUTS = {"RodSpan": "OAL"}
 
 
@@ -171,7 +177,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="grip crossrod turning axis",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-    add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.185)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

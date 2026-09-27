@@ -55,7 +55,8 @@ TITLE_BLOCK_OWNED_NOTE_TEXT = (
 
 def test_notes_do_not_repeat_title_block_metadata() -> None:
     for part_name, spec in SHEETS:
-        notes = spec.DRAWING_NOTES.upper()
+        # A sheet with no notes (MHA-135, rule 6) has nothing to repeat.
+        notes = getattr(spec, "DRAWING_NOTES", "").upper()
         for duplicate in TITLE_BLOCK_OWNED_NOTE_TEXT:
             assert duplicate not in notes, f"{part_name}: {duplicate}"
 
@@ -572,6 +573,15 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 4.1656,
                 3.454,
                 8.6624,
+            ),
+            # #743 PR2: MHA-143 #8-32 x 3/4 through the 6.0 rocker-bracket foot.
+            **_expected_numbered_pairs(
+                "channel-1/pedestal-hold-down-screw",
+                range(1, 5),
+                "frame-1/rocker-arm-support",
+                4.1656,
+                3.454,
+                13.05,
             ),
         },
     }

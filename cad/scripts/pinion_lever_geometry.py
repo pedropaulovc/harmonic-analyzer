@@ -13,6 +13,11 @@ BORE = 6.35  # nominal; the REAM_SLIDE band (pinion_lever_spec) opens it 0.010-0
 WALL_T = 2.0
 CAP_SAG = 1.5
 CAP_RADIUS = ((HUB_OD / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
+# Printed places of the dimensions that station the grip on the lift rod (the
+# rig layout books their bands; pinion_lever_spec.DRAWING_PRECISION states them).
+BORE_DEPTH_PLACES = 1  # BoreDepth: mouth face B to the floor the rod seats on
+GRIP_FROM_B_PLACES = 2  # GripFromB: the grip axis from face B
+ROD_DIA_PLACES = 1  # RodDia
 
 # U36 (MHA-135): the retention pin crosses the hub at mid-engagement -- half the
 # bore depth in from the mouth face, which also puts it half the rod's

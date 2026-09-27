@@ -411,14 +411,14 @@ _strap = compose_rows(ROT_Y_180, d.rot_z_rows(d.STRAP_LEAN_DEG))
 expect(
     DT,
     "pinion-bracket-1",
-    [d.PIVOT_X, d.PIVOT_Y, d.APINION_Z_FRONT - d.STRAP_AIR],
+    [d.PIVOT_X, d.PIVOT_Y, d.RIG.STRAP_Z_INNER[0]],
     _strap,
     "pinion-bracket front",
 )
 expect(
     DT,
     "pinion-bracket-2",
-    [d.PIVOT_X, d.PIVOT_Y, d.APINION_Z_BACK + d.STRAP_AIR + d.STRAP_T],
+    [d.PIVOT_X, d.PIVOT_Y, d.RIG.STRAP_Z_OUTER[1]],
     _strap,
     "pinion-bracket back",
 )

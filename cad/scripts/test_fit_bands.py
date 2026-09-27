@@ -72,6 +72,15 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ("build_drive_train_assembly", "_ARB_Z_BANDS"): (
         "(z extent, minimum gap) pairs for the swing-plate clearance sweep"
     ),
+    ("build_drive_train_assembly", "_SWING_RIG_BANDS"): (
+        "(z low, z high, name) pinion-rig extents for the engage-swing sweep"
+    ),
+    ("build_drive_train_assembly", "_SPRING_Z_BAND"): (
+        "plan z extent of the return spring for the engage-swing sweep"
+    ),
+    ("pinion_spring_geometry", "FORMED_CONTACT_BANDS"): (
+        "names of the formed dimensions the contact corners perturb, not a band"
+    ),
 }
 
 # (upper, lower) fit bands that no helper reads: the owning module indexes them
@@ -81,6 +90,10 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("alignment_pinion_spec", "BASE_TANGENT_SPAN_BAND"): (
         "indexed into the span-measurement note text"
     ),
+    ("cone_gear_shaft_spec", "STOCK_DIA_BAND"): (
+        "the 5/8 bar's supplied size band, indexed for the thrust ring's "
+        "worst-case width (THRUST_RING_MIN)"
+    ),
     ("connecting_rod_spec", "RING_THICKNESS_BAND"): (
         "indexed by cylinder_bank_layout for the thickest ring its cam slot holds"
     ),
@@ -88,9 +101,17 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "centred (cylinder_bank_layout asserts it): indexed as the symmetric "
         "tolerance and the fit-up mic limits"
     ),
-    ("pinion_arbor_spec", "DRUM_LEN_BAND"): "indexed into the drum-length limits",
+    ("pinion_arbor_collar_spec", "BORE_BAND"): (
+        "the title block's drilled-hole row, indexed for the slide-clearance, "
+        "wall and pin-end-depth stacks (not printed on the bore)"
+    ),
+    ("pinion_arbor_geometry", "DRUM_LEN_BAND"): "indexed into the drum-length limits",
     ("pinion_handle_geometry", "ROD_DIA_BAND"): (
         "indexed by pinion_arbor_spec for the cross-rod fit limits"
+    ),
+    ("rocker_arm_spec", "PIVOT_HOLE_BAND"): (
+        "indexed into the hub's wall floor (HUB_DIA_MIN); the build also "
+        "sets it natively on PivotDia"
     ),
 }
 

@@ -110,11 +110,11 @@ _INSERTED_SOURCES = {
     "cylinder_gear_shaft "
     "fillister_screw foot_screw pedestal_hold_down_screw pinion_arbor pinion_arbor_collar pinion_bracket pinion_cam "
     "pinion_cam_pin pinion_handle pinion_lever pinion_lever_pin pinion_lift_rod "
-    "pinion_pivot_block pinion_pivot_shaft pinion_spring post_mount_screw slotted_screw "
+    "pinion_pivot_block pinion_pivot_shaft pinion_spring pinion_strap_pin post_mount_screw slotted_screw "
     "swing_stop_screw",
     "channel": "amplitude_bar channel_lever channel_spring_installed connecting_rod "
-    "frame_side_screw fulcrum_keeper fulcrum_shaft pivot_bracket pivot_shaft "
-    "rocker_arm spring_hook",
+    "frame_side_screw fulcrum_keeper fulcrum_shaft pedestal_hold_down_screw pivot_bracket "
+    "pivot_shaft rocker_arm rocker_thrust_washer spring_hook",
     "summing": "boss_hook counter_spring gooseneck knife_hanger_stud knife_hanger_washer knife_mount summing_lever",
     "magnifier": "clamp_screw column_clamp_back column_clamp_front lever_wire "
     "magnifying_bracket magnifying_clamp magnifying_lever magnifying_vertical_rod "
@@ -1445,9 +1445,6 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ("build_channel_assembly.py", "build_fulcrum_keeper"): (
         "dtrefactor: reads CBORE_DEPTH_MM, FOOT_H"
     ),
-    ("build_channel_assembly.py", "build_pivot_bracket"): (
-        "dtrefactor: reads FOOT_H"
-    ),
     ("build_drive_train_assembly.py", "build_alignment_pinion"): (
         "dtrefactor: reads BORE_DIA"
     ),
@@ -1481,14 +1478,8 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ("build_drive_train_assembly.py", "build_harmonic_base"): (
         "dtrefactor: reads BLOCK_SCREW_HOLE_DEPTH, BLOCK_SCREW_XZ, BLOCK_SEAT_SPEC, FOOT_SCREW_HOLE_DEPTH, FOOT_SCREW_XZ, FOOT_SEAT_SPEC, LOCK_KNOB_XZ, LOCK_SEAT_SPEC, LOCK_STUD_ENGAGEMENT, PEDESTAL_SCREW_HOLE_DEPTH, PEDESTAL_SCREW_XZ, PEDESTAL_SEAT_SPEC, PIVOT_SCREW_XZ, PIVOT_SEAT_SPEC, STOP_SCREW_XZ, STOP_SEAT_SPEC, SWING_HARDWARE_GEOMETRY, require_blind_seat_fit"
     ),
-    ("build_drive_train_assembly.py", "build_rocker_arm_support"): (
-        "dtrefactor: reads WIDE"
-    ),
     ("build_frame_assembly.py", "build_gooseneck_set_screw"): (
         "dtrefactor: reads SHANK_LEN"
-    ),
-    ("build_frame_assembly.py", "build_rocker_arm_support"): (
-        "dtrefactor: reads FOOT_THICKNESS, HOLE_DIA"
     ),
     ("build_frame_assembly.py", "build_top_frame"): (
         "dtrefactor: reads SIDE_TAP_SPEC"

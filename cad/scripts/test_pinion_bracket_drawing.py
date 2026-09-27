@@ -178,9 +178,14 @@ def test_follower_seat_station_is_printed_from_face_a_with_a_rule_12_web() -> No
         '_tolerance_at_dimension_places(adapter, "PinSeatProfile", "PinSeatCz")'
         in build_source
     )
-    assert drawing.LEFT_KEEP["PinSeatCz"][0] < drawing.LEFT_CENTER[0] - (
+    # Both through-thickness stations print left of face A with their arrows
+    # inside the span: centred, the cross hole's threw its right arrow outside,
+    # into the THRU callout's leader (pc-rc eye pass, nit D).
+    face_a = drawing.LEFT_CENTER[0] - (
         pinion_bracket_geometry.THICKNESS * drawing.SHEET_SCALE[0] / 2000.0
     )
+    for name in ("PinSeatCz", "CrossHoleCz"):
+        assert drawing.LEFT_KEEP[name][0] < face_a, name
 
 
 def _segment_distance(
@@ -236,6 +241,23 @@ def test_hole_callout_leaders_keep_off_the_other_hole() -> None:
     assert abs(bearing[0] - bearing[1]) >= 45.0
 
 
+def test_section_labels_hang_clear_of_the_centre_distance_arrows() -> None:
+    # Layout audit (text-on-line, gating): the section cut ended on the 28.00
+    # centre distance's dimension line, so the right B label hung under that
+    # dimension's lower arrow, 0.17 mm off it.  Each label hangs under its
+    # cut end; both ends stand clear of that dimension line, and the right
+    # one past its extension lines' end, by at least a label's width.
+    label_width = 0.005
+    dim_x = drawing.FRONT_KEEP["ArborBoreCz"][0]
+    for end_x in drawing.SECTION_LINE_X:
+        assert abs(end_x - dim_x) >= 2.0 * label_width, end_x
+    assert drawing.SECTION_LINE_X[1] > dim_x
+    # The cut still crosses the whole strap, with room for its arrows.
+    half = pinion_bracket_geometry.R_END * drawing.SHEET_SCALE[0] / 1000.0
+    assert drawing.SECTION_LINE_X[0] <= drawing.FRONT_CENTER[0] - half - 0.010
+    assert drawing.SECTION_LINE_X[1] >= drawing.FRONT_CENTER[0] + half + 0.010
+
+
 def test_blind_seat_entry_face_is_complete_solid_flank() -> None:
     # The full follower-seat mouth lies on the straight flank between the two
     # rounded ends. Its complete diameter and blind depth therefore remain in
@@ -278,18 +300,20 @@ def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
     # face A) prints at .XX; across the bar a hidden construction reference
     # sketch owns the hole's distance from the pivot-bore wall ("PivotBore" /
     # 2), which the side view shows and prints at .XX.  The callout keeps only
-    # THRU and the loose-supplied pin.
+    # THRU and the pin it takes.  Main overrode the loose-SUPPLY wording once
+    # MHA-145 became a modelled BOM line (2 used): supplying one per strap
+    # would double the order, so the callout names the part, and its number
+    # is the parts registry's.
     import inspect
+
+    import _config
 
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
     assert callout is pinion_bracket_spec.CROSS_HOLE_CALLOUT
     assert "AXIS" not in callout and "CENTRED" not in callout
-    assert callout.splitlines()[0] == "THRU"
-    assert "SUPPLY 1/16 X 1/2 SLOTTED SPRING" in callout
-    assert "PIN (ASME B18.8.2) LOOSE" in callout
-    assert len(callout.splitlines()) <= 4
-    body = callout.replace("1/16 X 1/2", "").replace("B18.8.2", "")
-    assert not any(ch.isdigit() for ch in body)
+    assert "SUPPLY" not in callout and "LOOSE" not in callout
+    number = _config.parts("pinion-strap-pin")["number"]
+    assert callout.splitlines() == ["THRU", f"FOR {number} SPRING PIN"]
     dims = pinion_bracket_spec.DRAWING_DIMENSIONS
     assert dims["CrossHoleProfile"] == {"CrossHoleDia", "CrossHoleCz"}
     assert dims["CrossHoleAxisReference"] == {"CrossHoleFromBoreWall"}
@@ -346,7 +370,13 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
     bore_r = (geometry.PIVOT_BORE + pinion_bracket_spec.PIVOT_BORE_BAND[0]) / 2.0
     shaft_min = shaft.SHAFT_DIA + shaft.SHAFT_DIA_BAND[1]
     half = geometry.THICKNESS / 2.0
-    hole_height = _printed_band("CrossHoleFromBoreWall")
+    # The bore-wall offset's nominal (3.175) does not print exactly at two
+    # places, so the offset carries its rounding too (restricted review).
+    places = pinion_bracket_spec.DRAWING_PRECISION_BY_NAME["CrossHoleFromBoreWall"]
+    wall = geometry.PIVOT_BORE / 2.0
+    hole_height = _printed_band("CrossHoleFromBoreWall") + abs(
+        round(wall, places) - wall
+    )
     seat_height = _printed_band("PinSeatCy")
     worst = {
         # Cross hole to the far and the near broad face.
@@ -388,7 +418,19 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
         worst["seat near face"], pinion_bracket_spec.PIN_SEAT_NEAR_WEB_WORST
     )
     assert math.isclose(worst["shaft wall"], pin.SHAFT_LIGAMENT_WORST)
+    # Restricted review (ruling 3): the places the web gates read are the
+    # sheet's own, stated once in pinion_bracket_geometry.
+    for name, places in (
+        ("Depth", geometry.THICKNESS_PLACES),
+        ("CrossHoleCz", geometry.CROSS_HOLE_CZ_PLACES),
+        ("CrossHoleFromBoreWall", geometry.CROSS_HOLE_FROM_BORE_WALL_PLACES),
+        ("BottomCapRadius", geometry.END_RADIUS_PLACES),
+        ("TopCapRadius", geometry.END_RADIUS_PLACES),
+    ):
+        assert pinion_bracket_spec.DRAWING_PRECISION_BY_NAME[name] == places, name
+    pin_source = Path(pin.__file__).read_text(encoding="utf-8")
+    assert "DOT_X_BAND" not in pin_source and "DOT_XX_BAND" not in pin_source
     # The values the ruling approved.
     assert math.isclose(worst["cross hole far face"], 2.316, abs_tol=5e-4)
     assert math.isclose(worst["seat far face"], 1.544, abs_tol=5e-4)
-    assert math.isclose(worst["shaft wall"], 1.831, abs_tol=5e-4)
+    assert math.isclose(worst["shaft wall"], 1.826, abs_tol=5e-4)

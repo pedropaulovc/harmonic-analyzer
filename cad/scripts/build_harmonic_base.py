@@ -39,13 +39,12 @@ from _common import (
     PANEL_BLACK,
     SketchDims,
     _early_bound,
-    _read_member,
     add_line_chain,
     anchor_point_to_origin,
     apply_color,
     apply_material,
     bbox_extent_check,
-    blank_sketch,
+    blank_reference_sketches,
     check,
     define_circle,
     define_rectilinear_chain,
@@ -127,9 +126,13 @@ from slotted_screw_spec import SHANK_LEN as BLOCK_SCREW_LEN
 from foot_screw_spec import SHANK_LEN as FOOT_SCREW_LEN
 from fillister_screw_spec import SHANK_LEN as NAMEPLATE_SCREW_LEN
 from swing_stop_screw_spec import EMBED_LEN as STOP_ENGAGEMENT
-from pinion_pivot_block_geometry import BLOCK_HEIGHT
-from pinion_rig_layout import BLOCK_SEAT_Z, SPRING_Z
-from pinion_spring_section import THICK as SPRING_THICKNESS
+from pinion_pivot_block_geometry import BLOCK_HEIGHT, SCREW_HALF_SPACING
+from pinion_rig_layout import BLOCK_SEAT_Z, SPRING_PAD_Z
+from pinion_spring_section import (
+    SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST,
+    THICK as SPRING_THICKNESS,
+    THICK_BAND as SPRING_THICKNESS_BAND,
+)
 from arbor_pedestal_spec import (
     SCREW_Z as PEDESTAL_LEDGE_SCREW_Z,
     STRAP_INNER_Z as PEDESTAL_STRAP_INNER_Z,
@@ -339,7 +342,9 @@ STOP_SCREW_DRILL_DEPTH = seat_drill_depth(STOP_SCREW_HOLE_DEPTH, STOP_THREAD, "t
 # about the pivot bore, block mid-depth 5.125 in from each outer face; the
 # drum-axis pedestal seats remain unchanged.  Ruling (c) (user, 2026-09-24):
 # the block and spring-foot z stations are pinion_rig_layout's -- the front
-# block stands one feeler off the front strap, the spring rides 0.8 aft.
+# block stands one feeler off the front strap, the spring foot's pad one
+# leaf off the back block, and the whole rig where the rig-set leaf D off gear
+# j = 19 puts it (RIG_AFT_SHIFT, user ruling P1-2).
 _FORMER_BLOCK_SCREW_X = (-17.226441649810653, -0.22644164981065273)  # east, west
 BLOCK_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z) for z in BLOCK_SEAT_Z for x in _FORMER_BLOCK_SCREW_X
@@ -355,18 +360,23 @@ BLOCK_SCREW_DRILL_DEPTH = seat_drill_depth(
     BLOCK_SCREW_HOLE_DEPTH, "#8-32", "tapped_bottoming"
 )
 _FORMER_FOOT_SCREW_XZ = (
-    # spring foot: 20.0 EAST of the swing pivot bore (the east block screw
-    # is 8.5 east of it), outboard of the back strap (re-derived 2026-09-24;
-    # pinion_spring_geometry.SCREW_EAST_OF_PIVOT, the drive train asserts it;
-    # z: pinion_rig_layout)
-    (_FORMER_BLOCK_SCREW_X[0] + 8.5 - 20.0, SPRING_Z - MECHANISM_Z_SHIFT),
+    # spring foot: SPRING_SCREW_EAST of the swing pivot bore, which stands
+    # SCREW_HALF_SPACING west of the east block screw -- outboard of the back
+    # strap (re-derived 2026-09-24; the drive train asserts it; z:
+    # pinion_rig_layout)
+    (
+        _FORMER_BLOCK_SCREW_X[0] + SCREW_HALF_SPACING - SPRING_SCREW_EAST,
+        SPRING_PAD_Z - MECHANISM_Z_SHIFT,
+    ),
 )
 FOOT_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_FOOT_SCREW_XZ
 )
-# The stock 9.525-mm foot screw penetrates 9.025 mm below the 0.5-mm spring;
-# the seat is sized at its printed worst case for a #4-40 bottoming tap.
-FOOT_SCREW_HOLE_DEPTH = seat_thread_depth(FOOT_SCREW_LEN - SPRING_THICKNESS)
+# The stock 9.525-mm foot screw penetrates deepest below the THINNEST spring
+# strip the stock band allows (#859 ruling 4: 17-7 PH 0.015 in, 2325K19); the
+# seat is sized at its printed worst case for a #4-40 bottoming tap.
+SPRING_THICKNESS_MIN = SPRING_THICKNESS + deviations(SPRING_THICKNESS_BAND)[0]
+FOOT_SCREW_HOLE_DEPTH = seat_thread_depth(FOOT_SCREW_LEN - SPRING_THICKNESS_MIN)
 FOOT_SCREW_DRILL_DEPTH = seat_drill_depth(
     FOOT_SCREW_HOLE_DEPTH, "#4-40", "tapped_bottoming"
 )
@@ -696,7 +706,7 @@ for _label, _seat, _engagement in (
     ("cone lock", LOCK_SEAT_SPEC, LOCK_STUD_LEN),
     ("swing stop", STOP_SEAT_SPEC, STOP_ENGAGEMENT),
     ("pinion block", BLOCK_SEAT_SPEC, BLOCK_SCREW_LEN - BLOCK_HEIGHT),
-    ("spring foot", FOOT_SEAT_SPEC, FOOT_SCREW_LEN - SPRING_THICKNESS),
+    ("spring foot", FOOT_SEAT_SPEC, FOOT_SCREW_LEN - SPRING_THICKNESS_MIN),
     (
         "pedestal hold-down",
         PEDESTAL_SEAT_SPEC,
@@ -991,27 +1001,6 @@ async def _paint_machined_faces_black(adapter) -> None:
 
 
 REFERENCE_SKETCHES = ("RimWidthReference", "HeightReference", "CrossTapReference")
-
-
-@_telemetry.traced("appearance.hide_reference_sketches")
-def _hide_reference_sketches(adapter) -> None:
-    """Blank the drawing-reference sketches and prove each one reads hidden."""
-    for name in REFERENCE_SKETCHES:
-        blank_sketch(adapter, name)
-    part = _early_bound(adapter.currentModel, "IPartDoc")
-    shown = {
-        name: visible
-        for name in REFERENCE_SKETCHES
-        # swVisibilityState_e: 1 hidden
-        if (visible := int(_read_member(part.FeatureByName(name), "Visible"))) != 1
-    }
-    if shown:
-        raise RuntimeError(f"reference sketches still visible after blanking: {shown}")
-    _telemetry.event(
-        "part.reference_sketches_hidden",
-        sketches=", ".join(REFERENCE_SKETCHES),
-        count=len(REFERENCE_SKETCHES),
-    )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -1757,7 +1746,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "CrossTapX@CrossTapReference", BOTTOM_LENGTH / 2.0 - COLUMN_X
     )
     _verify_named_dimension(adapter, "CrossTapPitch@CrossTapReference", 2.0 * COLUMN_X)
-    _hide_reference_sketches(adapter)
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     blank_reference_geometry(adapter, tuple((name, "PLANE") for name in ref_planes))
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)

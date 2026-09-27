@@ -1,40 +1,53 @@
-r"""Create the curated machinist drawing for the rocker pivot shaft."""
+r"""Create the curated machinist drawing for the rocker pivot shaft (MHA-065)."""
 
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    PmiDrawingPlacement,
     add_property_linked_note,
     add_surface_finish,
+    add_view_centerline,
+    assert_imported_precision,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
-    project_part_pmi,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_reference_dimension,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from pivot_shaft_spec import (
-    GEOMETRIC_CONTROLS,
-    PART_DATUMS,
+    DOME_CALLOUT,
+    DOME_HEIGHT,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    JOURNAL_LENGTH,
+    LENGTH_CALLOUT,
+    RELIEF_CALLOUT,
+    RELIEF_DIA,
+    RELIEF_WIDTH,
     SHAFT_DIA,
-    SHAFT_LENGTH,
+    SHOULDER_DIA,
+    SHOULDER_LENGTH,
+    SHOULDER_SOUTH_Z_MM,
     SURFACE_FINISHES,
 )
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
-)
+from rocker_bank_layout import PIVOT_SHAFT_LENGTH
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import place_view, view_name
 
 
 SPEC = DRAWINGS_BY_NAME["pivot_shaft"]
@@ -50,36 +63,217 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
-END_VIEW_SCALE = 2.0
-FRONT_CENTER = (0.055, 0.205)
-RIGHT_CENTER = (
-    FRONT_CENTER[0] + SHAFT_LENGTH * SHEET_SCALE[0] / 2000.0 + 0.045,
-    FRONT_CENTER[1],
+# One orthographic view: the side view carries every turned diameter and
+# length (policy rule 7), all authored on the Right-plane half-profile, so
+# "*Right" imports them natively with the axis horizontal, as the bar sits in
+# the lathe. Model -Z runs to the sheet's right: the shouldered north end
+# (the part origin) is on the LEFT, the plain cut-to-fit end on the right.
+# An end view would carry nothing, so this sheet has none.
+PROFILE_CENTER = (0.150, 0.190)
+_MM = SHEET_SCALE[0] / 1000.0
+# The view centres on the bar's bounding box, domes included.
+_OVERALL = PIVOT_SHAFT_LENGTH + 2.0 * DOME_HEIGHT
+NORTH_END_X = PROFILE_CENTER[0] - (_OVERALL / 2.0 - DOME_HEIGHT) * _MM
+SOUTH_END_X = NORTH_END_X + PIVOT_SHAFT_LENGTH * _MM
+SHOULDER_X = (
+    NORTH_END_X + JOURNAL_LENGTH * _MM,
+    NORTH_END_X + (JOURNAL_LENGTH + SHOULDER_LENGTH) * _MM,
 )
-# NOT the fulcrum-shaft spot (0.355, 0.205): the 203.2 shaft's isometric
-# silhouette reaches ~0.072 m each side of center, so up there it ran past the
-# right border line and onto the right-end GD&T. The empty band between the
-# notes block and the title block fits it whole (its low tip stays above the
-# title block's 0.064 top rule).
-ISO_CENTER = (0.320, 0.120)
+SHAFT_FLANK_Y = PROFILE_CENTER[1] + SHAFT_DIA * _MM / 2.0
+SHAFT_UNDER_Y = PROFILE_CENTER[1] - SHAFT_DIA * _MM / 2.0
+SHOULDER_TOP_Y = PROFILE_CENTER[1] + SHOULDER_DIA * _MM / 2.0
+# The 160 shaft's isometric silhouette is a slender bar taller than the
+# drawable band at 1:1, so the pictorial renders at 1:2 and says so.
+ISO_CENTER = (0.330, 0.175)
+ISO_SCALE = (1, 2)
 
-# The shaft's flank in the *Right view: a 6.35-dia cylinder at 1:1, so its top
-# silhouette runs ~3.2 mm above the view centre. The bearing Ra anchors HERE
-# rather than on the front view's end circle -- see the finish block below.
-SHAFT_FLANK_Y = RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 2000.0
+# A short dimension's callout is far wider than the span it measures, so its
+# text stands OUTSIDE the witness pair, clear of both lines, and the dimension
+# line runs out under it: centred between them, both witnesses crossed "1.5
+# BOTH ENDS" and "2.0 BOTH SHOULDER FACES" (r743-3 eye pass). Callout text
+# runs ~2.75 mm a character at the template's dimension height (r743-3 render:
+# "BOTH ENDS" 24.5 mm, "BOTH SHOULDER FACES" 52 mm).
+CALLOUT_CHAR_WIDTH = 0.00275
+CALLOUT_WITNESS_GAP = 0.003
 
-FRONT_KEEP = {
-    # x=0.030, not the bbox-derived 0.017: horizontal text made this callout
-    # ~25 mm wide ("+0.00/-0.02"), so centred that far left it ran over the
-    # 12.7 mm zone margin. 0.030 clears the margin on the left and stops short
-    # of the end circle at x=0.049 on the right.
-    "ShaftDia": (0.030, 0.220),
+
+def _left_of_witness(witness_x: float, callout: str) -> float:
+    """Text centre x that ends a callout CALLOUT_WITNESS_GAP left of a witness."""
+    return witness_x - CALLOUT_WITNESS_GAP - len(callout) * CALLOUT_CHAR_WIDTH / 2.0
+
+
+PROFILE_KEEP = {
+    # Under the bar, centred: the REF span the cut-to-fit callout governs.
+    "ShaftLength": (PROFILE_CENTER[0], 0.158),
+    # The two diameters stand clear of the ends they measure: the body's
+    # past the plain end, the shoulder's before the north end.
+    "ShaftDia": (SOUTH_END_X + 0.018, PROFILE_CENTER[1]),
+    "ShoulderDia": (NORTH_END_X - 0.022, PROFILE_CENTER[1]),
+    # The short axial lengths stack above the north end: journal, then
+    # shoulder, each over the feature it spans.
+    "JournalLength": ((NORTH_END_X + SHOULDER_X[0]) / 2.0, 0.210),
+    "ShoulderLength": ((SHOULDER_X[0] + SHOULDER_X[1]) / 2.0, 0.226),
+    # Under the north dome, left of the dome tip's witness: a short .X height
+    # the "BOTH ENDS" callout makes a 2X statement. Its top stays under the
+    # O10.00 dimension's lower arrow.
+    "DomeHeight": (
+        _left_of_witness(NORTH_END_X - DOME_HEIGHT * _MM, DOME_CALLOUT),
+        0.172,
+    ),
 }
-RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
+# Ra on the two running faces: the body the 20 hubs rock on, and the north
+# journal in its ear. A revolved flank is a drawing SILHOUETTE, not a model
+# edge, so the pick names that entity type; straight leaders keep off the
+# geometry. The body's rides its top flank, the journal's its underside
+# (the lengths stand over the journal).
+# Note text height, as on the other part sheets: at the template default the
+# symbols printed ~18 mm tall, the journal's over the profile and DETAIL A's
+# over the length dimension (r743-2R render).
+FINISH_CHAR_HEIGHT = 0.0025
+BEARING_FINISH_EDGE = (PROFILE_CENTER[0] + 0.030, SHAFT_FLANK_Y)
+BEARING_FINISH_SYMBOL = (BEARING_FINISH_EDGE[0], 0.206)
+JOURNAL_FINISH_EDGE = ((NORTH_END_X + SHOULDER_X[0]) / 2.0, SHAFT_UNDER_Y)
+JOURNAL_FINISH_SYMBOL = (JOURNAL_FINISH_EDGE[0] + 0.012, 0.172)
+
+# DETAIL A: the shoulder and its two reliefs (Codex #936 PRRT_kwDOPHDy386mTMXq)
+# are 2 x 0.33 features on a 1:1 sheet, so a native 5:1 detail carries their
+# dimensions and the shoulder's thrust-face Ra (PRRT_kwDOPHDy386mTMXt). The
+# fence centres on the axis mid-shoulder and takes in both grooves and the
+# shoulder O.D.; the detail sits in the open field under the profile, left of
+# the title block (x 0.218) and right of the notes.
+DETAIL_SCALE = (5, 1)
+DETAIL_RADIUS_MM = 6.0
+DETAIL_CENTER = (0.180, 0.105)
+DETAIL_FENCE_Z_MM = -(JOURNAL_LENGTH + SHOULDER_LENGTH / 2.0)
+_DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
+# The label anchors at its top centre, under the fence.
+DETAIL_LABEL_XY = (
+    DETAIL_CENTER[0],
+    DETAIL_CENTER[1] - DETAIL_RADIUS_MM * _DETAIL_MM - 0.004,
+)
+
+
+def _detail_x(z_mm: float) -> float:
+    """Sheet x of part station z in the detail: model -Z runs to the right."""
+    return DETAIL_CENTER[0] - (z_mm - DETAIL_FENCE_Z_MM) * _DETAIL_MM
+
+
+DETAIL_KEEP = {
+    # Above the fence, left of the north groove's outer witness; the Ra
+    # symbol takes the air on the right.
+    "ReliefWidth": (
+        _left_of_witness(_detail_x(-(JOURNAL_LENGTH - RELIEF_WIDTH)), RELIEF_CALLOUT),
+        DETAIL_CENTER[1] + 0.037,
+    ),
+    # Left of the fence, on the axis: the diameter's line runs through the
+    # north groove. At 42 mm out its callout ran across the fence (r743-2R).
+    "ReliefDia": (DETAIL_CENTER[0] - 0.061, DETAIL_CENTER[1]),
 }
-# Size tolerances live on the source-model dimensions; the sheet renders them natively.
-DIMENSION_CALLOUTS: dict[str, str] = {}
+# The thrust face's Ra: the leader lands on the face's upper half, between the
+# relief floor and the shoulder O.D., and runs right, through the air over the
+# south groove and the body, to a symbol outside the fence. Up-right of the
+# face it crossed the ReliefWidth callout and the length dimension (r743-2R).
+SHOULDER_FACE_X = _detail_x(SHOULDER_SOUTH_Z_MM)
+SHOULDER_FINISH_ATTACH = (
+    SHOULDER_FACE_X,
+    DETAIL_CENTER[1] + (RELIEF_DIA + SHOULDER_DIA) / 4.0 * _DETAIL_MM,
+)
+SHOULDER_FINISH_SYMBOL = (
+    DETAIL_CENTER[0] + DETAIL_RADIUS_MM * _DETAIL_MM + 0.002,
+    SHOULDER_FINISH_ATTACH[1] + 0.003,
+)
+
+
+def _shoulder_detail(adapter: Any, profile: Any) -> Any:
+    """A native 5:1 detail of the shoulder and its reliefs."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(profile, "IView")
+    if not drawing.ActivateView(view_name(adapter, profile)):
+        raise RuntimeError("failed to activate the shoulder detail's parent")
+    draw.ClearSelection2(True)
+    center = model_point_in_view(
+        adapter,
+        profile,
+        (0.0, 0.0, DETAIL_FENCE_Z_MM / 1000.0),
+        label="shoulder detail centre",
+    )
+    radius = DETAIL_RADIUS_MM * SHEET_SCALE[0] / 1000.0
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("failed to create the shoulder detail fence")
+    detail = drawing.CreateDetailViewAt4(
+        *DETAIL_CENTER,
+        0.0,
+        0,  # swDetViewSTANDARD
+        *DETAIL_SCALE,
+        "A",
+        1,  # swDetCircleCIRCLE
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("failed to create the shoulder detail")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("the shoulder detail has invalid bounds")
+    target = [
+        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position the shoulder detail")
+    draw.EditRebuild3()
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native detail label, found {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    label_xyz = (*DETAIL_LABEL_XY, 0.0)
+    if not annotation.SetPosition2(*label_xyz):
+        raise RuntimeError("failed to position the shoulder detail label")
+    draw.EditRebuild3()
+    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
+    if math.dist(actual, label_xyz) > 1e-8:
+        raise RuntimeError(f"the shoulder detail label did not persist: {actual}")
+    return detail
+
+
+def _shoulder_rim_edge(view: Any) -> Any:
+    """The shoulder's O.D. circle at its south face: edge-on it IS that face's
+    line, and its faces include the thrust face the control names."""
+    matches = []
+    for raw in visible_view_entities(view, 1, label="shoulder south rim"):
+        edge = _early_bound(raw, "IEdge")
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        if not curve.IsCircle():
+            continue
+        _cx, _cy, centre_z, *_axis, radius = (
+            float(value) for value in curve.CircleParams
+        )
+        if abs(radius - SHOULDER_DIA / 2000.0) > 1e-7:
+            continue
+        if abs(centre_z - SHOULDER_SOUTH_Z_MM / 1000.0) > 1e-7:
+            continue
+        matches.append(edge)
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one shoulder south rim edge, found {len(matches)}")
+    return matches[0]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -97,7 +291,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
+            "Isometric View Note",
         ),
         required=(
             "Number",
@@ -105,7 +299,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
+            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -123,98 +317,97 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (front, right, iso):
+    profile = place_view(adapter, str(SOURCE), "*Right", *PROFILE_CENTER, scale=(1, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (profile, iso):
         set_hidden_lines_removed(adapter, view)
 
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+    profile_annotations = curate_view_dimensions(
+        adapter,
+        profile,
+        keep=PROFILE_KEEP,
+        view_label="profile",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="right"
+    # Decimal places (and so the general-tolerance row each dimension claims)
+    # are authored on the part; the sheet only proves the import kept them.
+    detail = _shoulder_detail(adapter, profile)
+    detail_annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="shoulder detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # Each call must consume every callout it is handed, so split by view.
+    assert_imported_precision(
+        adapter,
+        [*profile_annotations, *detail_annotations],
+        DRAWING_PRECISION_BY_NAME,
+    )
     set_dimension_callouts(
         adapter,
-        front_annotations,
-        {n: t for n, t in DIMENSION_CALLOUTS.items() if n in FRONT_KEEP},
+        detail_annotations,
+        {"ReliefWidth": RELIEF_CALLOUT, "ReliefDia": RELIEF_CALLOUT},
     )
-    set_dimension_callouts(
-        adapter,
-        right_annotations,
-        {n: t for n, t in DIMENSION_CALLOUTS.items() if n in RIGHT_KEEP},
-    )
-    # SolidWorks classifies a solid circular end silhouette under the same
-    # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
-    # makes the API a guaranteed no-op even though the end view is circular.
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to shaft end view")
+    # #743 PR2: the plain end is cut to fit the installed brackets, so the
+    # modelled length prints as a REFERENCE value and the callout under it is
+    # the requirement. Keyed on the parametric name.
+    length_annotations = [
+        annotation
+        for annotation in profile_annotations
+        if dimension_name(adapter, annotation) == "ShaftLength"
+    ]
+    if len(length_annotations) != 1:
+        raise RuntimeError("profile view does not carry exactly one shaft length")
+    set_reference_dimension(adapter, length_annotations[0], label="pivot shaft length")
+    set_dimension_callouts(adapter, length_annotations, {"ShaftLength": LENGTH_CALLOUT})
+    set_dimension_callouts(adapter, profile_annotations, {"DomeHeight": DOME_CALLOUT})
 
-    left_end = (RIGHT_CENTER[0] - SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
-    right_end = (RIGHT_CENTER[0] + SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
-    end_top = (
-        FRONT_CENTER[0],
-        FRONT_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
-    )
-    # GD&T is model PMI (pivot_shaft_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
-    # authored by build_pivot_shaft) — project it and place it where the
-    # hand-authored symbols used to sit (sheet-LEFT of the *Right view is the
-    # model +Z end, so the +Z squareness frame takes the left-end spot). Which
-    # VIEW receives each annotation depends on its attachment (a datum tag
-    # only lands in a view aligned with its face), and the projection fails
-    # loud on any mismatch.
-    project_part_pmi(
+    # The axis says which pairs of lines are diameters and is what the shop
+    # indicates the bar on. The face pick sits mid-body, clear of every
+    # placed annotation.
+    add_view_centerline(
         adapter,
-        placements={
-            "datum:A": PmiDrawingPlacement(
-                view=front,
-                position=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
-                attachment_xy=end_top,
-            ),
-            "bearing_cylindricity": PmiDrawingPlacement(
-                view=right,
-                position=(RIGHT_CENTER[0] - 0.045, 0.236),
-                attachment_xy=(RIGHT_CENTER[0] - 0.045, SHAFT_FLANK_Y),
-                attachment_type="SILHOUETTE",
-            ),
-            "plus_z_end_perpendicularity": PmiDrawingPlacement(
-                view=right,
-                position=(left_end[0] - 0.042, 0.180),
-                attachment_xy=left_end,
-            ),
-            "minus_z_end_perpendicularity": PmiDrawingPlacement(
-                view=right,
-                position=(right_end[0] + 0.014, 0.180),
-                attachment_xy=right_end,
-            ),
-        },
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        label="pivot shaft PMI",
+        profile,
+        face_xy=(PROFILE_CENTER[0] - 0.030, PROFILE_CENTER[1]),
+        label="pivot shaft axis centerline",
     )
-    # The bearing finish controls the shaft's CYLINDRICAL face, which the side
-    # view shows edge-on -- so it anchors to the flank there instead of to the
-    # front view's end circle (from which the leader had to run the whole way
-    # back across the side view). A cylinder carries no model edge along its
-    # side, so the pick is a SILHOUETTE entity (as in draw_transgear_stub).
-    # The Ra text renders ABOVE the arm (ASME Y14.36), reaching y~0.236.
     add_surface_finish(
         adapter,
-        right,
-        edge_xy=(RIGHT_CENTER[0] + 0.045, SHAFT_FLANK_Y),
-        symbol_xy=(RIGHT_CENTER[0] + 0.045, 0.222),
+        profile,
+        edge_xy=BEARING_FINISH_EDGE,
+        entity_type="SILHOUETTE",
+        symbol_xy=BEARING_FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bearing"),
         label="pivot bearing finish",
+        char_height=FINISH_CHAR_HEIGHT,
+    )
+    add_surface_finish(
+        adapter,
+        profile,
+        edge_xy=JOURNAL_FINISH_EDGE,
         entity_type="SILHOUETTE",
+        symbol_xy=JOURNAL_FINISH_SYMBOL,
+        control=surface_finish_by_key(SURFACE_FINISHES, "pivot_journal"),
+        label="pivot journal finish",
+        char_height=FINISH_CHAR_HEIGHT,
+    )
+    add_surface_finish(
+        adapter,
+        detail,
+        edge_entity=_shoulder_rim_edge(detail),
+        symbol_xy=SHOULDER_FINISH_SYMBOL,
+        control=surface_finish_by_key(SURFACE_FINISHES, "shoulder_thrust"),
+        label="shoulder thrust-face finish",
+        leader_attach_xy=SHOULDER_FINISH_ATTACH,
+        char_height=FINISH_CHAR_HEIGHT,
     )
 
     # 0.020: a note is left-aligned on its anchor, so the ink starts here. The
-    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred border rule
-    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
-    add_property_linked_note(adapter, "End View Note", 0.020, 0.170)
+    # bound is the 12.7 mm zone margin (~0.0127); 0.020 clears it, and the
+    # audit enforces it.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.085)
+    add_property_linked_note(adapter, "Isometric View Note", 0.298, 0.118)
 
     return await finalize_drawing(
         adapter,

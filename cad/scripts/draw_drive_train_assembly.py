@@ -22,10 +22,13 @@ from itertools import combinations
 from pathlib import Path
 from typing import Any, Callable, Literal, Sequence
 
+import _config
 import _seat_forensics
 import _telemetry
 import connecting_rod_spec as rod
 import cylinder_bank_layout as bank
+import drive_train_steps as steps
+from channel_assembly_steps import NORTH_BRACKET_SET_KEY
 from _common import _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
@@ -50,6 +53,8 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from cone_gear_notes import ATTACHMENT as CONE_GEAR_JOINT
 from crank_drive_gear_notes import ATTACHMENT_ALTERNATIVE as CRANK_GEAR_ALTERNATIVE
 from crank_drive_gear_notes import ATTACHMENT_PROCESS as CRANK_GEAR_JOINT
+from cone_pivot_post_spec import CRANK_SPOT_FACE_RETREAT
+from crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
 from drive_train_assembly_spec import (
     CLUSTERS,
     EXPLODED_VIEW_NAME,
@@ -123,18 +128,41 @@ REFERENCE_ISO_SCALE = (1.0, 8.0)
 # The bank still filled a small fraction of its sheet at 1:2 (r9 Fable review);
 # at 2:3 its ~145 x 107 mm outline plus the balloon ring fits the 395 x 176 field.
 # The rig cannot grow: its ~116 mm-tall outline plus ring already nears 176.
+# Each is the cluster's PREFERRED scale: the build places the view there and
+# steps down CLUSTER_SCALE_LADDER until its balloon ring fits (cluster_ring_scale).
 CLUSTER_SCALES: dict[Cluster, tuple[float, float]] = {
     "cylinder-bank": (2.0, 3.0),
     "cone-crank": (1.0, 3.0),
     "pinion-rig": (1.0, 2.0),
 }
-# Sheets without a cluster or the assembled views carry only the 1:8
-# reference isometric.
-SHEET_SCALES = {
-    **{name: REFERENCE_ISO_SCALE for name in SHEET_NAMES},
-    SHEET_NAMES[0]: ASSEMBLED_SCALE,
-    **{SHEET_NAMES[number - 1]: CLUSTER_SCALES[c] for c, number in CLUSTER_SHEETS.items()},
-}
+# The standard scales a cluster view may step down through, largest first
+# (Main, 2026-09-27: cascade-3's cone-crank ring ran 191.6 mm tall at 1:3 and
+# put balloons '42'/'43' on sheet 4's heading; fit the sheet, never warn).
+CLUSTER_SCALE_LADDER: tuple[tuple[float, float], ...] = (
+    (2.0, 3.0),
+    (1.0, 2.0),
+    (1.0, 3.0),
+    (1.0, 4.0),
+    (1.0, 5.0),
+)
+
+
+def package_sheet_scales(
+    cluster_scales: dict[Cluster, tuple[float, float]],
+) -> dict[str, tuple[float, float]]:
+    """Every sheet's scale, each cluster sheet at its cluster view's scale.
+
+    Sheets without a cluster or the assembled views carry only the 1:8
+    reference isometric.
+    """
+    return {
+        **{name: REFERENCE_ISO_SCALE for name in SHEET_NAMES},
+        SHEET_NAMES[0]: ASSEMBLED_SCALE,
+        **{SHEET_NAMES[number - 1]: cluster_scales[c] for c, number in CLUSTER_SHEETS.items()},
+    }
+
+
+SHEET_SCALES = package_sheet_scales(CLUSTER_SCALES)
 
 # --- sheet 1: projected front/top/right group + isometric ---------------------
 # The projected group's lower-left lands here; the views are aligned on the
@@ -187,6 +215,13 @@ CLUSTER_VIEW_CENTER = (0.200, 0.165)
 CLUSTER_RING_REGION = (0.020, 0.072, 0.415, 0.248)
 CLUSTER_BALLOON_MARGIN = 0.012
 BALLOON_DIAMETER = 0.010
+# How far past the view outline balloon ink reaches: _spread_balloons puts each
+# circle CENTRE on the ellipse CLUSTER_BALLOON_MARGIN outside, so the ink stops
+# a radius beyond it. cascade-3's audit read balloon '42' at y 246.1-255.5 mm,
+# its centre on the ellipse's top vertex (margin + diameter overstated it 5 mm).
+CLUSTER_RING_REACH = CLUSTER_BALLOON_MARGIN + BALLOON_DIAMETER / 2.0
+# A ring balloon keeps the paper clearance the BOM keeps off the title block.
+CLUSTER_TITLE_BLOCK_CLEARANCE = BOM_SHEET_CLEARANCE
 # Extra arc clearance between neighbouring ring balloons. The shared ring keeps
 # circles 1.5 apart; on sheet 5 the left-block attachments bunch so tightly that
 # items 17/18/19/20/26 read as one converging knot (Main eye-pass of r6b).
@@ -225,7 +260,7 @@ REFERENCE_ISO_CENTER = (0.380, 0.110)
 # needs for its title-block property links (finalize_drawing refuses a sheet
 # without a view: r8, leaf 20260923T214354Z-1-4126331f). Sheet 6 carries steps
 # 1-7 and the general notes on the left, its right field kept free for D1; the
-# bank's steps 8-9F fill sheet 7's left field; steps 10-21 continue on sheet 8
+# bank's steps 8-10 fill sheet 7's left field; steps 11-22 continue on sheet 8
 # beside the station table (Main, B1 re-ruling 2026-09-26).
 ISO_RIGHT_FIELD = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
@@ -282,6 +317,7 @@ BOM_PART_NUMBERS = {
     "pinion-handle": "MHA-058",
     "pinion-arbor": "MHA-102",
     "pinion-arbor-collar": "MHA-144",
+    "pinion-strap-pin": "MHA-145",
     "slotted-screw": "MHA-101",
 }
 BOM_DESCRIPTIONS = {
@@ -327,10 +363,13 @@ BOM_DESCRIPTIONS = {
     "pinion-cam-pin": "PINION CAM FOLLOWER PIN",
     "pinion-cam": "PINION ECCENTRIC CAM, WITH M2.5 SET SCREW",
     "pinion-lever": "PINION LEVER",
-    "pinion-lever-pin": "PINION LEVER PIN, 1/16 X 13 STEEL",
+    # Grouped: its configurations' BOM description wins over a written cell,
+    # so the row prints the registry description the builder stamps.
+    "pinion-lever-pin": str(_config.parts("pinion-lever-pin")["description"]),
     "pinion-handle": "PINION GRIP CROSSROD",
     "pinion-arbor": "INTEGRAL PINION ARBOR AND GRIP HEAD",
     "pinion-arbor-collar": "PINION ARBOR RETENTION COLLAR",
+    "pinion-strap-pin": "1/16 X 1/2 SPRING PIN, MCMASTER 98296A027",
     "slotted-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A201",
 }
 if set(BOM_DESCRIPTIONS) != set(BOM_PART_NUMBERS):
@@ -348,6 +387,7 @@ BOM_NORMALIZED_ALIASES = {
 # package is not released while any remains.
 ASSEMBLED_HEADING = f"SAVED WORKING POSE AND FREE MOTIONS: SEE SHEET {CHECKS_SHEET} FOR SETUP."
 
+PINION_FEELER_STACK = CRANK_SPOT_FACE_RETREAT + PINION_SEAT_FEELER
 CONE_CRANK_STEPS = "\n".join(
     (
         "ASSEMBLY SEQUENCE - CONE SET AND CRANK",
@@ -357,8 +397,11 @@ CONE_CRANK_STEPS = "\n".join(
         f"   {CONE_GEAR_JOINT}: T006 AT THE BACK THROUGH",
         f"   T120 AT THE FRONT (STATION TABLE, SHEET {FIT_SHEET}).",
         # #906 (Main 2026-09-26): MHA-021's joining method moved here from its
-        # print (rule 6); the wording is the gear's own constants.
-        f"   MHA-021 FRONT OF T120: {CRANK_GEAR_JOINT} ITS MHA-014 SEAT;",
+        # print (rule 6); the wording is the gear's own constants.  #916: the
+        # shaft's thrust collar is the 64T's axial stop, so the step names it
+        # (Main 2026-09-27; crank_boss_rim books the collar stack).
+        "   MHA-021 FRONT OF T120, AGAINST THE MHA-014 COLLAR:",
+        f"   {CRANK_GEAR_JOINT} ITS SEAT;",
         f"   {CRANK_GEAR_ALTERNATIVE}.",
         # U37c (user, 2026-09-23): MHA-142 is MSC 40923898, 1/4-20 x 3-1/2
         # slotted fillister, through the unchanged 6.02 counterbore. Its floor
@@ -399,10 +442,13 @@ CONE_CRANK_STEPS = "\n".join(
         "   PINNED, AND MESH IT WITH MHA-021 TOOTH IN GAP. CHECK BACKLASH",
         "   0.20-0.55 AT THE MHA-025 PITCH LINE, FREE THROUGH ONE FULL MHA-021",
         "   TURN. OUT OF BAND: STOP - MHA-016 BORE SPACING IS OUT (SEE ITS",
-        "   PRINT). HOLD MHA-025 IN MESH; SET ITS STATION 0.25 OFF THE SPOT",
-        "   FACE WITH A FEELER. ONLY THEN MATCH-DRILL AND REAM FOR MHA-134 AT",
-        "   BOSS MID-LENGTH WITH MHA-026; SEAT FLUSH BOTH SIDES PER THE MHA-025",
-        "   PRINT. RE-CHECK BACKLASH 0.20-0.55 AFTER PINNING.",
+        # The spot face stands back from the 64T (cone_pivot_post_spec
+        # CRANK_SPOT_FACE_RETREAT), so the feeler is a stack: the retreat
+        # plus the 16T's seat feeler.
+        f"   PRINT). HOLD MHA-025 IN MESH; SET ITS STATION {PINION_FEELER_STACK:.2f} OFF THE SPOT",
+        "   FACE WITH A FEELER STACK. ONLY THEN MATCH-DRILL AND REAM FOR",
+        "   MHA-134 AT BOSS MID-LENGTH WITH MHA-026; SEAT FLUSH BOTH SIDES PER",
+        "   THE MHA-025 PRINT. RE-CHECK BACKLASH 0.20-0.55 AFTER PINNING.",
         "5. THE PAPER-DRIVE T12 WHEEL GOES ON MHA-026 BEFORE THE ARM.",
         # U33 (user, 2026-09-23): crank hub MHA-137 pressed into the arm and
         # seam-pinned by MHA-138 (a 4 m6 dowel, 4.0 long = half the arm); the
@@ -497,6 +543,20 @@ BANK_STEPS = "\n".join(
         # the back washer; pulled forward it reads nothing.
         "9F. THE BANK TURNS FREE BY HAND. BANK PUSHED BACK:",
         "   A 0.35 LEAF ENTERS AT THE FRONT MHA-121, A 0.55 LEAF DOES NOT.",
+        # #936 P1 b, option A (user ruling 2026-09-26): the north MHA-123 ear
+        # is the rocker bank's axial datum (rocker_bank_layout), set here on
+        # the 9A DRO zero so the cams and the rocker stations share one datum.
+        # Y is the hole-table rear-face distance of the ear inner face,
+        # BOTTOM_REAR_Z - NORTH_EAR_INNER_Z = 67.711, held to the same
+        # BACK_STRAP_LOCATE_BAND edge-find as 9A. Channel assembly MHA-A02
+        # cites this step by key (channel_steps.NORTH_BRACKET_SET_REF). The
+        # band the rod pins need from it is open: #948.
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}. MHA-089 SCREWED DOWN ON THE BASE"
+        " (FRAME ASSEMBLY MHA-A04 STEP 8),",
+        "   DRO STILL ZEROED AS 9A. STAND THE NORTH MHA-123 ON THE MHA-089",
+        "   RAIL, EAR TO THE BACK. SET ITS EAR INNER FACE TO Y 67.62-67.81;",
+        "   CLAMP. DRILL AND TAP THE RAIL THROUGH ITS FEET PER THE MHA-089 SEAT",
+        "   CALLOUT (VIEW B); SCREW IT DOWN AND RECHECK Y.",
         f"   PINION RIG: CONT. ON SHEET {FIT_SHEET}.",
     )
 )
@@ -508,32 +568,32 @@ RIG_STEPS = "\n".join(
         # bonded, the drum blocks MHA-102 from the north and its 15 mm head
         # from the south. So the arbor passes the front strap bare, back end
         # first, and the drum is bonded after (reviewfirst, Main 2026-09-24).
-        "10. PRESS {cam_pins}X MHA-116 INTO THE MHA-056 SEATS PER ITS PRINT.",
-        "11. MATCH-REAM THE MHA-102 HEAD TO MHA-058; PRESS MHA-058 (NO TURN OR",
+        "11. PRESS {cam_pins}X MHA-116 INTO THE MHA-056 SEATS PER ITS PRINT.",
+        "12. MATCH-REAM THE MHA-102 HEAD TO MHA-058; PRESS MHA-058 (NO TURN OR",
         "    SLIDE BY HAND).",
         # R1a (user): pinned retention collar MHA-144 (#860). It goes on
         # before the arbor is journalled (pinion_arbor_collar_spec); the pin
         # is the rig's 1/16 x 1/2 slotted spring pin, never proud of the Ø15.
-        "12. SLIDE MHA-144 ON FROM THE MHA-102 BACK END, PAST BOTH JOURNALS,",
+        "13. SLIDE MHA-144 ON FROM THE MHA-102 BACK END, PAST BOTH JOURNALS,",
         "    TO THE MHA-102 PIN HOLE; DRIVE ONE 1/16 X 1/2 SPRING PIN THROUGH",
         "    BOTH, SUB-FLUSH.",
-        "13. PASS MHA-102, BACK END FIRST, THROUGH THE FRONT MHA-056 TOP BORE",
+        "14. PASS MHA-102, BACK END FIRST, THROUGH THE FRONT MHA-056 TOP BORE",
         "    FROM THE HEAD SIDE.",
-        "14. FIT MHA-002 ON MHA-102 PER THE MHA-102 PRINT.",
-        "15. JOURNAL THE MHA-102 BACK END IN THE BACK MHA-056 TOP BORE; HANG",
+        "15. FIT MHA-002 ON MHA-102 PER THE MHA-102 PRINT.",
+        "16. JOURNAL THE MHA-102 BACK END IN THE BACK MHA-056 TOP BORE; HANG",
         "    BOTH MHA-056 ON MHA-062 THROUGH {pivot_blocks}X MHA-061.",
         # E-a (user): the strap feet are pinned to the torque shaft. Right
         # after the hang: MHA-062 is drilled off the machine (the cams sit
         # ~18.5 west of the foot), and once the cams are on, the pin's west
         # edge has 0.38 of air to the MHA-104 collar. Wording from
         # pinioncluster (dt-torque-shaft-pin-fitup-steps-20260924.md), #858.
-        "16. PUSH THE HUNG CLUSTER HARD ON THE BACK MHA-061; SET",
+        "17. PUSH THE HUNG CLUSTER HARD ON THE BACK MHA-061; SET",
         "    MHA-062 FLUSH WITH ITS OUTER FACE. TRANSFER-PUNCH MHA-062 THROUGH",
         "    EACH MHA-056 CROSS HOLE; WITHDRAW IT AND DRILL 1/16 THRU AT EACH",
         "    MARK (V-BLOCK). REFIT MHA-062 FLUSH END BACK; DRIVE ONE 1/16 X 1/2",
         "    SPRING PIN PER STRAP, SUB-FLUSH BOTH EDGES. THE CLUSTER SWINGS",
         "    FREELY AND MHA-062 TURNS WITH IT IN BOTH MHA-061.",
-        "17. FIT {cams}X MHA-104 AND MHA-059 ON MHA-060 IN THE MHA-061 LIFT",
+        "18. FIT {cams}X MHA-104 AND MHA-059 ON MHA-060 IN THE MHA-061 LIFT",
         "    BORES. PARK EACH CAM ECCENTRIC DOWN; LOCK IT WITH THE M2.5 SET",
         "    SCREW SUPPLIED WITH MHA-104. SEAT MHA-059 ON MHA-060 TO THE BORE",
         "    FLOOR, GRIP AT ITS PARK ANGLE; AT 3 O'CLOCK MATCH-DRILL 1/16",
@@ -544,16 +604,16 @@ RIG_STEPS = "\n".join(
         # TRANSFER FROM MHA-061. The level line of centres makes block travel
         # equal gap change; 2.5 is the physical rest gap, not the CAD gap
         # (pinioncluster, PR #837).
-        "18. LOCATE THE RIG ON BASE MHA-035 (FRAME ASSEMBLY MHA-A04); ITS",
+        "19. LOCATE THE RIG ON BASE MHA-035 (FRAME ASSEMBLY MHA-A04); ITS",
         "    SEATS ARE TRANSFERRED, NOT PRE-DRILLED. SET BOTH MHA-061 LOOSE",
         "    ON THE BASE WITH MHA-114 FITTED.",
         "    PARK MHA-059: THE MHA-116 PINS REST ON THE CAMS UNDER THE SPRING.",
-        "19. FACE A MHA-002 TOOTH TIP TO A MHA-027 TOOTH TIP ON THE LEVEL",
+        "20. FACE A MHA-002 TOOTH TIP TO A MHA-027 TOOTH TIP ON THE LEVEL",
         "    LINE OF CENTRES. SLIDE THE RIG IN UNTIL A 2.5 FEELER (E.G. 2.00",
         "    + 0.50 LEAVES) IS SNUG; ACCEPT 2.3-2.7. SET IT AT THE FRONT AND",
         "    BACK STATIONS TO SQUARE BOTH MHA-061 TO THE DRUM.",
         # #854 Codex P1: the front-block end-play feeler is set here, before
-        # the clamp and before step 20 spots the seats. Wording from
+        # the clamp and before step 21 spots the seats. Wording from
         # pinioncluster; the band is pinion_rig_layout FRONT_BLOCK_FEELER
         # 0.25 with FRONT_BLOCK_FEELER_BAND 0.10, printed as limits (the purity
         # gate keeps bilateral bands in the spec). PENDING until #854 lands,
@@ -565,12 +625,12 @@ RIG_STEPS = "\n".join(
         # BLOCK_/FOOT_SCREW_DRILL_DEPTH and _HOLE_DEPTH; the #8-32 pair is the
         # rule-12 E10 re-derive on dt-pinion-lever-pin #844). FOOT_HOLE_DEPTH
         # 8.975 prints as 9.0: .X +/-0.8 is the honest band for a tap depth.
-        "20. SPOT MHA-035 THROUGH THE MHA-061 HOLES; DRILL #29 X 15.0, TAP",
+        "21. SPOT MHA-035 THROUGH THE MHA-061 HOLES; DRILL #29 X 15.0, TAP",
         "    #8-32 X 12.75 (PLUG, THEN BOTTOMING), {slotted} PLACES. SET",
         "    MHA-114 WITH ITS TERMINAL FLAT ON THE PARKED BACK MHA-056; SPOT",
         "    THROUGH ITS FOOT HOLE; DRILL #43 X 11.0, TAP #4-40 X 9.0 (PLUG,",
         "    THEN BOTTOMING), 1 PLACE. FIT {slotted}X MHA-101 AND 1X MHA-103.",
-        f"21. OTHER BASE MOUNTING: SEE SHEET {CHECKS_SHEET}, EXTERNAL INTERFACES.",
+        f"22. OTHER BASE MOUNTING: SEE SHEET {CHECKS_SHEET}, EXTERNAL INTERFACES.",
     )
 )
 
@@ -606,7 +666,7 @@ CHECKS = "\n".join(
         "   (SINES). RETURN MHA-059 TO PARK; RE-ENGAGE THE CONE SET.",
         "6. PARKED, MHA-114 HOLDS MHA-002 CLEAR OF EVERY MHA-027.",
         "7. PARKED, PINS ON THE CAMS: A 2.5 FEELER IS SNUG TIP TO TIP AT THE",
-        f"   FRONT AND BACK STATIONS; ACCEPT 2.3-2.7 (SHEET {FIT_SHEET}, STEP 19).",
+        f"   FRONT AND BACK STATIONS; ACCEPT 2.3-2.7 (SHEET {FIT_SHEET}, STEP 20).",
     )
 )
 
@@ -705,6 +765,105 @@ def ring_fit_shift(
         (y0 + y1) / 2.0 - (ring[1] + ring[3]) / 2.0,
     )
     return shift, overflows
+
+
+def ring_keep_out_shift_x(
+    outline: tuple[float, float, float, float],
+    shift: tuple[float, float],
+    *,
+    margin: float,
+    balloon_radius: float,
+    keep_out: tuple[float, float, float, float],
+) -> float:
+    """The x shift that keeps the balloon ring's low arc left of a keep-out.
+
+    ``_spread_balloons`` puts every balloon centre on the ellipse ``margin``
+    outside the (shifted) outline, so the ellipse bounds where a balloon can
+    land.  ``keep_out`` is (left, bottom, right, top), already grown by the
+    clearance.  Where the ellipse dips low enough for a balloon to reach below
+    the keep-out's top, its right-most balloon must stay left of the keep-out:
+    returns ``shift[0]`` when that holds, else the shift that just makes it.
+    """
+    left, _bottom, _right, top = keep_out
+    rx = (outline[2] - outline[0]) / 2.0 + margin
+    ry = (outline[3] - outline[1]) / 2.0 + margin
+    cx = (outline[0] + outline[2]) / 2.0 + shift[0]
+    cy = (outline[1] + outline[3]) / 2.0 + shift[1]
+    low = (top + balloon_radius - cy) / ry  # sin of the arc's upper edge
+    if low <= -1.0:
+        return shift[0]
+    reach = rx if low >= 0.0 else rx * math.sqrt(1.0 - low * low)
+    limit = left - balloon_radius - reach
+    return shift[0] if cx <= limit else shift[0] - (cx - limit)
+
+
+def cluster_ring_fit(
+    outline: tuple[float, float, float, float],
+) -> tuple[tuple[float, float], list[str], float]:
+    """Shift that fits a cluster view's balloon ring, its overflows, its slide.
+
+    The ring is centred in CLUSTER_RING_REGION. A ring taller than the region
+    spills below it, where the title block takes the sheet's right half, so it
+    slides left until its low arc clears the block (rim-124f: items 5 and 33
+    landed on it); a slide that pushes it past the region's left is an overflow.
+    Only the outline's size matters: the shift re-centres wherever it landed.
+    """
+    shift, overflows = ring_fit_shift(outline, CLUSTER_RING_REGION, grow=CLUSTER_RING_REACH)
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    keep_out = (
+        template.title_block_left_m - CLUSTER_TITLE_BLOCK_CLEARANCE,
+        0.0,
+        template.width_m,
+        template.title_block_top_m + CLUSTER_TITLE_BLOCK_CLEARANCE,
+    )
+    x = ring_keep_out_shift_x(
+        outline,
+        shift,
+        margin=CLUSTER_BALLOON_MARGIN,
+        balloon_radius=BALLOON_DIAMETER / 2.0,
+        keep_out=keep_out,
+    )
+    ring_left = outline[0] + x - CLUSTER_RING_REACH
+    if ring_left < CLUSTER_RING_REGION[0]:
+        overflows.append(
+            f"left {ring_left * 1000:.1f} mm < {CLUSTER_RING_REGION[0] * 1000:.1f} mm "
+            "clearing the title block"
+        )
+    return (x, shift[1]), overflows, x - shift[0]
+
+
+def _scale_text(scale: tuple[float, float]) -> str:
+    return f"{scale[0]:g}:{scale[1]:g}"
+
+
+def cluster_ring_scale(
+    outline: tuple[float, float, float, float],
+    placed: tuple[float, float],
+    *,
+    label: str,
+) -> tuple[float, float]:
+    """The largest ladder scale, from ``placed`` down, whose balloon ring fits.
+
+    ``outline`` is the view's outline at ``placed``; a view's outline scales
+    with its scale, and the fit reads only its size (cluster_ring_fit).
+    Raises naming every scale's overflow when none on the ladder fits.
+    """
+    if placed not in CLUSTER_SCALE_LADDER:
+        raise ValueError(f"{label}: scale {_scale_text(placed)} is not on the ladder")
+    x0, y0, x1, y1 = outline
+    cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+    findings = []
+    for scale in CLUSTER_SCALE_LADDER[CLUSTER_SCALE_LADDER.index(placed) :]:
+        k = (scale[0] / scale[1]) / (placed[0] / placed[1])
+        hw, hh = (x1 - x0) / 2.0 * k, (y1 - y0) / 2.0 * k
+        _shift, overflows, _slide = cluster_ring_fit((cx - hw, cy - hh, cx + hw, cy + hh))
+        if not overflows:
+            return scale
+        findings.append(f"{_scale_text(scale)}: {'; '.join(overflows)}")
+    raise ValueError(
+        f"{label}: no ladder scale fits the balloon ring in the cluster region "
+        f"({' | '.join(findings)})"
+    )
 
 
 def balloon_attachment_violations(
@@ -940,6 +1099,18 @@ def _view_outline(view: Any) -> tuple[float, float, float, float]:
     if len(outline) != 4 or outline[2] <= outline[0] or outline[3] <= outline[1]:
         raise RuntimeError(f"view has an invalid outline {outline!r}")
     return outline
+
+
+def _set_view_scale(
+    adapter: Any, view: Any, scale: tuple[float, float], *, label: str
+) -> None:
+    """Re-scale a placed drawing view and read the scale back."""
+    view = _early_bound(view, "IView")
+    view.ScaleRatio = double_array([float(scale[0]), float(scale[1])])
+    adapter.currentModel.EditRebuild3()
+    ratio = tuple(float(value) for value in view.ScaleRatio)
+    if len(ratio) != 2 or abs(ratio[0] / ratio[1] - scale[0] / scale[1]) > 1e-9:
+        raise RuntimeError(f"{label}: view scale reads {ratio!r}, expected {scale!r}")
 
 
 def _shift_view(adapter: Any, view: Any, delta: tuple[float, float], *, label: str) -> None:
@@ -1984,32 +2155,48 @@ def _place_cluster_sheet(
     *,
     bom_name: str,
     items: dict[str, str],
-) -> dict[str, Any]:
-    """Place one exploded cluster sheet; return its balloons by note name."""
+) -> tuple[dict[str, Any], tuple[float, float]]:
+    """Place one exploded cluster sheet; return its balloons by note name and
+    the scale its view fitted at."""
     number = CLUSTER_SHEETS[cluster]
     _activate_sheet(adapter, SHEET_NAMES[number - 1])
     label = f"{cluster} exploded isometric"
-    scale = CLUSTER_SCALES[cluster]
-    view = place_view(adapter, str(SOURCE), "*Isometric", *CLUSTER_VIEW_CENTER, scale=scale)
+    preferred = CLUSTER_SCALES[cluster]
+    view = place_view(adapter, str(SOURCE), "*Isometric", *CLUSTER_VIEW_CENTER, scale=preferred)
     _set_exploded_state(adapter, view, True, label=label)
     names = frozenset(facts.clusters[cluster])
     _isolate_instances(adapter, view, names, label=label)
     set_high_quality_shaded_with_edges(adapter, view, label=label)
     _link_view_to_bom(view, bom_name, label=label)
-    outline = _view_outline(view)
-    shift, overflows = ring_fit_shift(
-        outline, CLUSTER_RING_REGION, grow=CLUSTER_BALLOON_MARGIN + BALLOON_DIAMETER
-    )
+    preferred_outline = _view_outline(view)
+    scale = cluster_ring_scale(preferred_outline, preferred, label=label)
+    outline = preferred_outline
+    if scale != preferred:
+        _set_view_scale(adapter, view, scale, label=label)
+        outline = _view_outline(view)
+    # The ladder predicted this fit from the preferred outline; the re-read
+    # outline is the proof, before any balloon exists.
+    shift, overflows, slide = cluster_ring_fit(outline)
     _telemetry.event(
         "drawing.cluster_ring_fit",
         cluster=cluster,
+        preferred_scale=_scale_text(preferred),
+        scale=_scale_text(scale),
+        preferred_outline_mm=tuple(value * 1000.0 for value in preferred_outline),
         outline_mm=tuple(value * 1000.0 for value in outline),
         shift_mm=tuple(value * 1000.0 for value in shift),
+        title_block_slide_mm=slide * 1000.0,
         overflows=tuple(overflows),
     )
     if overflows:
-        _telemetry.warn(
-            f"{label}: balloon ring estimate overflows ({'; '.join(overflows)}); the audit decides"
+        raise RuntimeError(
+            f"{label}: at {_scale_text(scale)} the balloon ring still overflows "
+            f"the cluster region ({'; '.join(overflows)})"
+        )
+    if scale != preferred:
+        _telemetry.info(
+            f"{label}: balloon ring fits at {_scale_text(scale)}, "
+            f"not the preferred {_scale_text(preferred)}"
         )
     _shift_view(adapter, view, shift, label=f"{label} ring fit")
     stems = sorted(
@@ -2043,9 +2230,9 @@ def _place_cluster_sheet(
         adapter,
         number,
         f"{CLUSTER_TITLES[cluster]} - EXPLODED ISOMETRIC "
-        f"{int(scale[0])}:{int(scale[1])}; ITEMS PER SHEET 2",
+        f"{_scale_text(scale)}; ITEMS PER SHEET 2",
     )
-    return _balloon_annotations(balloons)
+    return _balloon_annotations(balloons), scale
 
 
 def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
@@ -2150,14 +2337,16 @@ def _place_checks_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     return findings
 
 
-def _place_package(adapter: Any, facts: SourceFacts) -> None:
+def _place_package(adapter: Any, facts: SourceFacts) -> dict[str, tuple[float, float]]:
+    """Place every sheet; return each sheet's scale as placed."""
     _create_package_sheets(adapter)
     findings = _place_assembled_sheet(adapter)
     bom_name, items = _place_bom_sheet(adapter, facts)
     cluster_balloons: dict[str, dict[str, Any]] = {}
+    cluster_scales: dict[Cluster, tuple[float, float]] = {}
     for cluster, number in CLUSTER_SHEETS.items():
-        cluster_balloons[SHEET_NAMES[number - 1]] = _place_cluster_sheet(
-            adapter, cluster, facts, bom_name=bom_name, items=items
+        cluster_balloons[SHEET_NAMES[number - 1]], cluster_scales[cluster] = (
+            _place_cluster_sheet(adapter, cluster, facts, bom_name=bom_name, items=items)
         )
     findings += _place_sequence_sheet(adapter, facts)
     findings += _place_bank_sheet(adapter, facts)
@@ -2166,6 +2355,7 @@ def _place_package(adapter: Any, facts: SourceFacts) -> None:
     for sheet_name, sheet_balloons in cluster_balloons.items():
         _final_balloon_uncross(adapter, sheet_name, sheet_balloons)
     _check_package_layout(adapter, findings)
+    return package_sheet_scales(cluster_scales)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -2189,7 +2379,7 @@ async def build(adapter: Any) -> dict[str, str]:
     try:
         try:
             facts = _validate_source(source_model)
-            _place_package(adapter, facts)
+            sheet_scales = _place_package(adapter, facts)
             artifacts = await finalize_drawing(
                 adapter,
                 OUTPUTS,
@@ -2198,7 +2388,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 scale=ASSEMBLED_SCALE,
                 expected_sheet_names=SHEET_NAMES,
                 sheet_layouts=SHEET_LAYOUTS,
-                sheet_scales=SHEET_SCALES,
+                sheet_scales=sheet_scales,
             )
         except Exception:
             _export_failure_pdf(adapter, "build")

@@ -43,7 +43,7 @@ from swing_stop_screw_spec import SHANK_DIA as STOP_SHANK_DIA
         (
             "spring foot",
             part.FOOT_SEAT_SPEC,
-            part.FOOT_SCREW_LEN - part.SPRING_THICKNESS,
+            part.FOOT_SCREW_LEN - part.SPRING_THICKNESS_MIN,
             "tapped_bottoming",
             2,
         ),
@@ -81,6 +81,20 @@ def test_blind_seats_keep_stock_in_full_threads_above_the_tap_lead(
     )
     with pytest.raises(AssertionError, match="tap lead"):
         part.require_blind_seat_fit(label, short_lead, engagement)
+
+
+def test_foot_seat_names_its_bottoming_tap_runout() -> None:
+    # Main (#859 restricted review, change 6): the foot seat's drill runs a
+    # bottoming-tap runout past its full threads, at least two pitches.  On
+    # integ every base seat sizes that runout through the shared
+    # harmonic_base_fasteners.seat_drill_depth, which also books both depths'
+    # printed band; the foot seat must take it from there.
+    pitch = 25.4 / 40.0  # #4-40
+    runout = part.FOOT_SCREW_DRILL_DEPTH - part.FOOT_SCREW_HOLE_DEPTH
+    assert runout >= 2.0 * pitch + 2.0 * part.SEAT_DEPTH_BAND - 1e-9
+    assert part.FOOT_SCREW_DRILL_DEPTH == pytest.approx(
+        part.seat_drill_depth(part.FOOT_SCREW_HOLE_DEPTH, "#4-40", "tapped_bottoming")
+    )
 
 
 def test_pivot_rejects_former_full_threads_to_drill_bottom() -> None:
@@ -316,6 +330,12 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
     assert math.isclose(engaged_gap, part.SWING_HARDWARE_GEOMETRY.stop_engaged_gap)
 
 
+def pinion_pivot_block_depth() -> float:
+    from pinion_pivot_block_geometry import BLOCK_DEPTH
+
+    return BLOCK_DEPTH
+
+
 def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
     # The 32T coherent-placement cutover shifts the block screws and spring
     # foot with the pinion rig while the arbor-pedestal seats stay on the
@@ -330,11 +350,28 @@ def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
 
     former_block_x = (-17.226441649810653, -0.22644164981065273)
     former_pivot_x = former_block_x[0] + 8.5
-    former_feet = ((former_pivot_x - 20.0, rig.SPRING_Z - MECHANISM_Z_SHIFT),)
+    former_feet = ((former_pivot_x - 20.0, rig.SPRING_PAD_Z - MECHANISM_Z_SHIFT),)
     assert part.BLOCK_SCREW_XZ == tuple(
         (x + MECHANISM_X_SHIFT, z) for z in rig.BLOCK_SEAT_Z for x in former_block_x
     )
-    assert rig.BLOCK_SEAT_Z[1] == pytest.approx(82.875 + MECHANISM_Z_SHIFT)
+    # Option E-a deepened the blocks outward from the back stop (10.25 ->
+    # 10.5 -> 11.0), so the back seats moved 0.375 aft of the released
+    # 82.875, and RIG_AFT_SHIFT (Main, #858: j = 19's full face) moved the
+    # rig 1.25 aft.
+    assert rig.BLOCK_SEAT_Z[1] == pytest.approx(
+        83.25 + rig.RIG_AFT_SHIFT + MECHANISM_Z_SHIFT
+    )
+    # Codex #854 P1: the front seats are cut at the fit-up station -- one
+    # block, the solid stack and one feeler off the back seats -- not at a
+    # pose carrying extra air (-86.237 before the fix).
+    assert rig.BLOCK_SEAT_Z[1] - rig.BLOCK_SEAT_Z[0] == pytest.approx(
+        pinion_pivot_block_depth() + rig.INNER_SPAN, abs=1e-9
+    )
+    # Ruling 3's 0.45 drum shim puts the front seats that much forward, and
+    # the 11.0 block half its extra depth.
+    assert rig.BLOCK_SEAT_Z[0] == pytest.approx(
+        -89.65 + rig.RIG_AFT_SHIFT + MECHANISM_Z_SHIFT
+    )
     assert part.FOOT_SCREW_XZ == tuple(
         (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in former_feet
     )
@@ -430,13 +467,11 @@ def test_socket_bore_leader_lands_on_bore_clear_of_the_cross_tap() -> None:
 
 
 def test_transferred_pinion_block_seats_print_no_station() -> None:
-    # Codex #855 P1: BLOCK_SEAT_Z is a model-pose station, and the pose's two
-    # STRAP_AIR gaps stand the front block 2 x STRAP_AIR south of its
-    # manufactured station -- more than a #8 floats in its clearance hole.
-    # That is harmless only because the print never carries the station: the
-    # four block seats are spotted THROUGH MHA-061 at assembly (U28 corollary;
-    # MHA-061's note "SPOT BASE SEATS THROUGH BLOCK HOLES AT ASSEMBLY."), so
-    # they leave the hole table and their one callout names the transfer.
+    # Codex #855 P1: the four block seats are spotted THROUGH MHA-061 at
+    # assembly (U28 corollary; the drive-train RIG_SET_STEP, "BEFORE SPOTTING
+    # THE TRANSFER SEATS"), so they leave the hole table and their one callout
+    # names the transfer.  Codex #854 P1: the model seats themselves sit at the
+    # fit-up stations, so the modelled holes match the transferred ones.
     import draw_harmonic_base as sheet
     import pinion_rig_layout as rig
     from pinion_pivot_block_geometry import BLOCK_DEPTH
@@ -444,13 +479,13 @@ def test_transferred_pinion_block_seats_print_no_station() -> None:
     block_seats = {(x, z, part.BLOCK_SCREW_HOLE_DIA) for x, z in part.BLOCK_SCREW_XZ}
     assert set(sheet.TRANSFER_BLOCK_HOLES) == block_seats
     assert not block_seats & set(sheet.TABLE_HOLES)
-    assert sheet.TRANSFER_BLOCK_CALLOUT.startswith("TRANSFER FROM MHA-061")
-    assert "AT ASSEMBLY" in sheet.TRANSFER_BLOCK_CALLOUT
-    # The front pair's pose-vs-hardware offset the transfer absorbs.
-    physical_front_seat = rig.PHYSICAL_FRONT_BLOCK_OUTER_Z + BLOCK_DEPTH / 2.0
-    assert physical_front_seat - rig.BLOCK_SEAT_Z[0] == pytest.approx(
-        2.0 * rig.STRAP_AIR
-    )
+    # User ruling P1-2: nothing in the frame fixes the rig along the bank
+    # until the fitter sets it, so both rig callouts name the RIG SET note that
+    # states it (the drum's back end on leaf D off the north gear).
+    assert sheet.TRANSFER_BLOCK_CALLOUT == "TRANSFER FROM MHA-061\nAFTER RIG SET;\n"
+    # The front pair sits one feeler off the fit-up stack, with no pose air.
+    front_seat = rig.BACK_BLOCK_Z0 - rig.INNER_SPAN - BLOCK_DEPTH / 2.0
+    assert rig.BLOCK_SEAT_Z[0] == pytest.approx(front_seat, abs=1e-9)
 
 
 def test_transferred_pedestal_and_spring_seats_print_no_station() -> None:
@@ -468,7 +503,7 @@ def test_transferred_pedestal_and_spring_seats_print_no_station() -> None:
     assert sheet.TRANSFER_SPRING_HOLE[:2] == part.FOOT_SCREW_XZ[0]
     assert not (pedestal_seats | {sheet.TRANSFER_SPRING_HOLE}) & set(sheet.TABLE_HOLES)
     assert sheet.TRANSFER_PEDESTAL_CALLOUT == "TRANSFER FROM MHA-004\nAT ASSEMBLY;\n"
-    assert sheet.TRANSFER_SPRING_CALLOUT == "TRANSFER FROM MHA-114\nAT ASSEMBLY;"
+    assert sheet.TRANSFER_SPRING_CALLOUT == "TRANSFER FROM MHA-114\nAFTER RIG SET;"
     assert not any(tag.startswith("G") for tag in sheet.HOLE_TAG_POSITIONS)
 
 
@@ -921,28 +956,38 @@ def test_only_notes_that_reach_the_final_sheet_are_obstacles() -> None:
     )
     keywords = {kw.arg: ast.unparse(kw.value) for kw in finalize.keywords}
     assert keywords["redundant_note_substrings"] == "FINAL_SHEET_REMOVED_NOTES"
-    assert "note_reaches_final_sheet(_note_text(adapter, annotation))" in inspect.getsource(
-        sheet._check_hole_sheet_callouts
-    )
+    source = inspect.getsource(sheet._check_hole_sheet_callouts)
+    assert "text = _note_text(adapter, annotation)" in source
+    assert "if not note_reaches_final_sheet(text):" in source
 
 
-def _drive_hole_sheet_callout_check(monkeypatch, note_box) -> None:
+# The fake sheet's RIG SET note, clear of its table, view and callout.
+_FAKE_RIG_SET_BOX = (0.150, 0.020, 0.180, 0.040)
+
+
+def _drive_hole_sheet_callout_check(
+    monkeypatch, note_box, rig_set_box: tuple[float, float, float, float] | None = _FAKE_RIG_SET_BOX
+) -> None:
     """Run _check_hole_sheet_callouts on fakes: one callout, one sheet note at
-    ``note_box`` and a display dimension, which _iter_view_annotations yields
-    as ``(None, annotation)`` since #902 (a5563c7a0)."""
+    ``note_box``, the RIG SET note at ``rig_set_box`` (None: absent) and a
+    display dimension, which _iter_view_annotations yields as
+    ``(None, annotation)`` since #902 (a5563c7a0)."""
     from types import SimpleNamespace
 
     import draw_harmonic_base as sheet
 
+    texts = {"note": "D1", "rig set": sheet.RIG_SET_STEP.replace("\n", "\r\n")}
+
     def annotations(_adapter, view):
         if view != "sheet":
             return iter(())
-        return iter(
-            (
-                (None, "display dimension"),
-                (SimpleNamespace(kind="note", label="D1", box=note_box), "note"),
-            )
-        )
+        rows = [
+            (None, "display dimension"),
+            (SimpleNamespace(kind="note", label="D1", box=note_box), "note"),
+        ]
+        if rig_set_box is not None:
+            rows.append((SimpleNamespace(kind="note", label="RS", box=rig_set_box), "rig set"))
+        return iter(rows)
 
     for name, value in {
         "_callout_display_data": lambda display, label: (None, (), ()),
@@ -955,7 +1000,7 @@ def _drive_hole_sheet_callout_check(monkeypatch, note_box) -> None:
         "datum_origin_boxes": lambda points: {},
         "_section_line_obstacles": lambda views: {},
         "_iter_view_annotations": annotations,
-        "_note_text": lambda adapter, annotation: "D1",
+        "_note_text": lambda adapter, annotation: texts[annotation],
         "_iter_tables": lambda adapter, view: (
             [SimpleNamespace(label="holes", box=(0.020, 0.020, 0.090, 0.060))]
             if view == "sheet"
@@ -984,6 +1029,19 @@ def test_hole_sheet_callout_check_still_measures_notes_beside_dimensions(
 ) -> None:
     with pytest.raises(RuntimeError, match="callout pedestal vs note D1"):
         _drive_hole_sheet_callout_check(monkeypatch, (0.110, 0.102, 0.120, 0.108))
+
+
+def test_hole_sheet_callout_check_measures_the_rig_set_note_against_obstacles(
+    monkeypatch,
+) -> None:
+    """Fail-first: the RIG SET note is measured like a callout, so the note
+    landing on the hole table fails the build -- a plain note obstacle is
+    never compared with the table -- and a sheet without it fails too."""
+    clear = (0.200, 0.200, 0.220, 0.210)
+    with pytest.raises(RuntimeError, match="callout RIG SET note vs table holes"):
+        _drive_hole_sheet_callout_check(monkeypatch, clear, rig_set_box=(0.030, 0.030, 0.060, 0.050))
+    with pytest.raises(RuntimeError, match="no RIG SET note"):
+        _drive_hole_sheet_callout_check(monkeypatch, clear, rig_set_box=None)
 
 
 def test_section_line_boxes_cover_arrows_and_labels_in_sheet_space() -> None:
@@ -1128,8 +1186,8 @@ def test_transfer_thread_goes_on_its_own_line_in_the_shared_band() -> None:
     # in the prefix DEFINITION (associative variables kept).
     import draw_harmonic_base as sheet
 
-    assert sheet.TRANSFER_BLOCK_CALLOUT == "TRANSFER FROM MHA-061\nAT ASSEMBLY;\n"
-    assert sheet.TRANSFER_SPRING_CALLOUT.endswith("AT ASSEMBLY;")
+    assert sheet.TRANSFER_BLOCK_CALLOUT == "TRANSFER FROM MHA-061\nAFTER RIG SET;\n"
+    assert sheet.TRANSFER_SPRING_CALLOUT.endswith("AFTER RIG SET;")
 
     class Display:
         def __init__(self, definition: str) -> None:
@@ -1491,3 +1549,95 @@ def test_flange_finish_fits_sheet_1_left_of_the_plan_with_named_margins() -> Non
     straight = harmonic_base_spec.BOTTOM_WIDTH / 2.0 - part.FLANGE_CORNER_R
     assert abs(sheet.FLANGE_FINISH_ATTACH_Z_MM) < straight
     assert attach[1] < y
+
+
+def test_rig_callouts_name_the_rig_set_note() -> None:
+    # User ruling P1-2 (pc-p1 eye pass): printed on the callouts, the RIG SET
+    # step ran the block callout through the top border and over the TOP VIEW
+    # caption. Each rig callout keeps its first line and swaps "AT ASSEMBLY;"
+    # for the note's name; the pedestal seats are not rig seats. Where the note
+    # lands is proved by the test below and measured at build time.
+    import draw_harmonic_base as sheet
+    import pinion_rig_fitup as fitup
+
+    for text in (sheet.TRANSFER_BLOCK_CALLOUT, sheet.TRANSFER_SPRING_CALLOUT):
+        lines = text.rstrip("\n").split("\n")
+        assert len(lines) == 2, text
+        assert lines[1] == sheet.TRANSFER_AFTER_RIG_SET
+        assert fitup.RIG_SET_NAME in lines[1]
+    assert sheet.TRANSFER_AFTER_RIG_SET == "AFTER RIG SET;"
+    assert "RIG SET" not in sheet.TRANSFER_PEDESTAL_CALLOUT
+    note = fitup.RIG_SET_STEP.split("\n")
+    assert note[0].startswith(fitup.RIG_SET_NAME + ",")
+    # The note carries every setting the transfers need, the front block's
+    # feeler included: it fixes FRONT_BLOCK_Z0, so the front seats with it
+    # (Codex #858, PRRT_kwDOPHDy386mUjhS).
+    feeler = f"FRONT MHA-061 {fitup.FRONT_BLOCK_FEELER:.2f} LEAF OFF FRONT MHA-056;"
+    assert feeler in note
+    assert note.index(feeler) == 1
+    assert "1.00 + 0.25 LEAVES OFF" in fitup.RIG_SET_STEP
+    assert "BANK PUSHED NORTH" in fitup.RIG_SET_STEP
+    assert "MHA-114 PAD 0.65 LEAF OFF MHA-061." in fitup.RIG_SET_STEP
+
+
+# The note's printed character advance and line pitch at the sheet's 3.5 text
+# height (read off the pc-p1 render of the same note).
+_NOTE_CHAR_MM = 2.69
+_NOTE_LINE_MM = 4.58
+
+
+def _rig_set_note_box(xy: tuple[float, float]) -> tuple[float, float, float, float]:
+    import pinion_rig_fitup as fitup
+
+    lines = fitup.RIG_SET_STEP.split("\n")
+    width = max(len(line) for line in lines) * _NOTE_CHAR_MM / 1000.0
+    height = len(lines) * _NOTE_LINE_MM / 1000.0
+    return (xy[0], xy[1] - height, xy[0] + width, xy[1])
+
+
+def test_rig_set_note_clears_the_sheet_2_callouts_table_and_views() -> None:
+    """The pc-p1 eye pass read the RIG SET text over the hole table's column,
+    the cross-tap callout and section arrow A.  The note's estimated box at
+    RIG_SET_NOTE_XY clears hb-render-4's callouts and e0e287c83's table,
+    views and labels; fail-first, the same box collides once moved onto the
+    table or across to the cross-tap callout.  The build measures the note's
+    read-back ink against every callout and obstacle the same way."""
+    import inspect
+
+    import draw_harmonic_base as sheet
+
+    obstacles = dict(E0E287C83_OBSTACLES)
+    obstacles.update((f"callout {name}", box) for name, box in HB_RENDER_4_BOXES.items())
+
+    def clashes(xy: tuple[float, float]) -> list[str]:
+        return sheet.find_callout_clashes({sheet.RIG_SET_NOTE_LABEL: _rig_set_note_box(xy)}, obstacles)
+
+    assert clashes(sheet.RIG_SET_NOTE_XY) == []
+    on_table = clashes((sheet.RIG_SET_NOTE_XY[0], 0.140))
+    assert any("table DetailItem460" in finding for finding in on_table), on_table
+    on_cross_tap = clashes((0.120, sheet.RIG_SET_NOTE_XY[1]))
+    assert any("MHA-132 cross-tap" in finding for finding in on_cross_tap), on_cross_tap
+    # The build check boxes the note's own ink, found by its text as read back.
+    assert sheet.is_rig_set_note(sheet.RIG_SET_STEP.replace("\n", "\r\n") + "\r\n")
+    assert not sheet.is_rig_set_note(sheet.TRANSFER_SPRING_CALLOUT)
+    source = inspect.getsource(sheet._check_hole_sheet_callouts)
+    assert "boxes[RIG_SET_NOTE_LABEL] = element.box" in source
+
+
+def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
+    # Main (restricted review of #858): one blanking helper in _common, traced
+    # like every other per-operation helper, and no local copy in the base.
+    import inspect
+
+    import _common
+
+    source = inspect.getsource(part)
+    blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
+    assert "def _hide_reference_sketches" not in source
+    assert source.count(blank) == 1
+    assert part.REFERENCE_SKETCHES == (
+        "RimWidthReference",
+        "HeightReference",
+        "CrossTapReference",
+    )
+    assert hasattr(_common.blank_reference_sketches, "__wrapped__")

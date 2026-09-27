@@ -349,14 +349,6 @@ def test_every_standalone_save_path_runs_the_check() -> None:
 # The debt at the time the check landed.  Owners delete entries as they convert
 # their parts; nobody adds one.  Shrink this snapshot along with the list.
 _SNAPSHOT = {
-    "pinion-arbor": {
-        "BackRimReference",
-        "BondZoneReference",
-        "DrumStationReference",
-        "OverallReference",
-        "PinStationReference",
-    },
-    "pinion-lever": {"GripStationReference", "PinHoleStationReference"},
     "cone-pivot-post": {"BoreSpacingReference", "JournalPlanReference"},
 }
 _OWNERS = {"pinioncluster", "crankhub", "pivot"}
@@ -595,6 +587,105 @@ def test_every_reference_creator_hides_what_it_creates() -> None:
         and not path.name.startswith("test_")
         and path.name not in _NON_SAVING_CREATORS
         and _creates_without_hiding(path.read_text(encoding="utf-8"))
+    )
+    assert offenders == []
+
+
+# Per NAME, not per module (#916, cg-916): build_cone_gear_shaft already blanked
+# its Sec planes, so the module-level sweep above passed while two new named
+# mate-reference planes (CollarFace, CollarEndPlane) saved shown and failed
+# #950's save gate on the seat.  A reference feature named by a string literal
+# must be hidden by that name, or by a type-based hider right after the
+# naming (_stock_fastener._blank_recipe_references takes no names).  Computed
+# names (f-strings, variables collected into a list) stay with the module-level
+# sweep and #950's save-time gate.
+_NAMED_AFTER_CREATE = re.compile(r"name_last_feature\(\s*\w+\s*,\s*(['\"])([^'\"]+)\1\s*\)")
+_HIDE_CALL = re.compile(r"\b\w*[Bb]lank\w*\(")
+_NAMING_WINDOW = 14  # lines from a create to its name_last_feature
+_HIDE_NEAR = 3  # lines from a naming to a type-based hide
+
+
+def _hide_calls(code: str) -> list[tuple[int, str]]:
+    """(line index, argument text) of every hide call, parentheses balanced."""
+    calls = []
+    for match in _HIDE_CALL.finditer(code):
+        if code[: match.start()].rstrip().endswith("def"):
+            continue
+        depth, start = 1, match.end()
+        for offset, char in enumerate(code[start:]):
+            depth += char == "("
+            depth -= char == ")"
+            if depth == 0:
+                calls.append((code.count("\n", 0, match.start()), code[start : start + offset]))
+                break
+    return calls
+
+
+def _named_references_left_shown(text: str) -> list[str]:
+    """Literal names a module gives reference features it never hides."""
+    lines = [
+        "" if line.lstrip().startswith("#") else line for line in text.splitlines()
+    ]
+    calls = _hide_calls("\n".join(lines))
+    hidden = "\n".join(arguments for _line, arguments in calls)
+    # A hide that names nothing hides by type, so it covers what was just named.
+    by_type = [line for line, arguments in calls if not re.search(r"['\"]", arguments)]
+    shown = []
+    for index, line in enumerate(lines):
+        if not _REFERENCE_CREATE.search(line):
+            continue
+        for at in range(index, min(index + _NAMING_WINDOW, len(lines))):
+            named = _NAMED_AFTER_CREATE.search(lines[at])
+            if named is None:
+                continue
+            name = named.group(2)
+            near = any(at < hide <= at + _HIDE_NEAR for hide in by_type)
+            by_name = re.search(rf"['\"]{re.escape(name)}['\"]", hidden)
+            if not by_name and not near:
+                shown.append(name)
+            break
+    return shown
+
+
+def test_the_per_name_sweep_flags_a_named_plane_left_shown() -> None:
+    """The cg-916 shape: one plane hidden by name, a second named and never
+    hidden, in a module that does hide something."""
+    source = (
+        "check('p', await adapter.create_plane(params))\n"
+        "name_last_feature(adapter, 'CollarFace')\n"
+        "check('p', await adapter.create_plane(params))\n"
+        "name_last_feature(adapter, 'Sec1EndPlane')\n"
+        "blank_reference_geometry(adapter, (('Sec1EndPlane', 'PLANE'),))\n"
+    )
+    assert not _creates_without_hiding(source)
+    assert _named_references_left_shown(source) == ["CollarFace"]
+    both = source.replace("(('Sec1EndPlane'", "(('CollarFace', 'PLANE'), ('Sec1EndPlane'")
+    assert _named_references_left_shown(both) == []
+    # A type-based hider right after the naming covers it (_stock_fastener).
+    assert (
+        _named_references_left_shown(
+            "check('a', await adapter.create_axis(params))\n"
+            "name_last_feature(adapter, 'ScrewAxis')\n"
+            "_blank_recipe_references(adapter)\n"
+        )
+        == []
+    )
+    # A commented-out hide does not count.
+    assert _named_references_left_shown(
+        "check('p', await adapter.create_plane(params))\n"
+        "name_last_feature(adapter, 'YokePlane')\n"
+        "# blank_reference_geometry(adapter, (('YokePlane', 'PLANE'),))\n"
+    ) == ["YokePlane"]
+
+
+def test_every_literal_named_reference_is_hidden_by_name() -> None:
+    offenders = sorted(
+        f"{path.name}: {name}"
+        for path in SCRIPTS.rglob("*.py")
+        if "diagnostics" not in path.relative_to(SCRIPTS).parts
+        and not path.name.startswith("test_")
+        and path.name not in _NON_SAVING_CREATORS
+        for name in _named_references_left_shown(path.read_text(encoding="utf-8"))
     )
     assert offenders == []
 

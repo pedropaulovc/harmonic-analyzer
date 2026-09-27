@@ -2,7 +2,7 @@ r"""Reproduction script: pinion return spring (book ch. 25; 1 used).
 
 The leaf spring that holds the alignment-pinion drum disengaged by default
 (p. 68-69 close-ups img01/img03/img04; video frames v4_pinion_013/018/019):
-a phosphor-bronze strip screwed to the base EAST of the BACK swing strap,
+a 17-7 PH stainless strip screwed to the base EAST of the BACK swing strap,
 outboard, rising in a blade that leans IN toward the strap and bears on its
 east flank 23.0 up from the pivot, 5.0 below the arbor.  Gravity swings the
 cluster east into mesh; the blade pushes the strap top back west onto the
@@ -16,9 +16,9 @@ Layout (sketch on the Front plane; the assembly seats the part at its machine
 anchor, base top 50.8, with a composed Ry(180), so part-local +x reads machine
 EAST -- direction words below are MACHINE directions; the part is an exact
 mid-plane z-extrude, so the Ry(180)'s z-flip is immaterial): the strip's
-INSIDE-surface path, drawn from the free tip down = a 2.0 flat, an R1.5 x 25
+INSIDE-surface path, drawn from the free tip down = a 2.0 flat, an R_KINK x 25
 deg crest turning back west, the straight blade leaning BLADE_LEAN_DEG west of
-vertical, an R2.0 bend, and the FOOT_LEN foot heading EAST to its free end.
+vertical, an R_BEND bend, and the FOOT_LEN foot heading EAST to its free end.
 Traced that way the one-sided thin wall lands right of travel -- west of the
 blade, under the foot -- so the blade's west face is the contact face.  The
 pad-merge volume gate proves the foot side and a west-extreme probe the
@@ -80,14 +80,13 @@ from pinion_spring_spec import (
     FLAT_LEN,
     FOOT_LEN,
     FORMED_DIMENSIONS,
-    FOOT_HOLE_SKETCH,
     FORMED_TOLERANCE_MM,
     FREE_FORM_SKETCH,
     ISOMETRIC_VIEW_NOTE,
     PAD_LEN,
     PAD_WIDTH,
+    PAD_Z,
     R_BEND,
-    REFERENCE_SKETCHES,
     R_KINK,
     THICK,
     WIDTH,
@@ -116,10 +115,12 @@ from pinion_spring_geometry import (
 )
 
 PART_NAME = "pinion-spring"
-# p.68: the leaf reads brass-coloured against the steel strap; C51000 phosphor
-# bronze (O1).  SolidWorks' library has no C51000 entry: "Brass" stands in for
-# the render colour and a mass within a few percent (8.5 vs 8.86 g/cc).
-MATERIAL = "Brass"
+# #859 ruling 4: 17-7 PH stainless, Condition C (the registry row carries the
+# stock).  p.68 reads the leaf brass-coloured; Main traded that look for a
+# corrosion-resistant spring that holds the corner gates (ruling 3).  The
+# SolidWorks library material the repo already uses for stainless, "AISI 304",
+# stands in for 17-7 PH (7.81 vs 8.0 g/cc; the part weighs about a gram).
+MATERIAL = "AISI 304"
 
 # Primitive nominals come from the drawing spec (single source of truth shared
 # with the manufacturing print). Design rationale:
@@ -172,37 +173,6 @@ FREE_PATH = {
     "kink_start": FREE_KINK_START,
     "bend_exit": FREE_BEND_EXIT,
 }
-
-
-# FootHoleReference (#843 Codex aB7): (dimension, start, end, orientation,
-# value, drives) per line, in Top-plane sketch coordinates (v = -z; a *Top
-# view prints model -Z UP). Both lines lie on the pad outline, so the view
-# that shows the sketch prints no extra line, and both start on a pad edge
-# (rule 7): the hole off the foot's free end runs along the pad's upper edge,
-# the hole off the pad's lower edge runs up the free end to the hole's
-# centreline. ``drives`` binds, in creation order, the value and then the
-# start point's two origin anchors to the part's globals. FOOT_END's x is
-# derived from the blade geometry, so the "FootEndX" global carries it and
-# drives the pad's free-end anchor too: the reference lines cannot drift off
-# the pad they restate (Main, #843 aB7 review).
-FOOT_HOLE_LINES = (
-    (
-        "HoleFromEnd",
-        (FOOT_END[0], PAD_WIDTH / 2.0),
-        (FOOT_END[0] - HOLE_FROM_END, PAD_WIDTH / 2.0),
-        "horizontal",
-        HOLE_FROM_END,
-        ('"HoleFromEnd"', '"FootEndX"', '"PadWidth" / 2'),
-    ),
-    (
-        "HoleFromEdge",
-        (FOOT_END[0], -PAD_WIDTH / 2.0),
-        (FOOT_END[0], 0.0),
-        "vertical",
-        PAD_WIDTH / 2.0,
-        ('"PadWidth" / 2', '"FootEndX"', '"PadWidth" / 2'),
-    ),
-)
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -345,10 +315,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "StripWidth", f"{WIDTH}mm")
     await set_global(adapter, "PadWidth", f"{PAD_WIDTH}mm")
     await set_global(adapter, "PadLength", f"{PAD_LEN}mm")
-    # The foot's free end and the hole's station off it: the pad and the
-    # FootHoleReference sketch both hang off these (#843 aB7).
-    await set_global(adapter, "FootEndX", f"{FOOT_END[0]}mm")
-    await set_global(adapter, "HoleFromEnd", f"{HOLE_FROM_END}mm")
 
     # Open inside-surface path, drawn from the free tip DOWN (_formed_path).
     check("create_sketch spring", await adapter.create_sketch("Front"))
@@ -389,8 +355,9 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.success(f"spring wall west of the blade: westmost x {west:.3f}")
 
     # Screw pad: a PAD_WIDTH x PAD_LEN square in from the foot's free end,
-    # symmetric about the strip (Top-plane sketch v = -z, so the symmetric pad
-    # needs no sign), extruded the strip thickness up from the foot's underside
+    # flush with the strip's aft edge, local -z (machine +z once placed
+    # Ry(180)); the Top-plane sketch reads v = -z, so that edge is v = +W/2 and
+    # the pad widens toward -v.  Extruded the strip thickness up from the foot's underside
     # (y 0, the gated side of the one-sided thin wall) so it merges with the
     # foot. The volume gate proves the merge: a pad on the wrong side would add
     # its whole footprint, not just the two wings beside the strip.
@@ -398,10 +365,10 @@ async def build(adapter) -> dict[str, str]:
     check("create_sketch pad", await adapter.create_sketch("Top"))
     x0 = FOOT_END[0]
     pad_pts = [
-        (x0, -PAD_WIDTH / 2.0),
-        (x0 - PAD_LEN, -PAD_WIDTH / 2.0),
-        (x0 - PAD_LEN, PAD_WIDTH / 2.0),
-        (x0, PAD_WIDTH / 2.0),
+        (x0, WIDTH / 2.0),
+        (x0 - PAD_LEN, WIDTH / 2.0),
+        (x0 - PAD_LEN, WIDTH / 2.0 - PAD_WIDTH),
+        (x0, WIDTH / 2.0 - PAD_WIDTH),
     ]
     pad_lines = await add_line_chain(adapter, pad_pts)
     await define_rectilinear_chain(
@@ -412,7 +379,7 @@ async def build(adapter) -> dict[str, str]:
         label="pad",
         dims=pad,
         names=["PadLen", "PadWidth", "PadEndX", "PadEdgeZ"],
-        drives=['"PadLength"', '"PadWidth"', '"FootEndX"', '"PadWidth" / 2'],
+        drives=['"PadLength"', '"PadWidth"', None, '"StripWidth" / 2'],
     )
     await ensure_fully_defined(adapter, "pad sketch")
     check("exit_sketch pad", await adapter.exit_sketch())
@@ -437,7 +404,7 @@ async def build(adapter) -> dict[str, str]:
     wizard_holes(
         adapter,
         HOLE_SPEC,
-        [[FOOT_END[0] - HOLE_FROM_END, FOOT_Y, 0.0]],
+        [[FOOT_END[0] - HOLE_FROM_END, FOOT_Y, PAD_Z]],
         (0.0, -1.0, 0.0),
         "foot screw hole (#4 clearance)",
         name="FootHole",
@@ -457,46 +424,6 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch free form", await adapter.exit_sketch())
     name_last_feature(adapter, FREE_FORM_SKETCH)
     drive_jobs += free.apply(adapter, FREE_FORM_SKETCH)
-
-    # #843 Codex aB7: the hole locations the print carries, owned by the part.
-    check("create_sketch foot-hole reference", await adapter.create_sketch("Top"))
-    names: list[str] = []
-    drives: list[str | None] = []
-    for dimension, start, end, orientation, value, line_drives in FOOT_HOLE_LINES:
-        # Direct-to-DB: each line lies on a pad outline station along a
-        # sketch axis direction, so inference would snap in the relations
-        # added below and over-define the sketch.
-        set_sketch_direct_db(adapter, True)
-        line = check(f"{dimension} line", await adapter.add_line(*start, *end))
-        set_sketch_direct_db(adapter, False)
-        _as_construction(adapter, line)
-        check(
-            f"{dimension} {orientation}",
-            await adapter.add_sketch_constraint(line, None, orientation),
-        )
-        await dimension_between(
-            adapter,
-            f"{line}.start",
-            f"{line}.end",
-            f"{orientation}_distance",
-            value,
-            dimension,
-        )
-        await anchor_point_to_origin(adapter, f"{line}.start", *start, dimension)
-        names += [dimension, f"{dimension}AnchorX", f"{dimension}AnchorY"]
-        drives += list(line_drives)
-    await ensure_fully_defined(adapter, "foot-hole reference sketch")
-    check("exit_sketch foot-hole reference", await adapter.exit_sketch())
-    name_last_feature(adapter, FOOT_HOLE_SKETCH)
-    full = name_dimensions(adapter, FOOT_HOLE_SKETCH, names)
-    for (dimension, *_rest, value, _drives) in FOOT_HOLE_LINES:
-        raw = adapter.currentModel.Parameter(f"{dimension}@{FOOT_HOLE_SKETCH}")
-        measured = float(_early_bound(raw, "IDimension").SystemValue) * 1000.0
-        if abs(measured - value) > 1e-6:
-            raise RuntimeError(f"{dimension} measures {measured:g}, expected {value:g}")
-    drive_jobs += [
-        (name, expr) for name, expr in zip(full, drives, strict=True) if expr is not None
-    ]
 
     # Deferred drive equations, then re-check neutrality (each evaluates to
     # the as-built value, so the geometry must not move).
@@ -521,14 +448,12 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
 
-    # Hidden so no assembly instance renders them; the drawing shows each in
-    # the one view that dimensions it.
+    # Hidden so no assembly instance renders it; the drawing shows it per view.
+    blank_sketch(adapter, FREE_FORM_SKETCH)
     part_doc = _early_bound(adapter.currentModel, "IPartDoc")
-    for sketch in REFERENCE_SKETCHES:
-        blank_sketch(adapter, sketch)
-        feature = _early_bound(part_doc.FeatureByName(sketch), "IFeature")
-        if int(feature.Visible) != 1:  # swVisibilityStateHide
-            raise RuntimeError(f"{sketch} still visible after BlankSketch")
+    feature = _early_bound(part_doc.FeatureByName(FREE_FORM_SKETCH), "IFeature")
+    if int(feature.Visible) != 1:  # swVisibilityStateHide
+        raise RuntimeError(f"{FREE_FORM_SKETCH} still visible after BlankSketch")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

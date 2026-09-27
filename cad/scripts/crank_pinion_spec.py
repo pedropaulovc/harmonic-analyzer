@@ -214,8 +214,9 @@ PIN_EDGE_TO_SHAFT_END_NOMINAL = 4.5
 PIN_EDGE_MIN_WORST = 2.0
 PIN_STATION_LAYOUT_ALLOWANCE_MM = 0.25
 # The pinion is set on its seat with this feeler between its toothed south
-# face and the v2 post boss's spot face (MHA-A03 step 4); the assembly's
-# seat-gap range starts here, and it may open to SEAT_GAP_MAX_MM before the
+# face and the v2 post boss's spot face, on top of the spot face's retreat
+# from the 64T (MHA-A03 step 4's feeler stack); the assembly's seat-gap range
+# starts here past the retreat, and it may open to SEAT_GAP_MAX_MM before the
 # pinion is re-set: the W15 pin-wall and recess stacks carry the pinion that
 # far north of its nominal seat on the shaft.
 SEAT_FEELER_MM = 0.25

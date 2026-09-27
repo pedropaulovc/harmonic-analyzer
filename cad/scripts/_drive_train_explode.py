@@ -13,7 +13,7 @@ from __future__ import annotations
 import math
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 import _telemetry
 from _assembly_patterns import ensure_global_pattern_axis
@@ -22,6 +22,7 @@ from drive_train_assembly_spec import (
     EXPLODED_VIEW_NAME,
     SOURCE_CONFIGURATION,
     Instance,
+    Role,
     plan_explode,
 )
 
@@ -88,8 +89,11 @@ def _create_named_view(model: Any, assembly: Any) -> None:
 
 
 @_telemetry.traced("assembly.drive_train_explode")
-def create_drive_train_explode(adapter: Any) -> None:
-    """Author the released presentation and restore the free working model."""
+def create_drive_train_explode(adapter: Any, roles: Mapping[str, Role]) -> None:
+    """Author the released presentation and restore the free working model.
+
+    ``roles`` maps a component name to the role the builder tagged it with at
+    insertion (the MHA-145 that pins the arbor collar)."""
     from solidworks_mcp.adapters.com_variant import null_callout
 
     model = _early_bound(adapter.currentModel, "IModelDoc2")
@@ -112,11 +116,15 @@ def create_drive_train_explode(adapter: Any) -> None:
     if len(by_name) != len(components):
         raise RuntimeError(f"{EXPLODED_VIEW_NAME}: duplicate component identities")
     baseline = {name: _presentation_transform(c) for name, c in by_name.items()}
+    unknown_roles = sorted(set(roles) - set(by_name))
+    if unknown_roles:
+        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: roles name absent components {unknown_roles!r}")
     instances = [
         Instance(
             name=name,
             stem=Path(str(component.GetPathName() or "")).stem.casefold(),
             origin_mm=tuple(value * 1000.0 for value in baseline[name][9:12]),
+            role=roles.get(name),
         )
         for name, component in by_name.items()
     ]

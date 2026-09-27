@@ -152,6 +152,8 @@ def test_od_moves_to_the_side_view_and_the_end_view_keeps_one_diametric_callout(
 def test_part_registry_values_remain_the_title_block_source() -> None:
     config = _config.parts("cone-tip-bushing")
     assert config["number"] == "MHA-096"
+    # The PART cell prints the registry title, falling back to the raw stem.
+    assert config["title"] == "Cone Tip Bushing"
     assert config["material_specification"] == "C36000 free-machining brass"
     assert int(config["quantity"]) == 1
 
