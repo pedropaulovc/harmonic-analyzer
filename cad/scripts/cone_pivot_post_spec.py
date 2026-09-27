@@ -55,11 +55,36 @@ CRANK_BORE_OFFSET = 0.0
 # The boss's near face is a MACHINED SPOT FACE, not the rim of the cast
 # collar: it is stationed from the post axis and the print dimensions it that
 # way, so it does not follow the collar diameter.  Decoupling it also keeps
-# the assembly's 0.25 mm north and 10.255 mm south crank-sprocket gaps.
-CRANK_BOSS_NORTH_FACE = 21.3753
+# the assembly's 10.255 mm south crank-sprocket gap.
+#
+# The spot face stands CRANK_SPOT_FACE_RETREAT south of the harvested station
+# (user ruling, 2026-09-27): at the harvested station the 64T's south face and
+# tip reached into the boss (cg-fx2b's drive-train interference gate) and,
+# at print-worst, into the Ø44 collar below it.  In the same setup the face is
+# run out as a flat CRANK_SPOT_FACE_WIDTH wide from the crank axis
+# CRANK_SPOT_FACE_RUN_OUT down, past the collar's lower edge into the turned
+# body, which stands proud of it there, and ends at a milled step.  The
+# retreat is the user's ruled 2.5.  The run-out is geometric, sized against
+# the Ø44 collar under the 64T with crank_boss_rim's print-worst terms:
+#   - run-out 17: the flat's print-worst foot (1.17 short) ends 0.89 below the
+#     collar's print-worst lower edge, so no lip of collar is left under the
+#     gear; 16 would leave one;
+#   - width 23: the narrowest whole millimetre at which the flat's side
+#     edges hold the collar clear of the 64T (+0.35 at 22.2 print-worst);
+#     at 22 the edges come within 0.20, and from 24 up the edges leave the
+#     gear's reach and the collar plateaus at +0.42.
+# build_drive_train_assembly asserts every feature holds crank_boss_rim's
+# FLOOR_CLEARANCE_MM at print-worst; the unit tests pin that each size a
+# step smaller misses it under today's station band.  The boss's south end
+# does not move, so the boss is that much shorter.
+CRANK_BOSS_HARVESTED_NORTH_FACE = 21.3753
+CRANK_SPOT_FACE_RETREAT = 2.5
+CRANK_SPOT_FACE_WIDTH = 23.0
+CRANK_SPOT_FACE_RUN_OUT = 17.0
+CRANK_BOSS_NORTH_FACE = CRANK_BOSS_HARVESTED_NORTH_FACE - CRANK_SPOT_FACE_RETREAT
 CRANK_BOSS_START_Z = -CRANK_BOSS_NORTH_FACE
-CRANK_BOSS_LENGTH_IN = 2.8360
-CRANK_BOSS_LENGTH = CRANK_BOSS_LENGTH_IN * MM_PER_IN
+CRANK_BOSS_LENGTH_IN = 2.8360  # harvested, from the harvested station
+CRANK_BOSS_LENGTH = CRANK_BOSS_LENGTH_IN * MM_PER_IN - CRANK_SPOT_FACE_RETREAT
 CRANK_BOSS_END_Z = CRANK_BOSS_START_Z + CRANK_BOSS_LENGTH
 
 # Inclined cone-shaft journal.  Unlike v1, the 12.5182-degree incline is baked
@@ -93,23 +118,25 @@ ATTACHMENT_CBORE_DEPTH = 6.0198
 #
 #   body      pi*21.0055^2*86                       = +119 210.4620
 #   collar    pi*(22^2 - 21.0055^2)*26.6            = +  3 574.0470
-#   crank boss outside the collar cylinder          = + 11 215.7157
-#   spot face (collar proud of z=-21.3753 in disc)  = -     93.1451
-#   crank bore pi*7.3^2*72.0344                     = - 12 059.6731
+#   crank boss outside the collar cylinder          = + 11 091.7876
+#   spot face (collar proud of z=-18.8753 in disc)  = -    913.5109
+#   its run-out flat, 23.0 x 17.0 outside the disc  = -    272.3536
+#   crank bore pi*7.3^2*69.5344                     = - 11 641.1344
 #   cone pads outside the body cylinder             = +    209.0550
 #   cone bore pi*6.1404^2*42.011                    = -  4 976.2960
 #   2x (thru pi*3.57124^2*79.9802 + cbore pi*5.75437^2*6.0198) = - 7 661.5921
-#                                                   = 109 418.5741
+#                                                   = 108 620.4654
 #
-# (#906 R1 bored the crank bore out from Ø11.438 to Ø14.6: 114 076.5723
-# before.  Lowering the crank boss by CRANK_BORE_DROP changes no term: the
-# boss stays inside the collar's 59.4..86 height band.)  The 2026-09-21 farm build of the previous recipe read 121 575.3: it had
+# (The 2.5 spot-face retreat and its run-out took 109 418.5741 to this.  #906
+# R1 bored the crank bore out from Ø11.438 to Ø14.6: 114 076.5723 before.
+# Lowering the crank boss by CRANK_BORE_DROP changes no term: the boss stays
+# inside the collar's 59.4..86 height band.)  The 2026-09-21 farm build of the previous recipe read 121 575.3: it had
 # never bored the crank boss (7 401.7) and had only nicked the 45 mm^3 collar
 # sliver behind the spot-face plane inside the bore disc -- a cut whose
 # default direction (opposite the sketch normal) found the Ø44 collar to bite
 # instead of auto-flipping into the boss.  Mass at gray iron 7.20 g/cc.
-HARVESTED_VOLUME_MM3 = 109_418.5741
-HARVESTED_MASS_KG = 0.787814
+HARVESTED_VOLUME_MM3 = 108_620.4654
+HARVESTED_MASS_KG = 0.782067
 
 # The cone journal bore is a running journal, so it carries the band the
 # `shaft_in_bushing` fit class needs and no tighter (tolerance-policy.md,
@@ -159,6 +186,10 @@ CRANK_BORE_BAND = (0.018, 0.0)  # (upper, lower): H7
 # how the shop holds it is theirs (policy rule 6).
 CRANK_ABOVE_CONE = CRANK_BORE_HEIGHT - BORE_HEIGHT
 CRANK_ABOVE_CONE_BAND = (0.37, 0.0)
+# The table's 64T axial station row: MHA-A03 bonds the gear "front of T120"
+# with nothing to butt, so it may stand this far either way on its shaft.
+# crank_boss_rim reads it for the 64T's clearance to this post's north side.
+GEAR64_STATION_BAND_MM = 0.5
 
 # Cone-axis height above the foot.  The post's journal sets the cone shaft's
 # height; at the shaft's tip MHA-092 is set on MHA-141's shim pack, whose
@@ -267,11 +298,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "AttachmentScrewHoles": {"MountWestX", "MountEastX"},
     "CrankBossProfile": {"CrankAxisY", "CrankBossDia"},
     "CrankSprocketBoss": {"CrankBossLen"},
+    "CrankSpotFaceRunOutProfile": {"SpotFaceWidth", "SpotFaceRunOut"},
     "CrankBoreProfile": {"CrankBoreDia"},
     "ConeBossProfile": {"JournalAxisY", "ConeBossDia"},
     "ConeShaftBoss": {"ConeBossLen"},
     "JournalBoreProfile": {"JournalBoreDia"},
-    "JournalPlanReference": {"CrankBossStartZ", "InclineAngle"},
+    "JournalPlanReference": {"InclineAngle"},
+    "SpotFaceStationReference": {"CrankBossStartZ"},
     "BoreSpacingReference": {"CrankAboveCone"},
 }
 
@@ -295,13 +328,18 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "AttachmentScrewHoles": {"MountWestX": 2, "MountEastX": 2},
     "CrankBossProfile": {"CrankAxisY": 2, "CrankBossDia": 1},
     "CrankSprocketBoss": {"CrankBossLen": 1},
+    # The spot face's run-out flat: a clearance cut, so one place, and the
+    # 64T's clearance takes each at the short end of its row
+    # (crank_boss_rim).
+    "CrankSpotFaceRunOutProfile": {"SpotFaceWidth": 1, "SpotFaceRunOut": 1},
     "CrankBoreProfile": {"CrankBoreDia": 3},
     "ConeBossProfile": {"JournalAxisY": 2, "ConeBossDia": 1},
     "ConeShaftBoss": {"ConeBossLen": 1},
     "JournalBoreProfile": {"JournalBoreDia": 3},
     # BASIC since #906: it feeds the crank bore's angularity frame, so it
     # prints the model's exact angle.
-    "JournalPlanReference": {"CrankBossStartZ": 2, "InclineAngle": 4},
+    "JournalPlanReference": {"InclineAngle": 4},
+    "SpotFaceStationReference": {"CrankBossStartZ": 2},
     "BoreSpacingReference": {"CrankAboveCone": 2},
 }
 

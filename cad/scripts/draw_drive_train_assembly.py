@@ -50,6 +50,8 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from cone_gear_notes import ATTACHMENT as CONE_GEAR_JOINT
 from crank_drive_gear_notes import ATTACHMENT_ALTERNATIVE as CRANK_GEAR_ALTERNATIVE
 from crank_drive_gear_notes import ATTACHMENT_PROCESS as CRANK_GEAR_JOINT
+from cone_pivot_post_spec import CRANK_SPOT_FACE_RETREAT
+from crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
 from drive_train_assembly_spec import (
     CLUSTERS,
     EXPLODED_VIEW_NAME,
@@ -187,6 +189,8 @@ CLUSTER_VIEW_CENTER = (0.200, 0.165)
 CLUSTER_RING_REGION = (0.020, 0.072, 0.415, 0.248)
 CLUSTER_BALLOON_MARGIN = 0.012
 BALLOON_DIAMETER = 0.010
+# A ring balloon keeps the paper clearance the BOM keeps off the title block.
+CLUSTER_TITLE_BLOCK_CLEARANCE = BOM_SHEET_CLEARANCE
 # Extra arc clearance between neighbouring ring balloons. The shared ring keeps
 # circles 1.5 apart; on sheet 5 the left-block attachments bunch so tightly that
 # items 17/18/19/20/26 read as one converging knot (Main eye-pass of r6b).
@@ -348,6 +352,7 @@ BOM_NORMALIZED_ALIASES = {
 # package is not released while any remains.
 ASSEMBLED_HEADING = f"SAVED WORKING POSE AND FREE MOTIONS: SEE SHEET {CHECKS_SHEET} FOR SETUP."
 
+PINION_FEELER_STACK = CRANK_SPOT_FACE_RETREAT + PINION_SEAT_FEELER
 CONE_CRANK_STEPS = "\n".join(
     (
         "ASSEMBLY SEQUENCE - CONE SET AND CRANK",
@@ -399,10 +404,13 @@ CONE_CRANK_STEPS = "\n".join(
         "   PINNED, AND MESH IT WITH MHA-021 TOOTH IN GAP. CHECK BACKLASH",
         "   0.20-0.55 AT THE MHA-025 PITCH LINE, FREE THROUGH ONE FULL MHA-021",
         "   TURN. OUT OF BAND: STOP - MHA-016 BORE SPACING IS OUT (SEE ITS",
-        "   PRINT). HOLD MHA-025 IN MESH; SET ITS STATION 0.25 OFF THE SPOT",
-        "   FACE WITH A FEELER. ONLY THEN MATCH-DRILL AND REAM FOR MHA-134 AT",
-        "   BOSS MID-LENGTH WITH MHA-026; SEAT FLUSH BOTH SIDES PER THE MHA-025",
-        "   PRINT. RE-CHECK BACKLASH 0.20-0.55 AFTER PINNING.",
+        # The spot face stands back from the 64T (cone_pivot_post_spec
+        # CRANK_SPOT_FACE_RETREAT), so the feeler is a stack: the retreat
+        # plus the 16T's seat feeler.
+        f"   PRINT). HOLD MHA-025 IN MESH; SET ITS STATION {PINION_FEELER_STACK:.2f} OFF THE SPOT",
+        "   FACE WITH A FEELER STACK. ONLY THEN MATCH-DRILL AND REAM FOR",
+        "   MHA-134 AT BOSS MID-LENGTH WITH MHA-026; SEAT FLUSH BOTH SIDES PER",
+        "   THE MHA-025 PRINT. RE-CHECK BACKLASH 0.20-0.55 AFTER PINNING.",
         "5. THE PAPER-DRIVE T12 WHEEL GOES ON MHA-026 BEFORE THE ARM.",
         # U33 (user, 2026-09-23): crank hub MHA-137 pressed into the arm and
         # seam-pinned by MHA-138 (a 4 m6 dowel, 4.0 long = half the arm); the
@@ -705,6 +713,36 @@ def ring_fit_shift(
         (y0 + y1) / 2.0 - (ring[1] + ring[3]) / 2.0,
     )
     return shift, overflows
+
+
+def ring_keep_out_shift_x(
+    outline: tuple[float, float, float, float],
+    shift: tuple[float, float],
+    *,
+    margin: float,
+    balloon_radius: float,
+    keep_out: tuple[float, float, float, float],
+) -> float:
+    """The x shift that keeps the balloon ring's low arc left of a keep-out.
+
+    ``_spread_balloons`` puts every balloon centre on the ellipse ``margin``
+    outside the (shifted) outline, so the ellipse bounds where a balloon can
+    land.  ``keep_out`` is (left, bottom, right, top), already grown by the
+    clearance.  Where the ellipse dips low enough for a balloon to reach below
+    the keep-out's top, its right-most balloon must stay left of the keep-out:
+    returns ``shift[0]`` when that holds, else the shift that just makes it.
+    """
+    left, _bottom, _right, top = keep_out
+    rx = (outline[2] - outline[0]) / 2.0 + margin
+    ry = (outline[3] - outline[1]) / 2.0 + margin
+    cx = (outline[0] + outline[2]) / 2.0 + shift[0]
+    cy = (outline[1] + outline[3]) / 2.0 + shift[1]
+    low = (top + balloon_radius - cy) / ry  # sin of the arc's upper edge
+    if low <= -1.0:
+        return shift[0]
+    reach = rx if low >= 0.0 else rx * math.sqrt(1.0 - low * low)
+    limit = left - balloon_radius - reach
+    return shift[0] if cx <= limit else shift[0] - (cx - limit)
 
 
 def balloon_attachment_violations(
@@ -2000,11 +2038,39 @@ def _place_cluster_sheet(
     shift, overflows = ring_fit_shift(
         outline, CLUSTER_RING_REGION, grow=CLUSTER_BALLOON_MARGIN + BALLOON_DIAMETER
     )
+    # A ring taller than the region spills below it, where the title block
+    # takes the sheet's right half: slide the ring left until its low arc
+    # clears the block (rim-124f: items 5 and 33 landed on it).
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    keep_out = (
+        template.title_block_left_m - CLUSTER_TITLE_BLOCK_CLEARANCE,
+        0.0,
+        template.width_m,
+        template.title_block_top_m + CLUSTER_TITLE_BLOCK_CLEARANCE,
+    )
+    centred_x = shift[0]
+    shift = (
+        ring_keep_out_shift_x(
+            outline,
+            shift,
+            margin=CLUSTER_BALLOON_MARGIN,
+            balloon_radius=BALLOON_DIAMETER / 2.0,
+            keep_out=keep_out,
+        ),
+        shift[1],
+    )
+    ring_left = outline[0] + shift[0] - CLUSTER_BALLOON_MARGIN - BALLOON_DIAMETER
+    if ring_left < CLUSTER_RING_REGION[0]:
+        overflows.append(
+            f"left {ring_left * 1000:.1f} mm < {CLUSTER_RING_REGION[0] * 1000:.1f} mm "
+            "clearing the title block"
+        )
     _telemetry.event(
         "drawing.cluster_ring_fit",
         cluster=cluster,
         outline_mm=tuple(value * 1000.0 for value in outline),
         shift_mm=tuple(value * 1000.0 for value in shift),
+        title_block_slide_mm=(shift[0] - centred_x) * 1000.0,
         overflows=tuple(overflows),
     )
     if overflows:
