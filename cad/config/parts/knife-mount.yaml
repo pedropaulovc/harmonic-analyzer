@@ -1,8 +1,12 @@
 knife-mount:
   number: MHA-037
-  material: Plain Carbon Steel
-  material_specification: AISI O1 tool steel, hardened and tempered to 58-60 HRC after machining
-  finish: heat treated, unpainted
+  # User ruling 2026-09-24 (#818 Codex P1): the grade is AISI O1 per the
+  # 2026-09-02 ch18 p.42 re-read (dimensions.yaml), "O1 or equivalent".
+  material: AISI O1 TOOL STEEL (OR EQUIVALENT)
+  material_specification: AISI O1 OR EQUIVALENT OIL-HARDENING TOOL STEEL, HARDEN AND TEMPER TO 58-60 HRC AFTER MACHINING
+  # The title block prints MATERIAL and FINISH only (material_specification
+  # is a custom property no cell shows), so the hardness rides FINISH.
+  finish: HARDEN AND TEMPER TO 58-60 HRC AFTER MACHINING; UNPAINTED
   quantity: 2
   tolerance_class: machined_block
   process: "machined (steel)"
