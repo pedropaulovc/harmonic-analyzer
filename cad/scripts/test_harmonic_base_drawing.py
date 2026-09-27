@@ -7,6 +7,7 @@ from dataclasses import replace
 
 import pytest
 
+import _drawing_common
 import build_harmonic_base as part
 import cone_swing_platform_geometry as platform
 import cone_pivot_post_installation
@@ -1179,37 +1180,53 @@ def test_hole_sheet_callout_check_runs_on_every_callout_before_finalize() -> Non
     assert check[0].lineno < finalize.lineno
 
 
-def test_transfer_thread_goes_on_its_own_line_in_the_shared_band() -> None:
+@pytest.mark.parametrize(
+    ("process_name", "expected_process_rows"),
+    [
+        ("TRANSFER_BLOCK_CALLOUT", "TRANSFER FROM MHA-061\nAFTER RIG SET;\n"),
+        ("TRANSFER_PEDESTAL_CALLOUT", "TRANSFER FROM MHA-004\nAT ASSEMBLY;\n"),
+        ("TRANSFER_SPRING_CALLOUT", "TRANSFER FROM MHA-114\nAFTER RIG SET; "),
+        ("CROSS_TAP_PROCESS", "THRU BOTH WALLS, SINGLE CONTINUOUS THREAD\n"),
+    ],
+)
+def test_base_callout_prefix_is_the_shared_helpers(
+    process_name: str, expected_process_rows: str
+) -> None:
     # Main's hb-notes-2 ruling (a): the block and pedestal callouts end their
-    # process text with a newline so the 8-32 thread gets its own fourth line.
-    # add_native_hole_callout strips that newline, so the sheet restores it
-    # in the prefix DEFINITION (associative variables kept).
+    # process text with a newline so the 8-32 thread gets its own fourth line;
+    # the cross-tap thread gets its own row the same way. The spring callout
+    # joins its thread with one space. add_native_hole_callout writes exactly
+    # compose_hole_callout_prefix's result into the prefix DEFINITION.
     import draw_harmonic_base as sheet
 
-    assert sheet.TRANSFER_BLOCK_CALLOUT == "TRANSFER FROM MHA-061\nAFTER RIG SET;\n"
-    assert sheet.TRANSFER_SPRING_CALLOUT.endswith("AFTER RIG SET;")
+    native = "<hw-threaddesc> <hw-threadclass> <HOLE-DEPTH> <hw-threaddepth>"
+    process = getattr(sheet, process_name)
+    assert _drawing_common.compose_hole_callout_prefix(process, native) == (
+        expected_process_rows + native
+    )
 
-    class Display:
-        def __init__(self, definition: str) -> None:
-            self.definition = definition
 
-        def GetText(self, part: int) -> str:
-            assert part == 5
-            return self.definition
+def test_base_sheet_leaves_the_callout_prefix_to_the_shared_helper() -> None:
+    # #877 cold build (drawing:harmonic_base, 2026-09-27): #937's sheet-local
+    # line-break rewrite expected the old "process.rstrip() + ' '" joint and
+    # raised on the "\n" joint compose_hole_callout_prefix now writes. The
+    # prefix is composed in one place: this sheet never writes the prefix
+    # compartment (swDimensionTextPrefix = 1) itself.
+    import ast
+    import inspect
 
-        def SetText(self, part: int, text: str) -> None:
-            assert part == 1
-            self.definition = text
+    import draw_harmonic_base as sheet
 
-    native = "<hw-thread> <MOD-DEPTH> <hw-threaddepth>"
-    display = Display(sheet.TRANSFER_PEDESTAL_CALLOUT.rstrip() + " " + native)
-    sheet._keep_process_line_break(display, sheet.TRANSFER_PEDESTAL_CALLOUT, "pedestal")
-    assert display.definition == "TRANSFER FROM MHA-004\nAT ASSEMBLY;\n" + native
-    spring = Display(sheet.TRANSFER_SPRING_CALLOUT + " " + native)
-    sheet._keep_process_line_break(spring, sheet.TRANSFER_SPRING_CALLOUT, "spring")
-    assert spring.definition == sheet.TRANSFER_SPRING_CALLOUT + " " + native
-    with pytest.raises(RuntimeError, match="does not start with its process text"):
-        sheet._keep_process_line_break(Display(native), sheet.TRANSFER_BLOCK_CALLOUT, "block")
+    prefix_writes = [
+        ast.unparse(node)
+        for node in ast.walk(ast.parse(inspect.getsource(sheet)))
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "attr", "") == "SetText"
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and node.args[0].value == 1
+    ]
+    assert prefix_writes == []
 
 
 def test_hole_sheet_callouts_moved_clear_per_the_eye_pass() -> None:
@@ -1267,7 +1284,6 @@ def test_cross_tap_callout_carries_hole_facts_only() -> None:
     # hb-render-4 eye pass: count/drill/depth, the thru instruction and the
     # thread each on a row; the depth datum is the model's (the tap starts on
     # the spotface floor) and the X location is a dimension, not text.
-    import ast
     import inspect
 
     import draw_harmonic_base as sheet
@@ -1276,12 +1292,6 @@ def test_cross_tap_callout_carries_hole_facts_only() -> None:
     source = inspect.getsource(sheet)
     for gone in ("DEPTHS FROM SPOTFACE FLOOR\n", "ON A1-A4 X CENTRES\n", "2 EACH FRONT/REAR FACE"):
         assert gone not in source
-    calls = [
-        node for node in ast.walk(ast.parse(source))
-        if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "_keep_process_line_break"
-        and ast.unparse(node.args[0]) == "tap_callout"
-    ]
-    assert [ast.unparse(call.args[1]) for call in calls] == ["CROSS_TAP_PROCESS"]
     # The Hole Wizard seats the taps on the spotface floor, so its depths
     # already run from there.
     assert part.BASE_SPOTFACE_PLANE_Z - part.BASE_SPOTFACE_DEPTH == part.BASE_SCREW_SEAT_Z

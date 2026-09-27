@@ -444,26 +444,6 @@ def _check_cross_tap_callout(display: Any) -> None:
         )
 
 
-def _keep_process_line_break(display: Any, process: str, label: str) -> None:
-    """Restore the line break a process text ends with.
-
-    add_native_hole_callout writes ``process.rstrip() + " "`` ahead of the
-    native thread definition, so a trailing newline would otherwise put the
-    thread back on the instruction's line. Rewrite only that joint in the
-    prefix DEFINITION, so every Hole Wizard variable stays associative.
-    """
-    if not process.endswith("\n"):
-        return
-    definition = str(display.GetText(5) or "")  # swDimensionTextPrefixDefinition
-    joint = process.rstrip() + " "
-    if not definition.startswith(joint):
-        raise RuntimeError(f"{label}: prefix does not start with its process text: {definition!r}")
-    updated = process + definition[len(joint) :]
-    display.SetText(1, updated)
-    if str(display.GetText(5) or "") != updated:
-        raise RuntimeError(f"{label}: process line break did not persist: {display.GetText(5)!r}")
-
-
 def _set_cross_tap_callout_text(display: Any) -> None:
     """Aggregate both two-hole features and call the drill depth a minimum.
 
@@ -677,7 +657,8 @@ TRANSFER_PEDESTAL_HOLES = tuple(
 # share the band above the plan, so their thread goes on its own fourth
 # line: side by side, two "AT ASSEMBLY; 8-32 UNC - 2B" lines ran into each
 # other (hb-notes-2 eye pass). The spring callout keeps the semicolon joining
-# the locating instruction to its "4-40 UNC - 2B" line.
+# the locating instruction to its "4-40 UNC - 2B" line. The trailing line
+# break reaches the sheet through _drawing_common.compose_hole_callout_prefix.
 TRANSFER_BLOCK_CALLOUT = f"TRANSFER FROM MHA-061\n{TRANSFER_AFTER_RIG_SET}\n"
 TRANSFER_SPRING_CALLOUT = f"TRANSFER FROM MHA-114\n{TRANSFER_AFTER_RIG_SET}"
 TRANSFER_PEDESTAL_CALLOUT = "TRANSFER FROM MHA-004\nAT ASSEMBLY;\n"
@@ -1738,11 +1719,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pinion-spring transfer seat",
         process=TRANSFER_SPRING_CALLOUT,
     )
-    for display, process, label in (
-        (block_callout, TRANSFER_BLOCK_CALLOUT, "pinion-block transfer seats"),
-        (pedestal_callout, TRANSFER_PEDESTAL_CALLOUT, "arbor-pedestal transfer seats"),
-    ):
-        _keep_process_line_break(display, process, label)
     tap_callout = add_native_hole_callout(
         adapter,
         hole_side,
@@ -1751,7 +1727,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="base column-retention taps",
         process=CROSS_TAP_PROCESS,
     )
-    _keep_process_line_break(tap_callout, CROSS_TAP_PROCESS, "base column-retention taps")
     _set_cross_tap_callout_text(tap_callout)
     # The MIN tap-drill depth prints as a whole millimetre; the diameter keeps
     # its two places (per-variable, see set_hole_callout_precision).
