@@ -162,6 +162,144 @@ def test_front_qualifier_text_clears_its_rows_extension_lines() -> None:
     )
 
 
+class _KinkView:
+    """A recording IView double for the kink detail's place-move-crop."""
+
+    def __init__(self, *, crop_status: int = 1, crops: bool = True, moves: bool = True):
+        self.ScaleRatio = (5.0, 1.0)
+        self.Position = (0.300, 0.100)
+        self.crop_status = crop_status
+        self.crops = crops
+        self.moves = moves
+        self.cropped = False
+        self.calls: list[str] = []
+        self.CropViewJaggedOutline = False
+        self.CropViewNoOutline = False
+
+    def SetViewPosition(self, target, _update) -> bool:  # noqa: N802
+        self.calls.append("SetViewPosition")
+        if self.moves:
+            self.Position = tuple(float(value) for value in target)
+        return True
+
+    def GetOutline(self):  # noqa: N802
+        if self.cropped:
+            return (0.2225, 0.1665, 0.2575, 0.2015)
+        return (0.180, 0.050, 0.300, 0.290)
+
+    def Crop2(self, jagged, no_outline, intensity) -> int:  # noqa: N802
+        self.calls.append(f"Crop2({jagged}, {no_outline}, {intensity})")
+        self.cropped = self.crops
+        return self.crop_status
+
+    def IsCropped(self) -> bool:  # noqa: N802
+        return self.cropped
+
+    def UpdateViewDisplayGeometry(self) -> None:  # noqa: N802
+        self.calls.append("UpdateViewDisplayGeometry")
+
+
+class _KinkModel:
+    def ClearSelection2(self, _all) -> None:  # noqa: N802
+        pass
+
+    def EditRebuild3(self) -> None:  # noqa: N802
+        pass
+
+
+def _kink_seat(monkeypatch, view: _KinkView) -> list[tuple]:
+    """Point draw_pinion_spring's COM helpers at ``view``; returns the log of
+    placements and crop circles."""
+    log: list[tuple] = []
+    # The focus sits a fixed sheet offset from the view's position.
+    offset = (-0.050, 0.070)
+
+    def place(_adapter, source, orientation, x, y, *, scale):
+        log.append(("place", orientation, (x, y), scale))
+        return view
+
+    def model_point(_adapter, _view, point, *, label):
+        assert point[:2] == pytest.approx(
+            (drawing.DETAIL_FOCUS[0] / 1000.0, drawing.DETAIL_FOCUS[1] / 1000.0)
+        )
+        return (view.Position[0] + offset[0], view.Position[1] + offset[1])
+
+    def circle(_adapter, _view, center, radius, *, label, add_to_db=False):
+        log.append(("circle", center, radius, add_to_db))
+        return object()
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(drawing, "double_array", lambda values: tuple(values))
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "model_point_in_view", model_point)
+    monkeypatch.setattr(drawing, "_sketch_circle", circle)
+    monkeypatch.setattr(drawing, "_activate_view", lambda *_a, **_k: "Drawing View4")
+    return log
+
+
+def _kink_adapter():
+    return type("Adapter", (), {"currentModel": _KinkModel()})()
+
+
+def test_kink_detail_is_a_cropped_front_model_view(monkeypatch) -> None:
+    # pc-r13 (leaf 20260927T001822Z-1-ba1f4546): the native detail's
+    # targeted import brought KinkR but not FlatLen.  Detail A is now a *Front
+    # model view at 5:1, its kink focus moved onto DETAIL_CENTER, cropped by
+    # the fence's 5:1 circle with a plain circular outline.
+    view = _KinkView()
+    log = _kink_seat(monkeypatch, view)
+    assert drawing._cropped_kink_view(_kink_adapter()) is view
+    assert log[0] == ("place", "*Front", drawing.DETAIL_CENTER, drawing.DETAIL_SCALE)
+    kind, center, radius, add_to_db = log[1]
+    assert kind == "circle" and not add_to_db
+    assert center == pytest.approx(drawing.DETAIL_CENTER, abs=1e-12)
+    assert radius == pytest.approx(5 * drawing.DETAIL_RADIUS_MM / 1000.0)
+    assert view.calls[0] == "SetViewPosition"
+    assert "Crop2(False, False, 1)" in view.calls
+    assert not hasattr(drawing, "_kink_detail")
+    assert "CreateDetailViewAt4" not in Path(drawing.__file__).read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"crop_status": 0}, "not cropped"),
+        ({"crops": False}, "not cropped"),
+        ({"moves": False}, "kink focus sits at"),
+    ],
+)
+def test_kink_detail_fails_loud_when_the_seat_does_not_obey(
+    monkeypatch, kwargs, message
+) -> None:
+    view = _KinkView(**kwargs)
+    _kink_seat(monkeypatch, view)
+    with pytest.raises(RuntimeError, match=message):
+        drawing._cropped_kink_view(_kink_adapter())
+
+
+def test_kink_crop_holds_its_dimensions_and_labels_clear_of_them() -> None:
+    # The crop circle is where pc-r12 printed the native detail's circle, so
+    # the KinkR and FlatLen text positions tuned there still ride its edge.
+    focus = drawing.DETAIL_FOCUS
+    radius = drawing.DETAIL_RADIUS_MM
+    flat_tip = geometry.FLAT_TIP
+    kink_c = geometry.KINK_C
+    # The flat's tip and the kink centre both sit inside the fence.
+    assert ((flat_tip[0] - focus[0]) ** 2 + (flat_tip[1] - focus[1]) ** 2) ** 0.5 < radius
+    assert ((kink_c[0] - focus[0]) ** 2 + (kink_c[1] - focus[1]) ** 2) ** 0.5 < radius
+    crop_bottom = drawing.DETAIL_CENTER[1] - drawing.DETAIL_CROP_RADIUS
+    assert drawing.DETAIL_LABEL_XY[0] == drawing.DETAIL_CENTER[0]
+    assert drawing.DETAIL_LABEL_XY[1] < crop_bottom
+    assert drawing.DETAIL_LABEL_TEXT == "DETAIL A\nSCALE 5 : 1"
+    # KinkR rides above-left of the circle, FlatLen right of it: neither
+    # reaches down to the label.
+    for name in ("KinkR", "FlatLen"):
+        assert drawing.DETAIL_KEEP[name][1] > drawing.DETAIL_LABEL_XY[1]
+    # The fence letter goes west of the front view's fence.
+    assert drawing.PARENT_LETTER_OFFSET[0] < -drawing.DETAIL_RADIUS_MM * drawing._S
+    assert drawing.PARENT_LETTER_OFFSET[1] == 0.0
+
+
 def test_views_are_projected_and_hidden_lines_removed() -> None:
     assert drawing.TOP_CENTER[0] == drawing.FRONT_CENTER[0]
     assert drawing.TOP_CENTER[1] > drawing.FRONT_CENTER[1]
