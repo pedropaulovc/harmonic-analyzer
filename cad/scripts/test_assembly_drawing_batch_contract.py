@@ -63,7 +63,7 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
         spec = drawing.SPEC
         assert spec.name in tasks
         assert set(tasks[spec.name]["targets"]) == {
-            str(path) for path in spec.outputs.values()
+            str(path) for path in (*spec.outputs.values(), spec.layout_report)
         }
         deps = dodo._drawing_file_deps(spec.name)
         assert str(spec.source) in deps
