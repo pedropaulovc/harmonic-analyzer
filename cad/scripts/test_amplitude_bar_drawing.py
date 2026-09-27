@@ -345,3 +345,46 @@ def test_neighbouring_bars_keep_a_running_gap_at_the_printed_worst_case() -> Non
     ):
         float_max = (width + upper) - (plate - tolerance)
         assert gap - float_max >= bank.MIN_END_PLAY
+
+
+def test_details_are_cropped_model_views_dimensioned_before_the_crop() -> None:
+    """r743-6 (d92938949, leaf 20260927T020523Z-1-e3f9f1f7): the front view's
+    import took the notch dimensions and deleted them, then a native detail of
+    it imported nothing (available=[]). Each detail is now a 4:1 *Front model
+    view, dimensioned uncropped, then cropped (the pc-r15 kink-detail pattern,
+    d6b8ed93f), and both details import before the front view."""
+    import ast
+    import inspect
+
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "CreateDetailViewAt4" not in source
+    tree = ast.parse(source)
+
+    def calls(function: str) -> list[str]:
+        node = next(
+            item
+            for item in ast.walk(tree)
+            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and item.name == function
+        )
+        found = []
+        for call in ast.walk(node):
+            if isinstance(call, ast.Call):
+                name = getattr(call.func, "id", None) or getattr(call.func, "attr", "")
+                found.append((call.lineno, call.col_offset, name))
+        return [name for _line, _col, name in sorted(found)]
+
+    order = calls("_dimension_then_crop")
+    assert order.index("curate_view_dimensions") < order.index("_crop_detail_view")
+    assert order.count("_view_dimension_names") == 2
+    build = calls("build")
+    assert build.index("_placed_detail_view") < build.index("_dimension_then_crop")
+    assert build.index("_dimension_then_crop") < build.index("curate_view_dimensions")
+    assert build.index("curate_view_dimensions") < build.index("_mark_detail_on_front")
+    assert "Crop2" in inspect.getsource(drawing._crop_detail_view)
+    for detail in (drawing.DETAIL_A, drawing.DETAIL_B):
+        assert detail.label_text == f"DETAIL {detail.label}\nSCALE 4 : 1"
+        assert detail.crop_radius == pytest.approx(detail.radius_mm * 4 / 1000)
+        assert detail.mark_radius == pytest.approx(detail.radius_mm / 4 / 1000)
+        # The label note's two lines stay on the sheet.
+        assert detail.label_xy[1] - 0.012 > 0.0127
