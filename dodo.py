@@ -2732,6 +2732,8 @@ def task_check():
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
         SCRIPTS_DIR / "test_drawing_layout_check.py",
+        # The shared layout audit's own contract (_layout_audit.py finders + ink model).
+        SCRIPTS_DIR / "test_layout_audit.py",
         # Drawing infrastructure and cross-sheet contracts do not follow the
         # per-sheet test_*_drawing.py suffix, so enroll them explicitly.
         SCRIPTS_DIR / "test_drawing_marks.py",
