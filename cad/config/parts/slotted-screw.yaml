@@ -3,9 +3,9 @@ slotted-screw:
   number: MHA-101
   stock_name: Steel Narrow Fillister Head Slotted Screw
   supplier: McMaster-Carr
-  supplier_skus: [90280A199]
+  supplier_skus: [90280A201]
   material: Plain Carbon Steel
-  material_specification: Steel, McMaster-Carr 90280A199
+  material_specification: Steel, McMaster-Carr 90280A201
   finish: zinc plated
   quantity: 4
   tolerance_class: machined_block

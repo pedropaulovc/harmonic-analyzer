@@ -116,7 +116,9 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
     properties.update(
         {
             "Number": "42",
-            "Title": "Test Fastener",
+            # The PART cell prints the slug; the registry title only names
+            # the drawing document (#877 PART-cell ruling).
+            "Title": source.stem,
             "Material": "Steel",
             "Stock Name": "Test stock",
             "Supplier": "Test supplier",
@@ -131,7 +133,7 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
     )
     registry = {
         "number": properties["Number"],
-        "title": properties["Title"],
+        "title": "Test Fastener",
         "material": properties["Material"],
         "finish": "As purchased",
     }

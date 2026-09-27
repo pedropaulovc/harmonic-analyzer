@@ -46,6 +46,7 @@ from _drawing_marks import (
 from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _part_pmi import author_part_pmi
+from _visibility import blank_reference_geometry
 from rack_pinion_spec import (
     BORE_DIA_BAND,
     DRAWING_DIMENSIONS,
@@ -128,12 +129,14 @@ async def build(adapter) -> dict[str, str]:
     # mates it on the stud. A reference feature -- no volume, geometry unchanged.
     from solidworks_mcp.adapters.base import CreateAxisParameters  # noqa: E402
 
-    check(
+    gear_axis = check(
         "create_axis Z (Top x Right)",
         await adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
         ),
-    )
+    ).name
+    # Hidden but still selectable by name for the assembly's mates.
+    blank_reference_geometry(adapter, ((gear_axis, "AXIS"),))
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

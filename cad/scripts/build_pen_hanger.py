@@ -60,7 +60,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _holes import TAP_DRILL_MM, HoleSpec, wizard_holes
-from build_hanger_screw import SHANK_DIA as HANGER_SCREW_DIA
+from hanger_screw_spec import SHANK_DIA as HANGER_SCREW_DIA
 from wheel_bar_geom import (
     HANGER_SCREW_LOCAL_X,
     HANGER_STRAP_TOP_LEFT_X,

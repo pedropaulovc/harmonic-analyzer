@@ -20,7 +20,7 @@ driving dims, SolidworksMCP-python PRs #55/#56):
 * **Circles**: :func:`define_circle` anchors the centre point semantically —
   coincident-to-origin at (0,0), an alignment relation plus one distance dim
   on-axis, two distance dims in general position — then adds a DRIVING
-  diameter. ``fix`` is never used.
+  diameter (or radius, ``size_dimension="radius"``). ``fix`` is never used.
 * **Line chains**: consecutive ``add_line`` calls sharing exact endpoint
   coordinates get merged/coincident vertices; anchor ONE vertex with
   :func:`anchor_point_to_origin`, then horizontal/vertical constraints and
@@ -59,7 +59,7 @@ from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Literal
 
 import _telemetry  # observability spine: console logging + tracing, preconfigured
 import _watchdog  # COM crash/hang watchdog (started per session in run_build)
@@ -475,9 +475,17 @@ async def define_circle(
     dims: "SketchDims | None" = None,
     names: tuple[str | None, str | None, str | None] | None = None,
     drives: tuple[str | None, str | None, str | None] | None = None,
+    size_dimension: Literal["diameter", "radius"] = "diameter",
 ) -> str:
     """Add a circle, anchor its centre to the origin semantically, then add
-    a DRIVING diameter dimension. No ``fix`` involved.
+    a DRIVING size dimension. No ``fix`` involved.
+
+    ``size_dimension`` picks what that dimension measures, and therefore what
+    its name/drive slot means. A circle that PRINTS as a radius (an arc crown)
+    must be dimensioned as one here: a drawing that flips a model diameter to
+    radial keeps its value and re-reads it as a radius, so an equation-driven
+    diameter doubles the feature on the sheet's rebuild (v37 arbor-pedestal
+    printed an R22 crown on its R11 part).
 
     The raw ``add_circle`` runs with sketch inference SUPPRESSED (restored
     afterwards): with it on, a second concentric/near circle snaps to the first
@@ -486,7 +494,7 @@ async def define_circle(
     explicitly below, so inference during the draw only ever hurts.
 
     Self-naming: pass ``dims`` (a per-sketch :class:`SketchDims`) plus ``names`` /
-    ``drives`` as ``(centre_x, centre_z, diameter)`` tuples to record this
+    ``drives`` as ``(centre_x, centre_z, size)`` tuples to record this
     circle's dims for later renaming/driving. Only the dims actually emitted are
     recorded -- an on-axis centre drops its zero coordinate -- so the same call
     is correct whether the circle is on an axis or not."""
@@ -499,16 +507,24 @@ async def define_circle(
     finally:
         sketch_mgr.AddToDB = prev_add_to_db
     await anchor_point_to_origin(adapter, f"{circle.data}.center", x, y, label)
-    n_x, n_z, n_dia = names or (None, None, None)
-    d_x, d_z, d_dia = drives or (None, None, None)
+    n_x, n_z, n_size = names or (None, None, None)
+    d_x, d_z, d_size = drives or (None, None, None)
     _record_origin_anchor(dims, x, y, n_x, n_z, d_x, d_z)
+    dimension_type, value = _CIRCLE_SIZE_DIMENSIONS[size_dimension](radius)
     check(
-        f"dimension {label} diameter",
-        await adapter.add_sketch_dimension(circle.data, None, "diameter", radius * 2.0),
+        f"dimension {label} {size_dimension}",
+        await adapter.add_sketch_dimension(circle.data, None, dimension_type, value),
     )
     if dims is not None:
-        dims.record(n_dia, d_dia)
+        dims.record(n_size, d_size)
     return circle.data
+
+
+# define_circle's size_dimension -> (adapter dimension type, value from radius).
+_CIRCLE_SIZE_DIMENSIONS = {
+    "diameter": lambda radius: ("diameter", radius * 2.0),
+    "radius": lambda radius: ("radial", radius),
+}
 
 
 @_telemetry.traced("sketch.rectangle", label_param="label")
@@ -894,6 +910,32 @@ def blank_sketch(adapter: Any, sketch_name: str) -> None:
     model.BlankSketch()
     model.ClearSelection2(True)
     _telemetry.success(f"blanked sketch {sketch_name}")
+
+
+@_telemetry.traced("appearance.hide_reference_sketches")
+def blank_reference_sketches(adapter: Any, sketches: tuple[str, ...]) -> None:
+    """Blank a part's reference sketches before it is saved, and prove it.
+
+    A dimension-carrying reference sketch stays in the part for the drawing to
+    import (``_drawing_hidden_sketches`` shows it per view), but saved shown it
+    prints grey dots and lines in every assembly render (#880).  Each sketch is
+    read back through ``IPartDoc.FeatureByName`` and must be hidden, so a
+    BlankSketch that silently did nothing fails the build.
+    """
+    part_doc = _early_bound(adapter.currentModel, "IPartDoc")
+    for sketch in sketches:
+        blank_sketch(adapter, sketch)
+        feature = _early_bound(part_doc.FeatureByName(sketch), "IFeature")
+        state = int(feature.Visible)
+        if state != 1:  # swVisibilityState_e: swVisibilityStateHide
+            raise RuntimeError(
+                f"{sketch} still visible after BlankSketch (state {state})"
+            )
+    _telemetry.event(
+        "part.reference_sketches_hidden",
+        sketches=", ".join(sketches),
+        count=len(sketches),
+    )
 
 
 def set_sketch_direct_db(adapter: Any, enabled: bool) -> None:
@@ -1310,11 +1352,21 @@ async def export_part_stl(adapter: Any, out_path: Path) -> None:
 
 @_telemetry.traced("export.part_images", label_param="part_name")
 async def save_part_and_images(
-    adapter: Any, part_name: str, views: Iterable[str] = DEFAULT_VIEWS
+    adapter: Any,
+    part_name: str,
+    views: Iterable[str] = DEFAULT_VIEWS,
+    *,
+    allowed_shown: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     """Save the part to ``cad/out/sldprt``, its STL to ``cad/out/stl`` (the
     assembly build reads it for mirror placement), and PNG views to
-    ``cad/out/png``."""
+    ``cad/out/png``.
+
+    The creating helpers hide the planes, axes, points and curves they make;
+    the save fails if anything still shows, including any sketch not listed in
+    ``allowed_shown`` (``reference_visibility_allowances``)."""
+    from _visibility import assert_reference_geometry_hidden
+
     # Recorded BEFORE anything touches the camera: this runs at the end of
     # authoring, and set_isometric_view below (like export_image further down) is
     # the first thing in the whole build path that moves the view, so this is the
@@ -1322,6 +1374,7 @@ async def save_part_and_images(
     # under can still be read. A SUCCESS has to record it too -- otherwise a good
     # run and a bad one cannot be compared (see _seat_forensics.record_authoring_context).
     _seat_forensics.record_authoring_context(adapter, part_name)
+    assert_reference_geometry_hidden(adapter, part_name, allowed_shown)
     OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
     part_path = (OUT_SLDPRT / f"{part_name}.SLDPRT").resolve()
     set_isometric_view(adapter)  # save on isometric so the .SLDPRT opens isometric
@@ -1336,7 +1389,7 @@ async def save_part_and_images(
     apply_custom_properties(adapter, properties)
     # The drawing template's PART cell resolves the linked model's document
     # summary Title, not its same-named custom property. Keep both identities
-    # sourced from part_properties so a registry title override cannot split.
+    # sourced from part_properties (the slug) so the two cannot split.
     apply_summary_info(adapter, title=properties["Title"])
     rebuild_stale_configurations(adapter, part_name)
     check(
@@ -1380,12 +1433,28 @@ def rebuild_stale_configurations(adapter: Any, part_name: str) -> None:
 
     Same shape as _assembly.rebuild_if_needed_before_save (1013334c3): every
     configuration's IConfiguration.NeedsRebuild is read first, and a clean part
-    -- the common case -- gets no rebuild call at all.  A stale one gets ONE
-    IModelDocExtension.EditRebuildAll, which rebuilds what needs it in every
-    configuration without activating any (#271 measured the cost of switching;
-    ForceRebuild3 dirties children, #267).  A refused rebuild, any non-warning
-    What's Wrong entry (the fleet's fault convention), or a configuration still
-    stale after it raises, naming the part.
+    -- the common case -- gets no rebuild call and no switch at all.
+
+    A stale INACTIVE configuration is activated and force-rebuilt
+    (ShowConfiguration2 + ForceRebuild3), must then read What's Wrong clean,
+    and the original active configuration is shown again.  efae8d795 rebuilt
+    those with one EditRebuildAll and no switch (#271 measured the cost of
+    switching), but cg-fx1 (9459428ec,
+    dt-logs/farm-runs/leaf-logs/cg-fx1-task.log:305-345) found that it left
+    every cone-gear T00x configuration saved with ToothGapCut and
+    ToothGapPattern at error 1 and NeedsRebuild false: the drive train's
+    configuration swap failed its EditRebuild3, and only an activated
+    ForceRebuild3 cleared the faults.  What's Wrong reads the active
+    configuration only, so the no-switch path could not see them.  The user
+    ruled (2026-09-27, option (a)) that the fix lives here: one switch per
+    stale inactive configuration, none otherwise.  #267's objection to
+    ForceRebuild3 is about an assembly's children; a part has none.
+
+    A stale ACTIVE configuration keeps ONE IModelDocExtension.EditRebuildAll.
+    A refused rebuild, any non-warning What's Wrong entry (the fleet's fault
+    convention), or a configuration still stale afterwards raises, naming the
+    part.  :func:`assert_saved_configurations_regenerate` proves the saved
+    result the way a placing assembly loads it.
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     names = [str(name) for name in (model.GetConfigurationNames() or ())]
@@ -1399,18 +1468,22 @@ def rebuild_stale_configurations(adapter: Any, part_name: str) -> None:
         _telemetry.annotate(rebuild_all="skipped", stale_after=0)
         _telemetry.success(f"{part_name}: {len(names)} configuration(s) clean before save")
         return
-    _telemetry.annotate(rebuild_all="ran")
-    extension = _early_bound(_read_member(model, "Extension"), "IModelDocExtension")
-    if not extension.EditRebuildAll():
-        raise RuntimeError(
-            f"{part_name}: EditRebuildAll refused rebuilding stale configurations "
-            f"{stale_before}"
-        )
-    faults = [
-        f"{name} ({_FEATURE_ERROR.get(code, code)})"
-        for name, code, warning in whats_wrong(adapter, model)
-        if not warning
-    ]
+    active = active_configuration_name(adapter, model)
+    if not active:
+        raise RuntimeError(f"{part_name}: the active configuration cannot be read")
+    inactive = [name for name in stale_before if name != active]
+    _telemetry.annotate(stale_inactive=len(inactive))
+    if inactive:
+        _rebuild_inactive_while_active(adapter, model, part_name, inactive, active)
+    if active in stale_before:
+        _telemetry.annotate(rebuild_all="ran")
+        extension = _early_bound(_read_member(model, "Extension"), "IModelDocExtension")
+        if not extension.EditRebuildAll():
+            raise RuntimeError(
+                f"{part_name}: EditRebuildAll refused rebuilding stale configurations "
+                f"{stale_before}"
+            )
+    faults = _hard_fault_names(adapter, model)
     if faults:
         raise RuntimeError(f"{part_name}: rebuilding {stale_before} left faults {faults}")
     stale_after = stale_configurations(model, names)
@@ -1434,6 +1507,97 @@ def stale_configurations(model: Any, names: Iterable[str]) -> list[str]:
             _early_bound(model.GetConfigurationByName(name), "IConfiguration").NeedsRebuild
         )
     ]
+
+
+def _hard_fault_names(adapter: Any, model: Any) -> list[str]:
+    """Non-warning What's Wrong entries of the ACTIVE configuration, named."""
+    return [
+        f"{name} ({_FEATURE_ERROR.get(code, code)})"
+        for name, code, warning in whats_wrong(adapter, model)
+        if not warning
+    ]
+
+
+def _rebuild_inactive_while_active(
+    adapter: Any, model: Any, part_name: str, inactive: list[str], active: str
+) -> None:
+    """Activate and force-rebuild each stale inactive configuration, then show
+    ``active`` again (see :func:`rebuild_stale_configurations`)."""
+    failures: list[str] = []
+    for name in inactive:
+        if not bool(model.ShowConfiguration2(name)):
+            failures.append(f"{name}: ShowConfiguration2 refused")
+            continue
+        if not bool(model.ForceRebuild3(False)):
+            failures.append(f"{name}: ForceRebuild3 returned False")
+            continue
+        faults = _hard_fault_names(adapter, model)
+        if faults:
+            failures.append(f"{name}: {faults}")
+    if not bool(model.ShowConfiguration2(active)):
+        failures.append(f"restoring {active}: ShowConfiguration2 refused")
+    if failures:
+        raise RuntimeError(
+            f"{part_name}: stale inactive configurations did not rebuild clean "
+            "while active: " + "; ".join(failures)
+        )
+
+
+@_telemetry.traced("save.saved_configs_regenerate", label_param="part_name")
+def assert_saved_configurations_regenerate(adapter: Any, part_name: str) -> None:
+    """Load each configuration of a reopened part the way a placing assembly
+    does, and prove it regenerates.
+
+    An assembly that places a configuration other than the part's saved
+    active one reads that configuration's saved cache and runs a plain
+    ``EditRebuild3`` (the drive train's cone-gear ladder swaps 19 copies).
+    cg-fx1 (9459428ec, dt-logs/farm-runs/leaf-logs/cg-fx1-task.log:305-345)
+    found cone-gear's T00x caches faulted as loaded, ``EditRebuild3``
+    returning False over them, and NeedsRebuild false throughout, so no
+    NeedsRebuild read or forced-rebuild check can stand in for this one.
+
+    Call it on the reopened part, before anything force-rebuilds it: each
+    configuration (the saved active one last, so the part ends on it) is
+    shown, What's Wrong is read as loaded, and ``EditRebuild3`` must return
+    True with What's Wrong still clean.  Nothing may save afterwards.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    active = active_configuration_name(adapter, model)
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    if active not in names:
+        raise RuntimeError(
+            f"{part_name}: active configuration {active!r} is not among {names}"
+        )
+    failures: list[str] = []
+    for name in [name for name in names if name != active] + [active]:
+        shown = active_configuration_name(adapter, model) == name or bool(
+            model.ShowConfiguration2(name)
+        )
+        if not shown:
+            failures.append(f"{name}: ShowConfiguration2 refused")
+            continue
+        loaded = _hard_fault_names(adapter, model)
+        rebuilt = bool(model.EditRebuild3())
+        after = _hard_fault_names(adapter, model)
+        _telemetry.info(
+            f"{part_name} saved {name}: loaded={loaded or 'clean'}, "
+            f"EditRebuild3={rebuilt}, after={after or 'clean'}"
+        )
+        if loaded or not rebuilt or after:
+            failures.append(
+                f"{name}: loaded {loaded or 'clean'}, EditRebuild3={rebuilt}, "
+                f"after {after or 'clean'}"
+            )
+    if failures:
+        raise RuntimeError(
+            f"saved {part_name} configurations do not regenerate the way a "
+            "placing assembly loads them (activate, then a plain EditRebuild3): "
+            + "; ".join(failures)
+        )
+    _telemetry.success(
+        f"{part_name}: {len(names)} saved configuration(s) regenerate clean as "
+        "an assembly loads them"
+    )
 
 
 def whats_wrong(adapter: Any, model: Any) -> list[tuple[str, int, bool]]:
@@ -1596,7 +1760,10 @@ def part_properties(part_name: str) -> dict[str, str]:
 
     ``Revision`` is the next compact release number from ``release.yaml``;
     per-part registry revisions are retained only as historical source data and
-    never override the release identity stamped into shipped CAD.
+    never override the release identity stamped into shipped CAD.  ``Title`` is
+    always the part's slug: it is what the title block's PART cell prints, one
+    convention on every sheet (user ruling 2026-09-26), so a registry
+    ``title:`` never reaches it (``test_buildgraph.test_part_cell_prints_the_slug``).
     """
     import _config
 
@@ -1637,7 +1804,6 @@ def part_properties(part_name: str) -> dict[str, str]:
         reg = _config.parts(registry_name)
     except KeyError:
         return props
-    props["Title"] = str(reg.get("title") or part_name)
     field_map = {
         "Number": "number",
         "Material": "material",
@@ -1824,14 +1990,15 @@ PROJECT_AUTHOR = "Pedro Paulo Vezza Campos"
 
 
 @_telemetry.traced("part.summary_info")
-def apply_summary_info(adapter: Any, *, title: str) -> None:
+def apply_summary_info(adapter: Any, *, title: str, model: Any = None) -> None:
     """Write and read-verify the document summary Title + Author.
 
     Same early-bound split as the drawing summary stamper: SummaryInfo is a
     property, so early binding exposes the getter as ``SummaryInfo(field)`` and
-    the setter as ``SetSummaryInfo(field, value)``.
+    the setter as ``SetSummaryInfo(field, value)``.  ``model`` defaults to the
+    active document, like ``apply_custom_properties``.
     """
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    model = _early_bound(adapter.currentModel if model is None else model, "IModelDoc2")
     for summary_field, value in ((_SUMMARY_TITLE, title), (_SUMMARY_AUTHOR, PROJECT_AUTHOR)):
         model.SetSummaryInfo(summary_field, value)
         if model.SummaryInfo(summary_field) != value:
@@ -2338,8 +2505,13 @@ async def force_rebuild(adapter: Any) -> None:
     makes the new names resolvable as equation targets and refreshes the tree
     labels. Delegates to the adapter's ``rebuild_model`` (``ForceRebuild3``) so
     the COM call runs on the adapter's executor thread and a failed rebuild
-    raises through :func:`check` rather than passing silently."""
-    check("rebuild", await adapter.rebuild_model())
+    raises through :func:`check` rather than passing silently.  A refused
+    rebuild first names its What's Wrong features and captures the seat
+    (:func:`_seat_forensics.capture_rebuild_failure`), raising the same message."""
+    result = await adapter.rebuild_model()
+    if not result.is_success:
+        _seat_forensics.capture_rebuild_failure(adapter, f"rebuild failed: {result.error}")
+    check("rebuild", result)
 
 
 # ---------------------------------------------------------------------------
@@ -2392,12 +2564,14 @@ async def name_bore_axis(
 
     Returns the new axis's resolved name (e.g. ``"Axis1"``).
     """
+    from _visibility import blank_reference_geometry
     from solidworks_mcp.adapters.base import (
         CreateAxisParameters,
         CreatePlaneParameters,
     )
 
     planes: list[str] = []
+    created: list[tuple[str, str]] = []
     for base, off, tag, drive in (
         (plane_a, offset_a, "A", drive_a),
         (plane_b, offset_b, "B", drive_b),
@@ -2412,14 +2586,19 @@ async def name_bore_axis(
             ),
         ).name
         planes.append(plane_name)
+        created.append((plane_name, "PLANE"))
         if drive is not None and drive_jobs is not None:
             drive_jobs.append((f"D1@{plane_name}", drive))
-    return check(
+    axis_name = check(
         f"axis {label} ({planes[0]} ∩ {planes[1]})",
         await adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=planes)
         ),
     ).name
+    # Hidden at creation, selectable by name: a shown axis or plane prints in
+    # every render of the part and of each assembly that places it.
+    blank_reference_geometry(adapter, (*created, (axis_name, "AXIS")))
+    return axis_name
 
 
 # swFeatureError_e: the codes GetWhatsWrong returns. Whether an entry is a

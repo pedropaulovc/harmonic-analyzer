@@ -60,16 +60,16 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
 * fillister-screw x4 (2026-09-02 ch26 p.71 re-derive): the brass slotted
   round-head screws at the plate's four corners, heads seated on the
   decorated face, shanks down through the plate's #4 clearance holes into the
-  base's blind #4-40 taps (build_harmonic_base NAMEPLATE_SCREW_XZ -- the same
+  base's blind #4-40 taps (harmonic_base_fasteners NAMEPLATE_SCREW_XZ -- the same
   nameplate_spec derivation). Same single-mate fix-all treatment.
 
 Hold-down: four stock 1/4-20 UNC-2A hex-head screws install from the top,
 through the support foot's 5/16 clearance drills, into blind 1/4-20 UNC-2B
 seats in the base. The foot pattern transforms from local X +/-60.32,
 Z +/-17.46 to machine x 55.44/90.36, z -60.32/+60.32 (the base's shared
-SUPPORT_HOLD_DOWN_XZ contract). Each McMaster 92240A539 screw bears on the
+SUPPORT_HOLD_DOWN_XZ contract). Each McMaster 92240A540 screw bears on the
 bottom of its exact vendor-modeled 0.277813 mm under-head washer transition,
-crosses the 6.35 mm foot, and engages 9.247187 mm = 1.456D in the base. The
+crosses the 6.35 mm foot, and engages 12.422187 mm = 1.956D in the base. The
 screws are inserted at exact authored transforms and locked to the fixed base;
 they do not constrain the support. Every rigid frame member uses this
 same single-mate strategy; transform readback remains the fail-loud placement
@@ -100,7 +100,6 @@ from _common import (
     OUT_SLDPRT,
     _early_bound,
     apply_custom_properties,
-    apply_summary_info,
     check,
     run_build,
 )
@@ -129,7 +128,7 @@ from _transforms import (
     rot_z_rows,
     rows_from_euler,
 )
-from build_harmonic_base import (
+from harmonic_base_fasteners import (
     BASE_CROSS_TAP_SPEC,
     HOLD_DOWN_ENGAGEMENT,
     HOLD_DOWN_THREAD,
@@ -142,7 +141,7 @@ from cone_pivot_post_installation import (
     FRAME_FRONT_COLUMN_Z,
     FRAME_REAR_COLUMN_Z,
 )
-from build_fillister_screw import SHANK_LEN as NAMEPLATE_SCREW_SHANK_LEN
+from fillister_screw_spec import SHANK_LEN as NAMEPLATE_SCREW_SHANK_LEN
 from nameplate_spec import (
     MOUNT_EULER as NAMEPLATE_EULER,
     MOUNT_FRONT_Y as NAMEPLATE_FRONT_Y,
@@ -151,7 +150,9 @@ from nameplate_spec import (
     MOUNT_ROWS as NAMEPLATE_ROWS,
     PLATE_THICKNESS as NAMEPLATE_THICKNESS,
 )
+from rocker_arm_support_section_spec import FOOT_THICKNESS as LAG_FOOT_THICKNESS
 from rocker_arm_support_spec import (
+    HOLE_DIA as LAG_SUPPORT_CLEARANCE_DIA,
     SUPPORT_HOLD_DOWN_XZ,
     SUPPORT_WORLD_SEAT_Y,
     SUPPORT_WORLD_X,
@@ -165,7 +166,7 @@ from frame_cross_screw_spec import (
     THREAD as CROSS_SCREW_THREAD,
     THREAD_CLASS as CROSS_SCREW_THREAD_CLASS,
 )
-from build_lag_screw import (
+from lag_screw_spec import (
     BEARING_OFFSET as LAG_BEARING_OFFSET,
     HEAD_AF as LAG_HEAD_AF,
     SHANK_DIA as LAG_SHANK_DIA,
@@ -174,11 +175,6 @@ from build_lag_screw import (
     THREAD_LEN as LAG_THREAD_LEN,
     THREAD_SIZE as LAG_THREAD_SIZE,
 )
-from build_rocker_arm_support import (
-    FOOT_THICKNESS as LAG_FOOT_THICKNESS,
-    HOLE_DIA as LAG_SUPPORT_CLEARANCE_DIA,
-)
-
 from build_top_frame import SIDE_TAP_SPEC as TOP_CROSS_TAP_SPEC
 from frame_attachment_spec import (
     BASE_SCREW_SEAT_Z,
@@ -218,7 +214,7 @@ SUPPORT_SEAT_Y = SUPPORT_WORLD_SEAT_Y  # rocker-arm-support's origin is
 SUPPORT_EULER = [0.0, 90.0, 0.0]
 SUPPORT_ROWS = ROT_Y_POS90
 
-# Rocker-support hold-down: four stock 1/4-20 x 5/8 hex-head screws,
+# Rocker-support hold-down: four stock 1/4-20 x 3/4 hex-head screws,
 # coaxial with the support clearance drills and blind base taps via authored
 # transforms; one seed lock mate and a native grid retain that placement.
 # Stations are the foot pattern in the machine frame: local X +/-60.32,
@@ -325,7 +321,7 @@ if any(
 #
 # nameplate screws (2026-09-02 ch26 p.71 re-derive): 4x #4-40 brass
 # fillister-screw, one per plate corner, screwed DOWN into the base's blind
-# #4-40 taps (build_harmonic_base NAMEPLATE_SCREW_XZ -- the plate's own
+# #4-40 taps (harmonic_base_fasteners NAMEPLATE_SCREW_XZ -- the plate's own
 # corner holes carried through the mount transform: x 209.75/163.75,
 # z +/-45.5). The part is authored axis along local +Z with the origin at the
 # UNDER-HEAD bearing plane, head at -Z. The stock wrapper preserves that frame,
@@ -895,9 +891,6 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    # The PART cell resolves the document summary Title; "frame assembly" (not
-    # the bare stem) so the sheet identifies itself as an assembly drawing.
-    apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
     _create_frame_explode(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
 

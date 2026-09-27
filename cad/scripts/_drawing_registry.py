@@ -16,6 +16,13 @@ from pathlib import Path
 SCRIPTS_DIR = Path(__file__).resolve().parent
 CAD_ROOT = SCRIPTS_DIR.parent
 TEMPLATES_DIR = CAD_ROOT / "templates"
+# Each drawing's layout-audit report (``_drawing_layout_audit``): a declared
+# drawing-task target, so it rides the remote cache with the sheet it audits.
+LAYOUT_REPORT_DIR = CAD_ROOT / "out" / "reports" / "layout-audit"
+
+
+def layout_report_path(artifact_stem: str) -> Path:
+    return LAYOUT_REPORT_DIR / f"{artifact_stem}.json"
 
 
 class DrawingLayout(StrEnum):
@@ -97,6 +104,11 @@ class DrawingSpec:
         }
 
     @property
+    def layout_report(self) -> Path:
+        """The layout-audit report: a task target, but not a release output."""
+        return layout_report_path(self.artifact_stem)
+
+    @property
     def assets(self) -> tuple[Path, ...]:
         layouts = dict.fromkeys((self.layout, *self.additional_layouts))
         return tuple(DRAWING_TEMPLATES[layout].path for layout in layouts)
@@ -115,6 +127,27 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="crank_arm",
         artifact_stem="crank-arm",
         script_name="draw_crank_arm.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="crank_hub",
+        part="crank_hub",
+        artifact_stem="crank-hub",
+        script_name="draw_crank_hub.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="crank_hub_pin",
+        part="crank_hub_pin",
+        artifact_stem="crank-hub-pin",
+        script_name="draw_crank_hub_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="crank_handle_pivot_screw",
+        part="crank_handle_pivot_screw",
+        artifact_stem="crank-handle-pivot-screw",
+        script_name="draw_crank_handle_pivot_screw.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
@@ -357,6 +390,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="pinion_arbor_collar",
+        part="pinion_arbor_collar",
+        artifact_stem="pinion-arbor-collar",
+        script_name="draw_pinion_arbor_collar.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pinion_bracket",
         part="pinion_bracket",
         artifact_stem="pinion-bracket",
@@ -382,6 +422,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="pinion_cam_pin",
         artifact_stem="pinion-cam-pin",
         script_name="draw_pinion_cam_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="pinion_lever_pin",
+        part="pinion_lever_pin",
+        artifact_stem="pinion-lever-pin",
+        script_name="draw_pinion_lever_pin.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
@@ -490,6 +537,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="crank_pinion_pin",
+        part="crank_pinion_pin",
+        artifact_stem="crank-pinion-pin",
+        script_name="draw_crank_pinion_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="alignment_pinion",
         part="alignment_pinion",
         artifact_stem="alignment-pinion",
@@ -536,6 +590,27 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="cone_tip_block",
         artifact_stem="cone-tip-block",
         script_name="draw_cone_tip_block.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="cone_tip_shim",
+        part="cone_tip_shim",
+        artifact_stem="cone-tip-shim",
+        script_name="draw_cone_tip_shim.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="cylinder_end_disc",
+        part="cylinder_end_disc",
+        artifact_stem="cylinder-end-disc",
+        script_name="draw_cylinder_end_disc.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="rocker_thrust_washer",
+        part="rocker_thrust_washer",
+        artifact_stem="rocker-thrust-washer",
+        script_name="draw_rocker_thrust_washer.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
@@ -623,6 +698,20 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="cone_tip_block_nut",
+        part="cone_tip_block_nut",
+        artifact_stem="cone-tip-block-nut",
+        script_name="draw_cone_tip_block_nut.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="cone_tip_block_screw",
+        part="cone_tip_block_screw",
+        artifact_stem="cone-tip-block-screw",
+        script_name="draw_cone_tip_block_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="fillister_screw",
         part="fillister_screw",
         artifact_stem="fillister-screw",
@@ -634,6 +723,20 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="foot_screw",
         artifact_stem="foot-screw",
         script_name="draw_foot_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="pedestal_hold_down_screw",
+        part="pedestal_hold_down_screw",
+        artifact_stem="pedestal-hold-down-screw",
+        script_name="draw_pedestal_hold_down_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="pinion_strap_pin",
+        part="pinion_strap_pin",
+        artifact_stem="pinion-strap-pin",
+        script_name="draw_pinion_strap_pin.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
@@ -700,10 +803,24 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="arbor_set_screw",
+        part="arbor_set_screw",
+        artifact_stem="arbor-set-screw",
+        script_name="draw_arbor_set_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pen_set_screw",
         part="pen_set_screw",
         artifact_stem="pen-set-screw",
         script_name="draw_pen_set_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="post_mount_screw",
+        part="post_mount_screw",
+        artifact_stem="post-mount-screw",
+        script_name="draw_post_mount_screw.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

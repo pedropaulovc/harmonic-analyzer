@@ -935,11 +935,19 @@ def _seat_error_state(adapter: Any) -> dict[str, Any]:
     )
     if isinstance(messages, (list, tuple)) and len(messages) >= 2:
         state["error_messages"] = [str(text) for text in (messages[1] or [])]
+    return {**state, **_whats_wrong_table(adapter)}
+
+
+def _whats_wrong_table(adapter: Any) -> dict[str, Any]:
+    """The active document's What's Wrong count and entries (feature name, code,
+    its ``swFeatureError_e`` label, warning flag).  Unlike the message stack it
+    is not cleared by the read, so it may be read more than once."""
+    table: dict[str, Any] = {}
     model = adapter.currentModel
     extension = _common._read_member(model, "Extension") if model is not None else None
     if extension is None:
-        return state
-    state["whats_wrong_count"] = adapter._attempt(
+        return table
+    table["whats_wrong_count"] = adapter._attempt(
         lambda: int(_common._early_bound(extension, "IModelDocExtension").GetWhatsWrongCount()),
         default=None,
     )
@@ -949,7 +957,7 @@ def _seat_error_state(adapter: Any) -> dict[str, Any]:
     )
     if isinstance(faults, (list, tuple)) and len(faults) >= 4:
         _retval, features, codes, warnings = faults[:4]
-        state["whats_wrong"] = [
+        table["whats_wrong"] = [
             {
                 "feature": str(_common._read_member(feature, "Name")),
                 "code": int(code or 0),
@@ -963,7 +971,7 @@ def _seat_error_state(adapter: Any) -> dict[str, Any]:
                 strict=False,
             )
         ]
-    return state
+    return table
 
 
 def _document_state(adapter: Any) -> dict[str, Any]:
@@ -1176,6 +1184,52 @@ def capture_com_failure(
             },
         )
     raise exc_type(message)
+
+
+def _describe_rows(rows: list[dict[str, Any]]) -> str:
+    return "; ".join(
+        f"{row['feature']} ({row['error']}, code {row['code']})" for row in rows
+    ) or "none reported"
+
+
+def capture_rebuild_failure(adapter: Any, message: str) -> NoReturn:
+    """Name the features behind a refused rebuild, capture the seat, then raise.
+
+    ``ForceRebuild3`` answers only "Failed to rebuild model".  part:crank_pinion
+    failed that way five times on four workers with nothing else in the log
+    (#906, 2026-09-26), and the cause (a hub boss silently dropped, so the pin
+    hole and two tooth cuts lost their geometry) was only found by a diagnostic
+    leaf that read What's Wrong by hand.  So the failing features ride a
+    ``rebuild.failed`` event on the caller's span first; the full capture
+    (:func:`capture_com_failure`: What's Wrong again, the session messages, the
+    document copy) follows and raises ``RuntimeError(message)``.
+    """
+    rows: list[dict[str, Any]] = []
+    with contextlib.suppress(Exception):
+        rows = list(_whats_wrong_table(adapter).get("whats_wrong") or [])
+    # What's Wrong also lists warning-only rows; they did not fail the rebuild,
+    # so they ride the event apart from the failures.
+    faults = [row for row in rows if not row.get("warning")]
+    warnings = [row for row in rows if row.get("warning")]
+    features = _describe_rows(faults)
+    with contextlib.suppress(Exception):
+        _telemetry.event(
+            "rebuild.failed",
+            failing_features=features,
+            fault_count=len(faults),
+            warning_features=_describe_rows(warnings),
+            warning_count=len(warnings),
+        )
+    title = "document"
+    with contextlib.suppress(Exception):
+        title = str(_common._read_member(adapter.currentModel, "GetTitle") or title)
+    capture_com_failure(
+        adapter,
+        f"rebuild {title}",
+        message,
+        api="IModelDoc2.ForceRebuild3",
+        failing_features=features,
+    )
 
 
 async def teardown_seat(adapter: Any) -> None:

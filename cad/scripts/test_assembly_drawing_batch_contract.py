@@ -1,4 +1,4 @@
-"""Cross-drawing contract for the seven remaining simple assembly drawings."""
+"""Cross-drawing contract for the five remaining simple assembly drawings."""
 
 from __future__ import annotations
 
@@ -43,7 +43,12 @@ ASSEMBLY_DRAWINGS = (
 )
 
 SIMPLE_ASSEMBLY_DRAWINGS = tuple(
-    drawing for drawing in ASSEMBLY_DRAWINGS if drawing is not draw_frame_assembly
+    drawing
+    for drawing in ASSEMBLY_DRAWINGS
+    # The channel sheet left the shared builder when it gained the rocker
+    # bank's fit-up steps (#743, Codex PRRT_kwDOPHDy386mRSOK).
+    if drawing
+    not in (draw_frame_assembly, draw_drive_train_assembly, draw_channel_assembly)
 )
 
 
@@ -61,7 +66,7 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
         spec = drawing.SPEC
         assert spec.name in tasks
         assert set(tasks[spec.name]["targets"]) == {
-            str(path) for path in spec.outputs.values()
+            str(path) for path in (*spec.outputs.values(), spec.layout_report)
         }
         deps = dodo._drawing_file_deps(spec.name)
         assert str(spec.source) in deps
@@ -73,6 +78,17 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                 str(frame_dir / "frame_cross_screw_spec.py"),
                 str(frame_dir / "tube_frame_cap_spec.py"),
             } <= set(deps)
+            assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
+        elif drawing is draw_channel_assembly:
+            scripts_dir = Path(draw_channel_assembly.__file__).resolve().parent
+            assert {
+                str(scripts_dir / "channel_assembly_steps.py"),
+                str(scripts_dir / "rocker_bank_layout.py"),
+            } <= set(deps)
+            assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
+        elif drawing is draw_drive_train_assembly:
+            scripts_dir = Path(draw_drive_train_assembly.__file__).resolve().parent
+            assert str(scripts_dir / "drive_train_assembly_spec.py") in deps
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         else:
             assert str(Path(_assembly_drawing.__file__).resolve()) in deps

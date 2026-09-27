@@ -1,0 +1,9 @@
+cone-tip-shim:
+  title: Cone Tip Shim Pack
+  number: MHA-141
+  material: Carbon steel shim stock
+  material_specification: Carbon steel shim stock, 0.05 / 0.10 / 0.25 / 0.50 mm leaves
+  finish: black oxide
+  quantity: 1
+  tolerance_class: plate_profile
+  process: "cut from shim stock, stacked to fit"

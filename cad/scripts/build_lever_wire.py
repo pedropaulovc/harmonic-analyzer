@@ -70,6 +70,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _visibility import blank_reference_geometry
 from lever_wire_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -174,6 +175,10 @@ async def build(adapter) -> dict[str, str]:
             mode="arc_center", edge_point=[WIRE_DIA / 2.0, 0.0, 0.0])),
     )
     name_last_feature(adapter, "HubPoint")
+    # Hidden but still selectable by name for the hook and swing mates.
+    blank_reference_geometry(
+        adapter, (("HookPoint", "DATUMPOINT"), ("HubPoint", "DATUMPOINT"))
+    )
 
     # Named centreline axis (local Y): the hub STAND-OFF mate holds this axis
     # at the offset-tangency distance from the wheel's Axis1 (axis-axis
