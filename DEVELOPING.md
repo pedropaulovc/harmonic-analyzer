@@ -202,6 +202,27 @@ Read the records first, in this order:
    workflows by ID (`USE_EXISTING`), so killing the submitter never cancelled
    anything.
 
+When a leaf returns a failed result, the submitter includes its worker `task.log`
+in the build output before exiting. The delimiters name the task, workflow and
+exact log blob. Every retrieved log or captured CLI-diagnostic line begins with
+`[farm task=<task>]`. Log retrieval has a 30-second timeout; an absent or
+unavailable log produces a warning without replacing the original worker
+failure or changing the nonzero exit. Successful leaves do not download logs.
+The commands below remain useful for following a running workflow or recovering
+evidence after an interruption.
+Concurrent failures download their logs in parallel. A build-scoped output lock
+prevents failed-log emitters from nesting with each other, but normal doit and
+telemetry output can still interleave; the per-line task prefix preserves source
+attribution when it does.
+Farm preflight prepares the pool's locked Python environment and checks that its
+local `farm.py` advertises `logs <workflow-id> --log-blob <blob>`. This is a
+local CLI capability check, not a farm protocol bump: a protocol-4 checkout
+that predates exact-log retrieval stops before dispatch. Update the checkout
+selected by `SOLIDWORKS_POOL_HOME`. Bounded log retrieval runs that environment's
+interpreter directly, so its timeout terminates the log reader rather than a
+`uv` wrapper. Missing-log and retrieval-error warnings also enter pipeline
+telemetry with task, workflow, worker, attempt and blob identity.
+
 In case 3, harvest every workflow ID the log recorded — both
 `Farm workflow requested: <id>` and `Farm workflow attached: <id>` lines, for
 *all* leaves, not one representative — and query each from the pool checkout:
