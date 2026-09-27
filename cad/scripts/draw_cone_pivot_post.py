@@ -1061,8 +1061,13 @@ def _draw_spot_face_sheet(adapter: Any) -> tuple[Any, Any, list[Any]]:
         adapter, annotations, SPOT_FACE_WIDTH_CALLOUT, location="above"
     )
     set_dimension_callouts(adapter, annotations, SPOT_FACE_CALLOUTS)
-    _hide_witness_sketch(adapter, rear, "JournalPlanReference")
+    # The plan keeps the station imported from JournalPlanReference but not
+    # the sketch's rays: with no 12.52 deg dimension on this sheet, the
+    # journal ray read as an edge (Main's rim-29eb eye pass).  The post axis
+    # is the collar's centre mark instead; the native gate proves the
+    # station survives the sketch being hidden.
     for view in (rear, plan):
+        _hide_witness_sketch(adapter, view, "JournalPlanReference")
         _hide_witness_sketch(adapter, view, "BoreSpacingReference")
     _mark_post_axis(adapter, plan)
     # The same crank-boss pick as sheet 1's plan (model z 35).
@@ -1211,6 +1216,18 @@ def _assert_native_layout(
     ]
     if placement:
         raise RuntimeError("cone pivot post view placement failed:\n" + "\n".join(placement))
+    # Sheet 2 hides the sketch its station is imported from; the dimension
+    # must still print, once, with the D's two.
+    spot_face_labels = [annotation.label for annotation in spot_face_sheet.annotations]
+    missing = [
+        name
+        for name in (SPOT_PLAN_DIMENSION, *REAR_KEEP)
+        if spot_face_labels.count(name) != 1
+    ]
+    if missing:
+        raise RuntimeError(
+            f"{SPOT_FACE_SHEET} must print each of {missing} once: {sorted(spot_face_labels)}"
+        )
 
     finish_notes = []
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
