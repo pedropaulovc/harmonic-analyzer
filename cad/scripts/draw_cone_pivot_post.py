@@ -38,6 +38,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _drawing_common import (
+    _select_view_entity,
     DrawingOutputs,
     PmiDrawingPlacement,
     add_attached_note,
@@ -66,7 +67,7 @@ from _drawing_common import (
     visible_view_entities,
     view_name,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DIA,
@@ -77,6 +78,7 @@ from cone_pivot_post_spec import (
     BORE_DIA,
     BORE_HEIGHT,
     CONE_AXIS_VIEW,
+    CONE_BOSS_DIA,
     CONE_BOSS_LENGTH,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
@@ -199,22 +201,80 @@ FRONT_KEEP = {
 # The spot face and its run-out flat are on the post's NORTH face, behind the
 # elevation (which looks at the crank boss's far end).  Sheet 1 has no room to
 # show them at a size a novice can read, so they get a sheet of their own at
-# 2:1: a rear view shows the D face-on (the flat's width over the top, its
-# run-out from the crank axis down to the milled step on the right), and a
-# plan locates the face from the post axis, the station sheet 1's plan
-# chains the crank boss length from.  Sheet 1 points here at the crank boss.
+# the largest preferred scale that fits: a rear view shows the D face-on (the
+# flat's width over the top, its run-out from the crank axis down to the
+# milled step on the right), and a plan locates the face from the post axis,
+# the station sheet 1's plan chains the crank boss length from.  Sheet 1
+# points here at the crank boss.
 SHEET_NAMES = ("MAIN", "SPOT-FACE")
 SPOT_FACE_SHEET = SHEET_NAMES[1]
-SHEET_SCALES = {SHEET_NAMES[0]: SHEET_SCALE, SPOT_FACE_SHEET: (2.0, 1.0)}
-SPOT_FACE_SCALE = SHEET_SCALES[SPOT_FACE_SHEET]
+_TEMPLATE = DRAWING_TEMPLATES[SPEC.layout]
+# The template's zone margin, 12.7 mm on every side (what ISheet::GetZoneMargin
+# reports and the layout audit's drawable region is built from; the tests
+# hold it to test_drawing_layout_check.ZONE_MARGINS).
+_ZONE_MARGIN = 0.0127
+DRAWABLE = (
+    _ZONE_MARGIN,
+    _ZONE_MARGIN,
+    _TEMPLATE.width_m - _ZONE_MARGIN,
+    _TEMPLATE.height_m - _ZONE_MARGIN,
+)
+# ASME Y14.1's and ISO 5455's preferred enlargements.
+PREFERRED_SCALES = ((1.0, 1.0), (2.0, 1.0), (4.0, 1.0), (5.0, 1.0), (10.0, 1.0))
+# Sheet-2 lanes (sheet metres).  Over and under the rear view stand the width
+# dimension with its label and the view label: 27.4 mm together, measured on
+# leaf crankhub-rim-29eb (run 20260927T060632040Z-47d7306d; 15.2 above, 12.2
+# below).  Between the views run the run-out's text and the station's; under
+# the plan, its label, above the title block.
+_REAR_TEXT_BANDS = 0.0274
+_REAR_LEFT_LANE = 0.028
+_BETWEEN_VIEWS_LANE = 0.117
+_PLAN_LABEL_LANE = 0.026
+
+
+def spot_plan_depth_mm() -> float:
+    """The plan's projected depth along the crank axis: from the cone boss's
+    far corner (beyond the body; the collar's own rim is trimmed at the spot
+    face) to the crank boss's far end."""
+    incline = math.radians(INCLINE_DEG)
+    corner = (CONE_BOSS_LENGTH / 2.0) * math.cos(incline) + (
+        CONE_BOSS_DIA / 2.0
+    ) * math.sin(incline)
+    return CRANK_BOSS_END_Z + max(corner, BLOCK_DIA / 2.0)
+
+
+def spot_face_fits(scale: tuple[float, float]) -> bool:
+    """Both sheet-2 views, with their text lanes, inside the drawable region
+    and the plan above the title block."""
+    f = scale[0] / scale[1] / 1000.0
+    rear_height = BLOCK_HEIGHT * f + _REAR_TEXT_BANDS
+    plan_top = _TEMPLATE.title_block_top_m + _PLAN_LABEL_LANE + spot_plan_depth_mm() * f
+    right = DRAWABLE[0] + _REAR_LEFT_LANE + 2.0 * HEAD_DIA * f + _BETWEEN_VIEWS_LANE
+    return (
+        rear_height <= DRAWABLE[3] - DRAWABLE[1]
+        and plan_top <= DRAWABLE[3]
+        and right <= DRAWABLE[2]
+    )
+
+
+SPOT_FACE_SCALE = max(
+    (scale for scale in PREFERRED_SCALES if spot_face_fits(scale)),
+    key=lambda scale: scale[0] / scale[1],
+)
+SHEET_SCALES = {SHEET_NAMES[0]: SHEET_SCALE, SPOT_FACE_SHEET: SPOT_FACE_SCALE}
 _F = SPOT_FACE_SCALE[0] / SPOT_FACE_SCALE[1] / 1000.0
 # ``place_view`` centres a view on its projected bounding box: the rear view's
-# runs the collar's width and the post's height.  At 2:1 it spans 88 x 172 mm,
-# left of the title block, so it may run down to the bottom border.
-REAR_CENTER = (0.085, 0.140)
-# The plan stands right of it, over the title block (inner edge 216 mm, top
-# 66 mm): at 2:1 its collar is 88 mm wide and it runs the crank boss's length.
-SPOT_PLAN_CENTER = (0.290, 0.165)
+# runs the collar's width and the post's height, centred in the drawable
+# height left of the title block; the plan stands right of it, over the
+# title block.
+REAR_CENTER = (
+    DRAWABLE[0] + _REAR_LEFT_LANE + HEAD_DIA / 2.0 * _F,
+    (DRAWABLE[1] + DRAWABLE[3]) / 2.0,
+)
+SPOT_PLAN_CENTER = (
+    REAR_CENTER[0] + HEAD_DIA * _F + _BETWEEN_VIEWS_LANE,
+    _TEMPLATE.title_block_top_m + _PLAN_LABEL_LANE + spot_plan_depth_mm() * _F / 2.0,
+)
 
 
 def _rear_x(model_x: float) -> float:
@@ -239,7 +299,7 @@ REAR_KEEP = {
 # Its text stands left of the view, level with the half-way point between the
 # axis and the face; both ends are read off the placed view.
 SPOT_PLAN_DIMENSION = "CrankBossStartZ"
-SPOT_PLAN_TEXT_LEFT_OF_VIEW = 0.024
+SPOT_PLAN_TEXT_LEFT_OF_VIEW = 0.030
 # The two views are not in projection with each other, so each is named,
 # centred under its live outline.  Every view on the sheet is at the sheet
 # scale, which the title block states.
@@ -311,10 +371,14 @@ DIMENSION_CALLOUTS = {
     "InclineAngle": "CONE/CRANK BORE AXES",
 }
 # Sheet 2's labels.  The width's stands above its value: below, it would print
-# on the head the dimension spans.  The station stays a plain value on its own
-# dimension line (the plan there carries nothing else).
+# on the head the dimension spans.  The station is labelled below its value on
+# its own dimension line, not on an offset shelf (Main's rim-8339 ruling: a
+# bare 18.88 was not found as the spot face's station).
 SPOT_FACE_WIDTH_CALLOUT = {"SpotFaceWidth": "SPOT FACE WIDTH"}
-SPOT_FACE_CALLOUTS = {"SpotFaceRunOut": "RUN-OUT TO STEP"}
+SPOT_FACE_CALLOUTS = {
+    "SpotFaceRunOut": "RUN-OUT TO STEP",
+    "CrankBossStartZ": "SPOT FACE STATION",
+}
 
 
 # COM edge-scan match slack; a selection aid, not product definition.
@@ -947,6 +1011,21 @@ def _spot_plan_keep(adapter: Any, plan: Any) -> dict[str, tuple[float, float]]:
     }
 
 
+_SW_CENTER_MARK_SINGLE = 2  # swCenterMarkStyle_e.swCenterMark_Single
+
+
+def _mark_post_axis(adapter: Any, plan: Any) -> None:
+    """Centre-mark the collar's top rim: in the plan the post axis is a point,
+    and the station is measured from it."""
+    edge = _circular_edge(plan, radius_mm=HEAD_DIA / 2.0, center_y_mm=BLOCK_HEIGHT)
+    _select_view_entity(adapter, plan, "EDGE", None, label="collar rim", entity=edge)
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    center_mark = drawing.InsertCenterMark3(_SW_CENTER_MARK_SINGLE, False, False)
+    adapter.currentModel.ClearSelection2(True)
+    if center_mark is None:
+        raise RuntimeError("failed to centre-mark the post axis on the spot-face plan")
+
+
 def _draw_spot_face_sheet(adapter: Any) -> tuple[Any, Any, list[Any]]:
     """Sheet 2: the spot face and its run-out flat at 2:1.
 
@@ -985,6 +1064,7 @@ def _draw_spot_face_sheet(adapter: Any) -> tuple[Any, Any, list[Any]]:
     _hide_witness_sketch(adapter, rear, "JournalPlanReference")
     for view in (rear, plan):
         _hide_witness_sketch(adapter, view, "BoreSpacingReference")
+    _mark_post_axis(adapter, plan)
     # The same crank-boss pick as sheet 1's plan (model z 35).
     add_view_centerline(
         adapter,
