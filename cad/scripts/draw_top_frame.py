@@ -330,9 +330,10 @@ SIDE_SECTION_CAPTION_XY = (0.3183, 0.0915)
 SIDE_SECTION_NOTE_XY = (0.290, 0.133)
 SIDE_WEB_TEXT_XY = (0.335, 0.120)
 # Where each removed section prints the rail centreline it cuts, sheet x:
-# B-B at z 112 and E-E / D-D at x -197, as on b49e1, the sheet the
-# machinist review passed.  Their text above is placed round these profiles,
-# so _pin_section_profile holds them here however far the cut runs.
+# B-B at z 112 and E-E / D-D at x -197, as on b49e1, the #946 layout-audit
+# leaf that every typed text point in B-B, E-E and D-D was tuned against.
+# (No cross-family machinist review has passed this sheet; see #1024.)
+# _pin_section_profile holds the profiles here however far the cut runs.
 RAIL_SECTION_PROFILE_X = 0.35643
 SIDE_SECTION_PROFILE_X = 0.29666
 HUB_SECTION_PROFILE_X = 0.33198
