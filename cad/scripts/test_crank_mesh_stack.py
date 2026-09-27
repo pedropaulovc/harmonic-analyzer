@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+import ast
+import asyncio
 import math
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+import build_drive_train_assembly as drive
 import cone_pivot_post_spec as post
 import crank_drive_gear_spec as gear64
 import crank_eccentric_bushing_spec as bushing
 import crank_mesh_stack as stack
 import crank_pinion_spec as pinion
+from diagnostics import probe_crank_post_phase, probe_live_crank_mesh
 
 
 def _terms(**overrides: float) -> dict[str, stack.Term]:
@@ -157,3 +162,109 @@ def test_the_platform_crank_axis_is_the_fitup_axis_and_prints_nothing() -> None:
     source = Path(plat.__file__).read_text(encoding="utf-8")
     for feature in plat._CRANK_AXIS_FEATURES:
         assert source.count(f'"{feature}"') >= 2, feature
+
+
+# ---- the SolidWorks mesh probes place the pair where the assembly does ------
+# ``diagnostics/probe_live_crank_mesh.py`` and ``probe_crank_post_phase.py``
+# rebuild the 16T/64T pair in a throwaway assembly to read exact interference,
+# so a probe that places either gear anywhere else measures a mesh the machine
+# does not have.  Codex on #960 (T_LAU): R1 moved the 16T onto the fit-up axis
+# while both probes still placed it on the frame crank axis (0.603 mm), and
+# the live probe still placed the 64T at the unshifted GEAR64_STATION.  Each
+# probe's ``build`` runs against a recording ``place_component`` that stops
+# once both gears are placed; the assembly's placements come from its single
+# ``place_component("crank-pinion", ...)`` and
+# ``_place_on_shaft(adapter, "crank-drive-gear", ...)`` call sites.
+
+ASSEMBLY = Path(drive.__file__)
+PROBE_GEARS = ("crank-drive-gear", "crank-pinion")
+
+
+class _BothGearsPlaced(Exception):
+    """The rest of the probe needs a seat."""
+
+
+class _ProbeAdapter:
+    async def create_assembly(self):
+        return SimpleNamespace(is_success=True, data=None, error=None)
+
+
+def _placement_recorder(placed: dict[str, list[float]], stop_when_both: bool):
+    async def place_component(adapter, part, position, *args, **kwargs):
+        placed[part] = [float(value) for value in position]
+        if stop_when_both and all(gear in placed for gear in PROBE_GEARS):
+            raise _BothGearsPlaced
+        return f"{part}-1"
+
+    return place_component
+
+
+def _probe_placements(probe, monkeypatch) -> dict[str, list[float]]:
+    placed: dict[str, list[float]] = {}
+    monkeypatch.setattr(probe, "place_component", _placement_recorder(placed, True))
+    with pytest.raises(_BothGearsPlaced):
+        asyncio.run(probe.build(_ProbeAdapter()))
+    return placed
+
+
+def _assembly_call(function: str, part: str) -> ast.Call:
+    tree = ast.parse(ASSEMBLY.read_text(encoding="utf-8"))
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", None) == function
+        and len(node.args) >= 2
+        and isinstance(node.args[1], ast.Constant)
+        and node.args[1].value == part
+    ]
+    assert len(calls) == 1, f"{part}: expected one {function} call site"
+    return calls[0]
+
+
+def _assembly_eval(expr: ast.expr):
+    code = compile(ast.Expression(expr), str(ASSEMBLY), "eval")
+    return eval(code, dict(vars(drive)))
+
+
+def _assembly_placements(monkeypatch) -> dict[str, list[float]]:
+    pinion_call = _assembly_call("place_component", "crank-pinion")
+    placed = {"crank-pinion": [float(v) for v in _assembly_eval(pinion_call.args[2])]}
+    gear_call = _assembly_call("_place_on_shaft", "crank-drive-gear")
+    monkeypatch.setattr(drive, "place_component", _placement_recorder(placed, False))
+    station, face = (_assembly_eval(arg) for arg in gear_call.args[2:4])
+    asyncio.run(drive._place_on_shaft(None, "crank-drive-gear", station, face))
+    return placed
+
+
+def _max_delta(a: list[float], b: list[float]) -> float:
+    return max(abs(x - y) for x, y in zip(a, b, strict=True))
+
+
+@pytest.mark.parametrize(
+    "probe",
+    [probe_live_crank_mesh, probe_crank_post_phase],
+    ids=lambda probe: probe.__name__.rsplit(".", 1)[-1],
+)
+@pytest.mark.parametrize("gear", PROBE_GEARS)
+def test_probe_places_the_gear_where_the_assembly_does(probe, gear, monkeypatch):
+    expected = _assembly_placements(monkeypatch)[gear]
+    monkeypatch.undo()
+    placed = _probe_placements(probe, monkeypatch)[gear]
+    delta = _max_delta(placed, expected)
+    assert delta < 1e-9, (
+        f"{probe.__name__} places {gear} at {placed}, {delta:.6f} mm off the "
+        f"assembly's {expected}"
+    )
+
+
+def test_the_frame_crank_axis_is_not_the_fit_up_axis(monkeypatch):
+    # Positive control: the pre-R1 pinion origin, on the frame crank axis,
+    # sits measurably off the placement the probes are pinned to.
+    stale = [
+        drive.X_CRANK,
+        drive.Y_CRANK,
+        drive.PINION_TOOTH_Z - drive.PINION_FACE / 2.0,
+    ]
+    expected = _assembly_placements(monkeypatch)["crank-pinion"]
+    assert _max_delta(stale, expected) > 1e-3
