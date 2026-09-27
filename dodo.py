@@ -1007,9 +1007,17 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
         superset of the rows it stamps -- conservative); a non-stamping assembly
         needs NO parts row (a referenced part's row edit rebuilds that PART, whose
         new .SLDPRT triggers the assembly REFRESH);
+      * a DRAWING reads its OWN part's row -> parts/<dashed-part>.yaml +
+        _defaults (none for an assembly-sourced sheet, which has no row).
+        Every dynamic registry read a drawing closure reaches is its own part
+        (``_common.part_properties``, ``_purchased_fastener_drawing``,
+        ``_drawing_marks.apply_drawing_properties``);
+        test_dodo_recipe.test_drawing_closures_read_no_foreign_dynamic_part_row
+        fails loud on any new one.  A literal read of ANOTHER part's row
+        (``_config.parts("pivot-bracket")``) is its own concrete token;
       * any other caller (e.g. an offline check) -> the whole registry.
     """
-    if kind == "part" and stem is not None:
+    if kind in ("part", "drawing") and stem is not None:
         return part_row_files(stem.replace("_", "-"))
     if kind == "assembly" and stem is not None:
         if not stamps_part_properties(script):
@@ -1814,6 +1822,10 @@ def _drawing_file_deps(stem: str) -> list[str]:
             str(RELEASE_VERSION_FILE),
             *source_deps,
             *runtime,
+            # The cad/config rows the draw closure reads (Codex #936 T_oyK): a
+            # sheet that prints another part's registry number must re-run, and
+            # miss the cache, when that row changes without any geometry change.
+            *_config_deps(script, spec.part, "drawing"),
             *(str(path.resolve()) for path in spec.assets),
         }
     )
