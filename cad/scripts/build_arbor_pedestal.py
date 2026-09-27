@@ -122,6 +122,10 @@ CAD_APPEARANCE = (0.28, 0.28, 0.30)  # neutral charcoal keeps drawing edges legi
 
 BORE_RADIUS = BORE_DIA / 2.0
 
+# The dome sketch's driving equations, by dimension: the crown centre on the
+# bore axis and the crown RADIUS (never a diameter the sheet flips radial).
+DOME_DRIVES = {"DomeCy": '"BoreHeight"', "DomeRadius": '"TopRadius"'}
+
 # The five drawing-reference lines (arbor_pedestal_spec.REFERENCE_SKETCHES):
 # (sketch, plane, dimension, start, end, orientation, value, drives). Points
 # are sketch coordinates -- the Top plane's sketch y is machine -Z, the Front
@@ -393,6 +397,9 @@ async def build(adapter) -> dict[str, str]:
     # Dome: a full circle boss centred on the bore station. The tangent strap
     # already contains the circle below its tangent chord, so the union adds
     # only the circular cap above that chord.
+    # The crown prints as the radius it is, so the model dimensions it as one:
+    # a diameter the sheet flips radial keeps its value and re-reads it as a
+    # radius (v37 MHA-004 printed R22 on this R11 part).
     dome = SketchDims()
     check("create_sketch dome", await adapter.create_sketch("Front"))
     await define_circle(
@@ -402,8 +409,9 @@ async def build(adapter) -> dict[str, str]:
         TOP_RADIUS,
         "dome",
         dims=dome,
-        names=("DomeX", "DomeCy", "DomeDia"),
-        drives=(None, '"BoreHeight"', '"TopRadius" * 2'),
+        names=("DomeX", "DomeCy", "DomeRadius"),
+        drives=(None, DOME_DRIVES["DomeCy"], DOME_DRIVES["DomeRadius"]),
+        size_dimension="radius",
     )
     await ensure_fully_defined(adapter, "dome sketch")
     check("exit_sketch dome", await adapter.exit_sketch())
