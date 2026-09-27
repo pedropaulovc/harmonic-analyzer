@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -192,9 +193,10 @@ def test_the_crank_boss_face_set_is_asserted_not_guessed() -> None:
         drawing._crank_face_centres(evidence)
 
 
-def test_the_rear_label_centres_under_its_view(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_the_rear_label_stands_left_of_its_view(monkeypatch: pytest.MonkeyPatch) -> None:
     """The text box does not sit on its insertion point, so the label is
-    steered by its rendered extent until centred under the view outline."""
+    steered by its rendered extent until it stands the gap left of the view
+    outline, centred on it (below the view is View B)."""
 
     class Annotation:
         def __init__(self) -> None:
@@ -215,9 +217,10 @@ def test_the_rear_label_centres_under_its_view(monkeypatch: pytest.MonkeyPatch) 
             return self.annotation
 
         def GetExtent(self):
-            # 48.5 x 4.2 mm, offset from the anchor the way SolidWorks offsets it
+            # 22 x 9 mm (two lines), offset from the anchor the way SolidWorks
+            # offsets it
             x, y, _z = self.annotation.position
-            return (x + 0.0003, y - 0.0050, 0.0, x + 0.0488, y - 0.0008, 0.0)
+            return (x + 0.0003, y - 0.0095, 0.0, x + 0.0223, y - 0.0005, 0.0)
 
     class Model:
         def GraphicsRedraw2(self) -> None:
@@ -225,12 +228,32 @@ def test_the_rear_label_centres_under_its_view(monkeypatch: pytest.MonkeyPatch) 
 
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, iface: obj)
     note = Note()
-    outline = (0.2205, 0.2039, 0.2425, 0.2469)
+    outline = (0.2148, 0.2079, 0.2479, 0.2509)
     adapter = type("Adapter", (), {"currentModel": Model()})()
-    drawing._centre_note_under(adapter, note, outline, gap=0.004, label="rear view label")
+    gap = drawing.REAR_LABEL_GAP
+    drawing._place_note_left_of(adapter, note, outline, gap=gap, label="rear view label")
     x0, y0, _z0, x1, y1, _z1 = note.GetExtent()
-    assert (x0 + x1) / 2.0 == pytest.approx((outline[0] + outline[2]) / 2.0, abs=1e-4)
-    assert y1 == pytest.approx(outline[1] - 0.004, abs=1e-4)
+    assert x1 == pytest.approx(outline[0] - gap, abs=1e-4)
+    assert (y0 + y1) / 2.0 == pytest.approx((outline[1] + outline[3]) / 2.0, abs=1e-4)
+
+
+def test_the_rear_view_stands_clear_of_view_b() -> None:
+    """At its station the rear view's outline bottom stands REAR_VIEW_GAP
+    above View B's measured top; the build re-checks the live outlines."""
+    bottom = drawing.REAR_CENTER[1] - (spec.BLOCK_HEIGHT / 2.0) * drawing._R
+    assert bottom - drawing._VIEW_B_TOP == pytest.approx(drawing.REAR_VIEW_GAP)
+
+
+def test_a_fused_rear_view_fails_the_build(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, iface: obj)
+    view_b = SimpleNamespace(GetOutline=lambda: (0.213, 0.117, 0.257, 0.2034))
+    fused = SimpleNamespace(GetOutline=lambda: (0.2148, 0.2039, 0.2479, 0.2469))
+    clear = SimpleNamespace(
+        GetOutline=lambda: (0.2148, 0.2034 + drawing.REAR_VIEW_GAP, 0.2479, 0.25)
+    )
+    with pytest.raises(RuntimeError, match="above View B"):
+        drawing._assert_rear_view_clear(fused, view_b)
+    drawing._assert_rear_view_clear(clear, view_b)
 
 
 def test_the_rear_width_text_clears_the_plan_callout_by_a_text_height() -> None:
