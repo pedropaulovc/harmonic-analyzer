@@ -643,7 +643,11 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
     } <= set(found)
     assert found["cylinder_gear_shaft"] == {"DomeReference"}
     # Blanked with _common.blank_reference_sketches, not blank_sketch.
-    assert found["cone_pivot_post"] == {"SpotFaceStationReference"}
+    assert found["cone_pivot_post"] == {
+        "BoreSpacingReference",
+        "JournalPlanReference",
+        "SpotFaceStationReference",
+    }
     assert found["cone_gear_shaft"] == {"SolderStations"}
 
 

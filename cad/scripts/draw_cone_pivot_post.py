@@ -36,7 +36,6 @@ import _telemetry
 from _layout_geometry import DEFAULT_MOVE_CLEARANCE_M
 from _common import CAD_ROOT, _early_bound, check, run_build
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _drawing_common import (
     _select_view_entity,
     DrawingOutputs,
@@ -65,7 +64,6 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
     stamp_drawing_summary,
     visible_view_entities,
-    view_name,
 )
 from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_owner_dimensions,
@@ -568,35 +566,6 @@ def _model_face_evidence(
     return rows
 
 
-def _hide_witness_sketch(adapter: Any, view: Any, sketch_name: str) -> None:
-    """Hide one model sketch in one drawing view, retaining imported dimensions."""
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    typed_view = _early_bound(view, "IView")
-    name = view_name(adapter, typed_view)
-    if not drawing.ActivateView(name):
-        raise RuntimeError(f"failed to activate {name!r} to hide {sketch_name}")
-    root = typed_view.RootDrawingComponent2(False)
-    if root is None:
-        raise RuntimeError(f"{name!r} has no drawing component for {sketch_name}")
-    component = str(_early_bound(root, "IDrawingComponent").Name)
-    qualified = f"{sketch_name}@{component}@{name}"
-    draw.ClearSelection2(True)
-    if not draw.Extension.SelectByID2(
-        qualified, "SKETCH", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
-    ):
-        raise RuntimeError(f"failed to select drawing witness sketch {qualified!r}")
-    # BlankSketch is a VT_VOID mutator.  Its drawing-view override has no
-    # corresponding getter: IFeature.Visible reports the model feature's
-    # global state, not the per-view override (and therefore remains "shown").
-    # The selected qualified path above is the API's documented call form; the
-    # exported sheet is the authoritative read-back for this view-local change.
-    draw.BlankSketch()
-    rebuild_drawing(adapter, label=f"hide {sketch_name} in {name}")
-    draw.ClearSelection2(True)
-    _telemetry.info(f"drawing witness sketch blanked in view: {qualified}")
-
-
 def _plane_centres(
     face_evidence: dict[str, list[tuple[str, tuple[float, ...]]]],
     feature_name: str,
@@ -1069,12 +1038,10 @@ def _draw_spot_face_sheet(adapter: Any) -> tuple[Any, Any, list[Any]]:
     )
     set_dimension_callouts(adapter, annotations, SPOT_FACE_CALLOUTS)
     # No 12.52 deg dimension stands on this sheet, so the plan-angle rays
-    # would print as undimensioned edges (Main's rim-29eb eye pass).  Hiding
-    # a sketch in a view hides what was imported from it, which is why the
-    # station has its own sketch; the native gate proves it still prints.
-    for view in (rear, plan):
-        _hide_witness_sketch(adapter, view, "JournalPlanReference")
-        _hide_witness_sketch(adapter, view, "BoreSpacingReference")
+    # would print as undimensioned edges (Main's rim-29eb eye pass).  The part
+    # saves every reference sketch hidden and this sheet dimensions only the
+    # station, so only its own sketch shows, in the plan; the native gate
+    # proves the station prints.
     _mark_post_axis(adapter, plan)
     # The same crank-boss pick as sheet 1's plan (model z 35).
     add_view_centerline(
@@ -1429,14 +1396,18 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    top_annotations = curate_view_dimensions(
+    # The part saves its reference sketches hidden.  The plan dimensions the
+    # plan angle and View B the bore spacing, so each shows its owning sketch
+    # (JournalPlanReference's two rays, BoreSpacingReference's centreline
+    # joining the bores) in that view only; no other view shows either.
+    top_annotations = curate_hidden_owner_dimensions(
         adapter,
         top,
         keep=TOP_KEEP,
         view_label="top",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    journal_annotations = curate_view_dimensions(
+    journal_annotations = curate_hidden_owner_dimensions(
         adapter,
         journal,
         keep=JOURNAL_KEEP,
@@ -1483,16 +1454,6 @@ async def build(adapter: Any) -> dict[str, str]:
         journal_annotations,
         JOURNAL_TEXT_OFFSETS,
     )
-    # The plan must retain JournalPlanReference: its two native centreline rays
-    # and imported dimensions carry the spotface station and 12.52-degree bore
-    # azimuth.  Other projections have no use for that witness geometry.
-    for view in (front, journal, iso):
-        _hide_witness_sketch(adapter, view, "JournalPlanReference")
-    # The cone-axis view keeps BoreSpacingReference: its centreline joins the
-    # two bore centres and carries the spacing.  Elsewhere it only doubles the
-    # post axis.
-    for view in (front, top, iso):
-        _hide_witness_sketch(adapter, view, "BoreSpacingReference")
     for view, label in ((front, "front"), (top, "top"), (journal, "cone journal")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to the {label} view")

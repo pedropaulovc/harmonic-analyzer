@@ -109,19 +109,14 @@ from cone_pivot_post_spec import (
 )
 
 PART_NAME = "cone-pivot-post"
-# Reference sketches this part still saves shown (#880), each with its owner
-# and why.  Delete an entry once the part hides that sketch; the release
-# refuses to start while any part lists one (visibility_debt).
-SHOWN_SKETCH_ALLOWANCES = {
-    "BoreSpacingReference": (
-        "pivot: carries the drawing's marked dimensions; hide it once "
-        "the sheet imports them from the hidden sketch"
-    ),
-    "JournalPlanReference": (
-        "pivot: carries the drawing's marked dimensions; hide it once "
-        "the sheet imports them from the hidden sketch"
-    ),
-}
+# The dimension-carrying reference sketches, saved hidden (#880): they render
+# in no part or assembly view, and the drawing shows each one only in the view
+# that dimensions it (_drawing_hidden_sketches).
+REFERENCE_SKETCHES = (
+    "JournalPlanReference",
+    "SpotFaceStationReference",
+    "BoreSpacingReference",
+)
 MATERIAL = "Gray Cast Iron"
 
 ATTACHMENT_HOLE_SPEC = HoleSpec(
@@ -761,9 +756,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # the two axis directions and a driving angular dimension reports the
     # angle, so the plan value the shop needs is model-owned, not sheet text
     # (drawing-simplicity-policy.md rule 2); the spot face's station has its
-    # own sketch (6b).  All geometry is construction and
-    # the sketch stays unblanked: a blanked sketch's dimensions never reach
-    # InsertModelAnnotations3.
+    # own sketch (6b).  All geometry is construction, and the part saves the
+    # sketch hidden (REFERENCE_SKETCHES): the drawing's plan shows it, and
+    # imports its angle, through the hidden-owner import.
     plan = SketchDims()
     check(
         "create sketch JournalPlanReference",
@@ -1042,10 +1037,8 @@ async def build(adapter: Any) -> dict[str, str]:
             ("mount east", "AXIS"),
         ),
     )
-    blank_reference_sketches(adapter, ("SpotFaceStationReference",))
-    return await save_part_and_images(
-        adapter, PART_NAME, allowed_shown=SHOWN_SKETCH_ALLOWANCES
-    )
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
+    return await save_part_and_images(adapter, PART_NAME)
 
 
 @_telemetry.traced("dim.driving_plan_incline", label_param="label")

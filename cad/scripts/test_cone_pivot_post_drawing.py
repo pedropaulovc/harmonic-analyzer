@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import math
 import re
 from types import SimpleNamespace
@@ -302,18 +303,16 @@ def _spot_face_gate(monkeypatch: pytest.MonkeyPatch, labels: list[str]) -> None:
 
 
 def test_the_station_must_survive_its_hidden_sketch(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Sheet 2 hides JournalPlanReference, whose rays read as edges without
-    the plan angle.  Hiding a sketch in a view hides what was imported from
-    it (rim-aba9 lost the station so), so the station comes from its own
+    """Sheet 2 must not print JournalPlanReference's rays, which read as edges
+    without the plan angle.  Hiding a sketch in a view hides what was imported
+    from it (rim-aba9 lost the station so), so the station comes from its own
     part-hidden sketch through the hidden-owner import, and the gate fails a
-    sheet that lost it."""
+    sheet that lost it.  The part now saves every reference sketch hidden, so
+    no view hides one: a view shows exactly the sketches it dimensions."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert (
-        '    for view in (rear, plan):\n'
-        '        _hide_witness_sketch(adapter, view, "JournalPlanReference")\n'
-    ) in source
+    assert "_hide_witness_sketch" not in source
+    assert "BlankSketch" not in source
     assert "plan_annotations = curate_hidden_owner_dimensions(" in source
-    assert '"SpotFaceStationReference"' not in source.split("_hide_witness_sketch")[-1]
     with pytest.raises(RuntimeError, match=r"\['CrankBossStartZ'\] once"):
         _spot_face_gate(monkeypatch, ["SpotFaceWidth", "SpotFaceRunOut"])
     # With all three present the gate moves on to sheet 1's title block.
@@ -643,7 +642,8 @@ def test_the_plan_angle_is_model_geometry_not_sheet_text() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'plan.record("InclineAngle", \'"ConeIncline"\')' in source
     assert "add_angular_reference_dimension" not in source
-    # A blanked sketch's dimensions never reach InsertModelAnnotations3.
+    # Hidden through blank_reference_sketches (read back, and the drawing
+    # shows it per view), never through the plane/axis blanker.
     assert "JournalPlanReference" not in source.split(
         "_blank_reference_geometry(\n        adapter,"
     )[1]
@@ -1012,8 +1012,60 @@ def test_spotface_station_has_one_driving_global() -> None:
     assert '"CrankBossNearZ": CRANK_BOSS_NEAR_Z,' in source
     assert 'drive_jobs.append(("D1@CrankInterfacePlane", \'"CrankBossNearZ"\'))' in source
     assert 'station.record("CrankBossStartZ", \'"CrankBossNearZ"\')' in source
-    # Saved hidden (no new #880 visibility debt); the drawing shows it per view.
-    assert 'blank_reference_sketches(adapter, ("SpotFaceStationReference",))' in source
+
+
+def _blanked_reference_sketches() -> set[str]:
+    """The sketches the post build passes to its one blank_reference_sketches."""
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", None) == "blank_reference_sketches"
+    ]
+    assert len(calls) == 1
+    assert getattr(calls[0].args[1], "id", None) == "REFERENCE_SKETCHES"
+    return set(part.REFERENCE_SKETCHES)
+
+
+def test_the_post_saves_every_reference_sketch_hidden() -> None:
+    """#880: no reference sketch renders in the part or any assembly.  Each
+    one that carries a drawing dimension is saved hidden, read back, and the
+    drawing shows it only in the view that dimensions it.  JournalPlanReference
+    and BoreSpacingReference were the release's last visibility debt."""
+    references = {name for name in spec.DRAWING_DIMENSIONS if name.endswith("Reference")}
+    assert references == {
+        "JournalPlanReference",
+        "SpotFaceStationReference",
+        "BoreSpacingReference",
+    }
+    assert _blanked_reference_sketches() == references
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "SHOWN_SKETCH_ALLOWANCES" not in source
+    assert "allowed_shown" not in source
+
+
+def test_every_view_dimensioning_a_hidden_sketch_shows_it_itself() -> None:
+    """A part-hidden sketch's dimensions import only through the hidden-owner
+    import, which shows the sketch in that one view.  The plan owns the plan
+    angle, View B the bore spacing, sheet 2's plan the station; no other view
+    keeps anything from those sketches, so none of them prints a ray."""
+    hidden = {
+        item
+        for name in _blanked_reference_sketches()
+        for item in spec.DRAWING_DIMENSIONS[name]
+    }
+    assert hidden == {"InclineAngle", "CrankAboveCone", "CrankBossStartZ"}
+    assert set(drawing.TOP_KEEP) & hidden == {"InclineAngle"}
+    assert set(drawing.JOURNAL_KEEP) & hidden == {"CrankAboveCone"}
+    assert drawing.SPOT_PLAN_DIMENSION == "CrankBossStartZ"
+    for keep in (drawing.FRONT_KEEP, drawing.SECTION_KEEP, drawing.REAR_KEEP):
+        assert not set(keep) & hidden
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for curated in ("top", "journal", "plan"):
+        assert f"{curated}_annotations = curate_hidden_owner_dimensions(" in source
+    for curated in ("front", "section", "rear"):
+        assert f"{curated}_annotations = curate_view_dimensions(" in source
 
 
 def test_crank_bore_is_located_from_the_cone_bore_inside_the_mesh_window() -> None:
