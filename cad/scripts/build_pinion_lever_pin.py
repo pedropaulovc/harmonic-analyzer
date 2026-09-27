@@ -33,6 +33,7 @@ from _common import (
     add_line_chain,
     apply_color,
     apply_material,
+    assert_saved_configurations_regenerate,
     check,
     dimension_between,
     drive_dimension,
@@ -238,6 +239,14 @@ async def build(adapter) -> dict[str, str]:
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    # The drive train places the Installed configuration while the part saves
+    # on its default, so Installed's saved cache is what it rebuilds.  Reopen
+    # and prove it the way the assembly loads it (cg-fx1).
+    part_title = str(_early_bound(adapter.currentModel, "IModelDoc2").GetTitle())
+    adapter.swApp.CloseDoc(part_title)
+    adapter.currentModel = None
+    check("reopen saved pinion-lever-pin", await adapter.open_model(artefacts["part"]))
+    assert_saved_configurations_regenerate(adapter, PART_NAME)
     return artefacts
 
 
