@@ -16,6 +16,13 @@ from pathlib import Path
 SCRIPTS_DIR = Path(__file__).resolve().parent
 CAD_ROOT = SCRIPTS_DIR.parent
 TEMPLATES_DIR = CAD_ROOT / "templates"
+# Each drawing's layout-audit report (``_drawing_layout_audit``): a declared
+# drawing-task target, so it rides the remote cache with the sheet it audits.
+LAYOUT_REPORT_DIR = CAD_ROOT / "out" / "reports" / "layout-audit"
+
+
+def layout_report_path(artifact_stem: str) -> Path:
+    return LAYOUT_REPORT_DIR / f"{artifact_stem}.json"
 
 
 class DrawingLayout(StrEnum):
@@ -95,6 +102,11 @@ class DrawingSpec:
             "pdf": CAD_ROOT / "out" / "pdf" / f"{self.artifact_stem}.pdf",
             "png": CAD_ROOT / "out" / "png" / f"{self.artifact_stem}_drawing.png",
         }
+
+    @property
+    def layout_report(self) -> Path:
+        """The layout-audit report: a task target, but not a release output."""
+        return layout_report_path(self.artifact_stem)
 
     @property
     def assets(self) -> tuple[Path, ...]:

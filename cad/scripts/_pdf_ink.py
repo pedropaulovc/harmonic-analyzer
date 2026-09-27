@@ -17,6 +17,7 @@ from __future__ import annotations
 import ctypes
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_raw
@@ -113,11 +114,45 @@ def _text_runs(page: "pdfium.PdfPage") -> tuple[list[Glyph], list[Span]]:
     return glyphs, spans
 
 
+# Pieces per cubic Bezier: a chord of a quarter circle of 30 mm radius
+# strays under 0.01 mm from the curve (r * (1 - cos(pi / 4 / pieces))).
+# Eight strayed 0.14 mm, past the audit's 0.1 mm tolerances (Codex, #902).
+BEZIER_PIECES = 32
+
+
+def bezier_points(
+    p0: tuple[float, float],
+    p1: tuple[float, float],
+    p2: tuple[float, float],
+    p3: tuple[float, float],
+    pieces: int = BEZIER_PIECES,
+) -> list[tuple[float, float]]:
+    """The cubic's points at ``pieces`` equal parameter steps, ends included."""
+    points = []
+    for step in range(pieces + 1):
+        t = step / pieces
+        u = 1.0 - t
+        a, b, c, d = u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t
+        points.append(
+            (
+                a * p0[0] + b * p1[0] + c * p2[0] + d * p3[0],
+                a * p0[1] + b * p1[1] + c * p2[1] + d * p3[1],
+            )
+        )
+    return points
+
+
 def _strokes(page: "pdfium.PdfPage") -> list[Stroke]:
     strokes: list[Stroke] = []
     for obj in page.get_objects(max_depth=8):
         if obj.type != pdfium_raw.FPDF_PAGEOBJ_PATH:
             continue
+        if obj.level > 0:
+            # A path inside a form XObject carries its matrix relative to the
+            # form, not the page. SolidWorks drawing PDFs have none (all six
+            # calibration PDFs: every object at level 0); fail rather than
+            # read a displaced path as ink.
+            raise ValueError(f"PDF path inside a form XObject (level {obj.level}): matrix not composed")
         handle = obj.raw
         width = ctypes.c_float()
         pdfium_raw.FPDFPageObj_GetStrokeWidth(handle, width)
@@ -136,8 +171,19 @@ def _strokes(page: "pdfium.PdfPage") -> list[Stroke]:
                 (matrix.b * x + matrix.d * y + matrix.f) * POINT_M,
             )
 
+        def piece(a: tuple[float, float], z: tuple[float, float]) -> Stroke:
+            return Stroke(
+                a[0], a[1], z[0], z[1],
+                width.value * scale * POINT_M,
+                (r.value, g.value, b.value),
+                dashed,
+                fill_mode.value != 0,
+                bool(stroke.value),
+            )
+
         start = None
         previous = None
+        controls: list[tuple[float, float]] = []
         for index in range(pdfium_raw.FPDFPath_CountSegments(handle)):
             segment = pdfium_raw.FPDFPath_GetPathSegment(handle, index)
             x, y = ctypes.c_float(), ctypes.c_float()
@@ -146,31 +192,22 @@ def _strokes(page: "pdfium.PdfPage") -> list[Stroke]:
             kind = pdfium_raw.FPDFPathSegment_GetType(segment)
             if kind == pdfium_raw.FPDF_SEGMENT_MOVETO or previous is None:
                 start = previous = point
+                controls = []
                 continue
-            # Bezier control points are joined as a polyline: drawing arcs are
-            # small, and the question asked of them is "does ink cross text".
-            strokes.append(
-                Stroke(
-                    previous[0], previous[1], point[0], point[1],
-                    width.value * scale * POINT_M,
-                    (r.value, g.value, b.value),
-                    dashed,
-                    fill_mode.value != 0,
-                    bool(stroke.value),
-                )
-            )
+            if kind == pdfium_raw.FPDF_SEGMENT_BEZIERTO:
+                # A cubic arrives as three BEZIERTO points (two controls, then
+                # the end); its control polygon can sit well off the drawn arc.
+                controls.append(point)
+                if len(controls) < 3:
+                    continue
+                curve = bezier_points(previous, *controls)
+                strokes.extend(piece(a, z) for a, z in zip(curve, curve[1:]))
+                controls = []
+            else:
+                strokes.append(piece(previous, point))
             previous = point
             if pdfium_raw.FPDFPathSegment_GetClose(segment) and start is not None:
-                strokes.append(
-                    Stroke(
-                        point[0], point[1], start[0], start[1],
-                        width.value * scale * POINT_M,
-                        (r.value, g.value, b.value),
-                        dashed,
-                        fill_mode.value != 0,
-                        bool(stroke.value),
-                    )
-                )
+                strokes.append(piece(point, start))
                 previous = start
     return strokes
 
@@ -196,3 +233,21 @@ def read_pdf_ink(path: Path) -> list[PageInk]:
     finally:
         document.close()
     return pages
+
+
+def page_ink(page: PageInk) -> dict[str, Any]:
+    """A page as layout-dump data: every text object with its glyph box, and
+    every black stroked line (the frame and title block print grey, and
+    arrowheads and section arrows are filled)."""
+    return {
+        "spans": [[span.text, *_round((span.xmin, span.ymin, span.xmax, span.ymax))] for span in page.spans],
+        "strokes": [
+            [*_round((stroke.x0, stroke.y0, stroke.x1, stroke.y1, stroke.width)), int(stroke.dashed)]
+            for stroke in page.strokes
+            if stroke.stroked and not stroke.filled and stroke.rgb == (0, 0, 0)
+        ],
+    }
+
+
+def _round(values: Any) -> list[float]:
+    return [round(float(value), 7) for value in values]

@@ -134,6 +134,7 @@ from _common import (
     _read_member,
     apply_custom_properties,
     apply_material,
+    assert_saved_configurations_regenerate,
     blank_sketch,
     check,
     define_circle,
@@ -147,6 +148,7 @@ from _common import (
     run_build,
     save_part_and_images,
     set_sketch_direct_db,
+    stale_configurations,
     volume_check,
 )
 from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
@@ -734,7 +736,9 @@ async def assert_saved_configuration_topology(
     C:/src/dt-logs/farm-runs/20260921T230142Z-cone-closure-capture/
     20260921T231022Z-leaf-part-cone_gear/task.log lines 480-505.
 
-    This validates the rebuilt saved model, not its cold caches.  A failed
+    This validates the rebuilt saved model, not its cold caches; the part's
+    reopen proves those first (``_common.assert_saved_configurations_regenerate``).
+    A failed
     activation/rebuild or any post-rebuild error, body, face, volume, or
     monotonicity mismatch remains fatal.
     """
@@ -742,9 +746,9 @@ async def assert_saved_configuration_topology(
     volumes: dict[str, float] = {}
     ordered = (CONFIGS[-1], *CONFIGS[:-1])
     _telemetry.info(
-        f"{phase}: validating all configurations only after the established "
-        "set_active_configuration rebuild; saved cold caches are not being "
-        "validated"
+        f"{phase}: validating all configurations after the established "
+        "set_active_configuration rebuild (the part's reopen proves the saved "
+        "caches first, assert_saved_configurations_regenerate)"
     )
     for configuration, teeth in ordered:
         try:
@@ -1517,10 +1521,12 @@ async def build(adapter) -> dict[str, str]:
         )
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
     part_path = artefacts["part"]
-    # Rebuild every configuration through the API intended for File > Save All
-    # > Rebuild and save document, then serialize all marked configuration
-    # caches in one Save3 call. AddRebuildSaveMark controls which caches are
-    # written; Save3 alone does not rebuild those configurations.
+    # save_part_and_images rebuilt every stale configuration, each inactive
+    # one while active (_common.rebuild_stale_configurations: the no-switch
+    # rebuild-all verbs left the T00x tooth gaps faulted, cg-fx1).  Mark every
+    # configuration's cache and serialize them all in one Save3 call.
+    # AddRebuildSaveMark controls which caches are written; Save3 alone does
+    # not rebuild those configurations, so none may be stale here.
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
     if not bool(manager.AddRebuildSaveMark(2, "")):
@@ -1532,14 +1538,11 @@ async def build(adapter) -> dict[str, str]:
         configuration = _early_bound(raw_configuration, "IConfiguration")
         if not bool(configuration.AddRebuildSaveMark):
             raise RuntimeError(f"{name}: rebuild-save mark was not set")
-    extension = _early_bound(model.Extension, "IModelDocExtension")
-    rebuild_started = time.perf_counter()
-    if not bool(extension.ForceRebuildAll()):
-        raise RuntimeError("ForceRebuildAll failed for cone-gear configurations")
-    _telemetry.info(
-        "rebuilt all cone-gear configurations in "
-        f"{time.perf_counter() - rebuild_started:.3f}s"
+    stale = stale_configurations(
+        model, [str(name) for name in (model.GetConfigurationNames() or ())]
     )
+    if stale:
+        raise RuntimeError(f"cone-gear configurations {stale} are stale at the final save")
     _save3_with_contract(
         adapter,
         1,
@@ -1552,6 +1555,7 @@ async def build(adapter) -> dict[str, str]:
     adapter.swApp.CloseDoc(part_title)
     adapter.currentModel = None
     check("reopen saved cone-gear", await adapter.open_model(part_path))
+    assert_saved_configurations_regenerate(adapter, PART_NAME)
     await assert_saved_configuration_topology(adapter, phase="reopened")
 
     if findings:

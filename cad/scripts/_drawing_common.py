@@ -41,7 +41,7 @@ from _drawing_layout_check import (
     format_findings,
 )
 from _drawing_layout_audit import run_layout_audit
-from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
+from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, layout_report_path
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import (
     bool_array,
@@ -6190,6 +6190,8 @@ async def finalize_drawing(
     run_layout_audit(
         adapter,
         stem=outputs.slddrw.stem,
+        pdf=outputs.pdf,
+        report=layout_report_path(outputs.slddrw.stem),
         sheet_layouts=resolved_layouts,
         is_pictorial=is_pictorial_orientation,
     )
