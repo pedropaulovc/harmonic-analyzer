@@ -221,6 +221,19 @@ def test_bom_descriptions_keep_one_line() -> None:
         assert len(text) <= drawing.BOM_DESCRIPTION_MAX_CHARS, stem
 
 
+def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
+    """#916: the shaft's thrust collar is the 64T's axial stop (the drive
+    train seats the gear's south face on the collar end), so step 1 names it;
+    crank_boss_rim books the gear's station from that collar."""
+    import cone_gear_shaft_spec as shaft
+
+    assert shaft.COLLAR_THICKNESS > 0.0
+    gear = drawing.BOM_PART_NUMBERS["crank-drive-gear"]
+    shaft_number = drawing.BOM_PART_NUMBERS["cone-gear-shaft"]
+    step_one = drawing.CONE_CRANK_STEPS.split("\n2. ")[0]
+    assert f"{gear} FRONT OF T120, AGAINST THE {shaft_number} COLLAR:" in step_one
+
+
 def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     """MHA-095 bounds the DISENGAGE swing; engaged, the plate stands off it."""
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())

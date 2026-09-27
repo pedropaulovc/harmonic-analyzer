@@ -37,6 +37,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import _config
+import cone_gear_shaft_spec as shaft
 import cone_pivot_post_spec as post
 import crank_drive_gear_spec as gear64
 import crank_eccentric_bushing_spec as bushing
@@ -81,14 +82,19 @@ GEAR_TIP_GROWTH = gear64.OUTSIDE_DIA_TOLERANCE_MM / 2.0
 #   the as-cast collar, HeadDia at .X; the turned body, MainBodyDia at .X
 COLLAR_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["HeadDia"]) / 2.0
 BODY_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["MainBodyDia"]) / 2.0
-#   the cone boss's end faces, ConeBossLen at .X, symmetric about the post axis
+#   the cone boss's end faces, ConeBossLen at .X, symmetric about the post
+#   axis: the north one short carries the collar and the 64T with it
 CONE_BOSS_END_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0
-#   the 64T's station on its shaft: the ONE input for how far it may stand
-#   toward the post.  Today MHA-A03 step 1 bonds it "front of T120" with
-#   nothing to butt, so it is U31's station band.  #916's thrust collar
-#   locates it (the cone-boss end + CollarWidth 1.681 +/-0.13): when that
-#   lands, this input becomes the collar's stack and every margin grows.
-GEAR64_STATION_TOWARD_POST = post.GEAR64_STATION_BAND_MM
+#   the 64T's station: the ONE input for how far it may stand toward the
+#   post.  MHA-A03 step 1 sets it against MHA-014's thrust collar (#916),
+#   and the collar bears on the cone boss's north end, so the gear's south
+#   face stands the boss end plus CollarWidth off the post axis.  Both
+#   joints are butts, nominally closed (build_drive_train_assembly asserts
+#   each; collar_contacts below reads their sum) and only ever opening, so
+#   they add nothing toward the post.  The stack is the boss end short by
+#   its row and the collar thin by its own (Main's ruling (b), 2026-09-27).
+COLLAR_WIDTH_SHORT = _row(shaft.DRAWING_PRECISION_BY_NAME["CollarWidth"])
+GEAR64_STATION_TOWARD_POST = CONE_BOSS_END_GROWTH + COLLAR_WIDTH_SHORT
 #   MHA-149's OD at the top of its g6 band
 BUSHING_RADIUS_MAX = (bushing.OUTER_DIA + bushing.OD_BAND[0]) / 2.0
 
@@ -96,9 +102,9 @@ BUSHING_RADIUS_MAX = (bushing.OUTER_DIA + bushing.OD_BAND[0]) / 2.0
 # The floor every feature holds at print-worst is the running gap this
 # assembly already sets between two parts: the 16T's seat feeler off the spot
 # face (MHA-A03 step 4; Main's ruling, 2026-09-27).  build_drive_train_assembly
-# asserts only this floor.  The steps below record the derivation at ruling
-# time (today's station band): the ruled 2.5 retreat and the 23 x 17 run-out
-# each miss the floor a step smaller, which the unit tests pin.
+# asserts only this floor.  The steps below record the derivation: under the
+# collar stack, the ruled 2.5 retreat and the 23 x 17 run-out each miss the
+# floor a step smaller, which the unit tests pin.
 FLOOR_CLEARANCE_MM = pinion.SEAT_FEELER_MM
 RETREAT_STEP = 0.5
 WIDTH_STEP = 1.0
@@ -189,15 +195,34 @@ def _cone_boss_end(p: Point, end: float) -> float:
     return along - end
 
 
+def collar_contacts(gear_offset: float) -> float:
+    """The two collar butts' nominal air, summed: the 64T's south face less
+    the cone boss's north end and the collar between them.  Zero when the
+    drive train seats the gear the way step 1 sets it."""
+    south_face = gear_offset - gear64.FACE_WIDTH / 2.0
+    return south_face - (post.CONE_BOSS_LENGTH / 2.0 + shaft.COLLAR_THICKNESS)
+
+
 def clearances(*, gear_offset: float, spot: SpotFace, worst: bool = True) -> dict[str, float]:
     """Least clearance from the 64T to each feature on MHA-016's north side.
 
     ``gear_offset`` and ``spot`` are nominal; ``worst`` moves every term above
     toward the gear.  MHA-149's north end is set flush with the spot face.
+    The cone boss end rides with the gear through the collar, so it is
+    measured from the gear's south face by the collar at its low limit, never
+    by the boss end's own growth on top of the station term.
     """
+    air = collar_contacts(gear_offset)
+    if abs(air) > 1e-6:
+        raise ValueError(f"the 64T stands {air:+.4f} off the collar stack; its butts are open")
     grow = 1.0 if worst else 0.0
     gear = Gear(
         gear_offset - grow * GEAR64_STATION_TOWARD_POST,
+        # Grown on both faces about the centre.  With the south face seated
+        # on the collar, face width can only grow north, so the south-side
+        # ~0.4 understates every margin here.  Kept: the ruled 2.5 / 23 x 17
+        # minimality and its fail-first steps were derived under it, and
+        # coupling it moves that derivation (#1049).
         gear64.FACE_WIDTH / 2.0 + grow * GEAR_FACE_GROWTH,
         gear64.OUTSIDE_DIA / 2.0 + grow * GEAR_TIP_GROWTH,
     )
@@ -205,7 +230,9 @@ def clearances(*, gear_offset: float, spot: SpotFace, worst: bool = True) -> dic
     collar_r = post.HEAD_DIA / 2.0 + grow * COLLAR_GROWTH
     collar_low = COLLAR_Y[0] - grow * COLLAR_EDGE_LOW
     body_r = post.BLOCK_DIA / 2.0 + grow * BODY_GROWTH
-    boss_end = post.CONE_BOSS_LENGTH / 2.0 + grow * CONE_BOSS_END_GROWTH
+    boss_end = gear.gear_offset - gear.half_face - (
+        shaft.COLLAR_THICKNESS - grow * COLLAR_WIDTH_SHORT
+    )
     bushing_r = BUSHING_RADIUS_MAX if worst else bushing.OUTER_DIA / 2.0
     measures: dict[str, Callable[[Point], float]] = {
         "crank boss": lambda p: _cylinder_end(p, post.CRANK_BOSS_DIA / 2.0, face.face_z),

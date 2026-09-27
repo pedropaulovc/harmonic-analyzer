@@ -90,6 +90,10 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("alignment_pinion_spec", "BASE_TANGENT_SPAN_BAND"): (
         "indexed into the span-measurement note text"
     ),
+    ("cone_gear_shaft_spec", "STOCK_DIA_BAND"): (
+        "the 5/8 bar's supplied size band, indexed for the thrust ring's "
+        "worst-case width (THRUST_RING_MIN)"
+    ),
     ("connecting_rod_spec", "RING_THICKNESS_BAND"): (
         "indexed by cylinder_bank_layout for the thickest ring its cam slot holds"
     ),
