@@ -1074,6 +1074,7 @@ from build_cone_pivot_post import (  # noqa: E402
     CRANK_BOSS_START_Z as POST_CRANK_BOSS_START_Z,
 )
 from cone_pivot_post_spec import (  # noqa: E402
+    BORE_DIA as POST_BORE_DIA,
     CONE_BOSS_DIA as POST_CONE_BOSS_DIA,
     CRANK_SPOT_FACE_RETREAT as POST_SPOT_FACE_RETREAT,
     CRANK_SPOT_FACE_RUN_OUT as POST_SPOT_FACE_RUN_OUT,
@@ -1354,6 +1355,15 @@ _PICK_AXIAL = sum(
 )
 if abs(_PICK_AXIAL) > 1e-9:
     raise AssertionError(f"post boss pick is {_PICK_AXIAL:.3g} mm off the face plane")
+# What the pick must land on: the boss's north annulus, whole.  #1046 mills a
+# run-out below the crank boss on the same side, so the build reads back the
+# face it picked (_picked_face) and fails on a face not square to the cone axis.
+_POST_BOSS_NORTH_AREA = math.pi / 4.0 * (POST_CONE_BOSS_DIA**2 - POST_BORE_DIA**2)
+# |n . cone axis| the picked face must reach.  Float noise through Transform2
+# and the incline trig sits far below 1e-6; the nearest wrong face, the milled
+# step (normal to z), reads cos(12.5 deg) = 0.976, 0.024 off; and a non-planar
+# face returns a zero Normal, so both fail loud.
+_PICK_SQUARE_TOL = 1e-6
 # --- tip end-play stack (item 5, v4_t00471 / 7:49) ---------------------------
 # Along the axis, south to north: T006 gear | brass bushing | block | shaft tip
 # | the 94025A164 adjuster's conical cup, its #10-32 thread tapped through the
@@ -3057,6 +3067,29 @@ async def _key_to_shaft(
     )
 
 
+def _picked_face(adapter, point_mm, component) -> tuple[list[float], list[float], float]:
+    """The face a point pick selects, as a mate given that point gets it: its
+    part-frame normal, that normal in the assembly frame, and its area in
+    mm^2.  A face selected in the assembly reports part-frame geometry, so
+    the normal is carried through the component's rotation (world = local .
+    R, as world_point)."""
+    from solidworks_mcp.adapters.com_variant import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    x, y, z = (c / 1000.0 for c in point_mm)
+    if not model.Extension.SelectByID2("", "FACE", x, y, z, False, 0, null_callout(), 0):
+        raise AssertionError(f"nothing selects at {point_mm}")
+    manager = _early_bound(model.SelectionManager, "ISelectionMgr")
+    face = _early_bound(manager.GetSelectedObject6(1, -1), "IFace2")
+    area = float(face.GetArea()) * 1e6
+    local = [float(v) for v in face.Normal]
+    model.ClearSelection2(True)
+    r = component_transform(adapter, component)[0:9]
+    normal = [sum(local[i] * r[i * 3 + k] for i in range(3)) for k in range(3)]
+    return local, normal, area
+
+
 async def _axial_seat(
     adapter, part, shaft, shaft_o, axis_dir, p_o, label, seat_plane
 ) -> None:
@@ -4131,13 +4164,40 @@ async def build(adapter) -> dict[str, str]:
         label="cone-shaft radial",
         verify=(cone_shaft, cone_o),
     )
-    await coincident_mate(
-        adapter,
-        named_ref(f"CollarFace@{cone_shaft}", "PLANE"),
-        bore_axis_ref(_POST_BOSS_NORTH_PICK, "FACE"),
-        label="cone-shaft collar on the post's north boss face",
-        verify=(cone_shaft, cone_o),
-    )
+    with _telemetry.span("mate.pick post north boss face", component=pivot_post):
+        local, normal, area = _picked_face(adapter, _POST_BOSS_NORTH_PICK, pivot_post)
+        square = abs(normal[0] * SIN_I + normal[2] * COS_I)
+        _telemetry.info(
+            f"collar pick on {pivot_post}: normal ({normal[0]:.6f}, {normal[1]:.6f}, "
+            f"{normal[2]:.6f}) [part frame ({local[0]:.6f}, {local[1]:.6f}, "
+            f"{local[2]:.6f})], |n.axis| {square:.9f}, area {area:.3f} mm^2 "
+            f"(whole north annulus {_POST_BOSS_NORTH_AREA:.3f})",
+            normal=normal,
+            part_normal=local,
+            normal_on_axis=square,
+            area_mm2=area,
+            expected_area_mm2=_POST_BOSS_NORTH_AREA,
+        )
+        _telemetry.event(
+            "mate.pick",
+            normal=normal,
+            part_normal=local,
+            normal_on_axis=square,
+            area_mm2=area,
+            expected_area_mm2=_POST_BOSS_NORTH_AREA,
+        )
+        if square < 1.0 - _PICK_SQUARE_TOL:
+            raise AssertionError(
+                f"the collar pick landed on a face {math.degrees(math.acos(min(1.0, square))):.3f} "
+                "deg off square to the cone axis, not the post's north boss face"
+            )
+        await coincident_mate(
+            adapter,
+            named_ref(f"CollarFace@{cone_shaft}", "PLANE"),
+            bore_axis_ref(_POST_BOSS_NORTH_PICK, "FACE"),
+            label="cone-shaft collar on the post's north boss face",
+            verify=(cone_shaft, cone_o),
+        )
     # Tip block: aligned to the shaft/adjuster axis (which the post + platform
     # already carry) + an axial seat + a
     # parallel anti-spin against the PLATFORM (not the spinning shaft). Its
