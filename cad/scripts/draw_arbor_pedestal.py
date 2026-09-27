@@ -9,6 +9,7 @@ from typing import Any, Literal
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import place_callout_clear, require_clear
 from _drawing_common import (
     DrawingOutputs,
     add_surface_finish,
@@ -120,8 +121,8 @@ FRONT_KEEP = {
     "BoreHeight": (FRONT_CENTER[0] - 0.046, _front_y(BORE_HEIGHT / 2.0)),
     "BoreDia": (FRONT_CENTER[0] + 0.043, _front_y(BORE_HEIGHT) - 0.010),
     "BoreLateral": BORE_LATERAL_XY,
-    # Crown: printed radial (_show_crown_as_radius), up and right of the dome.
-    "DomeDia": (0.178, _front_y(BORE_HEIGHT + TOP_RADIUS) + 0.008),
+    # Crown: the model's radius (_show_crown_radius), up and right of the dome.
+    "DomeRadius": (0.178, _front_y(BORE_HEIGHT + TOP_RADIUS) + 0.008),
 }
 TOP_KEEP = {
     "Width": (TOP_CENTER[0], _top_y(FOOT_NEAR_Z) + 0.018),
@@ -157,8 +158,74 @@ CROWN_CALLOUT = "SIDES TANGENT FROM FOOT CORNERS"
 # The apex tap runs down to the arbor bore and stops there; the MHA-147 cup
 # point's spot is drilled into the arbor at fit-up through this hole, so the
 # callout says where the thread ends and nothing more (digit-free, rule 6).
-SET_SCREW_PROCESS = "TAP TO BORE, AT CROWN APEX"
-SET_SCREW_CALLOUT_XY = (0.045, _top_y(STRAP_INNER_Z) - 0.007)
+# The plan already shows the hole at the apex, so the words do not repeat it:
+# v37's "..., AT CROWN APEX" ran the callout 22.6 mm past the zone frame.
+SET_SCREW_PROCESS = "TAP TO BORE"
+# The overall height's lane, left of the elevation.
+OVERALL_HEIGHT_XY = (FRONT_CENTER[0] - 0.058, FRONT_CENTER[1])
+# Sheet Y of the elevation's crown apex and of the plan's far face: the tap
+# callout sits in the band between them, left of the hole, so its leader
+# rises right into the plan under the left lanes instead of crossing the
+# right-hand strap and set-screw dimensions.
+_CROWN_APEX_Y = _front_y(BORE_HEIGHT + TOP_RADIUS)
+_PLAN_FAR_Y = _top_y(STRAP_INNER_Z)
+SET_SCREW_CALLOUT_XY = (TOP_CENTER[0] - 0.055, (_CROWN_APEX_Y + _PLAN_FAR_Y) / 2.0)
+# Half the ink of a drawn line: the 0.25 mm line weight.
+_LINE_HALF_M = 0.000125
+
+
+def _line_box(x0: float, y0: float, x1: float, y1: float) -> tuple[float, ...]:
+    """A drawn horizontal or vertical line as the box its ink covers."""
+    return (
+        min(x0, x1) - _LINE_HALF_M,
+        min(y0, y1) - _LINE_HALF_M,
+        max(x0, x1) + _LINE_HALF_M,
+        max(y0, y1) + _LINE_HALF_M,
+    )
+
+
+def set_screw_callout_below() -> dict[str, tuple[float, ...]]:
+    """The elevation ink under the apex tap callout's band: its text must
+    clear it from above (place_callout_clear's ``below``)."""
+    overall_x = OVERALL_HEIGHT_XY[0]
+    return {
+        "crown apex and its overall-height extension line": _line_box(
+            overall_x, _CROWN_APEX_Y, FRONT_CENTER[0], _CROWN_APEX_Y
+        ),
+        "overall height dimension line": _line_box(
+            overall_x, _front_y(0.0), overall_x, _CROWN_APEX_Y
+        ),
+    }
+
+
+def set_screw_callout_beside() -> dict[str, tuple[float, ...]]:
+    """The plan's left lanes over the band: the text clears them from the
+    right, and the leader must not cross them (place_callout_clear's
+    ``beside``). The far face is split at the plan's west edge: the leader has
+    to cross the face itself to reach the hole, but not the extension lines
+    the two left lanes draw off it."""
+    plan_west = TOP_CENTER[0] - FOOT_WIDTH / 2.0 * _S
+    depth_x = TOP_KEEP["Depth"][0]
+    return {
+        "plan far-face extension lines": _line_box(
+            depth_x, _PLAN_FAR_Y, plan_west, _PLAN_FAR_Y
+        ),
+        "foot depth (28.0) dimension line": _line_box(
+            depth_x, _PLAN_FAR_Y, depth_x, _top_y(FOOT_NEAR_Z)
+        ),
+    }
+
+
+def set_screw_callout_above() -> dict[str, tuple[float, ...]]:
+    """The plan's far face over the band: the text stays under it."""
+    return {
+        "plan far face": _line_box(
+            TOP_CENTER[0] - FOOT_WIDTH / 2.0 * _S,
+            _PLAN_FAR_Y,
+            TOP_CENTER[0] + FOOT_WIDTH / 2.0 * _S,
+            _PLAN_FAR_Y,
+        ),
+    }
 
 
 def _set_reference_precision(display: Any, label: str) -> None:
@@ -236,21 +303,22 @@ _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 
 
 @_telemetry.traced("drawing.crown_radius")
-def _show_crown_as_radius(adapter: Any, annotations: list[Any]) -> None:
-    """Print the model's dome diameter as the crown RADIUS it is on the part.
+def _show_crown_radius(adapter: Any, annotations: list[Any]) -> None:
+    """Dress the model's crown radius (DomeRadius, part-owned places).
 
-    The dome is a full-circle boss in the model (DomeDia, part-owned places),
-    but only its upper arc survives on the part, and a print gives an arc a
-    radius. ``Diametric = False`` flips the imported diameter to its radial
-    form -- same model dimension, same places, half the value -- so no sheet
-    geometry restates it (#810 Codex l4afp, policy rule 2).
+    The dome is a full-circle boss in the model, but only its upper arc
+    survives on the part, and a print gives an arc a radius -- so the PART
+    dimensions it as one (#810 Codex l4afp, policy rule 2). The sheet must not
+    flip a model diameter radial instead: that keeps the value and re-reads it
+    as a radius, and v37 printed an R22 crown on this R11 part.
     """
     for raw_annotation in annotations:
         annotation = _early_bound(raw_annotation, "IAnnotation")
-        if dimension_name(adapter, annotation) != "DomeDia":
+        if dimension_name(adapter, annotation) != "DomeRadius":
             continue
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        display.Diametric = False
+        if bool(display.Diametric):
+            raise RuntimeError("the imported crown dimension is not radial")
         # The crown is what places the tapered flanks: each side runs from a
         # 24.0 foot corner up to tangency with this radius, whose centre is
         # the bore's (the shared centre mark says so). The Fable round-2
@@ -273,11 +341,29 @@ def _show_crown_as_radius(adapter: Any, annotations: list[Any]) -> None:
             or int(display.ArrowSide) != _ARROWS_OUTSIDE
         ):
             raise RuntimeError("crown radius display did not persist")
-        _telemetry.info(
-            f"crown radius: DomeDia shown radial, text {display.GetText(1)!r}"
-        )
+        _telemetry.info(f"crown radius: DomeRadius text {display.GetText(1)!r}")
         return
-    raise RuntimeError("front view has no imported DomeDia to show as the crown radius")
+    raise RuntimeError("front view has no imported DomeRadius to show as the crown")
+
+
+@_telemetry.traced("drawing.set_screw_callout_clear")
+def _prove_set_screw_callout_clear(adapter: Any, display: Any) -> None:
+    """Place the apex tap callout from its read-back ink and prove it: inside
+    the zone frame, its text clear of the crown apex, the overall height, both
+    left lanes and the plan, and its leader off every line but the plan face
+    it has to cross (v37: 22.6 mm past the frame, over the (61.72) and the
+    elevation)."""
+    annotation = _early_bound(display, "IDisplayDimension").GetAnnotation()
+    ink = place_callout_clear(
+        adapter,
+        annotation,
+        label="apex set-screw tap",
+        below=set_screw_callout_below(),
+        beside=set_screw_callout_beside(),
+    )
+    # place_callout_clear only moves up and right; the plan above the band
+    # is proven separately so a move can never push the text into it.
+    require_clear(ink.label, ink.text, set_screw_callout_above())
 
 
 @_telemetry.traced("drawing.diameter_second_arrow", label_param="label")
@@ -467,7 +553,7 @@ async def build(adapter: Any) -> dict[str, str]:
         foot_entity,
         dome_entity,
         orientation="vertical",
-        position=(FRONT_CENTER[0] - 0.058, FRONT_CENTER[1]),
+        position=OVERALL_HEIGHT_XY,
         label="overall height",
         arc_endpoint="max",
     )
@@ -477,7 +563,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="overall height",
     )
     _set_reference_precision(overall, "overall height")
-    _show_crown_as_radius(adapter, front_annotations)
+    _show_crown_radius(adapter, front_annotations)
     adapter.currentModel.GraphicsRedraw2()
     _screw_r = SCREW_HOLE_DIA / 2.0 * _S
     # ``callout_xy`` is the text's CENTRE, and this callout's text is ~114 mm
@@ -494,11 +580,10 @@ async def build(adapter: Any) -> dict[str, str]:
         process="DRILL",
     )
     # Apex set-screw tap (#743): the plan sees it end-on at the crown apex.
-    # Its callout sits left of the plan, below the depth lanes' far-face
-    # extension lines, so the leader rises to the hole under the left lanes
-    # instead of crossing the right-hand strap and set-screw dimensions.
+    # Its callout sits in the band between the crown apex and the plan
+    # (SET_SCREW_CALLOUT_XY); the read-back ink proves it there.
     _tap_r = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) / 2.0 * _S
-    add_native_hole_callout(
+    tap_callout = add_native_hole_callout(
         adapter,
         top,
         edge_xy=(TOP_CENTER[0] - _tap_r, _top_y(SET_SCREW_Z)),
@@ -506,6 +591,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="apex set-screw tap",
         process=SET_SCREW_PROCESS,
     )
+    _prove_set_screw_callout_clear(adapter, tap_callout)
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set
     # unregenerated, and only a real mode change rebuilds it.
@@ -521,6 +607,12 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Cylinder-Arbor Pedestal Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # SolidWorks pins its own "#4-40 Tapped Hole" note to the tap; the
+        # native callout already says everything it does (v37 printed it
+        # over the plan's 24.0). One tap, one note: the v37 sheet carried
+        # exactly one.
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=1,
     )
 
 

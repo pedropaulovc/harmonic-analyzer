@@ -38,7 +38,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "FootHt",
         "BoreDia",
         "BoreHeight",
-        "DomeDia",
+        "DomeRadius",
         "StrapDepth",
         "HoldDownLocation",
         "HoleLateral",
@@ -59,7 +59,7 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
         "FootHt": 1,
         "BoreDia": 2,
         "BoreHeight": 2,
-        "DomeDia": 1,
+        "DomeRadius": 1,
         "StrapDepth": 1,
         "HoldDownLocation": 1,
         "HoleLateral": 1,
@@ -101,22 +101,63 @@ def test_sheet_derived_dimensions_take_their_places_from_the_spec() -> None:
     assert labels == {"overall height"}
 
 
-def test_crown_radius_is_the_dome_diameter_printed_radial() -> None:
+def test_crown_radius_is_the_dome_radius_the_part_drives() -> None:
     """#810 Codex l4afp follow-up (Main): the R11.0 crown is a controlling
-    dimension, so it is the dome boss's own DomeDia, imported and flipped to
-    its radial form, never a radius the sheet measures off the arc."""
+    dimension, so it is the dome boss's own model dimension, never a radius the
+    sheet measures off the arc.
+
+    v37 printed R22.0: the dome carried a DIAMETER dimension driven by
+    ``"TopRadius" * 2`` and the sheet flipped it radial, so the drawing's
+    rebuild fed 22 into a radius and doubled the crown (the part render stayed
+    R11). The part now dimensions the crown as the radius it is, and each dome
+    equation evaluates to the as-built value it drives."""
     spec = arbor_pedestal_spec
-    assert spec.DRAWING_DIMENSIONS["DomeProfile"] == {"DomeDia"}
-    assert spec.DRAWING_PRECISION["DomeProfile"] == {"DomeDia": 1}
-    assert "DomeDia" in drawing.FRONT_KEEP
-    source = _drawing_source()
-    assert "display.Diametric = False" in source
+    assert spec.DRAWING_DIMENSIONS["DomeProfile"] == {"DomeRadius"}
+    assert spec.DRAWING_PRECISION["DomeProfile"] == {"DomeRadius": 1}
+    assert "DomeRadius" in drawing.FRONT_KEEP
+    globals_mm = {"BoreHeight": spec.BORE_HEIGHT, "TopRadius": spec.TOP_RADIUS}
+    as_built = {"DomeCy": spec.BORE_HEIGHT, "DomeRadius": spec.TOP_RADIUS}
+    assert set(part.DOME_DRIVES) == set(as_built)
+    for name, expression in part.DOME_DRIVES.items():
+        text = re.sub(r'"(\w+)"', lambda m: repr(globals_mm[m.group(1)]), expression)
+        assert float(eval(text, {"__builtins__": {}})) == as_built[name], name  # noqa: S307
     # 810-l4afp-1 eye pass: the radius line ran through the bore to the
     # centre; the arrow sits outside the arc so the leader stops on it.
-    assert "display.ArrowSide = _ARROWS_OUTSIDE" in source
     assert drawing._ARROWS_OUTSIDE == 1
-    assert "AddRadialDimension2" not in source
-    assert "_show_crown_as_radius(adapter, front_annotations)" in source
+    assert "_show_crown_radius(adapter, front_annotations)" in _drawing_source()
+
+
+# Every Diametric write a drawing script may make, each onto a dimension that
+# is ALREADY a diameter, so the write changes nothing the model solves. Setting
+# Diametric on a MODEL dimension keeps its value and re-reads it as the other
+# kind: False on a diameter doubles the feature (v37 MHA-004 printed an R22
+# crown on the R11 part), True on a radius halves it. A new writer must show
+# its dimension is sheet-made or already the kind it sets, and join this list.
+_DIAMETRIC_WRITERS = {
+    # The OD is the blank's define_circle DIAMETER (build_alignment_pinion).
+    "draw_alignment_pinion.py": 1,
+    # A sheet-made edge dimension (AddDimension2), not a model dimension.
+    "draw_crank_pin.py": 1,
+    # The OD reference is sheet-made; the cross-hole callout is the
+    # CrossHoleProfile define_circle DIAMETER.
+    "draw_tube_frame.py": 2,
+    # set_near_side_diameter styles imported define_circle DIAMETERS.
+    "_drawing_leaders.py": 1,
+}
+
+
+def test_no_sheet_re_solves_a_model_dimension_through_diametric() -> None:
+    """A radial print must come from a radial model dimension (define_circle
+    size_dimension="radius"), never from flipping a diameter on the sheet."""
+    writes = re.compile(r"""Diametric["']?\s*(?:=|,)\s*(True|False)\b""")
+    scripts = Path(drawing.__file__).parent
+    found: dict[str, list[str]] = {}
+    for path in sorted(scripts.glob("draw_*.py")) + sorted(scripts.glob("_drawing_*.py")):
+        values = writes.findall(path.read_text(encoding="utf-8"))
+        if values:
+            found[path.name] = values
+    assert all(value == "True" for values in found.values() for value in values), found
+    assert {name: len(values) for name, values in found.items()} == _DIAMETRIC_WRITERS
 
 
 def test_manufacturing_locations_are_model_dimensions() -> None:
@@ -381,6 +422,80 @@ def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
         ), f"{label} is inside the title block"
 
 
+# The native hole-callout font as v37 MHA-004 printed it: the thread line
+# "TAP TO BORE, AT CROWN APEX 4-40 UNC <depth> 0.00" (42 glyphs) ran
+# 109.7 mm at the 3.5 mm cap height, and its two lines stood 16.8 pt apart.
+_CALLOUT_CAP_M = 0.0035
+_CALLOUT_ADVANCE = 109.7 / (42 * 3.5)
+_CALLOUT_LINE_SPACING = 16.8 * 25.4 / 72.0 / 3.5
+
+
+def _estimated_set_screw_callout():
+    from _layout_geometry import estimate_text_box
+
+    drill = f"Ø{blind_cut_dia_mm(arbor_pedestal_spec.SET_SCREW_HOLE_SPEC):.2f} THRU"
+    thread = f"{drawing.SET_SCREW_PROCESS} 4-40 UNC-2B THRU"
+    return estimate_text_box(
+        f"{drill}\n{thread}",
+        anchor=drawing.SET_SCREW_CALLOUT_XY,
+        height=_CALLOUT_CAP_M,
+        reference=2,  # swCENTER: callout_xy is the text block's centre
+        advance_ratio=_CALLOUT_ADVANCE,
+        line_spacing=_CALLOUT_LINE_SPACING,
+    )
+
+
+def test_apex_tap_callout_prints_inside_the_zone_frame() -> None:
+    """V37 blocker: the callout's CENTRE sat on the sheet, its text ran 22.6 mm
+    past the left zone frame. The whole estimated block must fit, with the
+    clear gap the sheet's read-back proof demands."""
+    from _drawing_annotation_extent import CLEAR_GAP_M
+
+    template = DRAWING_TEMPLATES[DRAWINGS_BY_NAME["arbor_pedestal"].layout]
+    frame = 0.0127
+    box = _estimated_set_screw_callout()
+    assert box.xmin >= frame + CLEAR_GAP_M
+    assert box.xmax <= template.width_m - frame - CLEAR_GAP_M
+    # Left of the hole, so the leader rises right into the plan.
+    assert box.xmax < drawing.TOP_CENTER[0]
+
+
+def test_apex_tap_callout_clears_the_crown_the_plan_and_the_left_lanes() -> None:
+    """V37 blocker: the callout sat on the (61.72) and the elevation. Its
+    estimated block must clear every neighbour the sheet's read-back proof
+    checks, WITHOUT place_callout_clear having to move it (a move only goes up
+    or right, toward the plan)."""
+    from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M, boxes_clear
+
+    box = _estimated_set_screw_callout()
+    block = (box.xmin, box.ymin, box.xmax, box.ymax)
+    below = drawing.set_screw_callout_below()
+    beside = drawing.set_screw_callout_beside()
+    above = drawing.set_screw_callout_above()
+    assert set(below) == {
+        "crown apex and its overall-height extension line",
+        "overall height dimension line",
+    }
+    assert set(beside) == {"plan far-face extension lines", "foot depth (28.0) dimension line"}
+    assert set(above) == {"plan far face"}
+    neighbours = {**below, **beside, **above}
+    crowded = [name for name, other in neighbours.items() if not boxes_clear(block, other)]
+    assert crowded == []
+    # No upward move: the band's floor already clears the crown with settle.
+    assert all(box.ymin >= other[3] + CLEAR_GAP_M + PLACE_SETTLE_M for other in below.values())
+    # The leader may cross the plan's own far face to reach the hole, never
+    # the extension lines drawn off it (place_callout_clear checks below and
+    # beside only).
+    assert "plan far face" not in {**below, **beside}
+
+
+def test_the_tap_note_solidworks_adds_is_removed() -> None:
+    """V37: a stray "#4-40 Tapped Hole" note printed over the plan's 24.0."""
+    source = _drawing_source()
+    assert 'redundant_note_substrings=("Tapped Hole",)' in source
+    assert "expected_redundant_notes=1" in source
+
+
 def test_part_stamps_make_flexible_material_and_protective_finish() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source
@@ -461,3 +576,4 @@ def test_apex_set_screw_sits_mid_strap_with_its_webs() -> None:
     source = _drawing_source()
     assert 'label="apex set-screw tap"' in source
     assert not re.search(r"\d", drawing.SET_SCREW_PROCESS)
+    assert "_prove_set_screw_callout_clear(adapter, tap_callout)" in source

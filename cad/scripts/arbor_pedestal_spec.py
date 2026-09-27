@@ -169,8 +169,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # BoreHeight plus a concentric R11 crown and tangent sides defines the
     # complete upright profile without redundant endpoint widths.
     "BoreProfile": {"BoreDia", "BoreHeight"},
-    # The crown: the dome boss's own diameter, printed radial on the arc.
-    "DomeProfile": {"DomeDia"},
+    # The crown: the dome boss's own RADIUS dimension, printed as modelled.
+    "DomeProfile": {"DomeRadius"},
     "StrapDepthReference": {"StrapDepth"},
     "HoldDownReference": {"HoldDownLocation"},
     "HoleLateralReference": {"HoleLateral"},
@@ -195,7 +195,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     # One place (R11.0): nothing mates to the crown, and the apex set screw's
     # full thread is sized at this .X band's least radius
     # (set_screw_wall_terms), so the general grade is enough.
-    "DomeProfile": {"DomeDia": 1},
+    "DomeProfile": {"DomeRadius": 1},
     "StrapDepthReference": {"StrapDepth": 1},
     # One place (.X, ±0.8): the base seat is transferred from this hole at
     # assembly, so its location only has to keep the webs, and the U27 worst

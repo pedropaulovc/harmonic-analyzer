@@ -2960,6 +2960,10 @@ def task_check():
         # channel's cross-bank axial budget and the hole-callout process line.
         SCRIPTS_DIR / "test_channel_axial_budget.py",
         SCRIPTS_DIR / "test_hole_callout_prefix.py",
+        # ... and #1075: a radial wizard tap commits its thread class and
+        # termination, and define_circle can dimension a circle by its radius.
+        SCRIPTS_DIR / "test_holes_thread_metadata.py",
+        SCRIPTS_DIR / "test_define_circle.py",
         SCRIPTS_DIR / "test_rocker_bank_layout.py",
         SCRIPTS_DIR / "test_rocker_bracket_seat_layout.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
