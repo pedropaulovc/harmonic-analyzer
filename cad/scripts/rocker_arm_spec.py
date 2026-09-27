@@ -71,6 +71,22 @@ ROD_HOLE_Y = (
 # stay out of assembly rebuild closures -- codex #354).
 PIVOT_MID_Y = ARM_DEPTH / 2.0  # 8.0
 
+# The amplitude bar's foot rides the top edge, and at d = 0 its cheeks pass
+# over this arm's hub, so the print controls the edge's height over the pivot
+# axis directly, on the mirror axis, one-sided: the edge may only come out
+# high (user ruling 2026-09-26). The 808.00 centre distance is then REF, and
+# the R800 governs only the curvature. With the amplitude bar's one-sided
+# notch (amplitude_bar_notes.BOTTOM_NOTCH_DEPTH_BAND) a bar can rest at most
+# 1.0 higher than nominal: a steady lever tilt of ~0.45 deg on that channel.
+# Its fundamental moves at most 0.0036 mm (0.04 % of the d = 88 term) across
+# the stations: error_budget.hook_displacement with the edge 0.5 high and the
+# notch 0.5 shallow (test_rocker_bank_layout pins both numbers).
+# Policy rule 2 (Codex #936 PRRT_kwDOPHDy386mV3AO): the band is the part's,
+# on a model dimension -- build_rocker_arm's hidden TopEdgeReference sketch,
+# whose one printed dimension IS this height and drives the arcs' centre.
+TOP_EDGE_ABOVE_PIVOT = CENTER_Y - PIVOT_MID_Y - R_TOP  # 8.0
+TOP_EDGE_BAND = (0.50, 0.0)  # (upper, lower)
+
 # Drawing prose (DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) lives in
 # rocker_arm_notes.py -- see connecting_rod_notes for the rationale.
 

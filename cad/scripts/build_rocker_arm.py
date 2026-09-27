@@ -58,10 +58,13 @@ from cone_pivot_post_installation import MECHANISM_X_SHIFT
 
 from _common import (
     SketchDims,
+    _early_bound,
     anchor_point_to_origin,
     apply_material,
+    blank_sketch,
     check,
     define_circle,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -94,8 +97,11 @@ from rocker_arm_spec import (
     HUB_DIA,
     HUB_LENGTH,
     HUB_LENGTH_BAND,
+    PIVOT_MID_Y,
     ROD_HOLE_SPEC,
     SURFACE_FINISHES,
+    TOP_EDGE_ABOVE_PIVOT,
+    TOP_EDGE_BAND,
 )
 import _config
 
@@ -136,6 +142,8 @@ THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > thickness
 CENTER_Y = CURVE_RADIUS + ARM_DEPTH
 R_TOP = CURVE_RADIUS
 R_BOTTOM = CURVE_RADIUS + ARM_DEPTH
+if abs(CENTER_Y - PIVOT_MID_Y - R_TOP - TOP_EDGE_ABOVE_PIVOT) > 1e-9:
+    raise AssertionError("the CenterY equation must rebuild the modelled centre")
 
 # Half-angle each arc subtends (arc_len / 2 / radius); the two differ, which is
 # what tapers the ends. Endpoint coords: on the circle centred at (0, CENTER_Y).
@@ -170,6 +178,19 @@ def _mid_y(x: float) -> float:
 # Rod-pin hole centre: LOW in the strap (ch14 fan photo), not mid-depth like
 # the pivot. Assembly scripts import this (imported-not-copied, like _mid_y).
 ROD_HOLE_Y = _bottom_point(ROD_HOLE_X)[1] + ROD_HOLE_ABOVE_BOTTOM  # 15.303
+
+
+def _as_construction(adapter, entity_id: str) -> None:
+    """Flag a registered sketch line as construction geometry.
+
+    ``ConstructionGeometry`` is declared on the base ISketchSegment, not the
+    derived ISketchLine the entity registry binds -- rebind before the set
+    (build_crank_arm's helper).
+    """
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
 def _strap_area() -> float:
@@ -234,9 +255,15 @@ async def build(adapter) -> dict[str, str]:
     # location rides the ROD_HOLE_X/ROD_HOLE_Y module constants that the channel
     # assembly imports.)
     await set_global(adapter, "ThroughCutDepth", f"{THROUGH_CUT_DEPTH}mm")
+    # The top edge's height over the pivot axis is the print's controlled
+    # value (rocker_arm_spec.TOP_EDGE_BAND), so the arcs' shared centre is
+    # derived from it: the pivot (ArmDepth / 2), up to the top edge, up R800.
+    await set_global(adapter, "TopAbovePivot", f"{TOP_EDGE_ABOVE_PIVOT}mm")
     await set_global(adapter, "RTop", '"CurveRadius"')
     await set_global(adapter, "RBottom", '"CurveRadius" + "ArmDepth"')
-    await set_global(adapter, "CenterY", '"CurveRadius" + "ArmDepth"')
+    await set_global(
+        adapter, "CenterY", '"ArmDepth" / 2 + "TopAbovePivot" + "CurveRadius"'
+    )
     await set_global(adapter, "TopEndX", f"{TOP_END_X}mm")
     await set_global(adapter, "BottomEndX", f"{BOT_END_X}mm")
 
@@ -435,6 +462,48 @@ async def build(adapter) -> dict[str, str]:
         adapter, "Right Plane", 0.0, "Top Plane", _mid_y(0.0), "pivot bore"
     )
 
+    # REFERENCE sketch (policy rule 2, Codex #936 PRRT_kwDOPHDy386mV3AO): the
+    # sheet prints the top edge's height over the pivot axis with a one-sided
+    # band, yet no strap dimension carries it (the arcs are placed by their
+    # shared centre). A construction line on the mirror axis, from the pivot
+    # centre to the top edge: its foot's height is the pivot's (ArmDepth / 2),
+    # and its length IS the printed value, the global CenterY is derived from.
+    # Direct-to-DB keeps inference from adding relations the explicit ones
+    # below would over-define.
+    top_ref = SketchDims()
+    check("create_sketch top edge reference", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    top_line = check(
+        "top edge reference line",
+        await adapter.add_line(
+            0.0, PIVOT_MID_Y, 0.0, PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, top_line)
+    check(
+        "top edge reference vertical",
+        await adapter.add_sketch_constraint(top_line, None, "vertical"),
+    )
+    # Dimensions in creation order; SketchDims renames them by that order.
+    await anchor_point_to_origin(
+        adapter, f"{top_line}.start", 0.0, PIVOT_MID_Y, "top edge reference foot"
+    )
+    top_ref.record("PivotY", '"ArmDepth" / 2')
+    await dimension_between(
+        adapter,
+        f"{top_line}.start",
+        f"{top_line}.end",
+        "vertical_distance",
+        TOP_EDGE_ABOVE_PIVOT,
+        "top edge above the pivot",
+    )
+    top_ref.record("TopAbovePivot", '"TopAbovePivot"')
+    await ensure_fully_defined(adapter, "top edge reference sketch")
+    check("exit_sketch top edge reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "TopEdgeReference")
+    drive_jobs += top_ref.apply(adapter, "TopEdgeReference")
+
     # Connecting-rod pin hole near the rod-side tip, low in the strap.
     rod_cut = wizard_holes(
         adapter,
@@ -501,7 +570,14 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "Hub", "HubLength", *deviations(HUB_LENGTH_BAND)
     )
-    apply_drawing_precision(adapter, {"Hub": {"HubLength": 3}})
+    # The top edge may only come out high (rocker_arm_spec.TOP_EDGE_BAND).
+    set_dimension_bilateral_tolerance(
+        adapter, "TopEdgeReference", "TopAbovePivot", *deviations(TOP_EDGE_BAND)
+    )
+    apply_drawing_precision(
+        adapter,
+        {"Hub": {"HubLength": 3}, "TopEdgeReference": {"TopAbovePivot": 2}},
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -514,6 +590,10 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+    # The reference sketch owns a printed dimension but no geometry: hide it so
+    # no assembly instance renders it (#880). The drawing shows it per view
+    # through _drawing_hidden_sketches to import that dimension.
+    blank_sketch(adapter, "TopEdgeReference")
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,

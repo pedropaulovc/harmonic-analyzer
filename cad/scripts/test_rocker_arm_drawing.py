@@ -83,13 +83,10 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "#47" not in notes
     assert "REAM +0.03/0" in notes
     assert "16.00 REF" in notes
-    # User ruling 2026-09-26: the edge height over the pivot is the control,
-    # one-sided high; the arc centre distance is reference.
+    # User ruling 2026-09-26: the edge height over the pivot is the control
+    # (a model dimension, test_top_edge_height_is_a_banded_model_dimension);
+    # the arc centre distance is reference.
     assert "808.00 REF FROM THE PIVOT" in notes
-    upper, lower = rocker_arm_notes.TOP_EDGE_BAND
-    assert lower == 0.0 < upper
-    assert f"TOP EDGE 8.00 +{upper:.2f}/0 ABOVE THE PIVOT" in notes
-    assert rocker_arm_notes.TOP_EDGE_ABOVE_PIVOT == pytest.approx(8.0)
     assert f"INTEGRAL HUB DIA {rocker_arm_spec.HUB_DIA:.2f}" in notes
     assert (
         "HUB OD COAXIAL WITH PIVOT BORE WITHIN Ø0.50 (TURN HUB AND REAM BORE IN ONE SETUP)"
@@ -206,6 +203,63 @@ def test_hub_length_prints_its_one_sided_band() -> None:
     )
     assert rocker_arm_spec.HUB_LENGTH_BAND == (0.05, 0.0)
     assert f"{rocker_arm_spec.HUB_LENGTH:.2f}" not in rocker_arm_notes.DRAWING_NOTES
+
+
+def test_top_edge_height_is_a_banded_model_dimension() -> None:
+    """Codex #936 PRRT_kwDOPHDy386mV3AO, policy rule 2: the clearance-critical
+    "8.00 +0.50/0" lived only in a note. It is now the one printed dimension
+    of a hidden reference sketch, carrying the band natively; the arcs'
+    centre is derived from it, and no note repeats it."""
+    from _drawing_contract import model_toleranced_dimensions
+
+    upper, lower = rocker_arm_spec.TOP_EDGE_BAND
+    assert lower == 0.0 < upper == 0.50
+    assert rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT == pytest.approx(8.0)
+    assert not hasattr(rocker_arm_notes, "TOP_EDGE_BAND")
+    assert rocker_arm_notes.DRAWING_DIMENSIONS["TopEdgeReference"] == {"TopAbovePivot"}
+    assert model_toleranced_dimensions(arm)[("TopEdgeReference", "TopAbovePivot")] == (
+        "*deviations(TOP_EDGE_BAND)"
+    )
+    assert "TopAbovePivot" in drawing.FRONT_KEEP
+    joined = " ".join(
+        line.strip() for line in rocker_arm_notes.DRAWING_NOTES.splitlines()
+    )
+    assert "ABOVE THE PIVOT" not in joined
+    assert f"+{upper:.2f}/0" not in joined
+    build = Path(arm.__file__).read_text(encoding="utf-8")
+    # The centre is an equation of the printed height, so the model can't
+    # hold one value while the sheet prints another.
+    assert '"ArmDepth" / 2 + "TopAbovePivot" + "CurveRadius"' in build
+    assert '"TopEdgeReference": {"TopAbovePivot": 2}' in build
+
+
+def test_top_edge_reference_is_saved_hidden_and_imported_per_view() -> None:
+    # #880 / #950: a reference sketch owns a printed dimension but no
+    # geometry, so the part saves it hidden (no assembly instance renders it)
+    # and the drawing shows it per view through _drawing_hidden_sketches.
+    build = Path(arm.__file__).read_text(encoding="utf-8")
+    blank = 'blank_sketch(adapter, "TopEdgeReference")'
+    assert blank in build
+    assert build.index(blank) < build.rindex("save_part_and_images(adapter, PART_NAME)")
+    source = Path(drawing.__file__).read_text(encoding="utf-8").replace("\r\n", "\n")
+    assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
+    assert "    curate_view_dimensions,\n" not in source
+
+
+def test_top_edge_height_text_stands_clear_above_the_strap() -> None:
+    """The dimension runs up the mirror axis from the pivot centre; its text
+    sits over the strap, right of datum A's box and left of the rod-pin
+    frame."""
+    pivot = drawing._sheet_xy(0.0, rocker_arm_spec.PIVOT_MID_Y)
+    edge = drawing._sheet_xy(
+        0.0, rocker_arm_spec.PIVOT_MID_Y + rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT
+    )
+    text = drawing.FRONT_KEEP["TopAbovePivot"]
+    assert text[0] == pytest.approx(pivot[0])
+    assert text[1] > edge[1] + 0.005
+    datum_a = drawing._pivot_datum_request(pivot)
+    assert datum_a[0] < text[0] - 0.012
+    assert text[0] + 0.012 < drawing.FCF_XY[0]
 
 
 _PIVOT_CENTRE = drawing._sheet_xy(0.0, rocker_arm_spec.PIVOT_MID_Y)

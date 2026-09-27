@@ -23,20 +23,10 @@ from rocker_arm_spec import (
     PIVOT_HOLE_BAND,
 )
 
-# The amplitude bar's foot rides the top edge, and at d = 0 its cheeks pass
-# over this arm's hub, so the print controls the edge's height over the pivot
-# axis directly, on the mirror axis, one-sided: the edge may only come out
-# high (user ruling 2026-09-26). The 808.00 centre distance is then REF, and
-# the R800 governs only the curvature. With the amplitude bar's one-sided
-# notch (amplitude_bar_notes.BOTTOM_NOTCH_DEPTH_BAND) a bar can rest at most
-# 1.0 higher than nominal: a steady lever tilt of ~0.45 deg on that channel.
-# Its fundamental moves at most 0.0036 mm (0.04 % of the d = 88 term) across
-# the stations: error_budget.hook_displacement with the edge 0.5 high and the
-# notch 0.5 shallow (test_rocker_bank_layout pins both numbers).
-TOP_EDGE_ABOVE_PIVOT = CENTER_Y - PIVOT_MID_Y - R_TOP  # 8.0
-TOP_EDGE_BAND = (0.50, 0.0)  # (upper, lower)
-# The hub is the other end of that chain: an OD off the bore axis by e lifts
-# its top e toward the cheeks, and nothing else relates the two features. A
+# The top edge's one-sided height over the pivot is a model dimension with
+# its band on the part (rocker_arm_spec.TOP_EDGE_BAND, policy rule 2), so no
+# note carries it. The hub is the other end of that chain: an OD off the bore
+# axis by e lifts its top e toward the cheeks, and nothing else relates the two features. A
 # plain note, not a frame (Main 2026-09-26); turning the hub and reaming the
 # bore in one setup meets it without measuring. Its radius comes off the
 # cheek-over-hub air in test_rocker_bank_layout.
@@ -55,6 +45,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # #743 PR2: the hub length carries its +0.05/0 band natively; the 20-arm
     # stack acceptance (rocker_bank_layout) caps the sum.
     "Hub": {"HubLength"},
+    # The top edge's height over the pivot axis, +0.50/0 natively (Codex #936
+    # PRRT_kwDOPHDy386mV3AO). Only this one of the sketch's two dimensions
+    # prints; the other places the line's foot on the pivot centre.
+    "TopEdgeReference": {"TopAbovePivot"},
 }
 
 DRAWING_NOTES = "\n".join(
@@ -69,9 +63,6 @@ DRAWING_NOTES = "\n".join(
         "   CONCENTRIC; COMMON CENTRE ON THE",
         f"   MIRROR AXIS, {CENTER_Y - PIVOT_MID_Y:.2f} REF FROM THE PIVOT",
         f"   AXIS (STRAP DEPTH {ARM_DEPTH:.2f} REF).",
-        # One-sided: the lower deviation is zero (rocker_arm_spec, tested).
-        f"   TOP EDGE {TOP_EDGE_ABOVE_PIVOT:.2f} +{TOP_EDGE_BAND[0]:.2f}/0 ABOVE THE PIVOT",
-        "   AXIS, ON THE MIRROR AXIS.",
         f"4. ARC LENGTHS {TOP_ARC_LEN:.2f} TOP / {BOT_ARC_LEN:.2f} BOTTOM",
         "   DEFINE THE ARC ENDPOINTS.",
         f"5. EACH END: {TIP_FACE:.2f} RADIAL LAND PERP TO",

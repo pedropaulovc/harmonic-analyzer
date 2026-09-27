@@ -39,7 +39,6 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     check_drawing_layout,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -50,6 +49,10 @@ from _drawing_common import (
     sheet_drawable_region,
     stamp_drawing_summary,
 )
+
+# The part saves TopEdgeReference hidden (#880): this form shows it in the
+# view that imports its dimension.
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from rocker_arm_notes import DRAWING_DIMENSIONS, DRAWING_NOTES
@@ -64,6 +67,7 @@ from rocker_arm_spec import (
     SURFACE_FINISHES,
     TIP_FACE,
     TOP_ARC_LEN,
+    TOP_EDGE_ABOVE_PIVOT,
     TOP_END_X,
     TOP_END_Y,
 )
@@ -271,8 +275,18 @@ def _pivot_finish_placement() -> tuple[tuple[float, float], tuple[float, float]]
 # dimension (pivot to rod-pin hole, its line at y 0.138): from (0.180, 0.120),
 # straight below the bore, its leader crossed that dimension's line and ran up
 # its extension line (r743-4D render).
+# The top edge's +0.50/0 height over the pivot axis (Codex #936
+# PRRT_kwDOPHDy386mV3AO) runs up the mirror axis from the pivot centre, its
+# text straight above the strap: right of datum A's box (up-left of the
+# pivot, x < 0.160), left of the rod-pin frame and datum C.
+TOP_ABOVE_PIVOT_TEXT_RISE = 0.010
 FRONT_KEEP = {
     "PivotDia": (0.130, 0.148),
+    "TopAbovePivot": (
+        _sheet_xy(0.0, _PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT)[0],
+        _sheet_xy(0.0, _PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT)[1]
+        + TOP_ABOVE_PIVOT_TEXT_RISE,
+    ),
 }
 NOTE_ONLY_DIMENSIONS = {"TopRadius", "BottomRadius"}
 # The hub length (+0.05/0, #743 PR2) under the end view, where the hub shows
@@ -397,8 +411,9 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
 
-    # By feature, like the end view: only PivotHoleProfile's O6.50 arrives,
-    # so the note-only radii are never imported to be deleted again.
+    # By feature, like the end view: only PivotHoleProfile's O6.50 and
+    # TopEdgeReference's height arrive, so the note-only radii are never
+    # imported to be deleted again.
     curate_view_dimensions(
         adapter,
         front,
