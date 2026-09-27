@@ -235,7 +235,7 @@ such build:
 | `verify_soundness:<stem>`, `verify:kinematics` | yes | yes | yes |
 | `preflight`, `export`, `package:release` | yes | yes | yes |
 | `verify:soundness` | no (aggregator) | no | — (its leaves are) |
-| `check:math`, `check:config`, `check:graph`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:budget` | **no** | no (parallel) | no (runs locally) |
+| `check:math`, `check:config`, `check:graph`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:orflag`, `check:partiso`, `check:budget` | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
 | `gallery` | **no** (Blender + GPU) | no | no (no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
@@ -254,6 +254,10 @@ such build:
   `HARMONIC_FARM_LEAF_TIMEOUT_S`); the farm clamps the request to 60 s–3 h.
   Leaving it at the default on a cold run costs one retry and then a
   `platform`-style failure per slow leaf.
+- `check:recipe` runs every `cad/scripts/test_*.py` that no dedicated `check:*`
+  gate names, by glob; a file that must run nowhere goes in `dodo._UNGATED_TESTS`
+  with a one-line reason. `test_check_gate_coverage.py` fails on a test file
+  that runs in no gate, or in two.
 - `build_bare` = parts + assemblies only (fast, no gates, no export).
 - `release` is opt-in: `doit release` defaults to the next `vNN`; pass an
   explicit tag/options after `--` (for example, `doit release -- v22 --draft`).

@@ -1286,6 +1286,7 @@ _CHECK_NAMES = (
     "watchdog",
     "freshness",
     "flagonly",
+    "orflag",
     "partiso",
     "budget",
 )
@@ -1295,6 +1296,12 @@ _CHECK_NAMES = (
 # checks) and has never caught a product defect -- so it is off the every-build
 # required path. Union of both MUST match task_check's specs keys.
 _OPTIONAL_CHECK_NAMES = ("verify_telemetry",)
+# ``cad/scripts/test_*.py`` files that NO check:* gate runs, each with a one-line
+# reason (a test that needs a live SolidWorks seat, say). Every other test file
+# runs in exactly one gate: its own dedicated gate if one names it, else
+# check:recipe by glob. test_check_gate_coverage.py fails on a file that is in
+# neither, on one that runs twice, and on a stale entry here.
+_UNGATED_TESTS: dict[str, str] = {}
 
 
 def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
@@ -2682,128 +2689,6 @@ def task_check():
     # invalidate the stamp (codex review).
     part_script_deps = [str(p.resolve()) for p in part_scripts()]
     pytest_cmd = [sys.executable, "-m", "pytest", "-q"]
-    recipe_tests = [
-        SCRIPTS_DIR / "test_dodo_recipe.py",
-        SCRIPTS_DIR / "test_cut_release_version.py",
-        SCRIPTS_DIR / "test_export_models.py",
-        SCRIPTS_DIR / "test_pose_manifest.py",
-        SCRIPTS_DIR / "test_render_offline.py",
-        SCRIPTS_DIR / "test_verify_auto_repair.py",
-        # The copied-mate safeguard must keep failing CLOSED: an unreadable
-        # GetErrorCode2 or a truncated MateGroup scan has to raise/re-walk, never
-        # read as "this copy is clean".
-        SCRIPTS_DIR / "test_cwm_mate_guard.py",
-        # A missing assembly-manager pair must not certify an overlapping spring.
-        SCRIPTS_DIR / "test_native_spring_contact.py",
-        SCRIPTS_DIR / "test_settled_spring_seats.py",
-        # The two anchor parts are dimensioned so both stock springs hang plumb
-        # (channel_lever_spec.LEVER_SPRING_X, gooseneck_geom.ARM_END_X); the
-        # recalibration search that re-measures their seats must converge and
-        # certify only through native evaluations, whatever ClosestDistance says.
-        SCRIPTS_DIR / "test_vertical_spring_anchors.py",
-        SCRIPTS_DIR / "test_seat_search.py",
-        # The [out]-param binding rule is ENFORCED, not just documented: no
-        # VT_BYREF on the (uniformly early-bound) build path, late-bound probes
-        # declare themselves, and _early_bound never falls back to a raw
-        # dispatch. Mixing the two conventions returns a wrong answer that looks
-        # like a clean result, so a comment alone decays into folklore.
-        SCRIPTS_DIR / "test_out_param_binding.py",
-        # COM failure forensics: a null COM return must still raise its own
-        # message (forensics can never mask the failure), and every capture step
-        # must survive its own failure. Both are pure-Python contracts of
-        # _common.capture_com_failure, so they gate offline.
-        SCRIPTS_DIR / "test_failure_forensics.py",
-        # The SolidWorks-free geometry contract for the drawing layout audit
-        # (collision / sheet-overflow logic run before every drawing saves).
-        SCRIPTS_DIR / "test_drawing_layout_check.py",
-        # Drawing infrastructure and cross-sheet contracts do not follow the
-        # per-sheet test_*_drawing.py suffix, so enroll them explicitly.
-        SCRIPTS_DIR / "test_drawing_marks.py",
-        SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
-        SCRIPTS_DIR / "test_fastener_catalog.py",
-        # Fleet-wide manufacturing ownership/validation contracts are standalone
-        # tests rather than one-file-per-drawing tests, so the glob below cannot
-        # discover them.  They must execute under the required recipe gate: these
-        # tests reject drawing-owned tolerances/finishes and validate the typed
-        # model-PMI controls that drawings consume.
-        SCRIPTS_DIR / "test_drawing_specification_purity.py",
-        SCRIPTS_DIR / "test_drawing_surface_finish_validation.py",
-        SCRIPTS_DIR / "test_gtol_spec.py",
-        SCRIPTS_DIR / "test_part_owned_geometric_tolerances.py",
-        SCRIPTS_DIR / "test_probe_surface_finish_pmi_telemetry.py",
-        SCRIPTS_DIR / "test_surface_finish.py",
-        SCRIPTS_DIR / "test_surface_finish_ownership_a.py",
-        SCRIPTS_DIR / "test_component_patterns.py",
-        # One offline contract file per manufacturing drawing (test_*_drawing.py),
-        # so registering a drawing auto-enrolls its contracts here.
-        *sorted(SCRIPTS_DIR.glob("test_*_drawing.py")),
-        # Cross-sheet ownership checks whose filenames intentionally do not match
-        # the one-file-per-drawing discovery pattern above.
-        SCRIPTS_DIR / "test_pen_summing_drawing_batch_contract.py",
-        # Was omitted while its two siblings above were enrolled, so NO gate ran
-        # it: converting channel to a three-view diagram left it reading
-        # attributes the sheet no longer defines, and every check:* gate stayed
-        # green (codex #416). Enrolled so the cross-sheet contracts are covered.
-        SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
-        # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
-        # prompt calibration, strict output schema, neutral-workdir command, pass
-        # logic and the blind-review tool-event detector are pinned offline.
-        SCRIPTS_DIR / "test_machinist_review.py",
-        # The settings-independence contracts this PR adds.  All three are
-        # pure Python (no COM), and unenrolled they would be exactly the
-        # "green gate that checks nothing" the comments above warn about: the
-        # offline closure invariant (endpoint_merges/minor_arc refusing the
-        # shapes an inference snap produces), the seat-preference contract
-        # (declared baseline vs observed restore, depth counting, refused
-        # writes), and the authoring contract (a profile must close against a
-        # seat that refuses every merge -- the 2026-09-18 farm failure) are
-        # the whole mechanism by which a recipe stops depending on a seat's
-        # inference settings, so they must fail a gate, not just a local run.
-        SCRIPTS_DIR / "test_logo_profile_closure.py",
-        SCRIPTS_DIR / "test_sketch_preference_baseline.py",
-        SCRIPTS_DIR / "test_diag_mcmaster_lib.py",
-    ]
-    # These are runtime-read rather than imported, so module_deps_of cannot
-    # discover them. A prompt/schema edit must invalidate check:recipe and rerun
-    # the offline machinist-review contract.
-    machinist_review_contract_deps = [
-        SCRIPTS_DIR / "prompts" / "machinist_review_part.md",
-        SCRIPTS_DIR / "prompts" / "machinist_review_assembly.md",
-        SCRIPTS_DIR / "prompts" / "machinist_review_schema.json",
-    ]
-    # test_out_param_binding SCANS sources instead of importing them (it reads
-    # every top-level build script and every diagnostics/*.py looking for
-    # VT_BYREF), so module_deps_of cannot see them -- an import graph does not
-    # cover a file the test merely opens. Without these, the first green stamp
-    # would freeze the gate: adding a VT_BYREF to a build script, or an unmarked
-    # late-bound probe, leaves check:recipe "up to date" and the enforcement
-    # silently stops enforcing (codex #418). Same failure shape as the
-    # never-enrolled contract test above -- a green gate that checks nothing.
-    scanned_by_binding_gate = {
-        *(str(path.resolve()) for path in SCRIPTS_DIR.glob("*.py")),
-        *(str(path.resolve()) for path in (SCRIPTS_DIR / "diagnostics").glob("*.py")),
-    }
-    recipe_test_deps = sorted(
-        {
-            *(str(path.resolve()) for path in recipe_tests),
-            *(dep for path in recipe_tests for dep in module_deps_of(path)),
-            *(str(path.resolve()) for path in machinist_review_contract_deps),
-            *scanned_by_binding_gate,
-            str(
-                (REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py").resolve()
-            ),
-            str(
-                (
-                    REPO_ROOT / "cad" / "comparisons" / "tools" / "pose_manifest.py"
-                ).resolve()
-            ),
-            str(
-                (
-                    REPO_ROOT / "cad" / "comparisons" / "tools" / "render_offline.py"
-                ).resolve()
-            ),
-        }
-    )
     specs = {
         "math": {
             # The import closure of verify.py (truth_model, the base-footprint
@@ -2875,23 +2760,6 @@ def task_check():
                 ),
             ],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_dxf_text.py")],
-        },
-        "recipe": {
-            # _CONFIG_YAMLS: the metadata-ownership contracts read part rows via
-            # _config.parts(), and module_deps_of tracks _config.py but not the
-            # YAML documents it loads -- without these deps a finish/material
-            # edit would leave the stamp valid and the guard silently stale
-            # (codex review #361).
-            "file_dep": [
-                str((REPO_ROOT / "dodo.py").resolve()),
-                *recipe_test_deps,
-                *_CONFIG_YAMLS,
-                *sorted(
-                    str(template.path.resolve())
-                    for template in DRAWING_TEMPLATES.values()
-                ),
-            ],
-            "cmd": [*pytest_cmd, *(str(path) for path in recipe_tests)],
         },
         "cache": {
             # The artefact-cache provenance/observability unit tests (issue #73):
@@ -2976,6 +2844,21 @@ def task_check():
             ],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_flag_only.py")],
         },
+        "orflag": {
+            # Every early_bound_or_flag/_early_bound call site must name fallback
+            # flags the interface really has. The test SCANS source text under
+            # cad/scripts AND the vendored submodule's src/ tree (its SCAN_ROOTS),
+            # which no import graph sees, so both trees are declared here. Its own
+            # gate rather than check:recipe: a submodule-only bump re-runs this
+            # one-second scan instead of the whole recipe suite.
+            "file_dep": sorted(
+                str(path.resolve())
+                for root in (SCRIPTS_DIR, REPO_ROOT / "SolidworksMCP-python" / "src")
+                for path in root.rglob("*.py")
+                if not {"_generated", ".venv", "__pycache__"} & set(path.parts)
+            ),
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_or_flag_fallback_names.py")],
+        },
         "partiso": {
             # Guards the three-tier submodule digest: parts must never import the
             # assembly/motion + drawing modules the PART recipe excludes, AND assemblies
@@ -3049,6 +2932,81 @@ def task_check():
             ),
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_error_budget.py")],
         },
+    }
+    # check:recipe runs every cad/scripts/test_*.py that no dedicated gate above
+    # names and _UNGATED_TESTS does not exclude. It used to be a hand list plus a
+    # test_*_drawing.py glob, and a file missing from both ran in no gate at all:
+    # test_assembly_drawing_batch_contract read attributes its sheet no longer
+    # defined while every gate stayed green (codex #416), and 22 more files were
+    # found orphaned on 2026-09-24, one of them red since 997f3534 unnoticed.
+    # test_check_gate_coverage.py pins the exactly-one-gate invariant.
+    claimed = {
+        Path(arg).resolve()
+        for spec in specs.values()
+        for arg in spec["cmd"]
+        if Path(arg).name.startswith("test_")
+    }
+    recipe_tests = [
+        path
+        for path in sorted(SCRIPTS_DIR.glob("test_*.py"))
+        if path.resolve() not in claimed and path.name not in _UNGATED_TESTS
+    ]
+    # Runtime-read rather than imported, so module_deps_of cannot discover them.
+    # A prompt/schema edit must re-run the offline machinist-review contracts, a
+    # regenerated base serial DXF the byte-identity check in test_base_serial, and
+    # a re-recorded native receipt the hash pins in test_vm2_rack_source_save.
+    runtime_read_by_recipe_tests = [
+        SCRIPTS_DIR / "prompts" / "machinist_review_part.md",
+        SCRIPTS_DIR / "prompts" / "machinist_review_assembly.md",
+        SCRIPTS_DIR / "prompts" / "machinist_review_schema.json",
+        REPO_ROOT / "cad" / "references" / "base-serial.dxf",
+        *(
+            REPO_ROOT
+            / "cad"
+            / "docs"
+            / "pipeline"
+            / "evidence"
+            / "vm2-datum-placement"
+            / "probes"
+            / f"rack-source-save-{mode}"
+            / "receipt.json"
+            for mode in ("full", "precision", "callout")
+        ),
+    ]
+    # test_out_param_binding SCANS sources instead of importing them (it reads
+    # every top-level build script and every diagnostics/*.py looking for
+    # VT_BYREF), so module_deps_of cannot see them -- an import graph does not
+    # cover a file the test merely opens. Without these, the first green stamp
+    # would freeze the gate: adding a VT_BYREF to a build script, or an unmarked
+    # late-bound probe, leaves check:recipe "up to date" and the enforcement
+    # silently stops enforcing (codex #418).
+    scanned_by_binding_gate = {
+        *(str(path.resolve()) for path in SCRIPTS_DIR.glob("*.py")),
+        *(str(path.resolve()) for path in (SCRIPTS_DIR / "diagnostics").glob("*.py")),
+    }
+    specs["recipe"] = {
+        # _CONFIG_YAMLS: the metadata-ownership contracts read part rows via
+        # _config.parts(), and module_deps_of tracks _config.py but not the
+        # YAML documents it loads -- without these deps a finish/material
+        # edit would leave the stamp valid and the guard silently stale
+        # (codex review #361). dodo.py: test_check_gate_coverage and
+        # test_dodo_recipe read every gate's command out of it.
+        "file_dep": sorted(
+            {
+                str((REPO_ROOT / "dodo.py").resolve()),
+                *(str(path.resolve()) for path in recipe_tests),
+                *(dep for path in recipe_tests for dep in module_deps_of(path)),
+                *(str(path.resolve()) for path in runtime_read_by_recipe_tests),
+                *scanned_by_binding_gate,
+                *(
+                    str((REPO_ROOT / "cad" / "comparisons" / "tools" / name).resolve())
+                    for name in ("composite.py", "pose_manifest.py", "render_offline.py")
+                ),
+                *_CONFIG_YAMLS,
+                *(str(template.path.resolve()) for template in DRAWING_TEMPLATES.values()),
+            }
+        ),
+        "cmd": [*pytest_cmd, *(str(path) for path in recipe_tests)],
     }
     # Tripwire: `build` and `release` depend on f"check:{c}" for c in _CHECK_NAMES, so a
     # spec added here without the matching name (or vice versa) would silently never run
