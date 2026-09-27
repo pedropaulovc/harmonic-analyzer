@@ -168,6 +168,16 @@ def test_the_spot_face_has_its_own_sheet_at_two_to_one() -> None:
     assert drawing.SHEET_NAMES == ("MAIN", "SPOT-FACE")
     assert drawing.SHEET_SCALES == {"MAIN": (1.0, 1.0), "SPOT-FACE": (2.0, 1.0)}
     assert drawing.SPOT_FACE_SCALE == drawing.SHEET_SCALES[drawing.SPOT_FACE_SHEET]
+    # Chosen by fit: the largest preferred scale whose views and text lanes
+    # fit the sheet; the next preferred one does not.
+    fitting = [s for s in drawing.PREFERRED_SCALES if drawing.spot_face_fits(s)]
+    assert drawing.SPOT_FACE_SCALE == max(fitting, key=lambda s: s[0] / s[1])
+    larger = [
+        s
+        for s in drawing.PREFERRED_SCALES
+        if s[0] / s[1] > drawing.SPOT_FACE_SCALE[0] / drawing.SPOT_FACE_SCALE[1]
+    ]
+    assert larger and not any(drawing.spot_face_fits(s) for s in larger)
     assert drawing.SEE_SPOT_FACE_SHEET == "SPOT FACE:\nSEE SHEET 2"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "sheet_scales=SHEET_SCALES" in source
@@ -178,7 +188,10 @@ def test_the_spot_face_has_its_own_sheet_at_two_to_one() -> None:
 
 def test_the_spot_face_dimensions_are_labelled_for_what_they_locate() -> None:
     assert drawing.SPOT_FACE_WIDTH_CALLOUT == {"SpotFaceWidth": "SPOT FACE WIDTH"}
-    assert drawing.SPOT_FACE_CALLOUTS == {"SpotFaceRunOut": "RUN-OUT TO STEP"}
+    assert drawing.SPOT_FACE_CALLOUTS == {
+        "SpotFaceRunOut": "RUN-OUT TO STEP",
+        "CrankBossStartZ": "SPOT FACE STATION",
+    }
     assert not set(drawing.DIMENSION_CALLOUTS) & (
         set(drawing.SPOT_FACE_WIDTH_CALLOUT) | set(drawing.SPOT_FACE_CALLOUTS)
     )
@@ -195,11 +208,7 @@ def _spot_face_outlines() -> dict[str, tuple[float, float, float, float]]:
     boss's corner (beyond the collar, whose flat trims it at the spot face) to
     the crank boss's far end."""
     f = drawing.SPOT_FACE_SCALE[0] / drawing.SPOT_FACE_SCALE[1] / 1000.0
-    incline = math.radians(spec.INCLINE_DEG)
-    corner = (spec.CONE_BOSS_LENGTH / 2.0) * math.cos(incline) + (
-        spec.CONE_BOSS_DIA / 2.0
-    ) * math.sin(incline)
-    plan_depth = spec.CRANK_BOSS_END_Z + max(corner, spec.BLOCK_DIA / 2.0)
+    plan_depth = drawing.spot_plan_depth_mm()
     half = spec.HEAD_DIA / 2.0 * f
     rear_x, rear_y = drawing.REAR_CENTER
     plan_x, plan_y = drawing.SPOT_PLAN_CENTER
@@ -228,6 +237,28 @@ def _landscape_sheet() -> tuple[object, tuple]:
     template = DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE]
     region = DrawableRegion.from_margins(template.width_m, template.height_m, **ZONE_MARGINS)
     return region, _keep_outs(template.width_m, template.height_m)
+
+
+def test_the_plan_depth_is_the_cone_boss_corner_to_the_crank_boss_end() -> None:
+    incline = math.radians(spec.INCLINE_DEG)
+    corner = (spec.CONE_BOSS_LENGTH / 2.0) * math.cos(incline) + (
+        spec.CONE_BOSS_DIA / 2.0
+    ) * math.sin(incline)
+    assert corner > spec.BLOCK_DIA / 2.0
+    assert drawing.spot_plan_depth_mm() == pytest.approx(spec.CRANK_BOSS_END_Z + corner)
+
+
+def test_the_drawable_region_is_the_templates_zone_margin() -> None:
+    from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
+    from test_drawing_layout_check import ZONE_MARGINS
+
+    template = DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE]
+    assert drawing.DRAWABLE == (
+        ZONE_MARGINS["left"],
+        ZONE_MARGINS["bottom"],
+        template.width_m - ZONE_MARGINS["right"],
+        template.height_m - ZONE_MARGINS["top"],
+    )
 
 
 def test_the_spot_face_views_fit_the_sheet_clear_of_the_title_block() -> None:
@@ -806,14 +837,17 @@ def test_section_reads_by_its_bore_axis_not_by_a_note() -> None:
 
 
 def test_spotface_station_prints_its_value_on_its_own_dimension_line() -> None:
-    """The spot-face station is a plain dimension: no label, no offset shelf.
-    It stands once, on sheet 2's plan (where it is the only dimension), not on
+    """The spot-face station prints on its own dimension line, never on an
+    offset shelf (where a blind reader once took it for a note).  Main's
+    rim-8339 ruling labels it below the value, because a bare 18.88 was not
+    found as the station.  It stands once, on sheet 2's plan, not on
     sheet 1's."""
     assert "CrankBossStartZ" not in drawing.DIMENSION_CALLOUTS
-    assert "CrankBossStartZ" not in drawing.SPOT_FACE_CALLOUTS
+    assert drawing.SPOT_FACE_CALLOUTS["CrankBossStartZ"] == "SPOT FACE STATION"
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_dimension_callouts(adapter, annotations, SPOT_FACE_CALLOUTS)\n" in source
     assert "CrankBossStartZ" not in drawing.TOP_KEEP
     assert drawing.SPOT_PLAN_DIMENSION == "CrankBossStartZ"
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '{"CrankBossStartZ":' not in source
     assert "offset_dimension_text(adapter, plan_annotations" not in source
 
