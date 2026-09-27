@@ -9,6 +9,7 @@ and mass properties.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 
@@ -32,6 +33,14 @@ def _stock(
 
 
 FASTENERS: dict[str, PurchasedFastenerSpec] = {
+    # #743: C45 alloy cup point, black oxide -- it bites the spotted steel
+    # arbor where an 18-8 (B80) cup would not.
+    "arbor-set-screw": _stock(
+        "arbor-set-screw",
+        "Alloy Steel Cup-Tip Set Screw",
+        "91375A106",
+        material="Alloy Steel",
+    ),
     "bracket-screw": _stock(
         "bracket-screw",
         "Steel Narrow Fillister Head Slotted Screw",
@@ -124,8 +133,13 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "lag-screw": _stock(
         "lag-screw",
         "18-8 Stainless Steel Hex Head Screw",
-        "92240A539",
+        "92240A540",
         material="AISI 304",
+    ),
+    "pedestal-hold-down-screw": _stock(
+        "pedestal-hold-down-screw",
+        "Steel Narrow Fillister Head Slotted Screw",
+        "90280A197",
     ),
     "pen-set-screw": _stock(
         "pen-set-screw",
@@ -142,7 +156,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "slotted-screw": _stock(
         "slotted-screw",
         "Steel Narrow Fillister Head Slotted Screw",
-        "90280A199",
+        "90280A201",
     ),
     "swing-stop-screw": _stock(
         "swing-stop-screw",
@@ -173,7 +187,19 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
 
 
 def fastener(part_name: str) -> PurchasedFastenerSpec:
-    """Return one purchased fastener identity, failing loud if unregistered."""
+    """Return one purchased fastener identity, failing loud if unregistered.
+
+    Under doit, ``HARMONIC_FASTENER_ROWS`` names the only rows this build's cache
+    key folds (``dodo._narrow_fastener_catalog``); reading any other row would
+    let an edit to that row reuse this artefact, so it fails instead.
+    """
+    allowed = os.environ.get("HARMONIC_FASTENER_ROWS")
+    if allowed is not None and part_name not in allowed.split(","):
+        raise KeyError(
+            f"fastener row {part_name!r} is outside this build's cache key "
+            f"(HARMONIC_FASTENER_ROWS={allowed!r}); read it through a literal "
+            "fastener(...) call so the build graph can see it"
+        )
     try:
         return FASTENERS[part_name]
     except KeyError as exc:

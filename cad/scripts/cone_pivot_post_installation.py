@@ -10,9 +10,6 @@ from __future__ import annotations
 
 POST_ROTATION_Y_DEG = 180.0
 
-POST_X_SHIFT = 1.484
-POST_Z_SHIFT = 35.415
-
 # Move the working gear stack toward the fixed post until the 64T retains
 # 0.10 mm axial air to the post's cone boss.  The world projections follow the
 # unchanged 12.5182-degree journal and recenter the channel/cylinder bank.

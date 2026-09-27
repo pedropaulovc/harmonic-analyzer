@@ -104,9 +104,10 @@ async def build(adapter) -> dict[str, str]:
         ground=True,
         label="64T at recentered design station",
     )
+    # The 16T rides the MHA-149 fit-up axis, as the assembly places it.
     pinion_position = [
-        dta.X_CRANK,
-        dta.Y_CRANK,
+        dta.X_CRANK_FIT,
+        dta.Y_CRANK_FIT,
         dta.PINION_TOOTH_Z - dta.PINION_FACE / 2.0,
     ]
     pinion = await place_component(

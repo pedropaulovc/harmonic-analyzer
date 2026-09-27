@@ -106,6 +106,7 @@ from cone_tip_block_spec import (
 from _fit_limits import deviations
 from _holes import wizard_holes
 from _part_pmi import author_part_pmi
+from _visibility import blank_reference_geometry
 
 PART_NAME = "cone-tip-block"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel, like the platform it rides
@@ -501,6 +502,7 @@ async def build(adapter) -> dict[str, str]:
     check("cut slit", await adapter.create_cut_extrude(
         ExtrusionParameters(depth=SLIT_DEPTH)))  # default cut dir = down into the block
     name_last_feature(adapter, "TopSlit")
+    blank_reference_geometry(adapter, (("BlockTop", "PLANE"),))
     slit_depth_dim = name_dimensions(adapter, "TopSlit", ["SlitDepth"])[0]
     drive_jobs.append((slit_depth_dim, '"SlitDepth"'))
     volume = await volume_check(

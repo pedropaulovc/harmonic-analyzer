@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ import build_cone_tip_shim as part
 import cone_tip_block_spec as block
 import cone_tip_shim_spec as spec
 import draw_cone_tip_shim as drawing
+import drive_train_steps as steps
 from _drawing_contract import drawing_specification_violations
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import THREAD_MAJOR_MM
@@ -135,15 +137,15 @@ def test_stack_range_rides_the_thickness_dimension_not_a_note() -> None:
     assert not hasattr(drawing, "REFERENCE_DIMENSIONS")
 
 
-def test_sheet_carries_no_general_note() -> None:
-    """The leaf stock is the material specification and blackening the
-    finish (rule 1); the fitting procedure is an MHA-A03 assembly step.  So
-    no Manufacturing Notes block is authored, stamped or placed."""
-    assert not hasattr(spec, "MANUFACTURING_NOTES")
-    for module in (part, drawing):
-        source = Path(module.__file__).read_text(encoding="utf-8")
-        assert "Manufacturing Notes" not in source
-        assert "MANUFACTURING_NOTES" not in source
+def test_the_only_general_note_is_the_fit_up_pointer() -> None:
+    """Stock is the material spec, blackening the finish, and the stack
+    range rides the thickness dimension (rule 1); the one note line points
+    at the MHA-A03 step that fits the pack (Codex P2 on #857)."""
+    pointer = steps.step_ref(spec.FIT_UP_STEP)
+    assert spec.MANUFACTURING_NOTES == f"STACK SET AT ASSEMBLY, {pointer}."
+    assert not re.search(r"\d", spec.MANUFACTURING_NOTES.replace(pointer, ""))
+    # The note clears the stack text below it.
+    assert drawing.THICKNESS_TEXT[1] + 0.006 < drawing.NOTES_XY[1] - 0.008
 
 
 def test_registry_row_is_the_bom_shim_pack() -> None:

@@ -1,0 +1,49 @@
+# paper-drive assembly contract -- per-assembly build data read through
+# cad/scripts/_assembly_contract.py. Editing this file re-keys ONLY the paper-drive
+# closure (its assembly leaf, its verify_soundness leaf, and whatever consumes
+# its saved .SLDASM), never a sibling assembly.
+#
+# flip_invert: _assembly._flip_sig signatures (+ " @<diag>" orientation suffix
+#   for a rotation/mirror twin) whose distance driver seats OPPOSITE the plain
+#   sign rule. List every signature THIS build queries that needs inverting; a
+#   signature shared with another assembly goes in both files. A build that
+#   lands a mate on the wrong side fails with "flip-seed MISS ... toggle sig",
+#   naming this file; the end-of-build seed audit logs every queried signature
+#   and warns on entries no mate queried.
+# allowed_free_stems: the exact component families allowed to read
+#   under-constrained (freed operational DOF + everything coupled to them).
+#   Shared by the incremental refresh and verify:soundness.
+# required_free_stems: one family per freed DOF that must itself read
+#   under-constrained (verify:soundness necessity).
+# free_dof (+ free_dof_per_active_channel x active channels): the operational
+#   DOF the saved model ships free (verify:soundness).
+flip_invert:
+  - crank wheel axial
+  - knob wheel axial
+  # (was "rack pinion disc axial" -- the 120T disc's label became "reducer
+  # disc" in the PR #196 real-train rework; same mate, same learned side.
+  # Latent until 2026-07-07's full paper-drive rebuild re-keyed it.)
+  - reducer disc axial
+allowed_free_stems:
+  - fillister-screw
+  - guide-lock
+  - platen
+  - platen-clip
+  - platen-guide
+  - platen-paper
+  - platen-rack
+  - rack-pinion
+  - transgear-feed-pinion
+  - transgear-knob-shaft
+  - transgear-pinion
+  - transgear-removable
+  - transgear-thumbnut  # rides the free knob shaft (lock-mated), 2026-09-02
+# One freed DOF (the crank T12 spin). paper-drive is checked by INSTANCE, not
+# this stem (verify._required_free_instances) -- three transgear-removable
+# siblings share the stem, so a stem check passes even if T12 is pinned and
+# T24/T18 is loose (codex #189 :679). Kept as reference data only.
+required_free_stems:
+  - transgear-removable
+# The freed crank (T12) spin; the knob T24 is belt-coupled and the platen is
+# rack-coupled (no DOF of their own).
+free_dof: 1

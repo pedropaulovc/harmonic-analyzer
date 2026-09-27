@@ -40,6 +40,7 @@ from _surface_finish import surface_finish_by_key
 from pinion_pivot_shaft_spec import (
     CAP_RADIUS,
     CAP_SAG,
+    PIN_HOLE_CALLOUT,
     SHAFT_DIA as SHAFT_DIA,
     SHAFT_LEN,
     SURFACE_FINISHES,
@@ -70,20 +71,30 @@ RIGHT_CENTER = (
     FRONT_CENTER[1],
 )
 ISO_CENTER = (0.355, 0.205)
-# 1:2, like fulcrum-shaft's identical long turned shaft: at 1:1 a 192 mm
+# 1:2, like fulcrum-shaft's identical long turned shaft: at 1:1 the ~180 mm
 # isometric bar runs over the right zone border, so the pictorial is halved and
 # a scale callout keeps the title block honest.
 ISO_SCALE = (1, 2)
 
 FRONT_KEEP = {
-    "ShaftDia": (0.055, 0.167),
+    # Left of the end view, so the leader rises right from the underline and
+    # never crosses the stacked tolerance (Main eye pass on pc-ea2: under the
+    # view its leader ran back through "-0.02").
+    "ShaftDia": (0.030, 0.167),
 }
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
+    # Option E-a: the set-pin holes read as solid circles in the side view.
+    # Only the size is printed; the match-drill callout carries the location.
+    # pc-ea eye pass: below the view its text ran into the 182.0 body
+    # dimension's callout, so it sits above the view between the datum frame
+    # and the Ra flag, its leader dropping to the left-hand hole.
+    "PinHoleDia": (0.125, 0.241),
 }
 DIMENSION_CALLOUTS = {
     "ShaftDia": "FINAL SIZE",
     "Depth": "CYLINDRICAL BODY\nBETWEEN CROWN ROOT CIRCLES",
+    "PinHoleDia": PIN_HOLE_CALLOUT,
 }
 
 

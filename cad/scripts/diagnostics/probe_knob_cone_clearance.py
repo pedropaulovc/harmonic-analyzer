@@ -77,7 +77,12 @@ def _pair_volume(adapter, wanted: tuple[str, str]) -> float:
 async def build(adapter) -> dict[str, str]:
     check("create_assembly", await adapter.create_assembly())
     teeth = _config.cone_teeth(0)
-    station = dta.SHAFT_T120_STATION + dta.GEAR_AXIS_SHIFT
+    # The 6.0 gear keeps the 6.5 reference face's north end (BDT seed placement).
+    station = (
+        dta.SHAFT_T120_STATION
+        + dta.GEAR_AXIS_SHIFT
+        + (dta.CONE_FACE_STATION_REFERENCE - dta.CONE_FACE) / 2.0
+    )
     centre = dta.cone_station(station)
     gear_position = [
         centre[0] - dta.CONE_FACE / 2.0 * dta.SIN_I,

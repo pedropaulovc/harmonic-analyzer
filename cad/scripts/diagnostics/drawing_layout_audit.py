@@ -112,7 +112,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import _telemetry  # noqa: E402
-import dodo  # noqa: E402
 from _drawing_common import is_pictorial_orientation  # noqa: E402
 from _drawing_layout_check import DrawableRegion  # noqa: E402
 from _drawing_registry import DRAWING_TEMPLATES  # noqa: E402
@@ -128,6 +127,8 @@ from _layout_geometry import (  # noqa: E402
     estimate_text_box,
     format_findings,
 )
+from _layout_audit import classify_segments as classify_callout_segments  # noqa: E402
+from _layout_audit import replace_text  # noqa: E402
 
 # swAnnotationType_e (enums/swAnnotationType_e.md)
 _ANNOT_DATUM = 2
@@ -250,7 +251,7 @@ def _display_data(adapter: Any, annotation: Any) -> Any:
     )
 
 
-def _display_lines(adapter: Any, data: Any) -> list[Segment]:
+def _display_lines(adapter: Any, data: Any, dropped: list[int] | None = None) -> list[Segment]:
     """Every straight run of the annotation's ink, in sheet metres.
 
     ``GetLineAtIndex3`` -> ``[color, lineType, lineStyle, lineWeight,
@@ -258,6 +259,15 @@ def _display_lines(adapter: Any, data: Any) -> list[Segment]:
     older ``GetLineAtIndex2`` drops lineStyle/lineWeight, shifting the points
     two slots left, so the index of the start point is read from the array
     LENGTH rather than assumed.
+
+    A record whose ends coincide on the sheet draws no ink and is dropped,
+    wherever it lies, and counted into ``dropped`` (``collect_sheet`` puts
+    the sheet's total on its span). Since #906 every linear dimension on
+    cone_pivot_post reads back 15 such records, ``[0, swLF_VISIBLE,
+    swLineHIDDEN, swLW_THIN, (0,0,0), (0,0,0)]``, between its extension and
+    dimension lines (diag/cone-pivot-origin-probe fc2212cd6, leaf run
+    20260926T205141966Z); boxed as ink, each dimension's box ran from the
+    sheet origin.
     """
     count = int(_get(adapter, data, "GetLineCount", 0) or 0)
     segments: list[Segment] = []
@@ -269,15 +279,18 @@ def _display_lines(adapter: Any, data: Any) -> list[Segment]:
         if len(values) < 10:
             continue
         start = len(values) - 6
-        segments.append(
-            Segment(
-                values[start],
-                values[start + 1],
-                values[start + 3],
-                values[start + 4],
-                _LINE_ROLE,
-            )
+        segment = Segment(
+            values[start],
+            values[start + 1],
+            values[start + 3],
+            values[start + 4],
+            _LINE_ROLE,
         )
+        if segment.length == 0.0:
+            if dropped is not None:
+                dropped.append(index)
+            continue
+        segments.append(segment)
     return segments
 
 
@@ -375,7 +388,9 @@ def _display_text_boxes(
     return boxes, samples
 
 
-def _classify_segments(segments: list[Segment], text_boxes: list[Box]) -> list[Segment]:
+def _classify_segments(
+    segments: list[Segment], text_boxes: list[Box], *, hole_callout: bool = False
+) -> list[Segment]:
     """Mark the runs that reach the annotation's own text as its LEADER.
 
     ``IDisplayData`` does not label a line's purpose, and the leader is the one
@@ -384,7 +399,17 @@ def _classify_segments(segments: list[Segment], text_boxes: list[Box]) -> list[S
     leader is what touches the text.  With no text box -- a bare centre mark,
     a symbol-only annotation -- nothing is promoted, so no phantom leader is
     fed to the crossing audit.
+
+    A hole callout is not classified here: the attach run from the rim to
+    the shelf need not touch the text (MHA-091 RD1's did not, so a leader
+    crossing it went unreported; swing, #902 case 2), and the shared audit
+    already owns that rule (``_layout_audit.classify_segments``: every line
+    is leader).  This audit has no shoulder role, so the shelf stays leader.
     """
+    if hole_callout:
+        return classify_callout_segments(
+            "hole-callout", {"dim": {"hole_callout": True}}, segments, ()
+        )
     if not text_boxes:
         return segments
     grown = [
@@ -436,6 +461,14 @@ def _registered_leader_segments(adapter: Any, annotation: Any) -> list[Segment]:
                 Segment(start[0], start[1], end[0], end[1], _LEADER_ROLE)
             )
     return segments
+
+
+def _is_hole_callout(adapter: Any, annotation: Any) -> bool:
+    """``IDisplayDimension::IsHoleCallout`` for a dimension annotation."""
+    display = _bind(
+        _attempt(adapter, lambda: annotation.GetSpecificAnnotation()), "IDisplayDimension"
+    )
+    return display is not None and bool(_get(adapter, display, "IsHoleCallout", False))
 
 
 def _note_box(adapter: Any, annotation: Any) -> Box | None:
@@ -510,8 +543,10 @@ def _annotation_geometry(
     *,
     owner: str,
     advance_ratio: float,
+    dropped: list[int] | None = None,
 ) -> tuple[AnnotationGeometry | None, list[tuple[str, float, Box]]]:
-    """One annotation's text boxes and ink, plus any exact-box calibration sample."""
+    """One annotation's text boxes and ink, plus any exact-box calibration
+    sample. Zero-length display lines go to ``dropped`` (``_display_lines``)."""
     annotation = _bind(annotation, "IAnnotation")
     kind_code = int(_get(adapter, annotation, "GetType", 0) or 0)
     kind = _TEXT_ANNOTATIONS.get(kind_code)
@@ -537,7 +572,7 @@ def _annotation_geometry(
     data = _display_data(adapter, annotation)
     estimated: list[tuple[str, float, tuple[float, float], int, float]] = []
     if data is not None:
-        segments.extend(_display_lines(adapter, data))
+        segments.extend(_display_lines(adapter, data, dropped))
         segments.extend(_display_arcs(adapter, data))
         boxes, estimated = _display_text_boxes(
             adapter, data, advance_ratio=advance_ratio
@@ -562,7 +597,11 @@ def _annotation_geometry(
         # the border and keep-out audits rather than vanishing from them.
         text_boxes = [Box(anchor[0], anchor[1], anchor[0], anchor[1])]
 
-    segments = _classify_segments(segments, text_boxes)
+    segments = _classify_segments(
+        segments,
+        text_boxes,
+        hole_callout=kind_code == _ANNOT_DIM and _is_hole_callout(adapter, annotation),
+    )
     segments.extend(_registered_leader_segments(adapter, annotation))
 
     return (
@@ -642,6 +681,7 @@ def _keep_outs(width: float, height: float) -> tuple[tuple[str, Box], ...]:
     return ()
 
 
+@_telemetry.traced("layout.collect_sheet")
 def collect_sheet(
     adapter: Any, drawing: Any, sheet_view: Any, views: list[Any]
 ) -> SheetGeometry:
@@ -695,6 +735,7 @@ def collect_sheet(
 
     annotations: list[AnnotationGeometry] = []
     seen_tables: dict[str, AnnotationGeometry] = {}
+    dropped: list[int] = []
     for view, geometry in [
         *zip(views, view_geometry),
         (sheet_view, None),
@@ -708,7 +749,11 @@ def collect_sheet(
                 if owner_type != _OWNER_DRAWING_SHEET:
                     continue
             item, _samples = _annotation_geometry(
-                adapter, annotation, owner=owner, advance_ratio=advance_ratio
+                adapter,
+                annotation,
+                owner=owner,
+                advance_ratio=advance_ratio,
+                dropped=dropped,
             )
             if item is not None:
                 annotations.append(item)
@@ -717,6 +762,10 @@ def collect_sheet(
             if item is not None:
                 seen_tables[item.label] = item
     annotations.extend(seen_tables.values())
+    # The zero-length display lines _display_lines dropped stay visible.
+    _telemetry.annotate(sheet=name, degenerate_lines=len(dropped))
+    if dropped:
+        _telemetry.debug(f"layout {name}: {len(dropped)} zero-length display line(s) dropped, no ink")
 
     return SheetGeometry(
         name=name,
@@ -936,11 +985,19 @@ def main(argv: list[str] | None = None) -> int:
     # Hold the seat for the whole open-audit-close: ``_com_seat`` queues behind any
     # running doit COM task (and makes them queue behind us), and sets
     # HARMONIC_COM_SEAT so the adapter's seat guard sees a claimed seat.
+    # dodo is imported here, not at module level: a draw_*.py recipe that calls
+    # audit_document runs inside a doit task that already holds the seat, and
+    # needs none of the task graph.
+    import dodo
+
     with dodo._com_seat(f"audit:layout {path.stem}"):
         return _audit_under_seat(arguments, path)
 
 
 def _audit_under_seat(arguments: argparse.Namespace, path: Path) -> int:
+    if arguments.json:
+        # A run that fails must not leave the previous run's dump behind.
+        arguments.json.unlink(missing_ok=True)
     app, document = _attach(None, path)
     try:
         sheets = collect_document(None, document)
@@ -958,7 +1015,8 @@ def _audit_under_seat(arguments: argparse.Namespace, path: Path) -> int:
         print(f"\n{len(findings)} finding(s):")
         print(format_findings(findings))
         if arguments.json:
-            arguments.json.write_text(
+            replace_text(
+                arguments.json,
                 json.dumps(
                     {
                         "drawing": str(path),
@@ -967,7 +1025,6 @@ def _audit_under_seat(arguments: argparse.Namespace, path: Path) -> int:
                     },
                     indent=2,
                 ),
-                encoding="utf-8",
             )
             print(f"wrote {arguments.json}")
         return 1 if findings else 0

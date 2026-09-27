@@ -1,4 +1,4 @@
-"""Cross-sheet offline contracts for the eight pinion-cluster drawings."""
+"""Cross-sheet offline contracts for the pinion-cluster drawings."""
 
 from __future__ import annotations
 
@@ -16,9 +16,11 @@ import pinion_bracket_spec
 import pinion_cam_pin_spec
 import pinion_cam_spec
 import pinion_handle_spec
+import pinion_lever_pin_spec
 import pinion_lever_spec
 import pinion_pivot_shaft_spec
 import pinion_spring_spec
+import post_mount_screw_spec
 from _buildgraph import module_deps_of
 
 
@@ -29,6 +31,7 @@ SHEETS = (
     ("pinion-cam-pin", pinion_cam_pin_spec),
     ("pinion-handle", pinion_handle_spec),
     ("pinion-lever", pinion_lever_spec),
+    ("pinion-lever-pin", pinion_lever_pin_spec),
     ("pinion-pivot-shaft", pinion_pivot_shaft_spec),
     ("pinion-spring", pinion_spring_spec),
 )
@@ -98,6 +101,7 @@ def test_drawing_notes_do_not_change_the_drive_train_recipe() -> None:
         for path in module_deps_of(scripts / "build_drive_train_assembly.py")
     }
     drawing_only = {
+        "pinion_arbor_spec.py",
         "pinion_cam_spec.py",
         "pinion_cam_pin_spec.py",
         "pinion_handle_spec.py",
@@ -106,6 +110,7 @@ def test_drawing_notes_do_not_change_the_drive_train_recipe() -> None:
     }
     assert deps.isdisjoint(drawing_only)
     assert {
+        "pinion_arbor_geometry.py",
         "pinion_cam_geometry.py",
         "pinion_cam_pin_geometry.py",
         "pinion_handle_geometry.py",
@@ -234,6 +239,14 @@ def _annulus_limit(major_d: float, tap_d: float, length: float) -> float:
     return 1.10 * math.pi * (major_d**2 - tap_d**2) * length / 4.0
 
 
+def _press_fit_shell_limit(
+    outer_d: float,
+    bore_d: float,
+    host_chord: float,
+) -> float:
+    return math.pi * (outer_d**2 - bore_d**2) * host_chord / 4.0
+
+
 def _expected_numbered_pairs(
     first_stem: str,
     numbers: Iterable[int],
@@ -316,6 +329,34 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("fillister-screw-1", "crank-arm-1")): _annulus_limit(
                 2.8448, 2.261, 5.33
             ),
+            # MHA-139 #8-32 major 4.166 in the #29 tap drill 3.454: 6.5 of
+            # full thread past the 1.5 relief plus the 0.5 lead cone.
+            frozenset(("crank-handle-pivot-screw-1", "crank-arm-1")): _annulus_limit(
+                4.166, 3.454, 7.0
+            ),
+            # U30 I22: each MHA-142 1/4-20 in its #7 MHA-091 tap, its cut
+            # length past the post's grip deep.
+            **_expected_numbered_pairs(
+                "post-mount-screw",
+                (1, 2),
+                "cone-swing-platform",
+                6.35,
+                5.105,
+                post_mount_screw_spec.CUT_LENGTH_MM - post_mount_screw_spec.GRIP_MM,
+            ),
+            # R1: MHA-058 is a bonded slip fit modelled line to line in the
+            # MHA-102 cross-hole, so the pair needs no interference allowance.
+            # #743 Q3: MHA-147 #4-40 x 1/4 in each pedestal crown tap (the
+            # _hole_spec major 2.845 in the #43 tap drill, over its length).
+            **_expected_numbered_pairs(
+                "arbor-set-screw",
+                range(1, 3),
+                "arbor-pedestal",
+                2.845,
+                2.261,
+                6.35,
+                second_number=None,
+            ),
         },
         "frame": {
             **_expected_numbered_pairs(
@@ -324,7 +365,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "harmonic-base",
                 6.35,
                 5.105,
-                9.2471875,
+                12.4221875,
             ),
             # MHA-132 / 90280A837: #10-32 major 4.826, #21 drill 4.0386.
             # The 44.45-mm shank crosses a 25.5-mm socket. Its shortest
@@ -505,7 +546,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "frame-1/harmonic-base",
                 4.1656,
                 3.454,
-                6.65,
+                11.25,  # rule 12 E10: #8-32 x 1-1/4 through the 20.5 block
             ),
             **_expected_numbered_pairs(
                 "drive-train-1/foot-screw",
@@ -515,13 +556,14 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 2.261,
                 8.725,
             ),
+            # U34c: MHA-143 #8-32 x 3/4 through the 5.0 pedestal ledge.
             **_expected_numbered_pairs(
-                "drive-train-1/foot-screw",
-                range(2, 4),
+                "drive-train-1/pedestal-hold-down-screw",
+                range(1, 3),
                 "frame-1/harmonic-base",
-                2.8448,
-                2.261,
-                4.525,
+                4.1656,
+                3.454,
+                14.05,
             ),
             **_expected_numbered_pairs(
                 "channel-1/frame-side-screw",
@@ -533,16 +575,19 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
         },
     }
+    # U27 (Main, 2026-09-23): the follower studs slip line-to-line into
+    # their H7 seats and are bonded, so the drive train allows them NO
+    # overlap -- the former press allowance is gone.
     cam_pairs = {
         frozenset(("pinion-bracket-1", "pinion-cam-pin-1")),
         frozenset(("pinion-bracket-2", "pinion-cam-pin-2")),
     }
     crank_pairs = {
-        frozenset(("crank-pin-1", "crank-arm-1")),
+        frozenset(("crank-pin-1", "crank-hub-1")),
         frozenset(("crank-pin-1", "crankshaft-1")),
     }
     special_pairs = {
-        "drive-train": cam_pairs | crank_pairs,
+        "drive-train": crank_pairs,
     }
     for name, expected_threaded in threaded_by_assembly.items():
         allowed = _interference_contracts.allowed_interference_pairs(name)
@@ -552,13 +597,16 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             assert allowed[pair] == pytest.approx(expected_limit)
         assert all(limit > 0.0 and math.isfinite(limit) for limit in allowed.values())
 
-    cam_limits = {
-        _interference_contracts.allowed_interference_pairs("drive-train")[pair]
-        for pair in cam_pairs
-    }
-    assert len(cam_limits) == 1
-    assert 0.40 < cam_limits.pop() < 0.45
+    drive_train_allowed = _interference_contracts.allowed_interference_pairs(
+        "drive-train"
+    )
+    assert not cam_pairs & set(drive_train_allowed)
     crank_allowed = _interference_contracts.allowed_interference_pairs("drive-train")
-    assert all(60.0 < crank_allowed[pair] < 65.0 for pair in crank_pairs)
+    hub_pair = frozenset(("crank-pin-1", "crank-hub-1"))
+    shaft_pair = frozenset(("crank-pin-1", "crankshaft-1"))
+    # The U29 hub barrel (Ø25.4) sets the MHA-024 pilot spans: a longer hub
+    # chord, and the shaft crossing further down the taper.
+    assert 136.0 < crank_allowed[hub_pair] < 137.0
+    assert 53.0 < crank_allowed[shaft_pair] < 54.0
     assert _interference_contracts.allowed_interference_pairs("channel") == {}
     assert _interference_contracts.allowed_interference_pairs("unknown") == {}

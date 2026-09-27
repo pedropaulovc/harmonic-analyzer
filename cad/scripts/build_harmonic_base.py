@@ -39,11 +39,13 @@ from _common import (
     PANEL_BLACK,
     SketchDims,
     _early_bound,
+    _read_member,
     add_line_chain,
     anchor_point_to_origin,
     apply_color,
     apply_material,
     bbox_extent_check,
+    blank_sketch,
     check,
     define_circle,
     define_rectilinear_chain,
@@ -54,6 +56,7 @@ from _common import (
     force_rebuild,
     name_last_feature,
     name_dimensions,
+    OUT_PNG,
     REFERENCES_DIR,
     report_mass_properties,
     run_build,
@@ -72,12 +75,12 @@ from _drawing_marks import (
 from _holes import (
     DRILL_POINT_H,
     THREAD_MAJOR_MM,
-    TAP_DRILL_MM,
     HoleSpec,
     blind_cut_dia_mm,
     blind_hole_volume_mm3,
     wizard_holes,
 )
+from _fit_limits import deviations
 from _part_pmi import _resolve_faces, author_part_pmi
 from harmonic_base_spec import (
     BOTTOM_LENGTH,
@@ -89,7 +92,6 @@ from harmonic_base_spec import (
     DRAWING_PRECISION,
     LIP_H,
     LIP_W,
-    DRAWING_NOTES,
     PART_SURFACE_FINISHES,
     SOCKET_BORE_FINISHES,
     SPOTFACE_DEPTH_BAND_MM,
@@ -103,48 +105,71 @@ from cone_pivot_post_installation import (
     FRAME_FRONT_COLUMN_Z,
     MECHANISM_X_SHIFT,
     MECHANISM_Z_SHIFT,
-    POST_X_SHIFT,
-    POST_Z_SHIFT,
 )
-from build_cone_pivot_screw import (
+from cone_line import PIVOT_XZ as PIVOT_SCREW_XZ
+from cone_pivot_screw_spec import (
     THREAD as PIVOT_THREAD,
     THREAD_TAIL_LEN as PIVOT_THREAD_ENGAGEMENT,
 )
-from build_cone_lock_knob import (
+from cone_lock_knob_spec import (
     COLLAR_DIA as LOCK_COLLAR_DIA,
     PLUG_TAP_LEAD as LOCK_PLUG_TAP_LEAD,
     STUD_BOTTOM_CLEARANCE as LOCK_STUD_BOTTOM_CLEARANCE,
     STUD_LEN as LOCK_STUD_LEN,
     THREAD as LOCK_THREAD,
 )
-from build_cone_swing_platform import PLATE_T, swing_hardware_geometry
-from build_swing_stop_screw import (
+from cone_swing_platform_geometry import PLATE_T, swing_hardware_geometry
+from swing_stop_screw_spec import (
     SHANK_DIA as STOP_SHANK_DIA,
     THREAD as STOP_THREAD,
 )
-from build_slotted_screw import SHANK_LEN as BLOCK_SCREW_LEN
-from build_foot_screw import SHANK_LEN as FOOT_SCREW_LEN
-from build_fillister_screw import SHANK_LEN as NAMEPLATE_SCREW_LEN
-from build_swing_stop_screw import EMBED_LEN as STOP_ENGAGEMENT
-from build_lag_screw import (
-    BEARING_OFFSET as HOLD_DOWN_BEARING_OFFSET,
-    SHANK_LEN as HOLD_DOWN_SCREW_LEN,
+from slotted_screw_spec import SHANK_LEN as BLOCK_SCREW_LEN
+from foot_screw_spec import SHANK_LEN as FOOT_SCREW_LEN
+from fillister_screw_spec import SHANK_LEN as NAMEPLATE_SCREW_LEN
+from swing_stop_screw_spec import EMBED_LEN as STOP_ENGAGEMENT
+from pinion_pivot_block_geometry import BLOCK_HEIGHT
+from pinion_rig_layout import BLOCK_SEAT_Z, SPRING_Z
+from pinion_spring_section import THICK as SPRING_THICKNESS
+from arbor_pedestal_spec import (
+    SCREW_Z as PEDESTAL_LEDGE_SCREW_Z,
+    STRAP_INNER_Z as PEDESTAL_STRAP_INNER_Z,
 )
-from pinion_pivot_block_spec import BLOCK_HEIGHT
-from pinion_spring_geometry import THICK as SPRING_THICKNESS
-from arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS
-from build_rocker_arm_support import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
 from rocker_arm_support_spec import SUPPORT_HOLD_DOWN_XZ
+from harmonic_base_fasteners import (
+    BASE_CROSS_TAP_DRILL_DIA,
+    BASE_CROSS_TAP_SPEC,
+    HOLD_DOWN_BEARING_OFFSET,
+    HOLD_DOWN_DRILL_DEPTH,
+    HOLD_DOWN_ENGAGEMENT,
+    HOLD_DOWN_PITCH,
+    HOLD_DOWN_SEAT_SPEC,
+    HOLD_DOWN_TAP_DRILL_DIA,
+    HOLD_DOWN_THREAD,
+    HOLD_DOWN_THREAD_DEPTH,
+    NAMEPLATE_SCREW_DRILL_DEPTH,
+    NAMEPLATE_SCREW_HOLE_DEPTH,
+    NAMEPLATE_SCREW_XZ,
+    PEDESTAL_SCREW_ENGAGEMENT,
+    SEAT_DEPTH_BAND,
+    SEAT_DEPTH_STEP,
+    SEAT_TIP_RESERVE,
+    SUPPORT_FOOT_THICKNESS,
+    seat_drill_depth,
+    seat_thread_depth,
+    title_block_band_mm,
+)
 from frame_attachment_spec import (
     BASE_SCREW_SEAT_Z,
     BASE_SCREW_Y,
-    CASTING_FULL_THREAD_DEPTH,
     CASTING_TAP_DRILL_DEPTH,
     COLUMN_SOCKET_DEPTH,
     COLUMN_SOCKET_DIAMETER,
     SCREW_SPOTFACE_DIAMETER,
 )
+from frame_column_stations import COLUMN_SOCKET_MATCH_BORE_MAX
 from _visibility import blank_reference_geometry
+
+import _config
 
 import _telemetry
 
@@ -201,52 +226,12 @@ IN = 25.4
 # tubes, not to a fixed diameter band.
 BASE_SPOTFACE_PLANE_Z = TOP_WIDTH / 2.0
 BASE_SPOTFACE_DEPTH = BASE_SPOTFACE_PLANE_Z - BASE_SCREW_SEAT_Z
-BASE_CROSS_TAP_SPEC = HoleSpec(
-    "tapped_bottoming",
-    "#10-32",
-    end="blind",
-    depth_mm=CASTING_TAP_DRILL_DEPTH,
-    thread_class="2B",
-    overrides_mm={"ThreadDepth": CASTING_FULL_THREAD_DEPTH},
-)
-BASE_CROSS_TAP_DRILL_DIA = TAP_DRILL_MM[BASE_CROSS_TAP_SPEC.size]
 BASE_SCREW_FACES = (("front", -1.0, True), ("rear", 1.0, False))
+
+
 if BASE_SPOTFACE_DEPTH <= 0.0:
     raise AssertionError("base cross-screw spotface must cut inward from the side")
-if CASTING_TAP_DRILL_DEPTH - CASTING_FULL_THREAD_DEPTH < 2.0 * 25.4 / 32.0:
-    raise AssertionError("base cross tap lacks two-pitch bottoming-tap lead")
 
-# Rocker-support hold-down seats (machine = part-local: frame.SLDASM places the
-# base unrotated at the origin). The support contract transforms its unchanged
-# four-hole foot pattern through the +90-degree installation and the v2 rear
-# shift. Base, support, and frame therefore cannot carry drifting copies.
-#
-# The selected 1/4-20 x 5/8 screw bears on the bottom of its vendor-modeled
-# 0.277813 mm under-head washer transition. That physical bearing face crosses
-# the 6.35 mm support foot and leaves 9.247187 mm (1.456D) of engagement in
-# this base. Usable full thread extends 0.25 mm beyond the screw tip so it
-# cannot bottom before the head seats. A machine plug tap then needs four lead
-# threads plus one pitch of margin: cylindrical tap-drill depth = full-thread
-# depth + 5P = 15.847187 mm. Keep all three lengths explicit; they are
-# different assembly/manufacturing constraints.
-HOLD_DOWN_THREAD = "1/4-20"
-HOLD_DOWN_THREAD_CLASS = "2B"
-HOLD_DOWN_PITCH = IN / 20.0
-HOLD_DOWN_ENGAGEMENT = (
-    HOLD_DOWN_SCREW_LEN - SUPPORT_FOOT_THICKNESS - HOLD_DOWN_BEARING_OFFSET
-)
-HOLD_DOWN_TIP_CLEARANCE = 0.25
-HOLD_DOWN_THREAD_DEPTH = HOLD_DOWN_ENGAGEMENT + HOLD_DOWN_TIP_CLEARANCE
-HOLD_DOWN_DRILL_DEPTH = HOLD_DOWN_THREAD_DEPTH + 5.0 * HOLD_DOWN_PITCH
-HOLD_DOWN_SEAT_SPEC = HoleSpec(
-    "tapped",
-    HOLD_DOWN_THREAD,
-    end="blind",
-    depth_mm=HOLD_DOWN_DRILL_DEPTH,
-    thread_class=HOLD_DOWN_THREAD_CLASS,
-    overrides_mm={"ThreadDepth": HOLD_DOWN_THREAD_DEPTH},
-)
-HOLD_DOWN_TAP_DRILL_DIA = blind_cut_dia_mm(HOLD_DOWN_SEAT_SPEC)
 HOLE_XZ = SUPPORT_HOLD_DOWN_XZ
 
 # Edge finishing (chamfer external, fillet internal; legacy 1/8-1/16 sizes).
@@ -308,12 +293,8 @@ SERIAL_AREA_MM2 = 3.1029  # pinned from gen_base_serial_dxf's summary (net glyph
 
 # Cone swing hardware, blind from the TOP face. MACHINE-handed part coords.
 # The platform recipe owns the shared lock/stop contact calculation; the base
-# supplies its installed pivot station and exact purchased-hardware diameters.
-_FORMER_PIVOT_SCREW_XZ = (-89.16663981674521, 60.60437088764276)
-PIVOT_SCREW_XZ = (
-    _FORMER_PIVOT_SCREW_XZ[0] + POST_X_SHIFT,
-    _FORMER_PIVOT_SCREW_XZ[1] + POST_Z_SHIFT,
-)
+# supplies its installed pivot station (cone_line.PIVOT_XZ, the swing pivot
+# on the cone journal line) and exact purchased-hardware diameters.
 SWING_HARDWARE_GEOMETRY = swing_hardware_geometry(
     PIVOT_SCREW_XZ,
     lock_collar_dia=LOCK_COLLAR_DIA,
@@ -323,75 +304,107 @@ LOCK_KNOB_XZ = SWING_HARDWARE_GEOMETRY.lock_xz
 STOP_SCREW_XZ = SWING_HARDWARE_GEOMETRY.stop_xz
 
 # Blind #10-24 UNC-2B bottoming tap: only the 9.525-mm threaded tail enters.
-# Full threads extend 0.25 past the tip; the 12-mm cylindrical drill leaves
-# 2.225 mm for the bottoming tap's two-pitch lead before the drill point.
-PIVOT_THREAD_BOTTOM_CLEARANCE = 0.25
-PIVOT_SCREW_HOLE_DEPTH = PIVOT_THREAD_ENGAGEMENT + PIVOT_THREAD_BOTTOM_CLEARANCE
-PIVOT_SCREW_DRILL_DEPTH = 12.0
+# Sized at the printed worst case: full threads clear the tip by 0.25 at
+# their low limit, and the drill keeps the bottoming tap's two-pitch lead.
+PIVOT_SCREW_HOLE_DEPTH = seat_thread_depth(PIVOT_THREAD_ENGAGEMENT)
+PIVOT_SCREW_DRILL_DEPTH = seat_drill_depth(
+    PIVOT_SCREW_HOLE_DEPTH, PIVOT_THREAD, "tapped_bottoming"
+)
 
 # The 19.05-mm stock stud enters 12.70 through the platform, or its full
 # length when the collar fences the disengaged notch on the bare base.
-# Full threads clear that deepest pose by 0.25; a five-pitch plug-tap lead
-# fits below them, before the separate 118-degree drill point.
+# Full threads clear that deepest pose by 0.25 at their printed low limit;
+# a five-pitch plug-tap lead fits below them, before the drill point.
 LOCK_STUD_ENGAGEMENT = LOCK_STUD_LEN - PLATE_T
-LOCK_SCREW_HOLE_DEPTH = LOCK_STUD_LEN + LOCK_STUD_BOTTOM_CLEARANCE
-LOCK_SCREW_DRILL_DEPTH = LOCK_SCREW_HOLE_DEPTH + LOCK_PLUG_TAP_LEAD
+LOCK_SCREW_HOLE_DEPTH = seat_thread_depth(LOCK_STUD_LEN)
+LOCK_SCREW_DRILL_DEPTH = seat_drill_depth(LOCK_SCREW_HOLE_DEPTH, LOCK_THREAD, "tapped")
+if LOCK_SCREW_HOLE_DEPTH - SEAT_DEPTH_BAND - LOCK_STUD_LEN < LOCK_STUD_BOTTOM_CLEARANCE:
+    raise AssertionError("cone lock seat loses the knob's stud clearance at its low limit")
+if LOCK_SCREW_DRILL_DEPTH - LOCK_SCREW_HOLE_DEPTH < LOCK_PLUG_TAP_LEAD:
+    raise AssertionError("cone lock seat drill loses the knob's plug-tap lead")
 
 # The shared 25.4-mm stock stop keeps its original 9.875-mm exposed height.
-# A 16-mm full thread clears the 15.525-mm embed; 4 mm below it accommodates
-# the #8-32 plug tap's five-pitch lead (3.96875), before the drill point.
-STOP_SCREW_HOLE_DEPTH = 16.0
-STOP_SCREW_DRILL_DEPTH = 20.0
+# Its full thread clears the 15.525-mm embed at the printed low limit; the
+# drill keeps the #8-32 plug tap's five-pitch lead below the high limit.
+STOP_SCREW_HOLE_DEPTH = seat_thread_depth(STOP_ENGAGEMENT)
+STOP_SCREW_DRILL_DEPTH = seat_drill_depth(STOP_SCREW_HOLE_DEPTH, STOP_THREAD, "tapped")
 
 # Alignment-pinion rig hold-downs, blind from the TOP face in the same
 # machine-handed convention: four #8-32 seats under the two pivot blocks
-# (2026-09 short-strap rig, the blocks right under the drum) and three #4-40
-# seats under the spring foot and both arbor-pedestal flanges.
-_FORMER_BLOCK_SCREW_XZ = (
-    (-13.669764612476252, -98.0),  # front block, east screw
-    (13.33023538752375, -98.0),  # front block, west screw
-    (-13.669764612476252, 82.0),  # back block, east screw
-    (13.33023538752375, 82.0),  # back block, west screw
-)
+# and one #4-40 seat under the spring foot (the arbor pedestals moved to their
+# own #8-32 group, PEDESTAL_SCREW_XZ, with U34c).
+# The block and spring seats follow the user-authoritative 32T rig's parked
+# tip gap (U28, 2026-09-23: 2.2425, the park-out that seats the 120T tips at
+# the drum's base-circle root) and the U28 block re-layout -- screws +-8.5
+# about the pivot bore, block mid-depth 5.125 in from each outer face; the
+# drum-axis pedestal seats remain unchanged.  Ruling (c) (user, 2026-09-24):
+# the block and spring-foot z stations are pinion_rig_layout's -- the front
+# block stands one feeler off the front strap, the spring rides 0.8 aft.
+_FORMER_BLOCK_SCREW_X = (-17.226441649810653, -0.22644164981065273)  # east, west
 BLOCK_SCREW_XZ = tuple(
-    (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_BLOCK_SCREW_XZ
+    (x + MECHANISM_X_SHIFT, z) for z in BLOCK_SEAT_Z for x in _FORMER_BLOCK_SCREW_X
 )
-# Stock 25.4-mm slotted screws penetrate 6.65 mm below each 18.75-mm block.
-BLOCK_SCREW_HOLE_DEPTH = 6.9  # stock engagement + 0.25 tip reserve
-BLOCK_SCREW_DRILL_DEPTH = 10.0
-# Bottoming tap: 3.1 mm runout exceeds two #8-32 pitches (1.5875 mm).
+# Rule 12 (audit E10): stock 31.75-mm (#8-32 x 1-1/4) slotted screws penetrate
+# 11.25 mm below each 20.5-mm block -- 10.74 = 2.58D at the BlockHeight .XX
+# band.  The full-thread depth keeps the screw off the bottom at the worst
+# case (12.75 - 0.8 .X depth band >= 11.25 + 0.51 block band, 0.19 spare).
+BLOCK_SCREW_HOLE_DEPTH = 12.75
+# The drill keeps the bottoming tap's two #8-32 pitches (1.5875 mm) past the
+# deepest printed thread; 15.0 left 1.23 at the .XX worst case.
+BLOCK_SCREW_DRILL_DEPTH = seat_drill_depth(
+    BLOCK_SCREW_HOLE_DEPTH, "#8-32", "tapped_bottoming"
+)
 _FORMER_FOOT_SCREW_XZ = (
-    (13.179270253802283, 70.95),  # spring foot: 28 reach keeps its screw head
-    # clear of the unchanged rocker-arm-support casting after the rig recenter
-    (-54.7, -95.5),  # south arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
-    (-54.7, 102.5),  # NORTH arbor-pedestal flange (PR8, ch12 img09: the
-    # mirrored base-standing clamp at z 97.5; ry180 flips its flange to +z)
+    # spring foot: 20.0 EAST of the swing pivot bore (the east block screw
+    # is 8.5 east of it), outboard of the back strap (re-derived 2026-09-24;
+    # pinion_spring_geometry.SCREW_EAST_OF_PIVOT, the drive train asserts it;
+    # z: pinion_rig_layout)
+    (_FORMER_BLOCK_SCREW_X[0] + 8.5 - 20.0, SPRING_Z - MECHANISM_Z_SHIFT),
 )
 FOOT_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_FOOT_SCREW_XZ
 )
-# The stock 9.525-mm foot screw penetrates 8.725 mm below the 0.8-mm spring.
-FOOT_SCREW_HOLE_DEPTH = 8.975  # stock engagement + 0.25 tip reserve
-FOOT_SCREW_DRILL_DEPTH = 11.0
-# Bottoming tap: 2.025 mm runout exceeds two #4-40 pitches (1.27 mm).
+# The stock 9.525-mm foot screw penetrates 9.025 mm below the 0.5-mm spring;
+# the seat is sized at its printed worst case for a #4-40 bottoming tap.
+FOOT_SCREW_HOLE_DEPTH = seat_thread_depth(FOOT_SCREW_LEN - SPRING_THICKNESS)
+FOOT_SCREW_DRILL_DEPTH = seat_drill_depth(
+    FOOT_SCREW_HOLE_DEPTH, "#4-40", "tapped_bottoming"
+)
 
-# Maker's nameplate seats (2026-09-02 ch26 p.71 re-derive: four brass slotted
-# fillister-head screws hold the plate at its corners), blind from the TOP face
-# like the other seats. The stations are the plate's four corner screw holes
-# (nameplate_spec.SCREW_XY, plate-local) carried through the plate's mount
-# transform into the machine frame -- nameplate_spec.MOUNT_HOLE_XZ, the ONE
-# derivation the frame assembly's screw drops read too:
-# (209.75, +/-45.5) and (163.75, +/-45.5). The plate is anchored to the pad's
-# east edge, not to the mechanism, so unlike the swing/rig seats no
-# MECHANISM/POST shift applies (no _FORMER_ twin). The plate lies flat on the
-# deck (its back face at STACK_HEIGHT, gap 0 -- asserted below), so each
-# screw axis runs -Y straight from the plate's front face into the deck.
-NAMEPLATE_SCREW_XZ = nameplate_spec.MOUNT_HOLE_XZ
-# The stock brass fillister's 6.35-mm shank passes through the 1.5-mm plate,
-# engaging 4.85 mm of the existing 6.0-mm #4-40 thread. The drill extends
-# 3.0 mm deeper for the bottoming tap's two-pitch lead (1.27 mm).
-NAMEPLATE_SCREW_HOLE_DEPTH = 6.0
-NAMEPLATE_SCREW_DRILL_DEPTH = 9.0
+# U34c (dt-bank-pedestal-layout-20260923 rev 3, H1): one MHA-143 #8-32 x 3/4
+# fillister holds each arbor pedestal through its ledge hole. Machine frame,
+# like NAMEPLATE_SCREW_XZ (no _FORMER_ twin; the mechanism shift is already in
+# the drive train's stations): the drum axis x, and z = each strap inner face
+# -+ the 19.0 from that face to the ledge hole. The strap faces are the
+# cylinder bank's own stack (#743, cylinder_bank_layout FRONT/BACK
+# _STRAP_INNER_Z). The seats are TRANSFERRED from the fitted pedestals at
+# assembly, so the print gives no position. These are literals because the
+# base cannot import the drive train (it imports the base), and importing the
+# bank layout would make the frame read machine/channels.yaml (its station
+# ladder; test_config_deps_recipe_digest_skips_unread_yaml); the drive train
+# asserts them against its own derivation within 0.05 and
+# test_drive_train_support_layout pins them within 0.005.
+_DRUM_AXIS_X = -54.7 + MECHANISM_X_SHIFT
+_PEDESTAL_STRAP_FACE_Z = (-71.519, 73.062)
+_PEDESTAL_LEDGE_OFFSET = PEDESTAL_STRAP_INNER_Z - PEDESTAL_LEDGE_SCREW_Z  # 19.0
+PEDESTAL_SCREW_XZ = (
+    (_DRUM_AXIS_X, _PEDESTAL_STRAP_FACE_Z[0] - _PEDESTAL_LEDGE_OFFSET),
+    (_DRUM_AXIS_X, _PEDESTAL_STRAP_FACE_Z[1] + _PEDESTAL_LEDGE_OFFSET),
+)
+# Rule 12 (audit E15), judged at the printed worst case: flange 5.0 +-0.8,
+# screw 19.05 +0/-0.76 (B18.6.3), these depths +-0.8 (.X). The longest screw
+# in the thinnest flange reaches 14.85; 16.0 - 0.8 keeps it 0.35 off the
+# incomplete threads (>= 0.25 tip reserve). The drill keeps two #8-32 pitches
+# of bottoming-tap lead beyond the deepest thread at the worst case too:
+# 19.5 - 0.8 >= 16.0 + 0.8 + 1.5875. Minimum engagement 12.49 = 3.0D.
+PEDESTAL_SCREW_HOLE_DEPTH = 16.0
+PEDESTAL_SCREW_DRILL_DEPTH = 19.5
+# A transferred seat lands where the fitted pedestal stands, within the
+# study's +-2 x / +-5 z fit-up bound of nominal; the wall checks book it.
+PEDESTAL_TRANSFER_ENVELOPE = math.hypot(2.0, 5.0)
+
+# Maker's nameplate seats: stations and depths in harmonic_base_fasteners.
+# The plate lies flat on the deck, so its seats are cut from the deck face.
 if abs(nameplate_spec.MOUNT_BACK_Y - STACK_HEIGHT) > 1e-9:
     raise AssertionError(
         f"nameplate back face y {nameplate_spec.MOUNT_BACK_Y} is not on the deck "
@@ -464,6 +477,27 @@ FOOT_SEAT_SPEC = HoleSpec(
     thread_class="2B",
     overrides_mm={"ThreadDepth": FOOT_SCREW_HOLE_DEPTH},
 )
+PEDESTAL_SEAT_SPEC = HoleSpec(
+    "tapped_bottoming",
+    "#8-32",
+    end="blind",
+    depth_mm=PEDESTAL_SCREW_DRILL_DEPTH,
+    thread_class="2B",
+    overrides_mm={"ThreadDepth": PEDESTAL_SCREW_HOLE_DEPTH},
+)
+# Rule 12 (E15) at the printed worst case, not just the nominal the stock-fit
+# guard checks: the shallowest drill still keeps two pitches of bottoming-tap
+# lead past the deepest thread (the reach side is asserted by the drive train
+# against BASE_PEDESTAL_HOLE_DEPTH).
+_PEDESTAL_DEPTH_BAND = 0.8  # .X
+_PEDESTAL_TAP_LEAD = 2 * 25.4 / float(PEDESTAL_SEAT_SPEC.size.rsplit("-", 1)[1])
+if (
+    PEDESTAL_SCREW_DRILL_DEPTH - _PEDESTAL_DEPTH_BAND
+    < PEDESTAL_SCREW_HOLE_DEPTH + _PEDESTAL_DEPTH_BAND + _PEDESTAL_TAP_LEAD
+):
+    raise AssertionError(
+        "pedestal hold-down drill loses the bottoming-tap lead at the worst case"
+    )
 NAMEPLATE_SEAT_SPEC = HoleSpec(
     "tapped_bottoming",
     "#4-40",
@@ -477,6 +511,7 @@ LOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(LOCK_SEAT_SPEC)
 STOP_SCREW_HOLE_DIA = blind_cut_dia_mm(STOP_SEAT_SPEC)
 BLOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(BLOCK_SEAT_SPEC)
 FOOT_SCREW_HOLE_DIA = blind_cut_dia_mm(FOOT_SEAT_SPEC)
+PEDESTAL_SCREW_HOLE_DIA = blind_cut_dia_mm(PEDESTAL_SEAT_SPEC)
 NAMEPLATE_SCREW_HOLE_DIA = blind_cut_dia_mm(NAMEPLATE_SEAT_SPEC)
 
 # Socket cylinders occupy Y=25.4..50.8, overlapping the deepest vertical-seat
@@ -492,6 +527,7 @@ COLUMN_SOCKET_NEAREST_OCCUPANT_WALL = min(
         ((STOP_SCREW_XZ,), STOP_SCREW_HOLE_DIA),
         (BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
         (FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DIA),
+        (PEDESTAL_SCREW_XZ, PEDESTAL_SCREW_HOLE_DIA),
         (NAMEPLATE_SCREW_XZ, NAMEPLATE_SCREW_HOLE_DIA),
     )
     for occupant in occupants
@@ -500,12 +536,11 @@ if COLUMN_SOCKET_NEAREST_OCCUPANT_WALL < 1.0:
     raise AssertionError(
         "base column socket leaves less than 1 mm wall to another base cavity"
     )
-# Nominal model-space sanity only: this does not validate manufactured
-# tolerance combinations. DRAWING_NOTES governs finished-part land acceptance.
-# TOP_WIDTH is sized so this land is EQUAL on both axes: the 2026-09 blind
-# machinist review rejected the former 10.5 in pad, whose 1.6 mm land in Z
-# could not survive the coordinate stack behind the 1.0 MIN finished-land
-# note while every table dimension stayed in tolerance.
+# Nominal model-space land; its worst case is proven below. TOP_WIDTH is
+# sized so this land is EQUAL on both axes: the 2026-09 blind machinist
+# review rejected the former 10.5 in pad, whose 1.6 mm land in Z could not
+# survive the coordinate stack while every table dimension stayed in
+# tolerance.
 COLUMN_SOCKET_LAND_X = min(
     TOP_LENGTH / 2.0 - LIP_W - abs(x) - COLUMN_SOCKET_DIAMETER / 2.0
     for x, _z in COLUMN_SOCKET_XZ
@@ -523,11 +558,97 @@ if abs(COLUMN_SOCKET_LAND_X - COLUMN_SOCKET_LAND_Z) > 1e-9:
 if COLUMN_SOCKET_RIM_CLEARANCE < 1.0:
     raise AssertionError("base column socket crowds the raised rim")
 
+# The finished deck land between each bore and the rim inner face must stay
+# 1.0 wide and continuous (2026-09 blind machinist review). It used to be
+# a sheet note ("1.0 MIN ... AFTER MATCHING AND EDGE BREAK"), which put a
+# dimension in a note (hb-render-4 eye pass); the stack below proves every
+# in-tolerance part meets it, so the sheet needs no note.
+COLUMN_SOCKET_LAND_MIN = 1.0
+
+
+def _general_band_mm() -> float:
+    """The title block's .X band: the loosest general tolerance it defines.
+
+    The lengths and rim width print one place; the hole-table coordinates
+    print at least one, so this band bounds every location term.
+    """
+    return title_block_band_mm("linear_1pl")
+
+
+def _edge_break_mm() -> float:
+    row = _config.title_block("edge_break")
+    return max(float(row["radius_mm"]), float(row["chamfer_max_mm"]))
+
+
+def column_socket_land_stack(nominal: float) -> dict[str, float]:
+    """Worst-case finished deck land from a bore to the rim inner face.
+
+    One axis, from its owning sources. The table locates the bore from the
+    flange edge; the rim inner face sits LIP_W in from the pad edge, and
+    the pad edge's place on the flange follows from the two printed plate
+    lengths, each of which moves one edge by half its band. The bore is
+    matched to its tube up to COLUMN_SOCKET_MATCH_BORE_MAX, and both land
+    edges take the title block's largest edge break.
+    """
+    band = _general_band_mm()
+    edge_break = _edge_break_mm()
+    return {
+        "nominal": nominal,
+        "flange length": -band / 2.0,
+        "pad length": -band / 2.0,
+        "rim width": -band,
+        "bore location": -band,
+        "matched bore": -(COLUMN_SOCKET_MATCH_BORE_MAX - COLUMN_SOCKET_DIAMETER) / 2.0,
+        "bore edge break": -edge_break,
+        "rim edge break": -edge_break,
+    }
+
+
+def _stack_text(stack: dict[str, float]) -> str:
+    terms = ", ".join(f"{name} {value:+.3f}" for name, value in stack.items())
+    return f"{terms} = {sum(stack.values()):.3f}"
+
+
+COLUMN_SOCKET_LAND_STACKS = {
+    "x": column_socket_land_stack(COLUMN_SOCKET_LAND_X),
+    "z": column_socket_land_stack(COLUMN_SOCKET_LAND_Z),
+}
+
+
+def column_socket_break_even_bore(stack: dict[str, float]) -> float:
+    """The largest matched bore for which ``stack`` still leaves the minimum
+    land: the ceiling plus twice the stack's radial slack over the minimum.
+    It shows how far COLUMN_SOCKET_MATCH_BORE_MAX, a functional judgement
+    rather than a printed or vendor limit, sits inside what the land allows.
+    """
+    return COLUMN_SOCKET_MATCH_BORE_MAX + 2.0 * (
+        sum(stack.values()) - COLUMN_SOCKET_LAND_MIN
+    )
+
+
+COLUMN_SOCKET_BREAK_EVEN_BORE = min(
+    column_socket_break_even_bore(stack) for stack in COLUMN_SOCKET_LAND_STACKS.values()
+)
+for _axis, _stack in COLUMN_SOCKET_LAND_STACKS.items():
+    if sum(_stack.values()) < COLUMN_SOCKET_LAND_MIN:
+        raise AssertionError(
+            f"base deck land ({_axis}), worst case: {_stack_text(_stack)} "
+            f"< {COLUMN_SOCKET_LAND_MIN}; break-even matched bore "
+            f"{column_socket_break_even_bore(_stack):.2f} is under the "
+            f"{COLUMN_SOCKET_MATCH_BORE_MAX} ceiling"
+        )
+
 
 def require_blind_seat_fit(
-    label: str, seat: HoleSpec, engagement: float, *, tip_reserve: float = 0.25
+    label: str,
+    seat: HoleSpec,
+    engagement: float,
+    *,
+    tip_reserve: float = SEAT_TIP_RESERVE,
+    band: float = SEAT_DEPTH_BAND,
 ) -> None:
-    """Keep a stock screw in full threads above a manufacturable tap lead."""
+    """Keep a stock screw in full threads above a manufacturable tap lead,
+    with both printed depths at the worst case of their ``band``."""
     if seat.kind not in ("tapped", "tapped_bottoming") or seat.end != "blind":
         raise AssertionError(f"{label}: base seat must be a native blind tap")
     thread_depth = seat.overrides_mm.get("ThreadDepth", seat.depth_mm)
@@ -540,23 +661,35 @@ def require_blind_seat_fit(
         raise AssertionError(
             f"{label}: engagement and depths must be finite and positive"
         )
-    if engagement < THREAD_MAJOR_MM[seat.size]:
+    diameter = THREAD_MAJOR_MM[seat.size]
+    if engagement < diameter:
         raise AssertionError(
             f"{label}: less than one diameter of full-thread engagement"
         )
-    if thread_depth - engagement < tip_reserve - 1e-9:
-        raise AssertionError(f"{label}: screw bottoms before seating in full threads")
+    if engagement < 1.5 * diameter - 1e-9:
+        raise AssertionError(
+            f"{label}: screw engages {engagement / diameter:.3f}D, under 1.5D"
+        )
+    if thread_depth - band < 1.5 * diameter - 1e-9:
+        raise AssertionError(
+            f"{label}: full thread {thread_depth - band:.3f} at its printed low "
+            f"limit is under 1.5D ({1.5 * diameter:.3f})"
+        )
+    if thread_depth - band - engagement < tip_reserve - 1e-9:
+        raise AssertionError(
+            f"{label}: screw bottoms before seating in full threads at the "
+            f"printed low limit ({thread_depth:.2f} - {band:.2f})"
+        )
     pitch = 25.4 / float(seat.size.rsplit("-", 1)[1])
     lead_pitches = 2.0 if seat.kind == "tapped_bottoming" else 5.0
-    if seat.depth_mm - thread_depth < lead_pitches * pitch - 1e-9:
+    if seat.depth_mm - band - (thread_depth + band) < lead_pitches * pitch - 1e-9:
         tap = "bottoming" if seat.kind == "tapped_bottoming" else "plug"
         raise AssertionError(
             f"{label}: drill lacks {lead_pitches:g}-pitch {tap}-tap lead"
         )
 
 
-# Guard the deepest installed stock insertion in all seven native seat groups.
-# The foot group also serves the thicker pedestal flange, with less insertion.
+# Guard the deepest installed stock insertion in all eight native seat groups.
 for _label, _seat, _engagement in (
     ("rocker support", HOLD_DOWN_SEAT_SPEC, HOLD_DOWN_ENGAGEMENT),
     ("cone pivot", PIVOT_SEAT_SPEC, PIVOT_THREAD_ENGAGEMENT),
@@ -564,7 +697,11 @@ for _label, _seat, _engagement in (
     ("swing stop", STOP_SEAT_SPEC, STOP_ENGAGEMENT),
     ("pinion block", BLOCK_SEAT_SPEC, BLOCK_SCREW_LEN - BLOCK_HEIGHT),
     ("spring foot", FOOT_SEAT_SPEC, FOOT_SCREW_LEN - SPRING_THICKNESS),
-    ("pedestal foot", FOOT_SEAT_SPEC, FOOT_SCREW_LEN - PEDESTAL_FLANGE_THICKNESS),
+    (
+        "pedestal hold-down",
+        PEDESTAL_SEAT_SPEC,
+        PEDESTAL_SCREW_ENGAGEMENT,
+    ),
     (
         "nameplate",
         NAMEPLATE_SEAT_SPEC,
@@ -593,6 +730,7 @@ PIVOT_NEAREST_CAVITY_WALL = min(
         ((STOP_SCREW_XZ,), STOP_SCREW_HOLE_DIA),
         (BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
         (FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DIA),
+        (PEDESTAL_SCREW_XZ, PEDESTAL_SCREW_HOLE_DIA),
         (NAMEPLATE_SCREW_XZ, NAMEPLATE_SCREW_HOLE_DIA),
     )
     for xz in points
@@ -618,6 +756,7 @@ LOCK_NEAREST_CAVITY_WALL = min(
         ((STOP_SCREW_XZ,), STOP_SCREW_HOLE_DIA),
         (BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
         (FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DIA),
+        (PEDESTAL_SCREW_XZ, PEDESTAL_SCREW_HOLE_DIA),
         (NAMEPLATE_SCREW_XZ, NAMEPLATE_SCREW_HOLE_DIA),
     )
     for xz in points
@@ -640,12 +779,52 @@ STOP_NEAREST_CAVITY_WALL = min(
         ((LOCK_KNOB_XZ,), LOCK_SCREW_HOLE_DIA),
         (BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
         (FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DIA),
+        (PEDESTAL_SCREW_XZ, PEDESTAL_SCREW_HOLE_DIA),
         (NAMEPLATE_SCREW_XZ, NAMEPLATE_SCREW_HOLE_DIA),
     )
     for xz in points
 )
 if STOP_NEAREST_CAVITY_WALL < STOP_SCREW_HOLE_DIA:
     raise AssertionError("swing-stop drill crowds another base cavity")
+
+# The transferred pedestal seats: bottom wall, and every neighbouring cavity
+# and the rim's inner face with the seat anywhere in its fit-up envelope.
+PEDESTAL_DRILL_BOTTOM_WALL = (
+    TOP_THICKNESS
+    - PEDESTAL_SCREW_DRILL_DEPTH
+    - PEDESTAL_SCREW_HOLE_DIA / 2.0 * DRILL_POINT_H
+)
+if PEDESTAL_DRILL_BOTTOM_WALL < 1.5 * PEDESTAL_SCREW_HOLE_DIA:
+    raise AssertionError(
+        "pedestal hold-down drill leaves less than 1.5 diameters of upper-pad wall"
+    )
+PEDESTAL_NEAREST_CAVITY_WALL = (
+    min(
+        math.dist(seat, xz) - (PEDESTAL_SCREW_HOLE_DIA + dia) / 2.0
+        for seat in PEDESTAL_SCREW_XZ
+        for points, dia in (
+            (HOLE_XZ, THREAD_MAJOR_MM[HOLD_DOWN_THREAD]),
+            ((PIVOT_SCREW_XZ,), PIVOT_SCREW_HOLE_DIA),
+            ((LOCK_KNOB_XZ,), LOCK_SCREW_HOLE_DIA),
+            ((STOP_SCREW_XZ,), STOP_SCREW_HOLE_DIA),
+            (BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
+            (FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DIA),
+            (NAMEPLATE_SCREW_XZ, NAMEPLATE_SCREW_HOLE_DIA),
+            (COLUMN_SOCKET_XZ, COLUMN_SOCKET_DIAMETER),
+        )
+        for xz in points
+    )
+    - PEDESTAL_TRANSFER_ENVELOPE
+)
+if PEDESTAL_NEAREST_CAVITY_WALL < PEDESTAL_SCREW_HOLE_DIA:
+    raise AssertionError("a transferred pedestal seat can crowd another base cavity")
+PEDESTAL_RIM_LAND = (
+    min(TOP_WIDTH / 2.0 - LIP_W - abs(z) for _x, z in PEDESTAL_SCREW_XZ)
+    - PEDESTAL_SCREW_HOLE_DIA / 2.0
+    - 5.0  # the z half of the fit-up envelope
+)
+if PEDESTAL_RIM_LAND < PEDESTAL_SCREW_HOLE_DIA:
+    raise AssertionError("a transferred pedestal seat can crowd the raised rim")
 
 MM3_PER_IN3 = IN**3
 
@@ -784,10 +963,7 @@ async def _paint_machined_faces_black(adapter) -> None:
     # through it (~1.3% of the cylinder), well inside the 5% band below.
     expected_areas.update(
         {
-            control.key: math.pi
-            * COLUMN_SOCKET_DIAMETER
-            * COLUMN_SOCKET_DEPTH
-            * 1e-6
+            control.key: math.pi * COLUMN_SOCKET_DIAMETER * COLUMN_SOCKET_DEPTH * 1e-6
             for control in SOCKET_BORE_FINISHES
         }
     )
@@ -801,7 +977,9 @@ async def _paint_machined_faces_black(adapter) -> None:
                 f"{expected * 1e6:.0f} (minus openings/edge breaks)"
             )
         if key not in BLACK_FINISH_KEYS:
-            _telemetry.info(f"{key} face qualified ({area * 1e6:.0f} mm^2), body colour")
+            _telemetry.info(
+                f"{key} face qualified ({area * 1e6:.0f} mm^2), body colour"
+            )
             continue
         face.MaterialPropertyValues = values
         back = tuple(float(value) for value in (face.MaterialPropertyValues or ())[:3])
@@ -810,6 +988,30 @@ async def _paint_machined_faces_black(adapter) -> None:
         ):
             raise RuntimeError(f"{key} black face colour did not persist: {back}")
         _telemetry.info(f"{key} face painted black ({area * 1e6:.0f} mm^2)")
+
+
+REFERENCE_SKETCHES = ("RimWidthReference", "HeightReference", "CrossTapReference")
+
+
+@_telemetry.traced("appearance.hide_reference_sketches")
+def _hide_reference_sketches(adapter) -> None:
+    """Blank the drawing-reference sketches and prove each one reads hidden."""
+    for name in REFERENCE_SKETCHES:
+        blank_sketch(adapter, name)
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    shown = {
+        name: visible
+        for name in REFERENCE_SKETCHES
+        # swVisibilityState_e: 1 hidden
+        if (visible := int(_read_member(part.FeatureByName(name), "Visible"))) != 1
+    }
+    if shown:
+        raise RuntimeError(f"reference sketches still visible after blanking: {shown}")
+    _telemetry.event(
+        "part.reference_sketches_hidden",
+        sketches=", ".join(REFERENCE_SKETCHES),
+        count=len(REFERENCE_SKETCHES),
+    )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -910,9 +1112,9 @@ async def build(adapter) -> dict[str, str]:
 
     # Four blind native 1/4-20 UNC-2B seats from the support deck. The screws
     # bear on their vendor-modeled under-head washer faces and pass through
-    # the support's 5/16 clearance drills: 6.35 mm foot + 9.247187 mm (1.456D)
-    # engagement, with 0.25 mm thread beyond each tip. The separate 15.847187 mm
-    # cylindrical drill depth leaves five pitches for plug-tap lead and margin.
+    # the support's 5/16 clearance drills: 6.35 mm foot + 12.422187 mm (1.956D)
+    # engagement, sized at the printed band's worst case (HOLD_DOWN_THREAD_DEPTH,
+    # HOLD_DOWN_DRILL_DEPTH) with a five-pitch plug-tap lead past the thread.
     pre_holes = await _volume(adapter)
     fastener_cut = wizard_holes(
         adapter,
@@ -980,7 +1182,13 @@ async def build(adapter) -> dict[str, str]:
             "FootScrewHoles",
             FOOT_SEAT_SPEC,
             FOOT_SCREW_XZ,
-            "foot-screw bottoming-tapped seats (#4-40)",
+            "foot-screw bottoming-tapped seat (#4-40)",
+        ),
+        (
+            "PedestalSeats",
+            PEDESTAL_SEAT_SPEC,
+            PEDESTAL_SCREW_XZ,
+            "arbor-pedestal hold-down bottoming-tapped seats (#8-32)",
         ),
         (
             "NameplateSeats",
@@ -1006,8 +1214,9 @@ async def build(adapter) -> dict[str, str]:
             )
         after = after_cut
 
-    # Four blind column sockets from the deck. Their Ø25.50 +0.05/0 limits
-    # match MHA-083's Ø25.40 +0/-0.05 OD for 0.10..0.20 diametral clearance.
+    # Four blind column sockets from the deck, nominal Ø25.50: production
+    # bores are matched to their assigned actual MHA-083 tubes, so the
+    # drawing prints the size as reference only.
     socket_plane = check(
         "create_plane column socket mouths",
         await adapter.create_plane(
@@ -1407,10 +1616,14 @@ async def build(adapter) -> dict[str, str]:
     # width is the gap between two loops of one profile, and the 40.6 spans
     # three features. Each therefore gets a hidden one-line sketch whose
     # single driving dimension IS the value, marked for drawing like any
-    # other. Construction, not hidden: a BLANKED sketch's dimensions never reach
-    # InsertModelAnnotations3 (first build failed with "geometry top view is
-    # missing model dimensions: ['RimWidth']"), while construction geometry
-    # imports normally and is never drawn in a view.
+    # other. Both are construction lines, and both are BLANKED once built:
+    # shown, the height line stood as a tick with two endpoint dots on the
+    # base's end face in every assembly render (top iso, asm round d60107b3).
+    # A blanked sketch's dimensions never reach a plain InsertModelAnnotations3
+    # (the first build failed with "geometry top view is missing model
+    # dimensions: ['RimWidth']"), so draw_harmonic_base imports them through
+    # _drawing_hidden_sketches.curate_view_dimensions, which shows each owner
+    # sketch in its own view only.
     check("create_sketch rim-width reference", await adapter.create_sketch("Top"))
     # Direct-to-DB for the geometry: this line lies ON the sketch X axis and
     # runs horizontally, so creation-time inference would snap in exactly the
@@ -1481,6 +1694,70 @@ async def build(adapter) -> dict[str, str]:
     _verify_named_dimension(
         adapter, "FlangeToRim@HeightReference", deck_top - BOTTOM_THICKNESS
     )
+
+    # The cross-tap X stations, chained from the flange's west face (the hole
+    # table's X0) to the first tap and on to the second, along the tap axis.
+    # The taps share their X with the A1-A4 bores, but the table locates only
+    # the bores, and "ON A1-A4 X CENTRES" in the tap callout was a location
+    # in a note (hb-render-4 eye pass). Chained, not baselined: the front
+    # view has one free dimension row beneath it.
+    check("create_sketch cross-tap reference", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    tap_edge_ref = check(
+        "cross-tap edge reference line",
+        await adapter.add_line(
+            -BOTTOM_LENGTH / 2.0, BASE_SCREW_Y, -COLUMN_X, BASE_SCREW_Y
+        ),
+    )
+    tap_pitch_ref = check(
+        "cross-tap pitch reference line",
+        await adapter.add_line(-COLUMN_X, BASE_SCREW_Y, COLUMN_X, BASE_SCREW_Y),
+    )
+    set_sketch_direct_db(adapter, False)
+    for line in (tap_edge_ref, tap_pitch_ref):
+        _as_construction(adapter, line)
+        check(
+            f"cross-tap reference {line} horizontal",
+            await adapter.add_sketch_constraint(line, None, "horizontal"),
+        )
+    check(
+        "cross-tap reference chain",
+        await adapter.add_sketch_constraint(
+            f"{tap_edge_ref}.end", f"{tap_pitch_ref}.start", "coincident"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{tap_edge_ref}.start",
+        f"{tap_edge_ref}.end",
+        "horizontal_distance",
+        BOTTOM_LENGTH / 2.0 - COLUMN_X,
+        "cross-tap X from flange edge",
+    )
+    await dimension_between(
+        adapter,
+        f"{tap_pitch_ref}.start",
+        f"{tap_pitch_ref}.end",
+        "horizontal_distance",
+        2.0 * COLUMN_X,
+        "cross-tap pitch",
+    )
+    await anchor_point_to_origin(
+        adapter,
+        f"{tap_edge_ref}.start",
+        -BOTTOM_LENGTH / 2.0,
+        BASE_SCREW_Y,
+        "cross-tap reference",
+    )
+    await ensure_fully_defined(adapter, "cross-tap reference sketch")
+    check("exit_sketch cross-tap reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "CrossTapReference")
+    name_dimensions(adapter, "CrossTapReference", ["CrossTapX", "CrossTapPitch"])
+    _verify_named_dimension(
+        adapter, "CrossTapX@CrossTapReference", BOTTOM_LENGTH / 2.0 - COLUMN_X
+    )
+    _verify_named_dimension(adapter, "CrossTapPitch@CrossTapReference", 2.0 * COLUMN_X)
+    _hide_reference_sketches(adapter)
     blank_reference_geometry(adapter, tuple((name, "PLANE") for name in ref_planes))
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
@@ -1502,17 +1779,51 @@ async def build(adapter) -> dict[str, str]:
     # never shallow, or the screw head rocks on an unfaced ring.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     set_dimension_bilateral_tolerance(
-        adapter, "BaseSpotFaceRear", "SpotFaceDepth", *SPOTFACE_DEPTH_BAND_MM
+        adapter,
+        "BaseSpotFaceRear",
+        "SpotFaceDepth",
+        *deviations(SPOTFACE_DEPTH_BAND_MM),
     )
     author_part_pmi(adapter, surface_finishes=PART_SURFACE_FINISHES)
-    apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-        },
+    apply_drawing_properties(adapter, PART_NAME)
+    return await _save_with_annotation_free_render(adapter)
+
+
+_SW_DISPLAY_ANNOTATIONS = 31  # swUserPreferenceToggle_e.swDisplayAnnotations
+_SW_DETAILING_NO_OPTION = 0  # swUserPreferenceOption_e.swDetailingNoOptionSpecified
+
+
+async def _save_with_annotation_free_render(adapter) -> dict[str, str]:
+    """Save the part, then render its isometric with model annotations hidden.
+
+    The part-owned surface-finish PMI is model annotation, so the isometric
+    showed "A1-A4 BORES Ra 3.2" and "FLANGE EDGES, 4 SIDES" floating in 3D over
+    the casting. The part is saved first with its annotations shown; only the
+    image hides them, and the teardown closes the document without saving, so
+    the display toggle never reaches the .SLDPRT the drawing reads.
+    """
+    artefacts = await save_part_and_images(adapter, PART_NAME, views=())
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    toggle = (_SW_DISPLAY_ANNOTATIONS, _SW_DETAILING_NO_OPTION)
+    extension.SetUserPreferenceToggle(*toggle, False)
+    if extension.GetUserPreferenceToggle(*toggle):
+        raise RuntimeError("harmonic-base render: model annotations are still displayed")
+    image = (OUT_PNG / PART_NAME / f"{PART_NAME}_isometric.png").resolve()
+    check(
+        "export_image isometric (annotations hidden)",
+        await adapter.export_image(
+            {
+                "file_path": str(image),
+                "format_type": "png",
+                "width": 1600,
+                "height": 1000,
+                "view_orientation": "isometric",
+            }
+        ),
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    artefacts["isometric"] = str(image)
+    return artefacts
 
 
 if __name__ == "__main__":

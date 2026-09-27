@@ -19,6 +19,7 @@ if str(_SCRIPTS) not in sys.path:
 _spec = importlib.util.spec_from_file_location("_common_impl", _SCRIPTS / "_common.py")
 assert _spec is not None and _spec.loader is not None, f"could not locate _common.py under {_SCRIPTS}"
 _mod = importlib.util.module_from_spec(_spec)
+sys.modules[_spec.name] = _mod
 _spec.loader.exec_module(_mod)
 
 globals().update({k: v for k, v in vars(_mod).items() if not k.startswith("__")})

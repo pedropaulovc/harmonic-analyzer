@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 import _drawing_marks
+from _fit_limits import REAM_SLIDE
 from pinion_cam_pin_spec import PIN_DIA_BAND
 from pinion_cam_spec import BORE_BAND as CAM_BORE_BAND
 from pinion_lever_spec import BORE_BAND as LEVER_BORE_BAND
@@ -135,15 +136,55 @@ def test_dimension_prefix_uses_native_readback_after_void_setter(
 @pytest.mark.parametrize(
     ("band", "expected"),
     [
-        (PIN_DIA_BAND, 3),
-        (CAM_BORE_BAND, 3),
-        (LEVER_BORE_BAND, 4),
+        (REAM_SLIDE, 3),
+        ((0.004, -0.004), 3),
+        (LEVER_BORE_BAND, 3),
     ],
 )
 def test_sub_hundredth_model_bands_get_exact_tolerance_precision(
     band: tuple[float, float], expected: int
 ) -> None:
     assert _drawing_marks._tolerance_precision_mm(*band) == expected
+
+
+@pytest.mark.parametrize("band", [PIN_DIA_BAND, CAM_BORE_BAND])
+def test_u27_slip_fit_bands_print_at_two_places(band: tuple[float, float]) -> None:
+    # U27 (Main, 2026-09-23): the cam bore and cam pin moved from micron press
+    # and slide bands to hundredth slip-fit bands a novice can hold.
+    assert _drawing_marks._tolerance_precision_mm(*band) == 2
+
+
+def test_display_precision_times_each_com_step_on_its_own_span(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The four COM steps of ``dim.display_precision`` are timed as attributes of
+    that one span (thousands of calls a week: child spans would flood the trace)."""
+
+    class PrecisionDisplay:
+        primary = -2
+
+        def SetPrecision3(self, primary: int, *_rest: int) -> int:
+            self.primary = primary
+            return 0
+
+        def GetPrimaryPrecision2(self) -> int:
+            return self.primary
+
+    annotated: list[dict[str, Any]] = []
+    display = PrecisionDisplay()
+    monkeypatch.setattr(
+        _drawing_marks, "_named_dimension", lambda *_args: (display, object())
+    )
+    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(
+        _drawing_marks._telemetry, "annotate", lambda **attrs: annotated.append(attrs)
+    )
+
+    _drawing_marks.set_dimension_display_precision(object(), "Boss", "D1", 3)
+
+    (timings,) = annotated
+    assert set(timings) == {"lookup_ms", "bind_ms", "set_ms", "readback_ms"}
+    assert all(value >= 0 for value in timings.values())
 
 
 def test_bilateral_tolerance_sets_and_verifies_display_precision(

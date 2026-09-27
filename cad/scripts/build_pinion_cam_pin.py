@@ -62,7 +62,7 @@ from pinion_cam_pin_spec import (
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    END_VIEW_NOTE,
+    ISOMETRIC_VIEW_NOTE,
     PIN_DIA,
     PIN_DIA_BAND,
     PIN_LEN,
@@ -78,7 +78,7 @@ _SAVED_DRAWING_PROPERTIES = (
     "Finish",
     "Quantity",
     "Manufacturing Notes",
-    "End View Note",
+    "Isometric View Note",
 )
 
 PIN_R = PIN_DIA / 2.0
@@ -226,7 +226,7 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
-            "End View Note": END_VIEW_NOTE,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)

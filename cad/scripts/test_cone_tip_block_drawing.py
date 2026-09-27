@@ -1448,20 +1448,19 @@ def test_slit_breaks_into_the_adjuster_thread_at_the_printed_limits() -> None:
 
 def test_shim_takes_up_the_printed_axis_height_band() -> None:
     """The fit-up shim sets the adjuster axis on the shaft axis, so its range
-    covers the printed AxisHeight band either way plus 0.25, which in turn
-    covers the pivot post's journal position (it sets the shaft's height)."""
+    covers the printed AxisHeight band either way plus the pivot post's
+    cone-axis height band (the post sets the shaft's height).  Read by value:
+    the post's printed band, stacked with the block's, must fit the pack."""
     import cone_pivot_post_spec
 
-    post_zone = cone_pivot_post_spec.GEOMETRIC_TOLERANCES_MM["journal-axis true position"]
-    assert float(post_zone) / 2.0 <= 0.25
-    drive_train = Path(part.__file__).with_name("build_drive_train_assembly.py")
-    source = drive_train.read_text(encoding="utf-8")
-    assert 'POST_GEOMETRIC_TOLERANCES_MM["journal-axis true position"]' in source
+    post_band = cone_pivot_post_spec.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM
     spec = cone_tip_block_spec
+    assert spec.FIT_UP_SHIM_MARGIN_MM == 0.25
+    assert post_band <= spec.FIT_UP_SHIM_MARGIN_MM
     low, high = _printed("AxisHeight", spec.ADJUSTER_AXIS_HEIGHT)
     needed = (
-        spec.SHIM_NOMINAL - (spec.ADJUSTER_AXIS_HEIGHT - low) - 0.25,
-        spec.SHIM_NOMINAL + (high - spec.ADJUSTER_AXIS_HEIGHT) + 0.25,
+        spec.SHIM_NOMINAL - (spec.ADJUSTER_AXIS_HEIGHT - low) - post_band,
+        spec.SHIM_NOMINAL + (high - spec.ADJUSTER_AXIS_HEIGHT) + post_band,
     )
     assert spec.FOOT_SHIM_RANGE_MM[0] <= needed[0] + 1e-9
     assert needed[1] <= spec.FOOT_SHIM_RANGE_MM[1] + 1e-9

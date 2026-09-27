@@ -37,6 +37,7 @@ from cone_tip_block_spec import (
     HEEL_RELIEF_DEPTH,
     SHIM_NOMINAL,
 )
+from drive_train_steps import step_ref
 
 SHIM_X = BLOCK_X
 # I31 (Main, 2026-09-25): the block's north-bottom heel is relieved for the
@@ -151,12 +152,18 @@ DRAWING_PRECISION_BY_NAME = {
 # sets these as the dimension's prefix and suffix; the value between them
 # is the imported model dimension at its model-owned places (Main's eye
 # pass of warm-c486).  The leaf stock is the material specification and
-# blackening the finish (rule 1), so the sheet carries no general note; how
-# the leaves go in is a fit-up step in the MHA-A03 sequence (Codex P2 on
-# #857).
+# blackening the finish (rule 1).  How the leaves go in is a fit-up step in
+# the MHA-A03 sequence, so the sheet's one general note points at that step
+# (Codex P2 on #857) and carries no numbers of its own.
 _THICKNESS_PLACES = DRAWING_PRECISION["Shim"]["Thickness"]
 THICKNESS_TEXT_PREFIX = (
     f"{STACK_RANGE_MM[0]:.{_THICKNESS_PLACES}f}"
     f"–{STACK_RANGE_MM[1]:.{_THICKNESS_PLACES}f} STACK ("
 )
 THICKNESS_TEXT_SUFFIX = " NOM)"
+
+# The MHA-A03 step that stacks the pack under the tip block at fit-up.  The
+# sheet cites it through the registry, so a renumbered sequence carries the
+# pointer with it.
+FIT_UP_STEP = "post-and-tip-block"
+MANUFACTURING_NOTES = f"STACK SET AT ASSEMBLY, {step_ref(FIT_UP_STEP)}."

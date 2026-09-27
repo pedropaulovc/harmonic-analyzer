@@ -29,9 +29,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import _seat_forensics  # noqa: E402
 import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
-    capture_com_failure,
     check,
     name_last_feature,
     volume_check,
@@ -228,7 +228,7 @@ async def build_91247A720(adapter, truth=None):
         False, False, True, False, False, False,
         0, 0.0, False, False)
     if feat is None:
-        capture_com_failure(
+        _seat_forensics.capture_com_failure(
             adapter,
             "corner-trim-cut",
             "corner trim cut failed",
@@ -293,7 +293,7 @@ async def build_91247A720(adapter, truth=None):
         True, False, True,
         0, 0.0, False)
     if feat is None:
-        capture_com_failure(
+        _seat_forensics.capture_com_failure(
             adapter,
             "runout-extrude",
             "runout extrude failed",
@@ -337,7 +337,7 @@ async def build_91247A720(adapter, truth=None):
             False, False, True,          # Merge=FALSE -> separate body
             0, 0.0, False)
         if feat is None:
-            capture_com_failure(
+            _seat_forensics.capture_com_failure(
                 adapter,
                 f"dash-extrude-{i}",
                 f"dash extrude {i} failed",
@@ -446,7 +446,7 @@ async def build_91247A720(adapter, truth=None):
         False, False, True,              # Merge=FALSE -> separate body
         0, 0.0, False)
     if feat is None:
-        capture_com_failure(
+        _seat_forensics.capture_com_failure(
             adapter,
             "logo-ring-extrude",
             "logo ring extrude failed",

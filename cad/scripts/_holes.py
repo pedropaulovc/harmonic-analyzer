@@ -42,6 +42,7 @@ from _hole_spec import (
     HoleSpec,
     blind_cut_dia_mm,
 )
+from _visibility import blank_sketch_feature
 
 PlacementDimension = tuple[str | None, str | None]
 PlacementDimensions = tuple[PlacementDimension, PlacementDimension]
@@ -532,6 +533,9 @@ def wizard_holes(
         raise RuntimeError(
             f"hole wizard {label}: expected {len(points_mm)} placement points, got {npts}"
         )
+    # Hidden by construction: a shown placement sketch prints its points in
+    # every render of the part and of each assembly that places it.
+    blank_sketch_feature(model, sub, f"hole wizard {label}")
 
     if name:
         try:
@@ -738,7 +742,10 @@ def wizard_hole_on_cylinder(
     a 3D sketch whose point coords ARE model coords, so no
     ModelToSketchTransform is involved (probe: diag_hole_wizard_cyl, volume
     exact to 0.01%). Through-all only -- a blind radial hole would need the
-    HoleWizard5 positional path re-probed on a cylinder. Single-point: the
+    HoleWizard5 positional path re-probed on a cylinder; through-next (stop
+    at the next surface -- a crown tap that must end in the bore below it,
+    not drill on through the casting) rides the same InitializeHole path with
+    its own end condition. Single-point: the
     wizard's auto point is moved onto the station; multi-point radial holes
     would each need their own feature anyway (one 3D-sketch point per face
     parameterization is untested).
@@ -748,8 +755,10 @@ def wizard_hole_on_cylinder(
     the point must lie inside the trimmed face's bounding box. This prevents
     stepped shafts from silently drilling the largest, wrong-diameter land.
     """
-    if spec.end != "through_all":
-        raise ValueError("wizard_hole_on_cylinder supports through_all only")
+    if spec.end not in ("through_all", "through_next"):
+        raise ValueError(
+            "wizard_hole_on_cylinder supports through_all and through_next only"
+        )
     hole_type, fastener = _KINDS[spec.kind]
 
     model = adapter.currentModel
@@ -798,7 +807,7 @@ def wizard_hole_on_cylinder(
     data = fm.CreateDefinition(SW_FM_HOLE_WZD)
     data = _early_bound(data, "IWizardHoleFeatureData2")
     data.InitializeHole(
-        hole_type, _STD_ANSI_INCH, fastener, spec.size, _ENDS["through_all"]
+        hole_type, _STD_ANSI_INCH, fastener, spec.size, _ENDS[spec.end]
     )
     feat = fm.CreateFeature(data)
     if feat is None:
@@ -884,6 +893,9 @@ def wizard_hole_on_cylinder(
                 )
     _telemetry.debug(f"hole wizard {label}: point constrained, rebuilding")
     model.EditRebuild3()
+    # Hidden by construction: a shown 3D placement sketch prints its point in
+    # every render of the part and of each assembly that places it.
+    blank_sketch_feature(model, sub, f"hole wizard {label}")
 
     if name:
         try:

@@ -575,6 +575,9 @@ def _preflight_fakes(monkeypatch, *, agents=None, git=None):
         return subprocess.CompletedProcess(argv, 0, out, "")
 
     monkeypatch.setattr(build.subprocess, "run", fake_run)
+    # The fake project has no parts, so it carries no visibility debt; the
+    # real repo's release gate is test_reference_visibility's.
+    monkeypatch.setattr(build, "_visibility_debt", lambda: None)
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "ro")
     monkeypatch.delenv("HARMONIC_FARM_PARALLELISM", raising=False)
     for key in FARM_ENV:

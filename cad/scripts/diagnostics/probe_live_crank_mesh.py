@@ -49,9 +49,15 @@ def _spin_off_u(rows: list[float]) -> float:
     ))
 
 
+# The assembly's placements: the 64T at its shifted journal-seat station, the
+# 16T on the MHA-149 fit-up axis (test_crank_mesh_probe_placements pins both).
+GEAR64_CENTRE_STATION = dta.GEAR64_STATION + dta.GEAR_AXIS_SHIFT
+X16, Y16 = dta.X_CRANK_FIT, dta.Y_CRANK_FIT
+
+
 async def build(adapter) -> dict[str, str]:
     check("create_assembly", await adapter.create_assembly())
-    g0 = dta.cone_station(dta.GEAR64_STATION)
+    g0 = dta.cone_station(GEAR64_CENTRE_STATION)
     await place_component(
         adapter, "crank-drive-gear",
         [g0[0] - dta.GEAR64_FACE / 2.0 * dta.SIN_I, dta.Y_DRIVE,
@@ -61,7 +67,7 @@ async def build(adapter) -> dict[str, str]:
     )
     await place_component(
         adapter, "crank-pinion",
-        [dta.X_CRANK, dta.Y_CRANK, dta.PINION_TOOTH_Z - dta.PINION_FACE / 2.0],
+        [X16, Y16, dta.PINION_TOOTH_Z - dta.PINION_FACE / 2.0],
         [0.0, 0.0, -dta.PINION_SEED_DEG], dta.rot_z_rows(-dta.PINION_SEED_DEG),
         ground=True, label="16T at design",
     )
@@ -76,7 +82,7 @@ async def build(adapter) -> dict[str, str]:
     log(f"equivalent seed error: {-(phi16 + 4.0 * phi64):+.4f} deg")
     o16 = [v * 1000.0 for v in a16[9:12]]
     o64 = [v * 1000.0 for v in a64[9:12]]
-    log(f"pinion origin {o16} (design [{dta.X_CRANK}, {dta.Y_CRANK}, "
+    log(f"pinion origin {o16} (design [{X16}, {Y16}, "
         f"{dta.PINION_TOOTH_Z - dta.PINION_FACE / 2.0}])")
     log(f"64T    origin {o64}")
 
@@ -97,7 +103,7 @@ async def build(adapter) -> dict[str, str]:
     hits = list(adapter._attempt(lambda: mgr.GetInterferences(), default=None) or [])
     log(f"{len(hits)} interference(s)")
     ux, uz = dta.SIN_I, dta.COS_I
-    g0 = dta.cone_station(dta.GEAR64_STATION)
+    g0 = dta.cone_station(GEAR64_CENTRE_STATION)
     patch_boxes: list[list[float]] = []
     for i, itf in enumerate(hits):
         itf = _early_bound(itf, "IInterference")
@@ -112,12 +118,12 @@ async def build(adapter) -> dict[str, str]:
         mm = [float(v) * 1000.0 for v in box]
         patch_boxes.append(mm)
         cx, cy, cz = ((mm[0] + mm[3]) / 2, (mm[1] + mm[4]) / 2, (mm[2] + mm[5]) / 2)
-        r_crank = math.hypot(cx - dta.X_CRANK, cy - dta.Y_CRANK)
+        r_crank = math.hypot(cx - X16, cy - Y16)
         rel = (cx - g0[0], cy - dta.Y_DRIVE, cz - g0[2])
         s64 = rel[0] * ux + rel[2] * uz
         rad = (rel[0] - s64 * ux, rel[1], rel[2] - s64 * uz)
         r_cone = math.sqrt(sum(v * v for v in rad))
-        az = math.degrees(math.atan2(cy - dta.Y_CRANK, cx - dta.X_CRANK))
+        az = math.degrees(math.atan2(cy - Y16, cx - X16))
         log(f"[{i}] {' & '.join(names)}: {vol:.3f} mm^3")
         log(f"     bbox x {mm[0]:.2f}..{mm[3]:.2f}  y {mm[1]:.2f}..{mm[4]:.2f}"
             f"  z {mm[2]:.2f}..{mm[5]:.2f}")
@@ -147,8 +153,8 @@ async def build(adapter) -> dict[str, str]:
         hi = [max(b[i + 3] for b in patch_boxes) for i in range(3)]
     else:
         c_az = math.radians(180.0 + dta.ALPHA16)
-        cx = dta.X_CRANK + dta.R16 * math.cos(c_az)
-        cy = dta.Y_CRANK + dta.R16 * math.sin(c_az)
+        cx = X16 + dta.R16 * math.cos(c_az)
+        cy = Y16 + dta.R16 * math.sin(c_az)
         lo = [cx, cy, dta.PINION_TOOTH_Z]
         hi = list(lo)
     pad = 8.0

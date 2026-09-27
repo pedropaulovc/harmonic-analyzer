@@ -11,7 +11,6 @@ import _telemetry
 from _fastener_catalog import fastener
 from _common import (
     _early_bound,
-    _flag,
     _read_member,
     apply_color,
     apply_custom_properties,
@@ -22,6 +21,7 @@ from _common import (
     report_mass_properties,
     save_part_and_images,
 )
+from _visibility import FeatureWalk
 
 
 type RecipeAuthor = Callable[..., Awaitable[None]]
@@ -44,6 +44,9 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         "90280A194": RecipeMetadata(
             "diagnostics.diag_build_90280A194", "build_90280A194"
         ),
+        "90280A197": RecipeMetadata(
+            "diagnostics.diag_build_90280A197", "build_90280A197"
+        ),
         "90280A837": RecipeMetadata(
             "diagnostics.diag_build_90280A837", "build_90280A837"
         ),
@@ -64,6 +67,9 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         ),
         "94025A164": RecipeMetadata(
             "diagnostics.diag_build_94025A164", "build_94025A164"
+        ),
+        "91375A106": RecipeMetadata(
+            "diagnostics.diag_build_91375A106", "build_91375A106"
         ),
         "90280A108": RecipeMetadata(
             "diagnostics.diag_build_90280A108", "build_90280A108"
@@ -95,8 +101,8 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         "90126A211": RecipeMetadata(
             "diagnostics.diag_build_90126A211", "build_90126A211"
         ),
-        "92240A539": RecipeMetadata(
-            "diagnostics.diag_build_92240A539", "build_92240A539"
+        "92240A540": RecipeMetadata(
+            "diagnostics.diag_build_92240A540", "build_92240A540"
         ),
         "99607A213": RecipeMetadata(
             "diagnostics.diag_build_99607A213", "build_99607A213"
@@ -242,23 +248,8 @@ def _blank_recipe_references(adapter: Any) -> None:
     }
     model = adapter.currentModel
     hidden: list[str] = []
-    visited = 0
-
-    def walk_siblings(feature: Any, next_member: str):
-        nonlocal visited
-        while feature:
-            visited += 1
-            if visited > 5000:
-                raise RuntimeError("stock reference traversal exceeded 5000 features")
-            yield feature
-            child = _read_member(feature, "GetFirstSubFeature")
-            if child:
-                yield from walk_siblings(child, "GetNextSubFeature")
-            feature = _read_member(feature, next_member)
-
-    first = _read_member(model, "FirstFeature")
-    for feature in walk_siblings(first, "GetNextFeature"):
-        _flag(feature, "IFeature")
+    walk = FeatureWalk(model)
+    for feature in walk:
         kind = str(_read_member(feature, "GetTypeName2"))
         name = str(_read_member(feature, "Name"))
         select_type = hide_types.get(kind)
@@ -299,6 +290,7 @@ def _blank_recipe_references(adapter: Any) -> None:
     _telemetry.event(
         "fastener.stock.references_hidden",
         count=len(hidden),
+        features_visited=walk.visited,
         references=", ".join(hidden),
     )
 
@@ -513,14 +505,20 @@ async def build_stock_fastener(
                 component=component_count,
                 bodies=len(new_bodies),
             ):
-                _transform_new_bodies(
-                    model,
-                    component_count,
-                    component,
-                    new_bodies,
-                    frozenset(item.name for item in before),
-                )
-                _blank_recipe_references(adapter)
+                # ~27 s per build in one opaque span: split the body move from
+                # the construction-feature walk so the cost can be attributed.
+                with _telemetry.span("fastener.stock.move_features", sku=component.sku):
+                    _transform_new_bodies(
+                        model,
+                        component_count,
+                        component,
+                        new_bodies,
+                        frozenset(item.name for item in before),
+                    )
+                with _telemetry.span(
+                    "fastener.stock.blank_references", sku=component.sku
+                ):
+                    _blank_recipe_references(adapter)
                 model.ClearSelection2(True)
     finally:
         if hasattr(adapter, "_mcm_com_map"):

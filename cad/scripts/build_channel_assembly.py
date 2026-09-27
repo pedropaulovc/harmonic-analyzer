@@ -50,7 +50,8 @@ axis (Ry(-90), machine frame) so its end slots and O2 top pin hole run
 across Z, straddling the 2.5 arm / 3.0 lever; the spring's end-hook ring
 lies perpendicular to the lever face. Channel
 stations: z_j = -64.0124 + 7.0565 j, arm/bar/lever mid-planes at z_j + 0.8,
-cam/rod plane z_j - 3.25 (rod tip strap face-flush against the arm).
+cam/rod plane z_j - 3.528 (half the cylinder gear's 7.0565 stacking
+thickness: the ring centred in its closed slot, #743).
 
 Operational DOF use semantic contact mates; fixed hardware and the static
 spring bank retain their measured transforms. Radial joints are concentric
@@ -124,13 +125,13 @@ from _common import (
     UNDER_CONSTRAINED,
     _early_bound,
     apply_custom_properties,
-    apply_summary_info,
     check,
     log,
     run_build,
 )
 from _drawing_marks import DRAWN_BY
 from _assembly import (
+    activate_assembly_contract,
     assembly_title_properties,
     assert_component_placed,
     assert_free_dof_necessity,
@@ -181,6 +182,8 @@ from build_fulcrum_keeper import (
     CBORE_DEPTH_MM as KEEPER_CBORE_DEPTH,
     FOOT_H as KEEPER_FOOT_H,
 )
+from cylinder_gear_spec import CAM_THICKNESS as CYL_CAM_THICKNESS
+from cylinder_gear_spec import FACE_WIDTH as CYL_FACE_WIDTH
 from cylinder_gear_spec import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
 
 # imported, NOT copied, so the rod ring stays concentric with the cam when the
@@ -235,7 +238,10 @@ if abs(Z0 - CHANNEL_Z0) > 1e-9:
         f"channels.station_z0_mm {Z0:g} != installation contract {CHANNEL_Z0:g}"
     )
 ARM_MID_DZ = 0.8  # arm/bar/lever mid-planes at z_j + 0.8
-CAM_DZ = -3.25  # end-for-end cylinder gear: cam / rod-ring plane at z_j - 3.25
+# End-for-end cylinder gear: the cam / rod-ring mid-plane sits half the gear's
+# overall (stacking) thickness south of z_j, centred in the closed rod slot
+# between gear j's web and gear j-1's back face (#743 solid stack).
+CAM_DZ = -(CYL_FACE_WIDTH + CYL_CAM_THICKNESS) / 2.0
 
 # --- rocker bank ------------------------------------------------------------
 # PIVOT (72.9, 253.8): the rocker pivot shaft axis -- imported from channel_frame_geom.
@@ -754,6 +760,8 @@ async def _prepare_native_spring_specs(adapter, amplitudes: list[float]) -> list
 
 
 async def build(adapter) -> dict[str, str]:
+    # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
+    activate_assembly_contract(ASM_NAME)
     # The amplitude-bar station per channel IS the Fourier coefficient a_j
     # (channels.yaml amplitude_mm, the square-wave preset). solve_state(a_j)
     # repositions that channel's bar + lever; a_j = 0 is the neutral pose. The
@@ -1650,9 +1658,6 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    # The PART cell resolves the document summary Title; "channel assembly" (not
-    # the bare stem) so the sheet identifies itself as an assembly drawing.
-    apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
     return await save_assembly_and_images(
         adapter,
         ASM_NAME,

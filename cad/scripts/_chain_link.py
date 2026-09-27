@@ -44,6 +44,7 @@ from _common import (
     save_part_and_images,
     set_sketch_direct_db,
 )
+from _visibility import blank_reference_geometry
 
 import _telemetry
 
@@ -166,6 +167,11 @@ async def build_link(
         )
         if axis.name != label:
             raise RuntimeError(f"pin-station axis is {axis.name!r}, expected {label!r}")
+    # Hidden, still selectable by name for the chain pattern's path links.
+    blank_reference_geometry(
+        adapter,
+        ((station_plane_name, "PLANE"), ("Axis1", "AXIS"), ("Axis2", "AXIS")),
+    )
 
     await apply_material(adapter, material)
     await apply_color(adapter, BAR_STEEL)
