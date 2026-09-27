@@ -32,6 +32,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_bore_axis,
     name_dimensions,
     name_last_feature,
     report_mass_properties,
@@ -115,6 +116,12 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven shaft (equations neutral)", v, 0.001 * v)
+
+    # The levers ride this axis by name.  A point on the O.D. is a
+    # view-dependent pick that grazes the silhouette in the standard views,
+    # where the lever bores' edges sit 0.075 mm off it (#916).
+    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "shaft axis")
+    name_last_feature(adapter, "shaft axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
