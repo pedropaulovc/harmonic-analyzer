@@ -67,6 +67,9 @@ from _drawing_common import (
     visible_view_entities,
     view_name,
 )
+from _drawing_hidden_sketches import (
+    curate_view_dimensions as curate_hidden_owner_dimensions,
+)
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from cone_pivot_post_spec import (
@@ -1029,9 +1032,8 @@ def _mark_post_axis(adapter: Any, plan: Any) -> None:
 def _draw_spot_face_sheet(adapter: Any) -> tuple[Any, Any, list[Any]]:
     """Sheet 2: the spot face and its run-out flat at 2:1.
 
-    Drawn before sheet 1, so the station the plan here keeps is on the drawing
-    when sheet 1's plan imports its bore azimuth from the same sketch: a model
-    dimension still on the drawing does not import twice.
+    The station comes from SpotFaceStationReference, which the part saves
+    hidden: the hidden-owner import shows that one ray in this plan only.
     """
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     if not ddoc.ActivateSheet(SPOT_FACE_SHEET):
@@ -1042,7 +1044,7 @@ def _draw_spot_face_sheet(adapter: Any) -> tuple[Any, Any, list[Any]]:
     )
     for view in (rear, plan):
         set_hidden_lines_removed(adapter, view)
-    plan_annotations = curate_view_dimensions(
+    plan_annotations = curate_hidden_owner_dimensions(
         adapter,
         plan,
         keep=_spot_plan_keep(adapter, plan),
@@ -1061,11 +1063,10 @@ def _draw_spot_face_sheet(adapter: Any) -> tuple[Any, Any, list[Any]]:
         adapter, annotations, SPOT_FACE_WIDTH_CALLOUT, location="above"
     )
     set_dimension_callouts(adapter, annotations, SPOT_FACE_CALLOUTS)
-    # The plan keeps the station imported from JournalPlanReference but not
-    # the sketch's rays: with no 12.52 deg dimension on this sheet, the
-    # journal ray read as an edge (Main's rim-29eb eye pass).  The post axis
-    # is the collar's centre mark instead; the native gate proves the
-    # station survives the sketch being hidden.
+    # No 12.52 deg dimension stands on this sheet, so the plan-angle rays
+    # would print as undimensioned edges (Main's rim-29eb eye pass).  Hiding
+    # a sketch in a view hides what was imported from it, which is why the
+    # station has its own sketch; the native gate proves it still prints.
     for view in (rear, plan):
         _hide_witness_sketch(adapter, view, "JournalPlanReference")
         _hide_witness_sketch(adapter, view, "BoreSpacingReference")
@@ -1216,8 +1217,9 @@ def _assert_native_layout(
     ]
     if placement:
         raise RuntimeError("cone pivot post view placement failed:\n" + "\n".join(placement))
-    # Sheet 2 hides the sketch its station is imported from; the dimension
-    # must still print, once, with the D's two.
+    # Hiding a sketch in a view hides the dimensions imported from it
+    # (rim-aba9 lost the station that way), so sheet 2's three must each
+    # still print, once.
     spot_face_labels = [annotation.label for annotation in spot_face_sheet.annotations]
     missing = [
         name

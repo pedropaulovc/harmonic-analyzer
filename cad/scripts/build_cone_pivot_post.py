@@ -33,6 +33,7 @@ from _common import (
     _early_bound,
     add_line_chain,
     apply_color,
+    blank_reference_sketches,
     apply_material,
     check,
     define_circle,
@@ -736,10 +737,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # crank axis and the cone-journal axis is the casting's defining
     # relationship, but it lives in ConeShaftNormal's plane angle and no FACE
     # projects it into a view.  Two Top-plane construction centrelines carry
-    # the two axis directions, a driven angular reference dimension reports the
-    # angle, and the crank line's near end states where the boss face starts --
-    # so both plan values the shop needs are model-owned, not sheet text
-    # (drawing-simplicity-policy.md rule 2).  All geometry is construction and
+    # the two axis directions and a driving angular dimension reports the
+    # angle, so the plan value the shop needs is model-owned, not sheet text
+    # (drawing-simplicity-policy.md rule 2); the spot face's station has its
+    # own sketch (6b).  All geometry is construction and
     # the sketch stays unblanked: a blanked sketch's dimensions never reach
     # InsertModelAnnotations3.
     plan = SketchDims()
@@ -769,23 +770,14 @@ async def build(adapter: Any) -> dict[str, str]:
             0.0, 0.0, JOURNAL_REFERENCE_X, -JOURNAL_REFERENCE_Z
         ),
     )
-    spot_face_line = check(
-        "crank boss spot face reference ray",
-        await adapter.add_centerline(0.0, 0.0, 0.0, CRANK_BOSS_NEAR_Z),
-    )
     set_sketch_direct_db(adapter, False)
-    for line, label in (
-        (crank_axis_line, "crank axis ray"),
-        (spot_face_line, "spot face ray"),
-    ):
-        check(
-            f"{label} vertical",
-            await adapter.add_sketch_constraint(line, None, "vertical"),
-        )
+    check(
+        "crank axis ray vertical",
+        await adapter.add_sketch_constraint(crank_axis_line, None, "vertical"),
+    )
     for line, label in (
         (crank_axis_line, "crank axis ray"),
         (journal_axis_line, "journal axis ray"),
-        (spot_face_line, "spot face ray"),
     ):
         check(
             f"{label} rooted on the post axis",
@@ -793,16 +785,6 @@ async def build(adapter: Any) -> dict[str, str]:
                 f"{line}.start", "origin", "coincident"
             ),
         )
-    check(
-        "crank boss near face station",
-        await adapter.add_sketch_dimension(
-            f"{spot_face_line}.end",
-            "origin",
-            "vertical_distance",
-            CRANK_BOSS_NEAR_Z,
-        ),
-    )
-    plan.record("CrankBossStartZ", '"CrankBossNearZ"')
     check(
         "crank boss far face station",
         await adapter.add_sketch_dimension(
@@ -841,6 +823,51 @@ async def build(adapter: Any) -> dict[str, str]:
     check("exit sketch JournalPlanReference", await adapter.exit_sketch())
     name_last_feature(adapter, "JournalPlanReference")
     drive_jobs += plan.apply(adapter, "JournalPlanReference")
+
+    # 6b. Spot-face station reference sketch: one Top-plane ray from the post
+    # axis to the crank boss's near (spot) face, carrying the station the
+    # print locates that face by.  It is its own sketch because a drawing view
+    # that dimensions only the station must not print the plan-angle rays
+    # beside it undimensioned (MHA-016 sheet 2), and hiding a sketch in a view
+    # hides the dimensions imported from it (_drawing_hidden_sketches, r21).
+    # The part saves it hidden; the drawing shows it per view.
+    station = SketchDims()
+    check(
+        "create sketch SpotFaceStationReference",
+        await adapter.create_sketch("Top"),
+    )
+    # Authored without inference, as the plan rays are, so the explicit
+    # relations below are the only ones.
+    set_sketch_direct_db(adapter, True)
+    spot_face_line = check(
+        "crank boss spot face reference ray",
+        await adapter.add_centerline(0.0, 0.0, 0.0, CRANK_BOSS_NEAR_Z),
+    )
+    set_sketch_direct_db(adapter, False)
+    check(
+        "spot face ray vertical",
+        await adapter.add_sketch_constraint(spot_face_line, None, "vertical"),
+    )
+    check(
+        "spot face ray rooted on the post axis",
+        await adapter.add_sketch_constraint(
+            f"{spot_face_line}.start", "origin", "coincident"
+        ),
+    )
+    check(
+        "crank boss near face station",
+        await adapter.add_sketch_dimension(
+            f"{spot_face_line}.end",
+            "origin",
+            "vertical_distance",
+            CRANK_BOSS_NEAR_Z,
+        ),
+    )
+    station.record("CrankBossStartZ", '"CrankBossNearZ"')
+    await ensure_fully_defined(adapter, "SpotFaceStationReference")
+    check("exit sketch SpotFaceStationReference", await adapter.exit_sketch())
+    name_last_feature(adapter, "SpotFaceStationReference")
+    drive_jobs += station.apply(adapter, "SpotFaceStationReference")
 
     # 7. Bore-spacing reference sketch.  Both bore axes cross the post axis,
     # which is ConeShaftNormal's local X axis (pointing down model -Y), so one
@@ -986,6 +1013,7 @@ async def build(adapter: Any) -> dict[str, str]:
             ("mount east", "AXIS"),
         ),
     )
+    blank_reference_sketches(adapter, ("SpotFaceStationReference",))
     return await save_part_and_images(
         adapter, PART_NAME, allowed_shown=SHOWN_SKETCH_ALLOWANCES
     )

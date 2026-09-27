@@ -303,7 +303,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ConeBossProfile": {"JournalAxisY", "ConeBossDia"},
     "ConeShaftBoss": {"ConeBossLen"},
     "JournalBoreProfile": {"JournalBoreDia"},
-    "JournalPlanReference": {"CrankBossStartZ", "InclineAngle"},
+    "JournalPlanReference": {"InclineAngle"},
+    "SpotFaceStationReference": {"CrankBossStartZ"},
     "BoreSpacingReference": {"CrankAboveCone"},
 }
 
@@ -337,7 +338,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "JournalBoreProfile": {"JournalBoreDia": 3},
     # BASIC since #906: it feeds the crank bore's angularity frame, so it
     # prints the model's exact angle.
-    "JournalPlanReference": {"CrankBossStartZ": 2, "InclineAngle": 4},
+    "JournalPlanReference": {"InclineAngle": 4},
+    "SpotFaceStationReference": {"CrankBossStartZ": 2},
     "BoreSpacingReference": {"CrankAboveCone": 2},
 }
 

@@ -303,12 +303,17 @@ def _spot_face_gate(monkeypatch: pytest.MonkeyPatch, labels: list[str]) -> None:
 
 def test_the_station_must_survive_its_hidden_sketch(monkeypatch: pytest.MonkeyPatch) -> None:
     """Sheet 2 hides JournalPlanReference, whose rays read as edges without
-    the plan angle; the station imported from it must still print."""
+    the plan angle.  Hiding a sketch in a view hides what was imported from
+    it (rim-aba9 lost the station so), so the station comes from its own
+    part-hidden sketch through the hidden-owner import, and the gate fails a
+    sheet that lost it."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert (
         '    for view in (rear, plan):\n'
         '        _hide_witness_sketch(adapter, view, "JournalPlanReference")\n'
     ) in source
+    assert "plan_annotations = curate_hidden_owner_dimensions(" in source
+    assert '"SpotFaceStationReference"' not in source.split("_hide_witness_sketch")[-1]
     with pytest.raises(RuntimeError, match=r"\['CrankBossStartZ'\] once"):
         _spot_face_gate(monkeypatch, ["SpotFaceWidth", "SpotFaceRunOut"])
     # With all three present the gate moves on to sheet 1's title block.
@@ -628,8 +633,10 @@ def test_the_plan_angle_is_model_geometry_not_sheet_text() -> None:
     global that builds ConeShaftNormal is what stops the printed value and
     the built geometry from drifting apart.
     """
-    assert "InclineAngle" in spec.DRAWING_DIMENSIONS["JournalPlanReference"]
-    assert "CrankBossStartZ" in spec.DRAWING_DIMENSIONS["JournalPlanReference"]
+    assert spec.DRAWING_DIMENSIONS["JournalPlanReference"] == {"InclineAngle"}
+    # The station has its own sketch: a view dimensioning only it must not
+    # print the plan-angle rays (MHA-016 sheet 2).
+    assert spec.DRAWING_DIMENSIONS["SpotFaceStationReference"] == {"CrankBossStartZ"}
     assert spec.CRANK_BOSS_NEAR_Z == spec.CRANK_BOSS_NORTH_FACE
     assert round(spec.JOURNAL_REFERENCE_X, 6) == 8.669989
     assert round(spec.JOURNAL_REFERENCE_Z, 6) == 39.049088
@@ -926,7 +933,9 @@ def test_spotface_station_has_one_driving_global() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"CrankBossNearZ": CRANK_BOSS_NEAR_Z,' in source
     assert 'drive_jobs.append(("D1@CrankInterfacePlane", \'"CrankBossNearZ"\'))' in source
-    assert 'plan.record("CrankBossStartZ", \'"CrankBossNearZ"\')' in source
+    assert 'station.record("CrankBossStartZ", \'"CrankBossNearZ"\')' in source
+    # Saved hidden (no new #880 visibility debt); the drawing shows it per view.
+    assert 'blank_reference_sketches(adapter, ("SpotFaceStationReference",))' in source
 
 
 def test_crank_bore_is_located_from_the_cone_bore_inside_the_mesh_window() -> None:
