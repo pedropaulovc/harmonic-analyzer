@@ -1194,25 +1194,43 @@ def test_solder_stations_ride_the_drive_train_seat_ladder() -> None:
 
 def test_drive_train_seats_the_shaft_and_64t_on_the_collar(monkeypatch) -> None:
     """#914: contacts, not distances -- the collar face ON the post's north
-    boss face (picked on the annulus outside the collar) and the 64T's south
-    face ON the collar's north face."""
+    boss face and the 64T's south face ON the collar's north face.  #916: both
+    collar-seat faces are named planes; the post's BossNorth, carried through
+    the post's installed placement, is the collar face's station on the cone
+    line and faces north along it (the collar side)."""
     import asyncio
-    import math
     from unittest.mock import AsyncMock
 
-    pick = drive._POST_BOSS_NORTH_PICK
-    north = drive.cone_station(drive._POST_NORTH_STATION)
-    axis = (drive.SIN_I, 0.0, drive.COS_I)
-    offset = [pick[k] - north[k] for k in range(3)]
-    assert sum(offset[k] * axis[k] for k in range(3)) == pytest.approx(0.0, abs=1e-9)
-    radius = math.hypot(*offset)
-    assert cone_gear_shaft_spec.COLLAR_DIA / 2.0 < radius
-    assert radius < drive.POST_CONE_BOSS_DIA / 2.0
-    assert offset[1] == 0.0  # horizontal: vertical lies on the body tangent
+    import build_cone_pivot_post as post
+
+    origin = drive.cone_station(drive.POST_STATION)
+    origin[1] = drive.Y_BASE_TOP + drive.PLAT_T
+    rows = drive.ROT_Y_180
+
+    def placed(local: tuple[float, ...], shift: list[float]) -> list[float]:
+        return [
+            sum(local[i] * rows[i][k] for i in range(3)) + shift[k] for k in range(3)
+        ]
+
+    # The casting's incline is the cone line's rounded to 4 places, so the
+    # face centre swings off the line by at most that angle times its lever.
+    import math
+
+    import cone_pivot_post_spec
+
+    skew = abs(math.radians(cone_pivot_post_spec.INCLINE_DEG - drive.INCLINE_DEG))
+    lever = math.hypot(*post.BOSS_NORTH_CENTRE[0::2])
+    centre = placed(post.BOSS_NORTH_CENTRE, origin)
+    assert centre == pytest.approx(
+        drive.cone_station(drive._POST_NORTH_STATION), abs=skew * lever + 1e-9
+    )
+    normal = placed(post.BOSS_NORTH_NORMAL, [0.0, 0.0, 0.0])
+    assert normal == pytest.approx([drive.SIN_I, 0.0, drive.COS_I], abs=skew + 1e-12)
 
     source = Path(drive.__file__).read_text(encoding="utf-8")
     assert 'named_ref(f"CollarFace@{cone_shaft}", "PLANE")' in source
-    assert 'bore_axis_ref(_POST_BOSS_NORTH_PICK, "FACE")' in source
+    assert 'named_ref(f"BossNorth@{pivot_post}", "PLANE")' in source
+    assert "bore_axis_ref" not in source
     assert (
         'named_ref(f"ConeShaftNormal@{pivot_post}", "PLANE"),\r\n        d_axial'
         not in source

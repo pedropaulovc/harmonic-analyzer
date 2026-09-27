@@ -134,6 +134,27 @@ ATTACHMENT_HOLE_SPEC = HoleSpec(
     },
 )
 
+# The north boss end, the face the cone shaft's thrust collar bears on (#914),
+# in the PART frame: the journal axis runs through (0, BORE_HEIGHT, 0) along
+# (sin I, 0, cos I), and the mid-plane pads end CONE_BOSS_LENGTH/2 either side
+# of ConeShaftNormal, so the north end faces -(sin I, 0, cos I).  The whole
+# face is the annulus between the pad and the journal bore.
+_INCLINE_RAD = math.radians(INCLINE_DEG)
+BOSS_NORTH_NORMAL = (-math.sin(_INCLINE_RAD), 0.0, -math.cos(_INCLINE_RAD))
+BOSS_NORTH_CENTRE = tuple(
+    base + CONE_BOSS_LENGTH / 2.0 * n
+    for base, n in zip((0.0, BORE_HEIGHT, 0.0), BOSS_NORTH_NORMAL)
+)
+BOSS_NORTH_AREA = math.pi / 4.0 * (CONE_BOSS_DIA**2 - BORE_DIA**2)
+# The found face must be this square to the axis and this close to the end
+# station: float noise through the angle plane sits far below both, and the
+# nearest other planar face (the milled step, normal to z) is 0.024 off
+# square.  The area band is float noise on a whole annulus; any cut into it
+# costs square millimetres.
+_FACE_SQUARE_TOL = 1e-9
+_FACE_PLANE_TOL_MM = 1e-3
+_FACE_AREA_TOL_MM2 = 0.01
+
 BLOCK_RADIUS = BLOCK_DIA / 2.0
 HEAD_RADIUS = HEAD_DIA / 2.0
 BORE_RADIUS = BORE_DIA / 2.0
@@ -977,6 +998,13 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, "Front Plane", 0.0, "Right Plane", x, label
         )
         name_last_feature(adapter, label)
+    _create_face_plane(
+        adapter,
+        BOSS_NORTH_NORMAL,
+        BOSS_NORTH_CENTRE,
+        BOSS_NORTH_AREA,
+        "BossNorth",
+    )
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
@@ -1007,6 +1035,7 @@ async def build(adapter: Any) -> dict[str, str]:
             ("CrankInterfacePlane", "PLANE"),
             ("Plane4", "PLANE"),
             ("Plane5", "PLANE"),
+            ("BossNorth", "PLANE"),
             ("swing pivot", "AXIS"),
             ("journal axis", "AXIS"),
             ("mount west", "AXIS"),
@@ -1129,6 +1158,80 @@ def _create_feature_cylinder_axis(
     _telemetry.success(
         f"axis {label} from {feature_name} r={radius_mm:g} mm "
         f"({len(candidates)} candidate face(s))"
+    )
+
+
+def _planar_faces_on(
+    faces: Any, normal: tuple[float, ...], point_mm: tuple[float, ...]
+) -> list[Any]:
+    """The planar faces whose outward normal is ``normal`` and whose plane
+    passes through ``point_mm`` (part frame).  A non-planar face reads a zero
+    ``Normal``, so it never matches."""
+    matches = []
+    for face in faces:
+        face = _early_bound(face, "IFace2")
+        face_normal = [float(v) for v in face.Normal]
+        if sum(a * b for a, b in zip(face_normal, normal)) < 1.0 - _FACE_SQUARE_TOL:
+            continue
+        surface = _early_bound(face.GetSurface(), "ISurface")
+        root = [float(v) * 1000.0 for v in surface.PlaneParams[3:6]]
+        offset = sum((r - p) * n for r, p, n in zip(root, point_mm, normal))
+        if abs(offset) > _FACE_PLANE_TOL_MM:
+            continue
+        matches.append(face)
+    return matches
+
+
+@_telemetry.traced("ref.face_plane", label_param="label")
+def _create_face_plane(
+    adapter: Any,
+    normal: tuple[float, ...],
+    point_mm: tuple[float, ...],
+    area_mm2: float,
+    label: str,
+) -> None:
+    """Name a reference plane coincident with the one planar face that has
+    this outward normal through this point, after checking the face whole by
+    its area.
+
+    The assembly mates the plane by name.  A coordinate pick on the face is
+    view-dependent: in the drive train it selected the shaft collar's OD,
+    0.33 mm off the pick point, on one seat and the face on another (#916).
+    """
+    from solidworks_mcp.adapters import sw_type_info
+
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    part = sw_type_info.early_bound_doc(adapter.currentModel)
+    faces = [
+        face
+        for body in part.GetBodies2(0, False) or []  # swSolidBody
+        for face in _early_bound(body, "IBody2").GetFaces() or []
+    ]
+    matches = _planar_faces_on(faces, normal, point_mm)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"plane {label}: {len(matches)} planar faces face {normal} through "
+            f"{point_mm} mm among {len(faces)}, expected exactly one"
+        )
+    face = matches[0]
+    area = float(face.GetArea()) * 1e6
+    if abs(area - area_mm2) > _FACE_AREA_TOL_MM2:
+        raise RuntimeError(
+            f"plane {label}: the face reads {area:.3f} mm^2, not the whole "
+            f"{area_mm2:.3f} mm^2"
+        )
+    model.ClearSelection2(True)
+    if not _early_bound(face, "IEntity").Select2(False, 0):
+        raise RuntimeError(f"plane {label}: face selection failed")
+    feature_manager = _early_bound(model.FeatureManager, "IFeatureManager")
+    # swRefPlaneReferenceConstraint_Coincident = 4
+    if feature_manager.InsertRefPlane(4, 0.0, 0, 0.0, 0, 0.0) is None:
+        raise RuntimeError(f"plane {label}: InsertRefPlane failed")
+    model.ClearSelection2(True)
+    name_last_feature(adapter, label)
+    _telemetry.success(
+        f"plane {label} on the {area:.3f} mm^2 face through {point_mm} "
+        f"facing {normal} ({len(faces)} faces walked)"
     )
 
 

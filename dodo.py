@@ -2982,6 +2982,9 @@ def task_check():
         # Every configuration of a saved part is rebuilt and read back clean
         # (pc-p1r: MHA-135 INSTALLED saved stale failed saved-rebuild-clean).
         SCRIPTS_DIR / "test_part_save_rebuild.py",
+        # Assembly mates select by name, never by a view-dependent point pick
+        # (#916: the collar pick selected the shaft collar's OD on one seat).
+        SCRIPTS_DIR / "test_assembly_named_selection.py",
     ]
     # These are runtime-read rather than imported, so module_deps_of cannot
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun
