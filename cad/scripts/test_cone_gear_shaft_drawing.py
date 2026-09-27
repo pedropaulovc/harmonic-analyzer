@@ -947,6 +947,23 @@ def _planes(adapter) -> list[tuple[str, float]]:
     ]
 
 
+def test_the_build_hides_every_plane_it_creates(monkeypatch) -> None:
+    """#950's save gate refuses a shown plane (cg-916: CollarFace and
+    CollarEndPlane saved shown and failed part:cone_gear_shaft).  The repo's
+    creator sweep only asks that a module hide SOME reference geometry, so it
+    passed on the Sec planes; this pins every plane the shaft build creates,
+    the two collar mate references included, as blanked by name."""
+    adapter, stubs, _dims, _gated = _stubbed_build(monkeypatch)
+    blanked = {
+        name
+        for c in stubs["blank_reference_geometry"].call_args_list
+        for name, kind in c.args[1]
+        if kind == "PLANE"
+    }
+    assert {"CollarFace", "CollarEndPlane"} <= blanked
+    assert len(blanked) == len(adapter.create_plane.call_args_list)
+
+
 def test_every_land_is_placed_from_the_one_origin(monkeypatch) -> None:
     """Option A (#914): the collar face is the one length origin.  Its plane
     comes first, from the front face by the journal; lands 1-3 end on planes

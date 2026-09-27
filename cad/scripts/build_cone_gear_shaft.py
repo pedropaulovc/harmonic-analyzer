@@ -343,6 +343,11 @@ async def build(adapter) -> dict[str, str]:
     land_dia = SECTIONS[1][0] * IN
     volume += math.pi / 4.0 * (COLLAR_DIA**2 - land_dia**2) * COLLAR_THICKNESS
     await volume_check(adapter, label, volume, 0.005 * volume)
+    # The collar's two planes stay as named mate references (the drive train
+    # seats the post's boss face on CollarFace and the 64T on CollarEndPlane,
+    # both by name), so they are hidden, not removed: shown, they would render
+    # in every assembly that places the shaft (#950's save gate).
+    blank_reference_geometry(adapter, (("CollarFace", "PLANE"), ("CollarEndPlane", "PLANE")))
 
     # Solder stations (#914): model-owned, measured from the collar face.
     stations = await _author_solder_stations(adapter)
