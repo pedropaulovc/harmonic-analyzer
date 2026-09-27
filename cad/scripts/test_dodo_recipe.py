@@ -2960,3 +2960,33 @@ def test_every_title_block_reader_is_classified() -> None:
     )
     stale = sorted(_buildgraph.TITLE_BLOCK_GEOMETRY_MODULES - readers)
     assert not stale, f"TITLE_BLOCK_GEOMETRY_MODULES names non-readers: {stale}"
+
+
+def test_every_python_action_passes_doits_argument_rules():
+    """doit refuses, at run time, a python action whose callable declares one of
+    its reserved names (``task``, ``targets``, ``dependencies``, ``changed``) with a
+    default.  ``gallery`` passed ``_run`` straight through after ``_run`` gained a
+    keyword-only ``task=None``, and the break surfaced only inside ``release``,
+    the one command that runs ``gallery`` (v37, 2026-09-27).  Prepare every
+    action's arguments through doit's own code so the whole graph is checked
+    offline, not just the tasks a build happens to execute."""
+    from doit.action import PythonAction
+    from doit.loader import load_tasks
+
+    dodo = _load_dodo()
+    tasks = load_tasks(dict(vars(dodo)), allow_delayed=True)
+    assert any(task.name == "gallery" for task in tasks)
+    refused = []
+    for task in tasks:
+        # doit fills these just before it executes a task.
+        task.init_options()
+        task.dep_changed = []
+        for action in task.actions:
+            if not isinstance(action, PythonAction):
+                continue
+            action.task = task
+            try:
+                action._prepare_kwargs()
+            except Exception as problem:  # doit raises InvalidTask
+                refused.append(f"{task.name}: {problem}")
+    assert not refused, "\n".join(refused)
