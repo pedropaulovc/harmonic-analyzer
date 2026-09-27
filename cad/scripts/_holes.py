@@ -254,6 +254,69 @@ def _tolerance_hole_diameter(
     )
 
 
+def _through_tap_metadata(spec: HoleSpec) -> list[tuple[str, object]]:
+    """The thread edits a non-blind tap needs AFTER CreateFeature.
+
+    InitializeHole/CreateFeature discard pre-create thread metadata, so the
+    created feature holds a blind thread of depth 0 with no class. Left
+    alone, its native callout prints ``4-40 UNC <depth> 0.00`` (top-frame,
+    016c990f8; the arbor-pedestal apex tap on the radial path, v37).
+    """
+    return [("ThreadClass", spec.thread_class), ("ThreadEndCondition", _ENDS[spec.end])]
+
+
+def _commit_definition_edits(
+    model: Any, feat: Any, defn: Any, edits: list[tuple[str, object]], label: str
+) -> Any:
+    """Write ``edits`` to a created wizard feature and return the re-read
+    committed definition."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    # Early-bound call: the params are DECLARED dispatches, so a plain
+    # None marshals as a typed null -- a VARIANT wrapper here throws
+    # "The Python instance can not be converted to a COM object" (the
+    # null-VARIANT idiom applies only to LATE-bound calls).
+    if not defn.AccessSelections(model, None):
+        raise RuntimeError(f"hole wizard {label}: AccessSelections failed")
+    try:
+        for prop, val in edits:
+            try:
+                setattr(defn, prop, val)
+            except Exception as exc:  # noqa: BLE001
+                if prop in ("ThreadClass", "ThreadEndCondition"):
+                    raise RuntimeError(f"hole wizard {label}: {prop} rejected") from exc
+                # Dimensional properties alias per hole Type. The caller's
+                # analytic volume gate verifies the surviving overrides.
+                _telemetry.debug(f"hole wizard {label}: property {prop} rejected")
+        # ModifyDefinition needs the definition's underlying IDispatch.
+        if not feat.ModifyDefinition(defn._oleobj_, model, null_callout()):
+            raise RuntimeError(f"hole wizard {label}: ModifyDefinition failed")
+    except BaseException:
+        try:
+            defn.ReleaseSelectionAccess()
+        except Exception as cleanup_exc:  # noqa: BLE001
+            _telemetry.warn(f"hole wizard {label}: selection cleanup failed: {cleanup_exc}")
+        raise
+    model.EditRebuild3()
+    return _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
+
+
+def _verify_tap_metadata(defn: Any, spec: HoleSpec, label: str) -> None:
+    """Raise unless the COMMITTED tap definition holds the requested thread
+    class and termination -- the readback, not the write, is the proof."""
+    end = _ENDS[spec.end]
+    for prop, expected in (
+        ("ThreadClass", spec.thread_class),
+        ("ThreadEndCondition", end),
+        ("EndCondition", end),
+    ):
+        actual = getattr(defn, prop)
+        if actual != expected:
+            raise RuntimeError(
+                f"hole wizard {label}: {prop} {actual!r} != requested {expected!r}"
+            )
+
+
 @_telemetry.traced("feature.hole_wizard", label_param="label")
 def wizard_holes(
     adapter,
@@ -549,10 +612,7 @@ def wizard_holes(
     defn = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
     edits: list[tuple[str, object]] = []
     if hole_type == 4 and spec.end != "blind":
-        # InitializeHole/CreateFeature discard pre-create thread metadata.
-        # Apply it to the populated feature: otherwise a through-wall tap can
-        # print a zero blind thread depth and omit its ANSI thread class.
-        edits.extend((("ThreadClass", spec.thread_class), ("ThreadEndCondition", end)))
+        edits.extend(_through_tap_metadata(spec))
     if spec.kind == "clearance" and spec.end != "blind":
         # HoleFit is a NO-OP on a plain (type-2) clearance hole: the API
         # applies it to counterbore/countersink features only (per the
@@ -594,49 +654,10 @@ def wizard_holes(
             # HoleDiameter writes are ignored there (probe) -- set both
             edits.append(("ThruHoleDiameter", v / 1000.0))
     if edits:
-        # Early-bound call: the params are DECLARED dispatches, so a plain
-        # None marshals as a typed null -- a VARIANT wrapper here throws
-        # "The Python instance can not be converted to a COM object" (the
-        # null-VARIANT idiom applies only to LATE-bound calls).
-        if not defn.AccessSelections(model, None):
-            raise RuntimeError(f"hole wizard {label}: AccessSelections failed")
-        try:
-            for prop, val in edits:
-                try:
-                    setattr(defn, prop, val)
-                except Exception as exc:  # noqa: BLE001
-                    if prop in ("ThreadClass", "ThreadEndCondition"):
-                        raise RuntimeError(
-                            f"hole wizard {label}: {prop} rejected"
-                        ) from exc
-                    # Dimensional properties alias per hole Type. The caller's
-                    # analytic volume gate verifies the surviving overrides.
-                    _telemetry.debug(f"hole wizard {label}: property {prop} rejected")
-            # ModifyDefinition needs the definition's underlying IDispatch.
-            if not feat.ModifyDefinition(defn._oleobj_, model, null_callout()):
-                raise RuntimeError(f"hole wizard {label}: ModifyDefinition failed")
-        except BaseException:
-            try:
-                defn.ReleaseSelectionAccess()
-            except Exception as cleanup_exc:  # noqa: BLE001
-                _telemetry.warn(
-                    f"hole wizard {label}: selection cleanup failed: {cleanup_exc}"
-                )
-            raise
-        model.EditRebuild3()
-        defn = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
+        defn = _commit_definition_edits(model, feat, defn, edits, label)
     if hole_type == 4:
         # Check the committed definition for both legacy blind and through taps.
-        for prop, expected in (
-            ("ThreadClass", spec.thread_class),
-            ("ThreadEndCondition", end),
-            ("EndCondition", end),
-        ):
-            actual = getattr(defn, prop)
-            if actual != expected:
-                raise RuntimeError(
-                    f"hole wizard {label}: {prop} {actual!r} != requested {expected!r}"
-                )
+        _verify_tap_metadata(defn, spec, label)
 
     def _dim(prop: str) -> float:
         try:
@@ -745,7 +766,8 @@ def wizard_hole_on_cylinder(
     HoleWizard5 positional path re-probed on a cylinder; through-next (stop
     at the next surface -- a crown tap that must end in the bore below it,
     not drill on through the casting) rides the same InitializeHole path with
-    its own end condition. Single-point: the
+    its own end condition, and a tap gets the same post-create thread
+    class/termination write-back and readback as the planar path. Single-point: the
     wizard's auto point is moved onto the station; multi-point radial holes
     would each need their own feature anyway (one 3D-sketch point per face
     parameterization is untested).
@@ -896,6 +918,15 @@ def wizard_hole_on_cylinder(
     # Hidden by construction: a shown 3D placement sketch prints its point in
     # every render of the part and of each assembly that places it.
     blank_sketch_feature(model, sub, f"hole wizard {label}")
+    if hole_type == 4:
+        # Mirrors wizard_holes: only a non-blind tap needs the write-back (the
+        # entry guard above refuses blind today), and every tap is read back.
+        defn = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
+        if spec.end != "blind":
+            defn = _commit_definition_edits(
+                model, feat, defn, _through_tap_metadata(spec), label
+            )
+        _verify_tap_metadata(defn, spec, label)
 
     if name:
         try:
