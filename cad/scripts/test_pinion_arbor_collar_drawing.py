@@ -49,7 +49,41 @@ def test_spring_pin_is_the_rig_family_and_never_proud() -> None:
     # 1.15 sub-flush each side at nominal, still sub-flush at the worst case.
     assert (geometry.COLLAR_OD - spec.PIN_LEN) / 2.0 == pytest.approx(1.15)
     assert spec.PIN_SUB_FLUSH_WORST > 0.0
-    assert spec.PIN_WALL_ENGAGEMENT_WORST >= 1.5
+    assert spec.PIN_WALL_ENGAGEMENT_WORST >= strap_pin.PIN_WALL_ENGAGEMENT_FLOOR
+
+
+def _worst_far_wall_grip(depth_spread: float) -> float:
+    """Least pin past the bore in either collar wall over every printed OD, pin
+    length and bore, for a pin driven with both ends sub-flush and their
+    depths within ``depth_spread`` of each other.  The two depths share OD - L,
+    so the deeper end sits min(OD - L, (OD - L + spread) / 2) below the OD."""
+    bore_max = geometry.BORE + spec.BORE_BAND[0]
+    worst = float("inf")
+    steps = 400
+    for i, length in product(
+        range(steps + 1), (spec.PIN_LEN - spec.PIN_LEN_TOL, spec.PIN_LEN + spec.PIN_LEN_TOL)
+    ):
+        od = geometry.COLLAR_OD - spec.OD_BAND + 2.0 * spec.OD_BAND * i / steps
+        share = od - length
+        assert share >= 0.0, "a pin would stand proud of the collar"
+        deeper = min(share, (share + depth_spread) / 2.0)
+        worst = min(worst, od / 2.0 - deeper - bore_max / 2.0)
+    return worst
+
+
+def test_the_pin_drive_keeps_a_pin_diameter_in_both_collar_walls() -> None:
+    """Codex #860 (PRRT_kwDOPHDy386mWhrK): SUB-FLUSH alone lets the largest
+    collar hold the shortest pin nearly flush at one end and 3.354 down at the
+    other, 0.496 past the Ø8.10 bore.  No one-sided "0 TO x BELOW" window fits
+    the .X OD band, so the drive's acceptance bounds the difference between
+    the two end depths instead; the worst end then keeps the rig's floor."""
+    spread = spec.PIN_END_DEPTH_SPREAD_MAX
+    worst = _worst_far_wall_grip(spread)
+    assert spec.PIN_WALL_ENGAGEMENT_WORST == pytest.approx(worst, abs=1e-6)
+    assert worst >= strap_pin.PIN_WALL_ENGAGEMENT_FLOOR
+    # The loosest 0.1 step: one more would drop the worst end under the floor.
+    assert _worst_far_wall_grip(spread + 0.1) < strap_pin.PIN_WALL_ENGAGEMENT_FLOOR
+    assert f"WITHIN {spread:.1f} OF EACH OTHER" in spec.ASSEMBLY_STEP.replace("\n", " ")
 
 
 def test_collar_pin_is_the_stock_mha145_named_on_the_hole_not_a_note() -> None:

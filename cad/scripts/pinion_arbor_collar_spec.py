@@ -143,10 +143,30 @@ for _name, _web in (
 # The pin is never proud of the smallest OD, and still crosses the largest
 # bore into both walls.
 PIN_SUB_FLUSH_WORST = (COLLAR_OD - OD_BAND - (PIN_LEN + PIN_LEN_TOL)) / 2.0
-PIN_WALL_ENGAGEMENT_WORST = (PIN_LEN - PIN_LEN_TOL) / 2.0 - (BORE + BORE_BAND[0]) / 2.0
+# The drive's acceptance (Codex #860, PRRT_kwDOPHDy386mWhrK).  SUB-FLUSH alone
+# lets the largest collar hold the shortest pin nearly flush at one end and
+# OD - L = 3.354 down at the other, 0.496 past the bore.  A one-sided "0 TO x
+# BELOW" window cannot fit the .X OD band: x must reach half the largest
+# OD - L to hold every pin, yet the smallest OD with an end x down leaves
+# under the floor.  So the acceptance bounds the difference between the two
+# end depths: with it under D, the deeper end sits at most D / 2 past centred,
+# and the far wall keeps (L - D - bore) / 2 at any OD.  D is the loosest 0.1
+# step that holds the rig's one-pin-diameter grip (pinion_strap_pin_spec).
+PIN_WALL_ENGAGEMENT_FLOOR = _pin.PIN_WALL_ENGAGEMENT_FLOOR
+_PIN_LEN_MIN = PIN_LEN - PIN_LEN_TOL
+_BORE_MAX = BORE + BORE_BAND[0]
+PIN_END_DEPTH_SPREAD_MAX = (
+    math.floor(
+        round((_PIN_LEN_MIN - _BORE_MAX - 2.0 * PIN_WALL_ENGAGEMENT_FLOOR) * 10.0, 9)
+    )
+    / 10.0
+)
+PIN_WALL_ENGAGEMENT_WORST = (_PIN_LEN_MIN - PIN_END_DEPTH_SPREAD_MAX - _BORE_MAX) / 2.0
 if PIN_SUB_FLUSH_WORST <= 0.0:
     raise AssertionError("the spring pin can stand proud of the collar")
-if PIN_WALL_ENGAGEMENT_WORST < 1.5:
+if PIN_END_DEPTH_SPREAD_MAX <= 0.0:
+    raise AssertionError("no pin-end depth spread keeps both collar walls gripped")
+if PIN_WALL_ENGAGEMENT_WORST < PIN_WALL_ENGAGEMENT_FLOOR:
     raise AssertionError("the spring pin barely reaches the collar wall")
 if not math.isclose(PIN_HOLE_Z, COLLAR_LEN / 2.0):
     raise AssertionError("the pin hole must stay centred on the collar length")
@@ -191,7 +211,9 @@ COLLAR_NUMBER = "MHA-144"
 ASSEMBLY_STEP = "\n".join(
     (
         f"BEFORE THE DRUM BOND: SLIDE {COLLAR_NUMBER} ONTO {ARBOR_NUMBER} FROM ITS",
-        f"BACK CROWN END TO THE PIN STATION; DRIVE {PIN_NUMBER} THRU BOTH, SUB-FLUSH;",
+        f"BACK CROWN END TO THE PIN STATION; DRIVE {PIN_NUMBER} THRU BOTH, BOTH ENDS",
+        "SUB-FLUSH AND THEIR DEPTHS BELOW THE OD WITHIN "
+        f"{PIN_END_DEPTH_SPREAD_MAX:.1f} OF EACH OTHER;",
         f"THEN SLIDE THE FRONT {STRAP_NUMBER} ON BEHIND IT.",
     )
 )
