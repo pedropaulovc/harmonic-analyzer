@@ -135,7 +135,15 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     # first step comes after it.
     labels = list(sheets[FITUP_DRAWING_NUMBER])
     assert labels.index(north_label) == labels.index("9F") + 1
-    rig_first = str(drive_train_steps.step_number("cam-pins-seated"))
+    # The rig's first step is whichever key the registry puts right after the
+    # north bracket, so reordering the rig's own steps cannot break this.
+    sequence = drive_train_steps.SEQUENCE
+    assert steps.NORTH_BRACKET_SET_KEY in sequence[:-1], (
+        f"{steps.NORTH_BRACKET_SET_KEY!r} must be in "
+        "drive_train_steps.SEQUENCE with a rig step after it"
+    )
+    rig_first_key = sequence[sequence.index(steps.NORTH_BRACKET_SET_KEY) + 1]
+    rig_first = str(drive_train_steps.step_number(rig_first_key))
     assert labels.index(rig_first) == labels.index(north_label) + 1
 
 
