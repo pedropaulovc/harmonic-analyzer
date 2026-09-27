@@ -40,6 +40,7 @@ from _drawing_layout_check import (
     audit_layout,
     format_findings,
 )
+from _drawing_layout_audit import run_layout_audit
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import (
@@ -124,16 +125,12 @@ _SF_BOX_UP_M = 0.018
 _SF_BOX_DOWN_M = 0.0
 
 # swAnnotationType_e.swDisplayDimension -- every linear/diameter dimension AND
-# the native hole callouts (a diameter dim carrying "/ THRU" text). Like GD&T
-# they expose only a text-anchor GetPosition (no clean box) and by design sit
-# ON/ACROSS the view geometry they measure, so they get a small nominal box and
-# ``NONE`` scope: overflow-checked + title-block keep-out (a callout dragged off
-# the sheet or over the title block is caught) but NOT overlap-checked against
-# views. Half-span is smaller than GD&T's -- dimension text is compact, and a
-# tight box keeps the zero-slack overflow check false-positive-free on interior
-# dims (Codex #269 thread 1).
+# the native hole callouts. The element audit gives them NO box: the shared
+# layout audit (``_drawing_layout_audit``) boxes their text from its display
+# data and checks it against text, lines and model edges on every sheet. The
+# 8 mm nominal square they used to get here was never overlap-checked, so
+# MHA-092's "20.8"/"8.42" and its callouts over the right view passed.
 _ANNOT_DIM = 4
-_NOMINAL_DIM_HALF_M = 0.004
 
 
 # swLeaderStyle_e.swBENT / swLeaderSide_e.swLS_SMART. Every leadered annotation
@@ -178,10 +175,6 @@ _DIM_DETAILING_SCOPES = {
     "swDetailingAngularRunningDimension": 209,
 }
 
-# A circular 2-character BOM balloon renders ~10-12 mm across at the template
-# font; its GetExtent is leader-polluted (see _note_element), so it gets this
-# nominal half-span box around its IAnnotation.GetPosition anchor instead.
-_NOMINAL_BALLOON_HALF_M = 0.006
 # Ink gap left between two balloon circles pushed apart on the ring. Their radius
 # is measured from its rendered full-circle arc (4.72 mm on pen-assembly), so
 # this is only the clearance between them, not a stand-in for the circle itself.
@@ -4532,10 +4525,11 @@ def _spread_balloons(
 
     ``AutoBalloon5`` stacks balloons whose attachment points cluster, and on a
     pictorial view its square layout can even drop balloons INSIDE the outline
-    box. Deterministic fix: place every balloon's box center on an ellipse
-    ``margin`` outside the view outline, evenly spaced, and assign the ring slots
-    in the angular order of the balloons' ATTACHMENT POINTS. Leaders stay
-    attached; only the balloon anchor moves (``IAnnotation.SetPosition``).
+    box. Deterministic fix: place every balloon's rendered CIRCLE centre on an
+    ellipse ``margin`` outside the view outline, evenly spaced, and assign the
+    ring slots in the angular order of the balloons' ATTACHMENT POINTS. Leaders
+    stay attached; only the balloon anchor moves (``IAnnotation.SetPosition``),
+    carrying the anchor's constant offset from the circle centre (#866).
 
     **Sort on the ATTACHMENT, not on where the balloon landed.** For straight
     leaders from points on a convex ring to points inside it, the non-crossing
@@ -4570,7 +4564,10 @@ def _spread_balloons(
         note = _sw_type_info.early_bound_or_flag(
             note, "INote", "GetAnnotation", "GetBomBalloonText"
         )
-        radii.append(rendered_balloon_circle(note, label="balloon spread")[2])
+        circle_x, circle_y, radius = rendered_balloon_circle(
+            note, label="balloon spread"
+        )
+        radii.append(radius)
         annotation = adapter._attempt(lambda n=note: n.GetAnnotation())
         if annotation is None:
             raise RuntimeError("balloon spread: balloon without an annotation")
@@ -4581,6 +4578,13 @@ def _spread_balloons(
             "SetPosition",
             "GetLeaderPointsAtIndex",
         )
+        # SetPosition moves the ANCHOR, which is not the circle centre: it sits
+        # a constant ~(+4.0, -1.7) mm off it (#866, 40 balloons on MHA-A03).
+        # Carry that offset so the CIRCLE lands on its ring slot.
+        anchor = annotation.GetPosition()
+        if anchor is None or len(anchor) < 2:
+            raise RuntimeError("balloon spread: balloon without a position")
+        offset = (float(anchor[0]) - circle_x, float(anchor[1]) - circle_y)
         # Never GetExtent: a balloon note's extent box includes its LEADER, so it
         # spans to the pointed-at component and is useless for placing the
         # balloon circle itself.
@@ -4595,7 +4599,13 @@ def _spread_balloons(
         attach_x, attach_y = float(raw[-3]), float(raw[-2])
         theta = math.atan2(attach_y - center_y, attach_x - center_x)
         items.append(
-            (theta, attach_x, attach_y, _balloon_item_key(adapter, note), annotation)
+            (
+                theta,
+                attach_x,
+                attach_y,
+                _balloon_item_key(adapter, note),
+                (annotation, offset),
+            )
         )
     # Sort on (theta, attach x, attach y, BOM item), never on theta alone. Two
     # balloons attached at the same angle from the view centre -- coaxial parts
@@ -4646,9 +4656,9 @@ def _spread_balloons(
     angles = _push_apart_on_ring(
         [theta for theta, _x, _y, _i, _a in items], min_gap=gap
     )
-    for angle, (_theta, _x, _y, _item, annotation) in zip(angles, items):
-        target_x = center_x + radius_x * math.cos(angle)
-        target_y = center_y + radius_y * math.sin(angle)
+    for angle, (_theta, _x, _y, _item, (annotation, offset)) in zip(angles, items):
+        target_x = center_x + radius_x * math.cos(angle) + offset[0]
+        target_y = center_y + radius_y * math.sin(angle) + offset[1]
         if not annotation.SetPosition(target_x, target_y, 0.0):
             raise RuntimeError("failed to re-ring a BOM balloon")
 
@@ -5440,25 +5450,6 @@ def _gdt_element(
     )
 
 
-def _dim_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | None:
-    """Box a display dimension / hole callout as a small nominal square (NONE scope).
-
-    Like GD&T, a dimension exposes only a text-anchor ``GetPosition`` and sits on
-    the geometry it measures, so it is overflow-checked and title-block-keep-out
-    checked only -- never overlap-checked against a view (Codex #269 thread 1).
-    """
-    position = adapter._attempt(
-        lambda: adapter._get_attr_or_call(annotation, "GetPosition")
-    )
-    if not position:
-        return None
-    x, y = float(position[0]), float(position[1])
-    half = _NOMINAL_DIM_HALF_M
-    return LayoutElement(
-        name, "dim", x - half, y - half, x + half, y + half, scope=CollisionScope.NONE
-    )
-
-
 def _iter_view_annotations(adapter: Any, view: Any):
     """Yield ``(LayoutElement, annotation)`` for each note / GD&T symbol / dimension.
 
@@ -5469,7 +5460,9 @@ def _iter_view_annotations(adapter: Any, view: Any):
     ``GetTableAnnotations`` instead.
 
     The live annotation rides along so the caller can pull its leader geometry
-    (see :func:`_leader_segments_of`) without a second COM walk.
+    (see :func:`_leader_segments_of`) without a second COM walk. A DISPLAY
+    DIMENSION yields ``None`` for its element: it gets no box here (see
+    ``_ANNOT_DIM``), only its leaders.
     """
     annotations = (
         adapter._attempt(lambda: adapter._get_attr_or_call(view, "GetAnnotations"))
@@ -5492,7 +5485,8 @@ def _iter_view_annotations(adapter: Any, view: Any):
         elif kind in _GDT_TYPES:
             element = _gdt_element(adapter, annotation, name, kind)
         elif kind == _ANNOT_DIM:
-            element = _dim_element(adapter, annotation, name)
+            yield None, annotation
+            continue
         else:
             continue
         if element is not None:
@@ -5748,9 +5742,10 @@ def collect_layout_elements(
       SMALL note centered inside its own view is a hole tag / balloon sitting on
       the geometry and is scoped ``NON_VIEW`` (does not collide with its view);
     * every native GD&T symbol (datum tag / feature-control frame /
-      surface-finish) and DISPLAY DIMENSION / hole callout, boxed nominally and
-      scoped ``NONE`` (no real bbox API, and they sit on the geometry they
+      surface-finish), boxed and scoped ``NONE`` (they sit on the geometry they
       annotate) -- overflow- and title-block-keep-out-checked only;
+    * NO display dimension or hole callout: only their leaders. The shared
+      layout audit boxes their text from display data (``_ANNOT_DIM``);
     * every TABLE (hole tables land on the SHEET view, so it is scanned too);
     * two reserved KEEP-OUT boxes -- the checked-in title block and its
       projection symbol -- so no content may land on either.
@@ -5802,6 +5797,25 @@ def collect_layout_elements(
                 )
             )
         for element, annotation in _iter_view_annotations(adapter, view):
+            if element is None:
+                # A display dimension: no box, but its leaders still cross-check.
+                label = str(adapter._get_attr_or_call(annotation, "GetName") or "")
+                leaders.extend(
+                    _leader_segments_of(
+                        adapter, annotation, label=label, kind="dim", owner=name
+                    )
+                )
+                # A native hole callout is an IDisplayDimension whose leader is
+                # NOT a SetLeader3 leader, so GetLeaderCount()==0 and the call
+                # above returns nothing -- yet its offset text can drive a leader
+                # across a neighbouring view. Read it from the display data
+                # (codex #3605215320); a no-op for non-callout dimensions.
+                leaders.extend(
+                    _display_dimension_leader_segments(
+                        adapter, annotation, label=label, owner=name
+                    )
+                )
+                continue
             # Record the owning view: a NON_VIEW annotation is exempt from
             # colliding with THIS view only, not other drawing views (Codex #269
             # thread 3).
@@ -5835,20 +5849,6 @@ def collect_layout_elements(
                         adapter, annotation, label=element.label, owner=name
                     )
                 )
-            # A native hole callout is an IDisplayDimension whose leader is NOT a
-            # SetLeader3 leader, so GetLeaderCount()==0 and the call above returns
-            # nothing -- yet its offset text can drive a leader across a
-            # neighbouring view. Reconstruct it from the text + the projected
-            # attachment (codex #3605215320); a no-op for non-callout dimensions.
-            if element.kind == "dim":
-                leaders.extend(
-                    _display_dimension_leader_segments(
-                        adapter,
-                        annotation,
-                        label=element.label,
-                        owner=name,
-                    )
-                )
             # A SMALL note centered inside its owning view is a hole tag / balloon
             # sitting on the geometry -- give it NON_VIEW scope so it does not
             # collide with the view it sits on (but still collides with a free
@@ -5876,7 +5876,7 @@ def collect_layout_elements(
         for table in _iter_tables(adapter, sheet_view):
             tables[table.label] = table
         for element, annotation in _iter_view_annotations(adapter, sheet_view):
-            if element.kind != "note":
+            if element is None or element.kind != "note":
                 continue
             owner_type = int(
                 adapter._attempt(
@@ -6184,6 +6184,15 @@ async def finalize_drawing(
     artifacts["png"] = str(outputs.png.resolve())
     if set(artifacts) != {"drawing", "pdf", "png"}:
         raise RuntimeError(f"drawing export incomplete: {artifacts!r}")
+    # Every sheet of every drawing is audited on the finished, still-open
+    # document, next to the PDF it printed (``_drawing_layout_audit``). Under
+    # GATE a finding fails the leaf, so no artefact is stored.
+    run_layout_audit(
+        adapter,
+        stem=outputs.slddrw.stem,
+        sheet_layouts=resolved_layouts,
+        is_pictorial=is_pictorial_orientation,
+    )
     # Release the file: SolidWorks keeps the saved SLDDRW open past the COM
     # session, and the next run (or a from-scratch rebuild deleting the
     # target) then hits "in use by another process".
