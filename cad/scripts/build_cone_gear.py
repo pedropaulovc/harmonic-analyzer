@@ -147,6 +147,7 @@ from _common import (
     run_build,
     save_part_and_images,
     set_sketch_direct_db,
+    stale_configurations,
     volume_check,
     whats_wrong,
 )
@@ -462,6 +463,42 @@ def _hard_faults(adapter: Any, model: Any) -> list[str]:
         f"{name} ({code})" for name, code, warning in whats_wrong(adapter, model)
         if not warning
     ]
+
+
+def rebuild_each_configuration_active(adapter: Any) -> None:
+    """Force-rebuild every configuration while it is ACTIVE, T120 last.
+
+    The save's configuration caches must be the ones an activated rebuild
+    produces.  Both rebuild-all verbs regenerate inactive configurations
+    without activating them -- ``EditRebuildAll`` in
+    ``_common.rebuild_stale_configurations`` and the ``ForceRebuildAll`` this
+    replaces -- and cg-fx1 found every T00x cache they left behind saved with
+    ToothGapCut and ToothGapPattern at error 1 and NeedsRebuild false.  An
+    activated ``ForceRebuild3`` is the rebuild cg-fx1 proved clears them.
+    Each configuration must then read What's Wrong clean, and none may be
+    left stale.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    names = _configurations_saved_last_on_t120(model)
+    failures: list[str] = []
+    for name in names:
+        if not _show_configuration(model, name):
+            failures.append(f"{name}: ShowConfiguration2 refused")
+            continue
+        if not bool(model.ForceRebuild3(False)):
+            failures.append(f"{name}: ForceRebuild3 returned False")
+            continue
+        faults = _hard_faults(adapter, model)
+        if faults:
+            failures.append(f"{name}: {faults}")
+    stale = stale_configurations(model, names)
+    if stale:
+        failures.append(f"still stale after the pass: {stale}")
+    if failures:
+        raise RuntimeError(
+            "cone-gear configurations did not rebuild clean while active: "
+            + "; ".join(failures)
+        )
 
 
 def assert_saved_caches_regenerate(adapter: Any) -> None:
@@ -1591,8 +1628,9 @@ async def build(adapter) -> dict[str, str]:
         )
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
     part_path = artefacts["part"]
-    # Rebuild every configuration through the API intended for File > Save All
-    # > Rebuild and save document, then serialize all marked configuration
+    # Mark every configuration's cache for the save, rebuild each one while
+    # it is active (the rebuild-all verbs leave the T00x tooth gaps faulted,
+    # see rebuild_each_configuration_active), then serialize all marked
     # caches in one Save3 call. AddRebuildSaveMark controls which caches are
     # written; Save3 alone does not rebuild those configurations.
     model = _early_bound(adapter.currentModel, "IModelDoc2")
@@ -1606,12 +1644,10 @@ async def build(adapter) -> dict[str, str]:
         configuration = _early_bound(raw_configuration, "IConfiguration")
         if not bool(configuration.AddRebuildSaveMark):
             raise RuntimeError(f"{name}: rebuild-save mark was not set")
-    extension = _early_bound(model.Extension, "IModelDocExtension")
     rebuild_started = time.perf_counter()
-    if not bool(extension.ForceRebuildAll()):
-        raise RuntimeError("ForceRebuildAll failed for cone-gear configurations")
+    rebuild_each_configuration_active(adapter)
     _telemetry.info(
-        "rebuilt all cone-gear configurations in "
+        "rebuilt every cone-gear configuration while active in "
         f"{time.perf_counter() - rebuild_started:.3f}s"
     )
     _save3_with_contract(

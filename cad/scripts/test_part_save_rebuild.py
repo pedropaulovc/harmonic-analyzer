@@ -233,10 +233,11 @@ class _ConeGear:
     """cone-gear.SLDPRT reopened, active on T120, ``bad`` configurations saved
     with the cg-fx1 caches."""
 
-    def __init__(self, bad: tuple[str, ...]) -> None:
+    def __init__(self, bad: tuple[str, ...], stuck: tuple[str, ...] = ()) -> None:
         self.configs = {name: _ConeConfig(name) for name in CONE_GEAR}
         self.active = "T120"
         self.bad = set(bad)
+        self.stuck = set(stuck)  # faults no rebuild clears
         self.log: list[str] = []
         self.ConfigurationManager = _ConeManager(self)
         self.Extension = _ConeExtension(self)
@@ -260,7 +261,8 @@ class _ConeGear:
 
     def ForceRebuild3(self, _top_only) -> bool:  # noqa: N802
         self.log.append(f"force {self.active}")
-        self.bad.discard(self.active)
+        if self.active not in self.stuck:
+            self.bad.discard(self.active)
         return True
 
 
@@ -269,8 +271,8 @@ def cone_gear(monkeypatch):
     monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(build_cone_gear, "_early_bound", lambda obj, _iface: obj)
 
-    def make(bad=()):
-        part = _ConeGear(tuple(bad))
+    def make(bad=(), stuck=()):
+        part = _ConeGear(tuple(bad), tuple(stuck))
         return _Adapter(part), part
 
     return make
@@ -312,3 +314,40 @@ def test_the_part_reopen_proves_the_saved_caches_before_any_forced_rebuild() -> 
     caches = source.index("assert_saved_caches_regenerate(adapter)", reopened)
     forced = source.index("assert_saved_configuration_topology(", reopened)
     assert reopened < caches < forced
+
+
+def test_the_save_pass_force_rebuilds_every_configuration_active_ending_on_t120(
+    cone_gear,
+) -> None:
+    adapter, part = cone_gear(bad=SWAPPED)
+    build_cone_gear.rebuild_each_configuration_active(adapter)
+    assert [entry for entry in part.log if entry.startswith("force")] == [
+        f"force {name}" for name in (*CONE_GEAR[:-1], "T120")
+    ]
+    assert part.active == "T120"
+    # What the save then persists regenerates the way the drive train loads it.
+    build_cone_gear.assert_saved_caches_regenerate(adapter)
+
+
+def test_a_configuration_still_faulted_after_its_active_rebuild_stops_the_save(
+    cone_gear,
+) -> None:
+    adapter, _part = cone_gear(bad=("T006", "T060"), stuck=("T060",))
+    with pytest.raises(
+        RuntimeError,
+        match=r"did not rebuild clean while active: "
+        r"T060: \['ToothGapCut \(1\)', 'ToothGapPattern \(1\)'\]$",
+    ):
+        build_cone_gear.rebuild_each_configuration_active(adapter)
+
+
+def test_the_save_tail_rebuilds_each_configuration_active_right_before_save3() -> None:
+    source = inspect.getsource(build_cone_gear.build)
+    assert "ForceRebuildAll" not in source
+    marks = source.index("AddRebuildSaveMark(2")
+    rebuild = source.index("rebuild_each_configuration_active(adapter)")
+    save = source.index('label="rebuild and persist all marked configurations"')
+    assert marks < rebuild < save
+    between = source[rebuild:save]
+    for edit in ("apply_", "set_dimension", "mark_dimensions", "set_global"):
+        assert edit not in between
