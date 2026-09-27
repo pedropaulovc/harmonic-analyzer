@@ -1037,6 +1037,64 @@ def test_cached_drawing_locked_restore_under_farm_fails_loud(tmp_path, monkeypat
         dodo._cached_drawing_action("platen_guide")
 
 
+def test_cached_drawing_auth_failure_on_a_local_seat_builds_and_says_why(
+    tmp_path, monkeypatch
+):
+    """A local seat keeps the cache's fail-soft contract -- it can build what it
+    cannot fetch -- but the probe span and the build it runs say ``auth-failed``,
+    never ``miss``: the key's presence was never looked up."""
+    from opentelemetry import trace
+
+    dodo = _load_dodo()
+    output = tmp_path / "platen-guide.SLDDRW"
+    events = []
+    dispositions = []
+    task_cache = []
+
+    monkeypatch.setattr(
+        dodo, "_drawing_file_deps", lambda _stem: [str(tmp_path / "dep")]
+    )
+    monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: [output])
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+    monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
+
+    def restore(key, outputs, label):
+        events.append(("restore", "auth"))
+        raise dodo._cache.RestoreAuthFailed(
+            label, key, dodo._cache.CacheAuthError("AzureCliCredential: Failed to invoke the Azure CLI")
+        )
+
+    real_probe = dodo._probe_cache
+
+    def probe(key, outputs, label, span, hit="hit"):
+        outcome = real_probe(key, outputs, label, span, hit)
+        dispositions.append(outcome)
+        return outcome
+
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(dodo, "_probe_cache", probe)
+    monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext())
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    def build(cmd, label, **_kwargs):
+        events.append(("exec", Path(cmd[1]).name))
+        # The task span is current while the build runs: its disposition is
+        # the probe's, not a hard-coded "miss" (Codex review on #884).
+        task_cache.append(trace.get_current_span().attributes.get("cache"))
+
+    monkeypatch.setattr(dodo, "_exec_com", build)
+    monkeypatch.setattr(dodo._cache, "store", lambda *_args: "auth_failed")
+
+    dodo._cached_drawing_action("platen_guide")
+
+    assert dispositions == ["auth-failed", "auth-failed"]
+    assert task_cache == ["auth-failed"]
+    assert events == [
+        ("restore", "auth"),
+        ("restore", "auth"),
+        ("exec", "draw_platen_guide.py"),
+    ]
+
+
 def test_cache_status_covers_drawings():
     dodo = _load_dodo()
     rows = dict(dodo._cache_rows())
@@ -2687,7 +2745,7 @@ def _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, stem, *, mode):
     monkeypatch.setattr(dodo._cache, "store", lambda *_a: "stored")
     monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
     monkeypatch.setattr(dodo, "_com_seat", free_seat)
-    monkeypatch.setattr(dodo, "_reprobe_under_seat", lambda *_a: False)
+    monkeypatch.setattr(dodo, "_reprobe_under_seat", lambda *_a: "miss")
     monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
     monkeypatch.setattr(dodo, "_sw_autostart_enabled", lambda: False)
     monkeypatch.setattr(dodo, "_recipe_sidecar", lambda _stem: sidecar)

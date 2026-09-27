@@ -84,7 +84,11 @@ is one ``<key>.tar.gz`` blob under a 2-hex virtual prefix. Configure with:
 Auth is keyless by default: ``DefaultAzureCredential`` picks up ``az login`` on a
 dev box and the VM's managed identity on the builder (grant it *Storage Blob Data
 Contributor*). For a keyed path (CI without RBAC), set ``HARMONIC_CACHE_SAS`` to a
-container SAS token.
+container SAS token. The chain is trimmed to what this project signs in with, ``az``
+gets :data:`_AUTH_PROCESS_TIMEOUT_S` instead of azure-identity's 10 s, and a failed
+token is retried a bounded number of times inside :class:`_CacheCredential`. A
+token that still cannot be had is :class:`RestoreAuthFailed` on a restore -- never
+a miss, because the key's presence was never looked up.
 
 Eviction is server-side and MANAGED -- Azure Blob has a native lifecycle policy
 (unlike Azure Files). With account *last-access-time tracking* enabled, a
@@ -102,7 +106,9 @@ import json
 import os
 import tarfile
 import time
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 # Bump to invalidate EVERY cached entry pipeline-wide (e.g. after a change to the
 # packed OUTPUT set, the pack format, or a build-logic change not captured by any
@@ -514,6 +520,149 @@ class _Unset:
 _UNSET = _Unset()
 _BACKEND: _BlobBackend | None | _Unset = _UNSET
 
+# How long ``az account get-access-token`` may take. azure-identity's default is
+# 10 s, and on the farm submitter under ``-n 4`` that is no margin at all: the
+# first token of each doit worker took ~10 s (cache.probe spans, run
+# 20260925T134711810Z), and one worker's ``az`` then failed every try of two
+# restores eleven minutes apart ("AzureCliCredential: Failed to invoke the
+# Azure CLI" is the SDK's catch-all branch, where a timeout lands). amet
+# answered in 2-7 s at 96 % CPU. Override with HARMONIC_CACHE_AUTH_TIMEOUT_S.
+_AUTH_PROCESS_TIMEOUT_S = 60
+# How many times one token request is tried, and the pause before each retry.
+_AUTH_ATTEMPTS = 3
+_AUTH_BACKOFF_S = (2.0, 8.0)
+
+
+class CacheAuthError(RuntimeError):
+    """No token for the cache after :data:`_AUTH_ATTEMPTS` tries.
+
+    Deliberately NOT an ``AzureError``: ``StorageRetryPolicy`` retries every
+    ``AzureError``, so an auth failure it can see re-runs the whole credential
+    chain three more times behind 15 s+ backoffs -- four minutes and more per
+    restore on the farm run above. This one it passes straight up."""
+
+
+def _auth_failure_line(exc: BaseException) -> str:
+    """The line of a credential failure that says what went wrong.
+
+    A chain failure lists every member, most of them "unavailable" by design
+    (no environment secret, no IMDS on a dev box); the one worth reading is the
+    member expected to answer, so the CLI's line wins, then managed identity's,
+    then the first line."""
+    text = getattr(exc, "message", None) or str(exc)
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    for member in ("AzureCliCredential:", "ManagedIdentityCredential:"):
+        for line in lines:
+            if line.startswith(member):
+                return line
+    return lines[0] if lines else type(exc).__name__
+
+
+class _CacheCredential:
+    """The one token source of this process's cache client.
+
+    Wraps the credential chain with a bounded retry (``az`` under load fails
+    by timing out, and the next try usually answers) and a ``cache.auth`` span
+    per token request -- which member answered, how many tries, how long --
+    so an auth stall is a named span on the ``build-infra`` resource instead
+    of an unexplained gap inside a restore. Only ``get_token``: azure-core
+    asks for ``get_token_info`` when a credential has it, and this keeps one
+    path to trace. The pipeline caches the token, so this runs once an hour,
+    not once a request."""
+
+    def __init__(
+        self,
+        inner: Any,
+        *,
+        attempts: int = _AUTH_ATTEMPTS,
+        backoff: tuple[float, ...] = _AUTH_BACKOFF_S,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        self.inner = inner
+        self._attempts = attempts
+        self._backoff = backoff
+        self._sleep = sleep
+
+    def _answered_by(self) -> str:
+        member = getattr(self.inner, "_successful_credential", None)
+        return type(member).__name__ if member is not None else type(self.inner).__name__
+
+    def get_token(self, *scopes: str, **kwargs: Any) -> Any:
+        from azure.core.exceptions import ClientAuthenticationError
+
+        import _telemetry
+
+        began = time.perf_counter()
+        with _telemetry.span(
+            "cache.auth", service=_telemetry.BUILD_INFRA_SERVICE
+        ) as span:
+            failure: ClientAuthenticationError | None = None
+            for attempt in range(1, self._attempts + 1):
+                if attempt > 1:
+                    self._sleep(self._backoff[min(attempt - 2, len(self._backoff) - 1)])
+                tried = time.perf_counter()
+                try:
+                    token = self.inner.get_token(*scopes, **kwargs)
+                except ClientAuthenticationError as exc:
+                    failure = exc
+                    _telemetry.event(
+                        "cache.auth_attempt", attempt=attempt, outcome="failed",
+                        latency_s=round(time.perf_counter() - tried, 3),
+                        error=_auth_failure_line(exc),
+                    )
+                    continue
+                _telemetry.event(
+                    "cache.auth_attempt", attempt=attempt, outcome="ok",
+                    latency_s=round(time.perf_counter() - tried, 3),
+                )
+                self._tag(span, "ok", attempt, began)
+                return token
+            self._tag(span, "failed", self._attempts, began)
+            raise CacheAuthError(
+                f"no cache token after {self._attempts} tries: "
+                f"{_auth_failure_line(failure) if failure else 'no attempt made'}"
+            ) from failure
+
+    def _tag(self, span: Any, outcome: str, attempts: int, began: float) -> None:
+        span.set_attribute("outcome", outcome)
+        span.set_attribute("attempts", attempts)
+        span.set_attribute("credential", self._answered_by())
+        span.set_attribute("latency_s", round(time.perf_counter() - began, 3))
+
+
+def _auth_process_timeout() -> int:
+    raw = os.environ.get("HARMONIC_CACHE_AUTH_TIMEOUT_S", "").strip()
+    if not raw:
+        return _AUTH_PROCESS_TIMEOUT_S
+    try:
+        seconds = int(raw)
+    except ValueError:
+        _warn(f"HARMONIC_CACHE_AUTH_TIMEOUT_S={raw!r} is not whole seconds; "
+              f"using {_AUTH_PROCESS_TIMEOUT_S}")
+        return _AUTH_PROCESS_TIMEOUT_S
+    return seconds if seconds > 0 else _AUTH_PROCESS_TIMEOUT_S
+
+
+def _chain_credential() -> Any:
+    """``DefaultAzureCredential`` down to the members this project signs in with.
+
+    Managed identity (the builder VM and the farm workers, which publish every
+    leaf) and ``az login`` (dev boxes and the farm submitter) stay, as do the
+    environment and workload-identity members, which only read variables. Out:
+    the shared token cache, VS Code, Azure PowerShell, azd and the broker --
+    none is used here, and PowerShell alone can spend a process timeout of its
+    own on every cold chain."""
+    from azure.identity import DefaultAzureCredential
+
+    return DefaultAzureCredential(
+        process_timeout=_auth_process_timeout(),
+        exclude_shared_token_cache_credential=True,
+        exclude_visual_studio_code_credential=True,
+        exclude_powershell_credential=True,
+        exclude_developer_cli_credential=True,
+        exclude_broker_credential=True,
+    )
+
 
 def _make_backend() -> _BlobBackend | None:
     try:
@@ -528,14 +677,14 @@ def _make_backend() -> _BlobBackend | None:
     sas = os.environ.get("HARMONIC_CACHE_SAS")
     if sas:
         return _BlobBackend(ContainerClient(account_url, container, credential=sas))
-    from azure.identity import DefaultAzureCredential
     return _BlobBackend(ContainerClient(account_url, container,
-                                        credential=DefaultAzureCredential()))
+                                        credential=_CacheCredential(_chain_credential())))
 
 
 def _backend() -> _BlobBackend | None:
-    """Memoized ContainerClient (one credential handshake per process). Returns
-    None when unconfigured / SDK absent, so the caller treats it as a miss."""
+    """Memoized ContainerClient: one credential, and one cached token, per
+    process. Returns None when unconfigured / SDK absent, so the caller treats
+    it as a miss."""
     global _BACKEND
     if isinstance(_BACKEND, _Unset):
         _BACKEND = _make_backend()
@@ -554,8 +703,24 @@ def probe(key: str) -> bool | None:
             return None
         return backend.exists(key)
     except Exception as exc:  # noqa: BLE001
+        if _is_auth_failure(exc):
+            _log(f"probe auth failed for {key[:12]}: {_auth_failure_line(exc)}")
+            return None
         _log(f"probe error for {key[:12]}: {exc!r}")
         return None
+
+
+def _is_auth_failure(exc: BaseException) -> bool:
+    """No token (:class:`CacheAuthError`), or the service refusing the one we
+    sent (a 401 is a ``ClientAuthenticationError``): either way nothing about
+    the key was learnt."""
+    if isinstance(exc, CacheAuthError):
+        return True
+    try:
+        from azure.core.exceptions import ClientAuthenticationError
+    except ImportError:
+        return False
+    return isinstance(exc, ClientAuthenticationError)
 
 
 class RestoreLocked(RuntimeError):
@@ -579,6 +744,28 @@ class RestoreLocked(RuntimeError):
             f"{label}: cached build {key[:12]} exists but its outputs are "
             f"share-locked on this seat ({cause.filename!s}) -- SolidWorks still "
             "holds the document; close it (release the seat) and retry"
+        )
+
+
+class RestoreAuthFailed(RuntimeError):
+    """The cache could not authenticate, so whether ``key`` exists is unknown.
+
+    Not swallowed as a miss: a miss says "nobody has built this", and on the
+    farm submitter it dispatches a leaf -- whose output the same failed token
+    then cannot fetch, which is how run 20260925T134711810Z ended reading
+    "cache key a2e60761e503 is absent" about a key it never looked up. The
+    caller decides: a local seat may build what it cannot fetch, the farm
+    submitter fails the task."""
+
+    def __init__(self, label: str, key: str, cause: BaseException) -> None:
+        self.label = label
+        self.key = key
+        self.cause = cause
+        super().__init__(
+            f"{label}: restore auth failed for cache key {key[:12]} -- the cache "
+            f"could not authenticate ({_auth_failure_line(cause)}), so whether "
+            "the key exists is unknown; check `az account show` (or the "
+            "machine's managed identity) and rerun"
         )
 
 
@@ -618,8 +805,9 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
     """Try to download+unpack a cached build for ``key``. Return True on a HIT (the
     outputs are now on disk and the COM build can be skipped), False on a miss or
     any error (caller falls through to the real build). Raises
-    :class:`RestoreLocked` -- the ONE non-swallowed failure -- when the HIT's
-    extraction is refused by a share lock on an output (see the class).
+    :class:`RestoreLocked` when the HIT's extraction is refused by a share lock
+    on an output, and :class:`RestoreAuthFailed` when the cache could not
+    authenticate -- the two failures that are not swallowed (see each class).
 
     On a HIT under a key this seat never PUBLISHED (its sidecar holds a different
     one), WARN -- the seat is serving an artefact it should have stored itself: the
@@ -659,6 +847,13 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
     except RestoreLocked:
         raise
     except Exception as exc:  # noqa: BLE001 -- cache must never break a build
+        if _is_auth_failure(exc):
+            failed = RestoreAuthFailed(label, key, exc)
+            _warn(str(failed))
+            _event("cache.restore_auth_failed", label, key,
+                   error=_auth_failure_line(exc))
+            _record("restore_auth_failed", label, key)
+            raise failed from exc
         _warn(f"restore error for {label}: {exc!r} -- building locally")
         _event("cache.restore_error", label, key)
         _record("restore_error", label, key)
@@ -671,7 +866,8 @@ def store(key: str, outputs: list[Path], label: str) -> str:
     in cache.jsonl and stamps the per-label "last published key" sidecar so a later
     HIT under a shifted key can be flagged as drift.
 
-    RETURNS the outcome (``stored``/``skip``/``empty``/``error``/``off``) so the
+    RETURNS the outcome (``stored``/``skip``/``empty``/``auth_failed``/``error``/
+    ``off``) so the
     caller's ``cache.store`` phase span can carry it as an attribute: swallowing the
     failure keeps the build alive, but a publish, a deliberate read-only skip and a
     failed upload must not all look like the same OK span (codex #424)."""
@@ -697,6 +893,12 @@ def store(key: str, outputs: list[Path], label: str) -> str:
         _record("store", label, key)
         return "stored"
     except Exception as exc:  # noqa: BLE001
+        if _is_auth_failure(exc):
+            _warn(f"store auth failed for {label} ({key[:12]}): "
+                  f"{_auth_failure_line(exc)} -- continuing unpublished")
+            _event("cache.store_auth_failed", label, key)
+            _record("store_auth_failed", label, key)
+            return "auth_failed"
         _warn(f"store error for {label}: {exc!r} -- continuing")
         _event("cache.store_error", label, key)
         _record("store_error", label, key)

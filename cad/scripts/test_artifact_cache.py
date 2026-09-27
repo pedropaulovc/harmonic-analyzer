@@ -8,12 +8,15 @@ on-disk sinks (cache.jsonl, the per-label key sidecar) are redirected to a tmp d
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import sys
 from pathlib import Path
 
 import pytest
+from azure.core.credentials import AccessToken
+from azure.core.exceptions import AzureError, ClientAuthenticationError
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -374,6 +377,231 @@ def test_probe_presence_and_disabled(tmp_path, fake, monkeypatch):
     assert cache.probe("q" * 64) is False
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "off")
     assert cache.probe(key) is None                          # disabled -> unknown
+
+
+# --------------------------------------------------------------------------- #
+# Auth: a token the cache could not get is not a miss. Farm run
+# 20260925T134711810Z: `az` timed out at azure-identity's 10 s default on a
+# loaded submitter, the storage retry policy re-ran the whole credential chain
+# four times (~4.5 min per restore), and the restore then read as a miss --
+# "building locally", and after the leaf "farm reported success but cache key
+# a2e60761e503 is absent".
+# --------------------------------------------------------------------------- #
+_CHAIN_FAILURE = (
+    "DefaultAzureCredential failed to retrieve a token from the included credentials.\n"
+    "Attempted credentials:\n"
+    "\tManagedIdentityCredential: ManagedIdentityCredential authentication unavailable, "
+    "no response from the IMDS endpoint.\n"
+    "\tAzureCliCredential: Failed to invoke the Azure CLI\n"
+    "To mitigate this issue, please refer to the troubleshooting guidelines here at "
+    "https://aka.ms/azsdk/python/identity/defaultazurecredential/troubleshoot."
+)
+
+
+class AzureCliCredential:
+    """Named like the chain member that answered, as ``_successful_credential``."""
+
+
+class _Chain:
+    """A token source failing its first ``failures`` calls, as ``az`` does
+    under load: a DefaultAzureCredential stand-in, no subprocess, no network."""
+
+    def __init__(self, failures: int):
+        self.failures = failures
+        self.calls = 0
+        self._successful_credential = None
+
+    def get_token(self, *scopes, **kwargs):
+        self.calls += 1
+        if self.calls <= self.failures:
+            raise ClientAuthenticationError(_CHAIN_FAILURE)
+        self._successful_credential = AzureCliCredential()
+        return AccessToken("token", 4_102_444_800)
+
+
+@pytest.fixture
+def auth_trace(monkeypatch):
+    """Record the spans and span events the auth path opens, in order."""
+    spans: list[dict] = []
+
+    @contextlib.contextmanager
+    def span(name, /, *, service=None, **attributes):
+        record = {"name": name, "service": service, "attributes": dict(attributes),
+                  "events": [], "error": None}
+        spans.append(record)
+
+        class _Span:
+            def set_attribute(self, attr, value):
+                record["attributes"][attr] = value
+
+        try:
+            yield _Span()
+        except BaseException as exc:
+            record["error"] = exc
+            raise
+
+    def event(name, **attributes):
+        if spans:
+            spans[-1]["events"].append((name, attributes))
+
+    monkeypatch.setattr(_telemetry, "span", span)
+    monkeypatch.setattr(_telemetry, "event", event)
+    return spans
+
+
+def _auth_credential(chain, sleeps):
+    return cache._CacheCredential(chain, sleep=sleeps.append)
+
+
+def test_auth_retries_a_failed_token_and_traces_who_answered(auth_trace):
+    chain = _Chain(failures=1)
+    sleeps: list[float] = []
+
+    token = _auth_credential(chain, sleeps).get_token("https://storage.azure.com/.default")
+
+    assert token.token == "token"
+    assert chain.calls == 2
+    assert sleeps == [cache._AUTH_BACKOFF_S[0]]
+    [auth] = [s for s in auth_trace if s["name"] == "cache.auth"]
+    assert auth["service"] == _telemetry.BUILD_INFRA_SERVICE
+    assert auth["attributes"]["outcome"] == "ok"
+    assert auth["attributes"]["attempts"] == 2
+    assert auth["attributes"]["credential"] == "AzureCliCredential"
+    assert auth["attributes"]["latency_s"] >= 0
+    attempts = [attrs for name, attrs in auth["events"] if name == "cache.auth_attempt"]
+    assert [a["outcome"] for a in attempts] == ["failed", "ok"]
+    assert attempts[0]["error"] == "AzureCliCredential: Failed to invoke the Azure CLI"
+
+
+def test_auth_gives_up_after_its_bound_with_an_error_storage_will_not_retry(auth_trace):
+    """The terminal error is deliberately NOT an AzureError: StorageRetryPolicy
+    retries every AzureError, so an auth failure it can see is re-run three more
+    times with 15 s+ backoffs -- the 4.5 minutes the farm run lost per restore."""
+    chain = _Chain(failures=99)
+    sleeps: list[float] = []
+
+    with pytest.raises(cache.CacheAuthError, match="Failed to invoke the Azure CLI") as info:
+        _auth_credential(chain, sleeps).get_token("https://storage.azure.com/.default")
+
+    assert not isinstance(info.value, AzureError)
+    assert chain.calls == cache._AUTH_ATTEMPTS
+    assert sleeps == list(cache._AUTH_BACKOFF_S[: cache._AUTH_ATTEMPTS - 1])
+    [auth] = [s for s in auth_trace if s["name"] == "cache.auth"]
+    assert auth["attributes"]["outcome"] == "failed"
+    assert auth["attributes"]["attempts"] == cache._AUTH_ATTEMPTS
+    assert auth["attributes"]["credential"] == type(chain).__name__  # no member answered
+    assert auth["error"] is info.value
+
+
+def test_the_storage_pipeline_does_not_multiply_the_auth_retries(tmp_path, fake, monkeypatch):
+    """The real azure-storage-blob pipeline, not a fake backend: the token is
+    asked for exactly the credential's own bound, and the restore names the
+    failure. Nothing reaches the network -- the token fails before any request."""
+    from azure.storage.blob import ContainerClient
+
+    chain = _Chain(failures=99)
+    client = ContainerClient(
+        "https://example.blob.core.windows.net", "buildcache",
+        credential=cache._CacheCredential(chain, sleep=lambda _s: None),
+    )
+    monkeypatch.setattr(cache, "_BACKEND", cache._BlobBackend(client))
+    key = "a" * 64
+
+    with pytest.raises(cache.RestoreAuthFailed):
+        cache.restore(key, [], "drawing:crank_pinion")
+
+    assert chain.calls == cache._AUTH_ATTEMPTS
+
+
+def test_restore_auth_failure_is_named_not_read_as_a_miss(tmp_path, fake, monkeypatch):
+    def refuse(_key):
+        raise cache.CacheAuthError("AzureCliCredential: Failed to invoke the Azure CLI")
+
+    monkeypatch.setattr(fake, "get", refuse)
+    key = "a" * 64
+
+    with pytest.raises(cache.RestoreAuthFailed, match="restore auth failed") as info:
+        cache.restore(key, [], "drawing:crank_pinion")
+
+    assert info.value.key == key
+    assert info.value.label == "drawing:crank_pinion"
+    assert "absent" not in str(info.value)
+    assert [e["event"] for e in _events(tmp_path)] == ["restore_auth_failed"]
+
+
+def test_a_service_side_auth_refusal_is_also_named(tmp_path, fake, monkeypatch):
+    """A 401 the service answers is a ClientAuthenticationError too: the key's
+    presence is just as unknown."""
+    def refuse(_key):
+        raise ClientAuthenticationError("Server failed to authenticate the request.")
+
+    monkeypatch.setattr(fake, "get", refuse)
+
+    with pytest.raises(cache.RestoreAuthFailed):
+        cache.restore("a" * 64, [], "drawing:crank_pinion")
+
+
+def test_probe_reports_an_auth_failure_as_unknown(tmp_path, fake, monkeypatch):
+    def refuse(_key):
+        raise cache.CacheAuthError("AzureCliCredential: Failed to invoke the Azure CLI")
+
+    monkeypatch.setattr(fake, "exists", refuse)
+    assert cache.probe("a" * 64) is None
+
+
+def test_store_auth_failure_is_its_own_outcome(tmp_path, fake, monkeypatch):
+    def refuse(_key, _blob):
+        raise cache.CacheAuthError("AzureCliCredential: Failed to invoke the Azure CLI")
+
+    monkeypatch.setattr(fake, "put", refuse)
+    out = tmp_path / "out.bin"
+    out.write_text("payload", encoding="utf-8")
+
+    assert cache.store("a" * 64, [out], "part:x") == "auth_failed"
+    assert [e["event"] for e in _events(tmp_path)] == ["store_auth_failed"]
+
+
+def test_backend_keeps_managed_identity_and_cli_with_a_patient_cli(monkeypatch):
+    """One lean credential per process. Workers and the builder VM authenticate
+    by managed identity, dev boxes and the farm submitter by ``az login``: both
+    stay. The developer tools nobody here signs in with -- and whose probes cost
+    seconds on every cold chain -- are out, and ``az`` gets a timeout a loaded
+    box can meet (the stock 10 s is what the farm run hit)."""
+    monkeypatch.delenv("HARMONIC_CACHE_SAS", raising=False)
+    monkeypatch.delenv("HARMONIC_CACHE_AUTH_TIMEOUT_S", raising=False)
+    monkeypatch.delenv("AZURE_TOKEN_CREDENTIALS", raising=False)
+
+    backend = cache._make_backend()
+
+    credential = backend._cc.credential
+    assert isinstance(credential, cache._CacheCredential)
+    members = [type(c).__name__ for c in credential.inner.credentials]
+    assert "ManagedIdentityCredential" in members
+    assert "AzureCliCredential" in members
+    for absent in ("SharedTokenCacheCredential", "VisualStudioCodeCredential",
+                   "AzurePowerShellCredential", "AzureDeveloperCliCredential"):
+        assert absent not in members
+    [cli] = [c for c in credential.inner.credentials if type(c).__name__ == "AzureCliCredential"]
+    assert cli._process_timeout == cache._AUTH_PROCESS_TIMEOUT_S >= 60
+
+
+def test_the_cli_timeout_can_be_raised_for_a_slower_box(monkeypatch):
+    monkeypatch.delenv("HARMONIC_CACHE_SAS", raising=False)
+    monkeypatch.delenv("AZURE_TOKEN_CREDENTIALS", raising=False)
+    monkeypatch.setenv("HARMONIC_CACHE_AUTH_TIMEOUT_S", "120")
+
+    credential = cache._make_backend()._cc.credential
+    [cli] = [c for c in credential.inner.credentials if type(c).__name__ == "AzureCliCredential"]
+    assert cli._process_timeout == 120
+
+
+def test_backend_is_built_once_per_process(monkeypatch):
+    built = []
+    monkeypatch.setattr(cache, "_BACKEND", cache._UNSET)
+    monkeypatch.setattr(cache, "_make_backend", lambda: built.append(1) or object())
+
+    assert cache._backend() is cache._backend()
+    assert built == [1]
 
 
 if __name__ == "__main__":
