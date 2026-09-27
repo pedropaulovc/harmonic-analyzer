@@ -32,6 +32,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
+    sketch_view_line,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -144,17 +145,20 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
     north = (pivot[0], outline[3])
     south = (pivot[0], outline[1])
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    model = adapter.currentModel
     # IDrawingDoc.EditSheet explicitly makes subsequently created geometry
     # sheet-owned. The endpoints are already transformed into sheet space, so
-    # this keeps the centerline coincident with the projected model axis.
+    # this keeps the centerline coincident with the projected model axis: the
+    # sheet's own sketch (``view=None``) takes sheet coordinates as they are.
     drawing.EditSheet()
-    sketch_manager = _early_bound(model.SketchManager, "ISketchManager")
-    centerline = sketch_manager.CreateCenterLine(
-        north[0], north[1], 0.0, south[0], south[1], 0.0
+    sketch_view_line(
+        adapter,
+        None,
+        north,
+        south,
+        kind="centerline",
+        coords="sheet",
+        label="cone-axis centerline in plan view",
     )
-    if centerline is None:
-        raise RuntimeError("failed to create cone-axis centerline in plan view")
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
     return pivot

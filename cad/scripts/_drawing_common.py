@@ -1185,61 +1185,309 @@ def add_view_centerline(
     return centerline
 
 
-# The section cutting line is a GEOMETRIC DATUM, not annotation: the plane it
-# defines is where every dimension taken off the section is measured, and a
-# cut-face line carries that plane's own coordinate (which is what the part
-# recipes pin dimensions to).  ``ISketchManager.CreateLine`` runs the new
-# segment through the INFERENCE engine unless the sketch manager is in
-# direct-to-DB mode, and sketch inference / automatic relations are
-# APPLICATION-level preferences a seat carries from one leaf to the next
-# (``diag_mcmaster_lib.SEAT_SKETCH_BASELINE`` restores all three ON), so an
-# endpoint authored within snap distance of a view edge is pulled onto it --
-# in SCREEN space, which makes the outcome depend on the seat's zoom rather
-# than on this recipe.  A snap of a fraction of a millimetre on the sheet
-# tilts the plane: top_frame's D-D was cut 4.29 degrees oblique, 0.674 mm off
-# station at the rail face, by exactly that (leaf 2026-09-18T14:40Z).  Both
-# mechanisms are shut off here, and the placement is then read back, because a
-# preference the seat declines to write fails SILENTLY.
-_SECTION_LINE_TOLERANCE_M = 1e-9
+# -- Sketch entities drawn in drawing views -------------------------------
+#
+# Every circle, line, centreline and point a drawing recipe sketches into a
+# view goes through ``sketch_view_circle`` / ``sketch_view_line`` /
+# ``sketch_view_point`` (``test_view_sketch_guard`` fails any draw_* or
+# _drawing* module that calls the SketchManager directly).  Two reasons:
+#
+# * ``ISketchManager.Create*`` runs a new entity through the INFERENCE engine
+#   unless the sketch manager is in direct-to-DB mode, and sketch inference /
+#   automatic relations are APPLICATION-level preferences a seat carries from
+#   one leaf to the next (``diag_mcmaster_lib.SEAT_SKETCH_BASELINE`` restores
+#   all three ON).  A point authored within snap distance of a view edge is
+#   pulled onto it -- in SCREEN space, so the outcome depends on the seat's
+#   zoom rather than on the recipe.  top_frame's D-D was cut 4.29 degrees
+#   oblique, 0.674 mm off station at the rail face, by exactly that (leaf
+#   2026-09-18T14:40Z); post_mount_screw's Front tip mark came out ~1.5 mm in
+#   radius on the cut end on one seat and at the asked 3.6 mm, 1 mm above,
+#   on another, from docstring-only changes (#857).  A detail or crop circle
+#   decides what a view SHOWS, so a snapped one is a wrong drawing.
+# * A preference the seat declines to write fails SILENTLY, so direct-to-DB
+#   mode is not evidence: every made entity is read back and must sit within
+#   ``tolerance_m`` (sheet metres) of its ask, or the build raises naming it.
+#
+# Direct-to-DB creation does not leave the new entity selected the way an
+# inferred draw does, so each helper selects it explicitly (in its view): a
+# circle is what CreateDetailViewAt4 / Crop2 consume, a line what
+# CreateSectionViewAt5 consumes.
+VIEW_SKETCH_TOLERANCE_M = 5e-5
+# Where the coordinates a caller hands in live.  ``"sheet"``: drawing-sheet
+# metres, mapped through the view sketch's ModelToSketchTransform.
+# ``"view"``: the view sketch's own frame (view-local model metres), used
+# as is.  ``view=None`` is the SHEET's own sketch (the caller ran
+# ``IDrawingDoc.EditSheet``), whose frame is the sheet, so only ``"sheet"``.
+SketchCoords = Literal["sheet", "view"]
+_SHEET_PROBE_M = 0.1
 
 
-def _assert_section_line_placed(
-    adapter: Any,
-    segment: Any,
-    points: list[tuple[float, ...]],
+@dataclass(frozen=True)
+class _ViewSketchFrame:
+    """Maps a caller's ask into the target sketch and scales tolerances."""
+
+    adapter: Any
+    view: Any | None
+    coords: SketchCoords
+    transform: Any | None
+
+    def to_sketch(self, xy: tuple[float, float]) -> tuple[float, float, float]:
+        if self.transform is None or self.coords == "view":
+            return (float(xy[0]), float(xy[1]), 0.0)
+        return self._map((float(xy[0]), float(xy[1])))
+
+    def _map(self, xy: tuple[float, float]) -> tuple[float, float, float]:
+        utility = _early_bound(self.adapter.swApp.GetMathUtility(), "IMathUtility")
+        point = _early_bound(
+            utility.CreatePoint(double_array([xy[0], xy[1], 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(self.transform), "IMathPoint")
+        values = tuple(float(value) for value in projected.ArrayData)
+        return (values[0], values[1], values[2] if len(values) > 2 else 0.0)
+
+    def sketch_per_sheet(self) -> float:
+        """Sketch length per sheet metre, read off the view's own transform."""
+        if self.transform is None:
+            return 1.0
+        origin = self._map((0.0, 0.0))
+        probe = self._map((_SHEET_PROBE_M, 0.0))
+        ratio = math.dist(origin, probe) / _SHEET_PROBE_M
+        if not ratio > 0.0:
+            raise RuntimeError("view sketch transform collapses the sheet")
+        return ratio
+
+
+def _view_sketch_frame(adapter: Any, view: Any | None, coords: SketchCoords) -> _ViewSketchFrame:
+    if coords not in ("sheet", "view"):
+        raise ValueError(f"unknown sketch coordinates {coords!r}")
+    if view is None:
+        if coords != "sheet":
+            raise ValueError("the sheet's own sketch takes sheet coordinates")
+        return _ViewSketchFrame(adapter, None, coords, None)
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    return _ViewSketchFrame(adapter, view, coords, transform)
+
+
+def _author_direct_to_db(adapter: Any, create: Callable[[Any], Any]) -> Any:
+    """Run one SketchManager ``Create*`` with inference off, then hand back the seat.
+
+    ``AddToDB`` (and ``DisplayWhenAdded``, which requires it) are
+    session-global sketch modes: a helper that sets them and dies would leave
+    every later sketch on the seat -- this leaf and the next -- authoring with
+    no inference at all, so the values found are restored in a ``finally``.
+    """
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    prior_add_to_db = bool(manager.AddToDB)
+    prior_display = bool(manager.DisplayWhenAdded)
+    manager.AddToDB = True
+    manager.DisplayWhenAdded = True
+    try:
+        return create(manager)
+    finally:
+        manager.DisplayWhenAdded = prior_display
+        manager.AddToDB = prior_add_to_db
+
+
+def _select_view_sketch_entity(
+    adapter: Any, view: Any | None, entity: Any, *, interface: str, label: str
+) -> None:
+    draw = adapter.currentModel
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    selection_data = selection_manager.CreateSelectData()
+    if view is not None:
+        selection_data.View = view
+    selectable = _sw_type_info.early_bound_or_flag(entity, interface, "Select4")
+    if not selectable.Select4(False, selection_data):
+        raise RuntimeError(f"{label}: failed to select the sketched entity")
+    selected = int(selection_manager.GetSelectedObjectCount2(-1))
+    if selected != 1:
+        raise RuntimeError(f"{label}: selecting the sketched entity produced {selected}")
+
+
+def _read_sketch_point(adapter: Any, raw: Any, *, what: str, label: str) -> tuple[float, float, float]:
+    if raw is None:
+        raise RuntimeError(f"{label}: the sketched {what} has no point to read back")
+    point = _early_bound(raw, "ISketchPoint")
+    return tuple(
+        float(adapter._get_attr_or_call(point, axis)) for axis in ("X", "Y", "Z")
+    )
+
+
+def _assert_placed(
+    frame: _ViewSketchFrame,
+    placements: Sequence[tuple[str, tuple[float, ...], tuple[float, ...]]],
     *,
+    tolerance_m: float,
+    entity: str,
     label: str,
 ) -> None:
-    """Read the created cutting line's endpoints back off the sketch.
+    """Every read-back point must sit within ``tolerance_m`` of its ask.
 
-    Suppression is not evidence.  Exactness is the right bar: nothing
-    legitimately moves an endpoint authored in sketch coordinates, and the
-    smallest snap observed on a seat is five orders of magnitude above this
-    tolerance, so a real snap can never hide under it and float noise can
-    never trip it.
+    ``placements`` are ``(which, made, asked)`` in sketch space; the drift is
+    reported in sheet mm, the scale a reader measures the print in.
     """
-    line = _early_bound(segment, "ISketchLine")
-    for expected, accessor, which in (
-        (points[0], "GetStartPoint2", "start"),
-        (points[1], "GetEndPoint2", "end"),
-    ):
-        raw = adapter._get_attr_or_call(line, accessor)
-        if raw is None:
-            raise RuntimeError(f"{label}: the section line has no {which} point")
-        point = _early_bound(raw, "ISketchPoint")
-        actual = tuple(
-            float(adapter._get_attr_or_call(point, axis)) for axis in ("X", "Y", "Z")
-        )
-        drift = max(abs(a - b) for a, b in zip(actual, expected))
-        if drift > _SECTION_LINE_TOLERANCE_M:
+    ratio = frame.sketch_per_sheet()
+    worst = 0.0
+    for which, made, asked in placements:
+        drift = math.dist(made, asked) / ratio
+        worst = max(worst, drift)
+        if drift > tolerance_m:
             raise RuntimeError(
-                f"{label}: the section cutting line's {which} point sits "
-                f"{drift * 1000.0:.4g} mm from where it was authored "
-                f"({actual} instead of {expected}) -- sketch inference snapped "
-                "it onto nearby geometry, so the cut plane is not the requested "
-                "one and every dimension taken off the section would be "
-                "measured on the wrong plane"
+                f"{label}: the {entity}'s {which} sits {drift * 1000.0:.4g} mm "
+                f"on the sheet from where it was authored ({made} instead of "
+                f"{asked}; tolerance {tolerance_m * 1000.0:.4g} mm) -- sketch "
+                "inference snapped it onto nearby geometry"
             )
+    _telemetry.event("sketch.readback", entity=entity, drift_mm=worst * 1000.0)
+
+
+def sketch_view_circle(
+    adapter: Any,
+    view: Any | None,
+    center_xy: tuple[float, float],
+    radius: float,
+    *,
+    coords: SketchCoords,
+    tolerance_m: float = VIEW_SKETCH_TOLERANCE_M,
+    label: str,
+) -> Any:
+    """Sketch a circle in ``view``'s sketch, read it back, leave it selected.
+
+    ``center_xy`` and ``radius`` are in ``coords`` units.  The caller has
+    activated the view.  Returns the ``CreateCircle`` segment.
+    """
+    with _telemetry.span(f"sketch.view_circle {label}", label=label, coords=coords):
+        frame = _view_sketch_frame(adapter, view, coords)
+        center = frame.to_sketch(center_xy)
+        rim = frame.to_sketch((center_xy[0] + radius, center_xy[1]))
+        circle = _author_direct_to_db(
+            adapter, lambda manager: manager.CreateCircle(*center, *rim)
+        )
+        if circle is None:
+            raise RuntimeError(f"{label}: failed to sketch the circle")
+        arc = _early_bound(circle, "ISketchArc")
+        made_center = _read_sketch_point(
+            adapter, adapter._get_attr_or_call(arc, "GetCenterPoint2"),
+            what="circle centre", label=label,
+        )
+        asked_radius = math.dist(center, rim)
+        made_radius = float(adapter._get_attr_or_call(arc, "GetRadius"))
+        _assert_placed(
+            frame,
+            (
+                ("centre", made_center, center),
+                ("radius", (made_radius,), (asked_radius,)),
+            ),
+            tolerance_m=tolerance_m,
+            entity="circle",
+            label=label,
+        )
+        _select_view_sketch_entity(
+            adapter, view, circle, interface="ISketchSegment", label=label
+        )
+        return circle
+
+
+def sketch_view_line(
+    adapter: Any,
+    view: Any | None,
+    start_xy: tuple[float, float],
+    end_xy: tuple[float, float],
+    *,
+    kind: Literal["line", "centerline"] = "line",
+    coords: SketchCoords,
+    tolerance_m: float = VIEW_SKETCH_TOLERANCE_M,
+    label: str,
+) -> Any:
+    """Sketch a line or centreline in ``view``'s sketch, read it back, select it.
+
+    Both endpoints are read back: inference snaps whichever end lands near a
+    witness entity, and checking one end hides a tilt about the other.  The
+    caller has activated the view; line style and colour stay with it.
+    """
+    with _telemetry.span(f"sketch.view_{kind} {label}", label=label, coords=coords):
+        frame = _view_sketch_frame(adapter, view, coords)
+        start = frame.to_sketch(start_xy)
+        end = frame.to_sketch(end_xy)
+        if kind == "line":
+            segment = _author_direct_to_db(
+                adapter, lambda manager: manager.CreateLine(*start, *end)
+            )
+        elif kind == "centerline":
+            segment = _author_direct_to_db(
+                adapter, lambda manager: manager.CreateCenterLine(*start, *end)
+            )
+        else:
+            raise ValueError(f"unknown sketch line kind {kind!r}")
+        if segment is None:
+            raise RuntimeError(f"{label}: failed to sketch the {kind}")
+        line = _early_bound(segment, "ISketchLine")
+        _assert_placed(
+            frame,
+            tuple(
+                (
+                    f"{which} point",
+                    _read_sketch_point(
+                        adapter, adapter._get_attr_or_call(line, accessor),
+                        what=f"{kind} {which}", label=label,
+                    ),
+                    asked,
+                )
+                for which, accessor, asked in (
+                    ("start", "GetStartPoint2", start),
+                    ("end", "GetEndPoint2", end),
+                )
+            ),
+            tolerance_m=tolerance_m,
+            entity=kind,
+            label=label,
+        )
+        _select_view_sketch_entity(
+            adapter, view, segment, interface="ISketchSegment", label=label
+        )
+        return segment
+
+
+def sketch_view_point(
+    adapter: Any,
+    view: Any | None,
+    point_xy: tuple[float, float],
+    *,
+    coords: SketchCoords,
+    tolerance_m: float = VIEW_SKETCH_TOLERANCE_M,
+    label: str,
+) -> Any:
+    """Sketch a retained point in ``view``'s sketch, read it back, select it."""
+    with _telemetry.span(f"sketch.view_point {label}", label=label, coords=coords):
+        frame = _view_sketch_frame(adapter, view, coords)
+        asked = frame.to_sketch(point_xy)
+        point = _author_direct_to_db(
+            adapter, lambda manager: manager.CreatePoint(*asked)
+        )
+        if point is None:
+            raise RuntimeError(f"{label}: failed to sketch the point")
+        made = _read_sketch_point(adapter, point, what="point", label=label)
+        _assert_placed(
+            frame, (("position", made, asked),),
+            tolerance_m=tolerance_m, entity="point", label=label,
+        )
+        _select_view_sketch_entity(
+            adapter, view, point, interface="ISketchPoint", label=label
+        )
+        return point
+
+
+# A GEOMETRIC DATUM sketched in a view is held to exactness, not to the
+# presentation tolerance.  The section cutting line defines the plane every
+# dimension taken off the section is measured on, and a cut-face line carries
+# that plane's own coordinate (which is what the part recipes pin dimensions
+# to); a theoretical datum point is the origin a hole table's X/Y LOC values
+# are measured from.  Nothing legitimately moves a point authored
+# direct-to-DB, and the smallest snap observed on a seat is five orders of
+# magnitude above this, so a real snap can never hide under it and float
+# noise can never trip it.
+VIEW_SKETCH_DATUM_TOLERANCE_M = 1e-9
 
 
 @_telemetry.traced("drawing.section_view", label_param="label")
@@ -1261,12 +1509,10 @@ def create_section_view(
     parent sketch's transform before CreateLine, which takes view-local sketch
     coordinates. Passing sheet coordinates directly offsets and scales the cut
     again (at 1:2, a centre cut can miss the part entirely).
-    ``CreateLine`` is placed with the sketch manager in direct-to-DB mode and
-    its endpoints are read back (:func:`_assert_section_line_placed`): an
-    inferred endpoint snaps, and a snapped cutting line cuts an OBLIQUE plane.
-    Direct-to-DB creation does not leave the new segment selected the way an
-    inferred draw does, so it is selected explicitly for the
-    ``CreateSectionViewAt5`` precondition.  The section is deliberately
+    The line goes through :func:`sketch_view_line` (direct-to-DB, both
+    endpoints read back to ``VIEW_SKETCH_DATUM_TOLERANCE_M``, left selected for
+    ``CreateSectionViewAt5``): an inferred endpoint snaps, and a snapped
+    cutting line cuts an OBLIQUE plane.  The section is deliberately
     unaligned so a part recipe can place and scale it independently of the
     parent view.
 
@@ -1283,45 +1529,19 @@ def create_section_view(
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
-    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
     name = view_name(adapter, parent_view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate section parent view {name!r} ({label})")
     draw.ClearSelection2(True)
-    parent = _early_bound(parent_view, "IView")
-    sketch = _early_bound(parent.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = []
-    for x, y in (line_start, line_end):
-        point = _early_bound(
-            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
-            "IMathPoint",
-        )
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        points.append(tuple(float(value) for value in projected.ArrayData))
-    previous_add_to_db = bool(sketch_manager.AddToDB)
-    sketch_manager.AddToDB = True
-    try:
-        segment = sketch_manager.CreateLine(*points[0], *points[1])
-    finally:
-        sketch_manager.AddToDB = previous_add_to_db
-    if segment is None:
-        raise RuntimeError(f"failed to create section line ({label})")
-    _assert_section_line_placed(adapter, segment, points, label=label)
-    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    selection_data = selection_manager.CreateSelectData()
-    selection_data.View = parent_view
-    selectable = _sw_type_info.early_bound_or_flag(
-        segment, "ISketchSegment", "Select4"
+    sketch_view_line(
+        adapter,
+        parent_view,
+        line_start,
+        line_end,
+        coords="sheet",
+        tolerance_m=VIEW_SKETCH_DATUM_TOLERANCE_M,
+        label=label,
     )
-    if not selectable.Select4(False, selection_data):
-        raise RuntimeError(f"failed to select the section line ({label})")
-    selected = int(selection_manager.GetSelectedObjectCount2(-1))
-    if selected != 1:
-        raise RuntimeError(
-            f"selecting the section line produced {selected} entities ({label})"
-        )
     # swCreateSectionView_NotAligned | swCreateSectionView_ScaleWithModel
     # (| swCreateSectionView_Partial for a removed section).
     options = 0x1 | 0x8 | (0x10 if partial else 0)
@@ -3799,18 +4019,14 @@ def create_view_theoretical_datum(
     name = view_name(adapter, view)
     if not drawing.ActivateView(name):
         raise RuntimeError(f"failed to activate theoretical-datum view {name!r}")
-    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    previous_add_to_db = bool(sketch_manager.AddToDB)
-    previous_display = bool(sketch_manager.DisplayWhenAdded)
-    sketch_manager.AddToDB = True
-    sketch_manager.DisplayWhenAdded = True
-    try:
-        point = sketch_manager.CreatePoint(point_xy[0], point_xy[1], 0.0)
-    finally:
-        sketch_manager.AddToDB = previous_add_to_db
-        sketch_manager.DisplayWhenAdded = previous_display
-    if point is None:
-        raise RuntimeError(f"failed to create {label} theoretical datum point")
+    point = sketch_view_point(
+        adapter,
+        view,
+        point_xy,
+        coords="view",
+        tolerance_m=VIEW_SKETCH_DATUM_TOLERANCE_M,
+        label=f"{label} theoretical datum",
+    )
     point = _early_bound(point, "ISketchPoint")
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="create_view_theoretical_datum")
