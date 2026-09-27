@@ -1951,3 +1951,17 @@ def test_drawing_revision_must_match_current_release():
             ("Revision",),
             required=("Revision",),
         )
+
+
+def test_same_named_leaders_in_different_views_still_cross():
+    # SolidWorks names hole callouts per view: in leaf 917-s1-b5d9 the plan's
+    # hole callout (Drawing View2) and the foot's (Drawing View5) were both
+    # "RD1". A name alone is not an annotation's identity, so the "same
+    # annotation cannot cross itself" exemption must not cover them.
+    plan = LeaderSegment("RD1", "dim", 0.170, 0.068, 0.0675, 0.100, owner="Drawing View2")
+    foot = LeaderSegment("RD1", "dim", 0.0956, 0.1044, 0.070, 0.090, owner="Drawing View5")
+    (crossing,) = find_leader_leader_crossings([plan, foot])
+    assert {crossing.a.owner, crossing.b.owner} == {"Drawing View2", "Drawing View5"}
+    # Positive control: the same pair in ONE view is one annotation's two runs.
+    same = LeaderSegment("RD1", "dim", 0.0956, 0.1044, 0.070, 0.090, owner="Drawing View2")
+    assert find_leader_leader_crossings([plan, same]) == []

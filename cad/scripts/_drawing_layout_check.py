@@ -472,7 +472,10 @@ def find_leader_leader_crossings(
     leader is exactly the error a machine check does not make.
 
     Segments of the SAME annotation are skipped: a bent leader is two segments
-    that meet at an elbow, and an annotation cannot cross itself.  Leaders
+    that meet at an elbow, and an annotation cannot cross itself.  An
+    annotation is its label AND its owning view: SolidWorks names hole
+    callouts per view, so two views' "RD1" are two annotations (leaf
+    917-s1-b5d9).  Leaders
     converging on a SHARED terminus are skipped too -- see
     :data:`_SHARED_TERMINUS_M`; that pair is stacked, not crossed, and the gate's
     first sweep proved the difference is 0.2 mm vs 4.7 mm rather than a judgement
@@ -480,7 +483,7 @@ def find_leader_leader_crossings(
     """
     crossings: list[LeaderCrossing] = []
     for a, b in combinations(segments, 2):
-        if a.label == b.label:
+        if (a.label, a.owner) == (b.label, b.owner):
             continue
         point = _proper_crossing(a, b, tol=tol)
         if point is None:
