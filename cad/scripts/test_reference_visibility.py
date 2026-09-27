@@ -349,14 +349,6 @@ def test_every_standalone_save_path_runs_the_check() -> None:
 # The debt at the time the check landed.  Owners delete entries as they convert
 # their parts; nobody adds one.  Shrink this snapshot along with the list.
 _SNAPSHOT = {
-    "pinion-arbor": {
-        "BackRimReference",
-        "BondZoneReference",
-        "DrumStationReference",
-        "OverallReference",
-        "PinStationReference",
-    },
-    "pinion-lever": {"GripStationReference", "PinHoleStationReference"},
     "cone-pivot-post": {"BoreSpacingReference", "JournalPlanReference"},
 }
 _OWNERS = {"pinioncluster", "crankhub", "pivot"}

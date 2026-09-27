@@ -141,6 +141,11 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Steel Narrow Fillister Head Slotted Screw",
         "90280A197",
     ),
+    "pinion-strap-pin": _stock(
+        "pinion-strap-pin",
+        "1050-1095 Spring Steel Slotted Spring Pin",
+        "98296A027",
+    ),
     "pen-set-screw": _stock(
         "pen-set-screw",
         "Stainless Steel Flared-Collar Knurled-Head Thumb Screw",

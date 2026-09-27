@@ -98,6 +98,7 @@ from harmonic_base_spec import (
     socket_bore_finish_key,
 )
 from frame_attachment_spec import BASE_SCREW_SEAT_Z, BASE_SCREW_Y
+from pinion_rig_fitup import RIG_SET_STEP, TRANSFER_AFTER_RIG_SET
 from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     _note_text,
@@ -661,6 +662,12 @@ def _spread_hole_tags(view: Any, table: Any) -> None:
 # the arbor running in both straps, and its seat is spotted through the ledge
 # hole. The sheet therefore prints no position for any of them: they leave
 # the hole table and carry their native size on a callout naming their source.
+# Along the bank nothing in the frame fixes the rig until the fitter sets it
+# (user ruling P1-2), so the two rig callouts name the RIG SET note that
+# states it and the spring pad's leaf (RIG_SET_STEP); printed on the callouts,
+# the step ran through the top border, over the TOP VIEW caption, section
+# arrow A and the MHA-132 callout (pc-p1 render). The pedestal seats are not
+# rig seats and keep AT ASSEMBLY.
 TRANSFER_BLOCK_HOLES = tuple((x, z, BLOCK_SCREW_HOLE_DIA) for x, z in BLOCK_SCREW_XZ)
 TRANSFER_SPRING_HOLE = (*FOOT_SCREW_XZ[0], FOOT_SCREW_HOLE_DIA)
 TRANSFER_PEDESTAL_HOLES = tuple(
@@ -671,9 +678,22 @@ TRANSFER_PEDESTAL_HOLES = tuple(
 # line: side by side, two "AT ASSEMBLY; 8-32 UNC - 2B" lines ran into each
 # other (hb-notes-2 eye pass). The spring callout keeps the semicolon joining
 # the locating instruction to its "4-40 UNC - 2B" line.
-TRANSFER_BLOCK_CALLOUT = "TRANSFER FROM MHA-061\nAT ASSEMBLY;\n"
-TRANSFER_SPRING_CALLOUT = "TRANSFER FROM MHA-114\nAT ASSEMBLY;"
+TRANSFER_BLOCK_CALLOUT = f"TRANSFER FROM MHA-061\n{TRANSFER_AFTER_RIG_SET}\n"
+TRANSFER_SPRING_CALLOUT = f"TRANSFER FROM MHA-114\n{TRANSFER_AFTER_RIG_SET}"
 TRANSFER_PEDESTAL_CALLOUT = "TRANSFER FROM MHA-004\nAT ASSEMBLY;\n"
+# The RIG SET note heads the sheet-2 notes column, under the hole table and
+# short of the 38.1 cross-screw-axis callout.  The sheet-2 callout check
+# measures its read-back ink like a callout's: against every callout AND every
+# other obstacle (the table, the views, the frame), so the note cannot land on
+# the table or a view any more than a callout can (pc-p1 eye pass).
+RIG_SET_NOTE_XY = (0.020, 0.108)
+RIG_SET_NOTE_LABEL = "RIG SET note"
+
+
+def is_rig_set_note(text: str) -> bool:
+    """Whether a note read back off the sheet is the RIG SET note (INote text
+    reads back with CRLF line breaks)."""
+    return text.replace("\r\n", "\n").strip() == RIG_SET_STEP.strip()
 # The cross-tap callout carries hole facts only, in three rows: count, drill
 # and depth; this instruction; the thread and its depth, on its own row. The
 # old "DEPTHS FROM SPOTFACE FLOOR" row restated the model: the Hole Wizard
@@ -1215,10 +1235,16 @@ def _check_hole_sheet_callouts(
             # The check runs before finalize_drawing deletes the Hole Wizard
             # "Tapped Hole" notes (hb-render-3 flagged leaders over them), so
             # only notes that reach the final sheet are obstacles.
-            if not note_reaches_final_sheet(_note_text(adapter, annotation)):
+            text = _note_text(adapter, annotation)
+            if not note_reaches_final_sheet(text):
+                continue
+            if is_rig_set_note(text):
+                boxes[RIG_SET_NOTE_LABEL] = element.box
                 continue
             is_label = any(word in element.label.upper() for word in _LAYOUT_LABEL_WORDS)
             obstacles[f"{'label' if is_label else 'note'} {element.label}"] = element.box
+    if RIG_SET_NOTE_LABEL not in boxes:
+        raise RuntimeError("callout check found no RIG SET note on the holes sheet")
     tables = [
         element
         for view in (sheet_view, *views.values())
@@ -1608,6 +1634,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # junction is not measurable with hobby-shop kit, so the model keeps its
     # fillet and the deck cutter's own corner radius defines it (2026-09
     # review over-specification item).
+    # Sheet-2 left notes column, below the hole table: the RIG SET note both
+    # rig transfer callouts name (the A1-A4 matched fit is on the sockets).
+    add_note(adapter, RIG_SET_STEP, *RIG_SET_NOTE_XY)
     if not auto_center_marks(adapter, hole_top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
 

@@ -162,12 +162,20 @@ LEFT_KEEP = {
     # the cross hole's height from the pivot-bore wall sits in the clear field
     # left of the view.  pc-ra eye pass: centred between its witnesses the
     # seat's 4.50 was cut by the seat-axis witness, so its text sits left of
-    # face A, outside the extension lines like the 3.18.
-    "CrossHoleCz": (0.0754, 0.099),
+    # face A, outside the extension lines like the 3.18.  pc-rc eye pass (nit
+    # D): centred, the cross hole's 4.50 threw its right arrow outside the
+    # span, where the THRU callout's leader cut through it -- so it sits left
+    # of face A too, arrows inside, nothing right of the hole's witness.
+    "CrossHoleCz": (0.058, 0.099),
     "PinSeatCz": (0.058, 0.2025),
     "CrossHoleFromBoreWall": (0.058, 0.119),
 }
 SECTION_CENTER = (0.350, 0.115)
+# The cut's B labels hang under its ends.  Ending at the 28.00's dimension
+# line (x 0.240) hung the right B on that dimension's lower arrow (layout
+# audit, text-on-line); 0.250 puts it past the arrow and the extension line's
+# end.
+SECTION_LINE_X = (0.180, 0.250)
 # Right of the seat's witness lines (x <= 0.3394), callout below the value:
 # the above-lane callout never rendered and left a bare 66 mm dimension line.
 SECTION_KEEP = {"PinSeatDepth": (0.361, 0.160)}
@@ -308,8 +316,8 @@ async def build(adapter: Any) -> dict[str, str]:
     seat_section = create_section_view(
         adapter,
         front,
-        line_start=(0.180, seat_axis_y),
-        line_end=(0.240, seat_axis_y),
+        line_start=(SECTION_LINE_X[0], seat_axis_y),
+        line_end=(SECTION_LINE_X[1], seat_axis_y),
         view_xy=SECTION_CENTER,
         section_label="B",
         scale=(3.0, 1.0),

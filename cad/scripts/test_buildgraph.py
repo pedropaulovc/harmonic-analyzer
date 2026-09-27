@@ -110,7 +110,7 @@ _INSERTED_SOURCES = {
     "cylinder_gear_shaft "
     "fillister_screw foot_screw pedestal_hold_down_screw pinion_arbor pinion_arbor_collar pinion_bracket pinion_cam "
     "pinion_cam_pin pinion_handle pinion_lever pinion_lever_pin pinion_lift_rod "
-    "pinion_pivot_block pinion_pivot_shaft pinion_spring post_mount_screw slotted_screw "
+    "pinion_pivot_block pinion_pivot_shaft pinion_spring pinion_strap_pin post_mount_screw slotted_screw "
     "swing_stop_screw",
     "channel": "amplitude_bar channel_lever channel_spring_installed connecting_rod "
     "frame_side_screw fulcrum_keeper fulcrum_shaft pivot_bracket pivot_shaft "

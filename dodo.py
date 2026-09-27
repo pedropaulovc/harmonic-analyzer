@@ -119,6 +119,7 @@ from _buildgraph import (  # noqa: E402
     part_scripts,
     part_stems,
     parts_registry_files,
+    reads_title_block_geometry,
     references_of,
     script_for,
     stamps_part_properties,
@@ -1035,10 +1036,16 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
 def _expand_title_block_token(kind: str | None, script: Path) -> list[str]:
     """Per-task expansion of the ``"title_block"`` token (the TOL_* stamping in
     ``_common.part_properties`` or ``_assembly.assembly_title_properties``):
-    every part and every drawing-owning assembly stamps these values. Assemblies
-    without either path drop the token. Any other caller keeps the dependency
+    every part and every drawing-owning assembly stamps these values. An
+    assembly whose closure sizes geometry from the printed rows
+    (``reads_title_block_geometry``) keeps it too, stamping or not. Other
+    assemblies drop the token. Any other caller keeps the dependency
     conservatively."""
-    if kind == "assembly" and not stamps_title_block_properties(script):
+    if (
+        kind == "assembly"
+        and not stamps_title_block_properties(script)
+        and not reads_title_block_geometry(script)
+    ):
         return []
     return [str((CONFIG_DIR / "title_block.yaml").resolve())]
 
@@ -2914,12 +2921,19 @@ def task_check():
         # dimensions.yaml is read by no part, so only this test keeps its
         # alignment-pinion record pinned to the CAD constants (#814).
         SCRIPTS_DIR / "test_dimensions_alignment_pinion_layout.py",
+        # Every cad/config YAML parses: prose-only records move no cache key,
+        # so a row that breaks the file is otherwise invisible (caf03f2b7).
+        SCRIPTS_DIR / "test_config_yaml_parses.py",
         # The mirror-retirement diagnostic's drive-train rows equal the rows the
         # assembly places with (Codex on #814 and #844).
         SCRIPTS_DIR / "test_mirror_retirement_expectations.py",
         # Every cad/scripts/test_*.py runs in some check:* gate or is exempted
         # with a reason, so a new test cannot ship un-enrolled (Codex on #844).
         SCRIPTS_DIR / "test_check_gate_enrollment.py",
+        # No module assigns an UPPERCASE name twice at top level: a merge that
+        # kept both sides of a rewritten block shadowed seven BDT constants
+        # (cascade -> integ merge, Main's restricted review).
+        SCRIPTS_DIR / "test_module_constants_assigned_once.py",
         # Integ-branch tests that guard caught un-enrolled at #877 round 4.
         SCRIPTS_DIR / "test_cone_gear_mesh_design.py",
         SCRIPTS_DIR / "test_cone_gear_seat_fit.py",

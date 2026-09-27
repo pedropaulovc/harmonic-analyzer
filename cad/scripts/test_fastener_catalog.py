@@ -29,6 +29,7 @@ _EXPECTED = {
     "lag-screw": (("92240A540",), "MHA-039", 4),
     "pedestal-hold-down-screw": (("90280A197",), "MHA-143", 2),
     "pen-set-screw": (("99607A213",), "MHA-052", 1),
+    "pinion-strap-pin": (("98296A027",), "MHA-145", 3),
     "post-mount-screw": (("40923898",), "MHA-142", 2),
     "slotted-screw": (("90280A201",), "MHA-101", 4),
     "swing-stop-screw": (("90280A199",), "MHA-095", 1),

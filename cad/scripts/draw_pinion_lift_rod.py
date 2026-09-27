@@ -20,6 +20,7 @@ from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
+from _drawing_annotation_extent import place_callout_clear
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -50,6 +51,7 @@ from pinion_lift_rod_spec import (
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -134,7 +136,9 @@ def _front_end_detail(adapter: Any, side: Any) -> Any:
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     points = []
     for x, y in (center, (center[0] + radius, center[1])):
-        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
     manager = _early_bound(draw.SketchManager, "ISketchManager")
@@ -278,6 +282,21 @@ async def build(adapter: Any) -> dict[str, str]:
         label="lift rod bearing finish",
         entity_type="SILHOUETTE",
         char_height=0.0025,  # the pivot-block size; the default read oversized
+    )
+
+    # pc-r7 machinist review: the end view's diameter shoulder ran past the
+    # inner border.  The callout is moved from its read-back box to clear the
+    # zone frame, and the placement is asserted.
+    place_callout_clear(
+        adapter,
+        next(
+            annotation
+            for annotation in front_annotations
+            if dimension_name(adapter, annotation) == "RodDia"
+        ),
+        label="MHA-060 end-view diameter",
+        below={},
+        beside={},
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)

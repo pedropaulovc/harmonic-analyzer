@@ -21,6 +21,7 @@ from pinion_pivot_shaft_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, check, run_build
+from _drawing_annotation_extent import gdt_box, place_callout_clear
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -47,6 +48,7 @@ from pinion_pivot_shaft_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -168,7 +170,7 @@ async def build(adapter: Any) -> dict[str, str]:
         FRONT_CENTER[0] + end_radius * math.cos(math.radians(50.0)),
         FRONT_CENTER[1] + end_radius * math.sin(math.radians(50.0)),
     )
-    add_feature_control_frame(
+    cylindricity = add_feature_control_frame(
         adapter,
         front,
         edge_xy=end_upper,
@@ -177,7 +179,7 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance=GEOMETRIC_TOLERANCES_MM["pinion pivot cylindrical body"],
         label="pinion pivot cylindrical body",
     )
-    add_datum_feature(
+    datum_a = add_datum_feature(
         adapter,
         front,
         edge_xy=end_top,
@@ -195,7 +197,7 @@ async def build(adapter: Any) -> dict[str, str]:
         RIGHT_CENTER[0],
         RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 4000.0,
     )
-    add_feature_control_frame(
+    crown_profile = add_feature_control_frame(
         adapter,
         right,
         edge_xy=right_crown_face,
@@ -207,7 +209,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pinion pivot crown profile",
         entity_type="FACE",
     )
-    add_surface_finish(
+    bearing_finish = add_surface_finish(
         adapter,
         right,
         edge_xy=body_face,
@@ -215,6 +217,35 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="pinion pivot bearing finish",
         entity_type="FACE",
+    )
+
+    # pc-r7 eye pass: the cylindricity frame and datum A sat on the
+    # match-drill callout's text, and the Ra bar on its shoulder.  The callout
+    # is moved from the symbols' read-back boxes, not by a hand-tuned
+    # coordinate, and the placement is asserted, so a longer callout moves
+    # further instead of re-colliding.
+    place_callout_clear(
+        adapter,
+        next(
+            annotation
+            for annotation in right_annotations
+            if dimension_name(adapter, annotation) == "PinHoleDia"
+        ),
+        label="MHA-062 match-drill callout",
+        below={
+            "bearing finish": gdt_box(
+                adapter, bearing_finish.GetAnnotation(), label="bearing Ra"
+            ),
+        },
+        beside={
+            "cylindricity frame": gdt_box(
+                adapter, cylindricity.GetAnnotation(), label="cylindricity frame"
+            ),
+            "datum A": gdt_box(adapter, datum_a.GetAnnotation(), label="datum A"),
+            "crown profile frame": gdt_box(
+                adapter, crown_profile.GetAnnotation(), label="crown profile frame"
+            ),
+        },
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
