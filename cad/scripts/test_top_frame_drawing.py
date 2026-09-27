@@ -466,7 +466,10 @@ def _letter_ink(name):
         return (
             _segment_ink("rail outer edge", edge, drawing.TEXT_CLEARANCE),
             _segment_ink("183.9 line", _mm_segment(_WINDOW_WIDTH_LINE), drawing.TEXT_CLEARANCE),
-            ("183.9", lambda box: _box_box_gap(box, _mm(_WINDOW_WIDTH_TEXT)), ink),
+            # Beside the value on its line: a letter's width of air, so the
+            # letter does not read as the value's prefix ("B183.9").
+            ("183.9", lambda box: _box_box_gap(box, _mm(_WINDOW_WIDTH_TEXT)),
+             drawing.SECTION_LETTER_TEXT_GAP),
         )
     if name == "B-inner":
         face = _plan_line("B", (part.BAR_X1, part.INNER_Z), (part.INNER_X, part.INNER_Z))
@@ -564,6 +567,73 @@ def test_section_cuts_cross_the_same_stock() -> None:
     (d_outer, dz), (d_inner, dz_inner) = ends["D"]
     assert dz == dz_inner == part.GOOSENECK_Z
     assert d_outer < -part.OUTER_X and -part.INNER_X < d_inner < part.BAR_X0
+
+
+# Each removed section's profile ink on b49e1 (mm, x only): B-B's T, E-E's
+# left side rail (its web to the right), D-D's hub rail.
+_B49E1_PROFILES = {
+    "B-B": (350.10, 362.76),
+    "E-E": (292.38, 344.91),
+    "D-D": (314.89, 349.07),
+}
+
+
+def test_section_profiles_pin_where_b49e1_printed_them() -> None:
+    """leaders955-f542: the longer cuts slid D-D's profile 4.27 mm, E-E's
+    2.84 and B-B's 0.67 under their typed text, so each is pinned by the
+    rail centreline it cuts, at b49e1's print."""
+    b0, b1 = _B49E1_PROFILES["B-B"]
+    assert drawing.RAIL_SECTION_PROFILE_X * 1000.0 == pytest.approx((b0 + b1) / 2.0, abs=0.01)
+    e0, _e1 = _B49E1_PROFILES["E-E"]
+    side_rail_centre = e0 + (part.OUTER_X - part.COLUMN_X) / 4.0
+    assert drawing.SIDE_SECTION_PROFILE_X * 1000.0 == pytest.approx(side_rail_centre, abs=0.01)
+    d0, d1 = _B49E1_PROFILES["D-D"]
+    assert d1 - d0 == pytest.approx(part.RAIL_W_SIDE, abs=0.05)
+    assert drawing.HUB_SECTION_PROFILE_X * 1000.0 == pytest.approx((d0 + d1) / 2.0, abs=0.01)
+
+
+class _FakeView:
+    def __init__(self, position, persists=True):
+        self.Position = position
+        self.persists = persists
+
+    def SetViewPosition(self, xy, _move_children):
+        if self.persists:
+            self.Position = tuple(xy)
+        return True
+
+
+def _pin(monkeypatch, view, offset):
+    """Pin with the model point printing at the view's position + offset."""
+    monkeypatch.setattr(
+        drawing, "model_point_in_view",
+        lambda _adapter, v, _xyz, *, label: (v.Position[0] + offset[0], v.Position[1] + offset[1]),
+    )
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda _adapter, *, label: None)
+    monkeypatch.setattr(drawing, "double_array", lambda values: tuple(values))
+    drawing._pin_section_profile(None, view, (0.0, 0.0, 0.0), 0.3320, label="D-D")
+
+
+def test_pin_section_profile_moves_the_view_by_the_miss(monkeypatch) -> None:
+    view = _FakeView((0.3300, 0.2100))
+    _pin(monkeypatch, view, (-0.0043, 0.0))
+    assert view.Position == pytest.approx((0.3363, 0.2100))
+
+
+def test_pin_section_profile_fails_loud_when_the_move_does_not_hold(monkeypatch) -> None:
+    with pytest.raises(RuntimeError, match="D-D section profile prints at"):
+        _pin(monkeypatch, _FakeView((0.3300, 0.2100), persists=False), (-0.0043, 0.0))
+
+
+def test_build_pins_every_removed_section_and_writes_centrelines_direct() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for pinned in ("RAIL_SECTION_PROFILE_X, label=\"B-B\"", "SIDE_SECTION_PROFILE_X, label=\"E-E\"",
+                   "HUB_SECTION_PROFILE_X, label=\"D-D\""):
+        assert pinned in source, pinned
+    body = source[source.index("def _add_view_centerlines(") :]
+    body = body[: body.index("\ndef ")]
+    assert "manager.AddToDB = True" in body
+    assert "_assert_centreline_placed(adapter, segment, points)" in body
 
 
 def test_build_cuts_each_section_at_its_derived_ends() -> None:

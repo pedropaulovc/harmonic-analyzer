@@ -329,6 +329,13 @@ SIDE_SECTION_SCALE = (1, 4)
 SIDE_SECTION_CAPTION_XY = (0.3183, 0.0915)
 SIDE_SECTION_NOTE_XY = (0.290, 0.133)
 SIDE_WEB_TEXT_XY = (0.335, 0.120)
+# Where each removed section prints the rail centreline it cuts, sheet x:
+# B-B at z 112 and E-E / D-D at x -197, as on b49e1, the sheet the
+# machinist review passed.  Their text above is placed round these profiles,
+# so _pin_section_profile holds them here however far the cut runs.
+RAIL_SECTION_PROFILE_X = 0.35643
+SIDE_SECTION_PROFILE_X = 0.29666
+HUB_SECTION_PROFILE_X = 0.33198
 
 # #955 (layoutcheck on b49e1): three cutting-plane letters printed on ink.
 # B's outer letter sat on the +Z rail's outer edge and the 183.9, E's outer
@@ -362,6 +369,11 @@ WINDOW_WIDTH_DIM_LINE_DROP = 0.0027
 # 1.7 mm, so INK_CLEARANCE cannot hold.  It keeps the text clearance the
 # cone-tip-block sheet uses between a letter and a view's edge.
 TEXT_CLEARANCE = 0.0015
+# A letter that stands on a value's line reads apart from it only with a
+# letter's width of air plus the ink clearance.
+SECTION_LETTER_TEXT_GAP = (
+    SECTION_LETTER_EXTENTS["B"][2] - SECTION_LETTER_EXTENTS["B"][0] + INK_CLEARANCE + ROUND_OUT
+)
 
 # Only views drawn at a scale the title block does not state carry a label,
 # and every label sits under its own view - centred where the dimension
@@ -458,6 +470,22 @@ SECTION_CALLOUTS = {
 }
 
 
+def _assert_centreline_placed(
+    adapter: Any, segment: Any, points: list[tuple[float, ...]]
+) -> None:
+    """Fail when a centreline's endpoints are not where they were authored."""
+    line = _early_bound(segment, "ISketchLine")
+    for expected, accessor in zip(points, ("GetStartPoint2", "GetEndPoint2")):
+        point = _early_bound(adapter._get_attr_or_call(line, accessor), "ISketchPoint")
+        actual = [float(adapter._get_attr_or_call(point, axis)) for axis in ("X", "Y", "Z")]
+        drift = max(abs(a - b) for a, b in zip(actual, expected))
+        if drift > 1e-9:
+            raise RuntimeError(
+                f"drawing centreline {accessor[3:-6].lower()} point sits {drift*1000.0:.4g} mm "
+                f"from where it was authored ({actual} instead of {list(expected)})"
+            )
+
+
 def _add_view_centerlines(
     adapter: Any,
     view: Any,
@@ -487,9 +515,18 @@ def _add_view_centerlines(
             )
             point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
             points.append(tuple(_early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData))
-        segment = manager.CreateCenterLine(*points[0], *points[1])
+        # Direct to the database: an inferred endpoint snaps onto nearby ink.
+        # leaders955-f542's D-D bore axis snapped 1.1 mm at one end and
+        # printed skewed across the pocket.
+        previous_add_to_db = bool(manager.AddToDB)
+        manager.AddToDB = True
+        try:
+            segment = manager.CreateCenterLine(*points[0], *points[1])
+        finally:
+            manager.AddToDB = previous_add_to_db
         if segment is None:
             raise RuntimeError("failed to create owned drawing centreline")
+        _assert_centreline_placed(adapter, segment, points)
         segment = _early_bound(segment, "ISketchSegment")
         segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
         if int(segment.Color) != 0:
@@ -858,7 +895,9 @@ def _hub_pocket_section(adapter: Any, parent_view: Any) -> Any:
         raise RuntimeError("set-pocket section centre did not persist")
     if not math.isclose(ratio[0]/ratio[1], HUB_SECTION_SCALE[0]/HUB_SECTION_SCALE[1]):
         raise RuntimeError("set-pocket section scale did not persist")
-    _log_section_profile(adapter, view, (-COLUMN_X, 0.0, GOOSENECK_Z), label="D-D")
+    _pin_section_profile(
+        adapter, view, (-COLUMN_X, 0.0, GOOSENECK_Z), HUB_SECTION_PROFILE_X, label="D-D",
+    )
     _add_view_centerlines(
         adapter, view,
         (
@@ -1019,11 +1058,13 @@ def section_cut_ends() -> dict[str, tuple[Point, Point]]:
     clear = INK_CLEARANCE + ROUND_OUT
     center_y = GEOMETRY_TOP_CENTER[1]
     # B: the station slides along the +Z rail until the outer letter ends
-    # an ink clearance left of the "183.9", and stays in the rail's plain T,
-    # past the junction land and short of the corner boss.
+    # left of the "183.9", and stays in the rail's plain T, past the junction
+    # land and short of the corner boss.  The letter stands on that value's
+    # line, and 1.7 mm off it (leaders955-f542) it read as "B183.9", so it
+    # keeps a further letter's width of air.
     b0, b_down, b1, b_up = SECTION_LETTER_EXTENTS["B"]
     text_left = WINDOW_WIDTH_TEXT_XS[1] - WINDOW_WIDTH_TEXT_EXTENT[0]
-    rail_x = (text_left - clear - b1 - GEOMETRY_TOP_CENTER[0]) / s
+    rail_x = (text_left - SECTION_LETTER_TEXT_GAP - b1 - GEOMETRY_TOP_CENTER[0]) / s
     if not LAND_X1 < rail_x < COLUMN_X - BOSS_DIA / 2.0:
         raise ValueError(f"B-B station x {rail_x:.1f} leaves the rail's plain T")
     # Its outer letter is centred in the band between that dimension's line
@@ -1056,23 +1097,42 @@ def section_cut_ends() -> dict[str, tuple[Point, Point]]:
     }
 
 
-def _log_section_profile(
-    adapter: Any, view: Any, model_point: tuple[float, float, float], *, label: str
+def _pin_section_profile(
+    adapter: Any,
+    view: Any,
+    model_point: tuple[float, float, float],
+    target_x: float,
+    *,
+    label: str,
 ) -> None:
-    """Record where a removed section prints its rail centreline.
+    """Slide a removed section along the sheet until ``model_point`` (the
+    rail centreline it cuts) prints at ``target_x``.
 
-    #955 lengthened B, E and D's cuts through air only.  On b49e1 each
-    view's outline centre sat no more than 0.35 mm off its profile's
-    centre, not on the cut's midpoint, so the profiles should not move.  This line is what
-    confirms it against b49e1's ink: B 356.43, E 296.66, D 331.98 mm.
+    A removed section's outline, and so where SolidWorks centres it, grows
+    with its cutting line, air included: on leaders955-f542 #955's longer
+    cuts moved D-D's profile 4.27 mm, E-E's 2.84 and B-B's 0.67 under their
+    typed dimension text.  Pinning the profile keeps the section where the
+    reviewed sheet has it whatever the cut spans.
     """
-    x, y = model_point_in_view(
-        adapter, view, tuple(value/1000.0 for value in model_point), label=label
-    )
+    point = tuple(value/1000.0 for value in model_point)
+    x, y = model_point_in_view(adapter, view, point, label=label)
+    position = tuple(float(value) for value in view.Position)
+    if len(position) != 2:
+        raise RuntimeError(f"{label} section has no position")
+    moved = (position[0] + target_x - x, position[1])
+    if not view.SetViewPosition(double_array(list(moved)), False):
+        raise RuntimeError(f"failed to pin the {label} section's profile")
+    rebuild_drawing(adapter, label=f"pin {label} profile")
+    pinned_x, pinned_y = model_point_in_view(adapter, view, point, label=label)
     _telemetry.info(
-        f"{label} rail centreline prints at ({x*1000.0:.2f}, {y*1000.0:.2f}) mm",
-        section_profile=label, sheet_x_mm=round(x*1000.0, 3), sheet_y_mm=round(y*1000.0, 3),
+        f"{label} rail centreline pinned {x*1000.0:.2f} -> {pinned_x*1000.0:.2f} mm",
+        section_profile=label, from_x_mm=round(x*1000.0, 3), sheet_x_mm=round(pinned_x*1000.0, 3),
     )
+    if abs(pinned_x - target_x) > 0.00005 or abs(pinned_y - y) > 0.00005:
+        raise RuntimeError(
+            f"{label} section profile prints at ({pinned_x*1000.0:.3f}, {pinned_y*1000.0:.3f}) mm, "
+            f"not at x {target_x*1000.0:.3f} mm on its row"
+        )
 
 
 def _model_offset_in_view(
@@ -1442,8 +1502,9 @@ async def build(adapter: Any) -> dict[str, str]:
         partial=True, label="T rail manufacturing section",
     )
     _orient_cut_section(adapter, rail_section, (0.0, 0.0, 1.0))
-    _log_section_profile(
-        adapter, rail_section, (rail_cut_x, 0.0, abs(FRONT_COLUMN_Z)), label="B-B"
+    _pin_section_profile(
+        adapter, rail_section, (rail_cut_x, 0.0, abs(FRONT_COLUMN_Z)),
+        RAIL_SECTION_PROFILE_X, label="B-B",
     )
     # The display mode comes before any pick: ``scan_view_edges``
     # answers for the mode the view is in, so an edge picked while the
@@ -1531,7 +1592,10 @@ async def build(adapter: Any) -> dict[str, str]:
         partial=True, label="side rail manufacturing section",
     )
     _orient_cut_section(adapter, side_section, (1.0, 0.0, 0.0))
-    _log_section_profile(adapter, side_section, (-COLUMN_X, 0.0, SIDE_SECTION_Z), label="E-E")
+    _pin_section_profile(
+        adapter, side_section, (-COLUMN_X, 0.0, SIDE_SECTION_Z),
+        SIDE_SECTION_PROFILE_X, label="E-E",
+    )
     set_hidden_lines_removed(adapter, side_section)
     _checked_dimension(
         adapter, side_section,
