@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import math
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -313,7 +314,9 @@ def test_the_frame_axis_seed_is_not_the_shipped_seed() -> None:
 # --- The 64T against MHA-016's north side (crank_boss_rim) --------------------
 # cg-fx2b's drive-train interference gate found the 64T's tip in the crank
 # boss at the harvested spot-face station; the user ruled the face retreated
-# and run out as a flat, each size the smallest step that holds the target.
+# 2.5 and run out as a flat.  The build asserts only the 0.25 floor; the
+# minimality below records the derivation at ruling time, under U31's +/-0.5
+# station band (#916's collar stack will widen every margin, not move sizes).
 
 
 def _spot_face_sizes() -> tuple[float, float, float]:
@@ -354,25 +357,33 @@ def test_the_printed_spot_face_holds_the_floor_on_all_five_surfaces() -> None:
     assert min(worst, key=worst.get) == "cone boss end"
 
 
-def test_the_ruled_retreat_was_needed_under_today_s_station_band() -> None:
-    """Fail-first: 0.5 less retreat leaves the collar under the floor."""
-    smaller = crank_boss_rim.one_step_short(*_spot_face_sizes())["retreat"]
-    assert set(crank_boss_rim.worst_shortfalls(drive.GEAR64_POST_OFFSET, smaller)) == {"collar"}
-    assert post.CRANK_SPOT_FACE_RETREAT == 2.5
-
-
-@pytest.mark.parametrize("size", ["width", "run-out"])
-def test_a_run_out_one_step_smaller_misses_the_floor(size: str) -> None:
-    """Fail-first for the import-time derivation: the printed run-out is the
-    smallest step that holds the floor."""
+@pytest.mark.parametrize(
+    ("size", "short_by_more_than"),
+    [
+        ("retreat", 0.25 - 0.15),  # 2.0: collar +0.142
+        ("width", 0.25 - 0.24),  # 22: collar +0.231
+        ("run-out", 0.25 + 0.47),  # 16: collar -0.48
+    ],
+)
+def test_each_size_a_step_smaller_misses_the_floor_under_today_s_band(
+    size: str, short_by_more_than: float
+) -> None:
+    """Fail-first, at ruling time: under U31's +/-0.5 station band each size
+    a step smaller leaves the collar under the floor, and only the collar."""
+    assert crank_boss_rim.GEAR64_STATION_TOWARD_POST == 0.5
     smaller = crank_boss_rim.one_step_short(*_spot_face_sizes())[size]
-    assert crank_boss_rim.worst_shortfalls(drive.GEAR64_POST_OFFSET, smaller)
+    short = crank_boss_rim.worst_shortfalls(drive.GEAR64_POST_OFFSET, smaller)
+    assert set(short) == {"collar"}
+    assert short["collar"] > short_by_more_than
+    assert _spot_face_sizes() == (2.5, 23.0, 17.0)
 
 
-def test_the_derivation_is_checked_at_import() -> None:
+def test_the_build_asserts_the_floor_and_not_minimality() -> None:
+    """Minimality in the build would move eye-passed geometry once #916's
+    collar narrows the station band; only the floor belongs there."""
     source = Path(drive.__file__).read_text(encoding="utf-8")
-    assert "crank_boss_rim.one_step_short(*_SPOT_FACE_SIZES)" in source
     assert "crank_boss_rim.worst_shortfalls(" in source
+    assert "one_step_short" not in source
 
 
 def test_the_nominal_clearances_the_solidworks_cross_check_reads() -> None:
@@ -440,3 +451,22 @@ def test_the_solidworks_cross_check_fails_when_the_gear_is_nearer(
     with pytest.raises(RuntimeError, match="misses real material"):
         _measured(monkeypatch, on_pad, 1.681 - 0.2)
     assert _measured(monkeypatch, on_pad, 1.70)["delta_mm"] == pytest.approx(0.019, abs=2e-3)
+
+
+def test_the_solidworks_cross_check_is_a_span_carrying_its_numbers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The leaf's trace answers the cross-check without its console log."""
+    spans: dict[str, dict] = {}
+
+    @contextmanager
+    def span(name: str, **attributes):
+        recorded = spans.setdefault(name, dict(attributes))
+        yield SimpleNamespace(set_attribute=recorded.__setitem__)
+
+    monkeypatch.setattr(gear64_post_measure._telemetry, "span", span)
+    on_face = (3.0, crank_boss_rim.CRANK_AXIS_Y - 5.0, post.CRANK_BOSS_NORTH_FACE)
+    record = _measured(monkeypatch, on_face, 2.40)
+    attributes = spans["verify.gear64_post_distance"]
+    for key in ("measured_mm", "measured_feature", "predicted_mm", "predicted_feature", "delta_mm"):
+        assert attributes[f"gear64_post.{key}"] == record[key]

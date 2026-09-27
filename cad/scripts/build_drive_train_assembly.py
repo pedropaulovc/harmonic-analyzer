@@ -1480,10 +1480,10 @@ if GRIP_HEAD_T12_AIR_WORST < PINION_SEAT_FEELER:
 # interference gate found its tip in the crank boss).  crank_boss_rim works in
 # the frame where the cone axis crosses the post axis; pin that frame to this
 # layout, then hold every feature to the floor at print-worst with the spot
-# face the post prints -- and fail if a run-out one step narrower or shorter
-# would hold it too, so the printed run-out stays the derived one.  The
-# retreat is the user's ruled 2.5, not re-derived here: when #916's collar
-# replaces the 64T's station band, the margins grow and nothing moves.
+# face the post prints.  Only the floor is asserted here, never minimality:
+# the sizes are the post's (the ruled retreat, a geometric run-out), and when
+# #916's collar replaces the 64T's station band the margins grow and nothing
+# moves.
 GEAR64_POST_OFFSET = GEAR64_STATION + GEAR_AXIS_SHIFT - POST_STATION
 _GEAR64_FROM_POST = [a - b for a, b in zip(GEAR64_SEAT, _PPOST, strict=True)]
 if (
@@ -1496,23 +1496,15 @@ if (
     > 1e-3  # the post prints its incline to 4 places; the layout carries 12.518222
 ):
     raise AssertionError("crank_boss_rim's post frame no longer matches this layout")
-_SPOT_FACE_SIZES = (POST_SPOT_FACE_RETREAT, POST_SPOT_FACE_WIDTH, POST_SPOT_FACE_RUN_OUT)
 _short = crank_boss_rim.worst_shortfalls(
-    GEAR64_POST_OFFSET, crank_boss_rim.spot_face(*_SPOT_FACE_SIZES)
+    GEAR64_POST_OFFSET,
+    crank_boss_rim.spot_face(POST_SPOT_FACE_RETREAT, POST_SPOT_FACE_WIDTH, POST_SPOT_FACE_RUN_OUT),
 )
 if _short:
     raise AssertionError(
         f"the 64T misses its {crank_boss_rim.FLOOR_CLEARANCE_MM} floor to "
         f"MHA-016 at print-worst by {_short}"
     )
-for _size, _smaller in crank_boss_rim.one_step_short(*_SPOT_FACE_SIZES).items():
-    if _size == "retreat":
-        continue
-    if not crank_boss_rim.worst_shortfalls(GEAR64_POST_OFFSET, _smaller):
-        raise AssertionError(
-            f"MHA-016's spot-face {_size} clears the 64T a step smaller: it is "
-            "not the derived size"
-        )
 
 
 # Every length term below is what an ACCEPTED part may be: the sheet's printed

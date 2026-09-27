@@ -25,7 +25,7 @@ from _common import _early_bound
 GEAR_COMPONENT = "crank-drive-gear-1"
 POST_COMPONENT = "cone-pivot-post-1"
 # The measured distance may undercut the envelope's by this much at most:
-# ClosestDistance's own resolution, well under the 0.75 target.
+# ClosestDistance's own resolution, well under crank_boss_rim's 0.25 floor.
 UNDERCUT_LIMIT_MM = 0.05
 POST_FEATURES = ("crank boss", "collar", "body", "cone boss end")
 
@@ -81,7 +81,7 @@ def measure(adapter: Any, *, post_origin: tuple[float, float, float], gear_offse
             "delta_mm": round(measured - predicted[least], 4),
         }
         for key, value in record.items():
-            sp.set_attribute(f"gear64_post.{key}", str(value))
+            sp.set_attribute(f"gear64_post.{key}", value)
         _telemetry.info(f"64T to MHA-016, SolidWorks vs crank_boss_rim nominal: {record}")
         if measured < predicted[least] - UNDERCUT_LIMIT_MM:
             raise RuntimeError(
