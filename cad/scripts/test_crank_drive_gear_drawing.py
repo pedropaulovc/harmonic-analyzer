@@ -144,20 +144,23 @@ def test_bore_band_is_derived_from_its_fit_class_not_written_by_hand() -> None:
     assert "_config.fit(" not in Path(spec.__file__).read_text(encoding="utf-8")
 
 
-def test_outside_diameter_stays_at_the_general_grade() -> None:
-    # The tip circle is NOT an accuracy feature (tolerance-policy.md scores
-    # gear runout below 0.1 %/mm and the one-sided-load bullets forbid
-    # tightening a clearance for accuracy). The crossed mesh is built with
-    # fits.crank_mesh's 0.25 mm of centre-distance slack ON TOP of the tooth
-    # system's own tip clearance, so the general .XX grade fits inside the
-    # radial room and the tips still cannot bottom.
-    assert not hasattr(spec, "OUTSIDE_DIA_BAND")
+def test_outside_diameter_prints_the_tip_band_the_mesh_stack_takes() -> None:
+    # #906 R1 (user, 2026-09-26): at the title block's .XX +/-0.51 a tip could
+    # reach the 16T's root at the worst accepted fit-up, so the tip diameter
+    # prints +/-0.10 of its own on the reference sketch the sheet imports, and
+    # the stack takes that band.
+    import crank_mesh_stack
+
+    assert spec.OUTSIDE_DIA_TOLERANCE_MM == 0.10
     assert spec.DRAWING_PRECISION["OutsideDiaReference"]["OutsideDia"] == 2
-    slack = _config.fit("crank_mesh")["c2c_slack_mm"]
     assert spec.TIP_CLEARANCE_MM == pytest.approx(0.152, abs=0.001)
-    radial_room = slack + spec.TIP_CLEARANCE_MM
-    general_radial = _config.title_block("linear_2pl")["value_in"] * 25.4 / 2.0
-    assert general_radial < radial_room
+    assert crank_mesh_stack.TIP_ROOT_BAND_RADIAL >= spec.OUTSIDE_DIA_TOLERANCE_MM / 2.0
+    assert crank_mesh_stack.TIP_CLEARANCE_MM <= spec.TIP_CLEARANCE_MM
+    assert crank_mesh_stack.TIP_ROOT_AIR_WORST > 0.0
+    assert (
+        'set_dimension_symmetric_tolerance(\n        adapter, "OutsideDiaReference", '
+        '"OutsideDia", OUTSIDE_DIA_TOLERANCE_MM\n    )'
+    ) in _build_source()
     # The face width is the one free length: one place, so the title block's
     # .X grade is the band it claims, and the mating pinion's face is wider
     # than this one by more than that band at every allowed axial position.
@@ -567,3 +570,50 @@ def test_bore_finish_reads_at_note_height_and_no_leader_crosses_at_the_bore() ->
         },
         label="gear bore layout",
     )
+
+
+def test_dimension_record_states_the_pair_slack_the_assembly_builds() -> None:
+    # Codex #906 (PRRT_kwDOPHDy386mTa1J): the record row said both "slack
+    # 0.423" and "reclosed at 39.735 mm c2c with 0.25 mm slack", so a reader
+    # could rebuild two meshes from one row.  The pair states one slack, the
+    # assembly's; the 0.25 appears only as the design slack the c2c was solved
+    # at, and names its config key.
+    import re
+
+    import yaml
+
+    import build_drive_train_assembly as bdt
+
+    record = yaml.safe_load(
+        (Path(spec.__file__).resolve().parents[1] / "config" / "dimensions.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    rows = []
+    stack = [record]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            stack.extend(node.values())
+            continue
+        if not isinstance(node, list):
+            continue
+        if node and isinstance(node[0], str) and node[0].startswith("Crank-drive gear"):
+            rows.append([str(cell) for cell in node])
+            continue
+        stack.extend(node)
+    assert len(rows) == 1
+    value, rationale = rows[0][1], rows[0][3]
+
+    assert f"{bdt.MESH16_C2C:.3f} mm c2c" in value
+    # Any "<number> [mm] [qualifier] slack" phrase counts as a stated slack.
+    stated_slack = re.compile(r"(\d+\.\d+)(?: mm)?(?: [\w-]+)? slack")
+    assert stated_slack.findall(value) == [f"{bdt.MESH16_C2C_SLACK:.3f}"]
+    # R1: the working centre distance the bushing sets at nominal fit-up.
+    import crank_mesh_stack
+
+    assert f"closing the working centre distance {-crank_mesh_stack.FITUP_DC_NOMINAL:.3f}" in value
+
+    design_slack = _config.fit("crank_mesh")["c2c_slack_mm"]
+    assert stated_slack.findall(rationale) == []
+    assert f"the {design_slack} mm `fits.crank_mesh.c2c_slack_mm` design slack" in rationale

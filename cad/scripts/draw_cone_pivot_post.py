@@ -134,6 +134,23 @@ def _front_x(model_x: float) -> float:
     return FRONT_CENTER[0] + model_x * _S
 
 
+# The manufacturing notes hang from their top-left anchor and grow down.
+NOTES_ANCHOR = (0.014, 0.0555)
+# Datum B tags the foot seat below the elevation, and its frame hangs 7.0 mm
+# down from the tag point (measured on leaf w3-1026: point at 60.0 mm, frame
+# 53.0..60.0).  At model y -9 the frame sat on the notes' first line; the tag
+# point now sits a frame height plus clearance above the notes' top, still
+# below the foot (model y 0) so the leader reaches the seat.
+_DATUM_TAG_FRAME_HEIGHT = 0.007
+_DATUM_NOTES_CLEARANCE = 0.0015
+DATUM_B_TAG_XY = (
+    _front_x(-16.0),
+    NOTES_ANCHOR[1] + _DATUM_TAG_FRAME_HEIGHT + _DATUM_NOTES_CLEARANCE,
+)
+if not DATUM_B_TAG_XY[1] < _front_y(0.0):
+    raise AssertionError("datum B's tag no longer sits below the foot seat it tags")
+
+
 def _top_x(model_x: float) -> float:
     return TOP_CENTER[0] + model_x * _S
 
@@ -200,6 +217,22 @@ JOURNAL_KEEP = {
     "CrankAboveCone": (0.208, 0.170),
     "ConeBossDia": (0.292, 0.172),
     "JournalBoreDia": (0.292, 0.153),
+}
+# Both chained heights share the dimension line at JOURNAL_KEEP's x, and the
+# crank spacing's extension line runs up it past the 33.37's text, so that text
+# must end left of the line.  Its text box (value plus the ±0.25 stack) runs
+# 20.4 mm right of the offset point: the layout check on leaf w3-1026 read the
+# box as 176.4..210.4 mm with the offset point at 190.0, so 210.4 - 190.0
+# (a measured box, not a per-character estimate), and the 208.0 line crossed
+# it.
+_JOURNAL_AXIS_TEXT_RIGHT = 0.0204
+_TEXT_LINE_CLEARANCE = 0.002
+JOURNAL_TEXT_OFFSETS = {
+    "JournalAxisY": (
+        JOURNAL_KEEP["CrankAboveCone"][0] - _JOURNAL_AXIS_TEXT_RIGHT - _TEXT_LINE_CLEARANCE,
+        0.157,
+    ),
+    "CrankAboveCone": (0.193, 0.183),
 }
 # The non-preferred bore limits tell the shop what to inspect without imposing
 # a particular cutting method.  Ø21.93 is the crank boss OD -- the elevation
@@ -1000,7 +1033,7 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(
         adapter,
         journal_annotations,
-        {"JournalAxisY": (0.190, 0.157), "CrankAboveCone": (0.193, 0.183)},
+        JOURNAL_TEXT_OFFSETS,
     )
     # The plan must retain JournalPlanReference: its two native centreline rays
     # and imported dimensions carry the spotface station and 12.52-degree bore
@@ -1142,7 +1175,7 @@ async def build(adapter: Any) -> dict[str, str]:
             ),
             "datum:B": PmiDrawingPlacement(
                 view=front,
-                position=(_front_x(-16.0), _front_y(-9.0)),
+                position=DATUM_B_TAG_XY,
                 edge_entity=_circular_edge(
                     front, radius_mm=BLOCK_DIA / 2.0, center_y_mm=0.0
                 ),
@@ -1165,7 +1198,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Rule 6 caps the block at four lines (about 18 mm); the anchor keeps the
     # r7 clearance to the bottom inner border.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.0555)
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_ANCHOR)
 
     # Attaching dimensions and symbols can leave a stale hidden-line display.
     # Reassert each manufacturing view after its final annotation.

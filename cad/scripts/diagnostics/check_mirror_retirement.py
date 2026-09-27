@@ -571,12 +571,13 @@ for j in range(20):
     )
 # The crank family is a fully mated keyed chain: the golden dump records its
 # SOLVED pose, which sits ~1.2 um / 3.9e-7 rows off the insert intent (mate
-# solver epsilon). Compare with a solver-noise allowance.
+# solver epsilon). Compare with a solver-noise allowance. The family rides the
+# MHA-149 fit-up axis (X_CRANK_FIT, Y_CRANK_FIT), not the frame crank axis.
 _SOLVED = dict(pos_tol=0.005, row_tol=1e-6)
 expect(
     DT,
     "crankshaft-1",
-    [d.X_CRANK, d.Y_CRANK, d.CRANKSHAFT_Z0],
+    [d.X_CRANK_FIT, d.Y_CRANK_FIT, d.CRANKSHAFT_Z0],
     d.ROT_X_POS90,
     "crankshaft",
     **_SOLVED,
@@ -584,7 +585,7 @@ expect(
 expect(
     DT,
     "crank-hub-1",
-    [d.X_CRANK, d.Y_CRANK, d.CRANK_HUB_Z0],
+    [d.X_CRANK_FIT, d.Y_CRANK_FIT, d.CRANK_HUB_Z0],
     d.ROT_X_POS90,
     "crank-hub",
     **_SOLVED,
@@ -600,7 +601,7 @@ expect(
 expect(
     DT,
     "crank-pinion-1",
-    [d.X_CRANK, d.Y_CRANK, d.PINION_TOOTH_Z - d.PINION_FACE / 2.0],
+    [d.X_CRANK_FIT, d.Y_CRANK_FIT, d.PINION_TOOTH_Z - d.PINION_FACE / 2.0],
     d.rot_z_rows(-d.PINION_SEED_DEG),
     "crank-pinion 16T",
     **_SOLVED,
@@ -608,7 +609,7 @@ expect(
 expect(
     DT,
     "crank-arm-1",
-    [d.X_CRANK, d.Y_CRANK, d.CRANK_ARM_ORIGIN_Z],
+    [d.X_CRANK_FIT, d.Y_CRANK_FIT, d.CRANK_ARM_ORIGIN_Z],
     compose_rows(d.rot_z_rows(-90.0), ROT_Y_180),
     "crank-arm",
     **_SOLVED,
@@ -616,7 +617,7 @@ expect(
 expect(
     DT,
     "crank-handle-1",
-    [d.X_CRANK, d.Y_CRANK - d.ARM_C2C, d.CRANK_ARM_Z0],
+    [d.X_CRANK_FIT, d.Y_CRANK_FIT - d.ARM_C2C, d.CRANK_ARM_Z0],
     d.ROT_Y_POS90,
     "crank-handle",
     **_SOLVED,

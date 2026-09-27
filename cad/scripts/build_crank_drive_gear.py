@@ -92,6 +92,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
@@ -103,6 +104,7 @@ from crank_drive_gear_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     OUTSIDE_DIA,
+    OUTSIDE_DIA_TOLERANCE_MM,
     PRESSURE_ANGLE_DEG,
     SURFACE_FINISHES,
 )
@@ -290,6 +292,11 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "OutsideDiaReference")
     name_dimensions(adapter, "OutsideDiaReference", ["OutsideDia"])
     _verify_named_dimension(adapter, "OutsideDia@OutsideDiaReference", OUTSIDE_DIA)
+    # Its own band: the crank-mesh stack's tip-to-root air takes it
+    # (crank_drive_gear_spec).
+    set_dimension_symmetric_tolerance(
+        adapter, "OutsideDiaReference", "OutsideDia", OUTSIDE_DIA_TOLERANCE_MM
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

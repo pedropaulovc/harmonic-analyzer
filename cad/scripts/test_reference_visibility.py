@@ -357,9 +357,6 @@ _SNAPSHOT = {
         "PinStationReference",
     },
     "pinion-lever": {"GripStationReference", "PinHoleStationReference"},
-    "crank-hub": {"ServicePinStationReference"},
-    "crank-handle-pivot-screw": {"StationReference"},
-    "crankshaft": {"StationReference"},
     "cone-pivot-post": {"BoreSpacingReference", "JournalPlanReference"},
 }
 _OWNERS = {"pinioncluster", "crankhub", "pivot"}
@@ -646,6 +643,69 @@ def test_every_allowance_names_a_sketch_its_builder_authors() -> None:
                 'f"{prefix}Reference"' in text and f'prefix="{prefix}"' in text
             )
             assert authored, f"{path.name} authors no sketch named {name!r}"
+
+
+_REFERENCE_KINDS = frozenset({"PLANE", "AXIS", "POINT", "DATUMPOINT", "SKETCH"})
+# SolidWorks' own sequential names for features the builder never renames.
+_AUTO_NAME = re.compile(r"^(?:Plane|Axis|Point)\d+$")
+
+
+def _blanked_names_never_authored(text: str) -> list[str]:
+    """Names passed to blank_reference_geometry that nothing else in the source
+    authors.  A name is authored if it is a string literal outside the blank
+    call, or, for ``<X>StartPlane``, if ``<X>`` is (the crankshaft's
+    ``f"{name}StartPlane"`` helper)."""
+    tree = ast.parse(text)
+    in_blank: set[int] = set()
+    blanked: list[str] = []
+    for node in ast.walk(tree):
+        func = getattr(node, "func", None)
+        called = getattr(func, "id", None) or getattr(func, "attr", None)
+        if isinstance(node, ast.Call) and called == "blank_reference_geometry":
+            for sub in ast.walk(node):
+                in_blank.add(id(sub))
+                if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
+                    blanked.append(sub.value)
+    authored = {
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and id(node) not in in_blank
+    }
+    return [
+        name
+        for name in blanked
+        if name not in _REFERENCE_KINDS
+        and not _AUTO_NAME.match(name)
+        and name not in authored
+        and name.removesuffix("StartPlane") not in authored
+    ]
+
+
+def test_the_blank_sweep_flags_a_name_nothing_authors() -> None:
+    stale = (
+        'await cut("PinionSeat")\n'
+        'blank_reference_geometry(adapter, (("JournalStartPlane", "PLANE"),))\n'
+    )
+    assert _blanked_names_never_authored(stale) == ["JournalStartPlane"]
+    fixed = stale.replace("JournalStartPlane", "PinionSeatStartPlane")
+    assert _blanked_names_never_authored(fixed) == []
+    assert _blanked_names_never_authored(
+        'blank_reference_geometry(adapter, (("Plane7", "PLANE"),))\n'
+    ) == []
+
+
+def test_every_blanked_name_is_one_its_builder_authors() -> None:
+    """A blank of a feature the build no longer creates fails the build at
+    selection (R1's crankshaft dropped its journal but still blanked
+    'JournalStartPlane': leaf 20260926T211617385Z-2783256a, part:crankshaft)."""
+    offenders = {
+        path.name: missing
+        for path in sorted(SCRIPTS.glob("build_*.py"))
+        if (missing := _blanked_names_never_authored(path.read_text(encoding="utf-8")))
+    }
+    assert offenders == {}
 
 
 def test_the_shared_walk_counts_every_feature_but_skips_components() -> None:

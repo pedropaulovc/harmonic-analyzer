@@ -76,6 +76,7 @@ from cone_pivot_post_spec import (
     CONE_BOSS_LENGTH,
     CRANK_ABOVE_CONE,
     CRANK_ABOVE_CONE_BAND,
+    CRANK_BORE_BAND,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
     CRANK_BOSS_DIA,
@@ -183,7 +184,7 @@ CRANK_SPOT_FACE_MM3 = _disc_column_integral(
     CRANK_BOSS_RADIUS,
     lambda x: max(_collar_surface_z(x) + CRANK_BOSS_START_Z, 0.0),
 )
-# Crank bore: the full Ø11.438 cylinder from the station through the boss end;
+# Crank bore: the full Ø15.45 cylinder from the station through the boss end;
 # after the spot face everything on that path is solid.
 CRANK_BORE_MM3 = math.pi * CRANK_BORE_RADIUS**2 * CRANK_BOSS_LENGTH
 # Cone pads: a Ø17.2 mid-plane cylinder of total length 42.011 whose axis is
@@ -198,7 +199,7 @@ CONE_PADS_OUTSIDE_BODY_MM3 = (
 )
 CONE_BORE_MM3 = math.pi * BORE_RADIUS**2 * CONE_BOSS_LENGTH
 # Mounting holes: two through drills plus two counterbores; they clear the
-# crank bore (|x| <= 5.72 against a hole edge at 9.87) and, drilled last, are
+# crank bore (|x| <= 7.73 against a hole edge at 9.87) and, drilled last, are
 # not re-filled by any boss.
 ATTACHMENT_HOLES_MM3 = 2.0 * (
     math.pi * (ATTACHMENT_THRU_DIA / 2.0) ** 2 * (BLOCK_HEIGHT - ATTACHMENT_CBORE_DEPTH)
@@ -806,15 +807,15 @@ async def build(adapter: Any) -> dict[str, str]:
         HARVESTED_VOLUME_MM3,
         0.001 * HARVESTED_VOLUME_MM3,
     )
-    # Four accuracy features on this casting: the two running bores carry the
-    # ONE band that closes the `shaft_in_bushing` fit class against their
-    # turned shafts (cad/docs/tolerance-policy.md), the spacing between them
-    # carries the 16T:64T mesh band, and the cone axis above the foot carries
-    # the tip block's shim-pack band.  Everything else -- cast body and collar
-    # diameters, boss diameters, boss extents, mounting-hole stations -- runs
-    # at the title block's general grade.
+    # Four accuracy features on this casting: the cone journal bore carries
+    # the band that closes the `shaft_in_bushing` fit class against its turned
+    # shaft (cad/docs/tolerance-policy.md), the crank bore its H7 seat for the
+    # MHA-149 bushing, the spacing between them the 16T:64T mesh band, and the
+    # cone axis above the foot the tip block's shim-pack band.  Everything
+    # else -- cast body and collar diameters, boss diameters, boss extents,
+    # mounting-hole stations -- runs at the title block's general grade.
     set_dimension_bilateral_tolerance(
-        adapter, "CrankBoreProfile", "CrankBoreDia", *deviations(RUNNING_BORE_BAND)
+        adapter, "CrankBoreProfile", "CrankBoreDia", *deviations(CRANK_BORE_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter,

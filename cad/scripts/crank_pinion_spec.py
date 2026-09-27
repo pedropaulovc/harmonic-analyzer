@@ -62,14 +62,19 @@ TOOTH_THICKNESS_LOWER_DEVIATION = -0.020
 
 # The blank's outside diameter is the one tooth-system number the turner sets
 # before a cutter touches the part, so it prints as a NATIVE dimension instead
-# of as text in the data block -- but at the title block's general .XX grade,
-# with no band of its own. The crossed 16T:64T mesh keeps at least
-# ``fits.crank_mesh.c2c_slack_mm`` 0.25 mm of centre-distance slack (the frame
-# leaves the single-cutter pair more) on top of the tooth system's own 0.157/DP
-# tip clearance (0.152 mm), so the tip circle has over 0.40 mm of radial room:
-# +/-0.51 diametral is +/-0.255 radial, inside it.
-# A tighter band here would be a habit, not a requirement
-# (cad/docs/tolerance-policy.md, "Fit classes" and the one-sided-load bullets).
+# of as text in the data block. #906 R1: the MHA-149 bushing closes the
+# crossed 16T:64T mesh at fit-up until the backlash reads its acceptance, so
+# the frame's ``fits.crank_mesh.c2c_slack_mm`` is not what keeps a tip off the
+# mating root.  The radial room is what is left at the worst accepted fit-up
+# (thinnest teeth, bushing turned in until the reading is at the bottom of its
+# acceptance) on top of the tooth system's own 0.157/DP tip clearance;
+# ``crank_mesh_stack.TIP_ROOT_AIR_WORST`` takes it with this band on the tip
+# circle and asserts it above zero.  At the title block's .XX +/-0.51 the
+# air read -0.020; the user ruled +/-0.10 on both gears' tips (2026-09-26,
+# #906), which the turner holds with a micrometer before cutting, as on the
+# cone gears' blanks (cone_gear_spec.BLANK_DIA_BAND).  The air alone would
+# stay positive to about +/-0.46; the ruling is what sets +/-0.10.
+OUTSIDE_DIA_TOLERANCE_MM = 0.10
 MESH_C2C_SLACK_MM = _config.fit("crank_mesh")["c2c_slack_mm"]
 TIP_CLEARANCE_MM = 0.157 / DIAMETRAL_PITCH * MM_PER_IN
 
@@ -252,7 +257,10 @@ for _name, _value, _places in (
 # wall alone needed 12.815 (1.23 faces) at the old 0.32 recess; the recess
 # that survives the printed row and an exactly printed shaft adds the rest.
 PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0  # 17.65 from the toothed (south) face
-PIN_CLOCKING_DEG = 13.783608450714796  # = build_drive_train_assembly.PINION_SEED_DEG
+# = build_drive_train_assembly.PINION_SEED_DEG at the R1 nominal fit-up axis,
+# window-centred at the exact-solid window measured there (MESH_WINDOW_CENTRE_DEG
+# -1.24; dt-logs/crankhub/crank-mesh-R1-fitaxis-20260926.jsonl).
+PIN_CLOCKING_DEG = 18.15033786449369
 if PIN_STATION - PIN_DIA / 2.0 < FACE_WIDTH + 0.5:
     raise AssertionError("retention pin hole breaks into the pinion's tooth face")
 if PIN_STATION + PIN_DIA / 2.0 > OVERALL_LENGTH - 0.5:
@@ -261,9 +269,14 @@ if PIN_STATION + PIN_DIA / 2.0 > OVERALL_LENGTH - 0.5:
 # the shared boss-mid-length operation and the actual fitted pin. It deliberately
 # omits the modeled hole nominal: reaming to a functional acceptance governs,
 # and the pin identity plus flush condition stay on the feature callout.
-CRANKSHAFT_NUMBER = _config.parts("crankshaft")["number"]
-PINION_NUMBER = _config.parts("crank-pinion")["number"]
-PIN_NUMBER = _config.parts("crank-pinion-pin")["number"]
+# The part numbers are hard-coded, not read from ``_config.parts``: this module
+# reaches the crank-mesh stack, and through it the cone-swing platform and every
+# script that imports that, so a registry read here would make three part rows
+# rebuild inputs of the frame (crank_drive_gear_notes' precedent).
+# test_crank_pinion_drawing checks them against the registry offline.
+CRANKSHAFT_NUMBER = "MHA-026"
+PINION_NUMBER = "MHA-025"
+PIN_NUMBER = "MHA-134"
 BORE_PROCESS_CALLOUT = "REAM THRU"
 BORE_FIT_CALLOUT = "\n".join(
     (
@@ -325,7 +338,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # ``GetPrimaryPrecision2()`` back off the sheet.
 #
 # The bore is the only fit on the part and prints three places with its own
-# derived band. The outside diameter prints two at the general grade. The face
+# derived band. The outside diameter prints two with its own +/-0.10. The face
 # width is a free length between two turned faces: one place, so the title
 # block's .X +/-0.8 is the band it claims -- and that is the band it needs, the
 # 64T row it runs in being far wider than this face. The boss diameter is a
@@ -401,8 +414,11 @@ GEAR_DATA = gear_data_note(
 # The nonstandard cutter geometry is already explicit in the gear-data block;
 # it needs no duplicate method prohibition.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-# The sheet states the thin boss wall as a plain fact; its acceptance (USER
-# RULING 2026-09-25, option C) lives in the policy's Named exceptions table.
+# The sheet states the thin boss wall as a plain fact, rounded down so it
+# never claims more wall; its acceptance (user, option C, 2026-09-25) lives in
+# the policy's Named exceptions table.
 # Named exception: MHA-025 boss wall (drawing-simplicity-policy.md, "Named exceptions").
-BOSS_WALL_NOTE = f"BOSS WALL {BOSS_WALL_WORST:.2f} MIN AT BORE."
+BOSS_WALL_NOTE = (
+    f"BOSS WALL {math.floor(BOSS_WALL_WORST * 100.0) / 100.0:.2f} MIN AT BORE."
+)
 DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, BOSS_WALL_NOTE))

@@ -50,7 +50,7 @@ def test_axial_seam_key_is_six_oclock_and_stops_halfway_through_arm() -> None:
     assert spec.AXIAL_PIN_X == geometry.AXIAL_PIN_RADIUS_FROM_AXIS == 9.7
     assert spec.AXIAL_PIN_Y == 0.0
     assert drive.CRANK_HUB_PIN_ORIGIN == pytest.approx(
-        [drive.X_CRANK, drive.Y_CRANK - 9.7, drive.CRANK_FACE_Z]
+        [drive.X_CRANK_FIT, drive.Y_CRANK_FIT - 9.7, drive.CRANK_FACE_Z]
     )
     assert drive.CRANK_HUB_PIN_ROWS == drive.IDENTITY
 

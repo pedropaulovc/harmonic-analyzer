@@ -419,19 +419,41 @@ CRANK_MESH_DEPTH = TIP16_C2C - MESH16_C2C
 # clearance floor (slack + 0.157*ADD16 of tip-to-root air stays positive).
 if not 1.2 * ADD16 < CRANK_MESH_DEPTH < 2.0 * ADD16 - 0.1:
     raise AssertionError("crank pair mesh depth left its derived band")
+from cone_pivot_post_spec import CRANK_BORE_DROP  # noqa: E402
+from crank_eccentric_bushing_spec import ECCENTRICITY as CRANK_THROW  # noqa: E402
+from crank_fitup_axis import X_CRANK_FIT, Y_CRANK_FIT  # noqa: E402
+from crank_mesh_stack import FITUP_DC_NOMINAL as CRANK_FITUP_DC  # noqa: E402
+
 # The crank axis (the Ry180 v2 installation's X, the cast-in crank-axis
-# height) is cone_line's X_CRANK / Y_CRANK.
-_DX16 = (GEAR64_SEAT[0] - X_CRANK) * COS_I  # horizontal leg toward the
+# height) is cone_line's X_CRANK / Y_CRANK: the FRAME's crank axis, where the
+# post is laid out.  #906 R1: the post's crank bore sits CRANK_BORE_DROP below
+# it and the MHA-149 throw carries the crank round a circle about that bore,
+# which the frame axis is inside.  The crank train is placed at the NOMINAL
+# FIT-UP (crank_fitup_axis, from crank_mesh_stack): the point on that circle
+# where nominal parts read the fit-up backlash.  The platform's crank-axis
+# reference is moved by the same offsets (build_cone_swing_platform), so the
+# crankshaft mates onto it.
+CRANK_FIT_C2C = math.hypot((GEAR64_SEAT[0] - X_CRANK_FIT) * COS_I, Y_CRANK_FIT - Y_DRIVE)
+if abs(CRANK_FIT_C2C - (MESH16_C2C + CRANK_FITUP_DC)) > 1e-4:
+    raise AssertionError("the fit-up crank axis misses the stack's centre distance")
+if abs(math.hypot(X_CRANK_FIT - X_CRANK, Y_CRANK_FIT - (Y_CRANK - CRANK_BORE_DROP)) - CRANK_THROW) > 1e-9:
+    raise AssertionError("the fit-up crank axis is off the MHA-149 throw circle")
+CRANK_MESH_DEPTH_FIT = TIP16_C2C - CRANK_FIT_C2C
+if not 1.2 * ADD16 < CRANK_MESH_DEPTH_FIT < 2.0 * ADD16 - 0.1:
+    raise AssertionError("crank pair mesh depth at the fit-up left its derived band")
+_DX16 = (GEAR64_SEAT[0] - X_CRANK_FIT) * COS_I  # horizontal leg toward the
 # crank (a plane-local magnitude: the azimuth convention below measures from
 # the in-plane horizontal TOWARD the other axis, so it is chirality-free)
-_DY16 = Y_CRANK - Y_DRIVE  # vertical leg in both gear planes
-if abs(math.hypot(_DX16, _DY16) - MESH16_C2C) > 0.05:
+_DY16 = Y_CRANK_FIT - Y_DRIVE  # vertical leg in both gear planes
+if _DX16 <= 0.0:
+    raise AssertionError("the 64T no longer lies +x of the crank (crank_mesh_stack premise)")
+if abs(math.hypot((GEAR64_SEAT[0] - X_CRANK) * COS_I, Y_CRANK - Y_DRIVE) - MESH16_C2C) > 0.05:
     raise AssertionError("crank mesh centre distance drifted off the engaged c2c")
 # Contact azimuths (from each gear's centre toward the other axis, in that
 # gear's own plane, ccw from the in-plane horizontal). The 64T plane rides
 # the inclined cone shaft; the 16T plane is a plain machine-Z section.
 ALPHA64 = math.degrees(math.atan2(_DY16, _DX16))
-ALPHA16 = math.degrees(math.atan2(_DY16, GEAR64_SEAT[0] - X_CRANK))
+ALPHA16 = math.degrees(math.atan2(_DY16, GEAR64_SEAT[0] - X_CRANK_FIT))
 # (both horizontal legs run TOWARD the other axis and read positive -- the
 # chirality-free plane-local convention; the CW spin sense is applied at the
 # rot_z(-PINION_SEED_DEG) callsite)
@@ -440,8 +462,20 @@ ALPHA16 = math.degrees(math.atan2(_DY16, GEAR64_SEAT[0] - X_CRANK))
 # that face's south end. The relocated cast-in axis removes the
 # former T120-rim radial overlap; the exact boss/T12/pinion closure below owns
 # the axial clearances.
+# The pinion's station is laid out on the FRAME's contact row: the fitter sets
+# the 16T on its seat feeler against the boss, and turning the throw does not
+# move it axially.  At the fit-up axis the contact row slides along the 64T's
+# inclined face (_GEAR64_CONTACT_Z); the engagement floor below takes it there.
+_ALPHA64_FRAME = math.degrees(
+    math.atan2(Y_CRANK - Y_DRIVE, (GEAR64_SEAT[0] - X_CRANK) * COS_I)
+)
+_GEAR64_CONTACT_Z_FRAME = (
+    GEAR64_SEAT[2] + R64 * math.cos(math.radians(_ALPHA64_FRAME)) * SIN_I
+)
 _GEAR64_CONTACT_Z = GEAR64_SEAT[2] + R64 * math.cos(math.radians(ALPHA64)) * SIN_I
-PINION_TOOTH_Z = _GEAR64_CONTACT_Z - (PINION_FACE_STATION_REFERENCE - PINION_FACE) / 2.0
+PINION_TOOTH_Z = (
+    _GEAR64_CONTACT_Z_FRAME - (PINION_FACE_STATION_REFERENCE - PINION_FACE) / 2.0
+)
 # The pinion follows the recentered cone/64T row while the photo-anchored crank
 # arm and T12 chain plane remain at their existing stations below.
 # Tooth-in-gap phase seed, generalizing the old +11.25 half-pitch: the 64T is
@@ -462,10 +496,12 @@ _TP64 = 360.0 / 64.0
 DELTA64 = round(ALPHA64 / _TP64) * _TP64 - ALPHA64  # 1.57: 64T tooth lead
 # The v2 post changed the crank-pair DP and therefore the tooth count's phase at
 # the new line of centres.  Re-arbitrated for the single-cutter pair at the
-# frame's slack (#906; diagnostics/crank_mesh_backlash_study.py, case Bstar0,
-# 9 crank phases): the free window is 2.39..2.45 deg wide and centred at
-# -1.41..-1.44, so -1.42 keeps +-1.2 deg of authoring margin.
-MESH_WINDOW_CENTRE_DEG = -1.42
+# nominal fit-up axis the crank train is placed on (#906 R1;
+# diagnostics/crank_mesh_backlash_study.py, case R1-fitaxis, 9 crank phases,
+# crankhub/crank-mesh-R1-fitaxis-20260926.jsonl): the free window is
+# 1.89..1.95 deg wide and centred at -1.22..-1.25, so -1.24 keeps +-0.95 deg
+# of authoring margin.
+MESH_WINDOW_CENTRE_DEG = -1.24
 PINION_SEED_DEG = (
     (ALPHA16 + 180.0) - DELTA64 * (64.0 / 16.0) - 22.5 / 2.0
 ) % 22.5 + MESH_WINDOW_CENTRE_DEG  # window-centred tooth-in-gap
@@ -507,8 +543,8 @@ CRANK_HUB_Z0 = CRANK_FACE_Z
 CRANK_ARM_ORIGIN_Z = CRANK_ARM_Z0 + ARM_THICKNESS
 CRANK_HUB_REAR_Z = CRANK_HUB_Z0 + HUB_LENGTH
 CRANK_HUB_PIN_ORIGIN = [
-    X_CRANK,
-    Y_CRANK - AXIAL_PIN_RADIUS_FROM_AXIS,
+    X_CRANK_FIT,
+    Y_CRANK_FIT - AXIAL_PIN_RADIUS_FROM_AXIS,
     CRANK_FACE_Z,
 ]
 # The +8-mm crank-face shift is matched by +8 in the shaft's local stations,
@@ -677,27 +713,27 @@ from fillister_screw_spec import (  # noqa: E402
 CRANK_RING_ARM_CLEARANCE = 0.25
 PIN_PROUD = PIN_RING_HOLE_X + CRANK_RING_WIRE_DIA / 2.0 + CRANK_RING_ARM_CLEARANCE
 CRANK_PIN_Z = CRANK_FACE_Z + PIN_HOLE_HEIGHT  # -169.4: behind the 8-mm arm
-CRANK_PIN_X0 = X_CRANK - HUB_BARREL_DIA / 2.0 - PIN_PROUD
+CRANK_PIN_X0 = X_CRANK_FIT - HUB_BARREL_DIA / 2.0 - PIN_PROUD
 # The ring lies in machine YZ. Its straight local-Z leg is concentric with the
 # pin's machine-Z cross-hole; its bends and return hang toward machine -Y.
-CRANK_RING_Y = Y_CRANK
+CRANK_RING_Y = Y_CRANK_FIT
 if (PIN_RING_HOLE_DIA - CRANK_RING_WIRE_DIA) / 2.0 < 0.1:
     raise AssertionError("keeper-ring wire does not clear the crank-pin cross-hole")
 if abs((CRANKSHAFT_Z0 + PIN_HOLE_HEIGHT) - CRANK_PIN_Z) > 1e-6:
     raise AssertionError("shaft and hub MHA-024 stations do not coincide")
-if CRANK_PIN_X0 + CRANK_PIN_LENGTH < X_CRANK + HUB_BARREL_DIA / 2.0 + 2.0:
+if CRANK_PIN_X0 + CRANK_PIN_LENGTH < X_CRANK_FIT + HUB_BARREL_DIA / 2.0 + 2.0:
     raise AssertionError("crank pin does not run out the far side of the hub")
 if abs(AXIAL_PIN_LENGTH - ARM_THICKNESS / 2.0) > 1e-9:
     raise AssertionError("MHA-138 no longer has half-arm-thickness engagement")
 # Keeper-ring anchor (ch11 p.14): the arm's front (south, machine -z) face is
-# CRANK_ARM_Z0; arm local (x, y) -> machine (X_CRANK - y, Y_CRANK - x) (the
+# CRANK_ARM_Z0; arm local (x, y) -> machine (X_CRANK_FIT - y, Y_CRANK_FIT - x) (the
 # placed rows: local +x -> -Y, local +y -> -X). The brass eyelet lies flat on
 # that face (wire centre a wire radius + air south of it), its tail pointing
 # UP the arm at the screw and ending at the shank; the fillister-screw's
 # under-head plane rides on the wire (one wire diameter + air off the face),
 # shank pointing +z into the arm's #4-40 tap.
 ANCHOR_AIR = 0.02
-ANCHOR_SCREW_XY = (X_CRANK - ANCHOR_SCREW_Y, Y_CRANK - ANCHOR_SCREW_X)
+ANCHOR_SCREW_XY = (X_CRANK_FIT - ANCHOR_SCREW_Y, Y_CRANK_FIT - ANCHOR_SCREW_X)
 ANCHOR_HEAD_Z = CRANK_ARM_Z0 - EYE_WIRE_DIA - ANCHOR_AIR
 EYE_Z = CRANK_ARM_Z0 - EYE_WIRE_DIA / 2.0 - ANCHOR_AIR
 # the tail's end touches the shank: loop centre (tail root) sits LOOP_R + TAIL_LEN
@@ -741,6 +777,7 @@ from crank_pinion_spec import (  # noqa: E402
     FACE_WIDTH_PLACES as PINION_FACE_WIDTH_PLACES,
     OVERALL_LENGTH_PLACES as PINION_OVERALL_LENGTH_PLACES,
     SHAFT_LENGTH_PLACES as PINION_SHAFT_LENGTH_PLACES,
+    printed_band_mm,
     printed_deviations,
     PIN_EDGE_MIN_WORST as PINION_PIN_EDGE_MIN_WORST,
     PIN_EDGE_TO_SHAFT_END_NOMINAL as PINION_PIN_EDGE_NOMINAL,
@@ -764,8 +801,8 @@ PINION_PIN_U = (
     0.0,
 )
 PINION_PIN_ORIGIN = [
-    X_CRANK - PINION_PIN_LENGTH / 2.0 * PINION_PIN_U[0],
-    Y_CRANK - PINION_PIN_LENGTH / 2.0 * PINION_PIN_U[1],
+    X_CRANK_FIT - PINION_PIN_LENGTH / 2.0 * PINION_PIN_U[0],
+    Y_CRANK_FIT - PINION_PIN_LENGTH / 2.0 * PINION_PIN_U[1],
     PINION_PIN_Z,
 ]
 if abs(PINION_SPEC_FACE - PINION_FACE) > 1e-9:
@@ -805,9 +842,12 @@ PINION_PIN_EDGE_NOMINAL_ACTUAL = _SHAFT_NORTH_END - (
 # they must agree with the live cone-shaft line placed here. Imported, not
 # copied (the CAM_ECC precedent), and asserted at import so a drifted anchor
 # fails before any COM work.
-from cone_swing_platform_geometry import (  # noqa: E402
+from cone_swing_platform_crank_axis import (  # noqa: E402
     CRANK_AXIS_OFF as PLAT_CRANK_OFF,
     CRANK_AXIS_Y as PLAT_CRANK_Y,
+    CRANK_SEAT_ANCHOR as PLAT_SEAT_ANCHOR,
+)
+from cone_swing_platform_geometry import (  # noqa: E402
     EAST_HALF_S as PLAT_EAST_S,
     HALF_WIDTH_N as PLAT_EAST_N,  # EAST taper line's north endpoint (12 --
     # the lock-slot side keeps its full seat; feeds the stop-screw/containment
@@ -817,7 +857,6 @@ from cone_swing_platform_geometry import (  # noqa: E402
     # the derived stop point -- Codex catch, 2026-07-05)
     NORTH_OVERHANG as PLAT_OVERHANG,
     LOCK_HEAD_POST_CLEARANCE as PLAT_LOCK_HEAD_POST_CLEARANCE,
-    CRANK_SEAT_ANCHOR as PLAT_SEAT_ANCHOR,
     PLATE_LEN as PLAT_LEN,
     PLATE_T as PLAT_T,
     SLOT_E_X as PLAT_SLOT_E_X,
@@ -1029,12 +1068,18 @@ from build_cone_pivot_post import (  # noqa: E402
     BLOCK_HEIGHT as POST_BLOCK_HEIGHT,
     BORE_HEIGHT as POST_BORE_HEIGHT,
     CONE_BOSS_LENGTH as POST_CONE_BOSS_LENGTH,
-    CRANK_BORE_HEIGHT as POST_CRANK_Y,
     CRANK_BOSS_LENGTH as POST_CRANK_BOSS_LENGTH,
     CRANK_BOSS_START_Z as POST_CRANK_BOSS_START_Z,
 )
 from cone_pivot_post_spec import (  # noqa: E402
     JOURNAL_AXIS_HEIGHT_TOLERANCE_MM as POST_JOURNAL_AXIS_HEIGHT_TOLERANCE_MM,
+)
+# #906 R1: the frame's crank axis; the post's crank bore sits CRANK_BORE_DROP
+# below it and the MHA-149 bushing's throw carries the crank back up.
+from cone_pivot_post_spec import CRANK_AXIS_HEIGHT as POST_CRANK_Y  # noqa: E402
+from crank_eccentric_bushing_spec import (  # noqa: E402
+    HEAD_LENGTH as BUSHING_HEAD_LENGTH,
+    LENGTH as BUSHING_LENGTH,
 )
 from cone_tip_block_spec import (  # noqa: E402
     ADJUSTER_BORE_SPEC as TIP_ADJ_BORE_SPEC,
@@ -1360,15 +1405,16 @@ for _x_local, _z_local in _PLATFORM_VERTICES:
             f"is outside harmonic-base top ({_BASE_X_LIMIT:.3f}, {_BASE_Z_LIMIT:.3f})"
         )
 
-# CRANK_AXIS_OFF is the distance the crank axis sits EAST of the pivot
-# (east = machine -x), so it equals pivot.x - X_CRANK.
-if abs(PLAT_CRANK_OFF - (_PPIVOT[0] - X_CRANK)) > 0.05:
+# CRANK_AXIS_OFF is the distance the plate's crank axis sits EAST of the
+# pivot (east = machine -x).  The crank train mates to it, so it is the
+# nominal fit-up axis: pivot.x - X_CRANK_FIT, at Y_CRANK_FIT.
+if abs(PLAT_CRANK_OFF - (_PPIVOT[0] - X_CRANK_FIT)) > 1e-6:
     raise AssertionError(
-        f"platform CRANK_AXIS_OFF {PLAT_CRANK_OFF} != pivot.x - X_CRANK "
-        f"{_PPIVOT[0] - X_CRANK:.3f}"
+        f"platform CRANK_AXIS_OFF {PLAT_CRANK_OFF} != pivot.x - X_CRANK_FIT "
+        f"{_PPIVOT[0] - X_CRANK_FIT:.6f}"
     )
-if abs(PLAT_CRANK_Y - (Y_CRANK - Y_BASE_TOP)) > 1e-6:
-    raise AssertionError("platform CRANK_AXIS_Y != Y_CRANK - Y_BASE_TOP")
+if abs(PLAT_CRANK_Y - (Y_CRANK_FIT - Y_BASE_TOP)) > 1e-6:
+    raise AssertionError("platform CRANK_AXIS_Y != Y_CRANK_FIT - Y_BASE_TOP")
 if abs(_PPOST[0] - X_CRANK) > 1e-9:
     raise AssertionError("v2 crank boss no longer shares the post body centre x")
 if abs(POST_CRANK_Y - (Y_CRANK - Y_BASE_TOP - PLAT_T)) > 1e-6:
@@ -1400,6 +1446,24 @@ if not (
     < _GAP_HI
 ):
     raise AssertionError("v2 crank boss north/pinion clearance left its derived band")
+# #906 R1: MHA-149's grip head sits in the boss's south gap.  The bushing's
+# north end is flush with the boss's north face, so its head runs from there.
+# At every printed row -- the bushing's length and head length at .XX, the
+# boss's length at .X -- the head must still stand off the boss (it is a grip,
+# not a stop), and the T12, which turns against the fixed bushing, must keep
+# the running gap the fitter sets the 16T to (PINION_SEAT_FEELER).
+_ROW_1 = printed_band_mm(1)
+_ROW_2 = printed_band_mm(2)
+_GRIP_HEAD_SOUTH = _POST_BOSS_NORTH - BUSHING_LENGTH
+_GRIP_HEAD_NORTH = _GRIP_HEAD_SOUTH + BUSHING_HEAD_LENGTH
+GRIP_HEAD_STANDOFF = _POST_BOSS_SOUTH - _GRIP_HEAD_NORTH
+GRIP_HEAD_T12_AIR = _GRIP_HEAD_SOUTH - _T12_NORTH
+GRIP_HEAD_STANDOFF_WORST = GRIP_HEAD_STANDOFF - (2.0 * _ROW_2 + _ROW_1)
+GRIP_HEAD_T12_AIR_WORST = GRIP_HEAD_T12_AIR - (_ROW_2 + _ROW_1)
+if GRIP_HEAD_STANDOFF_WORST <= 0.0:
+    raise AssertionError("MHA-149's grip head does not stand off the crank boss")
+if GRIP_HEAD_T12_AIR_WORST < PINION_SEAT_FEELER:
+    raise AssertionError("MHA-149's grip head does not clear the T12")
 
 
 # Every length term below is what an ACCEPTED part may be: the sheet's printed
@@ -1486,7 +1550,7 @@ if sum(PINION_RECESS_STACK.values()) < PINION_RECESS_MIN_WORST:
     )
 if abs(
     (PINION_TOOTH_Z - PINION_FACE / 2.0)
-    - (_GEAR64_CONTACT_Z - PINION_FACE_STATION_REFERENCE / 2.0)
+    - (_GEAR64_CONTACT_Z_FRAME - PINION_FACE_STATION_REFERENCE / 2.0)
 ) > 0.05:
     raise AssertionError("16T south face left its 64T-row reference station")
 
@@ -1500,7 +1564,7 @@ for _k in range(7200):
     _c = _TIP120 * math.cos(math.radians(0.05 * _k))
     _s = _TIP120 * math.sin(math.radians(0.05 * _k))
     if (
-        math.hypot(_T120_SEAT[0] + _c * COS_I - X_CRANK, Y_DRIVE + _s - Y_CRANK)
+        math.hypot(_T120_SEAT[0] + _c * COS_I - X_CRANK_FIT, Y_DRIVE + _s - Y_CRANK_FIT)
         <= R16 + ADD16
     ):
         _T120_SOUTH = min(
@@ -1640,13 +1704,13 @@ for _j in range(20):
     ):
         raise AssertionError(f"cone-lock knob head crowds cone gear {_j + 1}")
 
-# The plate's crank-axis datum remains on the machine crank axis in the
+# The plate's crank-axis datum remains on the fit-up crank axis in the
 # engaged pose.
 _SEAT_ANCHOR_M = _plate_local_to_machine(PLAT_SEAT_ANCHOR[0], PLAT_SEAT_ANCHOR[1])
-if abs(_SEAT_ANCHOR_M[0] - X_CRANK) > 0.05:
+if abs(_SEAT_ANCHOR_M[0] - X_CRANK_FIT) > 1e-6:
     raise AssertionError(
-        f"platform CRANK_SEAT_ANCHOR maps to machine x {_SEAT_ANCHOR_M[0]:.3f}"
-        f" != X_CRANK {X_CRANK} -- anchor sign convention broke"
+        f"platform CRANK_SEAT_ANCHOR maps to machine x {_SEAT_ANCHOR_M[0]:.6f}"
+        f" != X_CRANK_FIT {X_CRANK_FIT:.6f} -- anchor sign convention broke"
     )
 
 # The collar controls notch-exit travel; the larger knurled head controls
@@ -2422,7 +2486,7 @@ for _lo, _hi, _what in (
 # The head's wider z band clips the T12 plane, so use radial clearance instead.
 # The crank arm/hub/handle sweep is axially disjoint from the integral head.
 if (
-    math.hypot(X_CRANK - APINION_X, Y_CRANK - APINION_Y)
+    math.hypot(X_CRANK_FIT - APINION_X, Y_CRANK_FIT - APINION_Y)
     < ARBOR_HEAD_DIA / 2.0 + 16.0 + 0.25
 ):  # T12 OD/2 ~14 + margin
     raise AssertionError("integral grip head reaches the T12 chain wheel")
@@ -3495,7 +3559,7 @@ async def build(adapter) -> dict[str, str]:
     crankshaft = await place_component(
         adapter,
         "crankshaft",
-        [X_CRANK, Y_CRANK, CRANKSHAFT_Z0],
+        [X_CRANK_FIT, Y_CRANK_FIT, CRANKSHAFT_Z0],
         [90.0, 0.0, 0.0],
         ROT_X_POS90,
         ground=False,
@@ -3503,7 +3567,7 @@ async def build(adapter) -> dict[str, str]:
     pinion = await place_component(
         adapter,
         "crank-pinion",
-        [X_CRANK, Y_CRANK, PINION_TOOTH_Z - PINION_FACE / 2.0],
+        [X_CRANK_FIT, Y_CRANK_FIT, PINION_TOOTH_Z - PINION_FACE / 2.0],
         [0.0, 0.0, -PINION_SEED_DEG],
         rot_z_rows(-PINION_SEED_DEG),  # tooth-in-gap
         ground=False,
@@ -3512,7 +3576,7 @@ async def build(adapter) -> dict[str, str]:
     hub = await place_component(
         adapter,
         "crank-hub",
-        [X_CRANK, Y_CRANK, CRANK_HUB_Z0],
+        [X_CRANK_FIT, Y_CRANK_FIT, CRANK_HUB_Z0],
         [90.0, 0.0, 0.0],
         ROT_X_POS90,
         ground=False,
@@ -3542,7 +3606,7 @@ async def build(adapter) -> dict[str, str]:
     arm = await place_component(
         adapter,
         "crank-arm",
-        [X_CRANK, Y_CRANK, CRANK_ARM_ORIGIN_Z],
+        [X_CRANK_FIT, Y_CRANK_FIT, CRANK_ARM_ORIGIN_Z],
         [180.0, 0.0, -90.0],
         compose_rows(rot_z_rows(-90.0), ROT_Y_180),
         ground=False,
@@ -3556,7 +3620,7 @@ async def build(adapter) -> dict[str, str]:
     pin = await place_component(
         adapter,
         "crank-pin",
-        [CRANK_PIN_X0, Y_CRANK, CRANK_PIN_Z],
+        [CRANK_PIN_X0, Y_CRANK_FIT, CRANK_PIN_Z],
         [0.0, 0.0, 0.0],
         IDENTITY,
         ground=False,
@@ -3640,7 +3704,7 @@ async def build(adapter) -> dict[str, str]:
     handle = await place_component(
         adapter,
         "crank-handle",
-        [X_CRANK, Y_CRANK - ARM_C2C, CRANK_ARM_Z0],
+        [X_CRANK_FIT, Y_CRANK_FIT - ARM_C2C, CRANK_ARM_Z0],
         [0.0, 90.0, 0.0],
         ROT_Y_POS90,
         ground=False,
@@ -3650,7 +3714,7 @@ async def build(adapter) -> dict[str, str]:
     handle_screw = await place_component(
         adapter,
         "crank-handle-pivot-screw",
-        [X_CRANK, Y_CRANK - ARM_C2C, HANDLE_SCREW_Z0],
+        [X_CRANK_FIT, Y_CRANK_FIT - ARM_C2C, HANDLE_SCREW_Z0],
         [0.0, 0.0, 0.0],
         IDENTITY,
         ground=False,
@@ -3674,7 +3738,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # Axial seat vs the plate's CrankAxisSeat plane (perpendicular to the
     # crank axis, anchored at the plate's crank-anchor point -- ON the crank
-    # axis, so its machine x is X_CRANK, asserted at import): distance =
+    # axis, so its machine x is X_CRANK_FIT, asserted at import): distance =
     # |Delta z| at the engaged rest pose (both are machine-z-normal planes
     # there).
     _cs_axial = cs_o[2] - _SEAT_ANCHOR_M[1]
