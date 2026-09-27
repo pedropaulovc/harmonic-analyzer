@@ -174,23 +174,32 @@ DETAIL_B = NotchDetail(
 DETAIL_TEXT_GAP = 0.010
 DETAIL_A_FENCE_TEXT_GAP = 0.014
 DETAIL_ROW_GAP = 0.012
+DETAIL_A_WIDTH_ROW_GAP = 0.020
+# A width with its +0.3/0.0 stack prints ~20 mm wide, wider than the 12.4 mm
+# mouth at 4:1: centred on the mouth it straddled both extension lines, and in
+# DETAIL A the Ra leader ran through it (r743-6b, 64fedd3cc). So each width's
+# text stands west of the bar, its centre this far out from the bar's edge,
+# and the dimension line runs out to it.
+WIDTH_TEXT_OFFSET = 0.014
 _DETAIL_A_TEXT_X = (
     DETAIL_A.centre[0] - DETAIL_A.radius_mm * DETAIL_A.mm - DETAIL_A_FENCE_TEXT_GAP
 )
 _DETAIL_A_ROW_Y = DETAIL_A.sheet_xy(0.0, 0.0)[1] - DETAIL_ROW_GAP
+_DETAIL_A_WIDTH_ROW_Y = DETAIL_A.sheet_xy(0.0, 0.0)[1] - DETAIL_A_WIDTH_ROW_GAP
 DETAIL_A_KEEP = {
     # Left of the fence, level with the notch: the depth and its band.
     "BottomNotchHeight": (
         _DETAIL_A_TEXT_X,
         DETAIL_A.sheet_xy(0.0, BOTTOM_NOTCH_HEIGHT / 2.0)[1],
     ),
-    # One row under the open end, chained on the ledge's inner witness: the
-    # centring ledge's text left of the fence, the width's under the mouth
-    # (its witnesses run down the walls, through the notch's air).
+    # One row under the open end: the centring ledge, its text left of the
+    # fence. The width a row lower, its witnesses running down the walls
+    # through the notch's air and its text west of the bar, so its dimension
+    # line runs west and leaves the air under the right cheek to the Ra symbol.
     "BottomLeftLedge": (_DETAIL_A_TEXT_X, _DETAIL_A_ROW_Y),
     "BottomNotchWidth": (
-        DETAIL_A.sheet_xy(BAR_WIDTH / 2.0, 0.0)[0],
-        _DETAIL_A_ROW_Y,
+        DETAIL_A.sheet_xy(0.0, 0.0)[0] - WIDTH_TEXT_OFFSET,
+        _DETAIL_A_WIDTH_ROW_Y,
     ),
 }
 _DETAIL_B_TEXT_X = DETAIL_B.sheet_xy(BAR_WIDTH, 0.0)[0] + DETAIL_TEXT_GAP
@@ -200,8 +209,12 @@ DETAIL_B_KEEP = {
         _DETAIL_B_TEXT_X,
         DETAIL_B.sheet_xy(0.0, BAR_LENGTH - TOP_NOTCH_HEIGHT / 2.0)[1],
     ),
-    # One row over the open end, chained on the ledge's inner witness.
-    "TopNotchWidth": (DETAIL_B.sheet_xy(BAR_WIDTH / 2.0, 0.0)[0], _DETAIL_B_ROW_Y),
+    # One row over the open end, chained on the ledge's inner witness: the
+    # width's text west of the bar, the ledge's east of it.
+    "TopNotchWidth": (
+        DETAIL_B.sheet_xy(0.0, 0.0)[0] - WIDTH_TEXT_OFFSET,
+        _DETAIL_B_ROW_Y,
+    ),
     "TopRightLedge": (_DETAIL_B_TEXT_X, _DETAIL_B_ROW_Y),
 }
 

@@ -136,18 +136,22 @@ def test_notch_details_frame_their_ends_and_place_text_outside_the_bar() -> None
     assert (
         a.sheet_xy(0.0, 0.0)[1] < depth_y < a.sheet_xy(0.0, spec.BOTTOM_NOTCH_HEIGHT)[1]
     )
-    bottom_row = {
-        drawing.DETAIL_A_KEEP[n][1] for n in ("BottomLeftLedge", "BottomNotchWidth")
-    }
-    (row_y,) = bottom_row
-    assert row_y < a.sheet_xy(0.0, 0.0)[1]
-    assert drawing.DETAIL_A_KEEP["BottomLeftLedge"][0] < a.sheet_xy(0.0, 0.0)[0]
+    # r743-6b (64fedd3cc): a width with its +0.3/0.0 stack prints ~20 mm
+    # wide; centred on the ~12.4 mm mouth it straddled both extension lines.
+    # Each width's text now stands west of the bar, clear of it.
+    ledge_x, ledge_y = drawing.DETAIL_A_KEEP["BottomLeftLedge"]
+    width_x, width_y = drawing.DETAIL_A_KEEP["BottomNotchWidth"]
+    assert width_y < ledge_y < a.sheet_xy(0.0, 0.0)[1]
+    assert ledge_y - width_y >= 0.007  # the stack's half-height plus a line
+    assert ledge_x < a.sheet_xy(0.0, 0.0)[0]
+    assert width_x + 0.010 < a.sheet_xy(0.0, 0.0)[0]
     assert (
         drawing.DETAIL_B_KEEP["TopNotchHeight"][0] > b.sheet_xy(spec.BAR_WIDTH, 0.0)[0]
     )
     top_row = {drawing.DETAIL_B_KEEP[n][1] for n in ("TopRightLedge", "TopNotchWidth")}
     (row_y,) = top_row
     assert row_y > b.sheet_xy(0.0, spec.BAR_LENGTH)[1]
+    assert drawing.DETAIL_B_KEEP["TopNotchWidth"][0] + 0.010 < b.sheet_xy(0.0, 0.0)[0]
     assert (
         drawing.DETAIL_B_KEEP["TopRightLedge"][0] > b.sheet_xy(spec.BAR_WIDTH, 0.0)[0]
     )
@@ -234,7 +238,9 @@ def test_floor_finish_leader_runs_through_the_mouth_crossing_only_a_witness() ->
     """The symbol (~17 mm wide) cannot stand in the 12.7 mm mouth; its bent
     leader climbs from under the right cheek through the mouth to the floor,
     crossing the right witness between the bar's end and the width row, never
-    the row's dimension line or the cheek."""
+    the width's dimension line, its text or the cheek. The width's text stands
+    west of the bar, so its dimension line runs west from the right witness
+    and the air east of that witness is the symbol's."""
     a = drawing.DETAIL_A
     spec = amplitude_bar_spec
     ax, ay = drawing.FLOOR_FINISH_ATTACH
@@ -258,9 +264,12 @@ def test_floor_finish_leader_runs_through_the_mouth_crossing_only_a_witness() ->
     t = (kx - right_wall) / (kx - ax)
     witness_y = vy + t * (ay - vy)
     assert row_y + 0.002 < witness_y < end_y - 0.002
-    # ...and passes the row outside the dimension line, arrows included.
-    assert vy < row_y - 0.002
-    assert x_at(row_y) > right_wall + 0.001
+    # ...and stays east of that witness below it, above the width row: the
+    # width's line and text lie west of the witness (r743-6b had the text on
+    # the mouth, under the leader).
+    assert drawing.DETAIL_A_KEEP["BottomNotchWidth"][0] < left_wall
+    assert kx > right_wall + 0.001
+    assert vy > row_y + 0.002
     # The symbol body (~2.5 mm left of the vertex to ~15 mm right, 5.4 mm up)
     # stands under the right cheek, clear of the bar, inside the fence.
     assert vx - 0.0025 > right_wall + 0.004
