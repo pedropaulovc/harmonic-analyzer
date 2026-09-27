@@ -2,10 +2,10 @@ r"""Pure-data dimensional contract shared by the pinion return leaf spring and
 its manufacturing drawing.
 
 PURE DATA, no SolidWorks/COM imports.  The pinion return spring is NOT a coil
-spring: it is a bent PHOSPHOR-BRONZE LEAF -- a 0.5 thick strip formed as a flat
-screw-down foot with a square screw pad at its free end, an R2 bend up to a
-blade leaning BLADE_LEAN_DEG west of vertical (in toward the strap), then an
-R1.5 crest turning 25 deg back east to a short free flat.  The nominals drive the part's named equation globals AND the
+spring: it is a bent 17-7 PH STAINLESS LEAF -- a 0.015 in (0.381) strip formed
+as a flat screw-down foot with a square screw pad at its free end, an R3.3 bend
+up to a blade leaning BLADE_LEAN_DEG west of vertical (in toward the strap),
+then an R3.3 crest turning 25 deg back east to a short free flat.  The nominals drive the part's named equation globals AND the
 drawing's coordinate math; the marked-dimension map keeps the part marks and
 drawing keeps in lockstep (``test_pinion_spring_drawing.py``).
 
@@ -26,11 +26,15 @@ from pinion_spring_geometry import (
     HOLE_FROM_END as HOLE_FROM_END,
     KINK_DEG as KINK_DEG,
     PAD_LEN as PAD_LEN,
+    PAD_LEN_PLACES as PAD_LEN_PLACES,
     PAD_WIDTH as PAD_WIDTH,
+    PAD_WIDTH_PLACES as PAD_WIDTH_PLACES,
+    PAD_Z as PAD_Z,
     R_BEND as R_BEND,
     R_KINK as R_KINK,
     THICK as THICK,
     WIDTH as WIDTH,
+    WIDTH_PLACES as WIDTH_PLACES,
 )
 
 # U27 + Main's r6 ruling (c): the profile is hand-formed, so every formed
@@ -44,13 +48,7 @@ FORMED_TOLERANCE_MM = FORMED_BAND_MM
 # profile, and the print locates the crest and the tip from it; the
 # shape-invariant length and radii print from the installed profile.
 FREE_FORM_SKETCH = "FreeForm"
-# #843 Codex aB7: the hole's two locations on the blank are .XX manufacturing
-# dimensions, but the Hole Wizard placement sketch cannot carry a datum
-# (rule 7) -- the hole is placed from the origin -- so no feature dimension
-# measures them from the pad.  A hidden construction-only sketch does: two
-# lines on the pad outline, each with one driving dimension that IS the value.
-FOOT_HOLE_SKETCH = "FootHoleReference"
-REFERENCE_SKETCHES = (FREE_FORM_SKETCH, FOOT_HOLE_SKETCH)
+REFERENCE_SKETCHES = (FREE_FORM_SKETCH,)
 FORMED_DIMENSIONS: dict[str, set[str]] = {
     "SpringProfile": {"FootLen", "BendR", "KinkR", "FlatLen"},
     FREE_FORM_SKETCH: {"FreeKinkH", "FreeKinkV", "FreeTipH"},
@@ -64,7 +62,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     **FORMED_DIMENSIONS,
     "Spring": {"StripWidth"},
     "PadProfile": {"PadWidth", "PadLen"},
-    FOOT_HOLE_SKETCH: {"HoleFromEnd", "HoleFromEdge"},
 }
 
 # Decimal places ARE the tolerance statement (policy rule 2); the model owns
@@ -72,9 +69,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SpringProfile": {name: 1 for name in FORMED_DIMENSIONS["SpringProfile"]},
     FREE_FORM_SKETCH: {name: 1 for name in FORMED_DIMENSIONS[FREE_FORM_SKETCH]},
-    "Spring": {"StripWidth": 2},
-    "PadProfile": {"PadWidth": 2, "PadLen": 2},
-    FOOT_HOLE_SKETCH: {"HoleFromEnd": 2, "HoleFromEdge": 2},
+    "Spring": {"StripWidth": WIDTH_PLACES},
+    "PadProfile": {"PadWidth": PAD_WIDTH_PLACES, "PadLen": PAD_LEN_PLACES},
 }
 
 _PRECISION_NAMES = [
@@ -88,10 +84,14 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
+# The bend coupon qualifies a blank cut along the roll's length, its bends
+# across the rolling direction (cad/docs/tolerance-policy.md); the blank also
+# fits across the roll, so the print names the direction (Codex #859,
+# PRRT_kwDOPHDy386mTtoA).
 DRAWING_NOTES = "\n".join(
     (
-        "CUT BLANK TO TEMPLATE OF TOP-VIEW PAD, DRILL, LEAVE STRIP LONG;",
-        "  FORM, THEN TRIM FREE TIP.",
+        "CUT BLANK ALONG ROLL LENGTH (BENDS ACROSS ROLLING DIRECTION)",
+        "  TO TOP-VIEW PAD TEMPLATE, DRILL, LEAVE LONG; FORM, TRIM TIP.",
         "RADII AND FORMED-PROFILE DIMENSIONS ARE TO THE INSIDE SURFACE.",
         "PHANTOM PROFILE IS THE FREE FORM; SOLID IS AS INSTALLED.",
     )

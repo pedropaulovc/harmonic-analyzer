@@ -378,10 +378,14 @@ def _configuration_builders() -> set[str]:
     }
 
 
-def test_the_builders_that_create_configurations_are_the_known_two() -> None:
+def test_the_builders_that_create_configurations_are_the_known_three() -> None:
     """A new multi-configuration builder must fail here until it reopens its
     saved part and runs the tripwire (and joins this set)."""
-    assert _configuration_builders() == {"build_cone_gear", "build_transgear_removable"}
+    assert _configuration_builders() == {
+        "build_cone_gear",
+        "build_pinion_lever_pin",
+        "build_transgear_removable",
+    }
 
 
 @pytest.mark.parametrize("stem", sorted(_configuration_builders()))

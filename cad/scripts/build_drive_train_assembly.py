@@ -158,6 +158,7 @@ from _common import (
     run_build,
 )
 from _drawing_marks import DRAWN_BY
+from _printed_tolerance import printed_deviations
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows
 from channel_frame_geom import (
     CAM_SHAFT_XY,
@@ -167,7 +168,6 @@ from cone_pivot_post_installation import (
     CHANNEL_Z0,
     DRUM_X,
     GEAR_AXIS_SHIFT,
-    MECHANISM_Z_SHIFT,
     POST_ROTATION_Y_DEG,
 )
 # The cone journal line and its named stations live in the pure cone_line
@@ -231,6 +231,7 @@ from _assembly_patterns import (
 )
 from _interference_contracts import allowed_interference_pairs
 from _drive_train_explode import create_drive_train_explode
+from drive_train_assembly_spec import COLLAR_PIN_ROLE
 
 # CopyWithMates2 helpers for the cone-gear ladder (#228). NB importing _cwm
 # folds it into THIS assembly's recipe/cache key -- intended.
@@ -687,7 +688,7 @@ if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
 # The crankshaft's named seat datums (the flip-free coincident seats for the
 # keyed chain -- see _seat_on_crank) must sit exactly at this module's
 # authored stations.  Hub and arm seat to one another at the shaft origin.
-from _hole_spec import THREAD_MAJOR_MM  # noqa: E402
+from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm  # noqa: E402
 from build_crankshaft import (  # noqa: E402
     SEAT_PINION as CS_SEAT_PINION,
     SEAT_T12 as CS_SEAT_T12,
@@ -780,7 +781,6 @@ from crank_pinion_spec import (  # noqa: E402
     OVERALL_LENGTH_PLACES as PINION_OVERALL_LENGTH_PLACES,
     SHAFT_LENGTH_PLACES as PINION_SHAFT_LENGTH_PLACES,
     printed_band_mm,
-    printed_deviations,
     PIN_EDGE_MIN_WORST as PINION_PIN_EDGE_MIN_WORST,
     PIN_EDGE_TO_SHAFT_END_NOMINAL as PINION_PIN_EDGE_NOMINAL,
     PIN_STATION as PINION_PIN_STATION,
@@ -962,14 +962,28 @@ from build_alignment_pinion import (  # noqa: E402
 )
 from pinion_arbor_geometry import (  # noqa: E402
     CROSS_HOLE_DIA as ARBOR_CROSS_HOLE_DIA,
+    DRUM_STATION_BAND as ARBOR_DRUM_STATION_BAND,
+    BACK_JOURNAL_Z as ARBOR_BACK_JOURNAL_Z,
+    DRUM_STATION as ARBOR_DRUM_STATION,
+    drum_total_air as ARBOR_DRUM_TOTAL_AIR,
+    FRONT_JOURNAL_Z as ARBOR_FRONT_JOURNAL_Z,
+    JOURNAL_LEN as ARBOR_JOURNAL_LEN,
+    LAND_MARGINS_AT_STOPS as ARBOR_LAND_MARGINS_AT_STOPS,
+    MIN_END_PLAY as ARBOR_MIN_END_PLAY,
+    MIN_LAND_OVER_STRAP as ARBOR_MIN_LAND_OVER_STRAP,
     HEAD_CAP_SAG as ARBOR_HEAD_CAP_SAG,
+    HEAD_CAP_SAG_PLACES as ARBOR_HEAD_CAP_SAG_PLACES,
     HEAD_CENTER_Z as ARBOR_HEAD_CENTER_Z,
     HEAD_DIA as ARBOR_HEAD_DIA,
     HEAD_FRONT_Z as ARBOR_HEAD_FRONT_Z,
+    HEAD_LEN as ARBOR_HEAD_LEN,
+    HEAD_LEN_PLACES as ARBOR_HEAD_LEN_PLACES,
+    HEAD_REAR_Z as ARBOR_HEAD_REAR_Z,
     NECK_END_Z as ARBOR_NECK_END_Z,
+    NECK_LEN as ARBOR_NECK_LEN,
+    NECK_LEN_PLACES as ARBOR_NECK_LEN_PLACES,
     PIN_Z as ARBOR_PIN_Z,
     SHAFT_DIA as ARBOR_DIA,
-    SHAFT_LEN as ARBOR_LEN,
 )
 from pinion_arbor_collar_geometry import (  # noqa: E402
     COLLAR_LEN as ARBOR_COLLAR_LEN,
@@ -979,12 +993,14 @@ from pinion_arbor_collar_geometry import (  # noqa: E402
 from pinion_bracket_geometry import (  # noqa: E402
     ARBOR_BORE as STRAP_ARBOR_BORE,
     C2C as STRAP_C2C,
+    CROSS_HOLE_CZ as STRAP_CROSS_HOLE_CZ,
     PIN_BORE as STRAP_PIN_BORE,
     PIN_DROP as FPIN_DROP,
     PIN_SEAT as FPIN_SEAT,
     PIVOT_BORE as STRAP_PIVOT_BORE,
     R_END as STRAP_R_END,
     THICKNESS as STRAP_T,
+    THICKNESS_PLACES as STRAP_T_PLACES,
 )
 from pinion_pivot_block_geometry import (  # noqa: E402
     BLOCK_DEPTH,
@@ -1018,22 +1034,28 @@ from pinion_lever_geometry import (  # noqa: E402
     ROD_LEN as LEVER_ROD_LEN,
     WALL_T as LEVER_WALL_T,
 )
-from pinion_handle_geometry import ROD_DIA as HANDLE_ROD_DIA  # noqa: E402
+from pinion_lever_pin_geometry import (  # noqa: E402
+    INSTALLED_CONFIG as LEVER_PIN_INSTALLED_CONFIG,
+)
+from pinion_handle_geometry import (  # noqa: E402
+    ROD_DIA as HANDLE_ROD_DIA,
+    ROD_DIA_BAND as HANDLE_ROD_DIA_BAND,
+)
 from pinion_spring_geometry import (  # noqa: E402
     BEND_EXIT as SPR_BEND_EXIT_L,
+    BLADE_ARM as SPR_BLADE_ARM,
     CONTACT_T as SPR_CONTACT_T,
     CREST as SPR_CREST_L,
     FLAT_TIP as SPR_FLAT_TIP_L,
     FOOT_END as SPR_FOOT_END_L,
     FOOT_TAN as SPR_FOOT_TAN_L,
     FORMED_BAND_MM as SPR_FORMED_BAND,
+    FORMED_CORNERS as SPR_FORMED_CORNERS,
     HOLE_SPEC as SPR_HOLE_SPEC,
     HOLE_X as SPR_HOLE_X_L,
     KINK_C as SPR_KINK_C_L,
     KINK_DEG as SPR_KINK_DEG,
     KINK_START as SPR_KINK_START_L,
-    PAD_LEN as SPR_PAD_LEN,
-    PAD_WIDTH as SPR_PAD_WIDTH,
     PARKED_AIR as SPR_PARKED_AIR,
     PIVOT_LX as SPR_PIVOT_LX,
     PIVOT_LY as SPR_PIVOT_LY,
@@ -1043,9 +1065,15 @@ from pinion_spring_geometry import (  # noqa: E402
     STRAP_LEAN_DEG as SPR_STRAP_LEAN_DEG,
     YIELD_MPA as SPR_YIELD_MPA,
     contact_force as spr_contact_force,
+    formed_contact as spr_formed_contact,
     root_stress as spr_root_stress,
 )
-from pinion_spring_section import THICK as SPRING_T, WIDTH as SPRING_W  # noqa: E402
+from pinion_spring_section import (  # noqa: E402
+    THICK as SPRING_T,
+    THICK_BAND as SPRING_T_BAND,
+    WIDTH as SPRING_W,
+    WIDTH_PLACES as SPRING_W_PLACES,
+)
 from slotted_screw_spec import (  # noqa: E402
     HEAD_DIA as BSCREW_HEAD_DIA,
     SHANK_LEN as BSCREW_SHANK_LEN,
@@ -2021,16 +2049,16 @@ if abs(ENGAGED_C2C - _CONFIG_ENGAGED_C2C) > 1e-6:
 APINION_X = X_DRUM + TIP_DRUM120 + TIP_APINION + APINION_GAP
 # Tip circles keep the configured parked gap at Delta-y = 0 (axis level).
 APINION_Y = Y_DRIVE
-# Ruling (c) (user, 2026-09-24): the blocks locate the swing cluster and the
-# drum's bond station moved 0.3 aft -- every rig z station is
-# pinion_rig_layout's, shared with the base's transferred seats.
+# Ruling (c) (user, 2026-09-24): the blocks locate the swing cluster -- every
+# rig z station is pinion_rig_layout's fit-up stack (the cluster hard on the
+# back block, the drum hard on the back strap and one shim off the front one:
+# MHA-A03's SHAFT DRILL SET), shared with the base's transferred seats.
 APINION_DRUM_LEN = RIG.DRUM_LEN  # build_alignment_pinion FACE_WIDTH
 APINION_Z_FRONT = RIG.DRUM_FRONT_Z
 APINION_Z_BACK = RIG.DRUM_BACK_Z
 PIVOT_Y = Y_BASE_TOP + 12.0  # 62.8: pivot block bore height
 # Bracket thickness, end radius and pivot-to-arbor spacing come from the
 # geometry-only contract imported above.
-STRAP_AIR = RIG.STRAP_AIR  # MODEL-pose drum-end air; physical play is the feeler P
 PIVOT_X = APINION_X + math.sqrt(
     STRAP_C2C**2 - (APINION_Y - PIVOT_Y) ** 2
 )  # the far side from the drum, so swinging the strap toward
@@ -2051,13 +2079,19 @@ LIFT_Y = PIVOT_Y + LIFT_BORE_RISE  # v2 closure: the steep strap carries its
 # follower contact above the pivot at the WEST cam station.  The eccentric cam
 # collars still meet the pins from below; the pins rest on the collar ODs.
 PIVOT_SHAFT_Z0 = RIG.TORQUE_SHAFT_Z0
-# Ø6.35 torque shaft flush with both block outer faces.
+# Ø6.35 torque shaft, set back-flush; its front end stands the worst-stack
+# allowance proud of the front block (pinion_rig_layout).
 LIFT_ROD_Z0 = RIG.LIFT_ROD_Z0
-# front end ~10 proud south of the front block -- lever hub seat
+# front end LEVER_SEAT_PROUD (15.60) south of the front block -- the lever
+# hub's seat, sized so the hub never stops the rod (pinion_rig_layout)
 BLOCK_X = PIVOT_X  # block local origin ON the pivot bore (datum B, U28)
 BLOCK_FRONT_Z0 = RIG.FRONT_BLOCK_Z0  # one 0.25 feeler off the front strap
-BLOCK_BACK_Z0 = RIG.BACK_BLOCK_Z0  # outer face fixed at 88; the (c) back stop
-# U28 thinned the blocks (12 -> 10.25) so the 9-thick back strap keeps 0.30 air
+BLOCK_BACK_Z0 = RIG.BACK_BLOCK_Z0  # the (c) back stop, the rig's reference
+# U28 thinned the blocks (12 -> 10.25); ruling (c) then put the back strap hard
+# on the back block, and pinion_rig_layout sizes the shaft and rod from the
+# worst fitted stack (Codex #837).  Option E-a deepened them outward, to 10.5
+# and then 11.0, so the strap-pinned shaft bears the back block with 0.5 to
+# spare over its floor (Codex #858, Main).
 LEVER_TILT_DEG = 10.0  # parked, from vertical toward machine -X
 # ch25 p.68 page002_img08 is explicitly the FRONT side and shows the
 # disengaged lever only about 10 degrees from vertical, with its tip to image
@@ -2072,7 +2106,9 @@ LEVER_LEN = LEVER_ROD_LEN  # 86: hub centre -> tip (img07 @9.37 px/mm,
 LEVER_Z = LIFT_ROD_Z0 + LEVER_HUB_LEN / 2.0 - LEVER_WALL_T
 # seats on the translated lift-rod front end; north face stays 2 off the block.
 HANDLE_TILT_DEG = 65.0  # grip crossrod from vertical
-ARBOR_Z0 = -135.0 + MECHANISM_Z_SHIFT
+# The drum is bonded on MHA-102 at the printed DRUM_STATION from the head
+# shoulder, so the arbor rides wherever the fit-up stack puts the drum.
+ARBOR_Z0 = APINION_Z_FRONT - ARBOR_DRUM_STATION - ARBOR_HEAD_REAR_Z
 # Preserve the released MHA-058 component origin at the head/cross-hole axis.
 # The head is now integral with MHA-102, whose local head centre is z=-6.5.
 HANDLE_Z = ARBOR_Z0 + ARBOR_HEAD_CENTER_Z
@@ -2099,6 +2135,43 @@ if Z_DRUM0 - DRUM_FACE / 2.0 < APINION_Z_FRONT + 1.0:
     raise AssertionError("alignment pinion too short at the front station")
 if Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 > APINION_Z_BACK + 0.5:
     raise AssertionError("alignment pinion misses the j = 19 station")
+# Worst stack at both ends (user ruling P1-2): the rig is set with the drum's
+# back end RIG_SET_LEAF_D off g19's back face, so from the pose it advances
+# by DRUM_BACK_ADVANCE_STACK and must still cover all of g19's face (so j = 19
+# engages >= 2.0 a fortiori); its front end retreats by DRUM_FRONT_RETREAT_STACK
+# and must stay 1.0 south of g0's front face.  Both spares join RIG_MARGINS
+# (below), and one leaf step thinner would leave j = 19 short of
+# RIG_MARGIN_SPARE (D is the thinnest setting that holds).  D is set with the
+# bank pushed north, so the bank adds nothing to j = 19; at the front g0
+# itself walks south by the bank's end play and a long g0 -> g19 pitch stack
+# (RIG.G0_FRONT_SOUTH_STACK, #743), so the j = 0 row carries those beside the
+# drum's own retreat (Codex #858, PRRT_kwDOPHDy386mUjhU).
+_G19_FACE_Z = (
+    Z_DRUM0 + 19 * Z_PITCH - DRUM_FACE / 2.0,
+    Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0,
+)
+APINION_BACK_WORST_Z = APINION_Z_BACK - sum(RIG.DRUM_BACK_ADVANCE_STACK.values())
+J19_ENGAGEMENT_WORST = min(APINION_BACK_WORST_Z, _G19_FACE_Z[1]) - _G19_FACE_Z[0]
+if J19_ENGAGEMENT_WORST < 2.0:
+    raise AssertionError(f"j = 19 engages only {J19_ENGAGEMENT_WORST:.3f} at the worst stack")
+J19_FULL_FACE_MARGIN = APINION_BACK_WORST_Z - _G19_FACE_Z[1]
+if J19_FULL_FACE_MARGIN < -1e-9:
+    raise AssertionError(
+        f"j = 19 loses {-J19_FULL_FACE_MARGIN:.3f} of its full face at the worst stack"
+    )
+if J19_FULL_FACE_MARGIN - RIG.FEELER_LEAF_STEP >= RIG.RIG_MARGIN_SPARE - 1e-9:
+    raise AssertionError("RIG_SET_LEAF_D is more than the thinnest setting for j = 19")
+# The rig layout carries g19's back face as a number (it reads no config);
+# the pose must put the drum's back end exactly D off it.
+if abs(_G19_FACE_Z[1] - RIG.G19_BACK_FACE_Z) > 1e-9:
+    raise AssertionError("pinion_rig_layout.G19_BACK_FACE_Z drifted from the gear grid")
+if abs(APINION_Z_BACK - _G19_FACE_Z[1] - RIG.RIG_SET_LEAF_D) > 1e-9:
+    raise AssertionError("the drum's back end is not RIG_SET_LEAF_D off g19")
+APINION_FRONT_WORST_Z = APINION_Z_FRONT + sum(RIG.DRUM_FRONT_RETREAT_STACK.values())
+G0_FRONT_WORST_Z = Z_DRUM0 - DRUM_FACE / 2.0 - sum(RIG.G0_FRONT_SOUTH_STACK.values())
+J0_SLACK_WORST = (G0_FRONT_WORST_Z - 1.0) - APINION_FRONT_WORST_Z
+if J0_SLACK_WORST < 0.0:
+    raise AssertionError(f"the drum uncovers j = 0 by {-J0_SLACK_WORST:.3f} at the worst stack")
 if (
     math.hypot(APINION_X - X_DRUM, Y_DRIVE - APINION_Y)
     < TIP_DRUM120 + TIP_APINION + 1.0
@@ -2176,13 +2249,14 @@ if _LEV_STUB_D < (_ARBOR_DIA_AT_LEVER + LEVER_ROD_DIA) / 2.0 + 0.25:
 # west of the blade and under the foot (the build's west-extreme and pad-merge
 # gates prove it), so SPR_CREST_L is already the contact face.
 SPRING_X = PIVOT_X + SPR_PIVOT_LX  # machine anchor
-# The strap's INNER face is what the drum end fixes (STRAP_AIR of axial air);
-# the strap thickness grows OUTBOARD from there, so the blade is referenced to
-# that inner face -- SPRING_BLADE_INSET in from it -- not to the strap
-# mid-plane.
+# The strap's INNER face is what the drum end fixes; the strap thickness grows
+# OUTBOARD from there.  The pad is set a gage leaf off the back block
+# (pinion_rig_layout.SPRING_PAD_LEAF), which puts the blade SPRING_BLADE_INSET
+# in from that inner face.
 STRAP_Z_INNER = RIG.STRAP_Z_INNER
-# Blade inner edge, in from the strap's inner face: 1.0 keeps the blade on
-# the flank at every split of the end play (pinion_rig_layout).
+# Blade inner edge, in from the strap's inner face: SPRING_BLADE_INSET keeps the
+# whole blade on the flank at every strap thickness, RIG_MARGIN_SPARE over its
+# floor (pinion_rig_layout).
 SPRING_BLADE_INSET = RIG.SPRING_BLADE_INSET
 SPRING_Z = RIG.SPRING_Z
 _SPR_TH = math.radians(-STRAP_LEAN_DEG)  # the strap leans east of vertical
@@ -2233,14 +2307,13 @@ if _CREST_T > STRAP_C2C - 1.0:
     raise AssertionError("spring crest bears on the arbor end cap, not the flank")
 if SPRING_BLADE_INSET < 0.0 or SPRING_BLADE_INSET + SPRING_W > STRAP_T:
     raise AssertionError("spring blade overhangs the strap flank axially")
-# The cylinder drum: the leaf rides axially PAST its last (j = 19) gear, so
-# the flexed blade can never meet the 120T tips; only the north end disc
-# (the Ø25 thrust washer against that gear) shares its z band.  Parked, the
-# crest and the flick tip also clear the tip circle itself in 2D; the engaged
-# blade is gated against the disc with the swing gates below.  Each books the
-# strip's full thickness on the east side.
-if (SPRING_Z - SPRING_W / 2.0) - (Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0) < 0.25:
-    raise AssertionError("spring reaches the cylinder drum's last gear axially")
+# The cylinder drum: the leaf rides axially PAST its last (j = 19) gear
+# (RIG_MARGINS books its front edge against that gear's back face at the
+# worst fit-up), so the flexed blade can never meet the 120T tips; only the
+# north end disc (Ø55, END_DISC_AIR outboard of that gear) shares its z
+# band.  Parked, the crest and the flick tip also clear the tip circle
+# itself in 2D; the engaged blade is gated against the disc with the swing
+# gates below.  Each books the strip's full thickness on the east side.
 for _label, _p in (("crest", SPRING_CREST), ("flick tip", SPRING_FLAT_TIP)):
     if math.hypot(X_DRUM - _p[0], Y_DRIVE - _p[1]) - SPRING_T < TIP_DRUM120 + 0.25:
         raise AssertionError(f"spring {_label} crowds the cylinder-gear tips")
@@ -2255,17 +2328,12 @@ if (
     raise AssertionError("spring flick tip reaches the strap's arbor end cap")
 if SPRING_Z + SPRING_W / 2.0 > BLOCK_BACK_Z0 - 0.25:
     raise AssertionError("spring reaches the back pivot block")
-# The foot's screw pad widens the free end symmetrically about the strip.
-# It lies on the base EAST of the back block's east end, so it clears the
-# block in x whatever its z band; where the two share a z band (booked at the
-# printed .XX worst case, +0.51 on the length and the width) the x gap must
-# hold 0.25.
-_SPR_PAD_WEST_X = SPRING_FOOT_END_X + SPR_PAD_LEN + 0.51
-_SPR_PAD_Z_HI = SPRING_Z + (SPR_PAD_WIDTH + 0.51) / 2.0
-if (
-    _SPR_PAD_Z_HI > BLOCK_BACK_Z0 - 0.25
-    and (PIVOT_X - BLOCK_EAST) - _SPR_PAD_WEST_X < 0.25
-):
+# The foot's screw pad widens the free end forward of the strip, flush with
+# its aft edge (pinion_rig_layout): booked with that edge at the pad leaf's
+# thinnest setting, no width band reaches it.  The leaf sets z, so z alone
+# is gated (Main, #859 restricted review).
+_SPR_PAD_Z_HI = RIG.SPRING_PAD_AFT_Z + RIG.FEELER_SET_ERROR
+if _SPR_PAD_Z_HI > BLOCK_BACK_Z0 - 0.25:
     raise AssertionError("spring foot pad reaches the back pivot block")
 # The screw head sits on the pad: clear of the free end and of the bend.
 if (SPRING_HOLE_X - FSCREW_HEAD_DIA / 2.0) - SPRING_FOOT_END_X < 0.25:
@@ -2318,14 +2386,14 @@ _FPIN_Y_AT_CAM = _FPIN_C[1] - _S_CAM * _SPR_N[1]  # 64.04
 # free cam spin.  Ruling (c): the FRONT collar is set against the front
 # block's inner face (0.25 feeler) -- flush with the strap's outer face, so
 # the pin rides mid-collar (T/2) and the collar and lever hub capture the lift
-# rod on the block.  The back collar moves from the boss-era 7.5 to 6.0: with
-# the end play, the rod play and a by-eye set it then keeps >= 2 of collar on
-# both sides of the pin, and its back face stays >= 1.1 off the back block at
-# the thinnest strap (test_drive_train_support_layout).
+# rod on the block.  The BACK collar is set the same way, its back face
+# BACK_COLLAR_LEAF_F off the back block (user ruling P1-1), so the pin rides
+# BACK_CAM_PIN_STATION into it and keeps >= 2.75 of collar on both sides at
+# every setting (test_drive_train_support_layout).
 _STRAP_MID_Z = tuple(
     z + s * STRAP_T / 2.0 for z, s in zip(STRAP_Z_INNER, (-1.0, 1.0), strict=True)
-)  # -76.362, +76.338 (pinion_rig_layout)
-CAM_PIN_STATION = (STRAP_T / 2.0, 6.0)  # pin plane, from each collar front face
+)  # -74.562, +78.088 (pinion_rig_layout)
+CAM_PIN_STATION = (STRAP_T / 2.0, RIG.BACK_CAM_PIN_STATION)  # pin plane, from each collar front face
 CAM_Z0 = tuple(z - s for z, s in zip(_STRAP_MID_Z, CAM_PIN_STATION, strict=True))
 for _z0 in CAM_Z0:
     if _z0 < LIFT_ROD_Z0 + 1.0 or _z0 + CAM_LEN > LIFT_ROD_Z0 + RIG.LIFT_ROD_LEN - 1.0:
@@ -2458,17 +2526,82 @@ if LIFT_Y - _CAM_SWEEP_R - Y_BASE_TOP < 0.25:
     raise AssertionError("cam collar sweep reaches the base top")
 if math.hypot(PIVOT_X - LIFT_X, PIVOT_Y - LIFT_Y) - _CAM_SWEEP_R - 3.175 < 0.25:
     raise AssertionError("cam sweep reaches the pivot shaft")
+# The return spring stands east of the strap and the lift rod west of it,
+# the collar's sweep spanning the blade's height.  The whole leaf -- foot,
+# bend, blade and crest -- keeps 0.25 off the rod's envelope (the collar
+# sweeps about the rod's own axis, so it contains the rod) where the leaf
+# sits furthest west.  The base seat is spotted through the pad hole, so
+# the screw's float in that hole and the formed profile's band move it.
+SPRING_WEST_SHIFT_STACK = {
+    "MHA-114 formed profile band": SPR_FORMED_BAND,
+    "#4 screw float in the pad's clearance hole": (
+        blind_cut_dia_mm(SPR_HOLE_SPEC) - THREAD_MAJOR_MM[FSCREW_THREAD]
+    )
+    / 2.0,
+}
+_SPR_WEST_X = max(
+    SPRING_FOOT_TAN_X,  # the foot, up to the bend
+    SPRING_BEND_EXIT[0] + SPRING_T,  # the bend and the blade's root
+    SPRING_KINK_START[0] + SPRING_T,  # the blade's top
+    SPRING_KINK_C[0] + SPR_R_KINK + SPRING_T,  # the crest's outer arc
+    SPRING_FLAT_TIP[0] + SPRING_T,  # the flick
+)
+SPRING_TO_LIFT_ROD = (
+    LIFT_X
+    - max(3.175, _CAM_SWEEP_R)
+    - _SPR_WEST_X
+    - sum(SPRING_WEST_SHIFT_STACK.values())
+)
+if SPRING_TO_LIFT_ROD < 0.25:
+    raise AssertionError("spring leaf reaches the lift rod's collar sweep")
 
 # --- return spring across the engage swing (analytic; issue #158) ------------
 # The strap swings 0 -> _PHI_ENG CCW into the blade.  The leaf deflects by the
 # crest's penetration into the swung flank on top of its PRESET (the free form
 # stands PRESET into the parked flank; the model hovers PARKED_AIR off it).
-# Gravity moments about the pivot (handoff estimate from the part volumes:
-# drum 175 g + arbor 65 g at the arbor axis, straps 80 g at mid-length) --
-# parked, then engaged, N.mm.  Both turn the cluster INTO mesh.
-_SWING_GRAVITY_NMM = (10.9, 19.2)
-_PRELOAD_MARGIN = 1.5  # over gravity, at the formed band's low end
-_STRESS_SF = 1.5  # on yield, at the nominal preset
+# Gravity moments of the swing cluster about the pivot, parked then engaged,
+# N.mm; both turn it INTO mesh.  CAD-derived (#859, 2026-09-25; re-derived
+# 2026-09-26): each part's centroid from the STLs of the warm integration
+# build (c486, cad/out/stl) placed on this module's own analytic transforms,
+# its mass from the volume in SWING_GRAVITY_BASIS at the SolidWorks library
+# densities.  The arbor, its collar and the torque shaft have moved since
+# c486 (#858, #860): their basis volumes are their parts' current analytic
+# volumes, and each keeps its centroid on its axis.  Brass density 8400
+# gives (13.95, 24.94).  The gates below use the 8800 corner.
+SWING_GRAVITY_NMM = (14.04, 25.10)
+SWING_GRAVITY_CORNER_NMM = (14.32, 25.58)  # brass at 8800 kg/m^3
+# The basis those moments were computed at: part -> (count, volume mm^3,
+# density kg/m^3).  The drum's and the strap's volumes are computed inside
+# their builds, so theirs are the c486 meshes (the drum's reads 23382.7
+# against its analytic 23374.1).  test_drive_train_support_layout holds every
+# entry to the current part and fails naming both moment constants when one
+# moves.
+SWING_GRAVITY_BASIS = {
+    "alignment-pinion": (1, 23382.7, 8500.0),
+    "pinion-arbor": (1, 13702.96, 7800.0),
+    "pinion-pivot-shaft": (1, 5937.02, 7800.0),
+    "pinion-bracket": (2, 4563.7, 7800.0),
+    "pinion-arbor-collar": (1, 2135.74, 7800.0),
+    "pinion-handle": (1, 1837.83, 7800.0),
+    "pinion-cam-pin": (2, 256.62, 7800.0),
+}
+SWING_GRAVITY_MASS_G = 458.14
+if (
+    abs(
+        sum(n * v * rho * 1e-6 for n, v, rho in SWING_GRAVITY_BASIS.values())
+        - SWING_GRAVITY_MASS_G
+    )
+    > 0.01
+):
+    raise AssertionError("SWING_GRAVITY_BASIS no longer sums to its mass")
+_PRELOAD_MARGIN = 1.5  # over gravity, at the soft corner
+_STRESS_SF = 1.5  # on yield, at the stiff corner
+# Stock corners (#859 ruling 1): the leaf is formed to the nominal inside
+# profile, so a thicker strip moves the contact face into the flank by the
+# thickness excess.  Soft: thinnest, narrowest strip.  Stiff: thickest strip.
+# Each is then walked over every formed corner (below).
+_SPR_T_LO, _SPR_T_HI = (SPRING_T + _d for _d in deviations(SPRING_T_BAND))
+_SPR_W_LO = SPRING_W + printed_deviations(SPRING_W, SPRING_W_PLACES)[0]
 _SPR_STEPS = 1 + math.ceil(math.degrees(_PHI_ENG) / 0.25)
 _SPR_BLADE_SAMPLES = 16
 _SPR_CREST_OUTER_R = SPR_R_KINK + SPRING_T  # the crest's contact-face radius
@@ -2512,18 +2645,60 @@ for _i in range(_SPR_STEPS):
     _spr_deflection.append(SPR_PRESET + SPR_PARKED_AIR - (_n - STRAP_R_END))
     _spr_station.append(_t)
 SPRING_DEFLECTION = (_spr_deflection[0], _spr_deflection[-1])  # parked, engaged
-for _label, _d, _t, _m in zip(
-    ("parked", "engaged"),
-    SPRING_DEFLECTION,
-    (_spr_station[0], _spr_station[-1]),
-    _SWING_GRAVITY_NMM,
-):
-    if spr_contact_force(_d - SPR_FORMED_BAND) * _t < _PRELOAD_MARGIN * _m:
-        raise AssertionError(
-            f"spring preload loses to gravity {_label} at the formed band's low end"
+# Every accepted formed profile (Codex #859, PRRT_kwDOPHDy386mTao2): the print
+# holds FootLen, BendR, FreeKinkH, FreeKinkV and KinkR to the formed band each,
+# independently, so each gate walks all 32 sign corners.  A corner moves the
+# free crest's penetration, the arm and the contact station by what it moves
+# them in the free profile (spr_formed_contact); those changes ride the
+# installed nominal the swing above computes.  The swing's own penetration
+# grows with the station, so a corner scales it by its station.  The stock
+# corners stay: the soft gate forms a thin, narrow strip, the stiff gate a
+# thick one (the thickness moves the crest's contact face with it).
+_SPR_FREE_NOM = spr_formed_contact()
+_SPR_SWING_DEFLECTION = SPRING_DEFLECTION[1] - SPRING_DEFLECTION[0]
+_SPR_SWING_STATION = _spr_station[-1] - _spr_station[0]
+
+
+def _spring_corner(deviations: dict[str, float], thick: float):
+    """(parked, engaged) deflection, arm, and (parked, engaged) station."""
+    penetration, arm, station = spr_formed_contact(deviations, thick)
+    parked = SPRING_DEFLECTION[0] + penetration - _SPR_FREE_NOM[0]
+    station_p = _spr_station[0] + station - _SPR_FREE_NOM[2]
+    engaged = parked + _SPR_SWING_DEFLECTION * station_p / _spr_station[0]
+    return (
+        (parked, engaged),
+        SPR_BLADE_ARM + arm - _SPR_FREE_NOM[1],
+        (station_p, station_p + _SPR_SWING_STATION),
+    )
+
+
+_spr_ratios = []
+for _dev in SPR_FORMED_CORNERS:
+    _defl, _arm, _stations = _spring_corner(_dev, _SPR_T_LO)
+    _spr_ratios.append(
+        tuple(
+            spr_contact_force(_d, _SPR_T_LO, _SPR_W_LO, _arm) * _t / _m
+            for _d, _t, _m in zip(_defl, _stations, SWING_GRAVITY_CORNER_NMM, strict=True)
         )
-if SPR_YIELD_MPA / spr_root_stress(SPRING_DEFLECTION[1]) < _STRESS_SF:
-    raise AssertionError("spring root stress over yield / SF at the engaged pose")
+    )
+SPRING_PRELOAD_RATIO = tuple(
+    min(_r[_k] for _r in _spr_ratios) for _k in range(2)
+)  # parked, engaged: the softest corner's moment over gravity
+for _label, _ratio in zip(("parked", "engaged"), SPRING_PRELOAD_RATIO, strict=True):
+    if _ratio < _PRELOAD_MARGIN:
+        raise AssertionError(
+            f"spring preload {_ratio:.2f}x loses to gravity {_label} at the soft corner"
+        )
+SPRING_STRESS_SF = min(
+    SPR_YIELD_MPA / spr_root_stress(_defl[1], _SPR_T_HI, _arm)
+    for _defl, _arm, _ in (
+        _spring_corner(_dev, _SPR_T_HI) for _dev in SPR_FORMED_CORNERS
+    )
+)
+if SPRING_STRESS_SF < _STRESS_SF:
+    raise AssertionError(
+        f"spring root stress SF {SPRING_STRESS_SF:.2f} engaged at the stiff corner"
+    )
 # The engaged blade flexes east toward the cylinder drum: the crest and the
 # flick tip, carried east by the extra deflection, keep 0.25 to the north end
 # disc beside them (the gears themselves end axially short of the leaf).
@@ -2531,7 +2706,7 @@ _spr_push = SPRING_DEFLECTION[1] - SPRING_DEFLECTION[0]
 for _label, _p in (("crest", SPRING_CREST), ("flick tip", SPRING_FLAT_TIP)):
     _q = (_p[0] + _spr_push * _SPR_N[0], _p[1] + _spr_push * _SPR_N[1])
     if (
-        math.hypot(X_DRUM - _q[0], Y_DRIVE - _q[1]) - SPRING_T
+        math.hypot(X_DRUM - _q[0], Y_DRIVE - _q[1]) - _SPR_T_HI
         < END_DISC_DIA / 2.0 + 0.25
     ):
         raise AssertionError(f"engaged spring {_label} reaches the drum end disc")
@@ -2558,7 +2733,7 @@ _GRIP_HEAD_Z = (
 )
 # In-assembly bodies near the grip: everything of the swing rig ends well
 # north of the crossrod band; the crank cluster lives south/east of it.
-for _lo, _hi, _what in (
+_SWING_RIG_BANDS = (
     (
         LEVER_Z - LEVER_HUB_LEN / 2.0 - LEVER_CAP_SAG,
         LEVER_Z + LEVER_HUB_LEN / 2.0,
@@ -2567,13 +2742,23 @@ for _lo, _hi, _what in (
     (BLOCK_FRONT_Z0, BLOCK_FRONT_Z0 + BLOCK_DEPTH, "front pivot block"),
     (LIFT_ROD_Z0, LIFT_ROD_Z0 + RIG.LIFT_ROD_LEN, "lift rod"),
     (PIVOT_SHAFT_Z0, PIVOT_SHAFT_Z0 + RIG.TORQUE_SHAFT_LEN, "pivot shaft"),
-    (APINION_Z_FRONT - STRAP_T - STRAP_AIR, APINION_Z_FRONT, "front strap"),
+    (RIG.STRAP_Z_OUTER[0], RIG.STRAP_Z_INNER[0], "front strap"),
+)
+for _lo, _hi, _what in (
+    *_SWING_RIG_BANDS,
     (REMOVABLE_Z0, REMOVABLE_Z0 + 5.0, "T12 chain wheel"),
     (CRANK_ARM_Z0, CRANK_ARM_Z0 + ARM_THICKNESS, "crank arm"),
     (CRANK_HUB_Z0, CRANK_HUB_REAR_Z, "crank hub"),
 ):
     if _GRIP_ROD_Z[1] > _lo - 0.25 and _GRIP_ROD_Z[0] < _hi + 0.25:
         raise AssertionError(f"grip-crossrod sweep band reaches the {_what}")
+# The integral head's own band (front crown apex to neck shoulder) spins with
+# the arbor and is wider than the crossrod's, so it is proved against the same
+# swing-rig bodies directly rather than inferred from the rod band.  The T12
+# wheel and the crank arm keep their own head checks below.
+for _lo, _hi, _what in _SWING_RIG_BANDS:
+    if _GRIP_HEAD_Z[1] > _lo - 0.25 and _GRIP_HEAD_Z[0] < _hi + 0.25:
+        raise AssertionError(f"integral grip-head band reaches the {_what}")
 # The head's wider z band clips the T12 plane, so use radial clearance instead.
 # The crank arm/hub/handle sweep is axially disjoint from the integral head.
 if (
@@ -2642,6 +2827,183 @@ if _LEV_Z[1] > PIVOT_SHAFT_Z0 - 0.25:
 if _LEV_Z[0] < _GRIP_HEAD_Z[1] + 0.25:
     raise AssertionError("lever throw plane reaches the integral grip head")
 
+# Worst-case travel of the parts whose clearances RIG_MARGINS reads (Main,
+# restricted review of #858, P2-3: the table claims worst case, so no row
+# may read the nominal pose).  The pose is the drilling set-up -- cluster and
+# drum hard back, both collars set -- so from it the arbor can only move
+# south by the drum's advance or north by its retreat (it is bonded at the
+# drum's front end), the lift rod floats between its two collar stops, and
+# the pinned torque shaft runs forward with the cluster.  Each part adds the
+# printed bands that station its face; frame-side faces (the T12, the crank
+# arm) are their own assemblies' stations.
+def _upper(value: float, places: int) -> float:
+    return printed_deviations(value, places)[1]
+
+
+def _lower(value: float, places: int) -> float:
+    return -printed_deviations(value, places)[0]
+
+
+ARBOR_SOUTH_TRAVEL_STACK = {
+    **RIG.DRUM_BACK_ADVANCE_STACK,
+    "MHA-002 drum length .X (longest)": _upper(RIG.DRUM_LEN, RIG.DRUM_LEN_PLACES),
+    "MHA-102 drum station .X (deepest)": ARBOR_DRUM_STATION_BAND,
+}
+ARBOR_NORTH_TRAVEL_STACK = {
+    **RIG.DRUM_FRONT_RETREAT_STACK,
+    "MHA-102 drum station .X (shallowest)": ARBOR_DRUM_STATION_BAND,
+}
+
+
+LEVER_SOUTH_TRAVEL_STACK = RIG.LEVER_SOUTH_TRAVEL_STACK
+LEVER_NORTH_TRAVEL_STACK = RIG.LEVER_NORTH_TRAVEL_STACK
+SHAFT_FRONT_SOUTH_TRAVEL_STACK = RIG.SHAFT_FRONT_SOUTH_TRAVEL_STACK
+# The rig layout sizes MHA-060 from the lever's nominal throw plane; the pose
+# must put it there.
+if abs(_LEV_Z[1] - (LIFT_ROD_Z0 + RIG.LEVER_PLANE_NORTH_FROM_ROD_END)) > 1e-9:
+    raise AssertionError("the lever throw plane drifted from the rig layout's")
+GRIP_ROD_SOUTH_TRAVEL_STACK = {
+    **ARBOR_SOUTH_TRAVEL_STACK,
+    "MHA-102 head length .X, half (crossrod centred)": _upper(
+        ARBOR_HEAD_LEN, ARBOR_HEAD_LEN_PLACES
+    )
+    / 2.0,
+    "MHA-058 crossrod dia, half": HANDLE_ROD_DIA_BAND[0] / 2.0,
+}
+GRIP_HEAD_SOUTH_TRAVEL_STACK = {
+    **ARBOR_SOUTH_TRAVEL_STACK,
+    "MHA-102 head length .X": _upper(ARBOR_HEAD_LEN, ARBOR_HEAD_LEN_PLACES),
+    "MHA-102 front crown sag .X": _upper(
+        ARBOR_HEAD_CAP_SAG, ARBOR_HEAD_CAP_SAG_PLACES
+    ),
+}
+GRIP_HEAD_NORTH_TRAVEL_STACK = {
+    **ARBOR_NORTH_TRAVEL_STACK,
+    "MHA-102 neck length .XX": _upper(ARBOR_NECK_LEN, ARBOR_NECK_LEN_PLACES),
+}
+# TODO(#743): the bank retention replaces the Ø55 end discs (MHA-121) with
+# Ø25 x 1.50 steel thrust washers, so this row changes or retires with it
+# (retention743 owns the update).
+# Radial: the widest drum tip against the largest end disc, which has no
+# sheet and so carries the title block's general .X row on its diameter.
+DRUM_TIP_TO_END_DISC_STACK = {
+    "MHA-002 OD .XX, half": _upper(2.0 * TIP_APINION, RIG.DRUM_OD_PLACES) / 2.0,
+    "end disc dia, general .X, half": _upper(END_DISC_DIA, 1) / 2.0,
+}
+
+
+# Axial: the return spring's strip against gear j = 19.  The back block is
+# spotted with the strap between it and the drum, whose back end the rig-set
+# leaf D stands off j = 19's back face; the pad is set its leaf off the block
+# with the strip's aft edge flush (pinion_rig_layout).  Each term moves the
+# strip's front edge south, toward the gear.
+SPRING_TO_J19_STACK = {
+    "rig-set leaf D, thinnest setting": RIG.FEELER_SET_ERROR,
+    "MHA-056 strap thickness .X, thinnest": _lower(STRAP_T, STRAP_T_PLACES),
+    "spring pad leaf, thickest setting": RIG.FEELER_SET_ERROR,
+    "MHA-114 strip width .XX, widest": _upper(SPRING_W, SPRING_W_PLACES),
+}
+
+
+def _worst(nominal: float, *stacks: dict[str, float]) -> float:
+    return nominal - sum(sum(stack.values()) for stack in stacks)
+
+
+# The novice-margin rule (Main, restricted review of #858): every rig-scope
+# margin -- the fit-up stacks, the drum's gears and end play, and each
+# clearance the rig's axial stations set against its neighbours -- stands at
+# least RIG_MARGIN_SPARE over its floor.  name -> (worst value, floor).
+RIG_MARGINS = {
+    "j = 19 past its full face (bank pushed north)": (J19_FULL_FACE_MARGIN, 0.0),
+    "j = 0 drum overhang slack (rig and bank terms)": (J0_SLACK_WORST, 0.0),
+    "torque shaft bearing in the front block": (
+        sum(RIG.TORQUE_SHAFT_BEARING_STACK.values()),
+        RIG.FRONT_BLOCK_MIN_BEARING,
+    ),
+    "torque shaft bearing in the back block": (
+        sum(RIG.TORQUE_SHAFT_BACK_BEARING_STACK.values()),
+        RIG.BACK_BLOCK_MIN_BEARING,
+    ),
+    "lift rod seat past the front block": (
+        sum(RIG.LIFT_ROD_SEAT_STACK.values()),
+        RIG.LEVER_SEAT_MIN,
+    ),
+    "drum end play": (ARBOR_DRUM_TOTAL_AIR()[0], ARBOR_MIN_END_PLAY),
+    "MHA-102 journal land over its strap": (
+        min(min(stop.values()) for stop in ARBOR_LAND_MARGINS_AT_STOPS.values()),
+        ARBOR_MIN_LAND_OVER_STRAP,
+    ),
+    "back collar to the back block": (RIG.BACK_COLLAR_GAP_MIN, RIG.BACK_COLLAR_MIN_GAP),
+    "spring blade on the back strap flank": (
+        RIG.SPRING_BLADE_ON_FLANK_WORST,
+        RIG.SPRING_BLADE_MIN_ON_FLANK,
+    ),
+    "spring foot pad to the back block": (
+        RIG.SPRING_PAD_TO_BLOCK_WORST,
+        RIG.SPRING_PAD_MIN_AIR,
+    ),
+    "spring strip to gear j = 19": (
+        _worst(SPRING_Z - SPRING_W / 2.0 - RIG.G19_BACK_FACE_Z, SPRING_TO_J19_STACK),
+        0.25,
+    ),
+    "grip crossrod to the T12 chain wheel": (
+        _worst(_GRIP_ROD_Z[0] - (REMOVABLE_Z0 + 5.0), GRIP_ROD_SOUTH_TRAVEL_STACK),
+        0.25,
+    ),
+    "grip head to the crank arm": (
+        _worst(
+            _GRIP_HEAD_Z[0] - (CRANK_ARM_Z0 + ARM_THICKNESS),
+            GRIP_HEAD_SOUTH_TRAVEL_STACK,
+        ),
+        0.25,
+    ),
+    "lever throw plane to the grip head": (
+        _worst(
+            _LEV_Z[0] - _GRIP_HEAD_Z[1],
+            LEVER_SOUTH_TRAVEL_STACK,
+            GRIP_HEAD_NORTH_TRAVEL_STACK,
+        ),
+        0.25,
+    ),
+    "lever throw plane to the torque shaft's front end": (
+        _worst(
+            PIVOT_SHAFT_Z0 - _LEV_Z[1],
+            LEVER_NORTH_TRAVEL_STACK,
+            SHAFT_FRONT_SOUTH_TRAVEL_STACK,
+        ),
+        0.25,
+    ),
+    "engaged drum tips to the north end disc": (
+        _worst(
+            ENGAGED_C2C - TIP_APINION - END_DISC_DIA / 2.0,
+            DRUM_TIP_TO_END_DISC_STACK,
+        ),
+        0.25,
+    ),
+}
+_THIN = {
+    name: (value, floor)
+    for name, (value, floor) in RIG_MARGINS.items()
+    if value < floor + RIG.RIG_MARGIN_SPARE - 1e-9
+}
+
+
+def rig_margin_lines() -> list[str]:
+    """One line per RIG_MARGINS row: worst value, floor and spare over the
+    floor + RIG_MARGIN_SPARE requirement, for the build log."""
+    return [
+        f"{name}: worst {value:.3f}, floor {floor:g}, "
+        f"spare {value - floor - RIG.RIG_MARGIN_SPARE:+.3f}"
+        for name, (value, floor) in RIG_MARGINS.items()
+    ]
+
+
+if _THIN:
+    raise AssertionError(
+        "rig margins under their floor + RIG_MARGIN_SPARE: "
+        + "; ".join(f"{n} {v:.3f} (floor {f})" for n, (v, f) in _THIN.items())
+    )
+
 # (The PR5 rod-pin throw checks died with the pins; the cam block above
 # bounds the collar sweep against the base and shaft.)
 
@@ -2650,13 +3012,19 @@ if _LEV_Z[0] < _GRIP_HEAD_Z[1] + 0.25:
 # pinion_arbor_collar_spec) and of every rig body whose z band it shares:
 # the lift rod and pivot shaft by radial distance between parallel axes (the
 # front pivot block, by height, once BLOCK_TOP_Y is derived below).
-if ARBOR_COLLAR_Z[1] > APINION_Z_FRONT - STRAP_AIR - STRAP_T - 0.25:
+if ARBOR_COLLAR_Z[1] > RIG.STRAP_Z_OUTER[0] - 0.25:
     raise AssertionError("arbor collar reaches the front strap's outer face")
 if ARBOR_COLLAR_Z[0] < _GRIP_HEAD_Z[1] + 0.25:
     raise AssertionError("arbor collar reaches the integral grip head's neck")
 for _lo, _hi, _axis_xy, _r, _what in (
-    (LIFT_ROD_Z0, LIFT_ROD_Z0 + 202.0, (LIFT_X, LIFT_Y), 3.175, "lift rod"),
-    (PIVOT_SHAFT_Z0, PIVOT_SHAFT_Z0 + 192.0, (PIVOT_X, PIVOT_Y), 3.175, "pivot shaft"),
+    (LIFT_ROD_Z0, LIFT_ROD_Z0 + RIG.LIFT_ROD_LEN, (LIFT_X, LIFT_Y), 3.175, "lift rod"),
+    (
+        PIVOT_SHAFT_Z0,
+        PIVOT_SHAFT_Z0 + RIG.TORQUE_SHAFT_LEN,
+        (PIVOT_X, PIVOT_Y),
+        3.175,
+        "pivot shaft",
+    ),
 ):
     if _hi < ARBOR_COLLAR_Z[0] - 0.25 or _lo > ARBOR_COLLAR_Z[1] + 0.25:
         continue
@@ -2673,8 +3041,18 @@ for _lo, _hi, _axis_xy, _r, _what in (
 # head/cross-hole station.
 if abs(HANDLE_Z - (ARBOR_Z0 + ARBOR_HEAD_CENTER_Z)) > 1e-9:
     raise AssertionError("grip crossrod is not centred in the integral head")
-if abs(ARBOR_Z0 + ARBOR_LEN - (91.25 + MECHANISM_Z_SHIFT)) > 0.01:
-    raise AssertionError("arbor back end off the translated p2 station")
+# MHA-102 runs in the straps on its two journal lands, so each land must
+# cover its strap in the pose, past both faces (the worst case over every
+# printed band and both drum stops is pinion_arbor_geometry's own stack).
+for _land_z, _strap_faces, _which in (
+    (ARBOR_FRONT_JOURNAL_Z, (RIG.STRAP_Z_OUTER[0], RIG.STRAP_Z_INNER[0]), "front"),
+    (ARBOR_BACK_JOURNAL_Z, (RIG.STRAP_Z_INNER[1], RIG.STRAP_Z_OUTER[1]), "back"),
+):
+    _land = (ARBOR_Z0 + _land_z, ARBOR_Z0 + _land_z + ARBOR_JOURNAL_LEN)
+    if min(_strap_faces[0] - _land[0], _land[1] - _strap_faces[1]) < (
+        ARBOR_MIN_LAND_OVER_STRAP - 1e-9
+    ):
+        raise AssertionError(f"MHA-102's {_which} journal land misses its strap")
 if not (ARBOR_DIA == DRUM_BORE_DIA == STRAP_ARBOR_BORE):
     raise AssertionError("arbor dia disagrees with drum and strap bores")
 # R1: the crossrod is a bonded slip fit, modelled line to line.  Its printed
@@ -2739,7 +3117,8 @@ def _plan_box(x0: float, x1: float, z0: float, z1: float) -> tuple[Plan, ...]:
 
 
 # The spring's formed profile, foot end to flick tip, one strip thickness
-# wider each way; its foot pad is the widest part across z.
+# wider each way.  Across z the foot pad is the widest part, flush with the
+# strip's aft edge and widening forward only (pinion_rig_layout).
 _SPRING_PLAN_X = tuple(
     SPRING_X - local[0]
     for local in (
@@ -2752,7 +3131,10 @@ _SPRING_PLAN_X = tuple(
         SPR_FLAT_TIP_L,
     )
 )
-_SPRING_HALF_Z = max(SPR_PAD_WIDTH, SPRING_W) / 2.0
+_SPRING_Z_BAND = (
+    RIG.SPRING_PAD_AFT_Z - max(RIG.SPRING_PAD_WIDTH, SPRING_W),
+    RIG.SPRING_PAD_AFT_Z,
+)
 _PIVOT_BLOCK_X = (PIVOT_X - BLOCK_EAST, PIVOT_X - BLOCK_EAST + BLOCK_WIDTH)
 SWING_FOOTPRINTS: dict[str, tuple[Plan, ...]] = {
     # The support's trapezoid is widest at its foot (x +-WIDE, z +-88.9).
@@ -2769,8 +3151,7 @@ SWING_FOOTPRINTS: dict[str, tuple[Plan, ...]] = {
     "pinion spring": _plan_box(
         min(_SPRING_PLAN_X) - SPRING_T,
         max(_SPRING_PLAN_X) + SPRING_T,
-        SPRING_Z - _SPRING_HALF_Z,
-        SPRING_Z + _SPRING_HALF_Z,
+        *_SPRING_Z_BAND,
     ),
     "nameplate": tuple(
         (corner[0], corner[2])
@@ -2894,9 +3275,11 @@ _require_clearance_size("pinion spring foot", FSCREW_THREAD, SPR_HOLE_SPEC)
 _require_tapped_thread(
     "foot-screw base seat", FSCREW_THREAD, BASE_FOOT_SEAT_SPEC, kind="tapped_bottoming"
 )
-if FSCREW_SHANK_LEN - SPRING_T > BASE_FOOT_HOLE_DEPTH - 0.25:
+# The thinnest strip lets the screw deepest.  The base sizes the seat from
+# the same stock band, so its 0.25 tip reserve holds line to line.
+if BASE_FOOT_HOLE_DEPTH - (FSCREW_SHANK_LEN - _SPR_T_LO) < 0.25 - 1e-9:
     raise AssertionError("foot screw bottoms out in the base spring seat")
-_FOOT_SCREW_XZ = ((SPRING_HOLE_X, SPRING_Z),)
+_FOOT_SCREW_XZ = ((SPRING_HOLE_X, RIG.SPRING_PAD_Z),)
 # U34c: one MHA-143 (90280A197 #8-32 x 3/4) per pedestal, through the ledge's
 # #8 close clearance into a base seat transferred from the fitted pedestal.
 _require_clearance_size("arbor pedestal ledge", HDSCREW_THREAD, ARBOR_PED_HOLE_SPEC)
@@ -2995,7 +3378,40 @@ LIFT_ROD_ROWS = rot_z_rows(LEVER_TILT_DEG)
 # Option E-a: the torque shaft's pin holes run along its local X, which must
 # lie along the straps' cross holes (their local X after Ry(180) . Rz(lean)).
 TORQUE_SHAFT_ROWS = rot_z_rows(STRAP_LEAN_DEG)
+# The straps extrude local +z, so their machine-handed pose composes a
+# Ry(180) with the lean, and each part origin sits on the strap's north face.
+STRAP_ROWS = compose_rows(ROT_Y_180, rot_z_rows(STRAP_LEAN_DEG))
+STRAP_ORIGIN_Z = (RIG.STRAP_Z_INNER[0], RIG.STRAP_Z_OUTER[1])  # (front, back)
+# Option E-a set pins (MHA-145, pinion-strap-pin): each strap cuts its cross
+# hole along its local X through the pivot-bore axis, CROSS_HOLE_CZ from its
+# part origin (build_pinion_bracket).  The torque shaft's holes are
+# match-drilled through those cross holes at the fit-up stack, which this pose
+# is, so each pin runs straight through its shaft hole (Codex #858 P1: a
+# straight pin cannot pass offset holes, and no interference row may pretend
+# it does).  LOCKSTEP GUARD (Main, restricted review of #858): each cross hole
+# is taken from the strap part as placed, each shaft hole from the stations
+# the shaft part cuts, so a strap placement, a cross-hole station or a shaft
+# station that drifts from the others fails here.
+STRAP_CROSS_HOLE_Z = tuple(
+    z0 + STRAP_CROSS_HOLE_CZ * STRAP_ROWS[2][2] for z0 in STRAP_ORIGIN_Z
+)
+STRAP_PIN_Z = STRAP_CROSS_HOLE_Z
+for _z_strap, _z_hole in zip(
+    STRAP_CROSS_HOLE_Z, RIG.TORQUE_SHAFT_PIN_HOLE_Z, strict=True
+):
+    if abs(PIVOT_SHAFT_Z0 + _z_hole * TORQUE_SHAFT_ROWS[2][2] - _z_strap) > 1e-9:
+        raise AssertionError("a strap cross hole is not coaxial with its torque-shaft hole")
 LEVER_ROWS = rot_z_rows(LEVER_TILT_DEG)
+# R1a: the MHA-144 collar's spring pin is the stock MHA-145, whose axis is its
+# local X.  The collar's and MHA-102's pin holes run along their local +Y
+# under ARBOR_ROWS, so the pin turns a further 90 about Z; its centre is the
+# arbor's printed pin station, where the collar's centred hole lands.
+COLLAR_PIN_ROWS = rot_z_rows(HANDLE_TILT_DEG + 90.0)
+COLLAR_PIN_Z = ARBOR_COLLAR_Z0 + ARBOR_COLLAR_PIN_Z
+if any(abs(a - b) > 1e-9 for a, b in zip(COLLAR_PIN_ROWS[0], ARBOR_ROWS[1])):
+    raise AssertionError("collar spring pin axis is not the arbor's pin-hole axis")
+if abs(COLLAR_PIN_Z - (ARBOR_Z0 + ARBOR_PIN_Z)) > 1e-9:
+    raise AssertionError("collar pin hole is off the arbor's pin station")
 PINION_CAM_ROWS = IDENTITY
 # Rod Top-plane normal (local +Y) against the assembly Right normal (+X): the
 # freed pinion_cam spin's rest dihedral -- 90 + LEVER_TILT_DEG.
@@ -3187,6 +3603,27 @@ async def _place_on_shaft(
     )
 
 
+def _require_collar_pin_in_collar_hole(adapter, pin: str, collar: str) -> None:
+    """The MHA-145 tagged as the collar pin for the explode must be the one in
+    the MHA-144 collar's pin hole: its axis (local X) along the hole's (the
+    collar's local +Y) and its centre on that axis.  A mislabelled instance
+    fails here instead of leaving a strap pin with the arbor."""
+    pin_t = component_transform(adapter, pin)
+    collar_t = component_transform(adapter, collar)
+    hole_axis = collar_t[3:6]
+    if abs(abs(sum(a * b for a, b in zip(pin_t[0:3], hole_axis))) - 1.0) > 1e-6:
+        raise AssertionError(f"{pin} does not lie along {collar}'s pin hole")
+    hole_centre = [
+        o + ARBOR_COLLAR_PIN_Z / 1000.0 * z
+        for o, z in zip(collar_t[9:12], collar_t[6:9], strict=True)
+    ]
+    offset = [p - h for p, h in zip(pin_t[9:12], hole_centre, strict=True)]
+    along = sum(d * a for d, a in zip(offset, hole_axis))
+    off_axis = math.sqrt(max(sum(d * d for d in offset) - along * along, 0.0))
+    if off_axis * 1000.0 > 1e-3:
+        raise AssertionError(f"{pin} stands {off_axis * 1000.0:.4f} mm off {collar}'s pin hole")
+
+
 async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
@@ -3203,6 +3640,11 @@ async def build(adapter) -> dict[str, str]:
         "crankshaft end recess inside the 16T boss, worst case: "
         f"{_stack_text(PINION_RECESS_STACK)} >= {PINION_RECESS_MIN_WORST}"
     )
+    # The rig's worst-case margin table (asserted at import), in the task log at
+    # info: the farm leaf log runs at info, and a debug line never reached it
+    # (pc-p1 leaf, 2026-09-25).
+    for line in rig_margin_lines():
+        _telemetry.info(f"rig margin {line}")
     check("create_assembly", await adapter.create_assembly())
 
     # =================== structure (static lock + moving joints) ===========
@@ -3455,13 +3897,10 @@ async def build(adapter) -> dict[str, str]:
     # pose composes a Ry(180) with the lean: the part origin then lands at the
     # component's NORTH face (south face + part thickness), which is where the
     # strap bands below are authored from.
-    _strap_rows = compose_rows(ROT_Y_180, rot_z_rows(STRAP_LEAN_DEG))
+    _strap_rows = STRAP_ROWS
     _strap_euler = euler_from_rows(_strap_rows)
     pinion_brackets: dict[str, str] = {}
-    for tag, z0 in (
-        ("front", APINION_Z_FRONT - STRAP_AIR),
-        ("back", APINION_Z_BACK + STRAP_AIR + STRAP_T),
-    ):
+    for tag, z0 in zip(("front", "back"), STRAP_ORIGIN_Z, strict=True):
         pinion_brackets[tag] = await place_component(
             adapter,
             "pinion-bracket",
@@ -3470,6 +3909,21 @@ async def build(adapter) -> dict[str, str]:
             _strap_rows,
             ground=False,
             label=f"pinion-bracket {tag} (leaning, arbor bore up top)",
+        )
+    # Option E-a set pins (MHA-145): the purchased 1/16 x 1/2 spring pin in
+    # each strap's cross hole, inserted with the strap's own rows so its axis
+    # (local X) is the hole's and its principal planes parallel the strap's.
+    # Front first: the interference contract keys the front pin as -1.
+    strap_pins: dict[str, str] = {}
+    for tag, z_pin in zip(("front", "back"), STRAP_PIN_Z, strict=True):
+        strap_pins[tag] = await place_component(
+            adapter,
+            "pinion-strap-pin",
+            [PIVOT_X, PIVOT_Y, z_pin],
+            _strap_euler,
+            _strap_rows,
+            ground=False,
+            label=f"pinion-strap-pin {tag} (MHA-145 in the strap cross hole)",
         )
     pinion_blocks: list[str] = []
     for tag, z0 in (("front", BLOCK_FRONT_Z0), ("back", BLOCK_BACK_Z0)):
@@ -3548,7 +4002,9 @@ async def build(adapter) -> dict[str, str]:
     )
     # MHA-135: the 1/16 pin driven through the match-drilled hub and rod holes.
     # Its axis is its local X, so it takes the rod's phase and sits centred on
-    # the rod's "lever pin" station.
+    # the rod's "lever pin" station.  The INSTALLED configuration is the pin
+    # trimmed and peened flush with the hub (Codex #858 P2), not the overlength
+    # cut the part's drawing prints.
     lever_pin = await place_component(
         adapter,
         "pinion-lever-pin",
@@ -3556,6 +4012,7 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 0.0, LEVER_TILT_DEG],
         LIFT_ROD_ROWS,
         ground=False,
+        configuration=LEVER_PIN_INSTALLED_CONFIG,
         label="pinion-lever-pin (MHA-135 through hub and rod)",
     )
     grip_crossrod = await place_component(
@@ -3589,6 +4046,16 @@ async def build(adapter) -> dict[str, str]:
         ARBOR_ROWS,
         ground=False,
         label="pinion-arbor-collar (spring-pinned walk-out backstop)",
+    )
+    # Its MHA-145 spring pin through collar and arbor.
+    collar_pin = await place_component(
+        adapter,
+        "pinion-strap-pin",
+        [APINION_X, APINION_Y, COLLAR_PIN_Z],
+        euler_from_rows(COLLAR_PIN_ROWS),
+        COLLAR_PIN_ROWS,
+        ground=False,
+        label="pinion-strap-pin collar (MHA-145 through MHA-144 and MHA-102)",
     )
     # Rig hold-downs (PR7 items 2/11/12): physically located seeds are patterned
     # across the repeated block/pedestal stations in the joints section below.
@@ -5047,8 +5514,10 @@ async def build(adapter) -> dict[str, str]:
         witness_local=[0.0, STRAP_C2C, 0.0],
     )
     # Option E-a set pins: the shaft's pin holes and the straps' cross holes
-    # share an axis (their local X), so the pin tie is the back strap's own
-    # rigid-group idiom -- the shaft's Right plane parallel to the front
+    # run along the same direction (their local X), and each pair shares an
+    # axis: the shaft's holes sit at the fit-up stack's strap stations, which
+    # this pose is (pinion_pivot_shaft_spec).  The pin tie is the back strap's
+    # own rigid-group idiom -- the shaft's Right plane parallel to the front
     # strap's.  The front strap's swing is the freed DOF, so the shaft now
     # turns with the group in the block bores.  Its origin is on the swing
     # axis (#154 blindness), so a point on the pin-hole axis at the shaft's
@@ -5113,6 +5582,16 @@ async def build(adapter) -> dict[str, str]:
             cp_phase,
             label=f"cam follower {tag} anti-spin (a={cp_phase:.2f})",
             verify=(cpin, cp_o),
+        )
+    # Option E-a set pins (MHA-145): each is inserted on its strap's cross
+    # hole -- coaxial with its shaft hole -- and locked to that strap, so it
+    # rides the freed swing.
+    for tag in ("front", "back"):
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{strap_pins[tag]}", "PLANE"),
+            named_ref(f"Front Plane@{pinion_brackets[tag]}", "PLANE"),
+            label=f"strap pin {tag} locked to its strap",
         )
     # Lift rod REVOLUTE (PR8): coaxial in the front block's raised west bore
     # + an axial seat; its spin -- the lever/cam input -- is a FREED
@@ -5318,6 +5797,14 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{pinion_arbor}", "PLANE"),
         label="arbor collar spring-pinned to the arbor",
     )
+    # Its pin is line-to-line in both 1/16 holes (no interference row, as the
+    # strap pins) and rides the collar.
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{collar_pin}", "PLANE"),
+        named_ref(f"Front Plane@{arbor_collar}", "PLANE"),
+        label="collar spring pin locked in the collar",
+    )
 
     # DRIVER #1 (the single machine input): the crank angle. The arm hangs at
     # bottom-dead-centre (straight down, ch30), which is a kinematic SINGULARITY
@@ -5395,7 +5882,9 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    create_drive_train_explode(adapter)
+    # The collar's MHA-145 leaves with the arbor it pins; the strap pins stay.
+    _require_collar_pin_in_collar_hole(adapter, collar_pin, arbor_collar)
+    create_drive_train_explode(adapter, {collar_pin: COLLAR_PIN_ROLE})
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 

@@ -181,7 +181,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -189,7 +188,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -266,7 +264,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pinion arbor collar axis centerline",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.320, 0.160)
     rebuild_drawing(adapter, label="pinion arbor collar layout audit")
     _assert_layout_clean(

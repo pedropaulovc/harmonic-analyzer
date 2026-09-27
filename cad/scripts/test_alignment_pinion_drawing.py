@@ -33,12 +33,20 @@ def test_gear_data_block_preserves_the_actual_base_chord_profile() -> None:
     assert "X.XX" not in data
 
 
-def test_bore_has_the_single_machined_finish_contract() -> None:
-    assert len(spec.SURFACE_FINISHES) == 1
-    (finish,) = spec.SURFACE_FINISHES
-    assert finish.key == "drum_bore"
-    assert finish.roughness_um == 1.6
-    assert finish.face.diameter_mm == 8.0
+def test_only_the_bore_carries_a_finish_symbol() -> None:
+    """Machinist review of the pc-r7 sheet: Ra 1.6 on both end faces was
+    over-specified.  The ends bear on the MHA-056 straps at the float's two
+    stops, but no friction or end-play budget asks for a grade, so they take
+    the title-block finish.  "End faces polished" stays retired too."""
+    import draw_alignment_pinion as drawing
+
+    (bore,) = spec.SURFACE_FINISHES
+    assert bore.key == "drum_bore"
+    assert bore.face.diameter_mm == spec.BORE_DIA
+    assert bore.roughness_um == 1.6
+    assert "polish" not in _config.parts("alignment-pinion")["finish"].lower()
+    for retired in ("_end_face_tip_arc", "BACK_END_FACE_XY", "FRONT_END_FACE_XY"):
+        assert not hasattr(drawing, retired), retired
 
 
 def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None:
@@ -71,20 +79,21 @@ def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None
     assert spec.BORE_DIA == arbor_geometry.SHAFT_DIA  # the CAD models line-to-line
 
 
-def test_notes_bond_the_drum_at_the_station_mha102_owns() -> None:
+def test_the_drum_bond_is_the_fitup_step_not_a_note() -> None:
+    import pinion_arbor_spec as arbor_spec
+
     notes = spec.DRAWING_NOTES
-    # Rule 6 (R3): three notes.  The drum is symmetric, so no orientation
-    # note; its axial station is stated once, on MHA-102, never re-derived
-    # here from j=19.  The MHA-102 bond-zone band is MHA-102's own native
-    # dimension (Codex P1 on #814), so it is not restated here.
-    assert len(notes.splitlines()) == 3
+    # Rule 6 (R3): one note.  The drum is symmetric, so no orientation note;
+    # its axial station is stated once, on MHA-102.  The MHA-102 bond-zone
+    # band is MHA-102's own native dimension (Codex P1 on #814), the hand
+    # slide rides the bore callout (Codex P2 on #832), and the bond itself is
+    # the pinion fit-up step MHA-102's spec owns (Main's rule-6 sweep).
+    assert notes == "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND."
     assert "BOND ZONE" not in notes
-    assert "DRUM SHALL SLIDE ON MHA-102 BY HAND." in notes
     assert "ARBOR JOURNAL" not in notes
-    assert (
-        "ON ASSEMBLY: BOND TO MHA-102 WITH LOCTITE 638 AT THE "
-        "DRUM STATION ON MHA-102." in notes
-    )
+    assert "LOCTITE" not in notes and "ON ASSEMBLY" not in notes
+    assert "MHA-002" in arbor_spec.ASSEMBLY_STEP
+    assert spec.RETAINING_COMPOUND in arbor_spec.ASSEMBLY_STEP
     assert "j=19" not in notes and "LOCATED FROM" not in notes
     assert "MATES WITH CYLINDER-GEAR BANK" not in notes
     for retired in ("INTERFERENCE", "MATCHED FIT", "ENSURES FULL ENGAGEMENT", "+/-0.5"):
@@ -94,7 +103,7 @@ def test_notes_bond_the_drum_at_the_station_mha102_owns() -> None:
 def test_part_metadata_preserves_material_finish_quantity() -> None:
     config = _config.parts("alignment-pinion")
     assert config["material_specification"] == "C36000 free-machining brass"
-    assert config["finish"] == "end faces polished; bore as reamed; teeth as cut"
+    assert config["finish"] == "bore as reamed; teeth as cut"
     assert int(config["quantity"]) == 1
 
 
@@ -160,7 +169,25 @@ def test_tooth_thickness_is_controlled_by_the_model_base_tangent_span() -> None:
 def test_fit_bore_callout_names_its_process() -> None:
     import draw_alignment_pinion as draw
 
-    assert draw.DIMENSION_CALLOUTS["ArborBoreDia"] == "REAM THRU"
+    assert draw.DIMENSION_CALLOUTS["ArborBoreDia"].splitlines()[0] == "REAM THRU"
+
+
+def test_hand_slide_fit_rides_the_bore_callout_not_a_note() -> None:
+    """Rule 6: a matched-fit acceptance belongs on the feature callout or an
+    assembly step, never in a general note (Codex P2 on #832)."""
+    import draw_alignment_pinion as draw
+
+    callout = draw.DIMENSION_CALLOUTS["ArborBoreDia"]
+    assert callout == spec.ARBOR_BORE_CALLOUT
+    arbor = _config.parts("pinion-arbor")
+    assert callout.splitlines()[1:] == [
+        f"SLIDES BY HAND ON {arbor['number']}",
+        arbor["title"].upper(),
+    ]
+    assert arbor["number"] == "MHA-102"
+    assert "PINION ARBOR" in callout
+    for line in spec.DRAWING_NOTES.splitlines():
+        assert "SLIDE" not in line and "BY HAND" not in line, line
 
 
 def test_od_at_the_general_band_keeps_tip_clearance_and_contact() -> None:
@@ -205,4 +232,3 @@ def test_no_note_line_carries_a_dimension() -> None:
     for line in spec.DRAWING_NOTES.splitlines():
         text = re.sub(r"MHA-\d+", "", line).replace(spec.RETAINING_COMPOUND, "")
         assert not re.search(r"\d", text), line
-

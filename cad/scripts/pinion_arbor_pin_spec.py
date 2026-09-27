@@ -15,23 +15,27 @@ spec read the hole from here.
 from __future__ import annotations
 
 import pinion_strap_pin_spec as _pin
-from pinion_arbor_geometry import (
-    NECK_LEN,
-    PIN_STATION_FROM_HEAD_REAR,
-    SHAFT_DIA,
-)
 from pinion_arbor_spec import (
     FRONT_JOURNAL_FROM_HEAD_REAR,
     LAND_FINISH_RUNOUT,
     LINEAR_X_BAND,
+    NECK_LEN,
     PIN_STATION_BAND,
+    PIN_STATION_FROM_HEAD_REAR,
+    SHAFT_DIA,
     SHAFT_DIA_BAND,
 )
 
 PIN_HOLE_DIA = _pin.HOLE_DIA
 PIN_HOLE_DIA_BAND = _pin.HOLE_BAND
 PIN_HOLE_DIA_MAX = _pin.HOLE_MAX
-PIN_HOLE_CALLOUT = _pin.DRILL_THRU_CALLOUT
+# The hole's function is the pin it takes: the stock MHA-145 (McMaster
+# 98296A027), the third of its BOM line.  Both sheets that drill for it,
+# MHA-102 and the MHA-144 collar, print this one callout, so a machinist
+# reading the arbor's +0.06/0 band sees why it beats the title block's
+# drilled-hole row (codex machinist pass on pc-r8; Main, 2026-09-26).
+PIN_NUMBER = "MHA-145"
+PIN_HOLE_CALLOUT = f"{_pin.DRILL_THRU_CALLOUT}\nFOR {PIN_NUMBER} SPRING PIN"
 
 # At its worst corner the hole stays clear of the front land and its Ra 1.6
 # run-out (the pin never enters the land), clear of the Ø10.5 neck shoulder,

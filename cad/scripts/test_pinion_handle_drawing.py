@@ -17,6 +17,7 @@ import pinion_arbor_spec as arbor
 import pinion_handle_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from cone_pivot_post_installation import MECHANISM_Z_SHIFT
 
 
 def test_registry_slug_now_describes_the_separate_grip_crossrod() -> None:
@@ -32,7 +33,12 @@ def test_registry_slug_now_describes_the_separate_grip_crossrod() -> None:
 def test_crossrod_preserves_released_geometry_and_local_origin() -> None:
     # R1: as-received Ø6 bar, bonded into MHA-102 (no longer a 6.0175 press rod).
     assert spec.ROD_DIA == pytest.approx(6.0)
-    assert "ON ASSEMBLY: BOND INTO MHA-102 HEAD WITH LOCTITE 638." in spec.DRAWING_NOTES
+    # Rule 6: the bond and its acceptance are the fit-up step, not notes.
+    assert spec.DRAWING_NOTES == "USE COLD-FINISHED BAR AS RECEIVED."
+    assert spec.ASSEMBLY_STEP == (
+        "BOND MHA-058 INTO MHA-102 HEAD WITH LOCTITE 638; "
+        "INSTALLED ROD SHALL NOT TURN OR SLIDE BY HAND."
+    )
     assert "MATCH-REAM" not in spec.DRAWING_NOTES
     assert spec.ROD_DOWN == pytest.approx(32.0)
     assert spec.ROD_UP == pytest.approx(33.0)
@@ -66,10 +72,20 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     # Released construction: MHA-058's component origin was the head/crossrod
     # axis, with the old Ø15x9 head followed by a 2 mm wall.  New construction:
     # that head centre is MHA-102 local z=-6.5; MHA-058 keeps its own origin.
+    # Codex #854/#858 P1 (Main): the assembly shows the fit-up stack, where the
+    # back stop puts the drum -- and the arbor it is bonded on -- 0.25 aft of
+    # the released -135.0 arbor station, and RIG_AFT_SHIFT a further 0.97 (user
+    # ruling P1-2: what the rig-set leaf D off g19 leaves, for j = 19's full
+    # face with margin).  Every released station below moves by exactly that,
+    # and nothing else about the cutover changes.
+    import pinion_rig_layout as rig
+
+    fitup_shift = assembly.ARBOR_Z0 - (-135.0 + MECHANISM_Z_SHIFT)
+    assert fitup_shift == pytest.approx(0.25 + rig.RIG_AFT_SHIFT, abs=1e-9)
     released_origin = (
         assembly.APINION_X,
         assembly.APINION_Y,
-        -135.0 + assembly.MECHANISM_Z_SHIFT - (9.0 / 2.0 + 2.0),
+        -135.0 + MECHANISM_Z_SHIFT - (9.0 / 2.0 + 2.0) + fitup_shift,
     )
     new_head_axis = _world_point(
         (assembly.APINION_X, assembly.APINION_Y, assembly.ARBOR_Z0),
@@ -91,15 +107,17 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     )
     # x follows the drum's parked station: U28 (2026-09-23) parks it with a
     # 2.2425 tip gap to the review-first 32T drum's 8.667 tip radius.
-    expected_axis = (-18.383940352466745, 90.518, -138.41241221957347)
-    # Rule 12 (audit W6): the head grows 9.0 -> 10.5 about the released
-    # centre, so both faces and the crown move 0.75 out; the neck shoulder
-    # (the released head rear + 2 wall + 10) stays put.
+    expected_axis = (-18.383940352466745, 90.518, -137.18811169145133)
+    # Rule 12 (audit W6) grew the head 9.0 -> 10.5 and the machinist review of
+    # 7f7fc1717 (Main's option 2) to 11.5, each about the released centre, so
+    # both faces and the crown move 1.25 out.  The neck shoulder (the released
+    # head rear + 2 wall + 10) moves 0.25 forward, so every turned length on
+    # the MHA-102 print lands on .X.
     released_head_stations = (
-        released_origin[2] - 10.5 / 2.0,
-        released_origin[2] + 10.5 / 2.0,
-        released_origin[2] - (10.5 / 2.0 + 3.0),
-        released_origin[2] + 9.0 / 2.0 + 2.0 + 10.0,
+        released_origin[2] - 11.5 / 2.0,
+        released_origin[2] + 11.5 / 2.0,
+        released_origin[2] - (11.5 / 2.0 + 3.0),
+        released_origin[2] + 9.0 / 2.0 + 2.0 + 10.0 - 0.25,
     )
     integral_head_stations = (
         assembly.ARBOR_Z0 + arbor_geometry.HEAD_FRONT_Z,
@@ -112,10 +130,10 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     )
     assert integral_head_stations == pytest.approx(
         (
-            -143.66241221957347,
-            -133.16241221957347,
-            -146.66241221957347,
-            -121.91241221957347,
+            -142.93811169145133,
+            -131.43811169145133,
+            -145.93811169145133,
+            -120.93811169145133,
         ),
         abs=1e-12,
     )
@@ -129,11 +147,11 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     for local, expected in (
         (
             (0.0, -32.0, 0.0),
-            (10.617908832706053, 76.99421562429762, -138.41241221957347),
+            (10.617908832706053, 76.99421562429762, -137.18811169145133),
         ),
         (
             (0.0, 33.0, 0.0),
-            (-48.29209732467619, 104.46440263744309, -138.41241221957347),
+            (-48.29209732467619, 104.46440263744309, -137.18811169145133),
         ),
     ):
         released_endpoint = _world_point(released_origin, assembly.HANDLE_ROWS, local)
@@ -153,6 +171,22 @@ def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
     assert marked == kept == {"RodDia", "RodSpan"}
     assert spec.DRAWING_PRECISION_BY_NAME == {"RodDia": 1, "RodSpan": 1}
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
+
+
+def test_view_group_is_centred_on_the_sheet_field() -> None:
+    """Machinist review of 7f7fc1717: the profile, dimensions and isometric
+    sat low and right.  The group's vertical span now centres on the field
+    between the title block and the inner border."""
+    lowest = drawing.PRINCIPAL_KEEP["RodSpan"][1]
+    highest = max(drawing.ROD_DIAMETER_XY[1], drawing.ISO_NOTE_XY[1])
+    field_mid = sum(drawing.FIELD_Y) / 2.0
+    assert abs((lowest + highest) / 2.0 - field_mid) <= 0.005
+    assert drawing.PRINCIPAL_CENTER[1] == pytest.approx(field_mid, abs=0.010)
+    # The profile's left end stands in the left half of the sheet's width.
+    from pinion_handle_geometry import ROD_SPAN
+
+    rod_half = ROD_SPAN * drawing.SHEET_SCALE[0] / 2000.0
+    assert drawing.PRINCIPAL_CENTER[0] - rod_half < 0.110
 
 
 def test_retired_head_socket_and_retention_exports_are_absent() -> None:

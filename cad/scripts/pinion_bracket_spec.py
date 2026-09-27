@@ -25,6 +25,9 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_bracket_geometry import (
     ARBOR_BORE as ARBOR_BORE,
     C2C as C2C,
+    CROSS_HOLE_CZ_PLACES,
+    CROSS_HOLE_FROM_BORE_WALL_PLACES,
+    END_RADIUS_PLACES,
     HALF_WIDTH as HALF_WIDTH,
     OVERALL_LENGTH as OVERALL_LENGTH,
     PIN_BORE as PIN_BORE,
@@ -33,6 +36,8 @@ from pinion_bracket_geometry import (
     PIVOT_BORE as PIVOT_BORE,
     R_END as R_END,
     THICKNESS as THICKNESS,
+    THICKNESS_BAND as THICKNESS_BAND,
+    THICKNESS_PLACES,
     WIDTH as WIDTH,
 )
 import pinion_strap_pin_spec as _strap_pin
@@ -69,17 +74,10 @@ PIN_SEAT_DIA_BAND = REAM_H7
 # functional band (pinion_strap_pin_spec).
 CROSS_HOLE_DIA = _strap_pin.HOLE_DIA
 CROSS_HOLE_BAND = _strap_pin.HOLE_BAND
-CROSS_HOLE_CALLOUT = "\n".join(
-    (
-        "THRU",
-        "SUPPLY 1/16 X 1/2 SLOTTED SPRING",
-        "PIN (ASME B18.8.2) LOOSE",
-    )
-)
-if "SUPPLY " + _strap_pin.PIN_SUPPLY + " LOOSE" != " ".join(
-    CROSS_HOLE_CALLOUT.splitlines()[1:]
-):
-    raise AssertionError("cross-hole callout drifted from the pin spec")
+# The pin is its own BOM line (MHA-145), so the callout names it
+# instead of supplying one loose with each strap; test_pinion_bracket_drawing
+# keeps the number in step with the parts registry.
+CROSS_HOLE_CALLOUT = "THRU\nFOR MHA-145 SPRING PIN"
 
 # Rule 12 (#842, U27; audit W23) worst-case web from the blind seat to a broad
 # face.  Codex #858 P2, user ruling (a) (2026-09-25): the seat's station is
@@ -91,7 +89,6 @@ if "SUPPLY " + _strap_pin.PIN_SUPPLY + " LOOSE" != " ".join(
 # seat's upper-limit radius and the 0.05 drilled-hole allowance: 1.54, over
 # the 1.5 floor (the 2.0 target gives way to the printed location).  The near
 # face keeps PIN_SEAT_NEAR_WEB_WORST.
-THICKNESS_BAND = 0.8  # Depth prints .X
 # Symmetric, so the print reads +/- (ASME Y14.5), not an equal bilateral pair.
 PIN_SEAT_STATION_TOL = 0.10
 _PIN_SEAT_MAX = PIN_BORE + PIN_SEAT_DIA_BAND[0]
@@ -152,17 +149,19 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PivotBoreDia": 2,
         "ArborBoreDia": 2,
         "ArborBoreCz": 2,
-        "BottomCapRadius": 1,
-        "TopCapRadius": 1,
+        "BottomCapRadius": END_RADIUS_PLACES,
+        "TopCapRadius": END_RADIUS_PLACES,
     },
-    "Strap": {"Depth": 1},
+    "Strap": {"Depth": THICKNESS_PLACES},
     # Two places on PinSeatCz resolve its +/-0.10 band.
     "PinSeatProfile": {"PinSeatDia": 2, "PinSeatCy": 3, "PinSeatCz": 2},
     "PinSeat": {"PinSeatDepth": 1},
     # Two places resolve the spring pin's +0.06/0 hole band; both locations
     # are routine .XX (their worst cases clear the 1.5 floor at that grade).
-    "CrossHoleProfile": {"CrossHoleDia": 2, "CrossHoleCz": 2},
-    "CrossHoleAxisReference": {"CrossHoleFromBoreWall": 2},
+    "CrossHoleProfile": {"CrossHoleDia": 2, "CrossHoleCz": CROSS_HOLE_CZ_PLACES},
+    "CrossHoleAxisReference": {
+        "CrossHoleFromBoreWall": CROSS_HOLE_FROM_BORE_WALL_PLACES
+    },
 }
 
 _PRECISION_NAMES = [

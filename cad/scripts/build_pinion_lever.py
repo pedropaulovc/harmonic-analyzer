@@ -48,6 +48,7 @@ from _common import (
     anchor_point_to_origin,
     apply_color,
     apply_material,
+    blank_reference_sketches,
     check,
     define_circle,
     dimension_between,
@@ -91,6 +92,7 @@ from pinion_lever_spec import (
     ISOMETRIC_VIEW_NOTE,
     PIN_HOLE_DIA,
     PIN_HOLE_Z,
+    REFERENCE_SKETCHES,
     ROD_DIA,
     ROD_LEN,
     ROD_Y0,
@@ -99,19 +101,6 @@ from pinion_lever_spec import (
 )
 
 PART_NAME = "pinion-lever"
-# Reference sketches this part still saves shown (#880), each with its owner
-# and why.  Delete an entry once the part hides that sketch; the release
-# refuses to start while any part lists one (visibility_debt).
-SHOWN_SKETCH_ALLOWANCES = {
-    "GripStationReference": (
-        "pinioncluster: carries the drawing's marked dimensions; hide it once "
-        "the sheet imports them from the hidden sketch"
-    ),
-    "PinHoleStationReference": (
-        "pinioncluster: carries the drawing's marked dimensions; hide it once "
-        "the sheet imports them from the hidden sketch"
-    ),
-}
 MATERIAL = "Plain Carbon Steel"  # bright steel (p.68)
 _SAVED_DRAWING_PROPERTIES = (
     "Number",
@@ -565,9 +554,8 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    artefacts = await save_part_and_images(
-        adapter, PART_NAME, allowed_shown=SHOWN_SKETCH_ALLOWANCES
-    )
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
+    artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

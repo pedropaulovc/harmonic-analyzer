@@ -10,6 +10,7 @@ marked-dimension map keeps the part marks and drawing keeps in lockstep
 
 from __future__ import annotations
 
+import _config
 from _fit_limits import REAM_H7
 from _gtol_spec import SphereFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -33,11 +34,35 @@ RETAINING_COMPOUND_MAX_GAP_MM = 0.25
 PIN_LENGTH_TOLERANCE_MM = 0.05
 CAP_RADIUS_TOLERANCE_MM = 0.05
 
+# Rule 7 (turned parts): the shank is a Right-plane half-profile, so its
+# diameter prints on the side view beside the length, not on the end view
+# (machinist review of 7f7fc1717).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "PinProfile": {"PinDia"},
-    "Pin": {"Depth"},
+    "PinProfile": {"PinDia", "Depth"},
     "CapProfile": {"CapR"},
 }
+# Decimal places ARE the tolerance statement (policy rule 2): the h9 stock
+# band and the two +/-0.05 bands are all hundredths.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "PinProfile": {"PinDia": 2, "Depth": 2},
+    "CapProfile": {"CapR": 2},
+}
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
+}
+if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
+    raise AssertionError("every marked dimension must state its decimal places")
+
+# The stock is stated once, in the title block's Material cell (the registry
+# row): repeating it on the diameter callout was over-specification (machinist
+# review of 7f7fc1717), and a callout that names no bar cannot disagree with
+# the title block (Codex P2 on #814).  The h9 slip fit above assumes drill rod.
+STOCK = _config.parts("pinion-cam-pin")["material"]
+if "drill rod" not in STOCK.lower():
+    raise AssertionError(f"the h9 bonded slip fit assumes drill rod, not {STOCK!r}")
+PIN_DIA_CALLOUT = f"SLIP FIT IN {SEAT_NUMBER} FOLLOWER SEAT"
 
 # Rule 5: the crown is the surface that runs (it rides the cam OD); the
 # bonded shank is a static seat and carries no symbol.
@@ -58,12 +83,18 @@ if BOND_CLEARANCE_MIN < 0.0 or BOND_CLEARANCE_MAX > RETAINING_COMPOUND_MAX_GAP_M
         f" 0-{RETAINING_COMPOUND_MAX_GAP_MM} {RETAINING_COMPOUND} window"
     )
 
+# Rule 6: assembly requirements belong on the feature callout or the
+# assembly step, never in a part's general notes.  ASSEMBLY_STEP is the
+# pinion fit-up step text (pinion_rig_fitup) that owns this joint.
 DRAWING_NOTES = "\n".join(
     (
         "LEAVE THE CROWN ROOT CIRCLE SHARP, NO CHAMFER;",
         "  EXEMPT FROM TITLE-BLOCK EDGE-BREAK REQUIREMENT.",
-        f"ON ASSEMBLY: BOND INTO {SEAT_NUMBER} FOLLOWER SEAT WITH {RETAINING_COMPOUND}.",
     )
+)
+ASSEMBLY_STEP = (
+    f"BOND {_config.parts('pinion-cam-pin')['number']} INTO {SEAT_NUMBER} "
+    f"FOLLOWER SEAT WITH {RETAINING_COMPOUND}."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"
 # The overall (seated end to crown apex) is a pure reference restatement;

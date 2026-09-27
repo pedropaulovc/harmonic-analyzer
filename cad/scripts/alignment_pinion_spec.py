@@ -68,6 +68,12 @@ FACE_WIDTH = 143.2  # general .X; located from the back end (drawing note)
 # +/-0.51, the drum tip keeps >= 0.21 mm to the 120T gap floor and the mesh
 # keeps a contact ratio >= 1.13 (test_alignment_pinion_drawing).
 
+# Only the reamed bore carries a roughness symbol.  The two end faces bear on
+# the MHA-056 straps' inner faces when the drum floats hard forward or hard
+# aft, but no friction or end-play budget derives a grade from that slow,
+# hand-cranked contact.  So they take the title-block finish, the loosest
+# band (novice rule), rather than a 1.6 no function asks for (machinist
+# review of the pc-r7 sheet: over-specification; Main ruling (a), 2026-09-26).
 SURFACE_FINISHES = (
     SurfaceFinishControl("drum_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
 )
@@ -122,13 +128,15 @@ GEAR_DATA = gear_data_note(
 )
 
 # Rule 6: notes never carry a dimension.  MHA-102 owns its bond-zone band
-# natively (BondZoneDia); the hand slide is this part's functional acceptance.
-DRAWING_NOTES = "\n".join(
-    (
-        "DRUM SHALL SLIDE ON MHA-102 BY HAND.",
-        f"ON ASSEMBLY: BOND TO MHA-102 WITH {RETAINING_COMPOUND} AT THE "
-        "DRUM STATION ON MHA-102.",
-        "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND.",
-    )
+# natively (BondZoneDia).  The hand slide is this part's matched-fit
+# acceptance, so it rides the reamed bore's callout, not a general note
+# (Codex P2 on #832).  It names the mating part as well as its number
+# (codex machinist review of f0faedc51), both from the part registry.
+_ARBOR = _config.parts("pinion-arbor")
+ARBOR_BORE_CALLOUT = (
+    f"REAM THRU\nSLIDES BY HAND ON {_ARBOR['number']}\n{_ARBOR['title'].upper()}"
 )
+# Rule 6: the bond to MHA-102 is an assembly step (pinion_arbor_spec
+# ASSEMBLY_STEP owns the drum joint), not a part note.
+DRAWING_NOTES = "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
