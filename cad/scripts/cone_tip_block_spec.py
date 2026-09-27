@@ -44,18 +44,32 @@ ADJUSTER_THREAD_DEPTH = 9.5  # full-form thread; leaves lead beyond usable threa
 ADJUSTER_DEPTH = 11.0  # tap-drill shoulder
 # U30 hold-down: one #6-32 x 1/2 socket head cap screw (McMaster 91251A148)
 # comes up through the platform's counterbored lateral slot into the foot
-# centre. Under the head the platform leaves a 1.64..2.66 ledge and the fit-up
-# shim pack is 0.05..2.20, so the 12.7 screw reaches 7.84..11.01 into the
-# block: at least 1.5D of engagement, and never onto the tap's lead threads.
+# centre. Under the head the platform leaves a ledge of stock thickness
+# (6.35 +/-0.13, user ruling U41: "1/4 PLATE AS SUPPLIED") less the 4.20 .XX
+# counterbore depth, 1.51..2.79 (cone_swing_platform_spec.TIP_LEDGE_RANGE),
+# and the fit-up shim pack is 0.05..2.20, so the 12.7 screw reaches
+# 7.71..11.14 into the block (rule-12 audit W22/E: the first cut left out the
+# plate band).  Judged at the printed worst case: engagement >= 1.5D, and the
+# deepest reach stays on full thread -- ThreadDepth .X, so 0.8 under nominal.
 FOOT_THREAD = "#6-32"
 FOOT_SCREW_LENGTH = 12.7
-FOOT_SCREW_REACH_MM = (12.7 - 2.66 - 2.20, 12.7 - 1.64 - 0.05)
-FOOT_THREAD_DEPTH = 11.5
-FOOT_DEPTH = 14.0
+FOOT_LEDGE_RANGE_MM = (1.51, 2.79)
+FOOT_SHIM_RANGE_MM = (0.05, 2.20)
+FOOT_SCREW_REACH_MM = (
+    FOOT_SCREW_LENGTH - FOOT_LEDGE_RANGE_MM[1] - FOOT_SHIM_RANGE_MM[1],
+    FOOT_SCREW_LENGTH - FOOT_LEDGE_RANGE_MM[0] - FOOT_SHIM_RANGE_MM[0],
+)
+FOOT_THREAD_DEPTH = 12.5
+# The tap drill runs 1.5P past the deepest full thread at the printed limits
+# (both depths .X), so a plug tap's lead never eats the full-thread depth.
+FOOT_DEPTH = 15.5
+_FOOT_PITCH_MM = 25.4 / 32.0
 if FOOT_SCREW_REACH_MM[0] < 1.5 * THREAD_MAJOR_MM[FOOT_THREAD]:
     raise AssertionError("foot screw engagement falls below 1.5D")
-if FOOT_SCREW_REACH_MM[1] > FOOT_THREAD_DEPTH - 0.25:
+if FOOT_SCREW_REACH_MM[1] > FOOT_THREAD_DEPTH - 0.8 - 0.25:
     raise AssertionError("foot screw can reach the tap's incomplete lead threads")
+if (FOOT_DEPTH - 0.8) - (FOOT_THREAD_DEPTH + 0.8) < 1.5 * _FOOT_PITCH_MM:
+    raise AssertionError("foot tap drill leaves no lead room past the full thread")
 # Non-bearing clearance passage from the south face into the adjuster bore. Its
 # diameter matches the already-defined adjuster cup, so the shaft tip has one
 # continuous envelope without reviving the removed fictional journal fit.
