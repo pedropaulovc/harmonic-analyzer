@@ -172,6 +172,10 @@ CRANK_BORE_BAND = (0.018, 0.0)  # (upper, lower): H7
 #   cone-bore plan angle +/-1 deg (title block):
 #     64T 26.69 from the post axis -> dDX 0.444 * DX/C 0.142  +/-0.063
 #   64T axial station +/-0.5 on the inclined shaft -> dC  +/-0.015
+#     (superseded by the collar stack, #916: the gear is set against the
+#     shaft's thrust collar, +/-0.53 either way -- boss end +/-0.4, collar
+#     +/-0.13, crank_boss_rim.GEAR64_STATION_TOWARD_POST -- so dC +/-0.016
+#     against the +/-0.015 booked, absorbed by the band's rounding)
 #   left for this spacing (dC)                        -0.072 .. +0.371
 #   / dC/dDY = DY/C = 39.332/39.735 = 0.990           -0.073 .. +0.374
 #
@@ -186,10 +190,6 @@ CRANK_BORE_BAND = (0.018, 0.0)  # (upper, lower): H7
 # how the shop holds it is theirs (policy rule 6).
 CRANK_ABOVE_CONE = CRANK_BORE_HEIGHT - BORE_HEIGHT
 CRANK_ABOVE_CONE_BAND = (0.37, 0.0)
-# The table's 64T axial station row: MHA-A03 bonds the gear "front of T120"
-# with nothing to butt, so it may stand this far either way on its shaft.
-# crank_boss_rim reads it for the 64T's clearance to this post's north side.
-GEAR64_STATION_BAND_MM = 0.5
 
 # Cone-axis height above the foot.  The post's journal sets the cone shaft's
 # height; at the shaft's tip MHA-092 is set on MHA-141's shim pack, whose

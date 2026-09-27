@@ -342,9 +342,54 @@ def test_the_harvested_spot_face_is_the_gate_s_clash() -> None:
 
 def test_the_floor_is_the_assembly_s_running_gap() -> None:
     """Cited, not invented: the 16T's seat feeler MHA-A03 step 4 sets, and it
-    is taken with the 64T's station band counted."""
+    is taken with the 64T's station counted."""
     assert crank_boss_rim.FLOOR_CLEARANCE_MM is pinion.SEAT_FEELER_MM
-    assert crank_boss_rim.GEAR64_STATION_TOWARD_POST is post.GEAR64_STATION_BAND_MM
+
+
+def test_the_64t_station_is_the_collar_stack() -> None:
+    """#916 (Main's ruling (b), 2026-09-27): the 64T is set against MHA-014's
+    thrust collar, which bears on the cone boss's north end.  Toward the post
+    it moves by the boss end short (ConeBossLen's .X row, half per end) and
+    the collar thin (CollarWidth's row); the two butts are closed nominally
+    and only open."""
+    import cone_gear_shaft_spec as shaft
+
+    row = crank_boss_rim._row
+    boss_end = row(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0
+    collar = row(shaft.DRAWING_PRECISION_BY_NAME["CollarWidth"])
+    assert crank_boss_rim.GEAR64_STATION_TOWARD_POST == pytest.approx(boss_end + collar)
+    assert crank_boss_rim.GEAR64_STATION_TOWARD_POST == pytest.approx(0.53)
+    assert crank_boss_rim.collar_contacts(drive.GEAR64_POST_OFFSET) == pytest.approx(
+        0.0, abs=1e-9
+    )
+    spot = crank_boss_rim.spot_face(*_spot_face_sizes())
+    with pytest.raises(ValueError, match="butts are open"):
+        crank_boss_rim.clearances(gear_offset=drive.GEAR64_POST_OFFSET + 0.1, spot=spot)
+
+
+def test_the_coupled_cone_boss_end_is_the_collar_at_its_low_limit(monkeypatch) -> None:
+    """The boss end rides with the gear through the collar, so it never takes
+    the boss end's growth and the station term at once: whatever the station
+    term, the worst air is the collar at its low limit."""
+    import cone_gear_shaft_spec as shaft
+
+    spot = crank_boss_rim.spot_face(*_spot_face_sizes())
+    low = shaft.COLLAR_THICKNESS - crank_boss_rim.COLLAR_WIDTH_SHORT
+    assert low == pytest.approx(1.551, abs=1e-3)
+    booked = crank_boss_rim.GEAR64_STATION_TOWARD_POST
+    for term in (0.0, booked, 1.0):
+        monkeypatch.setattr(crank_boss_rim, "GEAR64_STATION_TOWARD_POST", term)
+        worst = crank_boss_rim.clearances(gear_offset=drive.GEAR64_POST_OFFSET, spot=spot)
+        assert worst["cone boss end"] == pytest.approx(low, abs=1e-3), term
+    # What the uncoupled model booked: the station, the boss end's growth and
+    # the face's growth all on top of the nominal collar.
+    uncoupled = (
+        shaft.COLLAR_THICKNESS
+        - booked
+        - crank_boss_rim.CONE_BOSS_END_GROWTH
+        - crank_boss_rim.GEAR_FACE_GROWTH
+    )
+    assert uncoupled == pytest.approx(0.351, abs=2e-3)
 
 
 def test_the_printed_spot_face_holds_the_floor_on_all_five_surfaces() -> None:
@@ -353,28 +398,25 @@ def test_the_printed_spot_face_holds_the_floor_on_all_five_surfaces() -> None:
     worst = crank_boss_rim.clearances(gear_offset=drive.GEAR64_POST_OFFSET, spot=spot)
     assert set(worst) == {"crank boss", "MHA-149 north end", "collar", "body", "cone boss end"}
     assert min(worst.values()) >= crank_boss_rim.FLOOR_CLEARANCE_MM
-    # The run-out's collar governs, then the untouched body and cone-boss end
-    # (flush with each other, so tied).
-    assert min(worst, key=worst.get) == "collar"
-    assert worst["collar"] == pytest.approx(0.345, abs=2e-3)
-    assert worst["body"] == pytest.approx(worst["cone boss end"], abs=1e-3)
-    assert worst["cone boss end"] == pytest.approx(0.381, abs=2e-3)
+    # The run-out's collar governs, then the untouched body.
+    assert sorted(worst, key=worst.get)[:2] == ["collar", "body"]
+    assert worst["collar"] == pytest.approx(0.318, abs=2e-3)
+    assert worst["body"] == pytest.approx(0.351, abs=2e-3)
 
 
 @pytest.mark.parametrize(
     ("size", "shortfall"),
     [
-        ("retreat", 0.115),  # 2.0: collar +0.135
-        ("width", 0.047),  # 22: collar +0.203
-        ("run-out", 0.700),  # 16: collar -0.450
+        ("retreat", 0.144),  # 2.0: collar +0.106
+        ("width", 0.074),  # 22: collar +0.176
+        ("run-out", 0.730),  # 16: collar -0.480
     ],
 )
-def test_each_size_a_step_smaller_misses_the_floor_under_today_s_band(
+def test_each_size_a_step_smaller_misses_the_floor_under_the_collar_stack(
     size: str, shortfall: float
 ) -> None:
-    """Fail-first, at ruling time: under U31's +/-0.5 station band each size
-    a step smaller leaves the collar under the floor, and only the collar."""
-    assert crank_boss_rim.GEAR64_STATION_TOWARD_POST == 0.5
+    """Fail-first: under the collar stack each size a step smaller leaves the
+    collar under the floor, and only the collar."""
     smaller = crank_boss_rim.one_step_short(*_spot_face_sizes())[size]
     short = crank_boss_rim.worst_shortfalls(drive.GEAR64_POST_OFFSET, smaller)
     assert set(short) == {"collar"}
