@@ -49,8 +49,8 @@ from amplitude_bar_spec import (
     BOTTOM_NOTCH_HEIGHT,
     BOTTOM_NOTCH_WIDTH,
     DRAWING_DIMENSIONS,
+    BOTTOM_NOTCH_OFFSET,
     DRAWING_PRECISION,
-    NOTCH_OFFSET,
     TOP_NOTCH_HEIGHT,
 )
 from solidworks_mcp.adapters.com_variant import double_array
@@ -265,7 +265,7 @@ def _notch_detail(adapter: Any, front: Any, detail: NotchDetail) -> Any:
 def _notch_floor_edge(view: Any) -> Any:
     """The foot notch floor's near edge in DETAIL A: edge-on it IS the floor's
     line, and its faces include the floor the control names."""
-    span = sorted((NOTCH_OFFSET, NOTCH_OFFSET + BOTTOM_NOTCH_WIDTH))
+    span = sorted((BOTTOM_NOTCH_OFFSET, BOTTOM_NOTCH_OFFSET + BOTTOM_NOTCH_WIDTH))
     matches = []
     for raw in visible_view_entities(view, 1, label="bottom notch floor"):
         edge = _early_bound(raw, "IEdge")

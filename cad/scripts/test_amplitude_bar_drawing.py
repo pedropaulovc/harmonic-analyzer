@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
+import pytest
+
 import amplitude_bar_notes
 import amplitude_bar_spec
 import draw_amplitude_bar as drawing
@@ -93,7 +95,8 @@ def test_bottom_notch_depth_band_is_native_on_its_dimension() -> None:
 # Each printed profile dimension's two sketch endpoints (part x, y mm): a
 # detail drops any dimension whose reference lies outside its fence.
 _W = amplitude_bar_spec.BAR_WIDTH
-_O = (_W - amplitude_bar_spec.BOTTOM_NOTCH_WIDTH) / 2.0
+_O = (_W - amplitude_bar_spec.BOTTOM_NOTCH_WIDTH) / 2.0  # bottom ledge
+_OT = (_W - amplitude_bar_spec.TOP_NOTCH_WIDTH) / 2.0  # top ledge
 _L = amplitude_bar_spec.BAR_LENGTH
 _DETAIL_DIMENSION_ENDS = {
     "BottomLeftLedge": ((0.0, 0.0), (_O, 0.0)),
@@ -102,14 +105,14 @@ _DETAIL_DIMENSION_ENDS = {
         (_O, amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT),
         (_W - _O, amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT),
     ),
-    "TopRightLedge": ((_W, _L), (_W - _O, _L)),
+    "TopRightLedge": ((_W, _L), (_W - _OT, _L)),
     "TopNotchHeight": (
-        (_W - _O, _L),
-        (_W - _O, _L - amplitude_bar_spec.TOP_NOTCH_HEIGHT),
+        (_W - _OT, _L),
+        (_W - _OT, _L - amplitude_bar_spec.TOP_NOTCH_HEIGHT),
     ),
     "TopNotchWidth": (
-        (_W - _O, _L - amplitude_bar_spec.TOP_NOTCH_HEIGHT),
-        (_O, _L - amplitude_bar_spec.TOP_NOTCH_HEIGHT),
+        (_W - _OT, _L - amplitude_bar_spec.TOP_NOTCH_HEIGHT),
+        (_OT, _L - amplitude_bar_spec.TOP_NOTCH_HEIGHT),
     ),
 }
 
@@ -168,7 +171,8 @@ def test_notch_centring_bands_ride_each_details_ledge_not_a_note() -> None:
     from _drawing_contract import model_toleranced_dimensions
 
     assert amplitude_bar_spec.NOTCH_OFFSET_TOLERANCE_MM == 0.05
-    assert amplitude_bar_spec.NOTCH_OFFSET == _O == bar.NOTCH_OFFSET
+    assert amplitude_bar_spec.BOTTOM_NOTCH_OFFSET == _O == bar.BOTTOM_NOTCH_OFFSET
+    assert amplitude_bar_spec.TOP_NOTCH_OFFSET == _OT == bar.TOP_NOTCH_OFFSET
     bands = model_toleranced_dimensions(bar)
     for name, keep in (
         ("BottomLeftLedge", drawing.DETAIL_A_KEEP),
@@ -276,3 +280,68 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["material_specification"] == "AISI 1018 cold-rolled steel, 6.35 sq"
     assert spec["finish"] == "bright chrome plated"
     assert int(spec["quantity"]) == 20
+
+
+def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
+    """User ruling 2026-09-27 (#1038): a notch is never narrower than the
+    plate it straddles. Its minimum -- the modelled nominal -- is the plate at
+    max material plus MIN_END_PLAY; the band is +0.30/0, native on the width."""
+    import channel_lever_spec as lever
+    import rocker_arm_notes
+    import rocker_arm_spec as rocker
+    import rocker_bank_layout as bank
+    from _drawing_contract import model_toleranced_dimensions
+
+    spec = amplitude_bar_spec
+    # The restated plate constants are their sources'.
+    assert spec.LEVER_THICKNESS == lever.LEVER_THICKNESS
+    lever_print = (
+        f"{lever.LEVER_THICKNESS:.2f} +/-{spec.LEVER_THICKNESS_TOLERANCE:.2f} OVERALL"
+    )
+    assert lever_print in lever.DRAWING_NOTES
+    assert spec.STRAP_THICKNESS == rocker.ARM_THICKNESS
+    assert spec.STRAP_THICKNESS_TOLERANCE == rocker.LINEAR_2PL  # printed at .XX
+    assert f"STRAP {rocker.ARM_THICKNESS:.2f} THICK" in rocker_arm_notes.DRAWING_NOTES
+    assert spec.STRADDLE_RUNNING_FLOOR == bank.MIN_END_PLAY
+
+    upper, lower = spec.NOTCH_WIDTH_BAND
+    assert (upper, lower) == (0.30, 0.0)
+    for width, plate, tolerance in (
+        (spec.TOP_NOTCH_WIDTH, spec.LEVER_THICKNESS, spec.LEVER_THICKNESS_TOLERANCE),
+        (spec.BOTTOM_NOTCH_WIDTH, spec.STRAP_THICKNESS, spec.STRAP_THICKNESS_TOLERANCE),
+    ):
+        least = width + lower
+        assert least >= plate + tolerance + bank.MIN_END_PLAY - 1e-9
+        assert least - (plate + tolerance + bank.MIN_END_PLAY) < 0.01  # the minimum
+    assert spec.TOP_NOTCH_WIDTH == 3.20
+    assert spec.BOTTOM_NOTCH_WIDTH == 3.11
+    assert bar.TOP_NOTCH_WIDTH is spec.TOP_NOTCH_WIDTH
+    assert bar.BOTTOM_NOTCH_WIDTH is spec.BOTTOM_NOTCH_WIDTH
+
+    bands = model_toleranced_dimensions(bar)
+    for name in ("BottomNotchWidth", "TopNotchWidth"):
+        assert bands[("BarProfile", name)] == "*deviations(NOTCH_WIDTH_BAND)"
+        assert spec.DRAWING_PRECISION["BarProfile"][name] == 2
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="#1038: at the printed bands a bar's notch float can close the "
+    "0.7065 side gap to its neighbour (user ruling 2026-09-27: ship as a "
+    "known issue with interim bands)",
+)
+def test_neighbouring_bars_keep_a_running_gap_at_the_printed_worst_case() -> None:
+    """Bars 6.35 wide sit at the 7.0565 station pitch. Each floats on its
+    straddled plate by (notch max - plate min); two neighbours floating toward
+    each other close the side gap by that much, at the top and at the foot."""
+    import rocker_bank_layout as bank
+
+    spec = amplitude_bar_spec
+    gap = bank.PITCH - spec.BAR_WIDTH
+    upper, _lower = spec.NOTCH_WIDTH_BAND
+    for width, plate, tolerance in (
+        (spec.TOP_NOTCH_WIDTH, spec.LEVER_THICKNESS, spec.LEVER_THICKNESS_TOLERANCE),
+        (spec.BOTTOM_NOTCH_WIDTH, spec.STRAP_THICKNESS, spec.STRAP_THICKNESS_TOLERANCE),
+    ):
+        float_max = (width + upper) - (plate - tolerance)
+        assert gap - float_max >= bank.MIN_END_PLAY
