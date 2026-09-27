@@ -179,10 +179,12 @@ def test_drawing_tasks_depend_on_all_selected_layout_templates():
 @pytest.mark.parametrize(
     ("stem", "rows"),
     [
-        # crank_pinion_spec prints the crankshaft and pinion numbers on the pin
-        # sheet; cone_gear_shaft reads the cone gear's grouped spec.
-        ("crank_pinion_pin", ("crankshaft", "crank-pinion", "crank-pinion-pin")),
+        # cone_gear_shaft and the drive-train sheet read the cone gear's
+        # grouped spec. (R1 hard-codes the crank numbers crank_pinion_spec
+        # prints, test_crank_pinion_drawing pins them to the registry, so the
+        # pin sheet no longer reads a foreign row.)
         ("cone_gear_shaft", ("cone-gear",)),
+        ("drive_train_assembly", ("cone-gear",)),
     ],
 )
 def test_drawing_depends_on_the_config_rows_its_closure_reads(stem, rows):
