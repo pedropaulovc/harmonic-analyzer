@@ -27,7 +27,6 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
     assert_imported_precision,
     curate_view_dimensions,
     dimension_name,
@@ -35,6 +34,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     offset_dimension_text,
+    property_link,
     rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
@@ -44,6 +44,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from cone_tip_shim_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    MANUFACTURING_NOTES,
     SHIM_NORTH_Z,
     SHIM_SOUTH_Z,
     SHIM_T,
@@ -54,7 +55,8 @@ from cone_tip_shim_spec import (
     THICKNESS_TEXT_PREFIX,
     THICKNESS_TEXT_SUFFIX,
 )
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from drive_train_steps import step_ref
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 
 SPEC = DRAWINGS_BY_NAME["cone_tip_shim"]
@@ -123,6 +125,14 @@ THICKNESS_TEXT = (FRONT_KEEP["Thickness"][0] + 0.044, FRONT_CENTER[1] - 0.010)
 DIMENSION_CALLOUTS = {"SlotWidth": "SLOT, FULL R"}
 
 NOTES_XY = (0.190, 0.120)
+# The MHA-A03 step that stacks the pack under the tip block at fit-up.  The
+# sheet cites it through the registry, so a renumbered sequence carries the
+# pointer with it; it rides behind the part's linked note here, never in the
+# part, so the part's recipe never reads the registry (Main's TbPB ruling 2).
+FIT_UP_STEP = "post-and-tip-block"
+FIT_UP_POINTER = f", {step_ref(FIT_UP_STEP)}."
+MANUFACTURING_NOTE = f"{property_link('Manufacturing Notes')}{FIT_UP_POINTER}"
+PRINTED_MANUFACTURING_NOTE = f"{MANUFACTURING_NOTES}{FIT_UP_POINTER}"
 
 
 def _set_stack_text(adapter: Any, annotations: list[Any]) -> None:
@@ -224,7 +234,8 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(adapter, front_annotations, {"Thickness": THICKNESS_TEXT})
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    if add_note(adapter, MANUFACTURING_NOTE, *NOTES_XY) is None:
+        raise RuntimeError("failed to add the manufacturing note")
 
     for view in (top, front):
         set_hidden_lines_removed(adapter, view)

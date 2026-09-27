@@ -38,6 +38,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
+from drive_train_steps import step_ref
 from pinion_lever_geometry import ROD_PIN_HOLE_FROM_END
 from pinion_lift_rod_spec import (
     CAP_SAG,
@@ -110,8 +111,10 @@ DETAIL_KEEP = {
     # axis 0.335, front end 0.355): between them the text was struck by both.
     "PinHoleZ": (DETAIL_CENTER[0] + 0.047, DETAIL_CENTER[1] - 0.045),
 }
+LEVER_PIN_SET_STEP_KEY = "lever-pin-set"
 DIMENSION_CALLOUTS = {
-    "PinHoleDia": PIN_HOLE_CALLOUT,
+    # Drilled at MHA-A03's LEVER PIN SET; the pointer comes from the registry.
+    "PinHoleDia": f"{PIN_HOLE_CALLOUT},\nPER {step_ref(LEVER_PIN_SET_STEP_KEY)}",
     "PinHoleZ": "FROM FRONT END",
 }
 

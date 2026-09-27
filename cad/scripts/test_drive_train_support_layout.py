@@ -1530,15 +1530,12 @@ def test_the_rig_assembly_sequence_carries_each_part_step_verbatim() -> None:
     ) < FITUP.ASSEMBLY_SEQUENCE.index(FITUP.RIG_SET_STEP)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="#1045: MHA-A03's hand-written rig steps still spell out DRIVE MHA-135",
-)
 def test_assembly_poses_print_once_on_their_rig_steps() -> None:
     # Main's re-ruling (2026-09-26): a drilling pose, drive or peen is
     # performed at assembly, so it prints on MHA-A03 where the fitter works,
     # and nowhere else; MHA-062's, MHA-059's and MHA-060's pin-hole callouts
-    # carry the hole specification (their step pointers land at integration).
+    # carry the hole specification.  MHA-A03 prints them from
+    # pinion_rig_fitup (#1045), so no source but the owner spells them out.
     import importlib
     from pathlib import Path
 

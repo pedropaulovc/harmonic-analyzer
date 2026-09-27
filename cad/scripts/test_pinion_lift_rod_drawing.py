@@ -50,10 +50,16 @@ def test_pin_hole_sits_at_the_lever_mid_engagement() -> None:
     # hub's bore depth in from the front end, which seats on the bore floor.
     assert lever.ROD_PIN_HOLE_FROM_END == lever.BORE_DEPTH / 2.0 == 4.0
     callout = pinion_lift_rod_spec.PIN_HOLE_CALLOUT
-    # The hole specification only; LEVER PIN SET drives and peens the pin.
+    # The hole specification only; LEVER PIN SET drives and peens the pin,
+    # and the sheet points at that MHA-A03 step through the registry.
+    import drive_train_steps
+
     assert callout.split("\n") == ["MATCH-DRILL THRU AT ASSEMBLY", "IN MHA-059 HUB"]
     assert pinion_lift_rod_spec.LEVER_NUMBER in callout
-    assert drawing.DIMENSION_CALLOUTS["PinHoleDia"] == callout
+    assert drawing.LEVER_PIN_SET_STEP_KEY == "lever-pin-set"
+    assert drawing.DIMENSION_CALLOUTS["PinHoleDia"] == (
+        f"{callout},\nPER {drive_train_steps.step_ref(drawing.LEVER_PIN_SET_STEP_KEY)}"
+    )
 
 
 def test_crown_and_hole_live_on_the_side_view_plane() -> None:

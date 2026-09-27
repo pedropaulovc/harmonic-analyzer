@@ -26,18 +26,20 @@ SEQUENCE: tuple[str, ...] = (
     # set on the bank's DRO zero, so it closes BANK_STEPS. Channel assembly
     # MHA-A02 cites it by key (channel_assembly_steps).
     "north-pivot-bracket-set",
-    # Pinion rig (RIG_STEPS).
-    "cam-pins-seated",
-    "crossrod-fitted",
+    # Pinion rig (rig_steps; pinion_rig_fitup.ASSEMBLY_SEQUENCE in order,
+    # with the hang, the cams, the locate, the seats and the base between).
     "arbor-collar-pinned",
-    "arbor-through-front-strap",
-    "drum-fitted",
+    "drum-bonded",
+    "handle-bonded",
+    "cam-pins-bonded",
     "cluster-hung",
     "straps-pinned-to-torque-shaft",
     "cams-and-lever-fitted",
     "rig-located",
-    "rig-tip-gap-set",
+    "rig-set",
     "rig-seats-transferred",
+    "cam-collars-set",
+    "lever-pin-set",
     "other-base-mounting",
 )
 

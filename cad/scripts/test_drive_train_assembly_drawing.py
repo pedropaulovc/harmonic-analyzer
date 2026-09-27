@@ -19,6 +19,8 @@ from _drawing_registry import DRAWINGS_BY_NAME
 SCRIPTS = Path(__file__).resolve().parent
 PARTS = SCRIPTS.parent / "config" / "parts"
 BUILDER = SCRIPTS / "build_drive_train_assembly.py"
+# The rig's steps at the built assembly's counts.
+RIG_STEPS = drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4)
 # Installation interfaces the package may cite without owning a BOM row.
 # Step 10 sets the channel's north MHA-123 on the frame's MHA-089 (#936 P1 b).
 EXTERNAL_NUMBERS = frozenset({"MHA-035", "MHA-089", "MHA-123"})
@@ -123,7 +125,7 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
         drawing.ASSEMBLED_HEADING,
         drawing.CONE_CRANK_STEPS,
         drawing.BANK_STEPS,
-        drawing.RIG_STEPS,
+        RIG_STEPS,
         drawing.CHECKS,
         drawing.SETUP_NOTES,
         drawing.INTERFACE_NOTES,
@@ -141,7 +143,7 @@ def test_note_lines_fit_a_half_sheet_field() -> None:
     for text in (
         drawing.CONE_CRANK_STEPS,
         drawing.BANK_STEPS,
-        drawing.RIG_STEPS,
+        RIG_STEPS,
         drawing.CHECKS,
         drawing.SETUP_NOTES,
         drawing.INTERFACE_NOTES,
@@ -247,15 +249,152 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     assert "RETURN IT TO THE MHA-095" not in check
 
 
+def _flat(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _rig_step_body(key: str) -> str:
+    """One printed rig step, head to the next head, whitespace-folded."""
+    import drive_train_steps as steps
+
+    heads = list(re.finditer(r"^(\d+)\. ", RIG_STEPS, re.MULTILINE))
+    number = steps.step_number(key)
+    index = next(i for i, head in enumerate(heads) if int(head.group(1)) == number)
+    end = heads[index + 1].start() if index + 1 < len(heads) else len(RIG_STEPS)
+    return _flat(RIG_STEPS[heads[index].end() : end])
+
+
 def test_rig_is_located_by_its_parked_tip_gap() -> None:
-    steps = drawing.RIG_STEPS
-    for phrase in ("TRANSFERRED", "2.5 FEELER", "ACCEPT 2.3-2.7", "#8-32", "#4-40"):
-        assert phrase in steps, phrase
-    assert f"ACCEPT 2.3-2.7 (SHEET {drawing.FIT_SHEET}, STEP 20)" in drawing.CHECKS
-    assert "20. FACE A MHA-002 TOOTH TIP" in steps
+    import drive_train_steps as steps
+    import pinion_rig_tip_gap as tip_gap
+
+    feeler = f"{tip_gap.TIP_GAP_FEELER:.2f} FEELER"
+    located = _rig_step_body("rig-located")
+    for phrase in ("TRANSFERRED", tip_gap.TIP_GAP_FEELER_TEXT, tip_gap.TIP_GAP_ACCEPT_TEXT):
+        assert phrase in located, phrase
+    check = _flat(drawing.CHECKS)
+    assert feeler in check
+    assert (
+        f"{tip_gap.TIP_GAP_ACCEPT_TEXT} (SHEET {drawing.FIT_SHEET}, "
+        f"STEP {steps.step_number('rig-located')})"
+    ) in check
     assert f"SEE SHEET {drawing.CHECKS_SHEET}" in drawing.ASSEMBLED_HEADING
-    assert f"SEE SHEET {drawing.CHECKS_SHEET}, EXTERNAL" in drawing.RIG_STEPS
+    assert f"SEE SHEET {drawing.CHECKS_SHEET}, EXTERNAL" in _rig_step_body(
+        "other-base-mounting"
+    )
     assert f"PINION RIG: CONT. ON SHEET {drawing.FIT_SHEET}." in drawing.BANK_STEPS
+    # The seats are spotted after RIG SET, and drilled per the base's own
+    # transfer callouts, not a second copy of their sizes.
+    seats = _rig_step_body("rig-seats-transferred")
+    assert "PER ITS MHA-035 TRANSFER CALLOUT" in seats
+    assert not re.search(r"#\d+-\d+|#\d+ X", seats)
+    assert steps.step_number("rig-set") < steps.step_number("rig-seats-transferred")
+
+
+def test_the_rig_steps_print_the_fitup_sequence_once_in_order() -> None:
+    """Codex #858 (PRRT_kwDOPHDy386mTbPB): the fit-up that produces the
+    modelled pin stations reaches the fitter.  Each pinion_rig_fitup step
+    prints once, word for word, in its own step, in ASSEMBLY_SEQUENCE order;
+    nothing is pending."""
+    import drive_train_steps as steps
+    import pinion_rig_fitup as fitup
+
+    keys = (
+        "arbor-collar-pinned",
+        "drum-bonded",
+        "handle-bonded",
+        "cam-pins-bonded",
+        "straps-pinned-to-torque-shaft",
+        "rig-set",
+        "cam-collars-set",
+        "lever-pin-set",
+    )
+    flat = _flat(RIG_STEPS)
+    for key, step in zip(keys, fitup.ASSEMBLY_SEQUENCE, strict=True):
+        assert flat.count(_flat(step)) == 1, key
+        assert _flat(step) in _rig_step_body(key), key
+    numbers = [steps.step_number(key) for key in keys]
+    assert numbers == sorted(numbers)
+    printed = [int(n) for n in re.findall(r"^(\d+)\. ", RIG_STEPS, re.MULTILINE)]
+    first = steps.SEQUENCE.index("arbor-collar-pinned") + 1
+    assert printed == list(range(first, len(steps.SEQUENCE) + 1))
+    assert "PENDING" not in RIG_STEPS
+    # Each match-drilled pin hole's callout points at the step that drills it.
+    import draw_pinion_lever as lever
+    import draw_pinion_lift_rod as lift_rod
+    import draw_pinion_pivot_shaft as shaft
+
+    for sheet, key, name in (
+        (shaft, shaft.SHAFT_DRILL_STEP_KEY, fitup.SHAFT_DRILL_NAME),
+        (lever, lever.LEVER_PIN_SET_STEP_KEY, "LEVER PIN SET"),
+        (lift_rod, lift_rod.LEVER_PIN_SET_STEP_KEY, "LEVER PIN SET"),
+    ):
+        assert steps.step_ref(key) in _flat(sheet.DIMENSION_CALLOUTS["PinHoleDia"])
+        assert name in _rig_step_body(key)
+
+
+def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:
+    """Main's TbPB ruling (Q1 b): the rig's east-west feeler is the bench
+    rest gap (pins on the cams), to the gage's leaf step, made up only of
+    the STARRETT 66MA leaves the fit-up uses; nothing on it is typed."""
+    import pinion_rig_fitup as fitup
+    import pinion_rig_layout as rig
+    import pinion_rig_tip_gap as tip_gap
+
+    # The model parks the pins a design air above the cams; the spring takes
+    # it up on the bench, so the rest gap is wider than the model's.
+    assert tip_gap.REST_TIP_GAP > tip_gap.MODEL_TIP_GAP
+    assert abs(tip_gap.TIP_GAP_FEELER - tip_gap.REST_TIP_GAP) <= rig.FEELER_LEAF_STEP / 2.0
+    assert set(tip_gap.TIP_GAP_LEAVES) <= set(fitup.FEELER_GAGE_LEAVES_MM)
+    assert math.isclose(sum(tip_gap.TIP_GAP_LEAVES), tip_gap.TIP_GAP_FEELER, abs_tol=1e-9)
+    assert tip_gap.TIP_GAP_ACCEPT == pytest.approx(
+        (
+            tip_gap.TIP_GAP_FEELER - tip_gap.TIP_GAP_ACCEPT_BAND,
+            tip_gap.TIP_GAP_FEELER + tip_gap.TIP_GAP_ACCEPT_BAND,
+        )
+    )
+    printed = re.search(r"\(([\d.+ ]+) STARRETT 66MA LEAVES\)", tip_gap.TIP_GAP_FEELER_TEXT)
+    assert printed is not None
+    leaves = [float(leaf) for leaf in printed.group(1).split(" + ")]
+    assert math.isclose(sum(leaves), tip_gap.TIP_GAP_FEELER, abs_tol=1e-9)
+    assert set(leaves) <= set(fitup.FEELER_GAGE_LEAVES_MM)
+
+
+@pytest.mark.parametrize("setting", (0.05, 0.95, 1.0, 1.05, 2.0, 2.5, 2.95))
+def test_a_leaf_stack_sums_to_its_setting_from_gage_leaves(setting: float) -> None:
+    import pinion_rig_fitup as fitup
+    import pinion_rig_tip_gap as tip_gap
+
+    leaves = tip_gap.leaf_stack(setting)
+    assert math.isclose(sum(leaves), setting, abs_tol=1e-9)
+    assert set(leaves) <= set(fitup.FEELER_GAGE_LEAVES_MM)
+    assert list(leaves) == sorted(leaves, reverse=True)
+
+
+def test_the_spring_is_stationed_east_west_where_its_preload_is_gated() -> None:
+    """Main's TbPB ruling Q2(2) A: MHA-114's foot hole is set where the
+    preload gates put it, the crest on the flank (the flick's flat stays off
+    it), before RIG SET's pad leaf sets it along the bank.  #1037 is the
+    window a fitter must hold."""
+    import drive_train_steps as steps
+    from pinion_spring_section import SCREW_EAST_OF_PIVOT
+
+    located = _rig_step_body("rig-located")
+    assert drawing.SPRING_EAST_WEST in located
+    printed = re.search(r"FOOT HOLE CENTRE ([\d.]+) EAST OF THE MHA-062 AXIS", located)
+    assert printed is not None
+    assert float(printed.group(1)) == pytest.approx(SCREW_EAST_OF_PIVOT, abs=0.05)
+    assert "CREST BEARING ON THE PARKED BACK MHA-056 FLANK" in located
+    assert "TERMINAL FLAT" not in _flat(RIG_STEPS)
+    assert "TERMINAL FLAT" not in Path(drawing.__file__).read_text(encoding="utf-8")
+    assert steps.step_number("rig-located") < steps.step_number("rig-set")
+
+
+def test_a_fitup_step_missing_from_its_key_is_caught() -> None:
+    """Positive control: the collar set is not the lever pin's step."""
+    import pinion_rig_fitup as fitup
+
+    assert _flat(fitup.COLLAR_SET_STEP) not in _rig_step_body("lever-pin-set")
 
 
 _SHEET_CITE = re.compile(r"SHEETS? \d")
@@ -282,17 +421,37 @@ def test_no_sheet_number_is_typed_into_the_package_text() -> None:
 
 def test_drum_is_bonded_after_the_arbor_passes_the_front_strap() -> None:
     """The front strap bore is closed: a bonded drum can no longer pass it."""
-    steps = drawing.RIG_STEPS
-    front = steps.index("THROUGH THE FRONT MHA-056 TOP BORE")
-    drum = steps.index("FIT MHA-002 ON MHA-102")
-    back = steps.index("IN THE BACK MHA-056 TOP BORE")
-    assert front < drum < back
+    import drive_train_steps as steps
+
+    assert "FRONT MHA-056 ON BEHIND IT" in _rig_step_body("arbor-collar-pinned")
+    assert "BOND WITH LOCTITE 638" in _rig_step_body("drum-bonded")
+    assert "IN THE BACK MHA-056 TOP BORE" in _rig_step_body("cluster-hung")
+    order = [
+        steps.step_number(key)
+        for key in ("arbor-collar-pinned", "drum-bonded", "cluster-hung")
+    ]
+    assert order == sorted(order)
 
 
 def test_torque_shaft_pins_go_in_before_the_cams() -> None:
-    """MHA-062 is drilled off the machine; the cams block the pin's west edge."""
-    steps = drawing.RIG_STEPS
-    assert steps.index("SPRING PIN PER STRAP") < steps.index("FIT {cams}X MHA-104")
+    """The cams block the strap pins' west edge, and the cam set screws are
+    locked only by COLLAR SET, before the lever pin (Main's TbPB ruling)."""
+    import drive_train_steps as steps
+
+    assert "DRIVE MHA-145 PINS" in _rig_step_body("straps-pinned-to-torque-shaft")
+    cams = _rig_step_body("cams-and-lever-fitted")
+    assert "FIT 2X MHA-104" in cams and "LOOSE" in cams and "MHA-135" not in cams
+    assert "LOCK SCREWS" in _rig_step_body("cam-collars-set")
+    order = [
+        steps.step_number(key)
+        for key in (
+            "straps-pinned-to-torque-shaft",
+            "cams-and-lever-fitted",
+            "cam-collars-set",
+            "lever-pin-set",
+        )
+    ]
+    assert order == sorted(order)
 
 
 def test_explode_plan_resolves_every_step_on_the_built_census() -> None:

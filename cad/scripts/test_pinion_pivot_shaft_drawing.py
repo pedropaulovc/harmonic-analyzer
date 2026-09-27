@@ -128,13 +128,26 @@ def test_set_pin_holes_print_only_size_and_the_match_drill() -> None:
     assert {"PinHoleDia"} <= marked
     assert not any(name.startswith("PinHole") and name.endswith("Z") for name in marked)
     callout = drawing.DIMENSION_CALLOUTS["PinHoleDia"]
-    assert callout is pinion_pivot_shaft_spec.PIN_HOLE_CALLOUT
     # The hole specification only (Main's re-ruling, 2026-09-26): the
-    # drilling pose is MHA-A03's SHAFT DRILL SET.
-    assert callout.split("\n") == [
+    # drilling pose is MHA-A03's SHAFT DRILL SET, and the sheet points at
+    # that step through the registry, so a renumbered sequence carries it
+    # (Codex #858, PRRT_kwDOPHDy386mTbPB).  The pointer is sheet text: the
+    # part's spec never reads the registry (Main's TbPB ruling 1).
+    import drive_train_steps
+
+    key = drawing.SHAFT_DRILL_STEP_KEY
+    assert key == "straps-pinned-to-torque-shaft"
+    assert pinion_pivot_shaft_spec.PIN_HOLE_CALLOUT.split("\n") == [
         "MATCH-DRILL THRU AT ASSEMBLY",
         "IN MHA-056 CROSS HOLES, 2 PL",
     ]
+    assert callout == (
+        f"{pinion_pivot_shaft_spec.PIN_HOLE_CALLOUT},\n"
+        f"PER {drive_train_steps.step_ref(key)}"
+    )
+    assert "drive_train_steps" not in Path(pinion_pivot_shaft_spec.__file__).read_text(
+        encoding="utf-8"
+    )
     assert pinion_pivot_shaft_spec.PIN_HOLE_DIA == 25.4 / 16.0
     assert pinion_pivot_shaft_spec.PIN_HOLE_BAND == (0.06, 0.0)
 

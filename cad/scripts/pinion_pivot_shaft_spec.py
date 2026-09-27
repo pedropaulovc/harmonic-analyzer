@@ -61,8 +61,9 @@ PIN_HOLE_Z = TORQUE_SHAFT_PIN_HOLE_Z  # (front, back), pinion_rig_layout
 # and both bearing stacks assume is an assembly step: Main's re-ruling
 # (2026-09-26) moved it from this callout to MHA-A03's SHAFT DRILL SET
 # (pinion_rig_fitup.SHAFT_DRILL_STEP), where the fitter drills, superseding
-# the #858 restricted review's rulings 2 and 3.  The pointer to that step
-# lands at integration, from the assembly step registry.
+# the #858 restricted review's rulings 2 and 3.  The drawing adds the
+# pointer to that step (draw_pinion_pivot_shaft): it is sheet text, so the
+# part never reads the assembly step registry.
 PIN_HOLE_CALLOUT = "\n".join(
     (
         "MATCH-DRILL THRU AT ASSEMBLY",
