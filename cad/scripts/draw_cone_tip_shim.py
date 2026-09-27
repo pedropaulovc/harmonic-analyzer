@@ -8,8 +8,8 @@ starts on a face the shop can pick up, never the model origin).  An edge
 view below it carries the thickness dimension, which reads the stack-to-fit
 range around the model's nominal ("0.05–2.20 STACK (1.10 NOM)"): the fitted
 thickness is set at assembly, not machined, and rule 6 keeps the range out
-of a note.  The leaf stock is the material specification; the sheet has no
-general note.
+of a note.  The leaf stock is the material specification; the one general
+note points at the MHA-A03 step that fits the pack.
 
 Run with SolidWorks open::
 
@@ -27,6 +27,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_property_linked_note,
     assert_imported_precision,
     curate_view_dimensions,
     dimension_name,
@@ -121,6 +122,8 @@ FRONT_KEEP = {"Thickness": (TOP_CENTER[0] + HALF_X + 0.016, FRONT_CENTER[1])}
 THICKNESS_TEXT = (FRONT_KEEP["Thickness"][0] + 0.044, FRONT_CENTER[1] - 0.010)
 DIMENSION_CALLOUTS = {"SlotWidth": "SLOT, FULL R"}
 
+NOTES_XY = (0.190, 0.120)
+
 
 def _set_stack_text(adapter: Any, annotations: list[Any]) -> None:
     """Wrap the imported thickness in the stack range: prefix + value + suffix.
@@ -168,12 +171,14 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -218,6 +223,8 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     offset_dimension_text(adapter, front_annotations, {"Thickness": THICKNESS_TEXT})
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     for view in (top, front):
         set_hidden_lines_removed(adapter, view)

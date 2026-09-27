@@ -9,6 +9,7 @@ from typing import Any
 import _telemetry
 from _assembly import _ledger_record, assert_component_placed, component_transform
 from _common import _early_bound, _read_member
+from _visibility import blank_reference_geometry
 
 
 _LOCAL_LINEAR_PATTERN = 108  # swFeatureNameID_e.swFmLocalLPattern
@@ -90,6 +91,7 @@ def ensure_global_pattern_axis(adapter: Any, axis: str) -> str:
         )
     created.Name = name
     model.ClearSelection2(True)
+    blank_reference_geometry(adapter, ((name, "AXIS"),))
     _telemetry.success(f"created assembly pattern axis {name}")
     return name
 

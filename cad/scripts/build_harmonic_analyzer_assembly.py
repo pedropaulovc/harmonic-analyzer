@@ -46,12 +46,12 @@ from _common import (
     OUT_PNG,
     OUT_SLDASM,
     apply_custom_properties,
-    apply_summary_info,
     check,
     run_build,
 )
 from _drawing_marks import DRAWN_BY
 from _assembly import (
+    activate_assembly_contract,
     _discard_copy_source,
     assembly_title_properties,
     assert_component_placed,
@@ -105,7 +105,6 @@ SUBASSEMBLIES = (
 # (STOP_DECK_GAP above it) and the bar rides SLOT_FLOOR + half the window
 # clearance above the block bottom. STICK_POS.y (the graduated top face) is
 # therefore derived from the stop's constants, never a literal.
-import _telemetry  # noqa: E402
 from build_measuring_stick import (  # noqa: E402
     BODY_THICKNESS as STICK_THICK,
     BODY_WIDTH as STICK_WIDTH,
@@ -167,6 +166,8 @@ def _subassembly(name: str) -> str:
 
 
 async def build(adapter) -> dict[str, str]:
+    # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
+    activate_assembly_contract(ASM_NAME)
     from solidworks_mcp.adapters.base import (
         ComponentRefParameters,
         InsertComponentParameters,
@@ -230,8 +231,6 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
-
     # The machine is authored output-side -Z, so SolidWorks' native Front view
     # shows the BACK. Redefine the document's standard views so Front (and the
     # eight-views gallery below, which goes through ShowNamedView2) shows the

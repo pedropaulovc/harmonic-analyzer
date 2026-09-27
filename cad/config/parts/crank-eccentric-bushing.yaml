@@ -1,0 +1,10 @@
+crank-eccentric-bushing:
+  title: Crank Eccentric Bushing
+  number: MHA-149
+  material: C93200 bearing bronze
+  material_specification: C93200 (SAE 660) bearing bronze, cored or solid bar
+  finish: turned, oiled
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: shaft_in_bushing
+  process: "turned eccentric bushing (bronze)"

@@ -13,14 +13,23 @@ from __future__ import annotations
 
 import math
 
+import _config
+from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
+from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
+
 
 MM_PER_IN = 25.4
 
-# Main casting: the upper 26.6 mm is a very slightly larger collar around the
-# main body.  Both cylinders share the vertical body/swing axis.
+# Main casting: the upper 26.6 mm is an integral AS-CAST collar around the
+# turned body, and it is a real step, not a rounding artefact.  Four sharp
+# manual frames (ch11 page002_img04/05/06, ch30 page003_img01) show the seam
+# 59.4-60.5 mm above the foot with a 0.8-1.27 mm radial step, orange-peel cast
+# skin above it and a turned surface below, giving a collar of 44.0 +/- 0.4.
+# The collar is therefore a one-place as-cast reference size; the body below
+# it is the locating/bore cylinder and keeps its turned size.
 BLOCK_DIA = 42.011
 BLOCK_HEIGHT = 86.0
-HEAD_DIA = 42.7506
+HEAD_DIA = 44.0
 HEAD_HEIGHT = 26.6
 HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
 
@@ -30,20 +39,59 @@ HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
 # corrected source dimension in inches: 2.8360 in replaces the 2.85086614 in
 # initial derivation.
 CRANK_BOSS_DIA = 21.93
-CRANK_BORE_DIA = 11.438
-TURNED_DIAMETER_TOLERANCE_MM = 0.05
-CRANK_BORE_TOLERANCE_MM = 0.025
-CRANK_BORE_HEIGHT = 72.7
+# #906 R1: the crank bore is bored out to an H7 seat for the MHA-149 eccentric
+# bushing; the crankshaft runs in the bushing, whose throw takes up the 16T:64T
+# centre distance at fit-up.  The whole crank boss sits CRANK_BORE_DROP below
+# the frame's crank axis (CRANK_AXIS_HEIGHT, where build_drive_train_assembly
+# lays the crank train out), because the mesh stack's fit-up window is not
+# centred on the frame: crank_mesh_stack sizes both and asserts the throw
+# reaches each end.  The boss moves with the bore, so the casting keeps its
+# shape and every harvested volume below holds.
+CRANK_BORE_DIA = 14.6
+CRANK_AXIS_HEIGHT = 72.7
+CRANK_BORE_DROP = 0.21
+CRANK_BORE_HEIGHT = CRANK_AXIS_HEIGHT - CRANK_BORE_DROP
 CRANK_BORE_OFFSET = 0.0
-CRANK_BOSS_START_Z = -HEAD_DIA / 2.0
-CRANK_BOSS_LENGTH_IN = 2.8360
-CRANK_BOSS_LENGTH = CRANK_BOSS_LENGTH_IN * MM_PER_IN
+# The boss's near face is a MACHINED SPOT FACE, not the rim of the cast
+# collar: it is stationed from the post axis and the print dimensions it that
+# way, so it does not follow the collar diameter.  Decoupling it also keeps
+# the assembly's 10.255 mm south crank-sprocket gap.
+#
+# The spot face stands CRANK_SPOT_FACE_RETREAT south of the harvested station
+# (user ruling, 2026-09-27): at the harvested station the 64T's south face and
+# tip reached into the boss (cg-fx2b's drive-train interference gate) and,
+# at print-worst, into the Ø44 collar below it.  In the same setup the face is
+# run out as a flat CRANK_SPOT_FACE_WIDTH wide from the crank axis
+# CRANK_SPOT_FACE_RUN_OUT down, past the collar's lower edge into the turned
+# body, which stands proud of it there, and ends at a milled step.  The
+# retreat is the user's ruled 2.5.  The run-out is geometric, sized against
+# the Ø44 collar under the 64T with crank_boss_rim's print-worst terms:
+#   - run-out 17: the flat's print-worst foot (1.17 short) ends 0.89 below the
+#     collar's print-worst lower edge, so no lip of collar is left under the
+#     gear; 16 would leave one;
+#   - width 23: the narrowest whole millimetre at which the flat's side
+#     edges hold the collar clear of the 64T (+0.35 at 22.2 print-worst);
+#     at 22 the edges come within 0.20, and from 24 up the edges leave the
+#     gear's reach and the collar plateaus at +0.42.
+# build_drive_train_assembly asserts every feature holds crank_boss_rim's
+# FLOOR_CLEARANCE_MM at print-worst; the unit tests pin that each size a
+# step smaller misses it under today's station band.  The boss's south end
+# does not move, so the boss is that much shorter.
+CRANK_BOSS_HARVESTED_NORTH_FACE = 21.3753
+CRANK_SPOT_FACE_RETREAT = 2.5
+CRANK_SPOT_FACE_WIDTH = 23.0
+CRANK_SPOT_FACE_RUN_OUT = 17.0
+CRANK_BOSS_NORTH_FACE = CRANK_BOSS_HARVESTED_NORTH_FACE - CRANK_SPOT_FACE_RETREAT
+CRANK_BOSS_START_Z = -CRANK_BOSS_NORTH_FACE
+CRANK_BOSS_LENGTH_IN = 2.8360  # harvested, from the harvested station
+CRANK_BOSS_LENGTH = CRANK_BOSS_LENGTH_IN * MM_PER_IN - CRANK_SPOT_FACE_RETREAT
 CRANK_BOSS_END_Z = CRANK_BOSS_START_Z + CRANK_BOSS_LENGTH
 
 # Inclined cone-shaft journal.  Unlike v1, the 12.5182-degree incline is baked
 # into the part; downstream placement composes it with the exact Ry(180)
 # installation instead of re-authoring the harvested feature frame.
 INCLINE_DEG = 12.5182
+CONE_AXIS_VIEW = "CONE JOURNAL"
 BORE_HEIGHT = 33.368
 CONE_BOSS_DIA = 17.2
 BORE_DIA = 12.2808
@@ -52,70 +100,306 @@ CONE_BOSS_LENGTH = BLOCK_DIA
 # Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the top face.
 # Ry(180) maps part-local +X to machine -X, so the assembly intentionally mates
 # local east/west axes to the opposite platform names.
+#
+# The screw is MHA-142, a 1/4-20 x 3-1/2 slotted fillister (MSC 40923898, user
+# ruling U37c) cut to 86.0 at assembly.  Its ASME B18.6.3 head (dia 9.1-9.5 x
+# 5.5 overall) sits about 0.5 below the top face in the dia 11.509 x 6.02
+# counterbore.  Deepening the counterbore for a shorter screw is not an
+# option: at 16.15 it would break into the crank bore at print-worst.
 ATTACHMENT_SPACING = 26.88704
 ATTACHMENT_X = ATTACHMENT_SPACING / 2.0
 ATTACHMENT_THRU_DIA = 7.14248
 ATTACHMENT_CBORE_DIA = 11.50874
 ATTACHMENT_CBORE_DEPTH = 6.0198
 
-# V2 B-rep ground truth cascaded through Pedro's boss-length correction.  The
-# correction removes a uniform annular segment beyond the main casting.
-HARVESTED_VOLUME_MM3 = 112_302.9406
-HARVESTED_MASS_KG = 0.808581173
+# Final solid volume, the sum of the per-feature analytic terms the build
+# checks natively one feature at a time (build_cone_pivot_post.py asserts
+# the sum at import):
+#
+#   body      pi*21.0055^2*86                       = +119 210.4620
+#   collar    pi*(22^2 - 21.0055^2)*26.6            = +  3 574.0470
+#   crank boss outside the collar cylinder          = + 11 091.7876
+#   spot face (collar proud of z=-18.8753 in disc)  = -    913.5109
+#   its run-out flat, 23.0 x 17.0 outside the disc  = -    272.3536
+#   crank bore pi*7.3^2*69.5344                     = - 11 641.1344
+#   cone pads outside the body cylinder             = +    209.0550
+#   cone bore pi*6.1404^2*42.011                    = -  4 976.2960
+#   2x (thru pi*3.57124^2*79.9802 + cbore pi*5.75437^2*6.0198) = - 7 661.5921
+#                                                   = 108 620.4654
+#
+# (The 2.5 spot-face retreat and its run-out took 109 418.5741 to this.  #906
+# R1 bored the crank bore out from Ø11.438 to Ø14.6: 114 076.5723 before.
+# Lowering the crank boss by CRANK_BORE_DROP changes no term: the boss stays
+# inside the collar's 59.4..86 height band.)  The 2026-09-21 farm build of the previous recipe read 121 575.3: it had
+# never bored the crank boss (7 401.7) and had only nicked the 45 mm^3 collar
+# sliver behind the spot-face plane inside the bore disc -- a cut whose
+# default direction (opposite the sketch normal) found the Ø44 collar to bite
+# instead of auto-flipping into the boss.  Mass at gray iron 7.20 g/cc.
+HARVESTED_VOLUME_MM3 = 108_620.4654
+HARVESTED_MASS_KG = 0.782067
 
-# Datum-coordinate definition of the inclined journal axis.  The bore passes
-# through the body axis at y=BORE_HEIGHT and points toward +X/+Z.
-_JOURNAL_SIN = math.sin(math.radians(INCLINE_DEG))
-_JOURNAL_COS = math.cos(math.radians(INCLINE_DEG))
-JOURNAL_AXIS_SECOND_POINT_DISTANCE = 100.0
-JOURNAL_AXIS_POINTS = (
-    ("P", 0.0, BORE_HEIGHT, 0.0),
-    (
-        "Q",
-        JOURNAL_AXIS_SECOND_POINT_DISTANCE * _JOURNAL_SIN,
-        BORE_HEIGHT,
-        JOURNAL_AXIS_SECOND_POINT_DISTANCE * _JOURNAL_COS,
-    ),
+# The cone journal bore is a running journal, so it carries the band the
+# `shaft_in_bushing` fit class needs and no tighter (tolerance-policy.md,
+# "How a critical-feature tolerance is decided", step 6b).  The cone shaft is
+# turned to (bore nominal - 0.05) with the fleet's `SHAFT_H` (0/-0.020) band,
+# so a bore held +0.005/-0.025 delivers exactly the class's 0.025..0.075 mm
+# diametral clearance:
+#
+#   journal: shaft 12.2108..12.2308 bore 12.2558..12.2858 (cone shaft MHA-014)
+#
+# The crank bore no longer runs anything: it seats the MHA-149 bushing, bored
+# H7 (ISO 286, 10-18 mm: +0.018/0), the fit the user ruled for the bushing.  The
+# bushing's OD band is derived from it (build_crank_eccentric_bushing), and
+# every web around it below is taken at its H7 maximum.
+#
+# Apart from these two, the spacing between them and the cone-axis height (both
+# below), nothing else on this casting is an accuracy feature, so nothing else
+# carries a band: the title block's general grades govern.
+RUNNING_BORE_BAND = (0.005, -0.025)
+CRANK_BORE_BAND = (0.018, 0.0)  # (upper, lower): H7
+
+# Crank-above-cone bore spacing (user ruling U31, 2026-09-23, option 3a).  The
+# crank axis is located FROM THE CONE AXIS, not from the foot: the 16T:64T
+# crank mesh closes on that spacing alone, and two foot-referenced .XX heights
+# stacked to +/-1.02 mm -- enough to jam the pair or let it skip.  The band is
+# the mesh contract less every other contributor, worst case (numbers from
+# build_drive_train_assembly, 14.5 deg pressure angle):
+#
+#   centre-distance contract dC (depth band)          -0.150 .. +0.540
+#   running float, loaded: gears push apart, so it only OPENS the mesh:
+#     crank 0.0375 + 0.075/72.03 * 5.65 overhang       0      .. +0.043
+#     cone  0.0375 + 0.075/42.01 * 5.68 overhang       0      .. +0.048
+#   cone-bore plan angle +/-1 deg (title block):
+#     64T 26.69 from the post axis -> dDX 0.444 * DX/C 0.142  +/-0.063
+#   64T axial station +/-0.5 on the inclined shaft -> dC  +/-0.015
+#   left for this spacing (dC)                        -0.072 .. +0.371
+#   / dC/dDY = DY/C = 39.332/39.735 = 0.990           -0.073 .. +0.374
+#
+# Backlash is not read against this band any more (#906 R1): the MHA-149
+# eccentric bushing takes up the mesh at fit-up, and crank_mesh_stack carries
+# this printed band as one of its terms, with the bore CRANK_BORE_DROP below
+# the frame.  The stack's single-cutter model (not the old two-cutter
+# 0.28 + 0.517 * dC) proves the throw reaches the fit-up backlash at both ends
+# of the band (its OPEN_MARGIN / CLOSE_MARGIN), so the band stays U31's,
+# unchanged.  Printed 39.12 +0.37/0 (the bore spacing, CRANK_BORE_DROP under
+# the 39.332 frame spacing; aim 39.30) is the post's one tight band;
+# how the shop holds it is theirs (policy rule 6).
+CRANK_ABOVE_CONE = CRANK_BORE_HEIGHT - BORE_HEIGHT
+CRANK_ABOVE_CONE_BAND = (0.37, 0.0)
+# The table's 64T axial station row: MHA-A03 bonds the gear "front of T120"
+# with nothing to butt, so it may stand this far either way on its shaft.
+# crank_boss_rim reads it for the 64T's clearance to this post's north side.
+GEAR64_STATION_BAND_MM = 0.5
+
+# Cone-axis height above the foot.  The post's journal sets the cone shaft's
+# height; at the shaft's tip MHA-092 is set on MHA-141's shim pack, whose
+# range holds 0.25 beyond the block's own AxisHeight band for this side's
+# terms (cone_tip_block_spec.FIT_UP_SHIM_MARGIN_MM; the plate top is common
+# to both and cancels).  The .XX grade (+/-0.51) overruns that, so the height
+# carries its own symmetric band: the loosest the pack allows, so the
+# machinist gets every hundredth the fit-up can absorb.  The drive train's
+# shim check reads this name.
+JOURNAL_AXIS_HEIGHT_TOLERANCE_MM = 0.25
+
+# #906 R1: webs around the Ø14.6 H7 crank bore, at print-worst (policy rule
+# 12: 2.0 target, 1.5 floor; R1 holds the target).  The bore is centred on the post's symmetry
+# plane, which is what keeps the two mounting holes beside it workable; its
+# worst case is the H7 maximum with the crank axis at its highest (the cone
+# axis at the top of its own band above plus the whole +0.37 spacing band).  Holes are drilled
+# (+0.10/0), their stations and the counterbore depth print .XX, the top face
+# and the boss diameter .X.
+WEB_FLOOR_MM = 1.5
+
+
+def _row(places: int) -> float:
+    return float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
+
+
+_DRILL_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
+_CRANK_BORE_R_MAX = (CRANK_BORE_DIA + CRANK_BORE_BAND[0]) / 2.0
+_CRANK_AXIS_Y_MAX = (
+    CRANK_BORE_HEIGHT + JOURNAL_AXIS_HEIGHT_TOLERANCE_MM + CRANK_ABOVE_CONE_BAND[0]
 )
-JOURNAL_AXIS_ORIENTATION_NOTE = "\n".join(
-    (
-        "O = A/B INTERSECTION; +Y ALONG B AWAY FROM A",
-        "+X RIGHT; +Z DOWN IN UPPER PLAN",
-    )
+_HOLE_X_MIN = ATTACHMENT_X - _row(2)
+_CBORE_CORNER = (
+    _HOLE_X_MIN - (ATTACHMENT_CBORE_DIA + _DRILL_OVERSIZE) / 2.0,
+    BLOCK_HEIGHT - ATTACHMENT_CBORE_DEPTH - _row(2) - _CRANK_AXIS_Y_MAX,
+)
+CRANK_BORE_WEBS_WORST = {
+    "mounting thru hole": _HOLE_X_MIN
+    - (ATTACHMENT_THRU_DIA + _DRILL_OVERSIZE) / 2.0
+    - _CRANK_BORE_R_MAX,
+    # the counterbore's bottom inner corner sits above and beside the bore
+    "mounting counterbore": math.hypot(*_CBORE_CORNER) - _CRANK_BORE_R_MAX,
+    "top face": BLOCK_HEIGHT - _row(1) - _CRANK_AXIS_Y_MAX - _CRANK_BORE_R_MAX,
+    "crank boss OD": (CRANK_BOSS_DIA - _row(1)) / 2.0 - _CRANK_BORE_R_MAX,
+}
+if _CBORE_CORNER[1] <= 0.0:
+    raise AssertionError("the mounting counterbore reaches below the crank axis")
+for _name, _web in CRANK_BORE_WEBS_WORST.items():
+    if _web < WEB_FLOOR_MM:
+        raise AssertionError(
+            f"Ø{CRANK_BORE_DIA} H7 crank bore leaves {_web:.3f} to the {_name} at "
+            f"print-worst, under the {WEB_FLOOR_MM} floor; the H7 upper limit is "
+            "load-bearing here, so the bore cannot take a looser class"
+        )
+
+# Journal-plan reference sketch (Top plane, all construction).  The 12.5182 deg
+# plan angle between the crank axis and the cone-journal axis is REAL model
+# geometry -- ConeShaftNormal's angle -- but no face carries it into a view, so
+# a construction sketch holds the two axis directions and a driven angular
+# reference dimension reports the angle the print has to state.
+JOURNAL_REFERENCE_LENGTH = 40.0
+JOURNAL_REFERENCE_X = JOURNAL_REFERENCE_LENGTH * math.sin(math.radians(INCLINE_DEG))
+JOURNAL_REFERENCE_Z = JOURNAL_REFERENCE_LENGTH * math.cos(math.radians(INCLINE_DEG))
+CRANK_BOSS_NEAR_Z = abs(CRANK_BOSS_START_Z)
+
+SURFACE_FINISHES = (
+    # The post is a casting that may be left as-cast everywhere else; the
+    # faces that MUST be cut say so on the face (the title block's surface row
+    # is the process statement "CAST/MACHINED", not a grade).
+    SurfaceFinishControl("foot_seat", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
+    # #906 A2: the crank bore seats the MHA-149 bushing and runs nothing, so
+    # it is a locating seat (rule 5), not a journal.
+    SurfaceFinishControl(
+        "crank_bore",
+        SEAT_UM,
+        CylinderFace(CRANK_BORE_DIA, contains_y_mm=CRANK_BORE_HEIGHT),
+    ),
+    SurfaceFinishControl(
+        "journal_bore",
+        MACHINED_UM,
+        CylinderFace(BORE_DIA, contains_y_mm=BORE_HEIGHT),
+    ),
+    # The cone shaft's thrust collar runs on the north cone-boss end face
+    # (#914), so it is a running face.  Part-local normal: Ry(180) maps it to
+    # machine +Z, the direction cone stations grow toward the gears.
+    SurfaceFinishControl(
+        "cone_boss_north_face",
+        MACHINED_UM,
+        PlanarFace(
+            (
+                -math.sin(math.radians(INCLINE_DEG)),
+                0.0,
+                -math.cos(math.radians(INCLINE_DEG)),
+            ),
+            CONE_BOSS_LENGTH / 2.0,
+        ),
+    ),
 )
 
 # Only dimensions that exist natively on the authored model are marked for the
-# curated print.  Boss, journal and counterbore callouts are sourced from these
-# same constants as attached notes, so the drawing cannot drift from the part.
+# curated print, so the drawing cannot drift from the part.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "MainBodyProfile": {"MainBodyDia"},
     "MainBody": {"MainBodyHt"},
     "HeadProfile": {"HeadDia"},
     "Head": {"HeadHt"},
+    "AttachmentScrewHoles": {"MountWestX", "MountEastX"},
     "CrankBossProfile": {"CrankAxisY", "CrankBossDia"},
+    "CrankSprocketBoss": {"CrankBossLen"},
+    "CrankSpotFaceRunOutProfile": {"SpotFaceWidth", "SpotFaceRunOut"},
     "CrankBoreProfile": {"CrankBoreDia"},
+    "ConeBossProfile": {"JournalAxisY", "ConeBossDia"},
+    "ConeShaftBoss": {"ConeBossLen"},
+    "JournalBoreProfile": {"JournalBoreDia"},
+    "JournalPlanReference": {"InclineAngle"},
+    "SpotFaceStationReference": {"CrankBossStartZ"},
+    "BoreSpacingReference": {"CrankAboveCone"},
 }
 
+# Decimal places are product definition: they select the title-block general
+# band (.X +/-0.8, .XX +/-0.51, .XXX +/-0.13), so the PART owns them and the
+# sheet only proves they survived the import (drawing-simplicity-policy rule 2).
+# The as-cast collar diameter and the cast body/boss sizes take one place --
+# nothing mates on them.  The cone-axis height and the crank-above-cone
+# spacing (each carries its own explicit band), the crank-axis height the print
+# repeats only as a reference, the two mounting-hole stations and the machined
+# spot-face station take two.  The plan angle takes
+# one: the title block holds angles to +/-1 deg, so a second place would only
+# suggest a precision nobody sets up for.  Only the two bores take three: the
+# cone journal because its size limits deliver the `shaft_in_bushing`
+# clearance band, the crank bore because it prints its H7 limits.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "MainBodyProfile": {"MainBodyDia": 1},
+    "MainBody": {"MainBodyHt": 1},
+    "HeadProfile": {"HeadDia": 1},
+    "Head": {"HeadHt": 1},
+    "AttachmentScrewHoles": {"MountWestX": 2, "MountEastX": 2},
+    "CrankBossProfile": {"CrankAxisY": 2, "CrankBossDia": 1},
+    "CrankSprocketBoss": {"CrankBossLen": 1},
+    # The spot face's run-out flat: a clearance cut, so one place, and the
+    # 64T's clearance takes each at the short end of its row
+    # (crank_boss_rim).
+    "CrankSpotFaceRunOutProfile": {"SpotFaceWidth": 1, "SpotFaceRunOut": 1},
+    "CrankBoreProfile": {"CrankBoreDia": 3},
+    "ConeBossProfile": {"JournalAxisY": 2, "ConeBossDia": 1},
+    "ConeShaftBoss": {"ConeBossLen": 1},
+    "JournalBoreProfile": {"JournalBoreDia": 3},
+    # BASIC since #906: it feeds the crank bore's angularity frame, so it
+    # prints the model's exact angle.
+    "JournalPlanReference": {"InclineAngle": 4},
+    "SpotFaceStationReference": {"CrankBossStartZ": 2},
+    "BoreSpacingReference": {"CrankAboveCone": 2},
+}
+
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+if any(
+    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
+    for feature, name in _PRECISION_NAMES
+):
+    raise AssertionError("DRAWING_PRECISION names a dimension the part never marks")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+
+# Notes identify mating parts and geometry relationships that are not
+# recognizable from silhouette alone; every size, band and finish remains on a
+# dimension or native symbol (drawing-simplicity-policy rules 1 and 6).
 DRAWING_NOTES = "\n".join(
     (
-        "MACHINE FOOT, BOSSES, BORES AND MOUNTING HOLES.",
-        "DATUM A IS FOOT SEAT; B IS MAIN-BODY OD; C IS INCLINED JOURNAL AXIS.",
-        f"CONE BOSS DIA {CONE_BOSS_DIA:.3f}; JOURNAL BORE DIA {BORE_DIA:.4f} THRU.",
-        f"JOURNAL AXIS INTERSECTS B AT BASIC {BORE_HEIGHT:.3f} ABOVE A; "
-        f"ANGLE {INCLINE_DEG:.4f} DEG ABOUT +Y.",
-        f"CRANK BOSS DIA {CRANK_BOSS_DIA:.3f}; BORE DIA {CRANK_BORE_DIA:.3f} THRU "
-        f"AT BASIC {CRANK_BORE_HEIGHT:.3f} ABOVE A.",
-        f"2X 1/4 FILLISTER C'BORE DIA {ATTACHMENT_CBORE_DIA:.5f} X "
-        f"{ATTACHMENT_CBORE_DEPTH:.4f} DEEP; THRU DIA {ATTACHMENT_THRU_DIA:.5f}; "
-        f"C-C {ATTACHMENT_SPACING:.5f}.",
+        # MHA-149's sheet is not in the package yet (#952 b); when it ships,
+        # "(DRAWING PENDING)" goes.  Two lines: the notes run 64 wide.
+        "CRANK BORE CARRIES MHA-149 ECCENTRIC BUSHING (DRAWING PENDING);",
+        "CONE BORE MHA-014; FOOT ON MHA-091.",
+        "CONE BOSS END FACES ARE SYMMETRIC ABOUT THE POST AXIS.",
+        "DRILL MOUNTING HOLES FROM TOP FACE; CHECK CONE BORE AT BREAKOUT.",
     )
 )
 
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "datum-A seat flatness": "0.05",
-    "datum-B outside-diameter form": "0.05",
-    "journal-axis true position": "0.05",
-    "crank-bore true position": "0.10",
-}
+# One frame, on the rule-3 allowlist since #906 (USER RULING 2026-09-26,
+# option ii): the crank bore's orientation to the cone journal.  The 16T:64T
+# crossed mesh loses backlash to yaw and tilt of the crank axis -- the #906
+# pose study (dt-logs/crankhub/crank-mesh-angle-20260926.jsonl) measured
+# -0.100 at 1 deg of yaw and -0.041 at 1 deg of tilt, more than the fit-up
+# bushing can spare -- and a +/- on a dimension cannot hold an axis's
+# direction in two planes at once.  A diametral zone of CRANK_BORE_ANGULARITY_MM
+# over the boss holds both to about 0.08 deg; the basic angle is the plan
+# angle the print already carries.  The running fits stay size limits.
+# Datum A alone leaves the zone free to turn about the journal axis, which
+# bounds the plan angle but not tilt; the foot seat as secondary datum B
+# clocks it, so the same zone holds tilt too.
+CRANK_BORE_ANGULARITY_MM = 0.10
+CRANK_BORE_ANGLE_LIMIT_DEG = math.degrees(
+    math.atan(CRANK_BORE_ANGULARITY_MM / CRANK_BOSS_LENGTH)
+)
+PART_DATUMS = (
+    PartDatum("A", CylinderFace(BORE_DIA, contains_y_mm=BORE_HEIGHT)),
+    PartDatum("B", PlanarFace((0, -1, 0), 0.0)),
+)
+GEOMETRIC_CONTROLS = (
+    GeometricControl(
+        "crank_bore_angularity",
+        "angularity",
+        f"{CRANK_BORE_ANGULARITY_MM:.2f}",
+        CylinderFace(CRANK_BORE_DIA, contains_y_mm=CRANK_BORE_HEIGHT),
+        datums=("A", "B"),
+        tolerance_zone="diametral",
+    ),
+)
+BASIC_DIMENSIONS = frozenset({"InclineAngle"})
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {}

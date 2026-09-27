@@ -36,8 +36,10 @@ from _common import (
     IN,
     OUT_PNG,
     SketchDims,
+    _early_bound,
     add_line_chain,
     apply_material,
+    assert_saved_configurations_regenerate,
     check,
     define_circle,
     drive_dimension,
@@ -50,13 +52,14 @@ from _common import (
     set_sketch_direct_db,
 )
 from _grouped_bom_properties import apply_grouped_bom_properties
+from _visibility import blank_reference_geometry
 # ``set_global`` is imported from _common under a distinct name: the gear-math
-# globals below use build_cone_gear's stricter 4-arg ``set_global`` (asserts the
+# globals below use involute_gear's stricter 4-arg ``set_global`` (asserts the
 # round-tripped value to test the equation-parser dialect), while the plain
 # length knobs added for the self-naming conversion use _common's mm-suffixing
 # 3-arg upsert. Keeping both avoids touching the validated involute math.
 from _common import set_global as set_global_mm
-from build_cone_gear import (
+from involute_gear import (
     PI_LIT,
     equation_curve,
     gap_area_in_disc,
@@ -332,12 +335,12 @@ async def build(adapter) -> dict[str, str]:
     # ------------------------------------------------------------------
     # Pattern about Z; link the instance count to ToothCount.
     # ------------------------------------------------------------------
-    check(
+    pattern_axis = check(
         "create_axis Z (Top x Right)",
         await adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
         ),
-    )
+    ).name
     adapter._zoom_to_fit(adapter.currentModel)
     candidates = [[0.0, 0.0, FACE_WIDTH / 2.0]]
     for angle_deg in (-45.0, -90.0, -135.0, 135.0, 45.0):
@@ -365,6 +368,9 @@ async def build(adapter) -> dict[str, str]:
         _telemetry.debug(f"axis candidate {point} failed: {res.error}")
     if pattern is None:
         raise RuntimeError("circular pattern: no axis candidate selectable")
+    # Hide only now: the pattern picks the axis by screen point, which a
+    # blanked axis would refuse.
+    blank_reference_geometry(adapter, ((pattern_axis, "AXIS"),))
     count_dim = pattern_count_dimension(adapter, pattern.data.name, DEFAULT_TEETH)
     check(
         f"link {count_dim} to ToothCount",
@@ -552,6 +558,15 @@ async def build(adapter) -> dict[str, str]:
     check("activate T24 for saved views", await adapter.set_active_configuration("T24"))
     await report_mass_properties(adapter)
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
+    # paper-drive places T12 and T18 while the part saves on T24, so their
+    # saved caches are what it rebuilds.  Reopen and prove them the way it
+    # loads them (cg-fx1: the same equation-driven recipe saved cone-gear's
+    # inactive caches faulted).
+    part_title = str(_early_bound(adapter.currentModel, "IModelDoc2").GetTitle())
+    adapter.swApp.CloseDoc(part_title)
+    adapter.currentModel = None
+    check("reopen saved transgear-removable", await adapter.open_model(artefacts["part"]))
+    assert_saved_configurations_regenerate(adapter, PART_NAME)
     return artefacts
 
 

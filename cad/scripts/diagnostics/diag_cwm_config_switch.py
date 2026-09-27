@@ -30,6 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
 
 from _assembly import (  # noqa: E402
+    activate_assembly_contract,
     coincident_mate,
     component_names,
     component_transform,
@@ -38,6 +39,10 @@ from _assembly import (  # noqa: E402
     parallel_mate,
     place_component,
 )
+
+# Distance drivers seed their side from drive-train's flip seeds
+# (cad/config/assemblies/drive-train.yaml), the assembly this probe mirrors.
+activate_assembly_contract("drive-train")
 from _assembly_postbuild import discard_open_documents  # noqa: E402
 from _common import _flag_only, check, log, run_build  # noqa: E402
 from _cwm import (  # noqa: E402

@@ -67,16 +67,26 @@ WASHER_DEPTH_MM = HEX_WIDTH_MM * 0.025
 
 # Vendor axial placement, expressed in the adapter's model-Y build frame.
 UNDERSIDE_MM = 0.0
-TIP_MM = UNDERSIDE_MM - LENGTH_MM
 HEAD_TOP_MM = UNDERSIDE_MM + HEX_HEIGHT_MM
 
 
 async def build_92240A539(adapter, truth=None):
     """Build the harvested 92240A539 geometry in the vendor coordinate frame."""
+    await build_hex_screw(adapter, sku="92240A539", length_mm=LENGTH_MM)
+
+
+async def build_hex_screw(adapter, *, sku: str, length_mm: float) -> None:
+    """The hex-screw law harvested from 92240A539, at one under-head length.
+
+    92240A540 matches 92240A539 in every catalog field but the under-head
+    length, and every law below scales with that length alone (the helix
+    spans ``L+P``).
+    """
     from _common import add_line_chain, _early_bound, _feature_by_name, _read_member
     from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
+    tip_mm = UNDERSIDE_MM - length_mm
     major_r = MAJOR_DIAMETER_MM / 2.0
     sharp_thread_h = PITCH_MM * math.sqrt(3.0) / 2.0
     root_r = major_r - 0.75 * sharp_thread_h
@@ -102,20 +112,20 @@ async def build_92240A539(adapter, truth=None):
                 UNDERSIDE_MM / 1000.0,
                 0.0,
                 0.0,
-                TIP_MM / 1000.0,
+                tip_mm / 1000.0,
                 0.0,
             )
             is None
         ):
-            raise RuntimeError("92240A539 shank: CreateCenterLine failed")
+            raise RuntimeError(f"{sku} shank: CreateCenterLine failed")
         await add_line_chain(
             adapter,
             [
                 (0.0, UNDERSIDE_MM),
                 (major_r, UNDERSIDE_MM),
-                (major_r, TIP_MM + tip_chamfer),
-                (tip_flat_r, TIP_MM),
-                (0.0, TIP_MM),
+                (major_r, tip_mm + tip_chamfer),
+                (tip_flat_r, tip_mm),
+                (0.0, tip_mm),
             ],
         )
     check("exit_sketch shank", await adapter.exit_sketch())
@@ -125,7 +135,7 @@ async def build_92240A539(adapter, truth=None):
         await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "Shank")
-    shank_volume = math.pi * major_r**2 * (LENGTH_MM - tip_chamfer) + _rev_frustum(
+    shank_volume = math.pi * major_r**2 * (length_mm - tip_chamfer) + _rev_frustum(
         tip_chamfer, major_r, tip_flat_r
     )
     await volume_check(adapter, "shank revolve", shank_volume, 0.005 * shank_volume)
@@ -257,7 +267,7 @@ async def build_92240A539(adapter, truth=None):
     # A Top-parallel plane at -L gives an ascending tip-seeded helix.  The
     # helper plane's orientation represents the vendor's clockwise+reversed
     # read-back as the equivalent false+false pair while growing toward +Y.
-    offset_plane(adapter, "TipPlane", TIP_MM)
+    offset_plane(adapter, "TipPlane", tip_mm)
     check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
     with no_sketch_inference(adapter):
         if (
@@ -270,7 +280,7 @@ async def build_92240A539(adapter, truth=None):
     insert_helix(
         adapter,
         PITCH_MM,
-        LENGTH_MM / PITCH_MM + 1.0,
+        length_mm / PITCH_MM + 1.0,
         clockwise=False,
         reversed_dir=False,
         start_angle_rad=math.pi / 2.0,
@@ -280,7 +290,7 @@ async def build_92240A539(adapter, truth=None):
     # The cutter is the harvested symmetric 60-degree thread profile.  Its
     # crest deliberately extends beyond the major cylinder and beyond both
     # axial ends; body scoping clips the sweep to the split shank.
-    cutter_center = TIP_MM - 7.0 * PITCH_MM / 16.0
+    cutter_center = tip_mm - 7.0 * PITCH_MM / 16.0
     cutter_outer_r = major_r + sharp_thread_h / 16.0
     check("create_sketch cutter", await adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):

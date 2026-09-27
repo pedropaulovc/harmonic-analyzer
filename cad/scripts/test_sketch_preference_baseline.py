@@ -17,7 +17,7 @@ failed`` leaf on ``swmaker000005@5``:
   outside a guard fails here, offline, with the file and line named.
 
 * **The closure verdict's error policy.** ``assert_profile_closed`` decides
-  from ONE shared read (``_common.record_sketch_closure``).  It must raise on a
+  from ONE shared read (``_sketch_closure.record_sketch_closure``).  It must raise on a
   MEASURED open profile and must NOT raise when the read failed or when the
   contour count merely disagrees -- the absence of a measurement is not a
   measurement of absence, and a guard that fails closed on healthy geometry is
@@ -980,7 +980,7 @@ def test_a_disable_inside_a_nested_function_does_not_leak_out(
 def _verdict(monkeypatch, verdict: dict, *, loops: int = 2) -> dict:
     """Drive :func:`assert_profile_closed` against a canned closure verdict.
 
-    The verdict is produced by ``_common.record_sketch_closure`` -- ONE read,
+    The verdict is produced by ``_sketch_closure.record_sketch_closure`` -- ONE read,
     shared with the forensics record -- so this decision is pure and testable
     without any COM at all.
     """

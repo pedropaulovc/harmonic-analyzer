@@ -1,0 +1,9 @@
+pinion-arbor-collar:
+  title: Pinion Arbor Retention Collar
+  number: MHA-144
+  material: AISI 1018 cold-finished steel
+  material_specification: AISI 1018 cold-finished steel bar, ASTM A108
+  finish: bright machined; protect with ISO VG 32 machine-oil film
+  quantity: 1
+  tolerance_class: machined_block
+  process: "turn OD and face to length; drill Ø8 slide bore; drill 1/16 spring-pin hole through both walls at the length's centre"

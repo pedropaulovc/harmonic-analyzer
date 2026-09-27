@@ -100,7 +100,8 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _part_pmi import author_part_pmi
-from rocker_arm_support_drawing_spec import HALF_Y, SURFACE_FINISHES
+from rocker_arm_support_drawing_spec import SURFACE_FINISHES
+from rocker_arm_support_section_spec import BIG, FOOT_THICKNESS, HALF_Y
 
 PART_NAME = "rocker-arm-support"
 # The source repro was authored in steel, but this casting is now the machine's
@@ -113,14 +114,14 @@ MATERIAL = "Gray Cast Iron"
 # Right plane: sketch-x -> model Z (taper), sketch-y -> model Y (height).
 WIDE = 31.75  # foot half-width (Z) at Y=-88.9
 NARROW = 8.4665  # top half-width (Z) at Y=+88.9
-# HALF_Y (trapezoid half-height, Y) is imported from the drawing spec: the
-# foot-seat finish control is pinned to that plane.
+# HALF_Y (trapezoid half-height, Y), BIG (window square half) and the
+# FOOT_THICKNESS they leave come from rocker_arm_support_section_spec: the
+# drawing spec pins the foot-seat finish control to HALF_Y and the base's
+# hold-down seats read FOOT_THICKNESS without importing this builder.
 BOSS_DEPTH = 177.8  # mid-plane extrude along X (X ±88.9)
 
 CAV = 63.5  # 127 mm square half (Cut-Extrude2)
-BIG = 82.55  # 165.1 mm square half (Cut-Extrude3/4)
 WEB = 3.175  # window-cut start-offset; the 2*WEB band left as the web
-FOOT_THICKNESS = HALF_Y - BIG
 
 FILLET_R = 12.7
 FILLET_EDGES = [  # four inner-frame corner edges (run along Z through the web)

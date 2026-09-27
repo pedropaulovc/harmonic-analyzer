@@ -59,6 +59,7 @@ from _drawing_marks import (
 from cone_tip_shim_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    MANUFACTURING_NOTES,
     REFERENCE_SKETCHES,
     SHIM_NORTH_Z,
     SHIM_SOUTH_Z,
@@ -298,7 +299,9 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     _blank_reference_sketches(adapter)
-    apply_drawing_properties(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter, PART_NAME, extra={"Manufacturing Notes": MANUFACTURING_NOTES}
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

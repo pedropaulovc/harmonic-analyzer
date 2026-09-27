@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import ast
-import difflib
 import hashlib
-import subprocess
+import json
 import math
 import re
 from pathlib import Path
@@ -281,38 +280,20 @@ _OWN_RECIPE_BLOBS = {
     # 3-1/2 in length, not the cut length.
     "diagnostics/diag_build_40923898.py": "0bd238baecda45dbac899bca6326245deb070113",
 }
-# The SHARED fillister family recipe moves with the base (#839 added
-# 91794A112 and dropped 90280A110 under it), so it is checked against the
-# base, not pinned: #857's only change to it is this one size row.
+# The SHARED fillister family recipe is pinned by its functions, not by git
+# history: an integration branch that carries #857 both before and after its
+# rebase adds the 40923898 row twice, so no one commit is "the base".  A
+# deliberate recipe change updates this digest in the same commit.  The
+# digest reads ast.dump, which follows the locked interpreter (uv.lock).
 _SHARED_RECIPE = "cad/scripts/diagnostics/diag_mcmaster_fillister.py"
-_ROW_MARKER = '"40923898": '
+_SHARED_RECIPE_FUNCTIONS_SHA256 = (
+    "31bd92ad76f011329ebfe56443443e03704b8427f29bd1bb20a5d006ae51eb3d"
+)
 
 
 def _git_blob_sha(path: Path) -> str:
     data = path.read_bytes().replace(b"\r\n", b"\n")
     return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
-
-
-def _git(*args: str) -> str:
-    root = Path(part.__file__).resolve().parents[2]
-    return subprocess.run(
-        ["git", "-C", str(root), *args],
-        check=True,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    ).stdout
-
-
-def _row_introducing_commit() -> str:
-    """The one commit on HEAD's history that added the 40923898 size row to
-    the shared recipe.  Its parent's copy of the file is #857's base (the
-    merge base with #839) for this file: no later #857 commit touches it."""
-    commits = _git(
-        "log", "--format=%H", f"-S{_ROW_MARKER}", "HEAD", "--", _SHARED_RECIPE
-    ).split()
-    assert len(commits) == 1, f"expected one commit adding the row, got {commits}"
-    return commits[0]
 
 
 def _functions(source: str) -> dict[str, str]:
@@ -327,32 +308,31 @@ def _functions(source: str) -> dict[str, str]:
 def test_shared_fillister_recipe_is_untouched() -> None:
     """Main's ruling on the cut end: the modification lives in MHA-142's
     builder, never in the family recipe (which would re-key every
-    fillister screw for one part's fact).  Against the base (Main's option
-    (b) after the restack onto #839): #857's only change to the shared
-    recipe is its one FILLISTER_SIZES row, and every function in the
-    recipe is identical to the base's."""
+    fillister screw for one part's fact).  So the family's row for the
+    supplied screw is the catalog's, and the recipe's functions are the
+    pinned ones."""
     scripts = Path(part.__file__).resolve().parent
     for relative, blob in _OWN_RECIPE_BLOBS.items():
         assert _git_blob_sha(scripts / relative) == blob, relative
-    base = _git("show", f"{_row_introducing_commit()}^:{_SHARED_RECIPE}")
+    # McMaster 40923898: 1/4"-20 x 3-1/2", head height .237, head dia .414.
+    assert FILLISTER_SIZES["40923898"] == (
+        6.35,
+        3.5 * 25.4,
+        0.237 * 25.4,
+        0.414 * 25.4,
+        25.4 / 20.0,
+    )
+    assert FILLISTER_SIZES["40923898"][1] == spec.STOCK_LENGTH_MM
     head = (Path(part.__file__).resolve().parents[2] / _SHARED_RECIPE).read_text(
         encoding="utf-8"
-    ).replace("\r\n", "\n")
-    diff = [
-        line
-        for line in difflib.unified_diff(
-            base.splitlines(), head.splitlines(), lineterm="", n=0
-        )
-        if line[:1] in "+-" and not line.startswith(("+++", "---"))
-    ]
-    removed = [line for line in diff if line.startswith("-")]
-    added = [line[1:] for line in diff if line.startswith("+")]
-    assert removed == [], removed
-    rows = [line for line in added if _ROW_MARKER in line]
-    assert len(rows) == 1, added
-    assert all(line.strip().startswith("#") for line in added if line not in rows), added
-    assert _functions(base) == _functions(head)
-    assert FILLISTER_SIZES["40923898"][1] == spec.STOCK_LENGTH_MM
+    )
+    digest = hashlib.sha256(
+        json.dumps(_functions(head), sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    assert digest == _SHARED_RECIPE_FUNCTIONS_SHA256, (
+        "the shared fillister recipe's functions changed; if deliberate, "
+        "update _SHARED_RECIPE_FUNCTIONS_SHA256 in the same commit"
+    )
 
 
 def test_catalog_row_is_the_supplied_stock_and_only_the_part_is_cut() -> None:

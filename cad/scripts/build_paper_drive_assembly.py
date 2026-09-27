@@ -82,14 +82,15 @@ from _chain import (
 )
 from _common import (
     IN,
+    _early_bound,
     apply_custom_properties,
-    apply_summary_info,
     check,
     log,
     run_build,
 )
 from _drawing_marks import DRAWN_BY
 from _assembly import (
+    activate_assembly_contract,
     angle_driver,
     assembly_title_properties,
     assert_component_placed,
@@ -119,6 +120,7 @@ from _assembly_patterns import (
     PatternDirection,
 )
 from _interference_contracts import allowed_interference_pairs
+from _visibility import blank_reference_geometry, visible_reference_geometry
 from _holes import CLEARANCE_MM
 from _transforms import (  # noqa: E402
     IDENTITY,
@@ -176,7 +178,7 @@ BAR_FRONT_Z = BAR_BACK_Z - BAR_DEPTH  # -138.9
 BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.4 bar centre
 
 # --- platen (hangs on the bar) ----------------------------------------------
-from build_platen import (  # noqa: E402
+from platen_spec import (  # noqa: E402
     CBORE_DEPTH as PLATEN_CBORE_DEPTH,
     CBORE_DIA as PLATEN_CBORE_DIA,
     GUIDE_HOLE_DIA as PLATEN_GUIDE_HOLE_DIA,
@@ -223,13 +225,13 @@ from build_bracket_screw import (  # noqa: E402
     SHANK_DIA as BRACKET_SCREW_DIA,
     SHANK_LEN as BRACKET_SCREW_LEN,
 )
-from build_clamp_screw import (  # noqa: E402
+from clamp_screw_spec import (  # noqa: E402
     HEAD_DIA as CLAMP_SCREW_HEAD_DIA,
     HEAD_H as CLAMP_SCREW_HEAD_H,
     SHANK_DIA as CLAMP_SCREW_DIA,
     SHANK_LEN as CLAMP_SCREW_LEN,
 )
-from build_fillister_screw import (  # noqa: E402
+from fillister_screw_spec import (  # noqa: E402
     HEAD_DIA as FILLISTER_HEAD_DIA,
     HEAD_H as FILLISTER_HEAD_H,
     SHANK_DIA as FILLISTER_SHANK_DIA,
@@ -804,12 +806,14 @@ def _assert_chain_layout() -> None:
             f"_chain KNOB_CENTRE {CHAIN_KNOB_CENTRE} != -KNOB_SHAFT_XY"
             f" ({knob_pre[0]:.4f}, {knob_pre[1]:.4f})"
         )
-    from build_drive_train_assembly import X_CRANK, Y_CRANK
+    # crank_fitup_axis, not the drive-train script: importing the script put
+    # the whole drive-train recipe on this assembly's cache key.
+    from crank_fitup_axis import X_CRANK_FIT, Y_CRANK_FIT
 
-    if CHAIN_CRANK_CENTRE != (-X_CRANK, Y_CRANK):
+    if CHAIN_CRANK_CENTRE != (-X_CRANK_FIT, Y_CRANK_FIT):
         raise RuntimeError(
             f"_chain CRANK_CENTRE {CHAIN_CRANK_CENTRE} != -drive-train crank"
-            f" ({-X_CRANK}, {Y_CRANK})"
+            f" ({-X_CRANK_FIT}, {Y_CRANK_FIT})"
         )
     if (TIP_R_T24, TIP_R_T12) != (REMOVABLE_TIP_R["T24"], REMOVABLE_TIP_R["T12"]):
         raise RuntimeError("_chain tip radii diverged from REMOVABLE_TIP_R")
@@ -974,6 +978,7 @@ async def _insert_roller_chain(adapter) -> None:
     # Hide the path spline: it is construction scaffolding for the pattern, not a
     # rendered feature.
     check("blank chain path sketch", await adapter.blank_sketch("chain-path"))
+    blank_reference_geometry(adapter, ((plane_name, "PLANE"),))
 
     # 4. Gates: enough links, on the chain plane, on the loop centreline.
     links = [
@@ -1008,6 +1013,50 @@ async def _insert_roller_chain(adapter) -> None:
         f"roller chain: native connected-linkage chain pattern, {len(links)} links"
         f" (worst off-loop {worst:.2f} mm)"
     )
+
+
+def _shown_planes(adapter) -> set[str]:
+    """The assembly's reference planes that would render if saved now."""
+    return {
+        name
+        for name, kind in visible_reference_geometry(adapter.currentModel, ASM_NAME)
+        if kind == "plane"
+    }
+
+
+def hide_generated_planes(adapter, shown_before: set[str], step: str) -> list[str]:
+    """Hide the reference planes ``step`` generated and prove each one hidden.
+
+    SolidWorks' chain pattern and Belt/Chain features author their own
+    construction in the assembly tree.  The adapter hides the sketches it
+    knows about; a plane either feature generates is named by SolidWorks
+    (the #950 save check caught 'PLANE2' on integ e12b78a2a), so it is found
+    as a plane shown after ``step`` that was not shown before it.
+    """
+    generated = sorted(_shown_planes(adapter) - shown_before)
+    if not generated:
+        log(f"{step}: generated no shown reference plane")
+        return []
+    def owner_of(name: str) -> str:
+        assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+        feature = _early_bound(assembly.FeatureByName(name), "IFeature")
+        return str(_early_bound(feature.GetOwnerFeature(), "IFeature").Name)
+
+    # Which feature owns each plane names it in the log (diagnostic only).
+    owners = [
+        adapter._attempt(lambda n=name: owner_of(n), default="?") for name in generated
+    ]
+    blank_reference_geometry(adapter, tuple((name, "PLANE") for name in generated))
+    still = sorted(_shown_planes(adapter) & set(generated))
+    if still:
+        raise RuntimeError(
+            f"{step}: generated plane(s) {still} still shown after BlankRefGeom"
+        )
+    log(
+        f"{step}: hid generated plane(s) "
+        + ", ".join(f"{name} (owner {owner})" for name, owner in zip(generated, owners))
+    )
+    return generated
 
 
 async def _sprocket_revolute(adapter, name: str, label: str) -> None:
@@ -1047,6 +1096,8 @@ async def _sprocket_revolute(adapter, name: str, label: str) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
+    # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
+    activate_assembly_contract(ASM_NAME)
     _assert_fastener_stacks()
     _assert_rack_mesh()
     _assert_gear_mesh()
@@ -1612,7 +1663,7 @@ async def build(adapter) -> dict[str, str]:
     # Crank-end T12 removable = the crank-shaft chain wheel, brought over from
     # drive-train so the chain seats on BOTH sprockets locally. Placed at the
     # MACHINE crank centre = -CHAIN_CRANK_CENTRE (the pre-mirror _chain anchor,
-    # == -drive-train (X_CRANK, Y_CRANK); _assert_chain_layout pins this).
+    # == -drive-train (X_CRANK_FIT, Y_CRANK_FIT); _assert_chain_layout pins this).
     # Coplanar with the T24 on the -155 chain plane; a spur gear is symmetric so
     # identity rotation. FREE to spin -- this is the crank input, the single
     # operational DOF.
@@ -1629,7 +1680,9 @@ async def build(adapter) -> dict[str, str]:
     await _sprocket_revolute(adapter, t12, "T12 crank wheel")
     # The roller chain looping both removables (_assert_chain_layout pins the
     # _chain.py anchors to KNOB_SHAFT_XY / the drive-train crank).
+    shown = _shown_planes(adapter)
     await _insert_roller_chain(adapter)
+    hide_generated_planes(adapter, shown, "roller chain pattern")
 
     # --- operational coupling (every stage a real mate) ------------------------
     # (1) The native Belt/Chain assembly feature couples the crank T12 <-> knob
@@ -1651,6 +1704,7 @@ async def build(adapter) -> dict[str, str]:
     # relative rotation -- 0 net free DOF added.
     from solidworks_mcp.adapters.base import BeltChainParameters
 
+    shown = _shown_planes(adapter)
     check(
         "chain coupling T12<->T24 (belt/chain feature, pitch 24:48)",
         await adapter.insert_belt_chain(
@@ -1665,6 +1719,7 @@ async def build(adapter) -> dict[str, str]:
             )
         ),
     )
+    hide_generated_planes(adapter, shown, "belt/chain coupling")
     # (2) GEAR mate 12:120: the third gear (in the knob cluster) drives the
     # reducer disc -- the permanent DP38 mesh the latch arm exists to hold.
     await gear_mate(
@@ -1760,9 +1815,6 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    # The PART cell resolves the document summary Title; "paper-drive assembly"
-    # (not the bare stem) so the sheet identifies itself as an assembly drawing.
-    apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 

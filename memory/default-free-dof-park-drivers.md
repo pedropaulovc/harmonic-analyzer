@@ -25,7 +25,7 @@ Everything below the divider is history of the removed system. What remains:
 - **Exact-set soundness gate** replaces the release closure proof:
   `assert_free_dof_necessity(..., allowed_stems=...)` — necessity (≥ N
   under-constrained, required families present) AND no under-constrained
-  component outside `verify._ALLOWED_FREE_STEMS[name]` (the freed families
+  component outside the contract's `allowed_free_stems` (the freed families
   plus everything coupled). Catches the one real thing the closure caught
   (an unintended freedom) in every soundness pass instead of only at release.
   The allowed lists were pinned from a live status dump; the gate names any
@@ -39,7 +39,7 @@ Everything below the divider is history of the removed system. What remains:
 - **Trap preserved**: mate `label=` strings that mention "PARK driver" (e.g.
   drive-train's crank/cone/pinion/lift-rod drivers, pen's travel driver) were
   deliberately NOT renamed — `_seed_flip` derives the recorded mate side from
-  the label signature and several are in `_FLIP_INVERT`; renaming would flip
+  the label signature and several are in the contract's `flip_invert`; renaming would flip
   replay sides. Labels are log strings, not machinery.
 
 **Why:** the closure re-proved what insertion already fixed; locked mode was
@@ -49,8 +49,11 @@ corpse mates, singularities — see [[park-driver-singularities]],
 
 **How to apply:** freeing a new operational DOF = call the `*_driver` helper
 with `free_dof_key="<key>"` (records, never authors), bump
-`verify._expected_free_dof`, add the family to `_REQUIRED_FREE_STEMS` and its
-coupled families to `_ALLOWED_FREE_STEMS`. To drive a freed DOF in a gate or
+`free_dof` (or `free_dof_per_active_channel`), add the family to
+`required_free_stems` and its coupled families to `allowed_free_stems` -- all in
+the assembly's `cad/config/assemblies/<stem>.yaml` (was `verify._expected_free_dof`,
+`verify._REQUIRED_FREE_STEMS`, `_assembly._ALLOWED_FREE_STEMS` until 2026-09-25;
+one file per assembly so the edit re-keys only that assembly's closure). To drive a freed DOF in a gate or
 diagnostic: `author_dof_drives(adapter, [spec])` transiently, discard unsaved.
 
 ---
