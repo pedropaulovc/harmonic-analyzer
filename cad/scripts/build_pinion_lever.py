@@ -54,14 +54,12 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
-    add_angular_reference_dimension,
-    add_diametric_linear_dimension,
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_angular_tolerance,
-    set_dimension_symmetric_tolerance,
+    set_dimension_prefix,
 )
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
@@ -69,22 +67,16 @@ from _saved_part_guard import require_saved_drawing_properties
 from pinion_lever_spec import (
     BORE,
     BORE_BAND,
-    BORE_DEPTH_BAND,
-    CAP_RADIUS_TOLERANCE_MM,
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    END_WALL_TOLERANCE_MM,
-    GRIP_HALF_ANGLE_DEG,
-    GRIP_HALF_ANGLE_TOLERANCE_DEG,
+    DRAWING_PRECISION,
     HUB_LEN,
     HUB_OD,
     ISOMETRIC_VIEW_NOTE,
     ROD_LEN,
     ROD_ROOT_DIA,
     ROD_TIP_DIA,
-    ROD_TIP_DIAMETER_TOLERANCE_MM,
-    ROD_TIP_Y_TOLERANCE_MM,
     ROD_Y0,
     SURFACE_FINISHES,
     WALL_T,
@@ -387,34 +379,13 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven lever (equations neutral)", V_TOTAL, 0.01 * V_FRUSTUM
     )
 
-    # Manufacturing drawing support: mark exactly the print's dimensions and
-    # stamp the make-critical title-block properties.
+    # Decimal places and the one true fit band belong to the model. Everything
+    # else is governed by the title-block general grade.
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     set_dimension_bilateral_tolerance(
         adapter, "BarrelProfile", "HubBore", *deviations(BORE_BAND)
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "Barrel", "BoreDepth", *deviations(BORE_DEPTH_BAND)
-    )
-    set_dimension_symmetric_tolerance(adapter, "Wall", "EndWall", END_WALL_TOLERANCE_MM)
-    set_dimension_symmetric_tolerance(
-        adapter, "RodProfile", "RodTipY", ROD_TIP_Y_TOLERANCE_MM
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "RodProfile",
-        "RodTipDia",
-        ROD_TIP_DIAMETER_TOLERANCE_MM,
-    )
-    set_dimension_symmetric_angular_tolerance(
-        adapter,
-        "RodProfile",
-        "GripHalfAngle",
-        GRIP_HALF_ANGLE_TOLERANCE_DEG,
-        require_driven=True,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "CapProfile", "CapR", CAP_RADIUS_TOLERANCE_MM
-    )
+    set_dimension_prefix(adapter, "CapProfile", "CapR", "SR")
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

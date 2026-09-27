@@ -13,25 +13,19 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
-
-from pinion_lever_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_attached_note,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -41,12 +35,10 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
-from _native_axis_datum import add_native_axis_datum
 from _surface_finish import surface_finish_by_key
 from pinion_lever_spec import (
     BORE,
-    CAP_RADIUS,
-    CAP_SAG,
+    DRAWING_PRECISION_BY_NAME,
     HUB_LEN,
     HUB_OD,
     ROD_LEN,
@@ -73,15 +65,13 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
 
-# Front view (XY): the hub is a Ø13 circle at the origin with the tapered rod
-# rising +Y to the tip (model y=ROD_LEN).  bbox y runs -HUB_OD/2..ROD_LEN.
+# Third-angle orthographic views remain aligned around the front view: the
+# axial top view shares its X station and the right view shares its Y station.
 FRONT_BBOX_CY = (ROD_LEN - HUB_OD / 2.0) / 2.0
-# At 1:1 the full 86 mm rod leaves enough room for the hub callouts and GD&T
-# without crowding the orthographic views.
 FRONT_CENTER = (0.078, 0.170)
-SECTION_CENTER = (0.190, 0.185)
-TOP_CENTER = (0.290, 0.135)
-ISO_CENTER = (0.340, 0.105)
+SECTION_CENTER = (0.190, FRONT_CENTER[1])
+TOP_CENTER = (FRONT_CENTER[0], 0.060)
+ISO_CENTER = (0.330, 0.105)
 
 
 def _front_x(model_x_mm: float) -> float:
@@ -104,7 +94,7 @@ RIGHT_KEEP = {
     "BoreDepth": (0.245, 0.105),
     "EndWall": (0.235, 0.190),
 }
-TOP_KEEP = {"CapR": (0.290, 0.165)}
+TOP_KEEP = {"CapR": (0.105, 0.085)}
 DIMENSION_CALLOUTS = {
     "HubBore": "FINAL REAM",
     "BoreDepth": "FULL-DIA DEPTH FROM B; FLAT BOTTOM",
