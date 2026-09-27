@@ -215,16 +215,24 @@ _REAR_WIDTH_TEXT_HALF = 0.0418 / 2.0
 _REAR_WIDTH_TEXT_LEFT_OF_VIEW = 0.0013
 _SHEET_TEXT_HEIGHT = 0.00906
 _VIEW_CROWDING_MARGIN = DEFAULT_MOVE_CLEARANCE_M
+# y: the rear view stands above View B, which leaf crankhub-rim-8339 (run
+# 20260927T053453238Z-fcbf1352) measured topping out at 203.4 mm; at y=0.2254
+# the two outlines stood 0.5 mm apart and read as one view.  The build
+# re-checks the live gap (_assert_rear_view_clear).
+_VIEW_B_TOP = 0.2034
+REAR_VIEW_GAP = 2.0 * DEFAULT_MOVE_CLEARANCE_M
 REAR_CENTER = (
     _PLAN_RD1_RIGHT
     + _SHEET_TEXT_HEIGHT
     + _VIEW_CROWDING_MARGIN
     + _REAR_WIDTH_TEXT_HALF
     + _REAR_WIDTH_TEXT_LEFT_OF_VIEW,
-    0.2254,
+    _VIEW_B_TOP + REAR_VIEW_GAP + (BLOCK_HEIGHT / 2.0) * _R,
 )
-# The label is centred under the view's live outline, this far below it.
-REAR_LABEL_GAP = 0.004
+# The label stands left of the view's live outline, centred on it: below it
+# is View B (rim-8339 printed it across View B's head).
+REAR_LABEL_TEXT = "REAR VIEW\nSCALE 1:2"
+REAR_LABEL_GAP = DEFAULT_MOVE_CLEARANCE_M
 
 
 def _rear_y(model_y: float) -> float:
@@ -845,7 +853,7 @@ def _show_section_scale_in_caption(adapter: Any, view: Any) -> None:
         raise RuntimeError("native cone-section scale caption did not persist")
 
 
-def _centre_note_under(
+def _place_note_left_of(
     adapter: Any,
     note: Any,
     outline: tuple[float, ...],
@@ -853,7 +861,8 @@ def _centre_note_under(
     gap: float,
     label: str,
 ) -> None:
-    """Centre a free note's rendered box under a view outline, ``gap`` below.
+    """Stand a free note's rendered box ``gap`` left of a view outline,
+    centred on it vertically.
 
     A note's text box neither sits on nor tracks its insertion point 1:1, so
     this reads the rendered extent and moves by the difference until it
@@ -863,14 +872,14 @@ def _centre_note_under(
         raise RuntimeError(f"failed to add {label}")
     note = _early_bound(note, "INote")
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    target = ((outline[0] + outline[2]) / 2.0, outline[1] - gap)
+    target = (outline[0] - gap, (outline[1] + outline[3]) / 2.0)
     extent: tuple[float, ...] = ()
     for _pass in range(3):
         adapter.currentModel.GraphicsRedraw2()
         extent = tuple(float(value) for value in (note.GetExtent() or ()))
         if len(extent) != 6 or extent[3] <= extent[0]:
             raise RuntimeError(f"{label}: note has no rendered extent: {extent!r}")
-        shift = (target[0] - (extent[0] + extent[3]) / 2.0, target[1] - extent[4])
+        shift = (target[0] - extent[3], target[1] - (extent[1] + extent[4]) / 2.0)
         if max(abs(shift[0]), abs(shift[1])) <= 1e-4:
             break
         position = tuple(float(value) for value in (annotation.GetPosition() or ()))
@@ -879,11 +888,55 @@ def _centre_note_under(
         if not annotation.SetPosition(position[0] + shift[0], position[1] + shift[1], position[2]):
             raise RuntimeError(f"{label}: note SetPosition failed")
     _telemetry.info(
-        f"{label} centred under its view: text "
+        f"{label} placed left of its view: text "
         f"[{extent[0] * 1000:.1f}..{extent[3] * 1000:.1f}]x"
         f"[{extent[1] * 1000:.1f}..{extent[4] * 1000:.1f}] mm, view "
-        f"[{outline[0] * 1000:.1f}..{outline[2] * 1000:.1f}] mm"
+        f"[{outline[0] * 1000:.1f}..{outline[2] * 1000:.1f}]x"
+        f"[{outline[1] * 1000:.1f}..{outline[3] * 1000:.1f}] mm"
     )
+
+
+def _set_independent_scale(adapter: Any, view: Any, scale: tuple[int, int]) -> None:
+    """Give the rear view its own scale, leaving the sheet's alone.
+
+    Created on the sheet scale, a view whose ScaleRatio is then set carries the
+    SHEET with it: rim-8339's failure PDF printed "SCALE: 1:2" in the title
+    block.  Detach it first (the cone section's pattern), then read back both
+    the view's ratio and the sheet's.
+    """
+    bound = _early_bound(view, "IView")
+    bound.UseParentScale = False
+    bound.UseSheetScale = 0
+    bound.ScaleRatio = double_array([float(scale[0]), float(scale[1])])
+    rebuild_drawing(adapter, label="rear view independent scale")
+    ratio = tuple(float(value) for value in bound.ScaleRatio)
+    if bool(bound.UseParentScale) or int(bound.UseSheetScale) != 0 or not math.isclose(
+        ratio[0] / ratio[1], scale[0] / scale[1]
+    ):
+        raise RuntimeError(f"rear view scale did not persist: {ratio=}")
+    sheet = _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet()
+    properties = list(_early_bound(sheet, "ISheet").GetProperties2() or [])
+    sheet_ratio = tuple(float(value) for value in properties[2:4])
+    _telemetry.info(f"rear view scale {ratio}, sheet scale {sheet_ratio}")
+    if sheet_ratio != tuple(float(value) for value in SHEET_SCALE):
+        raise RuntimeError(
+            f"placing the rear view moved the sheet scale to {sheet_ratio}, not {SHEET_SCALE}"
+        )
+
+
+def _assert_rear_view_clear(rear: Any, journal: Any) -> None:
+    """The rear view's outline must stand REAR_VIEW_GAP above View B's: the
+    layout audit checks text, not view outlines, so it would not see them
+    fuse."""
+    rear_box = tuple(float(value) for value in _early_bound(rear, "IView").GetOutline())
+    journal_box = tuple(float(value) for value in _early_bound(journal, "IView").GetOutline())
+    gap = rear_box[1] - journal_box[3]
+    _telemetry.info(f"rear view stands {gap * 1000:.2f} mm above View B")
+    if gap < REAR_VIEW_GAP - 5e-4:
+        raise RuntimeError(
+            f"rear view stands {gap * 1000:.2f} mm above View B, under "
+            f"{REAR_VIEW_GAP * 1000:.1f}: rear {rear_box!r}, View B {journal_box!r}"
+        )
 
 
 def _assert_native_layout_with_evidence(
@@ -1110,7 +1163,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _configure_section_caption(drawing_model)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    rear = place_view(adapter, str(SOURCE), "*Back", *REAR_CENTER, scale=REAR_SCALE)
+    rear = place_view(adapter, str(SOURCE), "*Back", *REAR_CENTER)
+    _set_independent_scale(adapter, rear, REAR_SCALE)
+    _assert_rear_view_clear(rear, journal)
     section = create_section_view(
         adapter,
         front,
@@ -1366,9 +1421,9 @@ async def build(adapter: Any) -> dict[str, str]:
         0.104,
     )
     rear_outline = tuple(float(value) for value in _early_bound(rear, "IView").GetOutline())
-    _centre_note_under(
+    _place_note_left_of(
         adapter,
-        add_note(adapter, "REAR VIEW, SCALE 1:2", rear_outline[0], rear_outline[1]),
+        add_note(adapter, REAR_LABEL_TEXT, rear_outline[0], rear_outline[1]),
         rear_outline,
         gap=REAR_LABEL_GAP,
         label="rear view label",
