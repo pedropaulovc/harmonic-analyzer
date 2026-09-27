@@ -31,10 +31,12 @@ from _common import (
     CASTING_GREEN,
     SketchDims,
     _early_bound,
+    add_line_chain,
     apply_color,
     apply_material,
     check,
     define_circle,
+    define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -83,7 +85,10 @@ from cone_pivot_post_spec import (
     CRANK_BOSS_END_Z,
     CRANK_BOSS_LENGTH,
     CRANK_BOSS_NEAR_Z,
+    CRANK_BOSS_NORTH_FACE,
     CRANK_BOSS_START_Z,
+    CRANK_SPOT_FACE_RUN_OUT,
+    CRANK_SPOT_FACE_WIDTH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -168,9 +173,10 @@ def _collar_surface_z(x: float) -> float:
 # as an unexplained final gap.  Their sum is HARVESTED_VOLUME_MM3 (asserted at
 # import below).
 #
-# Crank boss: a Ø21.93 cylinder from z=-21.3753 to +50.6591 minus the part of
-# it already inside the collar -- at each x the collar spans |z| <= s(x), and
-# the boss starts at the station, so the overlap column is s + min(21.3753, s).
+# Crank boss: a Ø21.93 cylinder from the station (z = -CRANK_BOSS_NORTH_FACE)
+# to +50.6591 minus the part of it already inside the collar -- at each x the
+# collar spans |z| <= s(x), and the boss starts at the station, so the overlap
+# column is s + min(station, s).
 CRANK_BOSS_OUTSIDE_COLLAR_MM3 = (
     math.pi * CRANK_BOSS_RADIUS** 2 * CRANK_BOSS_LENGTH
     - _disc_column_integral(
@@ -179,11 +185,51 @@ CRANK_BOSS_OUTSIDE_COLLAR_MM3 = (
     )
 )
 # Spot face: the collar material standing proud of the station plane inside
-# the boss disc (s(x) - 21.3753 where positive, i.e. |x| < 5.21).
+# the boss disc (s(x) - station where positive: the whole disc since the
+# 2.5 retreat).
 CRANK_SPOT_FACE_MM3 = _disc_column_integral(
     CRANK_BOSS_RADIUS,
     lambda x: max(_collar_surface_z(x) + CRANK_BOSS_START_Z, 0.0),
 )
+# Spot-face run-out: the flat carried |x| <= W/2 from the crank axis down
+# CRANK_SPOT_FACE_RUN_OUT, outside the boss disc the spot face already cut.
+# Over the collar band the collar stands s(x) - station proud of it, below the
+# collar the turned body; the disc's lower half is the only part of the band
+# already gone.
+def _spot_face_run_out_column(x: float) -> float:
+    station = -CRANK_BOSS_START_Z
+    collar_band = CRANK_BORE_HEIGHT - HEAD_BASE_Y
+    collar_len = collar_band - (
+        math.sqrt(CRANK_BOSS_RADIUS**2 - x * x) if abs(x) < CRANK_BOSS_RADIUS else 0.0
+    )
+    body_len = CRANK_SPOT_FACE_RUN_OUT - collar_band
+    return max(_collar_surface_z(x) - station, 0.0) * collar_len + max(
+        math.sqrt(max(BLOCK_RADIUS**2 - x * x, 0.0)) - station, 0.0
+    ) * body_len
+
+
+def _piecewise_simpson(f: Any, breaks: list[float]) -> float:
+    return sum(_simpson(f, a, b) for a, b in zip(breaks, breaks[1:]) if b > a)
+
+
+_RUN_OUT_HALF = CRANK_SPOT_FACE_WIDTH / 2.0
+_RUN_OUT_KINKS = sorted(
+    {
+        -_RUN_OUT_HALF,
+        _RUN_OUT_HALF,
+        *(
+            k * edge
+            for k in (-1.0, 1.0)
+            for edge in (
+                CRANK_BOSS_RADIUS,
+                math.sqrt(HEAD_RADIUS**2 - CRANK_BOSS_NORTH_FACE**2),
+                math.sqrt(BLOCK_RADIUS**2 - CRANK_BOSS_NORTH_FACE**2),
+            )
+            if edge < _RUN_OUT_HALF
+        ),
+    }
+)
+CRANK_SPOT_FACE_RUN_OUT_MM3 = _piecewise_simpson(_spot_face_run_out_column, _RUN_OUT_KINKS)
 # Crank bore: the full Ø15.45 cylinder from the station through the boss end;
 # after the spot face everything on that path is solid.
 CRANK_BORE_MM3 = math.pi * CRANK_BORE_RADIUS**2 * CRANK_BOSS_LENGTH
@@ -210,6 +256,7 @@ _ANALYTIC_FINAL_MM3 = (
     + math.pi * (HEAD_RADIUS**2 - BLOCK_RADIUS**2) * HEAD_HEIGHT
     + CRANK_BOSS_OUTSIDE_COLLAR_MM3
     - CRANK_SPOT_FACE_MM3
+    - CRANK_SPOT_FACE_RUN_OUT_MM3
     - CRANK_BORE_MM3
     + CONE_PADS_OUTSIDE_BODY_MM3
     - CONE_BORE_MM3
@@ -346,6 +393,8 @@ async def build(adapter: Any) -> dict[str, str]:
         # The spot-face station: one global drives both the interface plane
         # the boss grows from and the plan ray the print dimensions it on.
         "CrankBossNearZ": CRANK_BOSS_NEAR_Z,
+        "CrankSpotFaceWidth": CRANK_SPOT_FACE_WIDTH,
+        "CrankSpotFaceRunOut": CRANK_SPOT_FACE_RUN_OUT,
     }
     for name, value in globals_mm.items():
         await set_global(adapter, name, f"{value}mm")
@@ -471,9 +520,9 @@ async def build(adapter: Any) -> dict[str, str]:
     await volume_check(adapter, "v2 crank boss", volume, 0.001 * volume)
 
     # The spot face is a MACHINED flat at the station: the Ø44 cast collar
-    # stands up to 0.62 mm proud of the station plane over |x| < 5.2 (inside
-    # the boss disc, around the bore mouth) and has to be faced off, or the
-    # 16T pinion that sits 0.25 mm from this face rides on a cast ridge.  A
+    # stands up to 3.12 mm proud of the station plane across the boss disc and
+    # has to be faced off -- the station is where the 64T clears the post
+    # (crank_boss_rim), and MHA-149's north end sits flush with it.  A
     # blind cut's default direction is OPPOSITE the sketch normal (-Z, behind
     # the plane), so with no direction flag it faces the collar and never
     # touches the boss; only the collar bulge lies behind the plane inside the
@@ -504,6 +553,53 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "CrankSpotFace")
     volume -= CRANK_SPOT_FACE_MM3
     await volume_check(adapter, "v2 crank spot face", volume, 0.1 * CRANK_SPOT_FACE_MM3)
+
+    # The spot face runs out as one flat, milled in the same setup, from the
+    # crank axis down past the collar's lower edge into the turned body, where
+    # the 64T's south face comes nearest (crank_boss_rim).  Same sketch plane
+    # and cut direction as the spot face, so it only bites what stands north
+    # of the station.
+    run_out = SketchDims()
+    check(
+        "create sketch CrankSpotFaceRunOutProfile",
+        await adapter.create_sketch("CrankInterfacePlane"),
+    )
+    half_width = CRANK_SPOT_FACE_WIDTH / 2.0
+    run_out_bottom = CRANK_BORE_HEIGHT - CRANK_SPOT_FACE_RUN_OUT
+    run_out_points = [
+        (-half_width, run_out_bottom),
+        (half_width, run_out_bottom),
+        (half_width, CRANK_BORE_HEIGHT),
+        (-half_width, CRANK_BORE_HEIGHT),
+    ]
+    run_out_lines = await add_line_chain(adapter, run_out_points)
+    await define_rectilinear_chain(
+        adapter,
+        run_out_lines,
+        run_out_points,
+        label="crank spot face run-out",
+        dims=run_out,
+        names=["SpotFaceWidth", "SpotFaceRunOut", "SpotFaceWest", "SpotFaceBottom"],
+        drives=[
+            '"CrankSpotFaceWidth"',
+            '"CrankSpotFaceRunOut"',
+            '"CrankSpotFaceWidth" / 2',
+            '"CrankAxisY" - "CrankSpotFaceRunOut"',
+        ],
+    )
+    await ensure_fully_defined(adapter, "CrankSpotFaceRunOutProfile")
+    check("exit sketch CrankSpotFaceRunOutProfile", await adapter.exit_sketch())
+    name_last_feature(adapter, "CrankSpotFaceRunOutProfile")
+    drive_jobs += run_out.apply(adapter, "CrankSpotFaceRunOutProfile")
+    check(
+        "cut CrankSpotFaceRunOut",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=HEAD_RADIUS)),
+    )
+    name_last_feature(adapter, "CrankSpotFaceRunOut")
+    volume -= CRANK_SPOT_FACE_RUN_OUT_MM3
+    await volume_check(
+        adapter, "v2 crank spot face run-out", volume, 0.01 * CRANK_SPOT_FACE_RUN_OUT_MM3
+    )
 
     # The bore runs INTO the boss (+Z), i.e. against the cut default, so it is
     # reversed explicitly (build_top_frame's SetScrewPocket precedent).  Do

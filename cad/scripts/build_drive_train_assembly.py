@@ -1072,8 +1072,13 @@ from build_cone_pivot_post import (  # noqa: E402
     CRANK_BOSS_START_Z as POST_CRANK_BOSS_START_Z,
 )
 from cone_pivot_post_spec import (  # noqa: E402
+    CRANK_SPOT_FACE_RETREAT as POST_SPOT_FACE_RETREAT,
+    CRANK_SPOT_FACE_RUN_OUT as POST_SPOT_FACE_RUN_OUT,
+    CRANK_SPOT_FACE_WIDTH as POST_SPOT_FACE_WIDTH,
     JOURNAL_AXIS_HEIGHT_TOLERANCE_MM as POST_JOURNAL_AXIS_HEIGHT_TOLERANCE_MM,
 )
+import crank_boss_rim  # noqa: E402
+import gear64_post_measure  # noqa: E402
 # #906 R1: the frame's crank axis; the post's crank bore sits CRANK_BORE_DROP
 # below it and the MHA-149 bushing's throw carries the crank back up.
 from cone_pivot_post_spec import CRANK_AXIS_HEIGHT as POST_CRANK_Y  # noqa: E402
@@ -1432,8 +1437,14 @@ _BOSS_SOUTH_GAP = _POST_BOSS_SOUTH - _T12_NORTH
 _BOSS_NORTH_GAP = _PINION_SOUTH - _POST_BOSS_NORTH
 # The 16T's south face seats against the post boss's north face across this
 # gap (low, high): the pinion is set on the feeler at the floor, and the gap
-# may open to the ceiling before the pinion is re-set.
-PINION_BOSS_NORTH_GAP_RANGE = (PINION_SEAT_FEELER, PINION_SEAT_GAP_MAX)
+# may open to the ceiling before the pinion is re-set.  The 16T keeps its
+# place on the 64T row while the spot face stands POST_SPOT_FACE_RETREAT back
+# from the 64T, so the fitter's feeler stack is the retreat plus the seat
+# feeler (MHA-A03 step 4).
+PINION_BOSS_NORTH_GAP_RANGE = (
+    POST_SPOT_FACE_RETREAT + PINION_SEAT_FEELER,
+    POST_SPOT_FACE_RETREAT + PINION_SEAT_GAP_MAX,
+)
 _GAP_LO, _GAP_HI = PINION_BOSS_NORTH_GAP_RANGE
 if min(_BOSS_SOUTH_GAP, _BOSS_NORTH_GAP) < 0.25:
     raise AssertionError("v2 crank boss does not clear its axial hardware")
@@ -1464,6 +1475,44 @@ if GRIP_HEAD_STANDOFF_WORST <= 0.0:
     raise AssertionError("MHA-149's grip head does not stand off the crank boss")
 if GRIP_HEAD_T12_AIR_WORST < PINION_SEAT_FEELER:
     raise AssertionError("MHA-149's grip head does not clear the T12")
+
+# The 64T against MHA-016's north side (user ruling, 2026-09-27; cg-fx2b's
+# interference gate found its tip in the crank boss).  crank_boss_rim works in
+# the frame where the cone axis crosses the post axis; pin that frame to this
+# layout, then hold every feature to the floor at print-worst with the spot
+# face the post prints -- and fail if a run-out one step narrower or shorter
+# would hold it too, so the printed run-out stays the derived one.  The
+# retreat is the user's ruled 2.5, not re-derived here: when #916's collar
+# replaces the 64T's station band, the margins grow and nothing moves.
+GEAR64_POST_OFFSET = GEAR64_STATION + GEAR_AXIS_SHIFT - POST_STATION
+_GEAR64_FROM_POST = [a - b for a, b in zip(GEAR64_SEAT, _PPOST, strict=True)]
+if (
+    max(
+        abs(_GEAR64_FROM_POST[0] - GEAR64_POST_OFFSET * crank_boss_rim.SIN_I),
+        abs(_GEAR64_FROM_POST[1]),
+        abs(_GEAR64_FROM_POST[2] - GEAR64_POST_OFFSET * crank_boss_rim.COS_I),
+        abs(Y_CRANK - CRANK_BORE_DROP - Y_DRIVE - crank_boss_rim.CRANK_AXIS_Y),
+    )
+    > 1e-3  # the post prints its incline to 4 places; the layout carries 12.518222
+):
+    raise AssertionError("crank_boss_rim's post frame no longer matches this layout")
+_SPOT_FACE_SIZES = (POST_SPOT_FACE_RETREAT, POST_SPOT_FACE_WIDTH, POST_SPOT_FACE_RUN_OUT)
+_short = crank_boss_rim.worst_shortfalls(
+    GEAR64_POST_OFFSET, crank_boss_rim.spot_face(*_SPOT_FACE_SIZES)
+)
+if _short:
+    raise AssertionError(
+        f"the 64T misses its {crank_boss_rim.FLOOR_CLEARANCE_MM} floor to "
+        f"MHA-016 at print-worst by {_short}"
+    )
+for _size, _smaller in crank_boss_rim.one_step_short(*_SPOT_FACE_SIZES).items():
+    if _size == "retreat":
+        continue
+    if not crank_boss_rim.worst_shortfalls(GEAR64_POST_OFFSET, _smaller):
+        raise AssertionError(
+            f"MHA-016's spot-face {_size} clears the 64T a step smaller: it is "
+            "not the derived size"
+        )
 
 
 # Every length term below is what an ACCEPTED part may be: the sheet's printed
@@ -5208,6 +5257,10 @@ async def build(adapter) -> dict[str, str]:
     check_no_interference(
         adapter,
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
+    )
+    # The positive control for crank_boss_rim's analytic 64T clearances.
+    gear64_post_measure.measure(
+        adapter, post_origin=tuple(_PPOST), gear_offset=GEAR64_POST_OFFSET
     )
     # Title-block identity for the assembly drawing (draw_drive_train_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells

@@ -230,7 +230,7 @@ sections:
         - legacy
         - med
       - - Crankshaft bearing
-        - 'plain Ø9.525 core in the MHA-149 bushing; local stations 32.789505572..112.789505572 (world z −150.210494428..−70.210494428)'
+        - 'plain Ø9.525 core in the MHA-149 bushing; local stations 32.789505572..110.289505572 (world z −150.210494428..−72.710494428)'
         - —
         - '#906 R1: the integral Ø11.388 journal and its relief are gone; the core runs in the eccentric bushing''s Ø9.575 bore at the shaft_in_bushing clearance. The bushing''s north end is flush with the boss spot face; its south end stands 7.966 proud of the boss, the 6.0 grip head starting 1.966 off the boss''s south face.'
         - derived
@@ -586,7 +586,7 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - 'along Z at the R1 nominal fit-up (x, y) = (−128.733, 129.805): the MHA-149 throw (0.625 at 15.27°) about the v2 casting''s straight crank bore, which sits 0.21 below the frame axis (−129.336, 129.850); fit-up 16T:64T c2c 39.611. The frame c2c 39.735 = radii + 0.25 slack at DP25.7311. The single-cutter pair (#906) keeps that frame c2c with 0.423 slack. The 136.8-mm cylinder spans z −183..−46.2 with a 2-mm integral dome outboard; +8-shifted local seats preserve T12 at z −155 and the pinion centre at z −64.560. The 2.8360-in boss remains z −142.245..−70.210, leaving 10.255 mm to T12 and 0.250 mm to the pinion. The Ø9.525 core runs in the MHA-149 eccentric bushing, whose north end is flush with the spot face at z −70.210 (local 112.79); the Ø9.0 pinion seat step is at local 112.7 (#906 R1).'
+        - 'along Z at the R1 nominal fit-up (x, y) = (−128.733, 129.805): the MHA-149 throw (0.625 at 15.27°) about the v2 casting''s straight crank bore, which sits 0.21 below the frame axis (−129.336, 129.850); fit-up 16T:64T c2c 39.611. The frame c2c 39.735 = radii + 0.25 slack at DP25.7311. The single-cutter pair (#906) keeps that frame c2c with 0.423 slack. The 136.8-mm cylinder spans z −183..−46.2 with a 2-mm integral dome outboard; +8-shifted local seats preserve T12 at z −155 and the pinion centre at z −64.560. The boss runs z −142.245..−72.710 (2.8360 in harvested, its spot face retreated 2.5 from the 64T), leaving 10.255 mm to T12 and 2.750 mm to the pinion. The Ø9.525 core runs in the MHA-149 eccentric bushing, whose north end is flush with the spot face at z −72.710 (local 110.29); the Ø9.0 pinion seat step is at local 112.7 (#906 R1).'
         - 'cone-pivot-post-v2 is the physical authority for x/y. The ch30 GT crank_sprocket result (−122.84, 144.78) remains independent image evidence, while the primary crank construction photo governs the separate through hub and flush outboard face. The crossed-helical accommodation and 0.25 mm mesh slack remain.'
         - high (GT + mesh)
       - - Chain run
@@ -619,7 +619,7 @@ sections:
         - p.18 top-down (the "pivot" label at the TIP; dark wedge under the whole cone set) + v4 stills; v2 envelope/mount cascade from cone-pivot-post-v2.SLDPRT, whose height was manually rederived from ch30 Eight Views image 2 (page003_img01.png) and whose proportions follow ch11 page002_img05.jpeg / page002_img06.jpeg
         - med (role high, dims low)
       - - '`cone-pivot-post` (ONE green column: big-end journal + crank pedestal, on the plate)'
-        - 'v2 green cast body: Ø42.011 × 86.0 tall, with an as-cast Ø44.0 ± 0.4 × 26.6 upper collar (y 59.4..86, a real 0.8-1.27 radial step at the cast/turned seam; one-place reference size); straight crank/sprocket boss Ø21.93 with Ø14.6 H7 bore on the body centreline at y 72.49 (#906 R1: boss and bore 0.21 below the frame''s crank axis at 72.7; the bore seats the MHA-149 eccentric bushing, e 0.625 ±0.025, whose Ø9.575 bore runs on the 3/8 in crankshaft core), length 2.8360 in (72.0344 mm); inclined cone-shaft boss Ø17.2 with Ø12.2808 journal at y 33.368, its axis yawed 12.5182° about the vertical body axis; 2× vertical ANSI-inch 1/4 fillister counterbores on 26.88704 centres (Ø7.14248 thru, Ø11.50874 × 6.0198 deep).'
+        - 'v2 green cast body: Ø42.011 × 86.0 tall, with an as-cast Ø44.0 ± 0.4 × 26.6 upper collar (y 59.4..86, a real 0.8-1.27 radial step at the cast/turned seam; one-place reference size); straight crank/sprocket boss Ø21.93 with Ø14.6 H7 bore on the body centreline at y 72.49 (#906 R1: boss and bore 0.21 below the frame''s crank axis at 72.7; the bore seats the MHA-149 eccentric bushing, e 0.625 ±0.025, whose Ø9.575 bore runs on the 3/8 in crankshaft core), harvested length 2.8360 in (72.0344 mm), its north spot face retreated 2.5 from the 64T (boss 69.5344) and run out as a 23.0-wide flat to 17.0 below the crank axis; inclined cone-shaft boss Ø17.2 with Ø12.2808 journal at y 33.368, its axis yawed 12.5182° about the vertical body axis; 2× vertical ANSI-inch 1/4 fillister counterbores on 26.88704 centres (Ø7.14248 thru, Ø11.50874 × 6.0198 deep).'
         - 'stands on the cone swing platform at exact Ry180, cross-pairing the two mounting-hole axes and putting the crank boss outside the machine. The post and carrier retain the ch30-fitted +1.484 X / +35.415 Z world placement. The working cone/cylinder/channel family is independently recentered 33.115 mm toward the post along its unchanged inclined bore; the post fit is not a machine-wide translation.'
         - 'manual height rederivation from ch30 Eight Views station 2 (references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png); proportions from ch11 references/albert-michelsons-harmonic-analyzer/ch11_images/page002_img05.jpeg and page002_img06.jpeg; collar Ø44.0 measured from the cast/turned seam in ch11 page002_img04/05/06 and ch30 page003_img01 (`cad/scripts/cone_pivot_post_spec.py` HEAD_DIA); other feature dimensions harvested from cone-pivot-post-v2.SLDPRT'
         - 'med (86 mm height, proportions and Ø44.0 as-cast collar photo-derived; other v2 feature dimensions exact)'
@@ -2143,9 +2143,10 @@ sections:
          pinion (face 10.8) stands PROUD of
          the green column's casting face — ch12 page002_img06 shows no
          relief pocket — centred in the TRUE casting-to-T120 span
-         (z −31.025, centred on the shifted 64T row). The 2.8360-in v2 boss occupies
-         z −142.245..−70.210, leaving 10.255 mm to the fixed T12 wheel and
-         0.250 mm to the pinion south face. The 130-mm shaft cylinder moves only
+         (z −31.025, centred on the shifted 64T row). The v2 boss occupies
+         z −142.245..−72.710 (its spot face retreated 2.5 from the 64T),
+         leaving 10.255 mm to the fixed T12 wheel and 2.750 mm to the pinion
+         south face. The 130-mm shaft cylinder moves only
          its common crank face outboard to z −183; all inboard world stations remain fixed.
       10. **Alignment-pinion mechanism removed (2026-06-18) — RESTORED
          2026-07-02** (ch. 25). The removal-era impossibility used the now-

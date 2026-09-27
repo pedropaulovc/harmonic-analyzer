@@ -12,7 +12,9 @@ import pytest
 
 import build_drive_train_assembly as drive
 import cone_pivot_post_spec as post
+import crank_boss_rim
 import crank_drive_gear_spec as gear64
+import gear64_post_measure
 import crank_eccentric_bushing_spec as bushing
 import crank_mesh_stack as stack
 import crank_pinion_spec as pinion
@@ -76,8 +78,10 @@ def test_every_angle_source_is_in_the_budget() -> None:
         stack.POST_ANGLE_DEG + stack.BUSHING_ANGLE_DEG + stack.SEAT_COCK_DEG
     )
     assert stack.MESH_LEVER == pytest.approx(27.575, abs=1e-3)
-    # The post frame's move at the mesh is the verifier's 0.038.
-    assert stack.POST_ANGLE_AT_MESH == pytest.approx(0.038, abs=5e-4)
+    # The post frame's move at the mesh: the verifier's 0.038 over the
+    # harvested 72.03 boss; the spot face's 2.5 retreat shortens the zone's
+    # span to 69.53, so the same 0.10 zone lets it turn a little further.
+    assert stack.POST_ANGLE_AT_MESH == pytest.approx(0.0397, abs=5e-4)
 
 
 def test_the_angularity_frame_is_load_bearing() -> None:
@@ -121,9 +125,12 @@ def test_the_tip_band_is_a_reach_term_measured_at_its_own_band() -> None:
 def test_r1_throw_margins_at_e_0625() -> None:
     assert bushing.ECCENTRICITY == 0.625
     assert stack.THROW_REACH == pytest.approx(0.600)
-    assert stack.OPEN_MARGIN == pytest.approx(0.0338, abs=5e-4)
-    assert stack.CLOSE_MARGIN == pytest.approx(0.0269, abs=5e-4)
-    assert stack.IDEAL_DROP == pytest.approx(0.2135, abs=5e-4)
+    # 0.0338 / 0.0269 before the spot face's 2.5 retreat: the shorter boss
+    # loosens the angularity zone's angle and the 16T now overhangs the
+    # bushing's end by the retreat more (crank_mesh_stack PINION_BEYOND_BUSHING).
+    assert stack.OPEN_MARGIN == pytest.approx(0.0282, abs=5e-4)
+    assert stack.CLOSE_MARGIN == pytest.approx(0.0219, abs=5e-4)
+    assert stack.IDEAL_DROP == pytest.approx(0.2132, abs=5e-4)
 
 
 def test_bonding_leaves_the_fitter_a_reading_allowance() -> None:
@@ -301,3 +308,135 @@ def test_the_frame_axis_seed_is_not_the_shipped_seed() -> None:
     # seed the assembly no longer ships.
     frame = crossed.pose((drive.X_CRANK, drive.Y_CRANK), drive.MESH_WINDOW_CENTRE_DEG)
     assert abs(frame["seed"] - drive.PINION_SEED_DEG) > 1e-3
+
+
+# --- The 64T against MHA-016's north side (crank_boss_rim) --------------------
+# cg-fx2b's drive-train interference gate found the 64T's tip in the crank
+# boss at the harvested spot-face station; the user ruled the face retreated
+# and run out as a flat, each size the smallest step that holds the target.
+
+
+def _spot_face_sizes() -> tuple[float, float, float]:
+    return (
+        post.CRANK_SPOT_FACE_RETREAT,
+        post.CRANK_SPOT_FACE_WIDTH,
+        post.CRANK_SPOT_FACE_RUN_OUT,
+    )
+
+
+def test_the_harvested_spot_face_is_the_gate_s_clash() -> None:
+    """Positive control: at the harvested station, with no run-out, the
+    nominal 64T already reaches into the boss -- the overlap cg-fx2b's gate
+    read -- and at print-worst into the collar too."""
+    harvested = crank_boss_rim.SpotFace(post.CRANK_BOSS_HARVESTED_NORTH_FACE)
+    nominal = crank_boss_rim.clearances(
+        gear_offset=drive.GEAR64_POST_OFFSET, spot=harvested, worst=False
+    )
+    assert -0.25 < nominal["crank boss"] < 0.0
+    worst = crank_boss_rim.worst_shortfalls(drive.GEAR64_POST_OFFSET, harvested)
+    assert {"crank boss", "collar"} <= set(worst)
+
+
+def test_the_floor_is_the_assembly_s_running_gap() -> None:
+    """Cited, not invented: the 16T's seat feeler MHA-A03 step 4 sets, and it
+    is taken with the 64T's station band counted."""
+    assert crank_boss_rim.FLOOR_CLEARANCE_MM is pinion.SEAT_FEELER_MM
+    assert crank_boss_rim.GEAR64_STATION_TOWARD_POST is post.GEAR64_STATION_BAND_MM
+
+
+def test_the_printed_spot_face_holds_the_floor_on_all_five_surfaces() -> None:
+    spot = crank_boss_rim.spot_face(*_spot_face_sizes())
+    assert crank_boss_rim.worst_shortfalls(drive.GEAR64_POST_OFFSET, spot) == {}
+    worst = crank_boss_rim.clearances(gear_offset=drive.GEAR64_POST_OFFSET, spot=spot)
+    assert set(worst) == {"crank boss", "MHA-149 north end", "collar", "body", "cone boss end"}
+    assert min(worst.values()) >= crank_boss_rim.FLOOR_CLEARANCE_MM
+    # The untouched cone-boss end governs; the run-out holds the collar next.
+    assert min(worst, key=worst.get) == "cone boss end"
+
+
+def test_the_ruled_retreat_was_needed_under_today_s_station_band() -> None:
+    """Fail-first: 0.5 less retreat leaves the collar under the floor."""
+    smaller = crank_boss_rim.one_step_short(*_spot_face_sizes())["retreat"]
+    assert set(crank_boss_rim.worst_shortfalls(drive.GEAR64_POST_OFFSET, smaller)) == {"collar"}
+    assert post.CRANK_SPOT_FACE_RETREAT == 2.5
+
+
+@pytest.mark.parametrize("size", ["width", "run-out"])
+def test_a_run_out_one_step_smaller_misses_the_floor(size: str) -> None:
+    """Fail-first for the import-time derivation: the printed run-out is the
+    smallest step that holds the floor."""
+    smaller = crank_boss_rim.one_step_short(*_spot_face_sizes())[size]
+    assert crank_boss_rim.worst_shortfalls(drive.GEAR64_POST_OFFSET, smaller)
+
+
+def test_the_derivation_is_checked_at_import() -> None:
+    source = Path(drive.__file__).read_text(encoding="utf-8")
+    assert "crank_boss_rim.one_step_short(*_SPOT_FACE_SIZES)" in source
+    assert "crank_boss_rim.worst_shortfalls(" in source
+
+
+def test_the_nominal_clearances_the_solidworks_cross_check_reads() -> None:
+    """The analytic nominal the drive-train leaf's measured minimum distance is
+    compared against (gear64_post_measure)."""
+    spot = crank_boss_rim.spot_face(*_spot_face_sizes())
+    nominal = crank_boss_rim.clearances(
+        gear_offset=drive.GEAR64_POST_OFFSET, spot=spot, worst=False
+    )
+    assert nominal["crank boss"] == pytest.approx(2.377, abs=2e-3)
+    assert min(nominal["collar"], nominal["body"], nominal["cone boss end"]) == pytest.approx(
+        1.681, abs=2e-3
+    )
+
+
+def test_every_print_worst_term_reads_its_print() -> None:
+    assert crank_boss_rim.SPOT_FACE_NORTH == 0.51  # CrankBossStartZ at .XX
+    assert crank_boss_rim.GEAR_FACE_GROWTH == 0.4  # FaceWidth at .X, per side
+    assert crank_boss_rim.GEAR_TIP_GROWTH == gear64.OUTSIDE_DIA_TOLERANCE_MM / 2.0
+    assert crank_boss_rim.COLLAR_GROWTH == crank_boss_rim.BODY_GROWTH == 0.4
+    assert crank_boss_rim.SPOT_FACE_WIDTH_SHORT == 0.8
+    assert crank_boss_rim.BUSHING_RADIUS_MAX == (bushing.OUTER_DIA + bushing.OD_BAND[0]) / 2.0
+
+
+def _measured(monkeypatch: pytest.MonkeyPatch, near_post_frame: tuple[float, float, float], distance_mm: float) -> dict:
+    """Run gear64_post_measure against a fake ClosestDistance (makepy's
+    convention: retval first, then the two [out] points, in metres)."""
+    origin = tuple(drive._PPOST)
+    post_point = tuple((c + o) / 1000.0 for c, o in zip(near_post_frame, origin, strict=True))
+
+    class Model:
+        def ClosestDistance(self, a, b):
+            return (distance_mm / 1000.0, (0.0, 0.0, 0.0), post_point)
+
+        def GetComponentByName(self, name):
+            return name
+
+    monkeypatch.setattr(gear64_post_measure, "_early_bound", lambda obj, iface: Model())
+    return gear64_post_measure.measure(
+        SimpleNamespace(currentModel=object()),
+        post_origin=origin,
+        gear_offset=drive.GEAR64_POST_OFFSET,
+    )
+
+
+def test_the_solidworks_cross_check_names_the_feature_it_lands_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    face = post.CRANK_BOSS_NORTH_FACE
+    on_face = (3.0, crank_boss_rim.CRANK_AXIS_Y - 5.0, face)
+    record = _measured(monkeypatch, on_face, 2.40)
+    assert record["measured_feature"] == "crank boss"
+    assert record["predicted_feature"] == "cone boss end"
+    assert record["predicted_mm"] == pytest.approx(1.681, abs=2e-3)
+
+
+def test_the_solidworks_cross_check_fails_when_the_gear_is_nearer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Measured nearer than the envelope predicts: the analytic model misses
+    material, so the build stops."""
+    end = post.CONE_BOSS_LENGTH / 2.0
+    on_pad = (end * crank_boss_rim.SIN_I, 0.0, end * crank_boss_rim.COS_I)
+    assert gear64_post_measure.post_feature_at(on_pad, post.CRANK_BOSS_NORTH_FACE) == "cone boss end"
+    with pytest.raises(RuntimeError, match="misses real material"):
+        _measured(monkeypatch, on_pad, 1.681 - 0.2)
+    assert _measured(monkeypatch, on_pad, 1.70)["delta_mm"] == pytest.approx(0.019, abs=2e-3)

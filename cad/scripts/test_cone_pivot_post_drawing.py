@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
+
+import pytest
 
 import build_cone_pivot_post as part
 import cone_pivot_post_spec as spec
@@ -39,12 +42,16 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
     ) == (21.93, 14.6, 72.49, 0.0)
     assert (spec.CRANK_AXIS_HEIGHT, spec.CRANK_BORE_DROP) == (72.7, 0.21)
     assert spec.CRANK_BOSS_LENGTH_IN == 2.8360
-    assert round(spec.CRANK_BOSS_LENGTH, 4) == 72.0344
     # The spot face is stationed from the post axis, NOT from the cast collar.
-    assert spec.CRANK_BOSS_NORTH_FACE == 21.3753
-    assert round(spec.CRANK_BOSS_START_Z, 4) == -21.3753
+    assert spec.CRANK_BOSS_HARVESTED_NORTH_FACE == 21.3753
     assert spec.CRANK_BOSS_START_Z != -spec.HEAD_DIA / 2.0
+    # The harvested boss ends where it always did; the spot face stands the
+    # retreat south of its harvested station, and the boss is that much shorter.
     assert round(spec.CRANK_BOSS_END_Z, 4) == 50.6591
+    retreat = spec.CRANK_SPOT_FACE_RETREAT
+    assert spec.CRANK_BOSS_NORTH_FACE == pytest.approx(21.3753 - retreat)
+    assert spec.CRANK_BOSS_START_Z == pytest.approx(-(21.3753 - retreat))
+    assert spec.CRANK_BOSS_LENGTH == pytest.approx(2.8360 * 25.4 - retreat)
     assert (spec.CONE_BOSS_DIA, spec.BORE_DIA, spec.BORE_HEIGHT) == (
         17.2,
         12.2808,
@@ -62,9 +69,41 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
     # build) fails at import, so only mass coherence is left to pin here.
     assert spec.HARVESTED_VOLUME_MM3 == round(part._ANALYTIC_FINAL_MM3, 4)
     assert round(spec.HARVESTED_VOLUME_MM3 * 7.2e-6, 6) == spec.HARVESTED_MASS_KG
-    assert round(part.CRANK_BORE_MM3, 1) == 12059.7
-    assert round(part.CRANK_SPOT_FACE_MM3, 1) == 93.1
+    assert part.CRANK_BORE_MM3 == pytest.approx(
+        math.pi * (spec.CRANK_BORE_DIA / 2.0) ** 2 * spec.CRANK_BOSS_LENGTH
+    )
     assert round(part.ATTACHMENT_HOLES_MM3, 1) == 7661.6
+
+
+def test_the_spot_face_volumes_are_their_columns() -> None:
+    """Brute-force the spot face and its run-out flat on a grid, independently
+    of the Simpson integrals the build checks each cut against."""
+    station = spec.CRANK_BOSS_NORTH_FACE
+    head_r, body_r, boss_r = spec.HEAD_DIA / 2.0, spec.BLOCK_DIA / 2.0, spec.CRANK_BOSS_DIA / 2.0
+    axis = spec.CRANK_BORE_HEIGHT
+    half = spec.CRANK_SPOT_FACE_WIDTH / 2.0
+    bottom = axis - spec.CRANK_SPOT_FACE_RUN_OUT
+    n = 600
+    dx, dy = 2.0 * half / n, (axis - bottom) / n
+    disc = run_out = 0.0
+    for i in range(n):
+        x = -half + (i + 0.5) * dx
+        for k in range(n):
+            y = bottom + (k + 0.5) * dy
+            radius = head_r if y >= spec.HEAD_BASE_Y else body_r
+            proud = max(math.sqrt(max(radius**2 - x * x, 0.0)) - station, 0.0)
+            if math.hypot(x, y - axis) > boss_r:
+                run_out += proud * dx * dy
+    # The disc's upper half lies above the run-out's band: grid the whole disc.
+    for i in range(n):
+        x = -boss_r + (i + 0.5) * 2.0 * boss_r / n
+        for k in range(n):
+            y = axis - boss_r + (k + 0.5) * 2.0 * boss_r / n
+            if math.hypot(x, y - axis) <= boss_r:
+                proud = max(math.sqrt(head_r**2 - x * x) - station, 0.0)
+                disc += proud * (2.0 * boss_r / n) ** 2
+    assert part.CRANK_SPOT_FACE_RUN_OUT_MM3 == pytest.approx(run_out, rel=2e-3)
+    assert part.CRANK_SPOT_FACE_MM3 == pytest.approx(disc, rel=2e-3)
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
@@ -75,6 +114,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         | set(drawing.TOP_KEEP)
         | set(drawing.SECTION_KEEP)
         | set(drawing.JOURNAL_KEEP)
+        | set(drawing.REAR_KEEP)
     )
     assert kept == marked
     assert marked == {
@@ -95,6 +135,8 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "JournalBoreDia",
         "CrankBossStartZ",
         "InclineAngle",
+        "SpotFaceWidth",
+        "SpotFaceRunOut",
     }
     # No dimension may be placed twice: two views that both carry a value are
     # two chances for the sheet to contradict itself.
@@ -103,8 +145,16 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         + len(drawing.TOP_KEEP)
         + len(drawing.SECTION_KEEP)
         + len(drawing.JOURNAL_KEEP)
+        + len(drawing.REAR_KEEP)
         == len(kept)
     )
+
+
+def test_the_spot_face_run_out_is_dimensioned_face_on() -> None:
+    """The run-out flat is on the north face, behind the elevation (which looks
+    at the crank boss's far end), so only the rear view shows it face-on."""
+    assert set(drawing.REAR_KEEP) == spec.DRAWING_DIMENSIONS["CrankSpotFaceRunOutProfile"]
+    assert "*Back" in Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_inclined_journal_sizes_live_in_the_true_shape_view() -> None:
@@ -241,7 +291,7 @@ def test_the_plan_angle_is_model_geometry_not_sheet_text() -> None:
     """
     assert "InclineAngle" in spec.DRAWING_DIMENSIONS["JournalPlanReference"]
     assert "CrankBossStartZ" in spec.DRAWING_DIMENSIONS["JournalPlanReference"]
-    assert round(spec.CRANK_BOSS_NEAR_Z, 4) == 21.3753
+    assert spec.CRANK_BOSS_NEAR_Z == spec.CRANK_BOSS_NORTH_FACE
     assert round(spec.JOURNAL_REFERENCE_X, 6) == 8.669989
     assert round(spec.JOURNAL_REFERENCE_Z, 6) == 39.049088
     source = Path(part.__file__).read_text(encoding="utf-8")
@@ -309,7 +359,9 @@ def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
     assert frame.face == CylinderFace(
         spec.CRANK_BORE_DIA, contains_y_mm=spec.CRANK_BORE_HEIGHT
     )
-    assert round(spec.CRANK_BORE_ANGLE_LIMIT_DEG, 4) == 0.0795
+    # The zone spans the boss, so the spot face's retreat (a shorter boss)
+    # loosens the angle it holds: 0.0795 deg over 72.03, 0.0824 over 69.53.
+    assert round(spec.CRANK_BORE_ANGLE_LIMIT_DEG, 4) == 0.0824
     assert part.PART_DATUMS is spec.PART_DATUMS
     assert part.GEOMETRIC_CONTROLS is spec.GEOMETRIC_CONTROLS
     policy = (

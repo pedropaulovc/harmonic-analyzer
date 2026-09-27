@@ -50,6 +50,8 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from cone_gear_notes import ATTACHMENT as CONE_GEAR_JOINT
 from crank_drive_gear_notes import ATTACHMENT_ALTERNATIVE as CRANK_GEAR_ALTERNATIVE
 from crank_drive_gear_notes import ATTACHMENT_PROCESS as CRANK_GEAR_JOINT
+from cone_pivot_post_spec import CRANK_SPOT_FACE_RETREAT
+from crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
 from drive_train_assembly_spec import (
     CLUSTERS,
     EXPLODED_VIEW_NAME,
@@ -348,6 +350,7 @@ BOM_NORMALIZED_ALIASES = {
 # package is not released while any remains.
 ASSEMBLED_HEADING = f"SAVED WORKING POSE AND FREE MOTIONS: SEE SHEET {CHECKS_SHEET} FOR SETUP."
 
+PINION_FEELER_STACK = CRANK_SPOT_FACE_RETREAT + PINION_SEAT_FEELER
 CONE_CRANK_STEPS = "\n".join(
     (
         "ASSEMBLY SEQUENCE - CONE SET AND CRANK",
@@ -399,10 +402,13 @@ CONE_CRANK_STEPS = "\n".join(
         "   PINNED, AND MESH IT WITH MHA-021 TOOTH IN GAP. CHECK BACKLASH",
         "   0.20-0.55 AT THE MHA-025 PITCH LINE, FREE THROUGH ONE FULL MHA-021",
         "   TURN. OUT OF BAND: STOP - MHA-016 BORE SPACING IS OUT (SEE ITS",
-        "   PRINT). HOLD MHA-025 IN MESH; SET ITS STATION 0.25 OFF THE SPOT",
-        "   FACE WITH A FEELER. ONLY THEN MATCH-DRILL AND REAM FOR MHA-134 AT",
-        "   BOSS MID-LENGTH WITH MHA-026; SEAT FLUSH BOTH SIDES PER THE MHA-025",
-        "   PRINT. RE-CHECK BACKLASH 0.20-0.55 AFTER PINNING.",
+        # The spot face stands back from the 64T (cone_pivot_post_spec
+        # CRANK_SPOT_FACE_RETREAT), so the feeler is a stack: the retreat
+        # plus the 16T's seat feeler.
+        f"   PRINT). HOLD MHA-025 IN MESH; SET ITS STATION {PINION_FEELER_STACK:.2f} OFF THE SPOT",
+        "   FACE WITH A FEELER STACK. ONLY THEN MATCH-DRILL AND REAM FOR",
+        "   MHA-134 AT BOSS MID-LENGTH WITH MHA-026; SEAT FLUSH BOTH SIDES PER",
+        "   THE MHA-025 PRINT. RE-CHECK BACKLASH 0.20-0.55 AFTER PINNING.",
         "5. THE PAPER-DRIVE T12 WHEEL GOES ON MHA-026 BEFORE THE ARM.",
         # U33 (user, 2026-09-23): crank hub MHA-137 pressed into the arm and
         # seam-pinned by MHA-138 (a 4 m6 dowel, 4.0 long = half the arm); the

@@ -143,11 +143,14 @@ STATION_64T_DC = 0.015
 # Mesh mid-face overhangs past each bearing's inboard end (U31 table).
 CRANK_OVERHANG = 5.65
 CONE_OVERHANG = 5.68
-# The 16T's mid-face stands this far north of the boss's spot face (the widest
-# seat gap + half the face), where the bushing's north end sits flush.  The
-# crank bore's spacing is inspected at the post axis, so a post angle error
-# moves the mesh by MESH_LEVER.
-PINION_BEYOND_BUSHING = pinion.SEAT_GAP_MAX_MM + pinion.FACE_WIDTH / 2.0
+# The 16T's mid-face stands this far north of the boss's spot face, where the
+# bushing's north end sits flush: the spot face's retreat from the 64T, the
+# widest seat gap past it, and half the face.  The crank bore's spacing is
+# inspected at the post axis, so a post angle error moves the mesh by
+# MESH_LEVER.
+PINION_BEYOND_BUSHING = (
+    post.CRANK_SPOT_FACE_RETREAT + pinion.SEAT_GAP_MAX_MM + pinion.FACE_WIDTH / 2.0
+)
 MESH_LEVER = post.CRANK_BOSS_NORTH_FACE + PINION_BEYOND_BUSHING
 
 # The crank axis's angle budget: the post's angularity frame, the bushing
