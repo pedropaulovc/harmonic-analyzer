@@ -813,6 +813,18 @@ def cluster_ring_fit(
     return (x, shift[1]), overflows, x - shift[0]
 
 
+def cluster_ring_slack(
+    outline: tuple[float, float, float, float],
+) -> tuple[float, float]:
+    """(horizontal, vertical) room CLUSTER_RING_REGION leaves around the ring;
+    negative is an overflow."""
+    x0, y0, x1, y1 = CLUSTER_RING_REGION
+    return (
+        (x1 - x0) - (outline[2] - outline[0] + 2.0 * CLUSTER_RING_REACH),
+        (y1 - y0) - (outline[3] - outline[1] + 2.0 * CLUSTER_RING_REACH),
+    )
+
+
 def _scale_text(scale: tuple[float, float]) -> str:
     return f"{scale[0]:g}:{scale[1]:g}"
 
@@ -2158,11 +2170,14 @@ def _place_cluster_sheet(
     # The ladder predicted this fit from the preferred outline; the re-read
     # outline is the proof, before any balloon exists.
     shift, overflows, slide = cluster_ring_fit(outline)
+    slack_x, slack_y = cluster_ring_slack(outline)
     _telemetry.event(
         "drawing.cluster_ring_fit",
         cluster=cluster,
         preferred_scale=_scale_text(preferred),
         scale=_scale_text(scale),
+        horizontal_slack_mm=slack_x * 1000.0,
+        vertical_slack_mm=slack_y * 1000.0,
         preferred_outline_mm=tuple(value * 1000.0 for value in preferred_outline),
         outline_mm=tuple(value * 1000.0 for value in outline),
         shift_mm=tuple(value * 1000.0 for value in shift),
@@ -2174,11 +2189,12 @@ def _place_cluster_sheet(
             f"{label}: at {_scale_text(scale)} the balloon ring still overflows "
             f"the cluster region ({'; '.join(overflows)})"
         )
-    if scale != preferred:
-        _telemetry.info(
-            f"{label}: balloon ring fits at {_scale_text(scale)}, "
-            f"not the preferred {_scale_text(preferred)}"
-        )
+    fit = (
+        f"{label}: balloon ring fits at {_scale_text(scale)} with "
+        f"{slack_x * 1000.0:.1f} x {slack_y * 1000.0:.1f} mm to spare"
+    )
+    stepped = "" if scale == preferred else f", not at the preferred {_scale_text(preferred)}"
+    (_telemetry.debug if scale == preferred else _telemetry.info)(fit + stepped)
     _shift_view(adapter, view, shift, label=f"{label} ring fit")
     stems = sorted(
         {instance.stem for instance in facts.instances if instance.name in names},

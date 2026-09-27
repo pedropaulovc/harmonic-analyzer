@@ -469,6 +469,89 @@ def test_the_ring_reach_is_where_the_balloon_ink_lands() -> None:
     assert ink_top * 1000.0 == pytest.approx(255.5, abs=0.5)
 
 
+# cascade-3's audit box for balloon '42' is 9.5 mm across: the rendered radius.
+RENDERED_BALLOON_RADIUS = 0.00475
+
+
+def test_the_ring_reach_covers_the_rendered_balloon() -> None:
+    """A balloon style that renders larger than BALLOON_DIAMETER must fail here,
+    not reopen the gap on a sheet."""
+    assert drawing.CLUSTER_RING_REACH == pytest.approx(
+        drawing.CLUSTER_BALLOON_MARGIN
+        + max(drawing.BALLOON_DIAMETER / 2.0, RENDERED_BALLOON_RADIUS)
+    )
+
+
+def _at_scale(outline, placed, scale):
+    k = (scale[0] / scale[1]) / (placed[0] / placed[1])
+    x0, y0, x1, y1 = outline
+    cx, cy, hw, hh = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2 * k, (y1 - y0) / 2 * k
+    return (cx - hw, cy - hh, cx + hw, cy + hh)
+
+
+def _ring_ink_reach(outline, shift):
+    """Lowest/highest ink of a balloon on the ring, and the right-most ink of
+    one low enough to reach the title block's height."""
+    margin, r = drawing.CLUSTER_BALLOON_MARGIN, drawing.BALLOON_DIAMETER / 2.0
+    cx = (outline[0] + outline[2]) / 2.0 + shift[0]
+    cy = (outline[1] + outline[3]) / 2.0 + shift[1]
+    rx = (outline[2] - outline[0]) / 2.0 + margin
+    ry = (outline[3] - outline[1]) / 2.0 + margin
+    _left, _bottom, _right, block_top = _title_block_keep_out()
+    points = [
+        (cx + rx * math.cos(2 * math.pi * k / 3600), cy + ry * math.sin(2 * math.pi * k / 3600))
+        for k in range(3600)
+    ]
+    low_right = max((x + r for x, y in points if y - r < block_top), default=-math.inf)
+    return min(y for _x, y in points) - r, max(y for _x, y in points) + r, low_right
+
+
+CLUSTER_OUTLINES = {
+    "cylinder-bank": (CYLINDER_BANK_OUTLINE_2_3, (2.0, 3.0)),
+    "cone-crank": (CONE_CRANK_OUTLINE_1_3, (1.0, 3.0)),
+    "pinion-rig": (PINION_RIG_OUTLINE_1_2, (1.0, 2.0)),
+}
+
+
+def test_at_1_3_the_cone_crank_ring_hits_the_title_block_or_the_heading() -> None:
+    """The two ends of one overflow. Centred (rim-124f), the low arc reached the
+    title block; slid left off it (cascade-3), the top arc passed the region top
+    onto the heading."""
+    outline = CONE_CRANK_OUTLINE_1_3
+    centred, _overflows = drawing.ring_fit_shift(
+        outline, drawing.CLUSTER_RING_REGION, grow=drawing.CLUSTER_RING_REACH
+    )
+    _low, _high, low_right = _ring_ink_reach(outline, centred)
+    assert low_right > _title_block_keep_out()[0]
+    shift, _overflows, slide = drawing.cluster_ring_fit(outline)
+    _low, high, _low_right = _ring_ink_reach(outline, shift)
+    assert slide < 0.0 and high > drawing.CLUSTER_RING_REGION[3]
+
+
+@pytest.mark.parametrize("cluster", sorted(CLUSTER_OUTLINES))
+def test_at_its_fitted_scale_every_ring_clears_both_ends_without_a_slide(cluster) -> None:
+    """The scale fit keeps the top arc under the heading and the low arc off the
+    title block, so ring_keep_out_shift_x moves no cluster (kept as a guard)."""
+    outline, preferred = CLUSTER_OUTLINES[cluster]
+    scale = drawing.cluster_ring_scale(outline, preferred, label=cluster)
+    fitted = _at_scale(outline, preferred, scale)
+    shift, overflows, slide = drawing.cluster_ring_fit(fitted)
+    assert overflows == [] and slide == 0.0
+    low, high, low_right = _ring_ink_reach(fitted, shift)
+    assert high <= drawing.CLUSTER_RING_REGION[3] + 1e-9
+    assert low >= drawing.CLUSTER_RING_REGION[1] - 1e-9
+    assert low_right <= _title_block_keep_out()[0]
+
+
+def test_the_cylinder_bank_fits_with_under_a_millimetre_of_height() -> None:
+    """The slack the ring-fit event reports: the bank's 0.8 mm is the near-miss
+    to watch."""
+    slack_x, slack_y = drawing.cluster_ring_slack(CYLINDER_BANK_OUTLINE_2_3)
+    assert 0.0 < slack_y < 0.001 and slack_x > 0.0
+    _slack_x, slack_y = drawing.cluster_ring_slack(CONE_CRANK_OUTLINE_1_3)
+    assert slack_y < 0.0
+
+
 def test_every_cluster_prefers_a_scale_on_the_ladder() -> None:
     ladder = drawing.CLUSTER_SCALE_LADDER
     ratios = [n / d for n, d in ladder]
