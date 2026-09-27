@@ -69,9 +69,10 @@ CRANK_BORE_OFFSET = 0.0
 #   - run-out 17: the flat's print-worst foot (1.17 short) ends 0.89 below the
 #     collar's print-worst lower edge, so no lip of collar is left under the
 #     gear; 16 would leave one;
-#   - width 23: at 23 (22.2 print-worst) the collar clears the 64T by 0.40,
-#     within 0.05 of the plateau it reaches at 24 and wider, where the flat's
-#     edges leave the gear's reach; at 22 the edges come within 0.23.
+#   - width 23: the narrowest whole millimetre at which the flat's side
+#     edges hold the collar clear of the 64T (+0.35 at 22.2 print-worst);
+#     at 22 the edges come within 0.20, and from 24 up the edges leave the
+#     gear's reach and the collar plateaus at +0.42.
 # build_drive_train_assembly asserts every feature holds crank_boss_rim's
 # FLOOR_CLEARANCE_MM at print-worst; the unit tests pin that each size a
 # step smaller misses it under today's station band.  The boss's south end

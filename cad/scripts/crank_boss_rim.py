@@ -19,9 +19,15 @@ drive-train assembly owns that station and passes it in.
 Each clearance is the gear's worst point against one solid: the boss and the
 bushing end are cylinders ending at their north face (Euclidean past the
 corner, axial over the face), the cone boss end a disc square to the cone
-axis (along that axis), the collar and body their cylinders cut down to the
-spot face over its footprint (axial: within a few degrees of their normal
-where the gear comes near).  A negative value is overlap.
+axis (along that axis), the collar and body vertical cylinders cut down to
+the spot face over its footprint (the normal distance to the cylinder, and
+over the footprint the larger of that and the air above the face -- a lower
+bound, so never optimistic).  A negative value is overlap.
+
+The collar and body were once z-axial air, which reads 1/cos(incline) wide
+of the normal distance where the gear's tilted south face is the near
+surface: the rim-124f SolidWorks cross-check measured 1.6812 on the Ø42 body
+where the axial model said 1.722 (dt-logs/scratch/crankhub/rim_euclid.log).
 """
 
 from __future__ import annotations
@@ -161,15 +167,17 @@ def _cylinder_end(p: Point, radius: float, face_z: float) -> float:
 
 
 def _casting(p: Point, band: tuple[float, float], radius: float, spot: SpotFace | None) -> float:
-    """Axial air over a vertical cylinder about the post axis over ``band``,
-    cut down to the spot face wherever that covers it."""
+    """Distance from a vertical cylinder about the post axis over ``band``,
+    cut down to the spot face wherever that covers it: normal to the
+    cylinder, and over the footprint the larger of that and the air above the
+    face (the distance to an intersection is at least either one)."""
     x, y, z = p
-    if not band[0] <= y <= band[1] or abs(x) >= radius:
+    if not band[0] <= y <= band[1]:
         return math.inf
-    top = math.sqrt(radius**2 - x * x)
+    radial = math.hypot(x, z) - radius
     if spot is not None and spot.covers(x, y):
-        top = min(top, spot.face_z)
-    return z - top
+        return max(radial, z - spot.face_z)
+    return radial
 
 
 def _cone_boss_end(p: Point, end: float) -> float:
