@@ -273,6 +273,53 @@ def test_the_spot_face_views_fit_the_sheet_clear_of_the_title_block() -> None:
     assert rear[2] < run_out_x < station_x < plan[0]
 
 
+def _spot_face_gate(monkeypatch: pytest.MonkeyPatch, labels: list[str]) -> None:
+    import diagnostics.drawing_layout_audit as audit
+
+    region, keep_outs = _landscape_sheet()
+    outlines = _spot_face_outlines()
+    sheets = [
+        SimpleNamespace(name="MAIN", region=region, keep_outs=keep_outs, annotations=()),
+        SimpleNamespace(
+            name="SPOT-FACE",
+            region=region,
+            keep_outs=keep_outs,
+            annotations=tuple(SimpleNamespace(label=label) for label in labels),
+        ),
+    ]
+    monkeypatch.setattr(audit, "collect_document", lambda _adapter: sheets)
+    views = {label: label for label in outlines}
+    journal_outline = (0.213, 0.117, 0.257, 0.2034)
+    monkeypatch.setattr(
+        drawing, "_view_outline", lambda view: outlines.get(view, journal_outline)
+    )
+    drawing._assert_native_layout(
+        SimpleNamespace(currentModel=object()),
+        "journal",
+        spot_face_views=views,
+        expected_finish="x",
+    )
+
+
+def test_the_station_must_survive_its_hidden_sketch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Sheet 2 hides JournalPlanReference, whose rays read as edges without
+    the plan angle; the station imported from it must still print."""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert (
+        '    for view in (rear, plan):\n'
+        '        _hide_witness_sketch(adapter, view, "JournalPlanReference")\n'
+    ) in source
+    with pytest.raises(RuntimeError, match=r"\['CrankBossStartZ'\] once"):
+        _spot_face_gate(monkeypatch, ["SpotFaceWidth", "SpotFaceRunOut"])
+    # With all three present the gate moves on to sheet 1's title block.
+    def sheet_one(_obj, _iface):
+        raise LookupError("sheet 1 title block")
+
+    monkeypatch.setattr(drawing, "_early_bound", sheet_one)
+    with pytest.raises(LookupError, match="sheet 1 title block"):
+        _spot_face_gate(monkeypatch, ["SpotFaceWidth", "SpotFaceRunOut", "CrankBossStartZ"])
+
+
 def test_view_placement_flags_the_border_and_the_title_block() -> None:
     region, keep_outs = _landscape_sheet()
     outlines = {
@@ -837,11 +884,13 @@ def test_section_reads_by_its_bore_axis_not_by_a_note() -> None:
 
 
 def test_spotface_station_prints_its_value_on_its_own_dimension_line() -> None:
-    """The spot-face station prints on its own dimension line, never on an
-    offset shelf (where a blind reader once took it for a note).  Main's
-    rim-8339 ruling labels it below the value, because a bare 18.88 was not
-    found as the station.  It stands once, on sheet 2's plan, not on
-    sheet 1's."""
+    """Labelled, stacked, no shelf.  On sheet 1 the station's text was once
+    offset to a distant shelf, where a blind reader took it for a note, so it
+    never leaves its own dimension line.  The "no label" half is Main's
+    rim-8339 station-label ruling's to change: a bare 18.88 was not found as
+    the station, so on sheet 2 the label stacks with the value in the
+    dimension's own text, like the width and run-out beside it.  It stands
+    once, on sheet 2's plan, not on sheet 1's."""
     assert "CrankBossStartZ" not in drawing.DIMENSION_CALLOUTS
     assert drawing.SPOT_FACE_CALLOUTS["CrankBossStartZ"] == "SPOT FACE STATION"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
