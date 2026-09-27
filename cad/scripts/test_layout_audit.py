@@ -1184,6 +1184,81 @@ def test_every_labelled_detail_circle_of_a_view_is_parsed():
         assert centres[1] - centres[0] == pytest.approx(30.0, abs=0.2)
 
 
+# IView::GetDetailCircleInfo2 of a view cropped by a circle: its crop profile,
+# the label point at the sheet origin with a 6.35 mm height. Read by the
+# r743-8 leaf (C:/src/_wt/r743-integ) on amplitude-bar's DETAIL B (Drawing
+# View5, whose ring the PDF prints at 0.18 mm) and on rocker-arm-support's
+# Drawing View5 (whose ring the PDF does not print).
+CROP_LABEL_AT_ORIGIN = [-0.0005696, 0.0002378, -0.0, 0.00635, 0.0]
+AMPLITUDE_BAR_CROP_B = [1.0, -1.0, 0.3, 0.205, 0.0, 0.3, 0.237, 0.0, 0.3, 0.237, 0.0, 3.0, *CROP_LABEL_AT_ORIGIN]
+ROCKER_SUPPORT_CROP = [
+    1.0, -1.0, 0.21, 0.1079955, 0.0, 0.253815, 0.1079955, 0.0, 0.253815, 0.1079955, 0.0, 3.0,
+    *CROP_LABEL_AT_ORIGIN,
+]
+
+
+def _printed_ring(cx, cy, radius):
+    """A printed detail circle: the PDF's polyline at annotation weight."""
+    return _edges(*_ring(cx, cy, radius, sides=96), width=0.00018)
+
+
+def _circles(dump):
+    return [a for a in sheet_model(dump).geometry.annotations if a.kind == "detail-circle"]
+
+
+def test_a_crop_profiles_label_at_the_sheet_origin_prints_nothing():
+    """The 446acf694 replay over the r743-8 and cascade dumps: every enforced
+    finding (amplitude-bar x3, pinion-arbor, rocker-arm-support x2) was a crop
+    profile's label boxed at the origin, 18.81 mm past the bottom border and in
+    the title block. No label prints there; the printed ring stays ink."""
+    from _layout_audit import ENFORCED_KINDS
+
+    view = _view("Drawing View5", (0.279172, 0.161812, 0.320828, 0.240188), [],
+                 detail_circles_info=AMPLITUDE_BAR_CROP_B)
+    dump = _dump(views=[view], strokes=_printed_ring(0.3, 0.205, 0.032))
+    assert [f for f in audit_dump(dump) if f.kind in ENFORCED_KINDS] == []
+    [circle] = _circles(dump)
+    assert circle.text_boxes == ()
+    assert circle.box().ymin == pytest.approx(0.205 - 0.032, abs=1e-4)
+
+
+def test_a_detail_circle_the_page_does_not_print_is_no_ink():
+    """rocker-arm-support's crop ring (r 43.8 mm) prints nothing, yet its box
+    corner read as keep-out in the title block. Printed, the same ring would
+    dip into the title block, and that still gates."""
+    from _layout_audit import ENFORCED_KINDS
+
+    view = _view("Drawing View5", (0.151834, 0.0952075, 0.268166, 0.1207835), [],
+                 detail_circles_info=ROCKER_SUPPORT_CROP)
+    # Ink elsewhere, and a line crossing the ring: near it at one point only.
+    elsewhere = _edges((0.05, 0.2, 0.08, 0.2), (0.15, 0.1079955, 0.27, 0.1079955), width=0.00018)
+    unprinted = _dump(views=[view], strokes=elsewhere)
+    assert _circles(unprinted) == []
+    assert [f for f in audit_dump(unprinted) if f.kind in ENFORCED_KINDS] == []
+    printed = _dump(views=[view], strokes=[*elsewhere, *_printed_ring(0.21, 0.1079955, 0.043815)])
+    assert [(f.kind, f.b) for f in audit_dump(printed) if f.kind in ENFORCED_KINDS] == [("keep-out", "title-block")]
+
+
+def test_a_crop_profile_is_ink_only_where_the_page_prints_it():
+    """amplitude-bar's DETAIL A (r743-8): the page prints the crop ring's arc
+    inside the view, 60-150 degrees, and none of its lower half, which the
+    whole COM circle ran through BottomNotchWidth's "+0.3" (text-on-line)."""
+    cx, cy, radius = 0.16822, 0.1, 0.03178
+    info = [1.0, -1.0, cx, cy, 0.0, cx, cy + radius, 0.0, cx, cy + radius, 0.0, 3.0, *CROP_LABEL_AT_ORIGIN]
+    view = _view("Drawing View4", (0.141172, 0.091234, 0.182828, 0.140546), [], detail_circles_info=info)
+    arc = [
+        (cx + radius * math.cos(math.radians(a)), cy + radius * math.sin(math.radians(a)))
+        for a in range(60, 151, 2)
+    ]
+    dump = _dump(views=[view], strokes=_edges(*[(*a, *b) for a, b in zip(arc, arc[1:])], width=0.00018))
+    [circle] = _circles(dump)
+    box = circle.box()
+    # The printed arc's lower end is its 150-degree end, well above the centre.
+    assert box.ymin >= cy + radius * math.sin(math.radians(150)) - 0.0005
+    assert box.xmin >= cx + radius * math.cos(math.radians(150)) - 0.002
+    assert box.xmax <= cx + radius * math.cos(math.radians(60)) + 0.002
+
+
 def test_arrow_clearance_to_a_balloon_is_measured_to_its_ring():
     """Codex P2 on f81d7ff3a: a 5 mm balloon's bounding square put an arrow
     7.5 mm out along the diagonal 0.4 mm from "text" -- 2.5 mm from the ring,

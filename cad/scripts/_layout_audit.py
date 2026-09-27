@@ -1095,7 +1095,7 @@ def assign_sheet_text(
             for t, item in enumerate(_section_label_items(section)):
                 options[("section", v, s, t)] = ink_options(item, spans, by_key)
         for number, (*_arc, text_pt, (height, _)) in enumerate(_detail_circles(view.get("detail_circles_info") or ())):
-            if height > 0.0:
+            if _labelled(text_pt, height, _sheet_box(dump)):
                 options[("detail", v, number)] = _detail_label_options(text_pt, height, spans)
     return _assign_all({key: found for key, found in options.items() if found})
 
@@ -1819,6 +1819,59 @@ def _detail_label_options(
     ]
 
 
+def _sheet_box(dump: Mapping[str, Any]) -> Box | None:
+    if "width" not in dump or "height" not in dump:
+        return None
+    return Box(0.0, 0.0, float(dump["width"]), float(dump["height"]))
+
+
+def _labelled(text_pt: tuple[float, float], height: float, sheet: Box | None) -> bool:
+    """Whether a detail circle's label prints: a text height, at a text point
+    on the sheet. ``GetDetailCircleInfo2`` on a view cropped by a circle
+    answers the crop profile with its label at the sheet origin (-0.57, 0.24
+    mm, height 6.35), where nothing prints: amplitude-bar's DETAIL A and B
+    (r743-8), pinion-arbor's (cascade), rocker-arm-support's (r743-8). Boxed
+    there, the label crossed the bottom border and the title block."""
+    if height <= 0.0:
+        return False
+    if sheet is None:
+        return True
+    return sheet.xmin <= text_pt[0] <= sheet.xmax and sheet.ymin <= text_pt[1] <= sheet.ymax
+
+
+# A detail circle's COM arc piece is printed ink when the page strokes a line
+# this close to the arc at each of the piece's quarter points (the 32-piece
+# COM polygon's chords run up to 0.15 mm inside a 32 mm ring; the ring
+# amplitude-bar's DETAIL A prints lies within 0.04 mm of the COM circle,
+# r743-8). Three points along the arc, not one: a line that merely crosses
+# the circle is near it at one point only.
+DETAIL_ARC_INK_M = 0.0002
+_ARC_SAMPLES = (0.25, 0.5, 0.75)
+
+
+def _printed_arc(
+    center: tuple[float, float], radius: float, segments: Sequence[Segment], grid: SegmentGrid
+) -> tuple[Segment, ...]:
+    """The pieces of a detail circle the page prints. A view cropped by a
+    circle prints only the part of its crop profile inside the view
+    (amplitude-bar's DETAIL A: its upper arc) or none of it
+    (rocker-arm-support's Drawing View5), yet GetDetailCircleInfo2 returns
+    the whole circle."""
+    tol = DETAIL_ARC_INK_M
+
+    def inked(t: float, segment: Segment) -> bool:
+        x = segment.x0 + (segment.x1 - segment.x0) * t
+        y = segment.y0 + (segment.y1 - segment.y0) * t
+        reach = math.hypot(x - center[0], y - center[1])
+        if reach == 0.0:
+            return False
+        point = (center[0] + (x - center[0]) * radius / reach, center[1] + (y - center[1]) * radius / reach)
+        near = Box(point[0] - tol, point[1] - tol, point[0] + tol, point[1] + tol)
+        return any(point_segment_distance(point, stroke) <= tol for _index, stroke in grid.near(near))
+
+    return tuple(segment for segment in segments if all(inked(t, segment) for t in _ARC_SAMPLES))
+
+
 def _detail_circles(info: Sequence[float]) -> list[tuple[tuple[float, float], ...]]:
     """``(center, start, end, text_pt, (height, 0))`` per circle of
     ``IView::GetDetailCircleInfo2``."""
@@ -1852,6 +1905,8 @@ def _detail_circle_geometries(
     spans: Sequence[InkSpan] = (),
     unmatched: list[tuple[str, str]] | None = None,
     printed: Mapping[int, tuple[int, ...]] | None = None,
+    sheet: Box | None = None,
+    strokes: Sequence[Segment] | None = None,
 ) -> list[AnnotationGeometry]:
     """``IView::GetDetailCircleInfo2``: [n, (layer, center3, start3, end3,
     lineType, textPt3, textHeight, numArrows, (tip3, comp3, w, h, style)*)*].
@@ -1859,16 +1914,22 @@ def _detail_circle_geometries(
     The label is boxed from the PDF text object ``printed`` gives for it
     (circle number -> span, from the sheet's one joint assignment over
     ``_detail_label_options``); else estimated and counted in ``unmatched``.
+    A circle has a label only at a text point on the ``sheet``
+    (``_labelled``). With the page's annotation ``strokes``, only the pieces
+    of the circle the page prints are ink (``_printed_arc``).
     """
+    grid = SegmentGrid(list(enumerate(strokes))) if strokes else None
     geometries = []
     for number, (center, start, end, text_pt, (height, _)) in enumerate(_detail_circles(info)):
         points = _arc_points(center, start, end, ccw=True)
         segments = tuple(
             Segment(a[0], a[1], b[0], b[1], "line") for a, b in zip(points, points[1:])
         )
+        if grid is not None:
+            segments = _printed_arc(center, math.hypot(start[0] - center[0], start[1] - center[1]), segments, grid)
         rows = ()
         label = f"detail-circle {owner} #{number + 1}"
-        if height > 0.0:
+        if _labelled(text_pt, height, sheet):
             chosen = (printed or {}).get(number)
             if spans and chosen is None and unmatched is not None:
                 unmatched.append((label, "label"))
@@ -1877,6 +1938,8 @@ def _detail_circle_geometries(
                 if chosen is not None
                 else Box(text_pt[0], text_pt[1] - height, text_pt[0] + advance * height, text_pt[1]),
             )
+        if not segments and not rows:
+            continue
         geometries.append(
             AnnotationGeometry(
                 label=label,
@@ -2027,6 +2090,8 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
                 spans=spans,
                 unmatched=unmatched,
                 printed={key[2]: chosen for key, chosen in chosen_all.items() if key[:2] == ("detail", v)},
+                sheet=Box(0.0, 0.0, width, height),
+                strokes=annotation_strokes,
             )
         )
         if edges.get(name):
