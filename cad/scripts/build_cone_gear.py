@@ -148,6 +148,7 @@ from _common import (
     save_part_and_images,
     set_sketch_direct_db,
     volume_check,
+    whats_wrong,
 )
 from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
 
@@ -437,6 +438,78 @@ def _blank_reference_sketches(adapter: Any) -> None:
 def _active_configuration(model: Any) -> Any:
     manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
     return _early_bound(manager.ActiveConfiguration, "IConfiguration")
+
+
+def _configurations_saved_last_on_t120(model: Any) -> list[str]:
+    """Every configuration of the part, T120 last so the part ends on it."""
+    final = CONFIGS[-1][0]
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    if final not in names:
+        raise RuntimeError(f"cone-gear has no {final} configuration: {names}")
+    return [name for name in names if name != final] + [final]
+
+
+def _show_configuration(model: Any, name: str) -> bool:
+    """``ShowConfiguration2``, treating the already-active configuration as
+    shown (the call returns False for it)."""
+    if str(_active_configuration(model).Name) == name:
+        return True
+    return bool(model.ShowConfiguration2(name))
+
+
+def _hard_faults(adapter: Any, model: Any) -> list[str]:
+    return [
+        f"{name} ({code})" for name, code, warning in whats_wrong(adapter, model)
+        if not warning
+    ]
+
+
+def assert_saved_caches_regenerate(adapter: Any) -> None:
+    """Load each saved configuration the way a placing assembly does, and
+    prove it regenerates.
+
+    The drive train swaps 19 cone-gear copies to T006..T114 and runs a plain
+    ``EditRebuild3``: SolidWorks reads each configuration's saved cache and
+    regenerates only what reads stale.  cg-fx1 (9459428ec,
+    dt-logs/farm-runs/leaf-logs/cg-fx1-task.log:305-345) found every one of
+    those caches saved with ToothGapCut and ToothGapPattern at error 1 while
+    NeedsRebuild read false: as loaded they faulted, ``EditRebuild3``
+    returned False and left them faulted, and only ``ForceRebuild3`` cleared
+    them.  :func:`assert_saved_configuration_topology` cannot see that,
+    because it force-rebuilds each configuration before reading it.
+
+    So, before any forced rebuild: activate each configuration, read What's
+    Wrong as loaded, then require ``EditRebuild3`` to return True with What's
+    Wrong still clean.  Nothing saves after this check.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    failures: list[str] = []
+    for name in _configurations_saved_last_on_t120(model):
+        if not _show_configuration(model, name):
+            failures.append(f"{name}: ShowConfiguration2 refused")
+            continue
+        loaded = _hard_faults(adapter, model)
+        rebuilt = bool(model.EditRebuild3())
+        after = _hard_faults(adapter, model)
+        _telemetry.info(
+            f"saved cache {name}: loaded={loaded or 'clean'}, "
+            f"EditRebuild3={rebuilt}, after={after or 'clean'}"
+        )
+        if loaded or not rebuilt or after:
+            failures.append(
+                f"{name}: loaded {loaded or 'clean'}, EditRebuild3={rebuilt}, "
+                f"after {after or 'clean'}"
+            )
+    if failures:
+        raise RuntimeError(
+            "saved cone-gear configurations do not regenerate the way a placing "
+            "assembly loads them (activate, then a plain EditRebuild3): "
+            + "; ".join(failures)
+        )
+    _telemetry.success(
+        "every saved cone-gear configuration regenerates clean as an assembly "
+        "loads it"
+    )
 
 
 def _activate_configuration(model: Any, configuration: str) -> Any:
@@ -734,7 +807,8 @@ async def assert_saved_configuration_topology(
     C:/src/dt-logs/farm-runs/20260921T230142Z-cone-closure-capture/
     20260921T231022Z-leaf-part-cone_gear/task.log lines 480-505.
 
-    This validates the rebuilt saved model, not its cold caches.  A failed
+    This validates the rebuilt saved model, not its cold caches; the part's
+    reopen proves those first (:func:`assert_saved_caches_regenerate`).  A failed
     activation/rebuild or any post-rebuild error, body, face, volume, or
     monotonicity mismatch remains fatal.
     """
@@ -742,9 +816,9 @@ async def assert_saved_configuration_topology(
     volumes: dict[str, float] = {}
     ordered = (CONFIGS[-1], *CONFIGS[:-1])
     _telemetry.info(
-        f"{phase}: validating all configurations only after the established "
-        "set_active_configuration rebuild; saved cold caches are not being "
-        "validated"
+        f"{phase}: validating all configurations after the established "
+        "set_active_configuration rebuild (the part's reopen proves the saved "
+        "caches first, assert_saved_caches_regenerate)"
     )
     for configuration, teeth in ordered:
         try:
@@ -1552,6 +1626,7 @@ async def build(adapter) -> dict[str, str]:
     adapter.swApp.CloseDoc(part_title)
     adapter.currentModel = None
     check("reopen saved cone-gear", await adapter.open_model(part_path))
+    assert_saved_caches_regenerate(adapter)
     await assert_saved_configuration_topology(adapter, phase="reopened")
 
     if findings:
