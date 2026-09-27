@@ -8,8 +8,11 @@ the model's nominal prediction for the nearest feature.  The positive control
 for the print-worst numbers (user ruling, 2026-09-27).
 
 The real gear is cut: its tips lie on the envelope only where a tooth
-happens to stand, so the measured distance may exceed the prediction.  It
-must never undercut it: that would mean the envelope misses real material.
+happens to stand, so the measured distance may exceed the prediction, and
+land on a different feature (rim-124f: the envelope's nearest is the collar,
+1.668, reached by the tip cylinder; SolidWorks read 1.6812 on the Ø42 body,
+reached by the gear's south face).  It must never undercut it: that would
+mean the envelope misses real material.
 """
 
 from __future__ import annotations
@@ -28,23 +31,47 @@ POST_COMPONENT = "cone-pivot-post-1"
 # ClosestDistance's own resolution, well under crank_boss_rim's 0.25 floor.
 UNDERCUT_LIMIT_MM = 0.05
 POST_FEATURES = ("crank boss", "collar", "body", "cone boss end")
+# Predicted features this close to the least are a tie, reported together.
+TIE_MM = 1e-3
+# How near a measured point must lie to a surface to be on it.
+ON_SURFACE_MM = 0.02
 
 
-def post_feature_at(point: tuple[float, float, float], face_z: float) -> str:
-    """Which MHA-016 feature a point (crank_boss_rim's frame, mm) lies on."""
+def post_features_at(
+    point: tuple[float, float, float], spot: crank_boss_rim.SpotFace
+) -> tuple[str, ...]:
+    """Every MHA-016 surface a point (crank_boss_rim's frame, mm) lies on.
+
+    A corner lies on several and a flush pair (the cone boss's end faces are
+    tangent to the Ø42 body) can tie, so this names all of them, never a pick.
+    """
     x, y, z = point
-    tol = 0.02
+    tol = ON_SURFACE_MM
+    on_face = abs(z - spot.face_z) <= tol
     crank_radial = math.hypot(x, y - crank_boss_rim.CRANK_AXIS_Y)
-    if crank_radial <= post.CRANK_BOSS_DIA / 2.0 + tol and abs(z - face_z) <= tol:
-        return "crank boss"
+    run_out_bottom = crank_boss_rim.CRANK_AXIS_Y - spot.run_out
+    half_width = (spot.width or 0.0) / 2.0
+    within_width = abs(x) <= half_width + tol
     along = x * crank_boss_rim.SIN_I + z * crank_boss_rim.COS_I
-    if abs(along - post.CONE_BOSS_LENGTH / 2.0) <= tol:
-        return "cone boss end"
-    if abs(z - face_z) <= tol:
-        return "spot-face run-out"
-    if y >= crank_boss_rim.COLLAR_Y[0]:
-        return "collar"
-    return "body"
+    off_cone_axis = math.sqrt(max(0.0, x * x + y * y + z * z - along * along))
+    post_radial = math.hypot(x, z)
+    features = {
+        "crank boss": on_face and crank_radial <= post.CRANK_BOSS_DIA / 2.0 + tol,
+        "spot-face run-out": on_face
+        and crank_radial > post.CRANK_BOSS_DIA / 2.0 + tol
+        and within_width
+        and run_out_bottom - tol <= y <= crank_boss_rim.CRANK_AXIS_Y + tol,
+        "run-out step": abs(y - run_out_bottom) <= tol
+        and within_width
+        and z >= spot.face_z - tol,
+        "cone boss end": abs(along - post.CONE_BOSS_LENGTH / 2.0) <= tol
+        and off_cone_axis <= post.CONE_BOSS_DIA / 2.0 + tol,
+        "collar": abs(post_radial - post.HEAD_DIA / 2.0) <= tol
+        and crank_boss_rim.COLLAR_Y[0] - tol <= y <= crank_boss_rim.COLLAR_Y[1] + tol,
+        "body": abs(post_radial - post.BLOCK_DIA / 2.0) <= tol
+        and crank_boss_rim.BODY_Y[0] - tol <= y <= crank_boss_rim.COLLAR_Y[0] + tol,
+    }
+    return tuple(name for name, hit in features.items() if hit) or ("unclassified",)
 
 
 def measure(adapter: Any, *, post_origin: tuple[float, float, float], gear_offset: float) -> dict[str, Any]:
@@ -69,24 +96,36 @@ def measure(adapter: Any, *, post_origin: tuple[float, float, float], gear_offse
             raise RuntimeError(f"ClosestDistance found no solution: {result!r}")
         measured = distance_m * 1000.0
         near = tuple(1000.0 * float(c) - o for c, o in zip(post_point, post_origin, strict=True))
-        feature = post_feature_at(near, spot.face_z)
-        predicted = crank_boss_rim.clearances(gear_offset=gear_offset, spot=spot, worst=False)
-        least = min(POST_FEATURES, key=predicted.get)
+        measured_features = post_features_at(near, spot)
+        nominal = crank_boss_rim.clearances(gear_offset=gear_offset, spot=spot, worst=False)
+        predicted = min(nominal[name] for name in POST_FEATURES)
+        predicted_features = tuple(
+            name for name in POST_FEATURES if nominal[name] <= predicted + TIE_MM
+        )
         record = {
             "measured_mm": round(measured, 4),
-            "measured_feature": feature,
+            "measured_feature": " + ".join(measured_features),
             "measured_point_post_frame_mm": [round(c, 3) for c in near],
-            "predicted_mm": round(predicted[least], 4),
-            "predicted_feature": least,
-            "delta_mm": round(measured - predicted[least], 4),
+            "predicted_mm": round(predicted, 4),
+            "predicted_feature": " + ".join(predicted_features),
+            "delta_mm": round(measured - predicted, 4),
         }
         for key, value in record.items():
             sp.set_attribute(f"gear64_post.{key}", value)
         _telemetry.info(f"64T to MHA-016, SolidWorks vs crank_boss_rim nominal: {record}")
-        if measured < predicted[least] - UNDERCUT_LIMIT_MM:
+        if set(measured_features) != set(predicted_features):
+            _telemetry.info(
+                f"64T to MHA-016: the envelope's nearest is {record['predicted_feature']}, "
+                f"SolidWorks' is {record['measured_feature']}. The prediction is the "
+                "untoothed 64T (a solid disc to its tip diameter); the cut gear reaches "
+                "a tip-approached feature only where a tooth stands, so it may read "
+                "farther and elsewhere, never nearer"
+            )
+        if measured < predicted - UNDERCUT_LIMIT_MM:
             raise RuntimeError(
-                f"the placed 64T comes {measured:.3f} from MHA-016's {feature}, nearer than "
-                f"crank_boss_rim's nominal {predicted[least]:.3f} ({least}): the envelope "
-                "misses real material"
+                f"the placed 64T comes {measured:.3f} from MHA-016's "
+                f"{record['measured_feature']}, nearer than crank_boss_rim's nominal "
+                f"{predicted:.3f} ({record['predicted_feature']}): the envelope misses "
+                "real material"
             )
         return record

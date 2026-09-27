@@ -353,20 +353,24 @@ def test_the_printed_spot_face_holds_the_floor_on_all_five_surfaces() -> None:
     worst = crank_boss_rim.clearances(gear_offset=drive.GEAR64_POST_OFFSET, spot=spot)
     assert set(worst) == {"crank boss", "MHA-149 north end", "collar", "body", "cone boss end"}
     assert min(worst.values()) >= crank_boss_rim.FLOOR_CLEARANCE_MM
-    # The untouched cone-boss end governs; the run-out holds the collar next.
-    assert min(worst, key=worst.get) == "cone boss end"
+    # The run-out's collar governs, then the untouched body and cone-boss end
+    # (flush with each other, so tied).
+    assert min(worst, key=worst.get) == "collar"
+    assert worst["collar"] == pytest.approx(0.345, abs=2e-3)
+    assert worst["body"] == pytest.approx(worst["cone boss end"], abs=1e-3)
+    assert worst["cone boss end"] == pytest.approx(0.381, abs=2e-3)
 
 
 @pytest.mark.parametrize(
-    ("size", "short_by_more_than"),
+    ("size", "shortfall"),
     [
-        ("retreat", 0.25 - 0.15),  # 2.0: collar +0.142
-        ("width", 0.25 - 0.24),  # 22: collar +0.231
-        ("run-out", 0.25 + 0.47),  # 16: collar -0.48
+        ("retreat", 0.115),  # 2.0: collar +0.135
+        ("width", 0.047),  # 22: collar +0.203
+        ("run-out", 0.700),  # 16: collar -0.450
     ],
 )
 def test_each_size_a_step_smaller_misses_the_floor_under_today_s_band(
-    size: str, short_by_more_than: float
+    size: str, shortfall: float
 ) -> None:
     """Fail-first, at ruling time: under U31's +/-0.5 station band each size
     a step smaller leaves the collar under the floor, and only the collar."""
@@ -374,8 +378,22 @@ def test_each_size_a_step_smaller_misses_the_floor_under_today_s_band(
     smaller = crank_boss_rim.one_step_short(*_spot_face_sizes())[size]
     short = crank_boss_rim.worst_shortfalls(drive.GEAR64_POST_OFFSET, smaller)
     assert set(short) == {"collar"}
-    assert short["collar"] > short_by_more_than
+    assert short["collar"] == pytest.approx(shortfall, abs=2e-3)
     assert _spot_face_sizes() == (2.5, 23.0, 17.0)
+
+
+def test_the_collar_and_body_are_normal_distances_not_axial_air() -> None:
+    """Where the tilted 64T face is the near surface, z-axial air reads
+    1/cos(incline) wide of the true gap; the body's nominal is the gear
+    face's distance from the Ø42 body's tangent line, flush with the cone
+    boss end."""
+    spot = crank_boss_rim.spot_face(*_spot_face_sizes())
+    nominal = crank_boss_rim.clearances(
+        gear_offset=drive.GEAR64_POST_OFFSET, spot=spot, worst=False
+    )
+    gear_face = drive.GEAR64_POST_OFFSET - gear64.FACE_WIDTH / 2.0
+    assert nominal["body"] == pytest.approx(gear_face - post.BLOCK_DIA / 2.0, abs=1e-3)
+    assert nominal["body"] == pytest.approx(nominal["cone boss end"], abs=1e-3)
 
 
 def test_the_build_asserts_the_floor_and_not_minimality() -> None:
@@ -394,9 +412,9 @@ def test_the_nominal_clearances_the_solidworks_cross_check_reads() -> None:
         gear_offset=drive.GEAR64_POST_OFFSET, spot=spot, worst=False
     )
     assert nominal["crank boss"] == pytest.approx(2.377, abs=2e-3)
-    assert min(nominal["collar"], nominal["body"], nominal["cone boss end"]) == pytest.approx(
-        1.681, abs=2e-3
-    )
+    # The untoothed envelope's least is the collar, reached by the tip.
+    assert min(nominal, key=nominal.get) == "collar"
+    assert nominal["collar"] == pytest.approx(1.668, abs=2e-3)
 
 
 def test_every_print_worst_term_reads_its_print() -> None:
@@ -429,6 +447,10 @@ def _measured(monkeypatch: pytest.MonkeyPatch, near_post_frame: tuple[float, flo
     )
 
 
+def _printed_spot() -> crank_boss_rim.SpotFace:
+    return crank_boss_rim.spot_face(*_spot_face_sizes())
+
+
 def test_the_solidworks_cross_check_names_the_feature_it_lands_on(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -436,21 +458,55 @@ def test_the_solidworks_cross_check_names_the_feature_it_lands_on(
     on_face = (3.0, crank_boss_rim.CRANK_AXIS_Y - 5.0, face)
     record = _measured(monkeypatch, on_face, 2.40)
     assert record["measured_feature"] == "crank boss"
-    assert record["predicted_feature"] == "cone boss end"
-    assert record["predicted_mm"] == pytest.approx(1.681, abs=2e-3)
+    assert record["predicted_feature"] == "collar"
+    assert record["predicted_mm"] == pytest.approx(1.668, abs=2e-3)
+
+
+def test_the_rim_124f_point_is_the_body_at_the_run_out_step() -> None:
+    """SolidWorks' nearest point on rim-124f (task.log line 405): on the Ø42
+    body where the milled step meets it -- a corner, so both are named -- and
+    NOT on the cone-boss end disc, though it sits in that disc's plane."""
+    point = (4.553, 22.122, 20.506)
+    assert gear64_post_measure.post_features_at(point, _printed_spot()) == ("run-out step", "body")
+
+
+def test_a_flush_tie_names_both_features() -> None:
+    """The cone boss's end face meets the Ø42 body at the body's tangent line
+    (BLOCK_DIA == CONE_BOSS_LENGTH): a point on that line is on both."""
+    end = post.CONE_BOSS_LENGTH / 2.0
+    on_pad_rim = (
+        end * crank_boss_rim.SIN_I,
+        post.CONE_BOSS_DIA / 2.0,
+        end * crank_boss_rim.COS_I,
+    )
+    features = gear64_post_measure.post_features_at(on_pad_rim, _printed_spot())
+    assert set(features) == {"cone boss end", "body"}
+
+
+def test_a_feature_mismatch_farther_than_predicted_passes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The rim-124f shape: the envelope's nearest is the collar (tip-reached),
+    SolidWorks' is the body, farther -- a cut gear, not missing material."""
+    said: list[str] = []
+    monkeypatch.setattr(gear64_post_measure._telemetry, "info", said.append)
+    record = _measured(monkeypatch, (4.553, 22.122, 20.506), 1.6812)
+    assert record["measured_feature"] != record["predicted_feature"]
+    assert record["delta_mm"] == pytest.approx(0.0135, abs=2e-3)
+    assert any("untoothed" in line for line in said)
 
 
 def test_the_solidworks_cross_check_fails_when_the_gear_is_nearer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Measured nearer than the envelope predicts: the analytic model misses
-    material, so the build stops."""
-    end = post.CONE_BOSS_LENGTH / 2.0
-    on_pad = (end * crank_boss_rim.SIN_I, 0.0, end * crank_boss_rim.COS_I)
-    assert gear64_post_measure.post_feature_at(on_pad, post.CRANK_BOSS_NORTH_FACE) == "cone boss end"
+    """Measured nearer than the envelope predicts by more than the limit: the
+    analytic model misses material, so the build stops; within it, it passes."""
+    point = (4.553, 22.122, 20.506)
+    limit = gear64_post_measure.UNDERCUT_LIMIT_MM
+    predicted = _measured(monkeypatch, point, 1.70)["predicted_mm"]
     with pytest.raises(RuntimeError, match="misses real material"):
-        _measured(monkeypatch, on_pad, 1.681 - 0.2)
-    assert _measured(monkeypatch, on_pad, 1.70)["delta_mm"] == pytest.approx(0.019, abs=2e-3)
+        _measured(monkeypatch, point, predicted - limit - 0.01)
+    assert _measured(monkeypatch, point, predicted - limit + 0.01)["delta_mm"] < 0.0
 
 
 def test_the_solidworks_cross_check_is_a_span_carrying_its_numbers(
