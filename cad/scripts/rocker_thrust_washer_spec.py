@@ -44,6 +44,11 @@ STOCK_TEXT_SUFFIX = ") STOCK"
 MATERIAL_SPECIFICATION = (
     f"1008 cold-rolled steel sheet, {_STOCK_FRACTION} in, ASTM A1008 CS"
 )
+# The title block's MATERIAL cell prints the registry row's ``material``: the
+# ruled sheet, short enough for the cell (r743-4 eye pass: it printed the
+# SolidWorks library name "Plain Carbon Steel", which only feeds the mass
+# model). The thickness prints on the view ("1/16 (1.59) STOCK").
+MATERIAL_TITLE = "1008 CR sheet, ASTM A1008 CS"
 
 BORE_DIA = _BRACKET_BORE_DIA  # slips on the O6.35 pivot shaft
 # Running clearance on the shaft: never under the bore (drilled class).

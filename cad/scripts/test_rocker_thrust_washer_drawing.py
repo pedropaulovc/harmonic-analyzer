@@ -86,6 +86,23 @@ def test_registry_row_is_the_one_sixteenth_stock_mha_148() -> None:
     assert "1/16 in" in str(row["process"])
 
 
+def test_title_block_material_prints_the_ruled_sheet() -> None:
+    """Main (r743-4 eye pass): the MATERIAL cell printed the SolidWorks
+    library name "Plain Carbon Steel". The cell reads the part's "Material"
+    property, which part_properties takes from the registry row's material;
+    that is now the ruled 1008 CR sheet, short enough for the cell."""
+    import _common
+
+    row = _config.parts("rocker-thrust-washer")
+    assert row["material"] == spec.MATERIAL_TITLE
+    assert dict(_common.part_properties(part.PART_NAME))["Material"] == (
+        spec.MATERIAL_TITLE
+    )
+    assert "1008" in spec.MATERIAL_TITLE and "A1008" in spec.MATERIAL_TITLE
+    assert "Plain Carbon Steel" not in spec.MATERIAL_TITLE
+    assert len(spec.MATERIAL_TITLE) <= 30
+
+
 def test_od_is_the_hub_od_over_its_own_wall_floor() -> None:
     """Main 2026-09-26: one O10.20 for hub and washer, each over its own
     rule-12 floor (bore max + 2 x 1.5 + the .XX band), computed in its spec."""

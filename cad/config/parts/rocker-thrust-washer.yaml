@@ -1,7 +1,8 @@
 rocker-thrust-washer:
   number: MHA-148
   title: Rocker Bank Thrust Washer
-  material: Plain Carbon Steel
+  # rocker_thrust_washer_spec.MATERIAL_TITLE: the title block's MATERIAL cell.
+  material: "1008 CR sheet, ASTM A1008 CS"
   # rocker_thrust_washer_spec.MATERIAL_SPECIFICATION verbatim (its drawing test pins it).
   material_specification: "1008 cold-rolled steel sheet, 1/16 in, ASTM A1008 CS"
   finish: oiled
