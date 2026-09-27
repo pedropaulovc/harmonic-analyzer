@@ -126,26 +126,28 @@ def test_pivot_relief_runs_out_through_the_north_edge() -> None:
     assert spec.PIVOT_RELIEF_FIT_REQUIREMENT.startswith(
         "TOP RELIEF: MATCH DEPTH TO FINISHED PLATE"
     )
-    # Only the NW fillet reaches over the 10.50 strip, and only by a sliver.
+    # No fillet reaches over the 10.50 strip.  The NW one did, by a sliver,
+    # until #838 r3's 17-wide tip block widened the north-west to 13.0.
     overlaps = {
         label: part._north_fillet_relief_overlap(label, r)
         for label, _x, _z, r in part._CORNERS
     }
-    assert overlaps["NE"] == 0.0 and overlaps["SW"] == 0.0 and overlaps["SE"] == 0.0
-    assert 0.0 < overlaps["NW"] < part._corner_fillet_area("NW", 8.0)
+    assert overlaps == {"NE": 0.0, "NW": 0.0, "SW": 0.0, "SE": 0.0}
 
 
 def test_corner_arc_count_follows_the_relief_overlap() -> None:
-    """The NW fillet's plan arc splits in two where W18's relief crosses it.
+    """The NW fillet's plan arc split in two where W18's relief crossed it.
 
-    Run d9711228 found two CornerNW arcs.  The count is pinned from the build's
-    own overlap check, so a third arc from an unintended cut still fails, and
-    arcs that do not share one plan circle fail too.
+    Run d9711228 found two CornerNW arcs.  Since #838 r3's 17-wide tip block
+    widened the north-west to 13.0 the fillet clears the relief, so it is one
+    arc again.  The count is pinned from the build's own overlap check, so a
+    second arc from an unintended cut still fails, and arcs that do not share
+    one plan circle fail too.
     """
     assert {
         name: drawing.expected_corner_arcs(name)
         for name in ("CornerNE", "CornerNW", "CornerSW", "CornerSE")
-    } == {"CornerNE": 1, "CornerNW": 2, "CornerSW": 1, "CornerSE": 1}
+    } == {"CornerNE": 1, "CornerNW": 1, "CornerSW": 1, "CornerSE": 1}
     split = [(0.0065, 0.007, 0.008), (0.0065, 0.007, 0.008)]
     drawing.check_corner_arc_plan("CornerNWR", split, 2)
     with pytest.raises(RuntimeError, match="found 3"):
@@ -313,14 +315,15 @@ def test_the_run_is_its_whole_degree_angle_to_the_west_edge() -> None:
     """Main, MHA-091 round 6: the run prints as its angle to the plate's
     WEST edge at the mouth -- both legs real edges, the vertex the south
     mouth corner -- not off a hidden east-west ray.  The stud's chord makes
-    87.38 with that edge (87.53 until #917 S1 widened the north-west by
-    0.6); the spec rounds it to 87 and the notch is cut at 87.00, the 0.38
-    joining the stud stack."""
+    87.02 with that edge (87.53 until #917 S1 widened the north-west by
+    0.6, 87.38 until #838 r3's 17-wide block widened it by 1.4); the spec
+    rounds it to 87 and the notch is cut at 87.00, the 0.02 joining the
+    stud stack."""
     assert spec.NOTCH_MOUTH_ANGLE_DEG == 87.0
     assert spec.DRAWING_PRECISION_BY_NAME["NotchMouthAngle"] == 0
-    assert abs(part.NOTCH_CHORD_MOUTH_DEG) == pytest.approx(87.38, abs=0.005)
+    assert abs(part.NOTCH_CHORD_MOUTH_DEG) == pytest.approx(87.02, abs=0.005)
     assert round(abs(part.NOTCH_CHORD_MOUTH_DEG)) == spec.NOTCH_MOUTH_ANGLE_DEG
-    assert part.NOTCH_MOUTH_ANGLE_OFFSET_DEG == pytest.approx(-0.38, abs=0.005)
+    assert part.NOTCH_MOUTH_ANGLE_OFFSET_DEG == pytest.approx(-0.02, abs=0.005)
     ux, uz = part.NOTCH_CUT_U
     inward_vs_south = math.degrees(math.acos(-(ux * part._EDGE_SX + uz * part._EDGE_SZ)))
     assert inward_vs_south == pytest.approx(87.0, abs=1e-9)
@@ -438,12 +441,12 @@ def test_the_stud_seats_and_runs_out_at_the_printed_bands() -> None:
     assert terms == part.NOTCH_STUD_STACK
     seat, channel = _slacks(terms)
     assert round(seat, 3) == 0.104
-    assert round(channel, 3) == 0.132
-    # The angle term: the 0.38 rounding, the block's 1 deg and the edge's own
-    # 0.41 (two .X ends over its 224.8 mm) over the 2.78 exit travel.
+    assert round(channel, 3) == 0.150
+    # The angle term: the 0.02 rounding, the block's 1 deg and the edge's own
+    # 0.41 (two .X ends over its 224.6 mm) over the 2.85 exit travel.
     assert part.WEST_EDGE_ANGLE_ERROR_DEG == pytest.approx(0.408, abs=0.001)
     assert terms["run angle error at the mouth"] == pytest.approx(
-        part.NOTCH_EXIT_TRAVEL * math.tan(math.radians(0.3784 + 1.0 + 0.4078)), abs=1e-4
+        part.NOTCH_EXIT_TRAVEL * math.tan(math.radians(0.0236 + 1.0 + 0.4081)), abs=1e-4
     )
 
 
@@ -804,8 +807,9 @@ def test_detail_d_states_width_angle_and_r_clear_of_each_other() -> None:
         angle, vertex, drawing.MOUTH_ANGLE_RAIL_XY, drawing.MOUTH_ANGLE_EDGE_XY
     )
     # #917 S1: detail D centres on the cap, 0.30 deeper, and the cut runs
-    # at 87 deg (d382..round 6: (0.36337, 0.25112)).
-    assert vertex == pytest.approx((0.36399, 0.25094), abs=1e-5)
+    # at 87 deg (d382..round 6: (0.36337, 0.25112); #917 S1: (0.36399,
+    # 0.25094); #838 r3's 17-wide block moves the edge leg).
+    assert vertex == pytest.approx((0.36408, 0.25096), abs=1e-5)
     # Its arc (radius = the value's distance) tops out under the frame.
     assert vertex[1] + math.dist(angle, vertex) <= _ZONE_FRAME[3] - 0.002
     # The width: right of the circle, its value above the witnesses' span.
@@ -1322,14 +1326,16 @@ def test_slot_section_cut_keeps_its_plane_and_crosses_the_plate() -> None:
     The plane is the one detail B carried; the line now runs past both plate
     edges, so the strip is the full plate width at the slot (32.28 mm since
     I31 moved the slot to -27.7 and widened the north-west; 32.79 since #917
-    S1 widened it another 0.6 for the +/-2.5 slot and the 1.65 north travel) and needs no symmetry.
+    S1 widened it another 0.6 for the +/-2.5 slot and the 1.65 north travel;
+    33.97 since #838 r3's 17-wide block widened it 1.4 more) and needs no
+    symmetry.
     """
     z = spec.TIP_SCREW_LOCAL_Z
     ends = drawing.slot_section_line_model_points()
     assert all(end[1:] == (spec.PLATE_THICKNESS / 1000.0, z / 1000.0) for end in ends)
     east, west = drawing.plate_edge_mm(z, -1), drawing.plate_edge_mm(z, +1)
     assert ends[0][0] * 1000.0 < east and ends[1][0] * 1000.0 > west
-    assert west - east == pytest.approx(32.79, abs=0.01)
+    assert west - east == pytest.approx(33.97, abs=0.01)
     # The slot and its counterbore lie inside the cut.
     assert east < -(spec.TIP_SCREW_HALF_TRAVEL + spec.TIP_CBORE_W / 2.0)
     assert west > spec.TIP_SCREW_HALF_TRAVEL + spec.TIP_CBORE_W / 2.0
@@ -1452,16 +1458,17 @@ def test_pivot_section_east_end_matches_the_pre_i31_measurement(monkeypatch) -> 
     lengthens the strip 2.9 mm west, which moves the pivot and the east end
     2.9 mm left on the sheet: the old x309 missed the witness window.  #917
     S1's +/-2.5 tip slot and 1.65 north travel widen it another 0.6 at the
-    north corner (west end 11.81 -> 12.40 at the pivot station); the witness
-    end still derives."""
+    north corner (west end 11.81 -> 12.40 at the pivot station), and #838
+    r3's 17-wide block another 1.36 (12.40 -> 13.75); the witness end still
+    derives."""
     east, west = drawing.pivot_section_strip_mm()
     # The NE R10 trims the east end at the pivot station (the straight edge
     # would read -16.25); the NW R8 still runs there, meeting its side edge
-    # at z -0.10 (NW_ROUND_END_Z), so it trims the west end by 0.6 um.
+    # at z -0.15 (NW_ROUND_END_Z), so it trims the west end by 1.3 um.
     assert east == pytest.approx(-15.8912, abs=1e-4)
     assert drawing.plate_edge_mm(0.0, -1) == pytest.approx(-16.2507, abs=1e-4)
-    assert 0.0 < drawing.plate_edge_mm(0.0, +1) - west < 1e-3
-    assert west == pytest.approx(12.3955, abs=1e-4)
+    assert 0.0 < drawing.plate_edge_mm(0.0, +1) - west < 2e-3
+    assert west == pytest.approx(13.7508, abs=1e-4)
     new_pivot = drawing.pivot_section_pivot_x()
     new_end = drawing.plate_thk_witness_end_x(new_pivot)
     old_end = drawing.SECTION_SHIFT[0] + 0.309
@@ -1474,7 +1481,8 @@ def test_pivot_section_east_end_matches_the_pre_i31_measurement(monkeypatch) -> 
     cut = pivot + old_east * drawing.PIVOT_SECTION_SCALE - drawing.SECTION_SHIFT[0]
     assert cut == pytest.approx(0.3102, abs=5e-5)
     assert drawing.plate_thk_witness_end_x(pivot) == pytest.approx(old_end, abs=5e-5)
-    assert pivot - new_pivot == pytest.approx(0.00339, abs=1e-4)  # 2.9 (I31) + 0.49 (#917 S1)
+    # 2.9 (I31) + 0.49 (#917 S1) + 1.45 (#838 r3's 17-wide block)
+    assert pivot - new_pivot == pytest.approx(0.00484, abs=1e-4)
 
 
 def test_every_kept_dimension_prints_once_on_its_owning_view() -> None:
@@ -1865,7 +1873,7 @@ def test_the_counterbored_slot_webs_at_the_longer_travel() -> None:
     west edge's."""
     webs = part.TIP_CBORE_WEBS
     assert webs == pytest.approx(
-        {"west edge": 7.900, "east edge": 9.964, "pivot relief": 18.13}, abs=1e-3
+        {"west edge": 9.112, "east edge": 9.964, "pivot relief": 18.13}, abs=1e-3
     )
     assert min(webs.values()) >= 2.0
 
@@ -1891,33 +1899,36 @@ def test_tip_block_north_travel_carries_the_collar_fit_up() -> None:
 def test_north_west_half_width_keeps_the_block_on_the_plate_at_full_west_travel() -> None:
     """I31 item 8: the U30 slot let the block hang 0.19 over the west edge.
     The north-west half-width is derived from the block's full west reach --
-    every float and every .XX location band (TipSlotWestCx, FlangeSlotX) --
+    every float and every location band (TipSlotWestCx .XX, FlangeSlotX at
+    the block's .X since #838 r3) --
     at its northmost station, plus 0.25, against the outline at the worst of
     its .X bands (Main, 2026-09-25)."""
     reach = (
         (2.5 + 0.51)  # TipSlotWestCx
         + (4.1 - 3.505) / 2.0  # screw float, widest plate slot
         + (5.0 / 32.0 * 25.4 + 0.10 - 3.505) / 2.0  # ... widest flange slot
-        + (7.5 + 0.51)  # FlangeSlotX from the block's west face
+        + (8.5 + 0.8)  # FlangeSlotX (.X) from the 17-wide block's west face
     )
-    assert spec.TIP_BLOCK_WEST_REACH == pytest.approx(reach)  # 11.599
+    assert spec.TIP_FLANGE_SLOT_X_PLACES == 1
+    assert spec.TIP_BLOCK_WEST_REACH == pytest.approx(reach)  # 12.889
     assert spec.TIP_BLOCK_NORTH_REACH_Z == pytest.approx(-3.35)
-    assert part._WEST_HALF_N_REQUIRED == pytest.approx(11.5658, abs=1e-4)
-    assert part.WEST_HALF_N == 11.6
+    assert part._WEST_HALF_N_REQUIRED == pytest.approx(12.9132, abs=1e-4)
+    assert part.WEST_HALF_N == 13.0
     z = spec.TIP_BLOCK_NORTH_REACH_Z
-    assert part.west_edge_x_worst(11.6, z) - reach >= 0.25
-    # One place coarser misses the margin: the derivation, not a typed 11.6.
-    assert part.west_edge_x_worst(11.5, z) - reach < 0.25
+    assert part.west_edge_x_worst(13.0, z) - reach >= 0.25
+    # One place coarser misses the margin: the derivation, not a typed 13.0.
+    assert part.west_edge_x_worst(12.9, z) - reach < 0.25
     # The worst outline is the nominal edge less its corner bands and the
     # north corner's station band: strictly inside the nominal.
-    assert part.west_edge_x_worst(11.6, z) < part._west_edge_x(z) - 0.8
+    assert part.west_edge_x_worst(13.0, z) < part._west_edge_x(z) - 0.8
     # Positive controls: the U30 plate (8.0), the first I31 cut (9.0, floats
     # only) and the +/-2.0 slot's plate (11.0, #917 S1) all leave the block
-    # over the worst-case edge; the 0.8 north travel's plate (11.5) is the
-    # coarser place above.
+    # over the worst-case edge, and so does the 15-wide block's (11.6, #917
+    # S1); 12.9 is the coarser place above.
     assert part.west_edge_x_worst(8.0, z) < reach
     assert part.west_edge_x_worst(9.0, z) < reach
     assert part.west_edge_x_worst(11.0, z) - reach < 0.25
+    assert part.west_edge_x_worst(11.6, z) - reach < 0.25
     # The NW round ends north of the block, on the edge it was derived for.
     assert part.NW_ROUND_END_Z - 0.8 > z
     # The south end is untouched.

@@ -45,6 +45,10 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "cone-tip-bushing",
         "cone-tip-adjuster",
         "cone-tip-pinch-screw",
+        "cone-tip-shim",
+        "cone-tip-block-screw",
+        "cone-tip-block-nut",
+        "post-mount-screw",
         "cone-lock-knob",
         "cone-pivot-screw",
         "swing-stop-screw",
@@ -122,6 +126,9 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep(
         "swing plate drops", ("cone-swing-platform", "cone-post-dowel"), "y", -30.0
     ),
+    ExplodeStep("tip block screw drops", ("cone-tip-block-screw",), "y", -45.0),
+    ExplodeStep("tip block nut lifts", ("cone-tip-block-nut",), "y", 20.0),
+    ExplodeStep("post mount screws lift", ("post-mount-screw",), "y", 100.0),
     ExplodeStep("pivot screw lifts", ("cone-pivot-screw",), "y", 35.0),
     ExplodeStep("lock knob lifts", ("cone-lock-knob",), "y", 30.0),
     ExplodeStep("swing stop lifts", ("swing-stop-screw",), "y", 25.0),
@@ -171,6 +178,7 @@ STATIONARY_STEMS = frozenset(
         "cone-pivot-post",
         "cone-tip-block",
         "cone-tip-bushing",
+        "cone-tip-shim",
         "crankshaft",
         "crank-pinion",
         "crank-pinion-pin",

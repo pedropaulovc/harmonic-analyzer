@@ -189,10 +189,12 @@ TITLE_BLOCK_BAND_BY_PLACES = {1: 0.8, 2: 0.51}
 # 11.0).
 TIP_BLOCK_LOCAL_Z = -11.0
 TIP_BLOCK_HALF_DEPTH = 6.0  # BLOCK_Z / 2
-TIP_BLOCK_HALF_WIDTH = 7.5  # BLOCK_X / 2
-# FLANGE_SLOT_X: the flange slot's centre from the block's +X face, which is
-# its west face (the block and the plate share the inclined frame).
-TIP_FLANGE_SLOT_X = 7.5
+TIP_BLOCK_HALF_WIDTH = 8.5  # BLOCK_X / 2 (the 17-wide block, #838 r3)
+# FLANGE_SLOT_X: the flange slot's centre from the block's -X face, which is
+# its west face (the block and the plate share the inclined frame), printed
+# at TIP_FLANGE_SLOT_X_PLACES (the block's FLANGE_SLOT_X_PLACES, .X since r3).
+TIP_FLANGE_SLOT_X = 8.5
+TIP_FLANGE_SLOT_X_PLACES = 1
 TIP_FLANGE_SLOT_Z = 10.7  # FLANGE_SLOT_Z, from the block's south face
 # FLANGE_SLOT_FLOAT: the screw's float across the 5/32 +0.10/0 flange slot.
 TIP_FLANGE_SLOT_FLOAT = (5.0 / 32.0 * 25.4 + 0.10 - 3.505) / 2.0
@@ -205,12 +207,12 @@ TIP_FLANGE_SLOT_FLOAT = (5.0 / 32.0 * 25.4 + 0.10 - 3.505) / 2.0
 #   - the post's cone-boss face-to-face (ConeBossLen) at its printed grade,
 #     read from the post's own precision;
 #   - the post's transfer at fit-up (the plan's T-A TRANSFER_POST_LATERAL).
-_TIP_FROM_COLLAR_BAND = 0.8
+TIP_FROM_COLLAR_BAND = 0.8
 _POST_CONE_BOSS_BAND = TITLE_BLOCK_BAND_BY_PLACES[
     cone_pivot_post_spec.DRAWING_PRECISION_BY_NAME["ConeBossLen"]
 ]
 _POST_TRANSFER = 0.05
-TIP_BLOCK_NORTH_TRAVEL = _TIP_FROM_COLLAR_BAND + _POST_CONE_BOSS_BAND + _POST_TRANSFER
+TIP_BLOCK_NORTH_TRAVEL = TIP_FROM_COLLAR_BAND + _POST_CONE_BOSS_BAND + _POST_TRANSFER
 if round(TIP_BLOCK_NORTH_TRAVEL, 2) != 1.65:
     raise AssertionError(
         f"tip block north travel reads {TIP_BLOCK_NORTH_TRAVEL:.3f}, not the ruled 1.65"
@@ -293,7 +295,7 @@ if TIP_LEDGE_RANGE[0] < 2.0:
 # every float and location band taken up: the plate slot's west end centre
 # (TipSlotWestCx, .XX), the screw's float in the widest plate slot, its float
 # in the widest flange slot, and the flange slot's location from the block's
-# west face (FlangeSlotX, .XX on the block).  Its north face stands
+# west face (FlangeSlotX, at its printed TIP_FLANGE_SLOT_X_PLACES).  Its north face stands
 # TIP_BLOCK_NORTH_TRAVEL north, set by the shaft tip.  build_cone_swing_platform
 # derives the plate's north-west half-width from it with the outline's own
 # bands (Main, I31 item 8: the U30 slot let the block hang 0.19 over the west
@@ -302,7 +304,7 @@ TIP_BLOCK_WEST_REACH = (
     (TIP_SCREW_HALF_TRAVEL + _XX)
     + TIP_SLOT_FLOAT_MAX
     + TIP_FLANGE_SLOT_FLOAT
-    + (TIP_FLANGE_SLOT_X + _XX)
+    + (TIP_FLANGE_SLOT_X + TITLE_BLOCK_BAND_BY_PLACES[TIP_FLANGE_SLOT_X_PLACES])
 )
 TIP_BLOCK_NORTH_REACH_Z = TIP_BLOCK_LOCAL_Z + TIP_BLOCK_HALF_DEPTH + TIP_BLOCK_NORTH_TRAVEL
 TIP_BLOCK_EDGE_MARGIN = 0.25

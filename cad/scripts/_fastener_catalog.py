@@ -59,11 +59,15 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "98381A304",
         material="Alloy Steel",
     ),
+    "cone-tip-block-nut": _stock(
+        "cone-tip-block-nut",
+        "Zinc-Plated Steel Nylon-Insert Locknut",
+        "90631A007",
+    ),
     "cone-tip-block-screw": _stock(
         "cone-tip-block-screw",
-        "Black-Oxide Alloy Steel Button Head Hex Drive Screw",
-        "91255A148",
-        material="Alloy Steel",
+        "Low-Strength Zinc-Plated Steel Hex Head Screw",
+        "93075A150",
     ),
     "cone-tip-adjuster": _stock(
         "cone-tip-adjuster",
@@ -73,8 +77,9 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     ),
     "cone-tip-pinch-screw": _stock(
         "cone-tip-pinch-screw",
-        "Steel Narrow Fillister Head Slotted Screw",
-        "90280A110",
+        "18-8 Stainless Steel Fillister Head Slotted Screw",
+        "91794A112",
+        material="AISI 304",
     ),
     "fillister-screw": _stock(
         "fillister-screw",
