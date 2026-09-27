@@ -52,6 +52,7 @@ from _drawing_common import (
     set_dimension_callouts,
     set_reference_dimension,
     stamp_drawing_summary,
+    visible_component_entities,
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -888,7 +889,7 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
     for component in components:
         edges = (
             adapter._attempt(
-                lambda c=component: view.GetVisibleEntities2(c, 1), default=()
+                lambda c=component: visible_component_entities(view, c, 1), default=()
             )
             or ()
         )

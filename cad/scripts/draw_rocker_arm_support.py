@@ -52,6 +52,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
     view_name,
+    visible_component_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gtol_spec import CylinderFace
@@ -458,7 +459,7 @@ def _bottom_datum_axes(adapter: Any, view: Any) -> tuple[Any, Any]:
     for component in components:
         edges = (
             adapter._attempt(
-                lambda c=component: view.GetVisibleEntities2(c, 1),
+                lambda c=component: visible_component_entities(view, c, 1),
                 default=(),
             )
             or ()
@@ -501,7 +502,7 @@ def _longest_right_z_edge(
     for component in components:
         edges = (
             adapter._attempt(
-                lambda c=component: view.GetVisibleEntities2(c, 1),
+                lambda c=component: visible_component_entities(view, c, 1),
                 default=(),
             )
             or ()

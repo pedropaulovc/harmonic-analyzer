@@ -37,6 +37,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     set_high_quality_shaded_with_edges,
     sheet_drawable_region,
+    visible_component_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from frame_attachment_spec import (
@@ -351,7 +352,7 @@ def _visible_circle_at_height(
         full_component = full_components.get(name)
         if full_component is None:
             raise RuntimeError(f"{label}: component {name!r} has no full peer")
-        for raw_edge in tuple(view.GetVisibleEntities2(visible_component, 1) or ()):
+        for raw_edge in tuple(visible_component_entities(view, visible_component, 1)):
             edge = _early_bound(raw_edge, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
             if curve is None or not curve.IsCircle():
@@ -857,7 +858,7 @@ def _upper_frame_balloon_edges(
     for stem in ("rocker-arm-support", "lag-screw"):
         for component, full in families[stem]:
             name = str(component.Name2)
-            for edge in view.GetVisibleEntities2(component, 1) or ():
+            for edge in visible_component_entities(view, component, 1):
                 key = _edge_endpoint_key(adapter, edge)
                 if key is None:
                     continue
@@ -879,7 +880,7 @@ def _bind_left_column_balloon(
     candidates = []
     for component, _full in components:
         rims = []
-        for raw_edge in view.GetVisibleEntities2(component, 1) or ():
+        for raw_edge in visible_component_entities(view, component, 1):
             curve = _early_bound(
                 _early_bound(raw_edge, "IEdge").GetCurve(), "ICurve"
             )
@@ -909,7 +910,7 @@ def _exposed_top_casting_edge(
 ) -> Any:
     candidates = []
     for component, full in components:
-        for edge in view.GetVisibleEntities2(component, 1) or ():
+        for edge in visible_component_entities(view, component, 1):
             curve = _early_bound(_early_bound(edge, "IEdge").GetCurve(), "ICurve")
             if not curve.IsLine():
                 continue
@@ -1083,7 +1084,7 @@ def _reattach_frame_balloons(
             > 1e-5
         ):
             continue
-        for raw_face in view.GetVisibleEntities2(component, 3) or ():
+        for raw_face in visible_component_entities(view, component, 3):
             face = _early_bound(raw_face, "IFace2")
             surface = _early_bound(face.GetSurface(), "ISurface")
             if (
