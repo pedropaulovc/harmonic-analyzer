@@ -134,6 +134,7 @@ from _common import (
     _read_member,
     apply_custom_properties,
     apply_material,
+    assert_saved_configurations_regenerate,
     blank_sketch,
     check,
     define_circle,
@@ -734,7 +735,9 @@ async def assert_saved_configuration_topology(
     C:/src/dt-logs/farm-runs/20260921T230142Z-cone-closure-capture/
     20260921T231022Z-leaf-part-cone_gear/task.log lines 480-505.
 
-    This validates the rebuilt saved model, not its cold caches.  A failed
+    This validates the rebuilt saved model, not its cold caches; the part's
+    reopen proves those first (``_common.assert_saved_configurations_regenerate``).
+    A failed
     activation/rebuild or any post-rebuild error, body, face, volume, or
     monotonicity mismatch remains fatal.
     """
@@ -742,9 +745,9 @@ async def assert_saved_configuration_topology(
     volumes: dict[str, float] = {}
     ordered = (CONFIGS[-1], *CONFIGS[:-1])
     _telemetry.info(
-        f"{phase}: validating all configurations only after the established "
-        "set_active_configuration rebuild; saved cold caches are not being "
-        "validated"
+        f"{phase}: validating all configurations after the established "
+        "set_active_configuration rebuild (the part's reopen proves the saved "
+        "caches first, assert_saved_configurations_regenerate)"
     )
     for configuration, teeth in ordered:
         try:
@@ -1552,6 +1555,7 @@ async def build(adapter) -> dict[str, str]:
     adapter.swApp.CloseDoc(part_title)
     adapter.currentModel = None
     check("reopen saved cone-gear", await adapter.open_model(part_path))
+    assert_saved_configurations_regenerate(adapter, PART_NAME)
     await assert_saved_configuration_topology(adapter, phase="reopened")
 
     if findings:

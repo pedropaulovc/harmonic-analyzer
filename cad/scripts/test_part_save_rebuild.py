@@ -1,26 +1,49 @@
-"""SolidWorks-free contract for ``_common.rebuild_stale_configurations``.
+"""SolidWorks-free contract for ``_common.rebuild_stale_configurations`` and
+``_common.assert_saved_configurations_regenerate``.
 
 pc-p1r: drive-train.SLDASM opened with NeedsRebuild2=1 because MHA-135's
 INSTALLED configuration, the one the assembly places, was saved stale (amet
 probe, dt-logs/pc-p1r/probe-saved-rebuild.jsonl).  The shared part-save
-chokepoint reads every configuration first and leaves a clean part alone.  A
-stale one gets exactly one EditRebuildAll, with no configuration switch, and
-the chokepoint refuses to save a refused rebuild, a hard fault, or a
-configuration still stale.
+chokepoint reads every configuration first and leaves a clean part alone, and
+it refuses to save a refused rebuild, a hard fault, or a configuration still
+stale.
+
+cg-fx1 (9459428ec, dt-logs/farm-runs/leaf-logs/cg-fx1-task.log:305-345): the
+drive train swapped 19 cone-gear copies to T006..T114 and its EditRebuild3
+failed, every copy on ToothGapCut + ToothGapPattern at error 1.  In the part,
+each of those configurations faulted as loaded, a plain EditRebuild3 returned
+False and left it faulted, and only an activated ForceRebuild3 cleared it --
+all while NeedsRebuild read false.  The reopen tripwire reads exactly that;
+the double below reproduces the cg-fx1 seat behaviour.
 """
 
 from __future__ import annotations
 
+import importlib
 import inspect
+import re
+from pathlib import Path
 
 import pytest
 
 import _common
 
+CONE_FAULTS = (("ToothGapCut", 1, False), ("ToothGapPattern", 1, False))
+
 
 class _Config:
-    def __init__(self, stale: bool) -> None:
+    def __init__(self, name: str, stale: bool) -> None:
+        self.Name = name
         self.NeedsRebuild = stale
+
+
+class _Manager:
+    def __init__(self, part: _Part) -> None:
+        self.part = part
+
+    @property
+    def ActiveConfiguration(self):  # noqa: N802
+        return self.part.configs[self.part.active]
 
 
 class _Extension:
@@ -28,6 +51,7 @@ class _Extension:
         self.part = part
 
     def EditRebuildAll(self) -> bool:  # noqa: N802
+        # cg-fx1: clears NeedsRebuild everywhere, repairs no bad cache.
         self.part.log.append("EditRebuildAll")
         for name, config in self.part.configs.items():
             if name not in self.part.stuck:
@@ -35,9 +59,10 @@ class _Extension:
         return self.part.rebuild_result
 
     def GetWhatsWrong(self):  # noqa: N802
-        names, codes, warnings = (
-            zip(*self.part.faults) if self.part.faults else ((), (), ())
-        )
+        faults = self.part.faults
+        if self.part.active in self.part.bad:
+            faults = (*faults, *CONE_FAULTS)
+        names, codes, warnings = zip(*faults) if faults else ((), (), ())
         return True, [_Feature(name) for name in names], list(codes), list(warnings)
 
 
@@ -48,21 +73,33 @@ class _Feature:
 
 class _Part:
     """An IModelDoc2 double.  It records every rebuild or activation call, so a
-    test can prove which ones the chokepoint made."""
+    test can prove which ones the chokepoint made.
+
+    ``bad`` configurations carry cg-fx1's saved caches: faulted while shown, a
+    plain EditRebuild3 returns False over them, and only ForceRebuild3 while
+    active repairs them.  ``stuck`` ones no rebuild repairs or un-stales.
+    """
 
     def __init__(
         self,
         stale: dict[str, bool],
         *,
+        active: str | None = None,
+        bad: tuple[str, ...] = (),
         stuck: tuple[str, ...] = (),
         rebuild_result: bool = True,
+        force_result: bool = True,
         faults: tuple[tuple[str, int, bool], ...] = (),
     ) -> None:
-        self.configs = {name: _Config(flag) for name, flag in stale.items()}
+        self.configs = {name: _Config(name, flag) for name, flag in stale.items()}
+        self.active = active or next(iter(self.configs))
+        self.bad = set(bad)
         self.stuck = set(stuck)
         self.rebuild_result = rebuild_result
+        self.force_result = force_result
         self.faults = faults
         self.log: list[str] = []
+        self.ConfigurationManager = _Manager(self)
         self.Extension = _Extension(self)
 
     def GetConfigurationNames(self):  # noqa: N802
@@ -71,17 +108,23 @@ class _Part:
     def GetConfigurationByName(self, name):  # noqa: N802
         return self.configs[name]
 
-    def ShowConfiguration2(self, name):  # noqa: N802
-        self.log.append(f"ShowConfiguration2 {name}")
+    def ShowConfiguration2(self, name) -> bool:  # noqa: N802
+        if name == self.active:
+            return False  # SolidWorks refuses the already-active configuration
+        self.log.append(f"show {name}")
+        self.active = name
         return True
 
     def EditRebuild3(self) -> bool:  # noqa: N802
-        self.log.append("EditRebuild3")
-        return True
+        self.log.append(f"edit {self.active}")
+        return self.active not in self.bad
 
     def ForceRebuild3(self, _top_only) -> bool:  # noqa: N802
-        self.log.append("ForceRebuild3")
-        return True
+        self.log.append(f"force {self.active}")
+        if self.active not in self.stuck:
+            self.bad.discard(self.active)
+            self.configs[self.active].NeedsRebuild = False
+        return self.force_result
 
 
 class _Adapter:
@@ -92,8 +135,7 @@ class _Adapter:
         return fn()
 
     async def set_active_configuration(self, name: str):
-        self.currentModel.log.append(f"activate {name}")
-        raise AssertionError("the save chokepoint must not switch configurations")
+        raise AssertionError("the chokepoint switches with ShowConfiguration2 only")
 
 
 @pytest.fixture
@@ -108,10 +150,14 @@ def seat(monkeypatch):
 
 
 CONE_GEAR = ("Default", *(f"T{teeth:03d}" for teeth in range(6, 121, 6)))
+SWAPPED = CONE_GEAR[1:-1]  # T006..T114, the configurations the copies take
+
+
+# --- rebuild_stale_configurations ---------------------------------------------
 
 
 def test_a_clean_part_gets_no_rebuild_call_at_all(seat) -> None:
-    adapter, part = seat({name: False for name in CONE_GEAR})
+    adapter, part = seat({name: False for name in CONE_GEAR}, active="T120")
     _common.rebuild_stale_configurations(adapter, "cone-gear")
     assert part.log == []
 
@@ -124,7 +170,7 @@ def test_a_stale_configuration_gets_one_edit_rebuild_all_and_no_switch(seat) -> 
 
 
 def test_many_stale_configurations_still_get_exactly_one_rebuild(seat) -> None:
-    adapter, part = seat({name: True for name in CONE_GEAR})
+    adapter, part = seat({name: True for name in CONE_GEAR}, active="T120")
     _common.rebuild_stale_configurations(adapter, "cone-gear")
     assert part.log == ["EditRebuildAll"]
 
@@ -132,7 +178,9 @@ def test_many_stale_configurations_still_get_exactly_one_rebuild(seat) -> None:
 def test_configurations_still_stale_after_the_rebuild_raise_naming_part_and_all(
     seat,
 ) -> None:
-    adapter, part = seat({name: True for name in CONE_GEAR[:5]}, stuck=("T006", "T018"))
+    adapter, part = seat(
+        {name: True for name in CONE_GEAR[:5]}, active="Default", stuck=("T006", "T018")
+    )
     with pytest.raises(
         RuntimeError, match=r"cone-gear: configurations \['T006', 'T018'\]"
     ):
@@ -187,3 +235,86 @@ def test_the_save_chokepoint_checks_every_configuration_right_before_its_final_s
         assert source.index(edit) < guard
     between = source[guard + len(call) : source.index('f"re-save with properties')]
     assert between.split() == ["check("]
+
+
+# --- assert_saved_configurations_regenerate -----------------------------------
+
+
+def test_edit_rebuild_all_alone_leaves_the_cg_fx1_caches_that_fail_the_reopen(
+    seat,
+) -> None:
+    """Fail-first on the double: efae8d795's no-switch EditRebuildAll clears
+    NeedsRebuild but leaves the T00x caches faulted, and the reopen tripwire
+    names them without repairing anything."""
+    adapter, part = seat(
+        {name: name != "T120" for name in CONE_GEAR}, active="T120", bad=SWAPPED
+    )
+    assert part.Extension.EditRebuildAll()
+    assert _common.stale_configurations(part, CONE_GEAR) == []
+    part.log.clear()
+    with pytest.raises(RuntimeError, match="do not regenerate") as failure:
+        _common.assert_saved_configurations_regenerate(adapter, "cone-gear")
+    message = str(failure.value)
+    # cg-fx2a's shape (dt-logs/farm-runs/leaf-logs/cg-fx2a-task.log:486), with
+    # the fleet's named fault codes: one entry per faulted configuration.
+    faulted = "['ToothGapCut (unknown-error)', 'ToothGapPattern (unknown-error)']"
+    assert message == (
+        "saved cone-gear configurations do not regenerate the way a placing "
+        "assembly loads them (activate, then a plain EditRebuild3): "
+        + "; ".join(
+            f"{name}: loaded {faulted}, EditRebuild3=False, after {faulted}"
+            for name in SWAPPED
+        )
+    )
+    assert "T120:" not in message and "Default:" not in message
+    assert not any(entry.startswith("force") for entry in part.log)
+
+
+def test_clean_saved_caches_pass_with_one_plain_rebuild_each_ending_on_active(
+    seat,
+) -> None:
+    adapter, part = seat({name: False for name in CONE_GEAR}, active="T120")
+    _common.assert_saved_configurations_regenerate(adapter, "cone-gear")
+    assert [entry for entry in part.log if entry.startswith("edit")] == [
+        f"edit {name}" for name in (*CONE_GEAR[:-1], "T120")
+    ]
+    assert part.active == "T120"
+    assert not any(entry.startswith("force") for entry in part.log)
+
+
+def test_a_single_configuration_part_regenerates_with_no_switch(seat) -> None:
+    adapter, part = seat({"Default": False})
+    _common.assert_saved_configurations_regenerate(adapter, "crank-pin")
+    assert part.log == ["edit Default"]
+
+
+SCRIPTS = Path(__file__).resolve().parent
+CONFIGURATION_CREATORS = re.compile(r"\bcreate_configuration\(|\bAddConfiguration\d*\(")
+TRIPWIRE = "assert_saved_configurations_regenerate(adapter, PART_NAME)"
+FORCED_REBUILDS = ("ForceRebuild3", "set_active_configuration(", "assert_saved_configuration_topology(")
+
+
+def _configuration_builders() -> set[str]:
+    return {
+        path.stem
+        for path in SCRIPTS.glob("build_*.py")
+        if CONFIGURATION_CREATORS.search(path.read_text(encoding="utf-8"))
+    }
+
+
+def test_the_builders_that_create_configurations_are_the_known_two() -> None:
+    """A new multi-configuration builder must fail here until it reopens its
+    saved part and runs the tripwire (and joins this set)."""
+    assert _configuration_builders() == {"build_cone_gear", "build_transgear_removable"}
+
+
+@pytest.mark.parametrize("stem", sorted(_configuration_builders()))
+def test_every_configuration_builder_proves_its_saved_caches_on_reopen(stem) -> None:
+    """Reopen, then the tripwire, with nothing force-rebuilding in between: a
+    forced rebuild would repair the very caches the tripwire has to read."""
+    source = inspect.getsource(importlib.import_module(stem).build)
+    reopened = source.rindex("await adapter.open_model(")
+    tripwire = source.index(TRIPWIRE, reopened)
+    between = source[reopened:tripwire]
+    assert not [call for call in FORCED_REBUILDS if call in between]
+    assert source.rindex("save_part_and_images(adapter, PART_NAME)") < reopened

@@ -1447,6 +1447,72 @@ def stale_configurations(model: Any, names: Iterable[str]) -> list[str]:
     ]
 
 
+def _hard_fault_names(adapter: Any, model: Any) -> list[str]:
+    """Non-warning What's Wrong entries of the ACTIVE configuration, named."""
+    return [
+        f"{name} ({_FEATURE_ERROR.get(code, code)})"
+        for name, code, warning in whats_wrong(adapter, model)
+        if not warning
+    ]
+
+
+@_telemetry.traced("save.saved_configs_regenerate", label_param="part_name")
+def assert_saved_configurations_regenerate(adapter: Any, part_name: str) -> None:
+    """Load each configuration of a reopened part the way a placing assembly
+    does, and prove it regenerates.
+
+    An assembly that places a configuration other than the part's saved
+    active one reads that configuration's saved cache and runs a plain
+    ``EditRebuild3`` (the drive train's cone-gear ladder swaps 19 copies).
+    cg-fx1 (9459428ec, dt-logs/farm-runs/leaf-logs/cg-fx1-task.log:305-345)
+    found cone-gear's T00x caches faulted as loaded, ``EditRebuild3``
+    returning False over them, and NeedsRebuild false throughout, so no
+    NeedsRebuild read or forced-rebuild check can stand in for this one.
+
+    Call it on the reopened part, before anything force-rebuilds it: each
+    configuration (the saved active one last, so the part ends on it) is
+    shown, What's Wrong is read as loaded, and ``EditRebuild3`` must return
+    True with What's Wrong still clean.  Nothing may save afterwards.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    active = active_configuration_name(adapter, model)
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    if active not in names:
+        raise RuntimeError(
+            f"{part_name}: active configuration {active!r} is not among {names}"
+        )
+    failures: list[str] = []
+    for name in [name for name in names if name != active] + [active]:
+        shown = active_configuration_name(adapter, model) == name or bool(
+            model.ShowConfiguration2(name)
+        )
+        if not shown:
+            failures.append(f"{name}: ShowConfiguration2 refused")
+            continue
+        loaded = _hard_fault_names(adapter, model)
+        rebuilt = bool(model.EditRebuild3())
+        after = _hard_fault_names(adapter, model)
+        _telemetry.info(
+            f"{part_name} saved {name}: loaded={loaded or 'clean'}, "
+            f"EditRebuild3={rebuilt}, after={after or 'clean'}"
+        )
+        if loaded or not rebuilt or after:
+            failures.append(
+                f"{name}: loaded {loaded or 'clean'}, EditRebuild3={rebuilt}, "
+                f"after {after or 'clean'}"
+            )
+    if failures:
+        raise RuntimeError(
+            f"saved {part_name} configurations do not regenerate the way a "
+            "placing assembly loads them (activate, then a plain EditRebuild3): "
+            + "; ".join(failures)
+        )
+    _telemetry.success(
+        f"{part_name}: {len(names)} saved configuration(s) regenerate clean as "
+        "an assembly loads them"
+    )
+
+
 def whats_wrong(adapter: Any, model: Any) -> list[tuple[str, int, bool]]:
     """Return ``[(feature_name, error_code, is_warning), ...]`` for a model.
 
