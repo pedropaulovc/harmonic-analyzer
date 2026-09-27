@@ -157,6 +157,40 @@ def test_the_spot_face_run_out_is_dimensioned_face_on() -> None:
     assert "*Back" in Path(drawing.__file__).read_text(encoding="utf-8")
 
 
+def _crank_evidence(boss_lists_spot_face: bool) -> dict:
+    """The crank boss's BREP evidence as draw_cone_pivot_post reads it (model
+    metres), shaped as the rim-124f leaf logged it (the run-out merges the
+    spot face out of CrankSprocketBoss's list) or as before the run-out."""
+    y = spec.CRANK_BORE_HEIGHT / 1000.0
+    spot = ("plane", (0.0, 0.0, 1.0, 0.0, y, spec.CRANK_BOSS_START_Z / 1000.0))
+    far = ("plane", (0.0, 0.0, 1.0, 0.0, y, spec.CRANK_BOSS_END_Z / 1000.0))
+    wall = ("cylinder", (0.0, y, 0.0, 0.0, 0.0, 1.0, spec.CRANK_BOSS_DIA / 2000.0))
+    return {
+        "CrankSprocketBoss": [far, wall, spot] if boss_lists_spot_face else [far, wall],
+        "CrankSpotFace": [wall, spot],
+    }
+
+
+@pytest.mark.parametrize("boss_lists_spot_face", [False, True])
+def test_the_crank_boss_faces_resolve_to_spot_then_far(boss_lists_spot_face: bool) -> None:
+    spot, far = drawing._crank_face_centres(_crank_evidence(boss_lists_spot_face))
+    assert spot[2] * 1000.0 == pytest.approx(spec.CRANK_BOSS_START_Z)
+    assert far[2] * 1000.0 == pytest.approx(spec.CRANK_BOSS_END_Z)
+
+
+def test_the_crank_boss_face_set_is_asserted_not_guessed() -> None:
+    """A boss missing its far face, or a spot face off its station, fails."""
+    evidence = _crank_evidence(False)
+    evidence["CrankSprocketBoss"] = evidence["CrankSprocketBoss"][1:]
+    with pytest.raises(RuntimeError, match="expected 1"):
+        drawing._crank_face_centres(evidence)
+    evidence = _crank_evidence(False)
+    kind, values = evidence["CrankSpotFace"][1]
+    evidence["CrankSpotFace"][1] = (kind, values[:5] + (values[5] - 0.0025,))
+    with pytest.raises(RuntimeError, match="spot face"):
+        drawing._crank_face_centres(evidence)
+
+
 def test_inclined_journal_sizes_live_in_the_true_shape_view() -> None:
     """The cone-axis view alone exposes the boss OD and bore in true shape.
 
