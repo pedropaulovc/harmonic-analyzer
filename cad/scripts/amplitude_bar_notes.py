@@ -16,7 +16,7 @@ from amplitude_bar_spec import BOTTOM_NOTCH_HEIGHT, TOP_PIN_HOLE_SPEC
 # The foot notch's roof rides the rocker's top edge, and at d = 0 the cheeks
 # either side pass over the rocker hub; a deep notch drops them onto it one
 # for one. So the depth is one-sided, shallow only (user ruling 2026-09-26):
-# a shallow notch just lifts the bar at rest (rocker_arm_notes.TOP_EDGE_BAND
+# a shallow notch just lifts the bar at rest (rocker_arm_spec.TOP_EDGE_BAND
 # states the lift budget and its effect on the channel).
 BOTTOM_NOTCH_DEPTH_BAND = (0.0, -0.50)  # (upper, lower) deviations
 
