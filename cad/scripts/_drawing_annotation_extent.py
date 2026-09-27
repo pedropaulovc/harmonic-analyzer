@@ -45,6 +45,12 @@ Box = tuple[float, float, float, float]
 
 # Two annotations closer than this read as one: one text height of air.
 CLEAR_GAP_M = 0.002
+# A move lands this far past the gap, so the read-back that proves it clear at
+# CLEAR_GAP_M has room to settle.  Placed at exactly the gap, the #877 cold
+# build's MHA-062 callout read back a hair short and failed the proof (leaf
+# 20260927T150045Z-1-3febc7c2, swmaker000006); the same frame read 0.2 mm
+# apart between two seats (ymin 0.2148 vs 0.2150).
+PLACE_SETTLE_M = 0.0002
 _HORIZONTAL_M = 1e-6
 
 
@@ -226,9 +232,10 @@ def place_callout_clear(
     lane runs under the text.  ``beside`` are symbols the text must clear from
     the right.  The zone frame's left edge is always one of them.  The move is
     computed from the read-back boxes, so a longer callout moves further rather
-    than re-colliding.  After the move the callout is read back again: its text
-    must clear every neighbour, its leader must not run through any of them,
-    and it must stay inside the zone frame.
+    than re-colliding.  A move clears each neighbour by CLEAR_GAP_M plus
+    PLACE_SETTLE_M.  After the move the callout is read back again: its text
+    must clear every neighbour by CLEAR_GAP_M, its leader must not run through
+    any of them, and it must stay inside the zone frame.
     """
     rebuild_drawing(adapter, label=f"measure {label}")
     region = sheet_region(adapter)
@@ -237,7 +244,7 @@ def place_callout_clear(
     dy = max(
         [0.0]
         + [
-            box[3] + CLEAR_GAP_M - ymin
+            box[3] + CLEAR_GAP_M + PLACE_SETTLE_M - ymin
             for box in below.values()
             if box[0] < xmax and xmin < box[2]
         ]
@@ -246,7 +253,7 @@ def place_callout_clear(
     dx = max(
         [0.0, region.xmin + CLEAR_GAP_M - xmin]
         + [
-            box[2] + CLEAR_GAP_M - xmin
+            box[2] + CLEAR_GAP_M + PLACE_SETTLE_M - xmin
             for box in beside.values()
             if not boxes_clear(raised, box)
         ]

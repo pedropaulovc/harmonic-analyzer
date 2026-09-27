@@ -205,10 +205,60 @@ def test_the_callout_moves_above_the_ra_lane_and_right_of_the_end_view_frames(
         below={"Ra 1.6": ra},
         beside={"cylindricity frame": frame, "crown profile frame": crown},
     )
-    assert placed.text[1] == pytest.approx(ra[3] + extent.CLEAR_GAP_M)
-    assert placed.text[0] == pytest.approx(frame[2] + extent.CLEAR_GAP_M)
+    lands = extent.CLEAR_GAP_M + extent.PLACE_SETTLE_M
+    assert placed.text[1] == pytest.approx(ra[3] + lands)
+    assert placed.text[0] == pytest.approx(frame[2] + lands)
     for box in (ra, frame, crown):
         assert extent.boxes_clear(placed.text, box)
+
+
+def test_a_move_that_reads_back_a_hair_short_still_clears(monkeypatch) -> None:
+    """Cold build #877 (swmaker000006, leaf 20260927T150045Z-1-3febc7c2): the
+    callout was moved to exactly frame + CLEAR_GAP_M, read back a hair short
+    of it, and the strict proof failed on a float.  The move lands a settle
+    margin past the gap, so a read-back short by far less than that margin
+    still proves clear at the full gap."""
+    import _drawing_annotation_extent as extent
+    from _drawing_layout_check import DrawableRegion
+
+    short = 1e-9
+    offset = [0.0, 0.0]
+    text = (0.0870, 0.2281, 0.1614, 0.2539)
+
+    def ink(_adapter, _annotation, *, label):
+        dx, dy = offset
+        box = (text[0] + dx, text[1] + dy, text[2] + dx, text[3] + dy)
+        return extent.CalloutInk(label, box, ())
+
+    def move(_adapter, _annotation, dx, dy, *, label):
+        offset[0] += dx - short if dx else 0.0
+        offset[1] += dy - short if dy else 0.0
+
+    monkeypatch.setattr(extent, "callout_ink", ink)
+    monkeypatch.setattr(extent, "move_annotation", move)
+    monkeypatch.setattr(extent, "rebuild_drawing", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        extent, "sheet_region", lambda _a: DrawableRegion(0.0127, 0.0127, 0.419, 0.2667)
+    )
+    frame = (0.0587, 0.2150, 0.0853, 0.2320)  # the failing leaf's read-back
+
+    def place():
+        offset[:] = [0.0, 0.0]
+        return extent.place_callout_clear(
+            None,
+            None,
+            label="MHA-062 match-drill callout",
+            below={},
+            beside={"cylindricity frame": frame},
+        )
+
+    placed = place()
+    assert extent.boxes_clear(placed.text, frame)
+    assert placed.text[0] - frame[2] > extent.CLEAR_GAP_M
+    # Control: placed at exactly the gap, the same short read-back fails.
+    monkeypatch.setattr(extent, "PLACE_SETTLE_M", 0.0)
+    with pytest.raises(RuntimeError, match="crowds"):
+        place()
 
 
 class _LateBoundSheet:
