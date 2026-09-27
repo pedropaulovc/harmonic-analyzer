@@ -395,8 +395,11 @@ CONE_CRANK_STEPS = "\n".join(
         f"   {CONE_GEAR_JOINT}: T006 AT THE BACK THROUGH",
         f"   T120 AT THE FRONT (STATION TABLE, SHEET {FIT_SHEET}).",
         # #906 (Main 2026-09-26): MHA-021's joining method moved here from its
-        # print (rule 6); the wording is the gear's own constants.
-        f"   MHA-021 FRONT OF T120: {CRANK_GEAR_JOINT} ITS MHA-014 SEAT;",
+        # print (rule 6); the wording is the gear's own constants.  #916: the
+        # shaft's thrust collar is the 64T's axial stop, so the step names it
+        # (Main 2026-09-27; crank_boss_rim books the collar stack).
+        "   MHA-021 FRONT OF T120, AGAINST THE MHA-014 COLLAR:",
+        f"   {CRANK_GEAR_JOINT} ITS SEAT;",
         f"   {CRANK_GEAR_ALTERNATIVE}.",
         # U37c (user, 2026-09-23): MHA-142 is MSC 40923898, 1/4-20 x 3-1/2
         # slotted fillister, through the unchanged 6.02 counterbore. Its floor

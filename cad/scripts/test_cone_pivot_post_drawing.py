@@ -823,6 +823,31 @@ def test_part_config_is_a_machined_casting() -> None:
     assert int(config["quantity"]) == 1
 
 
+def test_journal_rims_print_the_thrust_ring_break() -> None:
+    """Codex P1 on #916 (PRRT_kwDOPHDy386mTQ-u): the collar's thrust ring is
+    bounded by the collar OD edge AND the post's journal rim, so the rim
+    prints the same derived break; the title block's 0.25 would leave the
+    worst-case ring under its 1.5 floor."""
+    import _config
+    import cone_gear_shaft_spec as shaft
+
+    break_max = shaft.THRUST_EDGE_BREAK_MAX
+    assert f"RIMS BREAK {break_max:.1f} MAX" == shaft.POST_JOURNAL_RIM_BREAK
+    bore_callout = drawing.DIMENSION_CALLOUTS["JournalBoreDia"]
+    assert bore_callout.splitlines()[-1] == shaft.POST_JOURNAL_RIM_BREAK
+    assert f"EDGE BREAK {break_max:.1f} MAX" in shaft.COLLAR_STOCK_CALLOUT
+    ring = shaft.THRUST_RING_MIN
+    assert ring - 2.0 * break_max >= shaft.THRUST_RING_FLOOR
+    # the title block's general break on the rim would not hold the floor
+    general = max(
+        float(_config.title_block("edge_break")[key])
+        for key in ("radius_mm", "chamfer_max_mm")
+    )
+    assert ring - break_max - general < shaft.THRUST_RING_FLOOR
+    # the ring's bore edge is the post's running bore at its band's top
+    assert shaft.POST_JOURNAL_BORE_BAND == spec.RUNNING_BORE_BAND
+
+
 def test_collar_diameter_lives_on_its_plan_circle() -> None:
     """The front-view crank-bore leaders must not cross a collar dimension line."""
     assert "HeadDia" in drawing.TOP_KEEP

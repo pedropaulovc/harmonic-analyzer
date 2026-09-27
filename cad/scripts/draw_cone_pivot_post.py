@@ -72,6 +72,7 @@ from _drawing_hidden_sketches import (
 )
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
+from cone_gear_shaft_spec import POST_JOURNAL_RIM_BREAK
 from cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DIA,
     ATTACHMENT_X,
@@ -363,12 +364,16 @@ JOURNAL_TEXT_OFFSETS = {
 # looks at the boss's far end, so it is labelled as the boss, not as the
 # spot-faced near face -- and sheet 2's station locates that near face from
 # the post axis without inventing a depth against the curved collar.
+# The cone bore's rims bound the thrust ring the shaft collar bears on, with
+# the collar's OD edge (cone_gear_shaft_spec: ring - 2 x break >= 1.5), so the
+# bore's callout prints the same break as the collar instead of the title
+# block's 0.25.
 DIMENSION_CALLOUTS = {
     "HeadDia": "COLLAR",
     "CrankBossDia": "CRANK BOSS",
     "CrankBossLen": "CRANK BOSS LENGTH",
     "CrankBoreDia": "CRANK BORE THRU",
-    "JournalBoreDia": "CONE BORE THRU",
+    "JournalBoreDia": f"CONE BORE THRU\n{POST_JOURNAL_RIM_BREAK}",
     "ConeBossDia": "CONE JOURNAL BOSS OD",
     "ConeBossLen": "CONE BOSS FACE-TO-FACE",
     "InclineAngle": "CONE/CRANK BORE AXES",

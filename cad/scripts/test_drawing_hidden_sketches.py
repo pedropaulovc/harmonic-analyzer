@@ -632,6 +632,7 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
     assert {
         "arbor_pedestal",
         "cone_gear",
+        "cone_gear_shaft",
         "cone_pivot_post",
         "cone_tip_block",
         "cone_tip_shim",
@@ -643,6 +644,7 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
     assert found["cylinder_gear_shaft"] == {"DomeReference"}
     # Blanked with _common.blank_reference_sketches, not blank_sketch.
     assert found["cone_pivot_post"] == {"SpotFaceStationReference"}
+    assert found["cone_gear_shaft"] == {"SolderStations"}
 
 
 def test_a_drawing_of_a_part_hidden_sketch_curates_through_this_module() -> None:
