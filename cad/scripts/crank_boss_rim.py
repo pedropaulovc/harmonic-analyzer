@@ -89,11 +89,10 @@ BUSHING_RADIUS_MAX = (bushing.OUTER_DIA + bushing.OD_BAND[0]) / 2.0
 # --- The requirement ----------------------------------------------------------
 # The floor every feature holds at print-worst is the running gap this
 # assembly already sets between two parts: the 16T's seat feeler off the spot
-# face (MHA-A03 step 4; Main's ruling, 2026-09-27).  The spot face's run-out
-# is sized in these steps: its width and length are the smallest that hold
-# the floor, and build_drive_train_assembly fails at import if either could
-# come a step smaller.  Its retreat is the user's ruled 2.5, which the floor
-# needs under today's station band (a 0.5 step less misses it).
+# face (MHA-A03 step 4; Main's ruling, 2026-09-27).  build_drive_train_assembly
+# asserts only this floor.  The steps below record the derivation at ruling
+# time (today's station band): the ruled 2.5 retreat and the 23 x 17 run-out
+# each miss the floor a step smaller, which the unit tests pin.
 FLOOR_CLEARANCE_MM = pinion.SEAT_FEELER_MM
 RETREAT_STEP = 0.5
 WIDTH_STEP = 1.0

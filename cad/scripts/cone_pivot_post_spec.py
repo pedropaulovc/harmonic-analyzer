@@ -64,12 +64,18 @@ CRANK_BORE_OFFSET = 0.0
 # run out as a flat CRANK_SPOT_FACE_WIDTH wide from the crank axis
 # CRANK_SPOT_FACE_RUN_OUT down, past the collar's lower edge into the turned
 # body, which stands proud of it there, and ends at a milled step.  The
-# retreat is the user's ruling; the width and run-out are the smallest steps
-# (crank_boss_rim WIDTH_STEP / RUN_OUT_STEP) that hold crank_boss_rim's
-# FLOOR_CLEARANCE_MM on every feature at print-worst, and
-# build_drive_train_assembly fails at import if either could be a step
-# smaller, or if any feature misses the floor.  The boss's south end does not
-# move, so the boss is that much shorter.
+# retreat is the user's ruled 2.5.  The run-out is geometric, sized against
+# the Ø44 collar under the 64T with crank_boss_rim's print-worst terms:
+#   - run-out 17: the flat's print-worst foot (1.17 short) ends 0.89 below the
+#     collar's print-worst lower edge, so no lip of collar is left under the
+#     gear; 16 would leave one;
+#   - width 23: at 23 (22.2 print-worst) the collar clears the 64T by 0.40,
+#     within 0.05 of the plateau it reaches at 24 and wider, where the flat's
+#     edges leave the gear's reach; at 22 the edges come within 0.23.
+# build_drive_train_assembly asserts every feature holds crank_boss_rim's
+# FLOOR_CLEARANCE_MM at print-worst; the unit tests pin that each size a
+# step smaller misses it under today's station band.  The boss's south end
+# does not move, so the boss is that much shorter.
 CRANK_BOSS_HARVESTED_NORTH_FACE = 21.3753
 CRANK_SPOT_FACE_RETREAT = 2.5
 CRANK_SPOT_FACE_WIDTH = 23.0
