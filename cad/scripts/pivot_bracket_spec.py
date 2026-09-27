@@ -23,8 +23,11 @@ FOOT_H = 6.0
 EAR_W = 14.0  # X
 EAR_T = 6.0  # Z; the ear's Z band is the bore's (z -3..+3)
 FOOT_Z0 = -EAR_T / 2.0  # foot starts at the ear's outer face ...
-FOOT_Z1 = 21.0  # ... and runs 24 along +Z (inboard once placed)
-FOOT_LEN = FOOT_Z1 - FOOT_Z0  # 24
+# ... and runs 24.2 along +Z (inboard once placed): 24.0 left the hold-down
+# holes' end ligaments 1.456 at the printed bands (Codex #936
+# PRRT_kwDOPHDy386mV3AN); the stations stay at .X and the foot grows instead.
+FOOT_Z1 = 21.2
+FOOT_LEN = FOOT_Z1 - FOOT_Z0  # 24.2
 BORE_H = 25.2  # shaft axis above the seat: the rocker pivot stays at machine
 # y 253.8 on the 228.6 support apex
 BORE_DIA = 6.5  # O6.35 shaft, 0.15 diametral clearance
@@ -38,26 +41,36 @@ HOLD_DOWN_HOLE_SPEC = HoleSpec("clearance", "#8", fit="close")
 HOLE_DIA = blind_cut_dia_mm(HOLD_DOWN_HOLE_SPEC)
 
 # The two hold-down holes sit on x = 0 in the foot's free run, from the ear's
-# inboard face to the foot end. Worst case is the title block's .XX band --
-# the band rocker_bracket_seat_layout already carries this foot at: an edge
-# and a hole centre each move a band toward each other and the hole grows a
-# band on its diameter, so an edge ligament loses 2.5 bands and the web
-# between the holes 3.
-LIGAMENT_BAND = 0.508  # title-block .XX
+# inboard face to the foot end. Worst case is each term at its OWN printed
+# band (Codex #936 PRRT_kwDOPHDy386mV3AN): the foot's edges at .XX (the band
+# rocker_bracket_seat_layout carries this foot at), the hole stations at .X
+# (they print at the step they are chosen on), and a drilled hole grows by the
+# title block's +0.10/0. An edge ligament loses an edge band, a station band
+# and half the drill growth; the web between the holes two station bands and
+# the whole growth.
+EDGE_BAND = 0.508  # title-block .XX
+STATION_BAND = 0.8  # title-block .X
+DRILL_GROWTH = 0.10  # title-block drilled hole, +0.10/0 on the diameter
 LIGAMENT_FLOOR = 1.5
 LIGAMENT_TARGET = 2.0
 PRINT_STEP = 0.1  # the hole stations print at .X
 FREE_RUN = (EAR_T / 2.0, FOOT_Z1)
 
 
-def hole_ligaments_min(hole_z: tuple[float, float]) -> dict[str, float]:
+def hole_ligaments_min(
+    hole_z: tuple[float, float], run: tuple[float, float] = FREE_RUN
+) -> dict[str, float]:
     """Worst-case ligament round the hold-down holes at stations hole_z."""
-    edge_loss = 2.5 * LIGAMENT_BAND
+    edge_loss = EDGE_BAND + STATION_BAND + DRILL_GROWTH / 2.0
     return {
-        "ear face": hole_z[0] - HOLE_DIA / 2.0 - FREE_RUN[0] - edge_loss,
-        "foot end": FREE_RUN[1] - hole_z[1] - HOLE_DIA / 2.0 - edge_loss,
+        "ear face": hole_z[0] - HOLE_DIA / 2.0 - run[0] - edge_loss,
+        "foot end": run[1] - hole_z[1] - HOLE_DIA / 2.0 - edge_loss,
         "foot side": (FOOT_W - HOLE_DIA) / 2.0 - edge_loss,
-        "between holes": hole_z[1] - hole_z[0] - HOLE_DIA - 3.0 * LIGAMENT_BAND,
+        "between holes": hole_z[1]
+        - hole_z[0]
+        - HOLE_DIA
+        - 2.0 * STATION_BAND
+        - DRILL_GROWTH,
     }
 
 
@@ -67,10 +80,18 @@ def _stations(half_pitch: float) -> tuple[float, float]:
 
 
 # Centred on the free run, so the ear and end ligaments are equal; the pitch
-# balances them against the web (run - p - d)/2 - 2.5b = p - d - 3b, which
-# maximises the least worst-case ligament. The half-pitch rounds to the print
-# step whichever way keeps that least ligament larger: (8.1, 15.9).
-_BALANCED_PITCH = (FREE_RUN[1] - FREE_RUN[0] + HOLE_DIA + LIGAMENT_BAND) / 3.0
+# balances them against the web (run - p - d)/2 - (e + s + g/2) =
+# p - d - 2s - g, which maximises the least worst-case ligament. The
+# half-pitch rounds to the print step whichever way keeps that least ligament
+# larger: (8.2, 16.0).
+_BALANCED_PITCH = (
+    FREE_RUN[1]
+    - FREE_RUN[0]
+    + HOLE_DIA
+    - 2.0 * EDGE_BAND
+    + 2.0 * STATION_BAND
+    + DRILL_GROWTH
+) / 3.0
 _HALF_STEPS = _BALANCED_PITCH / 2.0 / PRINT_STEP
 HOLE_Z = max(
     (

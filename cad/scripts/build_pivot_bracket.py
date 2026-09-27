@@ -13,7 +13,7 @@ is feeler-set (``rocker_bank_layout``).
 The channel assembly inserts the SOUTH bracket (inboard = +Z) as IDENTITY
 and the NORTH one turned Ry(180) about its bore axis, so both feet run
 INBOARD under the outer arms (the support leaves too little apex outboard
-of an ear for a 24 foot); inboard, the foot top (y 234.6) clears the arm
+of an ear for a 24.2 foot); inboard, the foot top (y 234.6) clears the arm
 bottoms (245.8) and the O10 hubs (248.8).
 
 Layout (part frame; the numbers live in ``pivot_bracket_spec``): seat face

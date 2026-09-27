@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import _config
 import _interference_contracts
 import build_channel_assembly as channel
 import build_pedestal_hold_down_screw as hold_down_build
@@ -125,13 +126,28 @@ def test_bracket_hole_ligaments_keep_the_floor_at_worst_case() -> None:
     assert bracket.HOLE_LIGAMENTS_MIN["ear face"] == pytest.approx(
         bracket.HOLE_LIGAMENTS_MIN["foot end"]
     )
-    assert bracket.HOLE_LIGAMENTS_MIN["ear face"] + 2.5 * bracket.LIGAMENT_BAND >= (
-        bracket.LIGAMENT_TARGET
-    )
-    # The band is the one the seat stack carries this foot at.
-    assert bracket.LIGAMENT_BAND == seats.LINEAR_2PL
+    edge_loss = bracket.EDGE_BAND + bracket.STATION_BAND + bracket.DRILL_GROWTH / 2.0
+    assert bracket.HOLE_LIGAMENTS_MIN["ear face"] + edge_loss >= bracket.LIGAMENT_TARGET
+    # Each term at its own printed band: the foot's edges at the .XX band the
+    # seat stack carries this foot at, the stations at .X, the drilled hole
+    # at the title block's +0.10/0.
+    assert bracket.EDGE_BAND == seats.LINEAR_2PL
+    assert bracket.STATION_BAND == seats.LINEAR_1PL
+    drilled = _config.title_block("drilled_hole")
+    assert (drilled["minus_mm"], drilled["plus_mm"]) == (0.0, bracket.DRILL_GROWTH)
     # The stations print at .X.
     assert all(round(z, 1) == z for z in bracket.HOLE_Z)
+    assert bracket.HOLE_Z == (8.2, 16.0)
+    assert bracket.FOOT_LEN == pytest.approx(24.2)
+
+
+def test_the_24_foot_failed_the_floor_at_the_printed_station_band() -> None:
+    """Fail-first, Codex #936 PRRT_kwDOPHDy386mV3AN: booking the .X stations
+    at the .XX band hid it -- on the 24.0 foot, (8.1, 15.9) left 1.456 to
+    each end at the printed bands. The foot grew; the print did not tighten."""
+    old = bracket.hole_ligaments_min((8.1, 15.9), (bracket.FREE_RUN[0], 21.0))
+    assert old["foot end"] == pytest.approx(1.456)
+    assert old["ear face"] < bracket.LIGAMENT_FLOOR
 
 
 def test_old_stations_fail_the_ligament_floor_with_the_close_hole() -> None:
