@@ -199,11 +199,27 @@ FRONT_KEEP = {
 # from the crank axis on the right.
 REAR_SCALE = (1, 2)
 _R = REAR_SCALE[0] / REAR_SCALE[1] / 1000.0
-# x: leaf crankhub-rim-091e measured the plan's RD1 hole callout ending at
-# 198.1 mm and SpotFaceWidth's text box 41.8 mm wide, centred 1.3 mm left of
-# the view; at x=0.2245 the two stood 4.16 mm apart, under one text height
-# (9.06 mm).  0.2315 opens that to 11.2 mm.
-REAR_CENTER = (0.2315, 0.2254)
+# x: the rear view's SpotFaceWidth text must stand one text height clear of
+# the plan's RD1 hole callout (_layout_geometry's view-crowding rule: the
+# smaller box's height), plus a margin.  Measured boxes, leaf crankhub-rim-091e
+# (x=0.2245, where the two stood 4.16 mm apart): RD1 ends at 198.1 mm; the
+# width text is 41.8 mm wide, centred 1.3 mm left of the view; the audit's
+# text height is 9.06 mm.
+_PLAN_RD1_RIGHT = 0.1981
+_REAR_WIDTH_TEXT_HALF = 0.0418 / 2.0
+_REAR_WIDTH_TEXT_LEFT_OF_VIEW = 0.0013
+_SHEET_TEXT_HEIGHT = 0.00906
+# Beyond the rule itself, so a note's re-layout jitter (~0.2 mm) and a
+# slightly longer callout cannot bring the pair back under it.
+_VIEW_CROWDING_MARGIN = 0.0015
+REAR_CENTER = (
+    _PLAN_RD1_RIGHT
+    + _SHEET_TEXT_HEIGHT
+    + _VIEW_CROWDING_MARGIN
+    + _REAR_WIDTH_TEXT_HALF
+    + _REAR_WIDTH_TEXT_LEFT_OF_VIEW,
+    0.2254,
+)
 # The label is centred under the view's live outline, this far below it.
 REAR_LABEL_GAP = 0.004
 
@@ -867,15 +883,31 @@ def _centre_note_under(
     )
 
 
+def _assert_native_layout_with_evidence(
+    adapter: Any, journal: Any, *, expected_finish: str
+) -> None:
+    """The native layout gate, leaving the failing sheet as a PDF.  The
+    evidence never masks the failure: the gate's own error is re-raised
+    whatever the export does."""
+    try:
+        _assert_native_layout(adapter, journal, expected_finish=expected_finish)
+    except RuntimeError:
+        try:
+            _export_failure_pdf(adapter, "native-layout")
+        except Exception as exc:  # noqa: BLE001 - evidence must not mask the failure
+            _telemetry.warn(f"native-layout failure PDF raised: {exc!r}")
+        raise
+
+
 def _export_failure_pdf(adapter: Any, stage: str) -> None:
     """Export the failing sheet under the forensic tree the farm uploads."""
-    path = (
-        _seat_forensics.OUT_FAILURES
-        / f"cone-pivot-post-{stage}"
-        / datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        / "cone-pivot-post.pdf"
-    )
     try:
+        path = (
+            _seat_forensics.OUT_FAILURES
+            / f"cone-pivot-post-{stage}"
+            / datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+            / "cone-pivot-post.pdf"
+        )
         path.parent.mkdir(parents=True, exist_ok=True)
         _early_bound(adapter.currentModel, "IModelDoc2").SaveAs3(str(path), 0, 0)
     except Exception as exc:  # noqa: BLE001 - evidence must not mask the failure
@@ -1351,15 +1383,9 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, rear)
     rebuild_drawing(adapter, label="final cone pivot post native layout")
     _show_section_scale_in_caption(adapter, section)
-    try:
-        _assert_native_layout(
-            adapter,
-            journal,
-            expected_finish=source_properties["Finish"],
-        )
-    except RuntimeError:
-        _export_failure_pdf(adapter, "native-layout")
-        raise
+    _assert_native_layout_with_evidence(
+        adapter, journal, expected_finish=source_properties["Finish"]
+    )
 
     set_high_quality_shaded_with_edges(adapter, iso, label="pictorial isometric")
 

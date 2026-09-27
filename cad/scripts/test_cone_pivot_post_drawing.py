@@ -232,6 +232,51 @@ def test_the_rear_label_centres_under_its_view(monkeypatch: pytest.MonkeyPatch) 
     assert y1 == pytest.approx(outline[1] - 0.004, abs=1e-4)
 
 
+def test_the_rear_width_text_clears_the_plan_callout_by_a_text_height() -> None:
+    """The view-crowding rule demands one text height between two views'
+    text; the rear view stands that plus the named margin off RD1."""
+    text_left = (
+        drawing.REAR_CENTER[0]
+        - drawing._REAR_WIDTH_TEXT_LEFT_OF_VIEW
+        - drawing._REAR_WIDTH_TEXT_HALF
+    )
+    gap = text_left - drawing._PLAN_RD1_RIGHT
+    assert gap == pytest.approx(drawing._SHEET_TEXT_HEIGHT + drawing._VIEW_CROWDING_MARGIN)
+    assert gap > drawing._SHEET_TEXT_HEIGHT
+
+
+def _failing_layout(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("cone pivot post native annotation layout failed: probe")
+
+    monkeypatch.setattr(drawing, "_assert_native_layout", fail)
+
+
+@pytest.mark.parametrize("export", ["saveas_fails", "export_raises"])
+def test_the_failure_pdf_never_masks_the_layout_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, export: str
+) -> None:
+    """Whatever the evidence export does -- SaveAs3 throwing inside it, or the
+    export itself raising -- the layout gate's own error is what propagates."""
+    _failing_layout(monkeypatch)
+    monkeypatch.setattr(drawing._seat_forensics, "OUT_FAILURES", tmp_path)
+    if export == "saveas_fails":
+
+        def early_bound(_obj, _iface):
+            raise OSError("SaveAs3 refused")
+
+        monkeypatch.setattr(drawing, "_early_bound", early_bound)
+    else:
+
+        def boom(*_args, **_kwargs):
+            raise ValueError("export blew up")
+
+        monkeypatch.setattr(drawing, "_export_failure_pdf", boom)
+    adapter = type("Adapter", (), {"currentModel": object()})()
+    with pytest.raises(RuntimeError, match="native annotation layout failed: probe"):
+        drawing._assert_native_layout_with_evidence(adapter, object(), expected_finish="x")
+
+
 def test_inclined_journal_sizes_live_in_the_true_shape_view() -> None:
     """The cone-axis view alone exposes the boss OD and bore in true shape.
 
