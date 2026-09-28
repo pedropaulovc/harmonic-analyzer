@@ -136,6 +136,124 @@ def test_add_surface_finish_validates_part_control_without_audit_opt_in(
         )
 
 
+class _Annotation:
+    """The ``IAnnotation`` readbacks the surface-finish attachment guard sends."""
+
+    def __init__(self, entities: tuple[Any, ...], types: tuple[int, ...]) -> None:
+        self.entities, self.types = entities, types
+
+    def GetAttachedEntities3(self) -> tuple[Any, ...]:  # noqa: N802
+        return self.entities
+
+    def GetAttachedEntityTypes(self) -> tuple[int, ...]:  # noqa: N802
+        return self.types
+
+    def GetLeaderCount(self) -> int:  # noqa: N802
+        return 1
+
+    def IsDangling(self) -> bool:  # noqa: N802
+        return False
+
+
+class _App:
+    def IsSame(self, left: Any, right: Any) -> int:  # noqa: N802
+        return int(left is right)
+
+
+class _Adapter:
+    swApp = _App()
+
+
+def test_surface_finish_guard_accepts_the_inserted_entity() -> None:
+    edge = object()
+    _drawing_common._assert_surface_finish_attached(
+        _Adapter(), _Annotation((edge,), (1,)), edge, entity_type="EDGE", label="bore"
+    )
+
+
+@pytest.mark.parametrize(
+    ("entities", "types"),
+    (
+        # A moved leader on the sfprobe leaves: IsAttached True, no entity.
+        ((), ()),
+        # A landing that resolved to the neighbouring face.
+        ((object(),), (1,)),
+    ),
+    ids=("detached", "neighbour"),
+)
+def test_surface_finish_guard_rejects_a_symbol_off_its_entity(
+    entities: tuple[Any, ...], types: tuple[int, ...]
+) -> None:
+    with pytest.raises(RuntimeError, match=r"lost its attachment \(bore\)"):
+        _drawing_common._assert_surface_finish_attached(
+            _Adapter(), _Annotation(entities, types), object(), entity_type="EDGE",
+            label="bore",
+        )
+
+
+@pytest.mark.parametrize(
+    ("types", "attached"), (((46,), True), ((), False), ((1,), False))
+)
+def test_silhouette_finish_guard_requires_one_silhouette(
+    types: tuple[int, ...], attached: bool
+) -> None:
+    # IsSame reads 0 for a silhouette finish even when unmoved, so the guard
+    # reads the attached type instead of identity.
+    annotation = _Annotation((object(),) * len(types), types)
+    check = lambda: _drawing_common._assert_surface_finish_attached(  # noqa: E731
+        _Adapter(), annotation, object(), entity_type="SILHOUETTE", label="journal"
+    )
+    if attached:
+        check()
+    else:
+        with pytest.raises(RuntimeError, match="lost its silhouette attachment"):
+            check()
+
+
+def _signature(radius: float, box_x: float = 0.01) -> dict[str, Any]:
+    return {
+        "identity": 4002,
+        "parameters": (0.197, 0.0254, -0.112, 0.0, 1.0, 0.0, radius),
+        "normal": None,
+        "box": (-box_x, 0.0, 0.0, box_x, 0.01, 0.01),
+    }
+
+
+@pytest.mark.parametrize(
+    ("attached_signature", "accepted"),
+    (
+        # The section-view socket bore: IsSame 0, the selected face's surface.
+        (_signature(0.01275), True),
+        # A coaxial counterbore of another size.
+        (_signature(0.015), False),
+        # The same surface, split into another face with its own extent.
+        (_signature(0.01275, box_x=0.02), False),
+    ),
+    ids=("same-face", "other-surface", "other-extent"),
+)
+def test_face_finish_guard_falls_back_to_the_face_surface_and_extent(
+    monkeypatch: pytest.MonkeyPatch,
+    attached_signature: dict[str, Any],
+    accepted: bool,
+) -> None:
+    selected, attached = object(), object()
+    signatures = {id(selected): _signature(0.01275), id(attached): attached_signature}
+    monkeypatch.setattr(
+        _drawing_common,
+        "_surface_finish_face_signatures",
+        lambda faces: tuple(signatures[id(face)] for face in faces),
+    )
+    check = lambda: _drawing_common._assert_surface_finish_attached(  # noqa: E731
+        _Adapter(), _Annotation((attached,), (2,)), selected, entity_type="FACE",
+        label="socket bore",
+    )
+    if accepted:
+        check()
+    else:
+        with pytest.raises(RuntimeError, match=r"lost its attachment \(socket bore\)"):
+            check()
+
+
 # _part_pmi._resolve_faces: the one raw walk the surface-finish faces come from.
 #
 # The doubles are raw dispatches, as SolidWorks hands them to the walk: they

@@ -127,6 +127,8 @@ _ANNOT_DATUM = 2
 _ANNOT_GTOL = 5
 _ANNOT_SFSYM = 7
 _SEL_DIMENSION = 14  # swSelectType_e.swSelDIMENSIONS
+_SEL_SILHOUETTE = 46  # swSelectType_e.swSelSILHOUETTES
+_SEL_FACE = 2  # swSelectType_e.swSelFACES
 _GDT_TYPES = frozenset({_ANNOT_DATUM, _ANNOT_GTOL, _ANNOT_SFSYM})
 # Fallback only, for an annotation whose geometry cannot be read. Every GD&T
 # symbol that CAN be measured is (see _measured_gdt_box) -- a fixed square is
@@ -311,8 +313,8 @@ def _assert_leader_lands(
     label: str,
 ) -> None:
     """Fail unless ``annotation`` keeps one live leader ending within 5 mm of
-    ``leader_attach_xy``.  ``SetLeaderAttachmentPointAtIndex`` returns True and
-    still re-solves the leader, so the requested point is read back."""
+    ``leader_attach_xy``.  A returned True from a leader or selection-point
+    setter proves nothing, so the landing is read back."""
     leaders = int(annotation.GetLeaderCount())
     dangling = bool(annotation.IsDangling())
     if dangling or leaders != 1:
@@ -358,6 +360,69 @@ def _assert_attached_to(
             f"{what} lost its attachment ({label}): entities={len(attached)}, "
             f"same_entity={same}, dangling={dangling}, leaders={leaders}"
         )
+
+
+def _face_extent_key(face: Any) -> tuple[Any, ...] | None:
+    """A model face's surface type, parameters, outward normal and box."""
+    signatures = _surface_finish_face_signatures((face,))
+    if len(signatures) != 1:
+        return None
+    sig = signatures[0]
+    return (sig["identity"], sig["parameters"], sig["normal"], sig["box"])
+
+
+def _assert_surface_finish_attached(
+    adapter: Any,
+    annotation: Any,
+    entity: Any,
+    *,
+    entity_type: str,
+    label: str,
+) -> None:
+    """Fail unless a surface-finish symbol is attached, by one live leader,
+    to exactly the entity it was inserted on.
+
+    ``ISldWorks::IsSame`` is not an identity test for every kind.  It read 0
+    for the pivot-shaft journal finish, which was inserted on its silhouette
+    and never moved.  It also read 0 for the harmonic-base socket bore and
+    top-frame cap seat, which are faces in section views landed by selection
+    point, while the attached face had the selected face's exact surface
+    parameters (sfprobe farm leaves, 2026-09-28).  So a silhouette must be
+    the one attached silhouette.  A face that fails IsSame must be the one
+    attached face and have the selected face's surface, normal and box.
+    """
+    kind = entity_type.upper()
+    types = tuple(int(t) for t in (annotation.GetAttachedEntityTypes() or ()))
+    if kind == "SILHOUETTE":
+        leaders = int(annotation.GetLeaderCount())
+        dangling = bool(annotation.IsDangling())
+        if types != (_SEL_SILHOUETTE,) or dangling or leaders != 1:
+            raise RuntimeError(
+                f"surface-finish symbol lost its silhouette attachment ({label}): "
+                f"types={types}, dangling={dangling}, leaders={leaders}"
+            )
+        return
+    try:
+        _assert_attached_to(
+            adapter, annotation, entity, what="surface-finish symbol", label=label
+        )
+    except RuntimeError as exc:
+        if kind != "FACE":
+            raise RuntimeError(f"{exc}; attached types={types}") from None
+        attached = tuple(annotation.GetAttachedEntities3() or ())
+        seen = _face_extent_key(attached[0]) if len(attached) == 1 else None
+        wanted = _face_extent_key(entity)
+        if (
+            types != (_SEL_FACE,)
+            or seen is None
+            or seen != wanted
+            or bool(annotation.IsDangling())
+            or int(annotation.GetLeaderCount()) != 1
+        ):
+            raise RuntimeError(
+                f"{exc}; attached types={types}, attached face={seen}, "
+                f"wanted face={wanted}"
+            ) from None
 
 
 # swSelectType_e names for the kinds a drawing-view pick can resolve to; an
@@ -1108,6 +1173,16 @@ def add_surface_finish(
     edges — a revolve's flank lines are ``"SILHOUETTE"`` edges.  Pass a model
     ``edge_entity`` obtained from ``IView.GetVisibleEntities2`` when a small or
     overlapping projection makes coordinate selection ambiguous.
+
+    ``leader_attach_xy`` is where the leader lands on that entity (sheet
+    metres).  It becomes the selection point of the selected entity before
+    insertion (``ISelectionMgr.SetSelectionPoint2``), so SolidWorks attaches
+    the leader there.  Do not move the leader afterwards: on #1105's
+    sfprobe farm leaves, ``SetLeaderAttachmentPointAtIndex`` dropped every
+    symbol's attached entity (count 1 before the call, 0 after) while
+    ``ISFSymbol.IsAttached`` still read True.  After the rebuild the symbol
+    must be attached to exactly the selected entity, and a moved leader must
+    end within 5 mm of ``leader_attach_xy``.
     """
     if control is not None:
         if roughness_ra is not None or production_method:
@@ -1149,6 +1224,16 @@ def add_surface_finish(
             f"SURFACE_AUDIT {label}: entity_type={entity_type}, faces={diagnostic!r}"
         )
     draw = adapter.currentModel
+    if leader_attach_xy is not None:
+        # Coordinates are sheet metres with z 0: the probe landed every
+        # leader within 0.01 mm of the requested point this way.
+        selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        if selection_manager.SetSelectionPoint2(
+            1, -1, leader_attach_xy[0], leader_attach_xy[1], 0.0
+        ) is not True:
+            raise RuntimeError(
+                f"failed to set the surface-finish landing {leader_attach_xy} ({label})"
+            )
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(
         1,  # installed R2026x swSFSymType_e.swSFMachining_Req
         _LEADER_BENT,  # swLeaderStyle_e.swBENT -- see _LEADER_BENT
@@ -1187,10 +1272,10 @@ def add_surface_finish(
         "IAnnotation",
         "SetPosition2",
         "SetLeader3",
-        "SetLeaderAttachmentPointAtIndex",
         "GetTextFormat",
         "SetTextFormat",
         "GetAttachedEntities3",
+        "GetAttachedEntityTypes",
         "GetLeaderCount",
         "IsDangling",
         "GetLeaderPointsAtIndex",
@@ -1212,10 +1297,6 @@ def add_surface_finish(
         )
     if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
         raise RuntimeError(f"failed to position surface-finish symbol ({label})")
-    if leader_attach_xy is not None and not annotation.SetLeaderAttachmentPointAtIndex(
-        0, leader_attach_xy[0], leader_attach_xy[1], 0.0
-    ):
-        raise RuntimeError(f"failed to position surface-finish leader ({label})")
     if char_height is not None:
         # The symbol scales with its text: a smaller Ra reads as the routine
         # callout it is instead of a headline (default document height is
@@ -1228,12 +1309,10 @@ def add_surface_finish(
             raise RuntimeError(f"failed to set surface-finish text height ({label})")
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="add_surface_finish")
+    _assert_surface_finish_attached(
+        adapter, annotation, selected_entity, entity_type=entity_type, label=label
+    )
     if leader_attach_xy is not None:
-        # Only the landing is checkable here: a surface-finish symbol whose
-        # leader was moved reads back no attached entity (entities=0, not
-        # dangling) on every #1105 leaf that moved one (arbor_pedestal,
-        # cylinder_gear, harmonic_base, cone_pivot_post), so the entity check
-        # the notes and frames use cannot tell a good one from a bad one.
         _assert_leader_lands(
             annotation, leader_attach_xy, what="surface-finish symbol", label=label
         )
