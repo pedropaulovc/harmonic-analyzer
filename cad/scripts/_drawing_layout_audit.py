@@ -54,6 +54,8 @@ from _layout_audit import (
 _ANNOT_DIM = 4
 _ANNOT_NOTE = 6
 _ANNOT_DATUM_ORIGIN = 16
+# swAnnotationOwner_e.swAnnotationOwner_DrawingTemplate
+_OWNER_DRAWING_TEMPLATE = 2
 # swCThread, swCenterLine: GetPosition answered None for every one of them
 # on the b49e13940 leaves (cone-swing-platform 14 + 1, top_frame's six
 # sheets 98 cosmetic threads). The audit reads their ink from display data;
@@ -294,6 +296,17 @@ def _dump_annotation(reader: _Reader, raw: Any) -> dict[str, Any] | None:
         "pos": _round((reader.call if kind in _ANCHORLESS else reader.need)(lambda: annotation.GetPosition(), ())),
         "layer": str(reader.call(lambda: annotation.Layer, "")),
     }
+    if record["owner_type"] == _OWNER_DRAWING_TEMPLATE:
+        # The title block's and sheet format's own notes, which the sheet
+        # view's GetAnnotations returns beside the drawing's. No finding reads
+        # their ink (``sheet_owned`` filters them out of every check), so their
+        # leaders, display data and note text are not read: they were ~66% of
+        # the collector's COM reads (40 template notes a B sheet, ~1200
+        # reads). Replaying all 147 sheets of the 111 cached drawing reports
+        # of 2026-09-27 without them changes no finding, summary or advance.
+        record["display"] = {}
+        reader.dumped(f"owner{record['owner_type']}", started)
+        return record
     leaders = []
     for index in range(int(reader.need(lambda: annotation.GetLeaderCount(), 0) or 0)):
         points = reader.need(lambda i=index: annotation.GetLeaderPointsAtIndex(i))
