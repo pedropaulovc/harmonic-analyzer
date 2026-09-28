@@ -139,6 +139,13 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   `GetPosition`. On 1024x640 seats the leader start COM reports is 0.15 to
   0.78 mm from where the PDF starts that leader, on the printed ring; the
   layout audit takes the printed start (`_layout_audit._printed_leader_starts`).
+  After a rebuild at fit the reported start stays where the fit render put it
+  at any zoom, and `UpdateViewDisplayGeometry` zoomed does not move it: frame
+  item 2 re-zoomed read its ring exactly as placed but its leader starting
+  4.19 mm from the centre inside a 4.89 mm ring, bit-identical on
+  swmaker000008 and swmaker000005 (runs 20260928T144159300Z,
+  20260928T145256004Z), while the same SetPosition printed its leader from the
+  ring. Check a leader start only on the read right after `SetPosition`.
 
 ## Refusal catalogue — do / don't
 

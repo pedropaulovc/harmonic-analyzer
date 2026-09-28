@@ -238,9 +238,10 @@ _ARROWTIP = (0.1511, 0.2664)
 _OFFSET = (0.008, 0.016)
 _TARGET = (_ARROWTIP[0] + _OFFSET[0], _ARROWTIP[1] + _OFFSET[1])
 _RING_R = 0.00475
-# The ring GetDisplayData draws at fit is smaller (item 2 on swmaker000008,
-# run 20260928T144159300Z: 4.19 mm at fit, 4.89 zoomed), and a leader keeps
-# the start the last UpdateViewDisplayGeometry gave it.
+# The ring GetDisplayData draws at fit is smaller, and after the rebuild at
+# fit a leader keeps the start the fit render gave it, whatever the zoom (item
+# 2 on swmaker000008 and 000005, runs 20260928T144159300Z and
+# 20260928T145256004Z: 4.19 mm from a centre whose zoomed ring is 4.89 mm).
 _RING_R_FIT = 0.00405
 
 
@@ -248,8 +249,12 @@ class _Window:
     """``adapter.currentModel``: the zoom state, and what ran under which.
 
     ``fit_drift_px``: how far GetDisplayData's ring sits off the model at fit,
-    in fit pixels. ``rebuild``: what EditRebuild3 does to the balloon, moving
-    its SetPosition anchor (``"position"``) or only its ring (``"ring"``) 1 mm.
+    in fit pixels. ``rebuild``: what EditRebuild3 does to the balloon besides
+    leaving its leader start at the fit ring: move its SetPosition anchor
+    (``"position"``) or only its ring (``"ring"``) 1 mm, grow the ring 1 mm
+    (``"radius"``), or move the arrowtip 1 mm (``"tip"``). ``fault``: raise
+    from ViewZoomTo2 (``"zoom"``) or SetPosition (``"position"``), or place
+    the leader starting 1 mm inside the ring (``"leader"``).
     """
 
     def __init__(
@@ -272,7 +277,7 @@ class _Window:
         return _FIT_PIXEL_M[self.window_px] if self.span is None else self.span / self.window_px
 
     def ring_r(self) -> float:
-        return _RING_R_FIT if self.span is None else _RING_R
+        return (_RING_R_FIT if self.span is None else _RING_R) + self.balloon.ring_grow
 
     def ViewZoomTo2(self, x1, y1, _z1, x2, _y2, _z2):  # noqa: N802
         self.span = x2 - x1
@@ -290,10 +295,15 @@ class _Window:
     def EditRebuild3(self):  # noqa: N802
         self.log.append(("rebuild", self.span))
         balloon = self.balloon
+        balloon.leader_r = _RING_R_FIT
         if self.rebuild == "position":
             balloon.position = (balloon.position[0] + 0.001, balloon.position[1])
         if self.rebuild in ("position", "ring"):
             balloon.centre = (balloon.centre[0] + 0.001, balloon.centre[1])
+        if self.rebuild == "radius":
+            balloon.ring_grow = 0.001
+        if self.rebuild == "tip":
+            balloon.tip = (balloon.tip[0] + 0.001, balloon.tip[1])
 
 
 class _ShortBalloon:
@@ -304,6 +314,8 @@ class _ShortBalloon:
         self.position = (_ARROWTIP[0] - 0.010, _ARROWTIP[1] + 0.005)
         self.centre = self.position
         self.leader_r = _RING_R_FIT
+        self.ring_grow = 0.0
+        self.tip = _ARROWTIP
 
     def GetAnnotation(self):  # noqa: N802
         return self
@@ -327,13 +339,14 @@ def _short_balloon_rig(monkeypatch, window: _Window):
         if window.fault == "position":
             raise RuntimeError("SetPosition failed")
         balloon.position = balloon.centre = tuple(position_xy)
+        balloon.leader_r = _RING_R - (0.001 if window.fault == "leader" else 0.0)
 
     def readback(_adapter, annotation, entity, item):
         assert annotation is balloon and entity is balloon.entity and item == "5"
         pixel = window.pixel()
         drift = window.fit_drift_px * pixel if window.span is None else 0.0
         centre = (balloon.centre[0] + drift, balloon.centre[1] + drift)
-        angle = math.atan2(_ARROWTIP[1] - centre[1], _ARROWTIP[0] - centre[0])
+        angle = math.atan2(balloon.tip[1] - centre[1], balloon.tip[0] - centre[0])
         start = (
             centre[0] + balloon.leader_r * math.cos(angle),
             centre[1] + balloon.leader_r * math.sin(angle),
@@ -341,14 +354,11 @@ def _short_balloon_rig(monkeypatch, window: _Window):
         window.log.append(("read", window.span))
         return {
             "failed_checks": [],
-            "actual_leader_points": (*start, 0.0, *_ARROWTIP, 0.0),
+            "actual_leader_points": (*start, 0.0, *balloon.tip, 0.0),
             "annotation_position": (*balloon.position, 0.0),
             "rendered_circle": (*centre, window.ring_r()),
             "viewport_pixel_bounds_m": (pixel, pixel),
         }
-
-    def update_display_geometry():
-        balloon.leader_r = window.ring_r()
 
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(drawing, "position_bom_balloon", position)
@@ -357,7 +367,7 @@ def _short_balloon_rig(monkeypatch, window: _Window):
         drawing._telemetry, "event", lambda name, **attrs: events.__setitem__(name, attrs)
     )
     adapter = SimpleNamespace(currentModel=window)
-    view = SimpleNamespace(UpdateViewDisplayGeometry=update_display_geometry)
+    view = SimpleNamespace(UpdateViewDisplayGeometry=lambda: None)
 
     def run():
         drawing._short_frame_balloon(adapter, view, balloon, "5", _OFFSET)
@@ -372,8 +382,9 @@ def test_short_balloon_places_and_rechecks_zoomed_around_the_fit_rebuild(
     """The ring is placed where a pixel is tens of microns on either seat, so
     both windows ask SetPosition for the same point. After the rebuild at fit
     it is read zoomed again: the fit read's ring is off by two fit pixels,
-    as GetDisplayData renders at fit, and does not decide; the leader the fit
-    render left inside the zoomed ring is re-rendered zoomed before the read."""
+    as GetDisplayData renders at fit, and does not decide; nor does the
+    leader start the rebuild left inside the zoomed ring, which the PDF does
+    not draw from."""
     window = _Window(window_px, fit_drift_px=2.0)
     run, placed_at, events = _short_balloon_rig(monkeypatch, window)
     run()
@@ -393,19 +404,23 @@ def test_short_balloon_places_and_rechecks_zoomed_around_the_fit_rebuild(
 
 @pytest.mark.parametrize("window_px", [640, 820])
 @pytest.mark.parametrize(
-    ("rebuild", "failed"),
+    ("rebuild", "fault", "failed"),
     [
-        ("position", ["fit:position_moved", "rebuilt:circle_position"]),
-        ("ring", ["rebuilt:circle_position"]),
+        ("position", None, ["fit:position_moved", "rebuilt:circle_position"]),
+        ("ring", None, ["rebuilt:circle_position"]),
+        ("radius", None, ["rebuilt:ring_radius"]),
+        ("tip", None, ["rebuilt:arrowtip_moved"]),
+        (None, "leader", ["zoomed:leader_inside_ring"]),
     ],
 )
-def test_short_balloon_fails_when_the_rebuild_moves_it(
-    monkeypatch, window_px, rebuild, failed
+def test_short_balloon_fails_when_placed_inside_or_moved_by_the_rebuild(
+    monkeypatch, window_px, rebuild, fault, failed
 ) -> None:
     """A zoomed read on target proves nothing about the rebuilt drawing the
-    export prints. The rebuild moving the SetPosition anchor, or only the
-    ring, 1 mm fails the leaf, with the view back at fit."""
-    window = _Window(window_px, fit_drift_px=0.0, rebuild=rebuild)
+    export prints. The rebuild moving the SetPosition anchor, the ring or the
+    arrowtip 1 mm, or growing the ring 1 mm, fails the leaf, as does a placed
+    leader starting 1 mm inside its ring; the view is back at fit."""
+    window = _Window(window_px, fit_drift_px=0.0, rebuild=rebuild, fault=fault)
     run, _placed_at, events = _short_balloon_rig(monkeypatch, window)
     with pytest.raises(RuntimeError, match="frame balloon 5 short placement failed"):
         run()

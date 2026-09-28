@@ -1078,7 +1078,8 @@ _SHORT_BALLOON_POSITION_TOL_M = 1e-7
 def _short_balloon_failures(
     state: dict[str, Any], target: tuple[float, float]
 ) -> list[str]:
-    """What one read of a short-leader balloon breaks, within that read's pixel."""
+    """What one read of a short-leader balloon's ring and length breaks,
+    within that read's pixel."""
     failures = list(state["failed_checks"])
     leader = state["actual_leader_points"]
     length = sum(
@@ -1094,14 +1095,38 @@ def _short_balloon_failures(
     pixel = state["viewport_pixel_bounds_m"]
     if any(abs(circle[index] - target[index]) > pixel[index] for index in range(2)):
         failures.append("circle_position")
-    # The leader leaves the ring: its start sits on the rendered ring, and no
-    # point of it lies inside the ring by more than a pixel.
+    return failures
+
+
+def _leader_start_failures(state: dict[str, Any]) -> list[str]:
+    """The leader leaves the ring: no point of it lies inside the ring by more
+    than a pixel. Meaningful only on the read right after SetPosition."""
+    leader = state["actual_leader_points"]
+    circle = state["rendered_circle"]
+    pixel = state["viewport_pixel_bounds_m"]
     if len(leader) >= 6 and any(
         math.hypot(leader[index] - circle[0], leader[index + 1] - circle[1])
         < circle[2] - max(pixel)
         for index in range(0, len(leader), 3)
     ):
-        failures.append("leader_inside_ring")
+        return ["leader_inside_ring"]
+    return []
+
+
+def _rebuilt_balloon_failures(
+    after: dict[str, Any], placed: dict[str, Any], target: tuple[float, float]
+) -> list[str]:
+    """The re-zoomed read after the rebuild: ring on target, the same radius
+    and arrowtip as placed, each within that read's pixel. Its leader start
+    is not checked: the rebuild leaves it where the fit render put it, which
+    is not where the PDF draws the leader (see :func:`_short_frame_balloon`)."""
+    failures = _short_balloon_failures(after, target)
+    pixel = max(after["viewport_pixel_bounds_m"])
+    if abs(after["rendered_circle"][2] - placed["rendered_circle"][2]) > pixel:
+        failures.append("ring_radius")
+    tip, placed_tip = after["actual_leader_points"][-3:-1], placed["actual_leader_points"][-3:-1]
+    if len(tip) != 2 or math.dist(tip, placed_tip) > pixel:
+        failures.append("arrowtip_moved")
     return failures
 
 
@@ -1111,11 +1136,21 @@ def _short_frame_balloon(
     """Give frame balloon ``item`` a short leader ``offset`` from its arrowtip.
 
     The ring is placed zoomed onto its target (:data:`_SHORT_BALLOON_ZOOM_HALF`)
-    and read back there. The window then goes back to fit and the drawing
-    rebuilds, the state the export starts from: read there, the balloon must
-    keep its attachment, item and SetPosition anchor. Its ring is then read
-    zoomed again, where the read matches the print, and must still sit on
-    target with its leader leaving it. Any failure fails the leaf.
+    and read back there: on target, short, its leader leaving it. The window
+    then goes back to fit and the drawing rebuilds, the state the export
+    starts from: read there, the balloon must keep its attachment, item and
+    SetPosition anchor. It is then read zoomed again, where the ring matches
+    the print, and must keep its ring and arrowtip. Any failure fails the leaf.
+
+    The rebuilt read's leader start is not checked. After the rebuild at fit,
+    item 2's re-zoomed ring was the placed one to the micron, but its leader
+    started 4.19 mm from the centre, the radius of the ring the fit render
+    drew, inside the 4.89 mm zoomed ring: bit-identical on swmaker000008 and
+    swmaker000005 (runs 20260928T144159300Z, 20260928T145256004Z), and
+    UpdateViewDisplayGeometry zoomed did not move it. The PDF does not draw
+    from it: from the same SetPosition, run 20260928T141421973Z printed the
+    leader from the printed ring (0.001 mm), 0.45 mm from the start COM
+    reported. The layout audit checks the printed leader.
     """
     note = _early_bound(note, "INote")
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
@@ -1148,22 +1183,20 @@ def _short_frame_balloon(
     view.UpdateViewDisplayGeometry()
     adapter.currentModel.GraphicsRedraw2()
     fit = _frame_balloon_binding_readback(adapter, annotation, entity, item)
-    # The rebuilt leader's start is the one the fit render left: on
-    # swmaker000008 (run 20260928T144159300Z) item 2's re-zoomed ring read on
-    # target with its leader starting 4.19 mm from the centre, the fit ring's
-    # radius, inside the zoomed 4.89 mm ring. Refresh it zoomed, as placed.
     with _zoomed_on(adapter, target, _SHORT_BALLOON_ZOOM_HALF):
-        view.UpdateViewDisplayGeometry()
         adapter.currentModel.GraphicsRedraw2()
         after = _frame_balloon_binding_readback(adapter, annotation, entity, item)
-    failures = [f"zoomed:{name}" for name in _short_balloon_failures(placed, target)]
+    failures = [
+        f"zoomed:{name}"
+        for name in _short_balloon_failures(placed, target) + _leader_start_failures(placed)
+    ]
     failures += [f"fit:{name}" for name in fit["failed_checks"]]
     moved = [
         abs(a - b) for a, b in zip(fit["annotation_position"][:2], placed["annotation_position"][:2])
     ]
     if len(moved) != 2 or max(moved) > _SHORT_BALLOON_POSITION_TOL_M:
         failures.append("fit:position_moved")
-    failures += [f"rebuilt:{name}" for name in _short_balloon_failures(after, target)]
+    failures += [f"rebuilt:{name}" for name in _rebuilt_balloon_failures(after, placed, target)]
     state = {"before": before, "placed": placed, "fit": fit, "after": after,
              "target_circle": target, "failed_checks": failures}
     _telemetry.event("drawing.frame_short_balloon", item=item, **state)
