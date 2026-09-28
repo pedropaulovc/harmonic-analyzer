@@ -1501,16 +1501,23 @@ async def build(adapter) -> dict[str, str]:
     # Each T-configuration's derived "<T> Simplified" (teeth suppressed) is
     # what the drive-train drawing's small line views print; it inherits the
     # grouped BOM identity and the per-configuration properties set above.
-    # It is derived on the saved part reopened from disk (on this authoring
-    # document the derivation raised a modal dialog, c85a21ec4), which is then
-    # finalized in place: every configuration activated and force-rebuilt
-    # (the no-switch rebuild-all verbs left the T00x tooth gaps faulted,
-    # cg-fx1), marked for rebuild-save, and saved in one Save3.
-    await derive_simplified_on_saved_part(adapter, PART_NAME, SIMPLIFIED_FEATURES, part_path)
+    # Only the T-configurations are derived: Default is never placed, and on
+    # farm build 2 of #1102 it read the teeth suppressed beside its derived
+    # child while every T parent kept them (the features were authored with
+    # T120 active, Default a bystander). It is derived on the saved part
+    # reopened from disk (on this authoring document the derivation raised a
+    # modal dialog, c85a21ec4), which is then finalized in place: every
+    # configuration activated and force-rebuilt (the no-switch rebuild-all
+    # verbs left the T00x tooth gaps faulted, cg-fx1), marked for
+    # rebuild-save, and saved in one Save3.
+    placed = [name for name, _teeth in CONFIGS]
+    await derive_simplified_on_saved_part(
+        adapter, PART_NAME, SIMPLIFIED_FEATURES, part_path, placed
+    )
     check("reopen saved cone-gear", await adapter.open_model(part_path))
     assert_saved_configurations_regenerate(adapter, PART_NAME)
     await assert_saved_configuration_topology(adapter, phase="reopened")
-    assert_simplified_configurations(adapter, PART_NAME, SIMPLIFIED_FEATURES)
+    assert_simplified_configurations(adapter, PART_NAME, SIMPLIFIED_FEATURES, placed)
 
     if findings:
         summary = "; ".join(findings)

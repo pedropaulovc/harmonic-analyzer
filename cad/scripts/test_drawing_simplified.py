@@ -392,3 +392,124 @@ def test_a_view_that_does_not_take_its_configuration_is_refused() -> None:
     view = FakeView((1.0, 4.0), "*Front", HLR, accepts=False)
     with pytest.raises(RuntimeError, match="Default Simplified"):
         _apply(view)
+
+
+TEETH = ("ToothGapCut", "ToothGapPattern")
+
+
+def _names(variant) -> list[str]:
+    """The configuration names of a ``bstr_array`` VARIANT (or a plain list)."""
+    return list(getattr(variant, "value", variant))
+
+
+class FakeFeature:
+    """An IFeature whose suppression is per configuration.
+
+    ``leaks_to_parent`` models the defect the readback must catch: suppressing
+    in a derived child also suppresses the parent.
+    """
+
+    def __init__(self, name: str, part: FakePart, suppressed_in: set[str]) -> None:
+        self.Name = name
+        self.part = part
+        self.suppressed = set(suppressed_in)
+
+    def IsSuppressed2(self, option: int, names) -> tuple[bool, ...]:
+        assert option == 3  # swSpecifyConfiguration
+        return tuple(name in self.suppressed for name in _names(names))
+
+    def SetSuppression2(self, action: int, option: int, names) -> bool:
+        assert (action, option) == (0, 3)  # swSuppressFeature, swSpecifyConfiguration
+        for name in _names(names):
+            self.suppressed.add(name)
+            parent = self.part.configurations[name].GetParent()
+            if self.part.leaks_to_parent and parent is not None:
+                self.suppressed.add(parent.Name)
+        return True
+
+
+class FakePart(FakeModel):
+    """A saved multi-configuration part: a derived child starts with its
+    parent's feature states and becomes active, as AddConfiguration2 does."""
+
+    def __init__(
+        self,
+        names: tuple[str, ...],
+        *,
+        active: str,
+        suppressed_in: set[str] = frozenset(),
+        leaks_to_parent: bool = False,
+    ) -> None:
+        super().__init__(*(FakeConfiguration(name) for name in names))
+        self.ConfigurationManager.ActiveConfiguration = self.configurations[active]
+        self.Extension.GetWhatsWrong = lambda: None
+        self.leaks_to_parent = leaks_to_parent
+        self.features = {name: FakeFeature(name, self, suppressed_in) for name in TEETH}
+
+    def _add(self, name, comment, alternate, options, parent, description, rebuild):
+        created = super()._add(name, comment, alternate, options, parent, description, rebuild)
+        for feature in self.features.values():
+            if parent in feature.suppressed:
+                feature.suppressed.add(name)
+        self.ConfigurationManager.ActiveConfiguration = created
+        return created
+
+    def FeatureByName(self, name: str) -> FakeFeature | None:
+        return self.features.get(name)
+
+    def ForceRebuild3(self, _top_only: bool) -> bool:
+        return True
+
+    def states(self, *configurations: str) -> dict[str, tuple[bool, ...]]:
+        return {
+            name: tuple(name in feature.suppressed for feature in self.features.values())
+            for name in configurations
+        }
+
+
+def _part_adapter(part: FakePart) -> SimpleNamespace:
+    return SimpleNamespace(currentModel=part, _attempt=lambda fn, default=None: fn())
+
+
+def _cone_gear() -> FakePart:
+    """cone-gear as farm build 2 read it: T-configurations keep their teeth,
+    the unplaced Default reads them suppressed."""
+    return FakePart(("Default", "T006", "T120"), active="T120", suppressed_in={"Default"})
+
+
+def test_only_the_named_parents_are_simplified_and_keep_their_teeth() -> None:
+    part = _cone_gear()
+    children = _drawing_simplified.add_simplified_configurations(
+        _part_adapter(part), "cone-gear", TEETH, ["T006", "T120"]
+    )
+    assert children == ["T006 Simplified", "T120 Simplified"]
+    assert "Default Simplified" not in part.GetConfigurationNames()
+    assert part.states("T006", "T120") == {"T006": (False, False), "T120": (False, False)}
+    assert part.states(*children) == {child: (True, True) for child in children}
+    assert part.ConfigurationManager.ActiveConfiguration.Name == "T120"
+
+
+def test_a_parent_that_already_lacks_the_features_is_refused_before_deriving() -> None:
+    part = _cone_gear()
+    with pytest.raises(RuntimeError, match=r"already suppressed: \['ToothGapCut in Default'"):
+        _drawing_simplified.add_simplified_configurations(_part_adapter(part), "cone-gear", TEETH)
+    assert part.GetConfigurationNames() == ["Default", "T006", "T120"]
+
+
+def test_a_child_suppression_that_reaches_its_parent_fails_the_readback() -> None:
+    part = FakePart(("Default", "T024"), active="Default", leaks_to_parent=True)
+    with pytest.raises(
+        RuntimeError, match=r"ToothGapCut: suppressed in \(Default, Default Simplified\) reads \(True, True\)"
+    ):
+        _drawing_simplified.add_simplified_configurations(_part_adapter(part), "fixture", TEETH)
+
+
+def test_a_simplified_child_of_an_unnamed_configuration_is_an_orphan() -> None:
+    part = _cone_gear()
+    adapter = _part_adapter(part)
+    _drawing_simplified.add_simplified_configurations(adapter, "cone-gear", TEETH, ["T006", "T120"])
+    part.ConfigurationManager.AddConfiguration2("Default Simplified", "", "", 0, "Default", "", False)
+    with pytest.raises(RuntimeError, match=r"orphan simplified configurations \['Default Simplified'\]"):
+        _drawing_simplified.assert_simplified_configurations(
+            adapter, "cone-gear", TEETH, ["T006", "T120"]
+        )

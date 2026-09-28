@@ -2,12 +2,19 @@ r"""Derived ``<configuration> Simplified`` configurations for assembly drawing v
 
 Modeled gear teeth and helical thread grooves print black in a small-scale line
 view of an assembly (the user's ruling, 2026-09-27). Every gear and threaded
-part therefore carries, for EACH of its configurations ``P``, a DERIVED child
-``P Simplified`` in which only the tooth/thread features are suppressed. The
-parent is untouched: part drawings, renders, STL and every gate keep reading
-``P``. Assemblies add ``Default Simplified`` and point each component at its
-``<referenced> Simplified`` child (``_assembly``), and an assembly drawing's
-small line views reference it (``_drawing_common``).
+part therefore carries, for each configuration ``P`` an assembly can place, a
+DERIVED child ``P Simplified`` in which only the tooth/thread features are
+suppressed. The parent keeps them, before and after: part drawings, renders,
+STL and every gate keep reading ``P``. Assemblies add ``Default Simplified``
+and point each component at its ``<referenced> Simplified`` child
+(``_assembly``), and an assembly drawing's small line views reference it
+(``_drawing_common``).
+
+A part simplifies every configuration unless its builder names the placeable
+ones. cone-gear names its twenty ``T<teeth>`` configurations: its ``Default`` is
+never placed, and its teeth, authored while ``T120`` was active, read
+suppressed there together with the ``Default Simplified`` child derived from it
+(farm build 2 of #1102), while every ``T`` parent read them present.
 
 The ``<parent> Simplified`` naming is uniform across tiers so one component rule
 serves parts and subassemblies alike. This module is part-tier: it imports no
@@ -247,29 +254,86 @@ def _suppression(feature: Any, configurations: Sequence[str]) -> tuple[bool, ...
     return tuple(bool(state) for state in (states or ()))
 
 
+def _simplified_parents(
+    part_name: str, names: Sequence[str], parents: Sequence[str] | None
+) -> list[str]:
+    """The configurations that get a ``<P> Simplified`` child: ``parents`` when
+    given, else every configuration of the part."""
+    if parents is None:
+        return [name for name in names if not is_simplified(name)]
+    chosen = list(parents)
+    if not chosen:
+        raise ValueError(f"{part_name}: no configurations to simplify")
+    if len(set(chosen)) != len(chosen):
+        raise ValueError(f"{part_name}: duplicate simplified parents {chosen!r}")
+    unknown = [name for name in chosen if name not in names or is_simplified(name)]
+    if unknown:
+        raise ValueError(
+            f"{part_name}: simplified parents {unknown!r} are not among {list(names)}"
+        )
+    return chosen
+
+
+def _assert_parents_keep_features(
+    part_name: str, targets: Sequence[Any], parents: Sequence[str], names: Sequence[str]
+) -> None:
+    """Refuse to derive from a parent that already suppresses a target feature:
+    a child can only be proven to suppress what its parent keeps.
+
+    The configurations left without a child are logged, not judged, so a part
+    whose unplaced configuration lacks the features says so on the record.
+    """
+    others = [name for name in names if name not in parents and not is_simplified(name)]
+    order = [*parents, *others]
+    lacking: list[str] = []
+    report: list[str] = []
+    for feature in targets:
+        states = dict(zip(order, _suppression(feature, order), strict=True))
+        lacking += [f"{feature.Name} in {parent}" for parent in parents if states[parent]]
+        if others:
+            report.append(f"{feature.Name} {({name: states[name] for name in others})!r}")
+    if report:
+        _telemetry.info(
+            f"{part_name}: no simplified child for {others}; suppressed there: "
+            + "; ".join(report)
+        )
+    if lacking:
+        raise RuntimeError(
+            f"{part_name}: a simplified parent must keep what its child suppresses, "
+            f"but these are already suppressed: {lacking}"
+        )
+
+
 @_telemetry.traced("simplified.configs", label_param="part_name")
 def add_simplified_configurations(
-    adapter: Any, part_name: str, features: Sequence[str]
+    adapter: Any,
+    part_name: str,
+    features: Sequence[str],
+    parents: Sequence[str] | None = None,
 ) -> list[str]:
-    """Derive ``<P> Simplified`` from every configuration ``P`` of the open part,
-    suppressing ``features`` in the children only; return the children's names.
+    """Derive ``<P> Simplified`` from each configuration ``P`` in ``parents``
+    (default: every configuration of the open part), suppressing ``features``
+    in the children only; return the children's names.
 
     Call on the saved part reopened from disk, after its configurations, BOM
     identity and configuration properties are final
-    (:func:`derive_simplified_on_saved_part`). Each child is activated and
-    force-rebuilt and must read What's Wrong clean; the active configuration is
-    restored. Nothing here saves.
+    (:func:`derive_simplified_on_saved_part`). Every parent must keep
+    ``features`` unsuppressed before anything is derived. Each child is
+    activated and force-rebuilt and must read What's Wrong clean; the active
+    configuration is restored. Nothing here saves.
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
     active = active_configuration_name(adapter, model)
-    parents = [str(name) for name in (model.GetConfigurationNames() or ())]
-    already = [name for name in parents if is_simplified(name)]
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    already = [name for name in names if is_simplified(name)]
     if already:
         raise RuntimeError(f"{part_name}: simplified configurations already exist: {already}")
-    if active not in parents:
-        raise RuntimeError(f"{part_name}: active configuration {active!r} not in {parents}")
+    if active not in names:
+        raise RuntimeError(f"{part_name}: active configuration {active!r} not in {names}")
+    parents = _simplified_parents(part_name, names, parents)
     targets = _features(model, part_name, features)
+    _assert_parents_keep_features(part_name, targets, parents, names)
     comment = simplified_comment(", ".join(features))
     children: list[str] = []
     failures: list[str] = []
@@ -318,7 +382,7 @@ def add_simplified_configurations(
         raise RuntimeError(
             f"{part_name}: simplified configurations failed: " + "; ".join(failures)
         )
-    assert_simplified_configurations(adapter, part_name, features)
+    assert_simplified_configurations(adapter, part_name, features, parents)
     _telemetry.annotate(
         configurations=len(parents), features=len(targets), feature_names=",".join(features)
     )
@@ -330,15 +394,23 @@ def add_simplified_configurations(
 
 @_telemetry.traced("simplified.readback", label_param="part_name")
 def assert_simplified_configurations(
-    adapter: Any, part_name: str, features: Sequence[str]
+    adapter: Any,
+    part_name: str,
+    features: Sequence[str],
+    parents: Sequence[str] | None = None,
 ) -> None:
-    """Prove, without switching, every ``P`` has its derived ``P Simplified``
-    with exactly ``features`` suppressed there (not in ``P``), a comment naming
-    them and ``P``'s BOM part number."""
+    """Prove, without switching, every ``P`` in ``parents`` (default: every
+    configuration) has its derived ``P Simplified`` with exactly ``features``
+    suppressed there (not in ``P``), a comment naming them and ``P``'s BOM part
+    number, and that no other simplified configuration exists."""
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     names = [str(name) for name in (model.GetConfigurationNames() or ())]
-    parents = [name for name in names if not is_simplified(name)]
-    orphans = sorted(set(names) - set(parents) - {simplified_name(p) for p in parents})
+    parents = _simplified_parents(part_name, names, parents)
+    orphans = sorted(
+        name
+        for name in names
+        if is_simplified(name) and name not in {simplified_name(p) for p in parents}
+    )
     targets = _features(model, part_name, features)
     comment = simplified_comment(", ".join(features))
     failures: list[str] = [f"orphan simplified configurations {orphans}"] if orphans else []
@@ -434,10 +506,15 @@ def persist_configurations_in_place(adapter: Any, part_name: str) -> None:
 
 
 async def derive_simplified_on_saved_part(
-    adapter: Any, part_name: str, features: Sequence[str], part_path: str
+    adapter: Any,
+    part_name: str,
+    features: Sequence[str],
+    part_path: str,
+    parents: Sequence[str] | None = None,
 ) -> None:
-    """Close the just-saved part, reopen it from ``part_path``, derive its
-    simplified configurations, finalize every configuration in place and close.
+    """Close the just-saved part, reopen it from ``part_path``, derive the
+    simplified configurations of ``parents`` (default: every configuration),
+    finalize every configuration in place and close.
 
     The caller then reopens the file and proves the saved caches
     (``assert_saved_configurations_regenerate``) before anything force-rebuilds
@@ -448,7 +525,7 @@ async def derive_simplified_on_saved_part(
         f"reopen saved {part_name} to derive simplified configurations",
         await adapter.open_model(part_path),
     )
-    add_simplified_configurations(adapter, part_name, features)
+    add_simplified_configurations(adapter, part_name, features, parents)
     persist_configurations_in_place(adapter, part_name)
     _close_part(adapter)
 
