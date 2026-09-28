@@ -2739,12 +2739,12 @@ def _ring(cx, cy, radius, sides=48):
     return [(*a, *b) for a, b in zip(points, points[1:])]
 
 
-def _balloon_17_dump(balloon=DTA_BALLOON_17):
+def _balloon_17_dump(balloon=DTA_BALLOON_17, leader_ink=DTA_BALLOON_17_LEADER_INK):
     return _dump(
         views=[_view("Drawing View8", (0.12, 0.08, 0.30, 0.20), [balloon])],
         spans=[["17", 0.1618, 0.1034, 0.1662, 0.1069]],
         strokes=[
-            *_edges(*_ring(*DTA_BALLOON_17_RING), *DTA_BALLOON_17_LEADER_INK, width=0.00018),
+            *_edges(*_ring(*DTA_BALLOON_17_RING), *leader_ink, width=0.00018),
             *_edges(*DTA_BALLOON_17_EDGES),
         ],
     )
@@ -2838,21 +2838,30 @@ def test_a_leader_through_its_own_balloon_is_still_found():
             "lines": [[0.0, 0.0, 0.0, 0.0, cx - radius, cy, 0.051225, 0.1676521, 0.1137831, 0.051225]],
         },
     }
-    findings = audit_dump(_balloon_17_dump(through))
+    printed = [(0.16764, 0.113771, cx - radius, cy), *DTA_BALLOON_17_LEADER_INK[1:]]
+    findings = audit_dump(_balloon_17_dump(through, printed))
     assert [f.kind for f in findings if f.kind == "leader-through-own-text"] == ["leader-through-own-text"]
 
 
-def _radial_balloon_17(com_inside_m, ink_inside_m):
+def _radial_balloon_17(com_inside_m, *ink, barb_m=0.0036):
     """Balloon 17 with a radial leader to its tip: COM registers the leader
-    from ``com_inside_m`` inside the printed ring, the PDF draws it from
-    ``ink_inside_m`` inside (``None``: no printed leader)."""
+    from ``com_inside_m`` inside the printed ring. Each ``ink`` entry
+    ``(inside_m, turn)`` is a printed stroke from the tip to a point
+    ``inside_m`` inside the ring, ``turn`` radians round from the leader's
+    radius; with any, the arrowhead prints as two ``barb_m`` strokes back
+    from the tip, 3.6 mm on frame-assembly (run 20260928T124727673Z)."""
     cx, cy, radius = DTA_BALLOON_17_RING
     tip = (0.1676521, 0.1137831)
     length = math.hypot(tip[0] - cx, tip[1] - cy)
     ux, uy = (tip[0] - cx) / length, (tip[1] - cy) / length
 
-    def at(inside):
-        return (cx + (radius - inside) * ux, cy + (radius - inside) * uy)
+    def at(inside, turn=0.0):
+        c, s = math.cos(turn), math.sin(turn)
+        return (cx + (radius - inside) * (ux * c - uy * s), cy + (radius - inside) * (ux * s + uy * c))
+
+    def barb(turn):
+        c, s = math.cos(turn), math.sin(turn)
+        return (tip[0] - barb_m * (ux * c - uy * s), tip[1] - barb_m * (ux * s + uy * c))
 
     start = at(com_inside_m)
     leader = [*start, 0.051225, *tip, 0.051225]
@@ -2861,37 +2870,64 @@ def _radial_balloon_17(com_inside_m, ink_inside_m):
         "leaders": [leader],
         "display": {**DTA_BALLOON_17["display"], "lines": [[0.0, 0.0, 0.0, 0.0, *leader]]},
     }
-    ink = [] if ink_inside_m is None else [(*tip, *at(ink_inside_m))]
+    strokes = [(*tip, *at(inside, turn)) for inside, turn in ink]
+    if strokes:
+        strokes += [(*tip, *barb(0.21)), (*tip, *barb(-0.21))]
     return _dump(
         views=[_view("Drawing View8", (0.12, 0.08, 0.30, 0.20), [balloon])],
         spans=[["17", 0.1618, 0.1034, 0.1662, 0.1069]],
-        strokes=[*_edges(*_ring(*DTA_BALLOON_17_RING), *ink, width=0.00018)],
+        strokes=[*_edges(*_ring(*DTA_BALLOON_17_RING), *strokes, width=0.00018)],
     )
 
 
 def _own_strikes(dump):
-    return [f for f in audit_dump(dump) if f.kind == "leader-through-own-text"]
+    return [f for f in audit_dump(dump) if f.kind in ("leader-through-own-text", "leader-ink-ambiguous")]
 
 
-def test_a_balloon_leader_starts_where_the_pdf_printed_it_not_where_com_read_it():
+@pytest.mark.parametrize("com_inside_m", [0.00047, 0.0015], ids=["r2c-balloon-5", "com-1.5mm-inside"])
+def test_a_balloon_leader_starts_where_the_pdf_printed_it_however_far_com_read_it(com_inside_m):
     """Frame balloon 5 on a 1024x640 seat (run 20260928T124727673Z): COM put
     its leader start 0.47 mm inside the printed ring, read off the window's
-    rendering, while the PDF drew the leader from the ring. The printed
-    stroke is the leader the sheet carries."""
-    assert _own_strikes(_radial_balloon_17(0.00047, None)), "fixture: the COM start alone is a finding"
-    assert _own_strikes(_radial_balloon_17(0.00047, 0.0)) == []
+    rendering, while the PDF drew the leader from the ring. The window sets
+    how far COM strays, so a start 1.5 mm off is the same clean sheet: the
+    printed stroke is the leader it carries."""
+    assert [f.kind for f in _own_strikes(_radial_balloon_17(com_inside_m))] == ["leader-through-own-text"], (
+        "fixture: the COM start alone is a finding"
+    )
+    assert _own_strikes(_radial_balloon_17(com_inside_m, (0.0, 0.0))) == []
 
 
-@pytest.mark.parametrize(
-    ("com_inside_m", "ink_inside_m"),
-    [(0.0015, 0.0015), (0.0015, 0.0)],
-    ids=["printed-inside", "ink-beyond-the-match"],
-)
-def test_a_balloon_leader_that_starts_well_inside_its_ring_is_still_found(com_inside_m, ink_inside_m):
+@pytest.mark.parametrize("com_inside_m", [0.0, 0.0015], ids=["com-on-ring", "com-inside-too"])
+def test_a_balloon_leader_printed_well_inside_its_ring_is_found(com_inside_m):
     """A leader the PDF draws from 1.5 mm inside its ring is ink through the
-    number, and a printed stroke 1.5 mm from the COM start is not evidence
-    about it (the match is BALLOON_LEADER_INK_MATCH_M, 1 mm): both report."""
-    assert _own_strikes(_radial_balloon_17(com_inside_m, ink_inside_m))
+    number, wherever COM read its start."""
+    assert [f.kind for f in _own_strikes(_radial_balloon_17(com_inside_m, (0.0015, 0.0)))] == [
+        "leader-through-own-text"
+    ]
+
+
+def test_an_arrowhead_ending_inside_the_com_circle_is_not_a_leader_start():
+    """The printed start is judged against the printed ring, not the COM
+    circle 0.5 mm off it: a short leader's 4.5 mm arrowhead strokes end
+    0.29 mm outside the ring, one of them inside the COM circle."""
+    from _layout_audit import BALLOON_LEADER_RING_M
+
+    cx, cy, radius = DTA_BALLOON_17_RING
+    com = balloon_circle(DTA_BALLOON_17["display"])
+    dump = _radial_balloon_17(0.0015, (0.0, 0.0), barb_m=0.0045)
+    barbs = [(s[2], s[3]) for s in dump["ink"]["strokes"][-2:]]
+    assert all(math.hypot(x - cx, y - cy) > radius + BALLOON_LEADER_RING_M for x, y in barbs)
+    assert any(math.hypot(x - com[0], y - com[1]) < com[2] for x, y in barbs), "fixture: a barb inside COM's circle"
+    assert _own_strikes(dump) == []
+
+
+def test_two_printed_starts_for_one_balloon_leader_are_reported_as_ambiguous():
+    """Two strokes from the tip to the ring leave the printed start
+    unsettled: the audit keeps the COM start and says so."""
+    [finding] = _own_strikes(_radial_balloon_17(0.0, (0.0, 0.0), (0.0, 0.3)))
+    assert finding.kind == "leader-ink-ambiguous"
+    assert finding.extra == {"strokes": 2.0}
+    assert severity(finding) is FindingSeverity.GATING
 
 
 def test_diagonal_balloons_are_separated_by_their_circles():
@@ -3898,31 +3934,34 @@ def test_report_mode_passes_a_gating_kind_that_is_not_enforced(monkeypatch, tmp_
 
 
 @pytest.mark.parametrize(
-    ("com_inside_m", "ink_inside_m", "fails"),
-    [(0.0015, 0.0015, True), (0.0015, 0.0, True), (0.00047, 0.0, False)],
-    ids=["printed-inside", "ink-beyond-the-match", "com-start-inside-printed-on-ring"],
+    ("com_inside_m", "ink", "kind"),
+    [
+        (0.0, ((0.0015, 0.0),), "leader-through-own-text"),
+        (0.0015, ((0.0, 0.0),), None),
+        (0.0, ((0.0, 0.0), (0.0, 0.3)), "leader-ink-ambiguous"),
+    ],
+    ids=["printed-inside", "com-1.5mm-inside-printed-on-ring", "two-printed-starts"],
 )
 def test_frame_assembly_fails_its_leaf_on_a_leader_printed_through_its_own_balloon(
-    monkeypatch, tmp_path, com_inside_m, ink_inside_m, fails
+    monkeypatch, tmp_path, com_inside_m, ink, kind
 ):
     """frame-assembly's short-leader balloons check their leader start only
     right after SetPosition; after the rebuild the printed leader is the
-    evidence, so REPORT fails that drawing on leader-through-own-text. A
-    leader printed 1.5 mm inside its ring, or one whose only ink is 1.5 mm
-    from the COM start, fails it; a COM start 0.47 mm inside with the leader
-    printed from the ring (run 20260928T124727673Z's balloon 5) passes.
-    Other drawings still only report the kind."""
+    evidence, so REPORT fails that drawing on a leader printed 1.5 mm inside
+    its ring (read from the ring by COM), or on two printed starts. A COM
+    start 1.5 mm inside with the leader printed from the ring passes. Other
+    drawings still only report both kinds."""
     import _layout_audit
 
-    dump = _radial_balloon_17(com_inside_m, ink_inside_m)
+    dump = _radial_balloon_17(com_inside_m, *ink)
     live = _patch_collect(monkeypatch, [dump])
-    assert "leader-through-own-text" not in _layout_audit.ENFORCED_KINDS
+    assert not {"leader-through-own-text", "leader-ink-ambiguous"} & _layout_audit.ENFORCED_KINDS
     _run(live, LayoutAuditMode.REPORT, tmp_path / "other.json")
     frame = tmp_path / "frame-assembly.json"
-    if not fails:
+    if kind is None:
         _run(live, LayoutAuditMode.REPORT, frame, stem="frame-assembly")
         return
-    with pytest.raises(RuntimeError, match=r"(?s)frame-assembly .*\[leader-through-own-text\]"):
+    with pytest.raises(RuntimeError, match=rf"(?s)frame-assembly .*\[{kind}\]"):
         _run(live, LayoutAuditMode.REPORT, frame, stem="frame-assembly")
 
 

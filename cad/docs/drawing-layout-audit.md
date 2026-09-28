@@ -115,10 +115,14 @@ page's annotation strokes and keeps the COM circle only when no closed ring
 prints within 1 mm of it. A balloon leader's registered start is also read
 off the window: on 1024x640 seats it lay 0.15-0.78 mm from where the PDF
 starts the leader, on the printed ring (frame-assembly, 20 balloons), and
-once 0.47 mm inside it, a false `leader-through-own-text`. So the start
-becomes the near end of the printed stroke that shares the leader's
-arrowtip and starts within 1 mm of the COM start; with no such stroke the
-COM start stands. Lines, leaders and gaps are then measured against
+once 0.47 mm inside it, a false `leader-through-own-text`. How far the COM
+start strays is the window's, so it does not pick the printed start: with a
+ring fitted, the start becomes the other end of the one printed stroke that
+shares the leader's arrowtip and ends on or inside that ring (0.1 mm band;
+printed starts measured 0.00-0.05 mm off it on 68 frame and drive-train
+balloons). A leader printed from inside its ring therefore reads there. No
+such stroke, or no fitted ring, keeps the COM start; several keep it and
+report `leader-ink-ambiguous`. Lines, leaders and gaps are then measured against
 the circle, not its bounding square, whose corners are blank paper
 (layoutcal2-c: 35 of drive-train-assembly's 36 findings; the 36th was the
 table below). A table is one
@@ -133,6 +137,7 @@ only for a dump with no PDF text, i.e. the offline fixtures.
 | `text-on-line` | gating | a foreign line runs through text; covers annotation lines, printed model edges, datum-origin, section-line and detail-circle ink |
 | `text-on-view` | gating | text printed inside a view its annotation does not belong to: within the extent of that view's printed edges (`GetOutline` pads the part by a few mm, so it is used, inset, only when no edges printed; pictorial views skipped); from swing's MHA-092 gap diff |
 | `leader-through-text` / `leader-through-own-text` | gating | a leader runs through foreign text, or through its own rows (0.2 mm inset, shoulder excluded) |
+| `leader-ink-ambiguous` | gating | more than one printed stroke runs from a balloon leader's arrowtip to a start on or inside its printed ring: the audit keeps the COM start, so its own-text check is unproven |
 | `leader-crosses-line` / `shoulder-crosses-line` | gating | a leader, or a callout's shoulder under its text, crosses another annotation's dimension or extension line (Main's ruling a) or frame line transversally (MHA-092's heel-height line through the ADJUSTER shoulder). Not a detail circle (a leader to a feature inside it must cross it), and not on the stretch a leader runs past its arrow tip into the hole, where the hole's own centre and extension lines pass |
 | `leader-converges-at-landing` | advisory | a leader crossing within 5 mm of both its own landing and the crossed line's end: two leaders closing on one corner (Main's ruling on cone-gear-shaft's Ra 1.6) |
 | `leader-crosses-section-line` | gating | a leader crossing a section cutting line (Main's ruling: the MHA-025 finish leader was moved off its A-A line for this) |
@@ -223,10 +228,11 @@ datum-origin case replay from the calibration run's dumps.
    a balloon's short leader has started inside its printed ring
    (drive-train-assembly), and the kind also fires on harmonic-base,
    platen-guide, pinion-pivot-shaft and rocker-arm-support (7 days to
-   2026-09-28). frame-assembly alone enforces it now
-   (`STEM_ENFORCED_KINDS`): its short-leader balloons check their leader
-   start only right after SetPosition, since after the rebuild COM reports
-   the start the fit render left, so the printed leader is their check.
+   2026-09-28). frame-assembly alone enforces it now, with
+   `leader-ink-ambiguous` (`STEM_ENFORCED_KINDS`): its short-leader balloons
+   check their leader start only right after SetPosition, since after the
+   rebuild COM reports the start the fit render left, so the printed leader
+   is their check.
    `view-edges-missing` is
    zero here, but not with the lighter line weights (c45096c90).
 2. **GATE**: one commit, landed before the release cut. It flips the mode and
