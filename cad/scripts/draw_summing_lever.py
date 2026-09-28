@@ -216,15 +216,17 @@ async def build(adapter: Any) -> dict[str, str]:
     # hole callout, which SolidWorks lands up-left of the 12-o'clock pick. From
     # the 9-o'clock point, with the frame up-left, the two leaders met 0.6 mm
     # apart and crossed (leader-crosses-leader). The frame now stands up-right
-    # (x ~0.204..0.234, y ~0.176..0.183, 3 mm under the 20X frame's "20X") and
+    # (x ~0.201..0.231, y ~0.176..0.183, 3 mm under the 20X frame's "20X") and
     # its leader drops almost vertically at x ~0.198, right of RD1's leader.
+    # At +6 mm its right end sat on the pivot stud's top-left corner (x
+    # ~0.2333); +3 mm leaves about 2 mm of air.
     anchor_tap_fcf_edge = _top_xy(TIP_X + COUNTER_R, 0.0)
     add_feature_control_frame(
         adapter,
         top,
         edge_xy=anchor_tap_fcf_edge,
         frame_xy=(
-            anchor_tap_fcf_edge[0] + 0.006,
+            anchor_tap_fcf_edge[0] + 0.003,
             anchor_tap_fcf_edge[1] + 0.053,
         ),
         characteristic="position",

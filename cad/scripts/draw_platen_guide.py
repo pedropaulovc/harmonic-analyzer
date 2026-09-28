@@ -217,11 +217,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # 10 x 5 section and fenced the opposite face, so the parallelism frame's
     # leader had to cross one of them to reach it (leader-crosses-line). At
     # x 0.338 the text clears the front view's box (0.3304) and datum A's tag
-    # (0.3485). Both dimensions live in the GuideProfile sketch (Front plane).
+    # (0.3485). y 0.110 centres the 3.5 mm text in the 5 mm gap between the
+    # extension lines (y 0.1075 and 0.1125); at 0.1111 the upper one ran
+    # through it (extension-through-own-text). Both dimensions live in the
+    # GuideProfile sketch (Front plane).
     curate_view_dimensions(
         adapter,
         front,
-        keep={"Length": (FRONT_VIEW_X_M, 0.135), "Height": (0.338, 0.1111)},
+        keep={"Length": (FRONT_VIEW_X_M, 0.135), "Height": (0.338, 0.110)},
         view_label="front",
     )
     curate_view_dimensions(
