@@ -2842,6 +2842,58 @@ def test_a_leader_through_its_own_balloon_is_still_found():
     assert [f.kind for f in findings if f.kind == "leader-through-own-text"] == ["leader-through-own-text"]
 
 
+def _radial_balloon_17(com_inside_m, ink_inside_m):
+    """Balloon 17 with a radial leader to its tip: COM registers the leader
+    from ``com_inside_m`` inside the printed ring, the PDF draws it from
+    ``ink_inside_m`` inside (``None``: no printed leader)."""
+    cx, cy, radius = DTA_BALLOON_17_RING
+    tip = (0.1676521, 0.1137831)
+    length = math.hypot(tip[0] - cx, tip[1] - cy)
+    ux, uy = (tip[0] - cx) / length, (tip[1] - cy) / length
+
+    def at(inside):
+        return (cx + (radius - inside) * ux, cy + (radius - inside) * uy)
+
+    start = at(com_inside_m)
+    leader = [*start, 0.051225, *tip, 0.051225]
+    balloon = {
+        **DTA_BALLOON_17,
+        "leaders": [leader],
+        "display": {**DTA_BALLOON_17["display"], "lines": [[0.0, 0.0, 0.0, 0.0, *leader]]},
+    }
+    ink = [] if ink_inside_m is None else [(*tip, *at(ink_inside_m))]
+    return _dump(
+        views=[_view("Drawing View8", (0.12, 0.08, 0.30, 0.20), [balloon])],
+        spans=[["17", 0.1618, 0.1034, 0.1662, 0.1069]],
+        strokes=[*_edges(*_ring(*DTA_BALLOON_17_RING), *ink, width=0.00018)],
+    )
+
+
+def _own_strikes(dump):
+    return [f for f in audit_dump(dump) if f.kind == "leader-through-own-text"]
+
+
+def test_a_balloon_leader_starts_where_the_pdf_printed_it_not_where_com_read_it():
+    """Frame balloon 5 on a 1024x640 seat (run 20260928T124727673Z): COM put
+    its leader start 0.47 mm inside the printed ring, read off the window's
+    rendering, while the PDF drew the leader from the ring. The printed
+    stroke is the leader the sheet carries."""
+    assert _own_strikes(_radial_balloon_17(0.00047, None)), "fixture: the COM start alone is a finding"
+    assert _own_strikes(_radial_balloon_17(0.00047, 0.0)) == []
+
+
+@pytest.mark.parametrize(
+    ("com_inside_m", "ink_inside_m"),
+    [(0.0015, 0.0015), (0.0015, 0.0)],
+    ids=["printed-inside", "ink-beyond-the-match"],
+)
+def test_a_balloon_leader_that_starts_well_inside_its_ring_is_still_found(com_inside_m, ink_inside_m):
+    """A leader the PDF draws from 1.5 mm inside its ring is ink through the
+    number, and a printed stroke 1.5 mm from the COM start is not evidence
+    about it (the match is BALLOON_LEADER_INK_MATCH_M, 1 mm): both report."""
+    assert _own_strikes(_radial_balloon_17(com_inside_m, ink_inside_m))
+
+
 def test_diagonal_balloons_are_separated_by_their_circles():
     """6 text-separation on drive-train-assembly: balloons set diagonally have
     bounding-square corners 2 mm apart and circles 7 mm apart. At 0.5 mm the

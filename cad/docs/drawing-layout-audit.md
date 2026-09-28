@@ -112,7 +112,13 @@ counts).
 A balloon is its printed circle. `GetDisplayData` puts the circle up to
 0.57 mm off the ring the PDF draws, so the audit fits the ring from the
 page's annotation strokes and keeps the COM circle only when no closed ring
-prints within 1 mm of it. Lines, leaders and gaps are then measured against
+prints within 1 mm of it. A balloon leader's registered start is also read
+off the window: on 1024x640 seats it lay 0.15-0.78 mm from where the PDF
+starts the leader, on the printed ring (frame-assembly, 20 balloons), and
+once 0.47 mm inside it, a false `leader-through-own-text`. So the start
+becomes the near end of the printed stroke that shares the leader's
+arrowtip and starts within 1 mm of the COM start; with no such stroke the
+COM start stands. Lines, leaders and gaps are then measured against
 the circle, not its bounding square, whose corners are blank paper
 (layoutcal2-c: 35 of drive-train-assembly's 36 findings; the 36th was the
 table below). A table is one
@@ -214,8 +220,10 @@ datum-origin case replay from the calibration run's dumps.
    another. Datum-origin labels are now boxed one by one, which removed 4 of
    its 5 findings. The X axis prints between its "0" and "X" labels, and one
    row box spanning both read the axis as a leader through its own text. But
-   a balloon's short leader still starts inside its printed ring from time
-   to time (drive-train-assembly, frame-assembly). `view-edges-missing` is
+   a balloon's short leader has started inside its printed ring
+   (drive-train-assembly), and the kind also fires on harmonic-base,
+   platen-guide, pinion-pivot-shaft and rocker-arm-support (7 days to
+   2026-09-28). `view-edges-missing` is
    zero here, but not with the lighter line weights (c45096c90).
 2. **GATE**: one commit, landed before the release cut. It flips the mode and
    removes the superseded audits: the 6 explicit `check_drawing_layout`

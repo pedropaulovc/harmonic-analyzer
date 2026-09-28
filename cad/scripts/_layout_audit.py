@@ -630,12 +630,24 @@ def ink_annotation_strokes(dump: Mapping[str, Any]) -> list[Segment]:
 
 
 # A balloon's GetDisplayData circle sits up to 0.57 mm off the ring the PDF
-# prints (layoutcal2-c, drive-train-assembly: 28 balloons, the COM leader
-# start lands exactly on the printed ring), so the printed ring wins when
-# the page's strokes trace one within this band of the COM circle.
+# prints (layoutcal2-c, drive-train-assembly: 28 balloons), so the printed
+# ring wins when the page's strokes trace one within this band of the COM
+# circle.
 BALLOON_RING_SEARCH_M = 0.001
 # The printed ring is a polyline; every vertex lies this close to its fit.
 BALLOON_RING_FIT_TOL_M = 0.0001
+# COM reads a balloon leader's start off the window's rendering of the ring,
+# so it moves with the seat's window; the PDF draws the leader from the
+# printed ring. On the frame's 1024x640 seats (runs 20260928T124727673Z and
+# 20260928T141421973Z, 20 balloons) every leader printed as one stroke from
+# the COM arrowtip (within 0.02 mm) to a point 0.00-0.02 mm off the printed
+# ring and 0.15-0.78 mm from the COM start; balloon 5 registered its start
+# 0.47 mm inside that ring. The printed stroke's end replaces the COM start
+# when it lies within this distance of it; with no such stroke the COM start
+# stands, so a leader the PDF really draws from inside its ring is found.
+BALLOON_LEADER_INK_MATCH_M = 0.001
+# How close the printed stroke's far end must be to the registered one.
+BALLOON_LEADER_TIP_M = 0.0001
 
 
 def _fit_circle(points: Sequence[tuple[float, float]]) -> tuple[float, float, float] | None:
@@ -731,6 +743,44 @@ def _move_ring(
             out.append(segment)
             continue
         out.append(Segment(*moved(segment.x0, segment.y0), *moved(segment.x1, segment.y1), segment.role))
+    return out
+
+
+def _printed_leader_starts(
+    segments: Sequence[Segment],
+    annotation: Mapping[str, Any],
+    strokes: Sequence[Segment],
+) -> list[Segment]:
+    """``segments`` with each balloon leader starting where the PDF printed it.
+
+    A registered leader's first segment keeps its far end; its start becomes
+    the near end of the printed stroke that shares that far end (within
+    :data:`BALLOON_LEADER_TIP_M`) and starts within
+    :data:`BALLOON_LEADER_INK_MATCH_M` of the COM start, the nearest if
+    several do. No such stroke leaves the COM start as registered.
+    """
+    starts = {span[0] for span in _leader_spans(annotation)}
+    out = []
+    for segment in segments:
+        start = (segment.x0, segment.y0)
+        if segment.role != "leader" or start not in starts:
+            out.append(segment)
+            continue
+        far = (segment.x1, segment.y1)
+        printed = [
+            near
+            for stroke in strokes
+            for near, other in (
+                ((stroke.x0, stroke.y0), (stroke.x1, stroke.y1)),
+                ((stroke.x1, stroke.y1), (stroke.x0, stroke.y0)),
+            )
+            if math.dist(other, far) <= BALLOON_LEADER_TIP_M
+            and math.dist(near, start) <= BALLOON_LEADER_INK_MATCH_M
+        ]
+        if printed:
+            near = min(printed, key=lambda point: (math.dist(point, start), point))
+            segment = Segment(near[0], near[1], segment.x1, segment.y1, segment.role)
+        out.append(segment)
     return out
 
 
@@ -1716,6 +1766,7 @@ def annotation_geometry(
     if circle is not None and strokes:
         printed = printed_circle(circle, strokes)
         segments = _move_ring(segments, circle, printed)
+        segments = _printed_leader_starts(segments, annotation, strokes)
         circle = printed
     if circle is not None:
         # A BOM balloon's GetExtent includes its leader; its rendered
@@ -3618,10 +3669,11 @@ GATING_KINDS = frozenset(
 # #1105 re-placed rebuilt on top. "view-edges-missing" is also zero here, but it
 # fires 157 times with the 0.13/0.18 mm line weights (c45096c90), so it waits
 # for that branch. "leader-through-own-text" is held out too. The datum-origin
-# boxing removed 4 of its 5 findings, but balloons still trip it
-# intermittently: a short leader starts just inside its printed ring. It fired
-# on drive-train-assembly in 4 of 18 runs and on frame-assembly (balloon 5,
-# 0.35 mm) at 081cfd468.
+# boxing removed 4 of its 5 findings. A balloon leader now starts where the PDF
+# prints it (BALLOON_LEADER_INK_MATCH_M), which cleared frame-assembly's
+# balloon 5 (0.47 mm inside its ring at 20260928T124727673Z) on replay, but it
+# still fires on harmonic-base, platen-guide, pinion-pivot-shaft and
+# rocker-arm-support (7 days to 2026-09-28).
 ENFORCED_KINDS: frozenset[str] = frozenset(
     {
         "com-read-errors",
