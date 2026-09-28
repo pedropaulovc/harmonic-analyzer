@@ -3087,16 +3087,13 @@ def task_check():
         SCRIPTS_DIR.parent / "docs" / "drawing-simplicity-policy.md",
     ]
     # test_adapter_feature_resolution exercises the vendored adapter, which
-    # module_deps_of never walks (an installed package, see SUBMODULE_SRC): a
-    # submodule bump touching these must re-run the gate.
-    adapter_contract_deps = [
-        SUBMODULE_SRC / "adapters" / "raw_dispatch.py",
-        SUBMODULE_SRC / "adapters" / "sw_type_info.py",
-        SUBMODULE_SRC / "adapters" / "_generated" / "sldworks_2026.py",
-        SUBMODULE_SRC / "adapters" / "solidworks" / "features.py",
-        SUBMODULE_SRC / "adapters" / "solidworks" / "reference_geometry.py",
-        SUBMODULE_SRC / "adapters" / "base.py",
-    ]
+    # module_deps_of never walks (an installed package, see SUBMODULE_SRC). Its
+    # real import closure (package __init__s, transitive helpers) is wider than
+    # any hand-picked list, so depend on EVERY submodule source file the digest
+    # tiers hash: any submodule bump re-runs the gate (codex #1101). The files,
+    # not a digest sidecar -- the sidecars are COM cache-key inputs, which no
+    # check:* task may carry (test_com_deps_include_submodule_and_checks_do_not).
+    adapter_contract_deps = [str(path) for path in _submodule_src_files()]
     # test_out_param_binding SCANS sources instead of importing them (it reads
     # every top-level build script and every diagnostics/*.py looking for
     # VT_BYREF), so module_deps_of cannot see them -- an import graph does not
@@ -3114,7 +3111,7 @@ def task_check():
             *(str(path.resolve()) for path in recipe_tests),
             *(dep for path in recipe_tests for dep in module_deps_of(path)),
             *(str(path.resolve()) for path in machinist_review_contract_deps),
-            *(str(path.resolve()) for path in adapter_contract_deps),
+            *adapter_contract_deps,
             *scanned_by_binding_gate,
             str(
                 (REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py").resolve()
