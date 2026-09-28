@@ -990,6 +990,7 @@ def add_feature_control_frame(
         "SetPosition2",
         "SetLeader3",
         "GetAttachedEntities3",
+        "GetAttachedEntityTypes",
         "GetLeaderCount",
         "IsDangling",
         "GetLeaderPointsAtIndex",
@@ -1023,7 +1024,10 @@ def add_feature_control_frame(
         raise RuntimeError(f"failed to position feature-control frame ({label})")
     rebuild_drawing(adapter, label="add_feature_control_frame")
     # IGtol.IsAttached reads True on a detached frame (run 20260928T080412049Z
-    # above), so the attached entity is what proves the attachment.
+    # above), so the attached entity is what proves the attachment.  A
+    # silhouette never passes IsSame, moved or not (probe 3 and the crank
+    # handle, pen marker and transgear stud frames on run 20260928T081119688Z),
+    # so it must be the one attached silhouette, as for surface finishes.
     if entity_type == "DIMENSION":
         if (
             int(annotation.GetAttachedEntityCount3()) not in expected_entities
@@ -1036,6 +1040,15 @@ def add_feature_control_frame(
                 f"expected in {sorted(expected_entities)}; "
                 f"attached={bool(gtol.IsAttached())}; "
                 f"leaders={gtol.GetLeaderCount()}, expected=1"
+            )
+    elif entity_type == "SILHOUETTE":
+        types = tuple(int(t) for t in (annotation.GetAttachedEntityTypes() or ()))
+        leaders = int(annotation.GetLeaderCount())
+        dangling = bool(annotation.IsDangling())
+        if types != (_SEL_SILHOUETTE,) or dangling or leaders != 1:
+            raise RuntimeError(
+                f"feature-control frame lost its silhouette attachment ({label}): "
+                f"types={types}, dangling={dangling}, leaders={leaders}"
             )
     else:
         _assert_attached_to(
