@@ -1525,6 +1525,11 @@ def test_cancel_keeps_outputs_the_launcher_moved_before_it_died(
         process.stderr.close()
         # The launcher's own first cleanup step, done before it was stopped.
         (Path(running["snapshot"]) / "cad" / "out").rename(running["outputs"])
+        status = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Status", "-Tag", "race"),
+            fixture["environment"],
+        )
         cancel = _run_launcher(
             fixture,
             _tracking(fixture, "-Cancel", "-Tag", "race", "-Why", "raced cleanup"),
@@ -1532,6 +1537,11 @@ def test_cancel_keeps_outputs_the_launcher_moved_before_it_died(
         )
     finally:
         release.touch()
+
+    assert status.returncode == 0, status.stderr
+    reported = json.loads(status.stdout)
+    assert reported["state"] == "launcher-died"
+    assert reported["outputs"] == running["outputs"]
 
     assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
     done = _record(Path(running["done"]))

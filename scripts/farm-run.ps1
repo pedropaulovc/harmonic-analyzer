@@ -432,6 +432,17 @@ function Complete-Snapshot {
     return $result
 }
 
+function Get-UnfinishedRunOutputs {
+    param([Parameter(Mandatory)]$Record)
+
+    # A launcher stopped between moving cad/out and writing .done has already
+    # put its outputs where a finished run's are.
+    if (Test-Path -LiteralPath $Record['outputs'] -PathType Container) {
+        return $Record['outputs']
+    }
+    return Join-Path $Record['snapshot'] 'cad\out'
+}
+
 # --- Tracking a recorded run: -Status, -Watch, -Cancel, -List -----------------
 #
 # Everything below reads the same three records a launch writes under
@@ -707,8 +718,9 @@ function Get-RunStatus {
         record = [System.IO.Path]::GetFullPath($RecordPath)
         log = $record['log']
         done = $record['done']
-        # .done's outputs is where they are; before it, the snapshot still has them.
-        outputs = if ($null -ne $done) { $done['outputs'] } else { Join-Path $record['snapshot'] 'cad\out' }
+        # .done's outputs is where they are; before it, the snapshot has them
+        # until the launcher's cleanup moves them to the recorded path.
+        outputs = if ($null -ne $done) { $done['outputs'] } else { Get-UnfinishedRunOutputs -Record $record }
         counts = [ordered]@{
             hits = $log['hits']
             requested = @($leaves | Where-Object { $null -ne $_['workflow_id'] }).Count
