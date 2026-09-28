@@ -1366,9 +1366,13 @@ def _exit_span(handle: Any, exc: BaseException | None) -> None:
             }
         )
         span.set_status(Status(StatusCode.ERROR, str(exc)))
-        error(
-            f"{span.name if isinstance(span, ReadableSpan) else 'span'} failed: {exc}"
-        )
+        # Best-effort: a log handler that raises here would replace the very
+        # exception this records (a SeatNotReady would become an exit 1) and
+        # leave the span open.
+        with contextlib.suppress(Exception):
+            error(
+                f"{span.name if isinstance(span, ReadableSpan) else 'span'} failed: {exc}"
+            )
     else:
         # get_current_span() is typed Span (mutable, has set_status); only
         # ReadableSpan exposes .status -- the live SDK span is both.
@@ -1663,10 +1667,13 @@ def build_session(
         raise
     except BaseException as exc:
         code = getattr(exc, "code", None)
-        error(
-            f"build {label} exiting ({type(exc).__name__}, exit {code}): {exc}",
-            **({"exit_code": code} if isinstance(code, int) else {}),
-        )
+        # Best-effort, like the flush: a raising handler must not turn exit 89
+        # into an ordinary exception.
+        with contextlib.suppress(Exception):
+            error(
+                f"build {label} exiting ({type(exc).__name__}, exit {code}): {exc}",
+                **({"exit_code": code} if isinstance(code, int) else {}),
+            )
         shutdown()
         raise
 

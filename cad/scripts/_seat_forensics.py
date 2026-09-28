@@ -452,13 +452,17 @@ def record_seat_provenance(adapter: Any) -> dict[str, Any]:
         prov.update(_seat_startup)
         _watchdog.set_seat_provenance(prov)
         _telemetry.event("seat.provenance", **prov)
-        _telemetry.info(
-            "seat "
-            + " ".join(
-                f"{key.removeprefix('seat_')}={value}" for key, value in prov.items()
-            ),
-            **prov,
-        )
+        # Best-effort: a log handler that raises here would replace a pending
+        # SeatNotReady with an ordinary exception -- exit 1, never retried.
+        with contextlib.suppress(Exception):
+            _telemetry.info(
+                "seat "
+                + " ".join(
+                    f"{key.removeprefix('seat_')}={value}"
+                    for key, value in prov.items()
+                ),
+                **prov,
+            )
     return prov
 
 

@@ -623,6 +623,62 @@ def test_exit_89_flushes_its_telemetry_and_names_itself(monkeypatch):
     assert any("exit 89" in m and "StartupProcessCompleted=False" in m for m in errors), errors
 
 
+class _LoggerThatFailsOnceArmed:
+    """The telemetry logger, until the gate decides; from then on every record
+    raises, as a log handler that breaks mid-exit would."""
+
+    def __init__(self, logger):
+        self._logger = logger
+        self.armed = False
+        self.refused: list[str] = []
+
+    def __getattr__(self, name: str):
+        emit = getattr(self._logger, name)
+        if not self.armed or name not in ("debug", "info", "warning", "error", "log"):
+            return emit
+
+        def _refuse(*args, **_kwargs) -> None:
+            self.refused.append(str(args[-1]))
+            raise OSError(28, "No space left on device")
+
+        return _refuse
+
+
+def test_exit_89_survives_telemetry_that_fails_on_the_way_out(monkeypatch, spans):
+    """Codex on #1108: the records that name exit 89 -- the gate span's
+    failure, the seat line and the session's exit line -- are best-effort. One
+    that raised would replace the pending SeatNotReady with an ordinary
+    exception, which ``run_build`` turns into exit 1 and ``_exec_com`` never
+    retries."""
+    _seat_age(monkeypatch, 20)
+    monkeypatch.setattr(_seat_forensics, "_STARTUP_WAIT_S", 0.05)
+    monkeypatch.delenv("TRACEPARENT", raising=False)
+    shutdown = Mock()
+    monkeypatch.setattr(_telemetry, "shutdown", shutdown)
+    logger = _LoggerThatFailsOnceArmed(_telemetry.get_logger())
+    monkeypatch.setattr(_telemetry, "get_logger", lambda: logger)
+    annotate = _telemetry.annotate
+
+    def _decide(**attributes) -> None:
+        logger.armed = True
+        annotate(**attributes)
+
+    monkeypatch.setattr(_telemetry, "annotate", _decide)
+
+    with pytest.raises(SystemExit) as caught:
+        with _telemetry.build_session("crank_hub", script="draw_crank_hub.py"):
+            _seat_forensics.record_seat_provenance(_Adapter(_Seat(False)))
+
+    assert type(caught.value) is _watchdog.SeatNotReady
+    assert caught.value.code == 89
+    shutdown.assert_called_once_with()
+    # Each exit-path record was attempted, and refused.
+    refused = " | ".join(logger.refused)
+    assert "sw.startup_wait failed" in refused
+    assert f"seat pid={_PID}" in refused
+    assert "exiting (SeatNotReady, exit 89)" in refused
+
+
 def _load_dodo():
     spec = importlib.util.spec_from_file_location("dodo", REPO_ROOT / "dodo.py")
     assert spec is not None and spec.loader is not None
