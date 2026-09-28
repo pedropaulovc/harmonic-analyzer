@@ -3118,6 +3118,66 @@ def _crown_finish_strikes(mm, y):
 
 
 # --------------------------------------------------------------------------
+# Real case: MHA-089 rocker-arm-support, datum origin (af13c8ff8)
+# --------------------------------------------------------------------------
+
+# DetailItem361 as the leaf logged it: "0"/"X" on the X axis (one baseline),
+# "0"/"Y" on the Y axis.
+RAS_DATUM_ORIGIN = {
+    "type": 16,
+    "name": "DetailItem361",
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.06055, 0.059125, 0.0],
+    "layer": "",
+    "datum_origin": {
+        "axis": [0.06055, 0.04563, 0.076601, 0.04563, 0.047055, 0.059125, 0.047055, 0.075176],
+        "x_label": "X",
+        "y_label": "Y",
+    },
+    "display": {
+        "lines": [
+            _line(0.06055, 0.058125, 0.06055, 0.04363),
+            _line(0.06055, 0.04563, 0.073045, 0.04563),
+            _line(0.05955, 0.059125, 0.045055, 0.059125),
+            _line(0.047055, 0.059125, 0.047055, 0.07162),
+        ],
+        "arrows": [
+            [0.076601, 0.04563, 0.0, -1.0, -0.0, -0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0],
+            [0.047055, 0.075176, 0.0, -0.0, -1.0, -0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0],
+        ],
+        "texts": [
+            {"t": "X", "pos": [0.080101, 0.0427801, 0.0], "h": 0.0035, "ref": 1, "ang": 0.0},
+            {"t": "Y", "pos": [0.0456744, 0.0758979, 0.0], "h": 0.0035, "ref": 1, "ang": 0.0},
+            {"t": "0", "pos": [0.0562569, 0.0428519, 0.0], "h": 0.0035, "ref": 1, "ang": 0.0},
+            {"t": "0", "pos": [0.0457619, 0.0533469, 0.0], "h": 0.0035, "ref": 1, "ang": 0.0},
+        ],
+    },
+}
+
+
+def test_a_datum_origins_axis_between_its_own_labels_is_not_through_its_text():
+    """af13c8ff8: 4 of the fleet's 5 leader-through-own-text were datum
+    origins (rocker-arm-support, platen-guide x2, harmonic-base). The X axis
+    prints between its "0" and "X" labels on one baseline; boxed as one row
+    they spanned 56.4..82.8 mm and the axis ran 12.5 mm "through" it. Each
+    label is its own box. The control: a label printed ON the axis is still
+    a strike."""
+    view = _view("Drawing View3", (0.054962, 0.053615, 0.155038, 0.096385), [RAS_DATUM_ORIGIN])
+
+    def own_strikes(annotation):
+        dump = _dump(views=[{**view, "annotations": [annotation]}])
+        return [f for f in audit_dump(dump) if f.kind == "leader-through-own-text"]
+
+    assert own_strikes(RAS_DATUM_ORIGIN) == []
+    display = RAS_DATUM_ORIGIN["display"]
+    on_axis = {**display["texts"][0], "pos": [0.066, 0.0445, 0.0]}
+    struck = {**RAS_DATUM_ORIGIN, "display": {**display, "texts": [on_axis, *display["texts"][1:]]}}
+    [finding] = own_strikes(struck)
+    assert "datum-origin" in finding.a and finding.a == finding.b
+
+
+# --------------------------------------------------------------------------
 # Real cases: MHA-089 rocker-arm-support, rocker fix3 (6a5d8dd5c)
 # --------------------------------------------------------------------------
 #

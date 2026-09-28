@@ -1734,6 +1734,22 @@ def annotation_geometry(
         exact = True
     else:
         rows = row_boxes(items, advance=advance, shoulders=shoulders)
+    if kind == "datum-origin":
+        # A datum origin prints one label at each end of each axis arrow: "0"
+        # at the origin, "X"/"Y" at the tip. The X axis's two labels share a
+        # baseline, so one row box spanned "0 .. X" across the arrow and the
+        # axis read as a leader 12.5 mm through its own text (platen-guide
+        # twice, rocker-arm-support, harmonic-base on af13c8ff8). Each label
+        # is its own box.
+        rows = [
+            row
+            for index, item in enumerate(items)
+            for row in (
+                ink_row_boxes([item], {0: ink[index]} if index in ink else {}, advance=advance)
+                if ink
+                else row_boxes([item], advance=advance)
+            )
+        ]
     if kind in _MARK_KINDS:
         rows = []
     if not rows and not segments:
