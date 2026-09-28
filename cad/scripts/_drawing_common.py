@@ -1791,6 +1791,12 @@ def _await_document_loaded(model: Any) -> dict[str, Any]:
         while view_only is True and time.monotonic() - begun < _VIEW_ONLY_WAIT_S:
             time.sleep(_VIEW_ONLY_POLL_S)
             view_only = _opened_view_only(model)
+            # One record per poll keeps the watchdog's idle clock (log records
+            # are its heartbeat) from reading this wait as a wedged COM call.
+            _telemetry.debug(
+                f"source document load poll: IsOpenedViewOnly={view_only} after "
+                f"{time.monotonic() - begun:.1f}s"
+            )
         load["view_only_wait_s"] = round(time.monotonic() - begun, 2)
         load["view_only_after_wait"] = "unknown" if view_only is None else view_only
         _telemetry.info(

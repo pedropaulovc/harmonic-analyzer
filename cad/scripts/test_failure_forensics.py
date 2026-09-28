@@ -664,6 +664,46 @@ def test_the_watchdog_names_the_seat_before_the_startup_wait(monkeypatch, fast_p
     assert _watchdog._seat_fields["seat_startup_completed"] is True
 
 
+@pytest.fixture
+def heartbeats(monkeypatch, capture_telemetry):
+    """A live count of watchdog heartbeats (``_telemetry._touch_activity``, the
+    idle clock every log record and span boundary pokes)."""
+    count = [0]
+    touch = _telemetry._touch_activity
+
+    def counted(op: str | None = None) -> None:
+        count[0] += 1
+        touch(op)
+
+    monkeypatch.setattr(_telemetry, "_touch_activity", counted)
+    return count
+
+
+def test_the_startup_wait_keeps_the_watchdog_heartbeat_alive(
+    monkeypatch, fast_polls, heartbeats
+):
+    """The startup wait polls silently for up to half the op timeout; a poll
+    that emits nothing leaves the watchdog's idle clock running, and a lower
+    ``HARMONIC_COM_OP_TIMEOUT`` would kill a healthy wait. Every poll must
+    advance the heartbeat."""
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: time.time() - 20)
+    seen: list[int] = []
+
+    class _ObservedSeat(_StartingSeat):
+        @property
+        def StartupProcessCompleted(self) -> Any:
+            seen.append(heartbeats[0])
+            return _StartingSeat.StartupProcessCompleted.fget(self)
+
+    _seat_forensics.record_seat_provenance(
+        _Adapter(sw=_ObservedSeat([False, False, False, False, True]))
+    )
+
+    assert len(seen) == 5
+    assert all(later > earlier for earlier, later in zip(seen, seen[1:])), seen
+
+
+
 def test_a_seat_older_than_the_startup_window_is_not_waited_on(
     monkeypatch, fast_polls, capture_telemetry
 ):
@@ -853,6 +893,28 @@ def test_a_still_loading_source_is_read_once_it_has_loaded(
     assert got == {name: "x" for name in _TITLE_BLOCK}
     assert source.property_reads == 2 * len(_TITLE_BLOCK)  # one read, one after the load
     assert any("IsOpenedViewOnly=True" in str(r.log_record.body) for r in logs.get_finished_logs())
+
+
+def test_the_load_wait_keeps_the_watchdog_heartbeat_alive(monkeypatch, heartbeats):
+    """The load wait polls for up to 30 s. With no telemetry between polls, a
+    ``HARMONIC_COM_OP_TIMEOUT`` below that hard-exits the leaf (87) before the
+    re-read or the forensics run. Every poll must advance the heartbeat."""
+    import _drawing_common
+
+    monkeypatch.setattr(_drawing_common, "_VIEW_ONLY_POLL_S", 0.0)
+    seen: list[int] = []
+
+    class _ObservedPart(_SourcePart):
+        def IsOpenedViewOnly(self) -> bool:
+            seen.append(heartbeats[0])
+            return super().IsOpenedViewOnly()
+
+    part = _ObservedPart({name: "x" for name in _TITLE_BLOCK}, loading_reads=5)
+    _drawing_common.read_required_properties(part, _TITLE_BLOCK, required=_TITLE_BLOCK)
+
+    assert len(seen) == 6  # the first check, then five polls until it loaded
+    assert all(later > earlier for earlier, later in zip(seen, seen[1:])), seen
+
 
 
 _SW_OPEN_VIEW_ONLY = 0x4  # swOpenDocOptions_e.swOpenDocOptions_ViewOnly

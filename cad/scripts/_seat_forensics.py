@@ -572,6 +572,12 @@ def await_seat_startup(adapter: Any, started_epoch_s: Any = None) -> dict[str, A
     while completed is False and time.time() < deadline:
         time.sleep(_STARTUP_POLL_S)
         completed = _startup_completed(sw)
+        # One record per poll keeps the watchdog's idle clock (log records are
+        # its heartbeat) from reading this wait as a wedged COM call.
+        _telemetry.debug(
+            f"seat startup poll: StartupProcessCompleted={completed} after "
+            f"{time.monotonic() - begun:.1f}s"
+        )
     waited = round(time.monotonic() - begun, 2)
     record["seat_startup_completed"] = "unknown" if completed is None else completed
     record["seat_startup_wait_s"] = waited
