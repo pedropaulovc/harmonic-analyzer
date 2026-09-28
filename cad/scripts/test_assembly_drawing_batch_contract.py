@@ -250,8 +250,8 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
         "Assembly Drawing",
         (1.0, 4.0),
     ) in calls
-    # The small line views print the simplified configuration; the isometric
-    # (shaded at finalize) keeps full detail, which the drawing must retain.
+    # The small front and right views print the simplified configuration; the
+    # isometric is the drawing's designated full-detail view.
     assert [view.ReferencedConfiguration for view in views] == [
         SIMPLIFIED_VIEW_CONFIGURATION,
         SIMPLIFIED_VIEW_CONFIGURATION,

@@ -78,8 +78,8 @@ async def build(adapter: Any) -> dict[str, str]:
     view = place_view(
         adapter, str(frame.SOURCE), "*Isometric", 0.20, 0.14, scale=frame.EXPLODED_ISO_SCALE
     )
-    frame._set_exploded_state(adapter, view, True, label="probe exploded")
     set_high_quality_shaded_with_edges(adapter, view, label="probe exploded")
+    frame._configure_view(adapter, view, exploded=True, label="probe exploded")
     view = _early_bound(view, "IView")
 
     visited, drawing_component = _timed(

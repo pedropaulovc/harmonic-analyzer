@@ -5,7 +5,11 @@ the presentation, the drawing only consumes it. Each step of
 ``drive_train_assembly_spec.EXPLODE_STEPS`` is authored along a global axis,
 read back as a world translation of exactly the intended instances, and the
 assembly is collapsed again before save -- the saved operational pose (the
-free kinematic model) is proven unchanged, transform for transform.
+free kinematic model) is proven unchanged, transform for transform. The same
+steps are authored in Default and in Default Simplified (as
+``DRIVE_TRAIN_EXPLODED Simplified``): a drawing view shows the explode of the
+configuration it references, and the small exploded views reference the
+teeth/thread-free one.
 """
 
 from __future__ import annotations
@@ -18,6 +22,7 @@ from typing import Any, Mapping
 import _telemetry
 from _assembly_patterns import ensure_global_pattern_axis
 from _common import _early_bound
+from _drawing_simplified import simplified_name
 from drive_train_assembly_spec import (
     EXPLODED_VIEW_NAME,
     SOURCE_CONFIGURATION,
@@ -35,6 +40,16 @@ def _presentation_transform(component: Any) -> tuple[float, ...]:
     if len(values) != 16 or not all(math.isfinite(value) for value in values):
         raise RuntimeError(f"{component.Name2}: invalid presentation transform {values!r}")
     return values
+
+
+def exploded_view_name(configuration: str) -> str:
+    """The named explode ``configuration`` owns: exploded-view names are unique
+    per document, so ``Default Simplified``'s copy carries the suffix too."""
+    if configuration == SOURCE_CONFIGURATION:
+        return EXPLODED_VIEW_NAME
+    if configuration == simplified_name(SOURCE_CONFIGURATION):
+        return simplified_name(EXPLODED_VIEW_NAME)
+    raise ValueError(f"{EXPLODED_VIEW_NAME}: no explode is authored in {configuration!r}")
 
 
 def _global_axes(adapter: Any, assembly: Any) -> dict[str, tuple[str, bool]]:
@@ -59,54 +74,64 @@ def _global_axes(adapter: Any, assembly: Any) -> dict[str, tuple[str, bool]]:
     return axes
 
 
-def _create_named_view(model: Any, assembly: Any) -> None:
+def _create_named_view(
+    model: Any, assembly: Any, configuration_name: str, view_name: str
+) -> None:
     from solidworks_mcp.adapters.com_variant import null_callout
 
     if not assembly.CreateExplodedView():
-        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: CreateExplodedView failed")
-    names = tuple(assembly.GetExplodedViewNames2(SOURCE_CONFIGURATION) or ())
+        raise RuntimeError(f"{view_name}: CreateExplodedView failed")
+    names = tuple(assembly.GetExplodedViewNames2(configuration_name) or ())
     if len(names) != 1:
-        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: unexpected created views {names!r}")
+        raise RuntimeError(f"{view_name}: unexpected created views {names!r}")
     model.ClearSelection2(True)
     if not model.Extension.SelectByID2(
         str(names[0]), "EXPLODEDVIEWS", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
     ):
         raise RuntimeError(
-            f"{EXPLODED_VIEW_NAME}: cannot select created exploded view {names[0]!r}"
+            f"{view_name}: cannot select created exploded view {names[0]!r}"
         )
     selection = _early_bound(model.SelectionManager, "ISelectionMgr")
     if int(selection.GetSelectedObjectType3(1, 0)) != 43:  # swSelEXPLVIEWS
-        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: selection is not an exploded-view feature")
+        raise RuntimeError(f"{view_name}: selection is not an exploded-view feature")
     feature = _early_bound(selection.GetSelectedObject6(1, 0), "IFeature")
     if feature is None or str(feature.GetTypeName2()) != "AsmExploder":
-        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: selected object is not an AsmExploder")
-    feature.Name = EXPLODED_VIEW_NAME
+        raise RuntimeError(f"{view_name}: selected object is not an AsmExploder")
+    feature.Name = view_name
     model.ClearSelection2(True)
     if not model.EditRebuild3() or tuple(
-        assembly.GetExplodedViewNames2(SOURCE_CONFIGURATION) or ()
-    ) != (EXPLODED_VIEW_NAME,):
-        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: exploded-view feature rename did not persist")
+        assembly.GetExplodedViewNames2(configuration_name) or ()
+    ) != (view_name,):
+        raise RuntimeError(f"{view_name}: exploded-view feature rename did not persist")
 
 
 @_telemetry.traced("assembly.drive_train_explode")
-def create_drive_train_explode(adapter: Any, roles: Mapping[str, Role]) -> None:
-    """Author the released presentation and restore the free working model.
+def create_drive_train_explode(
+    adapter: Any, roles: Mapping[str, Role], configuration_name: str
+) -> None:
+    """Author the released presentation in the active ``configuration_name``
+    and restore the free working model.
 
     ``roles`` maps a component name to the role the builder tagged it with at
-    insertion (the MHA-145 that pins the arbor collar)."""
+    insertion (the MHA-145 that pins the arbor collar). The builder runs this
+    in Default and in Default Simplified
+    (``_assembly.author_in_drawing_configurations``): each owns its explode."""
     from solidworks_mcp.adapters.com_variant import null_callout
 
+    view_name = exploded_view_name(configuration_name)
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     assembly = _early_bound(model, "IAssemblyDoc")
     manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
     configuration = _early_bound(manager.ActiveConfiguration, "IConfiguration")
-    if str(configuration.Name) != SOURCE_CONFIGURATION:
+    if str(configuration.Name) != configuration_name:
         raise RuntimeError(
-            f"{EXPLODED_VIEW_NAME} requires the builder's {SOURCE_CONFIGURATION} "
+            f"{view_name} requires the active {configuration_name} "
             f"configuration, not {configuration.Name!r}"
         )
-    if int(assembly.GetExplodedViewCount2(SOURCE_CONFIGURATION)):
-        raise RuntimeError("new drive-train assembly unexpectedly contains exploded views")
+    if int(assembly.GetExplodedViewCount2(configuration_name)):
+        raise RuntimeError(
+            f"{view_name}: {configuration_name} unexpectedly contains exploded views"
+        )
 
     components = tuple(
         _early_bound(component, "IComponent2")
@@ -114,11 +139,11 @@ def create_drive_train_explode(adapter: Any, roles: Mapping[str, Role]) -> None:
     )
     by_name = {str(component.Name2): component for component in components}
     if len(by_name) != len(components):
-        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: duplicate component identities")
+        raise RuntimeError(f"{view_name}: duplicate component identities")
     baseline = {name: _presentation_transform(c) for name, c in by_name.items()}
     unknown_roles = sorted(set(roles) - set(by_name))
     if unknown_roles:
-        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: roles name absent components {unknown_roles!r}")
+        raise RuntimeError(f"{view_name}: roles name absent components {unknown_roles!r}")
     instances = [
         Instance(
             name=name,
@@ -131,21 +156,21 @@ def create_drive_train_explode(adapter: Any, roles: Mapping[str, Role]) -> None:
     try:
         plan = plan_explode(instances)
     except ValueError as exc:
-        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: {exc}") from exc
+        raise RuntimeError(f"{view_name}: {exc}") from exc
     expected = {name: [0.0, 0.0, 0.0] for name in by_name}
     axes = _global_axes(adapter, assembly)
 
-    _create_named_view(model, assembly)
-    if not assembly.ShowExploded2(True, EXPLODED_VIEW_NAME):
-        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: cannot activate authored view")
+    _create_named_view(model, assembly, configuration_name, view_name)
+    if not assembly.ShowExploded2(True, view_name):
+        raise RuntimeError(f"{view_name}: cannot activate authored view")
 
     try:
         for index in range(int(configuration.GetNumberOfExplodeSteps()) - 1, -1, -1):
             seed = _early_bound(configuration.GetExplodeStep(index), "IExplodeStep")
             if seed is None or not configuration.DeleteExplodeStep(str(seed.Name)):
-                raise RuntimeError(f"{EXPLODED_VIEW_NAME}: cannot remove auto step {index}")
+                raise RuntimeError(f"{view_name}: cannot remove auto step {index}")
         if int(configuration.GetNumberOfExplodeSteps()) != 0:
-            raise RuntimeError(f"{EXPLODED_VIEW_NAME}: auto steps remain")
+            raise RuntimeError(f"{view_name}: auto steps remain")
 
         for step_index, (step, names) in enumerate(plan, 1):
             label = step.label
@@ -181,7 +206,10 @@ def create_drive_train_explode(adapter: Any, roles: Mapping[str, Role]) -> None:
                 if int(error) != 0 or raw_step is None:
                     raise RuntimeError(f"{label}: AddExplodeStep2 error {error!r}")
                 native = _early_bound(raw_step, "IExplodeStep")
+                # Distinct per explode: Default Simplified's copy carries the suffix.
                 step_name = f"DRIVE TRAIN {label.upper()}"
+                if configuration_name != SOURCE_CONFIGURATION:
+                    step_name = simplified_name(step_name)
                 native.Name = step_name
                 if str(native.Name) != step_name or not model.EditRebuild3():
                     raise RuntimeError(f"{label}: step name/rebuild failed")
@@ -226,9 +254,9 @@ def create_drive_train_explode(adapter: Any, roles: Mapping[str, Role]) -> None:
         primary_error = sys.exception()
         try:
             model.ClearSelection2(True)
-            if not assembly.ShowExploded2(False, EXPLODED_VIEW_NAME) or not model.EditRebuild3():
+            if not assembly.ShowExploded2(False, view_name) or not model.EditRebuild3():
                 raise RuntimeError(
-                    f"{EXPLODED_VIEW_NAME}: failed to restore the collapsed working model"
+                    f"{view_name}: failed to restore the collapsed working model"
                 )
             for name, component in by_name.items():
                 current = _presentation_transform(component)
@@ -242,22 +270,22 @@ def create_drive_train_explode(adapter: Any, roles: Mapping[str, Role]) -> None:
                     for i in range(16)
                 ):
                     raise RuntimeError(
-                        f"{EXPLODED_VIEW_NAME}: collapse changed the saved pose of {name}"
+                        f"{view_name}: collapse changed the saved pose of {name}"
                     )
         except Exception as cleanup_error:
             if primary_error is None:
                 raise
-            _telemetry.warn(f"{EXPLODED_VIEW_NAME}: cleanup after authoring failure: {cleanup_error}")
+            _telemetry.warn(f"{view_name}: cleanup after authoring failure: {cleanup_error}")
 
     if int(configuration.GetNumberOfExplodeSteps()) != len(plan):
-        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: collapsed presentation lost authored steps")
-    if tuple(assembly.GetExplodedViewNames2(SOURCE_CONFIGURATION) or ()) != (EXPLODED_VIEW_NAME,):
-        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: collapsed presentation lost the named view")
-    if str(assembly.GetExplodedViewConfigurationName(EXPLODED_VIEW_NAME)) != SOURCE_CONFIGURATION:
+        raise RuntimeError(f"{view_name}: collapsed presentation lost authored steps")
+    if tuple(assembly.GetExplodedViewNames2(configuration_name) or ()) != (view_name,):
+        raise RuntimeError(f"{view_name}: collapsed presentation lost the named view")
+    if str(assembly.GetExplodedViewConfigurationName(view_name)) != configuration_name:
         raise RuntimeError(
-            f"{EXPLODED_VIEW_NAME}: named presentation is not owned by {SOURCE_CONFIGURATION}"
+            f"{view_name}: named presentation is not owned by {configuration_name}"
         )
     _telemetry.success(
-        f"{EXPLODED_VIEW_NAME}: {len(plan)} native steps verified in world space; "
+        f"{view_name}: {len(plan)} native steps verified in world space; "
         f"all {len(by_name)} instances restored to the saved pose"
     )

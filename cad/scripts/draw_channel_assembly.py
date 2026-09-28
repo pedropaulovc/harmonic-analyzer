@@ -19,6 +19,7 @@ import channel_assembly_steps as steps
 from _common import _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    ViewRole,
     apply_view_configuration,
     assert_full_detail_view,
     finalize_drawing,
@@ -171,7 +172,9 @@ async def build(adapter: Any) -> dict[str, str]:
         ("*Isometric", ISO_CENTER),
     ):
         view = place_view(adapter, str(SOURCE), view_name, *center, scale=SHEET_SCALE)
-        apply_view_configuration(adapter, view, label=f"channel {view_name}")
+        # The isometric is the drawing's full-detail view.
+        role = ViewRole.FULL_DETAIL if view_name == "*Isometric" else ViewRole.PLAIN
+        apply_view_configuration(adapter, view, role=role, label=f"channel {view_name}")
     assert_full_detail_view(adapter, label="channel assembly")
     _place_fitup_steps(adapter, sheet)
 

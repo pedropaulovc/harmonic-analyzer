@@ -14,6 +14,7 @@ from _drawing_common import (
     SIMPLIFIED_VIEW_CONFIGURATION,
     ViewRole,
     apply_view_configuration,
+    set_view_exploded_state,
     view_configuration,
 )
 from _drawing_simplified import (
@@ -23,12 +24,19 @@ from _drawing_simplified import (
     simplified_name,
 )
 
-HLV, HLR, SHADED, SHADED_EDGES = 1, 2, 3, 7
+WIREFRAME, HLV, HLR, SHADED, SHADED_EDGES = 0, 1, 2, 3, 7
+FACETED_WIREFRAME, FACETED_HLV, FACETED_HLR = 4, 5, 6
+# Every swDisplayMode_e that inks edges.
+EDGE_MODES = [WIREFRAME, HLV, HLR, FACETED_WIREFRAME, FACETED_HLV, FACETED_HLR, SHADED_EDGES]
 DOCUMENT, CONFIGURATION, PARENT, USER = 1, 2, 4, 8
 
 
 class FakeView:
-    """An IView whose configuration switch lands only when the drawing rebuilds."""
+    """An IView whose configuration switch lands only when the drawing rebuilds.
+
+    ``ShowExploded`` shows the explode the referenced configuration owns (one
+    of ``explodes``); the explode shown does not follow a later configuration
+    switch, so a view exploded before its switch shows the wrong one."""
 
     def __init__(
         self,
@@ -38,6 +46,9 @@ class FakeView:
         configuration: str = ASSEMBLY_VIEW_CONFIGURATION,
         *,
         accepts: bool = True,
+        explodes: frozenset[str] = frozenset(
+            {ASSEMBLY_VIEW_CONFIGURATION, SIMPLIFIED_VIEW_CONFIGURATION}
+        ),
     ) -> None:
         self.ScaleRatio = scale
         self.orientation = orientation
@@ -45,6 +56,20 @@ class FakeView:
         self.configuration = configuration
         self.accepts = accepts
         self.pending: str | None = None
+        self.explodes = explodes
+        self.exploded_in: str | None = None
+
+    def ShowExploded(self, show: bool) -> bool:
+        if not show:
+            self.exploded_in = None
+            return True
+        if self.configuration not in self.explodes:
+            return False
+        self.exploded_in = self.configuration
+        return True
+
+    def IsExploded(self) -> bool:
+        return self.exploded_in is not None
 
     def GetOrientationName(self) -> str:
         return self.orientation
@@ -89,7 +114,7 @@ def test_the_simplified_view_configuration_is_the_derived_default() -> None:
     assert not is_simplified(ASSEMBLY_VIEW_CONFIGURATION)
 
 
-@pytest.mark.parametrize("mode", [HLV, HLR])
+@pytest.mark.parametrize("mode", EDGE_MODES)
 @pytest.mark.parametrize(
     ("scale", "expected"),
     [
@@ -102,20 +127,32 @@ def test_the_simplified_view_configuration_is_the_derived_default() -> None:
         ((2.0, 1.0), ASSEMBLY_VIEW_CONFIGURATION),
     ],
 )
-def test_a_line_view_is_simplified_at_one_to_two_or_smaller(mode, scale, expected) -> None:
+def test_a_view_that_inks_edges_is_simplified_at_one_to_two_or_smaller(
+    mode, scale, expected
+) -> None:
     assert view_configuration(scale, mode) == expected
 
 
-@pytest.mark.parametrize("mode", [SHADED, SHADED_EDGES, 0])
-def test_a_shaded_or_wireframe_view_keeps_full_detail(mode) -> None:
-    assert view_configuration((1.0, 8.0), mode) == ASSEMBLY_VIEW_CONFIGURATION
+def test_a_pure_shaded_view_keeps_full_detail() -> None:
+    """Tone without edge ink: the teeth never print as a black mass."""
+    assert view_configuration((1.0, 8.0), SHADED) == ASSEMBLY_VIEW_CONFIGURATION
 
 
-@pytest.mark.parametrize(
-    "role", [ViewRole.EXPLODED, ViewRole.BOM, ViewRole.BALLOONS, ViewRole.FULL_DETAIL]
-)
-def test_a_view_that_carries_more_than_geometry_keeps_full_detail(role) -> None:
-    assert view_configuration((1.0, 8.0), HLR, role) == ASSEMBLY_VIEW_CONFIGURATION
+@pytest.mark.parametrize("mode", EDGE_MODES)
+def test_only_the_designated_full_detail_view_is_exempt(mode) -> None:
+    """An exploded, BOM-bearing or ballooned view is not exempt: it shows the
+    simplified configuration's own explode, and its components carry their
+    parents' BOM identity."""
+    assert view_configuration((1.0, 8.0), mode) == SIMPLIFIED_VIEW_CONFIGURATION
+    assert (
+        view_configuration((1.0, 8.0), mode, ViewRole.FULL_DETAIL)
+        == ASSEMBLY_VIEW_CONFIGURATION
+    )
+
+
+def test_an_unknown_display_mode_is_refused() -> None:
+    with pytest.raises(ValueError, match="unknown"):
+        view_configuration((1.0, 8.0), -1)
 
 
 @pytest.mark.parametrize("scale", [(0.0, 2.0), (1.0, 0.0), (-1.0, 2.0)])
@@ -365,9 +402,20 @@ def _apply(view: FakeView, role: ViewRole = ViewRole.PLAIN) -> tuple[str, FakeDr
     [
         (FakeView((1.0, 4.0), "*Front", HLR), ViewRole.PLAIN, SIMPLIFIED_VIEW_CONFIGURATION),
         (FakeView((1.0, 2.0), "*Right", HLV), ViewRole.PLAIN, SIMPLIFIED_VIEW_CONFIGURATION),
-        # A pictorial view is judged shaded whatever its current line mode.
-        (FakeView((1.0, 4.0), "*Isometric", HLR), ViewRole.PLAIN, ASSEMBLY_VIEW_CONFIGURATION),
-        (FakeView((1.0, 4.0), "*Front", HLR), ViewRole.BOM, ASSEMBLY_VIEW_CONFIGURATION),
+        # A pictorial view is judged shaded-with-edges (finalize_drawing's
+        # mode) whatever its current mode: the drive-train's 1:8 exploded,
+        # BOM-bearing and ballooned isometrics.
+        (
+            FakeView((1.0, 8.0), "*Isometric", SHADED_EDGES),
+            ViewRole.PLAIN,
+            SIMPLIFIED_VIEW_CONFIGURATION,
+        ),
+        (FakeView((1.0, 4.0), "*Isometric", SHADED), ViewRole.PLAIN, SIMPLIFIED_VIEW_CONFIGURATION),
+        (
+            FakeView((1.0, 8.0), "*Isometric", SHADED_EDGES),
+            ViewRole.FULL_DETAIL,
+            ASSEMBLY_VIEW_CONFIGURATION,
+        ),
         # A view enlarged past 1:2 goes back to full detail.
         (
             FakeView((1.0, 1.0), "*Front", HLR, SIMPLIFIED_VIEW_CONFIGURATION),
@@ -392,6 +440,189 @@ def test_a_view_that_does_not_take_its_configuration_is_refused() -> None:
     view = FakeView((1.0, 4.0), "*Front", HLR, accepts=False)
     with pytest.raises(RuntimeError, match="Default Simplified"):
         _apply(view)
+
+
+def _explode(view: FakeView, show: bool, configuration: str, drawing: FakeDrawing) -> None:
+    set_view_exploded_state(
+        SimpleNamespace(currentModel=drawing),
+        view,
+        show,
+        configuration=configuration,
+        label="fixture",
+    )
+
+
+def test_an_exploded_view_shows_its_policy_configurations_explode() -> None:
+    view = FakeView((1.0, 8.0), "*Isometric", SHADED_EDGES)
+    applied, drawing = _apply(view)
+    _explode(view, True, applied, drawing)
+    assert view.exploded_in == SIMPLIFIED_VIEW_CONFIGURATION
+
+
+def test_the_exploded_state_is_refused_before_the_configuration_switch() -> None:
+    view = FakeView((1.0, 8.0), "*Isometric", SHADED_EDGES)
+    with pytest.raises(RuntimeError, match="after apply_view_configuration"):
+        _explode(view, True, SIMPLIFIED_VIEW_CONFIGURATION, FakeDrawing([view]))
+    assert not view.IsExploded()
+
+
+def test_a_view_exploded_before_its_switch_is_re_exploded_in_the_new_one() -> None:
+    view = FakeView((1.0, 8.0), "*Isometric", SHADED_EDGES)
+    view.ShowExploded(True)  # Default's explode, e.g. a re-scale re-applies the policy
+    applied, drawing = _apply(view)
+    _explode(view, True, applied, drawing)
+    assert view.exploded_in == SIMPLIFIED_VIEW_CONFIGURATION
+
+
+def test_a_configuration_without_its_own_explode_is_refused() -> None:
+    """An assembly built before Default Simplified carried the explode."""
+    view = FakeView(
+        (1.0, 8.0),
+        "*Isometric",
+        SHADED_EDGES,
+        explodes=frozenset({ASSEMBLY_VIEW_CONFIGURATION}),
+    )
+    applied, drawing = _apply(view)
+    with pytest.raises(RuntimeError, match="exploded-state readback is False"):
+        _explode(view, True, applied, drawing)
+
+
+@pytest.mark.parametrize(
+    ("preferred", "fitted", "expected"),
+    [
+        ((1.0, 3.0), (1.0, 3.0), SIMPLIFIED_VIEW_CONFIGURATION),
+        # The ring fits only a step down the ladder: the re-scale crosses 1:2.
+        ((2.0, 3.0), (1.0, 2.0), SIMPLIFIED_VIEW_CONFIGURATION),
+        # Larger than 1:2 the cluster keeps every tooth, exploded in Default.
+        ((2.0, 3.0), (2.0, 3.0), ASSEMBLY_VIEW_CONFIGURATION),
+    ],
+)
+def test_cluster_balloons_attach_to_the_explode_of_the_configuration_printed(
+    monkeypatch, preferred, fitted, expected
+) -> None:
+    """Configuration, then its own explode, then isolation and BOM link, and
+    only then balloons -- also after a re-scale moves the view across 1:2."""
+    import draw_drive_train_assembly as drawing
+
+    cluster = next(iter(drawing.CLUSTER_SHEETS))
+    view = FakeView(preferred, "*Isometric", SHADED_EDGES)
+    adapter = SimpleNamespace(currentModel=FakeDrawing([view]))
+    seen: list[tuple[str, str, str | None]] = []
+
+    def record(event: str):
+        def call(*_args, **_kwargs):
+            seen.append((event, view.configuration, view.exploded_in))
+
+        return call
+
+    def set_scale(_adapter, bound, scale, *, label) -> None:
+        bound.ScaleRatio = scale
+
+    def anchored(*_args, **_kwargs) -> tuple[list, frozenset]:
+        record("anchored balloons")()
+        return [], frozenset()
+
+    def ballooned(*_args, **_kwargs) -> list:
+        record("balloons")()
+        return []
+
+    idle = lambda *_args, **_kwargs: None  # noqa: E731
+    monkeypatch.setitem(drawing.CLUSTER_SCALES, cluster, preferred)
+    for name, stub in {
+        "_activate_sheet": idle,
+        "place_view": lambda *_args, **_kwargs: view,
+        "set_high_quality_shaded_with_edges": idle,
+        "_isolate_instances": record("isolate"),
+        "_link_view_to_bom": record("bom link"),
+        "_view_outline": lambda _view: (0.0, 0.0, 0.1, 0.1),
+        "cluster_ring_scale": lambda *_args, **_kwargs: fitted,
+        "_set_view_scale": set_scale,
+        "cluster_ring_fit": lambda _outline: ((0.0, 0.0), [], 0.0),
+        "_shift_view": idle,
+        "_head_anchored_balloons": anchored,
+        "add_component_bom_balloons": ballooned,
+        "_spread_balloons": idle,
+        "rebuild_drawing": idle,
+        "_uncross_balloon_leaders": idle,
+        "_verify_balloon_attachments": record("balloon read-back"),
+        "_heading": idle,
+        "_balloon_annotations": lambda _balloons: {},
+    }.items():
+        monkeypatch.setattr(drawing, name, stub)
+    facts = SimpleNamespace(clusters={cluster: frozenset()}, instances=[])
+
+    _balloons, scale = drawing._place_cluster_sheet(
+        adapter, cluster, facts, bom_name="BOM", items={}
+    )
+
+    assert scale == fitted
+    events = [event for event, _configuration, _explode in seen]
+    last_link = len(events) - 1 - events[::-1].index("bom link")
+    assert events[last_link - 1] == "isolate"
+    assert events[last_link + 1 :] == [
+        "anchored balloons",
+        "balloons",
+        "balloon read-back",
+    ]
+    assert all(
+        (configuration, explode) == (expected, expected)
+        for _event, configuration, explode in seen[last_link - 1 :]
+    ), seen
+
+
+class FakeConfiguredAssembly:
+    """An assembly whose active configuration changes only through
+    ``ShowConfiguration2`` of a configuration that exists."""
+
+    def __init__(self) -> None:
+        self.names = [ASSEMBLY_VIEW_CONFIGURATION]
+        self.active = ASSEMBLY_VIEW_CONFIGURATION
+
+    def ShowConfiguration2(self, name: str) -> bool:
+        if name not in self.names:
+            return False
+        self.active = name
+        return True
+
+
+def _author_in_both(monkeypatch, model: FakeConfiguredAssembly, author) -> None:
+    def sync(_adapter, _asm_name, *, verify: bool = True) -> int:
+        model.names.append(SIMPLIFIED_VIEW_CONFIGURATION)
+        return 1
+
+    monkeypatch.setattr(_assembly, "sync_simplified_configuration", sync)
+    monkeypatch.setattr(_assembly, "active_configuration_name", lambda _a, m: m.active)
+    _assembly.author_in_drawing_configurations(
+        SimpleNamespace(currentModel=model), "fixture", author
+    )
+
+
+def test_the_explode_is_authored_in_both_drawing_configurations(monkeypatch) -> None:
+    """Default Simplified exists before anything configuration-owned is
+    authored; each run sees its own configuration active; the saved-active
+    Default is active again afterwards."""
+    model = FakeConfiguredAssembly()
+    authored: list[tuple[str, str]] = []
+    _author_in_both(
+        monkeypatch, model, lambda configuration: authored.append((configuration, model.active))
+    )
+    assert authored == [
+        (ASSEMBLY_VIEW_CONFIGURATION, ASSEMBLY_VIEW_CONFIGURATION),
+        (SIMPLIFIED_VIEW_CONFIGURATION, SIMPLIFIED_VIEW_CONFIGURATION),
+    ]
+    assert model.active == ASSEMBLY_VIEW_CONFIGURATION
+
+
+def test_a_failed_simplified_explode_still_leaves_default_active(monkeypatch) -> None:
+    model = FakeConfiguredAssembly()
+
+    def author(configuration: str) -> None:
+        if configuration == SIMPLIFIED_VIEW_CONFIGURATION:
+            raise RuntimeError("AddExplodeStep2 error 3")
+
+    with pytest.raises(RuntimeError, match="AddExplodeStep2"):
+        _author_in_both(monkeypatch, model, author)
+    assert model.active == ASSEMBLY_VIEW_CONFIGURATION
 
 
 TEETH = ("ToothGapCut", "ToothGapPattern")

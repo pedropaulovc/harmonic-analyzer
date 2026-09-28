@@ -9,6 +9,7 @@ import hashlib
 import json
 import math
 import re
+import sys
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import contextmanager
 from typing import Any
@@ -2275,8 +2276,9 @@ def sync_simplified_configuration(
     """Ensure ``Default Simplified`` (derived from ``Default``) points every
     top-level component at its ``<referenced> Simplified`` configuration.
 
-    Assembly drawings' small line views reference it, so modeled gear teeth and
-    screw threads do not print black (``_drawing_simplified``). The rule is the
+    Every assembly-drawing view at 1:2 or smaller that inks edges references
+    it, so modeled gear teeth and screw threads do not print black
+    (``_drawing_simplified``). The rule is the
     uniform ``<parent> Simplified`` name, so a subassembly's own ``Default
     Simplified`` is picked up the same way as a part's ``T24 Simplified``; a
     component whose model has no such configuration keeps its parent one.
@@ -2378,6 +2380,48 @@ def sync_simplified_configuration(
     return changes
 
 
+@_telemetry.traced("simplified.author_in_drawing_configurations", label_param="asm_name")
+def author_in_drawing_configurations(
+    adapter: Any, asm_name: str, author: Callable[[str], None]
+) -> None:
+    """Run a configuration-owned authoring step in ``Default`` and in ``Default
+    Simplified``, each while it is the active configuration.
+
+    An exploded view belongs to one configuration, and a drawing view shows
+    the explode of the configuration it references (``IView.ShowExploded``),
+    so the small exploded drawing views -- which reference ``Default
+    Simplified`` -- need the same steps authored there. The simplified
+    configuration is created first, before anything configuration-owned
+    exists to be copied into it; ``author`` receives the active
+    configuration's name. ``Default`` is active again on return.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    rest = "Default"
+    if active_configuration_name(adapter, model) != rest:
+        raise RuntimeError(f"{asm_name}: drawing configurations are authored from {rest!r}")
+    sync_simplified_configuration(adapter, asm_name, verify=False)
+    author(rest)
+    child = simplified_name(rest)
+    if not bool(model.ShowConfiguration2(child)):
+        raise RuntimeError(f"{asm_name}: ShowConfiguration2({child!r}) refused")
+    try:
+        if active_configuration_name(adapter, model) != child:
+            raise RuntimeError(f"{asm_name}: {child!r} did not become active")
+        author(child)
+    finally:
+        primary_error = sys.exception()
+        try:
+            if not bool(model.ShowConfiguration2(rest)) or (
+                active_configuration_name(adapter, model) != rest
+            ):
+                raise RuntimeError(f"{asm_name}: re-activating {rest!r} refused")
+        except Exception as cleanup_error:
+            if primary_error is None:
+                raise
+            _telemetry.warn(f"{asm_name}: cleanup after {child} authoring: {cleanup_error}")
+
+
+
 def _referenced_comment(
     asm_name: str,
     component: Any,
@@ -2432,9 +2476,9 @@ async def save_assembly_and_images(
     leaves a manifest beside an assembly it does not describe."""
     if asm_name in ("channel", "summing") and native_contact_check is None:
         raise ValueError(f"{asm_name} assembly requires native_contact_check")
-    # The drawings' small line views print this derived configuration (gear
-    # teeth and screw threads suppressed); Default stays the solved, gated,
-    # rendered and saved-active pose.
+    # The drawings' views at 1:2 and smaller print this derived configuration
+    # (gear teeth and screw threads suppressed); Default stays the solved,
+    # gated, rendered and saved-active pose.
     sync_simplified_configuration(adapter, asm_name)
     # Establish a clean solved state for the health and pose gates.
     final_rebuild_before_save(adapter, asm_name)

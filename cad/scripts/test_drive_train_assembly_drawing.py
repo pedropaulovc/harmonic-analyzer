@@ -567,6 +567,17 @@ def test_balloon_attachment_gate_names_every_mismatch() -> None:
     assert any("crank-handle" in f for f in findings)
 
 
+@pytest.mark.parametrize("item", ["?", "", "  "])
+def test_balloon_attachment_gate_refuses_an_unresolved_item(item) -> None:
+    """A balloon whose component no longer resolves to a BOM row prints ``?``
+    (the feature-suppression preview's did): the gate names it even when its
+    leader lands on the right component."""
+    findings = drawing.balloon_attachment_violations(
+        [("B1", item, ("crank-arm",))], {"crank-arm": "1"}
+    )
+    assert any("B1 shows unresolved item" in f for f in findings)
+
+
 def test_note_fields_and_ring_fit() -> None:
     field = drawing.NOTE_FIELD_LEFT
     assert drawing.note_field_violations((0.020, 0.100, 0.200, 0.250), field) == []
