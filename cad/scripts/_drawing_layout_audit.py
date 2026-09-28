@@ -287,26 +287,26 @@ def _dump_annotation(reader: _Reader, raw: Any) -> dict[str, Any] | None:
     annotation = reader.bind(raw, "IAnnotation")
     if annotation is None:
         return None
+    owner_type = int(reader.need(lambda: annotation.OwnerType, -1))
+    if owner_type == _OWNER_DRAWING_TEMPLATE:
+        # The title block's and sheet format's own notes, which the sheet
+        # view's GetAnnotations returns beside the drawing's (~40 a B sheet).
+        # No check reads anything of them but their owner (``sheet_owned``
+        # drops them everywhere), so nothing else is read: in full they were
+        # ~66% of the collector's COM reads, at ~2.8 ms a read. Replaying the
+        # 147 sheets of the 111 cached drawing reports of 2026-09-27 with
+        # them reduced to this record changes no finding, summary or advance.
+        reader.dumped(f"owner{owner_type}", started)
+        return {"owner_type": owner_type, "display": {}}
     kind = int(reader.need(lambda: annotation.GetType(), 0))
     record: dict[str, Any] = {
         "type": kind,
         "name": str(reader.need(lambda: annotation.GetName(), "")),
         "visible": int(reader.need(lambda: annotation.Visible, 1)),
-        "owner_type": int(reader.need(lambda: annotation.OwnerType, -1)),
+        "owner_type": owner_type,
         "pos": _round((reader.call if kind in _ANCHORLESS else reader.need)(lambda: annotation.GetPosition(), ())),
         "layer": str(reader.call(lambda: annotation.Layer, "")),
     }
-    if record["owner_type"] == _OWNER_DRAWING_TEMPLATE:
-        # The title block's and sheet format's own notes, which the sheet
-        # view's GetAnnotations returns beside the drawing's. No finding reads
-        # their ink (``sheet_owned`` filters them out of every check), so their
-        # leaders, display data and note text are not read: they were ~66% of
-        # the collector's COM reads (40 template notes a B sheet, ~1200
-        # reads). Replaying all 147 sheets of the 111 cached drawing reports
-        # of 2026-09-27 without them changes no finding, summary or advance.
-        record["display"] = {}
-        reader.dumped(f"owner{record['owner_type']}", started)
-        return record
     leaders = []
     for index in range(int(reader.need(lambda: annotation.GetLeaderCount(), 0) or 0)):
         points = reader.need(lambda i=index: annotation.GetLeaderPointsAtIndex(i))

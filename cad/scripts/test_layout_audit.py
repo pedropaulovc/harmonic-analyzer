@@ -2313,9 +2313,9 @@ def test_a_required_read_answering_none_is_a_read_error(monkeypatch):
 @pytest.mark.parametrize("owner_type", [0, 1, 2], ids=["view", "sheet", "template"])
 def test_only_template_annotations_skip_their_ink(monkeypatch, owner_type):
     """The title block's notes (owner 2) were ~66% of the collector's COM
-    reads and no check reads their ink, so their leaders, display data and
-    note are never fetched; a view's or the sheet's own annotation still
-    dumps all of it."""
+    reads and no check reads anything of them but their owner, so nothing
+    else is fetched; a view's or the sheet's own annotation still dumps its
+    identity, position, leaders, display data and note."""
     import _drawing_layout_audit as collector
 
     monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
@@ -2343,12 +2343,14 @@ def test_only_template_annotations_skip_their_ink(monkeypatch, owner_type):
         Layer = ""
 
         def GetType(self):
+            fetched.append("type")
             return 6
 
         def GetName(self):
             return "DetailItem1"
 
         def GetPosition(self):
+            fetched.append("pos")
             return (0.1, 0.2, 0.0)
 
         def GetLeaderCount(self):
@@ -2366,11 +2368,11 @@ def test_only_template_annotations_skip_their_ink(monkeypatch, owner_type):
     reader = collector._Reader(adapter=None)
     record = collector._dump_annotation(reader, Annotation())
     assert reader.take_errors() == {}
-    assert record["owner_type"] == owner_type and record["pos"] == [0.1, 0.2, 0.0]
     if owner_type == 2:
-        assert fetched == [] and record["display"] == {} and "note" not in record
+        assert fetched == [] and record == {"owner_type": 2, "display": {}}
     else:
-        assert fetched == ["leaders", "display", "note"]
+        assert fetched == ["type", "pos", "leaders", "display", "note"]
+        assert record["owner_type"] == owner_type and record["pos"] == [0.1, 0.2, 0.0]
         assert record["display"]["texts"][0]["t"] == "REV" and record["note"]["text"] == "REV"
 
 
