@@ -119,9 +119,13 @@ TOP_KEEP = {
     "Bore1X": (_sheet_x(BORE_X[1] / 2.0), TOP_CENTER[1] - 0.052),
     "Bore0Dia": (_sheet_x(BORE_X[0]) + 0.030, TOP_CENTER[1] + 0.042),
     # Bottom groove band (a Top-plane sketch, so its Z dims project into the
-    # top view): the width and its offset from the front depth face, stacked
-    # LEFT of the view (the right side carries the bore position FCF).
-    "GrooveWidth": (_sheet_x(0.0) - 0.018, TOP_CENTER[1]),
+    # top view). GrooveWidth's extension lines start at the groove edges' RIGHT
+    # ends (x=0.202), so text LEFT of the view dragged them across the whole view
+    # at y 0.198/0.232, walling both bores in (audit leader-crosses-line x4 for
+    # the bore Ra/FCF leaders) and parking its "8.50" under datum B's leader
+    # (leader-through-text). RIGHT of the view they shrink to 13 mm stubs; text
+    # x 0.2106..0.2194 keeps 3 mm off the view outline and 3.7 mm above the FCF.
+    "GrooveWidth": (_sheet_x(BLOCK_LENGTH) + 0.013, TOP_CENTER[1]),
     "GrooveZ0": (_sheet_x(0.0) - 0.032, TOP_CENTER[1] - 0.024),
 }
 RIGHT_KEEP = {
@@ -281,11 +285,18 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="C",
         label="block broad face",
     )
-    bore0_edge = (_sheet_x(BORE_X[0]) + 0.016, TOP_CENTER[1])
+    # 45 deg points on the two Ø8 bore circles (16 mm sheet radius at 4:1): off
+    # the right silhouette, which coincides with the chamfer line for bore 1, and
+    # off the top point, which sat 1 mm under the groove edge line.
+    bore_r45 = 0.0113
     add_feature_control_frame(
         adapter,
         top,
-        edge_xy=bore0_edge,
+        # Bore 1's lower-right point, not bore 0's right point (0.114, 0.215):
+        # the leader to bore 0 crossed Bore1X's extension line (x=0.162) and the
+        # groove band (audit leader-crosses-line x2). 2X covers both bores; the
+        # new leader drops 18 mm from the frame, 7.4 mm off GrooveWidth's stub.
+        edge_xy=(_sheet_x(BORE_X[1]) + bore_r45, TOP_CENTER[1] - bore_r45),
         frame_xy=(0.198, 0.196),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["pen bore position"],
@@ -308,41 +319,32 @@ async def build(adapter: Any) -> dict[str, str]:
     # attaches to one edge, so each bore carries its own symbol; a single symbol
     # would leave the other Ø8 bore without the finish requirement.
     #
-    # Both symbols stack in the empty space RIGHT of the top view. The ▽ tip sits
-    # AT the anchor and the body draws up-right from there (~46 x 19 mm), so the
-    # old shared y=0.240 dropped both glyphs onto the view, whose top edge is
-    # y=0.248; there is no room to lift them (the border cuts in) and the band
-    # under the view is full of bore stations and chamfer/screw callouts.
-    #
-    # The LEFT column cannot take bore 0 either, though it looks empty: the body
-    # would have to clear the left frame bound at ~0.0127 (ink >= 0.020, so
-    # ax >= 0.026) AND stop before the view at 0.0658 (ax <= 0.0248) -- an empty
-    # window. Dropping it lower-left instead puts its bore up-RIGHT of the anchor,
-    # the one direction that makes the leader strike through its own text.
-    #
-    # So bore 0 is picked at its TOP rather than a side: from the right, a leader
-    # to its top edge passes ~5 mm ABOVE bore 1 (y=0.2365 vs bore 1's 0.231),
-    # whereas a leader to either of its side edges would run straight through
-    # bore 1. y=0.244 keeps this leader off bore 1's Ra body below (top 0.239).
+    # Both symbols sit ABOVE the top view at the fleet's 2.5 mm Ra height, each
+    # dropping onto its bore's upper-right 45 deg point. From the old right-side
+    # anchors (0.205, 0.244/0.220) both leaders had to run left across Bore1X's
+    # extension line (x=0.162) and, for bore 0, Bore0X's (x=0.098), the groove
+    # line and the Ø8.00 leader (audit leader-crosses-line x5). The band above
+    # the view (y 0.2526..0.2667) is 14 mm -- too low for the default ~19 mm
+    # body, enough for the 7 mm one. Bore 0's leader passes 4 mm under the Ø8.00
+    # shoulder; its text (x 0.1603..0.1697) is 9.9 mm from bore 1's leader. Both
+    # bodies sit 2.4 mm above the view outline, tops at y 0.262.
     add_surface_finish(
         adapter,
         top,
-        edge_xy=(_sheet_x(BORE_X[0]), TOP_CENTER[1] + 0.016),  # bore 0, top edge
-        symbol_xy=(0.205, 0.244),
+        edge_xy=(_sheet_x(BORE_X[0]) + bore_r45, TOP_CENTER[1] + bore_r45),
+        symbol_xy=(0.155, 0.255),
         control=surface_finish_by_key(SURFACE_FINISHES, "pen_bore_0"),
         label="pen bore finish (bore 0)",
+        char_height=0.0025,
     )
-    # Bore 1's RIGHT silhouette point (x 30) now coincides with the top chamfer's
-    # start line in the top view (BLOCK_LENGTH - CHAMFER = 30), so the pick
-    # grabbed that edge instead of the circle; pick the LEFT point (x 22).
-    bore1_edge = (_sheet_x(BORE_X[1]) - 0.016, TOP_CENTER[1])
     add_surface_finish(
         adapter,
         top,
-        edge_xy=bore1_edge,
-        symbol_xy=(0.205, 0.220),
+        edge_xy=(_sheet_x(BORE_X[1]) + bore_r45, TOP_CENTER[1] + bore_r45),
+        symbol_xy=(0.185, 0.255),
         control=surface_finish_by_key(SURFACE_FINISHES, "pen_bore_1"),
         label="pen bore finish (bore 1)",
+        char_height=0.0025,
     )
 
     # x=0.020: the anchor is the text's left edge, so the ink starts here. The

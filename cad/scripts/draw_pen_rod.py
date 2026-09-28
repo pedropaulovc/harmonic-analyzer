@@ -261,11 +261,18 @@ async def build(adapter: Any) -> dict[str, str]:
     _require_dimension_value(
         wire_hole_x, ROD_SECTION / 2.0, label="wire-hole centerline location"
     )
+    # Text up-RIGHT of the top view, not beside it: at (+0.034, +0.017) the
+    # leader climbed 45 deg into the 4:1 top view's outline (audit
+    # leader-crosses-view, View3). (+0.046, +0.015) puts the shoulder at
+    # y ~0.2322 from x ~0.0959, so the 25 deg leader passes 1.9 mm under the top
+    # view's padded outline corner (85.6, 229.4) and 9 mm from its square; the
+    # text (x 0.0975..0.1344, y 0.2331..0.2367) sits 2.5 mm above the right
+    # view's outline and 12 mm right of the top view's.
     add_native_hole_callout(
         adapter,
         front,
         edge=wire_hole_edge,
-        callout_xy=(FRONT_CENTER[0] + 0.034, hole_center_y + 0.017),
+        callout_xy=(FRONT_CENTER[0] + 0.046, hole_center_y + 0.015),
         label="pen-rod wire hole",
     )
 
@@ -298,30 +305,26 @@ async def build(adapter: Any) -> dict[str, str]:
         controls=GEOMETRIC_CONTROLS,
         label="pen rod PMI",
     )
-    # Sits RIGHT of the rod and BELOW the right view, reaching back up-left to the
-    # slide face. At (0.0415, 0.165) the body printed "Ra 1.6" straight across the
-    # rod, which is only 5 mm wide at 1:1 and sits at x 0.0675..0.0725.
-    #
-    # The symbol may not go LEFT of the rod, even though that corner is empty: the
-    # leader leaves the ▽ tip AT the anchor and the ~46 mm body draws up-RIGHT of
-    # it (text at x+0.013..x+0.039, y+0.010..y+0.017), so a target up-right forces
-    # the leader to thread between the ▽ and its own text -- steeper than the ▽'s
-    # ~1.8 flank slope is drawn through the glyph, shallower than ~1.9 clips the
-    # text. That window is empty in practice: a 1.5 slope still grazed the "R".
-    # Anchoring right of the rod puts the target up-LEFT instead, so the leader
-    # runs away from the body and the constraint disappears.
-    #
-    # y=0.068 keeps the run under the right view (its box starts at y=0.090, and a
-    # leader through a view it does not annotate fails the crossing gate) and above
-    # the notes at y<=0.062; it also passes below the 115.00 line and the squareness
-    # frame, both of which start at y>=0.095.
+    # LEFT of the rod, at the fleet's 2.5 mm Ra height: from (0.170, 0.068) at
+    # the default height the leader ran 100 mm back across the right view and
+    # the 145.00 dimension line (audit leader-crosses-line / leader-crosses-view).
+    # The slide face is the rod's -X face, seen edge-on as its LEFT edge
+    # (x 0.0675), so the only uncrossed approach is from the band between the
+    # front view's outline (x 0.0619) and the 150.00 dimension line (x 0.040) --
+    # 22 mm, too narrow for the default ~42 mm body, wide enough for the 2.5 mm
+    # one (~17 mm: x-0.0022 to x+0.0147, y to y+0.0072). Target down-RIGHT of
+    # the anchor, so the bent leader's 7.6 mm stub runs right under the open ▽
+    # and drops 4.7 mm onto the face -- away from the body, never through it.
+    # Body x 0.0426..0.0595 keeps 2.6 mm off the 150.00 line and 2.4 mm off the
+    # view outline; its top (0.1121) stays 4.4 mm under datum A's box.
     add_surface_finish(
         adapter,
         front,
         edge_xy=(front_side[0], FRONT_CENTER[1] - 0.050),
-        symbol_xy=(0.170, 0.068),
+        symbol_xy=(0.0448, 0.105),
         control=surface_finish_by_key(SURFACE_FINISHES, "slide_face"),
         label="pen-rod slide face finish",
+        char_height=0.0025,
     )
 
     # The manufacturing note is wider than most sheets' notes. Keep its anchor
