@@ -79,6 +79,7 @@ from pathlib import Path
 from typing import Any
 import yaml as _yaml
 from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker
+from doit.tools import config_changed
 from filelock import FileLock, Timeout  # noqa: E402
 
 # Every build/verify/export task routes its subprocess through ``_run``, which
@@ -3216,6 +3217,19 @@ def task_check():
                 ),
             ],
             "cmd": [*pytest_cmd, *(str(path) for path in recipe_tests)],
+            # file_dep sees additions and edits, but a source file DELETED from
+            # the submodule just drops out of the list -- doit never compares it
+            # -- so the stamp stayed green (codex #1101). The manifest of paths
+            # makes a removal or rename re-run the adapter contract too.
+            "uptodate": [
+                config_changed(
+                    {
+                        "submodule_sources": [
+                            _rel_tag(path) for path in adapter_contract_deps
+                        ]
+                    }
+                )
+            ],
         },
         "cache": {
             # The artefact-cache provenance/observability unit tests (issue #73):
@@ -3423,6 +3437,7 @@ def task_check():
         yield {
             "name": name,
             "file_dep": sorted({*spec["file_dep"], *executed}),
+            "uptodate": spec.get("uptodate", []),
             "targets": [stamp],
             "actions": [
                 (_run_stamped, [spec["cmd"], f"check {name}", stamp, f"check:{name}"])
