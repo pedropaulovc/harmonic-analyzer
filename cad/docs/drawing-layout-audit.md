@@ -127,6 +127,10 @@ a third stroke from the tip and each within 15° of it (the printed
 arrowheads measured 3.54-3.62 mm, pairs within 0.03 mm), since on a short
 leader they end inside the ring. A leader as long as its barbs pairs with
 either by length and angle, but never has the third stroke between them.
+Only one pair per tip is the arrowhead, the one nearest
+GetArrowHeadAtIndex2's barbs (3.576 mm at 6.1°) in length and angle
+together; every other stroke, a second symmetric pair included, even one
+as long as the barbs, is a leader candidate.
 A leader printed from inside its ring therefore reads there. No such
 stroke keeps the COM start; several keep it and report
 `leader-ink-ambiguous`. Lines, leaders and gaps are then measured against

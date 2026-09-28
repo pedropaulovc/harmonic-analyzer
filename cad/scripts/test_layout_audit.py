@@ -2847,7 +2847,9 @@ def test_a_leader_through_its_own_balloon_is_still_found():
 DTA_BALLOON_17_COM = balloon_circle(DTA_BALLOON_17["display"])
 
 
-def _radial_balloon_17(com_inside_m, *ink, ring=DTA_BALLOON_17_RING, sides=48, leader_m=None, beyond=None):
+def _radial_balloon_17(
+    com_inside_m, *ink, ring=DTA_BALLOON_17_RING, sides=48, leader_m=None, beyond=None, spokes=(), arrowhead=True
+):
     """Balloon 17 with a radial leader: COM registers it from ``com_inside_m``
     inside ``ring`` to its tip, ``leader_m`` out from the ring (None: the
     DTA tip, 4.6 mm out). The page prints ``ring`` as a ``sides``-gon. Each
@@ -2855,7 +2857,10 @@ def _radial_balloon_17(com_inside_m, *ink, ring=DTA_BALLOON_17_RING, sides=48, l
     point ``inside_m`` inside the ring, ``turn`` radians round from the
     leader's radius; with any, the arrowhead prints as two strokes back from
     the tip, GetArrowHeadAtIndex2's 3.556 x 0.762 mm. With ``beyond`` the tip
-    is a bend: the leader and its print go on from there to ``beyond``."""
+    is a bend: the leader and its print go on from there to ``beyond``. Each
+    ``spokes`` entry ``(length_m, half_rad)`` prints two more strokes back
+    from the tip, ``half_rad`` either side of the leader's radius. Without
+    ``arrowhead`` the barbs are not printed as strokes."""
     cx, cy, radius = ring
     tip = (0.1676521, 0.1137831)
     length = math.hypot(tip[0] - cx, tip[1] - cy)
@@ -2867,11 +2872,12 @@ def _radial_balloon_17(com_inside_m, *ink, ring=DTA_BALLOON_17_RING, sides=48, l
         c, s = math.cos(turn), math.sin(turn)
         return (cx + (radius - inside) * (ux * c - uy * s), cy + (radius - inside) * (ux * s + uy * c))
 
-    def barb(side):
-        half = side * math.atan2(0.000381, 0.003556)
+    def spoke(reach, half):
         c, s = math.cos(half), math.sin(half)
-        reach = math.hypot(0.000381, 0.003556)
         return (tip[0] - reach * (ux * c - uy * s), tip[1] - reach * (ux * s + uy * c))
+
+    def barb(side):
+        return spoke(math.hypot(0.000381, 0.003556), side * math.atan2(0.000381, 0.003556))
 
     start = at(com_inside_m)
     leader = [*start, 0.051225, *tip, 0.051225, *((*beyond, 0.051225) if beyond else ())]
@@ -2883,8 +2889,9 @@ def _radial_balloon_17(com_inside_m, *ink, ring=DTA_BALLOON_17_RING, sides=48, l
     strokes = [(*tip, *at(inside, turn)) for inside, turn in ink]
     if strokes and beyond:
         strokes.append((*tip, *beyond))
-    elif strokes:
+    elif strokes and arrowhead:
         strokes += [(*tip, *barb(1)), (*tip, *barb(-1))]
+    strokes += [(*tip, *spoke(reach, side * half)) for reach, half in spokes for side in (1, -1)]
     return _dump(
         views=[_view("Drawing View8", (0.12, 0.08, 0.30, 0.20), [balloon])],
         spans=[["17", 0.1618, 0.1034, 0.1662, 0.1069]],
@@ -2983,30 +2990,79 @@ def test_a_leader_as_long_as_its_arrowhead_is_still_its_printed_start(com_inside
 
 
 @pytest.mark.parametrize(
-    ("leader_m", "ink"),
+    ("leader_m", "ink", "spokes", "arrowhead"),
     [
-        (None, ((0.0, 0.0), (0.0, 0.3))),
-        (0.003, ((0.0, 0.0), (0.0, 0.3), (0.0, -0.3))),
-        (0.006, ((0.0, 0.0), (0.0, 0.2), (0.0, -0.2))),
-        (0.003, ((0.0, 0.0), (0.00015, 0.12), (0.0003, -0.12))),
+        (None, ((0.0, 0.0), (0.0, 0.3)), (), True),
+        (0.003, ((0.0, 0.0), (0.0, 0.3), (0.0, -0.3)), (), True),
+        (0.006, ((0.0, 0.0), (0.0, 0.2), (0.0, -0.2)), (), True),
+        (0.003, ((0.0, 0.0), (0.00015, 0.12), (0.0003, -0.12)), (), True),
+        (0.003, ((0.0, 0.0), (0.0, 0.15), (0.0, -0.15)), (), True),
+        (0.003, ((0.0, 0.0),), ((ARROWHEAD_BARB_M, math.radians(10.0)),), True),
+        (0.003, ((0.0, 0.0), (0.0, 0.3), (0.0, -0.3)), (), False),
+        (0.006, ((0.0, 0.0), (0.0, 0.2), (0.0, -0.2)), (), False),
+        (0.003, ((0.0, 0.0), (0.00015, 0.12), (0.0003, -0.12)), (), False),
+        (0.003, ((0.0, 0.0), (0.0, 0.15), (0.00011, 0.07)), (), False),
     ],
-    ids=["dta-leader", "short-leader-wide-twins", "long-leader-long-twins", "short-leader-uneven-close-pair"],
+    ids=[
+        "dta-leader",
+        "short-leader-wide-twins",
+        "long-leader-long-twins",
+        "short-leader-uneven-close-pair",
+        "short-leader-close-twins",
+        "twins-as-long-as-the-barbs",
+        "unstroked-arrowhead-wide-twins",
+        "unstroked-arrowhead-long-twins",
+        "unstroked-arrowhead-uneven-close-pair",
+        "unstroked-arrowhead-twins-one-side",
+    ],
 )
-def test_competing_printed_starts_for_one_balloon_leader_are_reported_as_ambiguous(leader_m, ink):
+def test_competing_printed_starts_for_one_balloon_leader_are_reported_as_ambiguous(leader_m, ink, spokes, arrowhead):
     """Several leader strokes from the tip to the ring, beside the
     arrowhead, leave the printed start unsettled: the audit keeps the COM
     start and says so. Strokes either side of the leader are still leaders,
     not an arrowhead, when 24 degrees off it (3.52 mm twins on a 3 mm
     leader), 6.2 mm long (twins 9 degrees off a 6 mm leader), or of unequal
-    length (3.23 and 3.38 mm, 10 and 9 degrees off a 3 mm leader)."""
+    length (3.23 and 3.38 mm, 10 and 9 degrees off a 3 mm leader), and
+    likewise with no arrowhead stroked, as are two of one length (3.14 mm)
+    on one side of it. Twins that could be an arrowhead (3.14 mm, 13 degrees
+    off; or exactly as long as the barbs, 10 degrees off) are leaders too:
+    one pair per tip is the arrowhead, the one nearest GetArrowHeadAtIndex2's
+    6.1 degree barbs."""
     [finding] = [
         f
-        for f in audit_dump(_radial_balloon_17(0.0, *ink, leader_m=leader_m))
+        for f in audit_dump(_radial_balloon_17(0.0, *ink, leader_m=leader_m, spokes=spokes, arrowhead=arrowhead))
         if f.kind in ("leader-through-own-text", "leader-ink-ambiguous")
     ]
     assert finding.kind == "leader-ink-ambiguous"
-    assert finding.extra == {"strokes": float(len(ink))}
+    assert finding.extra == {"strokes": float(len(ink) + 2 * len(spokes))}
     assert severity(finding) is FindingSeverity.GATING
+
+
+@pytest.mark.parametrize(
+    ("leader_m", "spokes"),
+    [
+        (0.003, ((ARROWHEAD_BARB_M, math.atan2(0.000381, 0.003556)), (0.002, math.radians(12.0)))),
+        (0.003, ((0.00362, math.radians(8.0)), (0.002, math.atan2(0.000381, 0.003556)))),
+        (0.00361, ((0.00362, math.atan2(0.000381, 0.003556)), (ARROWHEAD_BARB_M, math.radians(13.0)))),
+    ],
+    ids=["registered-barbs-short-pair-12deg", "barbs-8deg-short-pair-at-6deg", "barbs-3.62mm-pair-as-long-at-13deg"],
+)
+def test_the_arrowhead_is_the_pair_nearest_its_registered_shape(leader_m, spokes):
+    """A short leader's barbs end inside its ring (within the 0.1 mm band);
+    a second symmetric pair (other ink meeting the tip) ends outside it.
+    The pair nearest GetArrowHeadAtIndex2's 3.576 mm, 6.1 degree barbs in
+    length and angle together is the arrowhead, even when the other matches
+    one of the two better, so the one leader stroke is the start: clean, no
+    ambiguity."""
+    from _layout_audit import BALLOON_LEADER_RING_M
+
+    cx, cy, radius = DTA_BALLOON_17_RING
+    dump = _radial_balloon_17(0.00047, (0.0, 0.0), leader_m=leader_m, spokes=spokes, arrowhead=False)
+    *_, barb_a, barb_b, spoke_a, spoke_b = [(s[2], s[3]) for s in dump["ink"]["strokes"]]
+    band = radius + BALLOON_LEADER_RING_M
+    assert all(math.hypot(x - cx, y - cy) < band for x, y in (barb_a, barb_b)), "fixture: barbs inside"
+    assert all(math.hypot(x - cx, y - cy) > band for x, y in (spoke_a, spoke_b)), "fixture: pair outside"
+    assert _own_strikes(dump) == []
 
 
 def test_diagonal_balloons_are_separated_by_their_circles():

@@ -659,13 +659,17 @@ BALLOON_LEADER_TIP_M = 0.0001
 # length, no longer than an arrowhead, one either side of a third stroke from
 # the tip (the leader) and each within 15 deg of it. A leader as long as its
 # barbs pairs with either of them too, but the other then lies on one side of
-# that pair, not between. GetArrowHeadAtIndex2 gives 3.556 x 0.762 mm
-# (half-angle 6.1 deg); the printed pairs measured 3.54-3.62 mm long, the two
-# within 0.03 mm of each other (frame-assembly and drive-train-assembly,
-# runs 20260928T124727673Z, 20260928T150721937Z, 20260928T152556482Z).
+# that pair, not between. Of several such pairs only the one closest to the
+# arrowhead GetArrowHeadAtIndex2 gives, 3.556 x 0.762 mm (barbs 3.576 mm at
+# 6.1 deg), is the arrowhead; any other is a leader stroke. The printed pairs
+# measured 3.54-3.62 mm long, the two within 0.03 mm of each other
+# (frame-assembly and drive-train-assembly, runs 20260928T124727673Z,
+# 20260928T150721937Z, 20260928T152556482Z).
 BALLOON_BARB_MAX_M = 0.005
 BALLOON_BARB_PAIR_M = 0.0001
 BALLOON_BARB_ANGLE_RAD = math.radians(15.0)
+BALLOON_BARB_LENGTH_M = math.hypot(0.003556, 0.000381)
+BALLOON_BARB_HALF_ANGLE_RAD = math.atan2(0.000381, 0.003556)
 
 
 def _fit_circle(points: Sequence[tuple[float, float]]) -> tuple[float, float, float] | None:
@@ -766,30 +770,42 @@ def _move_ring(
 
 
 def _arrowhead_barbs(tip: tuple[float, float], ends: Sequence[tuple[float, float]]) -> set[tuple[float, float]]:
-    """Of the strokes from ``tip`` (given by their other ``ends``), those
-    printing its arrowhead: pairs of one length (``BALLOON_BARB_PAIR_M``), no
-    longer than ``BALLOON_BARB_MAX_M``, either side of a third stroke from the
-    tip (the leader) and within ``BALLOON_BARB_ANGLE_RAD`` of it."""
+    """Of the strokes from ``tip`` (given by their other ``ends``), the two
+    printing its arrowhead: of the pairs of one length
+    (``BALLOON_BARB_PAIR_M``), no longer than ``BALLOON_BARB_MAX_M``, either
+    side of a third stroke from the tip (the leader) and within
+    ``BALLOON_BARB_ANGLE_RAD`` of it, the one nearest GetArrowHeadAtIndex2's
+    barb (``BALLOON_BARB_LENGTH_M`` at ``BALLOON_BARB_HALF_ANGLE_RAD``).
+    Never more than one pair: any other is leader strokes."""
 
     def turn(end: tuple[float, float], other: tuple[float, float]) -> float:
         u = (end[0] - tip[0], end[1] - tip[1])
         v = (other[0] - tip[0], other[1] - tip[1])
         return math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1])
 
-    barbs: set[tuple[float, float]] = set()
+    def mismatch(end: tuple[float, float], half: float) -> float:
+        return (
+            abs(math.dist(end, tip) - BALLOON_BARB_LENGTH_M) / BALLOON_BARB_LENGTH_M
+            + abs(half - BALLOON_BARB_HALF_ANGLE_RAD) / BALLOON_BARB_ANGLE_RAD
+        )
+
+    pairs = []
     for index, a in enumerate(ends):
         for b in ends[index + 1 :]:
             la, lb = math.dist(a, tip), math.dist(b, tip)
             if max(la, lb) > BALLOON_BARB_MAX_M or abs(la - lb) > BALLOON_BARB_PAIR_M:
                 continue
-            if any(
-                (0.0 < turn(c, a) <= BALLOON_BARB_ANGLE_RAD and 0.0 < turn(b, c) <= BALLOON_BARB_ANGLE_RAD)
-                or (0.0 < turn(c, b) <= BALLOON_BARB_ANGLE_RAD and 0.0 < turn(a, c) <= BALLOON_BARB_ANGLE_RAD)
-                for c in ends
-                if c not in (a, b)
-            ):
-                barbs |= {a, b}
-    return barbs
+            for c in ends:
+                if c in (a, b):
+                    continue
+                for left, right in ((a, b), (b, a)):
+                    ta, tb = turn(c, left), turn(right, c)
+                    if 0.0 < ta <= BALLOON_BARB_ANGLE_RAD and 0.0 < tb <= BALLOON_BARB_ANGLE_RAD:
+                        pairs.append((mismatch(left, ta) + mismatch(right, tb), a, b))
+    if not pairs:
+        return set()
+    _, a, b = min(pairs)
+    return {a, b}
 
 
 def _printed_leader_starts(
