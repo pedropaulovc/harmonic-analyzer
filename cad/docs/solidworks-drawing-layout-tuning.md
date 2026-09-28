@@ -293,12 +293,22 @@ tip, and DETACHES the annotation: `GetAttachedEntityCount3` goes 1 -> 0 and
 had). Those three reads are not attachment evidence.
 Do: select the entity, call `ISelectionMgr::SetSelectionPoint2(1, -1, x, y,
 0)` with the sheet landing, THEN insert (`InsertSurfaceFinishSymbol3`,
-`InsertGtol`); assert `GetAttachedEntityCount3 == 1` and the types after the
-rebuild (`add_surface_finish`, `add_feature_control_frame`). A pointer note
-(`add_leader_note`) has no attachment to lose (0 -> 0 on the same run) and
-keeps the call. Where the pick and the landing differ, the leader may end on
-the PICK (pinion_bracket pivot finish, 4.6 mm off), so pick the edge at the
-landing point.
+`InsertGtol`); after the rebuild require `GetAttachedEntities3`,
+`GetAttachedEntityCount3` and `GetAttachedEntityTypes` to agree on ONE entity
+of the selected kind, and require that entity to BE the selected one
+(`_drawing_common._assert_attached_to`). `ISldWorks::IsSame` proves an edge or
+face; it reads 0 for every silhouette, so a silhouette is proved through
+`ISilhouetteEdge::GetFace` — the selected and attached silhouettes' faces
+passed IsSame on all 16 silhouette finishes and frames of farm run
+20260928T085009031Z, and `IModelDocExtension::IsSamePersistentID` on the
+drawing agreed. The two flanks of one cylinder share that face; the leader
+landing readback (`GetLeaderPointsAtIndex`) tells them apart, and it must be
+within 1 mm of the request: 13 of 14 landings on run 20260928T084216466Z were
+within 4e-8 m, the pinion-bracket pivot-bore finish re-solved 0.61 mm along
+its edge. A pointer note (`add_leader_note`) has no attachment to lose (0 -> 0
+on the same run) and keeps the call. Where the pick and the landing differ,
+the leader may end on the PICK (pinion_bracket pivot finish, 4.6 mm off), so
+pick the edge at the landing point.
 
 **j. A fresh detail view whose readbacks lag its ink.**
 Right after `CreateDetailViewAt4` + rebuild, `IView::GetOutline` is centred

@@ -137,22 +137,50 @@ def test_add_surface_finish_validates_part_control_without_audit_opt_in(
 
 
 class _Annotation:
-    """The ``IAnnotation`` readbacks the surface-finish attachment guard sends."""
+    """The ``IAnnotation`` readbacks the attachment guard sends."""
 
-    def __init__(self, entities: tuple[Any, ...], types: tuple[int, ...]) -> None:
+    def __init__(
+        self,
+        entities: tuple[Any, ...],
+        types: tuple[int, ...],
+        *,
+        count: int | None = None,
+        leaders: int = 1,
+        dangling: bool = False,
+        leader_points: tuple[float, ...] = (),
+    ) -> None:
         self.entities, self.types = entities, types
+        self.count = len(entities) if count is None else count
+        self.leaders, self.dangling, self.leader_points = leaders, dangling, leader_points
 
     def GetAttachedEntities3(self) -> tuple[Any, ...]:  # noqa: N802
         return self.entities
+
+    def GetAttachedEntityCount3(self) -> int:  # noqa: N802
+        return self.count
 
     def GetAttachedEntityTypes(self) -> tuple[int, ...]:  # noqa: N802
         return self.types
 
     def GetLeaderCount(self) -> int:  # noqa: N802
-        return 1
+        return self.leaders
 
     def IsDangling(self) -> bool:  # noqa: N802
-        return False
+        return self.dangling
+
+    def GetLeaderPointsAtIndex(self, index: int) -> tuple[float, ...]:  # noqa: N802
+        assert index == 0
+        return self.leader_points
+
+
+class _Silhouette:
+    """An ``ISilhouetteEdge``: identified only through its owning face."""
+
+    def __init__(self, face: Any) -> None:
+        self.face = face
+
+    def GetFace(self) -> Any:  # noqa: N802
+        return self.face
 
 
 class _App:
@@ -164,93 +192,136 @@ class _Adapter:
     swApp = _App()
 
 
-def test_surface_finish_guard_accepts_the_inserted_entity() -> None:
-    edge = object()
-    _drawing_common._assert_surface_finish_attached(
-        _Adapter(), _Annotation((edge,), (1,)), edge, entity_type="EDGE", label="bore"
+@pytest.fixture(autouse=True)
+def _plain_early_binding(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
+
+
+def _guard(annotation: _Annotation, entity: Any, entity_type: str) -> None:
+    _drawing_common._assert_attached_to(
+        _Adapter(), annotation, entity, entity_type=entity_type,
+        what="surface-finish symbol", label="bore",
     )
 
 
 @pytest.mark.parametrize(
-    ("entities", "types"),
+    ("entity_type", "code"), (("EDGE", 1), ("FACE", 2), ("SILHOUETTE", 46))
+)
+def test_attachment_guard_accepts_the_inserted_entity(entity_type: str, code: int) -> None:
+    face = object()
+    entity = _Silhouette(face) if entity_type == "SILHOUETTE" else object()
+    # Another silhouette of the same face (the other flank) is the same
+    # attachment as far as identity goes; the leader landing tells them apart.
+    attached = _Silhouette(face) if entity_type == "SILHOUETTE" else entity
+    _guard(_Annotation((attached,), (code,)), entity, entity_type)
+
+
+@pytest.mark.parametrize(
+    ("entities", "types", "count", "expected"),
     (
         # A moved leader on the sfprobe leaves: IsAttached True, no entity.
-        ((), ()),
-        # A landing that resolved to the neighbouring face.
-        ((object(),), (1,)),
+        ((), (), 0, "entities=0"),
+        # A landing that resolved to the neighbouring edge.
+        (("other",), (1,), 1, "same_entity=False"),
+        # The count, type and entity readbacks disagree.
+        (("edge",), (1,), 0, "count=0"),
+        (("edge",), (), 1, "types=()"),
+        (("edge",), (2,), 1, "types=(2,)"),
+        (("edge", "edge"), (1, 1), 2, "entities=2"),
+        ((None,), (0,), 1, "same_entity=False"),
     ),
-    ids=("detached", "neighbour"),
+    ids=(
+        "detached", "neighbour", "count-disagrees", "type-missing",
+        "type-is-face", "two-entities", "null-entity",
+    ),
 )
-def test_surface_finish_guard_rejects_a_symbol_off_its_entity(
-    entities: tuple[Any, ...], types: tuple[int, ...]
+def test_attachment_guard_rejects_a_symbol_off_its_edge(
+    entities: tuple[Any, ...], types: tuple[int, ...], count: int, expected: str
 ) -> None:
-    with pytest.raises(RuntimeError, match=r"lost its attachment \(bore\)"):
-        _drawing_common._assert_surface_finish_attached(
-            _Adapter(), _Annotation(entities, types), object(), entity_type="EDGE",
-            label="bore",
+    edge, other = object(), object()
+    resolved = tuple({"edge": edge, "other": other, None: None}[e] for e in entities)
+    with pytest.raises(RuntimeError, match=r"lost its edge attachment \(bore\)") as info:
+        _guard(_Annotation(resolved, types, count=count), edge, "EDGE")
+    assert expected in str(info.value)
+
+
+@pytest.mark.parametrize(
+    ("leaders", "dangling"), ((0, False), (2, False), (1, True)), ids=("none", "two", "dangling")
+)
+def test_attachment_guard_requires_one_live_leader(leaders: int, dangling: bool) -> None:
+    edge = object()
+    with pytest.raises(RuntimeError, match=r"lost its edge attachment \(bore\)"):
+        _guard(_Annotation((edge,), (1,), leaders=leaders, dangling=dangling), edge, "EDGE")
+
+
+@pytest.mark.parametrize(
+    ("attached", "types", "expected"),
+    (
+        # IsSame reads 0 for every silhouette, so the owning faces decide:
+        # a silhouette of another face is the neighbouring feature.
+        (_Silhouette(object()), (46,), "same_entity=False"),
+        # A silhouette that has lost its face cannot be identified.
+        (_Silhouette(None), (46,), "same_entity=False"),
+        # The type readback says edge, however the entity reads.
+        (None, (1,), "types=(1,)"),
+    ),
+    ids=("other-face", "faceless", "type-is-edge"),
+)
+def test_silhouette_guard_requires_the_selected_silhouettes_face(
+    attached: Any, types: tuple[int, ...], expected: str
+) -> None:
+    selected = _Silhouette(object())
+    attached = selected if attached is None else attached
+    with pytest.raises(RuntimeError, match=r"lost its silhouette attachment \(bore\)") as info:
+        _guard(_Annotation((attached,), types), selected, "SILHOUETTE")
+    assert expected in str(info.value)
+
+
+def test_face_guard_rejects_a_face_that_is_not_the_selected_one() -> None:
+    # The former surface/normal/box fallback accepted any face with the
+    # selected face's signature; identity is now IsSame or nothing.
+    with pytest.raises(RuntimeError, match=r"lost its face attachment \(bore\)"):
+        _guard(_Annotation((object(),), (2,)), object(), "FACE")
+
+
+def test_attachment_guard_refuses_a_kind_it_cannot_prove() -> None:
+    with pytest.raises(ValueError, match="cannot verify a DIMENSION attachment"):
+        _guard(_Annotation((object(),), (14,)), object(), "DIMENSION")
+
+
+def test_feature_control_frame_refuses_a_dimension_attachment() -> None:
+    class _Adapter:
+        currentModel = None
+
+    with pytest.raises(ValueError, match="cannot attach to a DIMENSION"):
+        _drawing_common.add_feature_control_frame(
+            _Adapter(), None, edge_xy=(0.0, 0.0), frame_xy=(0.0, 0.0),
+            characteristic="runout", tolerance="0.01", label="runout",
+            entity_type="DIMENSION",
         )
 
 
 @pytest.mark.parametrize(
-    ("types", "attached"), (((46,), True), ((), False), ((1,), False))
-)
-def test_silhouette_finish_guard_requires_one_silhouette(
-    types: tuple[int, ...], attached: bool
-) -> None:
-    # IsSame reads 0 for a silhouette finish even when unmoved, so the guard
-    # reads the attached type instead of identity.
-    annotation = _Annotation((object(),) * len(types), types)
-    check = lambda: _drawing_common._assert_surface_finish_attached(  # noqa: E731
-        _Adapter(), annotation, object(), entity_type="SILHOUETTE", label="journal"
-    )
-    if attached:
-        check()
-    else:
-        with pytest.raises(RuntimeError, match="lost its silhouette attachment"):
-            check()
-
-
-def _signature(radius: float, box_x: float = 0.01) -> dict[str, Any]:
-    return {
-        "identity": 4002,
-        "parameters": (0.197, 0.0254, -0.112, 0.0, 1.0, 0.0, radius),
-        "normal": None,
-        "box": (-box_x, 0.0, 0.0, box_x, 0.01, 0.01),
-    }
-
-
-@pytest.mark.parametrize(
-    ("attached_signature", "accepted"),
+    ("offset_m", "accepted"),
     (
-        # The section-view socket bore: IsSame 0, the selected face's surface.
-        (_signature(0.01275), True),
-        # A coaxial counterbore of another size.
-        (_signature(0.015), False),
-        # The same surface, split into another face with its own extent.
-        (_signature(0.01275, box_x=0.02), False),
+        # The pinion-bracket pivot-bore finish re-solved 0.61 mm along its edge.
+        (0.00061, True),
+        # A landing on a neighbouring edge 1.5 mm away passed the old 5 mm bound.
+        (0.0015, False),
     ),
-    ids=("same-face", "other-surface", "other-extent"),
+    ids=("edge-resolve", "neighbouring-edge"),
 )
-def test_face_finish_guard_falls_back_to_the_face_surface_and_extent(
-    monkeypatch: pytest.MonkeyPatch,
-    attached_signature: dict[str, Any],
-    accepted: bool,
-) -> None:
-    selected, attached = object(), object()
-    signatures = {id(selected): _signature(0.01275), id(attached): attached_signature}
-    monkeypatch.setattr(
-        _drawing_common,
-        "_surface_finish_face_signatures",
-        lambda faces: tuple(signatures[id(face)] for face in faces),
-    )
-    check = lambda: _drawing_common._assert_surface_finish_attached(  # noqa: E731
-        _Adapter(), _Annotation((attached,), (2,)), selected, entity_type="FACE",
-        label="socket bore",
+def test_leader_landing_tolerance_is_one_millimetre(offset_m: float, accepted: bool) -> None:
+    requested = (0.2055, 0.1175)
+    points = (0.136, 0.106, 0.0, requested[0] + offset_m, requested[1], 0.0)
+    check = lambda: _drawing_common._assert_leader_lands(  # noqa: E731
+        _Annotation((object(),), (1,), leader_points=points), requested,
+        what="surface-finish symbol", label="bore",
     )
     if accepted:
         check()
     else:
-        with pytest.raises(RuntimeError, match=r"lost its attachment \(socket bore\)"):
+        with pytest.raises(RuntimeError, match=r"leader attachment moved \(bore\)"):
             check()
 
 

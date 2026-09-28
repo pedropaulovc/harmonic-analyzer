@@ -127,6 +127,7 @@ _ANNOT_DATUM = 2
 _ANNOT_GTOL = 5
 _ANNOT_SFSYM = 7
 _SEL_DIMENSION = 14  # swSelectType_e.swSelDIMENSIONS
+_SEL_EDGE = 1  # swSelectType_e.swSelEDGES
 _SEL_SILHOUETTE = 46  # swSelectType_e.swSelSILHOUETTES
 _SEL_FACE = 2  # swSelectType_e.swSelFACES
 _GDT_TYPES = frozenset({_ANNOT_DATUM, _ANNOT_GTOL, _ANNOT_SFSYM})
@@ -305,6 +306,16 @@ def _select_view_entity(
     return entity
 
 
+# How far a leader may land from its requested attachment point.  Measured on
+# the #1105 idprobe farm leaves (20260928T084216466Z, 14 surface finishes and
+# feature-control frames landed by selection point): every leader but one read
+# back within 4e-8 m of its request; the pinion-bracket pivot-bore finish,
+# whose request sits on the bore circle at 45 deg, re-solved 0.61 mm along the
+# edge.  1 mm admits that re-solve and rejects a landing on the neighbouring
+# edge, which the earlier 5 mm bound could not.
+_LEADER_LANDING_TOLERANCE_M = 0.001
+
+
 def _assert_leader_lands(
     annotation: Any,
     leader_attach_xy: tuple[float, float],
@@ -312,9 +323,10 @@ def _assert_leader_lands(
     what: str,
     label: str,
 ) -> None:
-    """Fail unless ``annotation`` keeps one live leader ending within 5 mm of
-    ``leader_attach_xy``.  A returned True from a leader or selection-point
-    setter proves nothing, so the landing is read back."""
+    """Fail unless ``annotation`` keeps one live leader ending within
+    ``_LEADER_LANDING_TOLERANCE_M`` of ``leader_attach_xy``.  A returned True
+    from a leader or selection-point setter proves nothing, so the landing is
+    read back."""
     leaders = int(annotation.GetLeaderCount())
     dangling = bool(annotation.IsDangling())
     if dangling or leaders != 1:
@@ -327,11 +339,40 @@ def _assert_leader_lands(
         raise RuntimeError(f"{what} leader is unreadable ({label})")
     actual = (float(points[-3]), float(points[-2]))
     error = math.dist(actual, leader_attach_xy)
-    if error > 0.005:
+    if error > _LEADER_LANDING_TOLERANCE_M:
         raise RuntimeError(
             f"{what} leader attachment moved ({label}): actual={actual}, "
-            f"requested={leader_attach_xy}, error={error:.6g} m"
+            f"requested={leader_attach_xy}, error={error:.6g} m, "
+            f"limit={_LEADER_LANDING_TOLERANCE_M:g} m"
         )
+
+
+_ATTACHMENT_SELECT_TYPES = {
+    "EDGE": _SEL_EDGE,
+    "FACE": _SEL_FACE,
+    "SILHOUETTE": _SEL_SILHOUETTE,
+}
+
+
+def _is_same_attachment(adapter: Any, attached: Any, entity: Any, kind: str) -> bool:
+    """Whether ``attached`` is the ``kind`` entity an annotation was inserted on.
+
+    ``ISldWorks::IsSame`` reads 1 for the model edge or face itself, and 0 for
+    every silhouette, moved or not (probe 3 and run 20260928T081119688Z).  A
+    silhouette is identified by its owning face instead: on the #1105 idprobe2
+    leaves (20260928T085009031Z) ``ISilhouetteEdge::GetFace`` of the selected
+    and of the attached silhouette passed IsSame on all 16 silhouette finishes
+    and frames, and the drawing's ``IsSamePersistentID`` agreed.  A cylinder's
+    two flank silhouettes share that face; the leader-landing check tells them
+    apart.
+    """
+    if kind != "SILHOUETTE":
+        return int(adapter.swApp.IsSame(attached, entity)) == 1
+    selected_face = _early_bound(entity, "ISilhouetteEdge").GetFace()
+    attached_face = _early_bound(attached, "ISilhouetteEdge").GetFace()
+    if selected_face is None or attached_face is None:
+        return False
+    return int(adapter.swApp.IsSame(attached_face, selected_face)) == 1
 
 
 def _assert_attached_to(
@@ -339,90 +380,41 @@ def _assert_attached_to(
     annotation: Any,
     entity: Any,
     *,
+    entity_type: str,
     what: str,
     label: str,
 ) -> None:
     """Fail unless ``annotation`` is still attached, by one live leader, to
-    exactly ``entity``.  A leader move re-solves the attachment:
+    exactly ``entity``, an ``entity_type`` (EDGE, FACE or SILHOUETTE) entity.
+
+    The count, type and entity readbacks must agree on one entity of that
+    type -- ``IGtol.IsAttached`` and ``ISFSymbol.IsAttached`` keep reading
+    True on a detached symbol -- and that entity must be ``entity`` by
+    :func:`_is_same_attachment`.  A leader move re-solves the attachment:
     ``SetLeaderAttachmentPointAtIndex`` detached a feature-control frame
     (entities=0) on the #1105 platen_guide leaf.
     """
+    kind = entity_type.upper()
+    if kind not in _ATTACHMENT_SELECT_TYPES:
+        raise ValueError(f"{what} cannot verify a {kind} attachment ({label})")
     attached = tuple(annotation.GetAttachedEntities3() or ())
+    count = int(annotation.GetAttachedEntityCount3())
+    types = tuple(int(t) for t in (annotation.GetAttachedEntityTypes() or ()))
     leaders = int(annotation.GetLeaderCount())
     dangling = bool(annotation.IsDangling())
-    same = (
+    one = (
         len(attached) == 1
+        and count == 1
+        and types == (_ATTACHMENT_SELECT_TYPES[kind],)
         and attached[0] is not None
-        and int(adapter.swApp.IsSame(attached[0], entity)) == 1
     )
+    same = one and _is_same_attachment(adapter, attached[0], entity, kind)
     if not same or dangling or leaders != 1:
         raise RuntimeError(
-            f"{what} lost its attachment ({label}): entities={len(attached)}, "
+            f"{what} lost its {kind.lower()} attachment ({label}): "
+            f"entities={len(attached)}, count={count}, types={types}, "
             f"same_entity={same}, dangling={dangling}, leaders={leaders}"
         )
-
-
-def _face_extent_key(face: Any) -> tuple[Any, ...] | None:
-    """A model face's surface type, parameters, outward normal and box."""
-    signatures = _surface_finish_face_signatures((face,))
-    if len(signatures) != 1:
-        return None
-    sig = signatures[0]
-    return (sig["identity"], sig["parameters"], sig["normal"], sig["box"])
-
-
-def _assert_surface_finish_attached(
-    adapter: Any,
-    annotation: Any,
-    entity: Any,
-    *,
-    entity_type: str,
-    label: str,
-) -> None:
-    """Fail unless a surface-finish symbol is attached, by one live leader,
-    to exactly the entity it was inserted on.
-
-    ``ISldWorks::IsSame`` is not an identity test for every kind.  It read 0
-    for the pivot-shaft journal finish, which was inserted on its silhouette
-    and never moved.  It also read 0 for the harmonic-base socket bore and
-    top-frame cap seat, which are faces in section views landed by selection
-    point, while the attached face had the selected face's exact surface
-    parameters (sfprobe farm leaves, 2026-09-28).  So a silhouette must be
-    the one attached silhouette.  A face that fails IsSame must be the one
-    attached face and have the selected face's surface, normal and box.
-    """
-    kind = entity_type.upper()
-    types = tuple(int(t) for t in (annotation.GetAttachedEntityTypes() or ()))
-    if kind == "SILHOUETTE":
-        leaders = int(annotation.GetLeaderCount())
-        dangling = bool(annotation.IsDangling())
-        if types != (_SEL_SILHOUETTE,) or dangling or leaders != 1:
-            raise RuntimeError(
-                f"surface-finish symbol lost its silhouette attachment ({label}): "
-                f"types={types}, dangling={dangling}, leaders={leaders}"
-            )
-        return
-    try:
-        _assert_attached_to(
-            adapter, annotation, entity, what="surface-finish symbol", label=label
-        )
-    except RuntimeError as exc:
-        if kind != "FACE":
-            raise RuntimeError(f"{exc}; attached types={types}") from None
-        attached = tuple(annotation.GetAttachedEntities3() or ())
-        seen = _face_extent_key(attached[0]) if len(attached) == 1 else None
-        wanted = _face_extent_key(entity)
-        if (
-            types != (_SEL_FACE,)
-            or seen is None
-            or seen != wanted
-            or bool(annotation.IsDangling())
-            or int(annotation.GetLeaderCount()) != 1
-        ):
-            raise RuntimeError(
-                f"{exc}; attached types={types}, attached face={seen}, "
-                f"wanted face={wanted}"
-            ) from None
 
 
 # swSelectType_e names for the kinds a drawing-view pick can resolve to; an
@@ -877,7 +869,10 @@ def add_feature_control_frame(
     """Attach a native feature-control frame to a drawing-view edge.
 
     ``entity_type`` widens the pick for entities that are not model edges —
-    a revolve's flank lines are ``"SILHOUETTE"`` edges.
+    a revolve's flank lines are ``"SILHOUETTE"`` edges.  Only the kinds
+    :func:`_assert_attached_to` can prove (EDGE, FACE, SILHOUETTE) are
+    accepted; the former DIMENSION path, which took ``IGtol.IsAttached`` as
+    proof, had no caller and is gone.
 
     ``leader_attach_xy`` is where the leader lands on that entity (sheet
     metres): it becomes the selection point before ``InsertGtol``, the same
@@ -889,6 +884,10 @@ def add_feature_control_frame(
     while IGtol.IsAttached kept reading True with one non-dangling leader.
     """
     draw = adapter.currentModel
+    if entity_type.upper() not in _ATTACHMENT_SELECT_TYPES:
+        raise ValueError(
+            f"feature-control frame cannot attach to a {entity_type} ({label})"
+        )
     edge = _select_annotation_entity(
         adapter,
         view,
@@ -995,13 +994,7 @@ def add_feature_control_frame(
         "IsDangling",
         "GetLeaderPointsAtIndex",
     )
-    # A GTol inserted from a selected display dimension reports its association
-    # through IGtol.IsAttached/GetLeaderCount; whether the dimension ALSO lands
-    # in the annotation's model-entity array is flow-dependent (0 on the
-    # pre-merge insertion order, 1 on the current one), so accept either.
-    # Ordinary edge/silhouette attachments must register exactly one entity.
-    expected_entities = {0, 1} if entity_type == "DIMENSION" else {1}
-    if entity_type != "DIMENSION" and int(annotation.GetAttachedEntityCount3()) != 1:
+    if int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
             raise RuntimeError(f"failed to attach feature-control frame ({label})")
     # Bent leaders keep ordinary feature attachments out of neighbouring views.
@@ -1024,36 +1017,15 @@ def add_feature_control_frame(
         raise RuntimeError(f"failed to position feature-control frame ({label})")
     rebuild_drawing(adapter, label="add_feature_control_frame")
     # IGtol.IsAttached reads True on a detached frame (run 20260928T080412049Z
-    # above), so the attached entity is what proves the attachment.  A
-    # silhouette never passes IsSame, moved or not (probe 3 and the crank
-    # handle, pen marker and transgear stud frames on run 20260928T081119688Z),
-    # so it must be the one attached silhouette, as for surface finishes.
-    if entity_type == "DIMENSION":
-        if (
-            int(annotation.GetAttachedEntityCount3()) not in expected_entities
-            or not bool(gtol.IsAttached())
-            or int(gtol.GetLeaderCount()) != 1
-        ):
-            raise RuntimeError(
-                f"feature-control frame attachment mismatch ({label}): "
-                f"entities={annotation.GetAttachedEntityCount3()}, "
-                f"expected in {sorted(expected_entities)}; "
-                f"attached={bool(gtol.IsAttached())}; "
-                f"leaders={gtol.GetLeaderCount()}, expected=1"
-            )
-    elif entity_type == "SILHOUETTE":
-        types = tuple(int(t) for t in (annotation.GetAttachedEntityTypes() or ()))
-        leaders = int(annotation.GetLeaderCount())
-        dangling = bool(annotation.IsDangling())
-        if types != (_SEL_SILHOUETTE,) or dangling or leaders != 1:
-            raise RuntimeError(
-                f"feature-control frame lost its silhouette attachment ({label}): "
-                f"types={types}, dangling={dangling}, leaders={leaders}"
-            )
-    else:
-        _assert_attached_to(
-            adapter, annotation, edge, what="feature-control frame", label=label
-        )
+    # above), so the attached entity is what proves the attachment.
+    _assert_attached_to(
+        adapter,
+        annotation,
+        edge,
+        entity_type=entity_type,
+        what="feature-control frame",
+        label=label,
+    )
     if leader_attach_xy is not None:
         _assert_leader_lands(
             annotation, leader_attach_xy, what="feature-control frame", label=label
@@ -1298,6 +1270,7 @@ def add_surface_finish(
         "SetLeader3",
         "GetTextFormat",
         "SetTextFormat",
+        "GetAttachedEntityCount3",
         "GetAttachedEntities3",
         "GetAttachedEntityTypes",
         "GetLeaderCount",
@@ -1333,8 +1306,13 @@ def add_surface_finish(
             raise RuntimeError(f"failed to set surface-finish text height ({label})")
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="add_surface_finish")
-    _assert_surface_finish_attached(
-        adapter, annotation, selected_entity, entity_type=entity_type, label=label
+    _assert_attached_to(
+        adapter,
+        annotation,
+        selected_entity,
+        entity_type=entity_type,
+        what="surface-finish symbol",
+        label=label,
     )
     if leader_attach_xy is not None:
         _assert_leader_lands(
@@ -1770,6 +1748,7 @@ def add_attached_note(
         "SetPosition2",
         "GetLeaderCount",
         "GetAttachedEntities3",
+        "GetAttachedEntityTypes",
         "IsDangling",
     )
     if int(annotation.GetAttachedEntityCount3()) != 1:
@@ -1787,7 +1766,14 @@ def add_attached_note(
     ):
         raise RuntimeError(f"attached note lacks one arrow ({label})")
     if attached_to is not None:
-        _assert_attached_to(adapter, annotation, attached_to, what="attached note", label=label)
+        _assert_attached_to(
+            adapter,
+            annotation,
+            attached_to,
+            entity_type=entity_type,
+            what="attached note",
+            label=label,
+        )
     draw.ClearSelection2(True)
     return note
 
