@@ -80,11 +80,14 @@ snapshot:
 
 ```
 uv run --frozen --no-sync --active python build.py --executor farm \
-  --leaf-timeout <minutes> --verbosity info -n 4 --continue <targets...>
+  --leaf-timeout <minutes> --verbosity info --continue <targets...>
 ```
 
-`-n 4` is the submitter's own concurrency, passed explicitly so it wins over the
-`-n 8` (`HARMONIC_FARM_PARALLELISM`) that `build.py` would otherwise insert.
+The launcher passes no `-n`, so `build.py` inserts `-n 8`
+(`HARMONIC_FARM_PARALLELISM`): more leaves in flight than the fleet has workers,
+so no worker idles between leaves. A hard-coded `-n 4` against five workers kept
+exactly four leaves running 88% of a cold build and one worker idle throughout
+(2026-09-28, build `20260928T150817352Z`).
 `--continue` collects later failures instead of stopping at the first; any failed
 task still leaves the run nonzero.
 
@@ -223,7 +226,7 @@ farm-launch started 20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516 C:\src\
   "tag": "smoke",
   "argv": ["uv", "run", "--frozen", "--no-sync", "--active", "python", "build.py",
            "--executor", "farm", "--leaf-timeout", "90", "--verbosity", "info",
-           "-n", "4", "--continue", "part:pen_rod"],
+           "--continue", "part:pen_rod"],
   "snapshot": "C:\\src\\dt-logs\\farm-runs\\snapshots\\3f7b1c9a2d5e",
   "outputs": "C:\\src\\dt-logs\\farm-runs\\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.out",
   "environment": "C:\\src\\dt-logs\\farm-runs\\envs\\9c41d07a2be35f18"

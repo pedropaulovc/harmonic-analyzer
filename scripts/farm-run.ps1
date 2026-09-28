@@ -544,12 +544,14 @@ try {
     # a per-snapshot .venv (--active, which reads VIRTUAL_ENV). VIRTUAL_ENV is
     # also what build.py strips before it runs the pool's own uv project, so
     # the shared environment cannot leak into the pool.
+    # No -n: build.py keeps HARMONIC_FARM_PARALLELISM (default 8) leaves in
+    # flight, more than the fleet's worker count, so a worker never idles
+    # waiting for the submitter to hand it the next ready leaf.
     $buildArgs = @(
         'run', '--frozen', '--no-sync', '--active', 'python', 'build.py',
         '--executor', 'farm',
         '--leaf-timeout', [string]$LeafTimeout,
         '--verbosity', 'info',
-        '-n', '4',
         '--continue'
     ) + $normalizedTargets
     [string[]]$nativeArgv = @('uv') + $buildArgs
