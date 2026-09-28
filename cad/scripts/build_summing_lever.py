@@ -296,14 +296,12 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     # AUTO-selected edge whose natural sense reversed the field off the -Z
     # plate edge (all but j=0 solid), and was replaced by cutting all 20
     # stations outright in one sketch. The pattern returns with the sense RISK
-    # managed, not inference-trusted (the platen-rack ToothPattern idiom): the
-    # direction reference is a DELIBERATE edge pick (the plate's +X top edge,
-    # mid-span, natural sense MEASURED -Z on this seat -- a j=0 seed marched
-    # off the plate and failed the gate below with exactly one landed
-    # instance), the seed sits at the +Z END of the station span so the -Z
-    # march covers the field and a reversal runs off the plate, and the
-    # analytic volume gate below resolves a single missing hole -- a flip
-    # cannot pass silently.
+    # managed, not inference-trusted: the direction is the plate's +X top edge
+    # (along Z) with an explicit -Z direction_vector, so neither the active
+    # view nor the edge's own sense decides it; the seed sits at the +Z END of
+    # the station span so the -Z march covers the field and a reversal runs
+    # off the plate, and the analytic volume gate below resolves a single
+    # missing hole -- a flip cannot pass silently.
     # Native number-drill seed for the patterned spring-hook seats.
     seed_dia = blind_cut_dia_mm(HOLE_SPEC)
     seed_result = wizard_holes(
@@ -333,6 +331,7 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
         await adapter.linear_pattern_feature(
             LinearPatternParameters(
                 direction_point=[PLATE_W, PLATE_T / 2.0, 0.0],
+                direction_vector=[0.0, 0.0, -1.0],
                 features=[seed_cut],
                 count=HOLE_COUNT,
                 spacing=CHANNEL_PITCH,

@@ -319,6 +319,7 @@ async def build(adapter) -> dict[str, str]:
         await adapter.linear_pattern_feature(
             LinearPatternParameters(
                 direction_point=[BODY_LENGTH / 2.0, 0.0, 0.0],
+                direction_vector=[1.0, 0.0, 0.0],
                 features=[seed_name],
                 count=DIVISION_COUNT,
                 spacing=DIVISION_SPACING,
@@ -362,6 +363,7 @@ async def build(adapter) -> dict[str, str]:
         await adapter.linear_pattern_feature(
             LinearPatternParameters(
                 direction_point=[BODY_LENGTH / 2.0, 0.0, 0.0],
+                direction_vector=[1.0, 0.0, 0.0],
                 features=minor_names,
                 count=DIVISION_COUNT - 1,
                 spacing=DIVISION_SPACING,
