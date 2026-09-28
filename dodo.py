@@ -2924,6 +2924,8 @@ def task_check():
         SCRIPTS_DIR / "test_drawing_layout_check.py",
         # The assembly-view configuration policy (1:2 boundary, roles, BOM identity).
         SCRIPTS_DIR / "test_drawing_simplified.py",
+        # Stock fasteners declare their thread; a missing groove fails loud.
+        SCRIPTS_DIR / "test_stock_fastener.py",
         # The shared layout audit's own contract (_layout_audit.py finders + ink model).
         SCRIPTS_DIR / "test_layout_audit.py",
         # Drawing infrastructure and cross-sheet contracts do not follow the
