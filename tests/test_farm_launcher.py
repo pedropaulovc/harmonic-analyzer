@@ -1511,6 +1511,39 @@ def test_cancel_stops_a_live_launcher_and_its_build_before_cancelling_leaves(
     assert not Path(running["snapshot"]).exists()
 
 
+def test_cancel_keeps_outputs_the_launcher_moved_before_it_died(
+    tmp_path: Path,
+) -> None:
+    """Codex on #1125: a launcher stopped after moving cad/out to <run-id>.out
+    but before writing .done must not leave the cancelled run's outputs null."""
+    fixture = _launcher_fixture(tmp_path)
+    process, release, running = _start_held(tmp_path, fixture, DISPATCH_LINES, "race")
+    try:
+        process.kill()
+        process.wait(timeout=HANG_GUARD_S)
+        process.stdout.close()
+        process.stderr.close()
+        # The launcher's own first cleanup step, done before it was stopped.
+        (Path(running["snapshot"]) / "cad" / "out").rename(running["outputs"])
+        cancel = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Cancel", "-Tag", "race", "-Why", "raced cleanup"),
+            fixture["environment"],
+        )
+    finally:
+        release.touch()
+
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    done = _record(Path(running["done"]))
+    assert done["state"] == "cancelled"
+    assert done["outputs"] == running["outputs"]
+    assert done["outputs_preserved"] is True
+    assert (Path(done["outputs"]) / "reports" / "stub-output.txt").read_text(
+        encoding="utf-8"
+    ) == "built\n"
+    assert not Path(running["snapshot"]).exists()
+
+
 def test_list_filters_runs_by_tag_and_state_newest_first(tmp_path: Path) -> None:
     fixture = _launcher_fixture(tmp_path)
     assert (

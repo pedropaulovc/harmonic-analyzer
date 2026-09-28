@@ -1068,6 +1068,12 @@ function Invoke-RunCancel {
     foreach ($problem in $cleanup['cleanup_errors']) {
         $errors.Add($problem)
     }
+    if ($null -eq $cleanup['outputs'] -and (Test-Path -LiteralPath $record['outputs'] -PathType Container)) {
+        # The launcher was stopped between moving cad/out and writing .done:
+        # its outputs are already where a finished run's are.
+        $cleanup['outputs'] = $record['outputs']
+        $cleanup['outputs_preserved'] = $true
+    }
 
     $startedAt = $runStartedAt
     $now = [System.DateTime]::UtcNow
