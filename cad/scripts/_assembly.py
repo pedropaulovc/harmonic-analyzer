@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import contextmanager
@@ -2525,6 +2526,13 @@ async def _solved_mass_properties(adapter: Any, span: Any) -> Any:
     the adapter's exact unit conversions so the digest value is unchanged. Any
     other state (dirty model, no mass-property object) takes the adapter path,
     rebuild included, exactly as before.
+
+    An incomplete fast read (a raising or non-finite / malformed Volume,
+    SurfaceArea, Mass, CenterOfMass or GetMomentOfInertia) RAISES. It must not
+    be zero-filled: the digest decides whether a refresh skips the DOF,
+    interference and health gates, so two placeholder digests would match and
+    certify an unmeasured model. Falling back is no cure -- the adapter path
+    zero-fills the same two reads (``io.get_mass_properties``).
     """
     from solidworks_mcp.adapters.base import (
         AdapterResult,
@@ -2540,35 +2548,62 @@ async def _solved_mass_properties(adapter: Any, span: Any) -> Any:
         if status == 0
         else None
     )
-    span.set_attribute("rebuild_skipped", mass_props is not None)
     if mass_props is None:
+        span.set_attribute("rebuild_skipped", False)
         return await adapter.get_mass_properties()
-    com = adapter._attempt(lambda: mass_props.CenterOfMass, default=None)
-    center_of_mass = (
-        [com[0] * 1000, com[1] * 1000, com[2] * 1000]
-        if isinstance(com, (list, tuple)) and len(com) >= 3
-        else [0.0, 0.0, 0.0]
-    )
-    moi = adapter._attempt(lambda: mass_props.GetMomentOfInertia(0), default=None)
-    if not isinstance(moi, (list, tuple)) or len(moi) < 9:
-        moi = [0.0] * 9
+    span.set_attribute("rebuild_skipped", True)
     return AdapterResult(
         status=AdapterResultStatus.SUCCESS,
-        data=MassProperties(
-            volume=mass_props.Volume * 1e9,
-            surface_area=mass_props.SurfaceArea * 1e6,
-            mass=mass_props.Mass,
-            center_of_mass=center_of_mass,
-            moments_of_inertia={
-                "Ixx": moi[0],
-                "Iyy": moi[4],
-                "Izz": moi[8],
-                "Ixy": moi[1],
-                "Ixz": moi[2],
-                "Iyz": moi[5],
-            },
-        ),
+        data=MassProperties(**_fast_mass_properties(adapter, mass_props)),
     )
+
+
+def _fast_mass_properties(adapter: Any, mass_props: Any) -> dict[str, Any]:
+    """``MassProperties`` fields from an ``IMassProperty`` in the adapter's units.
+    Raises when any read fails or is not the expected finite number(s)."""
+
+    def _numbers(label: str, value: Any, count: int) -> list[float]:
+        if isinstance(value, (list, tuple)) and len(value) >= count:
+            items = value[:count]
+            if all(
+                isinstance(v, (int, float))
+                and not isinstance(v, bool)
+                and math.isfinite(v)
+                for v in items
+            ):
+                return [float(v) for v in items]
+        raise RuntimeError(
+            f"IMassProperty.{label} returned {value!r}; refusing to fingerprint "
+            "an incomplete mass-property read"
+        )
+
+    def _scalar(name: str) -> float:
+        value = adapter._attempt(lambda: getattr(mass_props, name), default=None)
+        return _numbers(name, [value], 1)[0]
+
+    volume, surface_area, mass = (_scalar(n) for n in ("Volume", "SurfaceArea", "Mass"))
+    com = _numbers(
+        "CenterOfMass", adapter._attempt(lambda: mass_props.CenterOfMass, default=None), 3
+    )
+    moi = _numbers(
+        "GetMomentOfInertia(0)",
+        adapter._attempt(lambda: mass_props.GetMomentOfInertia(0), default=None),
+        9,
+    )
+    return {
+        "volume": volume * 1e9,
+        "surface_area": surface_area * 1e6,
+        "mass": mass,
+        "center_of_mass": [com[0] * 1000, com[1] * 1000, com[2] * 1000],
+        "moments_of_inertia": {
+            "Ixx": moi[0],
+            "Iyy": moi[4],
+            "Izz": moi[8],
+            "Ixy": moi[1],
+            "Ixz": moi[2],
+            "Iyz": moi[5],
+        },
+    }
 
 
 @_telemetry.traced("assembly.geometry_digest", label_param="asm_name")

@@ -129,7 +129,7 @@ class Span:
         self.attrs[key] = value
 
 
-def _mass_adapter(needs_rebuild):
+def _mass_adapter(needs_rebuild, **native_overrides):
     calls = []
     native = NS(
         Volume=1.25e-6,
@@ -138,6 +138,8 @@ def _mass_adapter(needs_rebuild):
         CenterOfMass=(0.001, -0.002, 0.003),
         GetMomentOfInertia=lambda _about: tuple(float(i) for i in range(1, 10)),
     )
+    for name, value in native_overrides.items():
+        setattr(native, name, value)
     model = NS(
         Extension=NS(
             NeedsRebuild2=needs_rebuild,
@@ -175,3 +177,29 @@ def test_dirty_model_uses_the_rebuilding_adapter_read():
     adapter, calls = _mass_adapter(needs_rebuild=1)
     asyncio.run(_assembly._solved_mass_properties(adapter, Span()))
     assert calls == ["adapter"]
+
+
+def _raises():
+    raise RuntimeError("COM read failed")
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"CenterOfMass": None},  # read raised (_attempt default) or returned nothing
+        {"CenterOfMass": (0.001, 0.002)},  # truncated
+        {"CenterOfMass": (0.001, float("nan"), 0.0)},
+        {"GetMomentOfInertia": lambda _about: _raises()},
+        {"GetMomentOfInertia": lambda _about: (1.0,) * 8},  # truncated
+        {"GetMomentOfInertia": lambda _about: ("x",) * 9},
+        {"Mass": None},
+    ],
+)
+def test_incomplete_fast_read_refuses_rather_than_fingerprinting_zeros(override):
+    # A zero-filled read would give two unmeasured models the same digest and
+    # let a refresh skip its broad gates. The adapter path zero-fills the same
+    # reads, so neither a SUCCESS nor a fallback is acceptable.
+    adapter, calls = _mass_adapter(needs_rebuild=0, **override)
+    with pytest.raises(RuntimeError, match="incomplete mass-property read"):
+        asyncio.run(_assembly._solved_mass_properties(adapter, Span()))
+    assert calls == ["native"]
