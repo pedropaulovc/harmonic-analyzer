@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 
 import _telemetry
-from _common import _early_bound, _read_member
+from _common import _bind, _com_invoke, _early_bound
 from _gtol_spec import (
     GTOL_SYMBOLS,
     ConeFace,
@@ -73,58 +73,54 @@ def _unit(vector: Sequence[float]) -> tuple[float, float, float]:
     return (x / norm, y / norm, z / norm)
 
 
-def _face_geometry(face: Any) -> _FaceGeometry | None:
-    face = _early_bound(face, "IFace2")
-    surface = face.GetSurface()
+# The ISurface accessor that holds each supported identity's parameters.
+_PARAMETERS = {
+    _SURFACE_CYLINDER: "CylinderParams",
+    _SURFACE_CONE: "ConeParams2",
+    _SURFACE_PLANE: "PlaneParams",
+    _SURFACE_SPHERE: "SphereParams",
+    _SURFACE_TORUS: "TorusParams",
+}
+_SPEC_IDENTITY = {
+    CylinderFace: _SURFACE_CYLINDER,
+    ConeFace: _SURFACE_CONE,
+    PlanarFace: _SURFACE_PLANE,
+    SphereFace: _SURFACE_SPHERE,
+    TorusFace: _SURFACE_TORUS,
+}
+
+
+def _face_geometry(
+    face: Any, *, identities: frozenset[int] | None = None
+) -> _FaceGeometry | None:
+    """Read one face's surface identity, parameters, sense and box.
+
+    Every read is one raw round trip (``_common._com_invoke``): through the
+    generated wrapper each returned surface cost three more (type info and a
+    ``QueryInterface``) on every face a walk only steps over.  ``face`` comes
+    back as given.  With ``identities``, a face whose surface is not one of
+    them stops after its identity: no spec of another type can match it.
+    """
+    surface = _com_invoke(face, "IFace2", "GetSurface")
     if surface is None:
         return None
-    surface = _early_bound(surface, "ISurface")
-    identity = int(_read_member(surface, "Identity"))
-    if identity == _SURFACE_CYLINDER:
-        return _FaceGeometry(
-            face=face,
-            identity=identity,
-            parameters=tuple(_read_member(surface, "CylinderParams")),
-            outward_normal=None,
-            box=tuple(face.GetBox() or ()),
-        )
-    if identity == _SURFACE_CONE:
-        return _FaceGeometry(
-            face=face,
-            identity=identity,
-            parameters=tuple(_read_member(surface, "ConeParams2")),
-            outward_normal=None,
-            box=tuple(face.GetBox() or ()),
-        )
+    identity = int(_com_invoke(surface, "ISurface", "Identity"))
+    accessor = _PARAMETERS.get(identity)
+    if accessor is None or (identities is not None and identity not in identities):
+        return _FaceGeometry(face, identity, (), None, ())
+    parameters = tuple(_com_invoke(surface, "ISurface", accessor))
+    normal = None
     if identity == _SURFACE_PLANE:
-        parameters = tuple(_read_member(surface, "PlaneParams"))
         normal = _unit(parameters[0:3])
-        if bool(face.FaceInSurfaceSense()):
+        if bool(_com_invoke(face, "IFace2", "FaceInSurfaceSense")):
             normal = (-normal[0], -normal[1], -normal[2])
-        return _FaceGeometry(
-            face=face,
-            identity=identity,
-            parameters=parameters,
-            outward_normal=normal,
-            box=tuple(face.GetBox() or ()),
-        )
-    if identity == _SURFACE_SPHERE:
-        return _FaceGeometry(
-            face=face,
-            identity=identity,
-            parameters=tuple(_read_member(surface, "SphereParams")),
-            outward_normal=None,
-            box=tuple(face.GetBox() or ()),
-        )
-    if identity == _SURFACE_TORUS:
-        return _FaceGeometry(
-            face=face,
-            identity=identity,
-            parameters=tuple(_read_member(surface, "TorusParams")),
-            outward_normal=None,
-            box=tuple(face.GetBox() or ()),
-        )
-    return _FaceGeometry(face, identity, (), None, ())
+    return _FaceGeometry(
+        face=face,
+        identity=identity,
+        parameters=parameters,
+        outward_normal=normal,
+        box=tuple(_com_invoke(face, "IFace2", "GetBox") or ()),
+    )
 
 
 def _face_matches(geometry: _FaceGeometry, spec: FaceSpec) -> bool:
@@ -223,26 +219,34 @@ def _face_matches(geometry: _FaceGeometry, spec: FaceSpec) -> bool:
     raise TypeError(f"unsupported face spec: {spec!r}")
 
 
+@_telemetry.traced("pmi.resolve_faces")
 def _resolve_faces(model: Any, requests: dict[str, FaceSpec]) -> dict[str, Any]:
     """Resolve every face spec in one document traversal.
 
     The previous implementation retraversed every body and reread every
     surface once per annotation (36 traversals across the ten migrated parts).
     One traversal per part cuts that to ten and reads each face's COM geometry
-    once, while keeping the exact-one-match contract per annotation.
+    once, while keeping the exact-one-match contract per annotation.  The walk
+    is raw and binds only the faces it returns; a face whose surface type no
+    request names costs two reads.
     """
+    wanted = {_SPEC_IDENTITY.get(type(spec)) for spec in requests.values()}
+    # An unsupported spec reads every face so _face_matches still names it.
+    identities = None if None in wanted else frozenset(wanted)
     matches: dict[str, list[Any]] = {label: [] for label in requests}
+    walked = 0
     part = _early_bound(model, "IPartDoc")
     for body in part.GetBodies2(0, False) or ():
-        body = _early_bound(body, "IBody2")
-        face = body.GetFirstFace()
+        face = _com_invoke(body, "IBody2", "GetFirstFace")
         while face is not None:
-            geometry = _face_geometry(face)
+            walked += 1
+            geometry = _face_geometry(face, identities=identities)
             if geometry is not None:
                 for label, spec in requests.items():
                     if _face_matches(geometry, spec):
-                        matches[label].append(geometry.face)
-            face = _early_bound(face, "IFace2").GetNextFace()
+                        matches[label].append(face)
+            face = _com_invoke(face, "IFace2", "GetNextFace")
+    _telemetry.annotate(requests=len(requests), faces=walked)
 
     resolved: dict[str, Any] = {}
     for label, candidates in matches.items():
@@ -251,7 +255,7 @@ def _resolve_faces(model: Any, requests: dict[str, FaceSpec]) -> dict[str, Any]:
                 f"{label}: face spec {requests[label]!r} matched "
                 f"{len(candidates)} faces; the spec must identify exactly one"
             )
-        resolved[label] = candidates[0]
+        resolved[label] = _bind(candidates[0], "IFace2")
     return resolved
 
 
