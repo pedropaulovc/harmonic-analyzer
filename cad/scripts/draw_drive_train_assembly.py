@@ -37,6 +37,7 @@ from _drawing_common import (
     SIMPLIFIED_VIEW_CONFIGURATION,
     DrawingOutputs,
     ViewRole,
+    _SW_SHADED_EDGES,
     _balloon_item_number,
     _leader_segments_of,
     _spread_balloons,
@@ -56,6 +57,7 @@ from _drawing_common import (
     set_hidden_lines_removed,
     set_high_quality_shaded_with_edges,
     set_view_exploded_state,
+    view_configuration,
     visible_component_entities,
 )
 from _drawing_simplified import simplified_name
@@ -2288,14 +2290,20 @@ def _place_assembled_sheet(adapter: Any) -> list[str]:
     return findings
 
 
-def _place_bom_sheet(adapter: Any, facts: SourceFacts) -> tuple[str, dict[str, str]]:
+def _place_bom_view(adapter: Any) -> Any:
+    """The BOM sheet's reference view, on its policy configuration: the BOM's
+    rows read this view's configuration (``_insert_bom``)."""
     _activate_sheet(adapter, SHEET_NAMES[1])
     view = place_view(
         adapter, str(SOURCE), "*Isometric", *BOM_REFERENCE_ISO_CENTER, scale=REFERENCE_ISO_SCALE
     )
     set_high_quality_shaded_with_edges(adapter, view, label="BOM reference isometric")
-    # Before the BOM binds to it: its rows read this view's configuration.
     _configure_view(adapter, view, exploded=False, label="BOM reference isometric")
+    return view
+
+
+def _insert_bom(adapter: Any, view: Any, facts: SourceFacts) -> tuple[str, dict[str, str]]:
+    _activate_sheet(adapter, SHEET_NAMES[1])
     table = insert_bom_table(
         adapter,
         view,
@@ -2319,37 +2327,47 @@ def _place_bom_sheet(adapter: Any, facts: SourceFacts) -> tuple[str, dict[str, s
     return bom_name, dict(items)
 
 
-def _place_cluster_sheet(
-    adapter: Any,
-    cluster: Cluster,
-    facts: SourceFacts,
-    *,
-    bom_name: str,
-    items: dict[str, str],
-) -> tuple[dict[str, Any], tuple[float, float]]:
-    """Place one exploded cluster sheet; return its balloons by note name and
-    the scale its view fitted at."""
-    number = CLUSTER_SHEETS[cluster]
-    _activate_sheet(adapter, SHEET_NAMES[number - 1])
+def _place_cluster_view(adapter: Any, cluster: Cluster) -> Any:
+    """Place one cluster's view at its preferred scale and point it, still
+    collapsed, at its policy configuration (see ``_place_package``)."""
+    _activate_sheet(adapter, SHEET_NAMES[CLUSTER_SHEETS[cluster] - 1])
+    label = f"{cluster} exploded isometric"
+    view = place_view(
+        adapter, str(SOURCE), "*Isometric", *CLUSTER_VIEW_CENTER, scale=CLUSTER_SCALES[cluster]
+    )
+    set_high_quality_shaded_with_edges(adapter, view, label=label)
+    _configure_view(adapter, view, exploded=False, label=label)
+    return view
+
+
+def _fit_cluster_view(
+    adapter: Any, cluster: Cluster, view: Any, facts: SourceFacts
+) -> tuple[float, float]:
+    """Explode, isolate and ring-fit one cluster's view
+    (``_place_cluster_view``), before the BOM table exists (``_place_package``);
+    return the scale it fitted at."""
+    _activate_sheet(adapter, SHEET_NAMES[CLUSTER_SHEETS[cluster] - 1])
     label = f"{cluster} exploded isometric"
     preferred = CLUSTER_SCALES[cluster]
-    view = place_view(adapter, str(SOURCE), "*Isometric", *CLUSTER_VIEW_CENTER, scale=preferred)
-    set_high_quality_shaded_with_edges(adapter, view, label=label)
-    names = frozenset(facts.clusters[cluster])
-    # Configuration, explode, isolation, BOM link, and only then balloons:
-    # every balloon attaches to the geometry the sheet prints.
+    # Its configuration is already set; now its own explode and isolation, so
+    # the ring fits, and later every balloon attaches to, the geometry the
+    # sheet prints.
     configuration = _configure_view(adapter, view, exploded=True, label=label)
-    _isolate_instances(adapter, view, names, label=label)
-    _link_view_to_bom(view, bom_name, label=label)
+    _isolate_instances(adapter, view, frozenset(facts.clusters[cluster]), label=label)
     preferred_outline = _view_outline(view)
     scale = cluster_ring_scale(preferred_outline, preferred, label=label)
     outline = preferred_outline
     if scale != preferred:
+        # Every configuration switch comes before every explode and the BOM
+        # (``_place_package``): a step across 1:2 is refused, not switched.
+        # The pictorial view is judged shaded-with-edges, as
+        # apply_view_configuration judges it.
+        if view_configuration(scale, _SW_SHADED_EDGES) != configuration:
+            raise RuntimeError(
+                f"{label}: {_scale_text(scale)} would move the exploded view off "
+                f"{configuration!r}; a configuration switch here dirties the source"
+            )
         _set_view_scale(adapter, view, scale, label=label)
-        # A step down past 1:2 moves the view to the simplified configuration.
-        if _configure_view(adapter, view, exploded=True, label=label) != configuration:
-            _isolate_instances(adapter, view, names, label=label)
-            _link_view_to_bom(view, bom_name, label=label)
         outline = _view_outline(view)
     # The ladder predicted this fit from the preferred outline; the re-read
     # outline is the proof, before any balloon exists.
@@ -2376,6 +2394,26 @@ def _place_cluster_sheet(
             f"not the preferred {_scale_text(preferred)}"
         )
     _shift_view(adapter, view, shift, label=f"{label} ring fit")
+    return scale
+
+
+def _balloon_cluster_sheet(
+    adapter: Any,
+    cluster: Cluster,
+    view: Any,
+    facts: SourceFacts,
+    scale: tuple[float, float],
+    *,
+    bom_name: str,
+    items: dict[str, str],
+) -> dict[str, Any]:
+    """Link one fitted cluster view (``_fit_cluster_view``) to the BOM and
+    balloon it; return its balloons by note name."""
+    number = CLUSTER_SHEETS[cluster]
+    _activate_sheet(adapter, SHEET_NAMES[number - 1])
+    label = f"{cluster} exploded isometric"
+    names = frozenset(facts.clusters[cluster])
+    _link_view_to_bom(view, bom_name, label=label)
     stems = sorted(
         {instance.stem for instance in facts.instances if instance.name in names},
         key=lambda stem: int(items[stem]),
@@ -2409,7 +2447,7 @@ def _place_cluster_sheet(
         f"{CLUSTER_TITLES[cluster]} - EXPLODED ISOMETRIC "
         f"{_scale_text(scale)}; ITEMS PER SHEET 2",
     )
-    return _balloon_annotations(balloons), scale
+    return _balloon_annotations(balloons)
 
 
 def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
@@ -2557,21 +2595,40 @@ def _place_full_detail_sheet(adapter: Any) -> tuple[float, float]:
 
 
 def _place_package(adapter: Any, facts: SourceFacts) -> dict[str, tuple[float, float]]:
-    """Place every sheet; return each sheet's scale as placed."""
+    """Place every sheet; return each sheet's scale as placed.
+
+    Every view is placed and pointed at its policy configuration first, then
+    the cluster views are exploded, isolated and fitted, and only then is the
+    BOM table inserted; after it come only the BOM links and balloons -- the
+    frame drawing's order. A view configuration switch made once the BOM table
+    (bound to Default Simplified) exists dirtied the released source, and the
+    drawing save wrote it: farm probes read the source's save flag after every
+    drawing step, and it went dirty on the rebuild of the first switch after
+    ``insert_bom_table`` -- the cone-crank cluster view, and, with every switch
+    moved ahead of the explodes but not the BOM, the sequence reference view --
+    and clean again on ``save_drawing``. The
+    full-detail view stays in Default, so it switches nothing.
+    """
     _create_package_sheets(adapter)
     findings = _place_assembled_sheet(adapter)
-    bom_name, items = _place_bom_sheet(adapter, facts)
-    cluster_balloons: dict[str, dict[str, Any]] = {}
-    cluster_scales: dict[Cluster, tuple[float, float]] = {}
-    for cluster, number in CLUSTER_SHEETS.items():
-        cluster_balloons[SHEET_NAMES[number - 1]], cluster_scales[cluster] = (
-            _place_cluster_sheet(adapter, cluster, facts, bom_name=bom_name, items=items)
-        )
+    bom_view = _place_bom_view(adapter)
     findings += _place_sequence_sheet(adapter, facts)
     findings += _place_bank_sheet(adapter, facts)
     findings += _place_fit_sheet(adapter, facts)
     findings += _place_checks_sheet(adapter, facts)
     full_detail = _place_full_detail_sheet(adapter)
+    cluster_views = {cluster: _place_cluster_view(adapter, cluster) for cluster in CLUSTER_SHEETS}
+    cluster_scales = {
+        cluster: _fit_cluster_view(adapter, cluster, view, facts)
+        for cluster, view in cluster_views.items()
+    }
+    bom_name, items = _insert_bom(adapter, bom_view, facts)
+    cluster_balloons = {
+        SHEET_NAMES[CLUSTER_SHEETS[cluster] - 1]: _balloon_cluster_sheet(
+            adapter, cluster, view, facts, cluster_scales[cluster], bom_name=bom_name, items=items
+        )
+        for cluster, view in cluster_views.items()
+    }
     assert_full_detail_view(adapter, label="drive-train package")
     for sheet_name, sheet_balloons in cluster_balloons.items():
         _final_balloon_uncross(adapter, sheet_name, sheet_balloons)

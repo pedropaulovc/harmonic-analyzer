@@ -88,16 +88,26 @@ class FakeView:
 
 
 class FakeDrawing:
-    """One sheet of ``FakeView``s; ``EditRebuild3`` regenerates them."""
+    """One sheet of ``FakeView``s; ``EditRebuild3`` regenerates them.
+
+    A configuration switch that lands once the drawing has a BOM table
+    (``bom_inserted``) dirties the source assembly: farm probes on #1102 read
+    the drive-train source dirty after the rebuild of the first switch after
+    ``insert_bom_table``, and the drawing save wrote it. ``dirtied_source``
+    names each such switch."""
 
     def __init__(self, views: list[FakeView]) -> None:
         self.views = views
         self.rebuilds = 0
+        self.bom_inserted = False
+        self.dirtied_source: list[str] = []
 
     def EditRebuild3(self) -> bool:
         self.rebuilds += 1
         for view in self.views:
             if view.pending is not None:
+                if self.bom_inserted:
+                    self.dirtied_source.append(f"{view.configuration} -> {view.pending}")
                 view.configuration, view.pending = view.pending, None
         return True
 
@@ -487,30 +497,32 @@ def test_a_configuration_without_its_own_explode_is_refused() -> None:
         _explode(view, True, applied, drawing)
 
 
-@pytest.mark.parametrize(
-    ("preferred", "fitted", "expected"),
-    [
-        ((1.0, 3.0), (1.0, 3.0), SIMPLIFIED_VIEW_CONFIGURATION),
-        # The ring fits only a step down the ladder: the re-scale crosses 1:2.
-        ((2.0, 3.0), (1.0, 2.0), SIMPLIFIED_VIEW_CONFIGURATION),
-        # Larger than 1:2 the cluster keeps every tooth, exploded in Default.
-        ((2.0, 3.0), (2.0, 3.0), ASSEMBLY_VIEW_CONFIGURATION),
-    ],
-)
-def test_cluster_balloons_attach_to_the_explode_of_the_configuration_printed(
-    monkeypatch, preferred, fitted, expected
-) -> None:
-    """Configuration, then its own explode, then isolation and BOM link, and
-    only then balloons -- also after a re-scale moves the view across 1:2."""
+def _stub_drive_train_sheets(monkeypatch, fitted_for):
+    """The drive-train recipe over one ``FakeDrawing``: every placed view is a
+    ``FakeView``; the cluster ring fits at ``fitted_for(preferred)``. Returns
+    the recipe module, its adapter, and the (event, configuration, explode)
+    log of the view on the active sheet."""
     import draw_drive_train_assembly as drawing
 
-    cluster = next(iter(drawing.CLUSTER_SHEETS))
-    view = FakeView(preferred, "*Isometric", SHADED_EDGES)
-    adapter = SimpleNamespace(currentModel=FakeDrawing([view]))
+    fake = FakeDrawing([])
+    adapter = SimpleNamespace(currentModel=fake)
+    by_sheet: dict[str, FakeView] = {}
+    active = [""]
     seen: list[tuple[str, str, str | None]] = []
+
+    def activate(_adapter, sheet_name: str) -> None:
+        active[0] = sheet_name
+
+    def place(_adapter, _source, orientation, _x, _y, *, scale) -> FakeView:
+        mode = SHADED_EDGES if orientation == "*Isometric" else HLR
+        view = FakeView(scale, orientation, mode)
+        fake.views.append(view)
+        by_sheet[active[0]] = view
+        return view
 
     def record(event: str):
         def call(*_args, **_kwargs):
+            view = by_sheet[active[0]]
             seen.append((event, view.configuration, view.exploded_in))
 
         return call
@@ -527,15 +539,14 @@ def test_cluster_balloons_attach_to_the_explode_of_the_configuration_printed(
         return []
 
     idle = lambda *_args, **_kwargs: None  # noqa: E731
-    monkeypatch.setitem(drawing.CLUSTER_SCALES, cluster, preferred)
     for name, stub in {
-        "_activate_sheet": idle,
-        "place_view": lambda *_args, **_kwargs: view,
+        "_activate_sheet": activate,
+        "place_view": place,
         "set_high_quality_shaded_with_edges": idle,
         "_isolate_instances": record("isolate"),
         "_link_view_to_bom": record("bom link"),
         "_view_outline": lambda _view: (0.0, 0.0, 0.1, 0.1),
-        "cluster_ring_scale": lambda *_args, **_kwargs: fitted,
+        "cluster_ring_scale": lambda _outline, preferred, **_kwargs: fitted_for(preferred),
         "_set_view_scale": set_scale,
         "cluster_ring_fit": lambda _outline: ((0.0, 0.0), [], 0.0),
         "_shift_view": idle,
@@ -549,25 +560,139 @@ def test_cluster_balloons_attach_to_the_explode_of_the_configuration_printed(
         "_balloon_annotations": lambda _balloons: {},
     }.items():
         monkeypatch.setattr(drawing, name, stub)
-    facts = SimpleNamespace(clusters={cluster: frozenset()}, instances=[])
+    return drawing, adapter, seen
 
-    _balloons, scale = drawing._place_cluster_sheet(
-        adapter, cluster, facts, bom_name="BOM", items={}
+
+def _cluster_facts(drawing) -> SimpleNamespace:
+    return SimpleNamespace(
+        clusters={cluster: frozenset() for cluster in drawing.CLUSTER_SHEETS}, instances=[]
     )
 
-    assert scale == fitted
-    events = [event for event, _configuration, _explode in seen]
-    last_link = len(events) - 1 - events[::-1].index("bom link")
-    assert events[last_link - 1] == "isolate"
-    assert events[last_link + 1 :] == [
+
+@pytest.mark.parametrize(
+    ("preferred", "expected"),
+    [
+        ((1.0, 3.0), SIMPLIFIED_VIEW_CONFIGURATION),
+        # Larger than 1:2 the cluster keeps every tooth, exploded in Default.
+        ((2.0, 3.0), ASSEMBLY_VIEW_CONFIGURATION),
+    ],
+)
+def test_cluster_balloons_attach_to_the_explode_of_the_configuration_printed(
+    monkeypatch, preferred, expected
+) -> None:
+    """Configuration, then its own explode, then isolation and BOM link, and
+    only then balloons."""
+    drawing, adapter, seen = _stub_drive_train_sheets(monkeypatch, lambda placed: placed)
+    cluster = next(iter(drawing.CLUSTER_SHEETS))
+    monkeypatch.setitem(drawing.CLUSTER_SCALES, cluster, preferred)
+
+    view = drawing._place_cluster_view(adapter, cluster)
+    facts = _cluster_facts(drawing)
+    scale = drawing._fit_cluster_view(adapter, cluster, view, facts)
+    drawing._balloon_cluster_sheet(adapter, cluster, view, facts, scale, bom_name="BOM", items={})
+
+    assert scale == preferred
+    assert [event for event, _configuration, _explode in seen] == [
+        "isolate",
+        "bom link",
         "anchored balloons",
         "balloons",
         "balloon read-back",
     ]
     assert all(
         (configuration, explode) == (expected, expected)
-        for _event, configuration, explode in seen[last_link - 1 :]
+        for _event, configuration, explode in seen
     ), seen
+
+
+def test_a_ring_fit_that_would_switch_an_exploded_view_is_refused(monkeypatch) -> None:
+    """A step down past 1:2 would switch the view after every other switch
+    was made; it is refused, not made, and the view keeps its scale."""
+    drawing, adapter, _seen = _stub_drive_train_sheets(monkeypatch, lambda _placed: (1.0, 2.0))
+    cluster = next(iter(drawing.CLUSTER_SHEETS))
+    monkeypatch.setitem(drawing.CLUSTER_SCALES, cluster, (2.0, 3.0))
+
+    view = drawing._place_cluster_view(adapter, cluster)
+    with pytest.raises(RuntimeError, match="dirties the source"):
+        drawing._fit_cluster_view(adapter, cluster, view, _cluster_facts(drawing))
+    assert view.ScaleRatio == (2.0, 3.0)
+    assert view.configuration == ASSEMBLY_VIEW_CONFIGURATION
+
+
+def test_the_package_switches_and_explodes_every_view_before_the_bom(monkeypatch) -> None:
+    """The whole drive-train package over one drawing: no configuration switch
+    lands once the BOM table exists, every cluster view is already exploded
+    then, every view prints its policy configuration, and each cluster view
+    shows that configuration's explode."""
+    drawing, adapter, _seen = _stub_drive_train_sheets(
+        monkeypatch, lambda placed: {(1.0, 3.0): (1.0, 4.0)}.get(placed, placed)
+    )
+
+    def reference(sheet: int, orientation: str, scale, role=ViewRole.PLAIN) -> FakeView:
+        drawing._activate_sheet(adapter, drawing.SHEET_NAMES[sheet - 1])
+        view = drawing.place_view(adapter, "src", orientation, 0.0, 0.0, scale=scale)
+        drawing._configure_view(adapter, view, exploded=False, role=role, label=orientation)
+        return view
+
+    def assembled(_adapter) -> list[str]:
+        for orientation in ("*Front", "*Top", "*Right", "*Isometric"):
+            reference(1, orientation, (1.0, 3.0))
+        return []
+
+    def sheet(number: int):
+        def place(_adapter, _facts) -> list[str]:
+            reference(number, "*Isometric", (1.0, 8.0))
+            return []
+
+        return place
+
+    def bom_view(_adapter) -> FakeView:
+        return reference(2, "*Isometric", (1.0, 8.0))
+
+    exploded_at_bom: list[int] = []
+
+    def insert_bom(_adapter, _view, _facts) -> tuple[str, dict[str, str]]:
+        fake = adapter.currentModel
+        exploded_at_bom.append(sum(view.IsExploded() for view in fake.views))
+        fake.bom_inserted = True
+        return "BOM", {}
+
+    def full_detail(_adapter) -> tuple[float, float]:
+        reference(drawing.FULL_DETAIL_SHEET, "*Right", (1.0, 1.0), ViewRole.FULL_DETAIL)
+        return (1.0, 1.0)
+
+    idle = lambda *_args, **_kwargs: None  # noqa: E731
+    for name, stub in {
+        "_create_package_sheets": idle,
+        "_place_assembled_sheet": assembled,
+        "_place_bom_view": bom_view,
+        "_insert_bom": insert_bom,
+        "_place_sequence_sheet": sheet(drawing.SEQUENCE_SHEET),
+        "_place_bank_sheet": sheet(drawing.BANK_SHEET),
+        "_place_fit_sheet": sheet(drawing.FIT_SHEET),
+        "_place_checks_sheet": sheet(drawing.CHECKS_SHEET),
+        "_place_full_detail_sheet": full_detail,
+        "assert_full_detail_view": idle,
+        "_final_balloon_uncross": idle,
+        "_check_package_layout": idle,
+    }.items():
+        monkeypatch.setattr(drawing, name, stub)
+
+    drawing._place_package(adapter, _cluster_facts(drawing))
+
+    fake = adapter.currentModel
+    assert fake.dirtied_source == []
+    assert exploded_at_bom == [len(drawing.CLUSTER_SHEETS)]
+    exploded = [view for view in fake.views if view.IsExploded()]
+    assert len(exploded) == len(drawing.CLUSTER_SHEETS)
+    for view in fake.views:
+        wanted = view_configuration(
+            view.ScaleRatio,
+            view.mode,
+            ViewRole.FULL_DETAIL if view.ScaleRatio == (1.0, 1.0) else ViewRole.PLAIN,
+        )
+        assert view.configuration == wanted
+        assert view.exploded_in in (None, wanted)
 
 
 class FakeConfiguredAssembly:
