@@ -223,7 +223,11 @@ datum-origin case replay from the calibration run's dumps.
    a balloon's short leader has started inside its printed ring
    (drive-train-assembly), and the kind also fires on harmonic-base,
    platen-guide, pinion-pivot-shaft and rocker-arm-support (7 days to
-   2026-09-28). `view-edges-missing` is
+   2026-09-28). frame-assembly alone enforces it now
+   (`STEM_ENFORCED_KINDS`): its short-leader balloons check their leader
+   start only right after SetPosition, since after the rebuild COM reports
+   the start the fit render left, so the printed leader is their check.
+   `view-edges-missing` is
    zero here, but not with the lighter line weights (c45096c90).
 2. **GATE**: one commit, landed before the release cut. It flips the mode and
    removes the superseded audits: the 6 explicit `check_drawing_layout`

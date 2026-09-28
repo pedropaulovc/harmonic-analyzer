@@ -694,12 +694,12 @@ def _patch_collect(monkeypatch, result):
     return live
 
 
-def _run(live, mode, report):
+def _run(live, mode, report, stem="fixture"):
     from pathlib import Path
 
     live.run_layout_audit(
         object(),
-        stem="fixture",
+        stem=stem,
         pdf=Path("fixture.pdf"),
         report=report,
         sheet_layouts={},
@@ -3838,11 +3838,13 @@ def test_a_dimension_past_the_border_or_on_the_title_block_gates(x, y, kind):
     assert kind in _kinds(findings)
     [found] = [f for f in findings if f.kind == kind]
     assert severity(found) is FindingSeverity.GATING
-    assert found in enforced(LayoutAuditMode.GATE, findings)
-    assert [f.kind for f in enforced(LayoutAuditMode.REPORT, findings)] == ([kind] if kind in ENFORCED_KINDS else [])
+    assert found in enforced(LayoutAuditMode.GATE, findings, stem="fixture")
+    assert [f.kind for f in enforced(LayoutAuditMode.REPORT, findings, stem="fixture")] == (
+        [kind] if kind in ENFORCED_KINDS else []
+    )
     clearance = Finding(kind="text-clearance", sheet="Sheet2", a="dim A", b="dim B", detail="")
-    assert enforced(LayoutAuditMode.REPORT, [clearance]) == []
-    assert enforced(LayoutAuditMode.GATE, [clearance]) == [clearance]
+    assert enforced(LayoutAuditMode.REPORT, [clearance], stem="fixture") == []
+    assert enforced(LayoutAuditMode.GATE, [clearance], stem="fixture") == [clearance]
 
 
 # The kinds that read zero fleet-wide (#1109), written out independently of
@@ -3892,7 +3894,36 @@ def test_report_mode_passes_a_gating_kind_that_is_not_enforced(monkeypatch, tmp_
     assert ENFORCED_KINDS <= GATING_KINDS
     crossing = Finding(kind="leader-crosses-line", sheet="Sheet1", a="surface-finish DetailItem350", b="", detail="x")
     _report_run_with(monkeypatch, tmp_path, crossing)
-    assert enforced(LayoutAuditMode.GATE, [crossing]) == [crossing]
+    assert enforced(LayoutAuditMode.GATE, [crossing], stem="fixture") == [crossing]
+
+
+@pytest.mark.parametrize(
+    ("com_inside_m", "ink_inside_m", "fails"),
+    [(0.0015, 0.0015, True), (0.0015, 0.0, True), (0.00047, 0.0, False)],
+    ids=["printed-inside", "ink-beyond-the-match", "com-start-inside-printed-on-ring"],
+)
+def test_frame_assembly_fails_its_leaf_on_a_leader_printed_through_its_own_balloon(
+    monkeypatch, tmp_path, com_inside_m, ink_inside_m, fails
+):
+    """frame-assembly's short-leader balloons check their leader start only
+    right after SetPosition; after the rebuild the printed leader is the
+    evidence, so REPORT fails that drawing on leader-through-own-text. A
+    leader printed 1.5 mm inside its ring, or one whose only ink is 1.5 mm
+    from the COM start, fails it; a COM start 0.47 mm inside with the leader
+    printed from the ring (run 20260928T124727673Z's balloon 5) passes.
+    Other drawings still only report the kind."""
+    import _layout_audit
+
+    dump = _radial_balloon_17(com_inside_m, ink_inside_m)
+    live = _patch_collect(monkeypatch, [dump])
+    assert "leader-through-own-text" not in _layout_audit.ENFORCED_KINDS
+    _run(live, LayoutAuditMode.REPORT, tmp_path / "other.json")
+    frame = tmp_path / "frame-assembly.json"
+    if not fails:
+        _run(live, LayoutAuditMode.REPORT, frame, stem="frame-assembly")
+        return
+    with pytest.raises(RuntimeError, match=r"(?s)frame-assembly .*\[leader-through-own-text\]"):
+        _run(live, LayoutAuditMode.REPORT, frame, stem="frame-assembly")
 
 
 _ZERO_LINE = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]

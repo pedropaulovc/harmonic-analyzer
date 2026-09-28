@@ -47,6 +47,7 @@ from heapq import heappop, heappush
 from itertools import combinations, product
 from pathlib import Path
 from statistics import median
+from types import MappingProxyType
 from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 from _drawing_layout_check import (
@@ -3687,6 +3688,17 @@ ENFORCED_KINDS: frozenset[str] = frozenset(
         "shoulder-crosses-line",
     }
 )
+# Kinds one drawing enforces under REPORT before the fleet does, because its
+# recipe rests a check on them. frame-assembly's short-leader balloons prove
+# their leader start only on the read right after SetPosition: after the
+# rebuild COM reports the start the fit render left, not the one the PDF
+# draws (draw_frame_assembly._short_frame_balloon). The printed leader is
+# measured here, so a leader printed from inside its own ring fails the leaf.
+# frame-assembly reads zero of the kind on replay of runs
+# 20260928T124727673Z (swmaker000007) and 20260928T141421973Z (swmaker000008).
+STEM_ENFORCED_KINDS: Mapping[str, frozenset[str]] = MappingProxyType(
+    {"frame-assembly": frozenset({"leader-through-own-text"})}
+)
 
 
 def severity(finding: Finding) -> FindingSeverity:
@@ -3695,11 +3707,12 @@ def severity(finding: Finding) -> FindingSeverity:
     return FindingSeverity.ADVISORY
 
 
-def enforced(mode: LayoutAuditMode, gating: Sequence[Finding]) -> list[Finding]:
-    """The gating findings that fail the leaf under ``mode``."""
+def enforced(mode: LayoutAuditMode, gating: Sequence[Finding], *, stem: str) -> list[Finding]:
+    """The gating findings that fail drawing ``stem``'s leaf under ``mode``."""
     if mode is LayoutAuditMode.GATE:
         return list(gating)
-    return [finding for finding in gating if finding.kind in ENFORCED_KINDS]
+    kinds = ENFORCED_KINDS | STEM_ENFORCED_KINDS.get(stem, frozenset())
+    return [finding for finding in gating if finding.kind in kinds]
 
 
 def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
