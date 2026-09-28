@@ -18,9 +18,9 @@ Mechanism (proven on SolidWorks 2026 against a scratch v37 drive train):
 ``IConfigurationManager.AddConfiguration2(child, …, ParentConfigName=P)`` makes
 the derived child; ``IFeature.SetSuppression2(swSuppressFeature,
 swSpecifyConfiguration, [child])`` suppresses in the child only; an activated
-``ForceRebuild3`` regenerates it. The child reports its parent's BOM identity
-(part-number source, alternate name, description, configuration-specific custom
-properties), so a BOM grouping a derived configuration cannot fork a row.
+``ForceRebuild3`` regenerates it. The child reports its parent's BOM part number,
+description and configuration-specific custom properties, so a BOM grouping a
+derived configuration cannot fork a row.
 """
 
 from __future__ import annotations
@@ -45,10 +45,15 @@ SIMPLIFIED_COMMENT = "drawing views: modeled gear teeth and screw threads suppre
 
 _SUPPRESS = 0  # swFeatureSuppressionAction_e.swSuppressFeature
 _SPECIFY_CONFIGURATION = 3  # swInConfigurationOpts_e.swSpecifyConfiguration
-_USER_SPECIFIED = 8  # swBOMPartNumberSource_e.swBOMPartNumber_UserSpecified
+_DOCUMENT_NAME = 1  # swBOMPartNumberSource_e.swBOMPartNumber_DocumentName
 _CONFIGURATION_NAME = 2  # swBOMPartNumberSource_e.swBOMPartNumber_ConfigurationName
 _PARENT_NAME = 4  # swBOMPartNumberSource_e.swBOMPartNumber_ParentName
+_USER_SPECIFIED = 8  # swBOMPartNumberSource_e.swBOMPartNumber_UserSpecified
 _REPLACE_VALUE = 2  # swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
+
+# (BOMPartNoSource, AlternateName, UseAlternateNameInBOM, Description,
+#  UseDescriptionInBOM) of one configuration.
+type BomIdentity = tuple[int, str, bool, str, bool]
 
 
 def simplified_name(configuration: str) -> str:
@@ -62,14 +67,33 @@ def is_simplified(configuration: str) -> bool:
     return configuration.endswith(SIMPLIFIED_SUFFIX)
 
 
-def bom_identity_for_child(parent_source: int) -> int:
-    """The child's ``BOMPartNoSource`` that prints the parent's part number.
+def child_bom_identity(
+    parent: BomIdentity, parent_name: str, grandparent_name: str | None
+) -> BomIdentity:
+    """The BOM identity that makes ``<parent> Simplified`` print ``parent``'s number.
 
-    A parent numbered by its own configuration name would hand the child ITS
-    name; ``ParentName`` prints the parent's instead. Document-name and
-    user-specified numbering carry over unchanged (the alternate name is copied).
+    "Link to Parent Configuration" (``ParentName``) prints the parent
+    configuration's NAME, not its part number (SOLIDWORKS help, Component
+    Options). So a parent numbered by its own name hands the child a link, but a
+    parent that is itself linked prints ITS parent's name, which the child must
+    pin as a user-specified number: a link would print the parent's name. The
+    document name and a user-specified number carry over unchanged.
     """
-    return _PARENT_NAME if parent_source == _CONFIGURATION_NAME else parent_source
+    source, alternate, use_alternate, description, use_description = parent
+    if source == _DOCUMENT_NAME:
+        return (source, "", use_alternate, description, use_description)
+    if source == _CONFIGURATION_NAME:
+        return (_PARENT_NAME, "", use_alternate, description, use_description)
+    if source == _PARENT_NAME:
+        if grandparent_name is None:
+            raise ValueError(
+                f"{parent_name!r} links its part number to a parent configuration "
+                "it does not have"
+            )
+        return (_USER_SPECIFIED, grandparent_name, True, description, use_description)
+    if source == _USER_SPECIFIED:
+        return (source, alternate, use_alternate, description, use_description)
+    raise ValueError(f"{parent_name!r}: unknown BOM part-number source {source}")
 
 
 def _bstr_array(names: Sequence[str]) -> Any:
@@ -85,7 +109,7 @@ def _configuration(model: Any, name: str) -> Any:
     return _early_bound(raw, "IConfiguration")
 
 
-def _bom_identity(configuration: Any) -> tuple[int, str, bool, str, bool]:
+def _bom_identity(configuration: Any) -> BomIdentity:
     return (
         int(configuration.BOMPartNoSource),
         str(configuration.AlternateName or ""),
@@ -95,12 +119,14 @@ def _bom_identity(configuration: Any) -> tuple[int, str, bool, str, bool]:
     )
 
 
-def _expected_child_identity(
-    parent: tuple[int, str, bool, str, bool],
-) -> tuple[int, str, bool, str, bool]:
-    source = bom_identity_for_child(parent[0])
-    alternate = parent[1] if source == _USER_SPECIFIED else ""
-    return (source, alternate, parent[2], parent[3], parent[4])
+def _expected_child_identity(model: Any, parent: str) -> BomIdentity:
+    configuration = _configuration(model, parent)
+    grandparent = configuration.GetParent()
+    return child_bom_identity(
+        _bom_identity(configuration),
+        parent,
+        None if grandparent is None else str(_early_bound(grandparent, "IConfiguration").Name),
+    )
 
 
 def _property_manager(model: Any, configuration: str) -> Any:
@@ -126,10 +152,8 @@ def _configuration_properties(model: Any, name: str) -> dict[str, tuple[int, str
 
 
 def _copy_bom_identity(model: Any, parent: str, child: str) -> None:
-    source = _configuration(model, parent)
     target = _configuration(model, child)
-    identity = _bom_identity(source)
-    expected = _expected_child_identity(identity)
+    expected = _expected_child_identity(model, parent)
     # The source must be set first: any non-user-specified source clears the
     # alternate name (IConfiguration.BOMPartNoSource remarks).
     target.BOMPartNoSource = expected[0]
@@ -141,8 +165,7 @@ def _copy_bom_identity(model: Any, parent: str, child: str) -> None:
     applied = _bom_identity(target)
     if applied != expected:
         raise RuntimeError(
-            f"{child}: BOM identity did not persist: {applied!r} != {expected!r} "
-            f"(parent {parent} reads {identity!r})"
+            f"{child}: BOM identity did not persist: {applied!r} != {expected!r}"
         )
     properties = _configuration_properties(model, parent)
     if properties:
@@ -274,7 +297,7 @@ def assert_simplified_configurations(
 ) -> None:
     """Prove, without switching, every ``P`` has its derived ``P Simplified``
     with exactly ``features`` suppressed there (not in ``P``) and ``P``'s BOM
-    identity."""
+    part number."""
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     names = [str(name) for name in (model.GetConfigurationNames() or ())]
     parents = [name for name in names if not is_simplified(name)]
@@ -286,7 +309,8 @@ def assert_simplified_configurations(
         if child not in names:
             failures.append(f"{parent}: no {child!r}")
             continue
-        derived_from = _configuration(model, child).GetParent()
+        configuration = _configuration(model, child)
+        derived_from = configuration.GetParent()
         if derived_from is None or str(_early_bound(derived_from, "IConfiguration").Name) != parent:
             failures.append(f"{child}: not derived from {parent}")
         for feature in targets:
@@ -295,8 +319,8 @@ def assert_simplified_configurations(
                 failures.append(
                     f"{feature.Name}: suppressed in ({parent}, {child}) reads {states}"
                 )
-        identity = _bom_identity(_configuration(model, child))
-        expected = _expected_child_identity(_bom_identity(_configuration(model, parent)))
+        identity = _bom_identity(configuration)
+        expected = _expected_child_identity(model, parent)
         if identity != expected:
             failures.append(f"{child}: BOM identity {identity!r} != {expected!r}")
     if failures:

@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import _drawing_simplified
 from _drawing_common import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -13,9 +14,10 @@ from _drawing_common import (
     apply_view_configuration,
     view_configuration,
 )
-from _drawing_simplified import bom_identity_for_child, is_simplified, simplified_name
+from _drawing_simplified import child_bom_identity, is_simplified, simplified_name
 
 HLV, HLR, SHADED, SHADED_EDGES = 1, 2, 3, 7
+DOCUMENT, CONFIGURATION, PARENT, USER = 1, 2, 4, 8
 
 
 class FakeView:
@@ -116,16 +118,97 @@ def test_a_degenerate_scale_is_refused(scale) -> None:
 
 
 @pytest.mark.parametrize(
-    ("parent", "child"),
+    ("parent", "grandparent", "child"),
     [
-        (1, 1),  # document name: the child already prints the file name
-        (2, 4),  # configuration name would print "<P> Simplified": use the parent's
-        (4, 4),
-        (8, 8),  # user specified: the AlternateName is copied with it
+        # Document name: the child already prints the file name.
+        ((DOCUMENT, "", False, "d", True), None, (DOCUMENT, "", False, "d", True)),
+        # Its own name would print "<P> Simplified": link to the parent instead.
+        ((CONFIGURATION, "", False, "d", True), None, (PARENT, "", False, "d", True)),
+        # A linked parent prints ITS parent's name; a link would print "T24".
+        ((PARENT, "", False, "d", True), "Default", (USER, "Default", True, "d", True)),
+        # User specified: the alternate name is copied with it.
+        ((USER, "MHA-1", True, "d", False), None, (USER, "MHA-1", True, "d", False)),
     ],
 )
-def test_a_derived_configuration_prints_its_parents_part_number(parent, child) -> None:
-    assert bom_identity_for_child(parent) == child
+def test_a_derived_configuration_prints_its_parents_part_number(
+    parent, grandparent, child
+) -> None:
+    assert child_bom_identity(parent, "T24", grandparent) == child
+
+
+@pytest.mark.parametrize(
+    ("parent", "grandparent"),
+    [((PARENT, "", False, "", False), None), ((16, "", False, "", False), "Default")],
+)
+def test_an_unresolvable_part_number_is_refused(parent, grandparent) -> None:
+    with pytest.raises(ValueError, match="T24"):
+        child_bom_identity(parent, "T24", grandparent)
+
+
+class FakeConfiguration:
+    def __init__(
+        self,
+        name: str,
+        parent: FakeConfiguration | None = None,
+        *,
+        comment: str = "",
+        source: int = DOCUMENT,
+    ) -> None:
+        self.Name = name
+        self.parent = parent
+        self.Comment = comment
+        self.BOMPartNoSource = source
+        self.AlternateName = ""
+        self.UseAlternateNameInBOM = False
+        self.Description = ""
+        self.UseDescriptionInBOM = False
+
+    def GetParent(self) -> FakeConfiguration | None:
+        return self.parent
+
+
+class FakeModel:
+    """A part or assembly document with configurations (and components)."""
+
+    def __init__(self, *configurations: FakeConfiguration, components=()) -> None:
+        self.configurations = {item.Name: item for item in configurations}
+        self.components = list(components)
+        self.ConfigurationManager = SimpleNamespace(
+            ActiveConfiguration=configurations[0], AddConfiguration2=self._add
+        )
+        self.Extension = SimpleNamespace(
+            CustomPropertyManager=lambda _name: SimpleNamespace(GetNames=lambda: ())
+        )
+
+    def _add(self, name, comment, _alternate, _options, parent, _description, _rebuild):
+        created = FakeConfiguration(name, self.configurations[parent], comment=comment)
+        self.configurations[name] = created
+        return created
+
+    def GetConfigurationNames(self) -> list[str]:
+        return list(self.configurations)
+
+    def GetConfigurationByName(self, name: str) -> FakeConfiguration | None:
+        return self.configurations.get(name)
+
+    def ShowConfiguration2(self, name: str) -> bool:
+        self.ConfigurationManager.ActiveConfiguration = self.configurations[name]
+        return True
+
+    def GetComponents(self, _top_level: bool) -> list[FakeComponent]:
+        return self.components
+
+
+def test_a_linked_configurations_simplified_child_prints_the_root_name() -> None:
+    root = FakeConfiguration("Default", source=CONFIGURATION)
+    linked = FakeConfiguration("T24", root, source=PARENT)
+    child = FakeConfiguration("T24 Simplified", linked)
+    _drawing_simplified._copy_bom_identity(FakeModel(root, linked, child), "T24", child.Name)
+    assert (child.BOMPartNoSource, child.AlternateName, child.UseAlternateNameInBOM) == (
+        USER,
+        "Default",
+        True,
+    )
 
 
 def _apply(view: FakeView, role: ViewRole = ViewRole.PLAIN) -> tuple[str, FakeDrawing]:
