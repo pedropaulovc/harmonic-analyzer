@@ -2266,12 +2266,20 @@ async def save_assembly_and_images(
     views: Iterable[str] = DEFAULT_VIEWS,
     *,
     native_contact_check: Callable[[Any, str], None] | None = None,
+    solved_gates: Callable[[Any], None] | None = None,
 ) -> dict[str, str]:
-    """Save the assembly to ``cad/out/sldasm`` and PNG views to ``cad/out/png``."""
+    """Save the assembly to ``cad/out/sldasm`` and PNG views to ``cad/out/png``.
+
+    ``solved_gates`` runs right after the final deep rebuild, before any other
+    gate reads the model: a builder whose own gates need a fully solved model
+    (``resolve=False``) certifies the exact state being saved there, instead of
+    paying a second deep rebuild of its own before the last mutation."""
     if asm_name in ("channel", "summing") and native_contact_check is None:
         raise ValueError(f"{asm_name} assembly requires native_contact_check")
     # Establish a clean solved state for the health and pose gates.
     final_rebuild_before_save(adapter, asm_name)
+    if solved_gates is not None:
+        solved_gates(adapter)
     # Fail fast: never save a broken assembly. Catches mate errors (e.g. a gear
     # mate whose entity went suppressed = the silent drive-train corruption) that
     # the DOF and interference gates miss -- a fixed/grounded component passes

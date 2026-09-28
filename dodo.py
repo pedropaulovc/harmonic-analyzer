@@ -2857,6 +2857,9 @@ def task_check():
         SCRIPTS_DIR / "test_pose_manifest.py",
         SCRIPTS_DIR / "test_render_offline.py",
         SCRIPTS_DIR / "test_verify_auto_repair.py",
+        # Builder gates handed to save's final deep rebuild (drive-train) must
+        # read AFTER it, cost no second rebuild, and still block the save.
+        SCRIPTS_DIR / "test_assembly_save_solved_gates.py",
         # The copied-mate safeguard must keep failing CLOSED: an unreadable
         # GetErrorCode2 or a truncated MateGroup scan has to raise/re-walk, never
         # read as "this copy is clean".

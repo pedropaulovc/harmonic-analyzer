@@ -5761,25 +5761,41 @@ async def build(adapter) -> dict[str, str]:
     # spin (all recorded above). Each names its family: the aggregate count
     # alone passes on the crank chain even with the others pinned (codex
     # review 2026-07-04). All other checks run on the as-built model.
-    assert_free_dof_necessity(
-        adapter,
-        4,
-        required_stems=(
-            "crankshaft",
-            "cone-swing-platform",
-            "pinion-bracket",
-            "pinion-lift-rod",
-        ),
-    )
-    write_dof_manifest(ASM_NAME)
-    check_no_interference(
-        adapter,
-        allowed_pairs=allowed_interference_pairs(ASM_NAME),
-    )
-    # The positive control for crank_boss_rim's analytic 64T clearances.
-    gear64_post_measure.measure(
-        adapter, post_origin=tuple(_PPOST), gear_offset=GEAR64_POST_OFFSET
-    )
+    #
+    # These gates read a fully solved model, and run on the one produced by
+    # save's final deep rebuild (``resolve=False``) rather than on a deep
+    # rebuild of their own before the explode: two ForceRebuild3(False) of
+    # this assembly cost 78 s + 62 s p50 (n=89, 30 d to 2026-09-27). The
+    # state is the same as-built model: the explode adds no mates (only
+    # exploded-view steps), and create_drive_train_explode proves the
+    # collapse restores every component's presentation AND operational
+    # transform to 1e-9 -- so the constrained statuses, the interference set
+    # and the 64T clearance are read on the identical mate system and poses,
+    # which is also exactly the state being saved. Soundness reads the same
+    # gate on the saved (exploded-and-collapsed) model after one shared
+    # rebuild, also ``resolve=False``.
+    def _certify_as_built(solved_adapter) -> None:
+        assert_free_dof_necessity(
+            solved_adapter,
+            4,
+            resolve=False,
+            required_stems=(
+                "crankshaft",
+                "cone-swing-platform",
+                "pinion-bracket",
+                "pinion-lift-rod",
+            ),
+        )
+        write_dof_manifest(ASM_NAME)
+        check_no_interference(
+            solved_adapter,
+            allowed_pairs=allowed_interference_pairs(ASM_NAME),
+        )
+        # The positive control for crank_boss_rim's analytic 64T clearances.
+        gear64_post_measure.measure(
+            solved_adapter, post_origin=tuple(_PPOST), gear_offset=GEAR64_POST_OFFSET
+        )
+
     # Title-block identity for the assembly drawing (draw_drive_train_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;
@@ -5802,7 +5818,9 @@ async def build(adapter) -> dict[str, str]:
     # The collar's MHA-145 leaves with the arbor it pins; the strap pins stay.
     _require_collar_pin_in_collar_hole(adapter, collar_pin, arbor_collar)
     create_drive_train_explode(adapter, {collar_pin: COLLAR_PIN_ROLE})
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    return await save_assembly_and_images(
+        adapter, ASM_NAME, solved_gates=_certify_as_built
+    )
 
 
 if __name__ == "__main__":
