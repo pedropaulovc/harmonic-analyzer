@@ -299,8 +299,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # coordinate hit-test on this point resolved to the rib flange 5.08 mm
     # inboard (datum B on the flange, start Z reading 3.35 for 8.43 -- #1105).
     top_edges = scan_view_edges(top, label="summing lever top plan")
-    end_edge = _end_face_edge(top_edges, x_mm=10.0)
     plate_end_edge = _top_xy(10.0, -PLATE_L / 2.0)
+    # The start-Z pick sits 4 mm further along the end edge: its extension
+    # line starts at the pick, and from x=10 it began under the seed
+    # callout's leader, which crosses it 1.7 mm in (leader-crosses-line,
+    # run 20260928T131507773Z; 0.1 mm past the audit's converging radius).
+    start_z_pick = _top_xy(18.0, -PLATE_L / 2.0)
+    end_edge = _end_face_edge(top_edges, x_mm=18.0)
     add_datum_feature(
         adapter,
         top,
@@ -335,7 +340,7 @@ async def build(adapter: Any) -> dict[str, str]:
     start_z = add_edge_dimension(
         adapter,
         top,
-        p0=plate_end_edge,
+        p0=start_z_pick,
         p1=seed_rim_top,
         text_xy=(0.292, 0.106),
         label="spring-hole start Z",
