@@ -3793,16 +3793,54 @@ def test_a_dimension_past_the_border_or_on_the_title_block_gates(x, y, kind):
     assert enforced(LayoutAuditMode.GATE, [clearance]) == [clearance]
 
 
-def test_report_mode_fails_the_leaf_only_on_enforced_gating_kinds():
-    """REPORT fails the leaf on exactly the enforced kinds; GATE on every
-    gating kind. A misspelt entry would enforce nothing and read green."""
+# The kinds that read zero fleet-wide (#1109), written out independently of
+# ENFORCED_KINDS so that dropping one from the set fails its own case.
+_ENFORCED_IN_REPORT = [
+    ("com-read-errors", "note DetailItem9", "2 refused COM read(s) on 'note DetailItem9'"),
+    ("duplicate-thread-callout", "hole-callout RD2", "'hole-callout RD2' repeats '10-24 UNC' from 'note DetailItem5'"),
+    ("leader-crosses-leader", "hole-callout RD1", "'hole-callout RD1' and 'gtol DetailItem354' cross their leaders"),
+    ("leader-crosses-section-line", "note DetailItem372", "leader of 'note DetailItem372' crosses 'section-line A'"),
+    ("leader-through-text", "datum DetailItem356", "leader of 'datum DetailItem356' runs 4.30mm through 'gtol DetailItem361'"),
+    ("line-on-dimension-line", "dim Depth", "leader of 'gtol DetailItem4' lies on the dimension line of 'dim Depth'"),
+    ("line-through-own-text", "note DetailItem7", "line of 'note DetailItem7' runs 2.10mm through its own text"),
+    ("merged-blocks", "note DetailItem8", "'note DetailItem8' and 'note DetailItem11' read as one block"),
+    ("shoulder-crosses-line", "hole-callout RD3", "shoulder of 'hole-callout RD3' crosses 'dim Width'"),
+]
+
+
+def _report_run_with(monkeypatch, tmp_path, finding):
+    """Run the drawing-task audit in REPORT mode on a sheet whose one finding
+    is ``finding``."""
+    import _layout_audit
+
+    monkeypatch.setattr(_layout_audit, "audit_dump", lambda _dump: [finding])
+    _run(_patch_collect(monkeypatch, [_dump()]), LayoutAuditMode.REPORT, tmp_path / "fixture.json")
+
+
+@pytest.mark.parametrize(("kind", "item", "detail"), _ENFORCED_IN_REPORT, ids=[k for k, _i, _d in _ENFORCED_IN_REPORT])
+def test_report_mode_fails_the_leaf_on_each_enforced_kind(monkeypatch, tmp_path, kind, item, detail):
+    """REPORT fails the drawing on every kind the fleet brought to zero,
+    naming the kind and the item, so none can come back unnoticed."""
+    from _layout_geometry import Finding
+
+    finding = Finding(kind=kind, sheet="Sheet1", a=item, b="", detail=detail)
+    with pytest.raises(RuntimeError, match=r"report mode.*\n") as raised:
+        _report_run_with(monkeypatch, tmp_path, finding)
+    assert f"[{kind}]" in str(raised.value)
+    assert item in str(raised.value)
+
+
+def test_report_mode_passes_a_gating_kind_that_is_not_enforced(monkeypatch, tmp_path):
+    """A kind that still fires fleet-wide is reported, not failed, until GATE.
+    Every enforced kind must be a gating kind: a misspelt entry would enforce
+    nothing and read green."""
     from _layout_audit import ENFORCED_KINDS, GATING_KINDS, enforced
     from _layout_geometry import Finding
 
     assert ENFORCED_KINDS <= GATING_KINDS
-    findings = [Finding(kind=kind, sheet="Sheet1", a="a", b="b", detail="") for kind in sorted(GATING_KINDS)]
-    assert [f.kind for f in enforced(LayoutAuditMode.REPORT, findings)] == sorted(ENFORCED_KINDS)
-    assert enforced(LayoutAuditMode.GATE, findings) == findings
+    crossing = Finding(kind="leader-crosses-line", sheet="Sheet1", a="surface-finish DetailItem350", b="", detail="x")
+    _report_run_with(monkeypatch, tmp_path, crossing)
+    assert enforced(LayoutAuditMode.GATE, [crossing]) == [crossing]
 
 
 _ZERO_LINE = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
