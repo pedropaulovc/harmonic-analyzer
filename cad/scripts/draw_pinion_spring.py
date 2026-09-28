@@ -187,9 +187,14 @@ FRONT_ROW_EXTENSION_X = {
 }
 TOP_KEEP = {
     "PadLen": (_front_x(FOOT_END[0] - PAD_LEN / 2.0), TOP_CENTER[1] + 0.021),
-    # Outboard of the hole-edge 4.75 (HOLE_EDGE_TEXT_XY) so the two stack apart.
-    "PadWidth": (_PAD_EAST + 0.030, TOP_CENTER[1]),
-    "StripWidth": (_front_x(_PROFILE_MIN_X) - 0.018, TOP_CENTER[1]),
+    # West, outboard of the hole-edge 4.75 (HOLE_EDGE_TEXT_XY) so the two stack
+    # apart: east, its extension lines (witnessed at the pad's west end) ran the
+    # pad's lower edge under the hole callout's leader (leader-crosses-line).
+    "PadWidth": (_front_x(_PROFILE_MIN_X) - 0.020, TOP_CENTER[1] + 0.0035),
+    # East of the pad: its extension lines are witnessed at the foot end, so
+    # the west placement drew the strip's y=206.8 line through the hole under
+    # the hole callout's leader (leader-crosses-line).
+    "StripWidth": (_PAD_EAST + 0.010, TOP_CENTER[1] + 0.004),
 }
 DETAIL_KEEP = {
     # The flick turns right (east) in this view: the radius leader goes
@@ -204,7 +209,9 @@ DIMENSION_CALLOUTS = {
     "FreeTipH": "FREE, TO TIP",
 }
 HOLE_END_TEXT_XY = (_front_x(FOOT_END[0] - HOLE_FROM_END / 2.0), TOP_CENTER[1] + 0.031)
-HOLE_EDGE_TEXT_XY = (_PAD_EAST + 0.012, TOP_CENTER[1] + 0.004)
+# West of the strip, inboard of PadWidth: east, it boxed the hole in with
+# StripWidth once that moved east (their extension and dimension lines cross).
+HOLE_EDGE_TEXT_XY = (_front_x(_PROFILE_MIN_X) - 0.010, TOP_CENTER[1] - 0.00375)
 # Below the pad: above it the leader crossed the 4.50 and 9.50 pad
 # dimensions on its way down to the hole.  The note centres on this point, so
 # it sits east of the pad, clear of the FREE, TO TIP text below the top view.

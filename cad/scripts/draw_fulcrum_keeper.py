@@ -217,11 +217,15 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="outboard lug face",
     )
+    # Flatness rides the END view's edge-on seat line: in the front view the
+    # seat is boxed in by the PadLen/FootReach extension lines, so any leader
+    # to it crossed them (leader-crosses-line x2).  Attach right of the
+    # ShaftAxisH extension (ends x=224 mm), frame below-right of the view.
     add_feature_control_frame(
         adapter,
-        front,
-        edge_xy=(_front_x(-10.0), SEAT_EDGE_Y),
-        frame_xy=(0.150, 0.084),
+        right,
+        edge_xy=(RIGHT_CENTER[0] + 0.005, SEAT_EDGE_Y),
+        frame_xy=(0.248, 0.088),
         characteristic="flatness",
         tolerance=GEOMETRIC_TOLERANCES_MM["foot seating face flatness"],
         label="seating face flatness",

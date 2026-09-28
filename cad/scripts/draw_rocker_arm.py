@@ -277,9 +277,12 @@ def _pivot_finish_placement() -> tuple[tuple[float, float], tuple[float, float]]
 # its extension line (r743-4D render).
 # The top edge's +0.50/0 height over the pivot axis (Codex #936
 # PRRT_kwDOPHDy386mV3AO) runs up the mirror axis from the pivot centre, its
-# text straight above the strap: right of datum A's box (up-left of the
-# pivot, x < 0.160), left of the rod-pin frame and datum C.
-TOP_ABOVE_PIVOT_TEXT_RISE = 0.010
+# text straight above the strap, left of the rod-pin frame and datum C. It
+# prints LEFT of the axis, so it rides above datum A's box (top y ~0.1905):
+# at a 10 mm rise its rows sat on datum A's 135-degree leader
+# (leader-through-text, 5.12 mm); at 22 mm its underline clears the box by
+# ~2.7 mm.
+TOP_ABOVE_PIVOT_TEXT_RISE = 0.022
 FRONT_KEEP = {
     "PivotDia": (0.130, 0.148),
     "TopAbovePivot": (
@@ -450,7 +453,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge=rod_hole_edge,
-        callout_xy=(0.300, 0.128),
+        # Above the strap, up-left of the hole: from (0.300, 0.128) below it
+        # the leader crossed the rod-pin Y location's pivot-rim extension
+        # line (y 0.1717, leader-crosses-line). The leader now drops ~57 deg
+        # onto the rim from above, >= 3.3 mm off every line bar the landing.
+        callout_xy=(0.216, 0.194),
         label="rod-pin hole",
     )
 
