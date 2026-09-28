@@ -1420,6 +1420,17 @@ async def place_components_batch(
     return out_names
 
 
+def _reads_constrained_status(adapter: Any, component: Any) -> bool:
+    """Whether the DOF gate must read this component's solver-owned
+    ``GetConstrainedStatus``: it is neither fixed nor a pattern instance."""
+    component = _early_bound(component, "IComponent2")
+    if bool(_read_member(component, "IsFixed")):
+        return False
+    return not bool(
+        adapter._attempt(lambda: component.IsPatternInstance(), default=False)
+    )
+
+
 def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> None:
     """Raise when any top-level component is neither fixed, fully defined,
     nor a pattern instance.
@@ -1437,23 +1448,36 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
     # assembly is rebuilt, GetConstrainedStatus returns a STALE swNoSolution
     # (5) for every mated part even though the mates are consistent and the
     # parts have not moved (probed live -- a ForceRebuild3 restores the true
-    # status). Always re-solve before reading the gate.
+    # status). Re-solve before reading any constrained status.
     problems = []
     with _telemetry.span("gate.dof") as gsp:
-        # Re-solve the mate solver before reading the gate (stale-status reason
-        # above). ``resolve=False`` means soundness already performed its single
-        # shared ``verify.rebuild``; do not emit a misleading rebuild span when
-        # this gate only collects components and reads their status.
-        if resolve:
+        asm_h = _early_bound(
+            asm, "IAssemblyDoc"
+        )  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
+
+        def _collect() -> list[Any]:
+            with _telemetry.span("dof.collect_components"):
+                return (
+                    adapter._attempt(lambda: asm_h.GetComponents(True), default=None)
+                    or []
+                )
+
+        components = _collect()
+        # Only GetConstrainedStatus goes stale before a solve; IsFixed and
+        # IsPatternInstance are component properties the solver never writes.
+        # When every top-level component is fixed or a pattern instance (the
+        # top assembly: nine fixed components), no status is read, so the deep
+        # re-solve cannot change the verdict and is skipped -- it measured 133 s
+        # median there, and the component collect after it another 24 s.
+        # ``resolve=False`` means soundness already performed its single shared
+        # ``verify.rebuild``; do not emit a misleading rebuild span then.
+        rebuilt = False
+        if resolve and any(_reads_constrained_status(adapter, c) for c in components):
             with _telemetry.span("dof.rebuild"):
                 adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
-        with _telemetry.span("dof.collect_components"):
-            asm_h = _early_bound(
-                asm, "IAssemblyDoc"
-            )  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
-            components = (
-                adapter._attempt(lambda: asm_h.GetComponents(True), default=None) or []
-            )
+            rebuilt = True
+            components = _collect()
+        gsp.set_attribute("rebuild_skipped", resolve and not rebuilt)
         gsp.set_attribute("components", len(components))
         log(f"checking {len(components)} components for free DOF ...")
         # NO span per component. A span per component floods the trace with one
@@ -2477,6 +2501,67 @@ def rebuild_if_needed_before_save(adapter: Any, label: str, model: Any = None) -
     _telemetry.success(f"solve state already clean before save ({label})")
 
 
+async def _solved_mass_properties(adapter: Any, span: Any) -> Any:
+    """Mass properties of the active model WITHOUT a redundant deep rebuild.
+
+    ``adapter.get_mass_properties()`` opens with ``ForceRebuild3(False)``: a deep
+    rebuild that re-solves every subassembly and regenerates every part (the
+    ``geometry_digest.mass_properties`` span measured median 169 s on the top
+    assembly, 79 s on drive-train, 30 days to 2026-09-27). Every digest caller has
+    already established the solved state it reads -- the full build reopened the
+    reconciled saved artifact, the refresh ran ``final_rebuild_before_save``, a
+    multi-config switch ran ``activate_resolved`` -- so that rebuild re-solved an
+    already-solved model. ``NeedsRebuild2 == 0`` is SolidWorks' own statement
+    that nothing is stale; only then read ``CreateMassProperty`` directly, with
+    the adapter's exact unit conversions so the digest value is unchanged. Any
+    other state (dirty model, no mass-property object) takes the adapter path,
+    rebuild included, exactly as before.
+    """
+    from solidworks_mcp.adapters.base import (
+        AdapterResult,
+        AdapterResultStatus,
+        MassProperties,
+    )
+
+    model = adapter.currentModel
+    status = saved_rebuild_status(adapter, model)
+    span.set_attribute("needs_rebuild", status)
+    mass_props = (
+        adapter._attempt(lambda: model.Extension.CreateMassProperty(), default=None)
+        if status == 0
+        else None
+    )
+    span.set_attribute("rebuild_skipped", mass_props is not None)
+    if mass_props is None:
+        return await adapter.get_mass_properties()
+    com = adapter._attempt(lambda: mass_props.CenterOfMass, default=None)
+    center_of_mass = (
+        [com[0] * 1000, com[1] * 1000, com[2] * 1000]
+        if isinstance(com, (list, tuple)) and len(com) >= 3
+        else [0.0, 0.0, 0.0]
+    )
+    moi = adapter._attempt(lambda: mass_props.GetMomentOfInertia(0), default=None)
+    if not isinstance(moi, (list, tuple)) or len(moi) < 9:
+        moi = [0.0] * 9
+    return AdapterResult(
+        status=AdapterResultStatus.SUCCESS,
+        data=MassProperties(
+            volume=mass_props.Volume * 1e9,
+            surface_area=mass_props.SurfaceArea * 1e6,
+            mass=mass_props.Mass,
+            center_of_mass=center_of_mass,
+            moments_of_inertia={
+                "Ixx": moi[0],
+                "Iyy": moi[4],
+                "Izz": moi[8],
+                "Ixy": moi[1],
+                "Ixz": moi[2],
+                "Iyz": moi[5],
+            },
+        ),
+    )
+
+
 @_telemetry.traced("assembly.geometry_digest", label_param="asm_name")
 async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     """A deterministic fingerprint of an assembly's RESOLVED geometry across every
@@ -2543,8 +2628,8 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
             await activate_resolved(cfg)
         async with _telemetry.aspan(
             "geometry_digest.mass_properties", configuration=cfg
-        ):
-            res = await adapter.get_mass_properties()
+        ) as msp:
+            res = await _solved_mass_properties(adapter, msp)
         if not res.is_success:
             raise RuntimeError(
                 f"{asm_name}: get_mass_properties failed for config {cfg!r}: "

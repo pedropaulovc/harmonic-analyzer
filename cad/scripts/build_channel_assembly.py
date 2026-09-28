@@ -120,6 +120,7 @@ from __future__ import annotations
 import functools
 import math
 import sys
+import time
 from typing import Any, Literal
 
 import _config
@@ -167,7 +168,6 @@ from _cwm import (
     ensure_component_distance_mate_flip,
     external_mate_rows,
     mates_with_owners,
-    put_component_pose,
     resolve_entity,
 )
 from _transforms import (
@@ -1485,10 +1485,36 @@ async def build(adapter) -> dict[str, str]:
     # trace spent 173 s across those repeated pose-drive spans. Re-putting the
     # complete copied bank before each transient driver keeps every still-free
     # chain on its design branch while the current channel is committed.
-    def _put_all_copies() -> None:
-        for rec in copied:
-            for part in CHAIN_PARTS:
-                put_component_pose(adapter, rec["comps"][part], rec["targets"][part])
+    #
+    # Each re-put puts all 18 copies x 4 chain parts, three times per copied
+    # channel. Resolving each put's component (GetComponentByName) and target
+    # transform (GetMathUtility + CreateTransform) on every put cost ~5.1 s per
+    # re-put, 15.4 s of each ~25 s cwm.pose_drive (2026-09-27 trace). The
+    # component set does not change during this phase (only driver MATES are
+    # added and deleted), so resolve both once; each re-put is then the same
+    # Transform2 puts, same order, same values.
+    from solidworks_mcp.adapters.solidworks.assembly import _create_math_transform
+
+    bank_puts: list[tuple[Any, Any]] = []
+    if copied:
+        asm_doc = _early_bound(adapter.currentModel, "IAssemblyDoc")
+        with _telemetry.span(
+            "cwm.resolve_copy_poses", puts=len(copied) * len(CHAIN_PARTS)
+        ):
+            for rec in copied:
+                for part in CHAIN_PARTS:
+                    name = rec["comps"][part]
+                    comp = asm_doc.GetComponentByName(name)
+                    if comp is None:
+                        raise RuntimeError(f"component not found: {name!r}")
+                    xform = _create_math_transform(adapter, list(rec["targets"][part]))
+                    bank_puts.append((comp, xform))
+
+    def _put_all_copies() -> float:
+        t0 = time.perf_counter()
+        for comp, xform in bank_puts:
+            comp.Transform2 = xform
+        return time.perf_counter() - t0
 
     for rec in copied:
         j = rec["j"]
@@ -1509,9 +1535,11 @@ async def build(adapter) -> dict[str, str]:
         pin = slice_info["rod_pin"]
         foot = slice_info["foot"]
         try:
-            with _telemetry.span("cwm.pose_drive", channel=j):
+            with _telemetry.span(
+                "cwm.pose_drive", channel=j, bank_puts=len(bank_puts)
+            ) as pose_span:
                 drives: list[str] = []
-                _put_all_copies()
+                bank_put_s = _put_all_copies()
                 mate = await spin_driver(
                     adapter,
                     component_named_ref(rocker_c, "Axis2"),
@@ -1521,7 +1549,7 @@ async def build(adapter) -> dict[str, str]:
                     verify=(rocker_c, _tgt_mm("rocker-arm")),
                 )
                 drives.append(mate["name"])
-                _put_all_copies()
+                bank_put_s += _put_all_copies()
                 mate = await distance_driver(
                     adapter,
                     component_named_ref(bar_c, "Axis2"),
@@ -1535,7 +1563,7 @@ async def build(adapter) -> dict[str, str]:
                     verify=(bar_c, _tgt_mm("amplitude-bar")),
                 )
                 drives.append(mate["name"])
-                _put_all_copies()
+                bank_put_s += _put_all_copies()
                 if _CWM_DEBUG and j == copied[0]["j"]:
                     seed_comps = seed_by_amp[round(amplitudes[j], 6)][1]
                     for part in CHAIN_PARTS:
@@ -1560,6 +1588,7 @@ async def build(adapter) -> dict[str, str]:
                 drives.append(mate["name"])
                 for name in reversed(drives):
                     delete_assembly_feature(adapter, name)
+                pose_span.set_attribute("bank_put_s", round(bank_put_s, 3))
         except Exception:
             if _CWM_DEBUG:
                 for part in CHAIN_PARTS:
