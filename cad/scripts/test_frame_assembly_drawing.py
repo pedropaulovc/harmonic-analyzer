@@ -37,6 +37,7 @@ def test_frame_package_bom_identifies_all_29_released_components() -> None:
 # the SolidWorks 2026 type library gives each member (flags 1 = method,
 # 2 = property get; 9 = IDispatch, 12 = VARIANT).
 
+import math  # noqa: E402
 from types import SimpleNamespace  # noqa: E402
 
 import pytest  # noqa: E402
@@ -226,3 +227,155 @@ def test_top_casting_pick_takes_the_rightmost_edge_long_on_the_sheet(monkeypatch
     assert (casting.reads, edgeless.reads) == (1, 0)
     assert projection.reads(MODEL_TO_VIEW_TRANSFORM) == 1
     assert projection.created == 8  # two ends of each of the four lines
+
+
+# Short-leader balloons: a drawing window whose GetDisplayData ring depends on
+# the viewport. Fit to the sheet a pixel is 0.94 mm on a 640-high seat window
+# and 0.68 mm on an 820-high one (swmaker000005/7/8 vs 000004/6); zoomed onto
+# the 24 mm square it is 24 mm over the window height.
+_FIT_PIXEL_M = {640: 0.00094, 820: 0.00068}
+_ARROWTIP = (0.1511, 0.2664)
+_OFFSET = (0.008, 0.016)
+_TARGET = (_ARROWTIP[0] + _OFFSET[0], _ARROWTIP[1] + _OFFSET[1])
+_RING_R = 0.00475
+
+
+class _Window:
+    """``adapter.currentModel``: the zoom state, and what ran under which."""
+
+    def __init__(self, window_px: int, *, fit_drift_px: float, fault: str | None = None):
+        self.window_px = window_px
+        self.fit_drift_px = fit_drift_px
+        self.fault = fault
+        self.span: float | None = None  # None: fit to the sheet
+        self.log: list[tuple[str, float | None]] = []
+
+    def pixel(self) -> float:
+        return _FIT_PIXEL_M[self.window_px] if self.span is None else self.span / self.window_px
+
+    def ViewZoomTo2(self, x1, y1, _z1, x2, _y2, _z2):  # noqa: N802
+        self.span = x2 - x1
+        self.log.append(("zoom", self.span))
+        if self.fault == "zoom":
+            raise RuntimeError("ViewZoomTo2 moved the view, then failed")
+
+    def ViewZoomtofit2(self):  # noqa: N802
+        self.span = None
+        self.log.append(("fit", None))
+
+    def GraphicsRedraw2(self):  # noqa: N802
+        pass
+
+    def EditRebuild3(self):  # noqa: N802
+        self.log.append(("rebuild", self.span))
+
+
+class _ShortBalloon:
+    """One balloon: note, annotation and its single attached edge."""
+
+    def __init__(self):
+        self.entity = object()
+        self.centre = (_ARROWTIP[0] - 0.010, _ARROWTIP[1] + 0.005)
+
+    def GetAnnotation(self):  # noqa: N802
+        return self
+
+    def GetSpecificAnnotation(self):  # noqa: N802
+        return self
+
+    def GetAttachedEntities3(self):  # noqa: N802
+        return (self.entity,)
+
+
+def _short_balloon_rig(monkeypatch, window: _Window):
+    balloon = _ShortBalloon()
+    placed_at: list[tuple[tuple[float, float], float | None]] = []
+    events: dict[str, dict] = {}
+
+    def position(_adapter, notes, *, item_number, position_xy, label):
+        assert notes == [balloon] and item_number == "5"
+        placed_at.append((tuple(position_xy), window.span))
+        if window.fault == "position":
+            raise RuntimeError("SetPosition failed")
+        balloon.centre = tuple(position_xy)
+
+    def readback(_adapter, annotation, entity, item):
+        assert annotation is balloon and entity is balloon.entity and item == "5"
+        pixel = window.pixel()
+        drift = window.fit_drift_px * pixel if window.span is None else 0.0
+        centre = (balloon.centre[0] + drift, balloon.centre[1] + drift)
+        angle = math.atan2(_ARROWTIP[1] - centre[1], _ARROWTIP[0] - centre[0])
+        start = (centre[0] + _RING_R * math.cos(angle), centre[1] + _RING_R * math.sin(angle))
+        window.log.append(("read", window.span))
+        return {
+            "failed_checks": [],
+            "actual_leader_points": (*start, 0.0, *_ARROWTIP, 0.0),
+            "rendered_circle": (*centre, _RING_R),
+            "viewport_pixel_bounds_m": (pixel, pixel),
+        }
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "position_bom_balloon", position)
+    monkeypatch.setattr(drawing, "_frame_balloon_binding_readback", readback)
+    monkeypatch.setattr(
+        drawing._telemetry, "event", lambda name, **attrs: events.__setitem__(name, attrs)
+    )
+    adapter = SimpleNamespace(currentModel=window)
+    view = SimpleNamespace(UpdateViewDisplayGeometry=lambda: None)
+
+    def run():
+        drawing._short_frame_balloon(adapter, view, balloon, "5", _OFFSET)
+
+    return run, placed_at, events
+
+
+def test_short_balloon_places_zoomed_on_both_windows_and_checks_the_rebuilt_fit(
+    monkeypatch,
+) -> None:
+    """The ring is placed where a pixel is tens of microns on either seat, so
+    both windows ask SetPosition for the same point; the read that decides is
+    then taken back at fit after the rebuild, the state the export prints."""
+    placements = []
+    for window_px in (640, 820):
+        window = _Window(window_px, fit_drift_px=0.5)
+        run, placed_at, events = _short_balloon_rig(monkeypatch, window)
+        run()
+        [(position_xy, span)] = placed_at
+        assert span == pytest.approx(2 * drawing._SHORT_BALLOON_ZOOM_HALF)
+        assert window.log[-3:] == [("fit", None), ("rebuild", None), ("read", None)]
+        final = events["drawing.frame_short_balloon"]
+        assert final["failed_checks"] == []
+        assert final["after"]["viewport_pixel_bounds_m"][0] == _FIT_PIXEL_M[window_px]
+        placements.append(position_xy)
+    assert placements[0] == placements[1] == pytest.approx(_TARGET)
+
+
+@pytest.mark.parametrize("window_px", [640, 820])
+def test_short_balloon_fails_when_the_rebuilt_fit_read_leaves_its_target(
+    monkeypatch, window_px
+) -> None:
+    """A zoomed read on target proves nothing about fit: GetDisplayData moves
+    with the viewport. Two fit pixels off, the leaf fails, with the view
+    back at fit."""
+    window = _Window(window_px, fit_drift_px=2.0)
+    run, _placed_at, events = _short_balloon_rig(monkeypatch, window)
+    with pytest.raises(RuntimeError, match="frame balloon 5 short placement failed"):
+        run()
+    assert events["drawing.frame_short_balloon"]["failed_checks"] == ["fit:circle_position"]
+    assert window.span is None
+
+
+@pytest.mark.parametrize("fault", ["zoom", "position"])
+def test_short_balloon_restores_fit_when_zooming_or_positioning_fails(
+    monkeypatch, fault
+) -> None:
+    """ViewZoomTo2 can move the view and then raise; SetPosition can raise
+    zoomed. Either way the error is the one raised and the window is left at
+    fit, the zoom every later pick and the export assume."""
+    window = _Window(640, fit_drift_px=0.0, fault=fault)
+    run, placed_at, _events = _short_balloon_rig(monkeypatch, window)
+    message = "ViewZoomTo2 moved the view" if fault == "zoom" else "SetPosition failed"
+    with pytest.raises(RuntimeError, match=message):
+        run()
+    assert window.span is None and window.log[-1] == ("fit", None)
+    assert len(placed_at) == (fault == "position")

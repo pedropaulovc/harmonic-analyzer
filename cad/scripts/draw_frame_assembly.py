@@ -1065,9 +1065,47 @@ def _bind_frame_balloon(
 _SHORT_BALLOON_ZOOM_HALF = 0.012
 
 
+def _short_balloon_failures(
+    state: dict[str, Any], target: tuple[float, float]
+) -> list[str]:
+    """What one read of a short-leader balloon breaks, within that read's pixel."""
+    failures = list(state["failed_checks"])
+    leader = state["actual_leader_points"]
+    length = sum(
+        math.hypot(
+            leader[index + 3] - leader[index], leader[index + 4] - leader[index + 1]
+        )
+        for index in range(0, len(leader) - 3, 3)
+    )
+    state["length_m"] = length
+    if length > 0.030:
+        failures.append("leader_length")
+    circle = state["rendered_circle"]
+    pixel = state["viewport_pixel_bounds_m"]
+    if any(abs(circle[index] - target[index]) > pixel[index] for index in range(2)):
+        failures.append("circle_position")
+    # The leader leaves the ring: its start sits on the rendered ring, and no
+    # point of it lies inside the ring by more than a pixel.
+    if len(leader) >= 6 and any(
+        math.hypot(leader[index] - circle[0], leader[index + 1] - circle[1])
+        < circle[2] - max(pixel)
+        for index in range(0, len(leader), 3)
+    ):
+        failures.append("leader_inside_ring")
+    return failures
+
+
 def _short_frame_balloon(
     adapter: Any, view: Any, note: Any, item: str, offset: tuple[float, float]
 ) -> None:
+    """Give frame balloon ``item`` a short leader ``offset`` from its arrowtip.
+
+    The ring is placed zoomed onto its target (:data:`_SHORT_BALLOON_ZOOM_HALF`)
+    and read back there, then read again after the window is back at fit and
+    the drawing rebuilt: the state the export starts from. GetDisplayData
+    moves with the viewport, so the zoomed read alone does not prove it. Both
+    reads must hold, each within its own pixel; the leaf fails otherwise.
+    """
     note = _early_bound(note, "INote")
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     view.UpdateViewDisplayGeometry()
@@ -1094,22 +1132,15 @@ def _short_frame_balloon(
         annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
         view.UpdateViewDisplayGeometry()
         adapter.currentModel.GraphicsRedraw2()
-        after = _frame_balloon_binding_readback(adapter, annotation, entity, item)
-    leader = after["actual_leader_points"]
-    length = sum(
-        math.hypot(
-            leader[index + 3] - leader[index], leader[index + 4] - leader[index + 1]
-        )
-        for index in range(0, len(leader) - 3, 3)
-    )
-    failures = list(after["failed_checks"])
-    if length > 0.030:
-        failures.append("leader_length")
-    circle = after["rendered_circle"]
-    if any(abs(circle[index] - target[index]) > after["viewport_pixel_bounds_m"][index] for index in range(2)):
-        failures.append("circle_position")
-    state = {"before": before, "after": after, "target_circle": target,
-             "length_m": length, "failed_checks": failures}
+        placed = _frame_balloon_binding_readback(adapter, annotation, entity, item)
+    adapter.currentModel.EditRebuild3()
+    view.UpdateViewDisplayGeometry()
+    adapter.currentModel.GraphicsRedraw2()
+    after = _frame_balloon_binding_readback(adapter, annotation, entity, item)
+    failures = [f"zoomed:{name}" for name in _short_balloon_failures(placed, target)]
+    failures += [f"fit:{name}" for name in _short_balloon_failures(after, target)]
+    state = {"before": before, "placed": placed, "after": after, "target_circle": target,
+             "failed_checks": failures}
     _telemetry.event("drawing.frame_short_balloon", item=item, **state)
     if failures:
         raise RuntimeError(f"frame balloon {item} short placement failed: {state!r}")
